@@ -34,8 +34,8 @@ static Vec3f N_editor_push_op_vec3(Object* obj, int op_type, FLOAT4 original, FL
 		EditOperationValue eov = gSelectedEditorMode->PushEditOperation(EditOperation {
 			.Type = static_cast<EditOperation::eType>(op_type),
 			.pObject = obj,
-			.Original = EditOperationValue(Vec3f(original)),
-			.Updated = EditOperationValue(Vec3f(updated)),
+			.ValueA = EditOperationValue(Vec3f(original)),
+			.ValueB = EditOperationValue(Vec3f(updated)),
 			.GroupSize = group_size,
 		});
 
@@ -55,8 +55,25 @@ static Object* N_editor_push_op_object(Object* obj, int op_type, Object* origina
 		EditOperationValue eov = gSelectedEditorMode->PushEditOperation(EditOperation {
 			.Type = static_cast<EditOperation::eType>(op_type),
 			.pObject = obj,
-			.Original = EditOperationValue(original),
-			.Updated = EditOperationValue(updated),
+			.ValueA = EditOperationValue(original),
+			.ValueB = EditOperationValue(updated),
+			.GroupSize = group_size,
+		});
+
+		return eov.pObject;
+	}
+
+	return nullptr;
+}
+
+static Object* N_editor_op_create_object(FLOAT4 position, int32 group_size)
+{
+	if (gSelectedEditorMode) {
+		EditOperationValue eov = gSelectedEditorMode->PushEditOperation(EditOperation {
+			.Type = EditOperation::eType::Create,
+			.pObject = nullptr,
+			.ValueA = EditOperationValue(Vec3f(position)),
+			.ValueB = EditOperationValue(nullptr),
 			.GroupSize = group_size,
 		});
 
@@ -238,6 +255,7 @@ static const PredefExtern scAvailableExterns[] = {
 
 	PREDEF("editor_push_op_vec", N_editor_push_op_vec3),
 	PREDEF("editor_push_op_obj", N_editor_push_op_object),
+	PREDEF("editor_op_create_object", N_editor_op_create_object),
 
 	PREDEF("OBJECT_move_to", N_object_move_to),
 	PREDEF("OBJECT_move_by", N_object_move_by),

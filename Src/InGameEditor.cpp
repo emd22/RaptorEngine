@@ -17,68 +17,87 @@ EditOperationValue EditOperation::Execute()
 {
 	switch (Type) {
 	case eType::Move: {
-		Assert(Original.Type == EditOperationValue::eValueType::Vec3);
-		Assert(Updated.Type == EditOperationValue::eValueType::Vec3);
+		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
+		Assert(ValueB.Type == EditOperationValue::eValueType::Vec3);
 		Assert(pObject != nullptr);
 
-		pObject->SetPosition(Updated.Position);
+		pObject->SetPosition(ValueB.Position);
 
-		return Updated;
+		return ValueB;
 	}
 	case eType::Scale: {
-		Assert(Original.Type == EditOperationValue::eValueType::Vec3);
-		Assert(Updated.Type == EditOperationValue::eValueType::Vec3);
+		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
+		Assert(ValueB.Type == EditOperationValue::eValueType::Vec3);
 		Assert(pObject != nullptr);
 
-		gWorld->pBlockout->ScaleInDirection(pObject, Original.Position, Updated.Position);
+		gWorld->pBlockout->ScaleInDirection(pObject, ValueA.Position, ValueB.Position);
 
 		break;
 	}
-	case eType::DupeObject: {
-		Assert(Original.Type == EditOperationValue::eValueType::Object);
-		Assert(Updated.Type == EditOperationValue::eValueType::Object);
+	case eType::Dupe: {
+		Assert(ValueA.Type == EditOperationValue::eValueType::Object);
+		Assert(ValueB.Type == EditOperationValue::eValueType::Object);
 		Assert(pObject != nullptr);
 
-		Updated.Set(gWorld->pBlockout->DupeObject(pObject));
+		ValueB.Set(gWorld->pBlockout->DupeObject(pObject));
 
-		return Updated;
+		return ValueB;
+	}
+	case eType::Create: {
+		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
+
+		pObject = (gWorld->pBlockout->NewObject(ValueA.Position));
+
+		return EditOperationValue(pObject);
 	}
 	}
 
-	return Updated;
+	return ValueB;
 }
 
 void EditOperation::Undo()
 {
 	switch (Type) {
 	case eType::Move: {
-		Assert(Original.Type == EditOperationValue::eValueType::Vec3);
-		Assert(Updated.Type == EditOperationValue::eValueType::Vec3);
+		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
+		Assert(ValueB.Type == EditOperationValue::eValueType::Vec3);
 		Assert(pObject != nullptr);
 
-		pObject->SetPosition(Original.Position);
+		pObject->SetPosition(ValueA.Position);
 
 		break;
 	}
 	case eType::Scale: {
-		Assert(Original.Type == EditOperationValue::eValueType::Vec3);
-		Assert(Updated.Type == EditOperationValue::eValueType::Vec3);
+		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
+		Assert(ValueB.Type == EditOperationValue::eValueType::Vec3);
 		Assert(pObject != nullptr);
 
-		gWorld->pBlockout->ScaleInDirection(pObject, Original.Position, -Updated.Position);
+		gWorld->pBlockout->ScaleInDirection(pObject, ValueA.Position, -ValueB.Position);
 		gWorld->pBlockout->RebuildObject(pObject);
 
 		break;
 	}
-	case eType::DupeObject: {
-		Assert(Original.Type == EditOperationValue::eValueType::Object);
-		Assert(Updated.Type == EditOperationValue::eValueType::Object);
+	case eType::Dupe: {
+		Assert(ValueA.Type == EditOperationValue::eValueType::Object);
+		Assert(ValueB.Type == EditOperationValue::eValueType::Object);
 
 		Assert(pObject != nullptr);
-		Assert(Updated.pObject != nullptr);
+		Assert(ValueB.pObject != nullptr);
 
-		gWorld->pBlockout->DestroyObject(Updated.pObject);
+		gWorld->pBlockout->DestroyObject(ValueB.pObject);
 
+		gSelectedEditorMode->SelectObject(nullptr, false);
+
+		break;
+	}
+	case eType::Create: {
+		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
+
+		if (!pObject) {
+			return;
+		}
+
+		gWorld->pBlockout->DestroyObject(pObject);
 		gSelectedEditorMode->SelectObject(nullptr, false);
 
 		break;
@@ -211,8 +230,8 @@ bool EditorMode::SelectObject(Object* object, bool append_selection)
 		return true;
 	}
 
-	// If we aren't appending to the selection (overwrite selection), then we need to reset the previous selection's
-	// materials
+	// If we aren't appending to the selection (overwrite selection), then we need to reset the previous
+	// selection's materials
 	if (append_selection == false) {
 		for (SelectedObject& selected_obj : mSelectedObjects) {
 			if (selected_obj.pObject == nullptr) {

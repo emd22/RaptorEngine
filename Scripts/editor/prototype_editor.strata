@@ -236,7 +236,10 @@ void editor_handle_controls()
 		/* Create a new blockout object */
 		if (KEY.K_K.is_pressed()) {
 			float3 origin = player.ray_get_point(20.0f);
-			OBJECT new_obj = blockout_new_object(editor_transform_snap(origin));
+			// OBJECT new_obj = blockout_new_object(editor_transform_snap(origin));
+
+			OBJECT new_obj = editor_op_create_object(origin, 1);
+
 			editor_select_object(new_obj, true, false);
 		}
 
