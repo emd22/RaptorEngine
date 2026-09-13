@@ -3,11 +3,35 @@
 #include <Blockout.hpp>
 #include <Controls.hpp>
 #include <Engine.hpp>
+#include <Object/ObjectManager.hpp>
 #include <Script/ScriptManager.hpp>
 #include <World.hpp>
 
 namespace fx {
 
+/// Returns the op's object only if it is still alive (guards against use-after-free
+/// when an object was destroyed outside of undo/redo).
+static Object* ResolveOpTarget(const EditOperation& op)
+{
+	if (op.pObject == nullptr || op.PushedObjectID.IsInvalid()) {
+		return nullptr;
+	}
+
+	Object* live = gObjectManager->GetObject(op.PushedObjectID);
+	return (live == op.pObject) ? live : nullptr;
+}
+
+/// Returns the op's `ValueB` object only if it is still alive (Dupe results).
+static Object* ResolveOpValue(const EditOperation& op)
+{
+	if (op.ValueB.Type != EditOperationValue::eValueType::Object || op.ValueB.pObject == nullptr ||
+		op.ValueObjectID.IsInvalid()) {
+		return nullptr;
+	}
+
+	Object* live = gObjectManager->GetObject(op.ValueObjectID);
+	return (live == op.ValueB.pObject) ? live : nullptr;
+}
 
 /////////////////////////////////////
 // Edit Operations
@@ -19,27 +43,52 @@ EditOperationValue EditOperation::Execute()
 	case eType::Move: {
 		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
 		Assert(ValueB.Type == EditOperationValue::eValueType::Vec3);
-		Assert(pObject != nullptr);
 
-		pObject->SetPosition(ValueB.Position);
+		Object* target = ResolveOpTarget(*this);
+		if (target == nullptr) {
+			break;
+		}
+
+		target->SetPosition(ValueB.Position);
 
 		return ValueB;
 	}
 	case eType::Scale: {
 		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
 		Assert(ValueB.Type == EditOperationValue::eValueType::Vec3);
-		Assert(pObject != nullptr);
 
-		gWorld->pBlockout->ScaleInDirection(pObject, ValueA.Position, ValueB.Position);
+		Object* target = ResolveOpTarget(*this);
+		if (target == nullptr) {
+			break;
+		}
+
+		gWorld->pBlockout->ScaleInDirection(target, ValueA.Position, ValueB.Position);
+		gWorld->pBlockout->RebuildObject(target);
 
 		break;
 	}
 	case eType::Dupe: {
 		Assert(ValueA.Type == EditOperationValue::eValueType::Object);
 		Assert(ValueB.Type == EditOperationValue::eValueType::Object);
-		Assert(pObject != nullptr);
 
-		ValueB.Set(gWorld->pBlockout->DupeObject(pObject));
+		Object* source = ResolveOpTarget(*this);
+		if (source == nullptr) {
+			break;
+		}
+
+		Object* dupe = gWorld->pBlockout->DupeObject(source);
+		if (dupe == nullptr) {
+			break;
+		}
+
+		// DupeObject copies the source's *current* material, which is the selection
+		// material while selected. Restore the original so dupes don't inherit it.
+		if (gSelectedEditorMode != nullptr) {
+			dupe->SetMaterial(gSelectedEditorMode->GetStoredMaterial(source));
+		}
+
+		ValueB.Set(dupe);
+		ValueObjectID = dupe->ID;
 
 		return ValueB;
 	}
@@ -47,8 +96,23 @@ EditOperationValue EditOperation::Execute()
 		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
 
 		pObject = (gWorld->pBlockout->NewObject(ValueA.Position));
+		PushedObjectID = (pObject != nullptr) ? pObject->ID : ObjectID::scNull;
 
 		return EditOperationValue(pObject);
+	}
+	case eType::Delete: {
+		Object* target = ResolveOpTarget(*this);
+		if (target == nullptr) {
+			break;
+		}
+
+		if (gSelectedEditorMode != nullptr) {
+			gSelectedEditorMode->RemoveFromSelectionInternal(target);
+		}
+
+		gWorld->pBlockout->DestroyObject(target);
+
+		break;
 	}
 	}
 
@@ -61,19 +125,27 @@ void EditOperation::Undo()
 	case eType::Move: {
 		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
 		Assert(ValueB.Type == EditOperationValue::eValueType::Vec3);
-		Assert(pObject != nullptr);
 
-		pObject->SetPosition(ValueA.Position);
+		Object* target = ResolveOpTarget(*this);
+		if (target == nullptr) {
+			break;
+		}
+
+		target->SetPosition(ValueA.Position);
 
 		break;
 	}
 	case eType::Scale: {
 		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
 		Assert(ValueB.Type == EditOperationValue::eValueType::Vec3);
-		Assert(pObject != nullptr);
 
-		gWorld->pBlockout->ScaleInDirection(pObject, ValueA.Position, -ValueB.Position);
-		gWorld->pBlockout->RebuildObject(pObject);
+		Object* target = ResolveOpTarget(*this);
+		if (target == nullptr) {
+			break;
+		}
+
+		gWorld->pBlockout->ScaleInDirection(target, ValueA.Position, -ValueB.Position);
+		gWorld->pBlockout->RebuildObject(target);
 
 		break;
 	}
@@ -81,24 +153,56 @@ void EditOperation::Undo()
 		Assert(ValueA.Type == EditOperationValue::eValueType::Object);
 		Assert(ValueB.Type == EditOperationValue::eValueType::Object);
 
-		Assert(pObject != nullptr);
-		Assert(ValueB.pObject != nullptr);
+		Object* dupe = ResolveOpValue(*this);
+		if (dupe == nullptr) {
+			break;
+		}
 
-		gWorld->pBlockout->DestroyObject(ValueB.pObject);
+		if (gSelectedEditorMode != nullptr) {
+			gSelectedEditorMode->RemoveFromSelectionInternal(dupe);
+		}
 
-		gSelectedEditorMode->SelectObject(nullptr, false);
+		gWorld->pBlockout->DestroyObject(dupe);
+
+		ValueB.Set(nullptr);
+		ValueObjectID = ObjectID::scNull;
 
 		break;
 	}
 	case eType::Create: {
 		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
 
-		if (!pObject) {
-			return;
+		Object* created = ResolveOpTarget(*this);
+		if (created == nullptr) {
+			break;
 		}
 
-		gWorld->pBlockout->DestroyObject(pObject);
-		gSelectedEditorMode->SelectObject(nullptr, false);
+		if (gSelectedEditorMode != nullptr) {
+			gSelectedEditorMode->RemoveFromSelectionInternal(created);
+		}
+
+		gWorld->pBlockout->DestroyObject(created);
+
+		pObject = nullptr;
+		PushedObjectID = ObjectID::scNull;
+
+		break;
+	}
+	case eType::Delete: {
+		if (gWorld->pBlockout == nullptr) {
+			break;
+		}
+
+		Object* restored = gWorld->pBlockout->RestoreObject(DeleteSnapshot.Position, DeleteSnapshot.BoundsMin,
+															DeleteSnapshot.BoundsMax, DeleteSnapshot.Material,
+															DeleteSnapshot.Rotation, DeleteSnapshot.ObjectName);
+
+		if (restored == nullptr) {
+			break;
+		}
+
+		pObject = restored;
+		PushedObjectID = restored->ID;
 
 		break;
 	}
@@ -137,64 +241,244 @@ void EditorMode::Update(const Vec3f& movement_vector, float32 delta_time)
 
 void EditorMode::Undo()
 {
-	EditOperation* op = mOperationStack.Last();
-	if (op == nullptr) {
+	EditOperation* first = mOperationStack.Last();
+	if (first == nullptr) {
 		return;
 	}
 
-	op->Undo();
-
-	if (!mOperationStack.DoUndo()) {
-		return;
+	// Clamp corrupt group sizes so one bad op can't unwind the whole stack.
+	int32 group_size = first->GroupSize;
+	if (group_size < 1) {
+		group_size = 1;
 	}
 
-	int32 group_size = op->GroupSize - 1;
+	bool selection_changed = false;
 
+	// Pop the index first (matching Redo's DoRedo-then-apply order) so a failure
+	// to apply can't desync the stack pointer from what was already mutated.
 	for (int i = 0; i < group_size; i++) {
-		op = mOperationStack.Last();
+		EditOperation* op = mOperationStack.Last();
 		if (op == nullptr) {
-			return;
+			break;
+		}
+
+		EditOperation::eType type = op->Type;
+		Object* undo_target = nullptr;
+
+		// Capture pre-undo state needed for selection fixups.
+		if (type == EditOperation::eType::Dupe) {
+			undo_target = ResolveOpValue(*op);
+		}
+		else if (type == EditOperation::eType::Create) {
+			undo_target = ResolveOpTarget(*op);
+		}
+
+		if (!mOperationStack.DoUndo()) {
+			break;
 		}
 
 		op->Undo();
 
-		if (!mOperationStack.DoUndo()) {
-			return;
+		// Selection fixups (C++-only; script is resynced once below).
+		if (type == EditOperation::eType::Dupe) {
+			if (undo_target != nullptr) {
+				RemoveFromSelectionInternal(undo_target);
+			}
+			Object* original = (op->pObject != nullptr && !op->PushedObjectID.IsInvalid() &&
+								gObjectManager->GetObject(op->PushedObjectID) == op->pObject)
+								   ? op->pObject
+								   : nullptr;
+			if (original != nullptr) {
+				AddToSelectionInternal(original);
+			}
+			selection_changed = true;
 		}
+		else if (type == EditOperation::eType::Create) {
+			if (undo_target != nullptr) {
+				RemoveFromSelectionInternal(undo_target);
+			}
+			selection_changed = true;
+		}
+		else if (type == EditOperation::eType::Delete) {
+			if (op->pObject != nullptr) {
+				AddToSelectionInternal(op->pObject);
+			}
+			selection_changed = true;
+		}
+	}
+
+	if (selection_changed) {
+		SyncScriptSelection();
 	}
 }
 
 
 void EditorMode::Redo()
 {
-	EditOperation* op = mOperationStack.DoRedo();
-	if (op == nullptr) {
-		return;
-	}
+	// Peek group size without consuming: DoRedo advances the pointer, so read the
+	// first redo slot's size via a speculative redo/undo round-trip is overkill;
+	// instead consume one op at a time and follow its group count.
+	bool started = false;
+	int32 group_size = 0;
+	bool selection_changed = false;
 
-	op->Execute();
-
-	int32 group_size = op->GroupSize - 1;
-
-	for (int i = 0; i < group_size; i++) {
-		op = mOperationStack.DoRedo();
+	while (true) {
+		EditOperation* op = mOperationStack.DoRedo();
 		if (op == nullptr) {
-			return;
+			break;
 		}
 
-		op->Execute();
+		if (!started) {
+			group_size = op->GroupSize;
+			if (group_size < 1) {
+				group_size = 1;
+			}
+			started = true;
+		}
+
+		EditOperation::eType type = op->Type;
+		Object* redo_target = nullptr;
+		if (type == EditOperation::eType::Delete) {
+			redo_target = ResolveOpTarget(*op);
+		}
+		else if (type == EditOperation::eType::Dupe) {
+			redo_target = ResolveOpTarget(*op);
+		}
+
+		EditOperationValue result = op->Execute();
+
+		if (type == EditOperation::eType::Dupe) {
+			if (redo_target != nullptr) {
+				RemoveFromSelectionInternal(redo_target);
+			}
+			if (result.Type == EditOperationValue::eValueType::Object && result.pObject != nullptr) {
+				AddToSelectionInternal(result.pObject);
+			}
+			selection_changed = true;
+		}
+		else if (type == EditOperation::eType::Create) {
+			if (result.Type == EditOperationValue::eValueType::Object && result.pObject != nullptr) {
+				AddToSelectionInternal(result.pObject);
+			}
+			selection_changed = true;
+		}
+		else if (type == EditOperation::eType::Delete) {
+			if (redo_target != nullptr) {
+				RemoveFromSelectionInternal(redo_target);
+			}
+			selection_changed = true;
+		}
+
+		if (--group_size <= 0) {
+			break;
+		}
+	}
+
+	if (selection_changed) {
+		SyncScriptSelection();
 	}
 }
 
 
 EditOperationValue EditorMode::PushEditOperation(const EditOperation& op)
 {
-	mOperationStack.Push(op);
+	// Evict oldest *whole groups* first so Undo never observes a split group.
+	// (UndoStack::Push would otherwise drop a single op off the front.)
+	uint32 capacity = mOperationStack.GetCapacity();
+	while (capacity > 0 && mOperationStack.GetSize() >= capacity) {
+		EditOperation& oldest = mOperationStack.First();
+		int32 evict = oldest.GroupSize;
+		if (evict < 1) {
+			evict = 1;
+		}
+		uint32 size = mOperationStack.GetSize();
+		if ((uint32)evict > size) {
+			evict = (int32)size;
+		}
+		for (int32 i = 0; i < evict; i++) {
+			mOperationStack.PopFront();
+		}
+	}
+
+	EditOperation stamped = op;
+	if (stamped.pObject != nullptr && stamped.PushedObjectID.IsInvalid()) {
+		stamped.PushedObjectID = stamped.pObject->ID;
+	}
+	if (stamped.ValueB.Type == EditOperationValue::eValueType::Object && stamped.ValueB.pObject != nullptr &&
+		stamped.ValueObjectID.IsInvalid()) {
+		stamped.ValueObjectID = stamped.ValueB.pObject->ID;
+	}
+
+	mOperationStack.Push(stamped);
 
 	EditOperation* p_op = mOperationStack.Last();
 	Assert(p_op != nullptr);
 
 	return p_op->Execute();
+}
+
+MaterialID EditorMode::GetStoredMaterial(Object* object)
+{
+	if (object != nullptr) {
+		for (SelectedObject& selected_obj : mSelectedObjects) {
+			if (selected_obj.pObject == object) {
+				return selected_obj.OldMaterial;
+			}
+		}
+		return object->GetMaterialID();
+	}
+
+	return MaterialID::scNull;
+}
+
+void EditorMode::AddToSelectionInternal(Object* object)
+{
+	if (object == nullptr || IsInSelection(object)) {
+		return;
+	}
+
+	if (mSelectedObjects.Size >= scLimitSelectionObjects) {
+		return;
+	}
+
+	mSelectedObjects.Insert(SelectedObject { .pObject = object, .OldMaterial = object->GetMaterialID() });
+	object->SetMaterial(gWorld->pBlockout->SelectionMaterialID);
+}
+
+void EditorMode::RemoveFromSelectionInternal(Object* object)
+{
+	if (object == nullptr) {
+		return;
+	}
+
+	for (uint32 i = 0; i < mSelectedObjects.Size; i++) {
+		if (mSelectedObjects[i].pObject == object) {
+			object->SetMaterial(mSelectedObjects[i].OldMaterial);
+			mSelectedObjects[i] = mSelectedObjects[mSelectedObjects.Size - 1];
+			mSelectedObjects.Size--;
+			return;
+		}
+	}
+}
+
+void EditorMode::SyncScriptSelection()
+{
+	if (pScript == nullptr) {
+		return;
+	}
+
+	auto mode_select_object = pScript->GetFunction<void (*)(void*, bool, bool)>("_internal_editor_select_object");
+	if (!mode_select_object) {
+		return;
+	}
+
+	mode_select_object(nullptr, false, false);
+	for (SelectedObject& selected_obj : mSelectedObjects) {
+		if (selected_obj.pObject == nullptr) {
+			continue;
+		}
+		mode_select_object(reinterpret_cast<void*>(selected_obj.pObject), true, true);
+	}
 }
 
 

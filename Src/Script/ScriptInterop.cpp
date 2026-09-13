@@ -83,6 +83,31 @@ static Object* N_editor_op_create_object(FLOAT4 position, int32 group_size)
 	return nullptr;
 }
 
+static void N_editor_push_op_delete(Object* obj, int32 group_size)
+{
+	if (obj == nullptr || gSelectedEditorMode == nullptr) {
+		return;
+	}
+
+	// Snapshot everything Undo needs before the Execute step destroys the object.
+	EditOperation op {
+		.Type = EditOperation::eType::Delete,
+		.pObject = obj,
+		.ValueA = EditOperationValue(Vec3f::sZero),
+		.ValueB = EditOperationValue(Vec3f::sZero),
+		.GroupSize = group_size,
+	};
+	op.PushedObjectID = obj->ID;
+	op.DeleteSnapshot.Position = obj->GetPosition();
+	op.DeleteSnapshot.BoundsMin = obj->Bounds.Min;
+	op.DeleteSnapshot.BoundsMax = obj->Bounds.Max;
+	op.DeleteSnapshot.Material = gSelectedEditorMode->GetStoredMaterial(obj);
+	op.DeleteSnapshot.Rotation = obj->mRotation;
+	op.DeleteSnapshot.ObjectName = obj->Name;
+
+	gSelectedEditorMode->PushEditOperation(op);
+}
+
 
 static void N_object_move_to(Object* obj, FLOAT4 position)
 {
@@ -255,6 +280,7 @@ static const PredefExtern scAvailableExterns[] = {
 
 	PREDEF("editor_push_op_vec", N_editor_push_op_vec3),
 	PREDEF("editor_push_op_obj", N_editor_push_op_object),
+	PREDEF("editor_push_op_delete", N_editor_push_op_delete),
 	PREDEF("editor_op_create_object", N_editor_op_create_object),
 
 	PREDEF("OBJECT_move_to", N_object_move_to),

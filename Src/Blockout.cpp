@@ -537,6 +537,70 @@ Object* Blockout::DupeObject(Object* object)
 	return dupe;
 }
 
+Object* Blockout::RestoreObject(const Vec3f& position, const Vec3f& bounds_min, const Vec3f& bounds_max,
+								MaterialID material, const Quat& rotation, const Name& name)
+{
+	std::string base_name = name.Get().empty() ? String::Fmt("{}", BlockoutObjects.Size).Str() : name.Get();
+
+	// The original name may have been reused since the delete; keep names unique.
+	std::string blockout_name = base_name;
+	if (gObjectManager->FindObject(HashStr32(blockout_name.c_str())) != nullptr) {
+		int suffix = 0;
+		do {
+			blockout_name = String::Fmt("{}_undo{}", base_name, suffix++).Str();
+		} while (gObjectManager->FindObject(HashStr32(blockout_name.c_str())) != nullptr);
+	}
+
+	LogInfo("Restoring blockout object '{}'", blockout_name);
+
+	Object* object =
+		gObjectManager->NewObject(blockout_name, material.IsNull() ? mOrangeMaterialID : material, eObjectTag::Blockout);
+
+	object->Bounds.Min = bounds_min;
+	object->Bounds.Max = bounds_max;
+
+	CubeGenOptions cgo {
+		.Left = { .Scale = -bounds_min.X },
+		.Right = { .Scale = bounds_max.X },
+		.Top = { .Scale = bounds_max.Y },
+		.Bottom = { .Scale = -bounds_min.Y },
+		.Front = { .Scale = bounds_max.Z },
+		.Back = { .Scale = -bounds_min.Z },
+
+		.bAlignUVs = true,
+	};
+
+	Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube(cgo);
+	object->pMesh = cube_mesh->AsDefaultMesh();
+	object->MoveBy(position);
+	object->SetShadowCaster(true);
+	object->SetRotation(rotation);
+
+	Vec3f midpoint = GetCubeMidpointOffset(cgo);
+	object->SetRotationOrigin(-midpoint);
+
+	physics::Body* phys = gPhysics->NewBody(blockout_name);
+	phys->CreatePrimitiveBody(physics::ePrimitiveType::Box, GetCubeSize(cgo), physics::eMotionType::Static,
+							  physics::BodyProps {
+								  .ConvexRadius = 0.05f,
+								  .Density = 20,
+							  });
+
+	phys->SetMidpoint(midpoint);
+	phys->Teleport(position, rotation);
+
+	object->AttachCollider(phys);
+
+	AssetTicket ticket(static_cast<void*>(object));
+	ticket.MarkAndSignalLoaded();
+
+	pWorld->Attach(ticket);
+
+	BlockoutObjects.NewItem(nullptr, object->ID);
+
+	return object;
+}
+
 
 void Blockout::Load(const String& path)
 {

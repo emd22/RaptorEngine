@@ -3,7 +3,11 @@
 #include <Core/StackArray.hpp>
 #include <Core/Types.hpp>
 #include <Core/UndoStack.hpp>
+#include <Material/MaterialID.hpp>
+#include <Math/Quat.hpp>
 #include <Math/SIMDHelper.hpp>
+#include <Math/Vec3.hpp>
+#include <Object/ObjectID.hpp>
 #include <Renderer/Camera.hpp>
 #include <Script/Script.hpp>
 #include <World.hpp>
@@ -60,6 +64,7 @@ struct EditOperation
 		Scale,
 		Dupe,
 		Create,
+		Delete,
 	} Type;
 
 public:
@@ -71,8 +76,24 @@ public:
 	/// The object to manipulate
 	Object* pObject = nullptr;
 
+	ObjectID PushedObjectID = ObjectID::scNull;
+
+	/// Stable ID for `ValueB` when it holds an object (Dupe result).
+	ObjectID ValueObjectID = ObjectID::scNull;
+
 	EditOperationValue ValueA;
 	EditOperationValue ValueB;
+
+	/// Full snapshot for `Delete` (captured before destruction so Undo can recreate).
+	struct Snapshot
+	{
+		Vec3f Position = Vec3f::sZero;
+		Vec3f BoundsMin = Vec3f::sZero;
+		Vec3f BoundsMax = Vec3f::sZero;
+		MaterialID Material = MaterialID::scNull;
+		Quat Rotation = Quat::scIdentity;
+		Name ObjectName;
+	} DeleteSnapshot;
 
 	/// The size of the operation group this is in. For example, when moving 10 objects, there will be 10 operations(one
 	/// for each event) making the GroupSize = 10.
@@ -90,6 +111,8 @@ FxEnumFlags(eEditorModeFlags);
 class EditorMode
 {
 	using UpdateFnDef = void (*)(FLOAT4, float32);
+
+	friend struct EditOperation;
 
 	/// The max amount of objects that can be selected. Mirrored in `prototype_editor.strata`
 	static constexpr uint32 scLimitSelectionObjects = 64;
@@ -119,6 +142,9 @@ public:
 
 	EditOperationValue PushEditOperation(const EditOperation& op);
 
+	/// Original (unselected) material for an object, falling back to its current material.
+	MaterialID GetStoredMaterial(Object* object);
+
 	void Undo();
 	void Redo();
 
@@ -127,6 +153,18 @@ public:
 	bool IsInSelection(Object* object) const;
 
 	~EditorMode() = default;
+
+private:
+	/// C++-only selection mutation (no script callback). Caller must SyncScriptSelection().
+	void AddToSelectionInternal(Object* object);
+	void RemoveFromSelectionInternal(Object* object);
+	void SyncScriptSelection();
+
+	static bool OpTouchesSelection(EditOperation::eType type)
+	{
+		return type == EditOperation::eType::Dupe || type == EditOperation::eType::Create ||
+			   type == EditOperation::eType::Delete;
+	}
 
 public:
 	eEditorModeFlags Flags = eEditorModeFlags::None;

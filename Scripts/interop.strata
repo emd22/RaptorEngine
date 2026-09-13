@@ -11,6 +11,7 @@ enum OPTYPE
 	SCALE,
 	DUPE,
 	CREATE,
+	DELETE,
 }
 
 
@@ -72,6 +73,7 @@ impl OBJECT
 
 extern float3 editor_push_op_vec(OBJECT obj, OPTYPE op_type, float3 original, float3 updated, int group_size);
 extern OBJECT editor_push_op_obj(OBJECT obj, OPTYPE op_type, OBJECT original, OBJECT updated, int group_size);
+extern void editor_push_op_delete(OBJECT obj, int group_size);
 
 extern OBJECT editor_op_create_object(float3 position, int group_size);
 
