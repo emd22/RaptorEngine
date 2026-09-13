@@ -1150,7 +1150,7 @@ bool ProbeManager::LoadProbes()
 
 	const FxProbeHeader* header = reinterpret_cast<const FxProbeHeader*>(data.pData);
 
-	if (header->Magic[0] != 'F' || header->Magic[1] != 'X' || header->Magic[2] != 'P' || header->Magic[3] != 'R') {
+	if (header->Magic[0] != 'R' || header->Magic[1] != 'P' || header->Magic[2] != 'P' || header->Magic[3] != 'V') {
 		LogError("Probe file {} has bad magic, ignoring", path.CStr());
 		return false;
 	}
