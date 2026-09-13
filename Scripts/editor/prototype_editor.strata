@@ -121,6 +121,7 @@ void _internal_editor_select_object(OBJECT object, bool is_selected, bool append
 		}
 
 		sel.selected_objects[sel.selected_objects_count++] = object;
+		return;
 	}
 
 	// We have selected an object, but will not append to the current selection.
@@ -300,7 +301,9 @@ void editor_on_mouse_just_down()
 
 	int selected_index = sel.selected_objects_count - 1;
 
-	sel.initial_object_positions[selected_index] = sel.selected_objects[selected_index].position;
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		sel.initial_object_positions[i] = sel.selected_objects[i].position;
+	}
 
 	// initial_object_position = sel.selected_object.position;
 	camera_distance = sel.initial_object_positions[selected_index] - initial_player_position;

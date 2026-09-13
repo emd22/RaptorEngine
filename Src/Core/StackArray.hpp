@@ -74,10 +74,10 @@ public:
 	}
 
 	Iterator begin() { return pData; }
-	Iterator end() { return pData + Capacity; }
+	Iterator end() { return pData + Size; }
 
 	ConstIterator begin() const { return pData; }
-	ConstIterator end() const { return pData + Capacity; }
+	ConstIterator end() const { return pData + Size; }
 
 	void MarkFull() { Size = Capacity; };
 	void Clear() { Size = 0; }
