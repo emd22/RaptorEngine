@@ -171,6 +171,29 @@ public:
 		return value;
 	}
 
+
+	T PopBackValue()
+	{
+		Assert(mSize > 0);
+
+		--mSize;
+
+		// Wrap around if we hit zero.
+		if (mPushIndex == 0) {
+			mPushIndex = mCapacity - 1;
+		}
+		else {
+			--mPushIndex;
+		}
+
+		T* ptr = mpData + mPushIndex;
+
+		T value = std::move(*ptr);
+		ptr->~T();
+
+		return value;
+	}
+
 	T& First() const
 	{
 		Assert(mSize > 0);
@@ -178,6 +201,18 @@ public:
 
 		return *ptr;
 	}
+
+	T* Last()
+	{
+		if (mSize <= 0) {
+			return nullptr;
+		}
+
+		T* ptr = mpData + (mPushIndex);
+
+		return *ptr;
+	}
+
 
 	void Pop()
 	{
@@ -193,6 +228,31 @@ public:
 		if (mPopIndex >= mCapacity) {
 			mPopIndex = 0;
 		}
+
+		if constexpr (!std::is_trivially_destructible_v<T>) {
+			ptr->~T();
+		}
+	}
+
+
+	void PopBack()
+	{
+		if (mSize == 0) {
+			LogError(LC_CORE, "Cannot pop from empty queue");
+			return;
+		}
+
+		--mSize;
+
+		// Wrap around if we hit zero.
+		if (mPushIndex == 0) {
+			mPushIndex = mCapacity - 1;
+		}
+		else {
+			--mPushIndex;
+		}
+
+		T* ptr = mpData + mPushIndex;
 
 		if constexpr (!std::is_trivially_destructible_v<T>) {
 			ptr->~T();

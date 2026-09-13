@@ -82,7 +82,7 @@ void EditorMode::Create(const String& name, const String& script_path)
 {
 	ModeName = name;
 	pScript = gScriptManager->LoadScript(script_path.CStr());
-	mOperationStack.SetPageSize(128);
+	mOperationStack.InitCapacity(256);
 }
 
 void EditorMode::ReloadHotFunctions() { pUpdateFunction = pScript->GetFunction<UpdateFnDef>("mode_update"); }
@@ -105,47 +105,50 @@ void EditorMode::Update(const Vec3f& movement_vector, float32 delta_time)
 
 void EditorMode::Undo()
 {
-	if (OperationStackIndex == 0) {
+	EditOperation* op = mOperationStack.Last();
+	if (op == nullptr) {
 		return;
 	}
 
-	--OperationStackIndex;
-	EditOperation* op = &mOperationStack[OperationStackIndex];
-
 	op->Undo();
+
+	if (!mOperationStack.DoUndo()) {
+		return;
+	}
 
 	int32 group_size = op->GroupSize - 1;
 
 	for (int i = 0; i < group_size; i++) {
-		if (OperationStackIndex == 0) {
+		op = mOperationStack.Last();
+		if (op == nullptr) {
 			return;
 		}
 
-		--OperationStackIndex;
-		op = &mOperationStack[OperationStackIndex];
 		op->Undo();
+
+		if (!mOperationStack.DoUndo()) {
+			return;
+		}
 	}
 }
 
 
 void EditorMode::Redo()
 {
-	if (OperationStackIndex >= mOperationStack.Size) {
+	EditOperation* op = mOperationStack.DoRedo();
+	if (op == nullptr) {
 		return;
 	}
-
-	EditOperation* op = &mOperationStack[OperationStackIndex++];
 
 	op->Execute();
 
 	int32 group_size = op->GroupSize - 1;
 
 	for (int i = 0; i < group_size; i++) {
-		if (OperationStackIndex >= mOperationStack.Size) {
+		op = mOperationStack.DoRedo();
+		if (op == nullptr) {
 			return;
 		}
-
-		op = &mOperationStack[OperationStackIndex++];
 
 		op->Execute();
 	}
@@ -154,15 +157,12 @@ void EditorMode::Redo()
 
 EditOperationValue EditorMode::PushEditOperation(const EditOperation& op)
 {
-	// Overwrite the existing after our current undo position operations
-	if (OperationStackIndex < mOperationStack.Size) {
-		mOperationStack.Size = OperationStackIndex;
-	}
+	mOperationStack.Push(op);
 
-	mOperationStack.Insert(op);
-	++OperationStackIndex;
+	EditOperation* p_op = mOperationStack.Last();
+	Assert(p_op != nullptr);
 
-	return mOperationStack[mOperationStack.Size - 1].Execute();
+	return p_op->Execute();
 }
 
 

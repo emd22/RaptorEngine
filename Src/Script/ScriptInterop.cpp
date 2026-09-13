@@ -41,6 +41,8 @@ static Vec3f N_editor_push_op_vec3(Object* obj, int op_type, FLOAT4 original, FL
 
 		return eov.Position;
 	}
+
+	return Vec3f::sZero;
 }
 
 static Object* N_editor_push_op_object(Object* obj, int op_type, Object* original, Object* updated, int32 group_size)
