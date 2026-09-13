@@ -43,7 +43,6 @@ struct SELECTION
 /////////////////////////////////////
 
 float3 initial_player_position;
-float3 camera_distance;
 bool mouse_is_dragging = false;
 bool mouse_was_in_drag_event = false;
 
@@ -299,14 +298,12 @@ void editor_on_mouse_just_down()
 {
 	initial_player_position = player.position;
 
-	int selected_index = sel.selected_objects_count - 1;
 
 	for (int i = 0; i < sel.selected_objects_count; i++) {
 		sel.initial_object_positions[i] = sel.selected_objects[i].position;
 	}
 
 	// initial_object_position = sel.selected_object.position;
-	camera_distance = sel.initial_object_positions[selected_index] - initial_player_position;
 	mouse_was_in_drag_event = true;
 
 
@@ -397,6 +394,7 @@ FACEDIR face_get_dir()
 	return FACEDIR.Z;
 }
 
+
 @private
 void editor_face_tool(float delta_time)
 {
@@ -406,7 +404,7 @@ void editor_face_tool(float delta_time)
 
 	float3 player_pos = player.position;
 
-	float3 destination_position = editor_transform_snap(player_pos + camera_distance);
+	float3 destination_position = editor_transform_snap(player_pos - initial_player_position);
 	float3 camera_pos = camera_position();
 
 	if (direction == FACEDIR.X) {
@@ -430,17 +428,24 @@ void editor_face_tool(float delta_time)
 @private
 void editor_face_tool_finalize()
 {
-	blockout_object_scale(
-		sel.selected_object,
-		sel.selected_face,
-		face_tool_magnitude
-	);
-
-	if (editor_has_object_selection()) {
-		blockout_reload_object(sel.selected_object);
-	}
+	bool has_selection = editor_has_object_selection();
 
 	hide_transform_marker_object();
+
+	if (!has_selection) {
+		return;
+	}
+
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		blockout_object_scale(
+			sel.selected_objects[i],
+			sel.selected_face,
+			face_tool_magnitude
+		);
+
+		blockout_reload_object(sel.selected_objects[i]);
+	}
+
 }
 
 
@@ -480,7 +485,6 @@ void editor_finalize_operation()
 /* Called when switching into the editor mode */
 void mode_load()
 {
-	camera_distance = float3(0.0f);
 	reset_selection();
 
 	player_had_headbob = cvar_get_bool("b_headbob_enabled", false);
