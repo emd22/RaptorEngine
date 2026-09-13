@@ -147,6 +147,7 @@ static FLOAT4 N_player_ray_get_point(void*, float32 range)
 }
 
 static FLOAT4 N_float4_round(FLOAT4 value) { return simd::Round(value); }
+static FLOAT4 N_float4_floor(FLOAT4 value) { return simd::Floor(value); }
 static FLOAT4 N_float3_abs(FLOAT4 value)
 {
 #ifdef FX_USE_NEON
@@ -220,6 +221,7 @@ static const PredefExtern scAvailableExterns[] = {
 
 	/* Math Util */
 	PREDEF("float4_round", N_float4_round),
+	PREDEF("float4_floor", N_float4_floor),
 	PREDEF("float3_abs", N_float3_abs),
 	PREDEF("float_sign", N_float_sign),
 	PREDEF("print_float4", N_print_float4),

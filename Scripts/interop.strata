@@ -13,6 +13,10 @@ extern int printf(string fmt, ...);
 extern float float_sign(float value);
 
 extern float4 float4_round(float4 value);
+extern float4 float4_floor(float4 value);
+
+float3 float3_floor(float3 value) { return (float4_floor(float4(value, 0.0f))).xyz; }
+
 
 float3 float3_round(float3 value)
 {

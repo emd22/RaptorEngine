@@ -98,9 +98,9 @@ void EditorMode::Unload()
 
 float EditorMode::GetQuantizeFraction() const
 {
-	auto mode_get_quantize = pScript->GetFunction<float (*)()>("mode_common_get_quantize_fraction");
-	if (mode_get_quantize) {
-		return mode_get_quantize();
+	auto editor_get_snap_value = pScript->GetFunction<float (*)()>("editor_get_snap_value");
+	if (editor_get_snap_value) {
+		return editor_get_snap_value();
 	}
 
 	return 0.0f;
@@ -108,7 +108,7 @@ float EditorMode::GetQuantizeFraction() const
 
 bool EditorMode::GetQuantizeEnabled() const
 {
-	auto mode_get_quantize = pScript->GetFunction<bool (*)()>("mode_common_get_quantize_enabled");
+	auto mode_get_quantize = pScript->GetFunction<bool (*)()>("editor_get_snap_enabled");
 	if (mode_get_quantize) {
 		return mode_get_quantize();
 	}

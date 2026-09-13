@@ -694,6 +694,7 @@ bool ProbeManager::ProjectStagedFaces(uint32 batch_slot, uint32 probe_index)
 
 	for (uint32 face = 0; face < scCaptureFaces; face++) {
 		mCaptureStaging[batch_slot][face].Map();
+		mCaptureStaging[batch_slot][face].InvalidateFromGpu();
 		const uint16* pixels = static_cast<const uint16*>(mCaptureStaging[batch_slot][face].pMappedBuffer);
 
 		if (pixels == nullptr) {
@@ -901,6 +902,7 @@ bool ProbeManager::BuildDepthMoments(uint32 batch_slot, uint32 probe_index)
 
 	for (uint32 face = 0; face < scCaptureFaces; face++) {
 		mDepthStaging[batch_slot][face].Map();
+		mDepthStaging[batch_slot][face].InvalidateFromGpu();
 		const float32* depths = static_cast<const float32*>(mDepthStaging[batch_slot][face].pMappedBuffer);
 
 		if (depths == nullptr) {
@@ -915,7 +917,7 @@ bool ProbeManager::BuildDepthMoments(uint32 batch_slot, uint32 probe_index)
 
 		for (uint32 y = 0; y < scCaptureSize; y++) {
 			for (uint32 x = 0; x < scCaptureSize; x++) {
-				const float32 depth = depths[y * scCaptureSize + x];
+				const float32 stored_depth = depths[y * scCaptureSize + x];
 
 				const float32 nx = ((static_cast<float32>(x) + 0.5f) / static_cast<float32>(scCaptureSize)) * 2.0f -
 								   1.0f;
@@ -944,9 +946,9 @@ bool ProbeManager::BuildDepthMoments(uint32 batch_slot, uint32 probe_index)
 				const float32 rr = 1.0f + nx * nx + ny * ny;
 				const float32 weight = scCaptureTexelArea / (rr * sqrtf(rr));
 
-				// Distance to nearest geometry along this ray
 				float32 dist = scMaxDist;
-				if (depth > 1e-6f) {
+				if (stored_depth > 1e-6f) {
+					const float32 depth = 1.0f - stored_depth;
 					Vec4f clip_d(nx, ny, depth, 1.0f);
 					Vec4f view_d = inv_proj.MultiplyVec4f(clip_d);
 					Vec4f world_d = inv_view.MultiplyVec4f(view_d);
@@ -1099,7 +1101,7 @@ void ProbeManager::UploadVolumeToGpu()
 
 struct FxProbeHeader
 {
-	char Magic[4] = { 'F', 'X', 'P', 'R' };
+	char Magic[4] = { 'R', 'P', 'P', 'V' };
 	uint32 Version = 2;
 	uint32 ProbeCount = Limits::MaxIrradianceProbes;
 };
@@ -1140,11 +1142,12 @@ bool ProbeManager::LoadProbes()
 	Slice<uint8> data = file.Read<uint8>();
 	file.Close();
 
-	const uint64 v1_size = sizeof(FxProbeHeader) + sizeof(ProbeVolumeData) + sizeof(mProbes);
-	const uint64 v2_size = v1_size + sizeof(mProbeDepths);
 
-	if (data.Size != v1_size && data.Size != v2_size) {
-		LogError("Probe file {} has wrong size ({} != {} or {}), ignoring", path.CStr(), data.Size, v1_size, v2_size);
+	const uint64 cache_file_size = sizeof(FxProbeHeader) + sizeof(ProbeVolumeData) + sizeof(mProbes) +
+								   sizeof(mProbeDepths);
+
+	if (data.Size != cache_file_size) {
+		LogError("Probe file {} has wrong size ({} != {}), ignoring", path.CStr(), data.Size, cache_file_size);
 		return false;
 	}
 
@@ -1167,8 +1170,15 @@ bool ProbeManager::LoadProbes()
 		return false;
 	}
 
-	memcpy(&mVolume, data.pData + sizeof(FxProbeHeader), sizeof(mVolume));
-	memcpy(mProbes, data.pData + sizeof(FxProbeHeader) + sizeof(mVolume), sizeof(mProbes));
+	uint64 offset = sizeof(FxProbeHeader);
+	memcpy(&mVolume, data.pData + offset, sizeof(mVolume));
+	offset += sizeof(mVolume);
+
+	memcpy(mProbes, data.pData + offset, sizeof(mProbes));
+	offset += sizeof(mProbes);
+
+	memcpy(mProbeDepths, data.pData + offset, sizeof(mProbeDepths));
+	offset += sizeof(mProbeDepths);
 
 	UploadVolumeToGpu();
 	UploadToGpu();

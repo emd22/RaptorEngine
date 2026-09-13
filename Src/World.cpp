@@ -797,8 +797,10 @@ void World::RenderProbeCapture()
 			PerspectiveCamera face_camera;
 			face_camera.SetFov(90.0f);
 			face_camera.SetAspectRatio(1.0f);
+
 			face_camera.SetNearPlane(200.0f);
-			face_camera.SetFarPlane(0.01f);
+			face_camera.SetFarPlane(0.1f);
+
 			face_camera.UpdateProjectionMatrix();
 
 			face_camera.MoveTo(capture_pos);

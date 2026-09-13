@@ -60,6 +60,8 @@ float3 face_tool_magnitude;
 
 XFORMTYPE transform_type = XFORMTYPE.TRANSLATE;
 
+float3 initial_object_position;
+
 
 /////////////////////////////////////
 // Editor functions
@@ -106,6 +108,7 @@ void _internal_editor_select_object(OBJECT object, bool is_selected)
 void editor_select_object(OBJECT object, bool is_selected)
 {
 	object._select_object_internal(is_selected);
+
 }
 
 
@@ -167,6 +170,8 @@ void editor_handle_controls()
 
 			OBJECT dupe = blockout_dupe_object(object_to_dupe);
 			editor_select_object(dupe, true);
+
+			dupe.move_to(object_to_dupe.get_position());
 		}
 
 	}
@@ -182,6 +187,11 @@ float editor_get_snap_value()
 	float[4] snap_values = { 0.05f, 0.10f, 0.25f, 0.50f };
 	uint index = fclamp(editor_snap_level, 0, 3);
 	return snap_values[index];
+}
+
+bool editor_get_snap_enabled()
+{
+	return editor_enable_snap;
 }
 
 /* If snap is enabled, this snaps a given vector to the selected snap fraction. */
@@ -215,8 +225,10 @@ void editor_disable_movement_damp()
 void editor_on_mouse_just_down()
 {
 	initial_player_position = player.position;
-	camera_distance = editor_selection.selected_object.position - initial_player_position;
+	initial_object_position = editor_selection.selected_object.position;
+	camera_distance = initial_object_position - initial_player_position;
 	mouse_was_in_drag_event = true;
+
 
 	if (transform_type == XFORMTYPE.FACE) {
 		/* Cast and gather the face we are pointing towards */
@@ -241,26 +253,27 @@ void editor_translate_tool(float delta_time)
 	}
 
 	float3 current_position = editor_selection.selected_object.get_position();
-	float3 translate_movement = player.position + camera_distance;
-
+	float3 translate_movement = player.position - initial_player_position;
 
 	/* We are not in fly mode, handle Z movement manually */
-	// if (!player.is_flymode()) {
-	const float speed = delta_time * 2.0f;
+	if (!player.is_flymode()) {
+		const float speed = delta_time * 2.0f;
 
-	if (KEY.K_Q.is_down()) {
-		float3 move_direction = float3(0.0f, -speed, 0.0f);
-		translate_movement += move_direction;
-		camera_distance += move_direction;
+		if (KEY.K_Q.is_down()) {
+			float3 move_direction = float3(0.0f, -speed, 0.0f);
+			translate_movement += move_direction;
+			initial_player_position += move_direction;
+		}
+		if (KEY.K_E.is_down()) {
+			float3 move_direction = float3(0.0f, speed, 0.0f);
+			initial_player_position += move_direction;
+		}
 	}
-	if (KEY.K_E.is_down()) {
-		float3 move_direction = float3(0.0f, speed, 0.0f);
-		translate_movement += move_direction;
-		camera_distance += move_direction;
-	}
-	// }
 
-	editor_selection.selected_object.move_to(editor_transform_snap(translate_movement));
+	float3 movement_delta = editor_transform_snap(translate_movement);
+	float3 new_position = initial_object_position + movement_delta;
+
+	editor_selection.selected_object.move_to(new_position);
 }
 
 /////////////////////////////////////

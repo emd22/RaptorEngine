@@ -44,6 +44,7 @@ FX_FORCE_INLINE FLOAT4 AbsDiff(FLOAT4 a, FLOAT4 b) { return vabdq_f32(a, b); }
 FX_FORCE_INLINE FLOAT4 Sub(FLOAT4 a, FLOAT4 b) { return vsubq_f32(a, b); }
 
 FX_FORCE_INLINE FLOAT4 Round(FLOAT4 value) { return vrndq_f32(value); }
+FX_FORCE_INLINE FLOAT4 Floor(FLOAT4 value) { return vrndmq_f32(value); }
 
 } // namespace simd
 
