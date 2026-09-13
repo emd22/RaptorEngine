@@ -1,8 +1,8 @@
 #pragma once
 
-#include <Core/DynArray.hpp>
 #include <Core/StackArray.hpp>
 #include <Core/Types.hpp>
+#include <Core/UndoStack.hpp>
 #include <Math/SIMDHelper.hpp>
 #include <Renderer/Camera.hpp>
 #include <Script/Script.hpp>
@@ -139,8 +139,10 @@ public:
 
 
 	StackArray<SelectedObject, scLimitSelectionObjects> mSelectedObjects;
-	DynArray<EditOperation> mOperationStack;
-	uint32 OperationStackIndex = 0;
+
+	UndoStack<EditOperation> mOperationStack;
+
+	// uint32 OperationStackIndex = 0;
 
 	script::Script* pScript = nullptr;
 };

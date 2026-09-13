@@ -8,8 +8,9 @@
 
 namespace fx {
 
+
 template <typename T>
-class Queue
+class UndoStack
 {
 public:
 	struct Iterator
@@ -40,22 +41,24 @@ public:
 	};
 
 public:
-	Queue() = default;
-	Queue(uint32 num_objects) { InitCapacity(num_objects); }
+	UndoStack() = default;
+	UndoStack(uint32 num_objects) { InitCapacity(num_objects); }
 
-	Queue(const Queue& other) = delete;
-	Queue(Queue&& other) { (*this) = std::move(other); }
+	UndoStack(const UndoStack& other) = delete;
+	UndoStack(UndoStack&& other) { (*this) = std::move(other); }
 
-	Queue& operator=(const Queue& other) = delete;
-	Queue& operator=(Queue&& other)
+	UndoStack& operator=(const UndoStack& other) = delete;
+	UndoStack& operator=(UndoStack&& other)
 	{
 		mpData = other.mpData;
 		mCapacity = other.mCapacity;
 		mSize = other.mSize;
 		mPushIndex = other.mPushIndex;
 		mPopIndex = other.mPopIndex;
+		mRedoCount = other.mRedoCount;
 
 		other.mCapacity = 0;
+		other.mRedoCount = 0;
 		other.mpData = nullptr;
 
 		return *this;
@@ -97,10 +100,12 @@ public:
 
 	T& Push(const T& value)
 	{
+		// We are out of space, pop the front value off.
 		if (mSize >= mCapacity) {
-			LogWarning("Queue is full");
-			Pop();
+			PopFront();
 		}
+
+		InvalidateRedos();
 
 		if (mPushIndex >= mCapacity) {
 			mPushIndex = 0;
@@ -116,10 +121,12 @@ public:
 
 	T& Push(T&& value)
 	{
+		// We are out of space, pop the front value off.
 		if (mSize >= mCapacity) {
-			LogWarning("Queue is full");
-			Pop();
+			PopFront();
 		}
+
+		InvalidateRedos();
 
 		if (mPushIndex >= mCapacity) {
 			mPushIndex = 0;
@@ -136,10 +143,12 @@ public:
 	template <typename... TArgs>
 	T& Emplace(TArgs&&... args)
 	{
+		// We are out of space, pop the front value off.
 		if (mSize >= mCapacity) {
-			LogWarning("Queue is full");
-			Pop();
+			PopFront();
 		}
+
+		InvalidateRedos();
 
 		if (mPushIndex >= mCapacity) {
 			mPushIndex = 0;
@@ -153,7 +162,7 @@ public:
 		return *ptr;
 	}
 
-	T PopValue()
+	T PopFrontValue()
 	{
 		Assert(mSize > 0);
 
@@ -170,7 +179,6 @@ public:
 
 		return value;
 	}
-
 
 	T PopBackValue()
 	{
@@ -208,13 +216,14 @@ public:
 			return nullptr;
 		}
 
-		T* ptr = mpData + (mPushIndex);
+		uint32 index = (mPushIndex == 0) ? (mCapacity - 1) : (mPushIndex - 1);
+		T* ptr = mpData + index;
 
-		return *ptr;
+		return ptr;
 	}
 
 
-	void Pop()
+	void PopFront()
 	{
 		if (mSize == 0) {
 			LogError(LC_CORE, "Cannot pop from empty queue");
@@ -234,12 +243,10 @@ public:
 		}
 	}
 
-
-	void PopBack()
+	bool DoUndo()
 	{
 		if (mSize == 0) {
-			LogError(LC_CORE, "Cannot pop from empty queue");
-			return;
+			return false;
 		}
 
 		--mSize;
@@ -252,11 +259,43 @@ public:
 			--mPushIndex;
 		}
 
-		T* ptr = mpData + mPushIndex;
+		++mRedoCount;
 
-		if constexpr (!std::is_trivially_destructible_v<T>) {
-			ptr->~T();
+		return true;
+	}
+
+	T* DoRedo()
+	{
+		if (mRedoCount <= 0) {
+			return nullptr;
 		}
+
+		--mRedoCount;
+
+		T* ptr = mpData + (mPushIndex);
+
+		++mPushIndex;
+		if (mPushIndex >= mCapacity) {
+			mPushIndex = 0;
+		}
+
+		++mSize;
+
+		return ptr;
+	}
+
+
+	void InvalidateRedos()
+	{
+		for (uint32 i = 0; i < mRedoCount; i++) {
+			T* ptr = mpData + ((mPushIndex + i) % mCapacity);
+
+			if constexpr (!std::is_trivially_destructible_v<T>) {
+				ptr->~T();
+			}
+		}
+
+		mRedoCount = 0;
 	}
 
 	bool IsEmpty() const { return mSize == 0; }
@@ -270,7 +309,7 @@ public:
 
 		// Destroy all items remaining - Pop decrements mSize, so while loop is needed
 		while (!IsEmpty()) {
-			Pop();
+			PopFront();
 		}
 
 		std::free(static_cast<void*>(mpData));
@@ -278,7 +317,7 @@ public:
 		mCapacity = 0;
 	}
 
-	~Queue() = default;
+	~UndoStack() = default;
 
 
 private:
@@ -288,6 +327,10 @@ private:
 	uint32 mCapacity = 0;
 
 	uint32 mPushIndex = 0;
+
+	// The number of valid redo-able items.
+	uint32 mRedoCount = 0;
+
 	uint32 mPopIndex = 0;
 };
 
