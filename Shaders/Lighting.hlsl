@@ -42,8 +42,8 @@ VSOutput main(VSInput input)
 	float2 out_uv = float2((input.iVertexIndex << 1) & 2, input.iVertexIndex & 2);
 	output.vPosition = float4(out_uv * 2.0 - 1.0, 0.0, 1.0);
 #else
-	float4x4 mvp = mul(VSConst.CameraMatrix, bObjectBuffer[VSConst.uiObjectIndex].mWorld);
-	output.vPosition = mul(mvp, float4(input.vPosition, 1.0));
+	float4x4 mvp = mul(bObjectBuffer[VSConst.uiObjectIndex].mWorld, VSConst.CameraMatrix);
+	output.vPosition = mul(float4(input.vPosition, 1.0), mvp);
 #endif
 
 	output.uiLightIndex = VSConst.uiLightIndex;
@@ -86,7 +86,7 @@ float3 WorldPosFromDepth(Light light, float2 uv, float depth)
 {
 	float4 ndc = float4(uv * 2.0 - 1.0, depth, 1.0);
 
-	float4 world_space = mul(mul(light.mInvView, light.mInvProjection), ndc);
+	float4 world_space = mul(mul(ndc, light.mInvProjection), light.mInvView);
 
 	return world_space.xyz / world_space.w;
 }
@@ -119,7 +119,7 @@ FSOutput main(FSInput input)
 	float visibility = 1.0f;
 
 #ifdef FX_LIGHT_DIRECTIONAL
-	float4 shadow_pos_light_space = mul(light.LightCameraMatrix, float4(world_position, 1.0));
+	float4 shadow_pos_light_space = mul(float4(world_position, 1.0), light.LightCameraMatrix);
 
 	float2 shadow_uv;
 	shadow_uv.x = 0.5f + (shadow_pos_light_space.x / shadow_pos_light_space.w * 0.5f);
