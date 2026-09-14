@@ -75,7 +75,7 @@ float3 ReconstructViewPos(float2 uv, float depth)
 {
 	float4 ndc = float4(uv * 2.0 - 1.0, depth, 1.0);
 
-	float4 view_space = mul(Consts.InvProjection, ndc);
+	float4 view_space = mul(ndc, Consts.InvProjection);
 
 	return view_space.xyz / view_space.w;
 }
@@ -116,7 +116,7 @@ float ComputeSSAO(float2 uv)
 	float3 fragment_position = ReconstructViewPos(uv, depth);
 
 	float3 world_normal = F_Sample(tNormal, uv).xyz;
-	float3 normal = normalize(mul((float3x3)Consts.View, world_normal));
+	float3 normal = normalize(mul(world_normal, (float3x3)Consts.View));
 
 	float2 noise_vector = GetNoiseVector(uv);
 
@@ -131,7 +131,7 @@ float ComputeSSAO(float2 uv)
 		float3 sample_direction = mul(GetSampleKernel(i), TBN);
 		float3 sample_position = fragment_position + sample_direction * Consts.Radius;
 
-		float4 sample_clip = mul(Consts.Projection, float4(sample_position, 1.0));
+		float4 sample_clip = mul(float4(sample_position, 1.0), Consts.Projection);
 		float3 sample_ndc = sample_clip.xyz / sample_clip.w;
 		float2 sample_uv = sample_ndc.xy * 0.5 + 0.5;
 

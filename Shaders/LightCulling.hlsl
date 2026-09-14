@@ -58,7 +58,7 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_GroupThreadID)
 			intersects_tile = true;
 		}
 		else {
-			float4 center_clip = mul(CSConst.mViewProjection, float4(light.vLightPosition, 1.0));
+			float4 center_clip = mul(float4(light.vLightPosition, 1.0), CSConst.mViewProjection);
 
 			if (center_clip.w < -light.fLightRadius) {
 				intersects_tile = false;
@@ -70,11 +70,11 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_GroupThreadID)
 				float2 center_screen = ProjectToScreen(center_clip);
 
 				// Approximate the screen space radius by projecting offset points
-				float radius_x = length(ProjectToScreen(mul(CSConst.mViewProjection,
-															float4(light.vLightPosition + float3(light.fLightRadius, 0.0, 0.0), 1.0))) -
+				float radius_x = length(ProjectToScreen(mul(float4(light.vLightPosition + float3(light.fLightRadius, 0.0, 0.0), 1.0),
+																CSConst.mViewProjection)) -
 										center_screen);
-				float radius_y = length(ProjectToScreen(mul(CSConst.mViewProjection,
-															float4(light.vLightPosition + float3(0.0, light.fLightRadius, 0.0), 1.0))) -
+				float radius_y = length(ProjectToScreen(mul(float4(light.vLightPosition + float3(0.0, light.fLightRadius, 0.0), 1.0),
+																CSConst.mViewProjection)) -
 										center_screen);
 
 				float radius = max(radius_x, radius_y);

@@ -33,7 +33,7 @@ VSOutput main(VSInput input)
     VSOutput output;
     float4x4 WVP = VSConst.mCombinedMatrix;
 
-    output.vPosition = mul(WVP, float4(input.vPosition, 1.0));
+    output.vPosition = mul(float4(input.vPosition, 1.0), WVP);
     output.vDebugColor = F_UnpackUIntToFloat4(VSConst.uiDebugColor);
 
     return output;
