@@ -83,6 +83,23 @@ static Object* N_editor_op_create_object(FLOAT4 position, int32 group_size)
 	return nullptr;
 }
 
+static Object* N_editor_op_dupe_object(Object* object_to_dupe, FLOAT4 position, int32 group_size)
+{
+	if (gSelectedEditorMode) {
+		EditOperationValue eov = gSelectedEditorMode->PushEditOperation(EditOperation {
+			.Type = EditOperation::eType::Dupe,
+			.pObject = object_to_dupe,
+			.ValueA = EditOperationValue(Vec3f(position)),
+			.ValueB = EditOperationValue(nullptr),
+			.GroupSize = group_size,
+		});
+
+		return eov.pObject;
+	}
+
+	return nullptr;
+}
+
 static void N_editor_push_op_delete(Object* obj, int32 group_size)
 {
 	if (obj == nullptr || gSelectedEditorMode == nullptr) {
@@ -282,6 +299,7 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("editor_push_op_obj", N_editor_push_op_object),
 	PREDEF("editor_push_op_delete", N_editor_push_op_delete),
 	PREDEF("editor_op_create_object", N_editor_op_create_object),
+	PREDEF("editor_op_dupe_object", N_editor_op_dupe_object),
 
 	PREDEF("OBJECT_move_to", N_object_move_to),
 	PREDEF("OBJECT_move_by", N_object_move_by),

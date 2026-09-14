@@ -84,6 +84,13 @@ public:
 	EditOperationValue ValueA;
 	EditOperationValue ValueB;
 
+	/// Pre-apply snapshot for `Scale` (bounds + position), so Undo restores exactly
+	/// even when the min-thickness push-through translated the object.
+	/// (Negating the magnitude alone would mis-split travel between bounds/shift.)
+	Vec3f ScaleBoundsMinBefore = Vec3f::sZero;
+	Vec3f ScaleBoundsMaxBefore = Vec3f::sZero;
+	Vec3f ScalePosBefore = Vec3f::sZero;
+
 	/// Full snapshot for `Delete` (captured before destruction so Undo can recreate).
 	struct Snapshot
 	{
@@ -130,6 +137,8 @@ public:
 	bool SelectObject(Object* object, bool append_selection);
 	void Update(const Vec3f& movement_vector, float32 delta_time);
 	void ReloadHotFunctions();
+
+	void ResetUndoStack();
 
 	Object* GetLastSelectedObject();
 

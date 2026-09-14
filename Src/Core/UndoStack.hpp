@@ -302,6 +302,22 @@ public:
 
 	bool IsEmpty() const { return mSize == 0; }
 
+	void Clear()
+	{
+		if (!mpData) {
+			return;
+		}
+
+		// Destroy all items remaining
+		while (!IsEmpty()) {
+			PopFront();
+		}
+
+		// Reset all indices
+		mPopIndex = 0;
+		mPushIndex = 0;
+		mRedoCount = 0;
+	}
 
 	void Destroy()
 	{
