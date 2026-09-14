@@ -62,29 +62,35 @@ EditOperationValue EditOperation::Execute()
 			break;
 		}
 
+		ScaleBoundsMinBefore = target->Bounds.Min;
+		ScaleBoundsMaxBefore = target->Bounds.Max;
+		ScalePosBefore = target->GetPosition();
+
 		gWorld->pBlockout->ScaleInDirection(target, ValueA.Position, ValueB.Position);
 		gWorld->pBlockout->RebuildObject(target);
 
 		break;
 	}
 	case eType::Dupe: {
-		Assert(ValueA.Type == EditOperationValue::eValueType::Object);
-		Assert(ValueB.Type == EditOperationValue::eValueType::Object);
+		// Origin point
+		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
 
-		Object* source = ResolveOpTarget(*this);
-		if (source == nullptr) {
-			break;
-		}
+		// Object to dupe
+		Assert(pObject != nullptr);
 
-		Object* dupe = gWorld->pBlockout->DupeObject(source);
+		Vec3f origin = ValueA.Position;
+
+		Object* dupe = gWorld->pBlockout->DupeObject(pObject);
 		if (dupe == nullptr) {
 			break;
 		}
 
+		dupe->SetPosition(origin);
+
 		// DupeObject copies the source's *current* material, which is the selection
 		// material while selected. Restore the original so dupes don't inherit it.
 		if (gSelectedEditorMode != nullptr) {
-			dupe->SetMaterial(gSelectedEditorMode->GetStoredMaterial(source));
+			dupe->SetMaterial(gSelectedEditorMode->GetStoredMaterial(pObject));
 		}
 
 		ValueB.Set(dupe);
@@ -144,13 +150,19 @@ void EditOperation::Undo()
 			break;
 		}
 
-		gWorld->pBlockout->ScaleInDirection(target, ValueA.Position, -ValueB.Position);
+		// Restore the exact pre-scale state: re-applying a negated magnitude would
+		// mis-split face travel between bounds and push-through shift.
+		target->Bounds.Min = ScaleBoundsMinBefore;
+		target->Bounds.Max = ScaleBoundsMaxBefore;
+		target->SetPosition(ScalePosBefore);
 		gWorld->pBlockout->RebuildObject(target);
 
 		break;
 	}
 	case eType::Dupe: {
-		Assert(ValueA.Type == EditOperationValue::eValueType::Object);
+		Assert(pObject != nullptr);
+
+		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
 		Assert(ValueB.Type == EditOperationValue::eValueType::Object);
 
 		Object* dupe = ResolveOpValue(*this);
@@ -603,6 +615,8 @@ void EditorMode::Unload()
 		}
 	}
 }
+
+void EditorMode::ResetUndoStack() { mOperationStack.Clear(); }
 
 float EditorMode::GetQuantizeFraction() const
 {

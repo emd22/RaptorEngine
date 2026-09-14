@@ -76,6 +76,7 @@ extern OBJECT editor_push_op_obj(OBJECT obj, OPTYPE op_type, OBJECT original, OB
 extern void editor_push_op_delete(OBJECT obj, int group_size);
 
 extern OBJECT editor_op_create_object(float3 position, int group_size);
+extern OBJECT editor_op_dupe_object(OBJECT object_to_dupe, float3 position, int group_size);
 
 extern OBJECT object_get(OBJECTID id);
 

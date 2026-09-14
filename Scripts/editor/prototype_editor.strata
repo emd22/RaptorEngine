@@ -175,7 +175,9 @@ void editor_dupe_selection()
 	for (int i = 0; i < n; i++) {
 		OBJECT object_to_dupe = sel.selected_objects[i];
 
-		OBJECT dupe = editor_push_op_obj(object_to_dupe, OPTYPE.DUPE, object_to_dupe, null_object, n);
+		// OBJECT dupe = editor_push_op_obj(object_to_dupe, OPTYPE.DUPE, object_to_dupe, null_object, n);
+
+		OBJECT dupe = editor_op_dupe_object(object_to_dupe, object_to_dupe.position, n);
 
 		// Replace the selected object with the dupe. We are overwriting the previous selection
 		// and essentially using `selected_objects` as a temp buffer.
@@ -227,7 +229,7 @@ void editor_handle_controls()
 	if (not_in_xform_operation) {
 		/* Create a new blockout object */
 		if (KEY.K_K.is_pressed()) {
-			float3 origin = player.ray_get_point(20.0f);
+			float3 origin = editor_transform_snap(player.ray_get_point(20.0f));
 			// OBJECT new_obj = blockout_new_object(editor_transform_snap(origin));
 
 			OBJECT new_obj = editor_op_create_object(origin, 1);
@@ -380,7 +382,7 @@ void editor_translate_tool(float delta_time)
 
 	/* We are not in fly mode, handle Z movement manually */
 	if (!player.is_flymode()) {
-		const float speed = delta_time * 2.0f;
+		const float speed = delta_time * (editor_get_snap_value() * 8.0);
 
 		if (KEY.K_Q.is_down()) {
 			float3 move_direction = float3(0.0f, speed, 0.0f);

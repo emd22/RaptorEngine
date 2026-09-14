@@ -2,6 +2,7 @@
 
 #include <Asset/AssetManager.hpp>
 #include <Asset/ConfigFile.hpp>
+#include <InGameEditor.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Math/SIMDHelper.hpp>
@@ -105,34 +106,45 @@ void Blockout::Create(World* world)
 }
 
 
+constexpr float scMinBlockoutThickness = 0.1f;
+
 void Blockout::ScaleInDirection(Object* object, const Vec3f& face_dir, const Vec3f& magnitude)
 {
-	if (object == nullptr) {
+	if (!object) {
 		return;
 	}
 
-	const float32 threshold = 0.01f;
+	constexpr float threshold = 0.01f;
 
-	if (face_dir.X > threshold) {
-		object->Bounds.Max.X += magnitude.X;
-	}
-	else if (face_dir.X < -threshold) {
-		object->Bounds.Min.X -= magnitude.X;
-	}
+	auto scaleAxis = [&](float face, float mag, float& min, float& max, const Vec3f& axis)
+	{
+		if (face > threshold) {
+			const float desired = max + mag;
+			if (desired - min >= scMinBlockoutThickness) {
+				max = desired;
+			}
+			else {
+				max = min + scMinBlockoutThickness;
+				const float shift = desired - max;
+				object->SetPosition(object->GetPosition() + Vec3f(axis.X * shift, axis.Y * shift, axis.Z * shift));
+			}
+		}
+		else if (face < -threshold) {
+			const float desired = min - mag;
+			if (max - desired >= scMinBlockoutThickness) {
+				min = desired;
+			}
+			else {
+				min = max - scMinBlockoutThickness;
+				const float shift = desired - min;
+				object->SetPosition(object->GetPosition() + Vec3f(axis.X * shift, axis.Y * shift, axis.Z * shift));
+			}
+		}
+	};
 
-	if (face_dir.Y > threshold) {
-		object->Bounds.Max.Y += magnitude.Y;
-	}
-	else if (face_dir.Y < -threshold) {
-		object->Bounds.Min.Y -= magnitude.Y;
-	}
-
-	if (face_dir.Z > threshold) {
-		object->Bounds.Max.Z += magnitude.Z;
-	}
-	else if (face_dir.Z < -threshold) {
-		object->Bounds.Min.Z -= magnitude.Z;
-	}
+	scaleAxis(face_dir.X, magnitude.X, object->Bounds.Min.X, object->Bounds.Max.X, Vec3f(1.0f, 0.0f, 0.0f));
+	scaleAxis(face_dir.Y, magnitude.Y, object->Bounds.Min.Y, object->Bounds.Max.Y, Vec3f(0.0f, 1.0f, 0.0f));
+	scaleAxis(face_dir.Z, magnitude.Z, object->Bounds.Min.Z, object->Bounds.Max.Z, Vec3f(0.0f, 0.0f, 1.0f));
 }
 
 void Blockout::ReloadSingleObject(Object* object)
@@ -258,14 +270,6 @@ ObjectID Blockout::CreateCubeVolume(ConfigEntry& entry)
 
 		.bAlignUVs = true,
 	};
-
-	const float32 min_scale = 0.01f;
-	cgo.Left.Scale = std::max(cgo.Left.Scale, min_scale);
-	cgo.Right.Scale = std::max(cgo.Right.Scale, min_scale);
-	cgo.Top.Scale = std::max(cgo.Top.Scale, min_scale);
-	cgo.Bottom.Scale = std::max(cgo.Bottom.Scale, min_scale);
-	cgo.Front.Scale = std::max(cgo.Front.Scale, min_scale);
-	cgo.Back.Scale = std::max(cgo.Back.Scale, min_scale);
 
 	Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube(cgo);
 
@@ -553,8 +557,8 @@ Object* Blockout::RestoreObject(const Vec3f& position, const Vec3f& bounds_min, 
 
 	LogInfo("Restoring blockout object '{}'", blockout_name);
 
-	Object* object =
-		gObjectManager->NewObject(blockout_name, material.IsNull() ? mOrangeMaterialID : material, eObjectTag::Blockout);
+	Object* object = gObjectManager->NewObject(blockout_name, material.IsNull() ? mOrangeMaterialID : material,
+											   eObjectTag::Blockout);
 
 	object->Bounds.Min = bounds_min;
 	object->Bounds.Max = bounds_max;
@@ -609,6 +613,11 @@ void Blockout::Load(const String& path)
 
 	if (info.HasErrors()) {
 		return;
+	}
+
+	// Since everything is getting reloaded, we need to clear the editor undo stack.
+	if (gSelectedEditorMode != nullptr) {
+		gSelectedEditorMode->ResetUndoStack();
 	}
 
 	ConfigEntry* blocks_entry = info.GetEntry(HashStr32("all"));
