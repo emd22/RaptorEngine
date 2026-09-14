@@ -50,7 +50,7 @@ struct OBJECTID = uint;
 handle OBJECT;
 
 const uint OBJ_TAG_BLOCKOUT = (1 << 0);
-const uint OBJ_TAG_PREVENTMOVE = (1 << 1);
+const uint OBJ_TAG_LOCK = (1 << 1);
 
 impl OBJECT
 {
@@ -58,6 +58,7 @@ impl OBJECT
 	extern void move_by(OBJECT obj, float3 by);
 	extern float3 get_position(OBJECT obj);
 	extern uint get_tags(OBJECT obj);
+	extern void set_tags(OBJECT obj, uint tags);
 
 	extern float3 ray_get_face(OBJECT obj);
 	extern float direction_scale(OBJECT obj, float3 direction);

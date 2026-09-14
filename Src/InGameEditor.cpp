@@ -522,6 +522,10 @@ bool EditorMode::SelectObject(Object* object, bool append_selection)
 		return false;
 	}
 
+	if (object->HasTags(eObjectTag::LockTransform)) {
+		return false;
+	}
+
 	if (IsInSelection(object)) {
 		return true;
 	}
