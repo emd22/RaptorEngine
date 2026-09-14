@@ -64,7 +64,7 @@ VSOutput main(VSInput input)
 
     float4x4 world_matrix = bObjectBuffer[VSConst.uiObjectIndex + input.uiInstanceId].mWorld;
 
-    float4x4 MVP = mul(VSConst.mViewProjection, world_matrix);
+    float4x4 MVP = mul(world_matrix, VSConst.mViewProjection);
 
 #ifdef USE_SKINNING
     float4x4 skin_xform = input.vJointWeights.x * bBones[input.vJointIndices.x]
@@ -72,21 +72,21 @@ VSOutput main(VSInput input)
         + input.vJointWeights.z * bBones[input.vJointIndices.z]
         + input.vJointWeights.w * bBones[input.vJointIndices.w];
 
-    output.vPosition = mul(MVP, mul(skin_xform, float4(input.vPosition, 1.0)));
-    output.vNormalWS = normalize(mul((float3x3)world_matrix, mul((float3x3)skin_xform, input.vNormal)));
+    output.vPosition = mul(mul(float4(input.vPosition, 1.0), skin_xform), MVP);
+    output.vNormalWS = normalize(mul(mul(input.vNormal, (float3x3)skin_xform), (float3x3)world_matrix));
 #else
-    output.vPosition = mul(MVP, float4(input.vPosition, 1.0));
-    output.vNormalWS = normalize(mul((float3x3)world_matrix, input.vNormal));
+    output.vPosition = mul(float4(input.vPosition, 1.0), MVP);
+    output.vNormalWS = normalize(mul(input.vNormal, (float3x3)world_matrix));
 #endif
 
 #ifdef USE_NORMAL_MAPS
-    output.vTangentWS = normalize(mul((float3x3)world_matrix, input.vTangent));
+    output.vTangentWS = normalize(mul(input.vTangent, (float3x3)world_matrix));
     output.vBitangentWS = cross(output.vNormalWS, output.vTangentWS);
 #endif
 
     output.vUV = input.vUV;
 
-    float4 position_ws = mul(world_matrix, float4(input.vPosition, 1.0));
+    float4 position_ws = mul(float4(input.vPosition, 1.0), world_matrix);
 	output.vPositionWS = position_ws.xyz;
 
 	output.uiMaterialIndex = VSConst.uiMaterialIndex;

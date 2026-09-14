@@ -1,4 +1,5 @@
 // Dummy macros for the shader preprocessor
+#pragma pack_matrix(row_major)
 #define F_PROGRAM(_type) ;
 #define FPT_VERTEX 0
 #define FPT_PIXEL 1

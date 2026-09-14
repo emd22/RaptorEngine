@@ -58,7 +58,7 @@ VSOutput main(VSInput input)
 	float2 text_position = instance.vPosition + (corner * instance.vSize);
 
 	float4 position = float4(text_position, 0.5f, 1.0f);
-	output.vPosition = mul(VSConst.mCombinedMatrix, position);
+	output.vPosition = mul(position, VSConst.mCombinedMatrix);
 
 	output.vUV = float2(lerp(instance.vUvMin.x, instance.vUvMax.x, corner.x),
 						lerp(instance.vUvMax.y, instance.vUvMin.y, corner.y));
