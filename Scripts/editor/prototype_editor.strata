@@ -469,8 +469,9 @@ void editor_face_tool(float delta_time)
 	/* Preview exactly where finalize will put the face:
 	   old face pos + player delta projected onto the face normal.
 	   This matches Blockout::ScaleInDirection (Max += mag / Min -= mag). */
-	float3 d = editor_transform_snap(player.position - initial_player_position);
-	float proj = (d.x * sel.selected_face.x) + (d.y * sel.selected_face.y) + (d.z * sel.selected_face.z);
+	float3 delta = editor_transform_snap(player.position - initial_player_position);
+
+	float proj = dot(delta, sel.selected_face);
 
 	float3 xform_marker_dest = initial_face_position + (sel.selected_face * float3(proj));
 	transform_marker_object.move_to(xform_marker_dest);
@@ -633,5 +634,18 @@ void CMD_snap2w()
 			continue;
 		}
 		editor_push_op_vec(obj, OPTYPE.MOVE, obj.position, snapped, snaps);
+	}
+}
+
+void CMD_lock()
+{
+	if (!editor_has_object_selection()) {
+		return;
+	}
+
+	int snaps = 0;
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		OBJECT obj = sel.selected_objects[i];
+		obj.set_tags(obj.get_tags() | OBJ_TAG_LOCK);
 	}
 }

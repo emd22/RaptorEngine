@@ -166,6 +166,15 @@ static uint32 N_object_get_tags(Object* obj)
 	return static_cast<uint32>(obj->Tags);
 }
 
+static void N_object_set_tags(Object* obj, uint32 tags)
+{
+	if (obj == nullptr) {
+		return;
+	}
+
+	obj->SetTags(static_cast<eObjectTag>(tags));
+}
+
 
 static float32 N_object_direction_scale(Object* obj, FLOAT4 direction)
 {
@@ -305,6 +314,7 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("OBJECT_move_by", N_object_move_by),
 	PREDEF("OBJECT_get_position", N_object_get_position),
 	PREDEF("OBJECT_get_tags", N_object_get_tags),
+	PREDEF("OBJECT_set_tags", N_object_set_tags),
 	PREDEF("OBJECT_ray_get_face", N_object_ray_get_face),
 	PREDEF("OBJECT_direction_scale", N_object_direction_scale),
 	PREDEF("OBJECT__select_object_internal", N_object__select_object_internal),
