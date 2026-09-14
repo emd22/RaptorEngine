@@ -567,7 +567,7 @@ void RaptorGame::Tick()
 	Vec3f target = gWorld->Player.Position;
 
 	gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(gShadowRenderer->ShadowCamera.Position, target, Vec3f(0, 1, 0));
-	// LogInfo("{}", gShadowRenderer->ShadowCamera.ViewMatrix.Columns[3]);
+	// LogInfo("{}", gShadowRenderer->ShadowCamera.ViewMatrix.Rows[3]);
 	gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
 	gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
 
