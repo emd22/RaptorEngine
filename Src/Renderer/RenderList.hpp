@@ -34,6 +34,11 @@ public:
 	RenderList() = default;
 
 	void AddObject(ePipelineName pl_name, const ObjectID id);
+	/**
+	 * @brief Invalidate object from renderlist. Use when an object is going to be destroyed or will be invalid before
+	 * the next renderlist rebuild.
+	 */
+	void InvalidateObject(const ObjectID id);
 	void ClearSection(ePipelineName section_name);
 
 	int32 CheckForObjectDuplicates(const ObjectID id) const;

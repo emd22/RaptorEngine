@@ -19,6 +19,20 @@ void RenderList::AddObject(ePipelineName pl_name, const ObjectID id)
 	section.Objects.Insert(id);
 }
 
+void RenderList::InvalidateObject(const ObjectID id)
+{
+	for (uint32 section_index = 0; section_index < mSections.Size; section_index++) {
+		RenderListSection& section = mSections[section_index];
+
+		for (ObjectID& found_id : section.Objects) {
+			if (found_id == id) {
+				found_id.Invalidate();
+				break;
+			}
+		}
+	}
+}
+
 void RenderList::ClearSection(ePipelineName section_name)
 {
 	DebugAssert(static_cast<uint32>(pl_name) < mSections.Capacity);

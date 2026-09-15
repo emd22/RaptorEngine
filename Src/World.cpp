@@ -124,7 +124,11 @@ void World::Attach(const Ref<LightBase>& light)
 	light->OnAttached(this);
 }
 
-void World::Detach(ObjectID id) { gWorldGrid->RemoveObject(id); }
+void World::Detach(ObjectID id)
+{
+	mRenderList.InvalidateObject(id);
+	gWorldGrid->RemoveObject(id);
+}
 
 // physics::BodyID World::NewPhysicsObject()
 // {
