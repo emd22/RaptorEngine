@@ -43,7 +43,7 @@ public:
 	 */
 	void AddObject(ObjectID id);
 
-	TileIndex GetTileIndex(const Vec3f& position) const;
+	TileIndex WorldToTile(const Vec3f& position) const;
 	TileIndex GetTileIndexXY(const Vec2u& xy) const;
 
 	const SizedArray<ObjectID>& GetNearbyObjects();
@@ -58,13 +58,19 @@ public:
 	 */
 	void RemoveObject(ObjectID id);
 
-	Vec2u GetTileXY(TileIndex tile_index) const;
+	Vec2u TileToTileXY(TileIndex tile_index) const;
+	Vec3f GetTileWorldPosition(TileIndex tile_index);
+
+	Vec3f TileXYToWorldCenter(Vec2u tile_xy) const;
+
 	Tile* GetTile(TileIndex index);
 	const Tile* GetTile(TileIndex index) const;
 
 	void SetViewTileIndex(TileIndex view_tile_index);
 
 	FX_FORCE_INLINE Vec2u GetGridSize() const { return mGridSize; }
+
+	FX_FORCE_INLINE uint32 GetNumTiles() const { return mTileBuffer.Size; }
 
 	~WorldGrid() = default;
 
@@ -78,7 +84,7 @@ private:
 
 public:
 	Vec2u mGridSize;
-	Vec2f mTileSize = Vec2f(25.0f, 25.0f);
+	Vec2f mTileSize = Vec2f(10.0f, 10.0f);
 	Vec3f mPositionOffset = Vec3f::sZero;
 
 	TileIndex ViewTileIndex = TileIndexNull;

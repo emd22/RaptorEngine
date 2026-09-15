@@ -46,6 +46,9 @@ FX_FORCE_INLINE FLOAT4 Sub(FLOAT4 a, FLOAT4 b) { return vsubq_f32(a, b); }
 FX_FORCE_INLINE FLOAT4 Round(FLOAT4 value) { return vrndq_f32(value); }
 FX_FORCE_INLINE FLOAT4 Floor(FLOAT4 value) { return vrndmq_f32(value); }
 
+FX_FORCE_INLINE FLOAT4 Min(FLOAT4 a, FLOAT4 b) { return vminq_f32(a, b); }
+FX_FORCE_INLINE FLOAT4 Max(FLOAT4 a, FLOAT4 b) { return vmaxq_f32(a, b); }
+
 } // namespace simd
 
 #else
@@ -78,6 +81,9 @@ FX_FORCE_INLINE FLOAT4 AbsDiff(FLOAT4 a, FLOAT4 b)
 FX_FORCE_INLINE FLOAT4 Sub(FLOAT4 a, FLOAT4 b) { return _mm_sub_ps(a, b); }
 
 FX_FORCE_INLINE FLOAT4 Round(FLOAT4 value) { return _mm_round_ps(value, _MM_FROUND_TO_NEAREST_INT); }
+
+FX_FORCE_INLINE FLOAT4 Min(FLOAT4 a, FLOAT4 b) { return _mm_min_ps(a, b); }
+FX_FORCE_INLINE FLOAT4 Max(FLOAT4 a, FLOAT4 b) { return _mm_max_ps(a, b); }
 
 
 } // namespace simd

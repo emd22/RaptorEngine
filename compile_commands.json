@@ -337,6 +337,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -O3 -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O3 -o CMakeFiles/raptor.dir/Src/Math/Frustum.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/Frustum.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Math/Frustum.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Math/Frustum.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -O3 -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O3 -o CMakeFiles/raptor.dir/Src/Math/Impl/Matrix/Mat4_AVX.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/Impl/Matrix/Mat4_AVX.cpp",
   "file": "/Users/emd22/Projects/raptor/Src/Math/Impl/Matrix/Mat4_AVX.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Math/Impl/Matrix/Mat4_AVX.cpp.o"

@@ -430,9 +430,9 @@ void RaptorGame::ProcessControls()
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_0)) {
-		TileIndex tile_index = gWorldGrid->GetTileIndex(gWorld->Player.Position);
+		TileIndex tile_index = gWorldGrid->WorldToTile(gWorld->Player.Position);
 
-		Vec2u tile_xy = gWorldGrid->GetTileXY(tile_index);
+		Vec2u tile_xy = gWorldGrid->TileToTileXY(tile_index);
 
 		LogInfo("Tile index: {}, {}", tile_xy.X, tile_xy.Y);
 	}

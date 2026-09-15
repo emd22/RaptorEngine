@@ -98,17 +98,12 @@ void Body::UpdateJoltBody(JPH::ShapeRefC shape, physics::Body::eFlags flags, phy
 		previous_position = GetPosition();
 		previous_rotation = GetRotation();
 
-		body_interface.RemoveBody(mpPhysicsBody->GetID());
+		RemoveFromWorld();
 		body_interface.DestroyBody(mpPhysicsBody->GetID());
 	}
 
 	JPH::EMotionType jolt_motion_type = JPH::EMotionType::Static;
 	PhLayer::Type object_layer = PhLayer::Static;
-	JPH::EActivation activation_mode = JPH::EActivation::Activate;
-
-	if (flags & Body::eFlags::CreateInactive) {
-		activation_mode = JPH::EActivation::DontActivate;
-	}
 
 	switch (motion_type) {
 	case physics::eMotionType::Static:
@@ -135,7 +130,7 @@ void Body::UpdateJoltBody(JPH::ShapeRefC shape, physics::Body::eFlags flags, phy
 	body_settings.mRestitution = properties.Restitution;
 
 	mpPhysicsBody = body_interface.CreateBody(body_settings);
-	body_interface.AddBody(mpPhysicsBody->GetID(), activation_mode);
+	AddToWorld();
 
 	mbHasPhysicsBody = true;
 }
@@ -157,6 +152,26 @@ void Body::DestroyPhysicsBody()
 
 
 void Body::SetMidpoint(const Vec3f& midpoint) { Midpoint = midpoint; }
+
+void Body::RemoveFromWorld()
+{
+	if (!mbIsInWorld) {
+		return;
+	}
+
+	gPhysics->pBackend->GetBodyInterface().RemoveBody(mpPhysicsBody->GetID());
+	mbIsInWorld = false;
+}
+void Body::AddToWorld()
+{
+	if (mbIsInWorld) {
+		return;
+	}
+
+	gPhysics->pBackend->GetBodyInterface().AddBody(mpPhysicsBody->GetID(), JPH::EActivation::DontActivate);
+
+	mbIsInWorld = true;
+}
 
 void Body::Teleport(const Vec3f& position, const Quat& rotation)
 {
