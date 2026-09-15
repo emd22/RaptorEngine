@@ -42,6 +42,7 @@ enum class eObjectFlags : uint16
 	IsInstance = (1 << 2),
 	ShadowCaster = (1 << 3),
 	Unlit = (1 << 4),
+	NoVisCulling = (1 << 5),
 };
 
 FxEnumFlags(eObjectFlags);

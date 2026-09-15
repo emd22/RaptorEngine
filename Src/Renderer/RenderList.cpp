@@ -5,9 +5,8 @@
 
 namespace fx::renderer {
 
-static constexpr uint32 scMaxRenderable = 512;
 
-uint32 RenderList::Add(ePipelineName pl_name, const ObjectID id)
+void RenderList::AddObject(ePipelineName pl_name, const ObjectID id)
 {
 	if (!mSections.IsInited()) {
 		mSections.InitSize(scNumPipelines);
@@ -17,60 +16,27 @@ uint32 RenderList::Add(ePipelineName pl_name, const ObjectID id)
 
 	RenderListSection& section = mSections[static_cast<uint32>(pl_name)];
 
-	if (!section.InUse.IsInited()) {
-		section.InUse.InitZero(scMaxRenderable);
-	}
-
-
-	uint32 index = section.InUse.FindNextFreeBit();
-
-	if (index >= section.Objects.Size) {
-		section.Objects.Insert(id);
-	}
-	else {
-		section.Objects[index] = id;
-	}
-
-	section.InUse.Set(index);
-
-	return index;
+	section.Objects.Insert(id);
 }
 
-void RenderList::Remove(ePipelineName pl_name, const ObjectID id)
+void RenderList::ClearSection(ePipelineName section_name)
 {
-	Assert(static_cast<uint32>(pl_name) < mSections.Capacity);
-	RenderListSection& section = mSections[static_cast<uint32>(pl_name)];
+	DebugAssert(static_cast<uint32>(pl_name) < mSections.Capacity);
+	RenderListSection& section = mSections[static_cast<uint32>(section_name)];
 
-	for (uint32 object_index = 0; object_index < section.Objects.Size; object_index++) {
-		if (section.Objects[object_index] == id) {
-			section.InUse.Unset(object_index);
-		}
-	}
+	section.Objects.Clear();
 }
 
-uint32 RenderList::GetObjectIndex(ePipelineName pl_name, const ObjectID id) const
+uint32 RenderList::GetItemCount() const
 {
-	if (static_cast<uint32>(pl_name) >= mSections.Capacity) {
-		// Sections have not been inited yet, so it doesn't exist
-		return scNotFound;
+	uint32 count = 0;
+
+	for (uint32 section_index = 0; section_index < mSections.Size; section_index++) {
+		const RenderListSection& section = mSections[section_index];
+		count += section.Objects.Size;
 	}
 
-	const RenderListSection& section = mSections[static_cast<uint32>(pl_name)];
-
-	for (uint32 object_index = 0; object_index < section.Objects.Size; object_index++) {
-		if (section.Objects[object_index] == id) {
-			return object_index;
-		}
-	}
-
-	return scNotFound;
-}
-
-void RenderList::RemoveAllOfObject(const ObjectID id)
-{
-	for (uint32 si = 0; si < scNumPipelines; si++) {
-		Remove(static_cast<ePipelineName>(si), id);
-	}
+	return count;
 }
 
 int32 RenderList::CheckForObjectDuplicates(const ObjectID id) const

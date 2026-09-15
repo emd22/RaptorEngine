@@ -62,10 +62,10 @@ static void AddObjectToRenderList(Object* object, World* scene)
 
 		// If the object casts shadows as well, add it to the shadow section
 		if (object->IsShadowCaster()) {
-			gWorld->mRenderList.Add(ePipelineName::ShadowDirectional, object->ID);
+			gWorld->mRenderList.AddObject(ePipelineName::ShadowDirectional, object->ID);
 		}
 
-		gWorld->mRenderList.Add(pipeline_name, object->ID);
+		gWorld->mRenderList.AddObject(pipeline_name, object->ID);
 	}
 
 	if (!object->AttachedNodes.IsEmpty()) {
@@ -84,22 +84,22 @@ static void AddObjectToRenderList(Object* object, World* scene)
 	}
 }
 
-static void RemoveObjectFromRenderList(ObjectID id)
-{
-	if (id.IsNull() || id.IsInvalid()) {
-		return;
-	}
+// static void RemoveObjectFromRenderList(ObjectID id)
+// {
+// 	if (id.IsNull() || id.IsInvalid()) {
+// 		return;
+// 	}
 
 
-	Object* object = gObjectManager->GetObject(id);
-	gWorld->mRenderList.RemoveAllOfObject(id);
+// 	Object* object = gObjectManager->GetObject(id);
+// 	gWorld->mRenderList.RemoveAllOfObject(id);
 
-	if (!object->AttachedNodes.IsEmpty()) {
-		for (const ObjectID& attach_id : object->AttachedNodes) {
-			RemoveObjectFromRenderList(attach_id);
-		}
-	}
-}
+// 	if (!object->AttachedNodes.IsEmpty()) {
+// 		for (const ObjectID& attach_id : object->AttachedNodes) {
+// 			RemoveObjectFromRenderList(attach_id);
+// 		}
+// 	}
+// }
 
 
 void World::Attach(AssetTicket object_ticket)
@@ -124,11 +124,7 @@ void World::Attach(const Ref<LightBase>& light)
 	light->OnAttached(this);
 }
 
-void World::Detach(ObjectID id)
-{
-	gWorldGrid->RemoveObject(id);
-	RemoveObjectFromRenderList(id);
-}
+void World::Detach(ObjectID id) { gWorldGrid->RemoveObject(id); }
 
 // physics::BodyID World::NewPhysicsObject()
 // {
@@ -180,11 +176,6 @@ void World::ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera
 {
 	RenderListSection& section = mRenderList.GetSection(pl_name);
 
-	if (!section.InUse.IsInited()) {
-		return;
-	}
-
-
 	renderer::Pipeline& pipeline = gPipelineCache->Request(pl_name);
 
 	pipeline.Bind(gGraphics->GetFrame()->CmdBuffer);
@@ -205,14 +196,7 @@ void World::ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera
 
 	uint32 index = 0;
 
-	while (true) {
-		index = section.InUse.FindNextSetBit(index);
-
-		if (index == Bitset::scNoFreeBits) {
-			break;
-		}
-
-		ObjectID object_id = section.Objects[index];
+	for (ObjectID object_id : section.Objects) {
 		Object* object = gObjectManager->GetObject(object_id);
 
 		object->Update();
@@ -232,32 +216,15 @@ void World::ExecuteTransparentRenderLists()
 	{
 		const RenderListSection& section = mRenderList.GetSection(pl_name);
 
-		if (!section.InUse.IsInited()) {
-			return;
-		}
+		for (ObjectID object_id : section.Objects) {
+			Object* object = gObjectManager->GetObject(object_id);
 
-		uint32 index = 0;
+			Vec3f center = object->GetPosition() + object->Bounds.Min + object->Bounds.GetSize() * 0.5f;
+			Vec3f diff = center - camera_position;
 
-		while (true) {
-			index = section.InUse.FindNextSetBit(index);
+			float32 distance_sq = diff.Dot(diff);
 
-			if (index == Bitset::scNoFreeBits) {
-				break;
-			}
-
-			{
-				ObjectID object_id = section.Objects[index];
-				Object* object = gObjectManager->GetObject(object_id);
-
-				Vec3f center = object->GetPosition() + object->Bounds.Min + object->Bounds.GetSize() * 0.5f;
-				Vec3f diff = center - camera_position;
-
-				float32 distance_sq = diff.Dot(diff);
-
-				SortedEntryBuffer.Insert({ object_id, pl_name, distance_sq });
-			}
-
-			++index;
+			SortedEntryBuffer.Insert({ object_id, pl_name, distance_sq });
 		}
 	};
 
@@ -411,10 +378,6 @@ void World::ExecuteShadowRenderList(renderer::ePipelineName pl_name)
 
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
-	if (!section.InUse.IsInited()) {
-		return;
-	}
-
 	renderer::Pipeline& pipeline = gPipelineCache->Request(pl_name);
 
 	// Push constants definition
@@ -422,15 +385,7 @@ void World::ExecuteShadowRenderList(renderer::ePipelineName pl_name)
 	memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData,
 		   sizeof(float32) * 16);
 
-	uint32 index = 0;
-	while (true) {
-		index = section.InUse.FindNextSetBit(index);
-		if (index == Bitset::scNoFreeBits) {
-			break;
-		}
-
-
-		ObjectID object_id = section.Objects[index];
+	for (ObjectID object_id : section.Objects) {
 		Object* object = gObjectManager->GetObject(object_id);
 
 		// Push the direct index for the object id
@@ -439,8 +394,6 @@ void World::ExecuteShadowRenderList(renderer::ePipelineName pl_name)
 
 		object->Update();
 		object->RenderPrimitive(cmd);
-
-		++index;
 	}
 }
 
@@ -456,10 +409,6 @@ void World::ExecutePrepassRenderList(renderer::ePipelineName forward_pl_name)
 	PerspectiveCamera& camera = *mpCurrentCamera;
 
 	const RenderListSection& section = mRenderList.GetSection(forward_pl_name);
-
-	if (!section.InUse.IsInited()) {
-		return;
-	}
 
 	ePipelineName prepass_pl_name = forward_pl_name;
 	switch (forward_pl_name) {
@@ -490,14 +439,8 @@ void World::ExecutePrepassRenderList(renderer::ePipelineName forward_pl_name)
 
 	const Mat4f& cam_matrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 
-	uint32 index = 0;
-	while (true) {
-		index = section.InUse.FindNextSetBit(index);
-		if (index == Bitset::scNoFreeBits) {
-			break;
-		}
 
-		ObjectID object_id = section.Objects[index];
+	for (ObjectID object_id : section.Objects) {
 		Object* object = gObjectManager->GetObject(object_id);
 
 		object->Update();
@@ -517,8 +460,6 @@ void World::ExecutePrepassRenderList(renderer::ePipelineName forward_pl_name)
 		}
 
 		object->RenderPrimitive(gGraphics->GetFrame()->CmdBuffer);
-
-		++index;
 	}
 }
 
@@ -533,29 +474,13 @@ void World::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* 
 
 	RenderListSection& section = mRenderList.GetSection(pl_name);
 
-	uint32 index = 0;
-	while (true) {
-		index = section.InUse.FindNextSetBit(index);
-		if (index == Bitset::scNoFreeBits) {
-			break;
-		}
-
-		const ObjectID* object_id = section.Objects.Get(index);
-		if (!object_id) {
-			break;
-		}
-
-		if ((*object_id) == id) {
-			// LogInfo("Avoiding ID {}, {}", *object_id, id);
+	for (ObjectID object_id : section.Objects) {
+		if (object_id == id) {
 			return;
 		}
-
-		++index;
 	}
 
-
-	// LogInfo("Adding object to render list index {}", section.Objects.Size);
-	mRenderList.Add(pl_name, id);
+	mRenderList.AddObject(pl_name, id);
 
 	Object* obj = gObjectManager->GetObject(id);
 
@@ -564,22 +489,16 @@ void World::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* 
 	}
 }
 
-#define CLEAR_RL_SECTION(pl_name_)                                                                                     \
-	{                                                                                                                  \
-		RenderListSection& rl = mRenderList.GetSection(pl_name_);                                                      \
-		rl.InUse.ClearAll();                                                                                           \
-		rl.Objects.Clear();                                                                                            \
-	}
 
 void World::ClearRenderList()
 {
-	CLEAR_RL_SECTION(ePipelineName::Geometry);
-	CLEAR_RL_SECTION(ePipelineName::GeometryNormalMaps);
-	CLEAR_RL_SECTION(ePipelineName::GeometrySkinned);
-	CLEAR_RL_SECTION(ePipelineName::GeometryTransparent);
-	CLEAR_RL_SECTION(ePipelineName::GeometryNormalMapsTransparent);
-	CLEAR_RL_SECTION(ePipelineName::GeometrySkinnedTransparent);
-	CLEAR_RL_SECTION(ePipelineName::ShadowDirectional);
+	mRenderList.ClearSection(ePipelineName::Geometry);
+	mRenderList.ClearSection(ePipelineName::GeometryNormalMaps);
+	mRenderList.ClearSection(ePipelineName::GeometrySkinned);
+	mRenderList.ClearSection(ePipelineName::GeometryTransparent);
+	mRenderList.ClearSection(ePipelineName::GeometryNormalMapsTransparent);
+	mRenderList.ClearSection(ePipelineName::GeometrySkinnedTransparent);
+	mRenderList.ClearSection(ePipelineName::ShadowDirectional);
 }
 
 void World::RebuildRenderList(bool clear, TileIndex new_tile_index)
@@ -664,8 +583,7 @@ void World::NotifyObjectMaterialChanged(ObjectID id)
 	// 	return;
 	// }
 
-	RemoveObjectFromRenderList(id);
-	AddObjectToRenderList(object, this);
+	// No need to remove/readd to renderlist as it is rebuilt every frame now.
 }
 
 struct QuadPlanes
@@ -800,7 +718,9 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 		}
 	}
 
-	LogInfo("{} of {} tiles visible", num_visible, gWorldGrid->GetNumTiles());
+	LogInfo("{} objects in renderlist", mRenderList.GetItemCount());
+
+	// LogInfo("{} of {} tiles visible", num_visible, gWorldGrid->GetNumTiles());
 }
 
 
