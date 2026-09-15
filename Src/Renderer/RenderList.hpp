@@ -23,9 +23,6 @@ namespace renderer {
 struct RenderListSection
 {
 	DynArray<ObjectID> Objects;
-	Bitset InUse;
-
-	void ClearObjects();
 };
 
 class RenderList
@@ -36,19 +33,12 @@ public:
 public:
 	RenderList() = default;
 
-	uint32 Add(ePipelineName pl_name, const ObjectID id);
-
-	void Remove(ePipelineName pl_name, const ObjectID id);
-	void RemoveAllOfObject(const ObjectID id);
+	void AddObject(ePipelineName pl_name, const ObjectID id);
+	void ClearSection(ePipelineName section_name);
 
 	int32 CheckForObjectDuplicates(const ObjectID id) const;
 
-
-	/**
-	 * @brief Gets the object's index in the given pipeline (section) of the renderlist. Returns scNotFound if not
-	 * found.
-	 */
-	uint32 GetObjectIndex(ePipelineName pl_name, const ObjectID id) const;
+	uint32 GetItemCount() const;
 
 	RenderListSection& GetSection(ePipelineName pl_name);
 
