@@ -940,8 +940,8 @@ bool ProbeManager::BuildDepthMoments(uint32 batch_slot, uint32 probe_index)
 				if (stored_depth > 1e-6f) {
 					const float32 depth = 1.0f - stored_depth;
 					Vec4f clip_d(nx, ny, depth, 1.0f);
-					Vec4f view_d = inv_proj.MultiplyVec4f(clip_d);
-					Vec4f world_d = inv_view.MultiplyVec4f(view_d);
+					Vec4f view_d = inv_proj * (clip_d);
+					Vec4f world_d = inv_view * (view_d);
 
 					if (fabsf(world_d.W) > 1e-6f) {
 						const float32 w_inv = 1.0f / world_d.W;

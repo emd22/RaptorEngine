@@ -115,6 +115,30 @@ Mat4f Mat4f::operator*(const Mat4f& other) const
 	return result;
 }
 
+Vec4f Mat4f::operator*(const Vec4f& other) const
+{
+	float32x4_t p0, p1, p2, p3;
+
+	{
+		float32x4_t vec = other.mIntrin;
+		p0 = vmulq_f32(Rows[0].mIntrin, vec);
+		p1 = vmulq_f32(Rows[1].mIntrin, vec);
+		p2 = vmulq_f32(Rows[2].mIntrin, vec);
+		p3 = vmulq_f32(Rows[3].mIntrin, vec);
+	}
+
+	// Pairwise add to get { X0+Y0, Z0+W0, X1+Y1, Z1+W1 }
+	float32x4_t sum01 = vpaddq_f32(p0, p1);
+	// Pairwise add to get { X2+Y2, Z2+W2, X3+Y3, Z3+W3 }
+	float32x4_t sum23 = vpaddq_f32(p2, p3);
+
+	// Sum these final results. Originally thought of doing this with vaddvq, but that would require 4 calls to an
+	// already compound intrinsic. Love pairwise adds!
+	float32x4_t res = vpaddq_f32(sum01, sum23);
+
+	return Vec4f(res);
+}
+
 
 Mat4f::Mat4f(float data[4][4]) noexcept
 {

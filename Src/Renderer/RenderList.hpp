@@ -24,6 +24,8 @@ struct RenderListSection
 {
 	DynArray<ObjectID> Objects;
 	Bitset InUse;
+
+	void ClearObjects();
 };
 
 class RenderList

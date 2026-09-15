@@ -139,6 +139,7 @@ public:
 	void CopyAsMat3To(float* dest) const;
 
 	Mat4f operator*(const Mat4f& other) const;
+	Vec4f operator*(const Vec4f& other) const;
 
 	void Print() const
 	{

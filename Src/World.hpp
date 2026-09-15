@@ -4,6 +4,7 @@
 #include "WorldGrid.hpp"
 
 #include <Asset/AssetTicket.hpp>
+#include <Math/Frustum.hpp>
 #include <Object/Object.hpp>
 #include <Player.hpp>
 #include <Renderer/Camera.hpp>
@@ -81,6 +82,8 @@ private:
 	void RenderBoundingBoxes(const Camera& camera);
 	void RenderWorldGrid(const Camera& camera);
 
+	void CullWorldTiles(const PerspectiveCamera& cam);
+
 	void ExecuteRenderList(renderer::ePipelineName pl_name);
 	void ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera& camera);
 	void ExecuteTransparentRenderLists();
@@ -88,6 +91,8 @@ private:
 	void ExecutePrepassRenderList(renderer::ePipelineName pl_name);
 
 	void RebuildRenderList(bool clear, TileIndex new_tile);
+	void ClearRenderList();
+
 	void AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* id);
 
 	void RebuildFromTiles(TileIndex tile_index);
@@ -128,6 +133,8 @@ private:
 
 	/// Sorted entries, only for transparent objects.
 	DynArray<TransparentObjectCarrier> SortedEntryBuffer;
+
+	Frustum mFrustum;
 };
 
 } // namespace fx

@@ -71,7 +71,7 @@ Tile* WorldGrid::GetObjectTile(const Object* object, TileIndex* out_tile_index)
 		return nullptr;
 	}
 
-	const uint32 tile_index = GetTileIndex(object->mPosition);
+	const uint32 tile_index = WorldToTile(object->mPosition);
 
 	if (out_tile_index != nullptr) {
 		(*out_tile_index) = tile_index;
@@ -94,8 +94,8 @@ void WorldGrid::AddObject(ObjectID id)
 
 	const Vec3f object_size = object->Bounds.GetSize();
 
-	Vec2u tile_index_start = GetTileXY(GetTileIndex(object->mPosition + object->Bounds.Min));
-	Vec2u tile_index_end = GetTileXY(GetTileIndex(object->mPosition + object->Bounds.GetSize()));
+	Vec2u tile_index_start = TileToTileXY(WorldToTile(object->mPosition + object->Bounds.Min));
+	Vec2u tile_index_end = TileToTileXY(WorldToTile(object->mPosition + object->Bounds.GetSize()));
 
 	uint32 width_in_tiles = std::clamp(tile_index_end.X - tile_index_start.X + 1, 1U, mGridSize.X);
 	uint32 height_in_tiles = std::clamp(tile_index_end.Y - tile_index_start.Y + 1, 1U, mGridSize.Y);
@@ -155,7 +155,7 @@ const SizedArray<ObjectID>& WorldGrid::GetNearbyObjects()
 		return mNearbyObjectCache;
 	}
 
-	Vec2u view_xy = GetTileXY(ViewTileIndex);
+	Vec2u view_xy = TileToTileXY(ViewTileIndex);
 	const Tile* view_tile = GetTile(GetTileIndexXY(view_xy));
 
 	const Tile* surrounding_tiles[] = {
@@ -225,7 +225,7 @@ TileIndex WorldGrid::InsertDirect(ObjectID id)
 	fx::ObjectID* out_id = tile->Objects.NewItem();
 	(*out_id) = id;
 
-	Vec2u tile_xy = GetTileXY(tile_index);
+	Vec2u tile_xy = TileToTileXY(tile_index);
 
 	LogInfo("Inserting object '{}' into tile index {}, {}", object->Name.Get(), tile_xy.X, tile_xy.Y);
 
@@ -305,11 +305,26 @@ void WorldGrid::UpdateObject(ObjectID id, bool update_attached)
 	}
 }
 
-Vec2u WorldGrid::GetTileXY(TileIndex tile_index) const
+Vec2u WorldGrid::TileToTileXY(TileIndex tile_index) const
 {
 	const uint32 tile_x = tile_index % mGridSize.X;
 	const uint32 tile_y = (tile_index - tile_x) / mGridSize.X;
 	return Vec2u(tile_x, tile_y);
+}
+
+Vec3f WorldGrid::GetTileWorldPosition(TileIndex tile_index)
+{
+	const uint32 column = tile_index % mGridSize.X;
+	const uint32 row = tile_index / mGridSize.Y;
+
+	return Vec3f(static_cast<float32>(column) * mTileSize.X, 0.0f, static_cast<float32>(row) * mTileSize.Y);
+}
+
+Vec3f WorldGrid::TileXYToWorldCenter(Vec2u tile_xy) const
+{
+	return Vec3f((static_cast<float32>(tile_xy.X) * mTileSize.X) - mPositionOffset.X + (mTileSize.X * 0.5f),
+				 mPositionOffset.Y,
+				 (static_cast<float32>(tile_xy.Y) * mTileSize.Y) - mPositionOffset.Z + (mTileSize.Y * 0.5f));
 }
 
 
@@ -336,11 +351,16 @@ TileIndex WorldGrid::GetTileIndexXY(const Vec2u& xy) const
 	return std::min(xy.Y, mGridSize.Y - 1) * mGridSize.X + std::min(xy.X, mGridSize.X - 1);
 }
 
-TileIndex WorldGrid::GetTileIndex(const Vec3f& position) const
+TileIndex WorldGrid::WorldToTile(const Vec3f& position) const
 {
 	const Vec3f adjusted = position + mPositionOffset;
-	return std::min(static_cast<uint32>(std::floor(adjusted.Z / mTileSize.Y)), mGridSize.Y - 1) * mGridSize.X +
-		   std::min(static_cast<uint32>(std::floor(adjusted.X / mTileSize.X)), mGridSize.X - 1);
+	const int32 tile_x = static_cast<int>(std::floor(adjusted.X / mTileSize.X));
+	const int32 tile_z = static_cast<int>(std::floor(adjusted.Z / mTileSize.Y));
+
+	const uint32 clamped_x = static_cast<uint32>(std::clamp(tile_x, 0, static_cast<int>(mGridSize.X) - 1));
+	const uint32 clamped_z = static_cast<uint32>(std::clamp(tile_z, 0, static_cast<int>(mGridSize.Y) - 1));
+
+	return clamped_z * mGridSize.X + clamped_x;
 }
 
 void WorldGrid::RemoveObject(ObjectID id)

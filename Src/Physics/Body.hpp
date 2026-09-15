@@ -87,6 +87,12 @@ public:
 	FX_FORCE_INLINE void SetName(const String& name) { mColliderName.Set(name); }
 	FX_FORCE_INLINE void SetName(const std::string& name) { mColliderName.Set(name); }
 
+	/**
+	 * @brief Removes the body from the simulation.
+	 */
+	void RemoveFromWorld();
+	void AddToWorld();
+
 	~Body() = default;
 
 private:
@@ -113,6 +119,8 @@ public:
 private:
 	Name mColliderName;
 	ObjectID mObjectID = ObjectID::scNull;
+
+	bool mbIsInWorld = false;
 };
 
 } // namespace physics
