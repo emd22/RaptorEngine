@@ -113,7 +113,7 @@ void RaptorGame::InitEngine()
 
 	gPhysics->Create();
 	gAssetManager->Start(3);
-	gWorldGrid->Create(Vec2u(10, 10));
+	gWorldGrid->Create(Vec2u(20, 20));
 
 	sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
 
