@@ -14,6 +14,13 @@ public:
 
 	void Add(const AABB& other);
 
+	AABB& OffsetBy(const Vec3f& offset)
+	{
+		Min += offset;
+		Max += offset;
+		return *this;
+	}
+
 	AABB operator+(const AABB& other) const;
 	AABB& operator+=(const AABB& other);
 
