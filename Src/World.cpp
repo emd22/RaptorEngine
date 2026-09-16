@@ -571,16 +571,16 @@ void World::RebuildFromTiles(TileIndex tile_index)
 	Vec2u xy = gWorldGrid->TileToTileXY(tile_index);
 
 	// Rebuild the immediate surrounding tiles (up, left, down, right)
-	AddTileToRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(1, 0)));
-	AddTileToRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(-1, 0)));
-	AddTileToRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(0, -1)));
-	AddTileToRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(0, 1)));
+	AddTileToRenderList(false, gWorldGrid->TileFromTileXY(xy + Vec2u(1, 0)));
+	AddTileToRenderList(false, gWorldGrid->TileFromTileXY(xy + Vec2u(-1, 0)));
+	AddTileToRenderList(false, gWorldGrid->TileFromTileXY(xy + Vec2u(0, -1)));
+	AddTileToRenderList(false, gWorldGrid->TileFromTileXY(xy + Vec2u(0, 1)));
 
 	// Build the diagonals
-	AddTileToRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(1, 1)));
-	AddTileToRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(1, -1)));
-	AddTileToRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(-1, -1)));
-	AddTileToRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(-1, 1)));
+	AddTileToRenderList(false, gWorldGrid->TileFromTileXY(xy + Vec2u(1, 1)));
+	AddTileToRenderList(false, gWorldGrid->TileFromTileXY(xy + Vec2u(1, -1)));
+	AddTileToRenderList(false, gWorldGrid->TileFromTileXY(xy + Vec2u(-1, -1)));
+	AddTileToRenderList(false, gWorldGrid->TileFromTileXY(xy + Vec2u(-1, 1)));
 }
 
 void World::NotifyObjectMaterialChanged(ObjectID id)
@@ -630,7 +630,9 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 
 	for (uint32 y = min_tile.Y; y <= max_tile.Y; y++) {
 		for (uint32 x = min_tile.X; x <= max_tile.X; x++) {
-			AABB tile_bounds = gWorldGrid->GetTileAABB();
+			TileIndex ti = gWorldGrid->TileFromTileXY(Vec2u(x, y));
+
+			AABB tile_bounds = gWorldGrid->GetTileAABB(ti);
 
 			if (!mFrustum.TileIntersectsAABB(tile_bounds)) {
 				continue;
@@ -638,7 +640,6 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 
 			++num_visible;
 
-			TileIndex ti = gWorldGrid->GetTileIndexXY(Vec2u(x, y));
 			mVisibleTiles.Emplace(ti);
 
 			AddTileToRenderList(false, ti);
@@ -893,7 +894,7 @@ void World::RenderWorldGrid(const Camera& camera)
 			push_constants.DebugColor = debug_color.AsUInt();
 
 			for (const TileIndex vis_ti : mVisibleTiles) {
-				if (vis_ti == gWorldGrid->GetTileIndexXY(Vec2u(x, y))) {
+				if (vis_ti == gWorldGrid->TileFromTileXY(Vec2u(x, y))) {
 					push_constants.DebugColor = player_debug_color.AsUInt();
 				}
 			}

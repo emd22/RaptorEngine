@@ -45,7 +45,7 @@ public:
 	void AddObject(ObjectID id);
 
 	TileIndex WorldToTile(const Vec3f& position) const;
-	TileIndex GetTileIndexXY(const Vec2u& xy) const;
+	TileIndex TileFromTileXY(const Vec2u& xy) const;
 
 	const SizedArray<ObjectID>& GetNearbyObjects();
 
@@ -60,7 +60,7 @@ public:
 	void RemoveObject(ObjectID id);
 
 	Vec2u TileToTileXY(TileIndex tile_index) const;
-	Vec3f GetTileWorldPosition(TileIndex tile_index);
+	Vec3f GetTileWorldPosition(TileIndex tile_index) const;
 
 	Vec3f TileXYToWorldCenter(Vec2u tile_xy) const;
 
@@ -69,9 +69,11 @@ public:
 
 	void SetViewTileIndex(TileIndex view_tile_index);
 
-	FX_FORCE_INLINE AABB GetTileAABB() const
+	FX_FORCE_INLINE AABB GetTileAABB(TileIndex ti) const
 	{
-		return AABB(-Vec3f(mTileSize.X, 1.0, mTileSize.Y), Vec3f(mTileSize.X, 1.0, mTileSize.Y));
+		Vec3f tile_position = GetTileWorldPosition(ti);
+		Vec3f half(mTileSize.X * 0.5f, 1.0f, mTileSize.Y * 0.5f);
+		return AABB(tile_position - half, tile_position + half);
 	}
 
 	FX_FORCE_INLINE Vec2u GetGridSize() const { return mGridSize; }
