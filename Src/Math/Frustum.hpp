@@ -33,6 +33,8 @@ public:
 
 	void Rebuild(const PerspectiveCamera& camera);
 
+	bool TileIntersectsAABB(const AABB& tile_aabb) const;
+
 	FX_FORCE_INLINE const Vec4f& GetPlane(const eFrustumPlane plane) const
 	{
 		return mClipPlanes[static_cast<uint32>(plane)];
