@@ -40,13 +40,13 @@ public:
 		return max_vertex;
 	}
 
-	static BoundingBox CalculateBounds(const renderer::VertexList& vertex_list)
+	static AABB CalculateBounds(const renderer::VertexList& vertex_list)
 	{
 		const AnonArray& vertices = vertex_list.GetLocalBuffer();
 
 		if (vertices.IsEmpty()) {
 			LogWarning(LC_ASSET, "Cannot calculate dimensions as there are no vertices!");
-			return BoundingBox {};
+			return AABB {};
 		}
 
 		Vec3f min_vertex = Vec3f(FLT_MAX);
@@ -63,7 +63,7 @@ public:
 			max_vertex = Vec3f::Max(max_vertex, position);
 		}
 
-		return BoundingBox { min_vertex, max_vertex };
+		return AABB { min_vertex, max_vertex };
 	}
 };
 

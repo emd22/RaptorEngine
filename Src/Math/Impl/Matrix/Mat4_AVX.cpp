@@ -18,24 +18,6 @@ static const float32 scIdentityData[16] = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 
 
 const Mat4f Mat4f::scIdentity = Mat4f(scIdentityData);
 
-__m128 Mat4f::MultiplyVec4f_SSE(const Vec4f& vec)
-{
-	__m128 v = vec.mIntrin;
-	__m128 v0 = SSE::Permute4<SSE::Shuffle_AX>(v);
-	__m128 v1 = SSE::Permute4<SSE::Shuffle_AY>(v);
-	__m128 v2 = SSE::Permute4<SSE::Shuffle_AZ>(v);
-	__m128 v3 = SSE::Permute4<SSE::Shuffle_AW>(v);
-
-	__m128 result = _mm_mul_ps(Rows[0].mIntrin, v0);
-	result = _mm_fmadd_ps(Rows[1].mIntrin, v1, result);
-	result = _mm_fmadd_ps(Rows[2].mIntrin, v2, result);
-	result = _mm_fmadd_ps(Rows[3].mIntrin, v3, result);
-
-	return result;
-}
-
-Vec4f Mat4f::MultiplyVec4f(Vec4f& vec) { return Vec4f(MultiplyVec4f_SSE(vec)); }
-
 Mat4f Mat4f::AsRotation(const Quat& quat)
 {
 	float x = quat.GetX();
@@ -157,6 +139,22 @@ Mat4f Mat4f::operator*(const Mat4f& other) const
 	}
 
 	return result;
+}
+
+Mat4f Mat4f::operator*(const Vec4f& vec) const
+{
+	__m128 v = vec.mIntrin;
+	__m128 v0 = SSE::Permute4<SSE::Shuffle_AX>(v);
+	__m128 v1 = SSE::Permute4<SSE::Shuffle_AY>(v);
+	__m128 v2 = SSE::Permute4<SSE::Shuffle_AZ>(v);
+	__m128 v3 = SSE::Permute4<SSE::Shuffle_AW>(v);
+
+	__m128 result = _mm_mul_ps(Rows[0].mIntrin, v0);
+	result = _mm_fmadd_ps(Rows[1].mIntrin, v1, result);
+	result = _mm_fmadd_ps(Rows[2].mIntrin, v2, result);
+	result = _mm_fmadd_ps(Rows[3].mIntrin, v3, result);
+
+	return Vec4f(result);
 }
 
 

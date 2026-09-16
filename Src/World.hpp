@@ -90,7 +90,7 @@ private:
 	void ExecuteShadowRenderList(renderer::ePipelineName pl_name);
 	void ExecutePrepassRenderList(renderer::ePipelineName pl_name);
 
-	void RebuildRenderList(bool clear, TileIndex new_tile);
+	void AddTileToRenderList(bool clear, TileIndex new_tile);
 	void ClearRenderList();
 
 	void AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* id);
@@ -135,6 +135,8 @@ private:
 	DynArray<TransparentObjectCarrier> SortedEntryBuffer;
 
 	Frustum mFrustum;
+
+	// SizedArray<TileIndex> mVisibleTiles;
 };
 
 } // namespace fx

@@ -4,7 +4,9 @@
 #include "SIMDHelper.hpp"
 
 #include <Renderer/Camera.hpp>
+#include <cfloat>
 
+#define PLANE(idx_) mClipPlanes[static_cast<uint32>(idx_)]
 
 namespace fx {
 // We need to find the tiles that can possibly intersect with the frustum.
@@ -20,90 +22,39 @@ void Frustum::Rebuild(const PerspectiveCamera& camera)
 	const Vec4f& vr_z = vp_m.Rows[2];
 	const Vec4f& vr_w = vp_m.Rows[3];
 
-	mLeftPlane = vr_w + vr_x;
-	mRightPlane = vr_w - vr_x;
+	PLANE(eFrustumPlane::Left) = vr_w + vr_x;
+	PLANE(eFrustumPlane::Right) = vr_w - vr_x;
 
-	mBottomPlane = vr_w + vr_y;
-	mTopPlane = vr_w - vr_y;
+	PLANE(eFrustumPlane::Bottom) = vr_w + vr_y;
+	PLANE(eFrustumPlane::Top) = vr_w - vr_y;
 
-	mNearPlane = vr_w - vr_z;
-	mFarPlane = vr_z;
+	PLANE(eFrustumPlane::Near) = vr_w - vr_z;
+	PLANE(eFrustumPlane::Far) = vr_z;
 
 	mFrustumY = 0.0f;
 }
 
-bool Frustum::IsTileVisible(float x, float z) const
+
+AABB Frustum::GetFrustumBoundingBox(const PerspectiveCamera& camera)
 {
-	FLOAT4 v_pos = simd::LoadFloat4(x, mFrustumY, z, 1.0f);
-
-	if ((Neon::Dot(mLeftPlane.mIntrin, v_pos) < 0.0f) ||  /* */
-		(Neon::Dot(mRightPlane.mIntrin, v_pos) < 0.0f) || /* */
-		(Neon::Dot(mNearPlane.mIntrin, v_pos) < 0.0f) ||  /* */
-		(Neon::Dot(mFarPlane.mIntrin, v_pos) < 0.0f)) {
-		return false;
-	}
-
-	return true;
-}
-
-
-Frustum::Coverage Frustum::GetFrustumCoverage(const PerspectiveCamera& camera)
-{
-	// General idea here: instead of checking per world tile if it intersects with the frustum, get the points for the
-	// frustum in all directions and get the range of visible tiles from there.
-
 	Mat4f vp_matrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 	Mat4f vp_inverse = vp_matrix.Inverse();
 
-	const Vec3f camera_pos = camera.Position;
+	static const Vec3f ndc_corners[8] = { { -1, -1, 0 }, { 1, -1, 0 }, { 1, 1, 0 }, { -1, 1, 0 },
+										  { -1, -1, 1 }, { 1, -1, 1 }, { 1, 1, 1 }, { -1, 1, 1 } };
 
-	constexpr float32 cGroundY = 0.0f;
-	constexpr float32 cEpsilon = 1e-6f;
+	Vec3f min_point(FLT_MAX, FLT_MAX, FLT_MAX);
+	Vec3f max_point(-FLT_MAX, -FLT_MAX, -FLT_MAX);
 
-	// NDC corners in screen space. Order is CCW starting at bottom left
-	static constexpr float32 scNdcCorners[4][2] = {
-		{ -1.0f, -1.0f },
-		{ 1.0f, -1.0f },
-		{ 1.0f, 1.0f },
-		{ -1.0f, 1.0f },
-	};
+	for (const Vec3f& corner : ndc_corners) {
+		Vec4f world = vp_inverse * Vec4f(corner.X, corner.Y, corner.Z, 1.0f);
+		world = (world / world.W);
 
-	Coverage coverage;
-
-	for (uint32 i = 0; i < 4; i++) {
-		Vec4f ndc(scNdcCorners[i][0], scNdcCorners[i][1], 1.0f, 1.0f);
-		Vec4f world_h = vp_inverse.MultiplyVec4f(ndc);
-
-		if (std::fabs(world_h.W) < cEpsilon) {
-			coverage.Corners[i] = Vec2f(camera_pos.X, camera_pos.Z);
-			continue;
-		}
-
-		const float32 inv_w = 1.0f / world_h.W;
-		Vec3f far_point(world_h.X * inv_w, world_h.Y * inv_w, world_h.Z * inv_w);
-
-		Vec3f ray = far_point - camera_pos;
-
-		// Ray parallel to the ground plane: use the far point itself. This is the case that the camera is exactly level
-		// or the corners match the horizon.
-		if (ray.Y > -cEpsilon && ray.Y < cEpsilon) {
-			coverage.Corners[i] = Vec2f(far_point.X, far_point.Z);
-			continue;
-		}
-
-		const float32 travel = (cGroundY - camera_pos.Y) / ray.Y;
-
-		if (travel < 0.0f) {
-			coverage.Corners[i] = Vec2f(far_point.X, far_point.Z);
-			continue;
-		}
-
-		Vec3f hit = camera_pos + (ray * Vec3f(travel));
-
-		coverage.Corners[i] = Vec2f(hit.X, hit.Z);
+		min_point = Vec3f::Min(min_point, Vec3f(world.X, world.Y, world.Z));
+		max_point = Vec3f::Max(max_point, Vec3f(world.X, world.Y, world.Z));
 	}
 
-	return coverage;
+	return AABB(min_point, max_point);
 }
 
 

@@ -24,6 +24,8 @@ void World::Create()
 	mLights.Create(32);
 
 	SortedEntryBuffer.SetPageSize(128);
+
+	// mVisibleTiles.InitCapacity(400);
 }
 
 static ePipelineName GetTransparentPipeline(ePipelineName base)
@@ -202,6 +204,9 @@ void World::ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera
 
 	for (ObjectID object_id : section.Objects) {
 		Object* object = gObjectManager->GetObject(object_id);
+		if (object == nullptr) {
+			continue;
+		}
 
 		object->Update();
 		object->RenderShallow(camera, &pipeline);
@@ -446,6 +451,9 @@ void World::ExecutePrepassRenderList(renderer::ePipelineName forward_pl_name)
 
 	for (ObjectID object_id : section.Objects) {
 		Object* object = gObjectManager->GetObject(object_id);
+		if (object == nullptr) {
+			continue;
+		}
 
 		object->Update();
 
@@ -487,6 +495,9 @@ void World::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* 
 	mRenderList.AddObject(pl_name, id);
 
 	Object* obj = gObjectManager->GetObject(id);
+	if (obj == nullptr) {
+		return;
+	}
 
 	for (ObjectID& attached_id : obj->AttachedNodes) {
 		AddToRenderListRecursive(pl_name, &attached_id);
@@ -505,7 +516,7 @@ void World::ClearRenderList()
 	mRenderList.ClearSection(ePipelineName::ShadowDirectional);
 }
 
-void World::RebuildRenderList(bool clear, TileIndex new_tile_index)
+void World::AddTileToRenderList(bool clear, TileIndex new_tile_index)
 {
 	Tile* tile = gWorldGrid->GetTile(new_tile_index);
 
@@ -531,6 +542,11 @@ void World::RebuildRenderList(bool clear, TileIndex new_tile_index)
 		}
 
 		Object* object = gObjectManager->GetObject(*object_id);
+		if (object == nullptr) {
+			++index;
+			continue;
+		}
+
 		Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
 		ePipelineName pipeline = material->GetRequiredPipeline();
 		if (IsTransparentMaterial(material)) {
@@ -551,20 +567,20 @@ void World::RebuildRenderList(bool clear, TileIndex new_tile_index)
 
 void World::RebuildFromTiles(TileIndex tile_index)
 {
-	RebuildRenderList(true, tile_index);
+	AddTileToRenderList(true, tile_index);
 	Vec2u xy = gWorldGrid->TileToTileXY(tile_index);
 
 	// Rebuild the immediate surrounding tiles (up, left, down, right)
-	RebuildRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(1, 0)));
-	RebuildRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(-1, 0)));
-	RebuildRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(0, -1)));
-	RebuildRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(0, 1)));
+	AddTileToRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(1, 0)));
+	AddTileToRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(-1, 0)));
+	AddTileToRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(0, -1)));
+	AddTileToRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(0, 1)));
 
 	// Build the diagonals
-	RebuildRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(1, 1)));
-	RebuildRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(1, -1)));
-	RebuildRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(-1, -1)));
-	RebuildRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(-1, 1)));
+	AddTileToRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(1, 1)));
+	AddTileToRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(1, -1)));
+	AddTileToRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(-1, -1)));
+	AddTileToRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(-1, 1)));
 }
 
 void World::NotifyObjectMaterialChanged(ObjectID id)
@@ -581,150 +597,51 @@ void World::NotifyObjectMaterialChanged(ObjectID id)
 
 	Material* material = gMaterialManager->GetMaterial(object->GetMaterialID());
 
-	// Check to see if the object is in the correct pipeline
-	// if (mRenderList.GetObjectIndex(material->GetRequiredPipeline(), object->ID) != RenderList::scNotFound) {
-	// 	// The object is in the expected rl section, break
-	// 	return;
-	// }
-
 	// No need to remove/readd to renderlist as it is rebuilt every frame now.
 }
 
-struct QuadPlanes
-{
-	Vec2f Min, Max;
-	Vec2f Normals[4];
-	float32 Offsets[4];
-};
-
-static QuadPlanes BuildQuadPlanes(const Frustum::Coverage& coverage)
-{
-	QuadPlanes q;
-	q.Min = q.Max = coverage.Corners[0];
-	for (int i = 1; i < 4; ++i) {
-		q.Min.X = std::min(q.Min.X, coverage.Corners[i].X);
-		q.Min.Y = std::min(q.Min.Y, coverage.Corners[i].Y);
-		q.Max.X = std::max(q.Max.X, coverage.Corners[i].X);
-		q.Max.Y = std::max(q.Max.Y, coverage.Corners[i].Y);
-	}
-
-	// Compute signed area to know winding.
-	float32 area = 0.0f;
-	for (int i = 0; i < 4; ++i) {
-		const Vec2f& A = coverage.Corners[i];
-		const Vec2f& B = coverage.Corners[(i + 1) % 4];
-
-		area += A.X * B.Y - B.X * A.Y;
-	}
-
-	for (int i = 0; i < 4; ++i) {
-		const Vec2f& A = coverage.Corners[i];
-		const Vec2f& B = coverage.Corners[(i + 1) % 4];
-		Vec2f edge = B - A;
-
-		Vec2f N(-edge.Y, edge.X);
-
-		float32 d = -(N.X * A.X + N.Y * A.Y);
-
-		// Make inside always >= 0.
-		if (area < 0.0f) {
-			N = -N;
-			d = -d;
-		}
-
-		q.Normals[i] = N;
-		q.Offsets[i] = d;
-	}
-	return q;
-}
 
 void World::CullWorldTiles(const PerspectiveCamera& cam)
 {
 	mFrustum.Rebuild(cam);
-	Frustum::Coverage coverage = mFrustum.GetFrustumCoverage(cam);
+	// mVisibleTiles.Clear();
+
+	AABB frustum_bounds = mFrustum.GetFrustumBoundingBox(cam);
 
 	uint32 num_visible = 0;
 
 	ClearRenderList();
 
 	// Super broad phase for culling.
-	// Precompute the quad edge planes (and AABB) once instead of per tile.
-	const QuadPlanes planes = BuildQuadPlanes(coverage);
 
-	Vec2u min_tile = gWorldGrid->TileToTileXY(gWorldGrid->WorldToTile(Vec3f(planes.Min.X, 0.0f, planes.Min.Y)));
-	Vec2u max_tile = gWorldGrid->TileToTileXY(gWorldGrid->WorldToTile(Vec3f(planes.Max.X, 0.0f, planes.Max.Y)));
+	Vec2u min_tile = gWorldGrid->TileToTileXY(
+		gWorldGrid->WorldToTile(Vec3f(frustum_bounds.Min.X, 0.0f, frustum_bounds.Min.Z)));
+	Vec2u max_tile = gWorldGrid->TileToTileXY(
+		gWorldGrid->WorldToTile(Vec3f(frustum_bounds.Max.X, 0.0f, frustum_bounds.Max.Z)));
 
-	auto IsPointInQuad = [&](Vec2f p)
-	{
-		// Cheap AABB rejection first.
-		if (p.X < planes.Min.X || p.X > planes.Max.X || p.Y < planes.Min.Y || p.Y > planes.Max.Y) {
-			return false;
-		}
+	const uint32 num_tiles_x = gWorldGrid->mGridSize.X;
+	const uint32 num_tiles_y = gWorldGrid->mGridSize.Y;
 
-		// Four half-plane tests.
-		for (int i = 0; i < 4; ++i) {
-			if (planes.Normals[i].X * p.X + planes.Normals[i].Y * p.Y + planes.Offsets[i] < 0.0f) {
-				return false;
-			}
-		}
+	min_tile.X = std::clamp(min_tile.X, 0U, num_tiles_x - 1);
+	min_tile.Y = std::clamp(min_tile.Y, 0U, num_tiles_y - 1);
+	max_tile.X = std::clamp(max_tile.X, 0U, num_tiles_x - 1);
+	max_tile.Y = std::clamp(max_tile.Y, 0U, num_tiles_y - 1);
 
-		return true;
-	};
-
-	// Narrow(er) phase
-
-	const float32 half_x = gWorldGrid->mTileSize.X * 0.5f;
-	const float32 half_z = gWorldGrid->mTileSize.Y * 0.5f;
 
 	for (uint32 y = min_tile.Y; y <= max_tile.Y; y++) {
 		for (uint32 x = min_tile.X; x <= max_tile.X; x++) {
-			const Vec3f center_xyz = gWorldGrid->TileXYToWorldCenter(Vec2u(x, y));
-			const Vec2f center = Vec2f(center_xyz.X, center_xyz.Z);
+			++num_visible;
 
-			// Tile rect in world XZ.
-			const float32 tile_min_x = center.X - half_x, tile_max_x = center.X + half_x;
-			const float32 tile_min_z = center.Y - half_z, tile_max_z = center.Y + half_z;
+			TileIndex ti = gWorldGrid->GetTileIndexXY(Vec2u(x, y));
+			// mVisibleTiles.Emplace(ti);
 
-			// Check if the center of the tile is visible.
-			bool is_visible = IsPointInQuad(center);
-
-			// Center is not visible, check each point of the tile.
-			if (!is_visible) {
-				const Vec2f tile_corners[4] = {
-					Vec2f(tile_min_x, tile_min_z),
-					Vec2f(tile_max_x, tile_min_z),
-					Vec2f(tile_max_x, tile_max_z),
-					Vec2f(tile_min_x, tile_max_z),
-				};
-				for (int c = 0; c < 4; c++) {
-					if (IsPointInQuad(tile_corners[c])) {
-						is_visible = true;
-						break;
-					}
-				}
-			}
-
-			if (!is_visible) {
-				for (int c = 0; c < 4; c++) {
-					const Vec2f& q = coverage.Corners[c];
-					if (q.X >= tile_min_x && q.X <= tile_max_x && q.Y >= tile_min_z && q.Y <= tile_max_z) {
-						is_visible = true;
-						break;
-					}
-				}
-			}
-
-			if (is_visible) {
-				++num_visible;
-
-				RebuildRenderList(false, gWorldGrid->GetTileIndexXY(Vec2u(x, y)));
-			}
+			AddTileToRenderList(false, ti);
 		}
 	}
 
-	LogInfo("{} objects in renderlist", mRenderList.GetItemCount());
+	LogInfo("MIN: {}, MAX: {}", frustum_bounds.Min, frustum_bounds.Max);
 
-	// LogInfo("{} of {} tiles visible", num_visible, gWorldGrid->GetNumTiles());
+	LogInfo("{} / {} world tiles visible", num_visible, gWorldGrid->GetNumTiles());
 }
 
 
@@ -802,6 +719,8 @@ void World::Render(Camera* shadow_camera)
 	if (bRenderProbes) {
 		RenderProbeDebug(camera);
 	}
+
+	// RenderWorldGrid(camera);
 }
 
 
@@ -948,8 +867,8 @@ void World::RenderWorldGrid(const Camera& camera)
 
 	DebugLayerPushConstants push_constants {};
 
-	const Color debug_color = Color::FromRGBA(255, 255, 30, 255);
-	const Color player_debug_color = Color::FromRGBA(0, 255, 255, 255);
+	const Color debug_color = Color::FromRGBA(255, 255, 255, 255);
+	const Color player_debug_color = Color::FromRGBA(255, 0, 0, 255);
 
 	const Vec3f tile_size = Vec3f(gWorldGrid->mTileSize.X, 1.0f, gWorldGrid->mTileSize.Y);
 
@@ -967,10 +886,16 @@ void World::RenderWorldGrid(const Camera& camera)
 
 			push_constants.DebugColor = debug_color.AsUInt();
 
-			if ((x >= camera_tile_index.X - 1 && x <= camera_tile_index.X + 1) &&
-				(y >= camera_tile_index.Y - 1 && y <= camera_tile_index.Y + 1)) {
-				push_constants.DebugColor = player_debug_color.AsUInt();
-			}
+			// for (const TileIndex vis_ti : mVisibleTiles) {
+			// 	if (vis_ti == gWorldGrid->GetTileIndexXY(Vec2u(x, y))) {
+			// 		push_constants.DebugColor = player_debug_color.AsUInt();
+			// 	}
+			// }
+
+			// if ((x >= camera_tile_index.X - 1 && x <= camera_tile_index.X + 1) &&
+			// 	(y >= camera_tile_index.Y - 1 && y <= camera_tile_index.Y + 1)) {
+			// push_constants.DebugColor = player_debug_color.AsUInt();
+			// }
 
 			gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
 			mpDebugCube->Render(cmd, 1);

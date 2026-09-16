@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <Core/StackArray.hpp>
+#include <Math/BoundingBox.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec4.hpp>
 
@@ -14,35 +16,35 @@ namespace fx {
 
 class PerspectiveCamera;
 
+enum class eFrustumPlane
+{
+	Left = 0,
+	Right = 1,
+	Bottom = 2,
+	Top = 3,
+	Near = 4,
+	Far = 5
+};
+
 class Frustum
 {
-public:
-	struct Coverage
-	{
-		Vec2f Corners[4];
-	};
-
 public:
 	Frustum() = default;
 
 	void Rebuild(const PerspectiveCamera& camera);
 
-	/**
-	 * @brief Returns true if a top-down 2D position is visible from this frustum.
-	 */
-	bool IsTileVisible(float x, float z) const;
+	FX_FORCE_INLINE const Vec4f& GetPlane(const eFrustumPlane plane) const
+	{
+		return mClipPlanes[static_cast<uint32>(plane)];
+	}
 
-	Coverage GetFrustumCoverage(const PerspectiveCamera& camera);
+	AABB GetFrustumBoundingBox(const PerspectiveCamera& camera);
 
 private:
-	Vec4f mLeftPlane;
-	Vec4f mRightPlane;
-	Vec4f mTopPlane;
-	Vec4f mBottomPlane;
-	Vec4f mNearPlane;
-	Vec4f mFarPlane;
+	StackArray<Vec4f, 6> mClipPlanes;
 
 	float32 mFrustumY = 0.0f;
 };
 
 } // namespace fx
+\

@@ -188,7 +188,7 @@ public:
 	ObjectID ParentID = ObjectID::scNull;
 	PagedArray<ObjectID> AttachedNodes;
 
-	BoundingBox Bounds { Vec3f::sZero, Vec3f::sZero };
+	AABB Bounds { Vec3f::sZero, Vec3f::sZero };
 
 	Ref<script::FoxScript> pScript { nullptr };
 
