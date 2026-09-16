@@ -25,7 +25,7 @@ void World::Create()
 
 	SortedEntryBuffer.SetPageSize(128);
 
-	// mVisibleTiles.InitCapacity(400);
+	mVisibleTiles.InitCapacity(600);
 }
 
 static ePipelineName GetTransparentPipeline(ePipelineName base)
@@ -604,7 +604,7 @@ void World::NotifyObjectMaterialChanged(ObjectID id)
 void World::CullWorldTiles(const PerspectiveCamera& cam)
 {
 	mFrustum.Rebuild(cam);
-	// mVisibleTiles.Clear();
+	mVisibleTiles.Clear();
 
 	AABB frustum_bounds = mFrustum.GetFrustumBoundingBox(cam);
 
@@ -630,10 +630,16 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 
 	for (uint32 y = min_tile.Y; y <= max_tile.Y; y++) {
 		for (uint32 x = min_tile.X; x <= max_tile.X; x++) {
+			AABB tile_bounds = gWorldGrid->GetTileAABB();
+
+			if (!mFrustum.TileIntersectsAABB(tile_bounds)) {
+				continue;
+			}
+
 			++num_visible;
 
 			TileIndex ti = gWorldGrid->GetTileIndexXY(Vec2u(x, y));
-			// mVisibleTiles.Emplace(ti);
+			mVisibleTiles.Emplace(ti);
 
 			AddTileToRenderList(false, ti);
 		}
@@ -720,7 +726,7 @@ void World::Render(Camera* shadow_camera)
 		RenderProbeDebug(camera);
 	}
 
-	// RenderWorldGrid(camera);
+	RenderWorldGrid(camera);
 }
 
 
@@ -886,16 +892,11 @@ void World::RenderWorldGrid(const Camera& camera)
 
 			push_constants.DebugColor = debug_color.AsUInt();
 
-			// for (const TileIndex vis_ti : mVisibleTiles) {
-			// 	if (vis_ti == gWorldGrid->GetTileIndexXY(Vec2u(x, y))) {
-			// 		push_constants.DebugColor = player_debug_color.AsUInt();
-			// 	}
-			// }
-
-			// if ((x >= camera_tile_index.X - 1 && x <= camera_tile_index.X + 1) &&
-			// 	(y >= camera_tile_index.Y - 1 && y <= camera_tile_index.Y + 1)) {
-			// push_constants.DebugColor = player_debug_color.AsUInt();
-			// }
+			for (const TileIndex vis_ti : mVisibleTiles) {
+				if (vis_ti == gWorldGrid->GetTileIndexXY(Vec2u(x, y))) {
+					push_constants.DebugColor = player_debug_color.AsUInt();
+				}
+			}
 
 			gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
 			mpDebugCube->Render(cmd, 1);

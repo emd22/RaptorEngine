@@ -136,7 +136,7 @@ private:
 
 	Frustum mFrustum;
 
-	// SizedArray<TileIndex> mVisibleTiles;
+	SizedArray<TileIndex> mVisibleTiles;
 };
 
 } // namespace fx

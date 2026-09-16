@@ -3,6 +3,7 @@
 #include <Core/FreeArray.hpp>
 #include <Core/PagedArray.hpp>
 #include <Core/SizedArray.hpp>
+#include <Math/BoundingBox.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
@@ -67,6 +68,11 @@ public:
 	const Tile* GetTile(TileIndex index) const;
 
 	void SetViewTileIndex(TileIndex view_tile_index);
+
+	FX_FORCE_INLINE AABB GetTileAABB() const
+	{
+		return AABB(-Vec3f(mTileSize.X, 1.0, mTileSize.Y), Vec3f(mTileSize.X, 1.0, mTileSize.Y));
+	}
 
 	FX_FORCE_INLINE Vec2u GetGridSize() const { return mGridSize; }
 

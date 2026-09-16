@@ -11,8 +11,8 @@ namespace fx {
 
 FX_FORCE_INLINE Vec4f::Vec4f(float32 x, float32 y, float32 z, float32 w)
 {
-    const float32 values[4] = { x, y, z, w };
-    mIntrin = _mm_loadu_ps(values);
+	const float32 values[4] = { x, y, z, w };
+	mIntrin = _mm_loadu_ps(values);
 }
 
 FX_FORCE_INLINE Vec4f::Vec4f(const float32* values) { mIntrin = _mm_loadu_ps(values); }
@@ -40,16 +40,23 @@ Vec4f Vec4f::operator/(const Vec4f& other) const { return Vec4f(_mm_div_ps(mIntr
 // Vec + Scalar Operators
 ///////////////////////////////
 
+FX_FORCE_INLINE Vec4f Vec4f::Normalize() const { return Vec4f(SSE::Normalize(mIntrin)); }
+FX_FORCE_INLINE Vec4f& Vec4f::NormalizeIP()
+{
+	mIntrin = (SSE::Normalize(mIntrin));
+	return *this;
+}
+
 FX_FORCE_INLINE Vec4f Vec4f::operator*(float32 scalar) const
 {
-    const __m128 scalar_v = _mm_set1_ps(scalar);
-    return Vec4f(_mm_mul_ps(mIntrin, scalar_v));
+	const __m128 scalar_v = _mm_set1_ps(scalar);
+	return Vec4f(_mm_mul_ps(mIntrin, scalar_v));
 }
 
 FX_FORCE_INLINE Vec4f Vec4f::operator/(float32 scalar) const
 {
-    const __m128 scalar_v = _mm_set1_ps(scalar);
-    return Vec4f(_mm_div_ps(mIntrin, scalar_v));
+	const __m128 scalar_v = _mm_set1_ps(scalar);
+	return Vec4f(_mm_div_ps(mIntrin, scalar_v));
 }
 
 FX_FORCE_INLINE Vec4f Vec4f::operator-() const { return Vec4f(_mm_xor_ps(mIntrin, _mm_set1_ps(-0.0f))); }
@@ -57,33 +64,33 @@ FX_FORCE_INLINE Vec4f Vec4f::operator-() const { return Vec4f(_mm_xor_ps(mIntrin
 
 FX_FORCE_INLINE Vec4f& Vec4f::operator+=(const Vec4f& other)
 {
-    mIntrin = _mm_add_ps(mIntrin, other.mIntrin);
-    return *this;
+	mIntrin = _mm_add_ps(mIntrin, other.mIntrin);
+	return *this;
 }
 
 FX_FORCE_INLINE Vec4f& Vec4f::operator-=(const Vec4f& other)
 {
-    mIntrin = _mm_sub_ps(mIntrin, other.mIntrin);
-    return *this;
+	mIntrin = _mm_sub_ps(mIntrin, other.mIntrin);
+	return *this;
 }
 
 FX_FORCE_INLINE Vec4f& Vec4f::operator*=(const Vec4f& other)
 {
-    mIntrin = _mm_mul_ps(mIntrin, other.mIntrin);
-    return *this;
+	mIntrin = _mm_mul_ps(mIntrin, other.mIntrin);
+	return *this;
 }
 
 FX_FORCE_INLINE Vec4f& Vec4f::operator*=(float32 scalar)
 {
-    const __m128 scalar_v = _mm_set1_ps(scalar);
-    mIntrin = _mm_mul_ps(mIntrin, scalar_v);
-    return *this;
+	const __m128 scalar_v = _mm_set1_ps(scalar);
+	mIntrin = _mm_mul_ps(mIntrin, scalar_v);
+	return *this;
 }
 
 FX_FORCE_INLINE Vec4f& Vec4f::operator=(const Vec4f& other)
 {
-    mIntrin = other.mIntrin;
-    return *this;
+	mIntrin = other.mIntrin;
+	return *this;
 }
 
 } // namespace fx
