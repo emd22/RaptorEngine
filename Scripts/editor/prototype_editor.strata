@@ -48,7 +48,7 @@ bool mouse_is_dragging = false;
 bool mouse_was_in_drag_event = false;
 
 /* snap */
-int editor_snap_level = 2;
+int editor_snap_level = 3;
 bool editor_enable_snap = true;
 
 bool player_had_headbob = false;
@@ -466,9 +466,6 @@ void editor_face_tool(float delta_time)
 {
 	face_tool_magnitude = editor_transform_snap(player.position - initial_player_position) * sel.selected_face;
 
-	/* Preview exactly where finalize will put the face:
-	   old face pos + player delta projected onto the face normal.
-	   This matches Blockout::ScaleInDirection (Max += mag / Min -= mag). */
 	float3 delta = editor_transform_snap(player.position - initial_player_position);
 
 	float proj = dot(delta, sel.selected_face);

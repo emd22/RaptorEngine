@@ -42,7 +42,8 @@ static_assert((ProbeGridDims[0] * ProbeGridDims[1] * ProbeGridDims[2]) == MaxIrr
 // Probe depth moments (visibility)
 /////////////////////////////////////
 
-/// Resolution of the per-probe depth cubemap face (16x16 texels per face).
+/// Resolution of the per-probe depth cubemap face. Must match PROBE_DEPTH_SIZE
+/// in Shaders/ProbeCommon.hlsli.
 static constexpr uint32 ProbeDepthSize = 16;
 static constexpr uint32 ProbeDepthFaces = 6;
 static constexpr uint32 ProbeDepthTexelsPerFace = ProbeDepthSize * ProbeDepthSize;

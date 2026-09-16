@@ -59,49 +59,25 @@ struct ProbeBoxList
 	bool Any = false;
 };
 
-/// Builds SH coeffs for a constant irradiance colour (matches the old flat ambient).
-ProbeSHData MakeUniformAmbientProbe(float32 r, float32 g, float32 b);
-
 /// Builds SH coeffs for a vertical sky/ground gradient (L00 + L10 terms).
 ProbeSHData MakeSkyGradientProbe(const float32 sky[3], const float32 ground[3]);
 
 class ProbeManager
 {
 public:
-	/// Face resolution for capture bakes
+	/// Face resolution for capture bakes.
 	static constexpr uint32 scCaptureSize = 64;
 	static constexpr uint32 scCaptureFaces = 6;
 
-	/// Resolution of the baked depth-moments cubemap face (see Limits::ProbeDepthSize).
-	static constexpr uint32 scDepthSize = Limits::ProbeDepthSize;
-	static constexpr uint32 scDepthFaces = Limits::ProbeDepthFaces;
-	static constexpr uint32 scDepthTexelsPerFace = Limits::ProbeDepthTexelsPerFace;
-
-	/// Clamp for baked probe distances (misses store this far value).
-	static constexpr float32 scDepthMaxDistance = Limits::ProbeDepthMaxDistance;
-
-	/// Number of probes baked per frame during a grid bake
+	/// Number of probes baked per frame during a grid bake.
 	static constexpr uint32 scProbesPerFrame = 4;
 
-public:
 	void Create();
 	void Destroy();
-
-	ProbeSHData* GetProbes() { return mProbes; }
-	ProbeInfo* GetProbeDepths() { return mProbeDepths; }
-	const ProbeInfo* GetProbeDepths() const { return mProbeDepths; }
-	const ProbeInfo& GetProbeDepth(uint32 index) const { return mProbeDepths[index]; }
 
 	const Vec3f* GetProbePositions() const { return mProbePositions; }
 	uint32 GetProbeCount() const { return Limits::MaxIrradianceProbes; }
 	uint32 GetCurrentProbeIndex() const { return mCurrentProbe; }
-	const ProbeVolumeData& GetVolume() const { return mVolume; }
-
-	/// Fills all probes
-	void SetUniformAmbient(float32 r, float32 g, float32 b);
-	void SetSkyGradient(const float32 sky[3], const float32 ground[3]);
-
-	void BakeFromSceneLights(const Vec3f& sunDir, const float32 sunRGB[3], const float32 ambRGB[3]);
 
 	///////////////////////////////////
 	// Probe Cubemap

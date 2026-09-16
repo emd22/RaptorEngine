@@ -376,6 +376,11 @@ void RaptorGame::ProcessControls()
 		gGraphics->bOnlyRenderProbes = !gGraphics->bOnlyRenderProbes;
 	}
 
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_3)) {
+		gGraphics->bOnlyRenderProbeVisibility = !gGraphics->bOnlyRenderProbeVisibility;
+		LogInfo("Probe visibility debug {}", gGraphics->bOnlyRenderProbeVisibility ? "enabled" : "disabled");
+	}
+
 	if (ControlManager::IsMouseLocked()) {
 		Vec2f mouse_delta = ControlManager::GetMouseDelta();
 		mouse_delta.X = static_cast<float32>(DeltaTime * static_cast<double>(mouse_delta.X) *

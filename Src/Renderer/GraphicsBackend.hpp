@@ -270,6 +270,7 @@ public:
 	Image* pNoiseTexture = nullptr;
 
 	bool bOnlyRenderProbes = false;
+	bool bOnlyRenderProbeVisibility = false;
 
 private:
 	GpuDevice mDevice;

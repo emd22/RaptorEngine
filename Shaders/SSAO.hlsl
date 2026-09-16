@@ -106,12 +106,13 @@ float ComputeSSAO(float2 uv)
 {
 	float raw_depth = F_Sample(tDepth, uv).r;
 
-	// Skip the skybox (reverse-Z: far plane = 0.0)
-	if (raw_depth >= 1.0)
+	// Depth storage is viewport-inverted (minDepth=1, maxDepth=0): far/miss = 0.
+	if (raw_depth <= 1e-4)
 	{
 		return 1.0;
 	}
 
+	// Un-flip storage (1-NDC) back to NDC for InvProjection.
 	float depth = 1.0 - raw_depth;
 	float3 fragment_position = ReconstructViewPos(uv, depth);
 

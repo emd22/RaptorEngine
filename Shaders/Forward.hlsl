@@ -320,25 +320,27 @@ FSOutput main(FSInput input)
 	float4 ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
 
 	float3 probe_irradiance = float3(0.0f, 0.0f, 0.0f);
+	float probe_visibility = 1.0f;
 
 	// Use probes
 	if ((FSConst.Flags & 0x01) == 0) {
 		float3 probe_normal = normalize(N_final);
-		probe_irradiance = SampleProbeVolume(input.vPositionWS, probe_normal, bProbeVolume[0], bProbeBuffer, bProbeDepth);
+		probe_irradiance = SampleProbeVolume(input.vPositionWS, probe_normal, bProbeVolume[0], bProbeBuffer);
 
 		float3 probe_min = bProbeVolume[0].vMin.xyz;
 		float3 inv_cell  = bProbeVolume[0].vInvCellSize.xyz;
 		uint3  dims      = bProbeVolume[0].vDimsAndCount.xyz;
 
-		float probe_visibility = SampleProbeVolumeVisibility(
+		probe_visibility = SampleProbeVolumeVisibility(
 			input.vPositionWS,
+			probe_normal,
 			bProbeDepth,
 			probe_min,
 			inv_cell,
 			dims
 		);
 
-		float ambient_visibility =  ssao;
+		float ambient_visibility = probe_visibility * ssao;
 		ambient = float4(probe_irradiance * albedo * ambient_visibility, 1.0f);
 	}
 
@@ -351,6 +353,10 @@ FSOutput main(FSInput input)
 
 	if (HAS_FLAG(FSConst.Flags, 0x02)) {
 		output.vAlbedo = float4(probe_irradiance, 1.0f);
+	}
+
+	if (HAS_FLAG(FSConst.Flags, 0x04)) {
+		output.vAlbedo = float4(probe_visibility, probe_visibility, probe_visibility, 1.0f);
 	}
 
     return output;

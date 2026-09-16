@@ -99,6 +99,7 @@ FSOutput main(FSInput input)
 
 	float2 screen_uv = input.vPosition.xy / light.vCameraSize;
 
+	// Depth storage is viewport-inverted (1-NDC): un-flip to NDC for InvProjection.
 	float depth = 1.0 - F_Sample(tDepth, screen_uv).r;
 	float4 albedo_rgba = F_Sample(tAlbedo, screen_uv);
 	float3 albedo = albedo_rgba.rgb;

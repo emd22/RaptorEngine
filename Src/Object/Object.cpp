@@ -209,6 +209,10 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 		push_constants.Flags |= 0x02;
 	}
 
+	if (gGraphics->bOnlyRenderProbeVisibility) {
+		push_constants.Flags |= 0x04;
+	}
+
 	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
 
 	gGraphics->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex | eShaderType::Pixel,

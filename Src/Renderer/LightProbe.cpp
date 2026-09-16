@@ -1,12 +1,13 @@
 /*
  * File:        LightProbe.cpp
- * Description: MVP light probe manager (SH L2 diffuse irradiance).
+ * Author:      emd22
+ * Created:     09/07/2026
+ * Description: Definitions for light probes (SH L2 irradiance + depth visibility).
  */
 
 #include "LightProbe.hpp"
 
 #include <Asset/AssetManager.hpp>
-#include <Asset/PPMWriter.hpp>
 #include <Core/File.hpp>
 #include <Engine.hpp>
 #include <Object/Object.hpp>
@@ -20,9 +21,7 @@
 #include <filesystem>
 #include <limits>
 
-#define FX_DEBUG_PROBES_EXPORT_FACE_IMAGES 1
-
-#define FX_PROBE_CACHE_FILE_VERSION 6
+#define FX_PROBE_CACHE_FILE_VERSION 9
 
 namespace fx {
 
@@ -30,17 +29,6 @@ namespace fx {
 // EvalProbeIrradiance() in Shaders/ProbeCommon.hlsli.
 static constexpr float32 scY00 = 0.282095f;
 static constexpr float32 scY1 = 0.488603f;
-
-ProbeSHData MakeUniformAmbientProbe(float32 r, float32 g, float32 b)
-{
-	ProbeSHData probe {};
-
-	probe.SH[0][0] = r / scY00;
-	probe.SH[0][1] = g / scY00;
-	probe.SH[0][2] = b / scY00;
-
-	return probe;
-}
 
 ProbeSHData MakeSkyGradientProbe(const float32 sky[3], const float32 ground[3])
 {
@@ -115,24 +103,6 @@ void ProbeManager::Destroy()
 	}
 }
 
-void ProbeManager::SetUniformAmbient(float32 r, float32 g, float32 b)
-{
-	const ProbeSHData probe = MakeUniformAmbientProbe(r, g, b);
-	for (uint32 i = 0; i < Limits::MaxIrradianceProbes; i++) {
-		mProbes[i] = probe;
-	}
-	UploadToGpu();
-}
-
-void ProbeManager::SetSkyGradient(const float32 sky[3], const float32 ground[3])
-{
-	const ProbeSHData probe = MakeSkyGradientProbe(sky, ground);
-	for (uint32 i = 0; i < Limits::MaxIrradianceProbes; i++) {
-		mProbes[i] = probe;
-	}
-	UploadToGpu();
-}
-
 /// SH basis matching EvalProbeIrradiance() in Shaders/ProbeCommon.hlsli.
 /// Order: Y00, Y1-1(y), Y10(z), Y11(x), Y2-2(xy), Y2-1(yz), Y20, Y21(xz), Y22.
 static void ProbeBasisSH(const Vec3f& d, float32 out_basis[9])
@@ -148,51 +118,6 @@ static void ProbeBasisSH(const Vec3f& d, float32 out_basis[9])
 	out_basis[6] = 0.315392f * (3.0f * d_sq.Z - 1.0f);
 	out_basis[7] = 1.092548f * d.X * d.Z;
 	out_basis[8] = 0.546274f * (d_sq.X - d_sq.Y);
-}
-
-void ProbeManager::BakeFromSceneLights(const Vec3f& sunDir, const float32 sunRGB[3], const float32 ambRGB[3])
-{
-	// Fibonacci sphere sampling for an even directional distribution.
-	static constexpr uint32 scSampleCount = 1024;
-	static constexpr float32 scGoldenAngle = 2.3999632f;
-	static constexpr float32 scFourPiOverN = (4.0f * 3.14159265f) / static_cast<float32>(scSampleCount);
-
-	const Vec3f sun = sunDir.Normalize();
-
-	float32 sh[Limits::ProbeSHCoeffCount][3] = {};
-
-	for (uint32 i = 0; i < scSampleCount; i++) {
-		const float32 y = 1.0f - (2.0f * (static_cast<float32>(i) + 0.5f) / static_cast<float32>(scSampleCount));
-		const float32 r = sqrtf(fmaxf(1.0f - y * y, 0.0f));
-		const float32 phi = static_cast<float32>(i) * scGoldenAngle;
-
-		const Vec3f normal = Vec3f(r * cosf(phi), y, r * sinf(phi));
-
-		const float32 NdotL = fmaxf(normal.Dot(sun), 0.0f);
-
-		float32 basis[Limits::ProbeSHCoeffCount];
-		ProbeBasisSH(normal, basis);
-
-		for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
-			for (uint32 c = 0; c < 3; c++) {
-				sh[k][c] += (ambRGB[c] + sunRGB[c] * NdotL) * basis[k];
-			}
-		}
-	}
-
-	ProbeSHData probe {};
-	for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
-		for (uint32 c = 0; c < 3; c++) {
-			probe.SH[k][c] = sh[k][c] * scFourPiOverN;
-		}
-		probe.SH[k][3] = 0.0f;
-	}
-
-	for (uint32 i = 0; i < Limits::MaxIrradianceProbes; i++) {
-		mProbes[i] = probe;
-	}
-
-	UploadToGpu();
 }
 
 ///////////////////////////////////
@@ -249,7 +174,6 @@ bool ProbeManager::GatherPlacementBoxes(ProbeBoxList& out)
 	for (const Object& object : object_cache) {
 		stat_total++;
 
-
 		if (!object.pMesh.IsValid()) {
 			stat_no_mesh++;
 			continue;
@@ -285,23 +209,16 @@ bool ProbeManager::GatherPlacementBoxes(ProbeBoxList& out)
 	return out.Any;
 }
 
-static constexpr float32 scProbeHugOffset = 0.25f;
+// Minimum distance kept between a probe and solid geometry. Probes that graze
+// surfaces make the depth cube's occluder silhouette subtend a huge angle, so
+// the (coarse, min-filtered) visibility boundary smears into the sawtooth/gap
+// seen near edges. Pushing probes into open space keeps those silhouettes sharp.
+static constexpr float32 scProbeHugOffset = 0.75f;
 static constexpr float32 scProbeInsideSkin = 0.05f;
-static constexpr float32 scProbeHugMaxDist = 1.5f;
 
-enum class ProbeAxis
+static float32 AxisComponent(const Vec3f& vec, uint32 axis)
 {
-	NegX,
-	PosX,
-	NegY,
-	PosY,
-	NegZ,
-	PosZ,
-};
-
-float32 IndexVec3f(const Vec3f& vec, uint32 index)
-{
-	switch (index) {
+	switch (axis) {
 	case 0:
 		return vec.X;
 	case 1:
@@ -348,10 +265,10 @@ static bool PushProbeOutOfBox(Vec3f& point, const ProbeBoxList::Box& box, float3
 	float32 bounds_value = 0.0f;
 
 	if (is_max_face) {
-		bounds_value = IndexVec3f(box.Max, axis_index);
+		bounds_value = AxisComponent(box.Max, axis_index);
 	}
 	else {
-		bounds_value = IndexVec3f(box.Min, axis_index);
+		bounds_value = AxisComponent(box.Min, axis_index);
 		probe_offset = -probe_offset;
 	}
 
@@ -360,15 +277,38 @@ static bool PushProbeOutOfBox(Vec3f& point, const ProbeBoxList::Box& box, float3
 	return true;
 }
 
-/// Snaps a free-space probe to hug the nearest box surface (+ hug offset
-/// along the outward normal). Returns true if the probe was moved.
-/// Probes deep inside the volume (far from any surface) are left alone so the
-/// grid still fills open space instead of collapsing onto geometry.
-static bool HugNearestSurface(const Vec3f& point, const ProbeBoxList& boxes, float32 hug, float32 max_dist,
-							  Vec3f& out_hugged)
+/// Repeatedly pushes a probe out of every box it currently overlaps.
+/// Returns true if the probe was moved at all.
+static bool PushProbeOutOfBoxes(Vec3f& point, const ProbeBoxList& boxes)
+{
+	bool pushed = false;
+
+	for (uint32 iter = 0; iter < 8; iter++) {
+		bool inside_any = false;
+		for (uint32 b = 0; b < boxes.Count; b++) {
+			if (PushProbeOutOfBox(point, boxes.Boxes[b], scProbeHugOffset)) {
+				inside_any = true;
+				pushed = true;
+				break;
+			}
+		}
+
+		if (!inside_any) {
+			break;
+		}
+	}
+
+	return pushed;
+}
+
+/// Pushes a probe out to at least `hug` distance from the nearest box surface.
+/// Acts only as a minimum-clearance pass (never pulls probes toward a surface):
+/// surfaces farther than `hug` are ignored. Returns true if the probe moved.
+static bool HugNearestSurface(const Vec3f& point, const ProbeBoxList& boxes, float32 hug, Vec3f& out_hugged)
 {
 	bool found = false;
-	float32 best_dist = max_dist;
+	// Only surfaces closer than `hug` need fixing; anything farther is fine.
+	float32 best_dist = hug;
 	Vec3f best_hugged = point;
 
 	for (uint32 b = 0; b < boxes.Count; b++) {
@@ -404,13 +344,8 @@ void ProbeManager::PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const P
 	Vec3f dim_vec = Vec3f(static_cast<float32>(x_dim - 1), static_cast<float32>(y_dim - 1),
 						  static_cast<float32>(z_dim - 1));
 
-	LogInfo("The dimensions are like {}", dim_vec);
-
 	mProbePositions.Clear();
 
-	const Vec3f cell_size = Vec3f(size.X / dim_vec.X, size.Y / dim_vec.Y, size.Z / dim_vec.Z);
-	const float32 min_cell = fminf(cell_size.X, fminf(cell_size.Y, cell_size.Z));
-	const float32 hug_dist = fminf(scProbeHugMaxDist, 0.5f * min_cell);
 	const Vec3f vol_max = gmin + size;
 
 	uint32 stat_pushed = 0;
@@ -425,50 +360,22 @@ void ProbeManager::PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const P
 				Vec3f probe_position = gmin + (Vec3f(size.X, size.Y, size.Z) * (per_vec / dim_vec));
 
 				// Push probes out of solid geometry along the closest face.
-				bool pushed = false;
-				for (uint32 iter = 0; iter < 8; iter++) {
-					bool inside_any = false;
-					for (uint32 b = 0; b < boxes.Count; b++) {
-						if (PushProbeOutOfBox(probe_position, boxes.Boxes[b], scProbeHugOffset)) {
-							inside_any = true;
-							pushed = true;
-							break;
-						}
-					}
-
-					if (!inside_any) {
-						break;
-					}
-				}
-
-				if (pushed) {
+				if (PushProbeOutOfBoxes(probe_position, boxes)) {
 					stat_pushed++;
 				}
 
-				// Hug nearby surfaces (pull free-space probes sitting just off a wall/floor/ceiling onto surface)
-				if (hug_dist > 1e-4f) {
-					Vec3f hugged = probe_position;
-					if (HugNearestSurface(probe_position, boxes, scProbeHugOffset, hug_dist, hugged)) {
-						// Hugging one box can land inside another; re-run the
-						// closest-face push-out so the final spot is valid.
-						for (uint32 iter = 0; iter < 8; iter++) {
-							bool inside_any = false;
-							for (uint32 b = 0; b < boxes.Count; b++) {
-								if (PushProbeOutOfBox(hugged, boxes.Boxes[b], scProbeHugOffset)) {
-									inside_any = true;
-									break;
-								}
-							}
+				// Minimum-clearance pass: push free-space probes that sit too
+				// close to a surface into open space, so the depth cube never has
+				// a grazing surface filling its faces.
+				Vec3f hugged = probe_position;
+				if (HugNearestSurface(probe_position, boxes, scProbeHugOffset, hugged)) {
+					// Pushing off one box can land inside another; re-run the
+					// closest-face push-out so the final spot is valid.
+					PushProbeOutOfBoxes(hugged, boxes);
 
-							if (!inside_any) {
-								break;
-							}
-						}
-
-						// Keep grid interpolation valid: never leave the volume.
-						probe_position = Vec3f::Clamp(hugged, gmin, vol_max);
-						stat_hugged++;
-					}
+					// Keep grid interpolation valid: never leave the volume.
+					probe_position = Vec3f::Clamp(hugged, gmin, vol_max);
+					stat_hugged++;
 				}
 
 				mProbePositions.Insert(probe_position);
@@ -677,11 +584,6 @@ bool ProbeManager::ProjectStagedFaces(uint32 batch_slot, uint32 probe_index)
 
 	const float32 texel_area = 4.0f / static_cast<float32>(scPixels);
 
-#ifdef FX_DEBUG_PROBES_EXPORT_FACE_IMAGES
-	SizedArray<uint8> ppm;
-	ppm.InitSize(scCaptureFaces * scPixels * 3);
-#endif
-
 	for (uint32 face = 0; face < scCaptureFaces; face++) {
 		mCaptureStaging[batch_slot][face].Map();
 		mCaptureStaging[batch_slot][face].InvalidateFromGpu();
@@ -706,12 +608,6 @@ bool ProbeManager::ProjectStagedFaces(uint32 batch_slot, uint32 probe_index)
 				const float32 g = fminf(HalfToFloat(texel[1]), scRadianceClamp);
 				const float32 b = fminf(HalfToFloat(texel[2]), scRadianceClamp);
 
-#ifdef FX_DEBUG_PROBES_EXPORT_FACE_IMAGES
-				uint8* ppm_px = ppm.pData + (face * scPixels + y * scCaptureSize + x) * 3;
-				ppm_px[0] = static_cast<uint8>(powf(fminf(r * 0.5f, 1.0f), 1.0f / 2.2f) * 255.0f);
-				ppm_px[1] = static_cast<uint8>(powf(fminf(g * 0.5f, 1.0f), 1.0f / 2.2f) * 255.0f);
-				ppm_px[2] = static_cast<uint8>(powf(fminf(b * 0.5f, 1.0f), 1.0f / 2.2f) * 255.0f);
-#endif
 				const float32 nx = ((static_cast<float32>(x) + 0.5f) / static_cast<float32>(scCaptureSize)) * 2.0f -
 								   1.0f;
 				const float32 ny = ((static_cast<float32>(y) + 0.5f) / static_cast<float32>(scCaptureSize)) * 2.0f -
@@ -756,25 +652,6 @@ bool ProbeManager::ProjectStagedFaces(uint32 batch_slot, uint32 probe_index)
 		mCaptureStaging[batch_slot][face].UnMap();
 	}
 
-#ifdef FX_DEBUG_PROBES_EXPORT_FACE_IMAGES
-	if (mNumProbesPending <= 1) {
-		static uint32 sBakeIndex = 0;
-
-		for (uint32 face_index = 0; face_index < scCaptureFaces; face_index++) {
-			String image_path = String::Fmt("bakes/probe_bake{}_face{}.ppm", sBakeIndex, face_index);
-
-			const uint32 face_image_size = scPixels * 3;
-			Slice<uint8> pixel_data = MakeSlice(ppm.pData + (face_index * face_image_size), face_image_size);
-
-			asset::PPMWriter writer {};
-			writer.WriteRGB(image_path, Vec2u(scCaptureSize, scCaptureSize), pixel_data);
-		}
-
-		LogInfo("Probe capture faces dumped as probe_bake{}_faceN.ppm", sBakeIndex);
-		sBakeIndex++;
-	}
-#endif
-
 	// Single bakes refresh the whole field (global ambient); grid bakes write
 	// only the current cell.
 	if (mNumProbesPending <= 1) {
@@ -799,7 +676,7 @@ bool ProbeManager::ProjectStagedFaces(uint32 batch_slot, uint32 probe_index)
 		}
 	}
 
-	LogInfo("Probe {}/{}", probe_index + 1, mNumProbesPending);
+	LogDebug("Probe {}/{} projected", probe_index + 1, mNumProbesPending);
 
 	return true;
 }
@@ -880,15 +757,13 @@ static void ProbeDepthDirectionToTexel(const Vec3f& d, uint32& out_face, uint32&
 
 bool ProbeManager::BuildDepthMoments(uint32 batch_slot, uint32 probe_index)
 {
-	static constexpr uint32 scCapturePixelsSize = scCaptureSize * scCaptureSize;
 	static constexpr uint32 scTexelsTotal = Limits::ProbeDepthFaces * Limits::ProbeDepthTexelsPerFace;
 	static constexpr float32 scMaxDist = Limits::ProbeDepthMaxDistance;
 
-	static constexpr float32 scCaptureTexelArea = 4.0f / static_cast<float32>(scCapturePixelsSize);
-
-	float32 sum_w[scTexelsTotal] = {};
-	float32 sum_d[scTexelsTotal] = {};
-	float32 sum_d2[scTexelsTotal] = {};
+	float32 min_dist[scTexelsTotal];
+	for (uint32 t = 0; t < scTexelsTotal; t++) {
+		min_dist[t] = scMaxDist;
+	}
 
 	for (uint32 face = 0; face < scCaptureFaces; face++) {
 		mDepthStaging[batch_slot][face].Map();
@@ -933,10 +808,9 @@ bool ProbeManager::BuildDepthMoments(uint32 batch_slot, uint32 probe_index)
 				const float32 inv_len = 1.0f / sqrtf(len_sq);
 				const Vec3f dir_n = direction * Vec3f(inv_len);
 
-				const float32 rr = 1.0f + nx * nx + ny * ny;
-				const float32 weight = scCaptureTexelArea / (rr * sqrtf(rr));
-
 				float32 dist = scMaxDist;
+				// Depth storage is viewport-inverted (VkViewport minDepth=1, maxDepth=0),
+				// so the buffer holds 1-NDC. Un-flip to NDC before InvProjection.
 				if (stored_depth > 1e-6f) {
 					const float32 depth = 1.0f - stored_depth;
 					Vec4f clip_d(nx, ny, depth, 1.0f);
@@ -954,6 +828,8 @@ bool ProbeManager::BuildDepthMoments(uint32 batch_slot, uint32 probe_index)
 					}
 				}
 
+				// Air-texel samples carry dist==scMaxDist, so the min() naturally
+				// keeps the first real occluder when a texel also sees sky.
 				uint32 tex_face = 0;
 				uint32 tex_x = 0;
 				uint32 tex_y = 0;
@@ -962,9 +838,9 @@ bool ProbeManager::BuildDepthMoments(uint32 batch_slot, uint32 probe_index)
 				const uint32 texel = tex_face * Limits::ProbeDepthTexelsPerFace + tex_y * Limits::ProbeDepthSize +
 									 tex_x;
 
-				sum_w[texel] += weight;
-				sum_d[texel] += dist * weight;
-				sum_d2[texel] += dist * dist * weight;
+				if (dist < min_dist[texel]) {
+					min_dist[texel] = dist;
+				}
 			}
 		}
 
@@ -974,24 +850,10 @@ bool ProbeManager::BuildDepthMoments(uint32 batch_slot, uint32 probe_index)
 	ProbeInfo probe_info {};
 
 	for (uint32 t = 0; t < scTexelsTotal; t++) {
-		float32 mean = scMaxDist;
-		float32 mean_sq = scMaxDist * scMaxDist;
-
-		if (sum_w[t] > 1e-9f) {
-			const float32 inv = 1.0f / sum_w[t];
-			mean = sum_d[t] * inv;
-			mean_sq = sum_d2[t] * inv;
-			// Guard against numeric drift (variance must be >= 0).
-			const float32 min_sq = mean * mean;
-			if (mean_sq < min_sq) {
-				mean_sq = min_sq;
-			}
-		}
-
+		const float32 mean = min_dist[t];
 		probe_info.DepthMoments[t * 2 + 0] = mean;
-		probe_info.DepthMoments[t * 2 + 1] = mean_sq;
+		probe_info.DepthMoments[t * 2 + 1] = mean * mean;
 	}
-
 
 	simd::StoreFloat4(probe_info.ProbePosition, mProbePositions[probe_index].mIntrin);
 	probe_info.ProbePosition[3] = 0.0f;
@@ -1036,6 +898,8 @@ bool ProbeManager::FinishCaptureBake()
 	return true;
 }
 
+static void LogProbeDepthStats(const ProbeInfo* depths, const char* context);
+
 bool ProbeManager::ServiceCaptureBake()
 {
 	if (!mbCaptureReady) {
@@ -1061,6 +925,7 @@ bool ProbeManager::ServiceCaptureBake()
 	mbCapturePending = false;
 	mNumProbesPending = 0;
 	LogInfo("Probe grid bake complete ({} probes)", Limits::MaxIrradianceProbes);
+	LogProbeDepthStats(mProbeDepths, "baked");
 	return false;
 }
 
@@ -1092,7 +957,7 @@ void ProbeManager::UploadVolumeToGpu()
 struct FxProbeHeader
 {
 	char Magic[4] = { 'R', 'P', 'P', 'V' };
-	uint32 Version = 2;
+	uint32 Version = FX_PROBE_CACHE_FILE_VERSION;
 	uint32 ProbeCount = Limits::MaxIrradianceProbes;
 };
 
@@ -1132,7 +997,6 @@ bool ProbeManager::LoadProbes()
 	Slice<uint8> data = file.Read<uint8>();
 	file.Close();
 
-
 	const uint64 cache_file_size = sizeof(FxProbeHeader) + sizeof(ProbeVolumeData) + sizeof(mProbes) +
 								   sizeof(mProbeDepths);
 
@@ -1148,9 +1012,10 @@ bool ProbeManager::LoadProbes()
 		return false;
 	}
 
-
 	if (header->Version != FX_PROBE_CACHE_FILE_VERSION) {
-		LogWarning("ProbeManager: Probe cache file is out of date.");
+		LogWarning(
+			"ProbeManager: Probe cache file is out of date (v{} != v{}). Rebake with G (wait for completion), then P.",
+			header->Version, FX_PROBE_CACHE_FILE_VERSION);
 		return false;
 	}
 
@@ -1169,6 +1034,8 @@ bool ProbeManager::LoadProbes()
 
 	memcpy(mProbeDepths, data.pData + offset, sizeof(mProbeDepths));
 	offset += sizeof(mProbeDepths);
+
+	LogProbeDepthStats(mProbeDepths, "loaded");
 
 	UploadVolumeToGpu();
 	UploadToGpu();
