@@ -12,19 +12,6 @@ namespace fx {
 
 const Mat4f Mat4f::scIdentity = Mat4f((float32[16]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 });
 
-float32x4_t Mat4f::MultiplyVec4f_Neon(Vec4f& vec)
-{
-	float32x4_t result = vmovq_n_f32(0);
-
-	result = vfmaq_laneq_f32(result, Rows[0].mIntrin, vec.mIntrin, 0);
-	result = vfmaq_laneq_f32(result, Rows[1].mIntrin, vec.mIntrin, 1);
-	result = vfmaq_laneq_f32(result, Rows[2].mIntrin, vec.mIntrin, 2);
-	result = vfmaq_laneq_f32(result, Rows[3].mIntrin, vec.mIntrin, 3);
-
-	return result;
-}
-
-Vec4f Mat4f::MultiplyVec4f(Vec4f& vec) { return Vec4f(MultiplyVec4f_Neon(vec)); }
 
 Mat4f Mat4f::AsRotation(const Quat& quat)
 {
@@ -117,6 +104,7 @@ Mat4f Mat4f::operator*(const Mat4f& other) const
 
 Vec4f Mat4f::operator*(const Vec4f& other) const
 {
+#if 0
 	float32x4_t p0, p1, p2, p3;
 
 	{
@@ -135,8 +123,16 @@ Vec4f Mat4f::operator*(const Vec4f& other) const
 	// Sum these final results. Originally thought of doing this with vaddvq, but that would require 4 calls to an
 	// already compound intrinsic. Love pairwise adds!
 	float32x4_t res = vpaddq_f32(sum01, sum23);
+#endif
 
-	return Vec4f(res);
+	float32x4_t result = vmovq_n_f32(0);
+
+	result = vfmaq_laneq_f32(result, Rows[0].mIntrin, other.mIntrin, 0);
+	result = vfmaq_laneq_f32(result, Rows[1].mIntrin, other.mIntrin, 1);
+	result = vfmaq_laneq_f32(result, Rows[2].mIntrin, other.mIntrin, 2);
+	result = vfmaq_laneq_f32(result, Rows[3].mIntrin, other.mIntrin, 3);
+
+	return Vec4f(result);
 }
 
 

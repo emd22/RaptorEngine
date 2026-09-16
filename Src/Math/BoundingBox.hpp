@@ -4,20 +4,20 @@
 
 namespace fx {
 
-class BoundingBox
+class AABB
 {
 public:
-	BoundingBox() = default;
-	BoundingBox(Vec3f min, Vec3f max);
+	AABB() = default;
+	AABB(Vec3f min, Vec3f max);
 
 	FX_FORCE_INLINE Vec3f GetSize() { return Max - Min; }
 
-	void Add(const BoundingBox& other);
+	void Add(const AABB& other);
 
-	BoundingBox operator+(const BoundingBox& other) const;
-	BoundingBox& operator+=(const BoundingBox& other);
+	AABB operator+(const AABB& other) const;
+	AABB& operator+=(const AABB& other);
 
-	BoundingBox& operator=(const BoundingBox& other);
+	AABB& operator=(const AABB& other);
 
 public:
 	Vec3f Min = Vec3f::sZero;

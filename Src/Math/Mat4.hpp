@@ -152,17 +152,9 @@ public:
 		}
 	}
 
-	Vec4f MultiplyVec4f(Vec4f& vec);
-
 	Mat4f GetWithoutTranslation() const;
 
 public:
-#if defined(FX_USE_NEON)
-	float32x4_t MultiplyVec4f_Neon(Vec4f& vec);
-#elif defined(FX_USE_AVX)
-	__m128 MultiplyVec4f_SSE(const Vec4f& vec);
-#endif
-
 public:
 	union alignas(16)
 	{

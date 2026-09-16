@@ -3,9 +3,9 @@
 namespace fx {
 
 
-BoundingBox::BoundingBox(Vec3f min, Vec3f max) : Min(min), Max(max) {}
+AABB::AABB(Vec3f min, Vec3f max) : Min(min), Max(max) {}
 
-BoundingBox& BoundingBox::operator+=(const BoundingBox& other)
+AABB& AABB::operator+=(const AABB& other)
 {
 	/*
 
@@ -28,23 +28,23 @@ BoundingBox& BoundingBox::operator+=(const BoundingBox& other)
 }
 
 
-void BoundingBox::Add(const BoundingBox& other)
+void AABB::Add(const AABB& other)
 {
 	Min = Vec3f::Min(other.Min, Min);
 	Max = Vec3f::Max(other.Max, Max);
 }
 
 
-BoundingBox BoundingBox::operator+(const BoundingBox& other) const
+AABB AABB::operator+(const AABB& other) const
 {
-	BoundingBox result = (*this);
+	AABB result = (*this);
 	result += other;
 
 	return result;
 }
 
 
-BoundingBox& BoundingBox::operator=(const BoundingBox& other)
+AABB& AABB::operator=(const AABB& other)
 {
 	this->Min = other.Min;
 	this->Max = other.Max;

@@ -718,8 +718,8 @@ bool ProbeManager::ProjectStagedFaces(uint32 batch_slot, uint32 probe_index)
 								   1.0f;
 
 				Vec4f clip(nx, ny, 0.5f, 1.0f);
-				Vec4f view = inv_proj.MultiplyVec4f(clip);
-				Vec4f world = inv_view.MultiplyVec4f(view);
+				Vec4f view = inv_proj * (clip);
+				Vec4f world = inv_view * (view);
 
 				if (fabsf(world.W) < 1e-6f) {
 					continue;
@@ -915,8 +915,8 @@ bool ProbeManager::BuildDepthMoments(uint32 batch_slot, uint32 probe_index)
 								   1.0f;
 
 				Vec4f clip_dir(nx, ny, 0.5f, 1.0f);
-				Vec4f view_dir = inv_proj.MultiplyVec4f(clip_dir);
-				Vec4f world_dir = inv_view.MultiplyVec4f(view_dir);
+				Vec4f view_dir = inv_proj * (clip_dir);
+				Vec4f world_dir = inv_view * (view_dir);
 
 				if (fabsf(world_dir.W) < 1e-6f) {
 					continue;

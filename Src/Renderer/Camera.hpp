@@ -32,13 +32,13 @@ public:
 	FX_FORCE_INLINE void SetNearPlane(float32 near)
 	{
 		RequireMatrixUpdate();
-		mNearPlane = near;
+		mZNearClip = near;
 	}
 
 	FX_FORCE_INLINE void SetFarPlane(float32 far)
 	{
 		RequireMatrixUpdate();
-		mFarPlane = far;
+		mZFarClip = far;
 	}
 
 	FX_FORCE_INLINE void MoveBy(const Vec3f& offset)
@@ -94,8 +94,8 @@ public:
 	bool mbUpdateTransform : 1 = true;
 	bool mbRequireMatrixUpdate : 1 = true;
 
-	float32 mNearPlane = 1000.0f;
-	float32 mFarPlane = 0.01f;
+	float32 mZNearClip = 1000.0f;
+	float32 mZFarClip = 0.01f;
 
 	bool bLookatTarget = false;
 
@@ -154,8 +154,8 @@ public:
 
 	PerspectiveCamera(float32 fov_degrees, float32 aspect_ratio, float32 near_plane, float32 far_plane)
 	{
-		mNearPlane = near_plane;
-		mFarPlane = far_plane;
+		mZNearClip = near_plane;
+		mZFarClip = far_plane;
 		SetFov(fov_degrees);
 		SetAspectRatio(aspect_ratio);
 
@@ -164,8 +164,8 @@ public:
 
 	void SetPlanes(float32 near_plane, float32 far_plane)
 	{
-		mNearPlane = near_plane;
-		mFarPlane = far_plane;
+		mZNearClip = near_plane;
+		mZFarClip = far_plane;
 		mbRequireMatrixUpdate = true;
 		Update();
 	}
