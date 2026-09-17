@@ -312,8 +312,14 @@ void GraphicsBackend::InitVulkan()
 	instance_info.enabledLayerCount = static_cast<uint32_t>(requested_validation_layers.size());
 	instance_info.pNext = nullptr;
 
-	// Allow portability devices (e.g. MoltenVK) to be shown when querying devices.
-	instance_info.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+	// Allow portability devices (e.g. MoltenVK) to be shown when querying devices. The flag is only
+	// valid alongside the portability enumeration extension.
+	if (RequiresVulkanPortability(available_extensions)) {
+		all_extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+		instance_info.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+		instance_info.ppEnabledExtensionNames = all_extensions.data();
+		instance_info.enabledExtensionCount = static_cast<uint32_t>(all_extensions.size());
+	}
 
 	VkResult result = vkCreateInstance(&instance_info, nullptr, &mInstance);
 
@@ -499,6 +505,9 @@ void GraphicsBackend::SubmitImmediateUploadCmd(GraphicsBackend::SubmitFunc uploa
 	};
 
 	SpinLockContext<VkQueue> transfer_queue = GetDevice()->GetTransferQueue();
+
+	// The fence is created signaled; it must be reset before each submit.
+	UploadContext.ImmediateUploadFence.Reset();
 
 	VkTry(vkQueueSubmit(transfer_queue.Get(), 1, &submit_info, UploadContext.ImmediateUploadFence.Get()),
 		  "Error submitting upload buffer");

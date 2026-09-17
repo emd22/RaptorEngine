@@ -13,8 +13,15 @@
 #include <dxc/WinAdapter.h>
 #else
 #define WIN32_LEAN_AND_MEAN
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <atlbase.h>
 #include <windows.h>
+#include <objbase.h>
+#pragma push_macro("GetObject")
+#undef GetObject
+#undef LoadImage
 #endif
 
 #include "ShaderPreproc.hpp"
