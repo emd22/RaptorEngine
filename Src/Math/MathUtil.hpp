@@ -6,6 +6,7 @@
 #define DegToRad(deg) ((deg) * (M_PI / 180.0f))
 #define RadToDeg(rad) ((rad) * (180.0f / M_PI))
 
+#include <bit>
 #include <cmath>
 
 

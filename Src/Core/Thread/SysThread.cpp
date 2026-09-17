@@ -120,7 +120,7 @@ SysThreadImpl_Windows& SysThreadImpl_Windows::operator=(SysThreadImpl_Windows&& 
 	}
 
 	if (bIsRunning) {
-		pthread_detach(InternalThread);
+		CloseHandle(InternalThread);
 	}
 
 	InternalThread = other.InternalThread;
@@ -139,12 +139,12 @@ SysThreadImpl_Windows& SysThreadImpl_Windows::operator=(SysThreadImpl_Windows&& 
 
 void SysThreadImpl_Windows::Create(ThreadFunc func)
 {
-	assert(!bIsRunning && "SysThreadImpl_Windows::Create called on an already-running thread");
+	AssertMsg(bIsRunning == false, "SysThreadImpl_Windows::Create called on an already-running thread");
 
 	pEntryFunction = func;
 	InternalThread = CreateThread(nullptr, 0, &SysThreadImpl_Windows::InternalEntrypoint, this, 0, &InternalID);
 
-	assert(InternalThread != nullptr && "CreateThread failed");
+	AssertMsg(InternalThread != nullptr, "CreateThread failed");
 
 	bIsRunning = true;
 }

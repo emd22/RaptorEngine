@@ -5,6 +5,7 @@
 #include <Core/Name.hpp>
 #include <Core/PagedArray.hpp>
 #include <Core/Types.hpp>
+#include <chrono>
 #include <unordered_map>
 
 namespace fx {

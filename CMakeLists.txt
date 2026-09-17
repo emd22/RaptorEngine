@@ -60,7 +60,7 @@ if(WIN32)
         target_link_directories(raptor PRIVATE "$ENV{VULKAN_SDK}/Lib")
     endif()
 
-    target_link_libraries(raptor PRIVATE vulkan-1 dxcompiler)
+    target_link_libraries(raptor PRIVATE vulkan-1 dxcompiler jpeg mincore)
     target_compile_definitions(raptor PRIVATE _USE_MATH_DEFINES)
 
 elseif(APPLE)

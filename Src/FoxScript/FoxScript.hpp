@@ -2,6 +2,8 @@
 
 #include "FoxVM.hpp"
 
+#include <chrono>
+
 namespace fx {
 class String;
 

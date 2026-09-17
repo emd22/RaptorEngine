@@ -172,6 +172,7 @@ void GpuDevice::QueryQueues()
 
 bool GpuDevice::SupportsPortabilityExtension() const
 {
+#ifdef VK_ENABLE_BETA_EXTENSIONS
 	uint32 extension_count = 0;
 	vkEnumerateDeviceExtensionProperties(Physical, nullptr, &extension_count, nullptr);
 	SizedArray<VkExtensionProperties> exts;
@@ -183,6 +184,7 @@ bool GpuDevice::SupportsPortabilityExtension() const
 			return true;
 		}
 	}
+#endif
 
 	return false;
 }
@@ -237,7 +239,9 @@ void GpuDevice::CreateLogicalDevice()
 
 	if (requires_portability_extension) {
 		LogInfo(LC_RENDER, "Device is using portability extension!");
+#ifdef VK_ENABLE_BETA_EXTENSIONS
 		device_extensions.emplace_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+#endif
 	}
 
 	// Get driver properties
@@ -259,11 +263,13 @@ void GpuDevice::CreateLogicalDevice()
 	}
 
 
+#ifdef VK_ENABLE_BETA_EXTENSIONS
 	VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_features {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PORTABILITY_SUBSET_FEATURES_KHR,
 		.pNext = nullptr,
 		.mutableComparisonSamplers = VK_TRUE, // For samplers that use compareOp's / SampleCmp in shaders
 	};
+#endif
 
 	// Vulkan 1.1 specific features
 	VkPhysicalDeviceVulkan11Features features_1_1 {
@@ -293,7 +299,9 @@ void GpuDevice::CreateLogicalDevice()
 
 
 	if (requires_portability_extension) {
+#ifdef VK_ENABLE_BETA_EXTENSIONS
 		features_1_1.pNext = &portability_features;
+#endif
 	}
 
 

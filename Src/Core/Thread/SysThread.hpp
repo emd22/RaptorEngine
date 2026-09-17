@@ -17,7 +17,15 @@ namespace fx {
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <Windows.h>
+// Windows.h defines these as macros to the ANSI/wide variants of the WinAPI functions of the same name,
+// which collide with identically-named methods elsewhere in the engine (AssetWorker::LoadImage,
+// ObjectManager::GetObject, ...).
+#undef LoadImage
+#undef GetObject
 #else
 #error "Unsupported platform"
 #endif
