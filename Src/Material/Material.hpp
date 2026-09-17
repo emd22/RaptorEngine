@@ -175,9 +175,12 @@ public:
 
 	/**
 	 * Binds the material to be used in the given command buffer.
+	 * @param bone_buffer_offset The drawn object's own slot offset into `GraphicsBackend::BoneBuffer` for this frame
+	 * (see `Object::BoneBufferOffset`), used when this pipeline requires a bone buffer binding. Irrelevant otherwise.
 	 * @returns True if the material was bound successfully.
 	 */
-	bool BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline);
+	bool BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline,
+						  uint32 bone_buffer_offset = 0);
 
 
 	void RequestQuality(uint32 quality);
@@ -209,6 +212,13 @@ private:
 	 */
 	renderer::DescriptorSet* RequestAlbedoOnlyDescriptors();
 
+	/**
+	 * @brief Generates a descriptor set with a bone buffer binding for materials that don't otherwise support
+	 * skinning (e.g. the null material), so they remain layout-compatible when bound as a fallback for a skinned
+	 * pipeline.
+	 */
+	renderer::DescriptorSet* RequestSkinnedFallbackDescriptors();
+
 public:
 	MaterialID ID = MaterialID::scNull;
 
@@ -231,6 +241,7 @@ public:
 private:
 	renderer::DescriptorSet* mpDescriptorSet = nullptr;
 	renderer::DescriptorSet* mpAlbedoOnlyDescriptorSet = nullptr;
+	renderer::DescriptorSet* mpSkinnedFallbackDescriptorSet = nullptr;
 
 	bool mbIsReady : 1 = false;
 	bool mbIsBeingBuilt : 1 = false;

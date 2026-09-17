@@ -57,14 +57,14 @@ void WorldFile::Load(const std::string& path)
 	bool first_time = !gWorld->bIsPopulated;
 
 	if (first_time) {
-		ConfigEntry* meta = info.GetEntry(HashStr32("Meta"));
+		ConfigEntry* meta = info.GetEntry(HashStr32("meta"));
 
 		if (!meta) {
 			LogError(LC_ASSET, "Project missing metadata!");
 			return;
 		}
 
-		gWorld->Name = meta->GetMember(HashStr32("Name"))->Get<const char*>();
+		gWorld->Name = meta->GetMember(HashStr32("name"))->Get<const char*>();
 	}
 
 	// Load sun
@@ -74,17 +74,16 @@ void WorldFile::Load(const std::string& path)
 		gWorld->Attach(sun);
 	}
 
-	ConfigEntry* sun_entry = info.GetEntry(HashStr32("Sun"));
+	ConfigEntry* sun_entry = info.GetEntry(HashStr32("sun"));
 
 	if (sun_entry) {
-		sun->SetPosition(sun_entry->GetMemberValue<Vec3f>(HashStr32("Pos"), Vec3f::sZero));
+		sun->SetPosition(sun_entry->GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero));
 
-		sun->Color = sun_entry->GetMemberValue<Color>(HashStr32("Color"), Color::FromRGBA(100, 100, 100, 4));
-		sun->AmbientColor = sun_entry->GetMemberValue<Color>(HashStr32("AmbientColor"),
-															 Color::FromRGBA(100, 100, 100, 1));
+		sun->Color = sun_entry->GetMemberValue<Color>(HashStr32("color"), Color::FromRGBA(100, 100, 100, 4));
+		sun->AmbientColor = sun_entry->GetMemberValue<Color>(HashStr32("ambient"), Color::FromRGBA(100, 100, 100, 1));
 	}
 
-	ConfigEntry* collider_list = info.GetEntry(HashStr32("Colliders"));
+	ConfigEntry* collider_list = info.GetEntry(HashStr32("colliders"));
 	if (collider_list) {
 		for (const ConfigEntry& collider_entry : collider_list->Members) {
 			if (first_time) {
@@ -96,7 +95,7 @@ void WorldFile::Load(const std::string& path)
 
 	// Load objects
 
-	ConfigEntry* object_list = info.GetEntry(HashStr32("Objects"));
+	ConfigEntry* object_list = info.GetEntry(HashStr32("objects"));
 
 	for (const ConfigEntry& object_entry : object_list->Members) {
 		if (first_time) {
@@ -128,17 +127,17 @@ void WorldFile::AddColliderFromEntry(const std::string& scene_path, const Config
 	physics::eMotionType motion_type = physics::eMotionType::Static;
 	physics::Body* phys = gPhysics->NewBody(collider_name);
 
-	Vec3f position = collider_entry.GetMemberValue(HashStr32("Pos"), Vec3f::sZero);
-	Quat rotation = collider_entry.GetMemberValue(HashStr32("Rot"), Quat::scIdentity);
+	Vec3f position = collider_entry.GetMemberValue(HashStr32("pos"), Vec3f::sZero);
+	Quat rotation = collider_entry.GetMemberValue(HashStr32("rot"), Quat::scIdentity);
 
-	ConfigEntry* physics_type = collider_entry.GetMember(HashStr32("Type"));
+	ConfigEntry* physics_type = collider_entry.GetMember(HashStr32("type"));
 	if (physics_type && physics_type->Get<uint32>() == static_cast<uint32>(physics::eMotionType::Dynamic)) {
 		motion_type = physics::eMotionType::Dynamic;
 	}
 
-	ConfigEntry* box = collider_entry.GetMember(HashStr32("Box"));
+	ConfigEntry* box = collider_entry.GetMember(HashStr32("box"));
 	if (box != nullptr) {
-		Vec3f size = box->GetMemberValue(HashStr32("Size"), Vec3f::sOne);
+		Vec3f size = box->GetMemberValue(HashStr32("size"), Vec3f::sOne);
 		if (size.X <= 0.0f || size.Y <= 0.0f || size.Z <= 0.0f) {
 			LogWarning(LC_PHYSICS, "Collider '{}' has invalid Size {} - falling back to 1,1,1", collider_name, size);
 			size = Vec3f::sOne;
@@ -153,7 +152,7 @@ void WorldFile::AddColliderFromEntry(const std::string& scene_path, const Config
 
 void WorldFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEntry& object_entry)
 {
-	const char* mesh_path = object_entry.GetMember(HashStr32("Mesh"))->Get<const char*>();
+	const char* mesh_path = object_entry.GetMember(HashStr32("mesh"))->Get<const char*>();
 
 	LoadObjectOptions load_options {};
 
@@ -161,6 +160,7 @@ void WorldFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEn
 	AssetTicket ticket = gAssetManager->LoadObject(object_entry.Name.Get(), path.CStr());
 
 	Object* object = static_cast<Object*>(ticket.Get());
+
 
 	ApplyPropertiesToObject(object, object_entry);
 
@@ -170,26 +170,21 @@ void WorldFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEn
 
 void WorldFile::ApplyPropertiesToObject(Object* object, const ConfigEntry& object_entry)
 {
-	ConfigEntry* shadow_caster = object_entry.GetMember(HashStr32("Shadows"));
+	ConfigEntry* shadow_caster = object_entry.GetMember(HashStr32("shadows"));
 	if (shadow_caster != nullptr) {
 		object->SetShadowCaster(static_cast<bool>(shadow_caster->Get<int64>()));
 	}
 
-	ConfigEntry* scale = object_entry.GetMember(HashStr32("Scale"));
-	if (scale != nullptr) {
-		object->SetScale(scale->Get<float32>());
-	}
-
 	// Transforms
 
-	object->SetPosition(object_entry.GetMemberValue(HashStr32("Pos"), object->mPosition));
-	object->SetRotation(object_entry.GetMemberValue(HashStr32("Rot"), object->mRotation));
-	object->SetScale(object_entry.GetMemberValue(HashStr32("Scale"), object->mScale));
+	object->SetPosition(object_entry.GetMemberValue(HashStr32("pos"), object->mPosition));
+	object->SetRotation(object_entry.GetMemberValue(HashStr32("rot"), object->mRotation));
+	object->SetScale(object_entry.GetMemberValue(HashStr32("scale"), object->mScale));
 	object->MarkTransformOutOfDate();
 
 	// Render options
 
-	ConfigEntry* layer = object_entry.GetMember(HashStr32("Layer"));
+	ConfigEntry* layer = object_entry.GetMember(HashStr32("layer"));
 	if (layer != nullptr) {
 		int64 layer_value = layer->Get<int64>();
 
@@ -198,18 +193,19 @@ void WorldFile::ApplyPropertiesToObject(Object* object, const ConfigEntry& objec
 		}
 	}
 
-	object->SetUnlit(static_cast<bool>(object_entry.GetMemberValue(HashStr32("Unlit"), 0)));
+	object->SetUnlit(static_cast<bool>(object_entry.GetMemberValue(HashStr32("unlit"), 0)));
 
-	ConfigEntry* unlit = object_entry.GetMember(HashStr32("Unlit"));
-	if (unlit != nullptr) {
-		object->SetUnlit(static_cast<bool>(unlit->Get<int64>()));
+	ConfigEntry* nocull = object_entry.GetMember(HashStr32("nocull"));
+	if (nocull != nullptr) {
+		object->SetCullable(false);
 	}
+
 
 	physics::BodyProps physics_properties {};
 
 	// Physics
 
-	ConfigEntry* collider_ref = object_entry.GetMember(HashStr32("ColliderRef"));
+	ConfigEntry* collider_ref = object_entry.GetMember(HashStr32("collider"));
 	if (collider_ref != nullptr) {
 		physics::Body* phys_object = gPhysics->FindBody(HashStr32(collider_ref->Get<const char*>()));
 		if (phys_object != nullptr) {

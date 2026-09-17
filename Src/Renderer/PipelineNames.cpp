@@ -15,16 +15,16 @@ static const PipelineNameInfo scNameInfos[] = {
 	/* Geometry pipelines */
 	NAME_INFO("Geometry", eFlags::AlbedoOnly),
 	NAME_INFO("GeometryNormalMaps", eFlags::None),
-	NAME_INFO("GeometrySkinned", eFlags::None),
+	NAME_INFO("GeometrySkinned", eFlags::Skinned),
 
 	NAME_INFO("GeometryTransparent", eFlags::AlbedoOnly),
 	NAME_INFO("GeometryNormalMapsTransparent", eFlags::None),
-	NAME_INFO("GeometrySkinnedTransparent", eFlags::None),
+	NAME_INFO("GeometrySkinnedTransparent", eFlags::Skinned),
 
 	/* Depth + Normal prepass */
 	NAME_INFO("DepthNormal", eFlags::AlbedoOnly),
 	NAME_INFO("DepthNormalNormalMaps", eFlags::None),
-	NAME_INFO("DepthNormalSkinned", eFlags::None),
+	NAME_INFO("DepthNormalSkinned", eFlags::Skinned),
 
 	NAME_INFO("DebugLayer", eFlags::None),
 	NAME_INFO("DebugSolid", eFlags::None),

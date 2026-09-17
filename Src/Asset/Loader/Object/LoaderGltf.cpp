@@ -445,7 +445,6 @@ void LoaderGltf::LoadSkeleton(Skeleton& skel, cgltf_skin* skin)
 
 		for (uint32 i = 0; i < joint_count; i++) {
 			Mat4f& m = skel.InvBindTransforms[i];
-			m = m.Transposed();
 
 			m = reflection * m * reflection;
 		}
@@ -540,6 +539,22 @@ void LoaderGltf::LoadAnimation(Animation& out_anim, const cgltf_animation& anim,
 				joint_track.Rotation.Values[key_index] = Quat(buffer);
 			}
 		}
+
+		// Get scales
+		else if (channel->target_path == cgltf_animation_path_type_scale) {
+			Assert(sampler->output->type == cgltf_type_vec3);
+			joint_track.Scale.Times = std::move(times);
+			joint_track.Scale.Values.InitSize(key_count);
+
+			for (uint32 key_index = 0; key_index < key_count; key_index++) {
+				float32 buffer[4];
+
+				cgltf_accessor_read_float(sampler->output, key_index, buffer, 3);
+				buffer[3] = 0.0f;
+
+				joint_track.Scale.Values[key_index] = (Vec3f(buffer));
+			}
+		}
 	}
 
 	LogInfo(LC_ASSET, "Loaded animation '{}': {:.3f}s, {} joints", out_anim.Name, out_anim.Duration, joint_count);
@@ -554,7 +569,7 @@ void LoaderGltf::LoadAnimations(Object* object, Skeleton& skel)
 	// Most models only have one skin/skeleton, so we just assume one for now.
 	cgltf_skin* skin = &mpGltfData->skins[0];
 
-	object->Animations.InitCapacity(8);
+	object->Animations.InitCapacity(32);
 
 
 	for (uint32 i = 0; i < mpGltfData->animations_count; i++) {

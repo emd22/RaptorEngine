@@ -42,7 +42,7 @@ enum class eObjectFlags : uint16
 	IsInstance = (1 << 2),
 	ShadowCaster = (1 << 3),
 	Unlit = (1 << 4),
-	NoVisCulling = (1 << 5),
+	DisableCulling = (1 << 5),
 };
 
 FxEnumFlags(eObjectFlags);
@@ -148,13 +148,24 @@ public:
 	FX_FORCE_INLINE void ClearTag(eObjectTag tag) { ClearFlag(Tags, tag); }
 	FX_FORCE_INLINE void SetTags(eObjectTag tags) { Tags = tags; }
 
-
 	FX_FORCE_INLINE bool IsShadowCaster() const { return (Flags & eObjectFlags::ShadowCaster) != 0; }
 
 	void SetUnlit(const bool value);
 	FX_FORCE_INLINE bool IsUnlit() const { return (Flags & eObjectFlags::Unlit) != 0; }
 
 	FX_FORCE_INLINE bool IsSkinned() const { return (pMesh != nullptr) && pMesh->VertexList.IsSkinned(); }
+
+	void SetCullable(bool value)
+	{
+		if (!value) {
+			SetFlag(Flags, eObjectFlags::DisableCulling);
+		}
+		else {
+			ClearFlag(Flags, eObjectFlags::DisableCulling);
+		}
+	}
+
+	FX_FORCE_INLINE bool IsCullable() const { return !HasFlag(Flags, eObjectFlags::DisableCulling); }
 
 	void Destroy();
 	~Object() override { Destroy(); }
@@ -185,6 +196,14 @@ public:
 	Animation* pCurrentAnimation = nullptr;
 	float32 AnimationTime = 0.0f;
 
+	/// This object's slot offset into `GraphicsBackend::BoneBuffer` for the current frame, set by `UpdateAnimation()`.
+	/// Remembered here (rather than re-read at bind time) because other skinned objects updating later in the same
+	/// frame advance the buffer's shared slot cursor.
+	uint32 BoneBufferOffset = 0;
+	/// The frame (`GraphicsBackend::GetElapsedFrameCount()`) this object's animation was last updated on, so that
+	/// being visited multiple times per frame (shadow pass, depth prepass, forward pass) only advances the pose once.
+	uint32 mAnimationUpdateFrame = UINT32_MAX;
+
 	ObjectID ParentID = ObjectID::scNull;
 	PagedArray<ObjectID> AttachedNodes;
 
@@ -202,6 +221,8 @@ private:
 	uint16 mInstanceSlotsInUse = 0;
 
 	TileIndex mTileIndex = TileIndexNull;
+	/// Number of tiles (width, height) this object spans starting at mTileIndex's XY.
+	Vec2u mTileSpan = Vec2u(1, 1);
 
 	eObjectFlags Flags = eObjectFlags::None;
 	eObjectLayer mObjectLayer = eObjectLayer::WorldLayer;

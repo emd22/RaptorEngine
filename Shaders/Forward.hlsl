@@ -84,7 +84,11 @@ VSOutput main(VSInput input)
 #endif
 
 #ifdef USE_NORMAL_MAPS
+#ifdef USE_SKINNING
+    output.vTangentWS = normalize(mul(mul(input.vTangent, (float3x3)skin_xform), (float3x3)world_matrix));
+#else
     output.vTangentWS = normalize(mul(input.vTangent, (float3x3)world_matrix));
+#endif
     output.vBitangentWS = cross(output.vNormalWS, output.vTangentWS);
 #endif
 

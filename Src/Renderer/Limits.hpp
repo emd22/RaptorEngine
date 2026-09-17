@@ -5,6 +5,10 @@
 namespace fx::Limits {
 static constexpr uint32 MaxActiveLights = 64;
 static constexpr uint32 MaxBones = 100;
+/// Maximum number of distinct skinned objects that can have their pose updated within a single frame. Each one gets
+/// its own slot in `GraphicsBackend::BoneBuffer` so simultaneously-visible skinned objects don't clobber each other's
+/// bone matrices.
+static constexpr uint32 MaxConcurrentSkinnedObjects = 32;
 static constexpr uint32 MaxDeletionQueueItems = 128;
 static constexpr uint32 MaxConcurrentThreads = 10;
 

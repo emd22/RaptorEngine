@@ -94,14 +94,17 @@ private:
 	void ClearRenderList();
 
 	void AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* id);
-
-	void RebuildFromTiles(TileIndex tile_index);
+	/**
+	 * @brief Recursively adds `id` and its attached nodes to the geometry render list, deriving each node's own
+	 * pipeline from its own material rather than inheriting the pipeline chosen for the root (attached primitives
+	 * of a multi-primitive mesh can each require a different pipeline, e.g. a skinned primitive attached to a
+	 * container object whose own material differs).
+	 */
+	void AddToRenderListRecursiveByMaterial(ObjectID* id);
 
 	void SortTransparentObjects(renderer::Pipeline& pipeline, renderer::RenderListSection& section);
 
 public:
-	void NotifyObjectMaterialChanged(ObjectID id);
-
 	Name Name = "(unnamed)";
 	bool bRenderPhysicsObjects = false;
 	bool bRenderProbes = false;
@@ -126,8 +129,8 @@ private:
 
 	Ref<PrimitiveMesh> mpDebugCube { nullptr };
 
-	// Used by RenderPhysicsObjects. Rebuild the physics objects list if there have been changes recorded in the physics
-	// manager.
+	/// Used by RenderPhysicsObjects. Rebuild the physics objects list if there have been changes recorded in the
+	/// physics manager.
 	uint32 mLastPhysicsUpdateState = UINT32_MAX;
 	SizedArray<physics::Body*> mCachedPhysicsBodies;
 
@@ -136,7 +139,7 @@ private:
 
 	Frustum mFrustum;
 
-	bool mbNoTileCulling = true;
+	bool mbDisableTileCulling = false;
 
 	SizedArray<TileIndex> mVisibleTiles;
 };

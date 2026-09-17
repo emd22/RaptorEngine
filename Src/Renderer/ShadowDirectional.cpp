@@ -17,6 +17,7 @@ namespace fx::renderer {
 FX_SET_MODULE_NAME("ShadowDirectional")
 
 ShadowDirectional::ShadowDirectional(const Vec2u& size)
+	: ShadowMapSize(size)
 {
 	RenderStage.Create("Shadows", size, eSizeDivisor::FullRes);
 

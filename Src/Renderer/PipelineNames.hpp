@@ -8,6 +8,8 @@ enum class ePipelineNameFlags
 {
 	None = 0,
 	AlbedoOnly = (1 << 0),
+	/// Set 1 (Object local) includes a bone buffer binding, requiring a skinning-capable material descriptor set.
+	Skinned = (1 << 1),
 };
 
 FxEnumFlags(ePipelineNameFlags);

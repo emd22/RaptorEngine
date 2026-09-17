@@ -572,6 +572,10 @@ void RaptorGame::Tick()
 
 	Vec3f target = gWorld->Player.Position;
 
+	// Snap to the shadow map's texel grid so shadow edges don't shimmer as the player moves by sub-texel amounts.
+	gShadowRenderer->ShadowCamera.ResolveViewToTexels(gShadowRenderer->ShadowCamera.Position, target, Vec3f(0, 1, 0),
+													   static_cast<float32>(gShadowRenderer->ShadowMapSize.X));
+
 	gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(gShadowRenderer->ShadowCamera.Position, target, Vec3f(0, 1, 0));
 	// LogInfo("{}", gShadowRenderer->ShadowCamera.ViewMatrix.Rows[3]);
 	gShadowRenderer->ShadowCamera.UpdateCameraMatrix();

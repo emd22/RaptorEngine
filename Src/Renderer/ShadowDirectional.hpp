@@ -40,6 +40,8 @@ public:
 
 	RenderStage RenderStage;
 
+	Vec2u ShadowMapSize = Vec2u::sZero;
+
 private:
 	// Pipeline mPipeline;
 	// Pipeline mPipelineSkinned;

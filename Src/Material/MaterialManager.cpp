@@ -60,7 +60,7 @@ void MaterialManager::Create()
 
 
 bool MaterialManager::BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline,
-									   const MaterialID& id)
+									   const MaterialID& id, uint32 bone_buffer_offset)
 {
 	Material* material = mMaterialList.GetItem(id.GetID());
 	if (material == nullptr) {
@@ -72,7 +72,7 @@ bool MaterialManager::BindWithPipeline(const renderer::CommandBuffer& cmd, const
 		SyncMaterialToGpu(material);
 	}
 
-	return material->BindWithPipeline(cmd, pipeline);
+	return material->BindWithPipeline(cmd, pipeline, bone_buffer_offset);
 }
 
 #define NM_PINK	 255, 80, 203, 255

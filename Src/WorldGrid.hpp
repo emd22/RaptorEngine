@@ -31,7 +31,11 @@ class Object;
 
 class WorldGrid
 {
+public:
 	static constexpr uint32 scMaxObjectsPerTile = 64;
+	static constexpr uint32 scMaxGlobalObjects = 64;
+
+	static constexpr TileIndex scGlobalTileIndex = UINT32_MAX - 1;
 
 public:
 	WorldGrid() = default;
@@ -69,6 +73,7 @@ public:
 
 	void SetViewTileIndex(TileIndex view_tile_index);
 
+
 	FX_FORCE_INLINE AABB GetTileAABB(TileIndex ti) const
 	{
 		Vec3f tile_position = GetTileWorldPosition(ti);
@@ -83,10 +88,14 @@ public:
 	~WorldGrid() = default;
 
 private:
-	Tile* GetObjectTile(const Object* object, TileIndex* out_tile_index);
-	TileIndex InsertInto(TileIndex tile_index, ObjectID id);
+	/// Computes the rectangle of tiles (start tile + width/height in tiles) that the object's world-space
+	/// bounds overlap.
+	void GetObjectTileRect(const Object* object, TileIndex* out_start, Vec2u* out_span) const;
 
-	TileIndex InsertDirect(ObjectID id);
+	void InsertObjectIntoRect(ObjectID id, TileIndex start, Vec2u span);
+	void RemoveObjectFromRect(ObjectID id, TileIndex start, Vec2u span);
+
+	TileIndex InsertInto(TileIndex tile_index, ObjectID id);
 
 	void AddObjectsFromTile(std::unordered_set<ObjectID>& object_buffer, const Tile* tile) const;
 
@@ -99,6 +108,9 @@ public:
 
 private:
 	SizedArray<Tile> mTileBuffer;
+
+	/// A tile for objects that are always visible.
+	Tile GlobalTile;
 
 	SizedArray<ObjectID> mNearbyObjectCache;
 	bool mbNearbyObjectCacheValid = false;
