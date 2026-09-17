@@ -60,3 +60,12 @@ float4 F_UnpackUIntToFloat4(uint x);
 #define SSAO_SIZE_DIVISOR 2
 
 #define HAS_FLAG(flags_, has_) ((flags_ & has_) != 0)
+
+/// DrawPushConstants::Flags bits. Mirrors eDrawFlags in Src/Renderer/Backend/Pipeline.hpp.
+///
+/// PROBE_CAPTURE marks the faces rendered for a light-probe bake: there is no
+/// SSAO target matching the capture extent, and probes must not feed back into
+/// their own bake.
+#define DRAW_FLAG_PROBE_CAPTURE 0x01
+#define DRAW_FLAG_DEBUG_PROBE_IRRADIANCE 0x02
+#define DRAW_FLAG_DEBUG_PROBE_VISIBILITY 0x04

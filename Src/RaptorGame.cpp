@@ -374,6 +374,12 @@ void RaptorGame::ProcessControls()
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_2)) {
 		gGraphics->bOnlyRenderProbes = !gGraphics->bOnlyRenderProbes;
+		LogInfo("Probe irradiance debug view {}", gGraphics->bOnlyRenderProbes ? "enabled" : "disabled");
+	}
+
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_3)) {
+		gGraphics->bRenderProbeVisibility = !gGraphics->bRenderProbeVisibility;
+		LogInfo("Probe visibility debug view {}", gGraphics->bRenderProbeVisibility ? "enabled" : "disabled");
 	}
 
 	if (ControlManager::IsMouseLocked()) {

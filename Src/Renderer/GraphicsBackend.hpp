@@ -269,7 +269,11 @@ public:
 
 	Image* pNoiseTexture = nullptr;
 
+	/// Debug view: show blended probe irradiance instead of the lit result.
 	bool bOnlyRenderProbes = false;
+
+	/// Debug view: show blended probe visibility instead of the lit result.
+	bool bRenderProbeVisibility = false;
 
 private:
 	GpuDevice mDevice;

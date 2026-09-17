@@ -779,6 +779,10 @@ void World::RenderProbeCapture()
 
 	const uint32 batch_count = gProbeManager->BeginBatchCapture();
 
+	// Everything drawn from here to EndCaptureFaces() is a bake face, not the
+	// player's view: no SSAO target at this extent, and no probe feedback.
+	gProbeManager->BeginCaptureFaces();
+
 	for (uint32 slot = 0; slot < batch_count; slot++) {
 		const Vec3f capture_pos = gProbeManager->GetCapturePosition();
 
@@ -790,6 +794,11 @@ void World::RenderProbeCapture()
 			face_camera.SetFov(90.0f);
 			face_camera.SetAspectRatio(1.0f);
 
+			// Reverse-Z: Mat4f::LoadPerspectiveMatrix() maps SetFarPlane() to the
+			// near clip and SetNearPlane() to the far clip (see the note there),
+			// so this is a 0.1 .. 200 m frustum. The far clip only has to reach
+			// past Limits::ProbeDepthMaxDistance, which is where baked distances
+			// saturate anyway.
 			face_camera.SetNearPlane(200.0f);
 			face_camera.SetFarPlane(0.1f);
 
@@ -818,6 +827,8 @@ void World::RenderProbeCapture()
 
 		gProbeManager->AdvanceBatchCapture();
 	}
+
+	gProbeManager->EndCaptureFaces();
 
 	for (uint32 i = 0; i < std::size(scCapturePipelines); i++) {
 		renderer::Pipeline& pipeline = gPipelineCache->Request(scCapturePipelines[i]);

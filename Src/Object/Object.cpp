@@ -200,13 +200,19 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 	push_constants.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
 
 
-	// Probe capture faces have no matching SSAO data; flag the shader to use ssao=1.
-	if (gProbeManager != nullptr && gProbeManager->IsCapturePending()) {
-		push_constants.Flags |= 0x01;
+	// Only the probe capture faces themselves get the capture flag. Keying it off
+	// IsCapturePending() would also strip probe GI and SSAO from the main view for
+	// every frame of a grid bake.
+	if (gProbeManager != nullptr && gProbeManager->IsCapturingFaces()) {
+		push_constants.Flags |= renderer::DrawFlag_ProbeCapture;
 	}
 
 	if (gGraphics->bOnlyRenderProbes) {
-		push_constants.Flags |= 0x02;
+		push_constants.Flags |= renderer::DrawFlag_DebugProbeIrradiance;
+	}
+
+	if (gGraphics->bRenderProbeVisibility) {
+		push_constants.Flags |= renderer::DrawFlag_DebugProbeVisibility;
 	}
 
 	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
