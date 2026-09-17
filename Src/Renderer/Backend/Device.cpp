@@ -397,15 +397,47 @@ void GpuDevice::PickPhysicalDevice()
 	VkTry(vkEnumeratePhysicalDevices(mInstance, &device_count, physical_devices.pData),
 		  "Could not enumerate physical devices");
 
+	// Prefer a discrete GPU over integrated/other suitable devices, since Vulkan does not
+	// otherwise guarantee any particular enumeration order.
+	VkPhysicalDevice fallback_device = nullptr;
+
 	for (VkPhysicalDevice& device : physical_devices) {
-		if (IsPhysicalDeviceSuitable(device)) {
+		if (!IsPhysicalDeviceSuitable(device)) {
+			continue;
+		}
+
+		VkPhysicalDeviceProperties properties;
+		vkGetPhysicalDeviceProperties(device, &properties);
+
+		if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
 			Physical = device;
 			break;
 		}
+
+		if (fallback_device == nullptr) {
+			fallback_device = device;
+		}
 	}
+
+	if (Physical == nullptr) {
+		Physical = fallback_device;
+	}
+
 	if (Physical == nullptr) {
 		ModulePanic("Could not find a suitable physical device!", 0);
 	}
+
+	VkPhysicalDeviceProperties selected_properties;
+	vkGetPhysicalDeviceProperties(Physical, &selected_properties);
+
+	const char* type_name = "Other";
+	if (selected_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+		type_name = "Discrete";
+	} else if (selected_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) {
+		type_name = "Integrated";
+	}
+
+	LogInfo(LC_RENDER, "Selected physical device: {} ({})", selected_properties.deviceName, type_name);
 }
 
 void GpuDevice::WaitForIdle()

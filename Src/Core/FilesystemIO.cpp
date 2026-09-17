@@ -1,6 +1,22 @@
 #include "FilesystemIO.hpp"
 
+#include <Core/Defines.hpp>
+#include <cstring>
 #include <filesystem>
+
+#ifdef FX_PLATFORM_WINDOWS
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
+#elif defined(FX_PLATFORM_MACOS)
+#include <mach-o/dyld.h>
+#elif defined(FX_PLATFORM_LINUX)
+#include <unistd.h>
+#endif
 
 namespace fx {
 
@@ -43,6 +59,56 @@ FilePath FilePath::GetFilename(bool keep_extension) const
 
 
 namespace FilesystemIO {
+
+/////////////////////////////////////
+// Base path functions
+/////////////////////////////////////
+
+static std::string QueryExecutableDir()
+{
+    constexpr size_t cMaxPathLength = 4096;
+    char buffer[cMaxPathLength];
+
+#ifdef FX_PLATFORM_WINDOWS
+    DWORD length = GetModuleFileNameA(nullptr, buffer, static_cast<DWORD>(cMaxPathLength));
+    if (length == 0 || length == cMaxPathLength) {
+        return std::string();
+    }
+#elif defined(FX_PLATFORM_MACOS)
+    uint32_t size = static_cast<uint32_t>(cMaxPathLength);
+    if (_NSGetExecutablePath(buffer, &size) != 0) {
+        return std::string();
+    }
+    size_t length = strlen(buffer);
+#elif defined(FX_PLATFORM_LINUX)
+    ssize_t result = readlink("/proc/self/exe", buffer, cMaxPathLength - 1);
+    if (result <= 0) {
+        return std::string();
+    }
+    size_t length = static_cast<size_t>(result);
+#endif
+
+    return std::filesystem::path(std::string(buffer, length)).parent_path().string();
+}
+
+const char* GetExecutablePath()
+{
+    static const std::string sExecutableDir = QueryExecutableDir();
+    return sExecutableDir.c_str();
+}
+
+const char* GetBasePath() { return FX_BASE_DIR; }
+
+std::string ResolvePath(const std::string& relative_path)
+{
+    const std::string exe_relative = std::string(GetExecutablePath()) + "/" + relative_path;
+
+    if (FileExists(exe_relative)) {
+        return exe_relative;
+    }
+
+    return std::string(GetBasePath()) + "/" + relative_path;
+}
 
 /////////////////////////////////////
 // File functions

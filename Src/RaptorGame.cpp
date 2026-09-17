@@ -63,7 +63,7 @@ void RaptorGame::InitEngine()
 	LogCreateFile("FoxtrotLog.log");
 #endif
 
-	Config.Load(FX_BASE_DIR "/Config/Main.conf");
+	Config.Load("Config/Main.conf");
 
 	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
 		ModulePanic("Could not initialize SDL! (SDL err: {})\n", SDL_GetError());
@@ -150,7 +150,7 @@ void RaptorGame::LoadOffsetsFile()
 {
 	ConfigFile info;
 
-	info.Load(FX_BASE_DIR "/Config/Offsets.conf");
+	info.Load("Config/Offsets.conf");
 
 	PistolOffset = info.GetEntryValue(HashStr32("PistolOffset"), Vec3f::sZero);
 	ArmsOffset = info.GetEntryValue(HashStr32("ArmsOffset"), Vec3f::sZero);
@@ -175,7 +175,7 @@ void RaptorGame::CreateGame()
 
 	const char* scene_to_load = Config.GetEntry(HashStr32("Scene"))->Get<const char*>();
 
-	scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, scene_to_load));
+	scene_file.Load(std::format("Data/{}", scene_to_load));
 	gPhysics->pBackend->OptimizeBroadPhase();
 
 	// Baked probes if the scene has them, procedural gradient otherwise.

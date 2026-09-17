@@ -44,6 +44,27 @@ public:
 namespace FilesystemIO {
 
 /////////////////////////////////////
+// Base path functions
+/////////////////////////////////////
+
+/**
+ * @brief Returns the directory containing the running executable (no trailing separator).
+ */
+const char* GetExecutablePath();
+
+/**
+ * @brief Returns the engine's base directory (FX_BASE_DIR) that assets are authored relative to.
+ */
+const char* GetBasePath();
+
+/**
+ * @brief Resolves `relative_path` against `GetExecutablePath()` first, falling back to
+ * `GetBasePath()` if no file exists there. Lets a packaged build ship assets next to the
+ * executable while dev builds keep loading them from the repo root.
+ */
+std::string ResolvePath(const std::string& relative_path);
+
+/////////////////////////////////////
 // File functions
 /////////////////////////////////////
 
