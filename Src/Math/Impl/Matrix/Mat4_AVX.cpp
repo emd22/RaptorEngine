@@ -141,7 +141,7 @@ Mat4f Mat4f::operator*(const Mat4f& other) const
 	return result;
 }
 
-Mat4f Mat4f::operator*(const Vec4f& vec) const
+Vec4f Mat4f::operator*(const Vec4f& vec) const
 {
 	__m128 v = vec.mIntrin;
 	__m128 v0 = SSE::Permute4<SSE::Shuffle_AX>(v);
