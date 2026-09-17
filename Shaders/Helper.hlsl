@@ -55,6 +55,10 @@ float4 F_UnpackUIntToFloat4(uint x);
 
 
 #define BONE_COUNT 100
+/// Mirrors fx::Limits::MaxConcurrentSkinnedObjects. The whole bone buffer (one BONE_COUNT-sized slot per
+/// simultaneously-updated skinned object this frame) is bound at a single fixed per-frame offset, same as the light
+/// buffer; DrawPushConstants::BoneSlot selects which slot a given draw call reads from.
+#define MAX_SKINNED_OBJECTS 32
 #define LIGHT_COUNT 64
 
 #define SSAO_SIZE_DIVISOR 2

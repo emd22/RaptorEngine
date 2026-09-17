@@ -474,16 +474,15 @@ void World::ExecutePrepassRenderList(renderer::ePipelineName forward_pl_name)
 		consts.ObjectId = object_id.GetID();
 		consts.MaterialIndex = object->GetMaterialID().GetID();
 		consts.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
+		consts.BoneSlot = object->BoneBufferSlot;
 
 		memcpy(consts.CameraMatrix, cam_matrix.RawData, sizeof(Mat4f));
 
 		gGraphics->SubmitPushConstants(gGraphics->GetFrame()->CmdBuffer, pipeline,
 									   eShaderType::Vertex | eShaderType::Pixel, consts);
 
-		if (!gMaterialManager->BindWithPipeline(gGraphics->GetFrame()->CmdBuffer, pipeline, object->GetMaterialID(),
-											   object->BoneBufferOffset)) {
-			gMaterialManager->BindWithPipeline(gGraphics->GetFrame()->CmdBuffer, pipeline, MaterialID::scNull,
-											   object->BoneBufferOffset);
+		if (!gMaterialManager->BindWithPipeline(gGraphics->GetFrame()->CmdBuffer, pipeline, object->GetMaterialID())) {
+			gMaterialManager->BindWithPipeline(gGraphics->GetFrame()->CmdBuffer, pipeline, MaterialID::scNull);
 		}
 
 		object->RenderPrimitive(gGraphics->GetFrame()->CmdBuffer);

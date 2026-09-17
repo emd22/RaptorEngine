@@ -50,12 +50,12 @@ objects = {
     }*/
 
 
-	/*testarms = {
+	testarms = {
 		mesh = "/fps_pistol_animations.glb"
 		pos = [0.0, 0.5, 0.0]
 
 		shadows = $False
-	}*/
+	}
 
 	/*FireExtinguisher = {
 		mesh = "/FireExtinguisher.glb"

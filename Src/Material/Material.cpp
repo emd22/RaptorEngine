@@ -175,7 +175,7 @@ void Material::RequestQuality(uint32 quality)
 }
 
 
-bool Material::BindWithPipeline(const CommandBuffer& cmd, const Pipeline& pipeline, uint32 bone_buffer_offset)
+bool Material::BindWithPipeline(const CommandBuffer& cmd, const Pipeline& pipeline)
 {
 	if (!bIsBuilt.load()) {
 		Build();
@@ -203,10 +203,12 @@ bool Material::BindWithPipeline(const CommandBuffer& cmd, const Pipeline& pipeli
 		descriptor_set = RequestSkinnedFallbackDescriptors();
 	}
 
-	// Buffer offsets
+	// Buffer offsets. Like LightBuffer, the whole per-frame bone buffer (covering every concurrently-updated skinned
+	// object's slot) is bound at a single fixed frame offset; which slot a given draw call reads is communicated via
+	// DrawPushConstants::BoneSlot, the same way uiObjectIndex/uiMaterialIndex are, not via a per-draw dynamic offset.
 	StackArray<uint32, 2> offsets;
 	if (bSupportsSkinning || needs_skinned_fallback) {
-		offsets.Insert(gGraphics->BoneBuffer.GetBaseOffset() + bone_buffer_offset);
+		offsets.Insert(gGraphics->BoneBuffer.GetBaseOffset());
 	}
 	offsets.Insert(gGraphics->LightBuffer.GetBaseOffset());
 

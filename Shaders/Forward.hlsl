@@ -47,13 +47,14 @@ struct VSPushConsts
     uint uiTileColumns;
     uint Flags;
     uint2 vTargetSize;
+    uint uiBoneSlot;
 };
 
 #ifdef USE_SKINNING
 
 F_CBuffer(VSUniforms, 3, 1)
 {
-    BoneMtx bBones[BONE_COUNT];
+    BoneMtx bBones[BONE_COUNT * MAX_SKINNED_OBJECTS];
 };
 
 #endif // USE_SKINNING
@@ -71,10 +72,12 @@ VSOutput main(VSInput input)
     float4x4 MVP = mul(world_matrix, VSConst.mViewProjection);
 
 #ifdef USE_SKINNING
-    float4x4 skin_xform = input.vJointWeights.x * bBones[input.vJointIndices.x]
-        + input.vJointWeights.y * bBones[input.vJointIndices.y]
-        + input.vJointWeights.z * bBones[input.vJointIndices.z]
-        + input.vJointWeights.w * bBones[input.vJointIndices.w];
+    const uint bone_base = VSConst.uiBoneSlot * BONE_COUNT;
+
+    float4x4 skin_xform = input.vJointWeights.x * bBones[bone_base + input.vJointIndices.x]
+        + input.vJointWeights.y * bBones[bone_base + input.vJointIndices.y]
+        + input.vJointWeights.z * bBones[bone_base + input.vJointIndices.z]
+        + input.vJointWeights.w * bBones[bone_base + input.vJointIndices.w];
 
     output.vPosition = mul(mul(float4(input.vPosition, 1.0), skin_xform), MVP);
     output.vNormalWS = normalize(mul(mul(input.vNormal, (float3x3)skin_xform), (float3x3)world_matrix));

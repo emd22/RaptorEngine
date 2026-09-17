@@ -22,6 +22,8 @@
 #include <Renderer/Globals.hpp>
 #include <Renderer/MeshUtil.hpp>
 
+#include <cmath>
+
 namespace fx {
 
 using namespace renderer;
@@ -420,6 +422,90 @@ int32 LoaderGltf::FindJointIndex(cgltf_skin* skin, const cgltf_node* node) const
 }
 
 
+/// Pulls the joint node's own local transform out of the GLTF, mirrored into engine space the same way
+/// the animation channels are (negate X on translations, negate Y/Z on rotations).
+///
+/// Every component an animation does not drive has to fall back to this, otherwise the joint lands at
+/// identity: bones collapse onto their parent's origin and the skin smears across the model.
+static BoneRestPose MakeRestPoseForJoint(const cgltf_node* joint)
+{
+	BoneRestPose rest {};
+
+	if (joint->has_matrix) {
+		// Decompose the raw matrix. GLTF stores matrices column-major, which lines up directly with
+		// the engine's row-major/row-vector matrices, so no transpose is needed here.
+		const Mat4f m(joint->matrix);
+
+		Vec3f axis_x = Vec3f(m.Rows[0]);
+		Vec3f axis_y = Vec3f(m.Rows[1]);
+		Vec3f axis_z = Vec3f(m.Rows[2]);
+
+		const float32 scale_x = axis_x.Length();
+		const float32 scale_y = axis_y.Length();
+		const float32 scale_z = axis_z.Length();
+
+		rest.Scale = Vec3f(scale_x, scale_y, scale_z);
+		rest.Translation = m.GetTranslation();
+
+		if (scale_x > 1e-8f && scale_y > 1e-8f && scale_z > 1e-8f) {
+			axis_x = axis_x / scale_x;
+			axis_y = axis_y / scale_y;
+			axis_z = axis_z / scale_z;
+
+			// Row-vector rotation basis -> quaternion.
+			const float32 trace = axis_x.X + axis_y.Y + axis_z.Z;
+
+			if (trace > 0.0f) {
+				const float32 w = std::sqrt(trace + 1.0f) * 0.5f;
+				const float32 inv = 0.25f / w;
+
+				rest.Rotation = Quat((axis_y.Z - axis_z.Y) * inv, (axis_z.X - axis_x.Z) * inv,
+									 (axis_x.Y - axis_y.X) * inv, w);
+			}
+			else if (axis_x.X > axis_y.Y && axis_x.X > axis_z.Z) {
+				const float32 x = std::sqrt((1.0f + axis_x.X - axis_y.Y - axis_z.Z)) * 0.5f;
+				const float32 inv = 0.25f / x;
+
+				rest.Rotation = Quat(x, (axis_x.Y + axis_y.X) * inv, (axis_z.X + axis_x.Z) * inv,
+									 (axis_y.Z - axis_z.Y) * inv);
+			}
+			else if (axis_y.Y > axis_z.Z) {
+				const float32 y = std::sqrt((1.0f + axis_y.Y - axis_x.X - axis_z.Z)) * 0.5f;
+				const float32 inv = 0.25f / y;
+
+				rest.Rotation = Quat((axis_x.Y + axis_y.X) * inv, y, (axis_y.Z + axis_z.Y) * inv,
+									 (axis_z.X - axis_x.Z) * inv);
+			}
+			else {
+				const float32 z = std::sqrt((1.0f + axis_z.Z - axis_x.X - axis_y.Y)) * 0.5f;
+				const float32 inv = 0.25f / z;
+
+				rest.Rotation = Quat((axis_z.X + axis_x.Z) * inv, (axis_y.Z + axis_z.Y) * inv, z,
+									 (axis_x.Y - axis_y.X) * inv);
+			}
+		}
+	}
+	else {
+		if (joint->has_translation) {
+			rest.Translation = Vec3f(joint->translation[0], joint->translation[1], joint->translation[2]);
+		}
+
+		if (joint->has_rotation) {
+			rest.Rotation = Quat(joint->rotation[0], joint->rotation[1], joint->rotation[2], joint->rotation[3]);
+		}
+
+		if (joint->has_scale) {
+			rest.Scale = Vec3f(joint->scale[0], joint->scale[1], joint->scale[2]);
+		}
+	}
+
+	// Mirror across X to match the vertex buffers and the animation tracks.
+	rest.Translation = Vec3f::FlipSigns<-1, 1, 1, 1>(rest.Translation);
+	rest.Rotation = Quat(rest.Rotation.GetX(), -rest.Rotation.GetY(), -rest.Rotation.GetZ(), rest.Rotation.GetW());
+
+	return rest;
+}
+
 void LoaderGltf::LoadSkeleton(Skeleton& skel, cgltf_skin* skin)
 {
 	if (!skin) {
@@ -453,6 +539,7 @@ void LoaderGltf::LoadSkeleton(Skeleton& skel, cgltf_skin* skin)
 	// Parent indices and names
 	skel.ParentIndices.InitSize(joint_count);
 	skel.BoneNames.InitSize(joint_count);
+	skel.RestPose.InitSize(joint_count);
 	skel.LocalTransforms.InitSize(joint_count);
 	skel.WorldTransforms.InitSize(joint_count);
 	skel.SkinningMatrices.InitSize(joint_count);
@@ -462,6 +549,7 @@ void LoaderGltf::LoadSkeleton(Skeleton& skel, cgltf_skin* skin)
 
 		skel.BoneNames[i] = joint->name ? String(joint->name) : String::Fmt("joint_{}", i);
 		skel.ParentIndices[i] = joint->parent ? FindJointIndex(skin, joint->parent) : BoneNull;
+		skel.RestPose[i] = MakeRestPoseForJoint(joint);
 	}
 }
 
