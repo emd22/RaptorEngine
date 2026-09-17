@@ -45,11 +45,9 @@ TextRenderer::~TextRenderer() { Destroy(); }
 
 void TextRenderer::Create()
 {
-	if (mpAtlas != nullptr) {
+	if (mpAtlas != nullptr || mAtlasTicket.IsValid()) {
 		return;
 	}
-
-	mpAtlas = gTextureManager->NewTexture();
 
 	mAtlasTicket = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm, "Textures/debug_font3.png",
 											eImageCreateFlags::None);
