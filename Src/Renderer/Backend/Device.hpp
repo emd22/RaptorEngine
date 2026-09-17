@@ -74,14 +74,7 @@ public:
 
     VkSurfaceFormatKHR GetSurfaceFormat();
 
-    SpinLockContext<VkQueue> GetLockableQueue(VkQueue& queue)
-    {
-        if (mQueueFamilies.HasIndependentTransfer() && queue == mTransferQueue) {
-            return SpinLockContext<VkQueue>(mTransferMutex, queue, true);
-        }
-
-        return SpinLockContext<VkQueue>(mTransferMutex, queue);
-    }
+    SpinLockContext<VkQueue> GetLockableQueue(VkQueue& queue) { return SpinLockContext<VkQueue>(mTransferMutex, queue); }
 
     FX_FORCE_INLINE SpinLockContext<VkQueue> GetGraphicsQueue()
     {
