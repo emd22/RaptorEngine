@@ -64,7 +64,28 @@ public:
 	FX_FORCE_INLINE bool IsBuilt() const { return mbIsBuilt; }
 
 	void Begin(CommandBuffer& cmd);
-	void End() { mRenderPass.End(); }
+
+	/**
+	 * @brief Ends the render pass.
+	 *
+	 * vkCmdEndRenderPass transitions every attachment to its FinalLayout, so the
+	 * tracked layout has to follow. Without this the next explicit barrier on a
+	 * target reports a stale oldLayout -- and a stale UNDEFINED lets the driver
+	 * legally discard everything the pass just rendered.
+	 */
+	void End()
+	{
+		mRenderPass.End();
+
+		for (Target& target : mOutputTargets.Targets) {
+			// Present targets carry a placeholder image; the swapchain owns the real one.
+			if (target.Image.InternalImage == nullptr) {
+				continue;
+			}
+
+			target.Image.ImageLayout = target.FinalLayout;
+		}
+	}
 
 	FX_FORCE_INLINE uint32 GetSizeDivisor() const { return mSizeDivisor; }
 

@@ -64,13 +64,28 @@ class CommandBuffer;
 class GpuDevice;
 
 
+/// Bits of DrawPushConstants::Flags. Mirrors the DRAW_FLAG_* defines in Shaders/Helper.hlsl.
+enum eDrawFlags : uint32
+{
+	/// Set only while rendering the cubemap faces of a light-probe bake. There is
+	/// no SSAO target at the capture extent, and probes must not light their own
+	/// bake, so the shader falls back to a flat ambient term.
+	DrawFlag_ProbeCapture = 0x01,
+
+	/// Debug view: output the blended probe irradiance instead of the lit result.
+	DrawFlag_DebugProbeIrradiance = 0x02,
+
+	/// Debug view: output the blended probe visibility instead of the lit result.
+	DrawFlag_DebugProbeVisibility = 0x04,
+};
+
 struct alignas(16) DrawPushConstants
 {
 	float32 CameraMatrix[16];
 	uint32 ObjectId = 0;
 	uint32 MaterialIndex = 0;
 	uint32 TileColumns = 0;
-	uint32 Flags;
+	uint32 Flags = 0;
 	uint32 TargetSize[2] = { 0U, 0U };
 };
 

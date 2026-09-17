@@ -85,12 +85,12 @@ void ProbeManager::Create()
 	mVolume.DimsAndCount[2] = Limits::ProbeGridDims[2];
 	mVolume.DimsAndCount[3] = Limits::MaxIrradianceProbes;
 
-	for (uint32 i = 0; i < Limits::MaxIrradianceProbes; i++) {
-		for (uint32 t = 0; t < Limits::ProbeDepthTexelsPerFace * Limits::ProbeDepthFaces; t++) {
-			mProbeDepths[i].DepthMoments[t * 2 + 0] = Limits::ProbeDepthMaxDistance;
-			mProbeDepths[i].DepthMoments[t * 2 + 1] = Limits::ProbeDepthMaxDistance * Limits::ProbeDepthMaxDistance;
-		}
-	}
+	// Positions have to agree with the volume that was just written, or the debug
+	// view draws every probe at the origin and the shader's backface weights are
+	// computed against a probe field that does not exist.
+	FillPositionsFromVolume();
+
+	ResetDepthMoments();
 
 	UploadToGpu();
 	UploadVolumeToGpu();
@@ -104,14 +104,73 @@ void ProbeManager::Destroy()
 	mbInitialized = false;
 	mbCapturePending = false;
 	mbCaptureReady = false;
+	mbCapturingFaces = false;
 	mNumProbesPending = 0;
 	mCurrentProbe = 0;
+	mBatchStart = 0;
 
 	for (uint32 slot = 0; slot < scProbesPerFrame; slot++) {
 		for (uint32 i = 0; i < scCaptureFaces; i++) {
 			mCaptureStaging[slot][i].Destroy();
 			mDepthStaging[slot][i].Destroy();
 		}
+	}
+
+	// Clearing this without clearing mbCaptureBuilt would leave a Create()/Destroy()/
+	// Create() cycle handing out the staging buffers that were just destroyed.
+	mbCaptureBuilt = false;
+}
+
+void ProbeManager::ResetDepthMoments()
+{
+	for (uint32 i = 0; i < Limits::MaxIrradianceProbes; i++) {
+		for (uint32 t = 0; t < Limits::ProbeDepthTexelsPerFace * Limits::ProbeDepthFaces; t++) {
+			mProbeDepths[i].DepthMoments[t * 2 + 0] = Limits::ProbeDepthMaxDistance;
+			mProbeDepths[i].DepthMoments[t * 2 + 1] = Limits::ProbeDepthMaxDistance * Limits::ProbeDepthMaxDistance;
+		}
+	}
+}
+
+/// Grid position of probe (ix, iy, iz) in the volume described by `volume`.
+/// Must match the fill order in PlaceGridProbes().
+static Vec3f ProbeGridPosition(const ProbeVolumeData& volume, uint32 ix, uint32 iy, uint32 iz)
+{
+	const Vec3f gmin(volume.Min[0], volume.Min[1], volume.Min[2]);
+
+	const Vec3f cell(1.0f / volume.InvCellSize[0], 1.0f / volume.InvCellSize[1], 1.0f / volume.InvCellSize[2]);
+
+	return gmin + cell * Vec3f(static_cast<float32>(ix), static_cast<float32>(iy), static_cast<float32>(iz));
+}
+
+void ProbeManager::FillPositionsFromVolume()
+{
+	const uint32 x_dim = mVolume.DimsAndCount[0];
+	const uint32 y_dim = mVolume.DimsAndCount[1];
+	const uint32 z_dim = mVolume.DimsAndCount[2];
+
+	mProbePositions.Clear();
+
+	for (uint32 iz = 0; iz < z_dim; iz++) {
+		for (uint32 iy = 0; iy < y_dim; iy++) {
+			for (uint32 ix = 0; ix < x_dim; ix++) {
+				mProbePositions.Insert(ProbeGridPosition(mVolume, ix, iy, iz));
+			}
+		}
+	}
+
+	for (uint32 i = 0; i < mProbePositions.Size; i++) {
+		simd::StoreFloat4(mProbeDepths[i].ProbePosition, mProbePositions[i].mIntrin);
+		mProbeDepths[i].ProbePosition[3] = 0.0f;
+	}
+}
+
+void ProbeManager::SyncPositionsFromDepths()
+{
+	mProbePositions.Clear();
+
+	for (uint32 i = 0; i < Limits::MaxIrradianceProbes; i++) {
+		const float32* pos = mProbeDepths[i].ProbePosition;
+		mProbePositions.Insert(Vec3f(pos[0], pos[1], pos[2]));
 	}
 }
 
@@ -238,7 +297,7 @@ bool ProbeManager::GatherPlacementBoxes(ProbeBoxList& out)
 	out.Any = false;
 
 	uint32 stat_total = 0;
-	uint32 stat_null = 0;
+	uint32 stat_unlit = 0;
 	uint32 stat_no_mesh = 0;
 	uint32 stat_too_big = 0;
 
@@ -256,6 +315,7 @@ bool ProbeManager::GatherPlacementBoxes(ProbeBoxList& out)
 		}
 
 		if (object.IsUnlit()) {
+			stat_unlit++;
 			continue;
 		}
 
@@ -277,7 +337,7 @@ bool ProbeManager::GatherPlacementBoxes(ProbeBoxList& out)
 		out.Any = true;
 	}
 
-	LogInfo("Probe placement: {}/{}/{}/{} total/null/no-mesh/too-big ({} boxes kept)", stat_total, stat_null,
+	LogInfo("Probe placement: {}/{}/{}/{} total/unlit/no-mesh/too-big ({} boxes kept)", stat_total, stat_unlit,
 			stat_no_mesh, stat_too_big, out.Count);
 
 	out.Min.Y = std::max(out.Min.Y, 0.5f);
@@ -401,10 +461,11 @@ void ProbeManager::PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const P
 	const uint32 y_dim = Limits::ProbeGridDims[1];
 	const uint32 z_dim = Limits::ProbeGridDims[2];
 
+	// Probes sit on the volume boundary, so there are (dim - 1) cells per axis.
+	// mVolume.InvCellSize below has to use the same divisor or the shader's
+	// trilinear lookup lands on different probes than the bake wrote.
 	Vec3f dim_vec = Vec3f(static_cast<float32>(x_dim - 1), static_cast<float32>(y_dim - 1),
 						  static_cast<float32>(z_dim - 1));
-
-	LogInfo("The dimensions are like {}", dim_vec);
 
 	mProbePositions.Clear();
 
@@ -491,7 +552,19 @@ void ProbeManager::PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const P
 	mVolume.DimsAndCount[2] = z_dim;
 	mVolume.DimsAndCount[3] = mProbePositions.Size;
 
+	// The probes have moved, so any moments still sitting in mProbeDepths were
+	// captured from somewhere else. Keeping them paired with the new positions
+	// would make un-baked probes report occluders that are not there; reset to
+	// "nothing hit" and let the bake fill them in probe by probe.
+	ResetDepthMoments();
+
+	for (uint32 i = 0; i < mProbePositions.Size; i++) {
+		simd::StoreFloat4(mProbeDepths[i].ProbePosition, mProbePositions[i].mIntrin);
+		mProbeDepths[i].ProbePosition[3] = 0.0f;
+	}
+
 	UploadVolumeToGpu();
+	UploadDepthsToGpu();
 
 	LogInfo("Probe volume: min={} size={} ({} probes, {} pushed out, {} hugging)", gmin, size, mProbePositions.Size,
 			stat_pushed, stat_hugged);
@@ -1169,6 +1242,9 @@ bool ProbeManager::LoadProbes()
 
 	memcpy(mProbeDepths, data.pData + offset, sizeof(mProbeDepths));
 	offset += sizeof(mProbeDepths);
+
+	// Positions are only stored inside ProbeInfo, so pull them back out.
+	SyncPositionsFromDepths();
 
 	UploadVolumeToGpu();
 	UploadToGpu();

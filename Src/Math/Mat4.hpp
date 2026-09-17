@@ -133,6 +133,14 @@ public:
 	Mat4f Transposed() const;
 	Mat4f TransposeMat3();
 
+	/// Builds a reverse-Z perspective projection (paired with a minDepth=1 /
+	/// maxDepth=0 viewport and a GREATER_OR_EQUAL depth test).
+	///
+	/// NOTE: the two plane arguments read backwards. `near_plane` ends up at
+	/// window depth 0 (the far clip) and `far_plane` at window depth 1 (the near
+	/// clip), so callers pass the far distance first -- e.g. (1000, 0.01) for a
+	/// 0.01 .. 1000 frustum. Every call site already does this; do not "fix" one
+	/// in isolation. LoadOrthographicMatrix() below uses the conventional order.
 	void LoadPerspectiveMatrix(float32 hfov, float32 aspect_ratio, float32 near_plane, float32 far_plane);
 	void LoadOrthographicMatrix(float32 width, float32 height, float32 near_plane, float32 far_plane);
 

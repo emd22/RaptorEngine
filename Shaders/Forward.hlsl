@@ -240,8 +240,8 @@ FSOutput main(FSInput input)
 
 	const float2 ssao_coords = float2(input.vPosition.xy / (float2(FSConst.vTargetSize)));
 
-	// Probe capture bakes have no matching SSAO data (flag in bit 0 of Flags).
-	float ssao = ((FSConst.Flags & 1u) != 0) ? 1.0 : F_Sample(tSSAO, ssao_coords);
+	// Probe capture bakes have no matching SSAO data.
+	float ssao = HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE) ? 1.0 : F_Sample(tSSAO, ssao_coords);
 
 #ifdef DEBUG_LIGHT_HEATMAP
 	output.vAlbedo = float4(GetSaturationColor((float)tile_data.Count), 1.0);
@@ -321,36 +321,32 @@ FSOutput main(FSInput input)
 
 	float3 probe_irradiance = float3(0.0f, 0.0f, 0.0f);
 
-	// Use probes
-	if ((FSConst.Flags & 0x01) == 0) {
-		float3 probe_normal = normalize(N_final);
+	float3 probe_normal = normalize(N_final);
+
+	// Use probes. SampleProbeVolume() already folds per-probe visibility into its
+	// blend weights, so the only ambient occlusion term left to apply is SSAO.
+	if (!HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE)) {
 		probe_irradiance = SampleProbeVolume(input.vPositionWS, probe_normal, bProbeVolume[0], bProbeBuffer, bProbeDepth);
 
-		float3 probe_min = bProbeVolume[0].vMin.xyz;
-		float3 inv_cell  = bProbeVolume[0].vInvCellSize.xyz;
-		uint3  dims      = bProbeVolume[0].vDimsAndCount.xyz;
-
-		float probe_visibility = SampleProbeVolumeVisibility(
-			input.vPositionWS,
-			bProbeDepth,
-			probe_min,
-			inv_cell,
-			dims
-		);
-
-		float ambient_visibility =  ssao;
-		ambient = float4(probe_irradiance * albedo * ambient_visibility, 1.0f);
+		ambient = float4(probe_irradiance * albedo * ssao, 1.0f);
 	}
 
 	output.vAlbedo = float4(accumulated_light.rgb + ambient.rgb, base_alpha);
 
-	if ((FSConst.Flags & 0x01) != 0) {
+	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE)) {
 		const float3 lp_ambient = float3(0.2f, 0.2f, 0.2f) * albedo;
 		output.vAlbedo = float4(accumulated_light.rgb + lp_ambient, 1.0f);
 	}
 
-	if (HAS_FLAG(FSConst.Flags, 0x02)) {
+	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_DEBUG_PROBE_IRRADIANCE)) {
 		output.vAlbedo = float4(probe_irradiance, 1.0f);
+	}
+
+	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_DEBUG_PROBE_VISIBILITY)) {
+		const float probe_visibility = SampleProbeVolumeVisibility(input.vPositionWS, probe_normal, bProbeVolume[0],
+																   bProbeDepth);
+
+		output.vAlbedo = float4(probe_visibility, probe_visibility, probe_visibility, 1.0f);
 	}
 
     return output;

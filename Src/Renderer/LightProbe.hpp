@@ -115,6 +115,13 @@ public:
 	bool IsCapturePending() const { return mbCapturePending; }
 	bool IsCaptureReady() const { return mbCaptureReady; }
 
+	/// True only while the capture faces themselves are being recorded, as opposed
+	/// to IsCapturePending(), which stays true for the whole frame a bake runs in.
+	/// The main view must keep its probe GI and SSAO during a bake.
+	bool IsCapturingFaces() const { return mbCapturingFaces; }
+	void BeginCaptureFaces() { mbCapturingFaces = true; }
+	void EndCaptureFaces() { mbCapturingFaces = false; }
+
 	const Vec3f& GetCapturePosition() const { return mProbePositions[mCurrentProbe]; }
 
 	void EnsureCaptureStage();
@@ -162,6 +169,19 @@ private:
 	bool GatherPlacementBoxes(ProbeBoxList& out);
 	void PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const ProbeBoxList& boxes);
 
+	/// Rebuilds mProbePositions as the plain grid described by mVolume (no
+	/// push-out / hugging), and mirrors them into the per-probe visibility data.
+	void FillPositionsFromVolume();
+
+	/// Sets every probe's depth moments to "nothing hit", so the Chebyshev test
+	/// reports fully visible until a bake supplies real data.
+	void ResetDepthMoments();
+
+	/// Copies the baked probe positions out of mProbeDepths into mProbePositions.
+	/// The cache file stores positions inside ProbeInfo, so a load has to put them
+	/// back or the CPU-side positions stay at the origin.
+	void SyncPositionsFromDepths();
+
 	bool ProjectStagedFaces(uint32 batch_slot, uint32 probe_index);
 
 	bool BuildDepthMoments(uint32 batch_slot, uint32 probe_index);
@@ -181,6 +201,7 @@ private:
 	bool mbCapturePending = false;
 	bool mbCaptureReady = false;
 	bool mbCaptureBuilt = false;
+	bool mbCapturingFaces = false;
 
 	renderer::RenderStage mCaptureStage;
 	renderer::RawGpuBuffer mCaptureStaging[scProbesPerFrame][scCaptureFaces];
