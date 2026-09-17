@@ -226,7 +226,13 @@ void World::ExecuteTransparentRenderLists()
 		const RenderListSection& section = mRenderList.GetSection(pl_name);
 
 		for (ObjectID object_id : section.Objects) {
+			if (object_id.IsInvalid()) {
+				continue;
+			}
 			Object* object = gObjectManager->GetObject(object_id);
+			if (object == nullptr) {
+				continue;
+			}
 
 			Vec3f center = object->GetPosition() + object->Bounds.Min + object->Bounds.GetSize() * 0.5f;
 			Vec3f diff = center - camera_position;
@@ -395,7 +401,14 @@ void World::ExecuteShadowRenderList(renderer::ePipelineName pl_name)
 		   sizeof(float32) * 16);
 
 	for (ObjectID object_id : section.Objects) {
+		if (object_id.IsInvalid()) {
+			continue;
+		}
+
 		Object* object = gObjectManager->GetObject(object_id);
+		if (object == nullptr) {
+			continue;
+		}
 
 		// Push the direct index for the object id
 		consts.ObjectIndex = object_id.GetID();

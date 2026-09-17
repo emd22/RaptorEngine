@@ -328,7 +328,9 @@ FSOutput main(FSInput input)
 	if (!HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE)) {
 		probe_irradiance = SampleProbeVolume(input.vPositionWS, probe_normal, bProbeVolume[0], bProbeBuffer, bProbeDepth);
 
-		ambient = float4(probe_irradiance * albedo * ssao, 1.0f);
+		float3 ambient_diffuse_reflectance = albedo * (1.0 - metallic);
+
+		ambient = float4(probe_irradiance * ambient_diffuse_reflectance * ssao, 1.0f);
 	}
 
 	output.vAlbedo = float4(accumulated_light.rgb + ambient.rgb, base_alpha);
