@@ -2,6 +2,7 @@
 
 #include <Color.hpp>
 #include <Core/File.hpp>
+#include <Core/FilesystemIO.hpp>
 #include <Core/Hash.hpp>
 #include <Core/PagedArray.hpp>
 #include <Math/Quat.hpp>
@@ -204,7 +205,9 @@ ConfigEntry::~ConfigEntry()
 
 void ConfigFile::Load(const std::string& path)
 {
-	File file(path.c_str(), File::eModType::Read, File::eDataType::Binary);
+	const std::string resolved_path = FilesystemIO::ResolvePath(path);
+
+	File file(resolved_path.c_str(), File::eModType::Read, File::eDataType::Binary);
 
 	if (!file.IsFileOpen()) {
 		return;
@@ -216,7 +219,7 @@ void ConfigFile::Load(const std::string& path)
 
 	Tokenizer tokenizer(file_buffer.pData, file_buffer.Size);
 	tokenizer.SetFileExtension(".conf");
-	tokenizer.IncludeFile(FX_BASE_DIR "/Config/Internal/Constants.conf");
+	tokenizer.IncludeFile(FilesystemIO::ResolvePath("Config/Internal/Constants.conf").c_str());
 	tokenizer.Tokenize();
 
 	Parse(tokenizer.GetTokens());

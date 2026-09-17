@@ -17,6 +17,12 @@ set(VS_STARTUP_PROJECT raptor)
 option(USE_SIMDE "Use SIMDe to use AVX on a non-AVX platform" OFF)
 option(USE_MOLTENVK "Compile with support for MoltenVK. Defaults to KosmicKrisp on macOS" OFF)
 
+# Fallback directory the engine searches for assets (Data/, Config/, Shaders/) when they aren't
+# found next to the executable (see FilesystemIO::ResolvePath). Defaults to "." (resolved against
+# the working directory at runtime); CMakePresets.json overrides this to the absolute source dir
+# so the fallback works regardless of what directory the executable is launched from.
+set(FX_BASE_DIR "." CACHE PATH "Fallback base directory for engine assets")
+
 file(GLOB_RECURSE SOURCES
     "Src/*.hpp" "Src/*.inl" "Src/*.cpp"
     "Src/ThirdParty/*.cpp" "Src/ThirdParty/*.h"
@@ -63,9 +69,10 @@ if(WIN32)
     target_link_libraries(raptor PRIVATE vulkan-1 dxcompiler jpeg)
     target_compile_definitions(raptor PRIVATE _USE_MATH_DEFINES)
 
-    # FX_BASE_DIR="." resolves against the working directory, and assets (Shaders/, Data/, Config/)
-    # live at the repo root, not next to the generated .vcxproj. Without this, VS defaults the
-    # debugger's working directory to $(ProjectDir) (the build folder) and asset loading fails.
+    # When FX_BASE_DIR is left as the default "." it resolves against the working directory, and
+    # assets (Shaders/, Data/, Config/) live at the repo root, not next to the generated .vcxproj.
+    # Without this, VS defaults the debugger's working directory to $(ProjectDir) (the build
+    # folder) and asset loading fails.
     set_target_properties(raptor PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
     # These are only shipped as DLLs (no import-time search path covers Lib/win32), so copy them
@@ -112,7 +119,7 @@ target_include_directories(raptor PRIVATE
 )
 
 target_compile_definitions(raptor PRIVATE
-    FX_BASE_DIR="."
+    FX_BASE_DIR="${FX_BASE_DIR}"
 )
 
 target_compile_definitions(raptor PRIVATE

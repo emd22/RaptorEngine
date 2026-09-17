@@ -26,7 +26,7 @@ using namespace JPH;
 void PhysicsPlayer::Create()
 {
 	ConfigFile player_config;
-	player_config.Load(FX_BASE_DIR "/Data/Player.conf");
+	player_config.Load("Data/Player.conf");
 
 	const float32 collider_radius = player_config.GetEntry(HashStr32("ColliderRadius"))->Get<float32>();
 
