@@ -175,12 +175,9 @@ public:
 
 	/**
 	 * Binds the material to be used in the given command buffer.
-	 * @param bone_buffer_offset The drawn object's own slot offset into `GraphicsBackend::BoneBuffer` for this frame
-	 * (see `Object::BoneBufferOffset`), used when this pipeline requires a bone buffer binding. Irrelevant otherwise.
 	 * @returns True if the material was bound successfully.
 	 */
-	bool BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline,
-						  uint32 bone_buffer_offset = 0);
+	bool BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline);
 
 
 	void RequestQuality(uint32 quality);

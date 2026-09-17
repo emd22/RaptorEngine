@@ -196,10 +196,12 @@ public:
 	Animation* pCurrentAnimation = nullptr;
 	float32 AnimationTime = 0.0f;
 
-	/// This object's slot offset into `GraphicsBackend::BoneBuffer` for the current frame, set by `UpdateAnimation()`.
-	/// Remembered here (rather than re-read at bind time) because other skinned objects updating later in the same
+	/// This object's slot index into `GraphicsBackend::BoneBuffer` for the current frame, set by `UpdateAnimation()`
+	/// and submitted to the shader via DrawPushConstants::BoneSlot (the whole buffer is bound at one fixed per-frame
+	/// offset, same as LightBuffer; the slot index tells the shader which entry within it belongs to this draw).
+	/// Remembered here rather than re-read at bind time because other skinned objects updating later in the same
 	/// frame advance the buffer's shared slot cursor.
-	uint32 BoneBufferOffset = 0;
+	uint32 BoneBufferSlot = 0;
 	/// The frame (`GraphicsBackend::GetElapsedFrameCount()`) this object's animation was last updated on, so that
 	/// being visited multiple times per frame (shadow pass, depth prepass, forward pass) only advances the pose once.
 	uint32 mAnimationUpdateFrame = UINT32_MAX;

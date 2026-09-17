@@ -148,7 +148,7 @@ void Object::UpdateAnimation()
 	AnimationTime += 0.01f;
 
 	gGraphics->BoneBuffer.CopyFrom(pSkeleton->SkinningMatrices.pData, pSkeleton->SkinningMatrices.Size * sizeof(Mat4f));
-	BoneBufferOffset = gGraphics->BoneBuffer.GetSlotOffset();
+	BoneBufferSlot = gGraphics->BoneBuffer.SlotIndex;
 	gGraphics->BoneBuffer.NextSlot();
 }
 
@@ -206,6 +206,7 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 
 	push_constants.MaterialIndex = mMaterialID.GetID();
 	push_constants.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
+	push_constants.BoneSlot = BoneBufferSlot;
 
 
 	// Only the probe capture faces themselves get the capture flag. Keying it off
@@ -247,8 +248,8 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 	Material* mat = gMaterialManager->GetMaterial(mMaterialID);
 
 	// If there was an error binding the object material, bind the null material.
-	if (!gMaterialManager->BindWithPipeline(cmd, *pipeline, mMaterialID, BoneBufferOffset)) {
-		gMaterialManager->BindWithPipeline(cmd, *pipeline, MaterialID::scNull, BoneBufferOffset);
+	if (!gMaterialManager->BindWithPipeline(cmd, *pipeline, mMaterialID)) {
+		gMaterialManager->BindWithPipeline(cmd, *pipeline, MaterialID::scNull);
 	}
 
 	if (pMesh) {

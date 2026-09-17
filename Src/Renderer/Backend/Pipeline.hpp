@@ -87,6 +87,9 @@ struct alignas(16) DrawPushConstants
 	uint32 TileColumns = 0;
 	uint32 Flags = 0;
 	uint32 TargetSize[2] = { 0U, 0U };
+	/// Which slot of GraphicsBackend::BoneBuffer this draw's skinning matrices live in this frame (see
+	/// Object::BoneBufferSlot). Unused by non-skinned pipelines.
+	uint32 BoneSlot = 0;
 };
 
 struct alignas(16) DebugLayerPushConstants

@@ -43,6 +43,18 @@ struct BoneTransform
 	Quat Rotation = Quat::scIdentity;
 };
 
+/// The local transform a joint sits at when an animation does not drive it.
+///
+/// GLTF animations only contain channels for the joints (and the components of those joints) that
+/// actually move, so anything not present in an animation has to fall back to the joint node's own
+/// transform. Falling back to identity instead collapses every bone onto its parent's origin.
+struct BoneRestPose
+{
+	Vec3f Translation = Vec3f::sZero;
+	Quat Rotation = Quat::scIdentity;
+	Vec3f Scale = Vec3f::sOne;
+};
+
 struct Skeleton
 {
 public:
@@ -54,6 +66,7 @@ public:
 
 public:
 	SizedArray<Mat4f> InvBindTransforms;
+	SizedArray<BoneRestPose> RestPose;
 	SizedArray<uint32> ParentIndices;
 	SizedArray<String> BoneNames;
 	uint32 JointCount = 0;

@@ -61,12 +61,19 @@ void Skeleton::EvaluatePose(Animation& anim, float32 time)
 {
 	const uint32 joint_count = JointCount;
 
+	const bool has_rest_pose = (RestPose.Size == joint_count);
+
 	for (uint32 i = 0; i < joint_count; i++) {
 		const BoneTrack& track = anim.BoneTracks[i];
 
-		Vec3f translation = GetComponentAtTime(time, track.Translation, Vec3f::sZero);
-		Quat rotation = GetComponentAtTime(time, track.Rotation, Quat::scIdentity);
-		Vec3f scale = GetComponentAtTime(time, track.Scale, Vec3f::sOne);
+		// An animation only carries channels for what it actually animates. Every component it leaves
+		// out has to keep the joint's rest transform, otherwise the bone snaps to its parent's origin
+		// and the mesh tears itself apart.
+		const BoneRestPose rest = has_rest_pose ? RestPose.pData[i] : BoneRestPose {};
+
+		Vec3f translation = GetComponentAtTime(time, track.Translation, rest.Translation);
+		Quat rotation = GetComponentAtTime(time, track.Rotation, rest.Rotation);
+		Vec3f scale = GetComponentAtTime(time, track.Scale, rest.Scale);
 
 		LocalTransforms.pData[i] =
 			Mat4f::AsScale(scale) * Mat4f::AsRotation(rotation) * Mat4f::AsTranslation(translation);
@@ -95,7 +102,7 @@ BoneTransform Skeleton::GetBoneTransform(const Ref<Animation>& anim, float32 tim
 		return xform;
 	}
 
-	if (bone_id > anim->BoneTracks.Size) {
+	if (bone_id >= anim->BoneTracks.Size) {
 		LogError(LC_ASSET, "Bone ID({}) out of range", bone_id);
 		return xform;
 	}
@@ -119,7 +126,7 @@ Mat4f Skeleton::GetBoneTransformMatrix(const Ref<Animation>& anim, float32 time,
 		return xform;
 	}
 
-	if (bone_id > anim->BoneTracks.Size) {
+	if (bone_id >= anim->BoneTracks.Size) {
 		LogError(LC_ASSET, "Bone ID({}) out of range", bone_id);
 		return xform;
 	}
