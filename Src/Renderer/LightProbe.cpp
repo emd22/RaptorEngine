@@ -1165,7 +1165,7 @@ void ProbeManager::UploadVolumeToGpu()
 struct FxProbeHeader
 {
 	char Magic[4] = { 'R', 'P', 'P', 'V' };
-	uint32 Version = 2;
+	uint32 Version = FX_PROBE_CACHE_FILE_VERSION;
 	uint32 ProbeCount = Limits::MaxIrradianceProbes;
 };
 

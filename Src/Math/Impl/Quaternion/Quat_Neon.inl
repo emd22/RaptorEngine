@@ -69,6 +69,14 @@ FX_FORCE_INLINE Quat Quat::SLerp(const Quat& dest, const float32 step) const
 
     // Calculate angle between them.
     float32 cos_half_theta = Neon::Dot(a_v, b_v);
+
+    // quat and -quat represent the same rotation; if they're in opposite hemispheres, negate one so we take the
+    // shortest path instead of interpolating the long way around (matches the check already done in NLerpIP above).
+    if (cos_half_theta < 0.0f) {
+        b_v = Neon::SetSigns<-1>(b_v);
+        cos_half_theta = -cos_half_theta;
+    }
+
     // if qa=qb or qa=-qb then theta = 0 and we can return qa
     if (abs(cos_half_theta) >= 1.0f) {
         return Quat(mIntrin);

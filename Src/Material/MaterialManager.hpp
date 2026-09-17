@@ -30,7 +30,8 @@ public:
 	Material* GetMaterial(const MaterialID& id);
 	void DestroyMaterial(const MaterialID& id);
 
-	bool BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline, const MaterialID& id);
+	bool BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline, const MaterialID& id,
+						 uint32 bone_buffer_offset = 0);
 
 	renderer::DescriptorPool& GetDescriptorPool() { return mDescriptorPool; }
 

@@ -130,7 +130,7 @@ void GraphicsBackend::Init(Vec2u window_size)
 	}
 
 	LightBuffer.Create(scLightUniformSize, Limits::MaxActiveLights);
-	BoneBuffer.Create(Limits::MaxBones * sizeof(Mat4f), 1);
+	BoneBuffer.Create(Limits::MaxBones * sizeof(Mat4f), Limits::MaxConcurrentSkinnedObjects);
 
 	// Forward+ tiled light list buffers. These are double buffered per frame in flight, each tile's
 	// contents are fully rewritten by the light culling pass every frame.
@@ -566,6 +566,7 @@ eFrameResult GraphicsBackend::BeginFrame()
 	BeginUploads();
 
 	LightBuffer.Rewind();
+	BoneBuffer.Rewind();
 
 	frame->InFlight.WaitFor();
 	frame->InFlight.Reset();

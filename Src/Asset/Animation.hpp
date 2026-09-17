@@ -24,6 +24,7 @@ struct BoneTrack
 {
 	BoneTransformTrack<Vec3f> Translation;
 	BoneTransformTrack<Quat> Rotation;
+	BoneTransformTrack<Vec3f> Scale;
 };
 
 struct Animation

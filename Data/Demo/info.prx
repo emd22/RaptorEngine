@@ -1,11 +1,11 @@
-Meta = {
-    Name = "demo0"
+meta = {
+    name = "demo0"
 }
 
-Sun = {
-    Pos = [10.0, 4, -2.5]
-    Color = [250, 220, 182, 7]
-    AmbientColor = [75, 75, 72, 3]
+sun = {
+    pos = [10.0, 4, -2.5]
+    color = [250, 220, 182, 7]
+    ambient = [75, 75, 72, 3]
 }
 
 
@@ -18,79 +18,88 @@ Lights = {
 */
 
 
-Colliders = {
-    Floor = {
-        Pos = [0.0, -1.5, 0.0]
-        Box = { Size = [64.0, 1.0, 64.0] }
+colliders = {
+    floor = {
+        pos = [0.0, -1.5, 0.0]
+        box = { Size = [64.0, 1.0, 64.0] }
     }
 }
 
 
-Objects = {
-    Skybox = {
-        Mesh = "/Skybox.glb"
-        Unlit = $True
+objects = {
+    skybox = {
+        mesh = "/Skybox.glb"
+        unlit = $True
+        nocull = $True
     }
 
 	/*FireExtinguisher = {
-		Mesh = "/FireExtinguisher.glb"
-		Pos = [-1.0, -0.1, 1.5]
-        Scale = 1.5
+		mesh = "/FireExtinguisher.glb"
+		pos = [-1.0, -0.1, 1.5]
+        scale = 1.5
 
-		Shadows = $True
+		shadows = $True
 	}
 
     Level = {
-        Mesh = "/Sponza.glb"
-        Scale = 0.01
-        Shadows = $True
-        ColliderRef = "Floor"
-        Pos = [0.0, -1.25, 0.0]
+        mesh = "/Sponza.glb"
+        scale = 0.01
+        shadows = $True
+        collider = "Floor"
+        pos = [0.0, -1.25, 0.0]
     }*/
 
-	FireExtinguisher = {
-		Mesh = "/FireExtinguisher.glb"
-		Pos = [0.0, 0.5, 0.0]
-        Scale = 1.5
 
-		Shadows = $True
-	}
+	/*testarms = {
+		mesh = "/fps_pistol_animations.glb"
+		pos = [0.0, 0.5, 0.0]
+
+		shadows = $False
+	}*/
+
+	/*FireExtinguisher = {
+		mesh = "/FireExtinguisher.glb"
+		pos = [0.0, 0.5, 0.0]
+        scale = 1.5
+
+		shadows = $True
+	}*/
 
 	/*
     Level = {
-        Mesh = "/TestFloor.glb"
-        ColliderRef = "Floor"
-        Pos = [0.0, -1.5, 0.0]
+        mesh = "/TestFloor.glb"
+        collider = "Floor"
+        pos = [0.0, -1.5, 0.0]
     }
 
 
     Building = {
-        Mesh = "/Building.glb"
-        Pos = [0.0, -0.8, 10.0]
+        mesh = "/Building.glb"
+        pos = [0.0, -0.8, 10.0]
     }
 
 
 
     AnimTest = {
-        Mesh = "/Model2.glb"
-        Shadows = $False
-        Scale = 1.20
-        Pos = [0.0, 0.0, -1.0]
+        mesh = "/Model2.glb"
+        shadows = $False
+        scale = 1.20
+        pos = [0.0, 0.0, -1.0]
         Layer = $CObjectLayer.Player
     }
     Pistol = {
-        Mesh = "/Pistol.glb"
-        Shadows = $True
+        mesh = "/Pistol.glb"
+        shadows = $True
         Layer = $CObjectLayer.Player
     }
 
 
 
     BrickTest = {
-        Mesh = "/BrickTest.glb"
-        Shadows = $True
-        ColliderRef = "BrickWall"
-        Pos = [0.0, 0.4, 2.0]
+        mesh = "/BrickTest.glb"
+        shadows = $True
+        collider = "BrickWall"
+        pos = [0.0, 0.4, 2.0]
     }
 	*/
 }

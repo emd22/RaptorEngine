@@ -7,6 +7,9 @@ Src/out/**/*
 Shaders/Spirv/**/*
 Shaders/LastUpdated.fxd
 
+Data/Sponza/**/*
+Data/Demo/Models/**/*
+
 obj
 *.ninja
 .*
@@ -46,3 +49,5 @@ bakes
 Testing
 
 compile_commands.json
+
+private

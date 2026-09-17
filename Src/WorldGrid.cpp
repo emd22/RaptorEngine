@@ -57,27 +57,54 @@ void WorldGrid::Create(const Vec2u grid_size)
 	mPositionOffset = ((Vec3f(half_grid.X, 0.0f, half_grid.Y) * Vec3f(mTileSize.X, 0.0f, mTileSize.Y)));
 }
 
-Tile* WorldGrid::GetObjectTile(const Object* object, TileIndex* out_tile_index)
+void WorldGrid::GetObjectTileRect(const Object* object, TileIndex* out_start, Vec2u* out_span) const
 {
-	// TODO: Check based on AABB or radius.
+	DebugAssert(out_start != nullptr);
+	DebugAssert(out_span != nullptr);
 
-	const Vec3f tile_size_v(mTileSize.X, 0.0f, mTileSize.Y);
-	const Vec3f position_tile_local = (object->mPosition) / tile_size_v;
+	const Vec2u tile_xy_start = TileToTileXY(WorldToTile(object->mPosition + object->Bounds.Min));
+	const Vec2u tile_xy_end = TileToTileXY(WorldToTile(object->mPosition + object->Bounds.Max));
 
-	if (position_tile_local.X >= mGridSize.X || position_tile_local.Z >= mGridSize.Y) {
+	const uint32 width_in_tiles = std::clamp(tile_xy_end.X - tile_xy_start.X + 1, 1U, mGridSize.X);
+	const uint32 height_in_tiles = std::clamp(tile_xy_end.Y - tile_xy_start.Y + 1, 1U, mGridSize.Y);
+
+	*out_start = TileFromTileXY(tile_xy_start);
+	*out_span = Vec2u(width_in_tiles, height_in_tiles);
+}
+
+void WorldGrid::InsertObjectIntoRect(ObjectID id, TileIndex start, Vec2u span)
+{
+	const Vec2u start_xy = TileToTileXY(start);
+
+	for (uint32 y = 0; y < span.Y; y++) {
+		for (uint32 x = 0; x < span.X; x++) {
+			InsertInto(TileFromTileXY(start_xy + Vec2u(x, y)), id);
+		}
+	}
+}
+
+void WorldGrid::RemoveObjectFromRect(ObjectID id, TileIndex start, Vec2u span)
+{
+	const Vec2u start_xy = TileToTileXY(start);
+
+	for (uint32 y = 0; y < span.Y; y++) {
+		for (uint32 x = 0; x < span.X; x++) {
+			Tile* tile = GetTile(TileFromTileXY(start_xy + Vec2u(x, y)));
+			if (tile == nullptr) {
+				continue;
+			}
+
+			const uint32 index = tile->FindObject(id);
+			if (index == TileIndexNull) {
 #ifdef FX_TILE_SYSTEM_LOG_ERRORS
-		LogError(LC_CORE, "Object out of tile grid range");
+				LogWarning(LC_CORE, "Could not find object ({}) in previous tile", id);
 #endif
-		return nullptr;
+				continue;
+			}
+
+			tile->Objects.FreeItem(index);
+		}
 	}
-
-	const uint32 tile_index = WorldToTile(object->mPosition);
-
-	if (out_tile_index != nullptr) {
-		(*out_tile_index) = tile_index;
-	}
-
-	return &mTileBuffer[tile_index];
 }
 
 void WorldGrid::AddObject(ObjectID id)
@@ -92,22 +119,22 @@ void WorldGrid::AddObject(ObjectID id)
 		return;
 	}
 
-	const Vec3f object_size = object->Bounds.GetSize();
-
-	Vec2u tile_index_start = TileToTileXY(WorldToTile(object->mPosition + object->Bounds.Min));
-	Vec2u tile_index_end = TileToTileXY(WorldToTile(object->mPosition + object->Bounds.GetSize()));
-
-	uint32 width_in_tiles = std::clamp(tile_index_end.X - tile_index_start.X + 1, 1U, mGridSize.X);
-	uint32 height_in_tiles = std::clamp(tile_index_end.Y - tile_index_start.Y + 1, 1U, mGridSize.Y);
-
-	Vec2u n_offset = Vec2u(width_in_tiles / 2, height_in_tiles / 2);
-
-	for (uint32 y = 0; y < height_in_tiles; y++) {
-		for (uint32 x = 0; x < width_in_tiles; x++) {
-			TileIndex tile_index = TileFromTileXY(Vec2u(x + tile_index_start.X, y + tile_index_start.Y));
-			InsertInto(tile_index, id);
-		}
+	// The object isn't cullable, insert into global tile
+	if (!object->IsCullable()) {
+		InsertInto(scGlobalTileIndex, object->ID);
+		return;
 	}
+
+	TileIndex tile_start = TileIndexNull;
+	Vec2u tile_span = Vec2u(1, 1);
+	GetObjectTileRect(object, &tile_start, &tile_span);
+
+	InsertObjectIntoRect(id, tile_start, tile_span);
+
+	// InsertInto() overwrites mTileIndex for each tile it's called on, so record the full span here
+	// after inserting into every tile so UpdateObject/RemoveObject can clear all of them later.
+	object->mTileIndex = tile_start;
+	object->mTileSpan = tile_span;
 }
 
 void WorldGrid::AddObjectsFromTile(std::unordered_set<ObjectID>& object_buffer, const Tile* tile) const
@@ -159,6 +186,7 @@ const SizedArray<ObjectID>& WorldGrid::GetNearbyObjects()
 	const Tile* view_tile = GetTile(TileFromTileXY(view_xy));
 
 	const Tile* surrounding_tiles[] = {
+
 		// Get the immediate surrounding tiles (up, left, down, right)
 		GetTile(TileFromTileXY(view_xy + Vec2u(1, 0))),
 		GetTile(TileFromTileXY(view_xy + Vec2u(-1, 0))),
@@ -207,36 +235,34 @@ void WorldGrid::SetViewTileIndex(TileIndex view_tile_index)
 	ViewTileIndex = view_tile_index;
 }
 
-TileIndex WorldGrid::InsertDirect(ObjectID id)
-{
-	mbNearbyObjectCacheValid = false;
-
-	Object* object = gObjectManager->GetObject(id);
-
-	TileIndex tile_index = 0;
-
-	Tile* tile = GetObjectTile(object, &tile_index);
-	object->mTileIndex = tile_index;
-
-	if (!tile->Objects.IsInited()) {
-		tile->Objects.Init(scMaxObjectsPerTile);
-	}
-
-	fx::ObjectID* out_id = tile->Objects.NewItem();
-	(*out_id) = id;
-
-	Vec2u tile_xy = TileToTileXY(tile_index);
-
-	LogInfo("Inserting object '{}' into tile index {}, {}", object->Name.Get(), tile_xy.X, tile_xy.Y);
-
-	return tile_index;
-}
 
 TileIndex WorldGrid::InsertInto(TileIndex tile_index, ObjectID id)
 {
 	mbNearbyObjectCacheValid = false;
 
 	Object* object = gObjectManager->GetObject(id);
+	if (object == nullptr) {
+		return TileIndexNull;
+	}
+
+	// Insert into global tile (uncullable)
+	if (!object->IsCullable()) {
+		object->mTileIndex = scGlobalTileIndex;
+
+		if (!GlobalTile.Objects.IsInited()) {
+			GlobalTile.Objects.Init(scMaxGlobalObjects);
+		}
+
+		fx::ObjectID* out_id = GlobalTile.Objects.NewItem();
+		if (out_id == nullptr) {
+			LogWarning("Global tile is full, cannot insert object {}", tile_index, id);
+			return TileIndexNull;
+		}
+
+		(*out_id) = id;
+
+		return scGlobalTileIndex;
+	}
 
 	Tile& tile = mTileBuffer[tile_index];
 	object->mTileIndex = tile_index;
@@ -246,23 +272,37 @@ TileIndex WorldGrid::InsertInto(TileIndex tile_index, ObjectID id)
 	}
 
 	fx::ObjectID* out_id = tile.Objects.NewItem();
+	// Tile is full, die
+	if (out_id == nullptr) {
+		LogWarning("Tile {} is full, cannot insert object {}", tile_index, id);
+		return TileIndexNull;
+	}
+
 	(*out_id) = id;
 
 	return tile_index;
 }
-
 
 void WorldGrid::UpdateObject(ObjectID id, bool update_attached)
 {
 	mbNearbyObjectCacheValid = false;
 
 	Object* object = gObjectManager->GetObject(id);
+	if (object == nullptr) {
+		return;
+	}
 
-	TileIndex new_tile_index = 0;
-	Tile* new_tile = GetObjectTile(object, &new_tile_index);
+	// If we are set to non-cullable and the object is not in the global tile, move it to the global tile.
+	if (!object->IsCullable() && object->mTileIndex != scGlobalTileIndex) {
+		RemoveObjectFromRect(id, object->mTileIndex, object->mTileSpan);
 
-	// The object hasn't moved past boundaries, leave it where it is
-	if (new_tile_index == object->mTileIndex) {
+		InsertInto(scGlobalTileIndex, id);
+		object->mTileIndex = scGlobalTileIndex;
+
+		return;
+	}
+
+	if (object->mTileIndex == scGlobalTileIndex) {
 		return;
 	}
 
@@ -274,23 +314,21 @@ void WorldGrid::UpdateObject(ObjectID id, bool update_attached)
 		return;
 	}
 
-	// Find the tile that the object is currently in. If it has been found, remove it from the current tile and add it
-	// to the tile in the new location.
-	Tile& old_tile = mTileBuffer[object->mTileIndex];
-	const TileIndex old_index = old_tile.FindObject(id);
+	TileIndex new_tile_start = TileIndexNull;
+	Vec2u new_tile_span = Vec2u(1, 1);
+	GetObjectTileRect(object, &new_tile_start, &new_tile_span);
 
-	if (old_index == TileIndexNull) {
-#ifdef FX_TILE_SYSTEM_LOG_ERRORS
-		LogWarning(LC_CORE, "Could not find object ({}) in previous tile", id);
-#endif
-	}
-	else {
-		old_tile.Objects.FreeItem(old_index);
+	// The object hasn't moved past any tile boundaries, leave it where it is
+	if (new_tile_start == object->mTileIndex && new_tile_span == object->mTileSpan) {
+		return;
 	}
 
-	// Finally, insert the object into the new tile.
-	InsertInto(new_tile_index, id);
-	object->mTileIndex = new_tile_index;
+	// Clear every tile the object was previously spanning, then insert it into every tile it now spans.
+	RemoveObjectFromRect(id, object->mTileIndex, object->mTileSpan);
+	InsertObjectIntoRect(id, new_tile_start, new_tile_span);
+
+	object->mTileIndex = new_tile_start;
+	object->mTileSpan = new_tile_span;
 
 	// If requested, update the objects attached to the current object.
 	if (update_attached) {
@@ -327,6 +365,10 @@ Vec3f WorldGrid::TileXYToWorldCenter(Vec2u tile_xy) const
 
 Tile* WorldGrid::GetTile(TileIndex index)
 {
+	if (index == scGlobalTileIndex) {
+		return &GlobalTile;
+	}
+
 	if (index >= mTileBuffer.Capacity) {
 		return nullptr;
 	}
@@ -336,6 +378,10 @@ Tile* WorldGrid::GetTile(TileIndex index)
 
 const Tile* WorldGrid::GetTile(TileIndex index) const
 {
+	if (index == scGlobalTileIndex) {
+		return &GlobalTile;
+	}
+
 	if (index >= mTileBuffer.Capacity) {
 		return nullptr;
 	}
@@ -365,15 +411,24 @@ void WorldGrid::RemoveObject(ObjectID id)
 	mbNearbyObjectCacheValid = false;
 
 	Object* object = gObjectManager->GetObject(id);
-	TileIndex tile_index = object->mTileIndex;
-
-	// Object was not assigned a tile, ignore
-	if (tile_index == TileIndexNull) {
+	if (object == nullptr) {
 		return;
 	}
 
-	Tile& tile = mTileBuffer[tile_index];
-	tile.Objects.FreeItem(tile.FindObject(id));
+	// Object was not assigned a tile, ignore
+	if (object->mTileIndex == TileIndexNull) {
+		return;
+	}
+
+	if (object->mTileIndex == scGlobalTileIndex) {
+		const uint32 index = GlobalTile.FindObject(id);
+		if (index != TileIndexNull) {
+			GlobalTile.Objects.FreeItem(index);
+		}
+		return;
+	}
+
+	RemoveObjectFromRect(id, object->mTileIndex, object->mTileSpan);
 }
 
 } // namespace fx

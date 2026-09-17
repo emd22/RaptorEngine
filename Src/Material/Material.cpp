@@ -175,7 +175,7 @@ void Material::RequestQuality(uint32 quality)
 }
 
 
-bool Material::BindWithPipeline(const CommandBuffer& cmd, const Pipeline& pipeline)
+bool Material::BindWithPipeline(const CommandBuffer& cmd, const Pipeline& pipeline, uint32 bone_buffer_offset)
 {
 	if (!bIsBuilt.load()) {
 		Build();
@@ -195,10 +195,18 @@ bool Material::BindWithPipeline(const CommandBuffer& cmd, const Pipeline& pipeli
 		descriptor_set = RequestAlbedoOnlyDescriptors();
 	}
 
+	// The requested pipeline's Set 1 layout includes a bone buffer binding (e.g. this material is standing in as a
+	// fallback for a skinned object's not-yet-ready material), but this material's own descriptor set was built
+	// without one. Use an alternate descriptor set that matches the skinned layout instead.
+	const bool needs_skinned_fallback = HasFlag(pl_info.Flags, ePipelineNameFlags::Skinned) && !bSupportsSkinning;
+	if (needs_skinned_fallback) {
+		descriptor_set = RequestSkinnedFallbackDescriptors();
+	}
+
 	// Buffer offsets
 	StackArray<uint32, 2> offsets;
-	if (bSupportsSkinning) {
-		offsets.Insert(gGraphics->BoneBuffer.GetBaseOffset());
+	if (bSupportsSkinning || needs_skinned_fallback) {
+		offsets.Insert(gGraphics->BoneBuffer.GetBaseOffset() + bone_buffer_offset);
 	}
 	offsets.Insert(gGraphics->LightBuffer.GetBaseOffset());
 
@@ -331,6 +339,36 @@ renderer::DescriptorSet* Material::RequestAlbedoOnlyDescriptors()
 	mpAlbedoOnlyDescriptorSet = ds_result.second;
 
 	return mpAlbedoOnlyDescriptorSet;
+}
+
+renderer::DescriptorSet* Material::RequestSkinnedFallbackDescriptors()
+{
+	if (mpSkinnedFallbackDescriptorSet != nullptr) {
+		return mpSkinnedFallbackDescriptorSet;
+	}
+
+	SamplerProps sampler_props { .MinLOD = GetComponentMinLOD(Diffuse), .MaxLOD = GetComponentMaxLOD(Diffuse) };
+
+	Image* normal_image = NormalMap.Exists() ? NormalMap.pImage : gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm);
+	Image* mr_image =
+		MetallicRoughness.Exists() ? MetallicRoughness.pImage : gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm);
+
+	// Build entries list, matching the Set 1 layout shared by every *Skinned pipeline (albedo, normal,
+	// metallic/roughness, bone buffer, light buffer).
+	SizedArray<DescriptorEntry> ds_entries(5);
+	ds_entries.Emplace(
+		DescriptorEntry::AsImage(0, eShaderType::Pixel, Diffuse.pImage, gSamplerCache->Request(sampler_props)));
+	ds_entries.Emplace(DescriptorEntry::AsImage(1, eShaderType::Pixel, normal_image, gSamplerCache->Request(sampler_props)));
+	ds_entries.Emplace(DescriptorEntry::AsImage(2, eShaderType::Pixel, mr_image, gSamplerCache->Request(sampler_props)));
+	ds_entries.Emplace(DescriptorEntry::AsBuffer(3, eShaderType::Vertex, &gGraphics->BoneBuffer.GetGpuBuffer(), 0,
+												 gGraphics->BoneBuffer.PageSize));
+	ds_entries.Emplace(DescriptorEntry::AsBuffer(4, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+												 gGraphics->LightBuffer.PageSize));
+
+	std::pair<DescriptorID, renderer::DescriptorSet*> ds_result = gDescriptorCache->Request(ds_entries);
+	mpSkinnedFallbackDescriptorSet = ds_result.second;
+
+	return mpSkinnedFallbackDescriptorSet;
 }
 
 

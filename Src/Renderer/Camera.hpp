@@ -120,7 +120,13 @@ public:
 
 	void OnWindowResize(const Vec2u& size) override;
 
-	void ResolveViewToTexels(float32 texture_res);
+	/**
+	 * @brief Snaps `eye` and `target` (in place, by the same offset) onto the shadow map's texel grid, in the
+	 * plane perpendicular to the view direction. This keeps the light-space texel grid stable relative to the
+	 * world as the shadow camera moves, which prevents shadow edges from shimmering as sub-texel movements
+	 * change which texel a world position rasterizes to.
+	 */
+	void ResolveViewToTexels(Vec3f& eye, Vec3f& target, const Vec3f& world_up, float32 texture_res);
 
 	FX_FORCE_INLINE void SetBounds(float32 width, float32 height)
 	{

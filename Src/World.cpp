@@ -480,8 +480,10 @@ void World::ExecutePrepassRenderList(renderer::ePipelineName forward_pl_name)
 		gGraphics->SubmitPushConstants(gGraphics->GetFrame()->CmdBuffer, pipeline,
 									   eShaderType::Vertex | eShaderType::Pixel, consts);
 
-		if (!gMaterialManager->BindWithPipeline(gGraphics->GetFrame()->CmdBuffer, pipeline, object->GetMaterialID())) {
-			gMaterialManager->BindWithPipeline(gGraphics->GetFrame()->CmdBuffer, pipeline, MaterialID::scNull);
+		if (!gMaterialManager->BindWithPipeline(gGraphics->GetFrame()->CmdBuffer, pipeline, object->GetMaterialID(),
+											   object->BoneBufferOffset)) {
+			gMaterialManager->BindWithPipeline(gGraphics->GetFrame()->CmdBuffer, pipeline, MaterialID::scNull,
+											   object->BoneBufferOffset);
 		}
 
 		object->RenderPrimitive(gGraphics->GetFrame()->CmdBuffer);
@@ -518,6 +520,49 @@ void World::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* 
 }
 
 
+void World::AddToRenderListRecursiveByMaterial(ObjectID* id_ptr)
+{
+	if (id_ptr == nullptr) {
+		return;
+	}
+
+	ObjectID id = *id_ptr;
+
+	Object* obj = gObjectManager->GetObject(id);
+	if (obj == nullptr) {
+		return;
+	}
+
+	// Container objects (e.g. the root of a multi-primitive mesh) have no mesh/material of their own; only the
+	// attached primitives that actually own a mesh need placing in a geometry section.
+	if (obj->pMesh.IsValid()) {
+		Material* material = MaterialManagerFwd::GetMaterial(obj->GetMaterialID());
+		ePipelineName pipeline = material->GetRequiredPipeline();
+		if (IsTransparentMaterial(material)) {
+			pipeline = GetTransparentPipeline(pipeline);
+		}
+
+		RenderListSection& section = mRenderList.GetSection(pipeline);
+
+		bool already_added = false;
+		for (ObjectID object_id : section.Objects) {
+			if (object_id == id) {
+				already_added = true;
+				break;
+			}
+		}
+
+		if (!already_added) {
+			mRenderList.AddObject(pipeline, id);
+		}
+	}
+
+	for (ObjectID& attached_id : obj->AttachedNodes) {
+		AddToRenderListRecursiveByMaterial(&attached_id);
+	}
+}
+
+
 void World::ClearRenderList()
 {
 	mRenderList.ClearSection(ePipelineName::Geometry);
@@ -535,10 +580,6 @@ void World::AddTileToRenderList(bool clear, TileIndex new_tile_index)
 
 	if (tile == nullptr) {
 		return;
-	}
-
-	if (clear) {
-		ClearRenderList();
 	}
 
 	uint32 index = 0;
@@ -560,57 +601,14 @@ void World::AddTileToRenderList(bool clear, TileIndex new_tile_index)
 			continue;
 		}
 
-		Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
-		ePipelineName pipeline = material->GetRequiredPipeline();
-		if (IsTransparentMaterial(material)) {
-			pipeline = GetTransparentPipeline(pipeline);
-		}
-
-		// LogInfo("Adding object ID {} -> {}", *object_id, PipelineNameUtil::GetName(pipeline));
-
 		if (object->IsShadowCaster()) {
 			AddToRenderListRecursive(ePipelineName::ShadowDirectional, object_id);
 		}
 
-		AddToRenderListRecursive(pipeline, object_id);
+		AddToRenderListRecursiveByMaterial(object_id);
 
 		++index;
 	}
-}
-
-void World::RebuildFromTiles(TileIndex tile_index)
-{
-	AddTileToRenderList(true, tile_index);
-	Vec2u xy = gWorldGrid->TileToTileXY(tile_index);
-
-	// Rebuild the immediate surrounding tiles (up, left, down, right)
-	AddTileToRenderList(false, gWorldGrid->TileFromTileXY(xy + Vec2u(1, 0)));
-	AddTileToRenderList(false, gWorldGrid->TileFromTileXY(xy + Vec2u(-1, 0)));
-	AddTileToRenderList(false, gWorldGrid->TileFromTileXY(xy + Vec2u(0, -1)));
-	AddTileToRenderList(false, gWorldGrid->TileFromTileXY(xy + Vec2u(0, 1)));
-
-	// Build the diagonals
-	AddTileToRenderList(false, gWorldGrid->TileFromTileXY(xy + Vec2u(1, 1)));
-	AddTileToRenderList(false, gWorldGrid->TileFromTileXY(xy + Vec2u(1, -1)));
-	AddTileToRenderList(false, gWorldGrid->TileFromTileXY(xy + Vec2u(-1, -1)));
-	AddTileToRenderList(false, gWorldGrid->TileFromTileXY(xy + Vec2u(-1, 1)));
-}
-
-void World::NotifyObjectMaterialChanged(ObjectID id)
-{
-	if (id.IsNull() || id.IsInvalid()) {
-		return;
-	}
-
-	Object* object = gObjectManager->GetObject(id);
-
-	if (object == nullptr || !object->pMesh.IsValid()) {
-		return;
-	}
-
-	Material* material = gMaterialManager->GetMaterial(object->GetMaterialID());
-
-	// No need to remove/readd to renderlist as it is rebuilt every frame now.
 }
 
 
@@ -637,9 +635,9 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 
 	min_tile.X = std::clamp(min_tile.X, 0U, num_tiles_x - 1);
 	min_tile.Y = std::clamp(min_tile.Y, 0U, num_tiles_y - 1);
+
 	max_tile.X = std::clamp(max_tile.X, 0U, num_tiles_x - 1);
 	max_tile.Y = std::clamp(max_tile.Y, 0U, num_tiles_y - 1);
-
 
 	for (uint32 y = min_tile.Y; y <= max_tile.Y; y++) {
 		for (uint32 x = min_tile.X; x <= max_tile.X; x++) {
@@ -659,9 +657,7 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 		}
 	}
 
-	LogInfo("MIN: {}, MAX: {}", frustum_bounds.Min, frustum_bounds.Max);
-
-	LogInfo("{} / {} world tiles visible", num_visible, gWorldGrid->GetNumTiles());
+	AddTileToRenderList(false, WorldGrid::scGlobalTileIndex);
 }
 
 
@@ -669,7 +665,7 @@ void World::Render(Camera* shadow_camera)
 {
 	PerspectiveCamera& camera = *mpCurrentCamera;
 
-	if (!mbNoTileCulling) {
+	if (!mbDisableTileCulling) {
 		CullWorldTiles(camera);
 	}
 
@@ -680,7 +676,6 @@ void World::Render(Camera* shadow_camera)
 	TileIndex tile_index = gWorldGrid->WorldToTile(mpCurrentCamera->Position);
 
 	if (tile_index != gWorldGrid->ViewTileIndex) {
-		// RebuildFromTiles(tile_index);
 		gWorldGrid->SetViewTileIndex(tile_index);
 	}
 
@@ -798,6 +793,7 @@ void World::RenderProbeCapture()
 	// Everything drawn from here to EndCaptureFaces() is a bake face, not the
 	// player's view: no SSAO target at this extent, and no probe feedback.
 	gProbeManager->BeginCaptureFaces();
+	mbDisableTileCulling = true;
 
 	for (uint32 slot = 0; slot < batch_count; slot++) {
 		const Vec3f capture_pos = gProbeManager->GetCapturePosition();
@@ -845,6 +841,7 @@ void World::RenderProbeCapture()
 	}
 
 	gProbeManager->EndCaptureFaces();
+	mbDisableTileCulling = false;
 
 	for (uint32 i = 0; i < std::size(scCapturePipelines); i++) {
 		renderer::Pipeline& pipeline = gPipelineCache->Request(scCapturePipelines[i]);

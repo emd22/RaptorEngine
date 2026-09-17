@@ -24,19 +24,12 @@ Quat Interpolate(const Quat& a, const Quat& b, float32 t)
 }
 
 template <typename T>
-static T GetComponentAtTime(float32 time, const BoneTransformTrack<T>& track)
+static T GetComponentAtTime(float32 time, const BoneTransformTrack<T>& track, const T& empty_default)
 {
 	const uint32 count = static_cast<uint32>(track.Times.Size);
 
 	if (count == 0) {
-		if constexpr (std::is_same_v<T, Quat>) {
-			return Quat::scIdentity;
-		}
-
-		else if constexpr (std::is_same_v<T, Vec3f>) {
-			return Vec3f::sZero;
-		}
-		return T {};
+		return empty_default;
 	}
 
 	// Clamp to ends
@@ -71,10 +64,12 @@ void Skeleton::EvaluatePose(Animation& anim, float32 time)
 	for (uint32 i = 0; i < joint_count; i++) {
 		const BoneTrack& track = anim.BoneTracks[i];
 
-		Vec3f translation = GetComponentAtTime(time, track.Translation);
-		Quat rotation = GetComponentAtTime(time, track.Rotation);
+		Vec3f translation = GetComponentAtTime(time, track.Translation, Vec3f::sZero);
+		Quat rotation = GetComponentAtTime(time, track.Rotation, Quat::scIdentity);
+		Vec3f scale = GetComponentAtTime(time, track.Scale, Vec3f::sOne);
 
-		LocalTransforms.pData[i] = Mat4f::AsRotation(rotation) * Mat4f::AsTranslation(translation);
+		LocalTransforms.pData[i] =
+			Mat4f::AsScale(scale) * Mat4f::AsRotation(rotation) * Mat4f::AsTranslation(translation);
 	}
 
 	for (uint32 i = 0; i < joint_count; i++) {
@@ -114,7 +109,7 @@ BoneTransform Skeleton::GetBoneTransform(const Ref<Animation>& anim, float32 tim
 	// negated. But also negating that component in the matrix causes spaghetti limbs.
 
 	return BoneTransform(Vec3f::FlipSigns<1, 1, -1, 1>(SkinningMatrices[bone_id].GetTranslation()),
-						 GetComponentAtTime(time, track.Rotation));
+						 GetComponentAtTime(time, track.Rotation, Quat::scIdentity));
 }
 
 Mat4f Skeleton::GetBoneTransformMatrix(const Ref<Animation>& anim, float32 time, BoneId bone_id) const

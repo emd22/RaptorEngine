@@ -41,9 +41,9 @@ void Object::SetMaterial(const MaterialID& id)
 
 	mMaterialID = id;
 
-	if (bIsAddedToWorld && !ID.IsInvalid() && pMesh.IsValid()) {
-		gWorld->NotifyObjectMaterialChanged(ID);
-	}
+	// if (bIsAddedToWorld && !ID.IsInvalid() && pMesh.IsValid()) {
+	// 	gWorld->NotifyObjectMaterialChanged(ID);
+	// }
 }
 
 void Object::Create(const Ref<PrimitiveMesh>& mesh, const MaterialID& material)
@@ -128,6 +128,13 @@ void Object::UpdateAnimation()
 		return;
 	}
 
+	// An object can be visited multiple times in one frame (shadow pass, depth prepass, forward pass); only advance
+	// the pose the first time, and reuse the bone-buffer slot claimed then for every subsequent draw this frame.
+	const uint32 current_frame = gGraphics->GetElapsedFrameCount();
+	if (mAnimationUpdateFrame == current_frame) {
+		return;
+	}
+	mAnimationUpdateFrame = current_frame;
 
 	if (AnimationTime >= pCurrentAnimation->Duration) {
 		AnimationTime = 0.0f;
@@ -140,8 +147,9 @@ void Object::UpdateAnimation()
 
 	AnimationTime += 0.01f;
 
-	gGraphics->BoneBuffer.Rewind();
 	gGraphics->BoneBuffer.CopyFrom(pSkeleton->SkinningMatrices.pData, pSkeleton->SkinningMatrices.Size * sizeof(Mat4f));
+	BoneBufferOffset = gGraphics->BoneBuffer.GetSlotOffset();
+	gGraphics->BoneBuffer.NextSlot();
 }
 
 void Object::MakeInstanceOf(const ObjectID& source_id)
@@ -239,8 +247,8 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 	Material* mat = gMaterialManager->GetMaterial(mMaterialID);
 
 	// If there was an error binding the object material, bind the null material.
-	if (!gMaterialManager->BindWithPipeline(cmd, *pipeline, mMaterialID)) {
-		gMaterialManager->BindWithPipeline(cmd, *pipeline, MaterialID::scNull);
+	if (!gMaterialManager->BindWithPipeline(cmd, *pipeline, mMaterialID, BoneBufferOffset)) {
+		gMaterialManager->BindWithPipeline(cmd, *pipeline, MaterialID::scNull, BoneBufferOffset);
 	}
 
 	if (pMesh) {
