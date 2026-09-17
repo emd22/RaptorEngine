@@ -35,7 +35,7 @@ void RenderList::InvalidateObject(const ObjectID id)
 
 void RenderList::ClearSection(ePipelineName section_name)
 {
-	DebugAssert(static_cast<uint32>(pl_name) < mSections.Capacity);
+	DebugAssert(static_cast<uint32>(section_name) < mSections.Capacity);
 	RenderListSection& section = mSections[static_cast<uint32>(section_name)];
 
 	section.Objects.Clear();
