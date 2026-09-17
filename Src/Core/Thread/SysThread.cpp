@@ -1,6 +1,7 @@
 #include "SysThread.hpp"
 
 #include <Core/Assert.hpp>
+#include <cassert>
 #include <utility>
 
 namespace fx {
@@ -139,12 +140,12 @@ SysThreadImpl_Windows& SysThreadImpl_Windows::operator=(SysThreadImpl_Windows&& 
 
 void SysThreadImpl_Windows::Create(ThreadFunc func)
 {
-	AssertMsg(bIsRunning == false, "SysThreadImpl_Windows::Create called on an already-running thread");
+	assert(!bIsRunning && "SysThreadImpl_Windows::Create called on an already-running thread");
 
 	pEntryFunction = func;
 	InternalThread = CreateThread(nullptr, 0, &SysThreadImpl_Windows::InternalEntrypoint, this, 0, &InternalID);
 
-	AssertMsg(InternalThread != nullptr, "CreateThread failed");
+	assert(InternalThread != nullptr && "CreateThread failed");
 
 	bIsRunning = true;
 }
@@ -203,7 +204,8 @@ bool SysThread::AreTIDsEqual(SysThreadInternalType a, SysThreadInternalType b)
 #if defined(FX_THREADS_PTHREAD)
 	return pthread_equal(a, b) != 0;
 #elif defined(FX_THREADS_WINDOWS)
-	return CompareObjectHandles(a, b);
+	// GetThreadId resolves pseudo-handles (from GetCurrentThread) as well, unlike a plain handle compare.
+	return GetThreadId(a) == GetThreadId(b);
 #endif
 }
 

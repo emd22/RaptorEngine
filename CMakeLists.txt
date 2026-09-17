@@ -60,8 +60,23 @@ if(WIN32)
         target_link_directories(raptor PRIVATE "$ENV{VULKAN_SDK}/Lib")
     endif()
 
-    target_link_libraries(raptor PRIVATE vulkan-1 dxcompiler jpeg mincore)
+    target_link_libraries(raptor PRIVATE vulkan-1 dxcompiler jpeg)
     target_compile_definitions(raptor PRIVATE _USE_MATH_DEFINES)
+
+    # FX_BASE_DIR="." resolves against the working directory, and assets (Shaders/, Data/, Config/)
+    # live at the repo root, not next to the generated .vcxproj. Without this, VS defaults the
+    # debugger's working directory to $(ProjectDir) (the build folder) and asset loading fails.
+    set_target_properties(raptor PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+
+    # These are only shipped as DLLs (no import-time search path covers Lib/win32), so copy them
+    # next to the executable or the debugger (and any run outside this directory) can't find them.
+    add_custom_command(TARGET raptor POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/Lib/win32/SDL3.dll"
+            "${CMAKE_SOURCE_DIR}/Lib/win32/jpeg62.dll"
+            "${CMAKE_SOURCE_DIR}/Lib/win32/turbojpeg.dll"
+            "$<TARGET_FILE_DIR:raptor>"
+    )
 
 elseif(APPLE)
     set_target_properties(raptor PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "aarch64")

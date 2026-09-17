@@ -927,6 +927,12 @@ pool_t MemPool::GetPool() { return reinterpret_cast<pool_t>(reinterpret_cast<uin
 
 void* MemPool::AllocRaw(size_t size)
 {
+    // Zero-size blocks are implementation-defined and get overrun by terminator writes on empty
+    // buffers; always hand out at least one byte.
+    if (size == 0) {
+        size = 1;
+    }
+
 #ifdef FX_DEBUG_DISABLE_MEMPOOL
     return std::malloc(size);
 #else

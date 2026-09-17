@@ -54,7 +54,7 @@ FX_FORCE_INLINE void Vec3f::Set(float32 x, float32 y, float32 z) { mIntrin = _mm
 
 FX_FORCE_INLINE float32 Vec3f::Dot(FLOAT4 other) const
 {
-	// Mask is Src->0111 Dest->1111 so we do not include the unused component in our result
+	// Mask is Src->0111 Dest->0111 so we do not include the unused component in our result
 	// This is likely already handled by the zero during initalization (and the _mm_blend when initializing with
 	// scalar), but better to be safe.
 	return _mm_cvtss_f32(_mm_dp_ps(mIntrin, other, 0b01110111));

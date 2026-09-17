@@ -21,11 +21,11 @@ namespace fx {
 #define NOMINMAX
 #endif
 #include <Windows.h>
-// Windows.h defines these as macros to the ANSI/wide variants of the WinAPI functions of the same name,
-// which collide with identically-named methods elsewhere in the engine (AssetWorker::LoadImage,
-// ObjectManager::GetObject, ...).
-#undef LoadImage
+// Win32 defines macros that collide with engine members (AssetWorker::LoadImage,
+// ObjectManager::GetObject). The engine never calls the Win32 functions.
+#pragma push_macro("GetObject")
 #undef GetObject
+#undef LoadImage
 #else
 #error "Unsupported platform"
 #endif

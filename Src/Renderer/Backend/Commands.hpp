@@ -53,6 +53,8 @@ public:
     FX_FORCE_INLINE const VkCommandBuffer Get() const { return Cmd; }
     FX_FORCE_INLINE VkCommandBuffer Get() { return Cmd; }
 
+    FX_FORCE_INLINE uint32 QueueFamily() const { return mpCommandPool->QueueFamilyIndex; }
+
     operator VkCommandBuffer() const { return Cmd; }
 
     bool IsInitialized() const { return mbInitialized; }
