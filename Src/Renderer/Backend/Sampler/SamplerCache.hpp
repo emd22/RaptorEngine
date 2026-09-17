@@ -5,6 +5,8 @@
 
 #include <Core/Hash.hpp>
 
+#include <unordered_map>
+
 namespace fx {
 namespace renderer {
 

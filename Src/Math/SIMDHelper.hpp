@@ -60,10 +60,10 @@ using FLOAT4 = __m128;
 
 namespace simd {
 
-FX_FORCE_INLINE void StoreUInt4(unsigned int* dst, UINT4 v) { _mm_storeu_si128(dst, v); }
+FX_FORCE_INLINE void StoreUInt4(unsigned int* dst, UINT4 v) { _mm_storeu_si128(reinterpret_cast<__m128i*>(dst), v); }
 FX_FORCE_INLINE void StoreFloat4(float* dst, FLOAT4 v) { _mm_storeu_ps(dst, v); }
 
-FX_FORCE_INLINE UINT4 LoadUInt4(const unsigned int* src) { return _mm_loadu_si128(src); }
+FX_FORCE_INLINE UINT4 LoadUInt4(const unsigned int* src) { return _mm_loadu_si128(reinterpret_cast<const __m128i*>(src)); }
 FX_FORCE_INLINE FLOAT4 LoadFloat4(const float* src) { return _mm_loadu_ps(src); }
 FX_FORCE_INLINE FLOAT4 LoadFloat4(float x, float y, float z, float w)
 {

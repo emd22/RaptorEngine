@@ -1,0 +1,3 @@
+[submodule "Submodules/strata"]
+	path = Submodules/strata
+	url = https://github.com/StrataLanguage/stratac.git

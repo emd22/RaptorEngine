@@ -32,7 +32,7 @@ uint64 FastRand64()
 UINT4 FastRand4()
 {
 	// A bunch of random seeds (needs to be non-zero)
-	static uint32 sSeeds[4] __attribute__((aligned(16))) = { 2463534258U, 480676568U, 784724923U, 521288629U };
+	alignas(16) static uint32 sSeeds[4] = { 2463534258U, 480676568U, 784724923U, 521288629U };
 
 	UINT4 vr = simd::LoadUInt4(sSeeds);
 	UINT4 tmp;

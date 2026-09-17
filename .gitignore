@@ -24,6 +24,7 @@ x64
 # Exclusions for .*
 !.gitignore
 !.gitattributes
+!.gitmodules
 
 !.clangd
 !.clang-format

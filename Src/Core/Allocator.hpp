@@ -2,6 +2,8 @@
 
 #include "Types.hpp"
 
+#include <concepts>
+
 #define FX_VALIDATE_ALLOCATOR(TType_) static_assert(C_IsAllocator<TType_>)
 
 
