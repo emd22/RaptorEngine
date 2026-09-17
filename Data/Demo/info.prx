@@ -3,7 +3,7 @@ Meta = {
 }
 
 Sun = {
-    Pos = [-1.0, 2.0, -5.5]
+    Pos = [10.0, 4, -2.5]
     Color = [250, 220, 182, 7]
     AmbientColor = [75, 75, 72, 3]
 }
@@ -48,6 +48,14 @@ Objects = {
         Pos = [0.0, -1.25, 0.0]
     }*/
 
+	FireExtinguisher = {
+		Mesh = "/FireExtinguisher.glb"
+		Pos = [0.0, 0.5, 0.0]
+        Scale = 1.5
+
+		Shadows = $True
+	}
+
 	/*
     Level = {
         Mesh = "/TestFloor.glb"
@@ -61,11 +69,7 @@ Objects = {
         Pos = [0.0, -0.8, 10.0]
     }
 
-    Mallard = {
-        Mesh = "/Mallard.glb"
-        Pos = [0.0, -0.75, 0.0]
-        Shadows = $True
-    }
+
 
     AnimTest = {
         Mesh = "/Model2.glb"

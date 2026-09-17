@@ -22,6 +22,10 @@
 /// Bias (metres) subtracted from the receiver distance before the Chebyshev test.
 #define PROBE_CHEBYSHEV_BIAS 0.02
 
+/// tan() of a depth-cubemap texel's half angular width (90 deg face FOV / PROBE_DEPTH_SIZE,
+/// halved), i.e. the worldspace radius one texel spans per metre of distance from the probe.
+#define PROBE_DEPTH_TEXEL_SLOPE tan(radians(45.0 / PROBE_DEPTH_SIZE))
+
 /// Receiver offset along the surface normal, as a fraction of the smallest probe
 /// spacing, clamped to [PROBE_NORMAL_BIAS_MIN, PROBE_NORMAL_BIAS_MAX] metres.
 /// Without it a surface occludes itself in the depth maps that baked it: one
@@ -123,6 +127,30 @@ void ProbeDepthDirectionToFaceUV(float3 d, out uint face, out float2 uv01)
 	uv01 = float2(u * 0.5 + 0.5, v * 0.5 + 0.5);
 }
 
+/// Minimum plausible variance for a texel, floored by its own angular footprint
+/// rather than a flat constant. At distance `mean`, one PROBE_DEPTH_SIZE face
+/// texel already spans roughly `mean * PROBE_DEPTH_TEXEL_SLOPE` metres, so two
+/// rays landing in it can legitimately disagree by that much even on a single
+/// flat, consistently-oriented facet -- a fixed ~1cm floor is far tighter than
+/// that footprint once `mean` is more than a few tens of centimetres.
+///
+/// Also floored by the receiver's normal-offset bias itself (PROBE_NORMAL_BIAS_MAX):
+/// at grazing angles -- common on thin/narrow faces, whose nearby probes are
+/// rarely straight-on -- offsetting the receiver along its normal barely changes
+/// distance to the probe, so the bias shows up almost undiminished as `d` in
+/// ProbeDepthChebyshev(). The bias amount comes from grid spacing, not this
+/// probe's actual distance, so a close-but-grazing probe isn't covered by the
+/// footprint term above. Without this floor too, variance/(variance + d^2)
+/// collapses to near-zero on an otherwise unoccluded flat facet seen edge-on --
+/// dark blotches following the mesh's facets on thin geometry.
+float ProbeMinVariance(float mean)
+{
+	float footprint = mean * PROBE_DEPTH_TEXEL_SLOPE;
+	float bias_floor = PROBE_NORMAL_BIAS_MAX * 1.0;
+
+	return max(max(footprint * footprint, bias_floor * bias_floor), 1e-4);
+}
+
 /// Chebyshev visibility from depth moments: 1 = visible, 0 = occluded.
 float ProbeDepthChebyshev(float receiver_dist, float mean, float mean_sq)
 {
@@ -133,7 +161,7 @@ float ProbeDepthChebyshev(float receiver_dist, float mean, float mean_sq)
 		return 1.0;
 	}
 
-	float variance = max(mean_sq - mean * mean, 1e-4);
+	float variance = max(mean_sq - mean * mean, ProbeMinVariance(mean));
 	float d = biased_dist - mean;
 
 	return variance / (variance + d * d);

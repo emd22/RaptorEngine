@@ -656,7 +656,9 @@ void World::Render(Camera* shadow_camera)
 {
 	PerspectiveCamera& camera = *mpCurrentCamera;
 
-	CullWorldTiles(camera);
+	if (!mbNoTileCulling) {
+		CullWorldTiles(camera);
+	}
 
 	if (!mpDebugCube.IsValid()) {
 		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
@@ -727,7 +729,7 @@ void World::Render(Camera* shadow_camera)
 		RenderProbeDebug(camera);
 	}
 
-	RenderWorldGrid(camera);
+	// RenderWorldGrid(camera);
 }
 
 
@@ -776,6 +778,7 @@ void World::RenderProbeCapture()
 		Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f),
 		Vec3f(0.0f, 0.0f, 1.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
 	};
+
 
 	const uint32 batch_count = gProbeManager->BeginBatchCapture();
 
