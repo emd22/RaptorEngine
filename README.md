@@ -1,4 +1,4 @@
-![](Screenshots/raptor-logo.png)
+![](Screenshots/raptor-logo2.png)
 
 Raptor is a 3D game engine being developed for an experimental game.
 
