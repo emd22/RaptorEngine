@@ -136,6 +136,8 @@ private:
 
 	Frustum mFrustum;
 
+	bool mbNoTileCulling = true;
+
 	SizedArray<TileIndex> mVisibleTiles;
 };
 
