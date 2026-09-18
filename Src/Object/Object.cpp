@@ -269,11 +269,11 @@ void Object::Update()
 		}
 
 		SyncObjectWithPhysics(phys);
+	}
 
-		// The transformation has changed via physics, we should tell the worldgrid
-		if (mbMatrixOutOfDate) {
-			gWorldGrid->UpdateObject(ID);
-		}
+	// The transformation has changed, we should tell the worldgrid
+	if (mbMatrixOutOfDate) {
+		gWorldGrid->UpdateObject(this);
 	}
 
 
@@ -379,7 +379,7 @@ void Object::SetCullable(bool value)
 		ClearFlag(Flags, eObjectFlags::DisableCulling);
 	}
 
-	gWorldGrid->UpdateObject(ID);
+	gWorldGrid->UpdateObject(this);
 }
 
 

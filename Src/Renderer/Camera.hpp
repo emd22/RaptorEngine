@@ -239,13 +239,8 @@ private:
 	{
 		constexpr float32 cf2Pi = FX_2PI;
 
-		if (v < -cf2Pi) {
-			return cf2Pi - static_cast<float32>(1e-5);
-		}
-		else if (v > cf2Pi) {
-			return -cf2Pi + static_cast<float32>(1e-5);
-		}
-		return v;
+		// Wrap into (-2pi, 2pi) while keeping any overshoot, so the view does not snap when the angle wraps.
+		return std::fmod(v, cf2Pi);
 	}
 
 private:

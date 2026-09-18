@@ -21,6 +21,13 @@ class Player
 	static constexpr float32 scSprintFov = 85.0f;
 	static constexpr float32 scWalkingFov = 80.0f;
 
+	/// The maximum angle (in radians) that the view model can trail behind the camera's rotation.
+	static constexpr float32 scViewModelMaxLag = MathUtil::DegreesToRadians(6.0f);
+	/// Natural frequency (rad/s) of the spring pulling the view model to the camera. Lower values feel heavier.
+	static constexpr float32 scViewModelSpringFrequency = 18.0f;
+	/// Damping ratio of the view model spring. Below 1 the view model swings slightly past the camera when it stops.
+	static constexpr float32 scViewModelSpringDamping = 1.2f;
+
 public:
 	Player() = default;
 
@@ -69,6 +76,7 @@ private:
 	FX_FORCE_INLINE void MarkApplyingUserForce() { mbIsApplyingUserForce = true; }
 
 	void UpdateViewModel(double delta_time);
+	void UpdateViewModelLag(float32 delta_time);
 
 	FX_FORCE_INLINE void UpdateDirection()
 	{
@@ -122,7 +130,6 @@ private:
 	float32 mHeadBobY = 0.0f;
 
 	Vec3f mCameraOffset = Vec3f::sZero;
-	Vec3f mCameraBumper = Vec3f::sZero;
 
 	Vec3f mMovementGoal = Vec3f::sZero;
 	Vec3f mCameraGoal = Vec3f::sZero;
@@ -131,6 +138,15 @@ private:
 
 
 	Object* mpViewModel = nullptr;
+
+	/**
+	 * @brief The view model's rotation, which lags behind the camera's rotation by up to `scViewModelMaxLag`.
+	 */
+	Quat mViewModelRotation = Quat::scIdentity;
+	/// World space angular velocity (axis * rad/s) of the view model.
+	Vec3f mViewModelAngularVelocity = Vec3f::sZero;
+	/// The camera rotation from the previous view model update, used to find how fast the camera is turning.
+	Quat mPrevCameraRotation = Quat::scIdentity;
 
 	bool bBobReverse = false;
 	bool mbIsApplyingUserForce : 1 = false;

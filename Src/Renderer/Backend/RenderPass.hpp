@@ -19,6 +19,13 @@ public:
     void Create(TargetList& color_attachments, Vec2u size, const Vec2u& offset = Vec2u::sZero);
 
     void Begin(CommandBuffer* cmd, VkFramebuffer framebuffer, const Slice<VkClearValue>& clear_colors);
+
+    /**
+     * @brief Begins the render pass over part of the framebuffer. Load, clear and store ops only touch the pixels
+     * inside of `render_area`, everything outside of it keeps its contents.
+     */
+    void Begin(CommandBuffer* cmd, VkFramebuffer framebuffer, const Slice<VkClearValue>& clear_colors,
+               const VkRect2D& render_area);
     void End();
 
     void Destroy();

@@ -5,8 +5,8 @@
 /// SH coefficient count for an L2 irradiance probe (Limits::ProbeSHCoeffCount).
 #define PROBE_SH_COEFF_COUNT 9
 
-/// Depth-moments cubemap: PROBE_DEPTH_FACES faces of PROBE_DEPTH_SIZE^2 texels,
-/// each texel holding (mean distance, mean distance squared).
+/// Depth moments, each texel holds mean distance, mean distance squared
+/// PROBE_DEPTH_SIZE refers to the 16x16 "texture" that is passed in.
 #define PROBE_DEPTH_SIZE 16
 #define PROBE_DEPTH_FACES 6
 #define PROBE_DEPTH_TEXELS_PER_FACE (PROBE_DEPTH_SIZE * PROBE_DEPTH_SIZE)
@@ -18,7 +18,7 @@
 #define PROBE_CHEBYSHEV_BIAS 0.02
 
 
-#define PROBE_DEPTH_TEXEL_SLOPE tan(radians(45.0 / PROBE_DEPTH_SIZE))
+// #define PROBE_DEPTH_TEXEL_SLOPE
 
 #define PROBE_NORMAL_BIAS_SCALE 0.2
 #define PROBE_NORMAL_BIAS_MIN 0.02
@@ -110,6 +110,7 @@ void ProbeDepthDirectionToFaceUV(float3 d, out uint face, out float2 uv01)
 	uv01 = float2(u * 0.5 + 0.5, v * 0.5 + 0.5);
 }
 
+static const float PROBE_DEPTH_TEXEL_SLOPE = tan(radians(45.0 / PROBE_DEPTH_SIZE));
 
 float ProbeMinVariance(float mean)
 {

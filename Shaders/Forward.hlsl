@@ -186,13 +186,55 @@ struct FSPushConsts
 	uint2 vTargetSize;
 	uint uiBoneSlot;
 	uint _uiPad0;
-	/// Camera position in world space (w unused)
+	/// Camera position in world space
 	float4 vEyePosition;
 };
 
 [[vk::push_constant]] FSPushConsts FSConst;
 
 #define SHADOW_BIAS -0.000005f
+
+/// How much of `light` reaches `position_ws` according to the light's shadow map in the atlas, 1 is fully lit.
+/// Lights without a shadow map, and positions outside of it, are fully lit.
+float SampleShadowAtlas(Light light, float3 position_ws)
+{
+	const float4 atlas_rect = light.vShadowAtlasRect;
+
+	if (atlas_rect.x <= 0.0) {
+		return 1.0;
+	}
+
+	const float4 position_ls = mul(float4(position_ws, 1.0), light.LightCameraMatrix);
+
+	// Behind a spot light
+	if (position_ls.w <= 0.0) {
+		return 1.0;
+	}
+
+	const float3 position_ndc = position_ls.xyz / position_ls.w;
+
+	// The projection flips Y, so NDC +Y is already the bottom of the shadow map
+	const float2 shadow_uv = position_ndc.xy * 0.5 + 0.5;
+
+	// I should probably flip the viewport depth range... This is my fault from like a year ago.
+	const float shadow_z = 1.0 - position_ndc.z;
+
+	if (any(saturate(shadow_uv) != shadow_uv) || (shadow_z <= 0.0)) {
+		return 1.0;
+	}
+
+	uint atlas_width, atlas_height;
+	F_TextureName(tShadowAtlas).GetDimensions(atlas_width, atlas_height);
+
+	// Keep the clip inside of this light's region so it never picks up a neighbouring shadow map (bilinear sampling shizzle)
+	const float2 half_texel = 0.5 / float2(atlas_width, atlas_height);
+	const float2 region_min = atlas_rect.zw + half_texel;
+	const float2 region_max = atlas_rect.zw + atlas_rect.xy - half_texel;
+
+	const float2 atlas_uv = clamp(shadow_uv * atlas_rect.xy + atlas_rect.zw, region_min, region_max);
+
+	return F_SampleCmpLevelZero(tShadowAtlas, atlas_uv, shadow_z + SHADOW_BIAS);
+}
 
 /// Lower bound on perceptual roughness. D_GGX() divides by roughness^4 at the
 /// highlight peak, so fully glossy texels would otherwise blow up.
@@ -264,6 +306,7 @@ FSOutput main(FSInput input)
     output.vAlbedo = float4(albedo, base_alpha);
 
     if (HAS_FLAG(material.Flags, MF_UNLIT)) {
+
 	    return output;
     }
 
@@ -320,21 +363,8 @@ FSOutput main(FSInput input)
 			L = normalize(light.vLightPosition);
 			attenuation = light_intensity;
 
-			// Calculate shadows
-			float4 shadow_pos_light_space = mul(float4(input.vPositionWS, 1.0), light.LightCameraMatrix);
-
-			float2 shadow_uv;
-			shadow_uv.x = 0.5f + (shadow_pos_light_space.x / shadow_pos_light_space.w * 0.5f);
-			shadow_uv.y = 0.5f - (shadow_pos_light_space.y / shadow_pos_light_space.w * 0.5f);
-			shadow_uv.y = 1.0 - shadow_uv.y;
-
-			float shadow_z = 1.0 - shadow_pos_light_space.z / shadow_pos_light_space.w;
-
-			// Check that the UV values are greater than 0.0 and less than 1.0
-			if ((saturate(shadow_uv.x) == shadow_uv.x) && (saturate(shadow_uv.y) == shadow_uv.y) && (shadow_z > 0)) {
-				visibility = F_SampleCmpLevelZero(tShadowAtlas, shadow_uv, shadow_z + SHADOW_BIAS);
-				visibility = clamp(visibility, 0.05f, 1.0f);
-			}
+			// Let a little of the sun into its own shadows
+			visibility = clamp(SampleShadowAtlas(light, input.vPositionWS), 0.05f, 1.0f);
 		}
 		else {
 			float3 light_position_local = light.vLightPosition - input.vPositionWS;
@@ -344,6 +374,11 @@ FSOutput main(FSInput input)
 
 			float inv_radius_sq = 1.0 / (light.fLightRadius * light.fLightRadius);
 			attenuation = light_intensity * AttenuationSmooth(dist_sq, inv_radius_sq);
+
+			if (light.uiLightType == FX_LIGHT_TYPE_SPOT) {
+				attenuation *= AttenuationSpot(L, light);
+				visibility = SampleShadowAtlas(light, input.vPositionWS);
+			}
 		}
 
 		float3 N = normalize(N_final);

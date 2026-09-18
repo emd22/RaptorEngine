@@ -12,7 +12,7 @@
 #include "Limits.hpp"
 #include "PSOBuild.hpp"
 #include "PipelineCache.hpp"
-#include "ShadowDirectional.hpp"
+#include "ShadowAtlas.hpp"
 #include "TextRenderer.hpp"
 
 #include <Asset/AssetManager.hpp>
@@ -152,7 +152,7 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 	ds_entries.Insert(DescriptorEntry::AsBuffer(8, eShaderType::Pixel, &gGraphics->ProbeDepthBuffer, 0,
 											   gGraphics->ProbeDepthPageSize));
 
-	Target* shadow_target = gShadowRenderer->RenderStage.GetTarget(eImageFormat::D32_Float);
+	Target* shadow_target = gShadowAtlas->GetTarget();
 	Assert(shadow_target != nullptr);
 
 	ds_entries.Insert(DescriptorEntry::AsImage(4, eShaderType::Pixel, &shadow_target->Image,

@@ -45,14 +45,12 @@ Vec3f Vec3f::Rotate(const Quat& rotation) const
 {
     const __m128 zero_v = _mm_setzero_ps();
 
-    Quat vec = Quat(_mm_shuffle_ps(mIntrin, zero_v, _MM_SHUFFLE(0, 1, 2, 4)));
-    LogInfo("Vec: {}", vec);
-    Quat conj_v = rotation.Conjugate();
+    // v' = q * v * conj(q), with v as the pure quaternion (x, y, z, 0)
+    const Quat vec = Quat(_mm_blend_ps(mIntrin, zero_v, 0b1000));
+    const Quat result = rotation * vec * rotation.Conjugate();
 
-    Quat result = conj_v * vec;
-    result = result * rotation;
-
-    return Vec3f(result.mIntrin);
+    // W is zero in exact arithmetic; clear any rounding residue so the Vec3f's W lane stays 0
+    return Vec3f(_mm_blend_ps(result.mIntrin, zero_v, 0b1000));
 }
 
 

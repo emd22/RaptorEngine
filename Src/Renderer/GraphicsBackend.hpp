@@ -52,7 +52,7 @@ class GraphicsBackend
 {
 	const uint32 scDeletionFrameSpacing = 3;
 
-	static constexpr uint32 scLightUniformSize = 240;
+	static constexpr uint32 scLightUniformSize = sizeof(LightGpuData);
 
 public:
 	using SubmitFunc = std::function<void(CommandBuffer& cmd)>;

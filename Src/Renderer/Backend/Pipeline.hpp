@@ -129,6 +129,41 @@ struct alignas(16) LightCullPushConstants
 	uint32 TileColumns = 0;
 };
 
+/// A single light slot in GraphicsBackend::LightBuffer. Mirrors `Light` in Shaders/LightingCommon.hlsli.
+struct alignas(16) LightGpuData
+{
+	/// View projection matrix the light's shadow map was rendered with, for lights with a region in the shadow atlas
+	float32 LightCameraMatrix[16];
+	float32 InvView[16];
+	float32 InvProjection[16];
+
+	float32 EyePosition[3];
+	float32 Radius;
+
+	/// Direction towards the light for directional lights, world position otherwise
+	float32 Position[3];
+	uint32 Color;
+
+	float32 CameraSize[2];
+	uint32 Ambient;
+	uint32 Type;
+
+	/// Spot lights only: world space direction the cone points along
+	float32 SpotDirection[3];
+	/// Spot lights only: cosine of the outer cone half-angle, the light is zero outside of it
+	float32 SpotCosOuter;
+
+	/// Spot lights only: 1 / (cos(inner) - cos(outer)), the falloff rate between the two cone angles
+	float32 SpotAngleScale;
+	float32 _Pad0[3];
+
+	/// Where the light's shadow map is in the shadow atlas: xy scales and zw offsets a shadow map UV into an atlas UV.
+	/// All zero when the light has no shadow map.
+	float32 ShadowAtlasRect[4];
+};
+
+static_assert(sizeof(LightGpuData) == 288, "LightGpuData must match the Light struct in LightingCommon.hlsli");
+
 struct PipelineProperties
 {
 	VkCullModeFlags CullMode = VK_CULL_MODE_NONE;

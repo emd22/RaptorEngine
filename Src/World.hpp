@@ -33,6 +33,16 @@ class World
 		float32 Distance;
 	};
 
+	/// A spot light whose shadow map is rendered into the shadow atlas this frame
+	struct SpotShadowBake
+	{
+		LightSpot* pLight = nullptr;
+
+		/// Range of the light's casters in mSpotShadowCasters
+		uint32 FirstCaster = 0;
+		uint32 NumCasters = 0;
+	};
+
 public:
 	World() = default;
 
@@ -67,6 +77,18 @@ public:
 		return Ref<LightDirectional>(nullptr);
 	}
 
+	/// Finds an attached light by its name, returns a null ref if there is no match.
+	Ref<LightBase> FindLight(Hash32 name)
+	{
+		for (Ref<LightBase>& light : mLights) {
+			if (light->Name == name) {
+				return light;
+			}
+		}
+
+		return Ref<LightBase>(nullptr);
+	}
+
 
 	void Destroy();
 
@@ -88,6 +110,26 @@ private:
 	void ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera& camera);
 	void ExecuteTransparentRenderLists();
 	void ExecuteShadowRenderList(renderer::ePipelineName pl_name);
+
+	/**
+	 * @brief Gives each shadowed spot light a tile in the shadow atlas and queues a bake for every light whose tile is
+	 * out of date. A bake is out of date when the light, the atlas, or any shadow caster in the light's range (its
+	 * transform, or whether it has finished loading) has changed since the tile was last rendered.
+	 */
+	void UpdateSpotShadows();
+
+	/// Renders the bakes queued by UpdateSpotShadows() into their shadow atlas tiles.
+	void BakeSpotShadows();
+
+	/// Starts a shadow pass over one region of the shadow atlas and binds the shadow pipeline's descriptors.
+	void BeginShadowAtlasRegion(const renderer::ShadowAtlasRegion& region);
+
+	/**
+	 * @brief Appends the shadow casters (and their attached nodes) from every tile that a sphere touches. Skinned
+	 * objects are skipped, the shadow pipeline cannot draw them.
+	 */
+	void GatherSpotShadowCasters(const Vec3f& center, float32 radius, DynArray<ObjectID>& out_casters);
+	void AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, DynArray<ObjectID>& out_casters);
 	void ExecutePrepassRenderList(renderer::ePipelineName pl_name);
 
 	void AddTileToRenderList(bool clear, TileIndex new_tile);
@@ -135,6 +177,10 @@ private:
 
 	/// Sorted entries, only for transparent objects.
 	DynArray<TransparentObjectCarrier> SortedEntryBuffer;
+
+	/// Spot light shadow maps to render this frame, see UpdateSpotShadows()
+	DynArray<SpotShadowBake> mSpotShadowBakes;
+	DynArray<ObjectID> mSpotShadowCasters;
 
 	Frustum mFrustum;
 

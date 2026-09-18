@@ -41,6 +41,11 @@ void Player::Create()
 			object->SetObjectLayer(eObjectLayer::PlayerLayer);
 
 			mpViewModel = object;
+
+			// Start in line with the camera so the view model doesn't swing in when it first appears
+			mViewModelRotation = Quat::FromEulerAngles(pCamera->GetRotation());
+			mPrevCameraRotation = mViewModelRotation;
+			mViewModelAngularVelocity = Vec3f::sZero;
 		});
 }
 
@@ -101,6 +106,95 @@ void Player::Move(float64 delta_time, const Vec3f& offset)
 	Physics.ApplyMovement(force);
 }
 
+/**
+ * @brief Convert a rotation to a rotation vector (axis * angle in radians), taking the shortest path.
+ */
+static Vec3f ToRotationVector(Quat quat)
+{
+	// q and -q are the same rotation, use the one with the smaller angle
+	if (quat.W < 0.0f) {
+		quat = Quat(-quat.X, -quat.Y, -quat.Z, -quat.W);
+	}
+
+	const Vec3f axis(quat.X, quat.Y, quat.Z);
+	const float32 sin_half_angle = axis.Length();
+
+	// For tiny angles, sin(angle / 2) ~= angle / 2
+	if (sin_half_angle < 1e-7f) {
+		return axis * 2.0f;
+	}
+
+	return axis * (2.0f * atan2f(sin_half_angle, quat.W) / sin_half_angle);
+}
+
+static Quat FromRotationVector(const Vec3f& rotation)
+{
+	const float32 angle = rotation.Length();
+
+	if (angle < 1e-7f) {
+		return Quat(rotation.X * 0.5f, rotation.Y * 0.5f, rotation.Z * 0.5f, 1.0f).Normalize();
+	}
+
+	return Quat::FromAxisAngle(rotation, angle);
+}
+
+void Player::UpdateViewModelLag(float32 delta_time)
+{
+	// The view model is attached to the camera by a damped spring. When the camera starts turning the view model trails
+	// behind, the spring pulls it back in line while the camera is still turning, and when the camera stops the view
+	// model's momentum carries it slightly past before settling.
+
+	if (delta_time <= 0.0f) {
+		return;
+	}
+
+	// const Quat camera_rotation = Quat::FromEulerAngles(mCameraGoal);
+	// const Vec3f camera_angular_velocity = ToRotationVector(camera_rotation * mPrevCameraRotation.Conjugate()) /
+	// 									  delta_time;
+
+	// const float32 stiffness = scViewModelSpringFrequency * scViewModelSpringFrequency;
+	// const float32 damping = 2.0f * scViewModelSpringDamping * scViewModelSpringFrequency;
+
+	// Integrate in fixed size substeps (sweeping the camera across the frame) so the feel is the same at any framerate.
+	// constexpr float32 cMaxStep = 1.0f / 240.0f;
+
+	// const int32 num_steps = std::max(1, static_cast<int32>(ceilf(delta_time / cMaxStep)));
+	// const float32 step = delta_time / static_cast<float32>(num_steps);
+
+	// for (int32 i = 1; i <= num_steps; i++) {
+	// 	const Quat step_camera_rotation = mPrevCameraRotation.SLerp(camera_rotation, static_cast<float32>(i) /
+	// 																				   static_cast<float32>(num_steps));
+
+	// 	const Vec3f lag = ToRotationVector(step_camera_rotation * mViewModelRotation.Conjugate());
+
+	// 	// Implicit euler step of `accel = stiffness * lag + damping * (camera velocity - view model velocity)`, which
+	// 	// stays stable for any step size.
+	// 	mViewModelAngularVelocity = (mViewModelAngularVelocity +
+	// 								 (lag * stiffness + camera_angular_velocity * damping) * step) /
+	// 								(1.0f + damping * step + stiffness * step * step);
+
+	// 	mViewModelRotation = (FromRotationVector(mViewModelAngularVelocity * step) * mViewModelRotation).Normalize();
+	// }
+
+	// mPrevCameraRotation = camera_rotation;
+
+	// Hard limit on how far the view model can drift from the camera, so it stays on screen during fast flicks.
+	// const Vec3f lag = ToRotationVector(camera_rotation * mViewModelRotation.Conjugate());
+	// const float32 lag_angle = lag.Length();
+
+	// if (lag_angle > scViewModelMaxLag) {
+	// 	const Vec3f lag_direction = lag / lag_angle;
+	// 	mViewModelRotation = FromRotationVector(lag_direction * -scViewModelMaxLag) * camera_rotation;
+
+	// 	// Drop any velocity that would push the view model further past the limit, so it's dragged along with the
+	// 	// camera.
+	// 	const float32 outward_speed = (camera_angular_velocity - mViewModelAngularVelocity).Dot(lag_direction);
+	// 	if (outward_speed > 0.0f) {
+	// 		mViewModelAngularVelocity += lag_direction * outward_speed;
+	// 	}
+	// }
+}
+
 void Player::UpdateViewModel(double delta_time)
 {
 	if (mpViewModel == nullptr) {
@@ -108,9 +202,15 @@ void Player::UpdateViewModel(double delta_time)
 	}
 
 
-	const Vec3f forward = pCamera->GetForwardVector();
-	const Vec3f right = pCamera->GetRightVector();
-	const Vec3f up = pCamera->GetUpVector();
+	mViewModelRotation = Quat::FromEulerAngles(pCamera->GetRotation());
+	// UpdateViewModelLag(static_cast<float32>(delta_time));
+
+	// Build the basis from the lagging rotation (rather than the camera's) so the view model pivots around the eye.
+	const Mat4f view_model_basis = Mat4f::AsRotation(mViewModelRotation);
+
+	const Vec3f right = Vec3f(view_model_basis.Rows[0]);
+	const Vec3f up = Vec3f(view_model_basis.Rows[1]);
+	const Vec3f forward = Vec3f(view_model_basis.Rows[2]);
 
 	float32 horizontal_scale = 0.25f;
 	float32 vertical_scale = 0.2f;
@@ -123,15 +223,6 @@ void Player::UpdateViewModel(double delta_time)
 	// Negate the bob (l'eponge) to reduce motion and make the movement feel more cohesive.
 	const Vec3f bob = -GetBob();
 
-	// Vec3f camera_goal_vs_actual = mCameraBumper - mCameraGoal;
-	// static constexpr float32 scCameraGoalMaxDistance = 0.5f;
-
-	// if (std::abs((camera_goal_vs_actual).Length()) > scCameraGoalMaxDistance) {
-	// 	FLOAT4 goal_sign = simd::GetSign(camera_goal_vs_actual.mIntrin);
-	// 	mCameraBumper = (mCameraGoal - (Vec3f(scCameraGoalMaxDistance * 0.75f) * Vec3f(goal_sign)));
-	// }
-
-
 	Vec3f view_model_bob = (right * (bob.X * horizontal_scale)) + (up * (bob.Y * vertical_scale));
 	view_model_bob += Vec3f(-Physics.pPlayerVirt->GetLinearVelocity() * 0.004f);
 
@@ -139,8 +230,7 @@ void Player::UpdateViewModel(double delta_time)
 
 	mpViewModel->SetPosition(pCamera->Position + (forward * 0.110) - (up * 0.265) + view_model_bob);
 
-	Vec3f camera_rotation = mCameraGoal;
-	mpViewModel->SetRotation(Quat::FromEulerAngles(camera_rotation));
+	mpViewModel->SetRotation(mViewModelRotation);
 }
 
 void Player::Update(float64 delta_time)

@@ -56,7 +56,7 @@ public:
 	/**
 	 * @brief Updates an object to a new tile if the object has moved into another tile boundary.
 	 */
-	void UpdateObject(ObjectID id, bool update_attached = true);
+	void UpdateObject(Object* object, bool update_attached = true);
 
 	/**
 	 * @brief Remove an object from its assigned tile.

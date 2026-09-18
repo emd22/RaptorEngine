@@ -12,6 +12,7 @@
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/LightProbe.hpp>
 #include <Renderer/PipelineCache.hpp>
+#include <Renderer/ShadowAtlas.hpp>
 #include <Renderer/ShadowDirectional.hpp>
 #include <algorithm>
 
@@ -24,6 +25,9 @@ void World::Create()
 	mLights.Create(32);
 
 	SortedEntryBuffer.SetPageSize(128);
+
+	mSpotShadowBakes.SetPageSize(ShadowAtlas::scMaxSpotTiles);
+	mSpotShadowCasters.SetPageSize(256);
 
 	mVisibleTiles.InitCapacity(600);
 }
@@ -419,6 +423,223 @@ void World::ExecuteShadowRenderList(renderer::ePipelineName pl_name)
 	}
 }
 
+
+void World::UpdateSpotShadows()
+{
+	mSpotShadowBakes.Clear();
+	mSpotShadowCasters.Clear();
+
+	for (const Ref<LightBase>& light_ref : mLights) {
+		if (light_ref->Type != eLightType::Spot) {
+			continue;
+		}
+
+		LightSpot* light = static_cast<LightSpot*>(&(*light_ref));
+		LightSpot::ShadowState& shadow = light->Shadow;
+
+		if (!light->bCastShadows) {
+			light->ReleaseShadowTile();
+			continue;
+		}
+
+		// Disabled lights hold on to their tile, so turning them back on doesn't need a new bake
+		if (!light->bEnabled) {
+			continue;
+		}
+
+		if (shadow.AtlasTile == ShadowTileIndexNull) {
+			shadow.AtlasTile = gShadowAtlas->AllocateSpotTile();
+
+			if (shadow.AtlasTile == ShadowTileIndexNull) {
+				static bool sbWarned = false;
+				if (!sbWarned) {
+					LogWarning(LC_RENDER, "Shadow atlas is out of spot light tiles ({}), '{}' will not cast shadows",
+							   ShadowAtlas::scMaxSpotTiles, light->Name.Get());
+					sbWarned = true;
+				}
+
+				continue;
+			}
+		}
+
+		const Mat4f shadow_matrix = light->CalculateShadowMatrix();
+
+		const uint32 first_caster = mSpotShadowCasters.Size;
+		GatherSpotShadowCasters(light->GetPosition(), light->GetRadius(), mSpotShadowCasters);
+
+		Hash32 bake_hash = HashObj32(gShadowAtlas->GetGeneration());
+		bake_hash = HashObj32(shadow.AtlasTile, bake_hash);
+		bake_hash = HashObj32(shadow_matrix.RawData, bake_hash);
+
+		for (uint32 index = first_caster; index < mSpotShadowCasters.Size; index++) {
+			const ObjectID caster_id = mSpotShadowCasters[index];
+			Object* caster = gObjectManager->GetObject(caster_id);
+
+			const PrimitiveMesh* mesh = caster->pMesh.IsValid() ? &(*caster->pMesh) : nullptr;
+
+			// The same test as Object::RenderPrimitive(), so a caster that finishes loading gets baked in
+			const bool is_drawable = (mesh != nullptr) && caster->CheckIfReady(false);
+
+			bake_hash = HashObj32(caster_id.GetID(), bake_hash);
+			bake_hash = HashObj32(mesh, bake_hash);
+			bake_hash = HashObj32(is_drawable, bake_hash);
+			bake_hash = HashObj32(caster->GetModelMatrix().RawData, bake_hash);
+		}
+
+		// The tile already holds this exact bake
+		if (bake_hash == shadow.BakeHash) {
+			while (mSpotShadowCasters.Size > first_caster) {
+				mSpotShadowCasters.RemoveLast();
+			}
+
+			continue;
+		}
+
+		shadow.Matrix = shadow_matrix;
+		shadow.BakeHash = bake_hash;
+
+		mSpotShadowBakes.Insert(SpotShadowBake {
+			.pLight = light,
+			.FirstCaster = first_caster,
+			.NumCasters = mSpotShadowCasters.Size - first_caster,
+		});
+	}
+}
+
+
+void World::BeginShadowAtlasRegion(const ShadowAtlasRegion& region)
+{
+	gShadowAtlas->BeginRegion(region);
+
+	Pipeline& pipeline = gPipelineCache->Request(ePipelineName::ShadowDirectional);
+
+	const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0 };
+
+	gGraphics->pRenderer->pPersistentDescriptorSlim->Bind(0, gGraphics->GetFrame()->CmdBuffer, pipeline,
+														  Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
+}
+
+
+void World::BakeSpotShadows()
+{
+	if (mSpotShadowBakes.Size == 0) {
+		return;
+	}
+
+	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
+
+	renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::ShadowDirectional);
+
+	ShadowPushConstants consts;
+
+	for (const SpotShadowBake& bake : mSpotShadowBakes) {
+		const LightSpot::ShadowState& shadow = bake.pLight->Shadow;
+
+		BeginShadowAtlasRegion(gShadowAtlas->GetSpotTileRegion(shadow.AtlasTile));
+
+		memcpy(consts.CameraMatrix, shadow.Matrix.RawData, sizeof(float32) * 16);
+
+		const uint32 end_caster = bake.FirstCaster + bake.NumCasters;
+
+		for (uint32 index = bake.FirstCaster; index < end_caster; index++) {
+			const ObjectID caster_id = mSpotShadowCasters[index];
+
+			Object* caster = gObjectManager->GetObject(caster_id);
+			if (caster == nullptr) {
+				continue;
+			}
+
+			// Casters out of view skip the forward pass, which is what normally uploads their matrix for this frame
+			gObjectManager->Submit(caster_id, caster->GetModelMatrix());
+
+			consts.ObjectIndex = caster_id.GetID();
+			gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, consts);
+
+			caster->RenderPrimitive(cmd);
+		}
+
+		gShadowAtlas->EndRegion();
+	}
+}
+
+
+void World::GatherSpotShadowCasters(const Vec3f& center, float32 radius, DynArray<ObjectID>& out_casters)
+{
+	const uint32 first_caster = out_casters.Size;
+
+	auto add_casters_from_tile = [&](TileIndex tile_index)
+	{
+		const Tile* tile = gWorldGrid->GetTile(tile_index);
+		if (tile == nullptr) {
+			return;
+		}
+
+		uint32 index = 0;
+		while (true) {
+			index = tile->Objects.SlotsInUse.FindNextSetBit(index);
+			if (index == Bitset::scNoFreeBits) {
+				break;
+			}
+
+			const ObjectID* object_id = tile->Objects.GetItem(index);
+			++index;
+
+			if (object_id == nullptr) {
+				continue;
+			}
+
+			Object* object = gObjectManager->GetObject(*object_id);
+
+			// Attached nodes cast shadows along with their root, same as the directional light's render list
+			if (object != nullptr && object->IsShadowCaster()) {
+				AddSpotShadowCasterRecursive(*object_id, first_caster, out_casters);
+			}
+		}
+	};
+
+	const Vec3f extent(radius, radius, radius);
+
+	const Vec2u min_tile = gWorldGrid->TileToTileXY(gWorldGrid->WorldToTile(center - extent));
+	const Vec2u max_tile = gWorldGrid->TileToTileXY(gWorldGrid->WorldToTile(center + extent));
+
+	for (uint32 y = min_tile.Y; y <= max_tile.Y; y++) {
+		for (uint32 x = min_tile.X; x <= max_tile.X; x++) {
+			add_casters_from_tile(gWorldGrid->TileFromTileXY(Vec2u(x, y)));
+		}
+	}
+
+	add_casters_from_tile(WorldGrid::scGlobalTileIndex);
+}
+
+
+void World::AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, DynArray<ObjectID>& out_casters)
+{
+	if (id.IsInvalid()) {
+		return;
+	}
+
+	Object* object = gObjectManager->GetObject(id);
+	if (object == nullptr) {
+		return;
+	}
+
+	// Objects that span several tiles are found more than once
+	for (uint32 index = first_caster; index < out_casters.Size; index++) {
+		if (out_casters[index] == id) {
+			return;
+		}
+	}
+
+	// The shadow pipeline only has the default vertex layout. Skinned meshes would also animate out of the bake.
+	if (!object->IsSkinned()) {
+		out_casters.Insert(id);
+	}
+
+	for (ObjectID& attached_id : object->AttachedNodes) {
+		AddSpotShadowCasterRecursive(attached_id, first_caster, out_casters);
+	}
+}
+
 void World::ExecutePrepassRenderList(renderer::ePipelineName forward_pl_name)
 {
 	// Skip prepass for transparent variants – they don't write depth and are blended in forward
@@ -678,30 +899,30 @@ void World::Render(Camera* shadow_camera)
 
 	gGraphics->LightBuffer.Rewind();
 
+	// Spot lights need their shadow atlas tile and shadow matrix before they are uploaded
+	UpdateSpotShadows();
+
 	for (const Ref<LightBase>& light : mLights) {
 		light->Render(camera, shadow_camera);
 	}
 
-	// Render shadows
-	{
-		gShadowRenderer->Begin();
+	// Render shadows into the atlas. The directional light is redrawn every frame, spot lights only when their bake is
+	// out of date.
+	Ref<LightDirectional> sun = GetDirectionalLight();
+	const bool render_sun_shadows = sun.IsValid() && sun->bEnabled;
 
-		Pipeline& pipeline = gPipelineCache->Request(ePipelineName::ShadowDirectional);
-		pipeline.Bind(gGraphics->GetFrame()->CmdBuffer);
+	// With the sun off its region is left alone, apart from the atlas's very first pass that makes it sampleable
+	if (render_sun_shadows || !gShadowAtlas->IsInitialized()) {
+		BeginShadowAtlasRegion(gShadowAtlas->GetDirectionalRegion());
 
-		{
-			const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0 };
-
-			gGraphics->pRenderer->pPersistentDescriptorSlim->Bind(
-				0, gGraphics->GetFrame()->CmdBuffer, pipeline,
-				Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
+		if (render_sun_shadows) {
+			ExecuteShadowRenderList(ePipelineName::ShadowDirectional);
 		}
 
-
-		ExecuteShadowRenderList(ePipelineName::ShadowDirectional);
-
-		gShadowRenderer->End();
+		gShadowAtlas->EndRegion();
 	}
+
+	BakeSpotShadows();
 
 	gGraphics->BeginPrepass();
 
