@@ -194,8 +194,8 @@ void World::ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera
 		const uint32 buffer_offsets[] = {
 			gObjectManager->GetBaseOffset(),	  0,
 			gGraphics->GetLightGridFrameOffset(), gGraphics->GetLightIndexListFrameOffset(),
-			gGraphics->GetProbeFrameOffset(),	  gGraphics->GetProbeVolumeFrameOffset(),
-			gGraphics->GetProbeDepthFrameOffset()
+			// The light probe buffers aren't paged per frame in flight
+			0, 0, 0,
 		};
 
 		gGraphics->pRenderer->pPersistentDescriptor->Bind(
@@ -204,18 +204,17 @@ void World::ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera
 	}
 
 
-	uint32 index = 0;
+	// Anything attached to the player (the view model) isn't part of the level that light probes capture
+	const bool skip_player_layer = gProbeManager->IsCapturingFaces();
 
 	for (ObjectID object_id : section.Objects) {
 		Object* object = gObjectManager->GetObject(object_id);
-		if (object == nullptr) {
+		if (object == nullptr || (skip_player_layer && object->GetObjectLayer() == eObjectLayer::PlayerLayer)) {
 			continue;
 		}
 
 		object->Update();
 		object->RenderShallow(camera, &pipeline);
-
-		++index;
 	}
 }
 
@@ -278,8 +277,8 @@ void World::ExecuteTransparentRenderLists()
 				const uint32 buffer_offsets[] = {
 					gObjectManager->GetBaseOffset(),	  0,
 					gGraphics->GetLightGridFrameOffset(), gGraphics->GetLightIndexListFrameOffset(),
-					gGraphics->GetProbeFrameOffset(),	  gGraphics->GetProbeVolumeFrameOffset(),
-					gGraphics->GetProbeDepthFrameOffset()
+					// The light probe buffers aren't paged per frame in flight
+					0, 0, 0,
 				};
 
 				gGraphics->pRenderer->pPersistentDescriptor->Bind(
@@ -883,9 +882,7 @@ void World::Render(Camera* shadow_camera)
 {
 	PerspectiveCamera& camera = *mpCurrentCamera;
 
-	if (!mbDisableTileCulling) {
-		CullWorldTiles(camera);
-	}
+	CullWorldTiles(camera);
 
 	if (!mpDebugCube.IsValid()) {
 		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
@@ -961,20 +958,17 @@ void World::Render(Camera* shadow_camera)
 
 void World::RenderProbeCapture()
 {
-	if (gProbeManager == nullptr || !gProbeManager->IsCapturePending()) {
+	if (!gProbeManager->IsCapturePending()) {
 		return;
 	}
 
-	gProbeManager->EnsureCaptureStage();
-
-	RenderStage& stage = gProbeManager->GetCaptureStage();
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
 	const Vec2u extent(ProbeManager::scCaptureSize, ProbeManager::scCaptureSize);
 
 	// The opaque geometry pipelines default to a swapchain-sized viewport.
 	// Override them for the capture extent (restored below).
-	static const renderer::ePipelineName scCapturePipelines[] = {
+	static constexpr renderer::ePipelineName scCapturePipelines[] = {
 		renderer::ePipelineName::Geometry,
 		renderer::ePipelineName::GeometryNormalMaps,
 		renderer::ePipelineName::GeometrySkinned,
@@ -996,70 +990,31 @@ void World::RenderProbeCapture()
 
 	const uint32 saved_tile_columns = gGraphics->pRenderer->GetLightTileColumns();
 
-	static const Vec3f scFaceDirs[ProbeManager::scCaptureFaces] = {
-		Vec3f(1.0f, 0.0f, 0.0f),  Vec3f(-1.0f, 0.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
-		Vec3f(0.0f, -1.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f),	Vec3f(0.0f, 0.0f, -1.0f),
-	};
-	static const Vec3f scFaceUps[ProbeManager::scCaptureFaces] = {
-		Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f),
-		Vec3f(0.0f, 0.0f, 1.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
-	};
+	// The render list was culled to the player's view, but the probes need to see the whole level
+	ClearRenderList();
 
+	const Vec2u grid_size = gWorldGrid->GetGridSize();
 
-	const uint32 batch_count = gProbeManager->BeginBatchCapture();
-
-	// Everything drawn from here to EndCaptureFaces() is a bake face, not the
-	// player's view: no SSAO target at this extent, and no probe feedback.
-	gProbeManager->BeginCaptureFaces();
-	mbDisableTileCulling = true;
-
-	for (uint32 slot = 0; slot < batch_count; slot++) {
-		const Vec3f capture_pos = gProbeManager->GetCapturePosition();
-
-		LogInfo("Probe capture: batch probe {} at {} ({} lights)", gProbeManager->GetCurrentProbeIndex() + 1,
-				capture_pos, gGraphics->LightBuffer.SlotIndex);
-
-		for (uint32 face = 0; face < ProbeManager::scCaptureFaces; face++) {
-			PerspectiveCamera face_camera;
-			face_camera.SetFov(90.0f);
-			face_camera.SetAspectRatio(1.0f);
-
-			// Reverse-Z: Mat4f::LoadPerspectiveMatrix() maps SetFarPlane() to the
-			// near clip and SetNearPlane() to the far clip (see the note there),
-			// so this is a 0.1 .. 200 m frustum. The far clip only has to reach
-			// past Limits::ProbeDepthMaxDistance, which is where baked distances
-			// saturate anyway.
-			face_camera.SetNearPlane(200.0f);
-			face_camera.SetFarPlane(0.1f);
-
-			face_camera.UpdateProjectionMatrix();
-
-			face_camera.MoveTo(capture_pos);
-			face_camera.ViewMatrix.LookAt(capture_pos, capture_pos + scFaceDirs[face], scFaceUps[face]);
-			face_camera.UpdateCameraMatrix();
-
-			gProbeManager->SetCaptureCamera(slot, face, face_camera);
-
-			// Re-run Forward+ culling for the capture extent + face camera.
-			gGraphics->pRenderer->DoLightCullingPass(face_camera, &extent);
-
-			stage.Begin(cmd);
-
-			ExecuteRenderList(renderer::ePipelineName::Geometry, face_camera);
-			ExecuteRenderList(renderer::ePipelineName::GeometryNormalMaps, face_camera);
-			ExecuteRenderList(renderer::ePipelineName::GeometrySkinned, face_camera);
-
-			stage.End();
-
-			gProbeManager->CopyCaptureFaceToStaging(cmd, slot, face);
-			gProbeManager->CopyDepthFaceToStaging(cmd, slot, face);
-		}
-
-		gProbeManager->AdvanceBatchCapture();
+	for (TileIndex tile = 0; tile < grid_size.X * grid_size.Y; tile++) {
+		AddTileToRenderList(false, tile);
 	}
 
-	gProbeManager->EndCaptureFaces();
-	mbDisableTileCulling = false;
+	AddTileToRenderList(false, WorldGrid::scGlobalTileIndex);
+
+	gProbeManager->RecordCaptureBatch(cmd,
+									  [&](PerspectiveCamera& camera, RenderStage& stage)
+									  {
+										  // Forward+ culling for this face's camera and extent
+										  gGraphics->pRenderer->DoLightCullingPass(camera, &extent);
+
+										  stage.Begin(cmd);
+
+										  for (renderer::ePipelineName pipeline_name : scCapturePipelines) {
+											  ExecuteRenderList(pipeline_name, camera);
+										  }
+
+										  stage.End();
+									  });
 
 	for (uint32 i = 0; i < std::size(scCapturePipelines); i++) {
 		renderer::Pipeline& pipeline = gPipelineCache->Request(scCapturePipelines[i]);
@@ -1071,8 +1026,6 @@ void World::RenderProbeCapture()
 
 	// Force the composition pass to re-emit viewport size/state
 	RequirePipelineDynamicStates();
-
-	gProbeManager->MarkCaptureReady();
 }
 
 void World::RenderBoundingBoxes(const Camera& camera)
@@ -1211,19 +1164,16 @@ void World::RenderProbeDebug(const Camera& camera)
 	const Color probe_color = Color::FromRGBA(60, 220, 255, 100);
 	const Color capturing_color = Color::FromRGBA(255, 150, 30, 255);
 
-	const Vec3f* positions = gProbeManager->GetProbePositions();
-	const uint32 probe_count = gProbeManager->GetProbeCount();
-	const bool bCapturePending = gProbeManager->IsCapturePending();
+	const bool is_baking = gProbeManager->IsBaking();
 	const uint32 current_probe = gProbeManager->GetCurrentProbeIndex();
 
-	for (uint32 i = 0; i < probe_count; i++) {
-		Mat4f world_matrix = Mat4f::AsScale(scProbeHalfExtent) * Mat4f::AsTranslation(positions[i]);
+	for (uint32 i = 0; i < gProbeManager->GetProbeCount(); i++) {
+		Mat4f world_matrix = Mat4f::AsScale(scProbeHalfExtent) * Mat4f::AsTranslation(gProbeManager->GetProbePosition(i));
 		Mat4f combined_matrix = world_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 
 		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
 
-		push_constants.DebugColor = (bCapturePending && i == current_probe) ? capturing_color.AsUInt()
-																			: probe_color.AsUInt();
+		push_constants.DebugColor = (is_baking && i == current_probe) ? capturing_color.AsUInt() : probe_color.AsUInt();
 
 		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
 		mpDebugCube->Render(cmd, 1);

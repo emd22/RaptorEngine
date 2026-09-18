@@ -58,9 +58,8 @@ public:
 	void Render(Camera* shadow_camera);
 
 	/**
-	 * @brief Renders the 6 cubemap faces for a pending probe capture bake into
-	 * the probe capture stage. Called from DoComposition after the main forward
-	 * pass has ended. No-op unless ProbeManager::BeginCaptureBake() armed one.
+	 * @brief Captures the next batch of probes for a light probe bake. Called from DoComposition after the main forward
+	 * pass has ended. No-op unless a bake is running.
 	 */
 	void RenderProbeCapture();
 
@@ -183,8 +182,6 @@ private:
 	DynArray<ObjectID> mSpotShadowCasters;
 
 	Frustum mFrustum;
-
-	bool mbDisableTileCulling = false;
 
 	SizedArray<TileIndex> mVisibleTiles;
 };

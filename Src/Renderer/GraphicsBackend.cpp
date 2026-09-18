@@ -142,26 +142,25 @@ void GraphicsBackend::Init(Vec2u window_size)
 	LightIndexListBuffer.Create(eGpuBufferType::StorageWithOffset, LightIndexListPageSize * FramesInFlight,
 								VMA_MEMORY_USAGE_GPU_ONLY);
 
-	// SH light probe buffer
+	// Light probes. These only change when probes are placed, baked or loaded, and ProbeManager waits for the GPU to be
+	// idle before writing them, so unlike the buffers above they have a single page shared by every frame in flight.
 	ProbePageSize = Limits::MaxIrradianceProbes * sizeof(ProbeSHData);
-	ProbeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbePageSize * FramesInFlight,
-					   VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
+	ProbeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbePageSize, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+					   eGpuBufferFlags::PersistentMapped);
 
-	// Probe volume descriptor (single element, spatial lookup for blending).
 	ProbeVolumePageSize = sizeof(ProbeVolumeData);
-	ProbeVolumeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeVolumePageSize * FramesInFlight,
-							 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
+	ProbeVolumeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeVolumePageSize, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+							 eGpuBufferFlags::PersistentMapped);
 
-	// Probe depth-moments cubemaps (visibility, 6x16x16 x mean/meanSq per probe).
 	ProbeDepthPageSize = Limits::MaxIrradianceProbes * sizeof(ProbeInfo);
-	ProbeDepthBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeDepthPageSize * FramesInFlight,
-							VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
+	ProbeDepthBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeDepthPageSize, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+							eGpuBufferFlags::PersistentMapped);
 
 
 	gMaterialManager->Create();
 	gObjectManager->Create();
 
-	// Upload the default (precomputed) irradiance probe now that ProbeBuffer exists.
+	// Upload the default probes now that the probe buffers exist
 	gProbeManager->Create();
 
 	gShadowAtlas = new ShadowAtlas;

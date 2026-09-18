@@ -408,12 +408,13 @@ FSOutput main(FSInput input)
 	float4 ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
 
 	float3 probe_irradiance = float3(0.0f, 0.0f, 0.0f);
+	float probe_visibility = 1.0f;
 
 	float3 probe_normal = normalize(N_final);
 
 	if (!HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE)) {
 		const ProbeSHData probe_sh = SampleProbeVolumeSH(input.vPositionWS, probe_normal, bProbeVolume[0], bProbeBuffer,
-														 bProbeDepth);
+														 bProbeDepth, probe_visibility);
 
 		probe_irradiance = EvalProbeIrradiance(probe_normal, probe_sh);
 
@@ -438,9 +439,6 @@ FSOutput main(FSInput input)
 	}
 
 	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_DEBUG_PROBE_VISIBILITY)) {
-		const float probe_visibility = SampleProbeVolumeVisibility(input.vPositionWS, probe_normal, bProbeVolume[0],
-																   bProbeDepth);
-
 		output.vAlbedo = float4(probe_visibility, probe_visibility, probe_visibility, 1.0f);
 	}
 
