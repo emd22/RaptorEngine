@@ -67,6 +67,8 @@ public:
 public:
 	SizedArray<Mat4f> InvBindTransforms;
 	SizedArray<BoneRestPose> RestPose;
+
+	SizedArray<Mat4f> RootTransforms;
 	SizedArray<uint32> ParentIndices;
 	SizedArray<String> BoneNames;
 	uint32 JointCount = 0;

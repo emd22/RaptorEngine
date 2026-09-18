@@ -21,7 +21,6 @@
 #include <Renderer/Backend/GraphicsBackendFwd.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/MeshUtil.hpp>
-
 #include <cmath>
 
 namespace fx {
@@ -515,6 +514,11 @@ void LoaderGltf::LoadSkeleton(Skeleton& skel, cgltf_skin* skin)
 	const uint32 joint_count = static_cast<uint32>(skin->joints_count);
 	skel.JointCount = joint_count;
 
+	// The GLTF coordinate system is garbage, reflect so -X becomes X (this also changes rotation back from CCW to
+	// CW). Everything loaded out of the skin has to be conjugated by this to stay in step with the vertex buffers.
+	Mat4f reflection = Mat4f::scIdentity;
+	reflection.Rows[0].X = -1.0f;
+
 	// Inverse bind matrices
 	if (skin->inverse_bind_matrices) {
 		cgltf_accessor* accessor = skin->inverse_bind_matrices;
@@ -523,11 +527,6 @@ void LoaderGltf::LoadSkeleton(Skeleton& skel, cgltf_skin* skin)
 		skel.InvBindTransforms.InitSize(joint_count);
 		cgltf_accessor_unpack_floats(accessor, reinterpret_cast<float32*>(skel.InvBindTransforms.pData),
 									 joint_count * 16);
-
-		// The GLTF coordinate system is garbage, reflect so -X becomes X (this also changes rotation back from CCW to
-		// CW).
-		Mat4f reflection = Mat4f::scIdentity;
-		reflection.Rows[0].X = -1.0f;
 
 		for (uint32 i = 0; i < joint_count; i++) {
 			Mat4f& m = skel.InvBindTransforms[i];
@@ -540,6 +539,7 @@ void LoaderGltf::LoadSkeleton(Skeleton& skel, cgltf_skin* skin)
 	skel.ParentIndices.InitSize(joint_count);
 	skel.BoneNames.InitSize(joint_count);
 	skel.RestPose.InitSize(joint_count);
+	skel.RootTransforms.InitSize(joint_count);
 	skel.LocalTransforms.InitSize(joint_count);
 	skel.WorldTransforms.InitSize(joint_count);
 	skel.SkinningMatrices.InitSize(joint_count);
@@ -550,6 +550,17 @@ void LoaderGltf::LoadSkeleton(Skeleton& skel, cgltf_skin* skin)
 		skel.BoneNames[i] = joint->name ? String(joint->name) : String::Fmt("joint_{}", i);
 		skel.ParentIndices[i] = joint->parent ? FindJointIndex(skin, joint->parent) : BoneNull;
 		skel.RestPose[i] = MakeRestPoseForJoint(joint);
+
+		const bool is_root_joint = (skel.ParentIndices[i] == BoneNull);
+
+		skel.RootTransforms[i] = Mat4f::scIdentity;
+
+		if (is_root_joint && joint->parent) {
+			Mat4f node_world;
+			cgltf_node_transform_world(joint->parent, reinterpret_cast<float32*>(&node_world));
+
+			skel.RootTransforms[i] = reflection * node_world * reflection;
+		}
 	}
 }
 

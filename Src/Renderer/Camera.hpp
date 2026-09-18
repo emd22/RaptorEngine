@@ -215,7 +215,7 @@ public:
 		RequireMatrixUpdate();
 	}
 
-	FX_FORCE_INLINE Vec3f GetRotation() { return Vec3f(mAngleY, mAngleX, 0); }
+	FX_FORCE_INLINE Vec3f GetRotation() { return Vec3f(-mAngleY, mAngleX, 0); }
 
 	const Mat4f& GetCameraMatrix(eObjectLayer layer) const override
 	{
