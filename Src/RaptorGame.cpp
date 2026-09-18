@@ -458,13 +458,6 @@ void RaptorGame::ProcessControls()
 	}
 
 
-	// if (ControlManager::IsKeyPressed(eKey::FX_KEY_C)) {
-	// 	if (!gProbeManager->IsCapturePending()) {
-	// 		gProbeManager->BeginCaptureBake(gWorld->Player.pCamera->Position);
-	// 		LogInfo("Probe capture bake armed at {}", gWorld->Player.pCamera->Position);
-	// 	}
-	// }
-
 	// if (ControlManager::IsKeyPressed(eKey::FX_KEY_V)) {
 	// 	// Dense local volume around the player.
 	// 	gProbeManager->BeginGridBakeAt(gWorld->Player.pCamera->Position, Vec3f(24.0f, 8.0f, 24.0f));

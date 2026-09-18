@@ -140,7 +140,7 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 	ds_entries.Insert(DescriptorEntry::AsBuffer(3, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
 												gGraphics->LightIndexListPageSize));
 
-	// bProbeBuffer (SH irradiance probes, MVP: index 0 is the global probe)
+	// bProbeBuffer (SH irradiance, per probe)
 	ds_entries.Insert(
 		DescriptorEntry::AsBuffer(6, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize));
 
@@ -310,7 +310,7 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bLightIndexList
 		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
 							 gGraphics->LightIndexListPageSize);
-		// bProbeBuffer (SH irradiance probes, MVP: index 0 is the global probe)
+		// bProbeBuffer (SH irradiance, per probe)
 		gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
 		// bProbeVolume (spatial lookup descriptor for probe blending)
 		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
@@ -369,7 +369,7 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bLightIndexList
 		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
 							 gGraphics->LightIndexListPageSize);
-		// bProbeBuffer (SH irradiance probes, MVP: index 0 is the global probe)
+		// bProbeBuffer (SH irradiance, per probe)
 		gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
 		// bProbeVolume (spatial lookup descriptor for probe blending)
 		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
@@ -435,7 +435,7 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bLightIndexList
 		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
 							 gGraphics->LightIndexListPageSize);
-		// bProbeBuffer (SH irradiance probes, MVP: index 0 is the global probe)
+		// bProbeBuffer (SH irradiance, per probe)
 		gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
 		// bProbeVolume (spatial lookup descriptor for probe blending)
 		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
@@ -504,7 +504,7 @@ void TiledForwardRenderer::CreateForwardPSO()
 		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
 		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
 							 gGraphics->LightIndexListPageSize);
-		// bProbeBuffer (SH irradiance probes, MVP: index 0 is the global probe)
+		// bProbeBuffer (SH irradiance, per probe)
 		gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
 		// bProbeVolume (spatial lookup descriptor for probe blending)
 		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
@@ -547,7 +547,7 @@ void TiledForwardRenderer::CreateForwardPSO()
 		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
 		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
 							 gGraphics->LightIndexListPageSize);
-		// bProbeBuffer (SH irradiance probes, MVP: index 0 is the global probe)
+		// bProbeBuffer (SH irradiance, per probe)
 		gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
 		// bProbeVolume (spatial lookup descriptor for probe blending)
 		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
@@ -594,7 +594,7 @@ void TiledForwardRenderer::CreateForwardPSO()
 		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
 		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
 							 gGraphics->LightIndexListPageSize);
-		// bProbeBuffer (SH irradiance probes, MVP: index 0 is the global probe)
+		// bProbeBuffer (SH irradiance, per probe)
 		gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
 		// bProbeVolume (spatial lookup descriptor for probe blending)
 		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,

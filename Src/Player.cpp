@@ -43,9 +43,10 @@ void Player::Create()
 			mpViewModel = object;
 
 			// Start in line with the camera so the view model doesn't swing in when it first appears
-			mViewModelRotation = Quat::FromEulerAngles(pCamera->GetRotation());
-			mPrevCameraRotation = mViewModelRotation;
-			mViewModelAngularVelocity = Vec3f::sZero;
+			mPrevCameraYaw = pCamera->mAngleX;
+			mPrevCameraPitch = pCamera->mAngleY;
+			mViewModelSwayYaw = 0.0f;
+			mViewModelSwayPitch = 0.0f;
 		});
 }
 
@@ -106,93 +107,24 @@ void Player::Move(float64 delta_time, const Vec3f& offset)
 	Physics.ApplyMovement(force);
 }
 
-/**
- * @brief Convert a rotation to a rotation vector (axis * angle in radians), taking the shortest path.
- */
-static Vec3f ToRotationVector(Quat quat)
+void Player::UpdateViewModelSway(float32 delta_time)
 {
-	// q and -q are the same rotation, use the one with the smaller angle
-	if (quat.W < 0.0f) {
-		quat = Quat(-quat.X, -quat.Y, -quat.Z, -quat.W);
-	}
+	// Yaw wraps at 2pi, so take the short way around to avoid a full-turn spike when it does.
+	const float32 yaw_delta = std::remainder(pCamera->mAngleX - mPrevCameraYaw, static_cast<float32>(FX_2PI));
+	const float32 pitch_delta = pCamera->mAngleY - mPrevCameraPitch;
 
-	const Vec3f axis(quat.X, quat.Y, quat.Z);
-	const float32 sin_half_angle = axis.Length();
+	mPrevCameraYaw = pCamera->mAngleX;
+	mPrevCameraPitch = pCamera->mAngleY;
 
-	// For tiny angles, sin(angle / 2) ~= angle / 2
-	if (sin_half_angle < 1e-7f) {
-		return axis * 2.0f;
-	}
+	// Ease back in line with the camera, then trail behind by a fraction of however far the camera turned this frame.
+	mViewModelSwayYaw = MathUtil::SmoothInterpolate(mViewModelSwayYaw, 0.0f, scViewModelSwayReturnSpeed, delta_time);
+	mViewModelSwayPitch = MathUtil::SmoothInterpolate(mViewModelSwayPitch, 0.0f, scViewModelSwayReturnSpeed,
+													  delta_time);
 
-	return axis * (2.0f * atan2f(sin_half_angle, quat.W) / sin_half_angle);
-}
-
-static Quat FromRotationVector(const Vec3f& rotation)
-{
-	const float32 angle = rotation.Length();
-
-	if (angle < 1e-7f) {
-		return Quat(rotation.X * 0.5f, rotation.Y * 0.5f, rotation.Z * 0.5f, 1.0f).Normalize();
-	}
-
-	return Quat::FromAxisAngle(rotation, angle);
-}
-
-void Player::UpdateViewModelLag(float32 delta_time)
-{
-	// The view model is attached to the camera by a damped spring. When the camera starts turning the view model trails
-	// behind, the spring pulls it back in line while the camera is still turning, and when the camera stops the view
-	// model's momentum carries it slightly past before settling.
-
-	if (delta_time <= 0.0f) {
-		return;
-	}
-
-	// const Quat camera_rotation = Quat::FromEulerAngles(mCameraGoal);
-	// const Vec3f camera_angular_velocity = ToRotationVector(camera_rotation * mPrevCameraRotation.Conjugate()) /
-	// 									  delta_time;
-
-	// const float32 stiffness = scViewModelSpringFrequency * scViewModelSpringFrequency;
-	// const float32 damping = 2.0f * scViewModelSpringDamping * scViewModelSpringFrequency;
-
-	// Integrate in fixed size substeps (sweeping the camera across the frame) so the feel is the same at any framerate.
-	// constexpr float32 cMaxStep = 1.0f / 240.0f;
-
-	// const int32 num_steps = std::max(1, static_cast<int32>(ceilf(delta_time / cMaxStep)));
-	// const float32 step = delta_time / static_cast<float32>(num_steps);
-
-	// for (int32 i = 1; i <= num_steps; i++) {
-	// 	const Quat step_camera_rotation = mPrevCameraRotation.SLerp(camera_rotation, static_cast<float32>(i) /
-	// 																				   static_cast<float32>(num_steps));
-
-	// 	const Vec3f lag = ToRotationVector(step_camera_rotation * mViewModelRotation.Conjugate());
-
-	// 	// Implicit euler step of `accel = stiffness * lag + damping * (camera velocity - view model velocity)`, which
-	// 	// stays stable for any step size.
-	// 	mViewModelAngularVelocity = (mViewModelAngularVelocity +
-	// 								 (lag * stiffness + camera_angular_velocity * damping) * step) /
-	// 								(1.0f + damping * step + stiffness * step * step);
-
-	// 	mViewModelRotation = (FromRotationVector(mViewModelAngularVelocity * step) * mViewModelRotation).Normalize();
-	// }
-
-	// mPrevCameraRotation = camera_rotation;
-
-	// Hard limit on how far the view model can drift from the camera, so it stays on screen during fast flicks.
-	// const Vec3f lag = ToRotationVector(camera_rotation * mViewModelRotation.Conjugate());
-	// const float32 lag_angle = lag.Length();
-
-	// if (lag_angle > scViewModelMaxLag) {
-	// 	const Vec3f lag_direction = lag / lag_angle;
-	// 	mViewModelRotation = FromRotationVector(lag_direction * -scViewModelMaxLag) * camera_rotation;
-
-	// 	// Drop any velocity that would push the view model further past the limit, so it's dragged along with the
-	// 	// camera.
-	// 	const float32 outward_speed = (camera_angular_velocity - mViewModelAngularVelocity).Dot(lag_direction);
-	// 	if (outward_speed > 0.0f) {
-	// 		mViewModelAngularVelocity += lag_direction * outward_speed;
-	// 	}
-	// }
+	mViewModelSwayYaw = MathUtil::Clamp(mViewModelSwayYaw - yaw_delta * scViewModelSwayAmount, -scViewModelMaxSway,
+										scViewModelMaxSway);
+	mViewModelSwayPitch = MathUtil::Clamp(mViewModelSwayPitch - pitch_delta * scViewModelSwayAmount,
+										  -scViewModelMaxSway, scViewModelMaxSway);
 }
 
 void Player::UpdateViewModel(double delta_time)
@@ -201,9 +133,14 @@ void Player::UpdateViewModel(double delta_time)
 		return;
 	}
 
+	UpdateViewModelSway(static_cast<float32>(delta_time));
 
-	mViewModelRotation = Quat::FromEulerAngles(pCamera->GetRotation());
-	// UpdateViewModelLag(static_cast<float32>(delta_time));
+	// Pitch/yaw map to euler angles the same way as PerspectiveCamera::GetRotation(). Roll goes in this local offset
+	// rather than the camera's euler angles, as FromEulerAngles applies Z last in world space.
+	const Quat sway = Quat::FromEulerAngles(
+		Vec3f(-mViewModelSwayPitch, mViewModelSwayYaw, mViewModelSwayYaw * scViewModelSwayRoll));
+
+	mViewModelRotation = Quat::FromEulerAngles(pCamera->GetRotation()) * sway;
 
 	// Build the basis from the lagging rotation (rather than the camera's) so the view model pivots around the eye.
 	const Mat4f view_model_basis = Mat4f::AsRotation(mViewModelRotation);

@@ -43,6 +43,7 @@ enum class eObjectFlags : uint16
 	ShadowCaster = (1 << 3),
 	Unlit = (1 << 4),
 	DisableCulling = (1 << 5),
+	NotProbeVisible = (1 << 6),
 };
 
 FxEnumFlags(eObjectFlags);
