@@ -2,10 +2,13 @@
 #define FX_LIGHT_TYPE_UNKNOWN 0
 #define FX_LIGHT_TYPE_DIRECTIONAL 1
 #define FX_LIGHT_TYPE_POINT 2
+#define FX_LIGHT_TYPE_SPOT 3
 
+/// Mirrors `LightGpuData` on the CPU
 struct Light
 {
 	// 64
+	/// View projection matrix of the light's shadow map, for lights with a region in the shadow atlas
 	float4x4 LightCameraMatrix;
 	// 128
 	float4x4 mInvView;
@@ -17,10 +20,23 @@ struct Light
 	// 224
 	float3 vLightPosition;
 	uint1 uiLightColor;
-	// 236
+	// 240
 	float2 vCameraSize;
 	uint1 uiAmbient;
 	uint1 uiLightType;
+	// 256
+	/// Spot lights only: world space direction the cone points along
+	float3 vSpotDirection;
+	/// Spot lights only: cosine of the outer cone half-angle
+	float1 fSpotCosOuter;
+	// 272
+	/// Spot lights only: 1 / (cos(inner) - cos(outer))
+	float1 fSpotAngleScale;
+	float1 _fPad0;
+	float2 _vPad1;
+	// 288
+	/// Shadow map UV to shadow atlas UV: xy is the scale, zw the offset. Zero when the light casts no shadows.
+	float4 vShadowAtlasRect;
 };
 
 ///////////////////////////////////
@@ -109,4 +125,32 @@ float AttenuationSmooth(float distance_sq, float inv_radius_sq)
 	float smooth_factor = saturate(1.0 - factor * factor);
 
 	return (smooth_factor * smooth_factor) / max(distance_sq, 1e-4);
+}
+
+/// Angular falloff of a spot light cone. `L` is the normalized surface to light vector.
+/// Full intensity inside the inner cone, fading smoothly to zero at the outer cone.
+float AttenuationSpot(float3 L, Light light)
+{
+	float cos_angle = dot(-L, light.vSpotDirection);
+	float factor = saturate((cos_angle - light.fSpotCosOuter) * light.fSpotAngleScale);
+
+	return factor * factor;
+}
+
+/// Sphere that tightly encloses a spot light's cone (Wronski, "Cull that cone").
+/// Returns the center in xyz and the radius in w.
+float4 GetSpotBoundingSphere(Light light)
+{
+	const float cos_outer = light.fSpotCosOuter;
+	const float range = light.fLightRadius;
+
+	// Wide cones (over 45 degrees): the sphere centered on the cap's base circle
+	if (cos_outer < 0.70710678) {
+		const float sin_outer = sqrt(saturate(1.0 - cos_outer * cos_outer));
+		return float4(light.vLightPosition + light.vSpotDirection * (range * cos_outer), range * sin_outer);
+	}
+
+	// Narrow cones: the sphere passing through the apex and the cap's base circle
+	const float radius = range / (2.0 * cos_outer);
+	return float4(light.vLightPosition + light.vSpotDirection * radius, radius);
 }

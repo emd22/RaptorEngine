@@ -6,6 +6,7 @@
 #include "PSOBuild.hpp"
 #include "PipelineCache.hpp"
 #include "ShaderCache.hpp"
+#include "ShadowAtlas.hpp"
 #include "ShadowDirectional.hpp"
 #include "TextRenderer.hpp"
 
@@ -13,6 +14,7 @@ namespace fx::renderer {
 
 GraphicsBackend* gGraphics = nullptr;
 ShadowDirectional* gShadowRenderer = nullptr;
+ShadowAtlas* gShadowAtlas = nullptr;
 ShaderCache* gShaderCache = nullptr;
 DsLayoutCache* gDsLayoutCache = nullptr;
 PipelineCache* gPipelineCache = nullptr;
@@ -45,6 +47,10 @@ void Destroy()
 {
 	if (gShadowRenderer) {
 		DESTROY_GLOBAL(gShadowRenderer);
+	}
+
+	if (gShadowAtlas) {
+		DESTROY_GLOBAL(gShadowAtlas);
 	}
 
 	DESTROY_GLOBAL(gSamplerCache);

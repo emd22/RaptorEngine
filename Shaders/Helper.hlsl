@@ -55,9 +55,7 @@ float4 F_UnpackUIntToFloat4(uint x);
 
 
 #define BONE_COUNT 100
-/// Mirrors fx::Limits::MaxConcurrentSkinnedObjects. The whole bone buffer (one BONE_COUNT-sized slot per
-/// simultaneously-updated skinned object this frame) is bound at a single fixed per-frame offset, same as the light
-/// buffer; DrawPushConstants::BoneSlot selects which slot a given draw call reads from.
+
 #define MAX_SKINNED_OBJECTS 32
 #define LIGHT_COUNT 64
 
@@ -65,11 +63,6 @@ float4 F_UnpackUIntToFloat4(uint x);
 
 #define HAS_FLAG(flags_, has_) ((flags_ & has_) != 0)
 
-/// DrawPushConstants::Flags bits. Mirrors eDrawFlags in Src/Renderer/Backend/Pipeline.hpp.
-///
-/// PROBE_CAPTURE marks the faces rendered for a light-probe bake: there is no
-/// SSAO target matching the capture extent, and probes must not feed back into
-/// their own bake.
 #define DRAW_FLAG_PROBE_CAPTURE 0x01
 #define DRAW_FLAG_DEBUG_PROBE_IRRADIANCE 0x02
 #define DRAW_FLAG_DEBUG_PROBE_VISIBILITY 0x04

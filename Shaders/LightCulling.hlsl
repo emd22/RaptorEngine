@@ -58,22 +58,33 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_GroupThreadID)
 			intersects_tile = true;
 		}
 		else {
-			float4 center_clip = mul(float4(light.vLightPosition, 1.0), CSConst.mViewProjection);
+			// Point lights are bounded by their radius, spot lights by a sphere around their cone
+			float3 bounds_center = light.vLightPosition;
+			float bounds_radius = light.fLightRadius;
 
-			if (center_clip.w < -light.fLightRadius) {
+			if (light.uiLightType == FX_LIGHT_TYPE_SPOT) {
+				const float4 spot_bounds = GetSpotBoundingSphere(light);
+
+				bounds_center = spot_bounds.xyz;
+				bounds_radius = spot_bounds.w;
+			}
+
+			float4 center_clip = mul(float4(bounds_center, 1.0), CSConst.mViewProjection);
+
+			if (center_clip.w < -bounds_radius) {
 				intersects_tile = false;
 			}
-			else if (center_clip.w <= light.fLightRadius) {
+			else if (center_clip.w <= bounds_radius) {
 				intersects_tile = true;
 			}
 			else {
 				float2 center_screen = ProjectToScreen(center_clip);
 
 				// Approximate the screen space radius by projecting offset points
-				float radius_x = length(ProjectToScreen(mul(float4(light.vLightPosition + float3(light.fLightRadius, 0.0, 0.0), 1.0),
+				float radius_x = length(ProjectToScreen(mul(float4(bounds_center + float3(bounds_radius, 0.0, 0.0), 1.0),
 																CSConst.mViewProjection)) -
 										center_screen);
-				float radius_y = length(ProjectToScreen(mul(float4(light.vLightPosition + float3(0.0, light.fLightRadius, 0.0), 1.0),
+				float radius_y = length(ProjectToScreen(mul(float4(bounds_center + float3(0.0, bounds_radius, 0.0), 1.0),
 																CSConst.mViewProjection)) -
 										center_screen);
 

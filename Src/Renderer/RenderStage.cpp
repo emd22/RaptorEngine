@@ -121,6 +121,17 @@ void RenderStage::Rebuild(const Vec2u& size)
 
 void RenderStage::Begin(CommandBuffer& cmd)
 {
+	const Vec2u size = mRenderPass.Size;
+	const Vec2u offset = mRenderPass.Offset;
+
+	Begin(cmd, VkRect2D {
+				   .offset = { .x = static_cast<int32>(offset.X), .y = static_cast<int32>(offset.Y) },
+				   .extent = { .width = size.X, .height = size.Y },
+			   });
+}
+
+void RenderStage::Begin(CommandBuffer& cmd, const VkRect2D& render_area)
+{
 	Assert(mbIsBuilt);
 
 	VkFramebuffer framebuffer;
@@ -132,7 +143,7 @@ void RenderStage::Begin(CommandBuffer& cmd)
 		framebuffer = mFramebuffer.Get();
 	}
 
-	mRenderPass.Begin(&cmd, framebuffer, ClearValues);
+	mRenderPass.Begin(&cmd, framebuffer, ClearValues, render_area);
 }
 
 void RenderStage::AddTarget(eImageFormat format, VkImageUsageFlags usage, eImageAspectFlag aspect)

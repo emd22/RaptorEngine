@@ -2,17 +2,62 @@ meta = {
     name = "demo0"
 }
 
+
 sun = {
-    pos = [-5.0, 8, -5.5]
+	enabled = $False
+    pos = [-5.0, 2, -5.5]
     color = [240, 160, 102, 4]
-    ambient = [75, 75, 72, 3]
+    ambient = [75, 75, 72, 1]
+}
+
+lights = {
+    spot0 = {
+        type = $CLight.Spot
+        pos = [0.0, 4.0, -5.0]
+        dir = [0.0, -1.0, 2.2]
+        color = [0, 255, 0, 240]
+        radius = 15.0
+        inner = 20.0
+        outer = 30.0
+    }
+    spot1 = {
+        type = $CLight.Spot
+        pos = [-3.0, 4.0, -5.0]
+        dir = [0.0, -1.0, 2.2]
+        color = [255, 0, 0, 240]
+        radius = 15.0
+        inner = 20.0
+        outer = 30.0
+    }
+    spot2 = {
+        type = $CLight.Spot
+        pos = [-6.0, 4.0, -5.0]
+        dir = [0.0, -1.0, 2.2]
+        color = [0, 0, 255, 240]
+        radius = 15.0
+        inner = 20.0
+        outer = 30.0
+    }
 }
 
 
 /*
-Lights = {
-    TP1 = {
-        Type = $CLight.Point
+lights = {
+    lamp0 = {
+        type = $CLight.Point
+        pos = [0.0, 1.0, 0.0]
+        color = [50, 250, 100, 8]
+        radius = 3.0
+    }
+
+    spot0 = {
+        type = $CLight.Spot
+        pos = [0.0, 2.0, 0.0]
+        dir = [0.0, -1.0, 0.2]
+        color = [255, 230, 200, 12]
+        radius = 8.0
+        inner = 20.0
+        outer = 30.0
     }
 }
 */
@@ -28,9 +73,9 @@ colliders = {
 
 
 objects = {
-    skybox = {
+    /*skybox = {
         mesh = "/Skybox.glb"
         unlit = $True
         nocull = $True
-    }
+    }*/
 }

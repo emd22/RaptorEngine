@@ -577,18 +577,24 @@ void RaptorGame::Tick()
 
 	Ref<PerspectiveCamera> camera = gWorld->Player.pCamera;
 
-	gShadowRenderer->ShadowCamera.Position = (gWorld->Player.Position + (pSun->GetPosition().Normalize() * 25.0f));
+	// Set from the scene file (see WorldFile::Load), or from the console
+	pSun->bEnabled = gCVars->Get("b_sun_enabled", true);
 
-	Vec3f target = gWorld->Player.Position;
+	if (pSun->bEnabled) {
+		gShadowRenderer->ShadowCamera.Position = (gWorld->Player.Position + (pSun->GetPosition().Normalize() * 25.0f));
+
+		Vec3f target = gWorld->Player.Position;
 
 
-	gShadowRenderer->ShadowCamera.ResolveViewToTexels(gShadowRenderer->ShadowCamera.Position, target, Vec3f(0, 1, 0),
-													  static_cast<float32>(gShadowRenderer->ShadowMapSize.X));
+		gShadowRenderer->ShadowCamera.ResolveViewToTexels(gShadowRenderer->ShadowCamera.Position, target,
+														  Vec3f(0, 1, 0),
+														  static_cast<float32>(gShadowRenderer->ShadowMapSize.X));
 
-	gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(gShadowRenderer->ShadowCamera.Position, target, Vec3f(0, 1, 0));
-	// LogInfo("{}", gShadowRenderer->ShadowCamera.ViewMatrix.Rows[3]);
-	gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
-	gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
+		gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(gShadowRenderer->ShadowCamera.Position, target, Vec3f(0, 1, 0));
+		// LogInfo("{}", gShadowRenderer->ShadowCamera.ViewMatrix.Rows[3]);
+		gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
+		gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
+	}
 
 	if (gGraphics->BeginFrame() != eFrameResult::Success) {
 		mLastTick = current_tick;
@@ -627,6 +633,9 @@ void RaptorGame::DestroyGame()
 
 	delete gShadowRenderer;
 	gShadowRenderer = nullptr;
+
+	delete gShadowAtlas;
+	gShadowAtlas = nullptr;
 
 	gMaterialManager->Destroy();
 	gAssetManager->Shutdown();

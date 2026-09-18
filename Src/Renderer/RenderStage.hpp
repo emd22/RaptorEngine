@@ -65,6 +65,9 @@ public:
 
 	void Begin(CommandBuffer& cmd);
 
+	/// Begins the stage over part of its targets, see RenderPass::Begin()
+	void Begin(CommandBuffer& cmd, const VkRect2D& render_area);
+
 	/**
 	 * @brief Ends the render pass.
 	 *

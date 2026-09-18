@@ -1,50 +1,27 @@
 #pragma once
 
 #include <Math/Vec2.hpp>
-#include <Renderer/Backend/Descriptors.hpp>
-#include <Renderer/Backend/Framebuffer.hpp>
-#include <Renderer/Backend/Image.hpp>
-#include <Renderer/Backend/Pipeline.hpp>
-#include <Renderer/Backend/RenderPass.hpp>
 #include <Renderer/Camera.hpp>
-#include <Renderer/RenderStage.hpp>
+#include <Renderer/ShadowAtlas.hpp>
 
 namespace fx::renderer {
 
-
-struct alignas(16) ShadowPushConstants
-{
-	float32 CameraMatrix[16];
-	uint32 ObjectIndex = 0;
-};
+/**
+ * @brief Shadow camera for the directional light. Its shadow map is the directional region of the shadow atlas, see
+ * ShadowAtlas::GetDirectionalRegion().
+ */
 class ShadowDirectional
 {
 public:
-	ShadowDirectional() = delete;
-	ShadowDirectional(const Vec2u& size);
-
-	void Begin();
-
-	void End();
-
-	// FX_FORCE_INLINE Pipeline& GetPipeline() { return mPipeline; }
-	// FX_FORCE_INLINE Pipeline& GetSkinnedPipeline() { return mPipelineSkinned; }
+	ShadowDirectional();
 
 	~ShadowDirectional() = default;
-
-private:
-	void UpdateLightDescriptors();
 
 public:
 	OrthoCamera ShadowCamera;
 
-	RenderStage RenderStage;
-
+	/// Size of the directional region of the shadow atlas
 	Vec2u ShadowMapSize = Vec2u::sZero;
-
-private:
-	// Pipeline mPipeline;
-	// Pipeline mPipelineSkinned;
 };
 
 } // namespace fx::renderer

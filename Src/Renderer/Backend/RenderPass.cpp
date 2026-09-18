@@ -146,6 +146,17 @@ void RenderPass::Create(TargetList& attachments, Vec2u size, const Vec2u& offset
 
 void RenderPass::Begin(CommandBuffer* cmd, VkFramebuffer framebuffer, const Slice<VkClearValue>& clear_values)
 {
+	const VkRect2D render_area = {
+		.offset = { .x = static_cast<int32>(Offset.X), .y = static_cast<int32>(Offset.Y) },
+		.extent = { .width = Size.Width(), .height = Size.Height() },
+	};
+
+	Begin(cmd, framebuffer, clear_values, render_area);
+}
+
+void RenderPass::Begin(CommandBuffer* cmd, VkFramebuffer framebuffer, const Slice<VkClearValue>& clear_values,
+					   const VkRect2D& render_area)
+{
 	pCommandBuffer = cmd;
 
 	if (InternalRenderPass == nullptr) {
@@ -156,8 +167,7 @@ void RenderPass::Begin(CommandBuffer* cmd, VkFramebuffer framebuffer, const Slic
 		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass = InternalRenderPass,
 		.framebuffer = framebuffer,
-		.renderArea = { .offset = { .x = static_cast<int32>(Offset.X), .y = static_cast<int32>(Offset.Y) },
-						.extent = { .width = Size.Width(), .height = Size.Height() } },
+		.renderArea = render_area,
 
 		.clearValueCount = static_cast<uint32>(clear_values.Size),
 		.pClearValues = clear_values.pData,

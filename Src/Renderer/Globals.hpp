@@ -8,6 +8,9 @@ extern GraphicsBackend* gGraphics;
 class ShadowDirectional;
 extern ShadowDirectional* gShadowRenderer;
 
+class ShadowAtlas;
+extern ShadowAtlas* gShadowAtlas;
+
 class ShaderCache;
 extern ShaderCache* gShaderCache;
 

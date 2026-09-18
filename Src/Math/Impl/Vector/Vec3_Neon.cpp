@@ -47,13 +47,12 @@ Vec3f Vec3f::CrossSlow(const Vec3f& other) const
 
 Vec3f Vec3f::Rotate(const Quat& rotation) const
 {
-    Quat vec = Quat(vsetq_lane_f32(0.0f, mIntrin, 3));
-    Quat conj_v = rotation.Conjugate();
+    // v' = q * v * conj(q), with v as the pure quaternion (x, y, z, 0)
+    const Quat vec = Quat(vsetq_lane_f32(0.0f, mIntrin, 3));
+    const Quat result = rotation * vec * rotation.Conjugate();
 
-    Quat result = conj_v * vec;
-    result = result * rotation;
-
-    return Vec3f(result.mIntrin);
+    // W is zero in exact arithmetic; clear any rounding residue so the Vec3f's W lane stays 0
+    return Vec3f(vsetq_lane_f32(0.0f, result.mIntrin, 3));
 }
 
 

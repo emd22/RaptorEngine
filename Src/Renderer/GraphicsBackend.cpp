@@ -164,7 +164,8 @@ void GraphicsBackend::Init(Vec2u window_size)
 	// Upload the default (precomputed) irradiance probe now that ProbeBuffer exists.
 	gProbeManager->Create();
 
-	gShadowRenderer = new ShadowDirectional(Vec2u(2048, 2048));
+	gShadowAtlas = new ShadowAtlas;
+	gShadowRenderer = new ShadowDirectional;
 
 	Mat4f initial_matrix = Mat4f::scIdentity;
 	BoneBuffer.SetAllValues(initial_matrix.RawData, true);

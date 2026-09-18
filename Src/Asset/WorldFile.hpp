@@ -19,6 +19,7 @@ public:
 private:
 	void AddObjectFromEntry(const std::string& path, const ConfigEntry& object);
 	void AddColliderFromEntry(const std::string& path, const ConfigEntry& collider);
+	void AddOrUpdateLightFromEntry(const ConfigEntry& light_entry);
 
 	void ApplyPropertiesToObject(Object* object, const ConfigEntry& object_entry);
 

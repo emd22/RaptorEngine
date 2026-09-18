@@ -34,6 +34,11 @@ public:
 
 	Vec3f GetEulerAngles() const;
 
+	/**
+	 * @brief Get Forward (+Z) rotated by this quaternion.
+	 */
+	FX_FORCE_INLINE Vec3f GetDirection() const;
+
 	Quat operator*(const Quat& other) const;
 
 	void FromJoltQuaternion(const JPH::Quat& quat);

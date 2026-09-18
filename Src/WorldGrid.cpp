@@ -283,14 +283,13 @@ TileIndex WorldGrid::InsertInto(TileIndex tile_index, ObjectID id)
 	return tile_index;
 }
 
-void WorldGrid::UpdateObject(ObjectID id, bool update_attached)
+void WorldGrid::UpdateObject(Object* object, bool update_attached)
 {
-	mbNearbyObjectCacheValid = false;
-
-	Object* object = gObjectManager->GetObject(id);
 	if (object == nullptr) {
 		return;
 	}
+
+	mbNearbyObjectCacheValid = false;
 
 	// Object has not been added to tile map, ignore
 	if (object->mTileIndex == TileIndexNull) {
@@ -302,8 +301,8 @@ void WorldGrid::UpdateObject(ObjectID id, bool update_attached)
 
 	if (!object->IsCullable()) {
 		if (object->mTileIndex != scGlobalTileIndex) {
-			RemoveObjectFromRect(id, object->mTileIndex, object->mTileSpan);
-			InsertInto(scGlobalTileIndex, id);
+			RemoveObjectFromRect(object->ID, object->mTileIndex, object->mTileSpan);
+			InsertInto(scGlobalTileIndex, object->ID);
 			object->mTileSpan = Vec2u(1, 1);
 		}
 		return;
@@ -319,8 +318,8 @@ void WorldGrid::UpdateObject(ObjectID id, bool update_attached)
 	}
 
 	// Clear every tile the object was previously spanning, then insert it into every tile it now spans.
-	RemoveObjectFromRect(id, object->mTileIndex, object->mTileSpan);
-	InsertObjectIntoRect(id, new_tile_start, new_tile_span);
+	RemoveObjectFromRect(object->ID, object->mTileIndex, object->mTileSpan);
+	InsertObjectIntoRect(object->ID, new_tile_start, new_tile_span);
 
 	object->mTileIndex = new_tile_start;
 	object->mTileSpan = new_tile_span;
@@ -329,11 +328,12 @@ void WorldGrid::UpdateObject(ObjectID id, bool update_attached)
 	if (update_attached) {
 		for (ObjectID attached_id : object->AttachedNodes) {
 			Object* attached_object = gObjectManager->GetObject(attached_id);
-			if (object->mTileIndex == attached_object->mTileIndex) {
+
+			if (attached_object == nullptr || object->mTileIndex == attached_object->mTileIndex) {
 				continue;
 			}
 
-			UpdateObject(attached_id, true);
+			UpdateObject(attached_object, true);
 		}
 	}
 }

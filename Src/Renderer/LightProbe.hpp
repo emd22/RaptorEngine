@@ -119,8 +119,15 @@ public:
 	/// to IsCapturePending(), which stays true for the whole frame a bake runs in.
 	/// The main view must keep its probe GI and SSAO during a bake.
 	bool IsCapturingFaces() const { return mbCapturingFaces; }
+
+	/**
+	 * @brief Marks the start of the capture faces. `capture_sky` is false while the sun is off: the skybox has a sun
+	 * painted into it, so it would otherwise light the probes as if the sun was still there.
+	 */
 	void BeginCaptureFaces() { mbCapturingFaces = true; }
+
 	void EndCaptureFaces() { mbCapturingFaces = false; }
+
 
 	const Vec3f& GetCapturePosition() const { return mProbePositions[mCurrentProbe]; }
 
