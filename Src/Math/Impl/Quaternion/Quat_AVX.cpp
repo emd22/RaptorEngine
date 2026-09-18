@@ -27,9 +27,9 @@ Quat::Quat(const JPH::Quat& other) { mIntrin = other.mValue.mValue; }
 Quat Quat::FromAxisAngle(Vec3f axis, float32 angle)
 {
 	float32 sv, cv;
-	MathUtil::SinCos(angle, &sv, &cv);
+	MathUtil::SinCos(angle * 0.5f, &sv, &cv);
 
-	const __m128 vec = _mm_mul_ps(SSE::Normalize(axis.mIntrin), _mm_set1_ps(sv));
+	const __m128 vec = _mm_mul_ps(axis.Normalize().mIntrin, _mm_set1_ps(sv));
 
 	// return Quat(vsetq_lane_f32(cv, vec, 3));
 	return Quat(_mm_insert_ps(vec, _mm_set_ss(cv), 0x30));
@@ -213,7 +213,7 @@ Vec3f Quat::GetEulerAngles() const
 	float t3 = 2.0f * (W * Z + X * Y);
 	float t4 = 1.0f - 2.0f * (y_sq + Z * Z);
 
-	return Vec3f(atan2(t0, t1), sin(t2), atan2(t3, t4));
+	return Vec3f(atan2(t0, t1), asin(t2), atan2(t3, t4));
 }
 
 } // namespace fx

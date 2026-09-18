@@ -8,10 +8,12 @@
 
 namespace fx {
 
+class Object;
+
 class Player
 {
 	const Vec3f scMaxWalkSpeed = Vec3f(4.5f);
-	const Vec3f scMaxSprintSpeed = Vec3f(6.5f);
+	const Vec3f scMaxSprintSpeed = Vec3f(5.5f);
 
 	static constexpr float32 scMovementLerpSpeed = 10.0f;
 
@@ -54,12 +56,7 @@ public:
 
 	void Move(float64 delta_time, const Vec3f& offset);
 
-	void RotateHead(const Vec2f& xy)
-	{
-		pCamera->Rotate(xy.X, xy.Y);
-
-		RequireDirectionUpdate();
-	}
+	void RotateHead(const Vec2f& xy);
 
 	FX_FORCE_INLINE Vec3f GetBob() const { return Vec3f(mHeadBobX, mHeadBobY, 0.0f); }
 
@@ -70,6 +67,8 @@ private:
 	FX_FORCE_INLINE void RequirePhysicsUpdate() { mbUpdatePhysicsTransform = true; }
 
 	FX_FORCE_INLINE void MarkApplyingUserForce() { mbIsApplyingUserForce = true; }
+
+	void UpdateViewModel(double delta_time);
 
 	FX_FORCE_INLINE void UpdateDirection()
 	{
@@ -119,14 +118,21 @@ public:
 	float32 mBobCounterY = 0.0f;
 
 private:
-	Vec3f mCameraOffset = Vec3f::sZero;
 	float32 mHeadBobX = 0.0f;
 	float32 mHeadBobY = 0.0f;
 
-	bool bBobReverse = false;
+	Vec3f mCameraOffset = Vec3f::sZero;
+	Vec3f mCameraBumper = Vec3f::sZero;
+
+	Vec3f mMovementGoal = Vec3f::sZero;
+	Vec3f mCameraGoal = Vec3f::sZero;
 
 	Vec3f mUserForce = Vec3f::sZero;
 
+
+	Object* mpViewModel = nullptr;
+
+	bool bBobReverse = false;
 	bool mbIsApplyingUserForce : 1 = false;
 	bool mbUpdateDirection : 1 = true;
 	bool mbUpdatePhysicsTransform : 1 = true;

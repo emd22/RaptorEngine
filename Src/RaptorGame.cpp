@@ -167,23 +167,6 @@ void RaptorGame::CreateGame()
 	gWorld->Player.SetFlyMode(false);
 
 
-	AssetTicket view_model = gAssetManager->LoadObject("view_model", "Data/Demo/Models/viewmodel.glb");
-	gWorld->Attach(view_model);
-	view_model.OnLoaded(
-		[&](void* item_ptr)
-		{
-			Object* object = static_cast<Object*>(item_ptr);
-			if (object == nullptr) {
-				return;
-			}
-
-			object->SetShadowCaster(false);
-			object->SetCullable(false);
-			object->SetObjectLayer(eObjectLayer::PlayerLayer);
-
-			mpViewModel = object;
-		});
-
 	gWorld->SelectCamera(gWorld->Player.pCamera);
 
 	AddEditorModes();
@@ -210,6 +193,10 @@ void RaptorGame::CreateGame()
 	gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
 
 	CreateLights();
+
+	// Start the frame timer now, otherwise the first Tick() measures from counter zero (time since boot) and steps
+	// physics by that much in one go.
+	mLastTick = SDL_GetPerformanceCounter();
 
 	while (sbRunning) {
 		Tick();
@@ -438,6 +425,10 @@ void RaptorGame::ProcessControls()
 		LogInfo("Reloading all scripts...");
 		gScriptManager->ReloadAllScripts();
 
+		WorldFile scene_file;
+		const char* scene_to_load = Config.GetEntry(HashStr32("Scene"))->Get<const char*>();
+		scene_file.Load(std::format("Data/{}", scene_to_load));
+
 		if (gSelectedEditorMode != nullptr) {
 			gSelectedEditorMode->Load();
 		}
@@ -572,7 +563,6 @@ void RaptorGame::Tick()
 
 	if (!bInCommandMode) {
 		gWorld->Player.Move(DeltaTime, GetMovementVector());
-		gWorld->Player.Update(DeltaTime);
 
 		if (EditorModeType != eEditorMode::Simulate) {
 			Vec3f forward = GetCameraForwardDominantAxis();
@@ -583,29 +573,14 @@ void RaptorGame::Tick()
 		}
 	}
 
+	gWorld->Player.Update(DeltaTime);
+
 	Ref<PerspectiveCamera> camera = gWorld->Player.pCamera;
 
 	gShadowRenderer->ShadowCamera.Position = (gWorld->Player.Position + (pSun->GetPosition().Normalize() * 25.0f));
 
 	Vec3f target = gWorld->Player.Position;
 
-	if (mpViewModel != nullptr) {
-		const Vec3f forward = camera->GetForwardVector();
-		const Vec3f right = camera->GetRightVector();
-		const Vec3f up = camera->GetUpVector();
-
-		const float32 horizontal_scale = 0.15f;
-		const float32 vertical_scale = 0.1f;
-
-		const Vec3f bob = gWorld->Player.GetBob();
-
-		Vec3f view_model_bob = (right * (bob.X * horizontal_scale)) + (up * (bob.Y * vertical_scale));
-
-		const float32 rotx = sin(gWorld->Player.mBobCounterY * 0.5f) * 0.05f;
-
-		mpViewModel->SetPosition(camera->Position + (forward * 0.1) - (up * 0.25) + view_model_bob);
-		mpViewModel->SetRotation(Quat::FromEulerAngles(camera->GetRotation()));
-	}
 
 	gShadowRenderer->ShadowCamera.ResolveViewToTexels(gShadowRenderer->ShadowCamera.Position, target, Vec3f(0, 1, 0),
 													  static_cast<float32>(gShadowRenderer->ShadowMapSize.X));

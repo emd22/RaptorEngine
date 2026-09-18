@@ -215,6 +215,9 @@ public:
 		RequireMatrixUpdate();
 	}
 
+	/**
+	 * @brief Get the camera rotation as euler angles (rotation around X, Y, Z)
+	 */
 	FX_FORCE_INLINE Vec3f GetRotation() { return Vec3f(-mAngleY, mAngleX, 0); }
 
 	const Mat4f& GetCameraMatrix(eObjectLayer layer) const override

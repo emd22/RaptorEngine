@@ -225,6 +225,7 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 	}
 
 	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
+	memcpy(push_constants.EyePosition, camera.Position.mData, sizeof(float32) * 3);
 
 	gGraphics->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex | eShaderType::Pixel,
 								   push_constants);

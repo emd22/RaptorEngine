@@ -459,9 +459,6 @@ void World::ExecutePrepassRenderList(renderer::ePipelineName forward_pl_name)
 			Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
 	}
 
-	const Mat4f& cam_matrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
-
-
 	for (ObjectID object_id : section.Objects) {
 		Object* object = gObjectManager->GetObject(object_id);
 		if (object == nullptr) {
@@ -476,6 +473,7 @@ void World::ExecutePrepassRenderList(renderer::ePipelineName forward_pl_name)
 		consts.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
 		consts.BoneSlot = object->BoneBufferSlot;
 
+		const Mat4f& cam_matrix = camera.GetCameraMatrix(object->GetObjectLayer());
 		memcpy(consts.CameraMatrix, cam_matrix.RawData, sizeof(Mat4f));
 
 		gGraphics->SubmitPushConstants(gGraphics->GetFrame()->CmdBuffer, pipeline,

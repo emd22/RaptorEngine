@@ -79,10 +79,15 @@ VSOutput main(VSInput input)
         + input.vJointWeights.z * bBones[bone_base + input.vJointIndices.z]
         + input.vJointWeights.w * bBones[bone_base + input.vJointIndices.w];
 
-    output.vPosition = mul(mul(float4(input.vPosition, 1.0), skin_xform), MVP);
+    // Posed vertex in model space
+    float4 position_ms = mul(float4(input.vPosition, 1.0), skin_xform);
+
+    output.vPosition = mul(position_ms, MVP);
     output.vNormalWS = normalize(mul(mul(input.vNormal, (float3x3)skin_xform), (float3x3)world_matrix));
 #else
-    output.vPosition = mul(float4(input.vPosition, 1.0), MVP);
+    float4 position_ms = float4(input.vPosition, 1.0);
+
+    output.vPosition = mul(position_ms, MVP);
     output.vNormalWS = normalize(mul(input.vNormal, (float3x3)world_matrix));
 #endif
 
@@ -97,7 +102,9 @@ VSOutput main(VSInput input)
 
     output.vUV = input.vUV;
 
-    float4 position_ws = mul(float4(input.vPosition, 1.0), world_matrix);
+    // Uses the posed position so skinned meshes are lit (probes, lights, shadows) where they are drawn,
+    // not at their bind pose.
+    float4 position_ws = mul(position_ms, world_matrix);
 	output.vPositionWS = position_ws.xyz;
 
 	output.uiMaterialIndex = VSConst.uiMaterialIndex;
@@ -177,14 +184,56 @@ struct FSPushConsts
 	uint uiTileColumns;
 	uint Flags;
 	uint2 vTargetSize;
+	uint uiBoneSlot;
+	uint _uiPad0;
+	/// Camera position in world space (w unused)
+	float4 vEyePosition;
 };
 
 [[vk::push_constant]] FSPushConsts FSConst;
 
-#define ROUGHNESS roughness_metallic.x
-#define METALLIC  roughness_metallic.y
-
 #define SHADOW_BIAS -0.000005f
+
+/// Lower bound on perceptual roughness. D_GGX() divides by roughness^4 at the
+/// highlight peak, so fully glossy texels would otherwise blow up.
+#define MIN_ROUGHNESS 0.045
+
+/// Surface response shared by the direct and ambient lighting.
+struct SurfaceParams
+{
+	/// Diffuse albedo (already scaled down by whatever the specular lobe takes)
+	float3 vDiffuse;
+	/// Specular reflectance at normal incidence
+	float3 vF0;
+	/// Perceptual roughness
+	float fRoughness;
+};
+
+/// Resolves the material's workflow into SurfaceParams. `surface_sample` is the
+/// texel from the metallic/roughness slot, or white when no texture is bound.
+SurfaceParams GetSurfaceParams(Material material, float3 albedo, float4 surface_sample)
+{
+	SurfaceParams surface;
+
+	if (HAS_FLAG(material.Flags, MF_SPECULAR_GLOSSINESS)) {
+		// KHR_materials_pbrSpecularGlossiness: specular colour in RGB, glossiness in A
+		surface.vF0 = surface_sample.rgb * material.vSpecularFactor;
+		surface.vDiffuse = albedo * (1.0 - max(surface.vF0.r, max(surface.vF0.g, surface.vF0.b)));
+		surface.fRoughness = 1.0 - (surface_sample.a * material.fGlossinessFactor);
+	}
+	else {
+		// glTF metallic/roughness: roughness in G, metallic in B
+		const float metallic = surface_sample.b * material.fMetallicFactor;
+
+		surface.vF0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
+		surface.vDiffuse = albedo * (1.0 - metallic);
+		surface.fRoughness = surface_sample.g * material.fRoughnessFactor;
+	}
+
+	surface.fRoughness = clamp(surface.fRoughness, MIN_ROUGHNESS, 1.0);
+
+	return surface;
+}
 
 
 float3 GetSaturationColor(float value)
@@ -219,23 +268,23 @@ FSOutput main(FSInput input)
     }
 
 #ifdef USE_NORMAL_MAPS
-    float2 roughness_metallic = F_Sample(tMetallicRoughness, input.vUV).gb;
+    float4 surface_sample = F_Sample(tMetallicRoughness, input.vUV);
     float3 normal_ts = F_Sample(tNormalMap, input.vUV).rgb * 2.0 - 1.0;
 
     float3x3 TBN = float3x3(input.vTangentWS, input.vBitangentWS, input.vNormalWS);
 
     float3 normal_ws = mul(normal_ts, TBN);
 
-	const float roughness = ROUGHNESS;
-	const float metallic = METALLIC;
-
     float3 N_final = normalize(normal_ws);
 #else
-	const float roughness = 0.5;
-	const float metallic = 0.5;
+	// No surface texture in this pipeline; the material factors alone describe the surface.
+	float4 surface_sample = float4(1.0, 1.0, 1.0, 1.0);
 
     float3 N_final = input.vNormalWS;
 #endif
+
+	const SurfaceParams surface = GetSurfaceParams(material, albedo, surface_sample);
+	const float roughness = surface.fRoughness;
 
 	float4 accumulated_light = float4(0.0, 0.0, 0.0, 0.0);
 
@@ -297,9 +346,6 @@ FSOutput main(FSInput input)
 			attenuation = light_intensity * AttenuationSmooth(dist_sq, inv_radius_sq);
 		}
 
-		float3 F0 = float3(0.04, 0.04, 0.04);
-		F0 = lerp(F0, albedo, metallic);
-
 		float3 N = normalize(N_final);
 		float3 V = normalize(light.vEyePosition - input.vPositionWS);
 		float3 H = normalize(V + L);
@@ -309,8 +355,8 @@ FSOutput main(FSInput input)
 		float NdotH = DotC(N, H);
 		float LdotH = DotC(L, H);
 
-		float3 F = F_Schlick(F0, 1.0, LdotH);
-		float3 diffuse_reflectance = albedo * (1.0 - metallic);
+		float3 F = F_Schlick(surface.vF0, 1.0, LdotH);
+		float3 diffuse_reflectance = surface.vDiffuse;
 
 		float D = D_GGX(NdotH, roughness);
 		float Vis = V_SmithGGXCorrelated(NdotV, NdotL, roughness);
@@ -330,14 +376,19 @@ FSOutput main(FSInput input)
 
 	float3 probe_normal = normalize(N_final);
 
-	// Use probes. SampleProbeVolume() already folds per-probe visibility into its
-	// blend weights, so the only ambient occlusion term left to apply is SSAO.
 	if (!HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE)) {
-		probe_irradiance = SampleProbeVolume(input.vPositionWS, probe_normal, bProbeVolume[0], bProbeBuffer, bProbeDepth);
+		const ProbeSHData probe_sh = SampleProbeVolumeSH(input.vPositionWS, probe_normal, bProbeVolume[0], bProbeBuffer,
+														 bProbeDepth);
 
-		float3 ambient_diffuse_reflectance = albedo * (1.0 - metallic);
+		probe_irradiance = EvalProbeIrradiance(probe_normal, probe_sh);
 
-		ambient = float4(probe_irradiance * ambient_diffuse_reflectance * ssao, 1.0f);
+		const float3 V = normalize(FSConst.vEyePosition.xyz - input.vPositionWS);
+		const float3 R = reflect(-V, probe_normal);
+		const float NdotV = abs(dot(probe_normal, V)) + 1e-5f;
+
+		const float3 probe_specular = EvalProbeIrradiance(R, probe_sh) * EnvBRDFApprox(surface.vF0, roughness, NdotV);
+
+		ambient = float4(((probe_irradiance * surface.vDiffuse) + probe_specular) * ssao, 1.0f);
 	}
 
 	output.vAlbedo = float4(accumulated_light.rgb + ambient.rgb, base_alpha);

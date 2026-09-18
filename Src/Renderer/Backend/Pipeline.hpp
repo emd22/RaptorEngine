@@ -90,7 +90,12 @@ struct alignas(16) DrawPushConstants
 	/// Which slot of GraphicsBackend::BoneBuffer this draw's skinning matrices live in this frame (see
 	/// Object::BoneBufferSlot). Unused by non-skinned pipelines.
 	uint32 BoneSlot = 0;
+	uint32 _Pad0 = 0;
+	/// World space position of the rendering camera (w unused). Used by the forward pass for view-dependent ambient.
+	float32 EyePosition[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 };
+
+static_assert(sizeof(DrawPushConstants) <= 128, "DrawPushConstants exceeds the minimum guaranteed push constant size");
 
 struct alignas(16) DebugLayerPushConstants
 {
