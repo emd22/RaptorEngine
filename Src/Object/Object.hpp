@@ -126,7 +126,7 @@ public:
 	void SetPhysicsEnabled(bool enabled);
 	FX_FORCE_INLINE bool GetPhysicsEnabled() { return (Flags & eObjectFlags::PhysicsEnabled) != 0; }
 
-	FX_FORCE_INLINE void SetObjectLayer(eObjectLayer layer) { mObjectLayer = layer; }
+	void SetObjectLayer(eObjectLayer layer);
 	FX_FORCE_INLINE eObjectLayer GetObjectLayer() const { return mObjectLayer; }
 
 	/////////////////////////////////////
@@ -155,16 +155,7 @@ public:
 
 	FX_FORCE_INLINE bool IsSkinned() const { return (pMesh != nullptr) && pMesh->VertexList.IsSkinned(); }
 
-	void SetCullable(bool value)
-	{
-		if (!value) {
-			SetFlag(Flags, eObjectFlags::DisableCulling);
-		}
-		else {
-			ClearFlag(Flags, eObjectFlags::DisableCulling);
-		}
-	}
-
+	void SetCullable(bool value);
 	FX_FORCE_INLINE bool IsCullable() const { return !HasFlag(Flags, eObjectFlags::DisableCulling); }
 
 	void Destroy();

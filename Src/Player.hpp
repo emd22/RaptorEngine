@@ -61,6 +61,8 @@ public:
 		RequireDirectionUpdate();
 	}
 
+	FX_FORCE_INLINE Vec3f GetBob() const { return Vec3f(mHeadBobX, mHeadBobY, 0.0f); }
+
 	~Player();
 
 private:
@@ -114,11 +116,12 @@ public:
 	float32 SpeedMultiplier = 1.0f;
 
 
+	float32 mBobCounterY = 0.0f;
+
 private:
 	Vec3f mCameraOffset = Vec3f::sZero;
 	float32 mHeadBobX = 0.0f;
 	float32 mHeadBobY = 0.0f;
-	float32 mBobCounterY = 0.0f;
 
 	bool bBobReverse = false;
 

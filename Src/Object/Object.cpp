@@ -357,8 +357,35 @@ void Object::AttachCollider(physics::Body* body)
 	body->SetObjectID(ID);
 }
 
+void Object::SetObjectLayer(eObjectLayer layer)
+{
+	mObjectLayer = layer;
+
+	for (ObjectID attached_id : AttachedNodes) {
+		Object* attached_object = gObjectManager->GetObject(attached_id);
+		if (attached_object != nullptr) {
+			attached_object->SetObjectLayer(layer);
+		}
+	}
+}
+
+void Object::SetCullable(bool value)
+{
+	if (!value) {
+		SetFlag(Flags, eObjectFlags::DisableCulling);
+	}
+	else {
+		ClearFlag(Flags, eObjectFlags::DisableCulling);
+	}
+
+	gWorldGrid->UpdateObject(ID);
+}
+
+
 void Object::SetPosition(const Vec3f& position)
 {
+	const Vec3f delta = position - mPosition;
+
 	Entity::SetPosition(position);
 
 	if (PhysicsID.IsInvalid() == false) {
@@ -367,10 +394,16 @@ void Object::SetPosition(const Vec3f& position)
 			body->Teleport(position, mRotation);
 		}
 	}
+
+	for (ObjectID attached_id : AttachedNodes) {
+		gObjectManager->GetObject(attached_id)->MoveBy(delta);
+	}
 }
 
 void Object::SetRotation(const Quat& rotation)
 {
+	const Quat delta = rotation * mRotation.Conjugate();
+
 	Entity::SetRotation(rotation);
 
 	if (PhysicsID.IsInvalid() == false) {
@@ -378,6 +411,11 @@ void Object::SetRotation(const Quat& rotation)
 		if (body != nullptr) {
 			body->Teleport(mPosition, rotation);
 		}
+	}
+
+	for (ObjectID attached_id : AttachedNodes) {
+		Object* attached_object = gObjectManager->GetObject(attached_id);
+		attached_object->SetRotation(delta * attached_object->mRotation);
 	}
 }
 

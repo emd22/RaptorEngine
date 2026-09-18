@@ -292,25 +292,20 @@ void WorldGrid::UpdateObject(ObjectID id, bool update_attached)
 		return;
 	}
 
-	// If we are set to non-cullable and the object is not in the global tile, move it to the global tile.
-	if (!object->IsCullable() && object->mTileIndex != scGlobalTileIndex) {
-		RemoveObjectFromRect(id, object->mTileIndex, object->mTileSpan);
-
-		InsertInto(scGlobalTileIndex, id);
-		object->mTileIndex = scGlobalTileIndex;
-
-		return;
-	}
-
-	if (object->mTileIndex == scGlobalTileIndex) {
-		return;
-	}
-
 	// Object has not been added to tile map, ignore
 	if (object->mTileIndex == TileIndexNull) {
 #ifdef FX_TILE_SYSTEM_LOG_ERRORS
 		LogError(LC_CORE, "Object ({}) has not been added to tile system!", id);
 #endif
+		return;
+	}
+
+	if (!object->IsCullable()) {
+		if (object->mTileIndex != scGlobalTileIndex) {
+			RemoveObjectFromRect(id, object->mTileIndex, object->mTileSpan);
+			InsertInto(scGlobalTileIndex, id);
+			object->mTileSpan = Vec2u(1, 1);
+		}
 		return;
 	}
 

@@ -3,7 +3,7 @@ meta = {
 }
 
 sun = {
-    pos = [10.0, 4, -2.5]
+    pos = [1.0, 8, -5.5]
     color = [250, 220, 182, 7]
     ambient = [75, 75, 72, 3]
 }
@@ -32,74 +32,4 @@ objects = {
         unlit = $True
         nocull = $True
     }
-
-	/*FireExtinguisher = {
-		mesh = "/FireExtinguisher.glb"
-		pos = [-1.0, -0.1, 1.5]
-        scale = 1.5
-
-		shadows = $True
-	}
-
-    Level = {
-        mesh = "/Sponza.glb"
-        scale = 0.01
-        shadows = $True
-        collider = "Floor"
-        pos = [0.0, -1.25, 0.0]
-    }*/
-
-
-	testarms = {
-		mesh = "/fps_pistol_animations.glb"
-		pos = [0.0, 0.5, 0.0]
-
-		shadows = $False
-	}
-
-	/*FireExtinguisher = {
-		mesh = "/FireExtinguisher.glb"
-		pos = [0.0, 0.5, 0.0]
-        scale = 1.5
-
-		shadows = $True
-	}*/
-
-	/*
-    Level = {
-        mesh = "/TestFloor.glb"
-        collider = "Floor"
-        pos = [0.0, -1.5, 0.0]
-    }
-
-
-    Building = {
-        mesh = "/Building.glb"
-        pos = [0.0, -0.8, 10.0]
-    }
-
-
-
-    AnimTest = {
-        mesh = "/Model2.glb"
-        shadows = $False
-        scale = 1.20
-        pos = [0.0, 0.0, -1.0]
-        Layer = $CObjectLayer.Player
-    }
-    Pistol = {
-        mesh = "/Pistol.glb"
-        shadows = $True
-        Layer = $CObjectLayer.Player
-    }
-
-
-
-    BrickTest = {
-        mesh = "/BrickTest.glb"
-        shadows = $True
-        collider = "BrickWall"
-        pos = [0.0, 0.4, 2.0]
-    }
-	*/
 }

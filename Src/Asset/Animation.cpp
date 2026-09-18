@@ -79,11 +79,16 @@ void Skeleton::EvaluatePose(Animation& anim, float32 time)
 			Mat4f::AsScale(scale) * Mat4f::AsRotation(rotation) * Mat4f::AsTranslation(translation);
 	}
 
+	const bool has_root_transforms = (RootTransforms.Size == joint_count);
+
 	for (uint32 i = 0; i < joint_count; i++) {
 		const int32 parent = ParentIndices.pData[i];
 
 		if (parent < 0) {
-			WorldTransforms[i] = LocalTransforms[i];
+			// A root joint's parent chain lives outside the skin, so its transform has to come from the
+			// node hierarchy instead of from another joint.
+			WorldTransforms[i] =
+				has_root_transforms ? (LocalTransforms[i] * RootTransforms[i]) : LocalTransforms[i];
 		}
 		else {
 			WorldTransforms[i] = LocalTransforms[i] * WorldTransforms[parent];
