@@ -32,7 +32,7 @@ Quat Quat::FromAxisAngle(Vec3f axis, float32 angle)
 	float32x4_t mp_v = vsetq_lane_f32(cv, vdupq_n_f32(sv), 3);
 
 	// { X, Y, Z, 1.0 }
-	const float32x4_t axis_v = vsetq_lane_f32(1.0, Neon::Normalize(axis.mIntrin), 3);
+	const float32x4_t axis_v = vsetq_lane_f32(1.0, axis.Normalize().mIntrin, 3);
 	return Quat(vmulq_f32(axis_v, mp_v));
 }
 
@@ -214,7 +214,7 @@ Vec3f Quat::GetEulerAngles() const
 	float t3 = 2.0f * (W * Z + X * Y);
 	float t4 = 1.0f - 2.0f * (y_sq + Z * Z);
 
-	return Vec3f(atan2(t0, t1), sin(t2), atan2(t3, t4));
+	return Vec3f(atan2(t0, t1), asin(t2), atan2(t3, t4));
 }
 
 } // namespace fx

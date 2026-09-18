@@ -46,6 +46,7 @@ public:
 	FX_FORCE_INLINE void NLerpIP(const Quat& dest, float32 step);
 
 	FX_FORCE_INLINE Quat Conjugate() const;
+	FX_FORCE_INLINE Quat Normalize() const;
 
 	FX_FORCE_INLINE Quat& SmoothInterpolate(const Quat& dest, const float speed, const float delta_time)
 	{

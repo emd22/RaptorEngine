@@ -111,8 +111,6 @@ private:
 	ObjectID mRaycastHitMarker = ObjectID::scNull;
 	ObjectID mEditorSelectedObject = ObjectID::scNull;
 
-	Object* mpViewModel = nullptr;
-
 	MaterialID mBlockoutMaterial = MaterialID::scNull;
 
 	ConfigFile Config;

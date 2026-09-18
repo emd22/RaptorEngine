@@ -40,19 +40,17 @@ void SinCos(float32 in_angle, float32* out_sine, float32* out_cosine)
     static constexpr float32 scPi = FX_PI;
     static constexpr float32 scHalfPi = FX_HALF_PI;
 
-    if (in_angle > FX_2PI) {
-        in_angle = -FX_2PI;
-    }
-    else if (in_angle < -FX_2PI) {
-        in_angle = FX_2PI;
-    }
+    // Wrap the angle into [-pi, pi]. x mod 2pi = x - (round(x / 2pi) * 2pi)
+    in_angle = std::fmaf(-std::round(in_angle * static_cast<float32>(FX_1_OVER_2PI)), static_cast<float32>(FX_2PI),
+                         in_angle);
 
     uint32 angle_sign = AsUInt(in_angle) & scSignMask;
 
     // Pi if the sign is positive, -Pi if the sign is negative.
     float32 pi_or_neg_pi = AsFloat(AsUInt(scPi) | angle_sign);
 
-    uint32 cmp_result = (float32((~angle_sign) & AsUInt(in_angle)) <= float32(scHalfPi)) ? 0xFFFFFFFF : 0x00000000;
+    // Compare |in_angle| <= pi / 2. Note that the masked bits must be reinterpreted (not converted) back to a float.
+    uint32 cmp_result = (AsFloat((~angle_sign) & AsUInt(in_angle)) <= scHalfPi) ? 0xFFFFFFFF : 0x00000000;
 
     uint32 sel0 = (cmp_result & AsUInt(in_angle));
     uint32 sel1 = ((~cmp_result) & AsUInt((pi_or_neg_pi - in_angle)));

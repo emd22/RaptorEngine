@@ -27,6 +27,9 @@ enum class eMaterialFlags : uint32
 {
 	None = 0,
 	Unlit = (1 << 0),
+	/// The MetallicRoughness component holds a KHR_materials_pbrSpecularGlossiness texture (specular RGB,
+	/// glossiness A) instead of glTF metallic/roughness (roughness G, metallic B).
+	SpecularGlossiness = (1 << 1),
 };
 
 FxEnumFlags(eMaterialFlags);
@@ -107,11 +110,26 @@ private:
 // Material
 /////////////////////////////////////
 
+/**
+ * @brief Per-material constants, uploaded as-is to the material properties buffer.
+ */
 struct MaterialProperties
 {
 	eMaterialFlags Flags = eMaterialFlags::None;
 	float32 Alpha = 1.0f;
+
+	/// Scales the metallic (B) and roughness (G) channels of the MetallicRoughness texture. With no texture bound these
+	/// are the surface values themselves.
+	float32 MetallicFactor = 0.0f;
+	float32 RoughnessFactor = 0.5f;
+
+	/// Scales the specular (RGB) and glossiness (A) channels when `eMaterialFlags::SpecularGlossiness` is set.
+	float32 SpecularFactor[3] = { 1.0f, 1.0f, 1.0f };
+	float32 GlossinessFactor = 1.0f;
 };
+
+static_assert(sizeof(MaterialProperties) == 32,
+			  "MaterialProperties must match `Material` in Shaders/MaterialDef.hlsli");
 
 /**
  * @brief Renderer material class.
@@ -193,6 +211,13 @@ public:
 
 	void SetUnlit(bool value);
 	void SetAlpha(float32 alpha);
+	void SetMetallicRoughness(float32 metallic, float32 roughness);
+
+	/**
+	 * @brief Switches the material to the specular/glossiness workflow. The MetallicRoughness component is then read
+	 * as specular (RGB) and glossiness (A).
+	 */
+	void SetSpecularGlossiness(const float32 specular[3], float32 glossiness);
 
 	bool IsAlbedoOnly() const { return (NormalMap.Exists() == false); }
 

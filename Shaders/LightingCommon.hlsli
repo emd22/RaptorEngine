@@ -89,6 +89,20 @@ float Fr_FrostbiteDisneyDiffuse(float NdotV, float NdotL, float LdotH, float lin
 	return light_scatter * view_scatter * energy_factor;
 }
 
+/// Analytic fit of the split-sum environment BRDF (Karis, "Physically Based Shading on Mobile").
+/// Scales prefiltered ambient radiance into reflected specular for the given F0 and perceptual roughness.
+float3 EnvBRDFApprox(float3 f0, float roughness, float NdotV)
+{
+	const float4 c0 = float4(-1.0, -0.0275, -0.572, 0.022);
+	const float4 c1 = float4(1.0, 0.0425, 1.04, -0.04);
+
+	float4 r = roughness * c0 + c1;
+	float a004 = min(r.x * r.x, exp2(-9.28 * NdotV)) * r.x + r.y;
+	float2 AB = float2(-1.04, 1.04) * a004 + r.zw;
+
+	return f0 * AB.x + AB.y;
+}
+
 float AttenuationSmooth(float distance_sq, float inv_radius_sq)
 {
 	float factor = distance_sq * inv_radius_sq;

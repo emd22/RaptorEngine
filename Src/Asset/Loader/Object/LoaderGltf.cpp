@@ -257,17 +257,25 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 
 	object->SetMaterial(material_id);
 
-	// For some reason the peeber metallic roughness holds our diffuse texture
-	if (gltf_material->has_pbr_metallic_roughness) {
-		cgltf_texture_view& texture_view = gltf_material->pbr_metallic_roughness.base_color_texture;
+	// KHR_materials_pbrSpecularGlossiness takes priority when present; any pbrMetallicRoughness block alongside it is
+	// only a fallback for loaders that don't support the extension.
+	const bool use_specular_glossiness = gltf_material->has_pbr_specular_glossiness;
 
-		if (!texture_view.texture) {
-			material->Diffuse.SetTicket(gAssetManager->GetNullImageTicket(eImageFormat::RGBA8_UNorm));
-		}
-		else {
-			MakeMaterialTextureForPrimitive(model_name, tcache_base_path, material, "AL", material->Diffuse,
-											texture_view);
-		}
+	cgltf_pbr_metallic_roughness& gltf_mr = gltf_material->pbr_metallic_roughness;
+	cgltf_pbr_specular_glossiness& gltf_sg = gltf_material->pbr_specular_glossiness;
+
+	// Diffuse lives in whichever PBR block the material uses
+	cgltf_texture_view* diffuse_view = nullptr;
+
+	if (use_specular_glossiness) {
+		diffuse_view = &gltf_sg.diffuse_texture;
+	}
+	else if (gltf_material->has_pbr_metallic_roughness) {
+		diffuse_view = &gltf_mr.base_color_texture;
+	}
+
+	if (diffuse_view != nullptr && diffuse_view->texture != nullptr) {
+		MakeMaterialTextureForPrimitive(model_name, tcache_base_path, material, "AL", material->Diffuse, *diffuse_view);
 	}
 	else {
 		material->Diffuse.SetTicket(gAssetManager->GetNullImageTicket(eImageFormat::RGBA8_UNorm));
@@ -279,17 +287,32 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 										gltf_material->normal_texture);
 	}
 
-	// Load the metallic/roughness texture
-	if (gltf_material->pbr_metallic_roughness.metallic_roughness_texture.texture != nullptr) {
-		MakeMaterialTextureForPrimitive(model_name, tcache_base_path, material, "MR", material->MetallicRoughness,
-										gltf_material->pbr_metallic_roughness.metallic_roughness_texture);
+	// Load the surface texture and factors. cgltf fills in the glTF defaults for any factor the file leaves out
+	if (use_specular_glossiness) {
+		material->SetSpecularGlossiness(gltf_sg.specular_factor, gltf_sg.glossiness_factor);
+
+		if (gltf_sg.specular_glossiness_texture.texture != nullptr) {
+			MakeMaterialTextureForPrimitive(model_name, tcache_base_path, material, "SG", material->MetallicRoughness,
+											gltf_sg.specular_glossiness_texture);
+		}
+	}
+	else {
+		material->SetMetallicRoughness(gltf_mr.metallic_factor, gltf_mr.roughness_factor);
+
+		if (gltf_mr.metallic_roughness_texture.texture != nullptr) {
+			MakeMaterialTextureForPrimitive(model_name, tcache_base_path, material, "MR", material->MetallicRoughness,
+											gltf_mr.metallic_roughness_texture);
+		}
 	}
 
 	// Handle glTF alpha mode / baseColorFactor alpha
 	{
 		float baseAlpha = 1.0f;
-		if (gltf_material->has_pbr_metallic_roughness) {
-			baseAlpha = gltf_material->pbr_metallic_roughness.base_color_factor[3];
+		if (use_specular_glossiness) {
+			baseAlpha = gltf_sg.diffuse_factor[3];
+		}
+		else if (gltf_material->has_pbr_metallic_roughness) {
+			baseAlpha = gltf_mr.base_color_factor[3];
 		}
 
 		if (gltf_material->alpha_mode == cgltf_alpha_mode_blend) {

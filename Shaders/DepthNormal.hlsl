@@ -79,21 +79,30 @@ VSOutput main(VSInput input)
         + input.vJointWeights.z * bBones[bone_base + input.vJointIndices.z]
         + input.vJointWeights.w * bBones[bone_base + input.vJointIndices.w];
 
-    output.vPosition = mul(mul(float4(input.vPosition, 1.0), skin_xform), MVP);
+    // Posed vertex in model space
+    float4 position_ms = mul(float4(input.vPosition, 1.0), skin_xform);
+
+    output.vPosition = mul(position_ms, MVP);
     output.vNormalWS = normalize(mul(mul(input.vNormal, (float3x3)skin_xform), (float3x3)world_matrix));
 #else
-    output.vPosition = mul(float4(input.vPosition, 1.0), MVP);
+    float4 position_ms = float4(input.vPosition, 1.0);
+
+    output.vPosition = mul(position_ms, MVP);
     output.vNormalWS = normalize(mul(input.vNormal, (float3x3)world_matrix));
 #endif
 
 #ifdef USE_NORMAL_MAPS
+#ifdef USE_SKINNING
+    output.vTangentWS = normalize(mul(mul(input.vTangent, (float3x3)skin_xform), (float3x3)world_matrix));
+#else
     output.vTangentWS = normalize(mul(input.vTangent, (float3x3)world_matrix));
+#endif
     output.vBitangentWS = cross(output.vNormalWS, output.vTangentWS);
 #endif
 
     output.vUV = input.vUV;
 
-    float4 position_ws = mul(float4(input.vPosition, 1.0), world_matrix);
+    float4 position_ws = mul(position_ms, world_matrix);
 	output.vPositionWS = position_ws.xyz;
 
 	output.uiMaterialIndex = VSConst.uiMaterialIndex;

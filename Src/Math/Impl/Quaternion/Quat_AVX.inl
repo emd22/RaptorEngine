@@ -119,6 +119,7 @@ Quat Quat::SLerp(const Quat& dest, const float32 step) const
 }
 
 FX_FORCE_INLINE Quat Quat::Conjugate() const { return Quat(SSE::FlipSigns<-1, -1, -1, 1>(mIntrin)); }
+FX_FORCE_INLINE Quat Quat::Normalize() const { return Quat(SSE::Normalize(mIntrin)); }
 
 } // namespace fx
 

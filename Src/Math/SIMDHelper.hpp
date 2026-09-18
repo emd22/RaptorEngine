@@ -17,6 +17,8 @@
 #include "SSE.hpp"
 #endif
 
+#include <bit>
+
 namespace fx {
 
 #ifdef FX_USE_NEON
@@ -51,6 +53,23 @@ FX_FORCE_INLINE FLOAT4 Max(FLOAT4 a, FLOAT4 b) { return vmaxq_f32(a, b); }
 
 FX_FORCE_INLINE FLOAT4 Select(UINT4 mask, FLOAT4 a, FLOAT4 b) { return vbslq_f32(mask, a, b); }
 
+/**
+ * @brief Returns the signs of a vector. 1.0 if the component is positive or -1.0 if negative.
+ * Follows the same logic as the version I wrote in MathUtil
+ */
+FX_FORCE_INLINE FLOAT4 GetSign(FLOAT4 v)
+{
+	const uint32x4_t v_sign_mask = vdupq_n_u32(0x80000000U);
+	const uint32x4_t v_one = vdupq_n_u32(std::bit_cast<unsigned int>(1.0f));
+
+	// The bare sign bit
+	const uint32x4_t sign = vandq_u32(vreinterpretq_u32_f32(v), v_sign_mask);
+
+	// Add back in the `1.0`. We could return negative or positive zero, but that is not very useful in
+	// multiplications...
+	return vreinterpretq_u32_f32(vorrq_u32(sign, v_one));
+}
+
 } // namespace simd
 
 #else
@@ -63,7 +82,10 @@ namespace simd {
 FX_FORCE_INLINE void StoreUInt4(unsigned int* dst, UINT4 v) { _mm_storeu_si128(reinterpret_cast<__m128i*>(dst), v); }
 FX_FORCE_INLINE void StoreFloat4(float* dst, FLOAT4 v) { _mm_storeu_ps(dst, v); }
 
-FX_FORCE_INLINE UINT4 LoadUInt4(const unsigned int* src) { return _mm_loadu_si128(reinterpret_cast<const __m128i*>(src)); }
+FX_FORCE_INLINE UINT4 LoadUInt4(const unsigned int* src)
+{
+	return _mm_loadu_si128(reinterpret_cast<const __m128i*>(src));
+}
 FX_FORCE_INLINE FLOAT4 LoadFloat4(const float* src) { return _mm_loadu_ps(src); }
 FX_FORCE_INLINE FLOAT4 LoadFloat4(float x, float y, float z, float w)
 {
@@ -89,6 +111,26 @@ FX_FORCE_INLINE FLOAT4 Min(FLOAT4 a, FLOAT4 b) { return _mm_min_ps(a, b); }
 FX_FORCE_INLINE FLOAT4 Max(FLOAT4 a, FLOAT4 b) { return _mm_max_ps(a, b); }
 
 FX_FORCE_INLINE FLOAT4 Select(UINT4 mask, FLOAT4 a, FLOAT4 b) { return _mm_blendv_ps(b, a, _mm_castsi128_ps(mask)); }
+
+/**
+ * @brief Returns the signs of a vector. 1.0 if the component is positive or -1.0 if negative.
+ * Follows the same logic as the version I wrote in MathUtil, and the same as the Neon implementation above
+ */
+FX_FORCE_INLINE FLOAT4 GetSign(FLOAT4 v)
+{
+	constexpr uint32 sign_mask = 0x80000000U;
+	constexpr uint32 one = std::bit_cast<unsigned int>(1.0f);
+
+	const __m128i v_sign_mask = _mm_set1_epi32(std::bit_cast<int>(sign_mask));
+	const __m128i v_one = _mm_set1_epi32(std::bit_cast<int>(one));
+
+	// The bare sign bit
+	const __m128 sign = _mm_and_ps(v, _mm_castsi128_ps(v_sign_mask));
+
+	// Add back in the `1.0`. We could return negative or positive zero, but that is not very useful in
+	// multiplications...
+	return _mm_or_ps(sign, _mm_castsi128_ps(v_one));
+}
 
 
 } // namespace simd

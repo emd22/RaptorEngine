@@ -53,6 +53,10 @@ public:
 
 	virtual void OnAttached(World* scene) {}
 
+	/**
+	 * @brief Rotate around the entity's own (local) X, Y or Z axis. A positive angle follows the right-hand rule, which
+	 * in this left-handed (+Z forward) space means RotateX(+) pitches forward down and RotateY(+) yaws forward right.
+	 */
 	void RotateX(float32 rad);
 	void RotateY(float32 rad);
 	void RotateZ(float32 rad);

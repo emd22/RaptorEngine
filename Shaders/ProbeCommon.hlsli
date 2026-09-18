@@ -1,17 +1,12 @@
 ///
 /// Light-probe sampling shared by the forward passes.
 ///
-/// The struct layouts and the constants below mirror Src/Renderer/Limits.hpp and
-/// Src/Renderer/LightProbe.hpp; the C++ side static_asserts its structs against
-/// these sizes, so the two have to be changed together.
-///
 
 /// SH coefficient count for an L2 irradiance probe (Limits::ProbeSHCoeffCount).
 #define PROBE_SH_COEFF_COUNT 9
 
 /// Depth-moments cubemap: PROBE_DEPTH_FACES faces of PROBE_DEPTH_SIZE^2 texels,
 /// each texel holding (mean distance, mean distance squared).
-/// Mirrors Limits::ProbeDepthSize / Limits::ProbeDepthFaces.
 #define PROBE_DEPTH_SIZE 16
 #define PROBE_DEPTH_FACES 6
 #define PROBE_DEPTH_TEXELS_PER_FACE (PROBE_DEPTH_SIZE * PROBE_DEPTH_SIZE)
@@ -22,22 +17,13 @@
 /// Bias (metres) subtracted from the receiver distance before the Chebyshev test.
 #define PROBE_CHEBYSHEV_BIAS 0.02
 
-/// tan() of a depth-cubemap texel's half angular width (90 deg face FOV / PROBE_DEPTH_SIZE,
-/// halved), i.e. the worldspace radius one texel spans per metre of distance from the probe.
+
 #define PROBE_DEPTH_TEXEL_SLOPE tan(radians(45.0 / PROBE_DEPTH_SIZE))
 
-/// Receiver offset along the surface normal, as a fraction of the smallest probe
-/// spacing, clamped to [PROBE_NORMAL_BIAS_MIN, PROBE_NORMAL_BIAS_MAX] metres.
-/// Without it a surface occludes itself in the depth maps that baked it: one
-/// 16x16 face texel covers a large solid angle, and bilinear filtering pulls the
-/// mean occluder distance in front of the surface near depth discontinuities.
 #define PROBE_NORMAL_BIAS_SCALE 0.2
 #define PROBE_NORMAL_BIAS_MIN 0.02
 #define PROBE_NORMAL_BIAS_MAX 0.5
 
-/// Floors on the per-probe weights. The weights are normalised, so these only
-/// bound how far one probe can be pushed below its trilinear share; they also
-/// keep the total weight away from zero when every probe reports "occluded".
 #define PROBE_VISIBILITY_FLOOR 0.05
 #define PROBE_BACKFACE_FLOOR 0.2
 
@@ -63,7 +49,6 @@ struct ProbeVolume
 };
 
 /// Spherical Harmonics L2 diffuse irradiance.
-/// Basis order must match ProbeBasisSH() in Src/Renderer/LightProbe.cpp.
 float3 EvalProbeIrradiance(float3 normal, ProbeSHData probe)
 {
 	float3 irradiance = probe.SH[0].rgb * 0.282095;
@@ -80,9 +65,7 @@ float3 EvalProbeIrradiance(float3 normal, ProbeSHData probe)
 	return max(irradiance, float3(0.0, 0.0, 0.0));
 }
 
-/// Maps a direction to a depth-cubemap face + 0..1 uv.
-/// Must match ProbeDepthDirectionToTexel() in Src/Renderer/LightProbe.cpp.
-/// Faces: 0:+X 1:-X 2:+Y 3:-Y 4:+Z 5:-Z.
+
 void ProbeDepthDirectionToFaceUV(float3 d, out uint face, out float2 uv01)
 {
 	float ax = abs(d.x);
@@ -127,22 +110,7 @@ void ProbeDepthDirectionToFaceUV(float3 d, out uint face, out float2 uv01)
 	uv01 = float2(u * 0.5 + 0.5, v * 0.5 + 0.5);
 }
 
-/// Minimum plausible variance for a texel, floored by its own angular footprint
-/// rather than a flat constant. At distance `mean`, one PROBE_DEPTH_SIZE face
-/// texel already spans roughly `mean * PROBE_DEPTH_TEXEL_SLOPE` metres, so two
-/// rays landing in it can legitimately disagree by that much even on a single
-/// flat, consistently-oriented facet -- a fixed ~1cm floor is far tighter than
-/// that footprint once `mean` is more than a few tens of centimetres.
-///
-/// Also floored by the receiver's normal-offset bias itself (PROBE_NORMAL_BIAS_MAX):
-/// at grazing angles -- common on thin/narrow faces, whose nearby probes are
-/// rarely straight-on -- offsetting the receiver along its normal barely changes
-/// distance to the probe, so the bias shows up almost undiminished as `d` in
-/// ProbeDepthChebyshev(). The bias amount comes from grid spacing, not this
-/// probe's actual distance, so a close-but-grazing probe isn't covered by the
-/// footprint term above. Without this floor too, variance/(variance + d^2)
-/// collapses to near-zero on an otherwise unoccluded flat facet seen edge-on --
-/// dark blotches following the mesh's facets on thin geometry.
+
 float ProbeMinVariance(float mean)
 {
 	float footprint = mean * PROBE_DEPTH_TEXEL_SLOPE;
@@ -168,12 +136,6 @@ float ProbeDepthChebyshev(float receiver_dist, float mean, float mean_sq)
 }
 
 /// Bilinear-filtered moments fetch from a single probe face.
-/// Moments live in a StructuredBuffer (no HW filtering), so filter manually.
-/// Out-of-range taps clamp to the face edge, so the four taps never cross a cube
-/// seam; that is a known approximation of a real cubemap fetch.
-///
-/// The buffer + index are threaded through instead of a ProbeInfo value: copying
-/// a ProbeInfo pulls all 12 KB of its moments into locals at every call site.
 float2 SampleProbeMomentsBilinear(StructuredBuffer<ProbeInfo> probe_infos, uint info_index, uint face, float2 uv01)
 {
 	uint face_base = face * PROBE_DEPTH_TEXELS_PER_FACE;
@@ -214,9 +176,6 @@ float SampleProbeVisibility(float3 pos_ws, StructuredBuffer<ProbeInfo> probe_inf
 
 	float3 dir = to_receiver / raw_dist;
 
-	// Baked distances saturate at PROBE_DEPTH_MAX_DISTANCE, so a receiver past
-	// that range has to be compared against the same saturated value; otherwise
-	// open space beyond the range always tests as occluded.
 	float dist = min(raw_dist, PROBE_DEPTH_MAX_DISTANCE);
 
 	uint face;
@@ -236,8 +195,6 @@ float SampleProbeVisibility(float3 pos_ws, StructuredBuffer<ProbeInfo> probe_inf
 	return ProbeDepthChebyshev(dist, mean, mean_sq);
 }
 
-/// Smooth backface weight: probes sitting behind the shaded surface fade out
-/// instead of leaking light through it.
 float ProbeBackfaceWeight(float3 pos_ws, float3 n, float3 probe_pos)
 {
 	float3 to_probe = probe_pos - pos_ws;
@@ -252,8 +209,6 @@ float ProbeBackfaceWeight(float3 pos_ws, float3 n, float3 probe_pos)
 	return wrap * wrap + PROBE_BACKFACE_FLOOR;
 }
 
-/// Receiver position used for every probe lookup, offset off the surface so it
-/// does not occlude itself in the depth maps that baked it.
 float3 ProbeBiasedPosition(float3 pos_ws, float3 n, ProbeVolume volume)
 {
 	float3 spacing = float3(1.0, 1.0, 1.0) / max(volume.vInvCellSize.xyz, float3(1e-6, 1e-6, 1e-6));
@@ -278,7 +233,6 @@ void ProbeVolumeCell(float3 pos_ws, ProbeVolume volume, out uint3 base, out floa
 }
 
 /// Linear probe index of tap `corner` (0..7) around `base`.
-/// Must match the probe fill order in ProbeManager::PlaceGridProbes().
 uint ProbeVolumeTapIndex(uint3 base, uint corner, uint3 dims, out float3 corner_mask)
 {
 	uint3 ridx = uint3(corner, corner >> 1, corner >> 2) & uint3(1, 1, 1);
@@ -297,17 +251,9 @@ float ProbeVolumeTapWeight(float3 corner_mask, float3 cell_frac)
 	return w.x * w.y * w.z;
 }
 
-/// Trilinearly blended SH irradiance, with each probe's share scaled by how well
-/// it can actually see the receiver.
-///
-/// Visibility weights the probes rather than scaling the result: an occluder
-/// between a probe and the surface means "use the other probes", not "make this
-/// surface darker" -- ambient occlusion is SSAO's job. Because the weights are
-/// normalised, a misprediction shared by all 8 probes cancels out, and only
-/// differential occlusion (the case probe visibility exists to catch) moves the
-/// result.
-float3 SampleProbeVolume(float3 pos_ws, float3 n, ProbeVolume volume, StructuredBuffer<ProbeSHData> probes,
-						 StructuredBuffer<ProbeInfo> probe_infos)
+
+ProbeSHData SampleProbeVolumeSH(float3 pos_ws, float3 n, ProbeVolume volume, StructuredBuffer<ProbeSHData> probes,
+								StructuredBuffer<ProbeInfo> probe_infos)
 {
 	uint3 dims = volume.vDimsAndCount.xyz;
 
@@ -347,12 +293,15 @@ float3 SampleProbeVolume(float3 pos_ws, float3 n, ProbeVolume volume, Structured
 		probe.SH[k3] = float4(blended[k3] * inv_weight, 0.0);
 	}
 
-	return EvalProbeIrradiance(n, probe);
+	return probe;
 }
 
-/// Trilinearly blended visibility from the 8 surrounding probes.
-/// Debug view only -- SampleProbeVolume() folds visibility into its probe weights
-/// rather than consuming this scalar.
+float3 SampleProbeVolume(float3 pos_ws, float3 n, ProbeVolume volume, StructuredBuffer<ProbeSHData> probes,
+						 StructuredBuffer<ProbeInfo> probe_infos)
+{
+	return EvalProbeIrradiance(n, SampleProbeVolumeSH(pos_ws, n, volume, probes, probe_infos));
+}
+
 float SampleProbeVolumeVisibility(float3 pos_ws, float3 n, ProbeVolume volume, StructuredBuffer<ProbeInfo> probe_infos)
 {
 	uint3 dims = volume.vDimsAndCount.xyz;

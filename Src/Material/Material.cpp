@@ -321,6 +321,24 @@ void Material::SetAlpha(float32 alpha)
 	mbRequiresSync = true;
 }
 
+void Material::SetMetallicRoughness(float32 metallic, float32 roughness)
+{
+	ClearFlag(Properties.Flags, eMaterialFlags::SpecularGlossiness);
+
+	Properties.MetallicFactor = metallic;
+	Properties.RoughnessFactor = roughness;
+	mbRequiresSync = true;
+}
+
+void Material::SetSpecularGlossiness(const float32 specular[3], float32 glossiness)
+{
+	SetFlag(Properties.Flags, eMaterialFlags::SpecularGlossiness);
+
+	memcpy(Properties.SpecularFactor, specular, sizeof(Properties.SpecularFactor));
+	Properties.GlossinessFactor = glossiness;
+	mbRequiresSync = true;
+}
+
 renderer::DescriptorSet* Material::RequestAlbedoOnlyDescriptors()
 {
 	if (mpAlbedoOnlyDescriptorSet != nullptr) {
@@ -389,6 +407,8 @@ void Material::Build()
 		diffuse_sampler_props.SetNearest();
 	}
 
+	// The null image is white, so the shader's texture * factor falls back to the material factors alone
+	// (Properties.MetallicFactor etc.), which is also how glTF defines a missing metallic/roughness texture.
 	if (NormalMap.Exists() && !MetallicRoughness.Exists()) {
 		MetallicRoughness.SetTicket(gAssetManager->GetNullImageTicket(eImageFormat::RGBA8_UNorm));
 	}
