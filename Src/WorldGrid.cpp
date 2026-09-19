@@ -289,15 +289,15 @@ void WorldGrid::UpdateObject(Object* object, bool update_attached)
 		return;
 	}
 
-	mbNearbyObjectCacheValid = false;
-
-	// Object has not been added to tile map, ignore
+	// Object has not been added to tile map, ignore.
 	if (object->mTileIndex == TileIndexNull) {
 #ifdef FX_TILE_SYSTEM_LOG_ERRORS
 		LogError(LC_CORE, "Object ({}) has not been added to tile system!", id);
 #endif
 		return;
 	}
+
+	mbNearbyObjectCacheValid = false;
 
 	if (!object->IsCullable()) {
 		if (object->mTileIndex != scGlobalTileIndex) {

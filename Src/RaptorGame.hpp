@@ -108,7 +108,7 @@ public:
 private:
 	uint64 mLastTick = 0;
 
-	ObjectID mRaycastHitMarker = ObjectID::scNull;
+	Object* mpRaycastHitMarker = nullptr;
 	ObjectID mEditorSelectedObject = ObjectID::scNull;
 
 	MaterialID mBlockoutMaterial = MaterialID::scNull;

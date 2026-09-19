@@ -4,14 +4,39 @@ meta = {
 
 
 sun = {
-	enabled = $True
-    pos = [-5.0, 2, -5.5]
+    pos = [-2.0, 10, -2.5]
     color = [240, 160, 102, 4]
     ambient = [75, 75, 72, 1]
 }
 
 lights = {
-
+    /*spot0 = {
+        type = $CLight.Spot
+        pos = [0.0, 0.7, 0.0]
+        dir = [0.0, 0.0, 1.0]
+        color = [255, 40, 40, 70]
+        radius = 30.0
+        inner = 5.0
+        outer = 50.0
+    }
+    spot1 = {
+        type = $CLight.Spot
+        pos = [-5.0, 0.7, 0.0]
+        dir = [0.0, 0.0, 1.0]
+        color = [40, 40, 255, 70]
+        radius = 30.0
+        inner = 5.0
+        outer = 50.0
+    }
+    spot2 = {
+        type = $CLight.Spot
+        pos = [-3.0, 0.7, 0.0]
+        dir = [0.0, 0.0, 1.0]
+        color = [50, 255, 70, 70]
+        radius = 30.0
+        inner = 5.0
+        outer = 50.0
+    }*/
 }
 
 

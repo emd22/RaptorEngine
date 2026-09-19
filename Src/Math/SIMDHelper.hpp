@@ -10,6 +10,7 @@
 #pragma once
 
 #include <Core/Defines.hpp>
+#include <Core/Types.hpp>
 
 #ifdef FX_USE_NEON
 #include <arm_neon.h>

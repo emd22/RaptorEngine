@@ -43,6 +43,7 @@ enum class eObjectFlags : uint16
 	ShadowCaster = (1 << 3),
 	Unlit = (1 << 4),
 	DisableCulling = (1 << 5),
+	/// Left out of light probe bakes (capture, capture shadows and probe placement). See Object::IsProbeVisible().
 	NotProbeVisible = (1 << 6),
 };
 
@@ -151,6 +152,20 @@ public:
 
 	FX_FORCE_INLINE bool IsShadowCaster() const { return (Flags & eObjectFlags::ShadowCaster) != 0; }
 
+	/**
+	 * @brief Sets whether light probe bakes can see this object and everything attached to it.
+	 */
+	void SetProbeVisible(bool value);
+
+	/**
+	 * @brief True if light probe bakes should include this object. Objects on the player layer (the view model) are
+	 * never part of the level, so they are always left out.
+	 */
+	FX_FORCE_INLINE bool IsProbeVisible() const
+	{
+		return !HasFlag(Flags, eObjectFlags::NotProbeVisible) && (mObjectLayer != eObjectLayer::PlayerLayer);
+	}
+
 	void SetUnlit(const bool value);
 	FX_FORCE_INLINE bool IsUnlit() const { return (Flags & eObjectFlags::Unlit) != 0; }
 
@@ -183,10 +198,8 @@ public:
 
 	eObjectTag Tags = eObjectTag::None;
 
+	/// May be shared with other objects skinned to the same GLTF skin. Animations and playback state live on it.
 	Ref<Skeleton> pSkeleton { nullptr };
-	SizedArray<Animation> Animations;
-	Animation* pCurrentAnimation = nullptr;
-	float32 AnimationTime = 0.0f;
 
 	/// This object's slot index into `GraphicsBackend::BoneBuffer` for the current frame, set by `UpdateAnimation()`
 	/// and submitted to the shader via DrawPushConstants::BoneSlot (the whole buffer is bound at one fixed per-frame
@@ -194,9 +207,6 @@ public:
 	/// Remembered here rather than re-read at bind time because other skinned objects updating later in the same
 	/// frame advance the buffer's shared slot cursor.
 	uint32 BoneBufferSlot = 0;
-	/// The frame (`GraphicsBackend::GetElapsedFrameCount()`) this object's animation was last updated on, so that
-	/// being visited multiple times per frame (shadow pass, depth prepass, forward pass) only advances the pose once.
-	uint32 mAnimationUpdateFrame = UINT32_MAX;
 
 	ObjectID ParentID = ObjectID::scNull;
 	PagedArray<ObjectID> AttachedNodes;

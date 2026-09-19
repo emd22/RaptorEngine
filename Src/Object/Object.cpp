@@ -120,36 +120,46 @@ void Object::OnAttached(World* scene)
 
 void Object::UpdateAnimation()
 {
-	if (!pCurrentAnimation && Animations.Size > 0) {
-		pCurrentAnimation = &Animations[0];
-	}
-
-	if (!pCurrentAnimation || !pSkeleton) {
+	if (!pSkeleton) {
 		return;
 	}
 
-	// An object can be visited multiple times in one frame (shadow pass, depth prepass, forward pass); only advance
-	// the pose the first time, and reuse the bone-buffer slot claimed then for every subsequent draw this frame.
+	Skeleton& skel = *pSkeleton;
+
+	if (!skel.pCurrentAnimation && skel.Animations.Size > 0) {
+		skel.pCurrentAnimation = &skel.Animations[0];
+	}
+
+	if (!skel.pCurrentAnimation) {
+		return;
+	}
+
+	// A skeleton can be visited multiple times in one frame (several meshes sharing it, and the shadow pass, depth
+	// prepass and forward pass for each); only advance the pose the first time, and reuse the bone-buffer slot
+	// claimed then for every subsequent draw this frame.
 	const uint32 current_frame = gGraphics->GetElapsedFrameCount();
-	if (mAnimationUpdateFrame == current_frame) {
-		return;
+	if (skel.LastUpdateFrame != current_frame) {
+		skel.LastUpdateFrame = current_frame;
+
+		Animation& anim = *skel.pCurrentAnimation;
+
+		if (skel.AnimationTime >= anim.Duration) {
+			skel.AnimationTime = 0.0f;
+		}
+		else if (skel.AnimationTime < 0.0001f) {
+			skel.AnimationTime = anim.Duration;
+		}
+
+		skel.EvaluatePose(anim, skel.AnimationTime);
+
+		skel.AnimationTime += 0.01f;
+
+		gGraphics->BoneBuffer.CopyFrom(skel.SkinningMatrices.pData, skel.SkinningMatrices.Size * sizeof(Mat4f));
+		skel.BoneBufferSlot = gGraphics->BoneBuffer.SlotIndex;
+		gGraphics->BoneBuffer.NextSlot();
 	}
-	mAnimationUpdateFrame = current_frame;
 
-	if (AnimationTime >= pCurrentAnimation->Duration) {
-		AnimationTime = 0.0f;
-	}
-	else if (AnimationTime < 0.0001f) {
-		AnimationTime = pCurrentAnimation->Duration;
-	}
-
-	pSkeleton->EvaluatePose(*pCurrentAnimation, AnimationTime);
-
-	AnimationTime += 0.01f;
-
-	gGraphics->BoneBuffer.CopyFrom(pSkeleton->SkinningMatrices.pData, pSkeleton->SkinningMatrices.Size * sizeof(Mat4f));
-	BoneBufferSlot = gGraphics->BoneBuffer.SlotIndex;
-	gGraphics->BoneBuffer.NextSlot();
+	BoneBufferSlot = skel.BoneBufferSlot;
 }
 
 void Object::MakeInstanceOf(const ObjectID& source_id)
@@ -187,19 +197,6 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 	Assert(pipeline != nullptr);
 
 	FrameData* frame = gGraphics->GetFrame();
-	// Material* material = gMaterialManager->GetMaterial(mMaterialID);
-
-	// if (!pipeline) {
-	// 	pipeline = &material->GetPipeline();
-	// }
-
-
-	// if (pipeline->Name == ePipelineName::Unlit) {
-	// 	Assert(material->IsAlbedoOnly());
-	// }
-	// else if (pipeline->Name == ePipelineName::UnlitNormalMaps) {
-	// 	Assert(!material->IsAlbedoOnly());
-	// }
 
 	DrawPushConstants push_constants { .TargetSize = { gGraphics->Swapchain.Extent.X, gGraphics->Swapchain.Extent.Y } };
 	push_constants.ObjectId = ID.GetID();
@@ -213,15 +210,15 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 	// IsCapturePending() would also strip probe GI and SSAO from the main view for
 	// every frame of a grid bake.
 	if (gProbeManager != nullptr && gProbeManager->IsCapturingFaces()) {
-		push_constants.Flags |= renderer::DrawFlag_ProbeCapture;
+		push_constants.Flags |= eDrawFlags::ProbeCapture;
 	}
 
 	if (gGraphics->bOnlyRenderProbes) {
-		push_constants.Flags |= renderer::DrawFlag_DebugProbeIrradiance;
+		push_constants.Flags |= eDrawFlags::DebugIrradiance;
 	}
 
 	if (gGraphics->bRenderProbeVisibility) {
-		push_constants.Flags |= renderer::DrawFlag_DebugProbeVisibility;
+		push_constants.Flags |= eDrawFlags::DebugProbeVisibility;
 	}
 
 	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
@@ -370,6 +367,23 @@ void Object::SetObjectLayer(eObjectLayer layer)
 	}
 }
 
+void Object::SetProbeVisible(bool value)
+{
+	if (value) {
+		ClearFlag(Flags, eObjectFlags::NotProbeVisible);
+	}
+	else {
+		SetFlag(Flags, eObjectFlags::NotProbeVisible);
+	}
+
+	for (ObjectID attached_id : AttachedNodes) {
+		Object* attached_object = gObjectManager->GetObject(attached_id);
+		if (attached_object != nullptr) {
+			attached_object->SetProbeVisible(value);
+		}
+	}
+}
+
 void Object::SetCullable(bool value)
 {
 	if (!value) {
@@ -388,6 +402,10 @@ void Object::SetPosition(const Vec3f& position)
 	const Vec3f delta = position - mPosition;
 
 	Entity::SetPosition(position);
+
+	// Move the object to its new tile now. Object::Update() does this as well, but it only runs for objects that are
+	// being drawn, which means an object moved away from a tile that isn't visible would never be found again.
+	gWorldGrid->UpdateObject(this);
 
 	if (PhysicsID.IsInvalid() == false) {
 		physics::Body* body = gPhysics->GetBody(PhysicsID);

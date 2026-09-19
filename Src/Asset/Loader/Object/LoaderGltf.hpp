@@ -54,7 +54,7 @@ private:
 
 	void LoadSkeleton(Skeleton& skel, cgltf_skin* skin); // now takes skel by ref
 	void LoadAnimation(Animation& out_anim, const cgltf_animation& anim, cgltf_skin* skin);
-	void LoadAnimations(Object* object, Skeleton& skel);
+	void LoadAnimations(Skeleton& skel, cgltf_skin* skin);
 
 	void BuildObjectsFromPrimitives(Object* container_object, cgltf_mesh* gltf_mesh);
 

@@ -682,22 +682,18 @@ void LoaderGltf::LoadAnimation(Animation& out_anim, const cgltf_animation& anim,
 	LogInfo(LC_ASSET, "Loaded animation '{}': {:.3f}s, {} joints", out_anim.Name, out_anim.Duration, joint_count);
 }
 
-void LoaderGltf::LoadAnimations(Object* object, Skeleton& skel)
+void LoaderGltf::LoadAnimations(Skeleton& skel, cgltf_skin* skin)
 {
-	if (!mpGltfData->animations_count || mpGltfData->skins_count == 0) {
+	if (!mpGltfData->animations_count || !skin) {
 		return;
 	}
 
-	// Most models only have one skin/skeleton, so we just assume one for now.
-	cgltf_skin* skin = &mpGltfData->skins[0];
-
-	object->Animations.InitCapacity(32);
-
+	skel.Animations.InitCapacity(mpGltfData->animations_count);
 
 	for (uint32 i = 0; i < mpGltfData->animations_count; i++) {
 		Animation anim;
 		LoadAnimation(anim, mpGltfData->animations[i], skin);
-		object->Animations.Insert(std::move(anim));
+		skel.Animations.Insert(std::move(anim));
 	}
 
 	LogInfo(LC_ASSET, "Loaded {} animations", mpGltfData->animations_count);
@@ -724,6 +720,10 @@ void LoaderGltf::ProcessData(AssetTicket& ticket)
 
 	bool needs_new_object = false;
 
+	// Skeletons (and their animations) built so far, indexed by skin. Meshes skinned to the same skin share one
+	// skeleton rather than each parsing their own copy.
+	std::vector<Ref<Skeleton>> skeletons(mpGltfData->skins_count);
+
 	// Load each object in the GLTF as a new separate object.
 	for (int32 node_index = 0; node_index < mpGltfData->nodes_count; node_index++) {
 		if (needs_new_object) {
@@ -741,9 +741,15 @@ void LoaderGltf::ProcessData(AssetTicket& ticket)
 
 			// If the node has a skeleton, load it in.
 			if (node->skin) {
-				current_object->pSkeleton = Ref<Skeleton>::New();
-				LoadSkeleton(*current_object->pSkeleton, node->skin);
-				LoadAnimations(current_object, *current_object->pSkeleton);
+				Ref<Skeleton>& skeleton = skeletons[node->skin - mpGltfData->skins];
+
+				if (!skeleton) {
+					skeleton = Ref<Skeleton>::New();
+					LoadSkeleton(*skeleton, node->skin);
+					LoadAnimations(*skeleton, node->skin);
+				}
+
+				current_object->pSkeleton = skeleton;
 			}
 		}
 

@@ -752,7 +752,8 @@ void TiledForwardRenderer::CreateLightCullingPSO()
 	gPSOBuild->EndPipeline();
 }
 
-void TiledForwardRenderer::DoLightCullingPass(Camera& camera, const Vec2u* pExtentOverride)
+void TiledForwardRenderer::DoLightCullingPass(Camera& camera, const Vec2u* pExtentOverride,
+											  const LightCullOverride* pLightOverride)
 {
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
@@ -774,6 +775,12 @@ void TiledForwardRenderer::DoLightCullingPass(Camera& camera, const Vec2u* pExte
 
 	push_constants.LightCount = gGraphics->LightBuffer.SlotIndex;
 	push_constants.TileColumns = tile_columns;
+
+	if (pLightOverride != nullptr) {
+		push_constants.LightCount = pLightOverride->LightCount;
+		push_constants.ReplacedLight = pLightOverride->ReplacedLight;
+		push_constants.ReplacementSlot = pLightOverride->ReplacementSlot;
+	}
 
 	gPipelineCache->AddBufferOffset(0, gGraphics->GetLightGridFrameOffset());
 	gPipelineCache->AddBufferOffset(0, gGraphics->GetLightIndexListFrameOffset());

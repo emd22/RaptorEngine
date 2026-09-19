@@ -48,6 +48,8 @@ namespace fx::renderer {
 using ExtensionNames = GraphicsBackend::ExtensionNames;
 using ExtensionList = GraphicsBackend::ExtensionList;
 
+static constexpr bool scEnableValidationLayers = false;
+
 FX_SET_MODULE_NAME("RenderBackend")
 
 ExtensionNames GraphicsBackend::CheckExtensionsAvailable(ExtensionNames& requested_extensions,
@@ -149,8 +151,8 @@ void GraphicsBackend::Init(Vec2u window_size)
 					   eGpuBufferFlags::PersistentMapped);
 
 	ProbeVolumePageSize = sizeof(ProbeVolumeData);
-	ProbeVolumeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeVolumePageSize, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-							 eGpuBufferFlags::PersistentMapped);
+	ProbeVolumeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeVolumePageSize,
+							 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
 
 	ProbeDepthPageSize = Limits::MaxIrradianceProbes * sizeof(ProbeInfo);
 	ProbeDepthBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeDepthPageSize, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
@@ -297,19 +299,22 @@ void GraphicsBackend::InitVulkan()
 
 	ExtensionNames missing_extensions = CheckExtensionsAvailable(all_extensions, available_extensions);
 
-	std::vector<const char*> requested_validation_layers = {
-		"VK_LAYER_KHRONOS_validation",
-
+	StackArray<const char*, 1> requested_validation_layers = {
 		// "VK_LAYER_KHRONOS_shader_object",
 	};
+
+
+	if (scEnableValidationLayers) {
+		requested_validation_layers.Insert("VK_LAYER_KHRONOS_validation");
+	}
 
 	VkInstanceCreateInfo instance_info = {};
 	instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 	instance_info.pApplicationInfo = &app_info;
 	instance_info.ppEnabledExtensionNames = all_extensions.data();
 	instance_info.enabledExtensionCount = static_cast<uint32_t>(all_extensions.size());
-	instance_info.ppEnabledLayerNames = requested_validation_layers.data();
-	instance_info.enabledLayerCount = static_cast<uint32_t>(requested_validation_layers.size());
+	instance_info.ppEnabledLayerNames = requested_validation_layers.pData;
+	instance_info.enabledLayerCount = static_cast<uint32_t>(requested_validation_layers.Size);
 	instance_info.pNext = nullptr;
 
 	// Allow portability devices (e.g. MoltenVK) to be shown when querying devices. The flag is only
@@ -328,10 +333,14 @@ void GraphicsBackend::InitVulkan()
 	}
 
 #ifdef FX_VULKAN_DEBUG
-	mDebugMessenger = CreateDebugMessenger(mInstance);
-	if (!mDebugMessenger) {
-		ModulePanic("Could not create debug messenger");
+
+	if (scEnableValidationLayers) {
+		mDebugMessenger = CreateDebugMessenger(mInstance);
+		if (!mDebugMessenger) {
+			ModulePanic("Could not create debug messenger");
+		}
 	}
+
 #endif
 
 	bInitialized = true;
@@ -866,7 +875,10 @@ void GraphicsBackend::Destroy()
 
 	GetDevice()->Destroy();
 
-	DestroyDebugMessenger(mInstance, mDebugMessenger);
+	if (scEnableValidationLayers) {
+		DestroyDebugMessenger(mInstance, mDebugMessenger);
+	}
+
 	vkDestroyInstance(mInstance, nullptr);
 
 	bInitialized = false;

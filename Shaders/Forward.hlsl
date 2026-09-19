@@ -382,7 +382,9 @@ FSOutput main(FSInput input)
 		}
 
 		float3 N = normalize(N_final);
-		float3 V = normalize(light.vEyePosition - input.vPositionWS);
+		// The camera this draw is rendered from. The light's own vEyePosition is always the player's camera, which is
+		// wrong for probe capture faces.
+		float3 V = normalize(FSConst.vEyePosition.xyz - input.vPositionWS);
 		float3 H = normalize(V + L);
 
 		float NdotL = DotC(N, L);
@@ -430,7 +432,7 @@ FSOutput main(FSInput input)
 	output.vAlbedo = float4(accumulated_light.rgb + ambient.rgb, base_alpha);
 
 	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE)) {
-		const float3 lp_ambient = float3(0.2f, 0.2f, 0.2f) * albedo;
+		const float3 lp_ambient = float3(0.3f, 0.3f, 0.3f) * albedo;
 		output.vAlbedo = float4(accumulated_light.rgb + lp_ambient, 1.0f);
 	}
 

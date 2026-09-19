@@ -108,7 +108,15 @@ private:
 	void ExecuteRenderList(renderer::ePipelineName pl_name);
 	void ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera& camera);
 	void ExecuteTransparentRenderLists();
-	void ExecuteShadowRenderList(renderer::ePipelineName pl_name);
+	void ExecuteShadowRenderList(renderer::ePipelineName pl_name, const Camera& shadow_camera);
+
+	/**
+	 * @brief Re-renders the sun's shadow map centered on `center` for a probe capture, and writes a copy of the sun that
+	 * reads it into a spare light buffer slot (the main view keeps the original slot and its shadow matrix).
+	 * @return False if the light buffer is full, in which case the shadow map is left alone.
+	 */
+	bool RenderCaptureSunShadows(LightDirectional& sun, const Vec3f& center, OrthoCamera& out_shadow_camera,
+								 uint32& out_light_slot);
 
 	/**
 	 * @brief Gives each shadowed spot light a tile in the shadow atlas and queues a bake for every light whose tile is
@@ -176,6 +184,9 @@ private:
 
 	/// Sorted entries, only for transparent objects.
 	DynArray<TransparentObjectCarrier> SortedEntryBuffer;
+
+	/// Light buffer slot that the sun was written to this frame, UINT32_MAX if it wasn't. See RenderProbeCapture().
+	uint32 mSunLightSlot = UINT32_MAX;
 
 	/// Spot light shadow maps to render this frame, see UpdateSpotShadows()
 	DynArray<SpotShadowBake> mSpotShadowBakes;
