@@ -223,8 +223,9 @@ ProbePlacementBoxes GatherPlacementBoxes()
 	uint32 num_objects = 0;
 
 	for (Object& object : gObjectManager->GetCache()) {
-		// Only the level's lit geometry. Unlit objects (the sky) and anything attached to the player don't count.
-		if (!object.pMesh.IsValid() || object.IsUnlit() || object.GetObjectLayer() == eObjectLayer::PlayerLayer) {
+		// Only the level's lit geometry. Unlit objects (the sky) and anything not probe visible (the view model) don't
+		// count.
+		if (!object.pMesh.IsValid() || object.IsUnlit() || !object.IsProbeVisible()) {
 			continue;
 		}
 

@@ -17,6 +17,10 @@ struct CSPushConsts
 	float2 vScreenSize;
 	uint uiLightCount;
 	uint uiTileColumns;
+	/// Light that is swapped out for `uiReplacementSlot`, 0xFFFFFFFF for none. Probe captures use this to give the sun
+	/// a shadow map centered on the probe.
+	uint uiReplacedLight;
+	uint uiReplacementSlot;
 };
 
 [[vk::push_constant]] CSPushConsts CSConst;
@@ -48,7 +52,8 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_GroupThreadID)
 	const uint2 tile_min = group_id.xy * LIGHT_TILE_SIZE;
 	const uint2 tile_max = min(tile_min + LIGHT_TILE_SIZE, uint2(CSConst.vScreenSize));
 
-	for (uint light_index = local_index; light_index < CSConst.uiLightCount; light_index += NUM_THREADS) {
+	for (uint cull_index = local_index; cull_index < CSConst.uiLightCount; cull_index += NUM_THREADS) {
+		const uint light_index = (cull_index == CSConst.uiReplacedLight) ? CSConst.uiReplacementSlot : cull_index;
 		Light light = Lights[light_index];
 
 		bool intersects_tile = false;

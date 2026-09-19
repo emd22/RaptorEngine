@@ -76,6 +76,19 @@ public:
 	SizedArray<Mat4f> LocalTransforms;
 	SizedArray<Mat4f> WorldTransforms;
 	SizedArray<Mat4f> SkinningMatrices;
+
+	/// Animations and playback state live on the skeleton rather than the object, as a single GLTF skin is commonly
+	/// shared by several meshes (each loaded as its own object). Those objects share this skeleton through `Ref`, so
+	/// the pose is evaluated and uploaded once per frame and every mesh draws with the same bone-buffer slot.
+	SizedArray<Animation> Animations;
+	Animation* pCurrentAnimation = nullptr;
+	float32 AnimationTime = 0.0f;
+
+	/// Slot index into `GraphicsBackend::BoneBuffer` claimed by the last pose update.
+	uint32 BoneBufferSlot = 0;
+	/// The frame the pose was last updated on, so that the shared skeleton only advances once per frame no matter
+	/// how many objects or passes (shadow, depth prepass, forward) visit it.
+	uint32 LastUpdateFrame = UINT32_MAX;
 };
 
 } // namespace fx

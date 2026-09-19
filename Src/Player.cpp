@@ -27,7 +27,9 @@ void Player::Create()
 	// Load the view model
 
 	AssetTicket view_model = gAssetManager->LoadObject("view_model", "Data/Demo/Models/viewmodel.glb");
-	gWorld->Attach(view_model);
+
+	// Registered before World::Attach() so these callbacks run first: the view model has to be set up before the world
+	// adds it to the grid, or a probe bake running on the main thread in between would capture it as level geometry.
 	view_model.OnLoaded(
 		[&](void* item_ptr)
 		{
@@ -39,6 +41,7 @@ void Player::Create()
 			object->SetShadowCaster(false);
 			object->SetCullable(false);
 			object->SetObjectLayer(eObjectLayer::PlayerLayer);
+			object->SetProbeVisible(false);
 
 			mpViewModel = object;
 
@@ -48,6 +51,8 @@ void Player::Create()
 			mViewModelSwayYaw = 0.0f;
 			mViewModelSwayPitch = 0.0f;
 		});
+
+	gWorld->Attach(view_model);
 }
 
 void Player::MoveBy(const Vec3f& by)

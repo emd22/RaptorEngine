@@ -192,10 +192,14 @@ void World::ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera
 
 	{
 		const uint32 buffer_offsets[] = {
-			gObjectManager->GetBaseOffset(),	  0,
-			gGraphics->GetLightGridFrameOffset(), gGraphics->GetLightIndexListFrameOffset(),
+			gObjectManager->GetBaseOffset(),
+			0,
+			gGraphics->GetLightGridFrameOffset(),
+			gGraphics->GetLightIndexListFrameOffset(),
 			// The light probe buffers aren't paged per frame in flight
-			0, 0, 0,
+			0,
+			0,
+			0,
 		};
 
 		gGraphics->pRenderer->pPersistentDescriptor->Bind(
@@ -204,12 +208,12 @@ void World::ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera
 	}
 
 
-	// Anything attached to the player (the view model) isn't part of the level that light probes capture
-	const bool skip_player_layer = gProbeManager->IsCapturingFaces();
+	// Light probes only capture the level, not the view model or anything else marked as not probe visible
+	const bool is_probe_capture = gProbeManager->IsCapturingFaces();
 
 	for (ObjectID object_id : section.Objects) {
 		Object* object = gObjectManager->GetObject(object_id);
-		if (object == nullptr || (skip_player_layer && object->GetObjectLayer() == eObjectLayer::PlayerLayer)) {
+		if (object == nullptr || (is_probe_capture && !object->IsProbeVisible())) {
 			continue;
 		}
 
@@ -275,10 +279,14 @@ void World::ExecuteTransparentRenderLists()
 
 			{
 				const uint32 buffer_offsets[] = {
-					gObjectManager->GetBaseOffset(),	  0,
-					gGraphics->GetLightGridFrameOffset(), gGraphics->GetLightIndexListFrameOffset(),
+					gObjectManager->GetBaseOffset(),
+					0,
+					gGraphics->GetLightGridFrameOffset(),
+					gGraphics->GetLightIndexListFrameOffset(),
 					// The light probe buffers aren't paged per frame in flight
-					0, 0, 0,
+					0,
+					0,
+					0,
 				};
 
 				gGraphics->pRenderer->pPersistentDescriptor->Bind(
@@ -297,101 +305,9 @@ void World::ExecuteTransparentRenderLists()
 	}
 }
 
-// void World::ExecuteTransparentRenderLists()
-// {
-// 	PerspectiveCamera& camera = *mpCurrentCamera;
-// 	const Vec3f camPos = camera.Position;
 
-// 	struct SortedEntry
-// 	{
-// 		ObjectID id;
-// 		ePipelineName pipeline;
-// 		float distSq;
-// 	};
-
-// 	// Precompute total transparent count for correctly sized array
-// 	size_t total_transparent = 0;
-
-// 	for (ePipelineName pl : { ePipelineName::GeometryTransparent, ePipelineName::GeometryNormalMapsTransparent,
-// 							  ePipelineName::GeometrySkinnedTransparent }) {
-// 		const RenderListSection& sec = mRenderList.GetSection(pl);
-// 		if (sec.InUse.IsInited()) {
-// 			total_transparent += sec.Objects.Size;
-// 		}
-// 	}
-
-// 	if (total_transparent == 0) {
-// 		return;
-// 	}
-
-// 	SizedArray<SortedEntry> sorted;
-// 	sorted.InitCapacity(total_transparent + 4);
-
-// 	auto Gather = [&](ePipelineName pl_name)
-// 	{
-// 		const RenderListSection& section = mRenderList.GetSection(pl_name);
-
-// 		if (!section.InUse.IsInited()) {
-// 			return;
-// 		}
-
-// 		uint32 index = 0;
-
-// 		while (true) {
-// 			index = section.InUse.FindNextSetBit(index);
-// 			if (index == Bitset::scNoFreeBits)
-// 				break;
-// 			ObjectID oid = section.Objects[index];
-// 			Object* obj = gObjectManager->GetObject(oid);
-// 			Vec3f center = =->GetPosition() + obj->Bounds.Min + obj->Bounds.GetSize() * 0.5f;
-// 			Vec3f diff = center - camPos;
-// 			float d2 = diff.X * diff.X + diff.Y * diff.Y + diff.Z * diff.Z;
-// 			sorted.Insert(SortedEntry { oid, pl_name, d2 });
-// 			++index;
-// 		}
-// 	};
-
-// 	Gather(ePipelineName::GeometryTransparent);
-// 	Gather(ePipelineName::GeometryNormalMapsTransparent);
-// 	Gather(ePipelineName::GeometrySkinnedTransparent);
-
-// 	if (sorted.Size == 0)
-// 		return;
-
-// 	std::sort(sorted.pData, sorted.pData + sorted.Size,
-// 			  [](const SortedEntry& a, const SortedEntry& b) { return a.distSq > b.distSq; });
-
-// 	// Bind per entry as pipeline changes; minimize binds by caching last pipeline
-// 	renderer::Pipeline* currentPipeline = nullptr;
-// 	ePipelineName currentPlName = ePipelineName::GeometryTransparent;
-// 	bool first = true;
-
-// 	for (const SortedEntry& e : sorted) {
-// 		if (first || e.pipeline != currentPlName) {
-// 			currentPipeline = &gPipelineCache->Request(e.pipeline);
-// 			currentPipeline->Bind(gGraphics->GetFrame()->CmdBuffer);
-// 			{
-// 				const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0,
-// 												  gGraphics->GetLightGridFrameOffset(),
-// 												  gGraphics->GetLightIndexListFrameOffset() };
-// 				gGraphics->pRenderer->pPersistentDescriptor->Bind(
-// 					0, gGraphics->GetFrame()->CmdBuffer, *currentPipeline,
-// 					Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
-// 			}
-// 			currentPlName = e.pipeline;
-// 			first = false;
-// 		}
-// 		Object* object = gObjectManager->GetObject(e.id);
-// 		object->Update();
-// 		object->RenderShallow(camera, currentPipeline);
-// 	}
-// }
-
-
-void World::ExecuteShadowRenderList(renderer::ePipelineName pl_name)
+void World::ExecuteShadowRenderList(renderer::ePipelineName pl_name, const Camera& shadow_camera)
 {
-	PerspectiveCamera& camera = *mpCurrentCamera;
-
 	const RenderListSection& section = mRenderList.GetSection(pl_name);
 
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
@@ -400,8 +316,11 @@ void World::ExecuteShadowRenderList(renderer::ePipelineName pl_name)
 
 	// Push constants definition
 	ShadowPushConstants consts;
-	memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData,
-		   sizeof(float32) * 16);
+	memcpy(consts.CameraMatrix, shadow_camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(float32) * 16);
+
+	// The sun shadows rendered for a probe capture only come from casters the probes can see, so objects left out of
+	// the capture don't shadow it either
+	const bool is_probe_capture = gProbeManager->IsCapturingFaces();
 
 	for (ObjectID object_id : section.Objects) {
 		if (object_id.IsInvalid()) {
@@ -409,7 +328,7 @@ void World::ExecuteShadowRenderList(renderer::ePipelineName pl_name)
 		}
 
 		Object* object = gObjectManager->GetObject(object_id);
-		if (object == nullptr) {
+		if (object == nullptr || (is_probe_capture && !object->IsProbeVisible())) {
 			continue;
 		}
 
@@ -514,8 +433,8 @@ void World::BeginShadowAtlasRegion(const ShadowAtlasRegion& region)
 
 	const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0 };
 
-	gGraphics->pRenderer->pPersistentDescriptorSlim->Bind(0, gGraphics->GetFrame()->CmdBuffer, pipeline,
-														  Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
+	gGraphics->pRenderer->pPersistentDescriptorSlim->Bind(
+		0, gGraphics->GetFrame()->CmdBuffer, pipeline, Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
 }
 
 
@@ -899,8 +818,19 @@ void World::Render(Camera* shadow_camera)
 	// Spot lights need their shadow atlas tile and shadow matrix before they are uploaded
 	UpdateSpotShadows();
 
+	mSunLightSlot = UINT32_MAX;
+
 	for (const Ref<LightBase>& light : mLights) {
+		const uint32 slot = gGraphics->LightBuffer.SlotIndex;
+
 		light->Render(camera, shadow_camera);
+
+		// Probe captures swap this slot out for a copy of the sun with its own shadow map, see RenderProbeCapture()
+		const bool was_written = (gGraphics->LightBuffer.SlotIndex != slot);
+
+		if (light->Type == eLightType::Directional && was_written && mSunLightSlot == UINT32_MAX) {
+			mSunLightSlot = slot;
+		}
 	}
 
 	// Render shadows into the atlas. The directional light is redrawn every frame, spot lights only when their bake is
@@ -913,7 +843,7 @@ void World::Render(Camera* shadow_camera)
 		BeginShadowAtlasRegion(gShadowAtlas->GetDirectionalRegion());
 
 		if (render_sun_shadows) {
-			ExecuteShadowRenderList(ePipelineName::ShadowDirectional);
+			ExecuteShadowRenderList(ePipelineName::ShadowDirectional, gShadowRenderer->ShadowCamera);
 		}
 
 		gShadowAtlas->EndRegion();
@@ -955,6 +885,36 @@ void World::Render(Camera* shadow_camera)
 	// RenderWorldGrid(camera);
 }
 
+
+/// Fraction of the sun shadow map's half-width that has to lie between a probe and the map's edges for the probe to
+/// be captured with it. Past that the shadow map is re-rendered around the probe.
+static constexpr float32 scProbeShadowEdgeMargin = 0.5f;
+
+bool World::RenderCaptureSunShadows(LightDirectional& sun, const Vec3f& center, OrthoCamera& out_shadow_camera,
+									uint32& out_light_slot)
+{
+	// Same projection as the player's shadow camera, only the placement changes
+	OrthoCamera shadow_camera = gShadowRenderer->ShadowCamera;
+	gShadowRenderer->PlaceCamera(shadow_camera, center, sun.GetPosition().Normalize());
+
+	const uint32 light_slot = gGraphics->LightBuffer.SlotIndex;
+
+	sun.Render(*mpCurrentCamera, &shadow_camera);
+
+	// The light buffer is full (LightBase::Render() warns about this)
+	if (gGraphics->LightBuffer.SlotIndex == light_slot) {
+		return false;
+	}
+
+	BeginShadowAtlasRegion(gShadowAtlas->GetDirectionalRegion());
+	ExecuteShadowRenderList(ePipelineName::ShadowDirectional, shadow_camera);
+	gShadowAtlas->EndRegion();
+
+	out_shadow_camera = shadow_camera;
+	out_light_slot = light_slot;
+
+	return true;
+}
 
 void World::RenderProbeCapture()
 {
@@ -1001,20 +961,47 @@ void World::RenderProbeCapture()
 
 	AddTileToRenderList(false, WorldGrid::scGlobalTileIndex);
 
-	gProbeManager->RecordCaptureBatch(cmd,
-									  [&](PerspectiveCamera& camera, RenderStage& stage)
-									  {
-										  // Forward+ culling for this face's camera and extent
-										  gGraphics->pRenderer->DoLightCullingPass(camera, &extent);
+	// The sun's shadow map follows the player and only holds the casters the player can see, so each batch renders
+	// its own from every caster in the level, centered on the batch's first probe. Later probes that aren't well
+	// inside of it get it re-rendered around them. The main view was already drawn with the player's shadow map, so
+	// each re-render goes with a copy of the sun in a spare light slot, which the capture's light culling swaps in.
+	Ref<LightDirectional> sun = GetDirectionalLight();
+	const bool sun_has_shadows = sun.IsValid() && sun->bEnabled && (mSunLightSlot != UINT32_MAX);
 
-										  stage.Begin(cmd);
+	OrthoCamera capture_shadow_camera;
+	bool has_capture_shadows = false;
 
-										  for (renderer::ePipelineName pipeline_name : scCapturePipelines) {
-											  ExecuteRenderList(pipeline_name, camera);
-										  }
+	// Only the lights from the main view get culled, not the copies of the sun appended after them
+	LightCullOverride light_override { .LightCount = gGraphics->LightBuffer.SlotIndex };
 
-										  stage.End();
-									  });
+	gProbeManager->RecordCaptureBatch(
+		cmd,
+		[&](PerspectiveCamera& camera, RenderStage& stage)
+		{
+			const bool needs_sun_shadows = !has_capture_shadows ||
+										   !ShadowDirectional::IsWellCovered(capture_shadow_camera, camera.Position,
+																			 scProbeShadowEdgeMargin);
+
+			uint32 sun_slot;
+
+			if (sun_has_shadows && needs_sun_shadows &&
+				RenderCaptureSunShadows(*sun, camera.Position, capture_shadow_camera, sun_slot)) {
+				light_override.ReplacedLight = mSunLightSlot;
+				light_override.ReplacementSlot = sun_slot;
+				has_capture_shadows = true;
+			}
+
+			// Forward+ culling for this face's camera and extent
+			gGraphics->pRenderer->DoLightCullingPass(camera, &extent, &light_override);
+
+			stage.Begin(cmd);
+
+			for (renderer::ePipelineName pipeline_name : scCapturePipelines) {
+				ExecuteRenderList(pipeline_name, camera);
+			}
+
+			stage.End();
+		});
 
 	for (uint32 i = 0; i < std::size(scCapturePipelines); i++) {
 		renderer::Pipeline& pipeline = gPipelineCache->Request(scCapturePipelines[i]);
@@ -1168,7 +1155,8 @@ void World::RenderProbeDebug(const Camera& camera)
 	const uint32 current_probe = gProbeManager->GetCurrentProbeIndex();
 
 	for (uint32 i = 0; i < gProbeManager->GetProbeCount(); i++) {
-		Mat4f world_matrix = Mat4f::AsScale(scProbeHalfExtent) * Mat4f::AsTranslation(gProbeManager->GetProbePosition(i));
+		Mat4f world_matrix = Mat4f::AsScale(scProbeHalfExtent) *
+							 Mat4f::AsTranslation(gProbeManager->GetProbePosition(i));
 		Mat4f combined_matrix = world_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 
 		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));

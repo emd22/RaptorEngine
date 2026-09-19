@@ -54,6 +54,17 @@ FX_FORCE_INLINE constexpr VkCullModeFlags CullModeToVk(eCullMode mode)
 	return VK_CULL_MODE_NONE;
 }
 
+enum class eDrawFlags : uint32
+{
+	None = 0,
+
+	ProbeCapture = (1 << 0),
+	DebugIrradiance = (1 << 1),
+	DebugProbeVisibility = (1 << 2),
+};
+
+FxEnumFlags(eDrawFlags);
+
 
 } // namespace fx
 
@@ -64,34 +75,21 @@ class CommandBuffer;
 class GpuDevice;
 
 
-/// Bits of DrawPushConstants::Flags. Mirrors the DRAW_FLAG_* defines in Shaders/Helper.hlsl.
-enum eDrawFlags : uint32
-{
-	/// Set only while rendering the cubemap faces of a light-probe bake. There is
-	/// no SSAO target at the capture extent, and probes must not light their own
-	/// bake, so the shader falls back to a flat ambient term.
-	DrawFlag_ProbeCapture = 0x01,
-
-	/// Debug view: output the blended probe irradiance instead of the lit result.
-	DrawFlag_DebugProbeIrradiance = 0x02,
-
-	/// Debug view: output the blended probe visibility instead of the lit result.
-	DrawFlag_DebugProbeVisibility = 0x04,
-};
-
 struct alignas(16) DrawPushConstants
 {
 	float32 CameraMatrix[16];
 	uint32 ObjectId = 0;
 	uint32 MaterialIndex = 0;
 	uint32 TileColumns = 0;
-	uint32 Flags = 0;
+
+	eDrawFlags Flags = eDrawFlags::None;
+	static_assert(sizeof(Flags) == 4);
+
 	uint32 TargetSize[2] = { 0U, 0U };
-	/// Which slot of GraphicsBackend::BoneBuffer this draw's skinning matrices live in this frame (see
-	/// Object::BoneBufferSlot). Unused by non-skinned pipelines.
+
 	uint32 BoneSlot = 0;
 	uint32 _Pad0 = 0;
-	/// World space position of the rendering camera (w unused). Used by the forward pass for view-dependent ambient.
+
 	float32 EyePosition[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 };
 
@@ -127,6 +125,9 @@ struct alignas(16) LightCullPushConstants
 	float32 ScreenSize[2];
 	uint32 LightCount = 0;
 	uint32 TileColumns = 0;
+	/// Light that is swapped out for `ReplacementSlot` in the tile lists, UINT32_MAX for none
+	uint32 ReplacedLight = UINT32_MAX;
+	uint32 ReplacementSlot = 0;
 };
 
 /// A single light slot in GraphicsBackend::LightBuffer. Mirrors `Light` in Shaders/LightingCommon.hlsli.

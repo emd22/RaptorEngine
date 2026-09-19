@@ -224,11 +224,18 @@ void ImageLayoutTransition(Image* image, VkImageLayout new_layout, CommandBuffer
 	};
 
 	// Upload queues (compute/transfer) cannot reference consumer stages like FRAGMENT_SHADER in a
-	// barrier. The layout change needs no consumer dependency on the uploading queue; the reading
-	// queue syncs through the submit/fence that follows.
+	// barrier. Strip those, but keep transfer stages so copies stay ordered after the layout change;
+	// the reading queue syncs through the submit/fence that follows.
 	if (cmd.QueueFamily() != gGraphics->GetDevice()->mQueueFamilies.GetGraphicsFamily()) {
-		barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
-		barrier.dstAccessMask = VK_ACCESS_2_NONE;
+		barrier.srcStageMask &= VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
+		barrier.dstStageMask &= VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
+
+		if (barrier.srcStageMask == VK_PIPELINE_STAGE_2_NONE) {
+			barrier.srcAccessMask = VK_ACCESS_2_NONE;
+		}
+		if (barrier.dstStageMask == VK_PIPELINE_STAGE_2_NONE) {
+			barrier.dstAccessMask = VK_ACCESS_2_NONE;
+		}
 	}
 
 	VkDependencyInfo dep_info {

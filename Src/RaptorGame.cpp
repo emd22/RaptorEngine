@@ -301,6 +301,42 @@ Vec3f RaptorGame::GetCameraForwardDominantAxis() const
 	return Vec3f(0.0f, 0.0, MathUtil::GetSign(fwd.Z));
 }
 
+static void EditorSelectObject()
+{
+	Ref<PerspectiveCamera>& cam = gWorld->Player.pCamera;
+
+	SizedArray<JPH::BodyID> hits = gPhysics->pBackend->RaycastObjects(cam->Position, cam->GetForwardVector() * 4.0f);
+
+	const bool should_append_selection = ControlManager::IsKeyDown(eKey::FX_KEY_LALT);
+
+	bool did_hit = false;
+
+	const bool can_add_selection = (gSelectedEditorMode != nullptr &&
+									(gSelectedEditorMode->HasSelection() == false || should_append_selection));
+
+	if (can_add_selection) {
+		for (int i = 0; i < hits.Size; i++) {
+			JPH::BodyID body_id = hits[i];
+
+			physics::Body* body = gPhysics->FindBody(body_id);
+
+			if (body == nullptr) {
+				continue;
+			}
+
+			did_hit = gSelectedEditorMode->SelectObject(gObjectManager->GetObject(body->GetObjectID()),
+														should_append_selection);
+			if (did_hit) {
+				break;
+			}
+		}
+
+		if (did_hit == false) {
+			gSelectedEditorMode->SelectObject(nullptr, false);
+		}
+	}
+}
+
 
 void RaptorGame::ProcessControls()
 {
@@ -325,42 +361,16 @@ void RaptorGame::ProcessControls()
 		}
 	}
 
-	if (ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
-		// physics::RayResult hit_point = gPhysics->pBackend->Raycast(Player.pCamera->Position,
-		// 														   Player.pCamera->GetForwardVector() * 10.0f);
+	if (gSelectedEditorMode != nullptr && ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
+		EditorSelectObject();
+	}
 
-		Ref<PerspectiveCamera>& cam = gWorld->Player.pCamera;
+	if (gSelectedEditorMode == nullptr && ControlManager::IsKeyDown(eKey::FX_MOUSE_LEFT)) {
+		physics::RayResult hit_point = gPhysics->pBackend->Raycast(gWorld->Player.pCamera->Position,
+																   gWorld->Player.pCamera->GetForwardVector() * 20.0f);
 
-		SizedArray<JPH::BodyID> hits = gPhysics->pBackend->RaycastObjects(cam->Position,
-																		  cam->GetForwardVector() * 4.0f);
-
-		const bool should_append_selection = ControlManager::IsKeyDown(eKey::FX_KEY_LALT);
-
-		bool did_hit = false;
-
-		const bool can_add_selection = (gSelectedEditorMode != nullptr &&
-										(gSelectedEditorMode->HasSelection() == false || should_append_selection));
-
-		if (can_add_selection) {
-			for (int i = 0; i < hits.Size; i++) {
-				JPH::BodyID body_id = hits[i];
-
-				physics::Body* body = gPhysics->FindBody(body_id);
-
-				if (body == nullptr) {
-					continue;
-				}
-
-				did_hit = gSelectedEditorMode->SelectObject(gObjectManager->GetObject(body->GetObjectID()),
-															should_append_selection);
-				if (did_hit) {
-					break;
-				}
-			}
-
-			if (did_hit == false) {
-				gSelectedEditorMode->SelectObject(nullptr, false);
-			}
+		if (hit_point.bHit) {
+			gWorld->pBlockout->pXFormObject->SetPosition(hit_point.Point);
 		}
 	}
 
@@ -502,7 +512,8 @@ void RaptorGame::RenderText()
 										gCVars->Get<const char*>("s_editor_op", "None"))
 								.CStr(),
 							2.0f, scWhite);
-	gTextRenderer->DrawText(String::Fmt("P={}", gWorld->Player.Position).CStr(), 2.0f, scWhite);
+	gTextRenderer->DrawText(
+		String::Fmt("P={}, Vis={}", gWorld->Player.Position, gWorld->mRenderList.GetItemCount()).CStr(), 2.0f, scWhite);
 
 	if (gSelectedEditorMode != nullptr) {
 		gTextRenderer->DrawText(String::Fmt("Q={}, QE={}", gSelectedEditorMode->GetQuantizeFraction(),
@@ -568,25 +579,15 @@ void RaptorGame::Tick()
 
 	gWorld->Player.Update(DeltaTime);
 
+
 	Ref<PerspectiveCamera> camera = gWorld->Player.pCamera;
 
 	// Set from the scene file (see WorldFile::Load), or from the console
 	pSun->bEnabled = gCVars->Get("b_sun_enabled", true);
 
 	if (pSun->bEnabled) {
-		gShadowRenderer->ShadowCamera.Position = (gWorld->Player.Position + (pSun->GetPosition().Normalize() * 25.0f));
-
-		Vec3f target = gWorld->Player.Position;
-
-
-		gShadowRenderer->ShadowCamera.ResolveViewToTexels(gShadowRenderer->ShadowCamera.Position, target,
-														  Vec3f(0, 1, 0),
-														  static_cast<float32>(gShadowRenderer->ShadowMapSize.X));
-
-		gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(gShadowRenderer->ShadowCamera.Position, target, Vec3f(0, 1, 0));
-		// LogInfo("{}", gShadowRenderer->ShadowCamera.ViewMatrix.Rows[3]);
-		gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
-		gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
+		gShadowRenderer->PlaceCamera(gShadowRenderer->ShadowCamera, gWorld->Player.Position,
+									 pSun->GetPosition().Normalize());
 	}
 
 	if (gGraphics->BeginFrame() != eFrameResult::Success) {

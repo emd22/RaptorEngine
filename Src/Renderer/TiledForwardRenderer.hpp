@@ -37,6 +37,20 @@ struct alignas(16) SSAOBlurPushConsts
 };
 
 
+/**
+ * @brief Culls a different view of the light buffer than what was submitted for the frame. Probe captures use this to
+ * swap the sun for a copy of it whose shadow map is centered on the probe, see World::RenderProbeCapture().
+ */
+struct LightCullOverride
+{
+	/// Number of light buffer slots to cull, starting from the first
+	uint32 LightCount = 0;
+	/// Light that is swapped out for `ReplacementSlot`, UINT32_MAX for none
+	uint32 ReplacedLight = UINT32_MAX;
+	uint32 ReplacementSlot = 0;
+};
+
+
 ///////////////////////////////
 // Main Deferred Renderer
 ///////////////////////////////
@@ -53,8 +67,10 @@ public:
 	 * after all lights have been submitted for the frame.
 	 * @param pExtentOverride Tile grid is derived from this extent instead of the swapchain
 	 * (used by probe capture bakes, which render at a fixed small size).
+	 * @param pLightOverride Culls these lights instead of every light submitted this frame.
 	 */
-	void DoLightCullingPass(Camera& camera, const Vec2u* pExtentOverride = nullptr);
+	void DoLightCullingPass(Camera& camera, const Vec2u* pExtentOverride = nullptr,
+							const LightCullOverride* pLightOverride = nullptr);
 
 	/// Binds the Forward+ tiled light list descriptor set (set 2) on the geometry pipeline
 	void BindLightGridDescriptors(CommandBuffer& cmd);
