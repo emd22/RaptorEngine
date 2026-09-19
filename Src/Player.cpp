@@ -2,6 +2,7 @@
 
 #include <Asset/AssetManager.hpp>
 #include <CVar.hpp>
+#include <Core/Random.hpp>
 #include <Core/RefUtil.hpp>
 #include <Engine.hpp>
 #include <Renderer/Globals.hpp>
@@ -157,10 +158,10 @@ void Player::UpdateViewModel(double delta_time)
 	float32 horizontal_scale = 0.25f;
 	float32 vertical_scale = 0.2f;
 
-	if (bIsSprinting) {
-		horizontal_scale = 0.30f;
-		vertical_scale = 0.3f;
-	}
+	// if (bIsSprinting) {
+	// 	horizontal_scale = 0.30f;
+	// 	vertical_scale = 0.3f;
+	// }
 
 	// Negate the bob (l'eponge) to reduce motion and make the movement feel more cohesive.
 	const Vec3f bob = -GetBob();
@@ -170,10 +171,23 @@ void Player::UpdateViewModel(double delta_time)
 
 	// const float32 rotx = sin(gWorld->Player.mBobCounterY * 0.5f) * 0.05f;
 
-	mpViewModel->SetPosition(pCamera->Position + (forward * 0.110) - (up * 0.265) + view_model_bob);
+	mpViewModel->SetPosition(pCamera->Position + (forward * 0.090) - (up * 0.205) + (right * 0.05) + view_model_bob);
 
-	mpViewModel->SetRotation(mViewModelRotation);
+	mpViewModel->SetRotation(mViewModelRotation * mViewModelAccumRot);
 }
+
+static float32 RandomUnitClosed()
+{
+	return static_cast<float32>(FastRand32() >> 8) * (2.0f / 16777215.0f) - 1.0f; // [-1.0, 1.0]
+}
+
+void Player::DoFireAnimation()
+{
+	mViewModelImpulseGoal = mViewModelImpulseGoal *
+							Quat::FromEulerAngles(Vec3f(-0.75f, RandomUnitClosed() * 0.2, RandomUnitClosed() * 0.2));
+	mbIsFiring = true;
+}
+
 
 void Player::Update(float64 delta_time)
 {
@@ -188,6 +202,8 @@ void Player::Update(float64 delta_time)
 	// const bool should_reset_center = ((user_force_released || Physics.bIsGrounded) &&
 	// 								  (MathUtil::IsCloseTo(mBobCounterY, 0.0f) == false));
 
+	mViewModelImpulseGoal.SmoothInterpolate(Quat::scIdentity, scViewImpulseReturnSpeed, delta_time);
+	mViewModelAccumRot.SmoothInterpolate(mViewModelImpulseGoal, scViewImpulseActSpeed, delta_time);
 
 	if (gCVars->Get("b_headbob_enabled", false) && (Physics.bIsGrounded)) {
 		float32 body_speed = mUserForce.Length();
@@ -203,6 +219,10 @@ void Player::Update(float64 delta_time)
 			bBobReverse = false;
 		}
 	}
+
+
+	float32 bob_x, bob_y;
+	MathUtil::SinCos(mBobCounterY + FX_PI_2, &bob_x, &bob_y);
 
 
 	mHeadBobX = HeadBobStrength.X * cosf(mBobCounterY + FX_PI_2);

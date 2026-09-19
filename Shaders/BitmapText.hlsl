@@ -30,6 +30,7 @@ struct VSOutput
 	float4 vPosition : SV_POSITION;
 	float2 vUV       : TEXCOORD0;
 	float4 vTextColor : COLOR;
+	nointerpolation uint uiIsImage : TEXCOORD1;
 };
 
 struct VSPushConsts
@@ -41,6 +42,7 @@ struct VSPushConsts
 	float fAtlasMinV;
 	float fAtlasMaxU;
 	float fAtlasMaxV;
+	uint uiIsImage;
 };
 
 F_StructBuffer(bTextInstances, TextInstanceData, 0, 0);
@@ -64,6 +66,7 @@ VSOutput main(VSInput input)
 						lerp(instance.vUvMax.y, instance.vUvMin.y, corner.y));
 
 	output.vTextColor = F_UnpackUIntToFloat4(VSConst.uiTextColor);
+	output.uiIsImage = VSConst.uiIsImage;
 
 	return output;
 }
@@ -79,6 +82,7 @@ struct FSInput
 	float4 vPosition : SV_POSITION;
 	float2 vUV : TEXCOORD0;
 	float4 vTextColor : COLOR;
+	nointerpolation uint uiIsImage : TEXCOORD1;
 };
 
 struct FSOutput
@@ -91,6 +95,32 @@ F_Texture2D(tFont, 1, 0)
 FSOutput main(FSInput input)
 {
 	FSOutput output;
+
+	// Taken before branching so the derivatives stay defined
+	const float2 footprint = float2(ddx(input.vUV.x), ddy(input.vUV.y));
+
+	if (input.uiIsImage != 0) {
+		// Images are usually drawn smaller than their source and have no mips, so box filter the pixel's footprint
+		// with a 4x4 grid of point taps (exact for 1:1, 2:1 and 4:1). Each tap is premultiplied before averaging, as
+		// transparent texels often hold black that would otherwise darken the edges.
+		float4 premultiplied = 0.0;
+
+		[unroll]
+		for (int y = 0; y < 4; y++) {
+			[unroll]
+			for (int x = 0; x < 4; x++) {
+				const float2 offset = (float2(x, y) - 1.5) * 0.25 * footprint;
+				const float4 texel = F_Sample(tFont, input.vUV + offset);
+				premultiplied += float4(texel.rgb * texel.a, texel.a);
+			}
+		}
+
+		premultiplied /= 16.0;
+
+		const float3 color = premultiplied.rgb / max(premultiplied.a, 1e-5);
+		output.vAlbedo = float4(color, premultiplied.a) * input.vTextColor;
+		return output;
+	}
 
 	float4 sampled = F_Sample(tFont, input.vUV);
 	output.vAlbedo = lerp(float4(0.1, 0.1, 0.1, 0.6), float4(input.vTextColor.rgb, sampled.a * input.vTextColor.a), sampled.a);

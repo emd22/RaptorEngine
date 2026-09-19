@@ -121,6 +121,7 @@ void Object::OnAttached(World* scene)
 void Object::UpdateAnimation()
 {
 	if (!pSkeleton) {
+		BoneBufferBase = Skeleton::scNoBones;
 		return;
 	}
 
@@ -130,36 +131,47 @@ void Object::UpdateAnimation()
 		skel.pCurrentAnimation = &skel.Animations[0];
 	}
 
-	if (!skel.pCurrentAnimation) {
-		return;
-	}
-
 	// A skeleton can be visited multiple times in one frame (several meshes sharing it, and the shadow pass, depth
-	// prepass and forward pass for each); only advance the pose the first time, and reuse the bone-buffer slot
+	// prepass and forward pass for each); only advance the pose the first time, and reuse the bone-buffer slots
 	// claimed then for every subsequent draw this frame.
 	const uint32 current_frame = gGraphics->GetElapsedFrameCount();
 	if (skel.LastUpdateFrame != current_frame) {
+		const bool is_first_update = (skel.LastUpdateFrame == UINT32_MAX);
 		skel.LastUpdateFrame = current_frame;
 
-		Animation& anim = *skel.pCurrentAnimation;
+		if (skel.pCurrentAnimation) {
+			Animation& anim = *skel.pCurrentAnimation;
 
-		if (skel.AnimationTime >= anim.Duration) {
-			skel.AnimationTime = 0.0f;
+			if (skel.AnimationTime >= anim.Duration) {
+				skel.AnimationTime = 0.0f;
+			}
+			else if (skel.AnimationTime < 0.0001f) {
+				skel.AnimationTime = anim.Duration;
+			}
+
+			skel.EvaluatePose(&anim, skel.AnimationTime);
+
+			skel.AnimationTime += 0.01f;
 		}
-		else if (skel.AnimationTime < 0.0001f) {
-			skel.AnimationTime = anim.Duration;
+		else if (is_first_update) {
+			// Nothing is playing, so the skeleton holds its rest pose. That never changes, so it only needs posing once.
+			skel.EvaluatePose(nullptr, 0.0f);
 		}
 
-		skel.EvaluatePose(anim, skel.AnimationTime);
+		// The bone buffer is rewritten every frame, so the pose is uploaded every frame even when it did not change
+		skel.BoneBufferBase = gGraphics->BoneBuffer.CopySlots(skel.SkinningMatrices.pData, skel.SkinningMatrices.Size);
 
-		skel.AnimationTime += 0.01f;
-
-		gGraphics->BoneBuffer.CopyFrom(skel.SkinningMatrices.pData, skel.SkinningMatrices.Size * sizeof(Mat4f));
-		skel.BoneBufferSlot = gGraphics->BoneBuffer.SlotIndex;
-		gGraphics->BoneBuffer.NextSlot();
+		if (skel.BoneBufferBase == Skeleton::scNoBones) {
+			static bool sbWarned = false;
+			if (!sbWarned) {
+				LogWarning(LC_RENDER, "Bone buffer is full ({} matrices), '{}' ({} bones) will not be drawn",
+						   Limits::MaxBoneMatrices, Name.Get(), skel.SkinningMatrices.Size);
+				sbWarned = true;
+			}
+		}
 	}
 
-	BoneBufferSlot = skel.BoneBufferSlot;
+	BoneBufferBase = skel.BoneBufferBase;
 }
 
 void Object::MakeInstanceOf(const ObjectID& source_id)
@@ -190,7 +202,7 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 {
 	UpdateIfOutOfDate();
 
-	if (!CheckIfReady(true)) {
+	if (!CheckIfReady(true) || !HasBonesForDraw()) {
 		return;
 	}
 
@@ -203,7 +215,7 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 
 	push_constants.MaterialIndex = mMaterialID.GetID();
 	push_constants.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
-	push_constants.BoneSlot = BoneBufferSlot;
+	push_constants.BoneBase = BoneBufferBase;
 
 
 	// Only the probe capture faces themselves get the capture flag. Keying it off
@@ -221,6 +233,11 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 		push_constants.Flags |= eDrawFlags::DebugProbeVisibility;
 	}
 
+	// Decals are placed in the world, and the view model only lines up with the world from the camera's position
+	if (mObjectLayer != eObjectLayer::WorldLayer) {
+		push_constants.Flags |= eDrawFlags::NoDecals;
+	}
+
 	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
 	memcpy(push_constants.EyePosition, camera.Position.mData, sizeof(float32) * 3);
 
@@ -233,7 +250,7 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 
 void Object::RenderPrimitive(const CommandBuffer& cmd)
 {
-	if (pMesh && CheckIfReady(false)) {
+	if (pMesh && CheckIfReady(false) && HasBonesForDraw()) {
 		pMesh->Render(cmd, (mInstanceSlotsInUse + 1));
 	}
 }

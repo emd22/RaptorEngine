@@ -1,6 +1,7 @@
 #include "World.hpp"
 
 #include <Blockout.hpp>
+#include <Decal/DecalManager.hpp>
 #include <Engine.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
@@ -200,6 +201,8 @@ void World::ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera
 			0,
 			0,
 			0,
+			gGraphics->GetDecalFrameOffset(),
+			gGraphics->GetDecalMaskFrameOffset(),
 		};
 
 		gGraphics->pRenderer->pPersistentDescriptor->Bind(
@@ -287,6 +290,8 @@ void World::ExecuteTransparentRenderLists()
 					0,
 					0,
 					0,
+					gGraphics->GetDecalFrameOffset(),
+					gGraphics->GetDecalMaskFrameOffset(),
 				};
 
 				gGraphics->pRenderer->pPersistentDescriptor->Bind(
@@ -610,7 +615,7 @@ void World::ExecutePrepassRenderList(renderer::ePipelineName forward_pl_name)
 		consts.ObjectId = object_id.GetID();
 		consts.MaterialIndex = object->GetMaterialID().GetID();
 		consts.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
-		consts.BoneSlot = object->BoneBufferSlot;
+		consts.BoneBase = object->BoneBufferBase;
 
 		const Mat4f& cam_matrix = camera.GetCameraMatrix(object->GetObjectLayer());
 		memcpy(consts.CameraMatrix, cam_matrix.RawData, sizeof(Mat4f));
@@ -859,7 +864,10 @@ void World::Render(Camera* shadow_camera)
 
 	gGraphics->pRenderer->Prepass.End();
 
-	// Cull lights into screen space tiles before rendering geometry
+	// The decals the camera can see, for the light culling pass to bin
+	gDecalManager->Update(camera);
+
+	// Cull lights and decals into screen space tiles before rendering geometry
 	gGraphics->BeginLightCulling(camera);
 
 	gGraphics->RenderEarlyFrameEffects(camera);

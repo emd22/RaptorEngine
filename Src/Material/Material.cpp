@@ -203,9 +203,9 @@ bool Material::BindWithPipeline(const CommandBuffer& cmd, const Pipeline& pipeli
 		descriptor_set = RequestSkinnedFallbackDescriptors();
 	}
 
-	// Buffer offsets. Like LightBuffer, the whole per-frame bone buffer (covering every concurrently-updated skinned
-	// object's slot) is bound at a single fixed frame offset; which slot a given draw call reads is communicated via
-	// DrawPushConstants::BoneSlot, the same way uiObjectIndex/uiMaterialIndex are, not via a per-draw dynamic offset.
+	// Buffer offsets. Like LightBuffer, the whole per-frame bone buffer (covering every skinned object posed this
+	// frame) is bound at a single fixed frame offset; where a given draw call's bones start is communicated via
+	// DrawPushConstants::BoneBase, the same way uiObjectIndex/uiMaterialIndex are, not via a per-draw dynamic offset.
 	StackArray<uint32, 2> offsets;
 	if (bSupportsSkinning || needs_skinned_fallback) {
 		offsets.Insert(gGraphics->BoneBuffer.GetBaseOffset());
@@ -369,7 +369,7 @@ renderer::DescriptorSet* Material::RequestSkinnedFallbackDescriptors()
 
 	SamplerProps sampler_props { .MinLOD = GetComponentMinLOD(Diffuse), .MaxLOD = GetComponentMaxLOD(Diffuse) };
 
-	Image* normal_image = NormalMap.Exists() ? NormalMap.pImage : gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm);
+	Image* normal_image = NormalMap.Exists() ? NormalMap.pImage : gAssetManager->GetFlatNormalImage();
 	Image* mr_image =
 		MetallicRoughness.Exists() ? MetallicRoughness.pImage : gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm);
 
@@ -428,6 +428,20 @@ void Material::Build()
 			ds_entries.Emplace(DescriptorEntry::AsImage(1, eShaderType::Pixel, NormalMap.pImage,
 														gSamplerCache->Request(diffuse_sampler_props)));
 			ds_entries.Emplace(DescriptorEntry::AsImage(2, eShaderType::Pixel, MetallicRoughness.pImage,
+														gSamplerCache->Request(diffuse_sampler_props)));
+		}
+		else if (bSupportsSkinning) {
+			// Every skinned pipeline samples a normal map and a metallic/roughness texture, so without them the set
+			// would not match the pipeline's layout. The flat normal leaves the vertex normal as is, and the white
+			// surface texture leaves the material factors as they are, same as the albedo only pipelines.
+			LogInfo(LC_RENDER, "\tAlbedo Only (flat normal for skinning)");
+
+			Image* mr_image = MetallicRoughness.Exists() ? MetallicRoughness.pImage
+														 : gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm);
+
+			ds_entries.Emplace(DescriptorEntry::AsImage(1, eShaderType::Pixel, gAssetManager->GetFlatNormalImage(),
+														gSamplerCache->Request(diffuse_sampler_props)));
+			ds_entries.Emplace(DescriptorEntry::AsImage(2, eShaderType::Pixel, mr_image,
 														gSamplerCache->Request(diffuse_sampler_props)));
 		}
 		else {

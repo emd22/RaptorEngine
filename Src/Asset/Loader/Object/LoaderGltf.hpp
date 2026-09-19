@@ -48,7 +48,11 @@ private:
 	// void MakeEmptyMaterialTexture(Ref<Material>& material, MaterialComponent& component);
 	void MakeMaterialForPrimitive(Object* object, cgltf_primitive* primitive, int32 primitive_index);
 
-	void UnpackMeshAttributes(Object* object, Ref<PrimitiveMesh>& mesh, cgltf_primitive* primitive);
+	/**
+	 * @brief Unpacks the vertex attributes of `primitive` into `mesh`. Joints and weights are only loaded when
+	 * `is_skinned` is set, as a mesh on a node without a skin is drawn unskinned even when it carries them.
+	 */
+	void UnpackMeshAttributes(Object* object, Ref<PrimitiveMesh>& mesh, cgltf_primitive* primitive, bool is_skinned);
 
 	int32 FindJointIndex(cgltf_skin* skin, const cgltf_node* node) const;
 
@@ -56,7 +60,7 @@ private:
 	void LoadAnimation(Animation& out_anim, const cgltf_animation& anim, cgltf_skin* skin);
 	void LoadAnimations(Skeleton& skel, cgltf_skin* skin);
 
-	void BuildObjectsFromPrimitives(Object* container_object, cgltf_mesh* gltf_mesh);
+	void BuildObjectsFromPrimitives(Object* container_object, cgltf_mesh* gltf_mesh, bool is_skinned);
 
 	/**
 	 * @brief Process the GLTF data and build out the object tree.

@@ -187,6 +187,12 @@ public:
 	fx::Image* GetNullImage(eImageFormat format);
 	AssetTicket GetNullImageTicket(eImageFormat format);
 
+	/**
+	 * @brief A 1x1 RGBA8 normal map that points straight out of the surface, for materials without a normal map that
+	 * are drawn by a pipeline that samples one (e.g. every skinned pipeline).
+	 */
+	fx::Image* GetFlatNormalImage();
+
 	/////////////////////////////////////
 	// General data loading
 	/////////////////////////////////////
@@ -319,6 +325,7 @@ private:
 	uint32 mLastActiveTick = 0;
 
 	std::unordered_map<eImageFormat, fx::Image*> mNullImageList;
+	fx::Image* mpFlatNormalImage = nullptr;
 	std::mutex mNullImageMutex;
 
 	bool mbIsTimeSet = false;

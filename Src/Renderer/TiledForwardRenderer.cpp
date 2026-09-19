@@ -16,6 +16,7 @@
 #include "TextRenderer.hpp"
 
 #include <Asset/AssetManager.hpp>
+#include <Decal/DecalManager.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Texture/TextureManager.hpp>
@@ -120,7 +121,7 @@ void TiledForwardRenderer::CreateSSAOBlurPass()
 
 void TiledForwardRenderer::BuildPersistentDescriptor()
 {
-	SizedArray<DescriptorEntry> ds_entries(10);
+	SizedArray<DescriptorEntry> ds_entries(16);
 
 	ds_entries.Insert(DescriptorEntry::AsBuffer(0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 												ObjectManager::scBoundSize));
@@ -174,6 +175,23 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 												   eSamplerFilter::Nearest,
 												   eSamplerFilter::Nearest,
 											   })));
+
+	// bDecals
+	ds_entries.Insert(
+		DescriptorEntry::AsBuffer(9, eShaderType::Pixel, &gGraphics->DecalBuffer, 0, gGraphics->DecalPageSize));
+
+	// bDecalMasks
+	ds_entries.Insert(DescriptorEntry::AsBuffer(10, eShaderType::Pixel, &gGraphics->DecalMaskBuffer, 0,
+												gGraphics->DecalMaskPageSize));
+
+	// tDecalAtlas and tDecalNormalAtlas, blank until DecalManager hands over the loaded atlases
+	Image* null_image = gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm);
+	Image* decal_atlas = (mpDecalAtlas != nullptr) ? mpDecalAtlas : null_image;
+	Image* decal_normal_atlas = (mpDecalNormalAtlas != nullptr) ? mpDecalNormalAtlas : null_image;
+
+	ds_entries.Insert(DescriptorEntry::AsImage(11, eShaderType::Pixel, decal_atlas, gSamplerCache->Request({})));
+	ds_entries.Insert(
+		DescriptorEntry::AsImage(12, eShaderType::Pixel, decal_normal_atlas, gSamplerCache->Request({})));
 
 	result = gDescriptorCache->Request(ds_entries);
 	pPersistentDescriptor = result.second;
@@ -318,6 +336,8 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bProbeDepth (per-probe depth moments for visibility)
 		gPSOBuild->AddBuffer(8, 0, eShaderType::Pixel, &gGraphics->ProbeDepthBuffer, 0,
 							 gGraphics->ProbeDepthPageSize);
+		// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
+		AddDecalDescriptors();
 		// tShadowAtlas
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
@@ -377,6 +397,8 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bProbeDepth (per-probe depth moments for visibility)
 		gPSOBuild->AddBuffer(8, 0, eShaderType::Pixel, &gGraphics->ProbeDepthBuffer, 0,
 							 gGraphics->ProbeDepthPageSize);
+		// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
+		AddDecalDescriptors();
 		// tShadowAtlas
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
@@ -443,6 +465,8 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bProbeDepth (per-probe depth moments for visibility)
 		gPSOBuild->AddBuffer(8, 0, eShaderType::Pixel, &gGraphics->ProbeDepthBuffer, 0,
 							 gGraphics->ProbeDepthPageSize);
+		// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
+		AddDecalDescriptors();
 		// tShadowAtlas
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
@@ -512,6 +536,8 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bProbeDepth (per-probe depth moments for visibility)
 		gPSOBuild->AddBuffer(8, 0, eShaderType::Pixel, &gGraphics->ProbeDepthBuffer, 0,
 							 gGraphics->ProbeDepthPageSize);
+		// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
+		AddDecalDescriptors();
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
 		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
@@ -555,6 +581,8 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bProbeDepth (per-probe depth moments for visibility)
 		gPSOBuild->AddBuffer(8, 0, eShaderType::Pixel, &gGraphics->ProbeDepthBuffer, 0,
 							 gGraphics->ProbeDepthPageSize);
+		// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
+		AddDecalDescriptors();
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
 		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
@@ -602,6 +630,8 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bProbeDepth (per-probe depth moments for visibility)
 		gPSOBuild->AddBuffer(8, 0, eShaderType::Pixel, &gGraphics->ProbeDepthBuffer, 0,
 							 gGraphics->ProbeDepthPageSize);
+		// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
+		AddDecalDescriptors();
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
 		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
@@ -734,6 +764,32 @@ void TiledForwardRenderer::CreateDepthNormalPSO()
 
 void TiledForwardRenderer::AddLightGridDescriptors() {}
 
+void TiledForwardRenderer::AddDecalDescriptors()
+{
+	// bDecals
+	gPSOBuild->AddBuffer(9, 0, eShaderType::Pixel, &gGraphics->DecalBuffer, 0, gGraphics->DecalPageSize);
+	// bDecalMasks
+	gPSOBuild->AddBuffer(10, 0, eShaderType::Pixel, &gGraphics->DecalMaskBuffer, 0, gGraphics->DecalMaskPageSize);
+	// tDecalAtlas and tDecalNormalAtlas, the real atlases are only bound in the persistent descriptor set
+	gPSOBuild->AddImage(11, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+						gSamplerCache->Request({}));
+	gPSOBuild->AddImage(12, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+						gSamplerCache->Request({}));
+}
+
+void TiledForwardRenderer::SetDecalAtlases(Image* atlas, Image* normal_atlas)
+{
+	if (atlas == mpDecalAtlas && normal_atlas == mpDecalNormalAtlas) {
+		return;
+	}
+
+	mpDecalAtlas = atlas;
+	mpDecalNormalAtlas = normal_atlas;
+
+	// The old set may still be in use by a frame in flight, so this builds a new one rather than updating it
+	BuildPersistentDescriptor();
+}
+
 void TiledForwardRenderer::CreateLightCullingPSO()
 {
 	gPSOBuild->BeginPipeline(ePipelineName::LightCulling);
@@ -748,6 +804,10 @@ void TiledForwardRenderer::CreateLightCullingPSO()
 	// FSLightBuffer
 	gPSOBuild->AddBuffer(4, 0, eShaderType::Compute, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
 						 gGraphics->LightBuffer.PageSize);
+	// bDecals
+	gPSOBuild->AddBuffer(5, 0, eShaderType::Compute, &gGraphics->DecalBuffer, 0, gGraphics->DecalPageSize);
+	// bDecalMasks
+	gPSOBuild->AddBuffer(6, 0, eShaderType::Compute, &gGraphics->DecalMaskBuffer, 0, gGraphics->DecalMaskPageSize);
 
 	gPSOBuild->EndPipeline();
 }
@@ -782,9 +842,17 @@ void TiledForwardRenderer::DoLightCullingPass(Camera& camera, const Vec2u* pExte
 		push_constants.ReplacementSlot = pLightOverride->ReplacementSlot;
 	}
 
+	// Decals were uploaded for the player's view, and they are left out of probe captures (the only views with
+	// overrides) anyway
+	const bool is_main_view = (pExtentOverride == nullptr && pLightOverride == nullptr);
+	push_constants.DecalCount = is_main_view ? gDecalManager->GetVisibleCount() : 0;
+
+	// In binding order
 	gPipelineCache->AddBufferOffset(0, gGraphics->GetLightGridFrameOffset());
 	gPipelineCache->AddBufferOffset(0, gGraphics->GetLightIndexListFrameOffset());
 	gPipelineCache->AddBufferOffset(0, gGraphics->LightBuffer.GetBaseOffset());
+	gPipelineCache->AddBufferOffset(0, gGraphics->GetDecalFrameOffset());
+	gPipelineCache->AddBufferOffset(0, gGraphics->GetDecalMaskFrameOffset());
 	gPipelineCache->Bind(ePipelineName::LightCulling, cmd);
 
 	gGraphics->SubmitPushConstants(cmd, gPipelineCache->Request(ePipelineName::LightCulling), eShaderType::Compute,
@@ -792,9 +860,10 @@ void TiledForwardRenderer::DoLightCullingPass(Camera& camera, const Vec2u* pExte
 
 	vkCmdDispatch(cmd.Get(), tile_columns, tile_rows, 1);
 
-	// Make the culled light lists visible to the fragment shader
+	// Make the culled light and decal lists visible to the fragment shader
 	BarrierHelper::BufferComputeToFragment(cmd, &gGraphics->LightGridBuffer);
 	BarrierHelper::BufferComputeToFragment(cmd, &gGraphics->LightIndexListBuffer);
+	BarrierHelper::BufferComputeToFragment(cmd, &gGraphics->DecalMaskBuffer);
 }
 
 void TiledForwardRenderer::BindLightGridDescriptors(CommandBuffer& cmd)

@@ -29,7 +29,8 @@ using namespace renderer;
 
 namespace loader {
 
-void LoaderGltf::UnpackMeshAttributes(Object* object, Ref<PrimitiveMesh>& mesh, cgltf_primitive* primitive)
+void LoaderGltf::UnpackMeshAttributes(Object* object, Ref<PrimitiveMesh>& mesh, cgltf_primitive* primitive,
+									  bool is_skinned)
 {
 	SizedArray<float32> positions;
 	SizedArray<float32> normals;
@@ -61,12 +62,12 @@ void LoaderGltf::UnpackMeshAttributes(Object* object, Ref<PrimitiveMesh>& mesh, 
 			tangents.InitSize(data_size);
 			cgltf_accessor_unpack_floats(attribute->data, tangents.pData, data_size);
 		}
-		else if (attribute->type == cgltf_attribute_type_weights) {
+		else if (is_skinned && attribute->type == cgltf_attribute_type_weights) {
 			cgltf_size data_size = cgltf_accessor_unpack_floats(attribute->data, nullptr, 0);
 			weights.InitSize(data_size);
 			cgltf_accessor_unpack_floats(attribute->data, weights.pData, data_size);
 		}
-		else if (attribute->type == cgltf_attribute_type_joints) {
+		else if (is_skinned && attribute->type == cgltf_attribute_type_joints) {
 			boneids.InitSize(attribute->data->count * 4);
 			for (cgltf_size j = 0; j < attribute->data->count; j++) {
 				cgltf_accessor_read_uint(attribute->data, j, reinterpret_cast<cgltf_uint*>(&boneids.pData[j * 4]), 4);
@@ -221,6 +222,54 @@ static void MakeMaterialTextureForPrimitive(const String& model_name, const Stri
 	}
 }
 
+/// Whether a glTF texture can carry per-texel alpha. JPEGs never do, and PNGs only do with an alpha color type
+/// (4 or 6) or a tRNS chunk. Anything else is assumed to.
+static bool TextureMayHaveAlpha(const cgltf_texture_view& view)
+{
+	if (view.texture == nullptr || view.texture->image == nullptr || view.texture->image->buffer_view == nullptr) {
+		return false;
+	}
+
+	const cgltf_image* image = view.texture->image;
+	const uint8* data = cgltf_buffer_view_data(image->buffer_view);
+	const size_t size = image->buffer_view->size;
+
+	static constexpr uint8 png_magic[8] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n' };
+
+	if (size >= 3 && data[0] == 0xFF && data[1] == 0xD8) {
+		return false;
+	}
+
+	if (size < 33 || memcmp(data, png_magic, sizeof(png_magic)) != 0) {
+		return true;
+	}
+
+	// The IHDR chunk is always first; its color type is at byte 25.
+	const uint8 color_type = data[25];
+	if (color_type == 4 || color_type == 6) {
+		return true;
+	}
+
+	// Palette and greyscale/RGB images can still get alpha from a tRNS chunk.
+	size_t offset = 8;
+	while (offset + 12 <= size) {
+		const uint32 length = (uint32(data[offset]) << 24) | (uint32(data[offset + 1]) << 16)
+			| (uint32(data[offset + 2]) << 8) | uint32(data[offset + 3]);
+		const char* type = reinterpret_cast<const char*>(data + offset + 4);
+
+		if (memcmp(type, "tRNS", 4) == 0) {
+			return true;
+		}
+		if (memcmp(type, "IDAT", 4) == 0) {
+			break;
+		}
+
+		offset += size_t(length) + 12;
+	}
+
+	return false;
+}
+
 void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primitive, int32 primitive_index)
 {
 	// if (!object->mMaterialID.IsNull()) {
@@ -320,10 +369,15 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 			if (baseAlpha < 0.99f) {
 				material->SetAlpha(baseAlpha);
 			}
-			else {
+			else if (diffuse_view != nullptr && TextureMayHaveAlpha(*diffuse_view)) {
 				// If baseColor is opaque but texture may have alpha, force transparent path
 				// so texAlpha * matAlpha blending works with depthWrite=false.
 				material->SetAlpha(0.99f);
+			}
+			else {
+				// Nothing to blend; exporters often mark opaque materials as BLEND. Drawing those through the
+				// unsorted, depth-write-less transparent path makes a model's own faces overdraw each other.
+				material->SetAlpha(1.0f);
 			}
 		}
 		else if (gltf_material->alpha_mode == cgltf_alpha_mode_mask) {
@@ -349,7 +403,7 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 	material->Finalize();
 }
 
-void LoaderGltf::BuildObjectsFromPrimitives(Object* container_object, cgltf_mesh* gltf_mesh)
+void LoaderGltf::BuildObjectsFromPrimitives(Object* container_object, cgltf_mesh* gltf_mesh, bool is_skinned)
 {
 	const bool has_multiple_primitives = gltf_mesh->primitives_count > 1;
 
@@ -388,7 +442,7 @@ void LoaderGltf::BuildObjectsFromPrimitives(Object* container_object, cgltf_mesh
 			primitive_mesh->SetIndices(std::move(indices));
 		}
 
-		UnpackMeshAttributes(current_object, primitive_mesh, gltf_primitive);
+		UnpackMeshAttributes(current_object, primitive_mesh, gltf_primitive, is_skinned);
 		current_object->pMesh = primitive_mesh;
 		current_object->Bounds = MeshUtil::CalculateBounds(primitive_mesh->GetVertices());
 
@@ -703,7 +757,6 @@ void LoaderGltf::ProcessData(AssetTicket& ticket)
 {
 	// If there is only one mesh to load, store the mesh directly in the output object
 	Object* output_object = static_cast<Object*>(ticket.Get());
-	Object* current_object = output_object;
 
 	// If there are multiple gltf meshes, we will need to use the output object as a
 	// container for multiple other meshes
@@ -711,52 +764,53 @@ void LoaderGltf::ProcessData(AssetTicket& ticket)
 
 	int32 attach_id = 1;
 
-	// If there are multiple objects, each object found will be attached to the output object.
-	if (has_multiple_meshes) {
-		current_object = gObjectManager->NewObject(std::format("{}_{}", output_object->Name.Get(), attach_id++),
-												   MaterialID::scNull);
-	}
-
-
-	bool needs_new_object = false;
-
 	// Skeletons (and their animations) built so far, indexed by skin. Meshes skinned to the same skin share one
 	// skeleton rather than each parsing their own copy.
 	std::vector<Ref<Skeleton>> skeletons(mpGltfData->skins_count);
 
-	// Load each object in the GLTF as a new separate object.
+	// Load each mesh node in the GLTF as a new separate object.
 	for (int32 node_index = 0; node_index < mpGltfData->nodes_count; node_index++) {
-		if (needs_new_object) {
-			// Create a new object to load into next
-			current_object = gObjectManager->NewObject(std::format("{}_{}", output_object->Name.Get(), attach_id++),
-													   MaterialID::scNull);
-			needs_new_object = false;
-		}
-
 		cgltf_node* node = &mpGltfData->nodes[node_index];
 
-		if (node->mesh) {
-			// Load all meshes from the node we are currently on.
-			BuildObjectsFromPrimitives(current_object, node->mesh);
+		// Only nodes that reference a mesh become objects. Skinned models can have hundreds of joint nodes (and other
+		// transform-only nodes); giving each of those an object quickly exhausts the object pool.
+		if (!node->mesh) {
+			continue;
+		}
 
-			// If the node has a skeleton, load it in.
-			if (node->skin) {
-				Ref<Skeleton>& skeleton = skeletons[node->skin - mpGltfData->skins];
+		Object* current_object = output_object;
 
-				if (!skeleton) {
-					skeleton = Ref<Skeleton>::New();
-					LoadSkeleton(*skeleton, node->skin);
-					LoadAnimations(*skeleton, node->skin);
-				}
+		// If there are multiple meshes, each one gets its own object that is attached to the output object.
+		if (has_multiple_meshes) {
+			current_object = gObjectManager->NewObject(std::format("{}_{}", output_object->Name.Get(), attach_id++),
+													   MaterialID::scNull);
+		}
 
-				current_object->pSkeleton = skeleton;
+		// Load all meshes from the node we are currently on.
+		BuildObjectsFromPrimitives(current_object, node->mesh, node->skin != nullptr);
+
+		// If the node has a skeleton, load it in.
+		if (node->skin) {
+			Ref<Skeleton>& skeleton = skeletons[node->skin - mpGltfData->skins];
+
+			if (!skeleton) {
+				skeleton = Ref<Skeleton>::New();
+				LoadSkeleton(*skeleton, node->skin);
+				LoadAnimations(*skeleton, node->skin);
+			}
+
+			current_object->pSkeleton = skeleton;
+
+			// A mesh with multiple primitives is split into attached objects, which each draw skinned vertices and
+			// need the skeleton themselves.
+			for (ObjectID primitive_id : current_object->AttachedNodes) {
+				gObjectManager->GetObject(primitive_id)->pSkeleton = skeleton;
 			}
 		}
 
 		if (has_multiple_meshes) {
 			// Attach the loaded object onto the final object. This will be a container.
 			output_object->AttachObject(current_object->ID);
-			needs_new_object = true;
 		}
 	}
 }

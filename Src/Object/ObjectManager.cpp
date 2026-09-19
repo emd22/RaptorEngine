@@ -33,7 +33,10 @@ ObjectID ObjectManager::NewObjectID(const std::string& name, eObjectTag tags)
 	std::lock_guard<std::mutex> guard(mInUse);
 
 	uint32 index;
+
 	Object* obj = mObjectList.NewItem(&index);
+	Assert(obj != nullptr);
+
 	obj->Name = Name(name);
 	obj->ID = ObjectID(index);
 	obj->Tags = tags;
@@ -47,7 +50,10 @@ Object* ObjectManager::NewObject(const std::string& name, MaterialID material, e
 	std::lock_guard<std::mutex> guard(mInUse);
 
 	uint32 index;
+
 	Object* obj = mObjectList.NewItem(&index, 0, material);
+	Assert(obj != nullptr);
+
 	obj->ID = ObjectID(index);
 	obj->Name = name;
 	obj->Tags = tags;

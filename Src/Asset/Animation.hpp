@@ -58,7 +58,14 @@ struct BoneRestPose
 struct Skeleton
 {
 public:
-	void EvaluatePose(Animation& anim, float32 time);
+	static constexpr uint32 scNoBones = UINT32_MAX;
+
+public:
+	/**
+	 * @brief Poses the skeleton at `time` in `anim`, or in its rest pose if `anim` is null, and updates
+	 * `SkinningMatrices`.
+	 */
+	void EvaluatePose(const Animation* anim, float32 time);
 	BoneTransform GetBoneTransform(const Ref<Animation>& anim, float32 time, BoneId bone_id) const;
 	Mat4f GetBoneTransformMatrix(const Ref<Animation>& anim, float32 time, BoneId bone_id) const;
 
@@ -84,8 +91,9 @@ public:
 	Animation* pCurrentAnimation = nullptr;
 	float32 AnimationTime = 0.0f;
 
-	/// Slot index into `GraphicsBackend::BoneBuffer` claimed by the last pose update.
-	uint32 BoneBufferSlot = 0;
+	/// Index of this skeleton's first matrix in `GraphicsBackend::BoneBuffer`, claimed by the last pose update.
+	/// `scNoBones` if the pose did not fit into the buffer.
+	uint32 BoneBufferBase = scNoBones;
 	/// The frame the pose was last updated on, so that the shared skeleton only advances once per frame no matter
 	/// how many objects or passes (shadow, depth prepass, forward) visit it.
 	uint32 LastUpdateFrame = UINT32_MAX;

@@ -5,6 +5,7 @@
 #include <CVar.hpp>
 #include <Core/MemPool/MemPool.hpp>
 #include <Core/Thread/ThreadManager.hpp>
+#include <Decal/DecalManager.hpp>
 #include <InGameEditor.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
@@ -33,6 +34,7 @@ MemPool* gScriptMemPool = nullptr;
 WorldGrid* gWorldGrid = nullptr;
 World* gWorld = nullptr;
 ProbeManager* gProbeManager = nullptr;
+DecalManager* gDecalManager = nullptr;
 ScriptManager* gScriptManager = nullptr;
 
 EditorMode* gSelectedEditorMode = nullptr;
@@ -59,6 +61,7 @@ void Init()
 	gScriptManager = new ScriptManager;
 	gWorld = new World;
 	gProbeManager = new ProbeManager;
+	gDecalManager = new DecalManager;
 	gCVars = new CVarManager;
 }
 
@@ -73,6 +76,7 @@ void Destroy()
 	DESTROY_GLOBAL(gScriptManager);
 	DESTROY_GLOBAL(gWorld);
 	DESTROY_GLOBAL(gProbeManager);
+	DESTROY_GLOBAL(gDecalManager);
 	DESTROY_GLOBAL(gCVars);
 }
 

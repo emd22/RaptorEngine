@@ -212,6 +212,7 @@ void AssetManager::Shutdown()
 	{
 		std::lock_guard<std::mutex> lock(mNullImageMutex);
 		mNullImageList.clear();
+		mpFlatNormalImage = nullptr;
 	}
 
 	// Flush pending GPU deletions before destroying allocator/device
@@ -412,22 +413,16 @@ AssetTicket AssetManager::NewTextureTicket()
 }
 
 
-fx::Image* AssetManager::GetNullImage(eImageFormat format)
+/**
+ * @brief Creates a 1x1 image of `format` filled with `pixel`, which must hold one pixel's worth of bytes.
+ */
+static fx::Image* CreateSolidImage(eImageFormat format, const uint8* pixel)
 {
-	{
-		std::lock_guard<std::mutex> lock(mNullImageMutex);
-		auto it = mNullImageList.find(format);
-		if (it != mNullImageList.end() && it->second != nullptr) {
-			return it->second;
-		}
-	}
-
 	const uint32 pixel_stride = ImageFormatUtil::GetPixelStride(format);
 
-	// 0xFF so shader multiplies remain neutral (1.0). 0x01 would give near-black.
 	SizedArray<uint8> pixel_data;
 	pixel_data.InitSize(pixel_stride);
-	memset(pixel_data.pData, 0xFF, pixel_stride);
+	memcpy(pixel_data.pData, pixel, pixel_stride);
 
 	fx::Image* image = gTextureManager->NewTexture();
 
@@ -442,6 +437,26 @@ fx::Image* AssetManager::GetNullImage(eImageFormat format)
 			image->Upload(cmd, image_info);
 		});
 
+	return image;
+}
+
+fx::Image* AssetManager::GetNullImage(eImageFormat format)
+{
+	{
+		std::lock_guard<std::mutex> lock(mNullImageMutex);
+		auto it = mNullImageList.find(format);
+		if (it != mNullImageList.end() && it->second != nullptr) {
+			return it->second;
+		}
+	}
+
+	// 0xFF so shader multiplies remain neutral (1.0). 0x01 would give near-black.
+	uint8 pixel[16];
+	memset(pixel, 0xFF, sizeof(pixel));
+	Assert(ImageFormatUtil::GetPixelStride(format) <= sizeof(pixel));
+
+	fx::Image* image = CreateSolidImage(format, pixel);
+
 	{
 		std::lock_guard<std::mutex> lock(mNullImageMutex);
 		// Double-check after creation to avoid race
@@ -455,6 +470,30 @@ fx::Image* AssetManager::GetNullImage(eImageFormat format)
 	}
 
 	return image;
+}
+
+fx::Image* AssetManager::GetFlatNormalImage()
+{
+	{
+		std::lock_guard<std::mutex> lock(mNullImageMutex);
+		if (mpFlatNormalImage != nullptr) {
+			return mpFlatNormalImage;
+		}
+	}
+
+	// (0.5, 0.5, 1.0) decodes to a tangent space normal of (0, 0, 1), which leaves the vertex normal unchanged
+	const uint8 pixel[4] = { 0x80, 0x80, 0xFF, 0xFF };
+	fx::Image* image = CreateSolidImage(eImageFormat::RGBA8_UNorm, pixel);
+
+	{
+		std::lock_guard<std::mutex> lock(mNullImageMutex);
+		// Same race handling as GetNullImage
+		if (mpFlatNormalImage == nullptr) {
+			mpFlatNormalImage = image;
+		}
+	}
+
+	return mpFlatNormalImage;
 }
 
 AssetTicket AssetManager::GetNullImageTicket(eImageFormat format)

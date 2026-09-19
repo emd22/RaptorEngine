@@ -35,6 +35,10 @@ public:
 
 	bool TileIntersectsAABB(const AABB& tile_aabb) const;
 
+	/// Whether any part of the sphere is inside of the frustum. Can let through spheres that are just outside of a
+	/// corner.
+	bool IntersectsSphere(const Vec3f& center, float32 radius) const;
+
 	FX_FORCE_INLINE const Vec4f& GetPlane(const eFrustumPlane plane) const
 	{
 		return mClipPlanes[static_cast<uint32>(plane)];

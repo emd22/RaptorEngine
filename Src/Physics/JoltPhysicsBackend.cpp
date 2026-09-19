@@ -15,6 +15,7 @@
 #include <ThirdParty/Jolt/Core/TempAllocator.h>
 #include <ThirdParty/Jolt/Physics/Body/BodyActivationListener.h>
 #include <ThirdParty/Jolt/Physics/Body/BodyCreationSettings.h>
+#include <ThirdParty/Jolt/Physics/Body/BodyLock.h>
 #include <ThirdParty/Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <ThirdParty/Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <ThirdParty/Jolt/Physics/PhysicsSettings.h>
@@ -163,10 +164,23 @@ RayResult JoltPhysicsBackend::Raycast(const Vec3f& origin, const Vec3f& directio
 	if (PhysicsSystem.GetNarrowPhaseQuery().CastRay(rc, result)) {
 		JPH::Vec3 hit_point = rc.GetPointOnRay(result.mFraction);
 
-		Vec3f v;
-		v.FromJoltVec3(hit_point);
+		RayResult hit { .bHit = true, .Body = result.mBodyID };
+		hit.Point.FromJoltVec3(hit_point);
 
-		return RayResult { true, v };
+		JPH::BodyLockRead lock(PhysicsSystem.GetBodyLockInterface(), result.mBodyID);
+
+		if (lock.Succeeded()) {
+			JPH::Vec3 normal = lock.GetBody().GetWorldSpaceSurfaceNormal(result.mSubShapeID2, hit_point);
+
+			// Back faces of meshes give a normal facing away from the ray
+			if (normal.Dot(rc.mDirection) > 0.0f) {
+				normal = -normal;
+			}
+
+			hit.Normal.FromJoltVec3(normal);
+		}
+
+		return hit;
 	}
 
 	return RayResult { false, Vec3f::sZero };

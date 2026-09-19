@@ -52,12 +52,25 @@ public:
 
 	void DrawText(const char* text, float32 scale, uint32 color);
 
+	/**
+	 * @brief Draws `image` as a screen-space quad tinted by `color`, for HUD elements like the crosshair.
+	 * @param position The top-left corner in window pixels, measured down from the top-left of the window.
+	 * @param size The size of the quad in window pixels.
+	 */
+	void DrawImage(Image* image, Vec2f position, Vec2f size, uint32 color);
+
 	Image* GetAtlas() const { return mpAtlas; }
 	RawGpuBuffer& GetInstanceBuffer() { return mInstanceBuffer; }
 
 	~TextRenderer();
 
 private:
+	/// Rewinds the instance tape and text cursor on the first draw of each frame.
+	void BeginFrameIfNeeded();
+
+	/// Copies `instances` onto the tape and draws them, returns false if the frame's tape is full.
+	bool SubmitQuads(DescriptorSet* ds, const InstanceData* instances, uint32 count, uint32 color, bool is_image);
+
 	Ref<PrimitiveMesh> mpQuad;
 	Image* mpAtlas = nullptr;
 

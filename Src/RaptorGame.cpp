@@ -16,6 +16,7 @@
 #include <Core/Defer.hpp>
 #include <Core/Ref.hpp>
 #include <Core/RefUtil.hpp>
+#include <Decal/DecalManager.hpp>
 #include <Engine.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
@@ -49,6 +50,11 @@ static double sClockFreq = 1.0;
 static bool sbRunning = true;
 
 static bool sbShowShadowCam = false;
+
+static constexpr const char* scCrosshairPath = "Textures/crosshair.png";
+
+/// Crosshair width and height in window pixels, set `$i_crosshair_size` in the console to change it (0 hides it)
+static constexpr int64 scCrosshairSize = 4;
 
 RaptorGame::RaptorGame()
 {
@@ -170,6 +176,14 @@ void RaptorGame::CreateGame()
 	gWorld->SelectCamera(gWorld->Player.pCamera);
 
 	AddEditorModes();
+
+	gCVars->Set("i_crosshair_size", scCrosshairSize);
+
+	mCrosshairTicket = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm, scCrosshairPath,
+												eImageCreateFlags::None);
+
+	// Runs on the asset thread, RenderCrosshair() starts drawing once it's set
+	mCrosshairTicket.OnLoaded([this](void* data) { mpCrosshair.store(static_cast<Image*>(data)); });
 
 	WorldFile scene_file;
 
@@ -338,8 +352,34 @@ static void EditorSelectObject()
 }
 
 
+/// How far the player's shots reach
+static constexpr float32 scShotRange = 100.0f;
+
+/// Casts a shot from the camera and leaves a bullet hole where it lands
+static void FireShot()
+{
+	Ref<PerspectiveCamera>& cam = gWorld->Player.pCamera;
+
+	physics::RayResult hit = gPhysics->pBackend->Raycast(cam->Position, cam->GetForwardVector() * scShotRange);
+
+	if (!hit.bHit) {
+		return;
+	}
+
+	// Decals stay where they are put, so only geometry that can't move gets them
+	if (gPhysics->pBackend->GetBodyInterface().GetMotionType(hit.Body) != JPH::EMotionType::Static) {
+		return;
+	}
+
+	gDecalManager->AddBulletHole(hit.Point, hit.Normal);
+}
+
+
 void RaptorGame::ProcessControls()
 {
+	// The click that captures the mouse shouldn't also fire
+	const bool was_mouse_locked = ControlManager::IsMouseLocked();
+
 	if (ControlManager::IsComboPressed(eKey::FX_KEY_LSHIFT, eKey::FX_KEY_GRAVE)) {
 		// Release the mouse before quitting the game incase there is a crash.
 		ControlManager::ReleaseMouse();
@@ -365,13 +405,10 @@ void RaptorGame::ProcessControls()
 		EditorSelectObject();
 	}
 
-	if (gSelectedEditorMode == nullptr && ControlManager::IsKeyDown(eKey::FX_MOUSE_LEFT)) {
-		physics::RayResult hit_point = gPhysics->pBackend->Raycast(gWorld->Player.pCamera->Position,
-																   gWorld->Player.pCamera->GetForwardVector() * 20.0f);
 
-		if (hit_point.bHit) {
-			gWorld->pBlockout->pXFormObject->SetPosition(hit_point.Point);
-		}
+	if (gSelectedEditorMode == nullptr && was_mouse_locked && ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
+		FireShot();
+		gWorld->Player.DoFireAnimation();
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_PERIOD)) {
@@ -533,6 +570,29 @@ void RaptorGame::RenderText()
 	}
 }
 
+void RaptorGame::RenderCrosshair()
+{
+	static const uint32 scWhite = Color::FromRGBA(255, 255, 255, 255).AsUInt();
+
+	// Only shown while left click shoots
+	if (gSelectedEditorMode != nullptr) {
+		return;
+	}
+
+	const int64 size = gCVars->Get("i_crosshair_size", scCrosshairSize);
+	const Vec2u window_size = gGraphics->GetWindow()->GetSize();
+
+	if (size <= 0 || size > static_cast<int64>(window_size.X) || size > static_cast<int64>(window_size.Y)) {
+		return;
+	}
+
+	// Whole pixels keep the image's texels lined up with the screen's, so it stays sharp
+	const Vec2f position(static_cast<float32>((static_cast<int64>(window_size.X) - size) / 2),
+						 static_cast<float32>((static_cast<int64>(window_size.Y) - size) / 2));
+
+	gTextRenderer->DrawImage(mpCrosshair.load(), position, Vec2f(static_cast<float32>(size)), scWhite);
+}
+
 
 void RaptorGame::Tick()
 {
@@ -611,6 +671,7 @@ void RaptorGame::Tick()
 	}
 
 	RenderText();
+	RenderCrosshair();
 
 	gGraphics->DoComposition(*gWorld->GetCurrentCamera());
 

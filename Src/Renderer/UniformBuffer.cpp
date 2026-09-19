@@ -7,7 +7,7 @@
 
 namespace fx::renderer {
 
-void Uniforms::Create(uint32 slot_size, uint32 count)
+void Uniforms::Create(uint32 slot_size, uint32 count, eGpuBufferType type)
 {
 	SlotSize = slot_size;
 	Capacity = count;
@@ -16,8 +16,7 @@ void Uniforms::Create(uint32 slot_size, uint32 count)
 
 	uint32 size_in_frames = PageSize * FramesInFlight;
 
-	mGpuBuffer.Create(eGpuBufferType::UniformWithOffset, size_in_frames, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-					  eGpuBufferFlags::PersistentMapped);
+	mGpuBuffer.Create(type, size_in_frames, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
 }
 
 void Uniforms::Rewind()
