@@ -30,6 +30,9 @@ class Player
 	/// Roll per radian of yaw sway, so the view model banks into horizontal turns.
 	static constexpr float32 scViewModelSwayRoll = 1.25f;
 
+	static constexpr float32 scViewImpulseReturnSpeed = 20.0f;
+	static constexpr float32 scViewImpulseActSpeed = 25.0f;
+
 public:
 	Player() = default;
 
@@ -37,6 +40,8 @@ public:
 
 	void Update(float64 delta_time);
 	void MoveBy(const Vec3f& by);
+
+	void DoFireAnimation();
 
 	void Jump();
 
@@ -137,6 +142,11 @@ private:
 	Vec3f mCameraGoal = Vec3f::sZero;
 
 	Vec3f mUserForce = Vec3f::sZero;
+
+	Quat mViewModelAccumRot = Quat::scIdentity;
+	Quat mViewModelImpulseGoal = Quat::scIdentity;
+
+	bool mbIsFiring = false;
 
 
 	Object* mpViewModel = nullptr;

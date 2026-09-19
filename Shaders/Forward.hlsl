@@ -47,15 +47,12 @@ struct VSPushConsts
     uint uiTileColumns;
     uint Flags;
     uint2 vTargetSize;
-    uint uiBoneSlot;
+    uint uiBoneBase;
 };
 
 #ifdef USE_SKINNING
 
-F_CBuffer(VSUniforms, 3, 1)
-{
-    BoneMtx bBones[BONE_COUNT * MAX_SKINNED_OBJECTS];
-};
+F_StructBuffer(bBones, BoneMtx, 3, 1);
 
 #endif // USE_SKINNING
 
@@ -72,7 +69,7 @@ VSOutput main(VSInput input)
     float4x4 MVP = mul(world_matrix, VSConst.mViewProjection);
 
 #ifdef USE_SKINNING
-    const uint bone_base = VSConst.uiBoneSlot * BONE_COUNT;
+    const uint bone_base = VSConst.uiBoneBase;
 
     float4x4 skin_xform = input.vJointWeights.x * bBones[bone_base + input.vJointIndices.x]
         + input.vJointWeights.y * bBones[bone_base + input.vJointIndices.y]
@@ -145,6 +142,7 @@ struct FSInput
 #include "MaterialDef.hlsli"
 #include "LightingCommon.hlsli"
 #include "ProbeCommon.hlsli"
+#include "DecalCommon.hlsli"
 
 F_CBuffer(FSLightBuffer, 4, 1)
 {
@@ -166,6 +164,12 @@ F_StructBuffer(bProbeVolume, ProbeVolume, 7, 0);
 // Per-probe depth moments cubemaps (6x16x16 mean + mean squared) for visibility
 F_StructBuffer(bProbeDepth, ProbeInfo, 8, 0);
 
+// Clustered decals, the tiles' decal masks are written by the light culling pass
+F_StructBuffer(bDecals, Decal, 9, 0);
+F_StructBuffer(bDecalMasks, uint, 10, 0);
+F_Texture2D(tDecalAtlas, 11, 0)
+F_Texture2D(tDecalNormalAtlas, 12, 0)
+
 F_Texture2D(tAlbedo, 0, 1)
 
 #ifdef USE_NORMAL_MAPS
@@ -184,7 +188,7 @@ struct FSPushConsts
 	uint uiTileColumns;
 	uint Flags;
 	uint2 vTargetSize;
-	uint uiBoneSlot;
+	uint uiBoneBase;
 	uint _uiPad0;
 	/// Camera position in world space
 	float4 vEyePosition;
@@ -278,6 +282,94 @@ SurfaceParams GetSurfaceParams(Material material, float3 albedo, float4 surface_
 }
 
 
+/// Cosine between a surface's normal and a decal's projection where the decal starts to fade out. Surfaces that turn
+/// further away than this would stretch it across them.
+#define DECAL_FADE_COS_START 0.5
+/// ...and where it is gone completely
+#define DECAL_FADE_COS_END 0.2
+
+/// `v` normalized, or zero instead of NaN when it has no length
+float3 SafeNormalize(float3 v)
+{
+	return v * rsqrt(max(dot(v, v), 1e-12));
+}
+
+/// Blends every decal that covers this pixel into `surface`, oldest first so newer decals end up on top. A decal
+/// lays a dielectric layer over the surface: it replaces the diffuse colour, drops the specular to that of a
+/// non-metal and pulls the roughness towards its own. Decals with a normal strength also bend `shading_normal`.
+/// `geometric_normal` is the unperturbed surface normal, for fading decals out on surfaces they don't face.
+void ApplyDecals(inout SurfaceParams surface, inout float3 shading_normal, TileLightData tile_data, uint tile_index,
+				 float3 position_ws, float3 geometric_normal, float3 position_ddx, float3 position_ddy)
+{
+	for (uint word = tile_data.DecalWordStart; word < tile_data.DecalWordEnd; word++) {
+		uint mask = bDecalMasks[(tile_index * DECAL_MASK_WORDS) + word];
+
+		while (mask != 0) {
+			const uint decal_index = (word * 32) + firstbitlow(mask);
+			mask &= (mask - 1);
+
+			const Decal decal = bDecals[decal_index];
+
+			const float3 position_ds = mul(float4(position_ws, 1.0), decal.mWorldToDecal).xyz;
+
+			if (any(abs(position_ds) > 0.5)) {
+				continue;
+			}
+
+			// Also rejects the back faces of thin walls that the box reaches through
+			const float facing = dot(geometric_normal, -normalize(decal.vHalfAxisZ));
+			const float angle_fade = saturate((facing - DECAL_FADE_COS_END) / (DECAL_FADE_COS_START - DECAL_FADE_COS_END));
+
+			// Fade out towards the front and back of the box, so it doesn't end in a hard line on curved surfaces
+			const float depth_fade = saturate((0.5 - abs(position_ds.z)) * 4.0);
+
+			// Decal space +Y is up, atlas V goes down
+			const float2 decal_uv = float2(position_ds.x + 0.5, 0.5 - position_ds.y);
+			const float2 atlas_uv = (decal_uv * decal.vAtlasRect.xy) + decal.vAtlasRect.zw;
+
+			// Implicit derivatives are undefined in this loop, so they come from the position's instead
+			const float3x3 world_to_decal = (float3x3)decal.mWorldToDecal;
+			const float2 uv_scale = float2(1.0, -1.0) * decal.vAtlasRect.xy;
+
+			const float2 atlas_ddx = mul(position_ddx, world_to_decal).xy * uv_scale;
+			const float2 atlas_ddy = mul(position_ddy, world_to_decal).xy * uv_scale;
+
+			const float4 decal_sample = F_SampleGrad(tDecalAtlas, atlas_uv, atlas_ddx, atlas_ddy);
+			const float4 tint = F_UnpackUIntToFloat4(decal.uiColor);
+
+			const float alpha = decal_sample.a * tint.a * angle_fade * depth_fade;
+
+			if (alpha <= 0.0) {
+				continue;
+			}
+
+			surface.vDiffuse = lerp(surface.vDiffuse, decal_sample.rgb * tint.rgb, alpha);
+			surface.vF0 = lerp(surface.vF0, float3(0.04, 0.04, 0.04), alpha);
+			surface.fRoughness = lerp(surface.fRoughness, decal.fRoughness, alpha * decal.fRoughnessWeight);
+
+			if (decal.fNormalStrength > 0.0) {
+				// Tangent space, green up
+				const float2 normal_ts = F_SampleGrad(tDecalNormalAtlas, atlas_uv, atlas_ddx, atlas_ddy).xy * 2.0 - 1.0;
+				const float2 bend = normal_ts * (decal.fNormalStrength * alpha);
+
+				// The decal's right and up flattened onto the shaded surface, so the bend follows curved and normal
+				// mapped surfaces instead of the plane the decal was projected from
+				const float3 decal_right = normalize(decal.vHalfAxisX);
+				const float3 decal_up = normalize(decal.vHalfAxisY);
+
+				const float3 tangent = SafeNormalize(decal_right - shading_normal * dot(decal_right, shading_normal));
+				const float3 bitangent = SafeNormalize(decal_up - shading_normal * dot(decal_up, shading_normal) -
+													   tangent * dot(decal_up, tangent));
+
+				shading_normal = normalize(shading_normal + (tangent * bend.x) + (bitangent * bend.y));
+			}
+		}
+	}
+
+	surface.fRoughness = clamp(surface.fRoughness, MIN_ROUGHNESS, 1.0);
+}
+
+
 float3 GetSaturationColor(float value)
 {
 	const float LIMIT = (float)MAX_LIGHTS_PER_TILE;
@@ -291,6 +383,10 @@ float3 GetSaturationColor(float value)
 FSOutput main(FSInput input)
 {
     FSOutput output;
+
+    // Taken before anything can discard, for the decals' texture gradients
+    const float3 position_ddx = ddx(input.vPositionWS);
+    const float3 position_ddy = ddy(input.vPositionWS);
 
     float4 albedo_sample = F_Sample(tAlbedo, input.vUV);
     float3 albedo = albedo_sample.rgb;
@@ -326,16 +422,27 @@ FSOutput main(FSInput input)
     float3 N_final = input.vNormalWS;
 #endif
 
-	const SurfaceParams surface = GetSurfaceParams(material, albedo, surface_sample);
-	const float roughness = surface.fRoughness;
+	SurfaceParams surface = GetSurfaceParams(material, albedo, surface_sample);
 
-	float4 accumulated_light = float4(0.0, 0.0, 0.0, 0.0);
-
-	// Retrieve the light list for the tile that this pixel belongs to
+	// Retrieve the light and decal lists for the tile that this pixel belongs to
 	uint2 tile_xy = uint2(input.vPosition.xy / LIGHT_TILE_SIZE);
 	uint tile_index = tile_xy.x + (tile_xy.y * FSConst.uiTileColumns);
 
 	TileLightData tile_data = bLightGrid[tile_index];
+
+#ifndef USE_SKINNING
+	// Decals stay where they are in the world, so skinned meshes would slide through them
+	if (!HAS_FLAG(FSConst.Flags, DRAW_FLAG_NO_DECALS | DRAW_FLAG_PROBE_CAPTURE)) {
+		N_final = normalize(N_final);
+
+		ApplyDecals(surface, N_final, tile_data, tile_index, input.vPositionWS, normalize(input.vNormalWS),
+					position_ddx, position_ddy);
+	}
+#endif
+
+	const float roughness = surface.fRoughness;
+
+	float4 accumulated_light = float4(0.0, 0.0, 0.0, 0.0);
 
 	const float2 ssao_coords = float2(input.vPosition.xy / (float2(FSConst.vTargetSize)));
 

@@ -57,23 +57,29 @@ static T GetComponentAtTime(float32 time, const BoneTransformTrack<T>& track, co
 	return track.Values.pData[count - 1];
 }
 
-void Skeleton::EvaluatePose(Animation& anim, float32 time)
+void Skeleton::EvaluatePose(const Animation* anim, float32 time)
 {
 	const uint32 joint_count = JointCount;
 
 	const bool has_rest_pose = (RestPose.Size == joint_count);
 
 	for (uint32 i = 0; i < joint_count; i++) {
-		const BoneTrack& track = anim.BoneTracks[i];
-
 		// An animation only carries channels for what it actually animates. Every component it leaves
 		// out has to keep the joint's rest transform, otherwise the bone snaps to its parent's origin
 		// and the mesh tears itself apart.
 		const BoneRestPose rest = has_rest_pose ? RestPose.pData[i] : BoneRestPose {};
 
-		Vec3f translation = GetComponentAtTime(time, track.Translation, rest.Translation);
-		Quat rotation = GetComponentAtTime(time, track.Rotation, rest.Rotation);
-		Vec3f scale = GetComponentAtTime(time, track.Scale, rest.Scale);
+		Vec3f translation = rest.Translation;
+		Quat rotation = rest.Rotation;
+		Vec3f scale = rest.Scale;
+
+		if (anim != nullptr) {
+			const BoneTrack& track = anim->BoneTracks[i];
+
+			translation = GetComponentAtTime(time, track.Translation, rest.Translation);
+			rotation = GetComponentAtTime(time, track.Rotation, rest.Rotation);
+			scale = GetComponentAtTime(time, track.Scale, rest.Scale);
+		}
 
 		LocalTransforms.pData[i] =
 			Mat4f::AsScale(scale) * Mat4f::AsRotation(rotation) * Mat4f::AsTranslation(translation);

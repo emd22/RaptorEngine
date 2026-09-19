@@ -21,6 +21,7 @@
 #include <Core/Defines.hpp>
 #include <Core/RefUtil.hpp>
 #include <Core/Types.hpp>
+#include <Decal/DecalManager.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Renderer/Backend/DescriptorCache.hpp>
 #include <Renderer/Backend/ExtensionHandles.hpp>
@@ -132,17 +133,25 @@ void GraphicsBackend::Init(Vec2u window_size)
 	}
 
 	LightBuffer.Create(scLightUniformSize, Limits::MaxActiveLights);
-	BoneBuffer.Create(Limits::MaxBones * sizeof(Mat4f), Limits::MaxConcurrentSkinnedObjects);
+	BoneBuffer.Create(sizeof(Mat4f), Limits::MaxBoneMatrices, eGpuBufferType::StorageWithOffset);
 
 	// Forward+ tiled light list buffers. These are double buffered per frame in flight, each tile's
-	// contents are fully rewritten by the light culling pass every frame.
-	LightGridPageSize = Limits::MaxScreenTiles * sizeof(uint32) * 2;
+	LightGridPageSize = Limits::MaxScreenTiles * sizeof(uint32) * 4;
 	LightIndexListPageSize = Limits::MaxScreenTiles * Limits::MaxLightsPerTile * sizeof(uint32);
 
 	LightGridBuffer.Create(eGpuBufferType::StorageWithOffset, LightGridPageSize * FramesInFlight,
 						   VMA_MEMORY_USAGE_GPU_ONLY);
 	LightIndexListBuffer.Create(eGpuBufferType::StorageWithOffset, LightIndexListPageSize * FramesInFlight,
 								VMA_MEMORY_USAGE_GPU_ONLY);
+
+	// Decals are written from the CPU every frame, so they get a page per frame in flight like the lights
+	DecalPageSize = Limits::MaxVisibleDecals * sizeof(DecalGpuData);
+	DecalMaskPageSize = Limits::MaxScreenTiles * Limits::DecalMaskWords * sizeof(uint32);
+
+	DecalBuffer.Create(eGpuBufferType::StorageWithOffset, DecalPageSize * FramesInFlight, VMA_MEMORY_USAGE_CPU_ONLY,
+					   eGpuBufferFlags::PersistentMapped);
+	DecalMaskBuffer.Create(eGpuBufferType::StorageWithOffset, DecalMaskPageSize * FramesInFlight,
+						   VMA_MEMORY_USAGE_GPU_ONLY);
 
 	// Light probes. These only change when probes are placed, baked or loaded, and ProbeManager waits for the GPU to be
 	// idle before writing them, so unlike the buffers above they have a single page shared by every frame in flight.
@@ -165,11 +174,11 @@ void GraphicsBackend::Init(Vec2u window_size)
 	// Upload the default probes now that the probe buffers exist
 	gProbeManager->Create();
 
+	// Starts loading the decal atlas, which the renderer binds once it's in
+	gDecalManager->Create();
+
 	gShadowAtlas = new ShadowAtlas;
 	gShadowRenderer = new ShadowDirectional;
-
-	Mat4f initial_matrix = Mat4f::scIdentity;
-	BoneBuffer.SetAllValues(initial_matrix.RawData, true);
 
 	pNoiseTexture = ImageGen::Random(Vec2u(64));
 
@@ -854,6 +863,8 @@ void GraphicsBackend::Destroy()
 
 	LightGridBuffer.Destroy();
 	LightIndexListBuffer.Destroy();
+	DecalBuffer.Destroy();
+	DecalMaskBuffer.Destroy();
 	ProbeBuffer.Destroy();
 	ProbeVolumeBuffer.Destroy();
 	ProbeDepthBuffer.Destroy();

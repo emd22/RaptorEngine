@@ -161,6 +161,8 @@ struct RayResult
 {
 	bool bHit = false;
 	Vec3f Point = Vec3f::sZero;
+	/// World space normal of the surface at `Point`, facing back towards the ray
+	Vec3f Normal = Vec3f::sZero;
 	JPH::BodyID Body {};
 };
 

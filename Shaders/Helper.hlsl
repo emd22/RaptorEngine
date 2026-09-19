@@ -29,6 +29,7 @@ float4 F_UnpackUIntToFloat4(uint x);
 #define F_Sample(_name, _coord) F_TextureName(_name).Sample(_name, _coord)
 #define F_SampleLoad(_name, _coord) F_TextureName(_name).Load(_coord)
 #define F_SampleCmpLevelZero(_name, _texcoord, _zcoord) F_TextureName(_name).SampleCmpLevelZero(_name, _texcoord, _zcoord)
+#define F_SampleGrad(_name, _coord, _ddx, _ddy) F_TextureName(_name).SampleGrad(_name, _coord, _ddx, _ddy)
 
 #define F_Texture2D(_name, binding_, set_) \
     Texture2D F_TextureName(_name) : register(t##binding_, space##set_); \
@@ -54,15 +55,13 @@ float4 F_UnpackUIntToFloat4(uint x);
 #define BoneMtx float4x4
 
 
-#define BONE_COUNT 100
-
-#define MAX_SKINNED_OBJECTS 32
 #define LIGHT_COUNT 64
 
 #define SSAO_SIZE_DIVISOR 2
 
-#define HAS_FLAG(flags_, has_) ((flags_ & has_) != 0)
+#define HAS_FLAG(flags_, has_) (((flags_) & (has_)) != 0)
 
 #define DRAW_FLAG_PROBE_CAPTURE 0x01
 #define DRAW_FLAG_DEBUG_PROBE_IRRADIANCE 0x02
 #define DRAW_FLAG_DEBUG_PROBE_VISIBILITY 0x04
+#define DRAW_FLAG_NO_DECALS 0x08

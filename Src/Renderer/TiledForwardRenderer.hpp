@@ -6,6 +6,7 @@
 
 namespace fx {
 class Camera;
+class Image;
 }
 
 namespace fx::renderer {
@@ -75,6 +76,12 @@ public:
 	/// Binds the Forward+ tiled light list descriptor set (set 2) on the geometry pipeline
 	void BindLightGridDescriptors(CommandBuffer& cmd);
 
+	/**
+	 * @brief Sets the atlases that decals are sampled from, rebuilding the persistent descriptor set when either
+	 * changes. Null binds a blank image.
+	 */
+	void SetDecalAtlases(Image* atlas, Image* normal_atlas);
+
 	void Destroy();
 	~TiledForwardRenderer() { Destroy(); }
 
@@ -104,6 +111,9 @@ private:
 
 	/// Registers the Forward+ tiled light list buffers (set 2) on the pipeline currently being built
 	void AddLightGridDescriptors();
+
+	/// Registers the decal buffers and atlases (set 0) on the forward pipeline currently being built
+	void AddDecalDescriptors();
 
 	// Composition
 	void CreateCompositionPSO();
@@ -138,6 +148,11 @@ public:
 
 	/// Amount of tile columns the light grid is dispatched with for the current frame
 	uint32 mLightTileColumns = 0;
+
+private:
+	/// Decal atlases that the persistent descriptor set was built with
+	Image* mpDecalAtlas = nullptr;
+	Image* mpDecalNormalAtlas = nullptr;
 };
 
 } // namespace fx::renderer

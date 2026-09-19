@@ -171,6 +171,10 @@ public:
 
 	FX_FORCE_INLINE bool IsSkinned() const { return (pMesh != nullptr) && pMesh->VertexList.IsSkinned(); }
 
+	/// A skinned mesh can only be drawn once its pose is in the bone buffer this frame. Otherwise the shader would read
+	/// matrices outside of what was written, or past the end of the buffer.
+	FX_FORCE_INLINE bool HasBonesForDraw() const { return !IsSkinned() || BoneBufferBase != Skeleton::scNoBones; }
+
 	void SetCullable(bool value);
 	FX_FORCE_INLINE bool IsCullable() const { return !HasFlag(Flags, eObjectFlags::DisableCulling); }
 
@@ -201,12 +205,12 @@ public:
 	/// May be shared with other objects skinned to the same GLTF skin. Animations and playback state live on it.
 	Ref<Skeleton> pSkeleton { nullptr };
 
-	/// This object's slot index into `GraphicsBackend::BoneBuffer` for the current frame, set by `UpdateAnimation()`
-	/// and submitted to the shader via DrawPushConstants::BoneSlot (the whole buffer is bound at one fixed per-frame
-	/// offset, same as LightBuffer; the slot index tells the shader which entry within it belongs to this draw).
+	/// Index of this object's first bone matrix in `GraphicsBackend::BoneBuffer` for the current frame, set by
+	/// `UpdateAnimation()` and submitted to the shader via DrawPushConstants::BoneBase (the whole buffer is bound at one
+	/// fixed per-frame offset, same as LightBuffer; the base tells the shader where this draw's bones start within it).
 	/// Remembered here rather than re-read at bind time because other skinned objects updating later in the same
-	/// frame advance the buffer's shared slot cursor.
-	uint32 BoneBufferSlot = 0;
+	/// frame advance the buffer's shared slot cursor. `Skeleton::scNoBones` when there are no bones to draw with.
+	uint32 BoneBufferBase = Skeleton::scNoBones;
 
 	ObjectID ParentID = ObjectID::scNull;
 	PagedArray<ObjectID> AttachedNodes;

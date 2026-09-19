@@ -219,6 +219,8 @@ public:
 	TiledForwardRenderer* pRenderer { nullptr };
 
 	Uniforms LightBuffer;
+	/// Skinning matrices for every skinned object posed this frame, one slot per matrix. Bound as a storage buffer, as
+	/// large skeletons quickly go past the 64KB range a uniform buffer is limited to.
 	Uniforms BoneBuffer;
 
 	///////////////////////////////////
@@ -236,6 +238,23 @@ public:
 
 	FX_FORCE_INLINE uint32 GetLightGridFrameOffset() const { return LightGridPageSize * GetFrameNumber(); }
 	FX_FORCE_INLINE uint32 GetLightIndexListFrameOffset() const { return LightIndexListPageSize * GetFrameNumber(); }
+
+	///////////////////////////////////
+	// Clustered Decals
+	///////////////////////////////////
+
+	/// The decals visible this frame, oldest first. Written by DecalManager::Update().
+	RawGpuBuffer DecalBuffer;
+
+	/// Per tile bitmask of the decals that overlap the tile, `Limits::DecalMaskWords` words per tile. Written by the
+	/// light culling pass.
+	RawGpuBuffer DecalMaskBuffer;
+
+	uint32 DecalPageSize = 0;
+	uint32 DecalMaskPageSize = 0;
+
+	FX_FORCE_INLINE uint32 GetDecalFrameOffset() const { return DecalPageSize * GetFrameNumber(); }
+	FX_FORCE_INLINE uint32 GetDecalMaskFrameOffset() const { return DecalMaskPageSize * GetFrameNumber(); }
 
 	///////////////////////////////////
 	// Light Probes

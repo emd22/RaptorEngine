@@ -13,7 +13,11 @@ public:
 public:
 	Uniforms() = default;
 
-	void Create(uint32 size, uint32 slot_size);
+	/**
+	 * @brief Creates the buffer with `count` slots of `slot_size` bytes per frame in flight. Pass `StorageWithOffset`
+	 * as the type to bind it as a storage buffer instead, for data too large for a uniform buffer's range limit.
+	 */
+	void Create(uint32 slot_size, uint32 count, eGpuBufferType type = eGpuBufferType::UniformWithOffset);
 
 	uint8* GetBasePtr();
 
@@ -60,12 +64,37 @@ public:
 	{
 		Assert(mGpuBuffer.IsMapped());
 
-		if (size >= PageSize) {
+		if (GetSlotOffset() + size > PageSize) {
 			LogError(LC_RENDER, "Could not write buffer that is larger than uniform!");
 			return;
 		}
 
 		std::memcpy(GetCurrentBuffer(), buffer, size);
+	}
+
+	/**
+	 * @brief Copies `count` consecutive slots of data into the current frame's page, starting at the current slot, and
+	 * moves the slot cursor past them.
+	 *
+	 * @returns The index of the first slot written, or `UINT32_MAX` if there is not enough room left this frame.
+	 */
+	template <typename TPtrType>
+	uint32 CopySlots(const TPtrType* buffer, uint32 count)
+	{
+		Assert(mGpuBuffer.IsMapped());
+
+		if (SlotIndex + count > Capacity) {
+			return UINT32_MAX;
+		}
+
+		const uint32 first_slot = SlotIndex;
+
+		std::memcpy(GetCurrentBuffer(), buffer, count * SlotSize);
+
+		SlotIndex += count;
+		mUniformIndex = 0;
+
+		return first_slot;
 	}
 
 	void AssertSize(uint32 expected_size) { Assert(mUniformIndex == expected_size); }

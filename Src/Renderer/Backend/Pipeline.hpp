@@ -61,6 +61,8 @@ enum class eDrawFlags : uint32
 	ProbeCapture = (1 << 0),
 	DebugIrradiance = (1 << 1),
 	DebugProbeVisibility = (1 << 2),
+	/// World decals are not projected onto this draw
+	NoDecals = (1 << 3),
 };
 
 FxEnumFlags(eDrawFlags);
@@ -87,7 +89,8 @@ struct alignas(16) DrawPushConstants
 
 	uint32 TargetSize[2] = { 0U, 0U };
 
-	uint32 BoneSlot = 0;
+	/// Index of the draw's first matrix in `GraphicsBackend::BoneBuffer` (skinned pipelines only).
+	uint32 BoneBase = 0;
 	uint32 _Pad0 = 0;
 
 	float32 EyePosition[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
@@ -110,6 +113,8 @@ struct alignas(16) TextPushConstants
 	float32 AtlasMinV;
 	float32 AtlasMaxU;
 	float32 AtlasMaxV;
+	/// Non-zero draws the whole image in colour instead of glyphs with a background
+	uint32 IsImage;
 };
 
 struct alignas(16) LightVertPushConstants
@@ -128,6 +133,8 @@ struct alignas(16) LightCullPushConstants
 	/// Light that is swapped out for `ReplacementSlot` in the tile lists, UINT32_MAX for none
 	uint32 ReplacedLight = UINT32_MAX;
 	uint32 ReplacementSlot = 0;
+	/// Number of decals in GraphicsBackend::DecalBuffer for this frame
+	uint32 DecalCount = 0;
 };
 
 /// A single light slot in GraphicsBackend::LightBuffer. Mirrors `Light` in Shaders/LightingCommon.hlsli.
@@ -164,6 +171,30 @@ struct alignas(16) LightGpuData
 };
 
 static_assert(sizeof(LightGpuData) == 288, "LightGpuData must match the Light struct in LightingCommon.hlsli");
+
+/// A single decal in GraphicsBackend::DecalBuffer. Mirrors `Decal` in Shaders/DecalCommon.hlsli.
+struct alignas(16) DecalGpuData
+{
+	float32 WorldToDecal[16];
+
+	float32 Center[3];
+	/// Tint in RGB, opacity in A. Packed RGBA8 with R in the low byte.
+	uint32 Color;
+
+	float32 HalfAxisX[3];
+	float32 Roughness;
+
+	float32 HalfAxisY[3];
+	/// How much of `Roughness` is blended in, 0 leaves the surface's roughness alone
+	float32 RoughnessWeight;
+
+	float32 HalfAxisZ[3];
+	float32 NormalStrength;
+
+	float32 AtlasRect[4];
+};
+
+static_assert(sizeof(DecalGpuData) == 144, "DecalGpuData must match the Decal struct in DecalCommon.hlsli");
 
 struct PipelineProperties
 {

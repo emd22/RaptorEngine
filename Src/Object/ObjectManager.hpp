@@ -23,7 +23,7 @@ class Mat4f;
 class ObjectManager
 {
 public:
-	static constexpr uint32 scMaxObjects = 512;
+	static constexpr uint32 scMaxObjects = 1024;
 	static constexpr uint32 scBoundSize = scMaxObjects * sizeof(ObjectGpuEntry);
 
 public:

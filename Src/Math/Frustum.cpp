@@ -68,6 +68,21 @@ bool Frustum::TileIntersectsAABB(const AABB& tile_aabb) const
 	return true;
 }
 
+bool Frustum::IntersectsSphere(const Vec3f& center, float32 radius) const
+{
+	// Rebuild() writes the planes by index, so `mClipPlanes.Size` stays at zero
+	for (uint32 i = 0; i <= static_cast<uint32>(eFrustumPlane::Far); i++) {
+		const Vec4f& plane = mClipPlanes[i];
+
+		// The planes are normalized, so this is the signed distance to the plane
+		if (Vec3f(plane).Dot(center) + plane.W < -radius) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
 
 AABB Frustum::GetFrustumBoundingBox(const PerspectiveCamera& camera)
 {

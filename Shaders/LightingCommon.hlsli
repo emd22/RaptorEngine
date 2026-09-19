@@ -51,6 +51,9 @@ struct TileLightData
 {
 	uint Count;
 	uint StartIndex;
+	/// The words of this tile's decal mask that have any bits set, [DecalWordStart, DecalWordEnd)
+	uint DecalWordStart;
+	uint DecalWordEnd;
 };
 
 

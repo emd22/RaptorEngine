@@ -77,4 +77,9 @@ objects = {
         unlit = $True
         nocull = $True
     }
+
+    guy = {
+        mesh = "/butt.glb"
+        pos = [0.0, -0.5, -2.0]
+    }
 }

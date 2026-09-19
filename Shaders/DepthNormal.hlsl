@@ -44,18 +44,15 @@ struct VSPushConsts
     uint uiMaterialIndex;
     uint uiTileColumns;
     // Unused by this pass, but declared to keep field offsets aligned with the full DrawPushConstants layout so
-    // uiBoneSlot below lands on the right bytes.
+    // uiBoneBase below lands on the right bytes.
     uint uiFlags;
     uint2 vTargetSize;
-    uint uiBoneSlot;
+    uint uiBoneBase;
 };
 
 #ifdef USE_SKINNING
 
-F_CBuffer(VSUniforms, 3, 1)
-{
-    BoneMtx bBones[BONE_COUNT * MAX_SKINNED_OBJECTS];
-};
+F_StructBuffer(bBones, BoneMtx, 3, 1);
 
 #endif // USE_SKINNING
 
@@ -72,7 +69,7 @@ VSOutput main(VSInput input)
     float4x4 MVP = mul(world_matrix, VSConst.mViewProjection);
 
 #ifdef USE_SKINNING
-    const uint bone_base = VSConst.uiBoneSlot * BONE_COUNT;
+    const uint bone_base = VSConst.uiBoneBase;
 
     float4x4 skin_xform = input.vJointWeights.x * bBones[bone_base + input.vJointIndices.x]
         + input.vJointWeights.y * bBones[bone_base + input.vJointIndices.y]

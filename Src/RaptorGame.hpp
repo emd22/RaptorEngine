@@ -5,15 +5,19 @@
 #include "InGameEditor.hpp"
 #include "Object/ObjectManager.hpp"
 
+#include <Asset/AssetTicket.hpp>
 #include <Asset/ConfigFile.hpp>
 #include <Object/Object.hpp>
 #include <Player.hpp>
 #include <Script/ScriptManager.hpp>
 #include <World.hpp>
+#include <atomic>
 
 class ShadowDirectional;
 
 namespace fx {
+
+class Image;
 
 
 /////////////////////////////////////
@@ -78,6 +82,7 @@ private:
 	void SwitchEditorMode(eEditorMode mode);
 
 	void RenderText();
+	void RenderCrosshair();
 
 	Vec3f GetCameraForwardDominantAxis() const;
 
@@ -116,6 +121,9 @@ private:
 	ConfigFile Config;
 
 	Console mCommandConsole;
+
+	AssetTicket mCrosshairTicket { nullptr };
+	std::atomic<Image*> mpCrosshair = nullptr;
 };
 
 } // namespace fx

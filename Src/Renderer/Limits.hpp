@@ -4,11 +4,10 @@
 
 namespace fx::Limits {
 static constexpr uint32 MaxActiveLights = 64;
-static constexpr uint32 MaxBones = 100;
-/// Maximum number of distinct skinned objects that can have their pose updated within a single frame. Each one gets
-/// its own slot in `GraphicsBackend::BoneBuffer` so simultaneously-visible skinned objects don't clobber each other's
-/// bone matrices.
-static constexpr uint32 MaxConcurrentSkinnedObjects = 32;
+/// Number of bone matrices `GraphicsBackend::BoneBuffer` can hold per frame, shared between every skinned object that
+/// updates its pose that frame. Each skeleton claims a run the length of its joint count, so a few very large
+/// skeletons and many small ones fit in the same budget. Skeletons that do not fit are skipped for that frame.
+static constexpr uint32 MaxBoneMatrices = 16384;
 static constexpr uint32 MaxDeletionQueueItems = 128;
 static constexpr uint32 MaxConcurrentThreads = 10;
 
@@ -26,6 +25,22 @@ static constexpr uint32 MaxLightsPerTile = 6;
 static constexpr uint32 MaxScreenTilesX = 240;
 static constexpr uint32 MaxScreenTilesY = 135;
 static constexpr uint32 MaxScreenTiles = MaxScreenTilesX * MaxScreenTilesY;
+
+///////////////////////////////////
+// Clustered Decals
+///////////////////////////////////
+
+/// Decals kept in the world at once. New decals replace the oldest ones past this.
+static constexpr uint32 MaxDecals = 1024;
+
+/// Decals uploaded for a single frame, after frustum culling. Mirrored by MAX_VISIBLE_DECALS in
+/// Shaders/DecalCommon.hlsli.
+static constexpr uint32 MaxVisibleDecals = 512;
+
+/// Each screen tile has a bit per visible decal, packed into this many words. Mirrored by DECAL_MASK_WORDS.
+static constexpr uint32 DecalMaskWords = MaxVisibleDecals / 32;
+
+static_assert((MaxVisibleDecals % 32) == 0);
 
 ///////////////////////////////////////
 // Light Probes
