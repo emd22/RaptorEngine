@@ -161,7 +161,7 @@ F_StructBuffer(bLightIndexList, uint, 3, 0);
 // SH irradiance probes
 F_StructBuffer(bProbeBuffer, ProbeSHData, 6, 0);
 
-// Probe volume descriptor for spatial probe blending
+// Probe volume descriptors for spatial probe blending, one per placed volume
 F_StructBuffer(bProbeVolume, ProbeVolume, 7, 0);
 
 // Per-probe depth moments cubemaps (6x16x16 mean + mean squared) for visibility
@@ -532,9 +532,13 @@ FSOutput main(FSInput input)
 
 	float3 probe_normal = normalize(N_final);
 
-	if (!HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE)) {
-		const ProbeSHData probe_sh = SampleProbeVolumeSH(input.vPositionWS, probe_normal, bProbeVolume[0], bProbeBuffer,
-														 bProbeDepth, probe_visibility);
+	const uint probe_volume_count = GetProbeVolumeCount(bProbeVolume);
+
+	if (!HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE) && probe_volume_count > 0) {
+		const uint volume_index = SelectProbeVolume(input.vPositionWS, bProbeVolume, probe_volume_count);
+
+		const ProbeSHData probe_sh = SampleProbeVolumeSH(input.vPositionWS, probe_normal, bProbeVolume[volume_index],
+														 bProbeBuffer, bProbeDepth, probe_visibility);
 
 		probe_irradiance = EvalProbeIrradiance(probe_normal, probe_sh);
 

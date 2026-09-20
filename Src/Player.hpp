@@ -127,6 +127,8 @@ public:
 	Vec3f MovementDirection = Vec3f::sForward;
 	Vec3f Position = Vec3f::sZero;
 
+	Vec3f mViewModelOffset = Vec3f::sZero;
+
 	float JumpForce = 0.0f;
 
 	bool bIsSprinting : 1 = false;

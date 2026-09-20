@@ -207,7 +207,7 @@ static float32 RandomUnitClosed()
 void Player::DoFireAnimation()
 {
 	mViewModelImpulseGoal = mViewModelImpulseGoal *
-							Quat::FromEulerAngles(Vec3f(-0.05f, RandomUnitClosed() * 0.05, 0.15f));
+							Quat::FromEulerAngles(Vec3f(-0.25f, RandomUnitClosed() * 0.05, 0.0f));
 	mbIsFiring = true;
 
 	if (!mpViewModelSkeleton) {
@@ -220,6 +220,7 @@ void Player::DoFireAnimation()
 	if (fire != nullptr && mpViewModelSkeleton->GetActiveAnimation() == fire) {
 		mpViewModelSkeleton->PopAnimation();
 	}
+
 
 	mpViewModelSkeleton->PushAnimation(fire);
 }
@@ -272,12 +273,11 @@ void Player::Update(float64 delta_time)
 	}
 
 
-	float32 bob_x, bob_y;
-	MathUtil::SinCos(mBobCounterY + FX_PI_2, &bob_x, &bob_y);
+	float32 bob_sin, bob_cos;
+	MathUtil::SinCos(mBobCounterY + FX_PI_2, &bob_sin, &bob_cos);
 
-
-	mHeadBobX = HeadBobStrength.X * cosf(mBobCounterY + FX_PI_2);
-	mHeadBobY = HeadBobStrength.Y * sinf(mBobCounterY + FX_PI_2);
+	mHeadBobX = HeadBobStrength.X * bob_cos;
+	mHeadBobY = HeadBobStrength.Y * bob_sin;
 
 	Vec3f bob_vector = pCamera->GetUpVector() * mHeadBobY + pCamera->GetRightVector() * mHeadBobX;
 	pCamera->MoveBy(bob_vector);

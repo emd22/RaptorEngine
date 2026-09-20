@@ -100,6 +100,15 @@ public:
 private:
 	void RenderPhysicsObjects(const Camera& camera);
 	void RenderProbeDebug(const Camera& camera);
+
+	/// Draws a wireframe box for each probe volume brush, which is otherwise not drawn at all
+	void RenderProbeVolumes(const Camera& camera);
+
+public:
+	Object* RaycastProbeVolumes(const Vec3f& origin, const Vec3f& direction, float32 max_distance,
+								float32& out_distance);
+
+private:
 	void RenderBoundingBoxes(const Camera& camera);
 	void RenderWorldGrid(const Camera& camera);
 
@@ -111,8 +120,8 @@ private:
 	void ExecuteShadowRenderList(renderer::ePipelineName pl_name, const Camera& shadow_camera);
 
 	/**
-	 * @brief Re-renders the sun's shadow map centered on `center` for a probe capture, and writes a copy of the sun that
-	 * reads it into a spare light buffer slot (the main view keeps the original slot and its shadow matrix).
+	 * @brief Re-renders the sun's shadow map centered on `center` for a probe capture, and writes a copy of the sun
+	 * that reads it into a spare light buffer slot (the main view keeps the original slot and its shadow matrix).
 	 * @return False if the light buffer is full, in which case the shadow map is left alone.
 	 */
 	bool RenderCaptureSunShadows(LightDirectional& sun, const Vec3f& center, OrthoCamera& out_shadow_camera,
@@ -175,7 +184,8 @@ private:
 
 	physics::BodyID mSelectedPhysicsObjectId = physics::BodyID::scNull;
 
-	Ref<PrimitiveMesh> mpDebugCube { nullptr };
+	/// 12 edge box for drawing brushes as wireframe
+	Ref<PrimitiveMesh> mpWireBox { nullptr };
 
 	/// Used by RenderPhysicsObjects. Rebuild the physics objects list if there have been changes recorded in the
 	/// physics manager.

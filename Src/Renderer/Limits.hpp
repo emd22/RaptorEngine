@@ -50,13 +50,20 @@ static_assert((MaxVisibleDecals % 32) == 0);
 /// Mirrored by PROBE_SH_COEFF_COUNT in Shaders/ProbeCommon.hlsli.
 static constexpr uint32 ProbeSHCoeffCount = 9;
 
-static constexpr uint32 MaxIrradianceProbes = 1024;
+/// Probe budget shared by every volume. Each volume takes a contiguous range out of it, so this has to leave
+/// room for more than the one grid fitted to the level (ProbeGridDims), which takes half of it on its own.
+/// Probes are dominated by their depth moments, at ~12 KB each, so this is also what sizes ProbeDepthBuffer.
+static constexpr uint32 MaxIrradianceProbes = 2048;
 
-/// Default probe grid dimensions (X x Y x Z). Product must equal MaxIrradianceProbes.
+
+static constexpr uint32 MaxProbeVolumes = 8;
+
+/// Default probe grid dimensions (X x Y x Z) of a volume fitted to the level.
 static constexpr uint32 ProbeGridDims[3] = { 16, 4, 16 };
 
+static constexpr uint32 MinProbeGridDim = 2;
 
-static_assert((ProbeGridDims[0] * ProbeGridDims[1] * ProbeGridDims[2]) == MaxIrradianceProbes);
+static_assert((ProbeGridDims[0] * ProbeGridDims[1] * ProbeGridDims[2]) <= MaxIrradianceProbes);
 
 /////////////////////////////////////
 // Probe depth moments (visibility)

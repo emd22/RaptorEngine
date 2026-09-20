@@ -3,9 +3,11 @@
 #include <Blockout.hpp>
 #include <Decal/DecalManager.hpp>
 #include <Engine.hpp>
+#include <InGameEditor.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Material/MaterialManagerFwd.hpp>
+#include <Math/RayCast.hpp>
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Physics/PhysicsManager.hpp>
@@ -331,7 +333,8 @@ public:
 			const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0 };
 
 			gGraphics->pRenderer->pPersistentDescriptorSlim->Bind(
-				0, cmd, gPipelineCache->Request(wanted), Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
+				0, cmd, gPipelineCache->Request(wanted),
+				Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
 		}
 
 		Pipeline& pipeline = gPipelineCache->Request(mBound);
@@ -456,7 +459,7 @@ void World::UpdateSpotShadows()
 			bake_hash = HashObj32(caster_id.GetID(), bake_hash);
 			bake_hash = HashObj32(mesh, bake_hash);
 			bake_hash = HashObj32(is_drawable, bake_hash);
-			bake_hash = HashObj32(caster->GetModelMatrix().RawData, bake_hash);
+			bake_hash = HashObj32(caster->GetWorldMatrix().RawData, bake_hash);
 		}
 
 		// The tile already holds this exact bake
@@ -523,7 +526,7 @@ void World::BakeSpotShadows()
 			}
 
 			// Casters out of view skip the forward pass, which is what normally uploads their matrix for this frame
-			gObjectManager->Submit(caster_id, caster->GetModelMatrix());
+			gObjectManager->Submit(caster_id, caster->GetWorldMatrix());
 
 			consts.ObjectIndex = caster_id.GetID();
 			gGraphics->SubmitPushConstants(cmd, selector.Select(caster, cmd), eShaderType::Vertex, consts);
@@ -792,6 +795,11 @@ void World::AddTileToRenderList(bool clear, TileIndex new_tile_index)
 			continue;
 		}
 
+		if (object->IsProbeVolume()) {
+			++index;
+			continue;
+		}
+
 		if (object->IsShadowCaster()) {
 			AddToRenderListRecursive(ePipelineName::ShadowDirectional, object_id);
 		}
@@ -938,6 +946,10 @@ void World::Render(Camera* shadow_camera)
 
 	if (bRenderProbes) {
 		RenderProbeDebug(camera);
+	}
+
+	if (gSelectedEditorMode != nullptr || bRenderProbes) {
+		RenderProbeVolumes(camera);
 	}
 
 	// RenderWorldGrid(camera);
@@ -1186,6 +1198,68 @@ void World::RenderPhysicsObjects(const Camera& camera)
 	}
 }
 
+Object* World::RaycastProbeVolumes(const Vec3f& origin, const Vec3f& direction, float32 max_distance,
+								   float32& out_distance)
+{
+	Object* nearest = nullptr;
+	float32 nearest_distance = max_distance;
+
+	for (Object& object : gObjectManager->GetCache()) {
+		if (!object.IsProbeVolume()) {
+			continue;
+		}
+
+		Vec3f face;
+		const float32 distance = object.RaycastBounds(origin, direction, face);
+
+		if (distance >= 0.0f && distance < nearest_distance) {
+			nearest = &object;
+			nearest_distance = distance;
+		}
+	}
+
+	out_distance = nearest_distance;
+
+	return nearest;
+}
+
+void World::RenderProbeVolumes(const Camera& camera)
+{
+	if (!mpWireBox.IsValid()) {
+		mpWireBox = MeshGen::MakeWireframeBox()->AsMesh(renderer::eVertexType::Slim);
+	}
+
+	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
+
+	renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
+	pipeline.Bind(cmd);
+
+	DebugLayerPushConstants push_constants {};
+
+	const Color volume_color = Color::FromRGBA(60, 220, 255, 255);
+	const Color selected_color = Color::FromRGBA(255, 220, 60, 255);
+
+	for (Object& object : gObjectManager->GetCache()) {
+		if (!object.IsProbeVolume()) {
+			continue;
+		}
+
+		const Vec3f half_extent = (object.Bounds.Max - object.Bounds.Min) * 0.5f;
+		const Vec3f center = (object.Bounds.Max + object.Bounds.Min) * 0.5f;
+
+		Mat4f world_matrix = Mat4f::AsScale(half_extent) * Mat4f::AsTranslation(center) * object.GetWorldMatrix();
+		Mat4f combined_matrix = world_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
+
+		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
+
+		const bool is_selected = gSelectedEditorMode != nullptr && gSelectedEditorMode->IsInSelection(&object);
+		push_constants.DebugColor = is_selected ? selected_color.AsUInt() : volume_color.AsUInt();
+
+		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
+		mpWireBox->Render(cmd, 1);
+	}
+}
+
 void World::RenderProbeDebug(const Camera& camera)
 {
 	if (!mpDebugCube.IsValid()) {
@@ -1206,23 +1280,36 @@ void World::RenderProbeDebug(const Camera& camera)
 	// Tiny solid cubes (~0.15m). The base debug cube spans -1..+1, so scale by half-extent.
 	static const Vec3f scProbeHalfExtent(0.1f);
 
-	const Color probe_color = Color::FromRGBA(60, 220, 255, 100);
+	static const Color scVolumeColors[Limits::MaxProbeVolumes] = {
+		Color::FromRGBA(60, 220, 255, 100),	 Color::FromRGBA(255, 220, 60, 100),  Color::FromRGBA(140, 255, 90, 100),
+		Color::FromRGBA(255, 110, 200, 100), Color::FromRGBA(170, 140, 255, 100), Color::FromRGBA(90, 255, 210, 100),
+		Color::FromRGBA(255, 160, 110, 100), Color::FromRGBA(200, 200, 200, 100),
+	};
+
 	const Color capturing_color = Color::FromRGBA(255, 150, 30, 255);
 
 	const bool is_baking = gProbeManager->IsBaking();
 	const uint32 current_probe = gProbeManager->GetCurrentProbeIndex();
 
-	for (uint32 i = 0; i < gProbeManager->GetProbeCount(); i++) {
-		Mat4f world_matrix = Mat4f::AsScale(scProbeHalfExtent) *
-							 Mat4f::AsTranslation(gProbeManager->GetProbePosition(i));
-		Mat4f combined_matrix = world_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
+	for (uint32 volume = 0; volume < gProbeManager->GetVolumeCount(); volume++) {
+		uint32 first_probe;
+		uint32 num_probes;
+		gProbeManager->GetVolumeProbeRange(volume, first_probe, num_probes);
 
-		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
+		const uint32 volume_color = scVolumeColors[volume % std::size(scVolumeColors)].AsUInt();
 
-		push_constants.DebugColor = (is_baking && i == current_probe) ? capturing_color.AsUInt() : probe_color.AsUInt();
+		for (uint32 i = first_probe; i < first_probe + num_probes; i++) {
+			Mat4f world_matrix = Mat4f::AsScale(scProbeHalfExtent) *
+								 Mat4f::AsTranslation(gProbeManager->GetProbePosition(i));
+			Mat4f combined_matrix = world_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 
-		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
-		mpDebugCube->Render(cmd, 1);
+			memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
+
+			push_constants.DebugColor = (is_baking && i == current_probe) ? capturing_color.AsUInt() : volume_color;
+
+			gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
+			mpDebugCube->Render(cmd, 1);
+		}
 	}
 }
 

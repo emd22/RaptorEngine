@@ -30,6 +30,8 @@ enum class eObjectTag : uint32
 	Blockout = (1 << 0),
 	/// Locks rotation and transformation for scripts
 	LockTransform = (1 << 1),
+	/// A blockout brush that marks out a light probe volume instead of level geometry
+	ProbeVolume = (1 << 2),
 };
 
 FxEnumFlags(eObjectTag);
@@ -158,6 +160,16 @@ public:
 	void SetProbeVisible(bool value);
 
 	/**
+	 * @brief Turns this object into a light probe volume marker, or back into normal geometry.
+	 */
+	void SetProbeVolume(bool value);
+
+	/// True if this object marks out a probe volume rather than being level geometry
+	FX_FORCE_INLINE bool IsProbeVolume() const { return HasTags(eObjectTag::ProbeVolume); }
+
+	float32 RaycastBounds(const Vec3f& origin, const Vec3f& direction, Vec3f& out_face);
+
+	/**
 	 * @brief True if light probe bakes should include this object. Objects on the player layer (the view model) are
 	 * never part of the level, so they are always left out.
 	 */
@@ -209,8 +221,6 @@ public:
 	PagedArray<ObjectID> AttachedNodes;
 
 	AABB Bounds { Vec3f::sZero, Vec3f::sZero };
-
-	Ref<script::FoxScript> pScript { nullptr };
 
 	std::atomic_bool bIsAddedToWorld = false;
 

@@ -350,6 +350,10 @@ ObjectID Blockout::CreateCubeVolume(ConfigEntry& entry)
 
 	object->AttachCollider(phys);
 
+	if (entry.GetMemberValue(HashStr32("probevolume"), 0) == 1) {
+		object->SetProbeVolume(true);
+	}
+
 	AssetTicket ticket(static_cast<void*>(object));
 	ticket.MarkAndSignalLoaded();
 
@@ -404,6 +408,10 @@ void Blockout::RebuildObject(Object* object)
 	phys->Teleport(position, rotation);
 
 	object->AttachCollider(phys);
+
+	if (object->IsProbeVolume()) {
+		object->SetProbeVolume(true);
+	}
 }
 
 void Blockout::DestroyObject(Object* object)
@@ -529,6 +537,10 @@ Object* Blockout::DupeObject(Object* object)
 		phys->Teleport(position, rotation);
 
 		dupe->AttachCollider(phys);
+	}
+
+	if (object->IsProbeVolume()) {
+		dupe->SetProbeVolume(true);
 	}
 
 	AssetTicket ticket(static_cast<void*>(dupe));
@@ -661,12 +673,19 @@ void Blockout::Save(const String& path)
 				blockout_entry.AddMember(ConfigEntry::Literal("lock", 1));
 			}
 
+			if (object->IsProbeVolume()) {
+				blockout_entry.AddMember(ConfigEntry::Literal("probevolume", 1));
+			}
+
 			// Save material type
 			if (object->GetMaterialID() == mBlueMaterialID) {
-				blockout_entry.AddMember(ConfigEntry::DotReference("mat", "$CProtoMat.Blue"));
+				blockout_entry.AddMember(ConfigEntry::DotReference("mat", "$cprotomat.blue"));
 			}
 			else if (object->GetMaterialID() == mWhiteMaterialID) {
-				blockout_entry.AddMember(ConfigEntry::DotReference("mat", "$CProtoMat.White"));
+				blockout_entry.AddMember(ConfigEntry::DotReference("mat", "$cprotomat.grey"));
+			}
+			else if (object->GetMaterialID() == mOrangeMaterialID) {
+				blockout_entry.AddMember(ConfigEntry::DotReference("mat", "$cprotomat.orange"));
 			}
 		}
 		all_entry->AddMember(std::move(blockout_entry));

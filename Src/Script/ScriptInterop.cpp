@@ -10,6 +10,7 @@
 #include <Object/ObjectManager.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
+#include <Renderer/LightProbe.hpp>
 #include <World.hpp>
 
 namespace fx::script {
@@ -121,6 +122,7 @@ static void N_editor_push_op_delete(Object* obj, int32 group_size)
 	op.DeleteSnapshot.Material = gSelectedEditorMode->GetStoredMaterial(obj);
 	op.DeleteSnapshot.Rotation = obj->mRotation;
 	op.DeleteSnapshot.ObjectName = obj->Name;
+	op.DeleteSnapshot.bIsProbeVolume = obj->IsProbeVolume();
 
 	gSelectedEditorMode->PushEditOperation(op);
 }
@@ -189,6 +191,15 @@ static FLOAT4 N_object_ray_get_face(Object* obj)
 {
 	if (obj == nullptr) {
 		return simd::LoadFloat4(0.0f);
+	}
+
+	if (obj->IsProbeVolume()) {
+		Vec3f face;
+
+		const float32 distance = obj->RaycastBounds(gWorld->Player.pCamera->Position,
+													gWorld->Player.pCamera->GetForwardVector(), face);
+
+		return (distance >= 0.0f) ? face.mIntrin : simd::LoadFloat4(0.0f);
 	}
 
 	physics::Body* body = gPhysics->GetBody(obj->PhysicsID);
@@ -279,6 +290,35 @@ static Object* N_blockout_dupe_object(Object* object) { return gWorld->pBlockout
 static void N_blockout_destroy_object(Object* object) { gWorld->pBlockout->DestroyObject(object); }
 
 
+/////////////////////////////////////
+// Light probes
+/////////////////////////////////////
+
+static void N_probe_volume_mark(Object* obj, bool enabled)
+{
+	if (obj == nullptr) {
+		return;
+	}
+
+	obj->SetProbeVolume(enabled);
+}
+
+static bool N_probe_volume_is_marked(Object* obj) { return obj != nullptr && obj->IsProbeVolume(); }
+
+static int32 N_probe_rebuild_volumes() { return static_cast<int32>(gProbeManager->RebuildVolumesFromWorld()); }
+
+static int32 N_probe_volume_count() { return static_cast<int32>(gProbeManager->GetVolumeCount()); }
+static int32 N_probe_count() { return static_cast<int32>(gProbeManager->GetProbeCount()); }
+static bool N_probe_is_baking() { return gProbeManager->IsBaking(); }
+
+static void N_probe_bake()
+{
+	gProbeManager->RebuildVolumesFromWorld();
+	gProbeManager->BeginBake();
+}
+
+static bool N_probe_save() { return gProbeManager->SaveProbes(); }
+
 static void N_cvar_set_int(const char* name, int64 value) { gCVars->Set(name, value); }
 static void N_cvar_set_float(const char* name, float32 value) { gCVars->Set(name, value); }
 static void N_cvar_set_string(const char* name, const char* value) { gCVars->Set(name, value); }
@@ -343,6 +383,16 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("KEY_is_up", N_is_key_up),
 	PREDEF("KEY_is_down", N_is_key_down),
 	PREDEF("KEY_is_pressed", N_is_key_pressed),
+
+	/* Light probes */
+	PREDEF("probe_volume_mark", N_probe_volume_mark),
+	PREDEF("probe_volume_is_marked", N_probe_volume_is_marked),
+	PREDEF("probe_rebuild_volumes", N_probe_rebuild_volumes),
+	PREDEF("probe_volume_count", N_probe_volume_count),
+	PREDEF("probe_count", N_probe_count),
+	PREDEF("probe_is_baking", N_probe_is_baking),
+	PREDEF("probe_bake", N_probe_bake),
+	PREDEF("probe_save", N_probe_save),
 
 	PREDEF("cvar_set_int", N_cvar_set_int),
 	PREDEF("cvar_set_float", N_cvar_set_float),

@@ -63,7 +63,7 @@ public:
 
 	void SetModelMatrix(const Mat4f& other);
 
-	Mat4f& GetModelMatrix();
+	Mat4f& GetWorldMatrix();
 	// const Mat4f& GetNormalMatrix();
 
 	const Vec3f& GetPosition() const { return mPosition; }

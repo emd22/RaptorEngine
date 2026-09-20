@@ -8,7 +8,6 @@
 #include <Renderer/Camera.hpp>
 #include <Renderer/Limits.hpp>
 #include <Renderer/RenderStage.hpp>
-
 #include <functional>
 
 namespace fx {
@@ -24,16 +23,36 @@ struct ProbeSHData
 static_assert(sizeof(ProbeSHData) == Limits::ProbeSHCoeffCount * 4 * sizeof(float32),
 			  "ProbeSHData must be tightly packed as 9 float4s to mirror the HLSL struct");
 
-/// Placement of the probe grid, for the shader's trilinear lookup. Mirrors ProbeVolume in Shaders/ProbeCommon.hlsli.
+/// Placement of one probe grid, for the shader's trilinear lookup. Mirrors ProbeVolume in
+/// Shaders/ProbeCommon.hlsli.
 struct ProbeVolumeData
 {
-	float32 Min[4];
+	/// World space min corner in XYZ. W holds the number of volumes in the buffer, the same in every entry, so
+	/// that the shader can read the list's length out of any one of them.
+	float32 MinAndCount[4];
+
 	float32 InvCellSize[4];
-	/// Grid dimensions in XYZ, probe count in W
-	uint32 DimsAndCount[4];
+
+	/// Grid dimensions in XYZ, and in W the index of this volume's first probe in the probe buffers
+	uint32 DimsAndFirst[4];
 };
 
 static_assert(sizeof(ProbeVolumeData) == 48, "ProbeVolumeData must mirror the HLSL ProbeVolume struct");
+
+/// Probe grid resolution of one volume, in probes along each axis
+struct ProbeGridSize
+{
+	uint32 X = Limits::ProbeGridDims[0];
+	uint32 Y = Limits::ProbeGridDims[1];
+	uint32 Z = Limits::ProbeGridDims[2];
+
+	uint32 GetProbeCount() const { return X * Y * Z; }
+
+	bool IsValid() const
+	{
+		return X >= Limits::MinProbeGridDim && Y >= Limits::MinProbeGridDim && Z >= Limits::MinProbeGridDim;
+	}
+};
 
 /// Where a probe ended up after placement, and its depth moments for visibility. Mirrors ProbeInfo in
 /// Shaders/ProbeCommon.hlsli.
@@ -51,7 +70,7 @@ static_assert(sizeof(ProbeInfo) == Limits::ProbeDepthFloatCount * sizeof(float32
 struct ProbePlacementBoxes;
 
 /**
- * @brief A grid of L2 SH irradiance probes, with depth moments so that probes behind walls don't light a surface.
+ * @brief Grids of L2 SH irradiance probes, with depth moments so that probes behind walls don't light a surface.
  *
  * Probes are baked by rendering a cubemap at each probe's position, a few probes per frame. The results live on the GPU
  * in `GraphicsBackend::ProbeBuffer`, `ProbeVolumeBuffer` and `ProbeDepthBuffer`, and can be cached to a file per scene.
@@ -73,21 +92,58 @@ public:
 	void Create();
 	void Destroy();
 
-	uint32 GetProbeCount() const { return Limits::MaxIrradianceProbes; }
+	/// Probes placed across every volume, which is what the bake walks
+	uint32 GetProbeCount() const { return mProbeCount; }
 	Vec3f GetProbePosition(uint32 index) const;
 
 	/// The next probe to be captured by a bake
 	uint32 GetCurrentProbeIndex() const { return mCurrentProbe; }
 
 	///////////////////////////////////
+	// Volumes
+	///////////////////////////////////
+
+	uint32 GetVolumeCount() const { return mVolumeCount; }
+
+	/// Index of the volume that owns probe `probe_index`, or `Limits::MaxProbeVolumes` if no volume does
+	uint32 GetVolumeOfProbe(uint32 probe_index) const;
+
+	/// Index of `volume`'s first probe, and how many it has
+	void GetVolumeProbeRange(uint32 volume, uint32& out_first_probe, uint32& out_count) const;
+
+	/// Removes every volume. The probes they placed keep their baked lighting, but nothing samples them until a
+	/// volume covers them again.
+	void ClearVolumes();
+
+	/// Adds a volume of `size` centred on `center` and places its probes, leaving them unbaked. Returns false if
+	/// `grid` is degenerate, or if there is no room left in the volume list or the probe budget.
+	bool AddVolume(const Vec3f& center, const Vec3f& size, const ProbeGridSize& grid = {});
+
+	/// Adds a volume fitted to the level's geometry, the way BeginGridBake() does. Returns false if there is no
+	/// geometry to fit to, or if AddVolume() would have failed.
+	bool AddLevelVolume(const ProbeGridSize& grid = {});
+
+	/**
+	 * @brief Replaces every volume with the ones the level defines: a coarse volume fitted to the whole level,
+	 * plus a denser one for each brush the editor has tagged `eObjectTag::ProbeVolume`.
+	 *
+	 * Brush volumes take their grid from the `r_probe_spacing` cvar (metres between probes), coarsened as needed
+	 * to fit what is left of the probe budget. Returns the number of brush volumes added.
+	 */
+	uint32 RebuildVolumesFromWorld();
+
+	///////////////////////////////////
 	// Baking
 	///////////////////////////////////
 
-	/// Fits the probe grid to the level's geometry and starts baking it.
+	/// Starts baking every probe of every placed volume. Does nothing if no volume has been added.
+	void BeginBake();
+
+	/// Replaces every volume with one fitted to the level's geometry, and starts baking it.
 	void BeginGridBake();
 
-	/// Starts baking a grid of `size` centred on `center`, instead of fitting it to the level.
-	void BeginGridBakeAt(const Vec3f& center, const Vec3f& size);
+	/// Replaces every volume with a grid of `size` centred on `center`, and starts baking it.
+	void BeginGridBakeAt(const Vec3f& center, const Vec3f& size, const ProbeGridSize& grid = {});
 
 	bool IsBaking() const { return mBakeState != eBakeState::Idle; }
 
@@ -131,8 +187,14 @@ private:
 		uint32 MomentTexel;
 	};
 
-	void StartBake(const Vec3f& volume_min, const Vec3f& volume_size, const ProbePlacementBoxes& boxes);
-	void PlaceGridProbes(const Vec3f& volume_min, const Vec3f& volume_size, const ProbePlacementBoxes& boxes);
+
+	bool AddVolumeAndPlaceProbes(const Vec3f& volume_min, const Vec3f& volume_size, const ProbeGridSize& grid,
+								 const ProbePlacementBoxes& boxes);
+	void StartSingleVolumeBake(const Vec3f& volume_min, const Vec3f& volume_size, const ProbeGridSize& grid,
+							   const ProbePlacementBoxes& boxes);
+	void PlaceVolumeProbes(uint32 volume_index, uint32 first_probe, const Vec3f& volume_min, const Vec3f& volume_size,
+						   const ProbeGridSize& grid, const ProbePlacementBoxes& boxes);
+	void RefreshVolumeCounts();
 
 	void CreateCaptureResources();
 	void BuildCaptureTexels();
@@ -145,13 +207,18 @@ private:
 	void ProjectCapture(const uint16* const colors[scCaptureFaces], const float32* const depths[scCaptureFaces],
 						ProbeSHData& out_sh, ProbeInfo& out_info) const;
 
-	/// Copies the volume, and the SH and depth moments of probes [`first_probe`, `first_probe + count`) to the GPU.
+	/// Copies the volumes, and the SH and depth moments of probes [`first_probe`, `first_probe + count`) to the GPU.
 	void UploadToGpu(uint32 first_probe, uint32 count);
 
 private:
 	ProbeSHData mProbes[Limits::MaxIrradianceProbes] {};
 	ProbeInfo mProbeInfos[Limits::MaxIrradianceProbes] {};
-	ProbeVolumeData mVolume {};
+
+	ProbeVolumeData mVolumes[Limits::MaxProbeVolumes] {};
+	uint32 mVolumeCount = 0;
+
+	/// Probes taken by `mVolumes`, which is where the next volume's range starts
+	uint32 mProbeCount = 0;
 
 	eBakeState mBakeState = eBakeState::Idle;
 	bool mbCapturingFaces = false;

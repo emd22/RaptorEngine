@@ -179,6 +179,9 @@ void RaptorGame::CreateGame()
 
 	gCVars->Set("i_crosshair_size", scCrosshairSize);
 
+	// Metres between probes in a volume built from an editor brush. Set `$r_probe_spacing` in the console
+	gCVars->Set("r_probe_spacing", 2.5f);
+
 	mCrosshairTicket = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm, scCrosshairPath,
 												eImageCreateFlags::None);
 
@@ -315,11 +318,36 @@ Vec3f RaptorGame::GetCameraForwardDominantAxis() const
 	return Vec3f(0.0f, 0.0, MathUtil::GetSign(fwd.Z));
 }
 
+static constexpr float32 scEditorPickRange = 4.0f;
+
+static Object* PickProbeVolume(const PerspectiveCamera& camera, const Vec3f& pick_direction)
+{
+	float32 volume_distance = 0.0f;
+	Object* volume = gWorld->RaycastProbeVolumes(camera.Position, pick_direction, scEditorPickRange, volume_distance);
+
+	if (volume == nullptr) {
+		return nullptr;
+	}
+
+	// Geometry in front of the volume wins, so looking at a wall inside a volume still selects the wall. The
+	// volume's box is hollow, so standing inside one doesn't put it in front of everything it contains.
+	const physics::RayResult solid = gPhysics->pBackend->Raycast(camera.Position, pick_direction * scEditorPickRange);
+
+	if (solid.bHit && (solid.Point - camera.Position).Length() <= volume_distance) {
+		return nullptr;
+	}
+
+	return volume;
+}
+
 static void EditorSelectObject()
 {
 	Ref<PerspectiveCamera>& cam = gWorld->Player.pCamera;
 
-	SizedArray<JPH::BodyID> hits = gPhysics->pBackend->RaycastObjects(cam->Position, cam->GetForwardVector() * 4.0f);
+	const Vec3f pick_direction = cam->GetForwardVector();
+
+	SizedArray<JPH::BodyID> hits = gPhysics->pBackend->RaycastObjects(cam->Position,
+																	  pick_direction * scEditorPickRange);
 
 	const bool should_append_selection = ControlManager::IsKeyDown(eKey::FX_KEY_LALT);
 
@@ -329,7 +357,13 @@ static void EditorSelectObject()
 									(gSelectedEditorMode->HasSelection() == false || should_append_selection));
 
 	if (can_add_selection) {
-		for (int i = 0; i < hits.Size; i++) {
+		Object* volume = PickProbeVolume(*cam, pick_direction);
+
+		if (volume != nullptr) {
+			did_hit = gSelectedEditorMode->SelectObject(volume, should_append_selection);
+		}
+
+		for (int i = 0; !did_hit && i < hits.Size; i++) {
 			JPH::BodyID body_id = hits[i];
 
 			physics::Body* body = gPhysics->FindBody(body_id);
@@ -510,17 +544,15 @@ void RaptorGame::ProcessControls()
 	}
 
 
-	// if (ControlManager::IsKeyPressed(eKey::FX_KEY_V)) {
-	// 	// Dense local volume around the player.
-	// 	gProbeManager->BeginGridBakeAt(gWorld->Player.pCamera->Position, Vec3f(24.0f, 8.0f, 24.0f));
-	// }
-
-	// `G` fits the probe grid to the whole level instead.
+	// `G` rebuilds the volumes from the level (a coarse volume over all of it, plus one per probe volume brush
+	// the editor has tagged) and bakes them.
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_G)) {
-		gProbeManager->BeginGridBake();
+		gProbeManager->RebuildVolumesFromWorld();
+		gProbeManager->BeginBake();
 	}
 
-	// `P` saves volume + probes for the current scene (auto-loaded next run).
+
+	// `P` saves the volumes + probes for the current scene (auto-loaded next run).
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_P)) {
 		gProbeManager->SaveProbes();
 	}
