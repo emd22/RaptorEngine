@@ -80,21 +80,17 @@ void LightBase::FillGpuData(LightGpuData& data, const PerspectiveCamera& camera,
 {
 	// No shadow map by default (ShadowAtlasRect stays zero), shadowed lights fill these in their own FillGpuData
 	memcpy(data.LightCameraMatrix, Mat4f::scIdentity.RawData, sizeof(Mat4f));
-	memcpy(data.InvView, camera.InvViewMatrix.RawData, sizeof(Mat4f));
-	memcpy(data.InvProjection, camera.InvProjectionMatrix.RawData, sizeof(Mat4f));
 
-	data.EyePosition[0] = camera.Position.X;
-	data.EyePosition[1] = camera.Position.Y;
-	data.EyePosition[2] = camera.Position.Z;
 	data.Radius = mRadius;
+
+	// The shading pass only ever needs the reciprocal, and dividing here keeps it out of the per pixel light loop.
+	// Clamped rather than left to divide by zero, so a zero radius light stays off instead of writing an infinity.
+	data.InvRadiusSq = 1.0f / std::max(mRadius * mRadius, 1e-8f);
 
 	data.Position[0] = mPosition.X;
 	data.Position[1] = mPosition.Y;
 	data.Position[2] = mPosition.Z;
 	data.Color = Color.Value;
-
-	data.CameraSize[0] = static_cast<float32>(gGraphics->Swapchain.Extent.X);
-	data.CameraSize[1] = static_cast<float32>(gGraphics->Swapchain.Extent.Y);
 
 	data.Ambient = AmbientColor.Value;
 	data.Type = static_cast<uint32>(Type);
@@ -139,6 +135,12 @@ LightDirectional::LightDirectional() { Type = eLightType::Directional; }
 void LightDirectional::FillGpuData(LightGpuData& data, const PerspectiveCamera& camera, Camera* shadow_camera) const
 {
 	LightBase::FillGpuData(data, camera, shadow_camera);
+
+	// Position holds the direction towards the light for this type. The shading pass takes it pre-normalized.
+	const Vec3f direction = mPosition.Normalize();
+	data.Position[0] = direction.X;
+	data.Position[1] = direction.Y;
+	data.Position[2] = direction.Z;
 
 	const Camera* light_camera = (shadow_camera != nullptr) ? shadow_camera : &camera;
 	memcpy(data.LightCameraMatrix, light_camera->GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));

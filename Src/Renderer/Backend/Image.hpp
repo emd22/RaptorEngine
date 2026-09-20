@@ -63,6 +63,7 @@ enum class eImageFormat : uint16
 	RGBA8_UNorm,
 
 	RG32_Float,
+	RG16_UNorm,
 
 	RGBA16_Float,
 
@@ -161,6 +162,7 @@ struct ImageFormatUtil
 		case eImageFormat::BGRA8_UNorm:
 		case eImageFormat::RGBA8_SRGB:
 		case eImageFormat::RGBA8_UNorm:
+		case eImageFormat::RG16_UNorm:
 			return 4;
 
 		case eImageFormat::RG32_Float:
@@ -243,6 +245,9 @@ struct ImageFormatUtil
 			break;
 
 			// Color formats
+
+		case eImageFormat::RG16_UNorm:
+			return VK_FORMAT_R16G16_UNORM;
 
 		case eImageFormat::RG32_Float:
 			return VK_FORMAT_R32G32_SFLOAT;
@@ -338,8 +343,9 @@ public:
 				   Vec2u size, uint32 mip_level);
 
 
+	/// `dst_offset` places the copied region inside the image, for updating part of an atlas.
 	void CopyFromBuffer(renderer::CommandBuffer& cmd, const renderer::RawGpuBuffer& buffer, VkImageLayout final_layout,
-						Vec2u size, uint32 base_layer, uint32 mip_level);
+						Vec2u size, uint32 base_layer, uint32 mip_level, Vec2u dst_offset = Vec2u::sZero);
 
 	void CreateLayeredImageFromCubemap(Image& cubemap, eImageFormat image_format, VkImageAspectFlags aspect_flags,
 									   ImageCubemapOptions options);

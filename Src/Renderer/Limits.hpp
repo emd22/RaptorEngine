@@ -90,5 +90,15 @@ static constexpr uint32 ProbeDepthFloatCount = ProbeDepthFaces * ProbeDepthTexel
 /// to the same value, so a receiver further out than this cannot be occluded.
 static constexpr float ProbeDepthMaxDistance = 50.0f;
 
+static constexpr uint32 ProbeAtlasColumns = 32;
+static constexpr uint32 ProbeAtlasProbeWidth = ProbeDepthFaces * ProbeDepthSize;
+static constexpr uint32 ProbeAtlasRows = (MaxIrradianceProbes + ProbeAtlasColumns - 1) / ProbeAtlasColumns;
+static constexpr uint32 ProbeAtlasWidth = ProbeAtlasColumns * ProbeAtlasProbeWidth;
+static constexpr uint32 ProbeAtlasHeight = ProbeAtlasRows * ProbeDepthSize;
+
+// Vulkan only guarantees maxImageDimension2D of 4096
+static_assert(ProbeAtlasWidth <= 4096 && ProbeAtlasHeight <= 4096, "The probe moment atlas must fit a 4096 texture");
+static_assert(ProbeAtlasColumns * ProbeAtlasRows >= MaxIrradianceProbes, "The atlas must hold every probe");
+
 
 } // namespace fx::Limits

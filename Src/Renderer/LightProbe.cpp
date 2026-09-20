@@ -20,12 +20,13 @@
 #include <Renderer/GraphicsBackend.hpp>
 #include <algorithm>
 #include <bit>
+#include <cfloat>
 #include <cmath>
 #include <cstring>
 #include <limits>
 
 /// Bump whenever the layout or meaning of the cached data changes
-#define FX_PROBE_CACHE_FILE_VERSION 8
+#define FX_PROBE_CACHE_FILE_VERSION 9
 
 namespace fx {
 
@@ -449,11 +450,57 @@ struct ProbeFileHeader
 	uint32 ProbeCount = 0;
 };
 
-/// Bytes a cache holding `probe_count` probes takes
-uint64 GetProbeFileSize(uint32 probe_count)
+
+struct ProbeVolumeDataV8
 {
-	return sizeof(ProbeFileHeader) + Limits::MaxProbeVolumes * sizeof(ProbeVolumeData) +
+	float32 MinAndCount[4];
+	float32 InvCellSize[4];
+	uint32 DimsAndFirst[4];
+};
+
+static_assert(sizeof(ProbeVolumeDataV8) == 48, "The version 8 volume layout is fixed, it describes files on disk");
+
+void FinaliseVolumeBounds(ProbeVolumeData& volume)
+{
+	if (volume.DimsAndFirst[0] == 0 || volume.DimsAndFirst[1] == 0 || volume.DimsAndFirst[2] == 0) {
+		volume.MaxAndCellVolume[0] = 0.0f;
+		volume.MaxAndCellVolume[1] = 0.0f;
+		volume.MaxAndCellVolume[2] = 0.0f;
+		volume.MaxAndCellVolume[3] = FLT_MAX;
+		return;
+	}
+
+	float32 cell_volume = 1.0f;
+
+	for (uint32 axis = 0; axis < 3; axis++) {
+		const float32 cell_size = 1.0f / std::max(volume.InvCellSize[axis], 1e-6f);
+		const float32 cells = static_cast<float32>(volume.DimsAndFirst[axis] - 1);
+
+		volume.MaxAndCellVolume[axis] = volume.MinAndCount[axis] + (cell_size * cells);
+		cell_volume *= cell_size;
+	}
+
+	volume.MaxAndCellVolume[3] = cell_volume;
+}
+
+static constexpr uint32 scOldestReadableCacheVersion = 8;
+
+uint64 GetProbeFileSize(uint32 probe_count, uint32 version)
+{
+	const uint64 volume_stride = (version >= 9) ? sizeof(ProbeVolumeData) : sizeof(ProbeVolumeDataV8);
+
+	return sizeof(ProbeFileHeader) + Limits::MaxProbeVolumes * volume_stride +
 		   static_cast<uint64>(probe_count) * (sizeof(ProbeSHData) + sizeof(ProbeInfo));
+}
+
+bool IsCacheLayoutReadable(const ProbeFileLayout& layout)
+{
+	const ProbeFileLayout expected {};
+
+	return memcmp(layout.Magic, expected.Magic, sizeof(expected.Magic)) == 0 &&
+		   layout.SHCoeffCount == expected.SHCoeffCount && layout.DepthFloatCount == expected.DepthFloatCount &&
+		   layout.MaxVolumes == expected.MaxVolumes && layout.Version >= scOldestReadableCacheVersion &&
+		   layout.Version <= FX_PROBE_CACHE_FILE_VERSION;
 }
 
 String GetProbeFilePath() { return String::Fmt("{}/probes.fxprobe", gAssetManager->GetScenePath().CStr()); }
@@ -803,6 +850,8 @@ void ProbeManager::PlaceVolumeProbes(uint32 volume_index, uint32 first_probe, co
 	volume.InvCellSize[3] = 0.0f;
 	volume.DimsAndFirst[3] = first_probe;
 
+	FinaliseVolumeBounds(volume);
+
 	LogInfo("Probe volume {}: min={} size={} grid={}x{}x{} ({} probes from index {}, {} pushed out, {} hugging)",
 			volume_index, volume_min, volume_size, dims[0], dims[1], dims[2], grid.GetProbeCount(), first_probe,
 			num_pushed, num_hugged);
@@ -1076,8 +1125,97 @@ void ProbeManager::UploadToGpu(uint32 first_probe, uint32 count)
 		return;
 	}
 
+
+	for (uint32 probe = first_probe; probe < first_probe + count; probe++) {
+		for (uint32 axis = 0; axis < 3; axis++) {
+			mProbes[probe].SH[axis][3] = mProbeInfos[probe].ProbePosition[axis];
+		}
+	}
+
 	UploadRange(graphics->ProbeBuffer, mProbes, first_probe * sizeof(ProbeSHData), count * sizeof(ProbeSHData));
-	UploadRange(graphics->ProbeDepthBuffer, mProbeInfos, first_probe * sizeof(ProbeInfo), count * sizeof(ProbeInfo));
+	UploadMomentsAtlas(first_probe, count);
+}
+
+/// Encodes `value` (already in 0..1) the way VK_FORMAT_R16G16_UNORM decodes it.
+static uint16 EncodeUNorm16(float32 value)
+{
+	return static_cast<uint16>(std::clamp(value, 0.0f, 1.0f) * 65535.0f + 0.5f);
+}
+
+void ProbeManager::UploadMomentsAtlas(uint32 first_probe, uint32 count)
+{
+	using namespace renderer;
+
+	if (count == 0) {
+		return;
+	}
+
+	GraphicsBackend* graphics = gGraphics;
+	Assert(graphics->pProbeMomentsAtlas != nullptr);
+
+	const uint32 first_row = first_probe / Limits::ProbeAtlasColumns;
+	const uint32 last_row = (first_probe + count - 1) / Limits::ProbeAtlasColumns;
+
+	constexpr uint32 cRowTexels = Limits::ProbeAtlasWidth * Limits::ProbeDepthSize;
+
+	SizedArray<uint16> row;
+	row.InitSize(static_cast<uint64>(cRowTexels) * 2);
+
+	for (uint32 atlas_row = first_row; atlas_row <= last_row; atlas_row++) {
+		// Probes past mProbeCount keep the max distance sentinel, which reads as unoccluded
+		memset(row.pData, 0xFF, row.Size * sizeof(uint16));
+
+		for (uint32 column = 0; column < Limits::ProbeAtlasColumns; column++) {
+			const uint32 probe = (atlas_row * Limits::ProbeAtlasColumns) + column;
+
+			if (probe >= mProbeCount) {
+				break;
+			}
+
+			const float32* moments = mProbeInfos[probe].DepthMoments;
+			const uint32 strip_x = column * Limits::ProbeAtlasProbeWidth;
+
+			for (uint32 face = 0; face < Limits::ProbeDepthFaces; face++) {
+				for (uint32 y = 0; y < Limits::ProbeDepthSize; y++) {
+					for (uint32 x = 0; x < Limits::ProbeDepthSize; x++) {
+						const uint32 src = ((face * Limits::ProbeDepthTexelsPerFace) + (y * Limits::ProbeDepthSize) +
+											x) *
+										   2;
+
+						const uint32 dst = ((y * Limits::ProbeAtlasWidth) + strip_x + (face * Limits::ProbeDepthSize) +
+											x) *
+										   2;
+
+						const float32 mean = moments[src + 0];
+
+						// Stored as a standard deviation rather than the raw second moment: at 16 bits the shader's
+						// mean_sq - mean * mean would lose the whole variance to cancellation at any distance.
+						const float32 stddev = std::sqrt(std::max(moments[src + 1] - (mean * mean), 0.0f));
+
+						row[dst + 0] = EncodeUNorm16(mean / Limits::ProbeDepthMaxDistance);
+						row[dst + 1] = EncodeUNorm16(stddev / Limits::ProbeDepthMaxDistance);
+					}
+				}
+			}
+		}
+
+		RawGpuBuffer staging;
+		staging.Create(eGpuBufferType::Transfer, row.Size * sizeof(uint16), VMA_MEMORY_USAGE_CPU_TO_GPU,
+					   eGpuBufferFlags::TransferReceiver);
+		staging.Upload(row.pData, row.Size * sizeof(uint16));
+
+		const Vec2u row_size(Limits::ProbeAtlasWidth, Limits::ProbeDepthSize);
+		const Vec2u row_offset(0, atlas_row * Limits::ProbeDepthSize);
+
+		graphics->SubmitImmediateUploadCmd(
+			[&](CommandBuffer& cmd)
+			{
+				graphics->pProbeMomentsAtlas->CopyFromBuffer(cmd, staging, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+															 row_size, 0, 0, row_offset);
+			});
+
+		staging.Destroy();
+	}
 }
 
 /////////////////////////////////////
@@ -1125,11 +1263,9 @@ bool ProbeManager::LoadProbes()
 		return false;
 	}
 
-	const ProbeFileLayout expected_layout {};
 	ProbeFileHeader header;
 
-	if (!ReadExact(file, &header, sizeof(header)) ||
-		memcmp(&header.Layout, &expected_layout, sizeof(expected_layout)) != 0) {
+	if (!ReadExact(file, &header, sizeof(header)) || !IsCacheLayoutReadable(header.Layout)) {
 		LogWarning("Probe file {} is out of date or not a probe file, rebake the probes", path.CStr());
 		return false;
 	}
@@ -1140,17 +1276,39 @@ bool ProbeManager::LoadProbes()
 		return false;
 	}
 
-	if (file.GetFileSize() != GetProbeFileSize(header.ProbeCount)) {
+	if (file.GetFileSize() != GetProbeFileSize(header.ProbeCount, header.Layout.Version)) {
 		LogError("Probe file {} is {} bytes, not the {} its {} probes need", path.CStr(), file.GetFileSize(),
-				 GetProbeFileSize(header.ProbeCount), header.ProbeCount);
+				 GetProbeFileSize(header.ProbeCount, header.Layout.Version), header.ProbeCount);
 		return false;
 	}
 
-	ProbeVolumeData volumes[Limits::MaxProbeVolumes];
+	ProbeVolumeData volumes[Limits::MaxProbeVolumes] {};
 
-	if (!ReadExact(file, volumes, sizeof(volumes))) {
-		LogError("Could not read the probe volumes from {}", path.CStr());
-		return false;
+	if (header.Layout.Version >= 9) {
+		if (!ReadExact(file, volumes, sizeof(volumes))) {
+			LogError("Could not read the probe volumes from {}", path.CStr());
+			return false;
+		}
+	}
+	else {
+		// Version 8 predates MaxAndCellVolume, which is derived, so the bake itself is still good
+		ProbeVolumeDataV8 legacy[Limits::MaxProbeVolumes];
+
+		if (!ReadExact(file, legacy, sizeof(legacy))) {
+			LogError("Could not read the probe volumes from {}", path.CStr());
+			return false;
+		}
+
+		for (uint32 volume = 0; volume < Limits::MaxProbeVolumes; volume++) {
+			memcpy(volumes[volume].MinAndCount, legacy[volume].MinAndCount, sizeof(legacy[volume].MinAndCount));
+			memcpy(volumes[volume].InvCellSize, legacy[volume].InvCellSize, sizeof(legacy[volume].InvCellSize));
+			memcpy(volumes[volume].DimsAndFirst, legacy[volume].DimsAndFirst, sizeof(legacy[volume].DimsAndFirst));
+
+			FinaliseVolumeBounds(volumes[volume]);
+		}
+
+		LogInfo("Migrated probe cache {} from version {} to {}", path.CStr(), header.Layout.Version,
+				FX_PROBE_CACHE_FILE_VERSION);
 	}
 
 	// A volume whose probes run past what the file holds would send the shader into probes that were never placed

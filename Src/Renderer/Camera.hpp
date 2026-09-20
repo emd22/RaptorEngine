@@ -255,7 +255,7 @@ private:
 	Mat4f mWeaponCameraMatrix = Mat4f::scIdentity;
 	Mat4f mWeaponProjectionMatrix = Mat4f::scIdentity;
 
-	float32 mWeaponFov = MathUtil::DegreesToRadians(60.0f);
+	float32 mWeaponFov = MathUtil::DegreesToRadians(65.0f);
 };
 
 } // namespace fx

@@ -31,6 +31,7 @@
 #include <Renderer/PSOBuild.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/ShadowDirectional.hpp>
+#include <Texture/TextureManager.hpp>
 #include <World.hpp>
 
 /* If this is defined, we will break on an error message containing this string. */
@@ -163,9 +164,26 @@ void GraphicsBackend::Init(Vec2u window_size)
 	ProbeVolumeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeVolumePageSize,
 							 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
 
-	ProbeDepthPageSize = Limits::MaxIrradianceProbes * sizeof(ProbeInfo);
-	ProbeDepthBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeDepthPageSize, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-							eGpuBufferFlags::PersistentMapped);
+
+	{
+		const Vec2u atlas_size(Limits::ProbeAtlasWidth, Limits::ProbeAtlasHeight);
+		const uint64 atlas_bytes = static_cast<uint64>(atlas_size.X) * atlas_size.Y *
+								   ImageFormatUtil::GetPixelStride(eImageFormat::RG16_UNorm);
+
+		SizedArray<uint8> blank;
+		blank.InitSize(atlas_bytes);
+		memset(blank.pData, 0xFF, atlas_bytes);
+
+		pProbeMomentsAtlas = gTextureManager->NewTexture();
+
+		SubmitImmediateUploadCmd(
+			[&](CommandBuffer& cmd)
+			{
+				ImageInfo info(atlas_size, eImageFormat::RG16_UNorm, 0, 1, Slice<const uint8>(blank.pData, blank.Size));
+
+				pProbeMomentsAtlas->CreateFromData(cmd, info, eImageCreateFlags::None);
+			});
+	}
 
 
 	gMaterialManager->Create();
@@ -868,7 +886,6 @@ void GraphicsBackend::Destroy()
 	DecalMaskBuffer.Destroy();
 	ProbeBuffer.Destroy();
 	ProbeVolumeBuffer.Destroy();
-	ProbeDepthBuffer.Destroy();
 
 	gAssetManager->ShutdownDeletionQueue();
 

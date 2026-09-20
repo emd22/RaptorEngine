@@ -31,7 +31,7 @@ class Player
 	/// Roll per radian of yaw sway, so the view model banks into horizontal turns.
 	static constexpr float32 scViewModelSwayRoll = 1.25f;
 
-	static constexpr const char* scViewModelIdleAnim = "0idle";
+	static constexpr const char* scViewModelIdleAnim = "BasePose";
 	static constexpr const char* scViewModelFireAnim = "Armature|Fire";
 	static constexpr const char* scViewModelReloadAnim = "Armature|ReloadClip";
 

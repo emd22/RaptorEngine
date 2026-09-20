@@ -82,9 +82,15 @@ void DecalManager::AddDecal(const DecalDesc& desc)
 	gpu_data.WorldToDecal[15] = 1.0f;
 
 	StoreFloat3(desc.Position, gpu_data.Center);
-	StoreFloat3(right * (desc.Width * 0.5f), gpu_data.HalfAxisX);
-	StoreFloat3(up * (desc.Height * 0.5f), gpu_data.HalfAxisY);
-	StoreFloat3(forward * (desc.Depth * 0.5f), gpu_data.HalfAxisZ);
+
+	StoreFloat3(right, gpu_data.AxisX);
+	StoreFloat3(up, gpu_data.AxisY);
+	StoreFloat3(forward, gpu_data.AxisZ);
+
+	gpu_data.HalfExtents[0] = desc.Width * 0.5f;
+	gpu_data.HalfExtents[1] = desc.Height * 0.5f;
+	gpu_data.HalfExtents[2] = desc.Depth * 0.5f;
+	gpu_data.HalfExtents[3] = 0.0f;
 
 	gpu_data.Color = desc.Color;
 	gpu_data.Roughness = desc.Roughness;

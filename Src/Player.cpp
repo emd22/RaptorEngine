@@ -28,7 +28,7 @@ void Player::Create()
 
 	// Load the view model
 
-	AssetTicket view_model = gAssetManager->LoadObject("view_model", "Data/Demo/Models/moararms.glb");
+	AssetTicket view_model = gAssetManager->LoadObject("view_model", "Data/Demo/Models/viewmodel.glb");
 
 	// Registered before World::Attach() so these callbacks run first: the view model has to be set up before the world
 	// adds it to the grid, or a probe bake running on the main thread in between would capture it as level geometry.
@@ -194,7 +194,7 @@ void Player::UpdateViewModel(double delta_time)
 
 	// const float32 rotx = sin(gWorld->Player.mBobCounterY * 0.5f) * 0.05f;
 
-	mpViewModel->SetPosition(pCamera->Position + (forward * 0.30) - (up * 0.255) + (right * 0.11) + view_model_bob);
+	mpViewModel->SetPosition(pCamera->Position + (forward * 0.30) - (up * 0.265) + (right * 0.05) + view_model_bob);
 
 	mpViewModel->SetRotation(mViewModelRotation * mViewModelAccumRot);
 }

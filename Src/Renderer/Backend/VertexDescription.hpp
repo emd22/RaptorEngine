@@ -63,11 +63,11 @@ VertexDescription BuildDescription()
                 .format = VK_FORMAT_R32G32_SFLOAT,
                 .offset = offsetof(VertexType, UV),
             },
-            // Tangent
+            // Tangent, xyz plus the bitangent handedness in w
             {
                 .location = 3,
                 .binding = 0,
-                .format = VK_FORMAT_R32G32B32_SFLOAT,
+                .format = VK_FORMAT_R32G32B32A32_SFLOAT,
                 .offset = offsetof(VertexType, Tangent),
             },
         };
@@ -97,11 +97,11 @@ VertexDescription BuildDescription()
                 .format = VK_FORMAT_R32G32_SFLOAT,
                 .offset = offsetof(VertexType, UV),
             },
-            // Tangent
+            // Tangent, xyz plus the bitangent handedness in w
             {
                 .location = 3,
                 .binding = 0,
-                .format = VK_FORMAT_R32G32B32_SFLOAT,
+                .format = VK_FORMAT_R32G32B32A32_SFLOAT,
                 .offset = offsetof(VertexType, Tangent),
             },
             // Bone IDs

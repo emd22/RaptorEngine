@@ -51,9 +51,14 @@ bool DecalIntersectsTile(Decal decal, float2 tile_min, float2 tile_max)
 {
 	// Each corner is the center plus or minus every half axis, so only these four need transforming
 	const float4 center_clip = mul(float4(decal.vCenter, 1.0), CSConst.mViewProjection);
-	const float4 axis_x_clip = mul(float4(decal.vHalfAxisX, 0.0), CSConst.mViewProjection);
-	const float4 axis_y_clip = mul(float4(decal.vHalfAxisY, 0.0), CSConst.mViewProjection);
-	const float4 axis_z_clip = mul(float4(decal.vHalfAxisZ, 0.0), CSConst.mViewProjection);
+	// The axes are stored unit length, so they are scaled back to half extents here
+	const float3 half_axis_x = decal.vAxisX * decal.vHalfExtents.x;
+	const float3 half_axis_y = decal.vAxisY * decal.vHalfExtents.y;
+	const float3 half_axis_z = decal.vAxisZ * decal.vHalfExtents.z;
+
+	const float4 axis_x_clip = mul(float4(half_axis_x, 0.0), CSConst.mViewProjection);
+	const float4 axis_y_clip = mul(float4(half_axis_y, 0.0), CSConst.mViewProjection);
+	const float4 axis_z_clip = mul(float4(half_axis_z, 0.0), CSConst.mViewProjection);
 
 	float2 rect_min = float2(1e30, 1e30);
 	float2 rect_max = float2(-1e30, -1e30);
