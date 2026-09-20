@@ -184,18 +184,14 @@ private:
 
 	physics::BodyID mSelectedPhysicsObjectId = physics::BodyID::scNull;
 
-	/// 12 edge box for drawing brushes as wireframe
 	Ref<PrimitiveMesh> mpWireBox { nullptr };
+	Ref<PrimitiveMesh> mpDebugCube { nullptr };
 
-	/// Used by RenderPhysicsObjects. Rebuild the physics objects list if there have been changes recorded in the
-	/// physics manager.
 	uint32 mLastPhysicsUpdateState = UINT32_MAX;
 	SizedArray<physics::Body*> mCachedPhysicsBodies;
 
-	/// Sorted entries, only for transparent objects.
 	DynArray<TransparentObjectCarrier> SortedEntryBuffer;
 
-	/// Light buffer slot that the sun was written to this frame, UINT32_MAX if it wasn't. See RenderProbeCapture().
 	uint32 mSunLightSlot = UINT32_MAX;
 
 	/// Spot light shadow maps to render this frame, see UpdateSpotShadows()
