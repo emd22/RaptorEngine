@@ -213,6 +213,10 @@ void EditOperation::Undo()
 			break;
 		}
 
+		if (DeleteSnapshot.bIsProbeVolume) {
+			restored->SetProbeVolume(true);
+		}
+
 		pObject = restored;
 		PushedObjectID = restored->ID;
 

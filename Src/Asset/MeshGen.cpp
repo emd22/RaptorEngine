@@ -319,6 +319,40 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeCube(CubeGenOptions options)
 	return mesh;
 }
 
+Ref<MeshGen::GeneratedMesh> MeshGen::MakeWireframeBox()
+{
+	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
+
+	mesh->Positions.InitSize(8);
+	mesh->Indices.InitSize(24);
+
+	// Corner i takes its sign on each axis from bit 0, 1 and 2, so corners that differ in one bit share an edge
+	for (uint32 corner = 0; corner < 8; corner++) {
+		mesh->Positions[corner] = Vec3f((corner & 1) ? 1.0f : -1.0f, (corner & 2) ? 1.0f : -1.0f,
+										(corner & 4) ? 1.0f : -1.0f);
+	}
+
+	uint32 index = 0;
+
+	for (uint32 corner = 0; corner < 8; corner++) {
+		for (uint32 axis = 0; axis < 3; axis++) {
+			const uint32 neighbour = corner | (1u << axis);
+
+			// Emit each edge once, from the corner on the low side of the axis
+			if (neighbour == corner) {
+				continue;
+			}
+
+			mesh->Indices[index++] = corner;
+			mesh->Indices[index++] = neighbour;
+		}
+	}
+
+	Assert(index == mesh->Indices.Size);
+
+	return mesh;
+}
+
 Ref<MeshGen::GeneratedMesh> MeshGen::MakeQuad(Vec2f scale)
 {
 	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();

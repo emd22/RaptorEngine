@@ -100,6 +100,8 @@ public:
 		MaterialID Material = MaterialID::scNull;
 		Quat Rotation = Quat::scIdentity;
 		Name ObjectName;
+		/// So that undoing the delete of a probe volume brush brings back a probe volume, not solid geometry
+		bool bIsProbeVolume = false;
 	} DeleteSnapshot;
 
 	/// The size of the operation group this is in. For example, when moving 10 objects, there will be 10 operations(one

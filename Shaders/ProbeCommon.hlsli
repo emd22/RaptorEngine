@@ -6,6 +6,9 @@
 
 #define PROBE_SH_COEFF_COUNT 9
 
+/// Probe volumes that can be placed at once. Mirrors Limits::MaxProbeVolumes.
+#define PROBE_MAX_VOLUMES 8
+
 /// Each probe has a depth moments cubemap: per texel, the mean distance and mean squared distance to what it sees
 #define PROBE_DEPTH_SIZE 16
 #define PROBE_DEPTH_FACES 6
@@ -46,10 +49,65 @@ struct ProbeInfo
 
 struct ProbeVolume
 {
-	float4 vMin;
+	/// xyz = world space min corner of the grid. w = how many volumes the buffer holds, repeated in every
+	/// entry so that a single descriptor is enough to walk the whole list.
+	float4 vMinAndCount;
+
 	float4 vInvCellSize;
-	uint4 vDimsAndCount;
+
+	/// Grid dimensions in XYZ, and in W the index this volume's first probe has in the probe buffers
+	uint4 vDimsAndFirst;
 };
+
+uint GetProbeVolumeCount(StructuredBuffer<ProbeVolume> volumes) { return uint(volumes[0].vMinAndCount.w); }
+
+/// Spacing between this volume's probes along each axis
+float3 ProbeVolumeCellSize(ProbeVolume volume) { return 1.0 / max(volume.vInvCellSize.xyz, 1e-6); }
+
+/// World space corner opposite vMin. Probes sit on the boundary, so the grid spans (dims - 1) cells.
+float3 ProbeVolumeMax(ProbeVolume volume)
+{
+	return volume.vMinAndCount.xyz + ProbeVolumeCellSize(volume) * float3(volume.vDimsAndFirst.xyz - 1);
+}
+
+/// Squared distance from `pos_ws` to `volume`, 0 when it is inside.
+float ProbeVolumeDistanceSq(float3 pos_ws, ProbeVolume volume)
+{
+	const float3 outside = max(max(volume.vMinAndCount.xyz - pos_ws, pos_ws - ProbeVolumeMax(volume)), 0.0);
+	return dot(outside, outside);
+}
+
+/// Picks the volume that lights `pos_ws`: the one it is inside, and of those the one with the tightest probe
+/// spacing, so a small dense volume wins over the level sized one it sits in. A position outside every volume
+/// falls back to the nearest one, whose lookup clamps it to the grid's edge.
+///
+/// Volumes are not blended into each other, so lighting changes across a volume's boundary. Overlapping a
+/// volume well past the geometry it was placed for keeps that step away from anything the player looks at.
+uint SelectProbeVolume(float3 pos_ws, StructuredBuffer<ProbeVolume> volumes, uint volume_count)
+{
+	uint best = 0;
+	float best_distance_sq = 1e30;
+	float best_cell_volume = 1e30;
+
+	for (uint i = 0; i < volume_count; i++) {
+		const float distance_sq = ProbeVolumeDistanceSq(pos_ws, volumes[i]);
+
+		const float3 cell = ProbeVolumeCellSize(volumes[i]);
+		const float cell_volume = cell.x * cell.y * cell.z;
+
+		// Closer wins outright; between volumes that both contain the position (both 0) the denser one does
+		const bool closer = distance_sq < best_distance_sq - 1e-4;
+		const bool denser = distance_sq <= best_distance_sq + 1e-4 && cell_volume < best_cell_volume;
+
+		if (closer || denser) {
+			best = i;
+			best_distance_sq = distance_sq;
+			best_cell_volume = cell_volume;
+		}
+	}
+
+	return best;
+}
 
 /// Evaluates a probe's SH in direction `normal`. The bake stores coefficients convolved with the cosine lobe, so this is
 /// the irradiance divided by pi.
@@ -190,9 +248,9 @@ float3 ProbeBiasedPosition(float3 pos_ws, float3 n, ProbeVolume volume)
 /// `base` is the low corner of the cell; the 8 taps are `base + (bit0, bit1, bit2)`.
 void ProbeVolumeCell(float3 pos_ws, ProbeVolume volume, out uint3 base, out float3 cell_frac)
 {
-	const uint3 dims = volume.vDimsAndCount.xyz;
+	const uint3 dims = volume.vDimsAndFirst.xyz;
 
-	const float3 local = clamp((pos_ws - volume.vMin.xyz) * volume.vInvCellSize.xyz, 0.0, float3(dims - 1));
+	const float3 local = clamp((pos_ws - volume.vMinAndCount.xyz) * volume.vInvCellSize.xyz, 0.0, float3(dims - 1));
 
 	base = min(uint3(floor(local)), dims - 2);
 	cell_frac = saturate(local - float3(base));
@@ -204,7 +262,9 @@ void ProbeVolumeCell(float3 pos_ws, ProbeVolume volume, out uint3 base, out floa
 ProbeSHData SampleProbeVolumeSH(float3 pos_ws, float3 n, ProbeVolume volume, StructuredBuffer<ProbeSHData> probes,
 								StructuredBuffer<ProbeInfo> probe_infos, out float out_visibility)
 {
-	const uint3 dims = volume.vDimsAndCount.xyz;
+	const uint3 dims = volume.vDimsAndFirst.xyz;
+	const uint first_probe = volume.vDimsAndFirst.w;
+
 	const float3 biased_pos = ProbeBiasedPosition(pos_ws, n, volume);
 
 	uint3 base;
@@ -222,7 +282,7 @@ ProbeSHData SampleProbeVolumeSH(float3 pos_ws, float3 n, ProbeVolume volume, Str
 	for (uint corner = 0; corner < 8; corner++) {
 		const uint3 offset = uint3(corner, corner >> 1, corner >> 2) & uint3(1, 1, 1);
 		const uint3 cell = base + offset;
-		const uint index = cell.x + dims.x * (cell.y + dims.y * cell.z);
+		const uint index = first_probe + cell.x + dims.x * (cell.y + dims.y * cell.z);
 
 		const float3 axis_weights = lerp(1.0 - cell_frac, cell_frac, float3(offset));
 		const float trilinear = axis_weights.x * axis_weights.y * axis_weights.z;

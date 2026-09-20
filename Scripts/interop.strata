@@ -51,6 +51,8 @@ handle OBJECT;
 
 const uint OBJ_TAG_BLOCKOUT = (1 << 0);
 const uint OBJ_TAG_LOCK = (1 << 1);
+/* Set through probe_volume_mark, not set_tags: marking also takes the brush out of the world. */
+const uint OBJ_TAG_PROBEVOLUME = (1 << 2);
 
 impl OBJECT
 {
@@ -114,6 +116,24 @@ extern OBJECT blockout_dupe_object(OBJECT object);
 extern void blockout_destroy_object(OBJECT object);
 
 extern void blockout_object_scale(OBJECT object, float3 face_dir, float3 magnitude);
+
+/* Light probes */
+
+extern void probe_volume_mark(OBJECT object, bool enabled);
+extern bool probe_volume_is_marked(OBJECT object);
+
+/* Rebuilds the probe volumes from the level and its marked brushes. Returns how many brushes were used. */
+extern int probe_rebuild_volumes();
+
+extern int probe_volume_count();
+extern int probe_count();
+extern bool probe_is_baking();
+
+/* Rebuilds the volumes, then starts baking every probe in them. */
+extern void probe_bake();
+
+/* Saves the baked probes for the current scene, picked up automatically on the next run. */
+extern bool probe_save();
 
 /* CVars */
 

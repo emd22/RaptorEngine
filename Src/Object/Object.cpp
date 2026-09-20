@@ -10,6 +10,7 @@
 #include <Engine.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
+#include <Math/RayCast.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
@@ -359,6 +360,48 @@ void Object::SetProbeVisible(bool value)
 			attached_object->SetProbeVisible(value);
 		}
 	}
+}
+
+void Object::SetProbeVolume(bool value)
+{
+	if (value) {
+		SetTag(eObjectTag::ProbeVolume);
+	}
+	else {
+		ClearTag(eObjectTag::ProbeVolume);
+	}
+
+	// A marker is not geometry: it must not light the level, occlude it, or push probes out of itself
+	SetProbeVisible(!value);
+	SetShadowCaster(!value);
+
+	// Deactivating a body is not enough, a static one still collides, so take it out of the world entirely
+	physics::Body* body = gPhysics->GetBody(PhysicsID);
+
+	if (body != nullptr && body->mbHasPhysicsBody) {
+		if (value) {
+			body->RemoveFromWorld();
+		}
+		else {
+			body->AddToWorld();
+		}
+	}
+}
+
+float32 Object::RaycastBounds(const Vec3f& origin, const Vec3f& direction, Vec3f& out_face)
+{
+	// Into the object's own space, so a rotated box is tested against the box it actually is rather than the
+	// looser one around it. An affine transform is linear in the ray parameter, so the distance that comes back
+	// is already in world metres.
+	const Mat4f inverse_model = GetWorldMatrix().Inverse();
+
+	const Vec4f local_origin = inverse_model * Vec4f(origin.X, origin.Y, origin.Z, 1.0f);
+	const Vec4f local_direction = inverse_model * Vec4f(direction.X, direction.Y, direction.Z, 0.0f);
+
+	const Ray ray(Vec3f(local_origin.X, local_origin.Y, local_origin.Z),
+				  Vec3f(local_direction.X, local_direction.Y, local_direction.Z));
+
+	return RayCast(ray, Bounds, out_face);
 }
 
 void Object::SetCullable(bool value)

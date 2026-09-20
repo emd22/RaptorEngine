@@ -72,6 +72,8 @@ public:
 public:
 	static Ref<GeneratedMesh> MakeIcoSphere(int resolution);
 	static Ref<GeneratedMesh> MakeCube(CubeGenOptions options = {});
+
+	static Ref<GeneratedMesh> MakeWireframeBox();
 	static Ref<GeneratedMesh> MakeQuad(Vec2f scale = Vec2f(1.0f, 1.0f));
 
 private:

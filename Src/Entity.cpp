@@ -62,7 +62,7 @@ void Entity::SetModelMatrix(const Mat4f& other)
 //     // return mNormalMatrix;
 // }
 
-Mat4f& Entity::GetModelMatrix()
+Mat4f& Entity::GetWorldMatrix()
 {
 	if (mbMatrixOutOfDate) {
 		RecalculateModelMatrix();

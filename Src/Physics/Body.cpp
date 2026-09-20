@@ -143,7 +143,7 @@ void Body::DestroyPhysicsBody()
 
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->PhysicsSystem.GetBodyInterface();
 
-	body_interface.RemoveBody(GetBodyID());
+	RemoveFromWorld();
 	body_interface.DestroyBody(GetBodyID());
 
 	mpPhysicsBody = nullptr;

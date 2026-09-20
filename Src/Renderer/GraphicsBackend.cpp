@@ -159,7 +159,7 @@ void GraphicsBackend::Init(Vec2u window_size)
 	ProbeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbePageSize, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
 					   eGpuBufferFlags::PersistentMapped);
 
-	ProbeVolumePageSize = sizeof(ProbeVolumeData);
+	ProbeVolumePageSize = Limits::MaxProbeVolumes * sizeof(ProbeVolumeData);
 	ProbeVolumeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeVolumePageSize,
 							 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
 
