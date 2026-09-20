@@ -9,13 +9,20 @@
 /// Probe volumes that can be placed at once. Mirrors Limits::MaxProbeVolumes.
 #define PROBE_MAX_VOLUMES 8
 
-/// Each probe has a depth moments cubemap: per texel, the mean distance and mean squared distance to what it sees
+/// Each probe has a depth moments cubemap: per texel, the mean distance to what it sees and the standard deviation
+/// of those distances
 #define PROBE_DEPTH_SIZE 16
 #define PROBE_DEPTH_FACES 6
 #define PROBE_DEPTH_TEXELS_PER_FACE (PROBE_DEPTH_SIZE * PROBE_DEPTH_SIZE)
 
 /// Distance stored by the bake where nothing was hit
 #define PROBE_DEPTH_MAX_DISTANCE 50.0
+
+/// Every probe's moments live in one RG16_UNorm atlas, each probe a horizontal strip of its six cube faces
+#define PROBE_ATLAS_COLUMNS 32
+#define PROBE_ATLAS_PROBE_WIDTH (PROBE_DEPTH_FACES * PROBE_DEPTH_SIZE)
+#define PROBE_ATLAS_WIDTH (PROBE_ATLAS_COLUMNS * PROBE_ATLAS_PROBE_WIDTH)
+#define PROBE_ATLAS_HEIGHT 1024
 
 // Tuning
 
@@ -35,17 +42,13 @@
 
 struct ProbeSHData
 {
+	/// RGB per coefficient. The w lanes of the first three carry the probe's world position (ProbeSHPosition), the
+	/// rest are padding.
 	float4 SH[PROBE_SH_COEFF_COUNT];
 };
 
-struct ProbeInfo
-{
-	/// Baked probe position. Probes get pushed out of geometry during placement,
-	/// so this is not necessarily the grid position the trilinear weights assume.
-	float4 vProbePosition;
 
-	float2 Moments[PROBE_DEPTH_FACES * PROBE_DEPTH_TEXELS_PER_FACE];
-};
+float3 ProbeSHPosition(ProbeSHData probe) { return float3(probe.SH[0].w, probe.SH[1].w, probe.SH[2].w); }
 
 struct ProbeVolume
 {
@@ -57,23 +60,26 @@ struct ProbeVolume
 
 	/// Grid dimensions in XYZ, and in W the index this volume's first probe has in the probe buffers
 	uint4 vDimsAndFirst;
+
+	/// World space corner opposite vMinAndCount in xyz, and the volume of one grid cell in w. Derived from the
+	/// fields above, but SelectProbeVolume() runs per pixel over every volume, so they come precomputed.
+	float4 vMaxAndCellVolume;
 };
 
-uint GetProbeVolumeCount(StructuredBuffer<ProbeVolume> volumes) { return uint(volumes[0].vMinAndCount.w); }
+
+
+uint GetProbeVolumeCount(StructuredBuffer<ProbeVolume> volumes)
+{
+	return min(uint(volumes[0].vMinAndCount.w), (uint)PROBE_MAX_VOLUMES);
+}
 
 /// Spacing between this volume's probes along each axis
 float3 ProbeVolumeCellSize(ProbeVolume volume) { return 1.0 / max(volume.vInvCellSize.xyz, 1e-6); }
 
-/// World space corner opposite vMin. Probes sit on the boundary, so the grid spans (dims - 1) cells.
-float3 ProbeVolumeMax(ProbeVolume volume)
-{
-	return volume.vMinAndCount.xyz + ProbeVolumeCellSize(volume) * float3(volume.vDimsAndFirst.xyz - 1);
-}
-
 /// Squared distance from `pos_ws` to `volume`, 0 when it is inside.
 float ProbeVolumeDistanceSq(float3 pos_ws, ProbeVolume volume)
 {
-	const float3 outside = max(max(volume.vMinAndCount.xyz - pos_ws, pos_ws - ProbeVolumeMax(volume)), 0.0);
+	const float3 outside = max(max(volume.vMinAndCount.xyz - pos_ws, pos_ws - volume.vMaxAndCellVolume.xyz), 0.0);
 	return dot(outside, outside);
 }
 
@@ -92,8 +98,7 @@ uint SelectProbeVolume(float3 pos_ws, StructuredBuffer<ProbeVolume> volumes, uin
 	for (uint i = 0; i < volume_count; i++) {
 		const float distance_sq = ProbeVolumeDistanceSq(pos_ws, volumes[i]);
 
-		const float3 cell = ProbeVolumeCellSize(volumes[i]);
-		const float cell_volume = cell.x * cell.y * cell.z;
+		const float cell_volume = volumes[i].vMaxAndCellVolume.w;
 
 		// Closer wins outright; between volumes that both contain the position (both 0) the denser one does
 		const bool closer = distance_sq < best_distance_sq - 1e-4;
@@ -109,9 +114,14 @@ uint SelectProbeVolume(float3 pos_ws, StructuredBuffer<ProbeVolume> volumes, uin
 	return best;
 }
 
-/// Evaluates a probe's SH in direction `normal`. The bake stores coefficients convolved with the cosine lobe, so this is
-/// the irradiance divided by pi.
-float3 EvalProbeIrradiance(float3 normal, ProbeSHData probe)
+/// Evaluates a probe's SH in direction `normal` without clamping. The bake stores coefficients convolved with the
+/// cosine lobe, so this is the irradiance divided by pi.
+///
+/// Evaluation is linear in the coefficients, so blending N probes and evaluating once gives the same answer as
+/// evaluating each and blending the results. SampleProbeVolumeIrradiance() relies on that to avoid carrying nine
+/// coefficients across its loop, which is also why the clamp to non-negative lives at the end of that blend and
+/// not in here.
+float3 EvalProbeIrradianceRaw(float3 normal, ProbeSHData probe)
 {
 	float3 irradiance = probe.SH[0].rgb * 0.282095;
 
@@ -124,7 +134,13 @@ float3 EvalProbeIrradiance(float3 normal, ProbeSHData probe)
 	irradiance += probe.SH[7].rgb * 1.092548 * normal.x * normal.z;
 	irradiance += probe.SH[8].rgb * 0.546274 * (normal.x * normal.x - normal.y * normal.y);
 
-	return max(irradiance, float3(0.0, 0.0, 0.0));
+	return irradiance;
+}
+
+/// EvalProbeIrradianceRaw() clamped to non-negative, for callers evaluating a single probe.
+float3 EvalProbeIrradiance(float3 normal, ProbeSHData probe)
+{
+	return max(EvalProbeIrradianceRaw(normal, probe), float3(0.0, 0.0, 0.0));
 }
 
 /// Cubemap face and UV that direction `d` falls in. Must match DirectionToMomentTexel() in Src/Renderer/LightProbe.cpp.
@@ -159,8 +175,8 @@ float ProbeMinVariance(float mean)
 	return stddev * stddev;
 }
 
-/// Chebyshev visibility from depth moments: 1 = visible, 0 = occluded.
-float ProbeDepthChebyshev(float receiver_dist, float mean, float mean_sq)
+
+float ProbeDepthChebyshev(float receiver_dist, float mean, float stddev)
 {
 	const float biased_dist = max(receiver_dist - PROBE_CHEBYSHEV_BIAS, 0.0);
 
@@ -169,37 +185,38 @@ float ProbeDepthChebyshev(float receiver_dist, float mean, float mean_sq)
 		return 1.0;
 	}
 
-	const float variance = max(mean_sq - mean * mean, ProbeMinVariance(mean));
+	const float variance = max(stddev * stddev, ProbeMinVariance(mean));
 	const float d = biased_dist - mean;
 
 	return variance / (variance + d * d);
 }
 
-/// Bilinear-filtered moments fetch from a single probe face.
-float2 SampleProbeMomentsBilinear(StructuredBuffer<ProbeInfo> probe_infos, uint info_index, uint face, float2 uv01)
+/// Where probe `index`'s strip for `face` starts in the atlas, in texels.
+float2 ProbeAtlasFaceOrigin(uint index, uint face)
 {
-	const float2 st = uv01 * float(PROBE_DEPTH_SIZE) - 0.5;
-	const float2 st_floor = floor(st);
-	const float2 f = st - st_floor;
+	const uint2 tile = uint2(index % PROBE_ATLAS_COLUMNS, index / PROBE_ATLAS_COLUMNS);
 
-	// Clamp at the face's edges rather than filtering across into the neighbouring face
-	const uint2 i0 = uint2(clamp(int2(st_floor), 0, PROBE_DEPTH_SIZE - 1));
-	const uint2 i1 = uint2(clamp(int2(st_floor) + 1, 0, PROBE_DEPTH_SIZE - 1));
+	return float2((tile.x * PROBE_ATLAS_PROBE_WIDTH) + (face * PROBE_DEPTH_SIZE), tile.y * PROBE_DEPTH_SIZE);
+}
 
-	const uint face_base = face * PROBE_DEPTH_TEXELS_PER_FACE;
+/// Bilinear-filtered moments fetch from a single probe face, decoded to metres. One hardware filtered sample: the
+/// coordinate is clamped half a texel inside the face so the filter cannot reach into a neighbouring face or probe,
+/// which is what the old manual bilinear was doing by hand.
+float2 SampleProbeMoments(Texture2D moments_atlas, SamplerState moments_sampler, uint index, uint face, float2 uv01)
+{
+	const float2 in_face = clamp(uv01 * float(PROBE_DEPTH_SIZE), 0.5, float(PROBE_DEPTH_SIZE) - 0.5);
 
-	const float2 m00 = probe_infos[info_index].Moments[face_base + i0.y * PROBE_DEPTH_SIZE + i0.x];
-	const float2 m10 = probe_infos[info_index].Moments[face_base + i0.y * PROBE_DEPTH_SIZE + i1.x];
-	const float2 m01 = probe_infos[info_index].Moments[face_base + i1.y * PROBE_DEPTH_SIZE + i0.x];
-	const float2 m11 = probe_infos[info_index].Moments[face_base + i1.y * PROBE_DEPTH_SIZE + i1.x];
+	const float2 texel = ProbeAtlasFaceOrigin(index, face) + in_face;
+	const float2 uv = texel / float2(PROBE_ATLAS_WIDTH, PROBE_ATLAS_HEIGHT);
 
-	return lerp(lerp(m00, m10, f.x), lerp(m01, m11, f.x), f.y);
+	return moments_atlas.SampleLevel(moments_sampler, uv, 0).xy * PROBE_DEPTH_MAX_DISTANCE;
 }
 
 /// Visibility of `pos_ws` as seen from probe `info_index` using its depth cubemap.
-float SampleProbeVisibility(float3 pos_ws, StructuredBuffer<ProbeInfo> probe_infos, uint info_index)
+float SampleProbeVisibility(float3 pos_ws, float3 probe_pos, Texture2D moments_atlas, SamplerState moments_sampler,
+							uint index)
 {
-	const float3 to_receiver = pos_ws - probe_infos[info_index].vProbePosition.xyz;
+	const float3 to_receiver = pos_ws - probe_pos;
 	const float raw_dist = length(to_receiver);
 
 	if (raw_dist < 1e-4) {
@@ -210,7 +227,7 @@ float SampleProbeVisibility(float3 pos_ws, StructuredBuffer<ProbeInfo> probe_inf
 	float2 uv01;
 	ProbeDepthDirectionToFaceUV(to_receiver / raw_dist, face, uv01);
 
-	const float2 moments = SampleProbeMomentsBilinear(probe_infos, info_index, face, uv01);
+	const float2 moments = SampleProbeMoments(moments_atlas, moments_sampler, index, face, uv01);
 
 	// Nothing was hit in this direction.
 	if (moments.x >= PROBE_DEPTH_MAX_DISTANCE) {
@@ -248,7 +265,9 @@ float3 ProbeBiasedPosition(float3 pos_ws, float3 n, ProbeVolume volume)
 /// `base` is the low corner of the cell; the 8 taps are `base + (bit0, bit1, bit2)`.
 void ProbeVolumeCell(float3 pos_ws, ProbeVolume volume, out uint3 base, out float3 cell_frac)
 {
-	const uint3 dims = volume.vDimsAndFirst.xyz;
+	// max(): a 1 thick axis would underflow `dims - 2` on a uint and index past the probe buffer. The CPU enforces
+	// Limits::MinProbeGridDim (2) in ProbeGridSize::IsValid(), but nothing checks that invariant on this side.
+	const uint3 dims = max(volume.vDimsAndFirst.xyz, uint3(2, 2, 2));
 
 	const float3 local = clamp((pos_ws - volume.vMinAndCount.xyz) * volume.vInvCellSize.xyz, 0.0, float3(dims - 1));
 
@@ -256,11 +275,11 @@ void ProbeVolumeCell(float3 pos_ws, ProbeVolume volume, out uint3 base, out floa
 	cell_frac = saturate(local - float3(base));
 }
 
-/// Blends the SH of the 8 probes around `pos_ws` with normal `n`. Each probe is weighted by distance (trilinear), by
-/// whether it is in front of the surface, and by whether it can see the surface. `out_visibility` is the trilinear
-/// blend of how well the probes can see the surface, for the debug view.
-ProbeSHData SampleProbeVolumeSH(float3 pos_ws, float3 n, ProbeVolume volume, StructuredBuffer<ProbeSHData> probes,
-								StructuredBuffer<ProbeInfo> probe_infos, out float out_visibility)
+
+void SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume volume,
+								 StructuredBuffer<ProbeSHData> probes, Texture2D moments_atlas,
+								 SamplerState moments_sampler, out float3 out_diffuse, out float3 out_specular,
+								 out float out_visibility)
 {
 	const uint3 dims = volume.vDimsAndFirst.xyz;
 	const uint first_probe = volume.vDimsAndFirst.w;
@@ -271,10 +290,8 @@ ProbeSHData SampleProbeVolumeSH(float3 pos_ws, float3 n, ProbeVolume volume, Str
 	float3 cell_frac;
 	ProbeVolumeCell(biased_pos, volume, base, cell_frac);
 
-	float3 blended[PROBE_SH_COEFF_COUNT];
-	for (uint k = 0; k < PROBE_SH_COEFF_COUNT; k++) {
-		blended[k] = float3(0.0, 0.0, 0.0);
-	}
+	float3 diffuse = float3(0.0, 0.0, 0.0);
+	float3 specular = float3(0.0, 0.0, 0.0);
 
 	float total_weight = 0.0;
 	out_visibility = 0.0;
@@ -287,25 +304,24 @@ ProbeSHData SampleProbeVolumeSH(float3 pos_ws, float3 n, ProbeVolume volume, Str
 		const float3 axis_weights = lerp(1.0 - cell_frac, cell_frac, float3(offset));
 		const float trilinear = axis_weights.x * axis_weights.y * axis_weights.z;
 
-		const float visibility = SampleProbeVisibility(biased_pos, probe_infos, index);
+		const ProbeSHData probe = probes[index];
+		const float3 probe_pos = ProbeSHPosition(probe);
+
+		const float visibility =
+			SampleProbeVisibility(biased_pos, probe_pos, moments_atlas, moments_sampler, index);
 		out_visibility += visibility * trilinear;
 
-		const float weight = trilinear * ProbeBackfaceWeight(pos_ws, n, probe_infos[index].vProbePosition.xyz) *
-							 max(visibility, PROBE_VISIBILITY_FLOOR);
+		const float weight =
+			trilinear * ProbeBackfaceWeight(pos_ws, n, probe_pos) * max(visibility, PROBE_VISIBILITY_FLOOR);
 
-		for (uint k2 = 0; k2 < PROBE_SH_COEFF_COUNT; k2++) {
-			blended[k2] += probes[index].SH[k2].rgb * weight;
-		}
+		diffuse += EvalProbeIrradianceRaw(n, probe) * weight;
+		specular += EvalProbeIrradianceRaw(r, probe) * weight;
 
 		total_weight += weight;
 	}
 
 	const float inv_weight = 1.0 / max(total_weight, 1e-6);
 
-	ProbeSHData probe;
-	for (uint k3 = 0; k3 < PROBE_SH_COEFF_COUNT; k3++) {
-		probe.SH[k3] = float4(blended[k3] * inv_weight, 0.0);
-	}
-
-	return probe;
+	out_diffuse = max(diffuse * inv_weight, float3(0.0, 0.0, 0.0));
+	out_specular = max(specular * inv_weight, float3(0.0, 0.0, 0.0));
 }

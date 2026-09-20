@@ -139,45 +139,6 @@ void World::Detach(ObjectID id)
 	gWorldGrid->RemoveObject(id);
 }
 
-// physics::BodyID World::NewPhysicsObject()
-// {
-// 	physics::BodyID id = mPhysicsObjects.Size();
-// 	physics::Body* phys = mPhysicsObjects.Insert();
-// 	phys->SetID(id);
-
-// 	return id;
-// }
-
-// physics::Body* World::GetPhysicsObject(physics::BodyID id) const
-// {
-// 	if (id == physics::BodyID::scNull || id.GetID() > mPhysicsObjects.Size()) {
-// 		return nullptr;
-// 	}
-
-// 	return &mPhysicsObjects[id.GetID()];
-// }
-
-// void World::SelectPhysicsObject(const JPH::BodyID& body_id)
-// {
-// 	for (const physics::Body& phys : mPhysicsObjects) {
-// 		if (phys.mpPhysicsBody->GetID() == body_id) {
-// 			mSelectedPhysicsObjectId = phys.GetID();
-// 			return;
-// 		}
-// 	}
-// }
-
-// physics::Body* World::FindPhysicsObject(const Hash32 name_hash)
-// {
-// 	for (physics::Body& phys : mPhysicsObjects) {
-// 		if (phys.GetName().GetHash() == name_hash) {
-// 			return &phys;
-// 		}
-// 	}
-
-// 	return nullptr;
-// }
-
 
 void World::ExecuteRenderList(renderer::ePipelineName pl_name)
 {
@@ -200,7 +161,6 @@ void World::ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera
 			gGraphics->GetLightGridFrameOffset(),
 			gGraphics->GetLightIndexListFrameOffset(),
 			// The light probe buffers aren't paged per frame in flight
-			0,
 			0,
 			0,
 			gGraphics->GetDecalFrameOffset(),
@@ -289,7 +249,6 @@ void World::ExecuteTransparentRenderLists()
 					gGraphics->GetLightGridFrameOffset(),
 					gGraphics->GetLightIndexListFrameOffset(),
 					// The light probe buffers aren't paged per frame in flight
-					0,
 					0,
 					0,
 					gGraphics->GetDecalFrameOffset(),

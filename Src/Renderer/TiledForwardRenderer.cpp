@@ -158,11 +158,16 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 
 	// bProbeVolume (spatial lookup descriptor for probe blending)
 	ds_entries.Insert(DescriptorEntry::AsBuffer(7, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
-											   gGraphics->ProbeVolumePageSize));
+												gGraphics->ProbeVolumePageSize));
 
-	// bProbeDepth (per-probe 6x16x16 depth moments for visibility)
-	ds_entries.Insert(DescriptorEntry::AsBuffer(8, eShaderType::Pixel, &gGraphics->ProbeDepthBuffer, 0,
-											   gGraphics->ProbeDepthPageSize));
+
+	ds_entries.Insert(DescriptorEntry::AsImage(8, eShaderType::Pixel, gGraphics->pProbeMomentsAtlas,
+											   gSamplerCache->Request({
+												   eSamplerFilter::Linear,
+												   eSamplerFilter::Linear,
+												   eSamplerFilter::Linear,
+												   eSamplerAddressMode::ClampToEdge,
+											   })));
 
 	Target* shadow_target = gShadowAtlas->GetTarget();
 	Assert(shadow_target != nullptr);
@@ -201,8 +206,7 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 	Image* decal_normal_atlas = (mpDecalNormalAtlas != nullptr) ? mpDecalNormalAtlas : null_image;
 
 	ds_entries.Insert(DescriptorEntry::AsImage(11, eShaderType::Pixel, decal_atlas, gSamplerCache->Request({})));
-	ds_entries.Insert(
-		DescriptorEntry::AsImage(12, eShaderType::Pixel, decal_normal_atlas, gSamplerCache->Request({})));
+	ds_entries.Insert(DescriptorEntry::AsImage(12, eShaderType::Pixel, decal_normal_atlas, gSamplerCache->Request({})));
 
 	result = gDescriptorCache->Request(ds_entries);
 	pPersistentDescriptor = result.second;
@@ -344,9 +348,9 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bProbeVolume (spatial lookup descriptor for probe blending)
 		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
 							 gGraphics->ProbeVolumePageSize);
-		// bProbeDepth (per-probe depth moments for visibility)
-		gPSOBuild->AddBuffer(8, 0, eShaderType::Pixel, &gGraphics->ProbeDepthBuffer, 0,
-							 gGraphics->ProbeDepthPageSize);
+		// tProbeMoments (per-probe depth moments for visibility)
+		gPSOBuild->AddImage(8, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
+							gSamplerCache->Request({}));
 		// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
 		AddDecalDescriptors();
 		// tShadowAtlas
@@ -405,9 +409,9 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bProbeVolume (spatial lookup descriptor for probe blending)
 		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
 							 gGraphics->ProbeVolumePageSize);
-		// bProbeDepth (per-probe depth moments for visibility)
-		gPSOBuild->AddBuffer(8, 0, eShaderType::Pixel, &gGraphics->ProbeDepthBuffer, 0,
-							 gGraphics->ProbeDepthPageSize);
+		// tProbeMoments (per-probe depth moments for visibility)
+		gPSOBuild->AddImage(8, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
+							gSamplerCache->Request({}));
 		// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
 		AddDecalDescriptors();
 		// tShadowAtlas
@@ -473,9 +477,9 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bProbeVolume (spatial lookup descriptor for probe blending)
 		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
 							 gGraphics->ProbeVolumePageSize);
-		// bProbeDepth (per-probe depth moments for visibility)
-		gPSOBuild->AddBuffer(8, 0, eShaderType::Pixel, &gGraphics->ProbeDepthBuffer, 0,
-							 gGraphics->ProbeDepthPageSize);
+		// tProbeMoments (per-probe depth moments for visibility)
+		gPSOBuild->AddImage(8, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
+							gSamplerCache->Request({}));
 		// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
 		AddDecalDescriptors();
 		// tShadowAtlas
@@ -544,9 +548,9 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bProbeVolume (spatial lookup descriptor for probe blending)
 		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
 							 gGraphics->ProbeVolumePageSize);
-		// bProbeDepth (per-probe depth moments for visibility)
-		gPSOBuild->AddBuffer(8, 0, eShaderType::Pixel, &gGraphics->ProbeDepthBuffer, 0,
-							 gGraphics->ProbeDepthPageSize);
+		// tProbeMoments (per-probe depth moments for visibility)
+		gPSOBuild->AddImage(8, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
+							gSamplerCache->Request({}));
 		// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
 		AddDecalDescriptors();
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
@@ -589,9 +593,9 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bProbeVolume (spatial lookup descriptor for probe blending)
 		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
 							 gGraphics->ProbeVolumePageSize);
-		// bProbeDepth (per-probe depth moments for visibility)
-		gPSOBuild->AddBuffer(8, 0, eShaderType::Pixel, &gGraphics->ProbeDepthBuffer, 0,
-							 gGraphics->ProbeDepthPageSize);
+		// tProbeMoments (per-probe depth moments for visibility)
+		gPSOBuild->AddImage(8, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
+							gSamplerCache->Request({}));
 		// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
 		AddDecalDescriptors();
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
@@ -638,9 +642,9 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bProbeVolume (spatial lookup descriptor for probe blending)
 		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
 							 gGraphics->ProbeVolumePageSize);
-		// bProbeDepth (per-probe depth moments for visibility)
-		gPSOBuild->AddBuffer(8, 0, eShaderType::Pixel, &gGraphics->ProbeDepthBuffer, 0,
-							 gGraphics->ProbeDepthPageSize);
+		// tProbeMoments (per-probe depth moments for visibility)
+		gPSOBuild->AddImage(8, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
+							gSamplerCache->Request({}));
 		// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
 		AddDecalDescriptors();
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),

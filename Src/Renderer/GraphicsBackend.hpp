@@ -272,9 +272,8 @@ public:
 	RawGpuBuffer ProbeVolumeBuffer;
 	uint32 ProbeVolumePageSize = 0;
 
-	/// Position and depth moments (6x16x16 texels x 2 moments), indexed by probe
-	RawGpuBuffer ProbeDepthBuffer;
-	uint32 ProbeDepthPageSize = 0;
+	/// Depth moments for light probes
+	Image* pProbeMomentsAtlas = nullptr;
 
 	Semaphore TransferSync;
 	std::atomic_uint64_t TransferCount = 0;

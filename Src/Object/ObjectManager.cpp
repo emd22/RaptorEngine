@@ -132,17 +132,13 @@ uint32 ObjectManager::GetOffsetObjectIndex(uint32 object_id) const
 ObjectGpuEntry* ObjectManager::GetBufferAtFrame(uint32 object_id)
 {
 	uint8* entry_buffer = reinterpret_cast<uint8*>(mObjectGpuBuffer.pMappedBuffer);
-
 	return reinterpret_cast<ObjectGpuEntry*>(entry_buffer + GetOffsetObjectIndex(object_id));
 }
 
 void ObjectManager::Submit(const ObjectID& object_id, ObjectGpuEntry& entry)
 {
 	Assert(object_id.GetID() < scMaxObjects);
-
 	memcpy(GetBufferAtFrame(object_id.GetID()), &entry, sizeof(ObjectGpuEntry));
-
-	// mObjectGpuBuffer.FlushToGpu(GetOffsetObjectIndex(object_id), sizeof(ObjectGpuEntry));
 }
 
 void ObjectManager::Submit(const ObjectID& object_id, const Mat4f& model_matrix)
@@ -150,10 +146,7 @@ void ObjectManager::Submit(const ObjectID& object_id, const Mat4f& model_matrix)
 	static_assert(offsetof(ObjectGpuEntry, ModelMatrix) == 0);
 
 	Assert(object_id.GetID() < scMaxObjects);
-
 	memcpy(GetBufferAtFrame(object_id.GetID()), model_matrix.RawData, sizeof(Mat4f));
-
-	// mObjectGpuBuffer.FlushToGpu(GetOffsetObjectIndex(object_id), sizeof(ObjectGpuEntry));
 }
 
 

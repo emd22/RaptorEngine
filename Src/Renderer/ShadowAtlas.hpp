@@ -36,6 +36,8 @@ public:
 	static constexpr uint32 scMaxSpotTiles = scSpotTilesPerRow * (scHeight / scSpotTileSize);
 
 	static_assert(scDirectionalSize <= scHeight, "The directional region must fit in the atlas");
+
+	static_assert(scWidth == 4096 && scHeight == 2048, "Update SHADOW_ATLAS_WIDTH/HEIGHT in Shaders/Helper.hlsl");
 	static_assert(scMaxSpotTiles <= 32, "Spot tiles are tracked with a 32 bit mask");
 
 public:

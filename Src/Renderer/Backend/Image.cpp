@@ -413,7 +413,8 @@ static const LayoutTransitionInfo GetLayoutTransitionInfo(VkImageLayout layout)
 
 
 void Image::CopyFromBuffer(renderer::CommandBuffer& cmd, const renderer::RawGpuBuffer& buffer,
-						   VkImageLayout final_layout, Vec2u size, uint32 base_layer, uint32 mip_level)
+						   VkImageLayout final_layout, Vec2u size, uint32 base_layer, uint32 mip_level,
+						   Vec2u dst_offset)
 {
 	if (mip_level < 0) {
 		return;
@@ -436,6 +437,12 @@ void Image::CopyFromBuffer(renderer::CommandBuffer& cmd, const renderer::RawGpuB
 			.baseArrayLayer = 0,
 			.layerCount = 1,
 		},
+		.imageOffset =
+			VkOffset3D {
+				.x = static_cast<int32>(dst_offset.X),
+				.y = static_cast<int32>(dst_offset.Y),
+				.z = 0,
+			},
 		.imageExtent =
 			VkExtent3D {
 				.width = size.X,

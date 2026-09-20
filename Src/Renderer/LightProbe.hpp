@@ -35,9 +35,11 @@ struct ProbeVolumeData
 
 	/// Grid dimensions in XYZ, and in W the index of this volume's first probe in the probe buffers
 	uint32 DimsAndFirst[4];
+
+	float32 MaxAndCellVolume[4];
 };
 
-static_assert(sizeof(ProbeVolumeData) == 48, "ProbeVolumeData must mirror the HLSL ProbeVolume struct");
+static_assert(sizeof(ProbeVolumeData) == 64, "ProbeVolumeData must mirror the HLSL ProbeVolume struct");
 
 /// Probe grid resolution of one volume, in probes along each axis
 struct ProbeGridSize
@@ -209,6 +211,8 @@ private:
 
 	/// Copies the volumes, and the SH and depth moments of probes [`first_probe`, `first_probe + count`) to the GPU.
 	void UploadToGpu(uint32 first_probe, uint32 count);
+
+	void UploadMomentsAtlas(uint32 first_probe, uint32 count);
 
 private:
 	ProbeSHData mProbes[Limits::MaxIrradianceProbes] {};

@@ -15,6 +15,7 @@ enum class eSamplerAddressMode : uint8
 {
     Repeat,
     ClampToBorder,
+    ClampToEdge,
 };
 
 enum class eSamplerBorderColor : uint8

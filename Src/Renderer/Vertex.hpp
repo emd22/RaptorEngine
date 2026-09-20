@@ -9,9 +9,9 @@ namespace fx::renderer {
 
 enum class eVertexType
 {
-    Slim,
-    Default,
-    Skinned,
+	Slim,
+	Default,
+	Skinned,
 };
 
 constexpr eVertexType VertexLargestType = eVertexType::Skinned;
@@ -31,27 +31,30 @@ struct Vertex
 template <>
 struct Vertex<eVertexType::Slim>
 {
-    float32 Position[3];
+	float32 Position[3];
 };
 
 template <>
 struct Vertex<eVertexType::Default>
 {
-    float32 Position[3];
-    float32 Normal[3];
-    float32 UV[2];
-    float32 Tangent[3];
+	float32 Position[3];
+	float32 Normal[3];
+	float32 UV[2];
+	/// xyz is the tangent, w is the bitangent's handedness (+1 or -1) as glTF stores it. Mirrored UV shells have
+	/// it negative, and the shader rebuilds the bitangent as cross(normal, tangent) * w.
+	float32 Tangent[4];
 };
 
 template <>
 struct Vertex<eVertexType::Skinned>
 {
-    float32 Position[3];
-    float32 Normal[3];
-    float32 UV[2];
-    float32 Tangent[3];
-    uint32 BoneIds[4];      /// Skinning bone ids
-    float32 BoneWeights[4]; /// Skinning bone weights
+	float32 Position[3];
+	float32 Normal[3];
+	float32 UV[2];
+
+	float32 Tangent[4];
+	uint32 BoneIds[4];		/// Skinning bone ids
+	float32 BoneWeights[4]; /// Skinning bone weights
 };
 
 
@@ -64,14 +67,14 @@ struct Vertex<eVertexType::Skinned>
 template <>
 struct std::formatter<fx::renderer::Vertex<fx::renderer::eVertexType::Default>>
 {
-    auto parse(format_parse_context& ctx) { return ctx.begin(); }
+	auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-    template <typename FmtContext>
-    auto format(const fx::renderer::Vertex<fx::renderer::eVertexType::Default>& obj, FmtContext& ctx) const
-    {
-        return std::format_to(ctx.out(), "( {:.04}, {:.04}, {:.04} )", static_cast<float>(obj.Position[0]),
-                              static_cast<float>(obj.Position[1]), static_cast<float>(obj.Position[2]));
-    }
+	template <typename FmtContext>
+	auto format(const fx::renderer::Vertex<fx::renderer::eVertexType::Default>& obj, FmtContext& ctx) const
+	{
+		return std::format_to(ctx.out(), "( {:.04}, {:.04}, {:.04} )", static_cast<float>(obj.Position[0]),
+							  static_cast<float>(obj.Position[1]), static_cast<float>(obj.Position[2]));
+	}
 };
 
 
@@ -82,17 +85,17 @@ namespace fx::renderer::VertexUtil {
  */
 FX_FORCE_INLINE uint32 GetSize(fx::renderer::eVertexType type)
 {
-    if (type == eVertexType::Slim) {
-        return sizeof(Vertex<eVertexType::Slim>);
-    }
-    else if (type == eVertexType::Default) {
-        return sizeof(Vertex<eVertexType::Default>);
-    }
-    else if (type == eVertexType::Skinned) {
-        return sizeof(Vertex<eVertexType::Skinned>);
-    }
+	if (type == eVertexType::Slim) {
+		return sizeof(Vertex<eVertexType::Slim>);
+	}
+	else if (type == eVertexType::Default) {
+		return sizeof(Vertex<eVertexType::Default>);
+	}
+	else if (type == eVertexType::Skinned) {
+		return sizeof(Vertex<eVertexType::Skinned>);
+	}
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -101,9 +104,9 @@ FX_FORCE_INLINE uint32 GetSize(fx::renderer::eVertexType type)
 template <eVertexType TVertexType>
 Vec3f GetPosition(const Vertex<TVertexType>& vertex)
 {
-    static_assert(offsetof(Vertex<eVertexType::Slim>, Position) == offsetof(Vertex<eVertexType::Default>, Position) &&
-                  offsetof(Vertex<eVertexType::Default>, Position) == offsetof(Vertex<eVertexType::Skinned>, Position));
+	static_assert(offsetof(Vertex<eVertexType::Slim>, Position) == offsetof(Vertex<eVertexType::Default>, Position) &&
+				  offsetof(Vertex<eVertexType::Default>, Position) == offsetof(Vertex<eVertexType::Skinned>, Position));
 
-    return Vec3f(vertex.Position);
+	return Vec3f(vertex.Position);
 }
 }; // namespace fx::renderer::VertexUtil

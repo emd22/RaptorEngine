@@ -142,19 +142,15 @@ struct alignas(16) LightGpuData
 {
 	/// View projection matrix the light's shadow map was rendered with, for lights with a region in the shadow atlas
 	float32 LightCameraMatrix[16];
-	float32 InvView[16];
-	float32 InvProjection[16];
 
-	float32 EyePosition[3];
+	/// Direction towards the light for directional lights, already normalized. World position otherwise.
+	float32 Position[3];
 	float32 Radius;
 
-	/// Direction towards the light for directional lights, world position otherwise
-	float32 Position[3];
 	uint32 Color;
-
-	float32 CameraSize[2];
-	uint32 Ambient;
 	uint32 Type;
+	uint32 Ambient;
+	float32 InvRadiusSq;
 
 	/// Spot lights only: world space direction the cone points along
 	float32 SpotDirection[3];
@@ -170,7 +166,9 @@ struct alignas(16) LightGpuData
 	float32 ShadowAtlasRect[4];
 };
 
-static_assert(sizeof(LightGpuData) == 288, "LightGpuData must match the Light struct in LightingCommon.hlsli");
+
+static_assert(sizeof(LightGpuData) == 144, "LightGpuData must match the Light struct in LightingCommon.hlsli");
+static_assert(sizeof(LightGpuData) * 64 <= 16384, "The light buffer must fit the guaranteed uniform buffer range");
 
 /// A single decal in GraphicsBackend::DecalBuffer. Mirrors `Decal` in Shaders/DecalCommon.hlsli.
 struct alignas(16) DecalGpuData
@@ -181,20 +179,25 @@ struct alignas(16) DecalGpuData
 	/// Tint in RGB, opacity in A. Packed RGBA8 with R in the low byte.
 	uint32 Color;
 
-	float32 HalfAxisX[3];
+	/// Unit length. The shading pass needs only the directions and would otherwise normalize all three per covered
+	/// pixel, so the lengths live in HalfExtents and light culling scales them back up once per tile.
+	float32 AxisX[3];
 	float32 Roughness;
 
-	float32 HalfAxisY[3];
+	float32 AxisY[3];
 	/// How much of `Roughness` is blended in, 0 leaves the surface's roughness alone
 	float32 RoughnessWeight;
 
-	float32 HalfAxisZ[3];
+	float32 AxisZ[3];
 	float32 NormalStrength;
 
 	float32 AtlasRect[4];
+
+	/// World space half extents along each axis. W is unused.
+	float32 HalfExtents[4];
 };
 
-static_assert(sizeof(DecalGpuData) == 144, "DecalGpuData must match the Decal struct in DecalCommon.hlsli");
+static_assert(sizeof(DecalGpuData) == 160, "DecalGpuData must match the Decal struct in DecalCommon.hlsli");
 
 struct PipelineProperties
 {

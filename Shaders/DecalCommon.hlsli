@@ -21,20 +21,23 @@ struct Decal
 	/// Tint in RGB, opacity in A
 	uint uiColor;
 	// 96
-	/// World space half extents of the box, one axis each
-	float3 vHalfAxisX;
+	/// Unit length axes of the box. The shading pass uses the directions, light culling scales them by vHalfExtents.
+	float3 vAxisX;
 	/// Perceptual roughness that the surface is blended towards
 	float1 fRoughness;
 	// 112
-	float3 vHalfAxisY;
+	float3 vAxisY;
 	/// How much of `fRoughness` is blended in, 0 leaves the surface's roughness alone
 	float1 fRoughnessWeight;
 	// 128
 	/// Points into the surface
-	float3 vHalfAxisZ;
+	float3 vAxisZ;
 	/// How far the normal atlas bends the surface's normal, 0 leaves it alone
 	float1 fNormalStrength;
 	// 144
 	/// Decal UV to atlas UV: xy is the scale, zw the offset
 	float4 vAtlasRect;
+	// 160
+	/// World space half extents along each axis, w unused
+	float4 vHalfExtents;
 };

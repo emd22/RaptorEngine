@@ -30,6 +30,7 @@ float4 F_UnpackUIntToFloat4(uint x);
 #define F_SampleLoad(_name, _coord) F_TextureName(_name).Load(_coord)
 #define F_SampleCmpLevelZero(_name, _texcoord, _zcoord) F_TextureName(_name).SampleCmpLevelZero(_name, _texcoord, _zcoord)
 #define F_SampleGrad(_name, _coord, _ddx, _ddy) F_TextureName(_name).SampleGrad(_name, _coord, _ddx, _ddy)
+#define F_SampleLevel(_name, _coord, _lod) F_TextureName(_name).SampleLevel(_name, _coord, _lod)
 
 #define F_Texture2D(_name, binding_, set_) \
     Texture2D F_TextureName(_name) : register(t##binding_, space##set_); \
@@ -56,6 +57,12 @@ float4 F_UnpackUIntToFloat4(uint x);
 
 
 #define LIGHT_COUNT 64
+
+/// Shadow atlas dimensions. Mirrors ShadowAtlas::scWidth / scHeight in Src/Renderer/ShadowAtlas.hpp, which are
+/// compile time constants that ShadowAtlas::GetRegionUVTransform() already bakes into the atlas rects, so the
+/// shader does not have to query the texture per pixel per light.
+#define SHADOW_ATLAS_WIDTH 4096
+#define SHADOW_ATLAS_HEIGHT 2048
 
 #define SSAO_SIZE_DIVISOR 2
 

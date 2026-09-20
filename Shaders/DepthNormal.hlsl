@@ -13,7 +13,8 @@ struct VSInput
     float3 vPosition : POSITION;
     float3 vNormal : NORMAL;
     float2 vUV : TEXCOORD0;
-    float3 vTangent : TANGENT;
+    /// xyz is the tangent, w the bitangent's handedness. See Vertex<> in Src/Renderer/Vertex.hpp.
+    float4 vTangent : TANGENT;
     uint uiInstanceId : SV_InstanceID;
 #ifdef USE_SKINNING
     uint4 vJointIndices : ATTR0;
@@ -28,8 +29,9 @@ struct VSOutput
     float2 vUV       : TEXCOORD0;
 
 #ifdef USE_NORMAL_MAPS
-    float3 vTangentWS   : TANGENT;
-    float3 vBitangentWS : BITANGENT;
+    /// xyz is the world space tangent, w the bitangent's handedness. The bitangent is rebuilt in the pixel
+    /// shader rather than interpolated.
+    float4 vTangentWS : TANGENT;
 #endif
 
     float3 vPositionWS   : POSITION;
@@ -90,11 +92,12 @@ VSOutput main(VSInput input)
 
 #ifdef USE_NORMAL_MAPS
 #ifdef USE_SKINNING
-    output.vTangentWS = normalize(mul(mul(input.vTangent, (float3x3)skin_xform), (float3x3)world_matrix));
+    const float3 tangent_ws = mul(mul(input.vTangent.xyz, (float3x3)skin_xform), (float3x3)world_matrix);
 #else
-    output.vTangentWS = normalize(mul(input.vTangent, (float3x3)world_matrix));
+    const float3 tangent_ws = mul(input.vTangent.xyz, (float3x3)world_matrix);
 #endif
-    output.vBitangentWS = cross(output.vNormalWS, output.vTangentWS);
+    // The handedness rides along untouched; the pixel shader rebuilds the bitangent from it
+    output.vTangentWS = float4(normalize(tangent_ws), input.vTangent.w);
 #endif
 
     output.vUV = input.vUV;
@@ -125,8 +128,9 @@ struct FSInput
     float2 vUV : TEXCOORD0;
 
 #ifdef USE_NORMAL_MAPS
-    float3 vTangentWS   : TANGENT;
-    float3 vBitangentWS : BITANGENT;
+    /// xyz is the world space tangent, w the bitangent's handedness. The bitangent is rebuilt in the pixel
+    /// shader rather than interpolated.
+    float4 vTangentWS : TANGENT;
 #endif
 
 	float3 vPositionWS : POSITION;
@@ -168,9 +172,6 @@ FSOutput main(FSInput input)
     // Double sided materials are lit from whichever side is seen
     if (!input.bIsFrontFace) {
         input.vNormalWS = -input.vNormalWS;
-#ifdef USE_NORMAL_MAPS
-        input.vBitangentWS = -input.vBitangentWS;
-#endif
     }
 
     Material material = bMaterialBuffer[input.uiMaterialIndex];
@@ -192,10 +193,16 @@ FSOutput main(FSInput input)
 #ifdef USE_NORMAL_MAPS
     float3 normal_ts = F_Sample(tNormalMap, input.vUV).rgb * 2.0 - 1.0;
 
-    float3x3 TBN = float3x3(input.vTangentWS, input.vBitangentWS, input.vNormalWS);
+    // Re-orthonormalised the same way Forward.hlsl does it, so the prepass normals the SSAO pass reads match
+    // what the lighting pass shades with. rsqrt guards a degenerate tangent instead of producing a NaN.
+    const float3 vertex_normal = normalize(input.vNormalWS);
+    const float3 projected = input.vTangentWS.xyz - (vertex_normal * dot(vertex_normal, input.vTangentWS.xyz));
+    const float3 tangent = projected * rsqrt(max(dot(projected, projected), 1e-12));
+    const float3 bitangent = cross(vertex_normal, tangent) * input.vTangentWS.w;
 
-    float3 normal_ws = mul(normal_ts, TBN);
-    output.vNormal = float4(normalize(normal_ws), 0.0);
+    float3x3 TBN = float3x3(tangent, bitangent, vertex_normal);
+
+    output.vNormal = float4(normalize(mul(normal_ts, TBN)), 0.0);
 #else
     output.vNormal = float4(input.vNormalWS, 0.0);
 #endif
