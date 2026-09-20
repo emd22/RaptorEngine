@@ -30,6 +30,10 @@ enum class eMaterialFlags : uint32
 	/// The MetallicRoughness component holds a KHR_materials_pbrSpecularGlossiness texture (specular RGB,
 	/// glossiness A) instead of glTF metallic/roughness (roughness G, metallic B).
 	SpecularGlossiness = (1 << 1),
+	/// The material is alpha tested (glTF MASK), so shadow passes have to discard on its albedo alpha too.
+	AlphaMask = (1 << 2),
+	/// Both faces are drawn (glTF doubleSided), with the back face lit with a flipped normal.
+	DoubleSided = (1 << 3),
 };
 
 FxEnumFlags(eMaterialFlags);
@@ -210,6 +214,8 @@ public:
 	renderer::ePipelineName GetRequiredPipeline() const;
 
 	void SetUnlit(bool value);
+	void SetAlphaMask(bool value);
+	void SetDoubleSided(bool value);
 	void SetAlpha(float32 alpha);
 	void SetMetallicRoughness(float32 metallic, float32 roughness);
 

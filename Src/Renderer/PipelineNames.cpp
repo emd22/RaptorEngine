@@ -36,6 +36,7 @@ static const PipelineNameInfo scNameInfos[] = {
 	NAME_INFO("TextRendering", eFlags::None),
 	NAME_INFO("Composition", eFlags::None),
 	NAME_INFO("ShadowDirectional", eFlags::None),
+	NAME_INFO("ShadowDirectionalMasked", eFlags::AlbedoOnly),
 
 	NAME_INFO("SSAO", eFlags::None),
 	NAME_INFO("SSAOBlur", eFlags::None),

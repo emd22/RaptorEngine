@@ -125,51 +125,11 @@ void Object::UpdateAnimation()
 		return;
 	}
 
-	Skeleton& skel = *pSkeleton;
-
-	if (!skel.pCurrentAnimation && skel.Animations.Size > 0) {
-		skel.pCurrentAnimation = &skel.Animations[0];
-	}
-
 	// A skeleton can be visited multiple times in one frame (several meshes sharing it, and the shadow pass, depth
-	// prepass and forward pass for each); only advance the pose the first time, and reuse the bone-buffer slots
-	// claimed then for every subsequent draw this frame.
-	const uint32 current_frame = gGraphics->GetElapsedFrameCount();
-	if (skel.LastUpdateFrame != current_frame) {
-		const bool is_first_update = (skel.LastUpdateFrame == UINT32_MAX);
-		skel.LastUpdateFrame = current_frame;
-
-		if (skel.pCurrentAnimation) {
-			Animation& anim = *skel.pCurrentAnimation;
-
-			if (skel.AnimationTime >= anim.Duration) {
-				skel.AnimationTime = 0.0f;
-			}
-			else if (skel.AnimationTime < 0.0001f) {
-				skel.AnimationTime = anim.Duration;
-			}
-
-			skel.EvaluatePose(&anim, skel.AnimationTime);
-
-			skel.AnimationTime += 0.01f;
-		}
-		else if (is_first_update) {
-			// Nothing is playing, so the skeleton holds its rest pose. That never changes, so it only needs posing once.
-			skel.EvaluatePose(nullptr, 0.0f);
-		}
-
-		// The bone buffer is rewritten every frame, so the pose is uploaded every frame even when it did not change
-		skel.BoneBufferBase = gGraphics->BoneBuffer.CopySlots(skel.SkinningMatrices.pData, skel.SkinningMatrices.Size);
-
-		if (skel.BoneBufferBase == Skeleton::scNoBones) {
-			static bool sbWarned = false;
-			if (!sbWarned) {
-				LogWarning(LC_RENDER, "Bone buffer is full ({} matrices), '{}' ({} bones) will not be drawn",
-						   Limits::MaxBoneMatrices, Name.Get(), skel.SkinningMatrices.Size);
-				sbWarned = true;
-			}
-		}
-	}
+	// prepass and forward pass for each); it only advances the first time, and every subsequent draw this frame reuses
+	// the bone-buffer slots claimed then.
+	Skeleton& skel = *pSkeleton;
+	skel.Update(gGraphics->DeltaTime);
 
 	BoneBufferBase = skel.BoneBufferBase;
 }

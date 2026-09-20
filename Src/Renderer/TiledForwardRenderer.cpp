@@ -72,10 +72,21 @@ void TiledForwardRenderer::CreateForwardPass()
 	ForwardPass.AddTarget(eImageFormat::RGBA16_Float, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 						  eImageAspectFlag::Color);
 
-	// Depth target
-	ForwardPass.AddTarget(eImageFormat::D32_Float,
-						  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-						  eImageAspectFlag::Depth);
+	// Depth target. This shares the prepass's depth image and loads it rather than clearing, so the forward pass only
+	// shades the fragments the prepass found visible (alpha discards included) instead of overdrawing the whole
+	// scene again. The prepass has to be created first.
+	Target* prepass_depth = Prepass.GetTarget(eImageFormat::D32_Float);
+	AssertMsg(prepass_depth != nullptr, "The prepass must be created before the forward pass");
+
+	Target depth(eImageFormat::D32_Float, gGraphics->Swapchain.Extent, true,
+				 VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Depth);
+	depth.UseImageFromTarget(prepass_depth);
+	depth.LoadOp = eLoadOp::Load;
+	depth.StencilLoadOp = eLoadOp::DontCare;
+	depth.StencilStoreOp = eStoreOp::DontCare;
+	// Where the prepass leaves it
+	depth.InitialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	ForwardPass.AddTarget(depth);
 
 	ForwardPass.BuildRenderStage();
 }

@@ -382,6 +382,7 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 		}
 		else if (gltf_material->alpha_mode == cgltf_alpha_mode_mask) {
 			// Mask mode: opaque pipeline with alpha-test at 0.5 (shader ALPHA_CUTOFF)
+			material->SetAlphaMask(true);
 			material->SetAlpha(baseAlpha);
 			// Keep on opaque path; shader discard will handle cutout
 		}
@@ -393,6 +394,13 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 			else {
 				material->SetAlpha(1.0f);
 			}
+		}
+
+		// Cutouts and blended surfaces (leaves, fences, glass) are the ones that have to show both faces. Exporters set
+		// doubleSided on nearly every material regardless, and drawing closed opaque meshes without culling would only
+		// cost fill rate, so it is only honored for these.
+		if (gltf_material->double_sided && gltf_material->alpha_mode != cgltf_alpha_mode_opaque) {
+			material->SetDoubleSided(true);
 		}
 
 		if (gltf_material->unlit) {
@@ -749,6 +757,10 @@ void LoaderGltf::LoadAnimations(Skeleton& skel, cgltf_skin* skin)
 		LoadAnimation(anim, mpGltfData->animations[i], skin);
 		skel.Animations.Insert(std::move(anim));
 	}
+
+	// Loop the first animation by default. The owner can swap it out with SetRestAnimation(), or pass null to hold the
+	// rest pose.
+	skel.SetRestAnimation(&skel.Animations[0]);
 
 	LogInfo(LC_ASSET, "Loaded {} animations", mpGltfData->animations_count);
 }

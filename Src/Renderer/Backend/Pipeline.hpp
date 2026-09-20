@@ -306,6 +306,9 @@ public:
 
 	void Bind(const CommandBuffer& command_buffer) const;
 
+	/// Draws after this with no face culling if `double_sided`, or with the pipeline's own culling otherwise.
+	void SetDoubleSided(const CommandBuffer& command_buffer, bool double_sided) const;
+
 	void Destroy();
 	~Pipeline() { Destroy(); }
 
@@ -327,6 +330,9 @@ public:
 
 	/// True if this pipeline was created as a compute pipeline
 	bool bIsCompute = false;
+
+	/// The cull mode the pipeline was created with. It is dynamic state, so it is set when the pipeline is bound.
+	VkCullModeFlags DefaultCullMode = VK_CULL_MODE_NONE;
 
 	bool bIsViewportFullscreen = false;
 

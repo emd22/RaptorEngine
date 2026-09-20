@@ -202,14 +202,7 @@ public:
 
 	eObjectTag Tags = eObjectTag::None;
 
-	/// May be shared with other objects skinned to the same GLTF skin. Animations and playback state live on it.
 	Ref<Skeleton> pSkeleton { nullptr };
-
-	/// Index of this object's first bone matrix in `GraphicsBackend::BoneBuffer` for the current frame, set by
-	/// `UpdateAnimation()` and submitted to the shader via DrawPushConstants::BoneBase (the whole buffer is bound at one
-	/// fixed per-frame offset, same as LightBuffer; the base tells the shader where this draw's bones start within it).
-	/// Remembered here rather than re-read at bind time because other skinned objects updating later in the same
-	/// frame advance the buffer's shared slot cursor. `Skeleton::scNoBones` when there are no bones to draw with.
 	uint32 BoneBufferBase = Skeleton::scNoBones;
 
 	ObjectID ParentID = ObjectID::scNull;

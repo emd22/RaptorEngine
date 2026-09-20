@@ -216,6 +216,10 @@ public:
 	bool bInitialized = false;
 	bool bDidFrameResize = false;
 
+	/// Seconds since the previous game tick, set at the start of each tick. Available to anything that advances per frame
+	/// but runs outside of the tick itself (e.g. skeletal animation, which is advanced when its object is first drawn).
+	float32 DeltaTime = 1.0f / 60.0f;
+
 	TiledForwardRenderer* pRenderer { nullptr };
 
 	Uniforms LightBuffer;

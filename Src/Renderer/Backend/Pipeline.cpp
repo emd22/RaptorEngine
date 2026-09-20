@@ -161,6 +161,8 @@ void Pipeline::Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shade
 	SizedArray<VkDynamicState> dynamic_states = {
 		VK_DYNAMIC_STATE_VIEWPORT,
 		VK_DYNAMIC_STATE_SCISSOR,
+		// Double sided materials draw with culling off; every pipeline's own mode is set again whenever it is bound
+		VK_DYNAMIC_STATE_CULL_MODE,
 	};
 
 	const VkPipelineDynamicStateCreateInfo dynamic_state_info = {
@@ -170,6 +172,7 @@ void Pipeline::Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shade
 	};
 
 	bHasDynamicViewport = true;
+	DefaultCullMode = properties.CullMode;
 	ViewportSize = properties.ViewportSize;
 	mViewportDivisor = properties.ViewportDivisor;
 
@@ -372,7 +375,18 @@ void Pipeline::Bind(const CommandBuffer& cmd) const
 
 	vkCmdBindPipeline(cmd.Get(), GetBindPoint(), InternalPipeline);
 
+	if (!bIsCompute) {
+		vkCmdSetCullMode(cmd.Get(), DefaultCullMode);
+	}
+
 	spBoundPipeline = this->InternalPipeline;
+}
+
+void Pipeline::SetDoubleSided(const CommandBuffer& cmd, bool double_sided) const
+{
+	if (!bIsCompute) {
+		vkCmdSetCullMode(cmd.Get(), double_sided ? VK_CULL_MODE_NONE : DefaultCullMode);
+	}
 }
 
 void Pipeline::Destroy()

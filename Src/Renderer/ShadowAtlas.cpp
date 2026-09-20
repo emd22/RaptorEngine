@@ -8,10 +8,12 @@
 
 #include "ShadowAtlas.hpp"
 
+#include <Asset/AssetManager.hpp>
 #include <Engine.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Renderer/Backend/BarrierHelper.hpp>
+#include <Renderer/Backend/Sampler/SamplerCache.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/PSOBuild.hpp>
@@ -94,6 +96,45 @@ ShadowAtlas::ShadowAtlas()
 
 		gPSOBuild->EndPipeline();
 	}
+
+	{
+		// Same as above, but discards on the albedo alpha for alpha masked materials (leaves, fences, etc.). The set 0
+		// layout has to stay identical as the shadow passes swap between the two without rebinding the region.
+		gPSOBuild->BeginPipeline(ePipelineName::ShadowDirectionalMasked);
+		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(ShadowPushConstants));
+		gPSOBuild->UseRenderStage(RenderStage);
+
+		gPSOBuild->SetVertexType(eVertexType::Default);
+		gPSOBuild->SetShader(eShaderName::Shadows, { ShaderMacro { .pcName = "ALPHA_MASK", .pcValue = "1" } });
+		gPSOBuild->SetViewportSize(size, eSizeDivisor::FullRes);
+		gPSOBuild->SetDepthCompareOp(VK_COMPARE_OP_GREATER);
+		gPSOBuild->SetCullMode(eCullMode::Back);
+		gPSOBuild->SetFaceOrder(eFaceOrder::Reverse);
+
+		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+							 gObjectManager->GetPageSize());
+		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
+							 gMaterialManager->MaterialPropertiesBuffer.Size);
+
+		// Set 1 (Object local), laid out like the albedo only prepass pipeline so the material's descriptors fit
+		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+							 gGraphics->LightBuffer.PageSize);
+
+		gPSOBuild->EndPipeline();
+	}
+}
+
+void ShadowAtlas::BindPipeline(ePipelineName name)
+{
+	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
+
+	gPipelineCache->Bind(name, cmd);
+
+	// Binding a pipeline points the viewport back at the whole target
+	vkCmdSetViewport(cmd.Cmd, 0, 1, &mCurrentViewport);
+	vkCmdSetScissor(cmd.Cmd, 0, 1, &mCurrentScissor);
 }
 
 Target* ShadowAtlas::GetTarget() { return RenderStage.GetTarget(eImageFormat::D32_Float); }
@@ -129,10 +170,9 @@ void ShadowAtlas::BeginRegion(const ShadowAtlasRegion& region)
 
 	gPipelineCache->AddBufferOffset(0, gObjectManager->GetBaseOffset());
 	gPipelineCache->AddBufferOffset(0, 0);
-	gPipelineCache->Bind(ePipelineName::ShadowDirectional, cmd);
 
 	// Same flipped depth range as Pipeline::Bind()
-	const VkViewport viewport {
+	mCurrentViewport = VkViewport {
 		.x = static_cast<float32>(region.Offset.X),
 		.y = static_cast<float32>(region.Offset.Y),
 		.width = static_cast<float32>(region.Size.X),
@@ -141,8 +181,9 @@ void ShadowAtlas::BeginRegion(const ShadowAtlasRegion& region)
 		.maxDepth = 0.0f,
 	};
 
-	vkCmdSetViewport(cmd.Cmd, 0, 1, &viewport);
-	vkCmdSetScissor(cmd.Cmd, 0, 1, &rect);
+	mCurrentScissor = rect;
+
+	BindPipeline(ePipelineName::ShadowDirectional);
 }
 
 void ShadowAtlas::EndRegion()
