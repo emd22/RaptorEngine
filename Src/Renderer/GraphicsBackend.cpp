@@ -264,8 +264,9 @@ void GraphicsBackend::RebuildRenderStages()
 
 	Vec2u size = GetWindow()->GetSize();
 
-	rd->ForwardPass.Rebuild(size);
+	// The forward pass shares the prepass's depth image, so the prepass has to be rebuilt first
 	rd->Prepass.Rebuild(size);
+	rd->ForwardPass.Rebuild(size);
 	rd->SSAOPass.Rebuild(size);
 	rd->SSAOBlurPass.Rebuild(size);
 	rd->CompPass.Rebuild(size);

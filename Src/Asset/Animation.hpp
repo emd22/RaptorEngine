@@ -2,6 +2,7 @@
 
 #include <Core/Ref.hpp>
 #include <Core/SizedArray.hpp>
+#include <Core/StackArray.hpp>
 #include <Core/String.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/Quat.hpp>
@@ -34,6 +35,27 @@ struct Animation
 	SizedArray<BoneTrack> BoneTracks;
 };
 
+/// What an animation on the stack does once it reaches its end.
+enum class eAnimationEnd : uint8
+{
+	/// Remove it from the stack, handing control back to whatever is beneath it (or the rest animation). For one-shots
+	/// such as firing or reloading.
+	Pop,
+	/// Stay on the last frame until popped.
+	Hold,
+	/// Wrap back around to the start.
+	Loop,
+};
+
+/// An animation being played on a skeleton, along with how far into it playback is.
+struct AnimationPlayback
+{
+	const Animation* pAnimation = nullptr;
+	float32 Time = 0.0f;
+	float32 Speed = 1.0f;
+	eAnimationEnd OnEnd = eAnimationEnd::Pop;
+};
+
 struct BoneTransform
 {
 	BoneTransform() = default;
@@ -59,8 +81,38 @@ struct Skeleton
 {
 public:
 	static constexpr uint32 scNoBones = UINT32_MAX;
+	static constexpr uint32 scMaxAnimationStack = 8;
 
 public:
+	const Animation* FindAnimation(const String& name) const;
+
+	/**
+	 * @brief Sets the animation that loops whenever the stack is empty. Pass null to hold the rest (bind) pose instead.
+	 */
+	void SetRestAnimation(const Animation* anim, float32 speed = 1.0f);
+
+	/**
+	 * @brief Plays `anim` on top of whatever is currently playing. The animation beneath it is paused, and resumes from
+	 * where it left off once this one is popped.
+	 *
+	 * @returns false if `anim` is null or the stack is full.
+	 */
+	bool PushAnimation(const Animation* anim, eAnimationEnd on_end = eAnimationEnd::Pop, float32 speed = 1.0f);
+	bool PushAnimation(const String& name, eAnimationEnd on_end = eAnimationEnd::Pop, float32 speed = 1.0f);
+
+	void PopAnimation();
+	void ClearAnimationStack();
+
+	/// The top of the animation stack, or the rest animation if the stack is empty. Null when holding the rest pose.
+	AnimationPlayback* GetActivePlayback();
+	const Animation* GetActiveAnimation();
+
+	/**
+	 * @brief Advances the active animation by `delta_time`, poses the skeleton and uploads the pose to the bone buffer.
+	 * Only runs once per frame, however many objects or passes share the skeleton.
+	 */
+	void Update(float32 delta_time);
+
 	/**
 	 * @brief Poses the skeleton at `time` in `anim`, or in its rest pose if `anim` is null, and updates
 	 * `SkinningMatrices`.
@@ -88,15 +140,19 @@ public:
 	/// shared by several meshes (each loaded as its own object). Those objects share this skeleton through `Ref`, so
 	/// the pose is evaluated and uploaded once per frame and every mesh draws with the same bone-buffer slot.
 	SizedArray<Animation> Animations;
-	Animation* pCurrentAnimation = nullptr;
-	float32 AnimationTime = 0.0f;
 
-	/// Index of this skeleton's first matrix in `GraphicsBackend::BoneBuffer`, claimed by the last pose update.
-	/// `scNoBones` if the pose did not fit into the buffer.
+	/// Plays while the animation stack is empty. Holds the rest pose if it has no animation.
+	AnimationPlayback RestPlayback { .OnEnd = eAnimationEnd::Loop };
+	/// Animations pushed over the rest animation. Only the top one advances.
+	StackArray<AnimationPlayback, scMaxAnimationStack> AnimationStack;
+
 	uint32 BoneBufferBase = scNoBones;
-	/// The frame the pose was last updated on, so that the shared skeleton only advances once per frame no matter
-	/// how many objects or passes (shadow, depth prepass, forward) visit it.
+
 	uint32 LastUpdateFrame = UINT32_MAX;
+
+private:
+	/// Set once the rest pose has been evaluated, as it never changes and only needs posing once.
+	bool mbHoldingRestPose = false;
 };
 
 } // namespace fx

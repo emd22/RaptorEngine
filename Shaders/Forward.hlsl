@@ -137,6 +137,9 @@ struct FSInput
 
 	uint uiMaterialIndex : ATTR0;
 
+	/// False when a double sided material is seen from behind
+	bool bIsFrontFace : SV_IsFrontFace;
+
 };
 
 #include "MaterialDef.hlsli"
@@ -383,6 +386,14 @@ float3 GetSaturationColor(float value)
 FSOutput main(FSInput input)
 {
     FSOutput output;
+
+    // Double sided materials are lit from whichever side is seen
+    if (!input.bIsFrontFace) {
+        input.vNormalWS = -input.vNormalWS;
+#ifdef USE_NORMAL_MAPS
+        input.vBitangentWS = -input.vBitangentWS;
+#endif
+    }
 
     // Taken before anything can discard, for the decals' texture gradients
     const float3 position_ddx = ddx(input.vPositionWS);

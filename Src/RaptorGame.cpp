@@ -462,6 +462,11 @@ void RaptorGame::ProcessControls()
 		gWorld->Player.bIsSprinting = false;
 	}
 
+	if (gSelectedEditorMode == nullptr && ControlManager::IsKeyPressed(eKey::FX_KEY_R) &&
+		!ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT)) {
+		gWorld->Player.DoReloadAnimation();
+	}
+
 	if (ControlManager::IsComboPressed(eKey::FX_KEY_LSHIFT, eKey::FX_KEY_R)) {
 		LogInfo("Reloading blockout...");
 		gWorld->pBlockout->Load(gWorld->BlockoutPath);
@@ -599,6 +604,7 @@ void RaptorGame::Tick()
 	const uint64 current_tick = SDL_GetPerformanceCounter();
 
 	DeltaTime = static_cast<double>(current_tick - mLastTick) / sClockFreq;
+	gGraphics->DeltaTime = static_cast<float32>(DeltaTime);
 
 	FrameTimeAvg += DeltaTime;
 

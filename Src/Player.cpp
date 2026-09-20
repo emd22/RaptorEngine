@@ -5,6 +5,7 @@
 #include <Core/Random.hpp>
 #include <Core/RefUtil.hpp>
 #include <Engine.hpp>
+#include <Object/ObjectManager.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <World.hpp>
@@ -27,7 +28,7 @@ void Player::Create()
 
 	// Load the view model
 
-	AssetTicket view_model = gAssetManager->LoadObject("view_model", "Data/Demo/Models/viewmodel.glb");
+	AssetTicket view_model = gAssetManager->LoadObject("view_model", "Data/Demo/Models/moararms.glb");
 
 	// Registered before World::Attach() so these callbacks run first: the view model has to be set up before the world
 	// adds it to the grid, or a probe bake running on the main thread in between would capture it as level geometry.
@@ -44,7 +45,29 @@ void Player::Create()
 			object->SetObjectLayer(eObjectLayer::PlayerLayer);
 			object->SetProbeVisible(false);
 
+			if (object->pSkeleton.IsValid()) {
+			}
+
 			mpViewModel = object;
+
+			// The skeleton lives on whichever mesh is skinned, which is one of the attached objects if the model has
+			// more than one mesh.
+			mpViewModelSkeleton = object->pSkeleton;
+
+			for (ObjectID child_id : object->AttachedNodes) {
+				if (mpViewModelSkeleton) {
+					break;
+				}
+
+				Object* child = gObjectManager->GetObject(child_id);
+				if (child != nullptr) {
+					mpViewModelSkeleton = child->pSkeleton;
+				}
+			}
+
+			if (mpViewModelSkeleton) {
+				mpViewModelSkeleton->SetRestAnimation(mpViewModelSkeleton->FindAnimation(scViewModelIdleAnim));
+			}
 
 			// Start in line with the camera so the view model doesn't swing in when it first appears
 			mPrevCameraYaw = pCamera->mAngleX;
@@ -155,8 +178,8 @@ void Player::UpdateViewModel(double delta_time)
 	const Vec3f up = Vec3f(view_model_basis.Rows[1]);
 	const Vec3f forward = Vec3f(view_model_basis.Rows[2]);
 
-	float32 horizontal_scale = 0.25f;
-	float32 vertical_scale = 0.2f;
+	float32 horizontal_scale = 0.29f;
+	float32 vertical_scale = 0.25f;
 
 	// if (bIsSprinting) {
 	// 	horizontal_scale = 0.30f;
@@ -171,7 +194,7 @@ void Player::UpdateViewModel(double delta_time)
 
 	// const float32 rotx = sin(gWorld->Player.mBobCounterY * 0.5f) * 0.05f;
 
-	mpViewModel->SetPosition(pCamera->Position + (forward * 0.090) - (up * 0.205) + (right * 0.05) + view_model_bob);
+	mpViewModel->SetPosition(pCamera->Position + (forward * 0.30) - (up * 0.255) + (right * 0.11) + view_model_bob);
 
 	mpViewModel->SetRotation(mViewModelRotation * mViewModelAccumRot);
 }
@@ -184,8 +207,36 @@ static float32 RandomUnitClosed()
 void Player::DoFireAnimation()
 {
 	mViewModelImpulseGoal = mViewModelImpulseGoal *
-							Quat::FromEulerAngles(Vec3f(-0.75f, RandomUnitClosed() * 0.2, RandomUnitClosed() * 0.2));
+							Quat::FromEulerAngles(Vec3f(-0.05f, RandomUnitClosed() * 0.05, 0.15f));
 	mbIsFiring = true;
+
+	if (!mpViewModelSkeleton) {
+		return;
+	}
+
+	const Animation* fire = mpViewModelSkeleton->FindAnimation(scViewModelFireAnim);
+
+	// Firing again mid-shot restarts the shot rather than stacking another one on top of it
+	if (fire != nullptr && mpViewModelSkeleton->GetActiveAnimation() == fire) {
+		mpViewModelSkeleton->PopAnimation();
+	}
+
+	mpViewModelSkeleton->PushAnimation(fire);
+}
+
+void Player::DoReloadAnimation()
+{
+	if (!mpViewModelSkeleton) {
+		return;
+	}
+
+	const Animation* reload = mpViewModelSkeleton->FindAnimation(scViewModelReloadAnim);
+
+	if (reload == nullptr || mpViewModelSkeleton->GetActiveAnimation() == reload) {
+		return;
+	}
+
+	mpViewModelSkeleton->PushAnimation(reload);
 }
 
 

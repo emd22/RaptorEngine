@@ -2,6 +2,11 @@
 
 #include <Core/String.hpp>
 #include <Math/Quat.hpp>
+#include <Renderer/Globals.hpp>
+#include <Renderer/GraphicsBackend.hpp>
+#include <World.hpp>
+
+#include <cmath>
 
 
 namespace fx {
@@ -81,8 +86,8 @@ void Skeleton::EvaluatePose(const Animation* anim, float32 time)
 			scale = GetComponentAtTime(time, track.Scale, rest.Scale);
 		}
 
-		LocalTransforms.pData[i] =
-			Mat4f::AsScale(scale) * Mat4f::AsRotation(rotation) * Mat4f::AsTranslation(translation);
+		LocalTransforms.pData[i] = Mat4f::AsScale(scale) * Mat4f::AsRotation(rotation) *
+								   Mat4f::AsTranslation(translation);
 	}
 
 	const bool has_root_transforms = (RootTransforms.Size == joint_count);
@@ -93,8 +98,7 @@ void Skeleton::EvaluatePose(const Animation* anim, float32 time)
 		if (parent < 0) {
 			// A root joint's parent chain lives outside the skin, so its transform has to come from the
 			// node hierarchy instead of from another joint.
-			WorldTransforms[i] =
-				has_root_transforms ? (LocalTransforms[i] * RootTransforms[i]) : LocalTransforms[i];
+			WorldTransforms[i] = has_root_transforms ? (LocalTransforms[i] * RootTransforms[i]) : LocalTransforms[i];
 		}
 		else {
 			WorldTransforms[i] = LocalTransforms[i] * WorldTransforms[parent];
@@ -103,6 +107,135 @@ void Skeleton::EvaluatePose(const Animation* anim, float32 time)
 
 	for (uint32 i = 0; i < joint_count; i++) {
 		SkinningMatrices[i] = InvBindTransforms[i] * WorldTransforms[i];
+	}
+}
+
+const Animation* Skeleton::FindAnimation(const String& name) const
+{
+	for (const Animation& anim : Animations) {
+		if (anim.Name == name) {
+			return &anim;
+		}
+	}
+
+	return nullptr;
+}
+
+void Skeleton::SetRestAnimation(const Animation* anim, float32 speed)
+{
+	RestPlayback = AnimationPlayback { .pAnimation = anim, .Time = 0.0f, .Speed = speed, .OnEnd = eAnimationEnd::Loop };
+	mbHoldingRestPose = false;
+}
+
+bool Skeleton::PushAnimation(const Animation* anim, eAnimationEnd on_end, float32 speed)
+{
+	if (anim == nullptr) {
+		return false;
+	}
+
+	if (AnimationStack.Size >= AnimationStack.Capacity) {
+		LogWarning(LC_ASSET, "Animation stack is full ({}), not playing '{}'", AnimationStack.Capacity, anim->Name);
+		return false;
+	}
+
+	AnimationStack.Insert(AnimationPlayback { .pAnimation = anim, .Time = 0.0f, .Speed = speed, .OnEnd = on_end });
+	mbHoldingRestPose = false;
+
+	return true;
+}
+
+bool Skeleton::PushAnimation(const String& name, eAnimationEnd on_end, float32 speed)
+{
+	const Animation* anim = FindAnimation(name);
+
+	if (anim == nullptr) {
+		LogWarning(LC_ASSET, "Could not find animation '{}'", name);
+		return false;
+	}
+
+	return PushAnimation(anim, on_end, speed);
+}
+
+void Skeleton::PopAnimation()
+{
+	if (AnimationStack.Size > 0) {
+		--AnimationStack.Size;
+	}
+}
+
+void Skeleton::ClearAnimationStack() { AnimationStack.Clear(); }
+
+AnimationPlayback* Skeleton::GetActivePlayback()
+{
+	if (AnimationStack.Size > 0) {
+		return &AnimationStack[AnimationStack.Size - 1];
+	}
+
+	if (RestPlayback.pAnimation != nullptr) {
+		return &RestPlayback;
+	}
+
+	return nullptr;
+}
+
+const Animation* Skeleton::GetActiveAnimation()
+{
+	const AnimationPlayback* playback = GetActivePlayback();
+	return (playback != nullptr) ? playback->pAnimation : nullptr;
+}
+
+void Skeleton::Update(float32 delta_time)
+{
+	const uint32 current_frame = renderer::gGraphics->GetElapsedFrameCount();
+
+	if (LastUpdateFrame == current_frame) {
+		return;
+	}
+
+	LastUpdateFrame = current_frame;
+
+	AnimationPlayback* playback = GetActivePlayback();
+
+	if (playback != nullptr) {
+		EvaluatePose(playback->pAnimation, playback->Time);
+
+		// Advanced after posing so a freshly pushed animation shows its first frame
+		const float32 duration = playback->pAnimation->Duration;
+		playback->Time += delta_time * playback->Speed;
+
+		if (playback->Time >= duration) {
+			// The rest animation is not on the stack, so it can only ever loop
+			const eAnimationEnd on_end = (playback == &RestPlayback) ? eAnimationEnd::Loop : playback->OnEnd;
+
+			switch (on_end) {
+			case eAnimationEnd::Pop:
+				PopAnimation();
+				break;
+			case eAnimationEnd::Hold:
+				playback->Time = duration;
+				break;
+			case eAnimationEnd::Loop:
+				playback->Time = (duration > 0.0f) ? std::fmod(playback->Time, duration) : 0.0f;
+				break;
+			}
+		}
+	}
+	else if (!mbHoldingRestPose) {
+		EvaluatePose(nullptr, 0.0f);
+		mbHoldingRestPose = true;
+	}
+
+	// The bone buffer is rewritten every frame, so the pose is uploaded every frame even when it did not change
+	BoneBufferBase = renderer::gGraphics->BoneBuffer.CopySlots(SkinningMatrices.pData, SkinningMatrices.Size);
+
+	if (BoneBufferBase == Skeleton::scNoBones) {
+		static bool sbWarned = false;
+
+		if (!sbWarned) {
+			LogWarning(LC_RENDER, "Bone buffer is full ({} matrices), ({} bones) will not be drawn",
+					   Limits::MaxBoneMatrices, SkinningMatrices.Size);
+			sbWarned = true;
+		}
 	}
 }
 

@@ -132,6 +132,9 @@ struct FSInput
 	float3 vPositionWS : POSITION;
 
 	uint uiMaterialIndex : ATTR0;
+
+	/// False when a double sided material is seen from behind
+	bool bIsFrontFace : SV_IsFrontFace;
 };
 
 #include "MaterialDef.hlsli"
@@ -161,6 +164,14 @@ FSOutput main(FSInput input)
     FSOutput output;
 
     output.vNormal = float4(0.0, 0.0, 0.0, 0.0);
+
+    // Double sided materials are lit from whichever side is seen
+    if (!input.bIsFrontFace) {
+        input.vNormalWS = -input.vNormalWS;
+#ifdef USE_NORMAL_MAPS
+        input.vBitangentWS = -input.vBitangentWS;
+#endif
+    }
 
     Material material = bMaterialBuffer[input.uiMaterialIndex];
 

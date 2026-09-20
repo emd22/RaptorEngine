@@ -215,6 +215,9 @@ bool Material::BindWithPipeline(const CommandBuffer& cmd, const Pipeline& pipeli
 	// Bind the descriptor set
 	descriptor_set->Bind(1, cmd, pipeline, Slice<uint32>(offsets));
 
+	// Culling is dynamic state, so every draw that binds a material sets it
+	pipeline.SetDoubleSided(cmd, HasFlag(Properties.Flags, eMaterialFlags::DoubleSided));
+
 	return true;
 }
 
@@ -311,6 +314,28 @@ void Material::SetUnlit(bool value)
 	}
 	else {
 		ClearFlag(Properties.Flags, eMaterialFlags::Unlit);
+	}
+	mbRequiresSync = true;
+}
+
+void Material::SetAlphaMask(bool value)
+{
+	if (value) {
+		SetFlag(Properties.Flags, eMaterialFlags::AlphaMask);
+	}
+	else {
+		ClearFlag(Properties.Flags, eMaterialFlags::AlphaMask);
+	}
+	mbRequiresSync = true;
+}
+
+void Material::SetDoubleSided(bool value)
+{
+	if (value) {
+		SetFlag(Properties.Flags, eMaterialFlags::DoubleSided);
+	}
+	else {
+		ClearFlag(Properties.Flags, eMaterialFlags::DoubleSided);
 	}
 	mbRequiresSync = true;
 }

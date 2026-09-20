@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Asset/Animation.hpp>
 #include <Core/Ref.hpp>
 #include <Math/MathUtil.hpp>
 #include <Math/Vec2.hpp>
@@ -30,6 +31,10 @@ class Player
 	/// Roll per radian of yaw sway, so the view model banks into horizontal turns.
 	static constexpr float32 scViewModelSwayRoll = 1.25f;
 
+	static constexpr const char* scViewModelIdleAnim = "0idle";
+	static constexpr const char* scViewModelFireAnim = "Armature|Fire";
+	static constexpr const char* scViewModelReloadAnim = "Armature|ReloadClip";
+
 	static constexpr float32 scViewImpulseReturnSpeed = 20.0f;
 	static constexpr float32 scViewImpulseActSpeed = 25.0f;
 
@@ -42,6 +47,7 @@ public:
 	void MoveBy(const Vec3f& by);
 
 	void DoFireAnimation();
+	void DoReloadAnimation();
 
 	void Jump();
 
@@ -150,6 +156,8 @@ private:
 
 
 	Object* mpViewModel = nullptr;
+	/// Shared by every mesh in the view model. Null if the view model has no skeleton.
+	Ref<Skeleton> mpViewModelSkeleton { nullptr };
 
 	/**
 	 * @brief The view model's rotation: the camera's rotation with the sway applied in the camera's local space.

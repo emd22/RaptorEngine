@@ -45,6 +45,8 @@ enum class ePipelineName : uint16
 	Composition,
 
 	ShadowDirectional,
+	/// Shadow pass variant for alpha masked materials, which discards on the albedo alpha
+	ShadowDirectionalMasked,
 
 	SSAO,
 	SSAOBlur,

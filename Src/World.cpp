@@ -311,13 +311,63 @@ void World::ExecuteTransparentRenderLists()
 }
 
 
+/**
+ * @brief Picks between the opaque and the alpha masked shadow pipeline as casters are drawn into a shadow atlas region,
+ * so only alpha masked casters pay for sampling their albedo.
+ */
+class ShadowPipelineSelector
+{
+public:
+	/// Binds whichever pipeline `object` needs (and its albedo, if masked), returning it for the push constants.
+	Pipeline& Select(Object* object, const CommandBuffer& cmd)
+	{
+		const bool masked = IsMasked(object);
+		const ePipelineName wanted = masked ? ePipelineName::ShadowDirectionalMasked : ePipelineName::ShadowDirectional;
+
+		if (wanted != mBound) {
+			gShadowAtlas->BindPipeline(wanted);
+			mBound = wanted;
+
+			const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0 };
+
+			gGraphics->pRenderer->pPersistentDescriptorSlim->Bind(
+				0, cmd, gPipelineCache->Request(wanted), Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
+		}
+
+		Pipeline& pipeline = gPipelineCache->Request(mBound);
+
+		if (masked) {
+			gMaterialManager->BindWithPipeline(cmd, pipeline, object->GetMaterialID());
+		}
+
+		return pipeline;
+	}
+
+private:
+	static bool IsMasked(Object* object)
+	{
+		if (object->IsSkinned()) {
+			return false;
+		}
+
+		Material* material = gMaterialManager->GetMaterial(object->GetMaterialID());
+
+		return material != nullptr && HasFlag(material->Properties.Flags, eMaterialFlags::AlphaMask) &&
+			   material->IsReady();
+	}
+
+private:
+	/// Every region starts out with the opaque pipeline bound
+	ePipelineName mBound = ePipelineName::ShadowDirectional;
+};
+
 void World::ExecuteShadowRenderList(renderer::ePipelineName pl_name, const Camera& shadow_camera)
 {
 	const RenderListSection& section = mRenderList.GetSection(pl_name);
 
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
-	renderer::Pipeline& pipeline = gPipelineCache->Request(pl_name);
+	ShadowPipelineSelector selector;
 
 	// Push constants definition
 	ShadowPushConstants consts;
@@ -339,7 +389,7 @@ void World::ExecuteShadowRenderList(renderer::ePipelineName pl_name, const Camer
 
 		// Push the direct index for the object id
 		consts.ObjectIndex = object_id.GetID();
-		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, consts);
+		gGraphics->SubmitPushConstants(cmd, selector.Select(object, cmd), eShaderType::Vertex, consts);
 
 		object->Update();
 		object->RenderPrimitive(cmd);
@@ -451,14 +501,14 @@ void World::BakeSpotShadows()
 
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
-	renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::ShadowDirectional);
-
 	ShadowPushConstants consts;
 
 	for (const SpotShadowBake& bake : mSpotShadowBakes) {
 		const LightSpot::ShadowState& shadow = bake.pLight->Shadow;
 
 		BeginShadowAtlasRegion(gShadowAtlas->GetSpotTileRegion(shadow.AtlasTile));
+
+		ShadowPipelineSelector selector;
 
 		memcpy(consts.CameraMatrix, shadow.Matrix.RawData, sizeof(float32) * 16);
 
@@ -476,7 +526,7 @@ void World::BakeSpotShadows()
 			gObjectManager->Submit(caster_id, caster->GetModelMatrix());
 
 			consts.ObjectIndex = caster_id.GetID();
-			gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, consts);
+			gGraphics->SubmitPushConstants(cmd, selector.Select(caster, cmd), eShaderType::Vertex, consts);
 
 			caster->RenderPrimitive(cmd);
 		}
