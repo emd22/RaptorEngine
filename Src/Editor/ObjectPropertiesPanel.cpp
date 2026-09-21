@@ -55,7 +55,7 @@ ObjectPropertiesPanel::ObjectPropertiesPanel(wxWindow* parent) : wxPanel(parent,
 {
 	wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
 
-	wxStaticText* title = new wxStaticText(this, wxID_ANY, "Prototype Block");
+	wxStaticText* title = new wxStaticText(this, wxID_ANY, "Properties");
 	title->SetFont(title->GetFont().Bold());
 	sizer->Add(title, wxSizerFlags().Border(wxALL, 6));
 

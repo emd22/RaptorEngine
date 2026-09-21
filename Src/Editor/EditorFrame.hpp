@@ -14,6 +14,8 @@ class EditorViewport;
 
 enum class eEditorTool : uint32
 {
+	Simulate,
+
 	Transform,
 	Face,
 	Rotate,
@@ -29,6 +31,7 @@ public:
 	FX_FORCE_INLINE EditorViewport* GetViewport() { return mpViewport; }
 	FX_FORCE_INLINE ObjectPropertiesPanel* GetComponentPanel() { return mpComponentPanel; }
 
+	FX_FORCE_INLINE void SetEditorTool(eEditorTool tool) { mSelectedTool = tool; }
 	FX_FORCE_INLINE eEditorTool GetSelectedTool() const { return mSelectedTool; }
 	FX_FORCE_INLINE bool IsCloseRequested() const { return mbCloseRequested; }
 
