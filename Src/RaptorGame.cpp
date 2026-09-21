@@ -54,7 +54,7 @@ static bool sbShowShadowCam = false;
 static constexpr const char* scCrosshairPath = "Textures/crosshair.png";
 
 /// Crosshair width and height in window pixels, set `$i_crosshair_size` in the console to change it (0 hides it)
-static constexpr int64 scCrosshairSize = 4;
+static constexpr int64 scCrosshairSize = 3;
 
 RaptorGame::RaptorGame()
 {
@@ -611,23 +611,13 @@ void RaptorGame::RenderCrosshair()
 {
 	static const uint32 scWhite = Color::FromRGBA(255, 255, 255, 255).AsUInt();
 
-	// Only shown while left click shoots
-	if (gSelectedEditorMode != nullptr) {
-		return;
-	}
-
-	const int64 size = gCVars->Get("i_crosshair_size", scCrosshairSize);
 	const Vec2u window_size = gGraphics->GetWindow()->GetSize();
 
-	if (size <= 0 || size > static_cast<int64>(window_size.X) || size > static_cast<int64>(window_size.Y)) {
-		return;
-	}
-
 	// Whole pixels keep the image's texels lined up with the screen's, so it stays sharp
-	const Vec2f position(static_cast<float32>((static_cast<int64>(window_size.X) - size) / 2),
-						 static_cast<float32>((static_cast<int64>(window_size.Y) - size) / 2));
+	const Vec2f position(static_cast<float32>((static_cast<int64>(window_size.X) - scCrosshairSize) / 2),
+						 static_cast<float32>((static_cast<int64>(window_size.Y) - scCrosshairSize) / 2));
 
-	gTextRenderer->DrawImage(mpCrosshair.load(), position, Vec2f(static_cast<float32>(size)), scWhite);
+	gTextRenderer->DrawImage(mpCrosshair.load(), position, Vec2f(static_cast<float32>(scCrosshairSize)), scWhite);
 }
 
 

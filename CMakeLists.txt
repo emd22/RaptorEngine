@@ -155,4 +155,4 @@ target_link_libraries(raptor PRIVATE strata)
 target_include_directories(raptor SYSTEM BEFORE PRIVATE "Submodules/strata/include")
 
 
-target_link_libraries(raptor PRIVATE turbojpeg SDL3 freetype)
+target_link_libraries(raptor PRIVATE turbojpeg SDL3 freetype ktx)

@@ -126,8 +126,9 @@ public:
     {
         char buffer[32];
 
-        std::strncpy(buffer, Start, Length);
-        buffer[Length] = 0;
+        const uint32 copy_length = (Length < sizeof(buffer) - 1) ? Length : sizeof(buffer) - 1;
+        std::strncpy(buffer, Start, copy_length);
+        buffer[copy_length] = 0;
 
         char* end = nullptr;
         return strtoll(buffer, &end, 10);
@@ -136,8 +137,9 @@ public:
     float32 ToFloat() const
     {
         char buffer[32];
-        std::strncpy(buffer, Start, Length);
-        buffer[Length] = 0;
+        const uint32 copy_length = (Length < sizeof(buffer) - 1) ? Length : sizeof(buffer) - 1;
+        std::strncpy(buffer, Start, copy_length);
+        buffer[copy_length] = 0;
 
         char* end = nullptr;
         return strtof(buffer, &end);

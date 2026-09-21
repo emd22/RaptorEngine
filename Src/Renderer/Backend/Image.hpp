@@ -59,6 +59,7 @@ enum class eImageFormat : uint16
 	// Color formats
 
 	BGRA8_UNorm,
+	BGRA8_SRGB,
 	RGBA8_SRGB,
 	RGBA8_UNorm,
 
@@ -151,6 +152,19 @@ struct ImageFormatUtil
 	/**
 	 * @brief Get the size of the format in bytes. For example, RGBA8 would return 4.
 	 */
+	/// Whether sampling this format applies the sRGB transfer function, i.e. its contents are gamma encoded.
+	static constexpr bool IsSrgb(eImageFormat format)
+	{
+		switch (format) {
+		case eImageFormat::BGRA8_SRGB:
+		case eImageFormat::RGBA8_SRGB:
+			return true;
+		default:;
+		}
+
+		return false;
+	}
+
 	static constexpr uint32 GetPixelStride(eImageFormat format)
 	{
 		switch (format) {
@@ -160,6 +174,7 @@ struct ImageFormatUtil
 			// Color formats
 
 		case eImageFormat::BGRA8_UNorm:
+		case eImageFormat::BGRA8_SRGB:
 		case eImageFormat::RGBA8_SRGB:
 		case eImageFormat::RGBA8_UNorm:
 		case eImageFormat::RG16_UNorm:
@@ -253,6 +268,8 @@ struct ImageFormatUtil
 			return VK_FORMAT_R32G32_SFLOAT;
 		case eImageFormat::BGRA8_UNorm:
 			return VK_FORMAT_B8G8R8A8_UNORM;
+		case eImageFormat::BGRA8_SRGB:
+			return VK_FORMAT_B8G8R8A8_SRGB;
 		case eImageFormat::RGBA8_SRGB:
 			return VK_FORMAT_R8G8B8A8_SRGB;
 		case eImageFormat::RGBA8_UNorm:

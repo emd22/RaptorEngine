@@ -21,8 +21,8 @@ struct DecalDesc
 	Vec3f Direction = Vec3f::sForward;
 
 	/// Size of the projection in world units
-	float32 Width = 0.1f;
-	float32 Height = 0.1f;
+	float32 Width = 0.25f;
+	float32 Height = 0.25f;
 
 	float32 Depth = 0.1f;
 
@@ -35,10 +35,10 @@ struct DecalDesc
 	uint32 Color = 0xFFFFFFFF;
 
 	float32 Roughness = 0.5f;
-	float32 RoughnessWeight = 0.0f;
+	float32 RoughnessWeight = 0.4f;
 
 	/// How far the normal atlas bends the lighting, 0 for a flat decal
-	float32 NormalStrength = 0.0f;
+	float32 NormalStrength = 0.6f;
 };
 
 class DecalManager

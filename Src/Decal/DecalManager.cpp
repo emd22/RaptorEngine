@@ -60,8 +60,6 @@ void DecalManager::AddDecal(const DecalDesc& desc)
 	DecalEntry entry {};
 	renderer::DecalGpuData& gpu_data = entry.GpuData;
 
-	// World to decal space, v * M. Column N takes a point to its distance from the center along axis N, measured in
-	// box sizes, so the box ends up spanning [-0.5, 0.5].
 	const Vec3f scaled_axes[3] = {
 		right * (1.0f / desc.Width),
 		up * (1.0f / desc.Height),
@@ -120,7 +118,7 @@ void DecalManager::AddBulletHole(const Vec3f& hit_point, const Vec3f& hit_normal
 	constexpr float32 cell_height = 1.0f / static_cast<float32>(scBulletHoleAtlasRows);
 
 	const uint32 variant = FastRand32() % variant_count;
-	const float32 size = scBulletHoleSize * (0.85f + (0.15f * RandomUnit()));
+	const float32 size = scBulletHoleSize * (1.0f + (0.15f * RandomUnit()));
 
 	uint32 rect_column = variant % scBulletHoleAtlasColumns;
 	uint32 rect_row = variant / scBulletHoleAtlasColumns;
@@ -138,7 +136,7 @@ void DecalManager::AddBulletHole(const Vec3f& hit_point, const Vec3f& hit_normal
 			static_cast<float32>(rect_column) * cell_width,
 			static_cast<float32>(rect_row) * cell_height,
 		},
-		.Roughness = 0.9f,
+		.Roughness = 0.4f,
 		.RoughnessWeight = 1.0f,
 		.NormalStrength = scBulletHoleNormalStrength,
 	};

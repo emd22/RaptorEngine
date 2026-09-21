@@ -18,6 +18,7 @@ obj
 *.sln
 
 *.ftx
+**/TGen/*.ktx2
 
 bin
 

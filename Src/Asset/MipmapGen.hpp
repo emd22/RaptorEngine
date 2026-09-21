@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <Asset/DataPack.hpp>
+#include <Asset/Loader/Image/LoaderKtx.hpp>
 #include <Core/Slice.hpp>
 #include <Math/Vec2.hpp>
 #include <Renderer/Backend/Image.hpp>
@@ -35,16 +35,17 @@ public:
 
 	void GenerateMipmaps(const char* path, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size);
 
-	Slice<uint8> GenerateMip(DataPack& dp, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size,
-							 uint8 mip_level);
+	/// Generates the pixels of a single mip level, tightly packed.
+	SizedArray<uint8> GenerateMip(eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size,
+								  uint8 mip_level);
 
 	void GenerateTestMipmap(const char* output_path, const Vec2u& size);
 
 	/**
-	 * @brief Loads a mipmap datapack and exports each image to its own JPEG.
-	 * @param dp_path The path to the datapack.
+	 * @brief Loads a mipmap KTX file and exports each mip level to its own single-level KTX file.
+	 * @param ktx_path The path to the mipmapped KTX file.
 	 */
-	void ExportMipmaps(const char* dp_path, const char* output_path);
+	void ExportMipmaps(const char* ktx_path, const char* output_path);
 
 	Image LoadMipmaps(renderer::CommandBuffer& cmd, const char* path);
 
@@ -60,15 +61,16 @@ public:
 
 	void Open(const char* path);
 
+	bool IsOpen() const { return Ktx.IsOpen(); }
+
+	uint32 GetMipCount() const { return Ktx.IsOpen() ? Ktx.GetMipCount() : 0; }
+
 	ImageInfo GetMip(uint32 mip_level);
 
 	ImageInfo GetQuality(eQualityLevel quality);
 
-private:
-	uint32 FindClosestMipLevel(uint32 mip_level);
-
 public:
-	DataPack Pack;
+	loader::LoaderKtx Ktx;
 };
 
 

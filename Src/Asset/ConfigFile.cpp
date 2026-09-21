@@ -217,6 +217,18 @@ void ConfigFile::Load(const std::string& path)
 
 	Slice<char> file_buffer = file.Read<char>();
 
+	if (file_buffer.pData == nullptr || file_buffer.Size == 0) {
+		LogWarning(LC_CORE, "Config '{}' is empty or could not be read", path);
+		if (file_buffer.pData) {
+			gEnginePool->Free(file_buffer.pData);
+		}
+		return;
+	}
+
+	mTokenIndex = 0;
+	mbHasErrors = false;
+	mDepth = 0;
+
 	Tokenizer tokenizer(file_buffer.pData, file_buffer.Size);
 	tokenizer.SetFileExtension(".conf");
 	tokenizer.IncludeFile(FilesystemIO::ResolvePath("Config/Internal/Constants.conf").c_str());
@@ -280,7 +292,7 @@ bool ConfigFile::EatToken(const Slice<eTokenType>& expected_types)
 		}
 	}
 
-	LogError(LC_CORE, "Config: found type '{}' but can only allow one of {}", Token::GetTypeName(GetToken()->Type));
+	LogError(LC_CORE, "Config({}): unexpected token type '{}'", mTokenIndex, Token::GetTypeName(token->Type));
 	mbHasErrors = true;
 	return false;
 }
@@ -294,10 +306,12 @@ void ConfigFile::PrintEntries()
 	}
 }
 
-void ConfigFile::ParseReference(ConfigPrimitive& value)
+bool ConfigFile::ParseReference(ConfigPrimitive& value)
 {
 	Token* ident_token = GetToken();
-	EatToken(eTokenType::Identifier);
+	if (!EatToken(eTokenType::Identifier)) {
+		return false;
+	}
 
 	ConfigEntry* value_entry = GetEntry(ident_token->GetHash());
 
@@ -317,12 +331,17 @@ void ConfigFile::ParseReference(ConfigPrimitive& value)
 		value_entry = value_entry->GetMember(ident_token->GetHash());
 	}
 
-	if (value_entry) {
-		value = *value_entry;
+	if (!value_entry) {
+		LogError(LC_CORE, "Config({}): could not resolve reference", mTokenIndex);
+		mbHasErrors = true;
+		return false;
 	}
+
+	value = *value_entry;
+	return true;
 }
 
-void ConfigFile::ParseValue(ConfigPrimitive& value)
+bool ConfigFile::ParseValue(ConfigPrimitive& value)
 {
 	using VType = ConfigEntry::ePrimitiveType;
 
@@ -331,8 +350,7 @@ void ConfigFile::ParseValue(ConfigPrimitive& value)
 	if (value_token->Type == eTokenType::Dollar) {
 		EatToken(eTokenType::Dollar);
 
-		ParseReference(value);
-		return;
+		return ParseReference(value);
 	}
 
 	// Check for constants
@@ -341,19 +359,32 @@ void ConfigFile::ParseValue(ConfigPrimitive& value)
 			if (entry.Name == value_token->GetHash()) {
 				value.Set(entry);
 				NextToken();
-				return;
+				return true;
 			}
 		}
 
 		LogError(LC_CORE, "Could not find reference to constant {}!", value_token->GetStr());
+		mbHasErrors = true;
 	}
 
 	// Handle unary minus (in a simple way, but still handles recursive negatives)
 	if (value_token->Type == eTokenType::Minus) {
 		EatToken(eTokenType::Minus);
 
+		if (mDepth >= cMaxDepth) {
+			LogError(LC_CORE, "Config({}): nesting too deep", mTokenIndex);
+			mbHasErrors = true;
+			return false;
+		}
+
 		ConfigPrimitive temp;
-		ParseValue(temp);
+		++mDepth;
+		const bool ok = ParseValue(temp);
+		--mDepth;
+
+		if (!ok) {
+			return false;
+		}
 
 		switch (temp.Type) {
 		case VType::Int:
@@ -363,17 +394,27 @@ void ConfigFile::ParseValue(ConfigPrimitive& value)
 			value.Set<float32>(-temp.Get<float32>());
 			break;
 		default:
-			break;
+			LogError(LC_CORE, "Config({}): cannot negate a non-numeric value", mTokenIndex);
+			mbHasErrors = true;
+			return false;
 		}
 
-		return;
+		return true;
 	}
 
 	const VType detected_type = GetValueTokenType(*value_token);
 
 	switch (detected_type) {
 	case VType::None:
-		break;
+		LogError(LC_CORE, "Config({}): expected a value but found '{}'", mTokenIndex,
+				 Token::GetTypeName(value_token->Type));
+		mbHasErrors = true;
+		// Do not consume closing tokens, so the caller can resynchronise on them
+		if (value_token->Type != eTokenType::Unknown && value_token->Type != eTokenType::RBrace &&
+			value_token->Type != eTokenType::RBracket) {
+			NextToken();
+		}
+		return false;
 	case VType::String:
 		value.Set(value_token->GetStr());
 		break;
@@ -388,6 +429,7 @@ void ConfigFile::ParseValue(ConfigPrimitive& value)
 	}
 
 	NextToken();
+	return true;
 }
 
 void ConfigEntry::AppendValue(ConfigPrimitive&& value)
@@ -399,17 +441,35 @@ void ConfigEntry::AppendValue(ConfigPrimitive&& value)
 	ArrayData.Insert(std::move(value));
 }
 
-ConfigEntry ConfigFile::ParseEntry(ConfigEntry* parent)
+void ConfigFile::SkipToNextEntry(bool in_struct)
+{
+	while (!IsAtEnd()) {
+		const Token* token = GetToken();
+
+		if (in_struct && token->Type == eTokenType::RBrace) {
+			return;
+		}
+
+		const bool can_start_entry = token->Type == eTokenType::Identifier || token->Type == eTokenType::Integer ||
+									 token->Type == eTokenType::Dollar;
+
+		if (can_start_entry && PeekToken(1)->Type == eTokenType::Equals) {
+			return;
+		}
+
+		NextToken();
+	}
+}
+
+bool ConfigFile::ParseEntry(ConfigEntry* parent, ConfigEntry& entry)
 {
 	// [IDENTIFIER] = [INT | FLOAT | STRING | STRUCT]
-
-	ConfigEntry entry;
 
 	Token* token = GetToken();
 
 	// Special case, set the name to the current member index
 	if (token->Type == eTokenType::Dollar && parent != nullptr) {
-		entry.Name = std::to_string(parent->Members.Size());
+		entry.Name = std::to_string(parent->Members.IsInited() ? parent->Members.Size() : 0);
 	}
 	// Default case, set the name to the identifier
 	else {
@@ -417,25 +477,53 @@ ConfigEntry ConfigFile::ParseEntry(ConfigEntry* parent)
 	}
 
 	eTokenType allowed_name_types[] = { eTokenType::Identifier, eTokenType::Integer, eTokenType::Dollar };
-	EatToken(MakeSlice(allowed_name_types, std::size(allowed_name_types)));
-	EatToken(eTokenType::Equals);
+	if (!EatToken(MakeSlice(allowed_name_types, std::size(allowed_name_types)))) {
+		return false;
+	}
+	if (!EatToken(eTokenType::Equals)) {
+		return false;
+	}
 
 	// Parse struct
 	// [IDENTIFIER] = { [ENTRY]... }
 	if (GetToken()->Type == eTokenType::LBrace) {
+		if (mDepth >= cMaxDepth) {
+			LogError(LC_CORE, "Config({}): nesting too deep", mTokenIndex);
+			mbHasErrors = true;
+			return false;
+		}
+
 		EatToken(eTokenType::LBrace);
 
 		entry.Type = ConfigEntry::ePrimitiveType::Struct;
 
+		++mDepth;
+
 		// Add each entry as a member of the current entry
-		while (GetToken()->Type != eTokenType::RBrace) {
-			ConfigEntry member = ParseEntry(&entry);
-			entry.AddMember(std::move(member));
+		while (!IsAtEnd() && GetToken()->Type != eTokenType::RBrace) {
+			const uint32 start_index = mTokenIndex;
+
+			ConfigEntry member;
+			if (ParseEntry(&entry, member)) {
+				entry.AddMember(std::move(member));
+				continue;
+			}
+
+			// Malformed member, drop it and resume at the next entry
+			SkipToNextEntry(true);
+			if (mTokenIndex == start_index && !IsAtEnd() && GetToken()->Type != eTokenType::RBrace) {
+				NextToken();
+			}
 		}
 
-		EatToken(eTokenType::RBrace);
+		--mDepth;
 
-		return entry;
+		// Missing closing brace (truncated file). Keep what was parsed.
+		if (!EatToken(eTokenType::RBrace)) {
+			return false;
+		}
+
+		return true;
 	}
 
 	// Parse array
@@ -447,41 +535,57 @@ ConfigEntry ConfigFile::ParseEntry(ConfigEntry* parent)
 		Token* value_token = GetToken();
 		entry.Type = GetValueTokenType(*value_token);
 
-		while (GetToken()->Type != eTokenType::RBracket) {
+		while (!IsAtEnd() && GetToken()->Type != eTokenType::RBracket) {
 			ConfigPrimitive value;
-			ParseValue(value);
+			if (!ParseValue(value)) {
+				return false;
+			}
 			entry.AppendValue(std::move(value));
 
 			if (GetToken()->Type == eTokenType::RBracket) {
 				break;
 			}
 
-			EatToken(eTokenType::Comma);
+			if (!EatToken(eTokenType::Comma)) {
+				return false;
+			}
 		}
 
-		EatToken(eTokenType::RBracket);
-
-		return entry;
+		return EatToken(eTokenType::RBracket);
 	}
 
 	// Parse single value entry
 	// [IDENTIFIER] = [INT | FLOAT | STRING]
 
-	ParseValue(entry);
-
-	return entry;
+	return ParseValue(entry);
 }
 
 void ConfigFile::Parse(PagedArray<Token>& tokens)
 {
-	mConfigEntries.Create(32);
+	if (!mConfigEntries.IsInited()) {
+		mConfigEntries.Create(32);
+	}
 
 	mpTokens = &tokens;
 
-	const uint32 tokens_size = tokens.Size();
+	while (!IsAtEnd()) {
+		const uint32 start_index = mTokenIndex;
 
-	while (mTokenIndex < tokens_size) {
-		mConfigEntries.Insert(ParseEntry(nullptr));
+		ConfigEntry entry;
+		if (ParseEntry(nullptr, entry)) {
+			mConfigEntries.Insert(std::move(entry));
+			continue;
+		}
+
+		// Malformed entry, skip it and resume at the next one
+		SkipToNextEntry(false);
+		if (mTokenIndex == start_index && !IsAtEnd()) {
+			NextToken();
+		}
+	}
+
+	if (mbHasErrors) {
+		LogWarning(LC_CORE, "Config file had errors; malformed entries were skipped");
 	}
 
 	mpTokens = nullptr;

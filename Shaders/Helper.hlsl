@@ -13,7 +13,12 @@
 
 #define F_PARAMTEST() ;
 
+/// Default cutoff for opaque and alpha masked materials. Pipelines that need a different one (the transparent
+/// variants drop it to near zero) pass ALPHA_CUTOFF as a shader macro, which the preprocessor defines ahead of
+/// this include, so the guard has to stay.
+#ifndef ALPHA_CUTOFF
 #define ALPHA_CUTOFF 0.5
+#endif
 
 struct Object
 {

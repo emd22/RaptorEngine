@@ -250,7 +250,9 @@ private:
 public:
 	MaterialID ID = MaterialID::scNull;
 
-	MaterialComponent Diffuse { eImageFormat::RGBA8_UNorm };
+	/// Albedo is authored in sRGB, so it is sampled through an _SRGB view and the hardware linearises it. The other
+	/// two carry data rather than colour (a direction, a metallic/roughness pair) and stay linear.
+	MaterialComponent Diffuse { eImageFormat::RGBA8_SRGB };
 	MaterialComponent NormalMap { eImageFormat::RGBA8_UNorm };
 	MaterialComponent MetallicRoughness { eImageFormat::RGBA8_UNorm };
 

@@ -208,6 +208,11 @@ struct FSPushConsts
 
 #define SHADOW_BIAS -0.000005f
 
+/// Taps per axis for the shadow PCF kernel. The comparison sampler is linear, so each tap is already a hardware
+/// 2x2 percentage closer fetch; 2 here offsets four of those by half a texel each, giving a 3x3 tent for 4 taps.
+/// Set to 1 for the single hardware tap this used to do.
+#define SHADOW_PCF_TAPS 2
+
 /// How much of `light` reaches `position_ws` according to the light's shadow map in the atlas, 1 is fully lit.
 /// Lights without a shadow map, and positions outside of it, are fully lit.
 float SampleShadowAtlas(Light light, float3 position_ws)
@@ -237,14 +242,38 @@ float SampleShadowAtlas(Light light, float3 position_ws)
 		return 1.0;
 	}
 
-	// Keep the clip inside of this light's region so it never picks up a neighbouring shadow map (bilinear sampling shizzle)
-	const float2 half_texel = 0.5 / float2(SHADOW_ATLAS_WIDTH, SHADOW_ATLAS_HEIGHT);
-	const float2 region_min = atlas_rect.zw + half_texel;
-	const float2 region_max = atlas_rect.zw + atlas_rect.xy - half_texel;
+	const float2 texel_size = 1.0 / float2(SHADOW_ATLAS_WIDTH, SHADOW_ATLAS_HEIGHT);
 
-	const float2 atlas_uv = clamp(shadow_uv * atlas_rect.xy + atlas_rect.zw, region_min, region_max);
+	// Keep every tap inside of this light's region so it never picks up a neighbouring shadow map (bilinear
+	// sampling shizzle). The kernel widens the footprint, so the inset has to cover it, not just one texel.
+	const float2 inset = texel_size * (0.5 * SHADOW_PCF_TAPS);
+	const float2 region_min = atlas_rect.zw + inset;
+	const float2 region_max = atlas_rect.zw + atlas_rect.xy - inset;
 
-	return F_SampleCmpLevelZero(tShadowAtlas, atlas_uv, shadow_z + SHADOW_BIAS);
+	const float2 base_uv = shadow_uv * atlas_rect.xy + atlas_rect.zw;
+	const float compare_z = shadow_z + SHADOW_BIAS;
+
+#if SHADOW_PCF_TAPS <= 1
+	return F_SampleCmpLevelZero(tShadowAtlas, clamp(base_uv, region_min, region_max), compare_z);
+#else
+	// Taps are spaced a texel apart and centred on base_uv, so the kernel stays symmetric for any tap count
+	const float first = -0.5 * (SHADOW_PCF_TAPS - 1);
+
+	float sum = 0.0;
+
+	[unroll]
+	for (int y = 0; y < SHADOW_PCF_TAPS; y++) {
+		[unroll]
+		for (int x = 0; x < SHADOW_PCF_TAPS; x++) {
+			const float2 offset = (first + float2(x, y)) * texel_size;
+			const float2 tap_uv = clamp(base_uv + offset, region_min, region_max);
+
+			sum += F_SampleCmpLevelZero(tShadowAtlas, tap_uv, compare_z);
+		}
+	}
+
+	return sum / (SHADOW_PCF_TAPS * SHADOW_PCF_TAPS);
+#endif
 }
 
 /// Lower bound on perceptual roughness. D_GGX() divides by alpha^2 = roughness^4 at the highlight peak, so fully
@@ -556,7 +585,10 @@ FSOutput main(FSInput input)
 		if (probe_volume_count > 0) {
 			const uint volume_index = SelectProbeVolume(input.vPositionWS, bProbeVolume, probe_volume_count);
 
-			const float3 R = reflect(-V, N);
+			// Not the mirror direction: an L2 SH probe is a very blurry environment, and a rough surface's lobe is
+			// centred nearer the normal than the reflection. Sampling along R regardless is wrong for most of this
+			// scene, where roughness sits at or near 1.
+			const float3 R = GetSpecularDominantDir(N, reflect(-V, N), roughness);
 
 			float3 probe_radiance;
 			SampleProbeVolumeIrradiance(input.vPositionWS, N, R, bProbeVolume[volume_index], bProbeBuffer,

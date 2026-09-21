@@ -3,6 +3,7 @@
 #include "Core/Assert.hpp"
 #include "Core/SizedArray.hpp"
 #include "Loader/Image/LoaderJpeg.hpp"
+#include "Loader/Image/LoaderKtx.hpp"
 #include "Loader/Image/LoaderStb.hpp"
 #include "Loader/Object/LoaderGltf.hpp"
 
@@ -264,6 +265,35 @@ inline bool IsMemoryJpeg(const uint8* data, uint32 data_size)
 }
 
 
+/// Both KTX1 and KTX2 files start with the identifier "\xABKTX 1" / "\xABKTX 2" followed by "0\xBB\r\n\x1A\n".
+inline bool IsMemoryKtx(const uint8* data, uint32 data_size)
+{
+	static constexpr uint8 scKtxMagic[] = { 0xAB, 'K', 'T', 'X', ' ' };
+
+	if (data == nullptr || data_size < 12) {
+		return false;
+	}
+
+	return memcmp(data, scKtxMagic, sizeof(scKtxMagic)) == 0 && (data[5] == '1' || data[5] == '2');
+}
+
+inline bool IsFileKtx(const std::string& path)
+{
+	FILE* fp = fopen(path.c_str(), "rb");
+
+	if (fp == nullptr) {
+		return false;
+	}
+
+	uint8 magic_buffer[12];
+	const bool read_ok = fread(magic_buffer, 1, sizeof(magic_buffer), fp) == sizeof(magic_buffer);
+
+	fclose(fp);
+
+	return read_ok && IsMemoryKtx(magic_buffer, sizeof(magic_buffer));
+}
+
+
 inline bool IsFileJpeg(const std::string& path)
 {
 	const char* path_cstr = path.c_str();
@@ -327,8 +357,17 @@ AssetTicket AssetManager::LoadImage(eImageType image_type, eImageFormat format, 
 
 	const bool is_jpeg = IsFileJpeg(path);
 
+	if (IsFileKtx(path)) {
+		TSRef<loader::LoaderKtx> loader = TSRef<loader::LoaderKtx>::New();
+
+		loader->ImageType = image_type;
+		loader->ImageFormat = format;
+		loader->CreationFlags = flags;
+
+		SubmitLoadAssetFromPath<loader::LoaderKtx>(ticket, loader, eAssetType::Image, path);
+	}
 	// Use TurboJPEG if this is a JPEG file
-	if (is_jpeg) {
+	else if (is_jpeg) {
 		TSRef<loader::LoaderJpeg> loader = TSRef<loader::LoaderJpeg>::New();
 
 		loader->ImageType = image_type;
@@ -359,7 +398,15 @@ AssetTicket AssetManager::LoadImageFromMemory(eImageType image_type, eImageForma
 
 	const bool is_jpeg = IsMemoryJpeg(data.pData, data.Size);
 
-	if (is_jpeg) {
+	if (IsMemoryKtx(data.pData, data.Size)) {
+		TSRef<loader::LoaderKtx> loader = TSRef<loader::LoaderKtx>::New();
+		loader->ImageType = image_type;
+		loader->ImageFormat = format;
+		loader->CreationFlags = flags;
+
+		SubmitLoadAssetFromData<loader::LoaderKtx>(ticket, loader, eAssetType::Image, data);
+	}
+	else if (is_jpeg) {
 		// Load the image using turbojpeg
 		TSRef<loader::LoaderJpeg> loader = TSRef<loader::LoaderJpeg>::New();
 		loader->ImageType = image_type;

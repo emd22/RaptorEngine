@@ -106,8 +106,9 @@ float ComputeSSAO(float2 uv)
 {
 	float raw_depth = F_Sample(tDepth, uv).r;
 
-	// Skip the skybox (reverse-Z: far plane = 0.0)
-	if (raw_depth >= 1.0)
+	// Skip the skybox. The viewport runs minDepth 1 -> maxDepth 0 and the depth target clears to 0, so the far
+	// plane (and anything the prepass never drew) reads as 0.0, not 1.0.
+	if (raw_depth <= 0.0)
 	{
 		return 1.0;
 	}
@@ -116,11 +117,24 @@ float ComputeSSAO(float2 uv)
 	float3 fragment_position = ReconstructViewPos(uv, depth);
 
 	float3 world_normal = F_Sample(tNormal, uv).xyz;
+
+	// DepthNormal.hlsl leaves unlit materials at a zero normal. normalize() would turn that into a NaN that
+	// poisons the whole kernel below, and SSAOBlur would then spread it over the neighbouring geometry.
+	if (dot(world_normal, world_normal) < 1e-8)
+	{
+		return 1.0;
+	}
+
 	float3 normal = normalize(mul(world_normal, (float3x3)Consts.View));
 
 	float2 noise_vector = GetNoiseVector(uv);
 
-	float3 tangent = normalize(cross(normal, float3(noise_vector, 0.0)));
+	// Built by projecting the noise direction onto the tangent plane instead of crossing with it: the noise lies
+	// in the XY plane, so a normal lying there too would cross to zero length and give a NaN basis.
+	float3 noise_direction = float3(noise_vector, 0.0);
+	float3 projected_tangent = noise_direction - normal * dot(noise_direction, normal);
+
+	float3 tangent = projected_tangent * rsqrt(max(dot(projected_tangent, projected_tangent), 1e-12));
 	float3 bitangent = cross(normal, tangent);
 	float3x3 TBN = float3x3(tangent, bitangent, normal);
 

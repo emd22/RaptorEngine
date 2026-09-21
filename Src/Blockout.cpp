@@ -60,6 +60,29 @@ void Blockout::Create(World* world)
 		test_material->Finalize();
 	}
 
+
+	{
+		mProtoTileID = gMaterialManager->NewMaterial("ProtoTile", renderer::ePipelineName::GeometryNormalMaps, false);
+		Material* test_material = gMaterialManager->GetMaterial(mProtoTileID);
+
+		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
+													   "Data/Demo/Textures/blue_tile/BlueTiles01_1K_BaseColor.png",
+													   eImageCreateFlags::None);
+
+		AssetTicket normal = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
+													  "Data/Demo/Textures/blue_tile/BlueTiles01_1K_Normal.png",
+													  eImageCreateFlags::None);
+
+		AssetTicket roughness = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
+														 "Data/Demo/Textures/blue_tile/BlueTiles01_1K_Roughness.png",
+														 eImageCreateFlags::None);
+
+
+		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
+		test_material->Attach(Material::eResourceType::Normal, normal);
+		test_material->Finalize();
+	}
+
 	// Selection material
 	{
 		SelectionMaterialID = gMaterialManager->NewMaterial("ProtoSelect", renderer::ePipelineName::Geometry, false);
@@ -238,8 +261,9 @@ static Vec3f GetCubeSize(const CubeGenOptions& cgo)
 enum class eCProtoMat
 {
 	Gray = 0,
-	Orange = 1,
-	Blue = 2,
+	Orange,
+	Blue,
+	Tile,
 };
 
 
@@ -299,6 +323,9 @@ ObjectID Blockout::CreateCubeVolume(ConfigEntry& entry)
 			break;
 		case eCProtoMat::Blue:
 			material_id = mBlueMaterialID;
+			break;
+		case eCProtoMat::Tile:
+			material_id = mProtoTileID;
 			break;
 		default:;
 		}
@@ -686,6 +713,9 @@ void Blockout::Save(const String& path)
 			}
 			else if (object->GetMaterialID() == mOrangeMaterialID) {
 				blockout_entry.AddMember(ConfigEntry::DotReference("mat", "$cprotomat.orange"));
+			}
+			else if (object->GetMaterialID() == mProtoTileID) {
+				blockout_entry.AddMember(ConfigEntry::DotReference("mat", "$cprotomat.tile"));
 			}
 		}
 		all_entry->AddMember(std::move(blockout_entry));

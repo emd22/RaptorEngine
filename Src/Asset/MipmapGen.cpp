@@ -1,51 +1,35 @@
 #include "MipmapGen.hpp"
 
-#include "DataPack.hpp"
-
 #include <ThirdParty/stb_image_resize2.h>
 
+#include <Asset/Loader/Image/LoaderKtx.hpp>
 #include <Asset/Loader/Image/LoaderStb.hpp>
-#include <Core/ArrayUtil.hpp>
 #include <Core/FilesystemIO.hpp>
 #include <Renderer/Backend/Image.hpp>
+
+#include <algorithm>
+#include <vector>
 
 
 namespace fx {
 
-#pragma pack(push, 1)
-
-struct MipHeader
-{
-	uint16 SizeX;
-	uint16 SizeY;
-	uint8 MipLevel;
-	uint8 Unused0;
-	eImageFormat Format;
-};
-
-#pragma pack(pop)
-
 void MipmapGen::GenerateMipmaps(const char* path, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size)
 {
-	uint32 expected_mip_count = GetExpectedMipCount(size);
+	const uint32 expected_mip_count = GetExpectedMipCount(size);
 
-	DataPack dp;
+	std::vector<SizedArray<uint8>> mips;
+	std::vector<Slice<const uint8>> mip_slices;
+
+	mips.reserve(expected_mip_count);
+	mip_slices.reserve(expected_mip_count);
 
 	for (uint32 i = 0; i < expected_mip_count; i++) {
-		GenerateMip(dp, format, pixels, size, i);
+		mips.push_back(GenerateMip(format, pixels, size, i));
+		mip_slices.emplace_back(mips.back().pData, mips.back().Size);
 	}
 
-	dp.WriteToFile(path);
-}
-
-FX_FORCE_INLINE constexpr float32 GetMipDivisor(uint32 mip_level)
-{
-	return 1.0f / (1U << static_cast<uint32>(mip_level));
-}
-
-FX_FORCE_INLINE constexpr float32 GetBaseMipMultiplier(uint32 mip_level)
-{
-	return (1U << static_cast<uint32>(mip_level));
+	loader::LoaderKtx::SaveToFile(path, format, size,
+								  Slice<const Slice<const uint8>>(mip_slices.data(), mip_slices.size()));
 }
 
 uint32 MipmapGen::GetExpectedMipCount(Vec2u base_size)
@@ -54,48 +38,40 @@ uint32 MipmapGen::GetExpectedMipCount(Vec2u base_size)
 }
 
 
-Slice<uint8> MipmapGen::GenerateMip(DataPack& dp, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size,
-									uint8 mip_level)
+SizedArray<uint8> MipmapGen::GenerateMip(eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size,
+										 uint8 mip_level)
 {
-	static constexpr uint32 scHeaderOffset = sizeof(MipHeader);
-
 	const uint32 pixel_size = ImageFormatUtil::GetPixelStride(format);
 
 	const int32 input_stride = size.X * pixel_size;
-	const float32 divisor = GetMipDivisor(static_cast<uint32>(mip_level));
 
-	Vec2u output_dimensions(std::max(1U, uint32(float32(size.X) * divisor)),
-							std::max(1U, uint32(float32(size.Y) * divisor)));
+	// Matches the level dimensions KTX derives from the base size.
+	Vec2u output_dimensions(std::max(1U, size.X >> mip_level), std::max(1U, size.Y >> mip_level));
 
 	SizedArray<uint8> output_data;
 
-	{
-		const uint32 data_output_size = output_dimensions.X * output_dimensions.Y * pixel_size;
-		output_data.InitSize(data_output_size + scHeaderOffset);
+	const uint32 data_output_size = output_dimensions.X * output_dimensions.Y * pixel_size;
+	output_data.InitSize(data_output_size);
 
-		const int32 output_stride = output_dimensions.X * pixel_size;
+	const int32 output_stride = output_dimensions.X * pixel_size;
 
-		if (mip_level > 0) {
-			stbir_resize_uint8_linear(pixels.pData, size.X, size.Y, input_stride, output_data.pData + scHeaderOffset,
-									  output_dimensions.X, output_dimensions.Y, output_stride, STBIR_RGBA_PM);
+	if (mip_level > 0) {
+		// STBIR_RGBA, not STBIR_RGBA_PM: these textures carry straight alpha, and claiming they are premultiplied
+		// lets the colour of fully transparent texels bleed into the chain (dark fringes around cutouts).
+		if (ImageFormatUtil::IsSrgb(format)) {
+			// Averaging sRGB encoded bytes as if they were linear darkens every level below the base, so the
+			// colour channels are filtered through the transfer function. Alpha stays linear either way.
+			stbir_resize_uint8_srgb(pixels.pData, size.X, size.Y, input_stride, output_data.pData,
+									output_dimensions.X, output_dimensions.Y, output_stride, STBIR_RGBA);
 		}
 		else {
-			Assert(output_dimensions == size);
-			memcpy(output_data.pData + scHeaderOffset, pixels.pData, data_output_size);
+			stbir_resize_uint8_linear(pixels.pData, size.X, size.Y, input_stride, output_data.pData,
+									  output_dimensions.X, output_dimensions.Y, output_stride, STBIR_RGBA);
 		}
 	}
-
-	// Write header
-	{
-		MipHeader header {
-			.SizeX = static_cast<uint16>(output_dimensions.X),
-			.SizeY = static_cast<uint16>(output_dimensions.Y),
-			.MipLevel = static_cast<uint8>(mip_level),
-			.Unused0 = 0,
-			.Format = format,
-		};
-
-		memcpy(output_data.pData, &header, sizeof(header));
+	else {
+		Assert(output_dimensions == size);
+		memcpy(output_data.pData, pixels.pData, data_output_size);
 	}
 
 #ifdef FX_DEBUG_MIPS_SAVE_AS_IMAGES
@@ -103,22 +79,13 @@ Slice<uint8> MipmapGen::GenerateMip(DataPack& dp, eImageFormat format, const Sli
 								  String::Fmt("Mip_{}.jpeg", mip_level), eImageSaveFlags::None);
 #endif
 
-	dp.AddEntry(mip_level, output_data);
-
-	return Slice(dp.GetEntry(mip_level, false)->Data);
+	return output_data;
 }
 
 void MipmapGen::GenerateTestMipmap(const char* output_path, const Vec2u& size)
 {
-	DataPack dp;
-
-	static constexpr uint32 scHeaderOffset = sizeof(MipHeader);
 	static constexpr uint32 scNumMips = 4;
 	static constexpr uint32 scPixelStride = 4;
-
-	// The buffer is the size of mip level 0, where each mip will get progressively smaller.
-	const uint32 buffer_size = (size.X * size.Y * scPixelStride) + scHeaderOffset;
-	uint8* buffer = static_cast<uint8*>(std::malloc(buffer_size));
 
 	const uint8 mip_level_colors[][4] = {
 		{ 0xFF, 0x11, 0x11, 0xFF }, // Mip Level 0 : Red
@@ -127,118 +94,66 @@ void MipmapGen::GenerateTestMipmap(const char* output_path, const Vec2u& size)
 		{ 0x11, 0xFF, 0xFF, 0xFF }, // Mip Level 3 : Teal
 	};
 
+	std::vector<std::vector<uint8>> mips(scNumMips);
+	std::vector<Slice<const uint8>> mip_slices;
+
 	for (uint32 mip_level = 0; mip_level < scNumMips; mip_level++) {
 		const uint8* level_color = mip_level_colors[(mip_level % std::size(mip_level_colors))];
-		const float32 mip_divisor = GetMipDivisor(mip_level);
 
-		const uint32 mip_buffer_size = (size.X * mip_divisor) * (size.Y * mip_divisor);
+		const Vec2u mip_size(std::max(1U, size.X >> mip_level), std::max(1U, size.Y >> mip_level));
+		const uint32 mip_pixel_count = mip_size.X * mip_size.Y;
 
-		// Write the image data
-		for (uint32 b_index = 0; b_index < mip_buffer_size; b_index++) {
-			memcpy(buffer + scHeaderOffset + (b_index * scPixelStride), level_color, scPixelStride);
+		mips[mip_level].resize(mip_pixel_count * scPixelStride);
+
+		for (uint32 pixel_index = 0; pixel_index < mip_pixel_count; pixel_index++) {
+			memcpy(mips[mip_level].data() + (pixel_index * scPixelStride), level_color, scPixelStride);
 		}
 
-		// Write the mip header
-		{
-			MipHeader header {
-				.SizeX = static_cast<uint16>(size.X * mip_divisor),
-				.SizeY = static_cast<uint16>(size.Y * mip_divisor),
-				.MipLevel = static_cast<uint8>(mip_level),
-				.Unused0 = 0,
-				.Format = eImageFormat::RGBA8_UNorm,
-			};
+		LogInfo("Mippy Width: {}, Height: {}", mip_size.X, mip_size.Y);
 
-			LogInfo("Mippy Width: {}, Height: {}", header.SizeX, header.SizeY);
-
-			memcpy(buffer, &header, sizeof(header));
-		}
-
-		dp.AddEntry(mip_level, Slice<uint8>(buffer, mip_buffer_size * scPixelStride + scHeaderOffset));
+		mip_slices.emplace_back(mips[mip_level].data(), static_cast<uint32>(mips[mip_level].size()));
 	}
 
-	dp.WriteToFile(output_path);
-
-	std::free(buffer);
+	loader::LoaderKtx::SaveToFile(output_path, eImageFormat::RGBA8_UNorm, size,
+								  Slice<const Slice<const uint8>>(mip_slices.data(), mip_slices.size()));
 }
 
 
-void MipmapGen::ExportMipmaps(const char* dp_path, const char* output_path)
+void MipmapGen::ExportMipmaps(const char* ktx_path, const char* output_path)
 {
 	FilesystemIO::DirCreate(output_path);
 
-	DataPack dp(eDataPackMode::Read, dp_path);
+	loader::LoaderKtx ktx;
 
-	if (!dp.IsOpen()) {
-		LogError(LC_ASSET, "Failed to open datapack at {} on mipmap export", dp_path);
+	if (!ktx.Open(ktx_path)) {
+		LogError(LC_ASSET, "Failed to open KTX file at {} on mipmap export", ktx_path);
 		return;
 	}
 
-	for (DataPackEntry& entry : dp.Entries) {
-		// If there is no data in this datapack entry, load it from the file.
-		if (!entry.HasData()) {
-			dp.ReadInto(&entry);
-		}
+	for (uint32 mip_level = 0; mip_level < ktx.GetMipCount(); mip_level++) {
+		const Slice<const uint8> mip_data = ktx.GetMipData(mip_level);
 
-		MipHeader* header = reinterpret_cast<MipHeader*>(entry.Data.pData);
-
-		Slice<uint8> image_data = Slice(entry.Data.pData + sizeof(MipHeader), entry.Data.Size - sizeof(MipHeader));
-
-		loader::LoaderStb::SaveToFile(eImageSaveFormat::Jpeg, image_data, Vec2u(header->SizeX, header->SizeY),
-									  String::Fmt("{}/Mip{}.jpeg", output_path, header->MipLevel),
-									  eImageSaveFlags::None);
+		loader::LoaderKtx::SaveToFile(String::Fmt("{}/Mip{}{}", output_path, mip_level,
+												  loader::LoaderKtx::scFileExtension),
+									  ktx.GetFormat(), ktx.GetMipDimensions(mip_level),
+									  Slice<const Slice<const uint8>>(&mip_data, 1));
 	}
-
-	dp.Close();
 }
-
-#define M_HEADER_PTR(ptr_) reinterpret_cast<MipHeader*>(ptr_)
-#define M_DATA_PTR(ptr_)   (ptr_ + sizeof(MipHeader))
-#define M_DATA_SIZE(arr_)  (arr_.Size - sizeof(MipHeader))
 
 Image MipmapGen::LoadMipmaps(renderer::CommandBuffer& cmd, const char* path)
 {
 	Image image;
 
-	DataPack dp;
-	dp.ReadFromFile(path);
-
-	if (!dp.IsOpen()) {
+	loader::LoaderKtx ktx;
+	if (!ktx.Open(path)) {
 		return image;
 	}
 
-	const int32 num_mips = static_cast<int32>(dp.Entries.Size());
+	ImageInfo image_info = ktx.MakeImageInfo(0);
 
-	DataPackEntry* base_mip = &dp.Entries[0];
-	dp.ReadInto(base_mip);
+	image.Upload(cmd, image_info);
 
-	MipHeader* base_header = M_HEADER_PTR(base_mip->Data.pData);
-	uint8* base_data = M_DATA_PTR(base_mip->Data.pData);
-	uint32 base_data_size = M_DATA_SIZE(base_mip->Data);
-
-	const Vec2u image_size(base_header->SizeX, base_header->SizeY);
-	Slice<uint8> image_data(base_data, base_data_size);
-
-	ImageInfo image_info {
-		image_size,						  // Dimensions
-		eImageFormat::RGBA8_UNorm,		  // Format
-		static_cast<int32>(base_mip->Id), // Mip level
-		num_mips,						  // Mips count
-		image_data,						  // Data
-	};
-
-	image.CreateFromData(cmd, image_info, eImageCreateFlags::None);
-
-	// for (uint32 i = 1; i < num_mips; i++) {
-	// 	DataPackEntry* entry = dp.GetEntry(i, true);
-
-	// 	MipHeader* header = M_HEADER_PTR(base_mip->Data.pData);
-	// 	uint8* data = M_DATA_PTR(base_mip->Data.pData);
-	// 	uint32 data_size = M_DATA_SIZE(base_mip->Data);
-
-	// 	LogInfo("Loading mip {} with size {}x{}", header->MipLevel, header->SizeX, header->SizeY);
-
-	// 	image.UploadMip(cmd, header->MipLevel, Vec2u(header->SizeX, header->SizeY), MakeSlice<uint8>(data, data_size));
-	// }
+	std::free(const_cast<uint8*>(image_info.ImageData.pData));
 
 	return image;
 }
@@ -251,121 +166,31 @@ Image MipmapGen::LoadMipmaps(renderer::CommandBuffer& cmd, const char* path)
 
 void MipmapLoader::Open(const char* path)
 {
-	Pack.ReadFromFile(path);
-	if (!Pack.IsOpen()) {
-		LogError(LC_ASSET, "MipmapLoader: Could not open datapack");
-		return;
+	if (!Ktx.Open(path)) {
+		LogError(LC_ASSET, "MipmapLoader: Could not open KTX file '{}'", path);
 	}
 }
 
 ImageInfo MipmapLoader::GetMip(uint32 mip_level)
 {
-	mip_level = FindClosestMipLevel(mip_level);
+	Assert(Ktx.IsOpen());
 
-	DataPackEntry* mip_entry = Pack.GetEntry(mip_level, true);
+	mip_level = std::min(mip_level, Ktx.GetMipCount() - 1);
 
-	LogInfo("Mip (DataOffset={}, DataSize={})", mip_entry->DataOffset, mip_entry->DataSize);
-
-	MipHeader* header = M_HEADER_PTR(mip_entry->Data.pData);
-	uint8* image_data = M_DATA_PTR(mip_entry->Data.pData);
-	uint32 image_size = M_DATA_SIZE(mip_entry->Data);
-
-	// When we upload the image, we want the image to be created to be the size of Mip 0.
-	// float32 bmm = GetBaseMipMultiplier(mip_level);
-
-	float32 bmm = 1.0f;
-
-	ImageInfo image_info {};
-	image_info.MipLevel = 0;
-	image_info.MipCount = 1;
-	image_info.Format = header->Format;
-	image_info.Size = Vec2u(static_cast<uint32>(static_cast<float32>(header->SizeX) * bmm),
-							static_cast<uint32>(static_cast<float32>(header->SizeY) * bmm));
-
-	LogInfo("Image info size: {}x{}", header->SizeX, header->SizeY);
-
-	image_info.ImageData = ArrayUtil::SliceDupe(Slice<const uint8>(image_data, image_size));
-
-	return image_info;
+	// Each mip is returned as its own single-level image.
+	return Ktx.MakeImageInfo(mip_level, 1);
 }
 
 ImageInfo MipmapLoader::GetQuality(eQualityLevel quality)
 {
-	ImageInfo image_info {};
+	Assert(Ktx.IsOpen());
 
 	uint32 zero_level = 0;
 	if (quality == eQualityLevel::LowQuality) {
-		zero_level = Pack.Entries.Size() / 2;
+		zero_level = Ktx.GetMipCount() / 2;
 	}
 
-	uint64 total_buffer_size = 0;
-
-	for (uint32 i = zero_level; i < Pack.Entries.Size(); i++) {
-		DataPackEntry* mip_entry = Pack.GetEntry(i, true);
-		uint32 image_size = M_DATA_SIZE(mip_entry->Data);
-		total_buffer_size += image_size;
-	}
-
-	uint8* data_to_load = static_cast<uint8*>(std::malloc(total_buffer_size));
-
-
-	uint64 offset = 0;
-
-	Vec2u zero_level_dimensions;
-
-	for (uint32 i = zero_level; i < Pack.Entries.Size(); i++) {
-		DataPackEntry* mip_entry = Pack.GetEntry(i, true);
-
-		MipHeader* header = M_HEADER_PTR(mip_entry->Data.pData);
-		if (i == zero_level) {
-			image_info.Size = Vec2u(header->SizeX, header->SizeY);
-			image_info.Format = header->Format;
-		}
-
-		uint8* image_data = M_DATA_PTR(mip_entry->Data.pData);
-		uint32 image_size = M_DATA_SIZE(mip_entry->Data);
-
-		memcpy(data_to_load + offset, image_data, image_size);
-
-		offset += image_size;
-	}
-
-
-	// When we upload the image, we want the image to be created to be the size of Mip 0.
-	// float32 bmm = GetBaseMipMultiplier(mip_level);
-
-	float32 bmm = 1.0f;
-
-	image_info.MipLevel = 0;
-	image_info.MipCount = Pack.Entries.Size() - zero_level;
-
-	image_info.ImageData = Slice<const uint8>(data_to_load, total_buffer_size);
-
-	return image_info;
-}
-
-
-uint32 MipmapLoader::FindClosestMipLevel(uint32 mip_level)
-{
-	DataPackEntry* prev = nullptr;
-
-	for (DataPackEntry& entry : Pack.Entries) {
-		// If the (next) entry's mip level is greater than the desired mip level, return the previous one.
-		if (entry.Id > mip_level) {
-			LogInfo("Closest mip level is {} (for {})", entry.Id, mip_level);
-
-			return prev->Id;
-		}
-
-		prev = &entry;
-	}
-
-	// No mips in the pack...
-	if (!prev) {
-		return 0;
-	}
-
-	return prev->Id;
+	return Ktx.MakeImageInfo(zero_level);
 }
 
 
