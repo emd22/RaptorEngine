@@ -195,6 +195,8 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
 		L"-T",
 		ShaderTypeToDxName(shader_type),
 
+		L"-O3",
+
 		// Output format
 		L"-spirv",
 	};
