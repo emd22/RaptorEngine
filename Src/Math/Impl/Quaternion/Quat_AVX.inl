@@ -27,6 +27,19 @@ FX_FORCE_INLINE bool Quat::IsCloseTo(const Quat& other, const float32 tolerance)
     return IsCloseTo(other.mIntrin, tolerance);
 }
 
+FX_FORCE_INLINE Vec3f Quat::GetDirection() const
+{
+    // dir X = (2.0 * ((X * Z) + (Y * W)))
+    // dir Y = (2.0 * ((Y * Z) - (X * W)))
+    // dir Z = 1.0 - (2.0 * ((X * X) + (Y * Y)))
+
+    const float32 dir_x = 2.0f * ((X * Z) + (Y * W));
+    const float32 dir_y = 2.0f * ((Y * Z) - (X * W));
+    const float32 dir_z = 1.0f - (2.0f * ((X * X) + (Y * Y)));
+
+    return Vec3f(dir_x, dir_y, dir_z);
+}
+
 FX_FORCE_INLINE bool Quat::IsCloseTo(const __m128 other, const float32 tolerance) const
 {
     // Get the absolute difference

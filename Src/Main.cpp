@@ -1,4 +1,3 @@
-
 #define VMA_DEBUG_LOG(...) LogWarning(LC_MEMORY, __VA_ARGS__)
 
 #include "RaptorGame.hpp"
