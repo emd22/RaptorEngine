@@ -33,6 +33,10 @@
 #include <Texture/TextureManager.hpp>
 #include <csignal>
 
+#ifdef FX_IS_EDITOR
+#include <Editor/EditorApp.hpp>
+#endif
+
 
 FX_SET_MODULE_NAME("FoxtrotGame");
 
@@ -71,9 +75,13 @@ void RaptorGame::InitEngine()
 
 	Config.Load("Config/Main.conf");
 
+#ifndef FX_IS_EDITOR
+	// The editor's window and input come from wxWidgets (see editor::Init), and SDL's video subsystem would fight it
+	// over the native application object
 	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
 		ModulePanic("Could not initialize SDL! (SDL err: {})\n", SDL_GetError());
 	}
+#endif
 
 	// Create the global engine variables
 	fx::Globals::Init();
@@ -95,7 +103,7 @@ void RaptorGame::InitEngine()
 	uint32 window_width = 800;
 	uint32 window_height = 800;
 
-	const char* window_title = "Foxtrot";
+	const char* window_title = "Raptor Engine";
 
 	if (window_entry != nullptr) {
 		window_width = window_entry->GetMember(HashStr32("Width"))->Get<uint32>();
@@ -115,7 +123,7 @@ void RaptorGame::InitEngine()
 	}
 
 	gGraphics->SelectWindow(window);
-	gGraphics->Init(Vec2u(window_width, window_height));
+	gGraphics->Init(window->GetSize());
 
 	gPhysics->Create();
 	gAssetManager->Start(3);
@@ -652,6 +660,11 @@ void RaptorGame::Tick()
 	else {
 		ProcessControls();
 	}
+
+#ifdef FX_IS_EDITOR
+	editor::UpdatePropertiesPanelForObject(
+		(gSelectedEditorMode != nullptr) ? gSelectedEditorMode->GetLastSelectedObject() : nullptr);
+#endif
 
 	if (!bInCommandMode) {
 		gWorld->Player.Move(DeltaTime, GetMovementVector());

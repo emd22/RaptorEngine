@@ -98,6 +98,18 @@ struct ImageInfo
 	{
 	}
 
+	/// Releases `ImageData` if this info owns it, and clears the ownership either way. Safe to call more than once,
+	/// and a no-op for the common case where `ImageData` points into a loader's own memory.
+	void FreeOwnedData()
+	{
+		if (bOwnsData && ImageData.pData != nullptr) {
+			std::free(const_cast<uint8*>(ImageData.pData));
+		}
+
+		ImageData = Slice<const uint8>(nullptr, 0);
+		bOwnsData = false;
+	}
+
 public:
 	Vec2u Size = Vec2u::sZero;
 
@@ -106,6 +118,10 @@ public:
 	uint32 MipLevel = 0;
 	uint32 MipCount = 1;
 	Slice<const uint8> ImageData { nullptr, 0 };
+
+	/// Whether `ImageData` is a malloc'd buffer this info is responsible for freeing. Copies of an ImageInfo are
+	/// deliberately shallow, so exactly one of them carries this: whoever takes the data on clears it on the source.
+	bool bOwnsData = false;
 };
 
 

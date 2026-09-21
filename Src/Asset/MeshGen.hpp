@@ -49,6 +49,8 @@ public:
 	{
 		SizedArray<Vec3f> Positions;
 		SizedArray<Vec3f> Normals;
+		/// Optional, only filled by generators that lay out UVs (cube, quad)
+		SizedArray<Vec3f> Tangents;
 		SizedArray<Vec2f> Texcoords;
 
 		SizedArray<uint32> Indices;

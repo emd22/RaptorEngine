@@ -61,6 +61,10 @@ void Swapchain::CreateSwapchainImages()
 		image->Allocation = nullptr;
 		image->ImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		image->Info.Format = Surface.Format;
+
+		image->Info.Size = Extent;
+		image->Info.MipLevel = 0;
+		image->Info.MipCount = 1;
 	}
 }
 
@@ -134,9 +138,8 @@ void Swapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR surface)
 		VkSurfaceFormatKHR surface_format = mDevice->GetSurfaceFormat();
 
 		// GpuDevice::GetSurfaceFormat() prefers an _SRGB format, so the composition pass's linear output is
-		// encoded by the presentation hardware. The rest are the fallbacks it walks if none is offered.
-		Assert(surface_format.format == VK_FORMAT_B8G8R8A8_SRGB ||
-			   surface_format.format == VK_FORMAT_R8G8B8A8_SRGB ||
+		// encoded by the GPU. the other formats are fallbacks
+		Assert(surface_format.format == VK_FORMAT_B8G8R8A8_SRGB || surface_format.format == VK_FORMAT_R8G8B8A8_SRGB ||
 			   surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT ||
 			   surface_format.format == VK_FORMAT_R8G8B8A8_UNORM);
 

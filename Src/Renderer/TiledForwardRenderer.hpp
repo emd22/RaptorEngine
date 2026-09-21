@@ -7,7 +7,7 @@
 namespace fx {
 class Camera;
 class Image;
-}
+} // namespace fx
 
 namespace fx::renderer {
 
@@ -73,9 +73,6 @@ public:
 	void DoLightCullingPass(Camera& camera, const Vec2u* pExtentOverride = nullptr,
 							const LightCullOverride* pLightOverride = nullptr);
 
-	/// Binds the Forward+ tiled light list descriptor set (set 2) on the geometry pipeline
-	void BindLightGridDescriptors(CommandBuffer& cmd);
-
 	/**
 	 * @brief Sets the atlases that decals are sampled from, rebuilding the persistent descriptor set when either
 	 * changes. Null binds a blank image.
@@ -109,9 +106,6 @@ private:
 	// Light culling
 	void CreateLightCullingPSO();
 
-	/// Registers the Forward+ tiled light list buffers (set 2) on the pipeline currently being built
-	void AddLightGridDescriptors();
-
 	/// Registers the decal buffers and atlases (set 0) on the forward pipeline currently being built
 	void AddDecalDescriptors();
 
@@ -126,6 +120,7 @@ public:
 	DescriptorPool DescriptorPool;
 
 	FX_FORCE_INLINE uint32 GetLightTileColumns() const { return mLightTileColumns; }
+	FX_FORCE_INLINE uint32 GetLightTileRows() const { return mLightTileRows; }
 
 	/// Depth + Normal prepass
 	RenderStage Prepass;
@@ -148,6 +143,7 @@ public:
 
 	/// Amount of tile columns the light grid is dispatched with for the current frame
 	uint32 mLightTileColumns = 0;
+	uint32 mLightTileRows = 0;
 
 private:
 	/// Decal atlases that the persistent descriptor set was built with

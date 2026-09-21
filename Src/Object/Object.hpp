@@ -190,6 +190,8 @@ public:
 	void SetCullable(bool value);
 	FX_FORCE_INLINE bool IsCullable() const { return !HasFlag(Flags, eObjectFlags::DisableCulling); }
 
+	FX_FORCE_INLINE eObjectFlags GetFlags() const { return Flags; }
+
 	void Destroy();
 	~Object() override { Destroy(); }
 

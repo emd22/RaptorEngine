@@ -64,7 +64,6 @@ struct PSPushConsts
 [[vk::push_constant]] PSPushConsts PSConst;
 
 F_Texture2D(tLighting, 2, 0);
-F_Texture2D(tNormal, 3, 0);
 
 float3 ACESFilm(float3 x)
 {

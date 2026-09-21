@@ -86,45 +86,6 @@ void QueueFamilies::FindQueueFamilies(VkPhysicalDevice physical_device, VkSurfac
 
 	FindGraphicsFamily(physical_device, surface);
 	FindTransferFamily(physical_device, surface);
-	// uint32 index = 0;
-	// for (const auto &family : RawFamilies) {
-	//     if (mPresentIndex != QueueNull && mGraphicsIndex != QueueNull && mTransferIndex != QueueNull) {
-	//         break;
-	//     }
-
-	//     if (family.queueCount == 0)
-	//         continue;
-
-	//     // check for a graphics family
-	//     {
-	//         if ((family.queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
-	//             mGraphicsIndex = index;
-	//         }
-	//     }
-
-	//     // check for a present family
-	//     {
-	//         uint32 present_support = 0;
-
-	//         VkResult status = vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, index, surface,
-	//         &present_support); if (status != VK_SUCCESS) {
-	//             Log::Error("Could not retrieve physical device surface support", status);
-	//             continue;
-	//         }
-
-	//         Log::Info("Present support: %d\n", present_support);
-	//         if (present_support > 0) {
-	//             mPresentIndex = index;
-	//         }
-	//     }
-
-	//     if (mPresentIndex != QueueNull && mGraphicsIndex != QueueNull && mTransferIndex == QueueNull &&
-	//     (family.queueFlags & VK_QUEUE_TRANSFER_BIT)) {
-	//         mTransferIndex = index;
-	//     }
-
-	//     index++;
-	// }
 }
 
 
@@ -397,8 +358,6 @@ VkSurfaceFormatKHR GpuDevice::GetSurfaceFormat()
 
 void GpuDevice::PickPhysicalDevice()
 {
-	// enumerate physical devices
-	//
 	uint32 device_count;
 	VkTry(vkEnumeratePhysicalDevices(mInstance, &device_count, nullptr), "Could not enumerate physical devices");
 
@@ -448,7 +407,8 @@ void GpuDevice::PickPhysicalDevice()
 	const char* type_name = "Other";
 	if (selected_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
 		type_name = "Discrete";
-	} else if (selected_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) {
+	}
+	else if (selected_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) {
 		type_name = "Integrated";
 	}
 
