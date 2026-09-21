@@ -199,7 +199,8 @@ struct FSPushConsts
 	uint Flags;
 	uint2 vTargetSize;
 	uint uiBoneBase;
-	uint _uiPad0;
+	/// Rows the light grid was dispatched with, paired with uiTileColumns
+	uint uiTileRows;
 	/// Camera position in world space
 	float4 vEyePosition;
 };
@@ -208,9 +209,7 @@ struct FSPushConsts
 
 #define SHADOW_BIAS -0.000005f
 
-/// Taps per axis for the shadow PCF kernel. The comparison sampler is linear, so each tap is already a hardware
-/// 2x2 percentage closer fetch; 2 here offsets four of those by half a texel each, giving a 3x3 tent for 4 taps.
-/// Set to 1 for the single hardware tap this used to do.
+/// Taps per axis for the shadow PCF kernel
 #define SHADOW_PCF_TAPS 2
 
 /// How much of `light` reaches `position_ws` according to the light's shadow map in the atlas, 1 is fully lit.
@@ -276,17 +275,9 @@ float SampleShadowAtlas(Light light, float3 position_ws)
 #endif
 }
 
-/// Lower bound on perceptual roughness. D_GGX() divides by alpha^2 = roughness^4 at the highlight peak, so fully
-/// glossy texels would otherwise blow up.
-///
-/// 0.212 rather than the usual 0.045, because sqrt(0.045) = 0.212: that puts the floor's GGX alpha at 0.045, which
-/// is the tightest lobe this shader produced before the alpha remap below, so materials sitting on the floor look
-/// exactly as they did. Engines that use 0.045 here have an IBL for a near mirror to reflect; this one does not,
-/// and a sharper floor just renders black. KHR_materials_pbrSpecularGlossiness assets default to
-/// glossinessFactor 1.0, i.e. roughness 0, and land on this floor.
+
 #define MIN_ROUGHNESS 0.212
 
-/// Surface response shared by the direct and ambient lighting.
 struct SurfaceParams
 {
 	/// Diffuse albedo (already scaled down by whatever the specular lobe takes)
@@ -324,10 +315,7 @@ SurfaceParams GetSurfaceParams(Material material, float3 albedo, float4 surface_
 }
 
 
-/// Cosine between a surface's normal and a decal's projection where the decal starts to fade out. Surfaces that turn
-/// further away than this would stretch it across them.
 #define DECAL_FADE_COS_START 0.5
-/// ...and where it is gone completely
 #define DECAL_FADE_COS_END 0.2
 
 /// `v` normalized, or zero instead of NaN when it has no length
@@ -336,10 +324,6 @@ float3 SafeNormalize(float3 v)
 	return v * rsqrt(max(dot(v, v), 1e-12));
 }
 
-/// Blends every decal that covers this pixel into `surface`, oldest first so newer decals end up on top. A decal
-/// lays a dielectric layer over the surface: it replaces the diffuse colour, drops the specular to that of a
-/// non-metal and pulls the roughness towards its own. Decals with a normal strength also bend `shading_normal`.
-/// `geometric_normal` is the unperturbed surface normal, for fading decals out on surfaces they don't face.
 void ApplyDecals(inout SurfaceParams surface, inout float3 shading_normal, TileLightData tile_data, uint tile_index,
 				 float3 position_ws, float3 geometric_normal, float3 position_ddx, float3 position_ddy)
 {
@@ -358,18 +342,15 @@ void ApplyDecals(inout SurfaceParams surface, inout float3 shading_normal, TileL
 				continue;
 			}
 
-			// Also rejects the back faces of thin walls that the box reaches through
 			const float facing = dot(geometric_normal, -decal.vAxisZ);
 			const float angle_fade = saturate((facing - DECAL_FADE_COS_END) / (DECAL_FADE_COS_START - DECAL_FADE_COS_END));
 
-			// Fade out towards the front and back of the box, so it doesn't end in a hard line on curved surfaces
 			const float depth_fade = saturate((0.5 - abs(position_ds.z)) * 4.0);
 
 			// Decal space +Y is up, atlas V goes down
 			const float2 decal_uv = float2(position_ds.x + 0.5, 0.5 - position_ds.y);
 			const float2 atlas_uv = (decal_uv * decal.vAtlasRect.xy) + decal.vAtlasRect.zw;
 
-			// Implicit derivatives are undefined in this loop, so they come from the position's instead
 			const float3x3 world_to_decal = (float3x3)decal.mWorldToDecal;
 			const float2 uv_scale = float2(1.0, -1.0) * decal.vAtlasRect.xy;
 
@@ -394,8 +375,6 @@ void ApplyDecals(inout SurfaceParams surface, inout float3 shading_normal, TileL
 				const float2 normal_ts = F_SampleGrad(tDecalNormalAtlas, atlas_uv, atlas_ddx, atlas_ddy).xy * 2.0 - 1.0;
 				const float2 bend = normal_ts * (decal.fNormalStrength * alpha);
 
-				// The decal's right and up flattened onto the shaded surface, so the bend follows curved and normal
-				// mapped surfaces instead of the plane the decal was projected from
 				const float3 decal_right = decal.vAxisX;
 				const float3 decal_up = decal.vAxisY;
 
@@ -459,9 +438,6 @@ FSOutput main(FSInput input)
     float4 surface_sample = F_Sample(tMetallicRoughness, input.vUV);
     float3 normal_ts = F_Sample(tNormalMap, input.vUV).rgb * 2.0 - 1.0;
 
-    // Re-orthonormalise: interpolation leaves the basis neither unit length nor perpendicular. The bitangent is
-    // rebuilt here rather than interpolated, so its handedness comes from glTF's tangent.w and mirrored UV shells
-    // light the right way round. Negating the normal for a backface flips the rebuilt bitangent with it.
     const float3 vertex_normal = normalize(input.vNormalWS);
     const float3 tangent =
         SafeNormalize(input.vTangentWS.xyz - (vertex_normal * dot(vertex_normal, input.vTangentWS.xyz)));
@@ -479,8 +455,11 @@ FSOutput main(FSInput input)
 
 	SurfaceParams surface = GetSurfaceParams(material, albedo, surface_sample);
 
-	// Retrieve the light and decal lists for the tile that this pixel belongs to
 	uint2 tile_xy = uint2(input.vPosition.xy / LIGHT_TILE_SIZE);
+
+	const uint2 tile_limit = max(uint2(FSConst.uiTileColumns, FSConst.uiTileRows), uint2(1, 1)) - uint2(1, 1);
+	tile_xy = min(tile_xy, tile_limit);
+
 	uint tile_index = tile_xy.x + (tile_xy.y * FSConst.uiTileColumns);
 
 	TileLightData tile_data = bLightGrid[tile_index];
@@ -501,16 +480,17 @@ FSOutput main(FSInput input)
 
 	float3 accumulated_light = float3(0.0, 0.0, 0.0);
 
-	// Shared by every light and by the ambient term below. The camera this draw is rendered from: the
-	// light's own vEyePosition is always the player's camera, which is wrong for probe capture faces.
 	const float3 N = N_final;
 	const float3 V = normalize(FSConst.vEyePosition.xyz - input.vPositionWS);
 	const float NdotV = abs(dot(N, V)) + 1e-5f;
 
+	/// The unperturbed surface normal (already flipped for backfaces), for rejecting light the surface faces away from
+	const float3 geometric_normal = normalize(input.vNormalWS);
+
 	const float2 ssao_coords = float2(input.vPosition.xy / (float2(FSConst.vTargetSize)));
 
 	// Probe capture bakes have no matching SSAO data.
-	float ssao = HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE) ? 1.0 : F_Sample(tSSAO, ssao_coords);
+	float ssao = HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE) ? 1.0 : F_Sample(tSSAO, ssao_coords).r;
 
 #ifdef DEBUG_LIGHT_HEATMAP
 	output.vAlbedo = float4(GetSaturationColor((float)tile_data.Count), 1.0);
@@ -525,6 +505,9 @@ FSOutput main(FSInput input)
 
 		/// How much light is visible (not occluded) at this pixel
 		float visibility = 1.0;
+		/// Visibility for the diffuse term only. The specular lobe peaks far above diffuse, so any floor on it shows
+		/// up as highlights in shadow.
+		float diffuse_visibility_floor = 0.0;
 
 		float3 L;
 		float attenuation;
@@ -534,8 +517,10 @@ FSOutput main(FSInput input)
 			L = light.vLightPosition;
 			attenuation = light_intensity;
 
+			visibility = SampleShadowAtlas(light, input.vPositionWS);
+
 			// Let a little of the sun into its own shadows
-			visibility = clamp(SampleShadowAtlas(light, input.vPositionWS), 0.05f, 1.0f);
+			diffuse_visibility_floor = 0.05;
 		}
 		else {
 			float3 light_position_local = light.vLightPosition - input.vPositionWS;
@@ -550,6 +535,10 @@ FSOutput main(FSInput input)
 				visibility = SampleShadowAtlas(light, input.vPositionWS);
 			}
 		}
+
+		// A normal map can tilt a texel towards a light that the surface itself faces away from (the top edges of
+		// bricks on the back of a sunlit wall). Fade the light out as the geometric surface turns away from it.
+		const float horizon = saturate(dot(geometric_normal, L) * 4.0);
 
 		float3 H = normalize(V + L);
 
@@ -571,7 +560,11 @@ FSOutput main(FSInput input)
 		float3 diffuse_term = Fd * diffuse_reflectance * FX_MATH_1_OVER_PI;
 		float3 specular_term = Fr;
 
-		accumulated_light += attenuation * visibility * (diffuse_term + specular_term) * light_color.rgb * NdotL;
+		const float diffuse_visibility = max(visibility * horizon, diffuse_visibility_floor);
+		const float specular_visibility = visibility * horizon;
+
+		accumulated_light += attenuation * ((diffuse_visibility * diffuse_term) + (specular_visibility * specular_term)) *
+							 light_color.rgb * NdotL;
 	}
 
 	float3 ambient = float3(0.0f, 0.0f, 0.0f);
@@ -585,9 +578,8 @@ FSOutput main(FSInput input)
 		if (probe_volume_count > 0) {
 			const uint volume_index = SelectProbeVolume(input.vPositionWS, bProbeVolume, probe_volume_count);
 
-			// Not the mirror direction: an L2 SH probe is a very blurry environment, and a rough surface's lobe is
-			// centred nearer the normal than the reflection. Sampling along R regardless is wrong for most of this
-			// scene, where roughness sits at or near 1.
+			// An L2 SH probe is blurry (duh) and a rough surface's lobe is centred nearer the normal than the reflection.
+			// Sampling along R regardless is wrong for most instances where roughness sits at or near 1
 			const float3 R = GetSpecularDominantDir(N, reflect(-V, N), roughness);
 
 			float3 probe_radiance;
@@ -604,7 +596,7 @@ FSOutput main(FSInput input)
 	output.vAlbedo = float4(accumulated_light + ambient, base_alpha);
 
 	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE)) {
-		const float3 lp_ambient = float3(0.3f, 0.3f, 0.3f) * albedo;
+		const float3 lp_ambient = float3(0.02f, 0.02f, 0.02f) * albedo;
 		output.vAlbedo = float4(accumulated_light + lp_ambient, 1.0f);
 	}
 

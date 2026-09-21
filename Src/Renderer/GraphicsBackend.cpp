@@ -11,9 +11,6 @@
 #include "TextRenderer.hpp"
 #include "TiledForwardRenderer.hpp"
 
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_vulkan.h>
-
 #include <Asset/Animation.hpp>
 #include <Asset/AssetManager.hpp>
 #include <Color.hpp>
@@ -463,7 +460,7 @@ ExtensionNames GraphicsBackend::MakeInstanceExtensionList(ExtensionNames& user_r
 														  ExtensionList& out_available_extensions)
 {
 	uint32 required_extension_count = 0;
-	const char* const* required_extensions = SDL_Vulkan_GetInstanceExtensions(&required_extension_count);
+	const char* const* required_extensions = Window::GetRequiredInstanceExtensions(&required_extension_count);
 
 	QueryInstanceExtensions(out_available_extensions);
 
@@ -631,12 +628,7 @@ void GraphicsBackend::BeginGeometry()
 	pRenderer->ForwardPass.Begin(frame->CmdBuffer);
 	// gPipelineCache->Bind(ePipelineName::Geometry, frame->CmdBuffer);
 
-	// pDeferredRenderer->BindLightGridDescriptors(frame->CmdBuffer);
-
-	const uint32 buffer_offsets[] = { gGraphics->GetLightGridFrameOffset(), gGraphics->GetLightIndexListFrameOffset() };
-
-	// pLightsDescriptor->Bind(2, frame->CmdBuffer, gPipelineCache->Request(ePipelineName::GeometryNormalMaps),
-	// 						Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
+	// The tiled light list offsets are applied with the persistent set 0 in World::ExecuteRenderList()
 }
 
 void GraphicsBackend::PresentFrame()
@@ -858,11 +850,7 @@ void GraphicsBackend::CreateSurfaceFromWindow()
 		ModulePanic("No window attached! use RenderBackend::SelectWindow()");
 	}
 
-	bool success = SDL_Vulkan_CreateSurface(mpWindow->GetWindow(), mInstance, nullptr, &mWindowSurface);
-
-	if (!success) {
-		ModulePanic("Could not attach Vulkan instance to window! (SDL err: {})", SDL_GetError());
-	}
+	mWindowSurface = mpWindow->CreateSurface(mInstance);
 }
 
 

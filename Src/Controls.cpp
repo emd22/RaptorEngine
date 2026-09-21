@@ -8,6 +8,10 @@
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 
+#ifdef FX_IS_EDITOR
+#include <Editor/EditorApp.hpp>
+#endif
+
 namespace fx {
 
 /** Converts an SDL scancode to its corresponding Key ID. */
@@ -62,12 +66,12 @@ void ControlManager::CaptureMouse()
 {
 	ControlManager& inst = GetInstance();
 
-	// Get the position of the mouse on capture
-	float32 x, y;
-	SDL_GetMouseState(&x, &y);
-	inst.mCapturedMousePos.Set(x, y);
+	Ref<Window> window = renderer::gGraphics->GetWindow();
 
-	SDL_SetWindowRelativeMouseMode(renderer::gGraphics->GetWindow()->GetWindow(), (inst.mMouseCaptured = true));
+	// Get the position of the mouse on capture
+	inst.mCapturedMousePos = window->GetMousePosition();
+
+	window->SetRelativeMouseMode((inst.mMouseCaptured = true));
 }
 
 bool ControlManager::IsMouseLocked() { return GetInstance().mMouseCaptured; }
@@ -76,13 +80,12 @@ void ControlManager::ReleaseMouse()
 {
 	ControlManager& inst = GetInstance();
 
-	Vec2f* pos = &inst.mCapturedMousePos;
-	SDL_Window* window = renderer::gGraphics->GetWindow()->GetWindow();
+	Ref<Window> window = renderer::gGraphics->GetWindow();
 
 	// Warp back to the original position
-	SDL_WarpMouseInWindow(window, pos->GetX(), pos->GetY());
+	window->WarpMouse(inst.mCapturedMousePos);
 
-	SDL_SetWindowRelativeMouseMode(window, (inst.mMouseCaptured = false));
+	window->SetRelativeMouseMode((inst.mMouseCaptured = false));
 }
 
 Vec2f& ControlManager::GetMouseDelta() { return GetInstance().mMouseDelta; }
@@ -186,6 +189,13 @@ void ControlManager::Update()
 	inst.mMouseDelta = Vec2f::sZero;
 	inst.mThisTick++;
 
+#ifdef FX_IS_EDITOR
+	// The editor viewport forwards its key and mouse events through PostButtonEvent() and PostMouseMotion() while
+	// they are dispatched here
+	if (!editor::PumpEvents()) {
+		inst.OnQuit();
+	}
+#else
 	SDL_Event event;
 
 	while (SDL_PollEvent(&event)) {
@@ -214,6 +224,18 @@ void ControlManager::Update()
 
 		default:;
 		}
+	}
+#endif
+}
+
+void ControlManager::PostButtonEvent(eKey key_id, bool is_now_down) { UpdateButtonFromEvent(key_id, is_now_down); }
+
+void ControlManager::PostMouseMotion(const Vec2f& delta) { GetInstance().mMouseDelta += delta; }
+
+void ControlManager::ReleaseAllKeys()
+{
+	for (uint32 key_code = 0; key_code < scMaxKeys; key_code++) {
+		UpdateButtonFromEvent(static_cast<eKey>(key_code), false);
 	}
 }
 

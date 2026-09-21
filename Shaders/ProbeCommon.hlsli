@@ -2,15 +2,11 @@
 /// Light-probe sampling shared by the forward passes.
 ///
 
-// These mirror Src/Renderer/Limits.hpp. There is no compile-time link, so they have to be changed in both places.
 
 #define PROBE_SH_COEFF_COUNT 9
 
-/// Probe volumes that can be placed at once. Mirrors Limits::MaxProbeVolumes.
 #define PROBE_MAX_VOLUMES 8
 
-/// Each probe has a depth moments cubemap: per texel, the mean distance to what it sees and the standard deviation
-/// of those distances
 #define PROBE_DEPTH_SIZE 16
 #define PROBE_DEPTH_FACES 6
 #define PROBE_DEPTH_TEXELS_PER_FACE (PROBE_DEPTH_SIZE * PROBE_DEPTH_SIZE)
@@ -29,7 +25,7 @@
 /// Bias (metres) subtracted from the receiver distance before the Chebyshev test
 #define PROBE_CHEBYSHEV_BIAS 0.02
 /// Lower bound (metres) on the spread of distances in a depth texel. Softens the edges of what a probe can see.
-#define PROBE_MIN_DEPTH_STDDEV 0.5
+#define PROBE_MIN_DEPTH_STDDEV 0.05
 
 /// Surfaces are sampled this fraction of the smallest probe spacing off the surface, clamped to MIN..MAX metres
 #define PROBE_NORMAL_BIAS_SCALE 0.2
@@ -83,12 +79,6 @@ float ProbeVolumeDistanceSq(float3 pos_ws, ProbeVolume volume)
 	return dot(outside, outside);
 }
 
-/// Picks the volume that lights `pos_ws`: the one it is inside, and of those the one with the tightest probe
-/// spacing, so a small dense volume wins over the level sized one it sits in. A position outside every volume
-/// falls back to the nearest one, whose lookup clamps it to the grid's edge.
-///
-/// Volumes are not blended into each other, so lighting changes across a volume's boundary. Overlapping a
-/// volume well past the geometry it was placed for keeps that step away from anything the player looks at.
 uint SelectProbeVolume(float3 pos_ws, StructuredBuffer<ProbeVolume> volumes, uint volume_count)
 {
 	uint best = 0;
@@ -114,13 +104,6 @@ uint SelectProbeVolume(float3 pos_ws, StructuredBuffer<ProbeVolume> volumes, uin
 	return best;
 }
 
-/// Evaluates a probe's SH in direction `normal` without clamping. The bake stores coefficients convolved with the
-/// cosine lobe, so this is the irradiance divided by pi.
-///
-/// Evaluation is linear in the coefficients, so blending N probes and evaluating once gives the same answer as
-/// evaluating each and blending the results. SampleProbeVolumeIrradiance() relies on that to avoid carrying nine
-/// coefficients across its loop, which is also why the clamp to non-negative lives at the end of that blend and
-/// not in here.
 float3 EvalProbeIrradianceRaw(float3 normal, ProbeSHData probe)
 {
 	float3 irradiance = probe.SH[0].rgb * 0.282095;
@@ -265,8 +248,6 @@ float3 ProbeBiasedPosition(float3 pos_ws, float3 n, ProbeVolume volume)
 /// `base` is the low corner of the cell; the 8 taps are `base + (bit0, bit1, bit2)`.
 void ProbeVolumeCell(float3 pos_ws, ProbeVolume volume, out uint3 base, out float3 cell_frac)
 {
-	// max(): a 1 thick axis would underflow `dims - 2` on a uint and index past the probe buffer. The CPU enforces
-	// Limits::MinProbeGridDim (2) in ProbeGridSize::IsValid(), but nothing checks that invariant on this side.
 	const uint3 dims = max(volume.vDimsAndFirst.xyz, uint3(2, 2, 2));
 
 	const float3 local = clamp((pos_ws - volume.vMinAndCount.xyz) * volume.vInvCellSize.xyz, 0.0, float3(dims - 1));

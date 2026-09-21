@@ -1,6 +1,10 @@
+// The editor build replaces this with the wxWidgets window in Editor/EditorWindow.cpp
+#ifndef FX_IS_EDITOR
+
 #include "Window.hpp"
 
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_vulkan.h>
 
 #include <Core/Assert.hpp>
 #include <Core/Ref.hpp>
@@ -43,6 +47,36 @@ void Window::HandleResize()
     mSize = Vec2u(static_cast<uint32>(width), static_cast<uint32>(height));
 }
 
+const char* const* Window::GetRequiredInstanceExtensions(uint32* out_count)
+{
+    return SDL_Vulkan_GetInstanceExtensions(out_count);
+}
+
+VkSurfaceKHR Window::CreateSurface(VkInstance instance)
+{
+    VkSurfaceKHR surface = nullptr;
+
+    if (!SDL_Vulkan_CreateSurface(mWindow, instance, nullptr, &surface)) {
+        Panic("Window", "Could not attach Vulkan instance to window! (SDL err: {})", SDL_GetError());
+    }
+
+    return surface;
+}
+
+void Window::SetRelativeMouseMode(bool enabled) { SDL_SetWindowRelativeMouseMode(mWindow, enabled); }
+
+Vec2f Window::GetMousePosition() const
+{
+    float32 x, y;
+    SDL_GetMouseState(&x, &y);
+
+    return Vec2f(x, y);
+}
+
+void Window::WarpMouse(const Vec2f& position) { SDL_WarpMouseInWindow(mWindow, position.GetX(), position.GetY()); }
+
 Window::~Window() { SDL_DestroyWindow(mWindow); }
 
 } // namespace fx
+
+#endif
