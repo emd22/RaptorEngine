@@ -82,6 +82,8 @@ if(WIN32)
             "${CMAKE_SOURCE_DIR}/Lib/win32/SDL3.dll"
             "${CMAKE_SOURCE_DIR}/Lib/win32/jpeg62.dll"
             "${CMAKE_SOURCE_DIR}/Lib/win32/turbojpeg.dll"
+            "${CMAKE_SOURCE_DIR}/Lib/win32/ktx.dll"
+            "${CMAKE_SOURCE_DIR}/Lib/win32/zstd.dll"
             "$<TARGET_FILE_DIR:raptor>"
     )
 
