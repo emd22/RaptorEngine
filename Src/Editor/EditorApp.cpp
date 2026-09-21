@@ -7,6 +7,7 @@
 
 #include <wx/app.h>
 #include <wx/evtloop.h>
+#include <wx/image.h>
 #include <wx/init.h>
 
 #include <Core/Log.hpp>
@@ -19,7 +20,11 @@ namespace fx::editor {
 class EditorApp : public wxApp
 {
 public:
-	bool OnInit() override { return true; }
+	bool OnInit() override
+	{
+		SetAppearance(wxApp::Appearance::Dark);
+		return true;
+	}
 };
 
 static wxGUIEventLoop* spEventLoop = nullptr;
@@ -36,6 +41,9 @@ bool Init(int argc, char** argv)
 		LogError(LC_CORE, "Could not initialize the wxWidgets backend for the editor");
 		return false;
 	}
+
+	// For the tool icons
+	wxInitAllImageHandlers();
 
 	if (!wxTheApp->CallOnInit()) {
 		wxEntryCleanup();

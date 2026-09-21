@@ -14,6 +14,7 @@
 
 namespace fx {
 
+
 enum class eEditorMode : int32
 {
 	// Translate,

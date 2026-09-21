@@ -15,12 +15,6 @@ enum OBJECTTAG
 	BLOCKOUT = (1 << 0),
 }
 
-enum XFORMTYPE
-{
-	TRANSLATE = 0,
-	FACE = 1,
-}
-
 
 const int LIMIT_SELECTION_OBJECTS = 64;
 
@@ -66,7 +60,7 @@ float3 face_tool_magnitude;
 float3 initial_face_object_position;
 float3 initial_face_position;
 
-XFORMTYPE transform_type = XFORMTYPE.TRANSLATE;
+EDITORMODE transform_type = EDITORMODE.TRANSLATE;
 
 
 
@@ -197,12 +191,12 @@ void editor_dupe_selection()
 }
 
 @private
-void set_mode(XFORMTYPE type)
+void set_mode(EDITORMODE type)
 {
-	if (type == XFORMTYPE.TRANSLATE) {
+	if (type == EDITORMODE.TRANSLATE) {
 		cvar_set_string("s_editor_op", "Translate");
 	}
-	else if (type == XFORMTYPE.FACE) {
+	else if (type == EDITORMODE.FACE) {
 		cvar_set_string("s_editor_op", "Face");
 	}
 
@@ -241,12 +235,12 @@ void editor_handle_controls()
 
 		/* Translate (Move) */
 		if (KEY.K_T.is_pressed()) {
-			set_mode(XFORMTYPE.TRANSLATE);
+			set_mode(EDITORMODE.TRANSLATE);
 		}
 
 		/* Face (Scale) */
 		if (KEY.K_F.is_pressed()) {
-			set_mode(XFORMTYPE.FACE);
+			set_mode(EDITORMODE.FACE);
 		}
 	}
 
@@ -337,7 +331,7 @@ void editor_on_mouse_just_down()
 	mouse_was_in_drag_event = true;
 
 
-	if (transform_type == XFORMTYPE.FACE) {
+	if (transform_type == EDITORMODE.FACE) {
 		/* Cast and gather the face we are pointing towards */
 		float3 selected_face = sel.selected_object.ray_get_face();
 
@@ -518,11 +512,11 @@ void editor_face_tool_finalize()
 @private
 void editor_handle_operation(float delta_time)
 {
-	if (transform_type == XFORMTYPE.TRANSLATE) {
+	if (transform_type == EDITORMODE.TRANSLATE) {
 		editor_translate_tool(delta_time);
 		return;
 	}
-	if (transform_type == XFORMTYPE.FACE) {
+	if (transform_type == EDITORMODE.FACE) {
 		editor_face_tool(delta_time);
 		return;
 	}
@@ -533,10 +527,10 @@ void editor_handle_operation(float delta_time)
 void editor_finalize_operation()
 {
 	/* Finalize the scale operation */
-	if (transform_type == XFORMTYPE.FACE) {
+	if (transform_type == EDITORMODE.FACE) {
 		editor_face_tool_finalize();
 	}
-	else if (transform_type == XFORMTYPE.TRANSLATE) {
+	else if (transform_type == EDITORMODE.TRANSLATE) {
 		editor_translate_tool_finalize();
 	}
 }
@@ -553,7 +547,7 @@ void mode_load()
 	reset_selection();
 
 	// Should default to translate when switching to editor mode
-	set_mode(XFORMTYPE.TRANSLATE);
+	set_mode(EDITORMODE.TRANSLATE);
 
 	player_had_headbob = cvar_get_bool("b_headbob_enabled", false);
 }
