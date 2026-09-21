@@ -30,8 +30,8 @@ static void N_MipsExport(FoxVM* vm, const SizedArray<FoxValue>& args)
 
 	MipmapLoader loader;
 	loader.Open(datapack_path.Get<const char*>());
-	if (!loader.Pack.IsOpen()) {
-		LogError("Could not open datapack");
+	if (!loader.IsOpen()) {
+		LogError("Could not open KTX file");
 		return;
 	}
 }

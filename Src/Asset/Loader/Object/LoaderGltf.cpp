@@ -1,5 +1,6 @@
 #include "LoaderGltf.hpp"
 
+#include "../Image/LoaderKtx.hpp"
 #include "../Image/LoaderStb.hpp"
 
 #include <ThirdParty/cgltf.h>
@@ -134,7 +135,7 @@ void LoaderGltf::UnpackMeshAttributes(Object* object, Ref<PrimitiveMesh>& mesh, 
 
 static String MakeMaterialTextureCacheName(Material* material, const char* component_name)
 {
-	return String::Fmt("{}_{}.ftx", material->Name.Get(), component_name);
+	return String::Fmt("{}_{}{}", material->Name.Get(), component_name, loader::LoaderKtx::scFileExtension);
 }
 
 static Hash32 GetTextureCacheID(const String& model_name, Material* material, const char* component_name)
@@ -149,7 +150,7 @@ static Hash32 GetTextureCacheID(const String& model_name, Material* material, co
 static String GetTextureCachePath(const Hash32 texture_cache_id, const String& base_path)
 {
 	// Some/Base/Path + abcd1234 + .ftx    ->      Some/Base/Path/abcd1234.ftx
-	String output_path = Path(base_path).Add(String::From(texture_cache_id)).AddExtension(".ftx").Str();
+	String output_path = Path(base_path).Add(String::From(texture_cache_id)).AddExtension(loader::LoaderKtx::scFileExtension).Str();
 
 	return output_path;
 }

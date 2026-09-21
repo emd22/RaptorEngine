@@ -118,6 +118,18 @@ float3 EnvBRDFApprox(float3 f0, float roughness, float NdotV)
 	return f0 * AB.x + AB.y;
 }
 
+/// Direction the specular lobe is centred on, for looking up ambient specular (Frostbite,
+/// "Moving Frostbite to PBR", getSpecularDominantDir). A mirror reflects along R, but as a surface roughens its
+/// lobe spreads over the hemisphere and its average direction swings towards the normal. Sampling along R
+/// regardless makes rough surfaces read the environment from a direction their lobe barely covers.
+float3 GetSpecularDominantDir(float3 N, float3 R, float roughness)
+{
+	const float smoothness = saturate(1.0 - roughness);
+	const float factor = smoothness * (sqrt(smoothness) + roughness);
+
+	return normalize(lerp(N, R, factor));
+}
+
 float AttenuationSmooth(float distance_sq, float inv_radius_sq)
 {
 	float factor = distance_sq * inv_radius_sq;

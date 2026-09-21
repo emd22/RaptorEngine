@@ -133,12 +133,20 @@ void Swapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR surface)
 	{
 		VkSurfaceFormatKHR surface_format = mDevice->GetSurfaceFormat();
 
-		// For now we will enforce that RGBA16 is supported by the render device. This is the first chosen
-		// if it is supported.
-		Assert(surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT ||
+		// GpuDevice::GetSurfaceFormat() prefers an _SRGB format, so the composition pass's linear output is
+		// encoded by the presentation hardware. The rest are the fallbacks it walks if none is offered.
+		Assert(surface_format.format == VK_FORMAT_B8G8R8A8_SRGB ||
+			   surface_format.format == VK_FORMAT_R8G8B8A8_SRGB ||
+			   surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT ||
 			   surface_format.format == VK_FORMAT_R8G8B8A8_UNORM);
 
-		if (surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT) {
+		if (surface_format.format == VK_FORMAT_B8G8R8A8_SRGB) {
+			Surface.Format = eImageFormat::BGRA8_SRGB;
+		}
+		else if (surface_format.format == VK_FORMAT_R8G8B8A8_SRGB) {
+			Surface.Format = eImageFormat::RGBA8_SRGB;
+		}
+		else if (surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT) {
 			Surface.Format = eImageFormat::RGBA16_Float;
 		}
 		else if (surface_format.format == VK_FORMAT_R8G8B8A8_UNORM) {

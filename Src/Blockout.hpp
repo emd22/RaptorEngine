@@ -48,8 +48,8 @@ public:
 	 * @brief Recreates a destroyed blockout object from a snapshot (undo of Delete).
 	 * Falls back to a unique name if the original name is taken.
 	 */
-	Object* RestoreObject(const Vec3f& position, const Vec3f& bounds_min, const Vec3f& bounds_max,
-						  MaterialID material, const Quat& rotation, const Name& name);
+	Object* RestoreObject(const Vec3f& position, const Vec3f& bounds_min, const Vec3f& bounds_max, MaterialID material,
+						  const Quat& rotation, const Name& name);
 
 	void DestroyObject(Object* object);
 
@@ -73,6 +73,7 @@ private:
 	MaterialID mWhiteMaterialID = MaterialID::scNull;
 	MaterialID mOrangeMaterialID = MaterialID::scNull;
 	MaterialID mBlueMaterialID = MaterialID::scNull;
+	MaterialID mProtoTileID = MaterialID::scNull;
 };
 
 

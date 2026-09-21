@@ -151,10 +151,10 @@ bool Material::IsReady()
 #define REQUEST_COMPONENT_HIGHER_DETAIL(component_)                                                                    \
 	if (component_.Exists()) {                                                                                         \
 		MipmapLoader loader {};                                                                                        \
-		String texture_cache_path = String::Fmt("{}/Models/TGen/{}.ftx", gAssetManager->GetScenePath(),                \
+		String texture_cache_path = String::Fmt("{}/Models/TGen/{}.ktx2", gAssetManager->GetScenePath(),                \
 												component_.TextureCacheID);                                            \
 		loader.Open(texture_cache_path.CStr());                                                                        \
-		if (loader.Pack.IsOpen()) {                                                                                    \
+		if (loader.IsOpen()) {                                                                                    \
 			component_.ImageToUpload = loader.GetQuality(quality);                                                     \
 			component_.pAssetImage->InvalidateLoaded();                                                                \
 			component_.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;                                          \

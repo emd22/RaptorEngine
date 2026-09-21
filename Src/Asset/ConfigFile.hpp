@@ -217,7 +217,10 @@ public:
 	template <>
 	const char* Get() const
 	{
-		Assert(Type == ePrimitiveType::String);
+		if (Type != ePrimitiveType::String || mStringValue == nullptr) {
+			LogWarning(LC_CORE, "Attempting to retrieve string from non-string config primitive");
+			return "";
+		}
 
 		return mStringValue;
 	}
@@ -382,21 +385,30 @@ public:
 	template <>
 	Vec2i GetValue<Vec2i>() const
 	{
-		Assert(bIsArray == true && ArrayData.Size() >= 2);
+		if (!bIsArray || ArrayData.Size() < 2) {
+			LogWarning(LC_CORE, "Config entry '{}' is not an array of at least 2 values", Name.Get());
+			return Vec2i(0, 0);
+		}
 		return Vec2i(ArrayData[0].Get<int32>(), ArrayData[1].Get<int32>());
 	}
 
 	template <>
 	Vec3f GetValue<Vec3f>() const
 	{
-		Assert(bIsArray == true && ArrayData.Size() >= 3);
+		if (!bIsArray || ArrayData.Size() < 3) {
+			LogWarning(LC_CORE, "Config entry '{}' is not an array of at least 3 values", Name.Get());
+			return Vec3f(0.0f, 0.0f, 0.0f);
+		}
 		return Vec3f(ArrayData[0].Get<float32>(), ArrayData[1].Get<float32>(), ArrayData[2].Get<float32>());
 	}
 
 	template <>
 	Quat GetValue<Quat>() const
 	{
-		Assert(bIsArray == true && ArrayData.Size() >= 4);
+		if (!bIsArray || ArrayData.Size() < 4) {
+			LogWarning(LC_CORE, "Config entry '{}' is not an array of at least 4 values", Name.Get());
+			return Quat(0.0f, 0.0f, 0.0f, 1.0f);
+		}
 		return Quat(ArrayData[0].Get<float32>(), ArrayData[1].Get<float32>(), ArrayData[2].Get<float32>(),
 					ArrayData[3].Get<float32>());
 	}
@@ -404,7 +416,10 @@ public:
 	template <>
 	Color GetValue<Color>() const
 	{
-		Assert(bIsArray == true && ArrayData.Size() >= 4);
+		if (!bIsArray || ArrayData.Size() < 4) {
+			LogWarning(LC_CORE, "Config entry '{}' is not an array of at least 4 values", Name.Get());
+			return Color::FromRGBA(0, 0, 0, 255);
+		}
 		return Color::FromRGBA(ArrayData[0].Get<int32>(), ArrayData[1].Get<int32>(), ArrayData[2].Get<int32>(),
 							   ArrayData[3].Get<int32>());
 	}
@@ -441,7 +456,10 @@ public:
 	template <>
 	const char* GetValue() const
 	{
-		Assert(Type == ePrimitiveType::String);
+		if (Type != ePrimitiveType::String || mStringValue == nullptr) {
+			LogWarning(LC_CORE, "Attempting to retrieve string from non-string config entry '{}'", Name.Get());
+			return "";
+		}
 
 		return mStringValue;
 	}
@@ -548,17 +566,34 @@ private:
 	bool EatToken(eTokenType type);
 	bool EatToken(const Slice<eTokenType>& expected_types);
 
-	ConfigEntry ParseEntry(ConfigEntry* parent);
-	void ParseValue(ConfigPrimitive& value);
-	void ParseReference(ConfigPrimitive& value);
+	bool ParseEntry(ConfigEntry* parent, ConfigEntry& out_entry);
+	bool ParseValue(ConfigPrimitive& value);
+	bool ParseReference(ConfigPrimitive& value);
 
-	FX_FORCE_INLINE Token* GetToken() const
+	/// Skip tokens until the start of the next `name =` entry (or a closing brace if `in_struct`).
+	void SkipToNextEntry(bool in_struct);
+
+	FX_FORCE_INLINE bool IsAtEnd() const { return mpTokens == nullptr || mTokenIndex >= mpTokens->Size(); }
+
+	/// Returns the token at the offset from the current one. Past the end this is an empty Unknown token,
+	/// so callers never read out of bounds.
+	FX_FORCE_INLINE Token* PeekToken(uint32 offset = 0) const
 	{
-		Assert(mTokenIndex <= mpTokens->Size());
-		return &mpTokens->Get(mTokenIndex);
+		static Token eof_token;
+		if (mpTokens == nullptr || mTokenIndex + offset >= mpTokens->Size()) {
+			return &eof_token;
+		}
+		return &mpTokens->Get(mTokenIndex + offset);
 	}
 
-	FX_FORCE_INLINE void NextToken() { ++mTokenIndex; }
+	FX_FORCE_INLINE Token* GetToken() const { return PeekToken(0); }
+
+	FX_FORCE_INLINE void NextToken()
+	{
+		if (!IsAtEnd()) {
+			++mTokenIndex;
+		}
+	}
 
 	void InitConstants();
 
@@ -571,6 +606,9 @@ private:
 	uint32 mTokenIndex = 0;
 
 	bool mbHasErrors = false;
+
+	static constexpr uint32 cMaxDepth = 64;
+	uint32 mDepth = 0;
 };
 
 } // namespace fx

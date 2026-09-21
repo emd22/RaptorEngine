@@ -3,7 +3,10 @@
 #include <array>
 #include <cctype>
 #include <cstdlib>
+#include <cstring>
+#include <format>
 #include <functional>
+#include <string>
 
 namespace fx {
 
@@ -546,12 +549,19 @@ static bool ParseIfdef(State& state, Result& result, const SizedArray<ShaderMacr
 		state.NextIfEqual('\r');
 		state.NextIfEqual('\n');
 
+		// Trailing whitespace is not part of the name
+		while (read_index > 0 && isspace(read_macro[read_index - 1])) {
+			--read_index;
+		}
+
 		read_macro[read_index] = 0;
 
 		bool condition_is_true = false;
 
 		for (const ShaderMacro& macro : macros) {
-			if (!std::strncmp(macro.pcName, read_macro, read_index)) {
+			// Compared in full, not over read_index characters: a prefix match would let `#ifdef USE_NORMAL` be
+			// answered by a defined `USE_NORMAL_MAPS`.
+			if (macro.pcName != nullptr && std::strcmp(macro.pcName, read_macro) == 0) {
 				condition_is_true = true;
 				break;
 			}
@@ -653,6 +663,52 @@ static bool ParsePPFuncCall(State& state, Result& result)
 }
 
 
+/// Writes `#define NAME VALUE` for every macro that carries a value ahead of each program's source.
+///
+/// ParseIfdef() answers `#ifdef`/`#ifndef` from `macros` directly and emits nothing, and DXC is invoked without any
+/// -D arguments, so this is the only thing that makes a macro's *value* visible to the compiler. The defines land
+/// before the shader's own #includes, which lets a header guard its default with `#ifndef` and be overridden.
+static void PrependMacroDefines(Result& result, const SizedArray<ShaderMacro>& macros)
+{
+	std::string defines;
+
+	for (const ShaderMacro& macro : macros) {
+		// A macro with no value is a plain switch, and ParseIfdef() has already resolved it
+		if (macro.pcName == nullptr || macro.pcValue == nullptr) {
+			continue;
+		}
+
+		defines += std::format("#define {} {}\n", macro.pcName, macro.pcValue);
+	}
+
+	if (defines.empty()) {
+		return;
+	}
+
+	for (uint32 type_index = 0; type_index < ShaderUtil::scNumShaderTypes; type_index++) {
+		DataBuffer& buffer = result.ProgramData[type_index];
+
+		// An empty buffer is how the shader says it has no program of this type, and the compiler skips it on
+		// exactly that. Writing the defines into one would turn it into a program with no entry point.
+		if (buffer.Size == 0) {
+			continue;
+		}
+
+		DataBuffer combined;
+		combined.SetPageSize(scDataPageSize);
+
+		for (const char ch : defines) {
+			combined.Insert(ch);
+		}
+
+		for (uint32 index = 0; index < buffer.Size; index++) {
+			combined.Insert(buffer[index]);
+		}
+
+		buffer = std::move(combined);
+	}
+}
+
 Result Process(const Slice<char>& data, const SizedArray<ShaderMacro>& macros)
 {
 	Result result {};
@@ -680,6 +736,8 @@ Result Process(const Slice<char>& data, const SizedArray<ShaderMacro>& macros)
 		WriteCurrentCharToProgram(state, result);
 		state.NextChar();
 	}
+
+	PrependMacroDefines(result, macros);
 
 	return result;
 }
