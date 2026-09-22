@@ -5,6 +5,7 @@
 
 extern int printf(string fmt, ...);
 
+/* Must match EditOperation::eType in InGameEditor.hpp! */
 enum OPTYPE
 {
 	MOVE,
@@ -12,6 +13,7 @@ enum OPTYPE
 	DUPE,
 	CREATE,
 	DELETE,
+	ROTATE,
 }
 
 /* This must match eEditorMode in InGameEditor.hpp! */
@@ -68,6 +70,9 @@ impl OBJECT
 	extern void move_to(OBJECT obj, float3 position);
 	extern void move_by(OBJECT obj, float3 by);
 	extern float3 get_position(OBJECT obj);
+	/* Euler angles in radians (pitch, yaw, roll) */
+	extern void rotate_to(OBJECT obj, float3 euler_radians);
+	extern float3 get_rotation(OBJECT obj);
 	extern uint get_tags(OBJECT obj);
 	extern void set_tags(OBJECT obj, uint tags);
 

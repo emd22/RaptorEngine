@@ -159,6 +159,24 @@ static FLOAT4 N_object_get_position(Object* obj)
 	return obj->GetPosition().mIntrin;
 }
 
+static void N_object_rotate_to(Object* obj, FLOAT4 euler_radians)
+{
+	if (obj == nullptr) {
+		return;
+	}
+
+	obj->SetRotation(Quat::FromEulerAngles(Vec3f(euler_radians)));
+}
+
+static FLOAT4 N_object_get_rotation(Object* obj)
+{
+	if (obj == nullptr) {
+		return simd::LoadFloat4(0.0f);
+	}
+
+	return obj->mRotation.GetEulerAngles().mIntrin;
+}
+
 static void N_print_float4(FLOAT4 v) { LogInfo(LC_SCRIPT, "{}", Vec4f(v)); }
 
 static uint32 N_object_get_tags(Object* obj)
@@ -363,6 +381,8 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("OBJECT_move_to", N_object_move_to),
 	PREDEF("OBJECT_move_by", N_object_move_by),
 	PREDEF("OBJECT_get_position", N_object_get_position),
+	PREDEF("OBJECT_rotate_to", N_object_rotate_to),
+	PREDEF("OBJECT_get_rotation", N_object_get_rotation),
 	PREDEF("OBJECT_get_tags", N_object_get_tags),
 	PREDEF("OBJECT_set_tags", N_object_set_tags),
 	PREDEF("OBJECT_ray_get_face", N_object_ray_get_face),

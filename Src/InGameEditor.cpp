@@ -71,6 +71,19 @@ EditOperationValue EditOperation::Execute()
 
 		break;
 	}
+	case eType::Rotate: {
+		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
+		Assert(ValueB.Type == EditOperationValue::eValueType::Vec3);
+
+		Object* target = ResolveOpTarget(*this);
+		if (target == nullptr) {
+			break;
+		}
+
+		target->SetRotation(Quat::FromEulerAngles(ValueB.Position));
+
+		return ValueB;
+	}
 	case eType::Dupe: {
 		// Origin point
 		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
@@ -156,6 +169,19 @@ void EditOperation::Undo()
 		target->Bounds.Max = ScaleBoundsMaxBefore;
 		target->SetPosition(ScalePosBefore);
 		gWorld->pBlockout->RebuildObject(target);
+
+		break;
+	}
+	case eType::Rotate: {
+		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
+		Assert(ValueB.Type == EditOperationValue::eValueType::Vec3);
+
+		Object* target = ResolveOpTarget(*this);
+		if (target == nullptr) {
+			break;
+		}
+
+		target->SetRotation(Quat::FromEulerAngles(ValueA.Position));
 
 		break;
 	}

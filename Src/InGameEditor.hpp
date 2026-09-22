@@ -78,6 +78,8 @@ struct EditOperation
 		Dupe,
 		Create,
 		Delete,
+		/// ValueA/ValueB hold Euler angles in radians (Quat::GetEulerAngles()/FromEulerAngles() convention)
+		Rotate,
 	} Type;
 
 public:
