@@ -42,7 +42,7 @@ EditorFrame* GetMainFrame();
  */
 bool PumpEvents();
 
-void UpdatePropertiesPanelForObject(const Object* object);
+void UpdatePropertiesPanelForObject(Object* object);
 void UpdateWorldPropertiesPanel();
 
 bool IsSimulationMode();

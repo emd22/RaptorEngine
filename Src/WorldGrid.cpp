@@ -57,13 +57,16 @@ void WorldGrid::Create(const Vec2u grid_size)
 	mPositionOffset = ((Vec3f(half_grid.X, 0.0f, half_grid.Y) * Vec3f(mTileSize.X, 0.0f, mTileSize.Y)));
 }
 
-void WorldGrid::GetObjectTileRect(const Object* object, TileIndex* out_start, Vec2u* out_span) const
+void WorldGrid::GetObjectTileRect(Object* object, TileIndex* out_start, Vec2u* out_span) const
 {
 	DebugAssert(out_start != nullptr);
 	DebugAssert(out_span != nullptr);
 
-	const Vec2u tile_xy_start = TileToTileXY(WorldToTile(object->mPosition + object->Bounds.Min));
-	const Vec2u tile_xy_end = TileToTileXY(WorldToTile(object->mPosition + object->Bounds.Max));
+
+	const AABB world_bounds = object->GetWorldOBB().GetWorldAABB();
+
+	const Vec2u tile_xy_start = TileToTileXY(WorldToTile(world_bounds.Min));
+	const Vec2u tile_xy_end = TileToTileXY(WorldToTile(world_bounds.Max));
 
 	const uint32 width_in_tiles = std::clamp(tile_xy_end.X - tile_xy_start.X + 1, 1U, mGridSize.X);
 	const uint32 height_in_tiles = std::clamp(tile_xy_end.Y - tile_xy_start.Y + 1, 1U, mGridSize.Y);

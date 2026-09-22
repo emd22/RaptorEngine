@@ -31,7 +31,7 @@ static constexpr uint32 MaxScreenTiles = MaxScreenTilesX * MaxScreenTilesY;
 ///////////////////////////////////
 
 /// Decals kept in the world at once. New decals replace the oldest ones past this.
-static constexpr uint32 MaxDecals = 1024;
+static constexpr uint32 MaxDecals = 512;
 
 /// Decals uploaded for a single frame, after frustum culling. Mirrored by MAX_VISIBLE_DECALS in
 /// Shaders/DecalCommon.hlsli.
@@ -52,14 +52,14 @@ static constexpr uint32 ProbeSHCoeffCount = 9;
 
 /// Probe budget shared by every volume. Each volume takes a contiguous range out of it, so this has to leave
 /// room for more than the one grid fitted to the level (ProbeGridDims), which takes half of it on its own.
-/// Probes are dominated by their depth moments, at ~12 KB each, so this is also what sizes ProbeDepthBuffer.
-static constexpr uint32 MaxIrradianceProbes = 2048;
+/// Mirrored by PROBE_MAX_PROBES in Shaders/ProbeCommon.hlsli, which derives the moments atlas height from it.
+static constexpr uint32 MaxIrradianceProbes = 4096;
 
 
 static constexpr uint32 MaxProbeVolumes = 8;
 
 /// Default probe grid dimensions (X x Y x Z) of a volume fitted to the level.
-static constexpr uint32 ProbeGridDims[3] = { 16, 4, 16 };
+static constexpr uint32 ProbeGridDims[3] = { 16, 8, 16 };
 
 static constexpr uint32 MinProbeGridDim = 2;
 

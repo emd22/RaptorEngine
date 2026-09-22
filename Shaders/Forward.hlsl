@@ -416,11 +416,12 @@ FSOutput main(FSInput input)
     const float3 position_ddy = ddy(input.vPositionWS);
 #endif
 
+    Material material = bMaterialBuffer[input.uiMaterialIndex];
+
     float4 albedo_sample = F_Sample(tAlbedo, input.vUV);
-    float3 albedo = albedo_sample.rgb;
+    float3 albedo = albedo_sample.rgb * material.vBaseColorFactor;
     float tex_alpha = albedo_sample.a;
 
-    Material material = bMaterialBuffer[input.uiMaterialIndex];
     float base_alpha = saturate(tex_alpha * material.fAlpha);
 
     if (base_alpha < ALPHA_CUTOFF) {

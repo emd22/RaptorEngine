@@ -130,9 +130,12 @@ struct MaterialProperties
 	/// Scales the specular (RGB) and glossiness (A) channels when `eMaterialFlags::SpecularGlossiness` is set.
 	float32 SpecularFactor[3] = { 1.0f, 1.0f, 1.0f };
 	float32 GlossinessFactor = 1.0f;
+
+	float32 BaseColorFactor[3] = { 1.0f, 1.0f, 1.0f };
+	float32 Padding = 0.0f;
 };
 
-static_assert(sizeof(MaterialProperties) == 32,
+static_assert(sizeof(MaterialProperties) == 48,
 			  "MaterialProperties must match `Material` in Shaders/MaterialDef.hlsli");
 
 /**
@@ -224,6 +227,8 @@ public:
 	 * as specular (RGB) and glossiness (A).
 	 */
 	void SetSpecularGlossiness(const float32 specular[3], float32 glossiness);
+
+	void SetBaseColorFactor(const float32 color[3]);
 
 	bool IsAlbedoOnly() const { return (NormalMap.Exists() == false); }
 

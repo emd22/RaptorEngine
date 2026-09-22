@@ -473,6 +473,22 @@ MaterialID EditorMode::GetStoredMaterial(Object* object)
 	return MaterialID::scNull;
 }
 
+void EditorMode::SetStoredMaterial(Object* object, MaterialID material)
+{
+	if (object == nullptr) {
+		return;
+	}
+
+	for (SelectedObject& selected_obj : mSelectedObjects) {
+		if (selected_obj.pObject == object) {
+			selected_obj.OldMaterial = material;
+			break;
+		}
+	}
+
+	object->SetMaterial(material);
+}
+
 void EditorMode::AddToSelectionInternal(Object* object)
 {
 	if (object == nullptr || IsInSelection(object)) {

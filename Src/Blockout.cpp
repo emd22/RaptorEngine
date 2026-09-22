@@ -258,14 +258,21 @@ static Vec3f GetCubeSize(const CubeGenOptions& cgo)
 			Vec3f(cgo.Right.Scale, cgo.Bottom.Scale, cgo.Back.Scale));
 }
 
-enum class eCProtoMat
+MaterialID Blockout::GetMaterialForSlot(eCProtoMat slot) const
 {
-	Gray = 0,
-	Orange,
-	Blue,
-	Tile,
-};
-
+	switch (slot) {
+	case eCProtoMat::Gray:
+		return mWhiteMaterialID;
+	case eCProtoMat::Orange:
+		return mOrangeMaterialID;
+	case eCProtoMat::Blue:
+		return mBlueMaterialID;
+	case eCProtoMat::Tile:
+		return mProtoTileID;
+	default:
+		return mWhiteMaterialID;
+	}
+}
 
 ObjectID Blockout::CreateCubeVolume(ConfigEntry& entry)
 {
@@ -313,22 +320,7 @@ ObjectID Blockout::CreateCubeVolume(ConfigEntry& entry)
 
 	if (mat_entry != nullptr) {
 		eCProtoMat mat_index = static_cast<eCProtoMat>(mat_entry->Get<int32>());
-
-		switch (mat_index) {
-		case eCProtoMat::Gray:
-			material_id = mWhiteMaterialID;
-			break;
-		case eCProtoMat::Orange:
-			material_id = mOrangeMaterialID;
-			break;
-		case eCProtoMat::Blue:
-			material_id = mBlueMaterialID;
-			break;
-		case eCProtoMat::Tile:
-			material_id = mProtoTileID;
-			break;
-		default:;
-		}
+		material_id = GetMaterialForSlot(mat_index);
 	}
 
 	Object* object = gObjectManager->NewObject(blockout_id.Str(), material_id, object_tags);

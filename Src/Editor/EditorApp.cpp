@@ -119,7 +119,7 @@ bool PumpEvents()
 	return !spMainFrame->IsCloseRequested();
 }
 
-void UpdatePropertiesPanelForObject(const Object* object)
+void UpdatePropertiesPanelForObject(Object* object)
 {
 	if (spMainFrame != nullptr) {
 		spMainFrame->GetObjectPropertiesPanel()->ShowObject(object);
