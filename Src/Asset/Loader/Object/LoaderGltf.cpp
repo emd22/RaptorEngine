@@ -150,7 +150,8 @@ static Hash32 GetTextureCacheID(const String& model_name, Material* material, co
 static String GetTextureCachePath(const Hash32 texture_cache_id, const String& base_path)
 {
 	// Some/Base/Path + abcd1234 + .ftx    ->      Some/Base/Path/abcd1234.ftx
-	String output_path = Path(base_path).Add(String::From(texture_cache_id)).AddExtension(loader::LoaderKtx::scFileExtension).Str();
+	String output_path =
+		Path(base_path).Add(String::From(texture_cache_id)).AddExtension(loader::LoaderKtx::scFileExtension).Str();
 
 	return output_path;
 }
@@ -254,8 +255,8 @@ static bool TextureMayHaveAlpha(const cgltf_texture_view& view)
 	// Palette and greyscale/RGB images can still get alpha from a tRNS chunk.
 	size_t offset = 8;
 	while (offset + 12 <= size) {
-		const uint32 length = (uint32(data[offset]) << 24) | (uint32(data[offset + 1]) << 16)
-			| (uint32(data[offset + 2]) << 8) | uint32(data[offset + 3]);
+		const uint32 length = (uint32(data[offset]) << 24) | (uint32(data[offset + 1]) << 16) |
+							  (uint32(data[offset + 2]) << 8) | uint32(data[offset + 3]);
 		const char* type = reinterpret_cast<const char*>(data + offset + 4);
 
 		if (memcmp(type, "tRNS", 4) == 0) {
@@ -329,6 +330,13 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 	}
 	else {
 		material->Diffuse.SetTicket(gAssetManager->GetNullImageTicket(eImageFormat::RGBA8_UNorm));
+	}
+
+	if (use_specular_glossiness) {
+		material->SetBaseColorFactor(gltf_sg.diffuse_factor);
+	}
+	else if (gltf_material->has_pbr_metallic_roughness) {
+		material->SetBaseColorFactor(gltf_mr.base_color_factor);
 	}
 
 	// Load the normalmap

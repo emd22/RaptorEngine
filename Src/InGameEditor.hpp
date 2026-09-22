@@ -171,6 +171,8 @@ public:
 	/// Original (unselected) material for an object, falling back to its current material.
 	MaterialID GetStoredMaterial(Object* object);
 
+	void SetStoredMaterial(Object* object, MaterialID material);
+
 	void Undo();
 	void Redo();
 
