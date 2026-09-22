@@ -1,11 +1,13 @@
 #include "EditorFrame.hpp"
 
+#include "EditorApp.hpp"
 #include "EditorViewport.hpp"
 #include "ObjectPropertiesPanel.hpp"
+#include "WorldPropertiesPanel.hpp"
 
 #include <wx/app.h>
 #include <wx/bitmap.h>
-#include <wx/button.h>
+#include <wx/menu.h>
 #include <wx/panel.h>
 #include <wx/sizer.h>
 #include <wx/tglbtn.h>
@@ -34,6 +36,8 @@ static constexpr ToolButtonInfo scToolButtons[] = {
 
 static_assert(std::size(scToolButtons) == static_cast<size_t>(eEditorTool::Count));
 
+static const wxColor scSelectedColor = wxColor(168, 50, 50);
+
 /// Creates an icon button for the tool, or a text button if its icon can't be loaded
 static wxToggleButton* MakeToolButton(wxWindow* parent, const ToolButtonInfo& info)
 {
@@ -58,15 +62,29 @@ static wxToggleButton* MakeToolButton(wxWindow* parent, const ToolButtonInfo& in
 
 EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : wxFrame(nullptr, wxID_ANY, title)
 {
+	// Top bar
+	wxMenuBar* menu_bar = new wxMenuBar;
+
+	wxMenu* file_menu = new wxMenu;
+
+	wxMenuItem* reload_world_item = file_menu->Append(wxID_ANY, "Reload World", "Reloads the world from disk");
+	wxMenuItem* reload_prototype_item = file_menu->Append(wxID_ANY, "Reload Prototype",
+														  "Reloads prototype geometry from disk");
+	wxMenuItem* reload_scripts_item = file_menu->Append(wxID_ANY, "Reload Scripts", "Reloads all loaded scripts");
+
+	menu_bar->Append(file_menu, "&File");
+
+	SetMenuBar(menu_bar);
+
+	Bind(wxEVT_MENU, [](wxCommandEvent&) { InvokeReloadHandler(eReloadTarget::World); }, reload_world_item->GetId());
+	Bind(
+		wxEVT_MENU, [](wxCommandEvent&) { InvokeReloadHandler(eReloadTarget::Prototype); },
+		reload_prototype_item->GetId());
+	Bind(
+		wxEVT_MENU, [](wxCommandEvent&) { InvokeReloadHandler(eReloadTarget::Scripts); }, reload_scripts_item->GetId());
+
 	wxPanel* root = new wxPanel(this, wxID_ANY);
 	wxBoxSizer* root_sizer = new wxBoxSizer(wxVERTICAL);
-
-	// Top bar
-	wxBoxSizer* top_bar = new wxBoxSizer(wxHORIZONTAL);
-
-	wxButton* reload_world = new wxButton(this, wxID_ANY, "Reload");
-	top_bar->AddStretchSpacer();
-	top_bar->Add(reload_world);
 
 	// Tools
 	wxBoxSizer* tool_sizer = new wxBoxSizer(wxVERTICAL);
@@ -83,8 +101,6 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 
 	// root_sizer->Add(tool_sizer, wxSizerFlags().Border(wxALL, 6));
 
-	root_sizer->Add(top_bar, wxSizerFlags().Border(wxALL, 2));
-
 	// Viewport and component panel
 	wxBoxSizer* body_sizer = new wxBoxSizer(wxHORIZONTAL);
 
@@ -94,9 +110,17 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	mpViewport->SetMinSize(viewport_size);
 	body_sizer->Add(mpViewport, wxSizerFlags(1).Expand());
 
-	mpComponentPanel = new ObjectPropertiesPanel(root);
-	mpComponentPanel->SetMinSize(wxSize(scObjectPropertyPanelWidth, -1));
-	body_sizer->Add(mpComponentPanel, wxSizerFlags().Expand());
+
+	wxBoxSizer* component_panel = new wxBoxSizer(wxVERTICAL);
+
+	mpWorldPropertiesPanel = new WorldPropertiesPanel(root);
+	component_panel->Add(mpWorldPropertiesPanel, wxSizerFlags().Expand());
+
+	mpObjectPropertiesPanel = new ObjectPropertiesPanel(root);
+	mpObjectPropertiesPanel->SetMinSize(wxSize(scObjectPropertyPanelWidth, -1));
+	component_panel->Add(mpObjectPropertiesPanel, wxSizerFlags().Expand());
+
+	body_sizer->Add(component_panel, wxSizerFlags().Expand());
 
 	root_sizer->Add(body_sizer, wxSizerFlags(1).Expand());
 
@@ -110,10 +134,11 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	mpViewport->SetMinSize(wxSize(64, 64));
 	SetMinSize(wxDefaultSize);
 
-	SetEditorTool(eEditorTool::Transform);
+	SetEditorTool(eEditorTool::Translate);
 
 	Bind(wxEVT_CLOSE_WINDOW, &EditorFrame::OnClose, this);
 	Bind(wxEVT_ACTIVATE, &EditorFrame::OnActivate, this);
+	Bind(wxEVT_ICONIZE, &EditorFrame::OnIconize, this);
 }
 
 void EditorFrame::SetEditorTool(const eEditorTool tool)
@@ -126,8 +151,8 @@ void EditorFrame::SetEditorTool(const eEditorTool tool)
 	}
 
 	// Transfer the changed editor tool info back to the script
-	if (gSelectedEditorMode != nullptr) {
-		auto set_tool = gSelectedEditorMode->pScript->GetFunction<void (*)(eEditorTool)>("__set_editor_tool");
+	if (gPrototypeEditor != nullptr) {
+		auto set_tool = gPrototypeEditor->pScript->GetFunction<void (*)(eEditorTool)>("__set_editor_tool");
 
 		if (set_tool != nullptr) {
 			set_tool(tool);
@@ -140,6 +165,8 @@ void EditorFrame::SetEditorTool(const eEditorTool tool)
 	}
 }
 
+void EditorFrame::SetDefaultTool() { SetEditorTool(eEditorTool::Translate); }
+
 void EditorFrame::OnClose(wxCloseEvent& event)
 {
 	// The renderer still presents to the viewport, so the frame is destroyed in editor::Shutdown() once the game has
@@ -149,10 +176,20 @@ void EditorFrame::OnClose(wxCloseEvent& event)
 
 void EditorFrame::OnActivate(wxActivateEvent& event)
 {
+	mbIsActive = event.GetActive();
+
 	// Don't keep the cursor locked while another app is in front
-	if (!event.GetActive() && ControlManager::IsMouseLocked()) {
+	if (!mbIsActive && ControlManager::IsMouseLocked()) {
 		ControlManager::ReleaseMouse();
 	}
+
+	event.Skip();
+}
+
+void EditorFrame::OnIconize(wxIconizeEvent& event)
+{
+	// wxEVT_ACTIVATE doesn't fire reliably on minimize on every platform
+	mbIsActive = !event.IsIconized();
 
 	event.Skip();
 }

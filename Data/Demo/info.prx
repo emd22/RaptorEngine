@@ -4,14 +4,13 @@ meta = {
 
 
 sun = {
-	enabled = $false
-    pos = [0.5, 4, 1.5]
-    color = [230, 160, 102, 7]
+    pos = [0.5, 4, -1.5]
+    color = [230, 200, 192, 7]
     ambient = [75, 75, 72, 1]
 }
 
 lights = {
-    spot0 = {
+    /*spot0 = {
         type = $CLight.Spot
         pos = [0.5, 1.5, -1.0]
         dir = [0.0, -0.6, 0.6]
@@ -28,7 +27,7 @@ lights = {
         radius = 30.0
         inner = 5.0
         outer = 30.0
-    }
+    }*/
     /*spot1 = {
         type = $CLight.Spot
         pos = [-8.0, 2.5, 0.0]
@@ -89,7 +88,7 @@ objects = {
     }
     brick = {
 		mesh = "/BrickTest.glb"
-		pos = [0.0, 0.0, 1.5]
+		pos = [0.0, 0.0, -8.5]
     }
 
 }

@@ -2,6 +2,7 @@
 
 #include <Core/Types.hpp>
 #include <Math/Vec2.hpp>
+#include <functional>
 
 namespace fx {
 class Object;
@@ -10,6 +11,16 @@ class Object;
 namespace fx::editor {
 
 class EditorFrame;
+
+/// The File > Reload menu items
+enum class eReloadTarget : uint32
+{
+	World,
+	Prototype,
+	Scripts,
+
+	Count,
+};
 
 /**
  * @brief Initialze wxWidgets gubbins
@@ -32,6 +43,17 @@ EditorFrame* GetMainFrame();
 bool PumpEvents();
 
 void UpdatePropertiesPanelForObject(const Object* object);
+void UpdateWorldPropertiesPanel();
+
+bool IsSimulationMode();
+
+/**
+ * @brief Sets up a handler used by the File > Reload X options
+ */
+void SetReloadHandler(eReloadTarget target, std::function<void()> handler);
+
+/// Called by EditorFrame's File > Reload menu. Does nothing if no handler is registered for `target` yet.
+void InvokeReloadHandler(eReloadTarget target);
 
 /**
  * @brief Destroys the editor frame and shuts wxWidgets down. Call after the renderer has destroyed its surface.

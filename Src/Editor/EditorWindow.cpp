@@ -109,6 +109,8 @@ void Window::WarpMouse(const Vec2f& position)
 	mpViewport->WarpPointer(static_cast<int>(position.GetX()), static_cast<int>(position.GetY()));
 }
 
+bool Window::IsFocused() const { return editor::GetMainFrame()->IsActive(); }
+
 // The viewport belongs to the editor frame, which editor::Shutdown() destroys
 Window::~Window() = default;
 

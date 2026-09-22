@@ -654,9 +654,9 @@ void Blockout::Load(const String& path)
 		return;
 	}
 
-	// Since everything is getting reloaded, we need to clear the editor undo stack.
-	if (gSelectedEditorMode != nullptr) {
-		gSelectedEditorMode->ResetUndoStack();
+	if (gPrototypeEditor != nullptr) {
+		// Since everything is getting reloaded, we need to clear the editor undo stack.
+		gPrototypeEditor->ResetUndoStack();
 	}
 
 	ConfigEntry* blocks_entry = info.GetEntry(HashStr32("all"));

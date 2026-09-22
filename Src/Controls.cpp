@@ -239,6 +239,14 @@ void ControlManager::ReleaseAllKeys()
 	}
 }
 
+void ControlManager::ReleaseNonModifierKeys()
+{
+	for (uint32 key_code = static_cast<uint32>(eKey::FX_KEYBOARD_STANDARD_BEGIN);
+		 key_code <= static_cast<uint32>(eKey::FX_KEYBOARD_STANDARD_END); key_code++) {
+		UpdateButtonFromEvent(static_cast<eKey>(key_code), false);
+	}
+}
+
 void ControlManager::UpdateButtonFromEvent(eKey key_id, bool is_now_down)
 {
 	Control* button = GetInstance().GetKey(key_id);
