@@ -90,7 +90,8 @@ public:
 private:
 	/// Computes the rectangle of tiles (start tile + width/height in tiles) that the object's world-space
 	/// bounds overlap.
-	void GetObjectTileRect(const Object* object, TileIndex* out_start, Vec2u* out_span) const;
+
+	void GetObjectTileRect(Object* object, TileIndex* out_start, Vec2u* out_span) const;
 
 	void InsertObjectIntoRect(ObjectID id, TileIndex start, Vec2u span);
 	void RemoveObjectFromRect(ObjectID id, TileIndex start, Vec2u span);

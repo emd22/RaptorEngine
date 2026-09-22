@@ -481,6 +481,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O2 -g -o CMakeFiles/raptor.dir/Src/Math/OrientedBoundingBox.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/OrientedBoundingBox.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Math/OrientedBoundingBox.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Math/OrientedBoundingBox.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O2 -g -o CMakeFiles/raptor.dir/Src/Math/RayCast.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/RayCast.cpp",
   "file": "/Users/emd22/Projects/raptor/Src/Math/RayCast.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Math/RayCast.cpp.o"
