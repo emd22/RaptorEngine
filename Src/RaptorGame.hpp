@@ -79,7 +79,7 @@ private:
 	void DestroyGame();
 
 	void NextEditorMode();
-	void SwitchEditorMode(eEditorMode mode);
+	void SwitchEditorMode(eEditorState mode);
 
 	void RenderText();
 	void RenderCrosshair();
@@ -105,7 +105,7 @@ public:
 	Vec3f PistolOffset = Vec3f::sZero;
 	Vec3f ArmsOffset = Vec3f::sZero;
 
-	eEditorMode EditorModeType = eEditorMode::Simulate;
+	eEditorState EditorModeType = eEditorState::Simulate;
 	SizedArray<EditorMode*> EditorModes;
 
 	bool bInCommandMode = false;

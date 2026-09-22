@@ -3,6 +3,8 @@
 #include <Blockout.hpp>
 #include <CVar.hpp>
 #include <Controls.hpp>
+#include <Editor/EditorApp.hpp>
+#include <Editor/EditorFrame.hpp>
 #include <Engine.hpp>
 #include <InGameEditor.hpp>
 #include <Math/SIMDHelper.hpp>
@@ -327,6 +329,14 @@ static int64 N_cvar_get_int(const char* name, int64 fallback) { return gCVars->G
 
 static void N_script_error(const char* str) { LogError(LC_SCRIPT, "{}", str); }
 
+static void N_GUI_set_editor_tool(eEditorTool tool)
+{
+#ifdef FX_IS_EDITOR
+	editor::GetMainFrame()->SetEditorTool(tool);
+#endif
+}
+
+
 /////////////////////////////////////
 // Predef gather
 /////////////////////////////////////
@@ -402,6 +412,7 @@ static const PredefExtern scAvailableExterns[] = {
 
 	PREDEF("script_error", N_script_error),
 
+	PREDEF("GUI_set_editor_tool", N_GUI_set_editor_tool),
 
 }; // namespace fx::script
 

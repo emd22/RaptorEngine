@@ -4,6 +4,7 @@
 
 #include <Core/StackArray.hpp>
 #include <Core/Types.hpp>
+#include <InGameEditor.hpp>
 
 class wxToggleButton;
 
@@ -12,16 +13,6 @@ namespace fx::editor {
 class ObjectPropertiesPanel;
 class EditorViewport;
 
-enum class eEditorTool : uint32
-{
-	Simulate,
-
-	Transform,
-	Face,
-	Rotate,
-
-	Count,
-};
 
 class EditorFrame : public wxFrame
 {
@@ -31,13 +22,12 @@ public:
 	FX_FORCE_INLINE EditorViewport* GetViewport() { return mpViewport; }
 	FX_FORCE_INLINE ObjectPropertiesPanel* GetComponentPanel() { return mpComponentPanel; }
 
-	FX_FORCE_INLINE void SetEditorTool(eEditorTool tool) { mSelectedTool = tool; }
 	FX_FORCE_INLINE eEditorTool GetSelectedTool() const { return mSelectedTool; }
 	FX_FORCE_INLINE bool IsCloseRequested() const { return mbCloseRequested; }
 
-private:
-	void SelectTool(eEditorTool tool);
+	void SetEditorTool(const eEditorTool tool);
 
+private:
 	void OnClose(wxCloseEvent& event);
 	void OnActivate(wxActivateEvent& event);
 

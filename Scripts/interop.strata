@@ -14,10 +14,13 @@ enum OPTYPE
 	DELETE,
 }
 
-enum EDITORMODE
+/* This must match eEditorMode in InGameEditor.hpp! */
+enum EDITORTOOL
 {
+	NONE = 0,
 	TRANSLATE = 1,
 	FACE = 2,
+	ROTATE = 3,
 }
 
 
@@ -165,4 +168,4 @@ extern void script_error(cstring str);
 
 /* GUI Editor */
 
-extern void set_editor_mode();
+extern void GUI_set_editor_tool(EDITORTOOL mode);

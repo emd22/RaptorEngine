@@ -60,7 +60,7 @@ float3 face_tool_magnitude;
 float3 initial_face_object_position;
 float3 initial_face_position;
 
-EDITORMODE transform_type = EDITORMODE.TRANSLATE;
+EDITORTOOL editor_tool = EDITORTOOL.TRANSLATE;
 
 
 
@@ -190,17 +190,22 @@ void editor_dupe_selection()
 	}
 }
 
-@private
-void set_mode(EDITORMODE type)
+void __set_editor_tool(EDITORTOOL tool)
 {
-	if (type == EDITORMODE.TRANSLATE) {
+	if (tool == EDITORTOOL.TRANSLATE) {
 		cvar_set_string("s_editor_op", "Translate");
 	}
-	else if (type == EDITORMODE.FACE) {
+	else if (tool == EDITORTOOL.FACE) {
 		cvar_set_string("s_editor_op", "Face");
 	}
 
-	transform_type = type;
+	editor_tool = tool;
+}
+
+void set_editor_tool(EDITORTOOL tool)
+{
+	GUI_set_editor_tool(tool);
+	// __set_editor_tool() is called by the GUI editor
 }
 
 @private
@@ -235,12 +240,12 @@ void editor_handle_controls()
 
 		/* Translate (Move) */
 		if (KEY.K_T.is_pressed()) {
-			set_mode(EDITORMODE.TRANSLATE);
+			set_editor_tool(EDITORTOOL.TRANSLATE);
 		}
 
 		/* Face (Scale) */
 		if (KEY.K_F.is_pressed()) {
-			set_mode(EDITORMODE.FACE);
+			set_editor_tool(EDITORTOOL.FACE);
 		}
 	}
 
@@ -331,7 +336,7 @@ void editor_on_mouse_just_down()
 	mouse_was_in_drag_event = true;
 
 
-	if (transform_type == EDITORMODE.FACE) {
+	if (editor_tool == EDITORTOOL.FACE) {
 		/* Cast and gather the face we are pointing towards */
 		float3 selected_face = sel.selected_object.ray_get_face();
 
@@ -512,11 +517,11 @@ void editor_face_tool_finalize()
 @private
 void editor_handle_operation(float delta_time)
 {
-	if (transform_type == EDITORMODE.TRANSLATE) {
+	if (editor_tool == EDITORTOOL.TRANSLATE) {
 		editor_translate_tool(delta_time);
 		return;
 	}
-	if (transform_type == EDITORMODE.FACE) {
+	if (editor_tool == EDITORTOOL.FACE) {
 		editor_face_tool(delta_time);
 		return;
 	}
@@ -527,10 +532,10 @@ void editor_handle_operation(float delta_time)
 void editor_finalize_operation()
 {
 	/* Finalize the scale operation */
-	if (transform_type == EDITORMODE.FACE) {
+	if (editor_tool == EDITORTOOL.FACE) {
 		editor_face_tool_finalize();
 	}
-	else if (transform_type == EDITORMODE.TRANSLATE) {
+	else if (editor_tool == EDITORTOOL.TRANSLATE) {
 		editor_translate_tool_finalize();
 	}
 }
@@ -547,7 +552,7 @@ void mode_load()
 	reset_selection();
 
 	// Should default to translate when switching to editor mode
-	set_mode(EDITORMODE.TRANSLATE);
+	set_editor_tool(EDITORTOOL.TRANSLATE);
 
 	player_had_headbob = cvar_get_bool("b_headbob_enabled", false);
 }
@@ -561,6 +566,8 @@ void mode_unload()
 	editor_disable_movement_damp();
 
 	cvar_set_string("s_editor_op", "None");
+
+	GUI_set_editor_tool(EDITORTOOL.NONE);
 }
 
 void editor_set_transform_marker(OBJECT xform_marker)
