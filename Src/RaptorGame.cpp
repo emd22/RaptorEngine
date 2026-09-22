@@ -433,12 +433,13 @@ void RaptorGame::ProcessControls()
 	}
 	// Escape to unlock mouse
 	else if (ControlManager::IsKeyPressed(eKey::FX_KEY_ESCAPE) && ControlManager::IsMouseLocked()) {
-		// If ESCAPE is pressed while there is an object selected in editor mode, deselect the object.
+		ControlManager::ReleaseMouse();
+	}
+
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_TAB)) {
+		// If tab is pressed while there is an object selected in editor mode, deselect the object.
 		if (gPrototypeEditor != nullptr && gPrototypeEditor->HasSelection()) {
 			gPrototypeEditor->SelectObject(nullptr, false);
-		}
-		else {
-			ControlManager::ReleaseMouse();
 		}
 	}
 
@@ -487,7 +488,7 @@ void RaptorGame::ProcessControls()
 		}
 	}
 
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_TAB)) {
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_X)) {
 		ToggleEditorMode();
 	}
 

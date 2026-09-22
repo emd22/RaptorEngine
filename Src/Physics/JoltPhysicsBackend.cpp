@@ -4,6 +4,7 @@
 
 #include <Core/Log.hpp>
 #include <Core/Types.hpp>
+#include <algorithm>
 
 /* Additional Jolt includes */
 #include <Jolt/Physics/Collision/CastResult.h>
@@ -217,18 +218,23 @@ FLOAT4 JoltPhysicsBackend::RaycastGetFaceOfBox(JPH::Body* body, const Vec3f& ori
 
 SizedArray<JPH::BodyID> JoltPhysicsBackend::RaycastObjects(const Vec3f& origin, const Vec3f& direction) const
 {
-	JPH::RayCast rc;
+	JPH::RRayCast rc;
 	origin.ToJoltVec3(rc.mOrigin);
 	direction.ToJoltVec3(rc.mDirection);
 
-	JPH::AllHitCollisionCollector<JPH::RayCastBodyCollector> collector;
 
-	PhysicsSystem.GetBroadPhaseQuery().CastRay(rc, collector);
+	JPH::RayCastSettings settings;
+	JPH::AllHitCollisionCollector<JPH::CastRayCollector> collector;
+
+	PhysicsSystem.GetNarrowPhaseQuery().CastRay(rc, settings, collector);
+
+	std::sort(collector.mHits.begin(), collector.mHits.end(),
+			  [](const JPH::RayCastResult& a, const JPH::RayCastResult& b) { return a.mFraction < b.mFraction; });
 
 	SizedArray<JPH::BodyID> hits;
 	hits.InitCapacity(collector.mHits.size());
 
-	for (JPH::BroadPhaseCastResult& hit : collector.mHits) {
+	for (const JPH::RayCastResult& hit : collector.mHits) {
 		hits.Insert(hit.mBodyID);
 	}
 

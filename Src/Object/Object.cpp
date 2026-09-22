@@ -306,8 +306,10 @@ void Object::AttachObject(const ObjectID& attach_id)
 
 void Object::SyncObjectWithPhysics(physics::Body* phys)
 {
-	if ((!mPosition.IsCloseTo(phys->GetPosition()) || !mRotation.IsCloseTo(phys->GetRotation()))) {
-		mPosition = phys->GetPosition();
+	const Vec3f physics_position = phys->GetPosition() - phys->Midpoint;
+
+	if ((!mPosition.IsCloseTo(physics_position) || !mRotation.IsCloseTo(phys->GetRotation()))) {
+		mPosition = physics_position;
 		mRotation = phys->GetRotation();
 
 		MarkMatrixOutOfDate();

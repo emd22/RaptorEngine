@@ -366,6 +366,12 @@ void Material::SetSpecularGlossiness(const float32 specular[3], float32 glossine
 	mbRequiresSync = true;
 }
 
+void Material::SetBaseColorFactor(const float32 color[3])
+{
+	memcpy(Properties.BaseColorFactor, color, sizeof(Properties.BaseColorFactor));
+	mbRequiresSync = true;
+}
+
 renderer::DescriptorSet* Material::RequestAlbedoOnlyDescriptors()
 {
 	if (mpAlbedoOnlyDescriptorSet != nullptr) {

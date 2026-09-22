@@ -1249,6 +1249,7 @@ void World::RenderProbeDebug(const Camera& camera)
 	};
 
 	const Color capturing_color = Color::FromRGBA(255, 150, 30, 255);
+	const Color inactive_color = Color::FromRGBA(255, 40, 40, 60);
 
 	const bool is_baking = gProbeManager->IsBaking();
 	const uint32 current_probe = gProbeManager->GetCurrentProbeIndex();
@@ -1267,7 +1268,12 @@ void World::RenderProbeDebug(const Camera& camera)
 
 			memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
 
-			push_constants.DebugColor = (is_baking && i == current_probe) ? capturing_color.AsUInt() : volume_color;
+			if (is_baking && i == current_probe) {
+				push_constants.DebugColor = capturing_color.AsUInt();
+			}
+			else {
+				push_constants.DebugColor = gProbeManager->IsProbeActive(i) ? volume_color : inactive_color.AsUInt();
+			}
 
 			gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
 			mpDebugCube->Render(cmd, 1);

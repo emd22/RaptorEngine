@@ -26,7 +26,7 @@
 #include <limits>
 
 /// Bump whenever the layout or meaning of the cached data changes
-#define FX_PROBE_CACHE_FILE_VERSION 9
+#define FX_PROBE_CACHE_FILE_VERSION 10
 
 namespace fx {
 
@@ -34,8 +34,9 @@ struct ProbePlacementBoxes
 {
 	struct Box
 	{
-		Vec3f Min;
-		Vec3f Max;
+		AABB LocalBounds;
+		Mat4f LocalToWorld;
+		Mat4f WorldToLocal;
 	};
 
 	static constexpr uint32 scMaxBoxes = 256;
@@ -43,7 +44,6 @@ struct ProbePlacementBoxes
 	Box Boxes[scMaxBoxes];
 	uint32 Count = 0;
 
-	/// Bounds of all of the geometry, including any objects that didn't fit in `Boxes`
 	Vec3f Min = Vec3f(std::numeric_limits<float32>::max());
 	Vec3f Max = Vec3f(-std::numeric_limits<float32>::max());
 
@@ -102,8 +102,9 @@ ProbeSHData MakeSkyGradientProbe(const float32 sky[3], const float32 ground[3])
 /// Brightest radiance a capture texel can contribute, so that a few very bright texels can't dominate a probe
 constexpr float32 scRadianceClamp = 16.0f;
 
-/// Camera for cube face `face` of a capture at `position`. This is the only place the face layout is defined, the bake
-/// unprojects the captured texels with the same cameras.
+/// Surfaces closer than this to a probe are clipped out of its capture, so it sees straight through them
+constexpr float32 scCaptureNearPlane = 0.1f;
+
 PerspectiveCamera MakeCaptureCamera(const Vec3f& position, uint32 face)
 {
 	static const Vec3f scFaceDirections[ProbeManager::scCaptureFaces] = {
@@ -116,9 +117,7 @@ PerspectiveCamera MakeCaptureCamera(const Vec3f& position, uint32 face)
 		Vec3f(0.0f, 0.0f, 1.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
 	};
 
-	// Reverse-Z: the near plane argument is the far clip (see Mat4f::LoadPerspectiveMatrix), so this is a 0.1 to 200 m
-	// frustum. It only has to reach past Limits::ProbeDepthMaxDistance, where baked distances saturate anyway.
-	PerspectiveCamera camera(90.0f, 1.0f, 200.0f, 0.1f);
+	PerspectiveCamera camera(90.0f, 1.0f, 200.0f, scCaptureNearPlane);
 
 	camera.Position = position;
 	camera.ViewMatrix.LookAt(position, position + scFaceDirections[face], scFaceUps[face]);
@@ -133,8 +132,6 @@ float32 CaptureTexelToNdc(uint32 index)
 	return ((static_cast<float32>(index) + 0.5f) / static_cast<float32>(ProbeManager::scCaptureSize)) * 2.0f - 1.0f;
 }
 
-/// Index of the depth moments texel that direction `d` falls in. Must match ProbeDepthDirectionToFaceUV() in
-/// Shaders/ProbeCommon.hlsli.
 uint32 DirectionToMomentTexel(const Vec3f& d)
 {
 	const Vec3f a = d.Abs();
@@ -206,18 +203,27 @@ float32 CaptureDepthToDistance(const Mat4f& inv_projection, float32 stored_depth
 // Placement
 ///////////////////////////////////
 
-/// How far probes sit off the surfaces they are pushed out of or pulled onto
+/// How far probes sit off a surface once they're pushed out of it
 constexpr float32 scProbeSurfaceOffset = 0.25f;
+constexpr float32 scProbeHugSurfaceOffset = 1.0f;
+
 /// Probes this close to the outside of a box still count as inside it
+
 constexpr float32 scProbeInsideSkin = 0.05f;
+
 /// Probes in open space further than this from a surface are left where they are
 constexpr float32 scProbeHugMaxDistance = 1.5f;
 constexpr uint32 scMaxPushOutIterations = 8;
 
+/// Furthest a probe can move from its grid point
+constexpr float32 scMaxProbeRelocation = 0.45f;
+
+constexpr float32 scProbeCrossingSkin = 0.01f;
+constexpr float32 scProbeMinClearance = 2.0f * scCaptureNearPlane;
+constexpr uint32 scRelocationSearchSteps = 5;
+
 /// Objects bigger than this (the sky) are left out of placement so that they can't blow up the volume
 constexpr float32 scMaxPlacementObjectSize = 100.0f;
-/// Padding around the level's geometry when fitting the volume to it
-constexpr float32 scVolumePadding = 0.5f;
 
 constexpr float32 scDefaultProbeSpacing = 2.5f;
 constexpr float32 scMaxProbeSpacing = 64.0f;
@@ -262,20 +268,24 @@ ProbePlacementBoxes GatherPlacementBoxes()
 			continue;
 		}
 
-		Vec3f min;
-		Vec3f max;
-		GetObjectWorldBounds(object, min, max);
+		const AABB world_bounds = object.GetWorldOBB().GetWorldAABB();
 
-		if ((max - min).Length() > scMaxPlacementObjectSize) {
+		if ((world_bounds.Max - world_bounds.Min).Length() > scMaxPlacementObjectSize) {
 			continue;
 		}
 
 		if (boxes.Count < ProbePlacementBoxes::scMaxBoxes) {
-			boxes.Boxes[boxes.Count++] = { min, max };
+			const Mat4f& local_to_world = object.GetWorldMatrix();
+
+			boxes.Boxes[boxes.Count++] = {
+				.LocalBounds = object.Bounds,
+				.LocalToWorld = local_to_world,
+				.WorldToLocal = local_to_world.Inverse(),
+			};
 		}
 
-		boxes.Min = Vec3f::Min(boxes.Min, min);
-		boxes.Max = Vec3f::Max(boxes.Max, max);
+		boxes.Min = Vec3f::Min(boxes.Min, world_bounds.Min);
+		boxes.Max = Vec3f::Max(boxes.Max, world_bounds.Max);
 		num_objects++;
 	}
 
@@ -286,23 +296,154 @@ ProbePlacementBoxes GatherPlacementBoxes()
 	return boxes;
 }
 
-/// If `point` is inside `box`, moves it out through the nearest face to just off the surface. Returns true if it moved.
-bool PushOutOfBox(Vec3f& point, const ProbePlacementBoxes::Box& box)
+Vec3f ToBoxLocal(const Vec3f& point, const ProbePlacementBoxes::Box& box)
 {
+	const Vec4f local = box.WorldToLocal * Vec4f(point.X, point.Y, point.Z, 1.0f);
+	return Vec3f(local.X, local.Y, local.Z);
+}
+
+bool IsInsideBox(const Vec3f& point, const ProbePlacementBoxes::Box& box, float32 skin)
+{
+	const Vec3f local = ToBoxLocal(point, box);
+
 	for (uint32 axis = 0; axis < 3; axis++) {
-		if (point.mData[axis] <= box.Min.mData[axis] - scProbeInsideSkin ||
-			point.mData[axis] >= box.Max.mData[axis] + scProbeInsideSkin) {
+		if (local.mData[axis] <= box.LocalBounds.Min.mData[axis] - skin ||
+			local.mData[axis] >= box.LocalBounds.Max.mData[axis] + skin) {
 			return false;
 		}
 	}
+
+	return true;
+}
+
+bool IsInsideAnyBox(const Vec3f& point, const ProbePlacementBoxes& boxes)
+{
+	for (uint32 i = 0; i < boxes.Count; i++) {
+		if (IsInsideBox(point, boxes.Boxes[i], scProbeInsideSkin)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool IsInsideLevel(const Vec3f& point, const ProbePlacementBoxes& boxes)
+{
+	for (uint32 axis = 0; axis < 3; axis++) {
+		if (point.mData[axis] < boxes.Min.mData[axis] || point.mData[axis] > boxes.Max.mData[axis]) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+float32 DistanceToBox(const Vec3f& point, const ProbePlacementBoxes::Box& box)
+{
+	const Vec3f closest_local = Vec3f::Clamp(ToBoxLocal(point, box), box.LocalBounds.Min, box.LocalBounds.Max);
+	const Vec4f closest = box.LocalToWorld * Vec4f(closest_local.X, closest_local.Y, closest_local.Z, 1.0f);
+
+	return (point - Vec3f(closest.X, closest.Y, closest.Z)).Length();
+}
+
+bool SegmentCrossesBox(const Vec3f& from, const Vec3f& to, const ProbePlacementBoxes::Box& box, float32 skin)
+{
+	const Vec3f local_from = ToBoxLocal(from, box);
+	const Vec3f local_to = ToBoxLocal(to, box);
+
+	float32 t_enter = 0.0f;
+	float32 t_exit = 1.0f;
+
+	for (uint32 axis = 0; axis < 3; axis++) {
+		const float32 lo = box.LocalBounds.Min.mData[axis] + skin;
+		const float32 hi = box.LocalBounds.Max.mData[axis] - skin;
+		const float32 start = local_from.mData[axis];
+		const float32 delta = local_to.mData[axis] - start;
+
+		if (std::abs(delta) < 1e-6f) {
+			if (start <= lo || start >= hi) {
+				return false;
+			}
+
+			continue;
+		}
+
+		float32 t0 = (lo - start) / delta;
+		float32 t1 = (hi - start) / delta;
+
+		if (t0 > t1) {
+			std::swap(t0, t1);
+		}
+
+		t_enter = std::max(t_enter, t0);
+		t_exit = std::min(t_exit, t1);
+
+		if (t_enter >= t_exit) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+bool IsProbePlacementValid(const Vec3f& grid_position, const Vec3f& position, const ProbePlacementBoxes& boxes)
+{
+	if (boxes.IsEmpty()) {
+		return true;
+	}
+
+	if (!IsInsideLevel(position, boxes)) {
+		return false;
+	}
+
+	for (uint32 i = 0; i < boxes.Count; i++) {
+		const ProbePlacementBoxes::Box& box = boxes.Boxes[i];
+
+		if (DistanceToBox(position, box) < scProbeMinClearance) {
+			return false;
+		}
+
+		// Leaving the box the grid point started in is what the push out is for
+		if (!IsInsideBox(grid_position, box, scProbeInsideSkin) &&
+			SegmentCrossesBox(grid_position, position, box, scProbeCrossingSkin)) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+Vec3f ExitThroughFace(const Vec3f& local, const ProbePlacementBoxes::Box& box, uint32 axis, bool through_max)
+{
+	Vec3f exit_local = local;
+	exit_local.mData[axis] = through_max ? box.LocalBounds.Max.mData[axis] : box.LocalBounds.Min.mData[axis];
+
+	const Vec4f exit_world = box.LocalToWorld * Vec4f(exit_local.X, exit_local.Y, exit_local.Z, 1.0f);
+
+	Vec3f local_normal = Vec3f::sZero;
+	local_normal.mData[axis] = through_max ? 1.0f : -1.0f;
+
+	const Vec4f world_normal4 = box.LocalToWorld * Vec4f(local_normal.X, local_normal.Y, local_normal.Z, 0.0f);
+	const Vec3f world_normal = Vec3f(world_normal4.X, world_normal4.Y, world_normal4.Z).Normalize();
+
+	return Vec3f(exit_world.X, exit_world.Y, exit_world.Z) + world_normal * scProbeSurfaceOffset;
+}
+
+bool PushOutOfBox(Vec3f& point, const ProbePlacementBoxes::Box& box)
+{
+	if (!IsInsideBox(point, box, scProbeInsideSkin)) {
+		return false;
+	}
+
+	const Vec3f local = ToBoxLocal(point, box);
 
 	uint32 exit_axis = 0;
 	bool exit_through_max = false;
 	float32 exit_distance = std::numeric_limits<float32>::max();
 
 	for (uint32 axis = 0; axis < 3; axis++) {
-		const float32 to_min = point.mData[axis] - box.Min.mData[axis];
-		const float32 to_max = box.Max.mData[axis] - point.mData[axis];
+		const float32 to_min = local.mData[axis] - box.LocalBounds.Min.mData[axis];
+		const float32 to_max = box.LocalBounds.Max.mData[axis] - local.mData[axis];
 
 		if (to_min < exit_distance) {
 			exit_distance = to_min;
@@ -317,18 +458,63 @@ bool PushOutOfBox(Vec3f& point, const ProbePlacementBoxes::Box& box)
 		}
 	}
 
-	point.mData[exit_axis] = exit_through_max ? box.Max.mData[exit_axis] + scProbeSurfaceOffset
-											  : box.Min.mData[exit_axis] - scProbeSurfaceOffset;
+	point = ExitThroughFace(local, box, exit_axis, exit_through_max);
 
 	return true;
 }
 
-/// Pushes `point` out of any boxes it is inside. Returns true if it moved.
+
 bool PushOutOfBoxes(Vec3f& point, const ProbePlacementBoxes& boxes)
 {
-	bool moved = false;
+	constexpr uint32 cNoExit = 3;
 
-	// Leaving one box can land inside another, so repeat a few times
+	uint32 best_rank = cNoExit;
+	float32 best_distance = std::numeric_limits<float32>::max();
+	Vec3f best_exit = point;
+	bool inside = false;
+
+	for (uint32 i = 0; i < boxes.Count; i++) {
+		const ProbePlacementBoxes::Box& box = boxes.Boxes[i];
+
+		if (!IsInsideBox(point, box, scProbeInsideSkin)) {
+			continue;
+		}
+
+		inside = true;
+
+		const Vec3f local = ToBoxLocal(point, box);
+
+		for (uint32 face = 0; face < 6; face++) {
+			const Vec3f exit = ExitThroughFace(local, box, face / 2, (face & 1) != 0);
+			const float32 distance = (exit - point).Length();
+
+			uint32 rank = cNoExit;
+
+			if (IsProbePlacementValid(point, exit, boxes)) {
+				rank = 0;
+			}
+			else if (!IsInsideAnyBox(exit, boxes)) {
+				rank = IsInsideLevel(exit, boxes) ? 1 : 2;
+			}
+
+			if (rank < best_rank || (rank == best_rank && rank != cNoExit && distance < best_distance)) {
+				best_rank = rank;
+				best_distance = distance;
+				best_exit = exit;
+			}
+		}
+	}
+
+	if (!inside) {
+		return false;
+	}
+
+	if (best_rank != cNoExit) {
+		point = best_exit;
+		return true;
+	}
+
+	// Every face leads into more geometry, so step out one box at a time and leave the result to the placement check
 	for (uint32 iteration = 0; iteration < scMaxPushOutIterations; iteration++) {
 		bool pushed = false;
 
@@ -339,38 +525,126 @@ bool PushOutOfBoxes(Vec3f& point, const ProbePlacementBoxes& boxes)
 		if (!pushed) {
 			break;
 		}
-
-		moved = true;
 	}
 
-	return moved;
+	return true;
 }
 
-/// Moves a probe in open space that is within `max_distance` of a surface to just off that surface, so that it samples
-/// the lighting next to it rather than floating near it. Returns true if it moved.
+/// Distance from `point` to the nearest box other than `skip_box`
+float32 DistanceToOtherBoxes(const Vec3f& point, const ProbePlacementBoxes& boxes, uint32 skip_box)
+{
+	float32 nearest = std::numeric_limits<float32>::max();
+
+	for (uint32 i = 0; i < boxes.Count; i++) {
+		if (i != skip_box) {
+			nearest = std::min(nearest, DistanceToBox(point, boxes.Boxes[i]));
+		}
+	}
+
+	return nearest;
+}
+
 bool HugNearestSurface(Vec3f& point, const ProbePlacementBoxes& boxes, float32 max_distance)
 {
 	float32 best_distance = max_distance;
-	Vec3f best_point = point;
+	uint32 best_box = 0;
+	Vec3f best_closest = point;
 	bool found = false;
 
 	for (uint32 i = 0; i < boxes.Count; i++) {
-		const Vec3f closest = Vec3f::Clamp(point, boxes.Boxes[i].Min, boxes.Boxes[i].Max);
-		const Vec3f to_point = point - closest;
-		const float32 distance = to_point.Length();
+		const ProbePlacementBoxes::Box& box = boxes.Boxes[i];
+
+		const Vec3f closest_local = Vec3f::Clamp(ToBoxLocal(point, box), box.LocalBounds.Min, box.LocalBounds.Max);
+
+		const Vec4f closest_world4 = box.LocalToWorld * Vec4f(closest_local.X, closest_local.Y, closest_local.Z, 1.0f);
+		const Vec3f closest(closest_world4.X, closest_world4.Y, closest_world4.Z);
+
+		const float32 distance = (point - closest).Length();
 
 		// Points on or inside a box are left to the push out
 		if (distance < 1e-6f || distance >= best_distance) {
 			continue;
 		}
 
-		best_point = closest + to_point * (scProbeSurfaceOffset / distance);
 		best_distance = distance;
+		best_box = i;
+		best_closest = closest;
 		found = true;
 	}
 
-	point = best_point;
+	if (!found) {
+		return false;
+	}
+
+	const Vec3f direction = (point - best_closest) * (1.0f / best_distance);
+
+	float32 target = scProbeHugSurfaceOffset;
+
+	const auto keeps_clear = [&](float32 along)
+	{ return DistanceToOtherBoxes(best_closest + direction * along, boxes, best_box) >= along; };
+
+	if (target > best_distance && !keeps_clear(target)) {
+		float32 clear = best_distance;
+		float32 blocked = target;
+
+		for (uint32 step = 0; step < 16; step++) {
+			const float32 middle = (clear + blocked) * 0.5f;
+
+			if (keeps_clear(middle)) {
+				clear = middle;
+			}
+			else {
+				blocked = middle;
+			}
+		}
+
+		target = clear;
+	}
+
+	point = best_closest + direction * target;
+	return true;
+}
+
+bool FindValidProbePosition(const Vec3f& grid_position, const Vec3f& preferred, const Vec3f& max_relocation,
+							const ProbePlacementBoxes& boxes, Vec3f& out_position)
+{
+	constexpr float32 cStepScale = 2.0f / static_cast<float32>(scRelocationSearchSteps - 1);
+
+	float32 best_distance = std::numeric_limits<float32>::max();
+	bool found = false;
+
+	for (uint32 iz = 0; iz < scRelocationSearchSteps; iz++) {
+		for (uint32 iy = 0; iy < scRelocationSearchSteps; iy++) {
+			for (uint32 ix = 0; ix < scRelocationSearchSteps; ix++) {
+				const Vec3f step = Vec3f(static_cast<float32>(ix), static_cast<float32>(iy), static_cast<float32>(iz)) *
+									   cStepScale -
+								   Vec3f(1.0f);
+
+				const Vec3f candidate = grid_position + max_relocation * step;
+				const float32 distance = (candidate - preferred).Length();
+
+				if (distance >= best_distance || !IsProbePlacementValid(grid_position, candidate, boxes)) {
+					continue;
+				}
+
+				best_distance = distance;
+				out_position = candidate;
+				found = true;
+			}
+		}
+	}
+
 	return found;
+}
+
+void FitVolumeInsideLevel(const ProbePlacementBoxes& boxes, const ProbeGridSize& grid, Vec3f& out_min, Vec3f& out_size)
+{
+	const Vec3f level_size = boxes.Max - boxes.Min;
+	const Vec3f slices(static_cast<float32>(grid.X), static_cast<float32>(grid.Y), static_cast<float32>(grid.Z));
+	const Vec3f inset = level_size / (slices * 2.0f);
+
+	out_min = boxes.Min + inset;
+	out_size = level_size - inset * 2.0f;
 }
 
 bool CheckGridSize(const ProbeGridSize& grid)
@@ -385,16 +659,14 @@ bool CheckGridSize(const ProbeGridSize& grid)
 	return false;
 }
 
-void SetProbePosition(ProbeInfo& info, const Vec3f& position)
+void SetProbePosition(ProbeInfo& info, const Vec3f& position, bool active)
 {
 	info.ProbePosition[0] = position.X;
 	info.ProbePosition[1] = position.Y;
 	info.ProbePosition[2] = position.Z;
-	info.ProbePosition[3] = 0.0f;
+	info.ProbePosition[3] = active ? 1.0f : 0.0f;
 }
 
-/// Puts a probe's depth moments back to "nothing hit". A probe that has moved was captured somewhere else, and a
-/// probe that has never been captured has zeroed moments, which would read as an occluder sitting on top of it.
 void ResetDepthMoments(ProbeInfo& info)
 {
 	for (uint32 texel = 0; texel < Limits::ProbeDepthFaces * Limits::ProbeDepthTexelsPerFace; texel++) {
@@ -407,7 +679,6 @@ void ResetDepthMoments(ProbeInfo& info)
 // GPU and file IO
 ///////////////////////////////////
 
-/// Copies `size` bytes at `offset` in `data` to the same offset in `buffer`
 void UploadRange(renderer::RawGpuBuffer& buffer, const void* data, uint64 offset, uint64 size)
 {
 	uint8* mapped = static_cast<uint8*>(buffer.pMappedBuffer);
@@ -426,8 +697,6 @@ struct ProbeFileLayout
 	uint32 Version = FX_PROBE_CACHE_FILE_VERSION;
 	uint32 SHCoeffCount = Limits::ProbeSHCoeffCount;
 	uint32 DepthFloatCount = Limits::ProbeDepthFloatCount;
-	/// The volume array is written whole, so its length is part of the layout. The probe count isn't: only the
-	/// probes the volumes actually use are written.
 	uint32 MaxVolumes = Limits::MaxProbeVolumes;
 };
 
@@ -504,8 +773,6 @@ bool ReadExact(File& file, void* out, uint64 size)
 
 void ProbeManager::Create()
 {
-	// Until probes are baked or loaded everything is lit by a dim sky gradient. Every probe is the same, so it doesn't
-
 	constexpr float32 cSky[3] = { 0.055f, 0.062f, 0.075f };
 	constexpr float32 cGround[3] = { 0.025f, 0.022f, 0.020f };
 
@@ -518,7 +785,6 @@ void ProbeManager::Create()
 
 	ClearVolumes();
 
-	// The object cache is empty this early, so there is nothing to keep the probes out of
 	AddVolumeAndPlaceProbes(Vec3f(-20.0f, -2.0f, -20.0f), Vec3f(150.0f, 15.0f, 150.0f), ProbeGridSize { 4, 2, 4 },
 							ProbePlacementBoxes {});
 }
@@ -618,13 +884,11 @@ bool ProbeManager::AddLevelVolume(const ProbeGridSize& grid)
 		return false;
 	}
 
-	// Pad the volume so that the outermost probes sit off the level's outer surfaces, but never put it below the ground
-	Vec3f volume_min = boxes.Min - Vec3f(scVolumePadding);
-	volume_min.Y = std::max(volume_min.Y, 0.0f);
+	Vec3f volume_min;
+	Vec3f volume_size;
+	FitVolumeInsideLevel(boxes, grid, volume_min, volume_size);
 
-	const Vec3f volume_max = boxes.Max + Vec3f(scVolumePadding);
-
-	return AddVolumeAndPlaceProbes(volume_min, volume_max - volume_min, grid, boxes);
+	return AddVolumeAndPlaceProbes(volume_min, volume_size, grid, boxes);
 }
 
 uint32 ProbeManager::RebuildVolumesFromWorld()
@@ -702,12 +966,13 @@ void ProbeManager::BeginGridBake()
 		return;
 	}
 
-	Vec3f volume_min = boxes.Min - Vec3f(scVolumePadding);
-	volume_min.Y = std::max(volume_min.Y, 0.0f);
+	const ProbeGridSize grid {};
 
-	const Vec3f volume_max = boxes.Max + Vec3f(scVolumePadding);
+	Vec3f volume_min;
+	Vec3f volume_size;
+	FitVolumeInsideLevel(boxes, grid, volume_min, volume_size);
 
-	StartSingleVolumeBake(volume_min, volume_max - volume_min, ProbeGridSize {}, boxes);
+	StartSingleVolumeBake(volume_min, volume_size, grid, boxes);
 }
 
 void ProbeManager::BeginGridBakeAt(const Vec3f& center, const Vec3f& size, const ProbeGridSize& grid)
@@ -790,20 +1055,25 @@ void ProbeManager::PlaceVolumeProbes(uint32 volume_index, uint32 first_probe, co
 						  static_cast<float32>(dims[2] - 1));
 
 	const Vec3f cell_size = volume_size / num_cells;
-	const Vec3f volume_max = volume_min + volume_size;
 
 	const float32 hug_distance = std::min(
 		{ scProbeHugMaxDistance, 0.5f * cell_size.X, 0.5f * cell_size.Y, 0.5f * cell_size.Z });
 
+	const Vec3f max_relocation = cell_size * scMaxProbeRelocation;
+
 	uint32 num_pushed = 0;
 	uint32 num_hugged = 0;
+	uint32 num_relocated = 0;
+	uint32 num_inactive = 0;
 	uint32 probe_index = first_probe;
 
 	for (uint32 iz = 0; iz < dims[2]; iz++) {
 		for (uint32 iy = 0; iy < dims[1]; iy++) {
 			for (uint32 ix = 0; ix < dims[0]; ix++) {
-				Vec3f position = volume_min + cell_size * Vec3f(static_cast<float32>(ix), static_cast<float32>(iy),
-																static_cast<float32>(iz));
+				const Vec3f grid_position = volume_min + cell_size * Vec3f(static_cast<float32>(ix),
+																		   static_cast<float32>(iy),
+																		   static_cast<float32>(iz));
+				Vec3f position = grid_position;
 
 				if (PushOutOfBoxes(position, boxes)) {
 					num_pushed++;
@@ -812,17 +1082,32 @@ void ProbeManager::PlaceVolumeProbes(uint32 volume_index, uint32 first_probe, co
 				if (HugNearestSurface(position, boxes, hug_distance)) {
 					// The surface of one box can be inside another
 					PushOutOfBoxes(position, boxes);
-
-					// The shader's trilinear lookup only works for probes inside the volume
-					position = Vec3f::Clamp(position, volume_min, volume_max);
 					num_hugged++;
+				}
+
+				position = Vec3f::Clamp(position, grid_position - max_relocation, grid_position + max_relocation);
+
+				bool active = IsProbePlacementValid(grid_position, position, boxes);
+
+				// A missing probe leaves its neighbours on the far side of a wall to light the surfaces around it
+				if (!active) {
+					Vec3f fallback;
+					active = FindValidProbePosition(grid_position, position, max_relocation, boxes, fallback);
+
+					if (active) {
+						position = fallback;
+						num_relocated++;
+					}
+					else {
+						num_inactive++;
+					}
 				}
 
 				// The probes have moved, so whatever depth moments they hold were captured somewhere else. Reset
 				// them until the bake fills them in, or unbaked probes would report occluders that aren't there.
 				ResetDepthMoments(mProbeInfos[probe_index]);
 
-				SetProbePosition(mProbeInfos[probe_index++], position);
+				SetProbePosition(mProbeInfos[probe_index++], position, active);
 			}
 		}
 	}
@@ -841,9 +1126,10 @@ void ProbeManager::PlaceVolumeProbes(uint32 volume_index, uint32 first_probe, co
 
 	FinaliseVolumeBounds(volume);
 
-	LogInfo("Probe volume {}: min={} size={} grid={}x{}x{} ({} probes from index {}, {} pushed out, {} hugging)",
+	LogInfo("Probe volume {}: min={} size={} grid={}x{}x{} ({} probes from index {}, {} pushed out, {} hugging, {} "
+			"relocated, {} inactive)",
 			volume_index, volume_min, volume_size, dims[0], dims[1], dims[2], grid.GetProbeCount(), first_probe,
-			num_pushed, num_hugged);
+			num_pushed, num_hugged, num_relocated, num_inactive);
 }
 
 ///////////////////////////////////
@@ -1116,8 +1402,9 @@ void ProbeManager::UploadToGpu(uint32 first_probe, uint32 count)
 
 
 	for (uint32 probe = first_probe; probe < first_probe + count; probe++) {
-		for (uint32 axis = 0; axis < 3; axis++) {
-			mProbes[probe].SH[axis][3] = mProbeInfos[probe].ProbePosition[axis];
+		// Position in the first three w lanes, the active flag in the fourth
+		for (uint32 lane = 0; lane < 4; lane++) {
+			mProbes[probe].SH[lane][3] = mProbeInfos[probe].ProbePosition[lane];
 		}
 	}
 
@@ -1273,31 +1560,17 @@ bool ProbeManager::LoadProbes()
 
 	ProbeVolumeData volumes[Limits::MaxProbeVolumes] {};
 
-	if (header.Layout.Version >= 9) {
+	if (header.Layout.Version == FX_PROBE_CACHE_FILE_VERSION) {
 		if (!ReadExact(file, volumes, sizeof(volumes))) {
 			LogError("Could not read the probe volumes from {}", path.CStr());
 			return false;
 		}
 	}
 	else {
-		// Version 8 predates MaxAndCellVolume, which is derived, so the bake itself is still good
-		ProbeVolumeDataV8 legacy[Limits::MaxProbeVolumes];
-
-		if (!ReadExact(file, legacy, sizeof(legacy))) {
-			LogError("Could not read the probe volumes from {}", path.CStr());
-			return false;
-		}
-
-		for (uint32 volume = 0; volume < Limits::MaxProbeVolumes; volume++) {
-			memcpy(volumes[volume].MinAndCount, legacy[volume].MinAndCount, sizeof(legacy[volume].MinAndCount));
-			memcpy(volumes[volume].InvCellSize, legacy[volume].InvCellSize, sizeof(legacy[volume].InvCellSize));
-			memcpy(volumes[volume].DimsAndFirst, legacy[volume].DimsAndFirst, sizeof(legacy[volume].DimsAndFirst));
-
-			FinaliseVolumeBounds(volumes[volume]);
-		}
-
-		LogInfo("Migrated probe cache {} from version {} to {}", path.CStr(), header.Layout.Version,
-				FX_PROBE_CACHE_FILE_VERSION);
+		LogError("Probe file version mismatch (found version {} but expected version {})", header.Layout.Version,
+				 FX_PROBE_CACHE_FILE_VERSION);
+		return false;
+		;
 	}
 
 	// A volume whose probes run past what the file holds would send the shader into probes that were never placed
