@@ -7,7 +7,6 @@
 
 #include <SDL3/SDL.h>
 
-#include <Asset/MipmapGen.hpp>
 #include <Core/Defer.hpp>
 #include <Core/String.hpp>
 
@@ -23,19 +22,6 @@ static void WB_InitStatVars(FoxVM* vm, const SizedArray<FoxValue>& args)
 {
 	LogInfo("Damage: {}", args[0].Get<int32>());
 }
-
-static void N_MipsExport(FoxVM* vm, const SizedArray<FoxValue>& args)
-{
-	// const FoxValue& datapack_path = args[0];
-
-	// MipmapLoader loader;
-	// loader.Open(datapack_path.Get<const char*>());
-	// if (!loader.Pack.IsOpen()) {
-	// 	LogError("Could not open datapack");
-	// 	return;
-	// }
-}
-
 
 FoxScript::FoxScript(const String& path) { Load(path); }
 

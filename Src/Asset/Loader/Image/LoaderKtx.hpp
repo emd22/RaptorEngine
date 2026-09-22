@@ -13,15 +13,12 @@ namespace fx {
 namespace loader {
 
 /**
- * @brief Loads and saves KTX (v1 and v2) images, including full mip chains.
+ * @brief Loads KTX (v1 and v2) images, including full mip chains.
  *
  * The pixel format is read from the file, so `ImageFormat` is ignored when loading.
  */
 class LoaderKtx final : public ImageLoaderBase
 {
-public:
-	static constexpr const char* scFileExtension = ".ktx2";
-
 public:
 	LoaderKtx() = default;
 	LoaderKtx(const LoaderKtx&) = delete;
@@ -33,15 +30,10 @@ public:
 	/// Loads a KTX file without an asset ticket. Returns whether the file was loaded.
 	bool Open(const char* path);
 
-	void CreateGpuResource(AssetTicket& ticket) override;
+	/// Loads a KTX image from memory without an asset ticket. `data` only needs to live for the duration of the call.
+	bool OpenFromMemory(const uint8* data, uint32 size);
 
-	/**
-	 * @brief Writes a KTX2 file from a set of tightly packed mip levels.
-	 * @param mips The pixel data of each mip level, ordered from the base (largest) level down
-	 * @param size The dimensions of the base level
-	 */
-	static eLoaderStatus SaveToFile(const String& path, eImageFormat format, const Vec2u& size,
-									const Slice<const Slice<const uint8>>& mips);
+	void CreateGpuResource(AssetTicket& ticket) override;
 
 	bool IsOpen() const { return mpTexture != nullptr; }
 

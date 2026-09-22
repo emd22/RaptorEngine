@@ -6,7 +6,6 @@
 #include <Asset/ConfigFile.hpp>
 #include <Asset/DataPack.hpp>
 #include <Asset/Font/Font.hpp>
-#include <Asset/MipmapGen.hpp>
 #include <Asset/ShaderCompiler.hpp>
 #include <Asset/ShaderPreproc.hpp>
 #include <Core/Defer.hpp>

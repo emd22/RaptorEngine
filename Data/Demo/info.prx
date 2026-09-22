@@ -15,26 +15,26 @@ lights = {
         type = $CLight.Spot
         pos = [4.0, 1.0, -4.0]
         dir = [-1.0, -0.2, -0.4]
-        color = [200, 180, 120, 120]
-        radius = 30.0
+        color = [255, 160, 120, 120]
+        radius = 40.0
         inner = 5.0
-        outer = 30.0
+        outer = 50.0
     }
     spot2 = {
         type = $CLight.Spot
         pos = [4.0, 1.0, 0.0]
         dir = [-1.0, -0.2, 0.0]
-        color = [200, 180, 120, 120]
-        radius = 30.0
+        color = [160, 255, 120, 120]
+        radius = 40.0
         inner = 5.0
-        outer = 30.0
+        outer = 50.0
     }
     /*spot1 = {
         type = $CLight.Spot
         pos = [-8.0, 2.5, 0.0]
         dir = [0.0, -1.0, 1.0]
         color = [40, 40, 255, 70]
-        radius = 30.0
+        radius = 40.0
         inner = 5.0
         outer = 50.0
     }

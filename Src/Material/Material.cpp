@@ -12,7 +12,6 @@
 #include <vulkan/vulkan.h>
 
 #include <Asset/AssetManager.hpp>
-#include <Asset/MipmapGen.hpp>
 #include <Core/Defines.hpp>
 #include <Core/StackArray.hpp>
 #include <Material/MaterialManager.hpp>
@@ -45,12 +44,9 @@ MaterialComponent& MaterialComponent::operator=(const MaterialComponent& other)
 	pImage = other.pImage;
 
 	UploadSrc = other.UploadSrc;
-	pDataToLoad = other.pDataToLoad;
 	ImageToUpload = other.ImageToUpload;
 	// Shallow, like the rest of this assignment: `other` stays the owner of the pixel buffer
 	ImageToUpload.bOwnsData = false;
-
-	TextureCacheID = other.TextureCacheID;
 
 	return *this;
 }
@@ -58,7 +54,7 @@ MaterialComponent& MaterialComponent::operator=(const MaterialComponent& other)
 MaterialComponent::Status MaterialComponent::Build()
 {
 	// There is no texture provided, we will use the base colours passed in and a dummy texture
-	if (!pImage && !pDataToLoad.pData && !ImageToUpload.ImageData.pData) {
+	if (!pImage && !ImageToUpload.ImageData.pData) {
 		return Status::MissingComponent;
 	}
 
@@ -91,12 +87,7 @@ bool MaterialComponent::CheckIfReady()
 	if (!pImage || mbRequiresUpdate) {
 		AssertMsg(UploadSrc != eMaterialComponentUploadSrc::None, "UploadSrc has not been set!");
 
-		if (UploadSrc == eMaterialComponentUploadSrc::ProcessAndUpload) {
-			AssetTicket ticket = gAssetManager->LoadImageFromMemory(eImageType::Flat, eImageFormat::RGBA8_UNorm,
-																	pDataToLoad, eImageCreateFlags::None);
-			SetTicket(ticket);
-		}
-		else if (UploadSrc == eMaterialComponentUploadSrc::DirectUpload) {
+		if (UploadSrc == eMaterialComponentUploadSrc::DirectUpload) {
 			// If the image has not been created yet, create the reference.
 			// if (!pImage && !Ticket.IsInvalid()) {
 			// 	Ticket = AssetTicket(gTextureManager->NewTexture());
@@ -149,33 +140,6 @@ bool Material::IsReady()
 
 	return (mbIsReady = true);
 }
-
-#define REQUEST_COMPONENT_HIGHER_DETAIL(component_)                                                                    \
-	if (component_.Exists()) {                                                                                         \
-		MipmapLoader loader {};                                                                                        \
-		String texture_cache_path = String::Fmt("{}/Models/TGen/{}.ktx2", gAssetManager->GetScenePath(),                \
-												component_.TextureCacheID);                                            \
-		loader.Open(texture_cache_path.CStr());                                                                        \
-		if (loader.IsOpen()) {                                                                                    \
-			component_.ImageToUpload = loader.GetQuality(quality);                                                     \
-			component_.pAssetImage->InvalidateLoaded();                                                                \
-			component_.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;                                          \
-			component_.RequireUpdate();                                                                                \
-		}                                                                                                              \
-	}
-
-
-void Material::RequestQuality(uint32 quality)
-{
-	// REQUEST_COMPONENT_HIGHER_DETAIL(Diffuse);
-	// REQUEST_COMPONENT_HIGHER_DETAIL(NormalMap);
-	// REQUEST_COMPONENT_HIGHER_DETAIL(MetallicRoughness);
-
-	bReadyToCheck.test_and_set();
-	bIsBuilt.store(false);
-	mbIsReady = false;
-}
-
 
 bool Material::BindWithPipeline(const CommandBuffer& cmd, const Pipeline& pipeline)
 {
