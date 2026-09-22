@@ -37,7 +37,7 @@ ProbeManager* gProbeManager = nullptr;
 DecalManager* gDecalManager = nullptr;
 ScriptManager* gScriptManager = nullptr;
 
-EditorMode* gSelectedEditorMode = nullptr;
+EditorMode* gPrototypeEditor = nullptr;
 CVarManager* gCVars = nullptr;
 
 

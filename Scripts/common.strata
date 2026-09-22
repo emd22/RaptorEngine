@@ -32,3 +32,10 @@ float fclamp(float value, float lo, float hi)
 
 	return value;
 }
+
+const float MATH_PI = 3.141592653589793f;
+
+float deg2rad(float deg)
+{
+	return ((deg * MATH_PI) / 180.0f);
+}

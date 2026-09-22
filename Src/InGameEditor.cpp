@@ -71,6 +71,19 @@ EditOperationValue EditOperation::Execute()
 
 		break;
 	}
+	case eType::Rotate: {
+		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
+		Assert(ValueB.Type == EditOperationValue::eValueType::Vec3);
+
+		Object* target = ResolveOpTarget(*this);
+		if (target == nullptr) {
+			break;
+		}
+
+		target->SetRotation(Quat::FromEulerAngles(ValueB.Position));
+
+		return ValueB;
+	}
 	case eType::Dupe: {
 		// Origin point
 		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
@@ -89,8 +102,8 @@ EditOperationValue EditOperation::Execute()
 
 		// DupeObject copies the source's *current* material, which is the selection
 		// material while selected. Restore the original so dupes don't inherit it.
-		if (gSelectedEditorMode != nullptr) {
-			dupe->SetMaterial(gSelectedEditorMode->GetStoredMaterial(pObject));
+		if (gPrototypeEditor != nullptr) {
+			dupe->SetMaterial(gPrototypeEditor->GetStoredMaterial(pObject));
 		}
 
 		ValueB.Set(dupe);
@@ -112,8 +125,8 @@ EditOperationValue EditOperation::Execute()
 			break;
 		}
 
-		if (gSelectedEditorMode != nullptr) {
-			gSelectedEditorMode->RemoveFromSelectionInternal(target);
+		if (gPrototypeEditor != nullptr) {
+			gPrototypeEditor->RemoveFromSelectionInternal(target);
 		}
 
 		gWorld->pBlockout->DestroyObject(target);
@@ -159,6 +172,19 @@ void EditOperation::Undo()
 
 		break;
 	}
+	case eType::Rotate: {
+		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
+		Assert(ValueB.Type == EditOperationValue::eValueType::Vec3);
+
+		Object* target = ResolveOpTarget(*this);
+		if (target == nullptr) {
+			break;
+		}
+
+		target->SetRotation(Quat::FromEulerAngles(ValueA.Position));
+
+		break;
+	}
 	case eType::Dupe: {
 		Assert(pObject != nullptr);
 
@@ -170,8 +196,8 @@ void EditOperation::Undo()
 			break;
 		}
 
-		if (gSelectedEditorMode != nullptr) {
-			gSelectedEditorMode->RemoveFromSelectionInternal(dupe);
+		if (gPrototypeEditor != nullptr) {
+			gPrototypeEditor->RemoveFromSelectionInternal(dupe);
 		}
 
 		gWorld->pBlockout->DestroyObject(dupe);
@@ -189,8 +215,8 @@ void EditOperation::Undo()
 			break;
 		}
 
-		if (gSelectedEditorMode != nullptr) {
-			gSelectedEditorMode->RemoveFromSelectionInternal(created);
+		if (gPrototypeEditor != nullptr) {
+			gPrototypeEditor->RemoveFromSelectionInternal(created);
 		}
 
 		gWorld->pBlockout->DestroyObject(created);
@@ -581,7 +607,8 @@ bool EditorMode::IsInSelection(Object* object) const
 	return false;
 }
 
-void EditorMode::Load()
+
+void EditorMode::Reload()
 {
 	auto mode_load = pScript->GetFunction<void (*)()>("mode_load");
 	if (mode_load) {

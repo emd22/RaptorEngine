@@ -137,7 +137,7 @@ void PhysicsPlayer::Update(float64 delta_time)
 
 	// Move character
 	CharacterVirtual::ExtendedUpdateSettings update_settings {
-		.mStickToFloorStepDown = JPH::Vec3(0.0f, -0.1f, 0.0f),
+		.mStickToFloorStepDown = JPH::Vec3(0.0f, -0.01f, 0.0f),
 		.mWalkStairsStepUp = Vec3(0, 1, 0),
 		.mWalkStairsMinStepForward = 0.02f,
 		.mWalkStairsStepForwardTest = 0.1f,

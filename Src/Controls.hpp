@@ -107,6 +107,23 @@ public:
 
 	static void Update();
 
+	////////////////////////////////
+	// External input
+	////////////////////////////////
+
+	/// Feeds a key or mouse button change from a window that doesn't go through SDL (the editor viewport)
+	static void PostButtonEvent(eKey key_id, bool is_now_down);
+
+	/// Feeds relative mouse movement from a window that doesn't go through SDL (the editor viewport)
+	static void PostMouseMotion(const Vec2f& delta);
+
+	/// Lifts every key and button, for when the window loses focus and won't see the key up events
+	static void ReleaseAllKeys();
+
+	/// Lifts every standard (non-modifier) key. macOS doesn't deliver key-up events for other keys while Cmd is held,
+	/// so the editor viewport calls this once Cmd itself comes back up to flush anything left stuck down.
+	static void ReleaseNonModifierKeys();
+
 private:
 	static void UpdateFromKeyboardEvent(SDL_Event* event);
 	static void UpdateFromMouseButtonEvent(SDL_Event* event);

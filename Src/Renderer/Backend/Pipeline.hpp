@@ -91,7 +91,10 @@ struct alignas(16) DrawPushConstants
 
 	/// Index of the draw's first matrix in `GraphicsBackend::BoneBuffer` (skinned pipelines only).
 	uint32 BoneBase = 0;
-	uint32 _Pad0 = 0;
+
+	/// Rows the light grid was dispatched with. Paired with `TileColumns` so the shading pass can clamp a pixel's
+	/// tile to the grid that was actually culled
+	uint32 TileRows = 0;
 
 	float32 EyePosition[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 };

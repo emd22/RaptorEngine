@@ -16,6 +16,7 @@ set(VS_STARTUP_PROJECT raptor)
 
 option(USE_SIMDE "Use SIMDe to use AVX on a non-AVX platform" OFF)
 option(USE_MOLTENVK "Compile with support for MoltenVK. Defaults to KosmicKrisp on macOS" OFF)
+option(FX_EDITOR "Build with the simple editor" OFF)
 
 # Fallback directory the engine searches for assets (Data/, Config/, Shaders/) when they aren't
 # found next to the executable (see FilesystemIO::ResolvePath). Defaults to "." (resolved against
@@ -36,6 +37,10 @@ file(GLOB_RECURSE SOURCES
 message(STATUS "${SHADER_SOURCES}")
 
 #set_source_files_properties(${SHADER_SOURCES} PROPERTIES LANGUAGE HLSL)
+
+if(NOT FX_EDITOR)
+    list(FILTER SOURCES EXCLUDE REGEX "/Src/Editor/")
+endif()
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${SOURCES})
 
@@ -138,6 +143,22 @@ endif()
 
 if(USE_MOLTENVK)
     target_compile_definitions(raptor PRIVATE FX_USE_PORTABILITY_EXTENSION)
+endif()
+
+if(FX_EDITOR)
+    find_package(wxWidgets 3.3.3 REQUIRED COMPONENTS core base)
+
+    target_link_libraries(raptor PRIVATE wxWidgets::wxWidgets)
+    target_compile_definitions(raptor PRIVATE FX_IS_EDITOR)
+
+    # TODO: test on windows and fix the library gubbins over there
+    if(APPLE)
+        # Metal layer and relative mouse helpers
+        enable_language(OBJCXX)
+        target_sources(raptor PRIVATE "Src/Editor/EditorPlatformMac.mm")
+        set_source_files_properties("Src/Editor/EditorPlatformMac.mm" PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+        target_link_libraries(raptor PRIVATE "-framework Cocoa" "-framework QuartzCore")
+    endif()
 endif()
 
 if(MSVC)

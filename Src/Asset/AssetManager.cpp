@@ -429,13 +429,18 @@ AssetTicket AssetManager::LoadImageFromMemory(eImageType image_type, eImageForma
 	return ticket;
 }
 
-AssetTicket AssetManager::UploadImage(const ImageInfo& img_info)
+AssetTicket AssetManager::UploadImage(ImageInfo& img_info)
 {
 	AssetTicket ticket = NewTextureTicket();
 
 	AssertMsg(img_info.ImageData.pData != nullptr, "Image data cannot be null");
 
 	mLoadQueue.Push(AssetQueueItem::DirectUploadImage(ticket, img_info));
+
+	// The queued item owns the pixels from here. The caller keeps its pointer (MaterialComponent still tests it to
+	// decide whether a component has anything to upload) but is no longer the one that frees it.
+	img_info.bOwnsData = false;
+
 	SignalUpdate();
 
 	return ticket;
@@ -567,6 +572,9 @@ static void DoDirectUpload(AssetQueueItem& item, AssetItemData& asset_data)
 	Image* image = static_cast<Image*>(ticket.Get());
 
 	image->Upload(renderer::GraphicsBackendFwd::GetUploadCmd(), img_info);
+
+	// Upload() stages the pixels into a GPU buffer, so the CPU side copy is done with here
+	img_info.FreeOwnedData();
 
 	ticket.SignalUploadedToGpu();
 }

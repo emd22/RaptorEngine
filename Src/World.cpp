@@ -627,6 +627,7 @@ void World::ExecutePrepassRenderList(renderer::ePipelineName forward_pl_name)
 		consts.ObjectId = object_id.GetID();
 		consts.MaterialIndex = object->GetMaterialID().GetID();
 		consts.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
+		consts.TileRows = gGraphics->pRenderer->GetLightTileRows();
 		consts.BoneBase = object->BoneBufferBase;
 
 		const Mat4f& cam_matrix = camera.GetCameraMatrix(object->GetObjectLayer());
@@ -907,7 +908,7 @@ void World::Render(Camera* shadow_camera)
 		RenderProbeDebug(camera);
 	}
 
-	if (gSelectedEditorMode != nullptr || bRenderProbes) {
+	if (gPrototypeEditor != nullptr || bRenderProbes) {
 		RenderProbeVolumes(camera);
 	}
 
@@ -978,6 +979,7 @@ void World::RenderProbeCapture()
 	RequirePipelineDynamicStates();
 
 	const uint32 saved_tile_columns = gGraphics->pRenderer->GetLightTileColumns();
+	const uint32 saved_tile_rows = gGraphics->pRenderer->GetLightTileRows();
 
 	// The render list was culled to the player's view, but the probes need to see the whole level
 	ClearRenderList();
@@ -1039,6 +1041,7 @@ void World::RenderProbeCapture()
 	}
 
 	gGraphics->pRenderer->mLightTileColumns = saved_tile_columns;
+	gGraphics->pRenderer->mLightTileRows = saved_tile_rows;
 
 	// Force the composition pass to re-emit viewport size/state
 	RequirePipelineDynamicStates();
@@ -1211,7 +1214,7 @@ void World::RenderProbeVolumes(const Camera& camera)
 
 		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
 
-		const bool is_selected = gSelectedEditorMode != nullptr && gSelectedEditorMode->IsInSelection(&object);
+		const bool is_selected = gPrototypeEditor != nullptr && gPrototypeEditor->IsInSelection(&object);
 		push_constants.DebugColor = is_selected ? selected_color.AsUInt() : volume_color.AsUInt();
 
 		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);

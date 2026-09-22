@@ -49,8 +49,8 @@ void Console::ExecuteCommand(const DynArray<String>& tokens)
 	else {
 		// Try and call an editor function.
 
-		if (gSelectedEditorMode != nullptr) {
-			auto fn = gSelectedEditorMode->pScript->GetFunction<void (*)()>((String::Fmt("CMD_{}", cmd)).CStr());
+		if (gPrototypeEditor != nullptr) {
+			auto fn = gPrototypeEditor->pScript->GetFunction<void (*)()>((String::Fmt("CMD_{}", cmd)).CStr());
 			if (fn != nullptr) {
 				fn();
 				Output = "Executed";

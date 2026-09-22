@@ -3,6 +3,8 @@
 #include <Blockout.hpp>
 #include <CVar.hpp>
 #include <Controls.hpp>
+#include <Editor/EditorApp.hpp>
+#include <Editor/EditorFrame.hpp>
 #include <Engine.hpp>
 #include <InGameEditor.hpp>
 #include <Math/SIMDHelper.hpp>
@@ -31,8 +33,8 @@ static Vec3f N_editor_push_op_vec3(Object* obj, int op_type, FLOAT4 original, FL
 		return Vec3f::sZero;
 	}
 
-	if (gSelectedEditorMode) {
-		EditOperationValue eov = gSelectedEditorMode->PushEditOperation(EditOperation {
+	if (gPrototypeEditor) {
+		EditOperationValue eov = gPrototypeEditor->PushEditOperation(EditOperation {
 			.Type = static_cast<EditOperation::eType>(op_type),
 			.pObject = obj,
 			.ValueA = EditOperationValue(Vec3f(original)),
@@ -52,8 +54,8 @@ static Object* N_editor_push_op_object(Object* obj, int op_type, Object* origina
 		return nullptr;
 	}
 
-	if (gSelectedEditorMode) {
-		EditOperationValue eov = gSelectedEditorMode->PushEditOperation(EditOperation {
+	if (gPrototypeEditor) {
+		EditOperationValue eov = gPrototypeEditor->PushEditOperation(EditOperation {
 			.Type = static_cast<EditOperation::eType>(op_type),
 			.pObject = obj,
 			.ValueA = EditOperationValue(original),
@@ -69,8 +71,8 @@ static Object* N_editor_push_op_object(Object* obj, int op_type, Object* origina
 
 static Object* N_editor_op_create_object(FLOAT4 position, int32 group_size)
 {
-	if (gSelectedEditorMode) {
-		EditOperationValue eov = gSelectedEditorMode->PushEditOperation(EditOperation {
+	if (gPrototypeEditor) {
+		EditOperationValue eov = gPrototypeEditor->PushEditOperation(EditOperation {
 			.Type = EditOperation::eType::Create,
 			.pObject = nullptr,
 			.ValueA = EditOperationValue(Vec3f(position)),
@@ -86,8 +88,8 @@ static Object* N_editor_op_create_object(FLOAT4 position, int32 group_size)
 
 static Object* N_editor_op_dupe_object(Object* object_to_dupe, FLOAT4 position, int32 group_size)
 {
-	if (gSelectedEditorMode) {
-		EditOperationValue eov = gSelectedEditorMode->PushEditOperation(EditOperation {
+	if (gPrototypeEditor) {
+		EditOperationValue eov = gPrototypeEditor->PushEditOperation(EditOperation {
 			.Type = EditOperation::eType::Dupe,
 			.pObject = object_to_dupe,
 			.ValueA = EditOperationValue(Vec3f(position)),
@@ -103,7 +105,7 @@ static Object* N_editor_op_dupe_object(Object* object_to_dupe, FLOAT4 position, 
 
 static void N_editor_push_op_delete(Object* obj, int32 group_size)
 {
-	if (obj == nullptr || gSelectedEditorMode == nullptr) {
+	if (obj == nullptr || editor::IsSimulationMode()) {
 		return;
 	}
 
@@ -119,12 +121,12 @@ static void N_editor_push_op_delete(Object* obj, int32 group_size)
 	op.DeleteSnapshot.Position = obj->GetPosition();
 	op.DeleteSnapshot.BoundsMin = obj->Bounds.Min;
 	op.DeleteSnapshot.BoundsMax = obj->Bounds.Max;
-	op.DeleteSnapshot.Material = gSelectedEditorMode->GetStoredMaterial(obj);
+	op.DeleteSnapshot.Material = gPrototypeEditor->GetStoredMaterial(obj);
 	op.DeleteSnapshot.Rotation = obj->mRotation;
 	op.DeleteSnapshot.ObjectName = obj->Name;
 	op.DeleteSnapshot.bIsProbeVolume = obj->IsProbeVolume();
 
-	gSelectedEditorMode->PushEditOperation(op);
+	gPrototypeEditor->PushEditOperation(op);
 }
 
 
@@ -155,6 +157,24 @@ static FLOAT4 N_object_get_position(Object* obj)
 	}
 
 	return obj->GetPosition().mIntrin;
+}
+
+static void N_object_rotate_to(Object* obj, FLOAT4 euler_radians)
+{
+	if (obj == nullptr) {
+		return;
+	}
+
+	obj->SetRotation(Quat::FromEulerAngles(Vec3f(euler_radians)));
+}
+
+static FLOAT4 N_object_get_rotation(Object* obj)
+{
+	if (obj == nullptr) {
+		return simd::LoadFloat4(0.0f);
+	}
+
+	return obj->mRotation.GetEulerAngles().mIntrin;
 }
 
 static void N_print_float4(FLOAT4 v) { LogInfo(LC_SCRIPT, "{}", Vec4f(v)); }
@@ -213,18 +233,18 @@ static FLOAT4 N_object_ray_get_face(Object* obj)
 
 static void N_object__select_object_internal(Object* obj, bool is_selected, bool append_selection)
 {
-	if (gSelectedEditorMode == nullptr) {
+	if (editor::IsSimulationMode()) {
 		return;
 	}
 
 	// Deselect object
 	if (!is_selected || obj == nullptr) {
-		gSelectedEditorMode->SelectObject(nullptr, false);
+		gPrototypeEditor->SelectObject(nullptr, false);
 		return;
 	}
 
 	// Select an object
-	gSelectedEditorMode->SelectObject(obj, append_selection);
+	gPrototypeEditor->SelectObject(obj, append_selection);
 }
 
 
@@ -327,6 +347,14 @@ static int64 N_cvar_get_int(const char* name, int64 fallback) { return gCVars->G
 
 static void N_script_error(const char* str) { LogError(LC_SCRIPT, "{}", str); }
 
+static void N_GUI_set_editor_tool(eEditorTool tool)
+{
+#ifdef FX_IS_EDITOR
+	editor::GetMainFrame()->SetEditorTool(tool);
+#endif
+}
+
+
 /////////////////////////////////////
 // Predef gather
 /////////////////////////////////////
@@ -353,6 +381,8 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("OBJECT_move_to", N_object_move_to),
 	PREDEF("OBJECT_move_by", N_object_move_by),
 	PREDEF("OBJECT_get_position", N_object_get_position),
+	PREDEF("OBJECT_rotate_to", N_object_rotate_to),
+	PREDEF("OBJECT_get_rotation", N_object_get_rotation),
 	PREDEF("OBJECT_get_tags", N_object_get_tags),
 	PREDEF("OBJECT_set_tags", N_object_set_tags),
 	PREDEF("OBJECT_ray_get_face", N_object_ray_get_face),
@@ -402,6 +432,7 @@ static const PredefExtern scAvailableExterns[] = {
 
 	PREDEF("script_error", N_script_error),
 
+	PREDEF("GUI_set_editor_tool", N_GUI_set_editor_tool),
 
 }; // namespace fx::script
 
