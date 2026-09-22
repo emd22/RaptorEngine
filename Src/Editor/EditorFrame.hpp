@@ -12,6 +12,7 @@ namespace fx::editor {
 
 class ObjectPropertiesPanel;
 class WorldPropertiesPanel;
+class ObjectListWindow;
 
 class EditorViewport;
 
@@ -35,6 +36,8 @@ public:
 	/// False while the frame is minimized or another app is in front, so the render loop can throttle itself
 	FX_FORCE_INLINE bool IsActive() const { return mbIsActive; }
 
+	void ShowObjectListWindow();
+
 private:
 	void OnClose(wxCloseEvent& event);
 	void OnActivate(wxActivateEvent& event);
@@ -44,6 +47,7 @@ private:
 	EditorViewport* mpViewport = nullptr;
 	ObjectPropertiesPanel* mpObjectPropertiesPanel = nullptr;
 	WorldPropertiesPanel* mpWorldPropertiesPanel = nullptr;
+	ObjectListWindow* mpObjectListWindow = nullptr;
 
 	StackArray<wxToggleButton*, static_cast<uint32>(eEditorTool::Count)> mToolButtons;
 	eEditorTool mSelectedTool = eEditorTool::Translate;
