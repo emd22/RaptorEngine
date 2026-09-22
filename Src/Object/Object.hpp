@@ -15,6 +15,7 @@
 #include <FoxScript/FoxScript.hpp>
 #include <Material/MaterialID.hpp>
 #include <Math/BoundingBox.hpp>
+#include <Math/OrientedBoundingBox.hpp>
 #include <WorldGrid.hpp>
 
 
@@ -168,6 +169,8 @@ public:
 	FX_FORCE_INLINE bool IsProbeVolume() const { return HasTags(eObjectTag::ProbeVolume); }
 
 	float32 RaycastBounds(const Vec3f& origin, const Vec3f& direction, Vec3f& out_face);
+
+	FX_FORCE_INLINE OBB GetWorldOBB() { return OBB::FromLocalBounds(Bounds, GetWorldMatrix()); }
 
 	/**
 	 * @brief True if light probe bakes should include this object. Objects on the player layer (the view model) are

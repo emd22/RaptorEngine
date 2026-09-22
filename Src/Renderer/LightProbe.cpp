@@ -224,22 +224,11 @@ constexpr float32 scMaxProbeSpacing = 64.0f;
 
 void GetObjectWorldBounds(Object& object, Vec3f& out_min, Vec3f& out_max)
 {
-	const Mat4f& model_matrix = object.GetWorldMatrix();
+	// OBB::FromLocalBounds() does the same per-corner transform this used to do inline
+	const AABB world_bounds = object.GetWorldOBB().GetWorldAABB();
 
-	out_min = Vec3f(std::numeric_limits<float32>::max());
-	out_max = Vec3f(-std::numeric_limits<float32>::max());
-
-	for (uint32 corner = 0; corner < 8; corner++) {
-		const Vec4f local((corner & 1) ? object.Bounds.Max.X : object.Bounds.Min.X,
-						  (corner & 2) ? object.Bounds.Max.Y : object.Bounds.Min.Y,
-						  (corner & 4) ? object.Bounds.Max.Z : object.Bounds.Min.Z, 1.0f);
-
-		const Vec4f world = model_matrix * local;
-		const Vec3f point(world.X, world.Y, world.Z);
-
-		out_min = Vec3f::Min(out_min, point);
-		out_max = Vec3f::Max(out_max, point);
-	}
+	out_min = world_bounds.Min;
+	out_max = world_bounds.Max;
 }
 
 ProbeGridSize MakeGridForSize(const Vec3f& size, float32 spacing, uint32 budget)
