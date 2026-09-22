@@ -529,6 +529,7 @@ void editor_face_tool_finalize()
 /////////////////////////////////////
 
 // 5 degrees as radians
+const float D2R_1_DEG = ((1.0f * MATH_PI) / 180.0f);
 const float D2R_5_DEG = ((5.0f * MATH_PI) / 180.0f);
 const float D2R_15_DEG = ((15.0f * MATH_PI) / 180.0f);
 const float D2R_45_DEG = ((45.0f * MATH_PI) / 180.0f);
@@ -536,7 +537,7 @@ const float D2R_90_DEG = ((90.0f * MATH_PI) / 180.0f);
 
 float editor_get_rotate_snap_value()
 {
-	float[4] snap_values = { D2R_5_DEG, D2R_15_DEG, D2R_45_DEG, D2R_90_DEG };
+	float[4] snap_values = { D2R_1_DEG, D2R_5_DEG, D2R_15_DEG, D2R_45_DEG };
 	uint index = fclamp(editor_snap_level, 0, 3);
 	return snap_values[index];
 }

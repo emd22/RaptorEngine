@@ -7,6 +7,8 @@
 
 #define PROBE_MAX_VOLUMES 8
 
+#define PROBE_MAX_PROBES 4096
+
 #define PROBE_DEPTH_SIZE 16
 #define PROBE_DEPTH_FACES 6
 #define PROBE_DEPTH_TEXELS_PER_FACE (PROBE_DEPTH_SIZE * PROBE_DEPTH_SIZE)
@@ -18,7 +20,7 @@
 #define PROBE_ATLAS_COLUMNS 32
 #define PROBE_ATLAS_PROBE_WIDTH (PROBE_DEPTH_FACES * PROBE_DEPTH_SIZE)
 #define PROBE_ATLAS_WIDTH (PROBE_ATLAS_COLUMNS * PROBE_ATLAS_PROBE_WIDTH)
-#define PROBE_ATLAS_HEIGHT 1024
+#define PROBE_ATLAS_HEIGHT (((PROBE_MAX_PROBES + PROBE_ATLAS_COLUMNS - 1) / PROBE_ATLAS_COLUMNS) * PROBE_DEPTH_SIZE)
 
 // Tuning
 
@@ -39,12 +41,15 @@
 struct ProbeSHData
 {
 	/// RGB per coefficient. The w lanes of the first three carry the probe's world position (ProbeSHPosition), the
-	/// rest are padding.
+	/// fourth whether the probe is active (ProbeSHActive), the rest are padding.
 	float4 SH[PROBE_SH_COEFF_COUNT];
 };
 
 
 float3 ProbeSHPosition(ProbeSHData probe) { return float3(probe.SH[0].w, probe.SH[1].w, probe.SH[2].w); }
+
+/// False for probes that placement left inside geometry, or could only have moved through a surface
+bool ProbeSHActive(ProbeSHData probe) { return probe.SH[3].w > 0.5; }
 
 struct ProbeVolume
 {
@@ -273,9 +278,14 @@ void SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume 
 
 	float3 diffuse = float3(0.0, 0.0, 0.0);
 	float3 specular = float3(0.0, 0.0, 0.0);
-
 	float total_weight = 0.0;
-	out_visibility = 0.0;
+
+	// Plain trilinear over every probe, only used if none of the cell's probes are active
+	float3 fallback_diffuse = float3(0.0, 0.0, 0.0);
+	float3 fallback_specular = float3(0.0, 0.0, 0.0);
+
+	float visibility_sum = 0.0;
+	float active_trilinear = 0.0;
 
 	for (uint corner = 0; corner < 8; corner++) {
 		const uint3 offset = uint3(corner, corner >> 1, corner >> 2) & uint3(1, 1, 1);
@@ -286,23 +296,45 @@ void SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume 
 		const float trilinear = axis_weights.x * axis_weights.y * axis_weights.z;
 
 		const ProbeSHData probe = probes[index];
+
+		const float3 probe_diffuse = EvalProbeIrradianceRaw(n, probe);
+		const float3 probe_specular = EvalProbeIrradianceRaw(r, probe);
+
+		fallback_diffuse += probe_diffuse * trilinear;
+		fallback_specular += probe_specular * trilinear;
+
+		if (!ProbeSHActive(probe)) {
+			continue;
+		}
+
 		const float3 probe_pos = ProbeSHPosition(probe);
 
 		const float visibility =
 			SampleProbeVisibility(biased_pos, probe_pos, moments_atlas, moments_sampler, index);
-		out_visibility += visibility * trilinear;
+
+		visibility_sum += visibility * trilinear;
+		active_trilinear += trilinear;
 
 		const float weight =
 			trilinear * ProbeBackfaceWeight(pos_ws, n, probe_pos) * max(visibility, PROBE_VISIBILITY_FLOOR);
 
-		diffuse += EvalProbeIrradianceRaw(n, probe) * weight;
-		specular += EvalProbeIrradianceRaw(r, probe) * weight;
+		diffuse += probe_diffuse * weight;
+		specular += probe_specular * weight;
 
 		total_weight += weight;
 	}
 
-	const float inv_weight = 1.0 / max(total_weight, 1e-6);
+	out_visibility = (active_trilinear > 1e-6) ? (visibility_sum / active_trilinear) : 1.0;
 
-	out_diffuse = max(diffuse * inv_weight, float3(0.0, 0.0, 0.0));
-	out_specular = max(specular * inv_weight, float3(0.0, 0.0, 0.0));
+	if (total_weight > 1e-6) {
+		diffuse /= total_weight;
+		specular /= total_weight;
+	}
+	else {
+		diffuse = fallback_diffuse;
+		specular = fallback_specular;
+	}
+
+	out_diffuse = max(diffuse, float3(0.0, 0.0, 0.0));
+	out_specular = max(specular, float3(0.0, 0.0, 0.0));
 }

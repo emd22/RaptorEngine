@@ -12,7 +12,7 @@
 
 namespace fx {
 
-/// L2 SH irradiance of one probe. Mirrors ProbeSHData in Shaders/ProbeCommon.hlsli.
+/// L2 SH irradiance of one probe
 struct ProbeSHData
 {
 	/// Coefficients in the order of EvalProbeIrradiance(), already convolved with the cosine lobe so evaluating them
@@ -23,12 +23,9 @@ struct ProbeSHData
 static_assert(sizeof(ProbeSHData) == Limits::ProbeSHCoeffCount * 4 * sizeof(float32),
 			  "ProbeSHData must be tightly packed as 9 float4s to mirror the HLSL struct");
 
-/// Placement of one probe grid, for the shader's trilinear lookup. Mirrors ProbeVolume in
-/// Shaders/ProbeCommon.hlsli.
 struct ProbeVolumeData
 {
-	/// World space min corner in XYZ. W holds the number of volumes in the buffer, the same in every entry, so
-	/// that the shader can read the list's length out of any one of them.
+	/// World space min corner in XYZ. W holds the number of volumes in the buffer.
 	float32 MinAndCount[4];
 
 	float32 InvCellSize[4];
@@ -60,6 +57,7 @@ struct ProbeGridSize
 /// Shaders/ProbeCommon.hlsli.
 struct ProbeInfo
 {
+	/// World space position in XYZ. W is 1 for an active probe, 0 for one that placement couldn't put anywhere useful.
 	float32 ProbePosition[4];
 	/// Mean distance and mean squared distance for each texel of a 6 face cubemap
 	float32 DepthMoments[Limits::ProbeDepthFloatCount];
@@ -68,14 +66,10 @@ struct ProbeInfo
 static_assert(sizeof(ProbeInfo) == Limits::ProbeDepthFloatCount * sizeof(float32) + sizeof(float32) * 4,
 			  "ProbeInfo must be tightly packed to mirror the HLSL struct");
 
-/// World space boxes of the level's geometry, used to fit the probe volume and keep probes out of walls
 struct ProbePlacementBoxes;
 
 /**
  * @brief Grids of L2 SH irradiance probes, with depth moments so that probes behind walls don't light a surface.
- *
- * Probes are baked by rendering a cubemap at each probe's position, a few probes per frame. The results live on the GPU
- * in `GraphicsBackend::ProbeBuffer`, `ProbeVolumeBuffer` and `ProbeDepthBuffer`, and can be cached to a file per scene.
  */
 class ProbeManager
 {
@@ -94,11 +88,10 @@ public:
 	void Create();
 	void Destroy();
 
-	/// Probes placed across every volume, which is what the bake walks
 	uint32 GetProbeCount() const { return mProbeCount; }
 	Vec3f GetProbePosition(uint32 index) const;
+	bool IsProbeActive(uint32 index) const { return mProbeInfos[index].ProbePosition[3] > 0.5f; }
 
-	/// The next probe to be captured by a bake
 	uint32 GetCurrentProbeIndex() const { return mCurrentProbe; }
 
 	///////////////////////////////////
@@ -106,59 +99,29 @@ public:
 	///////////////////////////////////
 
 	uint32 GetVolumeCount() const { return mVolumeCount; }
-
-	/// Index of the volume that owns probe `probe_index`, or `Limits::MaxProbeVolumes` if no volume does
 	uint32 GetVolumeOfProbe(uint32 probe_index) const;
-
-	/// Index of `volume`'s first probe, and how many it has
 	void GetVolumeProbeRange(uint32 volume, uint32& out_first_probe, uint32& out_count) const;
 
-	/// Removes every volume. The probes they placed keep their baked lighting, but nothing samples them until a
-	/// volume covers them again.
 	void ClearVolumes();
-
-	/// Adds a volume of `size` centred on `center` and places its probes, leaving them unbaked. Returns false if
-	/// `grid` is degenerate, or if there is no room left in the volume list or the probe budget.
 	bool AddVolume(const Vec3f& center, const Vec3f& size, const ProbeGridSize& grid = {});
-
-	/// Adds a volume fitted to the level's geometry, the way BeginGridBake() does. Returns false if there is no
-	/// geometry to fit to, or if AddVolume() would have failed.
 	bool AddLevelVolume(const ProbeGridSize& grid = {});
 
-	/**
-	 * @brief Replaces every volume with the ones the level defines: a coarse volume fitted to the whole level,
-	 * plus a denser one for each brush the editor has tagged `eObjectTag::ProbeVolume`.
-	 *
-	 * Brush volumes take their grid from the `r_probe_spacing` cvar (metres between probes), coarsened as needed
-	 * to fit what is left of the probe budget. Returns the number of brush volumes added.
-	 */
 	uint32 RebuildVolumesFromWorld();
 
 	///////////////////////////////////
 	// Baking
 	///////////////////////////////////
 
-	/// Starts baking every probe of every placed volume. Does nothing if no volume has been added.
 	void BeginBake();
-
-	/// Replaces every volume with one fitted to the level's geometry, and starts baking it.
 	void BeginGridBake();
-
-	/// Replaces every volume with a grid of `size` centred on `center`, and starts baking it.
 	void BeginGridBakeAt(const Vec3f& center, const Vec3f& size, const ProbeGridSize& grid = {});
 
 	bool IsBaking() const { return mBakeState != eBakeState::Idle; }
-
-	/// A batch of probes is waiting to be captured this frame, see RecordCaptureBatch().
 	bool IsCapturePending() const { return mBakeState == eBakeState::CapturePending; }
 
 	/// True only while the capture faces are being drawn. The main view keeps its probe GI and SSAO during a bake.
 	bool IsCapturingFaces() const { return mbCapturingFaces; }
-
-	/// Records the capture faces for the next batch of probes into `cmd`, drawing each face with `render_face`.
 	void RecordCaptureBatch(renderer::CommandBuffer& cmd, const RenderFaceFunc& render_face);
-
-	/// Reads back the batch captured this frame and arms the next one. Call after the frame has been submitted.
 	void ServiceCaptureBake();
 
 	///////////////////////////////////
@@ -203,9 +166,6 @@ private:
 	void CopyTargetToStaging(renderer::CommandBuffer& cmd, eImageFormat format, renderer::RawGpuBuffer& staging);
 
 	bool ReadBackProbe(uint32 batch_slot, uint32 probe_index);
-
-	/// Projects one probe's captured faces (RGBA16F colour and reverse-Z depth, one pointer per face) into its SH and
-	/// depth moments.
 	void ProjectCapture(const uint16* const colors[scCaptureFaces], const float32* const depths[scCaptureFaces],
 						ProbeSHData& out_sh, ProbeInfo& out_info) const;
 

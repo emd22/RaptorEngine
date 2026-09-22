@@ -4,11 +4,9 @@ Raptor is a 3D game engine being developed for an experimental game.
 
 ## Screenshots
 
-|              Global Illumination              |          Dynamic Physics Level          |
-| :-------------------------------------------: | :-------------------------------------: |
-| ![GI test scene](Screenshots/07_ProbeGI.png)  | ![After GI](Screenshots/10_AfterGI.png) |
-|               Probe Debug View                |                                         |
-| ![Probe Debug](Screenshots/08_ProbeDebug.png) |                                         |
+|          Global Illumination (Bright)          |       Global Illumination (Dark)        |
+| :--------------------------------------------: | :-------------------------------------: |
+| ![GI test scene](Screenshots/11_GI_Bright.png) | ![After GI](Screenshots/12_GI_Dark.png) |
 
 ## Features
 

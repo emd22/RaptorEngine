@@ -21,6 +21,15 @@ class World;
 class ConfigEntry;
 class Object;
 
+enum class eCProtoMat
+{
+	Gray = 0,
+	Orange,
+	Blue,
+	Tile,
+
+	Count,
+};
 
 class Blockout
 {
@@ -52,6 +61,8 @@ public:
 						  const Quat& rotation, const Name& name);
 
 	void DestroyObject(Object* object);
+
+	MaterialID GetMaterialForSlot(eCProtoMat slot) const;
 
 	~Blockout();
 

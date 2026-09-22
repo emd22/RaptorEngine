@@ -19,4 +19,7 @@ struct Material
 	/// channels.
 	float3 vSpecularFactor;
 	float fGlossinessFactor;
+
+	float3 vBaseColorFactor;
+	float fPadding;
 };
