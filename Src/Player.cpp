@@ -28,7 +28,7 @@ void Player::Create()
 
 	// Load the view model
 
-	AssetTicket view_model = gAssetManager->LoadObject("view_model", "Data/Demo/Models/viewmodel.glb");
+	AssetTicket view_model = gAssetManager->LoadObject("view_model", "Data/Demo/Models/view_model/viewmodel.glb");
 
 	// Registered before World::Attach() so these callbacks run first: the view model has to be set up before the world
 	// adds it to the grid, or a probe bake running on the main thread in between would capture it as level geometry.

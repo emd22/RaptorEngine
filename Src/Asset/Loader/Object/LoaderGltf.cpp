@@ -16,9 +16,6 @@
 #include <Renderer/PrimitiveMesh.hpp>
 
 // Renderer includes
-#include <Asset/MipmapGen.hpp>
-#include <Core/FilesystemIO.hpp>
-#include <Core/Path.hpp>
 #include <Renderer/Backend/GraphicsBackendFwd.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/MeshUtil.hpp>
@@ -85,191 +82,182 @@ void LoaderGltf::UnpackMeshAttributes(Object* object, Ref<PrimitiveMesh>& mesh, 
 	// mesh->UploadVertices();
 }
 
-// static void GenerateMipsForTexture(const String& asset_path, const Slice<uint8>& pixels)
-// {
-//     MipmapGen mg {};
+static constexpr uint8 scKtx2Magic[12] = { 0xAB, 'K', 'T', 'X', ' ', '2', '0', 0xBB, '\r', '\n', 0x1A, '\n' };
 
-//     const String path = String::Fmt("");
-
-//     mg.GenerateMipmaps(path.CStr(), eImageFormat::RGBA8_UNorm, pixels, )
-// }
-
-// template <eImageFormat TFormat>
-// static void LoadMipmapsIfExists(const String& asset_path, const char* component_name,
-//                                 MaterialComponent<TFormat>& component)
-// {
-//     // Get the folder that the model would be stored in.
-//     // This uses the normal path minus the file extension.
-//     // For example,
-//     //      Assets/Folder/NameOfModel.glb   becomes    Assets/Folder/NameOfModel/...
-
-//     // const FilePath base_path = FilePath(asset_path).RemoveExtension();
-
-//     Path base_path = Path(asset_path);
-//     base_path.RemoveExtension();
-//     base_path.Add(String(component_name) + ".ftx");
-
-
-//     // Get the full path:
-//     //      Assets/Folder/NameOfModel/Diffuse.ftx
-
-//     const String full_path = String::Fmt("{}/{}.ftx", base_path.Str(), component_name);
-
-//     // The pregenerated file exists, use it.
-//     if (FilesystemIO::FileExists(full_path.CStr())) {
-//         // TSRef<AxImage> image = TSRef<AxImage>::New();
-
-//         // image->Image.CreateFromData(eImageType::Flat, const Vec2u &size, uint16 mips_count, eImageFormat format,
-//         // const SizedArray<uint8> &image_data, eImageCreateFlags flags)
-
-//         // component.pAssetImage = image;
-//         // component.pDataToLoad = nullptr;
-//     }
-//     else {
-//         // MipmapGen mm {};
-//         // mm.GenerateMipmaps(full_path.CStr(), eImageFormat::RGBA8_UNorm, const Slice<uint8>& pixels,
-//         //                    const Vec2u& size)
-//     }
-// }
-
-
-static String MakeMaterialTextureCacheName(Material* material, const char* component_name)
+static bool HasKtx2Magic(const uint8* data, size_t size)
 {
-	return String::Fmt("{}_{}{}", material->Name.Get(), component_name, loader::LoaderKtx::scFileExtension);
+	return data != nullptr && size >= sizeof(scKtx2Magic) && memcmp(data, scKtx2Magic, sizeof(scKtx2Magic)) == 0;
 }
 
-static Hash32 GetTextureCacheID(const String& model_name, Material* material, const char* component_name)
+/*
+ * @brief KHR_texture_basisu points at the KTX2 image through the extension (leaving `source` as a png or jpeg fallback
+ * for other loaders) but some exporters just put the KTX2 image straight into `source`. Check for both
+ */
+static const cgltf_image* GetTextureImage(const cgltf_texture* texture)
 {
-	// Build a unique name (e.g. FireExtinguisher_BodyMaterial_Albedo)
-	const String text = (String::Fmt("{}_{}_{}", model_name, material->Name.Get(), component_name));
-	const Hash32 id = HashStr32(text.CStr());
-
-	return id;
-}
-
-static String GetTextureCachePath(const Hash32 texture_cache_id, const String& base_path)
-{
-	// Some/Base/Path + abcd1234 + .ftx    ->      Some/Base/Path/abcd1234.ftx
-	String output_path =
-		Path(base_path).Add(String::From(texture_cache_id)).AddExtension(loader::LoaderKtx::scFileExtension).Str();
-
-	return output_path;
-}
-
-
-static void GenerateMipmapImage(const String& output_path, eImageFormat format, const uint8* data, uint32 size)
-{
-	loader::LoaderStb loader {};
-	loader.ImageType = eImageType::Flat;
-	loader.ImageFormat = format;
-	loader.CreationFlags = eImageCreateFlags::None;
-
-	AssetTicket ticket(new fx::Image);
-	loader::eLoaderStatus status = loader.Load(ticket, data, size);
-
-	if (status != loader::eLoaderStatus::Success) {
-		LogError("Error loading material texture!");
-		return;
+	if (texture->has_basisu && texture->basisu_image != nullptr) {
+		return texture->basisu_image;
 	}
 
-	MipmapGen mm {};
-	mm.GenerateMipmaps(output_path.CStr(), format, loader.GetImageData(), loader.GetImageSize());
-
-	loader.InvalidateImageData();
+	return texture->image;
 }
 
-
-static void MakeMaterialTextureForPrimitive(const String& model_name, const String& base_path, Material* material,
-											const char* component_name, MaterialComponent& component,
-											cgltf_texture_view& texture_view)
+static const char* GetImageName(const cgltf_image* image)
 {
-	Assert(texture_view.texture != nullptr);
-
-	Hash32 texture_cache_id = GetTextureCacheID(model_name, material, component_name);
-	String texture_cache_path = GetTextureCachePath(texture_cache_id, base_path);
-
-	const bool texture_cache_exists = FilesystemIO::FileExists(texture_cache_path);
-
-	if (texture_cache_exists) {
-		MipmapLoader ml {};
-
-		ml.Open(texture_cache_path.CStr());
-
-		component.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;
-		// component.ImageToUpload = ml.GetMip(3);
-		component.ImageToUpload = ml.GetQuality(eQualityLevel::HighQuality);
-		component.TextureCacheID = texture_cache_id;
-		return;
+	if (image->name != nullptr) {
+		return image->name;
 	}
 
-	const uint8* image_buffer = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
-	uint32 image_buffer_size = static_cast<uint32>(texture_view.texture->image->buffer_view->size);
-
-	// Stage that shit so we can nuke mGltfData as soon as we can
-	uint8* goober_buffer = static_cast<uint8*>(std::malloc(image_buffer_size));
-	memcpy(goober_buffer, image_buffer, image_buffer_size);
-
-	Assert(goober_buffer != nullptr);
-	Assert(image_buffer_size > 0);
-
-	// Submit as data to be loaded later by the asset manager
-	component.UploadSrc = eMaterialComponentUploadSrc::ProcessAndUpload;
-	component.pDataToLoad = MakeSlice(const_cast<const uint8*>(goober_buffer), image_buffer_size);
-
-	// Set the ID to be able to load higher resolution textures later
-	component.TextureCacheID = texture_cache_id;
-
-	if (!texture_cache_exists) {
-		GenerateMipmapImage(texture_cache_path, component.ImageFormat, goober_buffer, image_buffer_size);
+	if (image->uri != nullptr && strncmp(image->uri, "data:", 5) != 0) {
+		return image->uri;
 	}
+
+	return "<unnamed>";
 }
 
-/// Whether a glTF texture can carry per-texel alpha. JPEGs never do, and PNGs only do with an alpha color type
-/// (4 or 6) or a tRNS chunk. Anything else is assumed to.
-static bool TextureMayHaveAlpha(const cgltf_texture_view& view)
+/**
+ * @brief Loads the KTX2 image that a GLTF image refers to. It is either embedded in a buffer view, inlined as a base64
+ * `data:` entry or stored as an external file relative to the model
+ */
+static bool OpenGltfKtxImage(loader::LoaderKtx& ktx, const cgltf_image* image, const String& model_path)
 {
-	if (view.texture == nullptr || view.texture->image == nullptr || view.texture->image->buffer_view == nullptr) {
+	if (image->buffer_view != nullptr) {
+		const uint8* data = cgltf_buffer_view_data(image->buffer_view);
+		const size_t size = image->buffer_view->size;
+
+		return HasKtx2Magic(data, size) && ktx.OpenFromMemory(data, static_cast<uint32>(size));
+	}
+
+	if (image->uri == nullptr) {
 		return false;
 	}
 
-	const cgltf_image* image = view.texture->image;
-	const uint8* data = cgltf_buffer_view_data(image->buffer_view);
-	const size_t size = image->buffer_view->size;
+	// Inline base64 encoded gubbins
+	if (strncmp(image->uri, "data:", 5) == 0) {
+		const char* comma = strchr(image->uri, ',');
 
-	static constexpr uint8 png_magic[8] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n' };
+		if (comma == nullptr || comma - image->uri < 7 || strncmp(comma - 7, ";base64", 7) != 0) {
+			return false;
+		}
 
-	if (size >= 3 && data[0] == 0xFF && data[1] == 0xD8) {
+		const char* base64 = comma + 1;
+		const size_t base64_length = strlen(base64);
+
+		size_t padding = 0;
+		while (padding < base64_length && padding < 2 && base64[base64_length - 1 - padding] == '=') {
+			padding++;
+		}
+
+		const size_t size = base64_length / 4 * 3 - padding;
+
+		cgltf_options options {};
+		void* data = nullptr;
+
+		if (size == 0 || cgltf_load_buffer_base64(&options, size, base64, &data) != cgltf_result_success) {
+			return false;
+		}
+
+		const bool opened = HasKtx2Magic(static_cast<const uint8*>(data), size) &&
+							ktx.OpenFromMemory(static_cast<const uint8*>(data), static_cast<uint32>(size));
+		std::free(data);
+
+		return opened;
+	}
+
+	// External file, relative to the directory containing the model
+	std::string uri = image->uri;
+	uri.resize(cgltf_decode_uri(uri.data()));
+
+	const int32 slash_index = model_path.FindLast('/');
+	const std::string full_path = (slash_index >= 0) ? std::string(model_path.CStr(), slash_index + 1) + uri : uri;
+
+	// Check the header first so a PNG/JPEG gets an earlier error rather than one from the KTX loader
+	uint8 header[sizeof(scKtx2Magic)] {};
+	std::FILE* fp = std::fopen(full_path.c_str(), "rb");
+
+	if (fp == nullptr) {
+		LogError(LC_ASSET, "Could not open glTF texture '{}'", full_path.c_str());
 		return false;
 	}
 
-	if (size < 33 || memcmp(data, png_magic, sizeof(png_magic)) != 0) {
-		return true;
+	const size_t header_size = std::fread(header, 1, sizeof(header), fp);
+	std::fclose(fp);
+
+	return HasKtx2Magic(header, header_size) && ktx.Open(full_path.c_str());
+}
+
+static bool IsRgba8Format(eImageFormat format)
+{
+	return format == eImageFormat::RGBA8_UNorm || format == eImageFormat::RGBA8_SRGB;
+}
+
+/// Whether any texel in the base level of an 8-bit, 4 channel image is not fully opaque.
+static bool ImageHasTranslucentTexels(const ImageInfo& info)
+{
+	if (!IsRgba8Format(info.Format) && info.Format != eImageFormat::BGRA8_UNorm) {
+		return false;
 	}
 
-	// The IHDR chunk is always first; its color type is at byte 25.
-	const uint8 color_type = data[25];
-	if (color_type == 4 || color_type == 6) {
-		return true;
-	}
+	// The base level comes first in the packed mip chain
+	const uint64 texel_count = std::min(uint64(info.Size.X) * info.Size.Y, info.ImageData.Size / 4);
 
-	// Palette and greyscale/RGB images can still get alpha from a tRNS chunk.
-	size_t offset = 8;
-	while (offset + 12 <= size) {
-		const uint32 length = (uint32(data[offset]) << 24) | (uint32(data[offset + 1]) << 16) |
-							  (uint32(data[offset + 2]) << 8) | uint32(data[offset + 3]);
-		const char* type = reinterpret_cast<const char*>(data + offset + 4);
-
-		if (memcmp(type, "tRNS", 4) == 0) {
+	for (uint64 i = 0; i < texel_count; i++) {
+		if (info.ImageData.pData[i * 4 + 3] != 0xFF) {
 			return true;
 		}
-		if (memcmp(type, "IDAT", 4) == 0) {
-			break;
-		}
-
-		offset += size_t(length) + 12;
 	}
 
 	return false;
+}
+
+/**
+ * @brief Loads a material texture's mip chain from its KTX2 image. Material textures must be KTX2, and anything else
+ * logs an error and returns false.
+ */
+static bool MakeMaterialTextureForPrimitive(const String& model_path, Material* material, const char* component_name,
+											MaterialComponent& component, const cgltf_texture_view& texture_view,
+											bool* out_has_alpha = nullptr)
+{
+	Assert(texture_view.texture != nullptr);
+
+	const cgltf_image* image = GetTextureImage(texture_view.texture);
+
+	if (image == nullptr) {
+		return false;
+	}
+
+	loader::LoaderKtx ktx {};
+
+	if (!OpenGltfKtxImage(ktx, image, model_path) || !ktx.IsOpen()) {
+		LogError(LC_ASSET, "glTF textures must be KTX2 (image '{}', {} of material '{}' in '{}')", GetImageName(image),
+				 component_name, material->Name.Get(), model_path);
+		return false;
+	}
+
+	ImageInfo image_info = ktx.MakeImageInfo();
+
+	if (image_info.ImageData.pData == nullptr) {
+		return false;
+	}
+
+	// The component decides the colour space (albedo is sRGB, normal and surface maps are linear), not whatever the
+	// exporter tagged the file with. Both are the same bits.
+	if (IsRgba8Format(image_info.Format) && IsRgba8Format(component.ImageFormat) &&
+		image_info.Format != component.ImageFormat) {
+		LogWarning(LC_ASSET, "glTF texture '{}' ({}) is stored as {}, expected {}", GetImageName(image), component_name,
+				   (image_info.Format == eImageFormat::RGBA8_SRGB) ? "sRGB" : "UNorm",
+				   (component.ImageFormat == eImageFormat::RGBA8_SRGB) ? "sRGB" : "UNorm");
+		image_info.Format = component.ImageFormat;
+	}
+
+	if (out_has_alpha != nullptr) {
+		*out_has_alpha = ImageHasTranslucentTexels(image_info);
+	}
+
+	component.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;
+	component.ImageToUpload = image_info;
+
+	return true;
 }
 
 void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primitive, int32 primitive_index)
@@ -286,22 +274,6 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 
 	String material_name = (gltf_material->name) ? gltf_material->name : object->Name.Get();
 
-
-	Path model_path(mModelPath);
-
-	// Get the filename (without extension) from the model path.
-	// Hello/Test/ModelName.xyz -> ModelName
-	model_path.RemoveExtension();
-	const String model_name = *model_path.BaseName();
-
-	// Remove the basename
-	// Hello/Test/ModelName -> Hello/Test
-	model_path.RemoveLast();
-	model_path.DirDown("TGen");
-	// Create the base dir if it doesn't exist
-	model_path.CreateDirs();
-
-	const String tcache_base_path = model_path.Str();
 
 	MaterialID material_id = gMaterialManager->NewMaterial(material_name, ePipelineName::Geometry, object->IsSkinned());
 	Material* material = gMaterialManager->GetMaterial(material_id);
@@ -325,10 +297,15 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 		diffuse_view = &gltf_mr.base_color_texture;
 	}
 
-	if (diffuse_view != nullptr && diffuse_view->texture != nullptr) {
-		MakeMaterialTextureForPrimitive(model_name, tcache_base_path, material, "AL", material->Diffuse, *diffuse_view);
-	}
-	else {
+	// Only blended materials care whether the texture has alpha, and finding out means scanning every texel
+	bool diffuse_has_alpha = false;
+	bool* out_diffuse_has_alpha = (gltf_material->alpha_mode == cgltf_alpha_mode_blend) ? &diffuse_has_alpha : nullptr;
+
+	const bool has_diffuse = (diffuse_view != nullptr && diffuse_view->texture != nullptr) &&
+							 MakeMaterialTextureForPrimitive(mModelPath, material, "diffuse", material->Diffuse,
+															 *diffuse_view, out_diffuse_has_alpha);
+
+	if (!has_diffuse) {
 		material->Diffuse.SetTicket(gAssetManager->GetNullImageTicket(eImageFormat::RGBA8_UNorm));
 	}
 
@@ -341,7 +318,7 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 
 	// Load the normalmap
 	if (gltf_material->normal_texture.texture != nullptr) {
-		MakeMaterialTextureForPrimitive(model_name, tcache_base_path, material, "NM", material->NormalMap,
+		MakeMaterialTextureForPrimitive(mModelPath, material, "normal", material->NormalMap,
 										gltf_material->normal_texture);
 	}
 
@@ -350,7 +327,7 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 		material->SetSpecularGlossiness(gltf_sg.specular_factor, gltf_sg.glossiness_factor);
 
 		if (gltf_sg.specular_glossiness_texture.texture != nullptr) {
-			MakeMaterialTextureForPrimitive(model_name, tcache_base_path, material, "SG", material->MetallicRoughness,
+			MakeMaterialTextureForPrimitive(mModelPath, material, "specular-glossiness", material->MetallicRoughness,
 											gltf_sg.specular_glossiness_texture);
 		}
 	}
@@ -358,7 +335,7 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 		material->SetMetallicRoughness(gltf_mr.metallic_factor, gltf_mr.roughness_factor);
 
 		if (gltf_mr.metallic_roughness_texture.texture != nullptr) {
-			MakeMaterialTextureForPrimitive(model_name, tcache_base_path, material, "MR", material->MetallicRoughness,
+			MakeMaterialTextureForPrimitive(mModelPath, material, "metallic-roughness", material->MetallicRoughness,
 											gltf_mr.metallic_roughness_texture);
 		}
 	}
@@ -378,7 +355,7 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 			if (baseAlpha < 0.99f) {
 				material->SetAlpha(baseAlpha);
 			}
-			else if (diffuse_view != nullptr && TextureMayHaveAlpha(*diffuse_view)) {
+			else if (diffuse_has_alpha) {
 				// If baseColor is opaque but texture may have alpha, force transparent path
 				// so texAlpha * matAlpha blending works with depthWrite=false.
 				material->SetAlpha(0.99f);

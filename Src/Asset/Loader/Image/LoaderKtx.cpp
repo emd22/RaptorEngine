@@ -14,23 +14,6 @@ namespace loader {
 static constexpr uint32 scGlRgba8 = 0x8058;
 static constexpr uint32 scGlSrgb8Alpha8 = 0x8C43;
 
-static constexpr uint32 GetVkFormat(eImageFormat format)
-{
-	switch (format) {
-	case eImageFormat::BGRA8_UNorm:
-		return VK_FORMAT_B8G8R8A8_UNORM;
-	case eImageFormat::RGBA8_UNorm:
-		return VK_FORMAT_R8G8B8A8_UNORM;
-	case eImageFormat::RGBA8_SRGB:
-		return VK_FORMAT_R8G8B8A8_SRGB;
-	case eImageFormat::R8_UNorm:
-		return VK_FORMAT_R8_UNORM;
-	default:;
-	}
-
-	return VK_FORMAT_UNDEFINED;
-}
-
 static constexpr eImageFormat GetImageFormatFromVk(uint32 vk_format)
 {
 	switch (vk_format) {
@@ -120,22 +103,28 @@ eLoaderStatus LoaderKtx::Load(AssetTicket& ticket, const std::string& path)
 	return eLoaderStatus::Success;
 }
 
-eLoaderStatus LoaderKtx::Load(AssetTicket& ticket, const uint8* data, uint32 size)
+bool LoaderKtx::OpenFromMemory(const uint8* data, uint32 size)
 {
 	Assert(data != nullptr);
 	Assert(size > 0);
 
 	ktxTexture* texture = nullptr;
 
+	// LOAD_IMAGE_DATA copies the levels into the texture's own storage, so `data` is not referenced afterwards
 	const KTX_error_code result =
 		ktxTexture_CreateFromMemory(data, size, KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &texture);
 
 	if (result != KTX_SUCCESS) {
 		LogError(LC_ASSET, "Could not load KTX from memory: {}", ktxErrorString(result));
-		return eLoaderStatus::Error;
+		return false;
 	}
 
-	if (!AdoptTexture(texture)) {
+	return AdoptTexture(texture);
+}
+
+eLoaderStatus LoaderKtx::Load(AssetTicket& ticket, const uint8* data, uint32 size)
+{
+	if (!OpenFromMemory(data, size)) {
 		return eLoaderStatus::Error;
 	}
 
@@ -222,54 +211,6 @@ void LoaderKtx::CreateGpuResource(AssetTicket& ticket)
 	image->CreateFromData(renderer::GraphicsBackendFwd::GetUploadCmd(), image_info, CreationFlags);
 
 	ticket.SignalUploadedToGpu();
-}
-
-eLoaderStatus LoaderKtx::SaveToFile(const String& path, eImageFormat format, const Vec2u& size,
-									const Slice<const Slice<const uint8>>& mips)
-{
-	const uint32 vk_format = GetVkFormat(format);
-	if (vk_format == VK_FORMAT_UNDEFINED) {
-		LogError(LC_ASSET, "KTX: cannot save image with unsupported pixel format");
-		return eLoaderStatus::Error;
-	}
-
-	ktxTextureCreateInfo create_info {};
-	create_info.vkFormat = vk_format;
-	create_info.baseWidth = size.X;
-	create_info.baseHeight = size.Y;
-	create_info.baseDepth = 1;
-	create_info.numDimensions = 2;
-	create_info.numLevels = mips.Size;
-	create_info.numLayers = 1;
-	create_info.numFaces = 1;
-	create_info.isArray = KTX_FALSE;
-	create_info.generateMipmaps = KTX_FALSE;
-
-	ktxTexture2* texture = nullptr;
-
-	KTX_error_code result = ktxTexture2_Create(&create_info, KTX_TEXTURE_CREATE_ALLOC_STORAGE, &texture);
-	if (result != KTX_SUCCESS) {
-		LogError(LC_ASSET, "KTX: could not create texture for '{}': {}", path, ktxErrorString(result));
-		return eLoaderStatus::Error;
-	}
-
-	for (uint32 level = 0; level < mips.Size && result == KTX_SUCCESS; level++) {
-		result = ktxTexture_SetImageFromMemory(ktxTexture(texture), level, 0, 0, mips.pData[level].pData,
-											   mips.pData[level].Size);
-	}
-
-	if (result == KTX_SUCCESS) {
-		result = ktxTexture_WriteToNamedFile(ktxTexture(texture), path.CStr());
-	}
-
-	ktxTexture_Destroy(ktxTexture(texture));
-
-	if (result != KTX_SUCCESS) {
-		LogError(LC_ASSET, "KTX: could not write '{}': {}", path, ktxErrorString(result));
-		return eLoaderStatus::Error;
-	}
-
-	return eLoaderStatus::Success;
 }
 
 void LoaderKtx::Destroy()

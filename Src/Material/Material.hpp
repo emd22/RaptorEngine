@@ -53,8 +53,6 @@ enum class eMaterialComponentStatus
 enum class eMaterialComponentUploadSrc
 {
 	None,
-	/// Load image (from memory), decompress to pixels and upload
-	ProcessAndUpload,
 	/// Upload raw pixel data
 	DirectUpload,
 };
@@ -74,7 +72,7 @@ public:
 
 	FX_FORCE_INLINE bool Exists() const
 	{
-		return (pImage != nullptr) || (pDataToLoad != nullptr) || (ImageToUpload.ImageData.pData != nullptr);
+		return (pImage != nullptr) || (ImageToUpload.ImageData.pData != nullptr);
 	}
 
 	void SetTicket(AssetTicket& ticket);
@@ -89,17 +87,9 @@ public:
 	AssetTicket Ticket { nullptr };
 	Image* pImage = nullptr;
 
-
-	/// The texture cache ID used to load this image from.
-	Hash32 TextureCacheID = HashNull32;
-
 	eMaterialComponentUploadSrc UploadSrc = eMaterialComponentUploadSrc::None;
 
-	/// Image data (including format containers) that needs to be parsed and uploaded by a loader.
-	Slice<const uint8> pDataToLoad { nullptr };
-
-	/// The image info used to _directly_ upload pixel data to an image. This would be used when uploading from
-	/// pregenerated texture cache files.
+	/// The pixel data (all mip levels) to _directly_ upload to an image, e.g. from a KTX2 texture.
 	ImageInfo ImageToUpload {};
 
 	eImageFormat ImageFormat = eImageFormat::RGBA8_UNorm;
@@ -205,7 +195,6 @@ public:
 	bool BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline);
 
 
-	void RequestQuality(uint32 quality);
 
 	void Build();
 
