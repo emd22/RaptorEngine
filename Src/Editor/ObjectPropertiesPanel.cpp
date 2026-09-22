@@ -41,9 +41,6 @@ MakeFlagGroup(wxWindow* parent, const char* title, const FlagName (&names)[TCoun
 	for (const FlagName& name : names) {
 		wxCheckBox* check_box = new wxCheckBox(group->GetStaticBox(), wxID_ANY, name.pName);
 
-		// The panel only shows the flags for now
-		check_box->Disable();
-
 		group->Add(check_box, wxSizerFlags().Border(wxALL, 2));
 		out_rows.Insert(ObjectPropertiesPanel::FlagRow { .Bit = name.Bit, .pCheckBox = check_box });
 	}

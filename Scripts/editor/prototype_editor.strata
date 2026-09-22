@@ -25,6 +25,7 @@ struct SELECTION
 
 	OBJECT[LIMIT_SELECTION_OBJECTS] selected_objects;
 	float3[LIMIT_SELECTION_OBJECTS] initial_object_positions;
+	float3[LIMIT_SELECTION_OBJECTS] initial_object_rotations;
 	int selected_objects_count;
 
 	/* Selected cube face (for FACE mode) */
@@ -59,6 +60,9 @@ SELECTION sel;
 float3 face_tool_magnitude;
 float3 initial_face_object_position;
 float3 initial_face_position;
+
+/* Accumulated Q/E pitch for the Rotate tool, reset at the start of each drag */
+float rotate_pitch_accum = 0.0f;
 
 EDITORTOOL editor_tool = EDITORTOOL.TRANSLATE;
 
@@ -198,6 +202,9 @@ void __set_editor_tool(EDITORTOOL tool)
 	else if (tool == EDITORTOOL.FACE) {
 		cvar_set_string("s_editor_op", "Face");
 	}
+	else if (tool == EDITORTOOL.ROTATE) {
+		cvar_set_string("s_editor_op", "Rotate");
+	}
 
 	editor_tool = tool;
 }
@@ -246,6 +253,11 @@ void editor_handle_controls()
 		/* Face (Scale) */
 		if (KEY.K_F.is_pressed()) {
 			set_editor_tool(EDITORTOOL.FACE);
+		}
+
+		/* Rotate. Excludes LSHIFT so this doesn't also fire on the C++ side's Shift+R (reload blockout). */
+		if (KEY.K_R.is_pressed() && !KEY.K_LSHIFT.is_down()) {
+			set_editor_tool(EDITORTOOL.ROTATE);
 		}
 	}
 
@@ -326,10 +338,12 @@ void editor_disable_movement_damp()
 void editor_on_mouse_just_down()
 {
 	initial_player_position = player.position;
+	rotate_pitch_accum = 0.0f;
 
 
 	for (int i = 0; i < sel.selected_objects_count; i++) {
 		sel.initial_object_positions[i] = sel.selected_objects[i].position;
+		sel.initial_object_rotations[i] = sel.selected_objects[i].get_rotation();
 	}
 
 	// initial_object_position = sel.selected_object.position;
@@ -511,6 +525,104 @@ void editor_face_tool_finalize()
 
 
 /////////////////////////////////////
+// Rotate Tool
+/////////////////////////////////////
+
+// 5 degrees as radians
+const float D2R_5_DEG = ((5.0f * MATH_PI) / 180.0f);
+const float D2R_15_DEG = ((15.0f * MATH_PI) / 180.0f);
+const float D2R_45_DEG = ((45.0f * MATH_PI) / 180.0f);
+const float D2R_90_DEG = ((90.0f * MATH_PI) / 180.0f);
+
+float editor_get_rotate_snap_value()
+{
+	float[4] snap_values = { D2R_5_DEG, D2R_15_DEG, D2R_45_DEG, D2R_90_DEG };
+	uint index = fclamp(editor_snap_level, 0, 3);
+	return snap_values[index];
+}
+
+/* If snap is enabled, this snaps a given angle vector (radians) to the selected rotation snap increment. */
+float3 editor_rotate_snap(float3 vec)
+{
+	if (!editor_enable_snap) {
+		return vec;
+	}
+
+	float3 qsnap = float3(editor_get_rotate_snap_value());
+	return (float3_round(vec / qsnap) * qsnap);
+}
+
+/* How many radians one metre of sideways drag equates to */
+const float ROTATE_SENSITIVITY = D2R_90_DEG;
+
+@private
+void editor_rotate_selection(float3 rotation_delta)
+{
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		OBJECT obj = sel.selected_objects[i];
+		float3 initial_rotation = sel.initial_object_rotations[i];
+
+		obj.rotate_to(initial_rotation + rotation_delta);
+	}
+}
+
+@private
+void editor_rotate_tool(float delta_time)
+{
+	if (!editor_has_object_selection()) {
+		return;
+	}
+
+	float3 player_delta = player.position - initial_player_position;
+	float yaw = player_delta.x * ROTATE_SENSITIVITY;
+
+	const float pitch_speed = delta_time * (editor_get_rotate_snap_value() * 4.0f);
+
+	if (KEY.K_Q.is_down()) {
+		rotate_pitch_accum -= pitch_speed;
+	}
+	if (KEY.K_E.is_down()) {
+		rotate_pitch_accum += pitch_speed;
+	}
+
+	float3 rotation_movement = float3(rotate_pitch_accum, yaw, 0.0f);
+	float3 rotation_delta = editor_rotate_snap(rotation_movement);
+
+	editor_rotate_selection(rotation_delta);
+}
+
+
+@private
+void editor_rotate_tool_finalize()
+{
+	// Skip clicks without any rotation
+	int movers = 0;
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		if (!editor_vec_equal(sel.initial_object_rotations[i], sel.selected_objects[i].get_rotation())) {
+			movers++;
+		}
+	}
+
+	if (movers == 0) {
+		return;
+	}
+
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		OBJECT obj = sel.selected_objects[i];
+
+		float3 initial_rotation = sel.initial_object_rotations[i];
+		float3 current_rotation = obj.get_rotation();
+
+		if (editor_vec_equal(initial_rotation, current_rotation)) {
+			continue;
+		}
+
+		editor_push_op_vec(obj, OPTYPE.ROTATE, initial_rotation, current_rotation, movers);
+	}
+}
+
+
+/////////////////////////////////////
 // Editor Dispatch
 /////////////////////////////////////
 
@@ -525,6 +637,10 @@ void editor_handle_operation(float delta_time)
 		editor_face_tool(delta_time);
 		return;
 	}
+	if (editor_tool == EDITORTOOL.ROTATE) {
+		editor_rotate_tool(delta_time);
+		return;
+	}
 }
 
 
@@ -537,6 +653,9 @@ void editor_finalize_operation()
 	}
 	else if (editor_tool == EDITORTOOL.TRANSLATE) {
 		editor_translate_tool_finalize();
+	}
+	else if (editor_tool == EDITORTOOL.ROTATE) {
+		editor_rotate_tool_finalize();
 	}
 }
 

@@ -86,9 +86,4 @@ objects = {
         unlit = $True
         nocull = $True
     }
-    brick = {
-		mesh = "/BrickTest.glb"
-		pos = [0.0, 0.0, -8.5]
-    }
-
 }
