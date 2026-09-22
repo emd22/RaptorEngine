@@ -75,6 +75,8 @@ Vec2f Window::GetMousePosition() const
 
 void Window::WarpMouse(const Vec2f& position) { SDL_WarpMouseInWindow(mWindow, position.GetX(), position.GetY()); }
 
+bool Window::IsFocused() const { return (SDL_GetWindowFlags(mWindow) & SDL_WINDOW_INPUT_FOCUS) != 0; }
+
 Window::~Window() { SDL_DestroyWindow(mWindow); }
 
 } // namespace fx

@@ -120,6 +120,10 @@ public:
 	/// Lifts every key and button, for when the window loses focus and won't see the key up events
 	static void ReleaseAllKeys();
 
+	/// Lifts every standard (non-modifier) key. macOS doesn't deliver key-up events for other keys while Cmd is held,
+	/// so the editor viewport calls this once Cmd itself comes back up to flush anything left stuck down.
+	static void ReleaseNonModifierKeys();
+
 private:
 	static void UpdateFromKeyboardEvent(SDL_Event* event);
 	static void UpdateFromMouseButtonEvent(SDL_Event* event);

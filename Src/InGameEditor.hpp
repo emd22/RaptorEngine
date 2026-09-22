@@ -18,7 +18,7 @@ enum class eEditorTool : uint32
 {
 	None,
 
-	Transform,
+	Translate,
 	Face,
 	Rotate,
 
@@ -159,7 +159,7 @@ public:
 
 	uint32 SelectedCount() const { return mSelectedObjects.Size; }
 
-	void Load();
+	void Reload();
 	void Unload();
 	float GetQuantizeFraction() const;
 	bool GetQuantizeEnabled() const;
@@ -175,6 +175,7 @@ public:
 	FX_FORCE_INLINE bool HasSelection() const { return (mSelectedObjects.Size > 0); }
 
 	bool IsInSelection(Object* object) const;
+
 
 	~EditorMode() = default;
 
@@ -194,8 +195,6 @@ public:
 	eEditorModeFlags Flags = eEditorModeFlags::None;
 
 	String ModeName;
-
-	eEditorTool EditorTool = eEditorTool::None;
 
 	UpdateFnDef pUpdateFunction = nullptr;
 

@@ -4,6 +4,7 @@
 #include "EditorPlatform.hpp"
 #include "EditorViewport.hpp"
 #include "ObjectPropertiesPanel.hpp"
+#include "WorldPropertiesPanel.hpp"
 
 #include <wx/app.h>
 #include <wx/evtloop.h>
@@ -30,6 +31,8 @@ public:
 static wxGUIEventLoop* spEventLoop = nullptr;
 static EditorFrame* spMainFrame = nullptr;
 
+static std::function<void()> spReloadHandlers[static_cast<uint32>(eReloadTarget::Count)];
+
 /// Upper bound on native events dispatched per frame, so a flood of them can't stall rendering
 static constexpr uint32 scMaxEventsPerFrame = 512;
 
@@ -55,6 +58,8 @@ bool Init(int argc, char** argv)
 
 	return true;
 }
+
+void UpdateWorldPropertiesPanel() { spMainFrame->GetWorldPropertiesPanel()->Update(); }
 
 EditorFrame* CreateMainFrame(const char* title, const Vec2u& viewport_size)
 {
@@ -113,7 +118,23 @@ bool PumpEvents()
 void UpdatePropertiesPanelForObject(const Object* object)
 {
 	if (spMainFrame != nullptr) {
-		spMainFrame->GetComponentPanel()->ShowObject(object);
+		spMainFrame->GetObjectPropertiesPanel()->ShowObject(object);
+	}
+}
+
+bool IsSimulationMode() { return spMainFrame->IsSimulationMode(); }
+
+void SetReloadHandler(eReloadTarget target, std::function<void()> handler)
+{
+	spReloadHandlers[static_cast<uint32>(target)] = std::move(handler);
+}
+
+void InvokeReloadHandler(eReloadTarget target)
+{
+	const std::function<void()>& handler = spReloadHandlers[static_cast<uint32>(target)];
+
+	if (handler) {
+		handler();
 	}
 }
 

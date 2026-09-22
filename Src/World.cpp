@@ -908,7 +908,7 @@ void World::Render(Camera* shadow_camera)
 		RenderProbeDebug(camera);
 	}
 
-	if (gSelectedEditorMode != nullptr || bRenderProbes) {
+	if (gPrototypeEditor != nullptr || bRenderProbes) {
 		RenderProbeVolumes(camera);
 	}
 
@@ -1214,7 +1214,7 @@ void World::RenderProbeVolumes(const Camera& camera)
 
 		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
 
-		const bool is_selected = gSelectedEditorMode != nullptr && gSelectedEditorMode->IsInSelection(&object);
+		const bool is_selected = gPrototypeEditor != nullptr && gPrototypeEditor->IsInSelection(&object);
 		push_constants.DebugColor = is_selected ? selected_color.AsUInt() : volume_color.AsUInt();
 
 		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);

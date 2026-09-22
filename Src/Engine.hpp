@@ -43,7 +43,7 @@ class DecalManager;
 extern DecalManager* gDecalManager;
 
 class EditorMode;
-extern EditorMode* gSelectedEditorMode;
+extern EditorMode* gPrototypeEditor;
 
 class CVarManager;
 extern CVarManager* gCVars;

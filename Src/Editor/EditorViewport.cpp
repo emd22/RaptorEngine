@@ -222,8 +222,19 @@ void EditorViewport::OnKey(wxKeyEvent& event)
 		return;
 	}
 
+	const bool is_down = event.GetEventType() == wxEVT_KEY_DOWN;
+
 	// Not skipped, so no char event follows (and macOS doesn't beep at the key)
-	ControlManager::PostButtonEvent(key_id, event.GetEventType() == wxEVT_KEY_DOWN);
+	ControlManager::PostButtonEvent(key_id, is_down);
+
+#ifdef FX_PLATFORM_MACOS
+	// Cocoa doesn't send key-up for another key at all while Cmd is held, so releasing it while still holding Cmd
+	// leaves it stuck down here. Once Cmd itself comes back up (which Cocoa always reports), flush anything left
+	// stuck.
+	if (!is_down && (key_id == eKey::FX_KEY_LMETA || key_id == eKey::FX_KEY_RMETA)) {
+		ControlManager::ReleaseNonModifierKeys();
+	}
+#endif
 }
 
 void EditorViewport::OnMouseButton(wxMouseEvent& event)

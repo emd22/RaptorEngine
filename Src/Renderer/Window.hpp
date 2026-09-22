@@ -54,6 +54,9 @@ public:
 	/// Moves the cursor to a position in window coordinates
 	void WarpMouse(const Vec2f& position);
 
+	/// True if the window currently has OS input focus (not minimized/backgrounded/alt-tabbed away from)
+	bool IsFocused() const;
+
 	float32 GetAspectRatio() const
 	{
 		return static_cast<float32>(mSize.X) / static_cast<float32>(mSize.Y);
