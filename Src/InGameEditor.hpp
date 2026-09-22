@@ -14,8 +14,20 @@
 
 namespace fx {
 
+enum class eEditorTool : uint32
+{
+	None,
 
-enum class eEditorMode : int32
+	Transform,
+	Face,
+	Rotate,
+
+	Count,
+};
+
+
+/// TODO: remove
+enum class eEditorState : int32
 {
 	// Translate,
 	// Scale,
@@ -182,6 +194,8 @@ public:
 	eEditorModeFlags Flags = eEditorModeFlags::None;
 
 	String ModeName;
+
+	eEditorTool EditorTool = eEditorTool::None;
 
 	UpdateFnDef pUpdateFunction = nullptr;
 

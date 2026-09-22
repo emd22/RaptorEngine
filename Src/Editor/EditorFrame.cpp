@@ -75,7 +75,7 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 		wxToggleButton* button = MakeToolButton(root, scToolButtons[i]);
 
 		const eEditorTool tool = static_cast<eEditorTool>(i);
-		button->Bind(wxEVT_TOGGLEBUTTON, [this, tool](wxCommandEvent&) { SelectTool(tool); });
+		button->Bind(wxEVT_TOGGLEBUTTON, [this, tool](wxCommandEvent&) { SetEditorTool(tool); });
 
 		tool_sizer->Add(button, wxSizerFlags().Border(wxALL, 2));
 		mToolButtons.Insert(button);
@@ -110,19 +110,28 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	mpViewport->SetMinSize(wxSize(64, 64));
 	SetMinSize(wxDefaultSize);
 
-	SelectTool(eEditorTool::Transform);
+	SetEditorTool(eEditorTool::Transform);
 
 	Bind(wxEVT_CLOSE_WINDOW, &EditorFrame::OnClose, this);
 	Bind(wxEVT_ACTIVATE, &EditorFrame::OnActivate, this);
 }
 
-void EditorFrame::SelectTool(eEditorTool tool)
+void EditorFrame::SetEditorTool(const eEditorTool tool)
 {
 	mSelectedTool = tool;
 
 	// Only one tool at a time, and clicking the selected one again keeps it selected
 	for (uint32 i = 0; i < mToolButtons.Size; i++) {
 		mToolButtons[i]->SetValue(i == static_cast<uint32>(tool));
+	}
+
+	// Transfer the changed editor tool info back to the script
+	if (gSelectedEditorMode != nullptr) {
+		auto set_tool = gSelectedEditorMode->pScript->GetFunction<void (*)(eEditorTool)>("__set_editor_tool");
+
+		if (set_tool != nullptr) {
+			set_tool(tool);
+		}
 	}
 
 	// Give the keyboard back to the viewport

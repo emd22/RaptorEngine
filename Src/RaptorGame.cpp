@@ -288,7 +288,7 @@ static FX_FORCE_INLINE Vec3f GetEditorMovementVector()
 }
 
 
-void RaptorGame::SwitchEditorMode(eEditorMode mode)
+void RaptorGame::SwitchEditorMode(eEditorState mode)
 {
 	if (gSelectedEditorMode != nullptr) {
 		gSelectedEditorMode->Unload();
@@ -297,15 +297,15 @@ void RaptorGame::SwitchEditorMode(eEditorMode mode)
 
 	EditorModeType = mode;
 
-	if (static_cast<int32>(EditorModeType) > static_cast<int32>(eEditorMode::Simulate)) {
-		EditorModeType = static_cast<eEditorMode>(0);
+	if (static_cast<int32>(EditorModeType) > static_cast<int32>(eEditorState::Simulate)) {
+		EditorModeType = static_cast<eEditorState>(0);
 	}
 
 	if (static_cast<int32>(EditorModeType) < 0) {
-		EditorModeType = eEditorMode::Simulate;
+		EditorModeType = eEditorState::Simulate;
 	}
 
-	if (EditorModeType != eEditorMode::Simulate) {
+	if (EditorModeType != eEditorState::Simulate) {
 		gSelectedEditorMode = EditorModes[static_cast<uint32>(EditorModeType)];
 		gSelectedEditorMode->Load();
 	}
@@ -454,10 +454,10 @@ void RaptorGame::ProcessControls()
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_PERIOD)) {
-		SwitchEditorMode(static_cast<eEditorMode>(static_cast<int32>(EditorModeType) + 1));
+		SwitchEditorMode(static_cast<eEditorState>(static_cast<int32>(EditorModeType) + 1));
 	}
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_COMMA)) {
-		SwitchEditorMode(static_cast<eEditorMode>(static_cast<int32>(EditorModeType) - 1));
+		SwitchEditorMode(static_cast<eEditorState>(static_cast<int32>(EditorModeType) - 1));
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_L)) {
@@ -493,7 +493,7 @@ void RaptorGame::ProcessControls()
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_TAB)) {
-		SwitchEditorMode(static_cast<eEditorMode>(static_cast<int32>(EditorModeType) + 1));
+		SwitchEditorMode(static_cast<eEditorState>(static_cast<int32>(EditorModeType) + 1));
 	}
 
 
@@ -669,7 +669,7 @@ void RaptorGame::Tick()
 	if (!bInCommandMode) {
 		gWorld->Player.Move(DeltaTime, GetMovementVector());
 
-		if (EditorModeType != eEditorMode::Simulate) {
+		if (EditorModeType != eEditorState::Simulate) {
 			Vec3f forward = GetCameraForwardDominantAxis();
 			Vec3f right = Vec3f(forward.Z, 0.0f, -forward.X);
 			Vec3f raw_momement = GetMovementVector();
@@ -742,7 +742,7 @@ void RaptorGame::DestroyGame()
 
 void RaptorGame::AddEditorModes()
 {
-	EditorModes.InitCapacity(static_cast<uint32>(eEditorMode::Simulate));
+	EditorModes.InitCapacity(static_cast<uint32>(eEditorState::Simulate));
 	// {
 	// 	EditorMode* mode = new EditorMode;
 	// 	mode->Create("Translate", "./Scripts/editor/mode_translate.strata");
