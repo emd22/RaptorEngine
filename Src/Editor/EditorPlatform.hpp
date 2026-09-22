@@ -28,6 +28,9 @@ Vec2f ConsumeRelativeMouseDelta();
  */
 void ActivateApp();
 
+void DisableWindowTabbing();
+bool IsAppActive();
+
 #endif
 
 } // namespace fx::editor::platform

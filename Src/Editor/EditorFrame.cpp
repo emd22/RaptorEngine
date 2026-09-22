@@ -2,6 +2,7 @@
 
 #include "EditorApp.hpp"
 #include "EditorViewport.hpp"
+#include "ObjectListWindow.hpp"
 #include "ObjectPropertiesPanel.hpp"
 #include "WorldPropertiesPanel.hpp"
 
@@ -74,6 +75,12 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 
 	menu_bar->Append(file_menu, "&File");
 
+	wxMenu* window_menu = new wxMenu;
+	wxMenuItem* object_list_item = window_menu->Append(wxID_ANY, "Open Object List",
+													   "View all objects currently in ObjectManager");
+
+	menu_bar->Append(window_menu, "&Object");
+
 	SetMenuBar(menu_bar);
 
 	Bind(wxEVT_MENU, [](wxCommandEvent&) { InvokeReloadHandler(eReloadTarget::World); }, reload_world_item->GetId());
@@ -82,6 +89,7 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 		reload_prototype_item->GetId());
 	Bind(
 		wxEVT_MENU, [](wxCommandEvent&) { InvokeReloadHandler(eReloadTarget::Scripts); }, reload_scripts_item->GetId());
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowObjectListWindow(); }, object_list_item->GetId());
 
 	wxPanel* root = new wxPanel(this, wxID_ANY);
 	wxBoxSizer* root_sizer = new wxBoxSizer(wxVERTICAL);
@@ -143,6 +151,20 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 
 void EditorFrame::SetEditorTool(const eEditorTool tool)
 {
+	const bool was_simulating = IsSimulationMode();
+	const bool will_simulate = (tool == eEditorTool::None);
+
+	mSelectedTool = tool;
+
+	if (gPrototypeEditor != nullptr) {
+		if (was_simulating && !will_simulate) {
+			gPrototypeEditor->Reload();
+		}
+		else if (!was_simulating && will_simulate) {
+			gPrototypeEditor->Unload();
+		}
+	}
+
 	mSelectedTool = tool;
 
 	// Only one tool at a time, and clicking the selected one again keeps it selected
@@ -166,6 +188,19 @@ void EditorFrame::SetEditorTool(const eEditorTool tool)
 }
 
 void EditorFrame::SetDefaultTool() { SetEditorTool(eEditorTool::Translate); }
+
+void EditorFrame::ShowObjectListWindow()
+{
+	if (mpObjectListWindow == nullptr) {
+		mpObjectListWindow = new ObjectListWindow(this);
+	}
+	else {
+		mpObjectListWindow->RefreshList();
+	}
+
+	mpObjectListWindow->Show();
+	mpObjectListWindow->Raise();
+}
 
 void EditorFrame::OnClose(wxCloseEvent& event)
 {

@@ -79,4 +79,8 @@ Vec2f ConsumeRelativeMouseDelta()
 
 void ActivateApp() { [NSApp activateIgnoringOtherApps:YES]; }
 
+void DisableWindowTabbing() { [NSWindow setAllowsAutomaticWindowTabbing:NO]; }
+
+bool IsAppActive() { return [NSApp isActive]; }
+
 } // namespace fx::editor::platform

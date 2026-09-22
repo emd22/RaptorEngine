@@ -181,6 +181,12 @@ void RaptorGame::CreateGame()
 
 	AddEditorModes();
 
+#ifdef FX_IS_EDITOR
+	if (!editor::IsSimulationMode()) {
+		gPrototypeEditor->Reload();
+	}
+#endif
+
 	gCVars->Set("i_crosshair_size", scCrosshairSize);
 
 	// Metres between probes in a volume built from an editor brush. Set `$r_probe_spacing` in the console
@@ -303,13 +309,7 @@ static FX_FORCE_INLINE Vec3f GetEditorMovementVector()
 void RaptorGame::ToggleEditorMode()
 {
 #ifdef FX_IS_EDITOR
-
-	if (!editor::IsSimulationMode()) {
-		gPrototypeEditor->Unload();
-	}
-
-	// Move from simulation to an editor tool
-	editor::GetMainFrame()->SetDefaultTool();
+	editor::GetMainFrame()->SetEditorTool(editor::IsSimulationMode() ? eEditorTool::Translate : eEditorTool::None);
 #endif
 }
 
@@ -442,7 +442,9 @@ void RaptorGame::ProcessControls()
 		}
 	}
 
-	if (gPrototypeEditor != nullptr && ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
+
+	if (!editor::IsSimulationMode() && gPrototypeEditor != nullptr &&
+		ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
 		EditorSelectObject();
 	}
 

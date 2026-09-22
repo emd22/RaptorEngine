@@ -48,6 +48,10 @@ bool Init(int argc, char** argv)
 	// For the tool icons
 	wxInitAllImageHandlers();
 
+#ifdef FX_PLATFORM_MACOS
+	platform::DisableWindowTabbing();
+#endif
+
 	if (!wxTheApp->CallOnInit()) {
 		wxEntryCleanup();
 		return false;

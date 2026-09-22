@@ -95,7 +95,7 @@ void ObjectPropertiesPanel::ShowObject(const Object* object)
 
 	const uint32 tags = static_cast<uint32>(object->Tags);
 	const uint32 flags = static_cast<uint32>(object->GetFlags());
-	const wxString name = wxString::FromUTF8(object->Name.Get());
+	const wxString name = wxString::Format("Selected '%s'", wxString::FromUTF8(object->Name.Get()));
 
 	if (mbShowingAnything && object == mpShownObject && tags == mShownTags && flags == mShownFlags &&
 		name == mShownName) {
