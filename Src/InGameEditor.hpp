@@ -14,7 +14,20 @@
 
 namespace fx {
 
-enum class eEditorMode : int32
+enum class eEditorTool : uint32
+{
+	None,
+
+	Translate,
+	Face,
+	Rotate,
+
+	Count,
+};
+
+
+/// TODO: remove
+enum class eEditorState : int32
 {
 	// Translate,
 	// Scale,
@@ -65,6 +78,8 @@ struct EditOperation
 		Dupe,
 		Create,
 		Delete,
+		/// ValueA/ValueB hold Euler angles in radians (Quat::GetEulerAngles()/FromEulerAngles() convention)
+		Rotate,
 	} Type;
 
 public:
@@ -146,7 +161,7 @@ public:
 
 	uint32 SelectedCount() const { return mSelectedObjects.Size; }
 
-	void Load();
+	void Reload();
 	void Unload();
 	float GetQuantizeFraction() const;
 	bool GetQuantizeEnabled() const;
@@ -162,6 +177,7 @@ public:
 	FX_FORCE_INLINE bool HasSelection() const { return (mSelectedObjects.Size > 0); }
 
 	bool IsInSelection(Object* object) const;
+
 
 	~EditorMode() = default;
 

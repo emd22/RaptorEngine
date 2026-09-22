@@ -322,6 +322,8 @@ void Image::Upload(renderer::CommandBuffer& cmd, const ImageInfo& info)
 		Vec2u mip_dimensions = GetMipDimensions(info.Size, info_index);
 		Assert(mip_dimensions.X > 0 && mip_dimensions.Y > 0);
 
+		AssertMsg((offset % 4) == 0, "Mip level is not 4 byte aligned in the staging buffer");
+
 		buffer_copy_infos.Insert(VkBufferImageCopy {
 			.bufferOffset = offset,
 			.bufferRowLength = 0,
@@ -353,6 +355,9 @@ void Image::Upload(renderer::CommandBuffer& cmd, const ImageInfo& info)
 	// Transition to shader r/o
 	renderer::BarrierHelper::ImageLayoutTransition(this, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 0,
 												   info.MipCount);
+
+	// Matches CreateFromData(), the most detailed level this image actually holds
+	Info.MipLevel = info.MipLevel;
 }
 
 

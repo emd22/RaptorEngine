@@ -180,9 +180,9 @@ public:
 
 
 	/**
-	 * @brief Uploads pixel data to the GPU creating an `fx::Image` object.
+	 * @brief Uploads pixel data to the GPU creating an `fx::Image` object
 	 */
-	AssetTicket UploadImage(const ImageInfo& img_info);
+	AssetTicket UploadImage(ImageInfo& img_info);
 
 	fx::Image* GetNullImage(eImageFormat format);
 	AssetTicket GetNullImageTicket(eImageFormat format);

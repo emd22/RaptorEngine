@@ -109,6 +109,7 @@ void LightBase::RenderDebugMesh(const PerspectiveCamera& camera)
 	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
 	push_constants.ObjectId = ID.GetID();
 	push_constants.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
+	push_constants.TileRows = gGraphics->pRenderer->GetLightTileRows();
 
 	gGraphics->SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::Geometry),
 								   eShaderType::Vertex | eShaderType::Pixel, push_constants);

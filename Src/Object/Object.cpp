@@ -176,6 +176,7 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 
 	push_constants.MaterialIndex = mMaterialID.GetID();
 	push_constants.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
+	push_constants.TileRows = gGraphics->pRenderer->GetLightTileRows();
 	push_constants.BoneBase = BoneBufferBase;
 
 

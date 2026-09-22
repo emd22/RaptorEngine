@@ -17,6 +17,9 @@
 #include <Core/Queue.hpp>
 #include <Core/String.hpp>
 #include <Engine.hpp>
+#ifdef FX_IS_EDITOR
+#include <Editor/EditorApp.hpp>
+#endif
 #include <FoxScript/FoxScript.hpp>
 #include <Math/MathConsts.hpp>
 #include <Math/MathUtil.hpp>
@@ -31,7 +34,7 @@ using namespace fx;
 using namespace fx::renderer;
 
 
-int main()
+int main(int argc, char** argv)
 {
 	fx::gEnginePool = new fx::MemPool;
 	fx::gEnginePool->Create(FX_MEMORY_ENGINE_POOL_SIZE);
@@ -55,6 +58,14 @@ int main()
 #endif
 
 #ifndef FX_RUN_TEST
+
+#ifdef FX_IS_EDITOR
+	// If there was an issue starting the editor, return with an error code
+	if (!fx::editor::Init(argc, argv)) {
+		return 1;
+	}
+#endif
+
 	fx::renderer::Globals::Init();
 
 	{
@@ -68,6 +79,11 @@ int main()
 		delete gAssetManager;
 		gAssetManager = nullptr;
 	}
+
+#ifdef FX_IS_EDITOR
+	// Destroy the editor after the renderer is gone as its surface presents to the editor frame
+	fx::editor::Shutdown();
+#endif
 
 	Defer(
 		[]()

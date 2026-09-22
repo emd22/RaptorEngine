@@ -37,9 +37,6 @@ namespace fx::renderer {
 
 FX_SET_MODULE_NAME("DeferredRenderer")
 
-/// Descriptor set index that holds the Forward+ tiled light lists
-static constexpr uint32 scLightGridSetIndex = 2;
-
 void TiledForwardRenderer::Create(const Vec2u& extent)
 {
 	DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10);
@@ -185,11 +182,13 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 	Target* ssao_target = SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm);
 	Assert(ssao_target != nullptr);
 
+	// Linear since the AO target is half resolution so point sampling it at full resolution shows the
+	// 2x2 blocks it was rendered at. Had this bad boy nearest for a while and it looked like shit
 	ds_entries.Insert(DescriptorEntry::AsImage(5, eShaderType::Pixel, &ssao_target->Image,
 											   gSamplerCache->Request({
-												   eSamplerFilter::Nearest,
-												   eSamplerFilter::Nearest,
-												   eSamplerFilter::Nearest,
+												   eSamplerFilter::Linear,
+												   eSamplerFilter::Linear,
+												   eSamplerFilter::Linear,
 											   })));
 
 	// bDecals
@@ -359,9 +358,9 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// tSSAO
 		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
 									  gSamplerCache->Request({
-										  .MinFilter = eSamplerFilter::Nearest,
-										  .MagFilter = eSamplerFilter::Nearest,
-										  .MipFilter = eSamplerFilter::Nearest,
+										  .MinFilter = eSamplerFilter::Linear,
+										  .MagFilter = eSamplerFilter::Linear,
+										  .MipFilter = eSamplerFilter::Linear,
 									  }));
 
 
@@ -420,9 +419,9 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// tSSAO
 		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
 									  gSamplerCache->Request({
-										  .MinFilter = eSamplerFilter::Nearest,
-										  .MagFilter = eSamplerFilter::Nearest,
-										  .MipFilter = eSamplerFilter::Nearest,
+										  .MinFilter = eSamplerFilter::Linear,
+										  .MagFilter = eSamplerFilter::Linear,
+										  .MipFilter = eSamplerFilter::Linear,
 									  }));
 
 		// Set 1 (Object local)
@@ -489,9 +488,9 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// tSSAO
 		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
 									  gSamplerCache->Request({
-										  .MinFilter = eSamplerFilter::Nearest,
-										  .MagFilter = eSamplerFilter::Nearest,
-										  .MipFilter = eSamplerFilter::Nearest,
+										  .MinFilter = eSamplerFilter::Linear,
+										  .MagFilter = eSamplerFilter::Linear,
+										  .MipFilter = eSamplerFilter::Linear,
 									  }));
 
 
@@ -556,9 +555,9 @@ void TiledForwardRenderer::CreateForwardPSO()
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
 		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
-									  gSamplerCache->Request({ .MinFilter = eSamplerFilter::Nearest,
-															   .MagFilter = eSamplerFilter::Nearest,
-															   .MipFilter = eSamplerFilter::Nearest }));
+									  gSamplerCache->Request({ .MinFilter = eSamplerFilter::Linear,
+															   .MagFilter = eSamplerFilter::Linear,
+															   .MipFilter = eSamplerFilter::Linear }));
 		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
 							gSamplerCache->Request({}));
 		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
@@ -601,9 +600,9 @@ void TiledForwardRenderer::CreateForwardPSO()
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
 		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
-									  gSamplerCache->Request({ .MinFilter = eSamplerFilter::Nearest,
-															   .MagFilter = eSamplerFilter::Nearest,
-															   .MipFilter = eSamplerFilter::Nearest }));
+									  gSamplerCache->Request({ .MinFilter = eSamplerFilter::Linear,
+															   .MagFilter = eSamplerFilter::Linear,
+															   .MipFilter = eSamplerFilter::Linear }));
 		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
 							gSamplerCache->Request({}));
 		gPSOBuild->AddImage(1, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
@@ -650,9 +649,9 @@ void TiledForwardRenderer::CreateForwardPSO()
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
 		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
-									  gSamplerCache->Request({ .MinFilter = eSamplerFilter::Nearest,
-															   .MagFilter = eSamplerFilter::Nearest,
-															   .MipFilter = eSamplerFilter::Nearest }));
+									  gSamplerCache->Request({ .MinFilter = eSamplerFilter::Linear,
+															   .MagFilter = eSamplerFilter::Linear,
+															   .MipFilter = eSamplerFilter::Linear }));
 		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
 							gSamplerCache->Request({}));
 		gPSOBuild->AddImage(1, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
@@ -777,8 +776,6 @@ void TiledForwardRenderer::CreateDepthNormalPSO()
 	}
 }
 
-void TiledForwardRenderer::AddLightGridDescriptors() {}
-
 void TiledForwardRenderer::AddDecalDescriptors()
 {
 	// bDecals
@@ -839,7 +836,13 @@ void TiledForwardRenderer::DoLightCullingPass(Camera& camera, const Vec2u* pExte
 	const uint32 tile_rows = std::min((extent.Y + (Limits::LightTileSize - 1)) / Limits::LightTileSize,
 									  Limits::MaxScreenTilesY);
 
+	if (tile_columns * Limits::LightTileSize < extent.X || tile_rows * Limits::LightTileSize < extent.Y) {
+		LogWarning(LC_RENDER, "Light grid capped at {}x{} tiles for a {}x{} view, raise Limits::MaxScreenTiles",
+				   tile_columns, tile_rows, extent.X, extent.Y);
+	}
+
 	mLightTileColumns = tile_columns;
+	mLightTileRows = tile_rows;
 
 	const Mat4f& cam_matrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 
@@ -881,24 +884,6 @@ void TiledForwardRenderer::DoLightCullingPass(Camera& camera, const Vec2u* pExte
 	BarrierHelper::BufferComputeToFragment(cmd, &gGraphics->DecalMaskBuffer);
 }
 
-void TiledForwardRenderer::BindLightGridDescriptors(CommandBuffer& cmd)
-{
-	Pipeline& pipeline = gPipelineCache->Request(ePipelineName::Geometry);
-
-	const uint32 buffer_offsets[] = { gGraphics->GetLightGridFrameOffset(), gGraphics->GetLightIndexListFrameOffset() };
-
-	for (Pipeline::DescriptorRef& desc_ref : pipeline.DescriptorIDs) {
-		if (desc_ref.SetIndex != scLightGridSetIndex) {
-			continue;
-		}
-
-		desc_ref.pSet->Bind(scLightGridSetIndex, cmd, pipeline,
-							Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
-		return;
-	}
-}
-
-
 //////////////////////////////////////////
 // DeferredRenderer CompPass Functions
 //////////////////////////////////////////
@@ -929,14 +914,6 @@ void TiledForwardRenderer::CreateCompositionPSO()
 	// tLighting
 	gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::RGBA16_Float),
 								  gSamplerCache->Request(SamplerProps {}));
-	// tNormal
-	gPSOBuild->AddImageFromTarget(3, 0, eShaderType::Pixel, Prepass.GetTarget(eImageFormat::RGBA16_Float),
-								  gSamplerCache->Request(SamplerProps {
-									  eSamplerFilter::Nearest,
-									  eSamplerFilter::Nearest,
-									  eSamplerFilter::Nearest,
-								  }));
-
 	gPSOBuild->EndPipeline();
 }
 

@@ -6,7 +6,6 @@
 #include <Asset/Loader/Image/LoaderStb.hpp>
 #include <Core/FilesystemIO.hpp>
 #include <Renderer/Backend/Image.hpp>
-
 #include <algorithm>
 #include <vector>
 
@@ -61,8 +60,8 @@ SizedArray<uint8> MipmapGen::GenerateMip(eImageFormat format, const Slice<uint8>
 		if (ImageFormatUtil::IsSrgb(format)) {
 			// Averaging sRGB encoded bytes as if they were linear darkens every level below the base, so the
 			// colour channels are filtered through the transfer function. Alpha stays linear either way.
-			stbir_resize_uint8_srgb(pixels.pData, size.X, size.Y, input_stride, output_data.pData,
-									output_dimensions.X, output_dimensions.Y, output_stride, STBIR_RGBA);
+			stbir_resize_uint8_srgb(pixels.pData, size.X, size.Y, input_stride, output_data.pData, output_dimensions.X,
+									output_dimensions.Y, output_stride, STBIR_RGBA);
 		}
 		else {
 			stbir_resize_uint8_linear(pixels.pData, size.X, size.Y, input_stride, output_data.pData,
@@ -109,7 +108,6 @@ void MipmapGen::GenerateTestMipmap(const char* output_path, const Vec2u& size)
 			memcpy(mips[mip_level].data() + (pixel_index * scPixelStride), level_color, scPixelStride);
 		}
 
-		LogInfo("Mippy Width: {}, Height: {}", mip_size.X, mip_size.Y);
 
 		mip_slices.emplace_back(mips[mip_level].data(), static_cast<uint32>(mips[mip_level].size()));
 	}
@@ -133,10 +131,9 @@ void MipmapGen::ExportMipmaps(const char* ktx_path, const char* output_path)
 	for (uint32 mip_level = 0; mip_level < ktx.GetMipCount(); mip_level++) {
 		const Slice<const uint8> mip_data = ktx.GetMipData(mip_level);
 
-		loader::LoaderKtx::SaveToFile(String::Fmt("{}/Mip{}{}", output_path, mip_level,
-												  loader::LoaderKtx::scFileExtension),
-									  ktx.GetFormat(), ktx.GetMipDimensions(mip_level),
-									  Slice<const Slice<const uint8>>(&mip_data, 1));
+		loader::LoaderKtx::SaveToFile(
+			String::Fmt("{}/Mip{}{}", output_path, mip_level, loader::LoaderKtx::scFileExtension), ktx.GetFormat(),
+			ktx.GetMipDimensions(mip_level), Slice<const Slice<const uint8>>(&mip_data, 1));
 	}
 }
 
@@ -153,7 +150,7 @@ Image MipmapGen::LoadMipmaps(renderer::CommandBuffer& cmd, const char* path)
 
 	image.Upload(cmd, image_info);
 
-	std::free(const_cast<uint8*>(image_info.ImageData.pData));
+	image_info.FreeOwnedData();
 
 	return image;
 }

@@ -74,12 +74,13 @@ private:
 	void Tick();
 	void ProcessControls();
 
-	void LoadOffsetsFile();
+	void ReloadWorldFile();
+	void ReloadBlockout();
+	void ReloadScripts();
 
 	void DestroyGame();
 
-	void NextEditorMode();
-	void SwitchEditorMode(eEditorMode mode);
+	void ToggleEditorMode();
 
 	void RenderText();
 	void RenderCrosshair();
@@ -101,12 +102,6 @@ public:
 
 	Quat PistolRotationGoal = Quat::scIdentity;
 	ObjectManager ObjectManager;
-
-	Vec3f PistolOffset = Vec3f::sZero;
-	Vec3f ArmsOffset = Vec3f::sZero;
-
-	eEditorMode EditorModeType = eEditorMode::Simulate;
-	SizedArray<EditorMode*> EditorModes;
 
 	bool bInCommandMode = false;
 

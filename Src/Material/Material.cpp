@@ -47,6 +47,8 @@ MaterialComponent& MaterialComponent::operator=(const MaterialComponent& other)
 	UploadSrc = other.UploadSrc;
 	pDataToLoad = other.pDataToLoad;
 	ImageToUpload = other.ImageToUpload;
+	// Shallow, like the rest of this assignment: `other` stays the owner of the pixel buffer
+	ImageToUpload.bOwnsData = false;
 
 	TextureCacheID = other.TextureCacheID;
 

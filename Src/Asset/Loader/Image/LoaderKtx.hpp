@@ -37,8 +37,8 @@ public:
 
 	/**
 	 * @brief Writes a KTX2 file from a set of tightly packed mip levels.
-	 * @param mips The pixel data of each mip level, ordered from the base (largest) level down.
-	 * @param size The dimensions of the base level. Level N is expected to be max(1, size >> N).
+	 * @param mips The pixel data of each mip level, ordered from the base (largest) level down
+	 * @param size The dimensions of the base level
 	 */
 	static eLoaderStatus SaveToFile(const String& path, eImageFormat format, const Vec2u& size,
 									const Slice<const Slice<const uint8>>& mips);

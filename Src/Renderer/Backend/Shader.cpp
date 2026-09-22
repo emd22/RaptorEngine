@@ -26,6 +26,29 @@ namespace fx::renderer {
 // Shader Functions
 /////////////////////////////////////
 
+/**
+ * @brief Folds a macro list into `hash` by its contents
+ */
+static Hash64 HashMacros(const SizedArray<ShaderMacro>& macros, Hash64 hash)
+{
+	for (const ShaderMacro& macro : macros) {
+		if (macro.pcName != nullptr) {
+			hash = HashStr64(macro.pcName, hash);
+		}
+
+		// Keeps `NAME=1` apart from a valueless `NAME`, and both from `NAME=2`
+		hash = HashStr64("=", hash);
+
+		if (macro.pcValue != nullptr) {
+			hash = HashStr64(macro.pcValue, hash);
+		}
+
+		hash = HashStr64(";", hash);
+	}
+
+	return hash;
+}
+
 ShaderId Shader::GenerateShaderId(eShaderType type, const SizedArray<ShaderMacro>& macros)
 {
 	Hash64 hash = FX_HASH64_FNV1A_INIT;
@@ -44,7 +67,7 @@ ShaderId Shader::GenerateShaderId(eShaderType type, const SizedArray<ShaderMacro
 		hash = cPrefixHashCS;
 	}
 
-	return HashData64(Slice<ShaderMacro>(macros), hash);
+	return HashMacros(macros, hash);
 }
 
 bool Shader::PreloadCompiledPrograms(const char* pack_path)
@@ -158,7 +181,7 @@ Ref<ShaderProgram> Shader::GetProgram(eShaderType shader_type, const SizedArray<
 {
 	ProgramCache& cached_type = mCachedTypes[static_cast<uint32>(shader_type)];
 
-	const Hash64 macro_hash = HashData64(MakeSlice(macros.pData, macros.GetSizeInBytes()));
+	const Hash64 macro_hash = HashMacros(macros, FX_HASH64_FNV1A_INIT);
 	auto program_it = cached_type.Programs.find(macro_hash);
 
 	if (program_it != cached_type.Programs.end()) {

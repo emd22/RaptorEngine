@@ -179,7 +179,17 @@ ImageInfo LoaderKtx::MakeImageInfo(uint32 first_mip, uint32 mip_count) const
 		total_size += GetMipData(level).Size;
 	}
 
+	if (total_size == 0) {
+		LogError(LC_ASSET, "KTX: no pixel data in levels [{}, {})", first_mip, end_mip);
+		return ImageInfo {};
+	}
+
 	uint8* buffer = static_cast<uint8*>(std::malloc(total_size));
+
+	if (buffer == nullptr) {
+		LogError(LC_ASSET, "KTX: could not allocate {} bytes for {} mip levels", total_size, mip_count);
+		return ImageInfo {};
+	}
 
 	uint64 offset = 0;
 	for (uint32 level = first_mip; level < end_mip; level++) {
@@ -195,6 +205,8 @@ ImageInfo LoaderKtx::MakeImageInfo(uint32 first_mip, uint32 mip_count) const
 	info.MipLevel = 0;
 	info.MipCount = mip_count;
 	info.ImageData = Slice<const uint8>(buffer, total_size);
+	// Caller's to release, via ImageInfo::FreeOwnedData()
+	info.bOwnsData = true;
 
 	return info;
 }

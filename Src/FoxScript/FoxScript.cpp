@@ -26,14 +26,14 @@ static void WB_InitStatVars(FoxVM* vm, const SizedArray<FoxValue>& args)
 
 static void N_MipsExport(FoxVM* vm, const SizedArray<FoxValue>& args)
 {
-	const FoxValue& datapack_path = args[0];
+	// const FoxValue& datapack_path = args[0];
 
-	MipmapLoader loader;
-	loader.Open(datapack_path.Get<const char*>());
-	if (!loader.IsOpen()) {
-		LogError("Could not open KTX file");
-		return;
-	}
+	// MipmapLoader loader;
+	// loader.Open(datapack_path.Get<const char*>());
+	// if (!loader.Pack.IsOpen()) {
+	// 	LogError("Could not open datapack");
+	// 	return;
+	// }
 }
 
 
