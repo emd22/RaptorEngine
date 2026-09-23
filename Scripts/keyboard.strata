@@ -30,6 +30,15 @@ enum KEY : uint
     K_BACKSPACE = 42,
     K_MINUS = 45,
     K_EQUALS = 46,
+    K_LBRACKET = 47,
+    K_RBRACKET = 48,
+    K_COMMA = 54,
+    K_PERIOD = 55,
+
+    K_RIGHT = 79,
+    K_LEFT = 80,
+    K_DOWN = 81,
+    K_UP = 82,
 
 
 	/* Left modifier keys */

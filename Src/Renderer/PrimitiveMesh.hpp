@@ -9,220 +9,235 @@ namespace fx {
 
 struct MeshBone
 {
-    Vec3f Position;
-    Quat Rotation;
+	Vec3f Position;
+	Quat Rotation;
 };
 
 class PrimitiveMesh
 {
 public:
-    PrimitiveMesh() = default;
+	PrimitiveMesh() = default;
 
-    template <renderer::eVertexType TVertexType>
-    PrimitiveMesh(SizedArray<renderer::Vertex<TVertexType>>& vertices)
-    {
-        UploadVertices(vertices);
-    }
+	template <renderer::eVertexType TVertexType>
+	PrimitiveMesh(SizedArray<renderer::Vertex<TVertexType>>& vertices)
+	{
+		UploadVertices(vertices);
+	}
 
-    template <renderer::eVertexType TVertexType>
-    PrimitiveMesh(SizedArray<renderer::Vertex<TVertexType>>& vertices, SizedArray<uint32>& indices)
-    {
-        CreateFromData(vertices, indices);
-    }
+	template <renderer::eVertexType TVertexType>
+	PrimitiveMesh(SizedArray<renderer::Vertex<TVertexType>>& vertices, SizedArray<uint32>& indices)
+	{
+		CreateFromData(vertices, indices);
+	}
 
-    /**
-     * @brief Recalculates normals if needed and uploads the vertex list to the GPU.
-     */
-    inline void UploadVertices(renderer::CommandBuffer& cmd)
-    {
-        if (VertexList.SupportsNormals() && !VertexList.HasNormals()) {
-            LogDebug("Calculating normals for mesh");
-            RecalculateNormals();
-        }
+	/**
+	 * @brief Recalculates normals if needed and uploads the vertex list to the GPU.
+	 */
+	inline void UploadVertices(renderer::CommandBuffer& cmd)
+	{
+		if (VertexList.SupportsNormals() && !VertexList.HasNormals()) {
+			LogDebug("Calculating normals for mesh");
+			RecalculateNormals();
+		}
 
-        VertexList.UploadToGpu(cmd);
-    }
+		VertexList.UploadToGpu(cmd);
+	}
 
-    /**
-     * @brief Uploads the vertices to the mesh's GPU buffers and copies the data into a cpu-side buffer if the property
-     * `KeepInMemory` is true.
-     */
-    template <renderer::eVertexType TVertexType>
-    void UploadVertices(renderer::CommandBuffer& cmd, const SizedArray<renderer::Vertex<TVertexType>>& vertices)
-    {
-        VertexList.CreateAsCopyOf<TVertexType>(vertices);
-        UploadVertices(cmd);
-    }
+	/**
+	 * @brief Uploads the vertices to the mesh's GPU buffers and copies the data into a cpu-side buffer if the property
+	 * `KeepInMemory` is true.
+	 */
+	template <renderer::eVertexType TVertexType>
+	void UploadVertices(renderer::CommandBuffer& cmd, const SizedArray<renderer::Vertex<TVertexType>>& vertices)
+	{
+		VertexList.CreateAsCopyOf<TVertexType>(vertices);
+		UploadVertices(cmd);
+	}
 
-    template <renderer::eVertexType TVertexType>
-    void UploadVertices(renderer::CommandBuffer& cmd, SizedArray<renderer::Vertex<TVertexType>>&& vertices)
-    {
-        VertexList.CreateFrom<TVertexType>(std::move(vertices));
-        UploadVertices(cmd);
-    }
+	template <renderer::eVertexType TVertexType>
+	void UploadVertices(renderer::CommandBuffer& cmd, SizedArray<renderer::Vertex<TVertexType>>&& vertices)
+	{
+		VertexList.CreateFrom<TVertexType>(std::move(vertices));
+		UploadVertices(cmd);
+	}
 
-    /** @brief Uploads mesh indices to a primitive mesh. */
-    void UploadIndices(renderer::CommandBuffer& cmd, const SizedArray<uint32>& indices)
-    {
-        LocalIndexBuffer.InitAsCopyOf(indices);
-        GpuIndexBuffer.Create(cmd, renderer::eGpuBufferType::IndexBuffer, Slice(indices));
-    }
+	/**
+	 * @brief Uploads mesh indices to a primitive mesh.
+	 */
+	void UploadIndices(renderer::CommandBuffer& cmd, const SizedArray<uint32>& indices)
+	{
+		LocalIndexBuffer.InitAsCopyOf(indices);
+		GpuIndexBuffer.Create(cmd, renderer::eGpuBufferType::IndexBuffer, Slice(indices));
+	}
 
-    /**
-     * @brief Uploads mesh indices to a primtive mesh, and stores the indices without copy if the property
-     * `KeepInMemory` is true.
-     */
-    void UploadIndices(renderer::CommandBuffer& cmd)
-    {
-        GpuIndexBuffer.Create<uint32>(cmd, renderer::eGpuBufferType::IndexBuffer, LocalIndexBuffer);
-    }
+	/**
+	 * @brief Uploads mesh indices to a primtive mesh, and stores the indices without copy if the property
+	 * `KeepInMemory` is true.
+	 */
+	void UploadIndices(renderer::CommandBuffer& cmd)
+	{
+		GpuIndexBuffer.Create<uint32>(cmd, renderer::eGpuBufferType::IndexBuffer, LocalIndexBuffer);
+	}
 
-    void SetIndices(SizedArray<uint32>&& indices) { LocalIndexBuffer = std::move(indices); }
+	void SetIndices(SizedArray<uint32>&& indices) { LocalIndexBuffer = std::move(indices); }
 
-    renderer::VertexList& GetVertices()
-    {
-        if (!bKeepInMemory) {
-            LogWarning(LC_ASSET, "Requesting vertices from a primitive mesh while `KeepInMemory` != true!");
-        }
+	renderer::VertexList& GetVertices()
+	{
+		if (!bKeepInMemory) {
+			LogWarning(LC_ASSET, "Requesting vertices from a primitive mesh while `KeepInMemory` != true!");
+		}
 
-        // Note that VertexList.LocalBuffer will be empty given bKeepInMemory is false.
-        return VertexList;
-    }
+		// Note that VertexList.LocalBuffer will be empty given bKeepInMemory is false.
+		return VertexList;
+	}
 
-    SizedArray<uint32>& GetIndices()
-    {
-        if (!bKeepInMemory) {
-            LogWarning(LC_ASSET, "Requesting indices from a primitive mesh while `KeepInMemory` != true!");
-        }
+	SizedArray<uint32>& GetIndices()
+	{
+		if (!bKeepInMemory) {
+			LogWarning(LC_ASSET, "Requesting indices from a primitive mesh while `KeepInMemory` != true!");
+		}
 
-        // This will return an empty array if `KeepInMemory` is false!
-        return LocalIndexBuffer;
-    }
+		// This will return an empty array if `KeepInMemory` is false!
+		return LocalIndexBuffer;
+	}
 
-    bool IsWritable() { return (VertexList.GpuBuffer.Initialized && GpuIndexBuffer.Initialized); }
+	bool IsWritable() { return (VertexList.GpuBuffer.Initialized && GpuIndexBuffer.Initialized); }
 
-    renderer::GpuBuffer& GetVertexBuffer() { return VertexList.GpuBuffer; }
-    renderer::GpuBuffer& GetIndexBuffer() { return GpuIndexBuffer; }
+	renderer::GpuBuffer& GetVertexBuffer() { return VertexList.GpuBuffer; }
+	renderer::GpuBuffer& GetIndexBuffer() { return GpuIndexBuffer; }
 
-    void Render(const renderer::CommandBuffer& cmd, uint32 num_instances)
-    {
-        const VkDeviceSize offset = 0;
+	void Render(const renderer::CommandBuffer& cmd, uint32 num_instances)
+	{
+		const VkDeviceSize offset = 0;
 
-        vkCmdBindVertexBuffers(cmd.Cmd, 0, 1, &VertexList.GpuBuffer.Buffer, &offset);
-        vkCmdBindIndexBuffer(cmd.Cmd, GpuIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdBindVertexBuffers(cmd.Cmd, 0, 1, &VertexList.GpuBuffer.Buffer, &offset);
+		vkCmdBindIndexBuffer(cmd.Cmd, GpuIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
-        vkCmdDrawIndexed(cmd.Cmd, static_cast<uint32>(GpuIndexBuffer.Size / sizeof(uint32)), num_instances, 0, 0, 0);
-    }
+		vkCmdDrawIndexed(cmd.Cmd, static_cast<uint32>(GpuIndexBuffer.Size / sizeof(uint32)), num_instances, 0, 0, 0);
+	}
 
-    void RecalculateNormals()
-    {
-        using VertexType = renderer::Vertex<renderer::eVertexType::Default>;
+	/**
+	 * @brief Draws `index_count` indices starting at `first_index`, for meshes drawn in parts with different materials
+	 */
+	void RenderRange(const renderer::CommandBuffer& cmd, uint32 first_index, uint32 index_count, uint32 num_instances)
+	{
+		const VkDeviceSize offset = 0;
 
-        if (LocalIndexBuffer.IsEmpty()) {
-            LogWarning(LC_ASSET, "Cannot recalculate normals as local indices are missing!");
-            return;
-        }
+		vkCmdBindVertexBuffers(cmd.Cmd, 0, 1, &VertexList.GpuBuffer.Buffer, &offset);
+		vkCmdBindIndexBuffer(cmd.Cmd, GpuIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
-        AnonArray& vertices = VertexList.GetLocalBuffer();
+		vkCmdDrawIndexed(cmd.Cmd, index_count, num_instances, first_index, 0, 0);
+	}
 
-        if (vertices.IsEmpty()) {
-            LogWarning(LC_ASSET, "Cannot recalculate normals as local vertices are missing!");
-            return;
-        }
+	void RecalculateNormals()
+	{
+		using VertexType = renderer::Vertex<renderer::eVertexType::Default>;
 
-        const uint32 num_vertices = vertices.Size;
-        const uint32 num_faces = num_vertices / 3;
+		if (LocalIndexBuffer.IsEmpty()) {
+			LogWarning(LC_ASSET, "Cannot recalculate normals as local indices are missing!");
+			return;
+		}
 
-        // Zero the mesh normals
-        for (uint32 index = 0; index < num_vertices; index++) {
-            memset(vertices.Get<VertexType>(index).Normal, 0, sizeof(VertexType::Normal));
-        }
+		AnonArray& vertices = VertexList.GetLocalBuffer();
 
-        for (uint32 index = 0; index < num_faces; index++) {
-            // Indices for each vertex of the triangle
-            const uint32 index_a = LocalIndexBuffer.pData[index];
-            const uint32 index_b = LocalIndexBuffer.pData[index + 1];
-            const uint32 index_c = LocalIndexBuffer.pData[index + 2];
+		if (vertices.IsEmpty()) {
+			LogWarning(LC_ASSET, "Cannot recalculate normals as local vertices are missing!");
+			return;
+		}
 
-            /*
-                        A
-                      / |
-                    /   |
-                  /     |
-                B-------C
+		const uint32 num_vertices = vertices.Size;
+		const uint32 num_faces = num_vertices / 3;
 
-                Get the edge between A and B and the edge between C and B.
-                then, we get the normal using:
+		// Zero the mesh normals
+		for (uint32 index = 0; index < num_vertices; index++) {
+			memset(vertices.Get<VertexType>(index).Normal, 0, sizeof(VertexType::Normal));
+		}
 
-                Normal = EdgeA x EdgeB.
+		for (uint32 index = 0; index < num_faces; index++) {
+			// Indices for each vertex of the triangle
+			const uint32 index_a = LocalIndexBuffer.pData[index];
+			const uint32 index_b = LocalIndexBuffer.pData[index + 1];
+			const uint32 index_c = LocalIndexBuffer.pData[index + 2];
 
-                Average across vertices and normalize to remove scale.
-             */
+			/*
+						A
+					  / |
+					/   |
+				  /     |
+				B-------C
 
+				Get the edge between A and B and the edge between C and B.
+				then, we get the normal using:
 
-            VertexType& vertex_a = vertices.Get<VertexType>(index_a);
-            VertexType& vertex_b = vertices.Get<VertexType>(index_b);
-            VertexType& vertex_c = vertices.Get<VertexType>(index_c);
+				Normal = EdgeA x EdgeB.
 
-            const Vec3f edge_a = Vec3f::FromDifference(vertex_a.Position, vertex_b.Position);
-            const Vec3f edge_b = Vec3f::FromDifference(vertex_c.Position, vertex_b.Position);
-
-            const Vec3f normal = edge_a.Cross(edge_b);
-
-            vertex_a.Normal[0] += normal.X;
-            vertex_a.Normal[1] += normal.Y;
-            vertex_a.Normal[2] += normal.Z;
-
-            vertex_b.Normal[0] += normal.X;
-            vertex_b.Normal[1] += normal.Y;
-            vertex_b.Normal[2] += normal.Z;
-
-            vertex_c.Normal[0] += normal.X;
-            vertex_c.Normal[1] += normal.Y;
-            vertex_c.Normal[2] += normal.Z;
-        }
+				Average across vertices and normalize to remove scale.
+			 */
 
 
-        for (uint32 index = 0; index < vertices.Size; index++) {
-            VertexType& vertex = vertices.Get<VertexType>(index);
+			VertexType& vertex_a = vertices.Get<VertexType>(index_a);
+			VertexType& vertex_b = vertices.Get<VertexType>(index_b);
+			VertexType& vertex_c = vertices.Get<VertexType>(index_c);
 
-            Vec3f vec(vertex.Position);
-            vec.NormalizeIP();
-            vec.CopyTo(vertex.Normal);
-        }
+			const Vec3f edge_a = Vec3f::FromDifference(vertex_a.Position, vertex_b.Position);
+			const Vec3f edge_b = Vec3f::FromDifference(vertex_c.Position, vertex_b.Position);
 
-        VertexList.bContainsNormals = true;
-    }
+			const Vec3f normal = edge_a.Cross(edge_b);
 
-    void Destroy()
-    {
-        if (bIsReference || !bIsReady.load()) {
-            return;
-        }
+			vertex_a.Normal[0] += normal.X;
+			vertex_a.Normal[1] += normal.Y;
+			vertex_a.Normal[2] += normal.Z;
 
-        bIsReady.store(false);
+			vertex_b.Normal[0] += normal.X;
+			vertex_b.Normal[1] += normal.Y;
+			vertex_b.Normal[2] += normal.Z;
 
-        VertexList.Destroy();
+			vertex_c.Normal[0] += normal.X;
+			vertex_c.Normal[1] += normal.Y;
+			vertex_c.Normal[2] += normal.Z;
+		}
 
-        GpuIndexBuffer.Destroy();
-        LocalIndexBuffer.Free();
-    }
 
-    ~PrimitiveMesh() { Destroy(); }
+		for (uint32 index = 0; index < vertices.Size; index++) {
+			VertexType& vertex = vertices.Get<VertexType>(index);
+
+			Vec3f vec(vertex.Position);
+			vec.NormalizeIP();
+			vec.CopyTo(vertex.Normal);
+		}
+
+		VertexList.bContainsNormals = true;
+	}
+
+	void Destroy()
+	{
+		if (bIsReference || !bIsReady.load()) {
+			return;
+		}
+
+		bIsReady.store(false);
+
+		VertexList.Destroy();
+
+		GpuIndexBuffer.Destroy();
+		LocalIndexBuffer.Free();
+	}
+
+	~PrimitiveMesh() { Destroy(); }
 
 
 public:
-    renderer::VertexList VertexList;
+	renderer::VertexList VertexList;
 
-    SizedArray<MeshBone> Bones;
+	SizedArray<MeshBone> Bones;
 
-    std::atomic_bool bIsReady = { false };
+	std::atomic_bool bIsReady = { false };
 
-    bool bIsReference = false;
-    bool bKeepInMemory = false;
+	bool bIsReference = false;
+	bool bKeepInMemory = false;
 
-    renderer::GpuBuffer GpuIndexBuffer;
-    SizedArray<uint32> LocalIndexBuffer;
+	renderer::GpuBuffer GpuIndexBuffer;
+	SizedArray<uint32> LocalIndexBuffer;
 };
 
 } // namespace fx

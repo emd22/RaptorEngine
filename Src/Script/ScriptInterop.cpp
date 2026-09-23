@@ -120,8 +120,7 @@ static void N_editor_push_op_delete(Object* obj, int32 group_size)
 	op.PushedObjectID = obj->ID;
 	op.DeleteSnapshot.Position = obj->GetPosition();
 	const Brush* brush = gWorld->pBlockout->GetBrush(obj);
-	op.DeleteSnapshot.Planes = (brush != nullptr) ? brush->Planes
-												  : Brush::FromBox(obj->Bounds.Min, obj->Bounds.Max).Planes;
+	op.PlanesBefore = (brush != nullptr) ? brush->Planes : Brush::FromBox(obj->Bounds.Min, obj->Bounds.Max).Planes;
 	op.DeleteSnapshot.Material = gPrototypeEditor->GetStoredMaterial(obj);
 	op.DeleteSnapshot.Rotation = obj->mRotation;
 	op.DeleteSnapshot.ObjectName = obj->Name;
@@ -205,6 +204,12 @@ static float32 N_object_direction_scale(Object* obj, FLOAT4 direction)
 		return 0.0f;
 	}
 
+	// A brush's reach along a face normal is exactly where that face is, which its bounds only give for boxes
+	const Brush* brush = gWorld->pBlockout->GetBrush(obj);
+	if (brush != nullptr) {
+		return brush->GetSupport(Vec3f(direction).Normalize());
+	}
+
 	return obj->GetDirectionScale(Vec3f(direction));
 }
 
@@ -250,6 +255,17 @@ static FLOAT4 N_object_ray_get_face(Object* obj)
 													gWorld->Player.pCamera->GetForwardVector(), face);
 
 		return (distance >= 0.0f) ? face.mIntrin : simd::LoadFloat4(0.0f);
+	}
+
+	if (gWorld->pBlockout->GetBrush(obj) != nullptr) {
+		Vec3f face_normal;
+
+		if (!gWorld->pBlockout->RaycastFace(obj, gWorld->Player.pCamera->Position,
+											gWorld->Player.pCamera->GetForwardVector(), face_normal)) {
+			return simd::LoadFloat4(0.0f);
+		}
+
+		return face_normal.mIntrin;
 	}
 
 	physics::Body* body = gPhysics->GetBody(obj->PhysicsID);
@@ -332,7 +348,54 @@ static void N_blockout_reload_object(Object* object) { gWorld->pBlockout->Rebuil
 
 static void N_blockout_object_scale(Object* object, FLOAT4 face_dir, FLOAT4 magnitude)
 {
-	gWorld->pBlockout->ScaleInDirection(object, Vec3f(face_dir), Vec3f(magnitude));
+	gWorld->pBlockout->MoveFace(object, Vec3f(face_dir), Vec3f(magnitude).X);
+}
+
+/// The centre of the face facing along `face`, in the object's local space
+static FLOAT4 N_blockout_face_center(Object* object, FLOAT4 face)
+{
+	const Brush* brush = gWorld->pBlockout->GetBrush(object);
+	if (brush == nullptr) {
+		return simd::LoadFloat4(0.0f);
+	}
+
+	const int32 plane_index = brush->FindPlane(Vec3f(face));
+	if (plane_index == Brush::scNoPlane) {
+		return simd::LoadFloat4(0.0f);
+	}
+
+	return brush->GetFaceCenter(static_cast<uint32>(plane_index)).mIntrin;
+}
+
+static void N_blockout_edit_face_texture(Object* object, FLOAT4 face, uint32 edit, FLOAT4 amount)
+{
+	if (object == nullptr || editor::IsSimulationMode()) {
+		return;
+	}
+
+	const Brush* brush = gWorld->pBlockout->GetBrush(object);
+	if (brush == nullptr) {
+		return;
+	}
+
+	const Vec3f amount_vec(amount);
+
+	EditOperation op {
+		.Type = EditOperation::eType::BrushEdit,
+		.pObject = object,
+		.ValueA = EditOperationValue(Vec3f::sZero),
+		.ValueB = EditOperationValue(Vec3f::sZero),
+	};
+
+	op.PushedObjectID = object->ID;
+	op.PlanesBefore = brush->Planes;
+
+	if (!gWorld->pBlockout->GetFaceTextureEdit(object, Vec3f(face), static_cast<eFaceTextureEdit>(edit),
+											   Vec2f(amount_vec.X, amount_vec.Y), op.PlanesAfter)) {
+		return;
+	}
+
+	gPrototypeEditor->PushEditOperation(op);
 }
 
 static Object* N_blockout_new_object(FLOAT4 position) { return gWorld->pBlockout->NewObject(Vec3f(position)); }
@@ -423,6 +486,8 @@ static const PredefExtern scAvailableExterns[] = {
 
 	PREDEF("blockout_reload_object", N_blockout_reload_object),
 	PREDEF("blockout_object_scale", N_blockout_object_scale),
+	PREDEF("blockout_face_center", N_blockout_face_center),
+	PREDEF("blockout_edit_face_texture", N_blockout_edit_face_texture),
 	PREDEF("blockout_new_object", N_blockout_new_object),
 	PREDEF("blockout_dupe_object", N_blockout_dupe_object),
 	PREDEF("blockout_destroy_object", N_blockout_destroy_object),

@@ -136,6 +136,17 @@ void PSOBuild::BuildPipeline()
 
 	// If there is no `NoVertices` flag set, use the built vertex description.
 	if ((mFlags & ePSOBuildFlags::NoVertices) == 0) {
+		const uint32 input_mask = vertex_shader->InputLocationMask;
+		uint32 num_attribs = 0;
+
+		for (const VkVertexInputAttributeDescription& attrib : vertex_desc.Attributes) {
+			if (attrib.location < 32 && (input_mask & (1U << attrib.location)) != 0) {
+				vertex_desc.Attributes.pData[num_attribs++] = attrib;
+			}
+		}
+
+		vertex_desc.Attributes.Size = num_attribs;
+
 		vertex_ptr = &vertex_desc;
 	}
 

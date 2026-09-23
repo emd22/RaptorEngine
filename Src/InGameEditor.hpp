@@ -81,6 +81,8 @@ struct EditOperation
 		Delete,
 		/// ValueA/ValueB hold Euler angles in radians (Quat::GetEulerAngles()/FromEulerAngles() convention)
 		Rotate,
+		/// Sets a blockout's brush to PlanesAfter, and back to PlanesBefore on undo
+		BrushEdit,
 	} Type;
 
 public:
@@ -100,18 +102,15 @@ public:
 	EditOperationValue ValueA;
 	EditOperationValue ValueB;
 
-	/// Pre-apply snapshot for `Scale` (bounds + position), so Undo restores exactly
-	/// even when the min-thickness push-through translated the object.
-	/// (Negating the magnitude alone would mis-split travel between bounds/shift.)
-	Vec3f ScaleBoundsMinBefore = Vec3f::sZero;
-	Vec3f ScaleBoundsMaxBefore = Vec3f::sZero;
+	Brush::PlaneList PlanesBefore;
+	Brush::PlaneList PlanesAfter;
+
 	Vec3f ScalePosBefore = Vec3f::sZero;
 
 	/// Full snapshot for `Delete` (captured before destruction so Undo can recreate).
 	struct Snapshot
 	{
 		Vec3f Position = Vec3f::sZero;
-		Brush::PlaneList Planes;
 		MaterialID Material = MaterialID::scNull;
 		Quat Rotation = Quat::scIdentity;
 		Name ObjectName;

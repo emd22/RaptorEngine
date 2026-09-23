@@ -13,6 +13,8 @@
 #include <ThirdParty/vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
+#include <mutex>
+
 #include <Core/Defer.hpp>
 #include <Core/Ref.hpp>
 #include <Core/TSQueue.hpp>
@@ -41,8 +43,12 @@ struct GpuUploadContext
 	CommandBuffer CmdBuffer;
 	Fence UploadFence;
 
+	// Immediate uploads can come from any thread while the asset thread records `CmdBuffer`, so they get their own pool
+	// (pools are externally synchronized) and are serialized by `ImmediateMutex`.
+	CommandPool ImmediateCmdPool;
 	CommandBuffer ImmediateCmdBuffer;
 	Fence ImmediateUploadFence;
+	std::mutex ImmediateMutex;
 
 	~GpuUploadContext() = default;
 };
