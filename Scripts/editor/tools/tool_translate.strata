@@ -1,0 +1,90 @@
+/*
+ * File:        tool_translate.strata
+ * Author:      emd22
+ * Created:     09/23/2026
+ * Description: Translate (move) tool. Run by `prototype_editor.strata` while EDITORTOOL.TRANSLATE is selected.
+ */
+
+import ../tool_common;
+
+
+/* Accumulated Q/E height for the Translate tool, reset at the start of each drag */
+float translate_height_accum = 0.0f;
+
+
+/* The mouse was pressed with the Translate tool selected. */
+void tool_translate_begin()
+{
+	translate_height_accum = 0.0f;
+}
+
+@private
+void tool_translate_move_selection(float3 movement_delta)
+{
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		OBJECT obj = sel.selected_objects[i];
+
+		// float3 start_position = obj.get_position();
+		float3 initial_position = sel.initial_object_positions[i];
+
+		obj.move_to((initial_position + movement_delta));
+	}
+
+}
+
+/* Translate an object */
+void tool_translate_update(float delta_time)
+{
+	if (!editor_has_object_selection()) {
+		return;
+	}
+
+	/* Only the player's X/Z movement drags the selection, so looking around or flying doesn't change its height. Height
+	   comes from Q/E alone (same directions as flying: E up, Q down). */
+	float3 player_delta = player.position - initial_player_position;
+
+	const float speed = delta_time * (editor_get_snap_value() * 8.0);
+
+	if (KEY.K_E.is_down()) {
+		translate_height_accum += speed;
+	}
+	if (KEY.K_Q.is_down()) {
+		translate_height_accum -= speed;
+	}
+
+	float3 translate_movement = float3(player_delta.x, translate_height_accum, player_delta.z);
+
+	float3 movement_delta = editor_transform_snap(translate_movement);
+
+	tool_translate_move_selection(movement_delta);
+}
+
+
+void tool_translate_finalize()
+{
+	// Skip clicks without movement so we don't burn undo history on no-ops.
+	// GroupSize must match the pushed op count exactly for multi-undo.
+	int movers = 0;
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		if (!editor_vec_equal(sel.initial_object_positions[i], sel.selected_objects[i].position)) {
+			movers++;
+		}
+	}
+
+	if (movers == 0) {
+		return;
+	}
+
+	// Log movements for undo
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		OBJECT obj = sel.selected_objects[i];
+
+		float3 initial_position = sel.initial_object_positions[i];
+
+		if (editor_vec_equal(initial_position, obj.position)) {
+			continue;
+		}
+
+		editor_push_op_vec(obj, OPTYPE.MOVE, initial_position, obj.position, movers);
+	}
+}

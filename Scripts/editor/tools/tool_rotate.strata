@@ -1,0 +1,112 @@
+/*
+ * File:        tool_rotate.strata
+ * Author:      emd22
+ * Created:     09/23/2026
+ * Description: Rotate tool. Run by `prototype_editor.strata` while EDITORTOOL.ROTATE is selected.
+ */
+
+import ../tool_common;
+
+
+// 5 degrees as radians
+const float D2R_1_DEG = ((1.0f * MATH_PI) / 180.0f);
+const float D2R_5_DEG = ((5.0f * MATH_PI) / 180.0f);
+const float D2R_15_DEG = ((15.0f * MATH_PI) / 180.0f);
+const float D2R_45_DEG = ((45.0f * MATH_PI) / 180.0f);
+const float D2R_90_DEG = ((90.0f * MATH_PI) / 180.0f);
+
+/* How many radians one metre of sideways drag equates to */
+const float ROTATE_SENSITIVITY = D2R_90_DEG;
+
+/* Accumulated Q/E pitch for the Rotate tool, reset at the start of each drag */
+float rotate_pitch_accum = 0.0f;
+
+
+float editor_get_rotate_snap_value()
+{
+	float[4] snap_values = { D2R_1_DEG, D2R_5_DEG, D2R_15_DEG, D2R_45_DEG };
+	uint index = fclamp(editor_snap_level, 0, 3);
+	return snap_values[index];
+}
+
+/* If snap is enabled, this snaps a given angle vector (radians) to the selected rotation snap increment. */
+float3 editor_rotate_snap(float3 vec)
+{
+	if (!editor_enable_snap) {
+		return vec;
+	}
+
+	float3 qsnap = float3(editor_get_rotate_snap_value());
+	return (float3_round(vec / qsnap) * qsnap);
+}
+
+
+/* The mouse was pressed with the Rotate tool selected. */
+void tool_rotate_begin()
+{
+	rotate_pitch_accum = 0.0f;
+}
+
+@private
+void tool_rotate_selection(float3 rotation_delta)
+{
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		OBJECT obj = sel.selected_objects[i];
+		float3 initial_rotation = sel.initial_object_rotations[i];
+
+		obj.rotate_to(initial_rotation + rotation_delta);
+	}
+}
+
+void tool_rotate_update(float delta_time)
+{
+	if (!editor_has_object_selection()) {
+		return;
+	}
+
+	float3 player_delta = player.position - initial_player_position;
+	float yaw = player_delta.x * ROTATE_SENSITIVITY;
+
+	const float pitch_speed = delta_time * (editor_get_rotate_snap_value() * 4.0f);
+
+	if (KEY.K_Q.is_down()) {
+		rotate_pitch_accum -= pitch_speed;
+	}
+	if (KEY.K_E.is_down()) {
+		rotate_pitch_accum += pitch_speed;
+	}
+
+	float3 rotation_movement = float3(rotate_pitch_accum, yaw, 0.0f);
+	float3 rotation_delta = editor_rotate_snap(rotation_movement);
+
+	tool_rotate_selection(rotation_delta);
+}
+
+
+void tool_rotate_finalize()
+{
+	// Skip clicks without any rotation
+	int movers = 0;
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		if (!editor_vec_equal(sel.initial_object_rotations[i], sel.selected_objects[i].get_rotation())) {
+			movers++;
+		}
+	}
+
+	if (movers == 0) {
+		return;
+	}
+
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		OBJECT obj = sel.selected_objects[i];
+
+		float3 initial_rotation = sel.initial_object_rotations[i];
+		float3 current_rotation = obj.get_rotation();
+
+		if (editor_vec_equal(initial_rotation, current_rotation)) {
+			continue;
+		}
+
+		editor_push_op_vec(obj, OPTYPE.ROTATE, initial_rotation, current_rotation, movers);
+	}
+}
