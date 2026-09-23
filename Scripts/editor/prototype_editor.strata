@@ -69,6 +69,9 @@ const float FACE_MIN_THICKNESS = 0.25f;
 /* Accumulated Q/E pitch for the Rotate tool, reset at the start of each drag */
 float rotate_pitch_accum = 0.0f;
 
+/* Accumulated Q/E height for the Translate tool, reset at the start of each drag */
+float translate_height_accum = 0.0f;
+
 EDITORTOOL editor_tool = EDITORTOOL.TRANSLATE;
 
 
@@ -344,6 +347,7 @@ void editor_on_mouse_just_down()
 {
 	initial_player_position = player.position;
 	rotate_pitch_accum = 0.0f;
+	translate_height_accum = 0.0f;
 
 
 	for (int i = 0; i < sel.selected_objects_count; i++) {
@@ -400,23 +404,20 @@ void editor_translate_tool(float delta_time)
 		return;
 	}
 
-	float3 translate_movement = player.position - initial_player_position;
+	/* Only the player's X/Z movement drags the selection, so looking around or flying doesn't change its height. Height
+	   comes from Q/E alone (same directions as flying: E up, Q down). */
+	float3 player_delta = player.position - initial_player_position;
 
-	/* We are not in fly mode, handle Z movement manually */
-	if (!player.is_flymode()) {
-		const float speed = delta_time * (editor_get_snap_value() * 8.0);
+	const float speed = delta_time * (editor_get_snap_value() * 8.0);
 
-		if (KEY.K_Q.is_down()) {
-			float3 move_direction = float3(0.0f, speed, 0.0f);
-			translate_movement += move_direction;
-			initial_player_position += move_direction;
-		}
-		if (KEY.K_E.is_down()) {
-			float3 move_direction = float3(0.0f, -speed, 0.0f);
-			translate_movement += move_direction;
-			initial_player_position += move_direction;
-		}
+	if (KEY.K_E.is_down()) {
+		translate_height_accum += speed;
 	}
+	if (KEY.K_Q.is_down()) {
+		translate_height_accum -= speed;
+	}
+
+	float3 translate_movement = float3(player_delta.x, translate_height_accum, player_delta.z);
 
 	float3 movement_delta = editor_transform_snap(translate_movement);
 

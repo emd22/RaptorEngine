@@ -602,8 +602,7 @@ void RaptorGame::RenderText()
 	}
 
 
-	gTextRenderer->DrawText(
-		String::Fmt("P={}, Vis={}", gWorld->Player.Position, gWorld->mRenderList.GetItemCount()).CStr(), 2.0f, scWhite);
+	gTextRenderer->DrawText(String::Fmt("Vis={}", gWorld->mRenderList.GetItemCount()).CStr(), 2.0f, scWhite);
 
 	if (gPrototypeEditor != nullptr) {
 		gTextRenderer->DrawText(

@@ -163,9 +163,11 @@ void TextRenderer::DrawText(const char* text, float32 scale, uint32 color)
 	const float32 atlas_h = static_cast<float32>(mpAtlas->Info.Size.Y);
 
 
-	Vec2u half_window_size = (gGraphics->GetWindow()->GetSize() / 2U);
+	const Vec2u window_size = gGraphics->GetWindow()->GetSize();
+	const Vec2f half_window_size(static_cast<float32>(window_size.X) * 0.5f,
+								 static_cast<float32>(window_size.Y) * 0.5f);
 
-	Vec2f cursor = mCursorPosition - Vec2f(float32(half_window_size.X), float32(half_window_size.Y)) + scMargin;
+	Vec2f cursor = mCursorPosition - half_window_size + scMargin;
 
 	for (const char* c = text; *c != '\0'; ++c) {
 		if (instances.Size >= scMaxGlyphs) {
