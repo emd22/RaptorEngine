@@ -33,6 +33,9 @@ static constexpr ToolButtonInfo scToolButtons[] = {
 	{ "Transform", "Textures/editor/move.png" },
 	{ "Face", "Textures/editor/face.png" },
 	{ "Rotate", "Textures/editor/rotate.png" },
+	{ "Create", "Textures/editor/create.png" },
+	{ "Clip", "Textures/editor/clip.png" },
+	{ "Set Material", "Textures/editor/set_material.png" },
 };
 
 static_assert(std::size(scToolButtons) == static_cast<size_t>(eEditorTool::Count));
@@ -43,7 +46,12 @@ static const wxColor scSelectedColor = wxColor(168, 50, 50);
 static wxToggleButton* MakeToolButton(wxWindow* parent, const ToolButtonInfo& info)
 {
 	const std::string icon_path = FilesystemIO::ResolvePath(info.pIconPath);
-	const wxBitmap icon(wxString::FromUTF8(icon_path), wxBITMAP_TYPE_PNG);
+
+	// wx shows an error dialog for images it can't load, so check the icon is there first
+	wxBitmap icon;
+	if (FilesystemIO::FileExists(icon_path)) {
+		icon.LoadFile(wxString::FromUTF8(icon_path), wxBITMAP_TYPE_PNG);
+	}
 
 	wxToggleButton* button = nullptr;
 

@@ -68,7 +68,6 @@ EditOperationValue EditOperation::Execute()
 		}
 
 		PlanesBefore = brush->Planes;
-		ScalePosBefore = target->GetPosition();
 
 		// ValueA is the face's normal and ValueB.X how far to move it
 		gWorld->pBlockout->MoveFace(target, ValueA.Position, ValueB.Position.X);
@@ -133,6 +132,17 @@ EditOperationValue EditOperation::Execute()
 
 		return EditOperationValue(pObject);
 	}
+	case eType::CreateBrush: {
+		pObject = gWorld->pBlockout->RestoreObject(ObjectSnapshot.Position, PlanesAfter, ObjectSnapshot.Material,
+												   ObjectSnapshot.Rotation, ObjectSnapshot.ObjectName);
+		PushedObjectID = (pObject != nullptr) ? pObject->ID : ObjectID::scNull;
+
+		if (pObject != nullptr && ObjectSnapshot.bIsProbeVolume) {
+			pObject->SetProbeVolume(true);
+		}
+
+		return EditOperationValue(pObject);
+	}
 	case eType::Delete: {
 		Object* target = ResolveOpTarget(*this);
 		if (target == nullptr) {
@@ -177,8 +187,8 @@ void EditOperation::Undo()
 			break;
 		}
 
-		// Restore the exact state from before, as moving the face back could leave planes it dropped behind
-		target->SetPosition(ScalePosBefore);
+		// Restore the planes from before, as moving the face back could leave planes it dropped behind. The object is
+		// put back where it was, as the brush is kept in place.
 		gWorld->pBlockout->SetBrushPlanes(target, PlanesBefore);
 
 		break;
@@ -247,20 +257,37 @@ void EditOperation::Undo()
 
 		break;
 	}
+	case eType::CreateBrush: {
+		Object* created = ResolveOpTarget(*this);
+		if (created == nullptr) {
+			break;
+		}
+
+		if (gPrototypeEditor != nullptr) {
+			gPrototypeEditor->RemoveFromSelectionInternal(created);
+		}
+
+		gWorld->pBlockout->DestroyObject(created);
+
+		pObject = nullptr;
+		PushedObjectID = ObjectID::scNull;
+
+		break;
+	}
 	case eType::Delete: {
 		if (gWorld->pBlockout == nullptr) {
 			break;
 		}
 
-		Object* restored = gWorld->pBlockout->RestoreObject(DeleteSnapshot.Position, PlanesBefore,
-															DeleteSnapshot.Material, DeleteSnapshot.Rotation,
-															DeleteSnapshot.ObjectName);
+		Object* restored = gWorld->pBlockout->RestoreObject(ObjectSnapshot.Position, PlanesBefore,
+															ObjectSnapshot.Material, ObjectSnapshot.Rotation,
+															ObjectSnapshot.ObjectName);
 
 		if (restored == nullptr) {
 			break;
 		}
 
-		if (DeleteSnapshot.bIsProbeVolume) {
+		if (ObjectSnapshot.bIsProbeVolume) {
 			restored->SetProbeVolume(true);
 		}
 
@@ -332,7 +359,7 @@ void EditorMode::Undo()
 		if (type == EditOperation::eType::Dupe) {
 			undo_target = ResolveOpValue(*op);
 		}
-		else if (type == EditOperation::eType::Create) {
+		else if ((type == EditOperation::eType::Create || type == EditOperation::eType::CreateBrush)) {
 			undo_target = ResolveOpTarget(*op);
 		}
 
@@ -356,7 +383,7 @@ void EditorMode::Undo()
 			}
 			selection_changed = true;
 		}
-		else if (type == EditOperation::eType::Create) {
+		else if ((type == EditOperation::eType::Create || type == EditOperation::eType::CreateBrush)) {
 			if (undo_target != nullptr) {
 				RemoveFromSelectionInternal(undo_target);
 			}
@@ -416,7 +443,7 @@ void EditorMode::Redo()
 			}
 			selection_changed = true;
 		}
-		else if (type == EditOperation::eType::Create) {
+		else if ((type == EditOperation::eType::Create || type == EditOperation::eType::CreateBrush)) {
 			if (result.Type == EditOperationValue::eValueType::Object && result.pObject != nullptr) {
 				AddToSelectionInternal(result.pObject);
 			}

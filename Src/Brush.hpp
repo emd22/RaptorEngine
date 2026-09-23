@@ -108,9 +108,23 @@ public:
 	bool Raycast(const Vec3f& origin, const Vec3f& direction, float32& out_distance, uint32& out_plane_index) const;
 
 	/**
+	 * @brief Splits the brush in two along a plane. The new faces get the texture layout of the brush's local space.
+	 * @param out_back The planes of the part behind the plane
+	 * @param out_front The planes of the part in front of it
+	 * @returns false if the plane misses the brush, or the brush has no room for another plane
+	 */
+	bool Split(const Vec3f& normal, float32 distance, PlaneList& out_back, PlaneList& out_front) const;
+
+	/**
 	 * @brief Resets a face's texture layout to the one FromBox() uses, keeping its material
 	 */
 	void ResetFaceTexture(uint32 plane_index);
+
+	/**
+	 * @brief Lines every face's texture up with the world grid, for a brush on an unrotated object at `origin`. Faces
+	 * keep their materials.
+	 */
+	void AlignTexturesToWorld(const Vec3f& origin);
 
 	/**
 	 * @brief Returns true if every face has the default layout from ResetFaceTexture() and no material of its own

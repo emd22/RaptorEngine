@@ -71,9 +71,32 @@ public:
 	bool MoveFace(Object* object, const Vec3f& face_normal, float32 distance);
 
 	/**
-	 * @brief Rebuilds a blockout from a set of planes, e.g. to undo an edit
+	 * @brief Rebuilds a blockout from a set of planes, e.g. to undo an edit. Anything the planes have in common with
+	 * the old brush stays where it is, even though the object may have to move for that.
 	 */
 	bool SetBrushPlanes(Object* object, const Brush::PlaneList& planes);
+
+	/**
+	 * @brief Works out how a blockout splits along the plane through `point_a` and `point_b` that is perpendicular to
+	 * the face they were drawn on. Everything is in world space.
+	 * @param out_kept The blockout's brush after the split
+	 * @param out_split The piece that splits off, for a new blockout at `out_split_position`
+	 */
+	bool GetClipPieces(Object* object, const Vec3f& point_a, const Vec3f& point_b, const Vec3f& face_normal,
+					   Brush::PlaneList& out_kept, Brush::PlaneList& out_split, Vec3f& out_split_position);
+
+	/**
+	 * @brief Returns the brush for a new blockout filling `min` to `max` in world space, with its textures lined up
+	 * with the world grid
+	 * @param out_position Where the blockout goes
+	 */
+	Brush MakeWorldBox(const Vec3f& min, const Vec3f& max, Vec3f& out_position) const;
+
+	/**
+	 * @brief Shows a see-through preview of a brush on an object with the given transform
+	 */
+	void ShowPreview(const Vec3f& position, const Quat& rotation, const Brush& brush);
+	void HidePreview();
 
 	/**
 	 * @brief Returns the planes of the object's brush with the texture on one face changed, without applying them
@@ -82,10 +105,27 @@ public:
 							Brush::PlaneList& out_planes);
 
 	/**
+	 * @brief Returns the planes of the object's brush with `material` on the face facing along `face_normal`, or on
+	 * every face if `whole_brush` is set. A null material draws the faces with the object's material.
+	 * @returns false if nothing would change
+	 */
+	bool GetMaterialEdit(Object* object, const Vec3f& face_normal, const MaterialID& material, bool whole_brush,
+						 Brush::PlaneList& out_planes);
+
+	/**
+	 * @brief Finds the nearest blockout that a world space ray hits
+	 * @param direction The direction of the ray, with the length of how far it reaches
+	 * @param out_face_normal The normal of the face that was hit, in the blockout's local space
+	 */
+	Object* RaycastBlockout(const Vec3f& origin, const Vec3f& direction, Vec3f& out_face_normal);
+
+	/**
 	 * @brief Finds the face of a blockout that a world space ray hits
 	 * @param out_face_normal The normal of the face that was hit, in the object's local space
+	 * @param out_point Where the face was hit, in world space
 	 */
-	bool RaycastFace(Object* object, const Vec3f& origin, const Vec3f& direction, Vec3f& out_face_normal);
+	bool RaycastFace(Object* object, const Vec3f& origin, const Vec3f& direction, Vec3f& out_face_normal,
+					 Vec3f* out_point = nullptr);
 
 	void ReloadSingleObject(Object* object);
 
@@ -136,6 +176,12 @@ private:
 	 */
 	void ApplyBrush(Object* object, Brush&& brush, physics::eMotionType motion_type);
 
+	/**
+	 * @brief Applies a brush that replaces the object's current one, moving the object so the parts they share stay
+	 * where they are
+	 */
+	void ApplyBrushInPlace(Object* object, Brush&& brush);
+
 	void RemoveBlockoutFromWorld(World* world);
 	void RemoveSingleObjectFromWorld(Object* object);
 
@@ -147,6 +193,9 @@ public:
 
 	Object* pXFormObject = nullptr;
 
+	/// Shows what the Create and Clip tools will make
+	Object* pPreviewObject = nullptr;
+
 private:
 	MaterialID mWhiteMaterialID = MaterialID::scNull;
 	MaterialID mOrangeMaterialID = MaterialID::scNull;
@@ -155,6 +204,9 @@ private:
 
 	/// Keyed by ObjectID::GetID()
 	std::unordered_map<uint32, Brush> mBrushes;
+
+	/// The planes the preview's mesh was last built from, so it is only rebuilt when they change
+	Brush::PlaneList mPreviewPlanes;
 };
 
 
