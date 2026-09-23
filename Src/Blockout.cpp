@@ -139,7 +139,10 @@ void Blockout::ScaleInDirection(Object* object, const Vec3f& face_dir, const Vec
 
 	constexpr float threshold = 0.01f;
 
-	auto scaleAxis = [&](float face, float mag, float& min, float& max, const Vec3f& axis)
+	const Vec3f old_midpoint = (object->Bounds.Min + object->Bounds.Max) * 0.5f;
+	Vec3f local_shift = Vec3f::sZero;
+
+	auto ScaleAxis = [&](float face, float mag, float& min, float& max, float& shift_axis)
 	{
 		if (face > threshold) {
 			const float desired = max + mag;
@@ -148,8 +151,7 @@ void Blockout::ScaleInDirection(Object* object, const Vec3f& face_dir, const Vec
 			}
 			else {
 				max = min + scMinBlockoutThickness;
-				const float shift = desired - max;
-				object->SetPosition(object->GetPosition() + Vec3f(axis.X * shift, axis.Y * shift, axis.Z * shift));
+				shift_axis = desired - max;
 			}
 		}
 		else if (face < -threshold) {
@@ -159,15 +161,23 @@ void Blockout::ScaleInDirection(Object* object, const Vec3f& face_dir, const Vec
 			}
 			else {
 				min = max - scMinBlockoutThickness;
-				const float shift = desired - min;
-				object->SetPosition(object->GetPosition() + Vec3f(axis.X * shift, axis.Y * shift, axis.Z * shift));
+				shift_axis = desired - min;
 			}
 		}
 	};
 
-	scaleAxis(face_dir.X, magnitude.X, object->Bounds.Min.X, object->Bounds.Max.X, Vec3f(1.0f, 0.0f, 0.0f));
-	scaleAxis(face_dir.Y, magnitude.Y, object->Bounds.Min.Y, object->Bounds.Max.Y, Vec3f(0.0f, 1.0f, 0.0f));
-	scaleAxis(face_dir.Z, magnitude.Z, object->Bounds.Min.Z, object->Bounds.Max.Z, Vec3f(0.0f, 0.0f, 1.0f));
+	ScaleAxis(face_dir.X, magnitude.X, object->Bounds.Min.X, object->Bounds.Max.X, local_shift.X);
+	ScaleAxis(face_dir.Y, magnitude.Y, object->Bounds.Min.Y, object->Bounds.Max.Y, local_shift.Y);
+	ScaleAxis(face_dir.Z, magnitude.Z, object->Bounds.Min.Z, object->Bounds.Max.Z, local_shift.Z);
+
+	// Blockouts rotate about their midpoint, which is applied unrotated, so a midpoint change has to be
+	// compensated for or the opposite face moves on rotated objects.
+	const Vec3f midpoint_delta = (object->Bounds.Min + object->Bounds.Max) * 0.5f - old_midpoint;
+	const Vec3f offset = (local_shift + midpoint_delta).Rotate(object->mRotation) - midpoint_delta;
+
+	if (!offset.IsCloseTo(simd::LoadFloat4(0.0f))) {
+		object->SetPosition(object->GetPosition() + offset);
+	}
 }
 
 void Blockout::ReloadSingleObject(Object* object)

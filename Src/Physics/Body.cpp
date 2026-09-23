@@ -47,9 +47,15 @@ void Body::CreatePrimitiveBody(ePrimitiveType primitive_type, const Vec3f& dimen
 	case ePrimitiveType::Box: {
 		JPH::BoxShapeSettings box_shape_settings(jolt_dimensions);
 		box_shape_settings.SetDensity(object_properties.Density);
-		box_shape_settings.mConvexRadius = object_properties.ConvexRadius;
+		// Jolt refuses a convex radius larger than the smallest half extent
+		box_shape_settings.mConvexRadius = std::min(object_properties.ConvexRadius, jolt_dimensions.ReduceMin());
 
 		JPH::ShapeSettings::ShapeResult box_shape_result = box_shape_settings.Create();
+		if (box_shape_result.HasError()) {
+			LogError(LC_PHYSICS, "Failed to create box collider: {}", box_shape_result.GetError().c_str());
+			return;
+		}
+
 		JPH::ShapeRefC box_shape = box_shape_result.Get();
 
 		UpdateJoltBody(box_shape, physics::Body::eFlags::None, motion_type, object_properties);

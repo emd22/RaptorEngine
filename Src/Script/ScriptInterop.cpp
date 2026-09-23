@@ -207,6 +207,35 @@ static float32 N_object_direction_scale(Object* obj, FLOAT4 direction)
 	return obj->GetDirectionScale(Vec3f(direction));
 }
 
+static FLOAT4 N_object_local_to_world(Object* obj, FLOAT4 point)
+{
+	if (obj == nullptr) {
+		return point;
+	}
+
+	const Vec3f p(point);
+	const Vec4f world = obj->GetWorldMatrix() * Vec4f(p.X, p.Y, p.Z, 1.0f);
+
+	return Vec3f(world.X, world.Y, world.Z).mIntrin;
+}
+
+static FLOAT4 N_object_local_dir_to_world(Object* obj, FLOAT4 direction)
+{
+	if (obj == nullptr) {
+		return direction;
+	}
+
+	const Vec3f d(direction);
+	const Vec4f world = obj->GetWorldMatrix() * Vec4f(d.X, d.Y, d.Z, 0.0f);
+	const Vec3f world_dir(world.X, world.Y, world.Z);
+
+	if (world_dir.IsCloseTo(simd::LoadFloat4(0.0f))) {
+		return simd::LoadFloat4(0.0f);
+	}
+
+	return world_dir.Normalize().mIntrin;
+}
+
 static FLOAT4 N_object_ray_get_face(Object* obj)
 {
 	if (obj == nullptr) {
@@ -386,6 +415,8 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("OBJECT_get_tags", N_object_get_tags),
 	PREDEF("OBJECT_set_tags", N_object_set_tags),
 	PREDEF("OBJECT_ray_get_face", N_object_ray_get_face),
+	PREDEF("OBJECT_local_to_world", N_object_local_to_world),
+	PREDEF("OBJECT_local_dir_to_world", N_object_local_dir_to_world),
 	PREDEF("OBJECT_direction_scale", N_object_direction_scale),
 	PREDEF("OBJECT__select_object_internal", N_object__select_object_internal),
 

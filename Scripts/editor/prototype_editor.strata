@@ -60,6 +60,11 @@ SELECTION sel;
 float3 face_tool_magnitude;
 float3 initial_face_object_position;
 float3 initial_face_position;
+float3 face_world_normal;
+float face_min_proj;
+
+/* Matches scMinBlockoutThickness in Blockout.cpp */
+const float FACE_MIN_THICKNESS = 0.25f;
 
 /* Accumulated Q/E pitch for the Rotate tool, reset at the start of each drag */
 float rotate_pitch_accum = 0.0f;
@@ -360,7 +365,11 @@ void editor_on_mouse_just_down()
 		/* Snapshot where the face is now so the preview marker can track
 		   exactly where it will be after finalize (obj pos + face offset). */
 		initial_face_object_position = sel.selected_object.position;
-		initial_face_position = initial_face_object_position + (selected_face * float3(sel.selected_face_scale));
+		initial_face_position = sel.selected_object.local_to_world(selected_face * float3(sel.selected_face_scale));
+		face_world_normal = sel.selected_object.local_dir_to_world(selected_face);
+
+		float thickness = sel.selected_face_scale + sel.selected_object.direction_scale(float3(0.0f) - selected_face);
+		face_min_proj = fmin(0.0f, FACE_MIN_THICKNESS - thickness);
 	}
 }
 
@@ -477,16 +486,14 @@ FACEDIR face_get_dir()
 @private
 void editor_face_tool(float delta_time)
 {
-	face_tool_magnitude = editor_transform_snap(player.position - initial_player_position) * sel.selected_face;
+	/* Player delta projected onto the face's world normal. Follows
+	   Blockout::ScaleInDirection (Max += mag / Min -= mag). */
+	float3 snapped = editor_transform_snap(float3(dot(player.position - initial_player_position, face_world_normal)));
+	float proj = fmax(snapped.x, face_min_proj);
 
-	/* Preview exactly where finalize will put the face:
-	   old face pos + player delta projected onto the face normal.
-	   This matches Blockout::ScaleInDirection (Max += mag / Min -= mag). */
-	float3 delta = editor_transform_snap(player.position - initial_player_position);
+	face_tool_magnitude = float3(proj);
 
-	float proj = dot(delta, sel.selected_face);
-
-	float3 xform_marker_dest = initial_face_position + (sel.selected_face * float3(proj));
+	float3 xform_marker_dest = initial_face_position + (face_world_normal * float3(proj));
 	transform_marker_object.move_to(xform_marker_dest);
 }
 
