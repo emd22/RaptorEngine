@@ -231,9 +231,9 @@ void EditOperation::Undo()
 			break;
 		}
 
-		Object* restored = gWorld->pBlockout->RestoreObject(DeleteSnapshot.Position, DeleteSnapshot.BoundsMin,
-															DeleteSnapshot.BoundsMax, DeleteSnapshot.Material,
-															DeleteSnapshot.Rotation, DeleteSnapshot.ObjectName);
+		Object* restored = gWorld->pBlockout->RestoreObject(DeleteSnapshot.Position, DeleteSnapshot.Planes,
+															DeleteSnapshot.Material, DeleteSnapshot.Rotation,
+															DeleteSnapshot.ObjectName);
 
 		if (restored == nullptr) {
 			break;

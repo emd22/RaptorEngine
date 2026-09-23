@@ -113,15 +113,26 @@ public:
 	ConstIterator begin() const { return pData; }
 	ConstIterator end() const { return pData + Size; }
 
-	DynArray& operator=(DynArray<TElementType>&& other) noexcept
+	DynArray& operator=(DynArray&& other) noexcept
 	{
+		if (this == &other) {
+			return *this;
+		}
+
+		// Release what we are holding before taking over the other array's buffer
+		Clear();
+		std::free(reinterpret_cast<void*>(pData));
+
 		Size = other.Size;
 		Capacity = other.Capacity;
 		PageSize = other.PageSize;
 
 		pData = other.pData;
 
+		// Leave the other array empty, otherwise its destructor destroys the elements we now own
 		other.pData = nullptr;
+		other.Size = 0;
+		other.Capacity = 0;
 
 		return *this;
 	}

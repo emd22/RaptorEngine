@@ -251,6 +251,8 @@ struct std::formatter<fx::Vec3f>
 };
 
 
+#ifdef FX_USE_AVX
 #include "Impl/Vector/Vec3_AVX.inl"
-#include "Impl/Vector/Vec3_Fallback.inl"
+#else
 #include "Impl/Vector/Vec3_Neon.inl"
+#endif
