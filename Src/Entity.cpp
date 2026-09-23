@@ -2,6 +2,8 @@
 
 #include <Engine.hpp>
 #include <Object/ObjectManager.hpp>
+#include <Renderer/Globals.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/TiledForwardRenderer.hpp>
 
 namespace fx {
@@ -48,6 +50,7 @@ void Entity::SetModelMatrix(const Mat4f& other)
 	mbMatrixOutOfDate = false;
 
 	mWorldMatrix = other;
+	mMatrixSubmittedFrames = 0;
 
 	// Trigger an immediate update
 	SubmitMatrixIfNeeded();
@@ -74,13 +77,19 @@ Mat4f& Entity::GetWorldMatrix()
 void Entity::SubmitMatrixIfNeeded()
 {
 	// There is no object id assigned to the object yet, break
-	if (ID.IsInvalid() || mMatrixUpdateFramesRemaining <= 0) {
+	if (ID.IsInvalid()) {
+		return;
+	}
+
+	const uint8 frame_bit = static_cast<uint8>(1U << renderer::gGraphics->GetFrameNumber());
+
+	if (mMatrixSubmittedFrames & frame_bit) {
 		return;
 	}
 
 	gObjectManager->Submit(ID.GetID(), mWorldMatrix);
 
-	--mMatrixUpdateFramesRemaining;
+	mMatrixSubmittedFrames |= frame_bit;
 }
 
 void Entity::RecalculateModelMatrix()
@@ -94,7 +103,7 @@ void Entity::RecalculateModelMatrix()
 					   Mat4f::AsTranslation(mPosition);
 	}
 
-	mMatrixUpdateFramesRemaining = renderer::FramesInFlight;
+	mMatrixSubmittedFrames = 0;
 
 	// mNormalMatrix = mWorldMatrix.Inverse().Transposed();
 	mbMatrixOutOfDate = false;

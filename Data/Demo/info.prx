@@ -4,14 +4,14 @@ meta = {
 
 
 sun = {
-	enabled = $false
+	//enabled = $false
     pos = [0.5, 6, -1.5]
-    color = [230, 180, 172, 12]
+    color = [230, 180, 172, 16]
     ambient = [75, 75, 72, 1]
 }
 
 lights = {
-    spot0 = {
+    /*spot0 = {
         type = $CLight.Spot
         pos = [4.0, 1.0, -4.0]
         dir = [-1.0, -0.2, -0.4]
@@ -28,7 +28,7 @@ lights = {
         radius = 40.0
         inner = 5.0
         outer = 50.0
-    }
+    }*/
     /*spot1 = {
         type = $CLight.Spot
         pos = [-8.0, 2.5, 0.0]
@@ -82,9 +82,9 @@ colliders = {
 
 
 objects = {
-    /*skybox = {
-        mesh = "/Skybox.glb"
+    skybox = {
+        mesh = "/skybox2.glb"
         unlit = $True
         nocull = $True
-    }*/
+    }
 }

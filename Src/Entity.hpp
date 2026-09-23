@@ -123,7 +123,9 @@ protected:
 
 	Mat4f mWorldMatrix = Mat4f::scIdentity;
 
-	int32 mMatrixUpdateFramesRemaining = renderer::FramesInFlight;
+
+	uint8 mMatrixSubmittedFrames = 0;
+	static_assert(renderer::FramesInFlight <= 8);
 	// Mat4f mNormalMatrix = Mat4f::Identity;
 };
 
