@@ -64,6 +64,12 @@ public:
 	void CreateMeshBody(const PrimitiveMesh& mesh, physics::eMotionType motion_type,
 						const BodyProps& object_properties);
 
+	/**
+	 * @brief Creates a collider from the convex hull of the points, which are relative to the body's position.
+	 */
+	void CreateConvexHullBody(const SizedArray<Vec3f>& points, physics::eMotionType motion_type,
+							  const BodyProps& object_properties);
+
 	void DestroyPhysicsBody();
 
 	void SetMidpoint(const Vec3f& midpoint);

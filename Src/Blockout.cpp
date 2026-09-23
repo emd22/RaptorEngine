@@ -2,6 +2,8 @@
 
 #include <Asset/AssetManager.hpp>
 #include <Asset/ConfigFile.hpp>
+#include <Asset/MeshGen.hpp>
+#include <Core/RefUtil.hpp>
 #include <InGameEditor.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
@@ -137,6 +139,13 @@ void Blockout::ScaleInDirection(Object* object, const Vec3f& face_dir, const Vec
 		return;
 	}
 
+	// Face resizing works on the bounds, which only describe box brushes
+	const Brush* brush = GetBrush(object);
+	if (brush != nullptr && !brush->IsBox()) {
+		LogWarning("Cannot resize blockout '{}', face resizing only supports box brushes", object->Name.Get());
+		return;
+	}
+
 	constexpr float threshold = 0.01f;
 
 	const Vec3f old_midpoint = (object->Bounds.Min + object->Bounds.Max) * 0.5f;
@@ -170,11 +179,11 @@ void Blockout::ScaleInDirection(Object* object, const Vec3f& face_dir, const Vec
 	ScaleAxis(face_dir.Y, magnitude.Y, object->Bounds.Min.Y, object->Bounds.Max.Y, local_shift.Y);
 	ScaleAxis(face_dir.Z, magnitude.Z, object->Bounds.Min.Z, object->Bounds.Max.Z, local_shift.Z);
 
-	// Blockouts rotate about their midpoint, which is applied unrotated, so a midpoint change has to be
-	// compensated for or the opposite face moves on rotated objects.
 	const Vec3f midpoint_delta = (object->Bounds.Min + object->Bounds.Max) * 0.5f - old_midpoint;
 	const Vec3f offset = (local_shift + midpoint_delta).Rotate(object->mRotation) - midpoint_delta;
 
+	// Blockouts rotate about their midpoint, which is applied unrotated, so a midpoint change has to be
+	// compensated for or the opposite face moves on rotated objects
 	if (!offset.IsCloseTo(simd::LoadFloat4(0.0f))) {
 		object->SetPosition(object->GetPosition() + offset);
 	}
@@ -204,7 +213,7 @@ void Blockout::ReloadSingleObject(Object* object)
 	for (ConfigEntry& entry : blocks_entry->Members) {
 		if (entry.Name.GetHash() == object_name_hash) {
 			RemoveSingleObjectFromWorld(object);
-			new_object_id = CreateCubeVolume(entry);
+			new_object_id = CreateBrushObject(entry);
 			break;
 		}
 	}
@@ -232,6 +241,8 @@ void Blockout::RemoveSingleObjectFromWorld(Object* object)
 		gPhysics->DestroyBody(object->PhysicsID);
 	}
 
+	mBrushes.erase(object->ID.GetID());
+
 	gObjectManager->DestroyObject(object->ID);
 }
 
@@ -242,30 +253,7 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	}
 
 	BlockoutObjects.Clear();
-}
-
-/**
- * @brief Get the offset to get the center of an asymmetrical block.
- */
-static Vec3f GetCubeMidpointOffset(const CubeGenOptions& cgo)
-{
-	// We want to offset the position of the block by the difference betwween the opposing side of the box.
-	// If we take a single dimension, e.g. X dimension:
-	//     |     :          |
-	// left^  pos^     right^
-	//
-	// Then we can offset the midpoint between the difference between left and right.
-
-	const FLOAT4 vmax = fx::simd::LoadFloat4(cgo.Right.Scale, cgo.Top.Scale, cgo.Front.Scale, 0.0f);
-	const FLOAT4 vmin = fx::simd::LoadFloat4(cgo.Left.Scale, cgo.Bottom.Scale, cgo.Back.Scale, 0.0f);
-
-	return Vec3f(fx::simd::Sub(vmax, vmin)) * 0.5f;
-}
-
-static Vec3f GetCubeSize(const CubeGenOptions& cgo)
-{
-	return (Vec3f(cgo.Left.Scale, cgo.Top.Scale, cgo.Front.Scale) +
-			Vec3f(cgo.Right.Scale, cgo.Bottom.Scale, cgo.Back.Scale));
+	mBrushes.clear();
 }
 
 MaterialID Blockout::GetMaterialForSlot(eCProtoMat slot) const
@@ -284,35 +272,126 @@ MaterialID Blockout::GetMaterialForSlot(eCProtoMat slot) const
 	}
 }
 
-ObjectID Blockout::CreateCubeVolume(ConfigEntry& entry)
+Brush* Blockout::GetBrush(const Object* object)
+{
+	if (object == nullptr) {
+		return nullptr;
+	}
+
+	auto it = mBrushes.find(object->ID.GetID());
+	return (it != mBrushes.end()) ? &it->second : nullptr;
+}
+
+void Blockout::ApplyBrush(Object* object, Brush&& brush, physics::eMotionType motion_type)
+{
+	Assert(brush.IsValid());
+
+	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
+	brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices);
+	object->pMesh = mesh->AsDefaultMesh();
+
+	object->Bounds.Min = brush.GetBoundsMin();
+	object->Bounds.Max = brush.GetBoundsMax();
+
+	// Blockouts rotate about the centre of their bounds
+	const Vec3f midpoint = brush.GetCenter();
+	object->SetRotationOrigin(-midpoint);
+
+	gPhysics->DestroyBody(object->PhysicsID);
+
+	SizedArray<Vec3f> hull_points;
+	hull_points.InitCapacity(brush.GetVertices().Size);
+
+	// The collider is centred on the midpoint so that it rotates the same way as the object
+	for (const Vec3f& vertex : brush.GetVertices()) {
+		hull_points.Insert(vertex - midpoint);
+	}
+
+	physics::Body* phys = gPhysics->NewBody(object->Name.Get());
+	phys->CreateConvexHullBody(hull_points, motion_type,
+							   physics::BodyProps {
+								   .ConvexRadius = 0.05f,
+								   .Density = 20,
+							   });
+
+	phys->SetMidpoint(midpoint);
+	phys->Teleport(object->GetPosition(), object->mRotation);
+
+	object->AttachCollider(phys);
+
+	// A probe volume's collider has to be taken back out of the world
+	if (object->IsProbeVolume()) {
+		object->SetProbeVolume(true);
+	}
+
+	mBrushes[object->ID.GetID()] = std::move(brush);
+}
+
+/**
+ * @brief Reads a blockout's brush from either a box (`scale`) or a list of planes (`planes`).
+ */
+static Brush ReadBrushEntry(ConfigEntry& entry)
+{
+	ConfigEntry* scale_entry = entry.GetMember(HashStr32("scale"));
+
+	if (scale_entry != nullptr) {
+		const PagedArray<ConfigPrimitive>& scales = scale_entry->GetArrayData();
+
+		if (scales.Size() < 6) {
+			return {};
+		}
+
+		// Left, right, top, bottom, front, back extents
+		const Vec3f min = -Vec3f(scales[0].Get<float32>(), scales[3].Get<float32>(), scales[5].Get<float32>());
+		const Vec3f max = Vec3f(scales[1].Get<float32>(), scales[2].Get<float32>(), scales[4].Get<float32>());
+
+		return Brush::FromBox(min, max);
+	}
+
+	ConfigEntry* planes_entry = entry.GetMember(HashStr32("planes"));
+
+	if (planes_entry != nullptr) {
+		const PagedArray<ConfigPrimitive>& values = planes_entry->GetArrayData();
+
+		// Four values per plane: the outward normal, then the distance from the origin
+		const uint32 plane_count = static_cast<uint32>(values.Size() / 4);
+
+		if (plane_count > Brush::scMaxPlanes) {
+			LogError("Blockout '{}' has {} planes, the maximum is {}", entry.Name.Get(), plane_count,
+					 Brush::scMaxPlanes);
+			return {};
+		}
+
+		Brush::PlaneList planes;
+
+		for (uint32 i = 0; i < plane_count; i++) {
+			planes.Insert(BrushPlane {
+				.Normal = Vec3f(values[i * 4].Get<float32>(), values[i * 4 + 1].Get<float32>(),
+								values[i * 4 + 2].Get<float32>()),
+				.Distance = values[i * 4 + 3].Get<float32>(),
+			});
+		}
+
+		return Brush::FromPlanes(planes);
+	}
+
+	return {};
+}
+
+ObjectID Blockout::CreateBrushObject(ConfigEntry& entry)
 {
 	Vec3f position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
-
 
 	String blockout_id = String::Fmt("{}", entry.Name.Get());
 
 	LogInfo("Adding blockout '{}'", blockout_id);
 
-	const PagedArray<ConfigPrimitive>& scales = entry.GetMember(HashStr32("scale"))->GetArrayData();
+	Brush brush = ReadBrushEntry(entry);
 
-	LogInfo("Creating block id {}", blockout_id);
-
-	if (scales.Size() < 6) {
+	if (!brush.IsValid()) {
+		LogError("Blockout '{}' does not describe a valid convex brush, skipping", blockout_id);
 		return ObjectID::scNull;
 	}
-
-	CubeGenOptions cgo {
-		.Left = { .Scale = scales[0].Get<float32>() },
-		.Right = { .Scale = scales[1].Get<float32>() },
-		.Top = { .Scale = scales[2].Get<float32>() },
-		.Bottom = { .Scale = scales[3].Get<float32>() },
-		.Front = { .Scale = scales[4].Get<float32>() },
-		.Back = { .Scale = scales[5].Get<float32>() },
-
-		.bAlignUVs = true,
-	};
-
-	Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube(cgo);
 
 	MaterialID material_id = mWhiteMaterialID;
 
@@ -334,13 +413,8 @@ ObjectID Blockout::CreateCubeVolume(ConfigEntry& entry)
 	}
 
 	Object* object = gObjectManager->NewObject(blockout_id.Str(), material_id, object_tags);
-	object->pMesh = cube_mesh->AsDefaultMesh();
 	object->MoveBy(position);
 	object->SetShadowCaster(true);
-	object->Bounds.Min = -Vec3f(cgo.Left.Scale, cgo.Bottom.Scale, cgo.Back.Scale);
-	object->Bounds.Max = Vec3f(cgo.Right.Scale, cgo.Top.Scale, cgo.Front.Scale);
-	Vec3f midpoint = GetCubeMidpointOffset(cgo);
-
 
 	Quat rotation = Quat::scIdentity;
 
@@ -362,26 +436,13 @@ ObjectID Blockout::CreateCubeVolume(ConfigEntry& entry)
 
 	object->SetRotation(rotation);
 
-	object->SetRotationOrigin(-midpoint);
-
-	bool is_dynamic = entry.GetMemberValue(HashStr32("dynamic"), 0) == 1;
-
-	physics::Body* phys = gPhysics->NewBody(blockout_id);
-	phys->CreatePrimitiveBody(physics::ePrimitiveType::Box, GetCubeSize(cgo),
-							  is_dynamic ? physics::eMotionType::Dynamic : physics::eMotionType::Static,
-							  physics::BodyProps {
-								  .ConvexRadius = 0.05f,
-								  .Density = 20,
-							  });
-
-	phys->SetMidpoint(midpoint);
-	phys->Teleport(position, rotation);
-
-	object->AttachCollider(phys);
-
 	if (entry.GetMemberValue(HashStr32("probevolume"), 0) == 1) {
 		object->SetProbeVolume(true);
 	}
+
+	bool is_dynamic = entry.GetMemberValue(HashStr32("dynamic"), 0) == 1;
+
+	ApplyBrush(object, std::move(brush), is_dynamic ? physics::eMotionType::Dynamic : physics::eMotionType::Static);
 
 	AssetTicket ticket(static_cast<void*>(object));
 	ticket.MarkAndSignalLoaded();
@@ -396,51 +457,27 @@ ObjectID Blockout::CreateCubeVolume(ConfigEntry& entry)
 
 void Blockout::RebuildObject(Object* object)
 {
-	CubeGenOptions cgo {
-		.Left = { .Scale = -object->Bounds.Min.X },
-		.Right = { .Scale = object->Bounds.Max.X },
-		.Top = { .Scale = object->Bounds.Max.Y },
-		.Bottom = { .Scale = -object->Bounds.Min.Y },
-		.Front = { .Scale = object->Bounds.Max.Z },
-		.Back = { .Scale = -object->Bounds.Min.Z },
-
-		.bAlignUVs = true,
-	};
-
-	Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube(cgo);
-	object->pMesh = cube_mesh->AsDefaultMesh();
+	if (object == nullptr) {
+		return;
+	}
 
 	physics::Body* body = gPhysics->GetBody(object->PhysicsID);
 	if (body == nullptr) {
 		return;
 	}
 
-	Vec3f midpoint = GetCubeMidpointOffset(cgo);
-	Vec3f position = object->GetPosition();
-	Quat rotation = body->GetRotation();
+	Brush* existing = GetBrush(object);
 
-	object->SetRotationOrigin(-midpoint);
+	// A box is edited through the object's bounds, anything else keeps its planes
+	Brush brush = (existing == nullptr || existing->IsBox()) ? Brush::FromBox(object->Bounds.Min, object->Bounds.Max)
+															 : Brush::FromPlanes(existing->Planes);
 
-	physics::eMotionType motion_type = body->GetMotionType();
-
-
-	gPhysics->DestroyBody(object->PhysicsID);
-
-	physics::Body* phys = gPhysics->NewBody(object->Name.Get());
-	phys->CreatePrimitiveBody(physics::ePrimitiveType::Box, GetCubeSize(cgo), motion_type,
-							  physics::BodyProps {
-								  .ConvexRadius = 0.05f,
-								  .Density = 20,
-							  });
-
-	phys->SetMidpoint(midpoint);
-	phys->Teleport(position, rotation);
-
-	object->AttachCollider(phys);
-
-	if (object->IsProbeVolume()) {
-		object->SetProbeVolume(true);
+	if (!brush.IsValid()) {
+		LogError("Could not rebuild blockout '{}', its brush is invalid", object->Name.Get());
+		return;
 	}
+
+	ApplyBrush(object, std::move(brush), body->GetMotionType());
 }
 
 void Blockout::DestroyObject(Object* object)
@@ -473,6 +510,8 @@ void Blockout::DestroyObject(Object* object)
 		++index;
 	}
 
+	mBrushes.erase(object->ID.GetID());
+
 	gWorld->Detach(object->ID);
 	gObjectManager->DestroyObject(object->ID);
 }
@@ -484,28 +523,12 @@ Object* Blockout::NewObject(const Vec3f& position)
 
 	Object* object = gObjectManager->NewObject(blockout_name, mWhiteMaterialID, eObjectTag::Blockout);
 
-	float32 scale = 0.25f;
+	constexpr float32 scale = 0.25f;
 
-	CubeGenOptions cgo = CubeGenOptions::Uniform(scale);
-
-	Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube(cgo);
-
-	object->pMesh = cube_mesh->AsDefaultMesh();
 	object->MoveBy(position);
 	object->SetShadowCaster(true);
-	object->Bounds.Min = -Vec3f(scale);
-	object->Bounds.Max = Vec3f(scale);
 
-	physics::Body* phys = gPhysics->NewBody(blockout_name);
-	phys->CreatePrimitiveBody(physics::ePrimitiveType::Box, GetCubeSize(cgo), physics::eMotionType::Static,
-							  physics::BodyProps {
-								  .ConvexRadius = 0.05f,
-								  .Density = 20,
-							  });
-
-	phys->Teleport(position, Quat::scIdentity);
-
-	object->AttachCollider(phys);
+	ApplyBrush(object, Brush::FromBox(Vec3f(-scale), Vec3f(scale)), physics::eMotionType::Static);
 
 	AssetTicket ticket(static_cast<void*>(object));
 	ticket.MarkAndSignalLoaded();
@@ -528,49 +551,23 @@ Object* Blockout::DupeObject(Object* object)
 
 	Object* dupe = gObjectManager->NewObject(blockout_name, object->GetMaterialID(), eObjectTag::Blockout);
 
-	dupe->Bounds.Min = object->Bounds.Min;
-	dupe->Bounds.Max = object->Bounds.Max;
-
-	CubeGenOptions cgo {
-		.Left = { .Scale = -object->Bounds.Min.X },
-		.Right = { .Scale = object->Bounds.Max.X },
-		.Top = { .Scale = object->Bounds.Max.Y },
-		.Bottom = { .Scale = -object->Bounds.Min.Y },
-		.Front = { .Scale = object->Bounds.Max.Z },
-		.Back = { .Scale = -object->Bounds.Min.Z },
-
-		.bAlignUVs = true,
-	};
-
-	Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube(cgo);
-	dupe->pMesh = cube_mesh->AsDefaultMesh();
+	const Brush* source_brush = GetBrush(object);
+	Brush brush = (source_brush != nullptr) ? Brush::FromPlanes(source_brush->Planes)
+											: Brush::FromBox(object->Bounds.Min, object->Bounds.Max);
 
 	physics::Body* existing_body = gPhysics->GetBody(object->PhysicsID);
-	if (existing_body != nullptr) {
-		Vec3f midpoint = GetCubeMidpointOffset(cgo);
-		Vec3f position = object->GetPosition();
-		Quat rotation = existing_body->GetRotation();
+	physics::eMotionType motion_type = (existing_body != nullptr) ? existing_body->GetMotionType()
+																  : physics::eMotionType::Static;
 
-		dupe->SetRotationOrigin(-midpoint);
-
-		physics::eMotionType motion_type = existing_body->GetMotionType();
-
-		physics::Body* phys = gPhysics->NewBody(dupe->Name.Get());
-		phys->CreatePrimitiveBody(physics::ePrimitiveType::Box, GetCubeSize(cgo), motion_type,
-								  physics::BodyProps {
-									  .ConvexRadius = 0.05f,
-									  .Density = 20,
-								  });
-
-		phys->SetMidpoint(midpoint);
-		phys->Teleport(position, rotation);
-
-		dupe->AttachCollider(phys);
-	}
+	dupe->SetPosition(object->GetPosition());
+	dupe->SetRotation(object->mRotation);
+	dupe->SetShadowCaster(true);
 
 	if (object->IsProbeVolume()) {
 		dupe->SetProbeVolume(true);
 	}
+
+	ApplyBrush(dupe, std::move(brush), motion_type);
 
 	AssetTicket ticket(static_cast<void*>(dupe));
 	ticket.MarkAndSignalLoaded();
@@ -582,9 +579,16 @@ Object* Blockout::DupeObject(Object* object)
 	return dupe;
 }
 
-Object* Blockout::RestoreObject(const Vec3f& position, const Vec3f& bounds_min, const Vec3f& bounds_max,
-								MaterialID material, const Quat& rotation, const Name& name)
+Object* Blockout::RestoreObject(const Vec3f& position, const Brush::PlaneList& planes, MaterialID material,
+								const Quat& rotation, const Name& name)
 {
+	Brush brush = Brush::FromPlanes(planes);
+
+	if (!brush.IsValid()) {
+		LogError("Cannot restore blockout '{}', its brush is invalid", name.Get());
+		return nullptr;
+	}
+
 	std::string base_name = name.Get().empty() ? String::Fmt("{}", BlockoutObjects.Size).Str() : name.Get();
 
 	// The original name may have been reused since the delete; keep names unique.
@@ -601,40 +605,11 @@ Object* Blockout::RestoreObject(const Vec3f& position, const Vec3f& bounds_min, 
 	Object* object = gObjectManager->NewObject(blockout_name, material.IsNull() ? mOrangeMaterialID : material,
 											   eObjectTag::Blockout);
 
-	object->Bounds.Min = bounds_min;
-	object->Bounds.Max = bounds_max;
-
-	CubeGenOptions cgo {
-		.Left = { .Scale = -bounds_min.X },
-		.Right = { .Scale = bounds_max.X },
-		.Top = { .Scale = bounds_max.Y },
-		.Bottom = { .Scale = -bounds_min.Y },
-		.Front = { .Scale = bounds_max.Z },
-		.Back = { .Scale = -bounds_min.Z },
-
-		.bAlignUVs = true,
-	};
-
-	Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube(cgo);
-	object->pMesh = cube_mesh->AsDefaultMesh();
 	object->MoveBy(position);
 	object->SetShadowCaster(true);
 	object->SetRotation(rotation);
 
-	Vec3f midpoint = GetCubeMidpointOffset(cgo);
-	object->SetRotationOrigin(-midpoint);
-
-	physics::Body* phys = gPhysics->NewBody(blockout_name);
-	phys->CreatePrimitiveBody(physics::ePrimitiveType::Box, GetCubeSize(cgo), physics::eMotionType::Static,
-							  physics::BodyProps {
-								  .ConvexRadius = 0.05f,
-								  .Density = 20,
-							  });
-
-	phys->SetMidpoint(midpoint);
-	phys->Teleport(position, rotation);
-
-	object->AttachCollider(phys);
+	ApplyBrush(object, std::move(brush), physics::eMotionType::Static);
 
 	AssetTicket ticket(static_cast<void*>(object));
 	ticket.MarkAndSignalLoaded();
@@ -645,7 +620,6 @@ Object* Blockout::RestoreObject(const Vec3f& position, const Vec3f& bounds_min, 
 
 	return object;
 }
-
 
 void Blockout::Load(const String& path)
 {
@@ -663,11 +637,16 @@ void Blockout::Load(const String& path)
 
 	ConfigEntry* blocks_entry = info.GetEntry(HashStr32("all"));
 
+	if (blocks_entry == nullptr) {
+		LogError("Blockout '{}' could not be loaded or has no 'all' entry", path);
+		return;
+	}
+
 	// Remove the current blockout from the world
 	RemoveBlockoutFromWorld(pWorld);
 
 	for (ConfigEntry& entry : blocks_entry->Members) {
-		CreateCubeVolume(entry);
+		CreateBrushObject(entry);
 	}
 }
 
@@ -687,14 +666,33 @@ void Blockout::Save(const String& path)
 		{
 			blockout_entry.AddMember(ConfigEntry::Literal("pos", object->mPosition));
 
-			ConfigEntry scales_array = ConfigEntry::Array("scale", ConfigPrimitive::ePrimitiveType::Float);
-			scales_array.AppendValue(ConfigPrimitive::FromValue(-object->Bounds.Min.X));
-			scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.X));
-			scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.Y));
-			scales_array.AppendValue(ConfigPrimitive::FromValue(-object->Bounds.Min.Y));
-			scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.Z));
-			scales_array.AppendValue(ConfigPrimitive::FromValue(-object->Bounds.Min.Z));
-			blockout_entry.AddMember(std::move(scales_array));
+			const Brush* brush = GetBrush(object);
+
+			if (brush == nullptr || brush->IsBox()) {
+				// Boxes are stored as their extents in each direction
+				ConfigEntry scales_array = ConfigEntry::Array("scale", ConfigPrimitive::ePrimitiveType::Float);
+
+				scales_array.AppendValue(ConfigPrimitive::FromValue(-object->Bounds.Min.X));
+				scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.X));
+				scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.Y));
+				scales_array.AppendValue(ConfigPrimitive::FromValue(-object->Bounds.Min.Y));
+				scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.Z));
+				scales_array.AppendValue(ConfigPrimitive::FromValue(-object->Bounds.Min.Z));
+
+				blockout_entry.AddMember(std::move(scales_array));
+			}
+			else {
+				ConfigEntry planes_array = ConfigEntry::Array("planes", ConfigPrimitive::ePrimitiveType::Float);
+
+				for (const BrushPlane& plane : brush->Planes) {
+					planes_array.AppendValue(ConfigPrimitive::FromValue(plane.Normal.X));
+					planes_array.AppendValue(ConfigPrimitive::FromValue(plane.Normal.Y));
+					planes_array.AppendValue(ConfigPrimitive::FromValue(plane.Normal.Z));
+					planes_array.AppendValue(ConfigPrimitive::FromValue(plane.Distance));
+				}
+
+				blockout_entry.AddMember(std::move(planes_array));
+			}
 
 			blockout_entry.AddMember(ConfigEntry::Literal("rotquat", object->mRotation));
 

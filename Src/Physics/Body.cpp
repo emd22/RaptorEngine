@@ -8,6 +8,7 @@
 #include <ThirdParty/Jolt/Physics/Body/BodyCreationSettings.h>
 #include <ThirdParty/Jolt/Physics/Body/MotionType.h>
 #include <ThirdParty/Jolt/Physics/Collision/Shape/BoxShape.h>
+#include <ThirdParty/Jolt/Physics/Collision/Shape/ConvexHullShape.h>
 #include <ThirdParty/Jolt/Physics/Collision/Shape/MeshShape.h>
 #include <ThirdParty/Jolt/Physics/EActivation.h>
 
@@ -78,6 +79,46 @@ void Body::CreateMeshBody(const PrimitiveMesh& mesh, physics::eMotionType motion
 
 
 	CreateJoltBody(box_shape, physics::Body::eFlags::None, motion_type, object_properties);
+}
+
+void Body::CreateConvexHullBody(const SizedArray<Vec3f>& points, physics::eMotionType motion_type,
+								const BodyProps& object_properties)
+{
+	mMotionType = motion_type;
+	PrimitiveType = ePrimitiveType::None;
+
+	if (points.Size < 4) {
+		LogError(LC_PHYSICS, "Cannot create convex hull collider from {} points", points.Size);
+		return;
+	}
+
+	JPH::Array<JPH::Vec3> jolt_points;
+	jolt_points.reserve(points.Size);
+
+	Vec3f min = points[0];
+	Vec3f max = points[0];
+
+	// TODO: Fix Vec3f::ToJoltVec3 to dupe the Z lane to W
+	for (const Vec3f& point : points) {
+		jolt_points.push_back(JPH::Vec3(point.X, point.Y, point.Z));
+
+		min = Vec3f::Min(min, point);
+		max = Vec3f::Max(max, point);
+	}
+
+	Dimensions = max - min;
+
+	// Jolt shrinks the convex radius itself if it is too large for the hull
+	JPH::ConvexHullShapeSettings hull_settings(jolt_points, object_properties.ConvexRadius);
+	hull_settings.SetDensity(object_properties.Density);
+
+	JPH::ShapeSettings::ShapeResult hull_shape_result = hull_settings.Create();
+	if (hull_shape_result.HasError()) {
+		LogError(LC_PHYSICS, "Failed to create convex hull collider: {}", hull_shape_result.GetError().c_str());
+		return;
+	}
+
+	UpdateJoltBody(hull_shape_result.Get(), physics::Body::eFlags::None, motion_type, object_properties);
 }
 
 void Body::CreateJoltBody(JPH::ShapeRefC shape, physics::Body::eFlags flags, physics::eMotionType motion_type,

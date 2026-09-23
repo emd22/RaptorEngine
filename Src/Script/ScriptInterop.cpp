@@ -119,8 +119,9 @@ static void N_editor_push_op_delete(Object* obj, int32 group_size)
 	};
 	op.PushedObjectID = obj->ID;
 	op.DeleteSnapshot.Position = obj->GetPosition();
-	op.DeleteSnapshot.BoundsMin = obj->Bounds.Min;
-	op.DeleteSnapshot.BoundsMax = obj->Bounds.Max;
+	const Brush* brush = gWorld->pBlockout->GetBrush(obj);
+	op.DeleteSnapshot.Planes = (brush != nullptr) ? brush->Planes
+												  : Brush::FromBox(obj->Bounds.Min, obj->Bounds.Max).Planes;
 	op.DeleteSnapshot.Material = gPrototypeEditor->GetStoredMaterial(obj);
 	op.DeleteSnapshot.Rotation = obj->mRotation;
 	op.DeleteSnapshot.ObjectName = obj->Name;

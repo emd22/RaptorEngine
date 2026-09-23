@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Brush.hpp>
 #include <Core/StackArray.hpp>
 #include <Core/Types.hpp>
 #include <Core/UndoStack.hpp>
@@ -110,8 +111,7 @@ public:
 	struct Snapshot
 	{
 		Vec3f Position = Vec3f::sZero;
-		Vec3f BoundsMin = Vec3f::sZero;
-		Vec3f BoundsMax = Vec3f::sZero;
+		Brush::PlaneList Planes;
 		MaterialID Material = MaterialID::scNull;
 		Quat Rotation = Quat::scIdentity;
 		Name ObjectName;
