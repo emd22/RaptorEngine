@@ -30,17 +30,6 @@ enum class eEditorTool : uint32
 };
 
 
-/// TODO: remove
-enum class eEditorState : int32
-{
-	// Translate,
-	// Scale,
-	IGE,
-	/// The default mode (simulate) must ALWAYS be last, as it does not possess an EditorMode.
-	Simulate,
-};
-
-
 struct EditOperationValue
 {
 	enum class eValueType
@@ -82,11 +71,8 @@ struct EditOperation
 		Dupe,
 		Create,
 		Delete,
-		/// ValueA/ValueB hold Euler angles in radians (Quat::GetEulerAngles()/FromEulerAngles() convention)
 		Rotate,
-		/// Sets a blockout's brush to PlanesAfter, and back to PlanesBefore on undo
 		BrushEdit,
-		/// Creates a blockout from ObjectSnapshot and PlanesAfter, and destroys it on undo
 		CreateBrush,
 	} Type;
 
@@ -204,15 +190,8 @@ public:
 
 	UpdateFnDef pUpdateFunction = nullptr;
 
-	// MaterialID mSelectedObjectPreviousMaterial = MaterialID::scNull;
-	// Object* mpLastSelectedObject = nullptr;
-
-
 	StackArray<SelectedObject, scLimitSelectionObjects> mSelectedObjects;
-
 	UndoStack<EditOperation> mOperationStack;
-
-	// uint32 OperationStackIndex = 0;
 
 	script::Script* pScript = nullptr;
 };

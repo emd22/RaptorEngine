@@ -1,0 +1,236 @@
+/*
+ * File:        tool_common.strata
+ * Author:      emd22
+ * Created:     09/23/2026
+ * Description: State and helpers shared by the editor tools (see `tools/tool_*.strata`) and `prototype_editor.strata`.
+ *
+ *              NOTE: `@private` functions are only visible inside their own file, so anything a tool or the
+ *              editor dispatcher needs from here must stay public.
+ */
+
+import ../interop;
+import ../common;
+import ../keyboard;
+
+
+enum OBJECTTAG
+{
+	BLOCKOUT = (1 << 0),
+}
+
+
+const int LIMIT_SELECTION_OBJECTS = 64;
+
+struct SELECTION
+{
+	/* The currently selected object (via raycast) */
+	OBJECT selected_object;
+
+	OBJECT[LIMIT_SELECTION_OBJECTS] selected_objects;
+	float3[LIMIT_SELECTION_OBJECTS] initial_object_positions;
+	float3[LIMIT_SELECTION_OBJECTS] initial_object_rotations;
+	int selected_objects_count;
+
+	/* Selected cube face (for FACE mode) */
+
+	float3 selected_face;
+	float selected_face_scale;
+};
+
+/////////////////////////////////////
+// Globals
+/////////////////////////////////////
+
+/* The tool currently selected in the GUI editor. Set through `__set_editor_tool`. */
+EDITORTOOL editor_tool = EDITORTOOL.TRANSLATE;
+
+/* Where the player was when the current mouse drag started */
+float3 initial_player_position;
+
+/* snap */
+int editor_snap_level = 2;
+bool editor_enable_snap = true;
+
+/* Cube marker used for showing distance and movement when transforming an object.
+   Used mainly with scale/face tool. */
+OBJECT transform_marker_object;
+
+/* Empty object */
+OBJECT null_object;
+
+SELECTION sel;
+
+
+/////////////////////////////////////
+// Transform marker
+/////////////////////////////////////
+
+void hide_transform_marker_object()
+{
+	/* Move the transform marker to a location where the user won't see it... */
+	transform_marker_object.move_to(float3(200.0f));
+}
+
+
+/////////////////////////////////////
+// Snapping
+/////////////////////////////////////
+
+/* Adjust the step size of the snap. negative (-1) decreases the size of each step,
+   positive (1) increases it. */
+void editor_adjust_snap_index(int direction)
+{
+	if (direction < 0) {
+		editor_snap_level--;
+	}
+	else {
+		editor_snap_level++;
+	}
+
+	editor_snap_level = fclamp(editor_snap_level, 0, 3);
+}
+
+/* Get the division that we are quantizing by. NOTE: not the index. */
+float editor_get_snap_value()
+{
+	float[4] snap_values = { 0.05f, 0.10f, 0.25f, 0.50f };
+	uint index = fclamp(editor_snap_level, 0, 3);
+	return snap_values[index];
+}
+
+bool editor_get_snap_enabled()
+{
+	return editor_enable_snap;
+}
+
+/* If snap is enabled, this snaps a given vector to the selected snap fraction. */
+float3 editor_transform_snap(float3 vec)
+{
+	if (!editor_enable_snap) {
+		return vec;
+	}
+
+	float3 qsnap = float3(editor_get_snap_value());
+	return (float3_round(vec / qsnap) * qsnap);
+}
+
+/* Epsilon helpers for skipping no-op undo pushes (a click without movement). */
+bool editor_vec_is_zero(float3 v)
+{
+	const float eps = 0.00001f;
+	return (v.x < eps && v.x > -eps) && (v.y < eps && v.y > -eps) && (v.z < eps && v.z > -eps);
+}
+
+bool editor_vec_equal(float3 a, float3 b)
+{
+	return editor_vec_is_zero(a - b);
+}
+
+
+/////////////////////////////////////
+// Selection
+/////////////////////////////////////
+
+bool editor_has_object_selection()
+{
+	return (sel.selected_objects_count > 0);
+}
+
+
+/* DO NOT USE NORMALLY, this is meant to be called by the C++ side. */
+void _internal_editor_select_object(OBJECT object, bool is_selected, bool append_selection)
+{
+	sel.selected_object = object;
+
+	if (is_selected && append_selection) {
+		// Ignore if we are above the current selection count
+		if (sel.selected_objects_count >= LIMIT_SELECTION_OBJECTS) {
+			script_error("object cannot be selected as selection is too large");
+			return;
+		}
+
+		sel.selected_objects[sel.selected_objects_count++] = object;
+		return;
+	}
+
+	// We have selected an object, but will not append to the current selection.
+	if (is_selected) {
+		sel.selected_objects[0] = object;
+		sel.selected_objects_count = 1;
+	}
+	// Clear the current selection
+	else {
+		sel.selected_objects_count = 0;
+	}
+}
+
+/* Select an object. Passing in false for `is_selected` acts as a null value, voiding the selection. */
+void editor_select_object(OBJECT object, bool is_selected, bool append_selection)
+{
+	// NOTE: this calls the C++ function `_select_object_internal` that will internally call
+	// `_internal_editor_select_object`.
+
+ 	object._select_object_internal(is_selected, append_selection);
+}
+
+
+void reset_selection()
+{
+	sel.selected_face = float3(0.0f);
+	sel.selected_face_scale = 0.0f;
+
+	editor_select_object(null_object, false, false);
+}
+
+
+/* Destroy all objects in the selection. Pushing the Delete op destroys each
+   object immediately (via Execute) and records the snapshot for undo. */
+void editor_destroy_selection()
+{
+	int count = sel.selected_objects_count;
+
+	for (int i = 0; i < count; i++) {
+		editor_push_op_delete(sel.selected_objects[i], count);
+	}
+
+	reset_selection();
+}
+
+void editor_dupe_selection()
+{
+	int n = sel.selected_objects_count;
+
+	// Push the Dupe op for each original. Execute creates the dupe with the
+	// original (unselected) material, so no deselect dance is needed. Reuse
+	// `selected_objects` as a temp buffer for the new handles.
+	for (int i = 0; i < n; i++) {
+		OBJECT object_to_dupe = sel.selected_objects[i];
+
+		// OBJECT dupe = editor_push_op_obj(object_to_dupe, OPTYPE.DUPE, object_to_dupe, null_object, n);
+
+		OBJECT dupe = editor_op_dupe_object(object_to_dupe, object_to_dupe.position, n);
+
+		// Replace the selected object with the dupe. We are overwriting the previous selection
+		// and essentially using `selected_objects` as a temp buffer.
+		sel.selected_objects[i] = dupe;
+	}
+
+	// Swap the selection over to the dupes. The null-select restores the
+	// originals' materials on the C++ side; the appends select the dupes.
+	editor_select_object(null_object, false, false);
+
+	{
+		for (int i = 0; i < n; i++) {
+			// Append the selection from the new object handles.
+			editor_select_object(sel.selected_objects[i], true, true);
+		}
+	}
+}
+
+
+// void editor_check_common_controls()
+// {
+
+
+
+// }

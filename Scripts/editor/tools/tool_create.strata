@@ -1,0 +1,111 @@
+/*
+ * File:        tool_create.strata
+ * Author:      emd22
+ * Created:     09/23/2026
+ * Description: Create tool (draw a new brush). Run by `prototype_editor.strata` while EDITORTOOL.CREATE is selected.
+ *              Unlike the other tools it works on whatever the crosshair is on, not on the selection.
+ */
+
+import ../tool_common;
+
+
+/* How far away a surface can be to start drawing a brush on it */
+const float CREATE_RANGE = 100.0f;
+
+/* Height of a new brush before it is changed with Q/E */
+const float CREATE_DEFAULT_HEIGHT = 1.0f;
+
+bool create_active = false;
+/* The snapped point the drag started at, on the surface that was clicked */
+float3 create_start;
+/* The world axis the brush grows out of the surface along */
+float3 create_normal;
+float create_height;
+float3 create_min;
+float3 create_max;
+
+
+/* The world axis closest to `v`, keeping its sign */
+@private
+float3 tool_create_dominant_axis(float3 v)
+{
+	float3 a = float3_abs(v);
+
+	if (a.y >= a.x && a.y >= a.z) {
+		return float3(0.0f, float_sign(v.y), 0.0f);
+	}
+	if (a.x >= a.z) {
+		return float3(float_sign(v.x), 0.0f, 0.0f);
+	}
+
+	return float3(0.0f, 0.0f, float_sign(v.z));
+}
+
+void tool_create_begin()
+{
+	float3 normal = player.ray_get_normal(CREATE_RANGE);
+
+	create_active = !editor_vec_is_zero(normal);
+
+	if (!create_active) {
+		return;
+	}
+
+	create_normal = tool_create_dominant_axis(normal);
+	create_start = editor_transform_snap(player.ray_get_point(CREATE_RANGE));
+	create_height = CREATE_DEFAULT_HEIGHT;
+}
+
+/* Sizes the brush from where the drag started to where the crosshair meets the surface's plane, and out from the
+   surface by the height */
+void tool_create_update(float delta_time)
+{
+	if (!create_active) {
+		return;
+	}
+
+	float step = editor_get_snap_value();
+
+	if (KEY.K_E.is_pressed()) {
+		create_height += step;
+	}
+	if (KEY.K_Q.is_pressed()) {
+		create_height = fmax(step, create_height - step);
+	}
+
+	float3 axis_mask = float3_abs(create_normal);
+	float3 plane_mask = float3(1.0f) - axis_mask;
+
+	/* The opposite corner stays on the plane the drag started on */
+	float3 corner = editor_transform_snap(camera_ray_to_plane(create_start, create_normal));
+	corner = (corner * plane_mask) + (create_start * axis_mask);
+
+	float3 top = create_start + (create_normal * float3(create_height));
+
+	float3 lo = float3(fmin(create_start.x, fmin(corner.x, top.x)), fmin(create_start.y, fmin(corner.y, top.y)),
+					   fmin(create_start.z, fmin(corner.z, top.z)));
+	float3 hi = float3(fmax(create_start.x, fmax(corner.x, top.x)), fmax(create_start.y, fmax(corner.y, top.y)),
+					   fmax(create_start.z, fmax(corner.z, top.z)));
+
+	/* Every side is at least one snap step long, so a click without a drag still makes a brush */
+	hi = float3(fmax(hi.x, lo.x + step), fmax(hi.y, lo.y + step), fmax(hi.z, lo.z + step));
+
+	create_min = lo;
+	create_max = hi;
+
+	blockout_preview_box(create_min, create_max);
+}
+
+void tool_create_finalize()
+{
+	blockout_hide_preview();
+
+	if (!create_active) {
+		return;
+	}
+
+	create_active = false;
+
+	OBJECT created = blockout_create_box(create_min, create_max);
+	editor_select_object(created, true, false);
+}

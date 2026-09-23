@@ -2,227 +2,44 @@
  * File:        prototype_editor.strata
  * Author:      emd22
  * Created:     09/09/2026
- * Description: This script serves as a one-stop shop for all object transformations in-game.
+ * Description: Entry point for the in-game editor. Owns the hotkeys, the drag lifecycle and the editor mode
+ *              interface called from C++, and runs the tool that is selected in the GUI editor.
+ *
+ *              The tools themselves live in `tools/tool_*.strata`, and the state they share in `tool_common.strata`.
+ *              Each tool provides `tool_<name>_begin` (mouse pressed), `tool_<name>_update` (every frame of the drag)
+ *              and `tool_<name>_finalize` (mouse released), and this file dispatches to them by `editor_tool`.
  */
 
 import ../interop;
 import ../common;
 import ../keyboard;
 
+import tool_common;
+import tools/tool_translate;
+import tools/tool_face;
+import tools/tool_rotate;
+import tools/tool_create;
+import tools/tool_clip;
+import tools/tool_set_material;
 
-enum OBJECTTAG
-{
-	BLOCKOUT = (1 << 0),
-}
-
-
-const int LIMIT_SELECTION_OBJECTS = 64;
-
-struct SELECTION
-{
-	/* The currently selected object (via raycast) */
-	OBJECT selected_object;
-
-	OBJECT[LIMIT_SELECTION_OBJECTS] selected_objects;
-	float3[LIMIT_SELECTION_OBJECTS] initial_object_positions;
-	float3[LIMIT_SELECTION_OBJECTS] initial_object_rotations;
-	int selected_objects_count;
-
-	/* Selected cube face (for FACE mode) */
-
-	float3 selected_face;
-	float selected_face_scale;
-};
 
 /////////////////////////////////////
 // Globals
 /////////////////////////////////////
 
-float3 initial_player_position;
 bool mouse_is_dragging = false;
 bool mouse_was_in_drag_event = false;
 
-/* snap */
-int editor_snap_level = 2;
-bool editor_enable_snap = true;
-
 bool player_had_headbob = false;
 
-/* Cube marker used for showing distance and movement when transforming an object.
-   Used mainly with scale/face tool. */
-OBJECT transform_marker_object;
-
-/* Empty object */
-OBJECT null_object;
-
-SELECTION sel;
-
-float3 face_tool_magnitude;
-float3 initial_face_object_position;
-float3 initial_face_position;
-float3 face_world_normal;
-float face_min_proj;
-
-/* Matches scMinBlockoutThickness in Blockout.cpp */
-const float FACE_MIN_THICKNESS = 0.25f;
-
-/* Accumulated Q/E pitch for the Rotate tool, reset at the start of each drag */
-float rotate_pitch_accum = 0.0f;
-
-/* Accumulated Q/E height for the Translate tool, reset at the start of each drag */
-float translate_height_accum = 0.0f;
-
-EDITORTOOL editor_tool = EDITORTOOL.TRANSLATE;
-
-
 
 /////////////////////////////////////
-// Editor functions
+// Editor tool selection
 /////////////////////////////////////
 
-
-void hide_transform_marker_object()
-{
-	/* Move the transform marker to a location where the user won't see it... */
-	transform_marker_object.move_to(float3(200.0f));
-}
-
-/* Adjust the step size of the snap. negative (-1) decreases the size of each step,
-   positive (1) increases it. */
-@private
-void editor_adjust_snap_index(int direction)
-{
-	if (direction < 0) {
-		editor_snap_level--;
-	}
-	else {
-		editor_snap_level++;
-	}
-
-	editor_snap_level = fclamp(editor_snap_level, 0, 3);
-}
-
-@private
-bool editor_has_object_selection()
-{
-	return (sel.selected_objects_count > 0);
-}
-
-
-/* DO NOT USE NORMALLY, this is meant to be called by the C++ side. */
-void _internal_editor_select_object(OBJECT object, bool is_selected, bool append_selection)
-{
-	sel.selected_object = object;
-
-	if (is_selected && append_selection) {
-		// Ignore if we are above the current selection count
-		if (sel.selected_objects_count >= LIMIT_SELECTION_OBJECTS) {
-			script_error("object cannot be selected as selection is too large");
-			return;
-		}
-
-		sel.selected_objects[sel.selected_objects_count++] = object;
-		return;
-	}
-
-	// We have selected an object, but will not append to the current selection.
-	if (is_selected) {
-		sel.selected_objects[0] = object;
-		sel.selected_objects_count = 1;
-	}
-	// Clear the current selection
-	else {
-		sel.selected_objects_count = 0;
-	}
-}
-
-/* Select an object. Passing in false for `is_selected` acts as a null value, voiding the selection. */
-void editor_select_object(OBJECT object, bool is_selected, bool append_selection)
-{
-	// NOTE: this calls the C++ function `_select_object_internal` that will internally call
-	// `_internal_editor_select_object`.
-
- 	object._select_object_internal(is_selected, append_selection);
-}
-
-
-@private
-void reset_selection()
-{
-	sel.selected_face = float3(0.0f);
-	sel.selected_face_scale = 0.0f;
-
-	editor_select_object(null_object, false, false);
-}
-
-
-/* Destroy all objects in the selection. Pushing the Delete op destroys each
-   object immediately (via Execute) and records the snapshot for undo. */
-@private
-void editor_destroy_selection()
-{
-	int count = sel.selected_objects_count;
-
-	for (int i = 0; i < count; i++) {
-		editor_push_op_delete(sel.selected_objects[i], count);
-	}
-
-	reset_selection();
-}
-
-@private
-void editor_dupe_selection()
-{
-	int n = sel.selected_objects_count;
-
-	// Push the Dupe op for each original. Execute creates the dupe with the
-	// original (unselected) material, so no deselect dance is needed. Reuse
-	// `selected_objects` as a temp buffer for the new handles.
-	for (int i = 0; i < n; i++) {
-		OBJECT object_to_dupe = sel.selected_objects[i];
-
-		// OBJECT dupe = editor_push_op_obj(object_to_dupe, OPTYPE.DUPE, object_to_dupe, null_object, n);
-
-		OBJECT dupe = editor_op_dupe_object(object_to_dupe, object_to_dupe.position, n);
-
-		// Replace the selected object with the dupe. We are overwriting the previous selection
-		// and essentially using `selected_objects` as a temp buffer.
-		sel.selected_objects[i] = dupe;
-	}
-
-	// Swap the selection over to the dupes. The null-select restores the
-	// originals' materials on the C++ side; the appends select the dupes.
-	editor_select_object(null_object, false, false);
-
-	{
-		for (int i = 0; i < n; i++) {
-			// Append the selection from the new object handles.
-			editor_select_object(sel.selected_objects[i], true, true);
-		}
-	}
-}
-
+/* Called by the GUI editor when its selected tool changes. */
 void __set_editor_tool(EDITORTOOL tool)
 {
-	if (tool == EDITORTOOL.TRANSLATE) {
-		cvar_set_string("s_editor_op", "Translate");
-	}
-	else if (tool == EDITORTOOL.FACE) {
-		cvar_set_string("s_editor_op", "Face");
-	}
-	else if (tool == EDITORTOOL.ROTATE) {
-		cvar_set_string("s_editor_op", "Rotate");
-	}
-	else if (tool == EDITORTOOL.CREATE) {
-		cvar_set_string("s_editor_op", "Create");
-	}
-	else if (tool == EDITORTOOL.CLIP) {
-		cvar_set_string("s_editor_op", "Clip");
-	}
-	else if (tool == EDITORTOOL.SET_MATERIAL) {
-		cvar_set_string("s_editor_op", "Set Material");
-	}
-
 	editor_tool = tool;
 }
 
@@ -231,6 +48,18 @@ void set_editor_tool(EDITORTOOL tool)
 	GUI_set_editor_tool(tool);
 	// __set_editor_tool() is called by the GUI editor
 }
+
+/* Create and Set Material work on whatever the crosshair is on, the other tools on the selection */
+@private
+bool editor_tool_needs_selection()
+{
+	return (editor_tool != EDITORTOOL.CREATE && editor_tool != EDITORTOOL.SET_MATERIAL);
+}
+
+
+/////////////////////////////////////
+// Controls
+/////////////////////////////////////
 
 @private
 void editor_handle_controls()
@@ -293,12 +122,14 @@ void editor_handle_controls()
 		}
 	}
 
-	if (editor_tool == EDITORTOOL.FACE && not_in_xform_operation) {
-		editor_face_texture_controls();
-	}
-
-	if (editor_tool == EDITORTOOL.SET_MATERIAL && not_in_xform_operation) {
-		editor_set_material_controls();
+	/* Per-tool hotkeys that are not part of a drag */
+	if (not_in_xform_operation) {
+		if (editor_tool == EDITORTOOL.FACE) {
+			tool_face_controls();
+		}
+		else if (editor_tool == EDITORTOOL.SET_MATERIAL) {
+			tool_set_material_controls();
+		}
 	}
 
 	/* Non-manipulation, but object functions. */
@@ -320,45 +151,6 @@ void editor_handle_controls()
 }
 
 
-/* Get the division that we are quantizing by. NOTE: not the index. */
-float editor_get_snap_value()
-{
-	float[4] snap_values = { 0.05f, 0.10f, 0.25f, 0.50f };
-	uint index = fclamp(editor_snap_level, 0, 3);
-	return snap_values[index];
-}
-
-bool editor_get_snap_enabled()
-{
-	return editor_enable_snap;
-}
-
-/* If snap is enabled, this snaps a given vector to the selected snap fraction. */
-float3 editor_transform_snap(float3 vec)
-{
-	if (!editor_enable_snap) {
-		return vec;
-	}
-
-	float3 qsnap = float3(editor_get_snap_value());
-	return (float3_round(vec / qsnap) * qsnap);
-}
-
-/* Epsilon helpers for skipping no-op undo pushes (a click without movement). */
-@private
-bool editor_vec_is_zero(float3 v)
-{
-	const float eps = 0.00001f;
-	return (v.x < eps && v.x > -eps) && (v.y < eps && v.y > -eps) && (v.z < eps && v.z > -eps);
-}
-
-@private
-bool editor_vec_equal(float3 a, float3 b)
-{
-	return editor_vec_is_zero(a - b);
-}
-
-
 /* Player movement dampening */
 
 void editor_enable_movement_damp()
@@ -374,13 +166,15 @@ void editor_disable_movement_damp()
 }
 
 
+/////////////////////////////////////
+// Tool Dispatch
+/////////////////////////////////////
+
 /* The mouse button was pressed with no ongoing mouse down event. */
+@private
 void editor_on_mouse_just_down()
 {
 	initial_player_position = player.position;
-	rotate_pitch_accum = 0.0f;
-	translate_height_accum = 0.0f;
-
 
 	for (int i = 0; i < sel.selected_objects_count; i++) {
 		sel.initial_object_positions[i] = sel.selected_objects[i].position;
@@ -390,629 +184,43 @@ void editor_on_mouse_just_down()
 	// initial_object_position = sel.selected_object.position;
 	mouse_was_in_drag_event = true;
 
-
-	if (editor_tool == EDITORTOOL.FACE) {
-		/* Cast and gather the face we are pointing towards */
-		float3 selected_face = sel.selected_object.ray_get_face();
-
-		sel.selected_face = selected_face;
-		sel.selected_face_scale = sel.selected_object.direction_scale(selected_face);
-
-		/* Snapshot where the face is now so the preview marker can track
-		   exactly where it will be after finalize (obj pos + face offset). */
-		initial_face_object_position = sel.selected_object.position;
-		initial_face_position = sel.selected_object.local_to_world(blockout_face_center(sel.selected_object, selected_face));
-		face_world_normal = sel.selected_object.local_dir_to_world(selected_face);
-
-		float thickness = sel.selected_face_scale + sel.selected_object.direction_scale(float3(0.0f) - selected_face);
-		face_min_proj = fmin(0.0f, FACE_MIN_THICKNESS - thickness);
+	if (editor_tool == EDITORTOOL.TRANSLATE) {
+		tool_translate_begin();
 	}
-
-	if (editor_tool == EDITORTOOL.CREATE) {
-		editor_create_tool_begin();
+	else if (editor_tool == EDITORTOOL.FACE) {
+		tool_face_begin();
 	}
-
-	if (editor_tool == EDITORTOOL.CLIP) {
-		editor_clip_tool_begin();
+	else if (editor_tool == EDITORTOOL.ROTATE) {
+		tool_rotate_begin();
 	}
-
-	if (editor_tool == EDITORTOOL.SET_MATERIAL) {
-		/* Shift paints every face of the brush */
-		blockout_paint_material(paint_material_slot, KEY.K_LSHIFT.is_down());
+	else if (editor_tool == EDITORTOOL.CREATE) {
+		tool_create_begin();
+	}
+	else if (editor_tool == EDITORTOOL.CLIP) {
+		tool_clip_begin();
+	}
+	else if (editor_tool == EDITORTOOL.SET_MATERIAL) {
+		tool_set_material_begin();
 	}
 }
-
-
-/////////////////////////////////////
-// Translate Tool
-/////////////////////////////////////
-
-@private
-void editor_move_selection(float3 movement_delta)
-{
-	for (int i = 0; i < sel.selected_objects_count; i++) {
-		OBJECT obj = sel.selected_objects[i];
-
-		// float3 start_position = obj.get_position();
-		float3 initial_position = sel.initial_object_positions[i];
-
-		obj.move_to((initial_position + movement_delta));
-	}
-
-}
-
-/* Translate an object */
-@private
-void editor_translate_tool(float delta_time)
-{
-	if (!editor_has_object_selection()) {
-		return;
-	}
-
-	/* Only the player's X/Z movement drags the selection, so looking around or flying doesn't change its height. Height
-	   comes from Q/E alone (same directions as flying: E up, Q down). */
-	float3 player_delta = player.position - initial_player_position;
-
-	const float speed = delta_time * (editor_get_snap_value() * 8.0);
-
-	if (KEY.K_E.is_down()) {
-		translate_height_accum += speed;
-	}
-	if (KEY.K_Q.is_down()) {
-		translate_height_accum -= speed;
-	}
-
-	float3 translate_movement = float3(player_delta.x, translate_height_accum, player_delta.z);
-
-	float3 movement_delta = editor_transform_snap(translate_movement);
-
-	editor_move_selection(movement_delta);
-}
-
-
-@private
-void editor_translate_tool_finalize()
-{
-	// Skip clicks without movement so we don't burn undo history on no-ops.
-	// GroupSize must match the pushed op count exactly for multi-undo.
-	int movers = 0;
-	for (int i = 0; i < sel.selected_objects_count; i++) {
-		if (!editor_vec_equal(sel.initial_object_positions[i], sel.selected_objects[i].position)) {
-			movers++;
-		}
-	}
-
-	if (movers == 0) {
-		return;
-	}
-
-	// Log movements for undo
-	for (int i = 0; i < sel.selected_objects_count; i++) {
-		OBJECT obj = sel.selected_objects[i];
-
-		float3 initial_position = sel.initial_object_positions[i];
-
-		if (editor_vec_equal(initial_position, obj.position)) {
-			continue;
-		}
-
-		editor_push_op_vec(obj, OPTYPE.MOVE, initial_position, obj.position, movers);
-	}
-}
-
-/////////////////////////////////////
-// Face Tool
-/////////////////////////////////////
-
-enum FACEDIR
-{
-	X = 0,
-	Y = 1,
-	Z = 2,
-};
-
-@private
-FACEDIR face_get_dir()
-{
-	float3 abs_face = float3_abs(sel.selected_face);
-
-	const float threshold = 0.01f;
-
-	if (abs_face.x > threshold) {
-		return FACEDIR.X;
-	}
-	if (abs_face.y > threshold) {
-		return FACEDIR.Y;
-	}
-
-	return FACEDIR.Z;
-}
-
-
-@private
-void editor_face_tool(float delta_time)
-{
-	/* Player delta projected onto the face's world normal. Follows
-	   Blockout::ScaleInDirection (Max += mag / Min -= mag). */
-	float3 snapped = editor_transform_snap(float3(dot(player.position - initial_player_position, face_world_normal)));
-	float proj = fmax(snapped.x, face_min_proj);
-
-	face_tool_magnitude = float3(proj);
-
-	float3 xform_marker_dest = initial_face_position + (face_world_normal * float3(proj));
-	transform_marker_object.move_to(xform_marker_dest);
-}
-
-/* Degrees the texture on a face turns per key press */
-const float FACE_TEXTURE_ROTATE_STEP = 15.0f;
-
-/* Scale applied to the texture on a face per key press */
-const float FACE_TEXTURE_SCALE_STEP = 2.0f;
-
-/* Edits the texture on the face of the selected object under the crosshair:
-   arrows shift it, [ and ] scale it, , and . rotate it, M cycles its material and J resets it. */
-@private
-void editor_face_texture_controls()
-{
-	if (!editor_has_object_selection()) {
-		return;
-	}
-
-	OBJECT obj = sel.selected_object;
-	float3 face = obj.ray_get_face();
-
-	if (editor_vec_is_zero(face)) {
-		return;
-	}
-
-	/* Shift by the current snap size, in texture repeats */
-	float step = editor_get_snap_value();
-
-	if (KEY.K_LEFT.is_pressed()) {
-		blockout_edit_face_texture(obj, face, FACETEXTUREEDIT.SHIFT, float3(0.0f - step, 0.0f, 0.0f));
-	}
-	if (KEY.K_RIGHT.is_pressed()) {
-		blockout_edit_face_texture(obj, face, FACETEXTUREEDIT.SHIFT, float3(step, 0.0f, 0.0f));
-	}
-	if (KEY.K_UP.is_pressed()) {
-		blockout_edit_face_texture(obj, face, FACETEXTUREEDIT.SHIFT, float3(0.0f, 0.0f - step, 0.0f));
-	}
-	if (KEY.K_DOWN.is_pressed()) {
-		blockout_edit_face_texture(obj, face, FACETEXTUREEDIT.SHIFT, float3(0.0f, step, 0.0f));
-	}
-
-	if (KEY.K_LBRACKET.is_pressed()) {
-		float shrink = 1.0f / FACE_TEXTURE_SCALE_STEP;
-		blockout_edit_face_texture(obj, face, FACETEXTUREEDIT.SCALE, float3(shrink, shrink, 0.0f));
-	}
-	if (KEY.K_RBRACKET.is_pressed()) {
-		blockout_edit_face_texture(obj, face, FACETEXTUREEDIT.SCALE,
-								   float3(FACE_TEXTURE_SCALE_STEP, FACE_TEXTURE_SCALE_STEP, 0.0f));
-	}
-
-	if (KEY.K_COMMA.is_pressed()) {
-		blockout_edit_face_texture(obj, face, FACETEXTUREEDIT.ROTATE, float3(0.0f - FACE_TEXTURE_ROTATE_STEP));
-	}
-	if (KEY.K_PERIOD.is_pressed()) {
-		blockout_edit_face_texture(obj, face, FACETEXTUREEDIT.ROTATE, float3(FACE_TEXTURE_ROTATE_STEP));
-	}
-
-	if (KEY.K_M.is_pressed()) {
-		blockout_edit_face_texture(obj, face, FACETEXTUREEDIT.CYCLE_MATERIAL, float3(0.0f));
-	}
-	if (KEY.K_J.is_pressed()) {
-		blockout_edit_face_texture(obj, face, FACETEXTUREEDIT.RESET, float3(0.0f));
-	}
-}
-
-@private
-void editor_face_tool_finalize()
-{
-	bool has_selection = editor_has_object_selection();
-
-	hide_transform_marker_object();
-
-	if (!has_selection) {
-		return;
-	}
-
-	// A click without drag leaves a zero magnitude; pushing it would burn
-	// undo history on a no-op and split nothing, so skip it.
-	if (editor_vec_is_zero(face_tool_magnitude)) {
-		return;
-	}
-
-	for (int i = 0; i < sel.selected_objects_count; i++) {
-		OBJECT obj = sel.selected_objects[i];
-
-		// blockout_object_scale(
-		// 	sel.selected_objects[i],
-		// 	sel.selected_face,
-		// 	face_tool_magnitude
-		// );
-
-		editor_push_op_vec(obj, OPTYPE.SCALE, sel.selected_face, face_tool_magnitude, sel.selected_objects_count);
-
-		blockout_reload_object(obj);
-	}
-
-}
-
-
-/////////////////////////////////////
-// Rotate Tool
-/////////////////////////////////////
-
-// 5 degrees as radians
-const float D2R_1_DEG = ((1.0f * MATH_PI) / 180.0f);
-const float D2R_5_DEG = ((5.0f * MATH_PI) / 180.0f);
-const float D2R_15_DEG = ((15.0f * MATH_PI) / 180.0f);
-const float D2R_45_DEG = ((45.0f * MATH_PI) / 180.0f);
-const float D2R_90_DEG = ((90.0f * MATH_PI) / 180.0f);
-
-float editor_get_rotate_snap_value()
-{
-	float[4] snap_values = { D2R_1_DEG, D2R_5_DEG, D2R_15_DEG, D2R_45_DEG };
-	uint index = fclamp(editor_snap_level, 0, 3);
-	return snap_values[index];
-}
-
-/* If snap is enabled, this snaps a given angle vector (radians) to the selected rotation snap increment. */
-float3 editor_rotate_snap(float3 vec)
-{
-	if (!editor_enable_snap) {
-		return vec;
-	}
-
-	float3 qsnap = float3(editor_get_rotate_snap_value());
-	return (float3_round(vec / qsnap) * qsnap);
-}
-
-/* How many radians one metre of sideways drag equates to */
-const float ROTATE_SENSITIVITY = D2R_90_DEG;
-
-@private
-void editor_rotate_selection(float3 rotation_delta)
-{
-	for (int i = 0; i < sel.selected_objects_count; i++) {
-		OBJECT obj = sel.selected_objects[i];
-		float3 initial_rotation = sel.initial_object_rotations[i];
-
-		obj.rotate_to(initial_rotation + rotation_delta);
-	}
-}
-
-@private
-void editor_rotate_tool(float delta_time)
-{
-	if (!editor_has_object_selection()) {
-		return;
-	}
-
-	float3 player_delta = player.position - initial_player_position;
-	float yaw = player_delta.x * ROTATE_SENSITIVITY;
-
-	const float pitch_speed = delta_time * (editor_get_rotate_snap_value() * 4.0f);
-
-	if (KEY.K_Q.is_down()) {
-		rotate_pitch_accum -= pitch_speed;
-	}
-	if (KEY.K_E.is_down()) {
-		rotate_pitch_accum += pitch_speed;
-	}
-
-	float3 rotation_movement = float3(rotate_pitch_accum, yaw, 0.0f);
-	float3 rotation_delta = editor_rotate_snap(rotation_movement);
-
-	editor_rotate_selection(rotation_delta);
-}
-
-
-@private
-void editor_rotate_tool_finalize()
-{
-	// Skip clicks without any rotation
-	int movers = 0;
-	for (int i = 0; i < sel.selected_objects_count; i++) {
-		if (!editor_vec_equal(sel.initial_object_rotations[i], sel.selected_objects[i].get_rotation())) {
-			movers++;
-		}
-	}
-
-	if (movers == 0) {
-		return;
-	}
-
-	for (int i = 0; i < sel.selected_objects_count; i++) {
-		OBJECT obj = sel.selected_objects[i];
-
-		float3 initial_rotation = sel.initial_object_rotations[i];
-		float3 current_rotation = obj.get_rotation();
-
-		if (editor_vec_equal(initial_rotation, current_rotation)) {
-			continue;
-		}
-
-		editor_push_op_vec(obj, OPTYPE.ROTATE, initial_rotation, current_rotation, movers);
-	}
-}
-
-
-/////////////////////////////////////
-// Create Tool
-/////////////////////////////////////
-
-/* How far away a surface can be to start drawing a brush on it */
-const float CREATE_RANGE = 100.0f;
-
-/* Height of a new brush before it is changed with Q/E */
-const float CREATE_DEFAULT_HEIGHT = 1.0f;
-
-bool create_active = false;
-/* The snapped point the drag started at, on the surface that was clicked */
-float3 create_start;
-/* The world axis the brush grows out of the surface along */
-float3 create_normal;
-float create_height;
-float3 create_min;
-float3 create_max;
-
-/* The world axis closest to `v`, keeping its sign */
-@private
-float3 editor_dominant_axis(float3 v)
-{
-	float3 a = float3_abs(v);
-
-	if (a.y >= a.x && a.y >= a.z) {
-		return float3(0.0f, float_sign(v.y), 0.0f);
-	}
-	if (a.x >= a.z) {
-		return float3(float_sign(v.x), 0.0f, 0.0f);
-	}
-
-	return float3(0.0f, 0.0f, float_sign(v.z));
-}
-
-@private
-void editor_create_tool_begin()
-{
-	float3 normal = player.ray_get_normal(CREATE_RANGE);
-
-	create_active = !editor_vec_is_zero(normal);
-
-	if (!create_active) {
-		return;
-	}
-
-	create_normal = editor_dominant_axis(normal);
-	create_start = editor_transform_snap(player.ray_get_point(CREATE_RANGE));
-	create_height = CREATE_DEFAULT_HEIGHT;
-}
-
-/* Sizes the brush from where the drag started to where the crosshair meets the surface's plane, and out from the
-   surface by the height */
-@private
-void editor_create_tool(float delta_time)
-{
-	if (!create_active) {
-		return;
-	}
-
-	float step = editor_get_snap_value();
-
-	if (KEY.K_E.is_pressed()) {
-		create_height += step;
-	}
-	if (KEY.K_Q.is_pressed()) {
-		create_height = fmax(step, create_height - step);
-	}
-
-	float3 axis_mask = float3_abs(create_normal);
-	float3 plane_mask = float3(1.0f) - axis_mask;
-
-	/* The opposite corner stays on the plane the drag started on */
-	float3 corner = editor_transform_snap(camera_ray_to_plane(create_start, create_normal));
-	corner = (corner * plane_mask) + (create_start * axis_mask);
-
-	float3 top = create_start + (create_normal * float3(create_height));
-
-	float3 lo = float3(fmin(create_start.x, fmin(corner.x, top.x)), fmin(create_start.y, fmin(corner.y, top.y)),
-					   fmin(create_start.z, fmin(corner.z, top.z)));
-	float3 hi = float3(fmax(create_start.x, fmax(corner.x, top.x)), fmax(create_start.y, fmax(corner.y, top.y)),
-					   fmax(create_start.z, fmax(corner.z, top.z)));
-
-	/* Every side is at least one snap step long, so a click without a drag still makes a brush */
-	hi = float3(fmax(hi.x, lo.x + step), fmax(hi.y, lo.y + step), fmax(hi.z, lo.z + step));
-
-	create_min = lo;
-	create_max = hi;
-
-	blockout_preview_box(create_min, create_max);
-}
-
-@private
-void editor_create_tool_finalize()
-{
-	blockout_hide_preview();
-
-	if (!create_active) {
-		return;
-	}
-
-	create_active = false;
-
-	OBJECT created = blockout_create_box(create_min, create_max);
-	editor_select_object(created, true, false);
-}
-
-
-/////////////////////////////////////
-// Clip Tool
-/////////////////////////////////////
-
-bool clip_active = false;
-OBJECT clip_object;
-/* The line being drawn across a face of the brush, and that face's world space normal */
-float3 clip_start;
-float3 clip_end;
-float3 clip_normal;
-/* Where the crosshair first hit the face, to keep snapped points on its plane */
-float3 clip_face_point;
-
-/* Snaps a point to the grid, then back onto the face being clipped */
-@private
-float3 editor_clip_snap(float3 point)
-{
-	float3 snapped = editor_transform_snap(point);
-	return snapped - (clip_normal * float3(dot(snapped - clip_face_point, clip_normal)));
-}
-
-@private
-void editor_clip_tool_begin()
-{
-	clip_object = sel.selected_object;
-
-	float3 face = clip_object.ray_get_face();
-	clip_active = !editor_vec_is_zero(face);
-
-	if (!clip_active) {
-		return;
-	}
-
-	clip_normal = clip_object.local_dir_to_world(face);
-	clip_face_point = blockout_ray_hit_point(clip_object);
-
-	clip_start = editor_clip_snap(clip_face_point);
-	clip_end = clip_start;
-}
-
-@private
-bool editor_clip_has_line()
-{
-	float3 line = clip_end - clip_start;
-	return dot(line, line) > 0.0001f;
-}
-
-@private
-void editor_clip_tool(float delta_time)
-{
-	if (!clip_active) {
-		return;
-	}
-
-	clip_end = editor_clip_snap(camera_ray_to_plane(clip_face_point, clip_normal));
-
-	if (editor_clip_has_line()) {
-		blockout_preview_clip(clip_object, clip_start, clip_end, clip_normal);
-	}
-	else {
-		blockout_hide_preview();
-	}
-}
-
-@private
-void editor_clip_tool_finalize()
-{
-	blockout_hide_preview();
-
-	if (!clip_active) {
-		return;
-	}
-
-	clip_active = false;
-
-	if (editor_clip_has_line()) {
-		blockout_clip(clip_object, clip_start, clip_end, clip_normal);
-	}
-}
-
-
-/////////////////////////////////////
-// Set Material Tool
-/////////////////////////////////////
-
-/* The prototype material slot (see eCProtoMat) that faces are painted with, or -1 for the blockout's own material */
-int paint_material_slot = 0;
-
-/* The last prototype material slot */
-const int PAINT_MATERIAL_LAST_SLOT = 3;
-
-@private
-void editor_print_paint_material()
-{
-	if (paint_material_slot == 0) {
-		printf("paint material: grey\n");
-	}
-	else if (paint_material_slot == 1) {
-		printf("paint material: orange\n");
-	}
-	else if (paint_material_slot == 2) {
-		printf("paint material: blue\n");
-	}
-	else if (paint_material_slot == 3) {
-		printf("paint material: tile\n");
-	}
-	else {
-		printf("paint material: the brush's own material\n");
-	}
-}
-
-/* [ and ] step through the materials to paint with: the brush's own material, then each prototype material */
-@private
-void editor_set_material_controls()
-{
-	/* Painted faces would be hidden under the selection highlight */
-	if (editor_has_object_selection()) {
-		reset_selection();
-	}
-
-	if (KEY.K_LBRACKET.is_pressed()) {
-		paint_material_slot--;
-
-		if (paint_material_slot < -1) {
-			paint_material_slot = PAINT_MATERIAL_LAST_SLOT;
-		}
-
-		editor_print_paint_material();
-	}
-	if (KEY.K_RBRACKET.is_pressed()) {
-		paint_material_slot++;
-
-		if (paint_material_slot > PAINT_MATERIAL_LAST_SLOT) {
-			paint_material_slot = -1;
-		}
-
-		editor_print_paint_material();
-	}
-}
-
-
-/////////////////////////////////////
-// Editor Dispatch
-/////////////////////////////////////
 
 @private
 void editor_handle_operation(float delta_time)
 {
 	if (editor_tool == EDITORTOOL.TRANSLATE) {
-		editor_translate_tool(delta_time);
-		return;
+		tool_translate_update(delta_time);
 	}
-	if (editor_tool == EDITORTOOL.FACE) {
-		editor_face_tool(delta_time);
-		return;
+	else if (editor_tool == EDITORTOOL.FACE) {
+		tool_face_update(delta_time);
 	}
-	if (editor_tool == EDITORTOOL.ROTATE) {
-		editor_rotate_tool(delta_time);
-		return;
+	else if (editor_tool == EDITORTOOL.ROTATE) {
+		tool_rotate_update(delta_time);
 	}
-	if (editor_tool == EDITORTOOL.CREATE) {
-		editor_create_tool(delta_time);
-		return;
+	else if (editor_tool == EDITORTOOL.CREATE) {
+		tool_create_update(delta_time);
 	}
-	if (editor_tool == EDITORTOOL.CLIP) {
-		editor_clip_tool(delta_time);
-		return;
+	else if (editor_tool == EDITORTOOL.CLIP) {
+		tool_clip_update(delta_time);
 	}
 }
 
@@ -1020,21 +228,20 @@ void editor_handle_operation(float delta_time)
 @private
 void editor_finalize_operation()
 {
-	/* Finalize the scale operation */
-	if (editor_tool == EDITORTOOL.FACE) {
-		editor_face_tool_finalize();
+	if (editor_tool == EDITORTOOL.TRANSLATE) {
+		tool_translate_finalize();
 	}
-	else if (editor_tool == EDITORTOOL.TRANSLATE) {
-		editor_translate_tool_finalize();
+	else if (editor_tool == EDITORTOOL.FACE) {
+		tool_face_finalize();
 	}
 	else if (editor_tool == EDITORTOOL.ROTATE) {
-		editor_rotate_tool_finalize();
+		tool_rotate_finalize();
 	}
 	else if (editor_tool == EDITORTOOL.CREATE) {
-		editor_create_tool_finalize();
+		tool_create_finalize();
 	}
 	else if (editor_tool == EDITORTOOL.CLIP) {
-		editor_clip_tool_finalize();
+		tool_clip_finalize();
 	}
 }
 
@@ -1082,8 +289,7 @@ void mode_update(float3 movement_vector, float delta_time)
 		editor_finalize_operation();
 	}
 
-	/* Create and Set Material work on whatever the crosshair is on, the other tools on the selection */
-	bool needs_selection = (editor_tool != EDITORTOOL.CREATE && editor_tool != EDITORTOOL.SET_MATERIAL);
+	bool needs_selection = editor_tool_needs_selection();
 
 	/* Mouse is no longer down, do not perform any operations */
 	if ((needs_selection && !editor_has_object_selection()) || !mouse_is_dragging) {

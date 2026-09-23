@@ -1,0 +1,172 @@
+/*
+ * File:        tool_face.strata
+ * Author:      emd22
+ * Created:     09/23/2026
+ * Description: Face (scale) tool, plus the face texture hotkeys. Run by `prototype_editor.strata` while
+ *              EDITORTOOL.FACE is selected.
+ */
+
+import ../tool_common;
+
+
+enum FACEDIR
+{
+	X = 0,
+	Y = 1,
+	Z = 2,
+};
+
+/* Matches scMinBlockoutThickness in Blockout.cpp */
+const float FACE_MIN_THICKNESS = 0.25f;
+
+/* Degrees the texture on a face turns per key press */
+const float FACE_TEXTURE_ROTATE_STEP = 15.0f;
+
+/* Scale applied to the texture on a face per key press */
+const float FACE_TEXTURE_SCALE_STEP = 2.0f;
+
+float3 face_tool_magnitude;
+float3 initial_face_object_position;
+float3 initial_face_position;
+float3 face_world_normal;
+float face_min_proj;
+
+
+@private
+FACEDIR face_get_dir()
+{
+	float3 abs_face = float3_abs(sel.selected_face);
+
+	const float threshold = 0.01f;
+
+	if (abs_face.x > threshold) {
+		return FACEDIR.X;
+	}
+	if (abs_face.y > threshold) {
+		return FACEDIR.Y;
+	}
+
+	return FACEDIR.Z;
+}
+
+
+/* The mouse was pressed with the Face tool selected. */
+void tool_face_begin()
+{
+	/* Cast and gather the face we are pointing towards */
+	float3 selected_face = sel.selected_object.ray_get_face();
+
+	sel.selected_face = selected_face;
+	sel.selected_face_scale = sel.selected_object.direction_scale(selected_face);
+
+	/* Snapshot where the face is now so the preview marker can track
+	   exactly where it will be after finalize (obj pos + face offset). */
+	initial_face_object_position = sel.selected_object.position;
+	initial_face_position = sel.selected_object.local_to_world(blockout_face_center(sel.selected_object, selected_face));
+	face_world_normal = sel.selected_object.local_dir_to_world(selected_face);
+
+	float thickness = sel.selected_face_scale + sel.selected_object.direction_scale(float3(0.0f) - selected_face);
+	face_min_proj = fmin(0.0f, FACE_MIN_THICKNESS - thickness);
+}
+
+void tool_face_update(float delta_time)
+{
+	/* Player delta projected onto the face's world normal. Follows
+	   Blockout::ScaleInDirection (Max += mag / Min -= mag). */
+	float3 snapped = editor_transform_snap(float3(dot(player.position - initial_player_position, face_world_normal)));
+	float proj = fmax(snapped.x, face_min_proj);
+
+	face_tool_magnitude = float3(proj);
+
+	float3 xform_marker_dest = initial_face_position + (face_world_normal * float3(proj));
+	transform_marker_object.move_to(xform_marker_dest);
+}
+
+void tool_face_finalize()
+{
+	bool has_selection = editor_has_object_selection();
+
+	hide_transform_marker_object();
+
+	if (!has_selection) {
+		return;
+	}
+
+	// A click without drag leaves a zero magnitude; pushing it would burn
+	// undo history on a no-op and split nothing, so skip it.
+	if (editor_vec_is_zero(face_tool_magnitude)) {
+		return;
+	}
+
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		OBJECT obj = sel.selected_objects[i];
+
+		// blockout_object_scale(
+		// 	sel.selected_objects[i],
+		// 	sel.selected_face,
+		// 	face_tool_magnitude
+		// );
+
+		editor_push_op_vec(obj, OPTYPE.SCALE, sel.selected_face, face_tool_magnitude, sel.selected_objects_count);
+
+		blockout_reload_object(obj);
+	}
+
+}
+
+
+/* Edits the texture on the face of the selected object under the crosshair:
+   arrows shift it, [ and ] scale it, , and . rotate it, M cycles its material and J resets it.
+   Called every frame the Face tool is selected and no drag is in progress. */
+void tool_face_controls()
+{
+	if (!editor_has_object_selection()) {
+		return;
+	}
+
+	OBJECT obj = sel.selected_object;
+	float3 face = obj.ray_get_face();
+
+	if (editor_vec_is_zero(face)) {
+		return;
+	}
+
+	/* Shift by the current snap size, in texture repeats */
+	float step = editor_get_snap_value();
+
+	if (KEY.K_LEFT.is_pressed()) {
+		blockout_edit_face_texture(obj, face, FACETEXTUREEDIT.SHIFT, float3(0.0f - step, 0.0f, 0.0f));
+	}
+	if (KEY.K_RIGHT.is_pressed()) {
+		blockout_edit_face_texture(obj, face, FACETEXTUREEDIT.SHIFT, float3(step, 0.0f, 0.0f));
+	}
+	if (KEY.K_UP.is_pressed()) {
+		blockout_edit_face_texture(obj, face, FACETEXTUREEDIT.SHIFT, float3(0.0f, 0.0f - step, 0.0f));
+	}
+	if (KEY.K_DOWN.is_pressed()) {
+		blockout_edit_face_texture(obj, face, FACETEXTUREEDIT.SHIFT, float3(0.0f, step, 0.0f));
+	}
+
+	if (KEY.K_LBRACKET.is_pressed()) {
+		float shrink = 1.0f / FACE_TEXTURE_SCALE_STEP;
+		blockout_edit_face_texture(obj, face, FACETEXTUREEDIT.SCALE, float3(shrink, shrink, 0.0f));
+	}
+	if (KEY.K_RBRACKET.is_pressed()) {
+		blockout_edit_face_texture(obj, face, FACETEXTUREEDIT.SCALE,
+								   float3(FACE_TEXTURE_SCALE_STEP, FACE_TEXTURE_SCALE_STEP, 0.0f));
+	}
+
+	if (KEY.K_COMMA.is_pressed()) {
+		blockout_edit_face_texture(obj, face, FACETEXTUREEDIT.ROTATE, float3(0.0f - FACE_TEXTURE_ROTATE_STEP));
+	}
+	if (KEY.K_PERIOD.is_pressed()) {
+		blockout_edit_face_texture(obj, face, FACETEXTUREEDIT.ROTATE, float3(FACE_TEXTURE_ROTATE_STEP));
+	}
+
+	if (KEY.K_M.is_pressed()) {
+		blockout_edit_face_texture(obj, face, FACETEXTUREEDIT.CYCLE_MATERIAL, float3(0.0f));
+	}
+	if (KEY.K_J.is_pressed()) {
+		blockout_edit_face_texture(obj, face, FACETEXTUREEDIT.RESET, float3(0.0f));
+	}
+}

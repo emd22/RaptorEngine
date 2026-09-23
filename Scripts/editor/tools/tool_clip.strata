@@ -1,0 +1,84 @@
+/*
+ * File:        tool_clip.strata
+ * Author:      emd22
+ * Created:     09/23/2026
+ * Description: Clip tool (split a brush along a line drawn across one of its faces). Run by
+ *              `prototype_editor.strata` while EDITORTOOL.CLIP is selected.
+ */
+
+import ../tool_common;
+
+
+bool clip_active = false;
+OBJECT clip_object;
+/* The line being drawn across a face of the brush, and that face's world space normal */
+float3 clip_start;
+float3 clip_end;
+float3 clip_normal;
+/* Where the crosshair first hit the face, to keep snapped points on its plane */
+float3 clip_face_point;
+
+
+/* Snaps a point to the grid, then back onto the face being clipped */
+@private
+float3 tool_clip_snap(float3 point)
+{
+	float3 snapped = editor_transform_snap(point);
+	return snapped - (clip_normal * float3(dot(snapped - clip_face_point, clip_normal)));
+}
+
+@private
+bool tool_clip_has_line()
+{
+	float3 line = clip_end - clip_start;
+	return dot(line, line) > 0.0001f;
+}
+
+void tool_clip_begin()
+{
+	clip_object = sel.selected_object;
+
+	float3 face = clip_object.ray_get_face();
+	clip_active = !editor_vec_is_zero(face);
+
+	if (!clip_active) {
+		return;
+	}
+
+	clip_normal = clip_object.local_dir_to_world(face);
+	clip_face_point = blockout_ray_hit_point(clip_object);
+
+	clip_start = tool_clip_snap(clip_face_point);
+	clip_end = clip_start;
+}
+
+void tool_clip_update(float delta_time)
+{
+	if (!clip_active) {
+		return;
+	}
+
+	clip_end = tool_clip_snap(camera_ray_to_plane(clip_face_point, clip_normal));
+
+	if (tool_clip_has_line()) {
+		blockout_preview_clip(clip_object, clip_start, clip_end, clip_normal);
+	}
+	else {
+		blockout_hide_preview();
+	}
+}
+
+void tool_clip_finalize()
+{
+	blockout_hide_preview();
+
+	if (!clip_active) {
+		return;
+	}
+
+	clip_active = false;
+
+	if (tool_clip_has_line()) {
+		blockout_clip(clip_object, clip_start, clip_end, clip_normal);
+	}
+}
