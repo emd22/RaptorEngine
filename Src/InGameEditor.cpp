@@ -62,12 +62,16 @@ EditOperationValue EditOperation::Execute()
 			break;
 		}
 
-		ScaleBoundsMinBefore = target->Bounds.Min;
-		ScaleBoundsMaxBefore = target->Bounds.Max;
+		const Brush* brush = gWorld->pBlockout->GetBrush(target);
+		if (brush == nullptr) {
+			break;
+		}
+
+		PlanesBefore = brush->Planes;
 		ScalePosBefore = target->GetPosition();
 
-		gWorld->pBlockout->ScaleInDirection(target, ValueA.Position, ValueB.Position);
-		gWorld->pBlockout->RebuildObject(target);
+		// ValueA is the face's normal and ValueB.X how far to move it
+		gWorld->pBlockout->MoveFace(target, ValueA.Position, ValueB.Position.X);
 
 		break;
 	}
@@ -83,6 +87,16 @@ EditOperationValue EditOperation::Execute()
 		target->SetRotation(Quat::FromEulerAngles(ValueB.Position));
 
 		return ValueB;
+	}
+	case eType::BrushEdit: {
+		Object* target = ResolveOpTarget(*this);
+		if (target == nullptr) {
+			break;
+		}
+
+		gWorld->pBlockout->SetBrushPlanes(target, PlanesAfter);
+
+		break;
 	}
 	case eType::Dupe: {
 		// Origin point
@@ -163,12 +177,9 @@ void EditOperation::Undo()
 			break;
 		}
 
-		// Restore the exact pre-scale state: re-applying a negated magnitude would
-		// mis-split face travel between bounds and push-through shift.
-		target->Bounds.Min = ScaleBoundsMinBefore;
-		target->Bounds.Max = ScaleBoundsMaxBefore;
+		// Restore the exact state from before, as moving the face back could leave planes it dropped behind
 		target->SetPosition(ScalePosBefore);
-		gWorld->pBlockout->RebuildObject(target);
+		gWorld->pBlockout->SetBrushPlanes(target, PlanesBefore);
 
 		break;
 	}
@@ -182,6 +193,16 @@ void EditOperation::Undo()
 		}
 
 		target->SetRotation(Quat::FromEulerAngles(ValueA.Position));
+
+		break;
+	}
+	case eType::BrushEdit: {
+		Object* target = ResolveOpTarget(*this);
+		if (target == nullptr) {
+			break;
+		}
+
+		gWorld->pBlockout->SetBrushPlanes(target, PlanesBefore);
 
 		break;
 	}
@@ -231,7 +252,7 @@ void EditOperation::Undo()
 			break;
 		}
 
-		Object* restored = gWorld->pBlockout->RestoreObject(DeleteSnapshot.Position, DeleteSnapshot.Planes,
+		Object* restored = gWorld->pBlockout->RestoreObject(DeleteSnapshot.Position, PlanesBefore,
 															DeleteSnapshot.Material, DeleteSnapshot.Rotation,
 															DeleteSnapshot.ObjectName);
 
@@ -357,9 +378,6 @@ void EditorMode::Undo()
 
 void EditorMode::Redo()
 {
-	// Peek group size without consuming: DoRedo advances the pointer, so read the
-	// first redo slot's size via a speculative redo/undo round-trip is overkill;
-	// instead consume one op at a time and follow its group count.
 	bool started = false;
 	int32 group_size = 0;
 	bool selection_changed = false;
@@ -424,8 +442,6 @@ void EditorMode::Redo()
 
 EditOperationValue EditorMode::PushEditOperation(const EditOperation& op)
 {
-	// Evict oldest *whole groups* first so Undo never observes a split group.
-	// (UndoStack::Push would otherwise drop a single op off the front.)
 	uint32 capacity = mOperationStack.GetCapacity();
 	while (capacity > 0 && mOperationStack.GetSize() >= capacity) {
 		EditOperation& oldest = mOperationStack.First();
@@ -489,6 +505,21 @@ void EditorMode::SetStoredMaterial(Object* object, MaterialID material)
 	object->SetMaterial(material);
 }
 
+/**
+ * @brief Draws an object with the selection material, including any parts of its mesh with materials of their own
+ */
+static void ShowAsSelected(Object* object)
+{
+	object->SetMaterial(gWorld->pBlockout->SelectionMaterialID);
+	object->SetMaterialOverridesSections(true);
+}
+
+static void ShowAsDeselected(Object* object, const MaterialID& material)
+{
+	object->SetMaterial(material);
+	object->SetMaterialOverridesSections(false);
+}
+
 void EditorMode::AddToSelectionInternal(Object* object)
 {
 	if (object == nullptr || IsInSelection(object)) {
@@ -500,7 +531,7 @@ void EditorMode::AddToSelectionInternal(Object* object)
 	}
 
 	mSelectedObjects.Insert(SelectedObject { .pObject = object, .OldMaterial = object->GetMaterialID() });
-	object->SetMaterial(gWorld->pBlockout->SelectionMaterialID);
+	ShowAsSelected(object);
 }
 
 void EditorMode::RemoveFromSelectionInternal(Object* object)
@@ -511,7 +542,7 @@ void EditorMode::RemoveFromSelectionInternal(Object* object)
 
 	for (uint32 i = 0; i < mSelectedObjects.Size; i++) {
 		if (mSelectedObjects[i].pObject == object) {
-			object->SetMaterial(mSelectedObjects[i].OldMaterial);
+			ShowAsDeselected(object, mSelectedObjects[i].OldMaterial);
 			mSelectedObjects[i] = mSelectedObjects[mSelectedObjects.Size - 1];
 			mSelectedObjects.Size--;
 			return;
@@ -555,7 +586,7 @@ bool EditorMode::SelectObject(Object* object, bool append_selection)
 				continue;
 			}
 
-			selected_obj.pObject->SetMaterial(selected_obj.OldMaterial);
+			ShowAsDeselected(selected_obj.pObject, selected_obj.OldMaterial);
 		}
 
 		mSelectedObjects.Clear();
@@ -584,7 +615,7 @@ bool EditorMode::SelectObject(Object* object, bool append_selection)
 				continue;
 			}
 
-			selected_obj.pObject->SetMaterial(selected_obj.OldMaterial);
+			ShowAsDeselected(selected_obj.pObject, selected_obj.OldMaterial);
 		}
 		mSelectedObjects.Clear();
 	}
@@ -592,7 +623,7 @@ bool EditorMode::SelectObject(Object* object, bool append_selection)
 	mSelectedObjects.Insert(SelectedObject { .pObject = object, .OldMaterial = object->GetMaterialID() });
 
 	// Set the newly selected object to the selection material.
-	object->SetMaterial(gWorld->pBlockout->SelectionMaterialID);
+	ShowAsSelected(object);
 
 	// Call the script's object selection routine
 	if (mode_select_object) {
@@ -644,7 +675,7 @@ void EditorMode::Reload()
 			continue;
 		}
 
-		selected_obj.pObject->SetMaterial(gWorld->pBlockout->SelectionMaterialID);
+		ShowAsSelected(selected_obj.pObject);
 	}
 }
 
@@ -662,7 +693,7 @@ void EditorMode::Unload()
 				continue;
 			}
 
-			selected_obj.pObject->SetMaterial(selected_obj.OldMaterial);
+			ShowAsDeselected(selected_obj.pObject, selected_obj.OldMaterial);
 		}
 	}
 }

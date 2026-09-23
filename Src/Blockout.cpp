@@ -133,60 +133,142 @@ void Blockout::Create(World* world)
 
 constexpr float scMinBlockoutThickness = 0.1f;
 
-void Blockout::ScaleInDirection(Object* object, const Vec3f& face_dir, const Vec3f& magnitude)
+/// Degrees per full turn, used to keep face texture rotations in [0, 360)
+constexpr float32 scDegreesPerTurn = 360.0f;
+
+static physics::eMotionType GetMotionType(const Object* object)
 {
-	if (!object) {
-		return;
+	physics::Body* body = gPhysics->GetBody(object->PhysicsID);
+	return (body != nullptr) ? body->GetMotionType() : physics::eMotionType::Static;
+}
+
+bool Blockout::MoveFace(Object* object, const Vec3f& face_normal, float32 distance)
+{
+	Brush* brush = GetBrush(object);
+	if (brush == nullptr) {
+		return false;
 	}
 
-	// Face resizing works on the bounds, which only describe box brushes
-	const Brush* brush = GetBrush(object);
-	if (brush != nullptr && !brush->IsBox()) {
-		LogWarning("Cannot resize blockout '{}', face resizing only supports box brushes", object->Name.Get());
-		return;
+	const int32 plane_index = brush->FindPlane(face_normal);
+	if (plane_index == Brush::scNoPlane) {
+		LogWarning("Blockout '{}' has no face facing {}", object->Name.Get(), face_normal);
+		return false;
 	}
 
-	constexpr float threshold = 0.01f;
+	Brush::PlaneList planes = brush->Planes;
+	BrushPlane& plane = planes[plane_index];
 
-	const Vec3f old_midpoint = (object->Bounds.Min + object->Bounds.Max) * 0.5f;
-	Vec3f local_shift = Vec3f::sZero;
+	const float32 thickness = plane.Distance + brush->GetSupport(-plane.Normal);
+	plane.Distance += std::max(distance, scMinBlockoutThickness - thickness);
 
-	auto ScaleAxis = [&](float face, float mag, float& min, float& max, float& shift_axis)
-	{
-		if (face > threshold) {
-			const float desired = max + mag;
-			if (desired - min >= scMinBlockoutThickness) {
-				max = desired;
-			}
-			else {
-				max = min + scMinBlockoutThickness;
-				shift_axis = desired - max;
-			}
-		}
-		else if (face < -threshold) {
-			const float desired = min - mag;
-			if (max - desired >= scMinBlockoutThickness) {
-				min = desired;
-			}
-			else {
-				min = max - scMinBlockoutThickness;
-				shift_axis = desired - min;
-			}
-		}
-	};
+	Brush moved = Brush::FromPlanes(planes);
+	if (!moved.IsValid()) {
+		LogWarning("Cannot move the face of blockout '{}' that far", object->Name.Get());
+		return false;
+	}
 
-	ScaleAxis(face_dir.X, magnitude.X, object->Bounds.Min.X, object->Bounds.Max.X, local_shift.X);
-	ScaleAxis(face_dir.Y, magnitude.Y, object->Bounds.Min.Y, object->Bounds.Max.Y, local_shift.Y);
-	ScaleAxis(face_dir.Z, magnitude.Z, object->Bounds.Min.Z, object->Bounds.Max.Z, local_shift.Z);
+	// Blockouts rotate about their midpoint, which is applied unrotated, so a midpoint change has to be compensated for
+	// or the rest of the brush moves on rotated objects.
+	const Vec3f midpoint_delta = moved.GetCenter() - brush->GetCenter();
+	const Vec3f offset = midpoint_delta.Rotate(object->mRotation) - midpoint_delta;
 
-	const Vec3f midpoint_delta = (object->Bounds.Min + object->Bounds.Max) * 0.5f - old_midpoint;
-	const Vec3f offset = (local_shift + midpoint_delta).Rotate(object->mRotation) - midpoint_delta;
-
-	// Blockouts rotate about their midpoint, which is applied unrotated, so a midpoint change has to be
-	// compensated for or the opposite face moves on rotated objects
 	if (!offset.IsCloseTo(simd::LoadFloat4(0.0f))) {
 		object->SetPosition(object->GetPosition() + offset);
 	}
+
+	ApplyBrush(object, std::move(moved), GetMotionType(object));
+
+	return true;
+}
+
+bool Blockout::SetBrushPlanes(Object* object, const Brush::PlaneList& planes)
+{
+	if (object == nullptr) {
+		return false;
+	}
+
+	Brush brush = Brush::FromPlanes(planes);
+	if (!brush.IsValid()) {
+		LogError("Cannot set the planes of blockout '{}', they do not make a valid brush", object->Name.Get());
+		return false;
+	}
+
+	ApplyBrush(object, std::move(brush), GetMotionType(object));
+
+	return true;
+}
+
+bool Blockout::GetFaceTextureEdit(Object* object, const Vec3f& face_normal, eFaceTextureEdit edit, const Vec2f& amount,
+								  Brush::PlaneList& out_planes)
+{
+	Brush* brush = GetBrush(object);
+	if (brush == nullptr) {
+		return false;
+	}
+
+	const int32 plane_index = brush->FindPlane(face_normal);
+	if (plane_index == Brush::scNoPlane) {
+		return false;
+	}
+
+	out_planes = brush->Planes;
+	BrushFaceTexture& texture = out_planes[plane_index].Texture;
+
+	switch (edit) {
+	case eFaceTextureEdit::Shift:
+		texture.Offset = texture.Offset + amount;
+		break;
+	case eFaceTextureEdit::Scale:
+		texture.Scale = texture.Scale * amount;
+		break;
+	case eFaceTextureEdit::Rotate:
+		texture.Rotation = std::fmod(texture.Rotation + amount.X + scDegreesPerTurn, scDegreesPerTurn);
+		break;
+	case eFaceTextureEdit::CycleMaterial: {
+		// No material of its own (the object's material), then each prototype material in turn
+		const int32 slot = texture.Material.IsNull() ? -1 : GetSlotForMaterial(texture.Material);
+		const int32 next_slot = slot + 1;
+
+		texture.Material = (next_slot < static_cast<int32>(eCProtoMat::Count))
+							   ? GetMaterialForSlot(static_cast<eCProtoMat>(next_slot))
+							   : MaterialID::scNull;
+		break;
+	}
+	case eFaceTextureEdit::Reset: {
+		// The default layout depends on the brush's bounds, so let the brush work it out
+		Brush reset = Brush::FromPlanes(out_planes);
+		reset.ResetFaceTexture(static_cast<uint32>(plane_index));
+		out_planes = reset.Planes;
+		break;
+	}
+	}
+
+	return true;
+}
+
+bool Blockout::RaycastFace(Object* object, const Vec3f& origin, const Vec3f& direction, Vec3f& out_face_normal)
+{
+	const Brush* brush = GetBrush(object);
+	if (brush == nullptr) {
+		return false;
+	}
+
+	// Bring the ray into the brush's local space
+	const Mat4f to_local = object->GetWorldMatrix().Inverse();
+	const Vec4f local_origin = to_local * Vec4f(origin.X, origin.Y, origin.Z, 1.0f);
+	const Vec4f local_direction = to_local * Vec4f(direction.X, direction.Y, direction.Z, 0.0f);
+
+	float32 distance;
+	uint32 plane_index;
+
+	if (!brush->Raycast(Vec3f(local_origin.X, local_origin.Y, local_origin.Z),
+						Vec3f(local_direction.X, local_direction.Y, local_direction.Z), distance, plane_index)) {
+		return false;
+	}
+
+	out_face_normal = brush->Planes[plane_index].Normal;
+
+	return true;
 }
 
 void Blockout::ReloadSingleObject(Object* object)
@@ -272,6 +354,17 @@ MaterialID Blockout::GetMaterialForSlot(eCProtoMat slot) const
 	}
 }
 
+int32 Blockout::GetSlotForMaterial(const MaterialID& material) const
+{
+	for (int32 slot = 0; slot < static_cast<int32>(eCProtoMat::Count); slot++) {
+		if (GetMaterialForSlot(static_cast<eCProtoMat>(slot)) == material) {
+			return slot;
+		}
+	}
+
+	return -1;
+}
+
 Brush* Blockout::GetBrush(const Object* object)
 {
 	if (object == nullptr) {
@@ -287,8 +380,12 @@ void Blockout::ApplyBrush(Object* object, Brush&& brush, physics::eMotionType mo
 	Assert(brush.IsValid());
 
 	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
-	brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices);
+	SizedArray<MeshSection> sections;
+
+	brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices, sections);
+
 	object->pMesh = mesh->AsDefaultMesh();
+	object->MeshSections = std::move(sections);
 
 	object->Bounds.Min = brush.GetBoundsMin();
 	object->Bounds.Max = brush.GetBoundsMax();
@@ -327,10 +424,13 @@ void Blockout::ApplyBrush(Object* object, Brush&& brush, physics::eMotionType mo
 	mBrushes[object->ID.GetID()] = std::move(brush);
 }
 
-/**
- * @brief Reads a blockout's brush from either a box (`scale`) or a list of planes (`planes`).
- */
-static Brush ReadBrushEntry(ConfigEntry& entry)
+/// Values stored per plane in a blockout's `uvs` array: offset U and V, scale U and V, then rotation
+constexpr uint32 scValuesPerFaceTexture = 5;
+
+/// Stored in a blockout's `facemats` array for faces that use the object's material
+constexpr int32 scNoFaceMaterial = -1;
+
+Brush Blockout::ReadBrushEntry(ConfigEntry& entry) const
 {
 	ConfigEntry* scale_entry = entry.GetMember(HashStr32("scale"));
 
@@ -350,32 +450,134 @@ static Brush ReadBrushEntry(ConfigEntry& entry)
 
 	ConfigEntry* planes_entry = entry.GetMember(HashStr32("planes"));
 
-	if (planes_entry != nullptr) {
-		const PagedArray<ConfigPrimitive>& values = planes_entry->GetArrayData();
-
-		// Four values per plane: the outward normal, then the distance from the origin
-		const uint32 plane_count = static_cast<uint32>(values.Size() / 4);
-
-		if (plane_count > Brush::scMaxPlanes) {
-			LogError("Blockout '{}' has {} planes, the maximum is {}", entry.Name.Get(), plane_count,
-					 Brush::scMaxPlanes);
-			return {};
-		}
-
-		Brush::PlaneList planes;
-
-		for (uint32 i = 0; i < plane_count; i++) {
-			planes.Insert(BrushPlane {
-				.Normal = Vec3f(values[i * 4].Get<float32>(), values[i * 4 + 1].Get<float32>(),
-								values[i * 4 + 2].Get<float32>()),
-				.Distance = values[i * 4 + 3].Get<float32>(),
-			});
-		}
-
-		return Brush::FromPlanes(planes);
+	if (planes_entry == nullptr) {
+		return {};
 	}
 
-	return {};
+	const PagedArray<ConfigPrimitive>& values = planes_entry->GetArrayData();
+
+	// Four values per plane: the outward normal, then the distance from the origin
+	const uint32 plane_count = static_cast<uint32>(values.Size() / 4);
+
+	if (plane_count > Brush::scMaxPlanes) {
+		LogError("Blockout '{}' has {} planes, the maximum is {}", entry.Name.Get(), plane_count, Brush::scMaxPlanes);
+		return {};
+	}
+
+	Brush::PlaneList planes;
+
+	for (uint32 i = 0; i < plane_count; i++) {
+		planes.Insert(BrushPlane {
+			.Normal = Vec3f(values[i * 4].Get<float32>(), values[i * 4 + 1].Get<float32>(),
+							values[i * 4 + 2].Get<float32>()),
+			.Distance = values[i * 4 + 3].Get<float32>(),
+		});
+	}
+
+	ConfigEntry* materials_entry = entry.GetMember(HashStr32("facemats"));
+
+	if (materials_entry != nullptr) {
+		const PagedArray<ConfigPrimitive>& slots = materials_entry->GetArrayData();
+
+		for (uint32 i = 0; i < plane_count && i < slots.Size(); i++) {
+			const int32 slot = slots[i].Get<int32>();
+
+			if (slot != scNoFaceMaterial) {
+				planes[i].Texture.Material = GetMaterialForSlot(static_cast<eCProtoMat>(slot));
+			}
+		}
+	}
+
+	ConfigEntry* uvs_entry = entry.GetMember(HashStr32("uvs"));
+
+	if (uvs_entry == nullptr) {
+		// Without a layout of their own, the faces get the default one, which depends on the finished brush
+		Brush brush = Brush::FromPlanes(planes);
+
+		for (uint32 i = 0; i < brush.Planes.Size; i++) {
+			brush.ResetFaceTexture(i);
+		}
+
+		return brush;
+	}
+
+	const PagedArray<ConfigPrimitive>& uvs = uvs_entry->GetArrayData();
+
+	for (uint32 i = 0; i < plane_count && (i + 1) * scValuesPerFaceTexture <= uvs.Size(); i++) {
+		const uint32 base = i * scValuesPerFaceTexture;
+		BrushFaceTexture& texture = planes[i].Texture;
+
+		texture.Offset = Vec2f(uvs[base].Get<float32>(), uvs[base + 1].Get<float32>());
+		texture.Scale = Vec2f(uvs[base + 2].Get<float32>(), uvs[base + 3].Get<float32>());
+		texture.Rotation = uvs[base + 4].Get<float32>();
+	}
+
+	return Brush::FromPlanes(planes);
+}
+
+void Blockout::WriteBrushEntry(ConfigEntry& entry, const Object* object)
+{
+	const Brush* brush = GetBrush(object);
+
+	// Plain boxes are stored as their extents in each direction
+	if (brush == nullptr || (brush->IsBox() && brush->HasDefaultTextures())) {
+		ConfigEntry scales_array = ConfigEntry::Array("scale", ConfigPrimitive::ePrimitiveType::Float);
+
+		scales_array.AppendValue(ConfigPrimitive::FromValue(-object->Bounds.Min.X));
+		scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.X));
+		scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.Y));
+		scales_array.AppendValue(ConfigPrimitive::FromValue(-object->Bounds.Min.Y));
+		scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.Z));
+		scales_array.AppendValue(ConfigPrimitive::FromValue(-object->Bounds.Min.Z));
+
+		entry.AddMember(std::move(scales_array));
+		return;
+	}
+
+	ConfigEntry planes_array = ConfigEntry::Array("planes", ConfigPrimitive::ePrimitiveType::Float);
+
+	for (const BrushPlane& plane : brush->Planes) {
+		planes_array.AppendValue(ConfigPrimitive::FromValue(plane.Normal.X));
+		planes_array.AppendValue(ConfigPrimitive::FromValue(plane.Normal.Y));
+		planes_array.AppendValue(ConfigPrimitive::FromValue(plane.Normal.Z));
+		planes_array.AppendValue(ConfigPrimitive::FromValue(plane.Distance));
+	}
+
+	entry.AddMember(std::move(planes_array));
+
+	bool has_face_materials = false;
+
+	for (const BrushPlane& plane : brush->Planes) {
+		has_face_materials |= !plane.Texture.Material.IsNull();
+	}
+
+	if (has_face_materials) {
+		ConfigEntry materials_array = ConfigEntry::Array("facemats", ConfigPrimitive::ePrimitiveType::Int);
+
+		for (const BrushPlane& plane : brush->Planes) {
+			const int32 slot = plane.Texture.Material.IsNull() ? scNoFaceMaterial
+															   : GetSlotForMaterial(plane.Texture.Material);
+			materials_array.AppendValue(ConfigPrimitive::FromValue(slot));
+		}
+
+		entry.AddMember(std::move(materials_array));
+	}
+
+	if (!brush->HasDefaultTextures()) {
+		ConfigEntry uvs_array = ConfigEntry::Array("uvs", ConfigPrimitive::ePrimitiveType::Float);
+
+		for (const BrushPlane& plane : brush->Planes) {
+			const BrushFaceTexture& texture = plane.Texture;
+
+			uvs_array.AppendValue(ConfigPrimitive::FromValue(texture.Offset.X));
+			uvs_array.AppendValue(ConfigPrimitive::FromValue(texture.Offset.Y));
+			uvs_array.AppendValue(ConfigPrimitive::FromValue(texture.Scale.X));
+			uvs_array.AppendValue(ConfigPrimitive::FromValue(texture.Scale.Y));
+			uvs_array.AppendValue(ConfigPrimitive::FromValue(texture.Rotation));
+		}
+
+		entry.AddMember(std::move(uvs_array));
+	}
 }
 
 ObjectID Blockout::CreateBrushObject(ConfigEntry& entry)
@@ -466,11 +668,10 @@ void Blockout::RebuildObject(Object* object)
 		return;
 	}
 
-	Brush* existing = GetBrush(object);
+	const Brush* existing = GetBrush(object);
 
-	// A box is edited through the object's bounds, anything else keeps its planes
-	Brush brush = (existing == nullptr || existing->IsBox()) ? Brush::FromBox(object->Bounds.Min, object->Bounds.Max)
-															 : Brush::FromPlanes(existing->Planes);
+	Brush brush = (existing != nullptr) ? Brush::FromPlanes(existing->Planes)
+										: Brush::FromBox(object->Bounds.Min, object->Bounds.Max);
 
 	if (!brush.IsValid()) {
 		LogError("Could not rebuild blockout '{}', its brush is invalid", object->Name.Get());
@@ -666,33 +867,7 @@ void Blockout::Save(const String& path)
 		{
 			blockout_entry.AddMember(ConfigEntry::Literal("pos", object->mPosition));
 
-			const Brush* brush = GetBrush(object);
-
-			if (brush == nullptr || brush->IsBox()) {
-				// Boxes are stored as their extents in each direction
-				ConfigEntry scales_array = ConfigEntry::Array("scale", ConfigPrimitive::ePrimitiveType::Float);
-
-				scales_array.AppendValue(ConfigPrimitive::FromValue(-object->Bounds.Min.X));
-				scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.X));
-				scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.Y));
-				scales_array.AppendValue(ConfigPrimitive::FromValue(-object->Bounds.Min.Y));
-				scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.Z));
-				scales_array.AppendValue(ConfigPrimitive::FromValue(-object->Bounds.Min.Z));
-
-				blockout_entry.AddMember(std::move(scales_array));
-			}
-			else {
-				ConfigEntry planes_array = ConfigEntry::Array("planes", ConfigPrimitive::ePrimitiveType::Float);
-
-				for (const BrushPlane& plane : brush->Planes) {
-					planes_array.AppendValue(ConfigPrimitive::FromValue(plane.Normal.X));
-					planes_array.AppendValue(ConfigPrimitive::FromValue(plane.Normal.Y));
-					planes_array.AppendValue(ConfigPrimitive::FromValue(plane.Normal.Z));
-					planes_array.AppendValue(ConfigPrimitive::FromValue(plane.Distance));
-				}
-
-				blockout_entry.AddMember(std::move(planes_array));
-			}
+			WriteBrushEntry(blockout_entry, object);
 
 			blockout_entry.AddMember(ConfigEntry::Literal("rotquat", object->mRotation));
 

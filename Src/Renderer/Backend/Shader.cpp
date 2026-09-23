@@ -49,6 +49,70 @@ static Hash64 HashMacros(const SizedArray<ShaderMacro>& macros, Hash64 hash)
 	return hash;
 }
 
+/**
+ * @brief Scans SPIR-V for `Input` variables decorated with a location, returning a mask of those locations. Used to
+ * leave vertex attributes out of the pipeline that the vertex shader does not consume.
+ */
+static uint32 GetInputLocationMask(const uint32* words, uint32 word_count)
+{
+	constexpr uint32 cSpirvMagic = 0x07230203;
+	constexpr uint32 cSpirvHeaderWords = 5;
+
+	constexpr uint32 cOpVariable = 59;
+	constexpr uint32 cOpDecorate = 71;
+	constexpr uint32 cDecorationLocation = 30;
+	constexpr uint32 cStorageClassInput = 1;
+
+	if (word_count < cSpirvHeaderWords || words[0] != cSpirvMagic) {
+		return ~0U;
+	}
+
+	const uint32 id_bound = words[3];
+
+	// Location for each id, or UINT32_MAX if the id has no location
+	SizedArray<uint32> locations;
+	locations.InitSize(id_bound);
+	memset(locations.pData, 0xFF, locations.GetSizeInBytes());
+
+	SizedArray<bool> is_input;
+	is_input.InitSize(id_bound);
+	memset(is_input.pData, 0, is_input.GetSizeInBytes());
+
+	for (uint32 i = cSpirvHeaderWords; i < word_count;) {
+		const uint32 opcode = words[i] & 0xFFFF;
+		const uint32 inst_words = words[i] >> 16;
+
+		if (inst_words == 0 || i + inst_words > word_count) {
+			return ~0U;
+		}
+
+		if (opcode == cOpDecorate && inst_words >= 4 && words[i + 2] == cDecorationLocation) {
+			const uint32 target = words[i + 1];
+			if (target < id_bound) {
+				locations[target] = words[i + 3];
+			}
+		}
+		else if (opcode == cOpVariable && inst_words >= 4 && words[i + 3] == cStorageClassInput) {
+			const uint32 result = words[i + 2];
+			if (result < id_bound) {
+				is_input[result] = true;
+			}
+		}
+
+		i += inst_words;
+	}
+
+	uint32 mask = 0;
+
+	for (uint32 id = 0; id < id_bound; id++) {
+		if (is_input[id] && locations[id] < 32) {
+			mask |= (1U << locations[id]);
+		}
+	}
+
+	return mask;
+}
+
 ShaderId Shader::GenerateShaderId(eShaderType type, const SizedArray<ShaderMacro>& macros)
 {
 	Hash64 hash = FX_HASH64_FNV1A_INIT;
@@ -164,6 +228,12 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
 
 		// Now that the shader is officially loaded, move over the reflection data.
 		program->Reflection = std::move(program_data.Reflection);
+
+		if (shader_type == eShaderType::Vertex) {
+			program->InputLocationMask = GetInputLocationMask(
+				reinterpret_cast<const uint32*>(program_data.pProgramData.pData),
+				static_cast<uint32>(program_data.pProgramData.Size / sizeof(uint32)));
+		}
 		// program->PrintReflection();
 
 		return program;

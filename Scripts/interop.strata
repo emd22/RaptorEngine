@@ -14,6 +14,17 @@ enum OPTYPE
 	CREATE,
 	DELETE,
 	ROTATE,
+	BRUSH_EDIT,
+}
+
+/* This must match eFaceTextureEdit in Blockout.hpp! */
+enum FACETEXTUREEDIT : uint
+{
+	SHIFT,
+	SCALE,
+	ROTATE,
+	CYCLE_MATERIAL,
+	RESET,
 }
 
 /* This must match eEditorMode in InGameEditor.hpp! */
@@ -132,6 +143,13 @@ extern OBJECT blockout_dupe_object(OBJECT object);
 extern void blockout_destroy_object(OBJECT object);
 
 extern void blockout_object_scale(OBJECT object, float3 face_dir, float3 magnitude);
+
+/* The centre of the face facing along `face`, in the object's local space. */
+extern float3 blockout_face_center(OBJECT object, float3 face);
+
+/* Changes the texture on the face facing along `face`, as an undoable operation. See eFaceTextureEdit for how
+   `amount` is used. */
+extern void blockout_edit_face_texture(OBJECT object, float3 face, FACETEXTUREEDIT edit, float3 amount);
 
 /* Light probes */
 

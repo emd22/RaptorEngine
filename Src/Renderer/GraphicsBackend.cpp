@@ -207,7 +207,8 @@ void GraphicsBackend::InitUploadContext()
 {
 	UploadContext.CmdPool.Create(GetDevice(), GetDevice()->mQueueFamilies.GetTransferFamily());
 	UploadContext.CmdBuffer.Create(&UploadContext.CmdPool);
-	UploadContext.ImmediateCmdBuffer.Create(&UploadContext.CmdPool);
+	UploadContext.ImmediateCmdPool.Create(GetDevice(), GetDevice()->mQueueFamilies.GetTransferFamily());
+	UploadContext.ImmediateCmdBuffer.Create(&UploadContext.ImmediateCmdPool);
 
 	Util::SetDebugLabel("UploadImmediate", VK_OBJECT_TYPE_COMMAND_BUFFER, UploadContext.ImmediateCmdBuffer.Cmd);
 	Util::SetDebugLabel("Upload", VK_OBJECT_TYPE_COMMAND_BUFFER, UploadContext.CmdBuffer.Cmd);
@@ -221,6 +222,7 @@ void GraphicsBackend::DestroyUploadContext()
 	UploadContext.CmdBuffer.Destroy();
 	UploadContext.ImmediateCmdBuffer.Destroy();
 	UploadContext.CmdPool.Destroy();
+	UploadContext.ImmediateCmdPool.Destroy();
 
 	UploadContext.UploadFence.Destroy();
 	UploadContext.ImmediateUploadFence.Destroy();
@@ -525,6 +527,8 @@ void GraphicsBackend::SubmitPushConstantsRaw(const CommandBuffer& cmd, const Pip
 
 void GraphicsBackend::SubmitImmediateUploadCmd(GraphicsBackend::SubmitFunc upload_func)
 {
+	std::lock_guard<std::mutex> lock(UploadContext.ImmediateMutex);
+
 	CommandBuffer& cmd = UploadContext.ImmediateCmdBuffer;
 
 	cmd.Record(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);

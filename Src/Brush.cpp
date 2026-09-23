@@ -1,9 +1,11 @@
 #include "Brush.hpp"
 
 #include <Core/DynArray.hpp>
+#include <Math/MathUtil.hpp>
 #include <Math/Vec3d.hpp>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -25,6 +27,9 @@ struct DPlane
 	Vec3d Normal;
 	double Distance = 0.0;
 
+	/// Index of the brush plane this came from, to carry its texture over
+	uint32 SourceIndex = 0;
+
 	double SignedDistance(const Vec3d& point) const { return Normal.Dot(point) - Distance; }
 };
 
@@ -42,15 +47,47 @@ constexpr double scSameNormalEpsilon = 1e-9;
 /// How far a normal component can be from 0 or 1 and still count as axis aligned
 constexpr float32 scAxisAlignedEpsilon = 1e-6f;
 
+/// How close to 1 the dot product of two normals has to be for FindPlane() to match them
+constexpr float32 scFindPlaneEpsilon = 1e-3f;
+
+/// Offsets closer than this to the default layout count as the default
+constexpr float32 scTextureOffsetEpsilon = 1e-4f;
+
 /// Plane index given to the faces of the initial box.
 constexpr int32 scBoundingPlane = -1;
 
-enum class eProjectionDirection
+struct TextureProjection
 {
-	X,
-	Y,
-	Z,
+	Vec3f UAxis;
+	Vec3f VAxis;
 };
+
+TextureProjection GetTextureProjection(const Vec3f& normal)
+{
+	const float32 abs_x = std::abs(normal.X);
+	const float32 abs_y = std::abs(normal.Y);
+	const float32 abs_z = std::abs(normal.Z);
+
+	if (abs_y >= abs_x && abs_y >= abs_z) {
+		return { Vec3f(1.0f, 0.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f) };
+	}
+
+	if (abs_x >= abs_z) {
+		return { Vec3f(0.0f, 0.0f, 1.0f), Vec3f(0.0f, -1.0f, 0.0f) };
+	}
+
+	return { Vec3f(1.0f, 0.0f, 0.0f), Vec3f(0.0f, -1.0f, 0.0f) };
+}
+
+Vec2f GetDefaultTextureOffset(const Vec3f& normal, const Vec3f& bounds_min, const Vec3f& bounds_max)
+{
+	const TextureProjection projection = GetTextureProjection(normal);
+
+	// V runs down walls, so the texture starts at the top of the brush
+	const Vec3f anchor(bounds_min.X, bounds_max.Y, bounds_min.Z);
+
+	return Vec2f(-anchor.Dot(projection.UAxis), -anchor.Dot(projection.VAxis));
+}
 
 bool IsNearlyEqual(const Vec3d& a, const Vec3d& b, double epsilon)
 {
@@ -320,6 +357,10 @@ Brush Brush::FromBox(const Vec3f& min, const Vec3f& max)
 
 	brush.Rebuild();
 
+	for (uint32 i = 0; i < brush.Planes.Size; i++) {
+		brush.ResetFaceTexture(i);
+	}
+
 	return brush;
 }
 
@@ -343,7 +384,8 @@ bool Brush::Rebuild()
 	planes.InitCapacity(Planes.Size);
 
 	// Normalize the planes, dropping ones that aren't valid or exact duplicates
-	for (const BrushPlane& plane : Planes) {
+	for (uint32 plane_index = 0; plane_index < Planes.Size; plane_index++) {
+		const BrushPlane& plane = Planes[plane_index];
 		const Vec3d normal(plane.Normal);
 		const double length = normal.Length();
 
@@ -351,7 +393,7 @@ bool Brush::Rebuild()
 			continue;
 		}
 
-		const DPlane normalized { normal * (1.0 / length), plane.Distance / length };
+		const DPlane normalized { normal * (1.0 / length), plane.Distance / length, plane_index };
 
 		bool is_duplicate = false;
 		for (const DPlane& existing : planes) {
@@ -460,7 +502,8 @@ bool Brush::Rebuild()
 		}
 
 		const DPlane& plane = planes[loop.PlaneIndex];
-		kept_planes.Insert({ plane.Normal.ToVec3f(), static_cast<float32>(plane.Distance) });
+		kept_planes.Insert(
+			{ plane.Normal.ToVec3f(), static_cast<float32>(plane.Distance), Planes[plane.SourceIndex].Texture });
 		faces.Insert(std::move(face));
 	}
 
@@ -536,8 +579,139 @@ bool Brush::ContainsPoint(const Vec3f& point, float32 tolerance) const
 	return true;
 }
 
+int32 Brush::FindPlane(const Vec3f& normal) const
+{
+	if (normal.IsCloseTo(simd::LoadFloat4(0.0f))) {
+		return scNoPlane;
+	}
+
+	const Vec3f direction = normal.Normalize();
+
+	// Take the closest match, as neighbouring faces can be very nearly parallel
+	int32 best_plane = scNoPlane;
+	float32 best_dot = 1.0f - scFindPlaneEpsilon;
+
+	for (uint32 i = 0; i < Planes.Size; i++) {
+		const float32 dot = Planes[i].Normal.Dot(direction);
+
+		if (dot > best_dot) {
+			best_dot = dot;
+			best_plane = static_cast<int32>(i);
+		}
+	}
+
+	return best_plane;
+}
+
+float32 Brush::GetSupport(const Vec3f& direction) const
+{
+	if (mVertices.IsEmpty()) {
+		return 0.0f;
+	}
+
+	float32 support = direction.Dot(mVertices[0]);
+
+	for (const Vec3f& vertex : mVertices) {
+		support = std::max(support, direction.Dot(vertex));
+	}
+
+	return support;
+}
+
+Vec3f Brush::GetFaceCenter(uint32 plane_index) const
+{
+	for (const Face& face : Faces) {
+		if (face.PlaneIndex != plane_index) {
+			continue;
+		}
+
+		Vec3f center = Vec3f::sZero;
+		for (const Vec3f& vertex : face.Vertices) {
+			center = center + vertex;
+		}
+
+		return center * (1.0f / static_cast<float32>(face.Vertices.Size));
+	}
+
+	return Vec3f::sZero;
+}
+
+bool Brush::Raycast(const Vec3f& origin, const Vec3f& direction, float32& out_distance, uint32& out_plane_index) const
+{
+	// Clip the ray against each plane in turn (Cyrus-Beck), keeping the latest entry and the earliest exit
+	float32 enter_distance = -std::numeric_limits<float32>::max();
+	float32 exit_distance = std::numeric_limits<float32>::max();
+	int32 enter_plane = scNoPlane;
+
+	for (uint32 i = 0; i < Planes.Size; i++) {
+		const BrushPlane& plane = Planes[i];
+
+		const float32 facing = plane.Normal.Dot(direction);
+		const float32 inside_distance = plane.Distance - plane.Normal.Dot(origin);
+
+		if (std::abs(facing) < scAxisAlignedEpsilon) {
+			// Parallel to the plane, so the ray is either always in front of it or always behind it
+			if (inside_distance < 0.0f) {
+				return false;
+			}
+
+			continue;
+		}
+
+		const float32 distance = inside_distance / facing;
+
+		if (facing < 0.0f) {
+			if (distance > enter_distance) {
+				enter_distance = distance;
+				enter_plane = static_cast<int32>(i);
+			}
+		}
+		else {
+			exit_distance = std::min(exit_distance, distance);
+		}
+	}
+
+	if (enter_plane == scNoPlane || enter_distance < 0.0f || enter_distance > exit_distance) {
+		return false;
+	}
+
+	out_distance = enter_distance;
+	out_plane_index = static_cast<uint32>(enter_plane);
+
+	return true;
+}
+
+void Brush::ResetFaceTexture(uint32 plane_index)
+{
+	BrushPlane& plane = Planes[plane_index];
+
+	const MaterialID material = plane.Texture.Material;
+
+	plane.Texture = BrushFaceTexture {
+		.Material = material,
+		.Offset = GetDefaultTextureOffset(plane.Normal, mBoundsMin, mBoundsMax),
+	};
+}
+
+bool Brush::HasDefaultTextures() const
+{
+	for (const BrushPlane& plane : Planes) {
+		const BrushFaceTexture& texture = plane.Texture;
+		const Vec2f default_offset = GetDefaultTextureOffset(plane.Normal, mBoundsMin, mBoundsMax);
+
+		if (!texture.Material.IsNull() || texture.Scale.X != 1.0f || texture.Scale.Y != 1.0f ||
+			texture.Rotation != 0.0f || std::abs(texture.Offset.X - default_offset.X) > scTextureOffsetEpsilon ||
+			std::abs(texture.Offset.Y - default_offset.Y) > scTextureOffsetEpsilon) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
 void Brush::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normals, SizedArray<Vec3f>& tangents,
-						 SizedArray<Vec2f>& texcoords, SizedArray<uint32>& indices) const
+						 SizedArray<Vec2f>& texcoords, SizedArray<uint32>& indices,
+						 SizedArray<MeshSection>& sections) const
 {
 	if (!IsValid()) {
 		return;
@@ -557,47 +731,69 @@ void Brush::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normal
 	texcoords.InitCapacity(vertex_count);
 	indices.InitCapacity(index_count);
 
-	for (const Face& face : Faces) {
-		const Vec3f normal = Planes[face.PlaneIndex].Normal;
+	// Faces are emitted grouped by material, so each material is drawn as one range of indices
+	SizedArray<uint32> face_order;
+	face_order.InitCapacity(Faces.Size);
 
-		const float32 abs_x = std::abs(normal.X);
-		const float32 abs_y = std::abs(normal.Y);
-		const float32 abs_z = std::abs(normal.Z);
+	for (uint32 i = 0; i < Faces.Size; i++) {
+		face_order.Insert(i);
+	}
 
-		// Project the texture along the axis the face is most aligned with. U runs along +X (or +Z for faces
-		// facing along X), V runs down -Y on walls and along +Z on floors and ceilings.
-		eProjectionDirection projection = eProjectionDirection::Z;
+	auto GetFaceMaterial = [&](uint32 face_index) { return Planes[Faces[face_index].PlaneIndex].Texture.Material; };
 
-		if (abs_y >= abs_x && abs_y >= abs_z) {
-			projection = eProjectionDirection::Y;
+	std::stable_sort(face_order.begin(), face_order.end(),
+					 [&](uint32 a, uint32 b) { return GetFaceMaterial(a).GetID() < GetFaceMaterial(b).GetID(); });
+
+	const bool has_face_materials = std::any_of(face_order.begin(), face_order.end(), [&](uint32 face_index)
+												{ return !GetFaceMaterial(face_index).IsNull(); });
+
+	if (has_face_materials) {
+		sections.InitCapacity(Faces.Size);
+	}
+
+	for (uint32 face_index : face_order) {
+		const Face& face = Faces[face_index];
+		const BrushPlane& plane = Planes[face.PlaneIndex];
+		const BrushFaceTexture& texture = plane.Texture;
+
+		const Vec3f normal = plane.Normal;
+		const TextureProjection projection = GetTextureProjection(normal);
+
+		float32 sine = 0.0f;
+		float32 cosine = 1.0f;
+
+		if (texture.Rotation != 0.0f) {
+			const float32 radians = MathUtil::DegreesToRadians(texture.Rotation);
+			sine = std::sin(radians);
+			cosine = std::cos(radians);
 		}
-		else if (abs_x >= abs_z) {
-			projection = eProjectionDirection::X;
-		}
 
-		const Vec3f u_axis = (projection == eProjectionDirection::X) ? Vec3f(0.0f, 0.0f, 1.0f)
-																	 : Vec3f(1.0f, 0.0f, 0.0f);
+		// How fast U and V change moving across the face. Only the parts along the face matter.
+		Vec3f u_gradient = (projection.UAxis * cosine - projection.VAxis * sine) * (1.0f / texture.Scale.X);
+		Vec3f v_gradient = (projection.UAxis * sine + projection.VAxis * cosine) * (1.0f / texture.Scale.Y);
 
-		// The tangent follows U across the surface of the face
-		Vec3f tangent = u_axis - normal * normal.Dot(u_axis);
+		u_gradient = u_gradient - normal * normal.Dot(u_gradient);
+		v_gradient = v_gradient - normal * normal.Dot(v_gradient);
+
+		// The tangent is the direction U increases in while V stays the same, which is only along the U gradient when
+		// the texture isn't skewed by the projection or an uneven scale
+		const float32 uu = u_gradient.Dot(u_gradient);
+		const float32 uv = u_gradient.Dot(v_gradient);
+		const float32 vv = v_gradient.Dot(v_gradient);
+
+		Vec3f tangent = u_gradient * vv - v_gradient * uv;
+		tangent = tangent * (1.0f / (uu * vv - uv * uv));
 		tangent.NormalizeIP();
 
+		const uint32 first_index = static_cast<uint32>(indices.Size);
 		const uint32 base = static_cast<uint32>(positions.Size);
 
 		for (const Vec3f& vertex : face.Vertices) {
-			Vec2f uv;
+			const float32 u = vertex.Dot(projection.UAxis);
+			const float32 v = vertex.Dot(projection.VAxis);
 
-			switch (projection) {
-			case eProjectionDirection::X:
-				uv = Vec2f(vertex.Z - mBoundsMin.Z, mBoundsMax.Y - vertex.Y);
-				break;
-			case eProjectionDirection::Y:
-				uv = Vec2f(vertex.X - mBoundsMin.X, vertex.Z - mBoundsMin.Z);
-				break;
-			case eProjectionDirection::Z:
-				uv = Vec2f(vertex.X - mBoundsMin.X, mBoundsMax.Y - vertex.Y);
-				break;
-			}
+			const Vec2f uv((u * cosine - v * sine) / texture.Scale.X + texture.Offset.X,
+						   (u * sine + v * cosine) / texture.Scale.Y + texture.Offset.Y);
 
 			positions.Insert(vertex);
 			normals.Insert(normal);
@@ -609,6 +805,24 @@ void Brush::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normal
 			indices.Insert(base);
 			indices.Insert(base + v);
 			indices.Insert(base + v + 1);
+		}
+
+		if (!has_face_materials) {
+			continue;
+		}
+
+		// Extend the current section while the material stays the same
+		const uint32 face_index_count = static_cast<uint32>(indices.Size) - first_index;
+
+		if (sections.IsNotEmpty() && sections[sections.Size - 1].Material == texture.Material) {
+			sections[sections.Size - 1].IndexCount += face_index_count;
+		}
+		else {
+			sections.Insert(MeshSection {
+				.FirstIndex = first_index,
+				.IndexCount = face_index_count,
+				.Material = texture.Material,
+			});
 		}
 	}
 }
