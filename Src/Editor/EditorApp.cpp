@@ -128,6 +128,8 @@ void UpdatePropertiesPanelForObject(Object* object)
 
 bool IsSimulationMode() { return spMainFrame->IsSimulationMode(); }
 
+eEditorTool GetEditorTool() { return spMainFrame->GetSelectedTool(); }
+
 void SetReloadHandler(eReloadTarget target, std::function<void()> handler)
 {
 	spReloadHandlers[static_cast<uint32>(target)] = std::move(handler);

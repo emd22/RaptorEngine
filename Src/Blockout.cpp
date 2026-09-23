@@ -128,6 +128,29 @@ void Blockout::Create(World* world)
 
 		pXFormObject->SetPosition(Vec3f(200.0f));
 	}
+
+	{
+		pPreviewObject = gObjectManager->NewObject("PROTO_PREVIEW", SelectionMaterialID,
+												   eObjectTag::Blockout | eObjectTag::LockTransform);
+		pPreviewObject->SetUnlit(true);
+		pPreviewObject->SetProbeVisible(false);
+
+		// Needs a mesh to be added to the world; ShowPreview() replaces it
+		Brush brush = Brush::FromBox(Vec3f(-0.25f), Vec3f(0.25f));
+		Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
+		SizedArray<MeshSection> sections;
+
+		brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices, sections);
+		pPreviewObject->pMesh = mesh->AsDefaultMesh();
+		mPreviewPlanes = brush.Planes;
+
+		AssetTicket ticket(static_cast<void*>(pPreviewObject));
+		ticket.MarkAndSignalLoaded();
+
+		pWorld->Attach(ticket);
+
+		HidePreview();
+	}
 }
 
 
@@ -167,16 +190,7 @@ bool Blockout::MoveFace(Object* object, const Vec3f& face_normal, float32 distan
 		return false;
 	}
 
-	// Blockouts rotate about their midpoint, which is applied unrotated, so a midpoint change has to be compensated for
-	// or the rest of the brush moves on rotated objects.
-	const Vec3f midpoint_delta = moved.GetCenter() - brush->GetCenter();
-	const Vec3f offset = midpoint_delta.Rotate(object->mRotation) - midpoint_delta;
-
-	if (!offset.IsCloseTo(simd::LoadFloat4(0.0f))) {
-		object->SetPosition(object->GetPosition() + offset);
-	}
-
-	ApplyBrush(object, std::move(moved), GetMotionType(object));
+	ApplyBrushInPlace(object, std::move(moved));
 
 	return true;
 }
@@ -193,9 +207,119 @@ bool Blockout::SetBrushPlanes(Object* object, const Brush::PlaneList& planes)
 		return false;
 	}
 
-	ApplyBrush(object, std::move(brush), GetMotionType(object));
+	ApplyBrushInPlace(object, std::move(brush));
 
 	return true;
+}
+
+static Vec3f GetOffsetToKeepInPlace(const Object* object, const Vec3f& old_center, const Vec3f& new_center)
+{
+	const Vec3f center_delta = new_center - old_center;
+	return center_delta.Rotate(object->mRotation) - center_delta;
+}
+
+void Blockout::ApplyBrushInPlace(Object* object, Brush&& brush)
+{
+	const Brush* current = GetBrush(object);
+
+	if (current != nullptr) {
+		const Vec3f offset = GetOffsetToKeepInPlace(object, current->GetCenter(), brush.GetCenter());
+
+		if (!offset.IsCloseTo(simd::LoadFloat4(0.0f))) {
+			object->SetPosition(object->GetPosition() + offset);
+		}
+	}
+
+	ApplyBrush(object, std::move(brush), GetMotionType(object));
+}
+
+bool Blockout::GetClipPieces(Object* object, const Vec3f& point_a, const Vec3f& point_b, const Vec3f& face_normal,
+							 Brush::PlaneList& out_kept, Brush::PlaneList& out_split, Vec3f& out_split_position)
+{
+	const Brush* brush = GetBrush(object);
+	if (brush == nullptr) {
+		return false;
+	}
+
+	const Mat4f to_local = object->GetWorldMatrix().Inverse();
+
+	const Vec4f local_a = to_local * Vec4f(point_a.X, point_a.Y, point_a.Z, 1.0f);
+	const Vec4f local_b = to_local * Vec4f(point_b.X, point_b.Y, point_b.Z, 1.0f);
+	const Vec4f local_normal = to_local * Vec4f(face_normal.X, face_normal.Y, face_normal.Z, 0.0f);
+
+	const Vec3f a(local_a.X, local_a.Y, local_a.Z);
+	const Vec3f b(local_b.X, local_b.Y, local_b.Z);
+
+	// The cut runs along the line and straight down through the face it was drawn on
+	const Vec3f cut_normal = (b - a).Cross(Vec3f(local_normal.X, local_normal.Y, local_normal.Z));
+
+	if (cut_normal.IsCloseTo(simd::LoadFloat4(0.0f))) {
+		return false;
+	}
+
+	const Vec3f normal = cut_normal.Normalize();
+
+	if (!brush->Split(normal, normal.Dot(a), out_kept, out_split)) {
+		return false;
+	}
+
+	const Brush split = Brush::FromPlanes(out_split);
+
+	// The split piece keeps the blockout's local space, so its textures carry on from the other piece
+	out_split_position = object->GetPosition() + GetOffsetToKeepInPlace(object, brush->GetCenter(), split.GetCenter());
+
+	return true;
+}
+
+Brush Blockout::MakeWorldBox(const Vec3f& min, const Vec3f& max, Vec3f& out_position) const
+{
+	out_position = (min + max) * 0.5f;
+
+	const Vec3f half_size = (max - min) * 0.5f;
+
+	Brush brush = Brush::FromBox(-half_size, half_size);
+	brush.AlignTexturesToWorld(out_position);
+
+	return brush;
+}
+
+void Blockout::ShowPreview(const Vec3f& position, const Quat& rotation, const Brush& brush)
+{
+	if (!brush.IsValid()) {
+		HidePreview();
+		return;
+	}
+
+	bool is_same_brush = (brush.Planes.Size == mPreviewPlanes.Size);
+
+	for (uint32 i = 0; is_same_brush && i < brush.Planes.Size; i++) {
+		is_same_brush = brush.Planes[i].Normal.IsCloseTo(mPreviewPlanes[i].Normal, 0.0f) &&
+						brush.Planes[i].Distance == mPreviewPlanes[i].Distance;
+	}
+
+	// Only rebuild the mesh when the brush changes, as dragging mostly moves it between the same few snapped sizes
+	if (!is_same_brush) {
+		Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
+		SizedArray<MeshSection> sections;
+
+		brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices, sections);
+
+		pPreviewObject->pMesh = mesh->AsDefaultMesh();
+		pPreviewObject->Bounds.Min = brush.GetBoundsMin();
+		pPreviewObject->Bounds.Max = brush.GetBoundsMax();
+		pPreviewObject->SetRotationOrigin(-brush.GetCenter());
+
+		mPreviewPlanes = brush.Planes;
+	}
+
+	pPreviewObject->SetRotation(rotation);
+	pPreviewObject->SetPosition(position);
+}
+
+void Blockout::HidePreview()
+{
+	// Out of the way, the same place the transform marker hides
+	pPreviewObject->SetPosition(Vec3f(200.0f));
 }
 
 bool Blockout::GetFaceTextureEdit(Object* object, const Vec3f& face_normal, eFaceTextureEdit edit, const Vec2f& amount,
@@ -246,7 +370,60 @@ bool Blockout::GetFaceTextureEdit(Object* object, const Vec3f& face_normal, eFac
 	return true;
 }
 
-bool Blockout::RaycastFace(Object* object, const Vec3f& origin, const Vec3f& direction, Vec3f& out_face_normal)
+bool Blockout::GetMaterialEdit(Object* object, const Vec3f& face_normal, const MaterialID& material, bool whole_brush,
+							   Brush::PlaneList& out_planes)
+{
+	const Brush* brush = GetBrush(object);
+	if (brush == nullptr) {
+		return false;
+	}
+
+	const int32 plane_index = brush->FindPlane(face_normal);
+	if (!whole_brush && plane_index == Brush::scNoPlane) {
+		return false;
+	}
+
+	out_planes = brush->Planes;
+
+	bool changed = false;
+
+	for (uint32 i = 0; i < out_planes.Size; i++) {
+		if (!whole_brush && static_cast<int32>(i) != plane_index) {
+			continue;
+		}
+
+		MaterialID& face_material = out_planes[i].Texture.Material;
+
+		changed |= !(face_material == material);
+		face_material = material;
+	}
+
+	return changed;
+}
+
+Object* Blockout::RaycastBlockout(const Vec3f& origin, const Vec3f& direction, Vec3f& out_face_normal)
+{
+	// Sorted nearest first
+	SizedArray<JPH::BodyID> hits = gPhysics->pBackend->RaycastObjects(origin, direction);
+
+	for (const JPH::BodyID& body_id : hits) {
+		physics::Body* body = gPhysics->FindBody(body_id);
+		if (body == nullptr) {
+			continue;
+		}
+
+		Object* object = gObjectManager->GetObject(body->GetObjectID());
+
+		if (object != nullptr && RaycastFace(object, origin, direction, out_face_normal)) {
+			return object;
+		}
+	}
+
+	return nullptr;
+}
+
+bool Blockout::RaycastFace(Object* object, const Vec3f& origin, const Vec3f& direction, Vec3f& out_face_normal,
+						   Vec3f* out_point)
 {
 	const Brush* brush = GetBrush(object);
 	if (brush == nullptr) {
@@ -267,6 +444,11 @@ bool Blockout::RaycastFace(Object* object, const Vec3f& origin, const Vec3f& dir
 	}
 
 	out_face_normal = brush->Planes[plane_index].Normal;
+
+	// The transform to local space is affine, so the distance along the ray is the same in world space
+	if (out_point != nullptr) {
+		*out_point = origin + direction * distance;
+	}
 
 	return true;
 }

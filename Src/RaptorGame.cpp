@@ -443,7 +443,11 @@ void RaptorGame::ProcessControls()
 	}
 
 
-	if (!editor::IsSimulationMode() && gPrototypeEditor != nullptr &&
+	// The Create and Set Material tools use clicks to draw new brushes and paint faces instead of picking objects
+	const bool tool_picks_objects = (editor::GetEditorTool() != eEditorTool::Create &&
+									 editor::GetEditorTool() != eEditorTool::SetMaterial);
+
+	if (!editor::IsSimulationMode() && gPrototypeEditor != nullptr && tool_picks_objects &&
 		ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
 		EditorSelectObject();
 	}

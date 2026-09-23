@@ -213,6 +213,15 @@ void __set_editor_tool(EDITORTOOL tool)
 	else if (tool == EDITORTOOL.ROTATE) {
 		cvar_set_string("s_editor_op", "Rotate");
 	}
+	else if (tool == EDITORTOOL.CREATE) {
+		cvar_set_string("s_editor_op", "Create");
+	}
+	else if (tool == EDITORTOOL.CLIP) {
+		cvar_set_string("s_editor_op", "Clip");
+	}
+	else if (tool == EDITORTOOL.SET_MATERIAL) {
+		cvar_set_string("s_editor_op", "Set Material");
+	}
 
 	editor_tool = tool;
 }
@@ -267,10 +276,29 @@ void editor_handle_controls()
 		if (KEY.K_R.is_pressed() && !KEY.K_LSHIFT.is_down()) {
 			set_editor_tool(EDITORTOOL.ROTATE);
 		}
+
+		/* Create (draw a new brush) */
+		if (KEY.K_B.is_pressed()) {
+			set_editor_tool(EDITORTOOL.CREATE);
+		}
+
+		/* Clip (split a brush) */
+		if (KEY.K_C.is_pressed()) {
+			set_editor_tool(EDITORTOOL.CLIP);
+		}
+
+		/* Set Material (paint faces) */
+		if (KEY.K_V.is_pressed()) {
+			set_editor_tool(EDITORTOOL.SET_MATERIAL);
+		}
 	}
 
 	if (editor_tool == EDITORTOOL.FACE && not_in_xform_operation) {
 		editor_face_texture_controls();
+	}
+
+	if (editor_tool == EDITORTOOL.SET_MATERIAL && not_in_xform_operation) {
+		editor_set_material_controls();
 	}
 
 	/* Non-manipulation, but object functions. */
@@ -378,6 +406,19 @@ void editor_on_mouse_just_down()
 
 		float thickness = sel.selected_face_scale + sel.selected_object.direction_scale(float3(0.0f) - selected_face);
 		face_min_proj = fmin(0.0f, FACE_MIN_THICKNESS - thickness);
+	}
+
+	if (editor_tool == EDITORTOOL.CREATE) {
+		editor_create_tool_begin();
+	}
+
+	if (editor_tool == EDITORTOOL.CLIP) {
+		editor_clip_tool_begin();
+	}
+
+	if (editor_tool == EDITORTOOL.SET_MATERIAL) {
+		/* Shift paints every face of the brush */
+		blockout_paint_material(paint_material_slot, KEY.K_LSHIFT.is_down());
 	}
 }
 
@@ -698,6 +739,255 @@ void editor_rotate_tool_finalize()
 
 
 /////////////////////////////////////
+// Create Tool
+/////////////////////////////////////
+
+/* How far away a surface can be to start drawing a brush on it */
+const float CREATE_RANGE = 100.0f;
+
+/* Height of a new brush before it is changed with Q/E */
+const float CREATE_DEFAULT_HEIGHT = 1.0f;
+
+bool create_active = false;
+/* The snapped point the drag started at, on the surface that was clicked */
+float3 create_start;
+/* The world axis the brush grows out of the surface along */
+float3 create_normal;
+float create_height;
+float3 create_min;
+float3 create_max;
+
+/* The world axis closest to `v`, keeping its sign */
+@private
+float3 editor_dominant_axis(float3 v)
+{
+	float3 a = float3_abs(v);
+
+	if (a.y >= a.x && a.y >= a.z) {
+		return float3(0.0f, float_sign(v.y), 0.0f);
+	}
+	if (a.x >= a.z) {
+		return float3(float_sign(v.x), 0.0f, 0.0f);
+	}
+
+	return float3(0.0f, 0.0f, float_sign(v.z));
+}
+
+@private
+void editor_create_tool_begin()
+{
+	float3 normal = player.ray_get_normal(CREATE_RANGE);
+
+	create_active = !editor_vec_is_zero(normal);
+
+	if (!create_active) {
+		return;
+	}
+
+	create_normal = editor_dominant_axis(normal);
+	create_start = editor_transform_snap(player.ray_get_point(CREATE_RANGE));
+	create_height = CREATE_DEFAULT_HEIGHT;
+}
+
+/* Sizes the brush from where the drag started to where the crosshair meets the surface's plane, and out from the
+   surface by the height */
+@private
+void editor_create_tool(float delta_time)
+{
+	if (!create_active) {
+		return;
+	}
+
+	float step = editor_get_snap_value();
+
+	if (KEY.K_E.is_pressed()) {
+		create_height += step;
+	}
+	if (KEY.K_Q.is_pressed()) {
+		create_height = fmax(step, create_height - step);
+	}
+
+	float3 axis_mask = float3_abs(create_normal);
+	float3 plane_mask = float3(1.0f) - axis_mask;
+
+	/* The opposite corner stays on the plane the drag started on */
+	float3 corner = editor_transform_snap(camera_ray_to_plane(create_start, create_normal));
+	corner = (corner * plane_mask) + (create_start * axis_mask);
+
+	float3 top = create_start + (create_normal * float3(create_height));
+
+	float3 lo = float3(fmin(create_start.x, fmin(corner.x, top.x)), fmin(create_start.y, fmin(corner.y, top.y)),
+					   fmin(create_start.z, fmin(corner.z, top.z)));
+	float3 hi = float3(fmax(create_start.x, fmax(corner.x, top.x)), fmax(create_start.y, fmax(corner.y, top.y)),
+					   fmax(create_start.z, fmax(corner.z, top.z)));
+
+	/* Every side is at least one snap step long, so a click without a drag still makes a brush */
+	hi = float3(fmax(hi.x, lo.x + step), fmax(hi.y, lo.y + step), fmax(hi.z, lo.z + step));
+
+	create_min = lo;
+	create_max = hi;
+
+	blockout_preview_box(create_min, create_max);
+}
+
+@private
+void editor_create_tool_finalize()
+{
+	blockout_hide_preview();
+
+	if (!create_active) {
+		return;
+	}
+
+	create_active = false;
+
+	OBJECT created = blockout_create_box(create_min, create_max);
+	editor_select_object(created, true, false);
+}
+
+
+/////////////////////////////////////
+// Clip Tool
+/////////////////////////////////////
+
+bool clip_active = false;
+OBJECT clip_object;
+/* The line being drawn across a face of the brush, and that face's world space normal */
+float3 clip_start;
+float3 clip_end;
+float3 clip_normal;
+/* Where the crosshair first hit the face, to keep snapped points on its plane */
+float3 clip_face_point;
+
+/* Snaps a point to the grid, then back onto the face being clipped */
+@private
+float3 editor_clip_snap(float3 point)
+{
+	float3 snapped = editor_transform_snap(point);
+	return snapped - (clip_normal * float3(dot(snapped - clip_face_point, clip_normal)));
+}
+
+@private
+void editor_clip_tool_begin()
+{
+	clip_object = sel.selected_object;
+
+	float3 face = clip_object.ray_get_face();
+	clip_active = !editor_vec_is_zero(face);
+
+	if (!clip_active) {
+		return;
+	}
+
+	clip_normal = clip_object.local_dir_to_world(face);
+	clip_face_point = blockout_ray_hit_point(clip_object);
+
+	clip_start = editor_clip_snap(clip_face_point);
+	clip_end = clip_start;
+}
+
+@private
+bool editor_clip_has_line()
+{
+	float3 line = clip_end - clip_start;
+	return dot(line, line) > 0.0001f;
+}
+
+@private
+void editor_clip_tool(float delta_time)
+{
+	if (!clip_active) {
+		return;
+	}
+
+	clip_end = editor_clip_snap(camera_ray_to_plane(clip_face_point, clip_normal));
+
+	if (editor_clip_has_line()) {
+		blockout_preview_clip(clip_object, clip_start, clip_end, clip_normal);
+	}
+	else {
+		blockout_hide_preview();
+	}
+}
+
+@private
+void editor_clip_tool_finalize()
+{
+	blockout_hide_preview();
+
+	if (!clip_active) {
+		return;
+	}
+
+	clip_active = false;
+
+	if (editor_clip_has_line()) {
+		blockout_clip(clip_object, clip_start, clip_end, clip_normal);
+	}
+}
+
+
+/////////////////////////////////////
+// Set Material Tool
+/////////////////////////////////////
+
+/* The prototype material slot (see eCProtoMat) that faces are painted with, or -1 for the blockout's own material */
+int paint_material_slot = 0;
+
+/* The last prototype material slot */
+const int PAINT_MATERIAL_LAST_SLOT = 3;
+
+@private
+void editor_print_paint_material()
+{
+	if (paint_material_slot == 0) {
+		printf("paint material: grey\n");
+	}
+	else if (paint_material_slot == 1) {
+		printf("paint material: orange\n");
+	}
+	else if (paint_material_slot == 2) {
+		printf("paint material: blue\n");
+	}
+	else if (paint_material_slot == 3) {
+		printf("paint material: tile\n");
+	}
+	else {
+		printf("paint material: the brush's own material\n");
+	}
+}
+
+/* [ and ] step through the materials to paint with: the brush's own material, then each prototype material */
+@private
+void editor_set_material_controls()
+{
+	/* Painted faces would be hidden under the selection highlight */
+	if (editor_has_object_selection()) {
+		reset_selection();
+	}
+
+	if (KEY.K_LBRACKET.is_pressed()) {
+		paint_material_slot--;
+
+		if (paint_material_slot < -1) {
+			paint_material_slot = PAINT_MATERIAL_LAST_SLOT;
+		}
+
+		editor_print_paint_material();
+	}
+	if (KEY.K_RBRACKET.is_pressed()) {
+		paint_material_slot++;
+
+		if (paint_material_slot > PAINT_MATERIAL_LAST_SLOT) {
+			paint_material_slot = -1;
+		}
+
+		editor_print_paint_material();
+	}
+}
+
+
+/////////////////////////////////////
 // Editor Dispatch
 /////////////////////////////////////
 
@@ -716,6 +1006,14 @@ void editor_handle_operation(float delta_time)
 		editor_rotate_tool(delta_time);
 		return;
 	}
+	if (editor_tool == EDITORTOOL.CREATE) {
+		editor_create_tool(delta_time);
+		return;
+	}
+	if (editor_tool == EDITORTOOL.CLIP) {
+		editor_clip_tool(delta_time);
+		return;
+	}
 }
 
 
@@ -731,6 +1029,12 @@ void editor_finalize_operation()
 	}
 	else if (editor_tool == EDITORTOOL.ROTATE) {
 		editor_rotate_tool_finalize();
+	}
+	else if (editor_tool == EDITORTOOL.CREATE) {
+		editor_create_tool_finalize();
+	}
+	else if (editor_tool == EDITORTOOL.CLIP) {
+		editor_clip_tool_finalize();
 	}
 }
 
@@ -778,8 +1082,11 @@ void mode_update(float3 movement_vector, float delta_time)
 		editor_finalize_operation();
 	}
 
+	/* Create and Set Material work on whatever the crosshair is on, the other tools on the selection */
+	bool needs_selection = (editor_tool != EDITORTOOL.CREATE && editor_tool != EDITORTOOL.SET_MATERIAL);
+
 	/* Mouse is no longer down, do not perform any operations */
-	if (!editor_has_object_selection() || !mouse_is_dragging) {
+	if ((needs_selection && !editor_has_object_selection()) || !mouse_is_dragging) {
 		editor_disable_movement_damp();
 		mouse_was_in_drag_event = false;
 		return;

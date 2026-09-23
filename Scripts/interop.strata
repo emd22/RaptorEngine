@@ -15,6 +15,7 @@ enum OPTYPE
 	DELETE,
 	ROTATE,
 	BRUSH_EDIT,
+	CREATE_BRUSH,
 }
 
 /* This must match eFaceTextureEdit in Blockout.hpp! */
@@ -34,6 +35,9 @@ enum EDITORTOOL
 	TRANSLATE = 1,
 	FACE = 2,
 	ROTATE = 3,
+	CREATE = 4,
+	CLIP = 5,
+	SET_MATERIAL = 6,
 }
 
 
@@ -123,6 +127,8 @@ impl PLAYER
 	extern bool is_flymode(PLAYER p);
 
 	extern float3 ray_get_point(float range);
+	/* The normal of the surface the crosshair is on, or zero if it hits nothing within `range`. */
+	extern float3 ray_get_normal(float range);
 
 
 	property float3 position {
@@ -134,6 +140,9 @@ PLAYER player;
 
 /* Retrieve the currently selected camera's position */
 extern float3 camera_position();
+
+/* Where the crosshair's ray meets the plane through `point` facing `normal`, or `point` if it never reaches it. */
+extern float3 camera_ray_to_plane(float3 point, float3 normal);
 
 
 /* Reloads an object from a blockout file. */
@@ -150,6 +159,25 @@ extern float3 blockout_face_center(OBJECT object, float3 face);
 /* Changes the texture on the face facing along `face`, as an undoable operation. See eFaceTextureEdit for how
    `amount` is used. */
 extern void blockout_edit_face_texture(OBJECT object, float3 face, FACETEXTUREEDIT edit, float3 amount);
+
+/* Where the crosshair's ray hits a blockout, in world space. */
+extern float3 blockout_ray_hit_point(OBJECT object);
+
+/* See-through previews of what the Create and Clip tools will make. */
+extern void blockout_preview_box(float3 min, float3 max);
+extern void blockout_preview_clip(OBJECT object, float3 point_a, float3 point_b, float3 face_normal);
+extern void blockout_hide_preview();
+
+/* Creates a box blockout filling `min` to `max`, as an undoable operation. */
+extern OBJECT blockout_create_box(float3 min, float3 max);
+
+/* Splits a blockout in two along the line from `point_a` to `point_b`, cutting straight through the face (with world
+   space normal `face_normal`) that the line was drawn on. Both pieces are kept. Undoable. */
+extern bool blockout_clip(OBJECT object, float3 point_a, float3 point_b, float3 face_normal);
+
+/* Paints the face under the crosshair, or its whole brush, with a prototype material slot (see eCProtoMat), as an
+   undoable operation. A negative slot paints with the blockout's own material. */
+extern bool blockout_paint_material(int slot, bool whole_brush);
 
 /* Light probes */
 

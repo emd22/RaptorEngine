@@ -22,6 +22,9 @@ enum class eEditorTool : uint32
 	Translate,
 	Face,
 	Rotate,
+	Create,
+	Clip,
+	SetMaterial,
 
 	Count,
 };
@@ -83,6 +86,8 @@ struct EditOperation
 		Rotate,
 		/// Sets a blockout's brush to PlanesAfter, and back to PlanesBefore on undo
 		BrushEdit,
+		/// Creates a blockout from ObjectSnapshot and PlanesAfter, and destroys it on undo
+		CreateBrush,
 	} Type;
 
 public:
@@ -105,9 +110,7 @@ public:
 	Brush::PlaneList PlanesBefore;
 	Brush::PlaneList PlanesAfter;
 
-	Vec3f ScalePosBefore = Vec3f::sZero;
-
-	/// Full snapshot for `Delete` (captured before destruction so Undo can recreate).
+	/// The object for `Delete` (captured before destruction so Undo can recreate it) and `CreateBrush`
 	struct Snapshot
 	{
 		Vec3f Position = Vec3f::sZero;
@@ -116,7 +119,7 @@ public:
 		Name ObjectName;
 		/// So that undoing the delete of a probe volume brush brings back a probe volume, not solid geometry
 		bool bIsProbeVolume = false;
-	} DeleteSnapshot;
+	} ObjectSnapshot;
 
 	/// The size of the operation group this is in. For example, when moving 10 objects, there will be 10 operations(one
 	/// for each event) making the GroupSize = 10.

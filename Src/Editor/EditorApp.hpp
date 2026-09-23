@@ -6,6 +6,7 @@
 
 namespace fx {
 class Object;
+enum class eEditorTool : uint32;
 }
 
 namespace fx::editor {
@@ -46,6 +47,11 @@ void UpdatePropertiesPanelForObject(Object* object);
 void UpdateWorldPropertiesPanel();
 
 bool IsSimulationMode();
+
+/**
+ * @brief Returns the tool selected in the editor's tool bar
+ */
+eEditorTool GetEditorTool();
 
 /**
  * @brief Sets up a handler used by the File > Reload X options

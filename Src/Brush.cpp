@@ -681,6 +681,32 @@ bool Brush::Raycast(const Vec3f& origin, const Vec3f& direction, float32& out_di
 	return true;
 }
 
+bool Brush::Split(const Vec3f& normal, float32 distance, PlaneList& out_back, PlaneList& out_front) const
+{
+	if (!IsValid() || Planes.Size >= scMaxPlanes) {
+		return false;
+	}
+
+	PlaneList back_planes = Planes;
+	back_planes.Insert({ normal, distance });
+
+	PlaneList front_planes = Planes;
+	front_planes.Insert({ -normal, -distance });
+
+	// Both parts have to be left with something, otherwise the plane missed the brush
+	const Brush back = FromPlanes(back_planes);
+	const Brush front = FromPlanes(front_planes);
+
+	if (!back.IsValid() || !front.IsValid()) {
+		return false;
+	}
+
+	out_back = back.Planes;
+	out_front = front.Planes;
+
+	return true;
+}
+
 void Brush::ResetFaceTexture(uint32 plane_index)
 {
 	BrushPlane& plane = Planes[plane_index];
@@ -691,6 +717,20 @@ void Brush::ResetFaceTexture(uint32 plane_index)
 		.Material = material,
 		.Offset = GetDefaultTextureOffset(plane.Normal, mBoundsMin, mBoundsMax),
 	};
+}
+
+void Brush::AlignTexturesToWorld(const Vec3f& origin)
+{
+	for (BrushPlane& plane : Planes) {
+		const TextureProjection projection = GetTextureProjection(plane.Normal);
+		const MaterialID material = plane.Texture.Material;
+
+		// Local corners are `origin` away from where they are in the world
+		plane.Texture = BrushFaceTexture {
+			.Material = material,
+			.Offset = Vec2f(origin.Dot(projection.UAxis), origin.Dot(projection.VAxis)),
+		};
+	}
 }
 
 bool Brush::HasDefaultTextures() const

@@ -118,13 +118,13 @@ static void N_editor_push_op_delete(Object* obj, int32 group_size)
 		.GroupSize = group_size,
 	};
 	op.PushedObjectID = obj->ID;
-	op.DeleteSnapshot.Position = obj->GetPosition();
+	op.ObjectSnapshot.Position = obj->GetPosition();
 	const Brush* brush = gWorld->pBlockout->GetBrush(obj);
 	op.PlanesBefore = (brush != nullptr) ? brush->Planes : Brush::FromBox(obj->Bounds.Min, obj->Bounds.Max).Planes;
-	op.DeleteSnapshot.Material = gPrototypeEditor->GetStoredMaterial(obj);
-	op.DeleteSnapshot.Rotation = obj->mRotation;
-	op.DeleteSnapshot.ObjectName = obj->Name;
-	op.DeleteSnapshot.bIsProbeVolume = obj->IsProbeVolume();
+	op.ObjectSnapshot.Material = gPrototypeEditor->GetStoredMaterial(obj);
+	op.ObjectSnapshot.Rotation = obj->mRotation;
+	op.ObjectSnapshot.ObjectName = obj->Name;
+	op.ObjectSnapshot.bIsProbeVolume = obj->IsProbeVolume();
 
 	gPrototypeEditor->PushEditOperation(op);
 }
@@ -326,6 +326,38 @@ static FLOAT4 N_player_ray_get_point(void*, float32 range)
 	return rr.Point.mIntrin;
 }
 
+static FLOAT4 N_player_ray_get_normal(void*, float32 range)
+{
+	physics::RayResult rr = gPhysics->pBackend->Raycast(gWorld->Player.pCamera->Position,
+														gWorld->Player.pCamera->Direction * range);
+
+	if (!rr.bHit) {
+		return simd::LoadFloat4(0.0f);
+	}
+
+	return rr.Normal.mIntrin;
+}
+
+/// Where the crosshair's ray meets the plane through `point` facing `normal`, or `point` if the ray never reaches it
+static FLOAT4 N_camera_ray_to_plane(FLOAT4 point, FLOAT4 normal)
+{
+	const Vec3f origin = gWorld->Player.pCamera->Position;
+	const Vec3f direction = gWorld->Player.pCamera->GetForwardVector();
+	const Vec3f plane_normal(normal);
+
+	const float32 facing = plane_normal.Dot(direction);
+	if (std::abs(facing) < 1e-5f) {
+		return point;
+	}
+
+	const float32 distance = plane_normal.Dot(Vec3f(point) - origin) / facing;
+	if (distance < 0.0f) {
+		return point;
+	}
+
+	return (origin + direction * distance).mIntrin;
+}
+
 static FLOAT4 N_float4_round(FLOAT4 value) { return simd::Round(value); }
 static FLOAT4 N_float4_floor(FLOAT4 value) { return simd::Floor(value); }
 static FLOAT4 N_float3_abs(FLOAT4 value)
@@ -365,6 +397,162 @@ static FLOAT4 N_blockout_face_center(Object* object, FLOAT4 face)
 	}
 
 	return brush->GetFaceCenter(static_cast<uint32>(plane_index)).mIntrin;
+}
+
+/// Where the crosshair's ray hits a blockout, in world space
+static FLOAT4 N_blockout_ray_hit_point(Object* object)
+{
+	Vec3f face_normal;
+	Vec3f point;
+
+	if (object == nullptr ||
+		!gWorld->pBlockout->RaycastFace(object, gWorld->Player.pCamera->Position,
+										gWorld->Player.pCamera->GetForwardVector(), face_normal, &point)) {
+		return simd::LoadFloat4(0.0f);
+	}
+
+	return point.mIntrin;
+}
+
+static void N_blockout_preview_box(FLOAT4 min, FLOAT4 max)
+{
+	Vec3f position;
+	const Brush brush = gWorld->pBlockout->MakeWorldBox(Vec3f(min), Vec3f(max), position);
+
+	gWorld->pBlockout->ShowPreview(position, Quat::scIdentity, brush);
+}
+
+/// Previews the piece that a clip would split off
+static void N_blockout_preview_clip(Object* object, FLOAT4 point_a, FLOAT4 point_b, FLOAT4 face_normal)
+{
+	Brush::PlaneList kept;
+	Brush::PlaneList split;
+	Vec3f split_position;
+
+	if (object == nullptr || !gWorld->pBlockout->GetClipPieces(object, Vec3f(point_a), Vec3f(point_b),
+															   Vec3f(face_normal), kept, split, split_position)) {
+		gWorld->pBlockout->HidePreview();
+		return;
+	}
+
+	gWorld->pBlockout->ShowPreview(split_position, object->mRotation, Brush::FromPlanes(split));
+}
+
+static void N_blockout_hide_preview() { gWorld->pBlockout->HidePreview(); }
+
+static Object* N_blockout_create_box(FLOAT4 min, FLOAT4 max)
+{
+	if (editor::IsSimulationMode()) {
+		return nullptr;
+	}
+
+	Vec3f position;
+	const Brush brush = gWorld->pBlockout->MakeWorldBox(Vec3f(min), Vec3f(max), position);
+
+	if (!brush.IsValid()) {
+		return nullptr;
+	}
+
+	EditOperation op {
+		.Type = EditOperation::eType::CreateBrush,
+		.ValueA = EditOperationValue(Vec3f::sZero),
+		.ValueB = EditOperationValue(Vec3f::sZero),
+	};
+
+	op.PlanesAfter = brush.Planes;
+	op.ObjectSnapshot.Position = position;
+	op.ObjectSnapshot.Material = gWorld->pBlockout->GetMaterialForSlot(eCProtoMat::Gray);
+
+	return gPrototypeEditor->PushEditOperation(op).pObject;
+}
+
+/// Splits a blockout in two along a line drawn on one of its faces. Both pieces are kept.
+static bool N_blockout_clip(Object* object, FLOAT4 point_a, FLOAT4 point_b, FLOAT4 face_normal)
+{
+	if (object == nullptr || editor::IsSimulationMode()) {
+		return false;
+	}
+
+	const Brush* brush = gWorld->pBlockout->GetBrush(object);
+	if (brush == nullptr) {
+		return false;
+	}
+
+	EditOperation clip_op {
+		.Type = EditOperation::eType::BrushEdit,
+		.pObject = object,
+		.ValueA = EditOperationValue(Vec3f::sZero),
+		.ValueB = EditOperationValue(Vec3f::sZero),
+		.GroupSize = 2,
+	};
+
+	clip_op.PushedObjectID = object->ID;
+	clip_op.PlanesBefore = brush->Planes;
+
+	EditOperation split_op {
+		.Type = EditOperation::eType::CreateBrush,
+		.ValueA = EditOperationValue(Vec3f::sZero),
+		.ValueB = EditOperationValue(Vec3f::sZero),
+		.GroupSize = 2,
+	};
+
+	if (!gWorld->pBlockout->GetClipPieces(object, Vec3f(point_a), Vec3f(point_b), Vec3f(face_normal),
+										  clip_op.PlanesAfter, split_op.PlanesAfter,
+										  split_op.ObjectSnapshot.Position)) {
+		return false;
+	}
+
+	split_op.ObjectSnapshot.Rotation = object->mRotation;
+	split_op.ObjectSnapshot.Material = gPrototypeEditor->GetStoredMaterial(object);
+	split_op.ObjectSnapshot.bIsProbeVolume = object->IsProbeVolume();
+
+	gPrototypeEditor->PushEditOperation(clip_op);
+	gPrototypeEditor->PushEditOperation(split_op);
+
+	return true;
+}
+
+/// How far away a face can be painted with the Set Material tool
+static constexpr float32 scPaintRange = 100.0f;
+
+/**
+ * @brief Paints the face under the crosshair (or its whole brush) with a prototype material slot, as an undoable
+ * operation. A negative slot paints with the blockout's own material.
+ */
+static bool N_blockout_paint_material(int32 slot, bool whole_brush)
+{
+	if (editor::IsSimulationMode() || slot >= static_cast<int32>(eCProtoMat::Count)) {
+		return false;
+	}
+
+	Vec3f face_normal;
+	Object* object = gWorld->pBlockout->RaycastBlockout(
+		gWorld->Player.pCamera->Position, gWorld->Player.pCamera->GetForwardVector() * scPaintRange, face_normal);
+
+	if (object == nullptr) {
+		return false;
+	}
+
+	const MaterialID material = (slot < 0) ? MaterialID::scNull
+										   : gWorld->pBlockout->GetMaterialForSlot(static_cast<eCProtoMat>(slot));
+
+	EditOperation op {
+		.Type = EditOperation::eType::BrushEdit,
+		.pObject = object,
+		.ValueA = EditOperationValue(Vec3f::sZero),
+		.ValueB = EditOperationValue(Vec3f::sZero),
+	};
+
+	op.PushedObjectID = object->ID;
+	op.PlanesBefore = gWorld->pBlockout->GetBrush(object)->Planes;
+
+	if (!gWorld->pBlockout->GetMaterialEdit(object, face_normal, material, whole_brush, op.PlanesAfter)) {
+		return false;
+	}
+
+	gPrototypeEditor->PushEditOperation(op);
+
+	return true;
 }
 
 static void N_blockout_edit_face_texture(Object* object, FLOAT4 face, uint32 edit, FLOAT4 amount)
@@ -488,6 +676,14 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("blockout_object_scale", N_blockout_object_scale),
 	PREDEF("blockout_face_center", N_blockout_face_center),
 	PREDEF("blockout_edit_face_texture", N_blockout_edit_face_texture),
+	PREDEF("blockout_ray_hit_point", N_blockout_ray_hit_point),
+	PREDEF("blockout_preview_box", N_blockout_preview_box),
+	PREDEF("blockout_preview_clip", N_blockout_preview_clip),
+	PREDEF("blockout_hide_preview", N_blockout_hide_preview),
+	PREDEF("blockout_create_box", N_blockout_create_box),
+	PREDEF("blockout_clip", N_blockout_clip),
+	PREDEF("blockout_paint_material", N_blockout_paint_material),
+	PREDEF("camera_ray_to_plane", N_camera_ray_to_plane),
 	PREDEF("blockout_new_object", N_blockout_new_object),
 	PREDEF("blockout_dupe_object", N_blockout_dupe_object),
 	PREDEF("blockout_destroy_object", N_blockout_destroy_object),
@@ -498,6 +694,7 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("PLAYER_set_speed_multiplier", N_player_set_speed_multiplier),
 	PREDEF("PLAYER_is_flymode", N_player_is_flymode),
 	PREDEF("PLAYER_ray_get_point", N_player_ray_get_point),
+	PREDEF("PLAYER_ray_get_normal", N_player_ray_get_normal),
 
 	/* Math Util */
 	PREDEF("float4_round", N_float4_round),
