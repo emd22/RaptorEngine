@@ -29,7 +29,7 @@ void Window::Create(const char* title, const Vec2u& size)
 	}
 
 	mSize = size;
-	mpViewport = gEditor->CreateMainWindow(title, size)->GetViewport();
+	mpViewport = gEditor->CreateMainFrame(title, size)->GetViewport();
 
 	HandleResize();
 }

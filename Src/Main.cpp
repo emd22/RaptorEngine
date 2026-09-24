@@ -42,6 +42,11 @@ int main(int argc, char** argv)
 
 	gScriptManager = new ScriptManager;
 
+
+#ifdef FX_IS_EDITOR
+	gEditor = new editor::RaptorEditor;
+#endif
+
 #ifdef FX_IS_EDITOR
 	// If there was an issue starting the editor, return with an error code
 	if (!gEditor->InitGUI(argc, argv)) {
@@ -74,6 +79,11 @@ int main(int argc, char** argv)
 			delete fx::gEnginePool;
 			fx::gEnginePool = nullptr;
 		});
+
+#ifdef FX_IS_EDITOR
+	delete gEditor;
+	gEditor = nullptr;
+#endif
 
 	return 0;
 }

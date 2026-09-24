@@ -694,10 +694,10 @@ bool EditorMode::IsInSelection(Object* object) const
 
 void EditorMode::Reload()
 {
-	pScript->CallFunction<void>("mode_load");
-
-	pScript->CallFunction<void, void*>("editor_get_transform_marker",
-									   reinterpret_cast<void*>(gWorld->pBlockout->pXFormObject));
+	// 	pScript->CallFunction<void>("mode_load");
+	//
+	// 	pScript->CallFunction<void, void*>("editor_get_transform_marker",
+	// 									   reinterpret_cast<void*>(gWorld->pBlockout->pXFormObject));
 	// auto mode_set_xform_marker = pScript->GetFunction<void (*)(void*)>("editor_set_transform_marker");
 	// if (mode_set_xform_marker) {
 	// 	mode_set_xform_marker(reinterpret_cast<void*>(gWorld->pBlockout->pXFormObject));
