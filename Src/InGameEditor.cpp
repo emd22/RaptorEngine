@@ -311,7 +311,10 @@ void EditorMode::Create(const String& name, const String& script_path)
 	mOperationStack.InitCapacity(256);
 }
 
-void EditorMode::ReloadHotFunctions() { pUpdateFunction = pScript->GetFunction<UpdateFnDef>("mode_update"); }
+void EditorMode::ReloadHotFunctions()
+{
+	pUpdateFunction = pScript->GetFunction<void (*)(void*, FLOAT4, float)>("mode_update");
+}
 
 void EditorMode::Update(const Vec3f& movement_vector, float32 delta_time)
 {
@@ -325,7 +328,9 @@ void EditorMode::Update(const Vec3f& movement_vector, float32 delta_time)
 	}
 
 	if (pUpdateFunction) {
-		pUpdateFunction(movement_vector.mIntrin, delta_time);
+		FLOAT4 x = movement_vector.mIntrin;
+		pScript->CallFunctionPtr<void, FLOAT4, float>(pUpdateFunction, x, delta_time);
+		// pUpdateFunction(movement_vector.mIntrin, delta_time);
 	}
 }
 
@@ -583,17 +588,22 @@ void EditorMode::SyncScriptSelection()
 		return;
 	}
 
-	auto mode_select_object = pScript->GetFunction<void (*)(void*, bool, bool)>("_internal_editor_select_object");
+
+	auto mode_select_object = pScript->GetFunction<void (*)(void*, void*, bool, bool)>(
+		"_internal_editor_select_object");
 	if (!mode_select_object) {
 		return;
 	}
 
-	mode_select_object(nullptr, false, false);
+	pScript->CallFunctionPtr<void, void*, bool, bool>(mode_select_object, nullptr, false, false);
+
 	for (SelectedObject& selected_obj : mSelectedObjects) {
 		if (selected_obj.pObject == nullptr) {
 			continue;
 		}
-		mode_select_object(reinterpret_cast<void*>(selected_obj.pObject), true, true);
+
+		pScript->CallFunctionPtr<void, void*, bool, bool>(mode_select_object,
+														  reinterpret_cast<void*>(selected_obj.pObject), true, true);
 	}
 }
 
@@ -684,15 +694,14 @@ bool EditorMode::IsInSelection(Object* object) const
 
 void EditorMode::Reload()
 {
-	auto mode_load = pScript->GetFunction<void (*)()>("mode_load");
-	if (mode_load) {
-		mode_load();
-	}
+	pScript->CallFunction<void>("mode_load");
 
-	auto mode_set_xform_marker = pScript->GetFunction<void (*)(void*)>("editor_set_transform_marker");
-	if (mode_set_xform_marker) {
-		mode_set_xform_marker(reinterpret_cast<void*>(gWorld->pBlockout->pXFormObject));
-	}
+	pScript->CallFunction<void, void*>("editor_get_transform_marker",
+									   reinterpret_cast<void*>(gWorld->pBlockout->pXFormObject));
+	// auto mode_set_xform_marker = pScript->GetFunction<void (*)(void*)>("editor_set_transform_marker");
+	// if (mode_set_xform_marker) {
+	// 	mode_set_xform_marker(reinterpret_cast<void*>(gWorld->pBlockout->pXFormObject));
+	// }
 
 	ReloadHotFunctions();
 
@@ -708,10 +717,12 @@ void EditorMode::Reload()
 
 void EditorMode::Unload()
 {
-	auto mode_unload = pScript->GetFunction<void (*)()>("mode_unload");
-	if (mode_unload) {
-		mode_unload();
-	}
+	pScript->CallFunction<void>("mode_unload");
+
+	// auto mode_unload = pScript->GetFunction<void (*)()>("mode_unload");
+	// if (mode_unload) {
+	// 	mode_unload();
+	// }
 
 	// Reset selection materials
 	if (mSelectedObjects.Size > 0) {

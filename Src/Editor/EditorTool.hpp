@@ -81,9 +81,9 @@ private:
 	// Cached hot functions
 	/////////////////////////////////////
 
-	void (*pFnBegin)() = nullptr;
-	void (*pFnUpdate)(float) = nullptr;
-	void (*pFnFinalize)() = nullptr;
+	void (*pFnBegin)(void*) = nullptr;
+	void (*pFnUpdate)(void*, float) = nullptr;
+	void (*pFnFinalize)(void*) = nullptr;
 };
 
 

@@ -29,9 +29,9 @@ void EditorTool::ReloadHotFunctions()
 		return;
 	}
 
-	pFnBegin = pScript->GetFunction<void (*)()>("tool_begin");
-	pFnUpdate = pScript->GetFunction<void (*)(float)>("tool_update");
-	pFnFinalize = pScript->GetFunction<void (*)(void)>("tool_finalize");
+	pFnBegin = pScript->GetFunction<void (*)(void*)>("tool_begin");
+	pFnUpdate = pScript->GetFunction<void (*)(void*, float)>("tool_update");
+	pFnFinalize = pScript->GetFunction<void (*)(void*)>("tool_finalize");
 }
 
 EditorTool::~EditorTool()
