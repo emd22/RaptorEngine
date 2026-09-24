@@ -1759,6 +1759,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/TypeMetadata.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/TypeMetadata.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/TypeMetadata.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/TypeMetadata.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
   "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/TypeUtil.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/TypeUtil.c",
   "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/TypeUtil.c",
   "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/TypeUtil.c.o"
@@ -2035,6 +2041,30 @@
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_SAMPLE_DIR=\\\"/Users/emd22/Projects/raptor/Submodules/strata/samples\\\" -DSTRATA_STATIC -DSTRATA_TEST_HAS_LLVM=1 -I/Users/emd22/Projects/raptor/Submodules/strata/tests/unit -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/ContextTests.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/tests/unit/ContextTests.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/tests/unit/ContextTests.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/ContextTests.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_SAMPLE_DIR=\\\"/Users/emd22/Projects/raptor/Submodules/strata/samples\\\" -DSTRATA_STATIC -DSTRATA_TEST_HAS_LLVM=1 -I/Users/emd22/Projects/raptor/Submodules/strata/tests/unit -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/CodegenRegressionTests.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/tests/unit/CodegenRegressionTests.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/tests/unit/CodegenRegressionTests.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/CodegenRegressionTests.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_SAMPLE_DIR=\\\"/Users/emd22/Projects/raptor/Submodules/strata/samples\\\" -DSTRATA_STATIC -DSTRATA_TEST_HAS_LLVM=1 -I/Users/emd22/Projects/raptor/Submodules/strata/tests/unit -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/LiteralTests.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/tests/unit/LiteralTests.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/tests/unit/LiteralTests.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/LiteralTests.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_SAMPLE_DIR=\\\"/Users/emd22/Projects/raptor/Submodules/strata/samples\\\" -DSTRATA_STATIC -DSTRATA_TEST_HAS_LLVM=1 -I/Users/emd22/Projects/raptor/Submodules/strata/tests/unit -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/ComponentTests.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/tests/unit/ComponentTests.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/tests/unit/ComponentTests.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/ComponentTests.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
   "command": "/usr/bin/cc -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/aot_test.dir/samples/hosts/engine_api_host.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/samples/hosts/engine_api_host.c",
   "file": "/Users/emd22/Projects/raptor/Submodules/strata/samples/hosts/engine_api_host.c",
   "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/aot_test.dir/samples/hosts/engine_api_host.c.o"
@@ -2080,5 +2110,11 @@
   "command": "/usr/bin/cc -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/aot_opaque_struct_test.dir/samples/hosts/opaque_struct_host.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/samples/hosts/opaque_struct_host.c",
   "file": "/Users/emd22/Projects/raptor/Submodules/strata/samples/hosts/opaque_struct_host.c",
   "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/aot_opaque_struct_test.dir/samples/hosts/opaque_struct_host.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -I/Users/emd22/Projects/raptor/Submodules/strata/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/aot_components_test.dir/samples/hosts/components_host.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/samples/hosts/components_host.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/samples/hosts/components_host.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/aot_components_test.dir/samples/hosts/components_host.c.o"
 }
 ]

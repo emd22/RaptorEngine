@@ -108,7 +108,7 @@ FxEnumFlags(eEditorModeFlags);
 
 class EditorMode
 {
-	using UpdateFnDef = void (*)(FLOAT4, float32);
+	using UpdateFnDef = void (*)(void*, FLOAT4, float32);
 
 	friend struct EditOperation;
 
@@ -174,7 +174,7 @@ public:
 
 	String ModeName;
 
-	UpdateFnDef pUpdateFunction = nullptr;
+	void (*pUpdateFunction)(void*, FLOAT4, float) = nullptr;
 
 	StackArray<SelectedObject, scLimitSelectionObjects> mSelectedObjects;
 	UndoStack<EditOperation> mOperationStack;

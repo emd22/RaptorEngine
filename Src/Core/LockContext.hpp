@@ -10,44 +10,44 @@ template <typename TObjectType>
 class LockContext
 {
 public:
-    static LockContext NoLock(std::mutex& mutex, TObjectType& object)
-    {
-        LockContext ctx(mutex, object, true);
-        return ctx;
-    }
+	static LockContext NoLock(std::mutex& mutex, TObjectType& object)
+	{
+		LockContext ctx(mutex, object, true);
+		return ctx;
+	}
 
-    FX_FORCE_INLINE LockContext(std::mutex& mutex, TObjectType& object, bool never_lock = false)
-        : mMutex(mutex), mObject(object)
-    {
-        if (!never_lock) {
-            mMutex.lock();
-            mbIsLocked = true;
-        }
-    }
+	FX_FORCE_INLINE LockContext(std::mutex& mutex, TObjectType& object, bool never_lock = false)
+		: mMutex(mutex), mObject(object)
+	{
+		if (!never_lock) {
+			mMutex.lock();
+			mbIsLocked = true;
+		}
+	}
 
-    FX_FORCE_INLINE TObjectType& Get() { return mObject; }
-    FX_FORCE_INLINE const TObjectType& Get() const { return mObject; }
+	FX_FORCE_INLINE TObjectType& Get() { return mObject; }
+	FX_FORCE_INLINE const TObjectType& Get() const { return mObject; }
 
-    FX_FORCE_INLINE TObjectType* operator->() { return &mObject; }
-    FX_FORCE_INLINE const TObjectType* operator->() const { return &mObject; }
+	FX_FORCE_INLINE TObjectType* operator->() { return &mObject; }
+	FX_FORCE_INLINE const TObjectType* operator->() const { return &mObject; }
 
-    FX_FORCE_INLINE void Unlock()
-    {
-        if (!mbIsLocked) {
-            return;
-        }
+	FX_FORCE_INLINE void Unlock()
+	{
+		if (!mbIsLocked) {
+			return;
+		}
 
-        mbIsLocked = false;
-        mMutex.unlock();
-    }
+		mbIsLocked = false;
+		mMutex.unlock();
+	}
 
-    ~LockContext() { Unlock(); }
+	~LockContext() { Unlock(); }
 
 
 private:
-    std::mutex& mMutex;
-    TObjectType& mObject;
-    bool mbIsLocked = false;
+	std::mutex& mMutex;
+	TObjectType& mObject;
+	bool mbIsLocked = false;
 };
 
 
@@ -55,93 +55,93 @@ template <typename TObjectType>
 class SpinLockContext
 {
 public:
-    FX_FORCE_INLINE SpinLockContext(std::atomic_flag& af, TObjectType& object, bool never_lock = false)
-        : mAtomicFlag(af), mObject(object)
-    {
-        if (never_lock) {
-            return;
-        }
+	FX_FORCE_INLINE SpinLockContext(std::atomic_flag& af, TObjectType& object, bool never_lock = false)
+		: mAtomicFlag(af), mObject(object)
+	{
+		if (never_lock) {
+			return;
+		}
 
-        while (af.test_and_set()) {
-            af.wait(true);
-        }
+		while (af.test_and_set()) {
+			af.wait(true);
+		}
 
-        mbIsLocked = true;
-    }
+		mbIsLocked = true;
+	}
 
-    SpinLockContext(const SpinLockContext& other) = delete;
+	SpinLockContext(const SpinLockContext& other) = delete;
 
-    FX_FORCE_INLINE SpinLockContext(SpinLockContext&& other) noexcept
-        : mAtomicFlag(other.mAtomicFlag), mObject(other.mObject), mbIsLocked(other.mbIsLocked)
-    {
-        other.mbIsLocked = false;
-    }
+	FX_FORCE_INLINE SpinLockContext(SpinLockContext&& other) noexcept
+		: mAtomicFlag(other.mAtomicFlag), mObject(other.mObject), mbIsLocked(other.mbIsLocked)
+	{
+		other.mbIsLocked = false;
+	}
 
-    FX_FORCE_INLINE TObjectType& Get() { return mObject; }
-    FX_FORCE_INLINE TObjectType* operator->() { return &mObject; }
+	FX_FORCE_INLINE TObjectType& Get() { return mObject; }
+	FX_FORCE_INLINE TObjectType* operator->() { return &mObject; }
 
-    SpinLockContext& operator=(const SpinLockContext& other) = delete;
+	SpinLockContext& operator=(const SpinLockContext& other) = delete;
 
-    FX_FORCE_INLINE void Unlock()
-    {
-        if (!mbIsLocked) {
-            return;
-        }
+	FX_FORCE_INLINE void Unlock()
+	{
+		if (!mbIsLocked) {
+			return;
+		}
 
-        mAtomicFlag.clear();
-        mAtomicFlag.notify_one();
+		mAtomicFlag.clear();
+		mAtomicFlag.notify_one();
 
-        mbIsLocked = false;
-    }
+		mbIsLocked = false;
+	}
 
-    ~SpinLockContext() { Unlock(); }
+	~SpinLockContext() { Unlock(); }
 
 
 private:
-    std::atomic_flag& mAtomicFlag;
-    TObjectType& mObject;
+	std::atomic_flag& mAtomicFlag;
+	TObjectType& mObject;
 
-    bool mbIsLocked = false;
+	bool mbIsLocked = false;
 };
 
 
 class SpinLockGuard
 {
 public:
-    FX_FORCE_INLINE SpinLockGuard(std::atomic_flag& af) : mAtomicFlag(af)
-    {
-        while (af.test_and_set()) {
-            af.wait(true);
-        }
+	FX_FORCE_INLINE SpinLockGuard(std::atomic_flag& af) : mAtomicFlag(af)
+	{
+		while (af.test_and_set()) {
+			af.wait(true);
+		}
 
-        mbIsLocked = true;
-    }
+		mbIsLocked = true;
+	}
 
-    SpinLockGuard(const SpinLockGuard& other) = delete;
+	SpinLockGuard(const SpinLockGuard& other) = delete;
 
-    FX_FORCE_INLINE SpinLockGuard(SpinLockGuard&& other) noexcept : mAtomicFlag(other.mAtomicFlag)
-    {
-        other.mbIsLocked = false;
-    }
+	FX_FORCE_INLINE SpinLockGuard(SpinLockGuard&& other) noexcept : mAtomicFlag(other.mAtomicFlag)
+	{
+		other.mbIsLocked = false;
+	}
 
-    SpinLockGuard& operator=(const SpinLockGuard& other) = delete;
+	SpinLockGuard& operator=(const SpinLockGuard& other) = delete;
 
-    FX_FORCE_INLINE void Unlock()
-    {
-        if (!mbIsLocked) {
-            return;
-        }
+	FX_FORCE_INLINE void Unlock()
+	{
+		if (!mbIsLocked) {
+			return;
+		}
 
-        mAtomicFlag.clear();
-        mAtomicFlag.notify_one();
+		mAtomicFlag.clear();
+		mAtomicFlag.notify_one();
 
-        mbIsLocked = false;
-    }
+		mbIsLocked = false;
+	}
 
-    ~SpinLockGuard() { Unlock(); }
+	~SpinLockGuard() { Unlock(); }
 
 
 private:
-    std::atomic_flag& mAtomicFlag;
-    bool mbIsLocked = false;
+	std::atomic_flag& mAtomicFlag;
+	bool mbIsLocked = false;
 };

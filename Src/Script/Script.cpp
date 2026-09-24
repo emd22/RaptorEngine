@@ -11,13 +11,6 @@ namespace fx::script {
 
 Script::Script(const String& path) : mPath(path) { ReloadScript(); }
 
-
-Script::Script(const Script& other)
-{
-	mpJit = other.mpJit;
-	mpErrors = other.mpErrors;
-}
-
 Script::Script(Script&& other)
 {
 	mpJit = other.mpJit;
@@ -44,6 +37,10 @@ void Script::ReloadScript()
 		return;
 	}
 
+	if (mpGlobalContext != nullptr) {
+		DestroyGlobalData();
+	}
+
 	mpJit = strataJitCompileFile(compiler, mPath.CStr(), &mpErrors);
 
 	if (HasErrors()) {
@@ -51,6 +48,8 @@ void Script::ReloadScript()
 		LogError(LC_SCRIPT, "Errors:\n{}", GetErrors());
 		return;
 	}
+
+	CreateGlobalData();
 
 	SetExterns();
 }
@@ -96,23 +95,37 @@ void Script::SetExterns()
 }
 
 
-Script& Script::operator=(const Script& other)
-{
-	mpJit = other.mpJit;
-	mpErrors = other.mpErrors;
-
-	return *this;
-}
-
 Script& Script::operator=(Script&& other)
 {
 	mpJit = other.mpJit;
 	mpErrors = other.mpErrors;
+	mpGlobalContext = other.mpGlobalContext;
+	mPath = other.mPath;
 
 	other.mpJit = nullptr;
 	other.mpErrors = nullptr;
+	other.mpGlobalContext = nullptr;
+	other.mPath.Clear();
 
 	return *this;
+}
+
+void Script::CreateGlobalData()
+{
+	auto context_create_func = GetFunction<void* (*)()>("__strata_context_create");
+	if (context_create_func != nullptr) {
+		mpGlobalContext = context_create_func();
+	}
+}
+
+void Script::DestroyGlobalData()
+{
+	auto context_destroy_func = GetFunction<void (*)(void*)>("__strata_context_destroy");
+
+	if (context_destroy_func != nullptr && mpGlobalContext != nullptr) {
+		context_destroy_func(mpGlobalContext);
+		mpGlobalContext = nullptr;
+	}
 }
 
 
@@ -124,6 +137,10 @@ Script::~Script()
 
 	if (mpJit != nullptr) {
 		strataJitDestroy(mpJit);
+	}
+
+	if (mpGlobalContext != nullptr) {
+		DestroyGlobalData();
 	}
 }
 
