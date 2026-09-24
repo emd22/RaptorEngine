@@ -45,7 +45,7 @@ void tool_create_begin()
 {
 	float3 normal = player.ray_get_normal(CREATE_RANGE);
 
-	create_active = !editor_vec_is_zero(normal);
+	create_active = !nearzero(normal);
 
 	if (!create_active) {
 		return;
@@ -64,7 +64,7 @@ void tool_create_update(float delta_time)
 		return;
 	}
 
-	float step = editor_get_snap_value();
+	float step = tool_get_snap_multiplier();
 
 	if (KEY.K_E.is_pressed()) {
 		create_height += step;

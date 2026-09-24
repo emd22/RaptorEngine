@@ -1,8 +1,8 @@
 /*
  * File:        tool_translate.strata
  * Author:      emd22
- * Created:     09/23/2026
- * Description: Translate (move) tool. Run by `prototype_editor.strata` while EDITORTOOL.TRANSLATE is selected.
+ * Created:     23/09/2026
+ * Description: Translate (move) tool
  */
 
 import ../tool_common;
@@ -12,10 +12,18 @@ import ../tool_common;
 float translate_height_accum = 0.0f;
 
 
+/////////////////////////////////////
+
 void tool_enter()
 {
-	printf("Hello, World\n");
 }
+
+void tool_leave()
+{
+}
+
+
+/////////////////////////////////////
 
 
 /* The mouse was pressed with the Translate tool selected. */
@@ -49,7 +57,7 @@ void tool_translate_update(float delta_time)
 	   comes from Q/E alone (same directions as flying: E up, Q down). */
 	float3 player_delta = player.position - initial_player_position;
 
-	const float speed = delta_time * (editor_get_snap_value() * 8.0);
+	const float speed = delta_time * (tool_get_snap_multiplier() * 8.0);
 
 	if (KEY.K_E.is_down()) {
 		translate_height_accum += speed;
@@ -59,7 +67,6 @@ void tool_translate_update(float delta_time)
 	}
 
 	float3 translate_movement = float3(player_delta.x, translate_height_accum, player_delta.z);
-
 	float3 movement_delta = editor_transform_snap(translate_movement);
 
 	tool_translate_move_selection(movement_delta);

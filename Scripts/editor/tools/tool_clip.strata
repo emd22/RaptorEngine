@@ -36,10 +36,14 @@ bool tool_clip_has_line()
 
 void tool_clip_begin()
 {
-	clip_object = sel.selected_object;
+	if (sel.selected_objects_count == 0) {
+		return;
+	}
+
+	clip_object = sel.selected_objects[0];
 
 	float3 face = clip_object.ray_get_face();
-	clip_active = !editor_vec_is_zero(face);
+	clip_active = !nearzero(face);
 
 	if (!clip_active) {
 		return;

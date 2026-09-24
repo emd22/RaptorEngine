@@ -729,9 +729,9 @@ void EditorMode::ResetUndoStack() { mOperationStack.Clear(); }
 
 float EditorMode::GetQuantizeFraction() const
 {
-	auto editor_get_snap_value = pScript->GetFunction<float (*)()>("editor_get_snap_value");
-	if (editor_get_snap_value) {
-		return editor_get_snap_value();
+	auto tool_get_snap_multiplier = pScript->GetFunction<float (*)()>("tool_get_snap_multiplier");
+	if (tool_get_snap_multiplier) {
+		return tool_get_snap_multiplier();
 	}
 
 	return 0.0f;

@@ -64,6 +64,13 @@ eEditorTool GetEditorTool();
 
 editor::EditorTool* GetEditorTool2(eEditorTool tool_type);
 
+editor::EditorToolState* GetEditorToolState();
+editor::EditorToolSelection* GetEditorToolSelection();
+
+void ReloadAllTools();
+
+void SubmitToolConfig(const editor::EditorToolState* config);
+
 /**
  * @brief Sets up a handler used by the File > Reload X options
  */

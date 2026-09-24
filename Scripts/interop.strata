@@ -31,13 +31,14 @@ enum FACETEXTUREEDIT : uint
 /* This must match eEditorMode in InGameEditor.hpp! */
 enum EDITORTOOL
 {
-	NONE = 0,
-	TRANSLATE = 1,
-	FACE = 2,
-	ROTATE = 3,
-	CREATE = 4,
-	CLIP = 5,
-	SET_MATERIAL = 6,
+	NONE,
+
+	TRANSLATE,
+	FACE,
+	ROTATE,
+	CREATE,
+	CLIP,
+	SET_MATERIAL,
 }
 
 

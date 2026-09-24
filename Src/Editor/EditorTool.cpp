@@ -19,6 +19,19 @@ EditorTool::EditorTool(eEditorTool tool_type, const char* script_path) : Tool(to
 	}
 
 	pScript = gScriptManager->LoadScript(script_path);
+
+	ReloadHotFunctions();
+}
+
+void EditorTool::ReloadHotFunctions()
+{
+	if (pScript == nullptr) {
+		return;
+	}
+
+	pFnBegin = pScript->GetFunction<void (*)()>("tool_begin");
+	pFnUpdate = pScript->GetFunction<void (*)(float)>("tool_update");
+	pFnFinalize = pScript->GetFunction<void (*)(void)>("tool_finalize");
 }
 
 EditorTool::~EditorTool()

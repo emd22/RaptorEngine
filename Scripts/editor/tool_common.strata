@@ -1,11 +1,8 @@
 /*
  * File:        tool_common.strata
  * Author:      emd22
- * Created:     09/23/2026
- * Description: State and helpers shared by the editor tools (see `tools/tool_*.strata`) and `prototype_editor.strata`.
- *
- *              NOTE: `@private` functions are only visible inside their own file, so anything a tool or the
- *              editor dispatcher needs from here must stay public.
+ * Created:     23/09/2026
+ * Description: State and helpers shared by the editor tools
  */
 
 import ../interop;
@@ -14,7 +11,7 @@ import ../keyboard;
 
 
 /* Configuration to be passed back and forth between the GUI editor and the strata scripts. */
-struct EDITORCONFIG
+struct TOOLSTATE
 {
 	EDITORTOOL selected_tool;
 
@@ -24,16 +21,6 @@ struct EDITORCONFIG
 
 	OBJECT transform_marker_object;
 }
-
-
-
-
-
-
-
-
-
-
 
 enum OBJECTTAG
 {
@@ -45,9 +32,6 @@ const int LIMIT_SELECTION_OBJECTS = 64;
 
 struct SELECTION
 {
-	/* The currently selected object (via raycast) */
-	OBJECT selected_object;
-
 	OBJECT[LIMIT_SELECTION_OBJECTS] selected_objects;
 	float3[LIMIT_SELECTION_OBJECTS] initial_object_positions;
 	float3[LIMIT_SELECTION_OBJECTS] initial_object_rotations;
@@ -78,9 +62,36 @@ bool editor_enable_snap = true;
 OBJECT transform_marker_object;
 
 /* Empty object */
-OBJECT null_object;
+OBJECT OBJECT_NULL;
 
+
+/* KEEP: Ethan refactor note */
+TOOLSTATE state;
 SELECTION sel;
+
+
+/////////////////////////////////////
+// Data interop
+/////////////////////////////////////
+
+/* Receive the current state from the GUI editor. */
+void tool_state_receive(ref TOOLSTATE tc)
+{
+	state.selected_tool = tc.selected_tool;
+	state.tool_snap_level = tc.tool_snap_level;
+	state.tool_snap_enabled = tc.tool_snap_enabled;
+	state.transform_marker_object = tc.transform_marker_object;
+}
+
+/* Submit the current state from script to editor. */
+extern void tool_state_send(ref TOOLSTATE tc);
+
+/* Sync the current tool state with the GUI editor. */
+@private
+void sync_state()
+{
+	tool_state_send(state);
+}
 
 
 /////////////////////////////////////
@@ -93,7 +104,6 @@ void hide_transform_marker_object()
 	transform_marker_object.move_to(float3(200.0f));
 }
 
-
 /////////////////////////////////////
 // Snapping
 /////////////////////////////////////
@@ -102,56 +112,63 @@ void hide_transform_marker_object()
    positive (1) increases it. */
 void editor_adjust_snap_index(int direction)
 {
+	int level = state.tool_snap_level;
+
 	if (direction < 0) {
-		editor_snap_level--;
+		level--;
 	}
 	else {
-		editor_snap_level++;
+		level++;
 	}
 
-	editor_snap_level = fclamp(editor_snap_level, 0, 3);
+	state.tool_snap_level = fclamp(level, 0, 3);;
+
+	sync_state();
 }
 
 /* Get the division that we are quantizing by. NOTE: not the index. */
-float editor_get_snap_value()
+float tool_get_snap_multiplier()
 {
 	float[4] snap_values = { 0.05f, 0.10f, 0.25f, 0.50f };
-	uint index = fclamp(editor_snap_level, 0, 3);
+	uint index = fclamp(state.tool_snap_level, 0, 3);
 	return snap_values[index];
 }
 
 bool editor_get_snap_enabled()
 {
-	return editor_enable_snap;
+	return state.tool_snap_enabled;
 }
 
 /* If snap is enabled, this snaps a given vector to the selected snap fraction. */
 float3 editor_transform_snap(float3 vec)
 {
-	if (!editor_enable_snap) {
+	if (!state.tool_snap_enabled) {
 		return vec;
 	}
 
-	float3 qsnap = float3(editor_get_snap_value());
+	float3 qsnap = float3(tool_get_snap_multiplier());
 	return (float3_round(vec / qsnap) * qsnap);
 }
 
-/* Epsilon helpers for skipping no-op undo pushes (a click without movement). */
-bool editor_vec_is_zero(float3 v)
-{
-	const float eps = 0.00001f;
-	return (v.x < eps && v.x > -eps) && (v.y < eps && v.y > -eps) && (v.z < eps && v.z > -eps);
-}
 
 bool editor_vec_equal(float3 a, float3 b)
 {
-	return editor_vec_is_zero(a - b);
+	return nearzero(a - b);
 }
 
 
 /////////////////////////////////////
 // Selection
 /////////////////////////////////////
+
+
+OBJECT editor_last_selected_object()
+{
+	if (sel.selected_objects_count == 0) {
+		return OBJECT_NULL;
+	}
+	return sel.selected_objects[sel.selected_objects_count - 1];
+}
 
 bool editor_has_object_selection()
 {
@@ -162,28 +179,30 @@ bool editor_has_object_selection()
 /* DO NOT USE NORMALLY, this is meant to be called by the C++ side. */
 void _internal_editor_select_object(OBJECT object, bool is_selected, bool append_selection)
 {
-	sel.selected_object = object;
 
-	if (is_selected && append_selection) {
-		// Ignore if we are above the current selection count
-		if (sel.selected_objects_count >= LIMIT_SELECTION_OBJECTS) {
-			script_error("object cannot be selected as selection is too large");
-			return;
+	if (!is_selected) {
+		// If we are in append mode, ignore the object as opposed to clearing the whole selection.
+		if (!append_selection) {
+			sel.selected_objects_count = 0;
 		}
 
+		return;
+	}
+
+	// Ignore if we are above the max selection count
+	if (sel.selected_objects_count + 1 >= LIMIT_SELECTION_OBJECTS) {
+		script_error("object cannot be selected as selection is too large");
+		return;
+	}
+
+	if (append_selection) {
 		sel.selected_objects[sel.selected_objects_count++] = object;
 		return;
 	}
 
 	// We have selected an object, but will not append to the current selection.
-	if (is_selected) {
-		sel.selected_objects[0] = object;
-		sel.selected_objects_count = 1;
-	}
-	// Clear the current selection
-	else {
-		sel.selected_objects_count = 0;
-	}
+	sel.selected_objects[0] = object;
+	sel.selected_objects_count = 1;
 }
 
 /* Select an object. Passing in false for `is_selected` acts as a null value, voiding the selection. */
@@ -201,7 +220,7 @@ void reset_selection()
 	sel.selected_face = float3(0.0f);
 	sel.selected_face_scale = 0.0f;
 
-	editor_select_object(null_object, false, false);
+	editor_select_object(OBJECT_NULL, false, false);
 }
 
 
@@ -239,7 +258,7 @@ void editor_dupe_selection()
 
 	// Swap the selection over to the dupes. The null-select restores the
 	// originals' materials on the C++ side; the appends select the dupes.
-	editor_select_object(null_object, false, false);
+	editor_select_object(OBJECT_NULL, false, false);
 
 	{
 		for (int i = 0; i < n; i++) {
