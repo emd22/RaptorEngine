@@ -91,12 +91,15 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 
 	SetMenuBar(menu_bar);
 
-	Bind(wxEVT_MENU, [](wxCommandEvent&) { InvokeReloadHandler(eReloadTarget::World); }, reload_world_item->GetId());
 	Bind(
-		wxEVT_MENU, [](wxCommandEvent&) { InvokeReloadHandler(eReloadTarget::Prototype); },
+		wxEVT_MENU, [](wxCommandEvent&) { gEditor->InvokeReloadHandler(eReloadTarget::World); },
+		reload_world_item->GetId());
+	Bind(
+		wxEVT_MENU, [](wxCommandEvent&) { gEditor->InvokeReloadHandler(eReloadTarget::Prototype); },
 		reload_prototype_item->GetId());
 	Bind(
-		wxEVT_MENU, [](wxCommandEvent&) { InvokeReloadHandler(eReloadTarget::Scripts); }, reload_scripts_item->GetId());
+		wxEVT_MENU, [](wxCommandEvent&) { gEditor->InvokeReloadHandler(eReloadTarget::Scripts); },
+		reload_scripts_item->GetId());
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowObjectListWindow(); }, object_list_item->GetId());
 
 	wxPanel* root = new wxPanel(this, wxID_ANY);
@@ -163,7 +166,8 @@ void EditorFrame::SetEditorTool(const eEditorTool tool)
 	const bool will_simulate = (tool == eEditorTool::None);
 
 	mSelectedToolType = tool;
-	EditorTool* new_tool = GetEditorTool2(tool);
+
+	EditorTool* new_tool = gEditor->GetTool(tool);
 
 	// Notify the new and previously selected tool
 	{
@@ -177,22 +181,9 @@ void EditorFrame::SetEditorTool(const eEditorTool tool)
 
 		// Call the enter function for the tool if it exists
 		if (new_tool && new_tool->pScript) {
-			// auto tool_enter = new_tool->pScript->GetFunction<void (*)(void)>("tool_enter");
-			//
-			// if (tool_enter != nullptr) {
-			//		tool_enter();
-			// }
-
 			new_tool->pScript->CallFunction<void>("tool_enter");
-
-			// Send over the editor state
-
+			// Send over the current state
 			new_tool->pScript->CallFunction<void>("tool_stata_receive", editor::GetEditorToolState());
-
-			// auto tool_state_receive = new_tool->pScript->GetFunction<void
-			// (*)(EditorToolState*)>("tool_state_receive"); if (tool_state_receive != nullptr) {
-			// 	tool_state_receive(editor::GetEditorToolState());
-			// }
 		}
 	}
 

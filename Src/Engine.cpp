@@ -66,10 +66,6 @@ void Init()
 	gProbeManager = new ProbeManager;
 	gDecalManager = new DecalManager;
 	gCVars = new CVarManager;
-
-#ifdef FX_IS_EDITOR
-	gEditor = new editor::RaptorEditor;
-#endif
 }
 
 
@@ -85,10 +81,6 @@ void Destroy()
 	DESTROY_GLOBAL(gProbeManager);
 	DESTROY_GLOBAL(gDecalManager);
 	DESTROY_GLOBAL(gCVars);
-
-#ifdef FX_IS_EDITOR
-	DESTROY_GLOBAL(gEditor);
-#endif
 }
 
 } // namespace Globals

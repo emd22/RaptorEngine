@@ -182,7 +182,7 @@ void RaptorGame::CreateGame()
 	AddEditorModes();
 
 #ifdef FX_IS_EDITOR
-	if (!editor::IsSimulationMode()) {
+	if (!gEditor->IsSimulationMode()) {
 		gPrototypeEditor->Reload();
 	}
 #endif
@@ -221,9 +221,9 @@ void RaptorGame::CreateGame()
 	CreateLights();
 
 #ifdef FX_IS_EDITOR
-	editor::SetReloadHandler(editor::eReloadTarget::World, [this] { ReloadWorldFile(); });
-	editor::SetReloadHandler(editor::eReloadTarget::Prototype, [this] { ReloadBlockout(); });
-	editor::SetReloadHandler(editor::eReloadTarget::Scripts, [this] { ReloadScripts(); });
+	gEditor->SetReloadHandler(editor::eReloadTarget::World, [this] { ReloadWorldFile(); });
+	gEditor->SetReloadHandler(editor::eReloadTarget::Prototype, [this] { ReloadBlockout(); });
+	gEditor->SetReloadHandler(editor::eReloadTarget::Scripts, [this] { ReloadScripts(); });
 #endif
 
 	// Start the frame timer now, otherwise the first Tick() measures from counter zero (time since boot) and steps
@@ -309,8 +309,8 @@ static FX_FORCE_INLINE Vec3f GetEditorMovementVector()
 void RaptorGame::ToggleEditorMode()
 {
 #ifdef FX_IS_EDITOR
-	editor::GetMainFrame()->SetEditorTool(editor::IsSimulationMode() ? editor::eEditorTool::Translate
-																	 : editor::eEditorTool::None);
+	gEditor->GetMainFrame()->SetEditorTool(gEditor->IsSimulationMode() ? editor::eEditorTool::Translate
+																	   : editor::eEditorTool::None);
 #endif
 }
 
@@ -419,6 +419,12 @@ static void FireShot()
 
 void RaptorGame::ProcessControls()
 {
+#ifdef FX_IS_EDITOR
+	const bool is_simulation_mode = gEditor->IsSimulationMode();
+#else
+	const bool is_simulation_mode = true;
+#endif
+
 	// The click that captures the mouse shouldn't also fire
 	const bool was_mouse_locked = ControlManager::IsMouseLocked();
 
@@ -442,22 +448,6 @@ void RaptorGame::ProcessControls()
 		if (gPrototypeEditor != nullptr && gPrototypeEditor->HasSelection()) {
 			gPrototypeEditor->SelectObject(nullptr, false);
 		}
-	}
-
-
-	// The Create and Set Material tools use clicks to draw new brushes and paint faces instead of picking objects
-	const bool tool_picks_objects = (editor::GetEditorTool() != editor::eEditorTool::Create &&
-									 editor::GetEditorTool() != editor::eEditorTool::SetMaterial);
-
-	if (!editor::IsSimulationMode() && gPrototypeEditor != nullptr && tool_picks_objects &&
-		ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
-		EditorSelectObject();
-	}
-
-
-	if (editor::IsSimulationMode() && was_mouse_locked && ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
-		FireShot();
-		gWorld->Player.DoFireAnimation();
 	}
 
 
@@ -505,19 +495,36 @@ void RaptorGame::ProcessControls()
 		gWorld->Player.bIsSprinting = false;
 	}
 
-	if (editor::IsSimulationMode() && ControlManager::IsKeyPressed(eKey::FX_KEY_R) &&
+	if (is_simulation_mode && was_mouse_locked && ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
+		FireShot();
+		gWorld->Player.DoFireAnimation();
+	}
+
+	if (is_simulation_mode && ControlManager::IsKeyPressed(eKey::FX_KEY_R) &&
 		!ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT)) {
 		gWorld->Player.DoReloadAnimation();
 	}
+
+
+#ifdef FX_IS_EDITOR
+	// The Create and Set Material tools use clicks to draw new brushes and paint faces instead of picking objects
+	const bool tool_picks_objects = (gEditor->GetCurrentToolType() != editor::eEditorTool::Create &&
+									 gEditor->GetCurrentToolType() != editor::eEditorTool::SetMaterial);
+
+	if (!is_simulation_mode && gPrototypeEditor != nullptr && tool_picks_objects &&
+		ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
+		EditorSelectObject();
+	}
+#endif
 
 	if (ControlManager::IsComboPressed(eKey::FX_KEY_LSHIFT, eKey::FX_KEY_R)) {
 		ReloadBlockout();
 	}
 
-
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_0)) {
 		ReloadScripts();
 	}
+
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_H)) {
 		const SizedArray<ObjectID>& nearby_objects = gWorldGrid->GetNearbyObjects();
 
@@ -595,7 +602,7 @@ void RaptorGame::ReloadScripts()
 		gPrototypeEditor->Reload();
 	}
 
-	editor::ReloadAllTools();
+	gEditor->ReloadAllTools();
 }
 
 void RaptorGame::RenderText()
@@ -677,21 +684,23 @@ void RaptorGame::Tick()
 	}
 
 #ifdef FX_IS_EDITOR
-	editor::UpdateWorldPropertiesPanel();
-	editor::UpdatePropertiesPanelForObject((gPrototypeEditor != nullptr) ? gPrototypeEditor->GetLastSelectedObject()
-																		 : nullptr);
+	gEditor->RefreshValues();
+	gEditor->UpdateForSelectedObject((gPrototypeEditor != nullptr) ? gPrototypeEditor->GetLastSelectedObject()
+																   : nullptr);
 #endif
 
 	if (!bInCommandMode) {
 		gWorld->Player.Move(DeltaTime, GetMovementVector());
 
-		if (!editor::IsSimulationMode()) {
+#ifdef FX_IS_EDITOR
+		if (!gEditor->IsSimulationMode()) {
 			Vec3f forward = GetCameraForwardDominantAxis();
 			Vec3f right = Vec3f(forward.Z, 0.0f, -forward.X);
 			Vec3f raw_momement = GetMovementVector();
 			Vec3f movement = forward * raw_momement.Z + right * raw_momement.X + Vec3f(0, raw_momement.Y, 0);
 			gPrototypeEditor->Update(movement, static_cast<float32>(DeltaTime));
 		}
+#endif
 	}
 
 	gWorld->Player.Update(DeltaTime);

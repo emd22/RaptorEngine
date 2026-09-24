@@ -105,7 +105,8 @@ static Object* N_editor_op_dupe_object(Object* object_to_dupe, FLOAT4 position, 
 
 static void N_editor_push_op_delete(Object* obj, int32 group_size)
 {
-	if (obj == nullptr || editor::IsSimulationMode()) {
+#ifdef FX_IS_EDITOR
+	if (obj == nullptr || gEditor->IsSimulationMode()) {
 		return;
 	}
 
@@ -127,6 +128,7 @@ static void N_editor_push_op_delete(Object* obj, int32 group_size)
 	op.ObjectSnapshot.bIsProbeVolume = obj->IsProbeVolume();
 
 	gPrototypeEditor->PushEditOperation(op);
+#endif
 }
 
 
@@ -279,7 +281,8 @@ static FLOAT4 N_object_ray_get_face(Object* obj)
 
 static void N_object__select_object_internal(Object* obj, bool is_selected, bool append_selection)
 {
-	if (editor::IsSimulationMode()) {
+#ifdef FX_IS_EDITOR
+	if (gEditor->IsSimulationMode()) {
 		return;
 	}
 
@@ -291,6 +294,7 @@ static void N_object__select_object_internal(Object* obj, bool is_selected, bool
 
 	// Select an object
 	gPrototypeEditor->SelectObject(obj, append_selection);
+#endif
 }
 
 
@@ -442,7 +446,8 @@ static void N_blockout_hide_preview() { gWorld->pBlockout->HidePreview(); }
 
 static Object* N_blockout_create_box(FLOAT4 min, FLOAT4 max)
 {
-	if (editor::IsSimulationMode()) {
+#ifdef FX_IS_EDITOR
+	if (gEditor->IsSimulationMode()) {
 		return nullptr;
 	}
 
@@ -464,12 +469,16 @@ static Object* N_blockout_create_box(FLOAT4 min, FLOAT4 max)
 	op.ObjectSnapshot.Material = gWorld->pBlockout->GetMaterialForSlot(eCProtoMat::Gray);
 
 	return gPrototypeEditor->PushEditOperation(op).pObject;
+#else
+	return nullptr;
+#endif
 }
 
 /// Splits a blockout in two along a line drawn on one of its faces. Both pieces are kept.
 static bool N_blockout_clip(Object* object, FLOAT4 point_a, FLOAT4 point_b, FLOAT4 face_normal)
 {
-	if (object == nullptr || editor::IsSimulationMode()) {
+#ifdef FX_IS_EDITOR
+	if (object == nullptr || gEditor->IsSimulationMode()) {
 		return false;
 	}
 
@@ -510,6 +519,9 @@ static bool N_blockout_clip(Object* object, FLOAT4 point_a, FLOAT4 point_b, FLOA
 	gPrototypeEditor->PushEditOperation(split_op);
 
 	return true;
+#else
+	return false;
+#endif
 }
 
 /// How far away a face can be painted with the Set Material tool
@@ -521,7 +533,8 @@ static constexpr float32 scPaintRange = 100.0f;
  */
 static bool N_blockout_paint_material(int32 slot, bool whole_brush)
 {
-	if (editor::IsSimulationMode() || slot >= static_cast<int32>(eCProtoMat::Count)) {
+#ifdef FX_IS_EDITOR
+	if (gEditor->IsSimulationMode() || slot >= static_cast<int32>(eCProtoMat::Count)) {
 		return false;
 	}
 
@@ -553,11 +566,15 @@ static bool N_blockout_paint_material(int32 slot, bool whole_brush)
 	gPrototypeEditor->PushEditOperation(op);
 
 	return true;
+#else
+	return false;
+#endif
 }
 
 static void N_blockout_edit_face_texture(Object* object, FLOAT4 face, uint32 edit, FLOAT4 amount)
 {
-	if (object == nullptr || editor::IsSimulationMode()) {
+#ifdef FX_IS_EDITOR
+	if (object == nullptr || gEditor->IsSimulationMode()) {
 		return;
 	}
 
@@ -584,6 +601,7 @@ static void N_blockout_edit_face_texture(Object* object, FLOAT4 face, uint32 edi
 	}
 
 	gPrototypeEditor->PushEditOperation(op);
+#endif
 }
 
 static Object* N_blockout_new_object(FLOAT4 position) { return gWorld->pBlockout->NewObject(Vec3f(position)); }
@@ -631,7 +649,7 @@ static void N_script_error(const char* str) { LogError(LC_SCRIPT, "{}", str); }
 static void N_GUI_set_editor_tool(editor::eEditorTool tool)
 {
 #ifdef FX_IS_EDITOR
-	editor::GetMainFrame()->SetEditorTool(tool);
+	gEditor->GetMainFrame()->SetEditorTool(tool);
 #endif
 }
 

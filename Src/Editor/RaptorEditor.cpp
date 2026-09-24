@@ -1,5 +1,7 @@
 #include "RaptorEditor.hpp"
 
+#ifdef FX_IS_EDITOR
+
 #include "EditorFrame.hpp"
 #include "EditorPlatform.hpp"
 #include "EditorViewport.hpp"
@@ -16,6 +18,7 @@
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 
+
 namespace fx::editor {
 
 /// Raptor controls the frame loop, so the app has nothing to do on init
@@ -31,27 +34,13 @@ public:
 
 struct EditorContext
 {
-	wxGUIEventLoop* pEventLoop = nullptr;
-	EditorFrame* pMainFrame = nullptr;
-
-	std::function<void()> pReloadHandlers[static_cast<uint32>(eReloadTarget::Count)];
-
-	StackArray<EditorTool, static_cast<uint32>(eEditorTool::Count)> Tools;
-
 	EditorToolState ToolState;
 	EditorToolSelection ToolSelection;
 };
 
 static EditorContext* pCtx = nullptr;
 
-static void AddTool(const eEditorTool tool, const char* path)
-{
-	uint32 tool_index = (static_cast<uint32>(tool));
-
-	Assert((static_cast<uint32>(tool)) == pCtx->Tools.Size);
-
-	pCtx->Tools.Insert(EditorTool(tool, path));
-}
+static void AddTool(const eEditorTool tool, const char* path) {}
 
 
 static void CreateEditorTools()
@@ -66,6 +55,16 @@ static void CreateEditorTools()
 
 /// Upper bound on native events dispatched per frame, so a flood of them can't stall rendering
 static constexpr uint32 scMaxEventsPerFrame = 256;
+
+void RaptorEditor::AddTool(const eEditorTool tool_type, const char* path)
+{
+	uint32 tool_index = (static_cast<uint32>(tool_type));
+	Assert((static_cast<uint32>(tool_type)) == mTools.Size);
+
+	mTools.Insert(EditorTool(tool_type, path));
+}
+
+void RaptorEditor::AddTools() {}
 
 
 bool RaptorEditor::InitGUI(int argc, char** argv)
@@ -91,48 +90,65 @@ bool RaptorEditor::InitGUI(int argc, char** argv)
 		return false;
 	}
 
-	pCtx->pEventLoop = new wxGUIEventLoop;
-	wxEventLoopBase::SetActive(pCtx->pEventLoop);
+	mpEventLoop = new wxGUIEventLoop;
+	wxEventLoopBase::SetActive(mpEventLoop);
 
 	CreateEditorTools();
 
 	return true;
 }
 
-
-void UpdateWorldPropertiesPanel() { pCtx->pMainFrame->GetWorldPropertiesPanel()->Update(); }
-
-EditorFrame* RaptorEditor::CreateMainWindow(const char* title, const Vec2u& viewport_size)
+EditorTool* RaptorEditor::GetTool(const eEditorTool tool_type)
 {
-	pCtx->pMainFrame = new EditorFrame(wxString::FromAscii(title),
-									   wxSize(static_cast<int>(viewport_size.X), static_cast<int>(viewport_size.Y)));
+	uint32 tool_index = static_cast<uint32>(tool_type);
 
-	pCtx->pMainFrame->Show();
-	pCtx->pMainFrame->Raise();
+	if (tool_index > mTools.Size || tool_index < 0) {
+		LogError("Tool {} has not been registered", tool_index);
+		return nullptr;
+	}
+
+	return &mTools[tool_index];
+}
+
+
+void RaptorEditor::UpdateForSelectedObject(Object* object)
+{
+	if (mpMainFrame != nullptr) {
+		mpMainFrame->GetObjectPropertiesPanel()->ShowObject(object);
+	}
+}
+
+void RaptorEditor::RefreshValues() { mpMainFrame->GetWorldPropertiesPanel()->Update(); }
+
+EditorFrame* RaptorEditor::CreateMainFrame(const char* title, const Vec2u& viewport_size)
+{
+	mpMainFrame = new EditorFrame(wxString::FromAscii(title),
+								  wxSize(static_cast<int>(viewport_size.X), static_cast<int>(viewport_size.Y)));
+
+	mpMainFrame->Show();
+	mpMainFrame->Raise();
 
 #ifdef FX_PLATFORM_MACOS
 	// Bring window to front
 	platform::ActivateApp();
 #endif
 
-	pCtx->pMainFrame->GetViewport()->SetFocus();
+	mpMainFrame->GetViewport()->SetFocus();
 
 	// Get the frame on screen and laid out before the renderer creates its surface on the viewport
 	PumpEvents();
 
-	return pCtx->pMainFrame;
+	return mpMainFrame;
 }
 
-EditorFrame* GetMainFrame() { return pCtx->pMainFrame; }
-
-bool PumpEvents()
+bool RaptorEditor::PumpEvents()
 {
-	if (pCtx->pEventLoop == nullptr || pCtx->pMainFrame == nullptr) {
+	if (mpEventLoop == nullptr || mpMainFrame == nullptr) {
 		return false;
 	}
 
 	for (uint32 i = 0; i < scMaxEventsPerFrame; i++) {
-		if (pCtx->pEventLoop->DispatchTimeout(0) != 1) {
+		if (mpEventLoop->DispatchTimeout(0) != 1) {
 			break;
 		}
 	}
@@ -140,7 +156,7 @@ bool PumpEvents()
 	wxTheApp->ProcessPendingEvents();
 	wxTheApp->ProcessIdle();
 
-	EditorViewport* viewport = pCtx->pMainFrame->GetViewport();
+	EditorViewport* viewport = mpMainFrame->GetViewport();
 
 	viewport->PollRelativeMouse();
 
@@ -153,50 +169,34 @@ bool PumpEvents()
 		}
 	}
 
-	return !pCtx->pMainFrame->IsCloseRequested();
+	return !mpMainFrame->IsCloseRequested();
 }
 
-void UpdatePropertiesPanelForObject(Object* object)
-{
-	if (pCtx->pMainFrame != nullptr) {
-		pCtx->pMainFrame->GetObjectPropertiesPanel()->ShowObject(object);
-	}
-}
 
-bool IsSimulationMode() { return pCtx->pMainFrame->IsSimulationMode(); }
+void UpdatePropertiesPanelForObject(Object* object) {}
 
-eEditorTool GetEditorTool() { return pCtx->pMainFrame->GetSelectedTool(); }
-EditorTool* GetEditorTool2(eEditorTool tool_type)
-{
-	uint32 tool_index = static_cast<uint32>(tool_type);
-	if (tool_index > pCtx->Tools.Size || tool_index < 0) {
-		LogError("Tool {} has not been registered", tool_index);
-		return nullptr;
-	}
-
-	return &pCtx->Tools[tool_index];
-}
+bool RaptorEditor::IsSimulationMode() const { return mpMainFrame->IsSimulationMode(); }
 
 editor::EditorToolState* GetEditorToolState() { return &pCtx->ToolState; }
 editor::EditorToolSelection* GetEditorToolSelection() { return &pCtx->ToolSelection; }
 
-void ReloadAllTools()
+void RaptorEditor::ReloadAllTools()
 {
-	for (EditorTool& tool : pCtx->Tools) {
+	for (EditorTool& tool : mTools) {
 		tool.ReloadHotFunctions();
 	}
 }
 
 void SubmitToolConfig(const editor::EditorToolState* config) { pCtx->ToolState = (*config); }
 
-void SetReloadHandler(eReloadTarget target, std::function<void()> handler)
+void RaptorEditor::SetReloadHandler(eReloadTarget target, std::function<void()> handler)
 {
-	pCtx->pReloadHandlers[static_cast<uint32>(target)] = std::move(handler);
+	mpReloadHandlers[static_cast<uint32>(target)] = std::move(handler);
 }
 
-void InvokeReloadHandler(eReloadTarget target)
+void RaptorEditor::InvokeReloadHandler(eReloadTarget target)
 {
-	const std::function<void()>& handler = pCtx->pReloadHandlers[static_cast<uint32>(target)];
+	const std::function<void()>& handler = mpReloadHandlers[static_cast<uint32>(target)];
 
 	if (handler != nullptr) {
 		handler();
@@ -205,9 +205,9 @@ void InvokeReloadHandler(eReloadTarget target)
 
 void RaptorEditor::Destroy()
 {
-	if (pCtx->pMainFrame != nullptr) {
-		pCtx->pMainFrame->Destroy();
-		pCtx->pMainFrame = nullptr;
+	if (mpMainFrame != nullptr) {
+		mpMainFrame->Destroy();
+		mpMainFrame = nullptr;
 	}
 
 	// Runs the frame's delayed deletion
@@ -217,8 +217,8 @@ void RaptorEditor::Destroy()
 
 	wxEventLoopBase::SetActive(nullptr);
 
-	delete pCtx->pEventLoop;
-	pCtx->pEventLoop = nullptr;
+	delete mpEventLoop;
+	mpEventLoop = nullptr;
 
 	delete pCtx;
 	pCtx = nullptr;
@@ -227,3 +227,5 @@ void RaptorEditor::Destroy()
 }
 
 } // namespace fx::editor
+
+#endif

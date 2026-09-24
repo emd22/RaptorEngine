@@ -1,7 +1,12 @@
 #pragma once
 
+#ifdef FX_IS_EDITOR
+
 #include "EditorTool.hpp"
 
+#include <wx/evtloop.h>
+
+#include <Core/StackArray.hpp>
 #include <Core/Types.hpp>
 #include <Math/Vec2.hpp>
 #include <functional>
@@ -22,6 +27,8 @@ namespace fx::editor {
 
 class EditorFrame;
 
+// class wxGUIEventLoop;
+
 /// The File > Reload menu items
 enum class eReloadTarget : uint32
 {
@@ -39,58 +46,56 @@ public:
 	RaptorEditor() = default;
 
 	bool InitGUI(int argc, char** argv);
-	EditorFrame* CreateMainWindow(const char* title, const Vec2u& viewport_size);
+	EditorFrame* CreateMainFrame(const char* title, const Vec2u& viewport_size);
+
+	FX_FORCE_INLINE EditorFrame* GetMainFrame() { return mpMainFrame; }
+	FX_FORCE_INLINE const EditorFrame* GetMainFrame() const { return mpMainFrame; }
+
+	void SetReloadHandler(eReloadTarget target, std::function<void()> handler);
+	void InvokeReloadHandler(eReloadTarget target);
+
+	bool PumpEvents();
+
+	void RefreshValues();
+	void UpdateForSelectedObject(Object* object);
+
+	eEditorTool GetCurrentToolType() const { return mCurrentToolType; }
+	EditorTool* GetCurrentTool() { return mpEditorTool; };
+	EditorTool* GetTool(const eEditorTool tool_type);
+
+	bool IsSimulationMode() const;
+
+	void ReloadAllTools();
 
 	void Destroy();
 
 	~RaptorEditor() = default;
 
 private:
-public:
+	void AddTools();
+	void AddTool(const eEditorTool tool_type, const char* path);
+
 private:
+	EditorFrame* mpMainFrame = nullptr;
+
+	StackArray<EditorTool, static_cast<uint32>(eEditorTool::Count)> mTools;
+
+	eEditorTool mCurrentToolType = eEditorTool::None;
+	EditorTool* mpEditorTool = nullptr;
+
+	wxGUIEventLoop* mpEventLoop = nullptr;
+
+	std::function<void()> mpReloadHandlers[static_cast<uint32>(eReloadTarget::Count)];
 };
 
-
-/**
- * @brief Creates the editor frame
- */
-
-EditorFrame* GetMainFrame();
-
-/**
- * @brief Dispatches the pending wxWidgets events for this frame. Key and mouse input on the viewport reaches the
- * ControlManager from in here.
- *
- * @returns false once the editor window has been closed.
- */
-bool PumpEvents();
-
-void UpdatePropertiesPanelForObject(Object* object);
-void UpdateWorldPropertiesPanel();
-
-bool IsSimulationMode();
-
-/**
- * @brief Returns the tool selected in the editor's tool bar
- */
-eEditorTool GetEditorTool();
-
-editor::EditorTool* GetEditorTool2(eEditorTool tool_type);
 
 editor::EditorToolState* GetEditorToolState();
 editor::EditorToolSelection* GetEditorToolSelection();
 
-void ReloadAllTools();
 
 void SubmitToolConfig(const editor::EditorToolState* config);
 
-/**
- * @brief Sets up a handler used by the File > Reload X options
- */
-void SetReloadHandler(eReloadTarget target, std::function<void()> handler);
-
-/// Called by EditorFrame's File > Reload menu. Does nothing if no handler is registered for `target` yet.
-void InvokeReloadHandler(eReloadTarget target);
-
 
 } // namespace fx::editor
+
+#endif
