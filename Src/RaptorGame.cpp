@@ -33,13 +33,13 @@
 #include <csignal>
 
 #ifdef FX_IS_EDITOR
-#include <Editor/EditorApp.hpp>
 #include <Editor/EditorFrame.hpp>
 #include <Editor/EditorTool.hpp>
+#include <Editor/RaptorEditor.hpp>
 #endif
 
 
-FX_SET_MODULE_NAME("FoxtrotGame");
+FX_SET_MODULE_NAME("RaptorGame");
 
 namespace fx {
 

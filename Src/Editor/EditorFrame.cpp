@@ -1,9 +1,9 @@
 #include "EditorFrame.hpp"
 
-#include "EditorApp.hpp"
 #include "EditorViewport.hpp"
 #include "ObjectListWindow.hpp"
 #include "ObjectPropertiesPanel.hpp"
+#include "RaptorEditor.hpp"
 #include "WorldPropertiesPanel.hpp"
 
 #include <wx/app.h>

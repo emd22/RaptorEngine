@@ -3,8 +3,8 @@
 #include <Blockout.hpp>
 #include <CVar.hpp>
 #include <Controls.hpp>
-#include <Editor/EditorApp.hpp>
 #include <Editor/EditorFrame.hpp>
+#include <Editor/RaptorEditor.hpp>
 #include <Engine.hpp>
 #include <InGameEditor.hpp>
 #include <Math/SIMDHelper.hpp>

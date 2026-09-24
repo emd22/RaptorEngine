@@ -832,13 +832,13 @@ void Brush::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normal
 			const float32 u = vertex.Dot(projection.UAxis);
 			const float32 v = vertex.Dot(projection.VAxis);
 
-			const Vec2f uv((u * cosine - v * sine) / texture.Scale.X + texture.Offset.X,
-						   (u * sine + v * cosine) / texture.Scale.Y + texture.Offset.Y);
+			const Vec2f new_uv((u * cosine - v * sine) / texture.Scale.X + texture.Offset.X,
+							   (u * sine + v * cosine) / texture.Scale.Y + texture.Offset.Y);
 
 			positions.Insert(vertex);
 			normals.Insert(normal);
 			tangents.Insert(tangent);
-			texcoords.Insert(uv);
+			texcoords.Insert(new_uv);
 		}
 
 		for (uint32 v = 1; v + 1 < face.Vertices.Size; v++) {
