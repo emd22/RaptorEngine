@@ -163,6 +163,30 @@ void EditorFrame::SetEditorTool(const eEditorTool tool)
 	const bool will_simulate = (tool == eEditorTool::None);
 
 	mSelectedTool = tool;
+	EditorTool* tool_object = GetEditorTool2(tool);
+
+	// Notify the new and previously selected tool
+	{
+		// If there is a previous tool selected, call the leave function
+		if (pSelectedTool != tool_object && pSelectedTool != nullptr && pSelectedTool->pScript != nullptr) {
+			auto tool_leave = pSelectedTool->pScript->GetFunction<void (*)(void)>("tool_leave");
+
+			if (tool_leave != nullptr) {
+				tool_leave();
+			}
+		}
+
+		pSelectedTool = tool_object;
+
+		// Call the enter function for the tool if it exists
+		if (tool_object && tool_object->pScript) {
+			auto tool_enter = tool_object->pScript->GetFunction<void (*)(void)>("tool_enter");
+
+			if (tool_enter != nullptr) {
+				tool_enter();
+			}
+		}
+	}
 
 	if (gPrototypeEditor != nullptr) {
 		if (was_simulating && !will_simulate) {

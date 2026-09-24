@@ -12,6 +12,12 @@ import ../tool_common;
 float translate_height_accum = 0.0f;
 
 
+void tool_enter()
+{
+	printf("Hello, World\n");
+}
+
+
 /* The mouse was pressed with the Translate tool selected. */
 void tool_translate_begin()
 {

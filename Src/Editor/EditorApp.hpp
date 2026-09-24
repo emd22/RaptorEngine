@@ -1,13 +1,22 @@
 #pragma once
 
+#include "EditorTool.hpp"
+
 #include <Core/Types.hpp>
 #include <Math/Vec2.hpp>
 #include <functional>
 
 namespace fx {
+
 class Object;
+
+namespace editor {
+
 enum class eEditorTool : uint32;
-}
+
+};
+
+} // namespace fx
 
 namespace fx::editor {
 
@@ -52,6 +61,8 @@ bool IsSimulationMode();
  * @brief Returns the tool selected in the editor's tool bar
  */
 eEditorTool GetEditorTool();
+
+editor::EditorTool* GetEditorTool2(eEditorTool tool_type);
 
 /**
  * @brief Sets up a handler used by the File > Reload X options

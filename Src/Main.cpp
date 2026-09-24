@@ -58,6 +58,8 @@ int main(int argc, char** argv)
 
 #ifndef FX_RUN_TEST
 
+	gScriptManager = new ScriptManager;
+
 #ifdef FX_IS_EDITOR
 	// If there was an issue starting the editor, return with an error code
 	if (!fx::editor::Init(argc, argv)) {
