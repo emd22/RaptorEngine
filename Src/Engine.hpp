@@ -48,6 +48,18 @@ extern EditorMode* gPrototypeEditor;
 class CVarManager;
 extern CVarManager* gCVars;
 
+#ifdef FX_IS_EDITOR
+
+namespace editor {
+
+class RaptorEditor;
+} // namespace editor
+
+extern editor::RaptorEditor* gEditor;
+
+
+#endif
+
 
 namespace Globals {
 void Init();

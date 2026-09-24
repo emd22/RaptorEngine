@@ -32,15 +32,28 @@ enum class eReloadTarget : uint32
 	Count,
 };
 
-/**
- * @brief Initialze wxWidgets gubbins
- */
-bool Init(int argc, char** argv);
+
+class RaptorEditor
+{
+public:
+	RaptorEditor() = default;
+
+	bool InitGUI(int argc, char** argv);
+	EditorFrame* CreateMainWindow(const char* title, const Vec2u& viewport_size);
+
+	void Destroy();
+
+	~RaptorEditor() = default;
+
+private:
+public:
+private:
+};
+
 
 /**
  * @brief Creates the editor frame
  */
-EditorFrame* CreateMainFrame(const char* title, const Vec2u& viewport_size);
 
 EditorFrame* GetMainFrame();
 
@@ -79,9 +92,5 @@ void SetReloadHandler(eReloadTarget target, std::function<void()> handler);
 /// Called by EditorFrame's File > Reload menu. Does nothing if no handler is registered for `target` yet.
 void InvokeReloadHandler(eReloadTarget target);
 
-/**
- * @brief Destroys the editor frame and shuts wxWidgets down. Call after the renderer has destroyed its surface.
- */
-void Shutdown();
 
 } // namespace fx::editor

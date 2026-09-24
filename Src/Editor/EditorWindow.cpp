@@ -1,9 +1,10 @@
 // fx::Window for the editor build. The game build uses the SDL window in Renderer/Window.cpp.
 
-#include "EditorApp.hpp"
 #include "EditorFrame.hpp"
 #include "EditorPlatform.hpp"
 #include "EditorViewport.hpp"
+#include "Engine.hpp"
+#include "RaptorEditor.hpp"
 
 #include <wx/utils.h>
 
@@ -28,7 +29,7 @@ void Window::Create(const char* title, const Vec2u& size)
 	}
 
 	mSize = size;
-	mpViewport = editor::CreateMainFrame(title, size)->GetViewport();
+	mpViewport = gEditor->CreateMainWindow(title, size)->GetViewport();
 
 	HandleResize();
 }

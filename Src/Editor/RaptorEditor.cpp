@@ -1,4 +1,4 @@
-#include "EditorApp.hpp"
+#include "RaptorEditor.hpp"
 
 #include "EditorFrame.hpp"
 #include "EditorPlatform.hpp"
@@ -29,8 +29,7 @@ public:
 	}
 };
 
-
-struct AppContext
+struct EditorContext
 {
 	wxGUIEventLoop* pEventLoop = nullptr;
 	EditorFrame* pMainFrame = nullptr;
@@ -43,7 +42,7 @@ struct AppContext
 	EditorToolSelection ToolSelection;
 };
 
-static AppContext* pCtx = nullptr;
+static EditorContext* pCtx = nullptr;
 
 static void AddTool(const eEditorTool tool, const char* path)
 {
@@ -66,11 +65,12 @@ static void CreateEditorTools()
 
 
 /// Upper bound on native events dispatched per frame, so a flood of them can't stall rendering
-static constexpr uint32 scMaxEventsPerFrame = 512;
+static constexpr uint32 scMaxEventsPerFrame = 256;
 
-bool Init(int argc, char** argv)
+
+bool RaptorEditor::InitGUI(int argc, char** argv)
 {
-	pCtx = new AppContext;
+	pCtx = new EditorContext;
 
 	wxApp::SetInstance(new EditorApp);
 
@@ -102,7 +102,7 @@ bool Init(int argc, char** argv)
 
 void UpdateWorldPropertiesPanel() { pCtx->pMainFrame->GetWorldPropertiesPanel()->Update(); }
 
-EditorFrame* CreateMainFrame(const char* title, const Vec2u& viewport_size)
+EditorFrame* RaptorEditor::CreateMainWindow(const char* title, const Vec2u& viewport_size)
 {
 	pCtx->pMainFrame = new EditorFrame(wxString::FromAscii(title),
 									   wxSize(static_cast<int>(viewport_size.X), static_cast<int>(viewport_size.Y)));
@@ -203,7 +203,7 @@ void InvokeReloadHandler(eReloadTarget target)
 	}
 }
 
-void Shutdown()
+void RaptorEditor::Destroy()
 {
 	if (pCtx->pMainFrame != nullptr) {
 		pCtx->pMainFrame->Destroy();

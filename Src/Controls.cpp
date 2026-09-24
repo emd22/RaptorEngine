@@ -9,7 +9,7 @@
 #include <Renderer/GraphicsBackend.hpp>
 
 #ifdef FX_IS_EDITOR
-#include <Editor/EditorApp.hpp>
+#include <Editor/RaptorEditor.hpp>
 #endif
 
 namespace fx {

@@ -17,15 +17,13 @@
 #include <Core/String.hpp>
 #include <Engine.hpp>
 #ifdef FX_IS_EDITOR
-#include <Editor/EditorApp.hpp>
+#include <Editor/RaptorEditor.hpp>
 #endif
 #include <FoxScript/FoxScript.hpp>
 #include <Math/MathConsts.hpp>
 #include <Math/MathUtil.hpp>
 #include <Renderer/Globals.hpp>
 
-// #define FX_RUN_TEST
-// #define FX_TEST_SCRIPT
 
 FX_SET_MODULE_NAME("Main")
 
@@ -42,27 +40,11 @@ int main(int argc, char** argv)
 	fx::gScriptMemPool->Create(1024 * 64);
 
 
-#ifdef FX_TEST_SCRIPT
-	script::FoxScript fs;
-	fs.Load("./Scripts/GlobalTest.fox");
-
-	script::FoxSymbol* sym = fs.GetSymbol("Default");
-	if (!sym) {
-		LogError("Cannot find symbol!");
-	}
-
-	script::FoxValue value = fs.CallProc(sym, {});
-
-	LogInfo("Value: {}", value);
-#endif
-
-#ifndef FX_RUN_TEST
-
 	gScriptManager = new ScriptManager;
 
 #ifdef FX_IS_EDITOR
 	// If there was an issue starting the editor, return with an error code
-	if (!fx::editor::Init(argc, argv)) {
+	if (!gEditor->InitGUI(argc, argv)) {
 		return 1;
 	}
 #endif
@@ -83,7 +65,7 @@ int main(int argc, char** argv)
 
 #ifdef FX_IS_EDITOR
 	// Destroy the editor after the renderer is gone as its surface presents to the editor frame
-	fx::editor::Shutdown();
+	gEditor->Destroy();
 #endif
 
 	Defer(
@@ -92,6 +74,6 @@ int main(int argc, char** argv)
 			delete fx::gEnginePool;
 			fx::gEnginePool = nullptr;
 		});
-#endif
+
 	return 0;
 }

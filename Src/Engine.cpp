@@ -6,6 +6,7 @@
 #include <Core/MemPool/MemPool.hpp>
 #include <Core/Thread/ThreadManager.hpp>
 #include <Decal/DecalManager.hpp>
+#include <Editor/RaptorEditor.hpp>
 #include <InGameEditor.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
@@ -40,6 +41,9 @@ ScriptManager* gScriptManager = nullptr;
 EditorMode* gPrototypeEditor = nullptr;
 CVarManager* gCVars = nullptr;
 
+#ifdef FX_IS_EDITOR
+editor::RaptorEditor* gEditor = nullptr;
+#endif
 
 #define DESTROY_GLOBAL(name_)                                                                                          \
 	delete name_;                                                                                                      \
@@ -62,6 +66,10 @@ void Init()
 	gProbeManager = new ProbeManager;
 	gDecalManager = new DecalManager;
 	gCVars = new CVarManager;
+
+#ifdef FX_IS_EDITOR
+	gEditor = new editor::RaptorEditor;
+#endif
 }
 
 
@@ -77,6 +85,10 @@ void Destroy()
 	DESTROY_GLOBAL(gProbeManager);
 	DESTROY_GLOBAL(gDecalManager);
 	DESTROY_GLOBAL(gCVars);
+
+#ifdef FX_IS_EDITOR
+	DESTROY_GLOBAL(gEditor);
+#endif
 }
 
 } // namespace Globals
