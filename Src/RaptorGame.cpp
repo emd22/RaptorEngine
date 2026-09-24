@@ -594,6 +594,8 @@ void RaptorGame::ReloadScripts()
 	if (gPrototypeEditor != nullptr) {
 		gPrototypeEditor->Reload();
 	}
+
+	editor::ReloadAllTools();
 }
 
 void RaptorGame::RenderText()

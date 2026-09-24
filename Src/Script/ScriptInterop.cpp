@@ -636,6 +636,16 @@ static void N_GUI_set_editor_tool(editor::eEditorTool tool)
 }
 
 
+static void N_tool_state_send(const editor::EditorToolState* tc)
+{
+	if (tc == nullptr) {
+		return;
+	}
+
+	editor::SubmitToolConfig(tc);
+}
+
+
 /////////////////////////////////////
 // Predef gather
 /////////////////////////////////////
@@ -727,6 +737,7 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("script_error", N_script_error),
 
 	PREDEF("GUI_set_editor_tool", N_GUI_set_editor_tool),
+	PREDEF("tool_state_send", N_tool_state_send),
 
 }; // namespace fx::script
 

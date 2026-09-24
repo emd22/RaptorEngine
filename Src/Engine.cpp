@@ -58,7 +58,6 @@ void Init()
 	gWorldGrid = new WorldGrid;
 	gTextureManager = new TextureManager;
 	gThreadManager = new ThreadManager;
-	gScriptManager = new ScriptManager;
 	gWorld = new World;
 	gProbeManager = new ProbeManager;
 	gDecalManager = new DecalManager;

@@ -162,13 +162,14 @@ void EditorFrame::SetEditorTool(const eEditorTool tool)
 	const bool was_simulating = IsSimulationMode();
 	const bool will_simulate = (tool == eEditorTool::None);
 
-	mSelectedTool = tool;
-	EditorTool* tool_object = GetEditorTool2(tool);
+	mSelectedToolType = tool;
+	EditorTool* new_tool = GetEditorTool2(tool);
 
 	// Notify the new and previously selected tool
 	{
 		// If there is a previous tool selected, call the leave function
-		if (pSelectedTool != tool_object && pSelectedTool != nullptr && pSelectedTool->pScript != nullptr) {
+		if (mSelectedToolType != eEditorTool::None && pSelectedTool != new_tool && pSelectedTool != nullptr &&
+			pSelectedTool->pScript != nullptr) {
 			auto tool_leave = pSelectedTool->pScript->GetFunction<void (*)(void)>("tool_leave");
 
 			if (tool_leave != nullptr) {
@@ -176,14 +177,21 @@ void EditorFrame::SetEditorTool(const eEditorTool tool)
 			}
 		}
 
-		pSelectedTool = tool_object;
+		pSelectedTool = new_tool;
 
 		// Call the enter function for the tool if it exists
-		if (tool_object && tool_object->pScript) {
-			auto tool_enter = tool_object->pScript->GetFunction<void (*)(void)>("tool_enter");
+		if (new_tool && new_tool->pScript) {
+			auto tool_enter = new_tool->pScript->GetFunction<void (*)(void)>("tool_enter");
 
 			if (tool_enter != nullptr) {
 				tool_enter();
+			}
+
+			// Send over the editor state
+
+			auto tool_state_receive = new_tool->pScript->GetFunction<void (*)(EditorToolState*)>("tool_state_receive");
+			if (tool_state_receive != nullptr) {
+				tool_state_receive(editor::GetEditorToolState());
 			}
 		}
 	}
@@ -197,7 +205,7 @@ void EditorFrame::SetEditorTool(const eEditorTool tool)
 		}
 	}
 
-	mSelectedTool = tool;
+	mSelectedToolType = tool;
 
 	// Only one tool at a time, and clicking the selected one again keeps it selected
 	for (uint32 i = 0; i < mToolButtons.Size; i++) {

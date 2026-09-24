@@ -38,6 +38,9 @@ struct AppContext
 	std::function<void()> pReloadHandlers[static_cast<uint32>(eReloadTarget::Count)];
 
 	StackArray<EditorTool, static_cast<uint32>(eEditorTool::Count)> Tools;
+
+	EditorToolState ToolState;
+	EditorToolSelection ToolSelection;
 };
 
 static AppContext* pCtx = nullptr;
@@ -173,6 +176,18 @@ EditorTool* GetEditorTool2(eEditorTool tool_type)
 
 	return &pCtx->Tools[tool_index];
 }
+
+editor::EditorToolState* GetEditorToolState() { return &pCtx->ToolState; }
+editor::EditorToolSelection* GetEditorToolSelection() { return &pCtx->ToolSelection; }
+
+void ReloadAllTools()
+{
+	for (EditorTool& tool : pCtx->Tools) {
+		tool.ReloadHotFunctions();
+	}
+}
+
+void SubmitToolConfig(const editor::EditorToolState* config) { pCtx->ToolState = (*config); }
 
 void SetReloadHandler(eReloadTarget target, std::function<void()> handler)
 {
