@@ -1,5 +1,7 @@
 #pragma once
 
+#include "EditorTool.hpp"
+
 #include <wx/frame.h>
 
 #include <Core/StackArray.hpp>
@@ -51,6 +53,9 @@ private:
 
 	StackArray<wxToggleButton*, static_cast<uint32>(eEditorTool::Count)> mToolButtons;
 	eEditorTool mSelectedTool = eEditorTool::Translate;
+
+	EditorTool* pSelectedTool = nullptr;
+
 
 	bool mbCloseRequested = false;
 	bool mbIsActive = true;

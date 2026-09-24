@@ -628,7 +628,7 @@ static int64 N_cvar_get_int(const char* name, int64 fallback) { return gCVars->G
 
 static void N_script_error(const char* str) { LogError(LC_SCRIPT, "{}", str); }
 
-static void N_GUI_set_editor_tool(eEditorTool tool)
+static void N_GUI_set_editor_tool(editor::eEditorTool tool)
 {
 #ifdef FX_IS_EDITOR
 	editor::GetMainFrame()->SetEditorTool(tool);

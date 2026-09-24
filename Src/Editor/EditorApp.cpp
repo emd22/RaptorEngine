@@ -12,6 +12,7 @@
 #include <wx/init.h>
 
 #include <Core/Log.hpp>
+#include <Core/StackArray.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 
@@ -28,16 +29,46 @@ public:
 	}
 };
 
-static wxGUIEventLoop* spEventLoop = nullptr;
-static EditorFrame* spMainFrame = nullptr;
 
-static std::function<void()> spReloadHandlers[static_cast<uint32>(eReloadTarget::Count)];
+struct AppContext
+{
+	wxGUIEventLoop* pEventLoop = nullptr;
+	EditorFrame* pMainFrame = nullptr;
+
+	std::function<void()> pReloadHandlers[static_cast<uint32>(eReloadTarget::Count)];
+
+	StackArray<EditorTool, static_cast<uint32>(eEditorTool::Count)> Tools;
+};
+
+static AppContext* pCtx = nullptr;
+
+static void AddTool(const eEditorTool tool, const char* path)
+{
+	uint32 tool_index = (static_cast<uint32>(tool));
+
+	Assert((static_cast<uint32>(tool)) == pCtx->Tools.Size);
+
+	pCtx->Tools.Insert(EditorTool(tool, path));
+}
+
+
+static void CreateEditorTools()
+{
+	Assert(pCtx != nullptr);
+
+	AddTool(eEditorTool::None, nullptr);
+	AddTool(eEditorTool::Translate, "./Scripts/editor/tools/tool_translate.strata");
+	AddTool(eEditorTool::Face, "./Scripts/editor/tools/tool_face.strata");
+}
+
 
 /// Upper bound on native events dispatched per frame, so a flood of them can't stall rendering
 static constexpr uint32 scMaxEventsPerFrame = 512;
 
 bool Init(int argc, char** argv)
 {
+	pCtx = new AppContext;
+
 	wxApp::SetInstance(new EditorApp);
 
 	if (!wxEntryStart(argc, argv)) {
@@ -57,45 +88,48 @@ bool Init(int argc, char** argv)
 		return false;
 	}
 
-	spEventLoop = new wxGUIEventLoop;
-	wxEventLoopBase::SetActive(spEventLoop);
+	pCtx->pEventLoop = new wxGUIEventLoop;
+	wxEventLoopBase::SetActive(pCtx->pEventLoop);
+
+	CreateEditorTools();
 
 	return true;
 }
 
-void UpdateWorldPropertiesPanel() { spMainFrame->GetWorldPropertiesPanel()->Update(); }
+
+void UpdateWorldPropertiesPanel() { pCtx->pMainFrame->GetWorldPropertiesPanel()->Update(); }
 
 EditorFrame* CreateMainFrame(const char* title, const Vec2u& viewport_size)
 {
-	spMainFrame = new EditorFrame(wxString::FromAscii(title),
-								  wxSize(static_cast<int>(viewport_size.X), static_cast<int>(viewport_size.Y)));
+	pCtx->pMainFrame = new EditorFrame(wxString::FromAscii(title),
+									   wxSize(static_cast<int>(viewport_size.X), static_cast<int>(viewport_size.Y)));
 
-	spMainFrame->Show();
-	spMainFrame->Raise();
+	pCtx->pMainFrame->Show();
+	pCtx->pMainFrame->Raise();
 
 #ifdef FX_PLATFORM_MACOS
 	// Bring window to front
 	platform::ActivateApp();
 #endif
 
-	spMainFrame->GetViewport()->SetFocus();
+	pCtx->pMainFrame->GetViewport()->SetFocus();
 
 	// Get the frame on screen and laid out before the renderer creates its surface on the viewport
 	PumpEvents();
 
-	return spMainFrame;
+	return pCtx->pMainFrame;
 }
 
-EditorFrame* GetMainFrame() { return spMainFrame; }
+EditorFrame* GetMainFrame() { return pCtx->pMainFrame; }
 
 bool PumpEvents()
 {
-	if (spEventLoop == nullptr || spMainFrame == nullptr) {
+	if (pCtx->pEventLoop == nullptr || pCtx->pMainFrame == nullptr) {
 		return false;
 	}
 
 	for (uint32 i = 0; i < scMaxEventsPerFrame; i++) {
-		if (spEventLoop->DispatchTimeout(0) != 1) {
+		if (pCtx->pEventLoop->DispatchTimeout(0) != 1) {
 			break;
 		}
 	}
@@ -103,7 +137,7 @@ bool PumpEvents()
 	wxTheApp->ProcessPendingEvents();
 	wxTheApp->ProcessIdle();
 
-	EditorViewport* viewport = spMainFrame->GetViewport();
+	EditorViewport* viewport = pCtx->pMainFrame->GetViewport();
 
 	viewport->PollRelativeMouse();
 
@@ -116,39 +150,49 @@ bool PumpEvents()
 		}
 	}
 
-	return !spMainFrame->IsCloseRequested();
+	return !pCtx->pMainFrame->IsCloseRequested();
 }
 
 void UpdatePropertiesPanelForObject(Object* object)
 {
-	if (spMainFrame != nullptr) {
-		spMainFrame->GetObjectPropertiesPanel()->ShowObject(object);
+	if (pCtx->pMainFrame != nullptr) {
+		pCtx->pMainFrame->GetObjectPropertiesPanel()->ShowObject(object);
 	}
 }
 
-bool IsSimulationMode() { return spMainFrame->IsSimulationMode(); }
+bool IsSimulationMode() { return pCtx->pMainFrame->IsSimulationMode(); }
 
-eEditorTool GetEditorTool() { return spMainFrame->GetSelectedTool(); }
+eEditorTool GetEditorTool() { return pCtx->pMainFrame->GetSelectedTool(); }
+EditorTool* GetEditorTool2(eEditorTool tool_type)
+{
+	uint32 tool_index = static_cast<uint32>(tool_type);
+	if (tool_index > pCtx->Tools.Size || tool_index < 0) {
+		LogError("Tool {} has not been registered", tool_index);
+		return nullptr;
+	}
+
+	return &pCtx->Tools[tool_index];
+}
 
 void SetReloadHandler(eReloadTarget target, std::function<void()> handler)
 {
-	spReloadHandlers[static_cast<uint32>(target)] = std::move(handler);
+	pCtx->pReloadHandlers[static_cast<uint32>(target)] = std::move(handler);
 }
 
 void InvokeReloadHandler(eReloadTarget target)
 {
-	const std::function<void()>& handler = spReloadHandlers[static_cast<uint32>(target)];
+	const std::function<void()>& handler = pCtx->pReloadHandlers[static_cast<uint32>(target)];
 
-	if (handler) {
+	if (handler != nullptr) {
 		handler();
 	}
 }
 
 void Shutdown()
 {
-	if (spMainFrame != nullptr) {
-		spMainFrame->Destroy();
-		spMainFrame = nullptr;
+	if (pCtx->pMainFrame != nullptr) {
+		pCtx->pMainFrame->Destroy();
+		pCtx->pMainFrame = nullptr;
 	}
 
 	// Runs the frame's delayed deletion
@@ -157,8 +201,12 @@ void Shutdown()
 	}
 
 	wxEventLoopBase::SetActive(nullptr);
-	delete spEventLoop;
-	spEventLoop = nullptr;
+
+	delete pCtx->pEventLoop;
+	pCtx->pEventLoop = nullptr;
+
+	delete pCtx;
+	pCtx = nullptr;
 
 	wxEntryCleanup();
 }

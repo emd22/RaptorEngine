@@ -13,6 +13,28 @@ import ../common;
 import ../keyboard;
 
 
+/* Configuration to be passed back and forth between the GUI editor and the strata scripts. */
+struct EDITORCONFIG
+{
+	EDITORTOOL selected_tool;
+
+	/* Snap / Quantization */
+	int tool_snap_level;
+	bool tool_snap_enabled;
+
+	OBJECT transform_marker_object;
+}
+
+
+
+
+
+
+
+
+
+
+
 enum OBJECTTAG
 {
 	BLOCKOUT = (1 << 0),
@@ -228,9 +250,10 @@ void editor_dupe_selection()
 }
 
 
-// void editor_check_common_controls()
-// {
+
+void editor_check_common_controls()
+{
 
 
 
-// }
+}

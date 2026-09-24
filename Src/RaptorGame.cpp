@@ -35,6 +35,7 @@
 #ifdef FX_IS_EDITOR
 #include <Editor/EditorApp.hpp>
 #include <Editor/EditorFrame.hpp>
+#include <Editor/EditorTool.hpp>
 #endif
 
 
@@ -308,7 +309,8 @@ static FX_FORCE_INLINE Vec3f GetEditorMovementVector()
 void RaptorGame::ToggleEditorMode()
 {
 #ifdef FX_IS_EDITOR
-	editor::GetMainFrame()->SetEditorTool(editor::IsSimulationMode() ? eEditorTool::Translate : eEditorTool::None);
+	editor::GetMainFrame()->SetEditorTool(editor::IsSimulationMode() ? editor::eEditorTool::Translate
+																	 : editor::eEditorTool::None);
 #endif
 }
 
@@ -444,8 +446,8 @@ void RaptorGame::ProcessControls()
 
 
 	// The Create and Set Material tools use clicks to draw new brushes and paint faces instead of picking objects
-	const bool tool_picks_objects = (editor::GetEditorTool() != eEditorTool::Create &&
-									 editor::GetEditorTool() != eEditorTool::SetMaterial);
+	const bool tool_picks_objects = (editor::GetEditorTool() != editor::eEditorTool::Create &&
+									 editor::GetEditorTool() != editor::eEditorTool::SetMaterial);
 
 	if (!editor::IsSimulationMode() && gPrototypeEditor != nullptr && tool_picks_objects &&
 		ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {

@@ -15,20 +15,6 @@
 
 namespace fx {
 
-enum class eEditorTool : uint32
-{
-	None,
-
-	Translate,
-	Face,
-	Rotate,
-	Create,
-	Clip,
-	SetMaterial,
-
-	Count,
-};
-
 
 struct EditOperationValue
 {
