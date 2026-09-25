@@ -260,7 +260,8 @@ bool Blockout::GetClipPieces(Object* object, const Vec3f& point_a, const Vec3f& 
 
 	const Vec3f normal = cut_normal.Normalize();
 
-	if (!brush->Split(normal, normal.Dot(a), out_kept, out_split)) {
+	// The cut faces line up with the world grid, like the faces of a box made with MakeWorldBox()
+	if (!brush->Split(normal, normal.Dot(a), object->GetPosition(), out_kept, out_split)) {
 		return false;
 	}
 

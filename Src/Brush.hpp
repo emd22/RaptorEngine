@@ -111,9 +111,12 @@ public:
 	 * @brief Splits the brush in two along a plane. The new faces get the texture layout of the brush's local space.
 	 * @param out_back The planes of the part behind the plane
 	 * @param out_front The planes of the part in front of it
+	 * @param origin Where the brush's local origin is in the world. The two new faces get their textures lined up with
+	 * the world grid from it, like AlignTexturesToWorld(), instead of starting from the local origin.
 	 * @returns false if the plane misses the brush, or the brush has no room for another plane
 	 */
-	bool Split(const Vec3f& normal, float32 distance, PlaneList& out_back, PlaneList& out_front) const;
+	bool Split(const Vec3f& normal, float32 distance, const Vec3f& origin, PlaneList& out_back,
+			   PlaneList& out_front) const;
 
 	/**
 	 * @brief Resets a face's texture layout to the one FromBox() uses, keeping its material

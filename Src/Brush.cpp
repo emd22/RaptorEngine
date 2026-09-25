@@ -89,6 +89,18 @@ Vec2f GetDefaultTextureOffset(const Vec3f& normal, const Vec3f& bounds_min, cons
 	return Vec2f(-anchor.Dot(projection.UAxis), -anchor.Dot(projection.VAxis));
 }
 
+/// The layout of a face on a brush at `origin`, lined up with the world grid. UVs use the brush's local corners, which
+/// are `origin` away from where they are in the world.
+BrushFaceTexture GetWorldAlignedTexture(const Vec3f& normal, const Vec3f& origin, MaterialID material)
+{
+	const TextureProjection projection = GetTextureProjection(normal);
+
+	return BrushFaceTexture {
+		.Material = material,
+		.Offset = Vec2f(origin.Dot(projection.UAxis), origin.Dot(projection.VAxis)),
+	};
+}
+
 bool IsNearlyEqual(const Vec3d& a, const Vec3d& b, double epsilon)
 {
 	return std::abs(a.X - b.X) <= epsilon && std::abs(a.Y - b.Y) <= epsilon && std::abs(a.Z - b.Z) <= epsilon;
@@ -681,17 +693,18 @@ bool Brush::Raycast(const Vec3f& origin, const Vec3f& direction, float32& out_di
 	return true;
 }
 
-bool Brush::Split(const Vec3f& normal, float32 distance, PlaneList& out_back, PlaneList& out_front) const
+bool Brush::Split(const Vec3f& normal, float32 distance, const Vec3f& origin, PlaneList& out_back,
+				  PlaneList& out_front) const
 {
 	if (!IsValid() || Planes.Size >= scMaxPlanes) {
 		return false;
 	}
 
 	PlaneList back_planes = Planes;
-	back_planes.Insert({ normal, distance });
+	back_planes.Insert({ normal, distance, GetWorldAlignedTexture(normal, origin, MaterialID::scNull) });
 
 	PlaneList front_planes = Planes;
-	front_planes.Insert({ -normal, -distance });
+	front_planes.Insert({ -normal, -distance, GetWorldAlignedTexture(-normal, origin, MaterialID::scNull) });
 
 	// Both parts have to be left with something, otherwise the plane missed the brush
 	const Brush back = FromPlanes(back_planes);
@@ -722,14 +735,7 @@ void Brush::ResetFaceTexture(uint32 plane_index)
 void Brush::AlignTexturesToWorld(const Vec3f& origin)
 {
 	for (BrushPlane& plane : Planes) {
-		const TextureProjection projection = GetTextureProjection(plane.Normal);
-		const MaterialID material = plane.Texture.Material;
-
-		// Local corners are `origin` away from where they are in the world
-		plane.Texture = BrushFaceTexture {
-			.Material = material,
-			.Offset = Vec2f(origin.Dot(projection.UAxis), origin.Dot(projection.VAxis)),
-		};
+		plane.Texture = GetWorldAlignedTexture(plane.Normal, origin, plane.Texture.Material);
 	}
 }
 
