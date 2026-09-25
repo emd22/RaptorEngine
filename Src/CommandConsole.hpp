@@ -7,10 +7,6 @@
 
 namespace fx {
 
-namespace script {
-class Script;
-}
-
 class Console
 {
 	static constexpr uint32 scMaxChars = 512;
@@ -31,8 +27,6 @@ public:
 private:
 	char mpEntryBuffer[scMaxChars];
 	uint32 mEntryBufferIndex = 0;
-
-	script::Script* mpScript = nullptr;
 };
 
 } // namespace fx

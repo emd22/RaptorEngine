@@ -1,8 +1,8 @@
 /*
  * File:        tool_rotate.strata
  * Author:      emd22
- * Created:     09/23/2026
- * Description: Rotate tool. Run by `prototype_editor.strata` while EDITORTOOL.ROTATE is selected.
+ * Created:     23/09/2026
+ * Description: Rotate tool. Dragging sideways turns the selection, Q/E pitch it.
  */
 
 import ../tool_common;
@@ -25,14 +25,14 @@ float rotate_pitch_accum = 0.0f;
 float editor_get_rotate_snap_value()
 {
 	float[4] snap_values = { D2R_1_DEG, D2R_5_DEG, D2R_15_DEG, D2R_45_DEG };
-	uint index = fclamp(editor_snap_level, 0, 3);
+	uint index = fclamp(state.tool_snap_level, 0, 3);
 	return snap_values[index];
 }
 
 /* If snap is enabled, this snaps a given angle vector (radians) to the selected rotation snap increment. */
 float3 editor_rotate_snap(float3 vec)
 {
-	if (!editor_enable_snap) {
+	if (!state.tool_snap_enabled) {
 		return vec;
 	}
 
@@ -42,8 +42,9 @@ float3 editor_rotate_snap(float3 vec)
 
 
 /* The mouse was pressed with the Rotate tool selected. */
-void tool_rotate_begin()
+void tool_begin()
 {
+	initial_player_position = player.position;
 	rotate_pitch_accum = 0.0f;
 }
 
@@ -58,7 +59,7 @@ void tool_rotate_selection(float3 rotation_delta)
 	}
 }
 
-void tool_rotate_update(float delta_time)
+void tool_update(float delta_time)
 {
 	if (!editor_has_object_selection()) {
 		return;
@@ -83,7 +84,7 @@ void tool_rotate_update(float delta_time)
 }
 
 
-void tool_rotate_finalize()
+void tool_finalize()
 {
 	// Skip clicks without any rotation
 	int movers = 0;

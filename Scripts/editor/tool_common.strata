@@ -2,7 +2,9 @@
  * File:        tool_common.strata
  * Author:      emd22
  * Created:     23/09/2026
- * Description: State and helpers shared by the editor tools
+ * Description: State and helpers shared by the editor tools. Each tool is a script of its own with its own copy of
+ *              these globals, which the editor (Src/Editor/RaptorEditor.cpp) keeps up to date by calling
+ *              `tool_state_receive` and `tool_selection_receive`.
  */
 
 import ../interop;
@@ -10,7 +12,8 @@ import ../common;
 import ../keyboard;
 
 
-/* Configuration to be passed back and forth between the GUI editor and the strata scripts. */
+/* Configuration to be passed back and forth between the GUI editor and the strata scripts.
+   Must match EditorToolState in Src/Editor/EditorTool.hpp! */
 struct TOOLSTATE
 {
 	EDITORTOOL selected_tool;
@@ -19,6 +22,8 @@ struct TOOLSTATE
 	int tool_snap_level;
 	bool tool_snap_enabled;
 
+	/* Cube marker used for showing distance and movement when transforming an object.
+	   Used mainly with scale/face tool. */
 	OBJECT transform_marker_object;
 }
 
@@ -28,38 +33,25 @@ enum OBJECTTAG
 }
 
 
+/* Must match scMaxSelectedObjects in Src/Editor/EditorTool.hpp! */
 const int LIMIT_SELECTION_OBJECTS = 64;
 
+/* The selection, along with where each object was when the current drag started.
+   Must match EditorToolSelection in Src/Editor/EditorTool.hpp! */
 struct SELECTION
 {
 	OBJECT[LIMIT_SELECTION_OBJECTS] selected_objects;
 	float3[LIMIT_SELECTION_OBJECTS] initial_object_positions;
 	float3[LIMIT_SELECTION_OBJECTS] initial_object_rotations;
 	int selected_objects_count;
-
-	/* Selected cube face (for FACE mode) */
-
-	float3 selected_face;
-	float selected_face_scale;
 };
 
 /////////////////////////////////////
 // Globals
 /////////////////////////////////////
 
-/* The tool currently selected in the GUI editor. Set through `__set_editor_tool`. */
-EDITORTOOL editor_tool = EDITORTOOL.TRANSLATE;
-
-/* Where the player was when the current mouse drag started */
+/* Where the player was when the current drag started. Set by the tools that move with the player. */
 float3 initial_player_position;
-
-/* snap */
-int editor_snap_level = 2;
-bool editor_enable_snap = true;
-
-/* Cube marker used for showing distance and movement when transforming an object.
-   Used mainly with scale/face tool. */
-OBJECT transform_marker_object;
 
 /* Empty object */
 OBJECT OBJECT_NULL;
@@ -68,8 +60,6 @@ OBJECT OBJECT_NULL;
 /* KEEP: Ethan refactor note */
 TOOLSTATE state;
 SELECTION sel;
-
-bool original_headbob_state = false;
 
 
 /////////////////////////////////////
@@ -85,37 +75,26 @@ void tool_state_receive(ref TOOLSTATE tc)
 	state.transform_marker_object = tc.transform_marker_object;
 }
 
-SELECTION _tool_get_selection()
+/* Receive the current selection from the GUI editor. Called whenever the selection changes, and at the start of
+   each drag. */
+void tool_selection_receive(ref SELECTION selection)
 {
-	return sel;
+	sel.selected_objects_count = selection.selected_objects_count;
+
+	for (int i = 0; i < selection.selected_objects_count; i++) {
+		sel.selected_objects[i] = selection.selected_objects[i];
+		sel.initial_object_positions[i] = selection.initial_object_positions[i];
+		sel.initial_object_rotations[i] = selection.initial_object_rotations[i];
+	}
 }
 
 /* Submit the current state from script to editor. */
 extern void tool_state_send(ref TOOLSTATE tc);
 
-/* Sync the current tool state with the GUI editor. */
-@private
+/* Sync the current tool state with the GUI editor, after changing its snap settings. */
 void sync_state()
 {
 	tool_state_send(state);
-}
-
-
-
-/////////////////////////////////////
-// Movement
-/////////////////////////////////////
-
-void editor_movement_damp_set(bool value)
-{
-	if (value) {
-		player.set_speed_multiplier(0.5f);
-		cvar_set_bool("b_headbob_enabled", false);
-	}
-	else {
-		player.set_speed_multiplier(1.0f);
-		cvar_set_bool("b_headbob_enabled", original_headbob_state);
-	}
 }
 
 
@@ -126,32 +105,15 @@ void editor_movement_damp_set(bool value)
 void hide_transform_marker_object()
 {
 	/* Move the transform marker to a location where the user won't see it... */
-	transform_marker_object.move_to(float3(200.0f));
+	state.transform_marker_object.move_to(float3(200.0f));
 }
 
 /////////////////////////////////////
 // Snapping
 /////////////////////////////////////
 
-/* Adjust the step size of the snap. negative (-1) decreases the size of each step,
-   positive (1) increases it. */
-void editor_adjust_snap_index(int direction)
-{
-	int level = state.tool_snap_level;
-
-	if (direction < 0) {
-		level--;
-	}
-	else {
-		level++;
-	}
-
-	state.tool_snap_level = fclamp(level, 0, 3);;
-
-	sync_state();
-}
-
-/* Get the division that we are quantizing by. NOTE: not the index. */
+/* Get the division that we are quantizing by. NOTE: not the index.
+   Mirrored by scSnapSteps in Src/Editor/RaptorEditor.cpp. */
 float tool_get_snap_multiplier()
 {
 	float[4] snap_values = { 0.05f, 0.10f, 0.25f, 0.50f };
@@ -200,110 +162,15 @@ bool editor_has_object_selection()
 	return (sel.selected_objects_count > 0);
 }
 
-
-/* DO NOT USE NORMALLY, this is meant to be called by the C++ side. */
-void _internal_editor_select_object(OBJECT object, bool is_selected, bool append_selection)
-{
-
-	if (!is_selected) {
-		// If we are in append mode, ignore the object as opposed to clearing the whole selection.
-		if (!append_selection) {
-			sel.selected_objects_count = 0;
-		}
-
-		return;
-	}
-
-	// Ignore if we are above the max selection count
-	if (sel.selected_objects_count + 1 >= LIMIT_SELECTION_OBJECTS) {
-		script_error("object cannot be selected as selection is too large");
-		return;
-	}
-
-	if (append_selection) {
-		sel.selected_objects[sel.selected_objects_count++] = object;
-		return;
-	}
-
-	// We have selected an object, but will not append to the current selection.
-	sel.selected_objects[0] = object;
-	sel.selected_objects_count = 1;
-}
-
-/* Select an object. Passing in false for `is_selected` acts as a null value, voiding the selection. */
+/* Select an object. Passing in false for `is_selected` acts as a null value, voiding the selection. The editor sends
+   the new selection back through `tool_selection_receive` before this returns. */
 void editor_select_object(OBJECT object, bool is_selected, bool append_selection)
 {
-	// NOTE: this calls the C++ function `_select_object_internal` that will internally call
-	// `_internal_editor_select_object`.
-
- 	object._select_object_internal(is_selected, append_selection);
+	object._select_object_internal(is_selected, append_selection);
 }
 
 
 void reset_selection()
 {
-	sel.selected_face = float3(0.0f);
-	sel.selected_face_scale = 0.0f;
-
 	editor_select_object(OBJECT_NULL, false, false);
-}
-
-
-/* Destroy all objects in the selection. Pushing the Delete op destroys each
-   object immediately (via Execute) and records the snapshot for undo. */
-void editor_destroy_selection()
-{
-	int count = sel.selected_objects_count;
-
-	for (int i = 0; i < count; i++) {
-		editor_push_op_delete(sel.selected_objects[i], count);
-	}
-
-	reset_selection();
-}
-
-void editor_dupe_selection()
-{
-	int n = sel.selected_objects_count;
-
-	// Push the Dupe op for each original. Execute creates the dupe with the
-	// original (unselected) material, so no deselect dance is needed. Reuse
-	// `selected_objects` as a temp buffer for the new handles.
-	for (int i = 0; i < n; i++) {
-		OBJECT object_to_dupe = sel.selected_objects[i];
-
-		// OBJECT dupe = editor_push_op_obj(object_to_dupe, OPTYPE.DUPE, object_to_dupe, null_object, n);
-
-		OBJECT dupe = editor_op_dupe_object(object_to_dupe, object_to_dupe.position, n);
-
-		// Replace the selected object with the dupe. We are overwriting the previous selection
-		// and essentially using `selected_objects` as a temp buffer.
-		sel.selected_objects[i] = dupe;
-	}
-
-	// Swap the selection over to the dupes. The null-select restores the
-	// originals' materials on the C++ side; the appends select the dupes.
-	editor_select_object(OBJECT_NULL, false, false);
-
-	{
-		for (int i = 0; i < n; i++) {
-			// Append the selection from the new object handles.
-			editor_select_object(sel.selected_objects[i], true, true);
-		}
-	}
-}
-
-/* When switching to a prototyping mode */
-void _on_prototype_enter()
-{
-	reset_selection();
-	original_headbob_state = cvar_get_bool("b_headbob_enabled", false);
-}
-
-
-void _on_prototype_leave()
-{
-	reset_selection();
-	hide_transform_marker_object();
-
 }

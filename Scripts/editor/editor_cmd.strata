@@ -2,7 +2,8 @@
  * File:        editor_cmd.strata
  * Author:      emd22
  * Created:     24/09/2026
- * Description: Builtin commands for controlling editor state or manipulating objects
+ * Description: Builtin commands for controlling editor state or manipulating objects. Typed into the console by
+ *              name, so `snap2w` runs CMD_snap2w. The editor sends over its state and selection before each one.
  */
 
 import tool_common;
@@ -28,7 +29,7 @@ void CMD_snap2w()
 		if (!editor_vec_equal(obj.position, editor_transform_snap(obj.position))) {
 			snaps++;
 		}
-		}
+	}
 
 	if (snaps == 0) {
 		return;
@@ -43,7 +44,7 @@ void CMD_snap2w()
 		}
 		editor_push_op_vec(obj, OPTYPE.MOVE, obj.position, snapped, snaps);
 	}
-	}
+}
 
 /////////////////////////////////////
 // Light probe volumes
@@ -121,7 +122,7 @@ void CMD_probesave()
 	if (probe_save()) {
 		printf("probes saved\n");
 	}
-	}
+}
 
 void CMD_lock()
 {
@@ -129,9 +130,8 @@ void CMD_lock()
 		return;
 	}
 
-	int snaps = 0;
 	for (int i = 0; i < sel.selected_objects_count; i++) {
 		OBJECT obj = sel.selected_objects[i];
 		obj.set_tags(obj.get_tags() | OBJ_TAG_LOCK);
 	}
-	}
+}

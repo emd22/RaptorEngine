@@ -2,8 +2,8 @@
 
 #include <Blockout.hpp>
 #include <Decal/DecalManager.hpp>
+#include <Editor/RaptorEditor.hpp>
 #include <Engine.hpp>
-#include <InGameEditor.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Material/MaterialManagerFwd.hpp>
@@ -972,9 +972,14 @@ void World::Render(Camera* shadow_camera)
 		RenderProbeDebug(camera);
 	}
 
-	if (gPrototypeEditor != nullptr || bRenderProbes) {
+#ifdef FX_IS_EDITOR
+	// Probe volumes are edited as brushes, so the editor always shows them
+	RenderProbeVolumes(camera);
+#else
+	if (bRenderProbes) {
 		RenderProbeVolumes(camera);
 	}
+#endif
 
 	// RenderWorldGrid(camera);
 }
@@ -1278,7 +1283,11 @@ void World::RenderProbeVolumes(const Camera& camera)
 
 		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
 
-		const bool is_selected = gPrototypeEditor != nullptr && gPrototypeEditor->IsInSelection(&object);
+#ifdef FX_IS_EDITOR
+		const bool is_selected = gEditor->GetSelection().Contains(&object);
+#else
+		const bool is_selected = false;
+#endif
 		push_constants.DebugColor = is_selected ? selected_color.AsUInt() : volume_color.AsUInt();
 
 		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);

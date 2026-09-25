@@ -16,6 +16,7 @@
 #include <Controls.hpp>
 #include <Core/FilesystemIO.hpp>
 #include <Core/Log.hpp>
+#include <Engine.hpp>
 
 namespace fx::editor {
 
@@ -112,7 +113,7 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 		wxToggleButton* button = MakeToolButton(root, scToolButtons[i]);
 
 		const eEditorTool tool = static_cast<eEditorTool>(i);
-		button->Bind(wxEVT_TOGGLEBUTTON, [this, tool](wxCommandEvent&) { SetEditorTool(tool); });
+		button->Bind(wxEVT_TOGGLEBUTTON, [tool](wxCommandEvent&) { gEditor->SetTool(tool); });
 
 		tool_sizer->Add(button, wxSizerFlags().Border(wxALL, 2));
 		mToolButtons.Insert(button);
@@ -153,59 +154,16 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	mpViewport->SetMinSize(wxSize(64, 64));
 	SetMinSize(wxDefaultSize);
 
-	SetEditorTool(eEditorTool::Translate);
-
 	Bind(wxEVT_CLOSE_WINDOW, &EditorFrame::OnClose, this);
 	Bind(wxEVT_ACTIVATE, &EditorFrame::OnActivate, this);
 	Bind(wxEVT_ICONIZE, &EditorFrame::OnIconize, this);
 }
 
-void EditorFrame::SetEditorTool(const eEditorTool tool)
+void EditorFrame::ShowSelectedTool(const eEditorTool tool)
 {
-	const bool was_simulating = IsSimulationMode();
-	const bool will_simulate = (tool == eEditorTool::None);
-
-	mSelectedToolType = tool;
-
-	EditorTool* new_tool = gEditor->GetTool(tool);
-
-	// Notify the new and previously selected tool
-	{
-		// If there is a previous tool selected, call the leave function
-		if (mSelectedToolType != eEditorTool::None && pSelectedTool != new_tool && pSelectedTool != nullptr &&
-			pSelectedTool->pScript != nullptr) {
-			pSelectedTool->pScript->CallFunction<void()>("tool_leave");
-		}
-
-		pSelectedTool = new_tool;
-
-		// Call the enter function for the tool if it exists
-		if (new_tool && new_tool->pScript) {
-			new_tool->pScript->CallFunction<void()>("tool_enter");
-			// Send over the current state
-			new_tool->pScript->CallFunction<void(void*)>("tool_stata_receive", editor::GetEditorToolState());
-		}
-	}
-
-	if (gPrototypeEditor != nullptr) {
-		if (was_simulating && !will_simulate) {
-			gPrototypeEditor->Reload();
-		}
-		else if (!was_simulating && will_simulate) {
-			gPrototypeEditor->Unload();
-		}
-	}
-
-	mSelectedToolType = tool;
-
 	// Only one tool at a time, and clicking the selected one again keeps it selected
 	for (uint32 i = 0; i < mToolButtons.Size; i++) {
 		mToolButtons[i]->SetValue(i == static_cast<uint32>(tool));
-	}
-
-	// Transfer the changed editor tool info back to the script
-	if (gPrototypeEditor != nullptr) {
-		gPrototypeEditor->pScript->CallFunction<void(eEditorTool)>("__set_editor_tool", tool);
 	}
 
 	// Give the keyboard back to the viewport
@@ -213,8 +171,6 @@ void EditorFrame::SetEditorTool(const eEditorTool tool)
 		mpViewport->SetFocus();
 	}
 }
-
-void EditorFrame::SetDefaultTool() { SetEditorTool(eEditorTool::Translate); }
 
 void EditorFrame::ShowObjectListWindow()
 {

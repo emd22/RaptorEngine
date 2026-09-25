@@ -1,9 +1,9 @@
 /*
  * File:        tool_set_material.strata
  * Author:      emd22
- * Created:     09/23/2026
- * Description: Set Material tool (paint faces). Run by `prototype_editor.strata` while EDITORTOOL.SET_MATERIAL is
- *              selected. Like Create it works on whatever the crosshair is on, not on the selection.
+ * Created:     23/09/2026
+ * Description: Set Material tool (paint faces). Like Create it works on whatever the crosshair is on, not on the
+ *              selection.
  */
 
 import ../tool_common;
@@ -37,14 +37,14 @@ void tool_set_material_print()
 }
 
 /* Paint the face under the crosshair on mouse down. Shift paints every face of the brush. */
-void tool_set_material_begin()
+void tool_begin()
 {
 	blockout_paint_material(paint_material_slot, KEY.K_LSHIFT.is_down());
 }
 
 /* [ and ] step through the materials to paint with: the brush's own material, then each prototype material.
    Called every frame the Set Material tool is selected and no drag is in progress. */
-void tool_set_material_controls()
+void tool_controls()
 {
 	/* Painted faces would be hidden under the selection highlight */
 	if (editor_has_object_selection()) {

@@ -7,7 +7,6 @@
 #include <Core/Thread/ThreadManager.hpp>
 #include <Decal/DecalManager.hpp>
 #include <Editor/RaptorEditor.hpp>
-#include <InGameEditor.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Physics/PhysicsManager.hpp>
@@ -38,7 +37,6 @@ ProbeManager* gProbeManager = nullptr;
 DecalManager* gDecalManager = nullptr;
 ScriptManager* gScriptManager = nullptr;
 
-EditorMode* gPrototypeEditor = nullptr;
 CVarManager* gCVars = nullptr;
 
 #ifdef FX_IS_EDITOR

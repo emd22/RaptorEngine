@@ -42,9 +42,6 @@ extern ProbeManager* gProbeManager;
 class DecalManager;
 extern DecalManager* gDecalManager;
 
-class EditorMode;
-extern EditorMode* gPrototypeEditor;
-
 class CVarManager;
 extern CVarManager* gCVars;
 

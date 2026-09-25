@@ -1,5 +1,7 @@
 #include "ObjectListWindow.hpp"
 
+#include "RaptorEditor.hpp"
+
 #include <wx/button.h>
 #include <wx/listctrl.h>
 #include <wx/panel.h>
@@ -7,7 +9,6 @@
 
 #include <Core/SizedArray.hpp>
 #include <Engine.hpp>
-#include <InGameEditor.hpp>
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
 
@@ -124,8 +125,8 @@ void ObjectListWindow::OnItemActivated(wxListEvent& event)
 {
 	Object* object = reinterpret_cast<Object*>(event.GetItem().GetData());
 
-	if (object != nullptr && gPrototypeEditor != nullptr) {
-		gPrototypeEditor->SelectObject(object, false);
+	if (object != nullptr) {
+		gEditor->SelectObject(object, false);
 	}
 }
 
