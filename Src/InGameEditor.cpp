@@ -313,7 +313,8 @@ void EditorMode::Create(const String& name, const String& script_path)
 
 void EditorMode::ReloadHotFunctions()
 {
-	pUpdateFunction = pScript->GetFunction<void (*)(void*, FLOAT4, float)>("mode_update");
+	/* */
+	pUpdateFunction = pScript->GetFunction<void(FLOAT4, float)>("mode_update");
 }
 
 void EditorMode::Update(const Vec3f& movement_vector, float32 delta_time)
@@ -329,7 +330,7 @@ void EditorMode::Update(const Vec3f& movement_vector, float32 delta_time)
 
 	if (pUpdateFunction) {
 		FLOAT4 x = movement_vector.mIntrin;
-		pScript->CallFunctionPtr<void, FLOAT4, float>(pUpdateFunction, x, delta_time);
+		pScript->CallFunctionPtr<void(FLOAT4, float)>(pUpdateFunction, x, delta_time);
 		// pUpdateFunction(movement_vector.mIntrin, delta_time);
 	}
 }
@@ -586,24 +587,6 @@ void EditorMode::SyncScriptSelection()
 {
 	if (pScript == nullptr) {
 		return;
-	}
-
-
-	auto mode_select_object = pScript->GetFunction<void (*)(void*, void*, bool, bool)>(
-		"_internal_editor_select_object");
-	if (!mode_select_object) {
-		return;
-	}
-
-	pScript->CallFunctionPtr<void, void*, bool, bool>(mode_select_object, nullptr, false, false);
-
-	for (SelectedObject& selected_obj : mSelectedObjects) {
-		if (selected_obj.pObject == nullptr) {
-			continue;
-		}
-
-		pScript->CallFunctionPtr<void, void*, bool, bool>(mode_select_object,
-														  reinterpret_cast<void*>(selected_obj.pObject), true, true);
 	}
 }
 

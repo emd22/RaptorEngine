@@ -174,16 +174,16 @@ void EditorFrame::SetEditorTool(const eEditorTool tool)
 		// If there is a previous tool selected, call the leave function
 		if (mSelectedToolType != eEditorTool::None && pSelectedTool != new_tool && pSelectedTool != nullptr &&
 			pSelectedTool->pScript != nullptr) {
-			pSelectedTool->pScript->CallFunction<void>("tool_leave");
+			pSelectedTool->pScript->CallFunction<void()>("tool_leave");
 		}
 
 		pSelectedTool = new_tool;
 
 		// Call the enter function for the tool if it exists
 		if (new_tool && new_tool->pScript) {
-			new_tool->pScript->CallFunction<void>("tool_enter");
+			new_tool->pScript->CallFunction<void()>("tool_enter");
 			// Send over the current state
-			new_tool->pScript->CallFunction<void>("tool_stata_receive", editor::GetEditorToolState());
+			new_tool->pScript->CallFunction<void(void*)>("tool_stata_receive", editor::GetEditorToolState());
 		}
 	}
 
@@ -205,7 +205,7 @@ void EditorFrame::SetEditorTool(const eEditorTool tool)
 
 	// Transfer the changed editor tool info back to the script
 	if (gPrototypeEditor != nullptr) {
-		gPrototypeEditor->pScript->CallFunction<void>("__set_editor_tool", tool);
+		gPrototypeEditor->pScript->CallFunction<void(eEditorTool)>("__set_editor_tool", tool);
 	}
 
 	// Give the keyboard back to the viewport

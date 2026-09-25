@@ -7,9 +7,33 @@
 #include <Core/DynArray.hpp>
 #include <Core/Slice.hpp>
 #include <Core/String.hpp>
+#include <Editor/RaptorEditor.hpp>
 #include <Engine.hpp>
 
 namespace fx {
+
+void Console::ExecuteScriptCommand(const String& cmd_name)
+{
+	if (mpScript == nullptr) {
+		return;
+	}
+
+	// Provide the command script with the selection from the editor
+	editor::EditorTool* tool = gEditor->GetCurrentTool();
+	if (tool != nullptr) {
+		mpScript->CallFunction<void(void*)>("tool_state_recieve", reinterpret_cast<void*>(tool->RetrieveSelection()));
+	}
+
+	auto cmd_func = mpScript->GetFunction<void()>((String::Fmt("CMD_{}", cmd_name)).CStr());
+
+	if (cmd_func != nullptr) {
+		mpScript->CallFunctionPtr<void()>(cmd_func);
+		Output = "Executed";
+	}
+	else {
+		Output = "Cmd not found";
+	}
+}
 
 void Console::ExecuteCommand(const DynArray<String>& tokens)
 {
@@ -49,17 +73,19 @@ void Console::ExecuteCommand(const DynArray<String>& tokens)
 	else {
 		// Try and call an editor function.
 
-		if (gPrototypeEditor != nullptr && gPrototypeEditor->pScript != nullptr) {
-			auto fn = gPrototypeEditor->pScript->GetFunction<void (*)(void*)>((String::Fmt("CMD_{}", cmd)).CStr());
-
-			if (fn != nullptr) {
-				gPrototypeEditor->pScript->CallFunctionPtr(fn);
-				Output = "Executed";
-			}
-			else {
-				Output = "Cmd not found";
-			}
-		}
+		ExecuteScriptCommand(cmd);
+		// 		if (gPrototypeEditor != nullptr && gPrototypeEditor->pScript != nullptr) {
+		// 			auto fn = gPrototypeEditor->pScript->GetFunction<void (*)(void*)>((String::Fmt("CMD_{}",
+		// cmd)).CStr());
+		//
+		// 			if (fn != nullptr) {
+		// 				gPrototypeEditor->pScript->CallFunctionPtr(fn);
+		// 				Output = "Executed";
+		// 			}
+		// 			else {
+		// 				Output = "Cmd not found";
+		// 			}
+		// 		}
 	}
 }
 
@@ -75,8 +101,8 @@ void Console::ParseCommand()
 	char tmp[scTempSize];
 	uint32 tmp_index = 0;
 
-	for (uint32 i = 0; i < EntryBufferIndex; i++) {
-		char ch = pEntryBuffer[i];
+	for (uint32 i = 0; i < mEntryBufferIndex; i++) {
+		char ch = mpEntryBuffer[i];
 
 		if (ch == ' ' || ch == '\t' || ch == '\n') {
 			if (tmp_index > 0) {
@@ -105,19 +131,19 @@ void Console::ParseCommand()
 
 	ExecuteCommand(args);
 
-	EntryBufferIndex = 0;
+	mEntryBufferIndex = 0;
 }
 
 
 void Console::HandleKeyboard()
 {
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_BACKSPACE) && EntryBufferIndex > 0) {
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_BACKSPACE) && mEntryBufferIndex > 0) {
 		// Clear the entire line, Cmd + Delete or Win + Backspace
 		if (ControlManager::IsKeyDown(eKey::FX_KEY_LMETA)) {
-			EntryBufferIndex = 0;
+			mEntryBufferIndex = 0;
 		}
 		else {
-			--EntryBufferIndex;
+			--mEntryBufferIndex;
 		}
 	}
 
@@ -127,15 +153,15 @@ void Console::HandleKeyboard()
 		return;
 	}
 
-	pEntryBuffer[EntryBufferIndex++] = ch;
+	mpEntryBuffer[mEntryBufferIndex++] = ch;
 
 	if (ch == '\n') {
-		pEntryBuffer[EntryBufferIndex] = '\0';
+		mpEntryBuffer[mEntryBufferIndex] = '\0';
 		ParseCommand();
 	}
 }
 
-StringView Console::GetString() const { return MakeStringView(pEntryBuffer, EntryBufferIndex); }
+StringView Console::GetString() const { return MakeStringView(mpEntryBuffer, mEntryBufferIndex); }
 
 
 } // namespace fx
