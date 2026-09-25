@@ -6,7 +6,7 @@ meta = {
 sun = {
 	//enabled = $false
     pos = [0.5, 6, -1.5]
-    color = [230, 180, 172, 16]
+    color = [255, 160, 142, 12]
     ambient = [75, 75, 72, 1]
 }
 
