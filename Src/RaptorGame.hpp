@@ -2,7 +2,6 @@
 
 #include "Blockout.hpp"
 #include "CommandConsole.hpp"
-#include "InGameEditor.hpp"
 #include "Object/ObjectManager.hpp"
 
 #include <Asset/AssetTicket.hpp>
@@ -66,8 +65,6 @@ public:
 	~RaptorGame();
 
 private:
-	void AddEditorModes();
-
 	void InitEngine();
 	void CreateLights();
 
@@ -84,8 +81,6 @@ private:
 
 	void RenderText();
 	void RenderCrosshair();
-
-	Vec3f GetCameraForwardDominantAxis() const;
 
 public:
 	Ref<LightDirectional> pSun { nullptr };

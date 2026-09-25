@@ -2,7 +2,7 @@
  * File:        tool_translate.strata
  * Author:      emd22
  * Created:     23/09/2026
- * Description: Translate (move) tool
+ * Description: Translate (move) tool. Drags the selection along with the player.
  */
 
 import ../tool_common;
@@ -12,23 +12,10 @@ import ../tool_common;
 float translate_height_accum = 0.0f;
 
 
-/////////////////////////////////////
-
-void tool_enter()
-{
-}
-
-void tool_leave()
-{
-}
-
-
-/////////////////////////////////////
-
-
 /* The mouse was pressed with the Translate tool selected. */
-void tool_translate_begin()
+void tool_begin()
 {
+	initial_player_position = player.position;
 	translate_height_accum = 0.0f;
 }
 
@@ -37,17 +24,14 @@ void tool_translate_move_selection(float3 movement_delta)
 {
 	for (int i = 0; i < sel.selected_objects_count; i++) {
 		OBJECT obj = sel.selected_objects[i];
-
-		// float3 start_position = obj.get_position();
 		float3 initial_position = sel.initial_object_positions[i];
 
 		obj.move_to((initial_position + movement_delta));
 	}
-
 }
 
 /* Translate an object */
-void tool_translate_update(float delta_time)
+void tool_update(float delta_time)
 {
 	if (!editor_has_object_selection()) {
 		return;
@@ -73,7 +57,7 @@ void tool_translate_update(float delta_time)
 }
 
 
-void tool_translate_finalize()
+void tool_finalize()
 {
 	// Skip clicks without movement so we don't burn undo history on no-ops.
 	// GroupSize must match the pushed op count exactly for multi-undo.

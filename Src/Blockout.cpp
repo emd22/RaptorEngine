@@ -4,7 +4,8 @@
 #include <Asset/ConfigFile.hpp>
 #include <Asset/MeshGen.hpp>
 #include <Core/RefUtil.hpp>
-#include <InGameEditor.hpp>
+#include <Editor/RaptorEditor.hpp>
+#include <Engine.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Math/SIMDHelper.hpp>
@@ -1013,10 +1014,10 @@ void Blockout::Load(const String& path)
 		return;
 	}
 
-	if (gPrototypeEditor != nullptr) {
-		// Since everything is getting reloaded, we need to clear the editor undo stack.
-		gPrototypeEditor->ResetUndoStack();
-	}
+#ifdef FX_IS_EDITOR
+	// Everything is getting reloaded, so the editor can't hold on to any objects
+	gEditor->ForgetObjects();
+#endif
 
 	ConfigEntry* blocks_entry = info.GetEntry(HashStr32("all"));
 

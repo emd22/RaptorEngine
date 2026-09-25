@@ -3,10 +3,10 @@
 #include <Blockout.hpp>
 #include <CVar.hpp>
 #include <Controls.hpp>
-#include <Editor/EditorFrame.hpp>
+#include <Editor/EditOperation.hpp>
+#include <Editor/EditorTool.hpp>
 #include <Editor/RaptorEditor.hpp>
 #include <Engine.hpp>
-#include <InGameEditor.hpp>
 #include <Math/SIMDHelper.hpp>
 #include <Object/ObjectID.hpp>
 #include <Object/ObjectManager.hpp>
@@ -27,107 +27,101 @@ static Object* N_object_get(uint32 id)
 	return gObjectManager->GetObject(obj_id);
 }
 
+/////////////////////////////////////
+// Edit operations
+/////////////////////////////////////
+
+using editor::EditOperation;
+using editor::EditOperationValue;
+
 static Vec3f N_editor_push_op_vec3(Object* obj, int op_type, FLOAT4 original, FLOAT4 updated, int32 group_size)
 {
+#ifdef FX_IS_EDITOR
 	if (obj == nullptr) {
 		return Vec3f::sZero;
 	}
 
-	if (gPrototypeEditor) {
-		EditOperationValue eov = gPrototypeEditor->PushEditOperation(EditOperation {
-			.Type = static_cast<EditOperation::eType>(op_type),
-			.pObject = obj,
-			.ValueA = EditOperationValue(Vec3f(original)),
-			.ValueB = EditOperationValue(Vec3f(updated)),
-			.GroupSize = group_size,
-		});
+	const EditOperationValue result = gEditor->PushEditOperation(EditOperation {
+		.Type = static_cast<EditOperation::eType>(op_type),
+		.pObject = obj,
+		.ValueA = EditOperationValue(Vec3f(original)),
+		.ValueB = EditOperationValue(Vec3f(updated)),
+		.GroupSize = group_size,
+	});
 
-		return eov.Position;
-	}
-
+	return result.Position;
+#else
 	return Vec3f::sZero;
+#endif
 }
 
 static Object* N_editor_push_op_object(Object* obj, int op_type, Object* original, Object* updated, int32 group_size)
 {
+#ifdef FX_IS_EDITOR
 	if (obj == nullptr) {
 		return nullptr;
 	}
 
-	if (gPrototypeEditor) {
-		EditOperationValue eov = gPrototypeEditor->PushEditOperation(EditOperation {
-			.Type = static_cast<EditOperation::eType>(op_type),
-			.pObject = obj,
-			.ValueA = EditOperationValue(original),
-			.ValueB = EditOperationValue(updated),
-			.GroupSize = group_size,
-		});
+	const EditOperationValue result = gEditor->PushEditOperation(EditOperation {
+		.Type = static_cast<EditOperation::eType>(op_type),
+		.pObject = obj,
+		.ValueA = EditOperationValue(original),
+		.ValueB = EditOperationValue(updated),
+		.GroupSize = group_size,
+	});
 
-		return eov.pObject;
-	}
-
+	return result.pObject;
+#else
 	return nullptr;
+#endif
 }
 
 static Object* N_editor_op_create_object(FLOAT4 position, int32 group_size)
 {
-	if (gPrototypeEditor) {
-		EditOperationValue eov = gPrototypeEditor->PushEditOperation(EditOperation {
-			.Type = EditOperation::eType::Create,
-			.pObject = nullptr,
-			.ValueA = EditOperationValue(Vec3f(position)),
-			.ValueB = EditOperationValue(nullptr),
-			.GroupSize = group_size,
-		});
+#ifdef FX_IS_EDITOR
+	const EditOperationValue result = gEditor->PushEditOperation(EditOperation {
+		.Type = EditOperation::eType::Create,
+		.pObject = nullptr,
+		.ValueA = EditOperationValue(Vec3f(position)),
+		.ValueB = EditOperationValue(nullptr),
+		.GroupSize = group_size,
+	});
 
-		return eov.pObject;
-	}
-
+	return result.pObject;
+#else
 	return nullptr;
+#endif
 }
 
 static Object* N_editor_op_dupe_object(Object* object_to_dupe, FLOAT4 position, int32 group_size)
 {
-	if (gPrototypeEditor) {
-		EditOperationValue eov = gPrototypeEditor->PushEditOperation(EditOperation {
-			.Type = EditOperation::eType::Dupe,
-			.pObject = object_to_dupe,
-			.ValueA = EditOperationValue(Vec3f(position)),
-			.ValueB = EditOperationValue(nullptr),
-			.GroupSize = group_size,
-		});
-
-		return eov.pObject;
+#ifdef FX_IS_EDITOR
+	if (object_to_dupe == nullptr) {
+		return nullptr;
 	}
 
+	const EditOperationValue result = gEditor->PushEditOperation(EditOperation {
+		.Type = EditOperation::eType::Dupe,
+		.pObject = object_to_dupe,
+		.ValueA = EditOperationValue(Vec3f(position)),
+		.ValueB = EditOperationValue(nullptr),
+		.GroupSize = group_size,
+	});
+
+	return result.pObject;
+#else
 	return nullptr;
+#endif
 }
 
 static void N_editor_push_op_delete(Object* obj, int32 group_size)
 {
 #ifdef FX_IS_EDITOR
-	if (obj == nullptr || gEditor->IsSimulationMode()) {
+	if (gEditor->IsSimulationMode()) {
 		return;
 	}
 
-	// Snapshot everything Undo needs before the Execute step destroys the object.
-	EditOperation op {
-		.Type = EditOperation::eType::Delete,
-		.pObject = obj,
-		.ValueA = EditOperationValue(Vec3f::sZero),
-		.ValueB = EditOperationValue(Vec3f::sZero),
-		.GroupSize = group_size,
-	};
-	op.PushedObjectID = obj->ID;
-	op.ObjectSnapshot.Position = obj->GetPosition();
-	const Brush* brush = gWorld->pBlockout->GetBrush(obj);
-	op.PlanesBefore = (brush != nullptr) ? brush->Planes : Brush::FromBox(obj->Bounds.Min, obj->Bounds.Max).Planes;
-	op.ObjectSnapshot.Material = gPrototypeEditor->GetStoredMaterial(obj);
-	op.ObjectSnapshot.Rotation = obj->mRotation;
-	op.ObjectSnapshot.ObjectName = obj->Name;
-	op.ObjectSnapshot.bIsProbeVolume = obj->IsProbeVolume();
-
-	gPrototypeEditor->PushEditOperation(op);
+	gEditor->DeleteObject(obj, group_size);
 #endif
 }
 
@@ -288,12 +282,12 @@ static void N_object__select_object_internal(Object* obj, bool is_selected, bool
 
 	// Deselect object
 	if (!is_selected || obj == nullptr) {
-		gPrototypeEditor->SelectObject(nullptr, false);
+		gEditor->ClearSelection();
 		return;
 	}
 
 	// Select an object
-	gPrototypeEditor->SelectObject(obj, append_selection);
+	gEditor->SelectObject(obj, append_selection);
 #endif
 }
 
@@ -468,7 +462,7 @@ static Object* N_blockout_create_box(FLOAT4 min, FLOAT4 max)
 	op.ObjectSnapshot.Position = position;
 	op.ObjectSnapshot.Material = gWorld->pBlockout->GetMaterialForSlot(eCProtoMat::Gray);
 
-	return gPrototypeEditor->PushEditOperation(op).pObject;
+	return gEditor->PushEditOperation(op).pObject;
 #else
 	return nullptr;
 #endif
@@ -512,11 +506,11 @@ static bool N_blockout_clip(Object* object, FLOAT4 point_a, FLOAT4 point_b, FLOA
 	}
 
 	split_op.ObjectSnapshot.Rotation = object->mRotation;
-	split_op.ObjectSnapshot.Material = gPrototypeEditor->GetStoredMaterial(object);
+	split_op.ObjectSnapshot.Material = gEditor->GetSelection().GetStoredMaterial(object);
 	split_op.ObjectSnapshot.bIsProbeVolume = object->IsProbeVolume();
 
-	gPrototypeEditor->PushEditOperation(clip_op);
-	gPrototypeEditor->PushEditOperation(split_op);
+	gEditor->PushEditOperation(clip_op);
+	gEditor->PushEditOperation(split_op);
 
 	return true;
 #else
@@ -563,7 +557,7 @@ static bool N_blockout_paint_material(int32 slot, bool whole_brush)
 		return false;
 	}
 
-	gPrototypeEditor->PushEditOperation(op);
+	gEditor->PushEditOperation(op);
 
 	return true;
 #else
@@ -600,7 +594,7 @@ static void N_blockout_edit_face_texture(Object* object, FLOAT4 face, uint32 edi
 		return;
 	}
 
-	gPrototypeEditor->PushEditOperation(op);
+	gEditor->PushEditOperation(op);
 #endif
 }
 
@@ -649,18 +643,23 @@ static void N_script_error(const char* str) { LogError(LC_SCRIPT, "{}", str); }
 static void N_GUI_set_editor_tool(editor::eEditorTool tool)
 {
 #ifdef FX_IS_EDITOR
-	gEditor->GetMainFrame()->SetEditorTool(tool);
-#endif
-}
-
-
-static void N_tool_state_send(const editor::EditorToolState* tc)
-{
-	if (tc == nullptr) {
+	if (tool >= editor::eEditorTool::Count) {
 		return;
 	}
 
-	editor::SubmitToolConfig(tc);
+	gEditor->SetTool(tool);
+#endif
+}
+
+static void N_tool_state_send(const editor::EditorToolState* state)
+{
+#ifdef FX_IS_EDITOR
+	if (state == nullptr) {
+		return;
+	}
+
+	gEditor->SubmitToolState(*state);
+#endif
 }
 
 

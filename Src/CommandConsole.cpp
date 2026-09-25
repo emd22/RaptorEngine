@@ -2,7 +2,6 @@
 
 #include "CVar.hpp"
 #include "Controls.hpp"
-#include "InGameEditor.hpp"
 
 #include <Core/DynArray.hpp>
 #include <Core/Slice.hpp>
@@ -14,25 +13,14 @@ namespace fx {
 
 void Console::ExecuteScriptCommand(const String& cmd_name)
 {
-	if (mpScript == nullptr) {
+#ifdef FX_IS_EDITOR
+	if (gEditor->RunCommand(cmd_name)) {
+		Output = "Executed";
 		return;
 	}
+#endif
 
-	// Provide the command script with the selection from the editor
-	editor::EditorTool* tool = gEditor->GetCurrentTool();
-	if (tool != nullptr) {
-		mpScript->CallFunction<void(void*)>("tool_state_recieve", reinterpret_cast<void*>(tool->RetrieveSelection()));
-	}
-
-	auto cmd_func = mpScript->GetFunction<void()>((String::Fmt("CMD_{}", cmd_name)).CStr());
-
-	if (cmd_func != nullptr) {
-		mpScript->CallFunctionPtr<void()>(cmd_func);
-		Output = "Executed";
-	}
-	else {
-		Output = "Cmd not found";
-	}
+	Output = "Cmd not found";
 }
 
 void Console::ExecuteCommand(const DynArray<String>& tokens)
@@ -72,20 +60,7 @@ void Console::ExecuteCommand(const DynArray<String>& tokens)
 	}
 	else {
 		// Try and call an editor function.
-
 		ExecuteScriptCommand(cmd);
-		// 		if (gPrototypeEditor != nullptr && gPrototypeEditor->pScript != nullptr) {
-		// 			auto fn = gPrototypeEditor->pScript->GetFunction<void (*)(void*)>((String::Fmt("CMD_{}",
-		// cmd)).CStr());
-		//
-		// 			if (fn != nullptr) {
-		// 				gPrototypeEditor->pScript->CallFunctionPtr(fn);
-		// 				Output = "Executed";
-		// 			}
-		// 			else {
-		// 				Output = "Cmd not found";
-		// 			}
-		// 		}
 	}
 }
 

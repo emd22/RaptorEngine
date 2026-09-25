@@ -6,7 +6,6 @@
 
 #include <Core/StackArray.hpp>
 #include <Core/Types.hpp>
-#include <InGameEditor.hpp>
 
 class wxToggleButton;
 
@@ -27,13 +26,10 @@ public:
 	FX_FORCE_INLINE ObjectPropertiesPanel* GetObjectPropertiesPanel() { return mpObjectPropertiesPanel; }
 	FX_FORCE_INLINE WorldPropertiesPanel* GetWorldPropertiesPanel() { return mpWorldPropertiesPanel; }
 
-	FX_FORCE_INLINE eEditorTool GetSelectedTool() const { return mSelectedToolType; }
 	FX_FORCE_INLINE bool IsCloseRequested() const { return mbCloseRequested; }
 
-	void SetEditorTool(const eEditorTool tool);
-	void SetDefaultTool();
-
-	FX_FORCE_INLINE bool IsSimulationMode() const { return mSelectedToolType == eEditorTool::None; }
+	/// Highlights the button of the selected tool
+	void ShowSelectedTool(const eEditorTool tool);
 
 	/// False while the frame is minimized or another app is in front, so the render loop can throttle itself
 	FX_FORCE_INLINE bool IsActive() const { return mbIsActive; }
@@ -52,10 +48,6 @@ private:
 	ObjectListWindow* mpObjectListWindow = nullptr;
 
 	StackArray<wxToggleButton*, static_cast<uint32>(eEditorTool::Count)> mToolButtons;
-	eEditorTool mSelectedToolType = eEditorTool::Translate;
-
-	EditorTool* pSelectedTool = nullptr;
-
 
 	bool mbCloseRequested = false;
 	bool mbIsActive = true;

@@ -1,9 +1,8 @@
 /*
  * File:        tool_face.strata
  * Author:      emd22
- * Created:     09/23/2026
- * Description: Face (scale) tool, plus the face texture hotkeys. Run by `prototype_editor.strata` while
- *              EDITORTOOL.FACE is selected.
+ * Created:     23/09/2026
+ * Description: Face extrusion tool
  */
 
 import ../tool_common;
@@ -25,6 +24,10 @@ const float FACE_TEXTURE_ROTATE_STEP = 15.0f;
 /* Scale applied to the texture on a face per key press */
 const float FACE_TEXTURE_SCALE_STEP = 2.0f;
 
+/* The face being moved (in the object's local space), and how far out it is */
+float3 selected_face;
+float selected_face_scale;
+
 float3 face_tool_magnitude;
 float3 initial_face_object_position;
 float3 initial_face_position;
@@ -35,7 +38,7 @@ float face_min_proj;
 @private
 FACEDIR face_get_dir()
 {
-	float3 abs_face = float3_abs(sel.selected_face);
+	float3 abs_face = float3_abs(selected_face);
 
 	const float threshold = 0.01f;
 
@@ -51,18 +54,18 @@ FACEDIR face_get_dir()
 
 
 /* The mouse was pressed with the Face tool selected. */
-void tool_face_begin()
+void tool_begin()
 {
+	initial_player_position = player.position;
+
 	OBJECT last_object = editor_last_selected_object();
 	if (last_object == OBJECT_NULL) {
 		return;
 	}
 
 	/* Cast and gather the face we are pointing towards */
-	float3 selected_face = last_object.ray_get_face();
-
-	sel.selected_face = selected_face;
-	sel.selected_face_scale = last_object.direction_scale(selected_face);
+	selected_face = last_object.ray_get_face();
+	selected_face_scale = last_object.direction_scale(selected_face);
 
 	/* Snapshot where the face is now so the preview marker can track
 	   exactly where it will be after finalize (obj pos + face offset). */
@@ -71,11 +74,11 @@ void tool_face_begin()
 
 	face_world_normal = last_object.local_dir_to_world(selected_face);
 
-	float thickness = sel.selected_face_scale + last_object.direction_scale(float3(0.0f) - selected_face);
+	float thickness = selected_face_scale + last_object.direction_scale(float3(0.0f) - selected_face);
 	face_min_proj = fmin(0.0f, FACE_MIN_THICKNESS - thickness);
 }
 
-void tool_face_update(float delta_time)
+void tool_update(float delta_time)
 {
 	/* Player delta projected onto the face's world normal. Follows
 	   Blockout::ScaleInDirection (Max += mag / Min -= mag). */
@@ -85,10 +88,10 @@ void tool_face_update(float delta_time)
 	face_tool_magnitude = float3(proj);
 
 	float3 xform_marker_dest = initial_face_position + (face_world_normal * float3(proj));
-	transform_marker_object.move_to(xform_marker_dest);
+	state.transform_marker_object.move_to(xform_marker_dest);
 }
 
-void tool_face_finalize()
+void tool_finalize()
 {
 	hide_transform_marker_object();
 
@@ -105,24 +108,17 @@ void tool_face_finalize()
 	for (int i = 0; i < sel.selected_objects_count; i++) {
 		OBJECT obj = sel.selected_objects[i];
 
-		// blockout_object_scale(
-		// 	sel.selected_objects[i],
-		// 	sel.selected_face,
-		// 	face_tool_magnitude
-		// );
-
-		editor_push_op_vec(obj, OPTYPE.SCALE, sel.selected_face, face_tool_magnitude, sel.selected_objects_count);
+		editor_push_op_vec(obj, OPTYPE.SCALE, selected_face, face_tool_magnitude, sel.selected_objects_count);
 
 		blockout_reload_object(obj);
 	}
-
 }
 
 
 /* Edits the texture on the face of the selected object under the crosshair:
    arrows shift it, [ and ] scale it, , and . rotate it, M cycles its material and J resets it.
    Called every frame the Face tool is selected and no drag is in progress. */
-void tool_face_controls()
+void tool_controls()
 {
 	OBJECT last_object = editor_last_selected_object();
 

@@ -1,5 +1,7 @@
 #include "ObjectPropertiesPanel.hpp"
 
+#include "RaptorEditor.hpp"
+
 #include <wx/checkbox.h>
 #include <wx/choice.h>
 #include <wx/sizer.h>
@@ -8,7 +10,6 @@
 
 #include <Blockout.hpp>
 #include <Engine.hpp>
-#include <InGameEditor.hpp>
 #include <World.hpp>
 
 namespace fx::editor {
@@ -100,7 +101,7 @@ void ObjectPropertiesPanel::SetRows(StackArray<FlagRow, scMaxRows>& rows, uint32
 
 void ObjectPropertiesPanel::OnMaterialChoice(wxCommandEvent& event)
 {
-	if (mpShownObject == nullptr || gWorld->pBlockout == nullptr || gPrototypeEditor == nullptr) {
+	if (mpShownObject == nullptr || gWorld->pBlockout == nullptr) {
 		return;
 	}
 
@@ -112,7 +113,7 @@ void ObjectPropertiesPanel::OnMaterialChoice(wxCommandEvent& event)
 	mShownMaterialSlot = slot;
 
 	const MaterialID material = gWorld->pBlockout->GetMaterialForSlot(static_cast<eCProtoMat>(slot));
-	gPrototypeEditor->SetStoredMaterial(mpShownObject, material);
+	gEditor->SetStoredMaterial(mpShownObject, material);
 }
 
 void ObjectPropertiesPanel::ShowObject(Object* object)
@@ -141,8 +142,8 @@ void ObjectPropertiesPanel::ShowObject(Object* object)
 
 	int32 material_slot = -1;
 
-	if (gWorld->pBlockout != nullptr && gPrototypeEditor != nullptr) {
-		const MaterialID current_material = gPrototypeEditor->GetStoredMaterial(object);
+	if (gWorld->pBlockout != nullptr) {
+		const MaterialID current_material = gEditor->GetSelection().GetStoredMaterial(object);
 
 		for (uint32 slot = 0; slot < static_cast<uint32>(eCProtoMat::Count); slot++) {
 			if (current_material == gWorld->pBlockout->GetMaterialForSlot(static_cast<eCProtoMat>(slot))) {

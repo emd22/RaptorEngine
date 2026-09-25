@@ -1,9 +1,9 @@
 /*
  * File:        tool_create.strata
  * Author:      emd22
- * Created:     09/23/2026
- * Description: Create tool (draw a new brush). Run by `prototype_editor.strata` while EDITORTOOL.CREATE is selected.
- *              Unlike the other tools it works on whatever the crosshair is on, not on the selection.
+ * Created:     23/09/2026
+ * Description: Create tool (draw a new brush). Unlike the other tools it works on whatever the crosshair is on, not on
+ *              the selection.
  */
 
 import ../tool_common;
@@ -41,7 +41,7 @@ float3 tool_create_dominant_axis(float3 v)
 	return float3(0.0f, 0.0f, float_sign(v.z));
 }
 
-void tool_create_begin()
+void tool_begin()
 {
 	float3 normal = player.ray_get_normal(CREATE_RANGE);
 
@@ -58,7 +58,7 @@ void tool_create_begin()
 
 /* Sizes the brush from where the drag started to where the crosshair meets the surface's plane, and out from the
    surface by the height */
-void tool_create_update(float delta_time)
+void tool_update(float delta_time)
 {
 	if (!create_active) {
 		return;
@@ -96,7 +96,7 @@ void tool_create_update(float delta_time)
 	blockout_preview_box(create_min, create_max);
 }
 
-void tool_create_finalize()
+void tool_finalize()
 {
 	blockout_hide_preview();
 
