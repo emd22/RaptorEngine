@@ -2,15 +2,12 @@
 
 #include <Core/Types.hpp>
 #include <Math/SIMDHelper.hpp>
+#include <Script/Script.hpp>
 
 namespace fx {
 
 class String;
 class Object;
-
-namespace script {
-class Script;
-}
 
 
 namespace editor {
@@ -70,6 +67,8 @@ public:
 	 */
 	void ReloadHotFunctions();
 
+	EditorToolSelection* RetrieveSelection();
+
 	~EditorTool();
 
 public:
@@ -81,9 +80,10 @@ private:
 	// Cached hot functions
 	/////////////////////////////////////
 
-	void (*pFnBegin)(void*) = nullptr;
-	void (*pFnUpdate)(void*, float) = nullptr;
-	void (*pFnFinalize)(void*) = nullptr;
+	script::ScriptFunctionType<void()> pFnBegin = nullptr;
+	script::ScriptFunctionType<void(float)> pFnUpdate = nullptr;
+	script::ScriptFunctionType<void()> pFnFinalize = nullptr;
+	script::ScriptFunctionType<void*()> pFnGetSelection = nullptr;
 };
 
 

@@ -1,0 +1,137 @@
+/*
+ * File:        editor_cmd.strata
+ * Author:      emd22
+ * Created:     24/09/2026
+ * Description: Builtin commands for controlling editor state or manipulating objects
+ */
+
+import tool_common;
+
+
+/////////////////////////////////////
+// Commands
+/////////////////////////////////////
+
+
+/* Snap selected object to world (undoable: pushes one Move op per moved object). */
+void CMD_snap2w()
+{
+	if (!editor_has_object_selection()) {
+		return;
+	}
+
+	int count = sel.selected_objects_count;
+
+	int snaps = 0;
+	for (int i = 0; i < count; i++) {
+		OBJECT obj = sel.selected_objects[i];
+		if (!editor_vec_equal(obj.position, editor_transform_snap(obj.position))) {
+			snaps++;
+		}
+		}
+
+	if (snaps == 0) {
+		return;
+	}
+
+	// Snap all objects to world grid
+	for (int i = 0; i < count; i++) {
+		OBJECT obj = sel.selected_objects[i];
+		float3 snapped = editor_transform_snap(obj.position);
+		if (editor_vec_equal(obj.position, snapped)) {
+			continue;
+		}
+		editor_push_op_vec(obj, OPTYPE.MOVE, obj.position, snapped, snaps);
+	}
+	}
+
+/////////////////////////////////////
+// Light probe volumes
+/////////////////////////////////////
+
+/* Marks or unmarks the selected brushes as probe volumes, and returns how many changed. */
+int editor_mark_probe_volumes(bool enabled)
+{
+	if (!editor_has_object_selection()) {
+		printf("probe volumes: nothing selected\n");
+		return 0;
+	}
+
+	int changed = 0;
+
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		OBJECT obj = sel.selected_objects[i];
+
+		if (probe_volume_is_marked(obj) == enabled) {
+			continue;
+		}
+
+		probe_volume_mark(obj, enabled);
+		changed++;
+	}
+
+	return changed;
+}
+
+/* Turn the selected brushes into probe volumes */
+void CMD_probevol()
+{
+	int changed = editor_mark_probe_volumes(true);
+	int total = probe_rebuild_volumes();
+
+	printf("probe volumes: marked %d brush(es), %d now defined, %d probes\n", changed, total, probe_count());
+}
+
+/* Turn the selected probe volume brushes back into ordinary geometry. */
+void CMD_probevolclear()
+{
+	int changed = editor_mark_probe_volumes(false);
+	int total = probe_rebuild_volumes();
+
+	printf("probe volumes: unmarked %d brush(es), %d still defined, %d probes\n", changed, total, probe_count());
+}
+
+/* Rebuild the volumes from the marked brushes without baking, to see where the probes land. */
+void CMD_proberebuild()
+{
+	int total = probe_rebuild_volumes();
+
+	printf("probe volumes: %d from brushes, %d volume(s), %d probes\n", total, probe_volume_count(), probe_count());
+}
+
+/* Rebuild the volumes and bake them. Runs a few probes per frame, so it takes a while on a big level. */
+void CMD_probebake()
+{
+	if (probe_is_baking()) {
+		printf("probe bake already running\n");
+		return;
+	}
+
+	probe_bake();
+}
+
+/* Save the baked probes for this scene. They are loaded automatically on the next run. */
+void CMD_probesave()
+{
+	if (probe_is_baking()) {
+		printf("cannot save while the probes are baking\n");
+		return;
+	}
+
+	if (probe_save()) {
+		printf("probes saved\n");
+	}
+	}
+
+void CMD_lock()
+{
+	if (!editor_has_object_selection()) {
+		return;
+	}
+
+	int snaps = 0;
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		OBJECT obj = sel.selected_objects[i];
+		obj.set_tags(obj.get_tags() | OBJ_TAG_LOCK);
+	}
+	}

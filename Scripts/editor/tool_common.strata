@@ -69,6 +69,8 @@ OBJECT OBJECT_NULL;
 TOOLSTATE state;
 SELECTION sel;
 
+bool original_headbob_state = false;
+
 
 /////////////////////////////////////
 // Data interop
@@ -83,6 +85,11 @@ void tool_state_receive(ref TOOLSTATE tc)
 	state.transform_marker_object = tc.transform_marker_object;
 }
 
+SELECTION _tool_get_selection()
+{
+	return sel;
+}
+
 /* Submit the current state from script to editor. */
 extern void tool_state_send(ref TOOLSTATE tc);
 
@@ -91,6 +98,24 @@ extern void tool_state_send(ref TOOLSTATE tc);
 void sync_state()
 {
 	tool_state_send(state);
+}
+
+
+
+/////////////////////////////////////
+// Movement
+/////////////////////////////////////
+
+void editor_movement_damp_set(bool value)
+{
+	if (value) {
+		player.set_speed_multiplier(0.5f);
+		cvar_set_bool("b_headbob_enabled", false);
+	}
+	else {
+		player.set_speed_multiplier(1.0f);
+		cvar_set_bool("b_headbob_enabled", original_headbob_state);
+	}
 }
 
 
@@ -268,11 +293,17 @@ void editor_dupe_selection()
 	}
 }
 
-
-
-void editor_check_common_controls()
+/* When switching to a prototyping mode */
+void _on_prototype_enter()
 {
+	reset_selection();
+	original_headbob_state = cvar_get_bool("b_headbob_enabled", false);
+}
 
 
+void _on_prototype_leave()
+{
+	reset_selection();
+	hide_transform_marker_object();
 
 }

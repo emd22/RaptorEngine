@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ScriptFunction.hpp"
+
 #include <Core/String.hpp>
 
 struct StrataJit;
@@ -21,19 +23,28 @@ public:
 
 	void ReloadScript();
 
+	template <typename TSignature>
+	auto GetFunction(const char* fn_name) const -> ScriptFunctionType<TSignature>
+	{
+		return reinterpret_cast<ScriptFunctionType<TSignature>>(GetFunctionPtr(fn_name));
+	}
+
 	template <typename T>
-	T GetFunction(const char* fn_name) const
+	T GetFunctionRaw(const char* fn_name) const
 	{
 		return reinterpret_cast<T>(GetFunctionPtr(fn_name));
 	}
 
-	template <typename TReturnType, typename... TArgs>
-	TReturnType CallFunction(const char* name, TArgs... args)
+	template <typename TSignature, typename... TArgs>
+	auto CallFunction(const char* name, TArgs... args) -> ScriptFunction<TSignature>::ReturnType
 	{
-		auto func_ptr = GetFunction<TReturnType (*)(void*, TArgs...)>(name);
+		using SC = ScriptFunction<TSignature>;
+		using ReturnType = SC::ReturnType;
+
+		auto func_ptr = GetFunctionRaw<typename SC::Type>(name);
 
 		if (func_ptr != nullptr) {
-			if constexpr (std::is_void_v<TReturnType>) {
+			if constexpr (std::is_void_v<ReturnType>) {
 				func_ptr(mpGlobalContext, args...);
 				return;
 			}
@@ -44,20 +55,29 @@ public:
 
 		// Fallback if function ptr was not found
 
-		if constexpr (std::is_void_v<TReturnType>) {
+		if constexpr (std::is_void_v<ReturnType>) {
 			return;
 		}
 		else {
-			return TReturnType {};
+			return ReturnType {};
 		}
 	}
 
-	template <typename TReturnType, typename... TArgs>
-	TReturnType CallFunctionPtr(TReturnType (*func_ptr)(void*, TArgs...), TArgs... args)
+	/**
+	 * @brief Calls a function in the script from its signature.
+	 *
+	 * For example, you can call a function as the following:
+	 * ```cpp
+	 * float result = CallFunctionPtr<float(float, float)>(ptr_add_floats, 10.0f, 20.0f);
+	 * ```
+	 */
+	template <typename TSignature, typename... TArgs>
+	auto CallFunctionPtr(ScriptFunctionType<TSignature> func_ptr, TArgs... args)
+		-> ScriptFunction<TSignature>::ReturnType
 	{
-		DebugAssert(func_ptr != nullptr);
+		using SF = ScriptFunction<TSignature>;
 
-		if constexpr (std::is_void_v<TReturnType>) {
+		if constexpr (std::is_void_v<typename SF::ReturnType>) {
 			func_ptr(mpGlobalContext, args...);
 			return;
 		}
