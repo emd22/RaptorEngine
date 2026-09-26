@@ -9,6 +9,7 @@
 #include <Core/RefCountedBase.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/Slice.hpp>
+#include <Renderer/PipelineKey.hpp>
 #include <Renderer/PipelineNames.hpp>
 #include <Renderer/Vertex.hpp>
 
@@ -213,10 +214,7 @@ struct PipelineProperties
 
 	bool bRenderLines : 1 = false;
 
-	Vec2u ViewportSize = Vec2u::sZero;
 	VkCompareOp DepthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
-
-	uint32 ViewportDivisor = 1U;
 };
 
 struct PushConstants
@@ -224,12 +222,6 @@ struct PushConstants
 	uint32 Size;
 	eShaderType ShaderTypes;
 };
-
-/**
- * @brief Marks an internal state to require the next pipeline bound to output its dynamic states.
- */
-void RequirePipelineDynamicStates();
-
 
 class PipelineLayout : public RefCountedBase
 {
@@ -326,9 +318,11 @@ public:
 
 	SizedArray<DescriptorRef> DescriptorIDs;
 
-	mutable Vec2u ViewportSize = Vec2u::sZero;
-
 	ePipelineName Name;
+
+	/// This pipeline's index in the PipelineCache, set by the cache. Lets code that holds a `Pipeline` get the handle
+	/// without hashing anything.
+	PipelineHandle Handle;
 
 	Ref<ShaderProgram> VertexShader { nullptr };
 	Ref<ShaderProgram> PixelShader { nullptr };
@@ -340,15 +334,8 @@ public:
 	/// The cull mode the pipeline was created with. It is dynamic state, so it is set when the pipeline is bound.
 	VkCullModeFlags DefaultCullMode = VK_CULL_MODE_NONE;
 
-	bool bIsViewportFullscreen = false;
-
-	/// True if the pipeline uses dynamic states for viewport and scissor
-	bool bHasDynamicViewport = true;
-
 private:
 	GpuDevice* mDevice = nullptr;
-
-	uint32 mViewportDivisor = 1U;
 
 protected:
 	bool mbDoNotDestroyLayout = false;

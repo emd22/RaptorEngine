@@ -113,6 +113,11 @@ class Shader
 public:
 	static ShaderId GenerateShaderId(eShaderType type, const SizedArray<ShaderMacro>& macros);
 
+	/**
+	 * @brief Folds a macro list into `hash` by its contents
+	 */
+	static Hash64 HashMacros(const SizedArray<ShaderMacro>& macros, Hash64 hash = FX_HASH64_FNV1A_INIT);
+
 	Shader() = delete;
 	Shader(const char* path)
 	{

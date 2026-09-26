@@ -17,9 +17,6 @@ FX_SET_MODULE_NAME("Pipeline")
 namespace fx::renderer {
 
 static VkPipeline spBoundPipeline = nullptr;
-static bool sbHaveDynamicStatesBeenBound = false;
-
-void RequirePipelineDynamicStates() { sbHaveDynamicStatesBeenBound = false; }
 
 
 /////////////////////////////////////
@@ -157,7 +154,8 @@ void Pipeline::Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shade
 		shader_create_info.Insert(create_info);
 	}
 
-	// Dynamic states (scissor & viewport updates dynamically)
+	// Dynamic states. The viewport and scissor come from the render stage that is being drawn to (RenderStage::Begin()),
+	// so a pipeline can be used on a target of any size.
 	SizedArray<VkDynamicState> dynamic_states = {
 		VK_DYNAMIC_STATE_VIEWPORT,
 		VK_DYNAMIC_STATE_SCISSOR,
@@ -171,37 +169,13 @@ void Pipeline::Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shade
 		.pDynamicStates = dynamic_states,
 	};
 
-	bHasDynamicViewport = true;
 	DefaultCullMode = properties.CullMode;
-	ViewportSize = properties.ViewportSize;
-	mViewportDivisor = properties.ViewportDivisor;
 
-	// If there is no viewport size passed in, assume the swapchain size.
-	if (ViewportSize.X == 0 || ViewportSize.Y == 0) {
-		bIsViewportFullscreen = true;
-		ViewportSize = gGraphics->Swapchain.Extent;
-	}
-
-	VkViewport viewport = {
-		.x = 0.0f,
-		.y = 0.0f,
-		.width = static_cast<float32>(ViewportSize.X) / mViewportDivisor,
-		.height = static_cast<float32>(ViewportSize.Y) / mViewportDivisor,
-		.minDepth = 1.0f,
-		.maxDepth = 0.0f,
-	};
-
-	VkRect2D scissor = {
-		.offset = { 0, 0 },
-		.extent = { .width = ViewportSize.X / mViewportDivisor, .height = ViewportSize.Y / mViewportDivisor },
-	};
-
+	// The counts are all a dynamic viewport and scissor need here, their values are ignored
 	const VkPipelineViewportStateCreateInfo viewport_state_info = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
 		.viewportCount = 1,
-		.pViewports = &viewport,
 		.scissorCount = 1,
-		.pScissors = &scissor,
 	};
 
 	// Vertex info + input info
@@ -345,32 +319,6 @@ void Pipeline::Bind(const CommandBuffer& cmd) const
 {
 	if (InternalPipeline == spBoundPipeline) {
 		return;
-	}
-
-	if (!bIsCompute && bHasDynamicViewport && !sbHaveDynamicStatesBeenBound) {
-		if (bIsViewportFullscreen) {
-			ViewportSize = gGraphics->GetWindow()->GetSize();
-		}
-
-		VkViewport viewport = {
-			.x = 0.0f,
-			.y = 0.0f,
-			.width = static_cast<float32>(ViewportSize.X) / mViewportDivisor,
-			.height = static_cast<float32>(ViewportSize.Y) / mViewportDivisor,
-			.minDepth = 1.0f,
-			.maxDepth = 0.0f,
-		};
-
-		VkRect2D scissor = {
-			.offset = { 0, 0 },
-			.extent = { .width = ViewportSize.X / mViewportDivisor, .height = ViewportSize.Y / mViewportDivisor },
-		};
-
-		vkCmdSetViewport(cmd, 0, 1, &viewport);
-		vkCmdSetScissor(cmd, 0, 1, &scissor);
-	}
-	else if (!bHasDynamicViewport) {
-		sbHaveDynamicStatesBeenBound = false;
 	}
 
 	vkCmdBindPipeline(cmd.Get(), GetBindPoint(), InternalPipeline);

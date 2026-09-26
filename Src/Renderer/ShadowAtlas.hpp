@@ -92,9 +92,6 @@ private:
 
 	uint32 mGeneration = 0;
 
-	VkViewport mCurrentViewport {};
-	VkRect2D mCurrentScissor {};
-
 	bool mbNeedsClear = true;
 	bool mbInitialized = false;
 };

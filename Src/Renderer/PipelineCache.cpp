@@ -1,5 +1,6 @@
 #include "PipelineCache.hpp"
 
+#include <Core/Log.hpp>
 #include <Core/Types.hpp>
 #include <Renderer/Backend/DescriptorCache.hpp>
 #include <Renderer/Globals.hpp>
@@ -12,6 +13,12 @@ static constexpr uint32 scMaxBuffersPerDS = 6;
 PipelineCache::PipelineCache()
 {
 	mCache.InitSize(scNumPipelines);
+
+	for (uint32 i = 0; i < scNumPipelines; i++) {
+		mCache[i].Handle = PipelineHandle { i };
+	}
+
+	mKeys.resize(scNumPipelines);
 
 	mOffsets.InitCapacity(scMaxDescriptorSets);
 
@@ -44,9 +51,77 @@ ePipelineName PipelineCache::GetName(const Pipeline* pipeline) const
 	// return ePipelineName::Geometry;
 }
 
-void PipelineCache::Bind(const ePipelineName name, const CommandBuffer& cmd)
+void PipelineCache::Bind(const ePipelineName name, const CommandBuffer& cmd) { Bind(Request(name).Handle, cmd); }
+
+Pipeline& PipelineCache::Get(const PipelineHandle handle)
 {
-	Pipeline& pl = Request(name);
+	AssertLess(handle.Index, mCache.Size);
+	return mCache[handle.Index];
+}
+
+bool PipelineCache::RegisterKey(const PipelineHandle handle, const PipelineKey& key)
+{
+	AssertLess(handle.Index, mKeys.size());
+
+	KeyEntry& entry = mKeys[handle.Index];
+
+	// The pipeline was rebuilt, so its old key no longer finds it
+	if (entry.bRegistered) {
+		auto old = mKeyLookup.find(entry.Hash);
+
+		if (old != mKeyLookup.end() && old->second == handle) {
+			mKeyLookup.erase(old);
+		}
+	}
+
+	entry.Key = key;
+	entry.Hash = key.GetHash();
+	entry.bRegistered = true;
+
+	auto [it, inserted] = mKeyLookup.try_emplace(entry.Hash, handle);
+
+	if (inserted || it->second == handle) {
+		return true;
+	}
+
+	const KeyEntry& other = mKeys[it->second.Index];
+
+	if (other.Key == key) {
+		LogWarning(LC_RENDER, "Pipelines {} and {} were built from identical keys (hash {:#x})", handle.Index,
+				   it->second.Index, entry.Hash);
+	}
+	else {
+		LogError(LC_RENDER, "Pipelines {} and {} have different keys with the same hash {:#x}", handle.Index,
+				 it->second.Index, entry.Hash);
+	}
+
+	return false;
+}
+
+PipelineHandle PipelineCache::Find(const PipelineKey& key) const
+{
+	auto it = mKeyLookup.find(key.GetHash());
+
+	// Whatever the hash matched has to have the whole key, or it was a collision
+	if (it == mKeyLookup.end() || !(mKeys[it->second.Index].Key == key)) {
+		return PipelineHandle {};
+	}
+
+	return it->second;
+}
+
+const PipelineKey* PipelineCache::GetKey(const PipelineHandle handle) const
+{
+	if (handle.Index >= mKeys.size() || !mKeys[handle.Index].bRegistered) {
+		return nullptr;
+	}
+
+	return &mKeys[handle.Index].Key;
+}
+
+void PipelineCache::Bind(const PipelineHandle handle, const CommandBuffer& cmd)
+{
+	Pipeline& pl = Get(handle);
 
 	pl.Bind(cmd);
 

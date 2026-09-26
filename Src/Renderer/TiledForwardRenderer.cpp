@@ -223,8 +223,6 @@ void TiledForwardRenderer::CreateSSAOPSO()
 		gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
 		gPSOBuild->SetCullMode(eCullMode::None);
 
-		gPSOBuild->SetViewportSize(Target::scFullScreen, eSizeDivisor::HalfRes);
-
 		gPSOBuild->SetPushConstants(eShaderType::Pixel, sizeof(SSAOPushConsts));
 
 		// Set 0 (Global / Per Frame)
@@ -262,8 +260,6 @@ void TiledForwardRenderer::CreateSSAOBlurPSO()
 		gPSOBuild->SetShader(eShaderName::SSAOBlur, {});
 		gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
 		gPSOBuild->SetCullMode(eCullMode::None);
-
-		gPSOBuild->SetViewportSize(Target::scFullScreen, eSizeDivisor::HalfRes);
 
 		gPSOBuild->SetPushConstants(eShaderType::Pixel, sizeof(SSAOBlurPushConsts));
 
@@ -926,7 +922,6 @@ void TiledForwardRenderer::CreateBitmapTextPSO()
 		gPSOBuild->BeginPipeline(ePipelineName::TextRendering);
 		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(TextPushConstants));
 
-		gPSOBuild->SetViewportSize(Target::scFullScreen, eSizeDivisor::FullRes);
 		gPSOBuild->UseRenderStage(ForwardPass);
 		gPSOBuild->SetShader(eShaderName::BitmapText, {});
 		gPSOBuild->SetVertexType(eVertexType::Default);
