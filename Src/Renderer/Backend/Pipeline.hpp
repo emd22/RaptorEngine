@@ -64,6 +64,8 @@ enum class eDrawFlags : uint32
 	DebugProbeVisibility = (1 << 2),
 	/// World decals are not projected onto this draw
 	NoDecals = (1 << 3),
+	/// The draw does not sample the light probes
+	NoProbes = (1 << 4),
 };
 
 FxEnumFlags(eDrawFlags);

@@ -111,6 +111,11 @@ private:
 
 	CVarValue* mpShowFpsCVar = nullptr;
 
+	// $i_show_gpu shows the GPU time of each stage. $r_probes and $r_decals switch the probes and decals off when 0
+	CVarValue* mpShowGpuCVar = nullptr;
+	CVarValue* mpProbesCVar = nullptr;
+	CVarValue* mpDecalsCVar = nullptr;
+
 	Object* mpRaycastHitMarker = nullptr;
 	ObjectID mEditorSelectedObject = ObjectID::scNull;
 
