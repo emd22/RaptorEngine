@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 4.0)
 project(raptor LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -146,12 +146,23 @@ if(USE_MOLTENVK)
 endif()
 
 if(FX_EDITOR)
-    find_package(wxWidgets 3.3.3 REQUIRED COMPONENTS core base)
-
-    target_link_libraries(raptor PRIVATE wxWidgets::wxWidgets)
+    # vcpkg (Windows) ships a wxWidgets CMake config exposing wx::core / wx::base; elsewhere fall back
+    # to the FindwxWidgets module (wx-config).
+    find_package(wxWidgets 3.3.3 CONFIG QUIET COMPONENTS core base)
+    if(wxWidgets_FOUND AND TARGET wx::core)
+        target_link_libraries(raptor PRIVATE wx::core wx::base)
+    else()
+        find_package(wxWidgets 3.3.3 REQUIRED COMPONENTS core base)
+        target_link_libraries(raptor PRIVATE wxWidgets::wxWidgets)
+    endif()
     target_compile_definitions(raptor PRIVATE FX_IS_EDITOR)
 
-    # TODO: test on windows and fix the library gubbins over there
+    if(WIN32)
+        # wxWidgets' stock resources (cursors, icons, bitmaps) and the application manifest
+        target_sources(raptor PRIVATE "Src/Editor/raptor.rc")
+    endif()
+
+    # TODO: test on macOS and Linux
     if(APPLE)
         # Metal layer and relative mouse helpers
         enable_language(OBJCXX)

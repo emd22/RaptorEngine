@@ -135,6 +135,9 @@ FX_FORCE_INLINE double Dot(DOUBLE4 a, DOUBLE4 b)
 using UINT4 = __m128i;
 using FLOAT4 = __m128;
 
+using DOUBLE2 = __m128d;
+using DOUBLE4 = __m256d;
+
 namespace simd {
 
 FX_FORCE_INLINE void StoreUInt4(unsigned int* dst, UINT4 v) { _mm_storeu_si128(reinterpret_cast<__m128i*>(dst), v); }
@@ -188,6 +191,33 @@ FX_FORCE_INLINE FLOAT4 GetSign(FLOAT4 v)
 	// Add back in the `1.0`. We could return negative or positive zero, but that is not very useful in
 	// multiplications...
 	return _mm_or_ps(sign, _mm_castsi128_ps(v_one));
+}
+
+/////////////////////////////////////
+// Double Precision
+/////////////////////////////////////
+
+/**
+ * @brief Load a block of four doubles directly into the vector (unaligned).
+ *
+ * @note Make sure this buffer is valid or it WILL cause a GP fault.
+ */
+FX_FORCE_INLINE DOUBLE4 LoadDouble4(const double* src) { return _mm256_loadu_pd(src); }
+FX_FORCE_INLINE DOUBLE4 LoadDouble4(double x, double y, double z, double w) { return _mm256_setr_pd(x, y, z, w); }
+FX_FORCE_INLINE DOUBLE4 LoadDouble4(const double scalar) { return _mm256_set1_pd(scalar); }
+
+/**
+ * @brief Get the sum of all four lanes of the product of two DOUBLE4's (a full 4-component dot product).
+ */
+FX_FORCE_INLINE double Dot(DOUBLE4 a, DOUBLE4 b)
+{
+	const __m256d prod = _mm256_mul_pd(a, b);
+
+	// Add the upper half onto the lower half, then add the two remaining lanes
+	__m128d sum = _mm_add_pd(_mm256_castpd256_pd128(prod), _mm256_extractf128_pd(prod, 1));
+	sum = _mm_add_sd(sum, _mm_unpackhi_pd(sum, sum));
+
+	return _mm_cvtsd_f64(sum);
 }
 
 

@@ -8,6 +8,11 @@
 
 #include <wx/evtloop.h>
 
+// wxWidgets pulls in windows.h on Windows, which #defines LoadImage to LoadImageW and breaks AssetManager::LoadImage
+#ifdef LoadImage
+#undef LoadImage
+#endif
+
 #include <Core/StackArray.hpp>
 #include <Core/Types.hpp>
 #include <Material/MaterialID.hpp>
