@@ -811,9 +811,6 @@ void GraphicsBackend::DoComposition(Camera& render_cam)
 
 	PresentFrame();
 
-
-	RequirePipelineDynamicStates();
-
 	mInternalFrameCounter++;
 
 	mFrameNumber = (mInternalFrameCounter % FramesInFlight);

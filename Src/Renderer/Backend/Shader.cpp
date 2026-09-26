@@ -26,10 +26,7 @@ namespace fx::renderer {
 // Shader Functions
 /////////////////////////////////////
 
-/**
- * @brief Folds a macro list into `hash` by its contents
- */
-static Hash64 HashMacros(const SizedArray<ShaderMacro>& macros, Hash64 hash)
+Hash64 Shader::HashMacros(const SizedArray<ShaderMacro>& macros, Hash64 hash)
 {
 	for (const ShaderMacro& macro : macros) {
 		if (macro.pcName != nullptr) {

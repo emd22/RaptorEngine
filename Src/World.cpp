@@ -1025,27 +1025,11 @@ void World::RenderProbeCapture()
 
 	const Vec2u extent(ProbeManager::scCaptureSize, ProbeManager::scCaptureSize);
 
-	// The opaque geometry pipelines default to a swapchain-sized viewport.
-	// Override them for the capture extent (restored below).
 	static constexpr renderer::ePipelineName scCapturePipelines[] = {
 		renderer::ePipelineName::Geometry,
 		renderer::ePipelineName::GeometryNormalMaps,
 		renderer::ePipelineName::GeometrySkinned,
 	};
-
-	Vec2u saved_viewports[std::size(scCapturePipelines)];
-	bool saved_fullscreen[std::size(scCapturePipelines)];
-
-	for (uint32 i = 0; i < std::size(scCapturePipelines); i++) {
-		renderer::Pipeline& pipeline = gPipelineCache->Request(scCapturePipelines[i]);
-		saved_viewports[i] = pipeline.ViewportSize;
-		saved_fullscreen[i] = pipeline.bIsViewportFullscreen;
-
-		pipeline.ViewportSize = extent;
-		pipeline.bIsViewportFullscreen = false;
-	}
-
-	RequirePipelineDynamicStates();
 
 	const uint32 saved_tile_columns = gGraphics->pRenderer->GetLightTileColumns();
 	const uint32 saved_tile_rows = gGraphics->pRenderer->GetLightTileRows();
@@ -1103,17 +1087,8 @@ void World::RenderProbeCapture()
 			stage.End();
 		});
 
-	for (uint32 i = 0; i < std::size(scCapturePipelines); i++) {
-		renderer::Pipeline& pipeline = gPipelineCache->Request(scCapturePipelines[i]);
-		pipeline.ViewportSize = saved_viewports[i];
-		pipeline.bIsViewportFullscreen = saved_fullscreen[i];
-	}
-
 	gGraphics->pRenderer->mLightTileColumns = saved_tile_columns;
 	gGraphics->pRenderer->mLightTileRows = saved_tile_rows;
-
-	// Force the composition pass to re-emit viewport size/state
-	RequirePipelineDynamicStates();
 }
 
 void World::RenderBoundingBoxes(const Camera& camera)

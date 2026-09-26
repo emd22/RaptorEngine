@@ -83,7 +83,6 @@ ShadowAtlas::ShadowAtlas()
 
 		gPSOBuild->SetVertexType(eVertexType::Default);
 		gPSOBuild->SetShader(eShaderName::Shadows, {});
-		gPSOBuild->SetViewportSize(size, eSizeDivisor::FullRes);
 		gPSOBuild->SetDepthCompareOp(VK_COMPARE_OP_GREATER);
 		gPSOBuild->SetCullMode(eCullMode::Back);
 		gPSOBuild->SetFaceOrder(eFaceOrder::Reverse);
@@ -106,7 +105,6 @@ ShadowAtlas::ShadowAtlas()
 
 		gPSOBuild->SetVertexType(eVertexType::Default);
 		gPSOBuild->SetShader(eShaderName::Shadows, { ShaderMacro { .pcName = "ALPHA_MASK", .pcValue = "1" } });
-		gPSOBuild->SetViewportSize(size, eSizeDivisor::FullRes);
 		gPSOBuild->SetDepthCompareOp(VK_COMPARE_OP_GREATER);
 		gPSOBuild->SetCullMode(eCullMode::Back);
 		gPSOBuild->SetFaceOrder(eFaceOrder::Reverse);
@@ -130,11 +128,8 @@ void ShadowAtlas::BindPipeline(ePipelineName name)
 {
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
+	// The viewport was set for the region when it began, and binding a pipeline leaves it alone
 	gPipelineCache->Bind(name, cmd);
-
-	// Binding a pipeline points the viewport back at the whole target
-	vkCmdSetViewport(cmd.Cmd, 0, 1, &mCurrentViewport);
-	vkCmdSetScissor(cmd.Cmd, 0, 1, &mCurrentScissor);
 }
 
 Target* ShadowAtlas::GetTarget() { return RenderStage.GetTarget(eImageFormat::D32_Float); }
@@ -165,23 +160,12 @@ void ShadowAtlas::BeginRegion(const ShadowAtlasRegion& region)
 		mbNeedsClear = false;
 	}
 
-	RenderStage.Begin(cmd, render_area);
+	// Only the region is drawn to, even when the whole atlas is being cleared
+	RenderStage.Begin(cmd, render_area, rect);
 	mbInitialized = true;
 
 	gPipelineCache->AddBufferOffset(0, gObjectManager->GetBaseOffset());
 	gPipelineCache->AddBufferOffset(0, 0);
-
-	// Same flipped depth range as Pipeline::Bind()
-	mCurrentViewport = VkViewport {
-		.x = static_cast<float32>(region.Offset.X),
-		.y = static_cast<float32>(region.Offset.Y),
-		.width = static_cast<float32>(region.Size.X),
-		.height = static_cast<float32>(region.Size.Y),
-		.minDepth = 1.0f,
-		.maxDepth = 0.0f,
-	};
-
-	mCurrentScissor = rect;
 
 	BindPipeline(ePipelineName::ShadowDirectional);
 }
@@ -189,9 +173,6 @@ void ShadowAtlas::BeginRegion(const ShadowAtlasRegion& region)
 void ShadowAtlas::EndRegion()
 {
 	RenderStage.End();
-
-	// The viewport was left pointing at a single region
-	RequirePipelineDynamicStates();
 }
 
 ShadowAtlasRegion ShadowAtlas::GetDirectionalRegion() const
