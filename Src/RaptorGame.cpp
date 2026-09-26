@@ -38,6 +38,8 @@
 #include <Editor/RaptorEditor.hpp>
 #endif
 
+// #define FX_LIMIT_FRAMERATE_ON_FOCUS_LOST 1
+
 
 FX_SET_MODULE_NAME("RaptorGame");
 
@@ -47,7 +49,8 @@ using namespace renderer;
 
 static constexpr float scMouseSensitivity = 0.25;
 
-static constexpr uint32 scFramesForAvg = 10;
+/// How long the frame rate shown on screen is averaged over. Any shorter and it flickers too fast to read.
+static constexpr double scFpsWindowSeconds = 0.25;
 
 /// Target frame time while the window doesn't have OS focus, so an unfocused/backgrounded window doesn't burn a full
 /// core rendering frames nobody's looking at
@@ -181,6 +184,8 @@ void RaptorGame::CreateGame()
 
 	gCVars->Set("i_crosshair_size", scCrosshairSize);
 
+	mpShowFpsCVar = gCVars->Set("i_show_fps", 1);
+
 	// Metres between probes in a volume built from an editor brush. Set `$r_probe_spacing` in the console
 	gCVars->Set("r_probe_spacing", 2.5f);
 
@@ -230,6 +235,7 @@ void RaptorGame::CreateGame()
 
 		Tick();
 
+#ifdef FX_LIMIT_FRAMERATE_ON_FOCUS_LOST
 		if (!gGraphics->GetWindow()->IsFocused()) {
 			const double elapsed = static_cast<double>(SDL_GetPerformanceCounter() - frame_start) / sClockFreq;
 			const double remaining = scUnfocusedFrameTime - elapsed;
@@ -238,6 +244,7 @@ void RaptorGame::CreateGame()
 				SDL_Delay(static_cast<uint32>(remaining * 1000.0));
 			}
 		}
+#endif
 	}
 }
 
@@ -511,6 +518,10 @@ void RaptorGame::RenderText()
 	}
 
 
+	if (mpShowFpsCVar == nullptr || mpShowFpsCVar->IntValue != 0) {
+		gTextRenderer->DrawText(String::Fmt("FPS={:.0f} ({:.2f}ms)", Fps, FrameTimeMs).CStr(), 2.0f, scWhite);
+	}
+
 	gTextRenderer->DrawText(String::Fmt("Vis={}", gWorld->mRenderList.GetItemCount()).CStr(), 2.0f, scWhite);
 
 #ifdef FX_IS_EDITOR
@@ -548,15 +559,21 @@ void RaptorGame::Tick()
 	DeltaTime = static_cast<double>(current_tick - mLastTick) / sClockFreq;
 	gGraphics->DeltaTime = static_cast<float32>(DeltaTime);
 
-	FrameTimeAvg += DeltaTime;
+	mFpsWindowTime += DeltaTime;
 
-	if (!(gGraphics->GetFrameNumber() % scFramesForAvg)) {
-		double frametime = FrameTimeAvg / scFramesForAvg;
-		double fps = 1.0 / frametime;
+	if (mFpsWindowTime >= scFpsWindowSeconds) {
+		// Frames that were finished, not calls to Tick(), since a Tick() that returns early (the swapchain is being
+		// rebuilt) does not draw a frame and would make the frame rate read too high
+		const uint64 elapsed_frames = gGraphics->GetElapsedFrameCount();
+		const uint64 frames = elapsed_frames - mFpsWindowStartFrame;
 
-		// LogInfo("FrameTime={}, FPS={}", frametime, fps);
+		if (frames > 0) {
+			FrameTimeMs = (mFpsWindowTime / static_cast<double>(frames)) * 1000.0;
+			Fps = static_cast<double>(frames) / mFpsWindowTime;
+		}
 
-		FrameTimeAvg = 0;
+		mFpsWindowTime = 0.0;
+		mFpsWindowStartFrame = elapsed_frames;
 	}
 
 

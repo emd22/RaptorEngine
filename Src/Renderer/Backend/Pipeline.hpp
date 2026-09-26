@@ -297,6 +297,9 @@ public:
 
 	FX_FORCE_INLINE bool IsCompute() const { return bIsCompute; }
 
+	/// False until the pipeline has been built, and if it could not be
+	FX_FORCE_INLINE bool IsBuilt() const { return InternalPipeline != nullptr; }
+
 	FX_FORCE_INLINE VkPipelineBindPoint GetBindPoint() const
 	{
 		return (bIsCompute) ? VK_PIPELINE_BIND_POINT_COMPUTE : VK_PIPELINE_BIND_POINT_GRAPHICS;

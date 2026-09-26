@@ -61,7 +61,7 @@ int32 RenderList::CheckForObjectDuplicates(const ObjectID id) const
 			if (section->Objects[object_index] == id) {
 				++count;
 				LogInfo(LC_RENDER, "Object '{}' found in pipeline '{}'", object->Name.Get(),
-						PipelineNameUtil::GetName(gPipelineCache->Get(PipelineHandle { section_index }).Name));
+						gPipelineCache->GetDebugName(PipelineHandle { section_index }));
 			}
 		}
 	}

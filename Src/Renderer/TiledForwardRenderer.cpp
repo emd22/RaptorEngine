@@ -17,6 +17,7 @@
 
 #include <Asset/AssetManager.hpp>
 #include <Decal/DecalManager.hpp>
+#include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Texture/TextureManager.hpp>
@@ -71,7 +72,7 @@ void TiledForwardRenderer::CreateForwardPass()
 
 	// Depth target. This shares the prepass's depth image and loads it rather than clearing, so the forward pass only
 	// shades the fragments the prepass found visible (alpha discards included) instead of overdrawing the whole
-	// scene again. The prepass has to be created first.
+	// scene again
 	Target* prepass_depth = Prepass.GetTarget(eImageFormat::D32_Float);
 	AssertMsg(prepass_depth != nullptr, "The prepass must be created before the forward pass");
 
@@ -312,353 +313,56 @@ void TiledForwardRenderer::CreateDebugSolidPSO()
 	gPSOBuild->EndPipeline();
 }
 
+namespace {
+
+/// Every set of features that was built up front, in the order they are drawn in. Asking for any other set makes its
+/// pipeline the first time it is needed.
+constexpr ePipelineFeatures scStartupFeatures[] = {
+	ePipelineFeatures::None,
+	ePipelineFeatures::NormalMap,
+	ePipelineFeatures::Skinned,
+	ePipelineFeatures::Skinned | ePipelineFeatures::NormalMap,
+};
+
+ePipelineFeatures GetGeometryShaderVariant(ePipelineFeatures features, std::vector<ShaderMacro>& out_macros,
+										   eVertexType& out_vertex_type, const char*& out_suffix)
+{
+	static const ShaderMacro scNormalMaps { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" };
+	static const ShaderMacro scSkinning { .pcName = "USE_SKINNING", .pcValue = "1" };
+
+	if (HasFlag(features, ePipelineFeatures::Skinned)) {
+		out_macros = { scNormalMaps, scSkinning };
+		out_vertex_type = eVertexType::Skinned;
+		out_suffix = "Skinned";
+		return ePipelineFeatures::Skinned;
+	}
+
+	out_vertex_type = eVertexType::Default;
+
+	if (HasFlag(features, ePipelineFeatures::NormalMap)) {
+		out_macros = { scNormalMaps };
+		out_suffix = "NormalMaps";
+		return ePipelineFeatures::NormalMap;
+	}
+
+	out_suffix = "";
+	return ePipelineFeatures::None;
+}
+
+} // namespace
+
 void TiledForwardRenderer::CreateForwardPSO()
 {
 	CreateForwardPass();
 
-	{
-		gPSOBuild->BeginPipeline(ePipelineName::Geometry);
-		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
+	for (const ePipelinePass pass :
+		 { ePipelinePass::Forward, ePipelinePass::ForwardBlend, ePipelinePass::ForwardCapture }) {
+		gPipelineCache->RegisterPassTemplate(pass, [this, pass](ePipelineFeatures features, PipelineDesc& out_desc)
+											 { return MakeForwardDesc(pass, features, out_desc); });
 
-		gPSOBuild->UseRenderStage(ForwardPass);
-		gPSOBuild->SetShader(eShaderName::Forward, {});
-		gPSOBuild->SetVertexType(eVertexType::Default);
-		gPSOBuild->SetCullMode(eCullMode::Back);
-
-		// Set 0 (Global / Per Frame)
-
-		// bObjectBuffer
-		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
-							 gObjectManager->GetPageSize());
-		// bMaterialBuffer
-		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
-							 gMaterialManager->MaterialPropertiesBuffer.Size);
-		// bLightGrid
-		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
-		// bLightIndexList
-		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
-							 gGraphics->LightIndexListPageSize);
-		// bProbeBuffer (SH irradiance, per probe)
-		gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
-		// bProbeVolume (spatial lookup descriptor for probe blending)
-		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
-							 gGraphics->ProbeVolumePageSize);
-		// tProbeMoments (per-probe depth moments for visibility)
-		gPSOBuild->AddImage(8, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
-							gSamplerCache->Request({}));
-		// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
-		AddDecalDescriptors();
-		// tShadowAtlas
-		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
-							gSamplerCache->Request({}));
-		// tSSAO
-		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
-									  gSamplerCache->Request({
-										  .MinFilter = eSamplerFilter::Linear,
-										  .MagFilter = eSamplerFilter::Linear,
-										  .MipFilter = eSamplerFilter::Linear,
-									  }));
-
-
-		// Set 1 (Object local)
-
-		// Use a null image for now, custom DS's created by the materials will be bound at render time
-		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-
-		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
-							 gGraphics->LightBuffer.PageSize);
-
-
-		gPSOBuild->EndPipeline();
-	}
-
-
-	{
-		// Normal mapped pipeline
-		gPSOBuild->BeginPipeline(ePipelineName::GeometryNormalMaps);
-		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
-
-		gPSOBuild->UseRenderStage(ForwardPass);
-		gPSOBuild->SetShader(eShaderName::Forward, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } });
-		gPSOBuild->SetVertexType(eVertexType::Default);
-		gPSOBuild->SetCullMode(eCullMode::Back);
-		// Opaque: no blending
-
-		// Set 0 (Global / Per Frame)
-
-		// bObjectBuffer
-		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
-							 gObjectManager->GetPageSize());
-		// bMaterialBuffer
-		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
-							 gMaterialManager->MaterialPropertiesBuffer.Size);
-
-		// bLightGrid
-		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
-		// bLightIndexList
-		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
-							 gGraphics->LightIndexListPageSize);
-		// bProbeBuffer (SH irradiance, per probe)
-		gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
-		// bProbeVolume (spatial lookup descriptor for probe blending)
-		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
-							 gGraphics->ProbeVolumePageSize);
-		// tProbeMoments (per-probe depth moments for visibility)
-		gPSOBuild->AddImage(8, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
-							gSamplerCache->Request({}));
-		// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
-		AddDecalDescriptors();
-		// tShadowAtlas
-		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
-							gSamplerCache->Request({}));
-		// tSSAO
-		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
-									  gSamplerCache->Request({
-										  .MinFilter = eSamplerFilter::Linear,
-										  .MagFilter = eSamplerFilter::Linear,
-										  .MipFilter = eSamplerFilter::Linear,
-									  }));
-
-		// Set 1 (Object local)
-
-		// tAlbedo
-		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		// tNormalMap
-		gPSOBuild->AddImage(1, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		// tMetallicRoughness
-		gPSOBuild->AddImage(2, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-
-		// FSLightBuffer
-		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
-							 gGraphics->LightBuffer.PageSize);
-
-
-		gPSOBuild->EndPipeline();
-	}
-
-	{
-		// Skinned + Normal mapped pipeline
-		gPSOBuild->BeginPipeline(ePipelineName::GeometrySkinned);
-		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
-
-		gPSOBuild->UseRenderStage(ForwardPass);
-		gPSOBuild->SetVertexType(eVertexType::Skinned);
-		gPSOBuild->SetShader(eShaderName::Forward, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" },
-													 ShaderMacro { .pcName = "USE_SKINNING", .pcValue = "1" } });
-		gPSOBuild->SetCullMode(eCullMode::Back);
-		// Opaque: no blending (alpha handled via discard at AlphaCutoff)
-
-		// Set 0 (Global / Per Frame)
-
-		// bObjectBuffer
-		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
-							 gObjectManager->GetPageSize());
-
-		// bMaterialBuffer
-		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
-							 gMaterialManager->MaterialPropertiesBuffer.Size);
-
-		// bLightGrid
-		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
-		// bLightIndexList
-		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
-							 gGraphics->LightIndexListPageSize);
-		// bProbeBuffer (SH irradiance, per probe)
-		gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
-		// bProbeVolume (spatial lookup descriptor for probe blending)
-		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
-							 gGraphics->ProbeVolumePageSize);
-		// tProbeMoments (per-probe depth moments for visibility)
-		gPSOBuild->AddImage(8, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
-							gSamplerCache->Request({}));
-		// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
-		AddDecalDescriptors();
-		// tShadowAtlas
-		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
-							gSamplerCache->Request({}));
-
-		// tSSAO
-		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
-									  gSamplerCache->Request({
-										  .MinFilter = eSamplerFilter::Linear,
-										  .MagFilter = eSamplerFilter::Linear,
-										  .MipFilter = eSamplerFilter::Linear,
-									  }));
-
-
-		// Set 1 (Object local)
-
-		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		gPSOBuild->AddImage(1, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		gPSOBuild->AddImage(2, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		// bBoneBuffer
-		gPSOBuild->AddBuffer(3, 1, eShaderType::Vertex, &gGraphics->BoneBuffer.GetGpuBuffer(), 0,
-							 gGraphics->BoneBuffer.PageSize);
-		// Light buffer
-		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
-							 gGraphics->LightBuffer.PageSize);
-
-		gPSOBuild->EndPipeline();
-
-
-		pGeometryPipelineName = ePipelineName::Geometry;
-	}
-
-
-	// Transparent pipelines
-	{
-		gPSOBuild->BeginPipeline(ePipelineName::GeometryTransparent);
-
-		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
-		gPSOBuild->UseRenderStage(ForwardPass);
-		gPSOBuild->SetShader(eShaderName::Forward, { ShaderMacro { .pcName = "ALPHA_CUTOFF", .pcValue = "0.01" } });
-		gPSOBuild->SetVertexType(eVertexType::Default);
-		gPSOBuild->SetCullMode(eCullMode::Back);
-		gPSOBuild->SetDepthWrite(false);
-
-		BlendAttachment blend = BlendAttachment {
-			.Enabled = true,
-			.BlendOp = { .Ops = { .Alpha = VK_BLEND_OP_ADD, .Color = VK_BLEND_OP_ADD } },
-			.AlphaBlend { .Ops { .Src = VK_BLEND_FACTOR_ONE, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
-			.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
-		};
-		gPSOBuild->SetTargetBlend(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float), blend);
-
-		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
-							 gObjectManager->GetPageSize());
-		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
-							 gMaterialManager->MaterialPropertiesBuffer.Size);
-		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
-		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
-							 gGraphics->LightIndexListPageSize);
-		// bProbeBuffer (SH irradiance, per probe)
-		gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
-		// bProbeVolume (spatial lookup descriptor for probe blending)
-		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
-							 gGraphics->ProbeVolumePageSize);
-		// tProbeMoments (per-probe depth moments for visibility)
-		gPSOBuild->AddImage(8, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
-							gSamplerCache->Request({}));
-		// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
-		AddDecalDescriptors();
-		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
-							gSamplerCache->Request({}));
-		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
-									  gSamplerCache->Request({ .MinFilter = eSamplerFilter::Linear,
-															   .MagFilter = eSamplerFilter::Linear,
-															   .MipFilter = eSamplerFilter::Linear }));
-		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
-							 gGraphics->LightBuffer.PageSize);
-
-		gPSOBuild->EndPipeline();
-	}
-	{
-		gPSOBuild->BeginPipeline(ePipelineName::GeometryNormalMapsTransparent);
-		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
-		gPSOBuild->UseRenderStage(ForwardPass);
-		gPSOBuild->SetShader(eShaderName::Forward, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } });
-		gPSOBuild->SetVertexType(eVertexType::Default);
-		gPSOBuild->SetCullMode(eCullMode::Back);
-		gPSOBuild->SetDepthWrite(false);
-		BlendAttachment blend = BlendAttachment {
-			.Enabled = true,
-			.BlendOp = { .Ops = { .Alpha = VK_BLEND_OP_ADD, .Color = VK_BLEND_OP_ADD } },
-			.AlphaBlend { .Ops { .Src = VK_BLEND_FACTOR_ONE, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
-			.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
-		};
-		gPSOBuild->SetTargetBlend(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float), blend);
-		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
-							 gObjectManager->GetPageSize());
-		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
-							 gMaterialManager->MaterialPropertiesBuffer.Size);
-		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
-		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
-							 gGraphics->LightIndexListPageSize);
-		// bProbeBuffer (SH irradiance, per probe)
-		gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
-		// bProbeVolume (spatial lookup descriptor for probe blending)
-		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
-							 gGraphics->ProbeVolumePageSize);
-		// tProbeMoments (per-probe depth moments for visibility)
-		gPSOBuild->AddImage(8, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
-							gSamplerCache->Request({}));
-		// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
-		AddDecalDescriptors();
-		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
-							gSamplerCache->Request({}));
-		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
-									  gSamplerCache->Request({ .MinFilter = eSamplerFilter::Linear,
-															   .MagFilter = eSamplerFilter::Linear,
-															   .MipFilter = eSamplerFilter::Linear }));
-		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		gPSOBuild->AddImage(1, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		gPSOBuild->AddImage(2, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
-							 gGraphics->LightBuffer.PageSize);
-		gPSOBuild->EndPipeline();
-	}
-	{
-		gPSOBuild->BeginPipeline(ePipelineName::GeometrySkinnedTransparent);
-		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
-		gPSOBuild->UseRenderStage(ForwardPass);
-		gPSOBuild->SetVertexType(eVertexType::Skinned);
-		gPSOBuild->SetShader(eShaderName::Forward, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" },
-													 ShaderMacro { .pcName = "USE_SKINNING", .pcValue = "1" } });
-		gPSOBuild->SetCullMode(eCullMode::Back);
-		gPSOBuild->SetDepthWrite(false);
-		BlendAttachment blend = BlendAttachment {
-			.Enabled = true,
-			.BlendOp = { .Ops = { .Alpha = VK_BLEND_OP_ADD, .Color = VK_BLEND_OP_ADD } },
-			.AlphaBlend { .Ops { .Src = VK_BLEND_FACTOR_ONE, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
-			.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
-		};
-		gPSOBuild->SetTargetBlend(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float), blend);
-		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
-							 gObjectManager->GetPageSize());
-		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
-							 gMaterialManager->MaterialPropertiesBuffer.Size);
-		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
-		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
-							 gGraphics->LightIndexListPageSize);
-		// bProbeBuffer (SH irradiance, per probe)
-		gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
-		// bProbeVolume (spatial lookup descriptor for probe blending)
-		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
-							 gGraphics->ProbeVolumePageSize);
-		// tProbeMoments (per-probe depth moments for visibility)
-		gPSOBuild->AddImage(8, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
-							gSamplerCache->Request({}));
-		// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
-		AddDecalDescriptors();
-		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
-							gSamplerCache->Request({}));
-		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
-									  gSamplerCache->Request({ .MinFilter = eSamplerFilter::Linear,
-															   .MagFilter = eSamplerFilter::Linear,
-															   .MipFilter = eSamplerFilter::Linear }));
-		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		gPSOBuild->AddImage(1, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		gPSOBuild->AddImage(2, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		gPSOBuild->AddBuffer(3, 1, eShaderType::Vertex, &gGraphics->BoneBuffer.GetGpuBuffer(), 0,
-							 gGraphics->BoneBuffer.PageSize);
-		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
-							 gGraphics->LightBuffer.PageSize);
-		gPSOBuild->EndPipeline();
+		for (const ePipelineFeatures features : scStartupFeatures) {
+			gPipelineCache->GetOrCreateVariant(pass, features);
+		}
 	}
 }
 
@@ -666,110 +370,151 @@ void TiledForwardRenderer::CreateDepthNormalPSO()
 {
 	CreateDepthNormalPass();
 
+	gPipelineCache->RegisterPassTemplate(ePipelinePass::Depth,
+										 [this](ePipelineFeatures features, PipelineDesc& out_desc)
+										 { return MakePrepassDesc(features, out_desc); });
+
+	for (const ePipelineFeatures features : scStartupFeatures) {
+		gPipelineCache->GetOrCreateVariant(ePipelinePass::Depth, features);
+	}
+}
+
+bool TiledForwardRenderer::MakeForwardDesc(ePipelinePass pass, ePipelineFeatures features, PipelineDesc& out_desc)
+{
+	static const ShaderMacro scPrepassDepth { .pcName = "USE_PREPASS_DEPTH", .pcValue = "1" };
+
+	const bool is_blended = (pass == ePipelinePass::ForwardBlend);
+
+	// Alpha masks are handled by the shadow pass
+	if (HasFlag(features, ePipelineFeatures::AlphaMask)) {
+		return false;
+	}
+
+	const char* suffix = "";
+	out_desc.Features = GetGeometryShaderVariant(features, out_desc.Macros, out_desc.VertexType, suffix);
+
+	// Transparent geometry without normal maps also discards what is nearly invisible
+	if (is_blended && out_desc.Features == ePipelineFeatures::None) {
+		out_desc.Macros = { ShaderMacro { .pcName = "ALPHA_CUTOFF", .pcValue = "0.01" } };
+	}
+
+	const char* pass_suffix = "";
+
+	if (pass == ePipelinePass::Forward) {
+		// The prepass has just drawn this geometry and already discarded its alpha masked texels, so the depth buffer
+		// holds exactly the depth of each visible fragment. Testing equal without writing depth or discarding lets the
+		// GPU reject hidden fragments before shading them.
+		out_desc.DepthCompareOp = VK_COMPARE_OP_EQUAL;
+		out_desc.bDepthWrite = false;
+		out_desc.Macros.push_back(scPrepassDepth);
+	}
+	else if (pass == ePipelinePass::ForwardBlend) {
+		pass_suffix = "Transparent";
+	}
+	else {
+		// Probe captures have no prepass, so they test and write depth themselves, and discard alpha masks here
+		pass_suffix = "Capture";
+	}
+
+	out_desc.DebugName = std::string("Geometry") + suffix + pass_suffix;
+
+	out_desc.Shader = eShaderName::Forward;
+	out_desc.pStage = &ForwardPass;
+	out_desc.CullMode = eCullMode::Back;
+
+	out_desc.PushConstantStages = eShaderType::Vertex | eShaderType::Pixel;
+	out_desc.PushConstantSize = sizeof(DrawPushConstants);
+
+	if (is_blended) {
+		// Transparent surfaces are blended over what is already there, and don't write depth
+		out_desc.bDepthWrite = false;
+
+		out_desc.Blends.push_back(BlendAttachment {
+			.Enabled = true,
+			.BlendOp = { .Ops = { .Alpha = VK_BLEND_OP_ADD, .Color = VK_BLEND_OP_ADD } },
+			.AlphaBlend { .Ops { .Src = VK_BLEND_FACTOR_ONE, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
+			.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
+			.TargetIndex = static_cast<uint16>(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float)),
+		});
+	}
+
+	out_desc.DeclareDescriptors = [this](PSOBuild& pso)
 	{
-		gPSOBuild->BeginPipeline(ePipelineName::DepthNormal);
-		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
+		AddGlobalDescriptors();
+		Material::DeclareDescriptors(pso);
+	};
 
-		gPSOBuild->UseRenderStage(Prepass);
-		gPSOBuild->SetShader(eShaderName::DepthNormal, {});
-		gPSOBuild->SetVertexType(eVertexType::Default);
-		gPSOBuild->SetCullMode(eCullMode::Back);
+	return true;
+}
 
+bool TiledForwardRenderer::MakePrepassDesc(ePipelineFeatures features, PipelineDesc& out_desc)
+{
+	if (HasFlag(features, ePipelineFeatures::AlphaMask)) {
+		return false;
+	}
+
+	const char* suffix = "";
+	out_desc.Features = GetGeometryShaderVariant(features, out_desc.Macros, out_desc.VertexType, suffix);
+
+	out_desc.DebugName = std::string("DepthNormal") + suffix;
+
+	out_desc.Shader = eShaderName::DepthNormal;
+	out_desc.pStage = &Prepass;
+	out_desc.CullMode = eCullMode::Back;
+
+	out_desc.PushConstantStages = eShaderType::Vertex | eShaderType::Pixel;
+	out_desc.PushConstantSize = sizeof(DrawPushConstants);
+
+	out_desc.DeclareDescriptors = [](PSOBuild& pso)
+	{
 		// Set 0 (Global / Per Frame)
 
 		// bObjectBuffer
-		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
-							 gObjectManager->GetPageSize());
+		pso.AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0, gObjectManager->GetPageSize());
 		// bMaterialBuffer
-		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
-							 gMaterialManager->MaterialPropertiesBuffer.Size);
+		pso.AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
+					  gMaterialManager->MaterialPropertiesBuffer.Size);
 
-		// Set 1 (Object local)
+		Material::DeclareDescriptors(pso);
+	};
 
-		// tAlbedo
-		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		// FSLightBuffer (declared to match the material descriptor set layout used by Geometry)
-		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
-							 gGraphics->LightBuffer.PageSize);
+	return true;
+}
 
-		gPSOBuild->EndPipeline();
-	}
+void TiledForwardRenderer::AddGlobalDescriptors()
+{
+	// Set 0 (Global / Per Frame)
 
-	{
-		// Normal mapped prepass pipeline
-		gPSOBuild->BeginPipeline(ePipelineName::DepthNormalNormalMaps);
-		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
-
-		gPSOBuild->UseRenderStage(Prepass);
-		gPSOBuild->SetShader(eShaderName::DepthNormal, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } });
-		gPSOBuild->SetVertexType(eVertexType::Default);
-		gPSOBuild->SetCullMode(eCullMode::Back);
-
-		// Set 0 (Global / Per Frame)
-
-		// bObjectBuffer
-		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
-							 gObjectManager->GetPageSize());
-		// bMaterialBuffer
-		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
-							 gMaterialManager->MaterialPropertiesBuffer.Size);
-
-		// Set 1 (Object local)
-
-		// tAlbedo
-		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		// tNormalMap
-		gPSOBuild->AddImage(1, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		// tMetallicRoughness
-		gPSOBuild->AddImage(2, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		// FSLightBuffer (declared to match the material descriptor set layout used by GeometryNormalMaps)
-		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
-							 gGraphics->LightBuffer.PageSize);
-
-		gPSOBuild->EndPipeline();
-	}
-
-	{
-		// Skinned + Normal mapped prepass pipeline
-		gPSOBuild->BeginPipeline(ePipelineName::DepthNormalSkinned);
-		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
-
-		gPSOBuild->UseRenderStage(Prepass);
-		gPSOBuild->SetVertexType(eVertexType::Skinned);
-		gPSOBuild->SetShader(eShaderName::DepthNormal, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" },
-														 ShaderMacro { .pcName = "USE_SKINNING", .pcValue = "1" } });
-		gPSOBuild->SetCullMode(eCullMode::Back);
-
-		// Set 0 (Global / Per Frame)
-
-		// bObjectBuffer
-		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
-							 gObjectManager->GetPageSize());
-		// bMaterialBuffer
-		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
-							 gMaterialManager->MaterialPropertiesBuffer.Size);
-
-		// Set 1 (Object local)
-
-		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		gPSOBuild->AddImage(1, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		gPSOBuild->AddImage(2, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		// bBoneBuffer
-		gPSOBuild->AddBuffer(3, 1, eShaderType::Vertex, &gGraphics->BoneBuffer.GetGpuBuffer(), 0,
-							 gGraphics->BoneBuffer.PageSize);
-		// FSLightBuffer (declared to match the material descriptor set layout used by GeometrySkinned)
-		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
-							 gGraphics->LightBuffer.PageSize);
-
-		gPSOBuild->EndPipeline();
-	}
+	// bObjectBuffer
+	gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+						 gObjectManager->GetPageSize());
+	// bMaterialBuffer
+	gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
+						 gMaterialManager->MaterialPropertiesBuffer.Size);
+	// bLightGrid
+	gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
+	// bLightIndexList
+	gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
+						 gGraphics->LightIndexListPageSize);
+	// bProbeBuffer (SH irradiance, per probe)
+	gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
+	// bProbeVolume (spatial lookup descriptor for probe blending)
+	gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0, gGraphics->ProbeVolumePageSize);
+	// tProbeMoments (per-probe depth moments for visibility)
+	gPSOBuild->AddImage(8, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
+						gSamplerCache->Request({}));
+	// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
+	AddDecalDescriptors();
+	// tShadowAtlas
+	gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
+						gSamplerCache->Request({}));
+	// tSSAO
+	gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
+								  gSamplerCache->Request({
+									  .MinFilter = eSamplerFilter::Linear,
+									  .MagFilter = eSamplerFilter::Linear,
+									  .MipFilter = eSamplerFilter::Linear,
+								  }));
 }
 
 void TiledForwardRenderer::AddDecalDescriptors()

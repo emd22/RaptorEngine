@@ -111,7 +111,7 @@ void LightBase::RenderDebugMesh(const PerspectiveCamera& camera)
 	push_constants.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
 	push_constants.TileRows = gGraphics->pRenderer->GetLightTileRows();
 
-	gGraphics->SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::Geometry),
+	gGraphics->SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Get(gPipelineCache->GetOrCreateVariant(ePipelinePass::Forward, ePipelineFeatures::None)),
 								   eShaderType::Vertex | eShaderType::Pixel, push_constants);
 
 	mpDebugMesh->Render(frame->CmdBuffer, 1);

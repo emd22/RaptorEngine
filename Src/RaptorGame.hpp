@@ -17,6 +17,7 @@ class ShadowDirectional;
 namespace fx {
 
 class Image;
+class CVarValue;
 
 
 /////////////////////////////////////
@@ -92,8 +93,10 @@ public:
 
 	BoneId RHandBone = BoneNull;
 
-	double FrameTimeAvg = 0.0f;
 	double DeltaTime = 1.0f / 60.0f;
+
+	double Fps = 0.0;
+	double FrameTimeMs = 0.0;
 
 	Quat PistolRotationGoal = Quat::scIdentity;
 	ObjectManager ObjectManager;
@@ -102,6 +105,11 @@ public:
 
 private:
 	uint64 mLastTick = 0;
+
+	double mFpsWindowTime = 0.0;
+	uint64 mFpsWindowStartFrame = 0;
+
+	CVarValue* mpShowFpsCVar = nullptr;
 
 	Object* mpRaycastHitMarker = nullptr;
 	ObjectID mEditorSelectedObject = ObjectID::scNull;
