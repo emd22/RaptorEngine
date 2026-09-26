@@ -65,6 +65,14 @@ struct PipelineNameInfo
 
 const PipelineNameInfo& GetPipelineNameInfo(const ePipelineName name);
 
+class PipelineCache;
+
+/**
+ * @brief Tells the cache which pipeline draws which features in each pass. This is the one place that connects the
+ * pipelines built at startup to the passes that use them.
+ */
+void RegisterPipelineVariants(PipelineCache& cache);
+
 
 namespace PipelineNameUtil {
 

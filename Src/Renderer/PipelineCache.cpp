@@ -1,6 +1,7 @@
 #include "PipelineCache.hpp"
 
 #include <Core/Log.hpp>
+#include <algorithm>
 #include <Core/Types.hpp>
 #include <Renderer/Backend/DescriptorCache.hpp>
 #include <Renderer/Globals.hpp>
@@ -19,6 +20,9 @@ PipelineCache::PipelineCache()
 	}
 
 	mKeys.resize(scNumPipelines);
+	mVariantInfos.resize(scNumPipelines);
+
+	RegisterPipelineVariants(*this);
 
 	mOffsets.InitCapacity(scMaxDescriptorSets);
 
@@ -133,6 +137,60 @@ void PipelineCache::Bind(const PipelineHandle handle, const CommandBuffer& cmd)
 	}
 
 	Reset();
+}
+
+void PipelineCache::RegisterVariant(const ePipelinePass pass, const ePipelineFeatures features,
+									const PipelineHandle handle)
+{
+	const uint32 pass_index = static_cast<uint32>(pass);
+	const uint32 feature_index = static_cast<uint32>(features);
+
+	AssertLess(pass_index, scNumPipelinePasses);
+	AssertLess(feature_index, scNumFeatureCombinations);
+	AssertLess(handle.Index, mVariantInfos.size());
+
+	mVariants[pass_index][feature_index] = handle;
+
+	std::vector<PipelineHandle>& pass_pipelines = mPassPipelines[pass_index];
+
+	if (std::find(pass_pipelines.begin(), pass_pipelines.end(), handle) == pass_pipelines.end()) {
+		pass_pipelines.push_back(handle);
+	}
+
+	// The first registration is the one FindVariantInPass() goes by. Any other would lead to the same pipeline in the
+	// other pass, as long as the passes are registered consistently.
+	VariantInfo& info = mVariantInfos[handle.Index];
+
+	if (info.Pass == ePipelinePass::Count) {
+		info = VariantInfo { .Pass = pass, .Features = features };
+	}
+}
+
+PipelineHandle PipelineCache::FindVariant(const ePipelinePass pass, const ePipelineFeatures features) const
+{
+	const uint32 pass_index = static_cast<uint32>(pass);
+	const uint32 feature_index = static_cast<uint32>(features);
+
+	if (pass_index >= scNumPipelinePasses || feature_index >= scNumFeatureCombinations) {
+		return PipelineHandle {};
+	}
+
+	return mVariants[pass_index][feature_index];
+}
+
+PipelineHandle PipelineCache::FindVariantInPass(const PipelineHandle handle, const ePipelinePass pass) const
+{
+	if (handle.Index >= mVariantInfos.size() || mVariantInfos[handle.Index].Pass == ePipelinePass::Count) {
+		return PipelineHandle {};
+	}
+
+	return FindVariant(pass, mVariantInfos[handle.Index].Features);
+}
+
+const std::vector<PipelineHandle>& PipelineCache::GetPassPipelines(const ePipelinePass pass) const
+{
+	AssertLess(static_cast<uint32>(pass), scNumPipelinePasses);
+	return mPassPipelines[static_cast<uint32>(pass)];
 }
 
 void PipelineCache::AddBufferOffset(uint32 set_index, uint32 offset) { mOffsets[set_index].Insert(offset); }

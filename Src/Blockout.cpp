@@ -27,7 +27,7 @@ void Blockout::Create(World* world)
 
 	// White material
 	{
-		mWhiteMaterialID = gMaterialManager->NewMaterial("ProtoWhite", renderer::ePipelineName::Geometry, false);
+		mWhiteMaterialID = gMaterialManager->NewMaterial("ProtoWhite", false);
 		Material* test_material = gMaterialManager->GetMaterial(mWhiteMaterialID);
 
 		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
@@ -40,7 +40,7 @@ void Blockout::Create(World* world)
 
 	// Orange material
 	{
-		mOrangeMaterialID = gMaterialManager->NewMaterial("ProtoOrange", renderer::ePipelineName::Geometry, false);
+		mOrangeMaterialID = gMaterialManager->NewMaterial("ProtoOrange", false);
 		Material* test_material = gMaterialManager->GetMaterial(mOrangeMaterialID);
 
 		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
@@ -53,7 +53,7 @@ void Blockout::Create(World* world)
 
 
 	{
-		mBlueMaterialID = gMaterialManager->NewMaterial("ProtoBlue", renderer::ePipelineName::Geometry, false);
+		mBlueMaterialID = gMaterialManager->NewMaterial("ProtoBlue", false);
 		Material* test_material = gMaterialManager->GetMaterial(mBlueMaterialID);
 
 		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
@@ -65,7 +65,7 @@ void Blockout::Create(World* world)
 
 
 	{
-		mProtoTileID = gMaterialManager->NewMaterial("ProtoTile", renderer::ePipelineName::GeometryNormalMaps, false);
+		mProtoTileID = gMaterialManager->NewMaterial("ProtoTile", false);
 		Material* test_material = gMaterialManager->GetMaterial(mProtoTileID);
 
 		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
@@ -88,7 +88,7 @@ void Blockout::Create(World* world)
 
 	// Selection material
 	{
-		SelectionMaterialID = gMaterialManager->NewMaterial("ProtoSelect", renderer::ePipelineName::Geometry, false);
+		SelectionMaterialID = gMaterialManager->NewMaterial("ProtoSelect", false);
 		Material* test_material = gMaterialManager->GetMaterial(SelectionMaterialID);
 
 		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,

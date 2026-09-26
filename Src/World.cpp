@@ -35,45 +35,40 @@ void World::Create()
 	mVisibleTiles.InitCapacity(600);
 }
 
-static ePipelineName GetTransparentPipeline(ePipelineName base)
-{
-	switch (base) {
-	case ePipelineName::Geometry:
-		return ePipelineName::GeometryTransparent;
-	case ePipelineName::GeometryNormalMaps:
-		return ePipelineName::GeometryNormalMapsTransparent;
-	case ePipelineName::GeometrySkinned:
-		return ePipelineName::GeometrySkinnedTransparent;
-	default:
-		return base;
-	}
-}
 static bool IsTransparentMaterial(Material* mat) { return (mat != nullptr && mat->Properties.Alpha < 0.999f); }
 
 /**
  * @brief The geometry pipeline that draws a material, including the transparent variants.
  */
-static ePipelineName GetPipelineForMaterial(const MaterialID& material_id)
+static PipelineHandle GetPipelineForMaterial(const MaterialID& material_id)
 {
 	Material* material = MaterialManagerFwd::GetMaterial(material_id);
-	ePipelineName pipeline_name = material->GetRequiredPipeline();
 
-	if (IsTransparentMaterial(material)) {
-		pipeline_name = GetTransparentPipeline(pipeline_name);
-	}
+	const ePipelinePass pass = IsTransparentMaterial(material) ? ePipelinePass::ForwardBlend : ePipelinePass::Forward;
+	const PipelineHandle pipeline = gPipelineCache->FindVariant(pass, material->GetPipelineFeatures());
 
-	return pipeline_name;
+	AssertMsg(pipeline.IsValid(), "No forward pipeline draws this material");
+
+	return pipeline;
 }
 
-static void AddToRenderListOnce(RenderList& render_list, ePipelineName pipeline_name, ObjectID id)
+/**
+ * @brief The render list section that objects that cast shadows are added to
+ */
+static PipelineHandle GetShadowListPipeline()
 {
-	for (ObjectID object_id : render_list.GetSection(pipeline_name).Objects) {
+	return gPipelineCache->FindVariant(ePipelinePass::Shadow, ePipelineFeatures::None);
+}
+
+static void AddToRenderListOnce(RenderList& render_list, PipelineHandle pipeline, ObjectID id)
+{
+	for (ObjectID object_id : render_list.GetSection(pipeline).Objects) {
 		if (object_id == id) {
 			return;
 		}
 	}
 
-	render_list.AddObject(pipeline_name, id);
+	render_list.AddObject(pipeline, id);
 }
 
 /**
@@ -97,7 +92,7 @@ static void AddToGeometrySections(RenderList& render_list, Object* object)
  * without mesh sections, otherwise each section whose material needs that pipeline.
  */
 template <typename TDrawFunc>
-static void ForEachDrawInPipeline(Object* object, ePipelineName pipeline_name, TDrawFunc&& draw)
+static void ForEachDrawInPipeline(Object* object, PipelineHandle pipeline, TDrawFunc&& draw)
 {
 	if (object->MeshSections.IsEmpty()) {
 		draw(nullptr);
@@ -105,7 +100,7 @@ static void ForEachDrawInPipeline(Object* object, ePipelineName pipeline_name, T
 	}
 
 	for (const MeshSection& section : object->MeshSections) {
-		if (GetPipelineForMaterial(object->GetSectionMaterial(section)) == pipeline_name) {
+		if (GetPipelineForMaterial(object->GetSectionMaterial(section)) == pipeline) {
 			draw(&section);
 		}
 	}
@@ -117,7 +112,7 @@ static void AddObjectToRenderList(Object* object, World* scene)
 	if (object->pMesh.IsValid()) {
 		// If the object casts shadows as well, add it to the shadow section
 		if (object->IsShadowCaster()) {
-			gWorld->mRenderList.AddObject(ePipelineName::ShadowDirectional, object->ID);
+			gWorld->mRenderList.AddObject(GetShadowListPipeline(), object->ID);
 		}
 
 		AddToGeometrySections(gWorld->mRenderList, object);
@@ -186,17 +181,24 @@ void World::Detach(ObjectID id)
 }
 
 
-void World::ExecuteRenderList(renderer::ePipelineName pl_name)
+void World::ExecuteRenderList(renderer::PipelineHandle pipeline_handle)
 {
 	PerspectiveCamera& camera = *mpCurrentCamera;
-	ExecuteRenderList(pl_name, camera);
+	ExecuteRenderList(pipeline_handle, camera);
 }
 
-void World::ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera& camera)
+void World::ExecuteForwardRenderLists(PerspectiveCamera& camera)
 {
-	RenderListSection& section = mRenderList.GetSection(pl_name);
+	for (const PipelineHandle pipeline : gPipelineCache->GetPassPipelines(ePipelinePass::Forward)) {
+		ExecuteRenderList(pipeline, camera);
+	}
+}
 
-	renderer::Pipeline& pipeline = gPipelineCache->Request(pl_name);
+void World::ExecuteRenderList(renderer::PipelineHandle pipeline_handle, PerspectiveCamera& camera)
+{
+	RenderListSection& section = mRenderList.GetSection(pipeline_handle);
+
+	renderer::Pipeline& pipeline = gPipelineCache->Get(pipeline_handle);
 
 	pipeline.Bind(gGraphics->GetFrame()->CmdBuffer);
 
@@ -230,7 +232,7 @@ void World::ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera
 
 		object->Update();
 
-		ForEachDrawInPipeline(object, pl_name,
+		ForEachDrawInPipeline(object, pipeline_handle,
 							  [&](const MeshSection* section) { object->RenderShallow(camera, &pipeline, section); });
 	}
 }
@@ -241,9 +243,9 @@ void World::ExecuteTransparentRenderLists()
 	const Vec3f camera_position = camera.Position;
 	;
 
-	auto Gather = [&](ePipelineName pl_name)
+	auto Gather = [&](PipelineHandle pipeline)
 	{
-		const RenderListSection& section = mRenderList.GetSection(pl_name);
+		const RenderListSection& section = mRenderList.GetSection(pipeline);
 
 		for (ObjectID object_id : section.Objects) {
 			if (object_id.IsInvalid()) {
@@ -259,7 +261,7 @@ void World::ExecuteTransparentRenderLists()
 
 			float32 distance_sq = diff.Dot(diff);
 
-			SortedEntryBuffer.Insert({ object_id, pl_name, distance_sq });
+			SortedEntryBuffer.Insert({ object_id, pipeline, distance_sq });
 		}
 	};
 
@@ -267,9 +269,9 @@ void World::ExecuteTransparentRenderLists()
 
 	// We store everything in one buffer as the order matters here. The furthest objects should be rendered first.
 
-	Gather(ePipelineName::GeometryTransparent);
-	Gather(ePipelineName::GeometryNormalMapsTransparent);
-	Gather(ePipelineName::GeometrySkinnedTransparent);
+	for (const PipelineHandle pipeline : gPipelineCache->GetPassPipelines(ePipelinePass::ForwardBlend)) {
+		Gather(pipeline);
+	}
 
 	if (SortedEntryBuffer.Size == 0) {
 		return;
@@ -281,13 +283,13 @@ void World::ExecuteTransparentRenderLists()
 
 	// Bind per entry as pipeline changes; minimize binds by caching last pipeline
 	renderer::Pipeline* pipeline = nullptr;
-	ePipelineName pipeline_name = ePipelineName::GeometryTransparent;
+	PipelineHandle pipeline_handle;
 	bool first = true;
 
 	for (const TransparentObjectCarrier& transparent_object : SortedEntryBuffer) {
 		// For each differing pipeline (per object), bind the pipeline.
-		if (first || transparent_object.Pipeline != pipeline_name) {
-			pipeline = &gPipelineCache->Request(transparent_object.Pipeline);
+		if (first || !(transparent_object.Pipeline == pipeline_handle)) {
+			pipeline = &gPipelineCache->Get(transparent_object.Pipeline);
 			pipeline->Bind(gGraphics->GetFrame()->CmdBuffer);
 
 			{
@@ -308,7 +310,7 @@ void World::ExecuteTransparentRenderLists()
 					Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
 			}
 
-			pipeline_name = transparent_object.Pipeline;
+			pipeline_handle = transparent_object.Pipeline;
 			first = false;
 		}
 
@@ -334,20 +336,21 @@ public:
 	Pipeline& Select(Object* object, const MaterialID& material_id, const CommandBuffer& cmd)
 	{
 		const bool masked = IsMasked(object, material_id);
-		const ePipelineName wanted = masked ? ePipelineName::ShadowDirectionalMasked : ePipelineName::ShadowDirectional;
+		const PipelineHandle wanted = gPipelineCache->FindVariant(
+			ePipelinePass::Shadow, masked ? ePipelineFeatures::AlphaMask : ePipelineFeatures::None);
 
-		if (wanted != mBound) {
+		if (!(wanted == mBound)) {
 			gShadowAtlas->BindPipeline(wanted);
 			mBound = wanted;
 
 			const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0 };
 
 			gGraphics->pRenderer->pPersistentDescriptorSlim->Bind(
-				0, cmd, gPipelineCache->Request(wanted),
+				0, cmd, gPipelineCache->Get(wanted),
 				Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
 		}
 
-		Pipeline& pipeline = gPipelineCache->Request(mBound);
+		Pipeline& pipeline = gPipelineCache->Get(mBound);
 
 		if (masked) {
 			gMaterialManager->BindWithPipeline(cmd, pipeline, material_id);
@@ -371,7 +374,7 @@ private:
 
 private:
 	/// Every region starts out with the opaque pipeline bound
-	ePipelineName mBound = ePipelineName::ShadowDirectional;
+	PipelineHandle mBound = gPipelineCache->FindVariant(ePipelinePass::Shadow, ePipelineFeatures::None);
 };
 
 /**
@@ -399,9 +402,9 @@ static void RenderShadowCaster(Object* object, ShadowPipelineSelector& selector,
 	}
 }
 
-void World::ExecuteShadowRenderList(renderer::ePipelineName pl_name, const Camera& shadow_camera)
+void World::ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Camera& shadow_camera)
 {
-	const RenderListSection& section = mRenderList.GetSection(pl_name);
+	const RenderListSection& section = mRenderList.GetSection(pipeline);
 
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
@@ -521,7 +524,7 @@ void World::BeginShadowAtlasRegion(const ShadowAtlasRegion& region)
 {
 	gShadowAtlas->BeginRegion(region);
 
-	Pipeline& pipeline = gPipelineCache->Request(ePipelineName::ShadowDirectional);
+	Pipeline& pipeline = gPipelineCache->Get(GetShadowListPipeline());
 
 	const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0 };
 
@@ -648,35 +651,20 @@ void World::AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, DynAr
 	}
 }
 
-void World::ExecutePrepassRenderList(renderer::ePipelineName forward_pl_name)
+void World::ExecutePrepassRenderList(renderer::PipelineHandle forward_pipeline)
 {
-	// Skip prepass for transparent variants – they don't write depth and are blended in forward
-	if (forward_pl_name == ePipelineName::GeometryTransparent ||
-		forward_pl_name == ePipelineName::GeometryNormalMapsTransparent ||
-		forward_pl_name == ePipelineName::GeometrySkinnedTransparent) {
+	// Only the opaque pipelines have a prepass one. The blended ones don't write depth, they are blended in forward.
+	const PipelineHandle prepass_pipeline = gPipelineCache->FindVariantInPass(forward_pipeline, ePipelinePass::Depth);
+
+	if (!prepass_pipeline.IsValid()) {
 		return;
 	}
 
 	PerspectiveCamera& camera = *mpCurrentCamera;
 
-	const RenderListSection& section = mRenderList.GetSection(forward_pl_name);
+	const RenderListSection& section = mRenderList.GetSection(forward_pipeline);
 
-	ePipelineName prepass_pl_name = forward_pl_name;
-	switch (forward_pl_name) {
-	case ePipelineName::Geometry:
-		prepass_pl_name = ePipelineName::DepthNormal;
-		break;
-	case ePipelineName::GeometryNormalMaps:
-		prepass_pl_name = ePipelineName::DepthNormalNormalMaps;
-		break;
-	case ePipelineName::GeometrySkinned:
-		prepass_pl_name = ePipelineName::DepthNormalSkinned;
-		break;
-	default:
-		return;
-	}
-
-	renderer::Pipeline& pipeline = gPipelineCache->Request(prepass_pl_name);
+	renderer::Pipeline& pipeline = gPipelineCache->Get(prepass_pipeline);
 
 	pipeline.Bind(gGraphics->GetFrame()->CmdBuffer);
 
@@ -706,7 +694,7 @@ void World::ExecutePrepassRenderList(renderer::ePipelineName forward_pl_name)
 		memcpy(consts.CameraMatrix, cam_matrix.RawData, sizeof(Mat4f));
 
 		ForEachDrawInPipeline(
-			object, forward_pl_name,
+			object, forward_pipeline,
 			[&](const MeshSection* section)
 			{
 				const MaterialID material_id = (section != nullptr) ? object->GetSectionMaterial(*section)
@@ -727,7 +715,7 @@ void World::ExecutePrepassRenderList(renderer::ePipelineName forward_pl_name)
 }
 
 
-void World::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* id_ptr)
+void World::AddToRenderListRecursive(renderer::PipelineHandle pipeline, ObjectID* id_ptr)
 {
 	if (id_ptr == nullptr) {
 		return;
@@ -735,7 +723,7 @@ void World::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* 
 
 	ObjectID id = *id_ptr;
 
-	RenderListSection& section = mRenderList.GetSection(pl_name);
+	RenderListSection& section = mRenderList.GetSection(pipeline);
 
 	for (ObjectID object_id : section.Objects) {
 		if (object_id == id) {
@@ -743,7 +731,7 @@ void World::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* 
 		}
 	}
 
-	mRenderList.AddObject(pl_name, id);
+	mRenderList.AddObject(pipeline, id);
 
 	Object* obj = gObjectManager->GetObject(id);
 	if (obj == nullptr) {
@@ -751,7 +739,7 @@ void World::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* 
 	}
 
 	for (ObjectID& attached_id : obj->AttachedNodes) {
-		AddToRenderListRecursive(pl_name, &attached_id);
+		AddToRenderListRecursive(pipeline, &attached_id);
 	}
 }
 
@@ -783,13 +771,13 @@ void World::AddToRenderListRecursiveByMaterial(ObjectID* id_ptr)
 
 void World::ClearRenderList()
 {
-	mRenderList.ClearSection(ePipelineName::Geometry);
-	mRenderList.ClearSection(ePipelineName::GeometryNormalMaps);
-	mRenderList.ClearSection(ePipelineName::GeometrySkinned);
-	mRenderList.ClearSection(ePipelineName::GeometryTransparent);
-	mRenderList.ClearSection(ePipelineName::GeometryNormalMapsTransparent);
-	mRenderList.ClearSection(ePipelineName::GeometrySkinnedTransparent);
-	mRenderList.ClearSection(ePipelineName::ShadowDirectional);
+	for (const ePipelinePass pass : { ePipelinePass::Forward, ePipelinePass::ForwardBlend }) {
+		for (const PipelineHandle pipeline : gPipelineCache->GetPassPipelines(pass)) {
+			mRenderList.ClearSection(pipeline);
+		}
+	}
+
+	mRenderList.ClearSection(GetShadowListPipeline());
 }
 
 void World::AddTileToRenderList(bool clear, TileIndex new_tile_index)
@@ -825,7 +813,7 @@ void World::AddTileToRenderList(bool clear, TileIndex new_tile_index)
 		}
 
 		if (object->IsShadowCaster()) {
-			AddToRenderListRecursive(ePipelineName::ShadowDirectional, object_id);
+			AddToRenderListRecursive(GetShadowListPipeline(), object_id);
 		}
 
 		AddToRenderListRecursiveByMaterial(object_id);
@@ -930,7 +918,7 @@ void World::Render(Camera* shadow_camera)
 		BeginShadowAtlasRegion(gShadowAtlas->GetDirectionalRegion());
 
 		if (render_sun_shadows) {
-			ExecuteShadowRenderList(ePipelineName::ShadowDirectional, gShadowRenderer->ShadowCamera);
+			ExecuteShadowRenderList(GetShadowListPipeline(), gShadowRenderer->ShadowCamera);
 		}
 
 		gShadowAtlas->EndRegion();
@@ -940,9 +928,9 @@ void World::Render(Camera* shadow_camera)
 
 	gGraphics->BeginPrepass();
 
-	ExecutePrepassRenderList(ePipelineName::Geometry);
-	ExecutePrepassRenderList(ePipelineName::GeometryNormalMaps);
-	ExecutePrepassRenderList(ePipelineName::GeometrySkinned);
+	for (const PipelineHandle pipeline : gPipelineCache->GetPassPipelines(ePipelinePass::Forward)) {
+		ExecutePrepassRenderList(pipeline);
+	}
 
 	gGraphics->pRenderer->Prepass.End();
 
@@ -957,9 +945,7 @@ void World::Render(Camera* shadow_camera)
 	gGraphics->BeginGeometry();
 
 	// Opaque first
-	ExecuteRenderList(ePipelineName::Geometry);
-	ExecuteRenderList(ePipelineName::GeometryNormalMaps);
-	ExecuteRenderList(ePipelineName::GeometrySkinned);
+	ExecuteForwardRenderLists(*mpCurrentCamera);
 
 	// Transparent after, back-to-front globally sorted, depth write disabled
 	ExecuteTransparentRenderLists();
@@ -1006,7 +992,7 @@ bool World::RenderCaptureSunShadows(LightDirectional& sun, const Vec3f& center, 
 	}
 
 	BeginShadowAtlasRegion(gShadowAtlas->GetDirectionalRegion());
-	ExecuteShadowRenderList(ePipelineName::ShadowDirectional, shadow_camera);
+	ExecuteShadowRenderList(GetShadowListPipeline(), shadow_camera);
 	gShadowAtlas->EndRegion();
 
 	out_shadow_camera = shadow_camera;
@@ -1024,12 +1010,6 @@ void World::RenderProbeCapture()
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
 	const Vec2u extent(ProbeManager::scCaptureSize, ProbeManager::scCaptureSize);
-
-	static constexpr renderer::ePipelineName scCapturePipelines[] = {
-		renderer::ePipelineName::Geometry,
-		renderer::ePipelineName::GeometryNormalMaps,
-		renderer::ePipelineName::GeometrySkinned,
-	};
 
 	const uint32 saved_tile_columns = gGraphics->pRenderer->GetLightTileColumns();
 	const uint32 saved_tile_rows = gGraphics->pRenderer->GetLightTileRows();
@@ -1080,9 +1060,7 @@ void World::RenderProbeCapture()
 
 			stage.Begin(cmd);
 
-			for (renderer::ePipelineName pipeline_name : scCapturePipelines) {
-				ExecuteRenderList(pipeline_name, camera);
-			}
+			ExecuteForwardRenderLists(camera);
 
 			stage.End();
 		});

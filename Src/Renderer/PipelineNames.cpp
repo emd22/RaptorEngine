@@ -1,5 +1,7 @@
 #include "PipelineNames.hpp"
 
+#include "PipelineCache.hpp"
+
 #include <Core/Assert.hpp>
 
 
@@ -43,6 +45,43 @@ static const PipelineNameInfo scNameInfos[] = {
 };
 
 static_assert(std::size(scNameInfos) == static_cast<uint32>(ePipelineName::NumPipelines));
+
+void RegisterPipelineVariants(PipelineCache& cache)
+{
+	using enum ePipelineFeatures;
+
+	struct Variant
+	{
+		ePipelinePass Pass;
+		ePipelineFeatures Features;
+		ePipelineName Pipeline;
+	};
+
+	// A skinned pipeline also handles normal maps, so both sets of features share it
+	static const Variant scVariants[] = {
+		{ ePipelinePass::Forward, None, ePipelineName::Geometry },
+		{ ePipelinePass::Forward, NormalMap, ePipelineName::GeometryNormalMaps },
+		{ ePipelinePass::Forward, Skinned, ePipelineName::GeometrySkinned },
+		{ ePipelinePass::Forward, Skinned | NormalMap, ePipelineName::GeometrySkinned },
+
+		{ ePipelinePass::ForwardBlend, None, ePipelineName::GeometryTransparent },
+		{ ePipelinePass::ForwardBlend, NormalMap, ePipelineName::GeometryNormalMapsTransparent },
+		{ ePipelinePass::ForwardBlend, Skinned, ePipelineName::GeometrySkinnedTransparent },
+		{ ePipelinePass::ForwardBlend, Skinned | NormalMap, ePipelineName::GeometrySkinnedTransparent },
+
+		{ ePipelinePass::Depth, None, ePipelineName::DepthNormal },
+		{ ePipelinePass::Depth, NormalMap, ePipelineName::DepthNormalNormalMaps },
+		{ ePipelinePass::Depth, Skinned, ePipelineName::DepthNormalSkinned },
+		{ ePipelinePass::Depth, Skinned | NormalMap, ePipelineName::DepthNormalSkinned },
+
+		{ ePipelinePass::Shadow, None, ePipelineName::ShadowDirectional },
+		{ ePipelinePass::Shadow, AlphaMask, ePipelineName::ShadowDirectionalMasked },
+	};
+
+	for (const Variant& variant : scVariants) {
+		cache.RegisterVariant(variant.Pass, variant.Features, PipelineCache::GetHandle(variant.Pipeline));
+	}
+}
 
 const PipelineNameInfo& GetPipelineNameInfo(const ePipelineName name)
 {

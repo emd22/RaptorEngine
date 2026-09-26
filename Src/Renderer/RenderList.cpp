@@ -2,29 +2,22 @@
 
 #include <Object/ObjectID.hpp>
 #include <Object/ObjectManager.hpp>
+#include <Renderer/Globals.hpp>
+#include <Renderer/PipelineCache.hpp>
 
 namespace fx::renderer {
 
 
-void RenderList::AddObject(ePipelineName pl_name, const ObjectID id)
-{
-	if (!mSections.IsInited()) {
-		mSections.InitSize(scNumPipelines);
-	}
-
-	AssertLess(static_cast<uint32>(pl_name), mSections.Capacity);
-
-	RenderListSection& section = mSections[static_cast<uint32>(pl_name)];
-
-	section.Objects.Insert(id);
-}
+void RenderList::AddObject(PipelineHandle pipeline, const ObjectID id) { GetSection(pipeline).Objects.Insert(id); }
 
 void RenderList::InvalidateObject(const ObjectID id)
 {
-	for (uint32 section_index = 0; section_index < mSections.Size; section_index++) {
-		RenderListSection& section = mSections[section_index];
+	for (std::unique_ptr<RenderListSection>& section : mSections) {
+		if (section == nullptr) {
+			continue;
+		}
 
-		for (ObjectID& found_id : section.Objects) {
+		for (ObjectID& found_id : section->Objects) {
 			if (found_id == id) {
 				found_id.Invalidate();
 				break;
@@ -33,21 +26,16 @@ void RenderList::InvalidateObject(const ObjectID id)
 	}
 }
 
-void RenderList::ClearSection(ePipelineName section_name)
-{
-	DebugAssert(static_cast<uint32>(section_name) < mSections.Capacity);
-	RenderListSection& section = mSections[static_cast<uint32>(section_name)];
-
-	section.Objects.Clear();
-}
+void RenderList::ClearSection(PipelineHandle pipeline) { GetSection(pipeline).Objects.Clear(); }
 
 uint32 RenderList::GetItemCount() const
 {
 	uint32 count = 0;
 
-	for (uint32 section_index = 0; section_index < mSections.Size; section_index++) {
-		const RenderListSection& section = mSections[section_index];
-		count += section.Objects.Size;
+	for (const std::unique_ptr<RenderListSection>& section : mSections) {
+		if (section != nullptr) {
+			count += section->Objects.Size;
+		}
 	}
 
 	return count;
@@ -62,14 +50,18 @@ int32 RenderList::CheckForObjectDuplicates(const ObjectID id) const
 		return 0;
 	}
 
-	for (uint32 section_index = 0; section_index < mSections.Size; section_index++) {
-		const RenderListSection& section = mSections[section_index];
+	for (uint32 section_index = 0; section_index < mSections.size(); section_index++) {
+		const RenderListSection* section = mSections[section_index].get();
 
-		for (uint32 object_index = 0; object_index < section.Objects.Size; object_index++) {
-			if (section.Objects[object_index] == id) {
+		if (section == nullptr) {
+			continue;
+		}
+
+		for (uint32 object_index = 0; object_index < section->Objects.Size; object_index++) {
+			if (section->Objects[object_index] == id) {
 				++count;
 				LogInfo(LC_RENDER, "Object '{}' found in pipeline '{}'", object->Name.Get(),
-						PipelineNameUtil::GetName(static_cast<ePipelineName>(section_index)));
+						PipelineNameUtil::GetName(gPipelineCache->Get(PipelineHandle { section_index }).Name));
 			}
 		}
 	}
@@ -77,13 +69,21 @@ int32 RenderList::CheckForObjectDuplicates(const ObjectID id) const
 	return count;
 }
 
-RenderListSection& RenderList::GetSection(ePipelineName pl_name)
+RenderListSection& RenderList::GetSection(PipelineHandle pipeline)
 {
-	if (!mSections.IsInited()) {
-		mSections.InitSize(scNumPipelines);
+	Assert(pipeline.IsValid());
+
+	if (pipeline.Index >= mSections.size()) {
+		mSections.resize(pipeline.Index + 1);
 	}
 
-	return mSections[static_cast<uint32>(pl_name)];
+	std::unique_ptr<RenderListSection>& section = mSections[pipeline.Index];
+
+	if (section == nullptr) {
+		section = std::make_unique<RenderListSection>();
+	}
+
+	return *section;
 }
 
 

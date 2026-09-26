@@ -124,12 +124,12 @@ ShadowAtlas::ShadowAtlas()
 	}
 }
 
-void ShadowAtlas::BindPipeline(ePipelineName name)
+void ShadowAtlas::BindPipeline(PipelineHandle pipeline)
 {
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
 	// The viewport was set for the region when it began, and binding a pipeline leaves it alone
-	gPipelineCache->Bind(name, cmd);
+	gPipelineCache->Bind(pipeline, cmd);
 }
 
 Target* ShadowAtlas::GetTarget() { return RenderStage.GetTarget(eImageFormat::D32_Float); }
@@ -167,7 +167,7 @@ void ShadowAtlas::BeginRegion(const ShadowAtlasRegion& region)
 	gPipelineCache->AddBufferOffset(0, gObjectManager->GetBaseOffset());
 	gPipelineCache->AddBufferOffset(0, 0);
 
-	BindPipeline(ePipelineName::ShadowDirectional);
+	BindPipeline(gPipelineCache->FindVariant(ePipelinePass::Shadow, ePipelineFeatures::None));
 }
 
 void ShadowAtlas::EndRegion()

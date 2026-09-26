@@ -29,7 +29,7 @@ class World
 	struct TransparentObjectCarrier
 	{
 		ObjectID ID;
-		renderer::ePipelineName Pipeline;
+		renderer::PipelineHandle Pipeline;
 		float32 Distance;
 	};
 
@@ -114,10 +114,13 @@ private:
 
 	void CullWorldTiles(const PerspectiveCamera& cam);
 
-	void ExecuteRenderList(renderer::ePipelineName pl_name);
-	void ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera& camera);
+	void ExecuteRenderList(renderer::PipelineHandle pipeline);
+	void ExecuteRenderList(renderer::PipelineHandle pipeline, PerspectiveCamera& camera);
+
+	/// Draws the opaque geometry with every pipeline of the forward pass
+	void ExecuteForwardRenderLists(PerspectiveCamera& camera);
 	void ExecuteTransparentRenderLists();
-	void ExecuteShadowRenderList(renderer::ePipelineName pl_name, const Camera& shadow_camera);
+	void ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Camera& shadow_camera);
 
 	/**
 	 * @brief Re-renders the sun's shadow map centered on `center` for a probe capture, and writes a copy of the sun
@@ -146,12 +149,13 @@ private:
 	 */
 	void GatherSpotShadowCasters(const Vec3f& center, float32 radius, DynArray<ObjectID>& out_casters);
 	void AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, DynArray<ObjectID>& out_casters);
-	void ExecutePrepassRenderList(renderer::ePipelineName pl_name);
+	/// Draws the objects of a forward pipeline's list into the prepass, with the prepass pipeline that goes with it
+	void ExecutePrepassRenderList(renderer::PipelineHandle forward_pipeline);
 
 	void AddTileToRenderList(bool clear, TileIndex new_tile);
 	void ClearRenderList();
 
-	void AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* id);
+	void AddToRenderListRecursive(renderer::PipelineHandle pipeline, ObjectID* id);
 	/**
 	 * @brief Recursively adds `id` and its attached nodes to the geometry render list, deriving each node's own
 	 * pipeline from its own material rather than inheriting the pipeline chosen for the root (attached primitives
