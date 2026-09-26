@@ -161,7 +161,7 @@ Material* MaterialManager::GetMaterial(const MaterialID& id)
 	return mMaterialList.GetItem(id.GetID());
 }
 
-MaterialID MaterialManager::NewMaterial(const String& name, renderer::ePipelineName pl_name, bool supports_skinning)
+MaterialID MaterialManager::NewMaterial(const String& name, bool supports_skinning)
 {
 	if (!mMaterialList.IsInited()) {
 		Create();

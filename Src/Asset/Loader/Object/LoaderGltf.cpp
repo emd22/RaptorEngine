@@ -275,7 +275,7 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 	String material_name = (gltf_material->name) ? gltf_material->name : object->Name.Get();
 
 
-	MaterialID material_id = gMaterialManager->NewMaterial(material_name, ePipelineName::Geometry, object->IsSkinned());
+	MaterialID material_id = gMaterialManager->NewMaterial(material_name, object->IsSkinned());
 	Material* material = gMaterialManager->GetMaterial(material_id);
 
 	object->SetMaterial(material_id);

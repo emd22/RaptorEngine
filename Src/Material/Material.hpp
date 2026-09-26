@@ -18,6 +18,7 @@
 #include <Renderer/Backend/Descriptors.hpp>
 #include <Renderer/Backend/GpuBuffer.hpp>
 #include <Renderer/PipelineNames.hpp>
+#include <Renderer/PipelineVariant.hpp>
 
 
 namespace fx {
@@ -201,9 +202,9 @@ public:
 	FX_FORCE_INLINE renderer::DescriptorSet* GetDescriptorSet() { return mpDescriptorSet; }
 
 	/**
-	 * @brief Returns the pipeline that is required by the material.
+	 * @brief Returns what the material needs from the pipelines that draw it, see PipelineCache::FindVariant()
 	 */
-	renderer::ePipelineName GetRequiredPipeline() const;
+	ePipelineFeatures GetPipelineFeatures() const;
 
 	void SetUnlit(bool value);
 	void SetAlphaMask(bool value);

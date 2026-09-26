@@ -235,20 +235,19 @@ void Material::Destroy()
 		}                                                                                                              \
 	}
 
-renderer::ePipelineName Material::GetRequiredPipeline() const
+ePipelineFeatures Material::GetPipelineFeatures() const
 {
+	ePipelineFeatures features = ePipelineFeatures::None;
+
 	if (NormalMap.Exists()) {
-		if (bSupportsSkinning) {
-			return ePipelineName::GeometrySkinned;
-		}
-		return ePipelineName::GeometryNormalMaps;
+		features |= ePipelineFeatures::NormalMap;
 	}
-	else {
-		if (bSupportsSkinning) {
-			return ePipelineName::GeometrySkinned;
-		}
-		return ePipelineName::Geometry;
+
+	if (bSupportsSkinning) {
+		features |= ePipelineFeatures::Skinned;
 	}
+
+	return features;
 }
 
 static float32 GetComponentMaxLOD(const MaterialComponent& component)
