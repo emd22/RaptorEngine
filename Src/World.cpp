@@ -949,6 +949,7 @@ void World::Render(Camera* shadow_camera)
 	}
 
 	BakeSpotShadows();
+	gGraphics->MarkGpu(eGpuMarker::Shadows);
 
 	gGraphics->BeginPrepass();
 
@@ -956,14 +957,17 @@ void World::Render(Camera* shadow_camera)
 										[&](PipelineHandle pipeline) { ExecutePrepassRenderList(pipeline); });
 
 	gGraphics->pRenderer->Prepass.End();
+	gGraphics->MarkGpu(eGpuMarker::Prepass);
 
 	// The decals the camera can see, for the light culling pass to bin
 	gDecalManager->Update(camera);
 
 	// Cull lights and decals into screen space tiles before rendering geometry
 	gGraphics->BeginLightCulling(camera);
+	gGraphics->MarkGpu(eGpuMarker::LightCulling);
 
 	gGraphics->RenderEarlyFrameEffects(camera);
+	gGraphics->MarkGpu(eGpuMarker::SSAO);
 
 	gGraphics->BeginGeometry();
 

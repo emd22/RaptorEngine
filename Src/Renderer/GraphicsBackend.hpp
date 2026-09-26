@@ -6,6 +6,7 @@
 #include "Backend/Swapchain.hpp"
 #include "Backend/Synchro.hpp"
 #include "DeletionObject.hpp"
+#include "GpuProfiler.hpp"
 #include "TiledForwardRenderer.hpp"
 #include "UniformBuffer.hpp"
 #include "Window.hpp"
@@ -287,6 +288,16 @@ public:
 	DescriptorSet* pLightsDescriptor = nullptr;
 
 	Image* pNoiseTexture = nullptr;
+
+	/// Times the stages of the GPU frame
+	GpuProfiler Profiler;
+
+	/// Writes a GPU timestamp for the end of a stage into the frame being recorded, see GpuProfiler
+	void MarkGpu(eGpuMarker marker) { Profiler.Mark(GetFrame()->CmdBuffer, marker); }
+
+	/// Turn off the probe lighting or the decals in every draw, to see what they cost in the GPU timings
+	bool bDisableProbes = false;
+	bool bDisableDecals = false;
 
 	/// Debug view: show blended probe irradiance instead of the lit result.
 	bool bOnlyRenderProbes = false;

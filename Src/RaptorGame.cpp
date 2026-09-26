@@ -186,6 +186,12 @@ void RaptorGame::CreateGame()
 
 	mpShowFpsCVar = gCVars->Set("i_show_fps", 1);
 
+	// GPU time per stage on screen, and switches for the light probes and the decals to see what they cost. Set
+	// `$i_show_gpu`, `$r_probes` or `$r_decals` to 0 in the console
+	mpShowGpuCVar = gCVars->Set("i_show_gpu", 1);
+	mpProbesCVar = gCVars->Set("r_probes", 1);
+	mpDecalsCVar = gCVars->Set("r_decals", 1);
+
 	// Metres between probes in a volume built from an editor brush. Set `$r_probe_spacing` in the console
 	gCVars->Set("r_probe_spacing", 2.5f);
 
@@ -522,6 +528,24 @@ void RaptorGame::RenderText()
 		gTextRenderer->DrawText(String::Fmt("FPS={:.0f} ({:.2f}ms)", Fps, FrameTimeMs).CStr(), 2.0f, scWhite);
 	}
 
+	const GpuProfiler& gpu = gGraphics->Profiler;
+
+	if (gpu.IsEnabled() && (mpShowGpuCVar == nullptr || mpShowGpuCVar->IntValue != 0)) {
+		gTextRenderer->DrawText(String::Fmt("GPU={:.2f}ms", gpu.GetTotalMs()).CStr(), 2.0f, scWhite);
+		gTextRenderer->DrawText(
+			String::Fmt("Sh {:.2f} Pre {:.2f} Cull {:.2f} SSAO {:.2f} Fwd {:.2f} Comp {:.2f}",
+						gpu.GetMs(eGpuMarker::Shadows), gpu.GetMs(eGpuMarker::Prepass),
+						gpu.GetMs(eGpuMarker::LightCulling), gpu.GetMs(eGpuMarker::SSAO),
+						gpu.GetMs(eGpuMarker::Forward), gpu.GetMs(eGpuMarker::Composition))
+				.CStr(),
+			2.0f, scWhite);
+
+		// Only bakes have this
+		if (gpu.GetMs(eGpuMarker::ProbeCapture) > 0.005) {
+			gTextRenderer->DrawText(String::Fmt("Bake {:.2f}", gpu.GetMs(eGpuMarker::ProbeCapture)).CStr(), 2.0f, scWhite);
+		}
+	}
+
 	gTextRenderer->DrawText(String::Fmt("Vis={}", gWorld->mRenderList.GetItemCount()).CStr(), 2.0f, scWhite);
 
 #ifdef FX_IS_EDITOR
@@ -624,8 +648,15 @@ void RaptorGame::Tick()
 
 	FrameData* frame = gGraphics->GetFrame();
 
+	// This frame slot's fence has been waited on, so what it timed last time round is ready
+	gGraphics->Profiler.ReadResults(gGraphics->GetFrameNumber(), DeltaTime);
+
+	gGraphics->bDisableProbes = (mpProbesCVar != nullptr) && (mpProbesCVar->IntValue == 0);
+	gGraphics->bDisableDecals = (mpDecalsCVar != nullptr) && (mpDecalsCVar->IntValue == 0);
+
 	frame->CmdBuffer.Reset();
 	frame->CmdBuffer.Record();
+	gGraphics->Profiler.BeginFrame(frame->CmdBuffer, gGraphics->GetFrameNumber());
 
 	// mMainScene.RenderShadows(&gShadowRenderer->ShadowCamera);
 	gWorld->Render(&gShadowRenderer->ShadowCamera);

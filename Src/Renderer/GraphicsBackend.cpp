@@ -254,6 +254,8 @@ void GraphicsBackend::InitFrames()
 		synchro_label = std::format("Frame {} R.F", i);
 		Util::SetDebugLabel(synchro_label.c_str(), VK_OBJECT_TYPE_SEMAPHORE, frame.RenderFinished.Get());
 	}
+
+	Profiler.Create(device, graphics_family);
 }
 
 void GraphicsBackend::DestroyFrames()
@@ -262,6 +264,9 @@ void GraphicsBackend::DestroyFrames()
 		SpinLockContext<VkQueue> graphics_queue = GetDevice()->GetGraphicsQueue();
 		vkQueueWaitIdle(graphics_queue.Get());
 	}
+
+	// Nothing that uses the query pools is in flight now
+	Profiler.Destroy();
 
 	for (auto& frame : Frames) {
 		// frame.DescriptorSet.Destroy();
@@ -789,11 +794,13 @@ void GraphicsBackend::DoComposition(Camera& render_cam)
 
 
 	pRenderer->ForwardPass.End();
+	MarkGpu(eGpuMarker::Forward);
 
 	// Probe capture bake faces render here: the main forward pass is done, so
 	// the capture can reuse its pipelines + light grid page before composition.
 	if (gProbeManager->IsCapturePending()) {
 		gWorld->RenderProbeCapture();
+		MarkGpu(eGpuMarker::ProbeCapture);
 	}
 
 	// pDeferredRenderer->UnlitPass.End();
@@ -804,6 +811,7 @@ void GraphicsBackend::DoComposition(Camera& render_cam)
 	pRenderer->RenderComposition(render_cam);
 
 	pRenderer->CompPass.End();
+	MarkGpu(eGpuMarker::Composition);
 	// SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
 	// ProcessDeletionQueue(false, deletion_queue.Get());
 	// deletion_queue.Unlock();
