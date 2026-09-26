@@ -3,6 +3,7 @@
 #include "Backend/BlendAttachment.hpp"
 #include "Backend/Pipeline.hpp"
 #include "Backend/Shader.hpp"
+#include "PipelineDesc.hpp"
 #include "PipelineKey.hpp"
 #include "PipelineNames.hpp"
 #include "ShaderNames.hpp"
@@ -38,6 +39,11 @@ public:
 	 */
 	void BeginPipeline(const ePipelineName pipeline);
 	void EndPipeline();
+
+	/**
+	 * @brief Builds the pipeline that `handle` refers to from a description, start to finish
+	 */
+	void Build(const PipelineHandle handle, const PipelineDesc& desc);
 
 	/**
 	 * @brief Sets the pipeline layout from a preexisting layout.
@@ -101,6 +107,8 @@ public:
 	}
 
 private:
+	void BeginPipeline(Pipeline& pipeline, const ePipelineName name, const char* debug_name);
+
 	void BuildPipeline();
 	void Reset();
 
@@ -118,7 +126,9 @@ public:
 
 private:
 	Pipeline* mpPipeline = nullptr;
-	ePipelineName mPipelineName = ePipelineName::Geometry;
+	/// Pipelines made from a description have no ePipelineName, and this is NumPipelines
+	ePipelineName mPipelineName = ePipelineName::NumPipelines;
+	const char* mDebugName = "";
 
 	RenderPass* mpRenderPass = nullptr;
 

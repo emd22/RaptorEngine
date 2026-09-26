@@ -21,8 +21,16 @@ static constexpr uint32 scMaxNumDescriptorBindings = 16;
 
 void PSOBuild::BeginPipeline(const ePipelineName name)
 {
+	BeginPipeline(gPipelineCache->Request(name), name, PipelineNameUtil::GetName(name));
+}
+
+void PSOBuild::BeginPipeline(Pipeline& pipeline, const ePipelineName name, const char* debug_name)
+{
+	AssertMsg(mpPipeline == nullptr, "A pipeline is already being built");
+
 	mPipelineName = name;
-	mpPipeline = &gPipelineCache->Request(name);
+	mDebugName = debug_name;
+	mpPipeline = &pipeline;
 
 	if (!mpPipeline->DescriptorIDs.IsInited()) {
 		mpPipeline->DescriptorIDs.InitCapacity(8);
@@ -35,6 +43,47 @@ void PSOBuild::BeginPipeline(const ePipelineName name)
 			entry_list.InitCapacity(scMaxNumDescriptorBindings);
 		}
 	}
+}
+
+void PSOBuild::Build(const PipelineHandle handle, const PipelineDesc& desc)
+{
+	Assert(desc.pStage != nullptr);
+
+	BeginPipeline(gPipelineCache->Get(handle), ePipelineName::NumPipelines, desc.DebugName.c_str());
+
+	if (desc.PushConstantSize > 0) {
+		SetPushConstants(desc.PushConstantStages, desc.PushConstantSize);
+	}
+
+	UseRenderStage(*desc.pStage);
+
+	SizedArray<ShaderMacro> macros(desc.Macros.size());
+
+	for (const ShaderMacro& macro : desc.Macros) {
+		macros.Insert(macro);
+	}
+
+	SetShader(desc.Shader, macros);
+
+	SetVertexType(desc.VertexType);
+	SetFlags(desc.bNoVertices ? ePSOBuildFlags::NoVertices : ePSOBuildFlags::None);
+
+	SetCullMode(desc.CullMode);
+	SetFaceOrder(desc.FaceOrder);
+	SetRenderLines(desc.bRenderLines);
+	SetDepthTest(desc.bDepthTest);
+	SetDepthWrite(desc.bDepthWrite);
+	SetDepthCompareOp(desc.DepthCompareOp);
+
+	for (const BlendAttachment& blend : desc.Blends) {
+		SetTargetBlend(blend.TargetIndex, blend);
+	}
+
+	if (desc.DeclareDescriptors) {
+		desc.DeclareDescriptors(*this);
+	}
+
+	EndPipeline();
 }
 
 void PSOBuild::SetShader(eShaderName shader_name, const SizedArray<ShaderMacro>& macros)
@@ -108,7 +157,7 @@ void PSOBuild::BuildPipeline()
 	// be created or used. Notify incase that is a mistake.
 	else if (HasDescriptorsToBuild() && !HasFlag(mFlags, ePSOBuildFlags::ReuseDescriptors)) {
 		LogWarning(LC_RENDER, "PSOBuild: Descriptors will never be built for pipeline '{}'",
-				   PipelineNameUtil::GetName(mPipelineName));
+				   mDebugName);
 		Panic("PSOBuild", "Oops!");
 	}
 
@@ -223,7 +272,7 @@ std::vector<VkDescriptorSetLayout> PSOBuild::BuildDescriptorSets()
 		AssertMsg(ds_layout != nullptr, "Could not find descriptor layout when building pipeline");
 
 #ifdef FX_DEBUG_SET_DESCRIPTOR_NAMES
-		String debug_str = String::Fmt("{}_{}_{}", PipelineNameUtil::GetName(mPipelineName), i, desc_list.Size);
+		String debug_str = String::Fmt("{}_{}_{}", mDebugName, i, desc_list.Size);
 		renderer::Util::SetDebugLabel(debug_str.CStr(), VK_OBJECT_TYPE_DESCRIPTOR_SET, ds_result.second->Get());
 		renderer::Util::SetDebugLabel(debug_str.CStr(), VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, *ds_layout);
 #endif
@@ -267,7 +316,7 @@ void PSOBuild::SetOutputTargets(TargetList* targets) { pOutputTargets = targets;
 void PSOBuild::EndPipeline()
 {
 #ifdef FX_BUILD_DEBUG
-	LogInfo(LC_RENDER, "** Building Pipeline {} **", PipelineNameUtil::GetName(mPipelineName));
+	LogInfo(LC_RENDER, "** Building Pipeline {} **", mDebugName);
 #endif
 
 	BuildPipeline();
@@ -279,7 +328,7 @@ void PSOBuild::EndPipeline()
 
 #ifdef FX_BUILD_DEBUG
 	LogInfo(LC_RENDER, "");
-	LogInfo(LC_RENDER, "Pipeline '{}' is assigned descriptor sets: ", PipelineNameUtil::GetName(mPipelineName));
+	LogInfo(LC_RENDER, "Pipeline '{}' is assigned descriptor sets: ", mDebugName);
 
 	for (Pipeline::DescriptorRef& ref : mpPipeline->DescriptorIDs) {
 		LogInfo(LC_RENDER, "\tSet={}\tID={}", ref.SetIndex, ref.pSet->ID);

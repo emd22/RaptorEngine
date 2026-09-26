@@ -115,7 +115,9 @@ private:
 	void CullWorldTiles(const PerspectiveCamera& cam);
 
 	void ExecuteRenderList(renderer::PipelineHandle pipeline);
-	void ExecuteRenderList(renderer::PipelineHandle pipeline, PerspectiveCamera& camera);
+	/// Draws the list of `pipeline` with `draw_pipeline`, which is a variant of it from another pass (or itself)
+	void ExecuteRenderList(renderer::PipelineHandle pipeline, renderer::PipelineHandle draw_pipeline,
+						   PerspectiveCamera& camera);
 
 	/// Draws the opaque geometry with every pipeline of the forward pass
 	void ExecuteForwardRenderLists(PerspectiveCamera& camera);

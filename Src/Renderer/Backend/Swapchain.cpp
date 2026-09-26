@@ -159,7 +159,7 @@ void Swapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR surface)
 		Surface.ColorSpace = surface_format.colorSpace;
 	}
 
-	const VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
+	const VkPresentModeKHR present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
 
 	VkSwapchainKHR old_swapchain = mSwapchain;
 

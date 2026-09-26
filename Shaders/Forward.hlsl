@@ -401,6 +401,10 @@ float3 GetSaturationColor(float value)
 }
 
 
+#ifdef USE_PREPASS_DEPTH
+// Depth tested EQUAL against the prepass without writing or discarding, so hidden fragments are never shaded
+[earlydepthstencil]
+#endif
 FSOutput main(FSInput input)
 {
     FSOutput output;
@@ -424,9 +428,12 @@ FSOutput main(FSInput input)
 
     float base_alpha = saturate(tex_alpha * material.fAlpha);
 
+#ifndef USE_PREPASS_DEPTH
+    // With the prepass, its discard leaves the depth of whatever is behind, which fails the EQUAL test here
     if (base_alpha < ALPHA_CUTOFF) {
         discard;
     }
+#endif
 
     output.vAlbedo = float4(albedo, base_alpha);
 

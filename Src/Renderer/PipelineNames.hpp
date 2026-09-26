@@ -2,37 +2,14 @@
 
 #include <Core/Types.hpp>
 
-namespace fx {
-
-enum class ePipelineNameFlags
-{
-	None = 0,
-	AlbedoOnly = (1 << 0),
-	/// Set 1 (Object local) includes a bone buffer binding, requiring a skinning-capable material descriptor set.
-	Skinned = (1 << 1),
-};
-
-FxEnumFlags(ePipelineNameFlags);
-} // namespace fx
-
-
 namespace fx::renderer {
 
+/**
+ * @brief The pipelines that are built once at startup and drawn with by name. Pipelines that come in variants
+ * (geometry, prepass and shadow) are made from a PipelineDesc when they are first needed instead
+ */
 enum class ePipelineName : uint16
 {
-	Geometry,
-	GeometryNormalMaps,
-	GeometrySkinned,
-
-	GeometryTransparent,
-	GeometryNormalMapsTransparent,
-	GeometrySkinnedTransparent,
-
-	// Depth+normal prepass pipelines
-	DepthNormal,
-	DepthNormalNormalMaps,
-	DepthNormalSkinned,
-
 	DebugLayer,
 	DebugSolid,
 
@@ -43,10 +20,6 @@ enum class ePipelineName : uint16
 
 	TextRendering,
 	Composition,
-
-	ShadowDirectional,
-	/// Shadow pass variant for alpha masked materials, which discards on the albedo alpha
-	ShadowDirectionalMasked,
 
 	SSAO,
 	SSAOBlur,
@@ -60,29 +33,14 @@ constexpr uint32 scNumPipelines = static_cast<uint32>(ePipelineName::NumPipeline
 struct PipelineNameInfo
 {
 	const char* pcName;
-	ePipelineNameFlags Flags;
 };
 
 const PipelineNameInfo& GetPipelineNameInfo(const ePipelineName name);
-
-class PipelineCache;
-
-/**
- * @brief Tells the cache which pipeline draws which features in each pass. This is the one place that connects the
- * pipelines built at startup to the passes that use them.
- */
-void RegisterPipelineVariants(PipelineCache& cache);
 
 
 namespace PipelineNameUtil {
 
 FX_FORCE_INLINE const char* GetName(const ePipelineName id) { return GetPipelineNameInfo(id).pcName; }
-
-FX_FORCE_INLINE bool IsTransparent(const ePipelineName name)
-{
-	return (name == ePipelineName::GeometryTransparent || name == ePipelineName::GeometryNormalMapsTransparent ||
-			name == ePipelineName::GeometrySkinnedTransparent);
-}
 
 
 } // namespace PipelineNameUtil

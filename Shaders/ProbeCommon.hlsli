@@ -109,20 +109,45 @@ uint SelectProbeVolume(float3 pos_ws, StructuredBuffer<ProbeVolume> volumes, uin
 	return best;
 }
 
-float3 EvalProbeIrradianceRaw(float3 normal, ProbeSHData probe)
+/// The irradiance SH basis evaluated along one direction, with the convolution constants folded in. Only depends on the
+/// direction, so it is built once and shared by every probe that is evaluated along it.
+struct ProbeSHBasis
 {
-	float3 irradiance = probe.SH[0].rgb * 0.282095;
+	float Coeffs[PROBE_SH_COEFF_COUNT];
+};
 
-	irradiance += probe.SH[1].rgb * 0.488603 * normal.y;
-	irradiance += probe.SH[2].rgb * 0.488603 * normal.z;
-	irradiance += probe.SH[3].rgb * 0.488603 * normal.x;
-	irradiance += probe.SH[4].rgb * 1.092548 * normal.x * normal.y;
-	irradiance += probe.SH[5].rgb * 1.092548 * normal.y * normal.z;
-	irradiance += probe.SH[6].rgb * 0.315392 * (3.0 * normal.z * normal.z - 1.0);
-	irradiance += probe.SH[7].rgb * 1.092548 * normal.x * normal.z;
-	irradiance += probe.SH[8].rgb * 0.546274 * (normal.x * normal.x - normal.y * normal.y);
+ProbeSHBasis MakeProbeSHBasis(float3 normal)
+{
+	ProbeSHBasis basis;
+
+	basis.Coeffs[0] = 0.282095;
+	basis.Coeffs[1] = 0.488603 * normal.y;
+	basis.Coeffs[2] = 0.488603 * normal.z;
+	basis.Coeffs[3] = 0.488603 * normal.x;
+	basis.Coeffs[4] = 1.092548 * normal.x * normal.y;
+	basis.Coeffs[5] = 1.092548 * normal.y * normal.z;
+	basis.Coeffs[6] = 0.315392 * (3.0 * normal.z * normal.z - 1.0);
+	basis.Coeffs[7] = 1.092548 * normal.x * normal.z;
+	basis.Coeffs[8] = 0.546274 * (normal.x * normal.x - normal.y * normal.y);
+
+	return basis;
+}
+
+float3 EvalProbeIrradianceRaw(ProbeSHBasis basis, ProbeSHData probe)
+{
+	float3 irradiance = float3(0.0, 0.0, 0.0);
+
+	[unroll]
+	for (uint i = 0; i < PROBE_SH_COEFF_COUNT; i++) {
+		irradiance += probe.SH[i].rgb * basis.Coeffs[i];
+	}
 
 	return irradiance;
+}
+
+float3 EvalProbeIrradianceRaw(float3 normal, ProbeSHData probe)
+{
+	return EvalProbeIrradianceRaw(MakeProbeSHBasis(normal), probe);
 }
 
 /// EvalProbeIrradianceRaw() clamped to non-negative, for callers evaluating a single probe.
@@ -262,51 +287,50 @@ void ProbeVolumeCell(float3 pos_ws, ProbeVolume volume, out uint3 base, out floa
 }
 
 
+/// Where corner `corner` (0-7, one bit per axis) of the cell at `base` is in the probe buffers, and its trilinear weight
+uint ProbeCellCorner(ProbeVolume volume, uint3 base, float3 cell_frac, uint corner, out float trilinear)
+{
+	const uint3 dims = volume.vDimsAndFirst.xyz;
+	const uint3 offset = uint3(corner, corner >> 1, corner >> 2) & uint3(1, 1, 1);
+	const uint3 cell = base + offset;
+
+	const float3 axis_weights = lerp(1.0 - cell_frac, cell_frac, float3(offset));
+	trilinear = axis_weights.x * axis_weights.y * axis_weights.z;
+
+	return volume.vDimsAndFirst.w + cell.x + dims.x * (cell.y + dims.y * cell.z);
+}
+
 void SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume volume,
 								 StructuredBuffer<ProbeSHData> probes, Texture2D moments_atlas,
 								 SamplerState moments_sampler, out float3 out_diffuse, out float3 out_specular,
 								 out float out_visibility)
 {
-	const uint3 dims = volume.vDimsAndFirst.xyz;
-	const uint first_probe = volume.vDimsAndFirst.w;
-
 	const float3 biased_pos = ProbeBiasedPosition(pos_ws, n, volume);
 
 	uint3 base;
 	float3 cell_frac;
 	ProbeVolumeCell(biased_pos, volume, base, cell_frac);
 
+	const ProbeSHBasis n_basis = MakeProbeSHBasis(n);
+	const ProbeSHBasis r_basis = MakeProbeSHBasis(r);
+
 	float3 diffuse = float3(0.0, 0.0, 0.0);
 	float3 specular = float3(0.0, 0.0, 0.0);
 	float total_weight = 0.0;
-
-	// Plain trilinear over every probe, only used if none of the cell's probes are active
-	float3 fallback_diffuse = float3(0.0, 0.0, 0.0);
-	float3 fallback_specular = float3(0.0, 0.0, 0.0);
 
 	float visibility_sum = 0.0;
 	float active_trilinear = 0.0;
 
 	for (uint corner = 0; corner < 8; corner++) {
-		const uint3 offset = uint3(corner, corner >> 1, corner >> 2) & uint3(1, 1, 1);
-		const uint3 cell = base + offset;
-		const uint index = first_probe + cell.x + dims.x * (cell.y + dims.y * cell.z);
+		float trilinear;
+		const uint index = ProbeCellCorner(volume, base, cell_frac, corner, trilinear);
 
-		const float3 axis_weights = lerp(1.0 - cell_frac, cell_frac, float3(offset));
-		const float trilinear = axis_weights.x * axis_weights.y * axis_weights.z;
-
-		const ProbeSHData probe = probes[index];
-
-		const float3 probe_diffuse = EvalProbeIrradianceRaw(n, probe);
-		const float3 probe_specular = EvalProbeIrradianceRaw(r, probe);
-
-		fallback_diffuse += probe_diffuse * trilinear;
-		fallback_specular += probe_specular * trilinear;
-
-		if (!ProbeSHActive(probe)) {
+		// Checked before the rest of the probe is read, inactive probes cost a single load
+		if (!ProbeSHActive(probes[index])) {
 			continue;
 		}
 
+		const ProbeSHData probe = probes[index];
 		const float3 probe_pos = ProbeSHPosition(probe);
 
 		const float visibility =
@@ -318,8 +342,8 @@ void SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume 
 		const float weight =
 			trilinear * ProbeBackfaceWeight(pos_ws, n, probe_pos) * max(visibility, PROBE_VISIBILITY_FLOOR);
 
-		diffuse += probe_diffuse * weight;
-		specular += probe_specular * weight;
+		diffuse += EvalProbeIrradianceRaw(n_basis, probe) * weight;
+		specular += EvalProbeIrradianceRaw(r_basis, probe) * weight;
 
 		total_weight += weight;
 	}
@@ -331,8 +355,20 @@ void SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume 
 		specular /= total_weight;
 	}
 	else {
-		diffuse = fallback_diffuse;
-		specular = fallback_specular;
+		// None of the cell's active probes carry any weight: plain trilinear over every probe instead. Rare, so it is
+		// done here rather than accumulated alongside the loop above for every pixel.
+		diffuse = float3(0.0, 0.0, 0.0);
+		specular = float3(0.0, 0.0, 0.0);
+
+		for (uint corner = 0; corner < 8; corner++) {
+			float trilinear;
+			const uint index = ProbeCellCorner(volume, base, cell_frac, corner, trilinear);
+
+			const ProbeSHData probe = probes[index];
+
+			diffuse += EvalProbeIrradianceRaw(n_basis, probe) * trilinear;
+			specular += EvalProbeIrradianceRaw(r_basis, probe) * trilinear;
+		}
 	}
 
 	out_diffuse = max(diffuse, float3(0.0, 0.0, 0.0));

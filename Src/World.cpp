@@ -45,7 +45,7 @@ static PipelineHandle GetPipelineForMaterial(const MaterialID& material_id)
 	Material* material = MaterialManagerFwd::GetMaterial(material_id);
 
 	const ePipelinePass pass = IsTransparentMaterial(material) ? ePipelinePass::ForwardBlend : ePipelinePass::Forward;
-	const PipelineHandle pipeline = gPipelineCache->FindVariant(pass, material->GetPipelineFeatures());
+	const PipelineHandle pipeline = gPipelineCache->GetOrCreateVariant(pass, material->GetPipelineFeatures());
 
 	AssertMsg(pipeline.IsValid(), "No forward pipeline draws this material");
 
@@ -57,7 +57,7 @@ static PipelineHandle GetPipelineForMaterial(const MaterialID& material_id)
  */
 static PipelineHandle GetShadowListPipeline()
 {
-	return gPipelineCache->FindVariant(ePipelinePass::Shadow, ePipelineFeatures::None);
+	return gPipelineCache->GetOrCreateVariant(ePipelinePass::Shadow, ePipelineFeatures::None);
 }
 
 static void AddToRenderListOnce(RenderList& render_list, PipelineHandle pipeline, ObjectID id)
@@ -184,21 +184,40 @@ void World::Detach(ObjectID id)
 void World::ExecuteRenderList(renderer::PipelineHandle pipeline_handle)
 {
 	PerspectiveCamera& camera = *mpCurrentCamera;
-	ExecuteRenderList(pipeline_handle, camera);
+	ExecuteRenderList(pipeline_handle, pipeline_handle, camera);
 }
 
 void World::ExecuteForwardRenderLists(PerspectiveCamera& camera)
 {
-	for (const PipelineHandle pipeline : gPipelineCache->GetPassPipelines(ePipelinePass::Forward)) {
-		ExecuteRenderList(pipeline, camera);
-	}
+	// The forward pipelines depth test against the prepass, which probe captures don't have
+	const bool is_probe_capture = gProbeManager->IsCapturingFaces();
+
+	gPipelineCache->ForEachPassPipeline(
+		ePipelinePass::Forward,
+		[&](PipelineHandle pipeline)
+		{
+			const PipelineHandle draw_pipeline =
+				is_probe_capture ? gPipelineCache->GetOrCreateVariantInPass(pipeline, ePipelinePass::ForwardCapture)
+								 : pipeline;
+
+			ExecuteRenderList(pipeline, draw_pipeline, camera);
+		});
 }
 
-void World::ExecuteRenderList(renderer::PipelineHandle pipeline_handle, PerspectiveCamera& camera)
+void World::ExecuteRenderList(renderer::PipelineHandle pipeline_handle, renderer::PipelineHandle draw_pipeline_handle,
+							  PerspectiveCamera& camera)
 {
 	RenderListSection& section = mRenderList.GetSection(pipeline_handle);
 
-	renderer::Pipeline& pipeline = gPipelineCache->Get(pipeline_handle);
+	if (!draw_pipeline_handle.IsValid()) {
+		return;
+	}
+
+	renderer::Pipeline& pipeline = gPipelineCache->Get(draw_pipeline_handle);
+
+	if (!pipeline.IsBuilt()) {
+		return;
+	}
 
 	pipeline.Bind(gGraphics->GetFrame()->CmdBuffer);
 
@@ -269,9 +288,7 @@ void World::ExecuteTransparentRenderLists()
 
 	// We store everything in one buffer as the order matters here. The furthest objects should be rendered first.
 
-	for (const PipelineHandle pipeline : gPipelineCache->GetPassPipelines(ePipelinePass::ForwardBlend)) {
-		Gather(pipeline);
-	}
+	gPipelineCache->ForEachPassPipeline(ePipelinePass::ForwardBlend, Gather);
 
 	if (SortedEntryBuffer.Size == 0) {
 		return;
@@ -290,6 +307,10 @@ void World::ExecuteTransparentRenderLists()
 		// For each differing pipeline (per object), bind the pipeline.
 		if (first || !(transparent_object.Pipeline == pipeline_handle)) {
 			pipeline = &gPipelineCache->Get(transparent_object.Pipeline);
+
+			if (!pipeline->IsBuilt()) {
+				continue;
+			}
 			pipeline->Bind(gGraphics->GetFrame()->CmdBuffer);
 
 			{
@@ -336,7 +357,7 @@ public:
 	Pipeline& Select(Object* object, const MaterialID& material_id, const CommandBuffer& cmd)
 	{
 		const bool masked = IsMasked(object, material_id);
-		const PipelineHandle wanted = gPipelineCache->FindVariant(
+		const PipelineHandle wanted = gPipelineCache->GetOrCreateVariant(
 			ePipelinePass::Shadow, masked ? ePipelineFeatures::AlphaMask : ePipelineFeatures::None);
 
 		if (!(wanted == mBound)) {
@@ -374,7 +395,7 @@ private:
 
 private:
 	/// Every region starts out with the opaque pipeline bound
-	PipelineHandle mBound = gPipelineCache->FindVariant(ePipelinePass::Shadow, ePipelineFeatures::None);
+	PipelineHandle mBound = gPipelineCache->GetOrCreateVariant(ePipelinePass::Shadow, ePipelineFeatures::None);
 };
 
 /**
@@ -654,7 +675,7 @@ void World::AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, DynAr
 void World::ExecutePrepassRenderList(renderer::PipelineHandle forward_pipeline)
 {
 	// Only the opaque pipelines have a prepass one. The blended ones don't write depth, they are blended in forward.
-	const PipelineHandle prepass_pipeline = gPipelineCache->FindVariantInPass(forward_pipeline, ePipelinePass::Depth);
+	const PipelineHandle prepass_pipeline = gPipelineCache->GetOrCreateVariantInPass(forward_pipeline, ePipelinePass::Depth);
 
 	if (!prepass_pipeline.IsValid()) {
 		return;
@@ -665,6 +686,10 @@ void World::ExecutePrepassRenderList(renderer::PipelineHandle forward_pipeline)
 	const RenderListSection& section = mRenderList.GetSection(forward_pipeline);
 
 	renderer::Pipeline& pipeline = gPipelineCache->Get(prepass_pipeline);
+
+	if (!pipeline.IsBuilt()) {
+		return;
+	}
 
 	pipeline.Bind(gGraphics->GetFrame()->CmdBuffer);
 
@@ -772,9 +797,8 @@ void World::AddToRenderListRecursiveByMaterial(ObjectID* id_ptr)
 void World::ClearRenderList()
 {
 	for (const ePipelinePass pass : { ePipelinePass::Forward, ePipelinePass::ForwardBlend }) {
-		for (const PipelineHandle pipeline : gPipelineCache->GetPassPipelines(pass)) {
-			mRenderList.ClearSection(pipeline);
-		}
+		gPipelineCache->ForEachPassPipeline(pass,
+											[&](PipelineHandle pipeline) { mRenderList.ClearSection(pipeline); });
 	}
 
 	mRenderList.ClearSection(GetShadowListPipeline());
@@ -928,9 +952,8 @@ void World::Render(Camera* shadow_camera)
 
 	gGraphics->BeginPrepass();
 
-	for (const PipelineHandle pipeline : gPipelineCache->GetPassPipelines(ePipelinePass::Forward)) {
-		ExecutePrepassRenderList(pipeline);
-	}
+	gPipelineCache->ForEachPassPipeline(ePipelinePass::Forward,
+										[&](PipelineHandle pipeline) { ExecutePrepassRenderList(pipeline); });
 
 	gGraphics->pRenderer->Prepass.End();
 
