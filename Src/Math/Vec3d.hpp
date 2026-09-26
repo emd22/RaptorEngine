@@ -60,7 +60,7 @@ public:
 	}
 
 public:
-	union alignas(16)
+	union alignas(alignof(DOUBLE4))
 	{
 		DOUBLE4 mIntrin;
 		double mData[4];

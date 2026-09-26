@@ -14,8 +14,10 @@
 #if defined(FX_PLATFORM_MACOS)
 #include <vulkan/vulkan_metal.h>
 #elif defined(FX_PLATFORM_WINDOWS)
-#include <vulkan/vulkan_win32.h>
 #include <windows.h>
+// vulkan_win32.h needs the core Vulkan types and the Win32 types (HINSTANCE, HWND) declared before it
+#include <vulkan/vulkan.h>
+#include <vulkan/vulkan_win32.h>
 #else
 #error "The editor can only create a Vulkan surface on macOS and Windows"
 #endif
@@ -116,7 +118,7 @@ bool Window::IsFocused() const
 #ifdef FX_PLATFORM_MACOS
 	return editor::platform::IsAppActive();
 #else
-	return editor::GetMainFrame()->IsActive();
+	return gEditor->GetMainFrame()->IsActive();
 #endif
 }
 

@@ -9,8 +9,10 @@
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_metal.h>
 #elif defined(FX_PLATFORM_WINDOWS)
-#include <vulkan/vulkan_win32.h>
 #include <windows.h>
+// vulkan_win32.h needs the core Vulkan types and the Win32 types (HINSTANCE, HWND) declared before it
+#include <vulkan/vulkan.h>
+#include <vulkan/vulkan_win32.h>
 #else
 #error "Unsupported platform for the editor"
 #endif

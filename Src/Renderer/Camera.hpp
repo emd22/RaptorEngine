@@ -29,16 +29,16 @@ public:
 	virtual const Mat4f& GetCameraMatrix(eObjectLayer layer) const { return mCameraMatrix; }
 	virtual void OnWindowResize(const Vec2u& size) {};
 
-	FX_FORCE_INLINE void SetNearPlane(float32 near)
+	FX_FORCE_INLINE void SetNearPlane(float32 near_plane)
 	{
 		RequireMatrixUpdate();
-		mZNearClip = near;
+		mZNearClip = near_plane;
 	}
 
-	FX_FORCE_INLINE void SetFarPlane(float32 far)
+	FX_FORCE_INLINE void SetFarPlane(float32 far_plane)
 	{
 		RequireMatrixUpdate();
-		mZFarClip = far;
+		mZFarClip = far_plane;
 	}
 
 	FX_FORCE_INLINE void MoveBy(const Vec3f& offset)
