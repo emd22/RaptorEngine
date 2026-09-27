@@ -16,10 +16,12 @@ struct VSInput
     /// xyz is the tangent, w the bitangent's handedness. See Vertex<> in Src/Renderer/Vertex.hpp.
     float4 vTangent : TANGENT;
     uint uiInstanceId : SV_InstanceID;
-#ifdef USE_SKINNING
+
+PERMIF(USE_SKINNING);
     uint4 vJointIndices : ATTR0;
     float4 vJointWeights : ATTR1;
-#endif
+PERMEND();
+
 };
 
 struct VSOutput
@@ -28,11 +30,11 @@ struct VSOutput
     float3 vNormalWS : NORMAL;
     float2 vUV       : TEXCOORD0;
 
-#ifdef USE_NORMAL_MAPS
+PERMIF(USE_NORMAL_MAPS);
     /// xyz is the world space tangent, w the bitangent's handedness. The bitangent is rebuilt in the pixel
     /// shader rather than interpolated.
     float4 vTangentWS : TANGENT;
-#endif
+PERMEND();
 
     float3 vPositionWS   : POSITION;
 
@@ -52,11 +54,9 @@ struct VSPushConsts
     uint uiBoneBase;
 };
 
-#ifdef USE_SKINNING
-
+PERMIF(USE_SKINNING);
 F_StructBuffer(bBones, BoneMtx, 3, 1);
-
-#endif // USE_SKINNING
+PERMEND();
 
 F_StructBuffer(bObjectBuffer, Object, 0, 0);
 
@@ -70,7 +70,7 @@ VSOutput main(VSInput input)
 
     float4x4 MVP = mul(world_matrix, VSConst.mViewProjection);
 
-#ifdef USE_SKINNING
+PERMIF(USE_SKINNING);
     const uint bone_base = VSConst.uiBoneBase;
 
     float4x4 skin_xform = input.vJointWeights.x * bBones[bone_base + input.vJointIndices.x]
@@ -83,22 +83,22 @@ VSOutput main(VSInput input)
 
     output.vPosition = mul(position_ms, MVP);
     output.vNormalWS = normalize(mul(mul(input.vNormal, (float3x3)skin_xform), (float3x3)world_matrix));
-#else
+PERMELSE();
     float4 position_ms = float4(input.vPosition, 1.0);
 
     output.vPosition = mul(position_ms, MVP);
     output.vNormalWS = normalize(mul(input.vNormal, (float3x3)world_matrix));
-#endif
+PERMEND();
 
-#ifdef USE_NORMAL_MAPS
-#ifdef USE_SKINNING
-    const float3 tangent_ws = mul(mul(input.vTangent.xyz, (float3x3)skin_xform), (float3x3)world_matrix);
-#else
-    const float3 tangent_ws = mul(input.vTangent.xyz, (float3x3)world_matrix);
-#endif
+PERMIF(USE_NORMAL_MAPS);
+	PERMIF(USE_SKINNING);
+	    const float3 tangent_ws = mul(mul(input.vTangent.xyz, (float3x3)skin_xform), (float3x3)world_matrix);
+	PERMELSE();
+	    const float3 tangent_ws = mul(input.vTangent.xyz, (float3x3)world_matrix);
+	PERMEND();
     // The handedness rides along untouched; the pixel shader rebuilds the bitangent from it
     output.vTangentWS = float4(normalize(tangent_ws), input.vTangent.w);
-#endif
+PERMEND();
 
     output.vUV = input.vUV;
 
@@ -127,11 +127,11 @@ struct FSInput
     float3 vNormalWS : NORMAL;
     float2 vUV : TEXCOORD0;
 
-#ifdef USE_NORMAL_MAPS
+PERMIF(USE_NORMAL_MAPS);
     /// xyz is the world space tangent, w the bitangent's handedness. The bitangent is rebuilt in the pixel
     /// shader rather than interpolated.
     float4 vTangentWS : TANGENT;
-#endif
+PERMEND();
 
 	float3 vPositionWS : POSITION;
 
@@ -148,10 +148,10 @@ F_StructBuffer(bMaterialBuffer, Material, 1, 0);
 // Object local textures
 F_Texture2D(tAlbedo, 0, 1)
 
-#ifdef USE_NORMAL_MAPS
+PERMIF(USE_NORMAL_MAPS);
 F_Texture2D(tNormalMap, 1, 1)
 F_Texture2D(tMetallicRoughness, 2, 1)
-#endif
+PERMEND();
 
 struct FSPushConsts
 {
@@ -190,7 +190,7 @@ FSOutput main(FSInput input)
         return output;
     }
 
-#ifdef USE_NORMAL_MAPS
+PERMIF(USE_NORMAL_MAPS);
     float3 normal_ts = F_Sample(tNormalMap, input.vUV).rgb * 2.0 - 1.0;
 
     // Re-orthonormalised the same way Forward.hlsl does it, so the prepass normals the SSAO pass reads match
@@ -203,9 +203,9 @@ FSOutput main(FSInput input)
     float3x3 TBN = float3x3(tangent, bitangent, vertex_normal);
 
     output.vNormal = float4(normalize(mul(normal_ts, TBN)), 0.0);
-#else
+PERMELSE()
     output.vNormal = float4(input.vNormalWS, 0.0);
-#endif
+PERMEND();
 
     return output;
 }

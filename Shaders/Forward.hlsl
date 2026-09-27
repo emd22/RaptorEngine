@@ -16,10 +16,11 @@ struct VSInput
     /// xyz is the tangent, w the bitangent's handedness. See Vertex<> in Src/Renderer/Vertex.hpp.
     float4 vTangent : TANGENT;
     uint uiInstanceId : SV_InstanceID;
-#ifdef USE_SKINNING
+
+PERMIF(USE_SKINNING);
     uint4 vJointIndices : ATTR0;
     float4 vJointWeights : ATTR1;
-#endif
+PERMEND()
 };
 
 struct VSOutput
@@ -28,11 +29,11 @@ struct VSOutput
     float3 vNormalWS : NORMAL;
     float2 vUV       : TEXCOORD0;
 
-#ifdef USE_NORMAL_MAPS
+PERMIF(USE_NORMAL_MAPS);
     /// xyz is the world space tangent, w the bitangent's handedness. The bitangent is rebuilt in the pixel shader
     /// instead of interpolated, which also costs one interpolator less.
     float4 vTangentWS : TANGENT;
-#endif
+PERMEND();
 
     /// Vertex position in world space
     float3 vPositionWS   : POSITION;
@@ -52,11 +53,9 @@ struct VSPushConsts
     uint uiBoneBase;
 };
 
-#ifdef USE_SKINNING
-
+PERMIF(USE_SKINNING);
 F_StructBuffer(bBones, BoneMtx, 3, 1);
-
-#endif // USE_SKINNING
+PERMEND();
 
 F_StructBuffer(bObjectBuffer, Object, 0, 0);
 
@@ -68,13 +67,9 @@ VSOutput main(VSInput input)
 
     float4x4 world_matrix = bObjectBuffer[VSConst.uiObjectIndex + input.uiInstanceId].mWorld;
 
-    // This pass is depth tested GREATER_OR_EQUAL against the DepthNormal prepass, so its clip position has to be
-    // bit identical to the one DepthNormal.hlsl computes. Matrix multiplication is associative in exact arithmetic
-    // but not in floating point: going via the world position instead of this concatenation shifts the depth by a
-    // few ULPs, and every triangle that lands on the wrong side of the test is dropped. Do not "optimize" this.
     float4x4 MVP = mul(world_matrix, VSConst.mViewProjection);
 
-#ifdef USE_SKINNING
+PERMIF(USE_SKINNING);
     const uint bone_base = VSConst.uiBoneBase;
 
     float4x4 skin_xform = input.vJointWeights.x * bBones[bone_base + input.vJointIndices.x]
@@ -87,22 +82,24 @@ VSOutput main(VSInput input)
 
     output.vPosition = mul(position_ms, MVP);
     output.vNormalWS = normalize(mul(mul(input.vNormal, (float3x3)skin_xform), (float3x3)world_matrix));
-#else
+PERMELSE();
     float4 position_ms = float4(input.vPosition, 1.0);
 
     output.vPosition = mul(position_ms, MVP);
     output.vNormalWS = normalize(mul(input.vNormal, (float3x3)world_matrix));
-#endif
+PERMEND();
 
-#ifdef USE_NORMAL_MAPS
-#ifdef USE_SKINNING
+PERMIF(USE_NORMAL_MAPS);
+
+PERMIF(USE_SKINNING);
     const float3 tangent_ws = mul(mul(input.vTangent.xyz, (float3x3)skin_xform), (float3x3)world_matrix);
-#else
+PERMELSE();
     const float3 tangent_ws = mul(input.vTangent.xyz, (float3x3)world_matrix);
-#endif
+PERMEND();
+
     // The handedness rides along untouched; the pixel shader rebuilds the bitangent from it
     output.vTangentWS = float4(normalize(tangent_ws), input.vTangent.w);
-#endif
+PERMEND();
 
     output.vUV = input.vUV;
 
@@ -134,10 +131,10 @@ struct FSInput
     float3 vNormalWS : NORMAL;
     float2 vUV : TEXCOORD0;
 
-#ifdef USE_NORMAL_MAPS
+PERMIF(USE_NORMAL_MAPS);
     /// xyz is the world space tangent, w the bitangent's handedness
     float4 vTangentWS : TANGENT;
-#endif
+PERMEND();
 
 	/// Vertex position in world space
 	float3 vPositionWS : POSITION;
@@ -182,10 +179,10 @@ F_Texture2D(tDecalNormalAtlas, 12, 0)
 
 F_Texture2D(tAlbedo, 0, 1)
 
-#ifdef USE_NORMAL_MAPS
+PERMIF(USE_NORMAL_MAPS);
 F_Texture2D(tNormalMap, 1, 1)
 F_Texture2D(tMetallicRoughness, 2, 1)
-#endif
+PERMEND();
 
 F_ShadowTexture2D(tShadowAtlas, 4, 0);
 F_Texture2D(tSSAO, 5, 0);
@@ -401,10 +398,11 @@ float3 GetSaturationColor(float value)
 }
 
 
-#ifdef USE_PREPASS_DEPTH
+PERMIF(USE_PREPASS_DEPTH);
 // Depth tested EQUAL against the prepass without writing or discarding, so hidden fragments are never shaded
 [earlydepthstencil]
-#endif
+PERMEND();
+
 FSOutput main(FSInput input)
 {
     FSOutput output;
@@ -414,11 +412,11 @@ FSOutput main(FSInput input)
         input.vNormalWS = -input.vNormalWS;
     }
 
-#ifndef USE_SKINNING
+PERMNOT(USE_SKINNING);
     // Taken before anything can discard, for the decals' texture gradients
     const float3 position_ddx = ddx(input.vPositionWS);
     const float3 position_ddy = ddy(input.vPositionWS);
-#endif
+PERMEND();
 
     Material material = bMaterialBuffer[input.uiMaterialIndex];
 
@@ -428,12 +426,12 @@ FSOutput main(FSInput input)
 
     float base_alpha = saturate(tex_alpha * material.fAlpha);
 
-#ifndef USE_PREPASS_DEPTH
-    // With the prepass, its discard leaves the depth of whatever is behind, which fails the EQUAL test here
+PERMNOT(USE_PREPASS_DEPTH);
+	// With the prepass, its discard leaves the depth of whatever is behind, which fails the EQUAL test here
     if (base_alpha < ALPHA_CUTOFF) {
         discard;
     }
-#endif
+PERMEND();
 
     output.vAlbedo = float4(albedo, base_alpha);
 
@@ -442,7 +440,7 @@ FSOutput main(FSInput input)
 	    return output;
     }
 
-#ifdef USE_NORMAL_MAPS
+PERMIF(USE_NORMAL_MAPS);
     float4 surface_sample = F_Sample(tMetallicRoughness, input.vUV);
     float3 normal_ts = F_Sample(tNormalMap, input.vUV).rgb * 2.0 - 1.0;
 
@@ -454,12 +452,12 @@ FSOutput main(FSInput input)
     float3x3 TBN = float3x3(tangent, bitangent, vertex_normal);
 
     float3 N_final = normalize(mul(normal_ts, TBN));
-#else
+PERMELSE();
 	// No surface texture in this pipeline; the material factors alone describe the surface.
 	float4 surface_sample = float4(1.0, 1.0, 1.0, 1.0);
 
     float3 N_final = normalize(input.vNormalWS);
-#endif
+PERMEND();
 
 	SurfaceParams surface = GetSurfaceParams(material, albedo, surface_sample);
 
@@ -472,14 +470,14 @@ FSOutput main(FSInput input)
 
 	TileLightData tile_data = bLightGrid[tile_index];
 
-#ifndef USE_SKINNING
+PERMNOT(USE_SKINNING);
 	// Decals stay where they are in the world, so skinned meshes would slide through them
 	if (!HAS_FLAG(FSConst.Flags, DRAW_FLAG_NO_DECALS | DRAW_FLAG_PROBE_CAPTURE)) {
 		// ApplyDecals() leaves the shading normal normalized, so N_final stays unit length through this
 		ApplyDecals(surface, N_final, tile_data, tile_index, input.vPositionWS, normalize(input.vNormalWS),
 					position_ddx, position_ddy);
 	}
-#endif
+PERMEND();
 
 	const float roughness = surface.fRoughness;
 
@@ -500,10 +498,10 @@ FSOutput main(FSInput input)
 	// Probe capture bakes have no matching SSAO data.
 	float ssao = HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE) ? 1.0 : F_Sample(tSSAO, ssao_coords).r;
 
-#ifdef DEBUG_LIGHT_HEATMAP
+PERMIF(DEBUG_LIGHT_HEATMAP);
 	output.vAlbedo = float4(GetSaturationColor((float)tile_data.Count), 1.0);
 	return output;
-#endif
+PERMEND();
 
 	for (uint tile_light = 0; tile_light < tile_data.Count; tile_light++) {
 		Light light = Lights[bLightIndexList[tile_data.StartIndex + tile_light]];
