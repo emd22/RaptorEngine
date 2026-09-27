@@ -606,6 +606,13 @@ void TiledForwardRenderer::DoLightCullingPass(Camera& camera, const Vec2u* pExte
 	const bool is_main_view = (pExtentOverride == nullptr && pLightOverride == nullptr);
 	push_constants.DecalCount = is_main_view ? gDecalManager->GetVisibleCount() : 0;
 
+	// Probe captures cull into the same pages that the main view, and the face before, were just shaded from
+	if (!is_main_view) {
+		BarrierHelper::BufferFragmentToCompute(cmd, &gGraphics->LightGridBuffer);
+		BarrierHelper::BufferFragmentToCompute(cmd, &gGraphics->LightIndexListBuffer);
+		BarrierHelper::BufferFragmentToCompute(cmd, &gGraphics->DecalMaskBuffer);
+	}
+
 	// In binding order
 	gPipelineCache->AddBufferOffset(0, gGraphics->GetLightGridFrameOffset());
 	gPipelineCache->AddBufferOffset(0, gGraphics->GetLightIndexListFrameOffset());
