@@ -44,6 +44,8 @@ public:
 
 	void SetRadius(const float radius);
 
+	FX_FORCE_INLINE float32 GetRadius() const { return mRadius; }
+
 	virtual void Render(const PerspectiveCamera& camera, Camera* shadow_camera);
 
 	virtual ~LightBase() {}
@@ -127,8 +129,6 @@ public:
 	void SetDirection(const Vec3f& direction);
 
 	Vec3f GetDirection() const;
-
-	FX_FORCE_INLINE float32 GetRadius() const { return mRadius; }
 
 	Mat4f CalculateShadowMatrix() const;
 

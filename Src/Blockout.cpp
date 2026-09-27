@@ -3,6 +3,7 @@
 #include <Asset/AssetManager.hpp>
 #include <Asset/ConfigFile.hpp>
 #include <Asset/MeshGen.hpp>
+#include <CVar.hpp>
 #include <Core/RefUtil.hpp>
 #include <Editor/RaptorEditor.hpp>
 #include <Engine.hpp>
@@ -11,6 +12,7 @@
 #include <Math/SIMDHelper.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
+#include <Renderer/LightManager.hpp>
 #include <Renderer/PipelineNames.hpp>
 #include <World.hpp>
 
@@ -1011,6 +1013,169 @@ Object* Blockout::RestoreObject(const Vec3f& position, const Brush::PlaneList& p
 	return object;
 }
 
+/// Values of the CLight constants in Config/Internal/Constants.conf
+enum class ePrxLightType : int64
+{
+	Point = 0,
+	Spot = 1,
+};
+
+static void WriteColorEntry(ConfigEntry& parent, const char* name, const Color& color)
+{
+	ConfigEntry color_array = ConfigEntry::Array(name, ConfigPrimitive::ePrimitiveType::Int);
+
+	color_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(color.R)));
+	color_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(color.G)));
+	color_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(color.B)));
+	color_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(color.A)));
+
+	parent.AddMember(std::move(color_array));
+}
+
+void Blockout::AddOrUpdateLightFromEntry(const ConfigEntry& light_entry)
+{
+	const int64 type_value = light_entry.GetMemberValue<int64>(HashStr32("type"),
+															   static_cast<int64>(ePrxLightType::Point));
+
+	eLightType light_type;
+
+	switch (static_cast<ePrxLightType>(type_value)) {
+	case ePrxLightType::Point:
+		light_type = eLightType::Point;
+		break;
+	case ePrxLightType::Spot:
+		light_type = eLightType::Spot;
+		break;
+	default:
+		LogError(LC_ASSET, "Light '{}' has unknown type {}", light_entry.Name.Get(), type_value);
+		return;
+	}
+
+	// Lights are matched by name so a hot reload updates them in place
+	Ref<LightBase> light = gLightManager->FindLight(light_entry.Name.GetHash());
+
+	if (light.IsValid() && light->Type != light_type) {
+		LogWarning(LC_ASSET, "Light '{}' changed type, restart to apply", light_entry.Name.Get());
+		return;
+	}
+
+	if (!light.IsValid()) {
+		if (light_type == eLightType::Spot) {
+			light = gLightManager->NewLight<LightSpot>(light_entry.Name.Get());
+		}
+		else {
+			light = gLightManager->NewLight<LightPoint>(light_entry.Name.Get());
+		}
+	}
+
+	light->SetPosition(light_entry.GetMemberValue(HashStr32("pos"), light->GetPosition()));
+	light->Color = light_entry.GetMemberValue(HashStr32("color"), Color::FromRGBA(255, 255, 255, 8));
+	light->SetRadius(light_entry.GetMemberValue<float32>(HashStr32("radius"), 5.0f));
+
+	if (light_type == eLightType::Spot) {
+		Ref<LightSpot> spot(light);
+
+		ConfigEntry* direction = light_entry.GetMember(HashStr32("dir"));
+		if (direction != nullptr) {
+			spot->SetDirection(direction->GetValue<Vec3f>());
+		}
+		else {
+			spot->SetRotation(light_entry.GetMemberValue(HashStr32("rot"), spot->mRotation));
+		}
+
+		// Cone half-angles, in degrees
+		const float32 inner_angle = light_entry.GetMemberValue<float32>(HashStr32("inner"), 20.0f);
+		const float32 outer_angle = light_entry.GetMemberValue<float32>(HashStr32("outer"), 30.0f);
+
+		spot->SetConeAngles(MathUtil::DegreesToRadians(inner_angle), MathUtil::DegreesToRadians(outer_angle));
+
+		// Spot lights bake a shadow map into the shadow atlas unless `shadows = $False`
+		spot->bCastShadows = (light_entry.GetMemberValue<int64>(HashStr32("shadows"), 1) != 0);
+	}
+}
+
+void Blockout::LoadLights(ConfigFile& info)
+{
+	// Load sun
+	Ref<LightDirectional> sun = gLightManager->GetDirectionalLight();
+	if (!sun.IsValid()) {
+		sun = gLightManager->NewLight<LightDirectional>("Sun");
+	}
+
+	ConfigEntry* sun_entry = info.GetEntry(HashStr32("sun"));
+
+	const bool sun_enabled = (sun_entry != nullptr) && (sun_entry->GetMemberValue<int64>(HashStr32("enabled"), 1) != 0);
+
+	sun->bEnabled = sun_enabled;
+	gCVars->Set("b_sun_enabled", sun_enabled);
+
+	if (sun_entry) {
+		sun->SetPosition(sun_entry->GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero));
+
+		sun->Color = sun_entry->GetMemberValue<Color>(HashStr32("color"), Color::FromRGBA(100, 100, 100, 4));
+		sun->AmbientColor = sun_entry->GetMemberValue<Color>(HashStr32("ambient"), Color::FromRGBA(100, 100, 100, 1));
+	}
+
+	// Load point and spot lights
+
+	ConfigEntry* light_list = info.GetEntry(HashStr32("lights"));
+	if (light_list) {
+		for (const ConfigEntry& light_entry : light_list->Members) {
+			AddOrUpdateLightFromEntry(light_entry);
+		}
+	}
+}
+
+void Blockout::SaveLights(ConfigFile& info)
+{
+	Ref<LightDirectional> sun = gLightManager->GetDirectionalLight();
+
+	if (sun.IsValid()) {
+		ConfigEntry* sun_entry = info.AddEntry("sun");
+
+		sun_entry->AddMember(ConfigEntry::Literal("enabled", static_cast<int64>(sun->bEnabled ? 1 : 0)));
+		sun_entry->AddMember(ConfigEntry::Literal("pos", sun->GetPosition()));
+
+		WriteColorEntry(*sun_entry, "color", sun->Color);
+		WriteColorEntry(*sun_entry, "ambient", sun->AmbientColor);
+	}
+
+	ConfigEntry* lights_entry = info.AddEntry("lights");
+
+	for (const Ref<LightBase>& light : gLightManager->GetCache()) {
+		if (light->Type != eLightType::Point && light->Type != eLightType::Spot) {
+			continue;
+		}
+
+		ConfigEntry light_entry = ConfigEntry::Struct(light->Name.Get());
+
+		light_entry.AddMember(
+			ConfigEntry::DotReference("type", light->Type == eLightType::Spot ? "$CLight.Spot" : "$CLight.Point"));
+
+		light_entry.AddMember(ConfigEntry::Literal("pos", light->GetPosition()));
+		WriteColorEntry(light_entry, "color", light->Color);
+		light_entry.AddMember(ConfigEntry::Literal("radius", light->GetRadius()));
+
+		if (light->Type == eLightType::Spot) {
+			Ref<LightSpot> spot(light);
+
+			const Vec3f direction = spot->GetDirection();
+
+			ConfigEntry direction_array = ConfigEntry::Array("dir", ConfigPrimitive::ePrimitiveType::Float);
+			direction_array.AppendValue(ConfigPrimitive::FromValue(direction.X));
+			direction_array.AppendValue(ConfigPrimitive::FromValue(direction.Y));
+			direction_array.AppendValue(ConfigPrimitive::FromValue(direction.Z));
+			light_entry.AddMember(std::move(direction_array));
+
+			light_entry.AddMember(ConfigEntry::Literal("inner", MathUtil::RadiansToDegrees(spot->GetInnerAngle())));
+			light_entry.AddMember(ConfigEntry::Literal("outer", MathUtil::RadiansToDegrees(spot->GetOuterAngle())));
+			light_entry.AddMember(ConfigEntry::Literal("shadows", static_cast<int64>(spot->bCastShadows ? 1 : 0)));
+		}
+
+		lights_entry->AddMember(std::move(light_entry));
+	}
+}
+
 void Blockout::Load(const String& path)
 {
 	ConfigFile info {};
@@ -1024,6 +1189,8 @@ void Blockout::Load(const String& path)
 	// Everything is getting reloaded, so the editor can't hold on to any objects
 	gEditor->ForgetObjects();
 #endif
+
+	LoadLights(info);
 
 	ConfigEntry* blocks_entry = info.GetEntry(HashStr32("all"));
 
@@ -1043,6 +1210,8 @@ void Blockout::Load(const String& path)
 void Blockout::Save(const String& path)
 {
 	ConfigFile info {};
+
+	SaveLights(info);
 
 	ConfigEntry* all_entry = info.AddEntry("all");
 

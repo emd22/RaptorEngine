@@ -20,6 +20,7 @@
 
 namespace fx {
 class World;
+class ConfigFile;
 class ConfigEntry;
 class Object;
 
@@ -163,6 +164,13 @@ public:
 
 private:
 	ObjectID CreateBrushObject(ConfigEntry& entry);
+
+	/**
+	 * @brief Loads the sun and the point/spot lights from the blockout's `sun`/`lights` entries
+	 */
+	void LoadLights(ConfigFile& info);
+	void SaveLights(ConfigFile& info);
+	void AddOrUpdateLightFromEntry(const ConfigEntry& light_entry);
 
 	/**
 	 * @brief Reads a blockout's brush from either a box (`scale`) or a list of planes (`planes`, with optional face
