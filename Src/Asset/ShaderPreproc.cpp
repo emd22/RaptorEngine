@@ -70,6 +70,10 @@ static constexpr const char* scStrings[] = {
 constexpr const char* FStr(eStringId id) { return scStrings[static_cast<uint32>(id)]; }
 constexpr Hash32 FHash(eStringId id) { return HashStr32(FStr(id)); }
 
+static const char* scPermIfDefinedName = "PERMIF";
+static const char* scPermIfNotDefinedName = "PERMNOT";
+static const char* scPermElseName = "PERMELSE";
+static const char* scPermEndIfName = "PERMEND";
 
 struct State
 {
@@ -92,11 +96,12 @@ public:
 
 	void NextChar()
 	{
-		++Index;
-
+		// The line number is that of the character at Index, so it moves on when a newline is left behind.
 		if (Get() == '\n') {
 			++CurrentLine;
 		}
+
+		++Index;
 	}
 
 	void Skip(uint32 skip)
@@ -119,6 +124,20 @@ public:
 	 */
 	bool TryReadString(const char* s)
 	{
+		if (!MatchesString(s)) {
+			return false;
+		}
+
+		Skip(static_cast<uint32>(std::strlen(s)));
+
+		return true;
+	}
+
+	/**
+	 * @brief Checks if the string `s` is at the current position, without consuming anything.
+	 */
+	bool MatchesString(const char* s) const
+	{
 		uint32 offset = 0;
 		char ch;
 
@@ -130,16 +149,18 @@ public:
 			++offset;
 		}
 
-		Skip(offset);
-
 		return true;
 	}
+
+	/// The character before the current position, or 0 at the start of the file.
+	char GetPrevious() const { return (Index > 0 && Index <= FileData.Size) ? FileData.pData[Index - 1] : 0; }
 
 public:
 	Slice<char> FileData;
 	uint32 Index = 0;
 
-	uint32 CurrentLine = 0;
+	/// One based, as `#line` expects it.
+	uint32 CurrentLine = 1;
 };
 
 enum class eParseResult
@@ -191,8 +212,7 @@ static bool ParsePPFuncCall(State& state, Result& result);
 /////////////////////////////////////
 
 
-static bool ParseIfdef(State& state, Result& result, const SizedArray<ShaderMacro>& macros,
-					   bool ifdef_directive_is_eaten, bool force_is_not_defined);
+static void ParsePermutation(State& state, Result& result, const SizedArray<ShaderMacro>& macros, bool is_negated);
 
 static void ParseProgramDefinition(const std::vector<Slice<char>>& params, State& state, Result& result)
 {
@@ -353,75 +373,177 @@ static void WriteCurrentCharToProgram(State& state, Result& result)
 	result.GetBuffer().Insert(ch);
 }
 
+static bool IsIdentifierChar(char ch) { return std::isalnum(static_cast<unsigned char>(ch)) || ch == '_'; }
 
-static void WriteUntilHash(State& state, Result& result)
+enum class eDirective
 {
-	while (state.Get() != '#') {
+	None,
+	If,
+	IfNot,
+	Else,
+	EndIf,
+};
+
+struct DirectiveEntry
+{
+	const char* pName;
+	eDirective Directive;
+};
+
+static const DirectiveEntry scDirectives[] = {
+	{ scPermIfDefinedName, eDirective::If },
+	{ scPermIfNotDefinedName, eDirective::IfNot },
+	{ scPermElseName, eDirective::Else },
+	{ scPermEndIfName, eDirective::EndIf },
+};
+
+/**
+ * @brief Checks if there is a permutation directive at the current position. Nothing is consumed. The directive has to
+ * be a whole identifier, so a name that only contains it (e.g. `MYPERMEND`) is not counted
+ */
+static eDirective PeekDirective(const State& state)
+{
+	if (IsIdentifierChar(state.GetPrevious())) {
+		return eDirective::None;
+	}
+
+	for (const DirectiveEntry& entry : scDirectives) {
+		if (state.MatchesString(entry.pName) &&
+			!IsIdentifierChar(state.Get(static_cast<uint32>(std::strlen(entry.pName))))) {
+			return entry.Directive;
+		}
+	}
+
+	return eDirective::None;
+}
+
+static const char* GetDirectiveName(eDirective directive)
+{
+	for (const DirectiveEntry& entry : scDirectives) {
+		if (entry.Directive == directive) {
+			return entry.pName;
+		}
+	}
+
+	return "";
+}
+
+static void SkipDirectiveName(State& state, eDirective directive)
+{
+	state.Skip(static_cast<uint32>(std::strlen(GetDirectiveName(directive))));
+}
+
+static void SkipHorizontalWhitespace(State& state)
+{
+	while (state.Get() == ' ' || state.Get() == '\t') {
+		state.NextChar();
+	}
+}
+
+/**
+ * @brief Eats what trails a directive name: an optional `()`, an optional `;` and the rest of the line if there is
+ * nothing else on it. Code that follows on the same line is left alone.
+ */
+static void SkipDirectiveTail(State& state)
+{
+	SkipHorizontalWhitespace(state);
+
+	if (state.Get() == '(') {
+		state.NextChar();
+		SkipHorizontalWhitespace(state);
+		state.NextIfEqual(')');
+	}
+
+	state.NextIfEqual(';');
+
+	SkipHorizontalWhitespace(state);
+	state.NextIfEqual('\r');
+	state.NextIfEqual('\n');
+}
+
+static void SkipLineComment(State& state)
+{
+	// Leave the newline itself for the caller.
+	while (state.Get() && state.Get() != '\n') {
+		state.NextChar();
+	}
+}
+
+static bool AtLineComment(const State& state) { return state.Get() == '/' && state.Get(1) == '/'; }
+
+/**
+ * @brief Write out characters as data until a directive is hit, without consuming the directive. Comments are dropped,
+ * and are never searched for directives.
+ */
+static void WriteUntilDirective(State& state, Result& result)
+{
+	while (state.Get()) {
+		if (PeekDirective(state) != eDirective::None) {
+			break;
+		}
+
+		if (AtLineComment(state)) {
+			SkipLineComment(state);
+			continue;
+		}
+
 		if (ParsePPFuncCall(state, result)) {
 			continue;
 		}
 
-		// Continue saving each character until the condition is closed
 		WriteCurrentCharToProgram(state, result);
 		state.NextChar();
 	}
-};
-
-
-static void SkipUntilHash(State& state)
-{
-	while (state.Get() != '#') {
-		// Continue saving each character until the condition is closed
-		state.NextChar();
-	}
-};
-
-static void SkipUntilEndif(State& state)
-{
-	int32 scope_index = 1;
-
-	while (scope_index > 0) {
-		if (state.TryReadString("#endif")) {
-			--scope_index;
-			continue;
-		}
-		else if (state.TryReadString("#ifdef")) {
-			++scope_index;
-			continue;
-		}
-		else {
-			// Skip the hash character to be able to jump to the next one
-			state.NextChar();
-		}
-
-		SkipUntilHash(state);
-	}
 }
 
-static bool SkipUntilElse(State& state)
+/**
+ * @brief Skips the part of a conditional that is not included in the final shader, tracking nested conditionals.
+ * Stops after the matching PERMEND (and its tail), or after the matching PERMELSE if `stop_at_else` is set.
+ *
+ * @returns true if it stopped at a PERMELSE, false if it stopped at the PERMEND (or the end of the file).
+ */
+static bool SkipConditional(State& state, bool stop_at_else)
 {
-	int32 scope_index = 1;
+	int32 depth = 1;
 
-	while (scope_index > 0) {
-		if (state.TryReadString("#endif")) {
-			--scope_index;
+	while (state.Get()) {
+		if (AtLineComment(state)) {
+			SkipLineComment(state);
 			continue;
 		}
-		else if (state.TryReadString("#ifdef")) {
-			++scope_index;
+
+		const eDirective directive = PeekDirective(state);
+
+		switch (directive) {
+		case eDirective::If:
+		case eDirective::IfNot:
+			SkipDirectiveName(state, directive);
+			++depth;
 			continue;
-		}
-		else if (state.TryReadString("#else") && scope_index <= 1) {
-			return true;
-		}
-		else {
-			// Skip the hash character to be able to jump to the next one
-			state.NextChar();
+		case eDirective::Else:
+			SkipDirectiveName(state, directive);
+
+			if (depth == 1 && stop_at_else) {
+				SkipDirectiveTail(state);
+				return true;
+			}
+			continue;
+		case eDirective::EndIf:
+			SkipDirectiveName(state, directive);
+
+			if (--depth == 0) {
+				SkipDirectiveTail(state);
+				return false;
+			}
+			continue;
+		case eDirective::None:
+			break;
 		}
 
-		SkipUntilHash(state);
+		state.NextChar();
 	}
 
+	LogError(LC_SHADER, "Preproc: Reached the end of the file without a matching {}", scPermEndIfName);
 	return false;
 }
 
@@ -430,163 +552,135 @@ static void EmitLineMarker(State& state, Result& result)
 	result.InsertString(std::format("#line {}\n", state.CurrentLine));
 }
 
-
-static void DoIfSection(State& state, Result& result, const SizedArray<ShaderMacro>& macros)
+/**
+ * @brief Writes out the active part of a conditional, resolving nested conditionals on the way. Runs until the
+ * matching PERMEND has been consumed.
+ *
+ * `in_true_branch` is whether we are in the branch that was chosen because its condition held. A PERMELSE there means
+ * the else branch is skipped, while a PERMELSE in the else branch itself is a mistake.
+ */
+static void WriteConditional(State& state, Result& result, const SizedArray<ShaderMacro>& macros, bool in_true_branch)
 {
 	while (true) {
 		EmitLineMarker(state, result);
 
-		// Write until the next hash character is encountered.
-		WriteUntilHash(state, result);
+		WriteUntilDirective(state, result);
 
-		// If it is an ifdef, parse it. This also eats the else's and endifs for that ifdef block.
-		if (state.TryReadString("#ifdef")) {
-			ParseIfdef(state, result, macros, true, false);
+		const eDirective directive = PeekDirective(state);
 
-			// Continue back to writing after encountering the nested ifdef.
+		switch (directive) {
+		case eDirective::If:
+		case eDirective::IfNot:
+			SkipDirectiveName(state, directive);
+			ParsePermutation(state, result, macros, directive == eDirective::IfNot);
 			continue;
-		}
-		else if (state.TryReadString("#ifndef")) {
-			ParseIfdef(state, result, macros, true, true);
+		case eDirective::Else:
+			SkipDirectiveName(state, directive);
 
-			// Continue back to writing after encountering the nested ifdef.
-			continue;
-		}
+			if (!in_true_branch) {
+				LogError(LC_SHADER, "Preproc: Multiple {} in the same conditional", scPermElseName);
+			}
 
-		// We encountered an else block. Since this condition is true, skip all data inside of the else directive.
-		if (state.TryReadString("#else")) {
-			SkipUntilEndif(state);
-			break;
-		}
-
-
-		// There are no else directives or nested blocks, just a direct endif. End the loop.
-		if (state.TryReadString("#endif")) {
-			break;
+			// This branch is the one being kept, so the rest of the conditional is dead.
+			SkipConditional(state, false);
+			return;
+		case eDirective::EndIf:
+			SkipDirectiveName(state, directive);
+			SkipDirectiveTail(state);
+			return;
+		case eDirective::None:
+			LogError(LC_SHADER, "Preproc: Reached the end of the file without a matching {}", scPermEndIfName);
+			return;
 		}
 	}
 }
 
-static void DoElseSection(State& state, Result& result, const SizedArray<ShaderMacro>& macros)
-{
-	bool found_else = SkipUntilElse(state);
-
-	while (found_else) {
-		EmitLineMarker(state, result);
-
-		// Write until the next hash character is encountered.
-		WriteUntilHash(state, result);
-
-		// If it is an ifdef, parse it. This also eats the else's and endifs for that ifdef block.
-		if (state.TryReadString("#ifdef")) {
-			ParseIfdef(state, result, macros, true, false);
-
-			// Continue back to writing after encountering the nested ifdef.
-			continue;
-		}
-		else if (state.TryReadString("#ifndef")) {
-			ParseIfdef(state, result, macros, true, true);
-
-			// Continue back to writing after encountering the nested ifndef.
-			continue;
-		}
-
-		if (state.TryReadString("#endif")) {
-			break;
-		}
-	}
-}
-
-static bool ParseIfdef(State& state, Result& result, const SizedArray<ShaderMacro>& macros,
-					   bool ifdef_directive_is_eaten, bool force_is_not_defined)
+/**
+ * @brief Parses `(MACRO);` after a PERMIF/PERMNOT, then keeps the branch that applies and drops the other one.
+ * The directive name itself has to be consumed already.
+ */
+static void ParsePermutation(State& state, Result& result, const SizedArray<ShaderMacro>& macros, bool is_negated)
 {
 	static constexpr uint32 scBufferSize = 256;
 	char read_macro[scBufferSize];
 	uint32 read_index = 0;
 
-	const char* directive = "#ifdef";
+	SkipHorizontalWhitespace(state);
 
+	if (state.Get() != '(') {
+		LogError(LC_SHADER, "Preproc: Missing '(' on permutation call");
+		return;
+	}
 
-	bool directive_found = false;
+	state.NextChar();
 
-	if (!ifdef_directive_is_eaten) {
-		directive_found = state.TryReadString("#ifdef");
+	while (state.Get() && state.Get() != ')' && state.Get() != '\n') {
+		const char ch = state.Get();
+		state.NextChar();
 
-		if (!directive_found && (state.TryReadString("#ifndef"))) {
-			directive_found = true;
-			force_is_not_defined = true;
+		if (ch == '\r') {
+			continue;
+		}
+
+		if (read_index >= scBufferSize - 1) {
+			LogError(LC_SHADER, "Preproc: Variable index is larger than the allocated buffer size");
+
+			// It will cause more issues to break than to just reset the index
+			read_index = 0;
+		}
+
+		read_macro[read_index++] = ch;
+	}
+
+	if (state.Get() != ')') {
+		LogError(LC_SHADER, "Preproc: Missing ')' on permutation call");
+		return;
+	}
+
+	// Eat the ')', the optional ';' and the rest of the line
+	state.NextChar();
+	state.NextIfEqual(';');
+	SkipHorizontalWhitespace(state);
+	state.NextIfEqual('\r');
+	state.NextIfEqual('\n');
+
+	read_macro[read_index] = 0;
+
+	// Whitespace around the name is not part of it
+	const char* name = read_macro;
+	while (isspace(static_cast<unsigned char>(*name))) {
+		++name;
+	}
+
+	uint32 name_length = static_cast<uint32>(std::strlen(name));
+	while (name_length > 0 && isspace(static_cast<unsigned char>(name[name_length - 1]))) {
+		--name_length;
+	}
+
+	bool condition_is_true = false;
+
+	for (const ShaderMacro& macro : macros) {
+		// Compared in full, not over the length of one of them: a prefix match would let `PERMIF(USE_NORMAL)` be
+		// answered by a defined `USE_NORMAL_MAPS`.
+		if (macro.pcName != nullptr && std::strlen(macro.pcName) == name_length &&
+			std::strncmp(macro.pcName, name, name_length) == 0) {
+			condition_is_true = true;
+			break;
 		}
 	}
 
-
-	if (ifdef_directive_is_eaten || directive_found) {
-		// Skip whitespace
-		while (isspace(state.Get())) {
-			state.NextChar();
-		}
-
-		read_index = 0;
-
-		while (state.Get() != '\n') {
-			char ch = state.Get();
-
-			if (ch == '\r') {
-				state.NextChar();
-				continue;
-			}
-
-			if (read_index >= scBufferSize) {
-				LogError(LC_SHADER, "Preproc: Variable index is larger than the allocated buffer size");
-
-				// It will cause more issues to break than to just reset the index
-				read_index = 0;
-			}
-
-			read_macro[read_index++] = ch;
-			state.NextChar();
-		}
-
-		state.NextIfEqual('\r');
-		state.NextIfEqual('\n');
-
-		// Trailing whitespace is not part of the name
-		while (read_index > 0 && isspace(read_macro[read_index - 1])) {
-			--read_index;
-		}
-
-		read_macro[read_index] = 0;
-
-		bool condition_is_true = false;
-
-		for (const ShaderMacro& macro : macros) {
-			// Compared in full, not over read_index characters: a prefix match would let `#ifdef USE_NORMAL` be
-			// answered by a defined `USE_NORMAL_MAPS`.
-			if (macro.pcName != nullptr && std::strcmp(macro.pcName, read_macro) == 0) {
-				condition_is_true = true;
-				break;
-			}
-		}
-
-		// Flip the condition if we are checking if a macro is _not_ defined
-		if (force_is_not_defined) {
-			condition_is_true = !condition_is_true;
-		}
-
-		if (condition_is_true) {
-			DoIfSection(state, result, macros);
-		}
-		else {
-			DoElseSection(state, result, macros);
-		}
-
-		// Hit endif, finish
-		state.NextIfEqual('\r');
-		state.NextIfEqual('\n');
-
-		return true;
+	// Flip the condition if we are checking if a macro is _not_ defined
+	if (is_negated) {
+		condition_is_true = !condition_is_true;
 	}
 
-	return false;
+	if (condition_is_true) {
+		WriteConditional(state, result, macros, true);
+	}
+	else if (SkipConditional(state, true)) {
+		// Found an else, that branch is the one that applies.
+		WriteConditional(state, result, macros, false);
+	}
 }
 
 static bool ParsePPFuncCall(State& state, Result& result)
@@ -649,10 +743,15 @@ static bool ParsePPFuncCall(State& state, Result& result)
 		// After parsing the preprocessor function, emit the call as text if the function is marked to.
 		uint32 final_index = state.Index;
 		if (do_not_eat) {
+			// The replay walks over lines that were already counted while parsing the call.
+			const uint32 final_line = state.CurrentLine;
+
 			for (state.Index = origin_index; state.Index < final_index;) {
 				WriteCurrentCharToProgram(state, result);
 				state.NextChar();
 			}
+
+			state.CurrentLine = final_line;
 		}
 
 		func->Func(param_list, state, result);
@@ -663,17 +762,13 @@ static bool ParsePPFuncCall(State& state, Result& result)
 }
 
 
-/// Writes `#define NAME VALUE` for every macro that carries a value ahead of each program's source.
-///
-/// ParseIfdef() answers `#ifdef`/`#ifndef` from `macros` directly and emits nothing, and DXC is invoked without any
-/// -D arguments, so this is the only thing that makes a macro's *value* visible to the compiler. The defines land
-/// before the shader's own #includes, which lets a header guard its default with `#ifndef` and be overridden.
 static void PrependMacroDefines(Result& result, const SizedArray<ShaderMacro>& macros)
 {
+	// TODO: replace this with just passing in the macros to DXC. Why am I not doing that right now? This is dumb!
 	std::string defines;
 
 	for (const ShaderMacro& macro : macros) {
-		// A macro with no value is a plain switch, and ParseIfdef() has already resolved it
+		// A macro with no value is a plain switch, and ParsePermutation() has already resolved it
 		if (macro.pcName == nullptr || macro.pcValue == nullptr) {
 			continue;
 		}
@@ -717,24 +812,25 @@ Result Process(const Slice<char>& data, const SizedArray<ShaderMacro>& macros)
 	State state(data);
 
 	while (state.Index < data.Size) {
-		// If there is a comment, skip until the end
-		if (state.Get() == '/' && state.Get(1) == '/') {
-			char ch;
-			while ((ch = state.Get()) && ch != '\n') {
-				state.NextChar();
-			}
-		}
+		WriteUntilDirective(state, result);
 
-		if (ParsePPFuncCall(state, result)) {
-			continue;
-		}
+		const eDirective directive = PeekDirective(state);
 
-		if (state.Get() == '#' && ParseIfdef(state, result, macros, false, false)) {
-			continue;
+		switch (directive) {
+		case eDirective::If:
+		case eDirective::IfNot:
+			SkipDirectiveName(state, directive);
+			ParsePermutation(state, result, macros, directive == eDirective::IfNot);
+			break;
+		case eDirective::Else:
+		case eDirective::EndIf:
+			LogError(LC_SHADER, "Preproc: {} without a matching {}", GetDirectiveName(directive), scPermIfDefinedName);
+			SkipDirectiveName(state, directive);
+			SkipDirectiveTail(state);
+			break;
+		case eDirective::None:
+			break;
 		}
-
-		WriteCurrentCharToProgram(state, result);
-		state.NextChar();
 	}
 
 	PrependMacroDefines(result, macros);
