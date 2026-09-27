@@ -31,7 +31,8 @@ void Blockout::Create(World* world)
 		Material* test_material = gMaterialManager->GetMaterial(mWhiteMaterialID);
 
 		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
-													   "Data/Demo/Textures/gray_check.png", eImageCreateFlags::None);
+													   "RaptorData/Data/Demo/Textures/gray_check.png",
+													   eImageCreateFlags::None);
 
 		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
 
@@ -44,7 +45,8 @@ void Blockout::Create(World* world)
 		Material* test_material = gMaterialManager->GetMaterial(mOrangeMaterialID);
 
 		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
-													   "Data/Demo/Textures/orange_check.png", eImageCreateFlags::None);
+													   "RaptorData/Data/Demo/Textures/orange_check.png",
+													   eImageCreateFlags::None);
 
 		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
 
@@ -57,7 +59,8 @@ void Blockout::Create(World* world)
 		Material* test_material = gMaterialManager->GetMaterial(mBlueMaterialID);
 
 		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
-													   "Data/Demo/Textures/aqua_check.png", eImageCreateFlags::None);
+													   "RaptorData/Data/Demo/Textures/aqua_check.png",
+													   eImageCreateFlags::None);
 
 		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
 		test_material->Finalize();
@@ -68,17 +71,17 @@ void Blockout::Create(World* world)
 		mProtoTileID = gMaterialManager->NewMaterial("ProtoTile", false);
 		Material* test_material = gMaterialManager->GetMaterial(mProtoTileID);
 
-		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
-													   "Data/Demo/Textures/blue_tile/BlueTiles01_1K_BaseColor.png",
-													   eImageCreateFlags::None);
+		AssetTicket diffuse = gAssetManager->LoadImage(
+			eImageType::Flat, eImageFormat::RGBA8_UNorm,
+			"RaptorData/Data/Demo/Textures/blue_tile/BlueTiles01_1K_BaseColor.png", eImageCreateFlags::None);
 
-		AssetTicket normal = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
-													  "Data/Demo/Textures/blue_tile/BlueTiles01_1K_Normal.png",
-													  eImageCreateFlags::None);
+		AssetTicket normal = gAssetManager->LoadImage(
+			eImageType::Flat, eImageFormat::RGBA8_UNorm,
+			"RaptorData/Data/Demo/Textures/blue_tile/BlueTiles01_1K_Normal.png", eImageCreateFlags::None);
 
-		AssetTicket roughness = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
-														 "Data/Demo/Textures/blue_tile/BlueTiles01_1K_Roughness.png",
-														 eImageCreateFlags::None);
+		AssetTicket roughness = gAssetManager->LoadImage(
+			eImageType::Flat, eImageFormat::RGBA8_UNorm,
+			"RaptorData/Data/Demo/Textures/blue_tile/BlueTiles01_1K_Roughness.png", eImageCreateFlags::None);
 
 
 		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
@@ -92,7 +95,8 @@ void Blockout::Create(World* world)
 		Material* test_material = gMaterialManager->GetMaterial(SelectionMaterialID);
 
 		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
-													   "Data/Demo/Textures/aqua_check.png", eImageCreateFlags::None);
+													   "RaptorData/Data/Demo/Textures/aqua_check.png",
+													   eImageCreateFlags::None);
 
 		test_material->SetAlpha(0.7f);
 		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
