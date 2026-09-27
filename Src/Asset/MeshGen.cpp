@@ -365,6 +365,22 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeWireframeBox()
 	return mesh;
 }
 
+Ref<MeshGen::GeneratedMesh> MeshGen::MakeLine()
+{
+	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
+
+	mesh->Positions.InitSize(2);
+	mesh->Indices.InitSize(2);
+
+	mesh->Positions[0] = Vec3f(0.0f, 0.0f, 0.0f);
+	mesh->Positions[1] = Vec3f(1.0f, 0.0f, 0.0f);
+
+	mesh->Indices[0] = 0;
+	mesh->Indices[1] = 1;
+
+	return mesh;
+}
+
 Ref<MeshGen::GeneratedMesh> MeshGen::MakeQuad(Vec2f scale)
 {
 	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();

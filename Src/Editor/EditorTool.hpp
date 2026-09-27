@@ -24,6 +24,7 @@ enum class eEditorTool : uint32
 	Create,
 	Clip,
 	SetMaterial,
+	Light,
 
 	Count,
 };
@@ -32,9 +33,11 @@ enum class eEditorToolFlags : uint32
 {
 	None = 0,
 
-	/// The tool works on the selection, so clicking picks objects and a drag needs something selected. Tools
-	/// without it work on whatever is under the crosshair instead.
+	/// The tool works on the selection, so clicking picks objects and a drag needs something selected
 	UsesSelection = (1 << 0),
+
+	/// The tool picks something other than objects, so the object selection is dropped when it is selected
+	ClearsSelection = (1 << 1),
 };
 
 } // namespace editor
@@ -82,16 +85,28 @@ static_assert(offsetof(EditorToolSelection, SelectionSize) == scMaxSelectedObjec
 
 
 /**
- * @brief An editor tool, run by a script in `Scripts/editor/tools/`. The script can provide any of:
- *
- * - `tool_enter()` / `tool_leave()`: the tool was selected / another tool was selected
- * - `tool_begin()`: the mouse was pressed, starting a drag
- * - `tool_update(float delta_time)`: every frame of the drag
- * - `tool_finalize()`: the mouse was released, ending the drag
- * - `tool_controls()`: every frame that the tool is selected and there is no drag, for the tool's own hotkeys
- *
- * The editor state and selection are sent to the script (see `tool_common.strata`) before any of these are called.
+ * @brief A tool that is written in C++ instead of as a script. This is for tools that touch more engine than the
+ * interop API provides.
  */
+class NativeEditorTool
+{
+public:
+	virtual ~NativeEditorTool() = default;
+
+	virtual void Enter() {}
+	virtual void Leave() {}
+
+	virtual void Begin() {}
+	virtual void Update(float32 delta_time) {}
+	virtual void Finalize() {}
+
+	/// The drag was thrown away without a Finalize(), because what it works on is going away
+	virtual void Cancel() {}
+
+	virtual void Controls() {}
+};
+
+
 struct EditorTool
 {
 public:
@@ -103,7 +118,9 @@ public:
 	 */
 	void ReloadHotFunctions();
 
-	/// Copies the editor's state and selection into the script
+	/**
+	 * @brief Copies the editor's state and selection into the script
+	 */
 	void Sync(const EditorToolState& state, const EditorToolSelection& selection);
 
 	void Enter();
@@ -112,8 +129,11 @@ public:
 	void Begin();
 	void Update(float32 delta_time);
 	void Finalize();
+	void Cancel();
 
 	void Controls();
+
+	void SetNative(NativeEditorTool* native) { pNative = native; }
 
 	FX_FORCE_INLINE bool UsesSelection() const { return HasFlag(Flags, eEditorToolFlags::UsesSelection); }
 
@@ -121,6 +141,7 @@ public:
 
 public:
 	script::Script* pScript = nullptr;
+	NativeEditorTool* pNative = nullptr;
 	eEditorTool Tool = eEditorTool::None;
 	eEditorToolFlags Flags = eEditorToolFlags::None;
 

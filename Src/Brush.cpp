@@ -86,7 +86,11 @@ Vec2f GetDefaultTextureOffset(const Vec3f& normal, const Vec3f& bounds_min, cons
 	// V runs down walls, so the texture starts at the top of the brush
 	const Vec3f anchor(bounds_min.X, bounds_max.Y, bounds_min.Z);
 
-	return Vec2f(-anchor.Dot(projection.UAxis), -anchor.Dot(projection.VAxis));
+
+	static const BrushFaceTexture scDefaultTexture {};
+
+	return Vec2f(-anchor.Dot(projection.UAxis) / scDefaultTexture.Scale.X,
+				 -anchor.Dot(projection.VAxis) / scDefaultTexture.Scale.Y);
 }
 
 /// The layout of a face on a brush at `origin`, lined up with the world grid. UVs use the brush's local corners, which
@@ -95,10 +99,13 @@ BrushFaceTexture GetWorldAlignedTexture(const Vec3f& normal, const Vec3f& origin
 {
 	const TextureProjection projection = GetTextureProjection(normal);
 
-	return BrushFaceTexture {
-		.Material = material,
-		.Offset = Vec2f(origin.Dot(projection.UAxis), origin.Dot(projection.VAxis)),
-	};
+
+	BrushFaceTexture texture { .Material = material };
+
+	texture.Offset = Vec2f(origin.Dot(projection.UAxis) / texture.Scale.X,
+						   origin.Dot(projection.VAxis) / texture.Scale.Y);
+
+	return texture;
 }
 
 bool IsNearlyEqual(const Vec3d& a, const Vec3d& b, double epsilon)
@@ -741,12 +748,15 @@ void Brush::AlignTexturesToWorld(const Vec3f& origin)
 
 bool Brush::HasDefaultTextures() const
 {
+	static const BrushFaceTexture scDefaultTexture {};
+
 	for (const BrushPlane& plane : Planes) {
 		const BrushFaceTexture& texture = plane.Texture;
 		const Vec2f default_offset = GetDefaultTextureOffset(plane.Normal, mBoundsMin, mBoundsMax);
 
-		if (!texture.Material.IsNull() || texture.Scale.X != 1.0f || texture.Scale.Y != 1.0f ||
-			texture.Rotation != 0.0f || std::abs(texture.Offset.X - default_offset.X) > scTextureOffsetEpsilon ||
+		if (!texture.Material.IsNull() || texture.Scale.X != scDefaultTexture.Scale.X ||
+			texture.Scale.Y != scDefaultTexture.Scale.Y || texture.Rotation != 0.0f ||
+			std::abs(texture.Offset.X - default_offset.X) > scTextureOffsetEpsilon ||
 			std::abs(texture.Offset.Y - default_offset.Y) > scTextureOffsetEpsilon) {
 			return false;
 		}
@@ -838,8 +848,8 @@ void Brush::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normal
 			const float32 u = vertex.Dot(projection.UAxis);
 			const float32 v = vertex.Dot(projection.VAxis);
 
-			const Vec2f new_uv((u * cosine - v * sine) / texture.Scale.X + texture.Offset.X,
-							   (u * sine + v * cosine) / texture.Scale.Y + texture.Offset.Y);
+			const Vec2f new_uv((u * cosine - v * sine) / (texture.Scale.X) + texture.Offset.X,
+							   (u * sine + v * cosine) / (texture.Scale.Y) + texture.Offset.Y);
 
 			positions.Insert(vertex);
 			normals.Insert(normal);

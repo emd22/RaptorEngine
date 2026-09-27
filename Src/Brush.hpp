@@ -27,9 +27,7 @@ struct BrushFaceTexture
 
 	/// Added after scaling, in texture repeats
 	Vec2f Offset = Vec2f(0.0f, 0.0f);
-
-	/// Units per texture repeat. Negative values mirror the texture
-	Vec2f Scale = Vec2f(1.0f, 1.0f);
+	Vec2f Scale = Vec2f(2.0f, 2.0f);
 
 	/// In degrees
 	float32 Rotation = 0.0f;

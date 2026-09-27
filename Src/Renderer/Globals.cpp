@@ -2,6 +2,7 @@
 
 #include "Backend/DescriptorCache.hpp"
 #include "Backend/Sampler/SamplerCache.hpp"
+#include "DebugDraw.hpp"
 #include "GraphicsBackend.hpp"
 #include "PSOBuild.hpp"
 #include "PipelineCache.hpp"
@@ -22,6 +23,7 @@ SamplerCache* gSamplerCache = nullptr;
 PSOBuild* gPSOBuild = nullptr;
 DescriptorCache* gDescriptorCache = nullptr;
 TextRenderer* gTextRenderer = nullptr;
+DebugDraw* gDebugDraw = nullptr;
 
 #define DESTROY_GLOBAL(name_)                                                                                          \
 	delete name_;                                                                                                      \
@@ -41,6 +43,7 @@ void Init()
 	gDsLayoutCache = new DsLayoutCache;
 	gDescriptorCache = new DescriptorCache;
 	gTextRenderer = new TextRenderer;
+	gDebugDraw = new DebugDraw;
 }
 
 void Destroy()
@@ -60,6 +63,7 @@ void Destroy()
 	DESTROY_GLOBAL(gPipelineCache);
 	DESTROY_GLOBAL(gShaderCache);
 	DESTROY_GLOBAL(gTextRenderer);
+	DESTROY_GLOBAL(gDebugDraw);
 
 	DESTROY_GLOBAL(gPSOBuild);
 	DESTROY_GLOBAL(gGraphics);

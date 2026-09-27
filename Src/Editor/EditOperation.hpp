@@ -8,10 +8,14 @@
 #include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
+#include <Renderer/LightID.hpp>
+#include <cstddef>
 
 namespace fx {
 
 class Object;
+class LightBase;
+class LightSpot;
 
 namespace editor {
 
@@ -23,17 +27,22 @@ struct EditOperationValue
 	{
 		Vec3,
 		Object,
+		Light,
 	} Type;
 
 	union
 	{
 		Object* pObject;
+		LightBase* pLight;
 		Vec3f Position;
 	};
 
 
 	explicit EditOperationValue(const Vec3f& vec) : Type(eValueType::Vec3), Position(vec) {}
 	explicit EditOperationValue(Object* obj) : Type(eValueType::Object), pObject(obj) {}
+	explicit EditOperationValue(LightBase* light) : Type(eValueType::Light), pLight(light) {}
+
+	explicit EditOperationValue(std::nullptr_t) : Type(eValueType::Object), pObject(nullptr) {}
 
 
 	void Set(const Vec3f& vec)
@@ -47,6 +56,15 @@ struct EditOperationValue
 		Type = eValueType::Object;
 		pObject = obj;
 	}
+
+	void Set(LightBase* light)
+	{
+		Type = eValueType::Light;
+		pLight = light;
+	}
+
+	/// Same ambiguity as the constructor above, resolved the same way
+	void Set(std::nullptr_t) { Set(static_cast<Object*>(nullptr)); }
 };
 
 struct EditOperation
@@ -62,6 +80,12 @@ struct EditOperation
 		Rotate,
 		BrushEdit,
 		CreateBrush,
+		/// Moves and aims a spot light: `ValueA`/`ValueB` are its position before and after, and `Light` holds the rest
+		LightTransform,
+		/// Creates a spot light at `ValueA`'s position, aimed along `Light.DirectionAfter`
+		LightCreate,
+		/// Destroys a spot light; `LightSnap` holds everything needed to bring it back
+		LightDelete,
 	} Type;
 
 public:
@@ -92,7 +116,6 @@ public:
 	Brush::PlaneList PlanesBefore;
 	Brush::PlaneList PlanesAfter;
 
-	/// The object for `Delete` (captured before destruction so Undo can recreate it) and `CreateBrush`
 	struct Snapshot
 	{
 		Vec3f Position = Vec3f::sZero;
@@ -102,6 +125,27 @@ public:
 		/// So that undoing the delete of a probe volume brush brings back a probe volume, not solid geometry
 		bool bIsProbeVolume = false;
 	} ObjectSnapshot;
+
+	struct LightEdit
+	{
+		LightSpot* pLight = nullptr;
+		LightID Id = LightID::scNull;
+		Vec3f DirectionBefore = Vec3f::sForward;
+		Vec3f DirectionAfter = Vec3f::sForward;
+	} Light;
+
+	struct LightSnapshot
+	{
+		Name LightName;
+		Vec3f Position = Vec3f::sZero;
+		Vec3f Direction = Vec3f::sForward;
+		float32 Radius = 5.0f;
+
+		float32 InnerAngle = 0.0f;
+		float32 OuterAngle = 0.0f;
+
+		bool bCastShadows = true;
+	} LightSnap;
 
 	/// The size of the operation group this is in. For example, when moving 10 objects, there will be 10 operations(one
 	/// for each event) making the GroupSize = 10.

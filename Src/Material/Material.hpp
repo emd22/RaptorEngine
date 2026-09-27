@@ -75,10 +75,7 @@ public:
 	MaterialComponent::Status Build();
 	FX_FORCE_INLINE void RequireUpdate() { mbRequiresUpdate = true; }
 
-	FX_FORCE_INLINE bool Exists() const
-	{
-		return (pImage != nullptr) || (ImageToUpload.ImageData.pData != nullptr);
-	}
+	FX_FORCE_INLINE bool Exists() const { return (pImage != nullptr) || (ImageToUpload.ImageData.pData != nullptr); }
 
 	void SetTicket(AssetTicket& ticket);
 	void SetTicket(AssetTicket&& ticket);
@@ -143,7 +140,7 @@ public:
 	{
 		Diffuse,
 		Normal,
-		MetallicRoughness,
+		ORM,
 
 		MaxImages,
 	};
@@ -172,7 +169,7 @@ public:
 		case eResourceType::Normal:
 			component = &NormalMap;
 			break;
-		case eResourceType::MetallicRoughness:
+		case eResourceType::ORM:
 			component = &MetallicRoughness;
 			break;
 
@@ -198,7 +195,6 @@ public:
 	 * @returns True if the material was bound successfully.
 	 */
 	bool BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline);
-
 
 
 	void Build();
