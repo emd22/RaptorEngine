@@ -205,7 +205,7 @@ void RaptorGame::CreateGame()
 
 	const char* scene_to_load = Config.GetEntry(HashStr32("Scene"))->Get<const char*>();
 
-	scene_file.Load(std::format("Data/{}", scene_to_load));
+	scene_file.Load(std::format("RaptorData/Data/{}", scene_to_load));
 	gPhysics->pBackend->OptimizeBroadPhase();
 
 	// Baked probes if the scene has them, procedural gradient otherwise.
@@ -481,7 +481,7 @@ void RaptorGame::ProcessControls()
 	// Save the blockout to a file
 	if (ControlManager::IsComboPressed(eKey::FX_KEY_LMETA, eKey::FX_KEY_S)) {
 		LogInfo("Saving blockout...");
-		gWorld->pBlockout->Save("Data/blockouts/btemp.prx");
+		gWorld->pBlockout->Save("RaptorData/Data/blockouts/btemp.prx");
 	}
 }
 
@@ -491,7 +491,7 @@ void RaptorGame::ReloadWorldFile()
 
 	WorldFile scene_file;
 	const char* scene_to_load = Config.GetEntry(HashStr32("Scene"))->Get<const char*>();
-	scene_file.Load(std::format("Data/{}", scene_to_load));
+	scene_file.Load(std::format("RaptorData/Data/{}", scene_to_load));
 }
 
 void RaptorGame::ReloadBlockout()
@@ -532,17 +532,17 @@ void RaptorGame::RenderText()
 
 	if (gpu.IsEnabled() && (mpShowGpuCVar == nullptr || mpShowGpuCVar->IntValue != 0)) {
 		gTextRenderer->DrawText(String::Fmt("GPU={:.2f}ms", gpu.GetTotalMs()).CStr(), 2.0f, scWhite);
-		gTextRenderer->DrawText(
-			String::Fmt("Sh {:.2f} Pre {:.2f} Cull {:.2f} SSAO {:.2f} Fwd {:.2f} Comp {:.2f}",
-						gpu.GetMs(eGpuMarker::Shadows), gpu.GetMs(eGpuMarker::Prepass),
-						gpu.GetMs(eGpuMarker::LightCulling), gpu.GetMs(eGpuMarker::SSAO),
-						gpu.GetMs(eGpuMarker::Forward), gpu.GetMs(eGpuMarker::Composition))
-				.CStr(),
-			2.0f, scWhite);
+		gTextRenderer->DrawText(String::Fmt("Sh {:.2f} Pre {:.2f} Cull {:.2f} SSAO {:.2f} Fwd {:.2f} Comp {:.2f}",
+											gpu.GetMs(eGpuMarker::Shadows), gpu.GetMs(eGpuMarker::Prepass),
+											gpu.GetMs(eGpuMarker::LightCulling), gpu.GetMs(eGpuMarker::SSAO),
+											gpu.GetMs(eGpuMarker::Forward), gpu.GetMs(eGpuMarker::Composition))
+									.CStr(),
+								2.0f, scWhite);
 
 		// Only bakes have this
 		if (gpu.GetMs(eGpuMarker::ProbeCapture) > 0.005) {
-			gTextRenderer->DrawText(String::Fmt("Bake {:.2f}", gpu.GetMs(eGpuMarker::ProbeCapture)).CStr(), 2.0f, scWhite);
+			gTextRenderer->DrawText(String::Fmt("Bake {:.2f}", gpu.GetMs(eGpuMarker::ProbeCapture)).CStr(), 2.0f,
+									scWhite);
 		}
 	}
 
