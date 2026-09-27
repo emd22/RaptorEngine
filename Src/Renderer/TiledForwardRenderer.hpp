@@ -1,8 +1,11 @@
 #pragma once
 
 #include "Backend/Descriptors.hpp"
+#include "Backend/Shader.hpp"
+#include "PipelineDesc.hpp"
 #include "PipelineNames.hpp"
 #include "RenderStage.hpp"
+#include "Vertex.hpp"
 
 namespace fx {
 class Camera;
@@ -109,6 +112,15 @@ private:
 	/// Registers the decal buffers and atlases (set 0) on the forward pipeline currently being built
 	void AddDecalDescriptors();
 
+	/// Set 0 of the forward pipelines
+	void AddGlobalDescriptors();
+
+	/**
+	 * @brief The pass templates for the geometry pipelines, see PipelineCache::RegisterPassTemplate()
+	 */
+	bool MakeForwardDesc(ePipelinePass pass, ePipelineFeatures features, PipelineDesc& out_desc);
+	bool MakePrepassDesc(ePipelineFeatures features, PipelineDesc& out_desc);
+
 	// Composition
 	void CreateCompositionPSO();
 	void CreateBitmapTextPSO();
@@ -133,7 +145,6 @@ public:
 	/// Composition pass, combine results from all passes
 	RenderStage CompPass;
 
-	ePipelineName pGeometryPipelineName = ePipelineName::Geometry;
 
 	/// Descriptors that remain bound for the entirety of the frame. This includes object buffer, material buffer, etc.
 	DescriptorSet* pPersistentDescriptor = nullptr;

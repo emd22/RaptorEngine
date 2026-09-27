@@ -130,7 +130,9 @@ void RenderStage::Begin(CommandBuffer& cmd)
 			   });
 }
 
-void RenderStage::Begin(CommandBuffer& cmd, const VkRect2D& render_area)
+void RenderStage::Begin(CommandBuffer& cmd, const VkRect2D& render_area) { Begin(cmd, render_area, render_area); }
+
+void RenderStage::Begin(CommandBuffer& cmd, const VkRect2D& render_area, const VkRect2D& draw_area)
 {
 	Assert(mbIsBuilt);
 
@@ -144,6 +146,21 @@ void RenderStage::Begin(CommandBuffer& cmd, const VkRect2D& render_area)
 	}
 
 	mRenderPass.Begin(&cmd, framebuffer, ClearValues, render_area);
+
+	// Pipelines leave the viewport and scissor to whoever is drawing, and the target is what decides them. They stay set
+	// across pipeline binds, so this is the only place that sets them.
+	const VkViewport viewport = {
+		.x = static_cast<float32>(draw_area.offset.x),
+		.y = static_cast<float32>(draw_area.offset.y),
+		.width = static_cast<float32>(draw_area.extent.width),
+		.height = static_cast<float32>(draw_area.extent.height),
+		// Flipped depth range, the engine uses reverse Z
+		.minDepth = 1.0f,
+		.maxDepth = 0.0f,
+	};
+
+	vkCmdSetViewport(cmd.Get(), 0, 1, &viewport);
+	vkCmdSetScissor(cmd.Get(), 0, 1, &draw_area);
 }
 
 void RenderStage::AddTarget(eImageFormat format, VkImageUsageFlags usage, eImageAspectFlag aspect)

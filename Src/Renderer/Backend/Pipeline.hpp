@@ -9,6 +9,7 @@
 #include <Core/RefCountedBase.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/Slice.hpp>
+#include <Renderer/PipelineKey.hpp>
 #include <Renderer/PipelineNames.hpp>
 #include <Renderer/Vertex.hpp>
 
@@ -63,6 +64,8 @@ enum class eDrawFlags : uint32
 	DebugProbeVisibility = (1 << 2),
 	/// World decals are not projected onto this draw
 	NoDecals = (1 << 3),
+	/// The draw does not sample the light probes
+	NoProbes = (1 << 4),
 };
 
 FxEnumFlags(eDrawFlags);
@@ -213,10 +216,7 @@ struct PipelineProperties
 
 	bool bRenderLines : 1 = false;
 
-	Vec2u ViewportSize = Vec2u::sZero;
 	VkCompareOp DepthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
-
-	uint32 ViewportDivisor = 1U;
 };
 
 struct PushConstants
@@ -224,12 +224,6 @@ struct PushConstants
 	uint32 Size;
 	eShaderType ShaderTypes;
 };
-
-/**
- * @brief Marks an internal state to require the next pipeline bound to output its dynamic states.
- */
-void RequirePipelineDynamicStates();
-
 
 class PipelineLayout : public RefCountedBase
 {
@@ -305,6 +299,9 @@ public:
 
 	FX_FORCE_INLINE bool IsCompute() const { return bIsCompute; }
 
+	/// False until the pipeline has been built, and if it could not be
+	FX_FORCE_INLINE bool IsBuilt() const { return InternalPipeline != nullptr; }
+
 	FX_FORCE_INLINE VkPipelineBindPoint GetBindPoint() const
 	{
 		return (bIsCompute) ? VK_PIPELINE_BIND_POINT_COMPUTE : VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -326,9 +323,11 @@ public:
 
 	SizedArray<DescriptorRef> DescriptorIDs;
 
-	mutable Vec2u ViewportSize = Vec2u::sZero;
-
 	ePipelineName Name;
+
+	/// This pipeline's index in the PipelineCache, set by the cache. Lets code that holds a `Pipeline` get the handle
+	/// without hashing anything.
+	PipelineHandle Handle;
 
 	Ref<ShaderProgram> VertexShader { nullptr };
 	Ref<ShaderProgram> PixelShader { nullptr };
@@ -340,15 +339,8 @@ public:
 	/// The cull mode the pipeline was created with. It is dynamic state, so it is set when the pipeline is bound.
 	VkCullModeFlags DefaultCullMode = VK_CULL_MODE_NONE;
 
-	bool bIsViewportFullscreen = false;
-
-	/// True if the pipeline uses dynamic states for viewport and scissor
-	bool bHasDynamicViewport = true;
-
 private:
 	GpuDevice* mDevice = nullptr;
-
-	uint32 mViewportDivisor = 1U;
 
 protected:
 	bool mbDoNotDestroyLayout = false;

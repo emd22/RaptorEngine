@@ -3,10 +3,10 @@
 #include <Blockout.hpp>
 #include <CVar.hpp>
 #include <Controls.hpp>
-#include <Editor/EditorApp.hpp>
-#include <Editor/EditorFrame.hpp>
+#include <Editor/EditOperation.hpp>
+#include <Editor/EditorTool.hpp>
+#include <Editor/RaptorEditor.hpp>
 #include <Engine.hpp>
-#include <InGameEditor.hpp>
 #include <Math/SIMDHelper.hpp>
 #include <Object/ObjectID.hpp>
 #include <Object/ObjectManager.hpp>
@@ -27,106 +27,102 @@ static Object* N_object_get(uint32 id)
 	return gObjectManager->GetObject(obj_id);
 }
 
+/////////////////////////////////////
+// Edit operations
+/////////////////////////////////////
+
+using editor::EditOperation;
+using editor::EditOperationValue;
+
 static Vec3f N_editor_push_op_vec3(Object* obj, int op_type, FLOAT4 original, FLOAT4 updated, int32 group_size)
 {
+#ifdef FX_IS_EDITOR
 	if (obj == nullptr) {
 		return Vec3f::sZero;
 	}
 
-	if (gPrototypeEditor) {
-		EditOperationValue eov = gPrototypeEditor->PushEditOperation(EditOperation {
-			.Type = static_cast<EditOperation::eType>(op_type),
-			.pObject = obj,
-			.ValueA = EditOperationValue(Vec3f(original)),
-			.ValueB = EditOperationValue(Vec3f(updated)),
-			.GroupSize = group_size,
-		});
+	const EditOperationValue result = gEditor->PushEditOperation(EditOperation {
+		.Type = static_cast<EditOperation::eType>(op_type),
+		.pObject = obj,
+		.ValueA = EditOperationValue(Vec3f(original)),
+		.ValueB = EditOperationValue(Vec3f(updated)),
+		.GroupSize = group_size,
+	});
 
-		return eov.Position;
-	}
-
+	return result.Position;
+#else
 	return Vec3f::sZero;
+#endif
 }
 
 static Object* N_editor_push_op_object(Object* obj, int op_type, Object* original, Object* updated, int32 group_size)
 {
+#ifdef FX_IS_EDITOR
 	if (obj == nullptr) {
 		return nullptr;
 	}
 
-	if (gPrototypeEditor) {
-		EditOperationValue eov = gPrototypeEditor->PushEditOperation(EditOperation {
-			.Type = static_cast<EditOperation::eType>(op_type),
-			.pObject = obj,
-			.ValueA = EditOperationValue(original),
-			.ValueB = EditOperationValue(updated),
-			.GroupSize = group_size,
-		});
+	const EditOperationValue result = gEditor->PushEditOperation(EditOperation {
+		.Type = static_cast<EditOperation::eType>(op_type),
+		.pObject = obj,
+		.ValueA = EditOperationValue(original),
+		.ValueB = EditOperationValue(updated),
+		.GroupSize = group_size,
+	});
 
-		return eov.pObject;
-	}
-
+	return result.pObject;
+#else
 	return nullptr;
+#endif
 }
 
 static Object* N_editor_op_create_object(FLOAT4 position, int32 group_size)
 {
-	if (gPrototypeEditor) {
-		EditOperationValue eov = gPrototypeEditor->PushEditOperation(EditOperation {
-			.Type = EditOperation::eType::Create,
-			.pObject = nullptr,
-			.ValueA = EditOperationValue(Vec3f(position)),
-			.ValueB = EditOperationValue(nullptr),
-			.GroupSize = group_size,
-		});
+#ifdef FX_IS_EDITOR
+	const EditOperationValue result = gEditor->PushEditOperation(EditOperation {
+		.Type = EditOperation::eType::Create,
+		.pObject = nullptr,
+		.ValueA = EditOperationValue(Vec3f(position)),
+		.ValueB = EditOperationValue(nullptr),
+		.GroupSize = group_size,
+	});
 
-		return eov.pObject;
-	}
-
+	return result.pObject;
+#else
 	return nullptr;
+#endif
 }
 
 static Object* N_editor_op_dupe_object(Object* object_to_dupe, FLOAT4 position, int32 group_size)
 {
-	if (gPrototypeEditor) {
-		EditOperationValue eov = gPrototypeEditor->PushEditOperation(EditOperation {
-			.Type = EditOperation::eType::Dupe,
-			.pObject = object_to_dupe,
-			.ValueA = EditOperationValue(Vec3f(position)),
-			.ValueB = EditOperationValue(nullptr),
-			.GroupSize = group_size,
-		});
-
-		return eov.pObject;
+#ifdef FX_IS_EDITOR
+	if (object_to_dupe == nullptr) {
+		return nullptr;
 	}
 
+	const EditOperationValue result = gEditor->PushEditOperation(EditOperation {
+		.Type = EditOperation::eType::Dupe,
+		.pObject = object_to_dupe,
+		.ValueA = EditOperationValue(Vec3f(position)),
+		.ValueB = EditOperationValue(nullptr),
+		.GroupSize = group_size,
+	});
+
+	return result.pObject;
+#else
 	return nullptr;
+#endif
 }
 
 static void N_editor_push_op_delete(Object* obj, int32 group_size)
 {
-	if (obj == nullptr || editor::IsSimulationMode()) {
+#ifdef FX_IS_EDITOR
+	if (gEditor->IsSimulationMode()) {
 		return;
 	}
 
-	// Snapshot everything Undo needs before the Execute step destroys the object.
-	EditOperation op {
-		.Type = EditOperation::eType::Delete,
-		.pObject = obj,
-		.ValueA = EditOperationValue(Vec3f::sZero),
-		.ValueB = EditOperationValue(Vec3f::sZero),
-		.GroupSize = group_size,
-	};
-	op.PushedObjectID = obj->ID;
-	op.DeleteSnapshot.Position = obj->GetPosition();
-	op.DeleteSnapshot.BoundsMin = obj->Bounds.Min;
-	op.DeleteSnapshot.BoundsMax = obj->Bounds.Max;
-	op.DeleteSnapshot.Material = gPrototypeEditor->GetStoredMaterial(obj);
-	op.DeleteSnapshot.Rotation = obj->mRotation;
-	op.DeleteSnapshot.ObjectName = obj->Name;
-	op.DeleteSnapshot.bIsProbeVolume = obj->IsProbeVolume();
-
-	gPrototypeEditor->PushEditOperation(op);
+	gEditor->DeleteObject(obj, group_size);
+#endif
 }
 
 
@@ -204,6 +200,12 @@ static float32 N_object_direction_scale(Object* obj, FLOAT4 direction)
 		return 0.0f;
 	}
 
+	// A brush's reach along a face normal is exactly where that face is, which its bounds only give for boxes
+	const Brush* brush = gWorld->pBlockout->GetBrush(obj);
+	if (brush != nullptr) {
+		return brush->GetSupport(Vec3f(direction).Normalize());
+	}
+
 	return obj->GetDirectionScale(Vec3f(direction));
 }
 
@@ -251,6 +253,17 @@ static FLOAT4 N_object_ray_get_face(Object* obj)
 		return (distance >= 0.0f) ? face.mIntrin : simd::LoadFloat4(0.0f);
 	}
 
+	if (gWorld->pBlockout->GetBrush(obj) != nullptr) {
+		Vec3f face_normal;
+
+		if (!gWorld->pBlockout->RaycastFace(obj, gWorld->Player.pCamera->Position,
+											gWorld->Player.pCamera->GetForwardVector(), face_normal)) {
+			return simd::LoadFloat4(0.0f);
+		}
+
+		return face_normal.mIntrin;
+	}
+
 	physics::Body* body = gPhysics->GetBody(obj->PhysicsID);
 	if (body == nullptr) {
 		return simd::LoadFloat4(0.0f);
@@ -262,18 +275,20 @@ static FLOAT4 N_object_ray_get_face(Object* obj)
 
 static void N_object__select_object_internal(Object* obj, bool is_selected, bool append_selection)
 {
-	if (editor::IsSimulationMode()) {
+#ifdef FX_IS_EDITOR
+	if (gEditor->IsSimulationMode()) {
 		return;
 	}
 
 	// Deselect object
 	if (!is_selected || obj == nullptr) {
-		gPrototypeEditor->SelectObject(nullptr, false);
+		gEditor->ClearSelection();
 		return;
 	}
 
 	// Select an object
-	gPrototypeEditor->SelectObject(obj, append_selection);
+	gEditor->SelectObject(obj, append_selection);
+#endif
 }
 
 
@@ -309,6 +324,38 @@ static FLOAT4 N_player_ray_get_point(void*, float32 range)
 	return rr.Point.mIntrin;
 }
 
+static FLOAT4 N_player_ray_get_normal(void*, float32 range)
+{
+	physics::RayResult rr = gPhysics->pBackend->Raycast(gWorld->Player.pCamera->Position,
+														gWorld->Player.pCamera->Direction * range);
+
+	if (!rr.bHit) {
+		return simd::LoadFloat4(0.0f);
+	}
+
+	return rr.Normal.mIntrin;
+}
+
+/// Where the crosshair's ray meets the plane through `point` facing `normal`, or `point` if the ray never reaches it
+static FLOAT4 N_camera_ray_to_plane(FLOAT4 point, FLOAT4 normal)
+{
+	const Vec3f origin = gWorld->Player.pCamera->Position;
+	const Vec3f direction = gWorld->Player.pCamera->GetForwardVector();
+	const Vec3f plane_normal(normal);
+
+	const float32 facing = plane_normal.Dot(direction);
+	if (std::abs(facing) < 1e-5f) {
+		return point;
+	}
+
+	const float32 distance = plane_normal.Dot(Vec3f(point) - origin) / facing;
+	if (distance < 0.0f) {
+		return point;
+	}
+
+	return (origin + direction * distance).mIntrin;
+}
+
 static FLOAT4 N_float4_round(FLOAT4 value) { return simd::Round(value); }
 static FLOAT4 N_float4_floor(FLOAT4 value) { return simd::Floor(value); }
 static FLOAT4 N_float3_abs(FLOAT4 value)
@@ -331,7 +378,224 @@ static void N_blockout_reload_object(Object* object) { gWorld->pBlockout->Rebuil
 
 static void N_blockout_object_scale(Object* object, FLOAT4 face_dir, FLOAT4 magnitude)
 {
-	gWorld->pBlockout->ScaleInDirection(object, Vec3f(face_dir), Vec3f(magnitude));
+	gWorld->pBlockout->MoveFace(object, Vec3f(face_dir), Vec3f(magnitude).X);
+}
+
+/// The centre of the face facing along `face`, in the object's local space
+static FLOAT4 N_blockout_face_center(Object* object, FLOAT4 face)
+{
+	const Brush* brush = gWorld->pBlockout->GetBrush(object);
+	if (brush == nullptr) {
+		return simd::LoadFloat4(0.0f);
+	}
+
+	const int32 plane_index = brush->FindPlane(Vec3f(face));
+	if (plane_index == Brush::scNoPlane) {
+		return simd::LoadFloat4(0.0f);
+	}
+
+	return brush->GetFaceCenter(static_cast<uint32>(plane_index)).mIntrin;
+}
+
+/// Where the crosshair's ray hits a blockout, in world space
+static FLOAT4 N_blockout_ray_hit_point(Object* object)
+{
+	Vec3f face_normal;
+	Vec3f point;
+
+	if (object == nullptr ||
+		!gWorld->pBlockout->RaycastFace(object, gWorld->Player.pCamera->Position,
+										gWorld->Player.pCamera->GetForwardVector(), face_normal, &point)) {
+		return simd::LoadFloat4(0.0f);
+	}
+
+	return point.mIntrin;
+}
+
+static void N_blockout_preview_box(FLOAT4 min, FLOAT4 max)
+{
+	Vec3f position;
+	const Brush brush = gWorld->pBlockout->MakeWorldBox(Vec3f(min), Vec3f(max), position);
+
+	gWorld->pBlockout->ShowPreview(position, Quat::scIdentity, brush);
+}
+
+/// Previews the piece that a clip would split off
+static void N_blockout_preview_clip(Object* object, FLOAT4 point_a, FLOAT4 point_b, FLOAT4 face_normal)
+{
+	Brush::PlaneList kept;
+	Brush::PlaneList split;
+	Vec3f split_position;
+
+	if (object == nullptr || !gWorld->pBlockout->GetClipPieces(object, Vec3f(point_a), Vec3f(point_b),
+															   Vec3f(face_normal), kept, split, split_position)) {
+		gWorld->pBlockout->HidePreview();
+		return;
+	}
+
+	gWorld->pBlockout->ShowPreview(split_position, object->mRotation, Brush::FromPlanes(split));
+}
+
+static void N_blockout_hide_preview() { gWorld->pBlockout->HidePreview(); }
+
+static Object* N_blockout_create_box(FLOAT4 min, FLOAT4 max)
+{
+#ifdef FX_IS_EDITOR
+	if (gEditor->IsSimulationMode()) {
+		return nullptr;
+	}
+
+	Vec3f position;
+	const Brush brush = gWorld->pBlockout->MakeWorldBox(Vec3f(min), Vec3f(max), position);
+
+	if (!brush.IsValid()) {
+		return nullptr;
+	}
+
+	EditOperation op {
+		.Type = EditOperation::eType::CreateBrush,
+		.ValueA = EditOperationValue(Vec3f::sZero),
+		.ValueB = EditOperationValue(Vec3f::sZero),
+	};
+
+	op.PlanesAfter = brush.Planes;
+	op.ObjectSnapshot.Position = position;
+	op.ObjectSnapshot.Material = gWorld->pBlockout->GetMaterialForSlot(eCProtoMat::Gray);
+
+	return gEditor->PushEditOperation(op).pObject;
+#else
+	return nullptr;
+#endif
+}
+
+/// Splits a blockout in two along a line drawn on one of its faces. Both pieces are kept.
+static bool N_blockout_clip(Object* object, FLOAT4 point_a, FLOAT4 point_b, FLOAT4 face_normal)
+{
+#ifdef FX_IS_EDITOR
+	if (object == nullptr || gEditor->IsSimulationMode()) {
+		return false;
+	}
+
+	const Brush* brush = gWorld->pBlockout->GetBrush(object);
+	if (brush == nullptr) {
+		return false;
+	}
+
+	EditOperation clip_op {
+		.Type = EditOperation::eType::BrushEdit,
+		.pObject = object,
+		.ValueA = EditOperationValue(Vec3f::sZero),
+		.ValueB = EditOperationValue(Vec3f::sZero),
+		.GroupSize = 2,
+	};
+
+	clip_op.PushedObjectID = object->ID;
+	clip_op.PlanesBefore = brush->Planes;
+
+	EditOperation split_op {
+		.Type = EditOperation::eType::CreateBrush,
+		.ValueA = EditOperationValue(Vec3f::sZero),
+		.ValueB = EditOperationValue(Vec3f::sZero),
+		.GroupSize = 2,
+	};
+
+	if (!gWorld->pBlockout->GetClipPieces(object, Vec3f(point_a), Vec3f(point_b), Vec3f(face_normal),
+										  clip_op.PlanesAfter, split_op.PlanesAfter,
+										  split_op.ObjectSnapshot.Position)) {
+		return false;
+	}
+
+	split_op.ObjectSnapshot.Rotation = object->mRotation;
+	split_op.ObjectSnapshot.Material = gEditor->GetSelection().GetStoredMaterial(object);
+	split_op.ObjectSnapshot.bIsProbeVolume = object->IsProbeVolume();
+
+	gEditor->PushEditOperation(clip_op);
+	gEditor->PushEditOperation(split_op);
+
+	return true;
+#else
+	return false;
+#endif
+}
+
+/// How far away a face can be painted with the Set Material tool
+static constexpr float32 scPaintRange = 100.0f;
+
+/**
+ * @brief Paints the face under the crosshair (or its whole brush) with a prototype material slot, as an undoable
+ * operation. A negative slot paints with the blockout's own material.
+ */
+static bool N_blockout_paint_material(int32 slot, bool whole_brush)
+{
+#ifdef FX_IS_EDITOR
+	if (gEditor->IsSimulationMode() || slot >= static_cast<int32>(eCProtoMat::Count)) {
+		return false;
+	}
+
+	Vec3f face_normal;
+	Object* object = gWorld->pBlockout->RaycastBlockout(
+		gWorld->Player.pCamera->Position, gWorld->Player.pCamera->GetForwardVector() * scPaintRange, face_normal);
+
+	if (object == nullptr) {
+		return false;
+	}
+
+	const MaterialID material = (slot < 0) ? MaterialID::scNull
+										   : gWorld->pBlockout->GetMaterialForSlot(static_cast<eCProtoMat>(slot));
+
+	EditOperation op {
+		.Type = EditOperation::eType::BrushEdit,
+		.pObject = object,
+		.ValueA = EditOperationValue(Vec3f::sZero),
+		.ValueB = EditOperationValue(Vec3f::sZero),
+	};
+
+	op.PushedObjectID = object->ID;
+	op.PlanesBefore = gWorld->pBlockout->GetBrush(object)->Planes;
+
+	if (!gWorld->pBlockout->GetMaterialEdit(object, face_normal, material, whole_brush, op.PlanesAfter)) {
+		return false;
+	}
+
+	gEditor->PushEditOperation(op);
+
+	return true;
+#else
+	return false;
+#endif
+}
+
+static void N_blockout_edit_face_texture(Object* object, FLOAT4 face, uint32 edit, FLOAT4 amount)
+{
+#ifdef FX_IS_EDITOR
+	if (object == nullptr || gEditor->IsSimulationMode()) {
+		return;
+	}
+
+	const Brush* brush = gWorld->pBlockout->GetBrush(object);
+	if (brush == nullptr) {
+		return;
+	}
+
+	const Vec3f amount_vec(amount);
+
+	EditOperation op {
+		.Type = EditOperation::eType::BrushEdit,
+		.pObject = object,
+		.ValueA = EditOperationValue(Vec3f::sZero),
+		.ValueB = EditOperationValue(Vec3f::sZero),
+	};
+
+	op.PushedObjectID = object->ID;
+	op.PlanesBefore = brush->Planes;
+
+	if (!gWorld->pBlockout->GetFaceTextureEdit(object, Vec3f(face), static_cast<eFaceTextureEdit>(edit),
+											   Vec2f(amount_vec.X, amount_vec.Y), op.PlanesAfter)) {
+		return;
+	}
+
+	gEditor->PushEditOperation(op);
+#endif
 }
 
 static Object* N_blockout_new_object(FLOAT4 position) { return gWorld->pBlockout->NewObject(Vec3f(position)); }
@@ -376,10 +640,25 @@ static int64 N_cvar_get_int(const char* name, int64 fallback) { return gCVars->G
 
 static void N_script_error(const char* str) { LogError(LC_SCRIPT, "{}", str); }
 
-static void N_GUI_set_editor_tool(eEditorTool tool)
+static void N_GUI_set_editor_tool(editor::eEditorTool tool)
 {
 #ifdef FX_IS_EDITOR
-	editor::GetMainFrame()->SetEditorTool(tool);
+	if (tool >= editor::eEditorTool::Count) {
+		return;
+	}
+
+	gEditor->SetTool(tool);
+#endif
+}
+
+static void N_tool_state_send(const editor::EditorToolState* state)
+{
+#ifdef FX_IS_EDITOR
+	if (state == nullptr) {
+		return;
+	}
+
+	gEditor->SubmitToolState(*state);
 #endif
 }
 
@@ -422,6 +701,16 @@ static const PredefExtern scAvailableExterns[] = {
 
 	PREDEF("blockout_reload_object", N_blockout_reload_object),
 	PREDEF("blockout_object_scale", N_blockout_object_scale),
+	PREDEF("blockout_face_center", N_blockout_face_center),
+	PREDEF("blockout_edit_face_texture", N_blockout_edit_face_texture),
+	PREDEF("blockout_ray_hit_point", N_blockout_ray_hit_point),
+	PREDEF("blockout_preview_box", N_blockout_preview_box),
+	PREDEF("blockout_preview_clip", N_blockout_preview_clip),
+	PREDEF("blockout_hide_preview", N_blockout_hide_preview),
+	PREDEF("blockout_create_box", N_blockout_create_box),
+	PREDEF("blockout_clip", N_blockout_clip),
+	PREDEF("blockout_paint_material", N_blockout_paint_material),
+	PREDEF("camera_ray_to_plane", N_camera_ray_to_plane),
 	PREDEF("blockout_new_object", N_blockout_new_object),
 	PREDEF("blockout_dupe_object", N_blockout_dupe_object),
 	PREDEF("blockout_destroy_object", N_blockout_destroy_object),
@@ -432,6 +721,7 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("PLAYER_set_speed_multiplier", N_player_set_speed_multiplier),
 	PREDEF("PLAYER_is_flymode", N_player_is_flymode),
 	PREDEF("PLAYER_ray_get_point", N_player_ray_get_point),
+	PREDEF("PLAYER_ray_get_normal", N_player_ray_get_normal),
 
 	/* Math Util */
 	PREDEF("float4_round", N_float4_round),
@@ -464,6 +754,7 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("script_error", N_script_error),
 
 	PREDEF("GUI_set_editor_tool", N_GUI_set_editor_tool),
+	PREDEF("tool_state_send", N_tool_state_send),
 
 }; // namespace fx::script
 

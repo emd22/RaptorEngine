@@ -98,6 +98,15 @@ public:
 		MarkItemFree(index);
 	}
 
+	void FreeItem(const TItemType* ptr)
+	{
+		if (ptr == nullptr) {
+			return;
+		}
+
+		FreeItem(GetIndexFromPtr(ptr));
+	}
+
 	FX_FORCE_INLINE void MarkItemFree(uint32 index) { SlotsInUse.Unset(index); }
 
 	FX_FORCE_INLINE uint32 GetIndexForItem(TItemType* ptr) const
@@ -129,6 +138,24 @@ public:
 
 		Size = 0;
 		Capacity = 0;
+	}
+
+
+	/**
+	 * @brief Finds the index for the item based on its pointer. Returns UINT32_MAX if not found.
+	 * @note Janky
+	 */
+	uint32 GetIndexFromPtr(const TItemType* ptr) const
+	{
+		if (ptr < pPtr || ptr > (pPtr + Capacity)) {
+			return UINT32_MAX;
+		}
+
+		uintptr_t potential_index = (ptr - pPtr);
+
+		Assert((potential_index % sizeof(TItemType)) == 0);
+
+		return (potential_index / sizeof(TItemType));
 	}
 
 	~FreeArray() { Free(); }

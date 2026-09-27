@@ -4,6 +4,7 @@
 #include <CVar.hpp>
 #include <Engine.hpp>
 #include <Physics/PhysicsManager.hpp>
+#include <Renderer/LightManager.hpp>
 
 namespace fx {
 
@@ -69,10 +70,9 @@ void WorldFile::Load(const std::string& path)
 	}
 
 	// Load sun
-	Ref<LightDirectional> sun = gWorld->GetDirectionalLight();
+	Ref<LightDirectional> sun = gLightManager->GetDirectionalLight();
 	if (!sun.IsValid()) {
-		sun = Ref<LightDirectional>::New();
-		gWorld->Attach(sun);
+		sun = gLightManager->NewLight<LightDirectional>("Sun");
 	}
 
 	ConfigEntry* sun_entry = info.GetEntry(HashStr32("sun"));
@@ -195,7 +195,7 @@ void WorldFile::AddOrUpdateLightFromEntry(const ConfigEntry& light_entry)
 	}
 
 	// Lights are matched by name so a hot reload updates them in place
-	Ref<LightBase> light = gWorld->FindLight(light_entry.Name.GetHash());
+	Ref<LightBase> light = gLightManager->FindLight(light_entry.Name.GetHash());
 
 	if (light.IsValid() && light->Type != light_type) {
 		LogWarning(LC_ASSET, "Light '{}' changed type, restart to apply", light_entry.Name.Get());
@@ -204,14 +204,11 @@ void WorldFile::AddOrUpdateLightFromEntry(const ConfigEntry& light_entry)
 
 	if (!light.IsValid()) {
 		if (light_type == eLightType::Spot) {
-			light = Ref<LightSpot>::New();
+			light = gLightManager->NewLight<LightSpot>(light_entry.Name.Get());
 		}
 		else {
-			light = Ref<LightPoint>::New();
+			light = gLightManager->NewLight<LightPoint>(light_entry.Name.Get());
 		}
-
-		light->Name = light_entry.Name.Get();
-		gWorld->Attach(light);
 	}
 
 	light->SetPosition(light_entry.GetMemberValue(HashStr32("pos"), light->GetPosition()));

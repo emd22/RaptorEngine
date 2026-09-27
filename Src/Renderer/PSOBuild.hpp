@@ -3,6 +3,8 @@
 #include "Backend/BlendAttachment.hpp"
 #include "Backend/Pipeline.hpp"
 #include "Backend/Shader.hpp"
+#include "PipelineDesc.hpp"
+#include "PipelineKey.hpp"
 #include "PipelineNames.hpp"
 #include "ShaderNames.hpp"
 
@@ -37,6 +39,11 @@ public:
 	 */
 	void BeginPipeline(const ePipelineName pipeline);
 	void EndPipeline();
+
+	/**
+	 * @brief Builds the pipeline that `handle` refers to from a description, start to finish
+	 */
+	void Build(const PipelineHandle handle, const PipelineDesc& desc);
 
 	/**
 	 * @brief Sets the pipeline layout from a preexisting layout.
@@ -87,12 +94,6 @@ public:
 	void SetFaceOrder(eFaceOrder order) { mProperties.WindingOrder = FaceOrderToVk(order); }
 	void SetCullMode(eCullMode mode) { mProperties.CullMode = CullModeToVk(mode); }
 
-	FX_FORCE_INLINE void SetViewportSize(const Vec2u& size, eSizeDivisor size_scale)
-	{
-		mProperties.ViewportSize = size;
-		mProperties.ViewportDivisor = static_cast<uint32>(size_scale);
-	}
-
 	FX_FORCE_INLINE void SetDepthCompareOp(VkCompareOp op) { mProperties.DepthCompareOp = op; }
 
 	FX_FORCE_INLINE Ref<ShaderProgram> GetShaderProgram(eShaderType shader_type)
@@ -106,8 +107,12 @@ public:
 	}
 
 private:
+	void BeginPipeline(Pipeline& pipeline, const ePipelineName name, const char* debug_name);
+
 	void BuildPipeline();
 	void Reset();
+
+	PipelineKey MakeKey();
 
 	std::vector<VkDescriptorSetLayout> BuildDescriptorSets();
 	bool HasDescriptorsToBuild() const;
@@ -121,11 +126,17 @@ public:
 
 private:
 	Pipeline* mpPipeline = nullptr;
-	ePipelineName mPipelineName = ePipelineName::Geometry;
+	/// Pipelines made from a description have no ePipelineName, and this is NumPipelines
+	ePipelineName mPipelineName = ePipelineName::NumPipelines;
+	const char* mDebugName = "";
 
 	RenderPass* mpRenderPass = nullptr;
 
 	eVertexType mVertexType = eVertexType::Default;
+
+	/// The shader that SetShader() was last called with, and the hash of its macros. Part of the pipeline's key.
+	eShaderName mShaderName = eShaderName::NumShaders;
+	Hash64 mMacroHash = 0;
 
 	StackArray<Ref<ShaderProgram>, (ShaderNameUtil::scNumShaders)> mShaderPrograms;
 

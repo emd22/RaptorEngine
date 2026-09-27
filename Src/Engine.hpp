@@ -36,17 +36,29 @@ extern ScriptManager* gScriptManager;
 class World;
 extern World* gWorld;
 
+class LightManager;
+extern LightManager* gLightManager;
+
 class ProbeManager;
 extern ProbeManager* gProbeManager;
 
 class DecalManager;
 extern DecalManager* gDecalManager;
 
-class EditorMode;
-extern EditorMode* gPrototypeEditor;
-
 class CVarManager;
 extern CVarManager* gCVars;
+
+#ifdef FX_IS_EDITOR
+
+namespace editor {
+
+class RaptorEditor;
+} // namespace editor
+
+extern editor::RaptorEditor* gEditor;
+
+
+#endif
 
 
 namespace Globals {

@@ -24,6 +24,19 @@ void ScriptManager::ReloadAllScripts()
 	}
 }
 
-ScriptManager::~ScriptManager() { strataCompilerDestroy(mpCompiler); }
+void ScriptManager::FreeScript(script::Script* script)
+{
+	if (script == nullptr) {
+		return;
+	}
+
+	mScripts.FreeItem(script);
+}
+
+ScriptManager::~ScriptManager()
+{
+	mScripts.Clear();
+	strataCompilerDestroy(mpCompiler);
+}
 
 } // namespace fx

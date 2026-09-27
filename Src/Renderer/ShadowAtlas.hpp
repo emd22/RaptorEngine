@@ -1,6 +1,8 @@
 #pragma once
 
 #include <Math/Vec2.hpp>
+#include <Renderer/PipelineDesc.hpp>
+#include <Renderer/PipelineKey.hpp>
 #include <Renderer/PipelineNames.hpp>
 #include <Renderer/RenderStage.hpp>
 
@@ -53,7 +55,9 @@ public:
 	/**
 	 * @brief Binds a shadow pipeline in the middle of a region, keeping the viewport and scissor on the region.
 	 */
-	void BindPipeline(ePipelineName name);
+	void BindPipeline(PipelineHandle pipeline);
+
+	bool MakeShadowDesc(ePipelineFeatures features, PipelineDesc& out_desc);
 
 	ShadowAtlasRegion GetDirectionalRegion() const;
 	ShadowAtlasRegion GetSpotTileRegion(ShadowTileIndex tile) const;
@@ -91,9 +95,6 @@ private:
 	uint32 mSpotTilesInUse = 0;
 
 	uint32 mGeneration = 0;
-
-	VkViewport mCurrentViewport {};
-	VkRect2D mCurrentScissor {};
 
 	bool mbNeedsClear = true;
 	bool mbInitialized = false;

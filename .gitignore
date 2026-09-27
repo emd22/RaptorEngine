@@ -3,6 +3,7 @@ buildobj
 xcbuild
 xcbuild/**/*
 Src/out/**/*
+*.ninja
 
 Shaders/Spirv/**/*
 Shaders/LastUpdated.fxd
@@ -10,20 +11,21 @@ Shaders/LastUpdated.fxd
 Data/Sponza/**/*
 Data/Demo/Models/**/*
 
-obj
-*.ninja
-.*
-*.vcxproj*
-*.slnx
-*.sln
+
 
 *.ftx
 **/TGen/*.ktx2
 
+# Windows builds
+vcpkg_installed/**/*
 bin
-
 *.dir
 x64
+obj
+.*
+*.vcxproj*
+*.slnx
+*.sln
 
 # Exclusions for .*
 !.gitignore
@@ -42,9 +44,8 @@ Makefile
 *.make
 
 CMakeCache.txt
-*.cmake
-
 CMakeFiles
+*.cmake
 
 bakes
 Testing

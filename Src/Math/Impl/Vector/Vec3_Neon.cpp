@@ -32,27 +32,27 @@ void Vec3f::Print() const { LogInfo("Vec3f {{ X={:.6f}, Y={:.6f}, Z={:.6f} }}", 
 
 Vec3f Vec3f::CrossSlow(const Vec3f& other) const
 {
-    const float32 ax = mData[0];
-    const float32 bx = other.mData[0];
+	const float32 ax = mData[0];
+	const float32 bx = other.mData[0];
 
-    const float32 ay = mData[1];
-    const float32 by = other.mData[1];
+	const float32 ay = mData[1];
+	const float32 by = other.mData[1];
 
-    const float32 az = mData[2];
-    const float32 bz = other.mData[2];
+	const float32 az = mData[2];
+	const float32 bz = other.mData[2];
 
-    return Vec3f(ay * bz - by * az, az * bx - bz * ax, ax * by - bx * ay);
+	return Vec3f(ay * bz - by * az, az * bx - bz * ax, ax * by - bx * ay);
 }
 
 
 Vec3f Vec3f::Rotate(const Quat& rotation) const
 {
-    // v' = q * v * conj(q), with v as the pure quaternion (x, y, z, 0)
-    const Quat vec = Quat(vsetq_lane_f32(0.0f, mIntrin, 3));
-    const Quat result = rotation * vec * rotation.Conjugate();
+	// v' = q * v * conj(q), with v as the pure quaternion (x, y, z, 0)
+	const Quat vec = Quat(vsetq_lane_f32(0.0f, mIntrin, 3));
+	const Quat result = rotation * vec * rotation.Conjugate();
 
-    // W is zero in exact arithmetic; clear any rounding residue so the Vec3f's W lane stays 0
-    return Vec3f(vsetq_lane_f32(0.0f, result.mIntrin, 3));
+	// W is zero in exact arithmetic; clear any rounding residue so the Vec3f's W lane stays 0
+	return Vec3f(vsetq_lane_f32(0.0f, result.mIntrin, 3));
 }
 
 
@@ -63,7 +63,7 @@ void Vec3f::FromJoltVec3(const JPH::RVec3& jolt_vec) { mIntrin = jolt_vec.mValue
 
 bool Vec3f::IsCloseTo(const JPH::Vec3& other, const float32 tolerance) const
 {
-    return IsCloseTo(other.mValue, tolerance);
+	return IsCloseTo(other.mValue, tolerance);
 }
 
 

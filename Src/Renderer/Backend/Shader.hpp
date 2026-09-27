@@ -60,6 +60,7 @@ public:
 		ShaderType = other.ShaderType;
 		pShader = other.pShader;
 		Reflection = std::move(other.Reflection);
+		InputLocationMask = other.InputLocationMask;
 
 		other.InternalShader = nullptr;
 		other.pShader = nullptr;
@@ -88,6 +89,9 @@ public:
 
 	SizedArray<ShaderReflectionEntry> Reflection;
 	eShaderType ShaderType = eShaderType::Vertex;
+
+	/// Bit N is set if the program declares a stage input at location N. All bits are set if unknown.
+	uint32 InputLocationMask = ~0U;
 };
 
 class Shader
@@ -108,6 +112,11 @@ class Shader
 
 public:
 	static ShaderId GenerateShaderId(eShaderType type, const SizedArray<ShaderMacro>& macros);
+
+	/**
+	 * @brief Folds a macro list into `hash` by its contents
+	 */
+	static Hash64 HashMacros(const SizedArray<ShaderMacro>& macros, Hash64 hash = FX_HASH64_FNV1A_INIT);
 
 	Shader() = delete;
 	Shader(const char* path)

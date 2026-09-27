@@ -1,3 +1,6 @@
 [submodule "Submodules/strata"]
 	path = Submodules/strata
 	url = https://github.com/StrataLanguage/stratac.git
+[submodule "RaptorData"]
+	path = RaptorData
+	url = https://github.com/emd22/RaptorData

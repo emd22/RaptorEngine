@@ -18,9 +18,14 @@
 #include <Renderer/Backend/Descriptors.hpp>
 #include <Renderer/Backend/GpuBuffer.hpp>
 #include <Renderer/PipelineNames.hpp>
+#include <Renderer/PipelineVariant.hpp>
 
 
 namespace fx {
+
+namespace renderer {
+class PSOBuild;
+} // namespace renderer
 
 
 enum class eMaterialFlags : uint32
@@ -70,10 +75,7 @@ public:
 	MaterialComponent::Status Build();
 	FX_FORCE_INLINE void RequireUpdate() { mbRequiresUpdate = true; }
 
-	FX_FORCE_INLINE bool Exists() const
-	{
-		return (pImage != nullptr) || (ImageToUpload.ImageData.pData != nullptr);
-	}
+	FX_FORCE_INLINE bool Exists() const { return (pImage != nullptr) || (ImageToUpload.ImageData.pData != nullptr); }
 
 	void SetTicket(AssetTicket& ticket);
 	void SetTicket(AssetTicket&& ticket);
@@ -138,7 +140,7 @@ public:
 	{
 		Diffuse,
 		Normal,
-		MetallicRoughness,
+		ORM,
 
 		MaxImages,
 	};
@@ -167,7 +169,7 @@ public:
 		case eResourceType::Normal:
 			component = &NormalMap;
 			break;
-		case eResourceType::MetallicRoughness:
+		case eResourceType::ORM:
 			component = &MetallicRoughness;
 			break;
 
@@ -195,15 +197,14 @@ public:
 	bool BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline);
 
 
-
 	void Build();
 
 	FX_FORCE_INLINE renderer::DescriptorSet* GetDescriptorSet() { return mpDescriptorSet; }
 
 	/**
-	 * @brief Returns the pipeline that is required by the material.
+	 * @brief Returns what the material needs from the pipelines that draw it, see PipelineCache::FindVariant()
 	 */
-	renderer::ePipelineName GetRequiredPipeline() const;
+	ePipelineFeatures GetPipelineFeatures() const;
 
 	void SetUnlit(bool value);
 	void SetAlphaMask(bool value);
@@ -219,7 +220,15 @@ public:
 
 	void SetBaseColorFactor(const float32 color[3]);
 
-	bool IsAlbedoOnly() const { return (NormalMap.Exists() == false); }
+	/**
+	 * @brief Adds the descriptors of a material's set (set 1) to the pipeline being built, so that it can be drawn with
+	 * any material.
+	 *
+	 * Every material builds the same layout: albedo, normal map, metallic roughness, bone buffer and light buffer. The
+	 * ones a pipeline's shader does not read are left alone by it, so a material without a normal map, or that is not
+	 * skinned, fills them with stand-ins (a flat normal, the white null image and the bone buffer).
+	 */
+	static void DeclareDescriptors(renderer::PSOBuild& pso);
 
 	void Finalize() { bReadyToCheck.test_and_set(); }
 
@@ -227,19 +236,6 @@ public:
 
 	void Destroy();
 	~Material() { Destroy(); }
-
-private:
-	/**
-	 * @brief If requested by the `Bind` functions, generate albedo only descriptor sets to be bound.
-	 */
-	renderer::DescriptorSet* RequestAlbedoOnlyDescriptors();
-
-	/**
-	 * @brief Generates a descriptor set with a bone buffer binding for materials that don't otherwise support
-	 * skinning (e.g. the null material), so they remain layout-compatible when bound as a fallback for a skinned
-	 * pipeline.
-	 */
-	renderer::DescriptorSet* RequestSkinnedFallbackDescriptors();
 
 public:
 	MaterialID ID = MaterialID::scNull;
@@ -264,8 +260,6 @@ public:
 
 private:
 	renderer::DescriptorSet* mpDescriptorSet = nullptr;
-	renderer::DescriptorSet* mpAlbedoOnlyDescriptorSet = nullptr;
-	renderer::DescriptorSet* mpSkinnedFallbackDescriptorSet = nullptr;
 
 	bool mbIsReady : 1 = false;
 	bool mbIsBeingBuilt : 1 = false;

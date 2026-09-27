@@ -2,7 +2,6 @@
 
 #include "Blockout.hpp"
 #include "CommandConsole.hpp"
-#include "InGameEditor.hpp"
 #include "Object/ObjectManager.hpp"
 
 #include <Asset/AssetTicket.hpp>
@@ -18,6 +17,7 @@ class ShadowDirectional;
 namespace fx {
 
 class Image;
+class CVarValue;
 
 
 /////////////////////////////////////
@@ -66,8 +66,6 @@ public:
 	~RaptorGame();
 
 private:
-	void AddEditorModes();
-
 	void InitEngine();
 	void CreateLights();
 
@@ -85,8 +83,6 @@ private:
 	void RenderText();
 	void RenderCrosshair();
 
-	Vec3f GetCameraForwardDominantAxis() const;
-
 public:
 	Ref<LightDirectional> pSun { nullptr };
 
@@ -97,8 +93,10 @@ public:
 
 	BoneId RHandBone = BoneNull;
 
-	double FrameTimeAvg = 0.0f;
 	double DeltaTime = 1.0f / 60.0f;
+
+	double Fps = 0.0;
+	double FrameTimeMs = 0.0;
 
 	Quat PistolRotationGoal = Quat::scIdentity;
 	ObjectManager ObjectManager;
@@ -107,6 +105,16 @@ public:
 
 private:
 	uint64 mLastTick = 0;
+
+	double mFpsWindowTime = 0.0;
+	uint64 mFpsWindowStartFrame = 0;
+
+	CVarValue* mpShowFpsCVar = nullptr;
+
+	// $i_show_gpu shows the GPU time of each stage. $r_probes and $r_decals switch the probes and decals off when 0
+	CVarValue* mpShowGpuCVar = nullptr;
+	CVarValue* mpProbesCVar = nullptr;
+	CVarValue* mpDecalsCVar = nullptr;
 
 	Object* mpRaycastHitMarker = nullptr;
 	ObjectID mEditorSelectedObject = ObjectID::scNull;

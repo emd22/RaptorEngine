@@ -207,7 +207,8 @@ void GraphicsBackend::InitUploadContext()
 {
 	UploadContext.CmdPool.Create(GetDevice(), GetDevice()->mQueueFamilies.GetTransferFamily());
 	UploadContext.CmdBuffer.Create(&UploadContext.CmdPool);
-	UploadContext.ImmediateCmdBuffer.Create(&UploadContext.CmdPool);
+	UploadContext.ImmediateCmdPool.Create(GetDevice(), GetDevice()->mQueueFamilies.GetTransferFamily());
+	UploadContext.ImmediateCmdBuffer.Create(&UploadContext.ImmediateCmdPool);
 
 	Util::SetDebugLabel("UploadImmediate", VK_OBJECT_TYPE_COMMAND_BUFFER, UploadContext.ImmediateCmdBuffer.Cmd);
 	Util::SetDebugLabel("Upload", VK_OBJECT_TYPE_COMMAND_BUFFER, UploadContext.CmdBuffer.Cmd);
@@ -221,6 +222,7 @@ void GraphicsBackend::DestroyUploadContext()
 	UploadContext.CmdBuffer.Destroy();
 	UploadContext.ImmediateCmdBuffer.Destroy();
 	UploadContext.CmdPool.Destroy();
+	UploadContext.ImmediateCmdPool.Destroy();
 
 	UploadContext.UploadFence.Destroy();
 	UploadContext.ImmediateUploadFence.Destroy();
@@ -252,6 +254,8 @@ void GraphicsBackend::InitFrames()
 		synchro_label = std::format("Frame {} R.F", i);
 		Util::SetDebugLabel(synchro_label.c_str(), VK_OBJECT_TYPE_SEMAPHORE, frame.RenderFinished.Get());
 	}
+
+	Profiler.Create(device, graphics_family);
 }
 
 void GraphicsBackend::DestroyFrames()
@@ -260,6 +264,9 @@ void GraphicsBackend::DestroyFrames()
 		SpinLockContext<VkQueue> graphics_queue = GetDevice()->GetGraphicsQueue();
 		vkQueueWaitIdle(graphics_queue.Get());
 	}
+
+	// Nothing that uses the query pools is in flight now
+	Profiler.Destroy();
 
 	for (auto& frame : Frames) {
 		// frame.DescriptorSet.Destroy();
@@ -525,6 +532,8 @@ void GraphicsBackend::SubmitPushConstantsRaw(const CommandBuffer& cmd, const Pip
 
 void GraphicsBackend::SubmitImmediateUploadCmd(GraphicsBackend::SubmitFunc upload_func)
 {
+	std::lock_guard<std::mutex> lock(UploadContext.ImmediateMutex);
+
 	CommandBuffer& cmd = UploadContext.ImmediateCmdBuffer;
 
 	cmd.Record(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -785,11 +794,13 @@ void GraphicsBackend::DoComposition(Camera& render_cam)
 
 
 	pRenderer->ForwardPass.End();
+	MarkGpu(eGpuMarker::Forward);
 
 	// Probe capture bake faces render here: the main forward pass is done, so
 	// the capture can reuse its pipelines + light grid page before composition.
 	if (gProbeManager->IsCapturePending()) {
 		gWorld->RenderProbeCapture();
+		MarkGpu(eGpuMarker::ProbeCapture);
 	}
 
 	// pDeferredRenderer->UnlitPass.End();
@@ -800,15 +811,13 @@ void GraphicsBackend::DoComposition(Camera& render_cam)
 	pRenderer->RenderComposition(render_cam);
 
 	pRenderer->CompPass.End();
+	MarkGpu(eGpuMarker::Composition);
 	// SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
 	// ProcessDeletionQueue(false, deletion_queue.Get());
 	// deletion_queue.Unlock();
 	frame->CmdBuffer.End();
 
 	PresentFrame();
-
-
-	RequirePipelineDynamicStates();
 
 	mInternalFrameCounter++;
 

@@ -24,6 +24,11 @@ void ImageLayoutTransition(Image* image, VkImageLayout new_layout, CommandBuffer
  */
 void BufferComputeToFragment(const CommandBuffer& cmd, RawGpuBuffer* buffer);
 
+/**
+ * @brief Holds back compute shader writes to a buffer until the fragment shader reads recorded before it are done.
+ */
+void BufferFragmentToCompute(const CommandBuffer& cmd, RawGpuBuffer* buffer);
+
 } // namespace BarrierHelper
 } // namespace renderer
 } // namespace fx

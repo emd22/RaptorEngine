@@ -17,6 +17,7 @@
 #include <Core/RefUtil.hpp>
 #include <Decal/DecalManager.hpp>
 #include <Engine.hpp>
+#include <Renderer/LightManager.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
@@ -33,12 +34,15 @@
 #include <csignal>
 
 #ifdef FX_IS_EDITOR
-#include <Editor/EditorApp.hpp>
 #include <Editor/EditorFrame.hpp>
+#include <Editor/EditorTool.hpp>
+#include <Editor/RaptorEditor.hpp>
 #endif
 
+#define FX_LIMIT_FRAMERATE_ON_FOCUS_LOST 1
 
-FX_SET_MODULE_NAME("FoxtrotGame");
+
+FX_SET_MODULE_NAME("RaptorGame");
 
 namespace fx {
 
@@ -46,7 +50,8 @@ using namespace renderer;
 
 static constexpr float scMouseSensitivity = 0.25;
 
-static constexpr uint32 scFramesForAvg = 10;
+/// How long the frame rate shown on screen is averaged over. Any shorter and it flickers too fast to read.
+static constexpr double scFpsWindowSeconds = 0.25;
 
 /// Target frame time while the window doesn't have OS focus, so an unfocused/backgrounded window doesn't burn a full
 /// core rendering frames nobody's looking at
@@ -178,15 +183,15 @@ void RaptorGame::CreateGame()
 
 	gWorld->SelectCamera(gWorld->Player.pCamera);
 
-	AddEditorModes();
-
-#ifdef FX_IS_EDITOR
-	if (!editor::IsSimulationMode()) {
-		gPrototypeEditor->Reload();
-	}
-#endif
-
 	gCVars->Set("i_crosshair_size", scCrosshairSize);
+
+	mpShowFpsCVar = gCVars->Set("i_show_fps", 1);
+
+	// GPU time per stage on screen, and switches for the light probes and the decals to see what they cost. Set
+	// `$i_show_gpu`, `$r_probes` or `$r_decals` to 0 in the console
+	mpShowGpuCVar = gCVars->Set("i_show_gpu", 1);
+	mpProbesCVar = gCVars->Set("r_probes", 1);
+	mpDecalsCVar = gCVars->Set("r_decals", 1);
 
 	// Metres between probes in a volume built from an editor brush. Set `$r_probe_spacing` in the console
 	gCVars->Set("r_probe_spacing", 2.5f);
@@ -201,13 +206,13 @@ void RaptorGame::CreateGame()
 
 	const char* scene_to_load = Config.GetEntry(HashStr32("Scene"))->Get<const char*>();
 
-	scene_file.Load(std::format("Data/{}", scene_to_load));
+	scene_file.Load(std::format("RaptorData/Data/{}", scene_to_load));
 	gPhysics->pBackend->OptimizeBroadPhase();
 
 	// Baked probes if the scene has them, procedural gradient otherwise.
 	gProbeManager->LoadProbes();
 
-	pSun = gWorld->GetDirectionalLight();
+	pSun = gLightManager->GetDirectionalLight();
 
 
 	gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(Vec3f(0, 8, 5), Vec3f(0.0f, 8.0f, -2.0f), Vec3f(0, 1, 0));
@@ -220,9 +225,12 @@ void RaptorGame::CreateGame()
 	CreateLights();
 
 #ifdef FX_IS_EDITOR
-	editor::SetReloadHandler(editor::eReloadTarget::World, [this] { ReloadWorldFile(); });
-	editor::SetReloadHandler(editor::eReloadTarget::Prototype, [this] { ReloadBlockout(); });
-	editor::SetReloadHandler(editor::eReloadTarget::Scripts, [this] { ReloadScripts(); });
+	gEditor->SetReloadHandler(editor::eReloadTarget::World, [this] { ReloadWorldFile(); });
+	gEditor->SetReloadHandler(editor::eReloadTarget::Prototype, [this] { ReloadBlockout(); });
+	gEditor->SetReloadHandler(editor::eReloadTarget::Scripts, [this] { ReloadScripts(); });
+
+	// Start out editing
+	gEditor->SetTool(editor::eEditorTool::Translate);
 #endif
 
 	// Start the frame timer now, otherwise the first Tick() measures from counter zero (time since boot) and steps
@@ -234,6 +242,7 @@ void RaptorGame::CreateGame()
 
 		Tick();
 
+#ifdef FX_LIMIT_FRAMERATE_ON_FOCUS_LOST
 		if (!gGraphics->GetWindow()->IsFocused()) {
 			const double elapsed = static_cast<double>(SDL_GetPerformanceCounter() - frame_start) / sClockFreq;
 			const double remaining = scUnfocusedFrameTime - elapsed;
@@ -242,6 +251,7 @@ void RaptorGame::CreateGame()
 				SDL_Delay(static_cast<uint32>(remaining * 1000.0));
 			}
 		}
+#endif
 	}
 }
 
@@ -308,89 +318,9 @@ static FX_FORCE_INLINE Vec3f GetEditorMovementVector()
 void RaptorGame::ToggleEditorMode()
 {
 #ifdef FX_IS_EDITOR
-	editor::GetMainFrame()->SetEditorTool(editor::IsSimulationMode() ? eEditorTool::Translate : eEditorTool::None);
+	gEditor->SetTool(gEditor->IsSimulationMode() ? editor::eEditorTool::Translate : editor::eEditorTool::None);
 #endif
 }
-
-Vec3f RaptorGame::GetCameraForwardDominantAxis() const
-{
-	Vec3f fwd = gWorld->Player.pCamera->GetForwardVector();
-	Vec3f fa = fwd.Abs();
-
-	if (fa.X > fa.Z) {
-		return Vec3f(MathUtil::GetSign(fwd.X), 0.0f, 0.0f);
-	}
-
-	return Vec3f(0.0f, 0.0, MathUtil::GetSign(fwd.Z));
-}
-
-static constexpr float32 scEditorPickRange = 4.0f;
-
-static Object* PickProbeVolume(const PerspectiveCamera& camera, const Vec3f& pick_direction)
-{
-	float32 volume_distance = 0.0f;
-	Object* volume = gWorld->RaycastProbeVolumes(camera.Position, pick_direction, scEditorPickRange, volume_distance);
-
-	if (volume == nullptr) {
-		return nullptr;
-	}
-
-	// Geometry in front of the volume wins, so looking at a wall inside a volume still selects the wall. The
-	// volume's box is hollow, so standing inside one doesn't put it in front of everything it contains.
-	const physics::RayResult solid = gPhysics->pBackend->Raycast(camera.Position, pick_direction * scEditorPickRange);
-
-	if (solid.bHit && (solid.Point - camera.Position).Length() <= volume_distance) {
-		return nullptr;
-	}
-
-	return volume;
-}
-
-static void EditorSelectObject()
-{
-	Ref<PerspectiveCamera>& cam = gWorld->Player.pCamera;
-
-	const Vec3f pick_direction = cam->GetForwardVector();
-
-	SizedArray<JPH::BodyID> hits = gPhysics->pBackend->RaycastObjects(cam->Position,
-																	  pick_direction * scEditorPickRange);
-
-	const bool should_append_selection = ControlManager::IsKeyDown(eKey::FX_KEY_LALT);
-
-	bool did_hit = false;
-
-	const bool can_add_selection = (gPrototypeEditor != nullptr &&
-									(gPrototypeEditor->HasSelection() == false || should_append_selection));
-
-	if (can_add_selection) {
-		Object* volume = PickProbeVolume(*cam, pick_direction);
-
-		if (volume != nullptr) {
-			did_hit = gPrototypeEditor->SelectObject(volume, should_append_selection);
-		}
-
-		for (int i = 0; !did_hit && i < hits.Size; i++) {
-			JPH::BodyID body_id = hits[i];
-
-			physics::Body* body = gPhysics->FindBody(body_id);
-
-			if (body == nullptr) {
-				continue;
-			}
-
-			did_hit = gPrototypeEditor->SelectObject(gObjectManager->GetObject(body->GetObjectID()),
-													 should_append_selection);
-			if (did_hit) {
-				break;
-			}
-		}
-
-		if (did_hit == false) {
-			gPrototypeEditor->SelectObject(nullptr, false);
-		}
-	}
-}
-
 
 /// How far the player's shots reach
 static constexpr float32 scShotRange = 100.0f;
@@ -417,6 +347,12 @@ static void FireShot()
 
 void RaptorGame::ProcessControls()
 {
+#ifdef FX_IS_EDITOR
+	const bool is_simulation_mode = gEditor->IsSimulationMode();
+#else
+	const bool is_simulation_mode = true;
+#endif
+
 	// The click that captures the mouse shouldn't also fire
 	const bool was_mouse_locked = ControlManager::IsMouseLocked();
 
@@ -434,26 +370,6 @@ void RaptorGame::ProcessControls()
 	else if (ControlManager::IsKeyPressed(eKey::FX_KEY_ESCAPE) && ControlManager::IsMouseLocked()) {
 		ControlManager::ReleaseMouse();
 	}
-
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_TAB)) {
-		// If tab is pressed while there is an object selected in editor mode, deselect the object.
-		if (gPrototypeEditor != nullptr && gPrototypeEditor->HasSelection()) {
-			gPrototypeEditor->SelectObject(nullptr, false);
-		}
-	}
-
-
-	if (!editor::IsSimulationMode() && gPrototypeEditor != nullptr &&
-		ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
-		EditorSelectObject();
-	}
-
-
-	if (editor::IsSimulationMode() && was_mouse_locked && ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
-		FireShot();
-		gWorld->Player.DoFireAnimation();
-	}
-
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_L)) {
 		gWorld->bRenderProbes = !gWorld->bRenderProbes;
@@ -499,19 +415,25 @@ void RaptorGame::ProcessControls()
 		gWorld->Player.bIsSprinting = false;
 	}
 
-	if (editor::IsSimulationMode() && ControlManager::IsKeyPressed(eKey::FX_KEY_R) &&
+	if (is_simulation_mode && was_mouse_locked && ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
+		FireShot();
+		gWorld->Player.DoFireAnimation();
+	}
+
+	if (is_simulation_mode && ControlManager::IsKeyPressed(eKey::FX_KEY_R) &&
 		!ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT)) {
 		gWorld->Player.DoReloadAnimation();
 	}
+
 
 	if (ControlManager::IsComboPressed(eKey::FX_KEY_LSHIFT, eKey::FX_KEY_R)) {
 		ReloadBlockout();
 	}
 
-
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_0)) {
 		ReloadScripts();
 	}
+
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_H)) {
 		const SizedArray<ObjectID>& nearby_objects = gWorldGrid->GetNearbyObjects();
 
@@ -560,7 +482,7 @@ void RaptorGame::ProcessControls()
 	// Save the blockout to a file
 	if (ControlManager::IsComboPressed(eKey::FX_KEY_LMETA, eKey::FX_KEY_S)) {
 		LogInfo("Saving blockout...");
-		gWorld->pBlockout->Save("Data/blockouts/btemp.prx");
+		gWorld->pBlockout->Save("RaptorData/Data/blockouts/btemp.prx");
 	}
 }
 
@@ -570,7 +492,7 @@ void RaptorGame::ReloadWorldFile()
 
 	WorldFile scene_file;
 	const char* scene_to_load = Config.GetEntry(HashStr32("Scene"))->Get<const char*>();
-	scene_file.Load(std::format("Data/{}", scene_to_load));
+	scene_file.Load(std::format("RaptorData/Data/{}", scene_to_load));
 }
 
 void RaptorGame::ReloadBlockout()
@@ -582,12 +504,13 @@ void RaptorGame::ReloadBlockout()
 void RaptorGame::ReloadScripts()
 {
 	LogInfo("Reloading all scripts...");
-	gScriptManager->ReloadAllScripts();
 
-	// Reload the editor so we can requery the hot functions
-	if (gPrototypeEditor != nullptr) {
-		gPrototypeEditor->Reload();
-	}
+#ifdef FX_IS_EDITOR
+	// The editor picks its tools' functions back up afterwards
+	gEditor->ReloadScripts();
+#else
+	gScriptManager->ReloadAllScripts();
+#endif
 }
 
 void RaptorGame::RenderText()
@@ -596,30 +519,48 @@ void RaptorGame::RenderText()
 	static const uint32 scGreen = Color::FromRGBA(100, 255, 0, 255).AsUInt();
 
 	if (bInCommandMode) {
-		gTextRenderer->DrawText(String::Fmt(":{}", mCommandConsole.GetString()).CStr(), 2.0f, scGreen);
-		gTextRenderer->DrawText(String::Fmt("={}", mCommandConsole.Output).CStr(), 2.0f, scWhite);
+		gTextRenderer->DrawText(String::Fmt(":{}", mCommandConsole.GetString()).CStr(), 1.0f, scGreen);
+		gTextRenderer->DrawText(String::Fmt("={}", mCommandConsole.Output).CStr(), 1.0f, scWhite);
 		return;
 	}
 
 
-	gTextRenderer->DrawText(String::Fmt("Vis={}", gWorld->mRenderList.GetItemCount()).CStr(), 2.0f, scWhite);
+	if (mpShowFpsCVar == nullptr || mpShowFpsCVar->IntValue != 0) {
+		gTextRenderer->DrawText(String::Fmt("FPS={:.0f} ({:.2f}ms)", Fps, FrameTimeMs).CStr(), 1.0f, scWhite);
+	}
 
-	if (gPrototypeEditor != nullptr) {
-		gTextRenderer->DrawText(
-			String::Fmt("Q={}, QE={}", gPrototypeEditor->GetQuantizeFraction(), gPrototypeEditor->GetQuantizeEnabled())
-				.CStr(),
-			2.0, scGreen);
+	const GpuProfiler& gpu = gGraphics->Profiler;
 
-		if (gPrototypeEditor->HasSelection()) {
-			Object* last_selected = gPrototypeEditor->GetLastSelectedObject();
+	if (gpu.IsEnabled() && (mpShowGpuCVar == nullptr || mpShowGpuCVar->IntValue != 0)) {
+		gTextRenderer->DrawText(String::Fmt("GPU={:.2f}ms", gpu.GetTotalMs()).CStr(), 1.0f, scWhite);
+		gTextRenderer->DrawText(String::Fmt("Sh {:.2f} Pre {:.2f} Cull {:.2f} SSAO {:.2f} Fwd {:.2f} Comp {:.2f}",
+											gpu.GetMs(eGpuMarker::Shadows), gpu.GetMs(eGpuMarker::Prepass),
+											gpu.GetMs(eGpuMarker::LightCulling), gpu.GetMs(eGpuMarker::SSAO),
+											gpu.GetMs(eGpuMarker::Forward), gpu.GetMs(eGpuMarker::Composition))
+									.CStr(),
+								1.0f, scWhite);
 
-			gTextRenderer->DrawText(String::Fmt("Last={}, Sel={}",
-												(last_selected != nullptr) ? last_selected->Name.Get() : "none",
-												gPrototypeEditor->SelectedCount())
-										.CStr(),
-									2.0, scGreen);
+		// Only bakes have this
+		if (gpu.GetMs(eGpuMarker::ProbeCapture) > 0.005) {
+			gTextRenderer->DrawText(String::Fmt("Bake {:.2f}", gpu.GetMs(eGpuMarker::ProbeCapture)).CStr(), 1.0f,
+									scWhite);
 		}
 	}
+
+	gTextRenderer->DrawText(String::Fmt("Vis={}", gWorld->mRenderList.GetItemCount()).CStr(), 1.0f, scWhite);
+
+#ifdef FX_IS_EDITOR
+	gTextRenderer->DrawText(
+		String::Fmt("Q={}, QE={}", gEditor->GetSnapStep(), gEditor->GetToolState().ToolSnapEnabled).CStr(), 1.0,
+		scGreen);
+
+	const editor::EditorSelection& selection = gEditor->GetSelection();
+
+	if (!selection.IsEmpty()) {
+		gTextRenderer->DrawText(
+			String::Fmt("Last={}, Sel={}", selection.GetLast()->Name.Get(), selection.GetCount()).CStr(), 1.0, scGreen);
+	}
+#endif
 }
 
 void RaptorGame::RenderCrosshair()
@@ -643,15 +584,21 @@ void RaptorGame::Tick()
 	DeltaTime = static_cast<double>(current_tick - mLastTick) / sClockFreq;
 	gGraphics->DeltaTime = static_cast<float32>(DeltaTime);
 
-	FrameTimeAvg += DeltaTime;
+	mFpsWindowTime += DeltaTime;
 
-	if (!(gGraphics->GetFrameNumber() % scFramesForAvg)) {
-		double frametime = FrameTimeAvg / scFramesForAvg;
-		double fps = 1.0 / frametime;
+	if (mFpsWindowTime >= scFpsWindowSeconds) {
+		// Frames that were finished, not calls to Tick(), since a Tick() that returns early (the swapchain is being
+		// rebuilt) does not draw a frame and would make the frame rate read too high
+		const uint64 elapsed_frames = gGraphics->GetElapsedFrameCount();
+		const uint64 frames = elapsed_frames - mFpsWindowStartFrame;
 
-		// LogInfo("FrameTime={}, FPS={}", frametime, fps);
+		if (frames > 0) {
+			FrameTimeMs = (mFpsWindowTime / static_cast<double>(frames)) * 1000.0;
+			Fps = static_cast<double>(frames) / mFpsWindowTime;
+		}
 
-		FrameTimeAvg = 0;
+		mFpsWindowTime = 0.0;
+		mFpsWindowStartFrame = elapsed_frames;
 	}
 
 
@@ -668,23 +615,17 @@ void RaptorGame::Tick()
 		ProcessControls();
 	}
 
-#ifdef FX_IS_EDITOR
-	editor::UpdateWorldPropertiesPanel();
-	editor::UpdatePropertiesPanelForObject((gPrototypeEditor != nullptr) ? gPrototypeEditor->GetLastSelectedObject()
-																		 : nullptr);
-#endif
-
 	if (!bInCommandMode) {
 		gWorld->Player.Move(DeltaTime, GetMovementVector());
 
-		if (!editor::IsSimulationMode()) {
-			Vec3f forward = GetCameraForwardDominantAxis();
-			Vec3f right = Vec3f(forward.Z, 0.0f, -forward.X);
-			Vec3f raw_momement = GetMovementVector();
-			Vec3f movement = forward * raw_momement.Z + right * raw_momement.X + Vec3f(0, raw_momement.Y, 0);
-			gPrototypeEditor->Update(movement, static_cast<float32>(DeltaTime));
-		}
+#ifdef FX_IS_EDITOR
+		gEditor->Update(static_cast<float32>(DeltaTime));
+#endif
 	}
+
+#ifdef FX_IS_EDITOR
+	gEditor->RefreshPanels();
+#endif
 
 	gWorld->Player.Update(DeltaTime);
 
@@ -708,8 +649,15 @@ void RaptorGame::Tick()
 
 	FrameData* frame = gGraphics->GetFrame();
 
+	// This frame slot's fence has been waited on, so what it timed last time round is ready
+	gGraphics->Profiler.ReadResults(gGraphics->GetFrameNumber(), DeltaTime);
+
+	gGraphics->bDisableProbes = (mpProbesCVar != nullptr) && (mpProbesCVar->IntValue == 0);
+	gGraphics->bDisableDecals = (mpDecalsCVar != nullptr) && (mpDecalsCVar->IntValue == 0);
+
 	frame->CmdBuffer.Reset();
 	frame->CmdBuffer.Record();
+	gGraphics->Profiler.BeginFrame(frame->CmdBuffer, gGraphics->GetFrameNumber());
 
 	// mMainScene.RenderShadows(&gShadowRenderer->ShadowCamera);
 	gWorld->Render(&gShadowRenderer->ShadowCamera);
@@ -747,13 +695,6 @@ void RaptorGame::DestroyGame()
 	delete gGraphics->pRenderer;
 	gGraphics->pRenderer = nullptr;
 }
-
-void RaptorGame::AddEditorModes()
-{
-	gPrototypeEditor = new EditorMode();
-	gPrototypeEditor->Create("Prototype", "./Scripts/editor/prototype_editor.strata");
-}
-
 
 RaptorGame::~RaptorGame()
 {

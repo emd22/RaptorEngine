@@ -11,13 +11,6 @@ namespace fx::script {
 
 Script::Script(const String& path) : mPath(path) { ReloadScript(); }
 
-
-Script::Script(const Script& other)
-{
-	mpJit = other.mpJit;
-	mpErrors = other.mpErrors;
-}
-
 Script::Script(Script&& other)
 {
 	mpJit = other.mpJit;
@@ -34,8 +27,14 @@ void Script::ReloadScript()
 		mpErrors = nullptr;
 	}
 
+	// The globals are destroyed by a function in the JIT, so they have to go first
+	if (mpGlobalContext != nullptr) {
+		DestroyGlobalData();
+	}
+
 	if (mpJit != nullptr) {
 		strataJitDestroy(mpJit);
+		mpJit = nullptr;
 	}
 
 	StrataCompiler* compiler = gScriptManager->GetCompiler();
@@ -51,6 +50,8 @@ void Script::ReloadScript()
 		LogError(LC_SCRIPT, "Errors:\n{}", GetErrors());
 		return;
 	}
+
+	CreateGlobalData();
 
 	SetExterns();
 }
@@ -96,28 +97,46 @@ void Script::SetExterns()
 }
 
 
-Script& Script::operator=(const Script& other)
-{
-	mpJit = other.mpJit;
-	mpErrors = other.mpErrors;
-
-	return *this;
-}
-
 Script& Script::operator=(Script&& other)
 {
 	mpJit = other.mpJit;
 	mpErrors = other.mpErrors;
+	mpGlobalContext = other.mpGlobalContext;
+	mPath = other.mPath;
 
 	other.mpJit = nullptr;
 	other.mpErrors = nullptr;
+	other.mpGlobalContext = nullptr;
+	other.mPath.Clear();
 
 	return *this;
+}
+
+void Script::CreateGlobalData()
+{
+	auto context_create_func = GetFunctionRaw<void* (*)()>("__strata_context_create");
+	if (context_create_func != nullptr) {
+		mpGlobalContext = context_create_func();
+	}
+}
+
+void Script::DestroyGlobalData()
+{
+	auto context_destroy_func = GetFunctionRaw<void (*)(void*)>("__strata_context_destroy");
+
+	if (context_destroy_func != nullptr && mpGlobalContext != nullptr) {
+		context_destroy_func(mpGlobalContext);
+		mpGlobalContext = nullptr;
+	}
 }
 
 
 Script::~Script()
 {
+	if (mpGlobalContext != nullptr) {
+		DestroyGlobalData();
+	}
+
 	if (mpErrors != nullptr) {
 		strataFree(const_cast<char*>(mpErrors));
 	}

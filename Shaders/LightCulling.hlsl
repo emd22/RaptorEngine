@@ -13,7 +13,7 @@ F_RWStructBuffer(bLightGrid, TileLightData, 0, 0);
 F_RWStructBuffer(bLightIndexList, uint, 1, 0);
 
 F_StructBuffer(bDecals, Decal, 5, 0);
-/// `DECAL_MASK_WORDS` words per tile, one bit per decal in `bDecals`
+
 F_RWStructBuffer(bDecalMasks, uint, 6, 0);
 
 struct CSPushConsts
@@ -22,75 +22,87 @@ struct CSPushConsts
 	float2 vScreenSize;
 	uint uiLightCount;
 	uint uiTileColumns;
-	/// Light that is swapped out for `uiReplacementSlot`, 0xFFFFFFFF for none. Probe captures use this to give the sun
-	/// a shadow map centered on the probe.
+
+	/// Light that is swapped out for `uiReplacementSlot`, 0xFFFFFFFF for no light
 	uint uiReplacedLight;
 	uint uiReplacementSlot;
-	/// Number of decals in `bDecals`
+
 	uint uiDecalCount;
 };
 
 [[vk::push_constant]] CSPushConsts CSConst;
 
 #define NUM_THREADS (LIGHT_TILE_SIZE * LIGHT_TILE_SIZE)
+#define LIGHT_MASK_WORDS ((LIGHT_COUNT + 31) / 32)
 
-groupshared uint sTileLightCount;
-groupshared uint sTileLightIndices[MAX_LIGHTS_PER_TILE];
+#define TILE_PLANE_COUNT 5
+
+groupshared uint sDirectionalMask[LIGHT_MASK_WORDS];
+groupshared uint sLocalMask[LIGHT_MASK_WORDS];
 groupshared uint sTileDecalMask[DECAL_MASK_WORDS];
 
-float2 ProjectToScreen(float4 clip_space)
+// World space planes bounding the part of the view a tile covers, normalized and facing inwards (Gribb & Hartmann).
+// `tile_min` and `tile_max` are in screen pixels.
+void GetTilePlanes(float2 tile_min, float2 tile_max, out float4 planes[TILE_PLANE_COUNT])
 {
-	float2 ndc = clip_space.xy / clip_space.w;
+	// clip = mul(float4(p, 1), VP), so each clip component is a dot product with one column of VP
+	const float4x4 vp_columns = transpose(CSConst.mViewProjection);
 
-	return (ndc * 0.5 + 0.5) * CSConst.vScreenSize;
+	const float2 ndc_min = (tile_min / CSConst.vScreenSize) * 2.0 - 1.0;
+	const float2 ndc_max = (tile_max / CSConst.vScreenSize) * 2.0 - 1.0;
+
+	// Inside the tile is ndc_min * w <= xy <= ndc_max * w
+	planes[0] = vp_columns[0] - (ndc_min.x * vp_columns[3]);
+	planes[1] = (ndc_max.x * vp_columns[3]) - vp_columns[0];
+	planes[2] = vp_columns[1] - (ndc_min.y * vp_columns[3]);
+	planes[3] = (ndc_max.y * vp_columns[3]) - vp_columns[1];
+
+	// w >= 0, in front of the eye
+	planes[4] = vp_columns[3];
+
+	[unroll]
+	for (uint plane = 0; plane < TILE_PLANE_COUNT; plane++) {
+		planes[plane] /= length(planes[plane].xyz);
+	}
 }
 
-/// Whether the screen space bounds of a decal's box overlap the tile. Boxes that reach behind the camera overlap every
-/// tile, as their projected corners no longer bound them.
-bool DecalIntersectsTile(Decal decal, float2 tile_min, float2 tile_max)
+bool SphereIntersectsTile(float4 planes[TILE_PLANE_COUNT], float3 center, float radius)
 {
-	// Each corner is the center plus or minus every half axis, so only these four need transforming
-	const float4 center_clip = mul(float4(decal.vCenter, 1.0), CSConst.mViewProjection);
+	const float4 center_h = float4(center, 1.0);
+
+	[unroll]
+	for (uint plane = 0; plane < TILE_PLANE_COUNT; plane++) {
+		if (dot(center_h, planes[plane]) < -radius) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+bool DecalIntersectsTile(float4 planes[TILE_PLANE_COUNT], Decal decal)
+{
+	const float4 center_h = float4(decal.vCenter, 1.0);
+
 	// The axes are stored unit length, so they are scaled back to half extents here
 	const float3 half_axis_x = decal.vAxisX * decal.vHalfExtents.x;
 	const float3 half_axis_y = decal.vAxisY * decal.vHalfExtents.y;
 	const float3 half_axis_z = decal.vAxisZ * decal.vHalfExtents.z;
 
-	const float4 axis_x_clip = mul(float4(half_axis_x, 0.0), CSConst.mViewProjection);
-	const float4 axis_y_clip = mul(float4(half_axis_y, 0.0), CSConst.mViewProjection);
-	const float4 axis_z_clip = mul(float4(half_axis_z, 0.0), CSConst.mViewProjection);
-
-	float2 rect_min = float2(1e30, 1e30);
-	float2 rect_max = float2(-1e30, -1e30);
-
-	uint corners_behind = 0;
-
 	[unroll]
-	for (uint corner = 0; corner < 8; corner++) {
-		const float3 signs = float3((corner & 1) ? 1.0 : -1.0, (corner & 2) ? 1.0 : -1.0, (corner & 4) ? 1.0 : -1.0);
-		const float4 corner_clip = center_clip + (axis_x_clip * signs.x) + (axis_y_clip * signs.y) +
-								   (axis_z_clip * signs.z);
+	for (uint plane = 0; plane < TILE_PLANE_COUNT; plane++) {
+		const float3 normal = planes[plane].xyz;
 
-		if (corner_clip.w <= 1e-4) {
-			corners_behind++;
-			continue;
+		// How far the box reaches from its center along the plane normal
+		const float reach = abs(dot(normal, half_axis_x)) + abs(dot(normal, half_axis_y)) +
+							abs(dot(normal, half_axis_z));
+
+		if (dot(center_h, planes[plane]) < -reach) {
+			return false;
 		}
-
-		const float2 corner_screen = ProjectToScreen(corner_clip);
-
-		rect_min = min(rect_min, corner_screen);
-		rect_max = max(rect_max, corner_screen);
 	}
 
-	if (corners_behind == 8) {
-		return false;
-	}
-
-	if (corners_behind > 0) {
-		return true;
-	}
-
-	return all(rect_max >= tile_min) && all(rect_min <= tile_max);
+	return true;
 }
 
 [numthreads(LIGHT_TILE_SIZE, LIGHT_TILE_SIZE, 1)]
@@ -98,8 +110,9 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_GroupThreadID)
 {
 	const uint local_index = thread_id.y * LIGHT_TILE_SIZE + thread_id.x;
 
-	if (local_index == 0) {
-		sTileLightCount = 0;
+	for (uint clear_light = local_index; clear_light < LIGHT_MASK_WORDS; clear_light += NUM_THREADS) {
+		sDirectionalMask[clear_light] = 0;
+		sLocalMask[clear_light] = 0;
 	}
 
 	for (uint clear_word = local_index; clear_word < DECAL_MASK_WORDS; clear_word += NUM_THREADS) {
@@ -112,64 +125,31 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_GroupThreadID)
 	const uint2 tile_min = group_id.xy * LIGHT_TILE_SIZE;
 	const uint2 tile_max = min(tile_min + LIGHT_TILE_SIZE, uint2(CSConst.vScreenSize));
 
+	float4 tile_planes[TILE_PLANE_COUNT];
+	GetTilePlanes(float2(tile_min), float2(tile_max), tile_planes);
+
 	for (uint cull_index = local_index; cull_index < CSConst.uiLightCount; cull_index += NUM_THREADS) {
 		const uint light_index = (cull_index == CSConst.uiReplacedLight) ? CSConst.uiReplacementSlot : cull_index;
-		Light light = Lights[light_index];
+		const uint light_bit = 1u << (light_index % 32);
 
-		bool intersects_tile = false;
+		Light light = Lights[light_index];
 
 		if (light.uiLightType == FX_LIGHT_TYPE_DIRECTIONAL) {
 			// Directional lights affect every tile
-			intersects_tile = true;
-		}
-		else {
-			// Point lights are bounded by their radius, spot lights by a sphere around their cone
-			float3 bounds_center = light.vLightPosition;
-			float bounds_radius = light.fLightRadius;
-
-			if (light.uiLightType == FX_LIGHT_TYPE_SPOT) {
-				const float4 spot_bounds = GetSpotBoundingSphere(light);
-
-				bounds_center = spot_bounds.xyz;
-				bounds_radius = spot_bounds.w;
-			}
-
-			float4 center_clip = mul(float4(bounds_center, 1.0), CSConst.mViewProjection);
-
-			if (center_clip.w < -bounds_radius) {
-				intersects_tile = false;
-			}
-			else if (center_clip.w <= bounds_radius) {
-				intersects_tile = true;
-			}
-			else {
-				float2 center_screen = ProjectToScreen(center_clip);
-
-				// Approximate the screen space radius by projecting offset points
-				float radius_x = length(ProjectToScreen(mul(float4(bounds_center + float3(bounds_radius, 0.0, 0.0), 1.0),
-																CSConst.mViewProjection)) -
-										center_screen);
-				float radius_y = length(ProjectToScreen(mul(float4(bounds_center + float3(0.0, bounds_radius, 0.0), 1.0),
-																CSConst.mViewProjection)) -
-										center_screen);
-
-				float radius = max(radius_x, radius_y);
-
-				// Circle vs AABB intersection test
-				float2 closest_point = clamp(center_screen, tile_min, tile_max);
-				float2 distance_sq = center_screen - closest_point;
-
-				intersects_tile = dot(distance_sq, distance_sq) <= (radius * radius);
-			}
+			InterlockedOr(sDirectionalMask[light_index / 32], light_bit);
+			continue;
 		}
 
-		if (intersects_tile) {
-			uint slot_index;
-			InterlockedAdd(sTileLightCount, 1, slot_index);
+		// Point lights are bounded by their radius, spot lights by a sphere around their cone
+		// Should probably implement cone tests here in the future to reduce the amount of tiles a spotlight shows up in
+		float4 bounds = float4(light.vLightPosition, light.fLightRadius);
 
-			if (slot_index < MAX_LIGHTS_PER_TILE) {
-				sTileLightIndices[slot_index] = light_index;
-			}
+		if (light.uiLightType == FX_LIGHT_TYPE_SPOT) {
+			bounds = GetSpotBoundingSphere(light);
+		}
+
+		if (SphereIntersectsTile(tile_planes, bounds.xyz, bounds.w)) {
+			InterlockedOr(sLocalMask[light_index / 32], light_bit);
 		}
 	}
 
@@ -178,16 +158,24 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_GroupThreadID)
 	const uint decal_count = min(CSConst.uiDecalCount, MAX_VISIBLE_DECALS);
 
 	for (uint decal_index = local_index; decal_index < decal_count; decal_index += NUM_THREADS) {
-		if (DecalIntersectsTile(bDecals[decal_index], float2(tile_min), float2(tile_max))) {
+		if (DecalIntersectsTile(tile_planes, bDecals[decal_index])) {
 			InterlockedOr(sTileDecalMask[decal_index / 32], 1u << (decal_index % 32));
 		}
 	}
 
 	GroupMemoryBarrierWithGroupSync();
 
+	uint directional_count = 0;
+	uint local_count = 0;
+
+	for (uint count_word = 0; count_word < LIGHT_MASK_WORDS; count_word++) {
+		directional_count += countbits(sDirectionalMask[count_word]);
+		local_count += countbits(sLocalMask[count_word]);
+	}
+
 	const uint tile_index = group_id.x + (group_id.y * CSConst.uiTileColumns);
 	const uint start_index = tile_index * MAX_LIGHTS_PER_TILE;
-	const uint light_count = min(sTileLightCount, MAX_LIGHTS_PER_TILE);
+	const uint light_count = min(directional_count + local_count, MAX_LIGHTS_PER_TILE);
 
 	if (local_index == 0) {
 		bLightGrid[tile_index].Count = light_count;
@@ -212,8 +200,29 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_GroupThreadID)
 		bDecalMasks[(tile_index * DECAL_MASK_WORDS) + mask_word] = sTileDecalMask[mask_word];
 	}
 
-	// Each tile owns a fixed region of the global index list, copy the shared list into it
-	for (uint copy_index = local_index; copy_index < light_count; copy_index += NUM_THREADS) {
-		bLightIndexList[start_index + copy_index] = sTileLightIndices[copy_index];
+	for (uint slot = local_index; slot < LIGHT_COUNT; slot += NUM_THREADS) {
+		const uint word = slot / 32;
+		const uint bit = 1u << (slot % 32);
+		const uint bits_below = bit - 1;
+
+		const bool is_directional = (sDirectionalMask[word] & bit) != 0;
+
+		if (!is_directional && (sLocalMask[word] & bit) == 0) {
+			continue;
+		}
+
+		uint rank = countbits((is_directional ? sDirectionalMask[word] : sLocalMask[word]) & bits_below);
+
+		for (uint prior_word = 0; prior_word < word; prior_word++) {
+			rank += countbits(is_directional ? sDirectionalMask[prior_word] : sLocalMask[prior_word]);
+		}
+
+		if (!is_directional) {
+			rank += directional_count;
+		}
+
+		if (rank < MAX_LIGHTS_PER_TILE) {
+			bLightIndexList[start_index + rank] = slot;
+		}
 	}
 }

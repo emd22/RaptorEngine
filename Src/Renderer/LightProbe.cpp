@@ -10,6 +10,7 @@
 #include "LightProbe.hpp"
 
 #include <Asset/AssetManager.hpp>
+#include <Blockout.hpp>
 #include <CVar.hpp>
 #include <Core/File.hpp>
 #include <Engine.hpp>
@@ -18,12 +19,14 @@
 #include <Renderer/Backend/BarrierHelper.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
+#include <World.hpp>
 #include <algorithm>
 #include <bit>
 #include <cfloat>
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <vector>
 
 /// Bump whenever the layout or meaning of the cached data changes
 #define FX_PROBE_CACHE_FILE_VERSION 10
@@ -32,11 +35,21 @@ namespace fx {
 
 struct ProbePlacementBoxes
 {
+	struct Plane
+	{
+		Vec3f Normal;
+		float32 Distance;
+	};
+
 	struct Box
 	{
 		AABB LocalBounds;
 		Mat4f LocalToWorld;
 		Mat4f WorldToLocal;
+
+		/// The bounding planes of a brush that isn't a box, in local space. Without them the solid is LocalBounds,
+		/// which for a slanted brush would also take in the empty space beside the slope.
+		std::vector<Plane> Planes;
 	};
 
 	static constexpr uint32 scMaxBoxes = 256;
@@ -277,11 +290,22 @@ ProbePlacementBoxes GatherPlacementBoxes()
 		if (boxes.Count < ProbePlacementBoxes::scMaxBoxes) {
 			const Mat4f& local_to_world = object.GetWorldMatrix();
 
-			boxes.Boxes[boxes.Count++] = {
-				.LocalBounds = object.Bounds,
-				.LocalToWorld = local_to_world,
-				.WorldToLocal = local_to_world.Inverse(),
-			};
+			ProbePlacementBoxes::Box& box = boxes.Boxes[boxes.Count++];
+			box.LocalBounds = object.Bounds;
+			box.LocalToWorld = local_to_world;
+			box.WorldToLocal = local_to_world.Inverse();
+
+			// Blockouts are brushes, whose bounds are the box around the whole hull. Use the hull itself when it isn't
+			// a box
+			const Brush* brush = (gWorld != nullptr && gWorld->pBlockout != nullptr)
+									 ? gWorld->pBlockout->GetBrush(&object)
+									 : nullptr;
+
+			if (brush != nullptr && brush->IsValid() && !brush->IsBox()) {
+				for (const BrushPlane& plane : brush->Planes) {
+					box.Planes.push_back({ plane.Normal, plane.Distance });
+				}
+			}
 		}
 
 		boxes.Min = Vec3f::Min(boxes.Min, world_bounds.Min);
@@ -305,6 +329,16 @@ Vec3f ToBoxLocal(const Vec3f& point, const ProbePlacementBoxes::Box& box)
 bool IsInsideBox(const Vec3f& point, const ProbePlacementBoxes::Box& box, float32 skin)
 {
 	const Vec3f local = ToBoxLocal(point, box);
+
+	if (!box.Planes.empty()) {
+		for (const ProbePlacementBoxes::Plane& plane : box.Planes) {
+			if (plane.Normal.Dot(local) - plane.Distance >= skin) {
+				return false;
+			}
+		}
+
+		return true;
+	}
 
 	for (uint32 axis = 0; axis < 3; axis++) {
 		if (local.mData[axis] <= box.LocalBounds.Min.mData[axis] - skin ||
@@ -338,9 +372,52 @@ bool IsInsideLevel(const Vec3f& point, const ProbePlacementBoxes& boxes)
 	return true;
 }
 
+/// The point of the box's solid nearest to `local`, in the box's local space
+Vec3f ClosestPointInBox(const Vec3f& local, const ProbePlacementBoxes::Box& box)
+{
+	if (box.Planes.empty()) {
+		return Vec3f::Clamp(local, box.LocalBounds.Min, box.LocalBounds.Max);
+	}
+
+	// Projecting onto the planes one after another gives a point inside the hull, but not necessarily the nearest one.
+	// Dykstra's correction terms make it converge on the nearest, and points that are already inside stop at once.
+	constexpr uint32 cMaxIterations = 32;
+	constexpr float32 cConvergedSquared = 1e-8f;
+
+	Vec3f corrections[Brush::scMaxPlanes] = {};
+
+	const uint32 plane_count = std::min(static_cast<uint32>(box.Planes.size()), Brush::scMaxPlanes);
+
+	Vec3f closest = local;
+
+	for (uint32 iteration = 0; iteration < cMaxIterations; iteration++) {
+		float32 moved_squared = 0.0f;
+
+		for (uint32 i = 0; i < plane_count; i++) {
+			const ProbePlacementBoxes::Plane& plane = box.Planes[i];
+
+			const Vec3f shifted = closest + corrections[i];
+			const float32 outside = plane.Normal.Dot(shifted) - plane.Distance;
+			const Vec3f projected = (outside > 0.0f) ? shifted - plane.Normal * outside : shifted;
+
+			corrections[i] = shifted - projected;
+
+			const Vec3f step = projected - closest;
+			moved_squared = std::max(moved_squared, step.Dot(step));
+			closest = projected;
+		}
+
+		if (moved_squared < cConvergedSquared) {
+			break;
+		}
+	}
+
+	return closest;
+}
+
 float32 DistanceToBox(const Vec3f& point, const ProbePlacementBoxes::Box& box)
 {
-	const Vec3f closest_local = Vec3f::Clamp(ToBoxLocal(point, box), box.LocalBounds.Min, box.LocalBounds.Max);
+	const Vec3f closest_local = ClosestPointInBox(ToBoxLocal(point, box), box);
 	const Vec4f closest = box.LocalToWorld * Vec4f(closest_local.X, closest_local.Y, closest_local.Z, 1.0f);
 
 	return (point - Vec3f(closest.X, closest.Y, closest.Z)).Length();
@@ -353,6 +430,38 @@ bool SegmentCrossesBox(const Vec3f& from, const Vec3f& to, const ProbePlacementB
 
 	float32 t_enter = 0.0f;
 	float32 t_exit = 1.0f;
+
+	if (!box.Planes.empty()) {
+		// Clip the segment against each plane pulled in by the skin
+		for (const ProbePlacementBoxes::Plane& plane : box.Planes) {
+			const float32 limit = plane.Distance - skin;
+			const float32 start = plane.Normal.Dot(local_from);
+			const float32 delta = plane.Normal.Dot(local_to) - start;
+
+			if (std::abs(delta) < 1e-6f) {
+				if (start >= limit) {
+					return false;
+				}
+
+				continue;
+			}
+
+			const float32 t = (limit - start) / delta;
+
+			if (delta < 0.0f) {
+				t_enter = std::max(t_enter, t);
+			}
+			else {
+				t_exit = std::min(t_exit, t);
+			}
+
+			if (t_enter >= t_exit) {
+				return false;
+			}
+		}
+
+		return true;
+	}
 
 	for (uint32 axis = 0; axis < 3; axis++) {
 		const float32 lo = box.LocalBounds.Min.mData[axis] + skin;
@@ -413,15 +522,46 @@ bool IsProbePlacementValid(const Vec3f& grid_position, const Vec3f& position, co
 	return true;
 }
 
-Vec3f ExitThroughFace(const Vec3f& local, const ProbePlacementBoxes::Box& box, uint32 axis, bool through_max)
+/// Boxes have six faces, and a brush has one per plane
+uint32 GetFaceCount(const ProbePlacementBoxes::Box& box)
+{
+	return box.Planes.empty() ? 6 : static_cast<uint32>(box.Planes.size());
+}
+
+/// How far `local` has to move to leave through a face. Box faces are numbered axis * 2 + (0 for min, 1 for max).
+float32 GetFacePenetration(const Vec3f& local, const ProbePlacementBoxes::Box& box, uint32 face)
+{
+	if (!box.Planes.empty()) {
+		const ProbePlacementBoxes::Plane& plane = box.Planes[face];
+		return plane.Distance - plane.Normal.Dot(local);
+	}
+
+	const uint32 axis = face / 2;
+
+	return ((face & 1) != 0) ? box.LocalBounds.Max.mData[axis] - local.mData[axis]
+							 : local.mData[axis] - box.LocalBounds.Min.mData[axis];
+}
+
+Vec3f ExitThroughFace(const Vec3f& local, const ProbePlacementBoxes::Box& box, uint32 face)
 {
 	Vec3f exit_local = local;
-	exit_local.mData[axis] = through_max ? box.LocalBounds.Max.mData[axis] : box.LocalBounds.Min.mData[axis];
+	Vec3f local_normal = Vec3f::sZero;
+
+	if (!box.Planes.empty()) {
+		const ProbePlacementBoxes::Plane& plane = box.Planes[face];
+
+		exit_local = local + plane.Normal * (plane.Distance - plane.Normal.Dot(local));
+		local_normal = plane.Normal;
+	}
+	else {
+		const uint32 axis = face / 2;
+		const bool through_max = (face & 1) != 0;
+
+		exit_local.mData[axis] = through_max ? box.LocalBounds.Max.mData[axis] : box.LocalBounds.Min.mData[axis];
+		local_normal.mData[axis] = through_max ? 1.0f : -1.0f;
+	}
 
 	const Vec4f exit_world = box.LocalToWorld * Vec4f(exit_local.X, exit_local.Y, exit_local.Z, 1.0f);
-
-	Vec3f local_normal = Vec3f::sZero;
-	local_normal.mData[axis] = through_max ? 1.0f : -1.0f;
 
 	const Vec4f world_normal4 = box.LocalToWorld * Vec4f(local_normal.X, local_normal.Y, local_normal.Z, 0.0f);
 	const Vec3f world_normal = Vec3f(world_normal4.X, world_normal4.Y, world_normal4.Z).Normalize();
@@ -437,32 +577,22 @@ bool PushOutOfBox(Vec3f& point, const ProbePlacementBoxes::Box& box)
 
 	const Vec3f local = ToBoxLocal(point, box);
 
-	uint32 exit_axis = 0;
-	bool exit_through_max = false;
+	uint32 exit_face = 0;
 	float32 exit_distance = std::numeric_limits<float32>::max();
 
-	for (uint32 axis = 0; axis < 3; axis++) {
-		const float32 to_min = local.mData[axis] - box.LocalBounds.Min.mData[axis];
-		const float32 to_max = box.LocalBounds.Max.mData[axis] - local.mData[axis];
+	for (uint32 face = 0; face < GetFaceCount(box); face++) {
+		const float32 penetration = GetFacePenetration(local, box, face);
 
-		if (to_min < exit_distance) {
-			exit_distance = to_min;
-			exit_axis = axis;
-			exit_through_max = false;
-		}
-
-		if (to_max < exit_distance) {
-			exit_distance = to_max;
-			exit_axis = axis;
-			exit_through_max = true;
+		if (penetration < exit_distance) {
+			exit_distance = penetration;
+			exit_face = face;
 		}
 	}
 
-	point = ExitThroughFace(local, box, exit_axis, exit_through_max);
+	point = ExitThroughFace(local, box, exit_face);
 
 	return true;
 }
-
 
 bool PushOutOfBoxes(Vec3f& point, const ProbePlacementBoxes& boxes)
 {
@@ -484,8 +614,8 @@ bool PushOutOfBoxes(Vec3f& point, const ProbePlacementBoxes& boxes)
 
 		const Vec3f local = ToBoxLocal(point, box);
 
-		for (uint32 face = 0; face < 6; face++) {
-			const Vec3f exit = ExitThroughFace(local, box, face / 2, (face & 1) != 0);
+		for (uint32 face = 0; face < GetFaceCount(box); face++) {
+			const Vec3f exit = ExitThroughFace(local, box, face);
 			const float32 distance = (exit - point).Length();
 
 			uint32 rank = cNoExit;
@@ -554,7 +684,7 @@ bool HugNearestSurface(Vec3f& point, const ProbePlacementBoxes& boxes, float32 m
 	for (uint32 i = 0; i < boxes.Count; i++) {
 		const ProbePlacementBoxes::Box& box = boxes.Boxes[i];
 
-		const Vec3f closest_local = Vec3f::Clamp(ToBoxLocal(point, box), box.LocalBounds.Min, box.LocalBounds.Max);
+		const Vec3f closest_local = ClosestPointInBox(ToBoxLocal(point, box), box);
 
 		const Vec4f closest_world4 = box.LocalToWorld * Vec4f(closest_local.X, closest_local.Y, closest_local.Z, 1.0f);
 		const Vec3f closest(closest_world4.X, closest_world4.Y, closest_world4.Z);
