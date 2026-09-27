@@ -47,6 +47,25 @@ void Object::SetMaterial(const MaterialID& id)
 	// }
 }
 
+MaterialID Object::GetSectionMaterial(const MeshSection& section) const
+{
+	if (section.Material.IsNull() || HasFlag(Flags, eObjectFlags::MaterialOverridesSections)) {
+		return mMaterialID;
+	}
+
+	return section.Material;
+}
+
+void Object::SetMaterialOverridesSections(bool value)
+{
+	if (value) {
+		SetFlag(Flags, eObjectFlags::MaterialOverridesSections);
+	}
+	else {
+		ClearFlag(Flags, eObjectFlags::MaterialOverridesSections);
+	}
+}
+
 void Object::Create(const Ref<PrimitiveMesh>& mesh, const MaterialID& material)
 {
 	pMesh = mesh;
@@ -159,7 +178,7 @@ void Object::ReserveInstances(uint32 num)
 }
 
 
-void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
+void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline, const MeshSection* section)
 {
 	UpdateIfOutOfDate();
 
@@ -174,7 +193,7 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 	DrawPushConstants push_constants { .TargetSize = { gGraphics->Swapchain.Extent.X, gGraphics->Swapchain.Extent.Y } };
 	push_constants.ObjectId = ID.GetID();
 
-	push_constants.MaterialIndex = mMaterialID.GetID();
+	push_constants.MaterialIndex = (section != nullptr) ? GetSectionMaterial(*section).GetID() : mMaterialID.GetID();
 	push_constants.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
 	push_constants.TileRows = gGraphics->pRenderer->GetLightTileRows();
 	push_constants.BoneBase = BoneBufferBase;
@@ -206,31 +225,46 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 	gGraphics->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex | eShaderType::Pixel,
 								   push_constants);
 
-	RenderMesh(pipeline);
+	RenderMesh(pipeline, section);
 }
 
 
-void Object::RenderPrimitive(const CommandBuffer& cmd)
+void Object::RenderPrimitive(const CommandBuffer& cmd, const MeshSection* section)
 {
-	if (pMesh && CheckIfReady(false) && HasBonesForDraw()) {
+	if (!pMesh || !CheckIfReady(false) || !HasBonesForDraw()) {
+		return;
+	}
+
+	if (section != nullptr) {
+		pMesh->RenderRange(cmd, section->FirstIndex, section->IndexCount, (mInstanceSlotsInUse + 1));
+	}
+	else {
 		pMesh->Render(cmd, (mInstanceSlotsInUse + 1));
 	}
 }
 
-void Object::RenderMesh(renderer::Pipeline* pipeline)
+void Object::RenderMesh(renderer::Pipeline* pipeline, const MeshSection* section)
 {
 	FrameData* frame = gGraphics->GetFrame();
 	CommandBuffer& cmd = frame->CmdBuffer;
 
-	Material* mat = gMaterialManager->GetMaterial(mMaterialID);
+	const MaterialID material_id = (section != nullptr) ? GetSectionMaterial(*section) : mMaterialID;
 
 	// If there was an error binding the object material, bind the null material.
-	if (!gMaterialManager->BindWithPipeline(cmd, *pipeline, mMaterialID)) {
+	if (!gMaterialManager->BindWithPipeline(cmd, *pipeline, material_id)) {
 		gMaterialManager->BindWithPipeline(cmd, *pipeline, MaterialID::scNull);
 	}
 
-	if (pMesh) {
-		pMesh->Render(cmd, (mInstanceSlotsInUse + 1)); // + 1 for source object
+	if (!pMesh) {
+		return;
+	}
+
+	// + 1 for source object
+	if (section != nullptr) {
+		pMesh->RenderRange(cmd, section->FirstIndex, section->IndexCount, (mInstanceSlotsInUse + 1));
+	}
+	else {
+		pMesh->Render(cmd, (mInstanceSlotsInUse + 1));
 	}
 }
 

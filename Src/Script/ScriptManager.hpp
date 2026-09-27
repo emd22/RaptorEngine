@@ -16,6 +16,7 @@ public:
 
 	script::Script* LoadScript(const String& path);
 	struct StrataCompiler* GetCompiler() { return mpCompiler; };
+	void FreeScript(script::Script* script);
 
 	void ReloadAllScripts();
 

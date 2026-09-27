@@ -10,7 +10,7 @@ struct MeshGenOptions
 {
 	float32 Scale = 1.0f;
 	Vec2f UvMin = Vec2f(0.0f, 0.0f);
-	Vec2f UvMax = Vec2f(1.0f, 1.0f);
+	Vec2f UvMax = Vec2f(0.5f, 0.5f);
 };
 
 struct CubeGenOptions
@@ -76,6 +76,8 @@ public:
 	static Ref<GeneratedMesh> MakeCube(CubeGenOptions options = {});
 
 	static Ref<GeneratedMesh> MakeWireframeBox();
+	/// A single segment from the origin to +1 on X, as a line list
+	static Ref<GeneratedMesh> MakeLine();
 	static Ref<GeneratedMesh> MakeQuad(Vec2f scale = Vec2f(1.0f, 1.0f));
 
 private:

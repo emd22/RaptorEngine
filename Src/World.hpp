@@ -29,7 +29,7 @@ class World
 	struct TransparentObjectCarrier
 	{
 		ObjectID ID;
-		renderer::ePipelineName Pipeline;
+		renderer::PipelineHandle Pipeline;
 		float32 Distance;
 	};
 
@@ -49,7 +49,6 @@ public:
 	void Create();
 
 	void Attach(AssetTicket object_ticket);
-	void Attach(const Ref<LightBase>& light);
 
 	void Detach(ObjectID id);
 
@@ -63,32 +62,6 @@ public:
 	 */
 	void RenderProbeCapture();
 
-	const PagedArray<Ref<LightBase>>& GetAllLights() { return mLights; }
-
-	Ref<LightDirectional> GetDirectionalLight()
-	{
-		for (Ref<LightBase>& light : mLights) {
-			if (light->Type == eLightType::Directional) {
-				return Ref<LightDirectional>(light);
-			}
-		}
-
-		return Ref<LightDirectional>(nullptr);
-	}
-
-	/// Finds an attached light by its name, returns a null ref if there is no match.
-	Ref<LightBase> FindLight(Hash32 name)
-	{
-		for (Ref<LightBase>& light : mLights) {
-			if (light->Name == name) {
-				return light;
-			}
-		}
-
-		return Ref<LightBase>(nullptr);
-	}
-
-
 	void Destroy();
 
 	FX_FORCE_INLINE Player& GetPlayer() { return this->Player; }
@@ -98,26 +71,32 @@ public:
 	~World() { Destroy(); }
 
 private:
-	void RenderPhysicsObjects(const Camera& camera);
-	void RenderProbeDebug(const Camera& camera);
+	// Queue debug shapes on gDebugDraw, which draws them at the end of Render()
+	void DebugDrawPhysicsBodies();
+	void DebugDrawProbes();
 
 	/// Draws a wireframe box for each probe volume brush, which is otherwise not drawn at all
-	void RenderProbeVolumes(const Camera& camera);
+	void DebugDrawProbeVolumes();
 
 public:
 	Object* RaycastProbeVolumes(const Vec3f& origin, const Vec3f& direction, float32 max_distance,
 								float32& out_distance);
 
 private:
-	void RenderBoundingBoxes(const Camera& camera);
-	void RenderWorldGrid(const Camera& camera);
+	void DebugDrawObjectBounds();
+	void DebugDrawWorldGrid();
 
 	void CullWorldTiles(const PerspectiveCamera& cam);
 
-	void ExecuteRenderList(renderer::ePipelineName pl_name);
-	void ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera& camera);
+	void ExecuteRenderList(renderer::PipelineHandle pipeline);
+	/// Draws the list of `pipeline` with `draw_pipeline`, which is a variant of it from another pass (or itself)
+	void ExecuteRenderList(renderer::PipelineHandle pipeline, renderer::PipelineHandle draw_pipeline,
+						   PerspectiveCamera& camera);
+
+	/// Draws the opaque geometry with every pipeline of the forward pass
+	void ExecuteForwardRenderLists(PerspectiveCamera& camera);
 	void ExecuteTransparentRenderLists();
-	void ExecuteShadowRenderList(renderer::ePipelineName pl_name, const Camera& shadow_camera);
+	void ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Camera& shadow_camera);
 
 	/**
 	 * @brief Re-renders the sun's shadow map centered on `center` for a probe capture, and writes a copy of the sun
@@ -146,12 +125,13 @@ private:
 	 */
 	void GatherSpotShadowCasters(const Vec3f& center, float32 radius, DynArray<ObjectID>& out_casters);
 	void AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, DynArray<ObjectID>& out_casters);
-	void ExecutePrepassRenderList(renderer::ePipelineName pl_name);
+	/// Draws the objects of a forward pipeline's list into the prepass, with the prepass pipeline that goes with it
+	void ExecutePrepassRenderList(renderer::PipelineHandle forward_pipeline);
 
 	void AddTileToRenderList(bool clear, TileIndex new_tile);
 	void ClearRenderList();
 
-	void AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* id);
+	void AddToRenderListRecursive(renderer::PipelineHandle pipeline, ObjectID* id);
 	/**
 	 * @brief Recursively adds `id` and its attached nodes to the geometry render list, deriving each node's own
 	 * pipeline from its own material rather than inheriting the pipeline chosen for the root (attached primitives
@@ -178,14 +158,9 @@ public:
 	String BlockoutPath;
 
 private:
-	PagedArray<Ref<LightBase>> mLights;
-
 	Ref<PerspectiveCamera> mpCurrentCamera { nullptr };
 
 	physics::BodyID mSelectedPhysicsObjectId = physics::BodyID::scNull;
-
-	Ref<PrimitiveMesh> mpWireBox { nullptr };
-	Ref<PrimitiveMesh> mpDebugCube { nullptr };
 
 	uint32 mLastPhysicsUpdateState = UINT32_MAX;
 	SizedArray<physics::Body*> mCachedPhysicsBodies;

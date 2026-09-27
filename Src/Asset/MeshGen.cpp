@@ -58,10 +58,16 @@ Ref<PrimitiveMesh> MeshGen::GeneratedMesh::AsSlimMesh()
 		vertex->Position[2] = vec.Z;
 	}
 
-	mesh->UploadIndices(renderer::GraphicsBackendFwd::GetCmd(), Indices);
-
 	mesh->VertexList.CreateFrom<renderer::eVertexType::Slim>(std::move(points));
-	mesh->UploadVertices(renderer::GraphicsBackendFwd::GetCmd());
+
+	// Upload on the immediate transfer cmd as slim meshes are created lazily mid-frame, and copies recorded into the
+	// frame cmd would land inside an active render pass. Gotta replace this with something else.
+	renderer::gGraphics->SubmitImmediateUploadCmd(
+		[&](renderer::CommandBuffer& cmd)
+		{
+			mesh->UploadIndices(cmd, Indices);
+			mesh->UploadVertices(cmd);
+		});
 
 	mesh->bIsReady.store(true);
 
@@ -355,6 +361,22 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeWireframeBox()
 	}
 
 	Assert(index == mesh->Indices.Size);
+
+	return mesh;
+}
+
+Ref<MeshGen::GeneratedMesh> MeshGen::MakeLine()
+{
+	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
+
+	mesh->Positions.InitSize(2);
+	mesh->Indices.InitSize(2);
+
+	mesh->Positions[0] = Vec3f(0.0f, 0.0f, 0.0f);
+	mesh->Positions[1] = Vec3f(1.0f, 0.0f, 0.0f);
+
+	mesh->Indices[0] = 0;
+	mesh->Indices[1] = 1;
 
 	return mesh;
 }

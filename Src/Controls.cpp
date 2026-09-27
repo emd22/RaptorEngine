@@ -9,7 +9,7 @@
 #include <Renderer/GraphicsBackend.hpp>
 
 #ifdef FX_IS_EDITOR
-#include <Editor/EditorApp.hpp>
+#include <Editor/RaptorEditor.hpp>
 #endif
 
 namespace fx {
@@ -192,10 +192,11 @@ void ControlManager::Update()
 #ifdef FX_IS_EDITOR
 	// The editor viewport forwards its key and mouse events through PostButtonEvent() and PostMouseMotion() while
 	// they are dispatched here
-	if (!editor::PumpEvents()) {
+	if (!gEditor->PumpEvents()) {
 		inst.OnQuit();
 	}
 #else
+
 	SDL_Event event;
 
 	while (SDL_PollEvent(&event)) {

@@ -246,9 +246,16 @@ void GpuDevice::CreateLogicalDevice()
 		.synchronization2 = VK_TRUE,
 	};
 
+	// Half precision arithmetic in shaders, see min16float in ProbeCommon.hlsli
+	VkPhysicalDeviceShaderFloat16Int8Features float16_features {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES,
+		.pNext = &features_1_3,
+		.shaderFloat16 = VK_TRUE,
+	};
+
 	VkPhysicalDeviceTimelineSemaphoreFeatures timeline_semaphore_features {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
-		.pNext = &features_1_3,
+		.pNext = &float16_features,
 		.timelineSemaphore = VK_TRUE,
 	};
 

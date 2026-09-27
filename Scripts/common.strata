@@ -1,4 +1,4 @@
-
+import ./interop;
 
 float fmin(float a, float b)
 {
@@ -38,4 +38,13 @@ const float MATH_PI = 3.141592653589793f;
 float deg2rad(float deg)
 {
 	return ((deg * MATH_PI) / 180.0f);
+}
+
+
+bool nearzero(float3 x)
+{
+	const float epsilon = 0.00001f;
+	const float3 xa = float3_abs(x);
+
+	return (xa.x <= epsilon && xa.y <= epsilon && xa.z <= epsilon);
 }

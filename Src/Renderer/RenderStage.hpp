@@ -63,10 +63,15 @@ public:
 	void Rebuild(const Vec2u& size);
 	FX_FORCE_INLINE bool IsBuilt() const { return mbIsBuilt; }
 
+	/// Begins the stage and points the viewport and scissor at all of its targets
 	void Begin(CommandBuffer& cmd);
 
-	/// Begins the stage over part of its targets, see RenderPass::Begin()
+	/// Begins the stage over part of its targets, see RenderPass::Begin(). The viewport and scissor cover that part.
 	void Begin(CommandBuffer& cmd, const VkRect2D& render_area);
+
+	/// Like above, for when what is drawn to is not what gets cleared: the render area is cleared, and the viewport and
+	/// scissor cover `draw_area`
+	void Begin(CommandBuffer& cmd, const VkRect2D& render_area, const VkRect2D& draw_area);
 
 	/**
 	 * @brief Ends the render pass.

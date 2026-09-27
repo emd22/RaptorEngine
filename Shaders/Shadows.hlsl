@@ -16,18 +16,20 @@ struct VSInput
     float2 vUV : TEXCOORD0;
     float3 vTangent : TANGENT;
     uint uiInstanceId : SV_InstanceID;
-#ifdef USE_SKINNING
+
+PERMIF(USE_SKINNING);
     uint4 vJointIndices : ATTR0;
     float4 vJointWeights : ATTR1;
-#endif
+PERMEND();
 };
 
 struct VSOutput
 {
     float4 vPosition : SV_POSITION;
-#ifdef ALPHA_MASK
+
+PERMIF(ALPHA_MASK);
     float2 vUV : TEXCOORD0;
-#endif
+PERMEND();
 };
 
 
@@ -48,10 +50,12 @@ VSOutput main(VSInput input)
     float4x4 model_matrix = bObjectBuffer[VSConst.uiObjectIndex + input.uiInstanceId].mWorld;
     float4x4 MVP = mul(model_matrix, VSConst.mCameraMatrix);
     output.vPosition = mul(float4(input.vPosition, 1.0), MVP);
-#ifdef ALPHA_MASK
+
+PERMIF(ALPHA_MASK);
     output.vUV = input.vUV;
-#endif
-    return output;
+PERMEND();
+
+	return output;
 }
 
 ///////////////////////////////////
@@ -65,24 +69,24 @@ F_PROGRAM(FPT_PIXEL)
 F_StructBuffer(bMaterialBuffer, Material, 1, 0);
 
 
-#ifdef ALPHA_MASK
+PERMIF(ALPHA_MASK);
 // Object local textures
 F_Texture2D(tAlbedo, 0, 1)
-#endif
+PERMEND();
 
 struct FSInput
 {
-#ifdef ALPHA_MASK
+PERMIF(ALPHA_MASK)
     float4 vPosition : SV_POSITION;
     float2 vUV : TEXCOORD0;
-#endif
+PERMEND();
 };
 
 void main(FSInput input)
 {
-#ifdef ALPHA_MASK
+PERMIF(ALPHA_MASK);
     if (F_Sample(tAlbedo, input.vUV).a < ALPHA_CUTOFF) {
         discard;
     }
-#endif
+PERMEND();
 }

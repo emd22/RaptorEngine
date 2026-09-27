@@ -32,6 +32,9 @@ extern PSOBuild* gPSOBuild;
 class TextRenderer;
 extern TextRenderer* gTextRenderer;
 
+class DebugDraw;
+extern DebugDraw* gDebugDraw;
+
 namespace Globals {
 
 void Init();

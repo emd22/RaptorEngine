@@ -7,8 +7,6 @@
 #include <Core/Types.hpp>
 #include <functional>
 
-namespace fx {
-
 #if defined(FX_PLATFORM_MACOS) || defined(FX_PLATFORM_LINUX)
 #include <pthread.h>
 #define FX_THREADS_PTHREAD 1
@@ -20,6 +18,8 @@ namespace fx {
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+// This must be included at global scope. wxWidgets (editor build) sees that windows.h was already included and
+// expects the Win32 types to be in the global namespace.
 #include <Windows.h>
 // Win32 defines macros that collide with engine members (AssetWorker::LoadImage,
 // ObjectManager::GetObject). The engine never calls the Win32 functions.
@@ -30,6 +30,7 @@ namespace fx {
 #error "Unsupported platform"
 #endif
 
+namespace fx {
 
 using ThreadFunc = std::function<void()>;
 

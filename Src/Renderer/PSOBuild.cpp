@@ -21,8 +21,16 @@ static constexpr uint32 scMaxNumDescriptorBindings = 16;
 
 void PSOBuild::BeginPipeline(const ePipelineName name)
 {
+	BeginPipeline(gPipelineCache->Request(name), name, PipelineNameUtil::GetName(name));
+}
+
+void PSOBuild::BeginPipeline(Pipeline& pipeline, const ePipelineName name, const char* debug_name)
+{
+	AssertMsg(mpPipeline == nullptr, "A pipeline is already being built");
+
 	mPipelineName = name;
-	mpPipeline = &gPipelineCache->Request(name);
+	mDebugName = debug_name;
+	mpPipeline = &pipeline;
 
 	if (!mpPipeline->DescriptorIDs.IsInited()) {
 		mpPipeline->DescriptorIDs.InitCapacity(8);
@@ -37,9 +45,53 @@ void PSOBuild::BeginPipeline(const ePipelineName name)
 	}
 }
 
+void PSOBuild::Build(const PipelineHandle handle, const PipelineDesc& desc)
+{
+	Assert(desc.pStage != nullptr);
+
+	BeginPipeline(gPipelineCache->Get(handle), ePipelineName::NumPipelines, desc.DebugName.c_str());
+
+	if (desc.PushConstantSize > 0) {
+		SetPushConstants(desc.PushConstantStages, desc.PushConstantSize);
+	}
+
+	UseRenderStage(*desc.pStage);
+
+	SizedArray<ShaderMacro> macros(desc.Macros.size());
+
+	for (const ShaderMacro& macro : desc.Macros) {
+		macros.Insert(macro);
+	}
+
+	SetShader(desc.Shader, macros);
+
+	SetVertexType(desc.VertexType);
+	SetFlags(desc.bNoVertices ? ePSOBuildFlags::NoVertices : ePSOBuildFlags::None);
+
+	SetCullMode(desc.CullMode);
+	SetFaceOrder(desc.FaceOrder);
+	SetRenderLines(desc.bRenderLines);
+	SetDepthTest(desc.bDepthTest);
+	SetDepthWrite(desc.bDepthWrite);
+	SetDepthCompareOp(desc.DepthCompareOp);
+
+	for (const BlendAttachment& blend : desc.Blends) {
+		SetTargetBlend(blend.TargetIndex, blend);
+	}
+
+	if (desc.DeclareDescriptors) {
+		desc.DeclareDescriptors(*this);
+	}
+
+	EndPipeline();
+}
+
 void PSOBuild::SetShader(eShaderName shader_name, const SizedArray<ShaderMacro>& macros)
 {
 	Ref<Shader> shader = gShaderCache->Request(shader_name);
+
+	mShaderName = shader_name;
+	mMacroHash = Shader::HashMacros(macros);
 
 	SetShaderProgram(eShaderType::Vertex, shader->GetProgram(eShaderType::Vertex, macros));
 	SetShaderProgram(eShaderType::Pixel, shader->GetProgram(eShaderType::Pixel, macros));
@@ -105,7 +157,7 @@ void PSOBuild::BuildPipeline()
 	// be created or used. Notify incase that is a mistake.
 	else if (HasDescriptorsToBuild() && !HasFlag(mFlags, ePSOBuildFlags::ReuseDescriptors)) {
 		LogWarning(LC_RENDER, "PSOBuild: Descriptors will never be built for pipeline '{}'",
-				   PipelineNameUtil::GetName(mPipelineName));
+				   mDebugName);
 		Panic("PSOBuild", "Oops!");
 	}
 
@@ -136,6 +188,17 @@ void PSOBuild::BuildPipeline()
 
 	// If there is no `NoVertices` flag set, use the built vertex description.
 	if ((mFlags & ePSOBuildFlags::NoVertices) == 0) {
+		const uint32 input_mask = vertex_shader->InputLocationMask;
+		uint32 num_attribs = 0;
+
+		for (const VkVertexInputAttributeDescription& attrib : vertex_desc.Attributes) {
+			if (attrib.location < 32 && (input_mask & (1U << attrib.location)) != 0) {
+				vertex_desc.Attributes.pData[num_attribs++] = attrib;
+			}
+		}
+
+		vertex_desc.Attributes.Size = num_attribs;
+
 		vertex_ptr = &vertex_desc;
 	}
 
@@ -209,7 +272,7 @@ std::vector<VkDescriptorSetLayout> PSOBuild::BuildDescriptorSets()
 		AssertMsg(ds_layout != nullptr, "Could not find descriptor layout when building pipeline");
 
 #ifdef FX_DEBUG_SET_DESCRIPTOR_NAMES
-		String debug_str = String::Fmt("{}_{}_{}", PipelineNameUtil::GetName(mPipelineName), i, desc_list.Size);
+		String debug_str = String::Fmt("{}_{}_{}", mDebugName, i, desc_list.Size);
 		renderer::Util::SetDebugLabel(debug_str.CStr(), VK_OBJECT_TYPE_DESCRIPTOR_SET, ds_result.second->Get());
 		renderer::Util::SetDebugLabel(debug_str.CStr(), VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, *ds_layout);
 #endif
@@ -253,14 +316,19 @@ void PSOBuild::SetOutputTargets(TargetList* targets) { pOutputTargets = targets;
 void PSOBuild::EndPipeline()
 {
 #ifdef FX_BUILD_DEBUG
-	LogInfo(LC_RENDER, "** Building Pipeline {} **", PipelineNameUtil::GetName(mPipelineName));
+	LogInfo(LC_RENDER, "** Building Pipeline {} **", mDebugName);
 #endif
 
 	BuildPipeline();
 
+	// A pipeline that failed to build has nothing to look up
+	if (mpPipeline->InternalPipeline != nullptr) {
+		gPipelineCache->RegisterKey(mpPipeline->Handle, MakeKey());
+	}
+
 #ifdef FX_BUILD_DEBUG
 	LogInfo(LC_RENDER, "");
-	LogInfo(LC_RENDER, "Pipeline '{}' is assigned descriptor sets: ", PipelineNameUtil::GetName(mPipelineName));
+	LogInfo(LC_RENDER, "Pipeline '{}' is assigned descriptor sets: ", mDebugName);
 
 	for (Pipeline::DescriptorRef& ref : mpPipeline->DescriptorIDs) {
 		LogInfo(LC_RENDER, "\tSet={}\tID={}", ref.SetIndex, ref.pSet->ID);
@@ -381,9 +449,74 @@ void PSOBuild::CheckDescriptorsAgainstShader() const
 	}
 }
 
+PipelineKey PSOBuild::MakeKey()
+{
+	PipelineKey key;
+
+	key.Shader = mShaderName;
+	key.MacroHash = mMacroHash;
+
+	key.VertexType = mVertexType;
+	key.bIsCompute = mpPipeline->IsCompute();
+	key.bHasVertexInput = (mFlags & ePSOBuildFlags::NoVertices) == 0;
+
+	key.CullMode = mProperties.CullMode;
+	key.WindingOrder = mProperties.WindingOrder;
+	key.PolygonMode = mProperties.PolygonMode;
+	key.DepthCompareOp = mProperties.DepthCompareOp;
+
+	key.bDepthTest = !mProperties.bDisableDepthTest;
+	key.bDepthWrite = !mProperties.bDisableDepthWrite;
+	key.bRenderLines = mProperties.bRenderLines;
+
+	if (pOutputTargets != nullptr && !key.bIsCompute) {
+		// Blend state applies to the colour attachments only, the same as when the pipeline is created
+		const uint32 color_target_count = pOutputTargets->GetTargetByType(eImageAspectFlag::Color).Size;
+		const SizedArray<VkPipelineColorBlendAttachmentState> blends = BlendAttachments.GetVkAttachments(
+			color_target_count);
+
+		Hash64 blend_hash = FX_HASH64_FNV1A_INIT;
+
+		for (const VkPipelineColorBlendAttachmentState& blend : blends) {
+			// Eight 32 bit fields with no padding in between
+			blend_hash = PipelineKey::MixHash(blend_hash, blend);
+		}
+
+		key.BlendHash = blend_hash;
+
+		Hash64 pass_hash = FX_HASH64_FNV1A_INIT;
+
+		for (const VkAttachmentDescription& attachment : pOutputTargets->GetDescriptions()) {
+			pass_hash = PipelineKey::MixHash(pass_hash, static_cast<uint32>(attachment.format));
+			pass_hash = PipelineKey::MixHash(pass_hash, static_cast<uint32>(attachment.samples));
+		}
+
+		key.PassHash = pass_hash;
+	}
+
+	Hash64 layout_hash = FX_HASH64_FNV1A_INIT;
+
+	for (const Pipeline::DescriptorRef& ds_ref : mpPipeline->DescriptorIDs) {
+		layout_hash = PipelineKey::MixHash(layout_hash, ds_ref.SetIndex);
+		// Content hash of the layout, so it does not change between runs
+		layout_hash = PipelineKey::MixHash(layout_hash, ds_ref.pSet->LayoutID.GetID());
+	}
+
+	for (uint32 i = 0; i < mPushConstants.Size; i++) {
+		layout_hash = PipelineKey::MixHash(layout_hash, mPushConstants[i].Size);
+		layout_hash = PipelineKey::MixHash(layout_hash, static_cast<uint32>(mPushConstants[i].ShaderTypes));
+	}
+
+	key.LayoutHash = layout_hash;
+
+	return key;
+}
+
 void PSOBuild::Reset()
 {
 	mpPipeline = nullptr;
+	mShaderName = eShaderName::NumShaders;
+	mMacroHash = 0;
 	mpRenderPass = nullptr;
 	mVertexType = eVertexType::Default;
 	// bBuiltDescriptorLayouts = false;

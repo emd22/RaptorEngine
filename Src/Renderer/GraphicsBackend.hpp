@@ -6,12 +6,15 @@
 #include "Backend/Swapchain.hpp"
 #include "Backend/Synchro.hpp"
 #include "DeletionObject.hpp"
+#include "GpuProfiler.hpp"
 #include "TiledForwardRenderer.hpp"
 #include "UniformBuffer.hpp"
 #include "Window.hpp"
 
 #include <ThirdParty/vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
+
+#include <mutex>
 
 #include <Core/Defer.hpp>
 #include <Core/Ref.hpp>
@@ -41,8 +44,12 @@ struct GpuUploadContext
 	CommandBuffer CmdBuffer;
 	Fence UploadFence;
 
+	// Immediate uploads can come from any thread while the asset thread records `CmdBuffer`, so they get their own pool
+	// (pools are externally synchronized) and are serialized by `ImmediateMutex`.
+	CommandPool ImmediateCmdPool;
 	CommandBuffer ImmediateCmdBuffer;
 	Fence ImmediateUploadFence;
+	std::mutex ImmediateMutex;
 
 	~GpuUploadContext() = default;
 };
@@ -281,6 +288,16 @@ public:
 	DescriptorSet* pLightsDescriptor = nullptr;
 
 	Image* pNoiseTexture = nullptr;
+
+	/// Times the stages of the GPU frame
+	GpuProfiler Profiler;
+
+	/// Writes a GPU timestamp for the end of a stage into the frame being recorded, see GpuProfiler
+	void MarkGpu(eGpuMarker marker) { Profiler.Mark(GetFrame()->CmdBuffer, marker); }
+
+	/// Turn off the probe lighting or the decals in every draw, to see what they cost in the GPU timings
+	bool bDisableProbes = false;
+	bool bDisableDecals = false;
 
 	/// Debug view: show blended probe irradiance instead of the lit result.
 	bool bOnlyRenderProbes = false;

@@ -28,6 +28,11 @@ namespace fx {
 using UINT4 = uint32x4_t;
 using FLOAT4 = float32x4_t;
 
+using DOUBLE2 = float64x2_t;
+
+/// A combined set of two double vectors. This is the closest we can get to __m256 with NEON.
+using DOUBLE4 = float64x2x2_t;
+
 namespace simd {
 
 FX_FORCE_INLINE void StoreUInt4(unsigned int* dst, UINT4 v) { vst1q_u32(dst, v); }
@@ -46,7 +51,7 @@ FX_FORCE_INLINE FLOAT4 LoadFloat4(float scalar) { return vdupq_n_f32(scalar); }
 FX_FORCE_INLINE FLOAT4 AbsDiff(FLOAT4 a, FLOAT4 b) { return vabdq_f32(a, b); }
 FX_FORCE_INLINE FLOAT4 Sub(FLOAT4 a, FLOAT4 b) { return vsubq_f32(a, b); }
 
-FX_FORCE_INLINE FLOAT4 Round(FLOAT4 value) { return vrndq_f32(value); }
+FX_FORCE_INLINE FLOAT4 Round(FLOAT4 value) { return vrndnq_f32(value); }
 FX_FORCE_INLINE FLOAT4 Floor(FLOAT4 value) { return vrndmq_f32(value); }
 
 FX_FORCE_INLINE FLOAT4 Min(FLOAT4 a, FLOAT4 b) { return vminq_f32(a, b); }
@@ -71,12 +76,67 @@ FX_FORCE_INLINE FLOAT4 GetSign(FLOAT4 v)
 	return vreinterpretq_u32_f32(vorrq_u32(sign, v_one));
 }
 
+/////////////////////////////////////
+// Double Precision
+/////////////////////////////////////
+
+/**
+ * @brief Load a block of doubles directly into the vector.
+ *
+ * @note Make sure this buffer is valid or it WILL cause a GP fault.
+ *
+ * @note Other platforms use this as an unaligned load, but NEON automatically deals with unaligned boundaries for load
+ * instructions. Keep in mind that there could be a small but noticable performance or latency penalty to this when
+ * running under AVX. If you can, use the scalar version of this function to ensure an aligned load.
+ */
+FX_FORCE_INLINE DOUBLE4 LoadDouble4(const double* src) { return vld1q_f64_x2(src); }
+FX_FORCE_INLINE DOUBLE4 LoadDouble4(double x, double y, double z, double w)
+{
+	const double sv alignas(16)[4] = { x, y, z, w };
+	return vld1q_f64_x2(sv);
+}
+
+FX_FORCE_INLINE DOUBLE4 LoadDouble4(const double scalar)
+{
+	return DOUBLE4 { { vdupq_n_f64(scalar), vdupq_n_f64(scalar) } };
+}
+
+/**
+ * @brief Get the dot product of two DOUBLE2's, with the result being returned in the first lane of a DOUBLE2.
+ */
+FX_FORCE_INLINE DOUBLE2 DotV(DOUBLE2 a, DOUBLE2 b)
+{
+	// Get the product of the two vectors
+	DOUBLE2 prod = vmulq_f64(a, b);
+	// No REV here, so we need to extract to flip the vector
+	DOUBLE2 rev_v = vextq_f64(prod, prod, 1);
+	return vaddq_f64(prod, rev_v);
+}
+
+FX_FORCE_INLINE double Dot(DOUBLE2 a, DOUBLE2 b)
+{
+	DOUBLE2 prod = vmulq_f64(a, b);
+	return vaddvq_f64(prod);
+}
+
+FX_FORCE_INLINE double Dot(DOUBLE4 a, DOUBLE4 b)
+{
+	DOUBLE2 result = vaddq_f64(DotV(a.val[0], b.val[0]), DotV(a.val[1], b.val[1]));
+
+	// Return the first lane (result of both of em)
+	return vgetq_lane_f64(result, 0);
+}
+
+
 } // namespace simd
 
 #else
 
 using UINT4 = __m128i;
 using FLOAT4 = __m128;
+
+using DOUBLE2 = __m128d;
+using DOUBLE4 = __m256d;
 
 namespace simd {
 
@@ -131,6 +191,33 @@ FX_FORCE_INLINE FLOAT4 GetSign(FLOAT4 v)
 	// Add back in the `1.0`. We could return negative or positive zero, but that is not very useful in
 	// multiplications...
 	return _mm_or_ps(sign, _mm_castsi128_ps(v_one));
+}
+
+/////////////////////////////////////
+// Double Precision
+/////////////////////////////////////
+
+/**
+ * @brief Load a block of four doubles directly into the vector (unaligned).
+ *
+ * @note Make sure this buffer is valid or it WILL cause a GP fault.
+ */
+FX_FORCE_INLINE DOUBLE4 LoadDouble4(const double* src) { return _mm256_loadu_pd(src); }
+FX_FORCE_INLINE DOUBLE4 LoadDouble4(double x, double y, double z, double w) { return _mm256_setr_pd(x, y, z, w); }
+FX_FORCE_INLINE DOUBLE4 LoadDouble4(const double scalar) { return _mm256_set1_pd(scalar); }
+
+/**
+ * @brief Get the sum of all four lanes of the product of two DOUBLE4's (a full 4-component dot product).
+ */
+FX_FORCE_INLINE double Dot(DOUBLE4 a, DOUBLE4 b)
+{
+	const __m256d prod = _mm256_mul_pd(a, b);
+
+	// Add the upper half onto the lower half, then add the two remaining lanes
+	__m128d sum = _mm_add_pd(_mm256_castpd256_pd128(prod), _mm256_extractf128_pd(prod, 1));
+	sum = _mm_add_sd(sum, _mm_unpackhi_pd(sum, sum));
+
+	return _mm_cvtsd_f64(sum);
 }
 
 

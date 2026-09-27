@@ -11,7 +11,11 @@
 #include <Core/DynArray.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
+#include <Renderer/PipelineKey.hpp>
 #include <Renderer/PipelineNames.hpp>
+
+#include <memory>
+#include <vector>
 
 
 namespace fx {
@@ -33,22 +37,26 @@ public:
 public:
 	RenderList() = default;
 
-	void AddObject(ePipelineName pl_name, const ObjectID id);
+	void AddObject(PipelineHandle pipeline, const ObjectID id);
 	/**
 	 * @brief Invalidate object from renderlist. Use when an object is going to be destroyed or will be invalid before
 	 * the next renderlist rebuild.
 	 */
 	void InvalidateObject(const ObjectID id);
-	void ClearSection(ePipelineName section_name);
+	void ClearSection(PipelineHandle pipeline);
 
 	int32 CheckForObjectDuplicates(const ObjectID id) const;
 
 	uint32 GetItemCount() const;
 
-	RenderListSection& GetSection(ePipelineName pl_name);
+	/**
+	 * @brief The objects drawn with a pipeline. Sections are made when they are first asked for, and stay where they are.
+	 */
+	RenderListSection& GetSection(PipelineHandle pipeline);
 
 private:
-	SizedArray<RenderListSection> mSections;
+	/// Indexed by pipeline handle. Not every pipeline has a section, so some are null.
+	std::vector<std::unique_ptr<RenderListSection>> mSections;
 };
 
 } // namespace renderer

@@ -6,10 +6,11 @@
 #include <Core/MemPool/MemPool.hpp>
 #include <Core/Thread/ThreadManager.hpp>
 #include <Decal/DecalManager.hpp>
-#include <InGameEditor.hpp>
+#include <Editor/RaptorEditor.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Physics/PhysicsManager.hpp>
+#include <Renderer/LightManager.hpp>
 #include <Renderer/LightProbe.hpp>
 #include <Script/ScriptManager.hpp>
 #include <Texture/TextureManager.hpp>
@@ -33,13 +34,16 @@ MemPool* gScriptMemPool = nullptr;
 
 WorldGrid* gWorldGrid = nullptr;
 World* gWorld = nullptr;
+LightManager* gLightManager = nullptr;
 ProbeManager* gProbeManager = nullptr;
 DecalManager* gDecalManager = nullptr;
 ScriptManager* gScriptManager = nullptr;
 
-EditorMode* gPrototypeEditor = nullptr;
 CVarManager* gCVars = nullptr;
 
+#ifdef FX_IS_EDITOR
+editor::RaptorEditor* gEditor = nullptr;
+#endif
 
 #define DESTROY_GLOBAL(name_)                                                                                          \
 	delete name_;                                                                                                      \
@@ -58,8 +62,9 @@ void Init()
 	gWorldGrid = new WorldGrid;
 	gTextureManager = new TextureManager;
 	gThreadManager = new ThreadManager;
-	gScriptManager = new ScriptManager;
 	gWorld = new World;
+	gLightManager = new LightManager;
+	gLightManager->Create();
 	gProbeManager = new ProbeManager;
 	gDecalManager = new DecalManager;
 	gCVars = new CVarManager;
@@ -75,6 +80,7 @@ void Destroy()
 	DESTROY_GLOBAL(gThreadManager);
 	DESTROY_GLOBAL(gScriptManager);
 	DESTROY_GLOBAL(gWorld);
+	DESTROY_GLOBAL(gLightManager);
 	DESTROY_GLOBAL(gProbeManager);
 	DESTROY_GLOBAL(gDecalManager);
 	DESTROY_GLOBAL(gCVars);

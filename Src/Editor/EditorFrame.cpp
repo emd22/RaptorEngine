@@ -1,9 +1,9 @@
 #include "EditorFrame.hpp"
 
-#include "EditorApp.hpp"
 #include "EditorViewport.hpp"
 #include "ObjectListWindow.hpp"
 #include "ObjectPropertiesPanel.hpp"
+#include "RaptorEditor.hpp"
 #include "WorldPropertiesPanel.hpp"
 
 #include <wx/app.h>
@@ -16,6 +16,7 @@
 #include <Controls.hpp>
 #include <Core/FilesystemIO.hpp>
 #include <Core/Log.hpp>
+#include <Engine.hpp>
 
 namespace fx::editor {
 
@@ -33,6 +34,10 @@ static constexpr ToolButtonInfo scToolButtons[] = {
 	{ "Transform", "Textures/editor/move.png" },
 	{ "Face", "Textures/editor/face.png" },
 	{ "Rotate", "Textures/editor/rotate.png" },
+	{ "Create", "Textures/editor/create.png" },
+	{ "Clip", "Textures/editor/clip.png" },
+	{ "Set Material", "Textures/editor/set_material.png" },
+	{ "Light", "Textures/editor/lamp.png" },
 };
 
 static_assert(std::size(scToolButtons) == static_cast<size_t>(eEditorTool::Count));
@@ -43,7 +48,12 @@ static const wxColor scSelectedColor = wxColor(168, 50, 50);
 static wxToggleButton* MakeToolButton(wxWindow* parent, const ToolButtonInfo& info)
 {
 	const std::string icon_path = FilesystemIO::ResolvePath(info.pIconPath);
-	const wxBitmap icon(wxString::FromUTF8(icon_path), wxBITMAP_TYPE_PNG);
+
+	// wx shows an error dialog for images it can't load, so check the icon is there first
+	wxBitmap icon;
+	if (FilesystemIO::FileExists(icon_path)) {
+		icon.LoadFile(wxString::FromUTF8(icon_path), wxBITMAP_TYPE_PNG);
+	}
 
 	wxToggleButton* button = nullptr;
 
@@ -83,12 +93,15 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 
 	SetMenuBar(menu_bar);
 
-	Bind(wxEVT_MENU, [](wxCommandEvent&) { InvokeReloadHandler(eReloadTarget::World); }, reload_world_item->GetId());
 	Bind(
-		wxEVT_MENU, [](wxCommandEvent&) { InvokeReloadHandler(eReloadTarget::Prototype); },
+		wxEVT_MENU, [](wxCommandEvent&) { gEditor->InvokeReloadHandler(eReloadTarget::World); },
+		reload_world_item->GetId());
+	Bind(
+		wxEVT_MENU, [](wxCommandEvent&) { gEditor->InvokeReloadHandler(eReloadTarget::Prototype); },
 		reload_prototype_item->GetId());
 	Bind(
-		wxEVT_MENU, [](wxCommandEvent&) { InvokeReloadHandler(eReloadTarget::Scripts); }, reload_scripts_item->GetId());
+		wxEVT_MENU, [](wxCommandEvent&) { gEditor->InvokeReloadHandler(eReloadTarget::Scripts); },
+		reload_scripts_item->GetId());
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowObjectListWindow(); }, object_list_item->GetId());
 
 	wxPanel* root = new wxPanel(this, wxID_ANY);
@@ -101,7 +114,7 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 		wxToggleButton* button = MakeToolButton(root, scToolButtons[i]);
 
 		const eEditorTool tool = static_cast<eEditorTool>(i);
-		button->Bind(wxEVT_TOGGLEBUTTON, [this, tool](wxCommandEvent&) { SetEditorTool(tool); });
+		button->Bind(wxEVT_TOGGLEBUTTON, [tool](wxCommandEvent&) { gEditor->SetTool(tool); });
 
 		tool_sizer->Add(button, wxSizerFlags().Border(wxALL, 2));
 		mToolButtons.Insert(button);
@@ -142,43 +155,16 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	mpViewport->SetMinSize(wxSize(64, 64));
 	SetMinSize(wxDefaultSize);
 
-	SetEditorTool(eEditorTool::Translate);
-
 	Bind(wxEVT_CLOSE_WINDOW, &EditorFrame::OnClose, this);
 	Bind(wxEVT_ACTIVATE, &EditorFrame::OnActivate, this);
 	Bind(wxEVT_ICONIZE, &EditorFrame::OnIconize, this);
 }
 
-void EditorFrame::SetEditorTool(const eEditorTool tool)
+void EditorFrame::ShowSelectedTool(const eEditorTool tool)
 {
-	const bool was_simulating = IsSimulationMode();
-	const bool will_simulate = (tool == eEditorTool::None);
-
-	mSelectedTool = tool;
-
-	if (gPrototypeEditor != nullptr) {
-		if (was_simulating && !will_simulate) {
-			gPrototypeEditor->Reload();
-		}
-		else if (!was_simulating && will_simulate) {
-			gPrototypeEditor->Unload();
-		}
-	}
-
-	mSelectedTool = tool;
-
 	// Only one tool at a time, and clicking the selected one again keeps it selected
 	for (uint32 i = 0; i < mToolButtons.Size; i++) {
 		mToolButtons[i]->SetValue(i == static_cast<uint32>(tool));
-	}
-
-	// Transfer the changed editor tool info back to the script
-	if (gPrototypeEditor != nullptr) {
-		auto set_tool = gPrototypeEditor->pScript->GetFunction<void (*)(eEditorTool)>("__set_editor_tool");
-
-		if (set_tool != nullptr) {
-			set_tool(tool);
-		}
 	}
 
 	// Give the keyboard back to the viewport
@@ -186,8 +172,6 @@ void EditorFrame::SetEditorTool(const eEditorTool tool)
 		mpViewport->SetFocus();
 	}
 }
-
-void EditorFrame::SetDefaultTool() { SetEditorTool(eEditorTool::Translate); }
 
 void EditorFrame::ShowObjectListWindow()
 {

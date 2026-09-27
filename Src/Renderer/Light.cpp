@@ -13,7 +13,6 @@
 #include <Object/ObjectManager.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
-#include <Renderer/PipelineCache.hpp>
 #include <algorithm>
 
 namespace fx {
@@ -26,24 +25,7 @@ using VertexType = LightBase::VertexType;
 // Base Light
 /////////////////////////////////////
 
-LightBase::LightBase(eLightFlags flags) : Flags(flags)
-{
-	this->ID = gObjectManager->NewObjectID("Light");
-	LogDebug("Creating light (id={})", this->ID);
-}
-
-void LightBase::SetLightVolume(const Ref<PrimitiveMesh>& volume) { pLightVolume = volume; }
-
-void LightBase::SetLightVolume(const Ref<MeshGen::GeneratedMesh>& volume_gen, bool create_debug_mesh)
-{
-	pLightVolumeGen = volume_gen;
-	pLightVolume = volume_gen->AsSlimMesh();
-	// Radius = LightVolume->VertexList.CalculateDimensionsFromPositions().X;
-
-	if (create_debug_mesh) {
-		mpDebugMesh = volume_gen->AsDefaultMesh();
-	}
-}
+LightBase::LightBase(eLightFlags flags) : Flags(flags) {}
 
 void LightBase::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
 {
@@ -72,8 +54,6 @@ void LightBase::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
 	light_buffer.Write(data);
 	light_buffer.FlushToGpu();
 	light_buffer.NextSlot();
-
-	// pLightVolume->Render(frame->CmdBuffer, 1);
 }
 
 void LightBase::FillGpuData(LightGpuData& data, const PerspectiveCamera& camera, Camera* shadow_camera) const
@@ -94,27 +74,6 @@ void LightBase::FillGpuData(LightGpuData& data, const PerspectiveCamera& camera,
 
 	data.Ambient = AmbientColor.Value;
 	data.Type = static_cast<uint32>(Type);
-}
-
-
-void LightBase::RenderDebugMesh(const PerspectiveCamera& camera)
-{
-	if (!mpDebugMesh) {
-		return;
-	}
-
-	FrameData* frame = gGraphics->GetFrame();
-
-	DrawPushConstants push_constants { .TargetSize = { gGraphics->Swapchain.Extent.X, gGraphics->Swapchain.Extent.Y } };
-	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
-	push_constants.ObjectId = ID.GetID();
-	push_constants.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
-	push_constants.TileRows = gGraphics->pRenderer->GetLightTileRows();
-
-	gGraphics->SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::Geometry),
-								   eShaderType::Vertex | eShaderType::Pixel, push_constants);
-
-	mpDebugMesh->Render(frame->CmdBuffer, 1);
 }
 
 

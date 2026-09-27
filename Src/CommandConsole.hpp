@@ -17,6 +17,7 @@ public:
 	void HandleKeyboard();
 	void ParseCommand();
 	void ExecuteCommand(const DynArray<String>& tokens);
+	void ExecuteScriptCommand(const String& cmd_name);
 
 	StringView GetString() const;
 
@@ -24,8 +25,8 @@ public:
 	String Output;
 
 private:
-	char pEntryBuffer[scMaxChars];
-	uint32 EntryBufferIndex = 0;
+	char mpEntryBuffer[scMaxChars];
+	uint32 mEntryBufferIndex = 0;
 };
 
 } // namespace fx

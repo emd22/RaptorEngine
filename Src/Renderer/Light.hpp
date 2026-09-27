@@ -1,13 +1,12 @@
 #pragma once
 
-#include <Asset/MeshGen.hpp>
 #include <Color.hpp>
 #include <Core/Hash.hpp>
 #include <Entity.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/MathUtil.hpp>
+#include <Renderer/LightID.hpp>
 #include <Renderer/PipelineNames.hpp>
-#include <Renderer/PrimitiveMesh.hpp>
 #include <Renderer/ShadowAtlas.hpp>
 
 namespace fx {
@@ -17,9 +16,6 @@ namespace renderer {
 class Pipeline;
 struct LightGpuData;
 } // namespace renderer
-
-using LightId = uint32;
-static constexpr LightId LightIdNull = UINT32_MAX;
 
 enum eLightFlags : uint16
 {
@@ -46,13 +42,9 @@ public:
 public:
 	LightBase(eLightFlags flags = LF_None);
 
-	void SetLightVolume(const Ref<PrimitiveMesh>& volume);
-	void SetLightVolume(const Ref<MeshGen::GeneratedMesh>& volume_gen, bool create_debug_mesh = false);
-
 	void SetRadius(const float radius);
 
 	virtual void Render(const PerspectiveCamera& camera, Camera* shadow_camera);
-	virtual void RenderDebugMesh(const PerspectiveCamera& camera);
 
 	virtual ~LightBase() {}
 
@@ -64,10 +56,7 @@ protected:
 							 Camera* shadow_camera) const;
 
 public:
-	LightId Id = LightIdNull;
-
-	Ref<PrimitiveMesh> pLightVolume { nullptr };
-	Ref<MeshGen::GeneratedMesh> pLightVolumeGen { nullptr };
+	LightID ID = LightID::scNull;
 
 	struct Color Color = Color::sWhite;
 	struct Color AmbientColor { 0x101f1f1f };
@@ -78,8 +67,6 @@ public:
 	bool bEnabled = true;
 
 protected:
-	Ref<PrimitiveMesh> mpDebugMesh { nullptr };
-
 	float32 mRadius = 1.0f;
 };
 
@@ -98,6 +85,7 @@ public:
 /////////////////////////////////////
 // Directional light
 /////////////////////////////////////
+
 class LightDirectional : public LightBase
 {
 public:

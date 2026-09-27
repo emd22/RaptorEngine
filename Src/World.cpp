@@ -2,8 +2,8 @@
 
 #include <Blockout.hpp>
 #include <Decal/DecalManager.hpp>
+#include <Editor/RaptorEditor.hpp>
 #include <Engine.hpp>
-#include <InGameEditor.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Material/MaterialManagerFwd.hpp>
@@ -11,8 +11,10 @@
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Physics/PhysicsManager.hpp>
+#include <Renderer/DebugDraw.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
+#include <Renderer/LightManager.hpp>
 #include <Renderer/LightProbe.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/ShadowAtlas.hpp>
@@ -25,8 +27,6 @@ using namespace renderer;
 
 void World::Create()
 {
-	mLights.Create(32);
-
 	SortedEntryBuffer.SetPageSize(128);
 
 	mSpotShadowBakes.SetPageSize(ShadowAtlas::scMaxSpotTiles);
@@ -35,46 +35,87 @@ void World::Create()
 	mVisibleTiles.InitCapacity(600);
 }
 
-static ePipelineName GetTransparentPipeline(ePipelineName base)
+static bool IsTransparentMaterial(Material* mat) { return (mat != nullptr && mat->Properties.Alpha < 0.999f); }
+
+/**
+ * @brief The geometry pipeline that draws a material, including the transparent variants.
+ */
+static PipelineHandle GetPipelineForMaterial(const MaterialID& material_id)
 {
-	switch (base) {
-	case ePipelineName::Geometry:
-		return ePipelineName::GeometryTransparent;
-	case ePipelineName::GeometryNormalMaps:
-		return ePipelineName::GeometryNormalMapsTransparent;
-	case ePipelineName::GeometrySkinned:
-		return ePipelineName::GeometrySkinnedTransparent;
-	default:
-		return base;
+	Material* material = MaterialManagerFwd::GetMaterial(material_id);
+
+	const ePipelinePass pass = IsTransparentMaterial(material) ? ePipelinePass::ForwardBlend : ePipelinePass::Forward;
+	const PipelineHandle pipeline = gPipelineCache->GetOrCreateVariant(pass, material->GetPipelineFeatures());
+
+	AssertMsg(pipeline.IsValid(), "No forward pipeline draws this material");
+
+	return pipeline;
+}
+
+/**
+ * @brief The render list section that objects that cast shadows are added to
+ */
+static PipelineHandle GetShadowListPipeline()
+{
+	return gPipelineCache->GetOrCreateVariant(ePipelinePass::Shadow, ePipelineFeatures::None);
+}
+
+static void AddToRenderListOnce(RenderList& render_list, PipelineHandle pipeline, ObjectID id)
+{
+	for (ObjectID object_id : render_list.GetSection(pipeline).Objects) {
+		if (object_id == id) {
+			return;
+		}
+	}
+
+	render_list.AddObject(pipeline, id);
+}
+
+/**
+ * @brief Adds the object to the section of each pipeline its materials need. An object drawn in mesh sections can need
+ * several.
+ */
+static void AddToGeometrySections(RenderList& render_list, Object* object)
+{
+	if (object->MeshSections.IsEmpty()) {
+		AddToRenderListOnce(render_list, GetPipelineForMaterial(object->GetMaterialID()), object->ID);
+		return;
+	}
+
+	for (const MeshSection& section : object->MeshSections) {
+		AddToRenderListOnce(render_list, GetPipelineForMaterial(object->GetSectionMaterial(section)), object->ID);
 	}
 }
-static bool IsTransparentMaterial(Material* mat) { return (mat != nullptr && mat->Properties.Alpha < 0.999f); }
+
+/**
+ * @brief Calls `draw` for each part of the object that the pipeline draws: the whole mesh (nullptr) for an object
+ * without mesh sections, otherwise each section whose material needs that pipeline.
+ */
+template <typename TDrawFunc>
+static void ForEachDrawInPipeline(Object* object, PipelineHandle pipeline, TDrawFunc&& draw)
+{
+	if (object->MeshSections.IsEmpty()) {
+		draw(nullptr);
+		return;
+	}
+
+	for (const MeshSection& section : object->MeshSections) {
+		if (GetPipelineForMaterial(object->GetSectionMaterial(section)) == pipeline) {
+			draw(&section);
+		}
+	}
+}
 
 
 static void AddObjectToRenderList(Object* object, World* scene)
 {
 	if (object->pMesh.IsValid()) {
-		Material* material = gMaterialManager->GetMaterial(object->GetMaterialID());
-		ePipelineName pipeline_name = material->GetRequiredPipeline();
-
-
-		if (IsTransparentMaterial(material)) {
-			pipeline_name = GetTransparentPipeline(pipeline_name);
-		}
-
-		// if (gWorld->mRenderList.GetObjectIndex(pipeline_name, object->ID) != RenderList::scNotFound) {
-		// 	return;
-		// }
-
-		// LogInfo("Adding Object '{}' to renderlist pipeline {}", object->Name.Get(),
-		// 		PipelineNameUtil::GetName(pipeline_name));
-
 		// If the object casts shadows as well, add it to the shadow section
 		if (object->IsShadowCaster()) {
-			gWorld->mRenderList.AddObject(ePipelineName::ShadowDirectional, object->ID);
+			gWorld->mRenderList.AddObject(GetShadowListPipeline(), object->ID);
 		}
 
-		gWorld->mRenderList.AddObject(pipeline_name, object->ID);
+		AddToGeometrySections(gWorld->mRenderList, object);
 	}
 
 	if (!object->AttachedNodes.IsEmpty()) {
@@ -127,12 +168,6 @@ void World::Attach(AssetTicket object_ticket)
 		});
 }
 
-void World::Attach(const Ref<LightBase>& light)
-{
-	mLights.Insert(light);
-	light->OnAttached(this);
-}
-
 void World::Detach(ObjectID id)
 {
 	mRenderList.InvalidateObject(id);
@@ -140,17 +175,43 @@ void World::Detach(ObjectID id)
 }
 
 
-void World::ExecuteRenderList(renderer::ePipelineName pl_name)
+void World::ExecuteRenderList(renderer::PipelineHandle pipeline_handle)
 {
 	PerspectiveCamera& camera = *mpCurrentCamera;
-	ExecuteRenderList(pl_name, camera);
+	ExecuteRenderList(pipeline_handle, pipeline_handle, camera);
 }
 
-void World::ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera& camera)
+void World::ExecuteForwardRenderLists(PerspectiveCamera& camera)
 {
-	RenderListSection& section = mRenderList.GetSection(pl_name);
+	// The forward pipelines depth test against the prepass, which probe captures don't have
+	const bool is_probe_capture = gProbeManager->IsCapturingFaces();
 
-	renderer::Pipeline& pipeline = gPipelineCache->Request(pl_name);
+	gPipelineCache->ForEachPassPipeline(
+		ePipelinePass::Forward,
+		[&](PipelineHandle pipeline)
+		{
+			const PipelineHandle draw_pipeline =
+				is_probe_capture ? gPipelineCache->GetOrCreateVariantInPass(pipeline, ePipelinePass::ForwardCapture)
+								 : pipeline;
+
+			ExecuteRenderList(pipeline, draw_pipeline, camera);
+		});
+}
+
+void World::ExecuteRenderList(renderer::PipelineHandle pipeline_handle, renderer::PipelineHandle draw_pipeline_handle,
+							  PerspectiveCamera& camera)
+{
+	RenderListSection& section = mRenderList.GetSection(pipeline_handle);
+
+	if (!draw_pipeline_handle.IsValid()) {
+		return;
+	}
+
+	renderer::Pipeline& pipeline = gPipelineCache->Get(draw_pipeline_handle);
+
+	if (!pipeline.IsBuilt()) {
+		return;
+	}
 
 	pipeline.Bind(gGraphics->GetFrame()->CmdBuffer);
 
@@ -183,7 +244,9 @@ void World::ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera
 		}
 
 		object->Update();
-		object->RenderShallow(camera, &pipeline);
+
+		ForEachDrawInPipeline(object, pipeline_handle,
+							  [&](const MeshSection* section) { object->RenderShallow(camera, &pipeline, section); });
 	}
 }
 
@@ -193,9 +256,9 @@ void World::ExecuteTransparentRenderLists()
 	const Vec3f camera_position = camera.Position;
 	;
 
-	auto Gather = [&](ePipelineName pl_name)
+	auto Gather = [&](PipelineHandle pipeline)
 	{
-		const RenderListSection& section = mRenderList.GetSection(pl_name);
+		const RenderListSection& section = mRenderList.GetSection(pipeline);
 
 		for (ObjectID object_id : section.Objects) {
 			if (object_id.IsInvalid()) {
@@ -211,7 +274,7 @@ void World::ExecuteTransparentRenderLists()
 
 			float32 distance_sq = diff.Dot(diff);
 
-			SortedEntryBuffer.Insert({ object_id, pl_name, distance_sq });
+			SortedEntryBuffer.Insert({ object_id, pipeline, distance_sq });
 		}
 	};
 
@@ -219,9 +282,7 @@ void World::ExecuteTransparentRenderLists()
 
 	// We store everything in one buffer as the order matters here. The furthest objects should be rendered first.
 
-	Gather(ePipelineName::GeometryTransparent);
-	Gather(ePipelineName::GeometryNormalMapsTransparent);
-	Gather(ePipelineName::GeometrySkinnedTransparent);
+	gPipelineCache->ForEachPassPipeline(ePipelinePass::ForwardBlend, Gather);
 
 	if (SortedEntryBuffer.Size == 0) {
 		return;
@@ -233,13 +294,17 @@ void World::ExecuteTransparentRenderLists()
 
 	// Bind per entry as pipeline changes; minimize binds by caching last pipeline
 	renderer::Pipeline* pipeline = nullptr;
-	ePipelineName pipeline_name = ePipelineName::GeometryTransparent;
+	PipelineHandle pipeline_handle;
 	bool first = true;
 
 	for (const TransparentObjectCarrier& transparent_object : SortedEntryBuffer) {
 		// For each differing pipeline (per object), bind the pipeline.
-		if (first || transparent_object.Pipeline != pipeline_name) {
-			pipeline = &gPipelineCache->Request(transparent_object.Pipeline);
+		if (first || !(transparent_object.Pipeline == pipeline_handle)) {
+			pipeline = &gPipelineCache->Get(transparent_object.Pipeline);
+
+			if (!pipeline->IsBuilt()) {
+				continue;
+			}
 			pipeline->Bind(gGraphics->GetFrame()->CmdBuffer);
 
 			{
@@ -260,14 +325,16 @@ void World::ExecuteTransparentRenderLists()
 					Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
 			}
 
-			pipeline_name = transparent_object.Pipeline;
+			pipeline_handle = transparent_object.Pipeline;
 			first = false;
 		}
 
 		Object* object = gObjectManager->GetObject(transparent_object.ID);
 
 		object->Update();
-		object->RenderShallow(camera, pipeline);
+
+		ForEachDrawInPipeline(object, transparent_object.Pipeline,
+							  [&](const MeshSection* section) { object->RenderShallow(camera, pipeline, section); });
 	}
 }
 
@@ -279,40 +346,42 @@ void World::ExecuteTransparentRenderLists()
 class ShadowPipelineSelector
 {
 public:
-	/// Binds whichever pipeline `object` needs (and its albedo, if masked), returning it for the push constants.
-	Pipeline& Select(Object* object, const CommandBuffer& cmd)
+	/// Binds whichever pipeline `object` needs to draw with `material_id` (and its albedo, if masked), returning it for
+	/// the push constants.
+	Pipeline& Select(Object* object, const MaterialID& material_id, const CommandBuffer& cmd)
 	{
-		const bool masked = IsMasked(object);
-		const ePipelineName wanted = masked ? ePipelineName::ShadowDirectionalMasked : ePipelineName::ShadowDirectional;
+		const bool masked = IsMasked(object, material_id);
+		const PipelineHandle wanted = gPipelineCache->GetOrCreateVariant(
+			ePipelinePass::Shadow, masked ? ePipelineFeatures::AlphaMask : ePipelineFeatures::None);
 
-		if (wanted != mBound) {
+		if (!(wanted == mBound)) {
 			gShadowAtlas->BindPipeline(wanted);
 			mBound = wanted;
 
 			const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0 };
 
 			gGraphics->pRenderer->pPersistentDescriptorSlim->Bind(
-				0, cmd, gPipelineCache->Request(wanted),
+				0, cmd, gPipelineCache->Get(wanted),
 				Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
 		}
 
-		Pipeline& pipeline = gPipelineCache->Request(mBound);
+		Pipeline& pipeline = gPipelineCache->Get(mBound);
 
 		if (masked) {
-			gMaterialManager->BindWithPipeline(cmd, pipeline, object->GetMaterialID());
+			gMaterialManager->BindWithPipeline(cmd, pipeline, material_id);
 		}
 
 		return pipeline;
 	}
 
 private:
-	static bool IsMasked(Object* object)
+	static bool IsMasked(Object* object, const MaterialID& material_id)
 	{
 		if (object->IsSkinned()) {
 			return false;
 		}
 
-		Material* material = gMaterialManager->GetMaterial(object->GetMaterialID());
+		Material* material = gMaterialManager->GetMaterial(material_id);
 
 		return material != nullptr && HasFlag(material->Properties.Flags, eMaterialFlags::AlphaMask) &&
 			   material->IsReady();
@@ -320,12 +389,37 @@ private:
 
 private:
 	/// Every region starts out with the opaque pipeline bound
-	ePipelineName mBound = ePipelineName::ShadowDirectional;
+	PipelineHandle mBound = gPipelineCache->GetOrCreateVariant(ePipelinePass::Shadow, ePipelineFeatures::None);
 };
 
-void World::ExecuteShadowRenderList(renderer::ePipelineName pl_name, const Camera& shadow_camera)
+/**
+ * @brief Draws a shadow caster, drawing each of its mesh sections with the pipeline its material needs.
+ */
+static void RenderShadowCaster(Object* object, ShadowPipelineSelector& selector, const ShadowPushConstants& consts,
+							   const CommandBuffer& cmd)
 {
-	const RenderListSection& section = mRenderList.GetSection(pl_name);
+	auto Draw = [&](const MeshSection* section)
+	{
+		const MaterialID material_id = (section != nullptr) ? object->GetSectionMaterial(*section)
+															: object->GetMaterialID();
+
+		gGraphics->SubmitPushConstants(cmd, selector.Select(object, material_id, cmd), eShaderType::Vertex, consts);
+		object->RenderPrimitive(cmd, section);
+	};
+
+	if (object->MeshSections.IsEmpty()) {
+		Draw(nullptr);
+		return;
+	}
+
+	for (const MeshSection& section : object->MeshSections) {
+		Draw(&section);
+	}
+}
+
+void World::ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Camera& shadow_camera)
+{
+	const RenderListSection& section = mRenderList.GetSection(pipeline);
 
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
@@ -349,12 +443,11 @@ void World::ExecuteShadowRenderList(renderer::ePipelineName pl_name, const Camer
 			continue;
 		}
 
+		object->Update();
+
 		// Push the direct index for the object id
 		consts.ObjectIndex = object_id.GetID();
-		gGraphics->SubmitPushConstants(cmd, selector.Select(object, cmd), eShaderType::Vertex, consts);
-
-		object->Update();
-		object->RenderPrimitive(cmd);
+		RenderShadowCaster(object, selector, consts, cmd);
 	}
 }
 
@@ -364,7 +457,7 @@ void World::UpdateSpotShadows()
 	mSpotShadowBakes.Clear();
 	mSpotShadowCasters.Clear();
 
-	for (const Ref<LightBase>& light_ref : mLights) {
+	for (const Ref<LightBase>& light_ref : gLightManager->GetCache()) {
 		if (light_ref->Type != eLightType::Spot) {
 			continue;
 		}
@@ -446,7 +539,7 @@ void World::BeginShadowAtlasRegion(const ShadowAtlasRegion& region)
 {
 	gShadowAtlas->BeginRegion(region);
 
-	Pipeline& pipeline = gPipelineCache->Request(ePipelineName::ShadowDirectional);
+	Pipeline& pipeline = gPipelineCache->Get(GetShadowListPipeline());
 
 	const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0 };
 
@@ -488,9 +581,7 @@ void World::BakeSpotShadows()
 			gObjectManager->Submit(caster_id, caster->GetWorldMatrix());
 
 			consts.ObjectIndex = caster_id.GetID();
-			gGraphics->SubmitPushConstants(cmd, selector.Select(caster, cmd), eShaderType::Vertex, consts);
-
-			caster->RenderPrimitive(cmd);
+			RenderShadowCaster(caster, selector, consts, cmd);
 		}
 
 		gShadowAtlas->EndRegion();
@@ -575,35 +666,24 @@ void World::AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, DynAr
 	}
 }
 
-void World::ExecutePrepassRenderList(renderer::ePipelineName forward_pl_name)
+void World::ExecutePrepassRenderList(renderer::PipelineHandle forward_pipeline)
 {
-	// Skip prepass for transparent variants – they don't write depth and are blended in forward
-	if (forward_pl_name == ePipelineName::GeometryTransparent ||
-		forward_pl_name == ePipelineName::GeometryNormalMapsTransparent ||
-		forward_pl_name == ePipelineName::GeometrySkinnedTransparent) {
+	// Only the opaque pipelines have a prepass one. The blended ones don't write depth, they are blended in forward.
+	const PipelineHandle prepass_pipeline = gPipelineCache->GetOrCreateVariantInPass(forward_pipeline, ePipelinePass::Depth);
+
+	if (!prepass_pipeline.IsValid()) {
 		return;
 	}
 
 	PerspectiveCamera& camera = *mpCurrentCamera;
 
-	const RenderListSection& section = mRenderList.GetSection(forward_pl_name);
+	const RenderListSection& section = mRenderList.GetSection(forward_pipeline);
 
-	ePipelineName prepass_pl_name = forward_pl_name;
-	switch (forward_pl_name) {
-	case ePipelineName::Geometry:
-		prepass_pl_name = ePipelineName::DepthNormal;
-		break;
-	case ePipelineName::GeometryNormalMaps:
-		prepass_pl_name = ePipelineName::DepthNormalNormalMaps;
-		break;
-	case ePipelineName::GeometrySkinned:
-		prepass_pl_name = ePipelineName::DepthNormalSkinned;
-		break;
-	default:
+	renderer::Pipeline& pipeline = gPipelineCache->Get(prepass_pipeline);
+
+	if (!pipeline.IsBuilt()) {
 		return;
 	}
-
-	renderer::Pipeline& pipeline = gPipelineCache->Request(prepass_pl_name);
 
 	pipeline.Bind(gGraphics->GetFrame()->CmdBuffer);
 
@@ -625,7 +705,6 @@ void World::ExecutePrepassRenderList(renderer::ePipelineName forward_pl_name)
 
 		DrawPushConstants consts { .TargetSize = { gGraphics->Swapchain.Extent.X, gGraphics->Swapchain.Extent.Y } };
 		consts.ObjectId = object_id.GetID();
-		consts.MaterialIndex = object->GetMaterialID().GetID();
 		consts.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
 		consts.TileRows = gGraphics->pRenderer->GetLightTileRows();
 		consts.BoneBase = object->BoneBufferBase;
@@ -633,19 +712,29 @@ void World::ExecutePrepassRenderList(renderer::ePipelineName forward_pl_name)
 		const Mat4f& cam_matrix = camera.GetCameraMatrix(object->GetObjectLayer());
 		memcpy(consts.CameraMatrix, cam_matrix.RawData, sizeof(Mat4f));
 
-		gGraphics->SubmitPushConstants(gGraphics->GetFrame()->CmdBuffer, pipeline,
-									   eShaderType::Vertex | eShaderType::Pixel, consts);
+		ForEachDrawInPipeline(
+			object, forward_pipeline,
+			[&](const MeshSection* section)
+			{
+				const MaterialID material_id = (section != nullptr) ? object->GetSectionMaterial(*section)
+																	: object->GetMaterialID();
 
-		if (!gMaterialManager->BindWithPipeline(gGraphics->GetFrame()->CmdBuffer, pipeline, object->GetMaterialID())) {
-			gMaterialManager->BindWithPipeline(gGraphics->GetFrame()->CmdBuffer, pipeline, MaterialID::scNull);
-		}
+				CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
-		object->RenderPrimitive(gGraphics->GetFrame()->CmdBuffer);
+				consts.MaterialIndex = material_id.GetID();
+				gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex | eShaderType::Pixel, consts);
+
+				if (!gMaterialManager->BindWithPipeline(cmd, pipeline, material_id)) {
+					gMaterialManager->BindWithPipeline(cmd, pipeline, MaterialID::scNull);
+				}
+
+				object->RenderPrimitive(cmd, section);
+			});
 	}
 }
 
 
-void World::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* id_ptr)
+void World::AddToRenderListRecursive(renderer::PipelineHandle pipeline, ObjectID* id_ptr)
 {
 	if (id_ptr == nullptr) {
 		return;
@@ -653,7 +742,7 @@ void World::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* 
 
 	ObjectID id = *id_ptr;
 
-	RenderListSection& section = mRenderList.GetSection(pl_name);
+	RenderListSection& section = mRenderList.GetSection(pipeline);
 
 	for (ObjectID object_id : section.Objects) {
 		if (object_id == id) {
@@ -661,7 +750,7 @@ void World::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* 
 		}
 	}
 
-	mRenderList.AddObject(pl_name, id);
+	mRenderList.AddObject(pipeline, id);
 
 	Object* obj = gObjectManager->GetObject(id);
 	if (obj == nullptr) {
@@ -669,7 +758,7 @@ void World::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* 
 	}
 
 	for (ObjectID& attached_id : obj->AttachedNodes) {
-		AddToRenderListRecursive(pl_name, &attached_id);
+		AddToRenderListRecursive(pipeline, &attached_id);
 	}
 }
 
@@ -690,25 +779,7 @@ void World::AddToRenderListRecursiveByMaterial(ObjectID* id_ptr)
 	// Container objects (e.g. the root of a multi-primitive mesh) have no mesh/material of their own; only the
 	// attached primitives that actually own a mesh need placing in a geometry section.
 	if (obj->pMesh.IsValid()) {
-		Material* material = MaterialManagerFwd::GetMaterial(obj->GetMaterialID());
-		ePipelineName pipeline = material->GetRequiredPipeline();
-		if (IsTransparentMaterial(material)) {
-			pipeline = GetTransparentPipeline(pipeline);
-		}
-
-		RenderListSection& section = mRenderList.GetSection(pipeline);
-
-		bool already_added = false;
-		for (ObjectID object_id : section.Objects) {
-			if (object_id == id) {
-				already_added = true;
-				break;
-			}
-		}
-
-		if (!already_added) {
-			mRenderList.AddObject(pipeline, id);
-		}
+		AddToGeometrySections(mRenderList, obj);
 	}
 
 	for (ObjectID& attached_id : obj->AttachedNodes) {
@@ -719,13 +790,12 @@ void World::AddToRenderListRecursiveByMaterial(ObjectID* id_ptr)
 
 void World::ClearRenderList()
 {
-	mRenderList.ClearSection(ePipelineName::Geometry);
-	mRenderList.ClearSection(ePipelineName::GeometryNormalMaps);
-	mRenderList.ClearSection(ePipelineName::GeometrySkinned);
-	mRenderList.ClearSection(ePipelineName::GeometryTransparent);
-	mRenderList.ClearSection(ePipelineName::GeometryNormalMapsTransparent);
-	mRenderList.ClearSection(ePipelineName::GeometrySkinnedTransparent);
-	mRenderList.ClearSection(ePipelineName::ShadowDirectional);
+	for (const ePipelinePass pass : { ePipelinePass::Forward, ePipelinePass::ForwardBlend }) {
+		gPipelineCache->ForEachPassPipeline(pass,
+											[&](PipelineHandle pipeline) { mRenderList.ClearSection(pipeline); });
+	}
+
+	mRenderList.ClearSection(GetShadowListPipeline());
 }
 
 void World::AddTileToRenderList(bool clear, TileIndex new_tile_index)
@@ -761,7 +831,7 @@ void World::AddTileToRenderList(bool clear, TileIndex new_tile_index)
 		}
 
 		if (object->IsShadowCaster()) {
-			AddToRenderListRecursive(ePipelineName::ShadowDirectional, object_id);
+			AddToRenderListRecursive(GetShadowListPipeline(), object_id);
 		}
 
 		AddToRenderListRecursiveByMaterial(object_id);
@@ -826,10 +896,6 @@ void World::Render(Camera* shadow_camera)
 
 	CullWorldTiles(camera);
 
-	if (!mpDebugCube.IsValid()) {
-		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
-	}
-
 	TileIndex tile_index = gWorldGrid->WorldToTile(mpCurrentCamera->Position);
 
 	if (tile_index != gWorldGrid->ViewTileIndex) {
@@ -843,7 +909,7 @@ void World::Render(Camera* shadow_camera)
 
 	mSunLightSlot = UINT32_MAX;
 
-	for (const Ref<LightBase>& light : mLights) {
+	for (const Ref<LightBase>& light : gLightManager->GetCache()) {
 		const uint32 slot = gGraphics->LightBuffer.SlotIndex;
 
 		light->Render(camera, shadow_camera);
@@ -858,7 +924,7 @@ void World::Render(Camera* shadow_camera)
 
 	// Render shadows into the atlas. The directional light is redrawn every frame, spot lights only when their bake is
 	// out of date.
-	Ref<LightDirectional> sun = GetDirectionalLight();
+	Ref<LightDirectional> sun = gLightManager->GetDirectionalLight();
 	const bool render_sun_shadows = sun.IsValid() && sun->bEnabled;
 
 	// With the sun off its region is left alone, apart from the atlas's very first pass that makes it sampleable
@@ -866,53 +932,63 @@ void World::Render(Camera* shadow_camera)
 		BeginShadowAtlasRegion(gShadowAtlas->GetDirectionalRegion());
 
 		if (render_sun_shadows) {
-			ExecuteShadowRenderList(ePipelineName::ShadowDirectional, gShadowRenderer->ShadowCamera);
+			ExecuteShadowRenderList(GetShadowListPipeline(), gShadowRenderer->ShadowCamera);
 		}
 
 		gShadowAtlas->EndRegion();
 	}
 
 	BakeSpotShadows();
+	gGraphics->MarkGpu(eGpuMarker::Shadows);
 
 	gGraphics->BeginPrepass();
 
-	ExecutePrepassRenderList(ePipelineName::Geometry);
-	ExecutePrepassRenderList(ePipelineName::GeometryNormalMaps);
-	ExecutePrepassRenderList(ePipelineName::GeometrySkinned);
+	gPipelineCache->ForEachPassPipeline(ePipelinePass::Forward,
+										[&](PipelineHandle pipeline) { ExecutePrepassRenderList(pipeline); });
 
 	gGraphics->pRenderer->Prepass.End();
+	gGraphics->MarkGpu(eGpuMarker::Prepass);
 
 	// The decals the camera can see, for the light culling pass to bin
 	gDecalManager->Update(camera);
 
 	// Cull lights and decals into screen space tiles before rendering geometry
 	gGraphics->BeginLightCulling(camera);
+	gGraphics->MarkGpu(eGpuMarker::LightCulling);
 
 	gGraphics->RenderEarlyFrameEffects(camera);
+	gGraphics->MarkGpu(eGpuMarker::SSAO);
 
 	gGraphics->BeginGeometry();
 
 	// Opaque first
-	ExecuteRenderList(ePipelineName::Geometry);
-	ExecuteRenderList(ePipelineName::GeometryNormalMaps);
-	ExecuteRenderList(ePipelineName::GeometrySkinned);
+	ExecuteForwardRenderLists(*mpCurrentCamera);
 
 	// Transparent after, back-to-front globally sorted, depth write disabled
 	ExecuteTransparentRenderLists();
 
 	if (bRenderPhysicsObjects) {
-		RenderPhysicsObjects(camera);
+		DebugDrawPhysicsBodies();
 	}
 
 	if (bRenderProbes) {
-		RenderProbeDebug(camera);
+		DebugDrawProbes();
 	}
 
-	if (gPrototypeEditor != nullptr || bRenderProbes) {
-		RenderProbeVolumes(camera);
+#ifdef FX_IS_EDITOR
+	// Probe volumes are edited as brushes, so the editor always shows them
+	DebugDrawProbeVolumes();
+#else
+	if (bRenderProbes) {
+		DebugDrawProbeVolumes();
 	}
+#endif
 
-	// RenderWorldGrid(camera);
+	// DebugDrawWorldGrid();
+	// DebugDrawObjectBounds();
+
+	// Everything queued this frame, by the calls above or by anything else, is drawn on top of the geometry
+	gDebugDraw->Render(gGraphics->GetFrame()->CmdBuffer, camera);
 }
 
 
@@ -937,7 +1013,7 @@ bool World::RenderCaptureSunShadows(LightDirectional& sun, const Vec3f& center, 
 	}
 
 	BeginShadowAtlasRegion(gShadowAtlas->GetDirectionalRegion());
-	ExecuteShadowRenderList(ePipelineName::ShadowDirectional, shadow_camera);
+	ExecuteShadowRenderList(GetShadowListPipeline(), shadow_camera);
 	gShadowAtlas->EndRegion();
 
 	out_shadow_camera = shadow_camera;
@@ -955,28 +1031,6 @@ void World::RenderProbeCapture()
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
 	const Vec2u extent(ProbeManager::scCaptureSize, ProbeManager::scCaptureSize);
-
-	// The opaque geometry pipelines default to a swapchain-sized viewport.
-	// Override them for the capture extent (restored below).
-	static constexpr renderer::ePipelineName scCapturePipelines[] = {
-		renderer::ePipelineName::Geometry,
-		renderer::ePipelineName::GeometryNormalMaps,
-		renderer::ePipelineName::GeometrySkinned,
-	};
-
-	Vec2u saved_viewports[std::size(scCapturePipelines)];
-	bool saved_fullscreen[std::size(scCapturePipelines)];
-
-	for (uint32 i = 0; i < std::size(scCapturePipelines); i++) {
-		renderer::Pipeline& pipeline = gPipelineCache->Request(scCapturePipelines[i]);
-		saved_viewports[i] = pipeline.ViewportSize;
-		saved_fullscreen[i] = pipeline.bIsViewportFullscreen;
-
-		pipeline.ViewportSize = extent;
-		pipeline.bIsViewportFullscreen = false;
-	}
-
-	RequirePipelineDynamicStates();
 
 	const uint32 saved_tile_columns = gGraphics->pRenderer->GetLightTileColumns();
 	const uint32 saved_tile_rows = gGraphics->pRenderer->GetLightTileRows();
@@ -996,7 +1050,7 @@ void World::RenderProbeCapture()
 	// its own from every caster in the level, centered on the batch's first probe. Later probes that aren't well
 	// inside of it get it re-rendered around them. The main view was already drawn with the player's shadow map, so
 	// each re-render goes with a copy of the sun in a spare light slot, which the capture's light culling swaps in.
-	Ref<LightDirectional> sun = GetDirectionalLight();
+	Ref<LightDirectional> sun = gLightManager->GetDirectionalLight();
 	const bool sun_has_shadows = sun.IsValid() && sun->bEnabled && (mSunLightSlot != UINT32_MAX);
 
 	OrthoCamera capture_shadow_camera;
@@ -1027,73 +1081,35 @@ void World::RenderProbeCapture()
 
 			stage.Begin(cmd);
 
-			for (renderer::ePipelineName pipeline_name : scCapturePipelines) {
-				ExecuteRenderList(pipeline_name, camera);
-			}
+			ExecuteForwardRenderLists(camera);
 
 			stage.End();
 		});
 
-	for (uint32 i = 0; i < std::size(scCapturePipelines); i++) {
-		renderer::Pipeline& pipeline = gPipelineCache->Request(scCapturePipelines[i]);
-		pipeline.ViewportSize = saved_viewports[i];
-		pipeline.bIsViewportFullscreen = saved_fullscreen[i];
-	}
-
 	gGraphics->pRenderer->mLightTileColumns = saved_tile_columns;
 	gGraphics->pRenderer->mLightTileRows = saved_tile_rows;
-
-	// Force the composition pass to re-emit viewport size/state
-	RequirePipelineDynamicStates();
 }
 
-void World::RenderBoundingBoxes(const Camera& camera)
+void World::DebugDrawObjectBounds()
 {
-	if (!mpDebugCube.IsValid()) {
-		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
-	}
-
-	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
-
-	renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
-	pipeline.Bind(cmd);
-
-	DebugLayerPushConstants push_constants {};
-
 	const Color debug_color = Color::FromRGBA(150, 255, 80, 255);
 
 	for (Object& object : gObjectManager->GetCache()) {
-		Mat4f model_matrix = Mat4f::AsScale(object.Bounds.GetSize()) * Mat4f::AsRotation(object.mRotation) *
-							 Mat4f::AsTranslation(object.GetPosition() + (object.Bounds.GetSize() / Vec3f(2.0f)) +
-												  object.Bounds.Min);
+		const Vec3f half_extent = (object.Bounds.Max - object.Bounds.Min) * 0.5f;
+		const Vec3f center = (object.Bounds.Max + object.Bounds.Min) * 0.5f;
 
-		Mat4f combined_matrix = model_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
-		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
-
-		push_constants.DebugColor = debug_color.AsUInt();
-
-		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
-		mpDebugCube->Render(cmd, 1);
+		gDebugDraw->WireBox(Mat4f::AsScale(half_extent) * Mat4f::AsTranslation(center) * object.GetWorldMatrix(),
+							debug_color);
 	}
 }
 
 
-void World::RenderWorldGrid(const Camera& camera)
+void World::DebugDrawWorldGrid()
 {
-	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
-
-	renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
-	pipeline.Bind(cmd);
-
-
-	DebugLayerPushConstants push_constants {};
-
 	const Color debug_color = Color::FromRGBA(255, 255, 255, 255);
 	const Color player_debug_color = Color::FromRGBA(255, 0, 0, 255);
 
 	const Vec3f tile_size = Vec3f(gWorldGrid->mTileSize.X, 1.0f, gWorldGrid->mTileSize.Y);
-
-	Vec2u camera_tile_index = gWorldGrid->TileToTileXY(gWorldGrid->ViewTileIndex);
 
 	for (uint32 y = 0; y < gWorldGrid->mGridSize.Y; y++) {
 		for (uint32 x = 0; x < gWorldGrid->mGridSize.X; x++) {
@@ -1102,40 +1118,23 @@ void World::RenderWorldGrid(const Camera& camera)
 			Mat4f model_matrix = Mat4f::AsScale(tile_size) * Mat4f::AsRotation(Quat::scIdentity) *
 								 Mat4f::AsTranslation((tile_offset)-gWorldGrid->mPositionOffset + (tile_size * 0.5f));
 
-			Mat4f combined_matrix = model_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
-			memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
-
-			push_constants.DebugColor = debug_color.AsUInt();
+			Color color = debug_color;
 
 			for (const TileIndex vis_ti : mVisibleTiles) {
 				if (vis_ti == gWorldGrid->TileFromTileXY(Vec2u(x, y))) {
-					push_constants.DebugColor = player_debug_color.AsUInt();
+					color = player_debug_color;
 				}
 			}
 
-			gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
-			mpDebugCube->Render(cmd, 1);
+			gDebugDraw->WireBox(model_matrix, color);
 		}
 	}
 }
 
 
-void World::RenderPhysicsObjects(const Camera& camera)
+void World::DebugDrawPhysicsBodies()
 {
-	if (!mpDebugCube.IsValid()) {
-		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
-	}
-
-	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
-	// gRenderer->pDeferredRenderer->PlDebugLayer.Bind(cmd);
-
-	renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
-	pipeline.Bind(cmd);
-
-	DebugLayerPushConstants push_constants {};
-
-	const Color debug_color = Color::FromRGBA(255, 40, 40, 255);
-	const Color selected_color = Color::FromRGBA(100, 255, 40, 255);
+	const Color debug_color = Color::FromRGBA(100, 255, 40, 255);
 
 	uint32 current_phys_state = gPhysics->UpdateState.load();
 	if (mLastPhysicsUpdateState != current_phys_state) {
@@ -1143,20 +1142,9 @@ void World::RenderPhysicsObjects(const Camera& camera)
 		mCachedPhysicsBodies = gPhysics->CollectBodies();
 	}
 
-
 	for (physics::Body* phys : mCachedPhysicsBodies) {
 		// As we are using scale here, we want to halve the dimensions
-		Mat4f world_matrix = Mat4f::AsScale(phys->Dimensions * 0.5) * Mat4f::AsRotation(phys->GetRotation()) *
-							 Mat4f::AsTranslation(phys->GetPosition());
-		Mat4f combined_matrix = world_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
-
-
-		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
-
-		push_constants.DebugColor = selected_color.AsUInt();
-
-		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
-		mpDebugCube->Render(cmd, 1);
+		gDebugDraw->WireBox(phys->GetPosition(), phys->Dimensions * 0.5, phys->GetRotation(), debug_color);
 	}
 }
 
@@ -1185,19 +1173,8 @@ Object* World::RaycastProbeVolumes(const Vec3f& origin, const Vec3f& direction, 
 	return nearest;
 }
 
-void World::RenderProbeVolumes(const Camera& camera)
+void World::DebugDrawProbeVolumes()
 {
-	if (!mpWireBox.IsValid()) {
-		mpWireBox = MeshGen::MakeWireframeBox()->AsMesh(renderer::eVertexType::Slim);
-	}
-
-	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
-
-	renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
-	pipeline.Bind(cmd);
-
-	DebugLayerPushConstants push_constants {};
-
 	const Color volume_color = Color::FromRGBA(60, 220, 255, 255);
 	const Color selected_color = Color::FromRGBA(255, 220, 60, 255);
 
@@ -1210,34 +1187,22 @@ void World::RenderProbeVolumes(const Camera& camera)
 		const Vec3f center = (object.Bounds.Max + object.Bounds.Min) * 0.5f;
 
 		Mat4f world_matrix = Mat4f::AsScale(half_extent) * Mat4f::AsTranslation(center) * object.GetWorldMatrix();
-		Mat4f combined_matrix = world_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 
-		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
+#ifdef FX_IS_EDITOR
+		const bool is_selected = gEditor->GetSelection().Contains(&object);
+#else
+		const bool is_selected = false;
+#endif
 
-		const bool is_selected = gPrototypeEditor != nullptr && gPrototypeEditor->IsInSelection(&object);
-		push_constants.DebugColor = is_selected ? selected_color.AsUInt() : volume_color.AsUInt();
-
-		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
-		mpWireBox->Render(cmd, 1);
+		gDebugDraw->WireBox(world_matrix, is_selected ? selected_color : volume_color);
 	}
 }
 
-void World::RenderProbeDebug(const Camera& camera)
+void World::DebugDrawProbes()
 {
-	if (!mpDebugCube.IsValid()) {
-		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
-	}
-
 	if (gProbeManager == nullptr) {
 		return;
 	}
-
-	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
-
-	renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugSolid);
-	pipeline.Bind(cmd);
-
-	DebugLayerPushConstants push_constants {};
 
 	// Tiny solid cubes (~0.15m). The base debug cube spans -1..+1, so scale by half-extent.
 	static const Vec3f scProbeHalfExtent(0.1f);
@@ -1259,32 +1224,25 @@ void World::RenderProbeDebug(const Camera& camera)
 		uint32 num_probes;
 		gProbeManager->GetVolumeProbeRange(volume, first_probe, num_probes);
 
-		const uint32 volume_color = scVolumeColors[volume % std::size(scVolumeColors)].AsUInt();
+		const Color volume_color = scVolumeColors[volume % std::size(scVolumeColors)];
 
 		for (uint32 i = first_probe; i < first_probe + num_probes; i++) {
-			Mat4f world_matrix = Mat4f::AsScale(scProbeHalfExtent) *
-								 Mat4f::AsTranslation(gProbeManager->GetProbePosition(i));
-			Mat4f combined_matrix = world_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
-
-			memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
+			Color color;
 
 			if (is_baking && i == current_probe) {
-				push_constants.DebugColor = capturing_color.AsUInt();
+				color = capturing_color;
 			}
 			else {
-				push_constants.DebugColor = gProbeManager->IsProbeActive(i) ? volume_color : inactive_color.AsUInt();
+				color = gProbeManager->IsProbeActive(i) ? volume_color : inactive_color;
 			}
 
-			gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
-			mpDebugCube->Render(cmd, 1);
+			gDebugDraw->SolidBox(gProbeManager->GetProbePosition(i), scProbeHalfExtent, Quat::scIdentity, color);
 		}
 	}
 }
 
 void World::Destroy()
 {
-	mLights.Destroy();
-
 	if (pBlockout != nullptr) {
 		delete pBlockout;
 		pBlockout = nullptr;

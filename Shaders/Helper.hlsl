@@ -7,11 +7,18 @@
 #define FPT_ALL 2
 
 #define F_REFLECT(_type, _binding, _set) ;
+
 #define FR_STRUCTBUFFER 0
 #define FR_CBUFFER 1
 #define FR_SAMPLER2D 2
 
 #define F_PARAMTEST() ;
+
+// Dummy permutation stuff, handled by ShaderPreproc.
+#define PERMIF(x_) ;
+#define PERMNOT(x_) ;
+#define PERMELSE() ;
+#define PERMEND() ;
 
 /// Default cutoff for opaque and alpha masked materials. Pipelines that need a different one (the transparent
 /// variants drop it to near zero) pass ALPHA_CUTOFF as a shader macro, which the preprocessor defines ahead of
@@ -72,6 +79,12 @@ float4 F_UnpackUIntToFloat4(uint x);
 #define SSAO_SIZE_DIVISOR 2
 
 #define HAS_FLAG(flags_, has_) (((flags_) & (has_)) != 0)
+
+
+
+///////////////////////////////////////
+// Draw Flags
+///////////////////////////////////////
 
 #define DRAW_FLAG_PROBE_CAPTURE 0x01
 #define DRAW_FLAG_DEBUG_PROBE_IRRADIANCE 0x02
