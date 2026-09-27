@@ -16,6 +16,9 @@ enum OPTYPE
 	ROTATE,
 	BRUSH_EDIT,
 	CREATE_BRUSH,
+	LIGHT_TRANSFORM,
+	LIGHT_CREATE,
+	LIGHT_DELETE,
 }
 
 /* This must match eFaceTextureEdit in Blockout.hpp! */
@@ -39,6 +42,7 @@ enum EDITORTOOL
 	CREATE,
 	CLIP,
 	SET_MATERIAL,
+	LIGHT,
 }
 
 

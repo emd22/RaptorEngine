@@ -181,7 +181,8 @@ F_Texture2D(tAlbedo, 0, 1)
 
 PERMIF(USE_NORMAL_MAPS);
 F_Texture2D(tNormalMap, 1, 1)
-F_Texture2D(tMetallicRoughness, 2, 1)
+// Occlusion, Roughness, Metallic
+F_Texture2D(tORM, 2, 1)
 PERMEND();
 
 F_ShadowTexture2D(tShadowAtlas, 4, 0);
@@ -291,20 +292,24 @@ SurfaceParams GetSurfaceParams(Material material, float3 albedo, float4 surface_
 {
 	SurfaceParams surface;
 
-	if (HAS_FLAG(material.Flags, MF_SPECULAR_GLOSSINESS)) {
-		// KHR_materials_pbrSpecularGlossiness: specular colour in RGB, glossiness in A
-		surface.vF0 = surface_sample.rgb * material.vSpecularFactor;
-		surface.vDiffuse = albedo * (1.0 - max(surface.vF0.r, max(surface.vF0.g, surface.vF0.b)));
-		surface.fRoughness = 1.0 - (surface_sample.a * material.fGlossinessFactor);
-	}
-	else {
-		// glTF metallic/roughness: roughness in G, metallic in B
-		const float metallic = surface_sample.b * material.fMetallicFactor;
+	// Going to ignore the new specular glossiness for now, as that is not how 99% of my materials are configured.
 
-		surface.vF0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
-		surface.vDiffuse = albedo * (1.0 - metallic);
-		surface.fRoughness = surface_sample.g * material.fRoughnessFactor;
-	}
+	// if (HAS_FLAG(material.Flags, MF_SPECULAR_GLOSSINESS)) {
+	// 	// KHR_materials_pbrSpecularGlossiness: specular colour in RGB, glossiness in A
+	// 	surface.vF0 = surface_sample.rgb * material.vSpecularFactor;
+	// 	surface.vDiffuse = albedo * (1.0 - max(surface.vF0.r, max(surface.vF0.g, surface.vF0.b)));
+	// 	surface.fRoughness = 1.0 - (surface_sample.a * material.fGlossinessFactor);
+	// }
+	// else {
+
+	// ORM: roughness in G, metallic in B
+	const float metallic = surface_sample.b * material.fMetallicFactor;
+
+	surface.vF0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
+	surface.vDiffuse = albedo * (1.0 - metallic);
+	surface.fRoughness = surface_sample.g * material.fRoughnessFactor;
+
+	// }
 
 	surface.fRoughness = clamp(surface.fRoughness, MIN_ROUGHNESS, 1.0);
 
@@ -441,7 +446,7 @@ PERMEND();
     }
 
 PERMIF(USE_NORMAL_MAPS);
-    float4 surface_sample = F_Sample(tMetallicRoughness, input.vUV);
+    float4 surface_sample = F_Sample(tORM, input.vUV);
     float3 normal_ts = F_Sample(tNormalMap, input.vUV).rgb * 2.0 - 1.0;
 
     const float3 vertex_normal = normalize(input.vNormalWS);

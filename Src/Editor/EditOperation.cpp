@@ -5,6 +5,8 @@
 #include <Blockout.hpp>
 #include <Engine.hpp>
 #include <Object/ObjectManager.hpp>
+#include <Renderer/Light.hpp>
+#include <Renderer/LightManager.hpp>
 #include <World.hpp>
 
 namespace fx::editor {
@@ -31,6 +33,17 @@ static Object* ResolveOpValue(const EditOperation& op)
 
 	Object* live = gObjectManager->GetObject(op.ValueObjectID);
 	return (live == op.ValueB.pObject) ? live : nullptr;
+}
+
+
+static LightSpot* ResolveOpLight(const EditOperation& op)
+{
+	if (op.Light.pLight == nullptr || op.Light.Id.IsInvalid()) {
+		return nullptr;
+	}
+
+	LightBase* live = gLightManager->GetLight(op.Light.Id);
+	return (live == op.Light.pLight) ? op.Light.pLight : nullptr;
 }
 
 /////////////////////////////////////
@@ -86,6 +99,43 @@ EditOperationValue EditOperation::Execute(EditorSelection& selection)
 		target->SetRotation(Quat::FromEulerAngles(ValueB.Position));
 
 		return ValueB;
+	}
+	case eType::LightTransform: {
+		LightSpot* light = ResolveOpLight(*this);
+		if (light == nullptr) {
+			break;
+		}
+
+		light->SetPosition(ValueB.Position);
+		light->SetDirection(Light.DirectionAfter);
+
+		return ValueB;
+	}
+	case eType::LightCreate: {
+		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
+
+		Ref<LightSpot> light = gLightManager->NewLight<LightSpot>(LightSnap.LightName.Get());
+		light->SetPosition(ValueA.Position);
+		light->SetDirection(Light.DirectionAfter);
+		light->SetRadius(LightSnap.Radius);
+		light->SetConeAngles(LightSnap.InnerAngle, LightSnap.OuterAngle);
+		light->bCastShadows = LightSnap.bCastShadows;
+
+		Light.pLight = &(*light);
+		Light.Id = light->ID;
+
+		return EditOperationValue(static_cast<LightBase*>(Light.pLight));
+	}
+	case eType::LightDelete: {
+		LightSpot* light = ResolveOpLight(*this);
+		if (light == nullptr) {
+			break;
+		}
+
+		gLightManager->DestroyLight(Light.Id);
+		Light.pLight = nullptr;
+
+		break;
 	}
 	case eType::BrushEdit: {
 		Object* target = ResolveOpTarget(*this);
@@ -199,6 +249,41 @@ void EditOperation::Undo(EditorSelection& selection)
 		}
 
 		target->SetRotation(Quat::FromEulerAngles(ValueA.Position));
+
+		break;
+	}
+	case eType::LightTransform: {
+		LightSpot* light = ResolveOpLight(*this);
+		if (light == nullptr) {
+			break;
+		}
+
+		light->SetPosition(ValueA.Position);
+		light->SetDirection(Light.DirectionBefore);
+
+		break;
+	}
+	case eType::LightCreate: {
+		if (Light.Id.IsInvalid()) {
+			break;
+		}
+
+		gLightManager->DestroyLight(Light.Id);
+		Light.pLight = nullptr;
+
+		break;
+	}
+	case eType::LightDelete: {
+		Ref<LightSpot> restored = gLightManager->NewLight<LightSpot>(LightSnap.LightName.Get());
+
+		restored->SetPosition(LightSnap.Position);
+		restored->SetDirection(LightSnap.Direction);
+		restored->SetRadius(LightSnap.Radius);
+		restored->SetConeAngles(LightSnap.InnerAngle, LightSnap.OuterAngle);
+		restored->bCastShadows = LightSnap.bCastShadows;
+
+		Light.pLight = &(*restored);
+		Light.Id = restored->ID;
 
 		break;
 	}
@@ -321,6 +406,9 @@ EditOperationValue EditHistory::Push(const EditOperation& op)
 	if (stamped.ValueB.Type == EditOperationValue::eValueType::Object && stamped.ValueB.pObject != nullptr &&
 		stamped.ValueObjectID.IsInvalid()) {
 		stamped.ValueObjectID = stamped.ValueB.pObject->ID;
+	}
+	if (stamped.Light.pLight != nullptr && stamped.Light.Id.IsInvalid()) {
+		stamped.Light.Id = stamped.Light.pLight->ID;
 	}
 
 	mOperations.Push(stamped);

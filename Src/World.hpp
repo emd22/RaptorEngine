@@ -49,7 +49,6 @@ public:
 	void Create();
 
 	void Attach(AssetTicket object_ticket);
-	void Attach(const Ref<LightBase>& light);
 
 	void Detach(ObjectID id);
 
@@ -63,32 +62,6 @@ public:
 	 */
 	void RenderProbeCapture();
 
-	const PagedArray<Ref<LightBase>>& GetAllLights() { return mLights; }
-
-	Ref<LightDirectional> GetDirectionalLight()
-	{
-		for (Ref<LightBase>& light : mLights) {
-			if (light->Type == eLightType::Directional) {
-				return Ref<LightDirectional>(light);
-			}
-		}
-
-		return Ref<LightDirectional>(nullptr);
-	}
-
-	/// Finds an attached light by its name, returns a null ref if there is no match.
-	Ref<LightBase> FindLight(Hash32 name)
-	{
-		for (Ref<LightBase>& light : mLights) {
-			if (light->Name == name) {
-				return light;
-			}
-		}
-
-		return Ref<LightBase>(nullptr);
-	}
-
-
 	void Destroy();
 
 	FX_FORCE_INLINE Player& GetPlayer() { return this->Player; }
@@ -98,19 +71,20 @@ public:
 	~World() { Destroy(); }
 
 private:
-	void RenderPhysicsObjects(const Camera& camera);
-	void RenderProbeDebug(const Camera& camera);
+	// Queue debug shapes on gDebugDraw, which draws them at the end of Render()
+	void DebugDrawPhysicsBodies();
+	void DebugDrawProbes();
 
 	/// Draws a wireframe box for each probe volume brush, which is otherwise not drawn at all
-	void RenderProbeVolumes(const Camera& camera);
+	void DebugDrawProbeVolumes();
 
 public:
 	Object* RaycastProbeVolumes(const Vec3f& origin, const Vec3f& direction, float32 max_distance,
 								float32& out_distance);
 
 private:
-	void RenderBoundingBoxes(const Camera& camera);
-	void RenderWorldGrid(const Camera& camera);
+	void DebugDrawObjectBounds();
+	void DebugDrawWorldGrid();
 
 	void CullWorldTiles(const PerspectiveCamera& cam);
 
@@ -184,14 +158,9 @@ public:
 	String BlockoutPath;
 
 private:
-	PagedArray<Ref<LightBase>> mLights;
-
 	Ref<PerspectiveCamera> mpCurrentCamera { nullptr };
 
 	physics::BodyID mSelectedPhysicsObjectId = physics::BodyID::scNull;
-
-	Ref<PrimitiveMesh> mpWireBox { nullptr };
-	Ref<PrimitiveMesh> mpDebugCube { nullptr };
 
 	uint32 mLastPhysicsUpdateState = UINT32_MAX;
 	SizedArray<physics::Body*> mCachedPhysicsBodies;

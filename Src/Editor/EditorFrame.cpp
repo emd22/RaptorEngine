@@ -37,6 +37,7 @@ static constexpr ToolButtonInfo scToolButtons[] = {
 	{ "Create", "Textures/editor/create.png" },
 	{ "Clip", "Textures/editor/clip.png" },
 	{ "Set Material", "Textures/editor/set_material.png" },
+	{ "Light", "Textures/editor/light.png" },
 };
 
 static_assert(std::size(scToolButtons) == static_cast<size_t>(eEditorTool::Count));

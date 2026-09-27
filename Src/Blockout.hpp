@@ -200,7 +200,7 @@ private:
 	MaterialID mWhiteMaterialID = MaterialID::scNull;
 	MaterialID mOrangeMaterialID = MaterialID::scNull;
 	MaterialID mBlueMaterialID = MaterialID::scNull;
-	MaterialID mProtoTileID = MaterialID::scNull;
+	MaterialID mProtoBricksID = MaterialID::scNull;
 
 	/// Keyed by ObjectID::GetID()
 	std::unordered_map<uint32, Brush> mBrushes;

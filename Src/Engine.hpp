@@ -36,6 +36,9 @@ extern ScriptManager* gScriptManager;
 class World;
 extern World* gWorld;
 
+class LightManager;
+extern LightManager* gLightManager;
+
 class ProbeManager;
 extern ProbeManager* gProbeManager;
 

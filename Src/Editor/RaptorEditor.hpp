@@ -5,6 +5,7 @@
 #include "EditOperation.hpp"
 #include "EditorSelection.hpp"
 #include "EditorTool.hpp"
+#include "LightEditor.hpp"
 
 #include <wx/evtloop.h>
 
@@ -94,6 +95,9 @@ public:
 	/// The size of a snap step, in metres
 	float32 GetSnapStep() const;
 
+	/// Rounds a position (or a distance) to the snap step, if snapping is on
+	Vec3f SnapToGrid(const Vec3f& position) const;
+
 	/////////////////////////////////////
 	// Selection
 	/////////////////////////////////////
@@ -166,7 +170,6 @@ private:
 	void DupeSelection();
 
 	void AdjustSnapLevel(int32 direction);
-	Vec3f SnapToGrid(const Vec3f& position) const;
 
 private:
 	EditorFrame* mpMainFrame = nullptr;
@@ -178,6 +181,9 @@ private:
 
 	EditorToolState mToolState {};
 	EditorToolSelection mToolSelection {};
+
+	/// Runs the Light tool
+	LightEditor mLightEditor;
 
 	EditorSelection mSelection;
 	EditHistory mHistory { mSelection };

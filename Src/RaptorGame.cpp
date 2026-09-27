@@ -17,6 +17,7 @@
 #include <Core/RefUtil.hpp>
 #include <Decal/DecalManager.hpp>
 #include <Engine.hpp>
+#include <Renderer/LightManager.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
@@ -38,7 +39,7 @@
 #include <Editor/RaptorEditor.hpp>
 #endif
 
-// #define FX_LIMIT_FRAMERATE_ON_FOCUS_LOST 1
+#define FX_LIMIT_FRAMERATE_ON_FOCUS_LOST 1
 
 
 FX_SET_MODULE_NAME("RaptorGame");
@@ -211,7 +212,7 @@ void RaptorGame::CreateGame()
 	// Baked probes if the scene has them, procedural gradient otherwise.
 	gProbeManager->LoadProbes();
 
-	pSun = gWorld->GetDirectionalLight();
+	pSun = gLightManager->GetDirectionalLight();
 
 
 	gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(Vec3f(0, 8, 5), Vec3f(0.0f, 8.0f, -2.0f), Vec3f(0, 1, 0));
@@ -518,46 +519,46 @@ void RaptorGame::RenderText()
 	static const uint32 scGreen = Color::FromRGBA(100, 255, 0, 255).AsUInt();
 
 	if (bInCommandMode) {
-		gTextRenderer->DrawText(String::Fmt(":{}", mCommandConsole.GetString()).CStr(), 2.0f, scGreen);
-		gTextRenderer->DrawText(String::Fmt("={}", mCommandConsole.Output).CStr(), 2.0f, scWhite);
+		gTextRenderer->DrawText(String::Fmt(":{}", mCommandConsole.GetString()).CStr(), 1.0f, scGreen);
+		gTextRenderer->DrawText(String::Fmt("={}", mCommandConsole.Output).CStr(), 1.0f, scWhite);
 		return;
 	}
 
 
 	if (mpShowFpsCVar == nullptr || mpShowFpsCVar->IntValue != 0) {
-		gTextRenderer->DrawText(String::Fmt("FPS={:.0f} ({:.2f}ms)", Fps, FrameTimeMs).CStr(), 2.0f, scWhite);
+		gTextRenderer->DrawText(String::Fmt("FPS={:.0f} ({:.2f}ms)", Fps, FrameTimeMs).CStr(), 1.0f, scWhite);
 	}
 
 	const GpuProfiler& gpu = gGraphics->Profiler;
 
 	if (gpu.IsEnabled() && (mpShowGpuCVar == nullptr || mpShowGpuCVar->IntValue != 0)) {
-		gTextRenderer->DrawText(String::Fmt("GPU={:.2f}ms", gpu.GetTotalMs()).CStr(), 2.0f, scWhite);
+		gTextRenderer->DrawText(String::Fmt("GPU={:.2f}ms", gpu.GetTotalMs()).CStr(), 1.0f, scWhite);
 		gTextRenderer->DrawText(String::Fmt("Sh {:.2f} Pre {:.2f} Cull {:.2f} SSAO {:.2f} Fwd {:.2f} Comp {:.2f}",
 											gpu.GetMs(eGpuMarker::Shadows), gpu.GetMs(eGpuMarker::Prepass),
 											gpu.GetMs(eGpuMarker::LightCulling), gpu.GetMs(eGpuMarker::SSAO),
 											gpu.GetMs(eGpuMarker::Forward), gpu.GetMs(eGpuMarker::Composition))
 									.CStr(),
-								2.0f, scWhite);
+								1.0f, scWhite);
 
 		// Only bakes have this
 		if (gpu.GetMs(eGpuMarker::ProbeCapture) > 0.005) {
-			gTextRenderer->DrawText(String::Fmt("Bake {:.2f}", gpu.GetMs(eGpuMarker::ProbeCapture)).CStr(), 2.0f,
+			gTextRenderer->DrawText(String::Fmt("Bake {:.2f}", gpu.GetMs(eGpuMarker::ProbeCapture)).CStr(), 1.0f,
 									scWhite);
 		}
 	}
 
-	gTextRenderer->DrawText(String::Fmt("Vis={}", gWorld->mRenderList.GetItemCount()).CStr(), 2.0f, scWhite);
+	gTextRenderer->DrawText(String::Fmt("Vis={}", gWorld->mRenderList.GetItemCount()).CStr(), 1.0f, scWhite);
 
 #ifdef FX_IS_EDITOR
 	gTextRenderer->DrawText(
-		String::Fmt("Q={}, QE={}", gEditor->GetSnapStep(), gEditor->GetToolState().ToolSnapEnabled).CStr(), 2.0,
+		String::Fmt("Q={}, QE={}", gEditor->GetSnapStep(), gEditor->GetToolState().ToolSnapEnabled).CStr(), 1.0,
 		scGreen);
 
 	const editor::EditorSelection& selection = gEditor->GetSelection();
 
 	if (!selection.IsEmpty()) {
 		gTextRenderer->DrawText(
-			String::Fmt("Last={}, Sel={}", selection.GetLast()->Name.Get(), selection.GetCount()).CStr(), 2.0, scGreen);
+			String::Fmt("Last={}, Sel={}", selection.GetLast()->Name.Get(), selection.GetCount()).CStr(), 1.0, scGreen);
 	}
 #endif
 }

@@ -150,7 +150,7 @@ F_Texture2D(tAlbedo, 0, 1)
 
 PERMIF(USE_NORMAL_MAPS);
 F_Texture2D(tNormalMap, 1, 1)
-F_Texture2D(tMetallicRoughness, 2, 1)
+F_Texture2D(tORM, 2, 1)
 PERMEND();
 
 struct FSPushConsts

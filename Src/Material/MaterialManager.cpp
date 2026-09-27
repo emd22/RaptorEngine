@@ -116,7 +116,7 @@ void MaterialManager::MakeNullMaterial()
 	// fits any pipeline, and it is what gets bound in place of a material that is not ready.
 	material->Attach(Material::eResourceType::Diffuse, diffuse_ticket);
 	material->Attach(Material::eResourceType::Normal, null_image_ticket);
-	material->Attach(Material::eResourceType::MetallicRoughness, null_image_ticket);
+	material->Attach(Material::eResourceType::ORM, null_image_ticket);
 
 	material->bNearestFiltering = true;
 

@@ -11,8 +11,10 @@
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Physics/PhysicsManager.hpp>
+#include <Renderer/DebugDraw.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
+#include <Renderer/LightManager.hpp>
 #include <Renderer/LightProbe.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/ShadowAtlas.hpp>
@@ -25,8 +27,6 @@ using namespace renderer;
 
 void World::Create()
 {
-	mLights.Create(32);
-
 	SortedEntryBuffer.SetPageSize(128);
 
 	mSpotShadowBakes.SetPageSize(ShadowAtlas::scMaxSpotTiles);
@@ -166,12 +166,6 @@ void World::Attach(AssetTicket object_ticket)
 			AddObjectToRenderList(object, this);
 			gWorldGrid->AddObject(object->ID);
 		});
-}
-
-void World::Attach(const Ref<LightBase>& light)
-{
-	mLights.Insert(light);
-	light->OnAttached(this);
 }
 
 void World::Detach(ObjectID id)
@@ -463,7 +457,7 @@ void World::UpdateSpotShadows()
 	mSpotShadowBakes.Clear();
 	mSpotShadowCasters.Clear();
 
-	for (const Ref<LightBase>& light_ref : mLights) {
+	for (const Ref<LightBase>& light_ref : gLightManager->GetCache()) {
 		if (light_ref->Type != eLightType::Spot) {
 			continue;
 		}
@@ -902,10 +896,6 @@ void World::Render(Camera* shadow_camera)
 
 	CullWorldTiles(camera);
 
-	if (!mpDebugCube.IsValid()) {
-		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
-	}
-
 	TileIndex tile_index = gWorldGrid->WorldToTile(mpCurrentCamera->Position);
 
 	if (tile_index != gWorldGrid->ViewTileIndex) {
@@ -919,7 +909,7 @@ void World::Render(Camera* shadow_camera)
 
 	mSunLightSlot = UINT32_MAX;
 
-	for (const Ref<LightBase>& light : mLights) {
+	for (const Ref<LightBase>& light : gLightManager->GetCache()) {
 		const uint32 slot = gGraphics->LightBuffer.SlotIndex;
 
 		light->Render(camera, shadow_camera);
@@ -934,7 +924,7 @@ void World::Render(Camera* shadow_camera)
 
 	// Render shadows into the atlas. The directional light is redrawn every frame, spot lights only when their bake is
 	// out of date.
-	Ref<LightDirectional> sun = GetDirectionalLight();
+	Ref<LightDirectional> sun = gLightManager->GetDirectionalLight();
 	const bool render_sun_shadows = sun.IsValid() && sun->bEnabled;
 
 	// With the sun off its region is left alone, apart from the atlas's very first pass that makes it sampleable
@@ -978,23 +968,27 @@ void World::Render(Camera* shadow_camera)
 	ExecuteTransparentRenderLists();
 
 	if (bRenderPhysicsObjects) {
-		RenderPhysicsObjects(camera);
+		DebugDrawPhysicsBodies();
 	}
 
 	if (bRenderProbes) {
-		RenderProbeDebug(camera);
+		DebugDrawProbes();
 	}
 
 #ifdef FX_IS_EDITOR
 	// Probe volumes are edited as brushes, so the editor always shows them
-	RenderProbeVolumes(camera);
+	DebugDrawProbeVolumes();
 #else
 	if (bRenderProbes) {
-		RenderProbeVolumes(camera);
+		DebugDrawProbeVolumes();
 	}
 #endif
 
-	// RenderWorldGrid(camera);
+	// DebugDrawWorldGrid();
+	// DebugDrawObjectBounds();
+
+	// Everything queued this frame, by the calls above or by anything else, is drawn on top of the geometry
+	gDebugDraw->Render(gGraphics->GetFrame()->CmdBuffer, camera);
 }
 
 
@@ -1056,7 +1050,7 @@ void World::RenderProbeCapture()
 	// its own from every caster in the level, centered on the batch's first probe. Later probes that aren't well
 	// inside of it get it re-rendered around them. The main view was already drawn with the player's shadow map, so
 	// each re-render goes with a copy of the sun in a spare light slot, which the capture's light culling swaps in.
-	Ref<LightDirectional> sun = GetDirectionalLight();
+	Ref<LightDirectional> sun = gLightManager->GetDirectionalLight();
 	const bool sun_has_shadows = sun.IsValid() && sun->bEnabled && (mSunLightSlot != UINT32_MAX);
 
 	OrthoCamera capture_shadow_camera;
@@ -1096,53 +1090,26 @@ void World::RenderProbeCapture()
 	gGraphics->pRenderer->mLightTileRows = saved_tile_rows;
 }
 
-void World::RenderBoundingBoxes(const Camera& camera)
+void World::DebugDrawObjectBounds()
 {
-	if (!mpDebugCube.IsValid()) {
-		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
-	}
-
-	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
-
-	renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
-	pipeline.Bind(cmd);
-
-	DebugLayerPushConstants push_constants {};
-
 	const Color debug_color = Color::FromRGBA(150, 255, 80, 255);
 
 	for (Object& object : gObjectManager->GetCache()) {
-		Mat4f model_matrix = Mat4f::AsScale(object.Bounds.GetSize()) * Mat4f::AsRotation(object.mRotation) *
-							 Mat4f::AsTranslation(object.GetPosition() + (object.Bounds.GetSize() / Vec3f(2.0f)) +
-												  object.Bounds.Min);
+		const Vec3f half_extent = (object.Bounds.Max - object.Bounds.Min) * 0.5f;
+		const Vec3f center = (object.Bounds.Max + object.Bounds.Min) * 0.5f;
 
-		Mat4f combined_matrix = model_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
-		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
-
-		push_constants.DebugColor = debug_color.AsUInt();
-
-		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
-		mpDebugCube->Render(cmd, 1);
+		gDebugDraw->WireBox(Mat4f::AsScale(half_extent) * Mat4f::AsTranslation(center) * object.GetWorldMatrix(),
+							debug_color);
 	}
 }
 
 
-void World::RenderWorldGrid(const Camera& camera)
+void World::DebugDrawWorldGrid()
 {
-	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
-
-	renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
-	pipeline.Bind(cmd);
-
-
-	DebugLayerPushConstants push_constants {};
-
 	const Color debug_color = Color::FromRGBA(255, 255, 255, 255);
 	const Color player_debug_color = Color::FromRGBA(255, 0, 0, 255);
 
 	const Vec3f tile_size = Vec3f(gWorldGrid->mTileSize.X, 1.0f, gWorldGrid->mTileSize.Y);
-
-	Vec2u camera_tile_index = gWorldGrid->TileToTileXY(gWorldGrid->ViewTileIndex);
 
 	for (uint32 y = 0; y < gWorldGrid->mGridSize.Y; y++) {
 		for (uint32 x = 0; x < gWorldGrid->mGridSize.X; x++) {
@@ -1151,40 +1118,23 @@ void World::RenderWorldGrid(const Camera& camera)
 			Mat4f model_matrix = Mat4f::AsScale(tile_size) * Mat4f::AsRotation(Quat::scIdentity) *
 								 Mat4f::AsTranslation((tile_offset)-gWorldGrid->mPositionOffset + (tile_size * 0.5f));
 
-			Mat4f combined_matrix = model_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
-			memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
-
-			push_constants.DebugColor = debug_color.AsUInt();
+			Color color = debug_color;
 
 			for (const TileIndex vis_ti : mVisibleTiles) {
 				if (vis_ti == gWorldGrid->TileFromTileXY(Vec2u(x, y))) {
-					push_constants.DebugColor = player_debug_color.AsUInt();
+					color = player_debug_color;
 				}
 			}
 
-			gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
-			mpDebugCube->Render(cmd, 1);
+			gDebugDraw->WireBox(model_matrix, color);
 		}
 	}
 }
 
 
-void World::RenderPhysicsObjects(const Camera& camera)
+void World::DebugDrawPhysicsBodies()
 {
-	if (!mpDebugCube.IsValid()) {
-		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
-	}
-
-	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
-	// gRenderer->pDeferredRenderer->PlDebugLayer.Bind(cmd);
-
-	renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
-	pipeline.Bind(cmd);
-
-	DebugLayerPushConstants push_constants {};
-
-	const Color debug_color = Color::FromRGBA(255, 40, 40, 255);
-	const Color selected_color = Color::FromRGBA(100, 255, 40, 255);
+	const Color debug_color = Color::FromRGBA(100, 255, 40, 255);
 
 	uint32 current_phys_state = gPhysics->UpdateState.load();
 	if (mLastPhysicsUpdateState != current_phys_state) {
@@ -1192,20 +1142,9 @@ void World::RenderPhysicsObjects(const Camera& camera)
 		mCachedPhysicsBodies = gPhysics->CollectBodies();
 	}
 
-
 	for (physics::Body* phys : mCachedPhysicsBodies) {
 		// As we are using scale here, we want to halve the dimensions
-		Mat4f world_matrix = Mat4f::AsScale(phys->Dimensions * 0.5) * Mat4f::AsRotation(phys->GetRotation()) *
-							 Mat4f::AsTranslation(phys->GetPosition());
-		Mat4f combined_matrix = world_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
-
-
-		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
-
-		push_constants.DebugColor = selected_color.AsUInt();
-
-		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
-		mpDebugCube->Render(cmd, 1);
+		gDebugDraw->WireBox(phys->GetPosition(), phys->Dimensions * 0.5, phys->GetRotation(), debug_color);
 	}
 }
 
@@ -1234,19 +1173,8 @@ Object* World::RaycastProbeVolumes(const Vec3f& origin, const Vec3f& direction, 
 	return nearest;
 }
 
-void World::RenderProbeVolumes(const Camera& camera)
+void World::DebugDrawProbeVolumes()
 {
-	if (!mpWireBox.IsValid()) {
-		mpWireBox = MeshGen::MakeWireframeBox()->AsMesh(renderer::eVertexType::Slim);
-	}
-
-	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
-
-	renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
-	pipeline.Bind(cmd);
-
-	DebugLayerPushConstants push_constants {};
-
 	const Color volume_color = Color::FromRGBA(60, 220, 255, 255);
 	const Color selected_color = Color::FromRGBA(255, 220, 60, 255);
 
@@ -1259,38 +1187,22 @@ void World::RenderProbeVolumes(const Camera& camera)
 		const Vec3f center = (object.Bounds.Max + object.Bounds.Min) * 0.5f;
 
 		Mat4f world_matrix = Mat4f::AsScale(half_extent) * Mat4f::AsTranslation(center) * object.GetWorldMatrix();
-		Mat4f combined_matrix = world_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
-
-		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
 
 #ifdef FX_IS_EDITOR
 		const bool is_selected = gEditor->GetSelection().Contains(&object);
 #else
 		const bool is_selected = false;
 #endif
-		push_constants.DebugColor = is_selected ? selected_color.AsUInt() : volume_color.AsUInt();
 
-		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
-		mpWireBox->Render(cmd, 1);
+		gDebugDraw->WireBox(world_matrix, is_selected ? selected_color : volume_color);
 	}
 }
 
-void World::RenderProbeDebug(const Camera& camera)
+void World::DebugDrawProbes()
 {
-	if (!mpDebugCube.IsValid()) {
-		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
-	}
-
 	if (gProbeManager == nullptr) {
 		return;
 	}
-
-	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
-
-	renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugSolid);
-	pipeline.Bind(cmd);
-
-	DebugLayerPushConstants push_constants {};
 
 	// Tiny solid cubes (~0.15m). The base debug cube spans -1..+1, so scale by half-extent.
 	static const Vec3f scProbeHalfExtent(0.1f);
@@ -1312,32 +1224,25 @@ void World::RenderProbeDebug(const Camera& camera)
 		uint32 num_probes;
 		gProbeManager->GetVolumeProbeRange(volume, first_probe, num_probes);
 
-		const uint32 volume_color = scVolumeColors[volume % std::size(scVolumeColors)].AsUInt();
+		const Color volume_color = scVolumeColors[volume % std::size(scVolumeColors)];
 
 		for (uint32 i = first_probe; i < first_probe + num_probes; i++) {
-			Mat4f world_matrix = Mat4f::AsScale(scProbeHalfExtent) *
-								 Mat4f::AsTranslation(gProbeManager->GetProbePosition(i));
-			Mat4f combined_matrix = world_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
-
-			memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
+			Color color;
 
 			if (is_baking && i == current_probe) {
-				push_constants.DebugColor = capturing_color.AsUInt();
+				color = capturing_color;
 			}
 			else {
-				push_constants.DebugColor = gProbeManager->IsProbeActive(i) ? volume_color : inactive_color.AsUInt();
+				color = gProbeManager->IsProbeActive(i) ? volume_color : inactive_color;
 			}
 
-			gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
-			mpDebugCube->Render(cmd, 1);
+			gDebugDraw->SolidBox(gProbeManager->GetProbePosition(i), scProbeHalfExtent, Quat::scIdentity, color);
 		}
 	}
 }
 
 void World::Destroy()
 {
-	mLights.Destroy();
-
 	if (pBlockout != nullptr) {
 		delete pBlockout;
 		pBlockout = nullptr;

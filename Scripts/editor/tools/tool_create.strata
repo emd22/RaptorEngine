@@ -16,7 +16,10 @@ const float CREATE_RANGE = 100.0f;
 const float CREATE_DEFAULT_HEIGHT = 1.0f;
 
 bool create_active = false;
-/* The snapped point the drag started at, on the surface that was clicked */
+/* The point that was clicked, flush with the surface along its normal. The crosshair is traced against the plane through
+   it for the whole drag. */
+float3 create_surface;
+/* The grid cell the drag started in, as its low corner on the surface's plane */
 float3 create_start;
 /* The world axis the brush grows out of the surface along */
 float3 create_normal;
@@ -41,6 +44,27 @@ float3 tool_create_dominant_axis(float3 v)
 	return float3(0.0f, 0.0f, float_sign(v.z));
 }
 
+/* The low corner of the snap cell the crosshair is in on the surface's plane. Cells rather than rounding to the nearest
+   grid line, so the brush covers the cell under the crosshair instead of starting at a grid corner beside it.
+
+   The start and every later corner both come from camera_ray_to_plane() with the same inputs, so a click without a
+   drag lands in the same cell bit for bit. (Taking the start from the physics hit instead meant the two points were a
+   hair apart, which was enough to tip one into the neighbouring cell when clicking near a grid line.) */
+@private
+float3 tool_create_cell()
+{
+	float3 point = camera_ray_to_plane(create_surface, create_normal);
+
+	if (editor_get_snap_enabled()) {
+		float3 step = float3(tool_get_snap_multiplier());
+		point = float3_floor(point / step) * step;
+	}
+
+	/* Along the normal it stays exactly on the surface */
+	float3 axis_mask = float3_abs(create_normal);
+	return (point * (float3(1.0f) - axis_mask)) + (create_surface * axis_mask);
+}
+
 void tool_begin()
 {
 	float3 normal = player.ray_get_normal(CREATE_RANGE);
@@ -52,11 +76,22 @@ void tool_begin()
 	}
 
 	create_normal = tool_create_dominant_axis(normal);
-	create_start = editor_transform_snap(player.ray_get_point(CREATE_RANGE));
+
+	/* Along the normal, snap only to strip the float noise off a surface that is on the grid already. A surface that is
+	   off the grid is kept as is, since snapping it would leave the brush floating above it or sunk into it. */
+	float3 hit = player.ray_get_point(CREATE_RANGE);
+	float3 snapped = editor_transform_snap(hit);
+
+	if (dot(float3_abs(snapped - hit), float3_abs(create_normal)) < 0.001f) {
+		hit = snapped;
+	}
+
+	create_surface = hit;
+	create_start = tool_create_cell();
 	create_height = CREATE_DEFAULT_HEIGHT;
 }
 
-/* Sizes the brush from where the drag started to where the crosshair meets the surface's plane, and out from the
+/* Sizes the brush to cover every cell from the one the drag started in to the one under the crosshair, and out from the
    surface by the height */
 void tool_update(float delta_time)
 {
@@ -73,21 +108,24 @@ void tool_update(float delta_time)
 		create_height = fmax(step, create_height - step);
 	}
 
-	float3 axis_mask = float3_abs(create_normal);
-	float3 plane_mask = float3(1.0f) - axis_mask;
+	float3 plane_mask = float3(1.0f) - float3_abs(create_normal);
 
-	/* The opposite corner stays on the plane the drag started on */
-	float3 corner = editor_transform_snap(camera_ray_to_plane(create_start, create_normal));
-	corner = (corner * plane_mask) + (create_start * axis_mask);
+	/* Both cells are low corners, so the far side of the brush is a cell further along the plane */
+	float3 cell_size = float3(0.0f);
+	if (editor_get_snap_enabled()) {
+		cell_size = plane_mask * float3(step);
+	}
 
+	float3 corner = tool_create_cell();
 	float3 top = create_start + (create_normal * float3(create_height));
 
 	float3 lo = float3(fmin(create_start.x, fmin(corner.x, top.x)), fmin(create_start.y, fmin(corner.y, top.y)),
 					   fmin(create_start.z, fmin(corner.z, top.z)));
-	float3 hi = float3(fmax(create_start.x, fmax(corner.x, top.x)), fmax(create_start.y, fmax(corner.y, top.y)),
-					   fmax(create_start.z, fmax(corner.z, top.z)));
+	float3 hi = float3(fmax(create_start.x, corner.x), fmax(create_start.y, corner.y), fmax(create_start.z, corner.z));
+	hi = hi + cell_size;
+	hi = float3(fmax(hi.x, top.x), fmax(hi.y, top.y), fmax(hi.z, top.z));
 
-	/* Every side is at least one snap step long, so a click without a drag still makes a brush */
+	/* Without snapping there are no cells, so a click without a drag still needs a minimum size to make a brush */
 	hi = float3(fmax(hi.x, lo.x + step), fmax(hi.y, lo.y + step), fmax(hi.z, lo.z + step));
 
 	create_min = lo;

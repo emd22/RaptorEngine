@@ -10,6 +10,7 @@
 #include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Physics/PhysicsManager.hpp>
+#include <Renderer/LightManager.hpp>
 #include <Renderer/LightProbe.hpp>
 #include <Script/ScriptManager.hpp>
 #include <Texture/TextureManager.hpp>
@@ -33,6 +34,7 @@ MemPool* gScriptMemPool = nullptr;
 
 WorldGrid* gWorldGrid = nullptr;
 World* gWorld = nullptr;
+LightManager* gLightManager = nullptr;
 ProbeManager* gProbeManager = nullptr;
 DecalManager* gDecalManager = nullptr;
 ScriptManager* gScriptManager = nullptr;
@@ -61,6 +63,8 @@ void Init()
 	gTextureManager = new TextureManager;
 	gThreadManager = new ThreadManager;
 	gWorld = new World;
+	gLightManager = new LightManager;
+	gLightManager->Create();
 	gProbeManager = new ProbeManager;
 	gDecalManager = new DecalManager;
 	gCVars = new CVarManager;
@@ -76,6 +80,7 @@ void Destroy()
 	DESTROY_GLOBAL(gThreadManager);
 	DESTROY_GLOBAL(gScriptManager);
 	DESTROY_GLOBAL(gWorld);
+	DESTROY_GLOBAL(gLightManager);
 	DESTROY_GLOBAL(gProbeManager);
 	DESTROY_GLOBAL(gDecalManager);
 	DESTROY_GLOBAL(gCVars);

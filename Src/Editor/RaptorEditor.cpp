@@ -23,7 +23,9 @@
 #include <Object/ObjectManager.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
+#include <Renderer/DebugDraw.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/Light.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Script/Script.hpp>
 #include <Script/ScriptManager.hpp>
@@ -266,9 +268,17 @@ void RaptorEditor::HandleHotkeys()
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_V)) {
 		SetTool(eEditorTool::SetMaterial);
 	}
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_I)) {
+		SetTool(eEditorTool::Light);
+	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_K)) {
-		CreateObjectAtCrosshair();
+		if (mCurrentToolType == eEditorTool::Light) {
+			mLightEditor.CreateAtCrosshair();
+		}
+		else {
+			CreateObjectAtCrosshair();
+		}
 	}
 
 	if (mSelection.IsEmpty()) {
@@ -384,6 +394,7 @@ void RaptorEditor::CancelDrag()
 	}
 
 	mbDragging = false;
+	mpCurrentTool->Cancel();
 	HideToolMarkers();
 
 	SetMovementDamped(false);
@@ -433,6 +444,10 @@ void RaptorEditor::AddTools()
 	AddTool(eEditorTool::Clip, "./Scripts/editor/tools/tool_clip.strata", eEditorToolFlags::UsesSelection);
 	AddTool(eEditorTool::SetMaterial, "./Scripts/editor/tools/tool_set_material.strata", eEditorToolFlags::None);
 
+	// The lights can't be reached from scripts, so this tool is written in C++
+	AddTool(eEditorTool::Light, nullptr, eEditorToolFlags::ClearsSelection);
+	GetTool(eEditorTool::Light)->SetNative(&mLightEditor);
+
 	mpCurrentTool = GetTool(mCurrentToolType);
 }
 
@@ -474,8 +489,8 @@ void RaptorEditor::SetTool(eEditorTool tool)
 		mCurrentToolType = tool;
 		mpCurrentTool = new_tool;
 
-		// Nothing stays selected while simulating
-		if (IsSimulationMode()) {
+		// Nothing stays selected while simulating, and the Light tool works on lights instead of objects
+		if (IsSimulationMode() || HasFlag(new_tool->Flags, eEditorToolFlags::ClearsSelection)) {
 			mSelection.Clear();
 		}
 

@@ -54,6 +54,11 @@ void EditorTool::Sync(const EditorToolState& state, const EditorToolSelection& s
 
 void EditorTool::Enter()
 {
+	if (pNative != nullptr) {
+		pNative->Enter();
+		return;
+	}
+
 	if (pFnEnter != nullptr) {
 		pScript->CallFunctionPtr<void()>(pFnEnter);
 	}
@@ -61,6 +66,11 @@ void EditorTool::Enter()
 
 void EditorTool::Leave()
 {
+	if (pNative != nullptr) {
+		pNative->Leave();
+		return;
+	}
+
 	if (pFnLeave != nullptr) {
 		pScript->CallFunctionPtr<void()>(pFnLeave);
 	}
@@ -68,6 +78,11 @@ void EditorTool::Leave()
 
 void EditorTool::Begin()
 {
+	if (pNative != nullptr) {
+		pNative->Begin();
+		return;
+	}
+
 	if (pFnBegin != nullptr) {
 		pScript->CallFunctionPtr<void()>(pFnBegin);
 	}
@@ -75,6 +90,11 @@ void EditorTool::Begin()
 
 void EditorTool::Update(float32 delta_time)
 {
+	if (pNative != nullptr) {
+		pNative->Update(delta_time);
+		return;
+	}
+
 	if (pFnUpdate != nullptr) {
 		pScript->CallFunctionPtr<void(float32)>(pFnUpdate, delta_time);
 	}
@@ -82,13 +102,30 @@ void EditorTool::Update(float32 delta_time)
 
 void EditorTool::Finalize()
 {
+	if (pNative != nullptr) {
+		pNative->Finalize();
+		return;
+	}
+
 	if (pFnFinalize != nullptr) {
 		pScript->CallFunctionPtr<void()>(pFnFinalize);
 	}
 }
 
+void EditorTool::Cancel()
+{
+	if (pNative != nullptr) {
+		pNative->Cancel();
+	}
+}
+
 void EditorTool::Controls()
 {
+	if (pNative != nullptr) {
+		pNative->Controls();
+		return;
+	}
+
 	if (pFnControls != nullptr) {
 		pScript->CallFunctionPtr<void()>(pFnControls);
 	}

@@ -68,24 +68,25 @@ void Blockout::Create(World* world)
 
 
 	{
-		mProtoTileID = gMaterialManager->NewMaterial("ProtoTile", false);
-		Material* test_material = gMaterialManager->GetMaterial(mProtoTileID);
+		mProtoBricksID = gMaterialManager->NewMaterial("ProtoTile", false);
+		Material* test_material = gMaterialManager->GetMaterial(mProtoBricksID);
 
-		AssetTicket diffuse = gAssetManager->LoadImage(
-			eImageType::Flat, eImageFormat::RGBA8_UNorm,
-			"RaptorData/Data/Demo/Textures/blue_tile/BlueTiles01_1K_BaseColor.png", eImageCreateFlags::None);
+		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
+													   "RaptorData/Data/Demo/Textures/bricks/Bricks_diffuse.ktx2",
+													   eImageCreateFlags::None);
 
-		AssetTicket normal = gAssetManager->LoadImage(
-			eImageType::Flat, eImageFormat::RGBA8_UNorm,
-			"RaptorData/Data/Demo/Textures/blue_tile/BlueTiles01_1K_Normal.png", eImageCreateFlags::None);
+		AssetTicket normal = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
+													  "RaptorData/Data/Demo/Textures/bricks/Bricks_normal.ktx2",
+													  eImageCreateFlags::None);
 
-		AssetTicket roughness = gAssetManager->LoadImage(
-			eImageType::Flat, eImageFormat::RGBA8_UNorm,
-			"RaptorData/Data/Demo/Textures/blue_tile/BlueTiles01_1K_Roughness.png", eImageCreateFlags::None);
+		AssetTicket orm_map = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
+													   "RaptorData/Data/Demo/Textures/bricks/Bricks_orm.ktx2",
+													   eImageCreateFlags::None);
 
 
 		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
 		test_material->Attach(Material::eResourceType::Normal, normal);
+		test_material->Attach(Material::eResourceType::ORM, orm_map);
 		test_material->Finalize();
 	}
 
@@ -536,7 +537,7 @@ MaterialID Blockout::GetMaterialForSlot(eCProtoMat slot) const
 	case eCProtoMat::Blue:
 		return mBlueMaterialID;
 	case eCProtoMat::Tile:
-		return mProtoTileID;
+		return mProtoBricksID;
 	default:
 		return mWhiteMaterialID;
 	}
@@ -1077,7 +1078,7 @@ void Blockout::Save(const String& path)
 			else if (object->GetMaterialID() == mOrangeMaterialID) {
 				blockout_entry.AddMember(ConfigEntry::DotReference("mat", "$cprotomat.orange"));
 			}
-			else if (object->GetMaterialID() == mProtoTileID) {
+			else if (object->GetMaterialID() == mProtoBricksID) {
 				blockout_entry.AddMember(ConfigEntry::DotReference("mat", "$cprotomat.tile"));
 			}
 		}
