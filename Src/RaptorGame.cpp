@@ -17,7 +17,6 @@
 #include <Core/RefUtil.hpp>
 #include <Decal/DecalManager.hpp>
 #include <Engine.hpp>
-#include <Renderer/LightManager.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
@@ -25,12 +24,14 @@
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
+#include <Renderer/LightManager.hpp>
 #include <Renderer/LightProbe.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/ShadowDirectional.hpp>
 #include <Renderer/TextRenderer.hpp>
 #include <Script/ScriptManager.hpp>
 #include <Texture/TextureManager.hpp>
+#include <cmath>
 #include <csignal>
 
 #ifdef FX_IS_EDITOR
@@ -192,6 +193,8 @@ void RaptorGame::CreateGame()
 	mpShowGpuCVar = gCVars->Set("i_show_gpu", 1);
 	mpProbesCVar = gCVars->Set("r_probes", 1);
 	mpDecalsCVar = gCVars->Set("r_decals", 1);
+
+	mpExposureCVar = gCVars->Set("r_exposure_ev", 0.0f);
 
 	// Metres between probes in a volume built from an editor brush. Set `$r_probe_spacing` in the console
 	gCVars->Set("r_probe_spacing", 2.5f);
@@ -654,6 +657,7 @@ void RaptorGame::Tick()
 
 	gGraphics->bDisableProbes = (mpProbesCVar != nullptr) && (mpProbesCVar->IntValue == 0);
 	gGraphics->bDisableDecals = (mpDecalsCVar != nullptr) && (mpDecalsCVar->IntValue == 0);
+	gGraphics->PreExposure = (mpExposureCVar != nullptr) ? std::exp2(mpExposureCVar->FloatValue) : 1.0f;
 
 	frame->CmdBuffer.Reset();
 	frame->CmdBuffer.Record();

@@ -100,6 +100,9 @@ struct alignas(16) DrawPushConstants
 	uint32 TileRows = 0;
 
 	float32 EyePosition[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+	/// Scale applied to the lit result before it is written to the HDR target, see GraphicsBackend::PreExposure
+	float32 PreExposure = 1.0f;
 };
 
 static_assert(sizeof(DrawPushConstants) <= 128, "DrawPushConstants exceeds the minimum guaranteed push constant size");
