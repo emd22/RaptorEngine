@@ -1,10 +1,13 @@
 #pragma once
 
+
 #include <wx/sizer.h>
 
 #include <Core/Types.hpp>
+#include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
 #include <functional>
+
 
 class wxTextCtrl;
 class wxWindow;
@@ -34,7 +37,7 @@ class FieldBase : public FieldBaseImpl
 {
 public:
 	static constexpr int32 scFieldWidth = 56;
-	static constexpr uint32 scPrecision = 3;
+	static constexpr uint32 scFloatPrecision = 3;
 
 	using TRefType = TGetConstRef<T>;
 	using TType = T;
@@ -49,6 +52,24 @@ public:
 
 	virtual bool HasFocus() const = 0;
 	virtual void SetEnabled(bool enable) = 0;
+
+	void OnCommit(wxCommandEvent& event)
+	{
+		if (!mbUpdatingFields && mpOnChange) {
+			mpOnChange(GetValue());
+		}
+
+		event.Skip();
+	}
+
+	void OnFocusLost(wxFocusEvent& event)
+	{
+		if (!mbUpdatingFields && mpOnChange) {
+			mpOnChange(GetValue());
+		}
+
+		event.Skip();
+	}
 
 	void SetOnChange(OnChangeFunc on_change) { mpOnChange = std::move(on_change); }
 
@@ -66,7 +87,7 @@ public:
 class Vector3Field final : public FieldBase<Vec3f>
 {
 public:
-	Vector3Field(wxWindow* parent, const wxString& label);
+	Vector3Field(wxWindow* parent, const wxString& label, const Vec2f& limits);
 
 	TType GetValue() const override;
 	void SetValue(TRefType value) override;
@@ -74,59 +95,38 @@ public:
 	bool HasFocus() const override;
 	void SetEnabled(bool enable) override;
 
-	void OnCommit(wxCommandEvent& event);
-	void OnFocusLost(wxFocusEvent& event);
+	~Vector3Field() override;
 
 private:
-	wxTextCtrl* MakeAxisField(wxWindow* parent, const wxString& axis_label);
+	wxTextCtrl* MakeAxisField(wxWindow* parent, const wxString& axis_label, const Vec2f& limits);
 
 private:
 	wxTextCtrl* mpFields[3] = {};
 };
 
-//
-// class Vector3Field_OLD
-// {
-// public:
-// 	using OnChangeFunc = std::function<void(const Vec3f&)>;
-//
-// 	static constexpr int32 scFieldWidth = 56;
-// 	static constexpr uint32 scPrecision = 3;
-//
-// public:
-// 	Vector3Field_OLD(wxWindow* parent, const wxString& label);
-//
-// 	wxSizer* GetSizer() { return mpSizer; }
-//
-// 	void SetValue(const Vec3f& value);
-// 	Vec3f GetValue() const;
-//
-// 	void Enable(bool enable = true);
-//
-// 	/// True while the user has one of the three fields focused, mid-edit
-// 	bool HasFocus() const;
-//
-// 	void SetOnChange(OnChangeFunc on_change) { mpOnChange = std::move(on_change); }
-//
-// 	~Vector3Field_OLD() = default;
-//
-// private:
-// 	wxTextCtrl* AddAxisField(wxWindow* parent, const wxString& axis_label);
-//
-// 	void OnCommit(wxCommandEvent& event);
-// 	void OnKillFocus(wxFocusEvent& event);
-//
-// private:
-// 	wxBoxSizer* mpSizer = nullptr;
-// 	wxTextCtrl* mpFields[3] = {};
-//
-// 	bool mbUpdatingFields = false;
-//
-// 	OnChangeFunc mpOnChange = nullptr;
-// };
-
 /////////////////////////////////////
 // Numeric fields
 /////////////////////////////////////
+
+class FloatField final : public FieldBase<float32>
+{
+public:
+	FloatField(wxWindow* parent, const wxString& label, const Vec2f& limits);
+
+	TType GetValue() const override;
+	void SetValue(TRefType value) override;
+
+	bool HasFocus() const override;
+	void SetEnabled(bool enable) override;
+
+	~FloatField() override;
+
+private:
+	wxTextCtrl* MakeAxisField(wxWindow* parent, const wxString& axis_label);
+
+private:
+	wxTextCtrl* mpField = nullptr;
+};
+
 
 } // namespace fx::editor

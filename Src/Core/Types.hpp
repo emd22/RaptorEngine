@@ -63,7 +63,7 @@ concept C_IsSameOrConst = std::is_same_v<typename std::remove_const<TPossiblyCon
 
 /// If this is a primitive type, pass by `T`, otherwise `const T&`
 template <typename T>
-using TGetConstRef = std::conditional_t<std::is_fundamental_v<T>, T, const T&>;
+using TGetConstRef = std::conditional_t<std::is_fundamental_v<T>, const T, const T&>;
 
 template <typename T>
 struct EnumFlagsOptIn

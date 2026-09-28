@@ -22,7 +22,7 @@ WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, w
 	title->SetFont(title->GetFont().Bold());
 	sizer->Add(title, wxSizerFlags().Border(wxALL, 6));
 
-	mpPositionField = new Vector3Field(this, "Player Position");
+	mpPositionField = new Vector3Field(this, "Player", Vec2f(-100000.0f, 100000.0f));
 	sizer->Add(mpPositionField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
 
 	mpPositionField->SetOnChange(
