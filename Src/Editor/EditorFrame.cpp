@@ -4,6 +4,7 @@
 #include "ObjectListWindow.hpp"
 #include "ObjectPropertiesPanel.hpp"
 #include "RaptorEditor.hpp"
+#include "ToolSettingsPanel.hpp"
 #include "WorldPropertiesPanel.hpp"
 
 #include <wx/app.h>
@@ -141,6 +142,10 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	mpObjectPropertiesPanel->SetMinSize(wxSize(scObjectPropertyPanelWidth, -1));
 	component_panel->Add(mpObjectPropertiesPanel, wxSizerFlags().Expand());
 
+	// The tool settings slot starts empty - RaptorEditor::SetTool swaps in a panel for tools that have one
+	mpComponentSizer = component_panel;
+	mpComponentParent = root;
+
 	body_sizer->Add(component_panel, wxSizerFlags().Expand());
 
 	root_sizer->Add(body_sizer, wxSizerFlags(1).Expand());
@@ -158,6 +163,28 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	Bind(wxEVT_CLOSE_WINDOW, &EditorFrame::OnClose, this);
 	Bind(wxEVT_ACTIVATE, &EditorFrame::OnActivate, this);
 	Bind(wxEVT_ICONIZE, &EditorFrame::OnIconize, this);
+}
+
+void EditorFrame::SetToolSettingsPanel(ToolSettingsBasePanel* new_panel)
+{
+	if (mpToolSettingsPanel != nullptr) {
+		mpComponentSizer->Detach(mpToolSettingsPanel);
+		mpToolSettingsPanel->Destroy();
+	}
+
+	mpToolSettingsPanel = new_panel;
+
+	if (mpToolSettingsPanel != nullptr) {
+		mpToolSettingsPanel->Create(mpComponentParent, wxID_ANY);
+
+		wxBoxSizer* inner_sizer = new wxBoxSizer(wxVERTICAL);
+		mpToolSettingsPanel->Construct(inner_sizer);
+		mpToolSettingsPanel->SetSizer(inner_sizer);
+
+		mpComponentSizer->Add(mpToolSettingsPanel, wxSizerFlags().Expand());
+	}
+
+	mpComponentSizer->Layout();
 }
 
 void EditorFrame::ShowSelectedTool(const eEditorTool tool)
@@ -186,12 +213,7 @@ void EditorFrame::ShowObjectListWindow()
 	mpObjectListWindow->Raise();
 }
 
-void EditorFrame::OnClose(wxCloseEvent& event)
-{
-	// The renderer still presents to the viewport, so the frame is destroyed in editor::Shutdown() once the game has
-	// shut down. Not skipping the event keeps wxWidgets from destroying it now.
-	mbCloseRequested = true;
-}
+void EditorFrame::OnClose(wxCloseEvent& event) { mbCloseRequested = true; }
 
 void EditorFrame::OnActivate(wxActivateEvent& event)
 {

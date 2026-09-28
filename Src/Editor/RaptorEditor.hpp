@@ -111,6 +111,8 @@ public:
 
 	FX_FORCE_INLINE const EditorSelection& GetSelection() const { return mSelection; }
 
+	FX_FORCE_INLINE LightEditor& GetLightEditor() { return mLightEditor; }
+
 	/// Changes an object's material, and the material it goes back to once it is deselected
 	void SetStoredMaterial(Object* object, MaterialID material);
 

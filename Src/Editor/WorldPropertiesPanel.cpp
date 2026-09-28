@@ -22,7 +22,7 @@ WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, w
 	title->SetFont(title->GetFont().Bold());
 	sizer->Add(title, wxSizerFlags().Border(wxALL, 6));
 
-	mpPositionField = new EditableVector3Field(this, "Player Position");
+	mpPositionField = new Vector3Field(this, "Player Position");
 	sizer->Add(mpPositionField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
 
 	mpPositionField->SetOnChange(
@@ -42,7 +42,7 @@ void WorldPropertiesPanel::Update()
 {
 	if (!mbShowingAnything) {
 		mbShowingAnything = true;
-		mpPositionField->Enable(true);
+		mpPositionField->SetEnabled(true);
 	}
 
 	const Vec3f position = gWorld->Player.Position;

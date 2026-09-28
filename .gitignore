@@ -47,9 +47,10 @@ CMakeCache.txt
 CMakeFiles
 *.cmake
 
+compile_commands.json
+
 bakes
 Testing
 
-compile_commands.json
 
 private

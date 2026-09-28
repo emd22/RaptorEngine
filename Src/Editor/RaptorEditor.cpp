@@ -6,6 +6,7 @@
 #include "EditorPlatform.hpp"
 #include "EditorViewport.hpp"
 #include "ObjectPropertiesPanel.hpp"
+#include "ToolSettingsPanel.hpp"
 #include "WorldPropertiesPanel.hpp"
 
 #include <wx/app.h>
@@ -25,8 +26,8 @@
 #include <Physics/PhysicsManager.hpp>
 #include <Renderer/DebugDraw.hpp>
 #include <Renderer/Globals.hpp>
-#include <Renderer/Light.hpp>
 #include <Renderer/GraphicsBackend.hpp>
+#include <Renderer/Light.hpp>
 #include <Script/Script.hpp>
 #include <Script/ScriptManager.hpp>
 #include <World.hpp>
@@ -161,6 +162,10 @@ void RaptorEditor::RefreshPanels()
 
 	mpMainFrame->GetWorldPropertiesPanel()->Update();
 	mpMainFrame->GetObjectPropertiesPanel()->ShowObject(mSelection.GetLast());
+
+	if (ToolSettingsBasePanel* tool_settings = mpMainFrame->GetToolSettingsPanel(); tool_settings != nullptr) {
+		tool_settings->Refresh();
+	}
 }
 
 void RaptorEditor::SetReloadHandler(eReloadTarget target, std::function<void()> handler)
@@ -447,6 +452,8 @@ void RaptorEditor::AddTools()
 	// The lights can't be reached from scripts, so this tool is written in C++
 	AddTool(eEditorTool::Light, nullptr, eEditorToolFlags::ClearsSelection);
 	GetTool(eEditorTool::Light)->SetNative(&mLightEditor);
+	GetTool(eEditorTool::Light)
+		->SetSettingsPanel([]() -> ToolSettingsBasePanel* { return new LightToolSettingsPanel(); });
 
 	mpCurrentTool = GetTool(mCurrentToolType);
 }
@@ -496,6 +503,10 @@ void RaptorEditor::SetTool(eEditorTool tool)
 
 		SyncSelection();
 		mpCurrentTool->Enter();
+
+		if (mpMainFrame != nullptr) {
+			mpMainFrame->SetToolSettingsPanel(mpCurrentTool->CreateSettingsPanel());
+		}
 	}
 
 	// Also run when the tool is unchanged, as clicking the selected tool's button toggles it off
