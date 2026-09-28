@@ -16,7 +16,6 @@ namespace fx::editor {
 
 FieldBaseImpl::FieldBaseImpl(wxWindow* parent, const wxString& label)
 {
-	/* */
 	mpSizer = new wxBoxSizer(wxHORIZONTAL);
 	mpSizer->Add(new wxStaticText(parent, wxID_ANY, label), wxSizerFlags().CenterVertical());
 }
@@ -26,40 +25,23 @@ FieldBaseImpl::FieldBaseImpl(wxWindow* parent, const wxString& label)
 // Vector3 field
 /////////////////////////////////////
 
-
-Vector3Field::Vector3Field(wxWindow* parent, const wxString& label) : FieldBase(parent, label)
+Vector3Field::Vector3Field(wxWindow* parent, const wxString& label, const Vec2f& limits) : FieldBase(parent, label)
 {
-	mpFields[0] = MakeAxisField(parent, "X");
-	mpFields[1] = MakeAxisField(parent, "Y");
-	mpFields[2] = MakeAxisField(parent, "Z");
+	mpFields[0] = MakeAxisField(parent, "X", limits);
+	mpFields[1] = MakeAxisField(parent, "Y", limits);
+	mpFields[2] = MakeAxisField(parent, "Z", limits);
 }
 
-
-void Vector3Field::OnCommit(wxCommandEvent& event)
+wxTextCtrl* Vector3Field::MakeAxisField(wxWindow* parent, const wxString& axis_label, const Vec2f& limits)
 {
-	if (!mbUpdatingFields && mpOnChange) {
-		mpOnChange(GetValue());
-	}
+	auto validator = wxFloatingPointValidator<float32>(scFloatPrecision, nullptr);
+	validator.SetMin(limits.X);
+	validator.SetMax(limits.Y);
 
-	event.Skip();
-}
-
-void Vector3Field::OnFocusLost(wxFocusEvent& event)
-{
-	if (!mbUpdatingFields && mpOnChange) {
-		mpOnChange(GetValue());
-	}
-
-	// Required for focus to actually move on to the next field/control
-	event.Skip();
-}
-
-wxTextCtrl* Vector3Field::MakeAxisField(wxWindow* parent, const wxString& axis_label)
-{
 	mpSizer->Add(new wxStaticText(parent, wxID_ANY, axis_label), wxSizerFlags().CenterVertical().Border(wxLEFT, 6));
 
 	wxTextCtrl* field = new wxTextCtrl(parent, wxID_ANY, "0", wxDefaultPosition, wxSize(scFieldWidth, -1),
-									   wxTE_PROCESS_ENTER, wxFloatingPointValidator<float32>(scPrecision, nullptr));
+									   wxTE_PROCESS_ENTER, validator);
 
 	// Commit on enter
 	field->Bind(wxEVT_TEXT_ENTER, &Vector3Field::OnCommit, this);
@@ -88,9 +70,9 @@ void Vector3Field::SetValue(Vector3Field::TRefType value)
 {
 	mbUpdatingFields = true;
 
-	mpFields[0]->ChangeValue(wxString::Format("%.*f", scPrecision, static_cast<double>(value.X)));
-	mpFields[1]->ChangeValue(wxString::Format("%.*f", scPrecision, static_cast<double>(value.Y)));
-	mpFields[2]->ChangeValue(wxString::Format("%.*f", scPrecision, static_cast<double>(value.Z)));
+	mpFields[0]->ChangeValue(wxString::Format("%.*f", scFloatPrecision, static_cast<double>(value.X)));
+	mpFields[1]->ChangeValue(wxString::Format("%.*f", scFloatPrecision, static_cast<double>(value.Y)));
+	mpFields[2]->ChangeValue(wxString::Format("%.*f", scFloatPrecision, static_cast<double>(value.Z)));
 
 	mbUpdatingFields = false;
 }
@@ -113,104 +95,59 @@ void Vector3Field::SetEnabled(bool enable)
 	}
 }
 
+Vector3Field::~Vector3Field()
+{
+	for (wxTextCtrl* field : mpFields) {
+		if (field != nullptr) {
+			delete field;
+		}
 
-/////////////////////////////////////
-//
-/////////////////////////////////////
-//
-// wxTextCtrl* Vector3Field_OLD::AddAxisField(wxWindow* parent, const wxString& axis_label)
-// {
-// 	mpSizer->Add(new wxStaticText(parent, wxID_ANY, axis_label), wxSizerFlags().CenterVertical().Border(wxLEFT, 6));
-//
-// 	wxTextCtrl* field = new wxTextCtrl(parent, wxID_ANY, "0", wxDefaultPosition, wxSize(scFieldWidth, -1),
-// 									   wxTE_PROCESS_ENTER, wxFloatingPointValidator<float32>(scPrecision, nullptr));
-//
-// 	// Commit on Enter, and also on focus-out so a typed value isn't lost by clicking straight to another field
-// 	field->Bind(wxEVT_TEXT_ENTER, &Vector3Field_OLD::OnCommit, this);
-// 	field->Bind(wxEVT_KILL_FOCUS, &Vector3Field_OLD::OnKillFocus, this);
-//
-// 	mpSizer->Add(field, wxSizerFlags().CenterVertical().Border(wxLEFT, 2));
-//
-// 	return field;
-// }
-//
-// Vector3Field_OLD::Vector3Field_OLD(wxWindow* parent, const wxString& label)
-// {
-// 	mpSizer = new wxBoxSizer(wxHORIZONTAL);
-//
-// 	mpSizer->Add(new wxStaticText(parent, wxID_ANY, label), wxSizerFlags().CenterVertical());
-//
-// 	mpFields[0] = AddAxisField(parent, "X");
-// 	mpFields[1] = AddAxisField(parent, "Y");
-// 	mpFields[2] = AddAxisField(parent, "Z");
-// }
-//
-// void Vector3Field_OLD::SetValue(const Vec3f& value)
-// {
-// 	mbUpdatingFields = true;
-//
-// 	mpFields[0]->ChangeValue(wxString::Format("%.*f", scPrecision, static_cast<double>(value.X)));
-// 	mpFields[1]->ChangeValue(wxString::Format("%.*f", scPrecision, static_cast<double>(value.Y)));
-// 	mpFields[2]->ChangeValue(wxString::Format("%.*f", scPrecision, static_cast<double>(value.Z)));
-//
-// 	mbUpdatingFields = false;
-// }
-//
-// Vec3f Vector3Field_OLD::GetValue() const
-// {
-// 	double axis_values[3] = { 0.0, 0.0, 0.0 };
-//
-// 	for (uint32 axis = 0; axis < 3; axis++) {
-// 		// Left as 0 if the field is empty or mid-edit (e.g. just "-"), rather than rejecting the keystroke
-// 		mpFields[axis]->GetValue().ToDouble(&axis_values[axis]);
-// 	}
-//
-// 	return Vec3f(static_cast<float32>(axis_values[0]), static_cast<float32>(axis_values[1]),
-// 				 static_cast<float32>(axis_values[2]));
-// }
-//
-// void Vector3Field_OLD::Enable(bool enable)
-// {
-// 	for (wxTextCtrl* field : mpFields) {
-// 		field->Enable(enable);
-// 	}
-// }
-//
-//
-// bool Vector3Field_OLD::HasFocus() const
-// {
-// 	for (wxTextCtrl* field : mpFields) {
-// 		if (field->HasFocus()) {
-// 			return true;
-// 		}
-// 	}
-//
-// 	return false;
-// }
-//
-// void Vector3Field_OLD::OnCommit(wxCommandEvent& event)
-// {
-// 	if (!mbUpdatingFields && mpOnChange) {
-// 		mpOnChange(GetValue());
-// 	}
-//
-// 	event.Skip();
-// }
-//
-// void Vector3Field_OLD::OnKillFocus(wxFocusEvent& event)
-// {
-// 	if (!mbUpdatingFields && mpOnChange) {
-// 		mpOnChange(GetValue());
-// 	}
-//
-// 	// Required for focus to actually move on to the next field/control
-// 	event.Skip();
-// }
-
+		field = nullptr;
+	}
+}
 
 /////////////////////////////////////
 // Float field
 /////////////////////////////////////
+
+FloatField::FloatField(wxWindow* parent, const wxString& label, const Vec2f& limits) : FieldBase(parent, label)
+{
+	auto validator = wxFloatingPointValidator<float32>(scFloatPrecision, nullptr);
+	validator.SetMin(limits.X);
+	validator.SetMax(limits.Y);
+
+	mpField = new wxTextCtrl(parent, wxID_ANY, "0", wxDefaultPosition, wxSize(scFieldWidth, -1), wxTE_PROCESS_ENTER,
+							 validator);
+	// Commit on enter
+	mpField->Bind(wxEVT_TEXT_ENTER, &FloatField::OnCommit, this);
+	// Commit when clicking off of the field
+	mpField->Bind(wxEVT_KILL_FOCUS, &FloatField::OnFocusLost, this);
+
+	mpSizer->Add(mpField, wxSizerFlags().CenterVertical().Border(wxLEFT, 2));
+}
+
+
+FloatField::TType FloatField::GetValue() const
+{
+	double double_value = 0.0;
+	mpField->GetValue().ToDouble(&double_value);
+
+	return static_cast<float32>(double_value);
+}
+
+void FloatField::SetValue(FloatField::TRefType value)
+{
+	mbUpdatingFields = true;
+	mpField->ChangeValue(wxString::Format("%.*f", scFloatPrecision, static_cast<double>(value)));
+
+	mbUpdatingFields = false;
+}
+
+bool FloatField::HasFocus() const { return mpField->HasFocus(); }
+
+void FloatField::SetEnabled(bool enable) { mpField->Enable(enable); }
+
+FloatField::~FloatField() { delete mpField; }
 
 
 } // namespace fx::editor

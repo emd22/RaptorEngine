@@ -22,6 +22,7 @@ class LightSpot;
 namespace fx::editor {
 
 class Vector3Field;
+class FloatField;
 
 class ToolSettingsBasePanel : public wxPanel
 {
@@ -47,9 +48,9 @@ private:
 private:
 	wxStaticText* mpNameLabel = nullptr;
 	wxColourPickerCtrl* mpColorPicker = nullptr;
-	Vector3Field* mpPositionField = nullptr;
-	wxSpinCtrlDouble* mpRadiusField = nullptr;
 
+	Vector3Field* mpPositionField = nullptr;
+	FloatField* mpRadiusField = nullptr;
 
 	LightSpot* mpShownLight = nullptr;
 	bool mbShowingAnything = false;

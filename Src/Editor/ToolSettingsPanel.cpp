@@ -36,31 +36,32 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 
 	mpColorPicker->Bind(wxEVT_COLOURPICKER_CHANGED, &LightToolSettingsPanel::OnColorChange, this);
 
-	mpPositionField = new Vector3Field(this, "Position");
-	tool_panel->Add(mpPositionField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
-
-	mpPositionField->SetOnChange(
-		[this](const Vec3f& value)
-		{
-			if (mpShownLight != nullptr) {
-				mpShownLight->SetPosition(value);
-			}
-		});
-
-	mpRadiusField = new wxSpinCtrlDouble(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize,
-										 wxSP_ARROW_KEYS | wxTE_PROCESS_ENTER, 0.1, 200.0, 0.1, 0.1);
-
-	auto UpdateRadiusField = [&](wxCommandEvent& event)
 	{
-		if (mpShownLight == nullptr) {
-			return;
-		}
+		mpPositionField = new Vector3Field(this, "Position", Vec2f(-100000.0f, 100000.0f));
+		mpPositionField->SetOnChange(
+			[this](const Vec3f& value)
+			{
+				if (mpShownLight != nullptr) {
+					mpShownLight->SetPosition(value);
+				}
+			});
 
-		mpShownLight->SetRadius(mpRadiusField->GetValue());
-	};
-	mpRadiusField->Bind(wxEVT_SPINCTRLDOUBLE, UpdateRadiusField);
+		tool_panel->Add(mpPositionField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
+	}
 
-	tool_panel->Add(mpRadiusField, wxSizerFlags().Border(wxALL, 6));
+	{
+		mpRadiusField = new FloatField(this, "Radius", Vec2f(3.0f, 150.0f));
+		mpRadiusField->SetOnChange(
+			[&](const float value)
+			{
+				if (mpShownLight == nullptr) {
+					return;
+				}
+				mpShownLight->SetRadius(value);
+			});
+
+		tool_panel->Add(mpRadiusField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
+	}
 
 	Refresh();
 }

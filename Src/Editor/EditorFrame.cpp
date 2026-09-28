@@ -77,20 +77,20 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	// Top bar
 	wxMenuBar* menu_bar = new wxMenuBar;
 
-	wxMenu* file_menu = new wxMenu;
+	wxMenu* world_menu = new wxMenu;
 
-	wxMenuItem* reload_world_item = file_menu->Append(wxID_ANY, "Reload World", "Reloads the world from disk");
-	wxMenuItem* reload_prototype_item = file_menu->Append(wxID_ANY, "Reload Prototype",
-														  "Reloads prototype geometry from disk");
-	wxMenuItem* reload_scripts_item = file_menu->Append(wxID_ANY, "Reload Scripts", "Reloads all loaded scripts");
+	wxMenuItem* reload_world_item = world_menu->Append(wxID_ANY, "Reload World", "Reloads the world from disk");
+	wxMenuItem* reload_prototype_item = world_menu->Append(wxID_ANY, "Reload Prototype",
+														   "Reloads prototype geometry from disk");
+	wxMenuItem* reload_scripts_item = world_menu->Append(wxID_ANY, "Reload Scripts", "Reloads all loaded scripts");
 
-	menu_bar->Append(file_menu, "&File");
+	menu_bar->Append(world_menu, "&World");
 
 	wxMenu* window_menu = new wxMenu;
 	wxMenuItem* object_list_item = window_menu->Append(wxID_ANY, "Open Object List",
 													   "View all objects currently in ObjectManager");
 
-	menu_bar->Append(window_menu, "&Object");
+	menu_bar->Append(window_menu, "&Tools");
 
 	SetMenuBar(menu_bar);
 
