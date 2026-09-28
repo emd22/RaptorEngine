@@ -115,6 +115,7 @@ private:
 	CVarValue* mpShowGpuCVar = nullptr;
 	CVarValue* mpProbesCVar = nullptr;
 	CVarValue* mpDecalsCVar = nullptr;
+	CVarValue* mpExposureCVar = nullptr;
 
 	Object* mpRaycastHitMarker = nullptr;
 	ObjectID mEditorSelectedObject = ObjectID::scNull;

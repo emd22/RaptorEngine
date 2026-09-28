@@ -201,6 +201,7 @@ struct FSPushConsts
 	uint uiTileRows;
 	/// Camera position in world space
 	float4 vEyePosition;
+	float fPreExposure;
 };
 
 [[vk::push_constant]] FSPushConsts FSConst;
@@ -604,11 +605,11 @@ PERMEND();
 		}
 	}
 
-	output.vAlbedo = float4(accumulated_light + ambient, base_alpha);
+	output.vAlbedo = float4((accumulated_light + ambient) * FSConst.fPreExposure, base_alpha);
 
 	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE)) {
 		const float3 lp_ambient = float3(0.02f, 0.02f, 0.02f) * albedo;
-		output.vAlbedo = float4(accumulated_light + lp_ambient, 1.0f);
+		output.vAlbedo = float4((accumulated_light + lp_ambient) * FSConst.fPreExposure, 1.0f);
 	}
 
 	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_DEBUG_PROBE_IRRADIANCE)) {

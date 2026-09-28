@@ -206,6 +206,9 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline, c
 		push_constants.Flags |= eDrawFlags::ProbeCapture;
 	}
 
+	const bool is_probe_capture = HasFlag(push_constants.Flags, eDrawFlags::ProbeCapture);
+	push_constants.PreExposure = is_probe_capture ? 1.0f : gGraphics->PreExposure;
+
 	if (gGraphics->bOnlyRenderProbes) {
 		push_constants.Flags |= eDrawFlags::DebugIrradiance;
 	}
