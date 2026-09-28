@@ -11,7 +11,7 @@ class wxStaticText;
 
 namespace fx::editor {
 
-class EditableVector3Field;
+class Vector3Field;
 
 class WorldPropertiesPanel : public wxPanel
 {
@@ -22,7 +22,7 @@ public:
 
 private:
 	wxStaticText* mpNameLabel = nullptr;
-	EditableVector3Field* mpPositionField = nullptr;
+	Vector3Field* mpPositionField = nullptr;
 
 	Vec3f mShownPosition = Vec3f::sZero;
 	bool mbShowingAnything = true;

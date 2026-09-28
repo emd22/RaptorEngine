@@ -8,11 +8,14 @@
 #include <Core/Types.hpp>
 
 class wxToggleButton;
+class wxBoxSizer;
+class wxPanel;
 
 namespace fx::editor {
 
 class ObjectPropertiesPanel;
 class WorldPropertiesPanel;
+class ToolSettingsBasePanel;
 class ObjectListWindow;
 
 class EditorViewport;
@@ -25,6 +28,13 @@ public:
 	FX_FORCE_INLINE EditorViewport* GetViewport() { return mpViewport; }
 	FX_FORCE_INLINE ObjectPropertiesPanel* GetObjectPropertiesPanel() { return mpObjectPropertiesPanel; }
 	FX_FORCE_INLINE WorldPropertiesPanel* GetWorldPropertiesPanel() { return mpWorldPropertiesPanel; }
+	FX_FORCE_INLINE ToolSettingsBasePanel* GetToolSettingsPanel() { return mpToolSettingsPanel; }
+
+	/**
+	 * @brief Swaps in `new_panel` as the tool settings slot below Object Properties, destroying whatever was shown
+	 * there before. Pass nullptr to leave the slot empty. Takes ownership of `new_panel`.
+	 */
+	void SetToolSettingsPanel(ToolSettingsBasePanel* new_panel);
 
 	FX_FORCE_INLINE bool IsCloseRequested() const { return mbCloseRequested; }
 
@@ -46,6 +56,11 @@ private:
 	ObjectPropertiesPanel* mpObjectPropertiesPanel = nullptr;
 	WorldPropertiesPanel* mpWorldPropertiesPanel = nullptr;
 	ObjectListWindow* mpObjectListWindow = nullptr;
+
+	/// The tool settings slot: whatever ToolSettingsBasePanel is currently swapped in, below Object Properties
+	ToolSettingsBasePanel* mpToolSettingsPanel = nullptr;
+	wxBoxSizer* mpComponentSizer = nullptr;
+	wxPanel* mpComponentParent = nullptr;
 
 	StackArray<wxToggleButton*, static_cast<uint32>(eEditorTool::Count)> mToolButtons;
 

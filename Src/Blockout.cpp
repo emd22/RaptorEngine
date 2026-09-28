@@ -1131,16 +1131,20 @@ void Blockout::SaveLights(ConfigFile& info)
 	Ref<LightDirectional> sun = gLightManager->GetDirectionalLight();
 
 	if (sun.IsValid()) {
-		ConfigEntry* sun_entry = info.AddEntry("sun");
+		ConfigEntry sun_entry = ConfigEntry::Struct("sun");
 
-		sun_entry->AddMember(ConfigEntry::Literal("enabled", static_cast<int64>(sun->bEnabled ? 1 : 0)));
-		sun_entry->AddMember(ConfigEntry::Literal("pos", sun->GetPosition()));
+		sun_entry.AddMember(ConfigEntry::Literal("enabled", static_cast<int64>(sun->bEnabled ? 1 : 0)));
+		sun_entry.AddMember(ConfigEntry::Literal("pos", sun->GetPosition()));
 
-		WriteColorEntry(*sun_entry, "color", sun->Color);
-		WriteColorEntry(*sun_entry, "ambient", sun->AmbientColor);
+		WriteColorEntry(sun_entry, "color", sun->Color);
+		WriteColorEntry(sun_entry, "ambient", sun->AmbientColor);
+
+		info.AddEntry(std::move(sun_entry));
 	}
 
-	ConfigEntry* lights_entry = info.AddEntry("lights");
+	// Built as a Struct up front: AddEntry("lights") only becomes a Struct once AddMember runs, so with zero
+	// point/spot lights it would otherwise serialize as a bare, unparsable `lights = ` line.
+	ConfigEntry lights_container = ConfigEntry::Struct("lights");
 
 	for (const Ref<LightBase>& light : gLightManager->GetCache()) {
 		if (light->Type != eLightType::Point && light->Type != eLightType::Spot) {
@@ -1172,8 +1176,10 @@ void Blockout::SaveLights(ConfigFile& info)
 			light_entry.AddMember(ConfigEntry::Literal("shadows", static_cast<int64>(spot->bCastShadows ? 1 : 0)));
 		}
 
-		lights_entry->AddMember(std::move(light_entry));
+		lights_container.AddMember(std::move(light_entry));
 	}
+
+	info.AddEntry(std::move(lights_container));
 }
 
 void Blockout::Load(const String& path)

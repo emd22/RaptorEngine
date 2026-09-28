@@ -4,6 +4,7 @@
 #include <Math/SIMDHelper.hpp>
 #include <Script/Script.hpp>
 #include <cstddef>
+#include <functional>
 
 namespace fx {
 
@@ -12,6 +13,8 @@ class Object;
 
 
 namespace editor {
+
+class ToolSettingsBasePanel;
 
 /// Mirrored by EDITORTOOL in `interop.strata`
 enum class eEditorTool : uint32
@@ -135,6 +138,19 @@ public:
 
 	void SetNative(NativeEditorTool* native) { pNative = native; }
 
+	/// Registers how to build this tool's panel in the Tool Settings slot below Object Properties. Pass nullptr
+	/// (the default) for a tool with no settings panel.
+	void SetSettingsPanel(std::function<ToolSettingsBasePanel*()> factory)
+	{
+		SettingsPanelFactory = std::move(factory);
+	}
+
+	/// Builds this tool's settings panel, or returns nullptr if it has none
+	ToolSettingsBasePanel* CreateSettingsPanel() const
+	{
+		return SettingsPanelFactory ? SettingsPanelFactory() : nullptr;
+	}
+
 	FX_FORCE_INLINE bool UsesSelection() const { return HasFlag(Flags, eEditorToolFlags::UsesSelection); }
 
 	~EditorTool();
@@ -146,6 +162,8 @@ public:
 	eEditorToolFlags Flags = eEditorToolFlags::None;
 
 private:
+	std::function<ToolSettingsBasePanel*()> SettingsPanelFactory = nullptr;
+
 	/////////////////////////////////////
 	// Cached hot functions
 	/////////////////////////////////////
