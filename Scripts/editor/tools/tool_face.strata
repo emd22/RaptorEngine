@@ -116,7 +116,7 @@ void tool_finalize()
 
 
 /* Edits the texture on the face of the selected object under the crosshair:
-   arrows shift it, [ and ] scale it, , and . rotate it, M cycles its material and J resets it.
+   arrows shift it, [ and ] scale it, , and . rotate it and J resets it.
    Called every frame the Face tool is selected and no drag is in progress. */
 void tool_controls()
 {
@@ -164,9 +164,6 @@ void tool_controls()
 		blockout_edit_face_texture(last_object, face, FACETEXTUREEDIT.ROTATE, float3(FACE_TEXTURE_ROTATE_STEP));
 	}
 
-	if (KEY.K_M.is_pressed()) {
-		blockout_edit_face_texture(last_object, face, FACETEXTUREEDIT.CYCLE_MATERIAL, float3(0.0f));
-	}
 	if (KEY.K_J.is_pressed()) {
 		blockout_edit_face_texture(last_object, face, FACETEXTUREEDIT.RESET, float3(0.0f));
 	}

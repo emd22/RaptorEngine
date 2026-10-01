@@ -518,53 +518,6 @@ static bool N_blockout_clip(Object* object, FLOAT4 point_a, FLOAT4 point_b, FLOA
 #endif
 }
 
-/// How far away a face can be painted with the Set Material tool
-static constexpr float32 scPaintRange = 100.0f;
-
-/**
- * @brief Paints the face under the crosshair (or its whole brush) with a prototype material slot, as an undoable
- * operation. A negative slot paints with the blockout's own material.
- */
-static bool N_blockout_paint_material(int32 slot, bool whole_brush)
-{
-#ifdef FX_IS_EDITOR
-	if (gEditor->IsSimulationMode() || slot >= static_cast<int32>(eCProtoMat::Count)) {
-		return false;
-	}
-
-	Vec3f face_normal;
-	Object* object = gWorld->pBlockout->RaycastBlockout(
-		gWorld->Player.pCamera->Position, gWorld->Player.pCamera->GetForwardVector() * scPaintRange, face_normal);
-
-	if (object == nullptr) {
-		return false;
-	}
-
-	const MaterialID material = (slot < 0) ? MaterialID::scNull
-										   : gWorld->pBlockout->GetMaterialForSlot(static_cast<eCProtoMat>(slot));
-
-	EditOperation op {
-		.Type = EditOperation::eType::BrushEdit,
-		.pObject = object,
-		.ValueA = EditOperationValue(Vec3f::sZero),
-		.ValueB = EditOperationValue(Vec3f::sZero),
-	};
-
-	op.PushedObjectID = object->ID;
-	op.PlanesBefore = gWorld->pBlockout->GetBrush(object)->Planes;
-
-	if (!gWorld->pBlockout->GetMaterialEdit(object, face_normal, material, whole_brush, op.PlanesAfter)) {
-		return false;
-	}
-
-	gEditor->PushEditOperation(op);
-
-	return true;
-#else
-	return false;
-#endif
-}
-
 static void N_blockout_edit_face_texture(Object* object, FLOAT4 face, uint32 edit, FLOAT4 amount)
 {
 #ifdef FX_IS_EDITOR
@@ -709,7 +662,6 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("blockout_hide_preview", N_blockout_hide_preview),
 	PREDEF("blockout_create_box", N_blockout_create_box),
 	PREDEF("blockout_clip", N_blockout_clip),
-	PREDEF("blockout_paint_material", N_blockout_paint_material),
 	PREDEF("camera_ray_to_plane", N_camera_ray_to_plane),
 	PREDEF("blockout_new_object", N_blockout_new_object),
 	PREDEF("blockout_dupe_object", N_blockout_dupe_object),

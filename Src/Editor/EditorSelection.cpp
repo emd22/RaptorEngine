@@ -8,18 +8,13 @@
 namespace fx::editor {
 
 /**
- * @brief Draws an object with the selection material, including any parts of its mesh with materials of their own
+ * @brief Draws an object with the selection material
  */
-static void ShowAsSelected(Object* object)
-{
-	object->SetMaterial(gWorld->pBlockout->SelectionMaterialID);
-	object->SetMaterialOverridesSections(true);
-}
+static void ShowAsSelected(Object* object) { object->SetMaterial(gWorld->pBlockout->SelectionMaterialID); }
 
 static void ShowAsDeselected(Object* object, const MaterialID& material)
 {
 	object->SetMaterial(material);
-	object->SetMaterialOverridesSections(false);
 }
 
 

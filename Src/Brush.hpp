@@ -9,10 +9,8 @@
 
 #include <Core/SizedArray.hpp>
 #include <Core/StackArray.hpp>
-#include <Material/MaterialID.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
-#include <Object/MeshSection.hpp>
 
 namespace fx {
 
@@ -22,9 +20,6 @@ namespace fx {
  */
 struct BrushFaceTexture
 {
-	/// Null uses the material of the object the brush belongs to
-	MaterialID Material = MaterialID::scNull;
-
 	/// Added after scaling, in texture repeats
 	Vec2f Offset = Vec2f(0.0f, 0.0f);
 	Vec2f Scale = Vec2f(2.0f, 2.0f);
@@ -117,28 +112,25 @@ public:
 			   PlaneList& out_front) const;
 
 	/**
-	 * @brief Resets a face's texture layout to the one FromBox() uses, keeping its material
+	 * @brief Resets a face's texture layout to the one FromBox() uses
 	 */
 	void ResetFaceTexture(uint32 plane_index);
 
 	/**
-	 * @brief Lines every face's texture up with the world grid, for a brush on an unrotated object at `origin`. Faces
-	 * keep their materials.
+	 * @brief Lines every face's texture up with the world grid, for a brush on an unrotated object at `origin`.
 	 */
 	void AlignTexturesToWorld(const Vec3f& origin);
 
 	/**
-	 * @brief Returns true if every face has the default layout from ResetFaceTexture() and no material of its own
+	 * @brief Returns true if every face has the default layout from ResetFaceTexture()
 	 */
 	bool HasDefaultTextures() const;
 
 	/**
 	 * @brief Generates a triangle mesh for rendering
-	 * @param sections Filled with a section per material if any face has a material of its own, otherwise left empty
 	 */
 	void GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normals, SizedArray<Vec3f>& tangents,
-					  SizedArray<Vec2f>& texcoords, SizedArray<uint32>& indices,
-					  SizedArray<MeshSection>& sections) const;
+					  SizedArray<Vec2f>& texcoords, SizedArray<uint32>& indices) const;
 
 public:
 	PlaneList Planes;

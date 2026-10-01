@@ -103,6 +103,7 @@ struct alignas(16) DrawPushConstants
 
 	/// Scale applied to the lit result before it is written to the HDR target, see GraphicsBackend::PreExposure
 	float32 PreExposure = 1.0f;
+
 };
 
 static_assert(sizeof(DrawPushConstants) <= 128, "DrawPushConstants exceeds the minimum guaranteed push constant size");
@@ -158,7 +159,7 @@ struct alignas(16) LightGpuData
 
 	uint32 Color;
 	uint32 Type;
-	uint32 Ambient;
+	float32 Intensity;
 	float32 InvRadiusSq;
 
 	/// Spot lights only: world space direction the cone points along

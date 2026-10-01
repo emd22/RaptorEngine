@@ -116,7 +116,7 @@ void hide_transform_marker_object()
    Mirrored by scSnapSteps in Src/Editor/RaptorEditor.cpp. */
 float tool_get_snap_multiplier()
 {
-	float[4] snap_values = { 0.05f, 0.10f, 0.25f, 0.50f };
+	float[4] snap_values = { 0.10f, 0.25f, 0.50f, 1.0f };
 	uint index = fclamp(state.tool_snap_level, 0, 3);
 	return snap_values[index];
 }

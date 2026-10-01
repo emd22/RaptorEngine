@@ -42,6 +42,7 @@ private:
 	void Deselect();
 
 	void DeleteSelected();
+	void DuplicateSelected();
 
 	void BeginEdit(LightSpot& light);
 	void CommitEdit();

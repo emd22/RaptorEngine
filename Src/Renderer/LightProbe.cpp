@@ -29,7 +29,7 @@
 #include <vector>
 
 /// Bump whenever the layout or meaning of the cached data changes
-#define FX_PROBE_CACHE_FILE_VERSION 10
+#define FX_PROBE_CACHE_FILE_VERSION 11
 
 namespace fx {
 
@@ -113,7 +113,7 @@ ProbeSHData MakeSkyGradientProbe(const float32 sky[3], const float32 ground[3])
 ///////////////////////////////////
 
 /// Brightest radiance a capture texel can contribute, so that a few very bright texels can't dominate a probe
-constexpr float32 scRadianceClamp = 16.0f;
+constexpr float32 scRadianceClamp = 65000.0f;
 
 /// Surfaces closer than this to a probe are clipped out of its capture, so it sees straight through them
 constexpr float32 scCaptureNearPlane = 0.1f;
@@ -871,7 +871,7 @@ void FinaliseVolumeBounds(ProbeVolumeData& volume)
 	volume.MaxAndCellVolume[3] = cell_volume;
 }
 
-static constexpr uint32 scOldestReadableCacheVersion = 8;
+static constexpr uint32 scOldestReadableCacheVersion = 11;
 
 uint64 GetProbeFileSize(uint32 probe_count, uint32 version)
 {
@@ -1477,7 +1477,8 @@ void ProbeManager::ProjectCapture(const uint16* const colors[scCaptureFaces],
 				const uint16* rgba = colors[face] + pixel * 4;
 
 				for (uint32 c = 0; c < 3; c++) {
-					const float32 radiance = std::clamp(HalfToFloat(rgba[c]), 0.0f, scRadianceClamp);
+					const float32 sample = HalfToFloat(rgba[c]);
+					const float32 radiance = std::isnan(sample) ? 0.0f : std::clamp(sample, 0.0f, scRadianceClamp);
 
 					for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
 						sh[k][c] += radiance * texel->WeightedBasis[k];

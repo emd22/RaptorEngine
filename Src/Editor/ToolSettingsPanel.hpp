@@ -51,6 +51,10 @@ private:
 
 	Vector3Field* mpPositionField = nullptr;
 	FloatField* mpRadiusField = nullptr;
+	FloatField* mpIntensityField = nullptr;
+	FloatField* mpLumensField = nullptr;
+	FloatField* mpOuterAngleField = nullptr;
+	FloatField* mpInnerAngleField = nullptr;
 
 	LightSpot* mpShownLight = nullptr;
 	bool mbShowingAnything = false;

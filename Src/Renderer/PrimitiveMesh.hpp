@@ -116,19 +116,6 @@ public:
 		vkCmdDrawIndexed(cmd.Cmd, static_cast<uint32>(GpuIndexBuffer.Size / sizeof(uint32)), num_instances, 0, 0, 0);
 	}
 
-	/**
-	 * @brief Draws `index_count` indices starting at `first_index`, for meshes drawn in parts with different materials
-	 */
-	void RenderRange(const renderer::CommandBuffer& cmd, uint32 first_index, uint32 index_count, uint32 num_instances)
-	{
-		const VkDeviceSize offset = 0;
-
-		vkCmdBindVertexBuffers(cmd.Cmd, 0, 1, &VertexList.GpuBuffer.Buffer, &offset);
-		vkCmdBindIndexBuffer(cmd.Cmd, GpuIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-
-		vkCmdDrawIndexed(cmd.Cmd, index_count, num_instances, first_index, 0, 0);
-	}
-
 	void RecalculateNormals()
 	{
 		using VertexType = renderer::Vertex<renderer::eVertexType::Default>;

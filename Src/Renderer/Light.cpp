@@ -71,8 +71,8 @@ void LightBase::FillGpuData(LightGpuData& data, const PerspectiveCamera& camera,
 	data.Position[1] = mPosition.Y;
 	data.Position[2] = mPosition.Z;
 	data.Color = Color.Value;
+	data.Intensity = Intensity;
 
-	data.Ambient = AmbientColor.Value;
 	data.Type = static_cast<uint32>(Type);
 }
 
@@ -131,6 +131,15 @@ void LightSpot::SetConeAngles(float32 inner_angle, float32 outer_angle)
 	mOuterAngle = MathUtil::Clamp(outer_angle, 0.0f, MathUtil::DegreesToRadians(90.0f));
 	mInnerAngle = MathUtil::Clamp(inner_angle, 0.0f, mOuterAngle);
 }
+
+float32 LightSpot::GetSolidAngle() const
+{
+	return 2.0f * static_cast<float32>(M_PI) * (1.0f - cosf(mOuterAngle));
+}
+
+float32 LightSpot::GetLumens() const { return Intensity * GetSolidAngle(); }
+
+void LightSpot::SetLumens(float32 lumens) { Intensity = lumens / std::max(GetSolidAngle(), 1e-4f); }
 
 void LightSpot::SetDirection(const Vec3f& direction)
 {

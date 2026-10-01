@@ -120,6 +120,8 @@ EditOperationValue EditOperation::Execute(EditorSelection& selection)
 		light->SetRadius(LightSnap.Radius);
 		light->SetConeAngles(LightSnap.InnerAngle, LightSnap.OuterAngle);
 		light->bCastShadows = LightSnap.bCastShadows;
+		light->Color = LightSnap.Colour;
+		light->Intensity = LightSnap.Intensity;
 
 		Light.pLight = &(*light);
 		Light.Id = light->ID;
@@ -281,6 +283,8 @@ void EditOperation::Undo(EditorSelection& selection)
 		restored->SetRadius(LightSnap.Radius);
 		restored->SetConeAngles(LightSnap.InnerAngle, LightSnap.OuterAngle);
 		restored->bCastShadows = LightSnap.bCastShadows;
+		restored->Color = LightSnap.Colour;
+		restored->Intensity = LightSnap.Intensity;
 
 		Light.pLight = &(*restored);
 		Light.Id = restored->ID;
