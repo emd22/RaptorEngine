@@ -26,7 +26,6 @@ enum class eEditorTool : uint32
 	Rotate,
 	Create,
 	Clip,
-	SetMaterial,
 	Light,
 
 	Count,

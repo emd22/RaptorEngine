@@ -70,7 +70,7 @@ void Blockout::Create(World* world)
 
 
 	{
-		mProtoBricksID = gMaterialManager->NewMaterial("ProtoTile", false);
+		mProtoBricksID = gMaterialManager->NewMaterial("ProtoBricks", false);
 		Material* test_material = gMaterialManager->GetMaterial(mProtoBricksID);
 
 		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
@@ -84,6 +84,29 @@ void Blockout::Create(World* world)
 		AssetTicket orm_map = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
 													   "RaptorData/Data/Demo/Textures/bricks/Bricks_orm.ktx2",
 													   eImageCreateFlags::None);
+
+
+		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
+		test_material->Attach(Material::eResourceType::Normal, normal);
+		test_material->Attach(Material::eResourceType::ORM, orm_map);
+		test_material->Finalize();
+	}
+
+	{
+		mProtoGraniteTileID = gMaterialManager->NewMaterial("ProtoGraniteTile", false);
+		Material* test_material = gMaterialManager->GetMaterial(mProtoGraniteTileID);
+
+		AssetTicket diffuse = gAssetManager->LoadImage(
+			eImageType::Flat, eImageFormat::RGBA8_UNorm,
+			"RaptorData/Data/Demo/Textures/granite_tile/granite_tile_diffuse.ktx2", eImageCreateFlags::None);
+
+		AssetTicket normal = gAssetManager->LoadImage(
+			eImageType::Flat, eImageFormat::RGBA8_UNorm,
+			"RaptorData/Data/Demo/Textures/granite_tile/granite_tile_normal.ktx2", eImageCreateFlags::None);
+
+		AssetTicket orm_map = gAssetManager->LoadImage(
+			eImageType::Flat, eImageFormat::RGBA8_UNorm,
+			"RaptorData/Data/Demo/Textures/granite_tile/granite_tile_orm.ktx2", eImageCreateFlags::None);
 
 
 		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
@@ -125,7 +148,9 @@ void Blockout::Create(World* world)
 
 		pXFormObject = gObjectManager->NewObject("PROTO_XFORM", SelectionMaterialID,
 												 eObjectTag::Blockout | eObjectTag::LockTransform);
-		pXFormObject->SetUnlit(true);
+		// pXFormObject->SetUnlit(true);
+		pXFormObject->SetProbeVisible(false);
+
 		pXFormObject->pMesh = cube_mesh->AsDefaultMesh();
 
 
@@ -140,15 +165,13 @@ void Blockout::Create(World* world)
 	{
 		pPreviewObject = gObjectManager->NewObject("PROTO_PREVIEW", SelectionMaterialID,
 												   eObjectTag::Blockout | eObjectTag::LockTransform);
-		pPreviewObject->SetUnlit(true);
+		// pPreviewObject->SetUnlit(true);
 		pPreviewObject->SetProbeVisible(false);
 
 		// Needs a mesh to be added to the world; ShowPreview() replaces it
 		Brush brush = Brush::FromBox(Vec3f(-0.25f), Vec3f(0.25f));
 		Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
-		SizedArray<MeshSection> sections;
-
-		brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices, sections);
+		brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices);
 		pPreviewObject->pMesh = mesh->AsDefaultMesh();
 		mPreviewPlanes = brush.Planes;
 
@@ -309,9 +332,7 @@ void Blockout::ShowPreview(const Vec3f& position, const Quat& rotation, const Br
 	// Only rebuild the mesh when the brush changes, as dragging mostly moves it between the same few snapped sizes
 	if (!is_same_brush) {
 		Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
-		SizedArray<MeshSection> sections;
-
-		brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices, sections);
+		brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices);
 
 		pPreviewObject->pMesh = mesh->AsDefaultMesh();
 		pPreviewObject->Bounds.Min = brush.GetBoundsMin();
@@ -328,7 +349,7 @@ void Blockout::ShowPreview(const Vec3f& position, const Quat& rotation, const Br
 void Blockout::HidePreview()
 {
 	// Out of the way, the same place the transform marker hides
-	pPreviewObject->SetPosition(Vec3f(200.0f));
+	pPreviewObject->SetPosition(Vec3f(-200.0f));
 }
 
 bool Blockout::GetFaceTextureEdit(Object* object, const Vec3f& face_normal, eFaceTextureEdit edit, const Vec2f& amount,
@@ -357,16 +378,6 @@ bool Blockout::GetFaceTextureEdit(Object* object, const Vec3f& face_normal, eFac
 	case eFaceTextureEdit::Rotate:
 		texture.Rotation = std::fmod(texture.Rotation + amount.X + scDegreesPerTurn, scDegreesPerTurn);
 		break;
-	case eFaceTextureEdit::CycleMaterial: {
-		// No material of its own (the object's material), then each prototype material in turn
-		const int32 slot = texture.Material.IsNull() ? -1 : GetSlotForMaterial(texture.Material);
-		const int32 next_slot = slot + 1;
-
-		texture.Material = (next_slot < static_cast<int32>(eCProtoMat::Count))
-							   ? GetMaterialForSlot(static_cast<eCProtoMat>(next_slot))
-							   : MaterialID::scNull;
-		break;
-	}
 	case eFaceTextureEdit::Reset: {
 		// The default layout depends on the brush's bounds, so let the brush work it out
 		Brush reset = Brush::FromPlanes(out_planes);
@@ -377,37 +388,6 @@ bool Blockout::GetFaceTextureEdit(Object* object, const Vec3f& face_normal, eFac
 	}
 
 	return true;
-}
-
-bool Blockout::GetMaterialEdit(Object* object, const Vec3f& face_normal, const MaterialID& material, bool whole_brush,
-							   Brush::PlaneList& out_planes)
-{
-	const Brush* brush = GetBrush(object);
-	if (brush == nullptr) {
-		return false;
-	}
-
-	const int32 plane_index = brush->FindPlane(face_normal);
-	if (!whole_brush && plane_index == Brush::scNoPlane) {
-		return false;
-	}
-
-	out_planes = brush->Planes;
-
-	bool changed = false;
-
-	for (uint32 i = 0; i < out_planes.Size; i++) {
-		if (!whole_brush && static_cast<int32>(i) != plane_index) {
-			continue;
-		}
-
-		MaterialID& face_material = out_planes[i].Texture.Material;
-
-		changed |= !(face_material == material);
-		face_material = material;
-	}
-
-	return changed;
 }
 
 Object* Blockout::RaycastBlockout(const Vec3f& origin, const Vec3f& direction, Vec3f& out_face_normal)
@@ -538,22 +518,13 @@ MaterialID Blockout::GetMaterialForSlot(eCProtoMat slot) const
 		return mOrangeMaterialID;
 	case eCProtoMat::Blue:
 		return mBlueMaterialID;
-	case eCProtoMat::Tile:
+	case eCProtoMat::Brick:
 		return mProtoBricksID;
+	case eCProtoMat::GraniteTile:
+		return mProtoGraniteTileID;
 	default:
 		return mWhiteMaterialID;
 	}
-}
-
-int32 Blockout::GetSlotForMaterial(const MaterialID& material) const
-{
-	for (int32 slot = 0; slot < static_cast<int32>(eCProtoMat::Count); slot++) {
-		if (GetMaterialForSlot(static_cast<eCProtoMat>(slot)) == material) {
-			return slot;
-		}
-	}
-
-	return -1;
 }
 
 Brush* Blockout::GetBrush(const Object* object)
@@ -571,12 +542,9 @@ void Blockout::ApplyBrush(Object* object, Brush&& brush, physics::eMotionType mo
 	Assert(brush.IsValid());
 
 	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
-	SizedArray<MeshSection> sections;
-
-	brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices, sections);
+	brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices);
 
 	object->pMesh = mesh->AsDefaultMesh();
-	object->MeshSections = std::move(sections);
 
 	object->Bounds.Min = brush.GetBoundsMin();
 	object->Bounds.Max = brush.GetBoundsMax();
@@ -617,9 +585,6 @@ void Blockout::ApplyBrush(Object* object, Brush&& brush, physics::eMotionType mo
 
 /// Values stored per plane in a blockout's `uvs` array: offset U and V, scale U and V, then rotation
 constexpr uint32 scValuesPerFaceTexture = 5;
-
-/// Stored in a blockout's `facemats` array for faces that use the object's material
-constexpr int32 scNoFaceMaterial = -1;
 
 Brush Blockout::ReadBrushEntry(ConfigEntry& entry) const
 {
@@ -663,20 +628,6 @@ Brush Blockout::ReadBrushEntry(ConfigEntry& entry) const
 							values[i * 4 + 2].Get<float32>()),
 			.Distance = values[i * 4 + 3].Get<float32>(),
 		});
-	}
-
-	ConfigEntry* materials_entry = entry.GetMember(HashStr32("facemats"));
-
-	if (materials_entry != nullptr) {
-		const PagedArray<ConfigPrimitive>& slots = materials_entry->GetArrayData();
-
-		for (uint32 i = 0; i < plane_count && i < slots.Size(); i++) {
-			const int32 slot = slots[i].Get<int32>();
-
-			if (slot != scNoFaceMaterial) {
-				planes[i].Texture.Material = GetMaterialForSlot(static_cast<eCProtoMat>(slot));
-			}
-		}
 	}
 
 	ConfigEntry* uvs_entry = entry.GetMember(HashStr32("uvs"));
@@ -735,24 +686,6 @@ void Blockout::WriteBrushEntry(ConfigEntry& entry, const Object* object)
 	}
 
 	entry.AddMember(std::move(planes_array));
-
-	bool has_face_materials = false;
-
-	for (const BrushPlane& plane : brush->Planes) {
-		has_face_materials |= !plane.Texture.Material.IsNull();
-	}
-
-	if (has_face_materials) {
-		ConfigEntry materials_array = ConfigEntry::Array("facemats", ConfigPrimitive::ePrimitiveType::Int);
-
-		for (const BrushPlane& plane : brush->Planes) {
-			const int32 slot = plane.Texture.Material.IsNull() ? scNoFaceMaterial
-															   : GetSlotForMaterial(plane.Texture.Material);
-			materials_array.AppendValue(ConfigPrimitive::FromValue(slot));
-		}
-
-		entry.AddMember(std::move(materials_array));
-	}
 
 	if (!brush->HasDefaultTextures()) {
 		ConfigEntry uvs_array = ConfigEntry::Array("uvs", ConfigPrimitive::ePrimitiveType::Float);
@@ -1032,6 +965,14 @@ static void WriteColorEntry(ConfigEntry& parent, const char* name, const Color& 
 	parent.AddMember(std::move(color_array));
 }
 
+static void ReadLightColor(const ConfigEntry& entry, LightBase& light)
+{
+	const Color color = entry.GetMemberValue(HashStr32("color"), light.Color);
+
+	light.Color = Color::FromRGBA(color.R, color.G, color.B, 255);
+	light.Intensity = entry.GetMemberValue<float32>(HashStr32("intensity"), light.Intensity);
+}
+
 void Blockout::AddOrUpdateLightFromEntry(const ConfigEntry& light_entry)
 {
 	const int64 type_value = light_entry.GetMemberValue<int64>(HashStr32("type"),
@@ -1069,7 +1010,7 @@ void Blockout::AddOrUpdateLightFromEntry(const ConfigEntry& light_entry)
 	}
 
 	light->SetPosition(light_entry.GetMemberValue(HashStr32("pos"), light->GetPosition()));
-	light->Color = light_entry.GetMemberValue(HashStr32("color"), Color::FromRGBA(255, 255, 255, 8));
+	ReadLightColor(light_entry, *light);
 	light->SetRadius(light_entry.GetMemberValue<float32>(HashStr32("radius"), 5.0f));
 
 	if (light_type == eLightType::Spot) {
@@ -1112,8 +1053,7 @@ void Blockout::LoadLights(ConfigFile& info)
 	if (sun_entry) {
 		sun->SetPosition(sun_entry->GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero));
 
-		sun->Color = sun_entry->GetMemberValue<Color>(HashStr32("color"), Color::FromRGBA(100, 100, 100, 4));
-		sun->AmbientColor = sun_entry->GetMemberValue<Color>(HashStr32("ambient"), Color::FromRGBA(100, 100, 100, 1));
+		ReadLightColor(*sun_entry, *sun);
 	}
 
 	// Load point and spot lights
@@ -1137,7 +1077,7 @@ void Blockout::SaveLights(ConfigFile& info)
 		sun_entry.AddMember(ConfigEntry::Literal("pos", sun->GetPosition()));
 
 		WriteColorEntry(sun_entry, "color", sun->Color);
-		WriteColorEntry(sun_entry, "ambient", sun->AmbientColor);
+		sun_entry.AddMember(ConfigEntry::Literal("intensity", sun->Intensity));
 
 		info.AddEntry(std::move(sun_entry));
 	}
@@ -1158,6 +1098,7 @@ void Blockout::SaveLights(ConfigFile& info)
 
 		light_entry.AddMember(ConfigEntry::Literal("pos", light->GetPosition()));
 		WriteColorEntry(light_entry, "color", light->Color);
+		light_entry.AddMember(ConfigEntry::Literal("intensity", light->Intensity));
 		light_entry.AddMember(ConfigEntry::Literal("radius", light->GetRadius()));
 
 		if (light->Type == eLightType::Spot) {
@@ -1254,6 +1195,9 @@ void Blockout::Save(const String& path)
 				blockout_entry.AddMember(ConfigEntry::DotReference("mat", "$cprotomat.orange"));
 			}
 			else if (object->GetMaterialID() == mProtoBricksID) {
+				blockout_entry.AddMember(ConfigEntry::DotReference("mat", "$cprotomat.bricks"));
+			}
+			else if (object->GetMaterialID() == mProtoGraniteTileID) {
 				blockout_entry.AddMember(ConfigEntry::DotReference("mat", "$cprotomat.tile"));
 			}
 		}

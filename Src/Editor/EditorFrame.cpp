@@ -37,7 +37,6 @@ static constexpr ToolButtonInfo scToolButtons[] = {
 	{ "Rotate", "Textures/editor/rotate.png" },
 	{ "Create", "Textures/editor/create.png" },
 	{ "Clip", "Textures/editor/clip.png" },
-	{ "Set Material", "Textures/editor/set_material.png" },
 	{ "Light", "Textures/editor/lamp.png" },
 };
 

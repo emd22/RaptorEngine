@@ -24,6 +24,7 @@
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
+#include <Renderer/Exposure.hpp>
 #include <Renderer/LightManager.hpp>
 #include <Renderer/LightProbe.hpp>
 #include <Renderer/PipelineCache.hpp>
@@ -49,7 +50,7 @@ namespace fx {
 
 using namespace renderer;
 
-static constexpr float scMouseSensitivity = 0.25;
+static constexpr float scMouseRadiansPerPixel = 0.25f / 120.0f;
 
 /// How long the frame rate shown on screen is averaged over. Any shorter and it flickers too fast to read.
 static constexpr double scFpsWindowSeconds = 0.25;
@@ -173,6 +174,21 @@ void RaptorGame::CreateLights()
 
 Vec2f PixelsToUV(const Vec2i& pos, const Vec2f& size) { return Vec2f(pos.X / size.X, pos.Y / size.Y); }
 
+void RaptorGame::UpdateExposure()
+{
+	if (!(mpExposureCVar && mpApertureCVar && mpShutterCVar && mpIsoCVar)) {
+		return;
+	}
+
+	ExposureSettings exposure;
+	exposure.Compensation = mpExposureCVar->FloatValue;
+	exposure.Aperture = mpApertureCVar->FloatValue;
+	exposure.ShutterTime = mpShutterCVar->FloatValue;
+	exposure.ISO = mpIsoCVar->FloatValue;
+
+	gGraphics->PreExposure = exposure.GetExposure();
+}
+
 void RaptorGame::CreateGame()
 {
 	gWorld->Player.Create();
@@ -195,6 +211,9 @@ void RaptorGame::CreateGame()
 	mpDecalsCVar = gCVars->Set("r_decals", 1);
 
 	mpExposureCVar = gCVars->Set("r_exposure_ev", 0.0f);
+	mpApertureCVar = gCVars->Set("r_aperture", 16.0f);
+	mpShutterCVar = gCVars->Set("r_shutter", 0.01f);
+	mpIsoCVar = gCVars->Set("r_iso", 100.0f);
 
 	// Metres between probes in a volume built from an editor brush. Set `$r_probe_spacing` in the console
 	gCVars->Set("r_probe_spacing", 2.5f);
@@ -391,10 +410,8 @@ void RaptorGame::ProcessControls()
 
 	if (ControlManager::IsMouseLocked()) {
 		Vec2f mouse_delta = ControlManager::GetMouseDelta();
-		mouse_delta.X = static_cast<float32>(DeltaTime * static_cast<double>(mouse_delta.X) *
-											 static_cast<double>(scMouseSensitivity));
-		mouse_delta.Y = static_cast<float32>(DeltaTime * static_cast<double>(mouse_delta.Y) *
-											 -static_cast<double>(scMouseSensitivity));
+		mouse_delta.X *= scMouseRadiansPerPixel;
+		mouse_delta.Y *= -scMouseRadiansPerPixel;
 
 		gWorld->Player.RotateHead(mouse_delta);
 	}
@@ -657,7 +674,8 @@ void RaptorGame::Tick()
 
 	gGraphics->bDisableProbes = (mpProbesCVar != nullptr) && (mpProbesCVar->IntValue == 0);
 	gGraphics->bDisableDecals = (mpDecalsCVar != nullptr) && (mpDecalsCVar->IntValue == 0);
-	gGraphics->PreExposure = (mpExposureCVar != nullptr) ? std::exp2(mpExposureCVar->FloatValue) : 1.0f;
+
+	UpdateExposure();
 
 	frame->CmdBuffer.Reset();
 	frame->CmdBuffer.Record();

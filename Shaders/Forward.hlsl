@@ -513,7 +513,7 @@ PERMEND();
 		Light light = Lights[bLightIndexList[tile_data.StartIndex + tile_light]];
 
 		float4 light_color = F_UnpackUIntToFloat4(light.uiLightColor);
-		float light_intensity = light_color.w * 255.0;
+		float light_intensity = light.fIntensity;
 
 		/// How much light is visible (not occluded) at this pixel
 		float visibility = 1.0;
@@ -608,7 +608,7 @@ PERMEND();
 	output.vAlbedo = float4((accumulated_light + ambient) * FSConst.fPreExposure, base_alpha);
 
 	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE)) {
-		const float3 lp_ambient = float3(0.02f, 0.02f, 0.02f) * albedo;
+		const float3 lp_ambient = albedo * (PROBE_CAPTURE_AMBIENT_ILLUMINANCE * FX_MATH_1_OVER_PI);
 		output.vAlbedo = float4((accumulated_light + lp_ambient) * FSConst.fPreExposure, 1.0f);
 	}
 

@@ -37,7 +37,7 @@ static constexpr FlagName scFlagNames[] = {
 };
 
 /// Dropdown items, in eCProtoMat order
-static constexpr const char* scMaterialSlotNames[] = { "Gray", "Orange", "Blue", "Tile" };
+static constexpr const char* scMaterialSlotNames[] = { "Gray", "Orange", "Blue", "Bricks", "Granite Tile" };
 
 static_assert(std::size(scMaterialSlotNames) == static_cast<size_t>(eCProtoMat::Count));
 

@@ -17,7 +17,7 @@ struct Light
 	// 96
 	uint1 uiLightColor;
 	uint1 uiLightType;
-	uint1 uiAmbient;
+	float1 fIntensity;
 	/// 1 / (radius * radius), so the shading pass does not divide once per pixel per light
 	float1 fInvRadiusSq;
 	// 112
@@ -55,6 +55,8 @@ struct TileLightData
 
 #define FX_MATH_PI 3.14159265359
 #define FX_MATH_1_OVER_PI 0.31830988618
+
+#define PROBE_CAPTURE_AMBIENT_ILLUMINANCE 1500.0
 
 /// Clamped dot product
 float DotC(float3 a, float3 b)

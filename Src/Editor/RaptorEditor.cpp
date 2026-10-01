@@ -61,6 +61,9 @@ static constexpr float32 scCreateRange = 20.0f;
 static constexpr float32 scSnapSteps[] = { 0.05f, 0.10f, 0.25f, 0.50f };
 static constexpr int32 scSnapLevelCount = static_cast<int32>(std::size(scSnapSteps));
 
+static constexpr float32 scAngleSnapSteps[] = { 5.0f, 15.0f, 45.0f, 90.0f };
+static_assert(std::size(scAngleSnapSteps) == std::size(scSnapSteps));
+
 /// Where the transform marker is kept while it isn't in use, out of view
 static const Vec3f scHiddenMarkerPosition = Vec3f(200.0f);
 
@@ -270,9 +273,6 @@ void RaptorEditor::HandleHotkeys()
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_C)) {
 		SetTool(eEditorTool::Clip);
 	}
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_V)) {
-		SetTool(eEditorTool::SetMaterial);
-	}
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_I)) {
 		SetTool(eEditorTool::Light);
 	}
@@ -447,7 +447,6 @@ void RaptorEditor::AddTools()
 	AddTool(eEditorTool::Rotate, "./Scripts/editor/tools/tool_rotate.strata", eEditorToolFlags::UsesSelection);
 	AddTool(eEditorTool::Create, "./Scripts/editor/tools/tool_create.strata", eEditorToolFlags::None);
 	AddTool(eEditorTool::Clip, "./Scripts/editor/tools/tool_clip.strata", eEditorToolFlags::UsesSelection);
-	AddTool(eEditorTool::SetMaterial, "./Scripts/editor/tools/tool_set_material.strata", eEditorToolFlags::None);
 
 	// The lights can't be reached from scripts, so this tool is written in C++
 	AddTool(eEditorTool::Light, nullptr, eEditorToolFlags::ClearsSelection);
@@ -550,6 +549,15 @@ void RaptorEditor::AdjustSnapLevel(int32 direction)
 	mToolState.ToolSnapLevel = std::clamp(mToolState.ToolSnapLevel + direction, 0, scSnapLevelCount - 1);
 
 	SyncCurrentTool();
+}
+
+float32 RaptorEditor::GetAngleSnapStep() const
+{
+	if (!mToolState.ToolSnapEnabled) {
+		return 0.0f;
+	}
+
+	return scAngleSnapSteps[std::clamp(mToolState.ToolSnapLevel, 0, scSnapLevelCount - 1)];
 }
 
 Vec3f RaptorEditor::SnapToGrid(const Vec3f& position) const
