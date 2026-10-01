@@ -142,8 +142,6 @@ void ShadowAtlas::BindPipeline(PipelineHandle pipeline)
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
 	// The viewport was set for the region when it began, and binding a pipeline leaves it alone
-	// Only the pipeline. The callers bind set 0 with its dynamic offsets, and the skinned and masked variants' set 1 is
-	// the material's, which is bound per draw.
 	Pipeline& pl = gPipelineCache->Get(pipeline);
 
 	if (pl.IsBuilt()) {

@@ -22,9 +22,9 @@
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
 #include <Renderer/Backend/Util.hpp>
+#include <Renderer/Exposure.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
-#include <Renderer/Exposure.hpp>
 #include <Renderer/LightManager.hpp>
 #include <Renderer/LightProbe.hpp>
 #include <Renderer/PipelineCache.hpp>
@@ -352,29 +352,6 @@ void RaptorGame::ToggleEditorMode()
 #endif
 }
 
-/// How far the player's shots reach
-static constexpr float32 scShotRange = 100.0f;
-
-/// Casts a shot from the camera and leaves a bullet hole where it lands
-static void FireShot()
-{
-	Ref<PerspectiveCamera>& cam = gWorld->Player.pCamera;
-
-	physics::RayResult hit = gPhysics->pBackend->Raycast(cam->Position, cam->GetForwardVector() * scShotRange);
-
-	if (!hit.bHit) {
-		return;
-	}
-
-	// Decals stay where they are put, so only geometry that can't move gets them
-	if (gPhysics->pBackend->GetBodyInterface().GetMotionType(hit.Body) != JPH::EMotionType::Static) {
-		return;
-	}
-
-	gDecalManager->AddBulletHole(hit.Point, hit.Normal);
-}
-
-
 void RaptorGame::ProcessControls()
 {
 #ifdef FX_IS_EDITOR
@@ -443,14 +420,33 @@ void RaptorGame::ProcessControls()
 		gWorld->Player.bIsSprinting = false;
 	}
 
-	if (is_simulation_mode && was_mouse_locked && ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
-		FireShot();
-		gWorld->Player.DoFireAnimation();
-	}
+	gWorld->Player.Weapons.SetEnabled(is_simulation_mode);
 
-	if (is_simulation_mode && ControlManager::IsKeyPressed(eKey::FX_KEY_R) &&
-		!ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT)) {
-		gWorld->Player.DoReloadAnimation();
+	if (is_simulation_mode) {
+		eWeaponInputFlags input_flags = eWeaponInputFlags::None;
+
+		if (was_mouse_locked && ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
+			input_flags |= eWeaponInputFlags::FirePressed;
+		}
+
+		if (ControlManager::IsMouseLocked() && ControlManager::IsKeyDown(eKey::FX_MOUSE_LEFT)) {
+			input_flags |= eWeaponInputFlags::FireHeld;
+		}
+
+
+		if (ControlManager::IsKeyPressed(eKey::FX_KEY_R) && !ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT)) {
+			input_flags |= eWeaponInputFlags::ReloadPressed;
+		}
+
+		if (ControlManager::ControlManager::IsKeyPressed(eKey::FX_KEY_V)) {
+			input_flags |= eWeaponInputFlags::SwitchMode;
+		}
+
+		if (ControlManager::ControlManager::IsKeyPressed(eKey::FX_KEY_TAB)) {
+			input_flags |= eWeaponInputFlags::SwitchWeapon;
+		}
+
+		gWorld->Player.Weapons.SetInput(input_flags);
 	}
 
 
@@ -543,6 +539,8 @@ void RaptorGame::ReloadScripts()
 #else
 	gScriptManager->ReloadAllScripts();
 #endif
+
+	gWorld->Player.Weapons.OnScriptsReloaded();
 }
 
 void RaptorGame::RenderText()
@@ -703,6 +701,7 @@ void RaptorGame::Tick()
 
 	RenderText();
 	RenderCrosshair();
+	gWorld->Player.Weapons.RenderHud();
 
 	gGraphics->DoComposition(*gWorld->GetCurrentCamera());
 

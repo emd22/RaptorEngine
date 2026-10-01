@@ -1126,6 +1126,28 @@ bool Blockout::Load(const String& path)
 	return true;
 }
 
+static void StoreLastBlockoutPath(const String& path, const char* config_path)
+{
+	ConfigFile config {};
+	config.Load(config_path);
+
+	if (config.HasErrors() || config.GetEntries().Size() == 0) {
+		LogWarning(LC_ASSET, "Could not update the blockout entry in {}", config_path);
+		return;
+	}
+
+	ConfigEntry* entry = config.GetEntry(HashStr32("blockout"));
+
+	if (entry != nullptr) {
+		entry->Set(std::string(path.CStr()));
+	}
+	else {
+		config.AddEntry(ConfigEntry::Literal("blockout", path.CStr()));
+	}
+
+	config.Write(config_path);
+}
+
 void Blockout::Save(const String& path)
 {
 	ConfigFile info {};
@@ -1173,6 +1195,8 @@ void Blockout::Save(const String& path)
 	}
 
 	info.Write(path.CStr());
+
+	StoreLastBlockoutPath(path, "Config/Main.conf");
 }
 
 

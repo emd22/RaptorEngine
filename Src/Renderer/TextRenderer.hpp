@@ -53,6 +53,11 @@ public:
 	void DrawText(const char* text, float32 scale, uint32 color);
 
 	/**
+	 * @brief Draws `text` with its top-left corner at `position` in window pixels
+	 */
+	void DrawTextAt(const char* text, Vec2f position, float32 scale, uint32 color);
+
+	/**
 	 * @brief Draws `image` as a screen-space quad tinted by `color`, for HUD elements like the crosshair.
 	 * @param position The top-left corner in window pixels, measured down from the top-left of the window.
 	 * @param size The size of the quad in window pixels.

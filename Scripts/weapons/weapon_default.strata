@@ -1,0 +1,240 @@
+import ./weapon_common;
+
+void begin_phase(ref WEAPONSTATE st, WEAPONPHASE phase, float duration)
+{
+	st.phase = phase;
+	st.timer = duration;
+	st.timer_total = fmax(duration, 0.0001f);
+}
+
+bool weapon_can_reload(ref WEAPONDEF def, ref WEAPONSTATE st)
+{
+	return (st.phase == WEAPONPHASE.READY && st.magazine < def.magazine_size && st.reserve > 0);
+}
+
+void begin_reload(ref WEAPONDEF def, ref WEAPONSTATE st)
+{
+	float duration = def.reload_time;
+	if (st.magazine == 0) {
+		duration = def.reload_empty_time;
+	}
+
+	st.burst_remaining = 0;
+	st.fire_buffer = 0.0f;
+
+	begin_phase(st, WEAPONPHASE.RELOADING, duration);
+	weapon_event(WEAPONEVENT.RELOAD_BEGIN);
+}
+
+void finish_reload(ref WEAPONDEF def, ref WEAPONSTATE st)
+{
+	int needed = def.magazine_size - st.magazine;
+	int taken = imin(needed, st.reserve);
+
+	st.magazine = st.magazine + taken;
+	st.reserve = st.reserve - taken;
+	st.phase = WEAPONPHASE.READY;
+	st.timer = 0.0f;
+
+	weapon_event(WEAPONEVENT.RELOAD_END);
+}
+
+void apply_recoil(ref WEAPONDEF def, ref WEAPONSTATE st)
+{
+	float ramp = fmin(def.recoil_ramp * (float)st.recoil_shots, def.recoil_ramp_max);
+	float scale = 1.0f + ramp;
+
+	float pitch = (def.recoil_pitch + random_range(-def.recoil_pitch_variance, def.recoil_pitch_variance)) * scale;
+	float yaw = random_range(-def.recoil_yaw, def.recoil_yaw) * scale;
+
+	weapon_kick(deg2rad(pitch), deg2rad(yaw));
+	st.recoil_shots = st.recoil_shots + 1;
+}
+
+void fire_shot(ref WEAPONDEF def, ref WEAPONSTATE st, ref WEAPONINPUT inp)
+{
+	float rpm = def.rounds_per_minute;
+	if (st.fire_mode == WEAPONMODE.BURST) {
+		rpm = def.burst_rounds_per_minute;
+	}
+
+	float spread_rad = deg2rad(weapon_spread(def, st, inp));
+
+	st.magazine = st.magazine - 1;
+	st.since_shot = 0.0f;
+	st.cooldown = weapon_interval(rpm);
+	st.fire_buffer = 0.0f;
+
+	weapon_event(WEAPONEVENT.FIRE);
+
+	for (int pellet = 0; pellet < def.pellets; pellet++) {
+		sample_disc();
+
+		float distance = weapon_trace(disc_x * spread_rad, disc_y * spread_rad, def.range);
+		if (distance >= 0.0f) {
+			float damage = def.damage * weapon_falloff(def, distance);
+			weapon_hit_apply(damage, def.hit_force, def.decals != 0);
+		}
+	}
+
+	apply_recoil(def, st);
+	st.bloom = fmin(st.bloom + def.spread_per_shot, def.spread_max);
+}
+
+void burst_step(ref WEAPONDEF def, ref WEAPONSTATE st, ref WEAPONINPUT inp)
+{
+	fire_shot(def, st, inp);
+	st.burst_remaining = st.burst_remaining - 1;
+
+	if (st.burst_remaining <= 0) {
+		st.burst_remaining = 0;
+		st.cooldown = fmax(st.cooldown, def.burst_cooldown);
+	}
+}
+
+void weapon_init(ref WEAPONDEF def, ref WEAPONSTATE st)
+{
+	st.phase = WEAPONPHASE.READY;
+	st.fire_mode = def.default_mode;
+	st.magazine = def.magazine_size;
+	st.reserve = imin(def.reserve_start, def.reserve_max);
+	st.burst_remaining = 0;
+	st.recoil_shots = 0;
+	st.timer = 0.0f;
+	st.timer_total = 1.0f;
+	st.cooldown = 0.0f;
+	st.since_shot = 10.0f;
+	st.bloom = 0.0f;
+	st.fire_buffer = 0.0f;
+}
+
+void weapon_equip(ref WEAPONDEF def, ref WEAPONSTATE st)
+{
+	st.burst_remaining = 0;
+	st.fire_buffer = 0.0f;
+
+	begin_phase(st, WEAPONPHASE.RAISING, def.raise_time);
+	weapon_event(WEAPONEVENT.RAISE);
+}
+
+void weapon_holster(ref WEAPONDEF def, ref WEAPONSTATE st)
+{
+	st.burst_remaining = 0;
+	st.fire_buffer = 0.0f;
+
+	begin_phase(st, WEAPONPHASE.LOWERING, def.lower_time);
+	weapon_event(WEAPONEVENT.LOWER);
+}
+
+void weapon_update(ref WEAPONDEF def, ref WEAPONSTATE st, ref WEAPONINPUT inp, float dt)
+{
+	st.cooldown = fmax(0.0f, st.cooldown - dt);
+	st.since_shot = st.since_shot + dt;
+	st.fire_buffer = fmax(0.0f, st.fire_buffer - dt);
+
+	if (st.since_shot > 0.06f) {
+		st.bloom = fmax(0.0f, st.bloom - def.spread_recovery * dt);
+	}
+	if (st.since_shot > def.recoil_reset_time) {
+		st.recoil_shots = 0;
+	}
+
+	if (st.phase == WEAPONPHASE.RAISING) {
+		st.timer = st.timer - dt;
+
+		if (st.timer <= 0.0f) {
+			st.timer = 0.0f;
+			st.phase = WEAPONPHASE.READY;
+		}
+
+		return;
+	}
+
+	if (st.phase == WEAPONPHASE.LOWERING) {
+		st.timer = st.timer - dt;
+
+		if (st.timer <= 0.0f) {
+			st.timer = 0.0f;
+			st.phase = WEAPONPHASE.LOWERED;
+		}
+
+		return;
+	}
+
+	if (st.phase == WEAPONPHASE.LOWERED) {
+		return;
+	}
+
+	if (st.phase == WEAPONPHASE.RELOADING) {
+		st.timer = st.timer - dt;
+
+		if (st.timer <= 0.0f) {
+			finish_reload(def, st);
+		}
+
+		return;
+	}
+
+	if (((uint)inp.flags & (uint)INPUTFLAGS.SWITCH_MODE) != 0 && st.burst_remaining == 0) {
+		WEAPONMODE mode = next_mode(def.fire_modes, st.fire_mode);
+
+		if (mode != st.fire_mode) {
+			st.fire_mode = mode;
+			weapon_event(WEAPONEVENT.MODE_CHANGED);
+		}
+	}
+
+	if (((uint)inp.flags & (uint)INPUTFLAGS.RELOAD_PRESSED) != 0 && weapon_can_reload(def, st)) {
+		begin_reload(def, st);
+		return;
+	}
+
+	if (st.burst_remaining > 0) {
+		if (st.cooldown <= 0.0f) {
+			if (st.magazine > 0) {
+				burst_step(def, st, inp);
+			}
+			else {
+				st.burst_remaining = 0;
+			}
+		}
+		return;
+	}
+
+	if (((uint)inp.flags & (uint)INPUTFLAGS.FIRE_PRESSED) != 0) {
+		st.fire_buffer = FIRE_BUFFER_TIME;
+	}
+
+	bool wants_fire = (st.fire_buffer > 0.0f);
+	if (st.fire_mode == WEAPONMODE.AUTO) {
+		wants_fire = (((uint)inp.flags & (uint)INPUTFLAGS.FIRE_HELD) != 0);
+	}
+
+	if (!wants_fire) {
+		return;
+	}
+
+	if (st.magazine <= 0) {
+		if (((uint)inp.flags & (uint)INPUTFLAGS.FIRE_PRESSED) != 0) {
+			weapon_event(WEAPONEVENT.DRY_FIRE);
+		}
+		if (def.auto_reload != 0 && weapon_can_reload(def, st)) {
+			begin_reload(def, st);
+		}
+
+		st.fire_buffer = 0.0f;
+		return;
+	}
+
+	if (st.cooldown > 0.0f) {
+		return;
+	}
+
+	if (st.fire_mode == WEAPONMODE.BURST) {
+		st.burst_remaining = imin(def.burst_count, st.magazine);
+		burst_step(def, st, inp);
+		return;
+	}
+
+	fire_shot(def, st, inp);
+}

@@ -2,10 +2,12 @@
 
 #include <Asset/Animation.hpp>
 #include <Core/Ref.hpp>
+#include <Core/String.hpp>
 #include <Math/MathUtil.hpp>
 #include <Math/Vec2.hpp>
 #include <Physics/PhysicsPlayer.hpp>
 #include <Renderer/Camera.hpp>
+#include <Weapon/WeaponSystem.hpp>
 
 namespace fx {
 
@@ -35,8 +37,19 @@ class Player
 	static constexpr const char* scViewModelFireAnim = "Armature|Fire";
 	static constexpr const char* scViewModelReloadAnim = "Armature|ReloadClip";
 
-	static constexpr float32 scViewImpulseReturnSpeed = 20.0f;
-	static constexpr float32 scViewImpulseActSpeed = 25.0f;
+	static constexpr float32 scViewKickFrequency = 22.0f;
+	static constexpr float32 scViewKickDamping = 0.55f;
+	static constexpr float32 scViewKickLimit = 2.5f;
+	static constexpr float32 scViewKickYawRatio = 0.3f;
+	static constexpr float32 scViewKickRollRatio = 0.5f;
+
+	static constexpr float32 scDefaultViewKickDegrees = 2.5f;
+	static constexpr float32 scDefaultViewKickback = 0.025f;
+	static constexpr float32 scHolsterDrop = 0.35f;
+	static constexpr float32 scHolsterPitch = 0.6f;
+
+	static constexpr float32 scRecoilApplySpeed = 40.0f;
+	static constexpr float32 scRecoilRecoveryDelay = 0.1f;
 
 public:
 	Player() = default;
@@ -46,8 +59,14 @@ public:
 	void Update(float64 delta_time);
 	void MoveBy(const Vec3f& by);
 
-	void DoFireAnimation();
+	void DoFireAnimation(float32 kick_degrees = scDefaultViewKickDegrees, float32 kickback = scDefaultViewKickback);
 	void DoReloadAnimation();
+
+	void SetViewModelAnimations(const char* idle, const char* fire, const char* reload);
+	void SetViewModelHolster(float32 amount) { mViewModelHolster = amount; }
+
+	void AddRecoil(float32 pitch, float32 yaw);
+	void SetRecoilRecovery(float32 radians_per_second) { mRecoilRecovery = radians_per_second; }
 
 	void Jump();
 
@@ -89,6 +108,9 @@ private:
 	FX_FORCE_INLINE void MarkApplyingUserForce() { mbIsApplyingUserForce = true; }
 
 	void UpdateViewModel(double delta_time);
+	void UpdateRecoil(float32 delta_time);
+	void UpdateViewKick(float32 delta_time);
+	static float32 ViewKickImpulsePerPeak();
 	void UpdateViewModelSway(float32 delta_time);
 
 	FX_FORCE_INLINE void UpdateDirection()
@@ -140,6 +162,8 @@ public:
 
 	float32 mBobCounterY = 0.0f;
 
+	weapon::WeaponSystem Weapons;
+
 private:
 	float32 mHeadBobX = 0.0f;
 	float32 mHeadBobY = 0.0f;
@@ -151,10 +175,33 @@ private:
 
 	Vec3f mUserForce = Vec3f::sZero;
 
-	Quat mViewModelAccumRot = Quat::scIdentity;
-	Quat mViewModelImpulseGoal = Quat::scIdentity;
+	enum eViewKickChannel : uint32
+	{
+		ViewKickPitch,
+		ViewKickYaw,
+		ViewKickRoll,
+		ViewKickBack,
+		ViewKickChannelCount,
+	};
+
+	float32 mViewKickValue[ViewKickChannelCount] = {};
+	float32 mViewKickVelocity[ViewKickChannelCount] = {};
+	float32 mViewKickBound[ViewKickChannelCount] = {};
 
 	bool mbIsFiring = false;
+
+	String mIdleAnim = scViewModelIdleAnim;
+	String mFireAnim = scViewModelFireAnim;
+	String mReloadAnim = scViewModelReloadAnim;
+
+	float32 mViewModelHolster = 0.0f;
+
+	float32 mRecoilPendingPitch = 0.0f;
+	float32 mRecoilPendingYaw = 0.0f;
+	float32 mRecoilAppliedPitch = 0.0f;
+	float32 mRecoilAppliedYaw = 0.0f;
+	float32 mRecoilRecovery = 0.0f;
+	float32 mRecoilIdleTime = 0.0f;
 
 
 	Object* mpViewModel = nullptr;

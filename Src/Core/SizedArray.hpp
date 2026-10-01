@@ -210,9 +210,9 @@ public:
 		InitCapacity(other.Capacity);
 		Size = other.Size;
 
-		if (std::is_copy_constructible_v<TElementType>) {
+		if constexpr (std::is_copy_constructible_v<TElementType>) {
 			for (SizeType i = 0; i < Size; i++) {
-				new (other.pData + i) TElementType(other.pData[i]);
+				new (pData + i) TElementType(other.pData[i]);
 			}
 		}
 		else {
@@ -228,6 +228,7 @@ public:
 		InitCapacity(max(other.Capacity, copy_capacity));
 		Size = other.Size;
 
+		// FIXME: Replace with std::copy
 		memcpy(pData, other.pData, other.GetSizeInBytes());
 	}
 
@@ -241,6 +242,8 @@ public:
 	{
 		InitCapacity(other.Capacity);
 		Size = other.Size;
+
+		// FIXME: Replace with std::copy
 		memcpy(pData, other.pData, other.GetSizeInBytes());
 	}
 

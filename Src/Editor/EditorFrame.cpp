@@ -21,6 +21,8 @@
 #include <Core/FilesystemIO.hpp>
 #include <Core/Log.hpp>
 #include <Engine.hpp>
+#include <Renderer/LightProbe.hpp>
+#include <Renderer/Globals.hpp>
 #include <World.hpp>
 #include <filesystem>
 
@@ -116,6 +118,8 @@ void EditorFrame::OpenBlockout()
 
 	if (gWorld->pBlockout->Load(new_path)) {
 		gWorld->BlockoutPath = new_path;
+
+		gProbeManager->LoadProbes();
 	}
 	else {
 		gWorld->BlockoutPath = previous_path;

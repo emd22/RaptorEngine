@@ -3,6 +3,7 @@
 #include <Blockout.hpp>
 #include <CVar.hpp>
 #include <Controls.hpp>
+#include <Core/Random.hpp>
 #include <Editor/EditOperation.hpp>
 #include <Editor/EditorTool.hpp>
 #include <Editor/RaptorEditor.hpp>
@@ -13,6 +14,7 @@
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
 #include <Renderer/LightProbe.hpp>
+#include <Weapon/WeaponSystem.hpp>
 #include <World.hpp>
 
 namespace fx::script {
@@ -591,6 +593,26 @@ static void N_cvar_set_string(const char* name, const char* value) { gCVars->Set
 
 static int64 N_cvar_get_int(const char* name, int64 fallback) { return gCVars->Get(name, fallback); }
 
+static float32 N_random_range(float32 lo, float32 hi)
+{
+	const float32 unit = static_cast<float32>(FastRand32() >> 8) * (1.0f / 16777216.0f);
+	return lo + (hi - lo) * unit;
+}
+
+static float32 N_weapon_trace(float32 yaw, float32 pitch, float32 range)
+{
+	return gWorld->Player.Weapons.Trace(yaw, pitch, range);
+}
+
+static void N_weapon_hit_apply(float32 damage, float32 force, bool decal)
+{
+	gWorld->Player.Weapons.ApplyHit(damage, force, decal);
+}
+
+static void N_weapon_kick(float32 pitch, float32 yaw) { gWorld->Player.Weapons.Kick(pitch, yaw); }
+
+static void N_weapon_event(int32 event) { gWorld->Player.Weapons.HandleEvent(static_cast<weapon::eEvent>(event)); }
+
 static void N_script_error(const char* str) { LogError(LC_SCRIPT, "{}", str); }
 
 static void N_GUI_set_editor_tool(editor::eEditorTool tool)
@@ -702,6 +724,13 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("cvar_set_string", N_cvar_set_string),
 
 	PREDEF("cvar_get_int", N_cvar_get_int),
+
+	PREDEF("random_range", N_random_range),
+
+	PREDEF("weapon_trace", N_weapon_trace),
+	PREDEF("weapon_hit_apply", N_weapon_hit_apply),
+	PREDEF("weapon_kick", N_weapon_kick),
+	PREDEF("weapon_event", N_weapon_event),
 
 	PREDEF("script_error", N_script_error),
 

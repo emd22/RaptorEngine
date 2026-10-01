@@ -10,6 +10,7 @@
 #include <Math/Vec4.hpp>
 #include <Util/Tokenizer.hpp>
 #include <string>
+#include <unordered_set>
 
 
 namespace fx {
@@ -214,6 +215,7 @@ void ConfigFile::Load(const std::string& path)
 	}
 
 	InitConstants();
+	mbLoadedConstants = true;
 
 	Slice<char> file_buffer = file.Read<char>();
 
@@ -603,6 +605,25 @@ ConfigEntry* ConfigFile::GetEntry(Hash32 requested_name_hash) const
 }
 
 
+static bool IsConstantEntry(const ConfigEntry& entry)
+{
+	static const std::unordered_set<Hash32> constant_names = []
+	{
+		std::unordered_set<Hash32> names;
+
+		ConfigFile constants;
+		constants.Load("Config/Internal/Constants.conf");
+
+		for (const ConfigEntry& constant : constants.GetEntries()) {
+			names.insert(constant.Name.GetHash());
+		}
+
+		return names;
+	}();
+
+	return constant_names.contains(entry.Name.GetHash());
+}
+
 void ConfigFile::Write(const std::string& path)
 {
 	File file(path.c_str(), File::eModType::Write, File::eDataType::Text);
@@ -612,6 +633,10 @@ void ConfigFile::Write(const std::string& path)
 	}
 
 	for (const ConfigEntry& entry : mConfigEntries) {
+		if (mbLoadedConstants && IsConstantEntry(entry)) {
+			continue;
+		}
+
 		file.WriteMulti(entry.Name.Get(), " = ", entry.AsString(), '\n');
 	}
 

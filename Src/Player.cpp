@@ -67,7 +67,7 @@ void Player::Create()
 			}
 
 			if (mpViewModelSkeleton) {
-				mpViewModelSkeleton->SetRestAnimation(mpViewModelSkeleton->FindAnimation(scViewModelIdleAnim));
+				mpViewModelSkeleton->SetRestAnimation(mpViewModelSkeleton->FindAnimation(mIdleAnim));
 			}
 
 			// Start in line with the camera so the view model doesn't swing in when it first appears
@@ -78,6 +78,8 @@ void Player::Create()
 		});
 
 	gWorld->Attach(view_model);
+
+	Weapons.Create(this);
 }
 
 void Player::MoveBy(const Vec3f& by)
@@ -167,8 +169,8 @@ void Player::UpdateViewModel(double delta_time)
 
 	// Pitch/yaw map to euler angles the same way as PerspectiveCamera::GetRotation(). Roll goes in this local offset
 	// rather than the camera's euler angles, as FromEulerAngles applies Z last in world space.
-	const Quat sway = Quat::FromEulerAngles(
-		Vec3f(-mViewModelSwayPitch, mViewModelSwayYaw, mViewModelSwayYaw * scViewModelSwayRoll));
+	const Quat sway = Quat::FromEulerAngles(Vec3f(-mViewModelSwayPitch + mViewModelHolster * scHolsterPitch,
+												  mViewModelSwayYaw, mViewModelSwayYaw * scViewModelSwayRoll));
 
 	mViewModelRotation = Quat::FromEulerAngles(pCamera->GetRotation()) * sway;
 
@@ -195,8 +197,12 @@ void Player::UpdateViewModel(double delta_time)
 
 	// const float32 rotx = sin(gWorld->Player.mBobCounterY * 0.5f) * 0.05f;
 
-	mpViewModel->SetPosition(pCamera->Position - (forward * 0.05) + (up * 0.15) + (right * 0.0) + view_model_bob);
-	mpViewModel->SetRotation(mViewModelRotation * mViewModelAccumRot);
+	mpViewModel->SetPosition(pCamera->Position - (forward * (0.05 + mViewKickValue[ViewKickBack])) + (up * (0.15 - mViewModelHolster * scHolsterDrop)) +
+							 (right * 0.0) + view_model_bob);
+	const Quat kick = Quat::FromEulerAngles(
+		Vec3f(-mViewKickValue[ViewKickPitch], mViewKickValue[ViewKickYaw], mViewKickValue[ViewKickRoll]));
+
+	mpViewModel->SetRotation(mViewModelRotation * kick);
 }
 
 static float32 RandomUnitClosed()
@@ -204,23 +210,80 @@ static float32 RandomUnitClosed()
 	return static_cast<float32>(FastRand32() >> 8) * (2.0f / 16777215.0f) - 1.0f; // [-1.0, 1.0]
 }
 
-void Player::DoFireAnimation()
+float32 Player::ViewKickImpulsePerPeak()
 {
-	mViewModelImpulseGoal = mViewModelImpulseGoal *
-							Quat::FromEulerAngles(Vec3f(-0.25f, RandomUnitClosed() * 0.05, 0.0f));
+	const float32 omega = scViewKickFrequency;
+	const float32 zeta = scViewKickDamping;
+	const float32 damped = omega * std::sqrt(1.0f - zeta * zeta);
+	const float32 peak_time = std::atan2(damped, zeta * omega) / damped;
+	const float32 peak_per_impulse = std::exp(-zeta * omega * peak_time) * std::sin(damped * peak_time) / damped;
+
+	return 1.0f / peak_per_impulse;
+}
+
+void Player::UpdateViewKick(float32 delta_time)
+{
+	const float32 omega = scViewKickFrequency;
+	const float32 zeta = scViewKickDamping;
+	const float32 damped = omega * std::sqrt(1.0f - zeta * zeta);
+
+	const float32 decay = std::exp(-zeta * omega * delta_time);
+	const float32 cos_step = std::cos(damped * delta_time);
+	const float32 sin_step = std::sin(damped * delta_time);
+
+	for (uint32 i = 0; i < ViewKickChannelCount; i++) {
+		const float32 x = mViewKickValue[i];
+		const float32 v = mViewKickVelocity[i];
+
+		const float32 next_x = decay * (x * cos_step + ((v + zeta * omega * x) / damped) * sin_step);
+		const float32 next_v = decay * (v * cos_step - ((omega * omega * x + zeta * omega * v) / damped) * sin_step);
+
+		mViewKickValue[i] = std::clamp(next_x, -mViewKickBound[i], mViewKickBound[i]);
+		mViewKickVelocity[i] = next_v;
+	}
+}
+
+void Player::DoFireAnimation(float32 kick_degrees, float32 kickback)
+{
+	const float32 pitch = MathUtil::DegreesToRadians(kick_degrees);
+
+	const float32 peaks[ViewKickChannelCount] = {
+		pitch,
+		pitch * scViewKickYawRatio * RandomUnitClosed(),
+		pitch * scViewKickRollRatio * RandomUnitClosed(),
+		kickback,
+	};
+
+	const float32 bounds[ViewKickChannelCount] = {
+		pitch,
+		pitch * scViewKickYawRatio,
+		pitch * scViewKickRollRatio,
+		kickback,
+	};
+
+	const float32 impulse_per_peak = ViewKickImpulsePerPeak();
+
+	for (uint32 i = 0; i < ViewKickChannelCount; i++) {
+		mViewKickVelocity[i] += peaks[i] * impulse_per_peak;
+		mViewKickBound[i] = std::max(mViewKickBound[i], bounds[i] * scViewKickLimit);
+	}
+
 	mbIsFiring = true;
 
 	if (!mpViewModelSkeleton) {
 		return;
 	}
 
-	const Animation* fire = mpViewModelSkeleton->FindAnimation(scViewModelFireAnim);
+	const Animation* fire = mpViewModelSkeleton->FindAnimation(mFireAnim);
 
-	// Firing again mid-shot restarts the shot rather than stacking another one on top of it
-	if (fire != nullptr && mpViewModelSkeleton->GetActiveAnimation() == fire) {
-		mpViewModelSkeleton->PopAnimation();
+	if (fire == nullptr) {
+		return;
 	}
 
+	// Firing again mid-shot restarts the shot rather than stacking another one on top of it
+	if (mpViewModelSkeleton->GetActiveAnimation() == fire) {
+		mpViewModelSkeleton->PopAnimation();
+	}
 
 	mpViewModelSkeleton->PushAnimation(fire);
 }
@@ -231,7 +294,7 @@ void Player::DoReloadAnimation()
 		return;
 	}
 
-	const Animation* reload = mpViewModelSkeleton->FindAnimation(scViewModelReloadAnim);
+	const Animation* reload = mpViewModelSkeleton->FindAnimation(mReloadAnim);
 
 	if (reload == nullptr || mpViewModelSkeleton->GetActiveAnimation() == reload) {
 		return;
@@ -240,11 +303,76 @@ void Player::DoReloadAnimation()
 	mpViewModelSkeleton->PushAnimation(reload);
 }
 
+void Player::SetViewModelAnimations(const char* idle, const char* fire, const char* reload)
+{
+	mIdleAnim = idle;
+	mFireAnim = fire;
+	mReloadAnim = reload;
+
+	if (!mpViewModelSkeleton) {
+		return;
+	}
+
+	const Animation* idle_anim = mpViewModelSkeleton->FindAnimation(mIdleAnim);
+
+	if (idle_anim != nullptr) {
+		mpViewModelSkeleton->SetRestAnimation(idle_anim);
+	}
+}
+
+void Player::AddRecoil(float32 pitch, float32 yaw)
+{
+	mRecoilPendingPitch += pitch;
+	mRecoilPendingYaw += yaw;
+	mRecoilIdleTime = 0.0f;
+}
+
+void Player::UpdateRecoil(float32 delta_time)
+{
+	mRecoilIdleTime += delta_time;
+
+	const float32 blend = 1.0f - std::exp(-delta_time * scRecoilApplySpeed);
+	const float32 step_pitch = mRecoilPendingPitch * blend;
+	const float32 step_yaw = mRecoilPendingYaw * blend;
+
+	mRecoilPendingPitch -= step_pitch;
+	mRecoilPendingYaw -= step_yaw;
+
+	float32 delta_pitch = step_pitch;
+	float32 delta_yaw = step_yaw;
+
+	mRecoilAppliedPitch += step_pitch;
+	mRecoilAppliedYaw += step_yaw;
+
+	if (mRecoilIdleTime > scRecoilRecoveryDelay && mRecoilRecovery > 0.0f) {
+		const float32 applied = std::sqrt(mRecoilAppliedPitch * mRecoilAppliedPitch +
+										  mRecoilAppliedYaw * mRecoilAppliedYaw);
+
+		if (applied > 0.0f) {
+			const float32 fraction = std::min(applied, mRecoilRecovery * delta_time) / applied;
+			const float32 back_pitch = mRecoilAppliedPitch * fraction;
+			const float32 back_yaw = mRecoilAppliedYaw * fraction;
+
+			mRecoilAppliedPitch -= back_pitch;
+			mRecoilAppliedYaw -= back_yaw;
+
+			delta_pitch -= back_pitch;
+			delta_yaw -= back_yaw;
+		}
+	}
+
+	if (delta_pitch != 0.0f || delta_yaw != 0.0f) {
+		RotateHead(Vec2f(delta_yaw, delta_pitch));
+	}
+}
+
 
 void Player::Update(float64 delta_time)
 {
 	Physics.Update(delta_time);
 	SyncPhysicsToPlayer();
+
+	UpdateRecoil(static_cast<float32>(delta_time));
 
 	UpdateDirection();
 	pCamera->MoveTo(Position + mCameraOffset);
@@ -254,8 +382,7 @@ void Player::Update(float64 delta_time)
 	// const bool should_reset_center = ((user_force_released || Physics.bIsGrounded) &&
 	// 								  (MathUtil::IsCloseTo(mBobCounterY, 0.0f) == false));
 
-	mViewModelImpulseGoal.SmoothInterpolate(Quat::scIdentity, scViewImpulseReturnSpeed, delta_time);
-	mViewModelAccumRot.SmoothInterpolate(mViewModelImpulseGoal, scViewImpulseActSpeed, delta_time);
+	UpdateViewKick(static_cast<float32>(delta_time));
 
 	if (gCVars->Get("b_headbob_enabled", false) && (Physics.bIsGrounded)) {
 		float32 body_speed = mUserForce.Length();
@@ -292,6 +419,8 @@ void Player::Update(float64 delta_time)
 	}
 
 	pCamera->Update();
+
+	Weapons.Update(static_cast<float32>(delta_time));
 
 	mbUpdatePhysicsTransform = false;
 
