@@ -41,7 +41,7 @@ void Player::Create()
 				return;
 			}
 
-			object->SetShadowCaster(true);
+			object->SetShadowCaster(false);
 			object->SetCullable(false);
 			object->SetObjectLayer(eObjectLayer::PlayerLayer);
 			object->SetProbeVisible(false);
