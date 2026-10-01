@@ -606,6 +606,7 @@ private:
 	uint32 mTokenIndex = 0;
 
 	bool mbHasErrors = false;
+	bool mbLoadedConstants = false;
 
 	static constexpr uint32 cMaxDepth = 64;
 	uint32 mDepth = 0;

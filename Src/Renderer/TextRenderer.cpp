@@ -208,6 +208,22 @@ void TextRenderer::DrawText(const char* text, float32 scale, uint32 color)
 	mCursorPosition.Y += glyph_height;
 }
 
+void TextRenderer::DrawTextAt(const char* text, Vec2f position, float32 scale, uint32 color)
+{
+	if (mpAtlas == nullptr) {
+		return;
+	}
+
+	BeginFrameIfNeeded();
+
+	const Vec2f saved_cursor = mCursorPosition;
+
+	mCursorPosition = position - scMargin;
+	DrawText(text, scale, color);
+
+	mCursorPosition = saved_cursor;
+}
+
 void TextRenderer::DrawImage(Image* image, Vec2f position, Vec2f size, uint32 color)
 {
 	if (image == nullptr) {

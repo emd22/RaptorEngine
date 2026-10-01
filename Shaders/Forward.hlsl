@@ -208,12 +208,14 @@ struct FSPushConsts
 
 #define SHADOW_BIAS -0.000005f
 
+#define SHADOW_NORMAL_OFFSET_TEXELS 1.5
+
 /// Taps per axis for the shadow PCF kernel
 #define SHADOW_PCF_TAPS 2
 
 /// How much of `light` reaches `position_ws` according to the light's shadow map in the atlas, 1 is fully lit.
 /// Lights without a shadow map, and positions outside of it, are fully lit.
-float SampleShadowAtlas(Light light, float3 position_ws)
+float SampleShadowAtlas(Light light, float3 position_ws, float3 normal_ws, float3 to_light)
 {
 	const float4 atlas_rect = light.vShadowAtlasRect;
 
@@ -221,7 +223,17 @@ float SampleShadowAtlas(Light light, float3 position_ws)
 		return 1.0;
 	}
 
-	const float4 position_ls = mul(float4(position_ws, 1.0), light.LightCameraMatrix);
+	float4 position_ls = mul(float4(position_ws, 1.0), light.LightCameraMatrix);
+
+	const float3 x_axis = float3(light.LightCameraMatrix[0][0], light.LightCameraMatrix[1][0],
+								 light.LightCameraMatrix[2][0]);
+	const float texel_world_size = position_ls.w * 2.0 / (atlas_rect.x * SHADOW_ATLAS_WIDTH * max(length(x_axis), 1e-6));
+
+	const float cos_theta = saturate(dot(normal_ws, to_light));
+	const float sin_theta = sqrt(saturate(1.0 - cos_theta * cos_theta));
+
+	position_ls = mul(float4(position_ws + normal_ws * (texel_world_size * SHADOW_NORMAL_OFFSET_TEXELS * sin_theta), 1.0),
+					  light.LightCameraMatrix);
 
 	// Behind a spot light
 	if (position_ls.w <= 0.0) {
@@ -532,7 +544,7 @@ PERMEND();
 			L = light.vLightPosition;
 			attenuation = light_intensity;
 
-			visibility = SampleShadowAtlas(light, input.vPositionWS);
+			visibility = SampleShadowAtlas(light, input.vPositionWS, geometric_normal, L);
 
 			// Let a little of the sun into its own shadows
 			diffuse_visibility_floor = 0.05;
@@ -547,7 +559,7 @@ PERMEND();
 
 			if (light.uiLightType == FX_LIGHT_TYPE_SPOT) {
 				attenuation *= AttenuationSpot(L, light);
-				visibility = SampleShadowAtlas(light, input.vPositionWS);
+				visibility = SampleShadowAtlas(light, input.vPositionWS, geometric_normal, L);
 			}
 		}
 
@@ -624,7 +636,7 @@ PERMEND();
 	}
 
 	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_DEBUG_PROBE_IRRADIANCE)) {
-		output.vAlbedo = float4(probe_irradiance, 1.0f);
+		output.vAlbedo = float4(probe_irradiance * FSConst.fPreExposure, 1.0f);
 	}
 
 	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_DEBUG_PROBE_VISIBILITY)) {

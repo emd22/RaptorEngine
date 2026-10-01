@@ -1,0 +1,207 @@
+import ../interop;
+import ../common;
+
+enum WEAPONPHASE
+{
+	READY = 0,
+	RELOADING,
+	RAISING,
+	LOWERING,
+	LOWERED,
+}
+
+enum WEAPONMODE
+{
+	SEMI = (1 << 0),
+	AUTO = (1 << 1),
+	BURST = (1 << 2),
+
+	COUNT = 3,
+}
+
+enum INPUTFLAGS
+{
+	FIRE_PRESSED = (1 << 0),
+	FIRE_HELD = (1 << 1),
+	RELOAD_PRESSED = (1 << 2),
+	SWITCH_MODE = (1 << 3),
+	SWITCH_WEAPON = (1 << 4),
+	AIRBORNE = (1 << 5),
+}
+
+const float FIRE_BUFFER_TIME = 0.12f;
+
+enum WEAPONEVENT
+{
+	FIRE = 0,
+
+	/* Out of ammo, does not actually fire. Tries to reload if there is ammo left in the ammo pool. */
+	DRY_FIRE,
+
+	RELOAD_BEGIN,
+	RELOAD_END,
+
+	RAISE,
+	LOWER,
+
+	MODE_CHANGED
+}
+
+struct WEAPONDEF
+{
+	float damage;
+	float range;
+	float rounds_per_minute;
+	int pellets;
+
+	/* Flags for the supported weapon modes */
+	WEAPONMODE fire_modes;
+	WEAPONMODE default_mode;
+	int burst_count;
+	float burst_rounds_per_minute;
+	float burst_cooldown;
+	float hit_force;
+	int decals;
+
+	float spread_hip;
+	float spread_moving;
+	float spread_air;
+	float spread_per_shot;
+	float spread_max;
+	float spread_recovery;
+
+	float recoil_pitch;
+	float recoil_pitch_variance;
+	float recoil_yaw;
+	float recoil_ramp;
+	float recoil_ramp_max;
+	float recoil_recovery;
+	float recoil_reset_time;
+
+	float falloff_start;
+	float falloff_end;
+	float falloff_min;
+
+	int magazine_size;
+	int reserve_max;
+	int reserve_start;
+	float reload_time;
+	float reload_empty_time;
+	int auto_reload;
+
+	float raise_time;
+	float lower_time;
+}
+
+struct WEAPONSTATE
+{
+	WEAPONPHASE phase;
+	WEAPONMODE fire_mode;
+	int magazine;
+	int reserve;
+	int burst_remaining;
+	int recoil_shots;
+	float timer;
+	float timer_total;
+	float cooldown;
+	float since_shot;
+	float bloom;
+	float fire_buffer;
+}
+
+struct WEAPONINPUT
+{
+	INPUTFLAGS flags;
+	// int fire_pressed;
+	// int fire_held;
+	// int reload_pressed;
+	// int mode_pressed;
+	// int airborne;
+	float move_amount;
+}
+
+extern float random_range(float lo, float hi);
+
+extern float weapon_trace(float yaw, float pitch, float range);
+extern void weapon_hit_apply(float damage, float force, bool decal);
+extern void weapon_kick(float pitch, float yaw);
+extern void weapon_event(WEAPONEVENT event);
+
+int imin(int a, int b)
+{
+	if (a < b) {
+		return a;
+	}
+	return b;
+}
+
+float weapon_interval(float rounds_per_minute)
+{
+	return 60.0f / fmax(rounds_per_minute, 1.0f);
+}
+
+float weapon_falloff(ref WEAPONDEF def, float distance)
+{
+	if (distance <= def.falloff_start) {
+		return 1.0f;
+	}
+	if (distance >= def.falloff_end) {
+		return def.falloff_min;
+	}
+
+	float t = (distance - def.falloff_start) / (def.falloff_end - def.falloff_start);
+	return 1.0f + (def.falloff_min - 1.0f) * t;
+}
+
+float weapon_spread(ref WEAPONDEF def, ref WEAPONSTATE st, ref WEAPONINPUT inp)
+{
+	float spread = def.spread_hip + st.bloom + def.spread_moving * fclamp(inp.move_amount, 0.0f, 1.0f);
+
+	if (((uint)inp.flags & (uint)INPUTFLAGS.AIRBORNE) != 0) {
+		spread = spread + def.spread_air;
+	}
+
+	return spread;
+}
+
+float disc_x;
+float disc_y;
+
+void sample_disc()
+{
+	for (int i = 0; i < 8; i++) {
+		float x = random_range(-1.0f, 1.0f);
+		float y = random_range(-1.0f, 1.0f);
+
+		if (x * x + y * y <= 1.0f) {
+			disc_x = x;
+			disc_y = y;
+			return;
+		}
+	}
+
+	disc_x = 0.0f;
+	disc_y = 0.0f;
+}
+
+bool mode_allowed(WEAPONMODE mode_flags, WEAPONMODE mode)
+{
+	return ((((uint)mode_flags) & ((uint)mode)) != 0);
+}
+
+WEAPONMODE next_mode(WEAPONMODE mode_flags, WEAPONMODE current)
+{
+	for (int i = 1; i <= WEAPONMODE.COUNT; i++) {
+		WEAPONMODE candidate = (WEAPONMODE)((int)current + i);
+
+		if (candidate >= WEAPONMODE.COUNT) {
+			candidate = (WEAPONMODE)((int)candidate - (int)WEAPONMODE.COUNT);
+		}
+
+		if (mode_allowed(mode_flags, candidate)) {
+			return candidate;
+		}
+	}
+
+	return current;
+}

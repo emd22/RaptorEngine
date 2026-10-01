@@ -25,6 +25,7 @@
 #include <cfloat>
 #include <cmath>
 #include <cstring>
+#include <filesystem>
 #include <limits>
 #include <vector>
 
@@ -894,7 +895,17 @@ bool IsCacheLayoutReadable(const ProbeFileLayout& layout)
 		   layout.Version <= FX_PROBE_CACHE_FILE_VERSION;
 }
 
-String GetProbeFilePath() { return String::Fmt("{}/probes.fxprobe", gAssetManager->GetScenePath().CStr()); }
+String GetProbeFilePath()
+{
+	if (gWorld != nullptr && gWorld->BlockoutPath.GetLength() > 0) {
+		std::filesystem::path path(gWorld->BlockoutPath.CStr());
+		path.replace_extension(".fxprobe");
+
+		return String(path.string().c_str());
+	}
+
+	return String::Fmt("{}/probes.fxprobe", gAssetManager->GetScenePath().CStr());
+}
 
 /// Reads exactly `size` bytes from the current position in `file` into `out`
 bool ReadExact(File& file, void* out, uint64 size)
