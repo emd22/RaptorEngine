@@ -14,12 +14,11 @@
 #include <ThirdParty/vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
-#include <mutex>
-
 #include <Core/Defer.hpp>
 #include <Core/Ref.hpp>
 #include <Core/TSQueue.hpp>
 #include <Math/Vec2.hpp>
+#include <mutex>
 
 namespace fx {
 class Camera;
@@ -298,6 +297,8 @@ public:
 	/// Turn off the probe lighting or the decals in every draw, to see what they cost in the GPU timings
 	bool bDisableProbes = false;
 	bool bDisableDecals = false;
+
+	float32 PreExposure = 1.0f;
 
 	/// Debug view: show blended probe irradiance instead of the lit result.
 	bool bOnlyRenderProbes = false;

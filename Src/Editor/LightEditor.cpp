@@ -15,6 +15,8 @@
 #include <Renderer/Light.hpp>
 #include <Renderer/LightManager.hpp>
 #include <World.hpp>
+#include <algorithm>
+#include <cmath>
 
 namespace fx::editor {
 
@@ -32,9 +34,9 @@ static constexpr float32 scEditTolerance = 0.0005f;
 
 static constexpr float32 scHeightSnapStepsPerSecond = 8.0f;
 
-static constexpr float32 scNewLightRadius = 5.0f;
-static const float32 scNewLightInnerAngle = MathUtil::DegreesToRadians(20.0f);
-static const float32 scNewLightOuterAngle = MathUtil::DegreesToRadians(30.0f);
+static constexpr float32 scNewLightRadius = 25.0f;
+static const float32 scNewLightInnerAngle = MathUtil::DegreesToRadians(30.0f);
+static const float32 scNewLightOuterAngle = MathUtil::DegreesToRadians(40.0f);
 
 static const Color scLightColor = Color::FromRGBA(255, 170, 40, 255);
 static const Color scSelectedLightColor = Color::FromRGBA(255, 255, 90, 255);
@@ -47,6 +49,24 @@ static void ForEachSpotLight(TFunc&& func)
 			func(static_cast<LightSpot&>(*light));
 		}
 	}
+}
+
+static Vec3f SnapDirection(const Vec3f& direction)
+{
+	const float32 step_degrees = gEditor->GetAngleSnapStep();
+
+	if (step_degrees <= 0.0f) {
+		return direction;
+	}
+
+	const Vec3f unit = direction.Normalize();
+	const float32 step = MathUtil::DegreesToRadians(step_degrees);
+
+	const float32 yaw = std::round(std::atan2(unit.X, unit.Z) / step) * step;
+	const float32 pitch = std::round(std::asin(std::clamp(unit.Y, -1.0f, 1.0f)) / step) * step;
+	const float32 horizontal = std::cos(pitch);
+
+	return Vec3f(std::sin(yaw) * horizontal, std::sin(pitch), std::cos(yaw) * horizontal);
 }
 
 /// The distance along a ray to where it enters a sphere, or a negative number if it misses. `direction` is normalized.
@@ -148,6 +168,12 @@ void LightEditor::Tick(float32 delta_time)
 		light = nullptr;
 	}
 
+	if (light != nullptr && ControlManager::IsComboPressed(eKey::FX_KEY_LCTRL, eKey::FX_KEY_D)) {
+		CommitEdit();
+		DuplicateSelected();
+		light = GetSelected();
+	}
+
 	// Delete the light
 	if (light != nullptr && ControlManager::IsKeyPressed(eKey::FX_KEY_BACKSPACE)) {
 		mbEditing = false;
@@ -241,8 +267,8 @@ void LightEditor::CreateAtCrosshair()
 		.ValueB = EditOperationValue(Vec3f::sZero),
 	};
 
-	// Aimed the way the camera is facing when it was created, same as a new object facing however it was placed
-	op.Light.DirectionAfter = forward;
+	// Aim er down
+	op.Light.DirectionAfter = SnapDirection(Vec3f(0.0f, -1.0f, 0.0f));
 
 	op.LightSnap.LightName = String::Fmt("Light_{}", gLightManager->GetCache().Size).Str();
 	op.LightSnap.Radius = scNewLightRadius;
@@ -302,10 +328,50 @@ void LightEditor::DeleteSelected()
 	op.LightSnap.InnerAngle = light->GetInnerAngle();
 	op.LightSnap.OuterAngle = light->GetOuterAngle();
 	op.LightSnap.bCastShadows = light->bCastShadows;
+	op.LightSnap.Colour = light->Color;
+	op.LightSnap.Intensity = light->Intensity;
 
 	gEditor->PushEditOperation(op);
 
 	Deselect();
+}
+
+void LightEditor::DuplicateSelected()
+{
+	LightSpot* light = GetSelected();
+
+	if (light == nullptr) {
+		return;
+	}
+
+	uint32 index = gLightManager->GetCache().Size;
+	Name name;
+
+	do {
+		name = String::Fmt("Light_{}", index++).Str();
+	} while (gLightManager->FindLight(name.GetHash()) != nullptr);
+
+	EditOperation op {
+		.Type = EditOperation::eType::LightCreate,
+		.ValueA = EditOperationValue(light->GetPosition()),
+		.ValueB = EditOperationValue(Vec3f::sZero),
+	};
+
+	op.Light.DirectionAfter = light->GetDirection().Normalize();
+
+	op.LightSnap.LightName = name;
+	op.LightSnap.Radius = light->GetRadius();
+	op.LightSnap.InnerAngle = light->GetInnerAngle();
+	op.LightSnap.OuterAngle = light->GetOuterAngle();
+	op.LightSnap.bCastShadows = light->bCastShadows;
+	op.LightSnap.Colour = light->Color;
+	op.LightSnap.Intensity = light->Intensity;
+
+	const EditOperationValue created = gEditor->PushEditOperation(op);
+
+	if (created.Type == EditOperationValue::eValueType::Light && created.pLight != nullptr) {
+		Select(static_cast<LightSpot*>(created.pLight));
+	}
 }
 
 
@@ -392,7 +458,7 @@ void LightEditor::AimSelected(LightSpot& light)
 		return;
 	}
 
-	light.SetDirection(to_target);
+	light.SetDirection(SnapDirection(to_target));
 }
 
 } // namespace fx::editor

@@ -36,11 +36,6 @@ static constexpr FlagName scFlagNames[] = {
 	{ static_cast<uint32>(eObjectFlags::NotProbeVisible), "Not Probe Visible" },
 };
 
-/// Dropdown items, in eCProtoMat order
-static constexpr const char* scMaterialSlotNames[] = { "Gray", "Orange", "Blue", "Tile" };
-
-static_assert(std::size(scMaterialSlotNames) == static_cast<size_t>(eCProtoMat::Count));
-
 template <size_t TCount>
 static wxStaticBoxSizer*
 MakeFlagGroup(wxWindow* parent, const char* title, const FlagName (&names)[TCount],
@@ -75,9 +70,6 @@ ObjectPropertiesPanel::ObjectPropertiesPanel(wxWindow* parent) : wxPanel(parent,
 	material_row->Add(new wxStaticText(this, wxID_ANY, "Material"), wxSizerFlags().CenterVertical());
 
 	mpMaterialChoice = new wxChoice(this, wxID_ANY);
-	for (const char* slot_name : scMaterialSlotNames) {
-		mpMaterialChoice->Append(slot_name);
-	}
 	material_row->Add(mpMaterialChoice, wxSizerFlags().Border(wxLEFT, 6));
 
 	sizer->Add(material_row, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
@@ -106,18 +98,41 @@ void ObjectPropertiesPanel::OnMaterialChoice(wxCommandEvent& event)
 	}
 
 	const int32 slot = mpMaterialChoice->GetSelection();
-	if (slot < 0 || slot >= static_cast<int32>(eCProtoMat::Count)) {
+	if (slot < 0 || slot >= static_cast<int32>(gWorld->pBlockout->GetMaterialLibrary().GetCount())) {
 		return;
 	}
 
 	mShownMaterialSlot = slot;
 
-	const MaterialID material = gWorld->pBlockout->GetMaterialForSlot(static_cast<eCProtoMat>(slot));
-	gEditor->SetStoredMaterial(mpShownObject, material);
+	gEditor->SetStoredMaterial(mpShownObject, gWorld->pBlockout->GetMaterialForID(slot));
+}
+
+void ObjectPropertiesPanel::RefreshMaterialChoices()
+{
+	if (gWorld->pBlockout == nullptr) {
+		return;
+	}
+
+	const MaterialLibrary& library = gWorld->pBlockout->GetMaterialLibrary();
+
+	if (library.GetCount() == mShownMaterialCount) {
+		return;
+	}
+
+	mpMaterialChoice->Clear();
+
+	for (uint32 id = 0; id < library.GetCount(); id++) {
+		mpMaterialChoice->Append(wxString::FromUTF8(library.GetName(id).Str()));
+	}
+
+	mShownMaterialCount = library.GetCount();
+	mShownMaterialSlot = -1;
 }
 
 void ObjectPropertiesPanel::ShowObject(Object* object)
 {
+	RefreshMaterialChoices();
+
 	if (object == nullptr) {
 		if (!mbShowingAnything) {
 			return;
@@ -143,14 +158,7 @@ void ObjectPropertiesPanel::ShowObject(Object* object)
 	int32 material_slot = -1;
 
 	if (gWorld->pBlockout != nullptr) {
-		const MaterialID current_material = gEditor->GetSelection().GetStoredMaterial(object);
-
-		for (uint32 slot = 0; slot < static_cast<uint32>(eCProtoMat::Count); slot++) {
-			if (current_material == gWorld->pBlockout->GetMaterialForSlot(static_cast<eCProtoMat>(slot))) {
-				material_slot = static_cast<int32>(slot);
-				break;
-			}
-		}
+		material_slot = gWorld->pBlockout->GetIDForMaterial(gEditor->GetSelection().GetStoredMaterial(object));
 	}
 
 	if (material_slot != mShownMaterialSlot) {

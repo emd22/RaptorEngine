@@ -13,8 +13,8 @@ class Object;
 
 class Player
 {
-	const Vec3f scMaxWalkSpeed = Vec3f(4.5f);
-	const Vec3f scMaxSprintSpeed = Vec3f(5.5f);
+	const Vec3f scMaxWalkSpeed = Vec3f(3.8f);
+	const Vec3f scMaxSprintSpeed = Vec3f(5.0f);
 
 	static constexpr float32 scMovementLerpSpeed = 10.0f;
 
@@ -31,7 +31,7 @@ class Player
 	/// Roll per radian of yaw sway, so the view model banks into horizontal turns.
 	static constexpr float32 scViewModelSwayRoll = 1.25f;
 
-	static constexpr const char* scViewModelIdleAnim = "BasePose";
+	static constexpr const char* scViewModelIdleAnim = "BASE";
 	static constexpr const char* scViewModelFireAnim = "Armature|Fire";
 	static constexpr const char* scViewModelReloadAnim = "Armature|ReloadClip";
 

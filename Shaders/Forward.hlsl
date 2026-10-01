@@ -201,6 +201,7 @@ struct FSPushConsts
 	uint uiTileRows;
 	/// Camera position in world space
 	float4 vEyePosition;
+	float fPreExposure;
 };
 
 [[vk::push_constant]] FSPushConsts FSConst;
@@ -284,6 +285,8 @@ struct SurfaceParams
 	float3 vF0;
 	/// Perceptual roughness
 	float fRoughness;
+	/// Ambient occlusion from the surface texture, 1 is unoccluded
+	float fOcclusion;
 };
 
 /// Resolves the material's workflow into SurfaceParams. `surface_sample` is the
@@ -308,6 +311,7 @@ SurfaceParams GetSurfaceParams(Material material, float3 albedo, float4 surface_
 	surface.vF0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
 	surface.vDiffuse = albedo * (1.0 - metallic);
 	surface.fRoughness = surface_sample.g * material.fRoughnessFactor;
+	surface.fOcclusion = lerp(1.0, surface_sample.r, material.fOcclusionStrength);
 
 	// }
 
@@ -512,7 +516,7 @@ PERMEND();
 		Light light = Lights[bLightIndexList[tile_data.StartIndex + tile_light]];
 
 		float4 light_color = F_UnpackUIntToFloat4(light.uiLightColor);
-		float light_intensity = light_color.w * 255.0;
+		float light_intensity = light.fIntensity;
 
 		/// How much light is visible (not occluded) at this pixel
 		float visibility = 1.0;
@@ -583,7 +587,7 @@ PERMEND();
 	float3 probe_irradiance = float3(0.0f, 0.0f, 0.0f);
 	float probe_visibility = 1.0f;
 
-	if (!HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE)) {
+	if (!HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE) || HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_BOUNCE)) {
 		const uint probe_volume_count = GetProbeVolumeCount(bProbeVolume);
 
 		if (probe_volume_count > 0) {
@@ -600,15 +604,23 @@ PERMEND();
 
 			const float3 probe_specular = probe_radiance * EnvBRDFApprox(surface.vF0, roughness, NdotV);
 
-			ambient = ((probe_irradiance * surface.vDiffuse) + probe_specular) * ssao;
+			const float specular_occlusion = SpecularOcclusion(NdotV, surface.fOcclusion, roughness);
+
+			ambient = ((probe_irradiance * surface.vDiffuse * surface.fOcclusion) + (probe_specular * specular_occlusion)) *
+					  ssao;
 		}
 	}
 
-	output.vAlbedo = float4(accumulated_light + ambient, base_alpha);
+	output.vAlbedo = float4((accumulated_light + ambient) * FSConst.fPreExposure, base_alpha);
 
 	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE)) {
-		const float3 lp_ambient = float3(0.02f, 0.02f, 0.02f) * albedo;
-		output.vAlbedo = float4(accumulated_light + lp_ambient, 1.0f);
+		float3 lp_ambient = albedo * (PROBE_CAPTURE_AMBIENT_ILLUMINANCE * FX_MATH_1_OVER_PI);
+
+		if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_BOUNCE)) {
+			lp_ambient += ambient;
+		}
+
+		output.vAlbedo = float4((accumulated_light + lp_ambient) * FSConst.fPreExposure, 1.0f);
 	}
 
 	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_DEBUG_PROBE_IRRADIANCE)) {

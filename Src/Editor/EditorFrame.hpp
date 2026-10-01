@@ -46,6 +46,10 @@ public:
 
 	void ShowObjectListWindow();
 
+	void SaveBlockout();
+	void SaveBlockoutAs();
+	void OpenBlockout();
+
 private:
 	void OnClose(wxCloseEvent& event);
 	void OnActivate(wxActivateEvent& event);

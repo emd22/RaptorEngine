@@ -95,12 +95,12 @@ Vec2f GetDefaultTextureOffset(const Vec3f& normal, const Vec3f& bounds_min, cons
 
 /// The layout of a face on a brush at `origin`, lined up with the world grid. UVs use the brush's local corners, which
 /// are `origin` away from where they are in the world.
-BrushFaceTexture GetWorldAlignedTexture(const Vec3f& normal, const Vec3f& origin, MaterialID material)
+BrushFaceTexture GetWorldAlignedTexture(const Vec3f& normal, const Vec3f& origin)
 {
 	const TextureProjection projection = GetTextureProjection(normal);
 
 
-	BrushFaceTexture texture { .Material = material };
+	BrushFaceTexture texture {};
 
 	texture.Offset = Vec2f(origin.Dot(projection.UAxis) / texture.Scale.X,
 						   origin.Dot(projection.VAxis) / texture.Scale.Y);
@@ -708,10 +708,10 @@ bool Brush::Split(const Vec3f& normal, float32 distance, const Vec3f& origin, Pl
 	}
 
 	PlaneList back_planes = Planes;
-	back_planes.Insert({ normal, distance, GetWorldAlignedTexture(normal, origin, MaterialID::scNull) });
+	back_planes.Insert({ normal, distance, GetWorldAlignedTexture(normal, origin) });
 
 	PlaneList front_planes = Planes;
-	front_planes.Insert({ -normal, -distance, GetWorldAlignedTexture(-normal, origin, MaterialID::scNull) });
+	front_planes.Insert({ -normal, -distance, GetWorldAlignedTexture(-normal, origin) });
 
 	// Both parts have to be left with something, otherwise the plane missed the brush
 	const Brush back = FromPlanes(back_planes);
@@ -731,10 +731,7 @@ void Brush::ResetFaceTexture(uint32 plane_index)
 {
 	BrushPlane& plane = Planes[plane_index];
 
-	const MaterialID material = plane.Texture.Material;
-
 	plane.Texture = BrushFaceTexture {
-		.Material = material,
 		.Offset = GetDefaultTextureOffset(plane.Normal, mBoundsMin, mBoundsMax),
 	};
 }
@@ -742,7 +739,7 @@ void Brush::ResetFaceTexture(uint32 plane_index)
 void Brush::AlignTexturesToWorld(const Vec3f& origin)
 {
 	for (BrushPlane& plane : Planes) {
-		plane.Texture = GetWorldAlignedTexture(plane.Normal, origin, plane.Texture.Material);
+		plane.Texture = GetWorldAlignedTexture(plane.Normal, origin);
 	}
 }
 
@@ -754,8 +751,8 @@ bool Brush::HasDefaultTextures() const
 		const BrushFaceTexture& texture = plane.Texture;
 		const Vec2f default_offset = GetDefaultTextureOffset(plane.Normal, mBoundsMin, mBoundsMax);
 
-		if (!texture.Material.IsNull() || texture.Scale.X != scDefaultTexture.Scale.X ||
-			texture.Scale.Y != scDefaultTexture.Scale.Y || texture.Rotation != 0.0f ||
+		if (texture.Scale.X != scDefaultTexture.Scale.X || texture.Scale.Y != scDefaultTexture.Scale.Y ||
+			texture.Rotation != 0.0f ||
 			std::abs(texture.Offset.X - default_offset.X) > scTextureOffsetEpsilon ||
 			std::abs(texture.Offset.Y - default_offset.Y) > scTextureOffsetEpsilon) {
 			return false;
@@ -766,8 +763,7 @@ bool Brush::HasDefaultTextures() const
 }
 
 void Brush::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normals, SizedArray<Vec3f>& tangents,
-						 SizedArray<Vec2f>& texcoords, SizedArray<uint32>& indices,
-						 SizedArray<MeshSection>& sections) const
+						 SizedArray<Vec2f>& texcoords, SizedArray<uint32>& indices) const
 {
 	if (!IsValid()) {
 		return;
@@ -787,27 +783,7 @@ void Brush::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normal
 	texcoords.InitCapacity(vertex_count);
 	indices.InitCapacity(index_count);
 
-	// Faces are emitted grouped by material, so each material is drawn as one range of indices
-	SizedArray<uint32> face_order;
-	face_order.InitCapacity(Faces.Size);
-
-	for (uint32 i = 0; i < Faces.Size; i++) {
-		face_order.Insert(i);
-	}
-
-	auto GetFaceMaterial = [&](uint32 face_index) { return Planes[Faces[face_index].PlaneIndex].Texture.Material; };
-
-	std::stable_sort(face_order.begin(), face_order.end(),
-					 [&](uint32 a, uint32 b) { return GetFaceMaterial(a).GetID() < GetFaceMaterial(b).GetID(); });
-
-	const bool has_face_materials = std::any_of(face_order.begin(), face_order.end(), [&](uint32 face_index)
-												{ return !GetFaceMaterial(face_index).IsNull(); });
-
-	if (has_face_materials) {
-		sections.InitCapacity(Faces.Size);
-	}
-
-	for (uint32 face_index : face_order) {
+	for (uint32 face_index = 0; face_index < Faces.Size; face_index++) {
 		const Face& face = Faces[face_index];
 		const BrushPlane& plane = Planes[face.PlaneIndex];
 		const BrushFaceTexture& texture = plane.Texture;
@@ -841,7 +817,6 @@ void Brush::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normal
 		tangent = tangent * (1.0f / (uu * vv - uv * uv));
 		tangent.NormalizeIP();
 
-		const uint32 first_index = static_cast<uint32>(indices.Size);
 		const uint32 base = static_cast<uint32>(positions.Size);
 
 		for (const Vec3f& vertex : face.Vertices) {
@@ -863,23 +838,6 @@ void Brush::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normal
 			indices.Insert(base + v + 1);
 		}
 
-		if (!has_face_materials) {
-			continue;
-		}
-
-		// Extend the current section while the material stays the same
-		const uint32 face_index_count = static_cast<uint32>(indices.Size) - first_index;
-
-		if (sections.IsNotEmpty() && sections[sections.Size - 1].Material == texture.Material) {
-			sections[sections.Size - 1].IndexCount += face_index_count;
-		}
-		else {
-			sections.Insert(MeshSection {
-				.FirstIndex = first_index,
-				.IndexCount = face_index_count,
-				.Material = texture.Material,
-			});
-		}
 	}
 }
 

@@ -13,6 +13,7 @@
 #include <Core/StackArray.hpp>
 #include <Core/String.hpp>
 #include <Material/MaterialID.hpp>
+#include <Material/MaterialLibrary.hpp>
 #include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
@@ -28,16 +29,6 @@ namespace physics {
 enum class eMotionType;
 }
 
-enum class eCProtoMat
-{
-	Gray = 0,
-	Orange,
-	Blue,
-	Tile,
-
-	Count,
-};
-
 /**
  * @brief A change to the texture on one face of a brush
  */
@@ -49,8 +40,6 @@ enum class eFaceTextureEdit : uint32
 	Scale,
 	/// Adds the amount's X to the rotation, in degrees
 	Rotate,
-	/// Steps the face's material through the prototype materials, then back to the object's material
-	CycleMaterial,
 	/// Resets the offset, scale and rotation
 	Reset,
 };
@@ -62,7 +51,7 @@ public:
 
 	void Create(World* world);
 
-	void Load(const String& path);
+	bool Load(const String& path);
 	void Save(const String& path);
 
 	/**
@@ -106,14 +95,6 @@ public:
 							Brush::PlaneList& out_planes);
 
 	/**
-	 * @brief Returns the planes of the object's brush with `material` on the face facing along `face_normal`, or on
-	 * every face if `whole_brush` is set. A null material draws the faces with the object's material.
-	 * @returns false if nothing would change
-	 */
-	bool GetMaterialEdit(Object* object, const Vec3f& face_normal, const MaterialID& material, bool whole_brush,
-						 Brush::PlaneList& out_planes);
-
-	/**
 	 * @brief Finds the nearest blockout that a world space ray hits
 	 * @param direction The direction of the ray, with the length of how far it reaches
 	 * @param out_face_normal The normal of the face that was hit, in the blockout's local space
@@ -148,12 +129,11 @@ public:
 
 	void DestroyObject(Object* object);
 
-	MaterialID GetMaterialForSlot(eCProtoMat slot) const;
+	const MaterialLibrary& GetMaterialLibrary() const { return mMaterials; }
 
-	/**
-	 * @brief Returns the prototype material slot a material is in, or -1 if it is not a prototype material
-	 */
-	int32 GetSlotForMaterial(const MaterialID& material) const;
+	MaterialID GetMaterialForID(int32 id) const;
+	int32 GetIDForMaterial(const MaterialID& material) const;
+	MaterialID GetDefaultMaterial() const;
 
 	/**
 	 * @brief The brush that a blockout object is built from, or nullptr if the object is not a blockout.
@@ -170,11 +150,13 @@ private:
 	 */
 	void LoadLights(ConfigFile& info);
 	void SaveLights(ConfigFile& info);
+	void LoadCamera(ConfigFile& info);
+	void SaveCamera(ConfigFile& info);
 	void AddOrUpdateLightFromEntry(const ConfigEntry& light_entry);
 
 	/**
 	 * @brief Reads a blockout's brush from either a box (`scale`) or a list of planes (`planes`, with optional face
-	 * textures in `uvs` and `facemats`)
+	 * textures in `uvs`)
 	 */
 	Brush ReadBrushEntry(ConfigEntry& entry) const;
 	void WriteBrushEntry(ConfigEntry& entry, const Object* object);
@@ -205,15 +187,9 @@ public:
 	Object* pPreviewObject = nullptr;
 
 private:
-	MaterialID mWhiteMaterialID = MaterialID::scNull;
-	MaterialID mOrangeMaterialID = MaterialID::scNull;
-	MaterialID mBlueMaterialID = MaterialID::scNull;
-	MaterialID mProtoBricksID = MaterialID::scNull;
-
-	/// Keyed by ObjectID::GetID()
+	MaterialLibrary mMaterials;
 	std::unordered_map<uint32, Brush> mBrushes;
 
-	/// The planes the preview's mesh was last built from, so it is only rebuilt when they change
 	Brush::PlaneList mPreviewPlanes;
 };
 

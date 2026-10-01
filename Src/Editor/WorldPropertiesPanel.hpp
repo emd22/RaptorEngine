@@ -1,5 +1,6 @@
 #pragma once
 
+#include <wx/collpane.h>
 #include <wx/panel.h>
 #include <wx/string.h>
 
@@ -12,6 +13,7 @@ class wxStaticText;
 namespace fx::editor {
 
 class Vector3Field;
+class FloatField;
 
 class WorldPropertiesPanel : public wxPanel
 {
@@ -23,6 +25,12 @@ public:
 private:
 	wxStaticText* mpNameLabel = nullptr;
 	Vector3Field* mpPositionField = nullptr;
+
+	wxCollapsiblePane* mpCameraPane = nullptr;
+	FloatField* mpApertureField = nullptr;
+	FloatField* mpShutterField = nullptr;
+	FloatField* mpIsoField = nullptr;
+	FloatField* mpCompensationField = nullptr;
 
 	Vec3f mShownPosition = Vec3f::sZero;
 	bool mbShowingAnything = true;

@@ -31,6 +31,9 @@ struct alignas(16) SSAOPushConsts
 	float32 RenderSize[2];
 	float32 Radius;
 	float32 Bias;
+	float32 Strength;
+	float32 Power;
+	float32 Floor;
 };
 
 struct alignas(16) SSAOBlurPushConsts

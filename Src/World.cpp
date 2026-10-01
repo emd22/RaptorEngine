@@ -60,53 +60,6 @@ static PipelineHandle GetShadowListPipeline()
 	return gPipelineCache->GetOrCreateVariant(ePipelinePass::Shadow, ePipelineFeatures::None);
 }
 
-static void AddToRenderListOnce(RenderList& render_list, PipelineHandle pipeline, ObjectID id)
-{
-	for (ObjectID object_id : render_list.GetSection(pipeline).Objects) {
-		if (object_id == id) {
-			return;
-		}
-	}
-
-	render_list.AddObject(pipeline, id);
-}
-
-/**
- * @brief Adds the object to the section of each pipeline its materials need. An object drawn in mesh sections can need
- * several.
- */
-static void AddToGeometrySections(RenderList& render_list, Object* object)
-{
-	if (object->MeshSections.IsEmpty()) {
-		AddToRenderListOnce(render_list, GetPipelineForMaterial(object->GetMaterialID()), object->ID);
-		return;
-	}
-
-	for (const MeshSection& section : object->MeshSections) {
-		AddToRenderListOnce(render_list, GetPipelineForMaterial(object->GetSectionMaterial(section)), object->ID);
-	}
-}
-
-/**
- * @brief Calls `draw` for each part of the object that the pipeline draws: the whole mesh (nullptr) for an object
- * without mesh sections, otherwise each section whose material needs that pipeline.
- */
-template <typename TDrawFunc>
-static void ForEachDrawInPipeline(Object* object, PipelineHandle pipeline, TDrawFunc&& draw)
-{
-	if (object->MeshSections.IsEmpty()) {
-		draw(nullptr);
-		return;
-	}
-
-	for (const MeshSection& section : object->MeshSections) {
-		if (GetPipelineForMaterial(object->GetSectionMaterial(section)) == pipeline) {
-			draw(&section);
-		}
-	}
-}
-
-
 static void AddObjectToRenderList(Object* object, World* scene)
 {
 	if (object->pMesh.IsValid()) {
@@ -115,7 +68,7 @@ static void AddObjectToRenderList(Object* object, World* scene)
 			gWorld->mRenderList.AddObject(GetShadowListPipeline(), object->ID);
 		}
 
-		AddToGeometrySections(gWorld->mRenderList, object);
+		gWorld->mRenderList.AddObject(GetPipelineForMaterial(object->GetMaterialID()), object->ID);
 	}
 
 	if (!object->AttachedNodes.IsEmpty()) {
@@ -245,8 +198,7 @@ void World::ExecuteRenderList(renderer::PipelineHandle pipeline_handle, renderer
 
 		object->Update();
 
-		ForEachDrawInPipeline(object, pipeline_handle,
-							  [&](const MeshSection* section) { object->RenderShallow(camera, &pipeline, section); });
+		object->RenderShallow(camera, &pipeline);
 	}
 }
 
@@ -333,8 +285,7 @@ void World::ExecuteTransparentRenderLists()
 
 		object->Update();
 
-		ForEachDrawInPipeline(object, transparent_object.Pipeline,
-							  [&](const MeshSection* section) { object->RenderShallow(camera, pipeline, section); });
+		object->RenderShallow(camera, pipeline);
 	}
 }
 
@@ -346,13 +297,14 @@ void World::ExecuteTransparentRenderLists()
 class ShadowPipelineSelector
 {
 public:
-	/// Binds whichever pipeline `object` needs to draw with `material_id` (and its albedo, if masked), returning it for
-	/// the push constants.
-	Pipeline& Select(Object* object, const MaterialID& material_id, const CommandBuffer& cmd)
+	/// Binds whichever pipeline `object` needs (and its albedo, if masked), returning it for the push constants.
+	Pipeline& Select(Object* object, const CommandBuffer& cmd)
 	{
-		const bool masked = IsMasked(object, material_id);
+		const bool masked = IsMasked(object);
+		const bool skinned = object->IsSkinned();
 		const PipelineHandle wanted = gPipelineCache->GetOrCreateVariant(
-			ePipelinePass::Shadow, masked ? ePipelineFeatures::AlphaMask : ePipelineFeatures::None);
+			ePipelinePass::Shadow,
+			skinned ? ePipelineFeatures::Skinned : (masked ? ePipelineFeatures::AlphaMask : ePipelineFeatures::None));
 
 		if (!(wanted == mBound)) {
 			gShadowAtlas->BindPipeline(wanted);
@@ -367,21 +319,23 @@ public:
 
 		Pipeline& pipeline = gPipelineCache->Get(mBound);
 
-		if (masked) {
-			gMaterialManager->BindWithPipeline(cmd, pipeline, material_id);
+		if (masked || skinned) {
+			if (!gMaterialManager->BindWithPipeline(cmd, pipeline, object->GetMaterialID())) {
+				gMaterialManager->BindWithPipeline(cmd, pipeline, MaterialID::scNull);
+			}
 		}
 
 		return pipeline;
 	}
 
 private:
-	static bool IsMasked(Object* object, const MaterialID& material_id)
+	static bool IsMasked(Object* object)
 	{
 		if (object->IsSkinned()) {
 			return false;
 		}
 
-		Material* material = gMaterialManager->GetMaterial(material_id);
+		Material* material = gMaterialManager->GetMaterial(object->GetMaterialID());
 
 		return material != nullptr && HasFlag(material->Properties.Flags, eMaterialFlags::AlphaMask) &&
 			   material->IsReady();
@@ -391,31 +345,6 @@ private:
 	/// Every region starts out with the opaque pipeline bound
 	PipelineHandle mBound = gPipelineCache->GetOrCreateVariant(ePipelinePass::Shadow, ePipelineFeatures::None);
 };
-
-/**
- * @brief Draws a shadow caster, drawing each of its mesh sections with the pipeline its material needs.
- */
-static void RenderShadowCaster(Object* object, ShadowPipelineSelector& selector, const ShadowPushConstants& consts,
-							   const CommandBuffer& cmd)
-{
-	auto Draw = [&](const MeshSection* section)
-	{
-		const MaterialID material_id = (section != nullptr) ? object->GetSectionMaterial(*section)
-															: object->GetMaterialID();
-
-		gGraphics->SubmitPushConstants(cmd, selector.Select(object, material_id, cmd), eShaderType::Vertex, consts);
-		object->RenderPrimitive(cmd, section);
-	};
-
-	if (object->MeshSections.IsEmpty()) {
-		Draw(nullptr);
-		return;
-	}
-
-	for (const MeshSection& section : object->MeshSections) {
-		Draw(&section);
-	}
-}
 
 void World::ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Camera& shadow_camera)
 {
@@ -447,7 +376,9 @@ void World::ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Cam
 
 		// Push the direct index for the object id
 		consts.ObjectIndex = object_id.GetID();
-		RenderShadowCaster(object, selector, consts, cmd);
+		consts.BoneBase = object->BoneBufferBase;
+		gGraphics->SubmitPushConstants(cmd, selector.Select(object, cmd), eShaderType::Vertex, consts);
+		object->RenderPrimitive(cmd);
 	}
 }
 
@@ -581,7 +512,8 @@ void World::BakeSpotShadows()
 			gObjectManager->Submit(caster_id, caster->GetWorldMatrix());
 
 			consts.ObjectIndex = caster_id.GetID();
-			RenderShadowCaster(caster, selector, consts, cmd);
+			gGraphics->SubmitPushConstants(cmd, selector.Select(caster, cmd), eShaderType::Vertex, consts);
+			caster->RenderPrimitive(cmd);
 		}
 
 		gShadowAtlas->EndRegion();
@@ -712,24 +644,18 @@ void World::ExecutePrepassRenderList(renderer::PipelineHandle forward_pipeline)
 		const Mat4f& cam_matrix = camera.GetCameraMatrix(object->GetObjectLayer());
 		memcpy(consts.CameraMatrix, cam_matrix.RawData, sizeof(Mat4f));
 
-		ForEachDrawInPipeline(
-			object, forward_pipeline,
-			[&](const MeshSection* section)
-			{
-				const MaterialID material_id = (section != nullptr) ? object->GetSectionMaterial(*section)
-																	: object->GetMaterialID();
+		const MaterialID material_id = object->GetMaterialID();
 
-				CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
+		CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
-				consts.MaterialIndex = material_id.GetID();
-				gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex | eShaderType::Pixel, consts);
+		consts.MaterialIndex = material_id.GetID();
+		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex | eShaderType::Pixel, consts);
 
-				if (!gMaterialManager->BindWithPipeline(cmd, pipeline, material_id)) {
-					gMaterialManager->BindWithPipeline(cmd, pipeline, MaterialID::scNull);
-				}
+		if (!gMaterialManager->BindWithPipeline(cmd, pipeline, material_id)) {
+			gMaterialManager->BindWithPipeline(cmd, pipeline, MaterialID::scNull);
+		}
 
-				object->RenderPrimitive(cmd, section);
-			});
+		object->RenderPrimitive(cmd);
 	}
 }
 
@@ -779,7 +705,7 @@ void World::AddToRenderListRecursiveByMaterial(ObjectID* id_ptr)
 	// Container objects (e.g. the root of a multi-primitive mesh) have no mesh/material of their own; only the
 	// attached primitives that actually own a mesh need placing in a geometry section.
 	if (obj->pMesh.IsValid()) {
-		AddToGeometrySections(mRenderList, obj);
+		mRenderList.AddObject(GetPipelineForMaterial(obj->GetMaterialID()), obj->ID);
 	}
 
 	for (ObjectID& attached_id : obj->AttachedNodes) {

@@ -98,6 +98,8 @@ public:
 	/// Rounds a position (or a distance) to the snap step, if snapping is on
 	Vec3f SnapToGrid(const Vec3f& position) const;
 
+	float32 GetAngleSnapStep() const;
+
 	/////////////////////////////////////
 	// Selection
 	/////////////////////////////////////

@@ -17,7 +17,6 @@
 #include <Material/MaterialID.hpp>
 #include <Math/BoundingBox.hpp>
 #include <Math/OrientedBoundingBox.hpp>
-#include <Object/MeshSection.hpp>
 #include <WorldGrid.hpp>
 
 
@@ -50,8 +49,6 @@ enum class eObjectFlags : uint16
 	DisableCulling = (1 << 5),
 	/// Left out of light probe bakes (capture, capture shadows and probe placement). See Object::IsProbeVisible().
 	NotProbeVisible = (1 << 6),
-	/// Draw every mesh section with the object's material, e.g. to highlight a selected object.
-	MaterialOverridesSections = (1 << 7),
 };
 
 FxEnumFlags(eObjectFlags);
@@ -77,16 +74,10 @@ public:
 
 	/**
 	 * @brief Render only the primitive(s) for the objects. Does not bind material or other object data.
-	 * @param section The part of the mesh to draw, or nullptr for the whole mesh.
 	 */
-	void RenderPrimitive(const renderer::CommandBuffer& cmd, const MeshSection* section = nullptr);
+	void RenderPrimitive(const renderer::CommandBuffer& cmd);
 
-	/**
-	 * @param section The part of the mesh to draw with its own material, or nullptr for the whole mesh with the
-	 * object's material.
-	 */
-	void RenderShallow(const Camera& camera, renderer::Pipeline* alt_pipeline = nullptr,
-					   const MeshSection* section = nullptr);
+	void RenderShallow(const Camera& camera, renderer::Pipeline* alt_pipeline = nullptr);
 
 	bool CheckIfReady(bool require_material);
 	void AttachObject(const ObjectID& object);
@@ -95,6 +86,7 @@ public:
 
 	void SetPosition(const Vec3f& position) override;
 	void SetRotation(const Quat& rotation) override;
+	void SetScale(const float scale) override;
 
 	void OnAttached(World* scene) override;
 
@@ -126,14 +118,6 @@ public:
 	FX_FORCE_INLINE const MaterialID& GetMaterialID() const { return mMaterialID; };
 
 	void SetMaterial(const MaterialID& id);
-
-	/**
-	 * @brief The material a mesh section is drawn with. Sections without a material of their own, and every section
-	 * while MaterialOverridesSections is set, use the object's material.
-	 */
-	MaterialID GetSectionMaterial(const MeshSection& section) const;
-
-	void SetMaterialOverridesSections(bool value);
 
 	/////////////////////////////////////
 	// Physics
@@ -228,7 +212,7 @@ private:
 	 * @brief Render the bare model for the object. Note that there are no `CheckIfReady` checks in here as they are
 	 * done by RenderShallow et. al!
 	 */
-	void RenderMesh(renderer::Pipeline* pipeline, const MeshSection* section);
+	void RenderMesh(renderer::Pipeline* pipeline);
 
 	void SyncObjectWithPhysics(physics::Body* phys);
 
@@ -245,10 +229,6 @@ public:
 	PagedArray<ObjectID> AttachedNodes;
 
 	AABB Bounds { Vec3f::sZero, Vec3f::sZero };
-
-	/// Parts of the mesh drawn with their own materials. When empty, the whole mesh is drawn with the object's
-	/// material.
-	SizedArray<MeshSection> MeshSections;
 
 	std::atomic_bool bIsAddedToWorld = false;
 
