@@ -21,5 +21,7 @@ struct Material
 	float fGlossinessFactor;
 
 	float3 vBaseColorFactor;
-	float fPadding;
+
+	/// How much of the surface texture's R channel is applied as ambient occlusion
+	float fOcclusionStrength;
 };

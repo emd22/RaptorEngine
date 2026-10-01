@@ -340,6 +340,16 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 		}
 	}
 
+	{
+		const cgltf_texture* occlusion = gltf_material->occlusion_texture.texture;
+		const cgltf_texture* metallic_roughness = gltf_mr.metallic_roughness_texture.texture;
+
+		const bool occlusion_is_packed = !use_specular_glossiness && occlusion != nullptr &&
+										 metallic_roughness != nullptr && occlusion->image == metallic_roughness->image;
+
+		material->SetOcclusionStrength(occlusion_is_packed ? gltf_material->occlusion_texture.scale : 0.0f);
+	}
+
 	// Handle glTF alpha mode / baseColorFactor alpha
 	{
 		float baseAlpha = 1.0f;

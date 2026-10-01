@@ -39,6 +39,7 @@ public:
 private:
 	void SetRows(StackArray<FlagRow, scMaxRows>& rows, uint32 value, bool has_object);
 	void OnMaterialChoice(wxCommandEvent& event);
+	void RefreshMaterialChoices();
 
 private:
 	wxStaticText* mpNameLabel = nullptr;
@@ -53,6 +54,7 @@ private:
 	uint32 mShownTags = 0;
 	uint32 mShownFlags = 0;
 	int32 mShownMaterialSlot = -1;
+	uint32 mShownMaterialCount = 0;
 
 	// Show Anything ...is a real bool
 	bool mbShowingAnything = true;

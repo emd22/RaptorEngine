@@ -29,7 +29,7 @@ void Player::Create()
 	// Load the view model
 
 	AssetTicket view_model = gAssetManager->LoadObject("view_model",
-													   "RaptorData/Data/Demo/Models/view_model/viewmodel.glb");
+													   "RaptorData/Data/Demo/Models/viewmodel/viewmodel_baked.glb");
 
 	// Registered before World::Attach() so these callbacks run first: the view model has to be set up before the world
 	// adds it to the grid, or a probe bake running on the main thread in between would capture it as level geometry.
@@ -179,8 +179,8 @@ void Player::UpdateViewModel(double delta_time)
 	const Vec3f up = Vec3f(view_model_basis.Rows[1]);
 	const Vec3f forward = Vec3f(view_model_basis.Rows[2]);
 
-	float32 horizontal_scale = 0.29f;
-	float32 vertical_scale = 0.25f;
+	float32 horizontal_scale = 0.19f;
+	float32 vertical_scale = 0.15f;
 
 	// if (bIsSprinting) {
 	// 	horizontal_scale = 0.30f;
@@ -195,8 +195,7 @@ void Player::UpdateViewModel(double delta_time)
 
 	// const float32 rotx = sin(gWorld->Player.mBobCounterY * 0.5f) * 0.05f;
 
-	mpViewModel->SetPosition(pCamera->Position + (forward * 0.30) - (up * 0.265) + (right * 0.05) + view_model_bob);
-
+	mpViewModel->SetPosition(pCamera->Position - (forward * 0.05) + (up * 0.15) + (right * 0.0) + view_model_bob);
 	mpViewModel->SetRotation(mViewModelRotation * mViewModelAccumRot);
 }
 

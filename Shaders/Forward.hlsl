@@ -285,6 +285,8 @@ struct SurfaceParams
 	float3 vF0;
 	/// Perceptual roughness
 	float fRoughness;
+	/// Ambient occlusion from the surface texture, 1 is unoccluded
+	float fOcclusion;
 };
 
 /// Resolves the material's workflow into SurfaceParams. `surface_sample` is the
@@ -309,6 +311,7 @@ SurfaceParams GetSurfaceParams(Material material, float3 albedo, float4 surface_
 	surface.vF0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
 	surface.vDiffuse = albedo * (1.0 - metallic);
 	surface.fRoughness = surface_sample.g * material.fRoughnessFactor;
+	surface.fOcclusion = lerp(1.0, surface_sample.r, material.fOcclusionStrength);
 
 	// }
 
@@ -601,7 +604,10 @@ PERMEND();
 
 			const float3 probe_specular = probe_radiance * EnvBRDFApprox(surface.vF0, roughness, NdotV);
 
-			ambient = ((probe_irradiance * surface.vDiffuse) + probe_specular) * ssao;
+			const float specular_occlusion = SpecularOcclusion(NdotV, surface.fOcclusion, roughness);
+
+			ambient = ((probe_irradiance * surface.vDiffuse * surface.fOcclusion) + (probe_specular * specular_occlusion)) *
+					  ssao;
 		}
 	}
 

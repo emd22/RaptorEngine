@@ -460,7 +460,7 @@ static Object* N_blockout_create_box(FLOAT4 min, FLOAT4 max)
 
 	op.PlanesAfter = brush.Planes;
 	op.ObjectSnapshot.Position = position;
-	op.ObjectSnapshot.Material = gWorld->pBlockout->GetMaterialForSlot(eCProtoMat::Gray);
+	op.ObjectSnapshot.Material = gWorld->pBlockout->GetDefaultMaterial();
 
 	return gEditor->PushEditOperation(op).pObject;
 #else

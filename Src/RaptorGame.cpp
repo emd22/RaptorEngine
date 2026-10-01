@@ -210,10 +210,10 @@ void RaptorGame::CreateGame()
 	mpProbesCVar = gCVars->Set("r_probes", 1);
 	mpDecalsCVar = gCVars->Set("r_decals", 1);
 
-	mpExposureCVar = gCVars->Set("r_exposure_ev", 0.0f);
-	mpApertureCVar = gCVars->Set("r_aperture", 16.0f);
-	mpShutterCVar = gCVars->Set("r_shutter", 0.01f);
-	mpIsoCVar = gCVars->Set("r_iso", 100.0f);
+	mpExposureCVar = gCVars->Set("r_exposure_ev", gCVars->Get("r_exposure_ev", 0.0f));
+	mpApertureCVar = gCVars->Set("r_aperture", gCVars->Get("r_aperture", 16.0f));
+	mpShutterCVar = gCVars->Set("r_shutter", gCVars->Get("r_shutter", 0.01f));
+	mpIsoCVar = gCVars->Set("r_iso", gCVars->Get("r_iso", 100.0f));
 
 	// Metres between probes in a volume built from an editor brush. Set `$r_probe_spacing` in the console
 	gCVars->Set("r_probe_spacing", 2.5f);
@@ -711,6 +711,7 @@ void RaptorGame::DestroyGame()
 	delete gShadowAtlas;
 	gShadowAtlas = nullptr;
 
+	gAssetManager->StopWorkers();
 	gMaterialManager->Destroy();
 	gAssetManager->Shutdown();
 
