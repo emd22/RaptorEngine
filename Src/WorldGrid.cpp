@@ -315,6 +315,20 @@ void WorldGrid::UpdateObject(Object* object, bool update_attached)
 	Vec2u new_tile_span = Vec2u(1, 1);
 	GetObjectTileRect(object, &new_tile_start, &new_tile_span);
 
+	if (object->mTileIndex == scGlobalTileIndex) {
+		const uint32 global_index = GlobalTile.FindObject(object->ID);
+
+		if (global_index != TileIndexNull) {
+			GlobalTile.Objects.FreeItem(global_index);
+		}
+
+		InsertObjectIntoRect(object->ID, new_tile_start, new_tile_span);
+
+		object->mTileIndex = new_tile_start;
+		object->mTileSpan = new_tile_span;
+		return;
+	}
+
 	// The object hasn't moved past any tile boundaries, leave it where it is
 	if (new_tile_start == object->mTileIndex && new_tile_span == object->mTileSpan) {
 		return;

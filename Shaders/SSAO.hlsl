@@ -57,16 +57,18 @@ struct SSAOPushConsts
 	float2 ScreenSize;
 	float Radius;
 	float Bias;
+	float Strength;
+	float Power;
+	float Floor;
 };
 
 [[vk::push_constant]] SSAOPushConsts Consts;
 
 #define SSAO_KERNEL_SIZE 32
-#define SSAO_POWER 2.0
+#define SSAO_KERNEL_MIN_SCALE 0.1
 #define SSAO_NOISE_IMAGE_SIZE 64
 #define SSAO_DISTANCE_CUTOFF 50.0
 #define SSAO_CUTOFF_FADE 10.0
-#define SSAO_STRENGTH 1.7
 #define PI 3.14159265
 
 #define GOLDEN_ANGLE 2.39996323
@@ -99,7 +101,9 @@ float3 GetSampleKernel(uint index)
 
 	float phi = index * GOLDEN_ANGLE;
 
-	return float3(r * cos(phi), r * sin(phi), z);
+	float scale = lerp(SSAO_KERNEL_MIN_SCALE, 1.0, findex * findex);
+
+	return float3(r * cos(phi), r * sin(phi), z) * scale;
 }
 
 float ComputeSSAO(float2 uv)
@@ -171,7 +175,8 @@ float ComputeSSAO(float2 uv)
 		occlusion += attenuation;
 	}
 
-	float ao = saturate(1.0 - SSAO_STRENGTH * (occlusion / SSAO_KERNEL_SIZE));
+	float ao = pow(saturate(1.0 - Consts.Strength * (occlusion / SSAO_KERNEL_SIZE)), Consts.Power);
+	ao = lerp(Consts.Floor, 1.0, ao);
 
 	// Fade AO out to 1.0 with distance from the camera
 	float cutoff = saturate((SSAO_DISTANCE_CUTOFF - length(fragment_position.xyz)) / SSAO_CUTOFF_FADE);

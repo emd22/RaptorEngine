@@ -51,7 +51,7 @@ public:
 
 	void Create(World* world);
 
-	void Load(const String& path);
+	bool Load(const String& path);
 	void Save(const String& path);
 
 	/**

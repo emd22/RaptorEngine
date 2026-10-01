@@ -86,6 +86,7 @@ public:
 
 	void SetPosition(const Vec3f& position) override;
 	void SetRotation(const Quat& rotation) override;
+	void SetScale(const float scale) override;
 
 	void OnAttached(World* scene) override;
 

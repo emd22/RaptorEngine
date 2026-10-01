@@ -463,6 +463,8 @@ void Blockout::ApplyBrush(Object* object, Brush&& brush, physics::eMotionType mo
 	const Vec3f midpoint = brush.GetCenter();
 	object->SetRotationOrigin(-midpoint);
 
+	gWorldGrid->UpdateObject(object);
+
 	gPhysics->DestroyBody(object->PhysicsID);
 
 	SizedArray<Vec3f> hull_points;
@@ -980,6 +982,30 @@ void Blockout::LoadLights(ConfigFile& info)
 			AddOrUpdateLightFromEntry(light_entry);
 		}
 	}
+
+	std::vector<LightID> stale_lights;
+
+	for (const Ref<LightBase>& light : gLightManager->GetCache()) {
+		if (!light.IsValid() || (light->Type != eLightType::Point && light->Type != eLightType::Spot)) {
+			continue;
+		}
+
+		bool in_file = false;
+
+		if (light_list) {
+			for (const ConfigEntry& light_entry : light_list->Members) {
+				in_file |= (light_entry.Name.GetHash() == light->Name.GetHash());
+			}
+		}
+
+		if (!in_file) {
+			stale_lights.push_back(light->ID);
+		}
+	}
+
+	for (LightID& id : stale_lights) {
+		gLightManager->DestroyLight(id);
+	}
 }
 
 void Blockout::SaveLights(ConfigFile& info)
@@ -1066,13 +1092,20 @@ void Blockout::SaveCamera(ConfigFile& info)
 	info.AddEntry(std::move(camera));
 }
 
-void Blockout::Load(const String& path)
+bool Blockout::Load(const String& path)
 {
 	ConfigFile info {};
 	info.Load(path.CStr());
 
 	if (info.HasErrors()) {
-		return;
+		return false;
+	}
+
+	ConfigEntry* blocks_entry = info.GetEntry(HashStr32("all"));
+
+	if (blocks_entry == nullptr) {
+		LogError("Blockout '{}' could not be loaded or has no 'all' entry", path);
+		return false;
 	}
 
 #ifdef FX_IS_EDITOR
@@ -1083,19 +1116,14 @@ void Blockout::Load(const String& path)
 	LoadLights(info);
 	LoadCamera(info);
 
-	ConfigEntry* blocks_entry = info.GetEntry(HashStr32("all"));
-
-	if (blocks_entry == nullptr) {
-		LogError("Blockout '{}' could not be loaded or has no 'all' entry", path);
-		return;
-	}
-
 	// Remove the current blockout from the world
 	RemoveBlockoutFromWorld(pWorld);
 
 	for (ConfigEntry& entry : blocks_entry->Members) {
 		CreateBrushObject(entry);
 	}
+
+	return true;
 }
 
 void Blockout::Save(const String& path)

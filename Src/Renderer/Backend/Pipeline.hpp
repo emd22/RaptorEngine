@@ -66,6 +66,7 @@ enum class eDrawFlags : uint32
 	NoDecals = (1 << 3),
 	/// The draw does not sample the light probes
 	NoProbes = (1 << 4),
+	ProbeBounce = (1 << 5),
 };
 
 FxEnumFlags(eDrawFlags);

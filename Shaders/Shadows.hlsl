@@ -14,7 +14,7 @@ struct VSInput
     float3 vPosition : POSITION;
     float3 vNormal : NORMAL;
     float2 vUV : TEXCOORD0;
-    float3 vTangent : TANGENT;
+    float4 vTangent : TANGENT;
     uint uiInstanceId : SV_InstanceID;
 
 PERMIF(USE_SKINNING);
@@ -37,6 +37,7 @@ struct VSPushConsts
 {
     float4x4 mCameraMatrix;
     uint uiObjectIndex;
+    uint uiBoneBase;
 };
 
 
@@ -44,12 +45,30 @@ struct VSPushConsts
 
 F_StructBuffer(bObjectBuffer, Object, 0, 0);
 
+PERMIF(USE_SKINNING);
+F_StructBuffer(bBones, BoneMtx, 3, 1);
+PERMEND();
+
 VSOutput main(VSInput input)
 {
     VSOutput output;
     float4x4 model_matrix = bObjectBuffer[VSConst.uiObjectIndex + input.uiInstanceId].mWorld;
     float4x4 MVP = mul(model_matrix, VSConst.mCameraMatrix);
-    output.vPosition = mul(float4(input.vPosition, 1.0), MVP);
+
+PERMIF(USE_SKINNING);
+    const uint bone_base = VSConst.uiBoneBase;
+
+    float4x4 skin_xform = input.vJointWeights.x * bBones[bone_base + input.vJointIndices.x]
+        + input.vJointWeights.y * bBones[bone_base + input.vJointIndices.y]
+        + input.vJointWeights.z * bBones[bone_base + input.vJointIndices.z]
+        + input.vJointWeights.w * bBones[bone_base + input.vJointIndices.w];
+
+    float4 position_ms = mul(float4(input.vPosition, 1.0), skin_xform);
+PERMELSE();
+    float4 position_ms = float4(input.vPosition, 1.0);
+PERMEND();
+
+    output.vPosition = mul(position_ms, MVP);
 
 PERMIF(ALPHA_MASK);
     output.vUV = input.vUV;

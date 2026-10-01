@@ -46,7 +46,7 @@ public:
 		MarkTransformOutOfDate();
 	}
 
-	void SetScale(const float scale);
+	virtual void SetScale(const float scale);
 
 	virtual void MoveBy(const Vec3f& offset) { SetPosition(mPosition + offset); }
 	void ScaleBy(const float scale);
