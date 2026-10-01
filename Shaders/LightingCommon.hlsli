@@ -120,6 +120,13 @@ float3 EnvBRDFApprox(float3 f0, float roughness, float NdotV)
 	return f0 * AB.x + AB.y;
 }
 
+/// Occlusion of specular ambient light (Lagarde & de Rousiers, "Moving Frostbite to PBR"). A cavity blocks the
+/// reflection less than it blocks diffuse light at grazing angles and on smooth surfaces.
+float SpecularOcclusion(float NdotV, float ambient_occlusion, float roughness)
+{
+	return saturate(pow(NdotV + ambient_occlusion, exp2(-16.0 * roughness - 1.0)) - 1.0 + ambient_occlusion);
+}
+
 /// Direction the specular lobe is centred on, for looking up ambient specular (Frostbite,
 /// "Moving Frostbite to PBR", getSpecularDominantDir). A mirror reflects along R, but as a surface roughens its
 /// lobe spreads over the hemisphere and its average direction swings towards the normal. Sampling along R

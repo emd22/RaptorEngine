@@ -38,7 +38,7 @@ WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, w
 
 	{
 		mpCameraPane = new wxCollapsiblePane(this, wxID_ANY, "Camera", wxDefaultPosition, wxDefaultSize,
-												wxCP_DEFAULT_STYLE | wxCP_NO_TLW_RESIZE);
+											 wxCP_DEFAULT_STYLE | wxCP_NO_TLW_RESIZE);
 
 		wxWindow* cam_pane_win = mpCameraPane->GetPane();
 		wxSizer* cam_pane_sizer = new wxBoxSizer(wxVERTICAL);

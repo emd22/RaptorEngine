@@ -13,6 +13,7 @@
 #include <Core/StackArray.hpp>
 #include <Core/String.hpp>
 #include <Material/MaterialID.hpp>
+#include <Material/MaterialLibrary.hpp>
 #include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
@@ -27,17 +28,6 @@ class Object;
 namespace physics {
 enum class eMotionType;
 }
-
-enum class eCProtoMat
-{
-	Gray = 0,
-	Orange,
-	Blue,
-	Brick,
-	GraniteTile,
-
-	Count,
-};
 
 /**
  * @brief A change to the texture on one face of a brush
@@ -139,7 +129,11 @@ public:
 
 	void DestroyObject(Object* object);
 
-	MaterialID GetMaterialForSlot(eCProtoMat slot) const;
+	const MaterialLibrary& GetMaterialLibrary() const { return mMaterials; }
+
+	MaterialID GetMaterialForID(int32 id) const;
+	int32 GetIDForMaterial(const MaterialID& material) const;
+	MaterialID GetDefaultMaterial() const;
 
 	/**
 	 * @brief The brush that a blockout object is built from, or nullptr if the object is not a blockout.
@@ -156,6 +150,8 @@ private:
 	 */
 	void LoadLights(ConfigFile& info);
 	void SaveLights(ConfigFile& info);
+	void LoadCamera(ConfigFile& info);
+	void SaveCamera(ConfigFile& info);
 	void AddOrUpdateLightFromEntry(const ConfigEntry& light_entry);
 
 	/**
@@ -191,16 +187,9 @@ public:
 	Object* pPreviewObject = nullptr;
 
 private:
-	MaterialID mWhiteMaterialID = MaterialID::scNull;
-	MaterialID mOrangeMaterialID = MaterialID::scNull;
-	MaterialID mBlueMaterialID = MaterialID::scNull;
-	MaterialID mProtoBricksID = MaterialID::scNull;
-	MaterialID mProtoGraniteTileID = MaterialID::scNull;
-
-	/// Keyed by ObjectID::GetID()
+	MaterialLibrary mMaterials;
 	std::unordered_map<uint32, Brush> mBrushes;
 
-	/// The planes the preview's mesh was last built from, so it is only rebuilt when they change
 	Brush::PlaneList mPreviewPlanes;
 };
 

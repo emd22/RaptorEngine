@@ -19,6 +19,9 @@
 
 namespace fx {
 
+static constexpr int32 scDefaultMaterialID = 0;
+static constexpr int32 scEditableMaterialID = 1;
+
 Blockout::Blockout() {}
 
 void Blockout::Create(World* world)
@@ -27,93 +30,7 @@ void Blockout::Create(World* world)
 
 	pWorld = world;
 
-	// White material
-	{
-		mWhiteMaterialID = gMaterialManager->NewMaterial("ProtoWhite", false);
-		Material* test_material = gMaterialManager->GetMaterial(mWhiteMaterialID);
-
-		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
-													   "RaptorData/Data/Demo/Textures/gray_check.png",
-													   eImageCreateFlags::None);
-
-		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
-
-		test_material->Finalize();
-	}
-
-	// Orange material
-	{
-		mOrangeMaterialID = gMaterialManager->NewMaterial("ProtoOrange", false);
-		Material* test_material = gMaterialManager->GetMaterial(mOrangeMaterialID);
-
-		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
-													   "RaptorData/Data/Demo/Textures/orange_check.png",
-													   eImageCreateFlags::None);
-
-		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
-
-		test_material->Finalize();
-	}
-
-
-	{
-		mBlueMaterialID = gMaterialManager->NewMaterial("ProtoBlue", false);
-		Material* test_material = gMaterialManager->GetMaterial(mBlueMaterialID);
-
-		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
-													   "RaptorData/Data/Demo/Textures/aqua_check.png",
-													   eImageCreateFlags::None);
-
-		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
-		test_material->Finalize();
-	}
-
-
-	{
-		mProtoBricksID = gMaterialManager->NewMaterial("ProtoBricks", false);
-		Material* test_material = gMaterialManager->GetMaterial(mProtoBricksID);
-
-		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
-													   "RaptorData/Data/Demo/Textures/bricks/Bricks_diffuse.ktx2",
-													   eImageCreateFlags::None);
-
-		AssetTicket normal = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
-													  "RaptorData/Data/Demo/Textures/bricks/Bricks_normal.ktx2",
-													  eImageCreateFlags::None);
-
-		AssetTicket orm_map = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
-													   "RaptorData/Data/Demo/Textures/bricks/Bricks_orm.ktx2",
-													   eImageCreateFlags::None);
-
-
-		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
-		test_material->Attach(Material::eResourceType::Normal, normal);
-		test_material->Attach(Material::eResourceType::ORM, orm_map);
-		test_material->Finalize();
-	}
-
-	{
-		mProtoGraniteTileID = gMaterialManager->NewMaterial("ProtoGraniteTile", false);
-		Material* test_material = gMaterialManager->GetMaterial(mProtoGraniteTileID);
-
-		AssetTicket diffuse = gAssetManager->LoadImage(
-			eImageType::Flat, eImageFormat::RGBA8_UNorm,
-			"RaptorData/Data/Demo/Textures/granite_tile/granite_tile_diffuse.ktx2", eImageCreateFlags::None);
-
-		AssetTicket normal = gAssetManager->LoadImage(
-			eImageType::Flat, eImageFormat::RGBA8_UNorm,
-			"RaptorData/Data/Demo/Textures/granite_tile/granite_tile_normal.ktx2", eImageCreateFlags::None);
-
-		AssetTicket orm_map = gAssetManager->LoadImage(
-			eImageType::Flat, eImageFormat::RGBA8_UNorm,
-			"RaptorData/Data/Demo/Textures/granite_tile/granite_tile_orm.ktx2", eImageCreateFlags::None);
-
-
-		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
-		test_material->Attach(Material::eResourceType::Normal, normal);
-		test_material->Attach(Material::eResourceType::ORM, orm_map);
-		test_material->Finalize();
-	}
+	mMaterials.Load("RaptorData/Data/materials/list.prx", "RaptorData/Data/materials");
 
 	// Selection material
 	{
@@ -509,23 +426,16 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	mBrushes.clear();
 }
 
-MaterialID Blockout::GetMaterialForSlot(eCProtoMat slot) const
+MaterialID Blockout::GetMaterialForID(int32 id) const
 {
-	switch (slot) {
-	case eCProtoMat::Gray:
-		return mWhiteMaterialID;
-	case eCProtoMat::Orange:
-		return mOrangeMaterialID;
-	case eCProtoMat::Blue:
-		return mBlueMaterialID;
-	case eCProtoMat::Brick:
-		return mProtoBricksID;
-	case eCProtoMat::GraniteTile:
-		return mProtoGraniteTileID;
-	default:
-		return mWhiteMaterialID;
-	}
+	const MaterialID material = mMaterials.GetMaterial(id);
+
+	return material.IsNull() ? GetDefaultMaterial() : material;
 }
+
+int32 Blockout::GetIDForMaterial(const MaterialID& material) const { return mMaterials.FindID(material); }
+
+MaterialID Blockout::GetDefaultMaterial() const { return mMaterials.GetMaterial(scDefaultMaterialID); }
 
 Brush* Blockout::GetBrush(const Object* object)
 {
@@ -719,7 +629,7 @@ ObjectID Blockout::CreateBrushObject(ConfigEntry& entry)
 		return ObjectID::scNull;
 	}
 
-	MaterialID material_id = mWhiteMaterialID;
+	MaterialID material_id = GetDefaultMaterial();
 
 	eObjectTag object_tags = eObjectTag::Blockout;
 
@@ -728,14 +638,19 @@ ObjectID Blockout::CreateBrushObject(ConfigEntry& entry)
 		SetFlag(object_tags, eObjectTag::LockTransform);
 	}
 	else {
-		material_id = mOrangeMaterialID;
+		material_id = mMaterials.GetMaterial(scEditableMaterialID);
 	}
 
 	ConfigEntry* mat_entry = entry.GetMember(HashStr32("mat"));
 
 	if (mat_entry != nullptr) {
-		eCProtoMat mat_index = static_cast<eCProtoMat>(mat_entry->Get<int32>());
-		material_id = GetMaterialForSlot(mat_index);
+		const int32 mat_id = mat_entry->Get<int32>();
+
+		if (mMaterials.GetMaterial(mat_id).IsNull()) {
+			LogWarning(LC_ASSET, "Blockout '{}' uses the unknown material {}", entry.Name.Get(), mat_id);
+		}
+
+		material_id = GetMaterialForID(mat_id);
 	}
 
 	Object* object = gObjectManager->NewObject(blockout_id.Str(), material_id, object_tags);
@@ -846,7 +761,7 @@ Object* Blockout::NewObject(const Vec3f& position)
 	std::string blockout_name = String::Fmt("{}", BlockoutObjects.Size).Str();
 	LogInfo("Creating new blockout object '{}'", blockout_name);
 
-	Object* object = gObjectManager->NewObject(blockout_name, mWhiteMaterialID, eObjectTag::Blockout);
+	Object* object = gObjectManager->NewObject(blockout_name, GetDefaultMaterial(), eObjectTag::Blockout);
 
 	constexpr float32 scale = 0.25f;
 
@@ -927,8 +842,9 @@ Object* Blockout::RestoreObject(const Vec3f& position, const Brush::PlaneList& p
 
 	LogInfo("Restoring blockout object '{}'", blockout_name);
 
-	Object* object = gObjectManager->NewObject(blockout_name, material.IsNull() ? mOrangeMaterialID : material,
-											   eObjectTag::Blockout);
+	Object* object = gObjectManager->NewObject(
+		blockout_name, material.IsNull() ? mMaterials.GetMaterial(scEditableMaterialID) : material,
+		eObjectTag::Blockout);
 
 	object->MoveBy(position);
 	object->SetShadowCaster(true);
@@ -1123,6 +1039,33 @@ void Blockout::SaveLights(ConfigFile& info)
 	info.AddEntry(std::move(lights_container));
 }
 
+void Blockout::LoadCamera(ConfigFile& info)
+{
+	const ConfigEntry* camera = info.GetEntry(HashStr32("camera"));
+
+	if (camera == nullptr) {
+		return;
+	}
+
+	gCVars->Set("r_aperture", camera->GetMemberValue<float32>(HashStr32("aperture"), gCVars->Get("r_aperture", 16.0f)));
+	gCVars->Set("r_shutter", camera->GetMemberValue<float32>(HashStr32("shutter"), gCVars->Get("r_shutter", 0.01f)));
+	gCVars->Set("r_iso", camera->GetMemberValue<float32>(HashStr32("iso"), gCVars->Get("r_iso", 100.0f)));
+	gCVars->Set("r_exposure_ev",
+				camera->GetMemberValue<float32>(HashStr32("exposure_ev"), gCVars->Get("r_exposure_ev", 0.0f)));
+}
+
+void Blockout::SaveCamera(ConfigFile& info)
+{
+	ConfigEntry camera = ConfigEntry::Struct("camera");
+
+	camera.AddMember(ConfigEntry::Literal("aperture", gCVars->Get("r_aperture", 16.0f)));
+	camera.AddMember(ConfigEntry::Literal("shutter", gCVars->Get("r_shutter", 0.01f)));
+	camera.AddMember(ConfigEntry::Literal("iso", gCVars->Get("r_iso", 100.0f)));
+	camera.AddMember(ConfigEntry::Literal("exposure_ev", gCVars->Get("r_exposure_ev", 0.0f)));
+
+	info.AddEntry(std::move(camera));
+}
+
 void Blockout::Load(const String& path)
 {
 	ConfigFile info {};
@@ -1138,6 +1081,7 @@ void Blockout::Load(const String& path)
 #endif
 
 	LoadLights(info);
+	LoadCamera(info);
 
 	ConfigEntry* blocks_entry = info.GetEntry(HashStr32("all"));
 
@@ -1159,6 +1103,7 @@ void Blockout::Save(const String& path)
 	ConfigFile info {};
 
 	SaveLights(info);
+	SaveCamera(info);
 
 	ConfigEntry* all_entry = info.AddEntry("all");
 
@@ -1184,21 +1129,16 @@ void Blockout::Save(const String& path)
 				blockout_entry.AddMember(ConfigEntry::Literal("probevolume", 1));
 			}
 
-			// Save material type
-			if (object->GetMaterialID() == mBlueMaterialID) {
-				blockout_entry.AddMember(ConfigEntry::DotReference("mat", "$cprotomat.blue"));
-			}
-			else if (object->GetMaterialID() == mWhiteMaterialID) {
-				blockout_entry.AddMember(ConfigEntry::DotReference("mat", "$cprotomat.grey"));
-			}
-			else if (object->GetMaterialID() == mOrangeMaterialID) {
-				blockout_entry.AddMember(ConfigEntry::DotReference("mat", "$cprotomat.orange"));
-			}
-			else if (object->GetMaterialID() == mProtoBricksID) {
-				blockout_entry.AddMember(ConfigEntry::DotReference("mat", "$cprotomat.bricks"));
-			}
-			else if (object->GetMaterialID() == mProtoGraniteTileID) {
-				blockout_entry.AddMember(ConfigEntry::DotReference("mat", "$cprotomat.tile"));
+#ifdef FX_IS_EDITOR
+			const MaterialID object_material = gEditor->GetSelection().GetStoredMaterial(object);
+#else
+			const MaterialID object_material = object->GetMaterialID();
+#endif
+
+			const int32 material_id = GetIDForMaterial(object_material);
+
+			if (material_id >= 0) {
+				blockout_entry.AddMember(ConfigEntry::Literal("mat", static_cast<int64>(material_id)));
 			}
 		}
 		all_entry->AddMember(std::move(blockout_entry));

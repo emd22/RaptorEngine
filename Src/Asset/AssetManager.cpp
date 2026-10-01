@@ -193,13 +193,42 @@ void AssetManager::DebugPrintWorkers() const
 	}
 }
 
+void AssetManager::StopWorkers()
+{
+	if (mbWorkersStopped || !mbActive.test()) {
+		return;
+	}
+
+	mbWorkersStopped = true;
+
+	mbActive.clear();
+	ManagerUpdateNotifier.Kill();
+
+	for (auto& worker : mWorkerThreads) {
+		worker.Kill();
+		gThreadManager->Join(worker.WorkerTID);
+	}
+
+	gThreadManager->Join(mAssetManagerTID);
+
+	mWorkerThreads.Free();
+}
+
 void AssetManager::Shutdown()
 {
 	LogInfo(LC_ASSET, "Shutting down asset manager...");
 
-	if (!mbActive.test()) {
+	if (!mbActive.test() && !mbWorkersStopped) {
 		return;
 	}
+
+	StopWorkers();
+
+	if (mbShutdownDone) {
+		return;
+	}
+
+	mbShutdownDone = true;
 
 	// Cleanup all permutations of empty images that were created.
 	// PagedArray<AxImage>& empty_images_list = AxImage::GetEmptyImagesArray();
@@ -218,18 +247,6 @@ void AssetManager::Shutdown()
 
 	// Flush pending GPU deletions before destroying allocator/device
 	ShutdownDeletionQueue();
-
-	mbActive.clear();
-	ManagerUpdateNotifier.Kill();
-
-	for (auto& worker : mWorkerThreads) {
-		worker.Kill();
-		gThreadManager->Join(worker.WorkerTID);
-	}
-
-	gThreadManager->Join(mAssetManagerTID);
-
-	mWorkerThreads.Free();
 }
 
 void AssetManager::RequestHigherDetail()
