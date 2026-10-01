@@ -218,6 +218,14 @@ void RaptorGame::CreateGame()
 	// Metres between probes in a volume built from an editor brush. Set `$r_probe_spacing` in the console
 	gCVars->Set("r_probe_spacing", 2.5f);
 
+	gCVars->Set("r_probe_bounces", 3);
+
+	gCVars->Set("r_ssao_radius", gCVars->Get("r_ssao_radius", 0.25f));
+	gCVars->Set("r_ssao_bias", gCVars->Get("r_ssao_bias", 0.02f));
+	gCVars->Set("r_ssao_strength", gCVars->Get("r_ssao_strength", 1.5f));
+	gCVars->Set("r_ssao_power", gCVars->Get("r_ssao_power", 1.2f));
+	gCVars->Set("r_ssao_floor", gCVars->Get("r_ssao_floor", 0.35f));
+
 	mCrosshairTicket = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm, scCrosshairPath,
 												eImageCreateFlags::None);
 
@@ -500,9 +508,13 @@ void RaptorGame::ProcessControls()
 	}
 
 	// Save the blockout to a file
-	if (ControlManager::IsComboPressed(eKey::FX_KEY_LMETA, eKey::FX_KEY_S)) {
-		LogInfo("Saving blockout...");
-		gWorld->pBlockout->Save("RaptorData/Data/blockouts/btemp.prx");
+	if (ControlManager::IsComboPressed(eKey::FX_KEY_LMETA, eKey::FX_KEY_S) &&
+		!ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT)) {
+		const String path = (gWorld->BlockoutPath.GetLength() > 0) ? gWorld->BlockoutPath
+																   : String("RaptorData/Data/blockouts/btemp.prx");
+
+		LogInfo("Saving blockout to '{}'", path);
+		gWorld->pBlockout->Save(path);
 	}
 }
 

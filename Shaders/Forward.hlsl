@@ -587,7 +587,7 @@ PERMEND();
 	float3 probe_irradiance = float3(0.0f, 0.0f, 0.0f);
 	float probe_visibility = 1.0f;
 
-	if (!HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE)) {
+	if (!HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE) || HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_BOUNCE)) {
 		const uint probe_volume_count = GetProbeVolumeCount(bProbeVolume);
 
 		if (probe_volume_count > 0) {
@@ -614,7 +614,12 @@ PERMEND();
 	output.vAlbedo = float4((accumulated_light + ambient) * FSConst.fPreExposure, base_alpha);
 
 	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE)) {
-		const float3 lp_ambient = albedo * (PROBE_CAPTURE_AMBIENT_ILLUMINANCE * FX_MATH_1_OVER_PI);
+		float3 lp_ambient = albedo * (PROBE_CAPTURE_AMBIENT_ILLUMINANCE * FX_MATH_1_OVER_PI);
+
+		if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_BOUNCE)) {
+			lp_ambient += ambient;
+		}
+
 		output.vAlbedo = float4((accumulated_light + lp_ambient) * FSConst.fPreExposure, 1.0f);
 	}
 

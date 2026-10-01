@@ -9,19 +9,25 @@
 
 #include <wx/app.h>
 #include <wx/bitmap.h>
+#include <wx/filedlg.h>
 #include <wx/menu.h>
+#include <wx/msgdlg.h>
 #include <wx/panel.h>
 #include <wx/sizer.h>
 #include <wx/tglbtn.h>
 
+#include <Blockout.hpp>
 #include <Controls.hpp>
 #include <Core/FilesystemIO.hpp>
 #include <Core/Log.hpp>
 #include <Engine.hpp>
+#include <World.hpp>
+#include <filesystem>
 
 namespace fx::editor {
 
 static constexpr int32 scObjectPropertyPanelWidth = 240;
+static constexpr const char* scDefaultBlockoutPath = "RaptorData/Data/blockouts/btemp.prx";
 
 struct ToolButtonInfo
 {
@@ -71,10 +77,112 @@ static wxToggleButton* MakeToolButton(wxWindow* parent, const ToolButtonInfo& in
 }
 
 
+static std::string ToBlockoutPath(const std::filesystem::path& chosen)
+{
+	std::error_code error;
+	const std::filesystem::path relative = std::filesystem::relative(chosen, std::filesystem::current_path(), error);
+
+	return (error || relative.empty()) ? chosen.string() : relative.string();
+}
+
+void EditorFrame::OpenBlockout()
+{
+	if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
+		return;
+	}
+
+	if (wxMessageBox("Open another blockout? Anything you haven't saved will be lost.", "Open blockout",
+					 wxYES_NO | wxICON_QUESTION, this) != wxYES) {
+		return;
+	}
+
+	const std::filesystem::path current = std::filesystem::absolute(
+		(gWorld->BlockoutPath.GetLength() > 0) ? gWorld->BlockoutPath.Str() : std::string(scDefaultBlockoutPath));
+
+	wxFileDialog dialog(this, "Open blockout", wxString::FromUTF8(current.parent_path().lexically_normal().string()),
+						wxString::FromUTF8(current.filename().string()), "Blockout files (*.prx)|*.prx",
+						wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+
+	if (dialog.ShowModal() != wxID_OK) {
+		return;
+	}
+
+	const std::string path = ToBlockoutPath(std::filesystem::path(dialog.GetPath().ToStdString()));
+
+	LogInfo("Opening blockout '{}'", path);
+
+	const String previous_path = gWorld->BlockoutPath;
+	const String new_path(path.c_str());
+
+	if (gWorld->pBlockout->Load(new_path)) {
+		gWorld->BlockoutPath = new_path;
+	}
+	else {
+		gWorld->BlockoutPath = previous_path;
+		wxMessageBox("That file could not be loaded as a blockout.", "Open blockout", wxOK | wxICON_ERROR, this);
+	}
+}
+
+void EditorFrame::SaveBlockout()
+{
+	if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
+		return;
+	}
+
+	if (gWorld->BlockoutPath.GetLength() == 0) {
+		SaveBlockoutAs();
+		return;
+	}
+
+	LogInfo("Saving blockout to '{}'", gWorld->BlockoutPath);
+	gWorld->pBlockout->Save(gWorld->BlockoutPath);
+}
+
+void EditorFrame::SaveBlockoutAs()
+{
+	if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
+		return;
+	}
+
+	const std::filesystem::path current = std::filesystem::absolute(
+		(gWorld->BlockoutPath.GetLength() > 0) ? gWorld->BlockoutPath.Str() : std::string(scDefaultBlockoutPath));
+
+	wxFileDialog dialog(this, "Save blockout as", wxString::FromUTF8(current.parent_path().lexically_normal().string()),
+						wxString::FromUTF8(current.filename().string()), "Blockout files (*.prx)|*.prx",
+						wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+
+	if (dialog.ShowModal() != wxID_OK) {
+		return;
+	}
+
+	std::filesystem::path chosen(dialog.GetPath().ToStdString());
+
+	if (chosen.extension().empty()) {
+		chosen += ".prx";
+	}
+
+	const std::string path = ToBlockoutPath(chosen);
+
+	LogInfo("Saving blockout as '{}'", path);
+
+	gWorld->BlockoutPath = String(path.c_str());
+	gWorld->pBlockout->Save(gWorld->BlockoutPath);
+}
+
 EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : wxFrame(nullptr, wxID_ANY, title)
 {
 	// Top bar
 	wxMenuBar* menu_bar = new wxMenuBar;
+
+	wxMenu* file_menu = new wxMenu;
+
+	wxMenuItem* open_item = file_menu->Append(wxID_ANY, "Open...\tCtrl+O", "Opens an existing blockout file");
+	file_menu->AppendSeparator();
+	wxMenuItem* save_item = file_menu->Append(wxID_ANY, "Save", "Saves the blockout to its current file");
+	wxMenuItem* save_as_item = file_menu->Append(wxID_ANY, "Save As...\tCtrl+Shift+S",
+												 "Saves the blockout under a new name");
+
+	menu_bar->Append(file_menu, "&File");
 
 	wxMenu* world_menu = new wxMenu;
 
@@ -93,6 +201,9 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 
 	SetMenuBar(menu_bar);
 
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { OpenBlockout(); }, open_item->GetId());
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { SaveBlockout(); }, save_item->GetId());
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { SaveBlockoutAs(); }, save_as_item->GetId());
 	Bind(
 		wxEVT_MENU, [](wxCommandEvent&) { gEditor->InvokeReloadHandler(eReloadTarget::World); },
 		reload_world_item->GetId());

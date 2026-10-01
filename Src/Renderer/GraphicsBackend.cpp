@@ -13,6 +13,7 @@
 
 #include <Asset/Animation.hpp>
 #include <Asset/AssetManager.hpp>
+#include <CVar.hpp>
 #include <Color.hpp>
 #include <Core/Assert.hpp>
 #include <Core/Defines.hpp>
@@ -736,6 +737,12 @@ void GraphicsBackend::PresentFrame()
 }
 
 
+static constexpr float32 scDefaultSSAORadius = 0.25f;
+static constexpr float32 scDefaultSSAOBias = 0.02f;
+static constexpr float32 scDefaultSSAOStrength = 1.5f;
+static constexpr float32 scDefaultSSAOPower = 1.2f;
+static constexpr float32 scDefaultSSAOFloor = 0.35f;
+
 void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 {
 	FrameData* frame = GetFrame();
@@ -755,8 +762,11 @@ void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 	memcpy(consts.Projection, camera.ProjectionMatrix.RawData, sizeof(float32) * 16);
 	memcpy(consts.View, camera.ViewMatrix.RawData, sizeof(float32) * 16);
 
-	consts.Radius = 0.50f;
-	consts.Bias = 0.025f;
+	consts.Radius = gCVars->Get("r_ssao_radius", scDefaultSSAORadius);
+	consts.Bias = gCVars->Get("r_ssao_bias", scDefaultSSAOBias);
+	consts.Strength = gCVars->Get("r_ssao_strength", scDefaultSSAOStrength);
+	consts.Power = gCVars->Get("r_ssao_power", scDefaultSSAOPower);
+	consts.Floor = gCVars->Get("r_ssao_floor", scDefaultSSAOFloor);
 
 	SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::SSAO), eShaderType::Pixel, consts);
 

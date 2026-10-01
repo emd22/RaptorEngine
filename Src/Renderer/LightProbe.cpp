@@ -115,6 +115,9 @@ ProbeSHData MakeSkyGradientProbe(const float32 sky[3], const float32 ground[3])
 /// Brightest radiance a capture texel can contribute, so that a few very bright texels can't dominate a probe
 constexpr float32 scRadianceClamp = 65000.0f;
 
+constexpr int64 scDefaultProbeBounces = 3;
+constexpr int64 scMaxProbeBounces = 8;
+
 /// Surfaces closer than this to a probe are clipped out of its capture, so it sees straight through them
 constexpr float32 scCaptureNearPlane = 0.1f;
 
@@ -1076,10 +1079,12 @@ void ProbeManager::BeginBake()
 	}
 
 	mCurrentProbe = 0;
+	mCurrentBounce = 0;
+	mBounceCount = static_cast<uint32>(std::clamp<int64>(gCVars->Get("r_probe_bounces", scDefaultProbeBounces), 1, scMaxProbeBounces));
 	mBakeState = eBakeState::CapturePending;
 
-	LogInfo("Probe bake started ({} probes across {} volume(s), {} per frame)", mProbeCount, mVolumeCount,
-			scProbesPerFrame);
+	LogInfo("Probe bake started ({} probes across {} volume(s), {} per frame, {} bounce(s))", mProbeCount,
+			mVolumeCount, scProbesPerFrame, mBounceCount);
 }
 
 void ProbeManager::BeginGridBake()
@@ -1419,8 +1424,17 @@ void ProbeManager::ServiceCaptureBake()
 		return;
 	}
 
+	if (mCurrentBounce + 1 < mBounceCount) {
+		mCurrentBounce++;
+		mCurrentProbe = 0;
+		mBakeState = eBakeState::CapturePending;
+		LogInfo("Probe bounce {}/{} done, starting the next", mCurrentBounce, mBounceCount);
+		return;
+	}
+
 	mBakeState = eBakeState::Idle;
-	LogInfo("Probe bake complete ({} probes across {} volume(s))", mProbeCount, mVolumeCount);
+	LogInfo("Probe bake complete ({} probes across {} volume(s), {} bounce(s))", mProbeCount, mVolumeCount,
+			mBounceCount);
 }
 
 bool ProbeManager::ReadBackProbe(uint32 batch_slot, uint32 probe_index)

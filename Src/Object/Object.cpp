@@ -185,6 +185,10 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 	// every frame of a grid bake.
 	if (gProbeManager != nullptr && gProbeManager->IsCapturingFaces()) {
 		push_constants.Flags |= eDrawFlags::ProbeCapture;
+
+		if (gProbeManager->IsCapturingBounce()) {
+			push_constants.Flags |= eDrawFlags::ProbeBounce;
+		}
 	}
 
 	const bool is_probe_capture = HasFlag(push_constants.Flags, eDrawFlags::ProbeCapture);
@@ -448,11 +452,20 @@ void Object::SetPosition(const Vec3f& position)
 	}
 }
 
+void Object::SetScale(const float scale)
+{
+	Entity::SetScale(scale);
+
+	gWorldGrid->UpdateObject(this);
+}
+
 void Object::SetRotation(const Quat& rotation)
 {
 	const Quat delta = rotation * mRotation.Conjugate();
 
 	Entity::SetRotation(rotation);
+
+	gWorldGrid->UpdateObject(this);
 
 	if (PhysicsID.IsInvalid() == false) {
 		physics::Body* body = gPhysics->GetBody(PhysicsID);

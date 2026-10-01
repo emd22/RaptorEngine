@@ -301,8 +301,10 @@ public:
 	Pipeline& Select(Object* object, const CommandBuffer& cmd)
 	{
 		const bool masked = IsMasked(object);
+		const bool skinned = object->IsSkinned();
 		const PipelineHandle wanted = gPipelineCache->GetOrCreateVariant(
-			ePipelinePass::Shadow, masked ? ePipelineFeatures::AlphaMask : ePipelineFeatures::None);
+			ePipelinePass::Shadow,
+			skinned ? ePipelineFeatures::Skinned : (masked ? ePipelineFeatures::AlphaMask : ePipelineFeatures::None));
 
 		if (!(wanted == mBound)) {
 			gShadowAtlas->BindPipeline(wanted);
@@ -317,8 +319,10 @@ public:
 
 		Pipeline& pipeline = gPipelineCache->Get(mBound);
 
-		if (masked) {
-			gMaterialManager->BindWithPipeline(cmd, pipeline, object->GetMaterialID());
+		if (masked || skinned) {
+			if (!gMaterialManager->BindWithPipeline(cmd, pipeline, object->GetMaterialID())) {
+				gMaterialManager->BindWithPipeline(cmd, pipeline, MaterialID::scNull);
+			}
 		}
 
 		return pipeline;
@@ -372,6 +376,7 @@ void World::ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Cam
 
 		// Push the direct index for the object id
 		consts.ObjectIndex = object_id.GetID();
+		consts.BoneBase = object->BoneBufferBase;
 		gGraphics->SubmitPushConstants(cmd, selector.Select(object, cmd), eShaderType::Vertex, consts);
 		object->RenderPrimitive(cmd);
 	}
