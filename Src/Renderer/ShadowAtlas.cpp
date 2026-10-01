@@ -84,30 +84,35 @@ ShadowAtlas::ShadowAtlas()
 	// Opaque casters first, then alpha masked ones
 	gPipelineCache->GetOrCreateVariant(ePipelinePass::Shadow, ePipelineFeatures::None);
 	gPipelineCache->GetOrCreateVariant(ePipelinePass::Shadow, ePipelineFeatures::AlphaMask);
+	gPipelineCache->GetOrCreateVariant(ePipelinePass::Shadow, ePipelineFeatures::Skinned);
 }
 
 bool ShadowAtlas::MakeShadowDesc(ePipelineFeatures features, PipelineDesc& out_desc)
 {
-	// Skinned casters are not drawn into the atlas, the shadow pipeline only has the default vertex layout
-	if (features != ePipelineFeatures::None && features != ePipelineFeatures::AlphaMask) {
+	if (features != ePipelineFeatures::None && features != ePipelineFeatures::AlphaMask &&
+		features != ePipelineFeatures::Skinned) {
 		return false;
 	}
 
 	// Alpha masked materials (leaves, fences, etc.) discard on the albedo alpha. The set 0 layout is identical for both
 	// pipelines, as the shadow passes swap between them without rebinding the region.
 	const bool is_masked = (features == ePipelineFeatures::AlphaMask);
+	const bool is_skinned = (features == ePipelineFeatures::Skinned);
 
 	out_desc.Features = features;
-	out_desc.DebugName = is_masked ? "ShadowDirectionalMasked" : "ShadowDirectional";
+	out_desc.DebugName = is_masked ? "ShadowDirectionalMasked" : (is_skinned ? "ShadowDirectionalSkinned" : "ShadowDirectional");
 
 	out_desc.Shader = eShaderName::Shadows;
 
 	if (is_masked) {
 		out_desc.Macros = { ShaderMacro { .pcName = "ALPHA_MASK", .pcValue = "1" } };
 	}
+	else if (is_skinned) {
+		out_desc.Macros = { ShaderMacro { .pcName = "USE_SKINNING", .pcValue = "1" } };
+	}
 
 	out_desc.pStage = &RenderStage;
-	out_desc.VertexType = eVertexType::Default;
+	out_desc.VertexType = is_skinned ? eVertexType::Skinned : eVertexType::Default;
 	out_desc.DepthCompareOp = VK_COMPARE_OP_GREATER;
 	out_desc.CullMode = eCullMode::Back;
 	out_desc.FaceOrder = eFaceOrder::Reverse;
@@ -115,14 +120,14 @@ bool ShadowAtlas::MakeShadowDesc(ePipelineFeatures features, PipelineDesc& out_d
 	out_desc.PushConstantStages = eShaderType::Vertex;
 	out_desc.PushConstantSize = sizeof(ShadowPushConstants);
 
-	out_desc.DeclareDescriptors = [is_masked](PSOBuild& pso)
+	out_desc.DeclareDescriptors = [is_masked, is_skinned](PSOBuild& pso)
 	{
 		// Set 0 (Global / Per Frame)
 		pso.AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0, gObjectManager->GetPageSize());
 		pso.AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
 					  gMaterialManager->MaterialPropertiesBuffer.Size);
 
-		if (is_masked) {
+		if (is_masked || is_skinned) {
 			// Set 1 (Object local), the material's own descriptors. Only the albedo is read.
 			Material::DeclareDescriptors(pso);
 		}
@@ -137,7 +142,13 @@ void ShadowAtlas::BindPipeline(PipelineHandle pipeline)
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
 	// The viewport was set for the region when it began, and binding a pipeline leaves it alone
-	gPipelineCache->Bind(pipeline, cmd);
+	// Only the pipeline. The callers bind set 0 with its dynamic offsets, and the skinned and masked variants' set 1 is
+	// the material's, which is bound per draw.
+	Pipeline& pl = gPipelineCache->Get(pipeline);
+
+	if (pl.IsBuilt()) {
+		pl.Bind(cmd);
+	}
 }
 
 Target* ShadowAtlas::GetTarget() { return RenderStage.GetTarget(eImageFormat::D32_Float); }
@@ -171,9 +182,6 @@ void ShadowAtlas::BeginRegion(const ShadowAtlasRegion& region)
 	// Only the region is drawn to, even when the whole atlas is being cleared
 	RenderStage.Begin(cmd, render_area, rect);
 	mbInitialized = true;
-
-	gPipelineCache->AddBufferOffset(0, gObjectManager->GetBaseOffset());
-	gPipelineCache->AddBufferOffset(0, 0);
 
 	BindPipeline(gPipelineCache->GetOrCreateVariant(ePipelinePass::Shadow, ePipelineFeatures::None));
 }

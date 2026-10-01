@@ -27,7 +27,6 @@ enum FACETEXTUREEDIT : uint
 	SHIFT,
 	SCALE,
 	ROTATE,
-	CYCLE_MATERIAL,
 	RESET,
 }
 
@@ -41,7 +40,6 @@ enum EDITORTOOL
 	ROTATE,
 	CREATE,
 	CLIP,
-	SET_MATERIAL,
 	LIGHT,
 }
 
@@ -180,10 +178,6 @@ extern OBJECT blockout_create_box(float3 min, float3 max);
 /* Splits a blockout in two along the line from `point_a` to `point_b`, cutting straight through the face (with world
    space normal `face_normal`) that the line was drawn on. Both pieces are kept. Undoable. */
 extern bool blockout_clip(OBJECT object, float3 point_a, float3 point_b, float3 face_normal);
-
-/* Paints the face under the crosshair, or its whole brush, with a prototype material slot (see eCProtoMat), as an
-   undoable operation. A negative slot paints with the blockout's own material. */
-extern bool blockout_paint_material(int slot, bool whole_brush);
 
 /* Light probes */
 

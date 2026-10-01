@@ -63,6 +63,58 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 		tool_panel->Add(mpRadiusField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
 	}
 
+	{
+		mpIntensityField = new FloatField(this, "Intensity (cd)", Vec2f(0.0f, 100000000.0f));
+		mpIntensityField->SetOnChange(
+			[this](const float value)
+			{
+				if (mpShownLight != nullptr) {
+					mpShownLight->Intensity = value;
+				}
+			});
+
+		tool_panel->Add(mpIntensityField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
+	}
+
+	{
+		mpLumensField = new FloatField(this, "Lumens", Vec2f(0.0f, 100000000.0f));
+		mpLumensField->SetOnChange(
+			[this](const float value)
+			{
+				if (mpShownLight != nullptr) {
+					mpShownLight->SetLumens(value);
+				}
+			});
+
+		tool_panel->Add(mpLumensField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
+	}
+
+	{
+		mpOuterAngleField = new FloatField(this, "Outer angle", Vec2f(1.0f, 90.0f));
+		mpOuterAngleField->SetOnChange(
+			[this](const float value)
+			{
+				if (mpShownLight != nullptr) {
+					mpShownLight->SetConeAngles(mpShownLight->GetInnerAngle(), MathUtil::DegreesToRadians(value));
+				}
+			});
+
+		tool_panel->Add(mpOuterAngleField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
+	}
+
+	{
+		mpInnerAngleField = new FloatField(this, "Inner angle", Vec2f(0.0f, 90.0f));
+		mpInnerAngleField->SetOnChange(
+			[this](const float value)
+			{
+				if (mpShownLight != nullptr) {
+					mpShownLight->SetConeAngles(MathUtil::DegreesToRadians(value), mpShownLight->GetOuterAngle());
+				}
+			});
+
+		tool_panel->Add(mpInnerAngleField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
+	}
+
 	Refresh();
 }
 
@@ -74,8 +126,7 @@ void LightToolSettingsPanel::OnColorChange(wxColourPickerEvent& event)
 
 	const wxColour colour = event.GetColour();
 
-	// The alpha is the brightness of the light, don't change it here.
-	mpShownLight->Color = Color::FromRGBA(colour.Red(), colour.Green(), colour.Blue(), mpShownLight->Color.A);
+	mpShownLight->Color = Color::FromRGBA(colour.Red(), colour.Green(), colour.Blue(), 255);
 }
 
 void LightToolSettingsPanel::Refresh()
@@ -113,6 +164,22 @@ void LightToolSettingsPanel::Refresh()
 
 	if (!mpRadiusField->HasFocus()) {
 		mpRadiusField->SetValue(light->GetRadius());
+	}
+
+	if (!mpIntensityField->HasFocus()) {
+		mpIntensityField->SetValue(light->Intensity);
+	}
+
+	if (!mpLumensField->HasFocus()) {
+		mpLumensField->SetValue(light->GetLumens());
+	}
+
+	if (!mpOuterAngleField->HasFocus()) {
+		mpOuterAngleField->SetValue(MathUtil::RadiansToDegrees(light->GetOuterAngle()));
+	}
+
+	if (!mpInnerAngleField->HasFocus()) {
+		mpInnerAngleField->SetValue(MathUtil::RadiansToDegrees(light->GetInnerAngle()));
 	}
 }
 

@@ -296,6 +296,12 @@ void Material::SetMetallicRoughness(float32 metallic, float32 roughness)
 	mbRequiresSync = true;
 }
 
+void Material::SetOcclusionStrength(float32 strength)
+{
+	Properties.OcclusionStrength = strength;
+	mbRequiresSync = true;
+}
+
 void Material::SetSpecularGlossiness(const float32 specular[3], float32 glossiness)
 {
 	SetFlag(Properties.Flags, eMaterialFlags::SpecularGlossiness);

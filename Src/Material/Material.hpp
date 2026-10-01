@@ -124,7 +124,9 @@ struct MaterialProperties
 	float32 GlossinessFactor = 1.0f;
 
 	float32 BaseColorFactor[3] = { 1.0f, 1.0f, 1.0f };
-	float32 Padding = 0.0f;
+
+	/// How much of the MetallicRoughness texture's R channel is applied as ambient occlusion, 0 ignores the channel.
+	float32 OcclusionStrength = 1.0f;
 };
 
 static_assert(sizeof(MaterialProperties) == 48,
@@ -219,6 +221,8 @@ public:
 	void SetSpecularGlossiness(const float32 specular[3], float32 glossiness);
 
 	void SetBaseColorFactor(const float32 color[3]);
+
+	void SetOcclusionStrength(float32 strength);
 
 	/**
 	 * @brief Adds the descriptors of a material's set (set 1) to the pipeline being built, so that it can be drawn with

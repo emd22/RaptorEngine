@@ -86,6 +86,9 @@ DsLayoutID DsLayoutCache::GetID(const SizedArray<DescriptorEntry>& entries)
 
 		const VkDescriptorType dtype = entry.GetDescriptorType();
 		id_result = ID_HASH_HANDLE(&dtype, sizeof(dtype));
+
+		const uint32 stages = static_cast<uint32>(entry.ShaderStages);
+		id_result = ID_HASH_HANDLE(&stages, sizeof(stages));
 	}
 
 	return DsLayoutID { id_result };

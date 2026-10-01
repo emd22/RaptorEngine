@@ -356,6 +356,10 @@ public:
 
 	void Clear()
 	{
+		if (!IsInited()) {
+			return;
+		}
+
 		Destroy();
 		Create(PageNodeCapacity);
 	}

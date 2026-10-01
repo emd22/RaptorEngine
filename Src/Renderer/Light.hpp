@@ -5,6 +5,7 @@
 #include <Entity.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/MathUtil.hpp>
+#include <Renderer/Exposure.hpp>
 #include <Renderer/LightID.hpp>
 #include <Renderer/PipelineNames.hpp>
 #include <Renderer/ShadowAtlas.hpp>
@@ -61,7 +62,7 @@ public:
 	LightID ID = LightID::scNull;
 
 	struct Color Color = Color::sWhite;
-	struct Color AmbientColor { 0x101f1f1f };
+	float32 Intensity = 100000.0f;
 
 	eLightFlags Flags = LF_None;
 	eLightType Type = eLightType::Unknown;
@@ -129,6 +130,10 @@ public:
 	void SetDirection(const Vec3f& direction);
 
 	Vec3f GetDirection() const;
+
+	float32 GetSolidAngle() const;
+	float32 GetLumens() const;
+	void SetLumens(float32 lumens);
 
 	Mat4f CalculateShadowMatrix() const;
 

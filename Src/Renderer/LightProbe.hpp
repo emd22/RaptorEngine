@@ -121,6 +121,8 @@ public:
 
 	/// True only while the capture faces are being drawn. The main view keeps its probe GI and SSAO during a bake.
 	bool IsCapturingFaces() const { return mbCapturingFaces; }
+
+	bool IsCapturingBounce() const { return mbCapturingFaces && mCurrentBounce > 0; }
 	void RecordCaptureBatch(renderer::CommandBuffer& cmd, const RenderFaceFunc& render_face);
 	void ServiceCaptureBake();
 
@@ -188,6 +190,8 @@ private:
 	bool mbCapturingFaces = false;
 	uint32 mCurrentProbe = 0;
 	uint32 mBatchStart = 0;
+	uint32 mCurrentBounce = 0;
+	uint32 mBounceCount = 1;
 
 	// Capture resources, created by the first bake
 

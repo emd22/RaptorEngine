@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Brush.hpp>
+#include <Color.hpp>
 #include <Core/Name.hpp>
 #include <Core/Types.hpp>
 #include <Core/UndoStack.hpp>
@@ -145,6 +146,9 @@ public:
 		float32 OuterAngle = 0.0f;
 
 		bool bCastShadows = true;
+
+		Color Colour = Color::sWhite;
+		float32 Intensity = 100000.0f;
 	} LightSnap;
 
 	/// The size of the operation group this is in. For example, when moving 10 objects, there will be 10 operations(one

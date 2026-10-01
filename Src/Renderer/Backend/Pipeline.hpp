@@ -66,6 +66,7 @@ enum class eDrawFlags : uint32
 	NoDecals = (1 << 3),
 	/// The draw does not sample the light probes
 	NoProbes = (1 << 4),
+	ProbeBounce = (1 << 5),
 };
 
 FxEnumFlags(eDrawFlags);
@@ -100,6 +101,10 @@ struct alignas(16) DrawPushConstants
 	uint32 TileRows = 0;
 
 	float32 EyePosition[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+	/// Scale applied to the lit result before it is written to the HDR target, see GraphicsBackend::PreExposure
+	float32 PreExposure = 1.0f;
+
 };
 
 static_assert(sizeof(DrawPushConstants) <= 128, "DrawPushConstants exceeds the minimum guaranteed push constant size");
@@ -155,7 +160,7 @@ struct alignas(16) LightGpuData
 
 	uint32 Color;
 	uint32 Type;
-	uint32 Ambient;
+	float32 Intensity;
 	float32 InvRadiusSq;
 
 	/// Spot lights only: world space direction the cone points along

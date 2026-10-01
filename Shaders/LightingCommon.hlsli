@@ -17,7 +17,7 @@ struct Light
 	// 96
 	uint1 uiLightColor;
 	uint1 uiLightType;
-	uint1 uiAmbient;
+	float1 fIntensity;
 	/// 1 / (radius * radius), so the shading pass does not divide once per pixel per light
 	float1 fInvRadiusSq;
 	// 112
@@ -55,6 +55,8 @@ struct TileLightData
 
 #define FX_MATH_PI 3.14159265359
 #define FX_MATH_1_OVER_PI 0.31830988618
+
+#define PROBE_CAPTURE_AMBIENT_ILLUMINANCE 1500.0
 
 /// Clamped dot product
 float DotC(float3 a, float3 b)
@@ -116,6 +118,13 @@ float3 EnvBRDFApprox(float3 f0, float roughness, float NdotV)
 	float2 AB = float2(-1.04, 1.04) * a004 + r.zw;
 
 	return f0 * AB.x + AB.y;
+}
+
+/// Occlusion of specular ambient light (Lagarde & de Rousiers, "Moving Frostbite to PBR"). A cavity blocks the
+/// reflection less than it blocks diffuse light at grazing angles and on smooth surfaces.
+float SpecularOcclusion(float NdotV, float ambient_occlusion, float roughness)
+{
+	return saturate(pow(NdotV + ambient_occlusion, exp2(-16.0 * roughness - 1.0)) - 1.0 + ambient_occlusion);
 }
 
 /// Direction the specular lobe is centred on, for looking up ambient specular (Frostbite,

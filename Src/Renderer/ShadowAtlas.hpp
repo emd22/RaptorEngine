@@ -16,6 +16,7 @@ struct alignas(16) ShadowPushConstants
 {
 	float32 CameraMatrix[16];
 	uint32 ObjectIndex = 0;
+	uint32 BoneBase = 0;
 };
 
 /// A rectangle of the shadow atlas, in texels

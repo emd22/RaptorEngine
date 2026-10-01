@@ -8,6 +8,7 @@
 #include <Asset/ConfigFile.hpp>
 #include <Object/Object.hpp>
 #include <Player.hpp>
+#include <Renderer/Exposure.hpp>
 #include <Script/ScriptManager.hpp>
 #include <World.hpp>
 #include <atomic>
@@ -115,6 +116,12 @@ private:
 	CVarValue* mpShowGpuCVar = nullptr;
 	CVarValue* mpProbesCVar = nullptr;
 	CVarValue* mpDecalsCVar = nullptr;
+	CVarValue* mpExposureCVar = nullptr;
+	CVarValue* mpApertureCVar = nullptr;
+	CVarValue* mpShutterCVar = nullptr;
+	CVarValue* mpIsoCVar = nullptr;
+
+	void UpdateExposure();
 
 	Object* mpRaycastHitMarker = nullptr;
 	ObjectID mEditorSelectedObject = ObjectID::scNull;

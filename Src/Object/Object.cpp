@@ -47,25 +47,6 @@ void Object::SetMaterial(const MaterialID& id)
 	// }
 }
 
-MaterialID Object::GetSectionMaterial(const MeshSection& section) const
-{
-	if (section.Material.IsNull() || HasFlag(Flags, eObjectFlags::MaterialOverridesSections)) {
-		return mMaterialID;
-	}
-
-	return section.Material;
-}
-
-void Object::SetMaterialOverridesSections(bool value)
-{
-	if (value) {
-		SetFlag(Flags, eObjectFlags::MaterialOverridesSections);
-	}
-	else {
-		ClearFlag(Flags, eObjectFlags::MaterialOverridesSections);
-	}
-}
-
 void Object::Create(const Ref<PrimitiveMesh>& mesh, const MaterialID& material)
 {
 	pMesh = mesh;
@@ -178,7 +159,7 @@ void Object::ReserveInstances(uint32 num)
 }
 
 
-void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline, const MeshSection* section)
+void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 {
 	UpdateIfOutOfDate();
 
@@ -193,7 +174,7 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline, c
 	DrawPushConstants push_constants { .TargetSize = { gGraphics->Swapchain.Extent.X, gGraphics->Swapchain.Extent.Y } };
 	push_constants.ObjectId = ID.GetID();
 
-	push_constants.MaterialIndex = (section != nullptr) ? GetSectionMaterial(*section).GetID() : mMaterialID.GetID();
+	push_constants.MaterialIndex = mMaterialID.GetID();
 	push_constants.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
 	push_constants.TileRows = gGraphics->pRenderer->GetLightTileRows();
 	push_constants.BoneBase = BoneBufferBase;
@@ -204,7 +185,14 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline, c
 	// every frame of a grid bake.
 	if (gProbeManager != nullptr && gProbeManager->IsCapturingFaces()) {
 		push_constants.Flags |= eDrawFlags::ProbeCapture;
+
+		if (gProbeManager->IsCapturingBounce()) {
+			push_constants.Flags |= eDrawFlags::ProbeBounce;
+		}
 	}
+
+	const bool is_probe_capture = HasFlag(push_constants.Flags, eDrawFlags::ProbeCapture);
+	push_constants.PreExposure = is_probe_capture ? 1.0f : gGraphics->PreExposure;
 
 	if (gGraphics->bOnlyRenderProbes) {
 		push_constants.Flags |= eDrawFlags::DebugIrradiance;
@@ -225,33 +213,26 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline, c
 	gGraphics->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex | eShaderType::Pixel,
 								   push_constants);
 
-	RenderMesh(pipeline, section);
+	RenderMesh(pipeline);
 }
 
 
-void Object::RenderPrimitive(const CommandBuffer& cmd, const MeshSection* section)
+void Object::RenderPrimitive(const CommandBuffer& cmd)
 {
 	if (!pMesh || !CheckIfReady(false) || !HasBonesForDraw()) {
 		return;
 	}
 
-	if (section != nullptr) {
-		pMesh->RenderRange(cmd, section->FirstIndex, section->IndexCount, (mInstanceSlotsInUse + 1));
-	}
-	else {
-		pMesh->Render(cmd, (mInstanceSlotsInUse + 1));
-	}
+	pMesh->Render(cmd, (mInstanceSlotsInUse + 1));
 }
 
-void Object::RenderMesh(renderer::Pipeline* pipeline, const MeshSection* section)
+void Object::RenderMesh(renderer::Pipeline* pipeline)
 {
 	FrameData* frame = gGraphics->GetFrame();
 	CommandBuffer& cmd = frame->CmdBuffer;
 
-	const MaterialID material_id = (section != nullptr) ? GetSectionMaterial(*section) : mMaterialID;
-
 	// If there was an error binding the object material, bind the null material.
-	if (!gMaterialManager->BindWithPipeline(cmd, *pipeline, material_id)) {
+	if (!gMaterialManager->BindWithPipeline(cmd, *pipeline, mMaterialID)) {
 		gMaterialManager->BindWithPipeline(cmd, *pipeline, MaterialID::scNull);
 	}
 
@@ -260,12 +241,7 @@ void Object::RenderMesh(renderer::Pipeline* pipeline, const MeshSection* section
 	}
 
 	// + 1 for source object
-	if (section != nullptr) {
-		pMesh->RenderRange(cmd, section->FirstIndex, section->IndexCount, (mInstanceSlotsInUse + 1));
-	}
-	else {
-		pMesh->Render(cmd, (mInstanceSlotsInUse + 1));
-	}
+	pMesh->Render(cmd, (mInstanceSlotsInUse + 1));
 }
 
 void Object::Update()
@@ -476,11 +452,20 @@ void Object::SetPosition(const Vec3f& position)
 	}
 }
 
+void Object::SetScale(const float scale)
+{
+	Entity::SetScale(scale);
+
+	gWorldGrid->UpdateObject(this);
+}
+
 void Object::SetRotation(const Quat& rotation)
 {
 	const Quat delta = rotation * mRotation.Conjugate();
 
 	Entity::SetRotation(rotation);
+
+	gWorldGrid->UpdateObject(this);
 
 	if (PhysicsID.IsInvalid() == false) {
 		physics::Body* body = gPhysics->GetBody(PhysicsID);

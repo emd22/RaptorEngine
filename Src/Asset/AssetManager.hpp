@@ -135,6 +135,7 @@ public:
 	AssetManager() = default;
 
 	void Start(int32 min_threads);
+	void StopWorkers();
 	void Shutdown();
 
 	void WorkerUpdate();
@@ -312,6 +313,8 @@ private:
 	SizedArray<AssetWorker*> WorkersWaitingToUpload;
 
 	std::atomic_flag mbActive;
+	bool mbWorkersStopped = false;
+	bool mbShutdownDone = false;
 	CountedNotifier ManagerUpdateNotifier;
 
 	bool mbShouldSleep = false;
