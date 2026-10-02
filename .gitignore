@@ -54,3 +54,11 @@ Testing
 
 
 private
+
+SrcRS/target
+rust-target
+
+*.spack
+
+strata_struct_test.o
+cache/shaders
