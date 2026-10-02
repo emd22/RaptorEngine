@@ -46,6 +46,44 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${SOURCES})
 
 add_subdirectory(Submodules/strata)
 
+find_program(RX_CARGO cargo HINTS "$ENV{HOME}/.cargo/bin" "$ENV{USERPROFILE}/.cargo/bin" REQUIRED)
+
+set(RX_RUST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/SrcRS")
+set(RX_RUST_TARGET_DIR "${CMAKE_BINARY_DIR}/rust-target")
+if(WIN32)
+    set(RX_RUST_LIB_NAME "raptor_ffi.lib")
+else()
+    set(RX_RUST_LIB_NAME "libraptor_ffi.a")
+endif()
+get_property(RX_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if(RX_MULTI_CONFIG)
+    set(RX_RUST_PROFILE_DIR "$<IF:$<CONFIG:Debug>,debug,release>")
+elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(RX_RUST_PROFILE_DIR "debug")
+else()
+    set(RX_RUST_PROFILE_DIR "release")
+endif()
+set(RX_RUST_LIB "${RX_RUST_TARGET_DIR}/${RX_RUST_PROFILE_DIR}/${RX_RUST_LIB_NAME}")
+
+add_custom_target(raptor_rust
+    COMMAND ${RX_CARGO} build
+        --manifest-path "${RX_RUST_DIR}/Cargo.toml"
+        --target-dir "${RX_RUST_TARGET_DIR}"
+        --package raptor-ffi
+        $<$<NOT:$<CONFIG:Debug>>:--release>
+    BYPRODUCTS "${RX_RUST_LIB}"
+    COMMENT "Building Rust crates"
+    USES_TERMINAL
+)
+
+add_library(raptor_ffi STATIC IMPORTED GLOBAL)
+set_target_properties(raptor_ffi PROPERTIES IMPORTED_LOCATION "${RX_RUST_LIB}")
+add_dependencies(raptor_ffi raptor_rust)
+target_include_directories(raptor_ffi INTERFACE "${RX_RUST_DIR}/raptor-ffi/include")
+if(WIN32)
+    target_link_libraries(raptor_ffi INTERFACE ws2_32 userenv ntdll bcrypt advapi32 kernel32)
+endif()
+
 
 # Add shaders as a Visual Studio filter, borrowed from Hyperion Engine
 file(GLOB_RECURSE SHADER_FILES "${CMAKE_SOURCE_DIR}/Shaders/*")
@@ -162,7 +200,6 @@ if(FX_EDITOR)
         target_sources(raptor PRIVATE "Src/Editor/raptor.rc")
     endif()
 
-    # TODO: test on macOS and Linux
     if(APPLE)
         # Metal layer and relative mouse helpers
         enable_language(OBJCXX)
@@ -185,7 +222,7 @@ else()
 endif()
 
 # Strata
-target_link_libraries(raptor PRIVATE strata)
+target_link_libraries(raptor PRIVATE strata raptor_ffi)
 target_include_directories(raptor SYSTEM BEFORE PRIVATE "Submodules/strata/include")
 
 
