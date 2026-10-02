@@ -62,6 +62,40 @@ size_t rx_config_entry_count(const RxConfig* config);
 const RxEntry* rx_config_entries(const RxConfig* config);
 void rx_config_free(RxConfig* config);
 
+typedef struct RxLogSink
+{
+    void* user;
+    void (*log)(void* user, int32_t level, int32_t category, const char* message, size_t length);
+} RxLogSink;
+
+typedef struct RxShaderMacro
+{
+    const char* name;
+    const char* value;
+} RxShaderMacro;
+
+typedef struct RxReflectionEntry
+{
+    uint16_t type;
+    uint8_t set;
+    uint8_t binding;
+} RxReflectionEntry;
+
+typedef struct RxPreprocResult RxPreprocResult;
+
+enum RxShaderStage
+{
+    RX_STAGE_VERTEX = 0,
+    RX_STAGE_PIXEL = 1,
+    RX_STAGE_COMPUTE = 2,
+};
+
+RxPreprocResult* rx_preproc_process(const uint8_t* data, size_t length, const RxShaderMacro* macros, size_t macro_count,
+                                    const RxLogSink* log);
+const uint8_t* rx_preproc_program(const RxPreprocResult* result, uint32_t stage, size_t* length);
+const RxReflectionEntry* rx_preproc_reflection(const RxPreprocResult* result, uint32_t stage, size_t* count);
+void rx_preproc_free(RxPreprocResult* result);
+
 #ifdef __cplusplus
 }
 #endif

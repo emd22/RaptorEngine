@@ -14,6 +14,7 @@
 #include <unordered_set>
 
 // Includes for Rust stuff
+#include <Util/RustInterop.hpp>
 #include <raptor_ffi.h>
 
 
@@ -244,27 +245,6 @@ int32 ReadIncludeForRust(void*, const char* path, const char* extension, uint8**
 
 void ReleaseIncludeForRust(void*, uint8* data) { delete[] data; }
 
-void LogForRust(void*, int32 level, int32 category, const char* message, size_t length)
-{
-	const std::string_view text(message, length);
-	const eLogCategory log_category = static_cast<eLogCategory>(category);
-
-	switch (level) {
-	case RX_LOG_PRINT:
-		puts(std::string(text).c_str());
-		break;
-	case RX_LOG_INFO:
-		LogInfo(log_category, "{}", text);
-		break;
-	case RX_LOG_WARNING:
-		LogWarning(log_category, "{}", text);
-		break;
-	default:
-		LogError(log_category, "{}", text);
-		break;
-	}
-}
-
 void ReadPrimitiveFromRust(ConfigPrimitive& out, const RxPrimitive& in)
 {
 	switch (static_cast<RxValueKind>(in.kind)) {
@@ -341,7 +321,7 @@ void ConfigFile::Load(const std::string& path)
 		.user = nullptr,
 		.read_include = ReadIncludeForRust,
 		.release_include = ReleaseIncludeForRust,
-		.log = LogForRust,
+		.log = RustInterop::Log,
 	};
 
 	const std::string constants_path = FilesystemIO::ResolvePath("Config/Internal/Constants.conf");
