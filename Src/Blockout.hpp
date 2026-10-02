@@ -125,7 +125,9 @@ public:
 	 * Falls back to a unique name if the original name is taken.
 	 */
 	Object* RestoreObject(const Vec3f& position, const Brush::PlaneList& planes, MaterialID material,
-						  const Quat& rotation, const Name& name);
+						  const Quat& rotation, const Name& name, bool is_dynamic = false);
+
+	bool IsDynamic(const Object* object) const;
 
 	void DestroyObject(Object* object);
 

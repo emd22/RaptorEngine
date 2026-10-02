@@ -388,12 +388,14 @@ void World::UpdateSpotShadows()
 	mSpotShadowBakes.Clear();
 	mSpotShadowCasters.Clear();
 
-	for (const Ref<LightBase>& light_ref : gLightManager->GetCache()) {
-		if (light_ref->Type != eLightType::Spot) {
+	for (const LightID light_id : mLightList.GetLights()) {
+		LightBase* light_base = gLightManager->GetLight(light_id);
+
+		if (light_base == nullptr || light_base->Type != eLightType::Spot) {
 			continue;
 		}
 
-		LightSpot* light = static_cast<LightSpot*>(&(*light_ref));
+		LightSpot* light = static_cast<LightSpot*>(light_base);
 		LightSpot::ShadowState& shadow = light->Shadow;
 
 		if (!light->bCastShadows) {
@@ -767,10 +769,50 @@ void World::AddTileToRenderList(bool clear, TileIndex new_tile_index)
 }
 
 
+void World::AddTileToLightList(TileIndex tile_index)
+{
+	const Tile* tile = gWorldGrid->GetTile(tile_index);
+
+	if (tile == nullptr || !tile->Lights.IsInited()) {
+		return;
+	}
+
+	uint32 index = 0;
+	while (true) {
+		index = tile->Lights.SlotsInUse.FindNextSetBit(index);
+		if (index == Bitset::scNoFreeBits) {
+			break;
+		}
+
+		const LightID* light_id = tile->Lights.GetItem(index);
+		++index;
+
+		if (light_id == nullptr) {
+			continue;
+		}
+
+		mLightList.AddLight(*light_id);
+	}
+}
+
+void World::AddUnculledLightsToLightList()
+{
+	const bool needs_all_lights = gProbeManager->IsBaking();
+
+	for (LightBase* light : gLightManager->GetCache()) {
+		if (needs_all_lights || light->mTileIndex == TileIndexNull) {
+			mLightList.AddLight(light->ID);
+		}
+	}
+}
+
 void World::CullWorldTiles(const PerspectiveCamera& cam)
 {
 	mFrustum.Rebuild(cam);
 	mVisibleTiles.Clear();
+
+	mLightList.Clear();
+	AddTileToLightList(WorldGrid::scGlobalTileIndex);
 
 	AABB frustum_bounds = mFrustum.GetFrustumBoundingBox(cam);
 
@@ -809,10 +851,13 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 			mVisibleTiles.Emplace(ti);
 
 			AddTileToRenderList(false, ti);
+			AddTileToLightList(ti);
 		}
 	}
 
 	AddTileToRenderList(false, WorldGrid::scGlobalTileIndex);
+
+	AddUnculledLightsToLightList();
 }
 
 
@@ -835,7 +880,13 @@ void World::Render(Camera* shadow_camera)
 
 	mSunLightSlot = UINT32_MAX;
 
-	for (const Ref<LightBase>& light : gLightManager->GetCache()) {
+	for (const LightID light_id : mLightList.GetLights()) {
+		LightBase* light = gLightManager->GetLight(light_id);
+
+		if (light == nullptr) {
+			continue;
+		}
+
 		const uint32 slot = gGraphics->LightBuffer.SlotIndex;
 
 		light->Render(camera, shadow_camera);
@@ -893,7 +944,15 @@ void World::Render(Camera* shadow_camera)
 	// Transparent after, back-to-front globally sorted, depth write disabled
 	ExecuteTransparentRenderLists();
 
-	if (bRenderPhysicsObjects) {
+	if (DebugBoundsMask & scDebugBoundsObjects) {
+		DebugDrawObjectBounds();
+	}
+
+	if (DebugBoundsMask & scDebugBoundsLights) {
+		DebugDrawLightBounds();
+	}
+
+	if (DebugBoundsMask & scDebugBoundsPhysics) {
 		DebugDrawPhysicsBodies();
 	}
 
@@ -911,7 +970,6 @@ void World::Render(Camera* shadow_camera)
 #endif
 
 	// DebugDrawWorldGrid();
-	// DebugDrawObjectBounds();
 
 	// Everything queued this frame, by the calls above or by anything else, is drawn on top of the geometry
 	gDebugDraw->Render(gGraphics->GetFrame()->CmdBuffer, camera);
@@ -1018,14 +1076,37 @@ void World::RenderProbeCapture()
 
 void World::DebugDrawObjectBounds()
 {
-	const Color debug_color = Color::FromRGBA(150, 255, 80, 255);
+	const Color debug_color = Color::FromRGBA(80, 200, 255, 255);
 
 	for (Object& object : gObjectManager->GetCache()) {
-		const Vec3f half_extent = (object.Bounds.Max - object.Bounds.Min) * 0.5f;
-		const Vec3f center = (object.Bounds.Max + object.Bounds.Min) * 0.5f;
+		if (object.IsProbeVolume() || object.GetObjectLayer() == eObjectLayer::PlayerLayer) {
+			continue;
+		}
 
-		gDebugDraw->WireBox(Mat4f::AsScale(half_extent) * Mat4f::AsTranslation(center) * object.GetWorldMatrix(),
-							debug_color);
+		gDebugDraw->WireBox(object.GetWorldOBB().GetWorldAABB(), debug_color);
+	}
+}
+
+void World::DebugDrawLightBounds()
+{
+	const Color listed_color = Color::FromRGBA(255, 215, 60, 255);
+	const Color culled_color = Color::FromRGBA(150, 80, 20, 255);
+	const Color disabled_color = Color::FromRGBA(110, 110, 110, 255);
+
+	for (LightBase* light : gLightManager->GetCache()) {
+		if (!light->IsCullable()) {
+			continue;
+		}
+
+		Color color = listed_color;
+		if (!light->bEnabled) {
+			color = disabled_color;
+		}
+		else if (!mLightList.Contains(light->ID)) {
+			color = culled_color;
+		}
+
+		gDebugDraw->WireBox(light->GetBounds(), color);
 	}
 }
 
@@ -1060,7 +1141,8 @@ void World::DebugDrawWorldGrid()
 
 void World::DebugDrawPhysicsBodies()
 {
-	const Color debug_color = Color::FromRGBA(100, 255, 40, 255);
+	const Color dynamic_color = Color::FromRGBA(100, 255, 40, 255);
+	const Color static_color = Color::FromRGBA(40, 120, 30, 255);
 
 	uint32 current_phys_state = gPhysics->UpdateState.load();
 	if (mLastPhysicsUpdateState != current_phys_state) {
@@ -1069,8 +1151,15 @@ void World::DebugDrawPhysicsBodies()
 	}
 
 	for (physics::Body* phys : mCachedPhysicsBodies) {
-		// As we are using scale here, we want to halve the dimensions
-		gDebugDraw->WireBox(phys->GetPosition(), phys->Dimensions * 0.5, phys->GetRotation(), debug_color);
+		const JPH::Body* body = phys->GetBody();
+		if (body == nullptr) {
+			continue;
+		}
+
+		const JPH::AABox bounds = body->GetWorldSpaceBounds();
+		const Color color = (phys->GetMotionType() == physics::eMotionType::Static) ? static_color : dynamic_color;
+
+		gDebugDraw->WireBox(AABB(Vec3f(bounds.mMin), Vec3f(bounds.mMax)), color);
 	}
 }
 

@@ -689,6 +689,7 @@ void RaptorEditor::DeleteObject(Object* object, int32 group_size)
 	op.ObjectSnapshot.Rotation = object->mRotation;
 	op.ObjectSnapshot.ObjectName = object->Name;
 	op.ObjectSnapshot.bIsProbeVolume = object->IsProbeVolume();
+	op.ObjectSnapshot.bIsDynamic = gWorld->pBlockout->IsDynamic(object);
 
 	PushEditOperation(op);
 }

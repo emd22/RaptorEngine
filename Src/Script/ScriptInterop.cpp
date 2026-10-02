@@ -510,6 +510,7 @@ static bool N_blockout_clip(Object* object, FLOAT4 point_a, FLOAT4 point_b, FLOA
 	split_op.ObjectSnapshot.Rotation = object->mRotation;
 	split_op.ObjectSnapshot.Material = gEditor->GetSelection().GetStoredMaterial(object);
 	split_op.ObjectSnapshot.bIsProbeVolume = object->IsProbeVolume();
+	split_op.ObjectSnapshot.bIsDynamic = gWorld->pBlockout->IsDynamic(object);
 
 	gEditor->PushEditOperation(clip_op);
 	gEditor->PushEditOperation(split_op);

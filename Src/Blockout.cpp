@@ -821,8 +821,13 @@ Object* Blockout::DupeObject(Object* object)
 	return dupe;
 }
 
+bool Blockout::IsDynamic(const Object* object) const
+{
+	return object != nullptr && GetMotionType(object) == physics::eMotionType::Dynamic;
+}
+
 Object* Blockout::RestoreObject(const Vec3f& position, const Brush::PlaneList& planes, MaterialID material,
-								const Quat& rotation, const Name& name)
+								const Quat& rotation, const Name& name, bool is_dynamic)
 {
 	Brush brush = Brush::FromPlanes(planes);
 
@@ -852,7 +857,7 @@ Object* Blockout::RestoreObject(const Vec3f& position, const Brush::PlaneList& p
 	object->SetShadowCaster(true);
 	object->SetRotation(rotation);
 
-	ApplyBrush(object, std::move(brush), physics::eMotionType::Static);
+	ApplyBrush(object, std::move(brush), is_dynamic ? physics::eMotionType::Dynamic : physics::eMotionType::Static);
 
 	AssetTicket ticket(static_cast<void*>(object));
 	ticket.MarkAndSignalLoaded();
@@ -1177,6 +1182,10 @@ void Blockout::Save(const String& path)
 
 			if (object->IsProbeVolume()) {
 				blockout_entry.AddMember(ConfigEntry::Literal("probevolume", 1));
+			}
+
+			if (IsDynamic(object)) {
+				blockout_entry.AddMember(ConfigEntry::Literal("dynamic", 1));
 			}
 
 #ifdef FX_IS_EDITOR

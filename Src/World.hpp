@@ -9,6 +9,7 @@
 #include <Player.hpp>
 #include <Renderer/Camera.hpp>
 #include <Renderer/Light.hpp>
+#include <Renderer/LightList.hpp>
 #include <Renderer/RenderList.hpp>
 
 
@@ -84,6 +85,7 @@ public:
 
 private:
 	void DebugDrawObjectBounds();
+	void DebugDrawLightBounds();
 	void DebugDrawWorldGrid();
 
 	void CullWorldTiles(const PerspectiveCamera& cam);
@@ -129,6 +131,8 @@ private:
 	void ExecutePrepassRenderList(renderer::PipelineHandle forward_pipeline);
 
 	void AddTileToRenderList(bool clear, TileIndex new_tile);
+	void AddTileToLightList(TileIndex tile_index);
+	void AddUnculledLightsToLightList();
 	void ClearRenderList();
 
 	void AddToRenderListRecursive(renderer::PipelineHandle pipeline, ObjectID* id);
@@ -144,9 +148,14 @@ private:
 
 public:
 	Name Name = "(unnamed)";
-	bool bRenderPhysicsObjects = false;
+	static constexpr uint32 scDebugBoundsObjects = (1u << 0);
+	static constexpr uint32 scDebugBoundsLights = (1u << 1);
+	static constexpr uint32 scDebugBoundsPhysics = (1u << 2);
+
+	uint32 DebugBoundsMask = 0;
 	bool bRenderProbes = false;
 	renderer::RenderList mRenderList;
+	renderer::LightList mLightList;
 
 	/// Set once a scene file has populated its objects. Used by WorldFile to
 	/// tell a first load (add everything) from a hot reload (update in place)

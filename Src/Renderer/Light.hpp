@@ -4,11 +4,13 @@
 #include <Core/Hash.hpp>
 #include <Entity.hpp>
 #include <Math/Mat4.hpp>
+#include <Math/BoundingBox.hpp>
 #include <Math/MathUtil.hpp>
 #include <Renderer/Exposure.hpp>
 #include <Renderer/LightID.hpp>
 #include <Renderer/PipelineNames.hpp>
 #include <Renderer/ShadowAtlas.hpp>
+#include <WorldGrid.hpp>
 
 namespace fx {
 class Camera;
@@ -44,8 +46,13 @@ public:
 	LightBase(eLightFlags flags = LF_None);
 
 	void SetRadius(const float radius);
+	void SetPosition(const Vec3f& position) override;
+	void SetRotation(const Quat& rotation) override;
+
+	virtual AABB GetBounds() const;
 
 	FX_FORCE_INLINE float32 GetRadius() const { return mRadius; }
+	FX_FORCE_INLINE bool IsCullable() const { return Type != eLightType::Directional; }
 
 	virtual void Render(const PerspectiveCamera& camera, Camera* shadow_camera);
 
@@ -68,6 +75,9 @@ public:
 	eLightType Type = eLightType::Unknown;
 
 	bool bEnabled = true;
+
+	TileIndex mTileIndex = TileIndexNull;
+	Vec2u mTileSpan = Vec2u(1, 1);
 
 protected:
 	float32 mRadius = 1.0f;
@@ -136,6 +146,8 @@ public:
 	void SetLumens(float32 lumens);
 
 	Mat4f CalculateShadowMatrix() const;
+
+	AABB GetBounds() const override;
 
 	/// Hands the light's shadow atlas tile back, the next bake allocates a new one.
 	void ReleaseShadowTile();

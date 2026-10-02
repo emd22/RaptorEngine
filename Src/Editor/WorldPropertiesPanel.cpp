@@ -3,6 +3,7 @@
 #include "Common.hpp"
 
 #include <wx/checkbox.h>
+#include <wx/choice.h>
 #include <wx/collpane.h>
 #include <wx/sizer.h>
 #include <wx/statbox.h>
@@ -17,6 +18,24 @@
 #include <algorithm>
 
 namespace fx::editor {
+
+namespace {
+
+struct DebugLayer
+{
+	const char* pcName;
+	uint32 Mask;
+};
+
+constexpr DebugLayer scDebugLayers[] = {
+	{ "None", 0 },
+	{ "Object Bounds", World::scDebugBoundsObjects },
+	{ "Light Bounds", World::scDebugBoundsLights },
+	{ "Physics Bounds", World::scDebugBoundsPhysics },
+	{ "All Bounds", World::scDebugBoundsObjects | World::scDebugBoundsLights | World::scDebugBoundsPhysics },
+};
+
+} // namespace
 
 WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, wxID_ANY)
 {
@@ -35,6 +54,32 @@ WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, w
 			gWorld->Player.TeleportTo(value);
 			mShownPosition = value;
 		});
+
+	{
+		wxBoxSizer* debug_row = new wxBoxSizer(wxHORIZONTAL);
+		debug_row->Add(new wxStaticText(this, wxID_ANY, "Debug Layer"), wxSizerFlags().CenterVertical());
+
+		mpDebugLayerChoice = new wxChoice(this, wxID_ANY);
+
+		for (const DebugLayer& layer : scDebugLayers) {
+			mpDebugLayerChoice->Append(wxString::FromUTF8(layer.pcName));
+		}
+
+		debug_row->Add(mpDebugLayerChoice, wxSizerFlags().Border(wxLEFT, 6));
+		sizer->Add(debug_row, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+
+		mpDebugLayerChoice->Bind(wxEVT_CHOICE,
+								 [this](wxCommandEvent&)
+								 {
+									 const int32 selection = mpDebugLayerChoice->GetSelection();
+									 if (selection < 0 || selection >= static_cast<int32>(std::size(scDebugLayers))) {
+										 return;
+									 }
+
+									 mShownDebugMask = static_cast<int64>(scDebugLayers[selection].Mask);
+									 gCVars->Set("r_debug_bounds", mShownDebugMask);
+								 });
+	}
 
 	{
 		mpCameraPane = new wxCollapsiblePane(this, wxID_ANY, "Camera", wxDefaultPosition, wxDefaultSize,
@@ -95,6 +140,23 @@ void WorldPropertiesPanel::Update()
 	// 	mpPositionField->SetValue(position);
 	// 	mShownPosition = position;
 	// }
+
+	const int64 debug_mask = gCVars->Get("r_debug_bounds", int64 { 0 });
+
+	if (debug_mask != mShownDebugMask) {
+		mShownDebugMask = debug_mask;
+
+		int32 selection = wxNOT_FOUND;
+
+		for (uint32 i = 0; i < std::size(scDebugLayers); i++) {
+			if (static_cast<int64>(scDebugLayers[i].Mask) == debug_mask) {
+				selection = static_cast<int32>(i);
+				break;
+			}
+		}
+
+		mpDebugLayerChoice->SetSelection(selection);
+	}
 
 	if (!mpCameraPane->IsExpanded()) {
 		return;

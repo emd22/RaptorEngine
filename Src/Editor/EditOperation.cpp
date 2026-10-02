@@ -183,8 +183,9 @@ EditOperationValue EditOperation::Execute(EditorSelection& selection)
 		return EditOperationValue(pObject);
 	}
 	case eType::CreateBrush: {
-		pObject = gWorld->pBlockout->RestoreObject(ObjectSnapshot.Position, PlanesAfter, ObjectSnapshot.Material,
-												   ObjectSnapshot.Rotation, ObjectSnapshot.ObjectName);
+		pObject = gWorld->pBlockout->RestoreObject(
+			ObjectSnapshot.Position, PlanesAfter, ObjectSnapshot.Material, ObjectSnapshot.Rotation,
+			ObjectSnapshot.ObjectName, ObjectSnapshot.bIsDynamic);
 		PushedObjectID = (pObject != nullptr) ? pObject->ID : ObjectID::scNull;
 
 		if (pObject != nullptr && ObjectSnapshot.bIsProbeVolume) {
@@ -358,9 +359,9 @@ void EditOperation::Undo(EditorSelection& selection)
 			break;
 		}
 
-		Object* restored = gWorld->pBlockout->RestoreObject(ObjectSnapshot.Position, PlanesBefore,
-															ObjectSnapshot.Material, ObjectSnapshot.Rotation,
-															ObjectSnapshot.ObjectName);
+		Object* restored = gWorld->pBlockout->RestoreObject(
+			ObjectSnapshot.Position, PlanesBefore, ObjectSnapshot.Material, ObjectSnapshot.Rotation,
+			ObjectSnapshot.ObjectName, ObjectSnapshot.bIsDynamic);
 
 		if (restored == nullptr) {
 			break;

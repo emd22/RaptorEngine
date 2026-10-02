@@ -209,6 +209,7 @@ void RaptorGame::CreateGame()
 	mpShowGpuCVar = gCVars->Set("i_show_gpu", 1);
 	mpProbesCVar = gCVars->Set("r_probes", 1);
 	mpDecalsCVar = gCVars->Set("r_decals", 1);
+	mpDebugBoundsCVar = gCVars->Set("r_debug_bounds", 0);
 
 	mpExposureCVar = gCVars->Set("r_exposure_ev", gCVars->Get("r_exposure_ev", 0.0f));
 	mpApertureCVar = gCVars->Set("r_aperture", gCVars->Get("r_aperture", 16.0f));
@@ -381,6 +382,26 @@ void RaptorGame::ProcessControls()
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_L)) {
 		gWorld->bRenderProbes = !gWorld->bRenderProbes;
 		LogInfo("Probe debug render {}", gWorld->bRenderProbes ? "enabled" : "disabled");
+	}
+
+	if (mpDebugBoundsCVar != nullptr) {
+		const std::pair<eKey, uint32> bounds_keys[] = {
+			{ eKey::FX_KEY_F5, World::scDebugBoundsObjects },
+			{ eKey::FX_KEY_F6, World::scDebugBoundsLights },
+			{ eKey::FX_KEY_F7, World::scDebugBoundsPhysics },
+		};
+
+		for (const auto& [key, bit] : bounds_keys) {
+			if (ControlManager::IsKeyPressed(key)) {
+				mpDebugBoundsCVar->IntValue ^= bit;
+
+				const int64 mask = mpDebugBoundsCVar->IntValue;
+				LogInfo("Debug bounds: objects {}, lights {}, physics {}",
+						(mask & World::scDebugBoundsObjects) ? "on" : "off",
+						(mask & World::scDebugBoundsLights) ? "on" : "off",
+						(mask & World::scDebugBoundsPhysics) ? "on" : "off");
+			}
+		}
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_2)) {
@@ -577,7 +598,10 @@ void RaptorGame::RenderText()
 		}
 	}
 
-	gTextRenderer->DrawText(String::Fmt("Vis={}", gWorld->mRenderList.GetItemCount()).CStr(), 1.0f, scWhite);
+	gTextRenderer->DrawText(String::Fmt("Vis={} Lights={}/{}", gWorld->mRenderList.GetItemCount(),
+										 gWorld->mLightList.GetItemCount(), gLightManager->GetCache().Size)
+							.CStr(),
+					1.0f, scWhite);
 
 #ifdef FX_IS_EDITOR
 	gTextRenderer->DrawText(
@@ -684,6 +708,7 @@ void RaptorGame::Tick()
 
 	gGraphics->bDisableProbes = (mpProbesCVar != nullptr) && (mpProbesCVar->IntValue == 0);
 	gGraphics->bDisableDecals = (mpDecalsCVar != nullptr) && (mpDecalsCVar->IntValue == 0);
+	gWorld->DebugBoundsMask = (mpDebugBoundsCVar != nullptr) ? static_cast<uint32>(mpDebugBoundsCVar->IntValue) : 0;
 
 	UpdateExposure();
 

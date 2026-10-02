@@ -11,6 +11,7 @@
 #include <Material/MaterialManagerFwd.hpp>
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
+#include <Renderer/Light.hpp>
 
 namespace fx {
 
@@ -30,6 +31,30 @@ uint32 Tile::FindObject(ObjectID id)
 
 		ObjectID object_id = Objects.pPtr[index];
 		if (object_id == id) {
+			return index;
+		}
+
+		++index;
+	}
+
+	return UINT32_MAX;
+}
+
+
+uint32 Tile::FindLight(LightID id)
+{
+	if (!Lights.IsInited()) {
+		return UINT32_MAX;
+	}
+
+	uint32 index = 0;
+	while (true) {
+		index = Lights.SlotsInUse.FindNextSetBit(index);
+		if (index == Bitset::scNoFreeBits) {
+			break;
+		}
+
+		if (Lights.pPtr[index] == id) {
 			return index;
 		}
 
@@ -138,6 +163,153 @@ void WorldGrid::AddObject(ObjectID id)
 	// after inserting into every tile so UpdateObject/RemoveObject can clear all of them later.
 	object->mTileIndex = tile_start;
 	object->mTileSpan = tile_span;
+}
+
+bool WorldGrid::GetLightPlacement(const LightBase* light, TileIndex* out_start, Vec2u* out_span) const
+{
+	*out_start = scGlobalTileIndex;
+	*out_span = Vec2u(1, 1);
+
+	if (!light->IsCullable() || mTileBuffer.Capacity == 0) {
+		return true;
+	}
+
+	const AABB bounds = light->GetBounds();
+
+	const Vec2u tile_xy_start = TileToTileXY(WorldToTile(bounds.Min));
+	const Vec2u tile_xy_end = TileToTileXY(WorldToTile(bounds.Max));
+
+	const uint32 width_in_tiles = std::clamp(tile_xy_end.X - tile_xy_start.X + 1, 1U, mGridSize.X);
+	const uint32 height_in_tiles = std::clamp(tile_xy_end.Y - tile_xy_start.Y + 1, 1U, mGridSize.Y);
+
+	if (width_in_tiles * height_in_tiles > scMaxLightTileCount) {
+		return true;
+	}
+
+	*out_start = TileFromTileXY(tile_xy_start);
+	*out_span = Vec2u(width_in_tiles, height_in_tiles);
+
+	return false;
+}
+
+void WorldGrid::InsertLightIntoRect(LightID id, TileIndex start, Vec2u span)
+{
+	const Vec2u start_xy = TileToTileXY(start);
+
+	for (uint32 y = 0; y < span.Y; y++) {
+		for (uint32 x = 0; x < span.X; x++) {
+			const TileIndex tile_index = TileFromTileXY(start_xy + Vec2u(x, y));
+			Tile& tile = mTileBuffer[tile_index];
+
+			if (!tile.Lights.IsInited()) {
+				tile.Lights.Init(scMaxLightsPerTile);
+			}
+
+			LightID* out_id = tile.Lights.NewItem();
+			if (out_id == nullptr) {
+				LogWarning("Tile {} is full, cannot insert light {}", tile_index, id);
+				continue;
+			}
+
+			(*out_id) = id;
+		}
+	}
+}
+
+void WorldGrid::RemoveLightFromRect(LightID id, TileIndex start, Vec2u span)
+{
+	const Vec2u start_xy = TileToTileXY(start);
+
+	for (uint32 y = 0; y < span.Y; y++) {
+		for (uint32 x = 0; x < span.X; x++) {
+			Tile* tile = GetTile(TileFromTileXY(start_xy + Vec2u(x, y)));
+			if (tile == nullptr) {
+				continue;
+			}
+
+			const uint32 index = tile->FindLight(id);
+			if (index == UINT32_MAX) {
+				continue;
+			}
+
+			tile->Lights.FreeItem(index);
+		}
+	}
+}
+
+void WorldGrid::AddLight(LightBase* light)
+{
+	if (light == nullptr || light->ID.IsNull() || light->ID.IsInvalid()) {
+		return;
+	}
+
+	if (light->mTileIndex != TileIndexNull) {
+		RemoveLight(light);
+	}
+
+	TileIndex tile_start = TileIndexNull;
+	Vec2u tile_span = Vec2u(1, 1);
+	const bool is_global = GetLightPlacement(light, &tile_start, &tile_span);
+
+	if (is_global) {
+		if (!GlobalTile.Lights.IsInited()) {
+			GlobalTile.Lights.Init(scMaxGlobalLights);
+		}
+
+		LightID* out_id = GlobalTile.Lights.NewItem();
+		if (out_id == nullptr) {
+			LogWarning("Global tile is full, cannot insert light {}", light->ID);
+			return;
+		}
+
+		(*out_id) = light->ID;
+
+		light->mTileIndex = scGlobalTileIndex;
+		light->mTileSpan = Vec2u(1, 1);
+		return;
+	}
+
+	InsertLightIntoRect(light->ID, tile_start, tile_span);
+
+	light->mTileIndex = tile_start;
+	light->mTileSpan = tile_span;
+}
+
+void WorldGrid::UpdateLight(LightBase* light)
+{
+	if (light == nullptr || light->mTileIndex == TileIndexNull) {
+		return;
+	}
+
+	TileIndex tile_start = TileIndexNull;
+	Vec2u tile_span = Vec2u(1, 1);
+	const bool is_global = GetLightPlacement(light, &tile_start, &tile_span);
+	const bool was_global = (light->mTileIndex == scGlobalTileIndex);
+
+	if (is_global == was_global && (is_global || (tile_start == light->mTileIndex && tile_span == light->mTileSpan))) {
+		return;
+	}
+
+	AddLight(light);
+}
+
+void WorldGrid::RemoveLight(LightBase* light)
+{
+	if (light == nullptr || light->mTileIndex == TileIndexNull) {
+		return;
+	}
+
+	if (light->mTileIndex == scGlobalTileIndex) {
+		const uint32 index = GlobalTile.FindLight(light->ID);
+		if (index != UINT32_MAX) {
+			GlobalTile.Lights.FreeItem(index);
+		}
+	}
+	else {
+		RemoveLightFromRect(light->ID, light->mTileIndex, light->mTileSpan);
+	}
+
+	light->mTileIndex = TileIndexNull;
 }
 
 void WorldGrid::AddObjectsFromTile(std::unordered_set<ObjectID>& object_buffer, const Tile* tile) const

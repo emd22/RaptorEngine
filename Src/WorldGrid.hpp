@@ -7,6 +7,7 @@
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
+#include <Renderer/LightID.hpp>
 #include <unordered_set>
 
 namespace fx {
@@ -21,19 +22,25 @@ struct Tile
 {
 public:
 	uint32 FindObject(ObjectID id);
+	uint32 FindLight(LightID id);
 
 public:
 	FreeArray<ObjectID> Objects;
+	FreeArray<LightID> Lights;
 };
 
 
 class Object;
+class LightBase;
 
 class WorldGrid
 {
 public:
 	static constexpr uint32 scMaxObjectsPerTile = 64;
 	static constexpr uint32 scMaxGlobalObjects = 64;
+	static constexpr uint32 scMaxLightsPerTile = 64;
+	static constexpr uint32 scMaxGlobalLights = 64;
+	static constexpr uint32 scMaxLightTileCount = 64;
 
 	static constexpr TileIndex scGlobalTileIndex = UINT32_MAX - 1;
 
@@ -62,6 +69,19 @@ public:
 	 * @brief Remove an object from its assigned tile.
 	 */
 	void RemoveObject(ObjectID id);
+
+	/**
+	 * @brief Inserts a light into every tile its radius reaches. Directional lights, and lights covering more than
+	 * `scMaxLightTileCount` tiles, go into the global tile.
+	 */
+	void AddLight(LightBase* light);
+
+	/**
+	 * @brief Moves a light to the tiles it now reaches, if they changed.
+	 */
+	void UpdateLight(LightBase* light);
+
+	void RemoveLight(LightBase* light);
 
 	Vec2u TileToTileXY(TileIndex tile_index) const;
 	Vec3f GetTileWorldPosition(TileIndex tile_index) const;
@@ -95,6 +115,10 @@ private:
 
 	void InsertObjectIntoRect(ObjectID id, TileIndex start, Vec2u span);
 	void RemoveObjectFromRect(ObjectID id, TileIndex start, Vec2u span);
+
+	bool GetLightPlacement(const LightBase* light, TileIndex* out_start, Vec2u* out_span) const;
+	void InsertLightIntoRect(LightID id, TileIndex start, Vec2u span);
+	void RemoveLightFromRect(LightID id, TileIndex start, Vec2u span);
 
 	TileIndex InsertInto(TileIndex tile_index, ObjectID id);
 
