@@ -8,6 +8,7 @@
 #include <Object/Object.hpp>
 
 class wxCheckBox;
+class wxChoice;
 class wxStaticText;
 
 namespace fx::editor {
@@ -25,6 +26,9 @@ public:
 private:
 	wxStaticText* mpNameLabel = nullptr;
 	Vector3Field* mpPositionField = nullptr;
+
+	wxChoice* mpDebugLayerChoice = nullptr;
+	int64 mShownDebugMask = -1;
 
 	wxCollapsiblePane* mpCameraPane = nullptr;
 	FloatField* mpApertureField = nullptr;

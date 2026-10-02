@@ -3,6 +3,7 @@
 #include <Engine.hpp>
 #include <Renderer/Light.hpp>
 #include <World.hpp>
+#include <WorldGrid.hpp>
 
 namespace fx {
 
@@ -25,6 +26,8 @@ void LightManager::RegisterLight(LightBase* light)
 
 	light->ID = LightID(index);
 	light->OnAttached(gWorld);
+
+	gWorldGrid->AddLight(light);
 }
 
 LightBase* LightManager::GetLight(LightID id)
@@ -57,6 +60,12 @@ void LightManager::DestroyLight(LightID& id)
 
 	LightBase** slot = mLightList.GetItem(id.GetID());
 	if (slot != nullptr) {
+		gWorldGrid->RemoveLight(*slot);
+
+		if (gWorld != nullptr) {
+			gWorld->mLightList.InvalidateLight(id);
+		}
+
 		(*slot)->ID.Invalidate();
 		// Gross
 		delete (*slot);

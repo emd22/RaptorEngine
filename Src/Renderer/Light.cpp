@@ -81,6 +81,34 @@ void LightBase::SetRadius(const float radius)
 {
 	mRadius = radius;
 	SetScale(mRadius * 2);
+
+	if (gWorldGrid != nullptr) {
+		gWorldGrid->UpdateLight(this);
+	}
+}
+
+void LightBase::SetPosition(const Vec3f& position)
+{
+	Entity::SetPosition(position);
+
+	if (gWorldGrid != nullptr) {
+		gWorldGrid->UpdateLight(this);
+	}
+}
+
+void LightBase::SetRotation(const Quat& rotation)
+{
+	Entity::SetRotation(rotation);
+
+	if (gWorldGrid != nullptr) {
+		gWorldGrid->UpdateLight(this);
+	}
+}
+
+AABB LightBase::GetBounds() const
+{
+	const Vec3f extent(mRadius);
+	return AABB(mPosition - extent, mPosition + extent);
 }
 
 LightPoint::LightPoint() { Type = eLightType::Point; }
@@ -130,6 +158,32 @@ void LightSpot::SetConeAngles(float32 inner_angle, float32 outer_angle)
 	// Past 90 degrees the cone no longer fits the bounding sphere used by light culling
 	mOuterAngle = MathUtil::Clamp(outer_angle, 0.0f, MathUtil::DegreesToRadians(90.0f));
 	mInnerAngle = MathUtil::Clamp(inner_angle, 0.0f, mOuterAngle);
+
+	if (gWorldGrid != nullptr) {
+		gWorldGrid->UpdateLight(this);
+	}
+}
+
+AABB LightSpot::GetBounds() const
+{
+	const Vec3f direction = GetDirection().Normalize();
+	const float32 axis_components[3] = { direction.X, direction.Y, direction.Z };
+
+	float32 low[3];
+	float32 high[3];
+
+	for (uint32 axis = 0; axis < 3; axis++) {
+		const float32 angle_positive = std::acos(std::clamp(axis_components[axis], -1.0f, 1.0f));
+		const float32 angle_negative = static_cast<float32>(M_PI) - angle_positive;
+
+		const float32 reach_positive = (angle_positive <= mOuterAngle) ? 1.0f : std::cos(angle_positive - mOuterAngle);
+		const float32 reach_negative = (angle_negative <= mOuterAngle) ? 1.0f : std::cos(angle_negative - mOuterAngle);
+
+		high[axis] = mRadius * std::max(reach_positive, 0.0f);
+		low[axis] = -mRadius * std::max(reach_negative, 0.0f);
+	}
+
+	return AABB(mPosition + Vec3f(low[0], low[1], low[2]), mPosition + Vec3f(high[0], high[1], high[2]));
 }
 
 float32 LightSpot::GetSolidAngle() const
