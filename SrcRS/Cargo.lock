@@ -11,4 +11,9 @@ name = "raptor-ffi"
 version = "0.1.0"
 dependencies = [
  "raptor-config",
+ "raptor-shader",
 ]
+
+[[package]]
+name = "raptor-shader"
+version = "0.1.0"

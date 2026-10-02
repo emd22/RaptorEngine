@@ -9,6 +9,7 @@ crate-type = ["staticlib", "rlib"]
 
 [dependencies]
 raptor-config = { path = "../raptor-config" }
+raptor-shader = { path = "../raptor-shader" }
 
 [lints]
 workspace = true
