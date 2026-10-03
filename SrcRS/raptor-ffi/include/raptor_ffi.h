@@ -136,6 +136,58 @@ const float* rx_mesh_texcoords(const RxMesh* mesh, size_t* count);
 const uint32_t* rx_mesh_indices(const RxMesh* mesh, size_t* count);
 void rx_mesh_free(RxMesh* mesh);
 
+typedef struct RxBrushPlane
+{
+    float normal[3];
+    float distance;
+    float offset[2];
+    float scale[2];
+    float rotation;
+} RxBrushPlane;
+
+typedef struct RxBrushFace
+{
+    uint32_t plane_index;
+    const float* vertices;
+    size_t vertex_count;
+} RxBrushFace;
+
+typedef struct RxBrushView
+{
+    const RxBrushPlane* planes;
+    size_t plane_count;
+    const RxBrushFace* faces;
+    size_t face_count;
+    const float* vertices;
+    size_t vertex_count;
+    float bounds_min[3];
+    float bounds_max[3];
+} RxBrushView;
+
+typedef struct RxBrushResult RxBrushResult;
+typedef struct RxBrushSplit RxBrushSplit;
+
+RxBrushResult* rx_brush_from_box(const float* min, const float* max);
+RxBrushResult* rx_brush_rebuild(const RxBrushPlane* planes, size_t count);
+int32_t rx_brush_result_ok(const RxBrushResult* result);
+const RxBrushView* rx_brush_result_view(const RxBrushResult* result);
+void rx_brush_result_free(RxBrushResult* result);
+
+int32_t rx_brush_is_box(const RxBrushView* view);
+int32_t rx_brush_contains_point(const RxBrushView* view, const float* point, float tolerance);
+int32_t rx_brush_find_plane(const RxBrushView* view, const float* normal);
+float rx_brush_support(const RxBrushView* view, const float* direction);
+void rx_brush_face_center(const RxBrushView* view, uint32_t plane_index, float* out);
+int32_t rx_brush_raycast(const RxBrushView* view, const float* origin, const float* direction, float* out_distance,
+                         uint32_t* out_plane_index);
+int32_t rx_brush_has_default_textures(const RxBrushView* view);
+void rx_brush_default_texture_offset(const RxBrushView* view, uint32_t plane_index, float* out_offset);
+void rx_brush_world_aligned_offset(const float* normal, const float* origin, float* out_offset);
+RxBrushSplit* rx_brush_split(const RxBrushView* view, const float* normal, float distance, const float* origin);
+const RxBrushPlane* rx_brush_split_planes(const RxBrushSplit* split, int32_t front, size_t* count);
+void rx_brush_split_free(RxBrushSplit* split);
+RxMesh* rx_brush_generate_mesh(const RxBrushView* view);
+
 #ifdef __cplusplus
 }
 #endif

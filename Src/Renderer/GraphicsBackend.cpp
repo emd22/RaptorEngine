@@ -162,6 +162,10 @@ void GraphicsBackend::Init(Vec2u window_size)
 	ProbeVolumeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeVolumePageSize,
 							 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
 
+	ProbeGridPageSize = Limits::MaxProbeGridPoints * sizeof(uint16);
+	ProbeGridBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeGridPageSize, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+						   eGpuBufferFlags::PersistentMapped);
+
 
 	{
 		const Vec2u atlas_size(Limits::ProbeAtlasWidth, Limits::ProbeAtlasHeight);
@@ -893,6 +897,7 @@ void GraphicsBackend::Destroy()
 	DecalMaskBuffer.Destroy();
 	ProbeBuffer.Destroy();
 	ProbeVolumeBuffer.Destroy();
+	ProbeGridBuffer.Destroy();
 
 	gAssetManager->ShutdownDeletionQueue();
 

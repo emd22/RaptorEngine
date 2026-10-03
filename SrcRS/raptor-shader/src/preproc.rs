@@ -6,7 +6,8 @@ const MAX_MACRO_NAME_LENGTH: usize = 255;
 const MAX_NESTING_DEPTH: u32 = 64;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Stage {
+pub enum Stage
+{
 	Vertex = 0,
 	Pixel = 1,
 	Compute = 2,
@@ -14,33 +15,38 @@ pub enum Stage {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u16)]
-pub enum ReflectionType {
+pub enum ReflectionType
+{
 	StructuredBuffer = 0,
 	CBuffer = 1,
 	Texture = 2,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ReflectionEntry {
+pub struct ReflectionEntry
+{
 	pub kind: ReflectionType,
 	pub set: u8,
 	pub binding: u8,
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct Macro<'a> {
+pub struct Macro<'a>
+{
 	pub name: &'a [u8],
 	pub value: Option<&'a [u8]>,
 }
 
 #[derive(Debug, Default)]
-pub struct Output {
+pub struct Output
+{
 	pub programs: [Vec<u8>; 3],
 	pub reflection: [Vec<ReflectionEntry>; 3],
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Directive {
+enum Directive
+{
 	None,
 	If,
 	IfNot,
@@ -56,7 +62,8 @@ const DIRECTIVES: [(&[u8], Directive); 4] = [
 ];
 
 #[derive(Clone, Copy)]
-enum PPFunction {
+enum PPFunction
+{
 	Program,
 	Reflect,
 	ParamTest,
@@ -66,7 +73,8 @@ enum PPFunction {
 	CBuffer,
 }
 
-struct PPEntry {
+struct PPEntry
+{
 	name: &'static [u8],
 	function: PPFunction,
 	keeps_text: bool,
@@ -122,11 +130,13 @@ const PP_FUNCTIONS: [PPEntry; 9] = [
 	},
 ];
 
-fn is_identifier_char(ch: u8) -> bool {
+fn is_identifier_char(ch: u8) -> bool
+{
 	ch.is_ascii_alphanumeric() || ch == b'_'
 }
 
-fn trim(mut bytes: &[u8]) -> &[u8] {
+fn trim(mut bytes: &[u8]) -> &[u8]
+{
 	while let [first, rest @ ..] = bytes {
 		if !first.is_ascii_whitespace() {
 			break;
@@ -142,7 +152,8 @@ fn trim(mut bytes: &[u8]) -> &[u8] {
 	bytes
 }
 
-fn parse_int(text: &[u8]) -> i32 {
+fn parse_int(text: &[u8]) -> i32
+{
 	let mut rest = trim(text);
 
 	let negative = match rest {
@@ -161,8 +172,9 @@ fn parse_int(text: &[u8]) -> i32 {
 	let mut value: i64 = 0;
 
 	for &ch in rest.iter().take_while(|ch| ch.is_ascii_digit()) {
-		// Add each digit to the result. We multiply the current value by 10 to shift it over, and then add the digit.
-		// e.g. 1234 becomes 12340 when multiplying by 10, and then we can add the next digit '5' to get 12345.
+		// Add each digit to the result. We multiply the current value by 10 to shift it over, and
+		// then add the digit. e.g. 1234 becomes 12340 when multiplying by 10, and then we
+		// can add the next digit '5' to get 12345.
 		value = value
 			.saturating_mul(10)
 			.saturating_add(i64::from(ch - b'0'));
@@ -171,7 +183,8 @@ fn parse_int(text: &[u8]) -> i32 {
 	(if negative { -value } else { value }) as i32
 }
 
-struct Preproc<'a> {
+struct Preproc<'a>
+{
 	data: &'a [u8],
 	index: usize,
 	line: u32,
@@ -183,56 +196,67 @@ struct Preproc<'a> {
 	depth: u32,
 }
 
-impl Preproc<'_> {
-	fn get_at(&self, offset: usize) -> u8 {
+impl Preproc<'_>
+{
+	fn get_at(&self, offset: usize) -> u8
+	{
 		self.data.get(self.index + offset).copied().unwrap_or(0)
 	}
 
-	fn get(&self) -> u8 {
+	fn get(&self) -> u8
+	{
 		self.get_at(0)
 	}
 
-	fn at_end(&self) -> bool {
+	fn at_end(&self) -> bool
+	{
 		self.index >= self.data.len()
 	}
 
-	fn previous(&self) -> u8 {
+	fn previous(&self) -> u8
+	{
 		match self.index {
 			0 => 0,
 			index => self.data.get(index - 1).copied().unwrap_or(0),
 		}
 	}
 
-	fn next_char(&mut self) {
+	fn next_char(&mut self)
+	{
 		if self.get() == b'\n' {
 			self.line += 1;
 		}
 		self.index += 1;
 	}
 
-	fn skip(&mut self, count: usize) {
+	fn skip(&mut self, count: usize)
+	{
 		for _ in 0..count {
 			self.next_char();
 		}
 	}
 
-	fn next_if_equal(&mut self, ch: u8) {
+	fn next_if_equal(&mut self, ch: u8)
+	{
 		if !self.at_end() && self.get() == ch {
 			self.next_char();
 		}
 	}
 
-	fn matches(&self, text: &[u8]) -> bool {
+	fn matches(&self, text: &[u8]) -> bool
+	{
 		self.data
 			.get(self.index..)
 			.is_some_and(|rest| rest.starts_with(text))
 	}
 
-	fn error(&mut self, message: &str) {
+	fn error(&mut self, message: &str)
+	{
 		self.log.log(LogLevel::Error, message);
 	}
 
-	fn write_byte(&mut self, ch: u8) {
+	fn write_byte(&mut self, ch: u8)
+	{
 		if self.broadcast {
 			self.output.programs[Stage::Vertex as usize].push(ch);
 			self.output.programs[Stage::Pixel as usize].push(ch);
@@ -241,13 +265,15 @@ impl Preproc<'_> {
 		}
 	}
 
-	fn write_str(&mut self, text: &str) {
+	fn write_str(&mut self, text: &str)
+	{
 		for &ch in text.as_bytes() {
 			self.write_byte(ch);
 		}
 	}
 
-	fn peek_directive(&self) -> Directive {
+	fn peek_directive(&self) -> Directive
+	{
 		if is_identifier_char(self.previous()) {
 			return Directive::None;
 		}
@@ -261,25 +287,29 @@ impl Preproc<'_> {
 		Directive::None
 	}
 
-	fn skip_directive_name(&mut self, directive: Directive) {
+	fn skip_directive_name(&mut self, directive: Directive)
+	{
 		if let Some((name, _)) = DIRECTIVES.iter().find(|(_, d)| *d == directive) {
 			self.skip(name.len());
 		}
 	}
 
-	fn skip_horizontal_whitespace(&mut self) {
+	fn skip_horizontal_whitespace(&mut self)
+	{
 		while !self.at_end() && matches!(self.get(), b' ' | b'\t') {
 			self.next_char();
 		}
 	}
 
-	fn skip_line_end(&mut self) {
+	fn skip_line_end(&mut self)
+	{
 		self.skip_horizontal_whitespace();
 		self.next_if_equal(b'\r');
 		self.next_if_equal(b'\n');
 	}
 
-	fn skip_directive_tail(&mut self) {
+	fn skip_directive_tail(&mut self)
+	{
 		self.skip_horizontal_whitespace();
 
 		if !self.at_end() && self.get() == b'(' {
@@ -292,21 +322,25 @@ impl Preproc<'_> {
 		self.skip_line_end();
 	}
 
-	fn at_line_comment(&self) -> bool {
+	fn at_line_comment(&self) -> bool
+	{
 		self.matches(b"//")
 	}
 
-	fn at_block_comment(&self) -> bool {
+	fn at_block_comment(&self) -> bool
+	{
 		self.matches(b"/*")
 	}
 
-	fn skip_line_comment(&mut self) {
+	fn skip_line_comment(&mut self)
+	{
 		while !self.at_end() && self.get() != b'\n' {
 			self.next_char();
 		}
 	}
 
-	fn block_comment_length(&self) -> usize {
+	fn block_comment_length(&self) -> usize
+	{
 		let rest = &self.data[self.index..];
 		rest[2..]
 			.windows(2)
@@ -314,7 +348,8 @@ impl Preproc<'_> {
 			.map_or(rest.len(), |position| position + 4)
 	}
 
-	fn copy_block_comment(&mut self) {
+	fn copy_block_comment(&mut self)
+	{
 		for _ in 0..self.block_comment_length() {
 			let ch = self.get();
 			self.write_byte(ch);
@@ -322,12 +357,14 @@ impl Preproc<'_> {
 		}
 	}
 
-	fn skip_block_comment(&mut self) {
+	fn skip_block_comment(&mut self)
+	{
 		let length = self.block_comment_length();
 		self.skip(length);
 	}
 
-	fn write_until_directive(&mut self) {
+	fn write_until_directive(&mut self)
+	{
 		while !self.at_end() {
 			if self.peek_directive() != Directive::None {
 				break;
@@ -353,7 +390,8 @@ impl Preproc<'_> {
 		}
 	}
 
-	fn skip_conditional(&mut self, stop_at_else: bool) -> bool {
+	fn skip_conditional(&mut self, stop_at_else: bool) -> bool
+	{
 		let mut depth = 1;
 
 		while !self.at_end() {
@@ -404,12 +442,14 @@ impl Preproc<'_> {
 		false
 	}
 
-	fn emit_line_marker(&mut self) {
+	fn emit_line_marker(&mut self)
+	{
 		let marker = format!("#line {}\n", self.line);
 		self.write_str(&marker);
 	}
 
-	fn write_conditional(&mut self, in_true_branch: bool) {
+	fn write_conditional(&mut self, in_true_branch: bool)
+	{
 		loop {
 			self.emit_line_marker();
 
@@ -445,7 +485,8 @@ impl Preproc<'_> {
 		}
 	}
 
-	fn parse_permutation(&mut self, is_negated: bool) {
+	fn parse_permutation(&mut self, is_negated: bool)
+	{
 		self.skip_horizontal_whitespace();
 
 		if self.at_end() || self.get() != b'(' {
@@ -509,7 +550,8 @@ impl Preproc<'_> {
 		self.depth -= 1;
 	}
 
-	fn match_function(&self) -> Option<(&'static PPEntry, usize)> {
+	fn match_function(&self) -> Option<(&'static PPEntry, usize)>
+	{
 		if is_identifier_char(self.previous()) {
 			return None;
 		}
@@ -532,7 +574,8 @@ impl Preproc<'_> {
 		None
 	}
 
-	fn parse_function_call(&mut self) -> bool {
+	fn parse_function_call(&mut self) -> bool
+	{
 		let Some((entry, header_length)) = self.match_function() else {
 			return false;
 		};
@@ -586,7 +629,8 @@ impl Preproc<'_> {
 		true
 	}
 
-	fn require(&mut self, params: &[&[u8]], count: usize) -> bool {
+	fn require(&mut self, params: &[&[u8]], count: usize) -> bool
+	{
 		if params.len() < count {
 			self.error("Not enough parameters found in preprocessor function!");
 			return false;
@@ -594,7 +638,8 @@ impl Preproc<'_> {
 		true
 	}
 
-	fn add_reflection(&mut self, kind: ReflectionType, set: &[u8], binding: &[u8]) {
+	fn add_reflection(&mut self, kind: ReflectionType, set: &[u8], binding: &[u8])
+	{
 		self.output.reflection[self.current as usize].push(ReflectionEntry {
 			kind,
 			set: parse_int(set) as u8,
@@ -602,12 +647,14 @@ impl Preproc<'_> {
 		});
 	}
 
-	fn set_stage(&mut self, stage: Stage) {
+	fn set_stage(&mut self, stage: Stage)
+	{
 		self.broadcast = false;
 		self.current = stage;
 	}
 
-	fn run_function(&mut self, function: PPFunction, params: &[&[u8]]) {
+	fn run_function(&mut self, function: PPFunction, params: &[&[u8]])
+	{
 		match function {
 			PPFunction::Program => {
 				if !self.require(params, 1) {
@@ -671,7 +718,8 @@ impl Preproc<'_> {
 		}
 	}
 
-	fn prepend_macro_defines(&mut self) {
+	fn prepend_macro_defines(&mut self)
+	{
 		let mut defines = Vec::new();
 
 		for m in self.macros {
@@ -700,7 +748,8 @@ impl Preproc<'_> {
 	}
 }
 
-pub fn process(source: &[u8], macros: &[Macro], log: &mut dyn Log) -> Output {
+pub fn process(source: &[u8], macros: &[Macro], log: &mut dyn Log) -> Output
+{
 	let mut preproc = Preproc {
 		data: source,
 		index: 0,
