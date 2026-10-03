@@ -22,6 +22,7 @@
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
 #include <Renderer/Backend/Util.hpp>
+#include <filesystem>
 #include <Renderer/Exposure.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
@@ -121,6 +122,8 @@ void RaptorGame::InitEngine()
 		window_height = window_entry->GetMember(HashStr32("Height"))->Get<uint32>();
 		window_title = window_entry->GetMember(HashStr32("Title"))->Get<const char*>();
 	}
+
+	mBaseWindowTitle = String(window_title);
 
 	Ref<Window> window = Window::New(window_title, Vec2u(window_width, window_height));
 
@@ -535,6 +538,30 @@ void RaptorGame::ProcessControls()
 	}
 }
 
+void RaptorGame::UpdateWindowTitle()
+{
+	if (gWorld == nullptr || (mbTitleShown && gWorld->BlockoutPath == mTitleBlockoutPath)) {
+		return;
+	}
+
+	Ref<Window> window = gGraphics->GetWindow();
+	if (!window.IsValid()) {
+		return;
+	}
+
+	mTitleBlockoutPath = gWorld->BlockoutPath;
+	mbTitleShown = true;
+
+	if (mTitleBlockoutPath.GetLength() == 0) {
+		window->SetTitle(mBaseWindowTitle.CStr());
+		return;
+	}
+
+	const std::string file_name = std::filesystem::path(mTitleBlockoutPath.CStr()).filename().string();
+
+	window->SetTitle(String::Fmt("{} - {}", mBaseWindowTitle.CStr(), file_name).CStr());
+}
+
 void RaptorGame::ReloadWorldFile()
 {
 	LogInfo("Reloading world...");
@@ -708,6 +735,8 @@ void RaptorGame::Tick()
 
 	gGraphics->bDisableProbes = (mpProbesCVar != nullptr) && (mpProbesCVar->IntValue == 0);
 	gGraphics->bDisableDecals = (mpDecalsCVar != nullptr) && (mpDecalsCVar->IntValue == 0);
+
+	UpdateWindowTitle();
 	gWorld->DebugBoundsMask = (mpDebugBoundsCVar != nullptr) ? static_cast<uint32>(mpDebugBoundsCVar->IntValue) : 0;
 
 	UpdateExposure();

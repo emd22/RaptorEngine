@@ -10,6 +10,9 @@
 #include <Math/Vec3.hpp>
 #include <Math/Vec4.hpp>
 #include <cstring>
+#include <deque>
+#include <filesystem>
+#include <vector>
 #include <string>
 #include <unordered_set>
 
@@ -82,64 +85,6 @@ void ConfigEntry::AddMember(ConfigEntry&& entry)
 		mStringValue = nullptr;
 	}
 	Type = ConfigEntry::ePrimitiveType::Struct;
-}
-
-std::string ConfigPrimitive::AsString() const
-{
-	switch (Type) {
-	case ePrimitiveType::None:
-		return "";
-	case ePrimitiveType::Int:
-		return std::to_string(mIntValue);
-	case ePrimitiveType::Float:
-		return std::to_string(mFloatValue);
-	case ePrimitiveType::String:
-		return std::format("\"{}\"", mStringValue);
-	case ePrimitiveType::Struct:
-		break;
-	}
-
-	return "";
-}
-
-std::string ConfigEntry::AsString(uint32 indent) const
-{
-	std::string member_list = "";
-
-	std::string indent_str = "";
-
-	for (uint32 i = 0; i < indent; i++) {
-		indent_str += '\t';
-	}
-
-
-	if (Type == ePrimitiveType::Struct) {
-		for (const ConfigEntry& entry : Members) {
-			member_list += std::format("{}\t{} = {}\n", indent_str, entry.Name.Get(), entry.AsString(indent + 1));
-		}
-
-		return std::format("{{\n{}{}}}", member_list, indent_str);
-	}
-	else if (bIsArray) {
-		uint32 array_size = ArrayData.Size();
-
-		for (uint32 value_index = 0; value_index < array_size; value_index++) {
-			const ConfigPrimitive& value = ArrayData[value_index];
-			if (value_index == array_size - 1) {
-				member_list += std::format("{}", value.AsString());
-			}
-			else {
-				member_list += std::format("{}, ", value.AsString());
-			}
-		}
-
-		return std::format("[ {} ]", member_list);
-	}
-	else if (bIsDotReference) {
-		return std::format("{}", this->mStringValue);
-	}
-
-	return this->ConfigPrimitive::AsString();
 }
 
 ConfigEntry* ConfigEntry::GetMember(const Hash32 name_hash) const
@@ -291,7 +236,102 @@ ConfigEntry ReadEntryFromRust(const RxEntry& in)
 	return entry;
 }
 
+struct RustConfigTree
+{
+	std::deque<std::vector<RxEntry>> EntryLists;
+	std::deque<std::vector<RxPrimitive>> PrimitiveLists;
+};
+
+RxPrimitive WriteRustPrimitive(const ConfigPrimitive& primitive)
+{
+	RxPrimitive out = {};
+	out.kind = static_cast<uint8>(primitive.Type);
+
+	switch (primitive.Type) {
+	case ConfigPrimitive::ePrimitiveType::Int:
+		out.int_value = primitive.mIntValue;
+		break;
+	case ConfigPrimitive::ePrimitiveType::Float:
+		out.float_value = primitive.mFloatValue;
+		break;
+	case ConfigPrimitive::ePrimitiveType::String:
+		out.string_value = primitive.mStringValue;
+		out.string_length = primitive.mStringValue ? std::strlen(primitive.mStringValue) : 0;
+		break;
+	default:
+		break;
+	}
+
+	return out;
+}
+
+RxEntry WriteRustEntry(const ConfigEntry& entry, RustConfigTree& tree)
+{
+	RxEntry out = {};
+	out.name = entry.Name.Get().c_str();
+	out.name_length = entry.Name.Get().size();
+	out.value = WriteRustPrimitive(entry);
+	out.is_array = entry.bIsArray ? 1 : 0;
+	out.is_dot_reference = entry.bIsDotReference ? 1 : 0;
+
+	std::vector<RxEntry> members;
+	for (const ConfigEntry& member : entry.Members) {
+		members.push_back(WriteRustEntry(member, tree));
+	}
+
+	if (!members.empty()) {
+		tree.EntryLists.push_back(std::move(members));
+		out.members = tree.EntryLists.back().data();
+		out.member_count = tree.EntryLists.back().size();
+	}
+
+	std::vector<RxPrimitive> values;
+	for (const ConfigPrimitive& value : entry.ArrayData) {
+		values.push_back(WriteRustPrimitive(value));
+	}
+
+	if (!values.empty()) {
+		tree.PrimitiveLists.push_back(std::move(values));
+		out.array = tree.PrimitiveLists.back().data();
+		out.array_count = tree.PrimitiveLists.back().size();
+	}
+
+	return out;
+}
+
+std::string TakeRustText(RxText* text)
+{
+	if (text == nullptr) {
+		return {};
+	}
+
+	size_t length = 0;
+	const char* data = rx_text_data(text, &length);
+	std::string result(data, length);
+
+	rx_text_free(text);
+
+	return result;
+}
+
+const RxLogSink scRustLog = { .user = nullptr, .log = RustInterop::Log };
+
 } // namespace
+
+std::string ConfigPrimitive::AsString() const
+{
+	const RxPrimitive primitive = WriteRustPrimitive(*this);
+
+	return TakeRustText(rx_config_format_primitive(&primitive, &scRustLog));
+}
+
+std::string ConfigEntry::AsString(uint32 indent) const
+{
+	RustConfigTree tree;
+	const RxEntry entry = WriteRustEntry(*this, tree);
+
+	return TakeRustText(rx_config_format_entry(&entry, indent, &scRustLog));
+}
 
 void ConfigFile::Load(const std::string& path)
 {
@@ -404,21 +444,49 @@ static bool IsConstantEntry(const ConfigEntry& entry)
 
 void ConfigFile::Write(const std::string& path)
 {
-	File file(path.c_str(), File::eModType::Write, File::eDataType::Text);
-
-	if (!file.IsFileOpen()) {
-		return;
-	}
+	RustConfigTree tree;
+	std::vector<RxEntry> entries;
 
 	for (const ConfigEntry& entry : mConfigEntries) {
 		if (mbLoadedConstants && IsConstantEntry(entry)) {
 			continue;
 		}
 
-		file.WriteMulti(entry.Name.Get(), " = ", entry.AsString(), '\n');
+		entries.push_back(WriteRustEntry(entry, tree));
 	}
 
-	file.Close();
+	RxText* text = rx_config_format_file(entries.data(), entries.size(), &scRustLog);
+
+	if (text == nullptr) {
+		LogError(LC_CORE, "Config '{}' could not be formatted, it was not written", path);
+		return;
+	}
+
+	const std::string temp_path = path + ".tmp";
+
+	{
+		File file(temp_path.c_str(), File::eModType::Write, File::eDataType::Text);
+
+		if (!file.IsFileOpen()) {
+			rx_text_free(text);
+			return;
+		}
+
+		size_t length = 0;
+		const char* data = rx_text_data(text, &length);
+		file.WriteRaw(data, length);
+		file.Close();
+	}
+
+	rx_text_free(text);
+
+	std::error_code error;
+	std::filesystem::rename(temp_path, path, error);
+
+	if (error) {
+		LogError(LC_CORE, "Could not replace '{}' with the new config: {}", path, error.message());
+		std::filesystem::remove(temp_path, error);
+	}
 }
 
 } // namespace fx

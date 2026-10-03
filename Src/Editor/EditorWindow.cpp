@@ -36,6 +36,13 @@ void Window::Create(const char* title, const Vec2u& size)
 	HandleResize();
 }
 
+void Window::SetTitle(const char* title)
+{
+	if (gEditor != nullptr && gEditor->GetMainFrame() != nullptr) {
+		gEditor->GetMainFrame()->SetTitle(wxString::FromUTF8(title));
+	}
+}
+
 void Window::HandleResize()
 {
 	const wxSize size = mpViewport->GetClientSize();

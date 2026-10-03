@@ -1,9 +1,12 @@
 use std::ffi::{CString, c_char, c_void};
 use std::mem::{align_of, offset_of, size_of};
+
+use crate::RxLogSink;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use raptor_config::host::{Host, LogLevel};
 use raptor_config::model::{Entry, Kind, Primitive};
+use raptor_config::writer;
 
 pub type ReadIncludeFn = unsafe extern "C" fn(
 	user: *mut c_void,
@@ -50,6 +53,7 @@ pub struct ConfigEntry {
 	pub array: *const ConfigPrimitive,
 	pub array_count: usize,
 	pub is_array: u8,
+	pub is_dot_reference: u8,
 }
 
 const _: () = {
@@ -69,6 +73,7 @@ const _: () = {
 	assert!(offset_of!(ConfigEntry, array) == 64);
 	assert!(offset_of!(ConfigEntry, array_count) == 72);
 	assert!(offset_of!(ConfigEntry, is_array) == 80);
+	assert!(offset_of!(ConfigEntry, is_dot_reference) == 81);
 };
 
 struct CHost<'a>(&'a RxHost);
@@ -180,6 +185,7 @@ impl Pool {
 			array: array_pointer,
 			array_count,
 			is_array: u8::from(entry.is_array),
+			is_dot_reference: u8::from(entry.is_dot_reference),
 		}
 	}
 
@@ -299,3 +305,185 @@ const _: () = {
 	assert!(Kind::String as u8 == 3);
 	assert!(Kind::Struct as u8 == 4);
 };
+
+fn primitive_from_c(primitive: &ConfigPrimitive) -> Primitive {
+	let kind = match primitive.kind {
+		1 => Kind::Int,
+		2 => Kind::Float,
+		3 => Kind::String,
+		4 => Kind::Struct,
+		_ => Kind::None,
+	};
+
+	let string_value = if primitive.string_value.is_null() {
+		None
+	} else {
+		// SAFETY: the caller promised `string_length` readable bytes at `string_value`.
+		Some(
+			unsafe {
+				std::slice::from_raw_parts(
+					primitive.string_value.cast::<u8>(),
+					primitive.string_length,
+				)
+			}
+			.to_vec(),
+		)
+	};
+
+	Primitive {
+		kind,
+		int_value: primitive.int_value,
+		float_value: primitive.float_value,
+		string_value,
+	}
+}
+
+/// # Safety
+///
+/// `entry` and everything it points to must be valid for the depth of the tree.
+unsafe fn entry_from_c(entry: &ConfigEntry) -> Entry {
+	// SAFETY: guaranteed by the caller.
+	let (members, array) = unsafe {
+		let members: &[ConfigEntry] = if entry.members.is_null() {
+			&[]
+		} else {
+			std::slice::from_raw_parts(entry.members, entry.member_count)
+		};
+		let array: &[ConfigPrimitive] = if entry.array.is_null() {
+			&[]
+		} else {
+			std::slice::from_raw_parts(entry.array, entry.array_count)
+		};
+		(members, array)
+	};
+
+	Entry {
+		// SAFETY: the caller promised `name_length` readable bytes at `name`.
+		name: unsafe { std::slice::from_raw_parts(entry.name.cast::<u8>(), entry.name_length) }
+			.to_vec(),
+		value: primitive_from_c(&entry.value),
+		is_array: entry.is_array != 0,
+		is_dot_reference: entry.is_dot_reference != 0,
+		// SAFETY: guaranteed by the caller.
+		members: members.iter().map(|m| unsafe { entry_from_c(m) }).collect(),
+		array: array.iter().map(primitive_from_c).collect(),
+	}
+}
+
+struct LogOnlyHost<'a>(&'a RxLogSink);
+
+impl Host for LogOnlyHost<'_> {
+	fn read_include(&mut self, _path: &[u8], _extension: &[u8]) -> Option<Vec<u8>> {
+		None
+	}
+
+	fn log(&mut self, level: LogLevel, category: i32, message: &[u8]) {
+		if let Some(log) = self.0.log {
+			// SAFETY: the host promised `log` accepts a pointer and length pair.
+			unsafe {
+				log(
+					self.0.user,
+					level as i32,
+					category,
+					message.as_ptr().cast(),
+					message.len(),
+				)
+			};
+		}
+	}
+}
+
+pub struct RxText(Vec<u8>);
+
+fn text(build: impl FnOnce() -> Vec<u8> + std::panic::UnwindSafe) -> *mut RxText {
+	catch_unwind(|| Box::into_raw(Box::new(RxText(build())))).unwrap_or(std::ptr::null_mut())
+}
+
+/// # Safety
+///
+/// `entries` must point to `count` valid entries (with all the memory they reference). `log` must be valid.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rx_config_format_file(
+	entries: *const ConfigEntry,
+	count: usize,
+	log: *const RxLogSink,
+) -> *mut RxText {
+	// SAFETY: guaranteed by the caller.
+	let (entries, log) = unsafe {
+		let entries = if entries.is_null() {
+			&[][..]
+		} else {
+			std::slice::from_raw_parts(entries, count)
+		};
+		(entries, &*log)
+	};
+
+	let entries: Vec<Entry> = entries
+		.iter()
+		// SAFETY: guaranteed by the caller.
+		.map(|e| unsafe { entry_from_c(e) })
+		.collect();
+
+	text(AssertUnwindSafe(move || {
+		writer::format_file(&entries, &mut LogOnlyHost(log))
+	}))
+}
+
+/// # Safety
+///
+/// `entry` must be valid (with all the memory it references). `log` must be valid.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rx_config_format_entry(
+	entry: *const ConfigEntry,
+	indent: u32,
+	log: *const RxLogSink,
+) -> *mut RxText {
+	// SAFETY: guaranteed by the caller.
+	let (entry, log) = unsafe { (entry_from_c(&*entry), &*log) };
+
+	text(AssertUnwindSafe(move || {
+		let mut out = Vec::new();
+		writer::format_entry(&entry, indent, &mut out, &mut LogOnlyHost(log));
+		out
+	}))
+}
+
+/// # Safety
+///
+/// `primitive` must be valid. `log` must be valid.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rx_config_format_primitive(
+	primitive: *const ConfigPrimitive,
+	log: *const RxLogSink,
+) -> *mut RxText {
+	// SAFETY: guaranteed by the caller.
+	let (primitive, log) = unsafe { (primitive_from_c(&*primitive), &*log) };
+
+	text(AssertUnwindSafe(move || {
+		let mut out = Vec::new();
+		writer::format_primitive(&primitive, &mut out, &mut LogOnlyHost(log));
+		out
+	}))
+}
+
+/// # Safety
+///
+/// `text` must come from an `rx_config_format_*` function and not have been freed. `length` must be writable.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rx_text_data(text: *const RxText, length: *mut usize) -> *const c_char {
+	// SAFETY: guaranteed by the caller.
+	let (text, length) = unsafe { (&*text, &mut *length) };
+	*length = text.0.len();
+	text.0.as_ptr().cast()
+}
+
+/// # Safety
+///
+/// `text` must be null or come from an `rx_config_format_*` function, and must not be used afterwards.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rx_text_free(text: *mut RxText) {
+	if !text.is_null() {
+		// SAFETY: guaranteed by the caller.
+		drop(unsafe { Box::from_raw(text) });
+	}
+}

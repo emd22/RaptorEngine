@@ -112,6 +112,21 @@ fn value_kind_of(cursor: &Cursor) -> Kind {
 	}
 }
 
+fn unescape(text: &[u8]) -> Vec<u8> {
+	let mut out = Vec::with_capacity(text.len());
+	let mut bytes = text.iter().copied().peekable();
+
+	while let Some(ch) = bytes.next() {
+		if ch == b'\\' && matches!(bytes.peek(), Some(b'"' | b'\\')) {
+			out.push(bytes.next().unwrap_or(ch));
+		} else {
+			out.push(ch);
+		}
+	}
+
+	out
+}
+
 fn find_entry<'e>(entries: &'e [Entry], name: &[u8]) -> Option<&'e Entry> {
 	entries.iter().find(|entry| entry.name == name)
 }
@@ -214,7 +229,7 @@ fn parse_value(cursor: &mut Cursor, entries: &[Entry], value: &mut Primitive) ->
 			}
 			return false;
 		}
-		Kind::String => *value = Primitive::string(cursor.text()),
+		Kind::String => *value = Primitive::string(&unescape(cursor.text())),
 		Kind::Int => *value = Primitive::int(to_int(cursor.text())),
 		Kind::Float => *value = Primitive::float(to_float(cursor.text())),
 	}

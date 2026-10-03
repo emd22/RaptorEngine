@@ -3,6 +3,7 @@ pub mod model;
 pub mod parser;
 pub mod token;
 pub mod tokenizer;
+pub mod writer;
 
 use host::Host;
 use model::Parsed;

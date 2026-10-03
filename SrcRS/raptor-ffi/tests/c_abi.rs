@@ -106,6 +106,7 @@ fn entry_from_c(e: &ConfigEntry) -> Entry {
 		name,
 		value: primitive_from_c(&e.value),
 		is_array: e.is_array != 0,
+		is_dot_reference: e.is_dot_reference != 0,
 		members,
 		array,
 	}

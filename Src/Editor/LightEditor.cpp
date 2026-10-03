@@ -34,7 +34,7 @@ static constexpr float32 scEditTolerance = 0.0005f;
 
 static constexpr float32 scHeightSnapStepsPerSecond = 8.0f;
 
-static constexpr float32 scNewLightRadius = 25.0f;
+static constexpr float32 scNewLightRadius = 8.0f;
 static const float32 scNewLightInnerAngle = MathUtil::DegreesToRadians(30.0f);
 static const float32 scNewLightOuterAngle = MathUtil::DegreesToRadians(40.0f);
 
