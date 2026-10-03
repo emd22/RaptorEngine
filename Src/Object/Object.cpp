@@ -189,6 +189,10 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 		if (gProbeManager->IsCapturingBounce()) {
 			push_constants.Flags |= eDrawFlags::ProbeBounce;
 		}
+
+		if (gProbeManager->IsCapturingReflection()) {
+			push_constants.Flags |= eDrawFlags::ReflectionCapture;
+		}
 	}
 
 	const bool is_probe_capture = HasFlag(push_constants.Flags, eDrawFlags::ProbeCapture);
@@ -200,6 +204,18 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 
 	if (gGraphics->bRenderProbeVisibility) {
 		push_constants.Flags |= eDrawFlags::DebugProbeVisibility;
+	}
+
+	if (gGraphics->bDisableReflectionProbes) {
+		push_constants.Flags |= eDrawFlags::NoReflectionProbes;
+	}
+
+	if (!is_probe_capture && gGraphics->ReflectionDebugView == 1) {
+		push_constants.Flags |= eDrawFlags::DebugReflection;
+	}
+
+	if (!is_probe_capture && gGraphics->ReflectionDebugView == 2) {
+		push_constants.Flags |= eDrawFlags::DebugReflectionCoverage;
 	}
 
 	// Decals are placed in the world, and the view model only lines up with the world from the camera's position
@@ -382,6 +398,7 @@ void Object::SetProbeVolume(bool value)
 	}
 	else {
 		ClearTag(eObjectTag::ProbeVolume);
+		ClearTag(eObjectTag::ReflectionProbe);
 	}
 
 	// A marker is not geometry: it must not light the level, occlude it, or push probes out of itself
@@ -398,6 +415,15 @@ void Object::SetProbeVolume(bool value)
 		else {
 			body->AddToWorld();
 		}
+	}
+}
+
+void Object::SetReflectionProbe(bool value)
+{
+	SetProbeVolume(value);
+
+	if (value) {
+		SetTag(eObjectTag::ReflectionProbe);
 	}
 }
 

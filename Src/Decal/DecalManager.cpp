@@ -30,7 +30,7 @@ void DecalManager::Create()
 	mDecals.InitCapacity(Limits::MaxDecals);
 	mVisibleSlots.InitCapacity(Limits::MaxDecals);
 
-	mAtlasTicket = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm, scBulletHoleAtlasPath,
+	mAtlasTicket = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_SRGB, scBulletHoleAtlasPath,
 											eImageCreateFlags::None);
 
 	mNormalAtlasTicket = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,

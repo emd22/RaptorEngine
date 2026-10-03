@@ -24,6 +24,7 @@ static constexpr FlagName scTagNames[] = {
 	{ static_cast<uint32>(eObjectTag::Blockout), "Blockout" },
 	{ static_cast<uint32>(eObjectTag::LockTransform), "Lock Transform" },
 	{ static_cast<uint32>(eObjectTag::ProbeVolume), "Probe Volume" },
+	{ static_cast<uint32>(eObjectTag::ReflectionProbe), "Reflection Probe" },
 };
 
 static constexpr FlagName scFlagNames[] = {

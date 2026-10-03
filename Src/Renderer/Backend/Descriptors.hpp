@@ -98,10 +98,10 @@ public:
 class DescriptorSet
 {
 private:
-	// Set 0 (global) now holds 9 buffers (object, material, light grid, light index list, 3 probe buffers, decals,
-	// decal masks).
+	// Set 0 (global) now holds 10 buffers (object, material, light grid, light index list, 3 probe buffers, decals,
+	// decal masks, reflection probes) and 6 images.
 	static constexpr uint32 scMaxBuffers = 12;
-	static constexpr uint32 scMaxImages = 6;
+	static constexpr uint32 scMaxImages = 8;
 
 	static constexpr uint32 scMaxDescriptorEntries = scMaxBuffers + scMaxImages;
 

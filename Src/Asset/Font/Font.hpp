@@ -8,6 +8,7 @@
 #include <Renderer/Backend/Image.hpp>
 #include FT_FREETYPE_H
 
+#include <Core/HashMap.hpp>
 #include <array>
 #include <string_view>
 
@@ -42,11 +43,10 @@ public:
 
 	const GlyphMetrics* GetGlyph(uint32 codepoint) const
 	{
-		auto it = Glyphs.find(codepoint);
-		return (it != Glyphs.end()) ? &it->second : nullptr;
+		return Glyphs.Find(codepoint);
 	}
 
-	bool HasGlyph(uint32 codepoint) const { return Glyphs.contains(codepoint); }
+	bool HasGlyph(uint32 codepoint) const { return Glyphs.Contains(codepoint); }
 
 	void Destroy();
 
@@ -54,7 +54,7 @@ private:
 	Vec2u FindSlot(uint32 width, uint32 height);
 
 public:
-	std::unordered_map<uint32, GlyphMetrics> Glyphs;
+	HashMap<uint32, GlyphMetrics> Glyphs;
 
 	Vec2u AtlasSize = Vec2u::sZero;
 	float32 FontSize = 0.0f;

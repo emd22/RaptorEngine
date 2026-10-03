@@ -125,6 +125,7 @@ public:
 		Name ObjectName;
 		/// So that undoing the delete of a probe volume brush brings back a probe volume, not solid geometry
 		bool bIsProbeVolume = false;
+		bool bIsReflectionProbe = false;
 		bool bIsDynamic = false;
 	} ObjectSnapshot;
 

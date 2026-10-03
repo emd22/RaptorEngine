@@ -16,6 +16,7 @@
 #include <Core/Thread/ThreadID.hpp>
 #include <Core/Types.hpp>
 #include <Renderer/Constants.hpp>
+#include <Core/HashMap.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <atomic>
@@ -327,7 +328,7 @@ private:
 	std::atomic_uint mTickCounter = 0;
 	uint32 mLastActiveTick = 0;
 
-	std::unordered_map<eImageFormat, fx::Image*> mNullImageList;
+	HashMap<eImageFormat, fx::Image*> mNullImageList;
 	fx::Image* mpFlatNormalImage = nullptr;
 	std::mutex mNullImageMutex;
 

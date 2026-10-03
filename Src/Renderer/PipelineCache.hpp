@@ -12,7 +12,7 @@
 #include <optional>
 #include <string>
 #include <thread>
-#include <unordered_map>
+#include <Core/HashMap.hpp>
 #include <vector>
 
 namespace fx::renderer {
@@ -177,7 +177,7 @@ private:
 	std::vector<KeyEntry> mKeys;
 	std::vector<VariantInfo> mVariantInfos;
 
-	std::unordered_map<Hash64, PipelineHandle, Hash64Stl> mKeyLookup;
+	HashMap<Hash64, PipelineHandle> mKeyLookup;
 
 	std::vector<PipelineHandle> mPassPipelines[scNumPipelinePasses];
 	PassTemplate mPassTemplates[scNumPipelinePasses];

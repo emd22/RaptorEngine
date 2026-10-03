@@ -25,6 +25,7 @@
 #include <Renderer/Backend/ExtensionHandles.hpp>
 #include <Renderer/Camera.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/Backend/BarrierHelper.hpp>
 #include <Renderer/LightProbe.hpp>
 #include <Renderer/PSOBuild.hpp>
 #include <Renderer/PipelineCache.hpp>
@@ -187,6 +188,30 @@ void GraphicsBackend::Init(Vec2u window_size)
 			});
 	}
 
+
+	ReflectionProbePageSize = Limits::MaxReflectionProbes * sizeof(ReflectionProbeData);
+	ReflectionProbeBuffer.Create(eGpuBufferType::StorageWithOffset, ReflectionProbePageSize,
+								 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
+
+	{
+		if (!mDevice.bSupportsCubeArrays) {
+			LogError("The GPU has no cubemap arrays, which the reflection probes need");
+		}
+
+		pReflectionProbes = gTextureManager->NewTexture();
+		pReflectionProbes->Create(eImageType::CubemapArray,
+								  Vec2u(Limits::ReflectionProbeSize, Limits::ReflectionProbeSize),
+								  Limits::ReflectionProbeMips, eImageFormat::RGBA16_Float,
+								  VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, eImageAspectFlag::Color,
+								  eImageCreateFlags::None, Limits::MaxReflectionProbes);
+
+		SubmitImmediateUploadCmd(
+			[&](CommandBuffer& cmd)
+			{
+				BarrierHelper::ImageLayoutTransition(pReflectionProbes, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd,
+													 0, Limits::ReflectionProbeMips);
+			});
+	}
 
 	gMaterialManager->Create();
 	gObjectManager->Create();
@@ -898,6 +923,7 @@ void GraphicsBackend::Destroy()
 	ProbeBuffer.Destroy();
 	ProbeVolumeBuffer.Destroy();
 	ProbeGridBuffer.Destroy();
+	ReflectionProbeBuffer.Destroy();
 
 	gAssetManager->ShutdownDeletionQueue();
 

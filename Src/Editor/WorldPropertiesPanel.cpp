@@ -1,7 +1,9 @@
 #include "WorldPropertiesPanel.hpp"
 
 #include "Common.hpp"
+#include "RaptorEditor.hpp"
 
+#include <wx/button.h>
 #include <wx/checkbox.h>
 #include <wx/choice.h>
 #include <wx/collpane.h>
@@ -14,6 +16,7 @@
 #include <CVar.hpp>
 #include <Engine.hpp>
 #include <Renderer/Exposure.hpp>
+#include <Renderer/LightProbe.hpp>
 #include <World.hpp>
 #include <algorithm>
 
@@ -33,6 +36,12 @@ constexpr DebugLayer scDebugLayers[] = {
 	{ "Light Bounds", World::scDebugBoundsLights },
 	{ "Physics Bounds", World::scDebugBoundsPhysics },
 	{ "All Bounds", World::scDebugBoundsObjects | World::scDebugBoundsLights | World::scDebugBoundsPhysics },
+};
+
+constexpr const char* scReflectionDebugViews[] = {
+	"Off",
+	"Mirror Reflections",
+	"Probe Coverage",
 };
 
 } // namespace
@@ -109,22 +118,167 @@ WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, w
 		cam_pane_win->SetSizer(cam_pane_sizer);
 		cam_pane_sizer->SetSizeHints(cam_pane_win);
 
-		mpCameraPane->Bind(wxEVT_COLLAPSIBLEPANE_CHANGED,
-						   [this](wxCollapsiblePaneEvent&)
-						   {
-							   Layout();
-
-							   if (GetParent() != nullptr) {
-								   GetParent()->Layout();
-							   }
-
-							   Update();
-						   });
+		mpCameraPane->Bind(wxEVT_COLLAPSIBLEPANE_CHANGED, [this](wxCollapsiblePaneEvent&) { OnPaneChanged(); });
 	}
+
+	BuildReflectionPane(sizer);
 
 	SetSizer(sizer);
 
 	Update();
+}
+
+void WorldPropertiesPanel::OnPaneChanged()
+{
+	Layout();
+
+	if (GetParent() != nullptr) {
+		GetParent()->Layout();
+	}
+
+	Update();
+}
+
+void WorldPropertiesPanel::BuildReflectionPane(wxSizer* sizer)
+{
+	mpReflectionPane = new wxCollapsiblePane(this, wxID_ANY, "Reflection Probes", wxDefaultPosition, wxDefaultSize,
+											 wxCP_DEFAULT_STYLE | wxCP_NO_TLW_RESIZE);
+
+	wxWindow* pane = mpReflectionPane->GetPane();
+	wxSizer* pane_sizer = new wxBoxSizer(wxVERTICAL);
+
+	sizer->Add(mpReflectionPane, wxSizerFlags().Expand().Border());
+
+	mpReflectionStatus = new wxStaticText(pane, wxID_ANY, wxEmptyString);
+	pane_sizer->Add(mpReflectionStatus, wxSizerFlags().Expand().Border(wxALL, 6));
+
+	mpReflectionEnabledCheck = new wxCheckBox(pane, wxID_ANY, "Enabled");
+	pane_sizer->Add(mpReflectionEnabledCheck, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+
+	mpReflectionEnabledCheck->Bind(wxEVT_CHECKBOX,
+								   [this](wxCommandEvent&)
+								   { gCVars->Set("r_reflection_probes", mpReflectionEnabledCheck->GetValue() ? 1 : 0); });
+
+	mpReflectionLevelProbeCheck = new wxCheckBox(pane, wxID_ANY, "Level fallback probe");
+	pane_sizer->Add(mpReflectionLevelProbeCheck, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+
+	mpReflectionLevelProbeCheck->Bind(wxEVT_CHECKBOX,
+									  [this](wxCommandEvent&)
+									  {
+										  gCVars->Set("r_reflection_level_probe",
+													  mpReflectionLevelProbeCheck->GetValue() ? 1 : 0);
+										  gProbeManager->RebuildReflectionProbesFromWorld();
+									  });
+
+	{
+		wxBoxSizer* debug_row = new wxBoxSizer(wxHORIZONTAL);
+		debug_row->Add(new wxStaticText(pane, wxID_ANY, "Debug View"), wxSizerFlags().CenterVertical());
+
+		mpReflectionDebugChoice = new wxChoice(pane, wxID_ANY);
+
+		for (const char* view : scReflectionDebugViews) {
+			mpReflectionDebugChoice->Append(wxString::FromUTF8(view));
+		}
+
+		debug_row->Add(mpReflectionDebugChoice, wxSizerFlags().Border(wxLEFT, 6));
+		pane_sizer->Add(debug_row, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+
+		mpReflectionDebugChoice->Bind(wxEVT_CHOICE,
+									  [this](wxCommandEvent&)
+									  {
+										  const int32 selection = mpReflectionDebugChoice->GetSelection();
+										  if (selection < 0) {
+											  return;
+										  }
+
+										  mShownReflectionDebug = selection;
+										  gCVars->Set("r_reflection_debug", selection);
+									  });
+	}
+
+	wxGridSizer* buttons = new wxGridSizer(2, 4, 4);
+
+	const auto add_button = [&](const char* label, std::function<void()> action)
+	{
+		wxButton* button = new wxButton(pane, wxID_ANY, label);
+		button->Bind(wxEVT_BUTTON, [action = std::move(action)](wxCommandEvent&) { action(); });
+		buttons->Add(button, wxSizerFlags().Expand());
+	};
+
+	add_button("New At Player", [] { gEditor->CreateReflectionProbeAtPlayer(); });
+	add_button("Mark Selection", [] { gEditor->SetSelectionReflectionProbe(true); });
+	add_button("Unmark Selection", [] { gEditor->SetSelectionReflectionProbe(false); });
+	add_button("Bake Reflections",
+			   []
+			   {
+				   gProbeManager->RebuildReflectionProbesFromWorld();
+				   gProbeManager->BeginReflectionBake();
+			   });
+	add_button("Bake All",
+			   []
+			   {
+				   gProbeManager->RebuildVolumesFromWorld();
+				   gProbeManager->BeginBake();
+			   });
+	add_button("Save Probes", [] { gProbeManager->SaveProbes(); });
+
+	pane_sizer->Add(buttons, wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+
+	pane->SetSizer(pane_sizer);
+	pane_sizer->SetSizeHints(pane);
+
+	mpReflectionPane->Bind(wxEVT_COLLAPSIBLEPANE_CHANGED, [this](wxCollapsiblePaneEvent&) { OnPaneChanged(); });
+}
+
+void WorldPropertiesPanel::UpdateReflectionPane()
+{
+	if (!mpReflectionPane->IsExpanded()) {
+		return;
+	}
+
+	const uint32 probe_count = gProbeManager->GetReflectionProbeCount();
+
+	wxString status;
+
+	if (gProbeManager->IsBakingReflections()) {
+		status = wxString::Format("Baking %u probe(s)...", probe_count);
+	}
+	else if (gProbeManager->IsBaking()) {
+		status = "Baking irradiance...";
+	}
+	else if (probe_count == 0) {
+		status = "No reflection probes";
+	}
+	else if (gProbeManager->AreReflectionsBaked()) {
+		status = wxString::Format("%u probe(s), baked", probe_count);
+	}
+	else {
+		status = wxString::Format("%u probe(s), needs a bake", probe_count);
+	}
+
+	if (status != mShownReflectionStatus) {
+		mShownReflectionStatus = status;
+		mpReflectionStatus->SetLabel(status);
+	}
+
+	const bool enabled = gCVars->Get("r_reflection_probes", int64 { 1 }) != 0;
+
+	if (mpReflectionEnabledCheck->GetValue() != enabled) {
+		mpReflectionEnabledCheck->SetValue(enabled);
+	}
+
+	const bool level_probe = gCVars->Get("r_reflection_level_probe", int64 { 0 }) != 0;
+
+	if (mpReflectionLevelProbeCheck->GetValue() != level_probe) {
+		mpReflectionLevelProbeCheck->SetValue(level_probe);
+	}
+
+	const int64 debug_view = std::clamp<int64>(gCVars->Get("r_reflection_debug", int64 { 0 }), 0, 2);
+
+	if (debug_view != mShownReflectionDebug) {
+		mShownReflectionDebug = debug_view;
+		mpReflectionDebugChoice->SetSelection(static_cast<int32>(debug_view));
+	}
 }
 
 void WorldPropertiesPanel::Update()
@@ -157,6 +311,8 @@ void WorldPropertiesPanel::Update()
 
 		mpDebugLayerChoice->SetSelection(selection);
 	}
+
+	UpdateReflectionPane();
 
 	if (!mpCameraPane->IsExpanded()) {
 		return;

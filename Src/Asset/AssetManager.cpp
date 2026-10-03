@@ -241,7 +241,7 @@ void AssetManager::Shutdown()
 
 	{
 		std::lock_guard<std::mutex> lock(mNullImageMutex);
-		mNullImageList.clear();
+		mNullImageList.Clear();
 		mpFlatNormalImage = nullptr;
 	}
 
@@ -513,9 +513,9 @@ fx::Image* AssetManager::GetNullImage(eImageFormat format)
 {
 	{
 		std::lock_guard<std::mutex> lock(mNullImageMutex);
-		auto it = mNullImageList.find(format);
-		if (it != mNullImageList.end() && it->second != nullptr) {
-			return it->second;
+		fx::Image** existing = mNullImageList.Find(format);
+		if (existing != nullptr && (*existing) != nullptr) {
+			return *existing;
 		}
 	}
 
@@ -529,13 +529,13 @@ fx::Image* AssetManager::GetNullImage(eImageFormat format)
 	{
 		std::lock_guard<std::mutex> lock(mNullImageMutex);
 		// Double-check after creation to avoid race
-		auto it = mNullImageList.find(format);
-		if (it != mNullImageList.end() && it->second != nullptr) {
+		fx::Image** existing = mNullImageList.Find(format);
+		if (existing != nullptr && (*existing) != nullptr) {
 			// Another thread won race, use existing. The newly created image will leak if not freed;
 			// but NewTexture is cheap vs complexity. In practice GetNullImage is called rarely.
-			return it->second;
+			return *existing;
 		}
-		mNullImageList[format] = image;
+		mNullImageList.Insert(format, image);
 	}
 
 	return image;

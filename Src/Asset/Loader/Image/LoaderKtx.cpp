@@ -204,11 +204,24 @@ void LoaderKtx::CreateGpuResource(AssetTicket& ticket)
 {
 	Image* image = static_cast<Image*>(ticket.Get());
 
-	// Only the base level is uploaded, matching the other image loaders.
-	ImageInfo image_info(GetImageSize(), mFormat, 0, 1, GetMipData(0));
-	image_info.ImageType = ImageType;
+	ImageInfo chain_info {};
 
-	image->CreateFromData(renderer::GraphicsBackendFwd::GetUploadCmd(), image_info, CreationFlags);
+	if (mpTexture->numLevels > 1 && ImageFormatUtil::GetPixelStride(mFormat) == 4) {
+		chain_info = MakeImageInfo();
+	}
+
+	if (chain_info.ImageData.pData != nullptr) {
+		chain_info.ImageType = ImageType;
+
+		image->Upload(renderer::GraphicsBackendFwd::GetUploadCmd(), chain_info);
+		chain_info.FreeOwnedData();
+	}
+	else {
+		ImageInfo image_info(GetImageSize(), mFormat, 0, 1, GetMipData(0));
+		image_info.ImageType = ImageType;
+
+		image->CreateFromData(renderer::GraphicsBackendFwd::GetUploadCmd(), image_info, CreationFlags);
+	}
 
 	ticket.SignalUploadedToGpu();
 }

@@ -6,7 +6,7 @@
 #include <Util/Tokenizer.hpp>
 
 #include <string>
-#include <unordered_map>
+#include <Core/HashMap.hpp>
 #include <vector>
 
 
@@ -149,13 +149,13 @@ public:
     // char* pFileData = nullptr;
     bool bHasErrors = false;
 
-    std::unordered_map<std::string, FoxCachedModule> CachedModules;
+    HashMap<std::string, FoxCachedModule> CachedModules;
 
 private:
     PagedArray<FoxScope> mScopes;
     FoxScope* mCurrentScope = nullptr;
 
-    std::unordered_map<std::string, FoxAstModuleLoad*> mModuleLoads;
+    HashMap<std::string, FoxAstModuleLoad*> mModuleLoads;
     std::vector<FoxFunctionFixup> mFunctionFixups;
 
     FoxAstBlock* mpRootBlock = nullptr;

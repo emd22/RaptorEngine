@@ -215,7 +215,7 @@ ePipelineFeatures Material::GetPipelineFeatures() const
 {
 	ePipelineFeatures features = ePipelineFeatures::None;
 
-	if (NormalMap.Exists()) {
+	if (NormalMap.Exists() || MetallicRoughness.Exists()) {
 		features |= ePipelineFeatures::NormalMap;
 	}
 
@@ -225,6 +225,8 @@ ePipelineFeatures Material::GetPipelineFeatures() const
 
 	return features;
 }
+
+static constexpr uint8 scMaterialAnisotropy = 8;
 
 static float32 GetComponentMaxLOD(const MaterialComponent& component)
 {
@@ -351,6 +353,9 @@ void Material::Build()
 
 	if (bNearestFiltering) {
 		diffuse_sampler_props.SetNearest();
+	}
+	else {
+		diffuse_sampler_props.MaxAnisotropy = scMaterialAnisotropy;
 	}
 
 	// The null image is white, so the shader's texture * factor falls back to the material factors alone

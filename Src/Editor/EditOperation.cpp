@@ -192,6 +192,10 @@ EditOperationValue EditOperation::Execute(EditorSelection& selection)
 			pObject->SetProbeVolume(true);
 		}
 
+		if (pObject != nullptr && ObjectSnapshot.bIsReflectionProbe) {
+			pObject->SetReflectionProbe(true);
+		}
+
 		return EditOperationValue(pObject);
 	}
 	case eType::Delete: {
@@ -369,6 +373,10 @@ void EditOperation::Undo(EditorSelection& selection)
 
 		if (ObjectSnapshot.bIsProbeVolume) {
 			restored->SetProbeVolume(true);
+		}
+
+		if (ObjectSnapshot.bIsReflectionProbe) {
+			restored->SetReflectionProbe(true);
 		}
 
 		pObject = restored;

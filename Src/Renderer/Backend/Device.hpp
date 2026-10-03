@@ -116,6 +116,8 @@ public:
 
     QueueFamilies mQueueFamilies;
 
+    float32 MaxSamplerAnisotropy = 1.0f;
+    bool bSupportsCubeArrays = false;
 
 private:
     VkInstance mInstance;

@@ -28,6 +28,7 @@
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/Light.hpp>
+#include <Renderer/LightProbe.hpp>
 #include <Script/Script.hpp>
 #include <Script/ScriptManager.hpp>
 #include <World.hpp>
@@ -689,6 +690,7 @@ void RaptorEditor::DeleteObject(Object* object, int32 group_size)
 	op.ObjectSnapshot.Rotation = object->mRotation;
 	op.ObjectSnapshot.ObjectName = object->Name;
 	op.ObjectSnapshot.bIsProbeVolume = object->IsProbeVolume();
+	op.ObjectSnapshot.bIsReflectionProbe = object->IsReflectionProbe();
 	op.ObjectSnapshot.bIsDynamic = gWorld->pBlockout->IsDynamic(object);
 
 	PushEditOperation(op);
@@ -711,6 +713,68 @@ void RaptorEditor::CreateObjectAtCrosshair()
 	});
 
 	SelectObject(created.pObject, false);
+}
+
+Object* RaptorEditor::CreateReflectionProbeAtPlayer()
+{
+	static const Vec3f scDefaultHalfExtent(2.0f, 1.5f, 2.0f);
+
+	if (gWorld->pBlockout == nullptr) {
+		return nullptr;
+	}
+
+	const Vec3f center = SnapToGrid(gWorld->Player.pCamera->Position);
+
+	Vec3f position;
+	const Brush brush = gWorld->pBlockout->MakeWorldBox(center - scDefaultHalfExtent, center + scDefaultHalfExtent,
+														position);
+
+	if (!brush.IsValid()) {
+		return nullptr;
+	}
+
+	EditOperation op {
+		.Type = EditOperation::eType::CreateBrush,
+		.ValueA = EditOperationValue(Vec3f::sZero),
+		.ValueB = EditOperationValue(Vec3f::sZero),
+	};
+
+	op.PlanesAfter = brush.Planes;
+	op.ObjectSnapshot.Position = position;
+	op.ObjectSnapshot.Material = gWorld->pBlockout->GetDefaultMaterial();
+	op.ObjectSnapshot.bIsProbeVolume = true;
+	op.ObjectSnapshot.bIsReflectionProbe = true;
+
+	Object* created = PushEditOperation(op).pObject;
+
+	if (created != nullptr) {
+		SelectObject(created, false);
+		gProbeManager->RebuildReflectionProbesFromWorld();
+	}
+
+	return created;
+}
+
+uint32 RaptorEditor::SetSelectionReflectionProbe(bool enabled)
+{
+	uint32 changed = 0;
+
+	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
+		Object* object = mSelection.GetObject(i);
+
+		if (object == nullptr || object->IsReflectionProbe() == enabled) {
+			continue;
+		}
+
+		object->SetReflectionProbe(enabled);
+		changed++;
+	}
+
+	if (changed > 0) {
+		gProbeManager->RebuildReflectionProbesFromWorld();
+	}
+
+	return changed;
 }
 
 void RaptorEditor::DeleteSelection()

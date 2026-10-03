@@ -172,6 +172,9 @@ FSOutput main(FSInput input)
     // Double sided materials are lit from whichever side is seen
     if (!input.bIsFrontFace) {
         input.vNormalWS = -input.vNormalWS;
+PERMIF(USE_NORMAL_MAPS);
+        input.vTangentWS = -input.vTangentWS;
+PERMEND();
     }
 
     Material material = bMaterialBuffer[input.uiMaterialIndex];

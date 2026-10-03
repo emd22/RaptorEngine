@@ -257,12 +257,12 @@ FoxFunction* FoxParser::FindFunction(Hash32 hashed_name)
 FoxFunction* FoxParser::FindModuleFunction(const String& module_alias, Hash32 hashed_name)
 {
     // Find the cached module
-    auto it = CachedModules.find(module_alias.Str());
-    if (it == CachedModules.end()) {
+    FoxCachedModule* cached_mod_ptr = CachedModules.Find(module_alias.Str());
+    if (cached_mod_ptr == nullptr) {
         return nullptr;
     }
 
-    FoxCachedModule& cached_mod = it->second;
+    FoxCachedModule& cached_mod = *cached_mod_ptr;
 
     return cached_mod.pParser->FindFunction(hashed_name);
 }
@@ -584,8 +584,8 @@ FoxAstModuleLoad* FoxParser::ParseModuleLoad()
 
     std::string path_str = node->pAlias->GetStr();
 
-    if (mModuleLoads.find(path_str) == mModuleLoads.end()) {
-        mModuleLoads[path_str] = node;
+    if (!mModuleLoads.Contains(path_str)) {
+        mModuleLoads.Insert(path_str, node);
     }
 
     Path mod_header_path(node->pModulePath->GetStr());
@@ -612,7 +612,7 @@ FoxAstModuleLoad* FoxParser::ParseModuleLoad()
         }
 
 
-        CachedModules[node->pAlias->GetStr()] = FoxCachedModule { .pParser = parser, .pAstTree = module_ast };
+        CachedModules.Insert(node->pAlias->GetStr(), FoxCachedModule { .pParser = parser, .pAstTree = module_ast });
     }
 
     return node;
@@ -796,11 +796,11 @@ FoxAstFunctionCall* FoxParser::ParseFunctionCall()
 FoxAstFunctionCall* FoxParser::ParseModuleFunctionCall(const std::string& module_name)
 {
     // Find the cached module
-    auto it = CachedModules.find(module_name);
-    if (it == CachedModules.end()) {
+    FoxCachedModule* cached_mod_ptr = CachedModules.Find(module_name);
+    if (cached_mod_ptr == nullptr) {
         return nullptr;
     }
-    FoxCachedModule& cached_mod = it->second;
+    FoxCachedModule& cached_mod = *cached_mod_ptr;
 
 
     FoxAstFunctionCall* node = FX_SCRIPT_ALLOC_NODE(FoxAstFunctionCall);
@@ -847,12 +847,12 @@ FoxAstModuleCall* FoxParser::ParseModuleCall()
     Token& mod_name = EatToken(TT::Identifier);
     std::string mod_str = mod_name.GetStr();
 
-    auto load_it = mModuleLoads.find(mod_str);
-    if (load_it == mModuleLoads.end()) {
+    FoxAstModuleLoad** module_load = mModuleLoads.Find(mod_str);
+    if (module_load == nullptr) {
         ParseError("No module load found for '{}'", mod_str);
     }
     else {
-        node->pModuleLoad = load_it->second;
+        node->pModuleLoad = *module_load;
     }
 
     EatToken(TT::Colon);
@@ -1012,12 +1012,12 @@ FoxParser::~FoxParser()
 {
     FoxAstDestroyer destroyer;
 
-    for (auto it : CachedModules) {
-        destroyer.Do(it.second.pAstTree);
-        delete it.second.pParser;
+    for (auto& it : CachedModules) {
+        destroyer.Do(it.Value.pAstTree);
+        delete it.Value.pParser;
     }
 
-    CachedModules.clear();
+    CachedModules.Clear();
 }
 
 } // namespace fx::script

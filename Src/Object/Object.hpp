@@ -34,6 +34,7 @@ enum class eObjectTag : uint32
 	LockTransform = (1 << 1),
 	/// A blockout brush that marks out a light probe volume instead of level geometry
 	ProbeVolume = (1 << 2),
+	ReflectionProbe = (1 << 3),
 };
 
 FxEnumFlags(eObjectTag);
@@ -170,6 +171,9 @@ public:
 
 	/// True if this object marks out a probe volume rather than being level geometry
 	FX_FORCE_INLINE bool IsProbeVolume() const { return HasTags(eObjectTag::ProbeVolume); }
+
+	void SetReflectionProbe(bool value);
+	FX_FORCE_INLINE bool IsReflectionProbe() const { return HasTags(eObjectTag::ReflectionProbe); }
 
 	float32 RaycastBounds(const Vec3f& origin, const Vec3f& direction, Vec3f& out_face);
 

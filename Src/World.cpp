@@ -180,6 +180,7 @@ void World::ExecuteRenderList(renderer::PipelineHandle pipeline_handle, renderer
 			gGraphics->GetDecalFrameOffset(),
 			gGraphics->GetDecalMaskFrameOffset(),
 			0,
+			0,
 		};
 
 		gGraphics->pRenderer->pPersistentDescriptor->Bind(
@@ -271,6 +272,7 @@ void World::ExecuteTransparentRenderLists()
 					0,
 					gGraphics->GetDecalFrameOffset(),
 					gGraphics->GetDecalMaskFrameOffset(),
+					0,
 					0,
 				};
 
@@ -1016,7 +1018,7 @@ void World::RenderProbeCapture()
 
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
-	const Vec2u extent(ProbeManager::scCaptureSize, ProbeManager::scCaptureSize);
+	const Vec2u extent = gProbeManager->GetCaptureExtent();
 
 	const uint32 saved_tile_columns = gGraphics->pRenderer->GetLightTileColumns();
 	const uint32 saved_tile_rows = gGraphics->pRenderer->GetLightTileRows();
@@ -1193,6 +1195,7 @@ Object* World::RaycastProbeVolumes(const Vec3f& origin, const Vec3f& direction, 
 void World::DebugDrawProbeVolumes()
 {
 	const Color volume_color = Color::FromRGBA(60, 220, 255, 255);
+	const Color reflection_color = Color::FromRGBA(255, 120, 220, 255);
 	const Color selected_color = Color::FromRGBA(255, 220, 60, 255);
 
 	for (Object& object : gObjectManager->GetCache()) {
@@ -1211,7 +1214,16 @@ void World::DebugDrawProbeVolumes()
 		const bool is_selected = false;
 #endif
 
-		gDebugDraw->WireBox(world_matrix, is_selected ? selected_color : volume_color);
+		const Color color = object.IsReflectionProbe() ? reflection_color : volume_color;
+
+		gDebugDraw->WireBox(world_matrix, is_selected ? selected_color : color);
+	}
+
+	static const Vec3f scCapturePointHalfExtent(0.12f);
+
+	for (uint32 i = 0; i < gProbeManager->GetReflectionProbeCount(); i++) {
+		gDebugDraw->SolidBox(gProbeManager->GetReflectionProbePosition(i), scCapturePointHalfExtent, Quat::scIdentity,
+							 reflection_color);
 	}
 }
 

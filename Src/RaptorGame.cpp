@@ -224,6 +224,9 @@ void RaptorGame::CreateGame()
 	gCVars->Set("r_probe_level_spacing", 0.5f);
 
 	gCVars->Set("r_probe_bounces", 3);
+	mpReflectionProbesCVar = gCVars->Set("r_reflection_probes", 1);
+	gCVars->Set("r_reflection_level_probe", 0);
+	mpReflectionDebugCVar = gCVars->Set("r_reflection_debug", 0);
 
 	gCVars->Set("r_ssao_radius", gCVars->Get("r_ssao_radius", 0.25f));
 	gCVars->Set("r_ssao_bias", gCVars->Get("r_ssao_bias", 0.02f));
@@ -416,6 +419,13 @@ void RaptorGame::ProcessControls()
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_3)) {
 		gGraphics->bRenderProbeVisibility = !gGraphics->bRenderProbeVisibility;
 		LogInfo("Probe visibility debug view {}", gGraphics->bRenderProbeVisibility ? "enabled" : "disabled");
+	}
+
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_4) && mpReflectionDebugCVar != nullptr) {
+		static const char* const scViewNames[] = { "off", "mirror reflections", "probe coverage" };
+
+		mpReflectionDebugCVar->IntValue = (std::clamp<int64>(mpReflectionDebugCVar->IntValue, 0, 2) + 1) % 3;
+		LogInfo("Reflection probe debug view: {}", scViewNames[mpReflectionDebugCVar->IntValue]);
 	}
 
 	if (ControlManager::IsMouseLocked()) {
@@ -735,6 +745,11 @@ void RaptorGame::Tick()
 	gGraphics->Profiler.ReadResults(gGraphics->GetFrameNumber(), DeltaTime);
 
 	gGraphics->bDisableProbes = (mpProbesCVar != nullptr) && (mpProbesCVar->IntValue == 0);
+	gGraphics->bDisableReflectionProbes = (mpReflectionProbesCVar != nullptr) &&
+										  (mpReflectionProbesCVar->IntValue == 0);
+	gGraphics->ReflectionDebugView = (mpReflectionDebugCVar != nullptr)
+										 ? static_cast<uint32>(std::clamp<int64>(mpReflectionDebugCVar->IntValue, 0, 2))
+										 : 0;
 	gGraphics->bDisableDecals = (mpDecalsCVar != nullptr) && (mpDecalsCVar->IntValue == 0);
 
 	UpdateWindowTitle();

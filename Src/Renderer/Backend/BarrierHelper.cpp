@@ -219,7 +219,7 @@ void ImageLayoutTransition(Image* image, VkImageLayout new_layout, CommandBuffer
 			.baseMipLevel = mip_level,
 			.levelCount = num_levels,
 			.baseArrayLayer = 0,
-			.layerCount = 1,
+			.layerCount = VK_REMAINING_ARRAY_LAYERS,
 		},
 	};
 

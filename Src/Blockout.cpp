@@ -411,7 +411,7 @@ void Blockout::RemoveSingleObjectFromWorld(Object* object)
 		gPhysics->DestroyBody(object->PhysicsID);
 	}
 
-	mBrushes.erase(object->ID.GetID());
+	mBrushes.Remove(object->ID.GetID());
 
 	gObjectManager->DestroyObject(object->ID);
 }
@@ -423,7 +423,7 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	}
 
 	BlockoutObjects.Clear();
-	mBrushes.clear();
+	mBrushes.Clear();
 }
 
 MaterialID Blockout::GetMaterialForID(int32 id) const
@@ -443,8 +443,7 @@ Brush* Blockout::GetBrush(const Object* object)
 		return nullptr;
 	}
 
-	auto it = mBrushes.find(object->ID.GetID());
-	return (it != mBrushes.end()) ? &it->second : nullptr;
+	return mBrushes.Find(object->ID.GetID());
 }
 
 void Blockout::ApplyBrush(Object* object, Brush&& brush, physics::eMotionType motion_type)
@@ -492,7 +491,7 @@ void Blockout::ApplyBrush(Object* object, Brush&& brush, physics::eMotionType mo
 		object->SetProbeVolume(true);
 	}
 
-	mBrushes[object->ID.GetID()] = std::move(brush);
+	mBrushes.Insert(object->ID.GetID(), std::move(brush));
 }
 
 /// Values stored per plane in a blockout's `uvs` array: offset U and V, scale U and V, then rotation
@@ -683,6 +682,10 @@ ObjectID Blockout::CreateBrushObject(ConfigEntry& entry)
 		object->SetProbeVolume(true);
 	}
 
+	if (entry.GetMemberValue(HashStr32("reflectionprobe"), 0) == 1) {
+		object->SetReflectionProbe(true);
+	}
+
 	bool is_dynamic = entry.GetMemberValue(HashStr32("dynamic"), 0) == 1;
 
 	ApplyBrush(object, std::move(brush), is_dynamic ? physics::eMotionType::Dynamic : physics::eMotionType::Static);
@@ -752,7 +755,7 @@ void Blockout::DestroyObject(Object* object)
 		++index;
 	}
 
-	mBrushes.erase(object->ID.GetID());
+	mBrushes.Remove(object->ID.GetID());
 
 	gWorld->Detach(object->ID);
 	gObjectManager->DestroyObject(object->ID);
@@ -807,6 +810,10 @@ Object* Blockout::DupeObject(Object* object)
 
 	if (object->IsProbeVolume()) {
 		dupe->SetProbeVolume(true);
+	}
+
+	if (object->IsReflectionProbe()) {
+		dupe->SetReflectionProbe(true);
 	}
 
 	ApplyBrush(dupe, std::move(brush), motion_type);
@@ -1182,6 +1189,10 @@ void Blockout::Save(const String& path)
 
 			if (object->IsProbeVolume()) {
 				blockout_entry.AddMember(ConfigEntry::Literal("probevolume", 1));
+			}
+
+			if (object->IsReflectionProbe()) {
+				blockout_entry.AddMember(ConfigEntry::Literal("reflectionprobe", 1));
 			}
 
 			if (IsDynamic(object)) {
