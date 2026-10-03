@@ -510,6 +510,7 @@ static bool N_blockout_clip(Object* object, FLOAT4 point_a, FLOAT4 point_b, FLOA
 	split_op.ObjectSnapshot.Rotation = object->mRotation;
 	split_op.ObjectSnapshot.Material = gEditor->GetSelection().GetStoredMaterial(object);
 	split_op.ObjectSnapshot.bIsProbeVolume = object->IsProbeVolume();
+	split_op.ObjectSnapshot.bIsReflectionProbe = object->IsReflectionProbe();
 	split_op.ObjectSnapshot.bIsDynamic = gWorld->pBlockout->IsDynamic(object);
 
 	gEditor->PushEditOperation(clip_op);
@@ -569,7 +570,30 @@ static void N_probe_volume_mark(Object* obj, bool enabled)
 		return;
 	}
 
+	obj->ClearTag(eObjectTag::ReflectionProbe);
 	obj->SetProbeVolume(enabled);
+}
+
+static void N_reflection_probe_mark(Object* obj, bool enabled)
+{
+	if (obj == nullptr) {
+		return;
+	}
+
+	obj->SetReflectionProbe(enabled);
+}
+
+static bool N_reflection_probe_is_marked(Object* obj) { return obj != nullptr && obj->IsReflectionProbe(); }
+
+static int32 N_reflection_probe_rebuild()
+{
+	return static_cast<int32>(gProbeManager->RebuildReflectionProbesFromWorld());
+}
+
+static void N_reflection_probe_bake()
+{
+	gProbeManager->RebuildReflectionProbesFromWorld();
+	gProbeManager->BeginReflectionBake();
 }
 
 static bool N_probe_volume_is_marked(Object* obj) { return obj != nullptr && obj->IsProbeVolume(); }
@@ -719,6 +743,10 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("probe_is_baking", N_probe_is_baking),
 	PREDEF("probe_bake", N_probe_bake),
 	PREDEF("probe_save", N_probe_save),
+	PREDEF("reflection_probe_mark", N_reflection_probe_mark),
+	PREDEF("reflection_probe_is_marked", N_reflection_probe_is_marked),
+	PREDEF("reflection_probe_rebuild", N_reflection_probe_rebuild),
+	PREDEF("reflection_probe_bake", N_reflection_probe_bake),
 
 	PREDEF("cvar_set_int", N_cvar_set_int),
 	PREDEF("cvar_set_float", N_cvar_set_float),

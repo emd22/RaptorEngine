@@ -67,6 +67,10 @@ enum class eDrawFlags : uint32
 	/// The draw does not sample the light probes
 	NoProbes = (1 << 4),
 	ProbeBounce = (1 << 5),
+	NoReflectionProbes = (1 << 6),
+	ReflectionCapture = (1 << 7),
+	DebugReflection = (1 << 8),
+	DebugReflectionCoverage = (1 << 9),
 };
 
 FxEnumFlags(eDrawFlags);
@@ -168,9 +172,9 @@ struct alignas(16) LightGpuData
 	/// Spot lights only: cosine of the outer cone half-angle, the light is zero outside of it
 	float32 SpotCosOuter;
 
+	float32 LinearColor[3];
 	/// Spot lights only: 1 / (cos(inner) - cos(outer)), the falloff rate between the two cone angles
 	float32 SpotAngleScale;
-	float32 _Pad0[3];
 
 	/// Where the light's shadow map is in the shadow atlas: xy scales and zw offsets a shadow map UV into an atlas UV.
 	/// All zero when the light has no shadow map.

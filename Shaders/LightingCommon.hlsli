@@ -26,10 +26,9 @@ struct Light
 	/// Spot lights only: cosine of the outer cone half-angle
 	float1 fSpotCosOuter;
 	// 128
+	float3 vLightColor;
 	/// Spot lights only: 1 / (cos(inner) - cos(outer))
 	float1 fSpotAngleScale;
-	float1 _fPad0;
-	float2 _vPad1;
 	// 144
 	/// Shadow map UV to shadow atlas UV: xy is the scale, zw the offset. Zero when the light casts no shadows.
 	float4 vShadowAtlasRect;
@@ -65,6 +64,20 @@ float DotC(float3 a, float3 b)
 }
 
 
+float3 SrgbToLinear(float3 srgb)
+{
+	const float3 low = srgb / 12.92;
+	const float3 high = pow((srgb + 0.055) / 1.055, 2.4);
+
+	return lerp(high, low, step(srgb, 0.04045));
+}
+
+float Pow5(float x)
+{
+	const float x2 = x * x;
+	return x2 * x2 * x;
+}
+
 float D_GGX(float NdotH, float m)
 {
 	float m2 = m * m;
@@ -89,7 +102,7 @@ float V_SmithGGXCorrelated(float NdotL, float NdotV, float alphaG)
 
 float3 F_Schlick(float3 f0, float f90, float u)
 {
-	return f0 + (f90 - f0) * pow(1.0 - u, 5.0);
+	return f0 + (f90 - f0) * Pow5(1.0 - u);
 }
 
 
@@ -100,8 +113,8 @@ float Fr_FrostbiteDisneyDiffuse(float NdotV, float NdotL, float LdotH, float lin
 
 	float fd90_minus_one = energy_bias + 2.0 * LdotH * LdotH * linear_roughness - 1.0;
 
-	float light_scatter = 1.0 + (fd90_minus_one * pow(1.0 - NdotL, 5.0));
-	float view_scatter = 1.0 + (fd90_minus_one * pow(1.0 - NdotV, 5.0));
+	float light_scatter = 1.0 + (fd90_minus_one * Pow5(1.0 - NdotL));
+	float view_scatter = 1.0 + (fd90_minus_one * Pow5(1.0 - NdotV));
 
 	return light_scatter * view_scatter * energy_factor;
 }

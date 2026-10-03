@@ -118,6 +118,9 @@ public:
 	/// Changes an object's material, and the material it goes back to once it is deselected
 	void SetStoredMaterial(Object* object, MaterialID material);
 
+	Object* CreateReflectionProbeAtPlayer();
+	uint32 SetSelectionReflectionProbe(bool enabled);
+
 	/////////////////////////////////////
 	// Edit operations
 	/////////////////////////////////////

@@ -71,6 +71,7 @@ void LightBase::FillGpuData(LightGpuData& data, const PerspectiveCamera& camera,
 	data.Position[1] = mPosition.Y;
 	data.Position[2] = mPosition.Z;
 	data.Color = Color.Value;
+	Color.GetLinearRGB(data.LinearColor);
 	data.Intensity = Intensity;
 
 	data.Type = static_cast<uint32>(Type);
@@ -186,14 +187,17 @@ AABB LightSpot::GetBounds() const
 	return AABB(mPosition + Vec3f(low[0], low[1], low[2]), mPosition + Vec3f(high[0], high[1], high[2]));
 }
 
-float32 LightSpot::GetSolidAngle() const
+float32 LightSpot::GetEffectiveSolidAngle() const
 {
-	return 2.0f * static_cast<float32>(M_PI) * (1.0f - cosf(mOuterAngle));
+	const float32 cos_inner = cosf(mInnerAngle);
+	const float32 cos_outer = cosf(mOuterAngle);
+
+	return 2.0f * static_cast<float32>(M_PI) * ((1.0f - cos_inner) + ((cos_inner - cos_outer) / 3.0f));
 }
 
-float32 LightSpot::GetLumens() const { return Intensity * GetSolidAngle(); }
+float32 LightSpot::GetLumens() const { return Intensity * GetEffectiveSolidAngle(); }
 
-void LightSpot::SetLumens(float32 lumens) { Intensity = lumens / std::max(GetSolidAngle(), 1e-4f); }
+void LightSpot::SetLumens(float32 lumens) { Intensity = lumens / std::max(GetEffectiveSolidAngle(), 1e-4f); }
 
 void LightSpot::SetDirection(const Vec3f& direction)
 {

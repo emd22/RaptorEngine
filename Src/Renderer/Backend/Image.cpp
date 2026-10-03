@@ -19,7 +19,7 @@ namespace fx {
 
 FX_SET_MODULE_NAME("Image")
 
-const ImageTypeProperties ImageTypeGetProperties(eImageType image_type)
+const ImageTypeProperties ImageTypeGetProperties(eImageType image_type, uint32 cube_count)
 {
 	ImageTypeProperties props {};
 
@@ -30,6 +30,10 @@ const ImageTypeProperties ImageTypeGetProperties(eImageType image_type)
 	else if (image_type == eImageType::Cubemap) {
 		props.ViewType = VK_IMAGE_VIEW_TYPE_CUBE;
 		props.LayerCount = 6;
+	}
+	else if (image_type == eImageType::CubemapArray) {
+		props.ViewType = VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
+		props.LayerCount = 6 * std::max(cube_count, 1U);
 	}
 	else {
 		LogError("Unknown image type!");
@@ -97,7 +101,8 @@ Image& Image::operator=(const Image& other)
 }
 
 void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format,
-				   VkImageTiling tiling, VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags)
+				   VkImageTiling tiling, VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags,
+				   uint32 cube_count)
 {
 	using namespace renderer;
 
@@ -126,11 +131,11 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 	}
 
 	// Get the vulkan values for the image type
-	ImageTypeProperties image_type_props = ImageTypeGetProperties(image_type);
+	ImageTypeProperties image_type_props = ImageTypeGetProperties(image_type, cube_count);
 
 	VkImageCreateFlags image_create_flags = 0;
 
-	if (image_type == eImageType::Cubemap) {
+	if (image_type == eImageType::Cubemap || image_type == eImageType::CubemapArray) {
 		image_create_flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 	}
 
@@ -249,9 +254,9 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 }
 
 void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format,
-				   VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags)
+				   VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags, uint32 cube_count)
 {
-	Create(image_type, size, mips_count, format, VK_IMAGE_TILING_OPTIMAL, usage, aspect, flags);
+	Create(image_type, size, mips_count, format, VK_IMAGE_TILING_OPTIMAL, usage, aspect, flags, cube_count);
 }
 
 

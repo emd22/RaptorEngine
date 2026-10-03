@@ -108,5 +108,15 @@ static constexpr uint32 ProbeAtlasHeight = ProbeAtlasRows * ProbeDepthSize;
 static_assert(ProbeAtlasWidth <= 4096 && ProbeAtlasHeight <= 4096, "The probe moment atlas must fit a 4096 texture");
 static_assert(ProbeAtlasColumns * ProbeAtlasRows >= MaxIrradianceProbes, "The atlas must hold every probe");
 
+static constexpr uint32 MaxReflectionProbes = 16;
+
+static constexpr uint32 ReflectionProbeSize = 128;
+
+static constexpr uint32 ReflectionProbeMips = 6;
+
+static constexpr uint32 ReflectionProbeFaces = 6;
+
+static_assert((ReflectionProbeSize >> (ReflectionProbeMips - 1)) >= 1);
+
 
 } // namespace fx::Limits

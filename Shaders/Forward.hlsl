@@ -170,6 +170,9 @@ F_StructBuffer(bProbeVolume, ProbeVolume, 7, 0);
 
 F_StructBuffer(bProbeGrid, uint, 13, 0);
 
+F_StructBuffer(bReflectionProbes, ReflectionProbe, 14, 0);
+F_TextureCubeArray(tReflectionProbes, 15, 0)
+
 // Per-probe depth moments (6x16x16 mean + standard deviation), one atlas strip per probe, for visibility
 F_Texture2D(tProbeMoments, 8, 0)
 
@@ -386,7 +389,7 @@ void ApplyDecals(inout SurfaceParams surface, inout float3 shading_normal, TileL
 				continue;
 			}
 
-			surface.vDiffuse = lerp(surface.vDiffuse, decal_sample.rgb * tint.rgb, alpha);
+			surface.vDiffuse = lerp(surface.vDiffuse, decal_sample.rgb * SrgbToLinear(tint.rgb), alpha);
 			surface.vF0 = lerp(surface.vF0, float3(0.04, 0.04, 0.04), alpha);
 			surface.fRoughness = lerp(surface.fRoughness, decal.fRoughness, alpha * decal.fRoughnessWeight);
 
@@ -433,6 +436,9 @@ FSOutput main(FSInput input)
     // Double sided materials are lit from whichever side is seen
     if (!input.bIsFrontFace) {
         input.vNormalWS = -input.vNormalWS;
+PERMIF(USE_NORMAL_MAPS);
+        input.vTangentWS = -input.vTangentWS;
+PERMEND();
     }
 
 PERMNOT(USE_SKINNING);
@@ -529,7 +535,7 @@ PERMEND();
 	for (uint tile_light = 0; tile_light < tile_data.Count; tile_light++) {
 		Light light = Lights[bLightIndexList[tile_data.StartIndex + tile_light]];
 
-		float4 light_color = F_UnpackUIntToFloat4(light.uiLightColor);
+		float3 light_color = light.vLightColor;
 		float light_intensity = light.fIntensity;
 
 		/// How much light is visible (not occluded) at this pixel
@@ -593,7 +599,7 @@ PERMEND();
 		const float specular_visibility = visibility * horizon;
 
 		accumulated_light += attenuation * ((diffuse_visibility * diffuse_term) + (specular_visibility * specular_term)) *
-							 light_color.rgb * NdotL;
+							 light_color * NdotL;
 	}
 
 	float3 ambient = float3(0.0f, 0.0f, 0.0f);
@@ -625,6 +631,12 @@ PERMEND();
 				volume_index = 0;
 			}
 
+			if (!HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE | DRAW_FLAG_NO_REFLECTION_PROBES)) {
+				probe_radiance = SampleReflectionProbes(input.vPositionWS, R, roughness, probe_radiance,
+														bReflectionProbes, F_TextureName(tReflectionProbes),
+														tReflectionProbes);
+			}
+
 			const float3 probe_specular = probe_radiance * EnvBRDFApprox(surface.vF0, roughness, NdotV);
 
 			const float specular_occlusion = SpecularOcclusion(NdotV, surface.fOcclusion, roughness);
@@ -643,11 +655,29 @@ PERMEND();
 			lp_ambient += ambient;
 		}
 
+		if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_REFLECTION_CAPTURE)) {
+			lp_ambient = ambient;
+		}
+
 		output.vAlbedo = float4((accumulated_light + lp_ambient) * FSConst.fPreExposure, 1.0f);
 	}
 
 	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_DEBUG_PROBE_IRRADIANCE)) {
 		output.vAlbedo = float4(probe_irradiance * FSConst.fPreExposure, 1.0f);
+	}
+
+	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_DEBUG_REFLECTION)) {
+		const float3 mirror = SampleReflectionProbes(input.vPositionWS, reflect(-V, geometric_normal), 0.0,
+													 float3(0.0, 0.0, 0.0), bReflectionProbes,
+													 F_TextureName(tReflectionProbes), tReflectionProbes);
+
+		output.vAlbedo = float4(mirror * FSConst.fPreExposure, 1.0f);
+	}
+
+	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_DEBUG_REFLECTION_COVERAGE)) {
+		const float shade = 0.4 + (0.6 * saturate(dot(geometric_normal, V)));
+
+		output.vAlbedo = float4(ReflectionProbeCoverage(input.vPositionWS, bReflectionProbes) * shade, 1.0f);
 	}
 
 	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_DEBUG_PROBE_VISIBILITY)) {

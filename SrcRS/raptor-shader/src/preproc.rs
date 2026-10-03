@@ -82,7 +82,7 @@ struct PPEntry
 
 // Heh PP functions
 /// Functions built into the preprocessor. Pretty much intrinsics, but heavily used with reflection.
-const PP_FUNCTIONS: [PPEntry; 9] = [
+const PP_FUNCTIONS: [PPEntry; 10] = [
 	PPEntry {
 		name: b"F_PROGRAM",
 		function: PPFunction::Program,
@@ -100,6 +100,11 @@ const PP_FUNCTIONS: [PPEntry; 9] = [
 	},
 	PPEntry {
 		name: b"F_Texture2D",
+		function: PPFunction::Texture2D,
+		keeps_text: true,
+	},
+	PPEntry {
+		name: b"F_TextureCubeArray",
 		function: PPFunction::Texture2D,
 		keeps_text: true,
 	},

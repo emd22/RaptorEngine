@@ -71,7 +71,7 @@ void FontAtlas::RenderGlyph(FT_GlyphSlot glyph, uint32 codepoint)
 		metrics.Lsb = static_cast<float32>(glyph->metrics.horiBearingX) / 64.0f;
 		metrics.Size = Vec2u::sZero;
 		metrics.Bearing = Vec2f::sZero;
-		Glyphs[codepoint] = metrics;
+		Glyphs.Insert(codepoint, metrics);
 		return;
 	}
 
@@ -91,7 +91,7 @@ void FontAtlas::RenderGlyph(FT_GlyphSlot glyph, uint32 codepoint)
 	metrics.Advance = static_cast<float32>(glyph->advance.x) / 64.0f;
 	metrics.Lsb = static_cast<float32>(glyph->metrics.horiBearingX) / 64.0f;
 
-	Glyphs[codepoint] = metrics;
+	Glyphs.Insert(codepoint, metrics);
 }
 
 
@@ -208,10 +208,10 @@ void Font::WriteMetaFile(const String& atlas_path) const
 
 	ConfigEntry* glyphs_entry = cf.AddEntry("Glyphs");
 
-	for (const std::pair<uint32, GlyphMetrics>& value : Atlas.Glyphs) {
-		const GlyphMetrics& metrics = value.second;
+	for (const auto& value : Atlas.Glyphs) {
+		const GlyphMetrics& metrics = value.Value;
 
-		ConfigEntry entry = ConfigEntry::Struct(std::format("{}", value.first));
+		ConfigEntry entry = ConfigEntry::Struct(std::format("{}", value.Key));
 
 
 		// Bearings
@@ -337,7 +337,7 @@ void Font::Destroy()
 void FontAtlas::Destroy()
 {
 	AtlasData.Free();
-	Glyphs.clear();
+	Glyphs.Clear();
 	Cursor = Vec2u::sZero;
 	RowHeight = 0;
 }

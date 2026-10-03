@@ -9,6 +9,7 @@
 #include <Renderer/Limits.hpp>
 #include <Renderer/RenderStage.hpp>
 #include <functional>
+#include <vector>
 
 namespace fx {
 
@@ -78,6 +79,15 @@ struct ProbeInfo
 static_assert(sizeof(ProbeInfo) == Limits::ProbeDepthFloatCount * sizeof(float32) + sizeof(float32) * 4,
 			  "ProbeInfo must be tightly packed to mirror the HLSL struct");
 
+struct ReflectionProbeData
+{
+	float32 WorldToBox[16];
+	float32 PositionAndCount[4];
+	float32 Fade[4];
+};
+
+static_assert(sizeof(ReflectionProbeData) == 96, "ReflectionProbeData must mirror the HLSL ReflectionProbe struct");
+
 struct ProbePlacementBoxes;
 
 /**
@@ -104,7 +114,10 @@ public:
 	Vec3f GetProbePosition(uint32 index) const;
 	uint32 GetGridPointCount() const { return mGridPointCount; }
 
-	uint32 GetCurrentProbeIndex() const { return mCurrentProbe; }
+	uint32 GetCurrentProbeIndex() const
+	{
+		return (mBakePhase == eBakePhase::Irradiance) ? mCurrentProbe : UINT32_MAX;
+	}
 
 	///////////////////////////////////
 	// Volumes
@@ -120,6 +133,14 @@ public:
 
 	uint32 RebuildVolumesFromWorld();
 
+	uint32 GetReflectionProbeCount() const { return mReflectionProbeCount; }
+	Vec3f GetReflectionProbePosition(uint32 index) const;
+	bool AreReflectionsBaked() const { return mbReflectionsBaked; }
+	bool IsBakingReflections() const { return IsBaking() && mBakePhase == eBakePhase::Reflection; }
+
+	uint32 RebuildReflectionProbesFromWorld();
+	void BeginReflectionBake();
+
 	///////////////////////////////////
 	// Baking
 	///////////////////////////////////
@@ -134,7 +155,19 @@ public:
 	/// True only while the capture faces are being drawn. The main view keeps its probe GI and SSAO during a bake.
 	bool IsCapturingFaces() const { return mbCapturingFaces; }
 
-	bool IsCapturingBounce() const { return mbCapturingFaces && mCurrentBounce > 0; }
+	bool IsCapturingBounce() const
+	{
+		return mbCapturingFaces && (mCurrentBounce > 0 || mBakePhase == eBakePhase::Reflection);
+	}
+
+	bool IsCapturingReflection() const { return mbCapturingFaces && mBakePhase == eBakePhase::Reflection; }
+
+	Vec2u GetCaptureExtent() const
+	{
+		const uint32 size = (mBakePhase == eBakePhase::Reflection) ? Limits::ReflectionProbeSize : scCaptureSize;
+		return Vec2u(size, size);
+	}
+
 	void RecordCaptureBatch(renderer::CommandBuffer& cmd, const RenderFaceFunc& render_face);
 	void ServiceCaptureBake();
 
@@ -154,6 +187,12 @@ private:
 		CapturePending,
 		/// A batch was recorded this frame and is waiting to be read back
 		CaptureRecorded,
+	};
+
+	enum class eBakePhase
+	{
+		Irradiance,
+		Reflection,
 	};
 
 	/// Everything about a capture texel that is the same for every probe
@@ -179,7 +218,20 @@ private:
 
 	void CreateCaptureResources();
 	void BuildCaptureTexels();
-	void CopyTargetToStaging(renderer::CommandBuffer& cmd, eImageFormat format, renderer::RawGpuBuffer& staging);
+	void CopyTargetToStaging(renderer::CommandBuffer& cmd, renderer::RenderStage& stage, uint32 size,
+							 eImageFormat format, renderer::RawGpuBuffer& staging);
+
+	void StartReflectionPhase();
+	void RecordReflectionCapture(renderer::CommandBuffer& cmd, const RenderFaceFunc& render_face);
+	void ServiceReflectionBake();
+	bool ReadBackReflectionProbe(uint32 probe_index);
+	void UploadReflectionProbes(uint32 visible_count);
+	void UploadReflectionCubemap(uint32 probe_index);
+
+	bool SaveIrradianceProbes();
+	bool LoadIrradianceProbes();
+	bool SaveReflectionProbes();
+	bool LoadReflectionProbes();
 
 	bool ReadBackProbe(uint32 batch_slot, uint32 probe_index);
 	void ProjectCapture(const uint16* const colors[scCaptureFaces], const float32* const depths[scCaptureFaces],
@@ -212,6 +264,12 @@ private:
 	uint32 mBatchStart = 0;
 	uint32 mCurrentBounce = 0;
 	uint32 mBounceCount = 1;
+	eBakePhase mBakePhase = eBakePhase::Irradiance;
+
+	ReflectionProbeData mReflectionProbes[Limits::MaxReflectionProbes] {};
+	uint32 mReflectionProbeCount = 0;
+	bool mbReflectionsBaked = false;
+	std::vector<uint16> mReflectionTexels;
 
 	// Capture resources, created by the first bake
 
@@ -222,6 +280,10 @@ private:
 	SizedArray<CaptureTexel> mCaptureTexels;
 	/// Inverse projection shared by every capture face
 	Mat4f mCaptureInvProjection = Mat4f::scIdentity;
+	Mat4f mCaptureFaceToClip[scCaptureFaces];
+
+	renderer::RenderStage mReflectionStage;
+	renderer::RawGpuBuffer mReflectionStaging[scCaptureFaces];
 };
 
 extern ProbeManager* gProbeManager;

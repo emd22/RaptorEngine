@@ -116,7 +116,7 @@ void FoxScript::RegisterProc(Hash32 name_hash, eFoxProcFlags flags, const SizedA
 {
 	VMExternalProcEntry entry { .pFunc = function, .ArgTypes = SizedArray<eFoxType>::Clone(arg_types), .Flags = flags };
 
-	Vm.ExternalProcs[name_hash] = std::move(entry);
+	Vm.ExternalProcs.Insert(name_hash, std::move(entry));
 
 	LogInfo("Registered external function {}", name_hash);
 }
@@ -144,16 +144,16 @@ FoxValue FoxScript::Update() { return Vm.Update(); }
 FoxValue FoxScript::Resume() { return Vm.Resume(); }
 
 
-void FoxScript::SetGlobal(const Hash32 name_hash, const FoxValue& value) { Vm.Globals[name_hash] = value; }
+void FoxScript::SetGlobal(const Hash32 name_hash, const FoxValue& value) { Vm.Globals.Insert(name_hash, value); }
 
 FoxValue FoxScript::GetGlobal(const Hash32 name_hash) const
 {
-	auto it = Vm.Globals.find(name_hash);
-	if (it == Vm.Globals.end()) {
+	const FoxValue* value = Vm.Globals.Find(name_hash);
+	if (value == nullptr) {
 		return FoxValue::scNone;
 	}
 
-	return it->second;
+	return *value;
 }
 
 

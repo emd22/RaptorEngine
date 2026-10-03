@@ -32,6 +32,7 @@ static constexpr TagName scTagNames[] = {
 	{ eObjectTag::Blockout, "Blockout" },
 	{ eObjectTag::LockTransform, "Lock Transform" },
 	{ eObjectTag::ProbeVolume, "Probe Volume" },
+	{ eObjectTag::ReflectionProbe, "Reflection Probe" },
 };
 
 static wxString BuildTagsList(eObjectTag tags)

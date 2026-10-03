@@ -284,6 +284,11 @@ public:
 	/// Depth moments for light probes
 	Image* pProbeMomentsAtlas = nullptr;
 
+	RawGpuBuffer ReflectionProbeBuffer;
+	uint32 ReflectionProbePageSize = 0;
+
+	Image* pReflectionProbes = nullptr;
+
 	Semaphore TransferSync;
 	std::atomic_uint64_t TransferCount = 0;
 
@@ -299,6 +304,8 @@ public:
 
 	/// Turn off the probe lighting or the decals in every draw, to see what they cost in the GPU timings
 	bool bDisableProbes = false;
+	bool bDisableReflectionProbes = false;
+	uint32 ReflectionDebugView = 0;
 	bool bDisableDecals = false;
 
 	float32 PreExposure = 1.0f;

@@ -141,7 +141,7 @@ public:
 
 	Vec3f GetDirection() const;
 
-	float32 GetSolidAngle() const;
+	float32 GetEffectiveSolidAngle() const;
 	float32 GetLumens() const;
 	void SetLumens(float32 lumens);
 

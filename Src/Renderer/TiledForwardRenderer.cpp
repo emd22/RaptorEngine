@@ -130,7 +130,7 @@ void TiledForwardRenderer::CreateSSAOBlurPass()
 
 void TiledForwardRenderer::BuildPersistentDescriptor()
 {
-	SizedArray<DescriptorEntry> ds_entries(16);
+	SizedArray<DescriptorEntry> ds_entries(20);
 
 	ds_entries.Insert(DescriptorEntry::AsBuffer(0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 												ObjectManager::scBoundSize));
@@ -169,6 +169,16 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 												   eSamplerFilter::Linear,
 												   eSamplerAddressMode::ClampToEdge,
 											   })));
+
+	ds_entries.Insert(DescriptorEntry::AsBuffer(14, eShaderType::Pixel, &gGraphics->ReflectionProbeBuffer, 0,
+												gGraphics->ReflectionProbePageSize));
+
+	ds_entries.Insert(
+		DescriptorEntry::AsImage(15, eShaderType::Pixel, gGraphics->pReflectionProbes,
+								 gSamplerCache->Request({
+									 .AddressMode = eSamplerAddressMode::ClampToEdge,
+									 .MaxLOD = static_cast<float32>(Limits::ReflectionProbeMips - 1),
+								 })));
 
 	Target* shadow_target = gShadowAtlas->GetTarget();
 	Assert(shadow_target != nullptr);
@@ -396,9 +406,9 @@ bool TiledForwardRenderer::MakeForwardDesc(ePipelinePass pass, ePipelineFeatures
 	const char* suffix = "";
 	out_desc.Features = GetGeometryShaderVariant(features, out_desc.Macros, out_desc.VertexType, suffix);
 
-	// Transparent geometry without normal maps also discards what is nearly invisible
-	if (is_blended && out_desc.Features == ePipelineFeatures::None) {
-		out_desc.Macros = { ShaderMacro { .pcName = "ALPHA_CUTOFF", .pcValue = "0.01" } };
+	// Transparent geometry also discards what is nearly invisible
+	if (is_blended) {
+		out_desc.Macros.push_back(ShaderMacro { .pcName = "ALPHA_CUTOFF", .pcValue = "0.01" });
 	}
 
 	const char* pass_suffix = "";
@@ -506,6 +516,10 @@ void TiledForwardRenderer::AddGlobalDescriptors()
 	gPSOBuild->AddBuffer(13, 0, eShaderType::Pixel, &gGraphics->ProbeGridBuffer, 0, gGraphics->ProbeGridPageSize);
 	// tProbeMoments (per-probe depth moments for visibility)
 	gPSOBuild->AddImage(8, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
+						gSamplerCache->Request({}));
+	gPSOBuild->AddBuffer(14, 0, eShaderType::Pixel, &gGraphics->ReflectionProbeBuffer, 0,
+						 gGraphics->ReflectionProbePageSize);
+	gPSOBuild->AddImage(15, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
 						gSamplerCache->Request({}));
 	// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
 	AddDecalDescriptors();

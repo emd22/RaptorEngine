@@ -17,7 +17,7 @@
 #include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
-#include <unordered_map>
+#include <Core/HashMap.hpp>
 
 namespace fx {
 class World;
@@ -190,7 +190,7 @@ public:
 
 private:
 	MaterialLibrary mMaterials;
-	std::unordered_map<uint32, Brush> mBrushes;
+	HashMap<uint32, Brush> mBrushes;
 
 	Brush::PlaneList mPreviewPlanes;
 };

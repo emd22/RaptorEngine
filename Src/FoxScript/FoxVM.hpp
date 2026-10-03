@@ -6,7 +6,7 @@
 #include <Core/PagedArray.hpp>
 #include <Core/Types.hpp>
 #include <chrono>
-#include <unordered_map>
+#include <Core/HashMap.hpp>
 
 namespace fx {
 
@@ -161,7 +161,7 @@ public:
 	SizedArray<FoxSymbol> SymTable;
 	SizedArray<VMModule> LoadedModules;
 
-	std::unordered_map<Hash32, FoxValue, Hash32Stl> Globals;
+	HashMap<Hash32, FoxValue> Globals;
 
 	VMVariable* pVariables = nullptr;
 
@@ -174,7 +174,7 @@ public:
 	int32 ScopeIndex = 0;
 
 
-	std::unordered_map<Hash32, VMExternalProcEntry, Hash32Stl> ExternalProcs;
+	HashMap<Hash32, VMExternalProcEntry> ExternalProcs;
 
 	uint32 PC = 0;
 	bool bReturnValueOnStack = false;

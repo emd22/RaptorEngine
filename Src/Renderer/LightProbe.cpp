@@ -19,6 +19,7 @@
 #include <Renderer/Backend/BarrierHelper.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
+#include <Renderer/ReflectionFilter.hpp>
 #include <World.hpp>
 #include <algorithm>
 #include <bit>
@@ -1132,6 +1133,8 @@ void ProbeManager::Create()
 
 	AddVolumeAndPlaceProbes(Vec3f(-20.0f, -2.0f, -20.0f), Vec3f(150.0f, 15.0f, 150.0f), ProbeGridSize { 4, 2, 4 },
 							ProbePlacementBoxes {}, eProbeFill::Dense);
+
+	UploadReflectionProbes(0);
 }
 
 void ProbeManager::Destroy()
@@ -1149,6 +1152,10 @@ void ProbeManager::Destroy()
 			mColorStaging[slot][face].Destroy();
 			mDepthStaging[slot][face].Destroy();
 		}
+	}
+
+	for (renderer::RawGpuBuffer& staging : mReflectionStaging) {
+		staging.Destroy();
 	}
 
 	mCaptureTexels.Free();
@@ -1328,7 +1335,7 @@ uint32 ProbeManager::RebuildVolumesFromWorld()
 	uint32 num_brush_volumes = 0;
 
 	for (Object& object : gObjectManager->GetCache()) {
-		if (!object.IsProbeVolume()) {
+		if (!object.IsProbeVolume() || object.IsReflectionProbe()) {
 			continue;
 		}
 
@@ -1345,6 +1352,8 @@ uint32 ProbeManager::RebuildVolumesFromWorld()
 	}
 
 	AddLevelSurfaceVolume(boxes);
+
+	RebuildReflectionProbesFromWorld();
 
 	LogInfo("Probe volumes rebuilt: {} from editor brushes, {} in total, {} of {} probes and {} of {} grid points used",
 			num_brush_volumes, mVolumeCount, mProbeCount, Limits::MaxIrradianceProbes, mGridPointCount,
@@ -1367,6 +1376,7 @@ void ProbeManager::BeginBake()
 
 	mCurrentProbe = 0;
 	mCurrentBounce = 0;
+	mBakePhase = eBakePhase::Irradiance;
 	mBounceCount = static_cast<uint32>(std::clamp<int64>(gCVars->Get("r_probe_bounces", scDefaultProbeBounces), 1, scMaxProbeBounces));
 	mBakeState = eBakeState::CapturePending;
 
@@ -1595,6 +1605,27 @@ void ProbeManager::CreateCaptureResources()
 		}
 	}
 
+	constexpr uint32 cReflectionSize = Limits::ReflectionProbeSize;
+
+	mReflectionStage.Create("ReflectionCapture", Vec2u(cReflectionSize, cReflectionSize), eSizeDivisor::FullRes);
+
+	mReflectionStage.AddTarget(eImageFormat::RGBA16_Float,
+							   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+								   VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+							   eImageAspectFlag::Color);
+
+	mReflectionStage.AddTarget(eImageFormat::D32_Float,
+							   VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+							   eImageAspectFlag::Depth);
+
+	mReflectionStage.BuildRenderStage();
+
+	for (renderer::RawGpuBuffer& staging : mReflectionStaging) {
+		staging.Create(renderer::eGpuBufferType::Transfer,
+					   static_cast<uint64>(cReflectionSize) * cReflectionSize * sizeof(uint16) * 4,
+					   VMA_MEMORY_USAGE_GPU_TO_CPU, eGpuBufferFlags::TransferReceiver);
+	}
+
 	BuildCaptureTexels();
 
 	mbCaptureResourcesCreated = true;
@@ -1614,6 +1645,7 @@ void ProbeManager::BuildCaptureTexels()
 		const Mat4f inv_view_projection = camera.InvProjectionMatrix * camera.InvViewMatrix;
 
 		mCaptureInvProjection = camera.InvProjectionMatrix;
+		mCaptureFaceToClip[face] = inv_view_projection.Inverse();
 
 		for (uint32 y = 0; y < scCaptureSize; y++) {
 			for (uint32 x = 0; x < scCaptureSize; x++, texel++) {
@@ -1647,6 +1679,11 @@ void ProbeManager::RecordCaptureBatch(renderer::CommandBuffer& cmd, const Render
 
 	CreateCaptureResources();
 
+	if (mBakePhase == eBakePhase::Reflection) {
+		RecordReflectionCapture(cmd, render_face);
+		return;
+	}
+
 	mBatchStart = mCurrentProbe;
 	const uint32 batch_end = std::min(mCurrentProbe + scProbesPerFrame, mProbeCount);
 
@@ -1660,8 +1697,10 @@ void ProbeManager::RecordCaptureBatch(renderer::CommandBuffer& cmd, const Render
 
 			render_face(camera, mCaptureStage);
 
-			CopyTargetToStaging(cmd, eImageFormat::RGBA16_Float, mColorStaging[slot][face]);
-			CopyTargetToStaging(cmd, eImageFormat::D32_Float, mDepthStaging[slot][face]);
+			CopyTargetToStaging(cmd, mCaptureStage, scCaptureSize, eImageFormat::RGBA16_Float,
+								mColorStaging[slot][face]);
+			CopyTargetToStaging(cmd, mCaptureStage, scCaptureSize, eImageFormat::D32_Float,
+								mDepthStaging[slot][face]);
 		}
 	}
 
@@ -1669,10 +1708,10 @@ void ProbeManager::RecordCaptureBatch(renderer::CommandBuffer& cmd, const Render
 	mBakeState = eBakeState::CaptureRecorded;
 }
 
-void ProbeManager::CopyTargetToStaging(renderer::CommandBuffer& cmd, eImageFormat format,
-									   renderer::RawGpuBuffer& staging)
+void ProbeManager::CopyTargetToStaging(renderer::CommandBuffer& cmd, renderer::RenderStage& stage, uint32 size,
+									   eImageFormat format, renderer::RawGpuBuffer& staging)
 {
-	renderer::Target* target = mCaptureStage.GetTarget(format);
+	renderer::Target* target = stage.GetTarget(format);
 	Assert(target != nullptr);
 
 	Image& image = target->Image;
@@ -1684,7 +1723,7 @@ void ProbeManager::CopyTargetToStaging(renderer::CommandBuffer& cmd, eImageForma
 
 	const VkBufferImageCopy copy {
 		.imageSubresource { .aspectMask = aspect, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1 },
-		.imageExtent { .width = scCaptureSize, .height = scCaptureSize, .depth = 1 },
+		.imageExtent { .width = size, .height = size, .depth = 1 },
 	};
 
 	vkCmdCopyImageToBuffer(cmd, image.InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, staging.Buffer, 1, &copy);
@@ -1700,6 +1739,11 @@ void ProbeManager::ServiceCaptureBake()
 
 	// The batch was recorded into this frame's command buffer, so wait for it to land in the staging buffers
 	renderer::gGraphics->GetDevice()->WaitForIdle();
+
+	if (mBakePhase == eBakePhase::Reflection) {
+		ServiceReflectionBake();
+		return;
+	}
 
 	for (uint32 probe = mBatchStart; probe < mCurrentProbe; probe++) {
 		if (!ReadBackProbe(probe - mBatchStart, probe)) {
@@ -1728,6 +1772,10 @@ void ProbeManager::ServiceCaptureBake()
 	mBakeState = eBakeState::Idle;
 	LogInfo("Probe bake complete ({} probes across {} volume(s), {} bounce(s))", mProbeCount, mVolumeCount,
 			mBounceCount);
+
+	if (mReflectionProbeCount > 0) {
+		StartReflectionPhase();
+	}
 }
 
 bool ProbeManager::ReadBackProbe(uint32 batch_slot, uint32 probe_index)
@@ -1945,6 +1993,30 @@ void ProbeManager::UploadMomentsAtlas(uint32 first_probe, uint32 count)
 
 bool ProbeManager::SaveProbes()
 {
+	const bool saved = SaveIrradianceProbes();
+
+	if (saved) {
+		SaveReflectionProbes();
+	}
+
+	return saved;
+}
+
+bool ProbeManager::LoadProbes()
+{
+	const bool loaded = LoadIrradianceProbes();
+
+	if (!loaded || !LoadReflectionProbes()) {
+		mReflectionProbeCount = 0;
+		mbReflectionsBaked = false;
+		UploadReflectionProbes(0);
+	}
+
+	return loaded;
+}
+
+bool ProbeManager::SaveIrradianceProbes()
+{
 	if (IsBaking()) {
 		LogWarning("Cannot save the probes while they are baking");
 		return false;
@@ -1976,7 +2048,7 @@ bool ProbeManager::SaveProbes()
 	return true;
 }
 
-bool ProbeManager::LoadProbes()
+bool ProbeManager::LoadIrradianceProbes()
 {
 	const String path = GetProbeFilePath();
 
@@ -2055,6 +2127,469 @@ bool ProbeManager::LoadProbes()
 	UploadToGpu(0, mProbeCount);
 
 	LogInfo("Loaded {} light probes across {} volume(s) from {}", mProbeCount, mVolumeCount, path.CStr());
+	return true;
+}
+
+namespace {
+
+constexpr float32 scReflectionBlendDistance = 0.25f;
+constexpr float32 scReflectionMinHalfExtent = 0.05f;
+constexpr float32 scReflectionRelocation = 0.9f;
+constexpr uint32 scReflectionFileVersion = 1;
+
+constexpr uint64 scReflectionTexelsPerProbe = 6ull * (128 * 128 + 64 * 64 + 32 * 32 + 16 * 16 + 8 * 8 + 4 * 4);
+constexpr uint64 scReflectionHalfsPerProbe = scReflectionTexelsPerProbe * 4;
+
+static_assert(Limits::ReflectionProbeSize == 128 && Limits::ReflectionProbeMips == 6);
+
+struct ReflectionBox
+{
+	Mat4f BoxToWorld;
+	Vec3f HalfExtent;
+	float32 Volume;
+};
+
+struct ReflectionFileHeader
+{
+	char Magic[4] = { 'R', 'P', 'R', 'F' };
+	uint32 Version = scReflectionFileVersion;
+	uint32 Size = Limits::ReflectionProbeSize;
+	uint32 Mips = Limits::ReflectionProbeMips;
+	uint32 ProbeCount = 0;
+};
+
+ReflectionBox MakeReflectionBox(const Vec3f& local_min, const Vec3f& local_max, const Mat4f& local_to_world)
+{
+	const Vec3f half_extent = Vec3f::Max((local_max - local_min) * 0.5f, Vec3f(scReflectionMinHalfExtent));
+	const Vec3f center = (local_max + local_min) * 0.5f;
+
+	ReflectionBox box;
+	box.BoxToWorld = Mat4f::AsScale(half_extent) * Mat4f::AsTranslation(center) * local_to_world;
+	box.HalfExtent = half_extent;
+	box.Volume = half_extent.X * half_extent.Y * half_extent.Z;
+
+	return box;
+}
+
+String GetReflectionFilePath()
+{
+	std::filesystem::path path(GetProbeFilePath().CStr());
+	path.replace_extension(".fxrefl");
+
+	return String(path.string().c_str());
+}
+
+void SampleCaptureFace(const std::vector<float32>& face, uint32 size, float32 ndc_x, float32 ndc_y, float32 out[3])
+{
+	const float32 max_coord = static_cast<float32>(size - 1);
+
+	const float32 x = std::clamp((ndc_x * 0.5f + 0.5f) * static_cast<float32>(size) - 0.5f, 0.0f, max_coord);
+	const float32 y = std::clamp((ndc_y * 0.5f + 0.5f) * static_cast<float32>(size) - 0.5f, 0.0f, max_coord);
+
+	const uint32 x0 = static_cast<uint32>(x);
+	const uint32 y0 = static_cast<uint32>(y);
+	const uint32 x1 = std::min(x0 + 1, size - 1);
+	const uint32 y1 = std::min(y0 + 1, size - 1);
+
+	const float32 fx = x - static_cast<float32>(x0);
+	const float32 fy = y - static_cast<float32>(y0);
+
+	const float32* t00 = face.data() + (y0 * size + x0) * 3;
+	const float32* t10 = face.data() + (y0 * size + x1) * 3;
+	const float32* t01 = face.data() + (y1 * size + x0) * 3;
+	const float32* t11 = face.data() + (y1 * size + x1) * 3;
+
+	for (uint32 c = 0; c < 3; c++) {
+		const float32 top = t00[c] + (t10[c] - t00[c]) * fx;
+		const float32 bottom = t01[c] + (t11[c] - t01[c]) * fx;
+
+		out[c] = top + (bottom - top) * fy;
+	}
+}
+
+} // namespace
+
+Vec3f ProbeManager::GetReflectionProbePosition(uint32 index) const
+{
+	const float32* position = mReflectionProbes[index].PositionAndCount;
+	return Vec3f(position[0], position[1], position[2]);
+}
+
+uint32 ProbeManager::RebuildReflectionProbesFromWorld()
+{
+	if (IsBaking()) {
+		LogWarning("Cannot rebuild the reflection probes while the probes are baking");
+		return 0;
+	}
+
+	const ProbePlacementBoxes boxes = GatherPlacementBoxes();
+
+	std::vector<ReflectionBox> reflection_boxes;
+
+	for (Object& object : gObjectManager->GetCache()) {
+		if (object.IsReflectionProbe()) {
+			reflection_boxes.push_back(MakeReflectionBox(object.Bounds.Min, object.Bounds.Max, object.GetWorldMatrix()));
+		}
+	}
+
+	std::sort(reflection_boxes.begin(), reflection_boxes.end(),
+			  [](const ReflectionBox& a, const ReflectionBox& b) { return a.Volume < b.Volume; });
+
+	const uint32 num_brush_probes = static_cast<uint32>(reflection_boxes.size());
+	const bool has_level_probe = !boxes.IsEmpty() && gCVars->Get("r_reflection_level_probe", int64(0)) != 0;
+	const uint32 max_brush_probes = Limits::MaxReflectionProbes - (has_level_probe ? 1 : 0);
+
+	if (reflection_boxes.size() > max_brush_probes) {
+		LogWarning("{} reflection probe brushes are placed but only {} fit, the largest are left out",
+				   reflection_boxes.size(), max_brush_probes);
+		reflection_boxes.resize(max_brush_probes);
+	}
+
+	if (has_level_probe) {
+		reflection_boxes.push_back(MakeReflectionBox(boxes.Min, boxes.Max, Mat4f::scIdentity));
+	}
+
+	mReflectionProbeCount = static_cast<uint32>(reflection_boxes.size());
+	mbReflectionsBaked = false;
+
+	for (uint32 i = 0; i < mReflectionProbeCount; i++) {
+		const ReflectionBox& box = reflection_boxes[i];
+		ReflectionProbeData& probe = mReflectionProbes[i];
+
+		const Vec4f center_h = box.BoxToWorld * Vec4f(0.0f, 0.0f, 0.0f, 1.0f);
+		const Vec3f center(center_h.X, center_h.Y, center_h.Z);
+
+		Vec3f position = center;
+
+		if (!IsProbePlacementValid(center, center, boxes) &&
+			!FindValidProbePosition(center, center, box.HalfExtent * scReflectionRelocation, boxes, position)) {
+			LogWarning("Reflection probe {} is captured from inside of the level's geometry, move its brush", i);
+			position = center;
+		}
+
+		memcpy(probe.WorldToBox, box.BoxToWorld.Inverse().RawData, sizeof(probe.WorldToBox));
+
+		probe.PositionAndCount[0] = position.X;
+		probe.PositionAndCount[1] = position.Y;
+		probe.PositionAndCount[2] = position.Z;
+		probe.PositionAndCount[3] = 0.0f;
+
+		probe.Fade[0] = box.HalfExtent.X / scReflectionBlendDistance;
+		probe.Fade[1] = box.HalfExtent.Y / scReflectionBlendDistance;
+		probe.Fade[2] = box.HalfExtent.Z / scReflectionBlendDistance;
+		probe.Fade[3] = 0.0f;
+	}
+
+	UploadReflectionProbes(0);
+
+	LogInfo("Reflection probes rebuilt: {} from editor brushes, {} in total", std::min(num_brush_probes, max_brush_probes),
+			mReflectionProbeCount);
+
+	return mReflectionProbeCount;
+}
+
+void ProbeManager::BeginReflectionBake()
+{
+	if (IsBaking()) {
+		LogWarning("A probe bake is already in progress");
+		return;
+	}
+
+	if (mReflectionProbeCount == 0) {
+		LogError("Reflection bake failed: no reflection probes have been placed");
+		return;
+	}
+
+	StartReflectionPhase();
+}
+
+void ProbeManager::StartReflectionPhase()
+{
+	mBakePhase = eBakePhase::Reflection;
+	mCurrentProbe = 0;
+	mbReflectionsBaked = false;
+	mBakeState = eBakeState::CapturePending;
+
+	mReflectionTexels.assign(mReflectionProbeCount * scReflectionHalfsPerProbe, 0);
+
+	UploadReflectionProbes(0);
+
+	LogInfo("Reflection probe bake started ({} probes)", mReflectionProbeCount);
+}
+
+void ProbeManager::RecordReflectionCapture(renderer::CommandBuffer& cmd, const RenderFaceFunc& render_face)
+{
+	mBatchStart = mCurrentProbe;
+
+	const Vec3f position = GetReflectionProbePosition(mCurrentProbe);
+
+	mbCapturingFaces = true;
+
+	for (uint32 face = 0; face < scCaptureFaces; face++) {
+		PerspectiveCamera camera = MakeCaptureCamera(position, face);
+
+		render_face(camera, mReflectionStage);
+
+		CopyTargetToStaging(cmd, mReflectionStage, Limits::ReflectionProbeSize, eImageFormat::RGBA16_Float,
+							mReflectionStaging[face]);
+	}
+
+	mbCapturingFaces = false;
+	mCurrentProbe++;
+	mBakeState = eBakeState::CaptureRecorded;
+}
+
+void ProbeManager::ServiceReflectionBake()
+{
+	const uint32 probe = mBatchStart;
+
+	if (!ReadBackReflectionProbe(probe)) {
+		LogError("Reflection probe bake failed: could not read back probe {}", probe);
+		mBakePhase = eBakePhase::Irradiance;
+		mBakeState = eBakeState::Idle;
+		return;
+	}
+
+	UploadReflectionCubemap(probe);
+
+	if (mCurrentProbe < mReflectionProbeCount) {
+		mBakeState = eBakeState::CapturePending;
+		LogInfo("Reflection probe bake progress: {}/{}", mCurrentProbe, mReflectionProbeCount);
+		return;
+	}
+
+	mBakePhase = eBakePhase::Irradiance;
+	mBakeState = eBakeState::Idle;
+	mbReflectionsBaked = true;
+
+	UploadReflectionProbes(mReflectionProbeCount);
+
+	LogInfo("Reflection probe bake complete ({} probes)", mReflectionProbeCount);
+}
+
+bool ProbeManager::ReadBackReflectionProbe(uint32 probe_index)
+{
+	constexpr uint32 cSize = Limits::ReflectionProbeSize;
+	constexpr uint32 cPixels = cSize * cSize;
+
+	std::vector<float32> captures[scCaptureFaces];
+	bool mapped = true;
+
+	for (uint32 face = 0; face < scCaptureFaces; face++) {
+		renderer::RawGpuBuffer& staging = mReflectionStaging[face];
+
+		staging.Map();
+		staging.InvalidateFromGpu();
+
+		const uint16* rgba = static_cast<const uint16*>(staging.pMappedBuffer);
+
+		if (rgba == nullptr) {
+			mapped = false;
+		}
+		else {
+			captures[face].resize(cPixels * 3);
+
+			for (uint32 pixel = 0; pixel < cPixels; pixel++) {
+				for (uint32 c = 0; c < 3; c++) {
+					captures[face][pixel * 3 + c] = std::clamp(HalfToFloat(rgba[pixel * 4 + c]), 0.0f, scRadianceClamp);
+				}
+			}
+		}
+
+		staging.UnMap();
+	}
+
+	if (!mapped) {
+		return false;
+	}
+
+	std::vector<float32> cube[scCaptureFaces];
+	const float32* cube_faces[scCaptureFaces];
+
+	for (uint32 face = 0; face < scCaptureFaces; face++) {
+		cube[face].resize(cPixels * 3);
+		float32* out = cube[face].data();
+
+		for (uint32 y = 0; y < cSize; y++) {
+			for (uint32 x = 0; x < cSize; x++, out += 3) {
+				const float32 u = ((static_cast<float32>(x) + 0.5f) / static_cast<float32>(cSize)) * 2.0f - 1.0f;
+				const float32 v = ((static_cast<float32>(y) + 0.5f) / static_cast<float32>(cSize)) * 2.0f - 1.0f;
+
+				const Vec3f direction = ReflectionFilter::FaceUVToDirection(face, u, v);
+
+				uint32 capture_face;
+				float32 unused_u;
+				float32 unused_v;
+				ReflectionFilter::DirectionToFaceUV(direction, capture_face, unused_u, unused_v);
+
+				const Vec4f clip = mCaptureFaceToClip[capture_face] *
+								   Vec4f(direction.X, direction.Y, direction.Z, 1.0f);
+
+				SampleCaptureFace(captures[capture_face], cSize, clip.X / clip.W, clip.Y / clip.W, out);
+			}
+		}
+
+		cube_faces[face] = cube[face].data();
+	}
+
+	ReflectionFilter::Prefilter(cube_faces, cSize, Limits::ReflectionProbeMips,
+								mReflectionTexels.data() + probe_index * scReflectionHalfsPerProbe);
+
+	return true;
+}
+
+void ProbeManager::UploadReflectionProbes(uint32 visible_count)
+{
+	renderer::GraphicsBackend* graphics = renderer::gGraphics;
+
+	graphics->GetDevice()->WaitForIdle();
+
+	ReflectionProbeData gpu_probes[Limits::MaxReflectionProbes];
+	memcpy(gpu_probes, mReflectionProbes, sizeof(gpu_probes));
+
+	for (ReflectionProbeData& probe : gpu_probes) {
+		probe.PositionAndCount[3] = static_cast<float32>(visible_count);
+		probe.Fade[3] = static_cast<float32>(mReflectionProbeCount);
+	}
+
+	UploadRange(graphics->ReflectionProbeBuffer, gpu_probes, 0, sizeof(gpu_probes));
+}
+
+void ProbeManager::UploadReflectionCubemap(uint32 probe_index)
+{
+	using namespace renderer;
+
+	GraphicsBackend* graphics = gGraphics;
+	Image* image = graphics->pReflectionProbes;
+	Assert(image != nullptr);
+
+	graphics->GetDevice()->WaitForIdle();
+
+	const uint64 bytes = scReflectionHalfsPerProbe * sizeof(uint16);
+
+	RawGpuBuffer staging;
+	staging.Create(eGpuBufferType::Transfer, bytes, VMA_MEMORY_USAGE_CPU_TO_GPU, eGpuBufferFlags::TransferReceiver);
+	staging.Upload(mReflectionTexels.data() + probe_index * scReflectionHalfsPerProbe, bytes);
+
+	VkBufferImageCopy regions[Limits::ReflectionProbeMips];
+	uint64 offset = 0;
+
+	for (uint32 mip = 0; mip < Limits::ReflectionProbeMips; mip++) {
+		const uint32 mip_size = Limits::ReflectionProbeSize >> mip;
+
+		regions[mip] = VkBufferImageCopy {
+			.bufferOffset = offset,
+			.imageSubresource {
+				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.mipLevel = mip,
+				.baseArrayLayer = probe_index * Limits::ReflectionProbeFaces,
+				.layerCount = Limits::ReflectionProbeFaces,
+			},
+			.imageExtent { .width = mip_size, .height = mip_size, .depth = 1 },
+		};
+
+		offset += static_cast<uint64>(mip_size) * mip_size * Limits::ReflectionProbeFaces * 4 * sizeof(uint16);
+	}
+
+	graphics->SubmitImmediateUploadCmd(
+		[&](CommandBuffer& cmd)
+		{
+			BarrierHelper::ImageLayoutTransition(image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 0,
+												 Limits::ReflectionProbeMips);
+
+			vkCmdCopyBufferToImage(cmd, staging.Buffer, image->InternalImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+								   Limits::ReflectionProbeMips, regions);
+
+			BarrierHelper::ImageLayoutTransition(image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 0,
+												 Limits::ReflectionProbeMips);
+		});
+
+	staging.Destroy();
+}
+
+bool ProbeManager::SaveReflectionProbes()
+{
+	if (mReflectionProbeCount > 0 && !mbReflectionsBaked) {
+		LogWarning("The reflection probes are not baked, so they were not saved");
+		return false;
+	}
+
+	const String path = GetReflectionFilePath();
+
+	if (mReflectionProbeCount == 0 && !File(path, File::eModType::Read, File::eDataType::Binary).IsFileOpen()) {
+		return true;
+	}
+
+	File file(path, File::eModType::Write, File::eDataType::Binary);
+
+	if (!file.IsFileOpen()) {
+		LogError("Could not open {} to save the reflection probes", path.CStr());
+		return false;
+	}
+
+	ReflectionFileHeader header;
+	header.ProbeCount = mReflectionProbeCount;
+
+	file.WriteRaw(&header, sizeof(header));
+	file.WriteRaw(mReflectionProbes, mReflectionProbeCount * sizeof(ReflectionProbeData));
+	file.WriteRaw(mReflectionTexels.data(), mReflectionProbeCount * scReflectionHalfsPerProbe * sizeof(uint16));
+
+	LogInfo("Saved {} reflection probes to {}", mReflectionProbeCount, path.CStr());
+	return true;
+}
+
+bool ProbeManager::LoadReflectionProbes()
+{
+	const String path = GetReflectionFilePath();
+
+	File file(path, File::eModType::Read, File::eDataType::Binary);
+
+	if (!file.IsFileOpen()) {
+		LogInfo("No reflection probe file at {}", path.CStr());
+		return false;
+	}
+
+	const ReflectionFileHeader expected {};
+	ReflectionFileHeader header;
+
+	if (!ReadExact(file, &header, sizeof(header)) || memcmp(header.Magic, expected.Magic, sizeof(header.Magic)) != 0 ||
+		header.Version != expected.Version || header.Size != expected.Size || header.Mips != expected.Mips ||
+		header.ProbeCount > Limits::MaxReflectionProbes) {
+		LogWarning("Reflection probe file {} is out of date or not a reflection probe file, rebake the probes",
+				   path.CStr());
+		return false;
+	}
+
+	const uint64 texel_bytes = header.ProbeCount * scReflectionHalfsPerProbe * sizeof(uint16);
+	const uint64 expected_size = sizeof(header) + header.ProbeCount * sizeof(ReflectionProbeData) + texel_bytes;
+
+	if (file.GetFileSize() != expected_size) {
+		LogError("Reflection probe file {} is {} bytes, not the {} its {} probes need", path.CStr(), file.GetFileSize(),
+				 expected_size, header.ProbeCount);
+		return false;
+	}
+
+	ReflectionProbeData probes[Limits::MaxReflectionProbes] {};
+	std::vector<uint16> texels(header.ProbeCount * scReflectionHalfsPerProbe);
+
+	if (!ReadExact(file, probes, header.ProbeCount * sizeof(ReflectionProbeData)) ||
+		!ReadExact(file, texels.data(), texel_bytes)) {
+		LogError("Could not read the reflection probes from {}", path.CStr());
+		return false;
+	}
+
+	memcpy(mReflectionProbes, probes, sizeof(mReflectionProbes));
+	mReflectionTexels = std::move(texels);
+	mReflectionProbeCount = header.ProbeCount;
+	mbReflectionsBaked = true;
+
+	for (uint32 probe = 0; probe < mReflectionProbeCount; probe++) {
+		UploadReflectionCubemap(probe);
+	}
+
+	UploadReflectionProbes(mReflectionProbeCount);
+
+	LogInfo("Loaded {} reflection probes from {}", mReflectionProbeCount, path.CStr());
 	return true;
 }
 
