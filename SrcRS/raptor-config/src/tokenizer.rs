@@ -161,8 +161,12 @@ impl<'h> Tokenizer<'h> {
 				let start = lexer.pos;
 
 				while lexer.pos < lexer.end && lexer.at(lexer.pos) != b'"' {
-					lexer.pos += 1;
+					let escaped = lexer.at(lexer.pos) == b'\\'
+						&& matches!(lexer.at(lexer.pos + 1), b'"' | b'\\');
+					lexer.pos += if escaped { 2 } else { 1 };
 				}
+
+				lexer.pos = lexer.pos.min(lexer.end);
 
 				self.stream.tokens.push(Token {
 					kind: TokenKind::String,

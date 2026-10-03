@@ -75,6 +75,7 @@ private:
 
 	void ReloadWorldFile();
 	void ReloadBlockout();
+	void UpdateWindowTitle();
 	void ReloadScripts();
 
 	void DestroyGame();
@@ -111,6 +112,10 @@ private:
 	uint64 mFpsWindowStartFrame = 0;
 
 	CVarValue* mpShowFpsCVar = nullptr;
+
+	String mBaseWindowTitle;
+	String mTitleBlockoutPath;
+	bool mbTitleShown = false;
 
 	// $i_show_gpu shows the GPU time of each stage. $r_probes and $r_decals switch the probes and decals off when 0
 	CVarValue* mpShowGpuCVar = nullptr;

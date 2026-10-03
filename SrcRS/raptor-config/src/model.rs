@@ -82,6 +82,7 @@ pub struct Entry {
 	pub name: Vec<u8>,
 	pub value: Primitive,
 	pub is_array: bool,
+	pub is_dot_reference: bool,
 	pub members: Vec<Entry>,
 	pub array: Vec<Primitive>,
 }

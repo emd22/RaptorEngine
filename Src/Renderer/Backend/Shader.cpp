@@ -337,6 +337,8 @@ void ShaderProgram::Destroy()
 
 	GpuDevice* device = gGraphics->GetDevice();
 	vkDestroyShaderModule(device->Device, InternalShader, nullptr);
+
+	InternalShader = nullptr;
 }
 
 

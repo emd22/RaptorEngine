@@ -103,12 +103,8 @@ pub fn classify_numeric(text: &[u8]) -> Numeric {
 }
 
 /// The maximum amount of digits(including decimal) we could accept from a tokie
-const NUMBER_BUFFER_LIMIT: usize = 31;
-
 /// Converts a token to an integer value
 pub fn to_int(text: &[u8]) -> i64 {
-	let text = &text[..text.len().min(NUMBER_BUFFER_LIMIT)];
-
 	let mut value: i64 = 0;
 	for &ch in text.iter().take_while(|ch| ch.is_ascii_digit()) {
 		let digit = i64::from(ch - b'0');
@@ -122,8 +118,6 @@ pub fn to_int(text: &[u8]) -> i64 {
 
 /// Converts a token to a floating point value
 pub fn to_float(text: &[u8]) -> f32 {
-	let text = &text[..text.len().min(NUMBER_BUFFER_LIMIT)];
-
 	let integer_digits = text.iter().take_while(|ch| ch.is_ascii_digit()).count();
 	if integer_digits == 0 {
 		return 0.0;
