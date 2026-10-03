@@ -8,7 +8,9 @@ publish.workspace = true
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
+raptor-brush = { path = "../raptor-brush" }
 raptor-config = { path = "../raptor-config" }
+raptor-math = { path = "../raptor-math" }
 raptor-mesh = { path = "../raptor-mesh" }
 raptor-shader = { path = "../raptor-shader" }
 

@@ -221,6 +221,7 @@ void RaptorGame::CreateGame()
 
 	// Metres between probes in a volume built from an editor brush. Set `$r_probe_spacing` in the console
 	gCVars->Set("r_probe_spacing", 2.5f);
+	gCVars->Set("r_probe_level_spacing", 0.5f);
 
 	gCVars->Set("r_probe_bounces", 3);
 

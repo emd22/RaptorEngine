@@ -179,6 +179,7 @@ void World::ExecuteRenderList(renderer::PipelineHandle pipeline_handle, renderer
 			0,
 			gGraphics->GetDecalFrameOffset(),
 			gGraphics->GetDecalMaskFrameOffset(),
+			0,
 		};
 
 		gGraphics->pRenderer->pPersistentDescriptor->Bind(
@@ -270,6 +271,7 @@ void World::ExecuteTransparentRenderLists()
 					0,
 					gGraphics->GetDecalFrameOffset(),
 					gGraphics->GetDecalMaskFrameOffset(),
+					0,
 				};
 
 				gGraphics->pRenderer->pPersistentDescriptor->Bind(
@@ -1229,7 +1231,6 @@ void World::DebugDrawProbes()
 	};
 
 	const Color capturing_color = Color::FromRGBA(255, 150, 30, 255);
-	const Color inactive_color = Color::FromRGBA(255, 40, 40, 60);
 
 	const bool is_baking = gProbeManager->IsBaking();
 	const uint32 current_probe = gProbeManager->GetCurrentProbeIndex();
@@ -1242,14 +1243,7 @@ void World::DebugDrawProbes()
 		const Color volume_color = scVolumeColors[volume % std::size(scVolumeColors)];
 
 		for (uint32 i = first_probe; i < first_probe + num_probes; i++) {
-			Color color;
-
-			if (is_baking && i == current_probe) {
-				color = capturing_color;
-			}
-			else {
-				color = gProbeManager->IsProbeActive(i) ? volume_color : inactive_color;
-			}
+			const Color color = (is_baking && i == current_probe) ? capturing_color : volume_color;
 
 			gDebugDraw->SolidBox(gProbeManager->GetProbePosition(i), scProbeHalfExtent, Quat::scIdentity, color);
 		}

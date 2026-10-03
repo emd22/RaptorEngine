@@ -158,6 +158,9 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 	ds_entries.Insert(DescriptorEntry::AsBuffer(7, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
 												gGraphics->ProbeVolumePageSize));
 
+	ds_entries.Insert(
+		DescriptorEntry::AsBuffer(13, eShaderType::Pixel, &gGraphics->ProbeGridBuffer, 0, gGraphics->ProbeGridPageSize));
+
 
 	ds_entries.Insert(DescriptorEntry::AsImage(8, eShaderType::Pixel, gGraphics->pProbeMomentsAtlas,
 											   gSamplerCache->Request({
@@ -500,6 +503,7 @@ void TiledForwardRenderer::AddGlobalDescriptors()
 	gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
 	// bProbeVolume (spatial lookup descriptor for probe blending)
 	gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0, gGraphics->ProbeVolumePageSize);
+	gPSOBuild->AddBuffer(13, 0, eShaderType::Pixel, &gGraphics->ProbeGridBuffer, 0, gGraphics->ProbeGridPageSize);
 	// tProbeMoments (per-probe depth moments for visibility)
 	gPSOBuild->AddImage(8, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
 						gSamplerCache->Request({}));

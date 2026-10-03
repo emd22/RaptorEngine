@@ -29,7 +29,7 @@ const _: () = {
 	assert!(offset_of!(RxCubeOptions, align_uvs) == 120);
 };
 
-pub struct RxMesh(Mesh);
+pub struct RxMesh(pub(crate) Mesh);
 
 fn face(options: &RxFaceOptions) -> FaceOptions {
 	FaceOptions {

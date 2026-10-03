@@ -168,6 +168,8 @@ F_StructBuffer(bProbeBuffer, ProbeSHData, 6, 0);
 // Probe volume descriptors for spatial probe blending, one per placed volume
 F_StructBuffer(bProbeVolume, ProbeVolume, 7, 0);
 
+F_StructBuffer(bProbeGrid, uint, 13, 0);
+
 // Per-probe depth moments (6x16x16 mean + standard deviation), one atlas strip per probe, for visibility
 F_Texture2D(tProbeMoments, 8, 0)
 
@@ -603,16 +605,25 @@ PERMEND();
 		const uint probe_volume_count = GetProbeVolumeCount(bProbeVolume);
 
 		if (probe_volume_count > 0) {
-			const uint volume_index = SelectProbeVolume(input.vPositionWS, bProbeVolume, probe_volume_count);
+			uint volume_index = SelectProbeVolume(input.vPositionWS, bProbeVolume, probe_volume_count);
 
 			// An L2 SH probe is blurry (duh) and a rough surface's lobe is centred nearer the normal than the reflection.
 			// Sampling along R regardless is wrong for most instances where roughness sits at or near 1
 			const float3 R = GetSpecularDominantDir(N, reflect(-V, N), roughness);
 
 			float3 probe_radiance;
-			SampleProbeVolumeIrradiance(input.vPositionWS, N, R, bProbeVolume[volume_index], bProbeBuffer,
-										F_TextureName(tProbeMoments), tProbeMoments, probe_irradiance,
-										probe_radiance, probe_visibility);
+
+			for (uint attempt = 0; attempt < 2; attempt++) {
+				const bool sampled = SampleProbeVolumeIrradiance(
+					input.vPositionWS, N, R, bProbeVolume[volume_index], bProbeBuffer, bProbeGrid,
+					F_TextureName(tProbeMoments), tProbeMoments, probe_irradiance, probe_radiance, probe_visibility);
+
+				if (sampled || volume_index == 0) {
+					break;
+				}
+
+				volume_index = 0;
+			}
 
 			const float3 probe_specular = probe_radiance * EnvBRDFApprox(surface.vF0, roughness, NdotV);
 

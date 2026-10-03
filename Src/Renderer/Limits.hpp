@@ -58,6 +58,14 @@ static constexpr uint32 MaxIrradianceProbes = 4096;
 
 static constexpr uint32 MaxProbeVolumes = 8;
 
+/// Mirrored by PROBE_GRID_EMPTY in Shaders/ProbeCommon.hlsli.
+static constexpr uint16 ProbeGridEmpty = 0xFFFF;
+
+static constexpr uint32 MaxProbeGridPoints = 1u << 20;
+
+static_assert(MaxIrradianceProbes < ProbeGridEmpty);
+static_assert((MaxProbeGridPoints % 2) == 0);
+
 /// Default probe grid dimensions (X x Y x Z) of a volume fitted to the level.
 static constexpr uint32 ProbeGridDims[3] = { 16, 8, 16 };
 

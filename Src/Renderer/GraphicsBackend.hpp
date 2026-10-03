@@ -278,6 +278,9 @@ public:
 	RawGpuBuffer ProbeVolumeBuffer;
 	uint32 ProbeVolumePageSize = 0;
 
+	RawGpuBuffer ProbeGridBuffer;
+	uint32 ProbeGridPageSize = 0;
+
 	/// Depth moments for light probes
 	Image* pProbeMomentsAtlas = nullptr;
 

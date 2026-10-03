@@ -7,6 +7,8 @@
 
 #define PROBE_MAX_VOLUMES 8
 
+#define PROBE_GRID_EMPTY 0xFFFF
+
 #define PROBE_MAX_PROBES 4096
 
 #define PROBE_DEPTH_SIZE 16
@@ -34,22 +36,19 @@
 #define PROBE_NORMAL_BIAS_MIN 0.02
 #define PROBE_NORMAL_BIAS_MAX 0.5
 
-/// Lowest weights a probe can be given for being occluded or behind the surface, so that no surface is left unlit
-#define PROBE_VISIBILITY_FLOOR 0.05
 #define PROBE_BACKFACE_FLOOR 0.2
+#define PROBE_MIN_WEIGHT 1e-6
+#define PROBE_WEIGHT_CRUSH 0.2
 
 struct ProbeSHData
 {
 	/// RGB per coefficient. The w lanes of the first three carry the probe's world position (ProbeSHPosition), the
-	/// fourth whether the probe is active (ProbeSHActive), the rest are padding.
+	/// rest are padding.
 	float4 SH[PROBE_SH_COEFF_COUNT];
 };
 
 
 float3 ProbeSHPosition(ProbeSHData probe) { return float3(probe.SH[0].w, probe.SH[1].w, probe.SH[2].w); }
-
-/// False for probes that placement left inside geometry, or could only have moved through a surface
-bool ProbeSHActive(ProbeSHData probe) { return probe.SH[3].w > 0.5; }
 
 struct ProbeVolume
 {
@@ -59,7 +58,7 @@ struct ProbeVolume
 
 	float4 vInvCellSize;
 
-	/// Grid dimensions in XYZ, and in W the index this volume's first probe has in the probe buffers
+	/// Grid dimensions in XYZ, and in W the index of this volume's first point in the probe grid table
 	uint4 vDimsAndFirst;
 
 	/// World space corner opposite vMinAndCount in xyz, and the volume of one grid cell in w. Derived from the
@@ -189,7 +188,7 @@ float ProbeMinVariance(float mean)
 }
 
 
-float ProbeDepthChebyshev(float receiver_dist, float mean, float stddev)
+float ProbeDepthChebyshev(float receiver_dist, float mean, float variance)
 {
 	const float biased_dist = max(receiver_dist - PROBE_CHEBYSHEV_BIAS, 0.0);
 
@@ -198,10 +197,10 @@ float ProbeDepthChebyshev(float receiver_dist, float mean, float stddev)
 		return 1.0;
 	}
 
-	const float variance = max(stddev * stddev, ProbeMinVariance(mean));
+	const float clamped_variance = max(variance, ProbeMinVariance(mean));
 	const float d = biased_dist - mean;
 
-	return variance / (variance + d * d);
+	return clamped_variance / (clamped_variance + d * d);
 }
 
 /// Where probe `index`'s strip for `face` starts in the atlas, in texels.
@@ -212,17 +211,35 @@ float2 ProbeAtlasFaceOrigin(uint index, uint face)
 	return float2((tile.x * PROBE_ATLAS_PROBE_WIDTH) + (face * PROBE_DEPTH_SIZE), tile.y * PROBE_DEPTH_SIZE);
 }
 
-/// Bilinear-filtered moments fetch from a single probe face, decoded to metres. One hardware filtered sample: the
-/// coordinate is clamped half a texel inside the face so the filter cannot reach into a neighbouring face or probe,
-/// which is what the old manual bilinear was doing by hand.
-float2 SampleProbeMoments(Texture2D moments_atlas, SamplerState moments_sampler, uint index, uint face, float2 uv01)
+struct ProbeMoments
 {
-	const float2 in_face = clamp(uv01 * float(PROBE_DEPTH_SIZE), 0.5, float(PROBE_DEPTH_SIZE) - 0.5);
+	float Mean;
+	float Variance;
+};
 
-	const float2 texel = ProbeAtlasFaceOrigin(index, face) + in_face;
-	const float2 uv = texel / float2(PROBE_ATLAS_WIDTH, PROBE_ATLAS_HEIGHT);
+ProbeMoments SampleProbeMoments(Texture2D moments_atlas, SamplerState moments_sampler, uint index, uint face,
+								float2 uv01)
+{
+	const float2 in_face = clamp(uv01 * float(PROBE_DEPTH_SIZE), 0.5, float(PROBE_DEPTH_SIZE) - 0.5) - 0.5;
+	const float2 base = floor(in_face);
+	const float2 f = in_face - base;
 
-	return moments_atlas.SampleLevel(moments_sampler, uv, 0).xy * PROBE_DEPTH_MAX_DISTANCE;
+	const float2 corner = ProbeAtlasFaceOrigin(index, face) + base + 1.0;
+	const float2 uv = corner / float2(PROBE_ATLAS_WIDTH, PROBE_ATLAS_HEIGHT);
+
+	const float4 means = moments_atlas.GatherRed(moments_sampler, uv) * PROBE_DEPTH_MAX_DISTANCE;
+	const float4 deviations = moments_atlas.GatherGreen(moments_sampler, uv) * PROBE_DEPTH_MAX_DISTANCE;
+
+	const float4 weights =
+		float4((1.0 - f.x) * f.y, f.x * f.y, f.x * (1.0 - f.y), (1.0 - f.x) * (1.0 - f.y));
+
+	ProbeMoments moments;
+	moments.Mean = dot(weights, means);
+
+	const float4 offsets = means - moments.Mean;
+	moments.Variance = dot(weights, deviations * deviations + offsets * offsets);
+
+	return moments;
 }
 
 /// Visibility of `pos_ws` as seen from probe `info_index` using its depth cubemap.
@@ -240,14 +257,14 @@ float SampleProbeVisibility(float3 pos_ws, float3 probe_pos, Texture2D moments_a
 	float2 uv01;
 	ProbeDepthDirectionToFaceUV(to_receiver / raw_dist, face, uv01);
 
-	const float2 moments = SampleProbeMoments(moments_atlas, moments_sampler, index, face, uv01);
+	const ProbeMoments moments = SampleProbeMoments(moments_atlas, moments_sampler, index, face, uv01);
 
 	// Nothing was hit in this direction.
-	if (moments.x >= PROBE_DEPTH_MAX_DISTANCE) {
+	if (moments.Mean >= PROBE_DEPTH_MAX_DISTANCE - 1e-3) {
 		return 1.0;
 	}
 
-	return ProbeDepthChebyshev(min(raw_dist, PROBE_DEPTH_MAX_DISTANCE), moments.x, moments.y);
+	return ProbeDepthChebyshev(min(raw_dist, PROBE_DEPTH_MAX_DISTANCE), moments.Mean, moments.Variance);
 }
 
 /// Lower weight for probes behind the surface.
@@ -287,8 +304,15 @@ void ProbeVolumeCell(float3 pos_ws, ProbeVolume volume, out uint3 base, out floa
 }
 
 
+uint ProbeGridLookup(StructuredBuffer<uint> grid, uint point_index)
+{
+	const uint word = grid[point_index >> 1];
+	return ((point_index & 1) != 0) ? (word >> 16) : (word & 0xFFFF);
+}
+
 /// Where corner `corner` (0-7, one bit per axis) of the cell at `base` is in the probe buffers, and its trilinear weight
-uint ProbeCellCorner(ProbeVolume volume, uint3 base, float3 cell_frac, uint corner, out float trilinear)
+uint ProbeCellCorner(ProbeVolume volume, StructuredBuffer<uint> grid, uint3 base, float3 cell_frac, uint corner,
+					 out float trilinear)
 {
 	const uint3 dims = volume.vDimsAndFirst.xyz;
 	const uint3 offset = uint3(corner, corner >> 1, corner >> 2) & uint3(1, 1, 1);
@@ -297,13 +321,13 @@ uint ProbeCellCorner(ProbeVolume volume, uint3 base, float3 cell_frac, uint corn
 	const float3 axis_weights = lerp(1.0 - cell_frac, cell_frac, float3(offset));
 	trilinear = axis_weights.x * axis_weights.y * axis_weights.z;
 
-	return volume.vDimsAndFirst.w + cell.x + dims.x * (cell.y + dims.y * cell.z);
+	return ProbeGridLookup(grid, volume.vDimsAndFirst.w + cell.x + dims.x * (cell.y + dims.y * cell.z));
 }
 
-void SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume volume,
-								 StructuredBuffer<ProbeSHData> probes, Texture2D moments_atlas,
-								 SamplerState moments_sampler, out float3 out_diffuse, out float3 out_specular,
-								 out float out_visibility)
+bool SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume volume,
+								 StructuredBuffer<ProbeSHData> probes, StructuredBuffer<uint> grid,
+								 Texture2D moments_atlas, SamplerState moments_sampler, out float3 out_diffuse,
+								 out float3 out_specular, out float out_visibility)
 {
 	const float3 biased_pos = ProbeBiasedPosition(pos_ws, n, volume);
 
@@ -319,16 +343,18 @@ void SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume 
 	float total_weight = 0.0;
 
 	float visibility_sum = 0.0;
-	float active_trilinear = 0.0;
+	float placed_trilinear = 0.0;
+	uint placed_count = 0;
 
 	for (uint corner = 0; corner < 8; corner++) {
 		float trilinear;
-		const uint index = ProbeCellCorner(volume, base, cell_frac, corner, trilinear);
+		const uint index = ProbeCellCorner(volume, grid, base, cell_frac, corner, trilinear);
 
-		// Checked before the rest of the probe is read, inactive probes cost a single load
-		if (!ProbeSHActive(probes[index])) {
+		if (index == PROBE_GRID_EMPTY) {
 			continue;
 		}
+
+		placed_count++;
 
 		const ProbeSHData probe = probes[index];
 		const float3 probe_pos = ProbeSHPosition(probe);
@@ -337,10 +363,16 @@ void SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume 
 			SampleProbeVisibility(biased_pos, probe_pos, moments_atlas, moments_sampler, index);
 
 		visibility_sum += visibility * trilinear;
-		active_trilinear += trilinear;
+		placed_trilinear += trilinear;
 
-		const float weight =
-			trilinear * ProbeBackfaceWeight(pos_ws, n, probe_pos) * max(visibility, PROBE_VISIBILITY_FLOOR);
+		float weight = max(ProbeBackfaceWeight(pos_ws, n, probe_pos) * visibility * visibility * visibility,
+						   PROBE_MIN_WEIGHT);
+
+		if (weight < PROBE_WEIGHT_CRUSH) {
+			weight *= weight * weight / (PROBE_WEIGHT_CRUSH * PROBE_WEIGHT_CRUSH);
+		}
+
+		weight *= trilinear;
 
 		diffuse += EvalProbeIrradianceRaw(n_basis, probe) * weight;
 		specular += EvalProbeIrradianceRaw(r_basis, probe) * weight;
@@ -348,29 +380,42 @@ void SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume 
 		total_weight += weight;
 	}
 
-	out_visibility = (active_trilinear > 1e-6) ? (visibility_sum / active_trilinear) : 1.0;
+	out_visibility = (placed_trilinear > 1e-6) ? (visibility_sum / placed_trilinear) : 1.0;
 
-	if (total_weight > 1e-6) {
+	if (placed_count == 0) {
+		out_diffuse = float3(0.0, 0.0, 0.0);
+		out_specular = float3(0.0, 0.0, 0.0);
+		return false;
+	}
+
+	if (total_weight > 1e-30) {
 		diffuse /= total_weight;
 		specular /= total_weight;
 	}
 	else {
-		// None of the cell's active probes carry any weight: plain trilinear over every probe instead. Rare, so it is
-		// done here rather than accumulated alongside the loop above for every pixel.
 		diffuse = float3(0.0, 0.0, 0.0);
 		specular = float3(0.0, 0.0, 0.0);
 
 		for (uint corner = 0; corner < 8; corner++) {
 			float trilinear;
-			const uint index = ProbeCellCorner(volume, base, cell_frac, corner, trilinear);
+			const uint index = ProbeCellCorner(volume, grid, base, cell_frac, corner, trilinear);
+
+			if (index == PROBE_GRID_EMPTY) {
+				continue;
+			}
 
 			const ProbeSHData probe = probes[index];
 
-			diffuse += EvalProbeIrradianceRaw(n_basis, probe) * trilinear;
-			specular += EvalProbeIrradianceRaw(r_basis, probe) * trilinear;
+			diffuse += EvalProbeIrradianceRaw(n_basis, probe);
+			specular += EvalProbeIrradianceRaw(r_basis, probe);
 		}
+
+		diffuse /= float(placed_count);
+		specular /= float(placed_count);
 	}
 
 	out_diffuse = max(diffuse, float3(0.0, 0.0, 0.0));
 	out_specular = max(specular, float3(0.0, 0.0, 0.0));
+
+	return true;
 }

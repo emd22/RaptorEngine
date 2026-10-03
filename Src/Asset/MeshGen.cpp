@@ -7,6 +7,7 @@
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
+#include <Util/RustInterop.hpp>
 #include <raptor_ffi.h>
 
 namespace fx {
@@ -85,19 +86,6 @@ RxFaceOptions ToRust(const MeshGenOptions& options)
 						   .uv_max = { options.UvMax.X, options.UvMax.Y } };
 }
 
-void ReadVec3s(SizedArray<Vec3f>& out, const float* data, size_t count)
-{
-	if (count == 0) {
-		return;
-	}
-
-	out.InitCapacity(count);
-
-	for (size_t i = 0; i < count; i++) {
-		out.Insert(Vec3f(data[i * 3], data[i * 3 + 1], data[i * 3 + 2]));
-	}
-}
-
 Ref<MeshGen::GeneratedMesh> TakeRustMesh(RxMesh* rust_mesh)
 {
 	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
@@ -107,34 +95,7 @@ Ref<MeshGen::GeneratedMesh> TakeRustMesh(RxMesh* rust_mesh)
 		return mesh;
 	}
 
-	size_t count = 0;
-
-	const float* positions = rx_mesh_positions(rust_mesh, &count);
-	ReadVec3s(mesh->Positions, positions, count);
-
-	const float* normals = rx_mesh_normals(rust_mesh, &count);
-	ReadVec3s(mesh->Normals, normals, count);
-
-	const float* tangents = rx_mesh_tangents(rust_mesh, &count);
-	ReadVec3s(mesh->Tangents, tangents, count);
-
-	const float* texcoords = rx_mesh_texcoords(rust_mesh, &count);
-	if (count > 0) {
-		mesh->Texcoords.InitCapacity(count);
-
-		for (size_t i = 0; i < count; i++) {
-			mesh->Texcoords.Insert(Vec2f(texcoords[i * 2], texcoords[i * 2 + 1]));
-		}
-	}
-
-	const uint32* indices = rx_mesh_indices(rust_mesh, &count);
-	if (count > 0) {
-		mesh->Indices.InitCapacity(count);
-
-		for (size_t i = 0; i < count; i++) {
-			mesh->Indices.Insert(indices[i]);
-		}
-	}
+	RustInterop::ReadMesh(rust_mesh, mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices);
 
 	rx_mesh_free(rust_mesh);
 
