@@ -70,14 +70,14 @@ bool SphereIntersectsTile(float4 planes[TILE_PLANE_COUNT], float3 center, float 
 {
 	const float4 center_h = float4(center, 1.0);
 
+	bool outside = false;
+
 	[unroll]
 	for (uint plane = 0; plane < TILE_PLANE_COUNT; plane++) {
-		if (dot(center_h, planes[plane]) < -radius) {
-			return false;
-		}
+		outside = or(outside, dot(center_h, planes[plane]) < -radius);
 	}
 
-	return true;
+	return !outside;
 }
 
 bool DecalIntersectsTile(float4 planes[TILE_PLANE_COUNT], Decal decal)
@@ -89,6 +89,8 @@ bool DecalIntersectsTile(float4 planes[TILE_PLANE_COUNT], Decal decal)
 	const float3 half_axis_y = decal.vAxisY * decal.vHalfExtents.y;
 	const float3 half_axis_z = decal.vAxisZ * decal.vHalfExtents.z;
 
+	bool outside = false;
+
 	[unroll]
 	for (uint plane = 0; plane < TILE_PLANE_COUNT; plane++) {
 		const float3 normal = planes[plane].xyz;
@@ -97,12 +99,10 @@ bool DecalIntersectsTile(float4 planes[TILE_PLANE_COUNT], Decal decal)
 		const float reach = abs(dot(normal, half_axis_x)) + abs(dot(normal, half_axis_y)) +
 							abs(dot(normal, half_axis_z));
 
-		if (dot(center_h, planes[plane]) < -reach) {
-			return false;
-		}
+		outside = or(outside, dot(center_h, planes[plane]) < -reach);
 	}
 
-	return true;
+	return !outside;
 }
 
 [numthreads(LIGHT_TILE_SIZE, LIGHT_TILE_SIZE, 1)]
@@ -129,7 +129,7 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_GroupThreadID)
 	GetTilePlanes(float2(tile_min), float2(tile_max), tile_planes);
 
 	for (uint cull_index = local_index; cull_index < CSConst.uiLightCount; cull_index += NUM_THREADS) {
-		const uint light_index = (cull_index == CSConst.uiReplacedLight) ? CSConst.uiReplacementSlot : cull_index;
+		const uint light_index = select(cull_index == CSConst.uiReplacedLight, CSConst.uiReplacementSlot, cull_index);
 		const uint light_bit = 1u << (light_index % 32);
 
 		Light light = Lights[light_index];
@@ -142,11 +142,9 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_GroupThreadID)
 
 		// Point lights are bounded by their radius, spot lights by a sphere around their cone
 		// Should probably implement cone tests here in the future to reduce the amount of tiles a spotlight shows up in
-		float4 bounds = float4(light.vLightPosition, light.fLightRadius);
-
-		if (light.uiLightType == FX_LIGHT_TYPE_SPOT) {
-			bounds = GetSpotBoundingSphere(light);
-		}
+		const bool is_spot = light.uiLightType == FX_LIGHT_TYPE_SPOT;
+		const float4 bounds = select(is_spot, GetSpotBoundingSphere(light),
+									 float4(light.vLightPosition, light.fLightRadius));
 
 		if (SphereIntersectsTile(tile_planes, bounds.xyz, bounds.w)) {
 			InterlockedOr(sLocalMask[light_index / 32], light_bit);
@@ -186,10 +184,10 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_GroupThreadID)
 		uint word_end = 0;
 
 		for (uint word = 0; word < DECAL_MASK_WORDS; word++) {
-			if (sTileDecalMask[word] != 0) {
-				word_start = min(word_start, word);
-				word_end = word + 1;
-			}
+			const bool has_decals = sTileDecalMask[word] != 0;
+
+			word_start = select(has_decals, min(word_start, word), word_start);
+			word_end = select(has_decals, word + 1, word_end);
 		}
 
 		bLightGrid[tile_index].DecalWordStart = min(word_start, word_end);
@@ -206,20 +204,19 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_GroupThreadID)
 		const uint bits_below = bit - 1;
 
 		const bool is_directional = (sDirectionalMask[word] & bit) != 0;
+		const bool is_local = (sLocalMask[word] & bit) != 0;
 
-		if (!is_directional && (sLocalMask[word] & bit) == 0) {
+		if (!or(is_directional, is_local)) {
 			continue;
 		}
 
-		uint rank = countbits((is_directional ? sDirectionalMask[word] : sLocalMask[word]) & bits_below);
+		uint rank = countbits(select(is_directional, sDirectionalMask[word], sLocalMask[word]) & bits_below);
 
 		for (uint prior_word = 0; prior_word < word; prior_word++) {
-			rank += countbits(is_directional ? sDirectionalMask[prior_word] : sLocalMask[prior_word]);
+			rank += countbits(select(is_directional, sDirectionalMask[prior_word], sLocalMask[prior_word]));
 		}
 
-		if (!is_directional) {
-			rank += directional_count;
-		}
+		rank += select(is_directional, 0u, directional_count);
 
 		if (rank < MAX_LIGHTS_PER_TILE) {
 			bLightIndexList[start_index + rank] = slot;

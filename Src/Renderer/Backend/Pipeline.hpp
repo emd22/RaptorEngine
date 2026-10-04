@@ -128,8 +128,6 @@ struct alignas(16) TextPushConstants
 	float32 AtlasMinV;
 	float32 AtlasMaxU;
 	float32 AtlasMaxV;
-	/// Non-zero draws the whole image in colour instead of glyphs with a background
-	uint32 IsImage;
 };
 
 struct alignas(16) LightVertPushConstants
@@ -208,7 +206,7 @@ struct alignas(16) DecalGpuData
 
 	float32 AtlasRect[4];
 
-	/// World space half extents along each axis. W is unused.
+	/// World space half extents along each axis. W picks the atlas, see `DecalAtlas`.
 	float32 HalfExtents[4];
 };
 

@@ -686,6 +686,10 @@ ObjectID Blockout::CreateBrushObject(ConfigEntry& entry)
 		object->SetReflectionProbe(true);
 	}
 
+	if (entry.GetMemberValue(HashStr32("bleeds"), 0) == 1) {
+		object->SetTag(eObjectTag::Bleeds);
+	}
+
 	bool is_dynamic = entry.GetMemberValue(HashStr32("dynamic"), 0) == 1;
 
 	ApplyBrush(object, std::move(brush), is_dynamic ? physics::eMotionType::Dynamic : physics::eMotionType::Static);
@@ -814,6 +818,10 @@ Object* Blockout::DupeObject(Object* object)
 
 	if (object->IsReflectionProbe()) {
 		dupe->SetReflectionProbe(true);
+	}
+
+	if (object->Bleeds()) {
+		dupe->SetTag(eObjectTag::Bleeds);
 	}
 
 	ApplyBrush(dupe, std::move(brush), motion_type);
@@ -1193,6 +1201,10 @@ void Blockout::Save(const String& path)
 
 			if (object->IsReflectionProbe()) {
 				blockout_entry.AddMember(ConfigEntry::Literal("reflectionprobe", 1));
+			}
+
+			if (object->Bleeds()) {
+				blockout_entry.AddMember(ConfigEntry::Literal("bleeds", 1));
 			}
 
 			if (IsDynamic(object)) {

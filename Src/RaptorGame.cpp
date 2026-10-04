@@ -637,7 +637,8 @@ void RaptorGame::RenderText()
 		}
 	}
 
-	gTextRenderer->DrawText(String::Fmt("Vis={} Lights={}/{}", gWorld->mRenderList.GetItemCount(),
+	gTextRenderer->DrawText(String::Fmt("Vis={} Culled={}/{} Lights={}/{}", gWorld->mRenderList.GetItemCount(),
+										 gWorld->FrustumCulledObjects, gWorld->FrustumTestedObjects,
 										 gWorld->mLightList.GetItemCount(), gLightManager->GetCache().Size)
 							.CStr(),
 					1.0f, scWhite);

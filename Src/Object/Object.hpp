@@ -16,6 +16,7 @@
 #include <FoxScript/FoxScript.hpp>
 #include <Material/MaterialID.hpp>
 #include <Math/BoundingBox.hpp>
+#include <Math/Frustum.hpp>
 #include <Math/OrientedBoundingBox.hpp>
 #include <WorldGrid.hpp>
 
@@ -35,6 +36,7 @@ enum class eObjectTag : uint32
 	/// A blockout brush that marks out a light probe volume instead of level geometry
 	ProbeVolume = (1 << 2),
 	ReflectionProbe = (1 << 3),
+	Bleeds = (1 << 4),
 };
 
 FxEnumFlags(eObjectTag);
@@ -173,11 +175,18 @@ public:
 	FX_FORCE_INLINE bool IsProbeVolume() const { return HasTags(eObjectTag::ProbeVolume); }
 
 	void SetReflectionProbe(bool value);
+	FX_FORCE_INLINE bool Bleeds() const { return HasTags(eObjectTag::Bleeds); }
 	FX_FORCE_INLINE bool IsReflectionProbe() const { return HasTags(eObjectTag::ReflectionProbe); }
 
 	float32 RaycastBounds(const Vec3f& origin, const Vec3f& direction, Vec3f& out_face);
 
+	bool ContainsPoint(const Vec3f& point);
+
 	FX_FORCE_INLINE OBB GetWorldOBB() { return OBB::FromLocalBounds(Bounds, GetWorldMatrix()); }
+
+	bool CanBeFrustumCulled() const;
+
+	bool IsOutsideFrustum(const Frustum& frustum, uint32 plane_mask = scFrustumAllPlanes);
 
 	/**
 	 * @brief True if light probe bakes should include this object. Objects on the player layer (the view model) are

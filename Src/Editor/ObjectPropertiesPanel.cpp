@@ -25,6 +25,7 @@ static constexpr FlagName scTagNames[] = {
 	{ static_cast<uint32>(eObjectTag::LockTransform), "Lock Transform" },
 	{ static_cast<uint32>(eObjectTag::ProbeVolume), "Probe Volume" },
 	{ static_cast<uint32>(eObjectTag::ReflectionProbe), "Reflection Probe" },
+	{ static_cast<uint32>(eObjectTag::Bleeds), "Bleeds" },
 };
 
 static constexpr FlagName scFlagNames[] = {
@@ -167,7 +168,7 @@ void ObjectPropertiesPanel::ShowObject(Object* object)
 		mpMaterialChoice->SetSelection(material_slot);
 	}
 
-	mpMaterialChoice->Enable();
+	mpMaterialChoice->Enable(object->HasTags(eObjectTag::Blockout));
 
 	if (mbShowingAnything && object == mpShownObject && tags == mShownTags && flags == mShownFlags &&
 		name == mShownName) {

@@ -233,6 +233,15 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
 			return CompileResult::Failed;
 		}
 	}
+	else if (SUCCEEDED(hresult)) {
+		CComPtr<IDxcBlobUtf8> warning_blob;
+		result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&warning_blob), nullptr);
+
+		if (warning_blob && warning_blob->GetStringLength() > 0) {
+			LogWarning(LC_SHADER, "Shader '{}' ({}) compiled with warnings:\n{}", state.pcPath,
+					   ShaderUtil::TypeToName(shader_type), warning_blob->GetStringPointer());
+		}
+	}
 
 	CComPtr<IDxcBlob> spirv_bin;
 	result->GetResult(&spirv_bin);

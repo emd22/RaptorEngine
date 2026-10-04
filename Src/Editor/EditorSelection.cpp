@@ -7,14 +7,18 @@
 
 namespace fx::editor {
 
-/**
- * @brief Draws an object with the selection material
- */
-static void ShowAsSelected(Object* object) { object->SetMaterial(gWorld->pBlockout->SelectionMaterialID); }
+static void ShowAsSelected(Object* object)
+{
+	if (object->HasTags(eObjectTag::Blockout)) {
+		object->SetMaterial(gWorld->pBlockout->SelectionMaterialID);
+	}
+}
 
 static void ShowAsDeselected(Object* object, const MaterialID& material)
 {
-	object->SetMaterial(material);
+	if (object->HasTags(eObjectTag::Blockout)) {
+		object->SetMaterial(material);
+	}
 }
 
 
@@ -103,7 +107,7 @@ MaterialID EditorSelection::GetStoredMaterial(Object* object) const
 
 void EditorSelection::SetStoredMaterial(Object* object, MaterialID material)
 {
-	if (object == nullptr) {
+	if (object == nullptr || !object->HasTags(eObjectTag::Blockout)) {
 		return;
 	}
 

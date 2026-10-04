@@ -10,8 +10,9 @@ namespace fx::renderer {
 
 
 static const PipelineNameInfo scNameInfos[] = {
-	NAME_INFO("DebugLayer"),  NAME_INFO("DebugSolid"),	   NAME_INFO("LightCulling"), NAME_INFO("TextRendering"),
-	NAME_INFO("Composition"), NAME_INFO("CompositionAgx"), NAME_INFO("SSAO"),		  NAME_INFO("SSAOBlur"),
+	NAME_INFO("DebugLayer"),	 NAME_INFO("DebugSolid"),	  NAME_INFO("LightCulling"),
+	NAME_INFO("TextRendering"),	 NAME_INFO("ImageRendering"), NAME_INFO("Composition"),
+	NAME_INFO("CompositionAgx"), NAME_INFO("SSAO"),			  NAME_INFO("SSAOBlur"),
 };
 
 static_assert(std::size(scNameInfos) == static_cast<uint32>(ePipelineName::NumPipelines));

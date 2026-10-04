@@ -260,6 +260,32 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 	pMesh->Render(cmd, (mInstanceSlotsInUse + 1));
 }
 
+bool Object::CanBeFrustumCulled() const
+{
+	if (!IsCullable() || !pMesh.IsValid() || mObjectLayer != eObjectLayer::WorldLayer) {
+		return false;
+	}
+
+	if (IsSkinned() || mInstanceSlotsInUse > 0 || HasFlag(Flags, eObjectFlags::IsInstance)) {
+		return false;
+	}
+
+	if (HasFlag(Flags, eObjectFlags::PhysicsEnabled)) {
+		return false;
+	}
+
+	return (Bounds.Max.X > Bounds.Min.X) || (Bounds.Max.Y > Bounds.Min.Y) || (Bounds.Max.Z > Bounds.Min.Z);
+}
+
+bool Object::IsOutsideFrustum(const Frustum& frustum, uint32 plane_mask)
+{
+	if (!CanBeFrustumCulled()) {
+		return false;
+	}
+
+	return !frustum.IntersectsOBB(GetWorldOBB(), plane_mask);
+}
+
 void Object::Update()
 {
 	if (HasFlag(Flags, eObjectFlags::PhysicsEnabled)) {
@@ -441,6 +467,14 @@ float32 Object::RaycastBounds(const Vec3f& origin, const Vec3f& direction, Vec3f
 				  Vec3f(local_direction.X, local_direction.Y, local_direction.Z));
 
 	return RayCast(ray, Bounds, out_face);
+}
+
+bool Object::ContainsPoint(const Vec3f& point)
+{
+	const Vec4f local = GetWorldMatrix().Inverse() * Vec4f(point.X, point.Y, point.Z, 1.0f);
+
+	return local.X >= Bounds.Min.X && local.X <= Bounds.Max.X && local.Y >= Bounds.Min.Y &&
+		   local.Y <= Bounds.Max.Y && local.Z >= Bounds.Min.Z && local.Z <= Bounds.Max.Z;
 }
 
 void Object::SetCullable(bool value)
