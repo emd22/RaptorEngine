@@ -28,6 +28,7 @@
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/TiledForwardRenderer.hpp>
 #include <Texture/TextureManager.hpp>
+#include <algorithm>
 
 FX_SET_MODULE_NAME("Material")
 
@@ -342,6 +343,10 @@ void Material::DeclareDescriptors(renderer::PSOBuild& pso)
 
 void Material::Build()
 {
+	if (!Diffuse.Exists()) {
+		Diffuse.SetTicket(gAssetManager->GetNullImageTicket(eImageFormat::RGBA8_UNorm));
+	}
+
 	// Build components
 	BUILD_REQUIRED_MATERIAL_COMPONENT(Diffuse);
 	BUILD_MATERIAL_COMPONENT(NormalMap);
@@ -349,7 +354,10 @@ void Material::Build()
 
 	AssertMsg(Diffuse.Ticket.IsValid(), "Diffuse texture must be valid");
 
-	SamplerProps diffuse_sampler_props { .MinLOD = GetComponentMinLOD(Diffuse), .MaxLOD = GetComponentMaxLOD(Diffuse) };
+	const float32 max_lod = std::max(
+		{ GetComponentMaxLOD(Diffuse), GetComponentMaxLOD(NormalMap), GetComponentMaxLOD(MetallicRoughness) });
+
+	SamplerProps diffuse_sampler_props { .MinLOD = GetComponentMinLOD(Diffuse), .MaxLOD = max_lod };
 
 	if (bNearestFiltering) {
 		diffuse_sampler_props.SetNearest();

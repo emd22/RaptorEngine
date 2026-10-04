@@ -1,6 +1,7 @@
 #include "World.hpp"
 
 #include <Blockout.hpp>
+#include <CVar.hpp>
 #include <Decal/DecalManager.hpp>
 #include <Editor/RaptorEditor.hpp>
 #include <Engine.hpp>
@@ -33,6 +34,8 @@ void World::Create()
 	mSpotShadowCasters.SetPageSize(256);
 
 	mVisibleTiles.InitCapacity(600);
+
+	pCVarShowProbeVolumes = gCVars->Set<int64>("r_show_volumes", 0);
 }
 
 static bool IsTransparentMaterial(Material* mat) { return (mat != nullptr && mat->Properties.Alpha < 0.999f); }
@@ -138,14 +141,20 @@ void World::ExecuteForwardRenderLists(PerspectiveCamera& camera)
 {
 	// The forward pipelines depth test against the prepass, which probe captures don't have
 	const bool is_probe_capture = gProbeManager->IsCapturingFaces();
+	const bool is_debug_view = gGraphics->HasDebugView();
 
 	gPipelineCache->ForEachPassPipeline(
 		ePipelinePass::Forward,
 		[&](PipelineHandle pipeline)
 		{
-			const PipelineHandle draw_pipeline =
-				is_probe_capture ? gPipelineCache->GetOrCreateVariantInPass(pipeline, ePipelinePass::ForwardCapture)
-								 : pipeline;
+			PipelineHandle draw_pipeline = pipeline;
+
+			if (is_probe_capture) {
+				draw_pipeline = gPipelineCache->GetOrCreateVariantInPass(pipeline, ePipelinePass::ForwardCapture);
+			}
+			else if (is_debug_view) {
+				draw_pipeline = gPipelineCache->GetOrCreateVariantInPass(pipeline, ePipelinePass::ForwardDebug);
+			}
 
 			ExecuteRenderList(pipeline, draw_pipeline, camera);
 		});
@@ -246,6 +255,8 @@ void World::ExecuteTransparentRenderLists()
 			  [](const TransparentObjectCarrier& a, const TransparentObjectCarrier& b)
 			  { return a.Distance > b.Distance; });
 
+	const bool is_debug_view = gGraphics->HasDebugView();
+
 	// Bind per entry as pipeline changes; minimize binds by caching last pipeline
 	renderer::Pipeline* pipeline = nullptr;
 	PipelineHandle pipeline_handle;
@@ -254,7 +265,16 @@ void World::ExecuteTransparentRenderLists()
 	for (const TransparentObjectCarrier& transparent_object : SortedEntryBuffer) {
 		// For each differing pipeline (per object), bind the pipeline.
 		if (first || !(transparent_object.Pipeline == pipeline_handle)) {
-			pipeline = &gPipelineCache->Get(transparent_object.Pipeline);
+			const PipelineHandle draw_pipeline = is_debug_view ? gPipelineCache->GetOrCreateVariantInPass(
+																	 transparent_object.Pipeline,
+																	 ePipelinePass::ForwardBlendDebug)
+															   : transparent_object.Pipeline;
+
+			if (!draw_pipeline.IsValid()) {
+				continue;
+			}
+
+			pipeline = &gPipelineCache->Get(draw_pipeline);
 
 			if (!pipeline->IsBuilt()) {
 				continue;
@@ -310,15 +330,14 @@ public:
 			ePipelinePass::Shadow,
 			skinned ? ePipelineFeatures::Skinned : (masked ? ePipelineFeatures::AlphaMask : ePipelineFeatures::None));
 
-		if (!(wanted == mBound)) {
+		if (wanted != mBound) {
 			gShadowAtlas->BindPipeline(wanted);
 			mBound = wanted;
 
 			const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0 };
 
 			gGraphics->pRenderer->pPersistentDescriptorSlim->Bind(
-				0, cmd, gPipelineCache->Get(wanted),
-				Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
+				0, cmd, gPipelineCache->Get(wanted), Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
 		}
 
 		Pipeline& pipeline = gPipelineCache->Get(mBound);
@@ -607,7 +626,8 @@ void World::AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, DynAr
 void World::ExecutePrepassRenderList(renderer::PipelineHandle forward_pipeline)
 {
 	// Only the opaque pipelines have a prepass one. The blended ones don't write depth, they are blended in forward.
-	const PipelineHandle prepass_pipeline = gPipelineCache->GetOrCreateVariantInPass(forward_pipeline, ePipelinePass::Depth);
+	const PipelineHandle prepass_pipeline = gPipelineCache->GetOrCreateVariantInPass(forward_pipeline,
+																					 ePipelinePass::Depth);
 
 	if (!prepass_pipeline.IsValid()) {
 		return;
@@ -723,8 +743,7 @@ void World::AddToRenderListRecursiveByMaterial(ObjectID* id_ptr)
 void World::ClearRenderList()
 {
 	for (const ePipelinePass pass : { ePipelinePass::Forward, ePipelinePass::ForwardBlend }) {
-		gPipelineCache->ForEachPassPipeline(pass,
-											[&](PipelineHandle pipeline) { mRenderList.ClearSection(pipeline); });
+		gPipelineCache->ForEachPassPipeline(pass, [&](PipelineHandle pipeline) { mRenderList.ClearSection(pipeline); });
 	}
 
 	mRenderList.ClearSection(GetShadowListPipeline());
@@ -948,6 +967,7 @@ void World::Render(Camera* shadow_camera)
 	// Transparent after, back-to-front globally sorted, depth write disabled
 	ExecuteTransparentRenderLists();
 
+#ifdef FX_IS_EDITOR
 	if (DebugBoundsMask & scDebugBoundsObjects) {
 		DebugDrawObjectBounds();
 	}
@@ -964,11 +984,8 @@ void World::Render(Camera* shadow_camera)
 		DebugDrawProbes();
 	}
 
-#ifdef FX_IS_EDITOR
 	// Probe volumes are edited as brushes, so the editor always shows them
-	DebugDrawProbeVolumes();
-#else
-	if (bRenderProbes) {
+	if (pCVarShowProbeVolumes->IntValue != 0) {
 		DebugDrawProbeVolumes();
 	}
 #endif

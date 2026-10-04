@@ -38,6 +38,8 @@ enum class ePipelinePass : uint8
 	ForwardBlend,
 	/// Opaque geometry drawn into a light probe capture. Captures have no prepass, so these write their own depth.
 	ForwardCapture,
+	ForwardDebug,
+	ForwardBlendDebug,
 	/// Casters drawn into the shadow atlas
 	Shadow,
 

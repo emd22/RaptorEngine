@@ -118,5 +118,7 @@ static constexpr uint32 ReflectionProbeFaces = 6;
 
 static_assert((ReflectionProbeSize >> (ReflectionProbeMips - 1)) >= 1);
 
+static constexpr uint32 DfgLutSize = 32;
+
 
 } // namespace fx::Limits

@@ -226,6 +226,7 @@ void GraphicsBackend::Init(Vec2u window_size)
 	gShadowRenderer = new ShadowDirectional;
 
 	pNoiseTexture = ImageGen::Random(Vec2u(64));
+	pDfgLut = ImageGen::DfgLut(Limits::DfgLutSize);
 
 	pRenderer = new TiledForwardRenderer;
 	pRenderer->Create(Swapchain.Extent);

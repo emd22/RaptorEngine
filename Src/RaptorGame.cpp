@@ -218,6 +218,7 @@ void RaptorGame::CreateGame()
 	mpApertureCVar = gCVars->Set("r_aperture", gCVars->Get("r_aperture", 16.0f));
 	mpShutterCVar = gCVars->Set("r_shutter", gCVars->Get("r_shutter", 0.01f));
 	mpIsoCVar = gCVars->Set("r_iso", gCVars->Get("r_iso", 100.0f));
+	mpTonemapperCVar = gCVars->Set("r_tonemapper", 1);
 
 	// Metres between probes in a volume built from an editor brush. Set `$r_probe_spacing` in the console
 	gCVars->Set("r_probe_spacing", 2.5f);
@@ -750,6 +751,9 @@ void RaptorGame::Tick()
 	gGraphics->ReflectionDebugView = (mpReflectionDebugCVar != nullptr)
 										 ? static_cast<uint32>(std::clamp<int64>(mpReflectionDebugCVar->IntValue, 0, 2))
 										 : 0;
+	gGraphics->Tonemapper = (mpTonemapperCVar != nullptr)
+								? static_cast<uint32>(std::clamp<int64>(mpTonemapperCVar->IntValue, 0, 1))
+								: 1;
 	gGraphics->bDisableDecals = (mpDecalsCVar != nullptr) && (mpDecalsCVar->IntValue == 0);
 
 	UpdateWindowTitle();

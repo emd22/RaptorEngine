@@ -2,14 +2,17 @@ use crate::Mesh;
 use crate::vec::{Vec3, length, normalized, sub, surface_normal};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct FaceOptions {
+pub struct FaceOptions
+{
 	pub scale: f32,
 	pub uv_min: [f32; 2],
 	pub uv_max: [f32; 2],
 }
 
-impl Default for FaceOptions {
-	fn default() -> Self {
+impl Default for FaceOptions
+{
+	fn default() -> Self
+	{
 		Self {
 			scale: 1.0,
 			uv_min: [0.0, 0.0],
@@ -19,7 +22,8 @@ impl Default for FaceOptions {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct CubeOptions {
+pub struct CubeOptions
+{
 	pub left: FaceOptions,
 	pub right: FaceOptions,
 	pub top: FaceOptions,
@@ -35,8 +39,11 @@ pub fn emit_quad(
 	options: &FaceOptions,
 	flip_u: bool,
 	flip_v: bool,
-) {
+)
+{
 	let normal = surface_normal(verts[0], verts[1], verts[2]);
+	// let normal = [normal[0], normal[1], normal[2]];
+
 	let base = mesh.positions.len() as u32;
 
 	let along_u = if flip_u {
@@ -67,6 +74,7 @@ pub fn emit_quad(
 	} else {
 		(uv_min[0], uv_max[0])
 	};
+
 	let (v_min, v_max) = if flip_v {
 		(uv_max[1], uv_min[1])
 	} else {
@@ -82,7 +90,8 @@ pub fn emit_quad(
 		.extend_from_slice(&[base, base + 1, base + 3, base + 1, base + 2, base + 3]);
 }
 
-pub fn cube(options: &CubeOptions) -> Mesh {
+pub fn cube(options: &CubeOptions) -> Mesh
+{
 	let mut mesh = Mesh::default();
 
 	let (left, right) = (options.left.scale, options.right.scale);

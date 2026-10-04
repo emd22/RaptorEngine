@@ -180,6 +180,11 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 									 .MaxLOD = static_cast<float32>(Limits::ReflectionProbeMips - 1),
 								 })));
 
+	ds_entries.Insert(DescriptorEntry::AsImage(16, eShaderType::Pixel, gGraphics->pDfgLut,
+											   gSamplerCache->Request({
+												   .AddressMode = eSamplerAddressMode::ClampToEdge,
+											   })));
+
 	Target* shadow_target = gShadowAtlas->GetTarget();
 	Assert(shadow_target != nullptr);
 
@@ -377,6 +382,11 @@ void TiledForwardRenderer::CreateForwardPSO()
 			gPipelineCache->GetOrCreateVariant(pass, features);
 		}
 	}
+
+	for (const ePipelinePass pass : { ePipelinePass::ForwardDebug, ePipelinePass::ForwardBlendDebug }) {
+		gPipelineCache->RegisterPassTemplate(pass, [this, pass](ePipelineFeatures features, PipelineDesc& out_desc)
+											 { return MakeForwardDesc(pass, features, out_desc); });
+	}
 }
 
 void TiledForwardRenderer::CreateDepthNormalPSO()
@@ -395,8 +405,12 @@ void TiledForwardRenderer::CreateDepthNormalPSO()
 bool TiledForwardRenderer::MakeForwardDesc(ePipelinePass pass, ePipelineFeatures features, PipelineDesc& out_desc)
 {
 	static const ShaderMacro scPrepassDepth { .pcName = "USE_PREPASS_DEPTH", .pcValue = "1" };
+	static const ShaderMacro scProbeCapture { .pcName = "PROBE_CAPTURE", .pcValue = "1" };
+	static const ShaderMacro scDebugViews { .pcName = "DEBUG_VIEWS", .pcValue = "1" };
 
-	const bool is_blended = (pass == ePipelinePass::ForwardBlend);
+	const bool is_opaque = (pass == ePipelinePass::Forward || pass == ePipelinePass::ForwardDebug);
+	const bool is_blended = (pass == ePipelinePass::ForwardBlend || pass == ePipelinePass::ForwardBlendDebug);
+	const bool is_debug = (pass == ePipelinePass::ForwardDebug || pass == ePipelinePass::ForwardBlendDebug);
 
 	// Alpha masks are handled by the shadow pass
 	if (HasFlag(features, ePipelineFeatures::AlphaMask)) {
@@ -413,7 +427,7 @@ bool TiledForwardRenderer::MakeForwardDesc(ePipelinePass pass, ePipelineFeatures
 
 	const char* pass_suffix = "";
 
-	if (pass == ePipelinePass::Forward) {
+	if (is_opaque) {
 		// The prepass has just drawn this geometry and already discarded its alpha masked texels, so the depth buffer
 		// holds exactly the depth of each visible fragment. Testing equal without writing depth or discarding lets the
 		// GPU reject hidden fragments before shading them.
@@ -421,15 +435,20 @@ bool TiledForwardRenderer::MakeForwardDesc(ePipelinePass pass, ePipelineFeatures
 		out_desc.bDepthWrite = false;
 		out_desc.Macros.push_back(scPrepassDepth);
 	}
-	else if (pass == ePipelinePass::ForwardBlend) {
+	else if (is_blended) {
 		pass_suffix = "Transparent";
 	}
 	else {
 		// Probe captures have no prepass, so they test and write depth themselves, and discard alpha masks here
 		pass_suffix = "Capture";
+		out_desc.Macros.push_back(scProbeCapture);
 	}
 
-	out_desc.DebugName = std::string("Geometry") + suffix + pass_suffix;
+	if (is_debug) {
+		out_desc.Macros.push_back(scDebugViews);
+	}
+
+	out_desc.DebugName = std::string("Geometry") + suffix + pass_suffix + (is_debug ? "Debug" : "");
 
 	out_desc.Shader = eShaderName::Forward;
 	out_desc.pStage = &ForwardPass;
@@ -520,6 +539,8 @@ void TiledForwardRenderer::AddGlobalDescriptors()
 	gPSOBuild->AddBuffer(14, 0, eShaderType::Pixel, &gGraphics->ReflectionProbeBuffer, 0,
 						 gGraphics->ReflectionProbePageSize);
 	gPSOBuild->AddImage(15, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
+						gSamplerCache->Request({}));
+	gPSOBuild->AddImage(16, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
 						gSamplerCache->Request({}));
 	// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
 	AddDecalDescriptors();
@@ -665,22 +686,28 @@ void TiledForwardRenderer::CreateCompositionPSO()
 
 	// Create composition pipeline
 
-	gPSOBuild->BeginPipeline(ePipelineName::Composition);
+	const auto BuildPipeline = [this](ePipelineName name, const SizedArray<ShaderMacro>& macros)
+	{
+		gPSOBuild->BeginPipeline(name);
 
-	gPSOBuild->UseRenderStage(CompPass);
-	gPSOBuild->SetShader(eShaderName::Composition, {});
-	gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
-	gPSOBuild->SetCullMode(eCullMode::None);
-	gPSOBuild->SetFaceOrder(eFaceOrder::Default);
-	gPSOBuild->SetDepthTest(false);
-	gPSOBuild->SetDepthWrite(false);
+		gPSOBuild->UseRenderStage(CompPass);
+		gPSOBuild->SetShader(eShaderName::Composition, macros);
+		gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
+		gPSOBuild->SetCullMode(eCullMode::None);
+		gPSOBuild->SetFaceOrder(eFaceOrder::Default);
+		gPSOBuild->SetDepthTest(false);
+		gPSOBuild->SetDepthWrite(false);
 
-	gPSOBuild->SetPushConstants(eShaderType::Pixel, sizeof(CompositionPushConsts));
+		gPSOBuild->SetPushConstants(eShaderType::Pixel, sizeof(CompositionPushConsts));
 
-	// tLighting
-	gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::RGBA16_Float),
-								  gSamplerCache->Request(SamplerProps {}));
-	gPSOBuild->EndPipeline();
+		// tLighting
+		gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::RGBA16_Float),
+									  gSamplerCache->Request(SamplerProps {}));
+		gPSOBuild->EndPipeline();
+	};
+
+	BuildPipeline(ePipelineName::Composition, {});
+	BuildPipeline(ePipelineName::CompositionAgx, { ShaderMacro { .pcName = "USE_AGX", .pcValue = "1" } });
 }
 
 void TiledForwardRenderer::CreateBitmapTextPSO()
@@ -730,7 +757,10 @@ void TiledForwardRenderer::RenderComposition(Camera& camera)
 {
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
-	gPipelineCache->Bind(ePipelineName::Composition, cmd);
+	const ePipelineName pipeline_name = (gGraphics->Tonemapper == 1) ? ePipelineName::CompositionAgx
+																	 : ePipelineName::Composition;
+
+	gPipelineCache->Bind(pipeline_name, cmd);
 
 	Vec2u& extent = gGraphics->Swapchain.Extent;
 
@@ -738,8 +768,7 @@ void TiledForwardRenderer::RenderComposition(Camera& camera)
 		.FrameExtent = { extent.X, extent.Y },
 	};
 
-	gGraphics->SubmitPushConstants(cmd, gPipelineCache->Request(ePipelineName::Composition), eShaderType::Pixel,
-								   consts);
+	gGraphics->SubmitPushConstants(cmd, gPipelineCache->Request(pipeline_name), eShaderType::Pixel, consts);
 
 	// Use single triangle instead of two triangles as it removes the overlapping quads the gpu
 	// renders between triangles. Source: https://wallisc.github.io/rendering/2021/04/18/Fullscreen-Pass.html

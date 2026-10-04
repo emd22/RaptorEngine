@@ -342,7 +342,11 @@ void RaptorEditor::PickObject()
 	Ref<PerspectiveCamera>& camera = gWorld->Player.pCamera;
 	const Vec3f pick_direction = camera->GetForwardVector();
 
-	Object* volume = PickProbeVolume(*camera, pick_direction);
+	Object* volume = nullptr;
+
+	if (gWorld->pCVarShowProbeVolumes->IntValue != 0) {
+		volume = PickProbeVolume(*camera, pick_direction);
+	}
 
 	if (volume != nullptr && SelectObject(volume, append_selection)) {
 		return;

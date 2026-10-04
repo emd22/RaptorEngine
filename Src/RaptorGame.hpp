@@ -128,6 +128,7 @@ private:
 	CVarValue* mpApertureCVar = nullptr;
 	CVarValue* mpShutterCVar = nullptr;
 	CVarValue* mpIsoCVar = nullptr;
+	CVarValue* mpTonemapperCVar = nullptr;
 
 	void UpdateExposure();
 

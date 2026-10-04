@@ -625,8 +625,10 @@ bool CellTouchesSurface(const Vec3f& cell_min, const Vec3f& cell_max, float32 pa
 		bool contained = true;
 
 		for (uint32 axis = 0; axis < 3; axis++) {
-			overlaps &= padded_min.mData[axis] < bounds.Max.mData[axis] && padded_max.mData[axis] > bounds.Min.mData[axis];
-			contained &= padded_min.mData[axis] >= bounds.Min.mData[axis] && padded_max.mData[axis] <= bounds.Max.mData[axis];
+			overlaps &= padded_min.mData[axis] < bounds.Max.mData[axis] &&
+						padded_max.mData[axis] > bounds.Min.mData[axis];
+			contained &= padded_min.mData[axis] >= bounds.Min.mData[axis] &&
+						 padded_max.mData[axis] <= bounds.Max.mData[axis];
 		}
 
 		if (!overlaps) {
@@ -706,7 +708,8 @@ uint32 FindNeededGridPoints(const Vec3f& volume_min, const Vec3f& cell_size, con
 	for (uint32 iz = 0; fill == eProbeFill::Surface && iz + 1 < dims[2]; iz++) {
 		for (uint32 iy = 0; iy + 1 < dims[1]; iy++) {
 			for (uint32 ix = 0; ix + 1 < dims[0]; ix++) {
-				const Vec3f cell_min = volume_min + cell_size * Vec3f(static_cast<float32>(ix), static_cast<float32>(iy),
+				const Vec3f cell_min = volume_min + cell_size * Vec3f(static_cast<float32>(ix),
+																	  static_cast<float32>(iy),
 																	  static_cast<float32>(iz));
 
 				if (!CellTouchesSurface(cell_min, cell_min + cell_size, pad, boxes)) {
@@ -736,7 +739,8 @@ uint32 FindNeededGridPoints(const Vec3f& volume_min, const Vec3f& cell_size, con
 					continue;
 				}
 
-				const Vec3f position = volume_min + cell_size * Vec3f(static_cast<float32>(ix), static_cast<float32>(iy),
+				const Vec3f position = volume_min + cell_size * Vec3f(static_cast<float32>(ix),
+																	  static_cast<float32>(iy),
 																	  static_cast<float32>(iz));
 
 				if (IsBuriedTooDeep(position, max_relocation, boxes)) {
@@ -1266,7 +1270,7 @@ bool ProbeManager::AddLevelSurfaceVolume(const ProbePlacementBoxes& boxes)
 }
 
 bool ProbeManager::AddSurfaceVolumeForBudget(const Vec3f& region_min, const Vec3f& region_max, float32 spacing,
-											  const ProbePlacementBoxes& boxes, bool cell_centred)
+											 const ProbePlacementBoxes& boxes, bool cell_centred)
 {
 	if (mVolumeCount >= Limits::MaxProbeVolumes) {
 		LogError("Probe volume rejected: all {} volume slots are taken", Limits::MaxProbeVolumes);
@@ -1377,11 +1381,12 @@ void ProbeManager::BeginBake()
 	mCurrentProbe = 0;
 	mCurrentBounce = 0;
 	mBakePhase = eBakePhase::Irradiance;
-	mBounceCount = static_cast<uint32>(std::clamp<int64>(gCVars->Get("r_probe_bounces", scDefaultProbeBounces), 1, scMaxProbeBounces));
+	mBounceCount = static_cast<uint32>(
+		std::clamp<int64>(gCVars->Get("r_probe_bounces", scDefaultProbeBounces), 1, scMaxProbeBounces));
 	mBakeState = eBakeState::CapturePending;
 
-	LogInfo("Probe bake started ({} probes across {} volume(s), {} per frame, {} bounce(s))", mProbeCount,
-			mVolumeCount, scProbesPerFrame, mBounceCount);
+	LogInfo("Probe bake started ({} probes across {} volume(s), {} per frame, {} bounce(s))", mProbeCount, mVolumeCount,
+			scProbesPerFrame, mBounceCount);
 }
 
 void ProbeManager::BeginGridBake()
@@ -1699,8 +1704,7 @@ void ProbeManager::RecordCaptureBatch(renderer::CommandBuffer& cmd, const Render
 
 			CopyTargetToStaging(cmd, mCaptureStage, scCaptureSize, eImageFormat::RGBA16_Float,
 								mColorStaging[slot][face]);
-			CopyTargetToStaging(cmd, mCaptureStage, scCaptureSize, eImageFormat::D32_Float,
-								mDepthStaging[slot][face]);
+			CopyTargetToStaging(cmd, mCaptureStage, scCaptureSize, eImageFormat::D32_Float, mDepthStaging[slot][face]);
 		}
 	}
 
@@ -2103,7 +2107,8 @@ bool ProbeManager::LoadIrradianceProbes()
 
 	for (uint16 probe : grid) {
 		if (probe != Limits::ProbeGridEmpty && probe >= header.ProbeCount) {
-			LogError("Probe file {} points at probe {} of {}, rebake the probes", path.CStr(), probe, header.ProbeCount);
+			LogError("Probe file {} points at probe {} of {}, rebake the probes", path.CStr(), probe,
+					 header.ProbeCount);
 			return false;
 		}
 	}
@@ -2228,16 +2233,23 @@ uint32 ProbeManager::RebuildReflectionProbesFromWorld()
 
 	for (Object& object : gObjectManager->GetCache()) {
 		if (object.IsReflectionProbe()) {
-			reflection_boxes.push_back(MakeReflectionBox(object.Bounds.Min, object.Bounds.Max, object.GetWorldMatrix()));
+			reflection_boxes.push_back(
+				MakeReflectionBox(object.Bounds.Min, object.Bounds.Max, object.GetWorldMatrix()));
 		}
 	}
 
 	std::sort(reflection_boxes.begin(), reflection_boxes.end(),
 			  [](const ReflectionBox& a, const ReflectionBox& b) { return a.Volume < b.Volume; });
 
+
 	const uint32 num_brush_probes = static_cast<uint32>(reflection_boxes.size());
 	const bool has_level_probe = !boxes.IsEmpty() && gCVars->Get("r_reflection_level_probe", int64(0)) != 0;
-	const uint32 max_brush_probes = Limits::MaxReflectionProbes - (has_level_probe ? 1 : 0);
+
+	uint32 max_brush_probes = Limits::MaxReflectionProbes;
+
+	if (has_level_probe) {
+		--max_brush_probes;
+	}
 
 	if (reflection_boxes.size() > max_brush_probes) {
 		LogWarning("{} reflection probe brushes are placed but only {} fit, the largest are left out",
@@ -2282,8 +2294,8 @@ uint32 ProbeManager::RebuildReflectionProbesFromWorld()
 
 	UploadReflectionProbes(0);
 
-	LogInfo("Reflection probes rebuilt: {} from editor brushes, {} in total", std::min(num_brush_probes, max_brush_probes),
-			mReflectionProbeCount);
+	LogInfo("Reflection probes rebuilt: {} from editor brushes, {} in total",
+			std::min(num_brush_probes, max_brush_probes), mReflectionProbeCount);
 
 	return mReflectionProbeCount;
 }
