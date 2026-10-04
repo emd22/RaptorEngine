@@ -41,7 +41,7 @@ void MaterialManager::Create()
 
 	MaterialPropertiesBuffer.Create(renderer::eGpuBufferType::Storage,
 									sizeof(MaterialProperties) * material_buffer_size,
-									VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
+									RX_MEMORY_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
 
 
 	// if (!mMaterialPropertiesDS.IsInited()) {

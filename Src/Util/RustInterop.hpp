@@ -37,6 +37,9 @@ inline void Log(void*, int32 level, int32 category, const char* message, size_t 
 	case RX_LOG_WARNING:
 		LogWarning(log_category, "{}", text);
 		break;
+	case RX_LOG_DEBUG:
+		LogDebug(log_category, "{}", text);
+		break;
 	default:
 		LogError(log_category, "{}", text);
 		break;

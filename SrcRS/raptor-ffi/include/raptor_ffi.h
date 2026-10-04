@@ -13,6 +13,7 @@ enum RxLogLevel
     RX_LOG_INFO = 1,
     RX_LOG_WARNING = 2,
     RX_LOG_ERROR = 3,
+    RX_LOG_DEBUG = 4,
 };
 
 enum RxValueKind
@@ -187,6 +188,129 @@ RxBrushSplit* rx_brush_split(const RxBrushView* view, const float* normal, float
 const RxBrushPlane* rx_brush_split_planes(const RxBrushSplit* split, int32_t front, size_t* count);
 void rx_brush_split_free(RxBrushSplit* split);
 RxMesh* rx_brush_generate_mesh(const RxBrushView* view);
+
+enum RxProbeCaptureLimits
+{
+    RX_PROBE_FACES = 6,
+    RX_PROBE_SH_COEFFS = 9,
+    RX_PROBE_SH_FLOATS = 36,
+    RX_PROBE_MOMENT_FLOATS = 3072,
+    RX_PROBE_DEPTH_SIZE = 16,
+};
+
+#define RX_PROBE_DEPTH_MAX_DISTANCE 50.0f
+
+typedef struct RxProbeCapture RxProbeCapture;
+
+int32_t rx_dfg_lut(uint32_t size, uint16_t* out);
+
+RxProbeCapture* rx_probe_capture_new(uint32_t size, const float* inv_projection, const float* face_inv_view_projection);
+int32_t rx_probe_capture_project(const RxProbeCapture* capture, const uint16_t* const* colors,
+                                 const float* const* depths, float* out_sh, float* out_moments);
+void rx_probe_capture_free(RxProbeCapture* capture);
+void rx_probe_sky_gradient(const float* sky, const float* ground, float* out_sh);
+
+typedef struct RxGpuInstance RxGpuInstance;
+typedef struct RxGpuDevice RxGpuDevice;
+
+typedef void (*RxVoidFn)(void);
+typedef RxVoidFn (*RxGetInstanceProcAddr)(void* instance, const char* name);
+
+typedef struct RxGpuInstanceConfig
+{
+    const char* app_name;
+    uint32_t api_version;
+    const char* const* extensions;
+    size_t extension_count;
+    const char* const* layers;
+    size_t layer_count;
+    uint8_t enumerate_portability;
+    uint8_t debug_messenger;
+} RxGpuInstanceConfig;
+
+typedef struct RxGpuDeviceInfo
+{
+    void* physical;
+    void* device;
+    void* graphics_queue;
+    void* present_queue;
+    void* transfer_queue;
+    uint32_t graphics_family;
+    uint32_t present_family;
+    uint32_t transfer_family;
+    float max_sampler_anisotropy;
+    uint8_t supports_cube_arrays;
+} RxGpuDeviceInfo;
+
+RxGpuInstance* rx_gpu_instance_create(RxGetInstanceProcAddr get_instance_proc_addr, const RxGpuInstanceConfig* config,
+                                      const RxLogSink* log);
+void* rx_gpu_instance_handle(const RxGpuInstance* instance);
+void rx_gpu_instance_free(RxGpuInstance* instance);
+
+RxGpuDevice* rx_gpu_device_create(const RxGpuInstance* instance, uint64_t surface);
+const RxGpuDeviceInfo* rx_gpu_device_info(const RxGpuDevice* device);
+int32_t rx_gpu_device_surface_format(const RxGpuDevice* device, int32_t* format, int32_t* color_space);
+void rx_gpu_device_wait_idle(const RxGpuDevice* device);
+void rx_gpu_device_free(RxGpuDevice* device);
+
+typedef struct RxGpuAllocator RxGpuAllocator;
+typedef struct RxGpuAllocation RxGpuAllocation;
+
+typedef enum RxMemoryUsage
+{
+    RX_MEMORY_AUTO = 0,
+    RX_MEMORY_AUTO_PREFER_DEVICE = 1,
+    RX_MEMORY_GPU_ONLY = 2,
+    RX_MEMORY_CPU_ONLY = 3,
+    RX_MEMORY_CPU_TO_GPU = 4,
+    RX_MEMORY_GPU_TO_CPU = 5,
+} RxMemoryUsage;
+
+typedef enum RxAllocFlags
+{
+    RX_ALLOC_MAPPED = 1,
+    RX_ALLOC_HOST_SEQUENTIAL_WRITE = 2,
+    RX_ALLOC_DEDICATED = 4,
+} RxAllocFlags;
+
+typedef struct RxGpuAllocRequest
+{
+    uint32_t memory;
+    uint32_t flags;
+    float priority;
+} RxGpuAllocRequest;
+
+RxGpuAllocator* rx_gpu_allocator_create(const RxGpuInstance* instance, const RxGpuDevice* device);
+void rx_gpu_allocator_free(RxGpuAllocator* allocator);
+
+int32_t rx_gpu_buffer_create(const RxGpuAllocator* allocator, const void* buffer_info, const RxGpuAllocRequest* request,
+                             uint64_t* out_buffer, RxGpuAllocation** out_allocation, void** out_mapped);
+void rx_gpu_buffer_destroy(const RxGpuAllocator* allocator, uint64_t buffer, RxGpuAllocation* allocation);
+int32_t rx_gpu_image_create(const RxGpuAllocator* allocator, const void* image_info, const RxGpuAllocRequest* request,
+                            uint64_t* out_image, RxGpuAllocation** out_allocation);
+void rx_gpu_image_destroy(const RxGpuAllocator* allocator, uint64_t image, RxGpuAllocation* allocation);
+int32_t rx_gpu_allocation_map(const RxGpuAllocator* allocator, RxGpuAllocation* allocation, void** out_mapped);
+void rx_gpu_allocation_unmap(const RxGpuAllocator* allocator, RxGpuAllocation* allocation);
+int32_t rx_gpu_allocation_flush(const RxGpuAllocator* allocator, const RxGpuAllocation* allocation, uint64_t offset,
+                                uint64_t size);
+int32_t rx_gpu_allocation_invalidate(const RxGpuAllocator* allocator, const RxGpuAllocation* allocation,
+                                     uint64_t offset, uint64_t size);
+
+int32_t rx_gpu_fence_create(const RxGpuDevice* device, uint8_t signaled, uint64_t* out);
+int32_t rx_gpu_fence_wait(const RxGpuDevice* device, uint64_t fence, uint64_t timeout);
+int32_t rx_gpu_fence_reset(const RxGpuDevice* device, uint64_t fence);
+void rx_gpu_fence_destroy(const RxGpuDevice* device, uint64_t fence);
+int32_t rx_gpu_semaphore_create(const RxGpuDevice* device, uint8_t timeline, uint64_t* out);
+void rx_gpu_semaphore_destroy(const RxGpuDevice* device, uint64_t semaphore);
+
+int32_t rx_gpu_command_pool_create(const RxGpuDevice* device, uint32_t queue_family, uint64_t* out);
+void rx_gpu_command_pool_reset(const RxGpuDevice* device, uint64_t pool);
+void rx_gpu_command_pool_destroy(const RxGpuDevice* device, uint64_t pool);
+int32_t rx_gpu_command_buffer_allocate(const RxGpuDevice* device, uint64_t pool, void** out);
+void rx_gpu_command_buffer_free(const RxGpuDevice* device, uint64_t pool, void* buffer);
+int32_t rx_gpu_command_buffer_begin(const RxGpuDevice* device, void* buffer);
+int32_t rx_gpu_command_buffer_end(const RxGpuDevice* device, void* buffer);
+void rx_gpu_command_buffer_reset(const RxGpuDevice* device, void* buffer);
 
 #ifdef __cplusplus
 }

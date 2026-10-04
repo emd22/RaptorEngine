@@ -16,7 +16,7 @@ void Uniforms::Create(uint32 slot_size, uint32 count, eGpuBufferType type)
 
 	uint32 size_in_frames = PageSize * FramesInFlight;
 
-	mGpuBuffer.Create(type, size_in_frames, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
+	mGpuBuffer.Create(type, size_in_frames, RX_MEMORY_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
 }
 
 void Uniforms::Rewind()

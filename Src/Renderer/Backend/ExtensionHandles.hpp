@@ -23,11 +23,4 @@ TFunc GetExtensionFunc(VkInstance instance, const char* name)
 VkResult Rx_EXT_SetDebugUtilsObjectName(VkInstance instance, VkDevice device,
                                         const VkDebugUtilsObjectNameInfoEXT* pNameInfo);
 
-VkResult Rx_EXT_CreateDebugUtilsMessenger(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
-                                          const VkAllocationCallbacks* pAllocator,
-                                          VkDebugUtilsMessengerEXT* pDebugMessenger);
-
-void Rx_EXT_DestroyDebugUtilsMessenger(VkInstance instance, VkDebugUtilsMessengerEXT messenger,
-                                       const VkAllocationCallbacks* pAllocator);
-
 } // namespace fx

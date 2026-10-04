@@ -20,6 +20,7 @@
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/ReflectionFilter.hpp>
+#include <Util/RustInterop.hpp>
 #include <World.hpp>
 #include <algorithm>
 #include <bit>
@@ -67,48 +68,22 @@ struct ProbePlacementBoxes
 	bool IsEmpty() const { return Min.X > Max.X; }
 };
 
+static_assert(RX_PROBE_FACES == ProbeManager::scCaptureFaces);
+static_assert(RX_PROBE_SH_FLOATS == Limits::ProbeSHCoeffCount * 4);
+static_assert(RX_PROBE_MOMENT_FLOATS == Limits::ProbeDepthFloatCount);
+static_assert(RX_PROBE_DEPTH_SIZE == Limits::ProbeDepthSize);
+static_assert(RX_PROBE_DEPTH_MAX_DISTANCE == Limits::ProbeDepthMaxDistance);
+
 namespace {
 
 ///////////////////////////////////
 // Spherical harmonics
 ///////////////////////////////////
 
-constexpr float32 scSHNorm0 = 0.282095f;
-constexpr float32 scSHNorm1 = 0.488603f;
-constexpr float32 scSHNorm2 = 1.092548f;
-constexpr float32 scSHNorm20 = 0.315392f;
-constexpr float32 scSHNorm22 = 0.546274f;
-
-/// Convolving radiance with the clamped cosine lobe scales each SH band l by A_l (Ramamoorthi & Hanrahan 2001). These
-/// are A_l / pi, so evaluating the result gives irradiance / pi, which the shader multiplies by the diffuse albedo.
-constexpr float32 scCosineLobe[Limits::ProbeSHCoeffCount] = {
-	1.0f, 2.0f / 3.0f, 2.0f / 3.0f, 2.0f / 3.0f, 0.25f, 0.25f, 0.25f, 0.25f, 0.25f,
-};
-
-/// Real SH basis up to L2. The order must match EvalProbeIrradiance() in Shaders/ProbeCommon.hlsli.
-void EvalSHBasis(const Vec3f& d, float32 out[Limits::ProbeSHCoeffCount])
-{
-	out[0] = scSHNorm0;
-	out[1] = scSHNorm1 * d.Y;
-	out[2] = scSHNorm1 * d.Z;
-	out[3] = scSHNorm1 * d.X;
-	out[4] = scSHNorm2 * d.X * d.Y;
-	out[5] = scSHNorm2 * d.Y * d.Z;
-	out[6] = scSHNorm20 * (3.0f * d.Z * d.Z - 1.0f);
-	out[7] = scSHNorm2 * d.X * d.Z;
-	out[8] = scSHNorm22 * (d.X * d.X - d.Y * d.Y);
-}
-
-/// Irradiance / pi that is `ground` looking straight down, `sky` looking straight up, and blends linearly in between.
 ProbeSHData MakeSkyGradientProbe(const float32 sky[3], const float32 ground[3])
 {
 	ProbeSHData probe {};
-
-	for (uint32 c = 0; c < 3; c++) {
-		probe.SH[0][c] = (sky[c] + ground[c]) * 0.5f / scSHNorm0;
-		probe.SH[1][c] = (sky[c] - ground[c]) * 0.5f / scSHNorm1;
-	}
-
+	rx_probe_sky_gradient(sky, ground, &probe.SH[0][0]);
 	return probe;
 }
 
@@ -146,44 +121,6 @@ PerspectiveCamera MakeCaptureCamera(const Vec3f& position, uint32 face)
 	return camera;
 }
 
-/// NDC coordinate of the centre of capture texel `index` along one axis
-float32 CaptureTexelToNdc(uint32 index)
-{
-	return ((static_cast<float32>(index) + 0.5f) / static_cast<float32>(ProbeManager::scCaptureSize)) * 2.0f - 1.0f;
-}
-
-uint32 DirectionToMomentTexel(const Vec3f& d)
-{
-	const Vec3f a = d.Abs();
-
-	uint32 face;
-	float32 u;
-	float32 v;
-
-	if (a.X >= a.Y && a.X >= a.Z) {
-		face = (d.X > 0.0f) ? 0 : 1;
-		u = ((d.X > 0.0f) ? -d.Z : d.Z) / a.X;
-		v = -d.Y / a.X;
-	}
-	else if (a.Y >= a.Z) {
-		face = (d.Y > 0.0f) ? 2 : 3;
-		u = d.X / a.Y;
-		v = ((d.Y > 0.0f) ? d.Z : -d.Z) / a.Y;
-	}
-	else {
-		face = (d.Z > 0.0f) ? 4 : 5;
-		u = ((d.Z > 0.0f) ? d.X : -d.X) / a.Z;
-		v = -d.Y / a.Z;
-	}
-
-	constexpr uint32 cSize = Limits::ProbeDepthSize;
-
-	const auto to_texel = [](float32 coord)
-	{ return std::min(static_cast<uint32>(std::max((coord * 0.5f + 0.5f) * cSize, 0.0f)), cSize - 1); };
-
-	return face * Limits::ProbeDepthTexelsPerFace + to_texel(v) * cSize + to_texel(u);
-}
-
 /// Decodes an IEEE half float. Subnormals flush to zero, and NaNs decode as zero so that a bad texel can't light a
 /// probe.
 float32 HalfToFloat(uint16 half)
@@ -199,24 +136,6 @@ float32 HalfToFloat(uint16 half)
 	bits |= (exponent == 31) ? 0x7F800000 : (((exponent + 112) << 23) | (mantissa << 13));
 
 	return std::bit_cast<float32>(bits);
-}
-
-/// Distance from a capture's origin to what the capture texel at `ndc_x`, `ndc_y` hit. `stored_depth` is reverse-Z (the
-/// viewport maps NDC depth z to 1 - z), and 0 where nothing was drawn.
-float32 CaptureDepthToDistance(const Mat4f& inv_projection, float32 stored_depth, float32 ndc_x, float32 ndc_y)
-{
-	constexpr float32 cFar = Limits::ProbeDepthMaxDistance;
-
-	if (stored_depth <= 0.0f) {
-		return cFar;
-	}
-
-	// Mat4f * Vec4f treats the vector as a row, matching the engine's v * M convention
-	const Vec4f view = inv_projection * Vec4f(ndc_x, ndc_y, 1.0f - stored_depth, 1.0f);
-	const float32 distance = Vec3f(view.X, view.Y, view.Z).Length() / fabsf(view.W);
-
-	// Also catches the NaN or infinity from a degenerate depth
-	return (distance < cFar) ? distance : cFar;
 }
 
 ///////////////////////////////////
@@ -1162,7 +1081,8 @@ void ProbeManager::Destroy()
 		staging.Destroy();
 	}
 
-	mCaptureTexels.Free();
+	rx_probe_capture_free(mpCapture);
+	mpCapture = nullptr;
 
 	mbCaptureResourcesCreated = false;
 }
@@ -1604,9 +1524,9 @@ void ProbeManager::CreateCaptureResources()
 	for (uint32 slot = 0; slot < scProbesPerFrame; slot++) {
 		for (uint32 face = 0; face < scCaptureFaces; face++) {
 			mColorStaging[slot][face].Create(renderer::eGpuBufferType::Transfer, cPixels * sizeof(uint16) * 4,
-											 VMA_MEMORY_USAGE_GPU_TO_CPU, eGpuBufferFlags::TransferReceiver);
+											 RX_MEMORY_GPU_TO_CPU, eGpuBufferFlags::TransferReceiver);
 			mDepthStaging[slot][face].Create(renderer::eGpuBufferType::Transfer, cPixels * sizeof(float32),
-											 VMA_MEMORY_USAGE_GPU_TO_CPU, eGpuBufferFlags::TransferReceiver);
+											 RX_MEMORY_GPU_TO_CPU, eGpuBufferFlags::TransferReceiver);
 		}
 	}
 
@@ -1628,7 +1548,7 @@ void ProbeManager::CreateCaptureResources()
 	for (renderer::RawGpuBuffer& staging : mReflectionStaging) {
 		staging.Create(renderer::eGpuBufferType::Transfer,
 					   static_cast<uint64>(cReflectionSize) * cReflectionSize * sizeof(uint16) * 4,
-					   VMA_MEMORY_USAGE_GPU_TO_CPU, eGpuBufferFlags::TransferReceiver);
+					   RX_MEMORY_GPU_TO_CPU, eGpuBufferFlags::TransferReceiver);
 	}
 
 	BuildCaptureTexels();
@@ -1638,42 +1558,22 @@ void ProbeManager::CreateCaptureResources()
 
 void ProbeManager::BuildCaptureTexels()
 {
-	// NDC area of one capture texel
-	constexpr float32 cTexelArea = 4.0f / static_cast<float32>(scCaptureSize * scCaptureSize);
-
-	mCaptureTexels.InitSize(scCaptureFaces * scCaptureSize * scCaptureSize);
-	CaptureTexel* texel = mCaptureTexels.pData;
+	float32 face_inv_view_projection[scCaptureFaces][16];
 
 	for (uint32 face = 0; face < scCaptureFaces; face++) {
-		// Every probe's faces point the same way, so a capture at the origin gives the directions for all of them
 		const PerspectiveCamera camera = MakeCaptureCamera(Vec3f::sZero, face);
 		const Mat4f inv_view_projection = camera.InvProjectionMatrix * camera.InvViewMatrix;
 
 		mCaptureInvProjection = camera.InvProjectionMatrix;
 		mCaptureFaceToClip[face] = inv_view_projection.Inverse();
 
-		for (uint32 y = 0; y < scCaptureSize; y++) {
-			for (uint32 x = 0; x < scCaptureSize; x++, texel++) {
-				const float32 ndc_x = CaptureTexelToNdc(x);
-				const float32 ndc_y = CaptureTexelToNdc(y);
-
-				const Vec4f point = inv_view_projection * Vec4f(ndc_x, ndc_y, 0.5f, 1.0f);
-				const Vec3f direction = Vec3f(point.X / point.W, point.Y / point.W, point.Z / point.W).Normalize();
-
-				// Solid angle of a texel on a 90 degree cube face
-				const float32 dist_sq = 1.0f + ndc_x * ndc_x + ndc_y * ndc_y;
-				texel->SolidAngle = cTexelArea / (dist_sq * sqrtf(dist_sq));
-
-				EvalSHBasis(direction, texel->WeightedBasis);
-
-				for (float32& basis : texel->WeightedBasis) {
-					basis *= texel->SolidAngle;
-				}
-
-				texel->MomentTexel = DirectionToMomentTexel(direction);
-			}
-		}
+		std::memcpy(face_inv_view_projection[face], inv_view_projection.RawData, sizeof(float32) * 16);
 	}
+
+	rx_probe_capture_free(mpCapture);
+	mpCapture = rx_probe_capture_new(scCaptureSize, mCaptureInvProjection.RawData, &face_inv_view_projection[0][0]);
+
+	Assert(mpCapture != nullptr);
 }
 
 void ProbeManager::RecordCaptureBatch(renderer::CommandBuffer& cmd, const RenderFaceFunc& render_face)
@@ -1817,64 +1717,10 @@ void ProbeManager::ProjectCapture(const uint16* const colors[scCaptureFaces],
 								  const float32* const depths[scCaptureFaces], ProbeSHData& out_sh,
 								  ProbeInfo& out_info) const
 {
-	constexpr uint32 cNumMomentTexels = Limits::ProbeDepthFaces * Limits::ProbeDepthTexelsPerFace;
-	constexpr float32 cFar = Limits::ProbeDepthMaxDistance;
+	const int32 projected =
+		rx_probe_capture_project(mpCapture, colors, depths, &out_sh.SH[0][0], out_info.DepthMoments);
 
-	float32 sh[Limits::ProbeSHCoeffCount][3] = {};
-
-	// Solid angle weighted sums of distance and distance squared for each moments texel
-	float32 moment_weight[cNumMomentTexels] = {};
-	float32 moment_sum[cNumMomentTexels] = {};
-	float32 moment_sum_sq[cNumMomentTexels] = {};
-
-	const CaptureTexel* texel = mCaptureTexels.pData;
-
-	for (uint32 face = 0; face < scCaptureFaces; face++) {
-		for (uint32 y = 0; y < scCaptureSize; y++) {
-			for (uint32 x = 0; x < scCaptureSize; x++, texel++) {
-				const uint32 pixel = y * scCaptureSize + x;
-				const uint16* rgba = colors[face] + pixel * 4;
-
-				for (uint32 c = 0; c < 3; c++) {
-					const float32 sample = HalfToFloat(rgba[c]);
-					const float32 radiance = std::isnan(sample) ? 0.0f : std::clamp(sample, 0.0f, scRadianceClamp);
-
-					for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
-						sh[k][c] += radiance * texel->WeightedBasis[k];
-					}
-				}
-
-				const float32 distance = CaptureDepthToDistance(mCaptureInvProjection, depths[face][pixel],
-																CaptureTexelToNdc(x), CaptureTexelToNdc(y));
-
-				moment_weight[texel->MomentTexel] += texel->SolidAngle;
-				moment_sum[texel->MomentTexel] += distance * texel->SolidAngle;
-				moment_sum_sq[texel->MomentTexel] += distance * distance * texel->SolidAngle;
-			}
-		}
-	}
-
-	for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
-		for (uint32 c = 0; c < 3; c++) {
-			out_sh.SH[k][c] = sh[k][c] * scCosineLobe[k];
-		}
-
-		out_sh.SH[k][3] = 0.0f;
-	}
-
-	for (uint32 t = 0; t < cNumMomentTexels; t++) {
-		float32 mean = cFar;
-		float32 mean_sq = cFar * cFar;
-
-		if (moment_weight[t] > 1e-9f) {
-			mean = moment_sum[t] / moment_weight[t];
-			// Variance can't be negative, but float error can make it so
-			mean_sq = std::max(moment_sum_sq[t] / moment_weight[t], mean * mean);
-		}
-
-		out_info.DepthMoments[t * 2 + 0] = mean;
-		out_info.DepthMoments[t * 2 + 1] = mean_sq;
-	}
+	Assert(projected != 0);
 }
 
 void ProbeManager::UploadToGpu(uint32 first_probe, uint32 count)
@@ -1973,7 +1819,7 @@ void ProbeManager::UploadMomentsAtlas(uint32 first_probe, uint32 count)
 		}
 
 		RawGpuBuffer staging;
-		staging.Create(eGpuBufferType::Transfer, row.Size * sizeof(uint16), VMA_MEMORY_USAGE_CPU_TO_GPU,
+		staging.Create(eGpuBufferType::Transfer, row.Size * sizeof(uint16), RX_MEMORY_CPU_TO_GPU,
 					   eGpuBufferFlags::TransferReceiver);
 		staging.Upload(row.pData, row.Size * sizeof(uint16));
 
@@ -2480,7 +2326,7 @@ void ProbeManager::UploadReflectionCubemap(uint32 probe_index)
 	const uint64 bytes = scReflectionHalfsPerProbe * sizeof(uint16);
 
 	RawGpuBuffer staging;
-	staging.Create(eGpuBufferType::Transfer, bytes, VMA_MEMORY_USAGE_CPU_TO_GPU, eGpuBufferFlags::TransferReceiver);
+	staging.Create(eGpuBufferType::Transfer, bytes, RX_MEMORY_CPU_TO_GPU, eGpuBufferFlags::TransferReceiver);
 	staging.Upload(mReflectionTexels.data() + probe_index * scReflectionHalfsPerProbe, bytes);
 
 	VkBufferImageCopy regions[Limits::ReflectionProbeMips];

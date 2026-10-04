@@ -116,7 +116,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 			vkDestroyImageView(device->Device, View, nullptr);
 		}
 
-		vmaDestroyImage(gGraphics->GpuAllocator, InternalImage, this->Allocation);
+		rx_gpu_image_destroy(gGraphics->GpuAllocator, RxRaw(InternalImage), this->Allocation);
 
 		InternalImage = nullptr;
 		Allocation = nullptr;
@@ -175,41 +175,18 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 		.initialLayout = ImageLayout,
 	};
 
-	VmaAllocationCreateInfo create_info {
-		.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
-		.usage = VMA_MEMORY_USAGE_AUTO,
-		.priority = 1.0f,
-	};
+	const RxGpuAllocRequest alloc_request = { .memory = RX_MEMORY_AUTO, .flags = RX_ALLOC_DEDICATED, .priority = 1.0f };
 
-	VkResult status = vmaCreateImage(gGraphics->GpuAllocator, &image_info, &create_info, &InternalImage, &Allocation,
-									 nullptr);
+	uint64 image_handle = 0;
+
+	VkResult status = static_cast<VkResult>(
+		rx_gpu_image_create(gGraphics->GpuAllocator, &image_info, &alloc_request, &image_handle, &Allocation));
+
 	if (status != VK_SUCCESS) {
 		ModulePanicVulkan("Could not create vulkan image", status);
 	}
 
-	static uint32 alloc_number = 0;
-
-	std::string alloc_name = std::to_string(alloc_number++);
-	vmaSetAllocationName(gGraphics->GpuAllocator, Allocation, alloc_name.c_str());
-
-	// LogInfo("Create Image (Image={:p}, Allocation={:p})", reinterpret_cast<void*>(Image),
-	//           reinterpret_cast<void*>(Allocation));
-
-#ifdef FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES
-	{
-		static uint32 allocation_number = 0;
-		allocation_number += 1;
-
-		std::string allocation_name = "";
-		// typeid(ElementType).name();
-
-		char name_buffer[256];
-
-		snprintf(name_buffer, 128, "Img(%u,%u){%u}", size.Width(), size.Height(), allocation_number);
-
-		vmaSetAllocationName(Fx_Fwd_GetGpuAllocator(), Allocation, name_buffer);
-	}
-#endif
+	InternalImage = RxFromRaw<VkImage>(image_handle);
 
 	const VkImageViewCreateInfo view_create_info = {
 		.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -264,7 +241,7 @@ void Image::CreateFromData(renderer::CommandBuffer& cmd, const ImageInfo& info, 
 {
 	// Upload image to staging buffer
 	renderer::RawGpuBuffer staging_buffer;
-	staging_buffer.Create(renderer::eGpuBufferType::Transfer, info.ImageData.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
+	staging_buffer.Create(renderer::eGpuBufferType::Transfer, info.ImageData.Size, RX_MEMORY_CPU_TO_GPU,
 						  eGpuBufferFlags::TransferReceiver);
 	staging_buffer.Upload(info.ImageData);
 
@@ -286,7 +263,7 @@ void Image::UploadMip(renderer::CommandBuffer& cmd, uint32 mip_index, const Vec2
 					  const Slice<const uint8>& image_data)
 {
 	renderer::RawGpuBuffer staging_buffer;
-	staging_buffer.Create(renderer::eGpuBufferType::Transfer, image_data.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
+	staging_buffer.Create(renderer::eGpuBufferType::Transfer, image_data.Size, RX_MEMORY_CPU_TO_GPU,
 						  eGpuBufferFlags::TransferReceiver);
 	staging_buffer.Upload(image_data);
 
@@ -305,7 +282,7 @@ void Image::Upload(renderer::CommandBuffer& cmd, const ImageInfo& info)
 	const Slice<const uint8>& image_data = info.ImageData;
 
 	renderer::RawGpuBuffer staging_buffer;
-	staging_buffer.Create(renderer::eGpuBufferType::Transfer, image_data.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
+	staging_buffer.Create(renderer::eGpuBufferType::Transfer, image_data.Size, RX_MEMORY_CPU_TO_GPU,
 						  eGpuBufferFlags::TransferReceiver);
 	staging_buffer.Upload(image_data);
 
@@ -625,7 +602,7 @@ void Image::DecRef()
 	}
 
 	if (InternalImage != nullptr && Allocation != nullptr) {
-		vmaDestroyImage(renderer::gGraphics->GpuAllocator, InternalImage, this->Allocation);
+		rx_gpu_image_destroy(renderer::gGraphics->GpuAllocator, renderer::RxRaw(InternalImage), this->Allocation);
 	}
 
 	InternalImage = nullptr;
@@ -645,7 +622,7 @@ void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
 		[&](renderer::CommandBuffer& cmd)
 		{
 			renderer::RawGpuBuffer staging_buffer;
-			staging_buffer.Create(renderer::eGpuBufferType::Transfer, data_size, VMA_MEMORY_USAGE_GPU_TO_CPU,
+			staging_buffer.Create(renderer::eGpuBufferType::Transfer, data_size, RX_MEMORY_GPU_TO_CPU,
 								  eGpuBufferFlags::TransferReceiver);
 
 			VkImageMemoryBarrier pre_barrier {

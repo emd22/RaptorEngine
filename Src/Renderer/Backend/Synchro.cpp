@@ -12,21 +12,23 @@ namespace fx::renderer {
 
 void Fence::Create()
 {
-	const VkFenceCreateInfo create_info = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-											.pNext = nullptr,
-											.flags = VK_FENCE_CREATE_SIGNALED_BIT };
+	uint64 handle = 0;
+	const VkResult status = static_cast<VkResult>(
+		rx_gpu_fence_create(gGraphics->GetDevice()->GetRustDevice(), true, &handle));
 
-	const VkResult status = vkCreateFence(gGraphics->GetDevice()->Device, &create_info, nullptr, &InternalFence);
 	if (status != VK_SUCCESS) {
 		PanicVulkan("Fence", "Could not create fence", status);
 	}
+
+	InternalFence = RxFromRaw<VkFence>(handle);
 }
 
 void Fence::WaitFor(uint64 timeout) const
 {
 	Assert(InternalFence != nullptr);
 
-	const VkResult status = vkWaitForFences(gGraphics->GetDevice()->Device, 1, &InternalFence, true, timeout);
+	const VkResult status = static_cast<VkResult>(
+		rx_gpu_fence_wait(gGraphics->GetDevice()->GetRustDevice(), RxRaw(InternalFence), timeout));
 
 	if (status != VK_SUCCESS) {
 		PanicVulkan("Fence", "Could not create fence", status);
@@ -37,7 +39,8 @@ void Fence::Reset()
 {
 	Assert(InternalFence != nullptr);
 
-	const VkResult status = vkResetFences(gGraphics->GetDevice()->Device, 1, &InternalFence);
+	const VkResult status = static_cast<VkResult>(
+		rx_gpu_fence_reset(gGraphics->GetDevice()->GetRustDevice(), RxRaw(InternalFence)));
 
 	if (status != VK_SUCCESS) {
 		PanicVulkan("Fence", "Could not reset fence", status);
@@ -49,7 +52,8 @@ void Fence::Destroy()
 	if (InternalFence == nullptr) {
 		return;
 	}
-	vkDestroyFence(gGraphics->GetDevice()->Device, InternalFence, nullptr);
+
+	rx_gpu_fence_destroy(gGraphics->GetDevice()->GetRustDevice(), RxRaw(InternalFence));
 	InternalFence = nullptr;
 }
 
@@ -60,41 +64,21 @@ void Fence::Destroy()
 
 void Semaphore::Create(eSemaphoreType semaphore_type)
 {
-	VkSemaphoreType sem_type = VK_SEMAPHORE_TYPE_BINARY;
-	switch (semaphore_type) {
-	case eSemaphoreType::Binary:
-		sem_type = VK_SEMAPHORE_TYPE_BINARY;
-		break;
-	case eSemaphoreType::Timeline:
-		sem_type = VK_SEMAPHORE_TYPE_TIMELINE;
-		break;
-	default:;
-	}
-
-	const VkSemaphoreTypeCreateInfo type_create_info {
-		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
-		.semaphoreType = sem_type,
-		.initialValue = 0,
-	};
-
-	const VkSemaphoreCreateInfo create_info {
-		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-		.pNext = &type_create_info,
-		.flags = 0,
-	};
-
-	const VkResult status = vkCreateSemaphore(gGraphics->GetDevice()->Device, &create_info, nullptr,
-											  &InternalSemaphore);
+	uint64 handle = 0;
+	const VkResult status = static_cast<VkResult>(rx_gpu_semaphore_create(
+		gGraphics->GetDevice()->GetRustDevice(), semaphore_type == eSemaphoreType::Timeline, &handle));
 
 	if (status != VK_SUCCESS) {
 		PanicVulkan("Semaphore", "Could not create semaphore", status);
 	}
+
+	InternalSemaphore = RxFromRaw<VkSemaphore>(handle);
 }
 
 void Semaphore::Destroy()
 {
 	if (InternalSemaphore != nullptr) {
-		vkDestroySemaphore(gGraphics->GetDevice()->Device, InternalSemaphore, nullptr);
+		rx_gpu_semaphore_destroy(gGraphics->GetDevice()->GetRustDevice(), RxRaw(InternalSemaphore));
 		InternalSemaphore = nullptr;
 	}
 }

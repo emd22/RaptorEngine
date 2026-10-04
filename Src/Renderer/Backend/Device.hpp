@@ -1,24 +1,51 @@
 #pragma once
 
-#include "Core/SizedArray.hpp"
-
+#include <raptor_ffi.h>
 #include <vulkan/vulkan.h>
 
 #include <Core/LockContext.hpp>
 #include <Core/Types.hpp>
+#include <atomic>
 #include <cstdint>
-#include <vector>
+#include <type_traits>
 
 // #define FX_DEBUG_DEVICE_ASSERT_INITIALIZED 1
 
 namespace fx::renderer {
+
+template <typename THandle>
+inline uint64 RxRaw(THandle handle)
+{
+    if constexpr (std::is_pointer_v<THandle>) {
+        return reinterpret_cast<uint64>(handle);
+    }
+    else {
+        return static_cast<uint64>(handle);
+    }
+}
+
+template <typename THandle>
+inline THandle RxFromRaw(uint64 raw)
+{
+    if constexpr (std::is_pointer_v<THandle>) {
+        return reinterpret_cast<THandle>(raw);
+    }
+    else {
+        return static_cast<THandle>(raw);
+    }
+}
 
 class QueueFamilies
 {
 public:
     static const uint32 scNullQueue = UINT32_MAX;
 
-    void FindQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface);
+    void Set(uint32 graphics, uint32 present, uint32 transfer)
+    {
+        mGraphicsIndex = graphics;
+        mPresentIndex = present;
+        mTransferIndex = transfer;
+    }
 
     /// Checks if the main graphics and presentation queues have been queried
     bool IsComplete()
@@ -26,31 +53,11 @@ public:
         return (mGraphicsIndex != scNullQueue && mPresentIndex != scNullQueue && mTransferIndex != scNullQueue);
     }
 
-    /// Retrieves the available queue indices
-    std::vector<uint32> GetQueueIndexList() const
-    {
-        return std::vector<uint32>({
-            mGraphicsIndex,
-            mPresentIndex,
-
-            mTransferIndex,
-        });
-    }
-
     FX_FORCE_INLINE bool HasIndependentTransfer() const { return mTransferIndex != mGraphicsIndex; }
 
     uint32 GetGraphicsFamily() const { return mGraphicsIndex; }
     uint32 GetPresentFamily() const { return mPresentIndex; }
     uint32 GetTransferFamily() const { return mTransferIndex; }
-
-private:
-    void FindGraphicsFamily(VkPhysicalDevice device, VkSurfaceKHR surface);
-    void FindTransferFamily(VkPhysicalDevice device, VkSurfaceKHR surface);
-
-    bool FamilyHasPresentSupport(VkPhysicalDevice device, VkSurfaceKHR surface, uint32 family_index);
-
-public:
-    SizedArray<VkQueueFamilyProperties> RawFamilies;
 
 private:
     uint32 mGraphicsIndex = scNullQueue;
@@ -62,15 +69,13 @@ class GpuDevice
 {
 public:
     GpuDevice() = default;
-    GpuDevice(VkInstance instance, VkSurfaceKHR surface) { Create(instance, surface); }
 
-    void Create(VkInstance instance, VkSurfaceKHR surface);
+    void Create(RxGpuInstance* instance, VkSurfaceKHR surface);
     void Destroy();
 
-    void PickPhysicalDevice();
-    void CreateLogicalDevice();
-
     void WaitForIdle();
+
+    RxGpuDevice* GetRustDevice() const { return mpRustDevice; }
 
     VkSurfaceFormatKHR GetSurfaceFormat();
 
@@ -105,11 +110,6 @@ public:
 
     ~GpuDevice();
 
-private:
-    bool IsPhysicalDeviceSuitable(VkPhysicalDevice& device);
-    void QueryQueues();
-    bool SupportsPortabilityExtension() const;
-
 public:
     VkPhysicalDevice Physical = nullptr;
     VkDevice Device = nullptr;
@@ -120,8 +120,7 @@ public:
     bool bSupportsCubeArrays = false;
 
 private:
-    VkInstance mInstance;
-    VkSurfaceKHR mSurface;
+    RxGpuDevice* mpRustDevice = nullptr;
 
     VkQueue mGraphicsQueue = nullptr;
     VkQueue mTransferQueue = nullptr;

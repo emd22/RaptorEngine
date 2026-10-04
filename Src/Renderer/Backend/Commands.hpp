@@ -13,7 +13,7 @@ class CommandPool
 public:
     void Create(GpuDevice* device, uint32 queue_family);
 
-    void Reset() { vkResetCommandPool(mpDevice->Device, CmdPool, 0); }
+    void Reset() { rx_gpu_command_pool_reset(mpDevice->GetRustDevice(), RxRaw(CmdPool)); }
 
     FX_FORCE_INLINE const VkCommandPool Get() const { return CmdPool; }
     FX_FORCE_INLINE VkCommandPool Get() { return CmdPool; };
@@ -24,7 +24,7 @@ public:
             return;
         }
 
-        vkDestroyCommandPool(mpDevice->Device, CmdPool, nullptr);
+        rx_gpu_command_pool_destroy(mpDevice->GetRustDevice(), RxRaw(CmdPool));
         CmdPool = nullptr;
     }
 

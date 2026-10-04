@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ThirdParty/vk_mem_alloc.h>
+#include <raptor_ffi.h>
 #include <vulkan/vulkan.h>
 
 #include <Core/Types.hpp>
@@ -14,7 +14,7 @@ struct DeletionObject
     // using FuncType = void (*)(DeletionObject *object);
 
     VkBuffer Buffer = VK_NULL_HANDLE;
-    VmaAllocation Allocation = VK_NULL_HANDLE;
+    RxGpuAllocation* Allocation = nullptr;
 
     uint32 DeletionFrameNumber = 0;
     FuncType Func = [](DeletionObject* object) {};

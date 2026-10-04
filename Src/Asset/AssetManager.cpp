@@ -49,7 +49,7 @@ void AssetDeletionTicket::DeleteImmediate() const
 			vkQueueWaitIdle(graphics_queue.Get());
 		}
 
-		vmaDestroyBuffer(renderer::gGraphics->GpuAllocator, ticket.Buffer, ticket.Allocation);
+		rx_gpu_buffer_destroy(renderer::gGraphics->GpuAllocator, renderer::RxRaw(ticket.Buffer), ticket.Allocation);
 	} break;
 	}
 }

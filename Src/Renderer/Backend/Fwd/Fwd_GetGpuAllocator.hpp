@@ -1,10 +1,10 @@
 #pragma once
 
-#include <ThirdParty/vk_mem_alloc.h>
+#include <raptor_ffi.h>
 
 namespace fx::renderer {
 
 
-VmaAllocator Fx_Fwd_GetGpuAllocator();
+RxGpuAllocator* Fx_Fwd_GetGpuAllocator();
 
 }

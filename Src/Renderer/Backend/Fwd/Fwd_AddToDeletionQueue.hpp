@@ -1,7 +1,5 @@
 #pragma once
 
-#include <ThirdParty/vk_mem_alloc.h>
-
 #include <Renderer/DeletionObject.hpp>
 
 namespace fx::renderer {

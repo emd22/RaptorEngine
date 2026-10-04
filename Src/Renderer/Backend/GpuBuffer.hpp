@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Device.hpp"
 #include "Fwd/Fwd_AddToDeletionQueue.hpp"
 #include "Fwd/Fwd_GetGpuAllocator.hpp"
 #include "Fwd/Fwd_SubmitUploadGpuCmd.hpp"
@@ -133,12 +134,12 @@ public:
 
 	RawGpuBuffer operator=(RawGpuBuffer& other) = delete;
 
-	void Create(eGpuBufferType buffer_type, uint64 size_in_bytes, VmaMemoryUsage memory_usage,
+	void Create(eGpuBufferType buffer_type, uint64 size_in_bytes, RxMemoryUsage memory_usage,
 				eGpuBufferFlags buffer_flags = eGpuBufferFlags::None);
 
 	void FlushToGpu(uint32 offset, uint32 size)
 	{
-		vmaFlushAllocation(Fx_Fwd_GetGpuAllocator(), Allocation, offset, size);
+		rx_gpu_allocation_flush(Fx_Fwd_GetGpuAllocator(), Allocation, offset, size);
 	}
 
 	/// Invalidates host caches so CPU reads see GPU writes (e.g. image-to-buffer
@@ -148,7 +149,7 @@ public:
 	void InvalidateFromGpu()
 	{
 		if (Allocation != nullptr) {
-			vmaInvalidateAllocation(Fx_Fwd_GetGpuAllocator(), Allocation, 0, Size);
+			rx_gpu_allocation_invalidate(Fx_Fwd_GetGpuAllocator(), Allocation, 0, Size);
 		}
 	}
 
@@ -179,7 +180,7 @@ public:
 	uint32 BufferId = 0;
 
 	VkBuffer Buffer = nullptr;
-	VmaAllocation Allocation = nullptr;
+	RxGpuAllocation* Allocation = nullptr;
 
 	void* pMappedBuffer = nullptr;
 
@@ -250,11 +251,11 @@ public:
 		// Type = buffer_type;
 
 		// pStagingBuffer = gEnginePool->Alloc<RawGpuBuffer>(sizeof(RawGpuBuffer));
-		// pStagingBuffer->Create(eGpuBufferType::Transfer, Size, VMA_MEMORY_USAGE_CPU_TO_GPU);
+		// pStagingBuffer->Create(eGpuBufferType::Transfer, Size, RX_MEMORY_CPU_TO_GPU);
 		// pStagingBuffer->Upload(data, Size);
 
 		// // Create the GPU-only buffer as a transfer destination
-		// this->Create(buffer_type, this->Size, VMA_MEMORY_USAGE_GPU_ONLY, eGpuBufferFlags::TransferReceiver);
+		// this->Create(buffer_type, this->Size, RX_MEMORY_GPU_ONLY, eGpuBufferFlags::TransferReceiver);
 
 		// VkBufferCopy copy = { .srcOffset = 0, .dstOffset = 0, .size = Size };
 		// vkCmdCopyBuffer(cmd.Get(), pStagingBuffer->Buffer, this->Buffer, 1, &copy);

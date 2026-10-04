@@ -45,7 +45,7 @@ struct AssetDeletionTicket
 	struct BufferTicket
 	{
 		VkBuffer Buffer = VK_NULL_HANDLE;
-		VmaAllocation Allocation = VK_NULL_HANDLE;
+		RxGpuAllocation* Allocation = nullptr;
 	};
 
 public:

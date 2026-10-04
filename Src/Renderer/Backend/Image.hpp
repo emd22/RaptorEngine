@@ -8,7 +8,6 @@
 #include "GpuBuffer.hpp"
 
 #include <ThirdParty/stb_image_write.h>
-#include <ThirdParty/vk_mem_alloc.h>
 
 #include <Core/Ref.hpp>
 #include <Core/SizedArray.hpp>
@@ -407,7 +406,7 @@ public:
 	VkImageView View = nullptr;
 
 	VkImageLayout ImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	VmaAllocation Allocation = nullptr;
+	RxGpuAllocation* Allocation = nullptr;
 
 	ImageInfo Info {};
 

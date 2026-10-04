@@ -16,7 +16,7 @@ FrameData* Fwd_GetFrame() { return gGraphics->GetFrame(); }
 void Fx_Fwd_SubmitUploadCmd(std::function<void(CommandBuffer&)> func) { gGraphics->SubmitUploadCmd(func); }
 
 
-VmaAllocator Fx_Fwd_GetGpuAllocator() { return gGraphics->GpuAllocator; }
+RxGpuAllocator* Fx_Fwd_GetGpuAllocator() { return gGraphics->GpuAllocator; }
 
 GpuDevice* Fwd_GetDevice() { return gGraphics->GetDevice(); }
 

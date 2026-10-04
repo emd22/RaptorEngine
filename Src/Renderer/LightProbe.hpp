@@ -11,6 +11,8 @@
 #include <functional>
 #include <vector>
 
+struct RxProbeCapture;
+
 namespace fx {
 
 /// L2 SH irradiance of one probe
@@ -195,17 +197,6 @@ private:
 		Reflection,
 	};
 
-	/// Everything about a capture texel that is the same for every probe
-	struct CaptureTexel
-	{
-		/// SH basis of the texel's direction, multiplied by the solid angle it covers
-		float32 WeightedBasis[Limits::ProbeSHCoeffCount];
-		float32 SolidAngle;
-		/// The depth moments texel that the texel's direction falls in
-		uint32 MomentTexel;
-	};
-
-
 	bool AddVolumeAndPlaceProbes(const Vec3f& volume_min, const Vec3f& volume_size, const ProbeGridSize& grid,
 								 const ProbePlacementBoxes& boxes, eProbeFill fill);
 	bool AddLevelBaseVolume(const ProbePlacementBoxes& boxes);
@@ -277,7 +268,7 @@ private:
 	renderer::RenderStage mCaptureStage;
 	renderer::RawGpuBuffer mColorStaging[scProbesPerFrame][scCaptureFaces];
 	renderer::RawGpuBuffer mDepthStaging[scProbesPerFrame][scCaptureFaces];
-	SizedArray<CaptureTexel> mCaptureTexels;
+	RxProbeCapture* mpCapture = nullptr;
 	/// Inverse projection shared by every capture face
 	Mat4f mCaptureInvProjection = Mat4f::scIdentity;
 	Mat4f mCaptureFaceToClip[scCaptureFaces];

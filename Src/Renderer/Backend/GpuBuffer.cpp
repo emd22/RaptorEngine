@@ -50,7 +50,7 @@ static BufferTracker gBufferTracker;
 void GpuBufferPrintUndestroyed() { gBufferTracker.PrintUndestroyed(); }
 
 
-void RawGpuBuffer::Create(eGpuBufferType buffer_type, uint64 size_in_bytes, VmaMemoryUsage memory_usage,
+void RawGpuBuffer::Create(eGpuBufferType buffer_type, uint64 size_in_bytes, RxMemoryUsage memory_usage,
 						  eGpuBufferFlags buffer_flags)
 {
 	Assert(size_in_bytes > 0);
@@ -71,10 +71,10 @@ void RawGpuBuffer::Create(eGpuBufferType buffer_type, uint64 size_in_bytes, VmaM
 	// GpuBufferUtil::BufferTypeToName(buffer_type), size_in_bytes, (buffer_flags & eGpuBufferFlags::PersistentMapped)
 	// != 0, (buffer_flags & eGpuBufferFlags::TransferReceiver) != 0);
 
-	VmaAllocationCreateFlags vma_create_flags = 0;
+	uint32 alloc_flags = 0;
 
 	if ((mBufferFlags & eGpuBufferFlags::PersistentMapped) != 0) {
-		vma_create_flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+		alloc_flags |= RX_ALLOC_MAPPED | RX_ALLOC_HOST_SEQUENTIAL_WRITE;
 	}
 
 	VkBufferUsageFlags usage_flags = GpuBufferUtil::BufferTypeToUnderlying(buffer_type);
@@ -91,16 +91,19 @@ void RawGpuBuffer::Create(eGpuBufferType buffer_type, uint64 size_in_bytes, VmaM
 		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
 	};
 
-	const VmaAllocationCreateInfo alloc_create_info = { .flags = vma_create_flags, .usage = memory_usage };
+	const RxGpuAllocRequest alloc_request = { .memory = memory_usage, .flags = alloc_flags, .priority = 0.0f };
 
-	VmaAllocationInfo allocation_info;
-	const VkResult status = vmaCreateBuffer(gGraphics->GpuAllocator, &create_info, &alloc_create_info, &Buffer,
-											&Allocation, &allocation_info);
+	uint64 buffer_handle = 0;
+	void* mapped_data = nullptr;
+
+	const VkResult status = static_cast<VkResult>(rx_gpu_buffer_create(
+		gGraphics->GpuAllocator, &create_info, &alloc_request, &buffer_handle, &Allocation, &mapped_data));
 
 	if (status != VK_SUCCESS) {
 		PanicVulkan("GPUBuffer", "Error allocating GPU buffer!", status);
 	}
 
+	Buffer = RxFromRaw<VkBuffer>(buffer_handle);
 
 	if (reinterpret_cast<uintptr_t>(Buffer) == 0x850000000085) {
 		// FX_BREAKPOINT;
@@ -112,7 +115,7 @@ void RawGpuBuffer::Create(eGpuBufferType buffer_type, uint64 size_in_bytes, VmaM
 
 	if ((mBufferFlags & eGpuBufferFlags::PersistentMapped) != 0) {
 		// Get the pointer from VMA for the mapped GPU buffer
-		pMappedBuffer = allocation_info.pMappedData;
+		pMappedBuffer = mapped_data;
 	}
 
 	Initialized = true;
@@ -125,7 +128,8 @@ void RawGpuBuffer::Map()
 		return;
 	}
 
-	const VkResult status = vmaMapMemory(gGraphics->GpuAllocator, Allocation, &pMappedBuffer);
+	const VkResult status = static_cast<VkResult>(
+		rx_gpu_allocation_map(gGraphics->GpuAllocator, Allocation, &pMappedBuffer));
 
 	if (status != VK_SUCCESS) {
 		LogError("Could not map GPU memory! (BufferType=0x{:x}, Error={})", static_cast<uint32>(Type),
@@ -141,7 +145,7 @@ void RawGpuBuffer::UnMap()
 		return;
 	}
 
-	vmaUnmapMemory(gGraphics->GpuAllocator, Allocation);
+	rx_gpu_allocation_unmap(gGraphics->GpuAllocator, Allocation);
 	pMappedBuffer = nullptr;
 }
 
@@ -190,11 +194,11 @@ void GpuBuffer::Create(CommandBuffer& cmd, eGpuBufferType buffer_type, void* dat
 	Type = buffer_type;
 
 	RawGpuBuffer staging_buffer;
-	staging_buffer.Create(eGpuBufferType::Transfer, Size, VMA_MEMORY_USAGE_CPU_TO_GPU);
+	staging_buffer.Create(eGpuBufferType::Transfer, Size, RX_MEMORY_CPU_TO_GPU);
 	staging_buffer.Upload(data, size);
 
 	// Create the GPU-only buffer as a transfer destination
-	this->Create(buffer_type, this->Size, VMA_MEMORY_USAGE_GPU_ONLY, eGpuBufferFlags::TransferReceiver);
+	this->Create(buffer_type, this->Size, RX_MEMORY_GPU_ONLY, eGpuBufferFlags::TransferReceiver);
 
 	VkBufferCopy copy = { .srcOffset = 0, .dstOffset = 0, .size = Size };
 	vkCmdCopyBuffer(cmd.Get(), staging_buffer.Buffer, this->Buffer, 1, &copy);

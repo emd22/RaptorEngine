@@ -11,7 +11,7 @@
 #include "UniformBuffer.hpp"
 #include "Window.hpp"
 
-#include <ThirdParty/vk_mem_alloc.h>
+#include <raptor_ffi.h>
 #include <vulkan/vulkan.h>
 
 #include <Core/Defer.hpp>
@@ -107,7 +107,7 @@ public:
 	FrameData* GetFrame();
 
 	uint32 GetImageIndex() const { return mImageIndex; }
-	VmaAllocator* GetGPUAllocator() { return &GpuAllocator; }
+	RxGpuAllocator* GetGPUAllocator() { return GpuAllocator; }
 
 	template <typename T>
 	void SubmitPushConstants(const CommandBuffer& cmd, const Pipeline& pipeline, eShaderType shader_types,
@@ -147,7 +147,7 @@ public:
 
 		if (immediate || is_frame_spaced) {
 			if (object.bIsGpuBuffer) {
-				vmaDestroyBuffer(GpuAllocator, object.Buffer, object.Allocation);
+				rx_gpu_buffer_destroy(GpuAllocator, RxRaw(object.Buffer), object.Allocation);
 			}
 			else {
 				object.Func(&object);
@@ -215,7 +215,7 @@ public:
 	Swapchain Swapchain;
 	SizedArray<FrameData> Frames;
 
-	VmaAllocator GpuAllocator = nullptr;
+	RxGpuAllocator* GpuAllocator = nullptr;
 
 	GpuUploadContext UploadContext;
 
@@ -325,7 +325,7 @@ public:
 private:
 	GpuDevice mDevice;
 	VkInstance mInstance = nullptr;
-	VkDebugUtilsMessengerEXT mDebugMessenger;
+	RxGpuInstance* mpGpuInstance = nullptr;
 
 	VkSurfaceKHR mWindowSurface = nullptr;
 	Ref<Window> mpWindow = nullptr;

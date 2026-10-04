@@ -77,7 +77,7 @@ void TextRenderer::Create()
 
 	mInstanceBuffer.Create(eGpuBufferType::StorageWithOffset,
 						   static_cast<uint64>(scMaxGlyphs) * sizeof(InstanceData) * renderer::FramesInFlight,
-						   VMA_MEMORY_USAGE_CPU_ONLY, eGpuBufferFlags::PersistentMapped);
+						   RX_MEMORY_CPU_ONLY, eGpuBufferFlags::PersistentMapped);
 }
 
 

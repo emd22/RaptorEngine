@@ -31,11 +31,8 @@
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/ShadowDirectional.hpp>
 #include <Texture/TextureManager.hpp>
+#include <Util/RustInterop.hpp>
 #include <World.hpp>
-
-/* If this is defined, we will break on an error message containing this string. */
-#define FX_DEBUG_BREAK_ON_ERROR_SUBSTR                                                                                 \
-	"VK_FORMAT_D32_SFLOAT with tiling VK_IMAGE_TILING_OPTIMAL doesn't support VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT"
 
 #define FX_VULKAN_DEBUG 1
 
@@ -105,14 +102,12 @@ SizedArray<VkLayerProperties> GraphicsBackend::GetAvailableValidationLayers()
 	return validation_layers;
 }
 
-VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance);
-
 void GraphicsBackend::Init(Vec2u window_size)
 {
 	InitVulkan();
 	CreateSurfaceFromWindow();
 
-	mDevice.Create(mInstance, mWindowSurface);
+	mDevice.Create(mpGpuInstance, mWindowSurface);
 
 	InitGPUAllocator();
 	Swapchain.Init(window_size, mWindowSurface, &mDevice);
@@ -140,31 +135,31 @@ void GraphicsBackend::Init(Vec2u window_size)
 	LightIndexListPageSize = Limits::MaxScreenTiles * Limits::MaxLightsPerTile * sizeof(uint32);
 
 	LightGridBuffer.Create(eGpuBufferType::StorageWithOffset, LightGridPageSize * FramesInFlight,
-						   VMA_MEMORY_USAGE_GPU_ONLY);
+						   RX_MEMORY_GPU_ONLY);
 	LightIndexListBuffer.Create(eGpuBufferType::StorageWithOffset, LightIndexListPageSize * FramesInFlight,
-								VMA_MEMORY_USAGE_GPU_ONLY);
+								RX_MEMORY_GPU_ONLY);
 
 	// Decals are written from the CPU every frame, so they get a page per frame in flight like the lights
 	DecalPageSize = Limits::MaxVisibleDecals * sizeof(DecalGpuData);
 	DecalMaskPageSize = Limits::MaxScreenTiles * Limits::DecalMaskWords * sizeof(uint32);
 
-	DecalBuffer.Create(eGpuBufferType::StorageWithOffset, DecalPageSize * FramesInFlight, VMA_MEMORY_USAGE_CPU_ONLY,
+	DecalBuffer.Create(eGpuBufferType::StorageWithOffset, DecalPageSize * FramesInFlight, RX_MEMORY_CPU_ONLY,
 					   eGpuBufferFlags::PersistentMapped);
 	DecalMaskBuffer.Create(eGpuBufferType::StorageWithOffset, DecalMaskPageSize * FramesInFlight,
-						   VMA_MEMORY_USAGE_GPU_ONLY);
+						   RX_MEMORY_GPU_ONLY);
 
 	// Light probes. These only change when probes are placed, baked or loaded, and ProbeManager waits for the GPU to be
 	// idle before writing them, so unlike the buffers above they have a single page shared by every frame in flight.
 	ProbePageSize = Limits::MaxIrradianceProbes * sizeof(ProbeSHData);
-	ProbeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbePageSize, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+	ProbeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbePageSize, RX_MEMORY_AUTO_PREFER_DEVICE,
 					   eGpuBufferFlags::PersistentMapped);
 
 	ProbeVolumePageSize = Limits::MaxProbeVolumes * sizeof(ProbeVolumeData);
 	ProbeVolumeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeVolumePageSize,
-							 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
+							 RX_MEMORY_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
 
 	ProbeGridPageSize = Limits::MaxProbeGridPoints * sizeof(uint16);
-	ProbeGridBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeGridPageSize, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+	ProbeGridBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeGridPageSize, RX_MEMORY_AUTO_PREFER_DEVICE,
 						   eGpuBufferFlags::PersistentMapped);
 
 
@@ -191,7 +186,7 @@ void GraphicsBackend::Init(Vec2u window_size)
 
 	ReflectionProbePageSize = Limits::MaxReflectionProbes * sizeof(ReflectionProbeData);
 	ReflectionProbeBuffer.Create(eGpuBufferType::StorageWithOffset, ReflectionProbePageSize,
-								 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
+								 RX_MEMORY_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
 
 	{
 		if (!mDevice.bSupportsCubeArrays) {
@@ -371,128 +366,54 @@ void GraphicsBackend::InitVulkan()
 		requested_validation_layers.Insert("VK_LAYER_KHRONOS_validation");
 	}
 
-	VkInstanceCreateInfo instance_info = {};
-	instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-	instance_info.pApplicationInfo = &app_info;
-	instance_info.ppEnabledExtensionNames = all_extensions.data();
-	instance_info.enabledExtensionCount = static_cast<uint32_t>(all_extensions.size());
-	instance_info.ppEnabledLayerNames = requested_validation_layers.pData;
-	instance_info.enabledLayerCount = static_cast<uint32_t>(requested_validation_layers.Size);
-	instance_info.pNext = nullptr;
-
 	// Allow portability devices (e.g. MoltenVK) to be shown when querying devices. The flag is only
 	// valid alongside the portability enumeration extension.
-	if (RequiresVulkanPortability(available_extensions)) {
+	const bool enumerate_portability = RequiresVulkanPortability(available_extensions);
+
+	if (enumerate_portability) {
 		all_extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-		instance_info.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-		instance_info.ppEnabledExtensionNames = all_extensions.data();
-		instance_info.enabledExtensionCount = static_cast<uint32_t>(all_extensions.size());
 	}
 
-	VkResult result = vkCreateInstance(&instance_info, nullptr, &mInstance);
+	const RxGpuInstanceConfig instance_config = {
+		.app_name = app_name,
+		.api_version = app_info.apiVersion,
+		.extensions = all_extensions.data(),
+		.extension_count = all_extensions.size(),
+		.layers = requested_validation_layers.pData,
+		.layer_count = requested_validation_layers.Size,
+		.enumerate_portability = enumerate_portability,
+		.debug_messenger = scEnableValidationLayers,
+	};
 
-	if (result != VK_SUCCESS) {
-		ModulePanicVulkan("Could not create vulkan instance!", result);
+	const RxLogSink log_sink = { .user = nullptr, .log = RustInterop::Log };
+
+	mpGpuInstance = rx_gpu_instance_create(reinterpret_cast<RxGetInstanceProcAddr>(vkGetInstanceProcAddr),
+										   &instance_config, &log_sink);
+
+	if (mpGpuInstance == nullptr) {
+		ModulePanic("Could not create vulkan instance!");
 	}
 
-#ifdef FX_VULKAN_DEBUG
-
-	if (scEnableValidationLayers) {
-		mDebugMessenger = CreateDebugMessenger(mInstance);
-		if (!mDebugMessenger) {
-			ModulePanic("Could not create debug messenger");
-		}
-	}
-
-#endif
+	mInstance = reinterpret_cast<VkInstance>(rx_gpu_instance_handle(mpGpuInstance));
 
 	bInitialized = true;
 }
 
-static uint32 DebugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity, uint32 type,
-								   const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data)
-{
-	const char* message = callback_data->pMessage;
-	const char* fmt = "VkValidator: {:s}";
-
-
-#ifdef FX_DEBUG_BREAK_ON_ERROR_SUBSTR
-	String s_msg(message);
-
-	if (s_msg.Contains(FX_DEBUG_BREAK_ON_ERROR_SUBSTR)) {
-		FX_BREAKPOINT;
-	}
-#endif
-
-	if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)) {
-		LogError(LC_RENDER, fmt, message);
-	}
-	else if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)) {
-		LogWarning(LC_RENDER, fmt, message);
-	}
-	else if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)) {
-		// Log::Info(fmt, message);
-	}
-	else {
-		LogDebug(LC_RENDER, fmt, message);
-	}
-
-	return 0;
-}
-
-VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance)
-{
-	const auto severity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
-						  VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-						  VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT;
-
-	const auto message_type = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-							  VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-							  VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-
-
-	VkDebugUtilsMessengerCreateInfoEXT create_info = {
-		.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-		.messageSeverity = severity,
-		.messageType = message_type,
-		.pfnUserCallback = DebugMessageCallback,
-	};
-
-	VkDebugUtilsMessengerEXT messenger;
-
-	const auto status = Rx_EXT_CreateDebugUtilsMessenger(instance, &create_info, nullptr, &messenger);
-	if (status != VK_SUCCESS) {
-		LogError(LC_RENDER, "Could not create debug messenger! (err: {:s})", Util::ResultToStr(status));
-		return nullptr;
-	}
-
-	return messenger;
-}
-
-static void DestroyDebugMessenger(VkInstance instance, VkDebugUtilsMessengerEXT messenger)
-{
-	if (messenger == nullptr) {
-		return;
-	}
-
-	Rx_EXT_DestroyDebugUtilsMessenger(instance, messenger, nullptr);
-}
-
 void GraphicsBackend::InitGPUAllocator()
 {
-	const GpuDevice* device = GetDevice();
+	GpuAllocator = rx_gpu_allocator_create(mpGpuInstance, GetDevice()->GetRustDevice());
 
-	const VmaAllocatorCreateInfo create_info = { .physicalDevice = device->Physical,
-												 .device = device->Device,
-												 .instance = mInstance };
-
-	const VkResult status = vmaCreateAllocator(&create_info, &GpuAllocator);
-	if (status != VK_SUCCESS) {
-		ModulePanicVulkan("Could not create VMA allocator!", status);
+	if (GpuAllocator == nullptr) {
+		ModulePanic("Could not create VMA allocator!");
 	}
 }
 
-void GraphicsBackend::DestroyGPUAllocator() { vmaDestroyAllocator(GpuAllocator); }
+void GraphicsBackend::DestroyGPUAllocator()
+{
+	rx_gpu_allocator_free(GpuAllocator);
+
+	GpuAllocator = nullptr;
+}
 
 ExtensionNames GraphicsBackend::MakeInstanceExtensionList(ExtensionNames& user_requested_extensions,
 														  ExtensionList& out_available_extensions)
@@ -943,11 +864,10 @@ void GraphicsBackend::Destroy()
 
 	GetDevice()->Destroy();
 
-	if (scEnableValidationLayers) {
-		DestroyDebugMessenger(mInstance, mDebugMessenger);
-	}
+	rx_gpu_instance_free(mpGpuInstance);
 
-	vkDestroyInstance(mInstance, nullptr);
+	mpGpuInstance = nullptr;
+	mInstance = nullptr;
 
 	bInitialized = false;
 }

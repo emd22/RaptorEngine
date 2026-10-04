@@ -125,7 +125,7 @@ void FontAtlas::Upload(Image& out_image)
 
 
 	RawGpuBuffer rgba_staging;
-	rgba_staging.Create(eGpuBufferType::Transfer, image_data.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
+	rgba_staging.Create(eGpuBufferType::Transfer, image_data.Size, RX_MEMORY_CPU_TO_GPU,
 						eGpuBufferFlags::TransferReceiver);
 	rgba_staging.Upload(image_data.pData, image_data.Size);
 

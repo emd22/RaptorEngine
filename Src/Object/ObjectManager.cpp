@@ -24,7 +24,7 @@ void ObjectManager::Create()
 	uint32 buffer_size = (sizeof(ObjectGpuEntry) * scMaxObjects) * renderer::FramesInFlight;
 
 	// TODO: replace with DescriptorCache'd version
-	mObjectGpuBuffer.Create(eGpuBufferType::StorageWithOffset, buffer_size, VMA_MEMORY_USAGE_CPU_ONLY,
+	mObjectGpuBuffer.Create(eGpuBufferType::StorageWithOffset, buffer_size, RX_MEMORY_CPU_ONLY,
 							eGpuBufferFlags::PersistentMapped);
 }
 
