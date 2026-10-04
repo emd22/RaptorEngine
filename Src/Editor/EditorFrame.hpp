@@ -17,6 +17,7 @@ class ObjectPropertiesPanel;
 class WorldPropertiesPanel;
 class ToolSettingsBasePanel;
 class ObjectListWindow;
+class CVarListWindow;
 
 class EditorViewport;
 
@@ -45,6 +46,7 @@ public:
 	FX_FORCE_INLINE bool IsActive() const { return mbIsActive; }
 
 	void ShowObjectListWindow();
+	void ShowCVarListWindow();
 
 	void SaveBlockout();
 	void SaveBlockoutAs();
@@ -60,6 +62,7 @@ private:
 	ObjectPropertiesPanel* mpObjectPropertiesPanel = nullptr;
 	WorldPropertiesPanel* mpWorldPropertiesPanel = nullptr;
 	ObjectListWindow* mpObjectListWindow = nullptr;
+	CVarListWindow* mpCVarListWindow = nullptr;
 
 	/// The tool settings slot: whatever ToolSettingsBasePanel is currently swapped in, below Object Properties
 	ToolSettingsBasePanel* mpToolSettingsPanel = nullptr;

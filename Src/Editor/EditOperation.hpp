@@ -6,11 +6,13 @@
 #include <Core/Types.hpp>
 #include <Core/UndoStack.hpp>
 #include <Material/MaterialID.hpp>
+#include <Math/BoundingBox.hpp>
 #include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
 #include <Renderer/LightID.hpp>
 #include <cstddef>
+#include <vector>
 
 namespace fx {
 
@@ -87,6 +89,9 @@ struct EditOperation
 		LightCreate,
 		/// Destroys a spot light; `LightSnap` holds everything needed to bring it back
 		LightDelete,
+		/// Resizes an object's bounding box: `BoundsBefore` and `BoundsAfter` hold the box on either side of the edit
+		BoundsEdit,
+		ObjectStateEdit,
 	} Type;
 
 public:
@@ -117,6 +122,9 @@ public:
 	Brush::PlaneList PlanesBefore;
 	Brush::PlaneList PlanesAfter;
 
+	AABB BoundsBefore;
+	AABB BoundsAfter;
+
 	struct Snapshot
 	{
 		Vec3f Position = Vec3f::sZero;
@@ -128,6 +136,23 @@ public:
 		bool bIsReflectionProbe = false;
 		bool bIsDynamic = false;
 	} ObjectSnapshot;
+
+	struct NodeFlags
+	{
+		ObjectID Id = ObjectID::scNull;
+		uint32 Flags = 0;
+	};
+
+	struct StateEditData
+	{
+		uint32 Bit = 0;
+		bool bIsTag = false;
+		bool bEnabled = false;
+		uint32 TagsBefore = 0;
+		std::vector<NodeFlags> NodesBefore;
+
+		void CaptureBefore(Object& object);
+	} StateEdit;
 
 	struct LightEdit
 	{
@@ -158,6 +183,9 @@ public:
 	int32 GroupSize = 1;
 };
 
+
+bool CanEditObjectTag(const Object* object, uint32 tag_bit);
+bool CanEditObjectFlag(const Object* object, uint32 flag_bit);
 
 /**
  * @brief The undo/redo history of edit operations. Keeps the selection in step with objects that undoing and redoing

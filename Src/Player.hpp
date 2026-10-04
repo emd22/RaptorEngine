@@ -50,6 +50,7 @@ class Player
 
 	static constexpr float32 scRecoilApplySpeed = 40.0f;
 	static constexpr float32 scRecoilRecoveryDelay = 0.1f;
+	static constexpr float32 scRecoilRecoveryRamp = 0.08f;
 
 public:
 	Player() = default;
@@ -66,7 +67,7 @@ public:
 	void SetViewModelHolster(float32 amount) { mViewModelHolster = amount; }
 
 	void AddRecoil(float32 pitch, float32 yaw);
-	void SetRecoilRecovery(float32 radians_per_second) { mRecoilRecovery = radians_per_second; }
+	void SetRecoilRecovery(float32 rate_per_second) { mRecoilRecovery = rate_per_second; }
 
 	void Jump();
 
@@ -108,6 +109,7 @@ private:
 	FX_FORCE_INLINE void MarkApplyingUserForce() { mbIsApplyingUserForce = true; }
 
 	void UpdateViewModel(double delta_time);
+	void RotateCamera(const Vec2f& xy);
 	void UpdateRecoil(float32 delta_time);
 	void UpdateViewKick(float32 delta_time);
 	static float32 ViewKickImpulsePerPeak();
@@ -198,8 +200,8 @@ private:
 
 	float32 mRecoilPendingPitch = 0.0f;
 	float32 mRecoilPendingYaw = 0.0f;
-	float32 mRecoilAppliedPitch = 0.0f;
-	float32 mRecoilAppliedYaw = 0.0f;
+	float32 mRecoilOffsetPitch = 0.0f;
+	float32 mRecoilOffsetYaw = 0.0f;
 	float32 mRecoilRecovery = 0.0f;
 	float32 mRecoilIdleTime = 0.0f;
 

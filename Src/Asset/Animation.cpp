@@ -6,6 +6,7 @@
 #include <Renderer/GraphicsBackend.hpp>
 #include <World.hpp>
 
+#include <algorithm>
 #include <cmath>
 
 
@@ -108,6 +109,110 @@ void Skeleton::EvaluatePose(const Animation* anim, float32 time)
 	for (uint32 i = 0; i < joint_count; i++) {
 		SkinningMatrices[i] = InvBindTransforms[i] * WorldTransforms[i];
 	}
+
+	UpdatePoseSummary();
+}
+
+void Skeleton::UpdatePoseSummary()
+{
+	if (JointCount == 0 || SkinningMatrices.pData == nullptr) {
+		return;
+	}
+
+	uint32 hash = 2166136261u;
+
+	const uint32* words = reinterpret_cast<const uint32*>(SkinningMatrices.pData);
+	const size_t word_count = static_cast<size_t>(JointCount) * 16;
+
+	for (size_t i = 0; i < word_count; i++) {
+		hash = (hash ^ words[i]) * 16777619u;
+	}
+
+	PoseHash = hash;
+
+	Vec3f min = Vec3f(1.0e30f, 1.0e30f, 1.0e30f);
+	Vec3f max = Vec3f(-1.0e30f, -1.0e30f, -1.0e30f);
+
+	for (uint32 i = 0; i < JointCount; i++) {
+		const float32* row = &WorldTransforms[i].RawData[12];
+
+		min = Vec3f(std::min(min.X, row[0]), std::min(min.Y, row[1]), std::min(min.Z, row[2]));
+		max = Vec3f(std::max(max.X, row[0]), std::max(max.Y, row[1]), std::max(max.Z, row[2]));
+	}
+
+	PoseCenter = (min + max) * 0.5f;
+	PoseRadius = (max - min).Length() * 0.5f;
+}
+
+void Skeleton::SetExternalPose(bool enabled)
+{
+	mbExternalPose = enabled;
+	mbHoldingRestPose = false;
+}
+
+void Skeleton::PoseFromDrivenBones(const Mat4f* driven_world, const uint8* is_driven)
+{
+	const bool has_root_transforms = (RootTransforms.Size == JointCount);
+
+	for (uint32 i = 0; i < JointCount; i++) {
+		const uint32 parent = ParentIndices.pData[i];
+
+		if (is_driven[i]) {
+			WorldTransforms[i] = driven_world[i];
+		}
+		else if (parent == BoneNull) {
+			WorldTransforms[i] = has_root_transforms ? (LocalTransforms[i] * RootTransforms[i]) : LocalTransforms[i];
+		}
+		else {
+			WorldTransforms[i] = LocalTransforms[i] * WorldTransforms[parent];
+		}
+
+		SkinningMatrices[i] = InvBindTransforms[i] * WorldTransforms[i];
+	}
+
+	UpdatePoseSummary();
+}
+
+template <typename T>
+static SizedArray<T> MakeView(SizedArray<T>& source)
+{
+	return SizedArray<T>(source.pData, source.Size);
+}
+
+Ref<Skeleton> Skeleton::CreateInstance(const Ref<Skeleton>& source)
+{
+	if (!source.IsValid()) {
+		return Ref<Skeleton>(nullptr);
+	}
+
+	Ref<Skeleton> base = source->pSource.IsValid() ? source->pSource : source;
+	Ref<Skeleton> instance = Ref<Skeleton>::New();
+
+	Skeleton& inst = *instance;
+	Skeleton& src = *base;
+
+	inst.pSource = base;
+	inst.JointCount = src.JointCount;
+
+	inst.InvBindTransforms = MakeView(src.InvBindTransforms);
+	inst.RestPose = MakeView(src.RestPose);
+	inst.RootTransforms = MakeView(src.RootTransforms);
+	inst.ParentIndices = MakeView(src.ParentIndices);
+	inst.BoneNames = MakeView(src.BoneNames);
+	inst.Animations = MakeView(src.Animations);
+
+	inst.LocalTransforms.InitSize(src.JointCount);
+	inst.WorldTransforms.InitSize(src.JointCount);
+	inst.SkinningMatrices.InitSize(src.JointCount);
+
+	inst.RestPlayback = src.RestPlayback;
+	inst.RestPlayback.Time = 0.0f;
+
+	if (inst.JointCount > 0) {
+		inst.EvaluatePose(inst.RestPlayback.pAnimation, 0.0f);
+	}
+
+	return instance;
 }
 
 const Animation* Skeleton::FindAnimation(const String& name) const
@@ -194,7 +299,7 @@ void Skeleton::Update(float32 delta_time)
 
 	LastUpdateFrame = current_frame;
 
-	AnimationPlayback* playback = GetActivePlayback();
+	AnimationPlayback* playback = mbExternalPose ? nullptr : GetActivePlayback();
 
 	if (playback != nullptr) {
 		EvaluatePose(playback->pAnimation, playback->Time);
@@ -220,7 +325,7 @@ void Skeleton::Update(float32 delta_time)
 			}
 		}
 	}
-	else if (!mbHoldingRestPose) {
+	else if (!mbExternalPose && !mbHoldingRestPose) {
 		EvaluatePose(nullptr, 0.0f);
 		mbHoldingRestPose = true;
 	}

@@ -10,6 +10,7 @@
 #include "Camera.hpp"
 #include "Engine.hpp"
 
+#include <Math/Frustum.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
@@ -112,6 +113,15 @@ AABB LightBase::GetBounds() const
 	return AABB(mPosition - extent, mPosition + extent);
 }
 
+bool LightBase::IsOutsideFrustum(const Frustum& frustum) const
+{
+	if (!IsCullable()) {
+		return false;
+	}
+
+	return !frustum.IntersectsSphere(mPosition, mRadius);
+}
+
 LightPoint::LightPoint() { Type = eLightType::Point; }
 
 
@@ -186,6 +196,8 @@ AABB LightSpot::GetBounds() const
 
 	return AABB(mPosition + Vec3f(low[0], low[1], low[2]), mPosition + Vec3f(high[0], high[1], high[2]));
 }
+
+bool LightSpot::IsOutsideFrustum(const Frustum& frustum) const { return !frustum.IntersectsAABB(GetBounds()); }
 
 float32 LightSpot::GetEffectiveSolidAngle() const
 {

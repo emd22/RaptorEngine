@@ -55,6 +55,8 @@ public:
 
 	void Detach(ObjectID id);
 
+	void AttachLoaded(Object* object);
+
 	void SelectCamera(const Ref<Camera>& camera) { mpCurrentCamera = camera; }
 
 	void Render(Camera* shadow_camera);
@@ -128,12 +130,15 @@ private:
 	 * objects are skipped, the shadow pipeline cannot draw them.
 	 */
 	void GatherSpotShadowCasters(const Vec3f& center, float32 radius, DynArray<ObjectID>& out_casters);
-	void AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, DynArray<ObjectID>& out_casters);
+	void AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, const Vec3f& center, float32 radius,
+									  DynArray<ObjectID>& out_casters);
 	/// Draws the objects of a forward pipeline's list into the prepass, with the prepass pipeline that goes with it
 	void ExecutePrepassRenderList(renderer::PipelineHandle forward_pipeline);
 
+	void AddLoadedObject(Object* object);
+
 	void AddTileToRenderList(bool clear, TileIndex new_tile, const Frustum* frustum = nullptr);
-	void AddTileToLightList(TileIndex tile_index);
+	void AddTileToLightList(TileIndex tile_index, const Frustum* frustum = nullptr);
 	void AddUnculledLightsToLightList();
 	void ClearRenderList();
 

@@ -14,6 +14,7 @@
 
 namespace fx {
 class Camera;
+class Frustum;
 
 namespace renderer {
 class Pipeline;
@@ -50,6 +51,8 @@ public:
 	void SetRotation(const Quat& rotation) override;
 
 	virtual AABB GetBounds() const;
+
+	virtual bool IsOutsideFrustum(const Frustum& frustum) const;
 
 	FX_FORCE_INLINE float32 GetRadius() const { return mRadius; }
 	FX_FORCE_INLINE bool IsCullable() const { return Type != eLightType::Directional; }
@@ -148,6 +151,8 @@ public:
 	Mat4f CalculateShadowMatrix() const;
 
 	AABB GetBounds() const override;
+
+	bool IsOutsideFrustum(const Frustum& frustum) const override;
 
 	/// Hands the light's shadow atlas tile back, the next bake allocates a new one.
 	void ReleaseShadowTile();

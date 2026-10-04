@@ -2,13 +2,15 @@
 
 #include <Core/Defines.hpp>
 #include <Core/Log.hpp>
+#include <algorithm>
 #include <charconv>
+#include <cstring>
 
 namespace fx {
 
 #define ENUM_TYPE eCVarType
 
-static const char* GetCVarTypeName(const eCVarType cv_type)
+const char* GetCVarTypeName(const eCVarType cv_type)
 {
 	switch (cv_type) {
 		FX_ENUM_CASE_NAME(Int);
@@ -59,28 +61,47 @@ String CVarValue::AsString() const
 	}
 }
 
-void CVarValue::SetFromString(const String& string_value)
+bool CVarValue::SetFromString(const String& string_value)
 {
+	const char* begin = string_value.CStr();
+	const char* end = begin + string_value.Length;
+
 	switch (Type) {
 	case eCVarType::String:
 		StringValue = string_value;
-		break;
+		return true;
 	case fx::eCVarType::Int: {
-		auto fcr = std::from_chars(string_value.CStr(), string_value.CStr() + string_value.Length, IntValue);
-		break;
+		int64 parsed = 0;
+		auto fcr = std::from_chars(begin, end, parsed);
+		if (fcr.ec != std::errc() || fcr.ptr != end) {
+			return false;
+		}
+		IntValue = parsed;
+		return true;
 	}
 	case fx::eCVarType::Float: {
-		auto fcr = std::from_chars(string_value.CStr(), string_value.CStr() + string_value.Length, FloatValue);
-		break;
+		float32 parsed = 0.0f;
+		auto fcr = std::from_chars(begin, end, parsed);
+		if (fcr.ec != std::errc() || fcr.ptr != end) {
+			return false;
+		}
+		FloatValue = parsed;
+		return true;
 	}
 	case fx::eCVarType::Boolean: {
-		IntValue = 0;
-		if (string_value == "true") {
+		if (string_value == "true" || string_value == "1") {
 			IntValue = 1;
+			return true;
 		}
-		break;
+		if (string_value == "false" || string_value == "0") {
+			IntValue = 0;
+			return true;
+		}
+		return false;
 	}
 	}
+
+	return false;
 }
 
 
@@ -153,6 +174,22 @@ CVarValue* CVarManager::GetCVar(const String& name)
 	}
 
 	return &it->second;
+}
+
+
+std::vector<CVarValue*> CVarManager::CollectCVars()
+{
+	std::vector<CVarValue*> cvars;
+	cvars.reserve(mCVars.size());
+
+	for (auto& [name, cvar] : mCVars) {
+		cvars.push_back(&cvar);
+	}
+
+	std::sort(cvars.begin(), cvars.end(),
+			  [](CVarValue* a, CVarValue* b) { return strcmp(a->GetName().CStr(), b->GetName().CStr()) < 0; });
+
+	return cvars;
 }
 
 

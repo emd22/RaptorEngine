@@ -311,6 +311,12 @@ void RaptorEditor::HandleHotkeys()
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_I)) {
 		SetTool(eEditorTool::Light);
 	}
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_O)) {
+		SetTool(eEditorTool::Bounds);
+	}
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_Y)) {
+		SetTool(eEditorTool::Grab);
+	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_K)) {
 		if (mCurrentToolType == eEditorTool::Light) {
@@ -556,6 +562,12 @@ void RaptorEditor::AddTools()
 	GetTool(eEditorTool::Light)->SetNative(&mLightEditor);
 	GetTool(eEditorTool::Light)
 		->SetSettingsPanel([]() -> ToolSettingsBasePanel* { return new LightToolSettingsPanel(); });
+
+	AddTool(eEditorTool::Bounds, nullptr, eEditorToolFlags::UsesSelection | eEditorToolFlags::UsesModels);
+	GetTool(eEditorTool::Bounds)->SetNative(&mBoundsEditor);
+
+	AddTool(eEditorTool::Grab, nullptr, eEditorToolFlags::None);
+	GetTool(eEditorTool::Grab)->SetNative(&mGrabEditor);
 
 	mpCurrentTool = GetTool(mCurrentToolType);
 }
@@ -898,6 +910,46 @@ uint32 RaptorEditor::SetSelectionReflectionProbe(bool enabled)
 	}
 
 	return changed;
+}
+
+uint32 RaptorEditor::SetSelectionObjectBit(bool is_tag, uint32 bit, bool enabled)
+{
+	Object* targets[scMaxSelectedObjects];
+	uint32 count = 0;
+
+	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
+		Object* object = mSelection.GetObject(i);
+
+		if (object == nullptr) {
+			continue;
+		}
+
+		const bool can_edit = is_tag ? CanEditObjectTag(object, bit) : CanEditObjectFlag(object, bit);
+		const uint32 current = is_tag ? static_cast<uint32>(object->Tags) : static_cast<uint32>(object->GetFlags());
+
+		if (can_edit && ((current & bit) != 0) != enabled) {
+			targets[count++] = object;
+		}
+	}
+
+	for (uint32 i = 0; i < count; i++) {
+		EditOperation op {
+			.Type = EditOperation::eType::ObjectStateEdit,
+			.pObject = targets[i],
+			.ValueA = EditOperationValue(Vec3f::sZero),
+			.ValueB = EditOperationValue(Vec3f::sZero),
+			.GroupSize = static_cast<int32>(count),
+		};
+
+		op.StateEdit.Bit = bit;
+		op.StateEdit.bIsTag = is_tag;
+		op.StateEdit.bEnabled = enabled;
+		op.StateEdit.CaptureBefore(*targets[i]);
+
+		PushEditOperation(op);
+	}
+
+	return count;
 }
 
 void RaptorEditor::DeleteSelection()

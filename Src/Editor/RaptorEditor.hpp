@@ -2,9 +2,11 @@
 
 #ifdef FX_IS_EDITOR
 
+#include "BoundsEditor.hpp"
 #include "EditOperation.hpp"
 #include "EditorSelection.hpp"
 #include "EditorTool.hpp"
+#include "GrabEditor.hpp"
 #include "LightEditor.hpp"
 
 #include <wx/evtloop.h>
@@ -123,6 +125,8 @@ public:
 	Object* CreateReflectionProbeAtPlayer();
 	uint32 SetSelectionReflectionProbe(bool enabled);
 
+	uint32 SetSelectionObjectBit(bool is_tag, uint32 bit, bool enabled);
+
 	/////////////////////////////////////
 	// Edit operations
 	/////////////////////////////////////
@@ -195,6 +199,10 @@ private:
 
 	/// Runs the Light tool
 	LightEditor mLightEditor;
+
+	BoundsEditor mBoundsEditor;
+
+	GrabEditor mGrabEditor;
 
 	EditorSelection mSelection;
 	EditHistory mHistory { mSelection };

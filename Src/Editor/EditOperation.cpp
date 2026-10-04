@@ -4,12 +4,204 @@
 
 #include <Blockout.hpp>
 #include <Engine.hpp>
+#include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
+#include <Physics/PhysicsManager.hpp>
 #include <Renderer/Light.hpp>
 #include <Renderer/LightManager.hpp>
+#include <Renderer/LightProbe.hpp>
 #include <World.hpp>
 
 namespace fx::editor {
+
+static constexpr eObjectTag scEditableTags[] = {
+	eObjectTag::LockTransform,
+	eObjectTag::ProbeVolume,
+	eObjectTag::ReflectionProbe,
+	eObjectTag::Bleeds,
+};
+
+static constexpr eObjectFlags scEditableFlags[] = {
+	eObjectFlags::PhysicsEnabled,
+	eObjectFlags::ShadowCaster,
+	eObjectFlags::DisableCulling,
+	eObjectFlags::NotProbeVisible,
+};
+
+bool CanEditObjectTag(const Object* object, uint32 tag_bit)
+{
+	if (object == nullptr) {
+		return false;
+	}
+
+	switch (static_cast<eObjectTag>(tag_bit)) {
+	case eObjectTag::LockTransform:
+	case eObjectTag::Bleeds:
+		return true;
+	case eObjectTag::ProbeVolume:
+	case eObjectTag::ReflectionProbe:
+		return object->HasTags(eObjectTag::Blockout);
+	default:
+		return false;
+	}
+}
+
+bool CanEditObjectFlag(const Object* object, uint32 flag_bit)
+{
+	if (object == nullptr) {
+		return false;
+	}
+
+	switch (static_cast<eObjectFlags>(flag_bit)) {
+	case eObjectFlags::DisableCulling:
+		return true;
+	case eObjectFlags::ShadowCaster:
+	case eObjectFlags::NotProbeVisible:
+		return !object->IsProbeVolume();
+	case eObjectFlags::PhysicsEnabled: {
+		const physics::Body* body = gPhysics->GetBody(object->GetPhysicsID());
+
+		return body != nullptr && body->mbHasPhysicsBody && body->GetMotionType() != physics::eMotionType::Static &&
+			   !object->IsProbeVolume();
+	}
+	default:
+		return false;
+	}
+}
+
+template <typename TFunc>
+static void ForEachNode(Object& object, const TFunc& func)
+{
+	func(object);
+
+	for (ObjectID attached_id : object.AttachedNodes) {
+		Object* attached = gObjectManager->GetObject(attached_id);
+
+		if (attached != nullptr) {
+			ForEachNode(*attached, func);
+		}
+	}
+}
+
+static void SetObjectTag(Object& object, eObjectTag tag, bool enabled)
+{
+	switch (tag) {
+	case eObjectTag::ProbeVolume:
+		object.SetProbeVolume(enabled);
+		break;
+	case eObjectTag::ReflectionProbe:
+		if (enabled) {
+			object.SetReflectionProbe(true);
+		}
+		else {
+			object.ClearTag(eObjectTag::ReflectionProbe);
+		}
+		break;
+	default:
+		if (enabled) {
+			object.SetTag(tag);
+		}
+		else {
+			object.ClearTag(tag);
+		}
+		break;
+	}
+}
+
+static void SetObjectFlag(Object& object, eObjectFlags flag, bool enabled, bool recursive)
+{
+	switch (flag) {
+	case eObjectFlags::PhysicsEnabled:
+		object.SetPhysicsEnabled(enabled);
+		break;
+	case eObjectFlags::ShadowCaster:
+		if (recursive) {
+			ForEachNode(object, [enabled](Object& node) { node.SetShadowCaster(enabled); });
+		}
+		else {
+			object.SetShadowCaster(enabled);
+		}
+		break;
+	case eObjectFlags::DisableCulling:
+		if (recursive) {
+			ForEachNode(object, [enabled](Object& node) { node.SetCullable(!enabled); });
+		}
+		else {
+			object.SetCullable(!enabled);
+		}
+		break;
+	case eObjectFlags::NotProbeVisible:
+		object.SetProbeVisible(!enabled);
+		break;
+	default:
+		break;
+	}
+}
+
+static void ApplyTag(Object& object, uint32 tag_bit, bool enabled)
+{
+	const eObjectTag tag = static_cast<eObjectTag>(tag_bit);
+
+	if (!CanEditObjectTag(&object, tag_bit) || object.HasTags(tag) == enabled) {
+		return;
+	}
+
+	const bool was_reflection_probe = object.IsReflectionProbe();
+
+	SetObjectTag(object, tag, enabled);
+
+	if (was_reflection_probe != object.IsReflectionProbe()) {
+		gProbeManager->RebuildReflectionProbesFromWorld();
+	}
+}
+
+static void ApplyFlag(Object& object, uint32 flag_bit, bool enabled)
+{
+	const eObjectFlags flag = static_cast<eObjectFlags>(flag_bit);
+
+	if (!CanEditObjectFlag(&object, flag_bit) || HasFlag(object.GetFlags(), flag) == enabled) {
+		return;
+	}
+
+	SetObjectFlag(object, flag, enabled, true);
+}
+
+static void RestoreObjectState(Object& root, const EditOperation::StateEditData& state)
+{
+	for (const eObjectTag tag : scEditableTags) {
+		const uint32 tag_bit = static_cast<uint32>(tag);
+
+		ApplyTag(root, tag_bit, (state.TagsBefore & tag_bit) != 0);
+	}
+
+	for (const EditOperation::NodeFlags& saved : state.NodesBefore) {
+		Object* node = gObjectManager->GetObject(saved.Id);
+
+		if (node == nullptr) {
+			continue;
+		}
+
+		for (const eObjectFlags flag : scEditableFlags) {
+			const uint32 flag_bit = static_cast<uint32>(flag);
+			const bool wanted = (saved.Flags & flag_bit) != 0;
+
+			if (CanEditObjectFlag(node, flag_bit) && HasFlag(node->GetFlags(), flag) != wanted) {
+				SetObjectFlag(*node, flag, wanted, false);
+			}
+		}
+	}
+}
+
+void EditOperation::StateEditData::CaptureBefore(Object& object)
+{
+	TagsBefore = static_cast<uint32>(object.Tags);
+
+	NodesBefore.clear();
+
+	ForEachNode(object, [this](Object& node) {
+		NodesBefore.push_back(NodeFlags { .Id = node.ID, .Flags = static_cast<uint32>(node.GetFlags()) });
+	});
+}
 
 /// Returns the op's object only if it is still alive (guards against use-after-free
 /// when an object was destroyed outside of undo/redo).
@@ -99,6 +291,31 @@ EditOperationValue EditOperation::Execute(EditorSelection& selection)
 		target->SetRotation(Quat::FromEulerAngles(ValueB.Position));
 
 		return ValueB;
+	}
+	case eType::BoundsEdit: {
+		Object* target = ResolveOpTarget(*this);
+		if (target == nullptr) {
+			break;
+		}
+
+		target->SetBounds(BoundsAfter);
+
+		break;
+	}
+	case eType::ObjectStateEdit: {
+		Object* target = ResolveOpTarget(*this);
+		if (target == nullptr) {
+			break;
+		}
+
+		if (StateEdit.bIsTag) {
+			ApplyTag(*target, StateEdit.Bit, StateEdit.bEnabled);
+		}
+		else {
+			ApplyFlag(*target, StateEdit.Bit, StateEdit.bEnabled);
+		}
+
+		break;
 	}
 	case eType::LightTransform: {
 		LightSpot* light = ResolveOpLight(*this);
@@ -256,6 +473,26 @@ void EditOperation::Undo(EditorSelection& selection)
 		}
 
 		target->SetRotation(Quat::FromEulerAngles(ValueA.Position));
+
+		break;
+	}
+	case eType::BoundsEdit: {
+		Object* target = ResolveOpTarget(*this);
+		if (target == nullptr) {
+			break;
+		}
+
+		target->SetBounds(BoundsBefore);
+
+		break;
+	}
+	case eType::ObjectStateEdit: {
+		Object* target = ResolveOpTarget(*this);
+		if (target == nullptr) {
+			break;
+		}
+
+		RestoreObjectState(*target, StateEdit);
 
 		break;
 	}
