@@ -27,6 +27,7 @@ pub struct Instance
 	entry: Entry,
 	raw: ash::Instance,
 	messenger: Option<Messenger>,
+	debug_utils: bool,
 	log: Arc<dyn Log>,
 }
 
@@ -106,10 +107,16 @@ impl Instance
 		let raw = unsafe { entry.create_instance(&create_info, None) }
 			.map_err(|result| Error::vulkan("Could not create vulkan instance!", result))?;
 
+		let debug_utils = config
+			.extensions
+			.iter()
+			.any(|name| name.as_c_str() == ext::debug_utils::NAME);
+
 		let mut instance = Self {
 			entry,
 			raw,
 			messenger: None,
+			debug_utils,
 			log,
 		};
 
@@ -168,6 +175,11 @@ impl Instance
 	pub fn entry(&self) -> &Entry
 	{
 		&self.entry
+	}
+
+	pub fn debug_utils_enabled(&self) -> bool
+	{
+		self.debug_utils
 	}
 
 	pub fn log(&self) -> &Arc<dyn Log>

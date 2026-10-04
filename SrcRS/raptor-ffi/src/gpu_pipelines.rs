@@ -1,7 +1,10 @@
 use std::ffi::{CStr, c_char, c_void};
 
 use ash::vk::{self, Handle};
-use raptor_gpu::{GraphicsPipelineDesc, PushConstantDef};
+use raptor_gpu::{
+	GraphicsPipelineDesc, PipelineLayoutRecord, PipelineRecord, PushConstantDef, ReflectionEntry,
+	SHADER_VERTEX, ShaderProgramRecord,
+};
 use raptor_shader::program::{self, MacroRef, ProgramKind};
 
 use crate::gpu::RxGpuDevice;
@@ -14,105 +17,152 @@ pub struct RxPushConstantDef
 	pub stages: u32,
 }
 
+pub type RxPipelineLayout = PipelineLayoutRecord;
+pub type RxPipeline = PipelineRecord;
+
 /// # Safety
 ///
 /// `device` must be live, `set_layouts` valid for `set_count` handles, `defs` for `def_count`
-/// entries, and `out` writable.
+/// entries, and `out_status` writable. The result is null on failure.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_pipeline_layout_create(
+pub unsafe extern "C" fn rx_pipeline_layout_new(
 	device: *const RxGpuDevice,
 	set_layouts: *const u64,
 	set_count: usize,
 	defs: *const RxPushConstantDef,
 	def_count: usize,
-	out: *mut u64,
-) -> i32
+	out_status: *mut i32,
+) -> *mut RxPipelineLayout
 {
-	let sets: Vec<_> = if set_count == 0 {
-		Vec::new()
-	} else {
-		// SAFETY: guaranteed by the caller.
-		unsafe { std::slice::from_raw_parts(set_layouts, set_count) }
-			.iter()
-			.map(|layout| vk::DescriptorSetLayout::from_raw(*layout))
-			.collect()
-	};
-
-	let defs: Vec<_> = if def_count == 0 {
-		Vec::new()
-	} else {
-		// SAFETY: guaranteed by the caller.
-		unsafe { std::slice::from_raw_parts(defs, def_count) }
-			.iter()
-			.map(|def| PushConstantDef {
-				size: def.size,
-				stages: vk::ShaderStageFlags::from_raw(def.stages),
-			})
-			.collect()
-	};
+	// SAFETY: guaranteed by the caller.
+	let sets: Vec<_> = unsafe { slice_or_empty(set_layouts, set_count) }
+		.iter()
+		.map(|layout| vk::DescriptorSetLayout::from_raw(*layout))
+		.collect();
 
 	// SAFETY: guaranteed by the caller.
-	match unsafe { &(*device).device }.create_pipeline_layout(&sets, &defs) {
-		Ok(layout) => {
-			// SAFETY: guaranteed by the caller.
-			unsafe { *out = layout.as_raw() };
-			vk::Result::SUCCESS.as_raw()
-		}
+	let defs: Vec<_> = unsafe { slice_or_empty(defs, def_count) }
+		.iter()
+		.map(|def| PushConstantDef {
+			size: def.size,
+			stages: vk::ShaderStageFlags::from_raw(def.stages),
+		})
+		.collect();
+
+	// SAFETY: guaranteed by the caller.
+	let created = PipelineLayoutRecord::create(unsafe { &(*device).device }, &sets, &defs);
+
+	// SAFETY: guaranteed by the caller.
+	unsafe { write_status(out_status, &created) };
+
+	created.map_or(std::ptr::null_mut(), PipelineLayoutRecord::into_raw)
+}
+
+/// # Safety
+///
+/// `layout` must come from `rx_pipeline_layout_new`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rx_pipeline_layout_retain(layout: *mut RxPipelineLayout)
+{
+	// SAFETY: guaranteed by the caller.
+	unsafe { PipelineLayoutRecord::retain(layout) };
+}
+
+/// # Safety
+///
+/// `layout` must come from `rx_pipeline_layout_new` and not be used by this reference afterwards.
+/// `device` must be live, or null to leak the layout, and the layout must not be in use.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rx_pipeline_layout_release(
+	layout: *mut RxPipelineLayout,
+	device: *const RxGpuDevice,
+)
+{
+	// SAFETY: guaranteed by the caller.
+	unsafe { PipelineLayoutRecord::release(layout, device.as_ref().map(|device| &device.device)) };
+}
+
+unsafe fn write_status<T>(out_status: *mut i32, result: &Result<T, vk::Result>)
+{
+	let status = match result {
+		Ok(_) => vk::Result::SUCCESS.as_raw(),
 		Err(error) => error.as_raw(),
-	}
-}
-
-/// # Safety
-///
-/// `device` must be live and `layout` one of its pipeline layouts that is not in use.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_pipeline_layout_destroy(device: *const RxGpuDevice, layout: u64)
-{
-	// SAFETY: guaranteed by the caller.
-	unsafe {
-		(*device)
-			.device
-			.destroy_pipeline_layout(vk::PipelineLayout::from_raw(layout))
 	};
+
+	// SAFETY: guaranteed by the caller.
+	unsafe { *out_status = status };
 }
+
+pub type RxShaderProgram = ShaderProgramRecord;
 
 /// # Safety
 ///
-/// `device` must be live, `code` valid for `word_count` words, and `out` writable.
+/// `device` must be live, `code` valid for `word_count` words, `reflection` for `reflection_count`
+/// entries, and `out_status` writable. `user` is only stored. The result is null on failure.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_shader_module_create(
+pub unsafe extern "C" fn rx_shader_program_new(
 	device: *const RxGpuDevice,
 	code: *const u32,
 	word_count: usize,
-	out: *mut u64,
-) -> i32
+	reflection: *const ReflectionEntry,
+	reflection_count: usize,
+	shader_type: u32,
+	user: *mut c_void,
+	out_status: *mut i32,
+) -> *mut RxShaderProgram
 {
 	// SAFETY: guaranteed by the caller.
-	let code = unsafe { std::slice::from_raw_parts(code, word_count) };
+	let (code, reflection) = unsafe {
+		(
+			slice_or_empty(code, word_count),
+			slice_or_empty(reflection, reflection_count).to_vec(),
+		)
+	};
+
+	let mask = if shader_type == SHADER_VERTEX {
+		program::input_location_mask(code)
+	} else {
+		!0
+	};
 
 	// SAFETY: guaranteed by the caller.
-	match unsafe { &(*device).device }.create_shader_module(code) {
-		Ok(module) => {
-			// SAFETY: guaranteed by the caller.
-			unsafe { *out = module.as_raw() };
-			vk::Result::SUCCESS.as_raw()
-		}
-		Err(error) => error.as_raw(),
-	}
+	let created = ShaderProgramRecord::create(
+		unsafe { &(*device).device },
+		code,
+		reflection,
+		shader_type,
+		mask,
+		user,
+	);
+
+	// SAFETY: guaranteed by the caller.
+	unsafe { write_status(out_status, &created) };
+
+	created.map_or(std::ptr::null_mut(), ShaderProgramRecord::into_raw)
 }
 
 /// # Safety
 ///
-/// `device` must be live and `module` one of its shader modules.
+/// `program` must come from `rx_shader_program_new`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_shader_module_destroy(device: *const RxGpuDevice, module: u64)
+pub unsafe extern "C" fn rx_shader_program_retain(program: *mut RxShaderProgram)
 {
 	// SAFETY: guaranteed by the caller.
-	unsafe {
-		(*device)
-			.device
-			.destroy_shader_module(vk::ShaderModule::from_raw(module))
-	};
+	unsafe { ShaderProgramRecord::retain(program) };
+}
+
+/// # Safety
+///
+/// `program` must come from `rx_shader_program_new` and not be used by this reference afterwards.
+/// `device` must be live, or null to leak the module.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rx_shader_program_release(
+	program: *mut RxShaderProgram,
+	device: *const RxGpuDevice,
+)
+{
+	// SAFETY: guaranteed by the caller.
+	unsafe { ShaderProgramRecord::release(program, device.as_ref().map(|device| &device.device)) };
 }
 
 #[repr(C)]
@@ -152,13 +202,13 @@ unsafe fn slice_or_empty<'a, T>(data: *const T, count: usize) -> &'a [T]
 /// # Safety
 ///
 /// `device` must be live, `desc` valid with every pointer valid for its count (`vertex_binding` may
-/// be null), the referenced handles live, and `out` writable.
+/// be null), the referenced handles live, and `out_status` writable. The result is null on failure.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_graphics_pipeline_create(
+pub unsafe extern "C" fn rx_pipeline_create_graphics(
 	device: *const RxGpuDevice,
 	desc: *const RxGraphicsPipelineDesc,
-	out: *mut u64,
-) -> i32
+	out_status: *mut i32,
+) -> *mut RxPipeline
 {
 	// SAFETY: guaranteed by the caller.
 	let (device, desc) = unsafe { (&(*device).device, &*desc) };
@@ -209,72 +259,72 @@ pub unsafe extern "C" fn rx_gpu_graphics_pipeline_create(
 		})
 	};
 
-	let pipeline = device.create_graphics_pipeline(&GraphicsPipelineDesc {
-		stages: &stages,
-		vertex_binding,
-		vertex_attributes: attributes,
-		color_blend: blends,
-		attachment_formats: &formats,
-		cull_mode: vk::CullModeFlags::from_raw(desc.cull_mode),
-		front_face: vk::FrontFace::from_raw(desc.front_face),
-		polygon_mode: vk::PolygonMode::from_raw(desc.polygon_mode),
-		depth_compare_op: vk::CompareOp::from_raw(desc.depth_compare_op),
-		render_lines: desc.render_lines != 0,
-		disable_depth_test: desc.disable_depth_test != 0,
-		disable_depth_write: desc.disable_depth_write != 0,
-		layout: vk::PipelineLayout::from_raw(desc.layout),
-		render_pass: vk::RenderPass::from_raw(desc.render_pass),
-	});
+	let created = PipelineRecord::create_graphics(
+		device,
+		&GraphicsPipelineDesc {
+			stages: &stages,
+			vertex_binding,
+			vertex_attributes: attributes,
+			color_blend: blends,
+			attachment_formats: &formats,
+			cull_mode: vk::CullModeFlags::from_raw(desc.cull_mode),
+			front_face: vk::FrontFace::from_raw(desc.front_face),
+			polygon_mode: vk::PolygonMode::from_raw(desc.polygon_mode),
+			depth_compare_op: vk::CompareOp::from_raw(desc.depth_compare_op),
+			render_lines: desc.render_lines != 0,
+			disable_depth_test: desc.disable_depth_test != 0,
+			disable_depth_write: desc.disable_depth_write != 0,
+			layout: vk::PipelineLayout::from_raw(desc.layout),
+			render_pass: vk::RenderPass::from_raw(desc.render_pass),
+		},
+	);
 
-	match pipeline {
-		Ok(pipeline) => {
-			// SAFETY: guaranteed by the caller.
-			unsafe { *out = pipeline.as_raw() };
-			vk::Result::SUCCESS.as_raw()
-		}
-		Err(error) => error.as_raw(),
-	}
+	// SAFETY: guaranteed by the caller.
+	unsafe { write_status(out_status, &created) };
+
+	created.map_or(std::ptr::null_mut(), Box::into_raw)
 }
 
 /// # Safety
 ///
-/// `device` must be live, `module` and `layout` handles of it, and `out` writable.
+/// `device` must be live, `module` and `layout` handles of it, and `out_status` writable. The
+/// result is null on failure.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_compute_pipeline_create(
+pub unsafe extern "C" fn rx_pipeline_create_compute(
 	device: *const RxGpuDevice,
 	module: u64,
 	layout: u64,
-	out: *mut u64,
-) -> i32
+	out_status: *mut i32,
+) -> *mut RxPipeline
 {
 	// SAFETY: guaranteed by the caller.
 	let device = unsafe { &(*device).device };
 
-	match device.create_compute_pipeline(
+	let created = PipelineRecord::create_compute(
+		device,
 		vk::ShaderModule::from_raw(module),
 		vk::PipelineLayout::from_raw(layout),
-	) {
-		Ok(pipeline) => {
-			// SAFETY: guaranteed by the caller.
-			unsafe { *out = pipeline.as_raw() };
-			vk::Result::SUCCESS.as_raw()
-		}
-		Err(error) => error.as_raw(),
-	}
+	);
+
+	// SAFETY: guaranteed by the caller.
+	unsafe { write_status(out_status, &created) };
+
+	created.map_or(std::ptr::null_mut(), Box::into_raw)
 }
 
 /// # Safety
 ///
-/// `device` must be live and `pipeline` one of its pipelines that is not in use.
+/// `pipeline` must come from one of the `rx_pipeline_create_*` functions on this device, not be in
+/// use, and not be used afterwards.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_pipeline_destroy(device: *const RxGpuDevice, pipeline: u64)
+pub unsafe extern "C" fn rx_pipeline_destroy(pipeline: *mut RxPipeline, device: *const RxGpuDevice)
 {
+	if pipeline.is_null() {
+		return;
+	}
+
 	// SAFETY: guaranteed by the caller.
-	unsafe {
-		(*device)
-			.device
-			.destroy_pipeline(vk::Pipeline::from_raw(pipeline))
-	};
+	unsafe { Box::from_raw(pipeline).destroy(&(*device).device) };
 }
 
 /// # Safety

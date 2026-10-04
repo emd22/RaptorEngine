@@ -72,9 +72,6 @@ pub struct RxGpuDeviceInfo
 {
 	pub physical: *mut c_void,
 	pub device: *mut c_void,
-	pub graphics_queue: *mut c_void,
-	pub present_queue: *mut c_void,
-	pub transfer_queue: *mut c_void,
 	pub graphics_family: u32,
 	pub present_family: u32,
 	pub transfer_family: u32,
@@ -211,9 +208,6 @@ pub unsafe extern "C" fn rx_gpu_device_create(
 	let info = RxGpuDeviceInfo {
 		physical: device.physical().as_raw() as *mut c_void,
 		device: device.handle().as_raw() as *mut c_void,
-		graphics_queue: device.graphics_queue().as_raw() as *mut c_void,
-		present_queue: device.present_queue().as_raw() as *mut c_void,
-		transfer_queue: device.transfer_queue().as_raw() as *mut c_void,
 		graphics_family: families.graphics,
 		present_family: families.present,
 		transfer_family: families.transfer,

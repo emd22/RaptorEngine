@@ -1,7 +1,10 @@
 use std::ffi::c_void;
 
 use ash::vk::{self, Handle};
-use raptor_gpu::{BufferType, DescriptorWrite, ImageFormat, Level, SwapchainRequest};
+use raptor_gpu::{
+	BufferType, DescriptorIdEntry, DescriptorPoolRecord, DescriptorWrite, ImageFormat, Level,
+	SwapchainRequest, descriptor_id,
+};
 
 use crate::gpu::RxGpuDevice;
 
@@ -101,53 +104,21 @@ pub unsafe extern "C" fn rx_gpu_swapchain_destroy(device: *const RxGpuDevice, sw
 
 /// # Safety
 ///
-/// `device` must be live, `swapchain` and `semaphore` handles of it, and `out_index` writable.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_swapchain_acquire(
-	device: *const RxGpuDevice,
-	swapchain: u64,
-	timeout: u64,
-	semaphore: u64,
-	out_index: *mut u32,
-) -> i32
-{
-	// SAFETY: guaranteed by the caller.
-	let device = unsafe { &(*device).device };
-
-	let (result, index) = device.acquire_next_image(
-		vk::SwapchainKHR::from_raw(swapchain),
-		timeout,
-		vk::Semaphore::from_raw(semaphore),
-	);
-
-	// SAFETY: guaranteed by the caller.
-	unsafe { *out_index = index };
-
-	result.as_raw()
-}
-
-/// # Safety
-///
-/// `device` must be live, `queue` a presentation queue of it that the caller has locked, and the
-/// other handles its own.
+/// `device` must be live and the other handles its own.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rx_gpu_swapchain_present(
 	device: *const RxGpuDevice,
-	queue: *mut c_void,
 	swapchain: u64,
 	wait_semaphore: u64,
 	image_index: u32,
 ) -> i32
 {
 	// SAFETY: guaranteed by the caller.
-	let result = unsafe {
-		(*device).device.queue_present(
-			vk::Queue::from_raw(queue as u64),
-			vk::SwapchainKHR::from_raw(swapchain),
-			vk::Semaphore::from_raw(wait_semaphore),
-			image_index,
-		)
-	};
+	let result = unsafe { &*device }.device.queue_present(
+		vk::SwapchainKHR::from_raw(swapchain),
+		vk::Semaphore::from_raw(wait_semaphore),
+		image_index,
+	);
 
 	result.as_raw()
 }
@@ -194,18 +165,21 @@ pub struct RxDescriptorPoolSize
 	pub count: u32,
 }
 
+pub type RxDescriptorPool = DescriptorPoolRecord;
+
 /// # Safety
 ///
-/// `device` must be live, `sizes` valid for `count` entries, and `out` writable.
+/// `device` must be live, `sizes` valid for `count` entries, and `out_status` writable. The result
+/// is null on failure.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_descriptor_pool_create(
+pub unsafe extern "C" fn rx_descriptor_pool_new(
 	device: *const RxGpuDevice,
 	sizes: *const RxDescriptorPoolSize,
 	count: usize,
 	max_sets: u32,
 	free_sets: u8,
-	out: *mut u64,
-) -> i32
+	out_status: *mut i32,
+) -> *mut RxDescriptorPool
 {
 	let sizes: Vec<_> = if count == 0 {
 		Vec::new()
@@ -221,48 +195,76 @@ pub unsafe extern "C" fn rx_gpu_descriptor_pool_create(
 	};
 
 	// SAFETY: guaranteed by the caller.
-	match unsafe { &(*device).device }.create_descriptor_pool(&sizes, max_sets, free_sets != 0) {
-		Ok(pool) => {
-			// SAFETY: guaranteed by the caller.
-			unsafe { *out = pool.as_raw() };
-			vk::Result::SUCCESS.as_raw()
-		}
+	let created = DescriptorPoolRecord::create(
+		unsafe { &(*device).device },
+		sizes,
+		max_sets,
+		free_sets != 0,
+	);
+
+	let status = match &created {
+		Ok(_) => vk::Result::SUCCESS.as_raw(),
+		Err(error) => error.as_raw(),
+	};
+
+	// SAFETY: guaranteed by the caller.
+	unsafe { *out_status = status };
+
+	created.map_or(std::ptr::null_mut(), Box::into_raw)
+}
+
+/// # Safety
+///
+/// `pool` must come from `rx_descriptor_pool_new` on this device with none of its sets in use.
+/// Every set allocated from it is invalid afterwards.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rx_descriptor_pool_recreate(
+	pool: *mut RxDescriptorPool,
+	device: *const RxGpuDevice,
+) -> i32
+{
+	// SAFETY: guaranteed by the caller.
+	match unsafe { (*pool).recreate(&(*device).device) } {
+		Ok(()) => vk::Result::SUCCESS.as_raw(),
 		Err(error) => error.as_raw(),
 	}
 }
 
 /// # Safety
 ///
-/// `device` must be live and `pool` one of its pools with no sets in use.
+/// `pool` must be null or come from `rx_descriptor_pool_new` on this device, with none of its sets
+/// in use, and must not be used afterwards.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_descriptor_pool_destroy(device: *const RxGpuDevice, pool: u64)
+pub unsafe extern "C" fn rx_descriptor_pool_destroy(
+	pool: *mut RxDescriptorPool,
+	device: *const RxGpuDevice,
+)
 {
+	if pool.is_null() {
+		return;
+	}
+
 	// SAFETY: guaranteed by the caller.
-	unsafe {
-		(*device)
-			.device
-			.destroy_descriptor_pool(vk::DescriptorPool::from_raw(pool))
-	};
+	unsafe { Box::from_raw(pool).destroy(&(*device).device) };
 }
 
 /// # Safety
 ///
-/// `device` must be live, `pool` and `layout` handles of it, and `out` writable.
+/// `pool` and `device` must be live, `layout` a handle of the device, and `out` writable.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_descriptor_set_allocate(
+pub unsafe extern "C" fn rx_descriptor_pool_allocate_set(
+	pool: *mut RxDescriptorPool,
 	device: *const RxGpuDevice,
-	pool: u64,
 	layout: u64,
 	out: *mut u64,
 ) -> i32
 {
 	// SAFETY: guaranteed by the caller.
-	let device = unsafe { &(*device).device };
+	let allocated = unsafe {
+		(*pool).allocate_set(&(*device).device, vk::DescriptorSetLayout::from_raw(layout))
+	};
 
-	match device.allocate_descriptor_set(
-		vk::DescriptorPool::from_raw(pool),
-		vk::DescriptorSetLayout::from_raw(layout),
-	) {
+	match allocated {
 		Ok(set) => {
 			// SAFETY: guaranteed by the caller.
 			unsafe { *out = set.as_raw() };
@@ -274,18 +276,49 @@ pub unsafe extern "C" fn rx_gpu_descriptor_set_allocate(
 
 /// # Safety
 ///
-/// `device` must be live, `pool` created with free sets, and `set` allocated from it and not in
-/// use.
+/// `pool` must have been created with free sets, and `set` allocated from it and not in use.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_descriptor_set_free(device: *const RxGpuDevice, pool: u64, set: u64)
+pub unsafe extern "C" fn rx_descriptor_pool_free_set(
+	pool: *const RxDescriptorPool,
+	device: *const RxGpuDevice,
+	set: u64,
+)
 {
 	// SAFETY: guaranteed by the caller.
-	unsafe {
-		(*device).device.free_descriptor_set(
-			vk::DescriptorPool::from_raw(pool),
-			vk::DescriptorSet::from_raw(set),
-		)
+	unsafe { (*pool).free_set(&(*device).device, vk::DescriptorSet::from_raw(set)) };
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct RxDescriptorIdEntry
+{
+	pub binding: u32,
+	pub kind: u32,
+	pub handle: u64,
+}
+
+/// # Safety
+///
+/// `entries` must be valid for `count` entries.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rx_descriptor_id(entries: *const RxDescriptorIdEntry, count: usize)
+-> u32
+{
+	let entries: Vec<_> = if count == 0 {
+		Vec::new()
+	} else {
+		// SAFETY: guaranteed by the caller.
+		unsafe { std::slice::from_raw_parts(entries, count) }
+			.iter()
+			.map(|entry| DescriptorIdEntry {
+				binding: entry.binding,
+				kind: entry.kind,
+				handle: entry.handle,
+			})
+			.collect()
 	};
+
+	descriptor_id(&entries)
 }
 
 pub const DESCRIPTOR_KIND_IMAGE: u32 = 1;

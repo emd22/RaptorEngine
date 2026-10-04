@@ -21,11 +21,11 @@ void ImageTransferHandoff(const CommandBuffer& cmd, Image* image)
 	Assert(image != nullptr);
 
 	const int32 recorded = rx_gpu_cmd_image_transfer_release(
-		gGraphics->GetDevice()->GetRustDevice(), cmd.Cmd, RxRaw(image->InternalImage),
-		ImageFormatUtil::GetAspectMask(image->Info.Format), image->Info.MipCount);
+		gGraphics->GetDevice()->GetRustDevice(), cmd.Cmd, image->GetRawImage(),
+		ImageFormatUtil::GetAspectMask(image->GetFormat()), image->GetMipCount());
 
 	if (recorded != 0) {
-		image->ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		image->SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	}
 }
 
@@ -34,11 +34,11 @@ void ImageGraphicsAcquire(const CommandBuffer& cmd, Image* image)
 	Assert(image != nullptr);
 
 	const int32 recorded = rx_gpu_cmd_image_graphics_acquire(
-		gGraphics->GetDevice()->GetRustDevice(), cmd.Cmd, RxRaw(image->InternalImage),
-		ImageFormatUtil::GetAspectMask(image->Info.Format), image->Info.MipCount);
+		gGraphics->GetDevice()->GetRustDevice(), cmd.Cmd, image->GetRawImage(),
+		ImageFormatUtil::GetAspectMask(image->GetFormat()), image->GetMipCount());
 
 	if (recorded != 0) {
-		image->ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		image->SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	}
 }
 
@@ -46,27 +46,27 @@ void ImageLayoutTransition(Image* image, VkImageLayout new_layout, CommandBuffer
 						   uint32 num_levels)
 {
 	rx_gpu_cmd_image_layout_transition(gGraphics->GetDevice()->GetRustDevice(), cmd.Get(),
-									   RxRaw(image->InternalImage),
-									   ImageFormatUtil::GetAspectMask(image->Info.Format), image->ImageLayout,
+									   image->GetRawImage(),
+									   ImageFormatUtil::GetAspectMask(image->GetFormat()), image->GetLayout(),
 									   new_layout, mip_level, num_levels, cmd.QueueFamily());
 
-	image->ImageLayout = new_layout;
+	image->SetLayout(new_layout);
 }
 
 void BufferComputeToFragment(const CommandBuffer& cmd, RawGpuBuffer* buffer)
 {
 	Assert(buffer != nullptr);
 
-	rx_gpu_cmd_buffer_compute_to_fragment(gGraphics->GetDevice()->GetRustDevice(), cmd.Cmd, RxRaw(buffer->Buffer),
-										  buffer->Size);
+	rx_gpu_cmd_buffer_compute_to_fragment(gGraphics->GetDevice()->GetRustDevice(), cmd.Cmd, buffer->GetRaw(),
+										  buffer->GetSize());
 }
 
 void BufferFragmentToCompute(const CommandBuffer& cmd, RawGpuBuffer* buffer)
 {
 	Assert(buffer != nullptr);
 
-	rx_gpu_cmd_buffer_fragment_to_compute(gGraphics->GetDevice()->GetRustDevice(), cmd.Cmd, RxRaw(buffer->Buffer),
-										  buffer->Size);
+	rx_gpu_cmd_buffer_fragment_to_compute(gGraphics->GetDevice()->GetRustDevice(), cmd.Cmd, buffer->GetRaw(),
+										  buffer->GetSize());
 }
 
 } // namespace BarrierHelper

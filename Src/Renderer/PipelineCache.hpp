@@ -14,6 +14,7 @@
 #include <thread>
 #include <Core/HashMap.hpp>
 #include <vector>
+#include <raptor_ffi.h>
 
 namespace fx::renderer {
 
@@ -23,6 +24,9 @@ class PipelineCache
 public:
 	PipelineCache();
 	~PipelineCache();
+
+	PipelineCache(const PipelineCache&) = delete;
+	PipelineCache& operator=(const PipelineCache&) = delete;
 
 	Pipeline& Request(const ePipelineName name);
 	ePipelineName GetName(const Pipeline* pipeline) const;
@@ -95,23 +99,14 @@ public:
 	template <typename TFunc>
 	void ForEachPassPipeline(const ePipelinePass pass, TFunc&& fn) const
 	{
-		const std::vector<PipelineHandle>& pipelines = mPassPipelines[static_cast<uint32>(pass)];
-
 		for (size_t i = 0;; i++) {
-			PipelineHandle handle;
+			uint32 handle = RX_INVALID_INDEX;
 
-			{
-				// Not held while `fn` runs, as it can make pipelines and add to the list
-				std::lock_guard lock(mMutex);
-
-				if (i >= pipelines.size()) {
-					break;
-				}
-
-				handle = pipelines[i];
+			if (rx_pipeline_registry_pass_pipeline(mpRegistry, static_cast<uint32>(pass), i, &handle) == 0) {
+				break;
 			}
 
-			fn(handle);
+			fn(PipelineHandle { handle });
 		}
 	}
 
@@ -126,19 +121,6 @@ public:
 
 private:
 	void Reset();
-
-	struct KeyEntry
-	{
-		PipelineKey Key;
-		Hash64 Hash = 0;
-		bool bRegistered = false;
-	};
-
-	struct VariantInfo
-	{
-		ePipelinePass Pass = ePipelinePass::Count;
-		ePipelineFeatures Features = ePipelineFeatures::None;
-	};
 
 	struct DynamicPipeline
 	{
@@ -159,32 +141,17 @@ private:
 	SizedArray<Pipeline> mCache;
 	SizedArray<SizedArray<uint32>> mOffsets;
 
-	/// The pipelines made from descriptions, after the ones in mCache. Filled in order, and each is stored once it is
-	/// set up so a reader that finds it sees all of it.
+	/// Keys, variants and handles for the pipelines made from descriptions are tracked by the Rust registry
+	RxPipelineRegistry* mpRegistry = nullptr;
+
+	/// The pipelines made from descriptions, after the ones in mCache. Each is stored once it is set up so a reader that
+	/// finds it sees all of it.
 	std::atomic<DynamicPipeline*> mDynamic[scMaxDynamicPipelines];
-	std::atomic<uint32> mDynamicCount { 0 };
 
-	/// The pipeline (as a handle index) for each pass and set of features, or PipelineHandle::scInvalidIndex
-	std::atomic<uint32> mVariants[scNumPipelinePasses][scNumFeatureCombinations];
-
-	/////////////////////////////////////
-	// Mutex guarded below:
-	/////////////////////////////////////
-
+	/// Guards creating a pipeline and queueing it to be built, and the pass templates
 	mutable std::mutex mMutex;
 
-	/// Indexed by handle
-	std::vector<KeyEntry> mKeys;
-	std::vector<VariantInfo> mVariantInfos;
-
-	HashMap<Hash64, PipelineHandle> mKeyLookup;
-
-	std::vector<PipelineHandle> mPassPipelines[scNumPipelinePasses];
 	PassTemplate mPassTemplates[scNumPipelinePasses];
-
-	/// Dynamic pipelines waiting for the main thread to build them
-	std::vector<uint32> mPending;
-	std::atomic<bool> mbHasPending { false };
 
 	std::thread::id mMainThread;
 

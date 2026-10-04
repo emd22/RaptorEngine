@@ -125,7 +125,7 @@ bool ShadowAtlas::MakeShadowDesc(ePipelineFeatures features, PipelineDesc& out_d
 		// Set 0 (Global / Per Frame)
 		pso.AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0, gObjectManager->GetPageSize());
 		pso.AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
-					  gMaterialManager->MaterialPropertiesBuffer.Size);
+					  gMaterialManager->MaterialPropertiesBuffer.GetSize());
 
 		if (is_masked || is_skinned) {
 			// Set 1 (Object local), the material's own descriptors. Only the albedo is read.
@@ -159,7 +159,7 @@ void ShadowAtlas::BeginRegion(const ShadowAtlasRegion& region)
 	Assert(target != nullptr);
 
 	// The image only reaches the sampled layout after its first pass
-	if (target->Image.ImageLayout != scAtlasLayout) {
+	if (target->Image.GetLayout() != scAtlasLayout) {
 		BarrierHelper::ImageLayoutTransition(&target->Image, scAtlasLayout, cmd, 0, 1);
 	}
 

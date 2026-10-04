@@ -69,7 +69,7 @@ const String Shader::GetProgramPath() const
 }
 
 
-Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const SizedArray<ShaderMacro>& macros)
+ShaderProgram Shader::LoadUncachedProgram(eShaderType shader_type, const SizedArray<ShaderMacro>& macros)
 {
 	String source_path = GetSourcePath();
 	const char* c_source_path = source_path.CStr();
@@ -100,18 +100,13 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
 	Hash64 program_id = Shader::GenerateShaderId(shader_type, macros);
 	LogDebug(LC_SHADER, "Getting program from {} (Id={})", Name, program_id);
 
-	// Create the program
-	Ref<ShaderProgram> program = MakeRef<ShaderProgram>();
-	program->ShaderType = shader_type;
-	program->pShader = this;
-
 	// Check for the program in the DataPack
 	// DataPackEntry* dp_entry = mDataPack.QuerySection(program_id);
 	ProgramData program_data = ShaderCompiler::GetProgramData(program_id, mDataPack);
 
 	// If there is no compiled version of the program in the DataPack, compile it and save it to disk.
 	if (!program_data.IsValid()) {
-		return Ref<ShaderProgram> { nullptr };
+		return ShaderProgram {};
 		// LogWarning(LC_SHADER, "Shader was not found in datapack, recompiling...");
 		// RecompileShader(GetSourcePath(), program_path, macros);
 
@@ -128,42 +123,31 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
 		Assert(program_data.pProgramData.Size == MathUtil::AlignValue<4>(program_data.pProgramData.Size));
 		Assert(program_data.pProgramData.Size > 0);
 
-		CreateShaderModule(*program, program_data.pProgramData.Size,
-						   reinterpret_cast<uint32*>(program_data.pProgramData.pData), program->InternalShader);
-
-		// Now that the shader is officially loaded, move over the reflection data.
-		program->Reflection = std::move(program_data.Reflection);
-
-		if (shader_type == eShaderType::Vertex) {
-			program->InputLocationMask = rx_spirv_input_location_mask(
-				reinterpret_cast<const uint32*>(program_data.pProgramData.pData),
-				program_data.pProgramData.Size / sizeof(uint32));
-		}
-		// program->PrintReflection();
-		return program;
+		return ShaderProgram::Create(shader_type, this, reinterpret_cast<uint32*>(program_data.pProgramData.pData),
+									 program_data.pProgramData.Size / sizeof(uint32), program_data.Reflection);
 	}
 
 	// Previously, there used to be logic here to force load from the data pack. Since data pack loading is now handled
 	// by the shader compiler, we should not need to handle this case.
 	LogError(LC_SHADER, "Shader: No data available");
 
-	return program;
+	return ShaderProgram {};
 }
 
 
-Ref<ShaderProgram> Shader::GetProgram(eShaderType shader_type, const SizedArray<ShaderMacro>& macros)
+ShaderProgram Shader::GetProgram(eShaderType shader_type, const SizedArray<ShaderMacro>& macros)
 {
 	ProgramCache& cached_type = mCachedTypes[static_cast<uint32>(shader_type)];
 
 	const Hash64 macro_hash = HashMacros(macros, FX_HASH64_FNV1A_INIT);
-	Ref<ShaderProgram>* cached_program = cached_type.Programs.Find(macro_hash);
+	ShaderProgram* cached_program = cached_type.Programs.Find(macro_hash);
 
 	if (cached_program != nullptr) {
 		return *cached_program;
 	}
 
 	// Program has not been cached, load it from the data pack or compile it, and save it back to the cache.
-	Ref<ShaderProgram> program = LoadUncachedProgram(shader_type, macros);
+	ShaderProgram program = LoadUncachedProgram(shader_type, macros);
 	cached_type.Programs.Insert(macro_hash, program);
 
 	return program;
@@ -184,84 +168,76 @@ void Shader::RecompileShader(const String& source_path, const String& compiled_p
 }
 
 
-void ShaderProgram::BuildDescriptor()
+ShaderProgram::ShaderProgram(const ShaderProgram& other) : mpRecord(other.mpRecord)
 {
-	DsLayoutBuilder layout_builder {};
+	if (mpRecord != nullptr) {
+		rx_shader_program_retain(mpRecord);
+	}
+}
 
-	uint32 binding_index = 0;
+ShaderProgram::ShaderProgram(ShaderProgram&& other) noexcept : mpRecord(other.mpRecord) { other.mpRecord = nullptr; }
 
-	bool has_dynamic_offsets = false;
-
-	for (const ShaderReflectionEntry& refl_entry : Reflection) {
-		if (ShaderReflectionUtil::RequiresOffset(refl_entry.Type)) {
-			has_dynamic_offsets = true;
-		}
-
-		layout_builder.AddBinding(binding_index++, ShaderReflectionUtil::TypeToVkDescriptorType(refl_entry.Type),
-								  ShaderType);
+ShaderProgram& ShaderProgram::operator=(const ShaderProgram& other)
+{
+	if (mpRecord == other.mpRecord) {
+		return *this;
 	}
 
-	if (!layout_builder.HasBindings()) {
+	Release();
+
+	mpRecord = other.mpRecord;
+
+	if (mpRecord != nullptr) {
+		rx_shader_program_retain(mpRecord);
+	}
+
+	return *this;
+}
+
+ShaderProgram& ShaderProgram::operator=(ShaderProgram&& other) noexcept
+{
+	if (this == &other) {
+		return *this;
+	}
+
+	Release();
+
+	mpRecord = other.mpRecord;
+	other.mpRecord = nullptr;
+
+	return *this;
+}
+
+ShaderProgram ShaderProgram::Create(eShaderType type, Shader* shader, const uint32* code, uint32 word_count,
+									const SizedArray<ShaderReflectionEntry>& reflection)
+{
+	int32 status = 0;
+
+	ShaderProgram program;
+
+	program.mpRecord = rx_shader_program_new(gGraphics->GetDevice()->GetRustDevice(), code, word_count,
+											 reinterpret_cast<const RxReflectionEntry*>(reflection.pData),
+											 reflection.Size, static_cast<uint32>(type), shader, &status);
+
+	if (program.mpRecord == nullptr) {
+		LogError(LC_SHADER, "Could not create Vulkan shader module: {}", Util::ResultToStr(static_cast<VkResult>(status)));
+	}
+
+	return program;
+}
+
+void ShaderProgram::Release()
+{
+	if (mpRecord == nullptr) {
 		return;
 	}
 
-	layout_builder.Build();
+	GraphicsBackend* graphics = gGraphics;
 
-	// Descriptor.Create(gRenderer->pDeferredRenderer->DescriptorPool, layout_builder.Build(), has_dynamic_offsets);
+	rx_shader_program_release(mpRecord, (graphics != nullptr) ? graphics->GetDevice()->GetRustDevice() : nullptr);
+	mpRecord = nullptr;
 }
 
-
-void ShaderProgram::Bind(const CommandBuffer& cmd, const Pipeline& pipeline, const ShaderBindOptions& bind_options)
-{
-	// for (const ShaderDescriptorId& ds_id : Descriptors) {
-	//     Ref<DescriptorSet> ds = gDescriptorCache->Request(ds_id);
-	//     if (bind_options.bUseOffset && ds->HasDynamicOffsets()) {
-	//         ds->BindWithOffset(ds_id.Set, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline, bind_options.BufferOffset);
-	//         continue;
-	//     }
-
-	//     ds->Bind(ds_id.Set, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-	// }
-}
-
-void ShaderProgram::PrintReflection()
-{
-	LogInfo(LC_SHADER, "Shader '{}' ({}) reflection:", pShader->GetName(), ShaderUtil::TypeToName(ShaderType));
-
-	for (const ShaderReflectionEntry& entry : Reflection) {
-		LogInfo(LC_SHADER, "\tType: {}, Set={}, Binding={}", ShaderReflectionUtil::GetName(entry.Type), entry.Set,
-				entry.Binding);
-	}
-
-	LogInfo(LC_SHADER, "");
-}
-
-void ShaderProgram::Destroy()
-{
-	if (InternalShader == nullptr) {
-		return;
-	}
-
-	rx_gpu_shader_module_destroy(gGraphics->GetDevice()->GetRustDevice(), RxRaw(InternalShader));
-
-	InternalShader = nullptr;
-}
-
-
-void Shader::CreateShaderModule(ShaderProgram& program, uint32 file_size, uint32* raw_data,
-								VkShaderModule& shader_module)
-{
-	uint64 handle = 0;
-
-	const VkResult status = static_cast<VkResult>(rx_gpu_shader_module_create(
-		gGraphics->GetDevice()->GetRustDevice(), raw_data, file_size / sizeof(uint32), &handle));
-
-	if (status != VK_SUCCESS) {
-		LogError(LC_SHADER, "Could not create Vulkan shader module: {}", Util::ResultToStr(status));
-		return;
-	}
-
-	shader_module = RxFromRaw<VkShaderModule>(handle);
-}
+ShaderProgram::~ShaderProgram() { Release(); }
 
 } // namespace fx::renderer

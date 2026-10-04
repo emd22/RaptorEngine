@@ -1,0 +1,21 @@
+[package]
+name = "raptor-app"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+build = "build.rs"
+
+[[bin]]
+name = "raptor"
+path = "src/main.rs"
+test = false
+
+[features]
+default = ["editor"]
+editor = []
+
+[dependencies]
+raptor-ffi = { path = "../raptor-ffi" }
+
+[lints]
+workspace = true

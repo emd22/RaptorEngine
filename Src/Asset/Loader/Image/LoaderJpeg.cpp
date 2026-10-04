@@ -55,7 +55,7 @@ eLoaderStatus LoaderJpeg::Load(AssetTicket& ticket, const std::string& path)
 	int32 num_jpeg_components = mJpegInfo.output_components;
 
 	printf("Read jpeg, [width=%u, height=%u]\n", mJpegInfo.output_width, mJpegInfo.output_height);
-	image->Info.Size = Vec2u { mJpegInfo.output_width, mJpegInfo.output_height };
+	image->SetSize(Vec2u { mJpegInfo.output_width, mJpegInfo.output_height });
 
 	uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * num_jpeg_components;
 	mImageData.InitSize(data_size);
@@ -96,7 +96,7 @@ eLoaderStatus LoaderJpeg::Load(AssetTicket& ticket, const uint8* data, uint32 si
 	mJpegInfo.out_color_space = color_space;
 
 	jpeg_start_decompress(&mJpegInfo);
-	image->Info.Size = Vec2u { mJpegInfo.output_width, mJpegInfo.output_height };
+	image->SetSize(Vec2u { mJpegInfo.output_width, mJpegInfo.output_height });
 
 	uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * num_components;
 	mImageData.InitSize(data_size);
@@ -119,7 +119,7 @@ void LoaderJpeg::CreateGpuResource(AssetTicket& ticket)
 {
 	Image* image = static_cast<Image*>(ticket.Get());
 
-	ImageInfo image_info { image->Info.Size, ImageFormat, 0, 1,
+	ImageInfo image_info { image->GetSize(), ImageFormat, 0, 1,
 						   MakeSlice<const uint8>(mImageData.pData, mImageData.Size) };
 
 	// Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.

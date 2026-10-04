@@ -1,7 +1,7 @@
 use ash::prelude::VkResult;
 use ash::vk;
 
-use crate::{Device, Error, ImageFormat, Level, Result};
+use crate::{Device, Error, ImageFormat, Level, QueueKind, Result};
 
 #[derive(Clone, Copy, Debug)]
 pub struct SwapchainRequest
@@ -142,13 +142,9 @@ impl Device
 		(result, index)
 	}
 
-	/// # Safety
-	///
-	/// `queue` must be a queue of this device that supports presentation, and must not be in use on
-	/// another thread.
-	pub unsafe fn queue_present(
+	/// Presents on the present queue while holding the queue lock.
+	pub fn queue_present(
 		&self,
-		queue: vk::Queue,
 		swapchain: vk::SwapchainKHR,
 		wait_semaphore: vk::Semaphore,
 		image_index: u32,
@@ -163,8 +159,12 @@ impl Device
 			.swapchains(&swapchains)
 			.image_indices(&indices);
 
-		// SAFETY: guaranteed by the caller.
-		unsafe { (self.swapchain_loader().fp().queue_present_khr)(queue, &info) }
+		let _queues = self.lock_queues();
+
+		// SAFETY: the queue and swapchain belong to this device, and the queue lock is held.
+		unsafe {
+			(self.swapchain_loader().fp().queue_present_khr)(self.queue(QueueKind::Present), &info)
+		}
 	}
 }
 

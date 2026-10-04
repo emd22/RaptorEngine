@@ -1,13 +1,9 @@
 use std::ffi::{c_char, c_void};
 
 use ash::vk::{self, Handle};
-use raptor_gpu::{
-	Buffer, BufferType, CopyError, Image, ImageDesc, ImageFormat, ImageType, Memory, MipChain,
-	mip_dimensions,
-};
+use raptor_gpu::{BufferType, CopyError, ImageFormat, ImageType, Memory, MipChain, mip_dimensions};
 
 use crate::gpu::RxGpuDevice;
-use crate::gpu_resources::{RxGpuAllocation, RxGpuAllocator};
 
 fn format(raw: u16) -> ImageFormat
 {
@@ -129,7 +125,7 @@ pub extern "C" fn rx_buffer_type_name(raw: u32) -> *const c_char
 		.as_ptr()
 }
 
-fn memory(raw: u32) -> Memory
+pub(crate) fn memory(raw: u32) -> Memory
 {
 	match raw {
 		1 => Memory::AutoPreferDevice,
@@ -138,43 +134,6 @@ fn memory(raw: u32) -> Memory
 		4 => Memory::CpuToGpu,
 		5 => Memory::GpuToCpu,
 		_ => Memory::Auto,
-	}
-}
-
-/// # Safety
-///
-/// `allocator` must be live. The outputs must be writable.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_buffer_create_typed(
-	allocator: *const RxGpuAllocator,
-	buffer_type: u32,
-	size: u64,
-	memory_usage: u32,
-	flags: u16,
-	out_buffer: *mut u64,
-	out_allocation: *mut *mut RxGpuAllocation,
-	out_mapped: *mut *mut c_void,
-) -> i32
-{
-	let Some(buffer_type) = BufferType::from_raw(buffer_type) else {
-		return vk::Result::ERROR_INITIALIZATION_FAILED.as_raw();
-	};
-
-	// SAFETY: guaranteed by the caller.
-	let allocator = unsafe { &(*allocator).0 };
-
-	// SAFETY: the allocator is live.
-	match unsafe { Buffer::create(allocator, buffer_type, size, memory(memory_usage), flags) } {
-		Ok(buffer) => {
-			// SAFETY: guaranteed by the caller.
-			unsafe {
-				*out_buffer = buffer.handle.as_raw();
-				*out_allocation = Box::into_raw(Box::new(RxGpuAllocation(buffer.allocation)));
-				*out_mapped = buffer.mapped.cast();
-			}
-			vk::Result::SUCCESS.as_raw()
-		}
-		Err(error) => error.as_raw(),
 	}
 }
 
@@ -217,87 +176,6 @@ pub struct RxImageDesc
 	pub cube_count: u32,
 	pub initial_layout: i32,
 	pub is_target: u8,
-}
-
-/// # Safety
-///
-/// `device` and `allocator` must be live, `desc` valid, and the outputs writable.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_image_create_full(
-	device: *const RxGpuDevice,
-	allocator: *const RxGpuAllocator,
-	desc: *const RxImageDesc,
-	out_image: *mut u64,
-	out_view: *mut u64,
-	out_allocation: *mut *mut RxGpuAllocation,
-) -> i32
-{
-	// SAFETY: guaranteed by the caller.
-	let (device, allocator, desc) = unsafe { (&(*device).device, &(*allocator).0, &*desc) };
-
-	let (Some(image_type), Ok(format)) = (
-		ImageType::from_raw(desc.image_type),
-		u16::try_from(desc.format),
-	) else {
-		return vk::Result::ERROR_INITIALIZATION_FAILED.as_raw();
-	};
-
-	let desc = ImageDesc {
-		image_type,
-		size: (desc.width, desc.height),
-		mips: desc.mips,
-		format: ImageFormat::from_raw(format).unwrap_or(ImageFormat::None),
-		tiling: vk::ImageTiling::from_raw(desc.tiling),
-		usage: vk::ImageUsageFlags::from_raw(desc.usage),
-		aspect: vk::ImageAspectFlags::from_raw(desc.aspect),
-		is_target: desc.is_target != 0,
-		cube_count: desc.cube_count,
-		initial_layout: vk::ImageLayout::from_raw(desc.initial_layout),
-	};
-
-	// SAFETY: the device and allocator are live and belong together.
-	match unsafe { Image::create(device, allocator, &desc) } {
-		Ok(image) => {
-			// SAFETY: guaranteed by the caller.
-			unsafe {
-				*out_image = image.image.as_raw();
-				*out_view = image.view.as_raw();
-				*out_allocation = Box::into_raw(Box::new(RxGpuAllocation(image.allocation)));
-			}
-			vk::Result::SUCCESS.as_raw()
-		}
-		Err(error) => error.as_raw(),
-	}
-}
-
-/// # Safety
-///
-/// The handles must come from `rx_gpu_image_create_full` on this device and allocator and not be in
-/// use. `view` may be 0. `allocation` must not be used afterwards.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_image_destroy_full(
-	device: *const RxGpuDevice,
-	allocator: *const RxGpuAllocator,
-	image: u64,
-	view: u64,
-	allocation: *mut RxGpuAllocation,
-)
-{
-	if allocation.is_null() {
-		return;
-	}
-
-	// SAFETY: guaranteed by the caller.
-	unsafe {
-		let allocation = Box::from_raw(allocation);
-
-		Image {
-			image: vk::Image::from_raw(image),
-			view: vk::ImageView::from_raw(view),
-			allocation: allocation.0,
-		}
-		.destroy(&(*device).device, &(*allocator).0);
-	}
 }
 
 /// # Safety

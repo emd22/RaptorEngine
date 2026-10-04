@@ -156,7 +156,7 @@ void FontAtlas::Upload(Image& out_image)
 				.imageExtent = VkExtent3D { .width = AtlasSize.X, .height = AtlasSize.Y, .depth = 1 },
 			};
 
-			vkCmdCopyBufferToImage(cmd, rgba_staging.Buffer, out_image.Get(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+			vkCmdCopyBufferToImage(cmd, rgba_staging.Get(), out_image.Get(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
 								   &copy);
 
 			renderer::BarrierHelper::ImageLayoutTransition(&out_image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 0,

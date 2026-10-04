@@ -2,7 +2,7 @@ use std::ffi::{CStr, c_char};
 
 use ash::{khr, vk};
 
-use crate::{Error, Instance, Level, Log, Result};
+use crate::{Error, Instance, Level, Log, QueueKind, Result};
 
 pub const NULL_QUEUE: u32 = u32::MAX;
 
@@ -39,11 +39,13 @@ pub struct Device
 	instance: ash::Instance,
 	surface_loader: khr::surface::Instance,
 	swapchain_loader: khr::swapchain::Device,
+	debug_utils: Option<ash::ext::debug_utils::Device>,
 	surface: vk::SurfaceKHR,
 	raw: ash::Device,
 	physical: vk::PhysicalDevice,
 	families: QueueFamilies,
 	queues: [vk::Queue; 3],
+	queue_lock: std::sync::Mutex<()>,
 	caps: DeviceCaps,
 	log: std::sync::Arc<dyn Log>,
 }
@@ -175,16 +177,21 @@ impl Device
 		);
 
 		let swapchain_loader = khr::swapchain::Device::new(&raw_instance, &raw);
+		let debug_utils = instance
+			.debug_utils_enabled()
+			.then(|| ash::ext::debug_utils::Device::new(&raw_instance, &raw));
 
 		Ok(Self {
 			instance: raw_instance,
 			surface_loader,
 			swapchain_loader,
+			debug_utils,
 			surface,
 			raw,
 			physical,
 			families,
 			queues,
+			queue_lock: std::sync::Mutex::new(()),
 			caps,
 			log,
 		})
@@ -198,6 +205,20 @@ impl Device
 	pub(crate) fn swapchain_loader(&self) -> &khr::swapchain::Device
 	{
 		&self.swapchain_loader
+	}
+
+	pub fn set_object_name(&self, object_type: vk::ObjectType, handle: u64, name: &CStr) -> bool
+	{
+		let Some(debug_utils) = self.debug_utils.as_ref() else {
+			return false;
+		};
+
+		let mut info = vk::DebugUtilsObjectNameInfoEXT::default().object_name(name);
+		info.object_type = object_type;
+		info.object_handle = handle;
+
+		// SAFETY: the handle belongs to this device and the info outlives the call.
+		unsafe { debug_utils.set_debug_utils_object_name(&info) }.is_ok()
 	}
 
 	pub fn physical(&self) -> vk::PhysicalDevice
@@ -220,19 +241,18 @@ impl Device
 		self.families
 	}
 
-	pub fn graphics_queue(&self) -> vk::Queue
+	pub fn queue(&self, kind: QueueKind) -> vk::Queue
 	{
-		self.queues[0]
+		self.queues[kind as usize]
 	}
 
-	pub fn present_queue(&self) -> vk::Queue
+	/// Queues are externally synchronised, and the graphics, present and transfer queues may be the
+	/// same queue, so one lock covers all of them.
+	pub fn lock_queues(&self) -> std::sync::MutexGuard<'_, ()>
 	{
-		self.queues[1]
-	}
-
-	pub fn transfer_queue(&self) -> vk::Queue
-	{
-		self.queues[2]
+		self.queue_lock
+			.lock()
+			.unwrap_or_else(std::sync::PoisonError::into_inner)
 	}
 
 	pub fn caps(&self) -> DeviceCaps
@@ -242,7 +262,9 @@ impl Device
 
 	pub fn wait_idle(&self)
 	{
-		// SAFETY: the device is alive.
+		let _queues = self.lock_queues();
+
+		// SAFETY: the device is alive, and no other thread is using a queue while the lock is held.
 		let _ = unsafe { self.raw.device_wait_idle() };
 	}
 

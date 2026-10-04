@@ -31,23 +31,26 @@ Raptor is a 3D game engine being developed for an experimental game.
 
 ## Building
 
-To build the engine, make sure you have CMake installed.
+Raptor is built with Cargo. The Rust workspace in `SrcRS/` is the entry point: `raptor-app` builds the remaining C++
+engine as a static library through CMake (in `SrcRS/target/cmake/`) and links it into the `raptor` executable, so you
+need Rust, CMake, Ninja, the Vulkan SDK, wxWidgets (for the editor), SDL3, freetype, turbojpeg, ktx and LLVM
+installed.
 
 ### Building for MacOS
 
-You can use `cmake` to generate the project files. To build with Ninja, you use one of the generated build targets.
-For example,
-
 ```
-# Generate the project or build files
-cmake -GNinja -DUSE_SIMDE=Off -DUSE_MOLTENVK=On .
+cd SrcRS
 
-# Build Raptor
-ninja
+# Build Raptor. `--release` builds the C++ as RelWithDebInfo, without it as Debug.
+# VULKAN_SDK is found in ~/VulkanSDK if it is not set.
+cargo build --release -p raptor-app
 
-# Run the executable. Replace `Debug` with the optimization level you built with.
-./build/Debug/raptor
+# Run it from the repository root (or anywhere, assets are found through FX_BASE_DIR)
+../SrcRS/target/release/raptor
 ```
+
+Pass `--no-default-features` to leave out the editor. Set `RAPTOR_SKIP_CPP=1` to skip the C++ build, for example to
+run `cargo check` or `cargo clippy` over the Rust crates only. `RAPTOR_CMAKE_CONFIG` overrides the CMake configuration.
 
 ## Platforms Supported
 

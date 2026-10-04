@@ -96,12 +96,12 @@ public:
 
 	FX_FORCE_INLINE void SetDepthCompareOp(VkCompareOp op) { mProperties.DepthCompareOp = op; }
 
-	FX_FORCE_INLINE Ref<ShaderProgram> GetShaderProgram(eShaderType shader_type)
+	FX_FORCE_INLINE ShaderProgram GetShaderProgram(eShaderType shader_type)
 	{
 		return mShaderPrograms[static_cast<uint32>(shader_type) - 1];
 	}
 
-	FX_FORCE_INLINE void SetShaderProgram(eShaderType shader_type, const Ref<ShaderProgram>& program)
+	FX_FORCE_INLINE void SetShaderProgram(eShaderType shader_type, const ShaderProgram& program)
 	{
 		mShaderPrograms[static_cast<uint32>(shader_type) - 1] = program;
 	}
@@ -117,7 +117,7 @@ private:
 	std::vector<VkDescriptorSetLayout> BuildDescriptorSets();
 	bool HasDescriptorsToBuild() const;
 
-	bool CheckDescriptorsAgainstProgram(const Ref<ShaderProgram>& program) const;
+	bool CheckDescriptorsAgainstProgram(const ShaderProgram& program) const;
 	void CheckDescriptorsAgainstShader() const;
 
 public:
@@ -138,7 +138,7 @@ private:
 	eShaderName mShaderName = eShaderName::NumShaders;
 	Hash64 mMacroHash = 0;
 
-	StackArray<Ref<ShaderProgram>, (ShaderNameUtil::scNumShaders)> mShaderPrograms;
+	StackArray<ShaderProgram, (ShaderNameUtil::scNumShaders)> mShaderPrograms;
 
 	StackArray<PushConstants, ShaderUtil::scNumShaderTypes> mPushConstants;
 

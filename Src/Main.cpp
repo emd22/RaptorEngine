@@ -30,7 +30,7 @@ using namespace fx;
 using namespace fx::renderer;
 
 
-int main(int argc, char** argv)
+extern "C" int RaptorMain(int argc, char** argv)
 {
 	fx::gEnginePool = new fx::MemPool;
 	fx::gEnginePool->Create(FX_MEMORY_ENGINE_POOL_SIZE);

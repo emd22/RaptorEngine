@@ -29,34 +29,20 @@ void RenderStage::Create(const char* name, const Vec2u& size, eSizeDivisor size_
 
 Target* RenderStage::GetTarget(eImageFormat format, int32 sub_index)
 {
-	for (Target& attachment : mOutputTargets.Targets) {
-		if (attachment.Image.Info.Format == format) {
-			if ((sub_index--) > 0) {
-				continue;
-			}
+	const int32 index = GetTargetIndex(format, sub_index);
 
-			return &attachment;
-		}
-	}
-
-	return nullptr;
+	return (index >= 0) ? &mOutputTargets.Targets[index] : nullptr;
 }
 
 int32 RenderStage::GetTargetIndex(eImageFormat format, int32 sub_index)
 {
-	for (int32 i = 0; i < mOutputTargets.Targets.Size; i++) {
-		const Target& target = mOutputTargets.Targets[i];
+	std::vector<uint16> formats;
 
-		if (target.Image.Info.Format == format) {
-			if ((sub_index--) > 0) {
-				continue;
-			}
-
-			return i;
-		}
+	for (const Target& target : mOutputTargets.Targets) {
+		formats.push_back(static_cast<uint16>(target.Image.GetFormat()));
 	}
 
-	return -1;
+	return rx_find_format_index(formats.data(), formats.size(), static_cast<uint16>(format), sub_index);
 }
 
 
@@ -149,18 +135,8 @@ void RenderStage::Begin(CommandBuffer& cmd, const VkRect2D& render_area, const V
 
 	// Pipelines leave the viewport and scissor to whoever is drawing, and the target is what decides them. They stay set
 	// across pipeline binds, so this is the only place that sets them.
-	const VkViewport viewport = {
-		.x = static_cast<float32>(draw_area.offset.x),
-		.y = static_cast<float32>(draw_area.offset.y),
-		.width = static_cast<float32>(draw_area.extent.width),
-		.height = static_cast<float32>(draw_area.extent.height),
-		// Flipped depth range, the engine uses reverse Z
-		.minDepth = 1.0f,
-		.maxDepth = 0.0f,
-	};
-
-	vkCmdSetViewport(cmd.Get(), 0, 1, &viewport);
-	vkCmdSetScissor(cmd.Get(), 0, 1, &draw_area);
+	rx_gpu_cmd_set_viewport_scissor(gGraphics->GetDevice()->GetRustDevice(), cmd.Get(), draw_area.offset.x,
+									draw_area.offset.y, draw_area.extent.width, draw_area.extent.height);
 }
 
 void RenderStage::AddTarget(eImageFormat format, VkImageUsageFlags usage, eImageAspectFlag aspect)
@@ -173,17 +149,20 @@ void RenderStage::AddTarget(const Target& attachment) { mOutputTargets.Add(attac
 
 void RenderStage::MakeClearValues()
 {
-	for (const Target& attachment : mOutputTargets.Targets) {
-		if (attachment.bRenderPassOnly || attachment.LoadOp != eLoadOp::Clear) {
-			continue;
-		}
+	std::vector<RxClearTarget> targets;
 
-		if (attachment.Aspect == eImageAspectFlag::Depth) {
-			ClearValues.Insert(VkClearValue { .depthStencil = { 0.0f, 0U } });
-		}
-		else if (attachment.Aspect == eImageAspectFlag::Color) {
-			ClearValues.Insert(VkClearValue { .color = { { 0.0f, 0.0f, 0.0f, 0.0f } } });
-		}
+	for (const Target& attachment : mOutputTargets.Targets) {
+		targets.push_back(RxClearTarget { .aspect = static_cast<uint32>(attachment.Aspect),
+										  .load_op = static_cast<int32>(attachment.LoadOp),
+										  .render_pass_only = attachment.bRenderPassOnly });
+	}
+
+	std::vector<VkClearValue> values(targets.size());
+
+	const size_t count = rx_clear_values(targets.data(), targets.size(), values.data(), values.size());
+
+	for (size_t i = 0; i < count; i++) {
+		ClearValues.Insert(values[i]);
 	}
 }
 
@@ -198,7 +177,7 @@ void RenderStage::CreateFinalStageFramebuffers()
 	image_views.InitSize(1);
 
 	for (uint32 i = 0; i < final_images.Size; i++) {
-		image_views[0] = final_images[i].View;
+		image_views[0] = final_images[i].GetView();
 		mFinalStageFramebuffers[i].Create(image_views, mRenderPass, gGraphics->Swapchain.Extent);
 	}
 }

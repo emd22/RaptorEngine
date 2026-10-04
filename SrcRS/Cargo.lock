@@ -50,6 +50,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raptor-app"
+version = "0.1.0"
+dependencies = [
+ "raptor-ffi",
+]
+
+[[package]]
 name = "raptor-brush"
 version = "0.1.0"
 dependencies = [

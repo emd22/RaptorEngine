@@ -44,54 +44,92 @@ static Vec2u GetMipDimensions(const Vec2u& ml_zero_size, uint32 mip_level)
 	return dimensions;
 }
 
-Image::Image() { mpRefCnt = gEnginePool->Alloc<RefCount>(sizeof(RefCount)); }
+Image::Image() { mpRecord = rx_image_new(); }
 
-Image::Image(const Image& other) { (*this) = other; }
+Image::Image(const Image& other) { ShareOrCopy(other); }
 
-Image::Image(Ref<Image>&& ref) { (*this) = std::move(ref); }
-
-Image& Image::operator=(Ref<Image>&& ref)
+Image::Image(Image&& other) noexcept : ID(other.ID), mpRecord(other.mpRecord)
 {
-	// Set the image properties, move the ref count over.
-	(*this) = *ref;
+	other.mpRecord = nullptr;
+}
 
-	mpRefCnt = ref.mpRefCnt;
-	ref.mpRefCnt = nullptr;
+Image& Image::operator=(const Image& other)
+{
+	if (mpRecord == other.mpRecord) {
+		return *this;
+	}
 
-	ref.DestroyRef();
+	Release();
+
+	ShareOrCopy(other);
 
 	return *this;
 }
 
-
-Image& Image::operator=(const Image& other)
+void Image::ShareOrCopy(const Image& other)
 {
-	// If this image is already established, then we should decrement the ref here.
-	if (mpRefCnt) {
-		DecRef();
+	// Copying an image that has not been created gives a description of it, which is then created on its own.
+	if (other.mpRecord->image == 0 && other.mpRecord->view == 0) {
+		mpRecord = rx_image_new();
+		*mpRecord = *other.mpRecord;
+		return;
 	}
 
-	Aspect = other.Aspect;
+	mpRecord = other.mpRecord;
+	rx_image_retain(mpRecord);
+}
 
-	InternalImage = other.InternalImage;
-	View = other.View;
-
-	ImageLayout = other.ImageLayout;
-	Allocation = other.Allocation;
-
-	Info = other.Info;
-
-	// Set the new ref count
-	mpRefCnt = other.mpRefCnt;
-
-	if (!mpRefCnt) {
-		mpRefCnt = gEnginePool->Alloc<RefCount>(sizeof(RefCount));
+Image& Image::operator=(Image&& other) noexcept
+{
+	if (this == &other) {
+		return *this;
 	}
-	else {
-		mpRefCnt->Inc();
-	}
+
+	Release();
+
+	ID = other.ID;
+	mpRecord = other.mpRecord;
+	other.mpRecord = nullptr;
 
 	return *this;
+}
+
+ImageInfo Image::GetInfo() const
+{
+	ImageInfo info;
+
+	info.Size = GetSize();
+	info.ImageType = static_cast<eImageType>(mpRecord->image_type);
+	info.Format = GetFormat();
+	info.MipLevel = mpRecord->mip_level;
+	info.MipCount = mpRecord->mip_count;
+
+	return info;
+}
+
+void Image::SetInfo(Vec2u size, eImageFormat format, uint32 mip_level, uint32 mip_count)
+{
+	SetSize(size);
+
+	mpRecord->image_type = static_cast<uint16>(eImageType::Flat);
+	mpRecord->format = static_cast<uint16>(format);
+	mpRecord->mip_level = mip_level;
+	mpRecord->mip_count = mip_count;
+}
+
+void Image::WrapExternal(VkImage image, Vec2u size, eImageFormat format)
+{
+	rx_image_wrap_external(mpRecord, renderer::RxRaw(image), size.X, size.Y, static_cast<uint16>(format));
+}
+
+void Image::RecreateColorView()
+{
+	const VkResult status = static_cast<VkResult>(
+		rx_image_recreate_color_view(mpRecord, renderer::gGraphics->GetDevice()->GetRustDevice()));
+
+	if (status != VK_SUCCESS) {
+		ModulePanicVulkan("Could not create image view", status);
+	}
 }
 
 void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format,
@@ -104,25 +142,6 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 
 	Assert(size.X > 0 && size.Y > 0);
 
-	// Destroy image if it already has been created
-	if (InternalImage != nullptr && Allocation != nullptr) {
-		rx_gpu_image_destroy_full(device->GetRustDevice(), gGraphics->GpuAllocator, RxRaw(InternalImage), RxRaw(View),
-								  Allocation);
-
-		InternalImage = nullptr;
-		Allocation = nullptr;
-		View = nullptr;
-	}
-
-	ImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-	Aspect = aspect;
-	Info = ImageInfo { size, format, 0, mips_count, Slice<const uint8>(nullptr, 0) };
-
-	if (!mpRefCnt) {
-		mpRefCnt = gEnginePool->Alloc<RefCount>(sizeof(RefCount));
-	}
-
 	const RxImageDesc desc = {
 		.image_type = static_cast<uint32>(image_type),
 		.width = size.Width(),
@@ -133,22 +152,16 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 		.usage = usage,
 		.aspect = static_cast<uint32>(aspect),
 		.cube_count = cube_count,
-		.initial_layout = static_cast<int32>(ImageLayout),
+		.initial_layout = static_cast<int32>(VK_IMAGE_LAYOUT_UNDEFINED),
 		.is_target = HasFlag(flags, eImageCreateFlags::IsTarget),
 	};
 
-	uint64 image_handle = 0;
-	uint64 view_handle = 0;
-
-	const VkResult status = static_cast<VkResult>(rx_gpu_image_create_full(
-		device->GetRustDevice(), gGraphics->GpuAllocator, &desc, &image_handle, &view_handle, &Allocation));
+	const VkResult status =
+		static_cast<VkResult>(rx_image_create(mpRecord, device->GetRustDevice(), gGraphics->GpuAllocator, &desc));
 
 	if (status != VK_SUCCESS) {
 		ModulePanicVulkan("Could not create vulkan image", status);
 	}
-
-	InternalImage = RxFromRaw<VkImage>(image_handle);
-	View = RxFromRaw<VkImageView>(view_handle);
 
 #ifdef FX_DEBUG_IMAGE_VIEWS
 	std::string image_view_name = "";
@@ -160,7 +173,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 
 		snprintf(name_buffer, 128, "View(%u,%u){%u}", size.Width(), size.Height(), view_allocation_number);
 
-		Util::SetDebugLabel(name_buffer, VK_OBJECT_TYPE_IMAGE_VIEW, View);
+		Util::SetDebugLabel(name_buffer, VK_OBJECT_TYPE_IMAGE_VIEW, GetView());
 	}
 #endif
 }
@@ -191,7 +204,7 @@ void Image::CreateFromData(renderer::CommandBuffer& cmd, const ImageInfo& info, 
 	CopyFromBuffer(cmd, staging_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				   GetMipDimensions(info.Size, info.MipLevel), 0, info.MipLevel);
 
-	Info.MipLevel = info.MipLevel;
+	SetMipLevel(info.MipLevel);
 }
 
 void Image::UploadMip(renderer::CommandBuffer& cmd, uint32 mip_index, const Vec2u& size,
@@ -205,7 +218,7 @@ void Image::UploadMip(renderer::CommandBuffer& cmd, uint32 mip_index, const Vec2
 	const VkImageUsageFlags usage_flags = (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
 										   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
-	Info.MipLevel = std::min(Info.MipLevel, mip_index);
+	SetMipLevel(std::min(GetMipLevel(), mip_index));
 
 	CopyToMip(cmd, staging_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, GetMipDimensions(size, mip_index),
 			  mip_index);
@@ -233,8 +246,8 @@ void Image::Upload(renderer::CommandBuffer& cmd, const ImageInfo& info)
 	renderer::BarrierHelper::ImageLayoutTransition(this, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 0, info.MipCount);
 
 	const int32 copied = rx_gpu_cmd_copy_buffer_to_mips(
-		renderer::gGraphics->GetDevice()->GetRustDevice(), cmd.Get(), renderer::RxRaw(staging_buffer.Buffer),
-		renderer::RxRaw(InternalImage), static_cast<uint16>(info.Format), info.Size.X, info.Size.Y, info.MipCount,
+		renderer::gGraphics->GetDevice()->GetRustDevice(), cmd.Get(), staging_buffer.GetRaw(),
+		GetRawImage(), static_cast<uint16>(info.Format), info.Size.X, info.Size.Y, info.MipCount,
 		static_cast<uint32>(aspect_flag));
 
 	AssertMsg(copied == 0, "Mip level is not 4 byte aligned in the staging buffer");
@@ -244,7 +257,7 @@ void Image::Upload(renderer::CommandBuffer& cmd, const ImageInfo& info)
 												   info.MipCount);
 
 	// Matches CreateFromData(), the most detailed level this image actually holds
-	Info.MipLevel = info.MipLevel;
+	SetMipLevel(info.MipLevel);
 }
 
 
@@ -312,15 +325,15 @@ void Image::CopyFromBuffer(renderer::CommandBuffer& cmd, const renderer::RawGpuB
 		return;
 	}
 
-	if (mip_level < Info.MipLevel) {
-		Info.MipLevel = mip_level;
+	if (mip_level < GetMipLevel()) {
+		SetMipLevel(mip_level);
 	}
 
 
 	renderer::BarrierHelper::ImageLayoutTransition(this, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, mip_level, 1);
 
 	rx_gpu_cmd_copy_buffer_to_region(renderer::gGraphics->GetDevice()->GetRustDevice(), cmd.Get(),
-									 renderer::RxRaw(buffer.Buffer), renderer::RxRaw(InternalImage), mip_level, size.X,
+									 buffer.GetRaw(), GetRawImage(), mip_level, size.X,
 									 size.Y, static_cast<int32>(dst_offset.X), static_cast<int32>(dst_offset.Y));
 
 	renderer::BarrierHelper::ImageLayoutTransition(this, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, mip_level, 1);
@@ -332,7 +345,7 @@ void Image::CopyToMip(renderer::CommandBuffer& cmd, const renderer::RawGpuBuffer
 	renderer::BarrierHelper::ImageLayoutTransition(this, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, mip_level, 1);
 
 	rx_gpu_cmd_copy_buffer_to_region(renderer::gGraphics->GetDevice()->GetRustDevice(), cmd.Get(),
-									 renderer::RxRaw(buffer.Buffer), renderer::RxRaw(InternalImage), mip_level, size.X,
+									 buffer.GetRaw(), GetRawImage(), mip_level, size.X,
 									 size.Y, 0, 0);
 
 	renderer::BarrierHelper::ImageLayoutTransition(this, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, mip_level, 1);
@@ -451,36 +464,29 @@ enum eCubemapLayer
 // 		});
 // }
 
-void Image::DecRef()
+void Image::Release()
 {
-	if (!mpRefCnt) {
+	if (mpRecord == nullptr) {
 		return;
 	}
 
-	if (mpRefCnt->Dec() > 0) {
-		return;
+	renderer::GraphicsBackend* graphics = renderer::gGraphics;
+
+	if (graphics != nullptr) {
+		rx_image_release(mpRecord, graphics->GetDevice()->GetRustDevice(), graphics->GpuAllocator);
+	}
+	else {
+		rx_image_release(mpRecord, nullptr, nullptr);
 	}
 
-	gEnginePool->Free(mpRefCnt);
-	mpRefCnt = nullptr;
-
-	if (InternalImage != nullptr && Allocation != nullptr) {
-		rx_gpu_image_destroy_full(renderer::gGraphics->GetDevice()->GetRustDevice(), renderer::gGraphics->GpuAllocator,
-								  renderer::RxRaw(InternalImage), renderer::RxRaw(View), Allocation);
-	}
-	else if (View != nullptr) {
-		vkDestroyImageView(renderer::gGraphics->GetDevice()->Device, View, nullptr);
-	}
-
-	InternalImage = nullptr;
-	Allocation = nullptr;
-	View = nullptr;
+	mpRecord = nullptr;
 }
 
 
 void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
 {
-	const uint32 data_size = Info.Size.X * Info.Size.Y * ImageFormatUtil::GetPixelStride(Info.Format);
+	const Vec2u image_size = GetSize();
+	const uint32 data_size = image_size.X * image_size.Y * ImageFormatUtil::GetPixelStride(GetFormat());
 
 	SizedArray<uint8> image_data;
 	image_data.InitSize(data_size);
@@ -496,11 +502,11 @@ void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
 				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 				.srcAccessMask = 0,
 				.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-				.oldLayout = ImageLayout,
+				.oldLayout = GetLayout(),
 				.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-				.image = InternalImage,
+				.image = Get(),
 				.subresourceRange = {
 					.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
 					.baseMipLevel = 0,
@@ -523,10 +529,10 @@ void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
 					.baseArrayLayer = 0,
 					.layerCount = 1,
 				},
-				.imageExtent = VkExtent3D { .width = Info.Size.X, .height = Info.Size.Y, .depth = 1 },
+				.imageExtent = VkExtent3D { .width = image_size.X, .height = image_size.Y, .depth = 1 },
 			};
 
-			vkCmdCopyImageToBuffer(cmd, InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, staging_buffer.Buffer, 1,
+			vkCmdCopyImageToBuffer(cmd, Get(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, staging_buffer.Get(), 1,
 								   &copy);
 
 			VkImageMemoryBarrier post_barrier {
@@ -537,7 +543,7 @@ void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
 				.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-				.image = InternalImage,
+				.image = Get(),
 				.subresourceRange = {
 					.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
 					.baseMipLevel = 0,
@@ -550,20 +556,20 @@ void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
 			vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0,
 								 nullptr, 0, nullptr, 1, &post_barrier);
 
-			ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 			staging_buffer.Map();
-			memcpy(image_data.pData, staging_buffer.pMappedBuffer, data_size);
+			memcpy(image_data.pData, staging_buffer.GetMapped(), data_size);
 			staging_buffer.UnMap();
 			staging_buffer.Destroy();
 		});
 
 
-	loader::LoaderStb::SaveToFile(file_format, image_data, Info.Size, path, eImageSaveFlags::None);
+	loader::LoaderStb::SaveToFile(file_format, image_data, image_size, path, eImageSaveFlags::None);
 }
 
 
-Image::~Image() { DecRef(); }
+Image::~Image() { Release(); }
 
 
 } // namespace fx

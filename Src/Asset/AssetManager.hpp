@@ -44,13 +44,12 @@ struct AssetDeletionTicket
 
 	struct BufferTicket
 	{
-		VkBuffer Buffer = VK_NULL_HANDLE;
-		RxGpuAllocation* Allocation = nullptr;
+		RxBuffer* pRecord = nullptr;
 	};
 
 public:
-	AssetDeletionTicket(uint32 current_frame, const renderer::RawGpuBuffer& gpu_buffer)
-		: Type(eType::Buffer), Value { .Ticket = { .Buffer = gpu_buffer.Buffer, .Allocation = gpu_buffer.Allocation } },
+	AssetDeletionTicket(uint32 current_frame, RxBuffer* buffer_record)
+		: Type(eType::Buffer), Value { .Ticket = { .pRecord = buffer_record } },
 		  MinDeletionFrame(current_frame + scBufferDeletionFrameSpacing)
 	{
 	}
@@ -58,7 +57,7 @@ public:
 	void DeleteImmediate() const;
 	bool TryDelete(uint32 current_frame) const;
 
-	bool IsNull() const { return (Value.Ticket.Allocation == nullptr && Value.Ticket.Buffer == nullptr); }
+	bool IsNull() const { return (Value.Ticket.pRecord == nullptr); }
 
 public:
 	eType Type = eType::None;
@@ -232,7 +231,8 @@ public:
 	// Deletion Functions
 	/////////////////////////////////////
 
-	void DeleteBuffer(const renderer::RawGpuBuffer& buffer)
+	/// Takes ownership of the buffer, which is destroyed once the GPU is done with it.
+	void DeleteBuffer(RxBuffer* buffer_record)
 	{
 		SpinLockContext<Queue<fx::AssetDeletionTicket>> queue = mDeletionTickets.GetQueue();
 
@@ -240,7 +240,7 @@ public:
 			queue->InitCapacity(256);
 		}
 
-		queue->Emplace(renderer::gGraphics->GetElapsedFrameCount(), buffer);
+		queue->Emplace(renderer::gGraphics->GetElapsedFrameCount(), buffer_record);
 		ManagerUpdateNotifier.Signal();
 	}
 

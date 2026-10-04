@@ -5,6 +5,7 @@
 #include <Color.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
+#include <raptor_ffi.h>
 
 namespace fx::renderer {
 
@@ -60,37 +61,30 @@ public:
 
     SizedArray<VkPipelineColorBlendAttachmentState> GetVkAttachments(uint32 count)
     {
+        SizedArray<RxBlendAttachment> rust_attachments(mBlendAttachments.Size);
+
+        for (const BlendAttachment& am : mBlendAttachments) {
+            rust_attachments.Insert(RxBlendAttachment {
+                .enabled = am.Enabled,
+                .write_mask = static_cast<uint32>(am.Mask),
+                .color_op = am.BlendOp.Ops.Color,
+                .alpha_op = am.BlendOp.Ops.Alpha,
+                .src_color = am.ColorBlend.Ops.Src,
+                .dst_color = am.ColorBlend.Ops.Dst,
+                .src_alpha = am.AlphaBlend.Ops.Src,
+                .dst_alpha = am.AlphaBlend.Ops.Dst,
+                .target_index = am.TargetIndex,
+            });
+        }
+
         SizedArray<VkPipelineColorBlendAttachmentState> vk_blend_attachments;
 
         vk_blend_attachments.InitSize(count);
 
-        for (uint32 i = 0; i < count; i++) {
-            BlendAttachment am {};
+        const int32 built = rx_blend_states(rust_attachments.pData, rust_attachments.Size, count,
+                                            vk_blend_attachments.pData);
 
-            vk_blend_attachments[i] = (VkPipelineColorBlendAttachmentState {
-                .blendEnable = 0U,
-                .srcColorBlendFactor = am.ColorBlend.Ops.Src,
-                .dstColorBlendFactor = am.ColorBlend.Ops.Dst,
-                .colorBlendOp = am.BlendOp.Ops.Color,
-                .srcAlphaBlendFactor = am.AlphaBlend.Ops.Src,
-                .dstAlphaBlendFactor = am.AlphaBlend.Ops.Dst,
-                .alphaBlendOp = am.BlendOp.Ops.Alpha,
-                .colorWriteMask = static_cast<VkColorComponentFlags>(am.Mask),
-            });
-        }
-
-        for (const BlendAttachment& am : mBlendAttachments) {
-            vk_blend_attachments[am.TargetIndex] = (VkPipelineColorBlendAttachmentState {
-                .blendEnable = am.Enabled ? 1U : 0U,
-                .srcColorBlendFactor = am.ColorBlend.Ops.Src,
-                .dstColorBlendFactor = am.ColorBlend.Ops.Dst,
-                .colorBlendOp = am.BlendOp.Ops.Color,
-                .srcAlphaBlendFactor = am.AlphaBlend.Ops.Src,
-                .dstAlphaBlendFactor = am.AlphaBlend.Ops.Dst,
-                .alphaBlendOp = am.BlendOp.Ops.Alpha,
-                .colorWriteMask = static_cast<VkColorComponentFlags>(am.Mask),
-            });
-        }
+        AssertMsg(built != 0, "A blend attachment targets an attachment that does not exist");
 
         return vk_blend_attachments;
     }

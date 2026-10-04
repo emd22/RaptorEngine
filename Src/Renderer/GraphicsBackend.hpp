@@ -106,7 +106,7 @@ public:
 
 	FrameData* GetFrame();
 
-	uint32 GetImageIndex() const { return mImageIndex; }
+	uint32 GetImageIndex() const { return (mpFrameLoop != nullptr) ? LoadFrameField(mpFrameLoop->image_index) : 0; }
 	RxGpuAllocator* GetGPUAllocator() { return GpuAllocator; }
 
 	template <typename T>
@@ -141,17 +141,12 @@ public:
 
 		DeletionObject& object = deletion_queue.First();
 
-		const bool is_frame_spaced = (mInternalFrameCounter >= object.DeletionFrameNumber);
+		const bool is_frame_spaced = (GetElapsedFrameCount() >= object.DeletionFrameNumber);
 
 		bool did_delete = false;
 
 		if (immediate || is_frame_spaced) {
-			if (object.bIsGpuBuffer) {
-				rx_gpu_buffer_destroy(GpuAllocator, RxRaw(object.Buffer), object.Allocation);
-			}
-			else {
-				object.Func(&object);
-			}
+			object.Func(&object);
 
 			did_delete = true;
 			deletion_queue.Pop();
@@ -174,12 +169,15 @@ public:
 	// deletion_queue->Push(std::move(obj));
 	// }
 
-	uint32 GetElapsedFrameCount() const { return mInternalFrameCounter.load(); }
-	uint32 GetFrameNumber() const { return mFrameNumber; }
+	uint32 GetElapsedFrameCount() const { return (mpFrameLoop != nullptr) ? LoadFrameField(mpFrameLoop->elapsed) : 0; }
+	uint32 GetFrameNumber() const { return (mpFrameLoop != nullptr) ? LoadFrameField(mpFrameLoop->frame_number) : 0; }
 
 	FX_FORCE_INLINE bool DidResize() const { return bDidFrameResize; }
 
 private:
+	/// The frame loop's counters are atomics on the Rust side, and the asset thread reads them too.
+	static uint32 LoadFrameField(const uint32& field) { return __atomic_load_n(&field, __ATOMIC_RELAXED); }
+
 	void InitVulkan();
 	void CreateSurfaceFromWindow();
 
@@ -330,14 +328,8 @@ private:
 	VkSurfaceKHR mWindowSurface = nullptr;
 	Ref<Window> mpWindow = nullptr;
 
-	SizedArray<Semaphore> mSubmitSemaphores;
-
-	uint32 mImageIndex = 0;
-
-
-protected:
-	uint32 mFrameNumber = 0;
-	std::atomic_uint32_t mInternalFrameCounter = 0;
+	/// Owns the per frame fences and semaphores, the swapchain submit semaphores and the frame counters.
+	RxFrameLoop* mpFrameLoop = nullptr;
 
 	// TSQueue<DeletionObject> mDeletionQueue;
 };

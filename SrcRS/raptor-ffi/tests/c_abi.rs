@@ -2,7 +2,7 @@
 // It's not really dead code, its just exported with a C API
 #![allow(dead_code)]
 
-use std::ffi::{CStr, CString, c_char, c_void};
+use std::ffi::{CStr, c_char, c_void};
 use std::path::PathBuf;
 
 use raptor_config::model::{Entry, Kind, Primitive};

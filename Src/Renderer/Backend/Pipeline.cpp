@@ -25,11 +25,11 @@ void PipelineLayout::Create(const Slice<const PushConstants>& push_constant_defs
 							const Slice<VkDescriptorSetLayout>& descriptor_set_layouts)
 
 {
+	Release();
+
 	StackArray<RxPushConstantDef, ShaderUtil::scNumShaderTypes> rust_defs;
 
 	for (uint32 i = 0; i < push_constant_defs.Size; i++) {
-		mPushConstDefs.Insert(push_constant_defs[i]);
-
 		rust_defs.Insert(RxPushConstantDef { .size = push_constant_defs[i].Size,
 											 .stages = ShaderUtil::ToUnderlyingType(
 												 push_constant_defs[i].ShaderTypes) });
@@ -37,50 +37,77 @@ void PipelineLayout::Create(const Slice<const PushConstants>& push_constant_defs
 
 	static_assert(sizeof(VkDescriptorSetLayout) == sizeof(uint64));
 
-	uint64 handle = 0;
+	int32 status = 0;
 
-	const VkResult status = static_cast<VkResult>(rx_gpu_pipeline_layout_create(
-		gGraphics->GetDevice()->GetRustDevice(), reinterpret_cast<const uint64*>(descriptor_set_layouts.pData),
-		descriptor_set_layouts.Size, rust_defs.pData, rust_defs.Size, &handle));
+	mpRecord = rx_pipeline_layout_new(gGraphics->GetDevice()->GetRustDevice(),
+									  reinterpret_cast<const uint64*>(descriptor_set_layouts.pData),
+									  descriptor_set_layouts.Size, rust_defs.pData, rust_defs.Size, &status);
 
-	if (status != VK_SUCCESS) {
-		ModulePanicVulkan("Failed to create pipeline layout", status);
+	if (mpRecord == nullptr) {
+		ModulePanicVulkan("Failed to create pipeline layout", static_cast<VkResult>(status));
 	}
-
-	InternalLayout = RxFromRaw<VkPipelineLayout>(handle);
 }
 
-PipelineLayout::PipelineLayout(const PipelineLayout& other) { (*this) = other; }
+PipelineLayout::PipelineLayout(const PipelineLayout& other) : mpRecord(other.mpRecord)
+{
+	if (mpRecord != nullptr) {
+		rx_pipeline_layout_retain(mpRecord);
+	}
+}
 
+PipelineLayout::PipelineLayout(PipelineLayout&& other) noexcept : mpRecord(other.mpRecord) { other.mpRecord = nullptr; }
 
 PipelineLayout& PipelineLayout::operator=(const PipelineLayout& other)
 {
-	InheritRef(other);
+	if (mpRecord == other.mpRecord) {
+		return *this;
+	}
 
-	InternalLayout = other.InternalLayout;
-	mPushConstDefs = other.mPushConstDefs;
+	Release();
+
+	mpRecord = other.mpRecord;
+
+	if (mpRecord != nullptr) {
+		rx_pipeline_layout_retain(mpRecord);
+	}
 
 	return *this;
 }
 
-void PipelineLayout::DestroyObject()
+PipelineLayout& PipelineLayout::operator=(PipelineLayout&& other) noexcept
 {
-	if (InternalLayout == nullptr) {
+	if (this == &other) {
+		return *this;
+	}
+
+	Release();
+
+	mpRecord = other.mpRecord;
+	other.mpRecord = nullptr;
+
+	return *this;
+}
+
+void PipelineLayout::Release()
+{
+	if (mpRecord == nullptr) {
 		return;
 	}
 
-	rx_gpu_pipeline_layout_destroy(gGraphics->GetDevice()->GetRustDevice(), RxRaw(InternalLayout));
-	InternalLayout = nullptr;
+	GraphicsBackend* graphics = gGraphics;
+
+	rx_pipeline_layout_release(mpRecord, (graphics != nullptr) ? graphics->GetDevice()->GetRustDevice() : nullptr);
+	mpRecord = nullptr;
 }
 
-PipelineLayout::~PipelineLayout() { ReleaseRef(); }
+PipelineLayout::~PipelineLayout() { Release(); }
 
 
 /////////////////////////////////////
 // Pipeline
 /////////////////////////////////////
 
-void Pipeline::Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shaders,
+void Pipeline::Create(ePipelineName name, const Slice<ShaderProgram>& shaders,
 					  const Slice<VkAttachmentDescription>& attachments,
 					  const Slice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
 					  VertexDescription* vertex_info, const RenderPass& render_pass,
@@ -96,9 +123,9 @@ void Pipeline::Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shade
 	SizedArray<uint32> stage_flags(shaders.Size);
 	SizedArray<uint64> stage_modules(shaders.Size);
 
-	for (const Ref<ShaderProgram>& shader_program : shaders) {
-		stage_flags.Insert(ShaderUtil::ToUnderlyingType(shader_program->ShaderType));
-		stage_modules.Insert(RxRaw(shader_program->Get()));
+	for (const ShaderProgram& shader_program : shaders) {
+		stage_flags.Insert(ShaderUtil::ToUnderlyingType(shader_program.GetType()));
+		stage_modules.Insert(RxRaw(shader_program.Get()));
 	}
 
 	SizedArray<int32> attachment_formats(attachments.Size);
@@ -107,7 +134,7 @@ void Pipeline::Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shade
 		attachment_formats.Insert(attachment.format);
 	}
 
-	DefaultCullMode = properties.CullMode;
+	Destroy();
 
 	const RxGraphicsPipelineDesc desc = {
 		.stage_flags = stage_flags.pData,
@@ -131,71 +158,69 @@ void Pipeline::Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shade
 		.render_pass = RxRaw(render_pass.Get()),
 	};
 
-	uint64 handle = 0;
+	int32 status = 0;
 
-	const VkResult status = static_cast<VkResult>(
-		rx_gpu_graphics_pipeline_create(mDevice->GetRustDevice(), &desc, &handle));
+	mpRecord = rx_pipeline_create_graphics(mDevice->GetRustDevice(), &desc, &status);
 
-	if (status != VK_SUCCESS) {
-		ModulePanicVulkan("Could not create graphics pipeline", status);
+	if (mpRecord == nullptr) {
+		ModulePanicVulkan("Could not create graphics pipeline", static_cast<VkResult>(status));
 	}
 
-	InternalPipeline = RxFromRaw<VkPipeline>(handle);
+	Util::SetDebugLabel(PipelineNameUtil::GetName(name), VK_OBJECT_TYPE_PIPELINE, Get());
 
-	Util::SetDebugLabel(PipelineNameUtil::GetName(name), VK_OBJECT_TYPE_PIPELINE, InternalPipeline);
-
-	LogInfo(LC_RENDER, "Creating pipeline for shader '{}' -> LayoutHandle={:p}", shaders[0]->pShader->GetName(),
+	LogInfo(LC_RENDER, "Creating pipeline for shader '{}' -> LayoutHandle={:p}", shaders[0].GetShader()->GetName(),
 			reinterpret_cast<void*>(Layout.Get()));
 }
 
-void Pipeline::CreateCompute(ePipelineName name, const Ref<ShaderProgram>& shader)
+void Pipeline::CreateCompute(ePipelineName name, const ShaderProgram& shader)
 {
 	mDevice = gGraphics->GetDevice();
 
 	Name = name;
-	bIsCompute = true;
 
 	ComputeShader = shader;
 
-	uint64 handle = 0;
+	Destroy();
 
-	const VkResult status = static_cast<VkResult>(rx_gpu_compute_pipeline_create(
-		mDevice->GetRustDevice(), RxRaw(shader->Get()), RxRaw(Layout.Get()), &handle));
+	int32 status = 0;
 
-	if (status != VK_SUCCESS) {
-		ModulePanicVulkan("Could not create compute pipeline", status);
+	mpRecord = rx_pipeline_create_compute(mDevice->GetRustDevice(), RxRaw(shader.Get()), RxRaw(Layout.Get()),
+										  &status);
+
+	if (mpRecord == nullptr) {
+		ModulePanicVulkan("Could not create compute pipeline", static_cast<VkResult>(status));
 	}
 
-	InternalPipeline = RxFromRaw<VkPipeline>(handle);
+	Util::SetDebugLabel(PipelineNameUtil::GetName(name), VK_OBJECT_TYPE_PIPELINE, Get());
 
-	Util::SetDebugLabel(PipelineNameUtil::GetName(name), VK_OBJECT_TYPE_PIPELINE, InternalPipeline);
-
-	LogInfo(LC_RENDER, "Creating compute pipeline for shader '{}' -> LayoutHandle={:p}", shader->pShader->GetName(),
+	LogInfo(LC_RENDER, "Creating compute pipeline for shader '{}' -> LayoutHandle={:p}", shader.GetShader()->GetName(),
 			reinterpret_cast<void*>(Layout.Get()));
 }
 
 void Pipeline::Bind(const CommandBuffer& cmd) const
 {
-	if (InternalPipeline == cmd.pBoundPipeline) {
+	const VkPipeline pipeline = Get();
+
+	if (pipeline == cmd.pBoundPipeline) {
 		return;
 	}
 
 	RxGpuDevice* device = gGraphics->GetDevice()->GetRustDevice();
 
-	rx_gpu_cmd_bind_pipeline(device, cmd.Cmd, GetBindPoint(), RxRaw(InternalPipeline));
+	rx_gpu_cmd_bind_pipeline(device, cmd.Cmd, GetBindPoint(), RxRaw(pipeline));
 
-	if (!bIsCompute) {
-		rx_gpu_cmd_set_cull_mode(device, cmd.Cmd, DefaultCullMode);
+	if (!IsCompute()) {
+		rx_gpu_cmd_set_cull_mode(device, cmd.Cmd, GetDefaultCullMode());
 	}
 
-	cmd.pBoundPipeline = InternalPipeline;
+	cmd.pBoundPipeline = pipeline;
 }
 
 void Pipeline::SetDoubleSided(const CommandBuffer& cmd, bool double_sided) const
 {
-	if (!bIsCompute) {
+	if (!IsCompute()) {
 		rx_gpu_cmd_set_cull_mode(gGraphics->GetDevice()->GetRustDevice(), cmd.Cmd,
-								 double_sided ? VK_CULL_MODE_NONE : DefaultCullMode);
+								 double_sided ? VK_CULL_MODE_NONE : GetDefaultCullMode());
 	}
 }
 
@@ -208,9 +233,9 @@ void Pipeline::Destroy()
 	// TODO: Remove this
 	mDevice->WaitForIdle();
 
-	if (InternalPipeline) {
-		rx_gpu_pipeline_destroy(mDevice->GetRustDevice(), RxRaw(InternalPipeline));
-		InternalPipeline = nullptr;
+	if (mpRecord != nullptr) {
+		rx_pipeline_destroy(mpRecord, mDevice->GetRustDevice());
+		mpRecord = nullptr;
 	}
 }
 

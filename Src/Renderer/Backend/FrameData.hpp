@@ -16,16 +16,8 @@ struct alignas(16) UniformBufferObject
 struct FrameData
 {
 public:
-    void Create(GpuDevice* device);
-    void Destroy();
-
-public:
     CommandPool CmdPool;
     CommandBuffer CmdBuffer;
-
-    Semaphore ImageAvailable;
-    Semaphore RenderFinished;
-    Fence InFlight;
 };
 
 } // namespace fx::renderer

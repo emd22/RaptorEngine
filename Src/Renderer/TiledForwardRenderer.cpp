@@ -136,7 +136,7 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 												ObjectManager::scBoundSize));
 
 	ds_entries.Insert(DescriptorEntry::AsBuffer(1, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
-												gMaterialManager->MaterialPropertiesBuffer.Size));
+												gMaterialManager->MaterialPropertiesBuffer.GetSize()));
 
 
 	std::pair<DescriptorID, DescriptorSet*> result = gDescriptorCache->Request(ds_entries);
@@ -521,7 +521,7 @@ bool TiledForwardRenderer::MakePrepassDesc(ePipelineFeatures features, PipelineD
 		pso.AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0, gObjectManager->GetPageSize());
 		// bMaterialBuffer
 		pso.AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
-					  gMaterialManager->MaterialPropertiesBuffer.Size);
+					  gMaterialManager->MaterialPropertiesBuffer.GetSize());
 
 		Material::DeclareDescriptors(pso);
 	};
@@ -538,7 +538,7 @@ void TiledForwardRenderer::AddGlobalDescriptors()
 						 gObjectManager->GetPageSize());
 	// bMaterialBuffer
 	gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
-						 gMaterialManager->MaterialPropertiesBuffer.Size);
+						 gMaterialManager->MaterialPropertiesBuffer.GetSize());
 	// bLightGrid
 	gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
 	// bLightIndexList

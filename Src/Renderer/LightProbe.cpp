@@ -949,7 +949,7 @@ void ResetDepthMoments(ProbeInfo& info)
 
 void UploadRange(renderer::RawGpuBuffer& buffer, const void* data, uint64 offset, uint64 size)
 {
-	uint8* mapped = static_cast<uint8*>(buffer.pMappedBuffer);
+	uint8* mapped = static_cast<uint8*>(buffer.GetMapped());
 	if (mapped == nullptr) {
 		return;
 	}
@@ -1630,7 +1630,7 @@ void ProbeManager::CopyTargetToStaging(renderer::CommandBuffer& cmd, renderer::R
 		.imageExtent { .width = size, .height = size, .depth = 1 },
 	};
 
-	vkCmdCopyImageToBuffer(cmd, image.InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, staging.Buffer, 1, &copy);
+	vkCmdCopyImageToBuffer(cmd, image.Get(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, staging.Get(), 1, &copy);
 
 	renderer::BarrierHelper::ImageLayoutTransition(&image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 0, 1);
 }
@@ -1695,8 +1695,8 @@ bool ProbeManager::ReadBackProbe(uint32 batch_slot, uint32 probe_index)
 			staging->InvalidateFromGpu();
 		}
 
-		colors[face] = static_cast<const uint16*>(mColorStaging[batch_slot][face].pMappedBuffer);
-		depths[face] = static_cast<const float32*>(mDepthStaging[batch_slot][face].pMappedBuffer);
+		colors[face] = static_cast<const uint16*>(mColorStaging[batch_slot][face].GetMapped());
+		depths[face] = static_cast<const float32*>(mDepthStaging[batch_slot][face].GetMapped());
 
 		mapped &= (colors[face] != nullptr && depths[face] != nullptr);
 	}
@@ -2239,7 +2239,7 @@ bool ProbeManager::ReadBackReflectionProbe(uint32 probe_index)
 		staging.Map();
 		staging.InvalidateFromGpu();
 
-		const uint16* rgba = static_cast<const uint16*>(staging.pMappedBuffer);
+		const uint16* rgba = static_cast<const uint16*>(staging.GetMapped());
 
 		if (rgba == nullptr) {
 			mapped = false;
@@ -2355,7 +2355,7 @@ void ProbeManager::UploadReflectionCubemap(uint32 probe_index)
 			BarrierHelper::ImageLayoutTransition(image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 0,
 												 Limits::ReflectionProbeMips);
 
-			vkCmdCopyBufferToImage(cmd, staging.Buffer, image->InternalImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			vkCmdCopyBufferToImage(cmd, staging.Get(), image->Get(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 								   Limits::ReflectionProbeMips, regions);
 
 			BarrierHelper::ImageLayoutTransition(image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 0,

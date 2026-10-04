@@ -22,7 +22,6 @@
 #include <Decal/DecalManager.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Renderer/Backend/DescriptorCache.hpp>
-#include <Renderer/Backend/ExtensionHandles.hpp>
 #include <Renderer/Camera.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/Backend/BarrierHelper.hpp>
@@ -119,13 +118,6 @@ void GraphicsBackend::Init(Vec2u window_size)
 
 	// SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
 	// deletion_queue->InitCapacity(Limits::MaxDeletionQueueItems);
-
-	// Create final submission semaphores. Note that there is one submission semaphore
-	// per Swapchain image, not frame in flight.
-	mSubmitSemaphores.InitSize(Swapchain.OutputImages.Size);
-	for (Semaphore& sem : mSubmitSemaphores) {
-		sem.Create(eSemaphoreType::Binary);
-	}
 
 	LightBuffer.Create(scLightUniformSize, Limits::MaxActiveLights);
 	BoneBuffer.Create(sizeof(Mat4f), Limits::MaxBoneMatrices, eGpuBufferType::StorageWithOffset);
@@ -268,17 +260,15 @@ void GraphicsBackend::InitFrames()
 		frame.CmdBuffer.Create(&frame.CmdPool);
 
 		Util::SetDebugLabel("RenderCmd", VK_OBJECT_TYPE_COMMAND_BUFFER, frame.CmdBuffer.Cmd);
+	}
 
-		frame.InFlight.Create();
-		// frame.InFlight.Reset();
+	// There is one submission semaphore per swapchain image, not frame in flight.
+	int32 status = 0;
 
-		frame.Create(device);
+	mpFrameLoop = rx_frame_loop_new(device->GetRustDevice(), FramesInFlight, Swapchain.OutputImages.Size, &status);
 
-		auto synchro_label = std::format("Frame {} I.A.", i);
-		Util::SetDebugLabel(synchro_label.c_str(), VK_OBJECT_TYPE_SEMAPHORE, frame.ImageAvailable.Get());
-
-		synchro_label = std::format("Frame {} R.F", i);
-		Util::SetDebugLabel(synchro_label.c_str(), VK_OBJECT_TYPE_SEMAPHORE, frame.RenderFinished.Get());
+	if (mpFrameLoop == nullptr) {
+		PanicVulkan("GraphicsBackend", "Could not create the frame synchronisation", static_cast<VkResult>(status));
 	}
 
 	Profiler.Create(device, graphics_family);
@@ -286,10 +276,7 @@ void GraphicsBackend::InitFrames()
 
 void GraphicsBackend::DestroyFrames()
 {
-	{
-		SpinLockContext<VkQueue> graphics_queue = GetDevice()->GetGraphicsQueue();
-		vkQueueWaitIdle(graphics_queue.Get());
-	}
+	rx_gpu_queue_wait_idle(GetDevice()->GetRustDevice(), RX_QUEUE_GRAPHICS);
 
 	// Nothing that uses the query pools is in flight now
 	Profiler.Destroy();
@@ -299,11 +286,12 @@ void GraphicsBackend::DestroyFrames()
 
 		frame.CmdBuffer.Destroy();
 		frame.CmdPool.Destroy();
-
-		frame.Destroy();
 	}
 
 	Frames.Free();
+
+	rx_frame_loop_destroy(mpFrameLoop, GetDevice()->GetRustDevice());
+	mpFrameLoop = nullptr;
 }
 
 void GraphicsBackend::RebuildRenderStages()
@@ -492,22 +480,15 @@ void GraphicsBackend::SubmitImmediateUploadCmd(GraphicsBackend::SubmitFunc uploa
 	upload_func(cmd);
 	cmd.End();
 
-	const VkSubmitInfo submit_info = {
-		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-
-		.commandBufferCount = 1,
-		.pCommandBuffers = &cmd.Cmd,
-	};
-
-	SpinLockContext<VkQueue> transfer_queue = GetDevice()->GetTransferQueue();
+	void* commands[] = { cmd.Cmd };
 
 	// The fence is created signaled; it must be reset before each submit.
 	UploadContext.ImmediateUploadFence.Reset();
 
-	VkTry(vkQueueSubmit(transfer_queue.Get(), 1, &submit_info, UploadContext.ImmediateUploadFence.Get()),
+	VkTry(static_cast<VkResult>(rx_gpu_queue_submit(GetDevice()->GetRustDevice(), RX_QUEUE_TRANSFER, nullptr, 0,
+													commands, 1, nullptr, 0,
+													RxRaw(UploadContext.ImmediateUploadFence.Get()))),
 		  "Error submitting upload buffer");
-
-	transfer_queue.Unlock();
 
 	UploadContext.ImmediateUploadFence.WaitFor();
 	UploadContext.ImmediateUploadFence.Reset();
@@ -535,19 +516,12 @@ void GraphicsBackend::SubmitOneTimeCmd(GraphicsBackend::SubmitFunc submit_func)
 	submit_func(cmd);
 	cmd.End();
 
-	const VkSubmitInfo submit_info = {
-		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+	void* commands[] = { cmd.Cmd };
 
-		.commandBufferCount = 1,
-		.pCommandBuffers = &cmd.Cmd,
-	};
-
-	SpinLockContext<VkQueue> graphics_queue = GetDevice()->GetGraphicsQueue();
-
-	VkTry(vkQueueSubmit(graphics_queue.Get(), 1, &submit_info, nullptr), "Error submitting upload buffer");
-	vkQueueWaitIdle(graphics_queue.Get());
-
-	graphics_queue.Unlock();
+	VkTry(static_cast<VkResult>(rx_gpu_queue_submit(GetDevice()->GetRustDevice(), RX_QUEUE_GRAPHICS, nullptr, 0,
+													commands, 1, nullptr, 0, 0)),
+		  "Error submitting upload buffer");
+	rx_gpu_queue_wait_idle(GetDevice()->GetRustDevice(), RX_QUEUE_GRAPHICS);
 
 	cmd.Reset();
 	cmd.Destroy();
@@ -563,8 +537,11 @@ eFrameResult GraphicsBackend::BeginFrame()
 	LightBuffer.Rewind();
 	BoneBuffer.Rewind();
 
-	frame->InFlight.WaitFor();
-	frame->InFlight.Reset();
+	const VkResult wait_status = static_cast<VkResult>(rx_frame_loop_begin(mpFrameLoop, GetDevice()->GetRustDevice()));
+
+	if (wait_status != VK_SUCCESS) {
+		PanicVulkan("Fence", "Could not wait for the frame fence", wait_status);
+	}
 
 	eFrameResult result = GetNextSwapchainImage(frame);
 	if (result != eFrameResult::Success) {
@@ -598,67 +575,18 @@ void GraphicsBackend::PresentFrame()
 
 	FrameData* frame = GetFrame();
 
-	const VkPipelineStageFlags wait_stages[] = {
-		VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-		VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-	};
-
-	VkSemaphore submit_semaphore = mSubmitSemaphores[mImageIndex].Get();
-	VkSemaphore wait_semaphores[] = {
-		frame->ImageAvailable.Get(),
-		TransferSync.Get(),
-	};
-
-
-	VkCommandBuffer cmds_to_submit[] = {
-		frame->CmdBuffer.Cmd,
-		// frame->TransferCmdBuffer.Cmd,
-	};
-
-	uint64_t wait_values[] = { 0, gGraphics->TransferCount.load() };
-
-	VkTimelineSemaphoreSubmitInfo timeline_info {
-		.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
-		.pNext = nullptr,
-		.waitSemaphoreValueCount = std::size(wait_values),
-		.pWaitSemaphoreValues = wait_values,
-		.signalSemaphoreValueCount = 0,
-		.pSignalSemaphoreValues = nullptr,
-	};
-
-	const VkSubmitInfo submit_info = {
-		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.pNext = &timeline_info,
-
-		.waitSemaphoreCount = std::size(wait_semaphores),
-		.pWaitSemaphores = wait_semaphores,
-
-		.pWaitDstStageMask = wait_stages,
-
-		.commandBufferCount = std::size(cmds_to_submit),
-		.pCommandBuffers = cmds_to_submit,
-
-		.signalSemaphoreCount = 1,
-		.pSignalSemaphores = &submit_semaphore,
-	};
-
-	{
-		SpinLockContext<VkQueue> graphics_queue = GetDevice()->GetGraphicsQueue();
-
-		VkTry(vkQueueSubmit(graphics_queue.Get(), 1, &submit_info, frame->InFlight.Get()),
-			  "Error submitting draw buffer");
-	}
-
-
-	SpinLockContext<VkQueue> present_queue = GetDevice()->GetPresentQueue();
-
 	if (Swapchain.bInitialized != true) {
 		ModulePanic("Swapchain not initialized!");
 	}
 
-	const VkResult status = static_cast<VkResult>(
-		rx_gpu_swapchain_present(GetDevice()->GetRustDevice(), present_queue.Get(), RxRaw(Swapchain.GetSwapchain()),
-								 RxRaw(submit_semaphore), mImageIndex));
+	int32 present_status = 0;
+
+	VkTry(static_cast<VkResult>(rx_frame_loop_submit_and_present(
+			  mpFrameLoop, GetDevice()->GetRustDevice(), RxRaw(Swapchain.GetSwapchain()), frame->CmdBuffer.Cmd,
+			  RxRaw(TransferSync.Get()), gGraphics->TransferCount.load(), &present_status)),
+		  "Error submitting draw buffer");
+
+	const VkResult status = static_cast<VkResult>(present_status);
 
 	if (status == VK_SUCCESS) {
 	}
@@ -691,7 +619,7 @@ void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 	Assert(target != nullptr);
 
 	SSAOPushConsts consts = {
-		.RenderSize = { static_cast<float32>(target->Image.Info.Size.X), static_cast<float32>(target->Image.Info.Size.Y), },
+		.RenderSize = { static_cast<float32>(target->Image.GetSize().X), static_cast<float32>(target->Image.GetSize().Y), },
 	};
 
 	memcpy(consts.InvProjection, camera.InvProjectionMatrix.RawData, sizeof(float32) * 16);
@@ -719,10 +647,10 @@ void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 	Assert(blur_target != nullptr);
 
 	SSAOBlurPushConsts blur_consts = {
-		.ScreenSize = { static_cast<float32>(blur_target->Image.Info.Size.X),
-						static_cast<float32>(blur_target->Image.Info.Size.Y) },
-		.TexelSize = { 1.0f / static_cast<float32>(blur_target->Image.Info.Size.X),
-					   1.0f / static_cast<float32>(blur_target->Image.Info.Size.Y) },
+		.ScreenSize = { static_cast<float32>(blur_target->Image.GetSize().X),
+						static_cast<float32>(blur_target->Image.GetSize().Y) },
+		.TexelSize = { 1.0f / static_cast<float32>(blur_target->Image.GetSize().X),
+					   1.0f / static_cast<float32>(blur_target->Image.GetSize().Y) },
 		.DepthSharpness = 100.0f,
 	};
 
@@ -765,9 +693,7 @@ void GraphicsBackend::DoComposition(Camera& render_cam)
 
 	PresentFrame();
 
-	mInternalFrameCounter++;
-
-	mFrameNumber = (mInternalFrameCounter % FramesInFlight);
+	rx_frame_loop_end_frame(mpFrameLoop);
 }
 
 void GraphicsBackend::RebuildToResizedWindow()
@@ -780,11 +706,8 @@ void GraphicsBackend::RebuildToResizedWindow()
 
 eFrameResult GraphicsBackend::GetNextSwapchainImage(FrameData* frame)
 {
-	const uint64 timeout = UINT64_MAX; // TODO: change this value and handle AcquireNextImage errors correctly
-
 	const VkResult result = static_cast<VkResult>(
-		rx_gpu_swapchain_acquire(GetDevice()->GetRustDevice(), RxRaw(Swapchain.GetSwapchain()), timeout,
-								 RxRaw(frame->ImageAvailable.Get()), &mImageIndex));
+		rx_frame_loop_acquire(mpFrameLoop, GetDevice()->GetRustDevice(), RxRaw(Swapchain.GetSwapchain())));
 
 	if (result == VK_SUCCESS) {
 		return eFrameResult::Success;
@@ -816,10 +739,6 @@ void GraphicsBackend::Destroy()
 
 	DestroyUploadContext();
 	DestroyFrames();
-
-	for (Semaphore& sem : mSubmitSemaphores) {
-		sem.Destroy();
-	}
 
 	LightBuffer.Destroy();
 	BoneBuffer.Destroy();

@@ -7,6 +7,7 @@
 
 #include <Core/Hash.hpp>
 #include <Core/Types.hpp>
+#include <raptor_ffi.h>
 
 namespace fx::renderer {
 
@@ -67,19 +68,29 @@ public:
 	bool operator==(const PipelineKey& other) const = default;
 
 	/// Not for the draw path, resolve a PipelineHandle once and keep it
-	Hash64 GetHash() const { return HashObj64(*this); }
-
-	/**
-	 * @brief Folds a value into a running hash, for building the sub-hashes that go in the key.
-	 */
-	template <typename TValue>
-	static Hash64 MixHash(Hash64 hash, const TValue& value)
-	{
-		return HashObj64(value, hash);
-	}
+	Hash64 GetHash() const { return rx_pipeline_key_hash(reinterpret_cast<const RxPipelineKey*>(this)); }
 };
 
 static_assert(std::has_unique_object_representations_v<PipelineKey>,
 			  "PipelineKey is hashed as raw bytes, so it can not have padding. Reorder the fields or add to Reserved.");
+
+
+static_assert(sizeof(PipelineKey) == sizeof(RxPipelineKey), "PipelineKey must mirror RxPipelineKey");
+static_assert(offsetof(PipelineKey, MacroHash) == offsetof(RxPipelineKey, macro_hash));
+static_assert(offsetof(PipelineKey, BlendHash) == offsetof(RxPipelineKey, blend_hash));
+static_assert(offsetof(PipelineKey, PassHash) == offsetof(RxPipelineKey, pass_hash));
+static_assert(offsetof(PipelineKey, LayoutHash) == offsetof(RxPipelineKey, layout_hash));
+static_assert(offsetof(PipelineKey, Shader) == offsetof(RxPipelineKey, shader));
+static_assert(offsetof(PipelineKey, VertexType) == offsetof(RxPipelineKey, vertex_type));
+static_assert(offsetof(PipelineKey, CullMode) == offsetof(RxPipelineKey, cull_mode));
+static_assert(offsetof(PipelineKey, WindingOrder) == offsetof(RxPipelineKey, winding_order));
+static_assert(offsetof(PipelineKey, PolygonMode) == offsetof(RxPipelineKey, polygon_mode));
+static_assert(offsetof(PipelineKey, DepthCompareOp) == offsetof(RxPipelineKey, depth_compare_op));
+static_assert(offsetof(PipelineKey, bIsCompute) == offsetof(RxPipelineKey, is_compute));
+static_assert(offsetof(PipelineKey, bHasVertexInput) == offsetof(RxPipelineKey, has_vertex_input));
+static_assert(offsetof(PipelineKey, bDepthTest) == offsetof(RxPipelineKey, depth_test));
+static_assert(offsetof(PipelineKey, bDepthWrite) == offsetof(RxPipelineKey, depth_write));
+static_assert(offsetof(PipelineKey, bRenderLines) == offsetof(RxPipelineKey, render_lines));
+static_assert(offsetof(PipelineKey, Reserved) == offsetof(RxPipelineKey, reserved));
 
 } // namespace fx::renderer

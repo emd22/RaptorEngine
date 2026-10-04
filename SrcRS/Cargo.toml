@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["raptor-gpu", "raptor-render", "raptor-brush", "raptor-config", "raptor-shader", "raptor-mesh", "raptor-math", "raptor-ffi"]
+members = ["raptor-app", "raptor-gpu", "raptor-render", "raptor-brush", "raptor-config", "raptor-shader", "raptor-mesh", "raptor-math", "raptor-ffi"]
 
 [workspace.package]
 version = "0.1.0"

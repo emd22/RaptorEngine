@@ -238,11 +238,11 @@ public:
 
 		TElementType* new_element = &pCurrentPage->pData[pCurrentPage->Size];
 
-		if constexpr (std::is_copy_constructible_v<TElementType>) {
-			::new (new_element) TElementType(element);
+		if constexpr (std::is_trivially_constructible_v<TElementType>) {
+			memcpy(new_element, &element, sizeof(TElementType));
 		}
 		else {
-			memcpy(new_element, &element, sizeof(TElementType));
+			::new (new_element) TElementType(element);
 		}
 
 		++pCurrentPage->Size;

@@ -79,32 +79,6 @@ public:
 
     VkSurfaceFormatKHR GetSurfaceFormat();
 
-    SpinLockContext<VkQueue> GetLockableQueue(VkQueue& queue) { return SpinLockContext<VkQueue>(mTransferMutex, queue); }
-
-    FX_FORCE_INLINE SpinLockContext<VkQueue> GetGraphicsQueue()
-    {
-#ifdef FX_DEBUG_DEVICE_ASSERT_INITIALIZED
-        DebugAssert(Device != nullptr);
-#endif
-        return GetLockableQueue(mGraphicsQueue);
-    }
-
-    FX_FORCE_INLINE SpinLockContext<VkQueue> GetTransferQueue()
-    {
-#ifdef FX_DEBUG_DEVICE_ASSERT_INITIALIZED
-        DebugAssert(Device != nullptr);
-#endif
-        return GetLockableQueue(mTransferQueue);
-    }
-
-    FX_FORCE_INLINE SpinLockContext<VkQueue> GetPresentQueue()
-    {
-#ifdef FX_DEBUG_DEVICE_ASSERT_INITIALIZED
-        DebugAssert(Device != nullptr);
-#endif
-        return GetLockableQueue(mPresentQueue);
-    }
-
     operator VkDevice() const { return Device; }
     operator VkPhysicalDevice() const { return Physical; }
 
@@ -122,11 +96,6 @@ public:
 private:
     RxGpuDevice* mpRustDevice = nullptr;
 
-    VkQueue mGraphicsQueue = nullptr;
-    VkQueue mTransferQueue = nullptr;
-    VkQueue mPresentQueue = nullptr;
-
-    std::atomic_flag mTransferMutex;
 };
 
 } // namespace fx::renderer

@@ -56,7 +56,7 @@ public:
 	void CreateImage();
 
 	Image& GetImage() { return Image; }
-	VkImageView& GetImageView() { return Image.View; }
+	VkImageView GetImageView() const { return Image.GetView(); }
 
 	void UseImageFromTarget(Target* ref_target)
 	{

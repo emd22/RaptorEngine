@@ -59,9 +59,9 @@ DsLayoutCache::Request(const SizedArray<DescriptorEntry>& requested_entries)
 	uint32 id = HashNull32;
 	uint64 layout = 0;
 
-	const VkResult status = static_cast<VkResult>(rx_gpu_ds_layout_cache_request(
-		mpCache, GraphicsBackendFwd::GetDevice()->GetRustDevice(), rust_entries.pData, rust_entries.Size, &id,
-		&layout));
+	const VkResult status = static_cast<VkResult>(
+		rx_gpu_ds_layout_cache_request(mpCache, GraphicsBackendFwd::GetDevice()->GetRustDevice(), rust_entries.pData,
+									   rust_entries.Size, &id, &layout));
 
 	if (status != VK_SUCCESS) {
 		LogError("Error building descriptor set layout! (status={})", Util::ResultToStr(status));
@@ -75,9 +75,6 @@ VkDescriptorSetLayout DsLayoutCache::RequestExisting(DsLayoutID layout_id)
 {
 	return RxFromRaw<VkDescriptorSetLayout>(rx_gpu_ds_layout_cache_get(mpCache, layout_id.ID));
 }
-
-#define ID_HASH_HANDLE(handle_, size_)                                                                                 \
-	HashData32(Slice<const uint8>(reinterpret_cast<const uint8*>(handle_), size_), id_result);
 
 DsLayoutID DsLayoutCache::GetID(const SizedArray<DescriptorEntry>& entries)
 {
@@ -115,7 +112,6 @@ DescriptorPool& DescriptorCache::FindPool()
 		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 64);
 		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 64);
 		pool->Create(GraphicsBackendFwd::GetDevice(), 128, true);
-		Pools.Insert(*pool);
 	}
 
 	return Pools[0];
@@ -135,8 +131,7 @@ void DescriptorCache::Free(DescriptorID id)
 	// many combinations for descriptor set layouts, so destroying it here wouldn't really matter.
 
 	// Free the set from the descriptor pool
-	VkDescriptorSet ds = it->second.Get();
-	rx_gpu_descriptor_set_free(GraphicsBackendFwd::GetDevice()->GetRustDevice(), RxRaw(FindPool().Get()), RxRaw(ds));
+	FindPool().FreeSet(it->second.Get());
 
 	// Remove it from the cache.
 	Cache.erase(it);
@@ -147,24 +142,27 @@ DescriptorID DescriptorCache::GetID(const SizedArray<DescriptorEntry>& entries)
 	// The ID's for actual descriptor sets are created based on the values of the image/buffer Vulkan handles. Layouts
 	// are much less granular, so they only require the descriptor entry types.
 
-	Hash32 id_result = FX_HASH32_FNV1A_INIT;
+	std::vector<RxDescriptorIdEntry> id_entries;
+	id_entries.reserve(entries.Size);
 
 	for (const DescriptorEntry& entry : entries) {
-		if (entry.Binding != 0) {
-			id_result = ID_HASH_HANDLE(reinterpret_cast<const void*>(&entry.Binding), sizeof(uint32));
-		}
+		RxDescriptorIdEntry id_entry = { .binding = entry.Binding, .kind = 0, .handle = 0 };
 
 		if (entry.IsImage()) {
 			Assert(entry.pImage != nullptr);
-			id_result = ID_HASH_HANDLE(reinterpret_cast<void*>(&entry.pImage->InternalImage), sizeof(uint64));
+			id_entry.kind = RX_DESCRIPTOR_IMAGE;
+			id_entry.handle = entry.pImage->GetRawImage();
 		}
 		else if (entry.IsBuffer()) {
 			Assert(entry.pBuffer != nullptr);
-			id_result = ID_HASH_HANDLE(reinterpret_cast<void*>(&entry.pBuffer->Buffer), sizeof(uint64));
+			id_entry.kind = RX_DESCRIPTOR_BUFFER;
+			id_entry.handle = entry.pBuffer->GetRaw();
 		}
+
+		id_entries.push_back(id_entry);
 	}
 
-	return DescriptorID { id_result };
+	return DescriptorID { rx_descriptor_id(id_entries.data(), id_entries.size()) };
 }
 
 std::pair<DescriptorID, DescriptorSet*> DescriptorCache::Request(const SizedArray<DescriptorEntry>& entries)
@@ -206,7 +204,7 @@ std::pair<DescriptorID, DescriptorSet*> DescriptorCache::Request(const SizedArra
 
 		if (entry.IsBuffer()) {
 			Assert(entry.pBuffer != nullptr);
-			Assert(entry.pBuffer->Buffer != VK_NULL_HANDLE);
+			Assert(entry.pBuffer->Get() != VK_NULL_HANDLE);
 			descriptor.AddBuffer(entry.Binding, entry.pBuffer, entry.BufferOffset, entry.BufferRange);
 		}
 		else if (entry.IsImage()) {

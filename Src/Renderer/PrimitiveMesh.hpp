@@ -109,11 +109,12 @@ public:
 	void Render(const renderer::CommandBuffer& cmd, uint32 num_instances)
 	{
 		const VkDeviceSize offset = 0;
+		const VkBuffer vertex_buffer = VertexList.GpuBuffer.Get();
 
-		vkCmdBindVertexBuffers(cmd.Cmd, 0, 1, &VertexList.GpuBuffer.Buffer, &offset);
-		vkCmdBindIndexBuffer(cmd.Cmd, GpuIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdBindVertexBuffers(cmd.Cmd, 0, 1, &vertex_buffer, &offset);
+		vkCmdBindIndexBuffer(cmd.Cmd, GpuIndexBuffer.Get(), 0, VK_INDEX_TYPE_UINT32);
 
-		vkCmdDrawIndexed(cmd.Cmd, static_cast<uint32>(GpuIndexBuffer.Size / sizeof(uint32)), num_instances, 0, 0, 0);
+		vkCmdDrawIndexed(cmd.Cmd, static_cast<uint32>(GpuIndexBuffer.GetSize() / sizeof(uint32)), num_instances, 0, 0, 0);
 	}
 
 	void RecalculateNormals()

@@ -4,6 +4,7 @@
 
 #include <Core/SizedArray.hpp>
 #include <Renderer/Vertex.hpp>
+#include <raptor_ffi.h>
 
 namespace fx::renderer {
 
@@ -15,134 +16,39 @@ struct VertexDescription
     bool bIsInited : 1 = false;
 };
 
+static_assert(sizeof(Vertex<eVertexType::Slim>) == RX_VERTEX_SLIM_SIZE);
+static_assert(sizeof(Vertex<eVertexType::Default>) == RX_VERTEX_DEFAULT_SIZE);
+static_assert(sizeof(Vertex<eVertexType::Skinned>) == RX_VERTEX_SKINNED_SIZE);
+static_assert(offsetof(Vertex<eVertexType::Default>, Normal) == RX_VERTEX_NORMAL_OFFSET);
+static_assert(offsetof(Vertex<eVertexType::Default>, UV) == RX_VERTEX_UV_OFFSET);
+static_assert(offsetof(Vertex<eVertexType::Default>, Tangent) == RX_VERTEX_TANGENT_OFFSET);
+static_assert(offsetof(Vertex<eVertexType::Skinned>, BoneIds) == RX_VERTEX_BONE_IDS_OFFSET);
+static_assert(offsetof(Vertex<eVertexType::Skinned>, BoneWeights) == RX_VERTEX_BONE_WEIGHTS_OFFSET);
+
 namespace VertexUtil {
-
-
-template <eVertexType TVertexType>
-VertexDescription BuildDescription()
-{
-    VkVertexInputBindingDescription binding_desc = {
-        .binding = 0,
-        .stride = sizeof(Vertex<TVertexType>),
-        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-    };
-
-    SizedArray<VkVertexInputAttributeDescription> attribs;
-
-    if constexpr (TVertexType == eVertexType::Slim) {
-        attribs = {
-            {
-                .location = 0,
-                .binding = 0,
-                .format = VK_FORMAT_R32G32B32_SFLOAT,
-                .offset = 0,
-            },
-        };
-    }
-    else if constexpr (TVertexType == eVertexType::Default) {
-        using VertexType = Vertex<eVertexType::Default>;
-        attribs = {
-            // Position
-            {
-                .location = 0,
-                .binding = 0,
-                .format = VK_FORMAT_R32G32B32_SFLOAT,
-                .offset = 0,
-            },
-            // Normal
-            {
-                .location = 1,
-                .binding = 0,
-                .format = VK_FORMAT_R32G32B32_SFLOAT,
-                .offset = offsetof(VertexType, Normal),
-            },
-            // UV
-            {
-                .location = 2,
-                .binding = 0,
-                .format = VK_FORMAT_R32G32_SFLOAT,
-                .offset = offsetof(VertexType, UV),
-            },
-            // Tangent, xyz plus the bitangent handedness in w
-            {
-                .location = 3,
-                .binding = 0,
-                .format = VK_FORMAT_R32G32B32A32_SFLOAT,
-                .offset = offsetof(VertexType, Tangent),
-            },
-        };
-    }
-
-    else if constexpr (TVertexType == eVertexType::Skinned) {
-        using VertexType = Vertex<eVertexType::Skinned>;
-        attribs = {
-            // Position
-            {
-                .location = 0,
-                .binding = 0,
-                .format = VK_FORMAT_R32G32B32_SFLOAT,
-                .offset = 0,
-            },
-            // Normal
-            {
-                .location = 1,
-                .binding = 0,
-                .format = VK_FORMAT_R32G32B32_SFLOAT,
-                .offset = offsetof(VertexType, Normal),
-            },
-            // UV
-            {
-                .location = 2,
-                .binding = 0,
-                .format = VK_FORMAT_R32G32_SFLOAT,
-                .offset = offsetof(VertexType, UV),
-            },
-            // Tangent, xyz plus the bitangent handedness in w
-            {
-                .location = 3,
-                .binding = 0,
-                .format = VK_FORMAT_R32G32B32A32_SFLOAT,
-                .offset = offsetof(VertexType, Tangent),
-            },
-            // Bone IDs
-            {
-                .location = 4,
-                .binding = 0,
-                .format = VK_FORMAT_R32G32B32A32_UINT,
-                .offset = offsetof(VertexType, BoneIds),
-            },
-            // Bone Weights
-            {
-                .location = 5,
-                .binding = 0,
-                .format = VK_FORMAT_R32G32B32A32_SFLOAT,
-                .offset = offsetof(VertexType, BoneWeights),
-            },
-        };
-    }
-    else {
-        LogError(LC_RENDER, "Unsupported vertex type!");
-    }
-
-    return { binding_desc, std::move(attribs), true };
-}
 
 FX_FORCE_INLINE VertexDescription BuildDescription(eVertexType vertex_type)
 {
-    switch (vertex_type) {
-    case eVertexType::Slim:
-        return VertexUtil::BuildDescription<eVertexType::Slim>();
-    case eVertexType::Default:
-        return VertexUtil::BuildDescription<eVertexType::Default>();
-    case eVertexType::Skinned:
-        return VertexUtil::BuildDescription<eVertexType::Skinned>();
-    default:;
+    constexpr size_t cMaxAttributes = 6;
+
+    VertexDescription description {};
+    VkVertexInputAttributeDescription attributes[cMaxAttributes];
+
+    const size_t count = rx_vertex_description(static_cast<uint32>(vertex_type), &description.Binding, attributes,
+                                               cMaxAttributes);
+
+    if (count == 0) {
+        LogError("Unsupported vertex type!");
+        return VertexDescription {};
     }
 
-    LogError("Unsupported vertex type!");
+    description.Attributes.InitSize(count);
+    std::memcpy(description.Attributes.pData, attributes, count * sizeof(VkVertexInputAttributeDescription));
+    description.bIsInited = true;
 
-    return VertexDescription {};
+    return description;
 }
+
 }; // namespace VertexUtil
 
 } // namespace fx::renderer

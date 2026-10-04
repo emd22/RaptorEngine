@@ -29,7 +29,7 @@ void MaterialManager::Create()
 
 	renderer::DescriptorPool& dp = mDescriptorPool;
 
-	if (!dp.Pool) {
+	if (!dp.IsInited()) {
 		dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 512);
 		dp.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 10);
 		dp.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 10);
@@ -188,7 +188,7 @@ void MaterialManager::DestroyMaterial(const MaterialID& id)
 
 void MaterialManager::SyncMaterialToGpu(Material* material)
 {
-	MaterialProperties* raw_buffer = static_cast<MaterialProperties*>(MaterialPropertiesBuffer.pMappedBuffer);
+	MaterialProperties* raw_buffer = static_cast<MaterialProperties*>(MaterialPropertiesBuffer.GetMapped());
 	memcpy(&raw_buffer[material->ID.GetID()], &material->Properties, sizeof(MaterialProperties));
 
 	material->mbRequiresSync = false;

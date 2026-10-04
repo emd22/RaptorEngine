@@ -131,7 +131,7 @@ uint32 ObjectManager::GetOffsetObjectIndex(uint32 object_id) const
 
 ObjectGpuEntry* ObjectManager::GetBufferAtFrame(uint32 object_id)
 {
-	uint8* entry_buffer = reinterpret_cast<uint8*>(mObjectGpuBuffer.pMappedBuffer);
+	uint8* entry_buffer = reinterpret_cast<uint8*>(mObjectGpuBuffer.GetMapped());
 	return reinterpret_cast<ObjectGpuEntry*>(entry_buffer + GetOffsetObjectIndex(object_id));
 }
 
@@ -205,7 +205,7 @@ void ObjectManager::ReleaseAllObjects()
 
 void ObjectManager::PrintActive(uint32 limit)
 {
-	ObjectGpuEntry* buffer = reinterpret_cast<ObjectGpuEntry*>(mObjectGpuBuffer.pMappedBuffer);
+	ObjectGpuEntry* buffer = reinterpret_cast<ObjectGpuEntry*>(mObjectGpuBuffer.GetMapped());
 
 	for (int i = 0; i < std::min(limit, mObjectList.Capacity); i++) {
 		if (mObjectList.SlotsInUse.Get(i)) {

@@ -4,6 +4,7 @@
 
 #include <Core/Hash.hpp>
 #include <Core/Types.hpp>
+#include <raptor_ffi.h>
 
 namespace fx {
 
@@ -23,51 +24,24 @@ using ShaderId = Hash64;
 namespace ShaderUtil {
 static constexpr uint32 scNumShaderTypes = static_cast<uint32>(eShaderType::Compute) + 1;
 
+static_assert(static_cast<uint32>(eShaderType::Vertex) == RX_SHADER_VERTEX);
+static_assert(static_cast<uint32>(eShaderType::Pixel) == RX_SHADER_PIXEL);
+static_assert(static_cast<uint32>(eShaderType::Compute) == RX_SHADER_COMPUTE);
+
 /**
  * @brief Get the underlying Vulkan shader stage bit for an ShaderType.
  */
-FX_FORCE_INLINE constexpr VkShaderStageFlags ToUnderlyingType(eShaderType type)
+FX_FORCE_INLINE VkShaderStageFlags ToUnderlyingType(eShaderType type)
 {
-	VkShaderStageFlags flags = 0;
-
-	if ((type & eShaderType::Vertex) != 0) {
-		flags |= VK_SHADER_STAGE_VERTEX_BIT;
-	}
-
-	if ((type & eShaderType::Pixel) != 0) {
-		flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
-	}
-
-	if ((type & eShaderType::Compute) != 0) {
-		flags |= VK_SHADER_STAGE_COMPUTE_BIT;
-	}
-
-	return flags;
+	return rx_shader_stage_flags(static_cast<uint32>(type));
 }
 
 FX_FORCE_INLINE VkPipelineBindPoint TypeToBindPoint(eShaderType type)
 {
-	if (type == eShaderType::Compute) {
-		return VK_PIPELINE_BIND_POINT_COMPUTE;
-	}
-
-	return VK_PIPELINE_BIND_POINT_GRAPHICS;
+	return static_cast<VkPipelineBindPoint>(rx_shader_bind_point(static_cast<uint32>(type)));
 }
 
-FX_FORCE_INLINE const char* TypeToName(eShaderType type)
-{
-	switch (type) {
-	case eShaderType::Vertex:
-		return "Vertex";
-	case eShaderType::Pixel:
-		return "Pixel";
-	case eShaderType::Compute:
-		return "Compute";
-	default:;
-	}
-
-	return "Unknown";
-}
+FX_FORCE_INLINE const char* TypeToName(eShaderType type) { return rx_shader_type_name(static_cast<uint32>(type)); }
 }; // namespace ShaderUtil
 
 

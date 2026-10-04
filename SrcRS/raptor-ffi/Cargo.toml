@@ -5,7 +5,7 @@ edition.workspace = true
 publish.workspace = true
 
 [lib]
-crate-type = ["staticlib", "rlib"]
+crate-type = ["rlib"]
 
 [dependencies]
 ash = { version = "0.38", default-features = false, features = ["std", "debug"] }

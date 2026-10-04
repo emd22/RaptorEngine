@@ -56,6 +56,6 @@ void Uniforms::SetAllValuesRaw(const void* data, uint32 value_size, bool all_fra
 	gEnginePool->FreeRaw(tmp_buffer);
 }
 
-uint8* Uniforms::GetBasePtr() { return reinterpret_cast<uint8*>(mGpuBuffer.pMappedBuffer); }
+uint8* Uniforms::GetBasePtr() { return reinterpret_cast<uint8*>(mGpuBuffer.GetMapped()); }
 
 } // namespace fx::renderer

@@ -21,10 +21,6 @@ void GpuDevice::Create(RxGpuInstance* instance, VkSurfaceKHR surface)
 	Physical = reinterpret_cast<VkPhysicalDevice>(info->physical);
 	Device = reinterpret_cast<VkDevice>(info->device);
 
-	mGraphicsQueue = reinterpret_cast<VkQueue>(info->graphics_queue);
-	mPresentQueue = reinterpret_cast<VkQueue>(info->present_queue);
-	mTransferQueue = reinterpret_cast<VkQueue>(info->transfer_queue);
-
 	mQueueFamilies.Set(info->graphics_family, info->present_family, info->transfer_family);
 
 	MaxSamplerAnisotropy = info->max_sampler_anisotropy;

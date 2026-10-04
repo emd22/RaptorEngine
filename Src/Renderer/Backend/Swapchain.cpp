@@ -54,15 +54,7 @@ void Swapchain::CreateSwapchainImages()
 
 	for (uint64& raw_image : raw_images) {
 		Image* image = OutputImages.Insert();
-		image->InternalImage = RxFromRaw<VkImage>(raw_image);
-		image->View = nullptr;
-		image->Allocation = nullptr;
-		image->ImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		image->Info.Format = Surface.Format;
-
-		image->Info.Size = Extent;
-		image->Info.MipLevel = 0;
-		image->Info.MipCount = 1;
+		image->WrapExternal(RxFromRaw<VkImage>(raw_image), Extent, Surface.Format);
 	}
 }
 
@@ -70,23 +62,8 @@ void Swapchain::CreateFramebuffers() {}
 
 void Swapchain::CreateImageViews()
 {
-	RxGpuDevice* device = mDevice->GetRustDevice();
-
 	for (int32 i = 0; i < OutputImages.Size; i++) {
-		if (OutputImages[i].View != nullptr) {
-			rx_gpu_view_destroy(device, RxRaw(OutputImages[i].View));
-		}
-
-		uint64 view = 0;
-
-		const VkResult status = static_cast<VkResult>(rx_gpu_color_view_create(
-			device, RxRaw(OutputImages[i].InternalImage), static_cast<uint16>(Surface.Format), &view));
-
-		if (status != VK_SUCCESS) {
-			ModulePanicVulkan("Could not create swapchain image view", status);
-		}
-
-		OutputImages[i].View = RxFromRaw<VkImageView>(view);
+		OutputImages[i].RecreateColorView();
 	}
 }
 
@@ -109,11 +86,6 @@ void Swapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR surface)
 
 void Swapchain::DestroyFramebuffersAndImageViews()
 {
-	for (int i = 0; i < FramesInFlight; i++) {
-		// HACK: Clear the images so that we only destroy the image view.
-		OutputImages[i].InternalImage = nullptr;
-	}
-
 	OutputImages.Free();
 }
 

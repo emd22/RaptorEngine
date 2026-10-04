@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 
 #include <Core/Types.hpp>
+#include <raptor_ffi.h>
 
 namespace fx {
 
@@ -14,47 +15,23 @@ enum eShaderReflectionType : uint16
 };
 
 namespace ShaderReflectionUtil {
+static_assert(eShaderReflectionType::StructuredBuffer == 0);
+static_assert(eShaderReflectionType::CBuffer == 1);
+static_assert(eShaderReflectionType::Texture == 2);
+
 FX_FORCE_INLINE VkDescriptorType TypeToVkDescriptorType(eShaderReflectionType refl_type)
 {
-	switch (refl_type) {
-	case eShaderReflectionType::StructuredBuffer:
-		return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-	case eShaderReflectionType::CBuffer:
-		return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-	case eShaderReflectionType::Texture:
-		return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	default:;
-	}
-
-	return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	return static_cast<VkDescriptorType>(rx_reflection_descriptor_type(static_cast<uint16>(refl_type)));
 }
 
 FX_FORCE_INLINE bool RequiresOffset(eShaderReflectionType refl_type)
 {
-	switch (refl_type) {
-	case eShaderReflectionType::StructuredBuffer:
-		[[fallthrough]];
-	case eShaderReflectionType::CBuffer:
-		return true;
-	default:;
-	}
-
-	return false;
+	return rx_reflection_requires_offset(static_cast<uint16>(refl_type)) != 0;
 }
 
 FX_FORCE_INLINE const char* GetName(eShaderReflectionType refl_type)
 {
-	switch (refl_type) {
-	case eShaderReflectionType::StructuredBuffer:
-		return "StructuredBuffer";
-	case eShaderReflectionType::CBuffer:
-		return "CBuffer";
-	case eShaderReflectionType::Texture:
-		return "Texture";
-	default:;
-	}
-
-	return "Unknown";
+	return rx_reflection_name(static_cast<uint16>(refl_type));
 }
 
 } // namespace ShaderReflectionUtil

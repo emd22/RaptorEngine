@@ -31,67 +31,76 @@ class Shader;
 class CommandBuffer;
 class Pipeline;
 
-struct ShaderDescriptorId
-{
-	uint32 Set = 0;
-	/// Hash of the outline entries and the shader type
-	Hash32 Hash = HashNull32;
+static_assert(sizeof(ShaderReflectionEntry) == sizeof(RxReflectionEntry));
 
-	bool bContainsDynamicEntry = false;
-};
-
-
-struct ShaderBindOptions
-{
-	bool bUseOffset = false;
-	uint32 BufferOffset = 0;
-};
-
-
+/**
+ * @brief A reference to a compiled shader program. The program lives in a record owned by Rust, copies of this
+ * share it, and the shader module is destroyed with the last copy. A default constructed program is null.
+ */
 class ShaderProgram
 {
 public:
 	ShaderProgram() = default;
-	ShaderProgram(nullptr_t np) : InternalShader(nullptr), ShaderType(eShaderType::Vertex) {}
+	ShaderProgram(nullptr_t np) {}
 
-	ShaderProgram(ShaderProgram&& other)
+	ShaderProgram(const ShaderProgram& other);
+	ShaderProgram(ShaderProgram&& other) noexcept;
+
+	ShaderProgram& operator=(const ShaderProgram& other);
+	ShaderProgram& operator=(ShaderProgram&& other) noexcept;
+
+	/**
+	 * @brief Creates the program from SPIR-V and its reflection data.
+	 *
+	 * @param shader The shader the program was loaded from, for reporting.
+	 * @return A null program if the shader module could not be created.
+	 */
+	static ShaderProgram Create(eShaderType type, Shader* shader, const uint32* code, uint32 word_count,
+								const SizedArray<ShaderReflectionEntry>& reflection);
+
+	FX_FORCE_INLINE bool IsValid() const { return mpRecord != nullptr; }
+	FX_FORCE_INLINE bool operator==(nullptr_t np) const { return mpRecord == nullptr; }
+	FX_FORCE_INLINE bool operator!=(nullptr_t np) const { return mpRecord != nullptr; }
+
+	FX_FORCE_INLINE VkShaderModule Get() const
 	{
-		InternalShader = other.InternalShader;
-		ShaderType = other.ShaderType;
-		pShader = other.pShader;
-		Reflection = std::move(other.Reflection);
-		InputLocationMask = other.InputLocationMask;
-
-		other.InternalShader = nullptr;
-		other.pShader = nullptr;
+		Assert(mpRecord != nullptr);
+		return reinterpret_cast<VkShaderModule>(mpRecord->module);
 	}
 
-	void BuildDescriptor();
-
-	void Bind(const CommandBuffer& cmd, const Pipeline& pipeline, const ShaderBindOptions& bind_options);
-
-	FX_FORCE_INLINE bool operator==(nullptr_t np) const { return InternalShader == nullptr; }
-
-	FX_FORCE_INLINE VkShaderModule& Get()
+	FX_FORCE_INLINE eShaderType GetType() const
 	{
-		Assert(InternalShader != nullptr);
-		return InternalShader;
+		return (mpRecord != nullptr) ? static_cast<eShaderType>(mpRecord->shader_type) : eShaderType::Vertex;
 	}
 
-	void PrintReflection();
-
-	void Destroy();
-	~ShaderProgram() { Destroy(); }
-
-public:
-	VkShaderModule InternalShader = nullptr;
-	Shader* pShader = nullptr;
-
-	SizedArray<ShaderReflectionEntry> Reflection;
-	eShaderType ShaderType = eShaderType::Vertex;
+	FX_FORCE_INLINE Shader* GetShader() const
+	{
+		return (mpRecord != nullptr) ? static_cast<Shader*>(mpRecord->user) : nullptr;
+	}
 
 	/// Bit N is set if the program declares a stage input at location N. All bits are set if unknown.
-	uint32 InputLocationMask = ~0U;
+	FX_FORCE_INLINE uint32 GetInputLocationMask() const
+	{
+		return (mpRecord != nullptr) ? mpRecord->input_location_mask : ~0U;
+	}
+
+	FX_FORCE_INLINE const ShaderReflectionEntry* GetReflectionData() const
+	{
+		return (mpRecord != nullptr) ? reinterpret_cast<const ShaderReflectionEntry*>(mpRecord->reflection) : nullptr;
+	}
+
+	FX_FORCE_INLINE uint32 GetReflectionCount() const
+	{
+		return (mpRecord != nullptr) ? static_cast<uint32>(mpRecord->reflection_count) : 0;
+	}
+
+	~ShaderProgram();
+
+private:
+	void Release();
+
+private:
+	RxShaderProgram* mpRecord = nullptr;
 };
 
 class Shader
@@ -107,7 +116,7 @@ class Shader
 	 */
 	struct ProgramCache
 	{
-		HashMap<ShaderId, Ref<ShaderProgram>> Programs;
+		HashMap<ShaderId, ShaderProgram> Programs;
 	};
 
 public:
@@ -128,21 +137,18 @@ public:
 	/**
 	 * @brief Returns a cached program if it has previously been queried or loads the uncached version from disk.
 	 */
-	Ref<ShaderProgram> GetProgram(eShaderType shader_type, const SizedArray<ShaderMacro>& macros);
+	ShaderProgram GetProgram(eShaderType shader_type, const SizedArray<ShaderMacro>& macros);
 
 	/**
 	 * @brief Loads a shader program from the DataPack or compiles it if it does not exist.
 	 */
-	Ref<ShaderProgram> LoadUncachedProgram(eShaderType shader_type, const SizedArray<ShaderMacro>& macros);
+	ShaderProgram LoadUncachedProgram(eShaderType shader_type, const SizedArray<ShaderMacro>& macros);
 
 	void Load(const char* path);
 
 	const String& GetName() const { return Name; }
 
 private:
-	void CreateShaderModule(ShaderProgram& program, uint32 file_size, uint32* shader_data,
-							VkShaderModule& shader_module);
-
 	/**
 	 * @brief Fetches all compiled shader permutations from the datapack if the pack exists.
 	 */

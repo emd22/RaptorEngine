@@ -6,7 +6,6 @@
 #include <vulkan/vulkan.h>
 
 #include <Core/Ref.hpp>
-#include <Core/RefCountedBase.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/Slice.hpp>
 #include <Renderer/PipelineKey.hpp>
@@ -232,12 +231,13 @@ struct PushConstants
 	eShaderType ShaderTypes;
 };
 
-class PipelineLayout : public RefCountedBase
+class PipelineLayout
 {
 public:
 	PipelineLayout() = default;
 
 	PipelineLayout(const PipelineLayout& other);
+	PipelineLayout(PipelineLayout&& other) noexcept;
 
 	PipelineLayout(const Slice<const PushConstants>& push_constant_defs,
 				   const Slice<VkDescriptorSetLayout>& descriptor_set_layouts)
@@ -248,20 +248,24 @@ public:
 	void Create(const Slice<const PushConstants>& push_constant_defs,
 				const Slice<VkDescriptorSetLayout>& descriptor_set_layouts);
 
-
-	FX_FORCE_INLINE VkPipelineLayout Get() const { return InternalLayout; }
-	FX_FORCE_INLINE bool IsValid() const { return InternalLayout != nullptr; }
-
+	/// Copies of a layout share it, and it is destroyed with the last copy.
 	PipelineLayout& operator=(const PipelineLayout& other);
+	PipelineLayout& operator=(PipelineLayout&& other) noexcept;
 
-	void DestroyObject() override;
+	FX_FORCE_INLINE VkPipelineLayout Get() const
+	{
+		return (mpRecord != nullptr) ? reinterpret_cast<VkPipelineLayout>(mpRecord->layout) : nullptr;
+	}
+
+	FX_FORCE_INLINE bool IsValid() const { return mpRecord != nullptr; }
 
 	~PipelineLayout();
 
-public:
-	VkPipelineLayout InternalLayout = nullptr;
+private:
+	void Release();
 
-	StackArray<PushConstants, ShaderUtil::scNumShaderTypes> mPushConstDefs;
+private:
+	RxPipelineLayout* mpRecord = nullptr;
 };
 
 
@@ -284,7 +288,10 @@ public:
 public:
 	Pipeline() = default;
 
-	void Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shaders,
+	Pipeline(const Pipeline&) = delete;
+	Pipeline& operator=(const Pipeline&) = delete;
+
+	void Create(ePipelineName name, const Slice<ShaderProgram>& shaders,
 				const Slice<VkAttachmentDescription>& attachments,
 				const Slice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
 				VertexDescription* vertex_info, const RenderPass& render_pass, const PipelineProperties& properties);
@@ -292,7 +299,7 @@ public:
 	/**
 	 * @brief Creates a compute pipeline from a single compute shader program.
 	 */
-	void CreateCompute(ePipelineName name, const Ref<ShaderProgram>& shader);
+	void CreateCompute(ePipelineName name, const ShaderProgram& shader);
 
 	FX_FORCE_INLINE void SetLayout(PipelineLayout layout)
 	{
@@ -304,14 +311,26 @@ public:
 
 	FX_FORCE_INLINE bool HasLayout() const { return Layout.IsValid(); }
 
-	FX_FORCE_INLINE bool IsCompute() const { return bIsCompute; }
+	/// True if this pipeline was created as a compute pipeline
+	FX_FORCE_INLINE bool IsCompute() const { return mpRecord != nullptr && mpRecord->is_compute != 0; }
 
 	/// False until the pipeline has been built, and if it could not be
-	FX_FORCE_INLINE bool IsBuilt() const { return InternalPipeline != nullptr; }
+	FX_FORCE_INLINE bool IsBuilt() const { return mpRecord != nullptr; }
+
+	FX_FORCE_INLINE VkPipeline Get() const
+	{
+		return (mpRecord != nullptr) ? reinterpret_cast<VkPipeline>(mpRecord->pipeline) : nullptr;
+	}
 
 	FX_FORCE_INLINE VkPipelineBindPoint GetBindPoint() const
 	{
-		return (bIsCompute) ? VK_PIPELINE_BIND_POINT_COMPUTE : VK_PIPELINE_BIND_POINT_GRAPHICS;
+		return (IsCompute()) ? VK_PIPELINE_BIND_POINT_COMPUTE : VK_PIPELINE_BIND_POINT_GRAPHICS;
+	}
+
+	/// The cull mode the pipeline was created with. It is dynamic state, so it is set when the pipeline is bound.
+	FX_FORCE_INLINE VkCullModeFlags GetDefaultCullMode() const
+	{
+		return (mpRecord != nullptr) ? static_cast<VkCullModeFlags>(mpRecord->default_cull_mode) : VK_CULL_MODE_NONE;
 	}
 
 	void Bind(const CommandBuffer& command_buffer) const;
@@ -326,8 +345,6 @@ private:
 public:
 	// VkPipelineLayout Layout = nullptr;
 	PipelineLayout Layout;
-	VkPipeline InternalPipeline = nullptr;
-
 	SizedArray<DescriptorRef> DescriptorIDs;
 
 	ePipelineName Name;
@@ -336,21 +353,14 @@ public:
 	/// without hashing anything.
 	PipelineHandle Handle;
 
-	Ref<ShaderProgram> VertexShader { nullptr };
-	Ref<ShaderProgram> PixelShader { nullptr };
-	Ref<ShaderProgram> ComputeShader { nullptr };
-
-	/// True if this pipeline was created as a compute pipeline
-	bool bIsCompute = false;
-
-	/// The cull mode the pipeline was created with. It is dynamic state, so it is set when the pipeline is bound.
-	VkCullModeFlags DefaultCullMode = VK_CULL_MODE_NONE;
+	ShaderProgram VertexShader { nullptr };
+	ShaderProgram PixelShader { nullptr };
+	ShaderProgram ComputeShader { nullptr };
 
 private:
 	GpuDevice* mDevice = nullptr;
 
-protected:
-	bool mbDoNotDestroyLayout = false;
+	RxPipeline* mpRecord = nullptr;
 };
 
 } // namespace fx::renderer

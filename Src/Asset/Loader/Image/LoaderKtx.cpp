@@ -98,7 +98,7 @@ eLoaderStatus LoaderKtx::Load(AssetTicket& ticket, const std::string& path)
 		return eLoaderStatus::Error;
 	}
 
-	static_cast<Image*>(ticket.Get())->Info.Size = GetImageSize();
+	static_cast<Image*>(ticket.Get())->SetSize(GetImageSize());
 
 	return eLoaderStatus::Success;
 }
@@ -128,7 +128,7 @@ eLoaderStatus LoaderKtx::Load(AssetTicket& ticket, const uint8* data, uint32 siz
 		return eLoaderStatus::Error;
 	}
 
-	static_cast<Image*>(ticket.Get())->Info.Size = GetImageSize();
+	static_cast<Image*>(ticket.Get())->SetSize(GetImageSize());
 
 	return eLoaderStatus::Success;
 }

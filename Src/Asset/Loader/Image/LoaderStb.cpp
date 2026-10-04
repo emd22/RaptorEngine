@@ -18,7 +18,7 @@ eLoaderStatus LoaderStb::Load(AssetTicket& ticket, const std::string& path)
 
 	stbi_info(c_path, &mWidth, &mHeight, &mChannels);
 
-	image->Info.Size = Vec2u { uint32(mWidth), uint32(mHeight) };
+	image->SetSize(Vec2u { uint32(mWidth), uint32(mHeight) });
 
 	uint32 data_size = mWidth * mHeight * pixel_size;
 	mDataSize = data_size;
@@ -52,7 +52,7 @@ eLoaderStatus LoaderStb::Load(AssetTicket& ticket, const uint8* data, uint32 siz
 	uint32 data_size = mWidth * mHeight * (pixel_size * sizeof(uint8));
 	mDataSize = data_size;
 
-	image->Info.Size = Vec2u { uint32(mWidth), uint32(mHeight) };
+	image->SetSize(Vec2u { uint32(mWidth), uint32(mHeight) });
 
 	mImageData = stbi_load_from_memory(data, size, &mWidth, &mHeight, &mChannels, pixel_size);
 
@@ -99,7 +99,7 @@ void LoaderStb::CreateGpuResource(AssetTicket& ticket)
 	// const bool should_save_data = (CreationFlags & eImageCreateFlags::KeepInMemory) != 0;
 
 	// Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
-	ImageInfo image_info { image->Info.Size, ImageFormat, 0, 1, Slice<const uint8>(data_arr.pData, data_arr.Size) };
+	ImageInfo image_info { image->GetSize(), ImageFormat, 0, 1, Slice<const uint8>(data_arr.pData, data_arr.Size) };
 	image->CreateFromData(renderer::GraphicsBackendFwd::GetUploadCmd(), image_info, (CreationFlags));
 
 	// Set to nullptr so that the data is not freed by the SizedArray

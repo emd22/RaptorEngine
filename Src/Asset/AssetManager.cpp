@@ -45,11 +45,10 @@ void AssetDeletionTicket::DeleteImmediate() const
 		// referencing the buffer. Because the ticket defers deletion by `scBufferDeletionFrameSpacing`
 		// rendered frames, this returns almost immediately
 		{
-			SpinLockContext<VkQueue> graphics_queue = renderer::gGraphics->GetDevice()->GetGraphicsQueue();
-			vkQueueWaitIdle(graphics_queue.Get());
+			rx_gpu_queue_wait_idle(renderer::gGraphics->GetDevice()->GetRustDevice(), RX_QUEUE_GRAPHICS);
 		}
 
-		rx_gpu_buffer_destroy(renderer::gGraphics->GpuAllocator, renderer::RxRaw(ticket.Buffer), ticket.Allocation);
+		rx_buffer_destroy(ticket.pRecord, renderer::gGraphics->GpuAllocator);
 	} break;
 	}
 }
@@ -713,43 +712,22 @@ int32 AssetManager::CheckForUploadableData()
 		}
 	}
 
-	SpinLockContext<VkQueue> transfer_queue = gGraphics->GetDevice()->GetTransferQueue();
-
 	if (should_upload) {
 		CommandBuffer& cmd = gGraphics->UploadContext.CmdBuffer;
 		cmd.End();
 
-		uint64_t tl_value = gGraphics->TransferCount.load() + 1;
+		const uint64_t tl_value = gGraphics->TransferCount.load() + 1;
 
-		VkTimelineSemaphoreSubmitInfo timeline_info {
-			.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
-			.pNext = nullptr,
-			.waitSemaphoreValueCount = 0U,
-			.pWaitSemaphoreValues = nullptr,
-			.signalSemaphoreValueCount = 1U,
-			.pSignalSemaphoreValues = &tl_value,
-		};
+		void* commands[] = { cmd.Cmd };
 
-		const VkSubmitInfo submit_info = {
-			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-			.pNext = &timeline_info,
+		const RxSubmitSignal signal = { .semaphore = RxRaw(gGraphics->TransferSync.InternalSemaphore),
+										.value = tl_value };
 
-			.commandBufferCount = 1U,
-			.pCommandBuffers = &cmd.Cmd,
-
-			.signalSemaphoreCount = 1U,
-			.pSignalSemaphores = &gGraphics->TransferSync.InternalSemaphore,
-		};
-
-		VkQueue vk_xfer_queue = transfer_queue.Get();
-
-		AssertMsg(vk_xfer_queue != nullptr, "Queue has not been initialized");
-		vkQueueSubmit(vk_xfer_queue, 1, &submit_info, gGraphics->UploadContext.UploadFence.Get());
+		rx_gpu_queue_submit(gGraphics->GetDevice()->GetRustDevice(), RX_QUEUE_TRANSFER, nullptr, 0, commands, 1,
+							&signal, 1, RxRaw(gGraphics->UploadContext.UploadFence.Get()));
 
 		gGraphics->TransferCount.store(tl_value);
 	}
-
-	transfer_queue.Unlock();
 
 	// Wait for transfer to complete before destroying staging buffers held by loaders
 	if (should_upload) {

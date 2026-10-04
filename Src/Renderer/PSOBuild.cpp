@@ -135,7 +135,7 @@ static void AssertCorrectBlendAttachments(const SizedArray<Target>& color_only_t
 	for (int32 i = 0; i < color_only_targets.Size; i++) {
 		const Target& target = color_only_targets[i];
 
-		const uint32 format_pixel_stride = ImageFormatUtil::GetPixelStride(target.Image.Info.Format);
+		const uint32 format_pixel_stride = ImageFormatUtil::GetPixelStride(target.Image.GetFormat());
 
 		if (blends[i].blendEnable == VK_TRUE) {
 			const uint32 ps_mod_4 = (format_pixel_stride % 4);
@@ -161,9 +161,9 @@ void PSOBuild::BuildPipeline()
 		Panic("PSOBuild", "Oops!");
 	}
 
-	Ref<ShaderProgram> vertex_shader = GetShaderProgram(eShaderType::Vertex);
-	Ref<ShaderProgram> pixel_shader = GetShaderProgram(eShaderType::Pixel);
-	Ref<ShaderProgram> compute_shader = GetShaderProgram(eShaderType::Compute);
+	ShaderProgram vertex_shader = GetShaderProgram(eShaderType::Vertex);
+	ShaderProgram pixel_shader = GetShaderProgram(eShaderType::Pixel);
+	ShaderProgram compute_shader = GetShaderProgram(eShaderType::Compute);
 
 	// Compute pipelines are built from a single compute shader program, without a renderpass.
 	if (compute_shader.IsValid() && !vertex_shader.IsValid() && !pixel_shader.IsValid()) {
@@ -181,23 +181,15 @@ void PSOBuild::BuildPipeline()
 		return;
 	}
 
-	SizedArray<Ref<ShaderProgram>> shader_list = { vertex_shader, pixel_shader };
+	SizedArray<ShaderProgram> shader_list = { vertex_shader, pixel_shader };
 
 	VertexDescription* vertex_ptr = nullptr;
 	VertexDescription vertex_desc = VertexUtil::BuildDescription(mVertexType);
 
 	// If there is no `NoVertices` flag set, use the built vertex description.
 	if ((mFlags & ePSOBuildFlags::NoVertices) == 0) {
-		const uint32 input_mask = vertex_shader->InputLocationMask;
-		uint32 num_attribs = 0;
-
-		for (const VkVertexInputAttributeDescription& attrib : vertex_desc.Attributes) {
-			if (attrib.location < 32 && (input_mask & (1U << attrib.location)) != 0) {
-				vertex_desc.Attributes.pData[num_attribs++] = attrib;
-			}
-		}
-
-		vertex_desc.Attributes.Size = num_attribs;
+		vertex_desc.Attributes.Size = rx_vertex_filter_attributes(
+			vertex_desc.Attributes.pData, vertex_desc.Attributes.Size, vertex_shader.GetInputLocationMask());
 
 		vertex_ptr = &vertex_desc;
 	}
@@ -234,14 +226,14 @@ void PSOBuild::SetPushConstants(eShaderType type, uint32 pc_size)
 }
 
 
-static Vec2u GetDescriptorIndexRangeForShader(const Ref<ShaderProgram>& program)
+static Vec2u GetDescriptorIndexRangeForShader(const ShaderProgram& program)
 {
-	SizedArray<ShaderReflectionEntry>& refl = program->Reflection;
-
 	uint8 min_set = 10;
 	uint8 max_set = 0;
 
-	for (const ShaderReflectionEntry& entry : refl) {
+	for (uint32 i = 0; i < program.GetReflectionCount(); i++) {
+		const ShaderReflectionEntry& entry = program.GetReflectionData()[i];
+
 		max_set = std::max(entry.Set, max_set);
 		min_set = std::min(entry.Set, min_set);
 	}
@@ -322,7 +314,7 @@ void PSOBuild::EndPipeline()
 	BuildPipeline();
 
 	// A pipeline that failed to build has nothing to look up
-	if (mpPipeline->InternalPipeline != nullptr) {
+	if (mpPipeline->IsBuilt()) {
 		gPipelineCache->RegisterKey(mpPipeline->Handle, MakeKey());
 	}
 
@@ -375,56 +367,42 @@ void PSOBuild::AddImageFromTarget(uint32 bind_index, uint32 set_index, eShaderTy
 	mDescriptorEntries[set_index].Insert(DescriptorEntry::AsImage(bind_index, shader_stages, &target->Image, sampler));
 }
 
-/**
- * @brief Translate shader reflection type to descriptor entry type.
- */
-static eDescriptorEntryType SRTToDET(eShaderReflectionType srt)
+static_assert(sizeof(ShaderReflectionEntry) == sizeof(RxReflectionEntry));
+static_assert(offsetof(ShaderReflectionEntry, Type) == offsetof(RxReflectionEntry, type));
+static_assert(offsetof(ShaderReflectionEntry, Set) == offsetof(RxReflectionEntry, set));
+static_assert(offsetof(ShaderReflectionEntry, Binding) == offsetof(RxReflectionEntry, binding));
+static_assert(static_cast<uint32>(eDescriptorEntryType::None) == RX_ENTRY_NONE);
+static_assert(static_cast<uint32>(eDescriptorEntryType::Image) == RX_ENTRY_IMAGE);
+static_assert(static_cast<uint32>(eDescriptorEntryType::Buffer) == RX_ENTRY_BUFFER);
+
+bool PSOBuild::CheckDescriptorsAgainstProgram(const ShaderProgram& program) const
 {
-	switch (srt) {
-	case eShaderReflectionType::StructuredBuffer:
-		[[fallthrough]];
-	case eShaderReflectionType::CBuffer:
-		return eDescriptorEntryType::Buffer;
-	case eShaderReflectionType::Texture:
-		return eDescriptorEntryType::Image;
-	default:;
-	}
+	std::vector<RxDescriptorSlot> slots;
 
-	return eDescriptorEntryType::None;
-}
-
-
-bool PSOBuild::CheckDescriptorsAgainstProgram(const Ref<ShaderProgram>& program) const
-{
-	int32 num_errors = 0;
-
-	for (const ShaderReflectionEntry& refl_entry : program->Reflection) {
-		eDescriptorEntryType det = SRTToDET(refl_entry.Type);
-
-		bool is_valid = false;
-
-		for (const DescriptorEntry& ds_entry : mDescriptorEntries[refl_entry.Set]) {
-			if (ds_entry.Binding == refl_entry.Binding && det == ds_entry.Type) {
-				is_valid = true;
-				break;
-			}
-		}
-
-		if (!is_valid) {
-			LogError(LC_RENDER, "PSOBuild: Missing descriptor (Binding={}, Set={}) of type '{}'", refl_entry.Binding,
-					 refl_entry.Set, DescriptorEntryUtil::GetTypeName(det));
-			++num_errors;
-			break;
+	for (uint32 set = 0; set < mDescriptorEntries.Size; set++) {
+		for (const DescriptorEntry& ds_entry : mDescriptorEntries[set]) {
+			slots.push_back(RxDescriptorSlot { .set = set,
+											   .binding = ds_entry.Binding,
+											   .kind = static_cast<uint32>(ds_entry.Type) });
 		}
 	}
 
-	if (num_errors > 0) {
-		LogError(LC_RENDER, "PSOBuild: Failed when builing '{}' ({})", program->pShader->GetName(),
-				 ShaderUtil::TypeToName(program->ShaderType));
-		return true;
+	RxDescriptorSlot missing {};
+
+	const int32 has_missing = rx_check_descriptors(reinterpret_cast<const RxReflectionEntry*>(program.GetReflectionData()),
+												   program.GetReflectionCount(), slots.data(), slots.size(), &missing);
+
+	if (has_missing == 0) {
+		return false;
 	}
 
-	return false;
+	LogError(LC_RENDER, "PSOBuild: Missing descriptor (Binding={}, Set={}) of type '{}'", missing.binding, missing.set,
+			 DescriptorEntryUtil::GetTypeName(static_cast<eDescriptorEntryType>(missing.kind)));
+
+	LogError(LC_RENDER, "PSOBuild: Failed when builing '{}' ({})", program.GetShader()->GetName(),
+			 ShaderUtil::TypeToName(program.GetType()));
+
+	return true;
 }
 
 void PSOBuild::CheckDescriptorsAgainstShader() const
@@ -434,7 +412,7 @@ void PSOBuild::CheckDescriptorsAgainstShader() const
 	int32 fails = 0;
 
 	for (uint32 shader_index = 0; shader_index < ShaderNameUtil::scNumShaders; shader_index++) {
-		const Ref<ShaderProgram>& sp = mShaderPrograms[shader_index];
+		const ShaderProgram& sp = mShaderPrograms[shader_index];
 		if (!sp.IsValid()) {
 			continue;
 		}
@@ -475,37 +453,36 @@ PipelineKey PSOBuild::MakeKey()
 		const SizedArray<VkPipelineColorBlendAttachmentState> blends = BlendAttachments.GetVkAttachments(
 			color_target_count);
 
-		Hash64 blend_hash = FX_HASH64_FNV1A_INIT;
+		static_assert(sizeof(VkPipelineColorBlendAttachmentState) == 8 * sizeof(uint32));
 
-		for (const VkPipelineColorBlendAttachmentState& blend : blends) {
-			// Eight 32 bit fields with no padding in between
-			blend_hash = PipelineKey::MixHash(blend_hash, blend);
-		}
+		key.BlendHash = rx_pipeline_blend_hash(blends.pData, blends.Size);
 
-		key.BlendHash = blend_hash;
-
-		Hash64 pass_hash = FX_HASH64_FNV1A_INIT;
+		std::vector<RxHashPair> pass_attachments;
 
 		for (const VkAttachmentDescription& attachment : pOutputTargets->GetDescriptions()) {
-			pass_hash = PipelineKey::MixHash(pass_hash, static_cast<uint32>(attachment.format));
-			pass_hash = PipelineKey::MixHash(pass_hash, static_cast<uint32>(attachment.samples));
+			pass_attachments.push_back(RxHashPair { .first = static_cast<uint32>(attachment.format),
+													.second = static_cast<uint32>(attachment.samples) });
 		}
 
-		key.PassHash = pass_hash;
+		key.PassHash = rx_pipeline_pass_hash(pass_attachments.data(), pass_attachments.size());
 	}
 
-	Hash64 layout_hash = FX_HASH64_FNV1A_INIT;
+	std::vector<RxHashPair> layout_sets;
 
 	for (const Pipeline::DescriptorRef& ds_ref : mpPipeline->DescriptorIDs) {
-		layout_hash = PipelineKey::MixHash(layout_hash, ds_ref.SetIndex);
 		// Content hash of the layout, so it does not change between runs
-		layout_hash = PipelineKey::MixHash(layout_hash, ds_ref.pSet->LayoutID.GetID());
+		layout_sets.push_back(RxHashPair { .first = ds_ref.SetIndex, .second = ds_ref.pSet->LayoutID.GetID() });
 	}
 
+	std::vector<RxHashPair> layout_push_constants;
+
 	for (uint32 i = 0; i < mPushConstants.Size; i++) {
-		layout_hash = PipelineKey::MixHash(layout_hash, mPushConstants[i].Size);
-		layout_hash = PipelineKey::MixHash(layout_hash, static_cast<uint32>(mPushConstants[i].ShaderTypes));
+		layout_push_constants.push_back(RxHashPair { .first = mPushConstants[i].Size,
+													 .second = static_cast<uint32>(mPushConstants[i].ShaderTypes) });
 	}
+
+	const uint64 layout_hash = rx_pipeline_layout_hash(layout_sets.data(), layout_sets.size(),
+													   layout_push_constants.data(), layout_push_constants.size());
 
 	key.LayoutHash = layout_hash;
 

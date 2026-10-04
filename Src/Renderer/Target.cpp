@@ -7,10 +7,10 @@ namespace fx::renderer {
 
 Target::Target(eImageFormat format, const Vec2u& size, bool is_fullscreen)
 {
-	Image.Info = ImageInfo { size, format, 0, 1, Slice<const uint8>(nullptr, 0) };
+	Image.SetInfo(size, format, 0, 1);
 
 	if (is_fullscreen) {
-		Image.Info.Size = gGraphics->Swapchain.Extent;
+		Image.SetSize(gGraphics->Swapchain.Extent);
 		bIsFullscreen = true;
 	}
 }
@@ -19,10 +19,10 @@ Target::Target(eImageFormat format, const Vec2u& size, bool is_fullscreen, eLoad
 			   VkImageLayout initial_layout, VkImageLayout final_layout)
 	: LoadOp(load_op), StoreOp(store_op), InitialLayout(initial_layout), FinalLayout(final_layout)
 {
-	Image.Info = ImageInfo { size, format, 0, 1, Slice<const uint8>(nullptr, 0) };
+	Image.SetInfo(size, format, 0, 1);
 
 	if (is_fullscreen) {
-		Image.Info.Size = gGraphics->Swapchain.Extent;
+		Image.SetSize(gGraphics->Swapchain.Extent);
 		bIsFullscreen = true;
 	}
 }
@@ -31,10 +31,10 @@ Target::Target(eImageFormat format, const Vec2u& size, bool is_fullscreen, VkIma
 			   eImageAspectFlag aspect)
 	: Usage(usage), Aspect(aspect)
 {
-	Image.Info = ImageInfo { size, format, 0, 1, Slice<const uint8>(nullptr, 0) };
+	Image.SetInfo(size, format, 0, 1);
 
 	if (is_fullscreen) {
-		Image.Info.Size = gGraphics->Swapchain.Extent;
+		Image.SetSize(gGraphics->Swapchain.Extent);
 		bIsFullscreen = true;
 	}
 }
@@ -51,28 +51,31 @@ void Target::CreateImage()
 		return;
 	}
 
-	Image.Create(ImageType, Image.Info.Size, 1, Image.Info.Format, VK_IMAGE_TILING_OPTIMAL, Usage, Aspect,
+	Image.Create(ImageType, Image.GetSize(), 1, Image.GetFormat(), VK_IMAGE_TILING_OPTIMAL, Usage, Aspect,
 				 eImageCreateFlags::IsTarget);
 }
 
 
 VkAttachmentDescription Target::BuildDescription() const
 {
-	Assert(Image.Info.Format != eImageFormat::None);
+	Assert(Image.GetFormat() != eImageFormat::None);
 
-	return VkAttachmentDescription {
-		.format = ImageFormatUtil::ToUnderlying(Image.Info.Format),
-		.samples = Samples,
-
-		.loadOp = static_cast<VkAttachmentLoadOp>(LoadOp),
-		.storeOp = static_cast<VkAttachmentStoreOp>(StoreOp),
-
-		.stencilLoadOp = static_cast<VkAttachmentLoadOp>(StencilLoadOp),
-		.stencilStoreOp = static_cast<VkAttachmentStoreOp>(StencilStoreOp),
-
-		.initialLayout = InitialLayout,
-		.finalLayout = FinalLayout,
+	const RxAttachmentInfo info = {
+		.format = ImageFormatUtil::ToUnderlying(Image.GetFormat()),
+		.samples = static_cast<uint32>(Samples),
+		.load_op = static_cast<int32>(LoadOp),
+		.store_op = static_cast<int32>(StoreOp),
+		.stencil_load_op = static_cast<int32>(StencilLoadOp),
+		.stencil_store_op = static_cast<int32>(StencilStoreOp),
+		.initial_layout = static_cast<int32>(InitialLayout),
+		.final_layout = static_cast<int32>(FinalLayout),
 	};
+
+	VkAttachmentDescription description;
+
+	rx_attachment_description(&info, &description);
+
+	return description;
 }
 
 
@@ -127,7 +130,9 @@ void TargetList::CreateImages(const Vec2u& size)
 	}
 
 	for (Target& target : Targets) {
-		target.Image.Info.Size = size;
+		if (!target.bImageIsReference) {
+			target.Image.SetSize(size);
+		}
 
 		target.CreateImage();
 	}
@@ -154,7 +159,7 @@ SizedArray<VkImageView>& TargetList::GetImageViews()
 			continue;
 		}
 
-		mBuiltImageViews.Insert(attachment.Image.View);
+		mBuiltImageViews.Insert(attachment.Image.GetView());
 	}
 
 	mFlags |= eTargetListFlags::ImageViewsBuilt;
@@ -165,22 +170,18 @@ SizedArray<VkImageView>& TargetList::GetImageViews()
 
 bool TargetList::IsCompatible(const TargetList& other) const
 {
-	if (Targets.Size != other.Targets.Size) {
-		return false;
+	std::vector<uint16> formats;
+	std::vector<uint16> other_formats;
+
+	for (const Target& target : Targets) {
+		formats.push_back(static_cast<uint16>(target.Image.GetFormat()));
 	}
 
-	for (uint32 index = 0; index < Targets.Size; index++) {
-		const Target& t = Targets[index];
-		const Target& other_t = other.Targets[index];
-
-		const bool format_matches = t.Image.Info.Format == other_t.Image.Info.Format;
-
-		if (!format_matches) {
-			return false;
-		}
+	for (const Target& target : other.Targets) {
+		other_formats.push_back(static_cast<uint16>(target.Image.GetFormat()));
 	}
 
-	return true;
+	return rx_formats_compatible(formats.data(), formats.size(), other_formats.data(), other_formats.size()) != 0;
 }
 
 } // namespace fx::renderer

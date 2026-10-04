@@ -87,11 +87,11 @@ public:
 
 		for (Target& target : mOutputTargets.Targets) {
 			// Present targets carry a placeholder image; the swapchain owns the real one.
-			if (target.Image.InternalImage == nullptr) {
+			if (target.Image.Get() == nullptr) {
 				continue;
 			}
 
-			target.Image.ImageLayout = target.FinalLayout;
+			target.Image.SetLayout(target.FinalLayout);
 		}
 	}
 

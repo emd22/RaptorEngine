@@ -126,7 +126,7 @@ bool TextRenderer::SubmitQuads(DescriptorSet* ds, const InstanceData* instances,
 	// Each frame in flight has its own region of the instance buffer
 	const uint32 base_offset = (gGraphics->GetFrameNumber() * scMaxGlyphs * sizeof(InstanceData));
 
-	uint8* mapped = reinterpret_cast<uint8*>(mInstanceBuffer.pMappedBuffer);
+	uint8* mapped = reinterpret_cast<uint8*>(mInstanceBuffer.GetMapped());
 	memcpy(mapped + base_offset + mTapeOffset, instances, instances_size);
 
 	gPipelineCache->AddBufferOffset(0, base_offset);
@@ -159,8 +159,8 @@ void TextRenderer::DrawText(const char* text, float32 scale, uint32 color)
 	const float32 glyph_height = static_cast<float32>(scGlyphHeight) * scale;
 
 	StackArray<InstanceData, scMaxGlyphs> instances;
-	const float32 atlas_w = static_cast<float32>(mpAtlas->Info.Size.X);
-	const float32 atlas_h = static_cast<float32>(mpAtlas->Info.Size.Y);
+	const float32 atlas_w = static_cast<float32>(mpAtlas->GetSize().X);
+	const float32 atlas_h = static_cast<float32>(mpAtlas->GetSize().Y);
 
 
 	const Vec2u window_size = gGraphics->GetWindow()->GetSize();

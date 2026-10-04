@@ -225,16 +225,42 @@ class Image
 public:
 	Image();
 	Image(const Image& other);
-
-	/**
-	 * @brief Transfers an `Ref` to the normal ref counted image.
-	 */
-	Image(Ref<Image>&& ref);
+	Image(Image&& other) noexcept;
 
 	Image& operator=(const Image& other);
-	Image& operator=(Ref<Image>&& ref);
+	Image& operator=(Image&& other) noexcept;
 
-	FX_FORCE_INLINE const ImageInfo& GetInfo() const { return Info; }
+	/// The image's state lives in a record owned by Rust. Copies of a created `Image` share that record, so they all
+	/// see the same handles, layout and size, and the resources are freed when the last copy goes away. Copies of an
+	/// image that has not been created are independent descriptions.
+	ImageInfo GetInfo() const;
+
+	void SetInfo(Vec2u size, eImageFormat format, uint32 mip_level, uint32 mip_count);
+
+	FX_FORCE_INLINE Vec2u GetSize() const { return Vec2u { mpRecord->width, mpRecord->height }; }
+	FX_FORCE_INLINE void SetSize(Vec2u size)
+	{
+		mpRecord->width = size.X;
+		mpRecord->height = size.Y;
+	}
+
+	FX_FORCE_INLINE eImageFormat GetFormat() const { return static_cast<eImageFormat>(mpRecord->format); }
+	FX_FORCE_INLINE uint32 GetMipLevel() const { return mpRecord->mip_level; }
+	FX_FORCE_INLINE void SetMipLevel(uint32 mip_level) { mpRecord->mip_level = mip_level; }
+	FX_FORCE_INLINE uint32 GetMipCount() const { return mpRecord->mip_count; }
+	FX_FORCE_INLINE eImageAspectFlag GetAspect() const { return static_cast<eImageAspectFlag>(mpRecord->aspect); }
+
+	FX_FORCE_INLINE VkImageLayout GetLayout() const { return static_cast<VkImageLayout>(mpRecord->layout); }
+	FX_FORCE_INLINE void SetLayout(VkImageLayout layout) { mpRecord->layout = static_cast<int32>(layout); }
+
+	FX_FORCE_INLINE VkImage Get() const { return reinterpret_cast<VkImage>(mpRecord->image); }
+	FX_FORCE_INLINE VkImageView GetView() const { return reinterpret_cast<VkImageView>(mpRecord->view); }
+
+	/// The image handle as an integer, for hashing and passing to Rust.
+	FX_FORCE_INLINE uint64 GetRawImage() const { return mpRecord->image; }
+	FX_FORCE_INLINE uint64 GetRawView() const { return mpRecord->view; }
+
+	FX_FORCE_INLINE bool IsInited() const { return mpRecord->image != 0; }
 
 	void Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format, VkImageTiling tiling,
 				VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags = eImageCreateFlags::None,
@@ -243,6 +269,13 @@ public:
 	void Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format,
 				VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags = eImageCreateFlags::None,
 				uint32 cube_count = 1);
+
+	/// Makes this image a view onto an image that something else owns, such as a swapchain image. Only the view is
+	/// destroyed with it.
+	void WrapExternal(VkImage image, Vec2u size, eImageFormat format);
+
+	/// Replaces the view with a color view of the whole image.
+	void RecreateColorView();
 
 	void CreateFromData(renderer::CommandBuffer& cmd, const ImageInfo& info, eImageCreateFlags flags);
 
@@ -271,30 +304,17 @@ public:
 
 	void SaveToFile(const String& path, eImageSaveFormat file_format);
 
-	VkImage Get() const { return InternalImage; }
-	FX_FORCE_INLINE bool IsInited() const { return (Get() != nullptr); }
-
-	void DecRef();
-
-
 	~Image();
 
-
 public:
-	eImageAspectFlag Aspect = eImageAspectFlag::Color;
-
-	VkImage InternalImage = nullptr;
-	VkImageView View = nullptr;
-
-	VkImageLayout ImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	RxGpuAllocation* Allocation = nullptr;
-
-	ImageInfo Info {};
-
 	TextureID ID = TextureID::Null;
 
 private:
-	RefCount* mpRefCnt = nullptr;
+	void Release();
+	void ShareOrCopy(const Image& other);
+
+private:
+	RxImage* mpRecord = nullptr;
 };
 
 

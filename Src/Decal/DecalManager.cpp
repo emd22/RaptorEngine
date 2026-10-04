@@ -223,7 +223,7 @@ void DecalManager::Update(const PerspectiveCamera& camera)
 																			: 0;
 
 	const uint32 page_offset = gGraphics->GetDecalFrameOffset();
-	DecalGpuData* page = reinterpret_cast<DecalGpuData*>(static_cast<uint8*>(gGraphics->DecalBuffer.pMappedBuffer) +
+	DecalGpuData* page = reinterpret_cast<DecalGpuData*>(static_cast<uint8*>(gGraphics->DecalBuffer.GetMapped()) +
 														 page_offset);
 
 	for (uint32 i = first_visible; i < visible_count; i++) {

@@ -100,24 +100,40 @@ public:
 
 	void FlushToGpu(uint32 offset, uint32 size)
 	{
-		rx_gpu_allocation_flush(Fx_Fwd_GetGpuAllocator(), Allocation, offset, size);
+		rx_buffer_flush(mpRecord, Fx_Fwd_GetGpuAllocator(), offset, size);
 	}
 
 	/// Invalidates host caches so CPU reads see GPU writes (e.g. image-to-buffer
 	/// readbacks into GPU_TO_CPU staging buffers). Must be called after Map()
-	/// and before reading pMappedBuffer. No-op on coherent memory.
+	/// and before reading the mapped memory. No-op on coherent memory.
 	/// This is essentially the CPU equivalent of `FlushToGpu`.
 	void InvalidateFromGpu()
 	{
-		if (Allocation != nullptr) {
-			rx_gpu_allocation_invalidate(Fx_Fwd_GetGpuAllocator(), Allocation, 0, Size);
+		if (mpRecord != nullptr) {
+			rx_buffer_invalidate(mpRecord, Fx_Fwd_GetGpuAllocator());
 		}
 	}
 
 	void Map();
 	void UnMap();
 
-	bool IsMapped() const { return pMappedBuffer != nullptr; }
+	bool IsMapped() const { return GetMapped() != nullptr; }
+
+	FX_FORCE_INLINE VkBuffer Get() const
+	{
+		return (mpRecord != nullptr) ? reinterpret_cast<VkBuffer>(mpRecord->buffer) : nullptr;
+	}
+
+	FX_FORCE_INLINE uint64 GetRaw() const { return (mpRecord != nullptr) ? mpRecord->buffer : 0; }
+	FX_FORCE_INLINE uint64 GetSize() const { return (mpRecord != nullptr) ? mpRecord->size : 0; }
+
+	FX_FORCE_INLINE eGpuBufferType GetType() const
+	{
+		return (mpRecord != nullptr) ? static_cast<eGpuBufferType>(mpRecord->buffer_type) : eGpuBufferType::Storage;
+	}
+
+	/// The mapped memory, if the buffer is mapped.
+	FX_FORCE_INLINE void* GetMapped() const { return (mpRecord != nullptr) ? mpRecord->mapped : nullptr; }
 
 	/**
 	 * @brief Uploads raw data buffer to the GPU buffer.
@@ -137,19 +153,11 @@ public:
 	~RawGpuBuffer() { Destroy(); }
 
 public:
-	eGpuBufferType Type = eGpuBufferType::Storage;
-	uint32 BufferId = 0;
-
-	VkBuffer Buffer = nullptr;
-	RxGpuAllocation* Allocation = nullptr;
-
-	void* pMappedBuffer = nullptr;
-
 	std::atomic_bool Initialized = { false };
-	uint64 Size = 0;
 
 private:
-	eGpuBufferFlags mBufferFlags = eGpuBufferFlags::None;
+	/// The buffer's state and its memory live in a record owned by Rust.
+	RxBuffer* mpRecord = nullptr;
 };
 
 
@@ -161,19 +169,15 @@ public:
 	/** Returns the raw pointer representation of the mapped data. */
 	operator void*()
 	{
-		if (!mpGpuBuffer->pMappedBuffer) {
-			return nullptr;
-		}
-
-		return mpGpuBuffer->pMappedBuffer;
+		return mpGpuBuffer->GetMapped();
 	}
 
 	/** Returns the pointer representation of the mapped data. */
 	template <typename TElementType>
 	TElementType* GetPtr()
 	{
-		DebugAssert(mpGpuBuffer->pMappedBuffer != nullptr);
-		return static_cast<TElementType*>(mpGpuBuffer->pMappedBuffer);
+		DebugAssert(mpGpuBuffer->GetMapped() != nullptr);
+		return static_cast<TElementType*>(mpGpuBuffer->GetMapped());
 	}
 
 	~GpuBufferMapContext() { mpGpuBuffer->UnMap(); }

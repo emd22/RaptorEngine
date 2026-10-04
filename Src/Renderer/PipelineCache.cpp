@@ -24,17 +24,10 @@ PipelineCache::PipelineCache()
 		mCache[i].Handle = PipelineHandle { i };
 	}
 
-	mKeys.resize(scNumPipelines);
-	mVariantInfos.resize(scNumPipelines);
+	mpRegistry = rx_pipeline_registry_create(scNumPipelines, scMaxDynamicPipelines);
 
 	for (std::atomic<DynamicPipeline*>& dynamic : mDynamic) {
 		dynamic.store(nullptr, std::memory_order_relaxed);
-	}
-
-	for (auto& pass_variants : mVariants) {
-		for (std::atomic<uint32>& variant : pass_variants) {
-			variant.store(PipelineHandle::scInvalidIndex, std::memory_order_relaxed);
-		}
 	}
 
 	mOffsets.InitCapacity(scMaxDescriptorSets);
@@ -50,11 +43,11 @@ PipelineCache::PipelineCache()
 
 PipelineCache::~PipelineCache()
 {
-	const uint32 count = mDynamicCount.load();
-
-	for (uint32 i = 0; i < count; i++) {
-		delete mDynamic[i].load();
+	for (std::atomic<DynamicPipeline*>& dynamic : mDynamic) {
+		delete dynamic.load();
 	}
+
+	rx_pipeline_registry_free(mpRegistry);
 }
 
 Pipeline& PipelineCache::Request(const ePipelineName id)
@@ -75,7 +68,7 @@ Pipeline& PipelineCache::Get(const PipelineHandle handle)
 	}
 
 	// Pipelines that other threads asked for are built here, before they are drawn with
-	if (mbHasPending.load(std::memory_order_acquire) && IsMainThread()) {
+	if (rx_pipeline_registry_has_pending(mpRegistry) != 0 && IsMainThread()) {
 		BuildPending();
 	}
 
@@ -106,15 +99,15 @@ const char* PipelineCache::GetDebugName(const PipelineHandle handle) const
 
 PipelineHandle PipelineCache::CreateLocked(const PipelineDesc& desc)
 {
-	const uint32 index = mDynamicCount.load(std::memory_order_relaxed);
+	const uint32 handle_index = rx_pipeline_registry_allocate(mpRegistry);
 
-	if (index >= scMaxDynamicPipelines) {
+	if (handle_index == RX_INVALID_INDEX) {
 		LogError(LC_RENDER, "Can not make pipeline '{}', there are already {} pipelines made from descriptions",
 				 desc.DebugName, scMaxDynamicPipelines);
 		return PipelineHandle {};
 	}
 
-	const PipelineHandle handle { scNumPipelines + index };
+	const PipelineHandle handle { handle_index };
 
 	DynamicPipeline* dynamic = new DynamicPipeline;
 	dynamic->Pipe.Handle = handle;
@@ -122,15 +115,8 @@ PipelineHandle PipelineCache::CreateLocked(const PipelineDesc& desc)
 	dynamic->Desc = desc;
 	dynamic->DebugName = desc.DebugName;
 
-	mKeys.emplace_back();
-	mVariantInfos.emplace_back();
-
 	// The pipeline is set up before it is stored, so whoever finds it finds all of it
-	mDynamic[index].store(dynamic, std::memory_order_release);
-	mDynamicCount.store(index + 1, std::memory_order_relaxed);
-
-	mPending.push_back(index);
-	mbHasPending.store(true, std::memory_order_release);
+	mDynamic[handle_index - scNumPipelines].store(dynamic, std::memory_order_release);
 
 	return handle;
 }
@@ -167,19 +153,20 @@ void PipelineCache::BuildPending()
 	mbBuilding = true;
 
 	while (true) {
-		std::vector<uint32> pending;
+		uint32 pending[scMaxDynamicPipelines];
+		size_t pending_count = 0;
 
 		{
 			std::lock_guard lock(mMutex);
-			pending.swap(mPending);
-			mbHasPending.store(false, std::memory_order_release);
+			pending_count = rx_pipeline_registry_take_pending(mpRegistry, pending, scMaxDynamicPipelines);
 		}
 
-		if (pending.empty()) {
+		if (pending_count == 0) {
 			break;
 		}
 
-		for (const uint32 index : pending) {
+		for (size_t pending_index = 0; pending_index < pending_count; pending_index++) {
+			const uint32 index = pending[pending_index];
 			DynamicPipeline* dynamic = mDynamic[index].load(std::memory_order_acquire);
 
 			gPSOBuild->Build(PipelineHandle { scNumPipelines + index }, dynamic->Desc);
@@ -198,73 +185,38 @@ void PipelineCache::BuildPending()
 
 bool PipelineCache::RegisterKey(const PipelineHandle handle, const PipelineKey& key)
 {
-	std::lock_guard lock(mMutex);
+	uint32 other = 0;
+	uint64 hash = 0;
 
-	AssertLess(handle.Index, mKeys.size());
+	const int32 result = rx_pipeline_registry_register_key(
+		mpRegistry, handle.Index, reinterpret_cast<const RxPipelineKey*>(&key), &other, &hash);
 
-	KeyEntry& entry = mKeys[handle.Index];
-
-	// The pipeline was rebuilt, so its old key no longer finds it
-	if (entry.bRegistered) {
-		const PipelineHandle* old = mKeyLookup.Find(entry.Hash);
-
-		if (old != nullptr && (*old) == handle) {
-			mKeyLookup.Remove(entry.Hash);
-		}
+	if (result == RX_KEY_IDENTICAL) {
+		LogWarning(LC_RENDER, "Pipelines {} and {} were built from identical keys (hash {:#x})", handle.Index, other,
+				   hash);
+	}
+	else if (result == RX_KEY_COLLISION) {
+		LogError(LC_RENDER, "Pipelines {} and {} have different keys with the same hash {:#x}", handle.Index, other,
+				 hash);
 	}
 
-	entry.Key = key;
-	entry.Hash = key.GetHash();
-	entry.bRegistered = true;
-
-	const PipelineHandle* existing = mKeyLookup.Find(entry.Hash);
-
-	if (existing == nullptr) {
-		mKeyLookup.Insert(entry.Hash, handle);
-		return true;
-	}
-
-	if ((*existing) == handle) {
-		return true;
-	}
-
-	const KeyEntry& other = mKeys[existing->Index];
-
-	if (other.Key == key) {
-		LogWarning(LC_RENDER, "Pipelines {} and {} were built from identical keys (hash {:#x})", handle.Index,
-				   existing->Index, entry.Hash);
-	}
-	else {
-		LogError(LC_RENDER, "Pipelines {} and {} have different keys with the same hash {:#x}", handle.Index,
-				 existing->Index, entry.Hash);
-	}
-
-	return false;
+	return result == RX_KEY_REGISTERED;
 }
 
 PipelineHandle PipelineCache::Find(const PipelineKey& key) const
 {
-	std::lock_guard lock(mMutex);
-
-	const PipelineHandle* handle = mKeyLookup.Find(key.GetHash());
-
-	// Whatever the hash matched has to have the whole key, or it was a collision
-	if (handle == nullptr || !(mKeys[handle->Index].Key == key)) {
-		return PipelineHandle {};
-	}
-
-	return *handle;
+	return PipelineHandle { rx_pipeline_registry_find(mpRegistry, reinterpret_cast<const RxPipelineKey*>(&key)) };
 }
 
 std::optional<PipelineKey> PipelineCache::GetKey(const PipelineHandle handle) const
 {
-	std::lock_guard lock(mMutex);
+	PipelineKey key;
 
-	if (handle.Index >= mKeys.size() || !mKeys[handle.Index].bRegistered) {
+	if (rx_pipeline_registry_get_key(mpRegistry, handle.Index, reinterpret_cast<RxPipelineKey*>(&key)) == 0) {
 		return std::nullopt;
 	}
 
-	return mKeys[handle.Index].Key;
+	return key;
 }
 
 void PipelineCache::Bind(const PipelineHandle handle, const CommandBuffer& cmd)
@@ -291,28 +243,11 @@ void PipelineCache::Bind(const PipelineHandle handle, const CommandBuffer& cmd)
 void PipelineCache::RegisterVariantLocked(const ePipelinePass pass, const ePipelineFeatures features,
 										  const PipelineHandle handle)
 {
-	const uint32 pass_index = static_cast<uint32>(pass);
-	const uint32 feature_index = static_cast<uint32>(features);
+	AssertLess(static_cast<uint32>(pass), scNumPipelinePasses);
+	AssertLess(static_cast<uint32>(features), scNumFeatureCombinations);
 
-	AssertLess(pass_index, scNumPipelinePasses);
-	AssertLess(feature_index, scNumFeatureCombinations);
-	AssertLess(handle.Index, mVariantInfos.size());
-
-	mVariants[pass_index][feature_index].store(handle.Index, std::memory_order_release);
-
-	std::vector<PipelineHandle>& pass_pipelines = mPassPipelines[pass_index];
-
-	if (std::find(pass_pipelines.begin(), pass_pipelines.end(), handle) == pass_pipelines.end()) {
-		pass_pipelines.push_back(handle);
-	}
-
-	// The first registration is the one FindVariantInPass() goes by. Any other would lead to the same pipeline in the
-	// other pass, as long as the passes are registered consistently.
-	VariantInfo& info = mVariantInfos[handle.Index];
-
-	if (info.Pass == ePipelinePass::Count) {
-		info = VariantInfo { .Pass = pass, .Features = features };
-	}
+	rx_pipeline_registry_register_variant(mpRegistry, static_cast<uint32>(pass), static_cast<uint32>(features),
+										  handle.Index);
 }
 
 void PipelineCache::RegisterVariant(const ePipelinePass pass, const ePipelineFeatures features,
@@ -324,14 +259,8 @@ void PipelineCache::RegisterVariant(const ePipelinePass pass, const ePipelineFea
 
 PipelineHandle PipelineCache::FindVariant(const ePipelinePass pass, const ePipelineFeatures features) const
 {
-	const uint32 pass_index = static_cast<uint32>(pass);
-	const uint32 feature_index = static_cast<uint32>(features);
-
-	if (pass_index >= scNumPipelinePasses || feature_index >= scNumFeatureCombinations) {
-		return PipelineHandle {};
-	}
-
-	return PipelineHandle { mVariants[pass_index][feature_index].load(std::memory_order_acquire) };
+	return PipelineHandle { rx_pipeline_registry_find_variant(mpRegistry, static_cast<uint32>(pass),
+															  static_cast<uint32>(features)) };
 }
 
 void PipelineCache::RegisterPassTemplate(const ePipelinePass pass, PassTemplate pass_template)
@@ -396,36 +325,26 @@ PipelineHandle PipelineCache::GetOrCreateVariant(const ePipelinePass pass, const
 
 PipelineHandle PipelineCache::GetOrCreateVariantInPass(const PipelineHandle handle, const ePipelinePass pass)
 {
-	ePipelineFeatures features;
+	uint32 handle_pass = 0;
+	uint32 features = 0;
 
-	{
-		std::lock_guard lock(mMutex);
-
-		if (handle.Index >= mVariantInfos.size() || mVariantInfos[handle.Index].Pass == ePipelinePass::Count) {
-			return PipelineHandle {};
-		}
-
-		features = mVariantInfos[handle.Index].Features;
+	if (rx_pipeline_registry_variant_info(mpRegistry, handle.Index, &handle_pass, &features) == 0) {
+		return PipelineHandle {};
 	}
 
-	return GetOrCreateVariant(pass, features);
+	return GetOrCreateVariant(pass, static_cast<ePipelineFeatures>(features));
 }
 
 PipelineHandle PipelineCache::FindVariantInPass(const PipelineHandle handle, const ePipelinePass pass) const
 {
-	ePipelineFeatures features;
+	uint32 handle_pass = 0;
+	uint32 features = 0;
 
-	{
-		std::lock_guard lock(mMutex);
-
-		if (handle.Index >= mVariantInfos.size() || mVariantInfos[handle.Index].Pass == ePipelinePass::Count) {
-			return PipelineHandle {};
-		}
-
-		features = mVariantInfos[handle.Index].Features;
+	if (rx_pipeline_registry_variant_info(mpRegistry, handle.Index, &handle_pass, &features) == 0) {
+		return PipelineHandle {};
 	}
 
-	return FindVariant(pass, features);
+	return FindVariant(pass, static_cast<ePipelineFeatures>(features));
 }
 
 void PipelineCache::AddBufferOffset(uint32 set_index, uint32 offset) { mOffsets[set_index].Insert(offset); }

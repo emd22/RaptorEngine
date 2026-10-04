@@ -66,7 +66,7 @@ VkDescriptorType DescriptorEntry::GetDescriptorType() const
 	if (IsBuffer()) {
 		// Get the buffer type
 
-		return GpuBufferUtil::BufferTypeToDescriptorType(pBuffer->Type);
+		return GpuBufferUtil::BufferTypeToDescriptorType(pBuffer->GetType());
 	}
 	else if (IsImage()) {
 		return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -82,43 +82,83 @@ VkDescriptorType DescriptorEntry::GetDescriptorType() const
 // Descriptor Pool Functions
 /////////////////////////////////////
 
+DescriptorPool::DescriptorPool(DescriptorPool&& other)
+{
+	mpRecord = other.mpRecord;
+	mPendingSizes = std::move(other.mPendingSizes);
+
+	other.mpRecord = nullptr;
+}
+
+DescriptorPool& DescriptorPool::operator=(DescriptorPool&& other)
+{
+	mpRecord = other.mpRecord;
+	mPendingSizes = std::move(other.mPendingSizes);
+
+	other.mpRecord = nullptr;
+
+	return *this;
+}
+
+void DescriptorPool::AddPoolSize(VkDescriptorType type, uint32_t count)
+{
+	for (RxDescriptorPoolSize& size : mPendingSizes) {
+		if (size.descriptor_type == static_cast<int32>(type)) {
+			size.count = count;
+			return;
+		}
+	}
+
+	mPendingSizes.push_back({ .descriptor_type = static_cast<int32>(type), .count = count });
+}
+
 void DescriptorPool::Create(GpuDevice* device, uint32 max_sets, bool enable_descriptor_free)
 {
-	const uint32 pool_sizes_count = RemainingDescriptorCounts.size();
-	SizedArray<RxDescriptorPoolSize> pool_sizes(pool_sizes_count);
+	Destroy();
 
-	for (const auto& desc_count : RemainingDescriptorCounts) {
-		pool_sizes.Insert({ .descriptor_type = desc_count.first, .count = desc_count.second });
+	int32 status = 0;
+
+	mpRecord = rx_descriptor_pool_new(device->GetRustDevice(), mPendingSizes.data(), mPendingSizes.size(), max_sets,
+									  enable_descriptor_free, &status);
+
+	if (mpRecord == nullptr) {
+		PanicVulkan("DescriptorPool", "Failed to create descriptor pool!", static_cast<VkResult>(status));
 	}
+}
 
-	SetCapacity = max_sets;
-
+VkDescriptorSet DescriptorPool::AllocateSet(VkDescriptorSetLayout layout, VkResult& out_status)
+{
 	uint64 handle = 0;
 
-	const VkResult status = static_cast<VkResult>(rx_gpu_descriptor_pool_create(
-		device->GetRustDevice(), pool_sizes.pData, pool_sizes.Size, max_sets, enable_descriptor_free, &handle));
+	out_status = static_cast<VkResult>(
+		rx_descriptor_pool_allocate_set(mpRecord, gGraphics->GetDevice()->GetRustDevice(), RxRaw(layout), &handle));
 
-	if (status != VK_SUCCESS) {
-		PanicVulkan("DescriptorPool", "Failed to create descriptor pool!", status);
-	}
+	return (out_status == VK_SUCCESS) ? RxFromRaw<VkDescriptorSet>(handle) : nullptr;
+}
 
-	Pool = RxFromRaw<VkDescriptorPool>(handle);
+void DescriptorPool::FreeSet(VkDescriptorSet set)
+{
+	rx_descriptor_pool_free_set(mpRecord, gGraphics->GetDevice()->GetRustDevice(), RxRaw(set));
 }
 
 void DescriptorPool::Recreate()
 {
-	Destroy();
-	Create(gGraphics->GetDevice(), SetCapacity);
+	const VkResult status = static_cast<VkResult>(
+		rx_descriptor_pool_recreate(mpRecord, gGraphics->GetDevice()->GetRustDevice()));
+
+	if (status != VK_SUCCESS) {
+		PanicVulkan("DescriptorPool", "Failed to recreate descriptor pool!", status);
+	}
 }
 
 void DescriptorPool::Destroy()
 {
-	if (!Pool) {
+	if (mpRecord == nullptr) {
 		return;
 	}
 
-	rx_gpu_descriptor_pool_destroy(gGraphics->GetDevice()->GetRustDevice(), RxRaw(Pool));
-	Pool = nullptr;
+	rx_descriptor_pool_destroy(mpRecord, gGraphics->GetDevice()->GetRustDevice());
+	mpRecord = nullptr;
 }
 
 /////////////////////////////////////
@@ -142,19 +182,14 @@ void DescriptorSet::Create(DescriptorPool& pool, DescriptorID id, DsLayoutID lay
 		Panic("DescriptorSet::Create", "Cannot continue.");
 	}
 
-	pool.SetsUsed++;
+	VkResult status = VK_SUCCESS;
 
-	uint64 handle = 0;
-
-	const VkResult status = static_cast<VkResult>(rx_gpu_descriptor_set_allocate(
-		gGraphics->GetDevice()->GetRustDevice(), RxRaw(pool.Get()), RxRaw(layout), &handle));
+	mInternalSet = pool.AllocateSet(layout, status);
 
 	if (status != VK_SUCCESS) {
-		LogError("Pool has {} allocated sets, with {} currently in use.", pool.SetCapacity, pool.SetsUsed);
+		LogError("Pool has {} allocated sets, with {} currently in use.", pool.GetSetCapacity(), pool.GetSetsUsed());
 		PanicVulkan("DescriptorSet", "Failed to allocate descriptor set!", status);
 	}
-
-	mInternalSet = RxFromRaw<VkDescriptorSet>(handle);
 }
 
 // void DescriptorSet::BindMultiple(uint32 first_set_index, const CommandBuffer& cmd, VkPipelineBindPoint bind_point,
@@ -288,20 +323,20 @@ void DescriptorSet::Build()
 				.binding = entry.Binding,
 				.kind = RX_DESCRIPTOR_IMAGE,
 				.sampler = RxRaw(entry.pSampler->InternalSampler),
-				.view = RxRaw(entry.pImage->View),
+				.view = entry.pImage->GetRawView(),
 			});
 		}
 		else if (entry.IsBuffer()) {
 			Assert(entry.pBuffer != nullptr);
-			AssertNotEqual(entry.pBuffer->Type, eGpuBufferType::None);
+			AssertNotEqual(entry.pBuffer->GetType(), eGpuBufferType::None);
 
 			writes.Insert(RxDescriptorWrite {
 				.binding = entry.Binding,
 				.kind = RX_DESCRIPTOR_BUFFER,
-				.buffer = RxRaw(entry.pBuffer->Buffer),
+				.buffer = entry.pBuffer->GetRaw(),
 				.offset = entry.BufferOffset,
 				.range = entry.BufferRange,
-				.buffer_type = static_cast<uint32>(entry.pBuffer->Type),
+				.buffer_type = static_cast<uint32>(entry.pBuffer->GetType()),
 			});
 		}
 	}
@@ -320,7 +355,7 @@ void DescriptorSet::Rebuild(DescriptorPool& pool)
 
 	// Free the old (now-stale) descriptor set from the old pool
 	if (mInternalSet != nullptr) {
-		rx_gpu_descriptor_set_free(gGraphics->GetDevice()->GetRustDevice(), RxRaw(pool.Get()), RxRaw(mInternalSet));
+		pool.FreeSet(mInternalSet);
 		mInternalSet = nullptr;
 	}
 
@@ -332,19 +367,14 @@ void DescriptorSet::Rebuild(DescriptorPool& pool)
 		return;
 	}
 
-	pool.SetsUsed++;
+	VkResult status = VK_SUCCESS;
 
-	uint64 handle = 0;
-
-	const VkResult status = static_cast<VkResult>(rx_gpu_descriptor_set_allocate(
-		gGraphics->GetDevice()->GetRustDevice(), RxRaw(pool.Get()), RxRaw(layout), &handle));
+	mInternalSet = pool.AllocateSet(layout, status);
 
 	if (status != VK_SUCCESS) {
 		PanicVulkan("DescriptorSet::Rebuild", "Failed to allocate descriptor set!", status);
 		return;
 	}
-
-	mInternalSet = RxFromRaw<VkDescriptorSet>(handle);
 
 	// Rewrite descriptors using the current (potentially new) image/buffer handles
 	mbIsBuilt = false;

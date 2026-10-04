@@ -18,7 +18,7 @@ pub struct DsLayoutEntry
 	pub count: u32,
 }
 
-fn fnv_bytes(mut hash: u32, bytes: &[u8]) -> u32
+pub(crate) fn fnv_bytes(mut hash: u32, bytes: &[u8]) -> u32
 {
 	for byte in bytes {
 		hash ^= u32::from(*byte);

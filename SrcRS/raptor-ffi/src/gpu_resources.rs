@@ -1,12 +1,11 @@
 use std::ffi::c_void;
 
 use ash::vk::{self, Handle};
-use raptor_gpu::{Allocation, Allocator, Level, SemaphoreKind};
+use raptor_gpu::{Allocator, Level, SemaphoreKind};
 
 use crate::gpu::{RxGpuDevice, RxGpuInstance};
 
 pub struct RxGpuAllocator(pub(crate) Allocator);
-pub struct RxGpuAllocation(pub(crate) Allocation);
 
 fn code(result: Result<(), vk::Result>) -> i32
 {
@@ -53,94 +52,6 @@ pub unsafe extern "C" fn rx_gpu_allocator_free(allocator: *mut RxGpuAllocator)
 		// SAFETY: guaranteed by the caller.
 		drop(unsafe { Box::from_raw(allocator) });
 	}
-}
-
-/// # Safety
-///
-/// `buffer` and `allocation` must come from `rx_gpu_buffer_create_typed` on this allocator and not
-/// be in use. `allocation` must not be used afterwards.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_buffer_destroy(
-	allocator: *const RxGpuAllocator,
-	buffer: u64,
-	allocation: *mut RxGpuAllocation,
-)
-{
-	if allocation.is_null() {
-		return;
-	}
-
-	// SAFETY: guaranteed by the caller.
-	unsafe {
-		let allocation = Box::from_raw(allocation);
-		(*allocator)
-			.0
-			.destroy_buffer(vk::Buffer::from_raw(buffer), allocation.0);
-	}
-}
-
-/// # Safety
-///
-/// `allocation` must be live and host visible. `out_mapped` must be writable.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_allocation_map(
-	allocator: *const RxGpuAllocator,
-	allocation: *mut RxGpuAllocation,
-	out_mapped: *mut *mut c_void,
-) -> i32
-{
-	// SAFETY: guaranteed by the caller.
-	match unsafe { (*allocator).0.map(&mut (*allocation).0) } {
-		Ok(mapped) => {
-			// SAFETY: guaranteed by the caller.
-			unsafe { *out_mapped = mapped.cast() };
-			vk::Result::SUCCESS.as_raw()
-		}
-		Err(error) => error.as_raw(),
-	}
-}
-
-/// # Safety
-///
-/// `allocation` must be live and mapped by `rx_gpu_allocation_map`.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_allocation_unmap(
-	allocator: *const RxGpuAllocator,
-	allocation: *mut RxGpuAllocation,
-)
-{
-	// SAFETY: guaranteed by the caller.
-	unsafe { (*allocator).0.unmap(&mut (*allocation).0) };
-}
-
-/// # Safety
-///
-/// `allocation` must be live.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_allocation_flush(
-	allocator: *const RxGpuAllocator,
-	allocation: *const RxGpuAllocation,
-	offset: u64,
-	size: u64,
-) -> i32
-{
-	// SAFETY: guaranteed by the caller.
-	code(unsafe { (*allocator).0.flush(&(*allocation).0, offset, size) })
-}
-
-/// # Safety
-///
-/// `allocation` must be live.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_allocation_invalidate(
-	allocator: *const RxGpuAllocator,
-	allocation: *const RxGpuAllocation,
-	offset: u64,
-	size: u64,
-) -> i32
-{
-	// SAFETY: guaranteed by the caller.
-	code(unsafe { (*allocator).0.invalidate(&(*allocation).0, offset, size) })
 }
 
 /// # Safety

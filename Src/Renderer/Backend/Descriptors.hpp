@@ -26,27 +26,42 @@ struct Target;
 class DescriptorPool
 {
 public:
+	DescriptorPool() = default;
+	DescriptorPool(DescriptorPool&& other);
+
+	DescriptorPool(const DescriptorPool&) = delete;
+	DescriptorPool& operator=(const DescriptorPool&) = delete;
+
+	DescriptorPool& operator=(DescriptorPool&& other);
+
+	/// Sets how many descriptors of `type` the pool will hold. Only applies to the next `Create`.
+	void AddPoolSize(VkDescriptorType type, uint32_t count);
+
 	void Create(GpuDevice* device, uint32 max_sets = 10, bool enable_descriptor_free = false);
 
-	bool IsInited() const { return (Pool != nullptr); }
-	FX_FORCE_INLINE VkDescriptorPool Get() const { return Pool; }
-	void AddPoolSize(VkDescriptorType type, uint32_t count) { RemainingDescriptorCounts[type] = count; }
+	bool IsInited() const { return (mpRecord != nullptr); }
+	FX_FORCE_INLINE VkDescriptorPool Get() const
+	{
+		return (mpRecord != nullptr) ? reinterpret_cast<VkDescriptorPool>(mpRecord->pool) : nullptr;
+	}
 
+	FX_FORCE_INLINE uint32 GetSetCapacity() const { return (mpRecord != nullptr) ? mpRecord->set_capacity : 0; }
+	FX_FORCE_INLINE uint32 GetSetsUsed() const { return (mpRecord != nullptr) ? mpRecord->sets_used : 0; }
+
+	/// Allocates a set with `layout`, or returns a null set and the error in `out_status`.
+	VkDescriptorSet AllocateSet(VkDescriptorSetLayout layout, VkResult& out_status);
+	void FreeSet(VkDescriptorSet set);
+
+	/// Makes the pool again with the same sizes. Every set allocated from it is invalid afterwards.
 	void Recreate();
 
 	void Destroy();
 	~DescriptorPool() { Destroy(); }
 
-public:
-	VkDescriptorPool Pool = nullptr;
-
-	uint16 SetCapacity = 0;
-	uint16 SetsUsed = 0;
-
-	std::unordered_map<VkDescriptorType, uint32> RemainingDescriptorCounts;
-
 private:
-	friend class DescriptorSet;
+	RxDescriptorPool* mpRecord = nullptr;
+
+	std::vector<RxDescriptorPoolSize> mPendingSizes;
 };
 
 enum class eDescriptorEntryType
