@@ -40,6 +40,8 @@ enum class eEditorToolFlags : uint32
 
 	/// The tool picks something other than objects, so the object selection is dropped when it is selected
 	ClearsSelection = (1 << 1),
+
+	UsesModels = (1 << 2),
 };
 
 } // namespace editor
@@ -151,6 +153,7 @@ public:
 	}
 
 	FX_FORCE_INLINE bool UsesSelection() const { return HasFlag(Flags, eEditorToolFlags::UsesSelection); }
+	FX_FORCE_INLINE bool UsesModels() const { return HasFlag(Flags, eEditorToolFlags::UsesModels); }
 
 	~EditorTool();
 

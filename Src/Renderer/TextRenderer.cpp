@@ -120,7 +120,8 @@ bool TextRenderer::SubmitQuads(DescriptorSet* ds, const InstanceData* instances,
 
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
-	const renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::TextRendering);
+	const ePipelineName pipeline_name = is_image ? ePipelineName::ImageRendering : ePipelineName::TextRendering;
+	const renderer::Pipeline& pipeline = gPipelineCache->Request(pipeline_name);
 
 	// Each frame in flight has its own region of the instance buffer
 	const uint32 base_offset = (gGraphics->GetFrameNumber() * scMaxGlyphs * sizeof(InstanceData));
@@ -129,7 +130,7 @@ bool TextRenderer::SubmitQuads(DescriptorSet* ds, const InstanceData* instances,
 	memcpy(mapped + base_offset + mTapeOffset, instances, instances_size);
 
 	gPipelineCache->AddBufferOffset(0, base_offset);
-	gPipelineCache->Bind(ePipelineName::TextRendering, cmd);
+	gPipelineCache->Bind(pipeline_name, cmd);
 
 	ds->Bind(0, cmd, pipeline, Slice<const uint32>(&base_offset, 1));
 
@@ -137,7 +138,6 @@ bool TextRenderer::SubmitQuads(DescriptorSet* ds, const InstanceData* instances,
 	memcpy(consts.CombinedMatrix, mOrthoProjection.RawData, sizeof(consts.CombinedMatrix));
 	consts.TextColor = color;
 	consts.InstanceBase = mTapeOffset / sizeof(InstanceData);
-	consts.IsImage = is_image ? 1 : 0;
 	gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, consts);
 
 	mTapeOffset += instances_size;

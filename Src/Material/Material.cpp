@@ -224,6 +224,10 @@ ePipelineFeatures Material::GetPipelineFeatures() const
 		features |= ePipelineFeatures::Skinned;
 	}
 
+	if (HasFlag(Properties.Flags, eMaterialFlags::Unlit)) {
+		features |= ePipelineFeatures::Unlit;
+	}
+
 	return features;
 }
 

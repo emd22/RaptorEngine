@@ -111,6 +111,8 @@ public:
 	bool SelectObject(Object* object, bool append_selection);
 	void ClearSelection();
 
+	void DeselectModels();
+
 	FX_FORCE_INLINE const EditorSelection& GetSelection() const { return mSelection; }
 
 	FX_FORCE_INLINE LightEditor& GetLightEditor() { return mLightEditor; }
@@ -156,6 +158,8 @@ private:
 
 	/// Selects the object under the crosshair
 	void PickObject();
+
+	void DrawModelSelection();
 
 	void BeginDrag();
 	/// Ends the drag in progress, letting the tool finish its operation

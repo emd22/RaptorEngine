@@ -36,6 +36,7 @@ void World::Create()
 	mVisibleTiles.InitCapacity(600);
 
 	pCVarShowProbeVolumes = gCVars->Set<int64>("r_show_volumes", 0);
+	pCVarFrustumCull = gCVars->Set<int64>("r_frustum_cull", 1);
 }
 
 static bool IsTransparentMaterial(Material* mat) { return (mat != nullptr && mat->Properties.Alpha < 0.999f); }
@@ -385,6 +386,11 @@ void World::ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Cam
 	// the capture don't shadow it either
 	const bool is_probe_capture = gProbeManager->IsCapturingFaces();
 
+	Frustum shadow_frustum;
+	shadow_frustum.Rebuild(shadow_camera, eObjectLayer::WorldLayer);
+
+	const bool cull_to_shadow_frustum = (pCVarFrustumCull->IntValue != 0);
+
 	for (ObjectID object_id : section.Objects) {
 		if (object_id.IsInvalid()) {
 			continue;
@@ -392,6 +398,10 @@ void World::ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Cam
 
 		Object* object = gObjectManager->GetObject(object_id);
 		if (object == nullptr || (is_probe_capture && !object->IsProbeVisible())) {
+			continue;
+		}
+
+		if (cull_to_shadow_frustum && object->IsOutsideFrustum(shadow_frustum, scFrustumSidePlanes)) {
 			continue;
 		}
 
@@ -715,7 +725,7 @@ void World::AddToRenderListRecursive(renderer::PipelineHandle pipeline, ObjectID
 }
 
 
-void World::AddToRenderListRecursiveByMaterial(ObjectID* id_ptr)
+void World::AddToRenderListRecursiveByMaterial(ObjectID* id_ptr, const Frustum* frustum)
 {
 	if (id_ptr == nullptr) {
 		return;
@@ -731,11 +741,24 @@ void World::AddToRenderListRecursiveByMaterial(ObjectID* id_ptr)
 	// Container objects (e.g. the root of a multi-primitive mesh) have no mesh/material of their own; only the
 	// attached primitives that actually own a mesh need placing in a geometry section.
 	if (obj->pMesh.IsValid()) {
-		mRenderList.AddObject(GetPipelineForMaterial(obj->GetMaterialID()), obj->ID);
+		bool is_visible = true;
+
+		if (frustum != nullptr && obj->CanBeFrustumCulled()) {
+			FrustumTestedObjects++;
+
+			if (obj->IsOutsideFrustum(*frustum)) {
+				FrustumCulledObjects++;
+				is_visible = false;
+			}
+		}
+
+		if (is_visible) {
+			mRenderList.AddObject(GetPipelineForMaterial(obj->GetMaterialID()), obj->ID);
+		}
 	}
 
 	for (ObjectID& attached_id : obj->AttachedNodes) {
-		AddToRenderListRecursiveByMaterial(&attached_id);
+		AddToRenderListRecursiveByMaterial(&attached_id, frustum);
 	}
 }
 
@@ -749,7 +772,7 @@ void World::ClearRenderList()
 	mRenderList.ClearSection(GetShadowListPipeline());
 }
 
-void World::AddTileToRenderList(bool clear, TileIndex new_tile_index)
+void World::AddTileToRenderList(bool clear, TileIndex new_tile_index, const Frustum* frustum)
 {
 	Tile* tile = gWorldGrid->GetTile(new_tile_index);
 
@@ -785,7 +808,7 @@ void World::AddTileToRenderList(bool clear, TileIndex new_tile_index)
 			AddToRenderListRecursive(GetShadowListPipeline(), object_id);
 		}
 
-		AddToRenderListRecursiveByMaterial(object_id);
+		AddToRenderListRecursiveByMaterial(object_id, frustum);
 
 		++index;
 	}
@@ -843,6 +866,11 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 
 	ClearRenderList();
 
+	FrustumTestedObjects = 0;
+	FrustumCulledObjects = 0;
+
+	const Frustum* object_frustum = (pCVarFrustumCull->IntValue != 0) ? &mFrustum : nullptr;
+
 	// Super broad phase for culling.
 
 	Vec2u min_tile = gWorldGrid->TileToTileXY(
@@ -873,12 +901,12 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 
 			mVisibleTiles.Emplace(ti);
 
-			AddTileToRenderList(false, ti);
+			AddTileToRenderList(false, ti, object_frustum);
 			AddTileToLightList(ti);
 		}
 	}
 
-	AddTileToRenderList(false, WorldGrid::scGlobalTileIndex);
+	AddTileToRenderList(false, WorldGrid::scGlobalTileIndex, object_frustum);
 
 	AddUnculledLightsToLightList();
 }

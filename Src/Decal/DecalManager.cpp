@@ -36,9 +36,13 @@ void DecalManager::Create()
 	mNormalAtlasTicket = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
 												  scBulletHoleNormalAtlasPath, eImageCreateFlags::None);
 
+	mBloodAtlasTicket = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_SRGB, scBloodAtlasPath,
+												 eImageCreateFlags::None);
+
 	// Runs on the asset thread, the renderer picks the atlases up in Update()
 	mAtlasTicket.OnLoaded([this](void* data) { mpAtlas.store(static_cast<Image*>(data)); });
 	mNormalAtlasTicket.OnLoaded([this](void* data) { mpNormalAtlas.store(static_cast<Image*>(data)); });
+	mBloodAtlasTicket.OnLoaded([this](void* data) { mpBloodAtlas.store(static_cast<Image*>(data)); });
 }
 
 void DecalManager::AddDecal(const DecalDesc& desc)
@@ -88,7 +92,7 @@ void DecalManager::AddDecal(const DecalDesc& desc)
 	gpu_data.HalfExtents[0] = desc.Width * 0.5f;
 	gpu_data.HalfExtents[1] = desc.Height * 0.5f;
 	gpu_data.HalfExtents[2] = desc.Depth * 0.5f;
-	gpu_data.HalfExtents[3] = 0.0f;
+	gpu_data.HalfExtents[3] = static_cast<float32>(desc.Atlas);
 
 	gpu_data.Color = desc.Color;
 	gpu_data.Roughness = desc.Roughness;
@@ -144,6 +148,32 @@ void DecalManager::AddBulletHole(const Vec3f& hit_point, const Vec3f& hit_normal
 	AddDecal(desc);
 }
 
+void DecalManager::AddBloodSplat(const Vec3f& hit_point, const Vec3f& hit_normal, float32 size)
+{
+	const float32 width = size * (0.8f + (0.4f * RandomUnit()));
+	const float32 height = width * (0.85f + (0.3f * RandomUnit()));
+
+	const float32 shade = 0.65f + (0.35f * RandomUnit());
+	const uint32 shade_byte = static_cast<uint32>(shade * 255.0f);
+
+	const DecalDesc desc {
+		.Position = hit_point,
+		.Direction = -hit_normal,
+		.Width = width,
+		.Height = height,
+		.Depth = scBloodDepth,
+		.Roll = RandomUnit() * 2.0f * static_cast<float32>(M_PI),
+		.AtlasRect = { 1.0f, 1.0f, 0.0f, 0.0f },
+		.Color = shade_byte | (shade_byte << 8) | (shade_byte << 16) | 0xFF000000u,
+		.Roughness = 0.2f,
+		.RoughnessWeight = 0.85f,
+		.NormalStrength = 0.0f,
+		.Atlas = eDecalAtlas::Blood,
+	};
+
+	AddDecal(desc);
+}
+
 void DecalManager::Clear()
 {
 	mDecals.Clear();
@@ -159,8 +189,9 @@ void DecalManager::Update(const PerspectiveCamera& camera)
 
 	Image* atlas = mpAtlas.load();
 	Image* normal_atlas = mpNormalAtlas.load();
+	Image* blood_atlas = mpBloodAtlas.load();
 
-	gGraphics->pRenderer->SetDecalAtlases(atlas, normal_atlas);
+	gGraphics->pRenderer->SetDecalAtlases(atlas, normal_atlas, blood_atlas);
 
 	// Until the atlas is in, the shader would sample the (opaque white) null image
 	if (atlas == nullptr) {
@@ -176,6 +207,10 @@ void DecalManager::Update(const PerspectiveCamera& camera)
 		// Oldest first. Once the ring is full the oldest is at `mNextSlot`, before then `mNextSlot` equals the count.
 		const uint32 slot = (mNextSlot + i) % decal_count;
 		const DecalEntry& entry = mDecals[slot];
+
+		if (blood_atlas == nullptr && entry.GpuData.HalfExtents[3] > 0.5f) {
+			continue;
+		}
 
 		if (frustum.IntersectsSphere(Vec3f(entry.GpuData.Center), entry.BoundsRadius)) {
 			mVisibleSlots.Insert(slot);

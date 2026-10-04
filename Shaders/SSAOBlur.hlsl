@@ -74,15 +74,12 @@ FSOutput main(FSInput input)
 	float total_ao = center_ao;
 	float total_weight = 1.0;
 
+	[unroll]
 	for (int x = -BLUR_KERNEL_RADIUS; x <= BLUR_KERNEL_RADIUS; ++x)
 	{
+		[unroll]
 		for (int y = -BLUR_KERNEL_RADIUS; y <= BLUR_KERNEL_RADIUS; ++y)
 		{
-			if (x == 0 && y == 0)
-			{
-				continue;
-			}
-
 			float2 offset = float2(x, y) * Consts.TexelSize;
 			float2 sample_uv = input.vUV + offset;
 
@@ -98,7 +95,7 @@ FSOutput main(FSInput input)
 			float sigma = float(BLUR_KERNEL_RADIUS) * 0.5;
 			float spatial_weight = exp(-(r * r) / (2.0 * sigma * sigma));
 
-			float weight = bilateral_weight * spatial_weight;
+			float weight = select(and(x == 0, y == 0), 0.0, bilateral_weight * spatial_weight);
 			total_ao += sample_ao * weight;
 			total_weight += weight;
 		}

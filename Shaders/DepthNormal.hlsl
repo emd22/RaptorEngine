@@ -189,10 +189,7 @@ PERMEND();
     }
 
     // Ignore normals for unlit objects
-    if (HAS_FLAG(material.Flags, MF_UNLIT)) {
-        return output;
-    }
-
+PERMNOT(UNLIT);
 PERMIF(USE_NORMAL_MAPS);
     float3 normal_ts = F_Sample(tNormalMap, input.vUV).rgb * 2.0 - 1.0;
 
@@ -208,6 +205,7 @@ PERMIF(USE_NORMAL_MAPS);
     output.vNormal = float4(normalize(mul(normal_ts, TBN)), 0.0);
 PERMELSE()
     output.vNormal = float4(input.vNormalWS, 0.0);
+PERMEND();
 PERMEND();
 
     return output;

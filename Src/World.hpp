@@ -132,7 +132,7 @@ private:
 	/// Draws the objects of a forward pipeline's list into the prepass, with the prepass pipeline that goes with it
 	void ExecutePrepassRenderList(renderer::PipelineHandle forward_pipeline);
 
-	void AddTileToRenderList(bool clear, TileIndex new_tile);
+	void AddTileToRenderList(bool clear, TileIndex new_tile, const Frustum* frustum = nullptr);
 	void AddTileToLightList(TileIndex tile_index);
 	void AddUnculledLightsToLightList();
 	void ClearRenderList();
@@ -144,7 +144,7 @@ private:
 	 * of a multi-primitive mesh can each require a different pipeline, e.g. a skinned primitive attached to a
 	 * container object whose own material differs).
 	 */
-	void AddToRenderListRecursiveByMaterial(ObjectID* id);
+	void AddToRenderListRecursiveByMaterial(ObjectID* id, const Frustum* frustum);
 
 	void SortTransparentObjects(renderer::Pipeline& pipeline, renderer::RenderListSection& section);
 
@@ -171,6 +171,10 @@ public:
 	String BlockoutPath;
 
 	CVarValue* pCVarShowProbeVolumes = nullptr;
+	CVarValue* pCVarFrustumCull = nullptr;
+
+	uint32 FrustumTestedObjects = 0;
+	uint32 FrustumCulledObjects = 0;
 
 private:
 	Ref<PerspectiveCamera> mpCurrentCamera { nullptr };

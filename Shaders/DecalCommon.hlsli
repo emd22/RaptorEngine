@@ -38,6 +38,6 @@ struct Decal
 	/// Decal UV to atlas UV: xy is the scale, zw the offset
 	float4 vAtlasRect;
 	// 160
-	/// World space half extents along each axis, w unused
+	/// World space half extents along each axis. W is the atlas: 0 samples tDecalAtlas, 1 samples tDecalBloodAtlas
 	float4 vHalfExtents;
 };

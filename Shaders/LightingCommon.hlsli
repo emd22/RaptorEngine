@@ -196,12 +196,12 @@ float4 GetSpotBoundingSphere(Light light)
 	const float range = light.fLightRadius;
 
 	// Wide cones (over 45 degrees): the sphere centered on the cap's base circle
-	if (cos_outer < 0.70710678) {
-		const float sin_outer = sqrt(saturate(1.0 - cos_outer * cos_outer));
-		return float4(light.vLightPosition + light.vSpotDirection * (range * cos_outer), range * sin_outer);
-	}
+	const float sin_outer = sqrt(saturate(1.0 - cos_outer * cos_outer));
+	const float4 wide = float4(light.vLightPosition + light.vSpotDirection * (range * cos_outer), range * sin_outer);
 
 	// Narrow cones: the sphere passing through the apex and the cap's base circle
 	const float radius = range / (2.0 * cos_outer);
-	return float4(light.vLightPosition + light.vSpotDirection * radius, radius);
+	const float4 narrow = float4(light.vLightPosition + light.vSpotDirection * radius, radius);
+
+	return select(cos_outer < 0.70710678, wide, narrow);
 }

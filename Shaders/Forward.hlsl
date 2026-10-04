@@ -183,6 +183,7 @@ F_StructBuffer(bDecals, Decal, 9, 0);
 F_StructBuffer(bDecalMasks, uint, 10, 0);
 F_Texture2D(tDecalAtlas, 11, 0)
 F_Texture2D(tDecalNormalAtlas, 12, 0)
+F_Texture2D(tDecalBloodAtlas, 17, 0)
 
 F_Texture2D(tAlbedo, 0, 1)
 
@@ -381,7 +382,13 @@ void ApplyDecals(inout SurfaceParams surface, inout float3 shading_normal, TileL
 			const float2 atlas_ddx = mul(position_ddx, world_to_decal).xy * uv_scale;
 			const float2 atlas_ddy = mul(position_ddy, world_to_decal).xy * uv_scale;
 
-			const float4 decal_sample = F_SampleGrad(tDecalAtlas, atlas_uv, atlas_ddx, atlas_ddy);
+			float4 decal_sample;
+			if (decal.vHalfExtents.w > 0.5) {
+				decal_sample = F_SampleGrad(tDecalBloodAtlas, atlas_uv, atlas_ddx, atlas_ddy);
+			}
+			else {
+				decal_sample = F_SampleGrad(tDecalAtlas, atlas_uv, atlas_ddx, atlas_ddy);
+			}
 			const float4 tint = F_UnpackUIntToFloat4(decal.uiColor);
 
 			const float alpha = decal_sample.a * tint.a * angle_fade * depth_fade;
@@ -465,11 +472,7 @@ PERMEND();
 
     output.vAlbedo = float4(albedo, base_alpha);
 
-    if (HAS_FLAG(material.Flags, MF_UNLIT)) {
-
-	    return output;
-    }
-
+PERMNOT(UNLIT);
 PERMIF(USE_NORMAL_MAPS);
     float4 surface_sample = F_Sample(tORM, input.vUV);
     float3 normal_ts = F_Sample(tNormalMap, input.vUV).rgb * 2.0 - 1.0;
@@ -692,6 +695,7 @@ PERMIF(DEBUG_VIEWS);
 	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_DEBUG_PROBE_VISIBILITY)) {
 		output.vAlbedo = float4(probe_visibility, probe_visibility, probe_visibility, 1.0f);
 	}
+PERMEND();
 PERMEND();
 
     return output;

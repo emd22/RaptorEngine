@@ -11,6 +11,7 @@
 #include <Jolt/Physics/Collision/CollisionCollector.h>
 #include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
 #include <Jolt/Physics/Collision/RayCast.h>
+#include <Jolt/Physics/Body/BodyFilter.h>
 #include <ThirdParty/Jolt/Core/Factory.h>
 #include <ThirdParty/Jolt/Core/JobSystemThreadPool.h>
 #include <ThirdParty/Jolt/Core/TempAllocator.h>
@@ -153,7 +154,7 @@ void JoltPhysicsBackend::Create()
 	mbIsInited = true;
 }
 
-RayResult JoltPhysicsBackend::Raycast(const Vec3f& origin, const Vec3f& direction) const
+RayResult JoltPhysicsBackend::Raycast(const Vec3f& origin, const Vec3f& direction, JPH::BodyID ignore_body) const
 {
 	JPH::RRayCast rc;
 
@@ -162,7 +163,9 @@ RayResult JoltPhysicsBackend::Raycast(const Vec3f& origin, const Vec3f& directio
 
 	JPH::RayCastResult result;
 
-	if (PhysicsSystem.GetNarrowPhaseQuery().CastRay(rc, result)) {
+	JPH::IgnoreSingleBodyFilter ignore_filter(ignore_body);
+
+	if (PhysicsSystem.GetNarrowPhaseQuery().CastRay(rc, result, {}, {}, ignore_filter)) {
 		JPH::Vec3 hit_point = rc.GetPointOnRay(result.mFraction);
 
 		RayResult hit { .bHit = true, .Body = result.mBodyID };
