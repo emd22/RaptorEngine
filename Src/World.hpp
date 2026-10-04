@@ -15,6 +15,8 @@
 
 namespace fx {
 
+class CVarValue;
+
 class Player;
 class Blockout;
 
@@ -154,8 +156,10 @@ public:
 
 	uint32 DebugBoundsMask = 0;
 	bool bRenderProbes = false;
+
 	renderer::RenderList mRenderList;
 	renderer::LightList mLightList;
+
 
 	/// Set once a scene file has populated its objects. Used by WorldFile to
 	/// tell a first load (add everything) from a hot reload (update in place)
@@ -165,6 +169,8 @@ public:
 
 	Blockout* pBlockout = nullptr;
 	String BlockoutPath;
+
+	CVarValue* pCVarShowProbeVolumes = nullptr;
 
 private:
 	Ref<PerspectiveCamera> mpCurrentCamera { nullptr };

@@ -141,7 +141,7 @@ void WorldPropertiesPanel::OnPaneChanged()
 
 void WorldPropertiesPanel::BuildReflectionPane(wxSizer* sizer)
 {
-	mpReflectionPane = new wxCollapsiblePane(this, wxID_ANY, "Reflection Probes", wxDefaultPosition, wxDefaultSize,
+	mpReflectionPane = new wxCollapsiblePane(this, wxID_ANY, "Probes", wxDefaultPosition, wxDefaultSize,
 											 wxCP_DEFAULT_STYLE | wxCP_NO_TLW_RESIZE);
 
 	wxWindow* pane = mpReflectionPane->GetPane();
@@ -155,24 +155,31 @@ void WorldPropertiesPanel::BuildReflectionPane(wxSizer* sizer)
 	mpReflectionEnabledCheck = new wxCheckBox(pane, wxID_ANY, "Enabled");
 	pane_sizer->Add(mpReflectionEnabledCheck, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
 
-	mpReflectionEnabledCheck->Bind(wxEVT_CHECKBOX,
-								   [this](wxCommandEvent&)
-								   { gCVars->Set("r_reflection_probes", mpReflectionEnabledCheck->GetValue() ? 1 : 0); });
+	mpReflectionEnabledCheck->Bind(
+		wxEVT_CHECKBOX,
+		[this](wxCommandEvent&) { gCVars->Set("r_reflection_probes", mpReflectionEnabledCheck->GetValue() ? 1 : 0); });
 
-	mpReflectionLevelProbeCheck = new wxCheckBox(pane, wxID_ANY, "Level fallback probe");
-	pane_sizer->Add(mpReflectionLevelProbeCheck, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+	mpReflectionFallbackCheck = new wxCheckBox(pane, wxID_ANY, "Reflection fallback probe");
+	pane_sizer->Add(mpReflectionFallbackCheck, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
 
-	mpReflectionLevelProbeCheck->Bind(wxEVT_CHECKBOX,
-									  [this](wxCommandEvent&)
-									  {
-										  gCVars->Set("r_reflection_level_probe",
-													  mpReflectionLevelProbeCheck->GetValue() ? 1 : 0);
-										  gProbeManager->RebuildReflectionProbesFromWorld();
-									  });
+	mpReflectionFallbackCheck->Bind(wxEVT_CHECKBOX,
+									[this](wxCommandEvent&)
+									{
+										gCVars->Set("r_reflection_level_probe",
+													mpReflectionFallbackCheck->GetValue() ? 1 : 0);
+										gProbeManager->RebuildReflectionProbesFromWorld();
+									});
+
+	mpShowProbeVolumesCheck = new wxCheckBox(pane, wxID_ANY, "Show probe volumes");
+	pane_sizer->Add(mpShowProbeVolumesCheck, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+
+	mpShowProbeVolumesCheck->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&)
+								  { gCVars->Set("r_show_volumes", mpShowProbeVolumesCheck->GetValue() ? 1 : 0); });
+
 
 	{
 		wxBoxSizer* debug_row = new wxBoxSizer(wxHORIZONTAL);
-		debug_row->Add(new wxStaticText(pane, wxID_ANY, "Debug View"), wxSizerFlags().CenterVertical());
+		debug_row->Add(new wxStaticText(pane, wxID_ANY, "Reflection View"), wxSizerFlags().CenterVertical());
 
 		mpReflectionDebugChoice = new wxChoice(pane, wxID_ANY);
 
@@ -182,6 +189,7 @@ void WorldPropertiesPanel::BuildReflectionPane(wxSizer* sizer)
 
 		debug_row->Add(mpReflectionDebugChoice, wxSizerFlags().Border(wxLEFT, 6));
 		pane_sizer->Add(debug_row, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+
 
 		mpReflectionDebugChoice->Bind(wxEVT_CHOICE,
 									  [this](wxCommandEvent&)
@@ -269,8 +277,8 @@ void WorldPropertiesPanel::UpdateReflectionPane()
 
 	const bool level_probe = gCVars->Get("r_reflection_level_probe", int64 { 0 }) != 0;
 
-	if (mpReflectionLevelProbeCheck->GetValue() != level_probe) {
-		mpReflectionLevelProbeCheck->SetValue(level_probe);
+	if (mpReflectionFallbackCheck->GetValue() != level_probe) {
+		mpReflectionFallbackCheck->SetValue(level_probe);
 	}
 
 	const int64 debug_view = std::clamp<int64>(gCVars->Get("r_reflection_debug", int64 { 0 }), 0, 2);

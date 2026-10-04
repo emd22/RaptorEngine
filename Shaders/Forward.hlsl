@@ -173,6 +173,8 @@ F_StructBuffer(bProbeGrid, uint, 13, 0);
 F_StructBuffer(bReflectionProbes, ReflectionProbe, 14, 0);
 F_TextureCubeArray(tReflectionProbes, 15, 0)
 
+F_Texture2D(tDfgLut, 16, 0)
+
 // Per-probe depth moments (6x16x16 mean + standard deviation), one atlas strip per probe, for visibility
 F_Texture2D(tProbeMoments, 8, 0)
 
@@ -240,11 +242,6 @@ float SampleShadowAtlas(Light light, float3 position_ws, float3 normal_ws, float
 	position_ls = mul(float4(position_ws + normal_ws * (texel_world_size * SHADOW_NORMAL_OFFSET_TEXELS * sin_theta), 1.0),
 					  light.LightCameraMatrix);
 
-	// Behind a spot light
-	if (position_ls.w <= 0.0) {
-		return 1.0;
-	}
-
 	const float3 position_ndc = position_ls.xyz / position_ls.w;
 
 	// The projection flips Y, so NDC +Y is already the bottom of the shadow map
@@ -253,7 +250,11 @@ float SampleShadowAtlas(Light light, float3 position_ws, float3 normal_ws, float
 	// I should probably flip the viewport depth range... This is my fault from like a year ago.
 	const float shadow_z = 1.0 - position_ndc.z;
 
-	if (any(saturate(shadow_uv) != shadow_uv) || (shadow_z <= 0.0)) {
+	// Behind a spot light, or outside of its shadow map
+	const bool behind = position_ls.w <= 0.0;
+	const bool outside = or(any(saturate(shadow_uv) != shadow_uv), shadow_z <= 0.0);
+
+	if (or(behind, outside)) {
 		return 1.0;
 	}
 
@@ -292,7 +293,7 @@ float SampleShadowAtlas(Light light, float3 position_ws, float3 normal_ws, float
 }
 
 
-#define MIN_ROUGHNESS 0.212
+#define MIN_LIGHT_ROUGHNESS 0.212
 
 struct SurfaceParams
 {
@@ -332,7 +333,7 @@ SurfaceParams GetSurfaceParams(Material material, float3 albedo, float4 surface_
 
 	// }
 
-	surface.fRoughness = clamp(surface.fRoughness, MIN_ROUGHNESS, 1.0);
+	surface.fRoughness = saturate(surface.fRoughness);
 
 	return surface;
 }
@@ -410,7 +411,7 @@ void ApplyDecals(inout SurfaceParams surface, inout float3 shading_normal, TileL
 		}
 	}
 
-	surface.fRoughness = clamp(surface.fRoughness, MIN_ROUGHNESS, 1.0);
+	surface.fRoughness = saturate(surface.fRoughness);
 }
 
 
@@ -434,12 +435,12 @@ FSOutput main(FSInput input)
     FSOutput output;
 
     // Double sided materials are lit from whichever side is seen
-    if (!input.bIsFrontFace) {
-        input.vNormalWS = -input.vNormalWS;
+    const float facing = select(input.bIsFrontFace, 1.0, -1.0);
+
+    input.vNormalWS *= facing;
 PERMIF(USE_NORMAL_MAPS);
-        input.vTangentWS = -input.vTangentWS;
+    input.vTangentWS *= facing;
 PERMEND();
-    }
 
 PERMNOT(USE_SKINNING);
     // Taken before anything can discard, for the decals' texture gradients
@@ -500,18 +501,22 @@ PERMEND();
 	TileLightData tile_data = bLightGrid[tile_index];
 
 PERMNOT(USE_SKINNING);
+PERMNOT(PROBE_CAPTURE);
 	// Decals stay where they are in the world, so skinned meshes would slide through them
-	if (!HAS_FLAG(FSConst.Flags, DRAW_FLAG_NO_DECALS | DRAW_FLAG_PROBE_CAPTURE)) {
-		// ApplyDecals() leaves the shading normal normalized, so N_final stays unit length through this
-		ApplyDecals(surface, N_final, tile_data, tile_index, input.vPositionWS, normalize(input.vNormalWS),
-					position_ddx, position_ddy);
-	}
+	tile_data.DecalWordEnd = select(HAS_FLAG(FSConst.Flags, DRAW_FLAG_NO_DECALS), tile_data.DecalWordStart,
+									tile_data.DecalWordEnd);
+
+	// ApplyDecals() leaves the shading normal normalized, so N_final stays unit length through this
+	ApplyDecals(surface, N_final, tile_data, tile_index, input.vPositionWS, normalize(input.vNormalWS),
+				position_ddx, position_ddy);
+PERMEND();
 PERMEND();
 
 	const float roughness = surface.fRoughness;
 
 	/// GGX alpha. The specular lobe is parameterised by the square of the perceptual roughness.
 	const float specular_alpha = roughness * roughness;
+	const float light_alpha = max(specular_alpha, MIN_LIGHT_ROUGHNESS * MIN_LIGHT_ROUGHNESS);
 
 	float3 accumulated_light = float3(0.0, 0.0, 0.0);
 
@@ -519,13 +524,20 @@ PERMEND();
 	const float3 V = normalize(FSConst.vEyePosition.xyz - input.vPositionWS);
 	const float NdotV = abs(dot(N, V)) + 1e-5f;
 
+	const float2 dfg = SampleDfg(F_TextureName(tDfgLut), tDfgLut, NdotV, roughness);
+	const float3 energy_compensation = SpecularEnergyCompensation(surface.vF0, dfg);
+
 	/// The unperturbed surface normal (already flipped for backfaces), for rejecting light the surface faces away from
 	const float3 geometric_normal = normalize(input.vNormalWS);
 
 	const float2 ssao_coords = float2(input.vPosition.xy / (float2(FSConst.vTargetSize)));
 
+PERMIF(PROBE_CAPTURE);
 	// Probe capture bakes have no matching SSAO data.
-	float ssao = HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE) ? 1.0 : F_Sample(tSSAO, ssao_coords).r;
+	const float ssao = 1.0;
+PERMELSE();
+	const float ssao = F_Sample(tSSAO, ssao_coords).r;
+PERMEND();
 
 PERMIF(DEBUG_LIGHT_HEATMAP);
 	output.vAlbedo = float4(GetSaturationColor((float)tile_data.Count), 1.0);
@@ -538,38 +550,24 @@ PERMEND();
 		float3 light_color = light.vLightColor;
 		float light_intensity = light.fIntensity;
 
+		const bool is_directional = light.uiLightType == FX_LIGHT_TYPE_DIRECTIONAL;
+		const bool is_spot = light.uiLightType == FX_LIGHT_TYPE_SPOT;
+
+		const float3 light_position_local = light.vLightPosition - input.vPositionWS;
+		const float dist_sq = dot(light_position_local, light_position_local);
+
+		// Already normalized by LightDirectional::FillGpuData()
+		const float3 L = select(is_directional, light.vLightPosition, normalize(light_position_local));
+
+		float attenuation = light_intensity * select(is_directional, 1.0, AttenuationSmooth(dist_sq, light.fInvRadiusSq));
+		attenuation *= select(is_spot, AttenuationSpot(L, light), 1.0);
+
 		/// How much light is visible (not occluded) at this pixel
-		float visibility = 1.0;
+		const float visibility = SampleShadowAtlas(light, input.vPositionWS, geometric_normal, L);
+
 		/// Visibility for the diffuse term only. The specular lobe peaks far above diffuse, so any floor on it shows
-		/// up as highlights in shadow.
-		float diffuse_visibility_floor = 0.0;
-
-		float3 L;
-		float attenuation;
-
-		if (light.uiLightType == FX_LIGHT_TYPE_DIRECTIONAL) {
-			// Already normalized by LightDirectional::FillGpuData()
-			L = light.vLightPosition;
-			attenuation = light_intensity;
-
-			visibility = SampleShadowAtlas(light, input.vPositionWS, geometric_normal, L);
-
-			// Let a little of the sun into its own shadows
-			diffuse_visibility_floor = 0.05;
-		}
-		else {
-			float3 light_position_local = light.vLightPosition - input.vPositionWS;
-			L = normalize(light_position_local);
-
-			float dist_sq = dot(light_position_local, light_position_local);
-
-			attenuation = light_intensity * AttenuationSmooth(dist_sq, light.fInvRadiusSq);
-
-			if (light.uiLightType == FX_LIGHT_TYPE_SPOT) {
-				attenuation *= AttenuationSpot(L, light);
-				visibility = SampleShadowAtlas(light, input.vPositionWS, geometric_normal, L);
-			}
-		}
+		/// up as highlights in shadow. Let a little of the sun into its own shadows
+		const float diffuse_visibility_floor = select(is_directional, 0.05, 0.0);
 
 		// A normal map can tilt a texel towards a light that the surface itself faces away from (the top edges of
 		// bricks on the back of a sunlit wall). Fade the light out as the geometric surface turns away from it.
@@ -586,9 +584,9 @@ PERMEND();
 
 		// D_GGX() and V_SmithGGXCorrelated() take the GGX alpha, which is the perceptual roughness squared.
 		// Fr_FrostbiteDisneyDiffuse() takes the perceptual roughness itself (Frostbite's "linearRoughness").
-		float D = D_GGX(NdotH, specular_alpha);
-		float Vis = V_SmithGGXCorrelated(NdotV, NdotL, specular_alpha);
-		float3 Fr = D * F * Vis * FX_MATH_1_OVER_PI;
+		float D = D_GGX(NdotH, light_alpha);
+		float Vis = V_SmithGGXCorrelated(NdotV, NdotL, light_alpha);
+		float3 Fr = D * F * Vis * FX_MATH_1_OVER_PI * energy_compensation;
 
 		float Fd = Fr_FrostbiteDisneyDiffuse(NdotV, NdotL, LdotH, roughness);
 
@@ -607,7 +605,13 @@ PERMEND();
 	float3 probe_irradiance = float3(0.0f, 0.0f, 0.0f);
 	float probe_visibility = 1.0f;
 
-	if (!HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE) || HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_BOUNCE)) {
+PERMIF(PROBE_CAPTURE);
+	const bool use_probes = HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_BOUNCE);
+PERMELSE();
+	const bool use_probes = true;
+PERMEND();
+
+	if (use_probes) {
 		const uint probe_volume_count = GetProbeVolumeCount(bProbeVolume);
 
 		if (probe_volume_count > 0) {
@@ -615,7 +619,7 @@ PERMEND();
 
 			// An L2 SH probe is blurry (duh) and a rough surface's lobe is centred nearer the normal than the reflection.
 			// Sampling along R regardless is wrong for most instances where roughness sits at or near 1
-			const float3 R = GetSpecularDominantDir(N, reflect(-V, N), roughness);
+			const float3 R = GetSpecularDominantDir(N, reflect(-V, N), specular_alpha);
 
 			float3 probe_radiance;
 
@@ -631,45 +635,50 @@ PERMEND();
 				volume_index = 0;
 			}
 
-			if (!HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE | DRAW_FLAG_NO_REFLECTION_PROBES)) {
-				probe_radiance = SampleReflectionProbes(input.vPositionWS, R, roughness, probe_radiance,
-														bReflectionProbes, F_TextureName(tReflectionProbes),
-														tReflectionProbes);
-			}
+PERMNOT(PROBE_CAPTURE);
+			const uint reflection_probe_count = select(HAS_FLAG(FSConst.Flags, DRAW_FLAG_NO_REFLECTION_PROBES), 0u,
+													   GetReflectionProbeCount(bReflectionProbes));
 
-			const float3 probe_specular = probe_radiance * EnvBRDFApprox(surface.vF0, roughness, NdotV);
+			probe_radiance = SampleReflectionProbes(input.vPositionWS, R, roughness, probe_radiance,
+													reflection_probe_count, bReflectionProbes,
+													F_TextureName(tReflectionProbes), tReflectionProbes);
+PERMEND();
 
-			const float specular_occlusion = SpecularOcclusion(NdotV, surface.fOcclusion, roughness);
+			const float3 single_scatter = (surface.vF0 * dfg.x) + dfg.y;
+			const float3 multi_scatter = MultiScatterReflectance(surface.vF0, single_scatter, dfg);
+			const float3 ambient_diffuse = surface.vDiffuse * (1.0 - single_scatter - multi_scatter);
 
-			ambient = ((probe_irradiance * surface.vDiffuse * surface.fOcclusion) + (probe_specular * specular_occlusion)) *
-					  ssao;
+			const float occlusion = min(surface.fOcclusion, ssao);
+			const float3 diffuse_occlusion = MultiBounceOcclusion(occlusion, surface.vDiffuse);
+			const float3 specular_occlusion =
+				MultiBounceOcclusion(SpecularOcclusion(NdotV, occlusion, specular_alpha), surface.vF0);
+
+			ambient = (probe_irradiance * ambient_diffuse * diffuse_occlusion) +
+					  (((probe_radiance * single_scatter) + (probe_irradiance * multi_scatter)) * specular_occlusion);
 		}
 	}
 
+PERMIF(PROBE_CAPTURE);
+	const float3 capture_ambient = albedo * (PROBE_CAPTURE_AMBIENT_ILLUMINANCE * FX_MATH_1_OVER_PI);
+	const float3 bounce_ambient =
+		select(HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_BOUNCE), capture_ambient + ambient, capture_ambient);
+	const float3 lp_ambient = select(HAS_FLAG(FSConst.Flags, DRAW_FLAG_REFLECTION_CAPTURE), ambient, bounce_ambient);
+
+	output.vAlbedo = float4((accumulated_light + lp_ambient) * FSConst.fPreExposure, 1.0f);
+PERMELSE();
 	output.vAlbedo = float4((accumulated_light + ambient) * FSConst.fPreExposure, base_alpha);
+PERMEND();
 
-	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_CAPTURE)) {
-		float3 lp_ambient = albedo * (PROBE_CAPTURE_AMBIENT_ILLUMINANCE * FX_MATH_1_OVER_PI);
-
-		if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_BOUNCE)) {
-			lp_ambient += ambient;
-		}
-
-		if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_REFLECTION_CAPTURE)) {
-			lp_ambient = ambient;
-		}
-
-		output.vAlbedo = float4((accumulated_light + lp_ambient) * FSConst.fPreExposure, 1.0f);
-	}
-
+PERMIF(DEBUG_VIEWS);
 	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_DEBUG_PROBE_IRRADIANCE)) {
 		output.vAlbedo = float4(probe_irradiance * FSConst.fPreExposure, 1.0f);
 	}
 
 	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_DEBUG_REFLECTION)) {
-		const float3 mirror = SampleReflectionProbes(input.vPositionWS, reflect(-V, geometric_normal), 0.0,
-													 float3(0.0, 0.0, 0.0), bReflectionProbes,
-													 F_TextureName(tReflectionProbes), tReflectionProbes);
+		const float3 mirror =
+			SampleReflectionProbes(input.vPositionWS, reflect(-V, geometric_normal), 0.0, float3(0.0, 0.0, 0.0),
+								   GetReflectionProbeCount(bReflectionProbes), bReflectionProbes,
+								   F_TextureName(tReflectionProbes), tReflectionProbes);
 
 		output.vAlbedo = float4(mirror * FSConst.fPreExposure, 1.0f);
 	}
@@ -683,6 +692,7 @@ PERMEND();
 	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_DEBUG_PROBE_VISIBILITY)) {
 		output.vAlbedo = float4(probe_visibility, probe_visibility, probe_visibility, 1.0f);
 	}
+PERMEND();
 
     return output;
 }

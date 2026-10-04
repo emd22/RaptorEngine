@@ -45,7 +45,8 @@ private:
 	wxCollapsiblePane* mpReflectionPane = nullptr;
 	wxStaticText* mpReflectionStatus = nullptr;
 	wxCheckBox* mpReflectionEnabledCheck = nullptr;
-	wxCheckBox* mpReflectionLevelProbeCheck = nullptr;
+	wxCheckBox* mpReflectionFallbackCheck = nullptr;
+	wxCheckBox* mpShowProbeVolumesCheck = nullptr;
 	wxChoice* mpReflectionDebugChoice = nullptr;
 	wxString mShownReflectionStatus;
 	int64 mShownReflectionDebug = -1;

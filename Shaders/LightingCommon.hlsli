@@ -119,35 +119,53 @@ float Fr_FrostbiteDisneyDiffuse(float NdotV, float NdotL, float LdotH, float lin
 	return light_scatter * view_scatter * energy_factor;
 }
 
-/// Analytic fit of the split-sum environment BRDF (Karis, "Physically Based Shading on Mobile").
-/// Scales prefiltered ambient radiance into reflected specular for the given F0 and perceptual roughness.
-float3 EnvBRDFApprox(float3 f0, float roughness, float NdotV)
+#define DFG_LUT_SIZE 32.0
+
+float2 SampleDfg(Texture2D lut, SamplerState lut_sampler, float NdotV, float roughness)
 {
-	const float4 c0 = float4(-1.0, -0.0275, -0.572, 0.022);
-	const float4 c1 = float4(1.0, 0.0425, 1.04, -0.04);
+	const float2 coords = saturate(float2(NdotV, roughness));
+	const float2 uv = (coords * ((DFG_LUT_SIZE - 1.0) / DFG_LUT_SIZE)) + (0.5 / DFG_LUT_SIZE);
 
-	float4 r = roughness * c0 + c1;
-	float a004 = min(r.x * r.x, exp2(-9.28 * NdotV)) * r.x + r.y;
-	float2 AB = float2(-1.04, 1.04) * a004 + r.zw;
+	return lut.SampleLevel(lut_sampler, uv, 0.0).rg;
+}
 
-	return f0 * AB.x + AB.y;
+float3 SpecularEnergyCompensation(float3 f0, float2 dfg)
+{
+	return 1.0 + (f0 * ((1.0 / max(dfg.x + dfg.y, 1e-3)) - 1.0));
+}
+
+float3 MultiScatterReflectance(float3 f0, float3 single_scatter, float2 dfg)
+{
+	const float missing = 1.0 - (dfg.x + dfg.y);
+	const float3 average_fresnel = f0 + ((1.0 - f0) / 21.0);
+
+	return (single_scatter * average_fresnel * missing) / (1.0 - (average_fresnel * missing));
 }
 
 /// Occlusion of specular ambient light (Lagarde & de Rousiers, "Moving Frostbite to PBR"). A cavity blocks the
 /// reflection less than it blocks diffuse light at grazing angles and on smooth surfaces.
-float SpecularOcclusion(float NdotV, float ambient_occlusion, float roughness)
+float SpecularOcclusion(float NdotV, float ambient_occlusion, float alpha)
 {
-	return saturate(pow(NdotV + ambient_occlusion, exp2(-16.0 * roughness - 1.0)) - 1.0 + ambient_occlusion);
+	return saturate(pow(NdotV + ambient_occlusion, exp2(-16.0 * alpha - 1.0)) - 1.0 + ambient_occlusion);
+}
+
+float3 MultiBounceOcclusion(float visibility, float3 albedo)
+{
+	const float3 a = (2.0404 * albedo) - 0.3324;
+	const float3 b = (-4.7951 * albedo) + 0.6417;
+	const float3 c = (2.7552 * albedo) + 0.6903;
+
+	return max(visibility, ((((visibility * a) + b) * visibility) + c) * visibility);
 }
 
 /// Direction the specular lobe is centred on, for looking up ambient specular (Frostbite,
 /// "Moving Frostbite to PBR", getSpecularDominantDir). A mirror reflects along R, but as a surface roughens its
 /// lobe spreads over the hemisphere and its average direction swings towards the normal. Sampling along R
 /// regardless makes rough surfaces read the environment from a direction their lobe barely covers.
-float3 GetSpecularDominantDir(float3 N, float3 R, float roughness)
+float3 GetSpecularDominantDir(float3 N, float3 R, float alpha)
 {
-	const float smoothness = saturate(1.0 - roughness);
-	const float factor = smoothness * (sqrt(smoothness) + roughness);
+	const float smoothness = saturate(1.0 - alpha);
+	const float factor = smoothness * (sqrt(smoothness) + alpha);
 
 	return normalize(lerp(N, R, factor));
 }

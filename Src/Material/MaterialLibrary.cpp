@@ -58,8 +58,12 @@ bool MaterialLibrary::Load(const std::string& list_path, const std::string& text
 					  item.GetMemberValue<const char*>(HashStr32("diffuse"), ""), name);
 		AttachTexture(material, Material::eResourceType::Normal, texture_root,
 					  item.GetMemberValue<const char*>(HashStr32("normal"), ""), name);
-		AttachTexture(material, Material::eResourceType::ORM, texture_root,
-					  item.GetMemberValue<const char*>(HashStr32("orm"), ""), name);
+		const bool has_orm = AttachTexture(material, Material::eResourceType::ORM, texture_root,
+										   item.GetMemberValue<const char*>(HashStr32("orm"), ""), name);
+
+		if (has_orm) {
+			material->SetMetallicRoughness(1.0f, 1.0f);
+		}
 
 		material->Finalize();
 

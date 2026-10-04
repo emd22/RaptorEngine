@@ -296,6 +296,8 @@ public:
 
 	Image* pNoiseTexture = nullptr;
 
+	Image* pDfgLut = nullptr;
+
 	/// Times the stages of the GPU frame
 	GpuProfiler Profiler;
 
@@ -310,11 +312,15 @@ public:
 
 	float32 PreExposure = 1.0f;
 
+	uint32 Tonemapper = 1;
+
 	/// Debug view: show blended probe irradiance instead of the lit result.
 	bool bOnlyRenderProbes = false;
 
 	/// Debug view: show blended probe visibility instead of the lit result.
 	bool bRenderProbeVisibility = false;
+
+	bool HasDebugView() const { return bOnlyRenderProbes || bRenderProbeVisibility || (ReflectionDebugView != 0); }
 
 private:
 	GpuDevice mDevice;

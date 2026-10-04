@@ -96,13 +96,12 @@ uint SelectProbeVolume(float3 pos_ws, StructuredBuffer<ProbeVolume> volumes, uin
 
 		// Closer wins outright; between volumes that both contain the position (both 0) the denser one does
 		const bool closer = distance_sq < best_distance_sq - 1e-4;
-		const bool denser = distance_sq <= best_distance_sq + 1e-4 && cell_volume < best_cell_volume;
+		const bool denser = and(distance_sq <= best_distance_sq + 1e-4, cell_volume < best_cell_volume);
+		const bool better = or(closer, denser);
 
-		if (closer || denser) {
-			best = i;
-			best_distance_sq = distance_sq;
-			best_cell_volume = cell_volume;
-		}
+		best = select(better, i, best);
+		best_distance_sq = select(better, distance_sq, best_distance_sq);
+		best_cell_volume = select(better, cell_volume, best_cell_volume);
 	}
 
 	return best;
@@ -159,21 +158,23 @@ float3 EvalProbeIrradiance(float3 normal, ProbeSHData probe)
 void ProbeDepthDirectionToFaceUV(float3 d, out uint face, out float2 uv01)
 {
 	const float3 a = abs(d);
-	float2 uv;
 
-	if (a.x >= a.y && a.x >= a.z) {
-		face = (d.x > 0.0) ? 0 : 1;
-		uv = float2((d.x > 0.0) ? -d.z : d.z, -d.y) / a.x;
-	}
-	else if (a.y >= a.z) {
-		face = (d.y > 0.0) ? 2 : 3;
-		uv = float2(d.x, (d.y > 0.0) ? d.z : -d.z) / a.y;
-	}
-	else {
-		face = (d.z > 0.0) ? 4 : 5;
-		uv = float2((d.z > 0.0) ? d.x : -d.x, -d.y) / a.z;
-	}
+	const bool x_major = and(a.x >= a.y, a.x >= a.z);
+	const bool y_major = a.y >= a.z;
+	const bool3 positive = d > 0.0;
 
+	const uint face_x = select(positive.x, 0u, 1u);
+	const uint face_y = select(positive.y, 2u, 3u);
+	const uint face_z = select(positive.z, 4u, 5u);
+
+	const float2 uv_x = float2(select(positive.x, -d.z, d.z), -d.y);
+	const float2 uv_y = float2(d.x, select(positive.y, d.z, -d.z));
+	const float2 uv_z = float2(select(positive.z, d.x, -d.x), -d.y);
+
+	const float major = select(x_major, a.x, select(y_major, a.y, a.z));
+	const float2 uv = select(x_major, uv_x, select(y_major, uv_y, uv_z)) / major;
+
+	face = select(x_major, face_x, select(y_major, face_y, face_z));
 	uv01 = uv * 0.5 + 0.5;
 }
 
@@ -192,15 +193,11 @@ float ProbeDepthChebyshev(float receiver_dist, float mean, float variance)
 {
 	const float biased_dist = max(receiver_dist - PROBE_CHEBYSHEV_BIAS, 0.0);
 
-	// In front of the mean occluder distance: fully visible.
-	if (biased_dist <= mean) {
-		return 1.0;
-	}
-
 	const float clamped_variance = max(variance, ProbeMinVariance(mean));
 	const float d = biased_dist - mean;
 
-	return clamped_variance / (clamped_variance + d * d);
+	// In front of the mean occluder distance: fully visible.
+	return select(biased_dist <= mean, 1.0, clamped_variance / (clamped_variance + d * d));
 }
 
 /// Where probe `index`'s strip for `face` starts in the atlas, in texels.
@@ -249,22 +246,22 @@ float SampleProbeVisibility(float3 pos_ws, float3 probe_pos, Texture2D moments_a
 	const float3 to_receiver = pos_ws - probe_pos;
 	const float raw_dist = length(to_receiver);
 
-	if (raw_dist < 1e-4) {
-		return 1.0;
-	}
+	const bool at_probe = raw_dist < 1e-4;
+	const float3 direction = select(at_probe, float3(0.0, 0.0, 1.0), to_receiver / max(raw_dist, 1e-4));
 
 	uint face;
 	float2 uv01;
-	ProbeDepthDirectionToFaceUV(to_receiver / raw_dist, face, uv01);
+	ProbeDepthDirectionToFaceUV(direction, face, uv01);
 
 	const ProbeMoments moments = SampleProbeMoments(moments_atlas, moments_sampler, index, face, uv01);
 
 	// Nothing was hit in this direction.
-	if (moments.Mean >= PROBE_DEPTH_MAX_DISTANCE - 1e-3) {
-		return 1.0;
-	}
+	const bool no_hit = moments.Mean >= PROBE_DEPTH_MAX_DISTANCE - 1e-3;
 
-	return ProbeDepthChebyshev(min(raw_dist, PROBE_DEPTH_MAX_DISTANCE), moments.Mean, moments.Variance);
+	const float visibility =
+		ProbeDepthChebyshev(min(raw_dist, PROBE_DEPTH_MAX_DISTANCE), moments.Mean, moments.Variance);
+
+	return select(or(at_probe, no_hit), 1.0, visibility);
 }
 
 /// Lower weight for probes behind the surface.
@@ -273,13 +270,9 @@ float ProbeBackfaceWeight(float3 pos_ws, float3 n, float3 probe_pos)
 	const float3 to_probe = probe_pos - pos_ws;
 	const float len = length(to_probe);
 
-	if (len < 1e-4) {
-		return 1.0 + PROBE_BACKFACE_FLOOR;
-	}
+	const float wrap = (dot(to_probe / max(len, 1e-4), n) + 1.0) * 0.5;
 
-	const float wrap = (dot(to_probe / len, n) + 1.0) * 0.5;
-
-	return wrap * wrap + PROBE_BACKFACE_FLOOR;
+	return select(len < 1e-4, 1.0 + PROBE_BACKFACE_FLOOR, wrap * wrap + PROBE_BACKFACE_FLOOR);
 }
 
 /// `pos_ws` moved off the surface along its normal, so that the surface doesn't occlude itself in the visibility test.
@@ -307,7 +300,7 @@ void ProbeVolumeCell(float3 pos_ws, ProbeVolume volume, out uint3 base, out floa
 uint ProbeGridLookup(StructuredBuffer<uint> grid, uint point_index)
 {
 	const uint word = grid[point_index >> 1];
-	return ((point_index & 1) != 0) ? (word >> 16) : (word & 0xFFFF);
+	return select((point_index & 1) != 0, word >> 16, word & 0xFFFF);
 }
 
 /// Where corner `corner` (0-7, one bit per axis) of the cell at `base` is in the probe buffers, and its trilinear weight
@@ -368,9 +361,8 @@ bool SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume 
 		float weight = max(ProbeBackfaceWeight(pos_ws, n, probe_pos) * visibility * visibility * visibility,
 						   PROBE_MIN_WEIGHT);
 
-		if (weight < PROBE_WEIGHT_CRUSH) {
-			weight *= weight * weight / (PROBE_WEIGHT_CRUSH * PROBE_WEIGHT_CRUSH);
-		}
+		weight = select(weight < PROBE_WEIGHT_CRUSH,
+						weight * (weight * weight / (PROBE_WEIGHT_CRUSH * PROBE_WEIGHT_CRUSH)), weight);
 
 		weight *= trilinear;
 
@@ -380,7 +372,7 @@ bool SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume 
 		total_weight += weight;
 	}
 
-	out_visibility = (placed_trilinear > 1e-6) ? (visibility_sum / placed_trilinear) : 1.0;
+	out_visibility = select(placed_trilinear > 1e-6, visibility_sum / placed_trilinear, 1.0);
 
 	if (placed_count == 0) {
 		out_diffuse = float3(0.0, 0.0, 0.0);
@@ -442,11 +434,7 @@ float3 ReflectionBoxProject(float3 pos_ws, float3 dir_ws, float3 pos_bs, float3 
 	const float3 t_far = max((1.0 - pos_bs) * inv_dir, (-1.0 - pos_bs) * inv_dir);
 	const float t = min(t_far.x, min(t_far.y, t_far.z));
 
-	if (t <= 0.0) {
-		return dir_ws;
-	}
-
-	return (pos_ws + (dir_ws * t)) - probe_pos;
+	return select(t <= 0.0, dir_ws, (pos_ws + (dir_ws * t)) - probe_pos);
 }
 
 float ReflectionProbeWeight(float3 pos_bs, ReflectionProbe probe)
@@ -478,11 +466,10 @@ float3 ReflectionProbeCoverage(float3 pos_ws, StructuredBuffer<ReflectionProbe> 
 	return color + (float3(0.03, 0.03, 0.03) * remaining);
 }
 
-float3 SampleReflectionProbes(float3 pos_ws, float3 r, float roughness, float3 fallback,
+float3 SampleReflectionProbes(float3 pos_ws, float3 r, float roughness, float3 fallback, uint probe_count,
 							  StructuredBuffer<ReflectionProbe> probes, TextureCubeArray cubemaps,
 							  SamplerState cubemap_sampler)
 {
-	const uint probe_count = GetReflectionProbeCount(probes);
 	const float lod = roughness * REFLECTION_PROBE_MAX_LOD;
 
 	float3 radiance = float3(0.0, 0.0, 0.0);
