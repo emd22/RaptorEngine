@@ -1,6 +1,7 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
-pub enum TokenKind {
+pub enum TokenKind
+{
 	Unknown,
 	Identifier,
 	String,
@@ -32,8 +33,10 @@ pub enum TokenKind {
 	DocComment,
 }
 
-impl TokenKind {
-	pub fn name(self) -> &'static str {
+impl TokenKind
+{
+	pub fn name(self) -> &'static str
+	{
 		match self {
 			TokenKind::Unknown => "Unknown",
 			TokenKind::Identifier => "Identifier",
@@ -69,13 +72,15 @@ impl TokenKind {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Numeric {
+pub enum Numeric
+{
 	NaN,
 	Integer,
 	Fractional,
 }
 
-pub fn classify_numeric(text: &[u8]) -> Numeric {
+pub fn classify_numeric(text: &[u8]) -> Numeric
+{
 	let mut result = Numeric::NaN;
 
 	for (i, &ch) in text.iter().enumerate() {
@@ -104,7 +109,8 @@ pub fn classify_numeric(text: &[u8]) -> Numeric {
 
 /// The maximum amount of digits(including decimal) we could accept from a tokie
 /// Converts a token to an integer value
-pub fn to_int(text: &[u8]) -> i64 {
+pub fn to_int(text: &[u8]) -> i64
+{
 	let mut value: i64 = 0;
 	for &ch in text.iter().take_while(|ch| ch.is_ascii_digit()) {
 		let digit = i64::from(ch - b'0');
@@ -117,7 +123,8 @@ pub fn to_int(text: &[u8]) -> i64 {
 }
 
 /// Converts a token to a floating point value
-pub fn to_float(text: &[u8]) -> f32 {
+pub fn to_float(text: &[u8]) -> f32
+{
 	let integer_digits = text.iter().take_while(|ch| ch.is_ascii_digit()).count();
 	if integer_digits == 0 {
 		return 0.0;

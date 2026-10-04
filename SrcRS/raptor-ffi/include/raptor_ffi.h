@@ -266,29 +266,10 @@ typedef enum RxMemoryUsage
     RX_MEMORY_GPU_TO_CPU = 5,
 } RxMemoryUsage;
 
-typedef enum RxAllocFlags
-{
-    RX_ALLOC_MAPPED = 1,
-    RX_ALLOC_HOST_SEQUENTIAL_WRITE = 2,
-    RX_ALLOC_DEDICATED = 4,
-} RxAllocFlags;
-
-typedef struct RxGpuAllocRequest
-{
-    uint32_t memory;
-    uint32_t flags;
-    float priority;
-} RxGpuAllocRequest;
-
 RxGpuAllocator* rx_gpu_allocator_create(const RxGpuInstance* instance, const RxGpuDevice* device);
 void rx_gpu_allocator_free(RxGpuAllocator* allocator);
 
-int32_t rx_gpu_buffer_create(const RxGpuAllocator* allocator, const void* buffer_info, const RxGpuAllocRequest* request,
-                             uint64_t* out_buffer, RxGpuAllocation** out_allocation, void** out_mapped);
 void rx_gpu_buffer_destroy(const RxGpuAllocator* allocator, uint64_t buffer, RxGpuAllocation* allocation);
-int32_t rx_gpu_image_create(const RxGpuAllocator* allocator, const void* image_info, const RxGpuAllocRequest* request,
-                            uint64_t* out_image, RxGpuAllocation** out_allocation);
-void rx_gpu_image_destroy(const RxGpuAllocator* allocator, uint64_t image, RxGpuAllocation* allocation);
 int32_t rx_gpu_allocation_map(const RxGpuAllocator* allocator, RxGpuAllocation* allocation, void** out_mapped);
 void rx_gpu_allocation_unmap(const RxGpuAllocator* allocator, RxGpuAllocation* allocation);
 int32_t rx_gpu_allocation_flush(const RxGpuAllocator* allocator, const RxGpuAllocation* allocation, uint64_t offset,
@@ -311,6 +292,262 @@ void rx_gpu_command_buffer_free(const RxGpuDevice* device, uint64_t pool, void* 
 int32_t rx_gpu_command_buffer_begin(const RxGpuDevice* device, void* buffer);
 int32_t rx_gpu_command_buffer_end(const RxGpuDevice* device, void* buffer);
 void rx_gpu_command_buffer_reset(const RxGpuDevice* device, void* buffer);
+
+typedef enum RxImageFormat
+{
+    RX_IMAGE_FORMAT_NONE = 0,
+    RX_IMAGE_FORMAT_BGRA8_UNORM = 1,
+    RX_IMAGE_FORMAT_BGRA8_SRGB = 2,
+    RX_IMAGE_FORMAT_RGBA8_SRGB = 3,
+    RX_IMAGE_FORMAT_RGBA8_UNORM = 4,
+    RX_IMAGE_FORMAT_RG32_FLOAT = 5,
+    RX_IMAGE_FORMAT_RG16_UNORM = 6,
+    RX_IMAGE_FORMAT_RGBA16_FLOAT = 7,
+    RX_IMAGE_FORMAT_RGB32_FLOAT = 8,
+    RX_IMAGE_FORMAT_D16_UNORM_S8_UINT = 9,
+    RX_IMAGE_FORMAT_D32_FLOAT = 10,
+    RX_IMAGE_FORMAT_D32_FLOAT_S8_UINT = 11,
+    RX_IMAGE_FORMAT_R32_SFLOAT = 12,
+    RX_IMAGE_FORMAT_R32_SINT = 13,
+    RX_IMAGE_FORMAT_R32_UINT = 14,
+    RX_IMAGE_FORMAT_R8_UINT = 15,
+    RX_IMAGE_FORMAT_R8_UNORM = 16,
+} RxImageFormat;
+
+typedef enum RxImageType
+{
+    RX_IMAGE_TYPE_FLAT = 0,
+    RX_IMAGE_TYPE_CUBEMAP = 1,
+    RX_IMAGE_TYPE_CUBEMAP_ARRAY = 2,
+} RxImageType;
+
+typedef enum RxBufferType
+{
+    RX_BUFFER_NONE = 0,
+    RX_BUFFER_STORAGE = 1,
+    RX_BUFFER_STORAGE_WITH_OFFSET = 2,
+    RX_BUFFER_UNIFORM = 3,
+    RX_BUFFER_UNIFORM_WITH_OFFSET = 4,
+    RX_BUFFER_TRANSFER = 5,
+    RX_BUFFER_VERTEX = 6,
+    RX_BUFFER_INDEX = 7,
+} RxBufferType;
+
+enum RxBufferFlags
+{
+    RX_BUFFER_FLAG_PERSISTENT_MAPPED = 1,
+    RX_BUFFER_FLAG_TRANSFER_RECEIVER = 2,
+};
+
+typedef struct RxImageDesc
+{
+    uint32_t image_type;
+    uint32_t width;
+    uint32_t height;
+    uint32_t mips;
+    uint32_t format;
+    int32_t tiling;
+    uint32_t usage;
+    uint32_t aspect;
+    uint32_t cube_count;
+    int32_t initial_layout;
+    uint8_t is_target;
+} RxImageDesc;
+
+int32_t rx_image_format_to_vk(uint16_t format);
+uint32_t rx_image_format_pixel_stride(uint16_t format);
+uint32_t rx_image_format_aspect_mask(uint16_t format);
+uint32_t rx_image_format_usage(uint16_t format);
+uint8_t rx_image_format_is_depth(uint16_t format);
+uint8_t rx_image_format_is_stencil(uint16_t format);
+uint8_t rx_image_format_is_srgb(uint16_t format);
+int32_t rx_image_type_properties(uint32_t image_type, uint32_t cube_count, int32_t* view_type, uint32_t* layer_count);
+void rx_image_mip_dimensions(uint32_t width, uint32_t height, uint32_t level, uint32_t* out_width, uint32_t* out_height);
+
+uint32_t rx_buffer_type_usage(uint32_t buffer_type);
+int32_t rx_buffer_type_descriptor_type(uint32_t buffer_type);
+const char* rx_buffer_type_name(uint32_t buffer_type);
+
+int32_t rx_gpu_buffer_create_typed(const RxGpuAllocator* allocator, uint32_t buffer_type, uint64_t size,
+                                   uint32_t memory_usage, uint16_t flags, uint64_t* out_buffer,
+                                   RxGpuAllocation** out_allocation, void** out_mapped);
+void rx_gpu_cmd_copy_buffer(const RxGpuDevice* device, void* cmd, uint64_t src, uint64_t dst, uint64_t size);
+
+int32_t rx_gpu_image_create_full(const RxGpuDevice* device, const RxGpuAllocator* allocator, const RxImageDesc* desc,
+                                 uint64_t* out_image, uint64_t* out_view, RxGpuAllocation** out_allocation);
+void rx_gpu_image_destroy_full(const RxGpuDevice* device, const RxGpuAllocator* allocator, uint64_t image,
+                               uint64_t view, RxGpuAllocation* allocation);
+int32_t rx_gpu_cmd_copy_buffer_to_mips(const RxGpuDevice* device, void* cmd, uint64_t buffer, uint64_t image,
+                                       uint16_t format, uint32_t width, uint32_t height, uint32_t mips,
+                                       uint32_t aspect);
+void rx_gpu_cmd_copy_buffer_to_region(const RxGpuDevice* device, void* cmd, uint64_t buffer, uint64_t image,
+                                      uint32_t mip, uint32_t width, uint32_t height, int32_t offset_x,
+                                      int32_t offset_y);
+
+typedef struct RxSamplerCache RxSamplerCache;
+
+typedef struct RxSamplerProps
+{
+    uint8_t min_filter;
+    uint8_t mag_filter;
+    uint8_t mip_filter;
+    uint8_t address_mode;
+    uint8_t border_color;
+    uint8_t compare_op;
+    uint8_t max_anisotropy;
+    float min_lod;
+    float max_lod;
+} RxSamplerProps;
+
+void rx_gpu_cmd_image_layout_transition(const RxGpuDevice* device, void* cmd, uint64_t image, uint32_t aspect,
+                                        int32_t old_layout, int32_t new_layout, uint32_t base_mip, uint32_t levels,
+                                        uint32_t cmd_queue_family);
+int32_t rx_gpu_cmd_image_transfer_release(const RxGpuDevice* device, void* cmd, uint64_t image, uint32_t aspect,
+                                          uint32_t mips);
+int32_t rx_gpu_cmd_image_graphics_acquire(const RxGpuDevice* device, void* cmd, uint64_t image, uint32_t aspect,
+                                          uint32_t mips);
+void rx_gpu_cmd_buffer_compute_to_fragment(const RxGpuDevice* device, void* cmd, uint64_t buffer, uint64_t size);
+void rx_gpu_cmd_buffer_fragment_to_compute(const RxGpuDevice* device, void* cmd, uint64_t buffer, uint64_t size);
+
+RxSamplerCache* rx_gpu_sampler_cache_create(void);
+const void* rx_gpu_sampler_cache_request(const RxSamplerCache* cache, const RxGpuDevice* device,
+                                         const RxSamplerProps* props);
+void rx_gpu_sampler_cache_free(RxSamplerCache* cache, const RxGpuDevice* device);
+
+typedef struct RxSwapchainResult
+{
+    uint64_t handle;
+    uint16_t format;
+    int32_t color_space;
+} RxSwapchainResult;
+
+int32_t rx_gpu_swapchain_create(const RxGpuDevice* device, uint64_t surface, uint32_t width, uint32_t height,
+                                uint64_t old, RxSwapchainResult* out);
+uint32_t rx_gpu_swapchain_images(const RxGpuDevice* device, uint64_t swapchain, uint64_t* out, uint32_t capacity);
+void rx_gpu_swapchain_destroy(const RxGpuDevice* device, uint64_t swapchain);
+int32_t rx_gpu_swapchain_acquire(const RxGpuDevice* device, uint64_t swapchain, uint64_t timeout, uint64_t semaphore,
+                                 uint32_t* out_index);
+int32_t rx_gpu_swapchain_present(const RxGpuDevice* device, void* queue, uint64_t swapchain, uint64_t wait_semaphore,
+                                 uint32_t image_index);
+int32_t rx_gpu_color_view_create(const RxGpuDevice* device, uint64_t image, uint16_t format, uint64_t* out);
+void rx_gpu_view_destroy(const RxGpuDevice* device, uint64_t view);
+
+enum RxDescriptorKind
+{
+    RX_DESCRIPTOR_IMAGE = 1,
+    RX_DESCRIPTOR_BUFFER = 2,
+};
+
+typedef struct RxDescriptorPoolSize
+{
+    int32_t descriptor_type;
+    uint32_t count;
+} RxDescriptorPoolSize;
+
+typedef struct RxDescriptorWrite
+{
+    uint32_t binding;
+    uint32_t kind;
+    uint64_t sampler;
+    uint64_t view;
+    uint64_t buffer;
+    uint64_t offset;
+    uint64_t range;
+    uint32_t buffer_type;
+} RxDescriptorWrite;
+
+int32_t rx_gpu_descriptor_pool_create(const RxGpuDevice* device, const RxDescriptorPoolSize* sizes, size_t count,
+                                      uint32_t max_sets, uint8_t free_sets, uint64_t* out);
+void rx_gpu_descriptor_pool_destroy(const RxGpuDevice* device, uint64_t pool);
+int32_t rx_gpu_descriptor_set_allocate(const RxGpuDevice* device, uint64_t pool, uint64_t layout, uint64_t* out);
+void rx_gpu_descriptor_set_free(const RxGpuDevice* device, uint64_t pool, uint64_t set);
+int32_t rx_gpu_descriptor_set_update(const RxGpuDevice* device, uint64_t set, const RxDescriptorWrite* writes,
+                                     size_t count);
+void rx_gpu_cmd_bind_descriptor_sets(const RxGpuDevice* device, void* cmd, int32_t bind_point, uint64_t layout,
+                                     uint32_t first_set, const uint64_t* sets, size_t set_count,
+                                     const uint32_t* offsets, size_t offset_count);
+
+typedef struct RxDsLayoutCache RxDsLayoutCache;
+
+typedef struct RxDsLayoutEntry
+{
+    uint32_t binding;
+    int32_t descriptor_type;
+    uint32_t stages;
+    uint32_t count;
+} RxDsLayoutEntry;
+
+int32_t rx_gpu_render_pass_create(const RxGpuDevice* device, const void* descriptions, const uint8_t* is_depth,
+                                  size_t count, uint64_t* out);
+void rx_gpu_render_pass_destroy(const RxGpuDevice* device, uint64_t pass);
+void rx_gpu_cmd_begin_render_pass(const RxGpuDevice* device, void* cmd, uint64_t pass, uint64_t framebuffer, int32_t x,
+                                  int32_t y, uint32_t width, uint32_t height, const void* clear_values,
+                                  size_t clear_count);
+void rx_gpu_cmd_end_render_pass(const RxGpuDevice* device, void* cmd);
+int32_t rx_gpu_framebuffer_create(const RxGpuDevice* device, uint64_t pass, const uint64_t* views, size_t count,
+                                  uint32_t width, uint32_t height, uint64_t* out);
+void rx_gpu_framebuffer_destroy(const RxGpuDevice* device, uint64_t framebuffer);
+
+int32_t rx_gpu_ds_layout_create(const RxGpuDevice* device, const RxDsLayoutEntry* entries, size_t count,
+                                uint64_t* out);
+uint32_t rx_gpu_ds_layout_id(const RxDsLayoutEntry* entries, size_t count);
+RxDsLayoutCache* rx_gpu_ds_layout_cache_create(void);
+int32_t rx_gpu_ds_layout_cache_request(const RxDsLayoutCache* cache, const RxGpuDevice* device,
+                                       const RxDsLayoutEntry* entries, size_t count, uint32_t* out_id,
+                                       uint64_t* out_layout);
+uint64_t rx_gpu_ds_layout_cache_get(const RxDsLayoutCache* cache, uint32_t id);
+void rx_gpu_ds_layout_cache_free(const RxDsLayoutCache* cache, const RxGpuDevice* device, uint32_t id);
+void rx_gpu_ds_layout_cache_destroy(RxDsLayoutCache* cache, const RxGpuDevice* device);
+
+typedef struct RxPushConstantDef
+{
+    uint32_t size;
+    uint32_t stages;
+} RxPushConstantDef;
+
+typedef struct RxGraphicsPipelineDesc
+{
+    const uint32_t* stage_flags;
+    const uint64_t* stage_modules;
+    size_t stage_count;
+    const void* vertex_binding;
+    const void* vertex_attributes;
+    size_t vertex_attribute_count;
+    const void* color_blend;
+    size_t color_blend_count;
+    const int32_t* attachment_formats;
+    size_t attachment_count;
+    uint32_t cull_mode;
+    int32_t front_face;
+    int32_t polygon_mode;
+    int32_t depth_compare_op;
+    uint8_t render_lines;
+    uint8_t disable_depth_test;
+    uint8_t disable_depth_write;
+    uint64_t layout;
+    uint64_t render_pass;
+} RxGraphicsPipelineDesc;
+
+typedef struct RxShaderMacroRef
+{
+    const char* name;
+    const char* value;
+} RxShaderMacroRef;
+
+int32_t rx_gpu_pipeline_layout_create(const RxGpuDevice* device, const uint64_t* set_layouts, size_t set_count,
+                                      const RxPushConstantDef* defs, size_t def_count, uint64_t* out);
+void rx_gpu_pipeline_layout_destroy(const RxGpuDevice* device, uint64_t layout);
+int32_t rx_gpu_shader_module_create(const RxGpuDevice* device, const uint32_t* code, size_t word_count, uint64_t* out);
+void rx_gpu_shader_module_destroy(const RxGpuDevice* device, uint64_t module);
+int32_t rx_gpu_graphics_pipeline_create(const RxGpuDevice* device, const RxGraphicsPipelineDesc* desc, uint64_t* out);
+int32_t rx_gpu_compute_pipeline_create(const RxGpuDevice* device, uint64_t module, uint64_t layout, uint64_t* out);
+void rx_gpu_pipeline_destroy(const RxGpuDevice* device, uint64_t pipeline);
+void rx_gpu_cmd_bind_pipeline(const RxGpuDevice* device, void* cmd, int32_t bind_point, uint64_t pipeline);
+void rx_gpu_cmd_set_cull_mode(const RxGpuDevice* device, void* cmd, uint32_t mode);
+
+uint64_t rx_shader_hash_macros(const RxShaderMacroRef* macros, size_t count, uint64_t seed);
+uint64_t rx_shader_id(uint32_t kind, const RxShaderMacroRef* macros, size_t count);
+uint32_t rx_spirv_input_location_mask(const uint32_t* words, size_t count);
 
 #ifdef __cplusplus
 }

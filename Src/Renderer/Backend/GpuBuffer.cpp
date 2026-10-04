@@ -71,33 +71,13 @@ void RawGpuBuffer::Create(eGpuBufferType buffer_type, uint64 size_in_bytes, RxMe
 	// GpuBufferUtil::BufferTypeToName(buffer_type), size_in_bytes, (buffer_flags & eGpuBufferFlags::PersistentMapped)
 	// != 0, (buffer_flags & eGpuBufferFlags::TransferReceiver) != 0);
 
-	uint32 alloc_flags = 0;
-
-	if ((mBufferFlags & eGpuBufferFlags::PersistentMapped) != 0) {
-		alloc_flags |= RX_ALLOC_MAPPED | RX_ALLOC_HOST_SEQUENTIAL_WRITE;
-	}
-
-	VkBufferUsageFlags usage_flags = GpuBufferUtil::BufferTypeToUnderlying(buffer_type);
-
-	if ((buffer_flags & eGpuBufferFlags::TransferReceiver) != 0) {
-		usage_flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-	}
-
-	const VkBufferCreateInfo create_info = {
-		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-		.flags = 0,
-		.size = size_in_bytes,
-		.usage = usage_flags,
-		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-	};
-
-	const RxGpuAllocRequest alloc_request = { .memory = memory_usage, .flags = alloc_flags, .priority = 0.0f };
-
 	uint64 buffer_handle = 0;
 	void* mapped_data = nullptr;
 
-	const VkResult status = static_cast<VkResult>(rx_gpu_buffer_create(
-		gGraphics->GpuAllocator, &create_info, &alloc_request, &buffer_handle, &Allocation, &mapped_data));
+	const VkResult status = static_cast<VkResult>(
+		rx_gpu_buffer_create_typed(gGraphics->GpuAllocator, static_cast<uint32>(buffer_type), size_in_bytes,
+								   memory_usage, static_cast<uint16>(buffer_flags), &buffer_handle, &Allocation,
+								   &mapped_data));
 
 	if (status != VK_SUCCESS) {
 		PanicVulkan("GPUBuffer", "Error allocating GPU buffer!", status);
@@ -200,8 +180,8 @@ void GpuBuffer::Create(CommandBuffer& cmd, eGpuBufferType buffer_type, void* dat
 	// Create the GPU-only buffer as a transfer destination
 	this->Create(buffer_type, this->Size, RX_MEMORY_GPU_ONLY, eGpuBufferFlags::TransferReceiver);
 
-	VkBufferCopy copy = { .srcOffset = 0, .dstOffset = 0, .size = Size };
-	vkCmdCopyBuffer(cmd.Get(), staging_buffer.Buffer, this->Buffer, 1, &copy);
+	rx_gpu_cmd_copy_buffer(gGraphics->GetDevice()->GetRustDevice(), cmd.Get(), RxRaw(staging_buffer.Buffer),
+						   RxRaw(this->Buffer), Size);
 
 	staging_buffer.Destroy();
 }

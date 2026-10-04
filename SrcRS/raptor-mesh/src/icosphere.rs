@@ -38,7 +38,8 @@ const INDICES: [u32; 60] = [
 	11, 13, 15, 15, 17, 19,
 ];
 
-fn base_vertices() -> [Vec3; 22] {
+fn base_vertices() -> [Vec3; 22]
+{
 	let z = (1.0 + 5.0f32.sqrt()) / 2.0;
 
 	[
@@ -67,7 +68,8 @@ fn base_vertices() -> [Vec3; 22] {
 	]
 }
 
-pub fn icosphere(resolution: u32) -> Mesh {
+pub fn icosphere(resolution: u32) -> Mesh
+{
 	let resolution = resolution.min(MAX_ICOSPHERE_RESOLUTION);
 
 	let mut positions: Vec<Vec3> = base_vertices().to_vec();

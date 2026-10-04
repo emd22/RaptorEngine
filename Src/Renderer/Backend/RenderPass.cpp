@@ -28,122 +28,24 @@ void RenderPass::Create(TargetList& attachments, Vec2u size, const Vec2u& offset
 
 	mpDevice = gGraphics->GetDevice();
 
-	SizedArray<VkAttachmentReference> color_refs(attachments.Targets.Size);
-
-	bool has_depth_attachment = false;
-	VkAttachmentReference depth_attachment_ref {};
-
-	for (int i = 0; i < attachments.Targets.Size; i++) {
-		const Target& attachment = attachments.Targets[i];
-
-		if (attachment.IsDepth()) {
-			has_depth_attachment = true;
-
-			depth_attachment_ref.attachment = i;
-			depth_attachment_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-		}
-		else {
-			VkAttachmentReference* ref = color_refs.Insert();
-
-			ref->attachment = i;
-			ref->layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		}
-	}
-
-	VkSubpassDescription subpass {
-		.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-		.colorAttachmentCount = static_cast<uint32>(color_refs.Size),
-		.pColorAttachments = color_refs.pData,
-		.pResolveAttachments = nullptr,
-		.pDepthStencilAttachment = has_depth_attachment ? &depth_attachment_ref : nullptr,
-	};
-
-	// VkSubpassDependency subpass_dependencies[] = {
-	//     VkSubpassDependency {
-	//         .srcSubpass = 0,
-	//         .dstSubpass = VK_SUBPASS_EXTERNAL,
-
-	//         .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-	//                       | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-
-	//         .dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-
-	//         .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-	//                        | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
-
-	//         .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT,
-
-	//         .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
-	//     },
-	//     VkSubpassDependency {
-	//         .srcSubpass = VK_SUBPASS_EXTERNAL,
-	//         .dstSubpass = 0,
-
-	//         .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-
-	//         .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-	//                       | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-
-	//         .srcAccessMask = VK_ACCESS_MEMORY_READ_BIT,
-
-	//         .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-	//                        | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
-
-	//         .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
-	//     }
-	// };
-	//
-	VkSubpassDependency subpass_dependencies[] = {
-		VkSubpassDependency {
-			.srcSubpass = 0,
-			.dstSubpass = VK_SUBPASS_EXTERNAL,
-
-			.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-
-			.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-
-			.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-
-			.dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-
-			.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
-		},
-		VkSubpassDependency {
-			.srcSubpass = VK_SUBPASS_EXTERNAL,
-			.dstSubpass = 0,
-
-			// Depth written by an earlier pass can be loaded by this one (the forward pass loads the prepass's depth)
-			.srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-
-			.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT |
-							VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-
-			.srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-
-			.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
-							 VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
-
-			.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
-		}
-	};
-
 	SizedArray<VkAttachmentDescription>& descriptions = attachments.GetDescriptions();
 
-	VkRenderPassCreateInfo create_info = {
-		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-		.attachmentCount = static_cast<uint32>(descriptions.Size),
-		.pAttachments = descriptions.pData,
-		.subpassCount = 1,
-		.pSubpasses = &subpass,
-		.dependencyCount = std::size(subpass_dependencies),
-		.pDependencies = subpass_dependencies,
-	};
+	SizedArray<uint8> is_depth(attachments.Targets.Size);
 
-	const VkResult status = vkCreateRenderPass(mpDevice->Device, &create_info, nullptr, &InternalRenderPass);
+	for (int i = 0; i < attachments.Targets.Size; i++) {
+		is_depth.Insert(attachments.Targets[i].IsDepth() ? 1 : 0);
+	}
+
+	uint64 handle = 0;
+
+	const VkResult status = static_cast<VkResult>(rx_gpu_render_pass_create(
+		mpDevice->GetRustDevice(), descriptions.pData, is_depth.pData, descriptions.Size, &handle));
 
 	if (status != VK_SUCCESS) {
 		ModulePanicVulkan("Failed to create render pass", status);
 	}
+
+	InternalRenderPass = RxFromRaw<VkRenderPass>(handle);
 }
 
 void RenderPass::Begin(CommandBuffer* cmd, VkFramebuffer framebuffer, const Slice<VkClearValue>& clear_values)
@@ -165,30 +67,22 @@ void RenderPass::Begin(CommandBuffer* cmd, VkFramebuffer framebuffer, const Slic
 		ModulePanic("Render pass has not been previously created", 0);
 	}
 
-	VkRenderPassBeginInfo render_pass_info = {
-		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-		.renderPass = InternalRenderPass,
-		.framebuffer = framebuffer,
-		.renderArea = render_area,
-
-		.clearValueCount = static_cast<uint32>(clear_values.Size),
-		.pClearValues = clear_values.pData,
-	};
-
-	vkCmdBeginRenderPass(cmd->Cmd, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
+	rx_gpu_cmd_begin_render_pass(mpDevice->GetRustDevice(), cmd->Cmd, RxRaw(InternalRenderPass), RxRaw(framebuffer),
+								 render_area.offset.x, render_area.offset.y, render_area.extent.width,
+								 render_area.extent.height, clear_values.pData, clear_values.Size);
 }
 
 void RenderPass::End()
 {
 	Assert(pCommandBuffer != nullptr);
 
-	vkCmdEndRenderPass(pCommandBuffer->Cmd);
+	rx_gpu_cmd_end_render_pass(mpDevice->GetRustDevice(), pCommandBuffer->Cmd);
 }
 
 void RenderPass::Destroy()
 {
 	if (InternalRenderPass != nullptr) {
-		vkDestroyRenderPass(mpDevice->Device, InternalRenderPass, nullptr);
+		rx_gpu_render_pass_destroy(mpDevice->GetRustDevice(), RxRaw(InternalRenderPass));
 	}
 	InternalRenderPass = nullptr;
 }

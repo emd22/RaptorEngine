@@ -160,7 +160,11 @@ impl Brush
 
 	pub fn find_plane(&self, normal: Vec3f) -> i32
 	{
-		if normal.to_array().iter().all(|c| c.abs() <= ZERO_NORMAL_TOLERANCE) {
+		if normal
+			.to_array()
+			.iter()
+			.all(|c| c.abs() <= ZERO_NORMAL_TOLERANCE)
+		{
 			return NO_PLANE;
 		}
 
@@ -338,7 +342,10 @@ mod tests
 
 		let (distance, plane) = hit.unwrap();
 		assert_eq!(distance, 7.0);
-		assert_eq!(brush.planes[plane as usize].normal.to_array(), [0.0, 0.0, -1.0]);
+		assert_eq!(
+			brush.planes[plane as usize].normal.to_array(),
+			[0.0, 0.0, -1.0]
+		);
 	}
 
 	#[test]
@@ -356,6 +363,9 @@ mod tests
 	#[test]
 	fn abs_clears_sign()
 	{
-		assert_eq!(Vec3f::new(-1.0, 2.0, -3.0).abs().to_array(), [1.0, 2.0, 3.0]);
+		assert_eq!(
+			Vec3f::new(-1.0, 2.0, -3.0).abs().to_array(),
+			[1.0, 2.0, 3.0]
+		);
 	}
 }

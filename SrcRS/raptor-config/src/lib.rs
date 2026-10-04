@@ -14,7 +14,8 @@ pub fn parse(
 	prelude_path: Option<&[u8]>,
 	include_extension: &[u8],
 	host: &mut dyn Host,
-) -> Parsed {
+) -> Parsed
+{
 	let mut tokenizer = Tokenizer::new(host, include_extension);
 
 	if let Some(path) = prelude_path {

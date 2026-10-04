@@ -16,9 +16,6 @@ FX_SET_MODULE_NAME("Pipeline")
 
 namespace fx::renderer {
 
-static VkPipeline spBoundPipeline = nullptr;
-
-
 /////////////////////////////////////
 // Pipeline Layout
 /////////////////////////////////////
@@ -28,56 +25,29 @@ void PipelineLayout::Create(const Slice<const PushConstants>& push_constant_defs
 							const Slice<VkDescriptorSetLayout>& descriptor_set_layouts)
 
 {
-	// Copy PC definitions to this layout
+	StackArray<RxPushConstantDef, ShaderUtil::scNumShaderTypes> rust_defs;
+
 	for (uint32 i = 0; i < push_constant_defs.Size; i++) {
 		mPushConstDefs.Insert(push_constant_defs[i]);
+
+		rust_defs.Insert(RxPushConstantDef { .size = push_constant_defs[i].Size,
+											 .stages = ShaderUtil::ToUnderlyingType(
+												 push_constant_defs[i].ShaderTypes) });
 	}
 
-	// Define push constants with proper offsets and shader flags
-	StackArray<VkPushConstantRange, 3> push_const_ranges;
-	uint32 current_pc_offset = 0;
+	static_assert(sizeof(VkDescriptorSetLayout) == sizeof(uint64));
 
-	for (int i = 0; i < push_constant_defs.Size; i++) {
-		const PushConstants& pc_def = push_constant_defs[i];
+	uint64 handle = 0;
 
-		if (pc_def.ShaderTypes == static_cast<eShaderType>(0)) {
-			continue;
-		}
-
-		VkPushConstantRange range {
-			.stageFlags = ShaderUtil::ToUnderlyingType(pc_def.ShaderTypes),
-			.offset = current_pc_offset,
-			.size = pc_def.Size,
-		};
-
-		// LogInfo("!! PC (Flags={}, Offset={}, Size={})", static_cast<uint32>(pc_def.ShaderTypes), current_pc_offset,
-		//         pc_def.Size);
-
-		push_const_ranges.Insert(range);
-
-		current_pc_offset += pc_def.Size;
-	}
-
-	// LogInfo("!! Built pipeline layout");
-
-	VkPipelineLayoutCreateInfo create_info {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount = static_cast<uint32>(descriptor_set_layouts.Size),
-		.pSetLayouts = descriptor_set_layouts.pData,
-
-		.pushConstantRangeCount = push_const_ranges.Size,
-		.pPushConstantRanges = push_const_ranges.pData,
-	};
-
-	VkResult status = vkCreatePipelineLayout(gGraphics->GetDevice()->Device, &create_info, nullptr, &InternalLayout);
-
-	// if (reinterpret_cast<uint64>(InternalLayout) == 0x420000000042ULL) {
-	//     FX_BREAKPOINT;
-	// }
+	const VkResult status = static_cast<VkResult>(rx_gpu_pipeline_layout_create(
+		gGraphics->GetDevice()->GetRustDevice(), reinterpret_cast<const uint64*>(descriptor_set_layouts.pData),
+		descriptor_set_layouts.Size, rust_defs.pData, rust_defs.Size, &handle));
 
 	if (status != VK_SUCCESS) {
 		ModulePanicVulkan("Failed to create pipeline layout", status);
 	}
+
+	InternalLayout = RxFromRaw<VkPipelineLayout>(handle);
 }
 
 PipelineLayout::PipelineLayout(const PipelineLayout& other) { (*this) = other; }
@@ -99,7 +69,7 @@ void PipelineLayout::DestroyObject()
 		return;
 	}
 
-	vkDestroyPipelineLayout(gGraphics->GetDevice()->Device, InternalLayout, nullptr);
+	rx_gpu_pipeline_layout_destroy(gGraphics->GetDevice()->GetRustDevice(), RxRaw(InternalLayout));
 	InternalLayout = nullptr;
 }
 
@@ -120,156 +90,57 @@ void Pipeline::Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shade
 
 	Name = name;
 
-	bool has_depth_attachment = false;
-
 	VertexShader = shaders[0];
 	PixelShader = shaders[1];
 
-	// Depth attachment is usually the last attachment, check last first
-	for (int32 i = attachments.Size - 1; i >= 0; i--) {
-		if (Util::IsFormatDepth(attachments[i].format)) {
-			has_depth_attachment = true;
-		}
-	}
-
-	VkSpecializationInfo specialization_info = {
-		.mapEntryCount = 0,
-		.pMapEntries = nullptr,
-		.dataSize = 0,
-		.pData = nullptr,
-	};
-
-	// Shaders
-	SizedArray<VkPipelineShaderStageCreateInfo> shader_create_info(shaders.Size);
+	SizedArray<uint32> stage_flags(shaders.Size);
+	SizedArray<uint64> stage_modules(shaders.Size);
 
 	for (const Ref<ShaderProgram>& shader_program : shaders) {
-		const VkPipelineShaderStageCreateInfo create_info = {
-			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-			.stage = static_cast<VkShaderStageFlagBits>(ShaderUtil::ToUnderlyingType(shader_program->ShaderType)),
-			.module = shader_program->Get(),
-			.pName = "main",
-			.pSpecializationInfo = &specialization_info,
-		};
-
-		shader_create_info.Insert(create_info);
+		stage_flags.Insert(ShaderUtil::ToUnderlyingType(shader_program->ShaderType));
+		stage_modules.Insert(RxRaw(shader_program->Get()));
 	}
 
-	// Dynamic states. The viewport and scissor come from the render stage that is being drawn to (RenderStage::Begin()),
-	// so a pipeline can be used on a target of any size.
-	SizedArray<VkDynamicState> dynamic_states = {
-		VK_DYNAMIC_STATE_VIEWPORT,
-		VK_DYNAMIC_STATE_SCISSOR,
-		// Double sided materials draw with culling off; every pipeline's own mode is set again whenever it is bound
-		VK_DYNAMIC_STATE_CULL_MODE,
-	};
+	SizedArray<int32> attachment_formats(attachments.Size);
 
-	const VkPipelineDynamicStateCreateInfo dynamic_state_info = {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-		.dynamicStateCount = static_cast<uint32>(dynamic_states.Size),
-		.pDynamicStates = dynamic_states,
-	};
+	for (const VkAttachmentDescription& attachment : attachments) {
+		attachment_formats.Insert(attachment.format);
+	}
 
 	DefaultCullMode = properties.CullMode;
 
-	// The counts are all a dynamic viewport and scissor need here, their values are ignored
-	const VkPipelineViewportStateCreateInfo viewport_state_info = {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-		.viewportCount = 1,
-		.scissorCount = 1,
+	const RxGraphicsPipelineDesc desc = {
+		.stage_flags = stage_flags.pData,
+		.stage_modules = stage_modules.pData,
+		.stage_count = stage_flags.Size,
+		.vertex_binding = (vertex_info != nullptr) ? &vertex_info->Binding : nullptr,
+		.vertex_attributes = (vertex_info != nullptr) ? vertex_info->Attributes.pData : nullptr,
+		.vertex_attribute_count = (vertex_info != nullptr) ? static_cast<size_t>(vertex_info->Attributes.Size) : 0,
+		.color_blend = color_blend_attachments.pData,
+		.color_blend_count = color_blend_attachments.Size,
+		.attachment_formats = attachment_formats.pData,
+		.attachment_count = attachment_formats.Size,
+		.cull_mode = properties.CullMode,
+		.front_face = properties.WindingOrder,
+		.polygon_mode = properties.PolygonMode,
+		.depth_compare_op = properties.DepthCompareOp,
+		.render_lines = properties.bRenderLines,
+		.disable_depth_test = properties.bDisableDepthTest,
+		.disable_depth_write = properties.bDisableDepthWrite,
+		.layout = RxRaw(Layout.Get()),
+		.render_pass = RxRaw(render_pass.Get()),
 	};
 
-	// Vertex info + input info
-	VkPipelineVertexInputStateCreateInfo vertex_input_info {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
-	};
+	uint64 handle = 0;
 
-	if (vertex_info != nullptr) {
-		vertex_input_info.vertexBindingDescriptionCount = 1;
-		vertex_input_info.pVertexBindingDescriptions = &vertex_info->Binding;
-		vertex_input_info.vertexAttributeDescriptionCount = static_cast<uint32>(vertex_info->Attributes.Size);
-		vertex_input_info.pVertexAttributeDescriptions = vertex_info->Attributes.pData;
-	}
-
-	const VkPipelineInputAssemblyStateCreateInfo input_assembly_info = {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-		.topology = (properties.bRenderLines) ? VK_PRIMITIVE_TOPOLOGY_LINE_LIST : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-		.primitiveRestartEnable = VK_FALSE,
-	};
-
-	const VkPipelineRasterizationStateCreateInfo rasterizer_info = {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-		.depthClampEnable = VK_FALSE,
-		.rasterizerDiscardEnable = VK_FALSE,
-		.polygonMode = properties.PolygonMode,
-		.cullMode = properties.CullMode,
-		.frontFace = properties.WindingOrder,
-		.depthBiasEnable = VK_FALSE,
-		.lineWidth = 1.0f,
-	};
-
-
-	const VkPipelineMultisampleStateCreateInfo multisampling_info {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-		.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
-		.sampleShadingEnable = VK_FALSE,
-	};
-
-
-	const VkPipelineColorBlendStateCreateInfo color_blend_info {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-		.logicOpEnable = VK_FALSE,
-		.attachmentCount = static_cast<uint32>(color_blend_attachments.Size),
-		.pAttachments = color_blend_attachments.pData,
-	};
-
-	VkBool32 depth_test_enabled = VK_TRUE;
-	VkBool32 depth_write_enabled = VK_TRUE;
-
-	if (properties.bDisableDepthTest) {
-		depth_test_enabled = VK_FALSE;
-	}
-	if (properties.bDisableDepthWrite) {
-		depth_write_enabled = VK_FALSE;
-	}
-
-	// Unused if has_depth_attachment is false
-	const VkPipelineDepthStencilStateCreateInfo depth_stencil_info {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-		.depthTestEnable = depth_test_enabled,
-		.depthWriteEnable = depth_write_enabled,
-		.depthCompareOp = properties.DepthCompareOp,
-		.depthBoundsTestEnable = VK_FALSE,
-		.stencilTestEnable = VK_FALSE,
-	};
-
-	const VkGraphicsPipelineCreateInfo pipeline_info = {
-		.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-
-		.stageCount = (uint32)shader_create_info.Size,
-		.pStages = shader_create_info,
-
-		.pVertexInputState = &vertex_input_info,
-		.pInputAssemblyState = &input_assembly_info,
-		.pViewportState = &viewport_state_info,
-		.pRasterizationState = &rasterizer_info,
-		.pMultisampleState = &multisampling_info,
-		.pDepthStencilState = has_depth_attachment ? &depth_stencil_info : nullptr,
-		.pColorBlendState = &color_blend_info,
-
-		.pDynamicState = &dynamic_state_info,
-
-		.layout = Layout.Get(),
-
-		.renderPass = render_pass.Get(),
-		.subpass = 0,
-	};
-
-	const VkResult status = vkCreateGraphicsPipelines(mDevice->Device, nullptr, 1, &pipeline_info, nullptr,
-													  &InternalPipeline);
+	const VkResult status = static_cast<VkResult>(
+		rx_gpu_graphics_pipeline_create(mDevice->GetRustDevice(), &desc, &handle));
 
 	if (status != VK_SUCCESS) {
 		ModulePanicVulkan("Could not create graphics pipeline", status);
 	}
+
+	InternalPipeline = RxFromRaw<VkPipeline>(handle);
 
 	Util::SetDebugLabel(PipelineNameUtil::GetName(name), VK_OBJECT_TYPE_PIPELINE, InternalPipeline);
 
@@ -286,28 +157,16 @@ void Pipeline::CreateCompute(ePipelineName name, const Ref<ShaderProgram>& shade
 
 	ComputeShader = shader;
 
-	const VkPipelineShaderStageCreateInfo stage_create_info = {
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-		.stage = VK_SHADER_STAGE_COMPUTE_BIT,
-		.module = shader->Get(),
-		.pName = "main",
-		.pSpecializationInfo = nullptr,
-	};
+	uint64 handle = 0;
 
-	const VkComputePipelineCreateInfo pipeline_info = {
-		.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-
-		.stage = stage_create_info,
-
-		.layout = Layout.Get(),
-	};
-
-	const VkResult status = vkCreateComputePipelines(mDevice->Device, nullptr, 1, &pipeline_info, nullptr,
-													 &InternalPipeline);
+	const VkResult status = static_cast<VkResult>(rx_gpu_compute_pipeline_create(
+		mDevice->GetRustDevice(), RxRaw(shader->Get()), RxRaw(Layout.Get()), &handle));
 
 	if (status != VK_SUCCESS) {
 		ModulePanicVulkan("Could not create compute pipeline", status);
 	}
+
+	InternalPipeline = RxFromRaw<VkPipeline>(handle);
 
 	Util::SetDebugLabel(PipelineNameUtil::GetName(name), VK_OBJECT_TYPE_PIPELINE, InternalPipeline);
 
@@ -317,23 +176,26 @@ void Pipeline::CreateCompute(ePipelineName name, const Ref<ShaderProgram>& shade
 
 void Pipeline::Bind(const CommandBuffer& cmd) const
 {
-	if (InternalPipeline == spBoundPipeline) {
+	if (InternalPipeline == cmd.pBoundPipeline) {
 		return;
 	}
 
-	vkCmdBindPipeline(cmd.Get(), GetBindPoint(), InternalPipeline);
+	RxGpuDevice* device = gGraphics->GetDevice()->GetRustDevice();
+
+	rx_gpu_cmd_bind_pipeline(device, cmd.Cmd, GetBindPoint(), RxRaw(InternalPipeline));
 
 	if (!bIsCompute) {
-		vkCmdSetCullMode(cmd.Get(), DefaultCullMode);
+		rx_gpu_cmd_set_cull_mode(device, cmd.Cmd, DefaultCullMode);
 	}
 
-	spBoundPipeline = this->InternalPipeline;
+	cmd.pBoundPipeline = InternalPipeline;
 }
 
 void Pipeline::SetDoubleSided(const CommandBuffer& cmd, bool double_sided) const
 {
 	if (!bIsCompute) {
-		vkCmdSetCullMode(cmd.Get(), double_sided ? VK_CULL_MODE_NONE : DefaultCullMode);
+		rx_gpu_cmd_set_cull_mode(gGraphics->GetDevice()->GetRustDevice(), cmd.Cmd,
+								 double_sided ? VK_CULL_MODE_NONE : DefaultCullMode);
 	}
 }
 
@@ -347,15 +209,9 @@ void Pipeline::Destroy()
 	mDevice->WaitForIdle();
 
 	if (InternalPipeline) {
-		vkDestroyPipeline(mDevice->Device, InternalPipeline, nullptr);
+		rx_gpu_pipeline_destroy(mDevice->GetRustDevice(), RxRaw(InternalPipeline));
 		InternalPipeline = nullptr;
 	}
-
-	// if (Layout && !mbDoNotDestroyLayout) {
-	//     vkDestroyPipelineLayout(mDevice->Device, Layout, nullptr);
-	// }
-
-	// Layout = nullptr;
 }
 
 

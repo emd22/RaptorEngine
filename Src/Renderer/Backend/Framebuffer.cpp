@@ -22,22 +22,19 @@ void Framebuffer::Create(const SizedArray<VkImageView>& image_views, const Rende
 		size = gGraphics->Swapchain.Extent;
 	}
 
-	const VkFramebufferCreateInfo create_info {
-		.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-		.renderPass = render_pass.Get(),
-		.attachmentCount = static_cast<uint32>(image_views.Size),
-		.pAttachments = image_views.pData,
-		.width = size.X,
-		.height = size.Y,
-		.layers = 1,
-	};
+	static_assert(sizeof(VkImageView) == sizeof(uint64));
 
-	const VkResult status = vkCreateFramebuffer(gGraphics->GetDevice()->Device, &create_info, nullptr,
-												&InternalFramebuffer);
+	uint64 handle = 0;
+
+	const VkResult status = static_cast<VkResult>(rx_gpu_framebuffer_create(
+		gGraphics->GetDevice()->GetRustDevice(), RxRaw(render_pass.Get()),
+		reinterpret_cast<const uint64*>(image_views.pData), image_views.Size, size.X, size.Y, &handle));
 
 	if (status != VK_SUCCESS) {
 		ModulePanicVulkan("Failed to create framebuffer", status);
 	}
+
+	InternalFramebuffer = RxFromRaw<VkFramebuffer>(handle);
 }
 
 void Framebuffer::Destroy()
@@ -46,7 +43,7 @@ void Framebuffer::Destroy()
 		return;
 	}
 
-	vkDestroyFramebuffer(gGraphics->GetDevice()->Device, InternalFramebuffer, nullptr);
+	rx_gpu_framebuffer_destroy(gGraphics->GetDevice()->GetRustDevice(), RxRaw(InternalFramebuffer));
 	InternalFramebuffer = nullptr;
 }
 

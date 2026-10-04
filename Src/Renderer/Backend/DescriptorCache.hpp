@@ -21,10 +21,14 @@ namespace renderer {
 class DsLayoutCache
 {
 public:
-	DsLayoutCache() = default;
+	DsLayoutCache();
 
 	std::pair<DsLayoutID, VkDescriptorSetLayout> Request(const SizedArray<DescriptorEntry>& entries);
-	VkDescriptorSetLayout* RequestExisting(DsLayoutID layout_id);
+
+	/**
+	 * @brief Returns the cached layout for `layout_id`, or a null handle if there is none.
+	 */
+	VkDescriptorSetLayout RequestExisting(DsLayoutID layout_id);
 
 	/**
 	 * @brief Frees a descriptor set layout from the cache.
@@ -36,8 +40,11 @@ public:
 	void Destroy();
 	~DsLayoutCache() { Destroy(); }
 
-public:
-	HashMap<Hash32, VkDescriptorSetLayout> Cache;
+	DsLayoutCache(const DsLayoutCache&) = delete;
+	DsLayoutCache& operator=(const DsLayoutCache&) = delete;
+
+private:
+	RxDsLayoutCache* mpCache = nullptr;
 };
 
 

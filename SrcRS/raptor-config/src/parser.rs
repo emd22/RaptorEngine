@@ -5,7 +5,8 @@ use crate::tokenizer::{Token, TokenStream};
 
 const MAX_DEPTH: u32 = 64;
 
-struct Cursor<'a> {
+struct Cursor<'a>
+{
 	stream: &'a TokenStream,
 	host: &'a mut dyn Host,
 	index: usize,
@@ -13,39 +14,48 @@ struct Cursor<'a> {
 	has_errors: bool,
 }
 
-impl Cursor<'_> {
-	fn is_at_end(&self) -> bool {
+impl Cursor<'_>
+{
+	fn is_at_end(&self) -> bool
+	{
 		self.index >= self.stream.tokens.len()
 	}
 
-	fn peek(&self, offset: usize) -> Option<&Token> {
+	fn peek(&self, offset: usize) -> Option<&Token>
+	{
 		self.stream.tokens.get(self.index + offset)
 	}
 
-	fn kind(&self, offset: usize) -> TokenKind {
+	fn kind(&self, offset: usize) -> TokenKind
+	{
 		self.peek(offset).map_or(TokenKind::Unknown, |t| t.kind)
 	}
 
-	fn text(&self) -> &[u8] {
+	fn text(&self) -> &[u8]
+	{
 		self.peek(0).map_or(&[], |t| self.stream.text(t))
 	}
 
-	fn next_token(&mut self) {
+	fn next_token(&mut self)
+	{
 		if !self.is_at_end() {
 			self.index += 1;
 		}
 	}
 
-	fn log(&mut self, level: LogLevel, message: &[u8]) {
+	fn log(&mut self, level: LogLevel, message: &[u8])
+	{
 		self.host.log(level, CATEGORY_CORE, message);
 	}
 
-	fn fail(&mut self, message: String) {
+	fn fail(&mut self, message: String)
+	{
 		self.log(LogLevel::Error, message.as_bytes());
 		self.has_errors = true;
 	}
 
-	fn eat(&mut self, kind: TokenKind) -> bool {
+	fn eat(&mut self, kind: TokenKind) -> bool
+	{
 		let found = self.kind(0);
 		if found != kind {
 			self.fail(format!(
@@ -62,7 +72,8 @@ impl Cursor<'_> {
 	}
 
 	/// Accepts any of the provided token types in `kinds`
-	fn eat_any_of(&mut self, kinds: &[TokenKind]) -> bool {
+	fn eat_any_of(&mut self, kinds: &[TokenKind]) -> bool
+	{
 		let found = self.kind(0);
 
 		if kinds.contains(&found) {
@@ -78,7 +89,8 @@ impl Cursor<'_> {
 		false
 	}
 
-	fn skip_to_next_entry(&mut self, in_struct: bool) {
+	fn skip_to_next_entry(&mut self, in_struct: bool)
+	{
 		while !self.is_at_end() {
 			let kind = self.kind(0);
 
@@ -100,7 +112,8 @@ impl Cursor<'_> {
 	}
 }
 
-fn value_kind_of(cursor: &Cursor) -> Kind {
+fn value_kind_of(cursor: &Cursor) -> Kind
+{
 	if cursor.kind(0) == TokenKind::String {
 		return Kind::String;
 	}
@@ -112,7 +125,8 @@ fn value_kind_of(cursor: &Cursor) -> Kind {
 	}
 }
 
-fn unescape(text: &[u8]) -> Vec<u8> {
+fn unescape(text: &[u8]) -> Vec<u8>
+{
 	let mut out = Vec::with_capacity(text.len());
 	let mut bytes = text.iter().copied().peekable();
 
@@ -127,11 +141,13 @@ fn unescape(text: &[u8]) -> Vec<u8> {
 	out
 }
 
-fn find_entry<'e>(entries: &'e [Entry], name: &[u8]) -> Option<&'e Entry> {
+fn find_entry<'e>(entries: &'e [Entry], name: &[u8]) -> Option<&'e Entry>
+{
 	entries.iter().find(|entry| entry.name == name)
 }
 
-fn parse_reference(cursor: &mut Cursor, entries: &[Entry], value: &mut Primitive) -> bool {
+fn parse_reference(cursor: &mut Cursor, entries: &[Entry], value: &mut Primitive) -> bool
+{
 	let mut identifier = cursor.text().to_vec();
 	if !cursor.eat(TokenKind::Identifier) {
 		return false;
@@ -166,7 +182,8 @@ fn parse_reference(cursor: &mut Cursor, entries: &[Entry], value: &mut Primitive
 	true
 }
 
-fn parse_value(cursor: &mut Cursor, entries: &[Entry], value: &mut Primitive) -> bool {
+fn parse_value(cursor: &mut Cursor, entries: &[Entry], value: &mut Primitive) -> bool
+{
 	let kind = cursor.kind(0);
 
 	if kind == TokenKind::Dollar {
@@ -243,7 +260,8 @@ fn parse_entry(
 	entries: &[Entry],
 	parent_member_count: Option<usize>,
 	entry: &mut Entry,
-) -> bool {
+) -> bool
+{
 	let token_kind = cursor.kind(0);
 
 	entry.name = match parent_member_count {
@@ -322,7 +340,8 @@ fn parse_entry(
 	parse_value(cursor, entries, &mut entry.value)
 }
 
-pub fn parse(stream: &TokenStream, host: &mut dyn Host) -> Parsed {
+pub fn parse(stream: &TokenStream, host: &mut dyn Host) -> Parsed
+{
 	let mut cursor = Cursor {
 		stream,
 		host,

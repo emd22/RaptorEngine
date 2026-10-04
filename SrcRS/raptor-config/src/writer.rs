@@ -3,11 +3,13 @@ use crate::model::{Entry, Kind, Primitive};
 
 const NAME_BREAKERS: &[u8] = b"=()[]{}<>+-*/$.,;:?!&\"#\\";
 
-fn is_valid_name_byte(ch: u8) -> bool {
+fn is_valid_name_byte(ch: u8) -> bool
+{
 	!ch.is_ascii_whitespace() && ch != 0 && !NAME_BREAKERS.contains(&ch)
 }
 
-fn format_float(value: f32, host: &mut dyn Host) -> String {
+fn format_float(value: f32, host: &mut dyn Host) -> String
+{
 	if !value.is_finite() {
 		host.log(
 			LogLevel::Error,
@@ -37,7 +39,8 @@ fn format_float(value: f32, host: &mut dyn Host) -> String {
 }
 
 /// Deals with escaped characters inside strings
-fn push_escaped(out: &mut Vec<u8>, bytes: &[u8]) {
+fn push_escaped(out: &mut Vec<u8>, bytes: &[u8])
+{
 	out.push(b'"');
 	for &ch in bytes {
 		if ch == b'"' || ch == b'\\' {
@@ -48,7 +51,8 @@ fn push_escaped(out: &mut Vec<u8>, bytes: &[u8]) {
 	out.push(b'"');
 }
 
-pub fn format_primitive(primitive: &Primitive, out: &mut Vec<u8>, host: &mut dyn Host) {
+pub fn format_primitive(primitive: &Primitive, out: &mut Vec<u8>, host: &mut dyn Host)
+{
 	match primitive.kind {
 		Kind::Int => out.extend_from_slice(primitive.int_value.to_string().as_bytes()),
 		Kind::Float => out.extend_from_slice(format_float(primitive.float_value, host).as_bytes()),
@@ -57,7 +61,8 @@ pub fn format_primitive(primitive: &Primitive, out: &mut Vec<u8>, host: &mut dyn
 	}
 }
 
-fn valid_name(name: &[u8], host: &mut dyn Host) -> Vec<u8> {
+fn valid_name(name: &[u8], host: &mut dyn Host) -> Vec<u8>
+{
 	if !name.is_empty() && name.iter().all(|&ch| is_valid_name_byte(ch)) {
 		return name.to_vec();
 	}
@@ -80,11 +85,13 @@ fn valid_name(name: &[u8], host: &mut dyn Host) -> Vec<u8> {
 	fixed
 }
 
-fn push_indent(out: &mut Vec<u8>, indent: u32) {
+fn push_indent(out: &mut Vec<u8>, indent: u32)
+{
 	out.extend(std::iter::repeat_n(b'\t', indent as usize));
 }
 
-pub fn format_entry(entry: &Entry, indent: u32, out: &mut Vec<u8>, host: &mut dyn Host) {
+pub fn format_entry(entry: &Entry, indent: u32, out: &mut Vec<u8>, host: &mut dyn Host)
+{
 	if entry.value.kind == Kind::Struct
 		|| (entry.value.kind == Kind::None && !entry.is_array && !entry.is_dot_reference)
 	{
@@ -118,7 +125,8 @@ pub fn format_entry(entry: &Entry, indent: u32, out: &mut Vec<u8>, host: &mut dy
 	}
 }
 
-pub fn format_file(entries: &[Entry], host: &mut dyn Host) -> Vec<u8> {
+pub fn format_file(entries: &[Entry], host: &mut dyn Host) -> Vec<u8>
+{
 	let mut out = Vec::new();
 
 	for entry in entries {

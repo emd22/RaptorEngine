@@ -31,7 +31,12 @@ pub mod vec3d_platform
 	#[inline(always)]
 	pub fn splat(scalar: f64) -> DOUBLE4
 	{
-		unsafe { float64x2x2_t(vdupq_n_f64(scalar), vsetq_lane_f64(0.0f64, vdupq_n_f64(scalar), 1)) }
+		unsafe {
+			float64x2x2_t(
+				vdupq_n_f64(scalar),
+				vsetq_lane_f64(0.0f64, vdupq_n_f64(scalar), 1),
+			)
+		}
 	}
 
 	/////////////////////////////////////
@@ -73,7 +78,12 @@ pub mod vec3d_platform
 	#[inline(always)]
 	pub fn divs(a: DOUBLE4, b: f64) -> DOUBLE4
 	{
-		unsafe { float64x2x2_t(vdivq_f64(a.0, vdupq_n_f64(b)), vdivq_f64(a.1, vdupq_n_f64(b))) }
+		unsafe {
+			float64x2x2_t(
+				vdivq_f64(a.0, vdupq_n_f64(b)),
+				vdivq_f64(a.1, vdupq_n_f64(b)),
+			)
+		}
 	}
 
 	#[inline(always)]

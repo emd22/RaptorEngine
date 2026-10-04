@@ -38,6 +38,7 @@ pub struct Device
 {
 	instance: ash::Instance,
 	surface_loader: khr::surface::Instance,
+	swapchain_loader: khr::swapchain::Device,
 	surface: vk::SurfaceKHR,
 	raw: ash::Device,
 	physical: vk::PhysicalDevice,
@@ -173,9 +174,12 @@ impl Device
 			),
 		);
 
+		let swapchain_loader = khr::swapchain::Device::new(&raw_instance, &raw);
+
 		Ok(Self {
 			instance: raw_instance,
 			surface_loader,
+			swapchain_loader,
 			surface,
 			raw,
 			physical,
@@ -184,6 +188,16 @@ impl Device
 			caps,
 			log,
 		})
+	}
+
+	pub(crate) fn surface_loader(&self) -> &khr::surface::Instance
+	{
+		&self.surface_loader
+	}
+
+	pub(crate) fn swapchain_loader(&self) -> &khr::swapchain::Device
+	{
+		&self.swapchain_loader
 	}
 
 	pub fn physical(&self) -> vk::PhysicalDevice
@@ -275,6 +289,11 @@ impl Device
 		}
 
 		Ok(best)
+	}
+
+	pub fn log(&self) -> &std::sync::Arc<dyn Log>
+	{
+		&self.log
 	}
 
 	pub fn instance(&self) -> &ash::Instance

@@ -8,7 +8,8 @@ use crate::mesh::RxMesh;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct BrushPlane {
+pub struct BrushPlane
+{
 	pub normal: [f32; 3],
 	pub distance: f32,
 	pub offset: [f32; 2],
@@ -18,7 +19,8 @@ pub struct BrushPlane {
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct BrushFace {
+pub struct BrushFace
+{
 	pub plane_index: u32,
 	pub vertices: *const f32,
 	pub vertex_count: usize,
@@ -26,7 +28,8 @@ pub struct BrushFace {
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct BrushView {
+pub struct BrushView
+{
 	pub planes: *const BrushPlane,
 	pub plane_count: usize,
 	pub faces: *const BrushFace,
@@ -46,7 +49,8 @@ const _: () = {
 	assert!(offset_of!(BrushView, bounds_min) == 48);
 };
 
-fn plane_from_c(plane: &BrushPlane) -> Plane {
+fn plane_from_c(plane: &BrushPlane) -> Plane
+{
 	Plane {
 		normal: Vec3f::from_array(plane.normal),
 		distance: plane.distance,
@@ -58,7 +62,8 @@ fn plane_from_c(plane: &BrushPlane) -> Plane {
 	}
 }
 
-fn plane_to_c(plane: &Plane) -> BrushPlane {
+fn plane_to_c(plane: &Plane) -> BrushPlane
+{
 	BrushPlane {
 		normal: plane.normal.to_array(),
 		distance: plane.distance,
@@ -68,7 +73,8 @@ fn plane_to_c(plane: &Plane) -> BrushPlane {
 	}
 }
 
-unsafe fn slice<'a, T>(pointer: *const T, count: usize) -> &'a [T] {
+unsafe fn slice<'a, T>(pointer: *const T, count: usize) -> &'a [T]
+{
 	if pointer.is_null() || count == 0 {
 		&[]
 	} else {
@@ -77,7 +83,8 @@ unsafe fn slice<'a, T>(pointer: *const T, count: usize) -> &'a [T] {
 	}
 }
 
-fn unpack(floats: &[f32]) -> Vec<Vec3f> {
+fn unpack(floats: &[f32]) -> Vec<Vec3f>
+{
 	floats
 		.as_chunks::<3>()
 		.0
@@ -89,7 +96,8 @@ fn unpack(floats: &[f32]) -> Vec<Vec3f> {
 /// # Safety
 ///
 /// `view` and everything it points to must be valid.
-unsafe fn brush_from_view(view: &BrushView) -> Brush {
+unsafe fn brush_from_view(view: &BrushView) -> Brush
+{
 	// SAFETY: guaranteed by the caller.
 	unsafe {
 		Brush {
@@ -111,7 +119,8 @@ unsafe fn brush_from_view(view: &BrushView) -> Brush {
 	}
 }
 
-pub struct BrushResult {
+pub struct BrushResult
+{
 	ok: bool,
 	view: BrushView,
 	_planes: Vec<BrushPlane>,
@@ -120,11 +129,13 @@ pub struct BrushResult {
 	_vertices: Vec<f32>,
 }
 
-fn pack(vertices: &[Vec3f]) -> Vec<f32> {
+fn pack(vertices: &[Vec3f]) -> Vec<f32>
+{
 	vertices.iter().flat_map(|v| v.to_array()).collect()
 }
 
-fn into_result(brush: &Brush, ok: bool) -> *mut BrushResult {
+fn into_result(brush: &Brush, ok: bool) -> *mut BrushResult
+{
 	let planes: Vec<BrushPlane> = brush.planes.iter().map(plane_to_c).collect();
 	let face_vertices: Vec<Vec<f32>> = brush.faces.iter().map(|f| pack(&f.vertices)).collect();
 	let faces: Vec<BrushFace> = brush
@@ -160,7 +171,8 @@ fn into_result(brush: &Brush, ok: bool) -> *mut BrushResult {
 	}))
 }
 
-fn guarded<T>(build: impl FnOnce() -> *mut T) -> *mut T {
+fn guarded<T>(build: impl FnOnce() -> *mut T) -> *mut T
+{
 	catch_unwind(AssertUnwindSafe(build)).unwrap_or(std::ptr::null_mut())
 }
 
@@ -168,7 +180,8 @@ fn guarded<T>(build: impl FnOnce() -> *mut T) -> *mut T {
 ///
 /// `min` and `max` must point to three floats each.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_brush_from_box(min: *const f32, max: *const f32) -> *mut BrushResult {
+pub unsafe extern "C" fn rx_brush_from_box(min: *const f32, max: *const f32) -> *mut BrushResult
+{
 	// SAFETY: guaranteed by the caller.
 	let (min, max) = unsafe {
 		(
@@ -190,7 +203,8 @@ pub unsafe extern "C" fn rx_brush_from_box(min: *const f32, max: *const f32) -> 
 pub unsafe extern "C" fn rx_brush_rebuild(
 	planes: *const BrushPlane,
 	count: usize,
-) -> *mut BrushResult {
+) -> *mut BrushResult
+{
 	// SAFETY: guaranteed by the caller.
 	let planes: Vec<Plane> = unsafe { slice(planes, count) }
 		.iter()
@@ -211,7 +225,8 @@ pub unsafe extern "C" fn rx_brush_rebuild(
 ///
 /// `result` must come from a `rx_brush_*` constructor and not have been freed.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_brush_result_ok(result: *const BrushResult) -> i32 {
+pub unsafe extern "C" fn rx_brush_result_ok(result: *const BrushResult) -> i32
+{
 	// SAFETY: guaranteed by the caller.
 	i32::from(unsafe { &*result }.ok)
 }
@@ -220,7 +235,8 @@ pub unsafe extern "C" fn rx_brush_result_ok(result: *const BrushResult) -> i32 {
 ///
 /// `result` must come from a `rx_brush_*` constructor and not have been freed.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_brush_result_view(result: *const BrushResult) -> *const BrushView {
+pub unsafe extern "C" fn rx_brush_result_view(result: *const BrushResult) -> *const BrushView
+{
 	// SAFETY: guaranteed by the caller.
 	&unsafe { &*result }.view
 }
@@ -229,14 +245,16 @@ pub unsafe extern "C" fn rx_brush_result_view(result: *const BrushResult) -> *co
 ///
 /// `result` must be null or come from a `rx_brush_*` constructor, and must not be used afterwards.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_brush_result_free(result: *mut BrushResult) {
+pub unsafe extern "C" fn rx_brush_result_free(result: *mut BrushResult)
+{
 	if !result.is_null() {
 		// SAFETY: guaranteed by the caller.
 		drop(unsafe { Box::from_raw(result) });
 	}
 }
 
-fn vec3(pointer: *const f32) -> Vec3f {
+fn vec3(pointer: *const f32) -> Vec3f
+{
 	// SAFETY: the callers of the public functions promise three readable floats.
 	unsafe { Vec3f::new(*pointer, *pointer.add(1), *pointer.add(2)) }
 }
@@ -245,7 +263,8 @@ fn vec3(pointer: *const f32) -> Vec3f {
 ///
 /// `view` must be valid.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_brush_is_box(view: *const BrushView) -> i32 {
+pub unsafe extern "C" fn rx_brush_is_box(view: *const BrushView) -> i32
+{
 	// SAFETY: guaranteed by the caller.
 	i32::from(unsafe { brush_from_view(&*view) }.is_box())
 }
@@ -258,7 +277,8 @@ pub unsafe extern "C" fn rx_brush_contains_point(
 	view: *const BrushView,
 	point: *const f32,
 	tolerance: f32,
-) -> i32 {
+) -> i32
+{
 	// SAFETY: guaranteed by the caller.
 	i32::from(unsafe { brush_from_view(&*view) }.contains_point(vec3(point), tolerance))
 }
@@ -267,7 +287,8 @@ pub unsafe extern "C" fn rx_brush_contains_point(
 ///
 /// `view` must be valid and `normal` must point to three floats.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_brush_find_plane(view: *const BrushView, normal: *const f32) -> i32 {
+pub unsafe extern "C" fn rx_brush_find_plane(view: *const BrushView, normal: *const f32) -> i32
+{
 	// SAFETY: guaranteed by the caller.
 	unsafe { brush_from_view(&*view) }.find_plane(vec3(normal))
 }
@@ -276,7 +297,8 @@ pub unsafe extern "C" fn rx_brush_find_plane(view: *const BrushView, normal: *co
 ///
 /// `view` must be valid and `direction` must point to three floats.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_brush_support(view: *const BrushView, direction: *const f32) -> f32 {
+pub unsafe extern "C" fn rx_brush_support(view: *const BrushView, direction: *const f32) -> f32
+{
 	// SAFETY: guaranteed by the caller.
 	unsafe { brush_from_view(&*view) }.support(vec3(direction))
 }
@@ -289,7 +311,8 @@ pub unsafe extern "C" fn rx_brush_face_center(
 	view: *const BrushView,
 	plane_index: u32,
 	out: *mut f32,
-) {
+)
+{
 	// SAFETY: guaranteed by the caller.
 	let center = unsafe { brush_from_view(&*view) }
 		.face_center(plane_index)
@@ -300,7 +323,8 @@ pub unsafe extern "C" fn rx_brush_face_center(
 
 /// # Safety
 ///
-/// `view` must be valid, `origin` and `direction` must point to three floats and the outputs must be writable.
+/// `view` must be valid, `origin` and `direction` must point to three floats and the outputs must
+/// be writable.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rx_brush_raycast(
 	view: *const BrushView,
@@ -308,7 +332,8 @@ pub unsafe extern "C" fn rx_brush_raycast(
 	direction: *const f32,
 	out_distance: *mut f32,
 	out_plane_index: *mut u32,
-) -> i32 {
+) -> i32
+{
 	// SAFETY: guaranteed by the caller.
 	let hit = unsafe { brush_from_view(&*view) }.raycast(vec3(origin), vec3(direction));
 
@@ -329,7 +354,8 @@ pub unsafe extern "C" fn rx_brush_raycast(
 ///
 /// `view` must be valid.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_brush_has_default_textures(view: *const BrushView) -> i32 {
+pub unsafe extern "C" fn rx_brush_has_default_textures(view: *const BrushView) -> i32
+{
 	// SAFETY: guaranteed by the caller.
 	i32::from(unsafe { brush_from_view(&*view) }.has_default_textures())
 }
@@ -342,7 +368,8 @@ pub unsafe extern "C" fn rx_brush_default_texture_offset(
 	view: *const BrushView,
 	plane_index: u32,
 	out_offset: *mut f32,
-) {
+)
+{
 	// SAFETY: guaranteed by the caller.
 	let mut brush = unsafe { brush_from_view(&*view) };
 
@@ -365,7 +392,8 @@ pub unsafe extern "C" fn rx_brush_world_aligned_offset(
 	normal: *const f32,
 	origin: *const f32,
 	out_offset: *mut f32,
-) {
+)
+{
 	let mut brush = Brush {
 		planes: vec![Plane::new(vec3(normal), 0.0)],
 		..Brush::default()
@@ -377,7 +405,8 @@ pub unsafe extern "C" fn rx_brush_world_aligned_offset(
 	};
 }
 
-pub struct BrushSplit {
+pub struct BrushSplit
+{
 	back: Vec<BrushPlane>,
 	front: Vec<BrushPlane>,
 }
@@ -391,7 +420,8 @@ pub unsafe extern "C" fn rx_brush_split(
 	normal: *const f32,
 	distance: f32,
 	origin: *const f32,
-) -> *mut BrushSplit {
+) -> *mut BrushSplit
+{
 	// SAFETY: guaranteed by the caller.
 	let brush = unsafe { brush_from_view(&*view) };
 	let (normal, origin) = (vec3(normal), vec3(origin));
@@ -413,7 +443,8 @@ pub unsafe extern "C" fn rx_brush_split_planes(
 	split: *const BrushSplit,
 	front: i32,
 	count: *mut usize,
-) -> *const BrushPlane {
+) -> *const BrushPlane
+{
 	// SAFETY: guaranteed by the caller.
 	let (split, count) = unsafe { (&*split, &mut *count) };
 	let planes = if front != 0 {
@@ -429,7 +460,8 @@ pub unsafe extern "C" fn rx_brush_split_planes(
 ///
 /// `split` must be null or come from `rx_brush_split`, and must not be used afterwards.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_brush_split_free(split: *mut BrushSplit) {
+pub unsafe extern "C" fn rx_brush_split_free(split: *mut BrushSplit)
+{
 	if !split.is_null() {
 		// SAFETY: guaranteed by the caller.
 		drop(unsafe { Box::from_raw(split) });
@@ -440,7 +472,8 @@ pub unsafe extern "C" fn rx_brush_split_free(split: *mut BrushSplit) {
 ///
 /// `view` must be valid.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_brush_generate_mesh(view: *const BrushView) -> *mut RxMesh {
+pub unsafe extern "C" fn rx_brush_generate_mesh(view: *const BrushView) -> *mut RxMesh
+{
 	// SAFETY: guaranteed by the caller.
 	let brush = unsafe { brush_from_view(&*view) };
 

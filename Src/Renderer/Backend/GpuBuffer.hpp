@@ -51,73 +51,34 @@ enum class eGpuBufferType
 
 
 namespace GpuBufferUtil {
-static constexpr VkBufferUsageFlags BufferTypeToUnderlying(eGpuBufferType type)
+
+static_assert(static_cast<uint32>(eGpuBufferType::None) == RX_BUFFER_NONE);
+static_assert(static_cast<uint32>(eGpuBufferType::Storage) == RX_BUFFER_STORAGE);
+static_assert(static_cast<uint32>(eGpuBufferType::StorageWithOffset) == RX_BUFFER_STORAGE_WITH_OFFSET);
+static_assert(static_cast<uint32>(eGpuBufferType::Uniform) == RX_BUFFER_UNIFORM);
+static_assert(static_cast<uint32>(eGpuBufferType::UniformWithOffset) == RX_BUFFER_UNIFORM_WITH_OFFSET);
+static_assert(static_cast<uint32>(eGpuBufferType::Transfer) == RX_BUFFER_TRANSFER);
+static_assert(static_cast<uint32>(eGpuBufferType::VertexBuffer) == RX_BUFFER_VERTEX);
+static_assert(static_cast<uint32>(eGpuBufferType::IndexBuffer) == RX_BUFFER_INDEX);
+
+static_assert(static_cast<uint16>(eGpuBufferFlags::PersistentMapped) == RX_BUFFER_FLAG_PERSISTENT_MAPPED);
+static_assert(static_cast<uint16>(eGpuBufferFlags::TransferReceiver) == RX_BUFFER_FLAG_TRANSFER_RECEIVER);
+
+inline VkBufferUsageFlags BufferTypeToUnderlying(eGpuBufferType type)
 {
-	switch (type) {
-	case eGpuBufferType::None:
-		[[fallthrough]];
-	case eGpuBufferType::Storage:
-		[[fallthrough]];
-	case eGpuBufferType::StorageWithOffset:
-		return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-
-	case eGpuBufferType::Uniform:
-		[[fallthrough]];
-	case eGpuBufferType::UniformWithOffset:
-		return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-
-	case eGpuBufferType::Transfer:
-		return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-	case eGpuBufferType::VertexBuffer:
-		return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-	case eGpuBufferType::IndexBuffer:
-		return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-	}
-
-	return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+	return static_cast<VkBufferUsageFlags>(rx_buffer_type_usage(static_cast<uint32>(type)));
 }
 
-#define ENUM_TYPE eGpuBufferType
-
-static constexpr const char* BufferTypeToName(const eGpuBufferType type)
+inline const char* BufferTypeToName(const eGpuBufferType type)
 {
-	switch (type) {
-		FX_ENUM_CASE_NAME(None);
-		FX_ENUM_CASE_NAME(Storage);
-		FX_ENUM_CASE_NAME(StorageWithOffset);
-		FX_ENUM_CASE_NAME(Uniform);
-		FX_ENUM_CASE_NAME(UniformWithOffset);
-		FX_ENUM_CASE_NAME(Transfer);
-		FX_ENUM_CASE_NAME(VertexBuffer);
-		FX_ENUM_CASE_NAME(IndexBuffer);
-	}
-
-	return "";
+	return rx_buffer_type_name(static_cast<uint32>(type));
 }
 
-#undef ENUM_TYPE
-
-
-static constexpr VkDescriptorType BufferTypeToDescriptorType(eGpuBufferType type)
+inline VkDescriptorType BufferTypeToDescriptorType(eGpuBufferType type)
 {
-	switch (type) {
-	case eGpuBufferType::None:
-		[[fallthrough]];
-	case eGpuBufferType::Storage:
-		[[fallthrough]];
-	case eGpuBufferType::StorageWithOffset:
-		return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-
-	case eGpuBufferType::Uniform:
-		[[fallthrough]];
-	case eGpuBufferType::UniformWithOffset:
-		return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-
-	default:;
-	}
-
-	return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+	return static_cast<VkDescriptorType>(rx_buffer_type_descriptor_type(static_cast<uint32>(type)));
 }
+
 }; // namespace GpuBufferUtil
 
 void GpuBufferPrintUndestroyed();

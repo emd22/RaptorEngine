@@ -7,6 +7,7 @@
 #include <Renderer/Backend/GraphicsBackendFwd.hpp>
 #include <Renderer/Backend/Image.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/ShaderNames.hpp>
 
 
@@ -32,40 +33,47 @@ static VkDescriptorType ReflectionTypeToDescriptorType(eShaderReflectionType typ
 }
 
 
+static SizedArray<RxDsLayoutEntry> ToRustEntries(const SizedArray<DescriptorEntry>& entries)
+{
+	SizedArray<RxDsLayoutEntry> rust_entries(entries.Size);
+
+	for (const DescriptorEntry& entry : entries) {
+		rust_entries.Insert(RxDsLayoutEntry {
+			.binding = entry.Binding,
+			.descriptor_type = entry.GetDescriptorType(),
+			.stages = ShaderUtil::ToUnderlyingType(entry.ShaderStages),
+			.count = 1,
+		});
+	}
+
+	return rust_entries;
+}
+
+DsLayoutCache::DsLayoutCache() { mpCache = rx_gpu_ds_layout_cache_create(); }
+
 std::pair<DsLayoutID, VkDescriptorSetLayout>
 DsLayoutCache::Request(const SizedArray<DescriptorEntry>& requested_entries)
 {
-	DsLayoutID entries_hash = GetID(requested_entries);
+	const SizedArray<RxDsLayoutEntry> rust_entries = ToRustEntries(requested_entries);
 
-	VkDescriptorSetLayout* cached_layout = Cache.Find(entries_hash.ID);
+	uint32 id = HashNull32;
+	uint64 layout = 0;
 
-	// If the descriptor layout was not found in the cache, create it
-	if (cached_layout != nullptr) {
-		return std::make_pair(entries_hash, *cached_layout);
+	const VkResult status = static_cast<VkResult>(rx_gpu_ds_layout_cache_request(
+		mpCache, GraphicsBackendFwd::GetDevice()->GetRustDevice(), rust_entries.pData, rust_entries.Size, &id,
+		&layout));
+
+	if (status != VK_SUCCESS) {
+		LogError("Error building descriptor set layout! (status={})", Util::ResultToStr(status));
+		return std::make_pair(DsLayoutID { HashNull32 }, nullptr);
 	}
 
-	DsLayoutBuilder builder {};
-
-#ifdef FX_BUILD_DEBUG
-	LogInfo(LC_CORE, "DS Layout Builder:");
-#endif
-
-	for (const DescriptorEntry& entry : requested_entries) {
-#ifdef FX_BUILD_DEBUG
-		LogInfo("\t Entry {} -> {} || {}", entry.Binding, DescriptorEntryUtil::GetTypeName(entry.GetType()),
-				ShaderUtil::TypeToName(entry.ShaderStages));
-#endif
-		builder.AddBinding(entry.Binding, entry.GetDescriptorType(), entry.ShaderStages);
-	}
-
-	VkDescriptorSetLayout layout = Cache.Insert(entries_hash.ID, builder.Build());
-
-	return std::make_pair(entries_hash, layout);
+	return std::make_pair(DsLayoutID { id }, RxFromRaw<VkDescriptorSetLayout>(layout));
 }
 
-VkDescriptorSetLayout* DsLayoutCache::RequestExisting(DsLayoutID layout_id)
+VkDescriptorSetLayout DsLayoutCache::RequestExisting(DsLayoutID layout_id)
 {
-	return Cache.Find(layout_id.ID);
+	return RxFromRaw<VkDescriptorSetLayout>(rx_gpu_ds_layout_cache_get(mpCache, layout_id.ID));
 }
 
 #define ID_HASH_HANDLE(handle_, size_)                                                                                 \
@@ -73,43 +81,23 @@ VkDescriptorSetLayout* DsLayoutCache::RequestExisting(DsLayoutID layout_id)
 
 DsLayoutID DsLayoutCache::GetID(const SizedArray<DescriptorEntry>& entries)
 {
-	Hash32 id_result = FX_HASH32_FNV1A_INIT;
+	const SizedArray<RxDsLayoutEntry> rust_entries = ToRustEntries(entries);
 
-	for (const DescriptorEntry& entry : entries) {
-		// Add the binding number
-		id_result = ID_HASH_HANDLE(reinterpret_cast<const void*>(&entry.Binding), sizeof(uint32));
-
-		const VkDescriptorType dtype = entry.GetDescriptorType();
-		id_result = ID_HASH_HANDLE(&dtype, sizeof(dtype));
-
-		const uint32 stages = static_cast<uint32>(entry.ShaderStages);
-		id_result = ID_HASH_HANDLE(&stages, sizeof(stages));
-	}
-
-	return DsLayoutID { id_result };
+	return DsLayoutID { rx_gpu_ds_layout_id(rust_entries.pData, rust_entries.Size) };
 }
 
 void DsLayoutCache::Free(DsLayoutID layout_id)
 {
-	VkDescriptorSetLayout* layout = Cache.Find(layout_id.ID);
-
-	// Descriptor layout not found, skip
-	if (layout == nullptr) {
-		return;
-	}
-
-	vkDestroyDescriptorSetLayout(GraphicsBackendFwd::GetDevice()->Device, *layout, nullptr);
-
-	Cache.Remove(layout_id.ID);
+	rx_gpu_ds_layout_cache_free(mpCache, GraphicsBackendFwd::GetDevice()->GetRustDevice(), layout_id.ID);
 }
 
 void DsLayoutCache::Destroy()
 {
-	for (auto& item : Cache) {
-		vkDestroyDescriptorSetLayout(GraphicsBackendFwd::GetDevice()->Device, item.Value, nullptr);
-	}
+	RxGpuDevice* device = (gGraphics != nullptr) ? gGraphics->GetDevice()->GetRustDevice() : nullptr;
 
-	Cache.Clear();
+	rx_gpu_ds_layout_cache_destroy(mpCache, device);
+
+	mpCache = nullptr;
 }
 
 /////////////////////////////////////
@@ -148,7 +136,7 @@ void DescriptorCache::Free(DescriptorID id)
 
 	// Free the set from the descriptor pool
 	VkDescriptorSet ds = it->second.Get();
-	vkFreeDescriptorSets(GraphicsBackendFwd::GetDevice()->Device, FindPool().Get(), 1, &ds);
+	rx_gpu_descriptor_set_free(GraphicsBackendFwd::GetDevice()->GetRustDevice(), RxRaw(FindPool().Get()), RxRaw(ds));
 
 	// Remove it from the cache.
 	Cache.erase(it);

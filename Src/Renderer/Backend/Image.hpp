@@ -137,119 +137,54 @@ enum class eImageAspectFlag
 	Depth = VK_IMAGE_ASPECT_DEPTH_BIT,
 };
 
+static_assert(static_cast<uint16>(eImageFormat::None) == RX_IMAGE_FORMAT_NONE);
+static_assert(static_cast<uint16>(eImageFormat::BGRA8_UNorm) == RX_IMAGE_FORMAT_BGRA8_UNORM);
+static_assert(static_cast<uint16>(eImageFormat::BGRA8_SRGB) == RX_IMAGE_FORMAT_BGRA8_SRGB);
+static_assert(static_cast<uint16>(eImageFormat::RGBA8_SRGB) == RX_IMAGE_FORMAT_RGBA8_SRGB);
+static_assert(static_cast<uint16>(eImageFormat::RGBA8_UNorm) == RX_IMAGE_FORMAT_RGBA8_UNORM);
+static_assert(static_cast<uint16>(eImageFormat::RG32_Float) == RX_IMAGE_FORMAT_RG32_FLOAT);
+static_assert(static_cast<uint16>(eImageFormat::RG16_UNorm) == RX_IMAGE_FORMAT_RG16_UNORM);
+static_assert(static_cast<uint16>(eImageFormat::RGBA16_Float) == RX_IMAGE_FORMAT_RGBA16_FLOAT);
+static_assert(static_cast<uint16>(eImageFormat::RGB32_Float) == RX_IMAGE_FORMAT_RGB32_FLOAT);
+static_assert(static_cast<uint16>(eImageFormat::D16_UNorm_S8_UInt) == RX_IMAGE_FORMAT_D16_UNORM_S8_UINT);
+static_assert(static_cast<uint16>(eImageFormat::D32_Float) == RX_IMAGE_FORMAT_D32_FLOAT);
+static_assert(static_cast<uint16>(eImageFormat::D32_Float_S8_UInt) == RX_IMAGE_FORMAT_D32_FLOAT_S8_UINT);
+static_assert(static_cast<uint16>(eImageFormat::R32_SFloat) == RX_IMAGE_FORMAT_R32_SFLOAT);
+static_assert(static_cast<uint16>(eImageFormat::R32_SInt) == RX_IMAGE_FORMAT_R32_SINT);
+static_assert(static_cast<uint16>(eImageFormat::R32_UInt) == RX_IMAGE_FORMAT_R32_UINT);
+static_assert(static_cast<uint16>(eImageFormat::R8_UInt) == RX_IMAGE_FORMAT_R8_UINT);
+static_assert(static_cast<uint16>(eImageFormat::R8_UNorm) == RX_IMAGE_FORMAT_R8_UNORM);
+
+static_assert(static_cast<uint32>(eImageType::Flat) == RX_IMAGE_TYPE_FLAT);
+static_assert(static_cast<uint32>(eImageType::Cubemap) == RX_IMAGE_TYPE_CUBEMAP);
+static_assert(static_cast<uint32>(eImageType::CubemapArray) == RX_IMAGE_TYPE_CUBEMAP_ARRAY);
+
 struct ImageFormatUtil
 {
-	static constexpr bool IsDepth(eImageFormat format)
-	{
-		switch (format) {
-		case eImageFormat::D16_UNorm_S8_UInt:
-		case eImageFormat::D32_Float:
-		case eImageFormat::D32_Float_S8_UInt:
-			return true;
-		default:;
-		}
+	static bool IsDepth(eImageFormat format) { return rx_image_format_is_depth(static_cast<uint16>(format)) != 0; }
 
-		return false;
+	static bool IsStencil(eImageFormat format)
+	{
+		return rx_image_format_is_stencil(static_cast<uint16>(format)) != 0;
 	}
 
-	static constexpr bool IsStencil(eImageFormat format)
-	{
-		switch (format) {
-		case eImageFormat::D16_UNorm_S8_UInt:
-		case eImageFormat::D32_Float_S8_UInt:
-			return true;
-		default:;
-		}
-
-		return false;
-	}
-
+	/// Whether sampling this format applies the sRGB transfer function, i.e. its contents are gamma encoded.
+	static bool IsSrgb(eImageFormat format) { return rx_image_format_is_srgb(static_cast<uint16>(format)) != 0; }
 
 	/**
 	 * @brief Get the size of the format in bytes. For example, RGBA8 would return 4.
 	 */
-	/// Whether sampling this format applies the sRGB transfer function, i.e. its contents are gamma encoded.
-	static constexpr bool IsSrgb(eImageFormat format)
+	static uint32 GetPixelStride(eImageFormat format)
 	{
-		switch (format) {
-		case eImageFormat::BGRA8_SRGB:
-		case eImageFormat::RGBA8_SRGB:
-			return true;
-		default:;
-		}
-
-		return false;
+		return rx_image_format_pixel_stride(static_cast<uint16>(format));
 	}
 
-	static constexpr uint32 GetPixelStride(eImageFormat format)
+	static VkImageAspectFlags GetAspectMask(const eImageFormat format)
 	{
-		switch (format) {
-		case eImageFormat::None:
-			break;
-
-			// Color formats
-
-		case eImageFormat::BGRA8_UNorm:
-		case eImageFormat::BGRA8_SRGB:
-		case eImageFormat::RGBA8_SRGB:
-		case eImageFormat::RGBA8_UNorm:
-		case eImageFormat::RG16_UNorm:
-			return 4;
-
-		case eImageFormat::RG32_Float:
-		case eImageFormat::RGBA16_Float:
-			return 8;
-
-		case eImageFormat::RGB32_Float:
-			return 12;
-
-			// Depth formats
-
-		case eImageFormat::D16_UNorm_S8_UInt:
-			return 3;
-
-		case eImageFormat::D32_Float:
-			return 4;
-
-		case eImageFormat::D32_Float_S8_UInt:
-			return 5;
-
-		case eImageFormat::R32_SFloat:
-		case eImageFormat::R32_SInt:
-		case eImageFormat::R32_UInt:
-			return 4;
-
-		case eImageFormat::R8_UInt:
-		case eImageFormat::R8_UNorm:
-			return 1;
-		}
-
-		return 0;
+		return static_cast<VkImageAspectFlags>(rx_image_format_aspect_mask(static_cast<uint16>(format)));
 	}
 
-	static constexpr VkImageAspectFlags GetAspectMask(const eImageFormat format)
-	{
-		VkImageAspectFlags aspect = 0;
-
-		// If the format is only depth, return depth aspect
-		if (IsDepth(format)) {
-			aspect |= VK_IMAGE_ASPECT_DEPTH_BIT;
-		}
-
-		// If format is only stencil, return stencil aspect. If it is both depth and stencil, return both or'd together
-		if (IsStencil(format)) {
-			aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
-		}
-
-		if (aspect != 0) {
-			return aspect;
-		}
-
-		// Not depth or stencil, must be colour
-		return VK_IMAGE_ASPECT_COLOR_BIT;
-	}
-
-	static constexpr eImageAspectFlag GetAspectFlag(const eImageFormat format)
+	static eImageAspectFlag GetAspectFlag(const eImageFormat format)
 	{
 		return static_cast<eImageAspectFlag>(GetAspectMask(format));
 	}
@@ -257,68 +192,14 @@ struct ImageFormatUtil
 	/**
 	 * @brief Returns the usage flags for the given format (e.g. USAGE_COLOR, USAGE_DEPTH_STENCIL)
 	 */
-	static constexpr VkImageUsageFlags GetFormatUsageFlags(const eImageFormat format)
+	static VkImageUsageFlags GetFormatUsageFlags(const eImageFormat format)
 	{
-		if (IsDepth(format) || IsStencil(format)) {
-			return VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-		}
-		else {
-			return VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-		}
-
-		return 0;
+		return static_cast<VkImageUsageFlags>(rx_image_format_usage(static_cast<uint16>(format)));
 	}
 
-	static constexpr VkFormat ToUnderlying(const eImageFormat format)
+	static VkFormat ToUnderlying(const eImageFormat format)
 	{
-		switch (format) {
-		case eImageFormat::None:
-			break;
-
-			// Color formats
-
-		case eImageFormat::RG16_UNorm:
-			return VK_FORMAT_R16G16_UNORM;
-
-		case eImageFormat::RG32_Float:
-			return VK_FORMAT_R32G32_SFLOAT;
-		case eImageFormat::BGRA8_UNorm:
-			return VK_FORMAT_B8G8R8A8_UNORM;
-		case eImageFormat::BGRA8_SRGB:
-			return VK_FORMAT_B8G8R8A8_SRGB;
-		case eImageFormat::RGBA8_SRGB:
-			return VK_FORMAT_R8G8B8A8_SRGB;
-		case eImageFormat::RGBA8_UNorm:
-			return VK_FORMAT_R8G8B8A8_UNORM;
-
-		case eImageFormat::RGBA16_Float:
-			return VK_FORMAT_R16G16B16A16_SFLOAT;
-		case eImageFormat::RGB32_Float:
-			return VK_FORMAT_R32G32B32_SFLOAT;
-
-			// Depth Formats
-
-		case eImageFormat::D16_UNorm_S8_UInt:
-			return VK_FORMAT_D16_UNORM_S8_UINT;
-		case eImageFormat::D32_Float:
-			return VK_FORMAT_D32_SFLOAT;
-		case eImageFormat::D32_Float_S8_UInt:
-			return VK_FORMAT_D32_SFLOAT_S8_UINT;
-
-		case eImageFormat::R32_SInt:
-			return VK_FORMAT_R32_SINT;
-		case eImageFormat::R32_UInt:
-			return VK_FORMAT_R32_UINT;
-		case eImageFormat::R32_SFloat:
-			return VK_FORMAT_R32_SFLOAT;
-
-		case eImageFormat::R8_UInt:
-			return VK_FORMAT_R8_UINT;
-		case eImageFormat::R8_UNorm:
-			return VK_FORMAT_R8_UNORM;
-		}
-
-		return VK_FORMAT_UNDEFINED;
+		return static_cast<VkFormat>(rx_image_format_to_vk(static_cast<uint16>(format)));
 	}
 };
 

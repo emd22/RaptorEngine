@@ -1,45 +1,12 @@
 use std::ffi::c_void;
 
 use ash::vk::{self, Handle};
-use raptor_gpu::{AllocRequest, Allocation, Allocator, Level, Memory, SemaphoreKind};
+use raptor_gpu::{Allocation, Allocator, Level, SemaphoreKind};
 
 use crate::gpu::{RxGpuDevice, RxGpuInstance};
 
-const ALLOC_MAPPED: u32 = 1;
-const ALLOC_HOST_SEQUENTIAL_WRITE: u32 = 2;
-const ALLOC_DEDICATED: u32 = 4;
-
-pub struct RxGpuAllocator(Allocator);
-pub struct RxGpuAllocation(Allocation);
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct RxGpuAllocRequest
-{
-	pub memory: u32,
-	pub flags: u32,
-	pub priority: f32,
-}
-
-fn request(raw: &RxGpuAllocRequest) -> AllocRequest
-{
-	let memory = match raw.memory {
-		1 => Memory::AutoPreferDevice,
-		2 => Memory::GpuOnly,
-		3 => Memory::CpuOnly,
-		4 => Memory::CpuToGpu,
-		5 => Memory::GpuToCpu,
-		_ => Memory::Auto,
-	};
-
-	AllocRequest {
-		memory,
-		mapped: raw.flags & ALLOC_MAPPED != 0,
-		host_sequential_write: raw.flags & ALLOC_HOST_SEQUENTIAL_WRITE != 0,
-		dedicated: raw.flags & ALLOC_DEDICATED != 0,
-		priority: raw.priority,
-	}
-}
+pub struct RxGpuAllocator(pub(crate) Allocator);
+pub struct RxGpuAllocation(pub(crate) Allocation);
 
 fn code(result: Result<(), vk::Result>) -> i32
 {
@@ -90,45 +57,8 @@ pub unsafe extern "C" fn rx_gpu_allocator_free(allocator: *mut RxGpuAllocator)
 
 /// # Safety
 ///
-/// `buffer_info` must point to a valid `VkBufferCreateInfo`. The outputs must be writable.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_buffer_create(
-	allocator: *const RxGpuAllocator,
-	buffer_info: *const c_void,
-	request_in: *const RxGpuAllocRequest,
-	out_buffer: *mut u64,
-	out_allocation: *mut *mut RxGpuAllocation,
-	out_mapped: *mut *mut c_void,
-) -> i32
-{
-	// SAFETY: guaranteed by the caller.
-	let (allocator, info, request_in) = unsafe {
-		(
-			&(*allocator).0,
-			&*buffer_info.cast::<vk::BufferCreateInfo>(),
-			request(&*request_in),
-		)
-	};
-
-	// SAFETY: guaranteed by the caller.
-	match unsafe { allocator.create_buffer(info, &request_in) } {
-		Ok((buffer, allocation, mapped)) => {
-			// SAFETY: guaranteed by the caller.
-			unsafe {
-				*out_buffer = buffer.as_raw();
-				*out_allocation = Box::into_raw(Box::new(RxGpuAllocation(allocation)));
-				*out_mapped = mapped.cast();
-			}
-			vk::Result::SUCCESS.as_raw()
-		}
-		Err(error) => error.as_raw(),
-	}
-}
-
-/// # Safety
-///
-/// `buffer` and `allocation` must come from `rx_gpu_buffer_create` on this allocator and not be in
-/// use. `allocation` must not be used afterwards.
+/// `buffer` and `allocation` must come from `rx_gpu_buffer_create_typed` on this allocator and not
+/// be in use. `allocation` must not be used afterwards.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rx_gpu_buffer_destroy(
 	allocator: *const RxGpuAllocator,
@@ -146,65 +76,6 @@ pub unsafe extern "C" fn rx_gpu_buffer_destroy(
 		(*allocator)
 			.0
 			.destroy_buffer(vk::Buffer::from_raw(buffer), allocation.0);
-	}
-}
-
-/// # Safety
-///
-/// `image_info` must point to a valid `VkImageCreateInfo`. The outputs must be writable.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_image_create(
-	allocator: *const RxGpuAllocator,
-	image_info: *const c_void,
-	request_in: *const RxGpuAllocRequest,
-	out_image: *mut u64,
-	out_allocation: *mut *mut RxGpuAllocation,
-) -> i32
-{
-	// SAFETY: guaranteed by the caller.
-	let (allocator, info, request_in) = unsafe {
-		(
-			&(*allocator).0,
-			&*image_info.cast::<vk::ImageCreateInfo>(),
-			request(&*request_in),
-		)
-	};
-
-	// SAFETY: guaranteed by the caller.
-	match unsafe { allocator.create_image(info, &request_in) } {
-		Ok((image, allocation)) => {
-			// SAFETY: guaranteed by the caller.
-			unsafe {
-				*out_image = image.as_raw();
-				*out_allocation = Box::into_raw(Box::new(RxGpuAllocation(allocation)));
-			}
-			vk::Result::SUCCESS.as_raw()
-		}
-		Err(error) => error.as_raw(),
-	}
-}
-
-/// # Safety
-///
-/// `image` and `allocation` must come from `rx_gpu_image_create` on this allocator and not be in
-/// use. `allocation` must not be used afterwards.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_gpu_image_destroy(
-	allocator: *const RxGpuAllocator,
-	image: u64,
-	allocation: *mut RxGpuAllocation,
-)
-{
-	if allocation.is_null() {
-		return;
-	}
-
-	// SAFETY: guaranteed by the caller.
-	unsafe {
-		let allocation = Box::from_raw(allocation);
-		(*allocator)
-			.0
-			.destroy_image(vk::Image::from_raw(image), allocation.0);
 	}
 }
 

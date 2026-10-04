@@ -656,24 +656,9 @@ void GraphicsBackend::PresentFrame()
 		ModulePanic("Swapchain not initialized!");
 	}
 
-	const VkSwapchainKHR swapchains[] = {
-		Swapchain.GetSwapchain(),
-	};
-
-	const VkPresentInfoKHR present_info = {
-		.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-		.waitSemaphoreCount = 1,
-		.pWaitSemaphores = &submit_semaphore,
-
-		.swapchainCount = 1,
-		.pSwapchains = swapchains,
-
-		.pImageIndices = &mImageIndex,
-
-		.pResults = nullptr,
-	};
-
-	const VkResult status = vkQueuePresentKHR(present_queue.Get(), &present_info);
+	const VkResult status = static_cast<VkResult>(
+		rx_gpu_swapchain_present(GetDevice()->GetRustDevice(), present_queue.Get(), RxRaw(Swapchain.GetSwapchain()),
+								 RxRaw(submit_semaphore), mImageIndex));
 
 	if (status == VK_SUCCESS) {
 	}
@@ -797,8 +782,9 @@ eFrameResult GraphicsBackend::GetNextSwapchainImage(FrameData* frame)
 {
 	const uint64 timeout = UINT64_MAX; // TODO: change this value and handle AcquireNextImage errors correctly
 
-	const VkResult result = vkAcquireNextImageKHR(GetDevice()->Device, Swapchain.GetSwapchain(), timeout,
-												  frame->ImageAvailable.Get(), nullptr, &mImageIndex);
+	const VkResult result = static_cast<VkResult>(
+		rx_gpu_swapchain_acquire(GetDevice()->GetRustDevice(), RxRaw(Swapchain.GetSwapchain()), timeout,
+								 RxRaw(frame->ImageAvailable.Get()), &mImageIndex));
 
 	if (result == VK_SUCCESS) {
 		return eFrameResult::Success;

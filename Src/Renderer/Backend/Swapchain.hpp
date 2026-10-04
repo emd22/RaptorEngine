@@ -2,7 +2,6 @@
 
 #include "Framebuffer.hpp"
 #include "Image.hpp"
-#include "Sampler/Sampler.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -37,20 +36,11 @@ private:
     void CreateSwapchainImages();
     void CreateImageViews();
     void CreateFramebuffers();
-    void CreateSamplers();
-
     void DestroyFramebuffersAndImageViews();
     void DestroyInternalSwapchain();
 
 public:
     SizedArray<Image> OutputImages;
-
-    Sampler ColorSampler;
-    Sampler ColorSamplerNearest;
-    Sampler DepthSampler;
-    Sampler ShadowDepthSampler;
-    Sampler NormalsSampler;
-    Sampler LightsSampler;
 
     Vec2u Extent = Vec2u::sZero;
 

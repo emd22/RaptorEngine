@@ -8,7 +8,7 @@ publish.workspace = true
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
-ash = { version = "0.38", default-features = false, features = ["std"] }
+ash = { version = "0.38", default-features = false, features = ["std", "debug"] }
 raptor-gpu = { path = "../raptor-gpu" }
 raptor-brush = { path = "../raptor-brush" }
 raptor-config = { path = "../raptor-config" }

@@ -26,109 +26,17 @@ namespace fx::renderer {
 // Shader Functions
 /////////////////////////////////////
 
+static_assert(sizeof(ShaderMacro) == sizeof(RxShaderMacroRef));
+
 Hash64 Shader::HashMacros(const SizedArray<ShaderMacro>& macros, Hash64 hash)
 {
-	for (const ShaderMacro& macro : macros) {
-		if (macro.pcName != nullptr) {
-			hash = HashStr64(macro.pcName, hash);
-		}
-
-		// Keeps `NAME=1` apart from a valueless `NAME`, and both from `NAME=2`
-		hash = HashStr64("=", hash);
-
-		if (macro.pcValue != nullptr) {
-			hash = HashStr64(macro.pcValue, hash);
-		}
-
-		hash = HashStr64(";", hash);
-	}
-
-	return hash;
-}
-
-/**
- * @brief Scans SPIR-V for `Input` variables decorated with a location, returning a mask of those locations. Used to
- * leave vertex attributes out of the pipeline that the vertex shader does not consume.
- */
-static uint32 GetInputLocationMask(const uint32* words, uint32 word_count)
-{
-	constexpr uint32 cSpirvMagic = 0x07230203;
-	constexpr uint32 cSpirvHeaderWords = 5;
-
-	constexpr uint32 cOpVariable = 59;
-	constexpr uint32 cOpDecorate = 71;
-	constexpr uint32 cDecorationLocation = 30;
-	constexpr uint32 cStorageClassInput = 1;
-
-	if (word_count < cSpirvHeaderWords || words[0] != cSpirvMagic) {
-		return ~0U;
-	}
-
-	const uint32 id_bound = words[3];
-
-	// Location for each id, or UINT32_MAX if the id has no location
-	SizedArray<uint32> locations;
-	locations.InitSize(id_bound);
-	memset(locations.pData, 0xFF, locations.GetSizeInBytes());
-
-	SizedArray<bool> is_input;
-	is_input.InitSize(id_bound);
-	memset(is_input.pData, 0, is_input.GetSizeInBytes());
-
-	for (uint32 i = cSpirvHeaderWords; i < word_count;) {
-		const uint32 opcode = words[i] & 0xFFFF;
-		const uint32 inst_words = words[i] >> 16;
-
-		if (inst_words == 0 || i + inst_words > word_count) {
-			return ~0U;
-		}
-
-		if (opcode == cOpDecorate && inst_words >= 4 && words[i + 2] == cDecorationLocation) {
-			const uint32 target = words[i + 1];
-			if (target < id_bound) {
-				locations[target] = words[i + 3];
-			}
-		}
-		else if (opcode == cOpVariable && inst_words >= 4 && words[i + 3] == cStorageClassInput) {
-			const uint32 result = words[i + 2];
-			if (result < id_bound) {
-				is_input[result] = true;
-			}
-		}
-
-		i += inst_words;
-	}
-
-	uint32 mask = 0;
-
-	for (uint32 id = 0; id < id_bound; id++) {
-		if (is_input[id] && locations[id] < 32) {
-			mask |= (1U << locations[id]);
-		}
-	}
-
-	return mask;
+	return rx_shader_hash_macros(reinterpret_cast<const RxShaderMacroRef*>(macros.pData), macros.Size, hash);
 }
 
 ShaderId Shader::GenerateShaderId(eShaderType type, const SizedArray<ShaderMacro>& macros)
 {
-	Hash64 hash = FX_HASH64_FNV1A_INIT;
-
-	constexpr Hash64 cPrefixHashVS = HashStr64("VERTSHADER");
-	constexpr Hash64 cPrefixHashFS = HashStr64("FRAGSHADER");
-	constexpr Hash64 cPrefixHashCS = HashStr64("COMPUTESHADER");
-
-	if (type == eShaderType::Vertex) {
-		hash = cPrefixHashVS;
-	}
-	else if (type == eShaderType::Pixel) {
-		hash = cPrefixHashFS;
-	}
-	else if (type == eShaderType::Compute) {
-		hash = cPrefixHashCS;
-	}
-
-	return HashMacros(macros, hash);
+	return rx_shader_id(static_cast<uint32>(type), reinterpret_cast<const RxShaderMacroRef*>(macros.pData),
+						macros.Size);
 }
 
 bool Shader::PreloadCompiledPrograms(const char* pack_path)
@@ -227,12 +135,11 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
 		program->Reflection = std::move(program_data.Reflection);
 
 		if (shader_type == eShaderType::Vertex) {
-			program->InputLocationMask = GetInputLocationMask(
+			program->InputLocationMask = rx_spirv_input_location_mask(
 				reinterpret_cast<const uint32*>(program_data.pProgramData.pData),
-				static_cast<uint32>(program_data.pProgramData.Size / sizeof(uint32)));
+				program_data.pProgramData.Size / sizeof(uint32));
 		}
 		// program->PrintReflection();
-
 		return program;
 	}
 
@@ -335,8 +242,7 @@ void ShaderProgram::Destroy()
 		return;
 	}
 
-	GpuDevice* device = gGraphics->GetDevice();
-	vkDestroyShaderModule(device->Device, InternalShader, nullptr);
+	rx_gpu_shader_module_destroy(gGraphics->GetDevice()->GetRustDevice(), RxRaw(InternalShader));
 
 	InternalShader = nullptr;
 }
@@ -345,20 +251,17 @@ void ShaderProgram::Destroy()
 void Shader::CreateShaderModule(ShaderProgram& program, uint32 file_size, uint32* raw_data,
 								VkShaderModule& shader_module)
 {
-	const VkShaderModuleCreateInfo create_info {
-		.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-		.codeSize = file_size,
-		.pCode = raw_data,
-	};
+	uint64 handle = 0;
 
-	GpuDevice* device = gGraphics->GetDevice();
-
-	const VkResult status = vkCreateShaderModule(device->Device, &create_info, nullptr, &shader_module);
+	const VkResult status = static_cast<VkResult>(rx_gpu_shader_module_create(
+		gGraphics->GetDevice()->GetRustDevice(), raw_data, file_size / sizeof(uint32), &handle));
 
 	if (status != VK_SUCCESS) {
 		LogError(LC_SHADER, "Could not create Vulkan shader module: {}", Util::ResultToStr(status));
 		return;
 	}
+
+	shader_module = RxFromRaw<VkShaderModule>(handle);
 }
 
 } // namespace fx::renderer

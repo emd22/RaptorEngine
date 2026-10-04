@@ -268,18 +268,18 @@ std::vector<VkDescriptorSetLayout> PSOBuild::BuildDescriptorSets()
 		std::pair<DescriptorID, DescriptorSet*> ds_result = gDescriptorCache->Request(desc_list);
 		AssertMsg(ds_result.second != nullptr, "Could not find descriptor set when building pipeline");
 
-		VkDescriptorSetLayout* ds_layout = gDsLayoutCache->RequestExisting(ds_result.second->LayoutID);
+		VkDescriptorSetLayout ds_layout = gDsLayoutCache->RequestExisting(ds_result.second->LayoutID);
 		AssertMsg(ds_layout != nullptr, "Could not find descriptor layout when building pipeline");
 
 #ifdef FX_DEBUG_SET_DESCRIPTOR_NAMES
 		String debug_str = String::Fmt("{}_{}_{}", mDebugName, i, desc_list.Size);
 		renderer::Util::SetDebugLabel(debug_str.CStr(), VK_OBJECT_TYPE_DESCRIPTOR_SET, ds_result.second->Get());
-		renderer::Util::SetDebugLabel(debug_str.CStr(), VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, *ds_layout);
+		renderer::Util::SetDebugLabel(debug_str.CStr(), VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, ds_layout);
 #endif
 
-		layouts.emplace_back(*ds_layout);
+		layouts.emplace_back(ds_layout);
 
-		mpPipeline->DescriptorIDs.Emplace(i, ds_result.second, *ds_layout);
+		mpPipeline->DescriptorIDs.Emplace(i, ds_result.second, ds_layout);
 	}
 
 	return layouts;

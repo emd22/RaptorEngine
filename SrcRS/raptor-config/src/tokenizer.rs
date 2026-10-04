@@ -9,7 +9,8 @@ const MAX_INCLUDE_PATH: usize = 512;
 const MAX_INCLUDE_DEPTH: u32 = 32;
 
 #[derive(Clone, Copy, Debug)]
-pub struct Token {
+pub struct Token
+{
 	pub kind: TokenKind,
 	pub source: usize,
 	pub start: usize,
@@ -17,13 +18,16 @@ pub struct Token {
 }
 
 #[derive(Default)]
-pub struct TokenStream {
+pub struct TokenStream
+{
 	pub tokens: Vec<Token>,
 	pub sources: Vec<Rc<[u8]>>,
 }
 
-impl TokenStream {
-	pub fn text(&self, token: &Token) -> &[u8] {
+impl TokenStream
+{
+	pub fn text(&self, token: &Token) -> &[u8]
+	{
 		let source = &self.sources[token.source];
 		let start = token.start.min(source.len());
 		let end = token.start.saturating_add(token.len).min(source.len());
@@ -31,24 +35,29 @@ impl TokenStream {
 	}
 }
 
-struct Pending {
+struct Pending
+{
 	start: usize,
 	len: usize,
 }
 
-struct Lexer {
+struct Lexer
+{
 	source: usize,
 	buffer: Rc<[u8]>,
 	pos: usize,
 	end: usize,
 }
 
-impl Lexer {
-	fn at(&self, index: usize) -> u8 {
+impl Lexer
+{
+	fn at(&self, index: usize) -> u8
+	{
 		self.buffer.get(index).copied().unwrap_or(0)
 	}
 
-	fn pending_text(&self, pending: &Pending) -> &[u8] {
+	fn pending_text(&self, pending: &Pending) -> &[u8]
+	{
 		let start = pending.start.min(self.buffer.len());
 
 		// Use saturating add here as we don't want to overflow
@@ -61,15 +70,18 @@ impl Lexer {
 	}
 }
 
-pub struct Tokenizer<'h> {
+pub struct Tokenizer<'h>
+{
 	host: &'h mut dyn Host,
 	extension: Vec<u8>,
 	stream: TokenStream,
 	include_depth: u32,
 }
 
-impl<'h> Tokenizer<'h> {
-	pub fn new(host: &'h mut dyn Host, extension: &[u8]) -> Self {
+impl<'h> Tokenizer<'h>
+{
+	pub fn new(host: &'h mut dyn Host, extension: &[u8]) -> Self
+	{
 		Self {
 			host,
 			extension: extension.to_vec(),
@@ -78,16 +90,19 @@ impl<'h> Tokenizer<'h> {
 		}
 	}
 
-	pub fn finish(self) -> TokenStream {
+	pub fn finish(self) -> TokenStream
+	{
 		self.stream
 	}
 
-	pub fn tokenize(&mut self, data: &[u8]) {
+	pub fn tokenize(&mut self, data: &[u8])
+	{
 		let buffer: Rc<[u8]> = Rc::from(data);
 		self.tokenize_buffer(buffer);
 	}
 
-	pub fn include_file(&mut self, path: &[u8]) {
+	pub fn include_file(&mut self, path: &[u8])
+	{
 		if self.include_depth >= MAX_INCLUDE_DEPTH {
 			let message = format!(
 				"Include depth limit reached at '{}'",
@@ -111,7 +126,8 @@ impl<'h> Tokenizer<'h> {
 		self.include_depth -= 1;
 	}
 
-	fn tokenize_buffer(&mut self, buffer: Rc<[u8]>) {
+	fn tokenize_buffer(&mut self, buffer: Rc<[u8]>)
+	{
 		let source = self.stream.sources.len();
 		self.stream.sources.push(buffer.clone());
 
@@ -212,7 +228,8 @@ impl<'h> Tokenizer<'h> {
 		self.submit(&lexer, &mut current);
 	}
 
-	fn token_kind(&self, lexer: &Lexer, pending: &Pending) -> TokenKind {
+	fn token_kind(&self, lexer: &Lexer, pending: &Pending) -> TokenKind
+	{
 		match classify_numeric(lexer.pending_text(pending)) {
 			Numeric::Integer => return TokenKind::Integer,
 			Numeric::Fractional => return TokenKind::Float,
@@ -254,7 +271,8 @@ impl<'h> Tokenizer<'h> {
 		TokenKind::Identifier
 	}
 
-	fn submit(&mut self, lexer: &Lexer, pending: &mut Pending) {
+	fn submit(&mut self, lexer: &Lexer, pending: &mut Pending)
+	{
 		if pending.len == 0 {
 			return;
 		}
@@ -271,7 +289,8 @@ impl<'h> Tokenizer<'h> {
 		pending.start = lexer.pos;
 	}
 
-	fn check_operators(&mut self, lexer: &mut Lexer, pending: &mut Pending, ch: u8) -> bool {
+	fn check_operators(&mut self, lexer: &mut Lexer, pending: &mut Pending, ch: u8) -> bool
+	{
 		if ch == b'.' && classify_numeric(lexer.pending_text(pending)) != Numeric::NaN {
 			return false;
 		}
@@ -299,7 +318,8 @@ impl<'h> Tokenizer<'h> {
 		true
 	}
 
-	fn expect_string(lexer: &mut Lexer, expected: &[u8]) -> bool {
+	fn expect_string(lexer: &mut Lexer, expected: &[u8]) -> bool
+	{
 		let mut expected_index = 0;
 		let mut pos = lexer.pos;
 
@@ -325,7 +345,8 @@ impl<'h> Tokenizer<'h> {
 		true
 	}
 
-	fn read_quoted_string(&mut self, lexer: &mut Lexer) -> Vec<u8> {
+	fn read_quoted_string(&mut self, lexer: &mut Lexer) -> Vec<u8>
+	{
 		let mut pos = lexer.pos;
 
 		if pos >= lexer.end {
@@ -373,7 +394,8 @@ impl<'h> Tokenizer<'h> {
 		path
 	}
 
-	fn try_read_internal_call(&mut self, lexer: &mut Lexer) {
+	fn try_read_internal_call(&mut self, lexer: &mut Lexer)
+	{
 		if !Self::expect_string(lexer, b"include") {
 			return;
 		}

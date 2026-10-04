@@ -11,20 +11,23 @@ const LEVEL_PRINT: i32 = 0;
 const LEVEL_ERROR: i32 = 3;
 
 #[repr(C)]
-pub struct RxLogSink {
+pub struct RxLogSink
+{
 	pub user: *mut c_void,
 	pub log: Option<LogFn>,
 }
 
 #[repr(C)]
-pub struct RxShaderMacro {
+pub struct RxShaderMacro
+{
 	pub name: *const c_char,
 	pub value: *const c_char,
 }
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct RxReflectionEntry {
+pub struct RxReflectionEntry
+{
 	pub kind: u16,
 	pub set: u8,
 	pub binding: u8,
@@ -35,16 +38,19 @@ const _: () = {
 	assert!(align_of::<RxReflectionEntry>() == 2);
 };
 
-pub struct RxPreprocResult {
+pub struct RxPreprocResult
+{
 	output: Output,
 	reflection: [Vec<RxReflectionEntry>; 3],
 }
 
 struct CLog<'a>(&'a RxLogSink);
 
-impl Log for CLog<'_> {
+impl Log for CLog<'_>
+{
 	/// Logs a message to the shader channel in the engine.
-	fn log(&mut self, level: LogLevel, message: &str) {
+	fn log(&mut self, level: LogLevel, message: &str)
+	{
 		let Some(log) = self.0.log else { return };
 
 		let level = match level {
@@ -67,8 +73,9 @@ impl Log for CLog<'_> {
 
 /// # Safety
 ///
-/// `data` must point to `length` readable bytes. `macros` must point to `macro_count` entries whose names are
-/// NUL-terminated and whose values are NUL-terminated or null. `log` must point to a valid `RxLogSink`.
+/// `data` must point to `length` readable bytes. `macros` must point to `macro_count` entries whose
+/// names are NUL-terminated and whose values are NUL-terminated or null. `log` must point to a
+/// valid `RxLogSink`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rx_preproc_process(
 	data: *const u8,
@@ -76,7 +83,8 @@ pub unsafe extern "C" fn rx_preproc_process(
 	macros: *const RxShaderMacro,
 	macro_count: usize,
 	log: *const RxLogSink,
-) -> *mut RxPreprocResult {
+) -> *mut RxPreprocResult
+{
 	let result = catch_unwind(AssertUnwindSafe(|| {
 		// SAFETY: guaranteed by the caller as documented above.
 		let (source, raw_macros, log) = unsafe {
@@ -134,7 +142,8 @@ pub unsafe extern "C" fn rx_preproc_program(
 	result: *const RxPreprocResult,
 	stage: u32,
 	length: *mut usize,
-) -> *const u8 {
+) -> *const u8
+{
 	// SAFETY: guaranteed by the caller.
 	let (result, length) = unsafe { (&*result, &mut *length) };
 
@@ -158,7 +167,8 @@ pub unsafe extern "C" fn rx_preproc_reflection(
 	result: *const RxPreprocResult,
 	stage: u32,
 	count: *mut usize,
-) -> *const RxReflectionEntry {
+) -> *const RxReflectionEntry
+{
 	// SAFETY: guaranteed by the caller.
 	let (result, count) = unsafe { (&*result, &mut *count) };
 
@@ -178,7 +188,8 @@ pub unsafe extern "C" fn rx_preproc_reflection(
 ///
 /// `result` must be null or come from `rx_preproc_process`, and must not be used afterwards.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_preproc_free(result: *mut RxPreprocResult) {
+pub unsafe extern "C" fn rx_preproc_free(result: *mut RxPreprocResult)
+{
 	if !result.is_null() {
 		// SAFETY: guaranteed by the caller.
 		drop(unsafe { Box::from_raw(result) });

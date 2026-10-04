@@ -1,7 +1,6 @@
 #include "Swapchain.hpp"
 
 #include "Device.hpp"
-#include "Sampler/SamplerProps.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -18,7 +17,6 @@ void Swapchain::Init(Vec2u size, VkSurfaceKHR surface, GpuDevice* device)
 	mDevice = device;
 
 	CreateSwapchain(size, surface);
-	CreateSamplers();
 	CreateSwapchainImages();
 	CreateImageViews();
 	CreateFramebuffers();
@@ -43,20 +41,20 @@ void Swapchain::CreateSwapchainImages()
 {
 	OutputImages.Free();
 
-	uint32 image_count;
+	RxGpuDevice* device = mDevice->GetRustDevice();
 
-	vkGetSwapchainImagesKHR(mDevice->Device, mSwapchain, &image_count, nullptr);
+	const uint32 image_count = rx_gpu_swapchain_images(device, RxRaw(mSwapchain), nullptr, 0);
 
-	SizedArray<VkImage> raw_images;
+	SizedArray<uint64> raw_images;
 	raw_images.InitSize(image_count);
 
-	vkGetSwapchainImagesKHR(mDevice->Device, mSwapchain, &image_count, raw_images.pData);
+	rx_gpu_swapchain_images(device, RxRaw(mSwapchain), raw_images.pData, image_count);
 
 	OutputImages.InitCapacity(image_count);
 
-	for (VkImage& raw_image : raw_images) {
+	for (uint64& raw_image : raw_images) {
 		Image* image = OutputImages.Insert();
-		image->InternalImage = raw_image;
+		image->InternalImage = RxFromRaw<VkImage>(raw_image);
 		image->View = nullptr;
 		image->Allocation = nullptr;
 		image->ImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -72,39 +70,23 @@ void Swapchain::CreateFramebuffers() {}
 
 void Swapchain::CreateImageViews()
 {
+	RxGpuDevice* device = mDevice->GetRustDevice();
+
 	for (int32 i = 0; i < OutputImages.Size; i++) {
 		if (OutputImages[i].View != nullptr) {
-			vkDestroyImageView(mDevice->Device, OutputImages[i].View, nullptr);
+			rx_gpu_view_destroy(device, RxRaw(OutputImages[i].View));
 		}
 
-		const VkImageViewCreateInfo create_info = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-            .image = OutputImages[i].InternalImage,
-            .viewType = VK_IMAGE_VIEW_TYPE_2D,
-            .format = ImageFormatUtil::ToUnderlying(Surface.Format),
-            .components = {
-                .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .a = VK_COMPONENT_SWIZZLE_IDENTITY,
-            },
-            .subresourceRange = {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1,
-            }
-        };
+		uint64 view = 0;
 
-		VkResult status = vkCreateImageView(mDevice->Device, &create_info, nullptr, &OutputImages[i].View);
+		const VkResult status = static_cast<VkResult>(rx_gpu_color_view_create(
+			device, RxRaw(OutputImages[i].InternalImage), static_cast<uint16>(Surface.Format), &view));
+
 		if (status != VK_SUCCESS) {
 			ModulePanicVulkan("Could not create swapchain image view", status);
 		}
 
-		// if (reinterpret_cast<uint64>(OutputImages[i].View) == 0xf000000000f) {
-		//     FX_BREAKPOINT;
-		// }
+		OutputImages[i].View = RxFromRaw<VkImageView>(view);
 	}
 }
 
@@ -112,121 +94,17 @@ void Swapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR surface)
 {
 	Extent = size;
 
-	VkSurfaceCapabilitiesKHR capabilities;
-	const VkResult result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mDevice->Physical, surface, &capabilities);
+	RxSwapchainResult result {};
 
-	if (result != VK_SUCCESS) {
-		ModulePanicVulkan("Error retrieving surface capabilities", result);
+	if (rx_gpu_swapchain_create(mDevice->GetRustDevice(), RxRaw(surface), size.X, size.Y, RxRaw(mSwapchain),
+								&result) == 0) {
+		ModulePanic("Could not create swapchain");
 	}
 
-	const VkExtent2D extent = {
-		.width = size.X,
-		.height = size.Y,
-	};
+	mSwapchain = RxFromRaw<VkSwapchainKHR>(result.handle);
 
-	uint32 image_count = capabilities.minImageCount + 1;
-
-	if (capabilities.maxImageCount > 0 && image_count > capabilities.maxImageCount) {
-		image_count = capabilities.maxImageCount;
-	}
-
-	LogInfo(LC_RENDER, "Swapchain - Min:{:d}, Max:{:d}, Selected:{:d}", capabilities.minImageCount,
-			capabilities.maxImageCount, image_count);
-
-	// Retrieve the image format for the surface (the window's render target)
-	{
-		VkSurfaceFormatKHR surface_format = mDevice->GetSurfaceFormat();
-
-		// GpuDevice::GetSurfaceFormat() prefers an _SRGB format, so the composition pass's linear output is
-		// encoded by the GPU. the other formats are fallbacks
-		Assert(surface_format.format == VK_FORMAT_B8G8R8A8_SRGB || surface_format.format == VK_FORMAT_R8G8B8A8_SRGB ||
-			   surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT ||
-			   surface_format.format == VK_FORMAT_R8G8B8A8_UNORM);
-
-		if (surface_format.format == VK_FORMAT_B8G8R8A8_SRGB) {
-			Surface.Format = eImageFormat::BGRA8_SRGB;
-		}
-		else if (surface_format.format == VK_FORMAT_R8G8B8A8_SRGB) {
-			Surface.Format = eImageFormat::RGBA8_SRGB;
-		}
-		else if (surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT) {
-			Surface.Format = eImageFormat::RGBA16_Float;
-		}
-		else if (surface_format.format == VK_FORMAT_R8G8B8A8_UNORM) {
-			Surface.Format = eImageFormat::RGBA8_UNorm;
-		}
-
-		Surface.ColorSpace = surface_format.colorSpace;
-	}
-
-	const VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
-
-	VkSwapchainKHR old_swapchain = mSwapchain;
-
-	VkSwapchainCreateInfoKHR create_info = {
-		.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-		.surface = surface,
-
-		.minImageCount = image_count,
-
-		.imageFormat = ImageFormatUtil::ToUnderlying(Surface.Format),
-		.imageColorSpace = Surface.ColorSpace,
-
-		.imageExtent = extent,
-		.imageArrayLayers = 1,
-		.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-
-		.preTransform = capabilities.currentTransform,
-		.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-
-		.presentMode = present_mode,
-		.clipped = VK_TRUE,
-
-		// mSwapchain is null if not initialized
-		.oldSwapchain = old_swapchain,
-	};
-
-	create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	create_info.queueFamilyIndexCount = 0;
-	create_info.pQueueFamilyIndices = nullptr;
-
-	const VkResult status = vkCreateSwapchainKHR(mDevice->Device, &create_info, nullptr, &mSwapchain);
-
-	if (status != VK_SUCCESS) {
-		ModulePanicVulkan("Could not create swapchain", status);
-	}
-
-	if (old_swapchain != nullptr && mSwapchain != old_swapchain) {
-		vkDestroySwapchainKHR(mDevice->Device, old_swapchain, nullptr);
-	}
-}
-
-void Swapchain::CreateSamplers()
-{
-	ColorSampler.Create();
-	ColorSamplerNearest.Create(SamplerProps {
-		eSamplerFilter::Nearest,
-		eSamplerFilter::Nearest,
-		eSamplerFilter::Nearest,
-	});
-
-	DepthSampler.Create(SamplerProps {
-		eSamplerFilter::Nearest,
-		eSamplerFilter::Nearest,
-		eSamplerFilter::Nearest,
-	});
-
-	ShadowDepthSampler.Create(SamplerProps {
-		eSamplerFilter::Linear,
-		eSamplerFilter::Linear,
-		eSamplerFilter::Linear,
-		eSamplerAddressMode::ClampToBorder,
-		eSamplerBorderColor::FloatWhite,
-		eSamplerCompareOp::Greater,
-	});
-
-	NormalsSampler.Create();
-	LightsSampler.Create();
+	Surface.Format = static_cast<eImageFormat>(result.format);
+	Surface.ColorSpace = static_cast<VkColorSpaceKHR>(result.color_space);
 }
 
 void Swapchain::DestroyFramebuffersAndImageViews()
@@ -237,18 +115,9 @@ void Swapchain::DestroyFramebuffersAndImageViews()
 	}
 
 	OutputImages.Free();
-
-
-	// TODO: Add sampler cache!
-	ColorSampler.Destroy();
-	ColorSamplerNearest.Destroy();
-	DepthSampler.Destroy();
-	ShadowDepthSampler.Destroy();
-	NormalsSampler.Destroy();
-	LightsSampler.Destroy();
 }
 
-void Swapchain::DestroyInternalSwapchain() { vkDestroySwapchainKHR(mDevice->Device, mSwapchain, nullptr); }
+void Swapchain::DestroyInternalSwapchain() { rx_gpu_swapchain_destroy(mDevice->GetRustDevice(), RxRaw(mSwapchain)); }
 
 void Swapchain::Destroy()
 {

@@ -59,6 +59,9 @@ public:
 
     bool IsInitialized() const { return mbInitialized; }
 
+    /// The pipeline most recently bound in this command buffer, so a repeated bind can be skipped
+    mutable VkPipeline pBoundPipeline = nullptr;
+
 private:
     void CheckInitialized() const;
 

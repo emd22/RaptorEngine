@@ -80,7 +80,17 @@ void ControlManager::ReleaseMouse()
 {
 	ControlManager& inst = GetInstance();
 
+	if (renderer::gGraphics == nullptr) {
+		inst.mMouseCaptured = false;
+		return;
+	}
+
 	Ref<Window> window = renderer::gGraphics->GetWindow();
+
+	if (!window) {
+		inst.mMouseCaptured = false;
+		return;
+	}
 
 	// Warp back to the original position
 	window->WarpMouse(inst.mCapturedMousePos);

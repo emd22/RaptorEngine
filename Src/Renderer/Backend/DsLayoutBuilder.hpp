@@ -2,6 +2,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include <raptor_ffi.h>
+
 #include <Renderer/Backend/Shader.hpp>
 #include <vector>
 
@@ -21,7 +23,7 @@ public:
 private:
 	// TODO: Replace usage of std::vector with custom dynamic array. PagedArray does not resize into a contiguous
 	// buffer, so that does not work here.
-	std::vector<VkDescriptorSetLayoutBinding> mLayoutBindings {};
+	std::vector<RxDsLayoutEntry> mLayoutBindings {};
 	VkDescriptorSetLayout mpDsLayout = nullptr;
 };
 

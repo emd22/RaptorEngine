@@ -8,7 +8,8 @@ use std::path::PathBuf;
 use raptor_config::model::{Entry, Kind, Primitive};
 use raptor_ffi::*;
 
-struct Context {
+struct Context
+{
 	root: PathBuf,
 	logged: Vec<(i32, i32, Vec<u8>)>,
 }
@@ -19,7 +20,8 @@ unsafe extern "C" fn read_include(
 	extension: *const c_char,
 	data: *mut *mut u8,
 	length: *mut usize,
-) -> i32 {
+) -> i32
+{
 	let context = unsafe { &*(user as *const Context) };
 	let mut path = unsafe { CStr::from_ptr(path) }
 		.to_string_lossy()
@@ -54,13 +56,15 @@ unsafe extern "C" fn log(
 	category: i32,
 	message: *const c_char,
 	length: usize,
-) {
+)
+{
 	let context = unsafe { &mut *(user as *mut Context) };
 	let bytes = unsafe { std::slice::from_raw_parts(message as *const u8, length) }.to_vec();
 	context.logged.push((level, category, bytes));
 }
 
-fn primitive_from_c(p: &ConfigPrimitive) -> Primitive {
+fn primitive_from_c(p: &ConfigPrimitive) -> Primitive
+{
 	let kind = match p.kind {
 		0 => Kind::None,
 		1 => Kind::Int,
@@ -84,7 +88,8 @@ fn primitive_from_c(p: &ConfigPrimitive) -> Primitive {
 	}
 }
 
-fn entry_from_c(e: &ConfigEntry) -> Entry {
+fn entry_from_c(e: &ConfigEntry) -> Entry
+{
 	let name = unsafe { std::slice::from_raw_parts(e.name as *const u8, e.name_length) }.to_vec();
 	let members = if e.member_count == 0 {
 		Vec::new()

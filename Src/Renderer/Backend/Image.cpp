@@ -23,31 +23,25 @@ const ImageTypeProperties ImageTypeGetProperties(eImageType image_type, uint32 c
 {
 	ImageTypeProperties props {};
 
-	if (image_type == eImageType::Flat) {
-		props.ViewType = VK_IMAGE_VIEW_TYPE_2D;
-		props.LayerCount = 1;
-	}
-	else if (image_type == eImageType::Cubemap) {
-		props.ViewType = VK_IMAGE_VIEW_TYPE_CUBE;
-		props.LayerCount = 6;
-	}
-	else if (image_type == eImageType::CubemapArray) {
-		props.ViewType = VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
-		props.LayerCount = 6 * std::max(cube_count, 1U);
-	}
-	else {
+	int32 view_type = 0;
+
+	if (rx_image_type_properties(static_cast<uint32>(image_type), cube_count, &view_type, &props.LayerCount) == 0) {
 		LogError("Unknown image type!");
+		return props;
 	}
+
+	props.ViewType = static_cast<VkImageViewType>(view_type);
 
 	return props;
 }
 
 static Vec2u GetMipDimensions(const Vec2u& ml_zero_size, uint32 mip_level)
 {
-	float32 mip_divisor = (1.0f / static_cast<float32>(1U << mip_level));
+	Vec2u dimensions;
 
-	return Vec2u(std::max(static_cast<uint32>(static_cast<float32>(ml_zero_size.X) * mip_divisor), 1U),
-				 std::max(static_cast<uint32>(static_cast<float32>(ml_zero_size.Y) * mip_divisor), 1U));
+	rx_image_mip_dimensions(ml_zero_size.X, ml_zero_size.Y, mip_level, &dimensions.X, &dimensions.Y);
+
+	return dimensions;
 }
 
 Image::Image() { mpRefCnt = gEnginePool->Alloc<RefCount>(sizeof(RefCount)); }
@@ -112,16 +106,15 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 
 	// Destroy image if it already has been created
 	if (InternalImage != nullptr && Allocation != nullptr) {
-		if (View != nullptr) {
-			vkDestroyImageView(device->Device, View, nullptr);
-		}
-
-		rx_gpu_image_destroy(gGraphics->GpuAllocator, RxRaw(InternalImage), this->Allocation);
+		rx_gpu_image_destroy_full(device->GetRustDevice(), gGraphics->GpuAllocator, RxRaw(InternalImage), RxRaw(View),
+								  Allocation);
 
 		InternalImage = nullptr;
 		Allocation = nullptr;
 		View = nullptr;
 	}
+
+	ImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 	Aspect = aspect;
 	Info = ImageInfo { size, format, 0, mips_count, Slice<const uint8>(nullptr, 0) };
@@ -130,90 +123,32 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 		mpRefCnt = gEnginePool->Alloc<RefCount>(sizeof(RefCount));
 	}
 
-	// Get the vulkan values for the image type
-	ImageTypeProperties image_type_props = ImageTypeGetProperties(image_type, cube_count);
-
-	VkImageCreateFlags image_create_flags = 0;
-
-	if (image_type == eImageType::Cubemap || image_type == eImageType::CubemapArray) {
-		image_create_flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-	}
-
-	uint32 queue_families[] = { device->mQueueFamilies.GetGraphicsFamily(),
-								device->mQueueFamilies.GetTransferFamily() };
-
-	VkSharingMode sharing_mode = VK_SHARING_MODE_EXCLUSIVE;
-	uint32 num_queue_families = 0;
-
-	const bool has_independent_xfer = gGraphics->GetDevice()->mQueueFamilies.HasIndependentTransfer();
-
-	if (!HasFlag(flags, eImageCreateFlags::IsTarget) && has_independent_xfer) {
-		sharing_mode = VK_SHARING_MODE_CONCURRENT;
-		num_queue_families = std::size(queue_families);
-	}
-
-	// Create the vulkan image
-	VkImageCreateInfo image_info {
-		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-		.flags = image_create_flags,
-
-		.imageType = VK_IMAGE_TYPE_2D,
-		.format = ImageFormatUtil::ToUnderlying(format),
-		.extent = { .width = size.Width(), .height = size.Height(), .depth = 1 },
-
-		.mipLevels = mips_count,
-		.arrayLayers = image_type_props.LayerCount,
-		.samples = VK_SAMPLE_COUNT_1_BIT,
-		.tiling = tiling,
-
+	const RxImageDesc desc = {
+		.image_type = static_cast<uint32>(image_type),
+		.width = size.Width(),
+		.height = size.Height(),
+		.mips = mips_count,
+		.format = static_cast<uint32>(format),
+		.tiling = static_cast<int32>(tiling),
 		.usage = usage,
-		.sharingMode = sharing_mode,
-
-		.queueFamilyIndexCount = num_queue_families,
-		.pQueueFamilyIndices = queue_families,
-
-		.initialLayout = ImageLayout,
+		.aspect = static_cast<uint32>(aspect),
+		.cube_count = cube_count,
+		.initial_layout = static_cast<int32>(ImageLayout),
+		.is_target = HasFlag(flags, eImageCreateFlags::IsTarget),
 	};
 
-	const RxGpuAllocRequest alloc_request = { .memory = RX_MEMORY_AUTO, .flags = RX_ALLOC_DEDICATED, .priority = 1.0f };
-
 	uint64 image_handle = 0;
+	uint64 view_handle = 0;
 
-	VkResult status = static_cast<VkResult>(
-		rx_gpu_image_create(gGraphics->GpuAllocator, &image_info, &alloc_request, &image_handle, &Allocation));
+	const VkResult status = static_cast<VkResult>(rx_gpu_image_create_full(
+		device->GetRustDevice(), gGraphics->GpuAllocator, &desc, &image_handle, &view_handle, &Allocation));
 
 	if (status != VK_SUCCESS) {
 		ModulePanicVulkan("Could not create vulkan image", status);
 	}
 
 	InternalImage = RxFromRaw<VkImage>(image_handle);
-
-	const VkImageViewCreateInfo view_create_info = {
-		.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.image = InternalImage,
-		.viewType = image_type_props.ViewType,
-		.format = ImageFormatUtil::ToUnderlying(format),
-		.components =
-			{
-				.r = VK_COMPONENT_SWIZZLE_IDENTITY,
-				.g = VK_COMPONENT_SWIZZLE_IDENTITY,
-				.b = VK_COMPONENT_SWIZZLE_IDENTITY,
-				.a = VK_COMPONENT_SWIZZLE_IDENTITY,
-			},
-		.subresourceRange =
-			{
-				.aspectMask = static_cast<VkImageAspectFlags>(aspect),
-				.baseMipLevel = 0,
-				.levelCount = mips_count,
-				.baseArrayLayer = 0,
-				.layerCount = image_type_props.LayerCount,
-			},
-	};
-
-	status = vkCreateImageView(device->Device, &view_create_info, nullptr, &View);
-	if (status != VK_SUCCESS) {
-		ModulePanicVulkan("Could not create swapchain image view", status);
-	}
+	View = RxFromRaw<VkImageView>(view_handle);
 
 #ifdef FX_DEBUG_IMAGE_VIEWS
 	std::string image_view_name = "";
@@ -294,45 +229,15 @@ void Image::Upload(renderer::CommandBuffer& cmd, const ImageInfo& info)
 
 	Create(info.ImageType, info.Size, info.MipCount, info.Format, VK_IMAGE_TILING_OPTIMAL, usage_flags, aspect_flag);
 
-	SizedArray<VkBufferImageCopy> buffer_copy_infos(info.MipCount);
-
-	uint32 pixel_stride = ImageFormatUtil::GetPixelStride(info.Format);
-
-	uint64 offset = 0;
-
-	for (uint32 info_index = 0; info_index < info.MipCount; info_index++) {
-		Vec2u mip_dimensions = GetMipDimensions(info.Size, info_index);
-		Assert(mip_dimensions.X > 0 && mip_dimensions.Y > 0);
-
-		AssertMsg((offset % 4) == 0, "Mip level is not 4 byte aligned in the staging buffer");
-
-		buffer_copy_infos.Insert(VkBufferImageCopy {
-			.bufferOffset = offset,
-			.bufferRowLength = 0,
-			.bufferImageHeight = 0,
-			.imageSubresource {
-				.aspectMask = static_cast<const VkImageAspectFlags>(aspect_flag),
-				.mipLevel = info_index,
-				.baseArrayLayer = 0,
-				.layerCount = 1,
-			},
-			.imageExtent =
-				VkExtent3D {
-					.width = mip_dimensions.X,
-					.height = mip_dimensions.Y,
-					.depth = 1,
-				},
-		});
-
-		offset += mip_dimensions.X * mip_dimensions.Y * pixel_stride;
-	}
-
-
 	// Transition all levels to transfer dest
 	renderer::BarrierHelper::ImageLayoutTransition(this, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 0, info.MipCount);
 
-	vkCmdCopyBufferToImage(cmd, staging_buffer.Buffer, InternalImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-						   buffer_copy_infos.Size, buffer_copy_infos.pData);
+	const int32 copied = rx_gpu_cmd_copy_buffer_to_mips(
+		renderer::gGraphics->GetDevice()->GetRustDevice(), cmd.Get(), renderer::RxRaw(staging_buffer.Buffer),
+		renderer::RxRaw(InternalImage), static_cast<uint16>(info.Format), info.Size.X, info.Size.Y, info.MipCount,
+		static_cast<uint32>(aspect_flag));
+
+	AssertMsg(copied == 0, "Mip level is not 4 byte aligned in the staging buffer");
 
 	// Transition to shader r/o
 	renderer::BarrierHelper::ImageLayoutTransition(this, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 0,
@@ -414,31 +319,9 @@ void Image::CopyFromBuffer(renderer::CommandBuffer& cmd, const renderer::RawGpuB
 
 	renderer::BarrierHelper::ImageLayoutTransition(this, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, mip_level, 1);
 
-	VkBufferImageCopy copy {
-		.bufferOffset = 0,
-		.bufferRowLength = 0,
-		.bufferImageHeight = 0,
-		.imageSubresource {
-			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-			.mipLevel = mip_level,
-			.baseArrayLayer = 0,
-			.layerCount = 1,
-		},
-		.imageOffset =
-			VkOffset3D {
-				.x = static_cast<int32>(dst_offset.X),
-				.y = static_cast<int32>(dst_offset.Y),
-				.z = 0,
-			},
-		.imageExtent =
-			VkExtent3D {
-				.width = size.X,
-				.height = size.Y,
-				.depth = 1,
-			},
-	};
-
-	vkCmdCopyBufferToImage(cmd, buffer.Buffer, InternalImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+	rx_gpu_cmd_copy_buffer_to_region(renderer::gGraphics->GetDevice()->GetRustDevice(), cmd.Get(),
+									 renderer::RxRaw(buffer.Buffer), renderer::RxRaw(InternalImage), mip_level, size.X,
+									 size.Y, static_cast<int32>(dst_offset.X), static_cast<int32>(dst_offset.Y));
 
 	renderer::BarrierHelper::ImageLayoutTransition(this, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, mip_level, 1);
 }
@@ -448,25 +331,9 @@ void Image::CopyToMip(renderer::CommandBuffer& cmd, const renderer::RawGpuBuffer
 {
 	renderer::BarrierHelper::ImageLayoutTransition(this, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, mip_level, 1);
 
-	VkBufferImageCopy copy {
-		.bufferOffset = 0,
-		.bufferRowLength = 0,
-		.bufferImageHeight = 0,
-		.imageSubresource {
-			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-			.mipLevel = mip_level,
-			.baseArrayLayer = 0,
-			.layerCount = 1,
-		},
-		.imageExtent =
-			VkExtent3D {
-				.width = size.X,
-				.height = size.Y,
-				.depth = 1,
-			},
-	};
-
-	vkCmdCopyBufferToImage(cmd, buffer.Buffer, InternalImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+	rx_gpu_cmd_copy_buffer_to_region(renderer::gGraphics->GetDevice()->GetRustDevice(), cmd.Get(),
+									 renderer::RxRaw(buffer.Buffer), renderer::RxRaw(InternalImage), mip_level, size.X,
+									 size.Y, 0, 0);
 
 	renderer::BarrierHelper::ImageLayoutTransition(this, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, mip_level, 1);
 }
@@ -597,12 +464,12 @@ void Image::DecRef()
 	gEnginePool->Free(mpRefCnt);
 	mpRefCnt = nullptr;
 
-	if (View != nullptr) {
-		vkDestroyImageView(renderer::gGraphics->GetDevice()->Device, View, nullptr);
-	}
-
 	if (InternalImage != nullptr && Allocation != nullptr) {
-		rx_gpu_image_destroy(renderer::gGraphics->GpuAllocator, renderer::RxRaw(InternalImage), this->Allocation);
+		rx_gpu_image_destroy_full(renderer::gGraphics->GetDevice()->GetRustDevice(), renderer::gGraphics->GpuAllocator,
+								  renderer::RxRaw(InternalImage), renderer::RxRaw(View), Allocation);
+	}
+	else if (View != nullptr) {
+		vkDestroyImageView(renderer::gGraphics->GetDevice()->Device, View, nullptr);
 	}
 
 	InternalImage = nullptr;

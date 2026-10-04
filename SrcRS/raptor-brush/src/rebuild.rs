@@ -12,54 +12,65 @@ const MIN_NORMAL_LENGTH: f64 = 1e-8;
 const SAME_NORMAL_EPSILON: f64 = 1e-9;
 const BOUNDING_PLANE: i32 = -1;
 
-struct DPlane {
+struct DPlane
+{
 	normal: Vec3d,
 	distance: f64,
 	source_index: usize,
 }
 
-impl DPlane {
-	fn signed_distance(&self, point: Vec3d) -> f64 {
+impl DPlane
+{
+	fn signed_distance(&self, point: Vec3d) -> f64
+	{
 		self.normal.dot(&point) - self.distance
 	}
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Side {
+enum Side
+{
 	Inside,
 	On,
 	Outside,
 }
 
 #[derive(PartialEq, Eq)]
-enum ClipResult {
+enum ClipResult
+{
 	Unchanged,
 	Clipped,
 	Empty,
 }
 
-struct Loop {
+struct Loop
+{
 	plane_index: i32,
 	corners: Vec<u32>,
 }
 
-struct Polyhedron {
+struct Polyhedron
+{
 	corners: Vec<Vec3d>,
 	faces: Vec<Loop>,
 }
 
-fn edge_key(from: u32, to: u32) -> u64 {
+fn edge_key(from: u32, to: u32) -> u64
+{
 	(u64::from(from) << 32) | u64::from(to)
 }
 
-fn nearly_equal(a: Vec3d, b: Vec3d, epsilon: f64) -> bool {
+fn nearly_equal(a: Vec3d, b: Vec3d, epsilon: f64) -> bool
+{
 	let delta = (a - b).abs();
 
 	delta.x <= epsilon && delta.y <= epsilon && delta.z <= epsilon
 }
 
-impl Polyhedron {
-	fn make_box(half_extent: f64) -> Polyhedron {
+impl Polyhedron
+{
+	fn make_box(half_extent: f64) -> Polyhedron
+	{
 		let signed = |set: bool| if set { half_extent } else { -half_extent };
 
 		let corners: Vec<Vec3d> = (0..8u32)
@@ -98,7 +109,8 @@ impl Polyhedron {
 		Polyhedron { corners, faces }
 	}
 
-	fn clip(&mut self, plane: &DPlane, plane_index: i32) -> ClipResult {
+	fn clip(&mut self, plane: &DPlane, plane_index: i32) -> ClipResult
+	{
 		let corner_count = self.corners.len();
 
 		let mut in_use = vec![false; corner_count];
@@ -247,8 +259,10 @@ impl Polyhedron {
 	}
 }
 
-impl Brush {
-	pub fn rebuild(&mut self) -> bool {
+impl Brush
+{
+	pub fn rebuild(&mut self) -> bool
+	{
 		self.faces.clear();
 		self.vertices.clear();
 		self.bounds_min = Vec3f::splat(0.0);
