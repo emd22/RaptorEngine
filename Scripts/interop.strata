@@ -41,6 +41,8 @@ enum EDITORTOOL
 	CREATE,
 	CLIP,
 	LIGHT,
+	BOUNDS,
+	GRAB,
 }
 
 

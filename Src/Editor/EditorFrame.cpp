@@ -1,5 +1,6 @@
 #include "EditorFrame.hpp"
 
+#include "CVarListWindow.hpp"
 #include "EditorViewport.hpp"
 #include "ObjectListWindow.hpp"
 #include "ObjectPropertiesPanel.hpp"
@@ -46,6 +47,8 @@ static constexpr ToolButtonInfo scToolButtons[] = {
 	{ "Create", "Textures/editor/create.png" },
 	{ "Clip", "Textures/editor/clip.png" },
 	{ "Light", "Textures/editor/lamp.png" },
+	{ "Bounds", "Textures/editor/bounds.png" },
+	{ "Grab", "Textures/editor/grab.png" },
 };
 
 static_assert(std::size(scToolButtons) == static_cast<size_t>(eEditorTool::Count));
@@ -200,6 +203,8 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	wxMenu* window_menu = new wxMenu;
 	wxMenuItem* object_list_item = window_menu->Append(wxID_ANY, "Open Object List",
 													   "View all objects currently in ObjectManager");
+	wxMenuItem* cvar_list_item = window_menu->Append(wxID_ANY, "Open CVar List",
+													 "View and edit all registered console variables");
 
 	menu_bar->Append(window_menu, "&Tools");
 
@@ -218,6 +223,7 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 		wxEVT_MENU, [](wxCommandEvent&) { gEditor->InvokeReloadHandler(eReloadTarget::Scripts); },
 		reload_scripts_item->GetId());
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowObjectListWindow(); }, object_list_item->GetId());
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowCVarListWindow(); }, cvar_list_item->GetId());
 
 	wxPanel* root = new wxPanel(this, wxID_ANY);
 	wxBoxSizer* root_sizer = new wxBoxSizer(wxVERTICAL);
@@ -325,6 +331,19 @@ void EditorFrame::ShowObjectListWindow()
 
 	mpObjectListWindow->Show();
 	mpObjectListWindow->Raise();
+}
+
+void EditorFrame::ShowCVarListWindow()
+{
+	if (mpCVarListWindow == nullptr) {
+		mpCVarListWindow = new CVarListWindow(this);
+	}
+	else {
+		mpCVarListWindow->RefreshList();
+	}
+
+	mpCVarListWindow->Show();
+	mpCVarListWindow->Raise();
 }
 
 void EditorFrame::OnClose(wxCloseEvent& event) { mbCloseRequested = true; }

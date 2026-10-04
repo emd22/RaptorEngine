@@ -21,6 +21,9 @@
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
 #include <World.hpp>
+#include <algorithm>
+#include <utility>
+#include <vector>
 
 namespace fx {
 
@@ -149,6 +152,68 @@ void Object::MakeInstanceOf(const ObjectID& source_id)
 	++source_obj->mInstanceSlotsInUse;
 
 	ID = ObjectID(source_obj->ID.GetID() + source_obj->mInstanceSlotsInUse);
+}
+
+struct SkeletonCloneMap
+{
+	std::vector<std::pair<const Skeleton*, Ref<Skeleton>>> Entries;
+};
+
+Object* Object::CloneNode(const std::string& name, SkeletonCloneMap& skeletons) const
+{
+	Object* clone = gObjectManager->NewObject(name, mMaterialID, Tags);
+
+	clone->pMesh = pMesh;
+	clone->Bounds = Bounds;
+	clone->mPosition = mPosition;
+	clone->mRotation = mRotation;
+	clone->mScale = mScale;
+	clone->mObjectLayer = mObjectLayer;
+
+	clone->Flags = Flags;
+	ClearFlag(clone->Flags, (eObjectFlags::ReadyToRender | eObjectFlags::IsInstance | eObjectFlags::PhysicsEnabled));
+	SetFlag(clone->Flags, eObjectFlags::SharedMesh);
+
+	clone->MarkTransformOutOfDate();
+
+	if (pSkeleton.IsValid()) {
+		const Skeleton* key = &(*pSkeleton);
+
+		auto found = std::find_if(skeletons.Entries.begin(), skeletons.Entries.end(),
+								  [key](const auto& entry) { return entry.first == key; });
+
+		if (found == skeletons.Entries.end()) {
+			skeletons.Entries.emplace_back(key, Skeleton::CreateInstance(pSkeleton));
+			found = skeletons.Entries.end() - 1;
+		}
+
+		clone->pSkeleton = found->second;
+	}
+
+	if (!AttachedNodes.IsEmpty()) {
+		clone->AttachedNodes.Create(8);
+
+		for (const ObjectID& child_id : AttachedNodes) {
+			const Object* child = gObjectManager->GetObject(child_id);
+
+			if (child == nullptr) {
+				continue;
+			}
+
+			Object* child_clone = child->CloneNode(std::string(child->Name.Get()), skeletons);
+			child_clone->ParentID = clone->ID;
+
+			clone->AttachedNodes.Insert(child_clone->ID);
+		}
+	}
+
+	return clone;
+}
+
+Object* Object::CloneWithOwnSkeleton(const std::string& name) const
+{
+	SkeletonCloneMap skeletons;
+	return CloneNode(name, skeletons);
 }
 
 void Object::ReserveInstances(uint32 num)
@@ -473,8 +538,41 @@ bool Object::ContainsPoint(const Vec3f& point)
 {
 	const Vec4f local = GetWorldMatrix().Inverse() * Vec4f(point.X, point.Y, point.Z, 1.0f);
 
-	return local.X >= Bounds.Min.X && local.X <= Bounds.Max.X && local.Y >= Bounds.Min.Y &&
-		   local.Y <= Bounds.Max.Y && local.Z >= Bounds.Min.Z && local.Z <= Bounds.Max.Z;
+	return local.X >= Bounds.Min.X && local.X <= Bounds.Max.X && local.Y >= Bounds.Min.Y && local.Y <= Bounds.Max.Y &&
+		   local.Z >= Bounds.Min.Z && local.Z <= Bounds.Max.Z;
+}
+
+void Object::SetBounds(const AABB& bounds)
+{
+	Bounds = bounds;
+
+	Object* node = this;
+
+	while (node != nullptr) {
+		gWorldGrid->UpdateObject(node, false);
+
+		if (node->ParentID.IsNull() || node->ParentID.IsInvalid()) {
+			break;
+		}
+
+		Object* parent = gObjectManager->GetObject(node->ParentID);
+
+		if (parent == nullptr) {
+			break;
+		}
+
+		const OBB world_box = node->GetWorldOBB();
+		const Mat4f parent_inverse = parent->GetWorldMatrix().Inverse();
+
+		for (const Vec3f& corner : world_box.Corners) {
+			const Vec4f local = parent_inverse * Vec4f(corner.X, corner.Y, corner.Z, 1.0f);
+			const Vec3f local_corner(local.X, local.Y, local.Z);
+
+			parent->Bounds.Add(AABB(local_corner, local_corner));
+		}
+
+		node = parent;
+	}
 }
 
 void Object::SetCullable(bool value)
@@ -595,7 +693,7 @@ void Object::PrintDebug() const
 
 void Object::Destroy()
 {
-	if (pMesh) {
+	if (pMesh && !HasFlag(Flags, eObjectFlags::SharedMesh)) {
 		pMesh->Destroy();
 	}
 

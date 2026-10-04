@@ -7,11 +7,15 @@
 #include <Asset/AssetTicket.hpp>
 #include <Asset/ConfigFile.hpp>
 #include <Object/Object.hpp>
+#include <Physics/JoltPhysicsBackend.hpp>
+#include <Physics/Ragdoll.hpp>
 #include <Player.hpp>
 #include <Renderer/Exposure.hpp>
 #include <Script/ScriptManager.hpp>
 #include <World.hpp>
 #include <atomic>
+#include <memory>
+#include <vector>
 
 class ShadowDirectional;
 
@@ -85,6 +89,14 @@ private:
 	void RenderText();
 	void RenderCrosshair();
 
+	struct RagdollDummy;
+
+	void RequestRagdollDrop();
+	void UpdateRagdollDummies();
+	void DropRagdollDummy(Object* model);
+	void DestroyRagdollDummy(size_t index);
+	void SpawnRagdollBlood(RagdollDummy& dummy, const physics::RagdollImpact& impact, float32 min_speed);
+
 public:
 	Ref<LightDirectional> pSun { nullptr };
 
@@ -140,6 +152,25 @@ private:
 	ConfigFile Config;
 
 	Console mCommandConsole;
+
+	struct RagdollDummy
+	{
+		ObjectID RootID = ObjectID::scNull;
+		std::unique_ptr<physics::Ragdoll> pRagdoll;
+		float32 BloodCooldown = 0.0f;
+	};
+
+	static constexpr size_t scMaxRagdollDummies = 8;
+	static constexpr float32 scDefaultRagdollBloodSpeed = 3.5f;
+
+	std::vector<RagdollDummy> mRagdollDummies;
+	std::vector<physics::RagdollImpact> mRagdollImpacts;
+	AssetTicket mRagdollTemplateTicket { nullptr };
+	std::atomic<Object*> mpRagdollTemplate = nullptr;
+	bool mbRagdollTemplateRequested = false;
+	uint32 mRagdollDropsPending = 0;
+	uint32 mRagdollSpawnCount = 0;
+	CVarValue* mpRagdollBloodSpeedCVar = nullptr;
 
 	AssetTicket mCrosshairTicket { nullptr };
 	std::atomic<Image*> mpCrosshair = nullptr;

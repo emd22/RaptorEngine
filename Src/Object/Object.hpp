@@ -52,12 +52,14 @@ enum class eObjectFlags : uint16
 	DisableCulling = (1 << 5),
 	/// Left out of light probe bakes (capture, capture shadows and probe placement). See Object::IsProbeVisible().
 	NotProbeVisible = (1 << 6),
+	SharedMesh = (1 << 7),
 };
 
 FxEnumFlags(eObjectFlags);
 
 
 class PrimitiveMesh;
+struct SkeletonCloneMap;
 
 class Object final : public Entity
 {
@@ -72,6 +74,8 @@ public:
 	Object(const ObjectID id, const MaterialID material);
 
 	void MakeInstanceOf(const ObjectID& source);
+
+	Object* CloneWithOwnSkeleton(const std::string& name) const;
 
 	void Create(const Ref<PrimitiveMesh>& mesh, const MaterialID& material);
 
@@ -182,6 +186,8 @@ public:
 
 	bool ContainsPoint(const Vec3f& point);
 
+	void SetBounds(const AABB& bounds);
+
 	FX_FORCE_INLINE OBB GetWorldOBB() { return OBB::FromLocalBounds(Bounds, GetWorldMatrix()); }
 
 	bool CanBeFrustumCulled() const;
@@ -228,6 +234,8 @@ private:
 	void RenderMesh(renderer::Pipeline* pipeline);
 
 	void SyncObjectWithPhysics(physics::Body* phys);
+
+	Object* CloneNode(const std::string& name, SkeletonCloneMap& skeletons) const;
 
 public:
 	Ref<PrimitiveMesh> pMesh { nullptr };

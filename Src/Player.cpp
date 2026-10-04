@@ -88,12 +88,27 @@ void Player::MoveBy(const Vec3f& by)
 	RequirePhysicsUpdate();
 }
 
-void Player::RotateHead(const Vec2f& xy)
+static void CancelRecoilOffset(float32& offset, float32 input)
+{
+	if (offset * input < 0.0f) {
+		offset += std::copysign(std::min(std::abs(input), std::abs(offset)), input);
+	}
+}
+
+void Player::RotateCamera(const Vec2f& xy)
 {
 	pCamera->Rotate(xy.X, xy.Y);
 	mCameraGoal = pCamera->GetRotation();
 
 	RequireDirectionUpdate();
+}
+
+void Player::RotateHead(const Vec2f& xy)
+{
+	CancelRecoilOffset(mRecoilOffsetYaw, xy.X);
+	CancelRecoilOffset(mRecoilOffsetPitch, xy.Y);
+
+	RotateCamera(xy);
 }
 
 void Player::Jump()
@@ -327,6 +342,22 @@ void Player::AddRecoil(float32 pitch, float32 yaw)
 	mRecoilIdleTime = 0.0f;
 }
 
+static constexpr float32 scRecoilSettleAngle = MathUtil::DegreesToRadians(0.01f);
+static constexpr float32 scRecoilClampEpsilon = 1.0e-6f;
+
+static float32 RecoverRecoilAxis(float32& offset, float32 fraction)
+{
+	float32 back = offset * fraction;
+
+	if (std::abs(offset - back) < scRecoilSettleAngle) {
+		back = offset;
+	}
+
+	offset -= back;
+
+	return back;
+}
+
 void Player::UpdateRecoil(float32 delta_time)
 {
 	mRecoilIdleTime += delta_time;
@@ -338,31 +369,33 @@ void Player::UpdateRecoil(float32 delta_time)
 	mRecoilPendingPitch -= step_pitch;
 	mRecoilPendingYaw -= step_yaw;
 
+	mRecoilOffsetPitch += step_pitch;
+	mRecoilOffsetYaw += step_yaw;
+
 	float32 delta_pitch = step_pitch;
 	float32 delta_yaw = step_yaw;
 
-	mRecoilAppliedPitch += step_pitch;
-	mRecoilAppliedYaw += step_yaw;
+	const float32 recovering = mRecoilIdleTime - scRecoilRecoveryDelay;
 
-	if (mRecoilIdleTime > scRecoilRecoveryDelay && mRecoilRecovery > 0.0f) {
-		const float32 applied = std::sqrt(mRecoilAppliedPitch * mRecoilAppliedPitch +
-										  mRecoilAppliedYaw * mRecoilAppliedYaw);
+	if (recovering > 0.0f && mRecoilRecovery > 0.0f) {
+		const float32 t = std::min(recovering / scRecoilRecoveryRamp, 1.0f);
+		const float32 ease = t * t * (3.0f - 2.0f * t);
+		const float32 fraction = 1.0f - std::exp(-delta_time * mRecoilRecovery * ease);
 
-		if (applied > 0.0f) {
-			const float32 fraction = std::min(applied, mRecoilRecovery * delta_time) / applied;
-			const float32 back_pitch = mRecoilAppliedPitch * fraction;
-			const float32 back_yaw = mRecoilAppliedYaw * fraction;
-
-			mRecoilAppliedPitch -= back_pitch;
-			mRecoilAppliedYaw -= back_yaw;
-
-			delta_pitch -= back_pitch;
-			delta_yaw -= back_yaw;
-		}
+		delta_pitch -= RecoverRecoilAxis(mRecoilOffsetPitch, fraction);
+		delta_yaw -= RecoverRecoilAxis(mRecoilOffsetYaw, fraction);
 	}
 
 	if (delta_pitch != 0.0f || delta_yaw != 0.0f) {
-		RotateHead(Vec2f(delta_yaw, delta_pitch));
+		const float32 pitch_before = pCamera->mAngleY;
+
+		RotateCamera(Vec2f(delta_yaw, delta_pitch));
+
+		const float32 clamped_pitch = delta_pitch - (pCamera->mAngleY - pitch_before);
+
+		if (std::abs(clamped_pitch) > scRecoilClampEpsilon) {
+			mRecoilOffsetPitch -= clamped_pitch;
+		}
 	}
 }
 

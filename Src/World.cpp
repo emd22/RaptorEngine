@@ -24,6 +24,7 @@
 
 namespace fx {
 
+
 using namespace renderer;
 
 void World::Create()
@@ -115,20 +116,26 @@ void World::Attach(AssetTicket object_ticket)
 
 	object->OnAttached(this);
 
-	object_ticket.OnLoaded(
-		[this](void* item_ptr)
-		{
-			Object* object = static_cast<Object*>(item_ptr);
-			object->bIsAddedToWorld.store(true);
-			AddObjectToRenderList(object, this);
-			gWorldGrid->AddObject(object->ID);
-		});
+	object_ticket.OnLoaded([this](void* item_ptr) { AddLoadedObject(static_cast<Object*>(item_ptr)); });
 }
 
 void World::Detach(ObjectID id)
 {
 	mRenderList.InvalidateObject(id);
 	gWorldGrid->RemoveObject(id);
+}
+
+void World::AttachLoaded(Object* object)
+{
+	object->OnAttached(this);
+	AddLoadedObject(object);
+}
+
+void World::AddLoadedObject(Object* object)
+{
+	object->bIsAddedToWorld.store(true);
+	AddObjectToRenderList(object, this);
+	gWorldGrid->AddObject(object->ID);
 }
 
 
@@ -327,6 +334,7 @@ public:
 	{
 		const bool masked = IsMasked(object);
 		const bool skinned = object->IsSkinned();
+
 		const PipelineHandle wanted = gPipelineCache->GetOrCreateVariant(
 			ePipelinePass::Shadow,
 			skinned ? ePipelineFeatures::Skinned : (masked ? ePipelineFeatures::AlphaMask : ePipelineFeatures::None));
@@ -478,7 +486,13 @@ void World::UpdateSpotShadows()
 			bake_hash = HashObj32(mesh, bake_hash);
 			bake_hash = HashObj32(is_drawable, bake_hash);
 			bake_hash = HashObj32(caster->GetWorldMatrix().RawData, bake_hash);
+
+			if (caster->IsSkinned() && caster->pSkeleton.IsValid()) {
+				bake_hash = HashObj32(caster->pSkeleton->PoseHash, bake_hash);
+				bake_hash = HashObj32(caster->HasBonesForDraw(), bake_hash);
+			}
 		}
+
 
 		// The tile already holds this exact bake
 		if (bake_hash == shadow.BakeHash) {
@@ -547,6 +561,7 @@ void World::BakeSpotShadows()
 			gObjectManager->Submit(caster_id, caster->GetWorldMatrix());
 
 			consts.ObjectIndex = caster_id.GetID();
+			consts.BoneBase = caster->BoneBufferBase;
 			gGraphics->SubmitPushConstants(cmd, selector.Select(caster, cmd), eShaderType::Vertex, consts);
 			caster->RenderPrimitive(cmd);
 		}
@@ -585,7 +600,7 @@ void World::GatherSpotShadowCasters(const Vec3f& center, float32 radius, DynArra
 
 			// Attached nodes cast shadows along with their root, same as the directional light's render list
 			if (object != nullptr && object->IsShadowCaster()) {
-				AddSpotShadowCasterRecursive(*object_id, first_caster, out_casters);
+				AddSpotShadowCasterRecursive(*object_id, first_caster, center, radius, out_casters);
 			}
 		}
 	};
@@ -605,7 +620,34 @@ void World::GatherSpotShadowCasters(const Vec3f& center, float32 radius, DynArra
 }
 
 
-void World::AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, DynArray<ObjectID>& out_casters)
+static bool SkinnedCasterReachesSphere(Object& object, const Vec3f& center, float32 radius)
+{
+	constexpr float32 scMeshPadding = 0.3f;
+
+	if (!object.pSkeleton.IsValid()) {
+		return false;
+	}
+
+	object.UpdateAnimation();
+
+	if (!object.HasBonesForDraw()) {
+		return false;
+	}
+
+	const Skeleton& skeleton = *object.pSkeleton;
+	const float32* m = object.GetWorldMatrix().RawData;
+	const Vec3f& c = skeleton.PoseCenter;
+
+	const Vec3f pose_center(c.X * m[0] + c.Y * m[4] + c.Z * m[8] + m[12], c.X * m[1] + c.Y * m[5] + c.Z * m[9] + m[13],
+							c.X * m[2] + c.Y * m[6] + c.Z * m[10] + m[14]);
+
+	const float32 reach = (skeleton.PoseRadius + scMeshPadding) * object.mScale + radius;
+
+	return (pose_center - center).Length() <= reach;
+}
+
+void World::AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, const Vec3f& center, float32 radius,
+										 DynArray<ObjectID>& out_casters)
 {
 	if (id.IsInvalid()) {
 		return;
@@ -623,13 +665,12 @@ void World::AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, DynAr
 		}
 	}
 
-	// The shadow pipeline only has the default vertex layout. Skinned meshes would also animate out of the bake.
-	if (!object->IsSkinned()) {
+	if (!object->IsSkinned() || SkinnedCasterReachesSphere(*object, center, radius)) {
 		out_casters.Insert(id);
 	}
 
 	for (ObjectID& attached_id : object->AttachedNodes) {
-		AddSpotShadowCasterRecursive(attached_id, first_caster, out_casters);
+		AddSpotShadowCasterRecursive(attached_id, first_caster, center, radius, out_casters);
 	}
 }
 
@@ -815,7 +856,7 @@ void World::AddTileToRenderList(bool clear, TileIndex new_tile_index, const Frus
 }
 
 
-void World::AddTileToLightList(TileIndex tile_index)
+void World::AddTileToLightList(TileIndex tile_index, const Frustum* frustum)
 {
 	const Tile* tile = gWorldGrid->GetTile(tile_index);
 
@@ -835,6 +876,14 @@ void World::AddTileToLightList(TileIndex tile_index)
 
 		if (light_id == nullptr) {
 			continue;
+		}
+
+		if (frustum != nullptr) {
+			const LightBase* light = gLightManager->GetLight(*light_id);
+
+			if (light != nullptr && light->IsOutsideFrustum(*frustum)) {
+				continue;
+			}
 		}
 
 		mLightList.AddLight(*light_id);
@@ -857,8 +906,12 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 	mFrustum.Rebuild(cam);
 	mVisibleTiles.Clear();
 
+	const bool frustum_cull = (pCVarFrustumCull->IntValue != 0);
+	const Frustum* object_frustum = frustum_cull ? &mFrustum : nullptr;
+	const Frustum* light_frustum = (frustum_cull && !gProbeManager->IsBaking()) ? &mFrustum : nullptr;
+
 	mLightList.Clear();
-	AddTileToLightList(WorldGrid::scGlobalTileIndex);
+	AddTileToLightList(WorldGrid::scGlobalTileIndex, light_frustum);
 
 	AABB frustum_bounds = mFrustum.GetFrustumBoundingBox(cam);
 
@@ -868,8 +921,6 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 
 	FrustumTestedObjects = 0;
 	FrustumCulledObjects = 0;
-
-	const Frustum* object_frustum = (pCVarFrustumCull->IntValue != 0) ? &mFrustum : nullptr;
 
 	// Super broad phase for culling.
 
@@ -902,7 +953,7 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 			mVisibleTiles.Emplace(ti);
 
 			AddTileToRenderList(false, ti, object_frustum);
-			AddTileToLightList(ti);
+			AddTileToLightList(ti, light_frustum);
 		}
 	}
 

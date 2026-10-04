@@ -27,6 +27,8 @@ enum class eEditorTool : uint32
 	Create,
 	Clip,
 	Light,
+	Bounds,
+	Grab,
 
 	Count,
 };

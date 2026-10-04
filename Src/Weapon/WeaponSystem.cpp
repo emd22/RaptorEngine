@@ -332,7 +332,7 @@ void WeaponSystem::OnScriptsReloaded()
 void WeaponSystem::ApplyAnimations(const Weapon& weapon)
 {
 	mpPlayer->SetViewModelAnimations(weapon.IdleAnim.CStr(), weapon.FireAnim.CStr(), weapon.ReloadAnim.CStr());
-	mpPlayer->SetRecoilRecovery(MathUtil::DegreesToRadians(weapon.Def.RecoilRecovery));
+	mpPlayer->SetRecoilRecovery(weapon.Def.RecoilRecovery);
 }
 
 void WeaponSystem::SelectWeapon(uint32 index)

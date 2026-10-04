@@ -9,6 +9,7 @@
 
 #include <Core/String.hpp>
 #include <unordered_map>
+#include <vector>
 
 namespace fx {
 
@@ -20,6 +21,8 @@ enum class eCVarType
 	String,
 };
 
+const char* GetCVarTypeName(eCVarType cv_type);
+
 class CVarValue
 {
 public:
@@ -29,7 +32,12 @@ public:
 	CVarValue(CVarValue&& other);
 
 	String AsString() const;
-	void SetFromString(const String& string_value);
+
+	/**
+	 * @brief Parses `string_value` according to the CVar's type and assigns it. Returns false and leaves the value
+	 * unchanged if the string is not a valid value for the type.
+	 */
+	bool SetFromString(const String& string_value);
 
 	const String& GetName() { return mName; };
 
@@ -117,6 +125,9 @@ public:
 	/////////////////////////////////////
 
 	CVarValue* GetCVar(const String& name);
+
+	/// All registered CVars, sorted by name. The pointers stay valid for the lifetime of the manager.
+	std::vector<CVarValue*> CollectCVars();
 
 	template <typename T>
 	T Get(const String& name, T fallback) = delete;
