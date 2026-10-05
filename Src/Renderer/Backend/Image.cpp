@@ -46,6 +46,12 @@ static Vec2u GetMipDimensions(const Vec2u& ml_zero_size, uint32 mip_level)
 
 Image::Image() { mpRecord = rx_image_new(); }
 
+Image::Image(const RxImage* record)
+{
+	mpRecord = const_cast<RxImage*>(record);
+	rx_image_retain(mpRecord);
+}
+
 Image::Image(const Image& other) { ShareOrCopy(other); }
 
 Image::Image(Image&& other) noexcept : ID(other.ID), mpRecord(other.mpRecord)

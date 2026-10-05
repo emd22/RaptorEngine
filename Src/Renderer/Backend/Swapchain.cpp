@@ -19,7 +19,6 @@ void Swapchain::Init(Vec2u size, VkSurfaceKHR surface, GpuDevice* device)
 	CreateSwapchain(size, surface);
 	CreateSwapchainImages();
 	CreateImageViews();
-	CreateFramebuffers();
 
 	bInitialized = true;
 }
@@ -57,8 +56,6 @@ void Swapchain::CreateSwapchainImages()
 		image->WrapExternal(RxFromRaw<VkImage>(raw_image), Extent, Surface.Format);
 	}
 }
-
-void Swapchain::CreateFramebuffers() {}
 
 void Swapchain::CreateImageViews()
 {

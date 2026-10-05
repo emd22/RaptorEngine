@@ -333,6 +333,39 @@ std::string ConfigEntry::AsString(uint32 indent) const
 	return TakeRustText(rx_config_format_entry(&entry, indent, &scRustLog));
 }
 
+RxHost MakeConfigHost()
+{
+	return RxHost {
+		.user = nullptr,
+		.read_include = ReadIncludeForRust,
+		.release_include = ReleaseIncludeForRust,
+		.log = RustInterop::Log,
+	};
+}
+
+std::string GetConfigConstantsPath() { return FilesystemIO::ResolvePath("Config/Internal/Constants.conf"); }
+
+bool ReadConfigFileBytes(const std::string& path, std::vector<uint8>& out_bytes)
+{
+	out_bytes.clear();
+
+	File file(FilesystemIO::ResolvePath(path).c_str(), File::eModType::Read, File::eDataType::Binary);
+
+	if (!file.IsFileOpen()) {
+		return false;
+	}
+
+	Slice<char> content = file.Read<char>();
+
+	if (content.pData != nullptr) {
+		out_bytes.assign(reinterpret_cast<const uint8*>(content.pData),
+						 reinterpret_cast<const uint8*>(content.pData) + content.Size);
+		gEnginePool->Free(content.pData);
+	}
+
+	return true;
+}
+
 void ConfigFile::Load(const std::string& path)
 {
 	const std::string resolved_path = FilesystemIO::ResolvePath(path);
@@ -357,14 +390,9 @@ void ConfigFile::Load(const std::string& path)
 
 	mbHasErrors = false;
 
-	const RxHost host = {
-		.user = nullptr,
-		.read_include = ReadIncludeForRust,
-		.release_include = ReleaseIncludeForRust,
-		.log = RustInterop::Log,
-	};
+	const RxHost host = MakeConfigHost();
 
-	const std::string constants_path = FilesystemIO::ResolvePath("Config/Internal/Constants.conf");
+	const std::string constants_path = GetConfigConstantsPath();
 
 	RxConfig* parsed = rx_config_parse(reinterpret_cast<const uint8*>(file_buffer.pData), file_buffer.Size,
 									   constants_path.c_str(), ".conf", &host);

@@ -1,100 +1,48 @@
 #pragma once
 
+#include <raptor_ffi.h>
 #include <vulkan/vulkan.h>
 
 #include <Color.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
-#include <raptor_ffi.h>
 
 namespace fx::renderer {
 
 union PipelineBlendFactor
 {
-    struct
-    {
-        VkBlendFactor Src : 8;
-        VkBlendFactor Dst : 8;
-    } Ops;
+	struct
+	{
+		VkBlendFactor Src : 8;
+		VkBlendFactor Dst : 8;
+	} Ops;
 
-    uint16 Value;
+	uint16 Value;
 };
 
 union PipelineBlendOp
 {
-    struct
-    {
-        VkBlendOp Alpha : 8;
-        VkBlendOp Color : 8;
-    } Ops;
+	struct
+	{
+		VkBlendOp Alpha : 8;
+		VkBlendOp Color : 8;
+	} Ops;
 
-    uint16 Value;
+	uint16 Value;
 };
 
 
 struct BlendAttachment
 {
-    bool Enabled = false;
-    eColorComponent Mask = eColorComponent::RGBA;
-    PipelineBlendOp BlendOp = { .Ops = { .Alpha = VK_BLEND_OP_ADD, .Color = VK_BLEND_OP_ADD } };
+	bool Enabled = false;
+	eColorComponent Mask = eColorComponent::RGBA;
+	PipelineBlendOp BlendOp = { .Ops = { .Alpha = VK_BLEND_OP_ADD, .Color = VK_BLEND_OP_ADD } };
 
-    PipelineBlendFactor AlphaBlend = { .Ops = { .Src = VK_BLEND_FACTOR_ZERO, .Dst = VK_BLEND_FACTOR_ZERO } };
-    PipelineBlendFactor ColorBlend = { .Ops = { .Src = VK_BLEND_FACTOR_ZERO, .Dst = VK_BLEND_FACTOR_ZERO } };
+	PipelineBlendFactor AlphaBlend = { .Ops = { .Src = VK_BLEND_FACTOR_ZERO, .Dst = VK_BLEND_FACTOR_ZERO } };
+	PipelineBlendFactor ColorBlend = { .Ops = { .Src = VK_BLEND_FACTOR_ZERO, .Dst = VK_BLEND_FACTOR_ZERO } };
 
-    uint16 TargetIndex = 0;
+	uint16 TargetIndex = 0;
 };
 
-class BlendAttachmentList
-{
-    static constexpr uint32 scMinAttachmentCount = 10;
-
-public:
-    void AddAttachment(uint32 target_index, const BlendAttachment& attachment)
-    {
-        if (!mBlendAttachments.IsInited()) {
-            mBlendAttachments.InitCapacity(scMinAttachmentCount);
-        }
-
-        BlendAttachment& at = mBlendAttachments.Insert(attachment);
-        at.TargetIndex = target_index;
-    }
-
-    SizedArray<VkPipelineColorBlendAttachmentState> GetVkAttachments(uint32 count)
-    {
-        SizedArray<RxBlendAttachment> rust_attachments(mBlendAttachments.Size);
-
-        for (const BlendAttachment& am : mBlendAttachments) {
-            rust_attachments.Insert(RxBlendAttachment {
-                .enabled = am.Enabled,
-                .write_mask = static_cast<uint32>(am.Mask),
-                .color_op = am.BlendOp.Ops.Color,
-                .alpha_op = am.BlendOp.Ops.Alpha,
-                .src_color = am.ColorBlend.Ops.Src,
-                .dst_color = am.ColorBlend.Ops.Dst,
-                .src_alpha = am.AlphaBlend.Ops.Src,
-                .dst_alpha = am.AlphaBlend.Ops.Dst,
-                .target_index = am.TargetIndex,
-            });
-        }
-
-        SizedArray<VkPipelineColorBlendAttachmentState> vk_blend_attachments;
-
-        vk_blend_attachments.InitSize(count);
-
-        const int32 built = rx_blend_states(rust_attachments.pData, rust_attachments.Size, count,
-                                            vk_blend_attachments.pData);
-
-        AssertMsg(built != 0, "A blend attachment targets an attachment that does not exist");
-
-        return vk_blend_attachments;
-    }
-
-    const SizedArray<BlendAttachment>& GetAttachments() const { return mBlendAttachments; }
-
-    void Clear() { mBlendAttachments.Clear(); }
-
-private:
-    SizedArray<BlendAttachment> mBlendAttachments {};
-};
 
 } // namespace fx::renderer

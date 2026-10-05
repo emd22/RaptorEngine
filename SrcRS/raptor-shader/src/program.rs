@@ -244,3 +244,97 @@ mod tests
 		assert_eq!(input_location_mask(&words), 0);
 	}
 }
+
+/// A compiled program as it is kept in a data pack: the number of reflection entries, the entries,
+/// then the SPIR-V. Each entry is one number, the type in the top 16 bits, the set in the next 8
+/// and the binding in the last 8.
+pub struct ProgramBlob<'a>
+{
+	pub reflection: Vec<u32>,
+	pub spirv: &'a [u8],
+}
+
+impl<'a> ProgramBlob<'a>
+{
+	/// Splits the bytes of a program, or returns none if they are too short for what they say they
+	/// hold.
+	pub fn parse(bytes: &'a [u8]) -> Option<Self>
+	{
+		let count = u32::from_ne_bytes(bytes.get(..4)?.try_into().ok()?) as usize;
+		let spirv_start = 4usize.checked_add(count.checked_mul(4)?)?;
+
+		let (entries, _) = bytes.get(4..spirv_start)?.as_chunks::<4>();
+		let reflection = entries
+			.iter()
+			.map(|entry| u32::from_ne_bytes(*entry))
+			.collect();
+
+		Some(Self {
+			reflection,
+			spirv: &bytes[spirv_start..],
+		})
+	}
+}
+
+/// Joins the reflection entries and SPIR-V of a program into the bytes that are kept in a data
+/// pack.
+pub fn pack_program(reflection: &[u32], spirv: &[u8]) -> Vec<u8>
+{
+	let mut bytes = Vec::with_capacity(4 + reflection.len() * 4 + spirv.len());
+
+	bytes.extend_from_slice(&(reflection.len() as u32).to_ne_bytes());
+
+	for entry in reflection {
+		bytes.extend_from_slice(&entry.to_ne_bytes());
+	}
+
+	bytes.extend_from_slice(spirv);
+
+	bytes
+}
+
+#[cfg(test)]
+mod blob_tests
+{
+	use super::*;
+
+	#[test]
+	fn a_program_round_trips_through_its_bytes()
+	{
+		let reflection = [0x0002_0105, 0x0001_0003];
+		let spirv = [0x03, 0x02, 0x23, 0x07, 1, 2, 3, 4];
+
+		let bytes = pack_program(&reflection, &spirv);
+		let blob = ProgramBlob::parse(&bytes).unwrap();
+
+		assert_eq!(blob.reflection, reflection);
+		assert_eq!(blob.spirv, spirv);
+	}
+
+	#[test]
+	fn a_program_without_reflection_is_all_spirv()
+	{
+		let bytes = pack_program(&[], &[9, 9, 9, 9]);
+
+		assert_eq!(&bytes[..4], &0u32.to_ne_bytes());
+
+		let blob = ProgramBlob::parse(&bytes).unwrap();
+
+		assert!(blob.reflection.is_empty());
+		assert_eq!(blob.spirv, [9, 9, 9, 9]);
+	}
+
+	#[test]
+	fn bytes_too_short_for_their_count_are_not_a_program()
+	{
+		assert!(ProgramBlob::parse(&[]).is_none());
+		assert!(ProgramBlob::parse(&[1, 0, 0]).is_none());
+
+		let mut bytes = pack_program(&[1, 2, 3], &[]);
+		bytes.truncate(8);
+
+		assert!(ProgramBlob::parse(&bytes).is_none());
+
+		assert!(ProgramBlob::parse(&u32::MAX.to_ne_bytes()).is_none());
+	}
+}

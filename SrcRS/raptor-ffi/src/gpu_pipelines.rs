@@ -2,8 +2,8 @@ use std::ffi::{CStr, c_char, c_void};
 
 use ash::vk::{self, Handle};
 use raptor_gpu::{
-	GraphicsPipelineDesc, PipelineLayoutRecord, PipelineRecord, PushConstantDef, ReflectionEntry,
-	SHADER_VERTEX, ShaderProgramRecord,
+	GraphicsPipelineDesc, PipelineLayoutRecord, PipelineRecord, PushConstantDef,
+	ShaderProgramRecord,
 };
 use raptor_shader::program::{self, MacroRef, ProgramKind};
 
@@ -97,53 +97,7 @@ pub type RxShaderProgram = ShaderProgramRecord;
 
 /// # Safety
 ///
-/// `device` must be live, `code` valid for `word_count` words, `reflection` for `reflection_count`
-/// entries, and `out_status` writable. `user` is only stored. The result is null on failure.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_shader_program_new(
-	device: *const RxGpuDevice,
-	code: *const u32,
-	word_count: usize,
-	reflection: *const ReflectionEntry,
-	reflection_count: usize,
-	shader_type: u32,
-	user: *mut c_void,
-	out_status: *mut i32,
-) -> *mut RxShaderProgram
-{
-	// SAFETY: guaranteed by the caller.
-	let (code, reflection) = unsafe {
-		(
-			slice_or_empty(code, word_count),
-			slice_or_empty(reflection, reflection_count).to_vec(),
-		)
-	};
-
-	let mask = if shader_type == SHADER_VERTEX {
-		program::input_location_mask(code)
-	} else {
-		!0
-	};
-
-	// SAFETY: guaranteed by the caller.
-	let created = ShaderProgramRecord::create(
-		unsafe { &(*device).device },
-		code,
-		reflection,
-		shader_type,
-		mask,
-		user,
-	);
-
-	// SAFETY: guaranteed by the caller.
-	unsafe { write_status(out_status, &created) };
-
-	created.map_or(std::ptr::null_mut(), ShaderProgramRecord::into_raw)
-}
-
-/// # Safety
-///
-/// `program` must come from `rx_shader_program_new`.
+/// `program` must come from `rx_shader_library_get_program`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rx_shader_program_retain(program: *mut RxShaderProgram)
 {
@@ -153,8 +107,8 @@ pub unsafe extern "C" fn rx_shader_program_retain(program: *mut RxShaderProgram)
 
 /// # Safety
 ///
-/// `program` must come from `rx_shader_program_new` and not be used by this reference afterwards.
-/// `device` must be live, or null to leak the module.
+/// `program` must come from `rx_shader_library_get_program` and not be used by this reference
+/// afterwards. `device` must be live, or null to leak the module.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rx_shader_program_release(
 	program: *mut RxShaderProgram,
@@ -375,7 +329,10 @@ pub struct RxShaderMacroRef
 	pub value: *const c_char,
 }
 
-unsafe fn macro_refs<'a>(macros: *const RxShaderMacroRef, count: usize) -> Vec<MacroRef<'a>>
+pub(crate) unsafe fn macro_refs<'a>(
+	macros: *const RxShaderMacroRef,
+	count: usize,
+) -> Vec<MacroRef<'a>>
 {
 	// SAFETY: guaranteed by the caller.
 	unsafe { slice_or_empty(macros, count) }

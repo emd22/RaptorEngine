@@ -255,6 +255,26 @@ impl Device
 			.unwrap_or_else(std::sync::PoisonError::into_inner)
 	}
 
+	pub fn physical_properties(&self) -> vk::PhysicalDeviceProperties
+	{
+		// SAFETY: the physical device belongs to the instance.
+		unsafe { self.instance.get_physical_device_properties(self.physical) }
+	}
+
+	/// How many bits of a timestamp from `family` are valid, which is 0 if it has none.
+	pub fn timestamp_valid_bits(&self, family: u32) -> u32
+	{
+		// SAFETY: the physical device belongs to the instance.
+		let families = unsafe {
+			self.instance
+				.get_physical_device_queue_family_properties(self.physical)
+		};
+
+		families
+			.get(family as usize)
+			.map_or(0, |properties| properties.timestamp_valid_bits)
+	}
+
 	pub fn caps(&self) -> DeviceCaps
 	{
 		self.caps

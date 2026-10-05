@@ -2,7 +2,7 @@
 
 #include "../ImageLoaderBase.hpp"
 
-#include <ktx.h>
+#include <raptor_ffi.h>
 
 #include <Core/Slice.hpp>
 #include <Core/String.hpp>
@@ -35,11 +35,11 @@ public:
 
 	void CreateGpuResource(AssetTicket& ticket) override;
 
-	bool IsOpen() const { return mpTexture != nullptr; }
+	bool IsOpen() const { return mpKtx != nullptr; }
 
 	eImageFormat GetFormat() const { return mFormat; }
-	Vec2u GetImageSize() const { return Vec2u(mpTexture->baseWidth, mpTexture->baseHeight); }
-	uint32 GetMipCount() const { return mpTexture->numLevels; }
+	Vec2u GetImageSize() const { return mSize; }
+	uint32 GetMipCount() const { return mMipCount; }
 
 	Vec2u GetMipDimensions(uint32 mip_level) const;
 
@@ -57,11 +57,13 @@ public:
 	~LoaderKtx() override { Destroy(); }
 
 private:
-	bool AdoptTexture(ktxTexture* texture);
+	bool Adopt(RxKtx* ktx);
 
 private:
-	ktxTexture* mpTexture = nullptr;
+	RxKtx* mpKtx = nullptr;
 	eImageFormat mFormat = eImageFormat::None;
+	Vec2u mSize = Vec2u::sZero;
+	uint32 mMipCount = 0;
 };
 
 } // namespace loader

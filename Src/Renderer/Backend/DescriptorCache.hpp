@@ -37,6 +37,8 @@ public:
 
 	DsLayoutID GetID(const SizedArray<DescriptorEntry>& entries);
 
+	const RxDsLayoutCache* GetRustCache() const { return mpCache; }
+
 	void Destroy();
 	~DsLayoutCache() { Destroy(); }
 
@@ -48,31 +50,46 @@ private:
 };
 
 
+/**
+ * @brief Makes and keeps the descriptor sets. There is one set for each distinct combination of resources, and the
+ * sets hold onto the images and buffers they use, so they follow them when they are recreated.
+ */
 class DescriptorCache
 {
 public:
 	DescriptorCache();
 
+	DescriptorCache(const DescriptorCache&) = delete;
+	DescriptorCache& operator=(const DescriptorCache&) = delete;
+
 	std::pair<DescriptorID, DescriptorSet*> Request(const SizedArray<DescriptorEntry>& entries);
 	DescriptorSet* RequestExisting(DescriptorID descriptor_id);
 
+	RxDescriptorCache* GetRust() const { return mpCache; }
+
 	/**
-	 * @brief Frees a descriptor set and its linked layout from the cache.
+	 * @brief The set for a record that Rust made, such as when it built a pipeline's descriptors
+	 */
+	DescriptorSet* Wrap(RxDescriptorSet* record);
+
+	/**
+	 * @brief Frees a descriptor set, and the references it held. The layout stays in the layout cache.
 	 */
 	void Free(DescriptorID descriptor_id);
 
-	DescriptorID GetID(const SizedArray<DescriptorEntry>& entries);
-
-	DescriptorPool& FindPool();
-
+	/**
+	 * @brief Rewrites every set with the current handles of its images and buffers.
+	 */
 	void RebuildAll();
 
 	void Destroy();
 	~DescriptorCache() { Destroy(); }
 
-public:
-	PagedArray<DescriptorPool> Pools;
-	std::unordered_map<Hash32, DescriptorSet, Hash32Stl> Cache;
+private:
+	RxDescriptorCache* mpCache = nullptr;
+
+	/// The sets stay at the same address until they are freed
+	std::unordered_map<Hash32, DescriptorSet, Hash32Stl> mSets;
 };
 
 } // namespace renderer

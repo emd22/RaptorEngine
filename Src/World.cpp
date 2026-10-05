@@ -488,7 +488,7 @@ void World::UpdateSpotShadows()
 			bake_hash = HashObj32(caster->GetWorldMatrix().RawData, bake_hash);
 
 			if (caster->IsSkinned() && caster->pSkeleton.IsValid()) {
-				bake_hash = HashObj32(caster->pSkeleton->PoseHash, bake_hash);
+				bake_hash = HashObj32(caster->pSkeleton->GetPoseHash(), bake_hash);
 				bake_hash = HashObj32(caster->HasBonesForDraw(), bake_hash);
 			}
 		}
@@ -577,32 +577,21 @@ void World::GatherSpotShadowCasters(const Vec3f& center, float32 radius, DynArra
 
 	auto add_casters_from_tile = [&](TileIndex tile_index)
 	{
-		const Tile* tile = gWorldGrid->GetTile(tile_index);
-		if (tile == nullptr) {
+		const TileView tile = gWorldGrid->GetTile(tile_index);
+		if (!tile.IsValid()) {
 			return;
 		}
 
-		uint32 index = 0;
-		while (true) {
-			index = tile->Objects.SlotsInUse.FindNextSetBit(index);
-			if (index == Bitset::scNoFreeBits) {
-				break;
-			}
+		tile.ForEachObject(
+			[&](const ObjectID* object_id)
+			{
+				Object* object = gObjectManager->GetObject(*object_id);
 
-			const ObjectID* object_id = tile->Objects.GetItem(index);
-			++index;
-
-			if (object_id == nullptr) {
-				continue;
-			}
-
-			Object* object = gObjectManager->GetObject(*object_id);
-
-			// Attached nodes cast shadows along with their root, same as the directional light's render list
-			if (object != nullptr && object->IsShadowCaster()) {
-				AddSpotShadowCasterRecursive(*object_id, first_caster, center, radius, out_casters);
-			}
-		}
+				// Attached nodes cast shadows along with their root, same as the directional light's render list
+				if (object != nullptr && object->IsShadowCaster()) {
+					AddSpotShadowCasterRecursive(*object_id, first_caster, center, radius, out_casters);
+				}
+			});
 	};
 
 	const Vec3f extent(radius, radius, radius);
@@ -636,12 +625,12 @@ static bool SkinnedCasterReachesSphere(Object& object, const Vec3f& center, floa
 
 	const Skeleton& skeleton = *object.pSkeleton;
 	const float32* m = object.GetWorldMatrix().RawData;
-	const Vec3f& c = skeleton.PoseCenter;
+	const Vec3f c = skeleton.GetPoseCenter();
 
 	const Vec3f pose_center(c.X * m[0] + c.Y * m[4] + c.Z * m[8] + m[12], c.X * m[1] + c.Y * m[5] + c.Z * m[9] + m[13],
 							c.X * m[2] + c.Y * m[6] + c.Z * m[10] + m[14]);
 
-	const float32 reach = (skeleton.PoseRadius + scMeshPadding) * object.mScale + radius;
+	const float32 reach = (skeleton.GetPoseRadius() + scMeshPadding) * object.mScale + radius;
 
 	return (pose_center - center).Length() <= reach;
 }
@@ -815,79 +804,54 @@ void World::ClearRenderList()
 
 void World::AddTileToRenderList(bool clear, TileIndex new_tile_index, const Frustum* frustum)
 {
-	Tile* tile = gWorldGrid->GetTile(new_tile_index);
+	const TileView tile = gWorldGrid->GetTile(new_tile_index);
 
-	if (tile == nullptr) {
+	if (!tile.IsValid()) {
 		return;
 	}
 
-	uint32 index = 0;
-	while (true) {
-		index = tile->Objects.SlotsInUse.FindNextSetBit(index);
-		if (index == Bitset::scNoFreeBits) {
-			break;
-		}
+	tile.ForEachObject(
+		[&](ObjectID* object_id)
+		{
+			Object* object = gObjectManager->GetObject(*object_id);
+			if (object == nullptr) {
+				return;
+			}
 
-		ObjectID* object_id = tile->Objects.GetItem(index);
-		if (!object_id) {
-			++index;
-			continue;
-		}
+			if (object->IsProbeVolume()) {
+				return;
+			}
 
-		Object* object = gObjectManager->GetObject(*object_id);
-		if (object == nullptr) {
-			++index;
-			continue;
-		}
+			if (object->IsShadowCaster()) {
+				AddToRenderListRecursive(GetShadowListPipeline(), object_id);
+			}
 
-		if (object->IsProbeVolume()) {
-			++index;
-			continue;
-		}
-
-		if (object->IsShadowCaster()) {
-			AddToRenderListRecursive(GetShadowListPipeline(), object_id);
-		}
-
-		AddToRenderListRecursiveByMaterial(object_id, frustum);
-
-		++index;
-	}
+			AddToRenderListRecursiveByMaterial(object_id, frustum);
+		});
 }
 
 
 void World::AddTileToLightList(TileIndex tile_index, const Frustum* frustum)
 {
-	const Tile* tile = gWorldGrid->GetTile(tile_index);
+	const TileView tile = gWorldGrid->GetTile(tile_index);
 
-	if (tile == nullptr || !tile->Lights.IsInited()) {
+	if (!tile.IsValid()) {
 		return;
 	}
 
-	uint32 index = 0;
-	while (true) {
-		index = tile->Lights.SlotsInUse.FindNextSetBit(index);
-		if (index == Bitset::scNoFreeBits) {
-			break;
-		}
+	tile.ForEachLight(
+		[&](LightID light_id)
+		{
+			if (frustum != nullptr) {
+				const LightBase* light = gLightManager->GetLight(light_id);
 
-		const LightID* light_id = tile->Lights.GetItem(index);
-		++index;
-
-		if (light_id == nullptr) {
-			continue;
-		}
-
-		if (frustum != nullptr) {
-			const LightBase* light = gLightManager->GetLight(*light_id);
-
-			if (light != nullptr && light->IsOutsideFrustum(*frustum)) {
-				continue;
+				if (light != nullptr && light->IsOutsideFrustum(*frustum)) {
+					return;
+				}
 			}
-		}
 
-		mLightList.AddLight(*light_id);
-	}
+			mLightList.AddLight(light_id);
+		});
 }
 
 void World::AddUnculledLightsToLightList()
@@ -895,7 +859,7 @@ void World::AddUnculledLightsToLightList()
 	const bool needs_all_lights = gProbeManager->IsBaking();
 
 	for (LightBase* light : gLightManager->GetCache()) {
-		if (needs_all_lights || light->mTileIndex == TileIndexNull) {
+		if (needs_all_lights || gWorldGrid->GetLightTile(light) == TileIndexNull) {
 			mLightList.AddLight(light->ID);
 		}
 	}
@@ -929,8 +893,9 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 	Vec2u max_tile = gWorldGrid->TileToTileXY(
 		gWorldGrid->WorldToTile(Vec3f(frustum_bounds.Max.X, 0.0f, frustum_bounds.Max.Z)));
 
-	const uint32 num_tiles_x = gWorldGrid->mGridSize.X;
-	const uint32 num_tiles_y = gWorldGrid->mGridSize.Y;
+	const Vec2u grid_size = gWorldGrid->GetGridSize();
+	const uint32 num_tiles_x = grid_size.X;
+	const uint32 num_tiles_y = grid_size.Y;
 
 	min_tile.X = std::clamp(min_tile.X, 0U, num_tiles_x - 1);
 	min_tile.Y = std::clamp(min_tile.Y, 0U, num_tiles_y - 1);
@@ -971,7 +936,7 @@ void World::Render(Camera* shadow_camera)
 
 	TileIndex tile_index = gWorldGrid->WorldToTile(mpCurrentCamera->Position);
 
-	if (tile_index != gWorldGrid->ViewTileIndex) {
+	if (tile_index != gWorldGrid->GetViewTileIndex()) {
 		gWorldGrid->SetViewTileIndex(tile_index);
 	}
 
@@ -1122,9 +1087,9 @@ void World::RenderProbeCapture()
 	// The render list was culled to the player's view, but the probes need to see the whole level
 	ClearRenderList();
 
-	const Vec2u grid_size = gWorldGrid->GetGridSize();
+	const Vec2u all_tiles_size = gWorldGrid->GetGridSize();
 
-	for (TileIndex tile = 0; tile < grid_size.X * grid_size.Y; tile++) {
+	for (TileIndex tile = 0; tile < all_tiles_size.X * all_tiles_size.Y; tile++) {
 		AddTileToRenderList(false, tile);
 	}
 
@@ -1216,14 +1181,17 @@ void World::DebugDrawWorldGrid()
 	const Color debug_color = Color::FromRGBA(255, 255, 255, 255);
 	const Color player_debug_color = Color::FromRGBA(255, 0, 0, 255);
 
-	const Vec3f tile_size = Vec3f(gWorldGrid->mTileSize.X, 1.0f, gWorldGrid->mTileSize.Y);
+	const Vec2f grid_tile_size = gWorldGrid->GetTileSize();
+	const Vec2u debug_grid_size = gWorldGrid->GetGridSize();
+	const Vec3f position_offset = gWorldGrid->GetPositionOffset();
+	const Vec3f tile_size = Vec3f(grid_tile_size.X, 1.0f, grid_tile_size.Y);
 
-	for (uint32 y = 0; y < gWorldGrid->mGridSize.Y; y++) {
-		for (uint32 x = 0; x < gWorldGrid->mGridSize.X; x++) {
+	for (uint32 y = 0; y < debug_grid_size.Y; y++) {
+		for (uint32 x = 0; x < debug_grid_size.X; x++) {
 			const Vec3f tile_offset = Vec3f(x, -1.5f, y) * tile_size;
 
 			Mat4f model_matrix = Mat4f::AsScale(tile_size) * Mat4f::AsRotation(Quat::scIdentity) *
-								 Mat4f::AsTranslation((tile_offset)-gWorldGrid->mPositionOffset + (tile_size * 0.5f));
+								 Mat4f::AsTranslation((tile_offset)-position_offset + (tile_size * 0.5f));
 
 			Color color = debug_color;
 

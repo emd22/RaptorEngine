@@ -57,17 +57,14 @@ void RawGpuBuffer::Create(eGpuBufferType buffer_type, uint64 size_in_bytes, RxMe
 
 	Assert(buffer_type != eGpuBufferType::None);
 
-	if (mpRecord != nullptr) {
-		Destroy();
-	}
+	Destroy();
 
-	int32 status = 0;
+	const VkResult status = static_cast<VkResult>(rx_buffer_create(
+		mpRecord, gGraphics->GpuAllocator, static_cast<uint32>(buffer_type), size_in_bytes, memory_usage,
+		static_cast<uint16>(buffer_flags)));
 
-	mpRecord = rx_buffer_create(gGraphics->GpuAllocator, static_cast<uint32>(buffer_type), size_in_bytes,
-								memory_usage, static_cast<uint16>(buffer_flags), &status);
-
-	if (mpRecord == nullptr) {
-		PanicVulkan("GPUBuffer", "Error allocating GPU buffer!", static_cast<VkResult>(status));
+	if (status != VK_SUCCESS) {
+		PanicVulkan("GPUBuffer", "Error allocating GPU buffer!", status);
 	}
 
 	Initialized = true;
@@ -101,14 +98,26 @@ void RawGpuBuffer::UnMap()
 
 void RawGpuBuffer::Destroy()
 {
-	if (!(Initialized.load()) || mpRecord == nullptr) {
+	if (!(Initialized.load())) {
 		return;
 	}
 
 	Initialized.store(false);
 
-	gAssetManager->DeleteBuffer(mpRecord);
+	RxBufferResource* resource = rx_buffer_detach(mpRecord);
 
+	if (resource != nullptr) {
+		gAssetManager->DeleteBuffer(resource);
+	}
+}
+
+RawGpuBuffer::~RawGpuBuffer()
+{
+	Destroy();
+
+	GraphicsBackend* graphics = gGraphics;
+
+	rx_buffer_release(mpRecord, (graphics != nullptr) ? graphics->GpuAllocator : nullptr);
 	mpRecord = nullptr;
 }
 

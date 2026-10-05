@@ -8,132 +8,41 @@
 #include "WorldGrid.hpp"
 
 #include <Engine.hpp>
-#include <Material/MaterialManagerFwd.hpp>
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Renderer/Light.hpp>
+#include <Util/RustInterop.hpp>
 
 namespace fx {
 
-/////////////////////////////////////
-// Tile functions
-/////////////////////////////////////
+static_assert(WorldGrid::scGlobalTileIndex == RX_WORLD_GRID_GLOBAL_TILE);
 
+namespace {
 
-uint32 Tile::FindObject(ObjectID id)
+const RxLogSink scGridLog = { .user = nullptr, .log = RustInterop::Log };
+
+void BoundsToFloats(const AABB& bounds, float32 out_min[3], float32 out_max[3])
 {
-	uint32 index = 0;
-	while (true) {
-		index = Objects.SlotsInUse.FindNextSetBit(index);
-		if (index == Bitset::scNoFreeBits) {
-			break;
-		}
+	out_min[0] = bounds.Min.X;
+	out_min[1] = bounds.Min.Y;
+	out_min[2] = bounds.Min.Z;
 
-		ObjectID object_id = Objects.pPtr[index];
-		if (object_id == id) {
-			return index;
-		}
-
-		++index;
-	}
-
-	return UINT32_MAX;
+	out_max[0] = bounds.Max.X;
+	out_max[1] = bounds.Max.Y;
+	out_max[2] = bounds.Max.Z;
 }
 
+} // namespace
 
-uint32 Tile::FindLight(LightID id)
+WorldGrid::WorldGrid() { mpGrid = rx_world_grid_new(&scGridLog); }
+
+WorldGrid::~WorldGrid()
 {
-	if (!Lights.IsInited()) {
-		return UINT32_MAX;
-	}
-
-	uint32 index = 0;
-	while (true) {
-		index = Lights.SlotsInUse.FindNextSetBit(index);
-		if (index == Bitset::scNoFreeBits) {
-			break;
-		}
-
-		if (Lights.pPtr[index] == id) {
-			return index;
-		}
-
-		++index;
-	}
-
-	return UINT32_MAX;
+	rx_world_grid_free(mpGrid);
+	mpGrid = nullptr;
 }
 
-
-/////////////////////////////////////
-// Tile System
-/////////////////////////////////////
-
-void WorldGrid::Create(const Vec2u grid_size)
-{
-	mGridSize = grid_size;
-
-	uint32 num_tiles = grid_size.X * grid_size.Y;
-	mTileBuffer.InitSize(num_tiles);
-
-	Vec2u half_grid = grid_size / Vec2u(2U);
-
-	// Center the grid about zero.
-	mPositionOffset = ((Vec3f(half_grid.X, 0.0f, half_grid.Y) * Vec3f(mTileSize.X, 0.0f, mTileSize.Y)));
-}
-
-void WorldGrid::GetObjectTileRect(Object* object, TileIndex* out_start, Vec2u* out_span) const
-{
-	DebugAssert(out_start != nullptr);
-	DebugAssert(out_span != nullptr);
-
-
-	const AABB world_bounds = object->GetWorldOBB().GetWorldAABB();
-
-	const Vec2u tile_xy_start = TileToTileXY(WorldToTile(world_bounds.Min));
-	const Vec2u tile_xy_end = TileToTileXY(WorldToTile(world_bounds.Max));
-
-	const uint32 width_in_tiles = std::clamp(tile_xy_end.X - tile_xy_start.X + 1, 1U, mGridSize.X);
-	const uint32 height_in_tiles = std::clamp(tile_xy_end.Y - tile_xy_start.Y + 1, 1U, mGridSize.Y);
-
-	*out_start = TileFromTileXY(tile_xy_start);
-	*out_span = Vec2u(width_in_tiles, height_in_tiles);
-}
-
-void WorldGrid::InsertObjectIntoRect(ObjectID id, TileIndex start, Vec2u span)
-{
-	const Vec2u start_xy = TileToTileXY(start);
-
-	for (uint32 y = 0; y < span.Y; y++) {
-		for (uint32 x = 0; x < span.X; x++) {
-			InsertInto(TileFromTileXY(start_xy + Vec2u(x, y)), id);
-		}
-	}
-}
-
-void WorldGrid::RemoveObjectFromRect(ObjectID id, TileIndex start, Vec2u span)
-{
-	const Vec2u start_xy = TileToTileXY(start);
-
-	for (uint32 y = 0; y < span.Y; y++) {
-		for (uint32 x = 0; x < span.X; x++) {
-			Tile* tile = GetTile(TileFromTileXY(start_xy + Vec2u(x, y)));
-			if (tile == nullptr) {
-				continue;
-			}
-
-			const uint32 index = tile->FindObject(id);
-			if (index == TileIndexNull) {
-#ifdef FX_TILE_SYSTEM_LOG_ERRORS
-				LogWarning(LC_CORE, "Could not find object ({}) in previous tile", id);
-#endif
-				continue;
-			}
-
-			tile->Objects.FreeItem(index);
-		}
-	}
-}
+void WorldGrid::Create(const Vec2u grid_size) { rx_world_grid_create(mpGrid, grid_size.X, grid_size.Y); }
 
 void WorldGrid::AddObject(ObjectID id)
 {
@@ -147,315 +56,11 @@ void WorldGrid::AddObject(ObjectID id)
 		return;
 	}
 
-	// The object isn't cullable, insert into global tile
-	if (!object->IsCullable()) {
-		InsertInto(scGlobalTileIndex, object->ID);
-		return;
-	}
-
-	TileIndex tile_start = TileIndexNull;
-	Vec2u tile_span = Vec2u(1, 1);
-	GetObjectTileRect(object, &tile_start, &tile_span);
-
-	InsertObjectIntoRect(id, tile_start, tile_span);
-
-	// InsertInto() overwrites mTileIndex for each tile it's called on, so record the full span here
-	// after inserting into every tile so UpdateObject/RemoveObject can clear all of them later.
-	object->mTileIndex = tile_start;
-	object->mTileSpan = tile_span;
-}
-
-bool WorldGrid::GetLightPlacement(const LightBase* light, TileIndex* out_start, Vec2u* out_span) const
-{
-	*out_start = scGlobalTileIndex;
-	*out_span = Vec2u(1, 1);
-
-	if (!light->IsCullable() || mTileBuffer.Capacity == 0) {
-		return true;
-	}
-
-	const AABB bounds = light->GetBounds();
-
-	const Vec2u tile_xy_start = TileToTileXY(WorldToTile(bounds.Min));
-	const Vec2u tile_xy_end = TileToTileXY(WorldToTile(bounds.Max));
-
-	const uint32 width_in_tiles = std::clamp(tile_xy_end.X - tile_xy_start.X + 1, 1U, mGridSize.X);
-	const uint32 height_in_tiles = std::clamp(tile_xy_end.Y - tile_xy_start.Y + 1, 1U, mGridSize.Y);
-
-	if (width_in_tiles * height_in_tiles > scMaxLightTileCount) {
-		return true;
-	}
-
-	*out_start = TileFromTileXY(tile_xy_start);
-	*out_span = Vec2u(width_in_tiles, height_in_tiles);
-
-	return false;
-}
-
-void WorldGrid::InsertLightIntoRect(LightID id, TileIndex start, Vec2u span)
-{
-	const Vec2u start_xy = TileToTileXY(start);
-
-	for (uint32 y = 0; y < span.Y; y++) {
-		for (uint32 x = 0; x < span.X; x++) {
-			const TileIndex tile_index = TileFromTileXY(start_xy + Vec2u(x, y));
-			Tile& tile = mTileBuffer[tile_index];
-
-			if (!tile.Lights.IsInited()) {
-				tile.Lights.Init(scMaxLightsPerTile);
-			}
-
-			LightID* out_id = tile.Lights.NewItem();
-			if (out_id == nullptr) {
-				LogWarning("Tile {} is full, cannot insert light {}", tile_index, id);
-				continue;
-			}
-
-			(*out_id) = id;
-		}
-	}
-}
-
-void WorldGrid::RemoveLightFromRect(LightID id, TileIndex start, Vec2u span)
-{
-	const Vec2u start_xy = TileToTileXY(start);
-
-	for (uint32 y = 0; y < span.Y; y++) {
-		for (uint32 x = 0; x < span.X; x++) {
-			Tile* tile = GetTile(TileFromTileXY(start_xy + Vec2u(x, y)));
-			if (tile == nullptr) {
-				continue;
-			}
-
-			const uint32 index = tile->FindLight(id);
-			if (index == UINT32_MAX) {
-				continue;
-			}
-
-			tile->Lights.FreeItem(index);
-		}
-	}
-}
-
-void WorldGrid::AddLight(LightBase* light)
-{
-	if (light == nullptr || light->ID.IsNull() || light->ID.IsInvalid()) {
-		return;
-	}
-
-	if (light->mTileIndex != TileIndexNull) {
-		RemoveLight(light);
-	}
-
-	TileIndex tile_start = TileIndexNull;
-	Vec2u tile_span = Vec2u(1, 1);
-	const bool is_global = GetLightPlacement(light, &tile_start, &tile_span);
-
-	if (is_global) {
-		if (!GlobalTile.Lights.IsInited()) {
-			GlobalTile.Lights.Init(scMaxGlobalLights);
-		}
-
-		LightID* out_id = GlobalTile.Lights.NewItem();
-		if (out_id == nullptr) {
-			LogWarning("Global tile is full, cannot insert light {}", light->ID);
-			return;
-		}
-
-		(*out_id) = light->ID;
-
-		light->mTileIndex = scGlobalTileIndex;
-		light->mTileSpan = Vec2u(1, 1);
-		return;
-	}
-
-	InsertLightIntoRect(light->ID, tile_start, tile_span);
-
-	light->mTileIndex = tile_start;
-	light->mTileSpan = tile_span;
-}
-
-void WorldGrid::UpdateLight(LightBase* light)
-{
-	if (light == nullptr || light->mTileIndex == TileIndexNull) {
-		return;
-	}
-
-	TileIndex tile_start = TileIndexNull;
-	Vec2u tile_span = Vec2u(1, 1);
-	const bool is_global = GetLightPlacement(light, &tile_start, &tile_span);
-	const bool was_global = (light->mTileIndex == scGlobalTileIndex);
-
-	if (is_global == was_global && (is_global || (tile_start == light->mTileIndex && tile_span == light->mTileSpan))) {
-		return;
-	}
-
-	AddLight(light);
-}
-
-void WorldGrid::RemoveLight(LightBase* light)
-{
-	if (light == nullptr || light->mTileIndex == TileIndexNull) {
-		return;
-	}
-
-	if (light->mTileIndex == scGlobalTileIndex) {
-		const uint32 index = GlobalTile.FindLight(light->ID);
-		if (index != UINT32_MAX) {
-			GlobalTile.Lights.FreeItem(index);
-		}
-	}
-	else {
-		RemoveLightFromRect(light->ID, light->mTileIndex, light->mTileSpan);
-	}
-
-	light->mTileIndex = TileIndexNull;
-}
-
-void WorldGrid::AddObjectsFromTile(std::unordered_set<ObjectID>& object_buffer, const Tile* tile) const
-{
-	uint32 index = 0;
-
-	while (true) {
-		index = tile->Objects.SlotsInUse.FindNextSetBit(index);
-		if (index == Bitset::scNoFreeBits) {
-			break;
-		}
-
-		const ObjectID* object_id = tile->Objects.GetItem(index);
-		if (!object_id || object_buffer.contains(*object_id)) {
-			++index;
-			continue;
-		}
-
-		object_buffer.emplace(*object_id);
-		++index;
-	}
-}
-
-
-const SizedArray<ObjectID>& WorldGrid::GetNearbyObjects()
-{
-	/*
-		+--------+--------+--------+-----
-		|		 |        |        |
-		| -1,  1 |  0,  1 |  1,  1 |  ...
-		|		 |        |        |
-		+--------+--------+--------+-----
-		|		 |        |        |
-		| -1,  0 |  VIEW  |  1,  0 |  ...
-		|		 |        |        |
-		+--------+--------+--------+-----
-		|		 |        |        |
-		| -1, -1 |  0, -1 |  1, -1 |  ...
-		|		 |        |        |
-		+--------+--------+--------+-----
-		| ...    |  ...   |  ...   |
-	*/
-
-	if (mbNearbyObjectCacheValid) {
-		return mNearbyObjectCache;
-	}
-
-	Vec2u view_xy = TileToTileXY(ViewTileIndex);
-	const Tile* view_tile = GetTile(TileFromTileXY(view_xy));
-
-	const Tile* surrounding_tiles[] = {
-
-		// Get the immediate surrounding tiles (up, left, down, right)
-		GetTile(TileFromTileXY(view_xy + Vec2u(1, 0))),
-		GetTile(TileFromTileXY(view_xy + Vec2u(-1, 0))),
-		GetTile(TileFromTileXY(view_xy + Vec2u(0, -1))),
-		GetTile(TileFromTileXY(view_xy + Vec2u(0, 1))),
-
-		// Get the diagonal surrounding tiles
-		GetTile(TileFromTileXY(view_xy + Vec2u(1, 1))),
-		GetTile(TileFromTileXY(view_xy + Vec2u(1, -1))),
-		GetTile(TileFromTileXY(view_xy + Vec2u(-1, -1))),
-		GetTile(TileFromTileXY(view_xy + Vec2u(-1, 1))),
-	};
-
-	std::unordered_set<ObjectID> objects_list;
-
-	AddObjectsFromTile(objects_list, view_tile);
-
-	for (uint32 index = 0; index < std::size(surrounding_tiles); index++) {
-		AddObjectsFromTile(objects_list, surrounding_tiles[index]);
-	}
-
-	mbNearbyObjectCacheValid = true;
-
-	uint32 objects_found_count = objects_list.size();
-	if (objects_found_count < mNearbyObjectCache.Capacity) {
-		mNearbyObjectCache.Size = 0;
-	}
-	else {
-		mNearbyObjectCache.Free();
-		mNearbyObjectCache.InitCapacity(objects_found_count);
-	}
-
-	for (ObjectID id : objects_list) {
-		mNearbyObjectCache.Insert(id);
-	}
-
-	return mNearbyObjectCache;
-}
-
-void WorldGrid::SetViewTileIndex(TileIndex view_tile_index)
-{
-	if (ViewTileIndex != view_tile_index) {
-		mbNearbyObjectCacheValid = false;
-	}
-
-	ViewTileIndex = view_tile_index;
-}
-
-
-TileIndex WorldGrid::InsertInto(TileIndex tile_index, ObjectID id)
-{
-	mbNearbyObjectCacheValid = false;
-
-	Object* object = gObjectManager->GetObject(id);
-	if (object == nullptr) {
-		return TileIndexNull;
-	}
-
-	// Insert into global tile (uncullable)
-	if (!object->IsCullable()) {
-		object->mTileIndex = scGlobalTileIndex;
-
-		if (!GlobalTile.Objects.IsInited()) {
-			GlobalTile.Objects.Init(scMaxGlobalObjects);
-		}
-
-		fx::ObjectID* out_id = GlobalTile.Objects.NewItem();
-		if (out_id == nullptr) {
-			LogWarning("Global tile is full, cannot insert object {}", tile_index, id);
-			return TileIndexNull;
-		}
-
-		(*out_id) = id;
-
-		return scGlobalTileIndex;
-	}
-
-	Tile& tile = mTileBuffer[tile_index];
-	object->mTileIndex = tile_index;
-
-	if (!tile.Objects.IsInited()) {
-		tile.Objects.Init(scMaxObjectsPerTile);
-	}
-
-	fx::ObjectID* out_id = tile.Objects.NewItem();
-	// Tile is full, die
-	if (out_id == nullptr) {
-		LogWarning("Tile {} is full, cannot insert object {}", tile_index, id);
-		return TileIndexNull;
-	}
-
-	(*out_id) = id;
-
-	return tile_index;
+	float32 min[3];
+	float32 max[3];
+	BoundsToFloats(object->GetWorldOBB().GetWorldAABB(), min, max);
+
+	rx_world_grid_add_object(mpGrid, object->ID.GetID(), min, max, object->IsCullable() ? 1 : 0);
 }
 
 void WorldGrid::UpdateObject(Object* object, bool update_attached)
@@ -464,74 +69,104 @@ void WorldGrid::UpdateObject(Object* object, bool update_attached)
 		return;
 	}
 
-	// Object has not been added to tile map, ignore.
-	if (object->mTileIndex == TileIndexNull) {
-#ifdef FX_TILE_SYSTEM_LOG_ERRORS
-		LogError(LC_CORE, "Object ({}) has not been added to tile system!", id);
-#endif
-		return;
-	}
+	float32 min[3];
+	float32 max[3];
+	BoundsToFloats(object->GetWorldOBB().GetWorldAABB(), min, max);
 
-	mbNearbyObjectCacheValid = false;
-
-	if (!object->IsCullable()) {
-		if (object->mTileIndex != scGlobalTileIndex) {
-			RemoveObjectFromRect(object->ID, object->mTileIndex, object->mTileSpan);
-			InsertInto(scGlobalTileIndex, object->ID);
-			object->mTileSpan = Vec2u(1, 1);
-		}
-		return;
-	}
-
-	TileIndex new_tile_start = TileIndexNull;
-	Vec2u new_tile_span = Vec2u(1, 1);
-	GetObjectTileRect(object, &new_tile_start, &new_tile_span);
-
-	if (object->mTileIndex == scGlobalTileIndex) {
-		const uint32 global_index = GlobalTile.FindObject(object->ID);
-
-		if (global_index != TileIndexNull) {
-			GlobalTile.Objects.FreeItem(global_index);
-		}
-
-		InsertObjectIntoRect(object->ID, new_tile_start, new_tile_span);
-
-		object->mTileIndex = new_tile_start;
-		object->mTileSpan = new_tile_span;
-		return;
-	}
-
-	// The object hasn't moved past any tile boundaries, leave it where it is
-	if (new_tile_start == object->mTileIndex && new_tile_span == object->mTileSpan) {
-		return;
-	}
-
-	// Clear every tile the object was previously spanning, then insert it into every tile it now spans.
-	RemoveObjectFromRect(object->ID, object->mTileIndex, object->mTileSpan);
-	InsertObjectIntoRect(object->ID, new_tile_start, new_tile_span);
-
-	object->mTileIndex = new_tile_start;
-	object->mTileSpan = new_tile_span;
+	const uint32 result = rx_world_grid_update_object(mpGrid, object->ID.GetID(), min, max, object->IsCullable() ? 1 : 0);
 
 	// If requested, update the objects attached to the current object.
-	if (update_attached) {
-		for (ObjectID attached_id : object->AttachedNodes) {
-			Object* attached_object = gObjectManager->GetObject(attached_id);
+	if (result != RX_OBJECT_MOVED || !update_attached) {
+		return;
+	}
 
-			if (attached_object == nullptr || object->mTileIndex == attached_object->mTileIndex) {
-				continue;
-			}
+	const TileIndex object_tile = GetObjectTile(object->ID);
 
-			UpdateObject(attached_object, true);
+	for (ObjectID attached_id : object->AttachedNodes) {
+		Object* attached_object = gObjectManager->GetObject(attached_id);
+
+		if (attached_object == nullptr || object_tile == GetObjectTile(attached_object->ID)) {
+			continue;
 		}
+
+		UpdateObject(attached_object, true);
 	}
 }
 
+void WorldGrid::RemoveObject(ObjectID id)
+{
+	if (gObjectManager->GetObject(id) == nullptr) {
+		return;
+	}
+
+	rx_world_grid_remove_object(mpGrid, id.GetID());
+}
+
+void WorldGrid::AddLight(LightBase* light)
+{
+	if (light == nullptr || light->ID.IsNull() || light->ID.IsInvalid()) {
+		return;
+	}
+
+	float32 min[3];
+	float32 max[3];
+	BoundsToFloats(light->GetBounds(), min, max);
+
+	rx_world_grid_add_light(mpGrid, light->ID.GetID(), min, max, light->IsCullable() ? 1 : 0);
+}
+
+void WorldGrid::UpdateLight(LightBase* light)
+{
+	if (light == nullptr || light->ID.IsNull() || light->ID.IsInvalid()) {
+		return;
+	}
+
+	float32 min[3];
+	float32 max[3];
+	BoundsToFloats(light->GetBounds(), min, max);
+
+	rx_world_grid_update_light(mpGrid, light->ID.GetID(), min, max, light->IsCullable() ? 1 : 0);
+}
+
+void WorldGrid::RemoveLight(LightBase* light)
+{
+	if (light == nullptr || light->ID.IsNull() || light->ID.IsInvalid()) {
+		return;
+	}
+
+	rx_world_grid_remove_light(mpGrid, light->ID.GetID());
+}
+
+ObjectIDSpan WorldGrid::GetNearbyObjects()
+{
+	uint32 count = 0;
+	const uint32* ids = rx_world_grid_nearby_objects(mpGrid, &count);
+
+	return ObjectIDSpan { .pFirst = reinterpret_cast<const ObjectID*>(ids), .Size = count };
+}
+
+void WorldGrid::SetViewTileIndex(TileIndex view_tile_index) { rx_world_grid_set_view_tile(mpGrid, view_tile_index); }
+
+TileIndex WorldGrid::GetObjectTile(ObjectID id) const { return rx_world_grid_object_tile(mpGrid, id.GetID()); }
+
+TileIndex WorldGrid::GetLightTile(const LightBase* light) const
+{
+	return rx_world_grid_light_tile(mpGrid, light->ID.GetID());
+}
+
+TileIndex WorldGrid::WorldToTile(const Vec3f& position) const
+{
+	return rx_world_grid_world_to_tile(mpGrid, position.X, position.Y, position.Z);
+}
+
+TileIndex WorldGrid::TileFromTileXY(const Vec2u& xy) const { return rx_world_grid_tile_from_xy(mpGrid, xy.X, xy.Y); }
+
 Vec2u WorldGrid::TileToTileXY(TileIndex tile_index) const
 {
-	const uint32 tile_x = tile_index % mGridSize.X;
-	const uint32 tile_y = (tile_index - tile_x) / mGridSize.X;
-	return Vec2u(tile_x, tile_y);
+	uint32 xy[2];
+	rx_world_grid_tile_to_xy(mpGrid, tile_index, xy);
+
+	return Vec2u(xy[0], xy[1]);
 }
 
 Vec3f WorldGrid::GetTileWorldPosition(TileIndex tile_index) const
@@ -541,78 +176,75 @@ Vec3f WorldGrid::GetTileWorldPosition(TileIndex tile_index) const
 
 Vec3f WorldGrid::TileXYToWorldCenter(Vec2u tile_xy) const
 {
-	return Vec3f((static_cast<float32>(tile_xy.X) * mTileSize.X) - mPositionOffset.X + (mTileSize.X * 0.5f),
-				 mPositionOffset.Y,
-				 (static_cast<float32>(tile_xy.Y) * mTileSize.Y) - mPositionOffset.Z + (mTileSize.Y * 0.5f));
+	float32 center[3];
+	rx_world_grid_tile_world_center(mpGrid, tile_xy.X, tile_xy.Y, center);
+
+	return Vec3f(center);
 }
 
-
-Tile* WorldGrid::GetTile(TileIndex index)
+TileView WorldGrid::GetTile(TileIndex index) const
 {
-	if (index == scGlobalTileIndex) {
-		return &GlobalTile;
+	RxTileSlots slots {};
+
+	if (!rx_world_grid_tile_slots(mpGrid, index, &slots)) {
+		return TileView {};
 	}
 
-	if (index >= mTileBuffer.Capacity) {
-		return nullptr;
-	}
-
-	return &mTileBuffer[index];
+	return TileView {
+		.pObjects = reinterpret_cast<ObjectID*>(const_cast<uint32*>(slots.objects)),
+		.ObjectSlots = slots.object_slots,
+		.pLights = reinterpret_cast<LightID*>(const_cast<uint32*>(slots.lights)),
+		.LightSlots = slots.light_slots,
+		.bValid = true,
+	};
 }
 
-const Tile* WorldGrid::GetTile(TileIndex index) const
+AABB WorldGrid::GetTileAABB(TileIndex ti) const
 {
-	if (index == scGlobalTileIndex) {
-		return &GlobalTile;
-	}
+	RxTileBounds bounds;
+	rx_world_grid_tile_bounds(mpGrid, ti, &bounds);
 
-	if (index >= mTileBuffer.Capacity) {
-		return nullptr;
-	}
-
-	return &mTileBuffer[index];
+	return AABB(Vec3f(bounds.min), Vec3f(bounds.max));
 }
 
-TileIndex WorldGrid::TileFromTileXY(const Vec2u& xy) const
+Vec2u WorldGrid::GetGridSize() const
 {
-	return std::min(xy.Y, mGridSize.Y - 1) * mGridSize.X + std::min(xy.X, mGridSize.X - 1);
+	RxGridInfo info;
+	rx_world_grid_info(mpGrid, &info);
+
+	return Vec2u(info.grid_size[0], info.grid_size[1]);
 }
 
-TileIndex WorldGrid::WorldToTile(const Vec3f& position) const
+Vec2f WorldGrid::GetTileSize() const
 {
-	const Vec3f adjusted = position + mPositionOffset;
-	const int32 tile_x = static_cast<int>(std::floor(adjusted.X / mTileSize.X));
-	const int32 tile_z = static_cast<int>(std::floor(adjusted.Z / mTileSize.Y));
+	RxGridInfo info;
+	rx_world_grid_info(mpGrid, &info);
 
-	const uint32 clamped_x = static_cast<uint32>(std::clamp(tile_x, 0, static_cast<int>(mGridSize.X) - 1));
-	const uint32 clamped_z = static_cast<uint32>(std::clamp(tile_z, 0, static_cast<int>(mGridSize.Y) - 1));
-
-	return clamped_z * mGridSize.X + clamped_x;
+	return Vec2f(info.tile_size[0], info.tile_size[1]);
 }
 
-void WorldGrid::RemoveObject(ObjectID id)
+Vec3f WorldGrid::GetPositionOffset() const
 {
-	mbNearbyObjectCacheValid = false;
+	RxGridInfo info;
+	rx_world_grid_info(mpGrid, &info);
 
-	Object* object = gObjectManager->GetObject(id);
-	if (object == nullptr) {
-		return;
-	}
+	return Vec3f(info.position_offset);
+}
 
-	// Object was not assigned a tile, ignore
-	if (object->mTileIndex == TileIndexNull) {
-		return;
-	}
+TileIndex WorldGrid::GetViewTileIndex() const
+{
+	RxGridInfo info;
+	rx_world_grid_info(mpGrid, &info);
 
-	if (object->mTileIndex == scGlobalTileIndex) {
-		const uint32 index = GlobalTile.FindObject(id);
-		if (index != TileIndexNull) {
-			GlobalTile.Objects.FreeItem(index);
-		}
-		return;
-	}
+	return info.view_tile;
+}
 
-	RemoveObjectFromRect(id, object->mTileIndex, object->mTileSpan);
+uint32 WorldGrid::GetNumTiles() const
+{
+	RxGridInfo info;
+	rx_world_grid_info(mpGrid, &info);
+
+	return info.tile_count;
 }
 
 } // namespace fx

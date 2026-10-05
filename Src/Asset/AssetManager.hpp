@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Asset/AxQueue.hpp"
 #include "Asset/AxQueueItem.hpp"
 #include "AssetBase.hpp"
 #include "AssetDef.hpp"
@@ -9,17 +8,15 @@
 #include "Object/ObjectManager.hpp"
 
 #include <Asset/Loader/Object/LoaderGltf.hpp>
-#include <Core/DataNotifier.hpp>
 #include <Core/Ref.hpp>
-#include <Core/TSQueue.hpp>
 #include <Core/TSRef.hpp>
-#include <Core/Thread/ThreadID.hpp>
 #include <Core/Types.hpp>
 #include <Renderer/Constants.hpp>
 #include <Core/HashMap.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <atomic>
+#include <vector>
 #include <chrono>
 #include <thread>
 
@@ -33,94 +30,6 @@ concept C_IsAsset = std::is_base_of_v<AssetBase, T>;
 // has completed before the buffer is destroyed.
 static constexpr uint32 scBufferDeletionFrameSpacing = renderer::FramesInFlight + 1;
 
-
-struct AssetDeletionTicket
-{
-	enum class eType
-	{
-		None,
-		Buffer,
-	};
-
-	struct BufferTicket
-	{
-		RxBuffer* pRecord = nullptr;
-	};
-
-public:
-	AssetDeletionTicket(uint32 current_frame, RxBuffer* buffer_record)
-		: Type(eType::Buffer), Value { .Ticket = { .pRecord = buffer_record } },
-		  MinDeletionFrame(current_frame + scBufferDeletionFrameSpacing)
-	{
-	}
-
-	void DeleteImmediate() const;
-	bool TryDelete(uint32 current_frame) const;
-
-	bool IsNull() const { return (Value.Ticket.pRecord == nullptr); }
-
-public:
-	eType Type = eType::None;
-
-	union
-	{
-		BufferTicket Ticket;
-	} Value;
-
-	uint32 MinDeletionFrame = 0;
-};
-
-/**
- * Worker thread that waits and processes individual asset loading.
- */
-class AssetWorker
-{
-public:
-	AssetWorker() = default;
-
-	void Create(int32 worker_index);
-
-	void SubmitItemToLoad(AssetQueueItem&& item)
-	{
-		Item = std::move(item);
-		ItemReady.Signal();
-	}
-
-	void DebugPrint() const
-	{
-		LogInfo(LC_ASSET, "Worker: Loading {}, {}", Item.Path, AssetTypeToString(Item.Data.LoadType));
-	}
-
-	void Update();
-
-	void Kill()
-	{
-		bRunning.store(false);
-		// The worker waits on the ItemReady notifier, so we kill the notifier
-		ItemReady.Kill();
-	}
-
-private:
-	void DirectUploadData(AssetItemData& item_data);
-
-	void LoadObject(LockContext<AssetItemData>& asset_data);
-	void LoadImage(LockContext<AssetItemData>& asset_data);
-
-
-public:
-	AssetQueueItem Item;
-	loader::eLoaderStatus LoadStatus = loader::eLoaderStatus::None;
-
-	DataNotifier ItemReady;
-
-	std::atomic_bool bRunning = { true };
-
-	std::atomic_flag bIsBusy = ATOMIC_FLAG_INIT;
-	std::atomic_bool bDataPendingUpload = { false };
-
-	ThreadID WorkerTID;
-	// std::thread Thread;
-};
 
 struct LoadObjectOptions
 {
@@ -138,11 +47,7 @@ public:
 	void StopWorkers();
 	void Shutdown();
 
-	void WorkerUpdate();
-
 	static AssetManager* GetInstance();
-
-	void DebugPrintWorkers() const;
 
 	template <typename T>
 		requires C_IsAsset<T>
@@ -232,35 +137,24 @@ public:
 	/////////////////////////////////////
 
 	/// Takes ownership of the buffer, which is destroyed once the GPU is done with it.
-	void DeleteBuffer(RxBuffer* buffer_record)
-	{
-		SpinLockContext<Queue<fx::AssetDeletionTicket>> queue = mDeletionTickets.GetQueue();
-
-		if (!queue->IsInited()) {
-			queue->InitCapacity(256);
-		}
-
-		queue->Emplace(renderer::gGraphics->GetElapsedFrameCount(), buffer_record);
-		ManagerUpdateNotifier.Signal();
-	}
+	void DeleteBuffer(RxBufferResource* buffer_resource);
 
 	void ShutdownDeletionQueue();
 
-	void SignalUpdate() { ManagerUpdateNotifier.Signal(); }
+	void SignalUpdate();
 
-	~AssetManager() { Shutdown(); }
+	~AssetManager()
+	{
+		Shutdown();
+
+		rx_asset_scheduler_free(mpScheduler);
+		mpScheduler = nullptr;
+	}
 
 
 private:
-	AssetWorker* FindWorkerThread();
-
-	int32 CheckForUploadableData();
-	int32 CheckForItemsToLoad();
-	int32 CheckForItemsToDelete();
-
-	bool CheckWorkersBusy();
-
-	void AssetManagerUpdate();
+	/// Queues an item to be loaded by one of the workers
+	void Submit(AssetQueueItem&& item);
 
 	AssetTicket NewTextureTicket();
 
@@ -274,10 +168,7 @@ private:
 	static void SubmitLoadAssetFromPath(AssetTicket& ticket, TSRef<TLoaderType>& loader, eAssetType asset_type,
 										const std::string& path)
 	{
-		AssetManager* mgr = GetInstance();
-
-		mgr->mLoadQueue.Push(AssetQueueItem::UploadFileToProcess(ticket, loader, path, asset_type));
-		mgr->SignalUpdate();
+		GetInstance()->Submit(AssetQueueItem::UploadFileToProcess(ticket, loader, path, asset_type));
 	}
 
 
@@ -295,10 +186,7 @@ private:
 	static void SubmitLoadAssetFromData(AssetTicket& ticket, TSRef<TLoaderType>& loader, eAssetType asset_type,
 										const Slice<const uint8>& asset_data)
 	{
-		AssetManager* mgr = GetInstance();
-
-		mgr->mLoadQueue.Push(AssetQueueItem::UploadAndProcess(ticket, loader, asset_type, asset_data));
-		mgr->SignalUpdate();
+		GetInstance()->Submit(AssetQueueItem::UploadAndProcess(ticket, loader, asset_type, asset_data));
 	}
 
 
@@ -306,34 +194,24 @@ public:
 	String ScenePath = "";
 
 
-	//    DataNotifier DataLoaded;
 private:
-	AxQueue mLoadQueue;
-	TSQueue<AssetDeletionTicket> mDeletionTickets;
+	RxAssetScheduler* mpScheduler = nullptr;
 
-	SizedArray<AssetWorker*> WorkersWaitingToUpload;
+	/// What came in before the scheduler was started, which is handed to it then
+	std::mutex mPendingMutex;
+	std::vector<AssetQueueItem*> mPendingJobs;
+	std::vector<RxBufferResource*> mPendingDeletions;
 
 	std::atomic_flag mbActive;
 	bool mbWorkersStopped = false;
 	bool mbShutdownDone = false;
-	CountedNotifier ManagerUpdateNotifier;
-
-	bool mbShouldSleep = false;
 
 	uint32 mMinThreads = 2;
-	SizedArray<AssetWorker> mWorkerThreads;
-
-	ThreadID mAssetManagerTID;
-
-	std::atomic_uint mTickCounter = 0;
-	uint32 mLastActiveTick = 0;
 
 	HashMap<eImageFormat, fx::Image*> mNullImageList;
 	fx::Image* mpFlatNormalImage = nullptr;
 	std::mutex mNullImageMutex;
 
-	bool mbIsTimeSet = false;
-	std::chrono::system_clock::time_point mLastActiveTime;
 };
 
 } // namespace fx

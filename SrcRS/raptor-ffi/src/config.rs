@@ -79,7 +79,7 @@ const _: () = {
 	assert!(offset_of!(ConfigEntry, is_dot_reference) == 81);
 };
 
-struct CHost<'a>(&'a RxHost);
+pub(crate) struct CHost<'a>(pub(crate) &'a RxHost);
 
 impl Host for CHost<'_>
 {
@@ -393,7 +393,7 @@ unsafe fn entry_from_c(entry: &ConfigEntry) -> Entry
 	}
 }
 
-struct LogOnlyHost<'a>(&'a RxLogSink);
+pub(crate) struct LogOnlyHost<'a>(pub(crate) &'a RxLogSink);
 
 impl Host for LogOnlyHost<'_>
 {

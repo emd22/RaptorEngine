@@ -89,11 +89,11 @@ void GpuBufferPrintUndestroyed();
 class RawGpuBuffer
 {
 public:
-	RawGpuBuffer() = default;
+	RawGpuBuffer() { mpRecord = rx_buffer_new(); }
 
-	RawGpuBuffer(RawGpuBuffer& other) = delete;
+	RawGpuBuffer(const RawGpuBuffer& other) = delete;
 
-	RawGpuBuffer operator=(RawGpuBuffer& other) = delete;
+	RawGpuBuffer& operator=(const RawGpuBuffer& other) = delete;
 
 	void Create(eGpuBufferType buffer_type, uint64 size_in_bytes, RxMemoryUsage memory_usage,
 				eGpuBufferFlags buffer_flags = eGpuBufferFlags::None);
@@ -109,9 +109,7 @@ public:
 	/// This is essentially the CPU equivalent of `FlushToGpu`.
 	void InvalidateFromGpu()
 	{
-		if (mpRecord != nullptr) {
-			rx_buffer_invalidate(mpRecord, Fx_Fwd_GetGpuAllocator());
-		}
+		rx_buffer_invalidate(mpRecord, Fx_Fwd_GetGpuAllocator());
 	}
 
 	void Map();
@@ -119,21 +117,19 @@ public:
 
 	bool IsMapped() const { return GetMapped() != nullptr; }
 
-	FX_FORCE_INLINE VkBuffer Get() const
-	{
-		return (mpRecord != nullptr) ? reinterpret_cast<VkBuffer>(mpRecord->buffer) : nullptr;
-	}
+	FX_FORCE_INLINE VkBuffer Get() const { return reinterpret_cast<VkBuffer>(mpRecord->buffer); }
 
-	FX_FORCE_INLINE uint64 GetRaw() const { return (mpRecord != nullptr) ? mpRecord->buffer : 0; }
-	FX_FORCE_INLINE uint64 GetSize() const { return (mpRecord != nullptr) ? mpRecord->size : 0; }
+	FX_FORCE_INLINE uint64 GetRaw() const { return mpRecord->buffer; }
+	FX_FORCE_INLINE uint64 GetSize() const { return mpRecord->size; }
 
-	FX_FORCE_INLINE eGpuBufferType GetType() const
-	{
-		return (mpRecord != nullptr) ? static_cast<eGpuBufferType>(mpRecord->buffer_type) : eGpuBufferType::Storage;
-	}
+	FX_FORCE_INLINE eGpuBufferType GetType() const { return static_cast<eGpuBufferType>(mpRecord->buffer_type); }
 
 	/// The mapped memory, if the buffer is mapped.
-	FX_FORCE_INLINE void* GetMapped() const { return (mpRecord != nullptr) ? mpRecord->mapped : nullptr; }
+	FX_FORCE_INLINE void* GetMapped() const { return mpRecord->mapped; }
+
+	/// The slot the buffer lives in. It stays the same across `Destroy()` and `Create()`, so things that hold onto it
+	/// follow the buffer.
+	FX_FORCE_INLINE RxBuffer* GetRecord() const { return mpRecord; }
 
 	/**
 	 * @brief Uploads raw data buffer to the GPU buffer.
@@ -150,13 +146,13 @@ public:
 
 	void Destroy();
 
-	~RawGpuBuffer() { Destroy(); }
+	~RawGpuBuffer();
 
 public:
 	std::atomic_bool Initialized = { false };
 
 private:
-	/// The buffer's state and its memory live in a record owned by Rust.
+	/// The buffer's state and its memory live in a slot owned by Rust.
 	RxBuffer* mpRecord = nullptr;
 };
 

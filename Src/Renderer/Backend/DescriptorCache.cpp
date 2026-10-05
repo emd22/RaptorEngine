@@ -101,146 +101,108 @@ void DsLayoutCache::Destroy()
 // Descriptor Cache
 /////////////////////////////////////
 
-DescriptorCache::DescriptorCache() { Pools.Create(2); }
-
-DescriptorPool& DescriptorCache::FindPool()
-{
-	// TODO: This should check to see if there is an open entry in a pool, move to the next if not.
-	if (Pools.Size() < 1) {
-		DescriptorPool* pool = Pools.Insert();
-		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 128);
-		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 64);
-		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 64);
-		pool->Create(GraphicsBackendFwd::GetDevice(), 128, true);
-	}
-
-	return Pools[0];
-}
-
-void DescriptorCache::Free(DescriptorID id)
-{
-	auto it = Cache.find(id.ID);
-
-	// Descriptor set not found, skip
-	if (it == Cache.end()) {
-		return;
-	}
-
-	// Note we aren't going to destroy the attached DsLayout here. This is mainly because its likely that multiple other
-	// descriptor sets are using the same layout, but also the size is pretty small. There also aren't really _that_
-	// many combinations for descriptor set layouts, so destroying it here wouldn't really matter.
-
-	// Free the set from the descriptor pool
-	FindPool().FreeSet(it->second.Get());
-
-	// Remove it from the cache.
-	Cache.erase(it);
-}
-
-DescriptorID DescriptorCache::GetID(const SizedArray<DescriptorEntry>& entries)
-{
-	// The ID's for actual descriptor sets are created based on the values of the image/buffer Vulkan handles. Layouts
-	// are much less granular, so they only require the descriptor entry types.
-
-	std::vector<RxDescriptorIdEntry> id_entries;
-	id_entries.reserve(entries.Size);
-
-	for (const DescriptorEntry& entry : entries) {
-		RxDescriptorIdEntry id_entry = { .binding = entry.Binding, .kind = 0, .handle = 0 };
-
-		if (entry.IsImage()) {
-			Assert(entry.pImage != nullptr);
-			id_entry.kind = RX_DESCRIPTOR_IMAGE;
-			id_entry.handle = entry.pImage->GetRawImage();
-		}
-		else if (entry.IsBuffer()) {
-			Assert(entry.pBuffer != nullptr);
-			id_entry.kind = RX_DESCRIPTOR_BUFFER;
-			id_entry.handle = entry.pBuffer->GetRaw();
-		}
-
-		id_entries.push_back(id_entry);
-	}
-
-	return DescriptorID { rx_descriptor_id(id_entries.data(), id_entries.size()) };
-}
+DescriptorCache::DescriptorCache() { mpCache = rx_descriptor_cache_new(); }
 
 std::pair<DescriptorID, DescriptorSet*> DescriptorCache::Request(const SizedArray<DescriptorEntry>& entries)
 {
-	std::pair<DsLayoutID, VkDescriptorSetLayout> layout_result = gDsLayoutCache->Request(entries);
-
-	const DescriptorID descriptor_id = GetID(entries);
-
-	AssertMsg(layout_result.first.IsValid(), "Could not retrieve descriptor set layout");
-
-	bool has_dynamic_offsets = false;
+	std::vector<RxDescriptorEntry> rust_entries;
+	rust_entries.reserve(entries.Size);
 
 	for (const DescriptorEntry& entry : entries) {
-		if (entry.IsBuffer()) {
-			has_dynamic_offsets = true;
-			break;
+		if (!entry.IsInvalid()) {
+			rust_entries.push_back(ToRustEntry(entry));
 		}
 	}
 
-	auto it = Cache.find(descriptor_id.ID);
+	uint32 id = HashNull32;
+	RxDescriptorSet* record = nullptr;
 
-	// If the descriptor set is already created, return it
-	if (it != Cache.end()) {
-		return std::make_pair(descriptor_id, &it->second);
+	const VkResult status = static_cast<VkResult>(
+		rx_descriptor_cache_request(mpCache, gDsLayoutCache->GetRustCache(), GraphicsBackendFwd::GetDevice()->GetRustDevice(),
+									rust_entries.data(), rust_entries.size(), &id, &record));
+
+	if (status != VK_SUCCESS) {
+		PanicVulkan("DescriptorCache", "Could not build the descriptor set", status);
 	}
 
-	DescriptorSet& descriptor = Cache[descriptor_id.ID];
-	descriptor.Create(FindPool(), descriptor_id, layout_result.first, has_dynamic_offsets);
+	const DescriptorID descriptor_id { id };
 
+	auto it = mSets.find(id);
+
+	if (it == mSets.end()) {
 #ifdef FX_BUILD_DEBUG
-	LogInfo(LC_CORE, "** Creating descriptor set {}", descriptor_id);
+		LogInfo(LC_CORE, "** Creating descriptor set {}", descriptor_id);
 #endif
-	// Build the descriptor set
-	for (const DescriptorEntry& entry : entries) {
-#ifdef FX_BUILD_DEBUG
-		LogInfo(LC_CORE, "\tEntry: {} -> {} || {}", entry.Binding, DescriptorEntryUtil::GetTypeName(entry.GetType()),
-				ShaderUtil::TypeToName(entry.ShaderStages));
-#endif
-
-		if (entry.IsBuffer()) {
-			Assert(entry.pBuffer != nullptr);
-			Assert(entry.pBuffer->Get() != VK_NULL_HANDLE);
-			descriptor.AddBuffer(entry.Binding, entry.pBuffer, entry.BufferOffset, entry.BufferRange);
-		}
-		else if (entry.IsImage()) {
-			descriptor.AddImage(entry.Binding, entry.pImage, entry.pSampler);
-		}
+		it = mSets.emplace(id, DescriptorSet(record, descriptor_id, DsLayoutID { record->layout_id })).first;
 	}
 
-	descriptor.Build();
+	return std::make_pair(descriptor_id, &it->second);
+}
 
-	return std::make_pair(descriptor_id, &descriptor);
+DescriptorSet* DescriptorCache::Wrap(RxDescriptorSet* record)
+{
+	auto it = mSets.find(record->id);
+
+	if (it == mSets.end()) {
+		it = mSets
+				 .emplace(record->id, DescriptorSet(record, DescriptorID { record->id }, DsLayoutID { record->layout_id }))
+				 .first;
+	}
+
+	return &it->second;
 }
 
 DescriptorSet* DescriptorCache::RequestExisting(DescriptorID descriptor_id)
 {
-	auto it = Cache.find(descriptor_id.ID);
-	if (it == Cache.end()) {
+	auto it = mSets.find(descriptor_id.ID);
+	if (it == mSets.end()) {
 		return nullptr;
 	}
 
 	return &it->second;
 }
 
-void DescriptorCache::Destroy()
+void DescriptorCache::Free(DescriptorID id)
 {
-	Pools.Destroy();
-	Cache.clear();
+	auto it = mSets.find(id.ID);
+
+	// Descriptor set not found, skip
+	if (it == mSets.end()) {
+		return;
+	}
+
+	// Note we aren't going to destroy the attached DsLayout here. This is mainly because its likely that multiple other
+	// descriptor sets are using the same layout, but also the size is pretty small. There also aren't really _that_
+	// many combinations for descriptor set layouts, so destroying it here wouldn't really matter.
+	rx_descriptor_cache_free(mpCache, GraphicsBackendFwd::GetDevice()->GetRustDevice(), gGraphics->GpuAllocator,
+							 id.ID);
+
+	mSets.erase(it);
 }
 
 void DescriptorCache::RebuildAll()
 {
-	DescriptorPool& pool = FindPool();
+	const VkResult status = static_cast<VkResult>(rx_descriptor_cache_rebuild_all(
+		mpCache, gDsLayoutCache->GetRustCache(), GraphicsBackendFwd::GetDevice()->GetRustDevice()));
 
-	for (auto& [hash, descriptor_set] : Cache) {
-		descriptor_set.Rebuild(pool);
+	if (status != VK_SUCCESS) {
+		PanicVulkan("DescriptorCache", "Failed to allocate descriptor set!", status);
 	}
 }
 
+void DescriptorCache::Destroy()
+{
+	mSets.clear();
+
+	GraphicsBackend* graphics = gGraphics;
+
+	const bool can_free = (graphics != nullptr) && (graphics->GetDevice()->GetRustDevice() != nullptr) &&
+						  (graphics->GpuAllocator != nullptr);
+
+	rx_descriptor_cache_destroy(mpCache, can_free ? graphics->GetDevice()->GetRustDevice() : nullptr,
+								can_free ? graphics->GpuAllocator : nullptr);
+
+	mpCache = nullptr;
+}
 
 } // namespace fx::renderer

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <raptor_ffi.h>
+
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
@@ -128,6 +130,8 @@ struct ScriptInput
 };
 
 static_assert(sizeof(ScriptDef) == 35 * 4);
+static_assert(static_cast<int32>(eWeaponFireMode::Semi) == 1 && static_cast<int32>(eWeaponFireMode::Auto) == 2 &&
+			  static_cast<int32>(eWeaponFireMode::Burst) == 4);
 static_assert(sizeof(ScriptState) == 12 * 4);
 
 using FnInit = script::ScriptFunctionType<void(const ScriptDef*, ScriptState*)>;
@@ -144,7 +148,6 @@ struct Weapon
 	String ReloadAnim;
 
 	float32 ViewKickDegrees = 2.5f;
-	float32 ViewKickback = 0.025f;
 
 	ScriptDef Def;
 	ScriptState State;

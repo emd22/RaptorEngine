@@ -6,7 +6,9 @@
 #include "GraphicsBackend.hpp"
 #include "PSOBuild.hpp"
 #include "PipelineCache.hpp"
-#include "ShaderCache.hpp"
+#include "ShaderLibrary.hpp"
+
+#include <Asset/AxPaths.hpp>
 #include "ShadowAtlas.hpp"
 #include "ShadowDirectional.hpp"
 #include "TextRenderer.hpp"
@@ -16,7 +18,7 @@ namespace fx::renderer {
 GraphicsBackend* gGraphics = nullptr;
 ShadowDirectional* gShadowRenderer = nullptr;
 ShadowAtlas* gShadowAtlas = nullptr;
-ShaderCache* gShaderCache = nullptr;
+ShaderLibrary* gShaderLibrary = nullptr;
 DsLayoutCache* gDsLayoutCache = nullptr;
 PipelineCache* gPipelineCache = nullptr;
 SamplerCache* gSamplerCache = nullptr;
@@ -39,7 +41,7 @@ void Init()
 	gPSOBuild = new PSOBuild;
 
 	gGraphics = new GraphicsBackend;
-	gShaderCache = new ShaderCache;
+	gShaderLibrary = new ShaderLibrary(AssetPath(eAxPathQuery::Shaders));
 	gDsLayoutCache = new DsLayoutCache;
 	gDescriptorCache = new DescriptorCache;
 	gTextRenderer = new TextRenderer;
@@ -61,7 +63,7 @@ void Destroy()
 	DESTROY_GLOBAL(gDescriptorCache);
 	DESTROY_GLOBAL(gDsLayoutCache);
 	DESTROY_GLOBAL(gPipelineCache);
-	DESTROY_GLOBAL(gShaderCache);
+	DESTROY_GLOBAL(gShaderLibrary);
 	DESTROY_GLOBAL(gTextRenderer);
 	DESTROY_GLOBAL(gDebugDraw);
 

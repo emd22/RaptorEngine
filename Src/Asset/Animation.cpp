@@ -1,292 +1,122 @@
 #include "Animation.hpp"
 
 #include <Core/String.hpp>
-#include <Math/Quat.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <World.hpp>
 
-#include <algorithm>
-#include <cmath>
-
-
 namespace fx {
 
-template <typename T>
-static T Interpolate(const T& a, const T& b, float32 t);
+static_assert(Skeleton::scNoBones == RX_NO_BONE);
+static_assert(NoAnimation == RX_NO_ANIMATION);
+static_assert(sizeof(RxSkeleton) == 64);
+static_assert(sizeof(RxPlayback) == 16);
+static_assert(alignof(Mat4f) == 16);
 
-template <>
-Vec3f Interpolate(const Vec3f& a, const Vec3f& b, float32 t)
+Skeleton::Skeleton()
 {
-	// return b;
-	return Vec3f::Lerp(a, b, t);
+	AssertEqual(rx_skeleton_max_animation_stack(), scMaxAnimationStack);
+
+	mpSkeleton = rx_skeleton_new(0, nullptr, nullptr, nullptr, nullptr, nullptr);
 }
 
-template <>
-Quat Interpolate(const Quat& a, const Quat& b, float32 t)
+Skeleton::~Skeleton()
 {
-	// return b;
-	return a.SLerp(b, t);
-}
-
-template <typename T>
-static T GetComponentAtTime(float32 time, const BoneTransformTrack<T>& track, const T& empty_default)
-{
-	const uint32 count = static_cast<uint32>(track.Times.Size);
-
-	if (count == 0) {
-		return empty_default;
-	}
-
-	// Clamp to ends
-	if (time <= track.Times.pData[0]) {
-		return track.Values.pData[0];
-	}
-
-	if (time >= track.Times.pData[count - 1]) {
-		return track.Values.pData[count - 1];
-	}
-
-	// Find bracketing keyframes
-	for (uint32 i = 0; i < count - 1; i++) {
-		const float32 t0 = track.Times[i];
-		const float32 t1 = track.Times[i + 1];
-
-		if (time >= t0 && time < t1) {
-			const float32 duration = t1 - t0;
-			const float32 alpha = (duration > 1e-6f) ? (time - t0) / duration : 0.0f;
-
-			return Interpolate(track.Values[i], track.Values[i + 1], alpha);
-		}
-	}
-
-	return track.Values.pData[count - 1];
-}
-
-void Skeleton::EvaluatePose(const Animation* anim, float32 time)
-{
-	const uint32 joint_count = JointCount;
-
-	const bool has_rest_pose = (RestPose.Size == joint_count);
-
-	for (uint32 i = 0; i < joint_count; i++) {
-		// An animation only carries channels for what it actually animates. Every component it leaves
-		// out has to keep the joint's rest transform, otherwise the bone snaps to its parent's origin
-		// and the mesh tears itself apart.
-		const BoneRestPose rest = has_rest_pose ? RestPose.pData[i] : BoneRestPose {};
-
-		Vec3f translation = rest.Translation;
-		Quat rotation = rest.Rotation;
-		Vec3f scale = rest.Scale;
-
-		if (anim != nullptr) {
-			const BoneTrack& track = anim->BoneTracks[i];
-
-			translation = GetComponentAtTime(time, track.Translation, rest.Translation);
-			rotation = GetComponentAtTime(time, track.Rotation, rest.Rotation);
-			scale = GetComponentAtTime(time, track.Scale, rest.Scale);
-		}
-
-		LocalTransforms.pData[i] = Mat4f::AsScale(scale) * Mat4f::AsRotation(rotation) *
-								   Mat4f::AsTranslation(translation);
-	}
-
-	const bool has_root_transforms = (RootTransforms.Size == joint_count);
-
-	for (uint32 i = 0; i < joint_count; i++) {
-		const int32 parent = ParentIndices.pData[i];
-
-		if (parent < 0) {
-			// A root joint's parent chain lives outside the skin, so its transform has to come from the
-			// node hierarchy instead of from another joint.
-			WorldTransforms[i] = has_root_transforms ? (LocalTransforms[i] * RootTransforms[i]) : LocalTransforms[i];
-		}
-		else {
-			WorldTransforms[i] = LocalTransforms[i] * WorldTransforms[parent];
-		}
-	}
-
-	for (uint32 i = 0; i < joint_count; i++) {
-		SkinningMatrices[i] = InvBindTransforms[i] * WorldTransforms[i];
-	}
-
-	UpdatePoseSummary();
-}
-
-void Skeleton::UpdatePoseSummary()
-{
-	if (JointCount == 0 || SkinningMatrices.pData == nullptr) {
-		return;
-	}
-
-	uint32 hash = 2166136261u;
-
-	const uint32* words = reinterpret_cast<const uint32*>(SkinningMatrices.pData);
-	const size_t word_count = static_cast<size_t>(JointCount) * 16;
-
-	for (size_t i = 0; i < word_count; i++) {
-		hash = (hash ^ words[i]) * 16777619u;
-	}
-
-	PoseHash = hash;
-
-	Vec3f min = Vec3f(1.0e30f, 1.0e30f, 1.0e30f);
-	Vec3f max = Vec3f(-1.0e30f, -1.0e30f, -1.0e30f);
-
-	for (uint32 i = 0; i < JointCount; i++) {
-		const float32* row = &WorldTransforms[i].RawData[12];
-
-		min = Vec3f(std::min(min.X, row[0]), std::min(min.Y, row[1]), std::min(min.Z, row[2]));
-		max = Vec3f(std::max(max.X, row[0]), std::max(max.Y, row[1]), std::max(max.Z, row[2]));
-	}
-
-	PoseCenter = (min + max) * 0.5f;
-	PoseRadius = (max - min).Length() * 0.5f;
-}
-
-void Skeleton::SetExternalPose(bool enabled)
-{
-	mbExternalPose = enabled;
-	mbHoldingRestPose = false;
-}
-
-void Skeleton::PoseFromDrivenBones(const Mat4f* driven_world, const uint8* is_driven)
-{
-	const bool has_root_transforms = (RootTransforms.Size == JointCount);
-
-	for (uint32 i = 0; i < JointCount; i++) {
-		const uint32 parent = ParentIndices.pData[i];
-
-		if (is_driven[i]) {
-			WorldTransforms[i] = driven_world[i];
-		}
-		else if (parent == BoneNull) {
-			WorldTransforms[i] = has_root_transforms ? (LocalTransforms[i] * RootTransforms[i]) : LocalTransforms[i];
-		}
-		else {
-			WorldTransforms[i] = LocalTransforms[i] * WorldTransforms[parent];
-		}
-
-		SkinningMatrices[i] = InvBindTransforms[i] * WorldTransforms[i];
-	}
-
-	UpdatePoseSummary();
-}
-
-template <typename T>
-static SizedArray<T> MakeView(SizedArray<T>& source)
-{
-	return SizedArray<T>(source.pData, source.Size);
+	rx_skeleton_free(mpSkeleton);
+	mpSkeleton = nullptr;
 }
 
 Ref<Skeleton> Skeleton::CreateInstance(const Ref<Skeleton>& source)
 {
-	if (!source.IsValid()) {
+	if (!source.IsValid() || source->mpSkeleton == nullptr) {
 		return Ref<Skeleton>(nullptr);
 	}
 
-	Ref<Skeleton> base = source->pSource.IsValid() ? source->pSource : source;
 	Ref<Skeleton> instance = Ref<Skeleton>::New();
-
-	Skeleton& inst = *instance;
-	Skeleton& src = *base;
-
-	inst.pSource = base;
-	inst.JointCount = src.JointCount;
-
-	inst.InvBindTransforms = MakeView(src.InvBindTransforms);
-	inst.RestPose = MakeView(src.RestPose);
-	inst.RootTransforms = MakeView(src.RootTransforms);
-	inst.ParentIndices = MakeView(src.ParentIndices);
-	inst.BoneNames = MakeView(src.BoneNames);
-	inst.Animations = MakeView(src.Animations);
-
-	inst.LocalTransforms.InitSize(src.JointCount);
-	inst.WorldTransforms.InitSize(src.JointCount);
-	inst.SkinningMatrices.InitSize(src.JointCount);
-
-	inst.RestPlayback = src.RestPlayback;
-	inst.RestPlayback.Time = 0.0f;
-
-	if (inst.JointCount > 0) {
-		inst.EvaluatePose(inst.RestPlayback.pAnimation, 0.0f);
-	}
+	instance->mpSkeleton = rx_skeleton_create_instance(source->mpSkeleton);
 
 	return instance;
 }
 
-const Animation* Skeleton::FindAnimation(const String& name) const
+void Skeleton::Adopt(RxSkeleton* skeleton)
 {
-	for (const Animation& anim : Animations) {
-		if (anim.Name == name) {
-			return &anim;
-		}
-	}
-
-	return nullptr;
+	rx_skeleton_free(mpSkeleton);
+	mpSkeleton = skeleton;
 }
 
-void Skeleton::SetRestAnimation(const Animation* anim, float32 speed)
+AnimationId Skeleton::FindAnimation(const String& name) const
 {
-	RestPlayback = AnimationPlayback { .pAnimation = anim, .Time = 0.0f, .Speed = speed, .OnEnd = eAnimationEnd::Loop };
-	mbHoldingRestPose = false;
+	return rx_skeleton_find_animation(mpSkeleton, name.CStr());
 }
 
-bool Skeleton::PushAnimation(const Animation* anim, eAnimationEnd on_end, float32 speed)
+void Skeleton::SetRestAnimation(AnimationId animation, float32 speed)
 {
-	if (anim == nullptr) {
+	rx_skeleton_set_rest_animation(mpSkeleton, animation, speed);
+}
+
+bool Skeleton::PushAnimation(AnimationId animation, eAnimationEnd on_end, float32 speed)
+{
+	if (animation == NoAnimation) {
 		return false;
 	}
 
-	if (AnimationStack.Size >= AnimationStack.Capacity) {
-		LogWarning(LC_ASSET, "Animation stack is full ({}), not playing '{}'", AnimationStack.Capacity, anim->Name);
+	if (rx_skeleton_stack_is_full(mpSkeleton)) {
+		LogWarning(LC_ASSET, "Animation stack is full ({}), not playing animation {}", scMaxAnimationStack, animation);
 		return false;
 	}
 
-	AnimationStack.Insert(AnimationPlayback { .pAnimation = anim, .Time = 0.0f, .Speed = speed, .OnEnd = on_end });
-	mbHoldingRestPose = false;
-
-	return true;
+	return rx_skeleton_push_animation(mpSkeleton, animation, static_cast<uint8>(on_end), speed) != 0;
 }
 
 bool Skeleton::PushAnimation(const String& name, eAnimationEnd on_end, float32 speed)
 {
-	const Animation* anim = FindAnimation(name);
+	const AnimationId animation = FindAnimation(name);
 
-	if (anim == nullptr) {
+	if (animation == NoAnimation) {
 		LogWarning(LC_ASSET, "Could not find animation '{}'", name);
 		return false;
 	}
 
-	return PushAnimation(anim, on_end, speed);
+	return PushAnimation(animation, on_end, speed);
 }
 
-void Skeleton::PopAnimation()
+void Skeleton::PopAnimation() { rx_skeleton_pop_animation(mpSkeleton); }
+
+void Skeleton::ClearAnimationStack() { rx_skeleton_clear_animation_stack(mpSkeleton); }
+
+bool Skeleton::GetActivePlayback(AnimationPlayback& out_playback) const
 {
-	if (AnimationStack.Size > 0) {
-		--AnimationStack.Size;
+	RxPlayback playback {};
+
+	if (!rx_skeleton_active_playback(mpSkeleton, &playback)) {
+		return false;
 	}
+
+	out_playback = AnimationPlayback { .Animation = playback.animation,
+									   .Time = playback.time,
+									   .Speed = playback.speed,
+									   .OnEnd = static_cast<eAnimationEnd>(playback.on_end) };
+
+	return true;
 }
 
-void Skeleton::ClearAnimationStack() { AnimationStack.Clear(); }
-
-AnimationPlayback* Skeleton::GetActivePlayback()
+AnimationId Skeleton::GetActiveAnimation() const
 {
-	if (AnimationStack.Size > 0) {
-		return &AnimationStack[AnimationStack.Size - 1];
-	}
+	AnimationPlayback playback;
 
-	if (RestPlayback.pAnimation != nullptr) {
-		return &RestPlayback;
-	}
-
-	return nullptr;
+	return GetActivePlayback(playback) ? playback.Animation : NoAnimation;
 }
 
-const Animation* Skeleton::GetActiveAnimation()
+void Skeleton::EvaluatePose(AnimationId animation, float32 time)
 {
-	const AnimationPlayback* playback = GetActivePlayback();
-	return (playback != nullptr) ? playback->pAnimation : nullptr;
+	rx_skeleton_evaluate_pose(mpSkeleton, animation, time);
+}
+
+void Skeleton::SetExternalPose(bool enabled) { rx_skeleton_set_external_pose(mpSkeleton, enabled ? 1 : 0); }
+
+void Skeleton::PoseFromDrivenBones(const Mat4f* driven_world, const uint8* is_driven)
+{
+	rx_skeleton_pose_from_driven_bones(mpSkeleton, reinterpret_cast<const float32*>(driven_world), is_driven);
 }
 
 void Skeleton::Update(float32 delta_time)
@@ -299,106 +129,21 @@ void Skeleton::Update(float32 delta_time)
 
 	LastUpdateFrame = current_frame;
 
-	AnimationPlayback* playback = mbExternalPose ? nullptr : GetActivePlayback();
+	rx_skeleton_advance(mpSkeleton, delta_time);
 
-	if (playback != nullptr) {
-		EvaluatePose(playback->pAnimation, playback->Time);
+	const uint32 joint_count = GetJointCount();
 
-		// Advanced after posing so a freshly pushed animation shows its first frame
-		const float32 duration = playback->pAnimation->Duration;
-		playback->Time += delta_time * playback->Speed;
-
-		if (playback->Time >= duration) {
-			// The rest animation is not on the stack, so it can only ever loop
-			const eAnimationEnd on_end = (playback == &RestPlayback) ? eAnimationEnd::Loop : playback->OnEnd;
-
-			switch (on_end) {
-			case eAnimationEnd::Pop:
-				PopAnimation();
-				break;
-			case eAnimationEnd::Hold:
-				playback->Time = duration;
-				break;
-			case eAnimationEnd::Loop:
-				playback->Time = (duration > 0.0f) ? std::fmod(playback->Time, duration) : 0.0f;
-				break;
-			}
-		}
-	}
-	else if (!mbExternalPose && !mbHoldingRestPose) {
-		EvaluatePose(nullptr, 0.0f);
-		mbHoldingRestPose = true;
-	}
-
-	// The bone buffer is rewritten every frame, so the pose is uploaded every frame even when it did not change
-	BoneBufferBase = renderer::gGraphics->BoneBuffer.CopySlots(SkinningMatrices.pData, SkinningMatrices.Size);
+	BoneBufferBase = renderer::gGraphics->BoneBuffer.CopySlots(GetSkinningMatrices(), joint_count);
 
 	if (BoneBufferBase == Skeleton::scNoBones) {
 		static bool sbWarned = false;
 
 		if (!sbWarned) {
 			LogWarning(LC_RENDER, "Bone buffer is full ({} matrices), ({} bones) will not be drawn",
-					   Limits::MaxBoneMatrices, SkinningMatrices.Size);
+					   Limits::MaxBoneMatrices, joint_count);
 			sbWarned = true;
 		}
 	}
-}
-
-BoneTransform Skeleton::GetBoneTransform(const Ref<Animation>& anim, float32 time, BoneId bone_id) const
-{
-	BoneTransform xform {};
-	if (!anim.IsValid() || bone_id == BoneNull) {
-		return xform;
-	}
-
-	if (bone_id >= anim->BoneTracks.Size) {
-		LogError(LC_ASSET, "Bone ID({}) out of range", bone_id);
-		return xform;
-	}
-
-	const BoneTrack& track = anim->BoneTracks[bone_id];
-
-	// The rotation should be taken from the matrix to have all of the parents propagated into the rotation. Currently
-	// thats a pretty gnarly function to have to write, so im just going with this mess for now.
-	//
-	// Another strange oddity (likely due to converting from GLTF's horrid coordinates) is that Z is
-	// negated. But also negating that component in the matrix causes spaghetti limbs.
-
-	return BoneTransform(Vec3f::FlipSigns<1, 1, -1, 1>(SkinningMatrices[bone_id].GetTranslation()),
-						 GetComponentAtTime(time, track.Rotation, Quat::scIdentity));
-}
-
-Mat4f Skeleton::GetBoneTransformMatrix(const Ref<Animation>& anim, float32 time, BoneId bone_id) const
-{
-	Mat4f xform {};
-	if (!anim.IsValid() || bone_id == BoneNull) {
-		return xform;
-	}
-
-	if (bone_id >= anim->BoneTracks.Size) {
-		LogError(LC_ASSET, "Bone ID({}) out of range", bone_id);
-		return xform;
-	}
-
-	const BoneTrack& track = anim->BoneTracks[bone_id];
-	return SkinningMatrices[bone_id];
-}
-
-
-BoneId Skeleton::FindBone(const Ref<Animation>& anim, const String& name) const
-{
-	if (!anim.IsValid()) {
-		return BoneNull;
-	}
-
-	for (int32 index = 0; index < BoneNames.Size; index++) {
-		if (BoneNames[index] == name) {
-			return index;
-			break;
-		}
-	}
-
-	return BoneNull;
 }
 
 } // namespace fx

@@ -13,11 +13,22 @@ static Vec2u GetRealTargetSize(const Vec2u& size)
 	return size;
 }
 
+RenderStage::RenderStage() { mpStage = rx_render_stage_new(); }
+
+RenderStage::~RenderStage()
+{
+	GraphicsBackend* graphics = gGraphics;
+
+	const bool can_free = (graphics != nullptr) && (graphics->GetDevice()->GetRustDevice() != nullptr) &&
+						  (graphics->GpuAllocator != nullptr);
+
+	rx_render_stage_destroy(mpStage, can_free ? graphics->GetDevice()->GetRustDevice() : nullptr,
+							can_free ? graphics->GpuAllocator : nullptr);
+}
+
 void RenderStage::Create(const char* name, const Vec2u& size, eSizeDivisor size_divisor)
 {
 	pcName = name;
-
-	ClearValues.InitCapacity(scMaxOutputTargets);
 
 	if (size == Target::scFullScreen) {
 		mbIsFullscreen = true;
@@ -27,24 +38,31 @@ void RenderStage::Create(const char* name, const Vec2u& size, eSizeDivisor size_
 	mSizeDivisor = static_cast<uint32>(size_divisor);
 }
 
-Target* RenderStage::GetTarget(eImageFormat format, int32 sub_index)
+TargetRef RenderStage::GetTarget(eImageFormat format, int32 sub_index) const
 {
-	const int32 index = GetTargetIndex(format, sub_index);
-
-	return (index >= 0) ? &mOutputTargets.Targets[index] : nullptr;
+	return TargetRef(mpStage, rx_render_stage_find_target(mpStage, static_cast<uint16>(format), sub_index));
 }
 
-int32 RenderStage::GetTargetIndex(eImageFormat format, int32 sub_index)
+std::vector<uint16> RenderStage::GetColorTargetFormats() const
 {
-	std::vector<uint16> formats;
+	std::vector<uint16> formats(rx_render_stage_color_target_formats(mpStage, nullptr, 0));
 
-	for (const Target& target : mOutputTargets.Targets) {
-		formats.push_back(static_cast<uint16>(target.Image.GetFormat()));
-	}
+	rx_render_stage_color_target_formats(mpStage, formats.data(), formats.size());
 
-	return rx_find_format_index(formats.data(), formats.size(), static_cast<uint16>(format), sub_index);
+	return formats;
 }
 
+Slice<VkAttachmentDescription> RenderStage::GetDescriptions()
+{
+	const void* descriptions = nullptr;
+	size_t count = 0;
+
+	rx_render_stage_descriptions(mpStage, &descriptions, &count);
+
+	return Slice<VkAttachmentDescription>(const_cast<VkAttachmentDescription*>(
+											  static_cast<const VkAttachmentDescription*>(descriptions)),
+										  count);
+}
 
 void RenderStage::BuildRenderStage()
 {
@@ -56,24 +74,7 @@ void RenderStage::BuildRenderStage()
 		AddPresentTarget();
 	}
 
-	// If there are no clear values already defined, generate them
-	if (ClearValues.Size == 0) {
-		MakeClearValues();
-	}
-
-	const Vec2u final_size = mSize / Vec2u(mSizeDivisor);
-
-	mOutputTargets.CreateImages(final_size);
-
-	mRenderPass.Create(mOutputTargets, final_size);
-	renderer::Util::SetDebugLabel(pcName, VK_OBJECT_TYPE_RENDER_PASS, mRenderPass.Get());
-
-	if (mbIsFinalStage) {
-		CreateFinalStageFramebuffers();
-	}
-	else {
-		mFramebuffer.Create(mOutputTargets.GetImageViews(), mRenderPass, final_size);
-	}
+	Build(mSize / Vec2u(mSizeDivisor), false);
 
 	mbIsBuilt = true;
 }
@@ -84,35 +85,46 @@ void RenderStage::Rebuild(const Vec2u& size)
 
 	mbIsBuilt = false;
 
-	const Vec2u final_size = mSize / Vec2u(mSizeDivisor);
-
-	mOutputTargets.RecreateImages(final_size);
-
-	mFramebuffer.Destroy();
-	mFinalStageFramebuffers.Free();
-	mRenderPass.Destroy();
-
-	mRenderPass.Create(mOutputTargets, final_size);
-	renderer::Util::SetDebugLabel(pcName, VK_OBJECT_TYPE_RENDER_PASS, mRenderPass.Get());
-
-	if (mbIsFinalStage) {
-		CreateFinalStageFramebuffers();
-	}
-	else {
-		mFramebuffer.Create(mOutputTargets.GetImageViews(), mRenderPass, final_size);
-	}
+	Build(mSize / Vec2u(mSizeDivisor), true);
 
 	mbIsBuilt = true;
 }
 
+void RenderStage::Build(const Vec2u& final_size, bool recreate)
+{
+	const Vec2u size = (final_size == Target::scFullScreen) ? gGraphics->Swapchain.Extent : final_size;
+
+	Assert(size.X > 0 && size.Y > 0);
+
+	// The final stage draws to the swapchain images, with a framebuffer for each
+	SizedArray<uint64> final_views;
+
+	if (mbIsFinalStage) {
+		SizedArray<Image>& final_images = gGraphics->Swapchain.OutputImages;
+
+		final_views.InitCapacity(final_images.Size);
+
+		for (const Image& image : final_images) {
+			final_views.Insert(image.GetRawView());
+		}
+	}
+
+	const VkResult status = static_cast<VkResult>(rx_render_stage_build(
+		mpStage, gGraphics->GetDevice()->GetRustDevice(), gGraphics->GpuAllocator, size.X, size.Y, final_views.pData,
+		final_views.Size, gGraphics->Swapchain.Extent.X, gGraphics->Swapchain.Extent.Y, recreate));
+
+	if (status != VK_SUCCESS) {
+		PanicVulkan("RenderStage", "Failed to build the render stage", status);
+	}
+
+	renderer::Util::SetDebugLabel(pcName, VK_OBJECT_TYPE_RENDER_PASS, GetRenderPass());
+}
+
 void RenderStage::Begin(CommandBuffer& cmd)
 {
-	const Vec2u size = mRenderPass.Size;
-	const Vec2u offset = mRenderPass.Offset;
-
 	Begin(cmd, VkRect2D {
-				   .offset = { .x = static_cast<int32>(offset.X), .y = static_cast<int32>(offset.Y) },
-				   .extent = { .width = size.X, .height = size.Y },
+				   .offset = { .x = static_cast<int32>(mpStage->offset_x), .y = static_cast<int32>(mpStage->offset_y) },
+				   .extent = { .width = mpStage->width, .height = mpStage->height },
 			   });
 }
 
@@ -122,64 +134,33 @@ void RenderStage::Begin(CommandBuffer& cmd, const VkRect2D& render_area, const V
 {
 	Assert(mbIsBuilt);
 
-	VkFramebuffer framebuffer;
-
-	if (mbIsFinalStage) {
-		framebuffer = mFinalStageFramebuffers[gGraphics->GetImageIndex()].Get();
-	}
-	else {
-		framebuffer = mFramebuffer.Get();
-	}
-
-	mRenderPass.Begin(&cmd, framebuffer, ClearValues, render_area);
-
 	// Pipelines leave the viewport and scissor to whoever is drawing, and the target is what decides them. They stay set
 	// across pipeline binds, so this is the only place that sets them.
-	rx_gpu_cmd_set_viewport_scissor(gGraphics->GetDevice()->GetRustDevice(), cmd.Get(), draw_area.offset.x,
-									draw_area.offset.y, draw_area.extent.width, draw_area.extent.height);
+	rx_render_stage_begin(mpStage, gGraphics->GetDevice()->GetRustDevice(), cmd.Get(),
+						  mbIsFinalStage ? gGraphics->GetImageIndex() : 0, render_area.offset.x, render_area.offset.y,
+						  render_area.extent.width, render_area.extent.height, draw_area.offset.x, draw_area.offset.y,
+						  draw_area.extent.width, draw_area.extent.height);
+
+	mpEndCommandBuffer = &cmd;
+}
+
+void RenderStage::End()
+{
+	Assert(mpEndCommandBuffer != nullptr);
+
+	rx_render_stage_end(mpStage, gGraphics->GetDevice()->GetRustDevice(), mpEndCommandBuffer->Cmd);
 }
 
 void RenderStage::AddTarget(eImageFormat format, VkImageUsageFlags usage, eImageAspectFlag aspect)
 {
-	mOutputTargets.Add(Target(format, mSize / mSizeDivisor, mbIsFullscreen, usage, aspect));
+	AddTarget(Target(format, mSize / mSizeDivisor, mbIsFullscreen, usage, aspect));
 }
 
-void RenderStage::AddTarget(const Target& attachment) { mOutputTargets.Add(attachment); }
-
-
-void RenderStage::MakeClearValues()
+void RenderStage::AddTarget(const Target& attachment)
 {
-	std::vector<RxClearTarget> targets;
+	const RxTargetConfig config = attachment.ToRust();
 
-	for (const Target& attachment : mOutputTargets.Targets) {
-		targets.push_back(RxClearTarget { .aspect = static_cast<uint32>(attachment.Aspect),
-										  .load_op = static_cast<int32>(attachment.LoadOp),
-										  .render_pass_only = attachment.bRenderPassOnly });
-	}
-
-	std::vector<VkClearValue> values(targets.size());
-
-	const size_t count = rx_clear_values(targets.data(), targets.size(), values.data(), values.size());
-
-	for (size_t i = 0; i < count; i++) {
-		ClearValues.Insert(values[i]);
-	}
-}
-
-
-void RenderStage::CreateFinalStageFramebuffers()
-{
-	SizedArray<Image>& final_images = gGraphics->Swapchain.OutputImages;
-
-	mFinalStageFramebuffers.InitSize(final_images.Size);
-
-	SizedArray<VkImageView> image_views;
-	image_views.InitSize(1);
-
-	for (uint32 i = 0; i < final_images.Size; i++) {
-		image_views[0] = final_images[i].GetView();
-		mFinalStageFramebuffers[i].Create(image_views, mRenderPass, gGraphics->Swapchain.Extent);
-	}
+	rx_render_stage_add_target(mpStage, &config, attachment.pReferenceImage);
 }
 
 
@@ -193,8 +174,8 @@ void RenderStage::MarkFinalStage()
 
 void RenderStage::AddPresentTarget()
 {
-	mOutputTargets.Add(Target(gGraphics->Swapchain.Surface.Format, Target::scFullScreen, true, eLoadOp::DontCare,
-							  eStoreOp::Store, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR));
+	AddTarget(Target(gGraphics->Swapchain.Surface.Format, Target::scFullScreen, true, eLoadOp::DontCare,
+					 eStoreOp::Store, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR));
 }
 
 } // namespace fx::renderer

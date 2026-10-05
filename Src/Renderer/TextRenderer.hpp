@@ -26,25 +26,19 @@ class TextRenderer
 public:
 	/// Max glyphs on screen at once
 	static constexpr uint32 scMaxGlyphs = 256;
+
+	/// The size of a glyph in the font atlas, which the layout in Rust uses too, see the check in the constructor
 	static constexpr uint32 scGlyphWidth = 6;
 	static constexpr uint32 scGlyphHeight = 12;
-	static constexpr uint32 scAtlasColumns = 16;
-	static constexpr uint32 scAtlasRows = 6;
 
 	static constexpr Vec2f scMargin = Vec2f(20.0f);
 
-	struct InstanceData
-	{
-		float vPosition[2];
-		float Size[2];
-		float UVMin[2];
-		float UVMax[2];
-	};
+	using InstanceData = RxTextInstance;
 
 public:
-	TextRenderer() = default;
-	TextRenderer(TextRenderer& other) = delete;
-	TextRenderer operator=(TextRenderer& other) = delete;
+	TextRenderer();
+	TextRenderer(const TextRenderer& other) = delete;
+	TextRenderer& operator=(const TextRenderer& other) = delete;
 
 	void Create();
 	void Resize();
@@ -70,8 +64,8 @@ public:
 	~TextRenderer();
 
 private:
-	/// Rewinds the instance tape and text cursor on the first draw of each frame.
-	void BeginFrameIfNeeded();
+	/// Lays `text` out from `origin` and draws it, moving the frame's text cursor down a line if `advance_cursor`.
+	void DrawTextFrom(const char* text, Vec2f origin, float32 scale, uint32 color, bool advance_cursor);
 
 	/// Copies `instances` onto the tape and draws them, returns false if the frame's tape is full.
 	bool SubmitQuads(DescriptorSet* ds, const InstanceData* instances, uint32 count, uint32 color, bool is_image);
@@ -84,13 +78,10 @@ private:
 
 	AssetTicket mAtlasTicket { nullptr };
 
-	uint32 mLastFrameNumber = 0;
-
-	/// The offset from the start of the current buffer. This increases for each call to `Render` in a single frame.
-	/// Think of it as an ink ribbon, where the characters are used and the cursor moves forward.
-	uint32 mTapeOffset = 0;
-
-	Vec2f mCursorPosition = Vec2f::sZero;
+	/// How much of the frame's instance buffer is used, and where the next line of text goes. Think of the buffer as an
+	/// ink ribbon, where the characters are used and the cursor moves forward. This is in Rust, along with the layout
+	/// of the text into quads.
+	RxTextState* mpState = nullptr;
 
 	Mat4f mOrthoProjection = Mat4f::scIdentity;
 };

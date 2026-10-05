@@ -505,7 +505,7 @@ void RaptorGame::ProcessControls()
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_H)) {
-		const SizedArray<ObjectID>& nearby_objects = gWorldGrid->GetNearbyObjects();
+		const ObjectIDSpan nearby_objects = gWorldGrid->GetNearbyObjects();
 
 		LogInfo("=== Nearby Objects ===");
 
@@ -966,7 +966,6 @@ void RaptorGame::Tick()
 
 	// This frame slot's fence has been waited on, so what it timed last time round is ready
 	gGraphics->Profiler.ReadResults(gGraphics->GetFrameNumber(), DeltaTime);
-
 	gGraphics->bDisableProbes = (mpProbesCVar != nullptr) && (mpProbesCVar->IntValue == 0);
 	gGraphics->bDisableReflectionProbes = (mpReflectionProbesCVar != nullptr) &&
 										  (mpReflectionProbesCVar->IntValue == 0);

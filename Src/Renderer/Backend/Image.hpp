@@ -7,7 +7,6 @@
 #include "Commands.hpp"
 #include "GpuBuffer.hpp"
 
-#include <ThirdParty/stb_image_write.h>
 
 #include <Core/Ref.hpp>
 #include <Core/SizedArray.hpp>
@@ -224,6 +223,10 @@ class Image
 {
 public:
 	Image();
+
+	/// An image that shares the state of `record`, whether or not it has been created yet.
+	explicit Image(const RxImage* record);
+
 	Image(const Image& other);
 	Image(Image&& other) noexcept;
 
@@ -261,6 +264,9 @@ public:
 	FX_FORCE_INLINE uint64 GetRawView() const { return mpRecord->view; }
 
 	FX_FORCE_INLINE bool IsInited() const { return mpRecord->image != 0; }
+
+	/// The record that holds the image's state, shared by copies of the image.
+	FX_FORCE_INLINE const RxImage* GetRecord() const { return mpRecord; }
 
 	void Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format, VkImageTiling tiling,
 				VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags = eImageCreateFlags::None,

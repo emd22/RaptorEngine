@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <raptor_ffi.h>
+
 #include <Color.hpp>
 #include <Core/Hash.hpp>
 #include <Core/Memory.hpp>
@@ -17,8 +19,8 @@
 #include <Math/Quat.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
-#include <Util/Tokenizer.hpp>
 #include <string>
+#include <vector>
 
 namespace fx {
 
@@ -497,6 +499,10 @@ public:
 	PagedArray<ConfigEntry> Members;
 	PagedArray<ConfigPrimitive> ArrayData;
 };
+
+RxHost MakeConfigHost();
+std::string GetConfigConstantsPath();
+bool ReadConfigFileBytes(const std::string& path, std::vector<uint8>& out_bytes);
 
 /////////////////////////////////////
 // Config File

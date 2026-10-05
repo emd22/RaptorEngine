@@ -5,6 +5,7 @@ mod buffer;
 mod buffer_store;
 mod commands;
 mod descriptor;
+mod descriptor_cache;
 mod descriptor_store;
 mod device;
 mod ds_layout;
@@ -17,15 +18,18 @@ mod instance;
 mod log;
 mod pipeline;
 mod pipeline_store;
+mod profiler;
 mod queue;
 mod registry;
 mod render_pass;
+mod render_stage;
 mod sampler;
 mod shader_store;
 mod stage;
 mod swapchain;
 mod sync;
 mod tables;
+mod target;
 mod vertex;
 
 pub use allocator::{AllocRequest, Allocation, Allocator, Memory};
@@ -33,8 +37,12 @@ pub use ash::vk;
 pub use barrier::LayoutTransition;
 pub use blend::{BlendAttachment, TargetOutOfRange, blend_states};
 pub use buffer::{BUFFER_PERSISTENT_MAPPED, BUFFER_TRANSFER_RECEIVER, Buffer, BufferType};
-pub use buffer_store::{BufferFields, BufferRecord};
+pub use buffer_store::{BufferFields, BufferRecord, BufferResource};
 pub use descriptor::DescriptorWrite;
+pub use descriptor_cache::{
+	DescriptorCache, DescriptorEntry, DescriptorEntryRef, DescriptorResource,
+	DescriptorResourceRef, DescriptorSetFields, DescriptorSetRecord,
+};
 pub use descriptor_store::{
 	DescriptorIdEntry, DescriptorPoolFields, DescriptorPoolRecord, KIND_BUFFER, KIND_IMAGE,
 	descriptor_id,
@@ -52,12 +60,14 @@ pub use pipeline::{GraphicsPipelineDesc, PushConstantDef, is_depth_format, push_
 pub use pipeline_store::{
 	PipelineFields, PipelineLayoutFields, PipelineLayoutRecord, PipelineRecord,
 };
+pub use profiler::{GpuProfiler, MARKER_COUNT, TimingWindow, WINDOW_SECONDS, stage_times};
 pub use queue::{QueueKind, SubmitSignal, SubmitWait};
 pub use registry::{
 	INVALID_INDEX, KeyRegistration, NUM_FEATURE_COMBINATIONS, NUM_PASSES, PipelineKey,
 	PipelineRegistry, blend_hash, fnv64, hash_init, layout_hash, mix_hash, pass_hash,
 };
 pub use render_pass::Attachment;
+pub use render_stage::{FinalViews, RenderStageFields, RenderStageRecord};
 pub use sampler::{
 	AddressMode, BorderColor, CompareOp, Filter, SamplerCache, SamplerEntry, SamplerProps,
 };
@@ -73,4 +83,5 @@ pub use tables::{
 	ReflectionType, SHADER_COMPUTE, SHADER_PIXEL, SHADER_VERTEX, result_name, shader_bind_point,
 	shader_stage_flags, shader_type_name,
 };
+pub use target::{Target, TargetConfig, TargetList};
 pub use vertex::{VertexType, filter_by_input_mask};

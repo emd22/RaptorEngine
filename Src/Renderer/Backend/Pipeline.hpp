@@ -1,6 +1,5 @@
 #pragma once
 
-#include "RenderPass.hpp"
 #include "Shader.hpp"
 
 #include <vulkan/vulkan.h>
@@ -11,6 +10,7 @@
 #include <Renderer/PipelineKey.hpp>
 #include <Renderer/PipelineNames.hpp>
 #include <Renderer/Vertex.hpp>
+#include "Device.hpp"
 
 namespace fx {
 
@@ -211,116 +211,28 @@ struct alignas(16) DecalGpuData
 
 static_assert(sizeof(DecalGpuData) == 160, "DecalGpuData must match the Decal struct in DecalCommon.hlsli");
 
-struct PipelineProperties
-{
-	VkCullModeFlags CullMode = VK_CULL_MODE_NONE;
-	VkFrontFace WindingOrder = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	VkPolygonMode PolygonMode = VK_POLYGON_MODE_FILL;
-
-	bool bDisableDepthTest : 1 = false;
-	bool bDisableDepthWrite : 1 = false;
-
-	bool bRenderLines : 1 = false;
-
-	VkCompareOp DepthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
-};
-
-struct PushConstants
-{
-	uint32 Size;
-	eShaderType ShaderTypes;
-};
-
-class PipelineLayout
+/**
+ * @brief A pipeline, and the descriptor sets it binds. These are made and owned by the PipelineCache, which is in Rust,
+ * and this is a view of one that it gives out references to.
+ */
+class Pipeline : public RxPipelineSlot
 {
 public:
-	PipelineLayout() = default;
-
-	PipelineLayout(const PipelineLayout& other);
-	PipelineLayout(PipelineLayout&& other) noexcept;
-
-	PipelineLayout(const Slice<const PushConstants>& push_constant_defs,
-				   const Slice<VkDescriptorSetLayout>& descriptor_set_layouts)
-	{
-		Create(push_constant_defs, descriptor_set_layouts);
-	}
-
-	void Create(const Slice<const PushConstants>& push_constant_defs,
-				const Slice<VkDescriptorSetLayout>& descriptor_set_layouts);
-
-	/// Copies of a layout share it, and it is destroyed with the last copy.
-	PipelineLayout& operator=(const PipelineLayout& other);
-	PipelineLayout& operator=(PipelineLayout&& other) noexcept;
-
-	FX_FORCE_INLINE VkPipelineLayout Get() const
-	{
-		return (mpRecord != nullptr) ? reinterpret_cast<VkPipelineLayout>(mpRecord->layout) : nullptr;
-	}
-
-	FX_FORCE_INLINE bool IsValid() const { return mpRecord != nullptr; }
-
-	~PipelineLayout();
-
-private:
-	void Release();
-
-private:
-	RxPipelineLayout* mpRecord = nullptr;
-};
-
-
-class Pipeline
-{
-public:
-	struct DescriptorRef
-	{
-		DescriptorRef() = default;
-		DescriptorRef(uint32 set_index, DescriptorSet* set, VkDescriptorSetLayout layout)
-			: SetIndex(set_index), pSet(set), Layout(layout)
-		{
-		}
-
-		uint32 SetIndex = 0;
-		DescriptorSet* pSet { nullptr };
-		VkDescriptorSetLayout Layout { nullptr };
-	};
-
-public:
-	Pipeline() = default;
-
+	Pipeline() = delete;
 	Pipeline(const Pipeline&) = delete;
 	Pipeline& operator=(const Pipeline&) = delete;
 
-	void Create(ePipelineName name, const Slice<ShaderProgram>& shaders,
-				const Slice<VkAttachmentDescription>& attachments,
-				const Slice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
-				VertexDescription* vertex_info, const RenderPass& render_pass, const PipelineProperties& properties);
-
-	/**
-	 * @brief Creates a compute pipeline from a single compute shader program.
-	 */
-	void CreateCompute(ePipelineName name, const ShaderProgram& shader);
-
-	FX_FORCE_INLINE void SetLayout(PipelineLayout layout)
-	{
-		Layout = layout;
-
-		// Layout is referenced from another pipeline or modified externally, do not destroy
-		// mbDoNotDestroyLayout = true;
-	}
-
-	FX_FORCE_INLINE bool HasLayout() const { return Layout.IsValid(); }
-
 	/// True if this pipeline was created as a compute pipeline
-	FX_FORCE_INLINE bool IsCompute() const { return mpRecord != nullptr && mpRecord->is_compute != 0; }
+	FX_FORCE_INLINE bool IsCompute() const { return is_compute != 0; }
 
 	/// False until the pipeline has been built, and if it could not be
-	FX_FORCE_INLINE bool IsBuilt() const { return mpRecord != nullptr; }
+	FX_FORCE_INLINE bool IsBuilt() const { return built != 0; }
 
-	FX_FORCE_INLINE VkPipeline Get() const
-	{
-		return (mpRecord != nullptr) ? reinterpret_cast<VkPipeline>(mpRecord->pipeline) : nullptr;
-	}
+	FX_FORCE_INLINE VkPipeline Get() const { return RxFromRaw<VkPipeline>(pipeline); }
+	FX_FORCE_INLINE VkPipelineLayout GetLayout() const { return RxFromRaw<VkPipelineLayout>(layout); }
+
+	/// This pipeline's index in the PipelineCache
+	FX_FORCE_INLINE PipelineHandle GetHandle() const { return PipelineHandle { handle }; }
 
 	FX_FORCE_INLINE VkPipelineBindPoint GetBindPoint() const
 	{
@@ -328,39 +240,12 @@ public:
 	}
 
 	/// The cull mode the pipeline was created with. It is dynamic state, so it is set when the pipeline is bound.
-	FX_FORCE_INLINE VkCullModeFlags GetDefaultCullMode() const
-	{
-		return (mpRecord != nullptr) ? static_cast<VkCullModeFlags>(mpRecord->default_cull_mode) : VK_CULL_MODE_NONE;
-	}
+	FX_FORCE_INLINE VkCullModeFlags GetDefaultCullMode() const { return static_cast<VkCullModeFlags>(default_cull_mode); }
 
 	void Bind(const CommandBuffer& command_buffer) const;
 
 	/// Draws after this with no face culling if `double_sided`, or with the pipeline's own culling otherwise.
 	void SetDoubleSided(const CommandBuffer& command_buffer, bool double_sided) const;
-
-	void Destroy();
-	~Pipeline() { Destroy(); }
-
-private:
-public:
-	// VkPipelineLayout Layout = nullptr;
-	PipelineLayout Layout;
-	SizedArray<DescriptorRef> DescriptorIDs;
-
-	ePipelineName Name;
-
-	/// This pipeline's index in the PipelineCache, set by the cache. Lets code that holds a `Pipeline` get the handle
-	/// without hashing anything.
-	PipelineHandle Handle;
-
-	ShaderProgram VertexShader { nullptr };
-	ShaderProgram PixelShader { nullptr };
-	ShaderProgram ComputeShader { nullptr };
-
-private:
-	GpuDevice* mDevice = nullptr;
-
-	RxPipeline* mpRecord = nullptr;
 };
 
 } // namespace fx::renderer

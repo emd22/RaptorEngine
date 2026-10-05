@@ -1,3 +1,5 @@
+pub mod compiler;
+pub mod datapack;
 pub mod preproc;
 pub mod program;
 
@@ -7,6 +9,7 @@ pub use preproc::{Macro, Output, ReflectionEntry, ReflectionType, Stage, process
 pub enum LogLevel
 {
 	Print,
+	Warning,
 	Error,
 }
 

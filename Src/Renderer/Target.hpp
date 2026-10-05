@@ -4,24 +4,10 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Core/SizedArray.hpp>
 #include <Core/Slice.hpp>
 
 
-namespace fx {
-
-enum class eTargetListFlags : uint16
-{
-	None = 0,
-	DescriptionsBuilt = (1 << 0),
-	ImageViewsBuilt = (1 << 1),
-	ImagesCreated = (1 << 2),
-};
-
-FxEnumFlags(eTargetListFlags);
-
-
-namespace renderer {
+namespace fx::renderer {
 
 enum class eLoadOp
 {
@@ -38,6 +24,34 @@ enum class eStoreOp
 	DontCare = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 };
 
+/**
+ * @brief A target that is already part of a render stage, which holds the target's image. This points into the stage,
+ * so it is only good for as long as the stage is.
+ */
+class TargetRef
+{
+public:
+	TargetRef() = default;
+	TargetRef(const RxRenderStage* stage, uint32 index) : mpStage(stage), mIndex(index) {}
+
+	FX_FORCE_INLINE bool IsValid() const { return mpStage != nullptr && mIndex != RX_NO_TARGET; }
+	FX_FORCE_INLINE bool operator==(nullptr_t np) const { return !IsValid(); }
+	FX_FORCE_INLINE bool operator!=(nullptr_t np) const { return IsValid(); }
+
+	/// The state of the target's image, which is shared with every copy of it
+	const RxImage* GetRecord() const { return rx_render_stage_target_image(mpStage, mIndex); }
+
+	/// The target's image. It is the same image whether or not it is made yet.
+	Image GetImage() const { return Image(GetRecord()); }
+
+private:
+	const RxRenderStage* mpStage = nullptr;
+	uint32 mIndex = RX_NO_TARGET;
+};
+
+/**
+ * @brief Describes a target to add to a render stage with `RenderStage::AddTarget()`, which makes its image.
+ */
 struct Target
 {
 public:
@@ -52,22 +66,17 @@ public:
 	Target(eImageFormat format, const Vec2u& size, bool is_fullscreen, eLoadOp load_op, eStoreOp store_op,
 		   VkImageLayout initial_layout, VkImageLayout final_layout);
 
-	VkAttachmentDescription BuildDescription() const;
-	void CreateImage();
-
-	Image& GetImage() { return Image; }
-	VkImageView GetImageView() const { return Image.GetView(); }
-
-	void UseImageFromTarget(Target* ref_target)
-	{
-		Image = ref_target->GetImage();
-		mpReferenceTarget = ref_target;
-		bImageIsReference = true;
-	}
+	/// Draws to the image of `ref_target`, which belongs to another stage, instead of making an image of its own.
+	void UseImageFromTarget(const TargetRef& ref_target) { pReferenceImage = ref_target.GetRecord(); }
 
 	bool IsDepth() const { return Aspect == eImageAspectFlag::Depth; }
 
+	RxTargetConfig ToRust() const;
+
 public:
+	eImageFormat Format = eImageFormat::RGBA8_UNorm;
+	Vec2u Size = Vec2u::sZero;
+
 	eImageType ImageType = eImageType::Flat;
 
 	VkImageUsageFlags Usage = (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
@@ -84,110 +93,13 @@ public:
 	VkImageLayout InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-	Image Image {};
+	/// The image the target draws to, if it is another stage's
+	const RxImage* pReferenceImage = nullptr;
 
-	/// The target that contains the original image when bReuseImage is true.
-	/// This is used to reload the Image and ImageView when recreating images.
-	Target* mpReferenceTarget = nullptr;
-
-	bool bImageIsReference : 1 = false;
-	bool bRenderPassOnly : 1 = false;
+	bool bRenderPassOnly = false;
 
 	/// True if the image size matches the size of the surface
-	bool bIsFullscreen : 1 = false;
+	bool bIsFullscreen = false;
 };
 
-
-/////////////////////////////////////
-// Target List
-/////////////////////////////////////
-
-class TargetList
-{
-public:
-	TargetList() = default;
-	TargetList(uint32 max_targets) : mMaxTargets(max_targets) {}
-	TargetList(const TargetList& other) { (*this) = other; }
-	TargetList(TargetList&& other) noexcept { (*this) = std::move(other); }
-
-	static TargetList New() { return {}; }
-
-	TargetList& Add(const Target* attachment);
-	TargetList& Add(const Target& attachment);
-
-	bool IsCompatible(const TargetList& other) const;
-
-	void CreateImages(const Vec2u& size);
-	SizedArray<VkAttachmentDescription>& GetDescriptions();
-	SizedArray<VkImageView>& GetImageViews();
-
-
-	SizedArray<Target> GetTargetByType(eImageAspectFlag aspect) const
-	{
-		SizedArray<Target> targets(Targets.Size);
-
-		for (const Target& tg : Targets) {
-			const bool is_depth = tg.IsDepth();
-
-			if (aspect == eImageAspectFlag::Color && !is_depth) {
-				targets.Insert(tg);
-			}
-			else if (aspect == eImageAspectFlag::Depth && is_depth) {
-				targets.Insert(tg);
-			}
-		}
-
-		return targets;
-	}
-
-	void RecreateImages(const Vec2u& size)
-	{
-		mFlags = eTargetListFlags::None;
-		CreateImages(size);
-	}
-
-	void Clear()
-	{
-		mFlags = eTargetListFlags::None;
-		mBuiltAttachmentDescriptions.Free();
-		mBuiltImageViews.Free();
-		Targets.Free();
-	}
-
-
-	FX_FORCE_INLINE TargetList& operator=(const TargetList& other)
-	{
-		Targets.InitAsCopyOf(other.Targets);
-		return *this;
-	}
-
-	FX_FORCE_INLINE TargetList& operator=(TargetList&& other)
-	{
-		Targets = std::move(other.Targets);
-		return *this;
-	}
-
-private:
-	FX_FORCE_INLINE void CheckInited()
-	{
-		if (!Targets) {
-			Targets.InitCapacity(mMaxTargets);
-		}
-	}
-
-public:
-	SizedArray<Target> Targets;
-
-
-private:
-	eTargetListFlags mFlags = eTargetListFlags::None;
-
-	SizedArray<VkAttachmentDescription> mBuiltAttachmentDescriptions;
-	SizedArray<VkImageView> mBuiltImageViews;
-
-	uint32 mMaxTargets = 10;
-};
-
-} // namespace renderer
-
-} // namespace fx
+} // namespace fx::renderer

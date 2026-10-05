@@ -3,10 +3,7 @@
 
 #include <Asset/AssetManager.hpp>
 #include <Asset/ConfigFile.hpp>
-#include <Asset/DataPack.hpp>
 #include <Asset/Font/Font.hpp>
-#include <Asset/ShaderCompiler.hpp>
-#include <Asset/ShaderPreproc.hpp>
 #include <Core/Defer.hpp>
 #include <Core/FilesystemIO.hpp>
 #include <Core/FreeArray.hpp>
@@ -18,7 +15,6 @@
 #ifdef FX_IS_EDITOR
 #include <Editor/RaptorEditor.hpp>
 #endif
-#include <FoxScript/FoxScript.hpp>
 #include <Math/MathConsts.hpp>
 #include <Math/MathUtil.hpp>
 #include <Renderer/Globals.hpp>

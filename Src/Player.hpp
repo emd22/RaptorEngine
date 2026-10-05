@@ -1,5 +1,7 @@
 #pragma once
 
+#include <raptor_ffi.h>
+
 #include <Asset/Animation.hpp>
 #include <Core/Ref.hpp>
 #include <Core/String.hpp>
@@ -24,12 +26,6 @@ class Player
 	static constexpr float32 scSprintFov = 85.0f;
 	static constexpr float32 scWalkingFov = 80.0f;
 
-	/// Fraction of each frame's camera turn that the view model trails behind by. Higher values sway further.
-	static constexpr float32 scViewModelSwayAmount = 0.12f;
-	/// How quickly (1/s) the view model settles back in line with the camera.
-	static constexpr float32 scViewModelSwayReturnSpeed = 12.0f;
-	/// The maximum angle (in radians) the view model can trail the camera by, so it stays on screen during flicks.
-	static constexpr float32 scViewModelMaxSway = MathUtil::DegreesToRadians(5.0f);
 	/// Roll per radian of yaw sway, so the view model banks into horizontal turns.
 	static constexpr float32 scViewModelSwayRoll = 1.25f;
 
@@ -37,20 +33,10 @@ class Player
 	static constexpr const char* scViewModelFireAnim = "Armature|Fire";
 	static constexpr const char* scViewModelReloadAnim = "Armature|ReloadClip";
 
-	static constexpr float32 scViewKickFrequency = 22.0f;
-	static constexpr float32 scViewKickDamping = 0.55f;
-	static constexpr float32 scViewKickLimit = 2.5f;
-	static constexpr float32 scViewKickYawRatio = 0.3f;
-	static constexpr float32 scViewKickRollRatio = 0.5f;
-
 	static constexpr float32 scDefaultViewKickDegrees = 2.5f;
 	static constexpr float32 scDefaultViewKickback = 0.025f;
 	static constexpr float32 scHolsterDrop = 0.35f;
 	static constexpr float32 scHolsterPitch = 0.6f;
-
-	static constexpr float32 scRecoilApplySpeed = 40.0f;
-	static constexpr float32 scRecoilRecoveryDelay = 0.1f;
-	static constexpr float32 scRecoilRecoveryRamp = 0.08f;
 
 public:
 	Player() = default;
@@ -67,7 +53,7 @@ public:
 	void SetViewModelHolster(float32 amount) { mViewModelHolster = amount; }
 
 	void AddRecoil(float32 pitch, float32 yaw);
-	void SetRecoilRecovery(float32 rate_per_second) { mRecoilRecovery = rate_per_second; }
+	void SetRecoilRecovery(float32 rate_per_second) { mRecoil.recovery = rate_per_second; }
 
 	void Jump();
 
@@ -112,7 +98,6 @@ private:
 	void RotateCamera(const Vec2f& xy);
 	void UpdateRecoil(float32 delta_time);
 	void UpdateViewKick(float32 delta_time);
-	static float32 ViewKickImpulsePerPeak();
 	void UpdateViewModelSway(float32 delta_time);
 
 	FX_FORCE_INLINE void UpdateDirection()
@@ -186,9 +171,9 @@ private:
 		ViewKickChannelCount,
 	};
 
-	float32 mViewKickValue[ViewKickChannelCount] = {};
-	float32 mViewKickVelocity[ViewKickChannelCount] = {};
-	float32 mViewKickBound[ViewKickChannelCount] = {};
+	static_assert(ViewKickChannelCount == 4);
+
+	RxViewKick mViewKick {};
 
 	bool mbIsFiring = false;
 
@@ -198,12 +183,7 @@ private:
 
 	float32 mViewModelHolster = 0.0f;
 
-	float32 mRecoilPendingPitch = 0.0f;
-	float32 mRecoilPendingYaw = 0.0f;
-	float32 mRecoilOffsetPitch = 0.0f;
-	float32 mRecoilOffsetYaw = 0.0f;
-	float32 mRecoilRecovery = 0.0f;
-	float32 mRecoilIdleTime = 0.0f;
+	RxRecoil mRecoil {};
 
 
 	Object* mpViewModel = nullptr;
@@ -214,12 +194,7 @@ private:
 	 * @brief The view model's rotation: the camera's rotation with the sway applied in the camera's local space.
 	 */
 	Quat mViewModelRotation = Quat::scIdentity;
-	/// How far (radians) the view model currently trails the camera's yaw and pitch.
-	float32 mViewModelSwayYaw = 0.0f;
-	float32 mViewModelSwayPitch = 0.0f;
-	/// Camera angles from the previous view model update, used to find how far the camera turned.
-	float32 mPrevCameraYaw = 0.0f;
-	float32 mPrevCameraPitch = 0.0f;
+	RxViewSway mViewSway {};
 
 	bool bBobReverse = false;
 	bool mbIsApplyingUserForce : 1 = false;

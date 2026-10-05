@@ -10,7 +10,6 @@
 namespace fx {
 
 namespace renderer {
-class DescriptorPool;
 class DescriptorSet;
 class RawGpuBuffer;
 } // namespace renderer
@@ -19,7 +18,6 @@ struct MaterialID;
 class Material;
 
 namespace MaterialManagerFwd {
-renderer::DescriptorPool& GetDescriptorPool();
 // renderer::DescriptorSet& GetDescriptorSet();
 renderer::RawGpuBuffer& GetMaterialPropertiesBuffer();
 void DestroyMaterial(const MaterialID& id);

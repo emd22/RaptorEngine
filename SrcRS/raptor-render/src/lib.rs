@@ -1,2 +1,10 @@
+pub mod debug_draw;
 pub mod dfg;
+pub mod pipeline_builder;
+pub mod pipeline_cache;
+pub mod pipeline_desc;
 pub mod probe_capture;
+pub mod probe_placement;
+pub mod shader_library;
+pub mod shadow_atlas;
+pub mod text;

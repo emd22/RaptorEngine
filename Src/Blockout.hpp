@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <raptor_ffi.h>
+
 #include <Brush.hpp>
 #include <Core/FreeArray.hpp>
 #include <Core/Name.hpp>
@@ -145,23 +147,19 @@ public:
 	~Blockout();
 
 private:
-	ObjectID CreateBrushObject(ConfigEntry& entry);
+	ObjectID CreateBrushObject(const RxLevelBlock& block);
 
 	/**
-	 * @brief Loads the sun and the point/spot lights from the blockout's `sun`/`lights` entries
+	 * @brief Loads the sun and the point/spot lights from a parsed level
 	 */
-	void LoadLights(ConfigFile& info);
-	void SaveLights(ConfigFile& info);
-	void LoadCamera(ConfigFile& info);
-	void SaveCamera(ConfigFile& info);
-	void AddOrUpdateLightFromEntry(const ConfigEntry& light_entry);
+	void LoadLights(const RxLevel* level);
+	void LoadCamera(const RxLevel* level);
+	void AddOrUpdateLightFromEntry(const RxLevelLight& light_entry);
 
 	/**
-	 * @brief Reads a blockout's brush from either a box (`scale`) or a list of planes (`planes`, with optional face
-	 * textures in `uvs`)
+	 * @brief Makes the brush a level file describes, from either a box or a list of planes with optional face textures
 	 */
-	Brush ReadBrushEntry(ConfigEntry& entry) const;
-	void WriteBrushEntry(ConfigEntry& entry, const Object* object);
+	Brush MakeBrush(const RxLevelBlock& block) const;
 
 	/**
 	 * @brief Builds the object's mesh, bounds and collider from the brush, and takes ownership of the brush.
@@ -173,6 +171,8 @@ private:
 	 * where they are
 	 */
 	void ApplyBrushInPlace(Object* object, Brush&& brush);
+
+	bool WriteLevelFile(const String& path);
 
 	void RemoveBlockoutFromWorld(World* world);
 	void RemoveSingleObjectFromWorld(Object* object);

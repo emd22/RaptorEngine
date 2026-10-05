@@ -1,5 +1,5 @@
 use std::cell::UnsafeCell;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use ash::prelude::VkResult;
 use ash::vk;
@@ -78,6 +78,67 @@ impl ImageRecord
 		Arc::into_raw(this).cast_mut()
 	}
 
+	/// Takes a reference to the record, to be held as an `Arc`.
+	///
+	/// # Safety
+	///
+	/// `record` must come from `into_raw` and be live.
+	pub unsafe fn arc_from_raw(record: *const Self) -> Arc<Self>
+	{
+		// SAFETY: guaranteed by the caller.
+		unsafe {
+			Arc::increment_strong_count(record);
+			Arc::from_raw(record)
+		}
+	}
+
+	/// A reference that does not keep the image alive, for code that tracks images it does not own.
+	///
+	/// # Safety
+	///
+	/// `record` must come from `into_raw` and still be alive.
+	pub unsafe fn weak_from_raw(record: *const Self) -> Weak<Self>
+	{
+		// SAFETY: guaranteed by the caller, and the borrowed `Arc` is not dropped.
+		let borrowed = std::mem::ManuallyDrop::new(unsafe { Arc::from_raw(record) });
+
+		Arc::downgrade(&borrowed)
+	}
+
+	/// Sets what the image will be made as, before it is made, the way `Image::SetInfo` does in
+	/// C++.
+	pub fn set_info(&self, size: (u32, u32), format: ImageFormat, mip_level: u32, mip_count: u32)
+	{
+		// SAFETY: access is externally synchronised, and no reference into the cell outlives a
+		// call.
+		let fields = unsafe { &mut *self.fields.get() };
+
+		fields.width = size.0;
+		fields.height = size.1;
+		fields.image_type = 0;
+		fields.format = format as u16;
+		fields.mip_level = mip_level;
+		fields.mip_count = mip_count;
+	}
+
+	pub fn set_size(&self, size: (u32, u32))
+	{
+		// SAFETY: access is externally synchronised, and no reference into the cell outlives a
+		// call.
+		let fields = unsafe { &mut *self.fields.get() };
+
+		fields.width = size.0;
+		fields.height = size.1;
+	}
+
+	/// Records the layout the image is now in.
+	pub fn set_layout(&self, layout: vk::ImageLayout)
+	{
+		// SAFETY: access is externally synchronised, and no reference into the cell outlives a
+		// call.
+		unsafe { (*self.fields.get()).layout = layout.as_raw() };
+	}
+
 	pub fn fields(&self) -> ImageFields
 	{
 		// SAFETY: access is externally synchronised, and no reference into the cell outlives a
@@ -128,6 +189,23 @@ impl ImageRecord
 			// SAFETY: guaranteed by the caller, and the last reference is gone.
 			unsafe { record.destroy_resources(device, allocator) };
 		}
+
+		true
+	}
+
+	/// Drops a reference held as an `Arc`, destroying the image if it was the last one.
+	///
+	/// # Safety
+	///
+	/// As for `release`.
+	pub unsafe fn release_arc(this: Arc<Self>, device: &Device, allocator: &Allocator) -> bool
+	{
+		let Some(record) = Arc::into_inner(this) else {
+			return false;
+		};
+
+		// SAFETY: guaranteed by the caller, and the last reference is gone.
+		unsafe { record.destroy_resources(device, allocator) };
 
 		true
 	}

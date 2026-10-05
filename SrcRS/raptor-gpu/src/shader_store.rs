@@ -1,4 +1,4 @@
-use std::ffi::c_void;
+use std::ffi::{CString, c_char};
 use std::sync::Arc;
 
 use ash::prelude::VkResult;
@@ -13,7 +13,7 @@ pub struct ShaderProgramFields
 	pub module: u64,
 	pub reflection: *const ReflectionEntry,
 	pub reflection_count: usize,
-	pub user: *mut c_void,
+	pub name: *const c_char,
 	pub shader_type: u32,
 	pub input_location_mask: u32,
 }
@@ -23,6 +23,7 @@ pub struct ShaderProgramRecord
 {
 	pub fields: ShaderProgramFields,
 	reflection: Vec<ReflectionEntry>,
+	name: CString,
 }
 
 impl ShaderProgramRecord
@@ -34,21 +35,24 @@ impl ShaderProgramRecord
 		reflection: Vec<ReflectionEntry>,
 		shader_type: u32,
 		input_location_mask: u32,
-		user: *mut c_void,
+		name: &str,
 	) -> VkResult<Arc<Self>>
 	{
 		let module = device.create_shader_module(code)?;
+
+		let name = CString::new(name.replace('\0', "")).unwrap_or_default();
 
 		Ok(Arc::new(Self {
 			fields: ShaderProgramFields {
 				module: module.as_raw(),
 				reflection: reflection.as_ptr(),
 				reflection_count: reflection.len(),
-				user,
+				name: name.as_ptr(),
 				shader_type,
 				input_location_mask,
 			},
 			reflection,
+			name,
 		}))
 	}
 
@@ -69,6 +73,23 @@ impl ShaderProgramRecord
 	{
 		// SAFETY: guaranteed by the caller.
 		unsafe { Arc::increment_strong_count(record) };
+	}
+
+	/// Drops a reference held as an `Arc`, destroying the module if it was the last one.
+	///
+	/// # Safety
+	///
+	/// As for `release`.
+	pub unsafe fn release_arc(this: Arc<Self>, device: &Device) -> bool
+	{
+		let Some(record) = Arc::into_inner(this) else {
+			return false;
+		};
+
+		// SAFETY: guaranteed by the caller, and the last reference is gone.
+		unsafe { device.destroy_shader_module(vk::ShaderModule::from_raw(record.fields.module)) };
+
+		true
 	}
 
 	/// # Safety
@@ -110,7 +131,7 @@ mod tests
 		assert_eq!(offset_of!(ShaderProgramFields, module), 0);
 		assert_eq!(offset_of!(ShaderProgramFields, reflection), 8);
 		assert_eq!(offset_of!(ShaderProgramFields, reflection_count), 16);
-		assert_eq!(offset_of!(ShaderProgramFields, user), 24);
+		assert_eq!(offset_of!(ShaderProgramFields, name), 24);
 		assert_eq!(offset_of!(ShaderProgramFields, shader_type), 32);
 		assert_eq!(offset_of!(ShaderProgramFields, input_location_mask), 36);
 	}

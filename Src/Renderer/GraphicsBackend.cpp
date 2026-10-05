@@ -21,10 +21,10 @@
 #include <Core/Types.hpp>
 #include <Decal/DecalManager.hpp>
 #include <Material/MaterialManager.hpp>
+#include <Renderer/Backend/BarrierHelper.hpp>
 #include <Renderer/Backend/DescriptorCache.hpp>
 #include <Renderer/Camera.hpp>
 #include <Renderer/Globals.hpp>
-#include <Renderer/Backend/BarrierHelper.hpp>
 #include <Renderer/LightProbe.hpp>
 #include <Renderer/PSOBuild.hpp>
 #include <Renderer/PipelineCache.hpp>
@@ -126,8 +126,7 @@ void GraphicsBackend::Init(Vec2u window_size)
 	LightGridPageSize = Limits::MaxScreenTiles * sizeof(uint32) * 4;
 	LightIndexListPageSize = Limits::MaxScreenTiles * Limits::MaxLightsPerTile * sizeof(uint32);
 
-	LightGridBuffer.Create(eGpuBufferType::StorageWithOffset, LightGridPageSize * FramesInFlight,
-						   RX_MEMORY_GPU_ONLY);
+	LightGridBuffer.Create(eGpuBufferType::StorageWithOffset, LightGridPageSize * FramesInFlight, RX_MEMORY_GPU_ONLY);
 	LightIndexListBuffer.Create(eGpuBufferType::StorageWithOffset, LightIndexListPageSize * FramesInFlight,
 								RX_MEMORY_GPU_ONLY);
 
@@ -137,8 +136,7 @@ void GraphicsBackend::Init(Vec2u window_size)
 
 	DecalBuffer.Create(eGpuBufferType::StorageWithOffset, DecalPageSize * FramesInFlight, RX_MEMORY_CPU_ONLY,
 					   eGpuBufferFlags::PersistentMapped);
-	DecalMaskBuffer.Create(eGpuBufferType::StorageWithOffset, DecalMaskPageSize * FramesInFlight,
-						   RX_MEMORY_GPU_ONLY);
+	DecalMaskBuffer.Create(eGpuBufferType::StorageWithOffset, DecalMaskPageSize * FramesInFlight, RX_MEMORY_GPU_ONLY);
 
 	// Light probes. These only change when probes are placed, baked or loaded, and ProbeManager waits for the GPU to be
 	// idle before writing them, so unlike the buffers above they have a single page shared by every frame in flight.
@@ -147,8 +145,8 @@ void GraphicsBackend::Init(Vec2u window_size)
 					   eGpuBufferFlags::PersistentMapped);
 
 	ProbeVolumePageSize = Limits::MaxProbeVolumes * sizeof(ProbeVolumeData);
-	ProbeVolumeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeVolumePageSize,
-							 RX_MEMORY_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
+	ProbeVolumeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeVolumePageSize, RX_MEMORY_AUTO_PREFER_DEVICE,
+							 eGpuBufferFlags::PersistentMapped);
 
 	ProbeGridPageSize = Limits::MaxProbeGridPoints * sizeof(uint16);
 	ProbeGridBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeGridPageSize, RX_MEMORY_AUTO_PREFER_DEVICE,
@@ -309,8 +307,6 @@ void GraphicsBackend::RebuildRenderStages()
 
 	gTextRenderer->Resize();
 
-	rd->DescriptorPool.Recreate();
-
 	gDescriptorCache->RebuildAll();
 }
 
@@ -458,14 +454,12 @@ ExtensionList& GraphicsBackend::QueryInstanceExtensions(ExtensionList& available
 void GraphicsBackend::SubmitPushConstantsRaw(const CommandBuffer& cmd, const Pipeline& pipeline,
 											 eShaderType shader_types, const void* data, uint32 data_size) const
 {
-	DebugAssert(pipeline.Layout.IsValid());
-
 	// Currently, there is nowhere in the engine that requires two separate PC buffers and therefore requires an offset.
 	// As well, the small required size of a PC kind of makes this useless. For now, we will ignore this and if needed
 	// there will be an updated version of this function.
 	// I'm pretty sure when I was using Slang I had one shader that required this, but thats since been cacked..
 	static constexpr uint32 scOffset = 0;
-	vkCmdPushConstants(cmd.Get(), pipeline.Layout.Get(), ShaderUtil::ToUnderlyingType(shader_types), scOffset,
+	vkCmdPushConstants(cmd.Get(), pipeline.GetLayout(), ShaderUtil::ToUnderlyingType(shader_types), scOffset,
 					   data_size, data);
 }
 
@@ -485,10 +479,10 @@ void GraphicsBackend::SubmitImmediateUploadCmd(GraphicsBackend::SubmitFunc uploa
 	// The fence is created signaled; it must be reset before each submit.
 	UploadContext.ImmediateUploadFence.Reset();
 
-	VkTry(static_cast<VkResult>(rx_gpu_queue_submit(GetDevice()->GetRustDevice(), RX_QUEUE_TRANSFER, nullptr, 0,
-													commands, 1, nullptr, 0,
-													RxRaw(UploadContext.ImmediateUploadFence.Get()))),
-		  "Error submitting upload buffer");
+	VkTry(
+		static_cast<VkResult>(rx_gpu_queue_submit(GetDevice()->GetRustDevice(), RX_QUEUE_TRANSFER, nullptr, 0, commands,
+												  1, nullptr, 0, RxRaw(UploadContext.ImmediateUploadFence.Get()))),
+		"Error submitting upload buffer");
 
 	UploadContext.ImmediateUploadFence.WaitFor();
 	UploadContext.ImmediateUploadFence.Reset();
@@ -615,11 +609,12 @@ void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 
 	gPipelineCache->Bind(ePipelineName::SSAO, frame->CmdBuffer);
 
-	Target* target = pRenderer->SSAOPass.GetTarget(eImageFormat::R8_UNorm);
-	Assert(target != nullptr);
+	const TargetRef target = pRenderer->SSAOPass.GetTarget(eImageFormat::R8_UNorm);
+	Assert(target.IsValid());
+	const Vec2u target_size = target.GetImage().GetSize();
 
 	SSAOPushConsts consts = {
-		.RenderSize = { static_cast<float32>(target->Image.GetSize().X), static_cast<float32>(target->Image.GetSize().Y), },
+		.RenderSize = { static_cast<float32>(target_size.X), static_cast<float32>(target_size.Y), },
 	};
 
 	memcpy(consts.InvProjection, camera.InvProjectionMatrix.RawData, sizeof(float32) * 16);
@@ -643,14 +638,13 @@ void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 
 	gPipelineCache->Bind(ePipelineName::SSAOBlur, frame->CmdBuffer);
 
-	Target* blur_target = pRenderer->SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm);
-	Assert(blur_target != nullptr);
+	const TargetRef blur_target = pRenderer->SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm);
+	Assert(blur_target.IsValid());
+	const Vec2u blur_size = blur_target.GetImage().GetSize();
 
 	SSAOBlurPushConsts blur_consts = {
-		.ScreenSize = { static_cast<float32>(blur_target->Image.GetSize().X),
-						static_cast<float32>(blur_target->Image.GetSize().Y) },
-		.TexelSize = { 1.0f / static_cast<float32>(blur_target->Image.GetSize().X),
-					   1.0f / static_cast<float32>(blur_target->Image.GetSize().Y) },
+		.ScreenSize = { static_cast<float32>(blur_size.X), static_cast<float32>(blur_size.Y) },
+		.TexelSize = { 1.0f / static_cast<float32>(blur_size.X), 1.0f / static_cast<float32>(blur_size.Y) },
 		.DepthSharpness = 100.0f,
 	};
 

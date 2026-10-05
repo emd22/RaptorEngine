@@ -1,14 +1,13 @@
 #pragma once
 
-#include <Core/FreeArray.hpp>
-#include <Core/PagedArray.hpp>
-#include <Core/SizedArray.hpp>
+#include <raptor_ffi.h>
+
+#include <Core/Types.hpp>
 #include <Math/BoundingBox.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
 #include <Renderer/LightID.hpp>
-#include <unordered_set>
 
 namespace fx {
 
@@ -17,16 +16,58 @@ using TileIndex = uint32;
 
 static constexpr TileIndex TileIndexNull = UINT32_MAX;
 
+static_assert(TileIndexNull == RX_WORLD_GRID_NULL_TILE);
+static_assert(sizeof(ObjectID) == sizeof(uint32));
+static_assert(sizeof(LightID) == sizeof(uint32));
 
-struct Tile
+
+/**
+ * @brief What is in a tile. The slots hold a null ID where there is nothing, and stay where they are for as long as
+ * the tile exists, so a pointer to one can be kept until the grid changes the slot.
+ */
+struct TileView
 {
 public:
-	uint32 FindObject(ObjectID id);
-	uint32 FindLight(LightID id);
+	bool IsValid() const { return bValid; }
+
+	template <typename TFunc>
+	void ForEachObject(TFunc&& func) const
+	{
+		for (uint32 i = 0; i < ObjectSlots; i++) {
+			if (!pObjects[i].IsNull()) {
+				func(&pObjects[i]);
+			}
+		}
+	}
+
+	template <typename TFunc>
+	void ForEachLight(TFunc&& func) const
+	{
+		for (uint32 i = 0; i < LightSlots; i++) {
+			if (!pLights[i].IsNull()) {
+				func(pLights[i]);
+			}
+		}
+	}
 
 public:
-	FreeArray<ObjectID> Objects;
-	FreeArray<LightID> Lights;
+	ObjectID* pObjects = nullptr;
+	uint32 ObjectSlots = 0;
+
+	LightID* pLights = nullptr;
+	uint32 LightSlots = 0;
+
+	bool bValid = false;
+};
+
+
+struct ObjectIDSpan
+{
+	const ObjectID* begin() const { return pFirst; }
+	const ObjectID* end() const { return pFirst + Size; }
+
+	const ObjectID* pFirst = nullptr;
+	uint32 Size = 0;
 };
 
 
@@ -36,43 +77,43 @@ class LightBase;
 class WorldGrid
 {
 public:
-	static constexpr uint32 scMaxObjectsPerTile = 64;
-	static constexpr uint32 scMaxGlobalObjects = 64;
-	static constexpr uint32 scMaxLightsPerTile = 64;
-	static constexpr uint32 scMaxGlobalLights = 64;
-	static constexpr uint32 scMaxLightTileCount = 64;
-
-	static constexpr TileIndex scGlobalTileIndex = UINT32_MAX - 1;
+	static constexpr TileIndex scGlobalTileIndex = RX_WORLD_GRID_GLOBAL_TILE;
 
 public:
-	WorldGrid() = default;
+	WorldGrid();
+	~WorldGrid();
+
+	WorldGrid(const WorldGrid&) = delete;
+	WorldGrid& operator=(const WorldGrid&) = delete;
 
 	void Create(const Vec2u grid_size);
 
 	/**
-	 * @brief Inserts an object into its respective tile.
-	 * @returns The tile index that it was added to.
+	 * @brief Inserts an object into the tiles its bounds reach, or the global tile if it cannot be culled.
 	 */
 	void AddObject(ObjectID id);
 
 	TileIndex WorldToTile(const Vec3f& position) const;
 	TileIndex TileFromTileXY(const Vec2u& xy) const;
 
-	const SizedArray<ObjectID>& GetNearbyObjects();
+	/**
+	 * @brief The objects in the tile of the view and the tiles around it. Valid until the grid next changes.
+	 */
+	ObjectIDSpan GetNearbyObjects();
 
 	/**
-	 * @brief Updates an object to a new tile if the object has moved into another tile boundary.
+	 * @brief Updates an object to new tiles if the object has moved into another tile boundary.
 	 */
 	void UpdateObject(Object* object, bool update_attached = true);
 
 	/**
-	 * @brief Remove an object from its assigned tile.
+	 * @brief Remove an object from its assigned tiles.
 	 */
 	void RemoveObject(ObjectID id);
 
 	/**
 	 * @brief Inserts a light into every tile its radius reaches. Directional lights, and lights covering more than
-	 * `scMaxLightTileCount` tiles, go into the global tile.
+	 * a set number of tiles, go into the global tile.
 	 */
 	void AddLight(LightBase* light);
 
@@ -88,57 +129,26 @@ public:
 
 	Vec3f TileXYToWorldCenter(Vec2u tile_xy) const;
 
-	Tile* GetTile(TileIndex index);
-	const Tile* GetTile(TileIndex index) const;
+	TileView GetTile(TileIndex index) const;
 
 	void SetViewTileIndex(TileIndex view_tile_index);
 
+	/// The first tile an object or light is in, scGlobalTileIndex for the global tile, or TileIndexNull if it is not in
+	/// the grid.
+	TileIndex GetObjectTile(ObjectID id) const;
+	TileIndex GetLightTile(const LightBase* light) const;
 
-	FX_FORCE_INLINE AABB GetTileAABB(TileIndex ti) const
-	{
-		Vec3f tile_position = GetTileWorldPosition(ti);
-		Vec3f half(mTileSize.X * 0.5f, 1.0f, mTileSize.Y * 0.5f);
-		return AABB(tile_position - half, tile_position + half);
-	}
+	AABB GetTileAABB(TileIndex ti) const;
 
-	FX_FORCE_INLINE Vec2u GetGridSize() const { return mGridSize; }
+	Vec2u GetGridSize() const;
+	Vec2f GetTileSize() const;
+	Vec3f GetPositionOffset() const;
+	TileIndex GetViewTileIndex() const;
 
-	FX_FORCE_INLINE uint32 GetNumTiles() const { return mTileBuffer.Size; }
-
-	~WorldGrid() = default;
-
-private:
-	/// Computes the rectangle of tiles (start tile + width/height in tiles) that the object's world-space
-	/// bounds overlap.
-
-	void GetObjectTileRect(Object* object, TileIndex* out_start, Vec2u* out_span) const;
-
-	void InsertObjectIntoRect(ObjectID id, TileIndex start, Vec2u span);
-	void RemoveObjectFromRect(ObjectID id, TileIndex start, Vec2u span);
-
-	bool GetLightPlacement(const LightBase* light, TileIndex* out_start, Vec2u* out_span) const;
-	void InsertLightIntoRect(LightID id, TileIndex start, Vec2u span);
-	void RemoveLightFromRect(LightID id, TileIndex start, Vec2u span);
-
-	TileIndex InsertInto(TileIndex tile_index, ObjectID id);
-
-	void AddObjectsFromTile(std::unordered_set<ObjectID>& object_buffer, const Tile* tile) const;
-
-public:
-	Vec2u mGridSize;
-	Vec2f mTileSize = Vec2f(10.0f, 10.0f);
-	Vec3f mPositionOffset = Vec3f::sZero;
-
-	TileIndex ViewTileIndex = TileIndexNull;
+	uint32 GetNumTiles() const;
 
 private:
-	SizedArray<Tile> mTileBuffer;
-
-	/// A tile for objects that are always visible.
-	Tile GlobalTile;
-
-	SizedArray<ObjectID> mNearbyObjectCache;
-	bool mbNearbyObjectCacheValid = false;
+	RxWorldGrid* mpGrid = nullptr;
 };
 
 } // namespace fx

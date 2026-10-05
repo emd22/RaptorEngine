@@ -8,8 +8,6 @@ extern PhysicsManager* gPhysics;
 class AssetManager;
 extern AssetManager* gAssetManager;
 
-class ShaderCompiler;
-extern ShaderCompiler* gShaderCompiler;
 
 class ObjectManager;
 extern ObjectManager* gObjectManager;

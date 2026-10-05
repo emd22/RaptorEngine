@@ -3,94 +3,36 @@
 #include <Asset/AssetBase.hpp>
 #include <Core/ArrayUtil.hpp>
 #include <Renderer/Backend/GraphicsBackendFwd.hpp>
+#include <Util/RustInterop.hpp>
 
 #include <algorithm>
-#include <vulkan/vulkan.h>
 
 namespace fx {
 
 namespace loader {
 
-static constexpr uint32 scGlRgba8 = 0x8058;
-static constexpr uint32 scGlSrgb8Alpha8 = 0x8C43;
+static const RxLogSink scKtxLog = { .user = nullptr, .log = RustInterop::Log };
 
-static constexpr eImageFormat GetImageFormatFromVk(uint32 vk_format)
-{
-	switch (vk_format) {
-	case VK_FORMAT_B8G8R8A8_UNORM:
-		return eImageFormat::BGRA8_UNorm;
-	case VK_FORMAT_R8G8B8A8_UNORM:
-		return eImageFormat::RGBA8_UNorm;
-	case VK_FORMAT_R8G8B8A8_SRGB:
-		return eImageFormat::RGBA8_SRGB;
-	case VK_FORMAT_R8_UNORM:
-		return eImageFormat::R8_UNorm;
-	default:;
-	}
-
-	return eImageFormat::None;
-}
-
-bool LoaderKtx::AdoptTexture(ktxTexture* texture)
+bool LoaderKtx::Adopt(RxKtx* ktx)
 {
 	Destroy();
 
-	eImageFormat format = eImageFormat::None;
-
-	if (texture->classId == ktxTexture2_c) {
-		ktxTexture2* texture2 = reinterpret_cast<ktxTexture2*>(texture);
-
-		if (ktxTexture2_NeedsTranscoding(texture2)) {
-			LogError(LC_ASSET, "KTX: GPU-compressed (Basis) textures are not supported");
-			ktxTexture_Destroy(texture);
-			return false;
-		}
-
-		format = GetImageFormatFromVk(texture2->vkFormat);
-	}
-	else {
-		ktxTexture1* texture1 = reinterpret_cast<ktxTexture1*>(texture);
-
-		if (texture1->glInternalformat == scGlRgba8) {
-			format = eImageFormat::RGBA8_UNorm;
-		}
-		else if (texture1->glInternalformat == scGlSrgb8Alpha8) {
-			format = eImageFormat::RGBA8_SRGB;
-		}
-	}
-
-	if (format == eImageFormat::None) {
-		LogError(LC_ASSET, "KTX: unsupported pixel format");
-		ktxTexture_Destroy(texture);
+	if (ktx == nullptr) {
 		return false;
 	}
 
-	if (texture->numDimensions != 2 || texture->numLayers != 1 || texture->numFaces != 1) {
-		LogError(LC_ASSET, "KTX: only plain 2D textures are supported");
-		ktxTexture_Destroy(texture);
-		return false;
-	}
+	RxKtxInfo info {};
+	rx_ktx_info(ktx, &info);
 
-	mpTexture = texture;
-	mFormat = format;
+	mpKtx = ktx;
+	mFormat = static_cast<eImageFormat>(info.format);
+	mSize = Vec2u(info.width, info.height);
+	mMipCount = info.level_count;
 
 	return true;
 }
 
-bool LoaderKtx::Open(const char* path)
-{
-	ktxTexture* texture = nullptr;
-
-	const KTX_error_code result =
-		ktxTexture_CreateFromNamedFile(path, KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &texture);
-
-	if (result != KTX_SUCCESS) {
-		LogError(LC_ASSET, "Could not load KTX file at '{}': {}", path, ktxErrorString(result));
-		return false;
-	}
-
-	return AdoptTexture(texture);
-}
+bool LoaderKtx::Open(const char* path) { return Adopt(rx_ktx_open_file(path, &scKtxLog)); }
 
 eLoaderStatus LoaderKtx::Load(AssetTicket& ticket, const std::string& path)
 {
@@ -108,18 +50,7 @@ bool LoaderKtx::OpenFromMemory(const uint8* data, uint32 size)
 	Assert(data != nullptr);
 	Assert(size > 0);
 
-	ktxTexture* texture = nullptr;
-
-	// LOAD_IMAGE_DATA copies the levels into the texture's own storage, so `data` is not referenced afterwards
-	const KTX_error_code result =
-		ktxTexture_CreateFromMemory(data, size, KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &texture);
-
-	if (result != KTX_SUCCESS) {
-		LogError(LC_ASSET, "Could not load KTX from memory: {}", ktxErrorString(result));
-		return false;
-	}
-
-	return AdoptTexture(texture);
+	return Adopt(rx_ktx_open_memory(data, size, &scKtxLog));
 }
 
 eLoaderStatus LoaderKtx::Load(AssetTicket& ticket, const uint8* data, uint32 size)
@@ -135,30 +66,27 @@ eLoaderStatus LoaderKtx::Load(AssetTicket& ticket, const uint8* data, uint32 siz
 
 Vec2u LoaderKtx::GetMipDimensions(uint32 mip_level) const
 {
-	return Vec2u(std::max(1U, mpTexture->baseWidth >> mip_level), std::max(1U, mpTexture->baseHeight >> mip_level));
+	return Vec2u(std::max(1U, mSize.X >> mip_level), std::max(1U, mSize.Y >> mip_level));
 }
 
 Slice<const uint8> LoaderKtx::GetMipData(uint32 mip_level) const
 {
-	Assert(mpTexture != nullptr);
-	Assert(mip_level < mpTexture->numLevels);
+	Assert(mpKtx != nullptr);
+	Assert(mip_level < mMipCount);
 
-	ktx_size_t offset = 0;
-	if (ktxTexture_GetImageOffset(mpTexture, mip_level, 0, 0, &offset) != KTX_SUCCESS) {
-		return Slice<const uint8>(nullptr, 0);
-	}
+	size_t size = 0;
+	const uint8* data = rx_ktx_level(mpKtx, mip_level, &size);
 
-	return Slice<const uint8>(ktxTexture_GetData(mpTexture) + offset,
-							  static_cast<uint32>(ktxTexture_GetImageSize(mpTexture, mip_level)));
+	return Slice<const uint8>(data, static_cast<uint32>(size));
 }
 
 ImageInfo LoaderKtx::MakeImageInfo(uint32 first_mip, uint32 mip_count) const
 {
-	Assert(mpTexture != nullptr);
-	Assert(first_mip < mpTexture->numLevels);
+	Assert(mpKtx != nullptr);
+	Assert(first_mip < mMipCount);
 
-	if (mip_count == 0 || first_mip + mip_count > mpTexture->numLevels) {
-		mip_count = mpTexture->numLevels - first_mip;
+	if (mip_count == 0 || first_mip + mip_count > mMipCount) {
+		mip_count = mMipCount - first_mip;
 	}
 
 	const uint32 end_mip = first_mip + mip_count;
@@ -206,7 +134,7 @@ void LoaderKtx::CreateGpuResource(AssetTicket& ticket)
 
 	ImageInfo chain_info {};
 
-	if (mpTexture->numLevels > 1 && ImageFormatUtil::GetPixelStride(mFormat) == 4) {
+	if (mMipCount > 1 && ImageFormatUtil::GetPixelStride(mFormat) == 4) {
 		chain_info = MakeImageInfo();
 	}
 
@@ -228,9 +156,9 @@ void LoaderKtx::CreateGpuResource(AssetTicket& ticket)
 
 void LoaderKtx::Destroy()
 {
-	if (mpTexture != nullptr) {
-		ktxTexture_Destroy(mpTexture);
-		mpTexture = nullptr;
+	if (mpKtx != nullptr) {
+		rx_ktx_free(mpKtx);
+		mpKtx = nullptr;
 	}
 }
 

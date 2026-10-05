@@ -40,11 +40,6 @@ FX_SET_MODULE_NAME("DeferredRenderer")
 
 void TiledForwardRenderer::Create(const Vec2u& extent)
 {
-	DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10);
-	DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 20);
-	DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 15);
-	DescriptorPool.Create(gGraphics->GetDevice(), 16);
-
 	CreateDepthNormalPSO();
 	CreateSSAOPSO();
 	CreateSSAOBlurPSO();
@@ -73,8 +68,8 @@ void TiledForwardRenderer::CreateForwardPass()
 	// Depth target. This shares the prepass's depth image and loads it rather than clearing, so the forward pass only
 	// shades the fragments the prepass found visible (alpha discards included) instead of overdrawing the whole
 	// scene again
-	Target* prepass_depth = Prepass.GetTarget(eImageFormat::D32_Float);
-	AssertMsg(prepass_depth != nullptr, "The prepass must be created before the forward pass");
+	const TargetRef prepass_depth = Prepass.GetTarget(eImageFormat::D32_Float);
+	AssertMsg(prepass_depth.IsValid(), "The prepass must be created before the forward pass");
 
 	Target depth(eImageFormat::D32_Float, gGraphics->Swapchain.Extent, true,
 				 VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Depth);
@@ -185,10 +180,10 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 												   .AddressMode = eSamplerAddressMode::ClampToEdge,
 											   })));
 
-	Target* shadow_target = gShadowAtlas->GetTarget();
-	Assert(shadow_target != nullptr);
+	const TargetRef shadow_target = gShadowAtlas->GetTarget();
+	Assert(shadow_target.IsValid());
 
-	ds_entries.Insert(DescriptorEntry::AsImage(4, eShaderType::Pixel, &shadow_target->Image,
+	ds_entries.Insert(DescriptorEntry::AsImage(4, eShaderType::Pixel, shadow_target.GetRecord(),
 											   gSamplerCache->Request({
 												   eSamplerFilter::Linear,
 												   eSamplerFilter::Linear,
@@ -198,12 +193,12 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 												   eSamplerCompareOp::Greater,
 											   })));
 
-	Target* ssao_target = SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm);
-	Assert(ssao_target != nullptr);
+	const TargetRef ssao_target = SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm);
+	Assert(ssao_target.IsValid());
 
 	// Linear since the AO target is half resolution so point sampling it at full resolution shows the
 	// 2x2 blocks it was rendered at. Had this bad boy nearest for a while and it looked like shit
-	ds_entries.Insert(DescriptorEntry::AsImage(5, eShaderType::Pixel, &ssao_target->Image,
+	ds_entries.Insert(DescriptorEntry::AsImage(5, eShaderType::Pixel, ssao_target.GetRecord(),
 											   gSamplerCache->Request({
 												   eSamplerFilter::Linear,
 												   eSamplerFilter::Linear,
@@ -434,11 +429,14 @@ bool TiledForwardRenderer::MakeForwardDesc(ePipelinePass pass, ePipelineFeatures
 	}
 
 	const char* suffix = "";
-	out_desc.Features = GetGeometryShaderVariant(features, out_desc.Macros, out_desc.VertexType, suffix);
+	std::vector<ShaderMacro> macros;
+	eVertexType vertex_type = eVertexType::Default;
+
+	out_desc.SetFeatures(GetGeometryShaderVariant(features, macros, vertex_type, suffix));
 
 	// Transparent geometry also discards what is nearly invisible
 	if (is_blended) {
-		out_desc.Macros.push_back(ShaderMacro { .pcName = "ALPHA_CUTOFF", .pcValue = "0.01" });
+		macros.push_back(ShaderMacro { .pcName = "ALPHA_CUTOFF", .pcValue = "0.01" });
 	}
 
 	const char* pass_suffix = "";
@@ -447,9 +445,9 @@ bool TiledForwardRenderer::MakeForwardDesc(ePipelinePass pass, ePipelineFeatures
 		// The prepass has just drawn this geometry and already discarded its alpha masked texels, so the depth buffer
 		// holds exactly the depth of each visible fragment. Testing equal without writing depth or discarding lets the
 		// GPU reject hidden fragments before shading them.
-		out_desc.DepthCompareOp = VK_COMPARE_OP_EQUAL;
-		out_desc.bDepthWrite = false;
-		out_desc.Macros.push_back(scPrepassDepth);
+		out_desc.SetDepthCompareOp(VK_COMPARE_OP_EQUAL);
+		out_desc.SetDepthWrite(false);
+		macros.push_back(scPrepassDepth);
 	}
 	else if (is_blended) {
 		pass_suffix = "Transparent";
@@ -457,40 +455,45 @@ bool TiledForwardRenderer::MakeForwardDesc(ePipelinePass pass, ePipelineFeatures
 	else {
 		// Probe captures have no prepass, so they test and write depth themselves, and discard alpha masks here
 		pass_suffix = "Capture";
-		out_desc.Macros.push_back(scProbeCapture);
+		macros.push_back(scProbeCapture);
 	}
 
 	if (is_debug) {
-		out_desc.Macros.push_back(scDebugViews);
+		macros.push_back(scDebugViews);
 	}
 
-	out_desc.DebugName = std::string("Geometry") + suffix + pass_suffix + (is_debug ? "Debug" : "");
+	const std::string debug_name = std::string("Geometry") + suffix + pass_suffix + (is_debug ? "Debug" : "");
 
-	out_desc.Shader = eShaderName::Forward;
-	out_desc.pStage = &ForwardPass;
-	out_desc.CullMode = eCullMode::Back;
+	out_desc.SetDebugName(debug_name.c_str());
 
-	out_desc.PushConstantStages = eShaderType::Vertex | eShaderType::Pixel;
-	out_desc.PushConstantSize = sizeof(DrawPushConstants);
+	out_desc.SetShader(eShaderName::Forward, macros);
+	out_desc.SetVertexType(vertex_type);
+	out_desc.UseRenderStage(ForwardPass);
+	out_desc.SetCullMode(eCullMode::Back);
+
+	out_desc.SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
 
 	if (is_blended) {
 		// Transparent surfaces are blended over what is already there, and don't write depth
-		out_desc.bDepthWrite = false;
+		out_desc.SetDepthWrite(false);
 
-		out_desc.Blends.push_back(BlendAttachment {
-			.Enabled = true,
-			.BlendOp = { .Ops = { .Alpha = VK_BLEND_OP_ADD, .Color = VK_BLEND_OP_ADD } },
-			.AlphaBlend { .Ops { .Src = VK_BLEND_FACTOR_ONE, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
-			.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
-			.TargetIndex = static_cast<uint16>(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float)),
-		});
+		const uint16 target_index = static_cast<uint16>(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float));
+
+		out_desc.SetTargetBlend(target_index,
+								BlendAttachment {
+									.Enabled = true,
+									.BlendOp = { .Ops = { .Alpha = VK_BLEND_OP_ADD, .Color = VK_BLEND_OP_ADD } },
+									.AlphaBlend { .Ops { .Src = VK_BLEND_FACTOR_ONE, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
+									.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
+									.TargetIndex = target_index,
+								});
 	}
 
-	out_desc.DeclareDescriptors = [this](PSOBuild& pso)
+	out_desc.SetDeclareDescriptors([this](PSOBuild& pso)
 	{
-		AddGlobalDescriptors();
+		AddGlobalDescriptors(pso);
 		Material::DeclareDescriptors(pso);
-	};
+	});
 
 	return true;
 }
@@ -502,18 +505,23 @@ bool TiledForwardRenderer::MakePrepassDesc(ePipelineFeatures features, PipelineD
 	}
 
 	const char* suffix = "";
-	out_desc.Features = GetGeometryShaderVariant(features, out_desc.Macros, out_desc.VertexType, suffix);
+	std::vector<ShaderMacro> macros;
+	eVertexType vertex_type = eVertexType::Default;
 
-	out_desc.DebugName = std::string("DepthNormal") + suffix;
+	out_desc.SetFeatures(GetGeometryShaderVariant(features, macros, vertex_type, suffix));
 
-	out_desc.Shader = eShaderName::DepthNormal;
-	out_desc.pStage = &Prepass;
-	out_desc.CullMode = eCullMode::Back;
+	const std::string debug_name = std::string("DepthNormal") + suffix;
 
-	out_desc.PushConstantStages = eShaderType::Vertex | eShaderType::Pixel;
-	out_desc.PushConstantSize = sizeof(DrawPushConstants);
+	out_desc.SetDebugName(debug_name.c_str());
 
-	out_desc.DeclareDescriptors = [](PSOBuild& pso)
+	out_desc.SetShader(eShaderName::DepthNormal, macros);
+	out_desc.SetVertexType(vertex_type);
+	out_desc.UseRenderStage(Prepass);
+	out_desc.SetCullMode(eCullMode::Back);
+
+	out_desc.SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
+
+	out_desc.SetDeclareDescriptors([](PSOBuild& pso)
 	{
 		// Set 0 (Global / Per Frame)
 
@@ -524,67 +532,67 @@ bool TiledForwardRenderer::MakePrepassDesc(ePipelineFeatures features, PipelineD
 					  gMaterialManager->MaterialPropertiesBuffer.GetSize());
 
 		Material::DeclareDescriptors(pso);
-	};
+	});
 
 	return true;
 }
 
-void TiledForwardRenderer::AddGlobalDescriptors()
+void TiledForwardRenderer::AddGlobalDescriptors(PSOBuild& pso)
 {
 	// Set 0 (Global / Per Frame)
 
 	// bObjectBuffer
-	gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
-						 gObjectManager->GetPageSize());
+	pso.AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+				  gObjectManager->GetPageSize());
 	// bMaterialBuffer
-	gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
-						 gMaterialManager->MaterialPropertiesBuffer.GetSize());
+	pso.AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
+				  gMaterialManager->MaterialPropertiesBuffer.GetSize());
 	// bLightGrid
-	gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
+	pso.AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
 	// bLightIndexList
-	gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
-						 gGraphics->LightIndexListPageSize);
+	pso.AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
+				  gGraphics->LightIndexListPageSize);
 	// bProbeBuffer (SH irradiance, per probe)
-	gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
+	pso.AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
 	// bProbeVolume (spatial lookup descriptor for probe blending)
-	gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0, gGraphics->ProbeVolumePageSize);
-	gPSOBuild->AddBuffer(13, 0, eShaderType::Pixel, &gGraphics->ProbeGridBuffer, 0, gGraphics->ProbeGridPageSize);
+	pso.AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0, gGraphics->ProbeVolumePageSize);
+	pso.AddBuffer(13, 0, eShaderType::Pixel, &gGraphics->ProbeGridBuffer, 0, gGraphics->ProbeGridPageSize);
 	// tProbeMoments (per-probe depth moments for visibility)
-	gPSOBuild->AddImage(8, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
-						gSamplerCache->Request({}));
-	gPSOBuild->AddBuffer(14, 0, eShaderType::Pixel, &gGraphics->ReflectionProbeBuffer, 0,
-						 gGraphics->ReflectionProbePageSize);
-	gPSOBuild->AddImage(15, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
-						gSamplerCache->Request({}));
-	gPSOBuild->AddImage(16, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
-						gSamplerCache->Request({}));
+	pso.AddImage(8, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
+				 gSamplerCache->Request({}));
+	pso.AddBuffer(14, 0, eShaderType::Pixel, &gGraphics->ReflectionProbeBuffer, 0,
+				  gGraphics->ReflectionProbePageSize);
+	pso.AddImage(15, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
+				 gSamplerCache->Request({}));
+	pso.AddImage(16, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
+				 gSamplerCache->Request({}));
 	// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas, tDecalBloodAtlas
-	AddDecalDescriptors();
+	AddDecalDescriptors(pso);
 	// tShadowAtlas
-	gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
-						gSamplerCache->Request({}));
+	pso.AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
+				 gSamplerCache->Request({}));
 	// tSSAO
-	gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
-								  gSamplerCache->Request({
-									  .MinFilter = eSamplerFilter::Linear,
-									  .MagFilter = eSamplerFilter::Linear,
-									  .MipFilter = eSamplerFilter::Linear,
-								  }));
+	pso.AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
+						   gSamplerCache->Request({
+							   .MinFilter = eSamplerFilter::Linear,
+							   .MagFilter = eSamplerFilter::Linear,
+							   .MipFilter = eSamplerFilter::Linear,
+						   }));
 }
 
-void TiledForwardRenderer::AddDecalDescriptors()
+void TiledForwardRenderer::AddDecalDescriptors(PSOBuild& pso)
 {
 	// bDecals
-	gPSOBuild->AddBuffer(9, 0, eShaderType::Pixel, &gGraphics->DecalBuffer, 0, gGraphics->DecalPageSize);
+	pso.AddBuffer(9, 0, eShaderType::Pixel, &gGraphics->DecalBuffer, 0, gGraphics->DecalPageSize);
 	// bDecalMasks
-	gPSOBuild->AddBuffer(10, 0, eShaderType::Pixel, &gGraphics->DecalMaskBuffer, 0, gGraphics->DecalMaskPageSize);
+	pso.AddBuffer(10, 0, eShaderType::Pixel, &gGraphics->DecalMaskBuffer, 0, gGraphics->DecalMaskPageSize);
 	// tDecalAtlas, tDecalNormalAtlas and tDecalBloodAtlas, the real atlases are only bound in the persistent descriptor set
-	gPSOBuild->AddImage(11, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-						gSamplerCache->Request({}));
-	gPSOBuild->AddImage(12, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-						gSamplerCache->Request({}));
-	gPSOBuild->AddImage(17, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-						gSamplerCache->Request({}));
+	pso.AddImage(11, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+				 gSamplerCache->Request({}));
+	pso.AddImage(12, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+				 gSamplerCache->Request({}));
+	pso.AddImage(17, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+				 gSamplerCache->Request({}));
 }
 
 void TiledForwardRenderer::SetDecalAtlases(Image* atlas, Image* normal_atlas, Image* blood_atlas)

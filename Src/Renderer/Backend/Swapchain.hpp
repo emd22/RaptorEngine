@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Framebuffer.hpp"
 #include "Image.hpp"
 
 #include <vulkan/vulkan.h>
@@ -35,7 +34,6 @@ private:
     void CreateSwapchain(Vec2u size, VkSurfaceKHR surface);
     void CreateSwapchainImages();
     void CreateImageViews();
-    void CreateFramebuffers();
     void DestroyFramebuffersAndImageViews();
     void DestroyInternalSwapchain();
 
@@ -54,7 +52,6 @@ public:
     bool bInitialized = false;
 
 private:
-    SizedArray<Framebuffer> mFramebuffers;
 
     GpuDevice* mDevice = nullptr;
     VkSwapchainKHR mSwapchain = nullptr;

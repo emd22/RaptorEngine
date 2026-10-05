@@ -1,58 +1,57 @@
 #pragma once
 
 #include "Backend/Descriptors.hpp"
-#include "Backend/Framebuffer.hpp"
 #include "Backend/Image.hpp"
-#include "Backend/RenderPass.hpp"
 #include "Backend/Sampler/Sampler.hpp"
 
 #include <Core/SizedArray.hpp>
+#include <vector>
+#include <Renderer/Target.hpp>
 
 namespace fx::renderer {
 
 class RenderStage
 {
-	static constexpr uint32 scMaxInputAttachments = 6;
-	static constexpr uint32 scMaxOutputTargets = 8;
-	static constexpr uint32 scMaxInputBuffers = 2;
-
-	struct InputTarget
-	{
-		uint32 BindIndex = 0;
-		Target* pTarget = nullptr;
-		Sampler* pSampler = nullptr;
-		RawGpuBuffer* pBuffer = nullptr;
-
-		uint32 BufferOffset = 0;
-		uint32 BufferRange = 0;
-	};
-
 public:
-	RenderStage() = default;
+	RenderStage();
+	RenderStage(const RenderStage&) = delete;
+	RenderStage& operator=(const RenderStage&) = delete;
 
 	void Create(const char* name, const Vec2u& size, eSizeDivisor size_divisor);
 
 	void AddTarget(eImageFormat format, VkImageUsageFlags usage, eImageAspectFlag aspect);
 	void AddTarget(const Target& attachment);
 
-	TargetList& GetTargets() { return mOutputTargets; }
+	/**
+	 * @brief Returns the output target with a given format, which is not valid if there is none. The optional argument
+	 * `sub_index` returns the n'th target of a given format.
+	 */
+	TargetRef GetTarget(eImageFormat format, int32 sub_index = 0) const;
 
 	/**
-	 * @brief Returns the output target with a given format. The optional argument `sub_index` returns the
-	 * n'th target of a given format.
+	 * @brief Returns the index of an output target with a given format, or -1. The optional argument `sub_index` returns
+	 * the index of the n'th target of a given format.
 	 */
-	Target* GetTarget(eImageFormat format, int32 sub_index = 0);
+	int32 GetTargetIndex(eImageFormat format, int32 sub_index = 0) const
+	{
+		const uint32 index = rx_render_stage_find_target(mpStage, static_cast<uint16>(format), sub_index);
 
-	/**
-	 * @brief Returns the index of an output target with a given format. The optional argument `sub_index` returns the
-	 * index of the n'th target of a given format.
-	 */
-	int32 GetTargetIndex(eImageFormat format, int32 sub_index = 0);
+		return (index == RX_NO_TARGET) ? -1 : static_cast<int32>(index);
+	}
+
+	RxRenderStage* GetRust() const { return mpStage; }
+
+	uint32 GetTargetCount() const { return rx_render_stage_target_count(mpStage); }
+
+	/// The formats of the targets that are not depth, which are the ones that blend
+	std::vector<uint16> GetColorTargetFormats() const;
+
+	/// The render pass attachment of each target
+	Slice<VkAttachmentDescription> GetDescriptions();
 
 	void MarkFinalStage();
 
-	RenderPass& GetRenderPass() { return mRenderPass; }
-	Framebuffer& GetFramebuffer() { return mFramebuffer; }
+	FX_FORCE_INLINE VkRenderPass GetRenderPass() const { return reinterpret_cast<VkRenderPass>(mpStage->render_pass); }
 
 	/**
 	 * @brief Builds the Vulkan objects for the render stage. This is deferred until the user requests a renderpass or
@@ -76,53 +75,35 @@ public:
 	/**
 	 * @brief Ends the render pass.
 	 *
-	 * vkCmdEndRenderPass transitions every attachment to its FinalLayout, so the
-	 * tracked layout has to follow. Without this the next explicit barrier on a
-	 * target reports a stale oldLayout -- and a stale UNDEFINED lets the driver
-	 * legally discard everything the pass just rendered.
+	 * vkCmdEndRenderPass transitions every attachment to its FinalLayout, so the tracked layout of each follows.
+	 * Without this the next explicit barrier on a target reports a stale oldLayout -- and a stale UNDEFINED lets the
+	 * driver legally discard everything the pass just rendered.
 	 */
-	void End()
-	{
-		mRenderPass.End();
-
-		for (Target& target : mOutputTargets.Targets) {
-			// Present targets carry a placeholder image; the swapchain owns the real one.
-			if (target.Image.Get() == nullptr) {
-				continue;
-			}
-
-			target.Image.SetLayout(target.FinalLayout);
-		}
-	}
+	void End();
 
 	FX_FORCE_INLINE uint32 GetSizeDivisor() const { return mSizeDivisor; }
 
-	~RenderStage() = default;
+	~RenderStage();
 
 private:
-	void MakeClearValues();
-	void CreateFinalStageFramebuffers();
+	/// Makes the stage's images, render pass and framebuffers, or makes them again at a new size if `recreate`
+	void Build(const Vec2u& final_size, bool recreate);
 
 	void AddPresentTarget();
-
-public:
-	SizedArray<VkClearValue> ClearValues;
 
 private:
 	const char* pcName = "Unnamed";
 
-	TargetList mOutputTargets;
-	SizedArray<InputTarget> mInputTargets;
-
-	Framebuffer mFramebuffer;
-	RenderPass mRenderPass;
+	/// The targets, render pass, framebuffers and clear values live in a record owned by Rust.
+	RxRenderStage* mpStage = nullptr;
 	Vec2u mSize = Vec2u::sZero;
+
+	/// The command buffer the stage was last begun on, which `End()` ends the render pass on
+	CommandBuffer* mpEndCommandBuffer = nullptr;
 
 	bool mbIsFullscreen = false;
 
 	uint32 mSizeDivisor = 1U;
-
-	SizedArray<Framebuffer> mFinalStageFramebuffers;
 
 	bool mbIsBuilt : 1 = false;
 	bool mbIsFinalStage : 1 = false;

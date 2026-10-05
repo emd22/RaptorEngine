@@ -366,9 +366,14 @@ typedef struct RxBuffer
     uint16_t flags;
 } RxBuffer;
 
-RxBuffer* rx_buffer_create(const RxGpuAllocator* allocator, uint32_t buffer_type, uint64_t size,
-                           uint32_t memory_usage, uint16_t flags, int32_t* out_status);
-void rx_buffer_destroy(RxBuffer* buffer, const RxGpuAllocator* allocator);
+RxBuffer* rx_buffer_new(void);
+void rx_buffer_retain(RxBuffer* buffer);
+void rx_buffer_release(RxBuffer* buffer, const RxGpuAllocator* allocator);
+int32_t rx_buffer_create(RxBuffer* buffer, const RxGpuAllocator* allocator, uint32_t buffer_type, uint64_t size,
+                         uint32_t memory_usage, uint16_t flags);
+typedef struct RxBufferResource RxBufferResource;
+RxBufferResource* rx_buffer_detach(RxBuffer* buffer);
+void rx_buffer_resource_destroy(RxBufferResource* resource, const RxGpuAllocator* allocator);
 int32_t rx_buffer_map(RxBuffer* buffer, const RxGpuAllocator* allocator);
 void rx_buffer_unmap(RxBuffer* buffer, const RxGpuAllocator* allocator);
 int32_t rx_buffer_upload(RxBuffer* buffer, const RxGpuAllocator* allocator, const void* data, uint64_t size);
@@ -456,51 +461,30 @@ enum RxDescriptorKind
     RX_DESCRIPTOR_BUFFER = 2,
 };
 
-typedef struct RxDescriptorPoolSize
-{
-    int32_t descriptor_type;
-    uint32_t count;
-} RxDescriptorPoolSize;
-
-typedef struct RxDescriptorWrite
+typedef struct RxDescriptorEntry
 {
     uint32_t binding;
+    uint32_t stages;
     uint32_t kind;
     uint64_t sampler;
-    uint64_t view;
-    uint64_t buffer;
+    const RxImage* image;
+    const RxBuffer* buffer;
     uint64_t offset;
     uint64_t range;
-    uint32_t buffer_type;
-} RxDescriptorWrite;
+} RxDescriptorEntry;
 
-typedef struct RxDescriptorPool
+typedef struct RxDescriptorSet
 {
-    uint64_t pool;
-    uint32_t set_capacity;
-    uint32_t sets_used;
-} RxDescriptorPool;
+    uint64_t set;
+    uint32_t id;
+    uint32_t layout_id;
+    uint32_t buffer_count;
+    uint8_t has_dynamic_offsets;
+    uint8_t built;
+} RxDescriptorSet;
 
-typedef struct RxDescriptorIdEntry
-{
-    uint32_t binding;
-    uint32_t kind;
-    uint64_t handle;
-} RxDescriptorIdEntry;
+typedef struct RxDescriptorCache RxDescriptorCache;
 
-RxDescriptorPool* rx_descriptor_pool_new(const RxGpuDevice* device, const RxDescriptorPoolSize* sizes, size_t count,
-                                         uint32_t max_sets, uint8_t free_sets, int32_t* out_status);
-int32_t rx_descriptor_pool_recreate(RxDescriptorPool* pool, const RxGpuDevice* device);
-void rx_descriptor_pool_destroy(RxDescriptorPool* pool, const RxGpuDevice* device);
-int32_t rx_descriptor_pool_allocate_set(RxDescriptorPool* pool, const RxGpuDevice* device, uint64_t layout,
-                                        uint64_t* out);
-void rx_descriptor_pool_free_set(const RxDescriptorPool* pool, const RxGpuDevice* device, uint64_t set);
-uint32_t rx_descriptor_id(const RxDescriptorIdEntry* entries, size_t count);
-int32_t rx_gpu_descriptor_set_update(const RxGpuDevice* device, uint64_t set, const RxDescriptorWrite* writes,
-                                     size_t count);
-void rx_gpu_cmd_bind_descriptor_sets(const RxGpuDevice* device, void* cmd, int32_t bind_point, uint64_t layout,
-                                     uint32_t first_set, const uint64_t* sets, size_t set_count,
-                                     const uint32_t* offsets, size_t offset_count);
 
 typedef struct RxDsLayoutCache RxDsLayoutCache;
 
@@ -512,16 +496,6 @@ typedef struct RxDsLayoutEntry
     uint32_t count;
 } RxDsLayoutEntry;
 
-int32_t rx_gpu_render_pass_create(const RxGpuDevice* device, const void* descriptions, const uint8_t* is_depth,
-                                  size_t count, uint64_t* out);
-void rx_gpu_render_pass_destroy(const RxGpuDevice* device, uint64_t pass);
-void rx_gpu_cmd_begin_render_pass(const RxGpuDevice* device, void* cmd, uint64_t pass, uint64_t framebuffer, int32_t x,
-                                  int32_t y, uint32_t width, uint32_t height, const void* clear_values,
-                                  size_t clear_count);
-void rx_gpu_cmd_end_render_pass(const RxGpuDevice* device, void* cmd);
-int32_t rx_gpu_framebuffer_create(const RxGpuDevice* device, uint64_t pass, const uint64_t* views, size_t count,
-                                  uint32_t width, uint32_t height, uint64_t* out);
-void rx_gpu_framebuffer_destroy(const RxGpuDevice* device, uint64_t framebuffer);
 
 int32_t rx_gpu_ds_layout_create(const RxGpuDevice* device, const RxDsLayoutEntry* entries, size_t count,
                                 uint64_t* out);
@@ -591,14 +565,11 @@ typedef struct RxShaderProgram
     uint64_t module;
     const RxReflectionEntry* reflection;
     size_t reflection_count;
-    void* user;
+    const char* name;
     uint32_t shader_type;
     uint32_t input_location_mask;
 } RxShaderProgram;
 
-RxShaderProgram* rx_shader_program_new(const RxGpuDevice* device, const uint32_t* code, size_t word_count,
-                                       const RxReflectionEntry* reflection, size_t reflection_count,
-                                       uint32_t shader_type, void* user, int32_t* out_status);
 void rx_shader_program_retain(RxShaderProgram* program);
 void rx_shader_program_release(RxShaderProgram* program, const RxGpuDevice* device);
 RxPipeline* rx_pipeline_create_graphics(const RxGpuDevice* device, const RxGraphicsPipelineDesc* desc,
@@ -658,35 +629,6 @@ const char* rx_reflection_name(uint16_t type);
 size_t rx_vk_result_name(int32_t result, char* buffer, size_t capacity);
 int32_t rx_gpu_set_object_name(const RxGpuDevice* device, int32_t object_type, uint64_t handle, const char* name);
 
-typedef struct RxPipelineRegistry RxPipelineRegistry;
-
-typedef struct RxPipelineKey
-{
-    uint64_t macro_hash;
-    uint64_t blend_hash;
-    uint64_t pass_hash;
-    uint64_t layout_hash;
-    uint32_t shader;
-    uint32_t vertex_type;
-    uint32_t cull_mode;
-    int32_t winding_order;
-    int32_t polygon_mode;
-    int32_t depth_compare_op;
-    uint8_t is_compute;
-    uint8_t has_vertex_input;
-    uint8_t depth_test;
-    uint8_t depth_write;
-    uint8_t render_lines;
-    uint8_t reserved[3];
-} RxPipelineKey;
-
-enum RxKeyRegistration
-{
-    RX_KEY_REGISTERED = 0,
-    RX_KEY_IDENTICAL = 1,
-    RX_KEY_COLLISION = 2,
-};
-
 typedef struct RxHashPair
 {
     uint32_t first;
@@ -707,45 +649,8 @@ typedef struct RxDescriptorSlot
     uint32_t kind;
 } RxDescriptorSlot;
 
-typedef struct RxAttachmentInfo
-{
-    int32_t format;
-    uint32_t samples;
-    int32_t load_op;
-    int32_t store_op;
-    int32_t stencil_load_op;
-    int32_t stencil_store_op;
-    int32_t initial_layout;
-    int32_t final_layout;
-} RxAttachmentInfo;
-
-typedef struct RxClearTarget
-{
-    uint32_t aspect;
-    int32_t load_op;
-    uint8_t render_pass_only;
-} RxClearTarget;
-
 #define RX_INVALID_INDEX 0xFFFFFFFFu
 
-RxPipelineRegistry* rx_pipeline_registry_create(uint32_t num_static, uint32_t max_dynamic);
-void rx_pipeline_registry_free(RxPipelineRegistry* registry);
-uint32_t rx_pipeline_registry_allocate(const RxPipelineRegistry* registry);
-uint8_t rx_pipeline_registry_has_pending(const RxPipelineRegistry* registry);
-size_t rx_pipeline_registry_take_pending(const RxPipelineRegistry* registry, uint32_t* out, size_t capacity);
-int32_t rx_pipeline_registry_register_key(const RxPipelineRegistry* registry, uint32_t handle, const RxPipelineKey* key,
-                                          uint32_t* other, uint64_t* hash);
-uint32_t rx_pipeline_registry_find(const RxPipelineRegistry* registry, const RxPipelineKey* key);
-int32_t rx_pipeline_registry_get_key(const RxPipelineRegistry* registry, uint32_t handle, RxPipelineKey* out);
-void rx_pipeline_registry_register_variant(const RxPipelineRegistry* registry, uint32_t pass, uint32_t features,
-                                           uint32_t handle);
-uint32_t rx_pipeline_registry_find_variant(const RxPipelineRegistry* registry, uint32_t pass, uint32_t features);
-int32_t rx_pipeline_registry_variant_info(const RxPipelineRegistry* registry, uint32_t handle, uint32_t* out_pass,
-                                          uint32_t* out_features);
-int32_t rx_pipeline_registry_pass_pipeline(const RxPipelineRegistry* registry, uint32_t pass, size_t index,
-                                           uint32_t* out);
-
-uint64_t rx_pipeline_key_hash(const RxPipelineKey* key);
 uint64_t rx_pipeline_hash_init(void);
 uint64_t rx_pipeline_blend_hash(const void* states, size_t count);
 uint64_t rx_pipeline_pass_hash(const RxHashPair* pairs, size_t count);
@@ -756,12 +661,6 @@ size_t rx_vertex_filter_attributes(void* attributes, size_t count, uint32_t mask
 int32_t rx_check_descriptors(const RxReflectionEntry* reflection, size_t reflection_count,
                              const RxDescriptorSlot* slots, size_t slot_count, RxDescriptorSlot* out_missing);
 
-void rx_attachment_description(const RxAttachmentInfo* info, void* out);
-size_t rx_clear_values(const RxClearTarget* targets, size_t count, void* out, size_t capacity);
-int32_t rx_find_format_index(const uint16_t* formats, size_t count, uint16_t format, int32_t sub_index);
-uint8_t rx_formats_compatible(const uint16_t* a, size_t a_count, const uint16_t* b, size_t b_count);
-void rx_gpu_cmd_set_viewport_scissor(const RxGpuDevice* device, void* cmd, int32_t x, int32_t y, uint32_t width,
-                                     uint32_t height);
 
 
 typedef struct RxSubmitWait
@@ -805,6 +704,919 @@ int32_t rx_frame_loop_submit_and_present(const RxFrameLoop* frame_loop, const Rx
                                          uint64_t transfer_value, int32_t* out_present);
 void rx_frame_loop_end_frame(const RxFrameLoop* frame_loop);
 void rx_frame_loop_destroy(RxFrameLoop* frame_loop, const RxGpuDevice* device);
+
+typedef struct RxRenderStage
+{
+    uint64_t render_pass;
+    uint32_t width;
+    uint32_t height;
+    uint32_t offset_x;
+    uint32_t offset_y;
+} RxRenderStage;
+
+typedef struct RxTargetConfig
+{
+    uint16_t format;
+    uint16_t image_type;
+    uint32_t usage;
+    uint32_t aspect;
+    int32_t samples;
+    int32_t load_op;
+    int32_t store_op;
+    int32_t stencil_load_op;
+    int32_t stencil_store_op;
+    int32_t initial_layout;
+    int32_t final_layout;
+    uint32_t width;
+    uint32_t height;
+    uint8_t render_pass_only;
+} RxTargetConfig;
+
+#define RX_NO_TARGET UINT32_MAX
+
+RxRenderStage* rx_render_stage_new(void);
+void rx_render_stage_destroy(RxRenderStage* stage, const RxGpuDevice* device, const RxGpuAllocator* allocator);
+uint32_t rx_render_stage_add_target(RxRenderStage* stage, const RxTargetConfig* config, const RxImage* reference);
+uint32_t rx_render_stage_target_count(const RxRenderStage* stage);
+const RxImage* rx_render_stage_target_image(const RxRenderStage* stage, uint32_t index);
+uint32_t rx_render_stage_find_target(const RxRenderStage* stage, uint16_t format, int32_t sub_index);
+size_t rx_render_stage_color_target_formats(const RxRenderStage* stage, uint16_t* out, size_t capacity);
+void rx_render_stage_descriptions(RxRenderStage* stage, const void** out_descriptions, size_t* out_count);
+int32_t rx_render_stage_build(RxRenderStage* stage, const RxGpuDevice* device, const RxGpuAllocator* allocator,
+                              uint32_t width, uint32_t height, const uint64_t* final_views, size_t final_view_count,
+                              uint32_t final_width, uint32_t final_height, uint8_t recreate);
+void rx_render_stage_begin(const RxRenderStage* stage, const RxGpuDevice* device, void* cmd, uint32_t image_index,
+                           int32_t render_x, int32_t render_y, uint32_t render_width, uint32_t render_height,
+                           int32_t draw_x, int32_t draw_y, uint32_t draw_width, uint32_t draw_height);
+void rx_render_stage_end(const RxRenderStage* stage, const RxGpuDevice* device, void* cmd);
+
+RxDescriptorCache* rx_descriptor_cache_new(void);
+void rx_descriptor_cache_destroy(RxDescriptorCache* cache, const RxGpuDevice* device, const RxGpuAllocator* allocator);
+int32_t rx_descriptor_cache_request(RxDescriptorCache* cache, const RxDsLayoutCache* layouts, const RxGpuDevice* device,
+                                    const RxDescriptorEntry* entries, size_t count, uint32_t* out_id,
+                                    RxDescriptorSet** out_set);
+RxDescriptorSet* rx_descriptor_cache_find(RxDescriptorCache* cache, uint32_t id);
+void rx_descriptor_cache_free(RxDescriptorCache* cache, const RxGpuDevice* device, const RxGpuAllocator* allocator,
+                              uint32_t id);
+int32_t rx_descriptor_cache_rebuild_all(RxDescriptorCache* cache, const RxDsLayoutCache* layouts,
+                                        const RxGpuDevice* device);
+void rx_descriptor_set_bind(const RxDescriptorSet* set, const RxGpuDevice* device, void* cmd, int32_t bind_point,
+                            uint64_t layout, uint32_t first_set, const uint32_t* offsets, size_t offset_count);
+
+typedef struct RxGpuProfiler RxGpuProfiler;
+
+uint32_t rx_gpu_marker_count(void);
+RxGpuProfiler* rx_gpu_profiler_new(const RxGpuDevice* device, uint32_t graphics_family, uint32_t frames_in_flight);
+void rx_gpu_profiler_destroy(RxGpuProfiler* profiler, const RxGpuDevice* device);
+void rx_gpu_profiler_read_results(RxGpuProfiler* profiler, const RxGpuDevice* device, uint32_t frame_index,
+                                  double delta_seconds);
+void rx_gpu_profiler_begin_frame(RxGpuProfiler* profiler, const RxGpuDevice* device, void* cmd, uint32_t frame_index);
+void rx_gpu_profiler_mark(RxGpuProfiler* profiler, const RxGpuDevice* device, void* cmd, uint32_t marker);
+double rx_gpu_profiler_average_ms(const RxGpuProfiler* profiler, uint32_t marker);
+double rx_gpu_profiler_total_ms(const RxGpuProfiler* profiler);
+
+typedef struct RxDebugDraw RxDebugDraw;
+
+typedef struct RxDebugDrawCommand
+{
+    float combined_matrix[16];
+    uint32_t color;
+    uint32_t shape;
+} RxDebugDrawCommand;
+
+RxDebugDraw* rx_debug_draw_new(void);
+void rx_debug_draw_free(RxDebugDraw* draw);
+int32_t rx_debug_draw_shape(RxDebugDraw* draw, uint32_t shape, const float* matrix, uint32_t color);
+int32_t rx_debug_draw_line(RxDebugDraw* draw, const float* from, const float* to, uint32_t color);
+int32_t rx_debug_draw_box(RxDebugDraw* draw, uint32_t shape, const float* center, const float* half_extent,
+                          const float* rotation, uint32_t color);
+int32_t rx_debug_draw_aabb(RxDebugDraw* draw, uint32_t shape, const float* min, const float* max, uint32_t color);
+uint32_t rx_debug_draw_count(const RxDebugDraw* draw);
+void rx_debug_draw_commands(RxDebugDraw* draw, const float* camera, const RxDebugDrawCommand** out_commands,
+                            size_t* out_count);
+void rx_debug_draw_clear(RxDebugDraw* draw);
+
+typedef struct RxTextState RxTextState;
+
+typedef struct RxTextInstance
+{
+    float position[2];
+    float size[2];
+    float uv_min[2];
+    float uv_max[2];
+} RxTextInstance;
+
+#define RX_TEXT_NO_ROOM UINT32_MAX
+
+uint32_t rx_text_glyph_width(void);
+uint32_t rx_text_glyph_height(void);
+uint32_t rx_text_max_glyphs(void);
+RxTextState* rx_text_state_new(void);
+void rx_text_state_free(RxTextState* state);
+void rx_text_begin_frame_if_needed(RxTextState* state, uint32_t frame_number);
+void rx_text_cursor(const RxTextState* state, float* out_x, float* out_y);
+void rx_text_move_cursor_down(RxTextState* state, float amount);
+uint32_t rx_text_reserve(RxTextState* state, uint32_t count);
+size_t rx_text_layout(const char* text, float scale, float origin_x, float origin_y, uint32_t window_width,
+                      uint32_t window_height, uint32_t atlas_width, uint32_t atlas_height,
+                      RxTextInstance* out_instances, size_t capacity, float* out_line_height);
+void rx_text_image_instance(float x, float y, float width, float height, uint32_t window_width,
+                            uint32_t window_height, RxTextInstance* out_instance);
+void rx_text_ortho(float width, float height, float near_plane, float far_plane, float* out);
+
+typedef struct RxShadowAtlas RxShadowAtlas;
+
+typedef struct RxShadowRegion
+{
+    uint32_t offset_x;
+    uint32_t offset_y;
+    uint32_t width;
+    uint32_t height;
+} RxShadowRegion;
+
+#define RX_SHADOW_NO_TILE UINT32_MAX
+
+uint32_t rx_shadow_atlas_width(void);
+uint32_t rx_shadow_atlas_height(void);
+uint32_t rx_shadow_atlas_directional_size(void);
+uint32_t rx_shadow_atlas_spot_tile_size(void);
+uint32_t rx_shadow_atlas_max_spot_tiles(void);
+RxShadowAtlas* rx_shadow_atlas_new(void);
+void rx_shadow_atlas_free(RxShadowAtlas* atlas);
+uint32_t rx_shadow_atlas_allocate_spot_tile(RxShadowAtlas* atlas);
+void rx_shadow_atlas_free_spot_tile(RxShadowAtlas* atlas, uint32_t tile);
+void rx_shadow_atlas_invalidate(RxShadowAtlas* atlas);
+uint32_t rx_shadow_atlas_generation(const RxShadowAtlas* atlas);
+uint8_t rx_shadow_atlas_is_initialized(const RxShadowAtlas* atlas);
+void rx_shadow_atlas_begin_region(RxShadowAtlas* atlas, const RxShadowRegion* region,
+                                  RxShadowRegion* out_render_area);
+void rx_shadow_atlas_directional_region(RxShadowRegion* out);
+uint8_t rx_shadow_atlas_spot_tile_region(uint32_t tile, RxShadowRegion* out);
+void rx_shadow_atlas_region_uv_transform(const RxShadowRegion* region, float* out);
+
+typedef struct RxShaderLibrary RxShaderLibrary;
+
+enum RxShaderLoad
+{
+    RX_SHADER_LOAD_OK = 0,
+    RX_SHADER_LOAD_COMPILE_FAILED = 1,
+    RX_SHADER_LOAD_COMPILER_UNAVAILABLE = 2,
+};
+
+RxShaderLibrary* rx_shader_library_new(const char* directory);
+void rx_shader_library_free(RxShaderLibrary* library, const RxGpuDevice* device);
+RxShaderProgram* rx_shader_library_get_program(RxShaderLibrary* library, const RxGpuDevice* device, const char* name,
+                                               uint32_t stage_bits, const RxShaderMacroRef* macros,
+                                               size_t macro_count, const RxLogSink* log, int32_t* out_status);
+
+typedef struct RxSkeleton
+{
+    uint32_t joint_count;
+    uint32_t pose_hash;
+    float pose_radius;
+    uint32_t reserved;
+    float pose_center[4];
+    const float* local;
+    const float* world;
+    const float* skinning;
+    const uint32_t* parents;
+} RxSkeleton;
+
+typedef struct RxPlayback
+{
+    uint32_t animation;
+    float time;
+    float speed;
+    uint8_t on_end;
+} RxPlayback;
+
+typedef struct RxRestPose
+{
+    float translation[4];
+    float rotation[4];
+    float scale[4];
+} RxRestPose;
+
+enum RxAnimationEnd
+{
+    RX_ANIMATION_END_POP = 0,
+    RX_ANIMATION_END_HOLD = 1,
+    RX_ANIMATION_END_LOOP = 2,
+};
+
+#define RX_NO_ANIMATION 0xFFFFFFFFu
+#define RX_NO_BONE 0xFFFFFFFFu
+
+RxSkeleton* rx_skeleton_new(uint32_t joint_count, const float* inverse_bind, const uint32_t* parents,
+                            const RxRestPose* rest_pose, const float* root_transforms, const char* const* names);
+void rx_skeleton_free(RxSkeleton* skeleton);
+RxSkeleton* rx_skeleton_create_instance(const RxSkeleton* source);
+uint32_t rx_skeleton_find_animation(const RxSkeleton* skeleton, const char* name);
+void rx_skeleton_set_rest_animation(RxSkeleton* skeleton, uint32_t animation, float speed);
+uint8_t rx_skeleton_push_animation(RxSkeleton* skeleton, uint32_t animation, uint8_t on_end, float speed);
+uint8_t rx_skeleton_stack_is_full(const RxSkeleton* skeleton);
+void rx_skeleton_pop_animation(RxSkeleton* skeleton);
+void rx_skeleton_clear_animation_stack(RxSkeleton* skeleton);
+uint8_t rx_skeleton_active_playback(const RxSkeleton* skeleton, RxPlayback* out);
+void rx_skeleton_set_external_pose(RxSkeleton* skeleton, uint8_t enabled);
+void rx_skeleton_evaluate_pose(RxSkeleton* skeleton, uint32_t animation, float time);
+void rx_skeleton_pose_from_driven_bones(RxSkeleton* skeleton, const float* driven_world, const uint8_t* is_driven);
+void rx_skeleton_advance(RxSkeleton* skeleton, float delta_time);
+uint32_t rx_skeleton_find_bone(const RxSkeleton* skeleton, const char* name);
+const char* rx_skeleton_bone_name(const RxSkeleton* skeleton, uint32_t bone);
+uint32_t rx_skeleton_max_animation_stack(void);
+
+typedef struct RxPipelineCache RxPipelineCache;
+typedef struct RxPipelineDesc RxPipelineDesc;
+
+typedef struct RxPipelineSetRef
+{
+    uint32_t index;
+    RxDescriptorSet* set;
+    uint64_t layout;
+} RxPipelineSetRef;
+
+typedef struct RxPipelineSlot
+{
+    uint64_t pipeline;
+    uint64_t layout;
+    uint32_t default_cull_mode;
+    uint32_t handle;
+    uint32_t name;
+    uint32_t set_count;
+    const RxPipelineSetRef* sets;
+    const char* debug_name;
+    uint8_t is_compute;
+    uint8_t built;
+} RxPipelineSlot;
+
+typedef struct RxPipelineContext
+{
+    const RxGpuDevice* device;
+    RxDescriptorCache* descriptor_cache;
+    const RxDsLayoutCache* ds_layouts;
+    RxShaderLibrary* library;
+    const RxLogSink* log;
+} RxPipelineContext;
+
+enum RxPipelineStatus
+{
+    RX_PIPELINE_OK = 0,
+    RX_PIPELINE_DESCRIPTOR_MISMATCH = 1,
+    RX_PIPELINE_VULKAN_ERROR = 2,
+    RX_PIPELINE_SHADER_COMPILE_FAILED = 3,
+    RX_PIPELINE_SHADER_COMPILER_UNAVAILABLE = 4,
+    RX_PIPELINE_BLEND_TARGET = 5,
+};
+
+typedef uint8_t (*RxPipelineTemplateFn)(void* user, uint32_t pass, uint32_t features, RxPipelineDesc* desc);
+typedef void (*RxPipelineDeclareFn)(void* user, RxPipelineDesc* desc);
+typedef void (*RxPipelineFreeFn)(void* user);
+
+RxPipelineCache* rx_pipeline_cache_new(uint32_t num_static, uint32_t max_dynamic);
+void rx_pipeline_cache_free(RxPipelineCache* cache, const RxGpuDevice* device);
+void rx_pipeline_cache_set_static_name(const RxPipelineCache* cache, uint32_t handle, const char* name);
+RxPipelineSlot* rx_pipeline_cache_slot(const RxPipelineCache* cache, uint32_t handle);
+uint8_t rx_pipeline_cache_has_pending(const RxPipelineCache* cache);
+uint8_t rx_pipeline_cache_is_main_thread(const RxPipelineCache* cache);
+void rx_pipeline_cache_register_template(const RxPipelineCache* cache, uint32_t pass, RxPipelineTemplateFn call,
+                                         void* user, RxPipelineFreeFn free);
+int32_t rx_pipeline_cache_create(const RxPipelineCache* cache, const RxPipelineContext* context, RxPipelineDesc* desc,
+                                 uint32_t* out_handle, int32_t* out_vk_result);
+int32_t rx_pipeline_cache_build_pending(const RxPipelineCache* cache, const RxPipelineContext* context,
+                                        int32_t* out_vk_result);
+int32_t rx_pipeline_cache_build_static(const RxPipelineCache* cache, const RxPipelineContext* context,
+                                       uint32_t handle, RxPipelineDesc* desc, int32_t* out_vk_result);
+uint32_t rx_pipeline_cache_find_variant(const RxPipelineCache* cache, uint32_t pass, uint32_t features);
+uint32_t rx_pipeline_cache_find_variant_in_pass(const RxPipelineCache* cache, uint32_t handle, uint32_t pass);
+int32_t rx_pipeline_cache_get_or_create_variant(const RxPipelineCache* cache, const RxPipelineContext* context,
+                                                uint32_t pass, uint32_t features, uint32_t* out_handle,
+                                                int32_t* out_vk_result);
+int32_t rx_pipeline_cache_get_or_create_variant_in_pass(const RxPipelineCache* cache,
+                                                        const RxPipelineContext* context, uint32_t handle,
+                                                        uint32_t pass, uint32_t* out_handle, int32_t* out_vk_result);
+uint8_t rx_pipeline_cache_pass_pipeline(const RxPipelineCache* cache, uint32_t pass, size_t index, uint32_t* out);
+void rx_pipeline_cache_add_buffer_offset(const RxPipelineCache* cache, uint32_t set, uint32_t offset);
+uint8_t rx_pipeline_cache_bind_sets(const RxPipelineCache* cache, const RxGpuDevice* device, const RxPipelineSlot* slot,
+                                    void* cmd, int32_t bind_point);
+
+RxPipelineDesc* rx_pipeline_desc_new(void);
+void rx_pipeline_desc_free(RxPipelineDesc* desc);
+void rx_pipeline_desc_set_debug_name(RxPipelineDesc* desc, const char* name);
+void rx_pipeline_desc_set_shader(RxPipelineDesc* desc, uint32_t index, const char* name, const RxShaderMacroRef* macros,
+                                 size_t macro_count);
+void rx_pipeline_desc_add_macro(RxPipelineDesc* desc, const char* name, const char* value);
+void rx_pipeline_desc_set_vertex_type(RxPipelineDesc* desc, uint32_t vertex_type);
+void rx_pipeline_desc_set_no_vertices(RxPipelineDesc* desc, uint8_t value);
+void rx_pipeline_desc_set_stage(RxPipelineDesc* desc, RxRenderStage* stage);
+void rx_pipeline_desc_set_cull_mode(RxPipelineDesc* desc, uint32_t cull_mode);
+void rx_pipeline_desc_set_front_face(RxPipelineDesc* desc, int32_t front_face);
+void rx_pipeline_desc_set_depth_compare_op(RxPipelineDesc* desc, int32_t op);
+void rx_pipeline_desc_set_depth_test(RxPipelineDesc* desc, uint8_t value);
+void rx_pipeline_desc_set_depth_write(RxPipelineDesc* desc, uint8_t value);
+void rx_pipeline_desc_set_render_lines(RxPipelineDesc* desc, uint8_t value);
+void rx_pipeline_desc_add_blend(RxPipelineDesc* desc, uint32_t target_index, const RxBlendAttachment* blend);
+void rx_pipeline_desc_add_push_constants(RxPipelineDesc* desc, uint32_t size, uint32_t stages);
+void rx_pipeline_desc_add_entry(RxPipelineDesc* desc, uint32_t set, const RxDescriptorEntry* entry);
+void rx_pipeline_desc_set_features(RxPipelineDesc* desc, uint32_t features);
+void rx_pipeline_desc_set_declare(RxPipelineDesc* desc, RxPipelineDeclareFn call, void* user, RxPipelineFreeFn free);
+
+typedef struct RxLevel RxLevel;
+
+typedef struct RxLevelSun
+{
+    uint32_t present;
+    uint32_t enabled;
+    uint32_t has_color;
+    uint32_t has_intensity;
+    float position[3];
+    int32_t color[3];
+    float intensity;
+} RxLevelSun;
+
+typedef struct RxLevelLight
+{
+    const char* name;
+    size_t name_length;
+    int64_t kind;
+    uint32_t has_position;
+    uint32_t has_color;
+    uint32_t has_intensity;
+    uint32_t has_direction;
+    uint32_t has_rotation;
+    uint32_t shadows;
+    float position[3];
+    int32_t color[3];
+    float intensity;
+    float radius;
+    float direction[3];
+    float rotation[4];
+    float inner_degrees;
+    float outer_degrees;
+} RxLevelLight;
+
+typedef struct RxLevelCamera
+{
+    uint32_t present;
+    uint32_t has_aperture;
+    uint32_t has_shutter;
+    uint32_t has_iso;
+    uint32_t has_exposure_ev;
+    float aperture;
+    float shutter;
+    float iso;
+    float exposure_ev;
+} RxLevelCamera;
+
+typedef struct RxLevelPlane
+{
+    float normal[3];
+    float distance;
+    uint32_t has_texture;
+    float offset[2];
+    float scale[2];
+    float rotation;
+} RxLevelPlane;
+
+typedef struct RxLevelBlock
+{
+    const char* name;
+    size_t name_length;
+    float position[3];
+    uint32_t brush_kind;
+    float box_min[3];
+    float box_max[3];
+    const RxLevelPlane* planes;
+    uint32_t plane_count;
+    uint32_t has_textures;
+    uint32_t rotation_kind;
+    float rotation[4];
+    uint32_t locked;
+    uint32_t has_material;
+    int32_t material;
+    uint32_t probe_volume;
+    uint32_t reflection_probe;
+    uint32_t bleeds;
+    uint32_t dynamic;
+} RxLevelBlock;
+
+enum RxLevelBrushKind
+{
+    RX_LEVEL_BRUSH_INVALID = 0,
+    RX_LEVEL_BRUSH_BOX = 1,
+    RX_LEVEL_BRUSH_PLANES = 2,
+};
+
+enum RxLevelRotationKind
+{
+    RX_LEVEL_ROTATION_IDENTITY = 0,
+    RX_LEVEL_ROTATION_EULER = 1,
+    RX_LEVEL_ROTATION_QUAT = 2,
+};
+
+enum RxLevelLightKind
+{
+    RX_LEVEL_LIGHT_POINT = 0,
+    RX_LEVEL_LIGHT_SPOT = 1,
+};
+
+typedef struct RxLevelWriteSun
+{
+    uint32_t present;
+    uint32_t enabled;
+    float position[3];
+    int32_t color[4];
+    float intensity;
+} RxLevelWriteSun;
+
+typedef struct RxLevelWriteLight
+{
+    const char* name;
+    size_t name_length;
+    uint32_t spot;
+    uint32_t shadows;
+    float position[3];
+    int32_t color[4];
+    float intensity;
+    float radius;
+    float direction[3];
+    float inner_degrees;
+    float outer_degrees;
+} RxLevelWriteLight;
+
+typedef struct RxLevelWritePlane
+{
+    float normal[3];
+    float distance;
+    float offset[2];
+    float scale[2];
+    float rotation;
+} RxLevelWritePlane;
+
+typedef struct RxLevelWriteBlock
+{
+    const char* name;
+    size_t name_length;
+    float position[3];
+    uint32_t brush_kind;
+    float box_extents[6];
+    const RxLevelWritePlane* planes;
+    uint32_t plane_count;
+    uint32_t textures;
+    float rotation[4];
+    uint32_t locked;
+    uint32_t has_material;
+    int32_t material;
+    uint32_t probe_volume;
+    uint32_t reflection_probe;
+    uint32_t bleeds;
+    uint32_t dynamic;
+} RxLevelWriteBlock;
+
+typedef struct RxLevelWrite
+{
+    RxLevelWriteSun sun;
+    const RxLevelWriteLight* lights;
+    uint32_t light_count;
+    float camera[4];
+    const RxLevelWriteBlock* blocks;
+    uint32_t block_count;
+} RxLevelWrite;
+
+RxLevel* rx_level_parse(const uint8_t* data, size_t length, const char* prelude_path, const RxHost* host);
+void rx_level_free(RxLevel* level);
+uint8_t rx_level_has_errors(const RxLevel* level);
+uint8_t rx_level_has_blocks(const RxLevel* level);
+const RxLevelSun* rx_level_sun(const RxLevel* level);
+const RxLevelCamera* rx_level_camera(const RxLevel* level);
+uint32_t rx_level_light_count(const RxLevel* level);
+const RxLevelLight* rx_level_light(const RxLevel* level, uint32_t index);
+uint32_t rx_level_block_count(const RxLevel* level);
+const RxLevelBlock* rx_level_block(const RxLevel* level, uint32_t index);
+uint8_t rx_level_save(const char* path, const RxLevelWrite* write, const RxLogSink* log);
+
+typedef struct RxWorldFile RxWorldFile;
+
+typedef struct RxWorldCollider
+{
+    const char* name;
+    size_t name_length;
+    float position[3];
+    float rotation[4];
+    uint32_t dynamic;
+    uint32_t has_box;
+    float box_size[3];
+} RxWorldCollider;
+
+typedef struct RxWorldObject
+{
+    const char* name;
+    size_t name_length;
+    const char* mesh;
+    const char* collider;
+    int64_t layer;
+    uint32_t has_shadows;
+    uint32_t shadows;
+    uint32_t has_position;
+    uint32_t has_rotation;
+    uint32_t has_scale;
+    uint32_t has_layer;
+    uint32_t unlit;
+    uint32_t no_cull;
+    float scale;
+    float position[3];
+    float rotation[4];
+} RxWorldObject;
+
+RxWorldFile* rx_world_file_parse(const uint8_t* data, size_t length, const char* prelude_path, const RxHost* host);
+void rx_world_file_free(RxWorldFile* world);
+uint8_t rx_world_file_has_errors(const RxWorldFile* world);
+uint8_t rx_world_file_has_meta(const RxWorldFile* world);
+const char* rx_world_file_name(const RxWorldFile* world);
+uint32_t rx_world_file_collider_count(const RxWorldFile* world);
+const RxWorldCollider* rx_world_file_collider(const RxWorldFile* world, uint32_t index);
+uint32_t rx_world_file_object_count(const RxWorldFile* world);
+const RxWorldObject* rx_world_file_object(const RxWorldFile* world, uint32_t index);
+
+typedef struct RxWorldGrid RxWorldGrid;
+
+typedef struct RxTileSlots
+{
+    const uint32_t* objects;
+    uint32_t object_slots;
+    const uint32_t* lights;
+    uint32_t light_slots;
+} RxTileSlots;
+
+typedef struct RxTileBounds
+{
+    float min[3];
+    float max[3];
+} RxTileBounds;
+
+typedef struct RxGridInfo
+{
+    uint32_t grid_size[2];
+    float tile_size[2];
+    float position_offset[3];
+    uint32_t tile_count;
+    uint32_t view_tile;
+} RxGridInfo;
+
+enum RxObjectUpdate
+{
+    RX_OBJECT_NOT_PLACED = 0,
+    RX_OBJECT_UNCHANGED = 1,
+    RX_OBJECT_MOVED = 2,
+    RX_OBJECT_PLACED = 3,
+};
+
+#define RX_WORLD_GRID_GLOBAL_TILE 0xFFFFFFFEu
+#define RX_WORLD_GRID_NULL_TILE 0xFFFFFFFFu
+
+RxWorldGrid* rx_world_grid_new(const RxLogSink* log);
+void rx_world_grid_free(RxWorldGrid* grid);
+void rx_world_grid_create(RxWorldGrid* grid, uint32_t width, uint32_t height);
+void rx_world_grid_info(const RxWorldGrid* grid, RxGridInfo* out);
+uint32_t rx_world_grid_world_to_tile(const RxWorldGrid* grid, float x, float y, float z);
+void rx_world_grid_tile_to_xy(const RxWorldGrid* grid, uint32_t tile, uint32_t* out);
+uint32_t rx_world_grid_tile_from_xy(const RxWorldGrid* grid, uint32_t x, uint32_t y);
+void rx_world_grid_tile_world_center(const RxWorldGrid* grid, uint32_t x, uint32_t y, float* out);
+void rx_world_grid_tile_bounds(const RxWorldGrid* grid, uint32_t tile, RxTileBounds* out);
+uint8_t rx_world_grid_tile_slots(const RxWorldGrid* grid, uint32_t tile, RxTileSlots* out);
+void rx_world_grid_add_object(RxWorldGrid* grid, uint32_t id, const float* min, const float* max, uint8_t cullable);
+uint32_t rx_world_grid_update_object(RxWorldGrid* grid, uint32_t id, const float* min, const float* max,
+                                     uint8_t cullable);
+void rx_world_grid_remove_object(RxWorldGrid* grid, uint32_t id);
+uint32_t rx_world_grid_object_tile(const RxWorldGrid* grid, uint32_t id);
+void rx_world_grid_add_light(RxWorldGrid* grid, uint32_t id, const float* min, const float* max, uint8_t cullable);
+void rx_world_grid_update_light(RxWorldGrid* grid, uint32_t id, const float* min, const float* max, uint8_t cullable);
+void rx_world_grid_remove_light(RxWorldGrid* grid, uint32_t id);
+uint32_t rx_world_grid_light_tile(const RxWorldGrid* grid, uint32_t id);
+void rx_world_grid_set_view_tile(RxWorldGrid* grid, uint32_t tile);
+const uint32_t* rx_world_grid_nearby_objects(RxWorldGrid* grid, uint32_t* count);
+
+typedef struct RxGltf RxGltf;
+
+typedef struct RxGltfNode
+{
+    uint32_t mesh;
+    int32_t skin;
+} RxGltfNode;
+
+typedef struct RxGltfPrimitive
+{
+    const uint32_t* indices;
+    size_t index_count;
+    const float* positions;
+    size_t position_floats;
+    const float* normals;
+    size_t normal_floats;
+    const float* uvs;
+    size_t uv_floats;
+    const float* tangents;
+    size_t tangent_floats;
+    const float* weights;
+    size_t weight_floats;
+    const uint32_t* joints;
+    size_t joint_values;
+    uint32_t has_indices;
+    int32_t material;
+} RxGltfPrimitive;
+
+typedef struct RxGltfTexture
+{
+    int32_t image;
+    int32_t source_image;
+} RxGltfTexture;
+
+enum RxGltfAlphaMode
+{
+    RX_GLTF_ALPHA_OPAQUE = 0,
+    RX_GLTF_ALPHA_MASK = 1,
+    RX_GLTF_ALPHA_BLEND = 2,
+};
+
+typedef struct RxGltfMaterial
+{
+    const char* name;
+    uint32_t alpha_mode;
+    uint32_t double_sided;
+    uint32_t unlit;
+    uint32_t has_specular_glossiness;
+    uint32_t has_packed_occlusion;
+    float packed_occlusion_strength;
+    float diffuse_factor[4];
+    float specular_factor[3];
+    float glossiness_factor;
+    float base_color_factor[4];
+    float metallic_factor;
+    float roughness_factor;
+    RxGltfTexture specular_glossiness_texture;
+    RxGltfTexture diffuse_texture;
+    RxGltfTexture metallic_roughness_texture;
+    RxGltfTexture base_color_texture;
+    RxGltfTexture normal_texture;
+} RxGltfMaterial;
+
+typedef struct RxGltfImage
+{
+    const char* name;
+    const uint8_t* bytes;
+    size_t size;
+} RxGltfImage;
+
+RxGltf* rx_gltf_load_file(const char* path, const RxLogSink* log);
+RxGltf* rx_gltf_load_memory(const uint8_t* data, size_t size, const RxLogSink* log);
+void rx_gltf_free(RxGltf* gltf);
+uint32_t rx_gltf_node_count(const RxGltf* gltf);
+const RxGltfNode* rx_gltf_node(const RxGltf* gltf, uint32_t index);
+uint32_t rx_gltf_mesh_count(const RxGltf* gltf);
+uint32_t rx_gltf_skin_count(const RxGltf* gltf);
+uint32_t rx_gltf_primitive_count(const RxGltf* gltf, uint32_t mesh);
+const RxGltfPrimitive* rx_gltf_primitive(const RxGltf* gltf, uint32_t mesh, uint32_t primitive);
+const RxGltfMaterial* rx_gltf_material(const RxGltf* gltf, uint32_t index);
+uint8_t rx_gltf_image(const RxGltf* gltf, uint32_t index, RxGltfImage* out);
+const char* rx_gltf_image_name(const RxGltf* gltf, uint32_t index);
+RxSkeleton* rx_gltf_skeleton_new(const RxGltf* gltf, uint32_t skin);
+
+typedef struct RxAssetScheduler RxAssetScheduler;
+typedef struct RxTicket RxTicket;
+
+enum RxLoadStatus
+{
+    RX_LOAD_STATUS_NONE = 0,
+    RX_LOAD_STATUS_SUCCESS = 1,
+    RX_LOAD_STATUS_ERROR = 2,
+};
+
+typedef struct RxAssetBackend
+{
+    void* user;
+    int32_t (*load)(void* user, void* job);
+    void (*begin_upload)(void* user);
+    uint8_t (*upload)(void* user, void* job);
+    void (*end_upload)(void* user);
+    void (*finish)(void* user, void* job, int32_t status);
+    uint32_t (*frame)(void* user);
+    void (*wait_for_uploads)(void* user);
+    void (*destroy)(void* user, void* resource);
+    void (*log)(void* user, int32_t level, int32_t category, const char* message, size_t length);
+} RxAssetBackend;
+
+typedef void (*RxTicketCallback)(void* user, void* argument);
+typedef void (*RxTicketDestroy)(void* user);
+
+RxAssetScheduler* rx_asset_scheduler_new(const RxAssetBackend* backend, uint32_t workers);
+void rx_asset_scheduler_free(RxAssetScheduler* scheduler);
+void rx_asset_scheduler_submit(const RxAssetScheduler* scheduler, void* job);
+void rx_asset_scheduler_delete_resource(const RxAssetScheduler* scheduler, void* resource, uint32_t frame_spacing);
+void rx_asset_scheduler_signal(const RxAssetScheduler* scheduler);
+void rx_asset_scheduler_stop(const RxAssetScheduler* scheduler);
+void rx_asset_scheduler_flush_deletions(const RxAssetScheduler* scheduler);
+
+const RxTicket* rx_ticket_new(void);
+void rx_ticket_retain(const RxTicket* ticket);
+void rx_ticket_release(const RxTicket* ticket);
+uint8_t rx_ticket_is_loaded(const RxTicket* ticket);
+void rx_ticket_wait_finished(const RxTicket* ticket);
+void rx_ticket_wait_uploaded(const RxTicket* ticket);
+void rx_ticket_signal_finished(const RxTicket* ticket);
+void rx_ticket_signal_uploaded(const RxTicket* ticket);
+void rx_ticket_mark_loaded(const RxTicket* ticket);
+void rx_ticket_on_loaded(const RxTicket* ticket, void* asset, RxTicketCallback callback, void* user,
+                         RxTicketDestroy destroy);
+void rx_ticket_on_error(const RxTicket* ticket, RxTicketCallback callback, void* user, RxTicketDestroy destroy);
+void rx_ticket_complete(const RxTicket* ticket, void* asset, uint8_t run_callbacks);
+void rx_ticket_fail(const RxTicket* ticket, uint8_t run_error_callback);
+
+typedef struct RxPlacementBoxes RxPlacementBoxes;
+typedef struct RxPlacement RxPlacement;
+
+#define RX_PLACEMENT_NO_PROBE UINT32_MAX
+
+RxPlacementBoxes* rx_placement_boxes_new(void);
+void rx_placement_boxes_free(RxPlacementBoxes* boxes);
+uint8_t rx_placement_boxes_add(RxPlacementBoxes* boxes, const float* local_min, const float* local_max,
+                               const float* world_min, const float* world_max, const float* local_to_world,
+                               const float* world_to_local, uint8_t axis_aligned, const float* planes,
+                               uint32_t plane_count);
+void rx_placement_boxes_extend(RxPlacementBoxes* boxes, const float* min, const float* max);
+uint32_t rx_placement_boxes_count(const RxPlacementBoxes* boxes);
+uint8_t rx_placement_boxes_is_empty(const RxPlacementBoxes* boxes);
+void rx_placement_boxes_bounds(const RxPlacementBoxes* boxes, float* out_min, float* out_max);
+uint32_t rx_probe_count_needed(const RxPlacementBoxes* boxes, const float* volume_min, const float* cell_size,
+                               const uint32_t* grid_dims, uint32_t fill);
+RxPlacement* rx_probe_place_volume(const RxPlacementBoxes* boxes, const float* volume_min, const float* volume_size,
+                                   const uint32_t* grid_dims, uint32_t fill, uint32_t probe_budget);
+void rx_placement_free(RxPlacement* placement);
+void rx_placement_counts(const RxPlacement* placement, uint32_t* out);
+void rx_placement_positions(const RxPlacement* placement, float* out);
+void rx_placement_grid(const RxPlacement* placement, uint32_t* out);
+void rx_probe_grid_for_spacing(const float* region_size, float spacing, uint8_t cell_centred, uint32_t* out_dims);
+void rx_probe_layout_grid(const float* region_min, const float* region_max, const uint32_t* grid_dims,
+                          uint8_t cell_centred, float* out_min, float* out_size);
+void rx_probe_grid_cell_size(const float* volume_size, const uint32_t* grid_dims, float* out_size);
+uint8_t rx_probe_position_valid(const RxPlacementBoxes* boxes, const float* grid_position, const float* position);
+uint8_t rx_probe_find_valid_position(const RxPlacementBoxes* boxes, const float* grid_position, const float* preferred,
+                                     const float* max_relocation, float* out_position);
+
+typedef struct RxKtx RxKtx;
+
+typedef struct RxKtxInfo
+{
+    uint32_t format;
+    uint32_t width;
+    uint32_t height;
+    uint32_t level_count;
+} RxKtxInfo;
+
+typedef struct RxDecodedImage RxDecodedImage;
+
+typedef struct RxDecodedInfo
+{
+    uint32_t width;
+    uint32_t height;
+    uint32_t channels;
+    size_t size;
+} RxDecodedInfo;
+
+enum RxImageSaveFormat
+{
+    RX_IMAGE_SAVE_JPEG = 0,
+    RX_IMAGE_SAVE_PNG = 1,
+};
+
+RxKtx* rx_ktx_open_file(const char* path, const RxLogSink* log);
+RxKtx* rx_ktx_open_memory(const uint8_t* data, size_t size, const RxLogSink* log);
+void rx_ktx_free(RxKtx* ktx);
+void rx_ktx_info(const RxKtx* ktx, RxKtxInfo* out);
+const uint8_t* rx_ktx_level(const RxKtx* ktx, uint32_t level, size_t* size);
+
+RxDecodedImage* rx_image_decode_file(const char* path, uint32_t channels);
+RxDecodedImage* rx_image_decode_memory(const uint8_t* data, size_t size, uint32_t channels);
+void rx_image_decoded_free(RxDecodedImage* image);
+void rx_image_decoded_info(const RxDecodedImage* image, RxDecodedInfo* out);
+const uint8_t* rx_image_decoded_data(const RxDecodedImage* image);
+uint8_t rx_image_probe_memory(const uint8_t* data, size_t size, uint32_t* width, uint32_t* height);
+uint8_t rx_image_save(const char* path, uint32_t format, const uint8_t* rgba, size_t size, uint32_t width,
+                      uint32_t height, uint8_t flip_y, const RxLogSink* log);
+
+typedef struct RxMaterialLibrary RxMaterialLibrary;
+
+typedef struct RxMaterialDef
+{
+    const char* name;
+    const char* diffuse;
+    const char* normal;
+    const char* orm;
+} RxMaterialDef;
+
+RxMaterialLibrary* rx_material_library_new(void);
+void rx_material_library_free(RxMaterialLibrary* library);
+uint8_t rx_material_library_parse(RxMaterialLibrary* library, const uint8_t* data, size_t length,
+                                  const char* prelude_path, const RxHost* host);
+uint32_t rx_material_library_def_count(const RxMaterialLibrary* library);
+const RxMaterialDef* rx_material_library_def(const RxMaterialLibrary* library, uint32_t index);
+void rx_material_library_register(RxMaterialLibrary* library, const char* name, uint32_t material);
+uint32_t rx_material_library_count(const RxMaterialLibrary* library);
+const char* rx_material_library_name(const RxMaterialLibrary* library, uint32_t index);
+uint32_t rx_material_library_material(const RxMaterialLibrary* library, int32_t index);
+int32_t rx_material_library_find(const RxMaterialLibrary* library, uint32_t material);
+
+typedef struct RxWeaponScriptDef
+{
+    float damage;
+    float range;
+    float rounds_per_minute;
+    int32_t pellets;
+    int32_t fire_mode_flags;
+    int32_t default_mode;
+    int32_t burst_count;
+    float burst_rounds_per_minute;
+    float burst_cooldown;
+    float hit_force;
+    int32_t decals;
+    float spread_hip;
+    float spread_moving;
+    float spread_air;
+    float spread_per_shot;
+    float spread_max;
+    float spread_recovery;
+    float recoil_pitch;
+    float recoil_pitch_variance;
+    float recoil_yaw;
+    float recoil_ramp;
+    float recoil_ramp_max;
+    float recoil_recovery;
+    float recoil_reset_time;
+    float falloff_start;
+    float falloff_end;
+    float falloff_min;
+    int32_t magazine_size;
+    int32_t reserve_max;
+    int32_t reserve_start;
+    float reload_time;
+    float reload_empty_time;
+    int32_t auto_reload;
+    float raise_time;
+    float lower_time;
+} RxWeaponScriptDef;
+
+typedef struct RxWeaponDef
+{
+    const char* name;
+    const char* script;
+    const char* idle_anim;
+    const char* fire_anim;
+    const char* reload_anim;
+    int32_t slot;
+    float view_kick;
+    RxWeaponScriptDef def;
+} RxWeaponDef;
+
+typedef struct RxWeaponDefOwner RxWeaponDefOwner;
+
+#define RX_WEAPON_ERROR_PARSE 1
+#define RX_WEAPON_ERROR_NO_SCRIPT 2
+
+RxWeaponDefOwner* rx_weapon_def_parse(const uint8_t* data, size_t length, const char* prelude_path, const RxHost* host,
+                                      int32_t* error);
+const RxWeaponDef* rx_weapon_def_get(const RxWeaponDefOwner* weapon);
+void rx_weapon_def_free(RxWeaponDefOwner* weapon);
+
+typedef struct RxViewKick
+{
+    float value[4];
+    float velocity[4];
+    float bound[4];
+} RxViewKick;
+
+typedef struct RxRecoil
+{
+    float pending_pitch;
+    float pending_yaw;
+    float offset_pitch;
+    float offset_yaw;
+    float recovery;
+    float idle_time;
+} RxRecoil;
+
+typedef struct RxViewSway
+{
+    float yaw;
+    float pitch;
+    float prev_yaw;
+    float prev_pitch;
+} RxViewSway;
+
+void rx_view_kick_fire(RxViewKick* kick, float kick_degrees, float kickback, float random_yaw, float random_roll);
+void rx_view_kick_update(RxViewKick* kick, float delta_time);
+void rx_recoil_add(RxRecoil* recoil, float pitch, float yaw);
+void rx_recoil_cancel(RxRecoil* recoil, float yaw, float pitch);
+void rx_recoil_update(RxRecoil* recoil, float delta_time, float* delta_yaw, float* delta_pitch);
+void rx_recoil_pitch_clamped(RxRecoil* recoil, float delta_pitch, float applied_pitch);
+void rx_view_sway_update(RxViewSway* sway, float camera_yaw, float camera_pitch, float delta_time);
 
 #ifdef __cplusplus
 }

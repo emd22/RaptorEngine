@@ -33,11 +33,11 @@ impl DescriptorPoolRecord
 		sizes: Vec<vk::DescriptorPoolSize>,
 		max_sets: u32,
 		free_sets: bool,
-	) -> VkResult<Box<Self>>
+	) -> VkResult<Self>
 	{
 		let pool = device.create_descriptor_pool(&sizes, max_sets, free_sets)?;
 
-		Ok(Box::new(Self {
+		Ok(Self {
 			fields: DescriptorPoolFields {
 				pool: pool.as_raw(),
 				set_capacity: max_sets,
@@ -45,7 +45,7 @@ impl DescriptorPoolRecord
 			},
 			sizes,
 			free_sets,
-		}))
+		})
 	}
 
 	/// # Safety

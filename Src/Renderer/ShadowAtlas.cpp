@@ -25,7 +25,7 @@ namespace fx::renderer {
 FX_SET_MODULE_NAME("ShadowAtlas")
 
 /**
- * The general layout of the atlas is like this;
+ * The general layout of the atlas, which is worked out in Rust, is like this;
  * Directional on the left with the largest chunk of resolution, and the 16 spotlight slots on the right (each about
  * 512x512).
  *
@@ -54,8 +54,37 @@ static VkRect2D RegionToRect(const ShadowAtlasRegion& region)
 	};
 }
 
+static RxShadowRegion ToRust(const ShadowAtlasRegion& region)
+{
+	return RxShadowRegion { .offset_x = region.Offset.X,
+							.offset_y = region.Offset.Y,
+							.width = region.Size.X,
+							.height = region.Size.Y };
+}
+
+static ShadowAtlasRegion FromRust(const RxShadowRegion& region)
+{
+	return ShadowAtlasRegion { .Offset = Vec2u(region.offset_x, region.offset_y),
+							   .Size = Vec2u(region.width, region.height) };
+}
+
+ShadowAtlas::~ShadowAtlas()
+{
+	rx_shadow_atlas_free(mpState);
+	mpState = nullptr;
+}
+
 ShadowAtlas::ShadowAtlas()
 {
+	// The sizes are written down here for the shaders and the rest of the engine, and in Rust for the layout
+	AssertEqual(rx_shadow_atlas_width(), scWidth);
+	AssertEqual(rx_shadow_atlas_height(), scHeight);
+	AssertEqual(rx_shadow_atlas_directional_size(), scDirectionalSize);
+	AssertEqual(rx_shadow_atlas_spot_tile_size(), scSpotTileSize);
+	AssertEqual(rx_shadow_atlas_max_spot_tiles(), scMaxSpotTiles);
+
+	mpState = rx_shadow_atlas_new();
+
 	const Vec2u size(scWidth, scHeight);
 
 	RenderStage.Create("ShadowAtlas", size, eSizeDivisor::FullRes);
@@ -99,28 +128,32 @@ bool ShadowAtlas::MakeShadowDesc(ePipelineFeatures features, PipelineDesc& out_d
 	const bool is_masked = (features == ePipelineFeatures::AlphaMask);
 	const bool is_skinned = (features == ePipelineFeatures::Skinned);
 
-	out_desc.Features = features;
-	out_desc.DebugName = is_masked ? "ShadowDirectionalMasked" : (is_skinned ? "ShadowDirectionalSkinned" : "ShadowDirectional");
+	static constexpr ShaderMacro scAlphaMask { .pcName = "ALPHA_MASK", .pcValue = "1" };
+	static constexpr ShaderMacro scSkinning { .pcName = "USE_SKINNING", .pcValue = "1" };
 
-	out_desc.Shader = eShaderName::Shadows;
+	out_desc.SetFeatures(features);
+	out_desc.SetDebugName(is_masked ? "ShadowDirectionalMasked"
+									: (is_skinned ? "ShadowDirectionalSkinned" : "ShadowDirectional"));
 
 	if (is_masked) {
-		out_desc.Macros = { ShaderMacro { .pcName = "ALPHA_MASK", .pcValue = "1" } };
+		out_desc.SetShader(eShaderName::Shadows, std::span { &scAlphaMask, 1 });
 	}
 	else if (is_skinned) {
-		out_desc.Macros = { ShaderMacro { .pcName = "USE_SKINNING", .pcValue = "1" } };
+		out_desc.SetShader(eShaderName::Shadows, std::span { &scSkinning, 1 });
+	}
+	else {
+		out_desc.SetShader(eShaderName::Shadows, {});
 	}
 
-	out_desc.pStage = &RenderStage;
-	out_desc.VertexType = is_skinned ? eVertexType::Skinned : eVertexType::Default;
-	out_desc.DepthCompareOp = VK_COMPARE_OP_GREATER;
-	out_desc.CullMode = eCullMode::Back;
-	out_desc.FaceOrder = eFaceOrder::Reverse;
+	out_desc.UseRenderStage(RenderStage);
+	out_desc.SetVertexType(is_skinned ? eVertexType::Skinned : eVertexType::Default);
+	out_desc.SetDepthCompareOp(VK_COMPARE_OP_GREATER);
+	out_desc.SetCullMode(eCullMode::Back);
+	out_desc.SetFaceOrder(eFaceOrder::Reverse);
 
-	out_desc.PushConstantStages = eShaderType::Vertex;
-	out_desc.PushConstantSize = sizeof(ShadowPushConstants);
+	out_desc.SetPushConstants(eShaderType::Vertex, sizeof(ShadowPushConstants));
 
-	out_desc.DeclareDescriptors = [is_masked, is_skinned](PSOBuild& pso)
+	out_desc.SetDeclareDescriptors([is_masked, is_skinned](PSOBuild& pso)
 	{
 		// Set 0 (Global / Per Frame)
 		pso.AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0, gObjectManager->GetPageSize());
@@ -131,7 +164,7 @@ bool ShadowAtlas::MakeShadowDesc(ePipelineFeatures features, PipelineDesc& out_d
 			// Set 1 (Object local), the material's own descriptors. Only the albedo is read.
 			Material::DeclareDescriptors(pso);
 		}
-	};
+	});
 
 	return true;
 }
@@ -149,37 +182,37 @@ void ShadowAtlas::BindPipeline(PipelineHandle pipeline)
 	}
 }
 
-Target* ShadowAtlas::GetTarget() { return RenderStage.GetTarget(eImageFormat::D32_Float); }
+TargetRef ShadowAtlas::GetTarget() { return RenderStage.GetTarget(eImageFormat::D32_Float); }
 
 void ShadowAtlas::BeginRegion(const ShadowAtlasRegion& region)
 {
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
-	Target* target = GetTarget();
-	Assert(target != nullptr);
+	const TargetRef target = GetTarget();
+	Assert(target.IsValid());
 
 	// The image only reaches the sampled layout after its first pass
-	if (target->Image.GetLayout() != scAtlasLayout) {
-		BarrierHelper::ImageLayoutTransition(&target->Image, scAtlasLayout, cmd, 0, 1);
+	Image atlas_image = target.GetImage();
+
+	if (atlas_image.GetLayout() != scAtlasLayout) {
+		BarrierHelper::ImageLayoutTransition(&atlas_image, scAtlasLayout, cmd, 0, 1);
 	}
 
 	const VkRect2D rect = RegionToRect(region);
 
-	// The render pass clears its render area. The first pass clears the whole atlas, since the image starts out
-	// undefined.
+	// The render pass clears its render area, which is the region, or all of the atlas for the first pass after it was
+	// invalidated, since the image starts out undefined.
 	//
 	// This used to be one pass per frame with vkCmdClearAttachments per region, but on MoltenVK a clear in the middle
 	// of a pass (after other draws) stops the draws that follow it from writing anything.
-	VkRect2D render_area = rect;
+	const RxShadowRegion rust_region = ToRust(region);
+	RxShadowRegion rust_render_area;
+	rx_shadow_atlas_begin_region(mpState, &rust_region, &rust_render_area);
 
-	if (mbNeedsClear) {
-		render_area = RegionToRect(ShadowAtlasRegion { .Offset = Vec2u::sZero, .Size = Vec2u(scWidth, scHeight) });
-		mbNeedsClear = false;
-	}
+	const VkRect2D render_area = RegionToRect(FromRust(rust_render_area));
 
 	// Only the region is drawn to, even when the whole atlas is being cleared
 	RenderStage.Begin(cmd, render_area, rect);
-	mbInitialized = true;
 
 	BindPipeline(gPipelineCache->GetOrCreateVariant(ePipelinePass::Shadow, ePipelineFeatures::None));
 }
@@ -191,60 +224,37 @@ void ShadowAtlas::EndRegion()
 
 ShadowAtlasRegion ShadowAtlas::GetDirectionalRegion() const
 {
-	return ShadowAtlasRegion { .Offset = Vec2u::sZero, .Size = Vec2u(scDirectionalSize, scDirectionalSize) };
+	RxShadowRegion region;
+	rx_shadow_atlas_directional_region(&region);
+
+	return FromRust(region);
 }
 
 ShadowAtlasRegion ShadowAtlas::GetSpotTileRegion(ShadowTileIndex tile) const
 {
-	Assert(tile < scMaxSpotTiles);
+	RxShadowRegion region;
 
-	const uint32 column = tile % scSpotTilesPerRow;
-	const uint32 row = tile / scSpotTilesPerRow;
+	const bool found = rx_shadow_atlas_spot_tile_region(tile, &region) != 0;
+	AssertMsg(found, "There is no such spot light tile");
 
-	return ShadowAtlasRegion {
-		.Offset = Vec2u(scDirectionalSize + (column * scSpotTileSize), row * scSpotTileSize),
-		.Size = Vec2u(scSpotTileSize, scSpotTileSize),
-	};
+	return FromRust(region);
 }
 
 void ShadowAtlas::GetRegionUVTransform(const ShadowAtlasRegion& region, float32 out_transform[4]) const
 {
-	constexpr float32 cWidth = static_cast<float32>(scWidth);
-	constexpr float32 cHeight = static_cast<float32>(scHeight);
+	const RxShadowRegion rust_region = ToRust(region);
 
-	out_transform[0] = static_cast<float32>(region.Size.X) / cWidth;
-	out_transform[1] = static_cast<float32>(region.Size.Y) / cHeight;
-	out_transform[2] = static_cast<float32>(region.Offset.X) / cWidth;
-	out_transform[3] = static_cast<float32>(region.Offset.Y) / cHeight;
+	rx_shadow_atlas_region_uv_transform(&rust_region, out_transform);
 }
 
 ShadowTileIndex ShadowAtlas::AllocateSpotTile()
 {
-	for (ShadowTileIndex tile = 0; tile < scMaxSpotTiles; tile++) {
-		const uint32 bit = (1U << tile);
-
-		if ((mSpotTilesInUse & bit) == 0) {
-			mSpotTilesInUse |= bit;
-			return tile;
-		}
-	}
-
-	return ShadowTileIndexNull;
+	// Rust and C++ agree that no tile is UINT32_MAX
+	return rx_shadow_atlas_allocate_spot_tile(mpState);
 }
 
-void ShadowAtlas::FreeSpotTile(ShadowTileIndex tile)
-{
-	if (tile >= scMaxSpotTiles) {
-		return;
-	}
+void ShadowAtlas::FreeSpotTile(ShadowTileIndex tile) { rx_shadow_atlas_free_spot_tile(mpState, tile); }
 
-	mSpotTilesInUse &= ~(1U << tile);
-}
-
-void ShadowAtlas::Invalidate()
-{
-	++mGeneration;
-	mbNeedsClear = true;
-}
+void ShadowAtlas::Invalidate() { rx_shadow_atlas_invalidate(mpState); }
 
 } // namespace fx::renderer

@@ -21,48 +21,8 @@ class Image;
 namespace renderer {
 
 class Pipeline;
+class CommandBuffer;
 struct Target;
-
-class DescriptorPool
-{
-public:
-	DescriptorPool() = default;
-	DescriptorPool(DescriptorPool&& other);
-
-	DescriptorPool(const DescriptorPool&) = delete;
-	DescriptorPool& operator=(const DescriptorPool&) = delete;
-
-	DescriptorPool& operator=(DescriptorPool&& other);
-
-	/// Sets how many descriptors of `type` the pool will hold. Only applies to the next `Create`.
-	void AddPoolSize(VkDescriptorType type, uint32_t count);
-
-	void Create(GpuDevice* device, uint32 max_sets = 10, bool enable_descriptor_free = false);
-
-	bool IsInited() const { return (mpRecord != nullptr); }
-	FX_FORCE_INLINE VkDescriptorPool Get() const
-	{
-		return (mpRecord != nullptr) ? reinterpret_cast<VkDescriptorPool>(mpRecord->pool) : nullptr;
-	}
-
-	FX_FORCE_INLINE uint32 GetSetCapacity() const { return (mpRecord != nullptr) ? mpRecord->set_capacity : 0; }
-	FX_FORCE_INLINE uint32 GetSetsUsed() const { return (mpRecord != nullptr) ? mpRecord->sets_used : 0; }
-
-	/// Allocates a set with `layout`, or returns a null set and the error in `out_status`.
-	VkDescriptorSet AllocateSet(VkDescriptorSetLayout layout, VkResult& out_status);
-	void FreeSet(VkDescriptorSet set);
-
-	/// Makes the pool again with the same sizes. Every set allocated from it is invalid afterwards.
-	void Recreate();
-
-	void Destroy();
-	~DescriptorPool() { Destroy(); }
-
-private:
-	RxDescriptorPool* mpRecord = nullptr;
-
-	std::vector<RxDescriptorPoolSize> mPendingSizes;
-};
 
 enum class eDescriptorEntryType
 {
@@ -88,6 +48,12 @@ struct DescriptorEntry
 	 */
 	static DescriptorEntry AsImage(uint32 bind_index, eShaderType shader_stages, Image* image, Sampler* sampler);
 
+	/**
+	 * @brief Builds a descriptor entry for an image that is only known by its record, such as a target's
+	 */
+	static DescriptorEntry AsImage(uint32 bind_index, eShaderType shader_stages, const RxImage* image,
+								   Sampler* sampler);
+
 	VkDescriptorType GetDescriptorType() const;
 	FX_FORCE_INLINE eDescriptorEntryType GetType() const { return Type; }
 
@@ -101,7 +67,7 @@ public:
 	uint32 Binding = 0;
 	eShaderType ShaderStages = eShaderType::None;
 
-	Image* pImage = nullptr;
+	const RxImage* pImage = nullptr;
 	Sampler* pSampler = nullptr;
 	RawGpuBuffer* pBuffer = nullptr;
 
@@ -110,33 +76,26 @@ public:
 };
 
 
+/**
+ * @brief A descriptor set made by the `DescriptorCache`. The set and the references it holds onto live in a record
+ * owned by Rust, this is the way to bind it.
+ */
+/// The entry as Rust takes it. The buffer or image has to exist.
+RxDescriptorEntry ToRustEntry(const DescriptorEntry& entry);
+
 class DescriptorSet
 {
-private:
-	// Set 0 (global) now holds 10 buffers (object, material, light grid, light index list, 3 probe buffers, decals,
-	// decal masks, reflection probes) and 6 images.
-	static constexpr uint32 scMaxBuffers = 12;
-	static constexpr uint32 scMaxImages = 8;
-
-	static constexpr uint32 scMaxDescriptorEntries = scMaxBuffers + scMaxImages;
-
 public:
-	DescriptorSet() = default;
+	DescriptorSet(RxDescriptorSet* record, DescriptorID id, DsLayoutID layout_id)
+		: ID(id), LayoutID(layout_id), mpRecord(record)
+	{
+	}
 
-	void Create(DescriptorPool& pool, DescriptorID id, DsLayoutID layout_id, bool has_dynamic_offsets,
-				uint32 count = 1);
-	bool IsInited() const { return mInternalSet != nullptr; }
+	FX_FORCE_INLINE VkDescriptorSet Get() const { return reinterpret_cast<VkDescriptorSet>(mpRecord->set); }
+	FX_FORCE_INLINE bool IsInited() const { return mpRecord->set != 0; }
+	FX_FORCE_INLINE bool HasDynamicOffsets() const { return mpRecord->has_dynamic_offsets != 0; }
 
-	static void BindMultiple(uint32 first_set_index, const CommandBuffer& cmd, VkPipelineBindPoint bind_point,
-							 const Pipeline& pipeline, VkDescriptorSet* sets, uint32 sets_count);
-
-	static void BindMultiple(uint32 first_set_index, const CommandBuffer& cmd, VkPipelineBindPoint bind_point,
-							 const Pipeline& pipeline, const Slice<VkDescriptorSet>& sets);
-
-	static void BindMultipleOffset(uint32 first_set_index, const CommandBuffer& cmd, VkPipelineBindPoint bind_point,
-								   const Pipeline& pipeline, const Slice<VkDescriptorSet>& sets,
-								   const Slice<uint32>& offsets);
-
+	/// Binds the set at `ds_set_index` with one dynamic offset for each of its buffers.
 	void Bind(uint32 ds_set_index, const CommandBuffer& cmd, const Pipeline& pipeline,
 			  const Slice<const uint32> buffer_offsets);
 
@@ -146,41 +105,12 @@ public:
 	void Bind(uint32 first_set_index, const CommandBuffer& cmd, VkPipelineBindPoint bind_point,
 			  const Pipeline& pipeline) const;
 
-	void AddBuffer(uint32 bind_index, RawGpuBuffer* buffer, uint64 offset, uint64 range);
-	void AddImage(uint32 bind_index, Image* image, Sampler* sampler);
-	void AddImageFromTarget(uint32 bind_index, Target* target, Sampler* sampler);
-
-	void Build();
-
-	void Rebuild(DescriptorPool& pool);
-
-	VkDescriptorSet Get()
-	{
-		if (!mbIsBuilt) {
-			Build();
-		}
-
-		return mInternalSet;
-	}
-
-	bool HasDynamicOffsets() const { return mbHasDynamicOffsets; }
-
-
-	~DescriptorSet() = default;
-
 public:
-	DescriptorID ID { HashNull32 };
-	DsLayoutID LayoutID { HashNull32 };
+	DescriptorID ID;
+	DsLayoutID LayoutID;
 
 private:
-	VkDescriptorSet mInternalSet = nullptr;
-
-	uint32 mBufferCount = 0;
-
-	bool mbHasDynamicOffsets : 1 = false;
-	bool mbIsBuilt : 1 = false;
-
-	SizedArray<DescriptorEntry> mDescriptorEntries;
+	RxDescriptorSet* mpRecord = nullptr;
 };
 
 } // namespace renderer

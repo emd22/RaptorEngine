@@ -2,20 +2,13 @@
 
 #include "../ObjectLoaderBase.hpp"
 
+#include <raptor_ffi.h>
+
 #include <Asset/Animation.hpp>
 #include <Core/Path.hpp>
 #include <Material/Material.hpp>
 #include <Object/Object.hpp>
 #include <vector>
-
-struct cgltf_data;
-struct cgltf_material;
-struct cgltf_mesh;
-struct cgltf_texture_view;
-struct cgltf_primitive;
-struct cgltf_animation;
-struct cgltf_skin;
-struct cgltf_node;
 
 namespace fx {
 
@@ -45,22 +38,15 @@ public:
 	~LoaderGltf() override = default;
 
 private:
-	// void MakeEmptyMaterialTexture(Ref<Material>& material, MaterialComponent& component);
-	void MakeMaterialForPrimitive(Object* object, cgltf_primitive* primitive, int32 primitive_index);
+	void MakeMaterialForPrimitive(Object* object, const RxGltfPrimitive& primitive);
 
 	/**
 	 * @brief Unpacks the vertex attributes of `primitive` into `mesh`. Joints and weights are only loaded when
 	 * `is_skinned` is set, as a mesh on a node without a skin is drawn unskinned even when it carries them.
 	 */
-	void UnpackMeshAttributes(Object* object, Ref<PrimitiveMesh>& mesh, cgltf_primitive* primitive, bool is_skinned);
+	void UnpackMeshAttributes(Ref<PrimitiveMesh>& mesh, const RxGltfPrimitive& primitive, bool is_skinned);
 
-	int32 FindJointIndex(cgltf_skin* skin, const cgltf_node* node) const;
-
-	void LoadSkeleton(Skeleton& skel, cgltf_skin* skin); // now takes skel by ref
-	void LoadAnimation(Animation& out_anim, const cgltf_animation& anim, cgltf_skin* skin);
-	void LoadAnimations(Skeleton& skel, cgltf_skin* skin);
-
-	void BuildObjectsFromPrimitives(Object* container_object, cgltf_mesh* gltf_mesh, bool is_skinned);
+	void BuildObjectsFromPrimitives(Object* container_object, uint32 mesh_index, bool is_skinned);
 
 	/**
 	 * @brief Process the GLTF data and build out the object tree.
@@ -74,7 +60,7 @@ public:
 	SizedArray<uint32> IndexBuffer;
 
 private:
-	cgltf_data* mpGltfData = nullptr;
+	RxGltf* mpGltf = nullptr;
 	String mModelPath;
 
 	SizedArray<Mat4f> mBones;

@@ -1,11 +1,13 @@
 use crate::vec3d::Vec3d;
 use crate::vec3f::Vec3f;
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(target_arch = "aarch64", not(feature = "simde")))]
 use core::arch::aarch64::*;
+#[cfg(any(target_arch = "x86_64", feature = "simde"))]
+use crate::x86::*;
 
 #[inline]
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(target_arch = "aarch64", not(feature = "simde")))]
 pub fn to_f64(v: Vec3f) -> Vec3d
 {
 	unsafe {
@@ -17,7 +19,7 @@ pub fn to_f64(v: Vec3f) -> Vec3d
 }
 
 #[inline]
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(target_arch = "aarch64", not(feature = "simde")))]
 pub fn to_f32(v: Vec3d) -> Vec3f
 {
 	unsafe {
@@ -28,4 +30,18 @@ pub fn to_f32(v: Vec3d) -> Vec3f
 		// Combine back to get float32x4_t
 		Vec3f::from_vector(vcombine_f32(a, b))
 	}
+}
+
+#[inline]
+#[cfg(any(target_arch = "x86_64", feature = "simde"))]
+pub fn to_f64(v: Vec3f) -> Vec3d
+{
+	unsafe { Vec3d(_mm256_cvtps_pd(v.0)) }
+}
+
+#[inline]
+#[cfg(any(target_arch = "x86_64", feature = "simde"))]
+pub fn to_f32(v: Vec3d) -> Vec3f
+{
+	unsafe { Vec3f::from_vector(_mm256_cvtpd_ps(v.0)) }
 }

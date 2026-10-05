@@ -76,7 +76,7 @@ if(WIN32)
         target_link_directories(raptor_cpp PRIVATE "$ENV{VULKAN_SDK}/Lib")
     endif()
 
-    target_link_libraries(raptor_cpp PRIVATE vulkan-1 dxcompiler jpeg)
+    target_link_libraries(raptor_cpp PRIVATE vulkan-1)
     target_compile_definitions(raptor_cpp PRIVATE _USE_MATH_DEFINES)
 
     # When FX_BASE_DIR is left as the default "." it resolves against the working directory, and
@@ -90,9 +90,6 @@ if(WIN32)
     add_custom_command(TARGET raptor_cpp POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_SOURCE_DIR}/Lib/win32/SDL3.dll"
-            "${CMAKE_SOURCE_DIR}/Lib/win32/jpeg62.dll"
-            "${CMAKE_SOURCE_DIR}/Lib/win32/turbojpeg.dll"
-            "${CMAKE_SOURCE_DIR}/Lib/win32/ktx.dll"
             "${CMAKE_SOURCE_DIR}/Lib/win32/zstd.dll"
             "$<TARGET_FILE_DIR:raptor_cpp>"
     )
@@ -116,7 +113,7 @@ elseif(APPLE)
     target_link_directories(raptor_cpp PRIVATE "${VK_SDK}/lib")
     set_target_properties(raptor_cpp PROPERTIES BUILD_RPATH "${VK_SDK}/lib")
 
-    target_link_libraries(raptor_cpp PRIVATE vulkan.1 dxcompiler)
+    target_link_libraries(raptor_cpp PRIVATE vulkan.1)
     target_compile_definitions(raptor_cpp PRIVATE VK_ENABLE_BETA_EXTENSIONS=1)
 
 	target_compile_options(raptor_cpp PRIVATE  -fcolor-diagnostics)
@@ -193,7 +190,7 @@ target_link_libraries(raptor_cpp PRIVATE strata raptor_ffi)
 target_include_directories(raptor_cpp SYSTEM BEFORE PRIVATE "Submodules/strata/include")
 
 
-target_link_libraries(raptor_cpp PRIVATE turbojpeg SDL3 freetype ktx)
+target_link_libraries(raptor_cpp PRIVATE SDL3 freetype)
 
 
 # Describes how to link raptor_cpp into the Rust executable (SrcRS/raptor-app/build.rs reads it). CMake only knows the

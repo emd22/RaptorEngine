@@ -13,7 +13,6 @@
 #include <Core/SizedArray.hpp>
 #include <Core/TSRef.hpp>
 #include <Entity.hpp>
-#include <FoxScript/FoxScript.hpp>
 #include <Material/MaterialID.hpp>
 #include <Math/BoundingBox.hpp>
 #include <Math/Frustum.hpp>
@@ -260,14 +259,9 @@ private:
 	uint16 mInstanceSlots = 0;
 	uint16 mInstanceSlotsInUse = 0;
 
-	TileIndex mTileIndex = TileIndexNull;
-	/// Number of tiles (width, height) this object spans starting at mTileIndex's XY.
-	Vec2u mTileSpan = Vec2u(1, 1);
-
 	eObjectFlags Flags = eObjectFlags::None;
 	eObjectLayer mObjectLayer = eObjectLayer::WorldLayer;
 
-	friend class WorldGrid;
 };
 
 

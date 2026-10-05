@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Color.hpp>
-#include <Core/DynArray.hpp>
 #include <Core/Ref.hpp>
 #include <Core/Types.hpp>
 #include <Math/BoundingBox.hpp>
@@ -33,8 +32,8 @@ public:
 	static constexpr uint32 scMaxShapes = 4096U;
 
 public:
-	DebugDraw() = default;
-	~DebugDraw() { Destroy(); }
+	DebugDraw();
+	~DebugDraw();
 
 	DebugDraw(const DebugDraw&) = delete;
 	DebugDraw& operator=(const DebugDraw&) = delete;
@@ -54,30 +53,22 @@ public:
 
 	void Render(const CommandBuffer& cmd, const Camera& camera);
 
-	uint32 GetQueuedCount() const { return static_cast<uint32>(mShapes.Size); }
+	uint32 GetQueuedCount() const { return rx_debug_draw_count(mpQueue); }
 
 	void Clear();
 	void Destroy();
 
 private:
-	struct QueuedShape
-	{
-		Mat4f WorldMatrix;
-		uint32 Color;
-		eDebugShape Shape;
-	};
-
 	/**
 	 * @brief Makes the meshes a shape needs on first use, as this is created before there is a device to upload to.
 	 */
 	PrimitiveMesh& GetMesh(eDebugShape shape);
 
 private:
-	DynArray<QueuedShape> mShapes;
+	/// The queued shapes, and the work of turning them into draws, are in Rust
+	RxDebugDraw* mpQueue = nullptr;
 
 	Ref<PrimitiveMesh> mMeshes[static_cast<uint32>(eDebugShape::Count)];
-
-	bool bWarnedAboutOverflow = false;
 };
 
 } // namespace renderer

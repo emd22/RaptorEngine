@@ -3,33 +3,24 @@
 #include "ShaderReflection.hpp"
 #include "ShaderType.hpp"
 
-#include <Asset/ShaderCompiler.hpp>
 #include <Core/Ref.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
 #include <Renderer/Backend/Descriptors.hpp>
-#include <Core/HashMap.hpp>
-
 
 namespace fx {
 
-
-struct ProgramData
+/// A macro that a shader is compiled with. The name and value are not copied, so they have to be string literals.
+struct ShaderMacro
 {
-	SizedArray<ShaderReflectionEntry> Reflection;
-	Slice<uint8> pProgramData;
-
-	FX_FORCE_INLINE bool HasData() const { return pProgramData.Size > 0; }
-	FX_FORCE_INLINE bool IsValid() const { return pProgramData.pData != nullptr && HasData(); }
+	const char* pcName;
+	const char* pcValue;
 };
 
+static_assert(sizeof(ShaderMacro) == sizeof(RxShaderMacroRef));
 
 namespace renderer {
-
-class Shader;
-class CommandBuffer;
-class Pipeline;
 
 static_assert(sizeof(ShaderReflectionEntry) == sizeof(RxReflectionEntry));
 
@@ -50,15 +41,17 @@ public:
 	ShaderProgram& operator=(ShaderProgram&& other) noexcept;
 
 	/**
-	 * @brief Creates the program from SPIR-V and its reflection data.
-	 *
-	 * @param shader The shader the program was loaded from, for reporting.
-	 * @return A null program if the shader module could not be created.
+	 * @brief Takes over the reference to a program that the shader library gave out.
 	 */
-	static ShaderProgram Create(eShaderType type, Shader* shader, const uint32* code, uint32 word_count,
-								const SizedArray<ShaderReflectionEntry>& reflection);
+	static ShaderProgram Adopt(RxShaderProgram* record)
+	{
+		ShaderProgram program;
+		program.mpRecord = record;
+		return program;
+	}
 
 	FX_FORCE_INLINE bool IsValid() const { return mpRecord != nullptr; }
+	FX_FORCE_INLINE const RxShaderProgram* GetRecord() const { return mpRecord; }
 	FX_FORCE_INLINE bool operator==(nullptr_t np) const { return mpRecord == nullptr; }
 	FX_FORCE_INLINE bool operator!=(nullptr_t np) const { return mpRecord != nullptr; }
 
@@ -73,10 +66,8 @@ public:
 		return (mpRecord != nullptr) ? static_cast<eShaderType>(mpRecord->shader_type) : eShaderType::Vertex;
 	}
 
-	FX_FORCE_INLINE Shader* GetShader() const
-	{
-		return (mpRecord != nullptr) ? static_cast<Shader*>(mpRecord->user) : nullptr;
-	}
+	/// The name of the shader the program is from
+	FX_FORCE_INLINE const char* GetName() const { return (mpRecord != nullptr) ? mpRecord->name : "Unknown"; }
 
 	/// Bit N is set if the program declares a stage input at location N. All bits are set if unknown.
 	FX_FORCE_INLINE uint32 GetInputLocationMask() const
@@ -101,72 +92,6 @@ private:
 
 private:
 	RxShaderProgram* mpRecord = nullptr;
-};
-
-class Shader
-{
-	/**
-	 * @brief Holds a collection of shader programs that have already been loaded from the DataPack or created with
-	 * the ShaderCompiler.
-	 *
-	 * A cached shader can be retrieved from mCachedTypes using the shader type as a key, using the helper function
-	 * `RetrieveCachedShaderProgram`.
-	 *
-	 * Each of these programs should be
-	 */
-	struct ProgramCache
-	{
-		HashMap<ShaderId, ShaderProgram> Programs;
-	};
-
-public:
-	static ShaderId GenerateShaderId(eShaderType type, const SizedArray<ShaderMacro>& macros);
-
-	/**
-	 * @brief Folds a macro list into `hash` by its contents
-	 */
-	static Hash64 HashMacros(const SizedArray<ShaderMacro>& macros, Hash64 hash = FX_HASH64_FNV1A_INIT);
-
-	Shader() = delete;
-	Shader(const char* path)
-	{
-		mCachedTypes.MarkFull();
-		Load(path);
-	}
-
-	/**
-	 * @brief Returns a cached program if it has previously been queried or loads the uncached version from disk.
-	 */
-	ShaderProgram GetProgram(eShaderType shader_type, const SizedArray<ShaderMacro>& macros);
-
-	/**
-	 * @brief Loads a shader program from the DataPack or compiles it if it does not exist.
-	 */
-	ShaderProgram LoadUncachedProgram(eShaderType shader_type, const SizedArray<ShaderMacro>& macros);
-
-	void Load(const char* path);
-
-	const String& GetName() const { return Name; }
-
-private:
-	/**
-	 * @brief Fetches all compiled shader permutations from the datapack if the pack exists.
-	 */
-	bool PreloadCompiledPrograms(const char* pack_path);
-
-	void RecompileShader(const String& source_path, const String& output_path, const SizedArray<ShaderMacro>& macros);
-
-	const String GetSourcePath() const;
-	const String GetProgramPath() const;
-
-private:
-	String Name = "Unknown";
-
-	/// A list of shader types (that hold shader programs) that have already been retreived from the datapack or
-	/// created.
-	StackArray<ProgramCache, ShaderUtil::scNumShaderTypes> mCachedTypes;
-
-	DataPack mDataPack;
 };
 
 } // namespace renderer

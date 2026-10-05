@@ -79,9 +79,6 @@ public:
 
 	bool bEnabled = true;
 
-	TileIndex mTileIndex = TileIndexNull;
-	Vec2u mTileSpan = Vec2u(1, 1);
-
 protected:
 	float32 mRadius = 1.0f;
 };

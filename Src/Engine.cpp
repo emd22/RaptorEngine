@@ -1,7 +1,6 @@
 #include "Engine.hpp"
 
 #include <Asset/AssetManager.hpp>
-#include <Asset/ShaderCompiler.hpp>
 #include <CVar.hpp>
 #include <Core/MemPool/MemPool.hpp>
 #include <Core/Thread/ThreadManager.hpp>
@@ -20,7 +19,6 @@
 namespace fx {
 
 PhysicsManager* gPhysics = nullptr;
-ShaderCompiler* gShaderCompiler = nullptr;
 
 // Managers
 AssetManager* gAssetManager = nullptr;
@@ -56,7 +54,6 @@ void Init()
 {
 	gPhysics = new PhysicsManager;
 	gAssetManager = new AssetManager;
-	gShaderCompiler = new ShaderCompiler;
 	gObjectManager = new ObjectManager;
 	gMaterialManager = new MaterialManager;
 	gWorldGrid = new WorldGrid;
@@ -74,7 +71,6 @@ void Init()
 void Destroy()
 {
 	DESTROY_GLOBAL(gPhysics);
-	DESTROY_GLOBAL(gShaderCompiler);
 	DESTROY_GLOBAL(gMaterialManager);
 	DESTROY_GLOBAL(gWorldGrid);
 	DESTROY_GLOBAL(gThreadManager);

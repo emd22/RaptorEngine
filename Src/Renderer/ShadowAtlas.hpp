@@ -11,6 +11,7 @@ namespace fx::renderer {
 using ShadowTileIndex = uint32;
 
 static constexpr ShadowTileIndex ShadowTileIndexNull = UINT32_MAX;
+static_assert(ShadowTileIndexNull == RX_SHADOW_NO_TILE);
 
 struct alignas(16) ShadowPushConstants
 {
@@ -79,26 +80,25 @@ public:
 	void Invalidate();
 
 	/// Changes whenever the atlas contents are lost. Bakes from an older generation are no longer in the atlas.
-	FX_FORCE_INLINE uint32 GetGeneration() const { return mGeneration; }
+	uint32 GetGeneration() const { return rx_shadow_atlas_generation(mpState); }
 
 	/// Returns true if the shadow atlas is ready to be sampled
-	FX_FORCE_INLINE bool IsInitialized() const { return mbInitialized; }
+	bool IsInitialized() const { return rx_shadow_atlas_is_initialized(mpState) != 0; }
 
-	Target* GetTarget();
+	TargetRef GetTarget();
 
-	~ShadowAtlas() = default;
+	ShadowAtlas(const ShadowAtlas&) = delete;
+	ShadowAtlas& operator=(const ShadowAtlas&) = delete;
+
+	~ShadowAtlas();
 
 public:
 	RenderStage RenderStage;
 
 private:
-	// Mini bitmap for the spotlights
-	uint32 mSpotTilesInUse = 0;
-
-	uint32 mGeneration = 0;
-
-	bool mbNeedsClear = true;
-	bool mbInitialized = false;
+	/// Which spot light tiles are in use, the generation, and the clearing, are in Rust, along with the layout of the
+	/// atlas
+	RxShadowAtlas* mpState = nullptr;
 };
 
 } // namespace fx::renderer

@@ -11,8 +11,8 @@ extern ShadowDirectional* gShadowRenderer;
 class ShadowAtlas;
 extern ShadowAtlas* gShadowAtlas;
 
-class ShaderCache;
-extern ShaderCache* gShaderCache;
+class ShaderLibrary;
+extern ShaderLibrary* gShaderLibrary;
 
 class PipelineCache;
 extern PipelineCache* gPipelineCache;

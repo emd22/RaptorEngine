@@ -104,18 +104,7 @@ void NormalizeRotationRows(Mat4f& m)
 	}
 }
 
-uint32 FindBoneIndex(const Skeleton& skeleton, const char* name)
-{
-	const String bone_name(name);
-
-	for (uint32 i = 0; i < skeleton.JointCount; i++) {
-		if (skeleton.BoneNames[i] == bone_name) {
-			return i;
-		}
-	}
-
-	return BoneNull;
-}
+uint32 FindBoneIndex(const Skeleton& skeleton, const char* name) { return skeleton.FindBone(name); }
 
 } // namespace
 
@@ -123,17 +112,17 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 {
 	Destroy();
 
-	if (!skeleton.IsValid() || skeleton->JointCount == 0 || gPhysics == nullptr || gPhysics->pBackend == nullptr) {
+	if (!skeleton.IsValid() || skeleton->GetJointCount() == 0 || gPhysics == nullptr || gPhysics->pBackend == nullptr) {
 		return false;
 	}
 
 	Skeleton& skel = *skeleton;
 
-	const AnimationPlayback* playback = skel.GetActivePlayback();
-	skel.EvaluatePose((playback != nullptr) ? playback->pAnimation : nullptr,
-					  (playback != nullptr) ? playback->Time : 0.0f);
+	AnimationPlayback playback;
+	const bool is_playing = skel.GetActivePlayback(playback);
+	skel.EvaluatePose(is_playing ? playback.Animation : NoAnimation, is_playing ? playback.Time : 0.0f);
 
-	const uint32 joint_count = skel.JointCount;
+	const uint32 joint_count = skel.GetJointCount();
 	const float32 scale = RowAsVec3(object_world_matrix, 0).Length();
 
 	// std::vector<ResolvedBone> parts;
@@ -177,8 +166,8 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 
 		int parent_body = -1;
 
-		for (uint32 ancestor = skel.ParentIndices[bone]; ancestor != BoneNull;
-			 ancestor = skel.ParentIndices[ancestor]) {
+		for (uint32 ancestor = skel.GetParentIndex(bone); ancestor != BoneNull;
+			 ancestor = skel.GetParentIndex(ancestor)) {
 			if (body_of_bone[ancestor] >= 0) {
 				parent_body = body_of_bone[ancestor];
 				break;
@@ -192,12 +181,12 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 
 		jolt_skeleton->AddJoint(std::string_view(def.Bone), parent_body);
 
-		const Mat4f bone_world = skel.WorldTransforms[bone] * object_world_matrix;
+		const Mat4f bone_world = skel.GetWorldTransform(bone) * object_world_matrix;
 		const JPH::Mat44 rotation = RotationFromMatrix(bone_world);
 		const JPH::Quat orientation = rotation.GetQuaternion().Normalized();
 		const JPH::Vec3 position = RowAsVec3(bone_world, 3);
 
-		const JPH::Vec3 end_position = RowAsVec3(skel.WorldTransforms[end_bone] * object_world_matrix, 3);
+		const JPH::Vec3 end_position = RowAsVec3(skel.GetWorldTransform(end_bone) * object_world_matrix, 3);
 		JPH::Vec3 delta = end_position - position;
 		const float32 span = delta.Length();
 
@@ -290,7 +279,7 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 	expected.InitSize(joint_count);
 
 	for (uint32 i = 0; i < joint_count; i++) {
-		expected[i] = skel.SkinningMatrices[i];
+		expected[i] = skel.GetSkinningMatrix(i);
 	}
 
 	WriteToSkeleton();
@@ -298,7 +287,7 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 	float32 worst_error = 0.0f;
 	for (uint32 i = 0; i < joint_count; i++) {
 		for (uint32 k = 0; k < 16; k++) {
-			worst_error = std::max(worst_error, std::abs(skel.SkinningMatrices[i].RawData[k] - expected[i].RawData[k]));
+			worst_error = std::max(worst_error, std::abs(skel.GetSkinningMatrix(i).RawData[k] - expected[i].RawData[k]));
 		}
 	}
 

@@ -27,15 +27,6 @@ void MaterialManager::Create()
 
 	// The null material should always be set
 
-	renderer::DescriptorPool& dp = mDescriptorPool;
-
-	if (!dp.IsInited()) {
-		dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 512);
-		dp.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 10);
-		dp.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 10);
-		dp.Create(renderer::gGraphics->GetDevice(), FX_MAX_BOUND_MATERIALS);
-	}
-
 	// Material properties buffer descriptors
 	const uint32 material_buffer_size = FX_MAX_BOUND_MATERIALS;
 
@@ -203,7 +194,6 @@ void MaterialManager::Destroy()
 	mMaterialList.Free();
 
 	MaterialPropertiesBuffer.Destroy();
-	mDescriptorPool.Destroy();
 
 	mbInitialized = false;
 }

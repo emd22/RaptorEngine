@@ -11,7 +11,6 @@
 #include "PipelineCache.hpp"
 #include "PrimitiveMesh.hpp"
 
-#include <ThirdParty/stb_image.h>
 
 #include <Asset/AssetManager.hpp>
 #include <Asset/MeshGen.hpp>
@@ -23,25 +22,24 @@ namespace fx::renderer {
 FX_SET_MODULE_NAME("TextRenderer")
 
 
-static constexpr const char* scGlyphMap = " !\"#$%&'()*+,-./"
-										  "0123456789:;<=>?"
-										  "@ABCDEFGHIJKLMNO"
-										  "PQRSTUVWXYZ[\\]^_"
-										  "`abcdefghijklmno"
-										  "pqrstuvwxyz{|}~ ";
+static_assert(sizeof(TextRenderer::InstanceData) == 8 * sizeof(float32));
 
-static int FindGlyphIndex(char c)
+TextRenderer::TextRenderer()
 {
-	for (int i = 0; scGlyphMap[i] != '\0'; ++i) {
-		if (scGlyphMap[i] == c) {
-			return i;
-		}
-	}
+	AssertEqual(rx_text_glyph_width(), scGlyphWidth);
+	AssertEqual(rx_text_glyph_height(), scGlyphHeight);
+	AssertEqual(rx_text_max_glyphs(), scMaxGlyphs);
 
-	return -1;
+	mpState = rx_text_state_new();
 }
 
-TextRenderer::~TextRenderer() { Destroy(); }
+TextRenderer::~TextRenderer()
+{
+	Destroy();
+
+	rx_text_state_free(mpState);
+	mpState = nullptr;
+}
 
 void TextRenderer::Create()
 {
@@ -72,8 +70,7 @@ void TextRenderer::Create()
 	Ref<MeshGen::GeneratedMesh> gm = MeshGen::MakeQuad(Vec2f { 1.0f, 1.0f });
 	mpQuad = gm->AsDefaultMesh();
 
-	Vec2u window_size = gGraphics->GetWindow()->GetSize();
-	mOrthoProjection.LoadOrthographicMatrix(window_size.X, window_size.Y, 0.1f, 10.0f);
+	Resize();
 
 	mInstanceBuffer.Create(eGpuBufferType::StorageWithOffset,
 						   static_cast<uint64>(scMaxGlyphs) * sizeof(InstanceData) * renderer::FramesInFlight,
@@ -83,8 +80,12 @@ void TextRenderer::Create()
 
 void TextRenderer::Resize()
 {
-	Vec2u size = gGraphics->GetWindow()->GetSize();
-	mOrthoProjection.LoadOrthographicMatrix(size.X, size.Y, 0.1f, 10.0f);
+	const Vec2u size = gGraphics->GetWindow()->GetSize();
+
+	float values[16];
+	rx_text_ortho(static_cast<float32>(size.X), static_cast<float32>(size.Y), 0.1f, 10.0f, values);
+
+	mOrthoProjection = Mat4f::FromRows(values);
 }
 
 void TextRenderer::Destroy()
@@ -97,23 +98,14 @@ void TextRenderer::Destroy()
 	mpQuad = nullptr;
 }
 
-void TextRenderer::BeginFrameIfNeeded()
-{
-	const uint32 frame_number = gGraphics->GetFrameNumber();
-
-	if (frame_number != mLastFrameNumber) {
-		mLastFrameNumber = frame_number;
-		mTapeOffset = 0;
-		mCursorPosition = Vec2f::sZero;
-	}
-}
-
 bool TextRenderer::SubmitQuads(DescriptorSet* ds, const InstanceData* instances, uint32 count, uint32 color,
 							   bool is_image)
 {
 	const uint32 instances_size = count * sizeof(InstanceData);
 
-	if (mTapeOffset + instances_size > scMaxGlyphs * sizeof(InstanceData)) {
+	const uint32 tape_offset = rx_text_reserve(mpState, count);
+
+	if (tape_offset == RX_TEXT_NO_ROOM) {
 		LogWarning(LC_RENDER, "TextRenderer: Too many quads in frame, dropping draw");
 		return false;
 	}
@@ -127,7 +119,7 @@ bool TextRenderer::SubmitQuads(DescriptorSet* ds, const InstanceData* instances,
 	const uint32 base_offset = (gGraphics->GetFrameNumber() * scMaxGlyphs * sizeof(InstanceData));
 
 	uint8* mapped = reinterpret_cast<uint8*>(mInstanceBuffer.GetMapped());
-	memcpy(mapped + base_offset + mTapeOffset, instances, instances_size);
+	memcpy(mapped + base_offset + tape_offset, instances, instances_size);
 
 	gPipelineCache->AddBufferOffset(0, base_offset);
 	gPipelineCache->Bind(pipeline_name, cmd);
@@ -137,10 +129,8 @@ bool TextRenderer::SubmitQuads(DescriptorSet* ds, const InstanceData* instances,
 	TextPushConstants consts {};
 	memcpy(consts.CombinedMatrix, mOrthoProjection.RawData, sizeof(consts.CombinedMatrix));
 	consts.TextColor = color;
-	consts.InstanceBase = mTapeOffset / sizeof(InstanceData);
+	consts.InstanceBase = tape_offset / sizeof(InstanceData);
 	gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, consts);
-
-	mTapeOffset += instances_size;
 
 	mpQuad->Render(cmd, count);
 
@@ -153,75 +143,48 @@ void TextRenderer::DrawText(const char* text, float32 scale, uint32 color)
 		return;
 	}
 
-	BeginFrameIfNeeded();
+	rx_text_begin_frame_if_needed(mpState, gGraphics->GetFrameNumber());
 
-	const float32 glyph_width = static_cast<float32>(scGlyphWidth) * scale;
-	const float32 glyph_height = static_cast<float32>(scGlyphHeight) * scale;
+	Vec2f cursor;
+	rx_text_cursor(mpState, &cursor.X, &cursor.Y);
 
-	StackArray<InstanceData, scMaxGlyphs> instances;
-	const float32 atlas_w = static_cast<float32>(mpAtlas->GetSize().X);
-	const float32 atlas_h = static_cast<float32>(mpAtlas->GetSize().Y);
+	DrawTextFrom(text, cursor, scale, color, true);
+}
 
-
+void TextRenderer::DrawTextFrom(const char* text, Vec2f origin, float32 scale, uint32 color, bool advance_cursor)
+{
 	const Vec2u window_size = gGraphics->GetWindow()->GetSize();
-	const Vec2f half_window_size(static_cast<float32>(window_size.X) * 0.5f,
-								 static_cast<float32>(window_size.Y) * 0.5f);
+	const Vec2u atlas_size = mpAtlas->GetSize();
 
-	Vec2f cursor = mCursorPosition - half_window_size + scMargin;
+	InstanceData instances[scMaxGlyphs];
+	float32 line_height = 0.0f;
 
-	for (const char* c = text; *c != '\0'; ++c) {
-		if (instances.Size >= scMaxGlyphs) {
-			break;
-		}
+	const size_t count = rx_text_layout(text, scale, origin.X, origin.Y, window_size.X, window_size.Y, atlas_size.X,
+										atlas_size.Y, instances, scMaxGlyphs, &line_height);
 
-		const int glyph_index = FindGlyphIndex(*c);
-
-		if (glyph_index < 0) {
-			cursor.X += glyph_width;
-			continue;
-		}
-
-		const uint32 col = static_cast<uint32>(glyph_index % scAtlasColumns);
-		const uint32 row = static_cast<uint32>(glyph_index / scAtlasColumns);
-
-		InstanceData* inst = instances.Insert();
-		inst->vPosition[0] = cursor.X;
-		inst->vPosition[1] = -cursor.Y;
-		inst->Size[0] = glyph_width;
-		inst->Size[1] = glyph_height;
-		inst->UVMin[0] = (static_cast<float32>(col) * scGlyphWidth) / atlas_w;
-		inst->UVMin[1] = (static_cast<float32>(row) * scGlyphHeight) / atlas_h;
-		inst->UVMax[0] = (static_cast<float32>(col + 1) * scGlyphWidth) / atlas_w;
-		inst->UVMax[1] = (static_cast<float32>(row + 1) * scGlyphHeight) / atlas_h;
-
-		cursor.X += glyph_width;
-	}
-
-	if (instances.Size == 0) {
+	if (count == 0) {
 		return;
 	}
 
-	if (!SubmitQuads(mpDS, instances.pData, instances.Size, color, false)) {
+	if (!SubmitQuads(mpDS, instances, static_cast<uint32>(count), color, false)) {
 		return;
 	}
 
-	mCursorPosition.Y += glyph_height;
+	if (advance_cursor) {
+		rx_text_move_cursor_down(mpState, line_height);
+	}
 }
 
 void TextRenderer::DrawTextAt(const char* text, Vec2f position, float32 scale, uint32 color)
 {
-	if (mpAtlas == nullptr) {
+	if (mpAtlas == nullptr || text == nullptr) {
 		return;
 	}
 
-	BeginFrameIfNeeded();
+	rx_text_begin_frame_if_needed(mpState, gGraphics->GetFrameNumber());
 
-	const Vec2f saved_cursor = mCursorPosition;
-
-	mCursorPosition = position - scMargin;
-	DrawText(text, scale, color);
-
-	mCursorPosition = saved_cursor;
+	// The text is placed from `position` without touching where the next line of the frame's text goes
+	DrawTextFrom(text, position - scMargin, scale, color, false);
 }
 
 void TextRenderer::DrawImage(Image* image, Vec2f position, Vec2f size, uint32 color)
@@ -230,7 +193,7 @@ void TextRenderer::DrawImage(Image* image, Vec2f position, Vec2f size, uint32 co
 		return;
 	}
 
-	BeginFrameIfNeeded();
+	rx_text_begin_frame_if_needed(mpState, gGraphics->GetFrameNumber());
 
 	// The shader filters images itself from point taps, clamped to a transparent border so taps past the edge of the
 	// image fade out instead of wrapping
@@ -248,15 +211,9 @@ void TextRenderer::DrawImage(Image* image, Vec2f position, Vec2f size, uint32 co
 
 	// Instances are placed by their bottom-left corner, relative to the centre of the window with +Y up
 	const Vec2u window_size = gGraphics->GetWindow()->GetSize();
-	const float32 half_width = static_cast<float32>(window_size.X) * 0.5f;
-	const float32 half_height = static_cast<float32>(window_size.Y) * 0.5f;
 
-	InstanceData instance {
-		.vPosition = { position.X - half_width, half_height - (position.Y + size.Y) },
-		.Size = { size.X, size.Y },
-		.UVMin = { 0.0f, 0.0f },
-		.UVMax = { 1.0f, 1.0f },
-	};
+	InstanceData instance;
+	rx_text_image_instance(position.X, position.Y, size.X, size.Y, window_size.X, window_size.Y, &instance);
 
 	SubmitQuads(ds, &instance, 1, color, true);
 }

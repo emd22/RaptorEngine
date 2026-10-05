@@ -46,3 +46,25 @@ macro_rules! vector_binop {
 		}
 	};
 }
+
+macro_rules! vector_assign_op {
+	($tr:ident, $meth:ident, $op:tt, $t:ty, $rhs:ty) => {
+		impl $tr<$rhs> for $t
+		{
+			#[inline]
+			fn $meth(&mut self, rhs: $rhs)
+			{
+				*self = *self $op rhs;
+			}
+		}
+
+		impl $tr<&$rhs> for $t
+		{
+			#[inline]
+			fn $meth(&mut self, rhs: &$rhs)
+			{
+				*self = *self $op *rhs;
+			}
+		}
+	};
+}

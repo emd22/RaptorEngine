@@ -32,7 +32,6 @@ public:
 
 	bool BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline, const MaterialID& id);
 
-	renderer::DescriptorPool& GetDescriptorPool() { return mDescriptorPool; }
 
 	void Destroy();
 
@@ -58,13 +57,11 @@ public:
 	/**
 	 * @brief Descriptor set for material properties. Used in the light pass.
 	 */
-	renderer::DescriptorSet mMaterialPropertiesDS {};
 
 
 private:
 	FreeArray<Material> mMaterialList;
 
-	renderer::DescriptorPool mDescriptorPool;
 
 	// VkDescriptorSetLayout DsLayoutMaterialBasic;
 	// VkDescriptorSetLayout DsLayoutMaterialPBR;

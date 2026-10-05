@@ -8,6 +8,7 @@ use crate::LogFn;
 
 const CATEGORY_SHADER: i32 = 1;
 const LEVEL_PRINT: i32 = 0;
+const LEVEL_WARNING: i32 = 2;
 const LEVEL_ERROR: i32 = 3;
 
 #[repr(C)]
@@ -55,6 +56,7 @@ impl Log for CLog<'_>
 
 		let level = match level {
 			LogLevel::Print => LEVEL_PRINT,
+			LogLevel::Warning => LEVEL_WARNING,
 			LogLevel::Error => LEVEL_ERROR,
 		};
 

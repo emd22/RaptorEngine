@@ -112,11 +112,11 @@ private:
 	// Light culling
 	void CreateLightCullingPSO();
 
-	/// Registers the decal buffers and atlases (set 0) on the forward pipeline currently being built
-	void AddDecalDescriptors();
+	/// Registers the decal buffers and atlases (set 0) on the pipeline being described
+	void AddDecalDescriptors(PSOBuild& pso);
 
 	/// Set 0 of the forward pipelines
-	void AddGlobalDescriptors();
+	void AddGlobalDescriptors(PSOBuild& pso);
 
 	/**
 	 * @brief The pass templates for the geometry pipelines, see PipelineCache::RegisterPassTemplate()
@@ -132,7 +132,6 @@ private:
 
 
 public:
-	DescriptorPool DescriptorPool;
 
 	FX_FORCE_INLINE uint32 GetLightTileColumns() const { return mLightTileColumns; }
 	FX_FORCE_INLINE uint32 GetLightTileRows() const { return mLightTileRows; }

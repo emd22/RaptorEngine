@@ -162,7 +162,7 @@ void ObjectPropertiesPanel::RefreshMaterialChoices()
 	mpMaterialChoice->Clear();
 
 	for (uint32 id = 0; id < library.GetCount(); id++) {
-		mpMaterialChoice->Append(wxString::FromUTF8(library.GetName(id).Str()));
+		mpMaterialChoice->Append(wxString::FromUTF8(library.GetName(id)));
 	}
 
 	mShownMaterialCount = library.GetCount();

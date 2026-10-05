@@ -1,153 +1,189 @@
 use std::ffi::c_void;
 
 use ash::vk;
-use raptor_gpu::{BufferRecord, BufferType};
+use raptor_gpu::{BufferRecord, BufferResource, BufferType};
 
 use crate::gpu_resources::RxGpuAllocator;
 use crate::gpu_resources_typed::memory;
 
 pub type RxBuffer = BufferRecord;
+pub type RxBufferResource = BufferResource;
 
-/// # Safety
-///
-/// `allocator` must be live and `out_status` writable. The result is null on failure, and otherwise
-/// must be given to `rx_buffer_destroy` with the same allocator.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_buffer_create(
-	allocator: *const RxGpuAllocator,
-	buffer_type: u32,
-	size: u64,
-	memory_usage: u32,
-	flags: u16,
-	out_status: *mut i32,
-) -> *mut RxBuffer
+fn status_of(result: Result<(), vk::Result>) -> i32
 {
-	let Some(buffer_type) = BufferType::from_raw(buffer_type) else {
-		// SAFETY: guaranteed by the caller.
-		unsafe { *out_status = vk::Result::ERROR_INITIALIZATION_FAILED.as_raw() };
-		return std::ptr::null_mut();
-	};
-
-	// SAFETY: guaranteed by the caller.
-	let allocator = unsafe { &(*allocator).0 };
-
-	// SAFETY: the allocator is live.
-	let created =
-		unsafe { BufferRecord::create(allocator, buffer_type, size, memory(memory_usage), flags) };
-
-	match created {
-		Ok(record) => {
-			// SAFETY: guaranteed by the caller.
-			unsafe { *out_status = vk::Result::SUCCESS.as_raw() };
-			Box::into_raw(record)
-		}
-		Err(error) => {
-			// SAFETY: guaranteed by the caller.
-			unsafe { *out_status = error.as_raw() };
-			std::ptr::null_mut()
-		}
-	}
-}
-
-/// # Safety
-///
-/// `record` must come from `rx_buffer_create` on this allocator, not be in use by pending work, and
-/// not be used afterwards.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_buffer_destroy(record: *mut RxBuffer, allocator: *const RxGpuAllocator)
-{
-	if record.is_null() {
-		return;
-	}
-
-	// SAFETY: guaranteed by the caller.
-	unsafe { Box::from_raw(record).destroy(&(*allocator).0) };
-}
-
-/// # Safety
-///
-/// `record` must be live with host visible memory, and `allocator` the one it was created with.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_buffer_map(
-	record: *mut RxBuffer,
-	allocator: *const RxGpuAllocator,
-) -> i32
-{
-	// SAFETY: guaranteed by the caller.
-	match unsafe { (*record).map(&(*allocator).0) } {
+	match result {
 		Ok(()) => vk::Result::SUCCESS.as_raw(),
 		Err(error) => error.as_raw(),
 	}
 }
 
-/// # Safety
-///
-/// `record` must be live, and `allocator` the one it was created with.
+/// Makes an empty buffer slot.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rx_buffer_unmap(record: *mut RxBuffer, allocator: *const RxGpuAllocator)
+pub extern "C" fn rx_buffer_new() -> *mut RxBuffer
 {
-	// SAFETY: guaranteed by the caller.
-	unsafe { (*record).unmap(&(*allocator).0) };
+	BufferRecord::into_raw(BufferRecord::new())
 }
 
 /// # Safety
 ///
-/// `record` must be live with host visible memory at least `size` bytes large, `data` valid for
+/// `buffer` must come from `rx_buffer_new`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rx_buffer_retain(buffer: *mut RxBuffer)
+{
+	// SAFETY: guaranteed by the caller.
+	unsafe { BufferRecord::retain(buffer) };
+}
+
+/// # Safety
+///
+/// `buffer` must come from `rx_buffer_new` and not be used by this reference afterwards.
+/// `allocator` may be null to leak a buffer that is still in the slot, which must not be in use.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rx_buffer_release(buffer: *mut RxBuffer, allocator: *const RxGpuAllocator)
+{
+	// SAFETY: guaranteed by the caller.
+	unsafe { BufferRecord::release(buffer, allocator.as_ref().map(|allocator| &allocator.0)) };
+}
+
+/// Makes a buffer in an empty slot.
+///
+/// # Safety
+///
+/// `buffer` and `allocator` must be live.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rx_buffer_create(
+	buffer: *mut RxBuffer,
+	allocator: *const RxGpuAllocator,
+	buffer_type: u32,
+	size: u64,
+	memory_usage: u32,
+	flags: u16,
+) -> i32
+{
+	let Some(buffer_type) = BufferType::from_raw(buffer_type) else {
+		return vk::Result::ERROR_INITIALIZATION_FAILED.as_raw();
+	};
+
+	// SAFETY: guaranteed by the caller.
+	status_of(unsafe {
+		(*buffer).create(
+			&(*allocator).0,
+			buffer_type,
+			size,
+			memory(memory_usage),
+			flags,
+		)
+	})
+}
+
+/// Empties the slot. The result is null if it was empty, and otherwise must be given to
+/// `rx_buffer_resource_destroy` once the GPU is done with the buffer.
+///
+/// # Safety
+///
+/// `buffer` must be live.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rx_buffer_detach(buffer: *mut RxBuffer) -> *mut RxBufferResource
+{
+	// SAFETY: guaranteed by the caller.
+	unsafe { &*buffer }
+		.detach()
+		.map_or(std::ptr::null_mut(), |resource| {
+			Box::into_raw(Box::new(resource))
+		})
+}
+
+/// # Safety
+///
+/// `resource` must be null or come from `rx_buffer_detach` on this allocator, not be in use by
+/// pending work, and not be used afterwards.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rx_buffer_resource_destroy(
+	resource: *mut RxBufferResource,
+	allocator: *const RxGpuAllocator,
+)
+{
+	if resource.is_null() {
+		return;
+	}
+
+	// SAFETY: guaranteed by the caller.
+	unsafe { Box::from_raw(resource).destroy(&(*allocator).0) };
+}
+
+/// # Safety
+///
+/// `buffer` must be live with host visible memory that is not mapped, and `allocator` the one it
+/// was created with.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rx_buffer_map(
+	buffer: *mut RxBuffer,
+	allocator: *const RxGpuAllocator,
+) -> i32
+{
+	// SAFETY: guaranteed by the caller.
+	status_of(unsafe { (*buffer).map(&(*allocator).0) })
+}
+
+/// # Safety
+///
+/// `buffer` must be live, and `allocator` the one it was created with.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rx_buffer_unmap(buffer: *mut RxBuffer, allocator: *const RxGpuAllocator)
+{
+	// SAFETY: guaranteed by the caller.
+	unsafe { (*buffer).unmap(&(*allocator).0) };
+}
+
+/// # Safety
+///
+/// `buffer` must be live with host visible memory at least `size` bytes large, `data` valid for
 /// `size` bytes, and `allocator` the one it was created with.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rx_buffer_upload(
-	record: *mut RxBuffer,
+	buffer: *mut RxBuffer,
 	allocator: *const RxGpuAllocator,
 	data: *const c_void,
 	size: u64,
 ) -> i32
 {
 	// SAFETY: guaranteed by the caller.
-	let (record, allocator, data) = unsafe {
+	let (buffer, allocator, data) = unsafe {
 		(
-			&mut *record,
+			&*buffer,
 			&(*allocator).0,
 			std::slice::from_raw_parts(data.cast::<u8>(), size as usize),
 		)
 	};
 
 	// SAFETY: guaranteed by the caller.
-	match unsafe { record.upload(allocator, data) } {
-		Ok(()) => vk::Result::SUCCESS.as_raw(),
-		Err(error) => error.as_raw(),
-	}
+	status_of(unsafe { buffer.upload(allocator, data) })
 }
 
 /// # Safety
 ///
-/// `record` must be live, and `allocator` the one it was created with.
+/// `buffer` must be live, and `allocator` the one it was created with.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rx_buffer_flush(
-	record: *const RxBuffer,
+	buffer: *const RxBuffer,
 	allocator: *const RxGpuAllocator,
 	offset: u64,
 	size: u64,
 ) -> i32
 {
 	// SAFETY: guaranteed by the caller.
-	match unsafe { (*record).flush(&(*allocator).0, offset, size) } {
-		Ok(()) => vk::Result::SUCCESS.as_raw(),
-		Err(error) => error.as_raw(),
-	}
+	status_of(unsafe { (*buffer).flush(&(*allocator).0, offset, size) })
 }
 
 /// # Safety
 ///
-/// `record` must be live, and `allocator` the one it was created with.
+/// `buffer` must be live, and `allocator` the one it was created with.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rx_buffer_invalidate(
-	record: *const RxBuffer,
+	buffer: *const RxBuffer,
 	allocator: *const RxGpuAllocator,
 ) -> i32
 {
 	// SAFETY: guaranteed by the caller.
-	match unsafe { (*record).invalidate(&(*allocator).0) } {
-		Ok(()) => vk::Result::SUCCESS.as_raw(),
-		Err(error) => error.as_raw(),
-	}
+	status_of(unsafe { (*buffer).invalidate(&(*allocator).0) })
 }

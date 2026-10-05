@@ -6,217 +6,102 @@
 #include <Core/Types.hpp>
 #include <Renderer/Backend/DescriptorCache.hpp>
 #include <Renderer/Globals.hpp>
-#include <algorithm>
+#include <Renderer/GraphicsBackend.hpp>
+#include <Renderer/ShaderLibrary.hpp>
+#include <Util/RustInterop.hpp>
 
 namespace fx::renderer {
 
-static constexpr uint32 scMaxDescriptorSets = 8;
-static constexpr uint32 scMaxBuffersPerDS = 6;
+static constexpr uint32 scMaxDynamicPipelines = 256;
 
 PipelineCache::PipelineCache()
 {
-	// The cache is made on the thread that builds pipelines
-	mMainThread = std::this_thread::get_id();
+	mpCache = rx_pipeline_cache_new(scNumPipelines, scMaxDynamicPipelines);
 
-	mCache.InitSize(scNumPipelines);
-
-	for (uint32 i = 0; i < scNumPipelines; i++) {
-		mCache[i].Handle = PipelineHandle { i };
-	}
-
-	mpRegistry = rx_pipeline_registry_create(scNumPipelines, scMaxDynamicPipelines);
-
-	for (std::atomic<DynamicPipeline*>& dynamic : mDynamic) {
-		dynamic.store(nullptr, std::memory_order_relaxed);
-	}
-
-	mOffsets.InitCapacity(scMaxDescriptorSets);
-
-	for (uint32 i = 0; i < mOffsets.Capacity; i++) {
-		mOffsets[i].pData = nullptr;
-		mOffsets[i].Size = 0;
-		mOffsets[i].Capacity = 0;
-		mOffsets[i].bDoNotDestroy = false;
-		mOffsets[i].InitCapacity(scMaxBuffersPerDS);
-	}
+	mLog = RxLogSink { .user = nullptr, .log = RustInterop::Log };
 }
 
 PipelineCache::~PipelineCache()
 {
-	for (std::atomic<DynamicPipeline*>& dynamic : mDynamic) {
-		delete dynamic.load();
-	}
+	GraphicsBackend* graphics = gGraphics;
 
-	rx_pipeline_registry_free(mpRegistry);
+	const bool can_free = (graphics != nullptr) && (graphics->GetDevice()->GetRustDevice() != nullptr);
+
+	rx_pipeline_cache_free(mpCache, can_free ? graphics->GetDevice()->GetRustDevice() : nullptr);
+	mpCache = nullptr;
 }
 
-Pipeline& PipelineCache::Request(const ePipelineName id)
+RxPipelineContext PipelineCache::MakeContext() const
 {
-	Pipeline& pl = mCache[static_cast<uint32>(id)];
-	pl.Name = id;
-	return pl;
+	return RxPipelineContext {
+		.device = gGraphics->GetDevice()->GetRustDevice(),
+		.descriptor_cache = gDescriptorCache->GetRust(),
+		.ds_layouts = gDsLayoutCache->GetRustCache(),
+		.library = gShaderLibrary->GetRust(),
+		.log = &mLog,
+	};
 }
 
-ePipelineName PipelineCache::GetName(const Pipeline* pipeline) const { return pipeline->Name; }
+void PipelineCache::CheckStatus(int32 status, int32 vk_result)
+{
+	switch (status) {
+	case RX_PIPELINE_OK:
+		break;
+	case RX_PIPELINE_DESCRIPTOR_MISMATCH:
+		Panic("PSOBuild", "Descriptor mismatch");
+		break;
+	case RX_PIPELINE_VULKAN_ERROR:
+		PanicVulkan("Pipeline", "Could not create pipeline", static_cast<VkResult>(vk_result));
+		break;
+	case RX_PIPELINE_BLEND_TARGET:
+		Panic("PSOBuild", "A blend attachment targets an attachment that does not exist");
+		break;
+	default:
+		Panic("RecompileShader", "Error compiling shaders");
+	}
+}
 
-void PipelineCache::Bind(const ePipelineName name, const CommandBuffer& cmd) { Bind(Request(name).Handle, cmd); }
+Pipeline& PipelineCache::Request(const ePipelineName id) { return Get(GetHandle(id)); }
+
+void PipelineCache::Bind(const ePipelineName name, const CommandBuffer& cmd) { Bind(GetHandle(name), cmd); }
 
 Pipeline& PipelineCache::Get(const PipelineHandle handle)
 {
-	if (handle.Index < scNumPipelines) {
-		return mCache[handle.Index];
-	}
-
 	// Pipelines that other threads asked for are built here, before they are drawn with
-	if (rx_pipeline_registry_has_pending(mpRegistry) != 0 && IsMainThread()) {
+	if (handle.Index >= scNumPipelines && rx_pipeline_cache_has_pending(mpCache) != 0 &&
+		rx_pipeline_cache_is_main_thread(mpCache) != 0) {
 		BuildPending();
 	}
 
-	const uint32 dynamic_index = handle.Index - scNumPipelines;
-	AssertLess(dynamic_index, scMaxDynamicPipelines);
+	RxPipelineSlot* slot = rx_pipeline_cache_slot(mpCache, handle.Index);
+	AssertMsg(slot != nullptr, "There is no pipeline for this handle");
 
-	DynamicPipeline* dynamic = mDynamic[dynamic_index].load(std::memory_order_acquire);
-	AssertMsg(dynamic != nullptr, "There is no pipeline for this handle");
-
-	return dynamic->Pipe;
+	return *static_cast<Pipeline*>(slot);
 }
 
 const char* PipelineCache::GetDebugName(const PipelineHandle handle) const
 {
-	if (handle.Index < scNumPipelines) {
-		return PipelineNameUtil::GetName(static_cast<ePipelineName>(handle.Index));
-	}
+	const RxPipelineSlot* slot = rx_pipeline_cache_slot(mpCache, handle.Index);
 
-	const uint32 dynamic_index = handle.Index - scNumPipelines;
-
-	if (dynamic_index >= scMaxDynamicPipelines) {
-		return "Unknown";
-	}
-
-	const DynamicPipeline* dynamic = mDynamic[dynamic_index].load(std::memory_order_acquire);
-	return (dynamic != nullptr) ? dynamic->DebugName.c_str() : "Unknown";
-}
-
-PipelineHandle PipelineCache::CreateLocked(const PipelineDesc& desc)
-{
-	const uint32 handle_index = rx_pipeline_registry_allocate(mpRegistry);
-
-	if (handle_index == RX_INVALID_INDEX) {
-		LogError(LC_RENDER, "Can not make pipeline '{}', there are already {} pipelines made from descriptions",
-				 desc.DebugName, scMaxDynamicPipelines);
-		return PipelineHandle {};
-	}
-
-	const PipelineHandle handle { handle_index };
-
-	DynamicPipeline* dynamic = new DynamicPipeline;
-	dynamic->Pipe.Handle = handle;
-	dynamic->Pipe.Name = ePipelineName::NumPipelines;
-	dynamic->Desc = desc;
-	dynamic->DebugName = desc.DebugName;
-
-	// The pipeline is set up before it is stored, so whoever finds it finds all of it
-	mDynamic[handle_index - scNumPipelines].store(dynamic, std::memory_order_release);
-
-	return handle;
-}
-
-PipelineHandle PipelineCache::Create(const PipelineDesc& desc)
-{
-	PipelineHandle handle;
-
-	{
-		std::lock_guard lock(mMutex);
-		handle = CreateLocked(desc);
-	}
-
-	if (handle.IsValid() && IsMainThread()) {
-		BuildPending();
-
-		if (!Get(handle).IsBuilt()) {
-			return PipelineHandle {};
-		}
-	}
-
-	return handle;
+	return (slot != nullptr) ? slot->debug_name : "Unknown";
 }
 
 void PipelineCache::BuildPending()
 {
-	Assert(IsMainThread());
+	int32 vk_result = 0;
 
-	// Building a pipeline looks pipelines up, which would build the pending ones again
-	if (mbBuilding) {
-		return;
-	}
+	const RxPipelineContext context = MakeContext();
 
-	mbBuilding = true;
-
-	while (true) {
-		uint32 pending[scMaxDynamicPipelines];
-		size_t pending_count = 0;
-
-		{
-			std::lock_guard lock(mMutex);
-			pending_count = rx_pipeline_registry_take_pending(mpRegistry, pending, scMaxDynamicPipelines);
-		}
-
-		if (pending_count == 0) {
-			break;
-		}
-
-		for (size_t pending_index = 0; pending_index < pending_count; pending_index++) {
-			const uint32 index = pending[pending_index];
-			DynamicPipeline* dynamic = mDynamic[index].load(std::memory_order_acquire);
-
-			gPSOBuild->Build(PipelineHandle { scNumPipelines + index }, dynamic->Desc);
-
-			if (!dynamic->Pipe.IsBuilt()) {
-				LogError(LC_RENDER, "Pipeline '{}' could not be built", dynamic->DebugName);
-			}
-
-			// The description is done with, and can hold onto a lot
-			dynamic->Desc = PipelineDesc {};
-		}
-	}
-
-	mbBuilding = false;
+	CheckStatus(rx_pipeline_cache_build_pending(mpCache, &context, &vk_result), vk_result);
 }
 
-bool PipelineCache::RegisterKey(const PipelineHandle handle, const PipelineKey& key)
+void PipelineCache::BuildStatic(const PipelineHandle handle, RxPipelineDesc* desc)
 {
-	uint32 other = 0;
-	uint64 hash = 0;
+	int32 vk_result = 0;
 
-	const int32 result = rx_pipeline_registry_register_key(
-		mpRegistry, handle.Index, reinterpret_cast<const RxPipelineKey*>(&key), &other, &hash);
+	const RxPipelineContext context = MakeContext();
 
-	if (result == RX_KEY_IDENTICAL) {
-		LogWarning(LC_RENDER, "Pipelines {} and {} were built from identical keys (hash {:#x})", handle.Index, other,
-				   hash);
-	}
-	else if (result == RX_KEY_COLLISION) {
-		LogError(LC_RENDER, "Pipelines {} and {} have different keys with the same hash {:#x}", handle.Index, other,
-				 hash);
-	}
-
-	return result == RX_KEY_REGISTERED;
-}
-
-PipelineHandle PipelineCache::Find(const PipelineKey& key) const
-{
-	return PipelineHandle { rx_pipeline_registry_find(mpRegistry, reinterpret_cast<const RxPipelineKey*>(&key)) };
-}
-
-std::optional<PipelineKey> PipelineCache::GetKey(const PipelineHandle handle) const
-{
-	PipelineKey key;
-
-	if (rx_pipeline_registry_get_key(mpRegistry, handle.Index, reinterpret_cast<RxPipelineKey*>(&key)) == 0) {
-		return std::nullopt;
-	}
-
-	return key;
+	CheckStatus(rx_pipeline_cache_build_static(mpCache, &context, handle.Index, desc, &vk_result), vk_result);
 }
 
 void PipelineCache::Bind(const PipelineHandle handle, const CommandBuffer& cmd)
@@ -230,133 +115,68 @@ void PipelineCache::Bind(const PipelineHandle handle, const CommandBuffer& cmd)
 
 	pl.Bind(cmd);
 
-	for (uint32 i = 0; i < pl.DescriptorIDs.Size; i++) {
-		Pipeline::DescriptorRef& desc_ref = pl.DescriptorIDs[i];
-		Assert(desc_ref.pSet != nullptr);
+	const bool matched = rx_pipeline_cache_bind_sets(mpCache, gGraphics->GetDevice()->GetRustDevice(), &pl, cmd.Cmd,
+													 pl.GetBindPoint()) != 0;
 
-		desc_ref.pSet->Bind(desc_ref.SetIndex, cmd, pl, Slice<uint32>(mOffsets[desc_ref.SetIndex]));
-	}
-
-	Reset();
-}
-
-void PipelineCache::RegisterVariantLocked(const ePipelinePass pass, const ePipelineFeatures features,
-										  const PipelineHandle handle)
-{
-	AssertLess(static_cast<uint32>(pass), scNumPipelinePasses);
-	AssertLess(static_cast<uint32>(features), scNumFeatureCombinations);
-
-	rx_pipeline_registry_register_variant(mpRegistry, static_cast<uint32>(pass), static_cast<uint32>(features),
-										  handle.Index);
-}
-
-void PipelineCache::RegisterVariant(const ePipelinePass pass, const ePipelineFeatures features,
-									const PipelineHandle handle)
-{
-	std::lock_guard lock(mMutex);
-	RegisterVariantLocked(pass, features, handle);
+	AssertMsg(matched, "The buffer offsets do not match the buffers in the pipeline's descriptor sets");
 }
 
 PipelineHandle PipelineCache::FindVariant(const ePipelinePass pass, const ePipelineFeatures features) const
 {
-	return PipelineHandle { rx_pipeline_registry_find_variant(mpRegistry, static_cast<uint32>(pass),
-															  static_cast<uint32>(features)) };
+	return PipelineHandle { rx_pipeline_cache_find_variant(mpCache, static_cast<uint32>(pass),
+														   static_cast<uint32>(features)) };
+}
+
+PipelineHandle PipelineCache::FindVariantInPass(const PipelineHandle handle, const ePipelinePass pass) const
+{
+	return PipelineHandle { rx_pipeline_cache_find_variant_in_pass(mpCache, handle.Index, static_cast<uint32>(pass)) };
 }
 
 void PipelineCache::RegisterPassTemplate(const ePipelinePass pass, PassTemplate pass_template)
 {
 	AssertLess(static_cast<uint32>(pass), scNumPipelinePasses);
 
-	std::lock_guard lock(mMutex);
-	mPassTemplates[static_cast<uint32>(pass)] = std::move(pass_template);
+	rx_pipeline_cache_register_template(
+		mpCache, static_cast<uint32>(pass),
+		[](void* user, uint32, uint32 features, RxPipelineDesc* desc) -> uint8
+		{
+			PSOBuild pso(desc);
+			return (*static_cast<PassTemplate*>(user))(static_cast<ePipelineFeatures>(features), pso) ? 1 : 0;
+		},
+		new PassTemplate(std::move(pass_template)), [](void* user) { delete static_cast<PassTemplate*>(user); });
 }
 
 PipelineHandle PipelineCache::GetOrCreateVariant(const ePipelinePass pass, const ePipelineFeatures features)
 {
-	PipelineHandle handle = FindVariant(pass, features);
+	uint32 handle = RX_INVALID_INDEX;
+	int32 vk_result = 0;
 
-	if (handle.IsValid()) {
-		return handle;
-	}
+	const RxPipelineContext context = MakeContext();
 
-	{
-		std::lock_guard lock(mMutex);
+	CheckStatus(rx_pipeline_cache_get_or_create_variant(mpCache, &context, static_cast<uint32>(pass),
+														static_cast<uint32>(features), &handle, &vk_result),
+				vk_result);
 
-		// Another thread may have made it while this one waited
-		handle = FindVariant(pass, features);
-
-		if (handle.IsValid()) {
-			return handle;
-		}
-
-		const PassTemplate& pass_template = mPassTemplates[static_cast<uint32>(pass)];
-
-		PipelineDesc desc;
-
-		if (!pass_template || !pass_template(features, desc)) {
-			return PipelineHandle {};
-		}
-
-		// The pipeline that draws these features may be one that already exists
-		handle = FindVariant(pass, desc.Features);
-
-		if (!handle.IsValid()) {
-			handle = CreateLocked(desc);
-
-			if (!handle.IsValid()) {
-				return PipelineHandle {};
-			}
-
-			RegisterVariantLocked(pass, desc.Features, handle);
-		}
-
-		if (features != desc.Features) {
-			RegisterVariantLocked(pass, features, handle);
-		}
-	}
-
-	// On the main thread, the caller gets a pipeline it can draw with
-	if (IsMainThread()) {
-		BuildPending();
-	}
-
-	return handle;
+	return PipelineHandle { handle };
 }
 
 PipelineHandle PipelineCache::GetOrCreateVariantInPass(const PipelineHandle handle, const ePipelinePass pass)
 {
-	uint32 handle_pass = 0;
-	uint32 features = 0;
+	uint32 variant = RX_INVALID_INDEX;
+	int32 vk_result = 0;
 
-	if (rx_pipeline_registry_variant_info(mpRegistry, handle.Index, &handle_pass, &features) == 0) {
-		return PipelineHandle {};
-	}
+	const RxPipelineContext context = MakeContext();
 
-	return GetOrCreateVariant(pass, static_cast<ePipelineFeatures>(features));
+	CheckStatus(rx_pipeline_cache_get_or_create_variant_in_pass(mpCache, &context, handle.Index,
+																static_cast<uint32>(pass), &variant, &vk_result),
+				vk_result);
+
+	return PipelineHandle { variant };
 }
 
-PipelineHandle PipelineCache::FindVariantInPass(const PipelineHandle handle, const ePipelinePass pass) const
+void PipelineCache::AddBufferOffset(uint32 set_index, uint32 offset)
 {
-	uint32 handle_pass = 0;
-	uint32 features = 0;
-
-	if (rx_pipeline_registry_variant_info(mpRegistry, handle.Index, &handle_pass, &features) == 0) {
-		return PipelineHandle {};
-	}
-
-	return FindVariant(pass, static_cast<ePipelineFeatures>(features));
+	rx_pipeline_cache_add_buffer_offset(mpCache, set_index, offset);
 }
-
-void PipelineCache::AddBufferOffset(uint32 set_index, uint32 offset) { mOffsets[set_index].Insert(offset); }
-
-void PipelineCache::Reset()
-{
-	for (uint32 i = 0; i < mOffsets.Capacity; i++) {
-		mOffsets[i].Size = 0;
-	}
-
-	mOffsets.Size = 0;
-}
-
 
 } // namespace fx::renderer

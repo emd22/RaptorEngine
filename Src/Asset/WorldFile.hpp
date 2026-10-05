@@ -17,10 +17,10 @@ public:
 	// void Save(const String& path, const World& world);
 
 private:
-	void AddObjectFromEntry(const std::string& path, const ConfigEntry& object);
-	void AddColliderFromEntry(const std::string& path, const ConfigEntry& collider);
+	void AddObjectFromEntry(const std::string& path, const RxWorldObject& object);
+	void AddColliderFromEntry(const std::string& path, const RxWorldCollider& collider);
 
-	void ApplyPropertiesToObject(Object* object, const ConfigEntry& object_entry);
+	void ApplyPropertiesToObject(Object* object, const RxWorldObject& object_entry);
 
 public:
 	// ConfigFile InfoFile;

@@ -6,3 +6,8 @@ publish.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+raptor-gpu = { path = "../raptor-gpu" }
+raptor-math = { path = "../raptor-math" }
+raptor-shader = { path = "../raptor-shader" }

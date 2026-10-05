@@ -14,10 +14,54 @@
 #include <Physics/PhysicsManager.hpp>
 #include <Renderer/LightManager.hpp>
 #include <Renderer/PipelineNames.hpp>
+#include <Util/RustInterop.hpp>
 #include <World.hpp>
+
+#include <deque>
+#include <memory>
+#include <unordered_set>
+#include <vector>
 
 
 namespace fx {
+
+static_assert(sizeof(RxLevelSun) == 44);
+static_assert(sizeof(RxLevelLight) == 120);
+static_assert(sizeof(RxLevelCamera) == 36);
+static_assert(sizeof(RxLevelPlane) == 40);
+static_assert(sizeof(RxLevelBlock) == 120);
+static_assert(sizeof(RxLevelWriteSun) == 40);
+static_assert(sizeof(RxLevelWriteLight) == 80);
+static_assert(sizeof(RxLevelWritePlane) == 36);
+static_assert(sizeof(RxLevelWriteBlock) == 120);
+static_assert(sizeof(RxLevelWrite) == 88);
+
+namespace {
+
+struct LevelDeleter
+{
+	void operator()(RxLevel* level) const { rx_level_free(level); }
+};
+
+using LevelPtr = std::unique_ptr<RxLevel, LevelDeleter>;
+
+const RxLogSink scLevelLog = { .user = nullptr, .log = RustInterop::Log };
+
+LevelPtr ReadLevel(const char* path)
+{
+	std::vector<uint8> bytes;
+
+	if (!ReadConfigFileBytes(path, bytes)) {
+		return nullptr;
+	}
+
+	const RxHost host = MakeConfigHost();
+	const std::string constants_path = GetConfigConstantsPath();
+
+	return LevelPtr(rx_level_parse(bytes.data(), bytes.size(), constants_path.c_str(), &host));
+}
+
+} // namespace
 
 static constexpr int32 scDefaultMaterialID = 0;
 static constexpr int32 scEditableMaterialID = 1;
@@ -365,25 +409,23 @@ void Blockout::ReloadSingleObject(Object* object)
 		return;
 	}
 
-	ConfigFile info {};
-	info.Load(gWorld->BlockoutPath.CStr());
+	LevelPtr level = ReadLevel(gWorld->BlockoutPath.CStr());
 
-	if (info.HasErrors()) {
+	if (level == nullptr || rx_level_has_errors(level.get())) {
 		return;
 	}
-
-	ConfigEntry* blocks_entry = info.GetEntry(HashStr32("all"));
 
 	ObjectID old_object_id = object->ID;
 	Hash32 object_name_hash = object->Name.GetHash();
 
 	ObjectID new_object_id;
 
+	for (uint32 i = 0; i < rx_level_block_count(level.get()); i++) {
+		const RxLevelBlock* block = rx_level_block(level.get(), i);
 
-	for (ConfigEntry& entry : blocks_entry->Members) {
-		if (entry.Name.GetHash() == object_name_hash) {
+		if (HashStr32(std::string(block->name, block->name_length).c_str()) == object_name_hash) {
 			RemoveSingleObjectFromWorld(object);
-			new_object_id = CreateBrushObject(entry);
+			new_object_id = CreateBrushObject(*block);
 			break;
 		}
 	}
@@ -494,136 +536,59 @@ void Blockout::ApplyBrush(Object* object, Brush&& brush, physics::eMotionType mo
 	mBrushes.Insert(object->ID.GetID(), std::move(brush));
 }
 
-/// Values stored per plane in a blockout's `uvs` array: offset U and V, scale U and V, then rotation
-constexpr uint32 scValuesPerFaceTexture = 5;
-
-Brush Blockout::ReadBrushEntry(ConfigEntry& entry) const
+Brush Blockout::MakeBrush(const RxLevelBlock& block) const
 {
-	ConfigEntry* scale_entry = entry.GetMember(HashStr32("scale"));
-
-	if (scale_entry != nullptr) {
-		const PagedArray<ConfigPrimitive>& scales = scale_entry->GetArrayData();
-
-		if (scales.Size() < 6) {
-			return {};
-		}
-
-		// Left, right, top, bottom, front, back extents
-		const Vec3f min = -Vec3f(scales[0].Get<float32>(), scales[3].Get<float32>(), scales[5].Get<float32>());
-		const Vec3f max = Vec3f(scales[1].Get<float32>(), scales[2].Get<float32>(), scales[4].Get<float32>());
-
-		return Brush::FromBox(min, max);
+	if (block.brush_kind == RX_LEVEL_BRUSH_BOX) {
+		return Brush::FromBox(Vec3f(block.box_min), Vec3f(block.box_max));
 	}
 
-	ConfigEntry* planes_entry = entry.GetMember(HashStr32("planes"));
-
-	if (planes_entry == nullptr) {
-		return {};
-	}
-
-	const PagedArray<ConfigPrimitive>& values = planes_entry->GetArrayData();
-
-	// Four values per plane: the outward normal, then the distance from the origin
-	const uint32 plane_count = static_cast<uint32>(values.Size() / 4);
-
-	if (plane_count > Brush::scMaxPlanes) {
-		LogError("Blockout '{}' has {} planes, the maximum is {}", entry.Name.Get(), plane_count, Brush::scMaxPlanes);
+	if (block.brush_kind != RX_LEVEL_BRUSH_PLANES) {
 		return {};
 	}
 
 	Brush::PlaneList planes;
 
-	for (uint32 i = 0; i < plane_count; i++) {
-		planes.Insert(BrushPlane {
-			.Normal = Vec3f(values[i * 4].Get<float32>(), values[i * 4 + 1].Get<float32>(),
-							values[i * 4 + 2].Get<float32>()),
-			.Distance = values[i * 4 + 3].Get<float32>(),
-		});
-	}
+	for (uint32 i = 0; i < block.plane_count; i++) {
+		const RxLevelPlane& source = block.planes[i];
 
-	ConfigEntry* uvs_entry = entry.GetMember(HashStr32("uvs"));
+		BrushPlane plane {
+			.Normal = Vec3f(source.normal),
+			.Distance = source.distance,
+		};
 
-	if (uvs_entry == nullptr) {
-		// Without a layout of their own, the faces get the default one, which depends on the finished brush
-		Brush brush = Brush::FromPlanes(planes);
-
-		for (uint32 i = 0; i < brush.Planes.Size; i++) {
-			brush.ResetFaceTexture(i);
+		if (source.has_texture) {
+			plane.Texture.Offset = Vec2f(source.offset[0], source.offset[1]);
+			plane.Texture.Scale = Vec2f(source.scale[0], source.scale[1]);
+			plane.Texture.Rotation = source.rotation;
 		}
 
-		return brush;
+		planes.Insert(plane);
 	}
 
-	const PagedArray<ConfigPrimitive>& uvs = uvs_entry->GetArrayData();
-
-	for (uint32 i = 0; i < plane_count && (i + 1) * scValuesPerFaceTexture <= uvs.Size(); i++) {
-		const uint32 base = i * scValuesPerFaceTexture;
-		BrushFaceTexture& texture = planes[i].Texture;
-
-		texture.Offset = Vec2f(uvs[base].Get<float32>(), uvs[base + 1].Get<float32>());
-		texture.Scale = Vec2f(uvs[base + 2].Get<float32>(), uvs[base + 3].Get<float32>());
-		texture.Rotation = uvs[base + 4].Get<float32>();
+	if (block.has_textures) {
+		return Brush::FromPlanes(planes);
 	}
 
-	return Brush::FromPlanes(planes);
+	Brush brush = Brush::FromPlanes(planes);
+
+	for (uint32 i = 0; i < brush.Planes.Size; i++) {
+		brush.ResetFaceTexture(i);
+	}
+
+	return brush;
 }
 
-void Blockout::WriteBrushEntry(ConfigEntry& entry, const Object* object)
+ObjectID Blockout::CreateBrushObject(const RxLevelBlock& block)
 {
-	const Brush* brush = GetBrush(object);
+	const std::string block_name(block.name, block.name_length);
 
-	// Plain boxes are stored as their extents in each direction
-	if (brush == nullptr || (brush->IsBox() && brush->HasDefaultTextures())) {
-		ConfigEntry scales_array = ConfigEntry::Array("scale", ConfigPrimitive::ePrimitiveType::Float);
+	Vec3f position(block.position);
 
-		scales_array.AppendValue(ConfigPrimitive::FromValue(-object->Bounds.Min.X));
-		scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.X));
-		scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.Y));
-		scales_array.AppendValue(ConfigPrimitive::FromValue(-object->Bounds.Min.Y));
-		scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.Z));
-		scales_array.AppendValue(ConfigPrimitive::FromValue(-object->Bounds.Min.Z));
-
-		entry.AddMember(std::move(scales_array));
-		return;
-	}
-
-	ConfigEntry planes_array = ConfigEntry::Array("planes", ConfigPrimitive::ePrimitiveType::Float);
-
-	for (const BrushPlane& plane : brush->Planes) {
-		planes_array.AppendValue(ConfigPrimitive::FromValue(plane.Normal.X));
-		planes_array.AppendValue(ConfigPrimitive::FromValue(plane.Normal.Y));
-		planes_array.AppendValue(ConfigPrimitive::FromValue(plane.Normal.Z));
-		planes_array.AppendValue(ConfigPrimitive::FromValue(plane.Distance));
-	}
-
-	entry.AddMember(std::move(planes_array));
-
-	if (!brush->HasDefaultTextures()) {
-		ConfigEntry uvs_array = ConfigEntry::Array("uvs", ConfigPrimitive::ePrimitiveType::Float);
-
-		for (const BrushPlane& plane : brush->Planes) {
-			const BrushFaceTexture& texture = plane.Texture;
-
-			uvs_array.AppendValue(ConfigPrimitive::FromValue(texture.Offset.X));
-			uvs_array.AppendValue(ConfigPrimitive::FromValue(texture.Offset.Y));
-			uvs_array.AppendValue(ConfigPrimitive::FromValue(texture.Scale.X));
-			uvs_array.AppendValue(ConfigPrimitive::FromValue(texture.Scale.Y));
-			uvs_array.AppendValue(ConfigPrimitive::FromValue(texture.Rotation));
-		}
-
-		entry.AddMember(std::move(uvs_array));
-	}
-}
-
-ObjectID Blockout::CreateBrushObject(ConfigEntry& entry)
-{
-	Vec3f position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
-
-	String blockout_id = String::Fmt("{}", entry.Name.Get());
+	String blockout_id = String::Fmt("{}", block_name);
 
 	LogInfo("Adding blockout '{}'", blockout_id);
 
-	Brush brush = ReadBrushEntry(entry);
+	Brush brush = MakeBrush(block);
 
 	if (!brush.IsValid()) {
 		LogError("Blockout '{}' does not describe a valid convex brush, skipping", blockout_id);
@@ -634,24 +599,19 @@ ObjectID Blockout::CreateBrushObject(ConfigEntry& entry)
 
 	eObjectTag object_tags = eObjectTag::Blockout;
 
-	bool is_locked = entry.GetMemberValue(HashStr32("lock"), 0) == 1;
-	if (is_locked) {
+	if (block.locked) {
 		SetFlag(object_tags, eObjectTag::LockTransform);
 	}
 	else {
 		material_id = mMaterials.GetMaterial(scEditableMaterialID);
 	}
 
-	ConfigEntry* mat_entry = entry.GetMember(HashStr32("mat"));
-
-	if (mat_entry != nullptr) {
-		const int32 mat_id = mat_entry->Get<int32>();
-
-		if (mMaterials.GetMaterial(mat_id).IsNull()) {
-			LogWarning(LC_ASSET, "Blockout '{}' uses the unknown material {}", entry.Name.Get(), mat_id);
+	if (block.has_material) {
+		if (mMaterials.GetMaterial(block.material).IsNull()) {
+			LogWarning(LC_ASSET, "Blockout '{}' uses the unknown material {}", block_name, block.material);
 		}
 
-		material_id = GetMaterialForID(mat_id);
+		material_id = GetMaterialForID(block.material);
 	}
 
 	Object* object = gObjectManager->NewObject(blockout_id.Str(), material_id, object_tags);
@@ -660,39 +620,29 @@ ObjectID Blockout::CreateBrushObject(ConfigEntry& entry)
 
 	Quat rotation = Quat::scIdentity;
 
-	{
-		ConfigEntry* rot_entry = entry.GetMember(HashStr32("rot"));
-
-		if (rot_entry != nullptr) {
-			rotation = Quat::FromEulerAngles(rot_entry->GetValue<Vec3f>());
-		}
+	if (block.rotation_kind == RX_LEVEL_ROTATION_EULER) {
+		rotation = Quat::FromEulerAngles(Vec3f(block.rotation));
 	}
-
-	{
-		ConfigEntry* rotq_entry = entry.GetMember(HashStr32("rotquat"));
-
-		if (rotq_entry != nullptr) {
-			rotation = rotq_entry->GetValue<Quat>();
-		}
+	else if (block.rotation_kind == RX_LEVEL_ROTATION_QUAT) {
+		rotation = Quat(block.rotation);
 	}
 
 	object->SetRotation(rotation);
 
-	if (entry.GetMemberValue(HashStr32("probevolume"), 0) == 1) {
+	if (block.probe_volume) {
 		object->SetProbeVolume(true);
 	}
 
-	if (entry.GetMemberValue(HashStr32("reflectionprobe"), 0) == 1) {
+	if (block.reflection_probe) {
 		object->SetReflectionProbe(true);
 	}
 
-	if (entry.GetMemberValue(HashStr32("bleeds"), 0) == 1) {
+	if (block.bleeds) {
 		object->SetTag(eObjectTag::Bleeds);
 	}
 
-	bool is_dynamic = entry.GetMemberValue(HashStr32("dynamic"), 0) == 1;
-
-	ApplyBrush(object, std::move(brush), is_dynamic ? physics::eMotionType::Dynamic : physics::eMotionType::Static);
+	ApplyBrush(object, std::move(brush),
+			   block.dynamic ? physics::eMotionType::Dynamic : physics::eMotionType::Static);
 
 	AssetTicket ticket(static_cast<void*>(object));
 	ticket.MarkAndSignalLoaded();
@@ -884,96 +834,82 @@ Object* Blockout::RestoreObject(const Vec3f& position, const Brush::PlaneList& p
 	return object;
 }
 
-/// Values of the CLight constants in Config/Internal/Constants.conf
-enum class ePrxLightType : int64
+static void ApplyLightColor(LightBase& light, const int32* color, bool has_color, float32 intensity,
+							bool has_intensity)
 {
-	Point = 0,
-	Spot = 1,
-};
+	if (has_color) {
+		light.Color = Color::FromRGBA(color[0], color[1], color[2], 255);
+	}
+	else {
+		light.Color = Color::FromRGBA(light.Color.R, light.Color.G, light.Color.B, 255);
+	}
 
-static void WriteColorEntry(ConfigEntry& parent, const char* name, const Color& color)
-{
-	ConfigEntry color_array = ConfigEntry::Array(name, ConfigPrimitive::ePrimitiveType::Int);
-
-	color_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(color.R)));
-	color_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(color.G)));
-	color_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(color.B)));
-	color_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(color.A)));
-
-	parent.AddMember(std::move(color_array));
+	if (has_intensity) {
+		light.Intensity = intensity;
+	}
 }
 
-static void ReadLightColor(const ConfigEntry& entry, LightBase& light)
+void Blockout::AddOrUpdateLightFromEntry(const RxLevelLight& light_entry)
 {
-	const Color color = entry.GetMemberValue(HashStr32("color"), light.Color);
-
-	light.Color = Color::FromRGBA(color.R, color.G, color.B, 255);
-	light.Intensity = entry.GetMemberValue<float32>(HashStr32("intensity"), light.Intensity);
-}
-
-void Blockout::AddOrUpdateLightFromEntry(const ConfigEntry& light_entry)
-{
-	const int64 type_value = light_entry.GetMemberValue<int64>(HashStr32("type"),
-															   static_cast<int64>(ePrxLightType::Point));
+	const std::string light_name(light_entry.name, light_entry.name_length);
 
 	eLightType light_type;
 
-	switch (static_cast<ePrxLightType>(type_value)) {
-	case ePrxLightType::Point:
+	switch (light_entry.kind) {
+	case RX_LEVEL_LIGHT_POINT:
 		light_type = eLightType::Point;
 		break;
-	case ePrxLightType::Spot:
+	case RX_LEVEL_LIGHT_SPOT:
 		light_type = eLightType::Spot;
 		break;
 	default:
-		LogError(LC_ASSET, "Light '{}' has unknown type {}", light_entry.Name.Get(), type_value);
+		LogError(LC_ASSET, "Light '{}' has unknown type {}", light_name, light_entry.kind);
 		return;
 	}
 
 	// Lights are matched by name so a hot reload updates them in place
-	Ref<LightBase> light = gLightManager->FindLight(light_entry.Name.GetHash());
+	Ref<LightBase> light = gLightManager->FindLight(HashStr32(light_name.c_str()));
 
 	if (light.IsValid() && light->Type != light_type) {
-		LogWarning(LC_ASSET, "Light '{}' changed type, restart to apply", light_entry.Name.Get());
+		LogWarning(LC_ASSET, "Light '{}' changed type, restart to apply", light_name);
 		return;
 	}
 
 	if (!light.IsValid()) {
 		if (light_type == eLightType::Spot) {
-			light = gLightManager->NewLight<LightSpot>(light_entry.Name.Get());
+			light = gLightManager->NewLight<LightSpot>(light_name);
 		}
 		else {
-			light = gLightManager->NewLight<LightPoint>(light_entry.Name.Get());
+			light = gLightManager->NewLight<LightPoint>(light_name);
 		}
 	}
 
-	light->SetPosition(light_entry.GetMemberValue(HashStr32("pos"), light->GetPosition()));
-	ReadLightColor(light_entry, *light);
-	light->SetRadius(light_entry.GetMemberValue<float32>(HashStr32("radius"), 5.0f));
+	if (light_entry.has_position) {
+		light->SetPosition(Vec3f(light_entry.position));
+	}
+
+	ApplyLightColor(*light, light_entry.color, light_entry.has_color, light_entry.intensity,
+					light_entry.has_intensity);
+	light->SetRadius(light_entry.radius);
 
 	if (light_type == eLightType::Spot) {
 		Ref<LightSpot> spot(light);
 
-		ConfigEntry* direction = light_entry.GetMember(HashStr32("dir"));
-		if (direction != nullptr) {
-			spot->SetDirection(direction->GetValue<Vec3f>());
+		if (light_entry.has_direction) {
+			spot->SetDirection(Vec3f(light_entry.direction));
 		}
 		else {
-			spot->SetRotation(light_entry.GetMemberValue(HashStr32("rot"), spot->mRotation));
+			spot->SetRotation(light_entry.has_rotation ? Quat(light_entry.rotation) : spot->mRotation);
 		}
 
-		// Cone half-angles, in degrees
-		const float32 inner_angle = light_entry.GetMemberValue<float32>(HashStr32("inner"), 20.0f);
-		const float32 outer_angle = light_entry.GetMemberValue<float32>(HashStr32("outer"), 30.0f);
+		spot->SetConeAngles(MathUtil::DegreesToRadians(light_entry.inner_degrees),
+							MathUtil::DegreesToRadians(light_entry.outer_degrees));
 
-		spot->SetConeAngles(MathUtil::DegreesToRadians(inner_angle), MathUtil::DegreesToRadians(outer_angle));
-
-		// Spot lights bake a shadow map into the shadow atlas unless `shadows = $False`
-		spot->bCastShadows = (light_entry.GetMemberValue<int64>(HashStr32("shadows"), 1) != 0);
+		spot->bCastShadows = (light_entry.shadows != 0);
 	}
 }
 
-void Blockout::LoadLights(ConfigFile& info)
+void Blockout::LoadLights(const RxLevel* level)
 {
 	// Load sun
 	Ref<LightDirectional> sun = gLightManager->GetDirectionalLight();
@@ -981,26 +917,30 @@ void Blockout::LoadLights(ConfigFile& info)
 		sun = gLightManager->NewLight<LightDirectional>("Sun");
 	}
 
-	ConfigEntry* sun_entry = info.GetEntry(HashStr32("sun"));
+	const RxLevelSun* sun_entry = rx_level_sun(level);
 
-	const bool sun_enabled = (sun_entry != nullptr) && (sun_entry->GetMemberValue<int64>(HashStr32("enabled"), 1) != 0);
+	const bool sun_enabled = (sun_entry->present != 0) && (sun_entry->enabled != 0);
 
 	sun->bEnabled = sun_enabled;
 	gCVars->Set("b_sun_enabled", sun_enabled);
 
-	if (sun_entry) {
-		sun->SetPosition(sun_entry->GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero));
+	if (sun_entry->present) {
+		sun->SetPosition(Vec3f(sun_entry->position));
 
-		ReadLightColor(*sun_entry, *sun);
+		ApplyLightColor(*sun, sun_entry->color, sun_entry->has_color, sun_entry->intensity,
+						sun_entry->has_intensity);
 	}
 
 	// Load point and spot lights
 
-	ConfigEntry* light_list = info.GetEntry(HashStr32("lights"));
-	if (light_list) {
-		for (const ConfigEntry& light_entry : light_list->Members) {
-			AddOrUpdateLightFromEntry(light_entry);
-		}
+	std::unordered_set<Hash32> names_in_file;
+
+	for (uint32 i = 0; i < rx_level_light_count(level); i++) {
+		const RxLevelLight* light_entry = rx_level_light(level, i);
+
+		AddOrUpdateLightFromEntry(*light_entry);
+
+		names_in_file.insert(HashStr32(std::string(light_entry->name, light_entry->name_length).c_str()));
 	}
 
 	std::vector<LightID> stale_lights;
@@ -1010,15 +950,7 @@ void Blockout::LoadLights(ConfigFile& info)
 			continue;
 		}
 
-		bool in_file = false;
-
-		if (light_list) {
-			for (const ConfigEntry& light_entry : light_list->Members) {
-				in_file |= (light_entry.Name.GetHash() == light->Name.GetHash());
-			}
-		}
-
-		if (!in_file) {
+		if (!names_in_file.contains(light->Name.GetHash())) {
 			stale_lights.push_back(light->ID);
 		}
 	}
@@ -1028,102 +960,30 @@ void Blockout::LoadLights(ConfigFile& info)
 	}
 }
 
-void Blockout::SaveLights(ConfigFile& info)
+void Blockout::LoadCamera(const RxLevel* level)
 {
-	Ref<LightDirectional> sun = gLightManager->GetDirectionalLight();
+	const RxLevelCamera* camera = rx_level_camera(level);
 
-	if (sun.IsValid()) {
-		ConfigEntry sun_entry = ConfigEntry::Struct("sun");
-
-		sun_entry.AddMember(ConfigEntry::Literal("enabled", static_cast<int64>(sun->bEnabled ? 1 : 0)));
-		sun_entry.AddMember(ConfigEntry::Literal("pos", sun->GetPosition()));
-
-		WriteColorEntry(sun_entry, "color", sun->Color);
-		sun_entry.AddMember(ConfigEntry::Literal("intensity", sun->Intensity));
-
-		info.AddEntry(std::move(sun_entry));
-	}
-
-	// Built as a Struct up front: AddEntry("lights") only becomes a Struct once AddMember runs, so with zero
-	// point/spot lights it would otherwise serialize as a bare, unparsable `lights = ` line.
-	ConfigEntry lights_container = ConfigEntry::Struct("lights");
-
-	for (const Ref<LightBase>& light : gLightManager->GetCache()) {
-		if (light->Type != eLightType::Point && light->Type != eLightType::Spot) {
-			continue;
-		}
-
-		ConfigEntry light_entry = ConfigEntry::Struct(light->Name.Get());
-
-		light_entry.AddMember(
-			ConfigEntry::DotReference("type", light->Type == eLightType::Spot ? "$CLight.Spot" : "$CLight.Point"));
-
-		light_entry.AddMember(ConfigEntry::Literal("pos", light->GetPosition()));
-		WriteColorEntry(light_entry, "color", light->Color);
-		light_entry.AddMember(ConfigEntry::Literal("intensity", light->Intensity));
-		light_entry.AddMember(ConfigEntry::Literal("radius", light->GetRadius()));
-
-		if (light->Type == eLightType::Spot) {
-			Ref<LightSpot> spot(light);
-
-			const Vec3f direction = spot->GetDirection();
-
-			ConfigEntry direction_array = ConfigEntry::Array("dir", ConfigPrimitive::ePrimitiveType::Float);
-			direction_array.AppendValue(ConfigPrimitive::FromValue(direction.X));
-			direction_array.AppendValue(ConfigPrimitive::FromValue(direction.Y));
-			direction_array.AppendValue(ConfigPrimitive::FromValue(direction.Z));
-			light_entry.AddMember(std::move(direction_array));
-
-			light_entry.AddMember(ConfigEntry::Literal("inner", MathUtil::RadiansToDegrees(spot->GetInnerAngle())));
-			light_entry.AddMember(ConfigEntry::Literal("outer", MathUtil::RadiansToDegrees(spot->GetOuterAngle())));
-			light_entry.AddMember(ConfigEntry::Literal("shadows", static_cast<int64>(spot->bCastShadows ? 1 : 0)));
-		}
-
-		lights_container.AddMember(std::move(light_entry));
-	}
-
-	info.AddEntry(std::move(lights_container));
-}
-
-void Blockout::LoadCamera(ConfigFile& info)
-{
-	const ConfigEntry* camera = info.GetEntry(HashStr32("camera"));
-
-	if (camera == nullptr) {
+	if (!camera->present) {
 		return;
 	}
 
-	gCVars->Set("r_aperture", camera->GetMemberValue<float32>(HashStr32("aperture"), gCVars->Get("r_aperture", 16.0f)));
-	gCVars->Set("r_shutter", camera->GetMemberValue<float32>(HashStr32("shutter"), gCVars->Get("r_shutter", 0.01f)));
-	gCVars->Set("r_iso", camera->GetMemberValue<float32>(HashStr32("iso"), gCVars->Get("r_iso", 100.0f)));
+	gCVars->Set("r_aperture", camera->has_aperture ? camera->aperture : gCVars->Get("r_aperture", 16.0f));
+	gCVars->Set("r_shutter", camera->has_shutter ? camera->shutter : gCVars->Get("r_shutter", 0.01f));
+	gCVars->Set("r_iso", camera->has_iso ? camera->iso : gCVars->Get("r_iso", 100.0f));
 	gCVars->Set("r_exposure_ev",
-				camera->GetMemberValue<float32>(HashStr32("exposure_ev"), gCVars->Get("r_exposure_ev", 0.0f)));
-}
-
-void Blockout::SaveCamera(ConfigFile& info)
-{
-	ConfigEntry camera = ConfigEntry::Struct("camera");
-
-	camera.AddMember(ConfigEntry::Literal("aperture", gCVars->Get("r_aperture", 16.0f)));
-	camera.AddMember(ConfigEntry::Literal("shutter", gCVars->Get("r_shutter", 0.01f)));
-	camera.AddMember(ConfigEntry::Literal("iso", gCVars->Get("r_iso", 100.0f)));
-	camera.AddMember(ConfigEntry::Literal("exposure_ev", gCVars->Get("r_exposure_ev", 0.0f)));
-
-	info.AddEntry(std::move(camera));
+				camera->has_exposure_ev ? camera->exposure_ev : gCVars->Get("r_exposure_ev", 0.0f));
 }
 
 bool Blockout::Load(const String& path)
 {
-	ConfigFile info {};
-	info.Load(path.CStr());
+	LevelPtr level = ReadLevel(path.CStr());
 
-	if (info.HasErrors()) {
+	if (level != nullptr && rx_level_has_errors(level.get())) {
 		return false;
 	}
 
-	ConfigEntry* blocks_entry = info.GetEntry(HashStr32("all"));
-
-	if (blocks_entry == nullptr) {
+	if (level == nullptr || !rx_level_has_blocks(level.get())) {
 		LogError("Blockout '{}' could not be loaded or has no 'all' entry", path);
 		return false;
 	}
@@ -1133,14 +993,14 @@ bool Blockout::Load(const String& path)
 	gEditor->ForgetObjects();
 #endif
 
-	LoadLights(info);
-	LoadCamera(info);
+	LoadLights(level.get());
+	LoadCamera(level.get());
 
 	// Remove the current blockout from the world
 	RemoveBlockoutFromWorld(pWorld);
 
-	for (ConfigEntry& entry : blocks_entry->Members) {
-		CreateBrushObject(entry);
+	for (uint32 i = 0; i < rx_level_block_count(level.get()); i++) {
+		CreateBrushObject(*rx_level_block(level.get(), i));
 	}
 
 	return true;
@@ -1168,14 +1028,74 @@ static void StoreLastBlockoutPath(const String& path, const char* config_path)
 	config.Write(config_path);
 }
 
-void Blockout::Save(const String& path)
+static void CopyColor(int32 out_color[4], const Color& color)
 {
-	ConfigFile info {};
+	out_color[0] = static_cast<int32>(color.R);
+	out_color[1] = static_cast<int32>(color.G);
+	out_color[2] = static_cast<int32>(color.B);
+	out_color[3] = static_cast<int32>(color.A);
+}
 
-	SaveLights(info);
-	SaveCamera(info);
+static void CopyVec3(float32 out[3], const Vec3f& value)
+{
+	out[0] = value.X;
+	out[1] = value.Y;
+	out[2] = value.Z;
+}
 
-	ConfigEntry* all_entry = info.AddEntry("all");
+bool Blockout::WriteLevelFile(const String& path)
+{
+	RxLevelWrite write {};
+
+	Ref<LightDirectional> sun = gLightManager->GetDirectionalLight();
+
+	if (sun.IsValid()) {
+		write.sun.present = 1;
+		write.sun.enabled = sun->bEnabled ? 1 : 0;
+		CopyVec3(write.sun.position, sun->GetPosition());
+		CopyColor(write.sun.color, sun->Color);
+		write.sun.intensity = sun->Intensity;
+	}
+
+	std::vector<RxLevelWriteLight> lights;
+
+	for (const Ref<LightBase>& light : gLightManager->GetCache()) {
+		if (light->Type != eLightType::Point && light->Type != eLightType::Spot) {
+			continue;
+		}
+
+		RxLevelWriteLight out {};
+
+		out.name = light->Name.Get().c_str();
+		out.name_length = light->Name.Get().size();
+		out.spot = (light->Type == eLightType::Spot) ? 1 : 0;
+		CopyVec3(out.position, light->GetPosition());
+		CopyColor(out.color, light->Color);
+		out.intensity = light->Intensity;
+		out.radius = light->GetRadius();
+
+		if (light->Type == eLightType::Spot) {
+			Ref<LightSpot> spot(light);
+
+			CopyVec3(out.direction, spot->GetDirection());
+			out.inner_degrees = MathUtil::RadiansToDegrees(spot->GetInnerAngle());
+			out.outer_degrees = MathUtil::RadiansToDegrees(spot->GetOuterAngle());
+			out.shadows = spot->bCastShadows ? 1 : 0;
+		}
+
+		lights.push_back(out);
+	}
+
+	write.lights = lights.data();
+	write.light_count = static_cast<uint32>(lights.size());
+
+	write.camera[0] = gCVars->Get("r_aperture", 16.0f);
+	write.camera[1] = gCVars->Get("r_shutter", 0.01f);
+	write.camera[2] = gCVars->Get("r_iso", 100.0f);
+	write.camera[3] = gCVars->Get("r_exposure_ev", 0.0f);
+
+	std::vector<RxLevelWriteBlock> blocks;
+	std::deque<std::vector<RxLevelWritePlane>> plane_lists;
 
 	for (const ObjectID box_id : BlockoutObjects) {
 		Object* object = gObjectManager->GetObject(box_id);
@@ -1183,50 +1103,88 @@ void Blockout::Save(const String& path)
 			continue;
 		}
 
-		ConfigEntry blockout_entry = ConfigEntry::Struct(object->Name.Get());
-		{
-			blockout_entry.AddMember(ConfigEntry::Literal("pos", object->mPosition));
+		const Brush* brush = GetBrush(object);
 
-			WriteBrushEntry(blockout_entry, object);
+		RxLevelWriteBlock out {};
 
-			blockout_entry.AddMember(ConfigEntry::Literal("rotquat", object->mRotation));
+		out.name = object->Name.Get().c_str();
+		out.name_length = object->Name.Get().size();
+		CopyVec3(out.position, object->mPosition);
 
-			if (object->HasTags(eObjectTag::LockTransform)) {
-				blockout_entry.AddMember(ConfigEntry::Literal("lock", 1));
+		if (brush == nullptr || (brush->IsBox() && brush->HasDefaultTextures())) {
+			out.brush_kind = RX_LEVEL_BRUSH_BOX;
+			out.box_extents[0] = -object->Bounds.Min.X;
+			out.box_extents[1] = object->Bounds.Max.X;
+			out.box_extents[2] = object->Bounds.Max.Y;
+			out.box_extents[3] = -object->Bounds.Min.Y;
+			out.box_extents[4] = object->Bounds.Max.Z;
+			out.box_extents[5] = -object->Bounds.Min.Z;
+		}
+		else {
+			out.brush_kind = RX_LEVEL_BRUSH_PLANES;
+
+			std::vector<RxLevelWritePlane>& planes = plane_lists.emplace_back();
+
+			for (const BrushPlane& plane : brush->Planes) {
+				RxLevelWritePlane out_plane {};
+
+				CopyVec3(out_plane.normal, plane.Normal);
+				out_plane.distance = plane.Distance;
+				out_plane.offset[0] = plane.Texture.Offset.X;
+				out_plane.offset[1] = plane.Texture.Offset.Y;
+				out_plane.scale[0] = plane.Texture.Scale.X;
+				out_plane.scale[1] = plane.Texture.Scale.Y;
+				out_plane.rotation = plane.Texture.Rotation;
+
+				planes.push_back(out_plane);
 			}
 
-			if (object->IsProbeVolume()) {
-				blockout_entry.AddMember(ConfigEntry::Literal("probevolume", 1));
-			}
+			out.planes = planes.data();
+			out.plane_count = static_cast<uint32>(planes.size());
+			out.textures = brush->HasDefaultTextures() ? 0 : 1;
+		}
 
-			if (object->IsReflectionProbe()) {
-				blockout_entry.AddMember(ConfigEntry::Literal("reflectionprobe", 1));
-			}
+		out.rotation[0] = object->mRotation.X;
+		out.rotation[1] = object->mRotation.Y;
+		out.rotation[2] = object->mRotation.Z;
+		out.rotation[3] = object->mRotation.W;
 
-			if (object->Bleeds()) {
-				blockout_entry.AddMember(ConfigEntry::Literal("bleeds", 1));
-			}
-
-			if (IsDynamic(object)) {
-				blockout_entry.AddMember(ConfigEntry::Literal("dynamic", 1));
-			}
+		out.locked = object->HasTags(eObjectTag::LockTransform) ? 1 : 0;
+		out.probe_volume = object->IsProbeVolume() ? 1 : 0;
+		out.reflection_probe = object->IsReflectionProbe() ? 1 : 0;
+		out.bleeds = object->Bleeds() ? 1 : 0;
+		out.dynamic = IsDynamic(object) ? 1 : 0;
 
 #ifdef FX_IS_EDITOR
-			const MaterialID object_material = gEditor->GetSelection().GetStoredMaterial(object);
+		const MaterialID object_material = gEditor->GetSelection().GetStoredMaterial(object);
 #else
-			const MaterialID object_material = object->GetMaterialID();
+		const MaterialID object_material = object->GetMaterialID();
 #endif
 
-			const int32 material_id = GetIDForMaterial(object_material);
+		const int32 material_id = GetIDForMaterial(object_material);
 
-			if (material_id >= 0) {
-				blockout_entry.AddMember(ConfigEntry::Literal("mat", static_cast<int64>(material_id)));
-			}
+		if (material_id >= 0) {
+			out.has_material = 1;
+			out.material = material_id;
 		}
-		all_entry->AddMember(std::move(blockout_entry));
+
+		blocks.push_back(out);
 	}
 
-	info.Write(path.CStr());
+	write.blocks = blocks.data();
+	write.block_count = static_cast<uint32>(blocks.size());
+
+	if (!rx_level_save(path.CStr(), &write, &scLevelLog)) {
+		LogError(LC_ASSET, "Could not write the blockout '{}'", path);
+		return false;
+	}
+
+	return true;
+}
+
+void Blockout::Save(const String& path)
+{
+	WriteLevelFile(path);
 
 	StoreLastBlockoutPath(path, "Config/Main.conf");
 }

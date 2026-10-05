@@ -59,6 +59,21 @@ pub struct RxBlendAttachment
 	pub target_index: u32,
 }
 
+pub(crate) fn blend_attachment(attachment: &RxBlendAttachment) -> BlendAttachment
+{
+	BlendAttachment {
+		enabled: attachment.enabled != 0,
+		write_mask: vk::ColorComponentFlags::from_raw(attachment.write_mask),
+		color_op: vk::BlendOp::from_raw(attachment.color_op),
+		alpha_op: vk::BlendOp::from_raw(attachment.alpha_op),
+		src_color: vk::BlendFactor::from_raw(attachment.src_color),
+		dst_color: vk::BlendFactor::from_raw(attachment.dst_color),
+		src_alpha: vk::BlendFactor::from_raw(attachment.src_alpha),
+		dst_alpha: vk::BlendFactor::from_raw(attachment.dst_alpha),
+		target_index: attachment.target_index,
+	}
+}
+
 /// # Safety
 ///
 /// `attachments` must be valid for `attachment_count` entries and `out` writable for `count`
@@ -77,17 +92,7 @@ pub unsafe extern "C" fn rx_blend_states(
 		// SAFETY: guaranteed by the caller.
 		unsafe { std::slice::from_raw_parts(attachments, attachment_count) }
 			.iter()
-			.map(|attachment| BlendAttachment {
-				enabled: attachment.enabled != 0,
-				write_mask: vk::ColorComponentFlags::from_raw(attachment.write_mask),
-				color_op: vk::BlendOp::from_raw(attachment.color_op),
-				alpha_op: vk::BlendOp::from_raw(attachment.alpha_op),
-				src_color: vk::BlendFactor::from_raw(attachment.src_color),
-				dst_color: vk::BlendFactor::from_raw(attachment.dst_color),
-				src_alpha: vk::BlendFactor::from_raw(attachment.src_alpha),
-				dst_alpha: vk::BlendFactor::from_raw(attachment.dst_alpha),
-				target_index: attachment.target_index,
-			})
+			.map(blend_attachment)
 			.collect()
 	};
 

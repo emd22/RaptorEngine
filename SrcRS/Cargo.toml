@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["raptor-app", "raptor-gpu", "raptor-render", "raptor-brush", "raptor-config", "raptor-shader", "raptor-mesh", "raptor-math", "raptor-ffi"]
+members = ["raptor-app", "raptor-gpu", "raptor-render", "raptor-brush", "raptor-config", "raptor-shader", "raptor-mesh", "raptor-math", "raptor-ffi", "raptor-anim", "raptor-level", "raptor-world", "raptor-asset", "raptor-player"]
 
 [workspace.package]
 version = "0.1.0"
@@ -9,3 +9,6 @@ publish = false
 
 [workspace.lints.clippy]
 undocumented_unsafe_blocks = "warn"
+
+[profile.dev.package.hassle-rs]
+debug-assertions = false
