@@ -63,9 +63,6 @@ public:
 		void Destroy()
 		{
 			Positions.Free();
-			Normals.Free();
-			Tangents.Free();
-			Texcoords.Free();
 			Indices.Free();
 		}
 

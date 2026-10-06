@@ -55,8 +55,6 @@ Testing
 
 private
 
-SrcRS/target
-rust-target
 
 *.spack
 

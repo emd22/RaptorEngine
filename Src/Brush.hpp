@@ -12,8 +12,6 @@
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
 
-struct RxBrushView;
-
 namespace fx {
 
 /**
@@ -137,9 +135,6 @@ public:
 public:
 	PlaneList Planes;
 	SizedArray<Face> Faces;
-
-private:
-	void Apply(const RxBrushView& view, bool replace_planes);
 
 private:
 	SizedArray<Vec3f> mVertices;

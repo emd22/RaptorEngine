@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <bit>
 #include <cmath>
+
+#include <Math/MathConsts.hpp>
 #include <vector>
 
 namespace fx::ReflectionFilter {
@@ -10,7 +12,7 @@ namespace fx::ReflectionFilter {
 namespace {
 
 constexpr uint32 scSampleCount = 128;
-constexpr float32 scPi = 3.14159265359f;
+// constexpr float32 scPi = 3.14159265359f;
 constexpr float32 scMaxHalf = 65504.0f;
 
 struct CubeLevel
@@ -141,7 +143,7 @@ std::vector<LobeSample> BuildLobeSamples(float32 roughness, uint32 source_size)
 	const float32 alpha = roughness * roughness;
 	const float32 alpha_sq = alpha * alpha;
 
-	const float32 texel_solid_angle = (4.0f * scPi) / (6.0f * static_cast<float32>(source_size * source_size));
+	const float32 texel_solid_angle = (4.0f * FX_PI) / (6.0f * static_cast<float32>(source_size * source_size));
 
 	std::vector<LobeSample> samples;
 	samples.reserve(scSampleCount);
