@@ -1,4 +1,54 @@
+/*
+ *	Common functions and externals for editor modes
+ */
+
+
 extern int printf(string fmt, ...);
+
+/* Must match EditOperation::eType in Src/Editor/EditOperation.hpp! */
+enum OPTYPE
+{
+	MOVE,
+	SCALE,
+	DUPE,
+	CREATE,
+	DELETE,
+	ROTATE,
+	BRUSH_EDIT,
+	CREATE_BRUSH,
+	LIGHT_TRANSFORM,
+	LIGHT_CREATE,
+	LIGHT_DELETE,
+}
+
+/* This must match eFaceTextureEdit in Blockout.hpp! */
+enum FACETEXTUREEDIT : uint
+{
+	SHIFT,
+	SCALE,
+	ROTATE,
+	RESET,
+}
+
+/* This must match eEditorTool in Src/Editor/EditorTool.hpp! */
+enum EDITORTOOL
+{
+	NONE,
+
+	TRANSLATE,
+	FACE,
+	ROTATE,
+	CREATE,
+	CLIP,
+	LIGHT,
+	BOUNDS,
+	GRAB,
+}
+
+
+/*
+	Math Util
+ */
 
 /* Returns 1.0 if `value` is positive, returns -1.0 if negative. */
 extern float float_sign(float value);
@@ -8,6 +58,7 @@ extern float4 float4_floor(float4 value);
 
 float3 float3_floor(float3 value) { return (float4_floor(float4(value, 0.0f))).xyz; }
 
+
 float3 float3_round(float3 value)
 {
 	float4 result = float4_round(float4(value, 0.0f));
@@ -15,3 +66,167 @@ float3 float3_round(float3 value)
 }
 
 extern float3 float3_abs(float3 value);
+
+extern void print_float4(float4 value);
+void print_float3(float3 value)
+{
+	print_float4(float4(value, 1.0));
+}
+
+/*
+	Object
+ */
+
+struct OBJECTID = uint;
+handle OBJECT;
+
+const uint OBJ_TAG_BLOCKOUT = (1 << 0);
+const uint OBJ_TAG_LOCK = (1 << 1);
+/* Set through probe_volume_mark, not set_tags: marking also takes the brush out of the world. */
+const uint OBJ_TAG_PROBEVOLUME = (1 << 2);
+const uint OBJ_TAG_REFLECTIONPROBE = (1 << 3);
+
+impl OBJECT
+{
+	extern void move_to(OBJECT obj, float3 position);
+	extern void move_by(OBJECT obj, float3 by);
+	extern float3 get_position(OBJECT obj);
+	/* Euler angles in radians (pitch, yaw, roll) */
+	extern void rotate_to(OBJECT obj, float3 euler_radians);
+	extern float3 get_rotation(OBJECT obj);
+	extern uint get_tags(OBJECT obj);
+	extern void set_tags(OBJECT obj, uint tags);
+
+	extern float3 ray_get_face(OBJECT obj);
+	extern float direction_scale(OBJECT obj, float3 direction);
+	extern float3 local_to_world(OBJECT obj, float3 point);
+	extern float3 local_dir_to_world(OBJECT obj, float3 direction);
+
+	/* DO NOT CALL! (unless your name is `editor_select_object`). Selects the object in the editor, which then sends the
+	   new selection to the script. */
+	extern void _select_object_internal(OBJECT obj, bool is_selected, bool append_selection);
+
+	property float3 position {
+		get = OBJECT_get_position;
+	}
+}
+
+
+extern float3 editor_push_op_vec(OBJECT obj, OPTYPE op_type, float3 original, float3 updated, int group_size);
+extern OBJECT editor_push_op_obj(OBJECT obj, OPTYPE op_type, OBJECT original, OBJECT updated, int group_size);
+extern void editor_push_op_delete(OBJECT obj, int group_size);
+
+extern OBJECT editor_op_create_object(float3 position, int group_size);
+extern OBJECT editor_op_dupe_object(OBJECT object_to_dupe, float3 position, int group_size);
+
+extern OBJECT object_get(OBJECTID id);
+
+/*
+	Player
+ */
+
+handle PLAYER;
+
+impl PLAYER
+{
+	extern void set_speed_multiplier(PLAYER p, float mult);
+	extern float3 get_position(PLAYER p);
+	extern bool is_flymode(PLAYER p);
+
+	extern float3 ray_get_point(float range);
+	/* The normal of the surface the crosshair is on, or zero if it hits nothing within `range`. */
+	extern float3 ray_get_normal(float range);
+
+
+	property float3 position {
+		get = PLAYER_get_position;
+	}
+}
+
+PLAYER player;
+
+/* Retrieve the currently selected camera's position */
+extern float3 camera_position();
+
+/* Where the crosshair's ray meets the plane through `point` facing `normal`, or `point` if it never reaches it. */
+extern float3 camera_ray_to_plane(float3 point, float3 normal);
+
+
+/* Reloads an object from a blockout file. */
+extern void blockout_reload_object(OBJECT object);
+extern OBJECT blockout_new_object(float3 position);
+extern OBJECT blockout_dupe_object(OBJECT object);
+extern void blockout_destroy_object(OBJECT object);
+
+extern void blockout_object_scale(OBJECT object, float3 face_dir, float3 magnitude);
+
+/* The centre of the face facing along `face`, in the object's local space. */
+extern float3 blockout_face_center(OBJECT object, float3 face);
+
+/* Changes the texture on the face facing along `face`, as an undoable operation. See eFaceTextureEdit for how
+   `amount` is used. */
+extern void blockout_edit_face_texture(OBJECT object, float3 face, FACETEXTUREEDIT edit, float3 amount);
+
+/* Where the crosshair's ray hits a blockout, in world space. */
+extern float3 blockout_ray_hit_point(OBJECT object);
+
+/* See-through previews of what the Create and Clip tools will make. */
+extern void blockout_preview_box(float3 min, float3 max);
+extern void blockout_preview_clip(OBJECT object, float3 point_a, float3 point_b, float3 face_normal);
+extern void blockout_hide_preview();
+
+/* Creates a box blockout filling `min` to `max`, as an undoable operation. */
+extern OBJECT blockout_create_box(float3 min, float3 max);
+
+/* Splits a blockout in two along the line from `point_a` to `point_b`, cutting straight through the face (with world
+   space normal `face_normal`) that the line was drawn on. Both pieces are kept. Undoable. */
+extern bool blockout_clip(OBJECT object, float3 point_a, float3 point_b, float3 face_normal);
+
+/* Light probes */
+
+extern void probe_volume_mark(OBJECT object, bool enabled);
+extern bool probe_volume_is_marked(OBJECT object);
+
+/* Rebuilds the probe volumes from the level and its marked brushes. Returns how many brushes were used. */
+extern int probe_rebuild_volumes();
+
+extern int probe_volume_count();
+extern int probe_count();
+extern bool probe_is_baking();
+
+/* Rebuilds the volumes, then starts baking every probe in them. */
+extern void probe_bake();
+
+/* Saves the baked probes for the current scene, picked up automatically on the next run. */
+extern bool probe_save();
+
+extern void reflection_probe_mark(OBJECT object, bool enabled);
+extern bool reflection_probe_is_marked(OBJECT object);
+extern int reflection_probe_rebuild();
+extern void reflection_probe_bake();
+
+/* CVars */
+
+extern void cvar_set_int(cstring name, long value);
+extern void cvar_set_float(cstring name, float value);
+extern void cvar_set_string(cstring name, string value);
+
+void cvar_set_bool(cstring name, bool value)
+{
+	cvar_set_int(name, (long)value);
+}
+
+extern long cvar_get_int(cstring name, long fallback);
+
+bool cvar_get_bool(cstring name, bool fallback)
+{
+	return (bool)cvar_get_int(name, (long)fallback);
+}
+
+
+extern void script_error(cstring str);
+
+
+/* GUI Editor */
+
+extern void GUI_set_editor_tool(EDITORTOOL mode);

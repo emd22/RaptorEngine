@@ -1,11 +1,8 @@
-mod cpp_host;
-
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use raptor_ffi as _;
 use raptor_game::{Game, GameConfig};
-use raptor_script as _;
+use raptor_engine::NativeHost;
 
 fn find_config() -> PathBuf
 {
@@ -28,7 +25,7 @@ fn main() -> ExitCode
 	let config = GameConfig::load(find_config());
 	let args: Vec<String> = std::env::args().collect();
 
-	let mut host = cpp_host::CppHost::new();
+	let mut host = NativeHost::new();
 
 	match Game::run(config, &mut host, args) {
 		Ok(()) => ExitCode::SUCCESS,

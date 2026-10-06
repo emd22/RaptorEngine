@@ -158,7 +158,7 @@ impl Host for MockHost {
 		true
 	}
 	fn set_debug_bounds_mask(&mut self, _mask: u32) {}
-	fn log_nearby_objects(&self) {}
+	fn log_nearby_objects(&mut self) {}
 	fn log_player_tile(&self) {}
 	fn probes_rebuild_and_bake(&mut self) {}
 	fn probes_save(&mut self) {}

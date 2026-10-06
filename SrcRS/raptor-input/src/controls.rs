@@ -1,3 +1,5 @@
+use std::cell::Cell;
+
 use raptor_core::Key;
 
 const KEY_COUNT: usize = Key::MAX as usize;
@@ -10,7 +12,7 @@ struct Control {
 }
 
 pub struct Controls {
-	keys: [Control; KEY_COUNT],
+	keys: [Cell<Control>; KEY_COUNT],
 	tick: bool,
 	mouse_delta: [f32; 2],
 	mouse_captured: bool,
@@ -20,7 +22,7 @@ pub struct Controls {
 impl Default for Controls {
 	fn default() -> Self {
 		Self {
-			keys: [Control::default(); KEY_COUNT],
+			keys: [const { Cell::new(Control { down: false, continued: false, tick_bit: false }) }; KEY_COUNT],
 			tick: false,
 			mouse_delta: [0.0; 2],
 			mouse_captured: false,
@@ -40,25 +42,24 @@ impl Controls {
 		self.tick = !self.tick;
 	}
 
-	fn settle(&mut self, key: Key) {
+	fn settle(&self, key: Key) {
 		let tick = self.tick;
-		let control = &mut self.keys[key.index()];
+		let mut control = self.keys[key.index()].get();
 
 		if control.down && !control.continued && control.tick_bit != tick {
 			control.continued = true;
+			self.keys[key.index()].set(control);
 		}
 	}
 
 	pub fn post_button(&mut self, key: Key, down: bool) {
 		let tick = self.tick;
 
-		let Some(control) = self
-			.keys
-			.get_mut(key.index())
-			.filter(|_| key != Key::Unknown)
-		else {
+		let Some(cell) = self.keys.get(key.index()).filter(|_| key != Key::Unknown) else {
 			return;
 		};
+
+		let mut control = cell.get();
 
 		if down && !control.down {
 			control.tick_bit = tick;
@@ -67,6 +68,8 @@ impl Controls {
 			control.down = false;
 			control.continued = false;
 		}
+
+		cell.set(control);
 	}
 
 	pub fn post_mouse_motion(&mut self, delta: [f32; 2]) {
@@ -74,47 +77,47 @@ impl Controls {
 		self.mouse_delta[1] += delta[1];
 	}
 
-	pub fn is_down(&mut self, key: Key) -> bool {
+	pub fn is_down(&self, key: Key) -> bool {
 		if key.index() >= KEY_COUNT {
 			return false;
 		}
 
 		self.settle(key);
 
-		self.keys[key.index()].down
+		self.keys[key.index()].get().down
 	}
 
 	pub fn is_up(&self, key: Key) -> bool {
 		self.keys
 			.get(key.index())
-			.is_none_or(|control| !control.down)
+			.is_none_or(|control| !control.get().down)
 	}
 
-	pub fn is_pressed(&mut self, key: Key) -> bool {
+	pub fn is_pressed(&self, key: Key) -> bool {
 		if key.index() >= KEY_COUNT {
 			return false;
 		}
 
 		self.settle(key);
 
-		let control = self.keys[key.index()];
+		let control = self.keys[key.index()].get();
 
 		control.down && !control.continued
 	}
 
-	pub fn combo_down(&mut self, keys: &[Key]) -> bool {
+	pub fn combo_down(&self, keys: &[Key]) -> bool {
 		keys.iter().all(|key| self.is_down(*key))
 	}
 
-	pub fn combo_pressed(&mut self, keys: &[Key]) -> bool {
+	pub fn combo_pressed(&self, keys: &[Key]) -> bool {
 		let all_down = keys.iter().all(|key| self.is_down(*key));
 
 		all_down && keys.iter().any(|key| self.is_pressed(*key))
 	}
 
 	pub fn reset_key(&mut self, key: Key) {
-		if let Some(control) = self.keys.get_mut(key.index()) {
-			*control = Control::default();
+		if let Some(control) = self.keys.get(key.index()) {
+			control.set(Control::default());
 		}
 	}
 
@@ -151,7 +154,7 @@ impl Controls {
 	}
 
 	/// The character typed by a key pressed this frame, with shift picking capitals and symbols.
-	pub fn typed_char(&mut self) -> Option<char> {
+	pub fn typed_char(&self) -> Option<char> {
 		let shift = self.is_down(Key::KeyLshift);
 
 		for code in Key::KeyA.code()..=Key::KeyZ.code() {

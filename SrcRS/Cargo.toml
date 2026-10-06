@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 exclude = ["vendor"]
-members = ["raptor-app", "raptor-core", "raptor-gpu", "raptor-gfx", "raptor-render", "raptor-brush", "raptor-config", "raptor-shader", "raptor-mesh", "raptor-math", "raptor-ffi", "raptor-anim", "raptor-level", "raptor-world", "raptor-asset", "raptor-player", "raptor-physics", "raptor-entity", "raptor-jolt", "raptor-input", "raptor-scene", "raptor-weapon", "raptor-engine", "raptor-editor", "raptor-script", "raptor-game"]
+members = ["raptor-app", "raptor-core", "raptor-gpu", "raptor-gfx", "raptor-render", "raptor-brush", "raptor-config", "raptor-shader", "raptor-mesh", "raptor-math", "raptor-anim", "raptor-level", "raptor-world", "raptor-asset", "raptor-player", "raptor-physics", "raptor-entity", "raptor-jolt", "raptor-input", "raptor-scene", "raptor-weapon", "raptor-engine", "raptor-editor", "raptor-script", "raptor-game"]
 
 [workspace.package]
 version = "0.1.0"

@@ -3,7 +3,6 @@ name = "raptor-app"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
-build = "build.rs"
 
 [[bin]]
 name = "raptor"
@@ -15,10 +14,9 @@ default = ["editor"]
 editor = ["dep:raptor-editor"]
 
 [dependencies]
-raptor-ffi = { path = "../raptor-ffi" }
+raptor-engine = { path = "../raptor-engine" }
 raptor-core = { path = "../raptor-core" }
 raptor-game = { path = "../raptor-game" }
-raptor-script = { path = "../raptor-script" }
 raptor-editor = { path = "../raptor-editor", features = ["gui"], optional = true }
 
 [lints]

@@ -1,0 +1,176 @@
+/*
+ * File:        tool_common.strata
+ * Author:      emd22
+ * Created:     23/09/2026
+ * Description: State and helpers shared by the editor tools. Each tool is a script of its own with its own copy of
+ *              these globals, which the editor (Src/Editor/RaptorEditor.cpp) keeps up to date by calling
+ *              `tool_state_receive` and `tool_selection_receive`.
+ */
+
+import ../interop;
+import ../common;
+import ../keyboard;
+
+
+/* Configuration to be passed back and forth between the GUI editor and the strata scripts.
+   Must match EditorToolState in Src/Editor/EditorTool.hpp! */
+struct TOOLSTATE
+{
+	EDITORTOOL selected_tool;
+
+	/* Snap / Quantization */
+	int tool_snap_level;
+	bool tool_snap_enabled;
+
+	/* Cube marker used for showing distance and movement when transforming an object.
+	   Used mainly with scale/face tool. */
+	OBJECT transform_marker_object;
+}
+
+enum OBJECTTAG
+{
+	BLOCKOUT = (1 << 0),
+}
+
+
+/* Must match scMaxSelectedObjects in Src/Editor/EditorTool.hpp! */
+const int LIMIT_SELECTION_OBJECTS = 64;
+
+/* The selection, along with where each object was when the current drag started.
+   Must match EditorToolSelection in Src/Editor/EditorTool.hpp! */
+struct SELECTION
+{
+	OBJECT[LIMIT_SELECTION_OBJECTS] selected_objects;
+	float3[LIMIT_SELECTION_OBJECTS] initial_object_positions;
+	float3[LIMIT_SELECTION_OBJECTS] initial_object_rotations;
+	int selected_objects_count;
+};
+
+/////////////////////////////////////
+// Globals
+/////////////////////////////////////
+
+/* Where the player was when the current drag started. Set by the tools that move with the player. */
+float3 initial_player_position;
+
+/* Empty object */
+OBJECT OBJECT_NULL;
+
+
+/* KEEP: Ethan refactor note */
+TOOLSTATE state;
+SELECTION sel;
+
+
+/////////////////////////////////////
+// Data interop
+/////////////////////////////////////
+
+/* Receive the current state from the GUI editor. */
+void tool_state_receive(ref TOOLSTATE tc)
+{
+	state.selected_tool = tc.selected_tool;
+	state.tool_snap_level = tc.tool_snap_level;
+	state.tool_snap_enabled = tc.tool_snap_enabled;
+	state.transform_marker_object = tc.transform_marker_object;
+}
+
+/* Receive the current selection from the GUI editor. Called whenever the selection changes, and at the start of
+   each drag. */
+void tool_selection_receive(ref SELECTION selection)
+{
+	sel.selected_objects_count = selection.selected_objects_count;
+
+	for (int i = 0; i < selection.selected_objects_count; i++) {
+		sel.selected_objects[i] = selection.selected_objects[i];
+		sel.initial_object_positions[i] = selection.initial_object_positions[i];
+		sel.initial_object_rotations[i] = selection.initial_object_rotations[i];
+	}
+}
+
+/* Submit the current state from script to editor. */
+extern void tool_state_send(ref TOOLSTATE tc);
+
+/* Sync the current tool state with the GUI editor, after changing its snap settings. */
+void sync_state()
+{
+	tool_state_send(state);
+}
+
+
+/////////////////////////////////////
+// Transform marker
+/////////////////////////////////////
+
+void hide_transform_marker_object()
+{
+	/* Move the transform marker to a location where the user won't see it... */
+	state.transform_marker_object.move_to(float3(200.0f));
+}
+
+/////////////////////////////////////
+// Snapping
+/////////////////////////////////////
+
+/* Get the division that we are quantizing by. NOTE: not the index.
+   Mirrored by scSnapSteps in Src/Editor/RaptorEditor.cpp. */
+float tool_get_snap_multiplier()
+{
+	float[4] snap_values = { 0.10f, 0.25f, 0.50f, 1.0f };
+	uint index = fclamp(state.tool_snap_level, 0, 3);
+	return snap_values[index];
+}
+
+bool editor_get_snap_enabled()
+{
+	return state.tool_snap_enabled;
+}
+
+/* If snap is enabled, this snaps a given vector to the selected snap fraction. */
+float3 editor_transform_snap(float3 vec)
+{
+	if (!state.tool_snap_enabled) {
+		return vec;
+	}
+
+	float3 qsnap = float3(tool_get_snap_multiplier());
+	return (float3_round(vec / qsnap) * qsnap);
+}
+
+
+bool editor_vec_equal(float3 a, float3 b)
+{
+	return nearzero(a - b);
+}
+
+
+/////////////////////////////////////
+// Selection
+/////////////////////////////////////
+
+
+OBJECT editor_last_selected_object()
+{
+	if (sel.selected_objects_count == 0) {
+		return OBJECT_NULL;
+	}
+	return sel.selected_objects[sel.selected_objects_count - 1];
+}
+
+bool editor_has_object_selection()
+{
+	return (sel.selected_objects_count > 0);
+}
+
+/* Select an object. Passing in false for `is_selected` acts as a null value, voiding the selection. The editor sends
+   the new selection back through `tool_selection_receive` before this returns. */
+void editor_select_object(OBJECT object, bool is_selected, bool append_selection)
+{
+	object._select_object_internal(is_selected, append_selection);
+}
+
+
+void reset_selection()
+{
+	editor_select_object(OBJECT_NULL, false, false);
+}

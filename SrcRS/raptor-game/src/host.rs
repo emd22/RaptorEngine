@@ -131,7 +131,7 @@ pub trait Host: Input {
 	fn toggle_only_render_probes(&mut self) -> bool;
 	fn toggle_probe_visibility(&mut self) -> bool;
 	fn set_debug_bounds_mask(&mut self, mask: u32);
-	fn log_nearby_objects(&self);
+	fn log_nearby_objects(&mut self);
 	fn log_player_tile(&self);
 
 	fn probes_rebuild_and_bake(&mut self);

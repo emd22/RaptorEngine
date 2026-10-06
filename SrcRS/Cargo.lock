@@ -1228,9 +1228,8 @@ version = "0.1.0"
 dependencies = [
  "raptor-core",
  "raptor-editor",
- "raptor-ffi",
+ "raptor-engine",
  "raptor-game",
- "raptor-script",
 ]
 
 [[package]]
@@ -1317,32 +1316,6 @@ name = "raptor-entity"
 version = "0.1.0"
 dependencies = [
  "raptor-math",
-]
-
-[[package]]
-name = "raptor-ffi"
-version = "0.1.0"
-dependencies = [
- "ash",
- "gltf",
- "raptor-anim",
- "raptor-asset",
- "raptor-brush",
- "raptor-config",
- "raptor-core",
- "raptor-entity",
- "raptor-gpu",
- "raptor-input",
- "raptor-jolt",
- "raptor-level",
- "raptor-math",
- "raptor-mesh",
- "raptor-physics",
- "raptor-player",
- "raptor-render",
- "raptor-script",
- "raptor-shader",
- "raptor-world",
 ]
 
 [[package]]

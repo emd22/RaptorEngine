@@ -34,13 +34,13 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T>
 	mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-struct Handoff(LoadedModel);
+pub struct Handoff(LoadedModel);
 
 // SAFETY: a loaded model holds skeletons whose raw pointers point into their own heap vectors,
 // which move with them, and it is only used by one thread at a time.
 unsafe impl Send for Handoff {}
 
-struct Request
+pub struct Request
 {
 	ticket: Arc<Ticket>,
 	slot: Arc<Mutex<Option<Handoff>>>,

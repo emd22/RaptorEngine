@@ -83,6 +83,11 @@ impl MeshStore
 		}
 	}
 
+	pub fn clear(&self)
+	{
+		lock(&self.slots).clear();
+	}
+
 	pub fn count(&self) -> usize
 	{
 		lock(&self.slots).iter().flatten().count()

@@ -140,6 +140,8 @@ impl SdlWindow {
 
 		let title = CString::new(title).map_err(|error| WindowError(error.to_string()))?;
 
+		point_sdl_at_the_vulkan_sdk();
+
 		// SAFETY: plain SDL calls with valid arguments.
 		let window = unsafe {
 			if !sdl::SDL_InitSubSystem(sdl::SDL_INIT_VIDEO) {
@@ -266,6 +268,36 @@ impl Drop for SdlWindow {
 		unsafe {
 			sdl::SDL_DestroyWindow(self.window);
 			sdl::SDL_QuitSubSystem(sdl::SDL_INIT_VIDEO);
+		}
+	}
+}
+
+fn sdk_vulkan_library() -> Option<std::path::PathBuf> {
+	if let Some(sdk) = std::env::var_os("VULKAN_SDK").filter(|sdk| !sdk.is_empty()) {
+		let library = std::path::Path::new(&sdk).join("lib/libvulkan.dylib");
+
+		if library.exists() {
+			return Some(library);
+		}
+	}
+
+	let mut sdks: Vec<_> = std::fs::read_dir(std::path::Path::new(&std::env::var_os("HOME")?).join("VulkanSDK"))
+		.ok()?
+		.filter_map(Result::ok)
+		.map(|entry| entry.path().join("macOS/lib/libvulkan.dylib"))
+		.filter(|library| library.exists())
+		.collect();
+
+	sdks.sort();
+
+	sdks.pop()
+}
+
+fn point_sdl_at_the_vulkan_sdk() {
+	if cfg!(target_os = "macos") && std::env::var_os("SDL_VULKAN_LIBRARY").is_none() {
+		if let Some(library) = sdk_vulkan_library().and_then(|library| CString::new(library.to_string_lossy().as_bytes()).ok()) {
+			// SAFETY: plain SDL calls with NUL terminated strings that SDL copies.
+			unsafe { sdl::SDL_SetHint(sdl::SDL_HINT_VULKAN_LIBRARY, library.as_ptr()) };
 		}
 	}
 }

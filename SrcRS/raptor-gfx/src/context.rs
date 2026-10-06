@@ -90,8 +90,8 @@ pub struct Gfx {
 	buffers: Option<RendererBuffers>,
 	dfg_lut: std::sync::OnceLock<Image>,
 	noise_texture: std::sync::OnceLock<Image>,
-	textures: Textures,
-	upload: Option<UploadContext>,
+	textures: Arc<Textures>,
+	upload: Option<Arc<UploadContext>>,
 	swapchain: RwLock<Swapchain>,
 	descriptors: Mutex<DescriptorCache>,
 	ds_layouts: DsLayoutCache,
@@ -257,8 +257,8 @@ impl Gfx {
 
 		let profiler = GpuProfiler::create(core.device(), families.graphics, FRAMES_IN_FLIGHT);
 
-		let upload = UploadContext::new(&core, families.transfer)?;
-		let textures = Textures::new(&core);
+		let upload = Arc::new(UploadContext::new(&core, families.transfer)?);
+		let textures = Arc::new(Textures::new(&core));
 
 		let buffers = RendererBuffers::create(
 			&core,
@@ -315,7 +315,7 @@ impl Gfx {
 		&self.state
 	}
 
-	pub fn textures(&self) -> &Textures {
+	pub fn textures(&self) -> &Arc<Textures> {
 		&self.textures
 	}
 
@@ -325,7 +325,7 @@ impl Gfx {
 			.expect("the renderer buffers exist until shutdown")
 	}
 
-	pub fn upload(&self) -> &UploadContext {
+	pub fn upload(&self) -> &Arc<UploadContext> {
 		self.upload
 			.as_ref()
 			.expect("the upload context exists until shutdown")
