@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::ffi::{CString, c_char, c_void};
+use std::ffi::{CString, c_char};
 use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::{self, ThreadId};
@@ -118,36 +118,7 @@ impl PipelineSlot
 	}
 }
 
-pub type TemplateFn = unsafe extern "C" fn(
-	user: *mut c_void,
-	pass: u32,
-	features: u32,
-	desc: *mut PipelineDesc,
-) -> bool;
-
-pub type TemplateFree = unsafe extern "C" fn(user: *mut c_void);
-
-struct Template
-{
-	call: TemplateFn,
-	user: *mut c_void,
-	free: Option<TemplateFree>,
-}
-
-impl Drop for Template
-{
-	fn drop(&mut self)
-	{
-		if let Some(free) = self.free {
-			// SAFETY: guaranteed by the creator of the template.
-			unsafe { free(self.user) };
-		}
-	}
-}
-
-// SAFETY: the host promised the callbacks can be called from any thread, and the user data dropped
-// on the thread that destroys the cache.
-unsafe impl Send for Template {}
+pub type TemplateFn = Arc<dyn Fn(u32, &mut PipelineDesc) -> bool + Send + Sync>;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum BuildFailure
@@ -171,7 +142,7 @@ pub trait Builder
 
 struct Inner
 {
-	templates: [Option<Template>; NUM_PASSES],
+	templates: [Option<TemplateFn>; NUM_PASSES],
 	descs: HashMap<u32, PipelineDesc>,
 }
 
@@ -273,17 +244,11 @@ impl PipelineCache
 		slot.debug_name = slot.name_storage.as_ptr();
 	}
 
-	pub fn register_template(
-		&self,
-		pass: u32,
-		call: TemplateFn,
-		user: *mut c_void,
-		free: Option<TemplateFree>,
-	)
+	pub fn register_template(&self, pass: u32, template: TemplateFn)
 	{
 		assert!((pass as usize) < NUM_PASSES);
 
-		self.lock().templates[pass as usize] = Some(Template { call, user, free });
+		self.lock().templates[pass as usize] = Some(template);
 	}
 
 	fn create_locked(&self, inner: &mut Inner, desc: PipelineDesc) -> Option<u32>
@@ -410,19 +375,18 @@ impl PipelineCache
 				return Ok(found);
 			}
 
-			let Some((call, user)) = inner
+			let Some(template) = inner
 				.templates
 				.get(pass as usize)
 				.and_then(Option::as_ref)
-				.map(|template| (template.call, template.user))
+				.cloned()
 			else {
 				return Ok(INVALID_INDEX);
 			};
 
 			let mut desc = PipelineDesc::default();
 
-			// SAFETY: guaranteed by the creator of the template.
-			if !unsafe { call(user, pass, features, &mut desc) } {
+			if !template(features, &mut desc) {
 				return Ok(INVALID_INDEX);
 			}
 
@@ -601,8 +565,8 @@ impl Builder for GpuBuilder<'_>
 		mut desc: PipelineDesc,
 	) -> Result<(), BuildFailure>
 	{
-		if let Some(declarer) = desc.declare.take() {
-			declarer.declare(&mut desc);
+		if let Some(declare) = desc.declare.take() {
+			declare(&mut desc);
 		}
 
 		let macros: Vec<MacroRef> = desc
@@ -758,21 +722,13 @@ mod tests
 
 	static CALLS: AtomicU32 = AtomicU32::new(0);
 
-	unsafe extern "C" fn template(
-		_user: *mut c_void,
-		_pass: u32,
-		features: u32,
-		desc: *mut PipelineDesc,
-	) -> bool
+	fn template(features: u32, desc: &mut PipelineDesc) -> bool
 	{
 		CALLS.fetch_add(1, Ordering::SeqCst);
 
 		if features & 4 != 0 {
 			return false;
 		}
-
-		// SAFETY: the cache passes a live description.
-		let desc = unsafe { &mut *desc };
 
 		desc.debug_name = format!("Variant{}", features & 1);
 		desc.features = features & 1;
@@ -784,7 +740,7 @@ mod tests
 	{
 		let cache = PipelineCache::new(3, 8);
 
-		cache.register_template(1, template, std::ptr::null_mut(), None);
+		cache.register_template(1, Arc::new(template));
 
 		cache
 	}
@@ -839,7 +795,7 @@ mod tests
 	fn a_variant_can_be_found_in_another_pass()
 	{
 		let cache = cache_with_template();
-		cache.register_template(2, template, std::ptr::null_mut(), None);
+		cache.register_template(2, Arc::new(template));
 
 		let mut fake = Fake { built: Vec::new() };
 
@@ -909,5 +865,32 @@ mod tests
 		cache.create(PipelineDesc::default(), &mut fake).unwrap();
 
 		assert_eq!(fake.built.len(), 1);
+	}
+}
+
+#[cfg(test)]
+mod layout_tests
+{
+	use std::mem::{offset_of, size_of};
+
+	use super::*;
+
+	#[test]
+	fn the_public_slot_fields_have_the_layout_the_c_header_declares()
+	{
+		assert_eq!(size_of::<SlotSet>(), 24);
+		assert_eq!(offset_of!(SlotSet, set), 8);
+		assert_eq!(offset_of!(SlotSet, layout), 16);
+
+		assert_eq!(offset_of!(PipelineSlot, pipeline), 0);
+		assert_eq!(offset_of!(PipelineSlot, layout), 8);
+		assert_eq!(offset_of!(PipelineSlot, default_cull_mode), 16);
+		assert_eq!(offset_of!(PipelineSlot, handle), 20);
+		assert_eq!(offset_of!(PipelineSlot, name), 24);
+		assert_eq!(offset_of!(PipelineSlot, set_count), 28);
+		assert_eq!(offset_of!(PipelineSlot, sets), 32);
+		assert_eq!(offset_of!(PipelineSlot, debug_name), 40);
+		assert_eq!(offset_of!(PipelineSlot, is_compute), 48);
+		assert_eq!(offset_of!(PipelineSlot, built), 49);
 	}
 }

@@ -1,0 +1,12 @@
+[package]
+name = "raptor-jolt"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+raptor-physics = { path = "../raptor-physics" }
+oxijolt-sys = "0.5"
+
+[lints]
+workspace = true

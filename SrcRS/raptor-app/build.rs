@@ -30,8 +30,12 @@ fn main()
 
 	let build_dir = target_dir.join("cmake").join(&config);
 
-	for path in ["Src", "CMakeLists.txt", "Submodules/strata/CMakeLists.txt", "Submodules/strata/src", "Submodules/strata/include"] {
+	for path in ["Src", "CMakeLists.txt"] {
 		println!("cargo:rerun-if-changed={}", repo.join(path).display());
+	}
+
+	if let Some(lib) = env::var_os("DEP_STRATA_LLVM_LIB") {
+		println!("cargo:rustc-link-arg-bins=-Wl,-rpath,{}", PathBuf::from(lib).display());
 	}
 
 	for var in ["VULKAN_SDK", "RAPTOR_CMAKE_CONFIG", "LLVM_DIR"] {
@@ -96,10 +100,6 @@ fn configure(repo: &Path, build_dir: &Path, config: &str, vulkan_sdk: Option<&Pa
 
 	cmake.arg(format!("-DCMAKE_BUILD_TYPE={config}"));
 	cmake.arg(format!("-DFX_BASE_DIR={}", repo.display()));
-	cmake.arg(format!(
-		"-DFX_EDITOR={}",
-		if env::var_os("CARGO_FEATURE_EDITOR").is_some() { "ON" } else { "OFF" }
-	));
 
 	if cfg!(target_os = "macos") {
 		cmake.arg("-DUSE_MOLTENVK=ON");

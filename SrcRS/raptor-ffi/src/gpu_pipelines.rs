@@ -9,6 +9,68 @@ use raptor_shader::program::{self, MacroRef, ProgramKind};
 
 use crate::gpu::RxGpuDevice;
 
+/// Binds a pipeline unless it is the one `bound` says is already bound, then records it in `bound`.
+/// Graphics pipelines get their own cull mode as the dynamic state. Returns whether it was bound.
+///
+/// # Safety
+///
+/// `device` must be live, `cmd` recording, `pipeline` live and usable with the bind point, and
+/// `bound` writable.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rx_gpu_cmd_bind_pipeline_cached(
+	device: *const RxGpuDevice,
+	cmd: *mut c_void,
+	bound: *mut u64,
+	bind_point: i32,
+	pipeline: u64,
+	is_compute: bool,
+	default_cull_mode: u32,
+) -> bool
+{
+	// SAFETY: guaranteed by the caller.
+	if unsafe { *bound } == pipeline {
+		return false;
+	}
+
+	// SAFETY: guaranteed by the caller.
+	unsafe {
+		rx_gpu_cmd_bind_pipeline(device, cmd, bind_point, pipeline);
+
+		if !is_compute {
+			rx_gpu_cmd_set_cull_mode(device, cmd, default_cull_mode);
+		}
+
+		*bound = pipeline;
+	}
+
+	true
+}
+
+/// Draws after this with no face culling if `double_sided`, or with the pipeline's own culling
+/// otherwise. Compute pipelines are left alone.
+///
+/// # Safety
+///
+/// `device` must be live and `cmd` recording with a graphics pipeline bound.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rx_gpu_cmd_set_double_sided(
+	device: *const RxGpuDevice,
+	cmd: *mut c_void,
+	is_compute: bool,
+	default_cull_mode: u32,
+	double_sided: bool,
+)
+{
+	if is_compute {
+		return;
+	}
+
+	let mode = if double_sided { 0 } else { default_cull_mode };
+
+	// SAFETY: guaranteed by the caller.
+	unsafe { rx_gpu_cmd_set_cull_mode(device, cmd, mode) };
+}
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct RxPushConstantDef

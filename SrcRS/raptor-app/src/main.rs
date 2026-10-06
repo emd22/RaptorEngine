@@ -1,24 +1,40 @@
-use std::ffi::CString;
-use std::os::raw::{c_char, c_int};
+mod cpp_host;
+
+use std::path::PathBuf;
+use std::process::ExitCode;
 
 use raptor_ffi as _;
+use raptor_game::{Game, GameConfig};
+use raptor_script as _;
 
-unsafe extern "C" {
-	fn RaptorMain(argc: c_int, argv: *mut *mut c_char) -> c_int;
+fn find_config() -> PathBuf
+{
+	let relative = PathBuf::from("Config/Main.conf");
+
+	let exe_dir = std::env::current_exe()
+		.ok()
+		.and_then(|exe| exe.parent().map(PathBuf::from));
+
+	exe_dir
+		.into_iter()
+		.chain([raptor_core::paths::base_dir().clone()])
+		.map(|dir| dir.join(&relative))
+		.find(|candidate| candidate.exists())
+		.unwrap_or(relative)
 }
 
-fn main()
+fn main() -> ExitCode
 {
-	let args: Vec<CString> = std::env::args_os()
-		.map(|arg| CString::new(arg.to_string_lossy().into_owned()).unwrap_or_default())
-		.collect();
+	let config = GameConfig::load(find_config());
+	let args: Vec<String> = std::env::args().collect();
 
-	let mut argv: Vec<*mut c_char> = args.iter().map(|arg| arg.as_ptr().cast_mut()).collect();
-	argv.push(std::ptr::null_mut());
+	let mut host = cpp_host::CppHost::new();
 
-	// SAFETY: `argv` is a null terminated array of `args.len()` NUL terminated strings that outlive
-	// the call.
-	let code = unsafe { RaptorMain(args.len() as c_int, argv.as_mut_ptr()) };
-
-	std::process::exit(code);
+	match Game::run(config, &mut host, args) {
+		Ok(()) => ExitCode::SUCCESS,
+		Err(error) => {
+			raptor_core::log_error!("{error}");
+			ExitCode::FAILURE
+		}
+	}
 }

@@ -26,6 +26,13 @@ pub struct InstanceData
 	pub uv_max: [f32; 2],
 }
 
+const _: () = assert!(std::mem::size_of::<InstanceData>() == 32);
+
+// SAFETY: `repr(C)` with eight 4 byte floats and no padding.
+unsafe impl bytemuck::Zeroable for InstanceData {}
+// SAFETY: as above, and any bit pattern is a valid float.
+unsafe impl bytemuck::Pod for InstanceData {}
+
 /// Where a character is in the atlas, if it has a glyph.
 pub fn glyph_index(character: u8) -> Option<usize>
 {

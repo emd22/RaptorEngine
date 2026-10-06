@@ -124,6 +124,8 @@ pub struct Skeleton
 	stack: Vec<Playback>,
 	external_pose: bool,
 	holding_rest_pose: bool,
+	last_update_frame: Option<u32>,
+	bone_buffer_base: u32,
 }
 
 /// Parents first, so that a joint's world transform can be built from its parent's. A joint whose
@@ -250,6 +252,8 @@ impl Skeleton
 			stack: Vec::with_capacity(MAX_ANIMATION_STACK),
 			external_pose: false,
 			holding_rest_pose: false,
+			last_update_frame: None,
+			bone_buffer_base: NO_BONE,
 		};
 
 		skeleton.fields.local = skeleton.local.as_ptr();
@@ -287,6 +291,16 @@ impl Skeleton
 	pub fn joint_count(&self) -> u32
 	{
 		self.data.joint_count
+	}
+
+	/// The parent of a joint, or `NO_BONE` for a root
+	pub fn parent(&self, bone: u32) -> u32
+	{
+		self.data
+			.parents
+			.get(bone as usize)
+			.copied()
+			.unwrap_or(NO_BONE)
 	}
 
 	pub fn bone_name(&self, bone: u32) -> Option<&CString>
@@ -358,16 +372,19 @@ impl Skeleton
 	{
 		if self.animation(animation).is_some() {
 			animation
-		}
-		else {
+		} else {
 			NO_ANIMATION
 		}
 	}
 
 	/// Plays `animation` over what is playing. It fails if there is no such animation or the stack
 	/// is full.
-	pub fn push_animation(&mut self, animation: AnimationId, on_end: AnimationEnd, speed: f32)
-	-> bool
+	pub fn push_animation(
+		&mut self,
+		animation: AnimationId,
+		on_end: AnimationEnd,
+		speed: f32,
+	) -> bool
 	{
 		if self.animation(animation).is_none() || self.stack.len() >= MAX_ANIMATION_STACK {
 			return false;
@@ -423,7 +440,11 @@ impl Skeleton
 		for (index, local) in self.local.iter_mut().enumerate() {
 			let rest = data.rest_pose[index];
 
-			let mut translation = [rest.translation[0], rest.translation[1], rest.translation[2]];
+			let mut translation = [
+				rest.translation[0],
+				rest.translation[1],
+				rest.translation[2],
+			];
 			let mut rotation = rest.rotation;
 			let mut scale = [rest.scale[0], rest.scale[1], rest.scale[2]];
 
@@ -445,8 +466,7 @@ impl Skeleton
 
 			self.world[index] = if parent == NO_BONE {
 				math::multiply(&self.local[index], &data.root_transforms[index])
-			}
-			else {
+			} else {
 				math::multiply(&self.local[index], &self.world[parent as usize])
 			};
 		}
@@ -470,11 +490,9 @@ impl Skeleton
 
 			self.world[index] = if is_driven.get(index).copied().unwrap_or(0) != 0 {
 				driven_world.get(index).copied().unwrap_or(Mat4::IDENTITY)
-			}
-			else if parent == NO_BONE {
+			} else if parent == NO_BONE {
 				math::multiply(&self.local[index], &data.root_transforms[index])
-			}
-			else {
+			} else {
 				math::multiply(&self.local[index], &self.world[parent as usize])
 			};
 
@@ -484,14 +502,39 @@ impl Skeleton
 		self.update_pose_summary();
 	}
 
+	/// Advances the animation once for `frame`, however many objects or passes share the skeleton.
+	/// Says whether it did, so the caller knows the pose changed and has to be uploaded again.
+	pub fn update(&mut self, frame: u32, delta_time: f32) -> bool
+	{
+		if self.last_update_frame == Some(frame) {
+			return false;
+		}
+
+		self.last_update_frame = Some(frame);
+		self.advance(delta_time);
+
+		true
+	}
+
+	/// Where the pose was last put in the bone buffer, or `NO_BONE` if it has not been or did not
+	/// fit.
+	pub fn bone_buffer_base(&self) -> u32
+	{
+		self.bone_buffer_base
+	}
+
+	pub fn set_bone_buffer_base(&mut self, base: u32)
+	{
+		self.bone_buffer_base = base;
+	}
+
 	/// Plays the active animation for `delta_time` more seconds and poses the skeleton, then deals
 	/// with the animation reaching its end.
 	pub fn advance(&mut self, delta_time: f32)
 	{
 		let playback = if self.external_pose {
 			None
-		}
-		else {
+		} else {
 			self.active_playback()
 		};
 
@@ -532,8 +575,7 @@ impl Skeleton
 
 		let active = if on_the_stack {
 			self.stack.last_mut()
-		}
-		else {
+		} else {
 			Some(&mut self.rest_playback)
 		};
 
@@ -936,7 +978,13 @@ mod tests
 	{
 		let skeleton = Skeleton::new(chain(2));
 
-		assert_eq!(skeleton.fields().world, skeleton.world_transforms().as_ptr());
-		assert_eq!(skeleton.fields().skinning, skeleton.skinning_matrices().as_ptr());
+		assert_eq!(
+			skeleton.fields().world,
+			skeleton.world_transforms().as_ptr()
+		);
+		assert_eq!(
+			skeleton.fields().skinning,
+			skeleton.skinning_matrices().as_ptr()
+		);
 	}
 }

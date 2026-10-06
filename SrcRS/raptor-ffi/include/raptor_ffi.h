@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -188,6 +189,45 @@ RxBrushSplit* rx_brush_split(const RxBrushView* view, const float* normal, float
 const RxBrushPlane* rx_brush_split_planes(const RxBrushSplit* split, int32_t front, size_t* count);
 void rx_brush_split_free(RxBrushSplit* split);
 RxMesh* rx_brush_generate_mesh(const RxBrushView* view);
+
+void rx_blockout_keep_in_place(const float* rotation, const float* old_center, const float* new_center, float* out);
+size_t rx_blockout_move_face(const RxBrushPlane* planes, size_t count, const float* normal, float distance,
+                             float min_thickness, RxBrushPlane* out, size_t capacity);
+size_t rx_blockout_edit_face_texture(const RxBrushPlane* planes, size_t count, const float* normal, uint32_t edit,
+                                     const float* amount, RxBrushPlane* out, size_t capacity);
+uint8_t rx_blockout_clip(const RxBrushPlane* planes, size_t count, const float* to_local, const float* rotation,
+                         const float* position, const float* point_a, const float* point_b, const float* face_normal,
+                         RxBrushPlane* out_kept, RxBrushPlane* out_split, size_t capacity, size_t* out_counts,
+                         float* out_split_position);
+size_t rx_blockout_world_box(const float* min, const float* max, RxBrushPlane* out, size_t capacity,
+                             float* out_position);
+uint8_t rx_blockout_same_planes(const RxBrushPlane* a, size_t a_count, const RxBrushPlane* b, size_t b_count);
+uint32_t rx_blockout_save_shape(const RxBrushPlane* planes, size_t count);
+
+enum RxBlockoutShape
+{
+    RX_BLOCKOUT_SHAPE_BOX = 1,
+    RX_BLOCKOUT_SHAPE_TEXTURES = 2,
+};
+void rx_script_point_to_world(const float* matrix, const float* point, float* out);
+void rx_script_direction_to_world(const float* matrix, const float* direction, float* out);
+void rx_script_ray_to_plane(const float* origin, const float* direction, const float* point, const float* normal,
+                            float* out);
+void rx_script_register_extern(const char* name, const void* function);
+const void* rx_script_find_extern(const char* name);
+uint32_t rx_script_load(const char* path);
+void rx_script_free(uint32_t id);
+void rx_script_reload(uint32_t id);
+void rx_script_reload_all(void);
+bool rx_script_has_errors(uint32_t id);
+void* rx_script_context(uint32_t id);
+const void* rx_script_function(uint32_t id, const char* name);
+void rx_script_shutdown(void);
+
+uint32_t rx_rand32(void);
+float rx_random_unit(void);
+float rx_random_signed_unit(void);
+float rx_random_range(float low, float high);
 
 enum RxProbeCaptureLimits
 {
@@ -400,6 +440,26 @@ void rx_image_retain(RxImage* image);
 void rx_image_release(RxImage* image, const RxGpuDevice* device, const RxGpuAllocator* allocator);
 int32_t rx_image_create(RxImage* image, const RxGpuDevice* device, const RxGpuAllocator* allocator,
                         const RxImageDesc* desc);
+
+typedef struct RxUploadInfo
+{
+    uint32_t image_type;
+    uint32_t width;
+    uint32_t height;
+    uint16_t format;
+    uint32_t mip_level;
+    uint32_t mip_count;
+    const uint8_t* data;
+    size_t size;
+} RxUploadInfo;
+
+typedef void (*RxDeleteBufferFn)(RxBufferResource* resource);
+
+int32_t rx_image_create_from_data(RxImage* image, const RxGpuDevice* device, const RxGpuAllocator* allocator,
+                                  void* cmd, uint32_t queue_family, RxDeleteBufferFn delete_buffer,
+                                  const RxUploadInfo* info, uint8_t is_target);
+int32_t rx_image_upload_chain(RxImage* image, const RxGpuDevice* device, const RxGpuAllocator* allocator, void* cmd,
+                              uint32_t queue_family, RxDeleteBufferFn delete_buffer, const RxUploadInfo* info);
 void rx_image_wrap_external(RxImage* image, uint64_t vk_image, uint32_t width, uint32_t height, uint16_t format);
 int32_t rx_image_recreate_color_view(RxImage* image, const RxGpuDevice* device);
 int32_t rx_gpu_cmd_copy_buffer_to_mips(const RxGpuDevice* device, void* cmd, uint64_t buffer, uint64_t image,
@@ -1193,6 +1253,7 @@ uint32_t rx_level_light_count(const RxLevel* level);
 const RxLevelLight* rx_level_light(const RxLevel* level, uint32_t index);
 uint32_t rx_level_block_count(const RxLevel* level);
 const RxLevelBlock* rx_level_block(const RxLevel* level, uint32_t index);
+size_t rx_blockout_make_planes(const RxLevelBlock* block, RxBrushPlane* out, size_t capacity);
 uint8_t rx_level_save(const char* path, const RxLevelWrite* write, const RxLogSink* log);
 
 typedef struct RxWorldFile RxWorldFile;
@@ -1390,24 +1451,51 @@ enum RxLoadStatus
     RX_LOAD_STATUS_ERROR = 2,
 };
 
-typedef struct RxAssetBackend
-{
-    void* user;
-    int32_t (*load)(void* user, void* job);
-    void (*begin_upload)(void* user);
-    uint8_t (*upload)(void* user, void* job);
-    void (*end_upload)(void* user);
-    void (*finish)(void* user, void* job, int32_t status);
-    uint32_t (*frame)(void* user);
-    void (*wait_for_uploads)(void* user);
-    void (*destroy)(void* user, void* resource);
-    void (*log)(void* user, int32_t level, int32_t category, const char* message, size_t length);
-} RxAssetBackend;
-
 typedef void (*RxTicketCallback)(void* user, void* argument);
 typedef void (*RxTicketDestroy)(void* user);
 
-RxAssetScheduler* rx_asset_scheduler_new(const RxAssetBackend* backend, uint32_t workers);
+typedef struct RxUploadContext RxUploadContext;
+
+typedef struct RxAssetJobs
+{
+    void* user;
+    int32_t (*load)(void* user, void* job);
+    uint8_t (*upload)(void* user, void* job);
+    void (*finish)(void* user, void* job, int32_t status);
+    void (*log)(void* user, int32_t level, int32_t category, const char* message, size_t length);
+} RxAssetJobs;
+
+RxUploadContext* rx_upload_context_new(const RxGpuDevice* device, const RxGpuAllocator* allocator,
+                                       const RxFrameLoop* frame_loop, uint32_t family);
+void rx_upload_context_free(RxUploadContext* context);
+void* rx_upload_cmd(const RxUploadContext* context);
+uint32_t rx_upload_family(const RxUploadContext* context);
+uint64_t rx_upload_transfer_semaphore(const RxUploadContext* context);
+uint64_t rx_upload_transfer_count(const RxUploadContext* context);
+int32_t rx_upload_immediate(const RxUploadContext* context, void (*record)(void* user, void* cmd), void* user);
+int32_t rx_upload_begin(const RxUploadContext* context);
+int32_t rx_upload_end(const RxUploadContext* context);
+void rx_upload_wait(const RxUploadContext* context);
+void rx_upload_forget_frames(const RxUploadContext* context);
+
+typedef struct RxImageJobDesc
+{
+    const RxTicket* ticket;
+    const RxImage* image;
+    void* asset;
+    uint16_t format;
+    uint32_t image_type;
+    uint8_t is_target;
+} RxImageJobDesc;
+
+void* rx_image_job_from_file(const RxImageJobDesc* desc, const char* path);
+void* rx_image_job_from_memory(const RxImageJobDesc* desc, const uint8_t* data, size_t size);
+void* rx_image_job_from_chain(const RxImageJobDesc* desc, const uint8_t* data, size_t size, uint32_t width,
+                              uint32_t height, uint32_t mip_level, uint32_t mip_count);
+
+RxAssetScheduler* rx_asset_scheduler_new_native(const RxUploadContext* context, const RxAssetJobs* jobs,
+                                                uint32_t workers);
+
 void rx_asset_scheduler_free(RxAssetScheduler* scheduler);
 void rx_asset_scheduler_submit(const RxAssetScheduler* scheduler, void* job);
 void rx_asset_scheduler_delete_resource(const RxAssetScheduler* scheduler, void* resource, uint32_t frame_spacing);
@@ -1492,6 +1580,24 @@ RxKtx* rx_ktx_open_memory(const uint8_t* data, size_t size, const RxLogSink* log
 void rx_ktx_free(RxKtx* ktx);
 void rx_ktx_info(const RxKtx* ktx, RxKtxInfo* out);
 const uint8_t* rx_ktx_level(const RxKtx* ktx, uint32_t level, size_t* size);
+
+uint8_t rx_asset_is_ktx_memory(const uint8_t* data, size_t size);
+uint8_t rx_asset_is_ktx_file(const char* path);
+size_t rx_ktx_chain_size(const RxKtx* ktx, uint32_t first, uint32_t count, uint32_t* out_count);
+void rx_ktx_chain_copy(const RxKtx* ktx, uint32_t first, uint32_t count, uint8_t* dst);
+void rx_ktx_mip_dimensions(const RxKtx* ktx, uint32_t level, uint32_t* out);
+
+typedef struct RxNullImages RxNullImages;
+
+#define RX_NULL_IMAGE_FLAT_NORMAL_KEY 0xFFFFFFFFu
+
+RxNullImages* rx_null_images_new(void);
+void rx_null_images_free(RxNullImages* images);
+void* rx_null_images_get(const RxNullImages* images, uint32_t key);
+void* rx_null_images_insert(const RxNullImages* images, uint32_t key, void* image);
+void rx_null_images_clear(const RxNullImages* images);
+void rx_null_image_pixel(size_t stride, uint8_t* out);
+void rx_flat_normal_pixel(uint8_t* out);
 
 RxDecodedImage* rx_image_decode_file(const char* path, uint32_t channels);
 RxDecodedImage* rx_image_decode_memory(const uint8_t* data, size_t size, uint32_t channels);
@@ -1618,6 +1724,651 @@ void rx_recoil_update(RxRecoil* recoil, float delta_time, float* delta_yaw, floa
 void rx_recoil_pitch_clamped(RxRecoil* recoil, float delta_pitch, float applied_pitch);
 void rx_view_sway_update(RxViewSway* sway, float camera_yaw, float camera_pitch, float delta_time);
 
+typedef struct RxLocomotion
+{
+    float user_force[3];
+    float bob_counter;
+    uint32_t bob_reverse;
+} RxLocomotion;
+
+void rx_locomotion_step(RxLocomotion* loco, double delta_time, const float* direction, const float* offset,
+                        uint8_t sprinting, float speed_multiplier, float* force);
+uint8_t rx_locomotion_released(const RxLocomotion* loco);
+void rx_locomotion_bob(RxLocomotion* loco, double delta_time);
+void rx_locomotion_head_bob(const RxLocomotion* loco, float strength_x, float strength_y, float* x, float* y);
+float rx_fov_step(float fov, uint8_t sprinting, uint8_t moving, double delta_time);
+
+typedef struct RxPackedVertices RxPackedVertices;
+
+typedef struct RxPackInput
+{
+    const float* positions;
+    size_t position_floats;
+    const float* normals;
+    size_t normal_floats;
+    const float* uvs;
+    size_t uv_floats;
+    const float* tangents;
+    size_t tangent_floats;
+    size_t tangent_stride;
+    float handedness;
+    const float* bone_weights;
+    size_t bone_weight_floats;
+    const uint32_t* bone_ids;
+    size_t bone_id_values;
+    uint8_t negative_x;
+    uint8_t mirror_basis;
+} RxPackInput;
+
+RxPackedVertices* rx_mesh_pack_vertices(const RxPackInput* input);
+void rx_mesh_packed_free(RxPackedVertices* packed);
+const uint8_t* rx_mesh_packed_data(const RxPackedVertices* packed);
+uint32_t rx_mesh_packed_count(const RxPackedVertices* packed);
+uint32_t rx_mesh_packed_info(const RxPackedVertices* packed, uint32_t* out_flags);
+uint8_t rx_mesh_recalculate_normals(uint8_t* vertices, size_t vertex_count, size_t stride, const uint32_t* indices,
+                                    size_t index_count);
+
+typedef struct RxMeshRecord RxMeshRecord;
+
+RxMeshRecord* rx_mesh_record_new(void);
+void rx_mesh_record_free(RxMeshRecord* mesh);
+uint8_t rx_mesh_record_pack(RxMeshRecord* mesh, const RxPackInput* input);
+void rx_mesh_record_set_vertices(RxMeshRecord* mesh, uint32_t vertex_type, const uint8_t* bytes, size_t size);
+void rx_mesh_record_set_indices(RxMeshRecord* mesh, const uint32_t* indices, size_t count);
+uint32_t rx_mesh_record_ensure_normals(RxMeshRecord* mesh);
+const uint8_t* rx_mesh_record_vertex_bytes(const RxMeshRecord* mesh, size_t* out_size);
+const uint32_t* rx_mesh_record_indices(const RxMeshRecord* mesh, size_t* out_count);
+uint32_t rx_mesh_record_vertex_count(const RxMeshRecord* mesh);
+uint32_t rx_mesh_record_vertex_type(const RxMeshRecord* mesh);
+uint8_t rx_mesh_record_is_skinned(const RxMeshRecord* mesh);
+uint8_t rx_mesh_record_is_ready(const RxMeshRecord* mesh);
+void rx_mesh_record_set_ready(const RxMeshRecord* mesh, uint8_t ready);
+uint8_t rx_mesh_record_is_reference(const RxMeshRecord* mesh);
+uint8_t rx_mesh_record_keeps_in_memory(const RxMeshRecord* mesh);
+void rx_mesh_record_set_keep_in_memory(RxMeshRecord* mesh, uint8_t value);
+void rx_mesh_record_positions(const RxMeshRecord* mesh, float* out);
+uint8_t rx_mesh_record_bounds(const RxMeshRecord* mesh, float* out_min, float* out_max);
+void rx_mesh_record_clear_local(RxMeshRecord* mesh);
+void rx_mesh_record_clear_vertices(RxMeshRecord* mesh);
+
+#define RX_MAX_VARIANT_MACROS 3
+
+typedef struct RxGeometryVariant
+{
+    uint32_t features;
+    uint32_t vertex_type;
+    uint32_t macro_count;
+    const char* macros[RX_MAX_VARIANT_MACROS];
+    const char* suffix;
+} RxGeometryVariant;
+
+void rx_forward_geometry_variant(uint32_t features, RxGeometryVariant* out);
+uint8_t rx_forward_light_grid(uint32_t width, uint32_t height, uint32_t tile_size, uint32_t max_columns,
+                              uint32_t max_rows, uint32_t* out_columns, uint32_t* out_rows);
+
+uint8_t rx_gpu_cmd_bind_pipeline_cached(const RxGpuDevice* device, void* cmd, uint64_t* bound, int32_t bind_point,
+                                        uint64_t pipeline, uint8_t is_compute, uint32_t default_cull_mode);
+void rx_gpu_cmd_set_double_sided(const RxGpuDevice* device, void* cmd, uint8_t is_compute, uint32_t default_cull_mode,
+                                 uint8_t double_sided);
+
+void rx_forward_ssao_blur_push(uint32_t width, uint32_t height, void* out);
+typedef struct RxSlotSet RxSlotSet;
+
+#define RX_SLOTS_NOT_FOUND 0xFFFFFFFFu
+
+RxSlotSet* rx_slots_new(uint32_t max_bits, uint8_t all_set);
+RxSlotSet* rx_slots_clone(const RxSlotSet* slots);
+void rx_slots_free(RxSlotSet* slots);
+uint8_t rx_slots_get(const RxSlotSet* slots, uint32_t index);
+void rx_slots_set(RxSlotSet* slots, uint32_t index);
+void rx_slots_unset(RxSlotSet* slots, uint32_t index);
+void rx_slots_clear_all(RxSlotSet* slots);
+uint32_t rx_slots_find_next_free(const RxSlotSet* slots, uint32_t start);
+uint32_t rx_slots_find_next_set(const RxSlotSet* slots, uint32_t start);
+uint32_t rx_slots_find_free_group(const RxSlotSet* slots, uint32_t size);
+uint32_t rx_slots_reserve_instances(RxSlotSet* slots, uint32_t current, uint32_t instances, bool* moved);
+uint64_t rx_slots_capacity(const RxSlotSet* slots);
+const uint64_t* rx_slots_words(const RxSlotSet* slots);
+
+typedef struct RxCullInputs
+{
+    uint8_t cullable;
+    uint8_t has_mesh;
+    uint8_t world_layer;
+    uint8_t skinned;
+    uint8_t is_instance;
+    uint8_t physics_enabled;
+    uint32_t instance_slots_in_use;
+} RxCullInputs;
+
+uint8_t rx_object_can_be_frustum_culled(const RxCullInputs* inputs, const float* bounds_min, const float* bounds_max);
+void rx_object_merge_child_bounds(float* parent_min, float* parent_max, const float* parent_world, const float* child_min,
+                                  const float* child_max, const float* child_world);
+uint8_t rx_object_contains_point(const float* bounds_min, const float* bounds_max, const float* world_matrix,
+                                 const float* point);
+float rx_object_raycast_bounds(const float* bounds_min, const float* bounds_max, const float* world_matrix,
+                               const float* origin, const float* direction, float* out_face);
+float rx_object_direction_scale(const float* bounds_min, const float* bounds_max, float scale, const float* direction);
+
+uint32_t rx_forward_material_features(uint8_t has_normal_or_orm, uint8_t skinned, uint8_t unlit);
+
+void rx_world_far_to_near(const float* centers, size_t count, const float* camera, uint32_t* out);
+void rx_world_clamp_tile_range(uint32_t* min, uint32_t* max, uint32_t width, uint32_t height);
+
+typedef struct RxCameraCore
+{
+    float view[16];
+    float projection[16];
+    float inv_view[16];
+    float inv_projection[16];
+    float camera_matrix[16];
+    float weapon_camera_matrix[16];
+    float weapon_projection[16];
+    float position[4];
+    float direction[4];
+    float target[4];
+    float angle_x;
+    float angle_y;
+    float z_near;
+    float z_far;
+    float fov_rad;
+    float aspect;
+    float weapon_fov;
+    float width;
+    float height;
+    uint32_t kind;
+    uint32_t update_transform;
+    uint32_t update_projection;
+    uint32_t look_at_target;
+} __attribute__((aligned(16))) RxCameraCore;
+
+RxCameraCore* rx_camera_core_new(uint8_t orthographic);
+RxCameraCore* rx_camera_core_clone(const RxCameraCore* core);
+void rx_camera_core_assign(RxCameraCore* dst, const RxCameraCore* src);
+void rx_camera_core_free(RxCameraCore* core);
+void rx_camera_update(RxCameraCore* core);
+void rx_camera_update_projection(RxCameraCore* core);
+void rx_camera_update_camera_matrix(RxCameraCore* core);
+void rx_camera_look_along(RxCameraCore* core, const float* position, const float* direction, const float* up);
+void rx_camera_rotate(RxCameraCore* core, float angle_x, float angle_y);
+void rx_camera_move_by(RxCameraCore* core, const float* offset);
+void rx_camera_move_to(RxCameraCore* core, const float* position);
+void rx_camera_set_planes(RxCameraCore* core, float near_plane, float far_plane);
+void rx_camera_set_bounds(RxCameraCore* core, float width, float height);
+void rx_camera_resolve_view_to_texels(float* eye, float* target, const float* world_up, float width, float resolution);
+
+float rx_light_inv_radius_sq(float radius);
+void rx_light_clamp_cone(float max_outer, float* inner, float* outer);
+void rx_light_spot_bounds(const float* position, const float* direction, float outer_angle, float radius,
+                          float* out_min, float* out_max);
+float rx_light_spot_solid_angle(float inner, float outer);
+float rx_light_intensity_from_lumens(float lumens, float inner, float outer);
+void rx_light_spot_falloff(float inner, float outer, float* out_cos_outer, float* out_angle_scale);
+void rx_light_spot_shadow_matrix(const float* position, const float* direction, float outer_angle, float radius,
+                                 float fov_padding, float max_half_fov, float near_plane, float* out);
+
+void rx_quat_from_axis_angle(const float* axis, float angle, float* out);
+void rx_quat_from_euler(const float* angles, float* out);
+void rx_quat_euler_angles(const float* rotation, float* out);
+void rx_quat_mul(const float* left, const float* right, float* out);
+void rx_quat_slerp(const float* from, const float* to, float step, float* out);
+void rx_quat_nlerp(const float* from, const float* to, float time, float* out);
+void rx_quat_rotate_by_axis(const float* rotation, const float* axis, float angle, float* out);
+void rx_quat_from_direction(const float* direction, float* out);
+
+#define RX_NO_BODY 0xFFFFFFFFu
+
+typedef struct RxPhysicsWorld RxPhysicsWorld;
+
+typedef struct RxCharacterSpec
+{
+    float standing_height;
+    float radius;
+    float mass;
+    float max_strength;
+    float max_slope_angle;
+} RxCharacterSpec;
+
+typedef struct RxBodyProps
+{
+    float convex_radius;
+    float friction;
+    float restitution;
+    float density;
+} RxBodyProps;
+
+typedef struct RxRayResult
+{
+    uint32_t body;
+    float point[3];
+    float normal[3];
+} RxRayResult;
+
+enum RxPhysicsStatus
+{
+    RX_PHYSICS_OK = 0,
+    RX_PHYSICS_SHAPE_ERROR = 1,
+    RX_PHYSICS_TOO_FEW_POINTS = 2,
+    RX_PHYSICS_NOT_TRIANGLES = 3,
+    RX_PHYSICS_NO_ROOM = 4,
+    RX_PHYSICS_BODY_EXISTS = 5,
+};
+
+RxPhysicsWorld* rx_physics_new(void);
+void rx_physics_free(RxPhysicsWorld* world);
+const char* rx_physics_last_error(const RxPhysicsWorld* world);
+int32_t rx_physics_create_box_body(RxPhysicsWorld* world, uint32_t previous_body, const float* dimensions,
+                                   uint8_t dynamic, const RxBodyProps* props, uint32_t* out_body,
+                                   float* out_dimensions);
+int32_t rx_physics_create_hull_body(RxPhysicsWorld* world, uint32_t previous_body, const float* points, size_t count,
+                                    uint8_t dynamic, const RxBodyProps* props, uint32_t* out_body,
+                                    float* out_dimensions);
+int32_t rx_physics_create_mesh_body(RxPhysicsWorld* world, uint32_t existing, const float* positions,
+                                    size_t vertex_count, const uint32_t* indices, size_t index_count, uint8_t dynamic,
+                                    const RxBodyProps* props, uint32_t* out_body);
+void rx_physics_add_to_world(RxPhysicsWorld* world, uint32_t body);
+void rx_physics_remove_from_world(RxPhysicsWorld* world, uint32_t body);
+void rx_physics_destroy_body(RxPhysicsWorld* world, uint32_t body);
+void rx_physics_teleport(RxPhysicsWorld* world, uint32_t body, const float* position, const float* rotation);
+void rx_physics_position_rotation(const RxPhysicsWorld* world, uint32_t body, float* position, float* rotation);
+uint8_t rx_physics_raycast(const RxPhysicsWorld* world, const float* origin, const float* direction, uint32_t ignore,
+                           RxRayResult* out);
+size_t rx_physics_raycast_objects(const RxPhysicsWorld* world, const float* origin, const float* direction,
+                                  uint32_t* out, size_t capacity);
+void rx_physics_raycast_face_of_box(const RxPhysicsWorld* world, uint32_t body, const float* origin,
+                                    const float* direction, float* out);
+
+void rx_physics_body_bounds(const RxPhysicsWorld* world, uint32_t body, float* out_min, float* out_max);
+uint8_t rx_physics_is_dynamic(const RxPhysicsWorld* world, uint32_t body);
+uint8_t rx_physics_is_active(const RxPhysicsWorld* world, uint32_t body);
+void rx_physics_activate(RxPhysicsWorld* world, uint32_t body);
+void rx_physics_deactivate(RxPhysicsWorld* world, uint32_t body);
+void rx_physics_push(RxPhysicsWorld* world, uint32_t body, const float* impulse);
+void rx_physics_point_to_local(const RxPhysicsWorld* world, uint32_t body, const float* point, float* out);
+uint8_t rx_physics_hold(RxPhysicsWorld* world, uint32_t body, const float* local_point, const float* target,
+                        float stiffness, float max_speed, float angular_damping, float* out_held);
+
+
+typedef struct RxImpact
+{
+    float point[3];
+    float normal[3];
+    float speed;
+    uint32_t ragdoll_serial;
+} RxImpact;
+
+void rx_physics_update(RxPhysicsWorld* world);
+void rx_physics_optimize(RxPhysicsWorld* world);
+void rx_physics_set_paused(RxPhysicsWorld* world, uint8_t paused);
+uint8_t rx_physics_is_paused(const RxPhysicsWorld* world);
+float rx_physics_time_step(void);
+
+void rx_physics_set_min_ragdoll_impact_speed(const RxPhysicsWorld* world, float speed);
+size_t rx_physics_drain_impacts(const RxPhysicsWorld* world, RxImpact* out, size_t capacity);
+uint64_t rx_impacts_ragdoll_user_data(uint32_t serial);
+uint32_t rx_impacts_ragdoll_serial(uint64_t user_data);
+
+typedef struct RxCharacter RxCharacter;
+typedef struct RxRagdoll RxRagdoll;
+
+RxCharacter* rx_character_new(RxPhysicsWorld* world, const RxCharacterSpec* spec);
+void rx_character_free(RxCharacter* character, RxPhysicsWorld* world);
+void rx_character_teleport(const RxCharacter* character, RxPhysicsWorld* world, const float* position);
+void rx_character_apply_movement(RxCharacter* character, const float* movement);
+void rx_character_set_collision_enabled(RxCharacter* character, RxPhysicsWorld* world, uint8_t enabled);
+void rx_character_set_gravity_disabled(RxCharacter* character, uint8_t disabled);
+uint8_t rx_character_is_grounded(const RxCharacter* character);
+void rx_character_position(const RxCharacter* character, const RxPhysicsWorld* world, float* out);
+void rx_character_linear_velocity(const RxCharacter* character, const RxPhysicsWorld* world, float* out);
+void rx_character_update(RxCharacter* character, RxPhysicsWorld* world, float delta_time);
+size_t rx_character_ray_bodies(const RxCharacter* character, const RxPhysicsWorld* world, const float* direction,
+                               uint32_t* out, size_t capacity);
+
+RxRagdoll* rx_ragdoll_new(RxPhysicsWorld* world, RxSkeleton* skeleton, const float* object_world,
+                          const float* object_world_inverse, uint32_t serial, uint64_t user_data,
+                          const RxLogSink* log, int32_t log_category);
+void rx_ragdoll_free(RxRagdoll* ragdoll, RxPhysicsWorld* world, RxSkeleton* skeleton);
+uint32_t rx_ragdoll_serial(const RxRagdoll* ragdoll);
+void rx_ragdoll_activate(const RxRagdoll* ragdoll, RxPhysicsWorld* world, RxSkeleton* skeleton, const float* velocity);
+void rx_ragdoll_write_to_skeleton(RxRagdoll* ragdoll, const RxPhysicsWorld* world, RxSkeleton* skeleton);
+size_t rx_ragdoll_debug_boxes(const RxRagdoll* ragdoll, const RxPhysicsWorld* world, float* out, size_t capacity);
+
+#define RX_PROBE_MAX_VOLUMES 8
+#define RX_PROBE_MAX_PROBES 4096
+#define RX_PROBE_MAX_GRID_POINTS (1u << 20)
+#define RX_PROBE_CACHE_FILE_VERSION 12
+#define RX_PROBE_ATLAS_WIDTH 3072
+
+enum RxProbeFileStatus
+{
+    RX_PROBE_FILE_OK = 0,
+    RX_PROBE_FILE_OUT_OF_DATE = 1,
+    RX_PROBE_FILE_INVALID = 2,
+};
+
+enum RxSurfaceCandidateStatus
+{
+    RX_SURFACE_FITS = 0,
+    RX_SURFACE_TOO_MANY_POINTS = 1,
+    RX_SURFACE_TOO_MANY_PROBES = 2,
+};
+
+typedef struct RxProbeFileLayout
+{
+    char magic[4];
+    uint32_t version;
+    uint32_t sh_coeff_count;
+    uint32_t depth_float_count;
+    uint32_t max_volumes;
+} RxProbeFileLayout;
+
+typedef struct RxProbeFileHeader
+{
+    RxProbeFileLayout layout;
+    uint32_t volume_count;
+    uint32_t probe_count;
+    uint32_t grid_point_count;
+} RxProbeFileHeader;
+
+typedef struct RxReflectionFileHeader
+{
+    char magic[4];
+    uint32_t version;
+    uint32_t size;
+    uint32_t mips;
+    uint32_t probe_count;
+} RxReflectionFileHeader;
+
+typedef struct RxProbeVolume
+{
+    float min_and_count[4];
+    float inv_cell_size[4];
+    uint32_t dims_and_first[4];
+    float max_and_cell_volume[4];
+} RxProbeVolume;
+
+typedef struct RxProbeVolumeRange
+{
+    uint32_t first_probe;
+    uint32_t probe_count;
+} RxProbeVolumeRange;
+
+typedef struct RxSurfaceCandidate
+{
+    float volume_min[3];
+    float volume_size[3];
+    uint32_t dims[3];
+    uint32_t needed;
+} RxSurfaceCandidate;
+
+uint64_t rx_probe_file_size(uint32_t probe_count, uint32_t grid_point_count);
+int32_t rx_probe_validate_file(const RxProbeFileHeader* header, uint64_t file_size, const RxProbeVolume* volumes,
+                               const RxProbeVolumeRange* ranges, size_t volume_slots, const uint16_t* grid,
+                               size_t grid_count, char* message, size_t message_capacity);
+uint64_t rx_probe_reflection_file_size(uint32_t probe_count);
+int32_t rx_probe_validate_reflection_file(const RxReflectionFileHeader* header, uint64_t file_size, char* message,
+                                          size_t message_capacity);
+void rx_probe_volume_data(const float* volume_min, const float* volume_size, const uint32_t* dims,
+                          uint32_t first_point, RxProbeVolume* out);
+void rx_probe_moments_row(const float* infos, size_t stride, size_t moments_offset, uint32_t probe_count,
+                          uint32_t atlas_row, uint16_t* out);
+void rx_probe_sample_capture_face(const float* face, uint32_t size, float ndc_x, float ndc_y, float* out);
+void rx_probe_reflection_box(const float* local_min, const float* local_max, const float* local_to_world,
+                             float* out_box_to_world, float* out_half_extent, float* out_volume);
+void rx_probe_reflection_data(const float* box_to_world, const float* half_extent, const float* position,
+                              float* out_world_to_box, float* out_position_and_count, float* out_fade);
+void rx_probe_base_grid(const float* level_size, uint32_t* out_dims);
+int32_t rx_probe_surface_candidate(const RxPlacementBoxes* boxes, const float* region_min, const float* region_max,
+                                   float spacing, uint8_t cell_centred, uint32_t probe_budget,
+                                   uint32_t point_budget, RxSurfaceCandidate* out);
+
+typedef struct RxCasterState
+{
+    uint32_t id;
+    uint8_t drawable;
+    uint8_t has_pose;
+    uint8_t has_bones;
+    uint32_t pose_hash;
+    uint64_t mesh;
+    float world_matrix[16];
+} RxCasterState;
+
+size_t rx_world_visible_tiles(const RxWorldGrid* grid, const float* view_projection, uint32_t* out, size_t capacity);
+uint32_t rx_world_spot_bake_hash(uint32_t atlas_generation, uint32_t tile, const float* shadow_matrix,
+                                 const RxCasterState* casters, size_t caster_count);
+uint8_t rx_world_skinned_reaches_sphere(const float* world_matrix, float scale, const float* pose_center,
+                                        float pose_radius, float padding, const float* center, float radius);
+
+typedef struct RxEntityCore
+{
+    float matrix[16];
+    float position[4];
+    float rotation[4];
+    float rotation_origin[4];
+    float scale;
+    uint32_t transform_mode;
+    uint32_t id;
+    uint8_t flags;
+    uint8_t submitted_frames;
+} __attribute__((aligned(16))) RxEntityCore;
+
+RxEntityCore* rx_entity_core_new(void);
+void rx_entity_core_free(RxEntityCore* core);
+void rx_entity_set_position(RxEntityCore* core, const float* position);
+void rx_entity_set_rotation(RxEntityCore* core, const float* rotation);
+void rx_entity_set_scale(RxEntityCore* core, float scale);
+void rx_entity_set_rotation_origin(RxEntityCore* core, const float* origin);
+void rx_entity_rotated_by_axis(const RxEntityCore* core, const float* axis, float angle, float* out);
+void rx_entity_update_matrix(RxEntityCore* core);
+void rx_entity_set_model_matrix(RxEntityCore* core, const float* matrix);
+uint8_t rx_entity_submit_needed(RxEntityCore* core, uint32_t frame);
+void rx_entity_mark_transform_out_of_date(RxEntityCore* core);
+void rx_entity_mark_matrix_out_of_date(RxEntityCore* core);
+uint8_t rx_entity_is_matrix_out_of_date(const RxEntityCore* core);
+uint8_t rx_entity_is_physics_out_of_date(const RxEntityCore* core);
+void rx_entity_set_physics_out_of_date(RxEntityCore* core, uint8_t value);
+
+typedef struct RxObjectCore
+{
+    float bounds_min[4];
+    float bounds_max[4];
+    uint32_t tags;
+    uint32_t material_id;
+    uint32_t physics_id;
+    uint32_t parent_id;
+    uint32_t bone_buffer_base;
+    uint32_t layer;
+    uint16_t flags;
+    uint16_t instance_slots;
+    uint16_t instance_slots_in_use;
+} __attribute__((aligned(16))) RxObjectCore;
+
+typedef struct RxObjectStore RxObjectStore;
+
+RxObjectStore* rx_object_store_new(uint32_t capacity);
+void rx_object_store_free(RxObjectStore* store);
+uint32_t rx_object_store_alloc(const RxObjectStore* store, uint32_t name_hash, RxEntityCore** out_entity,
+                               RxObjectCore** out_object);
+uint8_t rx_object_store_get(const RxObjectStore* store, uint32_t id, RxEntityCore** out_entity,
+                            RxObjectCore** out_object);
+uint8_t rx_object_store_is_used(const RxObjectStore* store, uint32_t id);
+void rx_object_store_release(const RxObjectStore* store, uint32_t id);
+void rx_object_store_set_name_hash(const RxObjectStore* store, uint32_t id, uint32_t hash);
+uint32_t rx_object_store_find_by_name(const RxObjectStore* store, uint32_t hash);
+size_t rx_object_store_used_ids(const RxObjectStore* store, uint32_t* out, size_t capacity);
+size_t rx_object_store_ids_with_tags(const RxObjectStore* store, uint32_t tags, uint32_t* out, size_t capacity);
+uint32_t rx_object_store_len(const RxObjectStore* store);
+void rx_object_store_clear(const RxObjectStore* store);
+
+typedef struct RxListBuilder RxListBuilder;
+
+typedef struct RxCullStats
+{
+    uint32_t tested;
+    uint32_t culled;
+} RxCullStats;
+
+RxListBuilder* rx_list_builder_new(const RxObjectStore* store, const float* view_projection, uint32_t shadow_pipeline);
+void rx_list_builder_free(RxListBuilder* builder);
+void rx_list_builder_add_tile(RxListBuilder* builder, const RxWorldGrid* grid, uint32_t tile, void* user,
+                              uint32_t (*pipeline_for_material)(void* user, uint32_t material),
+                              void (*add)(void* user, uint32_t pipeline, uint32_t id));
+void rx_list_builder_stats(const RxListBuilder* builder, RxCullStats* out);
+
+RxObjectCore* rx_object_core_new(void);
+void rx_object_core_free(RxObjectCore* core);
+uint8_t rx_object_is_probe_visible(const RxObjectCore* core);
+const uint32_t* rx_object_children(const RxObjectCore* core, size_t* out_count);
+void rx_object_add_child(RxObjectCore* core, uint32_t id);
+void rx_object_clear_children(RxObjectCore* core);
+
+typedef struct RxLightCore
+{
+    float shadow_matrix[16];
+    uint32_t shadow_atlas_tile;
+    uint32_t shadow_bake_hash;
+    uint32_t shadow_padding[2];
+    uint32_t color;
+    float intensity;
+    float radius;
+    float inner_angle;
+    float outer_angle;
+    uint32_t light_id;
+    uint32_t light_type;
+    uint16_t flags;
+    uint8_t enabled;
+    uint8_t cast_shadows;
+} __attribute__((aligned(16))) RxLightCore;
+
+RxLightCore* rx_light_core_new(void);
+void rx_light_core_free(RxLightCore* core);
+uint8_t rx_light_is_cullable(const RxLightCore* core);
+
+typedef struct RxLightGpuData
+{
+    float light_camera_matrix[16];
+    float position[3];
+    float radius;
+    uint32_t color;
+    uint32_t light_type;
+    float intensity;
+    float inv_radius_sq;
+    float spot_direction[3];
+    float spot_cos_outer;
+    float linear_color[3];
+    float spot_angle_scale;
+    float shadow_atlas_rect[4];
+} __attribute__((aligned(16))) RxLightGpuData;
+
+typedef struct RxMaterialRecord RxMaterialRecord;
+
+typedef struct RxMaterialProperties
+{
+    uint32_t flags;
+    float alpha;
+    float metallic_factor;
+    float roughness_factor;
+    float specular_factor[3];
+    float glossiness_factor;
+    float base_color_factor[3];
+    float occlusion_strength;
+} RxMaterialProperties;
+
+typedef struct RxMaterialComponent
+{
+    uint8_t exists;
+    uint8_t has_image;
+    uint8_t loaded;
+} RxMaterialComponent;
+
+RxMaterialRecord* rx_material_record_new(void);
+void rx_material_record_free(RxMaterialRecord* material);
+void rx_material_reset(RxMaterialRecord* material, uint32_t id);
+void rx_material_copy_from(RxMaterialRecord* material, const RxMaterialRecord* other);
+RxMaterialProperties* rx_material_properties(RxMaterialRecord* material);
+uint32_t rx_material_id(const RxMaterialRecord* material);
+void rx_material_set_id(RxMaterialRecord* material, uint32_t id);
+uint32_t* rx_material_id_ptr(RxMaterialRecord* material);
+int32_t rx_material_quality_level(const RxMaterialRecord* material);
+void rx_material_lower_quality(RxMaterialRecord* material, int32_t level);
+uint8_t rx_material_supports_skinning(const RxMaterialRecord* material);
+void rx_material_set_supports_skinning(RxMaterialRecord* material, uint8_t value);
+uint8_t rx_material_nearest_filtering(const RxMaterialRecord* material);
+void rx_material_set_nearest_filtering(RxMaterialRecord* material, uint8_t value);
+uint8_t rx_material_is_built(const RxMaterialRecord* material);
+void rx_material_set_built(const RxMaterialRecord* material, uint8_t value);
+uint8_t rx_material_is_ready_to_check(const RxMaterialRecord* material);
+void rx_material_set_ready_to_check(const RxMaterialRecord* material, uint8_t value);
+uint8_t rx_material_requires_sync(const RxMaterialRecord* material);
+void rx_material_mark_synced(RxMaterialRecord* material);
+void rx_material_set_unlit(RxMaterialRecord* material, uint8_t value);
+void rx_material_set_alpha_mask(RxMaterialRecord* material, uint8_t value);
+void rx_material_set_double_sided(RxMaterialRecord* material, uint8_t value);
+void rx_material_set_alpha(RxMaterialRecord* material, float alpha);
+void rx_material_set_metallic_roughness(RxMaterialRecord* material, float metallic, float roughness);
+void rx_material_set_specular_glossiness(RxMaterialRecord* material, const float* specular, float glossiness);
+void rx_material_set_base_color_factor(RxMaterialRecord* material, const float* color);
+void rx_material_set_occlusion_strength(RxMaterialRecord* material, float strength);
+uint8_t rx_material_is_transparent(const RxMaterialRecord* material);
+uint32_t rx_material_pipeline_features(const RxMaterialRecord* material, uint8_t has_normal_or_orm);
+uint8_t rx_material_evaluate_ready(RxMaterialRecord* material, const RxMaterialComponent* components, size_t count);
+
+void rx_light_fill_gpu_data(const RxLightCore* light, const RxEntityCore* entity, const float* directional_matrix,
+                            const float* directional_rect, const float* spot_rect, RxLightGpuData* out);
+
+typedef struct RxPlayerState
+{
+    float position[4];
+    float movement_direction[4];
+    float camera_offset[4];
+    float head_bob_strength[4];
+    float speed_multiplier;
+    float jump_force;
+    uint8_t sprinting;
+    uint8_t flags;
+    float holster;
+    float head_bob[2];
+    RxLocomotion locomotion;
+    RxViewKick kick;
+    RxRecoil recoil;
+    RxViewSway sway;
+} __attribute__((aligned(16))) RxPlayerState;
+
+RxPlayerState* rx_player_state_new(void);
+void rx_player_state_free(RxPlayerState* state);
+void rx_player_set_fly_mode(RxPlayerState* state, uint8_t value);
+uint8_t rx_player_is_fly_mode(const RxPlayerState* state);
+void rx_player_start_sway(RxPlayerState* state, const RxCameraCore* camera);
+void rx_player_rotate_camera(RxPlayerState* state, RxCameraCore* camera, float yaw, float pitch);
+void rx_player_rotate_head(RxPlayerState* state, RxCameraCore* camera, float yaw, float pitch);
+void rx_player_jump(RxPlayerState* state, uint8_t grounded);
+void rx_player_move_by(RxPlayerState* state, const float* by);
+void rx_player_movement_force(RxPlayerState* state, double delta_time, const float* input, float* out);
+void rx_player_update(RxPlayerState* state, RxCameraCore* camera, double delta_time, uint8_t grounded,
+                      uint8_t head_bob_enabled);
+void rx_player_view_model_pose(RxPlayerState* state, const RxCameraCore* camera, const float* velocity,
+                               float delta_time, float* out_position, float* out_rotation);
+
+#define RX_WINDOW_EVENT_QUIT 1u
+#define RX_WINDOW_EVENT_RESIZED 2u
+
+void rx_controls_begin_frame(void);
+uint32_t rx_controls_pump_sdl(void);
+uint8_t rx_controls_is_down(uint32_t code);
+uint8_t rx_controls_is_up(uint32_t code);
+uint8_t rx_controls_is_pressed(uint32_t code);
+void rx_controls_reset_key(uint32_t code);
+void rx_controls_post_button(uint32_t code, uint8_t down);
+void rx_controls_post_mouse_motion(float x, float y);
+void rx_controls_release_all(void);
+void rx_controls_release_non_modifiers(void);
+void rx_controls_mouse_delta(float* out);
+void rx_controls_set_mouse_captured(uint8_t captured, float x, float y);
+uint8_t rx_controls_mouse_captured(void);
+void rx_controls_captured_mouse_position(float* out);
+uint32_t rx_controls_typed_char(void);
+
 #ifdef __cplusplus
 }
 #endif
+

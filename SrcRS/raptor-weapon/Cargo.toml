@@ -1,0 +1,16 @@
+[package]
+name = "raptor-weapon"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+raptor-core = { path = "../raptor-core" }
+raptor-level = { path = "../raptor-level" }
+raptor-script = { path = "../raptor-script", optional = true }
+
+[features]
+strata = ["dep:raptor-script"]
+
+[lints]
+workspace = true

@@ -9,6 +9,14 @@ workspace = true
 
 [dependencies]
 raptor-anim = { path = "../raptor-anim" }
+raptor-core = { path = "../raptor-core" }
+raptor-config = { path = "../raptor-config" }
+raptor-gpu = { path = "../raptor-gpu" }
+raptor-gfx = { path = "../raptor-gfx" }
+ash = { version = "0.38", default-features = false, features = ["std", "debug"] }
+raptor-render = { path = "../raptor-render" }
+raptor-level = { path = "../raptor-level" }
+raptor-mesh = { path = "../raptor-mesh" }
 base64 = "0.22"
 ktx2 = "0.4"
 miniz_oxide = "0.8"

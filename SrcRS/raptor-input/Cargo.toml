@@ -1,0 +1,12 @@
+[package]
+name = "raptor-input"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+raptor-core = { path = "../raptor-core" }
+sdl3-sys = { version = "0.6", features = ["use-ash-v0-38"] }
+
+[lints]
+workspace = true

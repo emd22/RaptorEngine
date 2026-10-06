@@ -1,17 +1,17 @@
-mod tests
-{
+mod tests {
 	use crate::gltf_scene::{AlphaMode, GltfScene, LoadError};
 	use crate::skin::build_skeleton;
 	use base64::Engine;
 	use raptor_anim::NO_BONE;
 
-	fn bytes_of(floats: &[f32]) -> Vec<u8>
-	{
-		floats.iter().flat_map(|value| value.to_le_bytes()).collect()
+	fn bytes_of(floats: &[f32]) -> Vec<u8> {
+		floats
+			.iter()
+			.flat_map(|value| value.to_le_bytes())
+			.collect()
 	}
 
-	fn uri_of(data: &[u8]) -> String
-	{
+	fn uri_of(data: &[u8]) -> String {
 		format!(
 			"data:application/octet-stream;base64,{}",
 			base64::engine::general_purpose::STANDARD.encode(data)
@@ -19,8 +19,7 @@ mod tests
 	}
 
 	/// positions, normals, uvs for one triangle, then u16 indices
-	fn triangle_buffer() -> Vec<u8>
-	{
+	fn triangle_buffer() -> Vec<u8> {
 		let mut data = bytes_of(&[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0]);
 		data.extend(bytes_of(&[0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0]));
 		data.extend(bytes_of(&[0.0, 0.0, 1.0, 0.0, 0.0, 1.0]));
@@ -29,8 +28,7 @@ mod tests
 		data
 	}
 
-	fn triangle_document(extra_node: &str, extra: &str) -> String
-	{
+	fn triangle_document(extra_node: &str, extra: &str) -> String {
 		format!(
 			r#"{{
 			"asset": {{"version": "2.0"}},
@@ -61,14 +59,12 @@ mod tests
 		)
 	}
 
-	fn scene(json: &str) -> GltfScene
-	{
+	fn scene(json: &str) -> GltfScene {
 		GltfScene::from_bytes(json.as_bytes(), None).unwrap()
 	}
 
 	#[test]
-	fn a_node_with_a_mesh_has_its_vertices_unpacked_into_floats()
-	{
+	fn a_node_with_a_mesh_has_its_vertices_unpacked_into_floats() {
 		let scene = scene(&triangle_document("", ""));
 
 		let nodes = scene.mesh_nodes();
@@ -79,17 +75,23 @@ mod tests
 
 		let primitive = scene.primitive(0, 0).unwrap();
 
-		assert_eq!(primitive.positions, vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0]);
+		assert_eq!(
+			primitive.positions,
+			vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+		);
 		assert_eq!(primitive.normals.len(), 9);
 		assert_eq!(primitive.uvs, vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0]);
 		assert_eq!(primitive.indices, Some(vec![0, 1, 2]));
-		assert!(primitive.tangents.is_empty() && primitive.weights.is_empty() && primitive.joints.is_empty());
+		assert!(
+			primitive.tangents.is_empty()
+				&& primitive.weights.is_empty()
+				&& primitive.joints.is_empty()
+		);
 		assert_eq!(primitive.material, Some(0));
 	}
 
 	#[test]
-	fn nodes_without_a_mesh_are_left_out_and_the_rest_keep_the_file_order()
-	{
+	fn nodes_without_a_mesh_are_left_out_and_the_rest_keep_the_file_order() {
 		let json = triangle_document("", "").replace(
 			r#""nodes": [{"mesh": 0 }]"#,
 			r#""nodes": [{"children": [1]}, {"mesh": 0}, {"mesh": 0}]"#,
@@ -99,15 +101,17 @@ mod tests
 	}
 
 	#[test]
-	fn a_material_reads_its_factors_and_defaults_the_rest()
-	{
+	fn a_material_reads_its_factors_and_defaults_the_rest() {
 		let scene = scene(&triangle_document("", ""));
 
 		let material = scene.material(0).unwrap();
 
 		assert_eq!(material.name.as_deref(), Some("paint"));
 		assert_eq!(material.base_color_factor, [0.5, 0.25, 0.125, 0.75]);
-		assert_eq!((material.metallic_factor, material.roughness_factor), (0.2, 0.8));
+		assert_eq!(
+			(material.metallic_factor, material.roughness_factor),
+			(0.2, 0.8)
+		);
 		assert_eq!(material.alpha_mode, AlphaMode::Opaque);
 		assert!(!material.double_sided && !material.unlit && !material.has_specular_glossiness);
 		assert!(material.base_color_texture.is_none() && material.normal_texture.is_none());
@@ -115,8 +119,7 @@ mod tests
 	}
 
 	#[test]
-	fn a_material_without_a_metallic_roughness_block_gets_the_glTF_defaults()
-	{
+	fn a_material_without_a_metallic_roughness_block_gets_the_glTF_defaults() {
 		let json = triangle_document("", "").replace(
 			r#""pbrMetallicRoughness": {
 				"baseColorFactor": [0.5, 0.25, 0.125, 0.75], "metallicFactor": 0.2, "roughnessFactor": 0.8}"#,
@@ -127,12 +130,14 @@ mod tests
 
 		assert_eq!(material.alpha_mode, AlphaMode::Mask);
 		assert!(material.double_sided);
-		assert_eq!((material.metallic_factor, material.roughness_factor), (1.0, 1.0));
+		assert_eq!(
+			(material.metallic_factor, material.roughness_factor),
+			(1.0, 1.0)
+		);
 		assert_eq!(material.base_color_factor, [1.0; 4]);
 	}
 
-	fn textured_material_document() -> String
-	{
+	fn textured_material_document() -> String {
 		triangle_document("", "").replace(
 			r#""materials": [{"name": "paint", "pbrMetallicRoughness": {
 				"baseColorFactor": [0.5, 0.25, 0.125, 0.75], "metallicFactor": 0.2, "roughnessFactor": 0.8}}],"#,
@@ -153,8 +158,7 @@ mod tests
 	}
 
 	#[test]
-	fn a_texture_prefers_the_basisu_image_over_its_regular_one()
-	{
+	fn a_texture_prefers_the_basisu_image_over_its_regular_one() {
 		let material = scene(&textured_material_document()).material(0).unwrap();
 
 		let base = material.base_color_texture.unwrap();
@@ -167,16 +171,14 @@ mod tests
 	}
 
 	#[test]
-	fn occlusion_is_packed_when_it_shares_the_metallic_roughness_image()
-	{
+	fn occlusion_is_packed_when_it_shares_the_metallic_roughness_image() {
 		let material = scene(&textured_material_document()).material(0).unwrap();
 
 		assert_eq!(material.packed_occlusion_strength, Some(0.6));
 	}
 
 	#[test]
-	fn occlusion_that_has_its_own_image_is_not_packed()
-	{
+	fn occlusion_that_has_its_own_image_is_not_packed() {
 		let json = textured_material_document().replace(
 			r#"{"source": 1}
 			],"#,
@@ -184,12 +186,14 @@ mod tests
 			],"#,
 		);
 
-		assert_eq!(scene(&json).material(0).unwrap().packed_occlusion_strength, None);
+		assert_eq!(
+			scene(&json).material(0).unwrap().packed_occlusion_strength,
+			None
+		);
 	}
 
 	#[test]
-	fn the_specular_glossiness_extension_replaces_the_metallic_roughness_values()
-	{
+	fn the_specular_glossiness_extension_replaces_the_metallic_roughness_values() {
 		let json = triangle_document("", "")
 			.replace(
 				r#""pbrMetallicRoughness": {
@@ -209,8 +213,7 @@ mod tests
 	}
 
 	#[test]
-	fn the_unlit_extension_is_noticed()
-	{
+	fn the_unlit_extension_is_noticed() {
 		let json = triangle_document("", "").replace(
 			r#""name": "paint","#,
 			r#""name": "paint", "extensions": {"KHR_materials_unlit": {}},"#,
@@ -220,9 +223,9 @@ mod tests
 	}
 
 	#[test]
-	fn an_image_comes_from_a_data_uri_a_buffer_view_or_a_file()
-	{
-		let directory = std::env::temp_dir().join(format!("raptor_asset_images_{}", std::process::id()));
+	fn an_image_comes_from_a_data_uri_a_buffer_view_or_a_file() {
+		let directory =
+			std::env::temp_dir().join(format!("raptor_asset_images_{}", std::process::id()));
 		std::fs::create_dir_all(&directory).unwrap();
 		std::fs::write(directory.join("my tex.ktx2"), b"from a file").unwrap();
 
@@ -249,13 +252,14 @@ mod tests
 	}
 
 	#[test]
-	fn a_file_buffer_is_read_from_beside_the_model()
-	{
-		let directory = std::env::temp_dir().join(format!("raptor_asset_buffers_{}", std::process::id()));
+	fn a_file_buffer_is_read_from_beside_the_model() {
+		let directory =
+			std::env::temp_dir().join(format!("raptor_asset_buffers_{}", std::process::id()));
 		std::fs::create_dir_all(&directory).unwrap();
 		std::fs::write(directory.join("tri angle.bin"), triangle_buffer()).unwrap();
 
-		let json = triangle_document("", "").replace(&uri_of(&triangle_buffer()), "tri%20angle.bin");
+		let json =
+			triangle_document("", "").replace(&uri_of(&triangle_buffer()), "tri%20angle.bin");
 		let path = directory.join("model.gltf");
 		std::fs::write(&path, json).unwrap();
 
@@ -267,9 +271,11 @@ mod tests
 	}
 
 	#[test]
-	fn bad_input_gives_an_error()
-	{
-		assert!(matches!(GltfScene::from_bytes(b"not a model", None), Err(LoadError::NotGltf(_))));
+	fn bad_input_gives_an_error() {
+		assert!(matches!(
+			GltfScene::from_bytes(b"not a model", None),
+			Err(LoadError::NotGltf(_))
+		));
 		assert!(matches!(
 			GltfScene::open(std::path::Path::new("/definitely/not/here.glb")),
 			Err(LoadError::Unreadable(_))
@@ -278,22 +284,29 @@ mod tests
 		let json = triangle_document("", "").replace(&uri_of(&triangle_buffer()), "missing.bin");
 
 		assert!(matches!(
-			GltfScene::from_bytes(json.as_bytes(), Some(std::path::Path::new("/definitely/not/here"))),
+			GltfScene::from_bytes(
+				json.as_bytes(),
+				Some(std::path::Path::new("/definitely/not/here"))
+			),
 			Err(LoadError::Buffer(_))
 		));
-		assert!(matches!(GltfScene::from_bytes(json.as_bytes(), None), Err(LoadError::Buffer(_))));
+		assert!(matches!(
+			GltfScene::from_bytes(json.as_bytes(), None),
+			Err(LoadError::Buffer(_))
+		));
 	}
 
 	/// Two joints, the second under the first, and a mesh skinned to them, with two animations
-	fn skinned_document() -> String
-	{
+	fn skinned_document() -> String {
 		let mut data = bytes_of(&[
-			1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-			1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, -2.0, -3.0, 1.0,
+			1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0,
+			0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, -2.0, -3.0, 1.0,
 		]);
 		data.extend(bytes_of(&[0.0, 1.0, 2.0]));
 		data.extend(bytes_of(&[0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 4.0, 0.0, 0.0]));
-		data.extend(bytes_of(&[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]));
+		data.extend(bytes_of(&[
+			0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+		]));
 
 		format!(
 			r#"{{
@@ -333,8 +346,7 @@ mod tests
 	}
 
 	#[test]
-	fn a_skeleton_has_a_joint_for_each_joint_node_with_parents_and_names()
-	{
+	fn a_skeleton_has_a_joint_for_each_joint_node_with_parents_and_names() {
 		let scene = scene(&skinned_document());
 
 		let skeleton = build_skeleton(&scene, 0).unwrap();
@@ -349,8 +361,7 @@ mod tests
 	}
 
 	#[test]
-	fn the_rest_pose_is_mirrored_across_x()
-	{
+	fn the_rest_pose_is_mirrored_across_x() {
 		let scene = scene(&skinned_document());
 
 		let mut skeleton = build_skeleton(&scene, 0).unwrap();
@@ -365,8 +376,7 @@ mod tests
 	}
 
 	#[test]
-	fn animations_are_added_and_the_first_one_loops_by_default()
-	{
+	fn animations_are_added_and_the_first_one_loops_by_default() {
 		let scene = scene(&skinned_document());
 
 		let skeleton = build_skeleton(&scene, 0).unwrap();
@@ -382,8 +392,7 @@ mod tests
 	}
 
 	#[test]
-	fn animation_keys_are_mirrored()
-	{
+	fn animation_keys_are_mirrored() {
 		let scene = scene(&skinned_document());
 
 		let skeleton = build_skeleton(&scene, 0).unwrap();
@@ -396,12 +405,16 @@ mod tests
 		);
 		assert_eq!(track.rotation.values[1], [0.0, -0.0, -1.0, 0.0]);
 		assert!(track.scale.times.is_empty());
-		assert!(skeleton.data().animations()[0].tracks[1].translation.times.is_empty());
+		assert!(
+			skeleton.data().animations()[0].tracks[1]
+				.translation
+				.times
+				.is_empty()
+		);
 	}
 
 	#[test]
-	fn a_scene_without_skins_or_animations_has_none()
-	{
+	fn a_scene_without_skins_or_animations_has_none() {
 		let scene = scene(&triangle_document("", ""));
 
 		assert_eq!(scene.skin_count(), 0);

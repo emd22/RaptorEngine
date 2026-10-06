@@ -4,5 +4,9 @@ version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
+[dependencies]
+raptor-entity = { path = "../raptor-entity" }
+raptor-math = { path = "../raptor-math" }
+
 [lints]
 workspace = true

@@ -49,7 +49,7 @@ const _: () = {
 	assert!(offset_of!(BrushView, bounds_min) == 48);
 };
 
-fn plane_from_c(plane: &BrushPlane) -> Plane
+pub(crate) fn plane_from_c(plane: &BrushPlane) -> Plane
 {
 	Plane {
 		normal: Vec3f::from_array(plane.normal),
@@ -62,7 +62,7 @@ fn plane_from_c(plane: &BrushPlane) -> Plane
 	}
 }
 
-fn plane_to_c(plane: &Plane) -> BrushPlane
+pub(crate) fn plane_to_c(plane: &Plane) -> BrushPlane
 {
 	BrushPlane {
 		normal: plane.normal.to_array(),

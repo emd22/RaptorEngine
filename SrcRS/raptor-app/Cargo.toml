@@ -12,10 +12,14 @@ test = false
 
 [features]
 default = ["editor"]
-editor = []
+editor = ["dep:raptor-editor"]
 
 [dependencies]
 raptor-ffi = { path = "../raptor-ffi" }
+raptor-core = { path = "../raptor-core" }
+raptor-game = { path = "../raptor-game" }
+raptor-script = { path = "../raptor-script" }
+raptor-editor = { path = "../raptor-editor", features = ["gui"], optional = true }
 
 [lints]
 workspace = true

@@ -53,7 +53,7 @@ pub use error::{Error, Result};
 pub use format::{ImageFormat, ImageType, mip_dimensions};
 pub use frame_loop::{FrameLoop, FrameLoopFields};
 pub use image::{CopyError, Image, ImageDesc, MipChain};
-pub use image_store::{DEFAULT_FORMAT, ImageFields, ImageRecord};
+pub use image_store::{DEFAULT_FORMAT, ImageFields, ImageRecord, ImageResource};
 pub use instance::{Instance, InstanceConfig};
 pub use log::{Level, Log};
 pub use pipeline::{GraphicsPipelineDesc, PushConstantDef, is_depth_format, push_constant_ranges};

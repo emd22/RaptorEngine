@@ -1,6 +1,0 @@
-// Windows resource script for the editor build.
-//
-// wx.rc provides the standard wxWidgets resources: the stock cursors, icons and bitmaps that wxWidgets loads by name,
-// and the application manifest (Common Controls v6 visual styles, per-monitor DPI awareness and UTF-8 code page).
-// Without it the editor falls back to the unstyled classic controls and loses several stock cursors and icons.
-#include "wx/msw/wx.rc"

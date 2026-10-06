@@ -3,16 +3,13 @@ use std::path::Path;
 use image::{ColorType, DynamicImage, ImageEncoder};
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum ImageError
-{
+pub enum ImageError {
 	Unreadable(String),
 	Unsupported(String),
 }
 
-impl std::fmt::Display for ImageError
-{
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
-	{
+impl std::fmt::Display for ImageError {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::Unreadable(message) | Self::Unsupported(message) => f.write_str(message),
 		}
@@ -21,8 +18,7 @@ impl std::fmt::Display for ImageError
 
 /// 8-bit pixels with `channels` values each
 #[derive(Debug, PartialEq, Eq)]
-pub struct Pixels
-{
+pub struct Pixels {
 	pub width: u32,
 	pub height: u32,
 	pub channels: u32,
@@ -30,23 +26,20 @@ pub struct Pixels
 }
 
 /// The samples of an image, as 8 or 16 bits to a channel
-enum Samples
-{
+enum Samples {
 	Eight(Vec<u8>),
 	Sixteen(Vec<u16>),
 }
 
 /// An image as it was in its file
-struct Native
-{
+struct Native {
 	width: u32,
 	height: u32,
 	channels: u32,
 	samples: Samples,
 }
 
-fn native_of(image: DynamicImage) -> Result<Native, ImageError>
-{
+fn native_of(image: DynamicImage) -> Result<Native, ImageError> {
 	let (width, height) = (image.width(), image.height());
 
 	let (channels, samples) = match image {
@@ -75,13 +68,11 @@ fn native_of(image: DynamicImage) -> Result<Native, ImageError>
 }
 
 /// The brightness of a pixel, as stb computes it
-fn luma8(red: u8, green: u8, blue: u8) -> u8
-{
+fn luma8(red: u8, green: u8, blue: u8) -> u8 {
 	((u32::from(red) * 77 + u32::from(green) * 150 + 29 * u32::from(blue)) >> 8) as u8
 }
 
-fn luma16(red: u16, green: u16, blue: u16) -> u16
-{
+fn luma16(red: u16, green: u16, blue: u16) -> u16 {
 	((u32::from(red) * 77 + u32::from(green) * 150 + 29 * u32::from(blue)) >> 8) as u16
 }
 
@@ -93,8 +84,7 @@ fn convert_channels<T: Copy>(
 	wanted: u32,
 	opaque: T,
 	luma: impl Fn(T, T, T) -> T,
-) -> Vec<T>
-{
+) -> Vec<T> {
 	if channels == wanted {
 		return data.to_vec();
 	}
@@ -124,8 +114,7 @@ fn convert_channels<T: Copy>(
 
 /// Pixels of `wanted` channels at 8 bits each. A 16-bit image is converted to the channels first and
 /// only then cut down to its top bytes, as stb does.
-fn to_eight_bit(native: &Native, wanted: u32) -> Vec<u8>
-{
+fn to_eight_bit(native: &Native, wanted: u32) -> Vec<u8> {
 	match &native.samples {
 		Samples::Eight(data) => convert_channels(data, native.channels, wanted, 255, luma8),
 		Samples::Sixteen(data) => convert_channels(data, native.channels, wanted, u16::MAX, luma16)
@@ -136,8 +125,7 @@ fn to_eight_bit(native: &Native, wanted: u32) -> Vec<u8>
 }
 
 /// How big an image is, without decoding it
-pub fn image_size(data: &[u8]) -> Option<(u32, u32)>
-{
+pub fn image_size(data: &[u8]) -> Option<(u32, u32)> {
 	image::ImageReader::new(std::io::Cursor::new(data))
 		.with_guessed_format()
 		.ok()?
@@ -147,10 +135,11 @@ pub fn image_size(data: &[u8]) -> Option<(u32, u32)>
 
 /// Decodes an image of any format the engine reads (PNG, JPEG, BMP, TGA, GIF) to `channels` 8-bit
 /// channels, whatever it has in the file.
-pub fn decode_image(data: &[u8], channels: u32) -> Result<Pixels, ImageError>
-{
+pub fn decode_image(data: &[u8], channels: u32) -> Result<Pixels, ImageError> {
 	if !(1..=4).contains(&channels) {
-		return Err(ImageError::Unsupported(format!("{channels} channels are not a pixel size")));
+		return Err(ImageError::Unsupported(format!(
+			"{channels} channels are not a pixel size"
+		)));
 	}
 
 	let image = image::ImageReader::new(std::io::Cursor::new(data))
@@ -169,17 +158,16 @@ pub fn decode_image(data: &[u8], channels: u32) -> Result<Pixels, ImageError>
 	})
 }
 
-pub fn decode_file(path: &Path, channels: u32) -> Result<Pixels, ImageError>
-{
-	let data = std::fs::read(path)
-		.map_err(|error| ImageError::Unreadable(format!("Could not read '{}': {error}", path.display())))?;
+pub fn decode_file(path: &Path, channels: u32) -> Result<Pixels, ImageError> {
+	let data = std::fs::read(path).map_err(|error| {
+		ImageError::Unreadable(format!("Could not read '{}': {error}", path.display()))
+	})?;
 
 	decode_image(&data, channels)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SaveFormat
-{
+pub enum SaveFormat {
 	Jpeg,
 	Png,
 }
@@ -194,8 +182,7 @@ pub fn save_rgba(
 	width: u32,
 	height: u32,
 	flip_y: bool,
-) -> Result<(), ImageError>
-{
+) -> Result<(), ImageError> {
 	let expected = width as usize * height as usize * 4;
 
 	if rgba.len() < expected {
@@ -217,42 +204,41 @@ pub fn save_rgba(
 		}
 	}
 
-	let file = std::fs::File::create(path)
-		.map_err(|error| ImageError::Unreadable(format!("Could not create '{}': {error}", path.display())))?;
+	let file = std::fs::File::create(path).map_err(|error| {
+		ImageError::Unreadable(format!("Could not create '{}': {error}", path.display()))
+	})?;
 
 	let writer = std::io::BufWriter::new(file);
 
-	let result = match format {
-		SaveFormat::Png => {
-			image::codecs::png::PngEncoder::new(writer).write_image(&pixels, width, height, ColorType::Rgba8.into())
-		}
-		SaveFormat::Jpeg => {
-			let rgb: Vec<u8> = pixels
-				.as_chunks::<4>()
-				.0
-				.iter()
-				.flat_map(|pixel| [pixel[0], pixel[1], pixel[2]])
-				.collect();
-
-			image::codecs::jpeg::JpegEncoder::new_with_quality(writer, JPEG_QUALITY).write_image(
-				&rgb,
+	let result =
+		match format {
+			SaveFormat::Png => image::codecs::png::PngEncoder::new(writer).write_image(
+				&pixels,
 				width,
 				height,
-				ColorType::Rgb8.into(),
-			)
-		}
-	};
+				ColorType::Rgba8.into(),
+			),
+			SaveFormat::Jpeg => {
+				let rgb: Vec<u8> = pixels
+					.as_chunks::<4>()
+					.0
+					.iter()
+					.flat_map(|pixel| [pixel[0], pixel[1], pixel[2]])
+					.collect();
+
+				image::codecs::jpeg::JpegEncoder::new_with_quality(writer, JPEG_QUALITY)
+					.write_image(&rgb, width, height, ColorType::Rgb8.into())
+			}
+		};
 
 	result.map_err(|error| ImageError::Unreadable(error.to_string()))
 }
 
 #[cfg(test)]
-mod tests
-{
+mod tests {
 	use super::*;
 
-	fn png_of(color: ColorType, width: u32, height: u32, data: &[u8]) -> Vec<u8>
-	{
+	fn png_of(color: ColorType, width: u32, height: u32, data: &[u8]) -> Vec<u8> {
 		let mut out = Vec::new();
 
 		image::codecs::png::PngEncoder::new(&mut out)
@@ -263,8 +249,7 @@ mod tests
 	}
 
 	#[test]
-	fn an_rgba_png_decodes_to_the_same_pixels()
-	{
+	fn an_rgba_png_decodes_to_the_same_pixels() {
 		let pixels: Vec<u8> = (0..16).map(|value| value * 13).collect();
 		let png = png_of(ColorType::Rgba8, 2, 2, &pixels);
 
@@ -275,27 +260,33 @@ mod tests
 	}
 
 	#[test]
-	fn rgb_gets_an_opaque_alpha()
-	{
+	fn rgb_gets_an_opaque_alpha() {
 		let png = png_of(ColorType::Rgb8, 2, 1, &[1, 2, 3, 4, 5, 6]);
 
-		assert_eq!(decode_image(&png, 4).unwrap().data, vec![1, 2, 3, 255, 4, 5, 6, 255]);
+		assert_eq!(
+			decode_image(&png, 4).unwrap().data,
+			vec![1, 2, 3, 255, 4, 5, 6, 255]
+		);
 	}
 
 	#[test]
-	fn gray_is_repeated_across_the_color_channels()
-	{
+	fn gray_is_repeated_across_the_color_channels() {
 		let png = png_of(ColorType::L8, 2, 1, &[10, 200]);
 
-		assert_eq!(decode_image(&png, 4).unwrap().data, vec![10, 10, 10, 255, 200, 200, 200, 255]);
-		assert_eq!(decode_image(&png, 3).unwrap().data, vec![10, 10, 10, 200, 200, 200]);
+		assert_eq!(
+			decode_image(&png, 4).unwrap().data,
+			vec![10, 10, 10, 255, 200, 200, 200, 255]
+		);
+		assert_eq!(
+			decode_image(&png, 3).unwrap().data,
+			vec![10, 10, 10, 200, 200, 200]
+		);
 		assert_eq!(decode_image(&png, 2).unwrap().data, vec![10, 255, 200, 255]);
 		assert_eq!(decode_image(&png, 1).unwrap().data, vec![10, 200]);
 	}
 
 	#[test]
-	fn gray_with_alpha_keeps_its_alpha()
-	{
+	fn gray_with_alpha_keeps_its_alpha() {
 		let png = png_of(ColorType::La8, 1, 1, &[50, 60]);
 
 		assert_eq!(decode_image(&png, 4).unwrap().data, vec![50, 50, 50, 60]);
@@ -303,18 +294,19 @@ mod tests
 	}
 
 	#[test]
-	fn color_is_turned_into_gray_with_stbs_weights()
-	{
+	fn color_is_turned_into_gray_with_stbs_weights() {
 		let png = png_of(ColorType::Rgba8, 2, 1, &[255, 0, 0, 9, 0, 255, 0, 9]);
 
 		assert_eq!(decode_image(&png, 1).unwrap().data, vec![76, 149]);
 		assert_eq!(decode_image(&png, 2).unwrap().data, vec![76, 9, 149, 9]);
-		assert_eq!(decode_image(&png, 3).unwrap().data, vec![255, 0, 0, 0, 255, 0]);
+		assert_eq!(
+			decode_image(&png, 3).unwrap().data,
+			vec![255, 0, 0, 0, 255, 0]
+		);
 	}
 
 	#[test]
-	fn sixteen_bit_pixels_keep_their_top_byte()
-	{
+	fn sixteen_bit_pixels_keep_their_top_byte() {
 		let samples: Vec<u8> = [0x1234u16, 0xFFFF, 0x00FF, 0x8000]
 			.iter()
 			.flat_map(|value| value.to_ne_bytes())
@@ -322,12 +314,14 @@ mod tests
 
 		let png = png_of(ColorType::Rgba16, 1, 1, &samples);
 
-		assert_eq!(decode_image(&png, 4).unwrap().data, vec![0x12, 0xFF, 0x00, 0x80]);
+		assert_eq!(
+			decode_image(&png, 4).unwrap().data,
+			vec![0x12, 0xFF, 0x00, 0x80]
+		);
 	}
 
 	#[test]
-	fn the_size_can_be_read_without_decoding()
-	{
+	fn the_size_can_be_read_without_decoding() {
 		let png = png_of(ColorType::Rgb8, 3, 2, &[0; 18]);
 
 		assert_eq!(image_size(&png), Some((3, 2)));
@@ -335,20 +329,28 @@ mod tests
 	}
 
 	#[test]
-	fn junk_and_bad_channel_counts_are_errors()
-	{
-		assert!(matches!(decode_image(b"junk", 4), Err(ImageError::Unreadable(_))));
+	fn junk_and_bad_channel_counts_are_errors() {
+		assert!(matches!(
+			decode_image(b"junk", 4),
+			Err(ImageError::Unreadable(_))
+		));
 
 		let png = png_of(ColorType::Rgb8, 1, 1, &[0; 3]);
 
-		assert!(matches!(decode_image(&png, 0), Err(ImageError::Unsupported(_))));
-		assert!(matches!(decode_image(&png, 5), Err(ImageError::Unsupported(_))));
+		assert!(matches!(
+			decode_image(&png, 0),
+			Err(ImageError::Unsupported(_))
+		));
+		assert!(matches!(
+			decode_image(&png, 5),
+			Err(ImageError::Unsupported(_))
+		));
 	}
 
 	#[test]
-	fn a_saved_png_reads_back_the_same_and_can_be_flipped()
-	{
-		let directory = std::env::temp_dir().join(format!("raptor_image_save_{}", std::process::id()));
+	fn a_saved_png_reads_back_the_same_and_can_be_flipped() {
+		let directory =
+			std::env::temp_dir().join(format!("raptor_image_save_{}", std::process::id()));
 		std::fs::create_dir_all(&directory).unwrap();
 
 		let pixels: Vec<u8> = (0..2 * 3 * 4).map(|value| value as u8 * 9).collect();
@@ -371,9 +373,9 @@ mod tests
 	}
 
 	#[test]
-	fn a_saved_jpeg_reads_back_close_to_the_original()
-	{
-		let directory = std::env::temp_dir().join(format!("raptor_image_jpeg_{}", std::process::id()));
+	fn a_saved_jpeg_reads_back_close_to_the_original() {
+		let directory =
+			std::env::temp_dir().join(format!("raptor_image_jpeg_{}", std::process::id()));
 		std::fs::create_dir_all(&directory).unwrap();
 
 		let pixels: Vec<u8> = (0..16 * 16)
@@ -402,8 +404,7 @@ mod tests
 	}
 
 	#[test]
-	fn saving_too_few_pixels_is_an_error()
-	{
+	fn saving_too_few_pixels_is_an_error() {
 		let path = std::env::temp_dir().join("raptor_never_written.png");
 
 		assert!(save_rgba(&path, SaveFormat::Png, &[0; 4], 4, 4, false).is_err());

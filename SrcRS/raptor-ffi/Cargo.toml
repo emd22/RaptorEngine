@@ -20,8 +20,14 @@ raptor-math = { path = "../raptor-math" }
 raptor-mesh = { path = "../raptor-mesh" }
 raptor-render = { path = "../raptor-render" }
 raptor-world = { path = "../raptor-world" }
+raptor-physics = { path = "../raptor-physics" }
+raptor-jolt = { path = "../raptor-jolt" }
+raptor-core = { path = "../raptor-core" }
+raptor-input = { path = "../raptor-input" }
+raptor-entity = { path = "../raptor-entity" }
 raptor-player = { path = "../raptor-player" }
 raptor-shader = { path = "../raptor-shader" }
+raptor-script = { path = "../raptor-script" }
 
 [lints]
 workspace = true

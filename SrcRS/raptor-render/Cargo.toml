@@ -8,6 +8,13 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+ash = { version = "0.38", default-features = false, features = ["std"] }
+bytemuck = "1"
+raptor-core = { path = "../raptor-core" }
+raptor-entity = { path = "../raptor-entity" }
+raptor-gfx = { path = "../raptor-gfx" }
 raptor-gpu = { path = "../raptor-gpu" }
 raptor-math = { path = "../raptor-math" }
+raptor-mesh = { path = "../raptor-mesh" }
 raptor-shader = { path = "../raptor-shader" }
+raptor-world = { path = "../raptor-world" }

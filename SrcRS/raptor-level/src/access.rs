@@ -1,6 +1,34 @@
 use raptor_config::host::{CATEGORY_CORE, Host, LogLevel};
 use raptor_config::model::{Entry, Kind, Primitive};
 
+/// A config host that reads includes from the file system and logs through the engine's log.
+pub struct FsHost;
+
+impl Host for FsHost
+{
+	fn read_include(&mut self, path: &[u8], extension: &[u8]) -> Option<Vec<u8>>
+	{
+		let mut name = String::from_utf8_lossy(path).into_owned();
+
+		if std::path::Path::new(&name).extension().is_none() {
+			name.push_str(&String::from_utf8_lossy(extension));
+		}
+
+		std::fs::read(name).ok()
+	}
+
+	fn log(&mut self, level: LogLevel, _category: i32, message: &[u8])
+	{
+		let message = String::from_utf8_lossy(message);
+
+		match level {
+			LogLevel::Error => raptor_core::log_error!("{message}"),
+			LogLevel::Warning => raptor_core::log_warn!("{message}"),
+			_ => raptor_core::log_info!("{message}"),
+		}
+	}
+}
+
 /// Reads typed values out of config entries the way the engine's `ConfigEntry` getters do: a number
 /// reads as either kind, and anything else warns and reads as zero.
 pub struct Reader<'a>

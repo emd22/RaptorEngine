@@ -1,0 +1,16 @@
+[package]
+name = "raptor-gfx"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+bytemuck = "1"
+ash = { version = "0.38", default-features = false, features = ["std", "debug"] }
+raptor-core = { path = "../raptor-core" }
+raptor-gpu = { path = "../raptor-gpu" }
+raptor-math = { path = "../raptor-math" }
+sdl3-sys = { version = "0.6", features = ["use-ash-v0-38"] }
+
+[lints]
+workspace = true

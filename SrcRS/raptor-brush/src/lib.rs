@@ -1,3 +1,4 @@
+pub mod edit;
 mod rebuild;
 mod texture;
 

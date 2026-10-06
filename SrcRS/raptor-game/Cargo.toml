@@ -1,0 +1,12 @@
+[package]
+name = "raptor-game"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+raptor-core = { path = "../raptor-core" }
+raptor-config = { path = "../raptor-config" }
+
+[lints]
+workspace = true

@@ -1,51 +1,18 @@
-use std::ffi::{CString, c_void};
+use std::ffi::CString;
 
-use raptor_gpu::{BlendAttachment, DescriptorEntryRef, RenderStageRecord};
+use std::sync::Arc;
+
+use raptor_gpu::vk;
+use raptor_gpu::{
+	BlendAttachment, BufferRecord, DescriptorEntryRef, DescriptorResourceRef, ImageRecord,
+	RenderStageRecord,
+};
+
+use crate::stage::RenderStage;
 
 pub const NO_SHADER: u32 = u32::MAX;
 
-pub type DeclareFn = unsafe extern "C" fn(user: *mut c_void, desc: *mut PipelineDesc);
-pub type FreeFn = unsafe extern "C" fn(user: *mut c_void);
-
-pub struct Declarer
-{
-	call: DeclareFn,
-	user: *mut c_void,
-	free: Option<FreeFn>,
-}
-
-impl Declarer
-{
-	/// # Safety
-	///
-	/// `call` must accept `user` and a description, and may be called on the thread that builds
-	/// pipelines. `free` is called with `user` once, when the declarer is dropped.
-	pub unsafe fn new(call: DeclareFn, user: *mut c_void, free: Option<FreeFn>) -> Self
-	{
-		Self { call, user, free }
-	}
-
-	pub fn declare(&self, desc: &mut PipelineDesc)
-	{
-		// SAFETY: guaranteed by the creator of the declarer.
-		unsafe { (self.call)(self.user, desc) };
-	}
-}
-
-impl Drop for Declarer
-{
-	fn drop(&mut self)
-	{
-		if let Some(free) = self.free {
-			// SAFETY: guaranteed by the creator of the declarer.
-			unsafe { free(self.user) };
-		}
-	}
-}
-
-// SAFETY: the host promised the callbacks can be called, and the user data dropped, on the thread
-// that builds pipelines, which is where a declarer is used and dropped.
-unsafe impl Send for Declarer {}
+pub type Declarer = Box<dyn FnOnce(&mut PipelineDesc) + Send>;
 
 pub struct MacroDef
 {
@@ -148,6 +115,72 @@ impl PipelineDesc
 			name: name.and_then(to_c),
 			value: value.and_then(to_c),
 		});
+	}
+
+	pub fn use_stage(&mut self, stage: &RenderStage)
+	{
+		self.stage = stage.record_ptr();
+	}
+
+	pub fn add_push_constants<T>(&mut self, stages: vk::ShaderStageFlags)
+	{
+		self.push_constants
+			.push((size_of::<T>() as u32, stages.as_raw()));
+	}
+
+	pub fn add_buffer(
+		&mut self,
+		set: usize,
+		binding: u32,
+		stages: vk::ShaderStageFlags,
+		buffer: &Arc<BufferRecord>,
+		offset: u64,
+		range: u64,
+	)
+	{
+		self.add_entry(
+			set,
+			DescriptorEntryRef {
+				binding,
+				stages,
+				resource: DescriptorResourceRef::Buffer {
+					buffer: Arc::as_ptr(buffer),
+					offset,
+					range,
+				},
+			},
+		);
+	}
+
+	pub fn add_image(
+		&mut self,
+		set: usize,
+		binding: u32,
+		stages: vk::ShaderStageFlags,
+		image: &Arc<ImageRecord>,
+		sampler: vk::Sampler,
+	)
+	{
+		self.add_entry(
+			set,
+			DescriptorEntryRef {
+				binding,
+				stages,
+				resource: DescriptorResourceRef::Image {
+					image: Arc::as_ptr(image),
+					sampler,
+				},
+			},
+		);
+	}
+
+	pub fn set_macros(&mut self, macros: &[(&str, &str)])
+	{
+		self.macros.clear();
+
+		for (name, value) in macros {
+			self.add_macro(Some(name.as_bytes()), Some(value.as_bytes()));
+		}
 	}
 
 	pub fn add_blend(&mut self, target_index: u32, mut blend: BlendAttachment)

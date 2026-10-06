@@ -52,7 +52,7 @@ impl ViewKick
 		let impulse = impulse_per_peak();
 
 		for i in 0..CHANNELS {
-			self.velocity[i] = peaks[i].mul_add(impulse, self.velocity[i]);
+			self.velocity[i] += peaks[i] * impulse;
 			self.bound[i] = self.bound[i].max(bounds[i] * LIMIT);
 		}
 	}
@@ -71,16 +71,8 @@ impl ViewKick
 			let x = self.value[i];
 			let v = self.velocity[i];
 
-			let next_x = decay
-				* x.mul_add(
-					cos_step,
-					((zeta * omega).mul_add(x, v) / damped) * sin_step,
-				);
-			let next_v = decay
-				* v.mul_add(
-					cos_step,
-					-(((omega * omega).mul_add(x, (zeta * omega) * v)) / damped) * sin_step,
-				);
+			let next_x = decay * (x * cos_step + ((v + zeta * omega * x) / damped) * sin_step);
+			let next_v = decay * (v * cos_step - ((omega * omega * x + zeta * omega * v) / damped) * sin_step);
 
 			self.value[i] = next_x.clamp(-self.bound[i], self.bound[i]);
 			self.velocity[i] = next_v;

@@ -9,3 +9,4 @@ workspace = true
 
 [dependencies]
 raptor-config = { path = "../raptor-config" }
+raptor-core = { path = "../raptor-core" }

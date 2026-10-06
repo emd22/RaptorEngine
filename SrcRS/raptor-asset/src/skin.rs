@@ -1,8 +1,6 @@
 use gltf::animation::util::ReadOutputs;
 use raptor_anim::math::multiply;
-use raptor_anim::{
-	Animation, BoneTrack, Mat4, NO_BONE, RestPose, Skeleton, SkeletonData, Track,
-};
+use raptor_anim::{Animation, BoneTrack, Mat4, NO_BONE, RestPose, Skeleton, SkeletonData, Track};
 
 use crate::gltf_scene::GltfScene;
 
@@ -10,23 +8,20 @@ const SCALE_EPSILON: f32 = 1e-8;
 
 /// The mirror across X that takes glTF's coordinates to the engine's. Everything read out of a skin is
 /// conjugated by it, to stay in step with the vertex buffers.
-fn reflection() -> Mat4
-{
+fn reflection() -> Mat4 {
 	let mut matrix = Mat4::IDENTITY;
 	matrix.0[0][0] = -1.0;
 	matrix
 }
 
-fn lengthwise(v: [f32; 3]) -> f32
-{
+fn lengthwise(v: [f32; 3]) -> f32 {
 	// Added pairwise, the way the engine's vector length is
 	((v[0] * v[0] + v[1] * v[1]) + (v[2] * v[2] + 0.0)).sqrt()
 }
 
 /// The local matrix of a node as glTF's own transform code builds it, with the products and sums fused
 /// the way the compiler fuses them there.
-fn local_matrix(node: &gltf::Node) -> [f32; 16]
-{
+fn local_matrix(node: &gltf::Node) -> [f32; 16] {
 	match node.transform() {
 		gltf::scene::Transform::Matrix { matrix } => {
 			let mut flat = [0.0; 16];
@@ -51,7 +46,8 @@ fn local_matrix(node: &gltf::Node) -> [f32; 16]
 			// `2*a*b + 2*c*d`
 			let sum = |a: f32, b: f32, c: f32, d: f32| (2.0 * a).mul_add(b, (2.0 * c) * d);
 			// `2*a*b - 2*c*d`
-			let difference = |a: f32, b: f32, c: f32, d: f32| (2.0 * a).mul_add(b, -((2.0 * c) * d));
+			let difference =
+				|a: f32, b: f32, c: f32, d: f32| (2.0 * a).mul_add(b, -((2.0 * c) * d));
 
 			[
 				diagonal(qy, qz) * sx,
@@ -76,8 +72,7 @@ fn local_matrix(node: &gltf::Node) -> [f32; 16]
 }
 
 /// The world matrix of a node, built by walking up through its parents
-fn world_matrix(node: &gltf::Node, parent_of: &[Option<usize>], nodes: &[gltf::Node]) -> [f32; 16]
-{
+fn world_matrix(node: &gltf::Node, parent_of: &[Option<usize>], nodes: &[gltf::Node]) -> [f32; 16] {
 	let mut lm = local_matrix(node);
 	let mut parent = parent_of[node.index()];
 
@@ -106,8 +101,7 @@ fn world_matrix(node: &gltf::Node, parent_of: &[Option<usize>], nodes: &[gltf::N
 	lm
 }
 
-fn mat4_from_flat(flat: &[f32; 16]) -> Mat4
-{
+fn mat4_from_flat(flat: &[f32; 16]) -> Mat4 {
 	let mut matrix = Mat4::IDENTITY;
 
 	for (row, chunk) in matrix.0.iter_mut().zip(flat.as_chunks::<4>().0) {
@@ -119,8 +113,7 @@ fn mat4_from_flat(flat: &[f32; 16]) -> Mat4
 
 /// The local transform a joint sits at when an animation does not drive it, mirrored across X like
 /// the animation channels are (X negated on translations, Y and Z on rotations).
-fn rest_pose(node: &gltf::Node) -> RestPose
-{
+fn rest_pose(node: &gltf::Node) -> RestPose {
 	let mut rest = RestPose::default();
 
 	match node.transform() {
@@ -163,8 +156,7 @@ fn rest_pose(node: &gltf::Node) -> RestPose
 						(axis_x[1] - axis_y[0]) * inv,
 						w,
 					]
-				}
-				else if axis_x[0] > axis_y[1] && axis_x[0] > axis_z[2] {
+				} else if axis_x[0] > axis_y[1] && axis_x[0] > axis_z[2] {
 					let x = (1.0 + axis_x[0] - axis_y[1] - axis_z[2]).sqrt() * 0.5;
 					let inv = 0.25 / x;
 
@@ -174,8 +166,7 @@ fn rest_pose(node: &gltf::Node) -> RestPose
 						(axis_z[0] + axis_x[2]) * inv,
 						(axis_y[2] - axis_z[1]) * inv,
 					]
-				}
-				else if axis_y[1] > axis_z[2] {
+				} else if axis_y[1] > axis_z[2] {
 					let y = (1.0 + axis_y[1] - axis_x[0] - axis_z[2]).sqrt() * 0.5;
 					let inv = 0.25 / y;
 
@@ -185,8 +176,7 @@ fn rest_pose(node: &gltf::Node) -> RestPose
 						(axis_y[2] + axis_z[1]) * inv,
 						(axis_z[0] - axis_x[2]) * inv,
 					]
-				}
-				else {
+				} else {
 					let z = (1.0 + axis_z[2] - axis_x[0] - axis_y[1]).sqrt() * 0.5;
 					let inv = 0.25 / z;
 
@@ -211,7 +201,12 @@ fn rest_pose(node: &gltf::Node) -> RestPose
 	}
 
 	rest.translation[0] = -rest.translation[0];
-	rest.rotation = [rest.rotation[0], -rest.rotation[1], -rest.rotation[2], rest.rotation[3]];
+	rest.rotation = [
+		rest.rotation[0],
+		-rest.rotation[1],
+		-rest.rotation[2],
+		rest.rotation[3],
+	];
 
 	rest
 }
@@ -220,8 +215,7 @@ fn build_animation(
 	scene: &GltfScene,
 	animation: &gltf::Animation,
 	joint_nodes: &[usize],
-) -> Animation
-{
+) -> Animation {
 	let buffers = scene.buffers();
 
 	let mut out = Animation {
@@ -252,12 +246,12 @@ fn build_animation(
 			continue;
 		};
 
-		let stride = if channel.sampler().interpolation() == gltf::animation::Interpolation::CubicSpline {
-			3
-		}
-		else {
-			1
-		};
+		let stride =
+			if channel.sampler().interpolation() == gltf::animation::Interpolation::CubicSpline {
+				3
+			} else {
+				1
+			};
 
 		let pick = |index: usize| index * stride + usize::from(stride == 3);
 		let track = &mut out.tracks[joint];
@@ -305,8 +299,7 @@ fn build_animation(
 
 /// Makes the skeleton of a skin, with every animation in the file, and the first of them set to loop
 /// when nothing else is playing.
-pub fn build_skeleton(scene: &GltfScene, skin_index: usize) -> Option<Skeleton>
-{
+pub fn build_skeleton(scene: &GltfScene, skin_index: usize) -> Option<Skeleton> {
 	let document = scene.document();
 	let skin = document.skins().nth(skin_index)?;
 

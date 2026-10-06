@@ -2,15 +2,16 @@ const AMOUNT: f32 = 0.12;
 const RETURN_SPEED: f32 = 12.0;
 const MAX_SWAY: f32 = 5.0 * (std::f64::consts::PI / 180.0) as f32;
 
-unsafe extern "C" {
-	fn remainderf(x: f32, y: f32) -> f32;
-}
-
 fn smooth_interpolate_to_zero(a: f32, speed: f32, delta_time: f32) -> f32
 {
-	let t = 1.0 - (-speed * delta_time).exp();
+	a * (-speed * delta_time).exp()
+}
 
-	t * 0.0 + (1.0 - t) * a
+fn wrap_angle(angle: f32) -> f32
+{
+	let turn = std::f32::consts::TAU;
+
+	angle - turn * (angle / turn).round()
 }
 
 /// How far the view model trails the camera, in radians.
@@ -28,8 +29,7 @@ impl ViewSway
 {
 	pub fn update(&mut self, camera_yaw: f32, camera_pitch: f32, delta_time: f32)
 	{
-		// SAFETY: `remainderf` is the C library's pure function on two floats.
-		let yaw_delta = unsafe { remainderf(camera_yaw - self.prev_yaw, std::f64::consts::TAU as f32) };
+		let yaw_delta = wrap_angle(camera_yaw - self.prev_yaw);
 		let pitch_delta = camera_pitch - self.prev_pitch;
 
 		self.prev_yaw = camera_yaw;
@@ -38,8 +38,8 @@ impl ViewSway
 		self.yaw = smooth_interpolate_to_zero(self.yaw, RETURN_SPEED, delta_time);
 		self.pitch = smooth_interpolate_to_zero(self.pitch, RETURN_SPEED, delta_time);
 
-		self.yaw = (-yaw_delta).mul_add(AMOUNT, self.yaw).clamp(-MAX_SWAY, MAX_SWAY);
-		self.pitch = (-pitch_delta).mul_add(AMOUNT, self.pitch).clamp(-MAX_SWAY, MAX_SWAY);
+		self.yaw = (self.yaw - yaw_delta * AMOUNT).clamp(-MAX_SWAY, MAX_SWAY);
+		self.pitch = (self.pitch - pitch_delta * AMOUNT).clamp(-MAX_SWAY, MAX_SWAY);
 	}
 }
 

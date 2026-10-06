@@ -6,3 +6,7 @@ publish.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+raptor-math = { path = "../raptor-math" }
+raptor-entity = { path = "../raptor-entity" }

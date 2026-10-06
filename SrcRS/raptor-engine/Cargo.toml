@@ -1,0 +1,32 @@
+[package]
+name = "raptor-engine"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+ash = { version = "0.38", default-features = false, features = ["std"] }
+bytemuck = "1"
+raptor-anim = { path = "../raptor-anim" }
+raptor-asset = { path = "../raptor-asset" }
+raptor-brush = { path = "../raptor-brush" }
+raptor-config = { path = "../raptor-config" }
+raptor-core = { path = "../raptor-core" }
+raptor-entity = { path = "../raptor-entity" }
+raptor-game = { path = "../raptor-game" }
+raptor-gfx = { path = "../raptor-gfx" }
+raptor-gpu = { path = "../raptor-gpu" }
+raptor-input = { path = "../raptor-input" }
+raptor-jolt = { path = "../raptor-jolt" }
+raptor-level = { path = "../raptor-level" }
+raptor-math = { path = "../raptor-math" }
+raptor-mesh = { path = "../raptor-mesh" }
+raptor-physics = { path = "../raptor-physics" }
+raptor-render = { path = "../raptor-render" }
+raptor-scene = { path = "../raptor-scene" }
+raptor-script = { path = "../raptor-script" }
+raptor-weapon = { path = "../raptor-weapon", features = ["strata"] }
+raptor-world = { path = "../raptor-world" }
+
+[lints]
+workspace = true

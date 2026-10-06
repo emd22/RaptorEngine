@@ -1,5 +1,4 @@
 use std::collections::VecDeque;
-use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::{self, JoinHandle};
@@ -15,40 +14,16 @@ pub const IDLE_SLEEP_AFTER: Duration = Duration::from_secs(3);
 /// How long the manager rests between looks for work while it is not asleep
 pub const IDLE_POLL: Duration = Duration::from_millis(20);
 
-/// An item of work, which the backend knows how to load, upload and finish. The scheduler only passes
-/// it around.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Job(pub *mut c_void);
-
-// SAFETY: the backend that makes jobs promises they can be handled from any thread, one at a time.
-unsafe impl Send for Job {}
-
-// SAFETY: as above, a job is only a pointer that is passed along.
-unsafe impl Sync for Job {}
-
-/// Something to be destroyed once the frames that could use it are over
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Resource(pub *mut c_void);
-
-// SAFETY: as for `Job`.
-unsafe impl Send for Resource {}
-
-// SAFETY: as for `Job`.
-unsafe impl Sync for Resource {}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
-pub enum LoadStatus
-{
+pub enum LoadStatus {
 	None = 0,
 	Success = 1,
 	Error = 2,
 }
 
-impl LoadStatus
-{
-	pub fn from_u8(value: u8) -> Self
-	{
+impl LoadStatus {
+	pub fn from_u8(value: u8) -> Self {
 		match value {
 			1 => Self::Success,
 			2 => Self::Error,
@@ -58,29 +33,34 @@ impl LoadStatus
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum LogLevel
-{
+pub enum LogLevel {
 	Info,
 	Error,
 }
 
 /// What the scheduler asks of the engine
-pub trait Backend: Send + Sync + 'static
-{
+pub trait Backend: Send + Sync + 'static {
+	/// An item of work, which the backend knows how to load, upload and finish. The scheduler only
+	/// passes it around.
+	type Job: Send + 'static;
+
+	/// Something to be destroyed once the frames that could use it are over
+	type Resource: Send + 'static;
+
 	/// Loads a job on a worker thread
-	fn load(&self, job: Job) -> LoadStatus;
+	fn load(&self, job: &mut Self::Job) -> LoadStatus;
 
 	/// Starts a batch of uploads
 	fn begin_upload(&self);
 
 	/// Uploads a job that loaded. Says whether that was an upload.
-	fn upload(&self, job: Job) -> bool;
+	fn upload(&self, job: &mut Self::Job) -> bool;
 
 	/// Sends the batch of uploads off and waits until it is done
 	fn end_upload(&self);
 
-	/// A job is done, whether it loaded, failed or never got a status. It is the backend's to free.
-	fn finish(&self, job: Job, status: LoadStatus);
+	/// A job is done, whether it loaded, failed or never got a status
+	fn finish(&self, job: Self::Job, status: LoadStatus);
 
 	/// The number of frames drawn so far
 	fn frame(&self) -> u32;
@@ -88,41 +68,35 @@ pub trait Backend: Send + Sync + 'static
 	/// Waits until nothing that was uploading could still be using what is about to be destroyed
 	fn wait_for_uploads(&self);
 
-	fn destroy(&self, resource: Resource);
+	fn destroy(&self, resource: Self::Resource);
 
 	fn log(&self, level: LogLevel, message: &str);
 }
 
-struct Deletion
-{
-	resource: Resource,
+struct Deletion<R> {
+	resource: R,
 	min_frame: u32,
 }
 
-impl Deletion
-{
+impl<R> Deletion<R> {
 	/// Whether `current_frame` has reached the minimum frame, with both counting around past the top of
 	/// the range
-	fn is_due(&self, current_frame: u32) -> bool
-	{
+	fn is_due(&self, current_frame: u32) -> bool {
 		(current_frame.wrapping_sub(self.min_frame) as i32) >= 0
 	}
 }
 
-struct Worker
-{
+struct Worker<J> {
 	busy: AtomicBool,
 	pending_upload: AtomicBool,
 	status: AtomicU8,
-	job: Mutex<Option<Job>>,
+	job: Mutex<Option<J>>,
 	ready: Notifier,
 	running: AtomicBool,
 }
 
-impl Worker
-{
-	fn new() -> Self
-	{
+impl<J> Worker<J> {
+	fn new() -> Self {
 		Self {
 			busy: AtomicBool::new(false),
 			pending_upload: AtomicBool::new(false),
@@ -133,45 +107,36 @@ impl Worker
 		}
 	}
 
-	fn status(&self) -> LoadStatus
-	{
+	fn status(&self) -> LoadStatus {
 		LoadStatus::from_u8(self.status.load(Ordering::SeqCst))
 	}
-
-	fn job(&self) -> Option<Job>
-	{
-		*lock(&self.job)
-	}
 }
 
-fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T>
-{
-	mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+	mutex
+		.lock()
+		.unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-struct Shared
-{
-	backend: Box<dyn Backend>,
-	queue: Mutex<VecDeque<Job>>,
-	deletions: Mutex<VecDeque<Deletion>>,
+struct Shared<B: Backend> {
+	backend: B,
+	queue: Mutex<VecDeque<B::Job>>,
+	deletions: Mutex<VecDeque<Deletion<B::Resource>>>,
 	manager_signal: CountedNotifier,
 	active: AtomicBool,
-	workers: Vec<Worker>,
+	workers: Vec<Worker<B::Job>>,
 	idle_sleep_after: Duration,
 	idle_poll: Duration,
 }
 
-pub struct SchedulerConfig
-{
+pub struct SchedulerConfig {
 	pub workers: u32,
 	pub idle_sleep_after: Duration,
 	pub idle_poll: Duration,
 }
 
-impl SchedulerConfig
-{
-	pub fn new(workers: u32) -> Self
-	{
+impl SchedulerConfig {
+	pub fn new(workers: u32) -> Self {
 		Self {
 			workers,
 			idle_sleep_after: IDLE_SLEEP_AFTER,
@@ -182,17 +147,14 @@ impl SchedulerConfig
 
 /// Loads assets on worker threads, uploads what they loaded in batches, and destroys resources once the
 /// frames that could be using them are over, all from a manager thread.
-pub struct Scheduler
-{
-	shared: Arc<Shared>,
+pub struct Scheduler<B: Backend> {
+	shared: Arc<Shared<B>>,
 	manager: Mutex<Option<JoinHandle<()>>>,
 	workers: Mutex<Vec<JoinHandle<()>>>,
 }
 
-impl Scheduler
-{
-	pub fn new(backend: Box<dyn Backend>, config: SchedulerConfig) -> Self
-	{
+impl<B: Backend> Scheduler<B> {
+	pub fn new(backend: B, config: SchedulerConfig) -> Self {
 		let worker_count = config.workers.min(MAX_WORKERS) as usize;
 
 		let shared = Arc::new(Shared {
@@ -233,31 +195,34 @@ impl Scheduler
 		}
 	}
 
+	pub fn backend(&self) -> &B {
+		&self.shared.backend
+	}
+
 	/// Queues a job to be loaded
-	pub fn submit(&self, job: Job)
-	{
+	pub fn submit(&self, job: B::Job) {
 		lock(&self.shared.queue).push_back(job);
 		self.signal();
 	}
 
 	/// Queues a resource to be destroyed `frame_spacing` frames from now
-	pub fn delete_resource(&self, resource: Resource, frame_spacing: u32)
-	{
+	pub fn delete_resource(&self, resource: B::Resource, frame_spacing: u32) {
 		let min_frame = self.shared.backend.frame().wrapping_add(frame_spacing);
 
-		lock(&self.shared.deletions).push_back(Deletion { resource, min_frame });
+		lock(&self.shared.deletions).push_back(Deletion {
+			resource,
+			min_frame,
+		});
 		self.signal();
 	}
 
 	/// Wakes the manager
-	pub fn signal(&self)
-	{
+	pub fn signal(&self) {
 		self.shared.manager_signal.signal();
 	}
 
 	/// Stops the manager and the workers and waits for them to end
-	pub fn stop(&self)
-	{
+	pub fn stop(&self) {
 		self.shared.active.store(false, Ordering::SeqCst);
 		self.shared.manager_signal.kill();
 
@@ -276,8 +241,7 @@ impl Scheduler
 	}
 
 	/// Destroys every resource that is waiting, due or not
-	pub fn flush_deletions(&self)
-	{
+	pub fn flush_deletions(&self) {
 		loop {
 			let Some(deletion) = lock(&self.shared.deletions).pop_front() else {
 				break;
@@ -287,29 +251,23 @@ impl Scheduler
 		}
 	}
 
-	pub fn queued_jobs(&self) -> usize
-	{
+	pub fn queued_jobs(&self) -> usize {
 		lock(&self.shared.queue).len()
 	}
 
-	pub fn queued_deletions(&self) -> usize
-	{
+	pub fn queued_deletions(&self) -> usize {
 		lock(&self.shared.deletions).len()
 	}
 }
 
-impl Drop for Scheduler
-{
-	fn drop(&mut self)
-	{
+impl<B: Backend> Drop for Scheduler<B> {
+	fn drop(&mut self) {
 		self.stop();
 	}
 }
 
-impl Shared
-{
-	fn worker_loop(&self, index: usize)
-	{
+impl<B: Backend> Shared<B> {
+	fn worker_loop(&self, index: usize) {
 		let worker = &self.workers[index];
 
 		while worker.running.load(Ordering::SeqCst) {
@@ -321,11 +279,15 @@ impl Shared
 
 			worker.ready.reset();
 
-			let Some(job) = worker.job() else {
-				continue;
-			};
+			let status = {
+				let mut slot = lock(&worker.job);
 
-			let status = self.backend.load(job);
+				let Some(job) = slot.as_mut() else {
+					continue;
+				};
+
+				self.backend.load(job)
+			};
 
 			worker.status.store(status as u8, Ordering::SeqCst);
 			worker.pending_upload.store(true, Ordering::SeqCst);
@@ -335,9 +297,8 @@ impl Shared
 	}
 
 	/// Uploads what the workers have loaded, in one batch. Returns how many were uploaded.
-	fn check_for_uploadable_data(&self) -> i32
-	{
-		let waiting: Vec<&Worker> = self
+	fn check_for_uploadable_data(&self) -> i32 {
+		let waiting: Vec<&Worker<B::Job>> = self
 			.workers
 			.iter()
 			.filter(|worker| worker.pending_upload.load(Ordering::SeqCst))
@@ -352,8 +313,11 @@ impl Shared
 		let mut uploads = 0;
 
 		for worker in &waiting {
-			if worker.status() == LoadStatus::Success
-				&& let Some(job) = worker.job()
+			if worker.status() != LoadStatus::Success {
+				continue;
+			}
+
+			if let Some(job) = lock(&worker.job).as_mut()
 				&& self.backend.upload(job)
 			{
 				uploads += 1;
@@ -363,8 +327,10 @@ impl Shared
 		self.backend.end_upload();
 
 		for worker in &waiting {
-			if let Some(job) = worker.job() {
-				self.backend.finish(job, worker.status());
+			let status = worker.status();
+
+			if let Some(job) = lock(&worker.job).take() {
+				self.backend.finish(job, status);
 			}
 
 			let was_pending = worker.pending_upload.swap(false, Ordering::SeqCst);
@@ -373,8 +339,9 @@ impl Shared
 				self.manager_signal.signal();
 			}
 
-			worker.status.store(LoadStatus::None as u8, Ordering::SeqCst);
-			*lock(&worker.job) = None;
+			worker
+				.status
+				.store(LoadStatus::None as u8, Ordering::SeqCst);
 			worker.busy.store(false, Ordering::SeqCst);
 		}
 
@@ -382,8 +349,7 @@ impl Shared
 	}
 
 	/// Hands the next queued job to an idle worker. Returns 1 if it did.
-	fn check_for_items_to_load(&self) -> i32
-	{
+	fn check_for_items_to_load(&self) -> i32 {
 		if lock(&self.queue).is_empty() {
 			return 0;
 		}
@@ -413,8 +379,7 @@ impl Shared
 
 	/// Destroys the resource at the front of the deletion queue if its time has come. Returns 1 if it
 	/// was.
-	fn check_for_items_to_delete(&self) -> i32
-	{
+	fn check_for_items_to_delete(&self) -> i32 {
 		if lock(&self.deletions).is_empty() {
 			return 0;
 		}
@@ -426,14 +391,6 @@ impl Shared
 		let Some(front) = deletions.front() else {
 			return 0;
 		};
-
-		if front.resource.0.is_null() {
-			self.backend
-				.log(LogLevel::Error, "Trying to delete a null asset!");
-			deletions.pop_front();
-
-			return 0;
-		}
 
 		if !front.is_due(self.backend.frame()) {
 			return 0;
@@ -448,8 +405,7 @@ impl Shared
 		1
 	}
 
-	fn manager_loop(&self)
-	{
+	fn manager_loop(&self) {
 		let mut should_sleep = false;
 		let mut idle_since: Option<Instant> = None;
 
@@ -483,10 +439,10 @@ impl Shared
 
 			if deletions_waiting {
 				idle_since = None;
-			}
-			else if since.elapsed() >= self.idle_sleep_after {
+			} else if since.elapsed() >= self.idle_sleep_after {
 				should_sleep = true;
-				self.backend.log(LogLevel::Info, "Sleeping asset manager...");
+				self.backend
+					.log(LogLevel::Info, "Sleeping asset manager...");
 				continue;
 			}
 
@@ -496,14 +452,12 @@ impl Shared
 }
 
 #[cfg(test)]
-mod tests
-{
+mod tests {
 	use super::*;
 	use std::sync::atomic::AtomicU32;
 
 	#[derive(Debug, Clone, PartialEq, Eq)]
-	enum Event
-	{
+	enum Event {
 		Load(usize),
 		BeginUpload,
 		Upload(usize),
@@ -513,8 +467,7 @@ mod tests
 		Destroy(usize),
 	}
 
-	struct Probe
-	{
+	struct Probe {
 		events: Mutex<Vec<Event>>,
 		frame: AtomicU32,
 		fail: Mutex<Vec<usize>>,
@@ -524,72 +477,63 @@ mod tests
 
 	struct TestBackend(Arc<Probe>);
 
-	fn id_of(job: Job) -> usize
-	{
-		job.0 as usize
-	}
+	impl Backend for TestBackend {
+		type Job = usize;
+		type Resource = usize;
 
-	impl Backend for TestBackend
-	{
-		fn load(&self, job: Job) -> LoadStatus
-		{
-			self.0.events.lock().unwrap().push(Event::Load(id_of(job)));
+		fn load(&self, job: &mut usize) -> LoadStatus {
+			let job = *job;
+			self.0.events.lock().unwrap().push(Event::Load(job));
 			thread::sleep(self.0.load_delay);
 
-			if self.0.fail.lock().unwrap().contains(&id_of(job)) {
+			if self.0.fail.lock().unwrap().contains(&job) {
 				LoadStatus::Error
-			}
-			else {
+			} else {
 				LoadStatus::Success
 			}
 		}
 
-		fn begin_upload(&self)
-		{
+		fn begin_upload(&self) {
 			self.0.events.lock().unwrap().push(Event::BeginUpload);
 		}
 
-		fn upload(&self, job: Job) -> bool
-		{
-			self.0.events.lock().unwrap().push(Event::Upload(id_of(job)));
+		fn upload(&self, job: &mut usize) -> bool {
+			self.0.events.lock().unwrap().push(Event::Upload(*job));
 			true
 		}
 
-		fn end_upload(&self)
-		{
+		fn end_upload(&self) {
 			self.0.events.lock().unwrap().push(Event::EndUpload);
 		}
 
-		fn finish(&self, job: Job, status: LoadStatus)
-		{
-			self.0.events.lock().unwrap().push(Event::Finish(id_of(job), status));
+		fn finish(&self, job: usize, status: LoadStatus) {
+			self.0
+				.events
+				.lock()
+				.unwrap()
+				.push(Event::Finish(job, status));
 		}
 
-		fn frame(&self) -> u32
-		{
+		fn frame(&self) -> u32 {
 			self.0.frame.load(Ordering::SeqCst)
 		}
 
-		fn wait_for_uploads(&self)
-		{
+		fn wait_for_uploads(&self) {
 			self.0.events.lock().unwrap().push(Event::WaitForUploads);
 		}
 
-		fn destroy(&self, resource: Resource)
-		{
-			self.0.events.lock().unwrap().push(Event::Destroy(resource.0 as usize));
+		fn destroy(&self, resource: usize) {
+			self.0.events.lock().unwrap().push(Event::Destroy(resource));
 		}
 
-		fn log(&self, _level: LogLevel, message: &str)
-		{
+		fn log(&self, _level: LogLevel, message: &str) {
 			if message.contains("Sleeping") {
 				self.0.sleeping_logs.fetch_add(1, Ordering::SeqCst);
 			}
 		}
 	}
 
-	fn probe(load_delay: Duration) -> Arc<Probe>
-	{
+	fn probe(load_delay: Duration) -> Arc<Probe> {
 		Arc::new(Probe {
 			events: Mutex::new(Vec::new()),
 			frame: AtomicU32::new(100),
@@ -599,22 +543,19 @@ mod tests
 		})
 	}
 
-	fn scheduler(probe: &Arc<Probe>, workers: u32) -> Scheduler
-	{
+	fn scheduler(probe: &Arc<Probe>, workers: u32) -> Scheduler<TestBackend> {
 		let mut config = SchedulerConfig::new(workers);
 		config.idle_poll = Duration::from_millis(2);
 		config.idle_sleep_after = Duration::from_millis(60);
 
-		Scheduler::new(Box::new(TestBackend(Arc::clone(probe))), config)
+		Scheduler::new(TestBackend(Arc::clone(probe)), config)
 	}
 
-	fn job(id: usize) -> Job
-	{
-		Job(id as *mut c_void)
+	fn job(id: usize) -> usize {
+		id
 	}
 
-	fn wait_until(mut condition: impl FnMut() -> bool)
-	{
+	fn wait_until(mut condition: impl FnMut() -> bool) {
 		let start = Instant::now();
 
 		while !condition() {
@@ -623,13 +564,11 @@ mod tests
 		}
 	}
 
-	fn events(probe: &Arc<Probe>) -> Vec<Event>
-	{
+	fn events(probe: &Arc<Probe>) -> Vec<Event> {
 		probe.events.lock().unwrap().clone()
 	}
 
-	fn finished(probe: &Arc<Probe>) -> usize
-	{
+	fn finished(probe: &Arc<Probe>) -> usize {
 		events(probe)
 			.iter()
 			.filter(|event| matches!(event, Event::Finish(..)))
@@ -637,8 +576,7 @@ mod tests
 	}
 
 	#[test]
-	fn a_job_is_loaded_then_uploaded_in_a_batch_then_finished()
-	{
+	fn a_job_is_loaded_then_uploaded_in_a_batch_then_finished() {
 		let probe = probe(Duration::ZERO);
 		let scheduler = scheduler(&probe, 2);
 
@@ -658,8 +596,7 @@ mod tests
 	}
 
 	#[test]
-	fn a_job_that_fails_to_load_is_finished_without_being_uploaded()
-	{
+	fn a_job_that_fails_to_load_is_finished_without_being_uploaded() {
 		let probe = probe(Duration::ZERO);
 		probe.fail.lock().unwrap().push(7);
 		let scheduler = scheduler(&probe, 1);
@@ -674,8 +611,7 @@ mod tests
 	}
 
 	#[test]
-	fn every_job_is_finished_once_whatever_the_number_of_workers()
-	{
+	fn every_job_is_finished_once_whatever_the_number_of_workers() {
 		for workers in [1, 2, 4] {
 			let probe = probe(Duration::from_millis(1));
 			let scheduler = scheduler(&probe, workers);
@@ -701,8 +637,7 @@ mod tests
 	}
 
 	#[test]
-	fn with_one_worker_jobs_load_in_the_order_they_were_submitted()
-	{
+	fn with_one_worker_jobs_load_in_the_order_they_were_submitted() {
 		let probe = probe(Duration::ZERO);
 		let scheduler = scheduler(&probe, 1);
 
@@ -724,8 +659,7 @@ mod tests
 	}
 
 	#[test]
-	fn jobs_that_load_together_are_uploaded_in_one_batch_each_after_its_begin()
-	{
+	fn jobs_that_load_together_are_uploaded_in_one_batch_each_after_its_begin() {
 		let probe = probe(Duration::from_millis(2));
 		let scheduler = scheduler(&probe, 4);
 
@@ -754,16 +688,20 @@ mod tests
 		}
 
 		assert!(!inside_batch);
-		assert!(events.iter().filter(|event| **event == Event::BeginUpload).count() <= 12);
+		assert!(
+			events
+				.iter()
+				.filter(|event| **event == Event::BeginUpload)
+				.count() <= 12
+		);
 	}
 
 	#[test]
-	fn a_resource_waits_for_its_frame_and_is_then_destroyed_after_waiting_for_uploads()
-	{
+	fn a_resource_waits_for_its_frame_and_is_then_destroyed_after_waiting_for_uploads() {
 		let probe = probe(Duration::ZERO);
 		let scheduler = scheduler(&probe, 1);
 
-		scheduler.delete_resource(Resource(5 as *mut c_void), 4);
+		scheduler.delete_resource(5, 4);
 
 		thread::sleep(Duration::from_millis(30));
 		assert!(!events(&probe).contains(&Event::Destroy(5)));
@@ -779,13 +717,12 @@ mod tests
 	}
 
 	#[test]
-	fn resources_are_destroyed_in_the_order_they_were_queued()
-	{
+	fn resources_are_destroyed_in_the_order_they_were_queued() {
 		let probe = probe(Duration::ZERO);
 		let scheduler = scheduler(&probe, 1);
 
 		for id in 1..=4 {
-			scheduler.delete_resource(Resource(id as *mut c_void), 0);
+			scheduler.delete_resource(id, 0);
 		}
 
 		wait_until(|| scheduler.queued_deletions() == 0);
@@ -802,25 +739,12 @@ mod tests
 	}
 
 	#[test]
-	fn a_null_resource_is_reported_and_dropped_instead_of_blocking_the_queue()
-	{
+	fn flushing_destroys_everything_waiting_even_if_it_is_not_due() {
 		let probe = probe(Duration::ZERO);
 		let scheduler = scheduler(&probe, 1);
 
-		scheduler.delete_resource(Resource(std::ptr::null_mut()), 0);
-		scheduler.delete_resource(Resource(9 as *mut c_void), 0);
-
-		wait_until(|| events(&probe).contains(&Event::Destroy(9)));
-	}
-
-	#[test]
-	fn flushing_destroys_everything_waiting_even_if_it_is_not_due()
-	{
-		let probe = probe(Duration::ZERO);
-		let scheduler = scheduler(&probe, 1);
-
-		scheduler.delete_resource(Resource(1 as *mut c_void), 1000);
-		scheduler.delete_resource(Resource(2 as *mut c_void), 1000);
+		scheduler.delete_resource(1, 1000);
+		scheduler.delete_resource(2, 1000);
 		scheduler.stop();
 		scheduler.flush_deletions();
 
@@ -833,10 +757,9 @@ mod tests
 	}
 
 	#[test]
-	fn the_deletion_time_counts_a_wrapped_frame_counter()
-	{
+	fn the_deletion_time_counts_a_wrapped_frame_counter() {
 		let deletion = Deletion {
-			resource: Resource(1 as *mut c_void),
+			resource: 1usize,
 			min_frame: 10,
 		};
 
@@ -845,7 +768,7 @@ mod tests
 		assert!(deletion.is_due(11));
 
 		let wrapped = Deletion {
-			resource: Resource(1 as *mut c_void),
+			resource: 1usize,
 			min_frame: 5,
 		};
 
@@ -857,8 +780,7 @@ mod tests
 	}
 
 	#[test]
-	fn an_idle_manager_goes_to_sleep_and_is_woken_by_new_work()
-	{
+	fn an_idle_manager_goes_to_sleep_and_is_woken_by_new_work() {
 		let probe = probe(Duration::ZERO);
 		let scheduler = scheduler(&probe, 1);
 
@@ -869,13 +791,12 @@ mod tests
 		scheduler.submit(job(1));
 		wait_until(|| finished(&probe) == 1);
 
-		scheduler.delete_resource(Resource(3 as *mut c_void), 0);
+		scheduler.delete_resource(3, 0);
 		wait_until(|| events(&probe).contains(&Event::Destroy(3)));
 	}
 
 	#[test]
-	fn stopping_ends_every_thread_even_while_asleep_or_busy()
-	{
+	fn stopping_ends_every_thread_even_while_asleep_or_busy() {
 		let asleep = probe(Duration::ZERO);
 		let scheduler_asleep = scheduler(&asleep, 3);
 
@@ -894,8 +815,7 @@ mod tests
 	}
 
 	#[test]
-	fn stopping_twice_does_nothing_the_second_time()
-	{
+	fn stopping_twice_does_nothing_the_second_time() {
 		let probe = probe(Duration::ZERO);
 		let scheduler = scheduler(&probe, 2);
 
@@ -904,8 +824,7 @@ mod tests
 	}
 
 	#[test]
-	fn more_workers_than_the_most_allowed_are_cut_back()
-	{
+	fn more_workers_than_the_most_allowed_are_cut_back() {
 		let probe = probe(Duration::ZERO);
 		let scheduler = scheduler(&probe, 50);
 

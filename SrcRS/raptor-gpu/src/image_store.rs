@@ -43,6 +43,34 @@ impl Default for ImageFields
 	}
 }
 
+/// An image and its view taken out of a record, to be destroyed once the GPU is done with them.
+pub struct ImageResource
+{
+	image: vk::Image,
+	view: vk::ImageView,
+	allocation: Option<Allocation>,
+}
+
+impl ImageResource
+{
+	/// # Safety
+	///
+	/// The device and allocator must be the ones the image was created with, and it must not be
+	/// in use.
+	pub unsafe fn destroy(self, device: &Device, allocator: &Allocator)
+	{
+		if self.view != vk::ImageView::null() {
+			// SAFETY: guaranteed by the caller.
+			unsafe { device.destroy_view(self.view) };
+		}
+
+		if let Some(allocation) = self.allocation {
+			// SAFETY: guaranteed by the caller.
+			unsafe { allocator.destroy_image(self.image, allocation) };
+		}
+	}
+}
+
 struct ImageState
 {
 	allocation: Option<Allocation>,
@@ -131,6 +159,14 @@ impl ImageRecord
 		fields.height = size.1;
 	}
 
+	/// Sets the most detailed mip level the image holds.
+	pub fn set_mip_level(&self, level: u32)
+	{
+		// SAFETY: access is externally synchronised, and no reference into the cell outlives a
+		// call.
+		unsafe { (*self.fields.get()).mip_level = level };
+	}
+
 	/// Records the layout the image is now in.
 	pub fn set_layout(&self, layout: vk::ImageLayout)
 	{
@@ -151,6 +187,34 @@ impl ImageRecord
 		let fields = self.fields();
 
 		fields.image != 0 || fields.view != 0
+	}
+
+	/// Empties the record of its image and view, handing them over to be destroyed later. The
+	/// size, format and layout bookkeeping stay.
+	pub fn detach(&self) -> Option<ImageResource>
+	{
+		use ash::vk::Handle;
+
+		// SAFETY: access is externally synchronised, and no reference into the cells outlives a
+		// call.
+		let (fields, state) = unsafe { (&mut *self.fields.get(), &mut *self.state.get()) };
+
+		if fields.image == 0 && fields.view == 0 {
+			return None;
+		}
+
+		let resource = ImageResource {
+			image: vk::Image::from_raw(fields.image),
+			view: vk::ImageView::from_raw(fields.view),
+			allocation: if state.owns_image { state.allocation.take() } else { None },
+		};
+
+		fields.image = 0;
+		fields.view = 0;
+		state.allocation = None;
+		state.owns_image = false;
+
+		Some(resource)
 	}
 
 	pub fn owns_image(&self) -> bool
