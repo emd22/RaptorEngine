@@ -88,6 +88,15 @@ struct BrushMarshal
 } // namespace
 
 
+BrushPlaneBuffer::BrushPlaneBuffer(const Brush::PlaneList& planes)
+{
+	for (const BrushPlane& plane : planes) {
+		Planes[Count++] = ToRust(plane);
+	}
+}
+
+Brush::PlaneList BrushPlaneBuffer::ToList() const { return PlanesFromRust(Planes, Count); }
+
 Brush Brush::FromBox(const Vec3f& min, const Vec3f& max)
 {
 	const float min_values[3] = { min.X, min.Y, min.Z };

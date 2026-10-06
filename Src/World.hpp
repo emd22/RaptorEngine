@@ -29,6 +29,8 @@ struct SceneDistanceBand
 
 class World
 {
+	friend struct RenderListFill;
+
 	struct TransparentObjectCarrier
 	{
 		ObjectID ID;
@@ -137,19 +139,9 @@ private:
 
 	void AddLoadedObject(Object* object);
 
-	void AddTileToRenderList(bool clear, TileIndex new_tile, const Frustum* frustum = nullptr);
 	void AddTileToLightList(TileIndex tile_index, const Frustum* frustum = nullptr);
 	void AddUnculledLightsToLightList();
 	void ClearRenderList();
-
-	void AddToRenderListRecursive(renderer::PipelineHandle pipeline, ObjectID* id);
-	/**
-	 * @brief Recursively adds `id` and its attached nodes to the geometry render list, deriving each node's own
-	 * pipeline from its own material rather than inheriting the pipeline chosen for the root (attached primitives
-	 * of a multi-primitive mesh can each require a different pipeline, e.g. a skinned primitive attached to a
-	 * container object whose own material differs).
-	 */
-	void AddToRenderListRecursiveByMaterial(ObjectID* id, const Frustum* frustum);
 
 	void SortTransparentObjects(renderer::Pipeline& pipeline, renderer::RenderListSection& section);
 

@@ -112,7 +112,7 @@ void Blockout::Create(World* world)
 		// pXFormObject->SetUnlit(true);
 		pXFormObject->SetProbeVisible(false);
 
-		pXFormObject->pMesh = cube_mesh->AsDefaultMesh();
+		pXFormObject->SetMesh(cube_mesh->AsDefaultMesh());
 
 
 		AssetTicket ticket(static_cast<void*>(pXFormObject));
@@ -133,7 +133,7 @@ void Blockout::Create(World* world)
 		Brush brush = Brush::FromBox(Vec3f(-0.25f), Vec3f(0.25f));
 		Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
 		brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices);
-		pPreviewObject->pMesh = mesh->AsDefaultMesh();
+		pPreviewObject->SetMesh(mesh->AsDefaultMesh());
 		mPreviewPlanes = brush.Planes;
 
 		AssetTicket ticket(static_cast<void*>(pPreviewObject));
@@ -148,9 +148,6 @@ void Blockout::Create(World* world)
 
 constexpr float scMinBlockoutThickness = 0.1f;
 
-/// Degrees per full turn, used to keep face texture rotations in [0, 360)
-constexpr float32 scDegreesPerTurn = 360.0f;
-
 static physics::eMotionType GetMotionType(const Object* object)
 {
 	physics::Body* body = gPhysics->GetBody(object->PhysicsID);
@@ -164,25 +161,18 @@ bool Blockout::MoveFace(Object* object, const Vec3f& face_normal, float32 distan
 		return false;
 	}
 
-	const int32 plane_index = brush->FindPlane(face_normal);
-	if (plane_index == Brush::scNoPlane) {
-		LogWarning("Blockout '{}' has no face facing {}", object->Name.Get(), face_normal);
+	const BrushPlaneBuffer planes(brush->Planes);
+	BrushPlaneBuffer moved;
+
+	moved.Count = rx_blockout_move_face(planes.Planes, planes.Count, &face_normal.mData[0], distance,
+										scMinBlockoutThickness, moved.Planes, Brush::scMaxPlanes);
+
+	if (moved.Count == 0) {
+		LogWarning("Cannot move the face of blockout '{}' facing {} that far", object->Name.Get(), face_normal);
 		return false;
 	}
 
-	Brush::PlaneList planes = brush->Planes;
-	BrushPlane& plane = planes[plane_index];
-
-	const float32 thickness = plane.Distance + brush->GetSupport(-plane.Normal);
-	plane.Distance += std::max(distance, scMinBlockoutThickness - thickness);
-
-	Brush moved = Brush::FromPlanes(planes);
-	if (!moved.IsValid()) {
-		LogWarning("Cannot move the face of blockout '{}' that far", object->Name.Get());
-		return false;
-	}
-
-	ApplyBrushInPlace(object, std::move(moved));
+	ApplyBrushInPlace(object, Brush::FromPlanes(moved.ToList()));
 
 	return true;
 }
@@ -206,8 +196,10 @@ bool Blockout::SetBrushPlanes(Object* object, const Brush::PlaneList& planes)
 
 static Vec3f GetOffsetToKeepInPlace(const Object* object, const Vec3f& old_center, const Vec3f& new_center)
 {
-	const Vec3f center_delta = new_center - old_center;
-	return center_delta.Rotate(object->mRotation) - center_delta;
+	Vec3f offset;
+	rx_blockout_keep_in_place(&object->mRotation.mData[0], &old_center.mData[0], &new_center.mData[0],
+							  &offset.mData[0]);
+	return offset;
 }
 
 void Blockout::ApplyBrushInPlace(Object* object, Brush&& brush)
@@ -234,46 +226,35 @@ bool Blockout::GetClipPieces(Object* object, const Vec3f& point_a, const Vec3f& 
 	}
 
 	const Mat4f to_local = object->GetWorldMatrix().Inverse();
+	const BrushPlaneBuffer planes(brush->Planes);
 
-	const Vec4f local_a = to_local * Vec4f(point_a.X, point_a.Y, point_a.Z, 1.0f);
-	const Vec4f local_b = to_local * Vec4f(point_b.X, point_b.Y, point_b.Z, 1.0f);
-	const Vec4f local_normal = to_local * Vec4f(face_normal.X, face_normal.Y, face_normal.Z, 0.0f);
+	BrushPlaneBuffer kept;
+	BrushPlaneBuffer split;
+	size_t counts[2] = {};
 
-	const Vec3f a(local_a.X, local_a.Y, local_a.Z);
-	const Vec3f b(local_b.X, local_b.Y, local_b.Z);
-
-	// The cut runs along the line and straight down through the face it was drawn on
-	const Vec3f cut_normal = (b - a).Cross(Vec3f(local_normal.X, local_normal.Y, local_normal.Z));
-
-	if (cut_normal.IsCloseTo(simd::LoadFloat4(0.0f))) {
+	if (!rx_blockout_clip(planes.Planes, planes.Count, &to_local.Rows[0].mData[0], &object->mRotation.mData[0],
+						  &object->GetPosition().mData[0], &point_a.mData[0], &point_b.mData[0],
+						  &face_normal.mData[0], kept.Planes, split.Planes, Brush::scMaxPlanes, counts,
+						  &out_split_position.mData[0])) {
 		return false;
 	}
 
-	const Vec3f normal = cut_normal.Normalize();
+	kept.Count = counts[0];
+	split.Count = counts[1];
 
-	// The cut faces line up with the world grid, like the faces of a box made with MakeWorldBox()
-	if (!brush->Split(normal, normal.Dot(a), object->GetPosition(), out_kept, out_split)) {
-		return false;
-	}
-
-	const Brush split = Brush::FromPlanes(out_split);
-
-	// The split piece keeps the blockout's local space, so its textures carry on from the other piece
-	out_split_position = object->GetPosition() + GetOffsetToKeepInPlace(object, brush->GetCenter(), split.GetCenter());
+	out_kept = kept.ToList();
+	out_split = split.ToList();
 
 	return true;
 }
 
 Brush Blockout::MakeWorldBox(const Vec3f& min, const Vec3f& max, Vec3f& out_position) const
 {
-	out_position = (min + max) * 0.5f;
+	BrushPlaneBuffer planes;
+	planes.Count = rx_blockout_world_box(&min.mData[0], &max.mData[0], planes.Planes, Brush::scMaxPlanes,
+										 &out_position.mData[0]);
 
-	const Vec3f half_size = (max - min) * 0.5f;
-
-	Brush brush = Brush::FromBox(-half_size, half_size);
-	brush.AlignTexturesToWorld(out_position);
-
-	return brush;
+	return Brush::FromPlanes(planes.ToList());
 }
 
 void Blockout::ShowPreview(const Vec3f& position, const Quat& rotation, const Brush& brush)
@@ -283,19 +264,17 @@ void Blockout::ShowPreview(const Vec3f& position, const Quat& rotation, const Br
 		return;
 	}
 
-	bool is_same_brush = (brush.Planes.Size == mPreviewPlanes.Size);
+	const BrushPlaneBuffer planes(brush.Planes);
+	const BrushPlaneBuffer previous(mPreviewPlanes);
 
-	for (uint32 i = 0; is_same_brush && i < brush.Planes.Size; i++) {
-		is_same_brush = brush.Planes[i].Normal.IsCloseTo(mPreviewPlanes[i].Normal, 0.0f) &&
-						brush.Planes[i].Distance == mPreviewPlanes[i].Distance;
-	}
+	const bool is_same_brush = rx_blockout_same_planes(planes.Planes, planes.Count, previous.Planes, previous.Count);
 
 	// Only rebuild the mesh when the brush changes, as dragging mostly moves it between the same few snapped sizes
 	if (!is_same_brush) {
 		Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
 		brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices);
 
-		pPreviewObject->pMesh = mesh->AsDefaultMesh();
+		pPreviewObject->SetMesh(mesh->AsDefaultMesh());
 		pPreviewObject->Bounds.Min = brush.GetBoundsMin();
 		pPreviewObject->Bounds.Max = brush.GetBoundsMax();
 		pPreviewObject->SetRotationOrigin(-brush.GetCenter());
@@ -321,32 +300,20 @@ bool Blockout::GetFaceTextureEdit(Object* object, const Vec3f& face_normal, eFac
 		return false;
 	}
 
-	const int32 plane_index = brush->FindPlane(face_normal);
-	if (plane_index == Brush::scNoPlane) {
+	const BrushPlaneBuffer planes(brush->Planes);
+	BrushPlaneBuffer edited;
+
+	const float32 amount_values[2] = { amount.X, amount.Y };
+
+	edited.Count = rx_blockout_edit_face_texture(planes.Planes, planes.Count, &face_normal.mData[0],
+												 static_cast<uint32>(edit), amount_values, edited.Planes,
+												 Brush::scMaxPlanes);
+
+	if (edited.Count == 0) {
 		return false;
 	}
 
-	out_planes = brush->Planes;
-	BrushFaceTexture& texture = out_planes[plane_index].Texture;
-
-	switch (edit) {
-	case eFaceTextureEdit::Shift:
-		texture.Offset = texture.Offset + amount;
-		break;
-	case eFaceTextureEdit::Scale:
-		texture.Scale = texture.Scale * amount;
-		break;
-	case eFaceTextureEdit::Rotate:
-		texture.Rotation = std::fmod(texture.Rotation + amount.X + scDegreesPerTurn, scDegreesPerTurn);
-		break;
-	case eFaceTextureEdit::Reset: {
-		// The default layout depends on the brush's bounds, so let the brush work it out
-		Brush reset = Brush::FromPlanes(out_planes);
-		reset.ResetFaceTexture(static_cast<uint32>(plane_index));
-		out_planes = reset.Planes;
-		break;
-	}
-	}
+	out_planes = edited.ToList();
 
 	return true;
 }
@@ -354,9 +321,9 @@ bool Blockout::GetFaceTextureEdit(Object* object, const Vec3f& face_normal, eFac
 Object* Blockout::RaycastBlockout(const Vec3f& origin, const Vec3f& direction, Vec3f& out_face_normal)
 {
 	// Sorted nearest first
-	SizedArray<JPH::BodyID> hits = gPhysics->pBackend->RaycastObjects(origin, direction);
+	SizedArray<physics::BodyHandle> hits = gPhysics->pBackend->RaycastObjects(origin, direction);
 
-	for (const JPH::BodyID& body_id : hits) {
+	for (const physics::BodyHandle& body_id : hits) {
 		physics::Body* body = gPhysics->FindBody(body_id);
 		if (body == nullptr) {
 			continue;
@@ -495,7 +462,7 @@ void Blockout::ApplyBrush(Object* object, Brush&& brush, physics::eMotionType mo
 	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
 	brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices);
 
-	object->pMesh = mesh->AsDefaultMesh();
+	object->SetMesh(mesh->AsDefaultMesh());
 
 	object->Bounds.Min = brush.GetBoundsMin();
 	object->Bounds.Max = brush.GetBoundsMax();
@@ -538,44 +505,14 @@ void Blockout::ApplyBrush(Object* object, Brush&& brush, physics::eMotionType mo
 
 Brush Blockout::MakeBrush(const RxLevelBlock& block) const
 {
-	if (block.brush_kind == RX_LEVEL_BRUSH_BOX) {
-		return Brush::FromBox(Vec3f(block.box_min), Vec3f(block.box_max));
-	}
+	BrushPlaneBuffer planes;
+	planes.Count = rx_blockout_make_planes(&block, planes.Planes, Brush::scMaxPlanes);
 
-	if (block.brush_kind != RX_LEVEL_BRUSH_PLANES) {
+	if (planes.Count == 0) {
 		return {};
 	}
 
-	Brush::PlaneList planes;
-
-	for (uint32 i = 0; i < block.plane_count; i++) {
-		const RxLevelPlane& source = block.planes[i];
-
-		BrushPlane plane {
-			.Normal = Vec3f(source.normal),
-			.Distance = source.distance,
-		};
-
-		if (source.has_texture) {
-			plane.Texture.Offset = Vec2f(source.offset[0], source.offset[1]);
-			plane.Texture.Scale = Vec2f(source.scale[0], source.scale[1]);
-			plane.Texture.Rotation = source.rotation;
-		}
-
-		planes.Insert(plane);
-	}
-
-	if (block.has_textures) {
-		return Brush::FromPlanes(planes);
-	}
-
-	Brush brush = Brush::FromPlanes(planes);
-
-	for (uint32 i = 0; i < brush.Planes.Size; i++) {
-		brush.ResetFaceTexture(i);
-	}
-
-	return brush;
+	return Brush::FromPlanes(planes.ToList());
 }
 
 ObjectID Blockout::CreateBrushObject(const RxLevelBlock& block)
@@ -1111,7 +1048,11 @@ bool Blockout::WriteLevelFile(const String& path)
 		out.name_length = object->Name.Get().size();
 		CopyVec3(out.position, object->mPosition);
 
-		if (brush == nullptr || (brush->IsBox() && brush->HasDefaultTextures())) {
+		const uint32 shape = (brush != nullptr) ? rx_blockout_save_shape(BrushPlaneBuffer(brush->Planes).Planes,
+																			brush->Planes.Size)
+												: RX_BLOCKOUT_SHAPE_BOX;
+
+		if ((shape & RX_BLOCKOUT_SHAPE_BOX) != 0) {
 			out.brush_kind = RX_LEVEL_BRUSH_BOX;
 			out.box_extents[0] = -object->Bounds.Min.X;
 			out.box_extents[1] = object->Bounds.Max.X;
@@ -1141,7 +1082,7 @@ bool Blockout::WriteLevelFile(const String& path)
 
 			out.planes = planes.data();
 			out.plane_count = static_cast<uint32>(planes.size());
-			out.textures = brush->HasDefaultTextures() ? 0 : 1;
+			out.textures = (shape & RX_BLOCKOUT_SHAPE_TEXTURES) != 0 ? 1 : 0;
 		}
 
 		out.rotation[0] = object->mRotation.X;

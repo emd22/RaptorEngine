@@ -1,177 +1,67 @@
 #pragma once
 
-#include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
 #include <Math/Vec2.hpp>
 #include <Util/Key.hpp>
-#include <cstring>
-
-union SDL_Event;
+#include <raptor_ffi.h>
 
 namespace fx {
 
-// Forward Declarations
-class Control;
-
 class ControlManager
 {
-private:
-	friend void CheckKeyForContinuedPress(Control* key);
-
 public:
-	static const uint32 scMaxKeys = static_cast<uint32>(eKey::FX_KEY_MAX);
+	using WindowEventFunc = void (*)();
 
-	ControlManager() = default;
-
-	static void Init();
+	static void Init() {}
 
 	static ControlManager& GetInstance();
 
 	static void CaptureMouse();
 	static void ReleaseMouse();
-	static bool IsMouseLocked();
+	static bool IsMouseLocked() { return rx_controls_mouse_captured() != 0; }
 
-	static Vec2f& GetMouseDelta();
+	static Vec2f GetMouseDelta();
 
-	/**
-	 * Check if a key is currently pressed.
-	 */
-	static bool IsKeyDown(eKey scancode);
+	static bool IsKeyDown(eKey scancode) { return rx_controls_is_down(static_cast<uint32>(scancode)) != 0; }
+	static bool IsKeyUp(eKey scancode) { return rx_controls_is_up(static_cast<uint32>(scancode)) != 0; }
+	static bool IsKeyPressed(eKey scancode) { return rx_controls_is_pressed(static_cast<uint32>(scancode)) != 0; }
 
-	/**
-	 * Check if a key is currently released.
-	 */
-	static bool IsKeyUp(eKey scancode);
-
-	/**
-	 * Check if a key was pressed once.
-	 *
-	 * This returns `true` if the key was pressed for the first time
-	 * during this frame. It will return `false` if the key was already pressed
-	 * before this frame or if it was released during this frame.
-	 *
-	 * - Any occurances of this function called during the frame will return true.
-	 *
-	 * *NOTE:* The current "scope" for currently pressed keys is reset or begun on
-	 * a call to `ControlManager::Update`. As well, if this function
-	 * is not called within the bounds of *every* `::Update` call, then
-	 * the bit that determines if the key is on the next frame returns false positives.
-	 * This *ONLY* pertains to if the key is held down.
-	 */
-	static bool IsKeyPressed(eKey scancode);
-
-	/**
-	 * Checks if a combination of keys is currently pressed down.
-	 */
 	template <std::same_as<eKey>... KeyV>
 	static bool IsComboDown(KeyV... keys)
 	{
 		return (IsKeyDown(keys) && ...);
 	}
 
-	/**
-	 * Checks if a combination of keys is no longer pressed.
-	 */
 	template <std::same_as<eKey>... KeyV>
 	static bool IsComboUp(KeyV... keys)
 	{
 		return (IsKeyUp(keys) && ...);
 	}
 
-	/**
-	 * Checks if a combination of keys have just been pressed down.
-	 *
-	 * This function will only return true if at least one of the keys satisifies `IsKeyPressed()`,
-	 * and all of the keys are pressed down.
-	 */
 	template <std::same_as<eKey>... KeyV>
 	static bool IsComboPressed(KeyV... keys)
 	{
-		// If all keys are down and at least one key has just been pressed, then return true
 		return (IsKeyDown(keys) && ...) && (IsKeyPressed(keys) || ...);
 	}
 
-	/**
-	 * Get a pointer to the control associated with the given keycode.
-	 * Returns `nullptr` if the keycode does not exist or is out of range.
-	 */
-	static Control* GetKey(eKey scancode);
+	static char GetAlphaKey() { return static_cast<char>(rx_controls_typed_char()); }
 
-	static char GetAlphaKey();
-
-	static void ResetKey(eKey scancode);
-
-	////////////////////////////////
-	// Update functions
-	////////////////////////////////
+	static void ResetKey(eKey scancode) { rx_controls_reset_key(static_cast<uint32>(scancode)); }
 
 	static void Update();
 
-	////////////////////////////////
-	// External input
-	////////////////////////////////
-
-	/// Feeds a key or mouse button change from a window that doesn't go through SDL (the editor viewport)
-	static void PostButtonEvent(eKey key_id, bool is_now_down);
-
-	/// Feeds relative mouse movement from a window that doesn't go through SDL (the editor viewport)
-	static void PostMouseMotion(const Vec2f& delta);
-
-	/// Lifts every key and button, for when the window loses focus and won't see the key up events
-	static void ReleaseAllKeys();
-
-	/// Lifts every standard (non-modifier) key. macOS doesn't deliver key-up events for other keys while Cmd is held,
-	/// so the editor viewport calls this once Cmd itself comes back up to flush anything left stuck down.
-	static void ReleaseNonModifierKeys();
-
-private:
-	static void UpdateFromKeyboardEvent(SDL_Event* event);
-	static void UpdateFromMouseButtonEvent(SDL_Event* event);
-	static void UpdateFromMouseMoveEvent(SDL_Event* event);
-
-	// General, used by UpdateFromKeyboardEvent and UpdateFromMouseButtonEvent
-	static void UpdateButtonFromEvent(eKey key_id, bool is_now_down);
-
-public:
-	using WindowEventFunc = void (*)();
-
-	WindowEventFunc OnQuit;
-
-private:
-	SizedArray<Control> mKeyMap;
-	bool mMouseCaptured = false;
-
-	Vec2f mMouseDelta = Vec2f::sZero;
-	Vec2f mCapturedMousePos = Vec2f::sZero;
-
-	uint8 mThisTick : 1 = 0;
-};
-
-class Control
-{
-private:
-	friend void CheckKeyForContinuedPress(Control* control);
-	friend class ControlManager;
-
-public:
-public:
-	inline bool IsKeyDown() const { return mbKeyDown; }
-	inline bool IsKeyUp() const { return !mbKeyDown; }
-
-	inline bool IsContinuedPress() const { return mbContinuedPress; }
-
-	inline void Reset()
+	static void PostButtonEvent(eKey key_id, bool is_now_down)
 	{
-		mbContinuedPress = false;
-		mbKeyDown = false;
+		rx_controls_post_button(static_cast<uint32>(key_id), is_now_down);
 	}
 
-	bool IsKeyPressed() const { return (IsKeyDown() && !IsContinuedPress()); }
+	static void PostMouseMotion(const Vec2f& delta) { rx_controls_post_mouse_motion(delta.X, delta.Y); }
 
-private:
-	uint8 mbContinuedPress : 1 = 0;
-	uint8 mbKeyDown : 1 = 0;
-	uint8 mbTickBit : 1 = 0;
+	static void ReleaseAllKeys() { rx_controls_release_all(); }
+	static void ReleaseNonModifierKeys() { rx_controls_release_non_modifiers(); }
+
+public:
+	WindowEventFunc OnQuit = nullptr;
 };
 
 } // namespace fx

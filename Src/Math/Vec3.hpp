@@ -14,11 +14,6 @@
 #include "SSEUtil.hpp"
 #endif
 
-namespace JPH {
-class Vec3;
-using RVec3 = Vec3;
-} // namespace JPH
-
 
 namespace fx {
 
@@ -41,7 +36,6 @@ public:
 	FX_FORCE_INLINE Vec3f(float32 x, float32 y, float32 z) : Vec3f(x, y, z, 0.0f) {}
 	FX_FORCE_INLINE Vec3f(float32 x, float32 y, float32 z, float32 w);
 	FX_FORCE_INLINE Vec3f(const float32* values);
-	Vec3f(const JPH::Vec3& other);
 
 	FX_FORCE_INLINE explicit Vec3f(float32 scalar);
 
@@ -64,9 +58,6 @@ public:
 
 
 	FX_FORCE_INLINE void Set(float32 x, float32 y, float32 z);
-
-	void ToJoltVec3(JPH::RVec3& jolt_vec) const;
-	void FromJoltVec3(const JPH::RVec3& jolt_vec);
 
 	static FX_FORCE_INLINE Vec3f FromDifference(const float32* a, const float32* b)
 	{
@@ -96,7 +87,6 @@ public:
 
 
 	FX_FORCE_INLINE bool operator==(const Vec3f& other) const;
-	bool operator==(const JPH::Vec3& other) const;
 
 	FX_FORCE_INLINE bool IsZero() const;
 	FX_FORCE_INLINE bool IsNearZero(const float32 tolerance = 0.00001) const;
@@ -104,7 +94,6 @@ public:
 #ifdef FX_USE_SIMD
 	FX_FORCE_INLINE bool IsCloseTo(const FLOAT4 other, const float32 tolerance = 0.00001) const;
 #endif
-	bool IsCloseTo(const JPH::Vec3& other, const float32 threshold = 0.001) const;
 
 	FX_FORCE_INLINE Vec3f Normalize() const;
 

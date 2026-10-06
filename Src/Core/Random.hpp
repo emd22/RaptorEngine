@@ -19,18 +19,14 @@ namespace fx {
 uint32 FastRand32();
 
 /**
- * @brief Generates a 64-bit random number using Xorshift.
+ * @brief Generates a random value in [0, 1).
  */
-uint64 FastRand64();
-
-
-/////////////////////////////////////
-// SIMD Functions
-/////////////////////////////////////
+float32 RandomUnit();
 
 /**
- * @brief Generates 4 PRNG values, returned in a platform specific vector.
+ * @brief Generates a random value in [-1, 1].
  */
-UINT4 FastRand4();
+float32 RandomSignedUnit();
+
 
 } // namespace fx

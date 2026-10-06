@@ -2,29 +2,35 @@
 
 #include "Script.hpp"
 
-#include <Core/FreeArray.hpp>
-
-struct StrataCompiler;
-
+#include <memory>
+#include <vector>
 
 namespace fx {
 
 class ScriptManager
 {
 public:
-	ScriptManager();
+	script::Script* LoadScript(const String& path)
+	{
+		mScripts.push_back(std::make_unique<script::Script>(path));
+		return mScripts.back().get();
+	}
 
-	script::Script* LoadScript(const String& path);
-	struct StrataCompiler* GetCompiler() { return mpCompiler; };
-	void FreeScript(script::Script* script);
+	void FreeScript(script::Script* script)
+	{
+		std::erase_if(mScripts, [script](const auto& owned) { return owned.get() == script; });
+	}
 
-	void ReloadAllScripts();
+	void ReloadAllScripts() { rx_script_reload_all(); }
 
-	~ScriptManager();
+	~ScriptManager()
+	{
+		mScripts.clear();
+		rx_script_shutdown();
+	}
 
 private:
-	struct StrataCompiler* mpCompiler = nullptr;
-	FreeArray<script::Script> mScripts;
+	std::vector<std::unique_ptr<script::Script>> mScripts;
 };
 
 } // namespace fx

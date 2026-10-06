@@ -1,10 +1,5 @@
 #include "Object.hpp"
 
-#include <ThirdParty/Jolt/Jolt.h>
-#include <ThirdParty/Jolt/Physics/Body/BodyCreationSettings.h>
-#include <ThirdParty/Jolt/Physics/Body/MotionType.h>
-#include <ThirdParty/Jolt/Physics/Collision/Shape/BoxShape.h>
-#include <ThirdParty/Jolt/Physics/EActivation.h>
 
 #include <Core/RefUtil.hpp>
 #include <Engine.hpp>
@@ -17,7 +12,6 @@
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/LightProbe.hpp>
-#include <Renderer/MeshUtil.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
 #include <World.hpp>
@@ -28,14 +22,6 @@
 namespace fx {
 
 using namespace renderer;
-
-Object::Object(const ObjectID id) { ID = id; }
-
-Object::Object(const ObjectID id, const MaterialID material)
-{
-	ID = id;
-	mMaterialID = material;
-}
 
 void Object::SetMaterial(const MaterialID& id)
 {
@@ -50,9 +36,28 @@ void Object::SetMaterial(const MaterialID& id)
 	// }
 }
 
-void Object::Create(const Ref<PrimitiveMesh>& mesh, const MaterialID& material)
+void Object::SetMesh(const Ref<PrimitiveMesh>& mesh)
 {
 	pMesh = mesh;
+
+	if (pMesh.IsValid()) {
+		Flags |= eObjectFlags::HasMesh;
+	}
+	else {
+		Flags &= ~eObjectFlags::HasMesh;
+	}
+
+	if (pMesh.IsValid() && pMesh->IsSkinned()) {
+		Flags |= eObjectFlags::Skinned;
+	}
+	else {
+		Flags &= ~eObjectFlags::Skinned;
+	}
+}
+
+void Object::Create(const Ref<PrimitiveMesh>& mesh, const MaterialID& material)
+{
+	SetMesh(mesh);
 
 	// Directly set the material to avoid the ol' `SetMaterial` curse
 	mMaterialID = material;
@@ -65,7 +70,7 @@ bool Object::CheckIfReady(bool require_material)
 	}
 
 	// This is not a container object, just check that the mesh is loaded
-	if (!pMesh || !pMesh->bIsReady) {
+	if (!pMesh || !pMesh->IsReady()) {
 		ClearFlag(Flags, eObjectFlags::ReadyToRender);
 		return false;
 	}
@@ -76,7 +81,7 @@ bool Object::CheckIfReady(bool require_material)
 	}
 
 	// Check material is ready
-	if (!material->bReadyToCheck.test()) {
+	if (!material->IsReadyToCheck()) {
 		return false;
 	}
 
@@ -117,7 +122,7 @@ void Object::OnAttached(World* scene)
 
 	// When the object is attached to the scene, enable physics if the physics object is active.
 	if (phys && phys->mbHasPhysicsBody) {
-		SetPhysicsEnabled(gPhysics->pBackend->GetBodyInterface().IsActive(phys->GetBodyID()));
+		SetPhysicsEnabled(rx_physics_is_active(gPhysics->pBackend->pWorld, phys->GetBodyID().Id) != 0);
 	}
 }
 
@@ -138,22 +143,6 @@ void Object::UpdateAnimation()
 	BoneBufferBase = skel.BoneBufferBase;
 }
 
-void Object::MakeInstanceOf(const ObjectID& source_id)
-{
-	Object* source_obj = gObjectManager->GetObject(source_id);
-
-	AssertMsg((source_obj->mInstanceSlots - source_obj->mInstanceSlotsInUse) > 0,
-			  "Object has no instance slots remaining! Did you reserve any instances on the source object?");
-
-
-	gObjectManager->DestroyObject(ID);
-	Flags |= eObjectFlags::IsInstance;
-
-	++source_obj->mInstanceSlotsInUse;
-
-	ID = ObjectID(source_obj->ID.GetID() + source_obj->mInstanceSlotsInUse);
-}
-
 struct SkeletonCloneMap
 {
 	std::vector<std::pair<const Skeleton*, Ref<Skeleton>>> Entries;
@@ -163,7 +152,7 @@ Object* Object::CloneNode(const std::string& name, SkeletonCloneMap& skeletons) 
 {
 	Object* clone = gObjectManager->NewObject(name, mMaterialID, Tags);
 
-	clone->pMesh = pMesh;
+	clone->SetMesh(pMesh);
 	clone->Bounds = Bounds;
 	clone->mPosition = mPosition;
 	clone->mRotation = mRotation;
@@ -191,8 +180,6 @@ Object* Object::CloneNode(const std::string& name, SkeletonCloneMap& skeletons) 
 	}
 
 	if (!AttachedNodes.IsEmpty()) {
-		clone->AttachedNodes.Create(8);
-
 		for (const ObjectID& child_id : AttachedNodes) {
 			const Object* child = gObjectManager->GetObject(child_id);
 
@@ -215,14 +202,6 @@ Object* Object::CloneWithOwnSkeleton(const std::string& name) const
 	SkeletonCloneMap skeletons;
 	return CloneNode(name, skeletons);
 }
-
-void Object::ReserveInstances(uint32 num)
-{
-	ID = gObjectManager->ReserveInstances(ID, num);
-	mInstanceSlots = num;
-	mInstanceSlotsInUse = 0;
-}
-
 
 void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 {
@@ -327,19 +306,17 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 
 bool Object::CanBeFrustumCulled() const
 {
-	if (!IsCullable() || !pMesh.IsValid() || mObjectLayer != eObjectLayer::WorldLayer) {
-		return false;
-	}
+	const RxCullInputs inputs = {
+		.cullable = IsCullable(),
+		.has_mesh = pMesh.IsValid(),
+		.world_layer = (mObjectLayer == eObjectLayer::WorldLayer),
+		.skinned = IsSkinned(),
+		.is_instance = HasFlag(Flags, eObjectFlags::IsInstance),
+		.physics_enabled = HasFlag(Flags, eObjectFlags::PhysicsEnabled),
+		.instance_slots_in_use = mInstanceSlotsInUse,
+	};
 
-	if (IsSkinned() || mInstanceSlotsInUse > 0 || HasFlag(Flags, eObjectFlags::IsInstance)) {
-		return false;
-	}
-
-	if (HasFlag(Flags, eObjectFlags::PhysicsEnabled)) {
-		return false;
-	}
-
-	return (Bounds.Max.X > Bounds.Min.X) || (Bounds.Max.Y > Bounds.Min.Y) || (Bounds.Max.Z > Bounds.Min.Z);
+	return rx_object_can_be_frustum_culled(&inputs, &Bounds.Min.mData[0], &Bounds.Max.mData[0]) != 0;
 }
 
 bool Object::IsOutsideFrustum(const Frustum& frustum, uint32 plane_mask)
@@ -356,16 +333,16 @@ void Object::Update()
 	if (HasFlag(Flags, eObjectFlags::PhysicsEnabled)) {
 		physics::Body* phys = gPhysics->GetBody(PhysicsID);
 
-		if (mbPhysicsTransformOutOfDate) {
+		if (IsPhysicsTransformOutOfDate()) {
 			phys->Teleport(mPosition, mRotation);
-			mbPhysicsTransformOutOfDate = false;
+			SetPhysicsTransformOutOfDate(false);
 		}
 
 		SyncObjectWithPhysics(phys);
 	}
 
 	// The transformation has changed, we should tell the worldgrid
-	if (mbMatrixOutOfDate) {
+	if (IsMatrixOutOfDate()) {
 		gWorldGrid->UpdateObject(this);
 	}
 
@@ -388,31 +365,12 @@ void Object::Update()
 
 float32 Object::GetDirectionScale(const Vec3f& direction)
 {
-	if (direction.IsCloseTo(simd::LoadFloat4(0.0f))) {
-		return 0.0f;
-	}
-
-	Vec3f dir = direction.Normalize();
-
-	Vec3f pos_extent = Bounds.Max;
-	Vec3f neg_extent = -Bounds.Min;
-
-	LogInfo("Bounds min: {}, Bounds Max: {}", Bounds.Min, Bounds.Max);
-
-	Vec3f extent((dir.X >= 0.0f) ? pos_extent.X : neg_extent.X, (dir.Y >= 0.0f) ? pos_extent.Y : neg_extent.Y,
-				 (dir.Z >= 0.0f) ? pos_extent.Z : neg_extent.Z);
-
-	float32 distance = dir.Abs().Dot(extent);
-	return distance * mScale;
+	return rx_object_direction_scale(&Bounds.Min.mData[0], &Bounds.Max.mData[0], mScale, &direction.mData[0]);
 }
 
 
 void Object::AttachObject(const ObjectID& attach_id)
 {
-	if (!AttachedNodes.IsInited()) {
-		AttachedNodes.Create(8);
-	}
-
 	Object* attached_object = gObjectManager->GetObject(attach_id);
 	attached_object->ParentID = ID;
 	attached_object->MoveBy(mPosition);
@@ -520,26 +478,18 @@ void Object::SetReflectionProbe(bool value)
 
 float32 Object::RaycastBounds(const Vec3f& origin, const Vec3f& direction, Vec3f& out_face)
 {
-	// Into the object's own space, so a rotated box is tested against the box it actually is rather than the
-	// looser one around it. An affine transform is linear in the ray parameter, so the distance that comes back
-	// is already in world metres.
-	const Mat4f inverse_model = GetWorldMatrix().Inverse();
+	const Mat4f& model = GetWorldMatrix();
 
-	const Vec4f local_origin = inverse_model * Vec4f(origin.X, origin.Y, origin.Z, 1.0f);
-	const Vec4f local_direction = inverse_model * Vec4f(direction.X, direction.Y, direction.Z, 0.0f);
-
-	const Ray ray(Vec3f(local_origin.X, local_origin.Y, local_origin.Z),
-				  Vec3f(local_direction.X, local_direction.Y, local_direction.Z));
-
-	return RayCast(ray, Bounds, out_face);
+	return rx_object_raycast_bounds(&Bounds.Min.mData[0], &Bounds.Max.mData[0], &model.Rows[0].mData[0],
+									&origin.mData[0], &direction.mData[0], &out_face.mData[0]);
 }
 
 bool Object::ContainsPoint(const Vec3f& point)
 {
-	const Vec4f local = GetWorldMatrix().Inverse() * Vec4f(point.X, point.Y, point.Z, 1.0f);
+	const Mat4f& model = GetWorldMatrix();
 
-	return local.X >= Bounds.Min.X && local.X <= Bounds.Max.X && local.Y >= Bounds.Min.Y && local.Y <= Bounds.Max.Y &&
-		   local.Z >= Bounds.Min.Z && local.Z <= Bounds.Max.Z;
+	return rx_object_contains_point(&Bounds.Min.mData[0], &Bounds.Max.mData[0], &model.Rows[0].mData[0],
+									&point.mData[0]) != 0;
 }
 
 void Object::SetBounds(const AABB& bounds)
@@ -561,15 +511,9 @@ void Object::SetBounds(const AABB& bounds)
 			break;
 		}
 
-		const OBB world_box = node->GetWorldOBB();
-		const Mat4f parent_inverse = parent->GetWorldMatrix().Inverse();
-
-		for (const Vec3f& corner : world_box.Corners) {
-			const Vec4f local = parent_inverse * Vec4f(corner.X, corner.Y, corner.Z, 1.0f);
-			const Vec3f local_corner(local.X, local.Y, local.Z);
-
-			parent->Bounds.Add(AABB(local_corner, local_corner));
-		}
+		rx_object_merge_child_bounds(&parent->Bounds.Min.mData[0], &parent->Bounds.Max.mData[0],
+									 &parent->GetWorldMatrix().Rows[0].mData[0], &node->Bounds.Min.mData[0],
+									 &node->Bounds.Max.mData[0], &node->GetWorldMatrix().Rows[0].mData[0]);
 
 		node = parent;
 	}
@@ -650,12 +594,12 @@ void Object::SetPhysicsEnabled(bool enabled)
 
 	if (enabled) {
 		LogInfo("Activate physics body");
-		gPhysics->pBackend->GetBodyInterface().ActivateBody(phys->GetBodyID());
+		rx_physics_activate(gPhysics->pBackend->pWorld, phys->GetBodyID().Id);
 		SetFlag(Flags, eObjectFlags::PhysicsEnabled);
 	}
 	else {
 		LogInfo("Deactivate physics body");
-		gPhysics->pBackend->GetBodyInterface().DeactivateBody(phys->GetBodyID());
+		rx_physics_deactivate(gPhysics->pBackend->pWorld, phys->GetBodyID().Id);
 		ClearFlag(Flags, eObjectFlags::PhysicsEnabled);
 	}
 }
@@ -671,7 +615,7 @@ void Object::PrintDebug() const
 	if ((phys = gPhysics->GetBody(PhysicsID))) {
 		bool has_body = phys->mbHasPhysicsBody;
 		LogInfo(LC_CORE, "\tHasPhys?={}, Enabled?={}, Id={}, Type={}", has_body,
-				HasFlag(Flags, eObjectFlags::PhysicsEnabled), phys->GetBodyID().GetIndex(),
+				HasFlag(Flags, eObjectFlags::PhysicsEnabled), (phys->GetBodyID().Id & 0x7FFFFF),
 				(phys->GetMotionType() == physics::eMotionType::Static) ? "Static" : "Dynamic");
 	}
 
@@ -679,7 +623,7 @@ void Object::PrintDebug() const
 			HasFlag(Flags, eObjectFlags::IsInstance),	 /* */
 			HasFlag(Flags, eObjectFlags::ReadyToRender), /* */
 			HasFlag(Flags, eObjectFlags::ShadowCaster),	 /* */
-			(pMesh && pMesh->VertexList.IsSkinned()));
+			(pMesh && pMesh->IsSkinned()));
 
 	LogInfo(LC_CORE, "}}");
 
@@ -715,3 +659,20 @@ void Object::Destroy()
 
 
 } // namespace fx
+
+namespace fx {
+
+static_assert(sizeof(AABB) == 2 * sizeof(Vec3f));
+static_assert(sizeof(physics::BodyID) == sizeof(uint32));
+static_assert(sizeof(MaterialID) == sizeof(uint32));
+static_assert(sizeof(eObjectTag) == sizeof(uint32));
+static_assert(sizeof(eObjectFlags) == sizeof(uint16));
+static_assert(sizeof(eObjectLayer) == sizeof(uint32));
+static_assert(offsetof(RxObjectCore, bounds_max) == sizeof(Vec3f));
+static_assert(offsetof(RxObjectCore, tags) == 32);
+static_assert(offsetof(RxObjectCore, layer) == 52);
+static_assert(offsetof(RxObjectCore, flags) == 56);
+
+} // namespace fx
+
+static_assert(sizeof(fx::ObjectID) == sizeof(fx::uint32));

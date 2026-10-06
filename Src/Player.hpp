@@ -17,17 +17,8 @@ class Object;
 
 class Player
 {
-	const Vec3f scMaxWalkSpeed = Vec3f(3.8f);
-	const Vec3f scMaxSprintSpeed = Vec3f(5.0f);
-
-	static constexpr float32 scMovementLerpSpeed = 10.0f;
-
 	// TODO: Break these out into config vars
-	static constexpr float32 scSprintFov = 85.0f;
 	static constexpr float32 scWalkingFov = 80.0f;
-
-	/// Roll per radian of yaw sway, so the view model banks into horizontal turns.
-	static constexpr float32 scViewModelSwayRoll = 1.25f;
 
 	static constexpr const char* scViewModelIdleAnim = "IDLE";
 	static constexpr const char* scViewModelFireAnim = "Armature|Fire";
@@ -35,11 +26,12 @@ class Player
 
 	static constexpr float32 scDefaultViewKickDegrees = 2.5f;
 	static constexpr float32 scDefaultViewKickback = 0.025f;
-	static constexpr float32 scHolsterDrop = 0.35f;
-	static constexpr float32 scHolsterPitch = 0.6f;
 
 public:
-	Player() = default;
+	Player();
+
+	Player(const Player&) = delete;
+	Player& operator=(const Player&) = delete;
 
 	void Create();
 
@@ -50,10 +42,10 @@ public:
 	void DoReloadAnimation();
 
 	void SetViewModelAnimations(const char* idle, const char* fire, const char* reload);
-	void SetViewModelHolster(float32 amount) { mViewModelHolster = amount; }
+	void SetViewModelHolster(float32 amount) { mpState->holster = amount; }
 
 	void AddRecoil(float32 pitch, float32 yaw);
-	void SetRecoilRecovery(float32 rate_per_second) { mRecoil.recovery = rate_per_second; }
+	void SetRecoilRecovery(float32 rate_per_second) { mpState->recoil.recovery = rate_per_second; }
 
 	void Jump();
 
@@ -78,52 +70,21 @@ public:
 	}
 
 	void SetFlyMode(bool value);
-	bool IsFlyMode() const { return Physics.bDisableGravity; };
+	bool IsFlyMode() const { return Physics.IsGravityDisabled(); }
 
 	void Move(float64 delta_time, const Vec3f& offset);
 
 	void RotateHead(const Vec2f& xy);
 
-	FX_FORCE_INLINE Vec3f GetBob() const { return Vec3f(mHeadBobX, mHeadBobY, 0.0f); }
-
-	~Player();
+	~Player() { rx_player_state_free(mpState); }
 
 private:
-	FX_FORCE_INLINE void RequireDirectionUpdate() { mbUpdateDirection = true; }
-	FX_FORCE_INLINE void RequirePhysicsUpdate() { mbUpdatePhysicsTransform = true; }
-
-	FX_FORCE_INLINE void MarkApplyingUserForce() { mbIsApplyingUserForce = true; }
-
 	void UpdateViewModel(double delta_time);
-	void RotateCamera(const Vec2f& xy);
-	void UpdateRecoil(float32 delta_time);
-	void UpdateViewKick(float32 delta_time);
-	void UpdateViewModelSway(float32 delta_time);
 
-	FX_FORCE_INLINE void UpdateDirection()
-	{
-		if (!mbUpdateDirection) {
-			return;
-		}
+	FX_FORCE_INLINE void SyncPhysicsToPlayer() { Position = Physics.GetPosition(); }
 
-		float32 s_anglex, c_anglex;
-		MathUtil::SinCos(pCamera->mAngleX, &s_anglex, &c_anglex);
-
-		MovementDirection.Set(s_anglex, 0.0f, c_anglex);
-		if (mbIsFlymode) {
-			MovementDirection.Y = sin(pCamera->mAngleY);
-		}
-
-		// MovementDirection = Vec3f(c_angley, s_angley, c_angley) * MovementDirection;
-		// Clear the movement direction's Y. This is because sin(mAngleY) = 0 when mAngleY is zero.
-		// MovementDirection.Y = 0.0f;
-
-		// CameraDirection.NormalizeIP();
-
-		mbUpdateDirection = false;
-	}
-
-	FX_FORCE_INLINE void SyncPhysicsToPlayer() { Position.FromJoltVec3(Physics.pPlayerVirt->GetPosition()); }
+private:
+	RxPlayerState* mpState = rx_player_state_new();
 
 public:
 	physics::PhysicsPlayer Physics;
@@ -133,35 +94,20 @@ public:
 	 * @brief The direction that the player is facing. This is the direction the player moves in and disregards the
 	 * pitch of the camera.
 	 */
-	Vec3f MovementDirection = Vec3f::sForward;
-	Vec3f Position = Vec3f::sZero;
+	Vec3f& MovementDirection = *reinterpret_cast<Vec3f*>(mpState->movement_direction);
+	Vec3f& Position = *reinterpret_cast<Vec3f*>(mpState->position);
 
-	Vec3f mViewModelOffset = Vec3f::sZero;
+	float32& JumpForce = mpState->jump_force;
 
-	float JumpForce = 0.0f;
+	bool& bIsSprinting = *reinterpret_cast<bool*>(&mpState->sprinting);
 
-	bool bIsSprinting : 1 = false;
+	Vec2f& HeadBobStrength = *reinterpret_cast<Vec2f*>(mpState->head_bob_strength);
 
-	Vec2f HeadBobStrength = Vec2f { 0.011, 0.018 };
-
-	float32 SpeedMultiplier = 1.0f;
-
-
-	float32 mBobCounterY = 0.0f;
+	float32& SpeedMultiplier = mpState->speed_multiplier;
 
 	weapon::WeaponSystem Weapons;
 
 private:
-	float32 mHeadBobX = 0.0f;
-	float32 mHeadBobY = 0.0f;
-
-	Vec3f mCameraOffset = Vec3f::sZero;
-
-	Vec3f mMovementGoal = Vec3f::sZero;
-	Vec3f mCameraGoal = Vec3f::sZero;
-
-	Vec3f mUserForce = Vec3f::sZero;
-
 	enum eViewKickChannel : uint32
 	{
 		ViewKickPitch,
@@ -173,35 +119,13 @@ private:
 
 	static_assert(ViewKickChannelCount == 4);
 
-	RxViewKick mViewKick {};
-
-	bool mbIsFiring = false;
-
 	String mIdleAnim = scViewModelIdleAnim;
 	String mFireAnim = scViewModelFireAnim;
 	String mReloadAnim = scViewModelReloadAnim;
 
-	float32 mViewModelHolster = 0.0f;
-
-	RxRecoil mRecoil {};
-
-
 	Object* mpViewModel = nullptr;
 	/// Shared by every mesh in the view model. Null if the view model has no skeleton.
 	Ref<Skeleton> mpViewModelSkeleton { nullptr };
-
-	/**
-	 * @brief The view model's rotation: the camera's rotation with the sway applied in the camera's local space.
-	 */
-	Quat mViewModelRotation = Quat::scIdentity;
-	RxViewSway mViewSway {};
-
-	bool bBobReverse = false;
-	bool mbIsApplyingUserForce : 1 = false;
-	bool mbUpdateDirection : 1 = true;
-	bool mbUpdatePhysicsTransform : 1 = true;
-
-	bool mbIsFlymode : 1 = false;
 };
 
 } // namespace fx

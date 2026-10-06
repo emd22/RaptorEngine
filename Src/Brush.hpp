@@ -11,6 +11,7 @@
 #include <Core/StackArray.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
+#include <raptor_ffi.h>
 
 struct RxBrushView;
 
@@ -146,6 +147,20 @@ private:
 
 	Vec3f mBoundsMin = Vec3f::sZero;
 	Vec3f mBoundsMax = Vec3f::sZero;
+};
+
+/**
+ * @brief A list of brush planes laid out for the Rust brush edit functions, which read and write planes this way
+ */
+struct BrushPlaneBuffer
+{
+	BrushPlaneBuffer() = default;
+	explicit BrushPlaneBuffer(const Brush::PlaneList& planes);
+
+	Brush::PlaneList ToList() const;
+
+	RxBrushPlane Planes[Brush::scMaxPlanes] = {};
+	size_t Count = 0;
 };
 
 } // namespace fx

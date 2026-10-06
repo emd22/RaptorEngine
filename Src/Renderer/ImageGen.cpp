@@ -4,7 +4,6 @@
 #include "Globals.hpp"
 #include "GraphicsBackend.hpp"
 
-#include <Asset/Loader/Image/LoaderStb.hpp>
 #include <Core/Random.hpp>
 #include <Math/SIMDHelper.hpp>
 #include <Texture/TextureManager.hpp>
@@ -29,10 +28,8 @@ Image* Random(Vec2u size)
 	SizedArray<uint32> pixel_data;
 	pixel_data.InitSize(total_image_size);
 
-	for (uint64 i = 0; i < pixel_data.Size; i += 4ULL) {
-		// Generate 4 random values
-		UINT4 rv = FastRand4();
-		simd::StoreUInt4(pixel_data.pData + i, rv);
+	for (uint64 i = 0; i < pixel_data.Size; i++) {
+		pixel_data[i] = FastRand32();
 	}
 
 	// loader::LoaderStb::SaveToFile(eImageSaveFormat::Jpeg,

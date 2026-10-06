@@ -25,9 +25,6 @@ extern WorldGrid* gWorldGrid;
 class TextureManager;
 extern TextureManager* gTextureManager;
 
-class ThreadManager;
-extern ThreadManager* gThreadManager;
-
 class ScriptManager;
 extern ScriptManager* gScriptManager;
 

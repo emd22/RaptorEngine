@@ -2,8 +2,6 @@
 
 #ifdef FX_USE_NEON
 
-#include <ThirdParty/Jolt/Jolt.h>
-#include <ThirdParty/Jolt/Math/Real.h>
 #include <arm_neon.h>
 
 #include <Core/Log.hpp>
@@ -23,7 +21,6 @@ const Vec3f Vec3f::sRight = Vec3f(1.0f, 0.0f, 0.0f);
 const Vec3f Vec3f::sForward = Vec3f(0.0f, 0.0f, 1.0f);
 
 
-Vec3f::Vec3f(const JPH::Vec3& other) { FromJoltVec3(other); }
 Vec3f::Vec3f(const Vec4f& other) { mIntrin = other.mIntrin; }
 
 
@@ -58,16 +55,9 @@ Vec3f Vec3f::Rotate(const Quat& rotation) const
 
 Vec3f Vec3f::Cross(const Vec3f& other) const { return Vec3f(Neon::Cross(mIntrin, other.mIntrin)); }
 
-void Vec3f::ToJoltVec3(JPH::RVec3& jolt_vec) const { jolt_vec.mValue = mIntrin; }
-void Vec3f::FromJoltVec3(const JPH::RVec3& jolt_vec) { mIntrin = jolt_vec.mValue; }
-
-bool Vec3f::IsCloseTo(const JPH::Vec3& other, const float32 tolerance) const
-{
-	return IsCloseTo(other.mValue, tolerance);
-}
 
 
-bool Vec3f::operator==(const JPH::Vec3& other) const { return (*this) == Vec3f(other.mValue); }
+
 
 } // namespace fx
 

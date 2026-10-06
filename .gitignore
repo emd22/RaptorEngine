@@ -64,3 +64,9 @@ strata_struct_test.o
 cache/shaders
 aarch64
 raptor_cpp.RelWithDebInfo.link
+
+rust-target-*
+
+*.md
+!README.md
+!docs/*.md

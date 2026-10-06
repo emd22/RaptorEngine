@@ -2,8 +2,6 @@
 
 #ifdef FX_NO_SIMD
 
-#include <ThirdParty/Jolt/Jolt.h>
-#include <ThirdParty/Jolt/Math/Real.h>
 
 #include <Math/Vec3.hpp>
 
@@ -16,7 +14,6 @@ const Vec3f Vec3f::sUp = Vec3f(0.0f, 1.0f, 0.0f);
 const Vec3f Vec3f::sRight = Vec3f(1.0f, 0.0f, 0.0f);
 const Vec3f Vec3f::sForward = Vec3f(0.0f, 0.0f, 1.0f);
 
-Vec3f::Vec3f(const JPH::Vec3& other) { FromJoltVec3(other); }
 
 
 void Vec3f::Print() const { LogInfo("Vec3f {{ X={:.6f}, Y={:.6f}, Z={:.6f} }}", X, Y, Z); }
@@ -57,25 +54,9 @@ float32 Vec3f::Dot(const Vec3f& other) const
     return result;
 }
 
-void Vec3f::ToJoltVec3(JPH::RVec3& jolt_vec) const
-{
-    jolt_vec.SetX(X);
-    jolt_vec.SetY(Y);
-    jolt_vec.SetZ(Z);
-}
-
-void Vec3f::FromJoltVec3(const JPH::RVec3& jolt_vec)
-{
-    X = jolt_vec.GetX();
-    Y = jolt_vec.GetY();
-    Z = jolt_vec.GetZ();
-}
 
 
-bool Vec3f::IsCloseTo(const JPH::Vec3& other, const float32 threshold) const
-{
-    return IsCloseTo(Vec3f(other), threshold);
-}
+
 
 
 //////////////////////////////
@@ -83,7 +64,6 @@ bool Vec3f::IsCloseTo(const JPH::Vec3& other, const float32 threshold) const
 //////////////////////////////
 
 
-bool Vec3f::operator==(const JPH::Vec3& other) const { return (*this) == Vec3f(other); }
 
 } // namespace fx
 

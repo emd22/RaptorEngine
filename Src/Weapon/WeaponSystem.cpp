@@ -337,9 +337,8 @@ void WeaponSystem::Update(float32 delta_time)
 	Weapon& weapon = mWeapons[mActive];
 
 	if (weapon.pFnUpdate != nullptr) {
-		const JPH::Vec3 velocity = mpPlayer->Physics.pPlayerVirt->GetLinearVelocity();
-		const float32 horizontal_speed = std::sqrt(velocity.GetX() * velocity.GetX() +
-												   velocity.GetZ() * velocity.GetZ());
+		const Vec3f velocity = mpPlayer->Physics.GetLinearVelocity();
+		const float32 horizontal_speed = std::sqrt(velocity.X * velocity.X + velocity.Z * velocity.Z);
 
 		if ((mScriptInput.InputFlags & eWeaponInputFlags::FireHeld) != 0 && mbFireLatched) {
 			SetFlag(mScriptInput.InputFlags, eWeaponInputFlags::FireHeld);
@@ -348,7 +347,7 @@ void WeaponSystem::Update(float32 delta_time)
 			ClearFlag(mScriptInput.InputFlags, eWeaponInputFlags::FireHeld);
 		}
 
-		if (!mpPlayer->Physics.bIsGrounded && !mpPlayer->IsFlyMode()) {
+		if (!mpPlayer->Physics.IsGrounded() && !mpPlayer->IsFlyMode()) {
 			mScriptInput.InputFlags |= eWeaponInputFlags::Airborne;
 		}
 
@@ -416,10 +415,10 @@ void WeaponSystem::ApplyHit(float32 damage, float32 force, bool decal)
 		return;
 	}
 
-	JPH::BodyInterface& bodies = gPhysics->pBackend->GetBodyInterface();
-	const JPH::EMotionType motion = bodies.GetMotionType(mLastHit.Body);
+	RxPhysicsWorld* world = gPhysics->pBackend->pWorld;
+	const uint32 hit_body_id = mLastHit.Body.Id;
 
-	const bool is_static = (motion == JPH::EMotionType::Static);
+	const bool is_static = (rx_physics_is_dynamic(world, hit_body_id) == 0);
 
 	physics::Body* hit_body = gPhysics->FindBody(mLastHit.Body);
 	const Object* hit_object = (hit_body != nullptr) ? gObjectManager->GetObject(hit_body->GetObjectID()) : nullptr;
@@ -437,17 +436,14 @@ void WeaponSystem::ApplyHit(float32 damage, float32 force, bool decal)
 	}
 
 	if (!is_static && force > 0.0f) {
-		bodies.ActivateBody(mLastHit.Body);
-		bodies.AddImpulse(mLastHit.Body,
-						  JPH::Vec3(mLastDirection.X * force, mLastDirection.Y * force, mLastDirection.Z * force));
+		const float32 impulse[3] = { mLastDirection.X * force, mLastDirection.Y * force, mLastDirection.Z * force };
+		rx_physics_push(world, hit_body_id, impulse);
 	}
 
 	if (gCVars->Get("b_weapon_debug", false)) {
 		LogInfo(LC_SCRIPT, "hit for {:.1f} damage at {}", damage, mLastHit.Point);
 	}
 }
-
-static float32 RandomUnit() { return static_cast<float32>(FastRand32() >> 8) * (1.0f / 16777216.0f); }
 
 void WeaponSystem::SpawnBloodSplatter(bool is_static)
 {

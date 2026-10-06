@@ -23,30 +23,14 @@ namespace fx::renderer {
 
 void Pipeline::Bind(const CommandBuffer& cmd) const
 {
-	const VkPipeline pipeline = Get();
-
-	if (pipeline == cmd.pBoundPipeline) {
-		return;
-	}
-
-	RxGpuDevice* device = gGraphics->GetDevice()->GetRustDevice();
-
-	rx_gpu_cmd_bind_pipeline(device, cmd.Cmd, GetBindPoint(), RxRaw(pipeline));
-
-	if (!IsCompute()) {
-		rx_gpu_cmd_set_cull_mode(device, cmd.Cmd, GetDefaultCullMode());
-	}
-
-	cmd.pBoundPipeline = pipeline;
+	rx_gpu_cmd_bind_pipeline_cached(gGraphics->GetDevice()->GetRustDevice(), cmd.Cmd, &cmd.BoundPipeline,
+									GetBindPoint(), pipeline, IsCompute(), default_cull_mode);
 }
 
 void Pipeline::SetDoubleSided(const CommandBuffer& cmd, bool double_sided) const
 {
-	if (!IsCompute()) {
-		rx_gpu_cmd_set_cull_mode(gGraphics->GetDevice()->GetRustDevice(), cmd.Cmd,
-								 double_sided ? VK_CULL_MODE_NONE : GetDefaultCullMode());
-	}
+	rx_gpu_cmd_set_double_sided(gGraphics->GetDevice()->GetRustDevice(), cmd.Cmd, IsCompute(), default_cull_mode,
+								double_sided);
 }
-
 
 } // namespace fx::renderer

@@ -77,6 +77,8 @@ class LightBase;
 class WorldGrid
 {
 public:
+	RxWorldGrid* GetRust() const { return mpGrid; }
+
 	static constexpr TileIndex scGlobalTileIndex = RX_WORLD_GRID_GLOBAL_TILE;
 
 public:

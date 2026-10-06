@@ -1,5 +1,6 @@
 #include "ObjectManager.hpp"
 
+#include <Core/Hash.hpp>
 #include <Engine.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Math/Mat4.hpp>
@@ -19,7 +20,7 @@ void ObjectManager::Create()
 {
 	using namespace renderer;
 
-	mObjectList.Init(scMaxObjects);
+	mpStorage = static_cast<uint8*>(std::malloc(sizeof(Object) * scMaxObjects));
 
 	uint32 buffer_size = (sizeof(ObjectGpuEntry) * scMaxObjects) * renderer::FramesInFlight;
 
@@ -28,33 +29,17 @@ void ObjectManager::Create()
 							eGpuBufferFlags::PersistentMapped);
 }
 
-ObjectID ObjectManager::NewObjectID(const std::string& name, eObjectTag tags)
-{
-	std::lock_guard<std::mutex> guard(mInUse);
-
-	uint32 index;
-
-	Object* obj = mObjectList.NewItem(&index);
-	Assert(obj != nullptr);
-
-	obj->Name = Name(name);
-	obj->ID = ObjectID(index);
-	obj->Tags = tags;
-
-	return obj->ID;
-}
-
-
 Object* ObjectManager::NewObject(const std::string& name, MaterialID material, eObjectTag tags)
 {
-	std::lock_guard<std::mutex> guard(mInUse);
+	RxEntityCore* entity_core = nullptr;
+	RxObjectCore* object_core = nullptr;
 
-	uint32 index;
+	const uint32 index = rx_object_store_alloc(mpStore, HashStr32(name.c_str()), &entity_core, &object_core);
+	Assert(index != UINT32_MAX);
 
-	Object* obj = mObjectList.NewItem(&index, 0, material);
-	Assert(obj != nullptr);
+	Object* obj = new (Slot(index)) Object(entity_core, object_core);
 
-	obj->ID = ObjectID(index);
+	obj->SetMaterialDirect(material);
 	obj->Name = name;
 	obj->Tags = tags;
 
@@ -63,56 +48,42 @@ Object* ObjectManager::NewObject(const std::string& name, MaterialID material, e
 
 Object* ObjectManager::GetObject(ObjectID id)
 {
-	if (id.IsInvalid()) {
+	if (id.IsInvalid() || id.GetID() >= scMaxObjects || rx_object_store_is_used(mpStore, id.GetID()) == 0) {
 		return nullptr;
 	}
 
-	std::lock_guard<std::mutex> guard(mInUse);
-
-	return mObjectList.GetItem(id.GetID());
+	return Slot(id.GetID());
 }
 
 Object* ObjectManager::FindObject(const Hash32 name_hash)
 {
-	std::lock_guard<std::mutex> guard(mInUse);
+	const uint32 id = rx_object_store_find_by_name(mpStore, name_hash);
 
-	const uint32 capacity = mObjectList.Capacity;
-
-	for (uint32 i = 0; i < capacity; i++) {
-		if (!mObjectList.SlotsInUse.Get(i)) {
-			continue;
-		}
-
-		Object* object = mObjectList.GetItem(i);
-
-		if (object->Name.GetHash() == name_hash) {
-			return object;
-		}
-	}
-
-	return nullptr;
+	return (id == UINT32_MAX) ? nullptr : Slot(id);
 }
 
 
 void ObjectManager::DestroyObject(ObjectID& id)
 {
-	std::lock_guard<std::mutex> guard(mInUse);
-
 	if (id.IsInvalid()) {
 		return;
 	}
 
 	// If the ID is passed in directly from an object (as it probably will be in some places), then we want to make sure
 	// we dont invalidate our ID before freeing it.
-	ObjectID id_copy = id;
+	const uint32 index = id.GetID();
 
-	// Delete the object id at the definition
-	mObjectList.GetItem(id.GetID())->ID.Invalidate();
+	Object* object = GetObject(id);
 
-	// Free the object from the list
-	mObjectList.FreeItem(id_copy.GetID());
+	if (object == nullptr) {
+		id.Invalidate();
+		return;
+	}
 
-	// Invalidate the passed ID
+	object->~Object();
+
+	rx_object_store_release(mpStore, index);
+
 	id.Invalidate();
 }
 
@@ -150,18 +121,24 @@ void ObjectManager::Submit(const ObjectID& object_id, const Mat4f& model_matrix)
 }
 
 
+std::vector<uint32> ObjectManager::UsedIds() const
+{
+	std::vector<uint32> ids(scMaxObjects);
+	ids.resize(std::min<size_t>(rx_object_store_used_ids(mpStore, ids.data(), ids.size()), ids.size()));
+
+	return ids;
+}
+
+ObjectManager::Range ObjectManager::GetCache() { return Range(reinterpret_cast<Object*>(mpStorage), UsedIds()); }
+
 SizedArray<Object*> ObjectManager::CollectObjects()
 {
-	std::lock_guard<std::mutex> guard(mInUse);
+	const std::vector<uint32> ids = UsedIds();
 
-	SizedArray<Object*> object_list(mObjectList.Size + 1);
+	SizedArray<Object*> object_list(ids.size() + 1);
 
-	for (uint32 i = 0; i < mObjectList.Capacity; i++) {
-		if (!mObjectList.SlotsInUse.Get(i)) {
-			continue;
-		}
-
-		object_list.Insert(mObjectList.GetItem(i));
+	for (const uint32 id : ids) {
+		object_list.Insert(Slot(id));
 	}
 
 	return object_list;
@@ -169,20 +146,14 @@ SizedArray<Object*> ObjectManager::CollectObjects()
 
 SizedArray<Object*> ObjectManager::CollectWithTags(eObjectTag tags)
 {
-	std::lock_guard<std::mutex> guard(mInUse);
+	std::vector<uint32> ids(scMaxObjects);
+	ids.resize(std::min<size_t>(
+		rx_object_store_ids_with_tags(mpStore, static_cast<uint32>(tags), ids.data(), ids.size()), ids.size()));
 
-	SizedArray<Object*> object_list(mObjectList.Size + 1);
+	SizedArray<Object*> object_list(ids.size() + 1);
 
-	for (uint32 i = 0; i < mObjectList.Capacity; i++) {
-		if (!mObjectList.SlotsInUse.Get(i)) {
-			continue;
-		}
-
-		Object* object = mObjectList.GetItem(i);
-
-		if (object->HasTags(tags)) {
-			object_list.Insert(object);
-		}
+	for (const uint32 id : ids) {
+		object_list.Insert(Slot(id));
 	}
 
 	return object_list;
@@ -190,16 +161,9 @@ SizedArray<Object*> ObjectManager::CollectWithTags(eObjectTag tags)
 
 void ObjectManager::ReleaseAllObjects()
 {
-	std::lock_guard<std::mutex> guard(mInUse);
-
-	uint32 capacity = mObjectList.Capacity;
-
-	for (uint32 i = 0; i < capacity; i++) {
-		if (!mObjectList.SlotsInUse.Get(i)) {
-			continue;
-		}
-
-		mObjectList.FreeItem(i);
+	for (const uint32 id : UsedIds()) {
+		Slot(id)->~Object();
+		rx_object_store_release(mpStore, id);
 	}
 }
 
@@ -207,46 +171,32 @@ void ObjectManager::PrintActive(uint32 limit)
 {
 	ObjectGpuEntry* buffer = reinterpret_cast<ObjectGpuEntry*>(mObjectGpuBuffer.GetMapped());
 
-	for (int i = 0; i < std::min(limit, mObjectList.Capacity); i++) {
-		if (mObjectList.SlotsInUse.Get(i)) {
-			LogInfo(LC_CORE, "Object [{}]", i);
+	for (const uint32 i : UsedIds()) {
+		if (i >= limit) {
+			break;
+		}
 
-			float* model1 = buffer[i].ModelMatrix;
+		LogInfo(LC_CORE, "Object [{}]", i);
 
-			for (int j = 0; j < 4; j++) {
-				LogInfo(LC_CORE, "[{}, {}, {}, {}]", model1[j * 4 + 0], model1[j * 4 + 1], model1[j * 4 + 2],
-						model1[j * 4 + 3]);
-			}
+		float* model1 = buffer[i].ModelMatrix;
+
+		for (int j = 0; j < 4; j++) {
+			LogInfo(LC_CORE, "[{}, {}, {}, {}]", model1[j * 4 + 0], model1[j * 4 + 1], model1[j * 4 + 2],
+					model1[j * 4 + 3]);
 		}
 	}
 }
 
-ObjectID ObjectManager::ReserveInstances(const ObjectID& object_id, uint32 num_instances)
+void ObjectManager::Destroy()
 {
-	// Unset the current object to determine if the current span of slots can contain the instances
-	mObjectList.SlotsInUse.Unset(object_id.GetID());
-
-	// Find the new bit group (+1 for the current object)
-	uint32 start_index = mObjectList.SlotsInUse.FindNextFreeBitGroup(num_instances + 1);
-	Assert(start_index != Bit::scBitNotFound);
-
-	// There is not enough room after our current object, move it
-	if (start_index != object_id.GetID()) {
-		Submit(start_index, *GetBufferAtFrame(object_id.GetID()));
-
-		// The object id is already 'freed', so we do not need to call FreeObjectId.
+	if (mpStorage == nullptr) {
+		return;
 	}
 
-	// Mark the following bits as 'in use' to prevent other future objects from snatching them.
-	for (uint32 i = start_index; i < start_index + num_instances; i++) {
-		mObjectList.SlotsInUse.Set(i);
-	}
+	ReleaseAllObjects();
 
-	// Return the new slot block
-	return ObjectID(start_index);
+	std::free(mpStorage);
+	mpStorage = nullptr;
 }
-
-
-void ObjectManager::Destroy() {}
 
 } // namespace fx

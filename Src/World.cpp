@@ -40,7 +40,7 @@ void World::Create()
 	pCVarFrustumCull = gCVars->Set<int64>("r_frustum_cull", 1);
 }
 
-static bool IsTransparentMaterial(Material* mat) { return (mat != nullptr && mat->Properties.Alpha < 0.999f); }
+static bool IsTransparentMaterial(Material* mat) { return (mat != nullptr && mat->IsTransparent()); }
 
 /**
  * @brief The geometry pipeline that draws a material, including the transparent variants.
@@ -227,6 +227,8 @@ void World::ExecuteTransparentRenderLists()
 	const Vec3f camera_position = camera.Position;
 	;
 
+	std::vector<float32> centers;
+
 	auto Gather = [&](PipelineHandle pipeline)
 	{
 		const RenderListSection& section = mRenderList.GetSection(pipeline);
@@ -246,6 +248,7 @@ void World::ExecuteTransparentRenderLists()
 			float32 distance_sq = diff.Dot(diff);
 
 			SortedEntryBuffer.Insert({ object_id, pipeline, distance_sq });
+			centers.insert(centers.end(), { center.X, center.Y, center.Z });
 		}
 	};
 
@@ -259,9 +262,19 @@ void World::ExecuteTransparentRenderLists()
 		return;
 	}
 
-	std::sort(SortedEntryBuffer.pData, SortedEntryBuffer.pData + SortedEntryBuffer.Size,
-			  [](const TransparentObjectCarrier& a, const TransparentObjectCarrier& b)
-			  { return a.Distance > b.Distance; });
+	{
+		std::vector<uint32> order(SortedEntryBuffer.Size);
+		rx_world_far_to_near(centers.data(), SortedEntryBuffer.Size, &camera_position.mData[0], order.data());
+
+		std::vector<TransparentObjectCarrier> sorted;
+		sorted.reserve(order.size());
+
+		for (const uint32 index : order) {
+			sorted.push_back(SortedEntryBuffer.pData[index]);
+		}
+
+		std::copy(sorted.begin(), sorted.end(), SortedEntryBuffer.pData);
+	}
 
 	const bool is_debug_view = gGraphics->HasDebugView();
 
@@ -469,9 +482,8 @@ void World::UpdateSpotShadows()
 		const uint32 first_caster = mSpotShadowCasters.Size;
 		GatherSpotShadowCasters(light->GetPosition(), light->GetRadius(), mSpotShadowCasters);
 
-		Hash32 bake_hash = HashObj32(gShadowAtlas->GetGeneration());
-		bake_hash = HashObj32(shadow.AtlasTile, bake_hash);
-		bake_hash = HashObj32(shadow_matrix.RawData, bake_hash);
+		std::vector<RxCasterState> caster_states;
+		caster_states.reserve(mSpotShadowCasters.Size - first_caster);
 
 		for (uint32 index = first_caster; index < mSpotShadowCasters.Size; index++) {
 			const ObjectID caster_id = mSpotShadowCasters[index];
@@ -482,17 +494,26 @@ void World::UpdateSpotShadows()
 			// The same test as Object::RenderPrimitive(), so a caster that finishes loading gets baked in
 			const bool is_drawable = (mesh != nullptr) && caster->CheckIfReady(false);
 
-			bake_hash = HashObj32(caster_id.GetID(), bake_hash);
-			bake_hash = HashObj32(mesh, bake_hash);
-			bake_hash = HashObj32(is_drawable, bake_hash);
-			bake_hash = HashObj32(caster->GetWorldMatrix().RawData, bake_hash);
+			RxCasterState state {
+				.id = caster_id.GetID(),
+				.drawable = is_drawable,
+				.mesh = reinterpret_cast<uint64>(mesh),
+			};
+
+			memcpy(state.world_matrix, caster->GetWorldMatrix().RawData, sizeof(state.world_matrix));
 
 			if (caster->IsSkinned() && caster->pSkeleton.IsValid()) {
-				bake_hash = HashObj32(caster->pSkeleton->GetPoseHash(), bake_hash);
-				bake_hash = HashObj32(caster->HasBonesForDraw(), bake_hash);
+				state.has_pose = true;
+				state.pose_hash = caster->pSkeleton->GetPoseHash();
+				state.has_bones = caster->HasBonesForDraw();
 			}
+
+			caster_states.push_back(state);
 		}
 
+		const Hash32 bake_hash = rx_world_spot_bake_hash(gShadowAtlas->GetGeneration(), shadow.AtlasTile,
+														 shadow_matrix.RawData, caster_states.data(),
+														 caster_states.size());
 
 		// The tile already holds this exact bake
 		if (bake_hash == shadow.BakeHash) {
@@ -624,15 +645,10 @@ static bool SkinnedCasterReachesSphere(Object& object, const Vec3f& center, floa
 	}
 
 	const Skeleton& skeleton = *object.pSkeleton;
-	const float32* m = object.GetWorldMatrix().RawData;
-	const Vec3f c = skeleton.GetPoseCenter();
+	const Vec3f pose_center = skeleton.GetPoseCenter();
 
-	const Vec3f pose_center(c.X * m[0] + c.Y * m[4] + c.Z * m[8] + m[12], c.X * m[1] + c.Y * m[5] + c.Z * m[9] + m[13],
-							c.X * m[2] + c.Y * m[6] + c.Z * m[10] + m[14]);
-
-	const float32 reach = (skeleton.GetPoseRadius() + scMeshPadding) * object.mScale + radius;
-
-	return (pose_center - center).Length() <= reach;
+	return rx_world_skinned_reaches_sphere(object.GetWorldMatrix().RawData, object.mScale, &pose_center.mData[0],
+										   skeleton.GetPoseRadius(), scMeshPadding, &center.mData[0], radius) != 0;
 }
 
 void World::AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, const Vec3f& center, float32 radius,
@@ -726,73 +742,6 @@ void World::ExecutePrepassRenderList(renderer::PipelineHandle forward_pipeline)
 }
 
 
-void World::AddToRenderListRecursive(renderer::PipelineHandle pipeline, ObjectID* id_ptr)
-{
-	if (id_ptr == nullptr) {
-		return;
-	}
-
-	ObjectID id = *id_ptr;
-
-	RenderListSection& section = mRenderList.GetSection(pipeline);
-
-	for (ObjectID object_id : section.Objects) {
-		if (object_id == id) {
-			return;
-		}
-	}
-
-	mRenderList.AddObject(pipeline, id);
-
-	Object* obj = gObjectManager->GetObject(id);
-	if (obj == nullptr) {
-		return;
-	}
-
-	for (ObjectID& attached_id : obj->AttachedNodes) {
-		AddToRenderListRecursive(pipeline, &attached_id);
-	}
-}
-
-
-void World::AddToRenderListRecursiveByMaterial(ObjectID* id_ptr, const Frustum* frustum)
-{
-	if (id_ptr == nullptr) {
-		return;
-	}
-
-	ObjectID id = *id_ptr;
-
-	Object* obj = gObjectManager->GetObject(id);
-	if (obj == nullptr) {
-		return;
-	}
-
-	// Container objects (e.g. the root of a multi-primitive mesh) have no mesh/material of their own; only the
-	// attached primitives that actually own a mesh need placing in a geometry section.
-	if (obj->pMesh.IsValid()) {
-		bool is_visible = true;
-
-		if (frustum != nullptr && obj->CanBeFrustumCulled()) {
-			FrustumTestedObjects++;
-
-			if (obj->IsOutsideFrustum(*frustum)) {
-				FrustumCulledObjects++;
-				is_visible = false;
-			}
-		}
-
-		if (is_visible) {
-			mRenderList.AddObject(GetPipelineForMaterial(obj->GetMaterialID()), obj->ID);
-		}
-	}
-
-	for (ObjectID& attached_id : obj->AttachedNodes) {
-		AddToRenderListRecursiveByMaterial(&attached_id, frustum);
-	}
-}
-
-
 void World::ClearRenderList()
 {
 	for (const ePipelinePass pass : { ePipelinePass::Forward, ePipelinePass::ForwardBlend }) {
@@ -801,35 +750,6 @@ void World::ClearRenderList()
 
 	mRenderList.ClearSection(GetShadowListPipeline());
 }
-
-void World::AddTileToRenderList(bool clear, TileIndex new_tile_index, const Frustum* frustum)
-{
-	const TileView tile = gWorldGrid->GetTile(new_tile_index);
-
-	if (!tile.IsValid()) {
-		return;
-	}
-
-	tile.ForEachObject(
-		[&](ObjectID* object_id)
-		{
-			Object* object = gObjectManager->GetObject(*object_id);
-			if (object == nullptr) {
-				return;
-			}
-
-			if (object->IsProbeVolume()) {
-				return;
-			}
-
-			if (object->IsShadowCaster()) {
-				AddToRenderListRecursive(GetShadowListPipeline(), object_id);
-			}
-
-			AddToRenderListRecursiveByMaterial(object_id, frustum);
-		});
-}
-
 
 void World::AddTileToLightList(TileIndex tile_index, const Frustum* frustum)
 {
@@ -865,64 +785,71 @@ void World::AddUnculledLightsToLightList()
 	}
 }
 
+/// What the render list builder in Rust asks of the engine, with the world it is filling the lists of
+struct RenderListFill
+{
+	World* pWorld;
+
+	static uint32 PipelineForMaterial(void*, uint32 material) { return GetPipelineForMaterial(MaterialID(material)).Index; }
+
+	static void Add(void* user, uint32 pipeline, uint32 id)
+	{
+		static_cast<RenderListFill*>(user)->pWorld->mRenderList.AddObject(PipelineHandle { pipeline }, ObjectID(id));
+	}
+};
+
 void World::CullWorldTiles(const PerspectiveCamera& cam)
 {
 	mFrustum.Rebuild(cam);
 	mVisibleTiles.Clear();
 
 	const bool frustum_cull = (pCVarFrustumCull->IntValue != 0);
-	const Frustum* object_frustum = frustum_cull ? &mFrustum : nullptr;
 	const Frustum* light_frustum = (frustum_cull && !gProbeManager->IsBaking()) ? &mFrustum : nullptr;
 
 	mLightList.Clear();
 	AddTileToLightList(WorldGrid::scGlobalTileIndex, light_frustum);
 
-	AABB frustum_bounds = mFrustum.GetFrustumBoundingBox(cam);
-
-	uint32 num_visible = 0;
-
 	ClearRenderList();
 
-	FrustumTestedObjects = 0;
-	FrustumCulledObjects = 0;
+	RxListBuilder* builder = rx_list_builder_new(
+		gObjectManager->GetStore(),
+		frustum_cull ? &cam.GetCameraMatrix(eObjectLayer::WorldLayer).Rows[0].mData[0] : nullptr,
+		GetShadowListPipeline().Index);
 
-	// Super broad phase for culling.
+	RenderListFill fill { this };
 
-	Vec2u min_tile = gWorldGrid->TileToTileXY(
-		gWorldGrid->WorldToTile(Vec3f(frustum_bounds.Min.X, 0.0f, frustum_bounds.Min.Z)));
-	Vec2u max_tile = gWorldGrid->TileToTileXY(
-		gWorldGrid->WorldToTile(Vec3f(frustum_bounds.Max.X, 0.0f, frustum_bounds.Max.Z)));
+	auto add_tile = [&](TileIndex tile)
+	{
+		rx_list_builder_add_tile(builder, gWorldGrid->GetRust(), tile, &fill, &RenderListFill::PipelineForMaterial,
+								 &RenderListFill::Add);
+	};
 
 	const Vec2u grid_size = gWorldGrid->GetGridSize();
-	const uint32 num_tiles_x = grid_size.X;
-	const uint32 num_tiles_y = grid_size.Y;
 
-	min_tile.X = std::clamp(min_tile.X, 0U, num_tiles_x - 1);
-	min_tile.Y = std::clamp(min_tile.Y, 0U, num_tiles_y - 1);
+	std::vector<TileIndex> visible_tiles(static_cast<size_t>(grid_size.X) * grid_size.Y);
 
-	max_tile.X = std::clamp(max_tile.X, 0U, num_tiles_x - 1);
-	max_tile.Y = std::clamp(max_tile.Y, 0U, num_tiles_y - 1);
+	const size_t tile_count = std::min(
+		visible_tiles.size(), rx_world_visible_tiles(gWorldGrid->GetRust(),
+													 &cam.GetCameraMatrix(eObjectLayer::WorldLayer).Rows[0].mData[0],
+													 visible_tiles.data(), visible_tiles.size()));
 
-	for (uint32 y = min_tile.Y; y <= max_tile.Y; y++) {
-		for (uint32 x = min_tile.X; x <= max_tile.X; x++) {
-			TileIndex ti = gWorldGrid->TileFromTileXY(Vec2u(x, y));
+	for (size_t i = 0; i < tile_count; i++) {
+		const TileIndex ti = visible_tiles[i];
 
-			AABB tile_bounds = gWorldGrid->GetTileAABB(ti);
+		mVisibleTiles.Emplace(ti);
 
-			if (!mFrustum.TileIntersectsAABB(tile_bounds)) {
-				continue;
-			}
-
-			++num_visible;
-
-			mVisibleTiles.Emplace(ti);
-
-			AddTileToRenderList(false, ti, object_frustum);
-			AddTileToLightList(ti, light_frustum);
-		}
+		add_tile(ti);
+		AddTileToLightList(ti, light_frustum);
 	}
 
-	AddTileToRenderList(false, WorldGrid::scGlobalTileIndex, object_frustum);
+	add_tile(WorldGrid::scGlobalTileIndex);
+
+	RxCullStats stats {};
+	rx_list_builder_stats(builder, &stats);
+	rx_list_builder_free(builder);
+
+	FrustumTestedObjects = stats.tested;
+	FrustumCulledObjects = stats.culled;
 
 	AddUnculledLightsToLightList();
 }
@@ -1089,11 +1016,18 @@ void World::RenderProbeCapture()
 
 	const Vec2u all_tiles_size = gWorldGrid->GetGridSize();
 
+	RxListBuilder* builder = rx_list_builder_new(gObjectManager->GetStore(), nullptr, GetShadowListPipeline().Index);
+	RenderListFill fill { this };
+
 	for (TileIndex tile = 0; tile < all_tiles_size.X * all_tiles_size.Y; tile++) {
-		AddTileToRenderList(false, tile);
+		rx_list_builder_add_tile(builder, gWorldGrid->GetRust(), tile, &fill, &RenderListFill::PipelineForMaterial,
+								 &RenderListFill::Add);
 	}
 
-	AddTileToRenderList(false, WorldGrid::scGlobalTileIndex);
+	rx_list_builder_add_tile(builder, gWorldGrid->GetRust(), WorldGrid::scGlobalTileIndex, &fill,
+							 &RenderListFill::PipelineForMaterial, &RenderListFill::Add);
+
+	rx_list_builder_free(builder);
 
 	// The sun's shadow map follows the player and only holds the casters the player can see, so each batch renders
 	// its own from every caster in the level, centered on the batch's first probe. Later probes that aren't well
@@ -1219,15 +1153,16 @@ void World::DebugDrawPhysicsBodies()
 	}
 
 	for (physics::Body* phys : mCachedPhysicsBodies) {
-		const JPH::Body* body = phys->GetBody();
-		if (body == nullptr) {
+		if (!phys->HasPhysicsBody()) {
 			continue;
 		}
 
-		const JPH::AABox bounds = body->GetWorldSpaceBounds();
+		Vec3f bounds_min, bounds_max;
+		phys->GetWorldBounds(bounds_min, bounds_max);
+
 		const Color color = (phys->GetMotionType() == physics::eMotionType::Static) ? static_color : dynamic_color;
 
-		gDebugDraw->WireBox(AABB(Vec3f(bounds.mMin), Vec3f(bounds.mMax)), color);
+		gDebugDraw->WireBox(AABB(bounds_min, bounds_max), color);
 	}
 }
 

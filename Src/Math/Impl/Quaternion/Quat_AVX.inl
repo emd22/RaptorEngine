@@ -62,22 +62,10 @@ FX_FORCE_INLINE bool Quat::IsCloseTo(const __m128 other, const float32 tolerance
 
 FX_FORCE_INLINE void Quat::NLerpIP(const Quat& dest, float32 time)
 {
-    __m128 dest_v = dest.mIntrin;
+	float32 out[4];
+	rx_quat_nlerp(&mData[0], &dest.mData[0], time, out);
 
-    if (SSE::Dot(mIntrin, dest.mIntrin) < 0.0f) {
-        dest_v = SSE::SetSigns<-1>(dest_v);
-    }
-
-    const __m128 inv_time_v = _mm_set1_ps(1.0 - time);
-    const __m128 time_v = _mm_set1_ps(time);
-
-    // (1 - time) * A
-    mIntrin = _mm_mul_ps(inv_time_v, mIntrin);
-
-    //  ... + time * B  ->  time * dest + mIntrin
-    mIntrin = _mm_fmadd_ps(time_v, dest_v, mIntrin);
-
-    mIntrin = SSE::Normalize(mIntrin);
+	*this = Quat(out[0], out[1], out[2], out[3]);
 }
 
 
@@ -85,50 +73,10 @@ FX_FORCE_INLINE void Quat::NLerpIP(const Quat& dest, float32 time)
 // for Neon.
 Quat Quat::SLerp(const Quat& dest, const float32 step) const
 {
-    // Note: there are so many different ways to implement this and a lot of them online just straight up pro
-    __m128 a_v = mIntrin;
-    __m128 b_v = dest.mIntrin;
+	float32 out[4];
+	rx_quat_slerp(&mData[0], &dest.mData[0], step, out);
 
-    __m128 result;
-
-    // Calculate angle between them.
-    float32 cos_half_theta = SSE::Dot(a_v, b_v);
-
-    // quat and -quat represent the same rotation; if they're in opposite hemispheres, negate one so we take the
-    // shortest path instead of interpolating the long way around (matches the check already done in NLerpIP above).
-    if (cos_half_theta < 0.0f) {
-        b_v = SSE::SetSigns<-1>(b_v);
-        cos_half_theta = -cos_half_theta;
-    }
-
-    // if qa=qb or qa=-qb then theta = 0 and we can return qa
-    if (abs(cos_half_theta) >= 1.0) {
-        return Quat(mIntrin);
-    }
-
-    // Calculate temporary values.
-    float32 half_theta = acosf(cos_half_theta);
-    float32 sin_half_theta = sqrtf(1.0f - cos_half_theta * cos_half_theta);
-
-    // if theta = 180 degrees then result is not fully defined
-    // we could rotate around any axis normal to qa or qb
-    if (sin_half_theta < 0.001) {
-        __m128 half = _mm_set1_ps(0.5f);
-
-        result = _mm_mul_ps(a_v, half);
-        result = _mm_fmadd_ps(b_v, half, result);
-
-        return Quat(result);
-    }
-
-    const float32 sht_recip = 1.0f / sin_half_theta;
-    float32 ratioA = sinf((1.0f - step) * half_theta) * sht_recip;
-    float32 ratioB = sinf(step * half_theta) * sht_recip;
-
-    result = _mm_mul_ps(a_v, _mm_set1_ps(ratioA));
-    result = _mm_fmadd_ps(b_v, _mm_set1_ps(ratioB), result);
-
-    return Quat(result);
+	return Quat(out[0], out[1], out[2], out[3]);
 }
 
 FX_FORCE_INLINE Quat Quat::Conjugate() const { return Quat(SSE::FlipSigns<-1, -1, -1, 1>(mIntrin)); }

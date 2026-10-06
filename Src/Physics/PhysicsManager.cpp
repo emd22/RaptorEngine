@@ -87,7 +87,7 @@ physics::Body* PhysicsManager::FindBody(const Hash32 name_hash)
 	return nullptr;
 }
 
-physics::Body* PhysicsManager::FindBody(JPH::BodyID jolt_id)
+physics::Body* PhysicsManager::FindBody(physics::BodyHandle id)
 {
 	std::lock_guard<std::mutex> guard(mInUse);
 
@@ -98,7 +98,7 @@ physics::Body* PhysicsManager::FindBody(JPH::BodyID jolt_id)
 
 		physics::Body* body = mBodies.GetItem(i);
 
-		if (body->GetBodyID() == jolt_id) {
+		if (body->GetBodyID() == id) {
 			return body;
 		}
 	}

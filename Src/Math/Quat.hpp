@@ -3,16 +3,13 @@
 #include <Core/Defines.hpp>
 #include <Math/Vec3.hpp>
 #include <Math/Vec4.hpp>
+#include <raptor_ffi.h>
 
 #ifdef FX_USE_NEON
 #include <arm_neon.h>
 #elif FX_USE_AVX
 #include "SSE.hpp"
 #endif
-
-namespace JPH {
-class Quat;
-}
 
 namespace fx {
 
@@ -27,7 +24,6 @@ public:
 	Quat() = default;
 	Quat(float32 x, float32 y, float32 z, float32 w);
 	Quat(const float32* buffer);
-	Quat(const JPH::Quat& other);
 
 	static Quat FromAxisAngle(Vec3f axis, float32 angle);
 	static Quat FromEulerAngles(Vec3f angles);
@@ -41,11 +37,7 @@ public:
 
 	Quat operator*(const Quat& other) const;
 
-	void FromJoltQuaternion(const JPH::Quat& quat);
-	void ToJoltQuaternion(JPH::Quat& quat) const;
-
 	FX_FORCE_INLINE bool IsCloseTo(const Quat& other, const float32 tolerance = 0.0001) const;
-	bool IsCloseTo(const JPH::Quat& other, const float32 tolerance = 0.0001) const;
 
 	FX_FORCE_INLINE Quat SLerp(const Quat& dest, const float32 step) const;
 	FX_FORCE_INLINE void NLerpIP(const Quat& dest, float32 step);

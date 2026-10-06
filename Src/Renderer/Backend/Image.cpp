@@ -2,7 +2,8 @@
 
 #include "BarrierHelper.hpp"
 
-#include <Asset/Loader/Image/LoaderStb.hpp>
+#include <Asset/AssetManager.hpp>
+#include <Asset/ImageFile.hpp>
 #include <Core/Assert.hpp>
 #include <Core/Defines.hpp>
 #include <Core/File.hpp>
@@ -191,26 +192,35 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 }
 
 
+namespace {
+
+void DeleteStagingBuffer(RxBufferResource* resource) { gAssetManager->DeleteBuffer(resource); }
+
+RxUploadInfo ToRust(const ImageInfo& info)
+{
+	return RxUploadInfo { .image_type = static_cast<uint32>(info.ImageType),
+						  .width = info.Size.X,
+						  .height = info.Size.Y,
+						  .format = static_cast<uint16>(info.Format),
+						  .mip_level = info.MipLevel,
+						  .mip_count = info.MipCount,
+						  .data = info.ImageData.pData,
+						  .size = info.ImageData.Size };
+}
+
+} // namespace
+
 void Image::CreateFromData(renderer::CommandBuffer& cmd, const ImageInfo& info, eImageCreateFlags flags)
 {
-	// Upload image to staging buffer
-	renderer::RawGpuBuffer staging_buffer;
-	staging_buffer.Create(renderer::eGpuBufferType::Transfer, info.ImageData.Size, RX_MEMORY_CPU_TO_GPU,
-						  eGpuBufferFlags::TransferReceiver);
-	staging_buffer.Upload(info.ImageData);
+	const RxUploadInfo upload = ToRust(info);
 
-	const VkImageUsageFlags usage_flags = (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-										   ImageFormatUtil::GetFormatUsageFlags(info.Format) |
-										   VK_IMAGE_USAGE_SAMPLED_BIT);
+	const VkResult status = static_cast<VkResult>(rx_image_create_from_data(
+		mpRecord, renderer::gGraphics->GetDevice()->GetRustDevice(), renderer::gGraphics->GpuAllocator, cmd.Get(),
+		cmd.QueueFamily(), &DeleteStagingBuffer, &upload, HasFlag(flags, eImageCreateFlags::IsTarget)));
 
-
-	Create(info.ImageType, info.Size, info.MipCount, info.Format, VK_IMAGE_TILING_OPTIMAL, usage_flags,
-		   ImageFormatUtil::GetAspectFlag(info.Format), flags);
-
-	CopyFromBuffer(cmd, staging_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				   GetMipDimensions(info.Size, info.MipLevel), 0, info.MipLevel);
-
-	SetMipLevel(info.MipLevel);
+	if (status != VK_SUCCESS) {
+		ModulePanicVulkan("Could not create vulkan image from data", status);
+	}
 }
 
 void Image::UploadMip(renderer::CommandBuffer& cmd, uint32 mip_index, const Vec2u& size,
@@ -233,37 +243,13 @@ void Image::UploadMip(renderer::CommandBuffer& cmd, uint32 mip_index, const Vec2
 
 void Image::Upload(renderer::CommandBuffer& cmd, const ImageInfo& info)
 {
-	const Slice<const uint8>& image_data = info.ImageData;
+	const RxUploadInfo upload = ToRust(info);
 
-	renderer::RawGpuBuffer staging_buffer;
-	staging_buffer.Create(renderer::eGpuBufferType::Transfer, image_data.Size, RX_MEMORY_CPU_TO_GPU,
-						  eGpuBufferFlags::TransferReceiver);
-	staging_buffer.Upload(image_data);
+	const int32 status = rx_image_upload_chain(mpRecord, renderer::gGraphics->GetDevice()->GetRustDevice(),
+											   renderer::gGraphics->GpuAllocator, cmd.Get(), cmd.QueueFamily(),
+											   &DeleteStagingBuffer, &upload);
 
-	const VkImageUsageFlags usage_flags = (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-										   ImageFormatUtil::GetFormatUsageFlags(info.Format) |
-										   VK_IMAGE_USAGE_SAMPLED_BIT);
-
-	const eImageAspectFlag aspect_flag = ImageFormatUtil::GetAspectFlag(info.Format);
-
-	Create(info.ImageType, info.Size, info.MipCount, info.Format, VK_IMAGE_TILING_OPTIMAL, usage_flags, aspect_flag);
-
-	// Transition all levels to transfer dest
-	renderer::BarrierHelper::ImageLayoutTransition(this, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 0, info.MipCount);
-
-	const int32 copied = rx_gpu_cmd_copy_buffer_to_mips(
-		renderer::gGraphics->GetDevice()->GetRustDevice(), cmd.Get(), staging_buffer.GetRaw(),
-		GetRawImage(), static_cast<uint16>(info.Format), info.Size.X, info.Size.Y, info.MipCount,
-		static_cast<uint32>(aspect_flag));
-
-	AssertMsg(copied == 0, "Mip level is not 4 byte aligned in the staging buffer");
-
-	// Transition to shader r/o
-	renderer::BarrierHelper::ImageLayoutTransition(this, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 0,
-												   info.MipCount);
-
-	// Matches CreateFromData(), the most detailed level this image actually holds
-	SetMipLevel(info.MipLevel);
+	AssertMsg(status == 0, "Could not upload the mip chain (a mip level is not 4 byte aligned in the chain?)");
 }
 
 
@@ -571,7 +557,7 @@ void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
 		});
 
 
-	loader::LoaderStb::SaveToFile(file_format, image_data, image_size, path, eImageSaveFlags::None);
+	SaveImageFile(file_format, image_data, image_size, path);
 }
 
 

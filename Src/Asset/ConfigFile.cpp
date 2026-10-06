@@ -5,7 +5,7 @@
 #include <Core/FilesystemIO.hpp>
 #include <Core/Hash.hpp>
 #include <Core/PagedArray.hpp>
-#include <Core/Path.hpp>
+#include <filesystem>
 #include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
 #include <Math/Vec4.hpp>
@@ -158,15 +158,13 @@ namespace {
 
 int32 ReadIncludeForRust(void*, const char* path, const char* extension, uint8** data, size_t* length)
 {
-	Path vpath(path);
+	std::filesystem::path vpath(path);
 
-	if (!vpath.HasExtension()) {
-		String* basename = vpath.BaseName();
-		(*basename) += extension;
-		LogInfo("basename : {}", *basename);
+	if (!vpath.has_extension()) {
+		vpath += extension;
 	}
 
-	File file(vpath.Str(), File::eModType::Read, File::eDataType::Binary);
+	File file(vpath.string().c_str(), File::eModType::Read, File::eDataType::Binary);
 
 	if (!file.IsFileOpen()) {
 		return 0;

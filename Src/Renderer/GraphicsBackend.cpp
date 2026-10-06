@@ -114,8 +114,6 @@ void GraphicsBackend::Init(Vec2u window_size)
 	InitFrames();
 	InitUploadContext();
 
-	TransferSync.Create(eSemaphoreType::Timeline);
-
 	// SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
 	// deletion_queue->InitCapacity(Limits::MaxDeletionQueueItems);
 
@@ -221,27 +219,21 @@ void GraphicsBackend::Init(Vec2u window_size)
 
 void GraphicsBackend::InitUploadContext()
 {
-	UploadContext.CmdPool.Create(GetDevice(), GetDevice()->mQueueFamilies.GetTransferFamily());
-	UploadContext.CmdBuffer.Create(&UploadContext.CmdPool);
-	UploadContext.ImmediateCmdPool.Create(GetDevice(), GetDevice()->mQueueFamilies.GetTransferFamily());
-	UploadContext.ImmediateCmdBuffer.Create(&UploadContext.ImmediateCmdPool);
+	const uint32 family = GetDevice()->mQueueFamilies.GetTransferFamily();
 
-	Util::SetDebugLabel("UploadImmediate", VK_OBJECT_TYPE_COMMAND_BUFFER, UploadContext.ImmediateCmdBuffer.Cmd);
-	Util::SetDebugLabel("Upload", VK_OBJECT_TYPE_COMMAND_BUFFER, UploadContext.CmdBuffer.Cmd);
+	pUploadContext = rx_upload_context_new(GetDevice()->GetRustDevice(), GpuAllocator, mpFrameLoop, family);
 
-	UploadContext.UploadFence.Create();
-	UploadContext.ImmediateUploadFence.Create();
+	if (pUploadContext == nullptr) {
+		ModulePanic("Could not create the upload context");
+	}
+
+	UploadCmd.WrapExternal(static_cast<VkCommandBuffer>(rx_upload_cmd(pUploadContext)), family);
 }
 
 void GraphicsBackend::DestroyUploadContext()
 {
-	UploadContext.CmdBuffer.Destroy();
-	UploadContext.ImmediateCmdBuffer.Destroy();
-	UploadContext.CmdPool.Destroy();
-	UploadContext.ImmediateCmdPool.Destroy();
-
-	UploadContext.UploadFence.Destroy();
-	UploadContext.ImmediateUploadFence.Destroy();
+	rx_upload_context_free(pUploadContext);
+	pUploadContext = nullptr;
 }
 
 void GraphicsBackend::InitFrames()
@@ -466,34 +458,31 @@ void GraphicsBackend::SubmitPushConstantsRaw(const CommandBuffer& cmd, const Pip
 
 void GraphicsBackend::SubmitImmediateUploadCmd(GraphicsBackend::SubmitFunc upload_func)
 {
-	std::lock_guard<std::mutex> lock(UploadContext.ImmediateMutex);
+	struct Record
+	{
+		SubmitFunc& Func;
+		uint32 Family;
+	} record { upload_func, rx_upload_family(pUploadContext) };
 
-	CommandBuffer& cmd = UploadContext.ImmediateCmdBuffer;
+	const VkResult status = static_cast<VkResult>(rx_upload_immediate(
+		pUploadContext,
+		[](void* user, void* cmd_handle)
+		{
+			Record& record = *static_cast<Record*>(user);
 
-	cmd.Record(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-	upload_func(cmd);
-	cmd.End();
+			CommandBuffer cmd;
+			cmd.WrapExternal(static_cast<VkCommandBuffer>(cmd_handle), record.Family);
 
-	void* commands[] = { cmd.Cmd };
+			record.Func(cmd);
+		},
+		&record));
 
-	// The fence is created signaled; it must be reset before each submit.
-	UploadContext.ImmediateUploadFence.Reset();
-
-	VkTry(
-		static_cast<VkResult>(rx_gpu_queue_submit(GetDevice()->GetRustDevice(), RX_QUEUE_TRANSFER, nullptr, 0, commands,
-												  1, nullptr, 0, RxRaw(UploadContext.ImmediateUploadFence.Get()))),
-		"Error submitting upload buffer");
-
-	UploadContext.ImmediateUploadFence.WaitFor();
-	UploadContext.ImmediateUploadFence.Reset();
-
-	UploadContext.ImmediateCmdBuffer.Reset();
+	VkTry(status, "Error submitting upload buffer");
 }
 
 void GraphicsBackend::SubmitUploadCmd(GraphicsBackend::SubmitFunc upload_func)
 {
-	CommandBuffer& cmd = UploadContext.CmdBuffer;
-	upload_func(cmd);
+	upload_func(UploadCmd);
 }
 
 void GraphicsBackend::BeginUploads() {}
@@ -577,7 +566,7 @@ void GraphicsBackend::PresentFrame()
 
 	VkTry(static_cast<VkResult>(rx_frame_loop_submit_and_present(
 			  mpFrameLoop, GetDevice()->GetRustDevice(), RxRaw(Swapchain.GetSwapchain()), frame->CmdBuffer.Cmd,
-			  RxRaw(TransferSync.Get()), gGraphics->TransferCount.load(), &present_status)),
+			  RxRaw(rx_upload_transfer_semaphore(pUploadContext)), rx_upload_transfer_count(pUploadContext), &present_status)),
 		  "Error submitting draw buffer");
 
 	const VkResult status = static_cast<VkResult>(present_status);
@@ -642,11 +631,8 @@ void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 	Assert(blur_target.IsValid());
 	const Vec2u blur_size = blur_target.GetImage().GetSize();
 
-	SSAOBlurPushConsts blur_consts = {
-		.ScreenSize = { static_cast<float32>(blur_size.X), static_cast<float32>(blur_size.Y) },
-		.TexelSize = { 1.0f / static_cast<float32>(blur_size.X), 1.0f / static_cast<float32>(blur_size.Y) },
-		.DepthSharpness = 100.0f,
-	};
+	SSAOBlurPushConsts blur_consts {};
+	rx_forward_ssao_blur_push(blur_size.X, blur_size.Y, &blur_consts);
 
 	SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::SSAOBlur), eShaderType::Pixel,
 						blur_consts);
@@ -731,7 +717,7 @@ void GraphicsBackend::Destroy()
 {
 	GetDevice()->WaitForIdle();
 
-	DestroyUploadContext();
+	rx_upload_forget_frames(pUploadContext);
 	DestroyFrames();
 
 	LightBuffer.Destroy();
@@ -748,7 +734,7 @@ void GraphicsBackend::Destroy()
 
 	gAssetManager->ShutdownDeletionQueue();
 
-	TransferSync.Destroy();
+	DestroyUploadContext();
 
 	GpuBufferPrintUndestroyed();
 

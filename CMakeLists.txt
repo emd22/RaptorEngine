@@ -14,7 +14,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
 option(USE_SIMDE "Use SIMDe to use AVX on a non-AVX platform" OFF)
 option(USE_MOLTENVK "Compile with support for MoltenVK. Defaults to KosmicKrisp on macOS" OFF)
-option(FX_EDITOR "Build with the simple editor" OFF)
 
 # Fallback directory the engine searches for assets (Data/, Config/, Shaders/) when they aren't
 # found next to the executable (see FilesystemIO::ResolvePath). Defaults to "." (resolved against
@@ -36,13 +35,9 @@ message(STATUS "${SHADER_SOURCES}")
 
 #set_source_files_properties(${SHADER_SOURCES} PROPERTIES LANGUAGE HLSL)
 
-if(NOT FX_EDITOR)
-    list(FILTER SOURCES EXCLUDE REGEX "/Src/Editor/")
-endif()
+list(FILTER SOURCES EXCLUDE REGEX "/Src/ThirdParty/Jolt/")
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${SOURCES})
-
-add_subdirectory(Submodules/strata)
 
 set(RX_RUST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/SrcRS")
 
@@ -147,32 +142,6 @@ if(USE_MOLTENVK)
     target_compile_definitions(raptor_cpp PRIVATE FX_USE_PORTABILITY_EXTENSION)
 endif()
 
-if(FX_EDITOR)
-    # vcpkg (Windows) ships a wxWidgets CMake config exposing wx::core / wx::base; elsewhere fall back
-    # to the FindwxWidgets module (wx-config).
-    find_package(wxWidgets 3.3.3 CONFIG QUIET COMPONENTS core base)
-    if(wxWidgets_FOUND AND TARGET wx::core)
-        target_link_libraries(raptor_cpp PRIVATE wx::core wx::base)
-    else()
-        find_package(wxWidgets 3.3.3 REQUIRED COMPONENTS core base)
-        target_link_libraries(raptor_cpp PRIVATE wxWidgets::wxWidgets)
-    endif()
-    target_compile_definitions(raptor_cpp PRIVATE FX_IS_EDITOR)
-
-    if(WIN32)
-        # wxWidgets' stock resources (cursors, icons, bitmaps) and the application manifest
-        target_sources(raptor_cpp PRIVATE "Src/Editor/raptor.rc")
-    endif()
-
-    if(APPLE)
-        # Metal layer and relative mouse helpers
-        enable_language(OBJCXX)
-        target_sources(raptor_cpp PRIVATE "Src/Editor/EditorPlatformMac.mm")
-        set_source_files_properties("Src/Editor/EditorPlatformMac.mm" PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
-        target_link_libraries(raptor_cpp PRIVATE "-framework Cocoa" "-framework QuartzCore")
-    endif()
-endif()
-
 if(MSVC)
     target_compile_options(raptor_cpp PRIVATE
         $<$<CONFIG:Release>:/O2>
@@ -185,12 +154,10 @@ else()
     )
 endif()
 
-# Strata
-target_link_libraries(raptor_cpp PRIVATE strata raptor_ffi)
-target_include_directories(raptor_cpp SYSTEM BEFORE PRIVATE "Submodules/strata/include")
+target_link_libraries(raptor_cpp PRIVATE raptor_ffi)
 
 
-target_link_libraries(raptor_cpp PRIVATE SDL3 freetype)
+target_link_libraries(raptor_cpp PRIVATE SDL3)
 
 
 # Describes how to link raptor_cpp into the Rust executable (SrcRS/raptor-app/build.rs reads it). CMake only knows the

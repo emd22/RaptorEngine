@@ -1,18 +1,17 @@
 #pragma once
 
-#include <ThirdParty/Jolt/Jolt.h>
-#include <ThirdParty/Jolt/Physics/Ragdoll/Ragdoll.h>
-
 #include <Asset/Animation.hpp>
 #include <Core/Ref.hpp>
-#include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/Vec3.hpp>
-#include <vector>
+#include <raptor_ffi.h>
 
 namespace fx::physics {
 
+/**
+ * @brief A ragdoll for a humanoid skeleton. It is built and posed by Rust, from the bones of the skeleton.
+ */
 class Ragdoll
 {
 public:
@@ -36,25 +35,9 @@ public:
 	~Ragdoll() { Destroy(); }
 
 private:
-	struct BodyInfo
-	{
-		uint32 BoneIndex = 0;
-		JPH::Vec3 LocalAxis = JPH::Vec3::sAxisY();
-		JPH::Vec3 LocalCenter = JPH::Vec3::sZero();
-		float32 Length = 0.0f;
-		float32 Radius = 0.0f;
-	};
-
 	Ref<Skeleton> mpSkeleton { nullptr };
-	JPH::Ref<JPH::Ragdoll> mpRagdoll;
-	SizedArray<BodyInfo> mBodies;
-
-	std::vector<Mat4f> mDrivenWorld;
-	std::vector<uint8> mIsDriven;
-
-	Mat4f mWorldInverse = Mat4f::scIdentity;
+	RxRagdoll* mpRagdoll = nullptr;
 	uint32 mSerial = 0;
-	bool mbPoseSettled = false;
 };
 
 } // namespace fx::physics

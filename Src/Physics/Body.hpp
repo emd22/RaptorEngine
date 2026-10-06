@@ -1,14 +1,12 @@
 #pragma once
 
+#include "BodyHandle.hpp"
 #include "BodyID.hpp"
-
-#include <ThirdParty/Jolt/Jolt.h>
-#include <ThirdParty/Jolt/Physics/Body/Body.h>
-#include <ThirdParty/Jolt/Physics/Body/BodyID.h>
 
 #include <Core/PagedArray.hpp>
 #include <Entity.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
+#include <raptor_ffi.h>
 
 namespace fx {
 class PrimitiveMesh;
@@ -76,11 +74,15 @@ public:
 
 	void Teleport(const Vec3f& position, const Quat& rotation);
 
-	FX_FORCE_INLINE Vec3f GetPosition() { return Vec3f(mpPhysicsBody->GetPosition()); }
-	FX_FORCE_INLINE Quat GetRotation() { return Quat(mpPhysicsBody->GetRotation()); }
+	Vec3f GetPosition() const;
+	Quat GetRotation() const;
 
-	FX_FORCE_INLINE JPH::Body* GetBody() { return mpPhysicsBody; };
-	FX_FORCE_INLINE const JPH::BodyID& GetBodyID() { return mpPhysicsBody->GetID(); };
+	FX_FORCE_INLINE bool HasPhysicsBody() const { return mbHasPhysicsBody; }
+
+	FX_FORCE_INLINE BodyHandle GetBodyID() const { return BodyHandle { mBodyId }; }
+
+	/// The box around the body in the world, which is zero if it has none
+	void GetWorldBounds(Vec3f& out_min, Vec3f& out_max) const;
 
 	/// Saves the ID for the linked object.
 	FX_FORCE_INLINE void SetObjectID(ObjectID id) { mObjectID = id; }
@@ -102,12 +104,10 @@ public:
 	~Body() = default;
 
 private:
-	void CreateJoltBody(JPH::ShapeRefC shape, eFlags flags, physics::eMotionType type, const BodyProps& properties);
-	void UpdateJoltBody(JPH::ShapeRefC shape, Body::eFlags flags, physics::eMotionType motion_type,
-						const BodyProps& properties);
+	static bool ReportCreateStatus(int32 status, const char* what);
 
 public:
-	JPH::Body* mpPhysicsBody = nullptr;
+	uint32 mBodyId = RX_NO_BODY;
 	physics::eMotionType mMotionType = physics::eMotionType::Static;
 
 	bool mbHasPhysicsBody = false;
@@ -126,7 +126,6 @@ private:
 	Name mColliderName;
 	ObjectID mObjectID = ObjectID::scNull;
 
-	bool mbIsInWorld = false;
 };
 
 } // namespace physics

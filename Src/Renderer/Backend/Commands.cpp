@@ -60,7 +60,7 @@ void CommandBuffer::Record(VkCommandBufferUsageFlags usage_flags)
 {
 	CheckInitialized();
 
-	pBoundPipeline = nullptr;
+	BoundPipeline = 0;
 
 	const VkResult status = static_cast<VkResult>(rx_gpu_command_buffer_begin(mpDevice->GetRustDevice(), Cmd));
 
@@ -89,6 +89,10 @@ void CommandBuffer::End()
 
 void CommandBuffer::Destroy()
 {
+	if (mpCommandPool == nullptr) {
+		return;
+	}
+
 	rx_gpu_command_buffer_free(mpDevice->GetRustDevice(), RxRaw(mpCommandPool->Get()), Cmd);
 }
 

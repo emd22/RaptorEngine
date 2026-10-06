@@ -3,16 +3,6 @@
 #include "JoltPhysicsBackend.hpp"
 #include "PhysicsManager.hpp"
 
-#include <Jolt/Physics/Body/Body.h>
-#include <Jolt/Physics/Body/BodyID.h>
-#include <Jolt/Physics/Character/CharacterVirtual.h>
-#include <Jolt/Physics/Collision/CastResult.h>
-#include <Jolt/Physics/Collision/CollisionCollector.h>
-#include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
-#include <Jolt/Physics/Collision/RayCast.h>
-#include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
-#include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
-
 #include <Asset/ConfigFile.hpp>
 #include <Engine.hpp>
 #include <Math/MathUtil.hpp>
@@ -21,131 +11,70 @@ namespace fx::physics {
 
 static constexpr float32 scMaxSlopeAngle = MathUtil::DegreesToRadians(45.0f);
 
-using namespace JPH;
+static RxPhysicsWorld* GetWorld() { return gPhysics->pBackend->pWorld; }
 
 void PhysicsPlayer::Create()
 {
 	ConfigFile player_config;
 	player_config.Load("RaptorData/Data/Player.conf");
 
-	const float32 collider_radius = player_config.GetEntry(HashStr32("ColliderRadius"))->Get<float32>();
+	const RxCharacterSpec spec = {
+		.standing_height = scStandingHeight,
+		.radius = player_config.GetEntry(HashStr32("ColliderRadius"))->Get<float32>(),
+		.mass = player_config.GetEntry(HashStr32("Mass"))->Get<float32>(),
+		.max_strength = player_config.GetEntry(HashStr32("Strength"))->Get<float32>(),
+		.max_slope_angle = scMaxSlopeAngle,
+	};
 
-	JPH::Ref<CharacterVirtualSettings> settings = new CharacterVirtualSettings;
+	mpCharacter = rx_character_new(GetWorld(), &spec);
 
-	pPhysicsShape = RotatedTranslatedShapeSettings(Vec3(0, 0.5f * scStandingHeight + collider_radius, 0),
-												   JPH::Quat::sIdentity(),
-												   new CapsuleShape(0.5f * scStandingHeight, collider_radius))
-						.Create()
-						.Get();
-
-	settings->mMaxSlopeAngle = scMaxSlopeAngle;
-	settings->mShape = pPhysicsShape;
-	settings->mCollisionTolerance = 0.01f;
-	settings->mPredictiveContactDistance = 0.2f;
-
-	settings->mMaxStrength = player_config.GetEntry(HashStr32("Strength"))->Get<float32>();
-	settings->mMass = player_config.GetEntry(HashStr32("Mass"))->Get<float32>();
-	settings->mBackFaceMode = JPH::EBackFaceMode::CollideWithBackFaces;
-	settings->mSupportingVolume = Plane(Vec3::sAxisY(), -collider_radius);
-	settings->mInnerBodyLayer = PhLayer::Dynamic;
-
-	pPlayerVirt = new CharacterVirtual(settings, RVec3::sZero(), JPH::Quat::sIdentity(), 0,
-									   &gPhysics->pBackend->PhysicsSystem);
+	AssertMsg(mpCharacter != nullptr, "Could not create the player's character");
 }
 
-void PhysicsPlayer::Teleport(const Vec3f& position)
-{
-	JPH::RVec3 jolt_position;
-	position.ToJoltVec3(jolt_position);
-
-	pPlayerVirt->SetPosition(jolt_position);
-}
+void PhysicsPlayer::Teleport(const Vec3f& position) { rx_character_teleport(mpCharacter, GetWorld(), &position.mData[0]); }
 
 void PhysicsPlayer::SetCollisionEnabled(bool value)
 {
-	bCollisionEnabled = value;
-
-	gPhysics->pBackend->GetBodyInterface().SetObjectLayer(pPlayerVirt->GetInnerBodyID(), PhLayer::Deactivated);
+	rx_character_set_collision_enabled(mpCharacter, GetWorld(), value);
 }
 
-void PhysicsPlayer::ApplyMovement(const Vec3f& direction)
+void PhysicsPlayer::ApplyMovement(const Vec3f& direction) { rx_character_apply_movement(mpCharacter, &direction.mData[0]); }
+
+void PhysicsPlayer::SetGravityDisabled(bool value)
 {
-	Vec3 jolt_dir;
-	direction.ToJoltVec3(jolt_dir);
-
-	mMovementVector = jolt_dir;
-	// pPlayerVirt->SetLinearVelocity(jolt_dir);
+	mbGravityDisabled = value;
+	rx_character_set_gravity_disabled(mpCharacter, value);
 }
 
-SizedArray<JPH::BodyID> PhysicsPlayer::RaycastBodies(Vec3f direction) const
+bool PhysicsPlayer::IsGrounded() const { return mpCharacter != nullptr && rx_character_is_grounded(mpCharacter) != 0; }
+
+Vec3f PhysicsPlayer::GetPosition() const
 {
-	JPH::RayCast rc;
-	rc.mOrigin = pPlayerVirt->GetPosition();
-	direction.ToJoltVec3(rc.mDirection);
+	Vec3f position;
+	rx_character_position(mpCharacter, GetWorld(), &position.mData[0]);
 
-	JPH::AllHitCollisionCollector<RayCastBodyCollector> collector;
-
-	gPhysics->pBackend->PhysicsSystem.GetBroadPhaseQuery().CastRay(rc, collector);
-
-	SizedArray<JPH::BodyID> hits;
-	hits.InitCapacity(collector.mHits.size());
-
-	for (JPH::BroadPhaseCastResult& hit : collector.mHits) {
-		hits.Insert(hit.mBodyID);
-	}
-
-	return hits;
+	return position;
 }
 
+Vec3f PhysicsPlayer::GetLinearVelocity() const
+{
+	Vec3f velocity;
+	rx_character_linear_velocity(mpCharacter, GetWorld(), &velocity.mData[0]);
+
+	return velocity;
+}
 
 void PhysicsPlayer::Update(float64 delta_time)
 {
-	mTime += delta_time;
+	rx_character_update(mpCharacter, GetWorld(), static_cast<float32>(delta_time));
+}
 
-	PhysicsSystem& phys = gPhysics->pBackend->PhysicsSystem;
-
-	Vec3 gravity = (phys.GetGravity() * 1.5f * delta_time);
-
-	// Apply gravity
-	Vec3 velocity = Vec3::sZero();
-
-	if (pPlayerVirt->GetGroundState() == CharacterVirtual::EGroundState::OnGround) {
-		velocity = Vec3::sZero();
-
-		bIsGrounded = true;
+PhysicsPlayer::~PhysicsPlayer()
+{
+	if (mpCharacter != nullptr && gPhysics != nullptr && gPhysics->pBackend != nullptr &&
+		gPhysics->pBackend->pWorld != nullptr) {
+		rx_character_free(mpCharacter, gPhysics->pBackend->pWorld);
 	}
-	else {
-		velocity = pPlayerVirt->GetLinearVelocity() * pPlayerVirt->GetUp();
-		if (bDisableGravity) {
-			velocity.SetY(0);
-		}
-		else {
-			velocity += gravity;
-		}
-
-		bIsGrounded = false;
-	}
-
-	velocity += mMovementVector;
-
-	pPlayerVirt->SetLinearVelocity(velocity);
-
-	JPH::ObjectLayer collision_layer = PhLayer::Dynamic;
-	if (bCollisionEnabled == false) {
-		collision_layer = PhLayer::Deactivated;
-	}
-
-	// Move character
-	CharacterVirtual::ExtendedUpdateSettings update_settings {
-		.mStickToFloorStepDown = JPH::Vec3(0.0f, -0.01f, 0.0f),
-		.mWalkStairsStepUp = Vec3(0, 1, 0),
-		.mWalkStairsMinStepForward = 0.02f,
-		.mWalkStairsStepForwardTest = 0.1f,
-
-	};
-	pPlayerVirt->ExtendedUpdate(
-		delta_time, gravity, update_settings, phys.GetDefaultBroadPhaseLayerFilter(collision_layer),
-		phys.GetDefaultLayerFilter(collision_layer), {}, {}, *gPhysics->pBackend->pTempAllocator);
 }
 
 } // namespace fx::physics

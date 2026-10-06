@@ -14,6 +14,13 @@ namespace fx {
 
 using namespace renderer;
 
+static_assert(sizeof(Vec2f) == 4 * sizeof(float32));
+static_assert(sizeof(Vec3f) == 4 * sizeof(float32));
+static_assert(offsetof(RxPlayerState, speed_multiplier) == 64);
+static_assert(offsetof(RxPlayerState, sprinting) == 72);
+
+Player::Player() {}
+
 void Player::Create()
 {
 	pCamera = MakeRef<PerspectiveCamera>();
@@ -24,7 +31,7 @@ void Player::Create()
 	Physics.Create();
 
 	// Since the physics position is the center of the capsule, we will use standing height / 2.
-	mCameraOffset = Vec3f(0, physics::PhysicsPlayer::scStandingHeight, 0);
+	mpState->camera_offset[1] = physics::PhysicsPlayer::scStandingHeight;
 
 	// Load the view model
 
@@ -45,9 +52,6 @@ void Player::Create()
 			object->SetCullable(false);
 			object->SetObjectLayer(eObjectLayer::PlayerLayer);
 			object->SetProbeVisible(false);
-
-			if (object->pSkeleton.IsValid()) {
-			}
 
 			mpViewModel = object;
 
@@ -71,10 +75,7 @@ void Player::Create()
 			}
 
 			// Start in line with the camera so the view model doesn't swing in when it first appears
-			mViewSway.prev_yaw = pCamera->mAngleX;
-			mViewSway.prev_pitch = pCamera->mAngleY;
-			mViewSway.yaw = 0.0f;
-			mViewSway.pitch = 0.0f;
+			rx_player_start_sway(mpState, pCamera->GetCore());
 		});
 
 	gWorld->Attach(view_model);
@@ -82,73 +83,24 @@ void Player::Create()
 	Weapons.Create(this);
 }
 
-void Player::MoveBy(const Vec3f& by)
-{
-	Position += by;
-	RequirePhysicsUpdate();
-}
+void Player::MoveBy(const Vec3f& by) { rx_player_move_by(mpState, &by.mData[0]); }
 
-void Player::RotateCamera(const Vec2f& xy)
-{
-	pCamera->Rotate(xy.X, xy.Y);
-	mCameraGoal = pCamera->GetRotation();
+void Player::RotateHead(const Vec2f& xy) { rx_player_rotate_head(mpState, pCamera->GetCore(), xy.X, xy.Y); }
 
-	RequireDirectionUpdate();
-}
-
-void Player::RotateHead(const Vec2f& xy)
-{
-	rx_recoil_cancel(&mRecoil, xy.X, xy.Y);
-
-	RotateCamera(xy);
-}
-
-void Player::Jump()
-{
-	if (Physics.bIsGrounded && !mbIsFlymode) {
-		JumpForce = 2.5f;
-	}
-}
+void Player::Jump() { rx_player_jump(mpState, Physics.IsGrounded()); }
 
 void Player::SetFlyMode(bool value)
 {
-	mbIsFlymode = value;
-	Physics.bDisableGravity = value;
+	rx_player_set_fly_mode(mpState, value);
+	Physics.SetGravityDisabled(value);
 }
 
 void Player::Move(float64 delta_time, const Vec3f& offset)
 {
-	const Vec3f forward = MovementDirection * offset.Z;
-	const Vec3f right = MovementDirection.Cross(Vec3f::sUp) * -offset.X;
-	const Vec3f up = Vec3f::sUp * offset.Y;
-
-	mMovementGoal = (forward + right + up);
-
-	if (mMovementGoal.Length() > 1e-3) {
-		mMovementGoal.NormalizeIP();
-	}
-
-	mUserForce.SmoothInterpolate(mMovementGoal * (bIsSprinting ? scMaxSprintSpeed : scMaxWalkSpeed) *
-									 Vec3f(SpeedMultiplier),
-								 scMovementLerpSpeed, delta_time);
-
-	if (mMovementGoal.Length() <= 0.25) {
-		mBobCounterY = MathUtil::SmoothInterpolate(mBobCounterY, 0.0f, 10.0f, delta_time);
-	}
-
-	Vec3f force = mUserForce;
-
-	if (!mbIsFlymode) {
-		force.Y = JumpForce;
-		JumpForce = 0;
-	}
+	Vec3f force;
+	rx_player_movement_force(mpState, delta_time, &offset.mData[0], &force.mData[0]);
 
 	Physics.ApplyMovement(force);
-}
-
-void Player::UpdateViewModelSway(float32 delta_time)
-{
-	rx_view_sway_update(&mViewSway, pCamera->mAngleX, pCamera->mAngleY, delta_time);
 }
 
 void Player::UpdateViewModel(double delta_time)
@@ -157,61 +109,24 @@ void Player::UpdateViewModel(double delta_time)
 		return;
 	}
 
-	UpdateViewModelSway(static_cast<float32>(delta_time));
+	const Vec3f velocity = Physics.GetLinearVelocity();
 
-	// Pitch/yaw map to euler angles the same way as PerspectiveCamera::GetRotation(). Roll goes in this local offset
-	// rather than the camera's euler angles, as FromEulerAngles applies Z last in world space.
-	const Quat sway = Quat::FromEulerAngles(Vec3f(-mViewSway.pitch + mViewModelHolster * scHolsterPitch,
-												  mViewSway.yaw, mViewSway.yaw * scViewModelSwayRoll));
+	float32 position[3];
+	float32 rotation[4];
 
-	mViewModelRotation = Quat::FromEulerAngles(pCamera->GetRotation()) * sway;
+	rx_player_view_model_pose(mpState, pCamera->GetCore(), &velocity.mData[0], static_cast<float32>(delta_time),
+							  position, rotation);
 
-	// Build the basis from the lagging rotation (rather than the camera's) so the view model pivots around the eye.
-	const Mat4f view_model_basis = Mat4f::AsRotation(mViewModelRotation);
-
-	const Vec3f right = Vec3f(view_model_basis.Rows[0]);
-	const Vec3f up = Vec3f(view_model_basis.Rows[1]);
-	const Vec3f forward = Vec3f(view_model_basis.Rows[2]);
-
-	float32 horizontal_scale = 0.19f;
-	float32 vertical_scale = 0.15f;
-
-	// if (bIsSprinting) {
-	// 	horizontal_scale = 0.30f;
-	// 	vertical_scale = 0.3f;
-	// }
-
-	// Negate the bob (l'eponge) to reduce motion and make the movement feel more cohesive.
-	const Vec3f bob = -GetBob();
-
-	Vec3f view_model_bob = (right * (bob.X * horizontal_scale)) + (up * (bob.Y * vertical_scale));
-	view_model_bob += Vec3f(-Physics.pPlayerVirt->GetLinearVelocity() * 0.004f);
-
-	// const float32 rotx = sin(gWorld->Player.mBobCounterY * 0.5f) * 0.05f;
-
-	mpViewModel->SetPosition(pCamera->Position - (forward * (0.05 + mViewKick.value[ViewKickBack])) + (up * (0.15 - mViewModelHolster * scHolsterDrop)) +
-							 (right * 0.0) + view_model_bob);
-	const Quat kick = Quat::FromEulerAngles(
-		Vec3f(-mViewKick.value[ViewKickPitch], mViewKick.value[ViewKickYaw], mViewKick.value[ViewKickRoll]));
-
-	mpViewModel->SetRotation(mViewModelRotation * kick);
+	mpViewModel->SetPosition(Vec3f(position[0], position[1], position[2]));
+	mpViewModel->SetRotation(Quat(rotation[0], rotation[1], rotation[2], rotation[3]));
 }
-
-static float32 RandomUnitClosed()
-{
-	return static_cast<float32>(FastRand32() >> 8) * (2.0f / 16777215.0f) - 1.0f; // [-1.0, 1.0]
-}
-
-void Player::UpdateViewKick(float32 delta_time) { rx_view_kick_update(&mViewKick, delta_time); }
 
 void Player::DoFireAnimation(float32 kick_degrees, float32 kickback)
 {
-	const float32 random_yaw = RandomUnitClosed();
-	const float32 random_roll = RandomUnitClosed();
+	const float32 random_yaw = RandomSignedUnit();
+	const float32 random_roll = RandomSignedUnit();
 
-	rx_view_kick_fire(&mViewKick, kick_degrees, kickback, random_yaw, random_roll);
-
-	mbIsFiring = true;
+	rx_view_kick_fire(&mpState->kick, kick_degrees, kickback, random_yaw, random_roll);
 
 	if (!mpViewModelSkeleton) {
 		return;
@@ -263,85 +178,19 @@ void Player::SetViewModelAnimations(const char* idle, const char* fire, const ch
 	}
 }
 
-void Player::AddRecoil(float32 pitch, float32 yaw) { rx_recoil_add(&mRecoil, pitch, yaw); }
-
-void Player::UpdateRecoil(float32 delta_time)
-{
-	float32 delta_yaw = 0.0f;
-	float32 delta_pitch = 0.0f;
-
-	rx_recoil_update(&mRecoil, delta_time, &delta_yaw, &delta_pitch);
-
-	if (delta_pitch != 0.0f || delta_yaw != 0.0f) {
-		const float32 pitch_before = pCamera->mAngleY;
-
-		RotateCamera(Vec2f(delta_yaw, delta_pitch));
-
-		rx_recoil_pitch_clamped(&mRecoil, delta_pitch, pCamera->mAngleY - pitch_before);
-	}
-}
-
+void Player::AddRecoil(float32 pitch, float32 yaw) { rx_recoil_add(&mpState->recoil, pitch, yaw); }
 
 void Player::Update(float64 delta_time)
 {
 	Physics.Update(delta_time);
 	SyncPhysicsToPlayer();
 
-	UpdateRecoil(static_cast<float32>(delta_time));
-
-	UpdateDirection();
-	pCamera->MoveTo(Position + mCameraOffset);
-
-	const bool user_force_released = mUserForce.IsNearZero(0.1);
-
-	// const bool should_reset_center = ((user_force_released || Physics.bIsGrounded) &&
-	// 								  (MathUtil::IsCloseTo(mBobCounterY, 0.0f) == false));
-
-	UpdateViewKick(static_cast<float32>(delta_time));
-
-	if (gCVars->Get("b_headbob_enabled", false) && (Physics.bIsGrounded)) {
-		float32 body_speed = mUserForce.Length();
-		float32 counter_speed = (bBobReverse ? -2.3f : 2.3f);
-
-		mBobCounterY += delta_time * counter_speed * body_speed;
-
-
-		if (mBobCounterY > (FX_PI_2)) {
-			bBobReverse = true;
-		}
-		else if (mBobCounterY < -(FX_PI_2)) {
-			bBobReverse = false;
-		}
-	}
-
-
-	float32 bob_sin, bob_cos;
-	MathUtil::SinCos(mBobCounterY + FX_PI_2, &bob_sin, &bob_cos);
-
-	mHeadBobX = HeadBobStrength.X * bob_cos;
-	mHeadBobY = HeadBobStrength.Y * bob_sin;
-
-	Vec3f bob_vector = pCamera->GetUpVector() * mHeadBobY + pCamera->GetRightVector() * mHeadBobX;
-	pCamera->MoveBy(bob_vector);
-
-	if (user_force_released == false) {
-		if (bIsSprinting && pCamera->GetFov() < scSprintFov) {
-			pCamera->SetFov(MathUtil::SmoothInterpolate(pCamera->GetFov(), scSprintFov, 8.0f, delta_time));
-		}
-		else if (!bIsSprinting && pCamera->GetFov() > scWalkingFov) {
-			pCamera->SetFov(MathUtil::SmoothInterpolate(pCamera->GetFov(), scWalkingFov, 13.0f, delta_time));
-		}
-	}
-
-	pCamera->Update();
+	rx_player_update(mpState, pCamera->GetCore(), delta_time, Physics.IsGrounded(),
+					 gCVars->Get("b_headbob_enabled", false));
 
 	Weapons.Update(static_cast<float32>(delta_time));
 
-	mbUpdatePhysicsTransform = false;
-
 	UpdateViewModel(delta_time);
 }
-
-Player::~Player() {}
 
 } // namespace fx

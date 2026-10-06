@@ -1,45 +1,8 @@
 #include "Bitset.hpp"
 
+#include <cstdio>
+
 namespace fx {
-
-
-uint32 Bitset::Init(uint32 max_bits)
-{
-    // 0 0 1 1 1 1 1 1 -> 63 -> 3F
-    const uint8 remainder = (max_bits & 0x3F);
-
-    // Adjust the amount of bits to be a multiple of 64
-    if (remainder != 0) {
-        max_bits += (scBitsPerInt - remainder);
-    }
-
-    const uint32 ints_required = (max_bits >> 6);
-
-    mBits.InitSize(ints_required);
-
-    return ints_required;
-}
-
-
-void Bitset::InitZero(uint32 max_bits)
-{
-    uint32 num_ints = Init(max_bits);
-
-    for (uint32 i = 0; i < num_ints; i++) {
-        mBits[i] = 0;
-    }
-}
-
-void Bitset::InitOne(uint32 max_bits)
-{
-    uint32 num_ints = Init(max_bits);
-
-    for (uint32 i = 0; i < num_ints; i++) {
-        mBits[i] = ~0ULL;
-    }
-}
-
-void Bitset::ClearAll() { memset(mBits.pData, 0, mBits.GetCapacityInBytes()); }
 
 static constexpr uint8 GetBit(uint8 byte, uint8 bit) { return ((byte >> bit) & 0x01); }
 
@@ -49,25 +12,23 @@ static void PrintByte(uint8 b)
            GetBit(b, 1), GetBit(b, 0));
 }
 
-
 void Bitset::Print() const
 {
-    uint32 size = static_cast<uint32>(mBits.Size);
+    if (mpSlots == nullptr) {
+        return;
+    }
 
-    for (int i = 0; i < size; i++) {
-        uint64 value = mBits.pData[i];
+    const uint64* words = rx_slots_words(mpSlots);
+    const uint32 size = static_cast<uint32>(rx_slots_capacity(mpSlots) / scBitsPerInt);
+
+    for (uint32 i = 0; i < size; i++) {
+        const uint64 value = words[i];
 
         printf("Bits(%d): ", i + 1);
 
-        PrintByte(static_cast<uint8>(value >> 56));
-        PrintByte(static_cast<uint8>(value >> 48));
-        PrintByte(static_cast<uint8>(value >> 40));
-        PrintByte(static_cast<uint8>(value >> 32));
-
-        PrintByte(static_cast<uint8>(value >> 24));
-        PrintByte(static_cast<uint8>(value >> 16));
-        PrintByte(static_cast<uint8>(value >> 8));
-        PrintByte(static_cast<uint8>(value >> 0));
+        for (int shift = 56; shift >= 0; shift -= 8) {
+            PrintByte(static_cast<uint8>(value >> shift));
+        }
 
         printf("\n");
     }

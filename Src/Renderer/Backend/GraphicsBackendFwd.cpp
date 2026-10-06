@@ -11,7 +11,7 @@ namespace GraphicsBackendFwd {
 GpuDevice* GetDevice() { return gGraphics->GetDevice(); }
 FrameData* GetFrame() { return gGraphics->GetFrame(); }
 
-CommandBuffer& GetUploadCmd() { return gGraphics->UploadContext.CmdBuffer; }
+CommandBuffer& GetUploadCmd() { return gGraphics->UploadCmd; }
 
 void SubmitImmediateUploadCmd(GraphicsBackend::SubmitFunc upload_func)
 {

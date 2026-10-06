@@ -3,7 +3,6 @@
 #include <Asset/AssetManager.hpp>
 #include <CVar.hpp>
 #include <Core/MemPool/MemPool.hpp>
-#include <Core/Thread/ThreadManager.hpp>
 #include <Decal/DecalManager.hpp>
 #include <Editor/RaptorEditor.hpp>
 #include <Material/MaterialManager.hpp>
@@ -25,7 +24,6 @@ AssetManager* gAssetManager = nullptr;
 ObjectManager* gObjectManager = nullptr;
 TextureManager* gTextureManager = nullptr;
 MaterialManager* gMaterialManager = nullptr;
-ThreadManager* gThreadManager = nullptr;
 
 MemPool* gEnginePool = nullptr;
 MemPool* gScriptMemPool = nullptr;
@@ -58,7 +56,6 @@ void Init()
 	gMaterialManager = new MaterialManager;
 	gWorldGrid = new WorldGrid;
 	gTextureManager = new TextureManager;
-	gThreadManager = new ThreadManager;
 	gWorld = new World;
 	gLightManager = new LightManager;
 	gLightManager->Create();
@@ -73,7 +70,6 @@ void Destroy()
 	DESTROY_GLOBAL(gPhysics);
 	DESTROY_GLOBAL(gMaterialManager);
 	DESTROY_GLOBAL(gWorldGrid);
-	DESTROY_GLOBAL(gThreadManager);
 	DESTROY_GLOBAL(gScriptManager);
 	DESTROY_GLOBAL(gWorld);
 	DESTROY_GLOBAL(gLightManager);

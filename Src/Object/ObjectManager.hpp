@@ -3,8 +3,10 @@
 #include "Object.hpp"
 #include "ObjectID.hpp"
 
+#include <raptor_ffi.h>
+
 #include <Core/Bitset.hpp>
-#include <Core/FreeArray.hpp>
+#include <vector>
 #include <Renderer/Backend/Descriptors.hpp>
 #include <Renderer/Backend/GpuBuffer.hpp>
 
@@ -29,7 +31,6 @@ public:
 public:
 	void Create();
 
-	ObjectID NewObjectID(const std::string& name, eObjectTag tags = eObjectTag::None);
 	Object* NewObject(const std::string& name, MaterialID material, eObjectTag tags = eObjectTag::None);
 
 	Object* GetObject(ObjectID id);
@@ -55,25 +56,59 @@ public:
 	uint32 GetPageSize() const;
 
 	/**
-	 * @brief Finds an object slot with `num_instances` free slots following.
-	 *
-	 * @note This does not update the object's object id or set the reserved instances counter, use
-	 * Object::ReserveInstances() for that!
-	 *
-	 * @param object_id An object id of the current object if it needs to be moved.
-	 * @returns The object id for the first slot of the block.
+	 * @brief The objects that are in use, to loop over. The list of them is taken when this is called.
 	 */
-	ObjectID ReserveInstances(const ObjectID& object_id, uint32 num_instances);
+	class Range
+	{
+	public:
+		class Iterator
+		{
+		public:
+			Iterator(Object* base, const uint32* at) : mpBase(base), mpAt(at) {}
 
-	const FreeArray<Object>& GetCache() const { return mObjectList; }
-	FreeArray<Object>& GetCache() { return mObjectList; }
+			Object& operator*() const { return mpBase[*mpAt]; }
+			Iterator& operator++()
+			{
+				++mpAt;
+				return *this;
+			}
+			bool operator!=(const Iterator& other) const { return mpAt != other.mpAt; }
+
+		private:
+			Object* mpBase;
+			const uint32* mpAt;
+		};
+
+		Range(Object* base, std::vector<uint32>&& ids) : mpBase(base), mIds(std::move(ids)) {}
+
+		Iterator begin() { return Iterator(mpBase, mIds.data()); }
+		Iterator end() { return Iterator(mpBase, mIds.data() + mIds.size()); }
+
+		size_t Size() const { return mIds.size(); }
+
+	private:
+		Object* mpBase;
+		std::vector<uint32> mIds;
+	};
+
+	Range GetCache();
+
+	const RxObjectStore* GetStore() const { return mpStore; }
 
 	void Destroy();
 
-	~ObjectManager() { Destroy(); }
+	~ObjectManager()
+	{
+		Destroy();
+		rx_object_store_free(mpStore);
+	}
 
 private:
 	ObjectGpuEntry* GetBufferAtFrame(uint32 object_id);
+
+	Object* Slot(uint32 id) { return reinterpret_cast<Object*>(mpStorage) + id; }
+
+	std::vector<uint32> UsedIds() const;
 
 public:
 	// renderer::DescriptorPool mDescriptorPool {};
@@ -89,7 +124,10 @@ public:
 	std::mutex mInUse;
 
 private:
-	FreeArray<Object> mObjectList;
+	RxObjectStore* mpStore = rx_object_store_new(scMaxObjects);
+
+	/// Where the objects are, one slot for each id in the store
+	uint8* mpStorage = nullptr;
 };
 
 } // namespace fx

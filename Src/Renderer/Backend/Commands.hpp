@@ -53,14 +53,26 @@ public:
     FX_FORCE_INLINE const VkCommandBuffer Get() const { return Cmd; }
     FX_FORCE_INLINE VkCommandBuffer Get() { return Cmd; }
 
-    FX_FORCE_INLINE uint32 QueueFamily() const { return mpCommandPool->QueueFamilyIndex; }
+    FX_FORCE_INLINE uint32 QueueFamily() const
+    {
+        return (mpCommandPool != nullptr) ? mpCommandPool->QueueFamilyIndex : mExternalQueueFamily;
+    }
+
+    /// Makes this a view of a command buffer that something else owns, such as the upload context in Rust.
+    void WrapExternal(VkCommandBuffer cmd, uint32 queue_family)
+    {
+        Cmd = cmd;
+        mExternalQueueFamily = queue_family;
+        mpDevice = nullptr;
+        mbInitialized = true;
+    }
 
     operator VkCommandBuffer() const { return Cmd; }
 
     bool IsInitialized() const { return mbInitialized; }
 
     /// The pipeline most recently bound in this command buffer, so a repeated bind can be skipped
-    mutable VkPipeline pBoundPipeline = nullptr;
+    mutable uint64 BoundPipeline = 0;
 
 private:
     void CheckInitialized() const;
@@ -70,6 +82,7 @@ public:
 
 private:
     bool mbInitialized = false;
+    uint32 mExternalQueueFamily = 0;
     CommandPool* mpCommandPool = nullptr;
     GpuDevice* mpDevice = nullptr;
 };

@@ -181,7 +181,7 @@ public:
 	FreeArray<ObjectID> BlockoutObjects;
 	World* pWorld = nullptr;
 
-	MaterialID SelectionMaterialID = MaterialID::scNull;
+	// MaterialID SelectionMaterialID = MaterialID::scNull;
 
 	Object* pXFormObject = nullptr;
 
@@ -189,7 +189,7 @@ public:
 	Object* pPreviewObject = nullptr;
 
 private:
-	MaterialLibrary mMaterials;
+	// MaterialLibrary mMaterials;
 	HashMap<uint32, Brush> mBrushes;
 
 	Brush::PlaneList mPreviewPlanes;

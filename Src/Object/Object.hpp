@@ -2,9 +2,6 @@
 
 #include "Physics/Body.hpp"
 
-// #include <ThirdParty/Jolt/Jolt.h>
-// #include <ThirdParty/Jolt/Physics/Body/Body.h>
-// #include <ThirdParty/Jolt/Physics/Body/BodyID.h>
 
 #include <Asset/Animation.hpp>
 #include <Core/Name.hpp>
@@ -52,6 +49,10 @@ enum class eObjectFlags : uint16
 	/// Left out of light probe bakes (capture, capture shadows and probe placement). See Object::IsProbeVisible().
 	NotProbeVisible = (1 << 6),
 	SharedMesh = (1 << 7),
+	/// The object has a mesh to draw
+	HasMesh = (1 << 8),
+	/// The mesh of the object is skinned
+	Skinned = (1 << 9),
 };
 
 FxEnumFlags(eObjectFlags);
@@ -59,6 +60,42 @@ FxEnumFlags(eObjectFlags);
 
 class PrimitiveMesh;
 struct SkeletonCloneMap;
+
+/**
+ * @brief The nodes attached to an object. The list is kept by Rust, with the rest of the object's record.
+ */
+class ObjectChildren
+{
+public:
+	explicit ObjectChildren(RxObjectCore* core) : mpCore(core) {}
+
+	uint32 Size() const
+	{
+		size_t count = 0;
+		rx_object_children(mpCore, &count);
+		return static_cast<uint32>(count);
+	}
+
+	bool IsEmpty() const { return Size() == 0; }
+
+	void Insert(const ObjectID& id) { rx_object_add_child(mpCore, id.GetID()); }
+	void Clear() { rx_object_clear_children(mpCore); }
+
+	ObjectID& operator[](uint32 index) const { return Data()[index]; }
+
+	ObjectID* begin() const { return Data(); }
+	ObjectID* end() const { return Data() + Size(); }
+
+private:
+	ObjectID* Data() const
+	{
+		size_t count = 0;
+		return reinterpret_cast<ObjectID*>(const_cast<uint32*>(rx_object_children(mpCore, &count)));
+	}
+
+private:
+	RxObjectCore* mpCore;
+};
 
 class Object final : public Entity
 {
@@ -68,15 +105,20 @@ public:
 	static constexpr eEntityType scEntityType = eEntityType::Object;
 
 public:
-	Object() = default;
-	Object(const ObjectID id);
-	Object(const ObjectID id, const MaterialID material);
-
-	void MakeInstanceOf(const ObjectID& source);
+	/// An object whose records are kept by the object store, which outlives it
+	Object(RxEntityCore* entity_core, RxObjectCore* object_core)
+		: Entity(entity_core), mpObjectCore(object_core)
+	{
+	}
 
 	Object* CloneWithOwnSkeleton(const std::string& name) const;
 
 	void Create(const Ref<PrimitiveMesh>& mesh, const MaterialID& material);
+
+	/**
+	 * @brief Gives the object the mesh it draws. The record that the renderer culls objects from learns of it.
+	 */
+	void SetMesh(const Ref<PrimitiveMesh>& mesh);
 
 	/**
 	 * @brief Render only the primitive(s) for the objects. Does not bind material or other object data.
@@ -103,11 +145,6 @@ public:
 	// XXX: TEMP
 	void UpdateAnimation();
 
-	/**
-	 * @brief Reserve `num_instances` amount of future instances in the object manager.
-	 * @note This may update the object id if there are not enough free slots following this object.
-	 */
-	void ReserveInstances(uint32 num_instances);
 
 	/////////////////////////////////////
 	// Script
@@ -124,6 +161,9 @@ public:
 	FX_FORCE_INLINE const MaterialID& GetMaterialID() const { return mMaterialID; };
 
 	void SetMaterial(const MaterialID& id);
+
+	/// Sets the material of an object that has just been made, before anything knows of it
+	void SetMaterialDirect(const MaterialID& id) { mMaterialID = id; }
 
 	/////////////////////////////////////
 	// Physics
@@ -197,15 +237,12 @@ public:
 	 * @brief True if light probe bakes should include this object. Objects on the player layer (the view model) are
 	 * never part of the level, so they are always left out.
 	 */
-	FX_FORCE_INLINE bool IsProbeVisible() const
-	{
-		return !HasFlag(Flags, eObjectFlags::NotProbeVisible) && (mObjectLayer != eObjectLayer::PlayerLayer);
-	}
+	FX_FORCE_INLINE bool IsProbeVisible() const { return rx_object_is_probe_visible(mpObjectCore) != 0; }
 
 	void SetUnlit(const bool value);
 	FX_FORCE_INLINE bool IsUnlit() const { return (Flags & eObjectFlags::Unlit) != 0; }
 
-	FX_FORCE_INLINE bool IsSkinned() const { return (pMesh != nullptr) && pMesh->VertexList.IsSkinned(); }
+	FX_FORCE_INLINE bool IsSkinned() const { return (pMesh != nullptr) && pMesh->IsSkinned(); }
 
 	/// A skinned mesh can only be drawn once its pose is in the bone buffer this frame. Otherwise the shader would read
 	/// matrices outside of what was written, or past the end of the buffer.
@@ -236,31 +273,34 @@ private:
 
 	Object* CloneNode(const std::string& name, SkeletonCloneMap& skeletons) const;
 
+private:
+	RxObjectCore* mpObjectCore = nullptr;
+
 public:
 	Ref<PrimitiveMesh> pMesh { nullptr };
-	physics::BodyID PhysicsID = physics::BodyID::scNull;
+	physics::BodyID& PhysicsID = *reinterpret_cast<physics::BodyID*>(&mpObjectCore->physics_id);
 
-	eObjectTag Tags = eObjectTag::None;
+	eObjectTag& Tags = *reinterpret_cast<eObjectTag*>(&mpObjectCore->tags);
 
 	Ref<Skeleton> pSkeleton { nullptr };
-	uint32 BoneBufferBase = Skeleton::scNoBones;
+	uint32& BoneBufferBase = mpObjectCore->bone_buffer_base;
 
-	ObjectID ParentID = ObjectID::scNull;
-	PagedArray<ObjectID> AttachedNodes;
+	ObjectID& ParentID = *reinterpret_cast<ObjectID*>(&mpObjectCore->parent_id);
+	ObjectChildren AttachedNodes { mpObjectCore };
 
-	AABB Bounds { Vec3f::sZero, Vec3f::sZero };
+	AABB& Bounds = *reinterpret_cast<AABB*>(mpObjectCore->bounds_min);
 
 	std::atomic_bool bIsAddedToWorld = false;
 
 
 private:
-	MaterialID mMaterialID = MaterialID::scNull;
+	MaterialID& mMaterialID = *reinterpret_cast<MaterialID*>(&mpObjectCore->material_id);
 	/// Object slots allocated following this object. Used by other instances of this object.
-	uint16 mInstanceSlots = 0;
-	uint16 mInstanceSlotsInUse = 0;
+	uint16& mInstanceSlots = mpObjectCore->instance_slots;
+	uint16& mInstanceSlotsInUse = mpObjectCore->instance_slots_in_use;
 
-	eObjectFlags Flags = eObjectFlags::None;
-	eObjectLayer mObjectLayer = eObjectLayer::WorldLayer;
+	eObjectFlags& Flags = *reinterpret_cast<eObjectFlags*>(&mpObjectCore->flags);
+	eObjectLayer& mObjectLayer = *reinterpret_cast<eObjectLayer*>(&mpObjectCore->layer);
 
 };
 

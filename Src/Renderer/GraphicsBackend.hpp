@@ -37,23 +37,6 @@ enum class eFrameResult
 
 class TiledForwardRenderer;
 
-struct GpuUploadContext
-{
-	CommandPool CmdPool;
-	CommandBuffer CmdBuffer;
-	Fence UploadFence;
-
-	// Immediate uploads can come from any thread while the asset thread records `CmdBuffer`, so they get their own pool
-	// (pools are externally synchronized) and are serialized by `ImmediateMutex`.
-	CommandPool ImmediateCmdPool;
-	CommandBuffer ImmediateCmdBuffer;
-	Fence ImmediateUploadFence;
-	std::mutex ImmediateMutex;
-
-	~GpuUploadContext() = default;
-};
-
-
 class GraphicsBackend
 {
 	const uint32 scDeletionFrameSpacing = 3;
@@ -215,7 +198,10 @@ public:
 
 	RxGpuAllocator* GpuAllocator = nullptr;
 
-	GpuUploadContext UploadContext;
+	/// Records and submits the work that copies data to the GPU. It lives in Rust, and the command buffer
+	/// is a view of the one the asset thread batches uploads in.
+	RxUploadContext* pUploadContext = nullptr;
+	CommandBuffer UploadCmd;
 
 	bool bInitialized = false;
 	bool bDidFrameResize = false;
@@ -286,9 +272,6 @@ public:
 	uint32 ReflectionProbePageSize = 0;
 
 	Image* pReflectionProbes = nullptr;
-
-	Semaphore TransferSync;
-	std::atomic_uint64_t TransferCount = 0;
 
 	DescriptorSet* pLightsDescriptor = nullptr;
 

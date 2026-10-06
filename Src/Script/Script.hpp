@@ -4,8 +4,7 @@
 
 #include <Core/String.hpp>
 
-struct StrataJit;
-struct StrataCompiler;
+#include <raptor_ffi.h>
 
 namespace fx::script {
 
@@ -13,15 +12,12 @@ class Script
 {
 public:
 	Script() = delete;
-	Script(const String& path);
+	explicit Script(const String& path) : mId(rx_script_load(path.CStr())) {}
 
 	Script(const Script& other) = delete;
-	Script(Script&& other);
-
 	Script& operator=(const Script& other) = delete;
-	Script& operator=(Script&& other);
 
-	void ReloadScript();
+	void ReloadScript() { rx_script_reload(mId); }
 
 	template <typename TSignature>
 	auto GetFunction(const char* fn_name) const -> ScriptFunctionType<TSignature>
@@ -45,15 +41,13 @@ public:
 
 		if (func_ptr != nullptr) {
 			if constexpr (std::is_void_v<ReturnType>) {
-				func_ptr(mpGlobalContext, args...);
+				func_ptr(GetGlobalContext(), args...);
 				return;
 			}
 			else {
-				return func_ptr(mpGlobalContext, args...);
+				return func_ptr(GetGlobalContext(), args...);
 			}
 		}
-
-		// Fallback if function ptr was not found
 
 		if constexpr (std::is_void_v<ReturnType>) {
 			return;
@@ -63,14 +57,6 @@ public:
 		}
 	}
 
-	/**
-	 * @brief Calls a function in the script from its signature.
-	 *
-	 * For example, you can call a function as the following:
-	 * ```cpp
-	 * float result = CallFunctionPtr<float(float, float)>(ptr_add_floats, 10.0f, 20.0f);
-	 * ```
-	 */
 	template <typename TSignature, typename... TArgs>
 	auto CallFunctionPtr(ScriptFunctionType<TSignature> func_ptr, TArgs... args)
 		-> ScriptFunction<TSignature>::ReturnType
@@ -78,39 +64,29 @@ public:
 		using SF = ScriptFunction<TSignature>;
 
 		if constexpr (std::is_void_v<typename SF::ReturnType>) {
-			func_ptr(mpGlobalContext, args...);
+			func_ptr(GetGlobalContext(), args...);
 			return;
 		}
 		else {
-			return func_ptr(mpGlobalContext, args...);
+			return func_ptr(GetGlobalContext(), args...);
 		}
 	}
 
+	void* GetGlobalContext() { return rx_script_context(mId); }
 
-	FX_FORCE_INLINE void* GetGlobalContext() { return mpGlobalContext; }
+	bool HasErrors() const { return rx_script_has_errors(mId); }
 
+	uint32_t GetId() const { return mId; }
 
-	FX_FORCE_INLINE bool HasErrors() const { return (mpErrors != nullptr); };
-	FX_FORCE_INLINE const char* GetErrors() const { return mpErrors; }
-
-	~Script();
-
-private:
-	void* GetFunctionPtr(const char* fn_name) const;
-
-	void CreateGlobalData();
-	void DestroyGlobalData();
-
-
-	void SetExterns();
+	~Script() { rx_script_free(mId); }
 
 private:
-	struct StrataJit* mpJit = nullptr;
-	const char* mpErrors = nullptr;
+	void* GetFunctionPtr(const char* fn_name) const
+	{
+		return const_cast<void*>(rx_script_function(mId, fn_name));
+	}
 
-	void* mpGlobalContext = nullptr;
-
-	String mPath;
+	uint32_t mId;
 };
 
 } // namespace fx::script
