@@ -561,10 +561,55 @@ public:
 	bool HasErrors() const { return mbHasErrors; }
 
 private:
+	void Parse(PagedArray<Token>& tokens);
+
+	bool EatToken(eTokenType type);
+	bool EatToken(const Slice<eTokenType>& expected_types);
+
+	bool ParseEntry(ConfigEntry* parent, ConfigEntry& out_entry);
+	bool ParseValue(ConfigPrimitive& value);
+	bool ParseReference(ConfigPrimitive& value);
+
+	/// Skip tokens until the start of the next `name =` entry (or a closing brace if `in_struct`).
+	void SkipToNextEntry(bool in_struct);
+
+	FX_FORCE_INLINE bool IsAtEnd() const { return mpTokens == nullptr || mTokenIndex >= mpTokens->Size(); }
+
+	/// Returns the token at the offset from the current one. Past the end this is an empty Unknown token,
+	/// so callers never read out of bounds.
+	FX_FORCE_INLINE Token* PeekToken(uint32 offset = 0) const
+	{
+		static Token eof_token;
+		if (mpTokens == nullptr || mTokenIndex + offset >= mpTokens->Size()) {
+			return &eof_token;
+		}
+		return &mpTokens->Get(mTokenIndex + offset);
+	}
+
+	FX_FORCE_INLINE Token* GetToken() const { return PeekToken(0); }
+
+	FX_FORCE_INLINE void NextToken()
+	{
+		if (!IsAtEnd()) {
+			++mTokenIndex;
+		}
+	}
+
+	void InitConstants();
+
+
+private:
 	PagedArray<ConfigEntry> mConfigEntries;
+	SizedArray<ConfigEntry> mConstants;
+
+	PagedArray<Token>* mpTokens = nullptr;
+	uint32 mTokenIndex = 0;
 
 	bool mbHasErrors = false;
 	bool mbLoadedConstants = false;
+
+	static constexpr uint32 cMaxDepth = 64;
+	uint32 mDepth = 0;
 };
 
 } // namespace fx

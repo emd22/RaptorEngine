@@ -7,10 +7,41 @@
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
-#include <Util/RustInterop.hpp>
-#include <raptor_ffi.h>
+#include <unordered_map>
 
 namespace fx {
+
+static const float Z = (1.0f + sqrt(5.0f)) / 2.0f;	// Golden ratio
+static const Vec2f UV = Vec2f(1 / 11.0f, 1 / 3.0f); // The UV coordinates are laid out in a 11x3 grid
+
+static const int IcoVertexCount = 22;
+static const int IcoIndexCount = 60;
+
+static const Vec3f IcoVerts[] = {
+	Vec3f(0, -1, -Z), Vec3f(-1, -Z, 0), Vec3f(Z, 0, -1), Vec3f(1, -Z, 0),  Vec3f(1, Z, 0), Vec3f(-1, -Z, 0),
+	Vec3f(Z, 0, 1),	  Vec3f(0, -1, Z),	Vec3f(1, Z, 0),	 Vec3f(-1, -Z, 0), Vec3f(0, 1, Z), Vec3f(-Z, 0, 1),
+	Vec3f(1, Z, 0),	  Vec3f(-1, -Z, 0), Vec3f(-1, Z, 0), Vec3f(-Z, 0, -1), Vec3f(1, Z, 0), Vec3f(-1, -Z, 0),
+	Vec3f(0, 1, -Z),  Vec3f(0, -1, -Z), Vec3f(1, Z, 0),	 Vec3f(Z, 0, -1),
+};
+
+static const Vec2f IcoUvs[] = {
+	UV * Vec2f(0, 1), UV * Vec2f(1, 0),	 UV * Vec2f(1, 2),	UV * Vec2f(2, 1),  UV * Vec2f(2, 3), UV * Vec2f(3, 0),
+	UV * Vec2f(3, 2), UV * Vec2f(4, 1),	 UV * Vec2f(4, 3),	UV * Vec2f(5, 0),  UV * Vec2f(5, 2), UV * Vec2f(6, 1),
+	UV * Vec2f(6, 3), UV * Vec2f(7, 0),	 UV * Vec2f(7, 2),	UV * Vec2f(8, 1),  UV * Vec2f(8, 3), UV * Vec2f(9, 0),
+	UV * Vec2f(9, 2), UV * Vec2f(10, 1), UV * Vec2f(10, 3), UV * Vec2f(11, 2),
+};
+
+static const int32 IcoIndex[] = {
+	2, 6,  4, // Top
+	6, 10, 8, 10, 14, 12, 14, 18, 16, 18, 21, 20,
+
+	0, 3,  2, // Middle
+	2, 3,  6, 3,  7,  6,  6,  7,  10, 7,  11, 10, 10, 11, 14, 11, 15, 14, 14, 15, 18, 15, 19, 18, 18, 19, 21,
+
+	0, 1,  3, // Bottom
+	3, 5,  7, 7,  9,  11, 11, 13, 15, 15, 17, 19,
+};
+
 
 Ref<PrimitiveMesh> MeshGen::GeneratedMesh::AsSlimMesh()
 {
@@ -77,57 +108,300 @@ Ref<PrimitiveMesh> MeshGen::GeneratedMesh::AsMesh(renderer::eVertexType vertex_t
 	return nullptr;
 }
 
-namespace {
-
-RxFaceOptions ToRust(const MeshGenOptions& options)
+// Implementation is based on code from https://winter.dev/projects/mesh/icosphere
+Ref<MeshGen::GeneratedMesh> MeshGen::MakeIcoSphere(int resolution)
 {
-	return RxFaceOptions { .scale = options.Scale,
-						   .uv_min = { options.UvMin.X, options.UvMin.Y },
-						   .uv_max = { options.UvMax.X, options.UvMax.Y } };
-}
+	const int rn = static_cast<int>(pow(4, resolution));
 
-Ref<MeshGen::GeneratedMesh> TakeRustMesh(RxMesh* rust_mesh)
-{
-	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
+	const int total_index_count = IcoIndexCount * rn;
+	const int total_vertex_count = IcoVertexCount + IcoIndexCount * (1 - rn) / (1 - 4);
 
-	if (rust_mesh == nullptr) {
-		LogError(LC_ASSET, "Mesh generation failed");
-		return mesh;
+	SizedArray<Vec3f> positions;
+	positions.InitSize(total_vertex_count);
+
+	SizedArray<uint32> indices;
+	indices.InitSize(total_index_count);
+
+	for (int i = 0; i < IcoVertexCount; i++) { // Copy in initial mesh
+		positions[i] = IcoVerts[i];
 	}
 
-	RustInterop::ReadMesh(rust_mesh, mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices);
+	for (int i = 0; i < IcoIndexCount; i++) {
+		indices[i] = IcoIndex[i];
+	}
 
-	rx_mesh_free(rust_mesh);
+	uint32 current_index_count = IcoIndexCount;
+	uint32 current_vert_count = IcoVertexCount;
+
+	for (int r = 0; r < resolution; r++) {
+		std::unordered_map<uint64_t, int> triangleFromEdge;
+		uint32 index_count = current_index_count;
+
+		for (int t = 0; t < index_count; t += 3) {
+			int midpoints[3] {};
+
+			for (int e = 0; e < 3; e++) {
+				uint32 first = indices[t + e];
+				uint32 second = indices[t + (t + e + 1) % 3];
+
+				if (first > second) {
+					std::swap(first, second);
+				}
+
+				uint64_t hash = (uint64_t)first | (uint64_t)second << (sizeof(uint32_t) * 8);
+
+				auto [triangle, was_new_edge] = triangleFromEdge.insert({ hash, current_vert_count });
+
+				if (was_new_edge) {
+					positions[current_vert_count] = (positions[first] + positions[second]) / 2.0f;
+
+					current_vert_count += 1;
+				}
+
+				midpoints[e] = triangle->second;
+			}
+
+			int mid0 = midpoints[0];
+			int mid1 = midpoints[1];
+			int mid2 = midpoints[2];
+
+			indices[current_index_count++] = indices[t];
+			indices[current_index_count++] = mid0;
+			indices[current_index_count++] = mid2;
+
+			indices[current_index_count++] = indices[t + 1];
+			indices[current_index_count++] = mid1;
+			indices[current_index_count++] = mid0;
+
+			indices[current_index_count++] = indices[t + 2];
+			indices[current_index_count++] = mid2;
+			indices[current_index_count++] = mid1;
+
+			indices[t] = mid0; // Overwrite the original triangle with the 4th new triangle
+			indices[t + 1] = mid1;
+			indices[t + 2] = mid2;
+		}
+	}
+
+	// Normalize all of the positions
+	for (Vec3f& pos : positions) {
+		pos.NormalizeIP();
+	}
+
+	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
+	mesh->Positions = std::move(positions);
+	mesh->Indices = std::move(indices);
 
 	return mesh;
 }
 
-} // namespace
-
-Ref<MeshGen::GeneratedMesh> MeshGen::MakeIcoSphere(int resolution)
+static void MC_EmitQuad(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normals, SizedArray<Vec3f>& tangents,
+						SizedArray<Vec2f>& uvs, SizedArray<uint32>& indices, const Vec3f (&verts)[4],
+						const MeshGenOptions& options, bool flip_u, bool flip_v)
 {
-	return TakeRustMesh(rx_mesh_icosphere(resolution));
+	const Vec3f surface_normal = Vec3f::GetSurfaceNormal(verts[0], verts[1], verts[2]);
+	const uint32 base = static_cast<uint32>(positions.Size);
+
+	// The tangent runs along increasing U, which is verts[0] -> verts[1] unless the U axis is flipped below
+	Vec3f tangent = flip_u ? (verts[0] - verts[1]) : (verts[1] - verts[0]);
+	tangent.NormalizeIP();
+
+	for (int i = 0; i < 4; i++) {
+		positions.Insert(verts[i]);
+		normals.Insert(surface_normal);
+		tangents.Insert(tangent);
+	}
+
+	// Measure the quad's actual world-space width/height so the UV span
+	// scales with face size
+	const float32 quad_width = (verts[1] - verts[0]).Length();
+	const float32 quad_height = (verts[3] - verts[0]).Length();
+
+	const Vec2f uv_span = options.UvMax - options.UvMin;
+	const Vec2f uv_min = options.UvMin;
+	const Vec2f uv_max = uv_min + Vec2f(uv_span.X * quad_width, uv_span.Y * quad_height);
+
+
+	const float32 u_left = flip_u ? uv_max.X : uv_min.X;
+	const float32 u_right = flip_u ? uv_min.X : uv_max.X;
+
+	const float32 v_min = flip_v ? uv_max.Y : uv_min.Y;
+	const float32 v_max = flip_v ? uv_min.Y : uv_max.Y;
+
+	// Top Left
+	uvs.Insert(Vec2f(u_left, v_min));
+	// Top Right
+	uvs.Insert(Vec2f(u_right, v_min));
+	// Bottom Right
+	uvs.Insert(Vec2f(u_right, v_max));
+	// Bottom Left
+	uvs.Insert(Vec2f(u_left, v_max));
+
+	// Top left triangle
+	indices.Insert(base + 0);
+	indices.Insert(base + 1);
+	indices.Insert(base + 3);
+	// Bottom right triangle
+	indices.Insert(base + 1);
+	indices.Insert(base + 2);
+	indices.Insert(base + 3);
 }
 
 Ref<MeshGen::GeneratedMesh> MeshGen::MakeCube(CubeGenOptions options)
 {
-	const RxCubeOptions rust_options = {
-		.left = ToRust(options.Left),
-		.right = ToRust(options.Right),
-		.top = ToRust(options.Top),
-		.bottom = ToRust(options.Bottom),
-		.front = ToRust(options.Front),
-		.back = ToRust(options.Back),
-		.align_uvs = static_cast<uint8>(options.bAlignUVs ? 1 : 0),
-	};
+	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
 
-	return TakeRustMesh(rx_mesh_cube(&rust_options));
+	// Scales for each face
+	const float32 l_s = options.Left.Scale;
+	const float32 r_s = options.Right.Scale;
+	const float32 t_s = options.Top.Scale;
+	const float32 b_s = options.Bottom.Scale;
+	const float32 fr_s = options.Front.Scale;
+	const float32 ba_s = options.Back.Scale;
+
+	// 4 verts per face and 36 indices (2 tris per face)
+	mesh->Positions.InitCapacity(24);
+	mesh->Normals.InitCapacity(24);
+	mesh->Tangents.InitCapacity(24);
+	mesh->Texcoords.InitCapacity(24);
+	mesh->Indices.InitCapacity(36);
+
+	const Vec3f f_tl { -l_s, t_s, fr_s };	// Front TL
+	const Vec3f f_tr { r_s, t_s, fr_s };	// Front TR
+	const Vec3f f_bl { -l_s, -b_s, fr_s };	// Front BL
+	const Vec3f f_br { r_s, -b_s, fr_s };	// Front BR
+	const Vec3f b_tl { -l_s, t_s, -ba_s };	// Back TL
+	const Vec3f b_tr { r_s, t_s, -ba_s };	// Back TR
+	const Vec3f b_bl { -l_s, -b_s, -ba_s }; // Back BL
+	const Vec3f b_br { r_s, -b_s, -ba_s };	// Back BR
+
+	if (options.bAlignUVs) {
+		// Front face (+Z)
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+					{ f_tl, f_tr, f_br, f_bl }, options.Front, false, false);
+
+		// Back face (-Z)
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+					{ b_tr, b_tl, b_bl, b_br }, options.Back, true, false);
+
+		// Top face (+Y)
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+					{ b_tl, b_tr, f_tr, f_tl }, options.Top, false, false);
+
+		// Bottom face (-Y)
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+					{ f_bl, f_br, b_br, b_bl }, options.Bottom, false, true);
+
+		// Right face (+X)
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+					{ f_tr, b_tr, b_br, f_br }, options.Right, true, false);
+
+		// Left face (-X)
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+					{ b_tl, f_tl, f_bl, b_bl }, options.Left, false, false);
+
+		return mesh;
+	}
+
+	// Do not flip UVs for any faces
+
+	// Front face (+Z)
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+				{ f_tl, f_tr, f_br, f_bl }, options.Front, false, false);
+
+	// Back face (-Z)
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+				{ b_tr, b_tl, b_bl, b_br }, options.Back, false, false);
+
+	// Top face (+Y)
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+				{ b_tl, b_tr, f_tr, f_tl }, options.Top, false, false);
+
+	// Bottom face (-Y)
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+				{ f_bl, f_br, b_br, b_bl }, options.Bottom, false, false);
+
+	// Right face (+X)
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+				{ f_tr, b_tr, b_br, f_br }, options.Right, false, false);
+
+	// Left face (-X)
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+				{ b_tl, f_tl, f_bl, b_bl }, options.Left, false, false);
+	return mesh;
 }
 
-Ref<MeshGen::GeneratedMesh> MeshGen::MakeWireframeBox() { return TakeRustMesh(rx_mesh_wireframe_box()); }
+Ref<MeshGen::GeneratedMesh> MeshGen::MakeWireframeBox()
+{
+	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
 
-Ref<MeshGen::GeneratedMesh> MeshGen::MakeLine() { return TakeRustMesh(rx_mesh_line()); }
+	mesh->Positions.InitSize(8);
+	mesh->Indices.InitSize(24);
 
-Ref<MeshGen::GeneratedMesh> MeshGen::MakeQuad(Vec2f scale) { return TakeRustMesh(rx_mesh_quad(scale.X, scale.Y)); }
+	// Corner i takes its sign on each axis from bit 0, 1 and 2, so corners that differ in one bit share an edge
+	for (uint32 corner = 0; corner < 8; corner++) {
+		mesh->Positions[corner] = Vec3f((corner & 1) ? 1.0f : -1.0f, (corner & 2) ? 1.0f : -1.0f,
+										(corner & 4) ? 1.0f : -1.0f);
+	}
+
+	uint32 index = 0;
+
+	for (uint32 corner = 0; corner < 8; corner++) {
+		for (uint32 axis = 0; axis < 3; axis++) {
+			const uint32 neighbour = corner | (1u << axis);
+
+			// Emit each edge once, from the corner on the low side of the axis
+			if (neighbour == corner) {
+				continue;
+			}
+
+			mesh->Indices[index++] = corner;
+			mesh->Indices[index++] = neighbour;
+		}
+	}
+
+	Assert(index == mesh->Indices.Size);
+
+	return mesh;
+}
+
+Ref<MeshGen::GeneratedMesh> MeshGen::MakeLine()
+{
+	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
+
+	mesh->Positions.InitSize(2);
+	mesh->Indices.InitSize(2);
+
+	mesh->Positions[0] = Vec3f(0.0f, 0.0f, 0.0f);
+	mesh->Positions[1] = Vec3f(1.0f, 0.0f, 0.0f);
+
+	mesh->Indices[0] = 0;
+	mesh->Indices[1] = 1;
+
+	return mesh;
+}
+
+Ref<MeshGen::GeneratedMesh> MeshGen::MakeQuad(Vec2f scale)
+{
+	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
+
+	mesh->Positions.InitCapacity(4);
+	mesh->Normals.InitCapacity(4);
+	mesh->Tangents.InitCapacity(4);
+	mesh->Texcoords.InitCapacity(4);
+	mesh->Indices.InitCapacity(8);
+
+	const float scale_z = 1.0f;
+
+	const Vec3f b_tl { -scale.X, scale.Y, -scale_z };  //  TL
+	const Vec3f b_tr { scale.X, scale.Y, -scale_z };   //  TR
+	const Vec3f b_bl { -scale.X, -scale.Y, -scale_z }; //  BL
+	const Vec3f b_br { scale.X, -scale.Y, -scale_z };  //  BR
+
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+				{ b_tr, b_tl, b_bl, b_br }, {}, false, false);
+
+	return mesh;
+}
 
 } // namespace fx

@@ -418,8 +418,16 @@ void Tokenizer::Tokenize()
             ++mpData;
 
             while (mpData < mpDataEnd && (*mpData) != '"') {
+                const bool is_escaped = (*mpData) == '\\' && (mpData + 1) < mpDataEnd &&
+                                        ((*(mpData + 1)) == '"' || (*(mpData + 1)) == '\\');
+
                 current_token.Increment();
                 ++mpData;
+
+                if (is_escaped) {
+                    current_token.Increment();
+                    ++mpData;
+                }
             }
 
             if (mpData < mpDataEnd) {

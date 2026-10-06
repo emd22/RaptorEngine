@@ -1,7 +1,0 @@
-unstable_features = true
-
-style_edition = "2024"
-hard_tabs = true
-wrap_comments = true
-comment_width = 100
-brace_style = "AlwaysNextLine"
