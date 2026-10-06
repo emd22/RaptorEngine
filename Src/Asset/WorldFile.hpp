@@ -17,10 +17,7 @@ public:
 	// void Save(const String& path, const World& world);
 
 private:
-	void AddObjectFromEntry(const std::string& path, const ConfigEntry& object);
 	void AddColliderFromEntry(const std::string& path, const ConfigEntry& collider);
-
-	void ApplyPropertiesToObject(Object* object, const ConfigEntry& object_entry);
 
 public:
 	// ConfigFile InfoFile;

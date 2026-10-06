@@ -763,7 +763,8 @@ bool Brush::HasDefaultTextures() const
 }
 
 void Brush::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normals, SizedArray<Vec3f>& tangents,
-						 SizedArray<Vec2f>& texcoords, SizedArray<uint32>& indices) const
+						 SizedArray<float32>& tangent_handedness, SizedArray<Vec2f>& texcoords,
+						 SizedArray<uint32>& indices) const
 {
 	if (!IsValid()) {
 		return;
@@ -780,6 +781,7 @@ void Brush::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normal
 	positions.InitCapacity(vertex_count);
 	normals.InitCapacity(vertex_count);
 	tangents.InitCapacity(vertex_count);
+	tangent_handedness.InitCapacity(vertex_count);
 	texcoords.InitCapacity(vertex_count);
 	indices.InitCapacity(index_count);
 
@@ -817,6 +819,11 @@ void Brush::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normal
 		tangent = tangent * (1.0f / (uu * vv - uv * uv));
 		tangent.NormalizeIP();
 
+		Vec3f v_direction = v_gradient * uu - u_gradient * uv;
+		v_direction = v_direction * (1.0f / (uu * vv - uv * uv));
+
+		const float32 handedness = (normal.Cross(tangent).Dot(v_direction) > 0.0f) ? -1.0f : 1.0f;
+
 		const uint32 base = static_cast<uint32>(positions.Size);
 
 		for (const Vec3f& vertex : face.Vertices) {
@@ -829,6 +836,7 @@ void Brush::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normal
 			positions.Insert(vertex);
 			normals.Insert(normal);
 			tangents.Insert(tangent);
+			tangent_handedness.Insert(handedness);
 			texcoords.Insert(new_uv);
 		}
 

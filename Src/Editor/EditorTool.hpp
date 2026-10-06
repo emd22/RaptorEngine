@@ -29,6 +29,7 @@ enum class eEditorTool : uint32
 	Light,
 	Bounds,
 	Grab,
+	Spawn,
 
 	Count,
 };
@@ -44,6 +45,8 @@ enum class eEditorToolFlags : uint32
 	ClearsSelection = (1 << 1),
 
 	UsesModels = (1 << 2),
+
+	KeepBob = (1 << 3),
 };
 
 } // namespace editor

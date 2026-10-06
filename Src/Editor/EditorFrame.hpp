@@ -18,6 +18,7 @@ class WorldPropertiesPanel;
 class ToolSettingsBasePanel;
 class ObjectListWindow;
 class CVarListWindow;
+class MaterialPickerWindow;
 
 class EditorViewport;
 
@@ -47,6 +48,7 @@ public:
 
 	void ShowObjectListWindow();
 	void ShowCVarListWindow();
+	void ShowMaterialPickerWindow();
 
 	void SaveBlockout();
 	void SaveBlockoutAs();
@@ -63,6 +65,7 @@ private:
 	WorldPropertiesPanel* mpWorldPropertiesPanel = nullptr;
 	ObjectListWindow* mpObjectListWindow = nullptr;
 	CVarListWindow* mpCVarListWindow = nullptr;
+	MaterialPickerWindow* mpMaterialPickerWindow = nullptr;
 
 	/// The tool settings slot: whatever ToolSettingsBasePanel is currently swapped in, below Object Properties
 	ToolSettingsBasePanel* mpToolSettingsPanel = nullptr;

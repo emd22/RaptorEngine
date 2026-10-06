@@ -172,6 +172,25 @@ public:
 
 	Player Player;
 
+	/// Where the player starts a level, and which way it looks. `bCustom` is false until the level sets one.
+	struct PlayerSpawnPoint
+	{
+		static Vec3f DefaultPosition() { return Vec3f(0.0f, -0.2f, -2.0f); }
+
+		Vec3f Position = DefaultPosition();
+		Vec3f Direction = Vec3f::sForward;
+		bool bCustom = false;
+
+		void Reset()
+		{
+			Position = DefaultPosition();
+			Direction = Vec3f::sForward;
+			bCustom = false;
+		}
+	} PlayerSpawn;
+
+	void RespawnPlayer() { Player.SpawnAt(PlayerSpawn.Position, PlayerSpawn.Direction); }
+
 	Blockout* pBlockout = nullptr;
 	String BlockoutPath;
 

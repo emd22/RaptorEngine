@@ -51,7 +51,7 @@ static void ForEachSpotLight(TFunc&& func)
 	}
 }
 
-static Vec3f SnapDirection(const Vec3f& direction)
+Vec3f SnapDirection(const Vec3f& direction)
 {
 	const float32 step_degrees = gEditor->GetAngleSnapStep();
 
@@ -263,12 +263,11 @@ void LightEditor::CreateAtCrosshair()
 
 	EditOperation op {
 		.Type = EditOperation::eType::LightCreate,
-		.ValueA = EditOperationValue(position),
-		.ValueB = EditOperationValue(Vec3f::sZero),
 	};
 
+	op.LightSnap.Position = position;
 	// Aim er down
-	op.Light.DirectionAfter = SnapDirection(Vec3f(0.0f, -1.0f, 0.0f));
+	op.LightSnap.Direction = SnapDirection(Vec3f(0.0f, -1.0f, 0.0f));
 
 	op.LightSnap.LightName = String::Fmt("Light_{}", gLightManager->GetCache().Size).Str();
 	op.LightSnap.Radius = scNewLightRadius;
@@ -313,23 +312,11 @@ void LightEditor::DeleteSelected()
 
 	EditOperation op {
 		.Type = EditOperation::eType::LightDelete,
-		.ValueA = EditOperationValue(Vec3f::sZero),
-		.ValueB = EditOperationValue(Vec3f::sZero),
 	};
 
 	// Snapshot everything Undo needs before the Execute step destroys the light, same as RaptorEditor::DeleteObject
 	op.Light.pLight = light;
-	op.Light.Id = light->ID;
-
-	op.LightSnap.LightName = light->Name;
-	op.LightSnap.Position = light->GetPosition();
-	op.LightSnap.Direction = light->GetDirection().Normalize();
-	op.LightSnap.Radius = light->GetRadius();
-	op.LightSnap.InnerAngle = light->GetInnerAngle();
-	op.LightSnap.OuterAngle = light->GetOuterAngle();
-	op.LightSnap.bCastShadows = light->bCastShadows;
-	op.LightSnap.Colour = light->Color;
-	op.LightSnap.Intensity = light->Intensity;
+	op.LightSnap = EditOperation::LightSnapshot::Capture(*light);
 
 	gEditor->PushEditOperation(op);
 
@@ -353,19 +340,10 @@ void LightEditor::DuplicateSelected()
 
 	EditOperation op {
 		.Type = EditOperation::eType::LightCreate,
-		.ValueA = EditOperationValue(light->GetPosition()),
-		.ValueB = EditOperationValue(Vec3f::sZero),
 	};
 
-	op.Light.DirectionAfter = light->GetDirection().Normalize();
-
+	op.LightSnap = EditOperation::LightSnapshot::Capture(*light);
 	op.LightSnap.LightName = name;
-	op.LightSnap.Radius = light->GetRadius();
-	op.LightSnap.InnerAngle = light->GetInnerAngle();
-	op.LightSnap.OuterAngle = light->GetOuterAngle();
-	op.LightSnap.bCastShadows = light->bCastShadows;
-	op.LightSnap.Colour = light->Color;
-	op.LightSnap.Intensity = light->Intensity;
 
 	const EditOperationValue created = gEditor->PushEditOperation(op);
 
@@ -411,7 +389,6 @@ void LightEditor::CommitEdit()
 
 	EditOperation op {
 		.Type = EditOperation::eType::LightTransform,
-		.pObject = nullptr,
 		.ValueA = EditOperationValue(mPositionBefore),
 		.ValueB = EditOperationValue(position_after),
 	};

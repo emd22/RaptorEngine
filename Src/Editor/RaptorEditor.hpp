@@ -8,6 +8,7 @@
 #include "EditorTool.hpp"
 #include "GrabEditor.hpp"
 #include "LightEditor.hpp"
+#include "SpawnEditor.hpp"
 
 #include <wx/evtloop.h>
 
@@ -203,6 +204,8 @@ private:
 	BoundsEditor mBoundsEditor;
 
 	GrabEditor mGrabEditor;
+
+	SpawnEditor mSpawnEditor;
 
 	EditorSelection mSelection;
 	EditHistory mHistory { mSelection };
