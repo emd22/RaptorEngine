@@ -2,6 +2,7 @@
 
 #include "CVarListWindow.hpp"
 #include "EditorViewport.hpp"
+#include "MaterialPickerWindow.hpp"
 #include "ObjectListWindow.hpp"
 #include "ObjectPropertiesPanel.hpp"
 #include "RaptorEditor.hpp"
@@ -49,6 +50,7 @@ static constexpr ToolButtonInfo scToolButtons[] = {
 	{ "Light", "Textures/editor/lamp.png" },
 	{ "Bounds", "Textures/editor/bounds.png" },
 	{ "Grab", "Textures/editor/grab.png" },
+	{ "Spawn", "Textures/editor/spawn.png" },
 };
 
 static_assert(std::size(scToolButtons) == static_cast<size_t>(eEditorTool::Count));
@@ -123,6 +125,7 @@ void EditorFrame::OpenBlockout()
 		gWorld->BlockoutPath = new_path;
 
 		gProbeManager->LoadProbes();
+		gWorld->RespawnPlayer();
 	}
 	else {
 		gWorld->BlockoutPath = previous_path;
@@ -206,6 +209,9 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	wxMenuItem* cvar_list_item = window_menu->Append(wxID_ANY, "Open CVar List",
 													 "View and edit all registered console variables");
 
+	wxMenuItem* material_picker_item = window_menu->Append(wxID_ANY, "Open Material Picker",
+														   "Search materials and preview their albedo");
+
 	menu_bar->Append(window_menu, "&Tools");
 
 	SetMenuBar(menu_bar);
@@ -224,6 +230,7 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 		reload_scripts_item->GetId());
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowObjectListWindow(); }, object_list_item->GetId());
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowCVarListWindow(); }, cvar_list_item->GetId());
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowMaterialPickerWindow(); }, material_picker_item->GetId());
 
 	wxPanel* root = new wxPanel(this, wxID_ANY);
 	wxBoxSizer* root_sizer = new wxBoxSizer(wxVERTICAL);
@@ -344,6 +351,19 @@ void EditorFrame::ShowCVarListWindow()
 
 	mpCVarListWindow->Show();
 	mpCVarListWindow->Raise();
+}
+
+void EditorFrame::ShowMaterialPickerWindow()
+{
+	if (mpMaterialPickerWindow == nullptr) {
+		mpMaterialPickerWindow = new MaterialPickerWindow(this);
+	}
+	else {
+		mpMaterialPickerWindow->RefreshList();
+	}
+
+	mpMaterialPickerWindow->Show();
+	mpMaterialPickerWindow->Raise();
 }
 
 void EditorFrame::OnClose(wxCloseEvent& event) { mbCloseRequested = true; }

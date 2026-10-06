@@ -199,8 +199,7 @@ void RaptorGame::CreateGame()
 {
 	gWorld->Player.Create();
 	gWorld->Player.pCamera->SetAspectRatio(gGraphics->GetWindow()->GetAspectRatio());
-	// Move the player up and behind the other objects
-	gWorld->Player.TeleportTo(Vec3f(0.0f, -0.2f, -2.0f));
+	gWorld->RespawnPlayer();
 	gWorld->Player.SetFlyMode(false);
 
 

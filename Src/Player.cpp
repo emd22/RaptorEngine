@@ -118,6 +118,26 @@ void Player::Jump()
 	}
 }
 
+void Player::SpawnAt(const Vec3f& position, const Vec3f& direction)
+{
+	TeleportTo(position);
+
+	const Vec3f unit = direction.Normalize();
+	const float32 yaw = std::atan2(unit.X, unit.Z);
+	const float32 pitch = std::asin(std::clamp(unit.Y, -1.0f, 1.0f));
+
+	pCamera->Rotate(std::remainder(yaw - pCamera->mAngleX, static_cast<float32>(FX_2PI)), pitch - pCamera->mAngleY);
+
+	mCameraGoal = pCamera->GetRotation();
+	mPrevCameraYaw = pCamera->mAngleX;
+	mPrevCameraPitch = pCamera->mAngleY;
+	mViewModelSwayYaw = 0.0f;
+	mViewModelSwayPitch = 0.0f;
+	JumpForce = 0.0f;
+
+	RequireDirectionUpdate();
+}
+
 void Player::SetFlyMode(bool value)
 {
 	mbIsFlymode = value;

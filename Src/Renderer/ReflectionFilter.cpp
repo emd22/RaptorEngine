@@ -152,7 +152,7 @@ std::vector<LobeSample> BuildLobeSamples(float32 roughness, uint32 source_size)
 		const float32 xi_x = (static_cast<float32>(i) + 0.5f) / static_cast<float32>(scSampleCount);
 		const float32 xi_y = RadicalInverse(i);
 
-		const float32 phi = 2.0f * scPi * xi_x;
+		const float32 phi = 2.0f * FX_PI * xi_x;
 		const float32 cos_theta = std::sqrt((1.0f - xi_y) / (1.0f + (alpha_sq - 1.0f) * xi_y));
 		const float32 sin_theta = std::sqrt(std::max(1.0f - cos_theta * cos_theta, 0.0f));
 
@@ -167,7 +167,7 @@ std::vector<LobeSample> BuildLobeSamples(float32 roughness, uint32 source_size)
 		}
 
 		const float32 denom = half_z * half_z * (alpha_sq - 1.0f) + 1.0f;
-		const float32 distribution = alpha_sq / (scPi * denom * denom);
+		const float32 distribution = alpha_sq / (FX_PI * denom * denom);
 
 		const float32 pdf = distribution * 0.25f;
 		const float32 sample_solid_angle = 1.0f / (static_cast<float32>(scSampleCount) * pdf);

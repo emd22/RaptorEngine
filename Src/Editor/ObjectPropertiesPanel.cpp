@@ -1,8 +1,10 @@
 #include "ObjectPropertiesPanel.hpp"
 
 #include "EditOperation.hpp"
+#include "EditorFrame.hpp"
 #include "RaptorEditor.hpp"
 
+#include <wx/button.h>
 #include <wx/checkbox.h>
 #include <wx/choice.h>
 #include <wx/sizer.h>
@@ -28,12 +30,13 @@ static constexpr FlagName scTagNames[] = {
 	{ static_cast<uint32>(eObjectTag::ProbeVolume), "Probe Volume", "Blockout brushes only" },
 	{ static_cast<uint32>(eObjectTag::ReflectionProbe), "Reflection Probe", "Blockout brushes only" },
 	{ static_cast<uint32>(eObjectTag::Bleeds), "Bleeds", nullptr },
+	{ static_cast<uint32>(eObjectTag::Spawn), "Spawn", nullptr },
 };
 
 static constexpr FlagName scFlagNames[] = {
 	{ static_cast<uint32>(eObjectFlags::ReadyToRender), "Ready To Render",
 	  "Set by the renderer once the mesh and material have loaded" },
-	{ static_cast<uint32>(eObjectFlags::PhysicsEnabled), "Physics Enabled", "Dynamic physics bodies only" },
+	{ static_cast<uint32>(eObjectFlags::PhysicsEnabled), "Physics Enabled", "Blockout brushes: on is a dynamic body, off is static" },
 	{ static_cast<uint32>(eObjectFlags::IsInstance), "Is Instance", "Set for instances of another object" },
 	{ static_cast<uint32>(eObjectFlags::ShadowCaster), "Shadow Caster", "Probe volumes never cast shadows" },
 	{ static_cast<uint32>(eObjectFlags::Unlit), "Unlit",
@@ -82,6 +85,17 @@ ObjectPropertiesPanel::ObjectPropertiesPanel(wxWindow* parent) : wxPanel(parent,
 
 	mpMaterialChoice = new wxChoice(this, wxID_ANY);
 	material_row->Add(mpMaterialChoice, wxSizerFlags().Border(wxLEFT, 6));
+
+	wxButton* browse_button = new wxButton(this, wxID_ANY, "Browse...", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+	material_row->Add(browse_button, wxSizerFlags().Border(wxLEFT, 6));
+
+	browse_button->Bind(wxEVT_BUTTON,
+						[this](wxCommandEvent&)
+						{
+							if (EditorFrame* frame = dynamic_cast<EditorFrame*>(wxGetTopLevelParent(this))) {
+								frame->ShowMaterialPickerWindow();
+							}
+						});
 
 	sizer->Add(material_row, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
 
@@ -229,6 +243,7 @@ void ObjectPropertiesPanel::ShowObject(Object* object)
 	mpNameLabel->SetLabel(name.IsEmpty() ? wxString("(unnamed)") : name);
 	SetRows(mTagRows, tags, object, true);
 	SetRows(mFlagRows, flags, object, false);
+
 }
 
 } // namespace fx::editor

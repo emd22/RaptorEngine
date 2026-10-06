@@ -31,7 +31,8 @@ FX_FORCE_INLINE void WriteOrZeroVec(TType* dst, const SizedArray<TVecType>& src,
 void VertexList::CreateFrom(const SizedArray<Vec3f>& positions, const SizedArray<Vec3f>& normals,
 							const SizedArray<Vec2f>& uvs, const SizedArray<Vec3f>& tangents,
 							const SizedArray<Vec4f>& bone_weights, const SizedArray<Vec4u>& bone_ids,
-							eVertexCreateFlags create_flags, float32 tangent_handedness)
+							eVertexCreateFlags create_flags,
+							const SizedArray<float32>& tangent_handedness)
 {
 	Assert(mLocalBuffer.IsEmpty());
 
@@ -59,6 +60,8 @@ void VertexList::CreateFrom(const SizedArray<Vec3f>& positions, const SizedArray
 	bContainsUVs = uvs.IsNotEmpty();
 	bContainsTangents = tangents.IsNotEmpty();
 
+	const bool has_handedness = tangent_handedness.IsNotEmpty();
+
 	for (uint64 vertex_index = 0; vertex_index < mLocalBuffer.Capacity; vertex_index++) {
 		Vertex<VertexLargestType> vertex;
 
@@ -74,9 +77,7 @@ void VertexList::CreateFrom(const SizedArray<Vec3f>& positions, const SizedArray
 			WriteOrZeroVec<float32, Vec2f, 2>(vertex.UV, uvs, vertex_index, bContainsUVs);
 			WriteOrZeroVec<float32, Vec3f, 3>(vertex.Tangent, tangents, vertex_index, bContainsTangents);
 
-			// This overload carries no per-vertex handedness (procedural meshes are not UV mirrored), so the caller
-			// supplies one for the whole mesh
-			vertex.Tangent[3] = tangent_handedness;
+			vertex.Tangent[3] = has_handedness ? tangent_handedness[vertex_index] : 1.0f;
 
 			if (supports_skinning) {
 				// To support skinned vertices, we enforce that there is data available above; this means we dont need

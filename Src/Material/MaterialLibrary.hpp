@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Core/PagedArray.hpp>
+#include <string>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
 #include <Material/MaterialID.hpp>
@@ -14,6 +15,7 @@ public:
 	{
 		String Name;
 		MaterialID Material = MaterialID::scNull;
+		std::string DiffusePath;
 	};
 
 public:
@@ -22,8 +24,10 @@ public:
 	FX_FORCE_INLINE uint32 GetCount() const { return static_cast<uint32>(mEntries.Size()); }
 
 	const String& GetName(uint32 id) const;
+	const std::string& GetDiffusePath(uint32 id) const;
 	MaterialID GetMaterial(int32 id) const;
 	int32 FindID(const MaterialID& material) const;
+	int32 FindIDByName(const char* name) const;
 
 private:
 	PagedArray<Entry> mEntries;

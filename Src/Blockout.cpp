@@ -88,7 +88,8 @@ void Blockout::Create(World* world)
 		// Needs a mesh to be added to the world; ShowPreview() replaces it
 		Brush brush = Brush::FromBox(Vec3f(-0.25f), Vec3f(0.25f));
 		Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
-		brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices);
+		brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
+					   mesh->Indices);
 		pPreviewObject->pMesh = mesh->AsDefaultMesh();
 		mPreviewPlanes = brush.Planes;
 
@@ -249,7 +250,8 @@ void Blockout::ShowPreview(const Vec3f& position, const Quat& rotation, const Br
 	// Only rebuild the mesh when the brush changes, as dragging mostly moves it between the same few snapped sizes
 	if (!is_same_brush) {
 		Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
-		brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices);
+		brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
+					   mesh->Indices);
 
 		pPreviewObject->pMesh = mesh->AsDefaultMesh();
 		pPreviewObject->Bounds.Min = brush.GetBoundsMin();
@@ -451,7 +453,8 @@ void Blockout::ApplyBrush(Object* object, Brush&& brush, physics::eMotionType mo
 	Assert(brush.IsValid());
 
 	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
-	brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices);
+	brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
+					   mesh->Indices);
 
 	object->pMesh = mesh->AsDefaultMesh();
 
@@ -645,10 +648,22 @@ ObjectID Blockout::CreateBrushObject(ConfigEntry& entry)
 	ConfigEntry* mat_entry = entry.GetMember(HashStr32("mat"));
 
 	if (mat_entry != nullptr) {
-		const int32 mat_id = mat_entry->Get<int32>();
+		int32 mat_id = -1;
 
-		if (mMaterials.GetMaterial(mat_id).IsNull()) {
-			LogWarning(LC_ASSET, "Blockout '{}' uses the unknown material {}", entry.Name.Get(), mat_id);
+		if (mat_entry->Type == ConfigEntry::ePrimitiveType::String) {
+			const char* mat_name = mat_entry->Get<const char*>();
+			mat_id = mMaterials.FindIDByName(mat_name);
+
+			if (mat_id < 0) {
+				LogWarning(LC_ASSET, "Blockout '{}' uses the unknown material '{}'", entry.Name.Get(), mat_name);
+			}
+		}
+		else {
+			mat_id = mat_entry->Get<int32>();
+
+			if (mMaterials.GetMaterial(mat_id).IsNull()) {
+				LogWarning(LC_ASSET, "Blockout '{}' uses the unknown material {}", entry.Name.Get(), mat_id);
+			}
 		}
 
 		material_id = GetMaterialForID(mat_id);
@@ -688,6 +703,10 @@ ObjectID Blockout::CreateBrushObject(ConfigEntry& entry)
 
 	if (entry.GetMemberValue(HashStr32("bleeds"), 0) == 1) {
 		object->SetTag(eObjectTag::Bleeds);
+	}
+
+	if (entry.GetMemberValue(HashStr32("spawn"), 0) == 1) {
+		object->SetTag(eObjectTag::Spawn);
 	}
 
 	bool is_dynamic = entry.GetMemberValue(HashStr32("dynamic"), 0) == 1;
@@ -824,6 +843,10 @@ Object* Blockout::DupeObject(Object* object)
 		dupe->SetTag(eObjectTag::Bleeds);
 	}
 
+	if (object->IsSpawn()) {
+		dupe->SetTag(eObjectTag::Spawn);
+	}
+
 	ApplyBrush(dupe, std::move(brush), motion_type);
 
 	AssetTicket ticket(static_cast<void*>(dupe));
@@ -834,6 +857,32 @@ Object* Blockout::DupeObject(Object* object)
 	BlockoutObjects.NewItem(nullptr, dupe->ID);
 
 	return dupe;
+}
+
+bool Blockout::HasBrush(const Object* object) { return GetBrush(object) != nullptr; }
+
+bool Blockout::SetDynamic(Object* object, bool dynamic)
+{
+	const Brush* existing = GetBrush(object);
+
+	if (existing == nullptr) {
+		return false;
+	}
+
+	Brush brush = Brush::FromPlanes(existing->Planes);
+
+	if (!brush.IsValid()) {
+		LogError("Could not rebuild blockout '{}', its brush is invalid", object->Name.Get());
+		return false;
+	}
+
+	if (IsDynamic(object) != dynamic) {
+		ApplyBrush(object, std::move(brush), dynamic ? physics::eMotionType::Dynamic : physics::eMotionType::Static);
+	}
+
+	object->SetPhysicsEnabled(dynamic);
+
+	return true;
 }
 
 bool Blockout::IsDynamic(const Object* object) const
@@ -1112,6 +1161,282 @@ void Blockout::SaveCamera(ConfigFile& info)
 	info.AddEntry(std::move(camera));
 }
 
+void Blockout::LoadPlayerSpawn(ConfigFile& info)
+{
+	const ConfigEntry* spawn = info.GetEntry(HashStr32("player_spawn"));
+
+	gWorld->PlayerSpawn.Reset();
+
+	if (spawn == nullptr) {
+		return;
+	}
+
+	gWorld->PlayerSpawn.Position = spawn->GetMemberValue<Vec3f>(HashStr32("pos"), World::PlayerSpawnPoint::DefaultPosition());
+	gWorld->PlayerSpawn.Direction = spawn->GetMemberValue<Vec3f>(HashStr32("dir"), Vec3f::sForward).Normalize();
+	gWorld->PlayerSpawn.bCustom = true;
+}
+
+void Blockout::SavePlayerSpawn(ConfigFile& info)
+{
+	if (!gWorld->PlayerSpawn.bCustom) {
+		return;
+	}
+
+	ConfigEntry spawn = ConfigEntry::Struct("player_spawn");
+
+	spawn.AddMember(ConfigEntry::Literal("pos", gWorld->PlayerSpawn.Position));
+	spawn.AddMember(ConfigEntry::Literal("dir", gWorld->PlayerSpawn.Direction));
+
+	info.AddEntry(std::move(spawn));
+}
+
+static void CollectModelNodes(Object& object, std::vector<ObjectID>& out_nodes)
+{
+	out_nodes.push_back(object.ID);
+
+	for (ObjectID attached_id : object.AttachedNodes) {
+		Object* attached = gObjectManager->GetObject(attached_id);
+
+		if (attached != nullptr) {
+			CollectModelNodes(*attached, out_nodes);
+		}
+	}
+}
+
+bool Blockout::RemoveModelFromWorld(ObjectID id)
+{
+	Object* object = gObjectManager->GetObject(id);
+
+	if (object == nullptr) {
+		return true;
+	}
+
+	// The asset thread is still writing to it
+	if (!object->bIsAddedToWorld.load()) {
+		return false;
+	}
+
+	std::vector<ObjectID> nodes;
+	CollectModelNodes(*object, nodes);
+
+	object->Destroy();
+
+	// The object manager is locked while it destroys an object, so no object can be left to look up its nodes there
+	for (ObjectID node_id : nodes) {
+		gWorld->Detach(node_id);
+		gObjectManager->GetObject(node_id)->AttachedNodes.Clear();
+	}
+
+	for (ObjectID& node_id : nodes) {
+		gObjectManager->DestroyObject(node_id);
+	}
+
+	return true;
+}
+
+void Blockout::RemovePendingModels()
+{
+	std::erase_if(mModelsPendingRemoval, [this](ObjectID id) { return RemoveModelFromWorld(id); });
+}
+
+void Blockout::ApplyModelProperties(Object& object, Model& model, const ConfigEntry& entry)
+{
+	const ConfigEntry* shadows = entry.GetMember(HashStr32("shadows"));
+	if (shadows != nullptr) {
+		object.SetShadowCaster(shadows->Get<int64>() != 0);
+	}
+
+	Quat rotation = entry.GetMemberValue(HashStr32("rot"), object.mRotation);
+	rotation = entry.GetMemberValue(HashStr32("rotquat"), rotation);
+
+	object.SetPosition(entry.GetMemberValue(HashStr32("pos"), object.mPosition));
+	object.SetRotation(rotation);
+	object.SetScale(entry.GetMemberValue(HashStr32("scale"), object.mScale));
+	object.MarkTransformOutOfDate();
+
+	const ConfigEntry* layer = entry.GetMember(HashStr32("layer"));
+	if (layer != nullptr && layer->Get<int64>() == static_cast<int64>(eObjectLayer::PlayerLayer)) {
+		object.SetObjectLayer(eObjectLayer::PlayerLayer);
+	}
+
+	object.SetUnlit(entry.GetMemberValue(HashStr32("unlit"), 0) != 0);
+
+	const bool cullable = (entry.GetMemberValue(HashStr32("nocull"), 0) == 0);
+	if (object.IsCullable() != cullable) {
+		object.SetCullable(cullable);
+	}
+
+	const bool probe_visible = (entry.GetMemberValue(HashStr32("noprobe"), 0) == 0);
+	if (!HasFlag(object.GetFlags(), eObjectFlags::NotProbeVisible) != probe_visible) {
+		object.SetProbeVisible(probe_visible);
+	}
+
+	const auto apply_tag = [&](const char* name, eObjectTag tag)
+	{
+		if (entry.GetMemberValue(HashStr32(name), 0) != 0) {
+			object.SetTag(tag);
+		}
+		else {
+			object.ClearTag(tag);
+		}
+	};
+
+	apply_tag("lock", eObjectTag::LockTransform);
+	apply_tag("bleeds", eObjectTag::Bleeds);
+	apply_tag("spawn", eObjectTag::Spawn);
+
+	const ConfigEntry* collider = entry.GetMember(HashStr32("collider"));
+	model.Collider = (collider != nullptr) ? collider->Get<const char*>() : "";
+}
+
+void Blockout::LinkModelColliders()
+{
+	for (const Model& model : mModels) {
+		Object* object = gObjectManager->GetObject(model.Id);
+
+		if (object == nullptr || model.Collider.empty() || !object->PhysicsID.IsNull()) {
+			continue;
+		}
+
+		physics::Body* body = gPhysics->FindBody(HashStr32(model.Collider.c_str()));
+
+		if (body != nullptr) {
+			object->AttachCollider(body);
+			object->SetPhysicsEnabled(true);
+		}
+	}
+}
+
+void Blockout::LoadModels(const ConfigEntry* list, const std::string& mesh_root)
+{
+	RemovePendingModels();
+
+	std::vector<Model> previous = std::move(mModels);
+	mModels.clear();
+
+	if (list != nullptr) {
+		for (const ConfigEntry& entry : list->Members) {
+			const ConfigEntry* mesh = entry.GetMember(HashStr32("mesh"));
+
+			if (mesh == nullptr) {
+				LogWarning(LC_ASSET, "Model '{}' has no mesh", entry.Name.Get());
+				continue;
+			}
+
+			Model model { .MeshPath = mesh_root + mesh->Get<const char*>() };
+
+			const auto existing = std::find_if(previous.begin(), previous.end(), [&](const Model& other) {
+				const Object* object = gObjectManager->GetObject(other.Id);
+
+				return object != nullptr && object->Name.GetHash() == entry.Name.GetHash() &&
+					   other.MeshPath == model.MeshPath;
+			});
+
+			if (existing != previous.end()) {
+				model.Id = existing->Id;
+				previous.erase(existing);
+
+				ApplyModelProperties(*gObjectManager->GetObject(model.Id), model, entry);
+			}
+			else {
+				AssetTicket ticket = gAssetManager->LoadObject(entry.Name.Get(), model.MeshPath);
+				Object* object = static_cast<Object*>(ticket.Get());
+
+				model.Id = object->ID;
+
+				ApplyModelProperties(*object, model, entry);
+
+				gWorld->Attach(ticket);
+			}
+
+			mModels.push_back(std::move(model));
+		}
+	}
+
+	for (const Model& model : previous) {
+		if (!RemoveModelFromWorld(model.Id)) {
+			mModelsPendingRemoval.push_back(model.Id);
+		}
+	}
+
+	LinkModelColliders();
+}
+
+void Blockout::LoadLegacyModels()
+{
+	const std::string scene_path = gAssetManager->GetScenePath().CStr();
+
+	if (scene_path.empty()) {
+		return;
+	}
+
+	ConfigFile info {};
+	info.Load(scene_path + "/info.prx");
+
+	LoadModels(info.HasErrors() ? nullptr : info.GetEntry(HashStr32("objects")), scene_path + "/Models");
+}
+
+void Blockout::SaveModels(ConfigFile& info)
+{
+	RemovePendingModels();
+
+	ConfigEntry models_container = ConfigEntry::Struct("objects");
+
+	for (const Model& model : mModels) {
+		const Object* object = gObjectManager->GetObject(model.Id);
+
+		if (object == nullptr) {
+			continue;
+		}
+
+		ConfigEntry model_entry = ConfigEntry::Struct(object->Name.Get());
+
+		model_entry.AddMember(ConfigEntry::Literal("mesh", model.MeshPath.c_str()));
+		model_entry.AddMember(ConfigEntry::Literal("pos", object->mPosition));
+		model_entry.AddMember(ConfigEntry::Literal("rotquat", object->mRotation));
+		model_entry.AddMember(ConfigEntry::Literal("scale", object->mScale));
+		model_entry.AddMember(ConfigEntry::Literal("shadows", static_cast<int64>(object->IsShadowCaster() ? 1 : 0)));
+
+		if (object->GetObjectLayer() == eObjectLayer::PlayerLayer) {
+			model_entry.AddMember(ConfigEntry::Literal("layer", static_cast<int64>(eObjectLayer::PlayerLayer)));
+		}
+
+		if (object->IsUnlit()) {
+			model_entry.AddMember(ConfigEntry::Literal("unlit", 1));
+		}
+
+		if (!object->IsCullable()) {
+			model_entry.AddMember(ConfigEntry::Literal("nocull", 1));
+		}
+
+		if (HasFlag(object->GetFlags(), eObjectFlags::NotProbeVisible)) {
+			model_entry.AddMember(ConfigEntry::Literal("noprobe", 1));
+		}
+
+		if (object->HasTags(eObjectTag::LockTransform)) {
+			model_entry.AddMember(ConfigEntry::Literal("lock", 1));
+		}
+
+		if (object->Bleeds()) {
+			model_entry.AddMember(ConfigEntry::Literal("bleeds", 1));
+		}
+
+		if (object->IsSpawn()) {
+			model_entry.AddMember(ConfigEntry::Literal("spawn", 1));
+		}
+
+		if (!model.Collider.empty()) {
+			model_entry.AddMember(ConfigEntry::Literal("collider", model.Collider.c_str()));
+		}
+
+		models_container.AddMember(std::move(model_entry));
+	}
+
+	info.AddEntry(std::move(models_container));
+
+	mbHasModelsEntry = true;
+}
+
 bool Blockout::Load(const String& path)
 {
 	ConfigFile info {};
@@ -1135,12 +1460,24 @@ bool Blockout::Load(const String& path)
 
 	LoadLights(info);
 	LoadCamera(info);
+	LoadPlayerSpawn(info);
 
 	// Remove the current blockout from the world
 	RemoveBlockoutFromWorld(pWorld);
 
 	for (ConfigEntry& entry : blocks_entry->Members) {
 		CreateBrushObject(entry);
+	}
+
+	const ConfigEntry* models_entry = info.GetEntry(HashStr32("objects"));
+
+	mbHasModelsEntry = (models_entry != nullptr);
+
+	if (mbHasModelsEntry) {
+		LoadModels(models_entry, "");
+	}
+	else {
+		LoadLegacyModels();
 	}
 
 	return true;
@@ -1174,6 +1511,8 @@ void Blockout::Save(const String& path)
 
 	SaveLights(info);
 	SaveCamera(info);
+	SavePlayerSpawn(info);
+	SaveModels(info);
 
 	ConfigEntry* all_entry = info.AddEntry("all");
 
@@ -1207,6 +1546,10 @@ void Blockout::Save(const String& path)
 				blockout_entry.AddMember(ConfigEntry::Literal("bleeds", 1));
 			}
 
+			if (object->IsSpawn()) {
+				blockout_entry.AddMember(ConfigEntry::Literal("spawn", 1));
+			}
+
 			if (IsDynamic(object)) {
 				blockout_entry.AddMember(ConfigEntry::Literal("dynamic", 1));
 			}
@@ -1220,7 +1563,7 @@ void Blockout::Save(const String& path)
 			const int32 material_id = GetIDForMaterial(object_material);
 
 			if (material_id >= 0) {
-				blockout_entry.AddMember(ConfigEntry::Literal("mat", static_cast<int64>(material_id)));
+				blockout_entry.AddMember(ConfigEntry::Literal("mat", mMaterials.GetName(material_id).CStr()));
 			}
 		}
 		all_entry->AddMember(std::move(blockout_entry));

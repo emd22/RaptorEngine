@@ -83,9 +83,7 @@ static Object* N_editor_op_create_object(FLOAT4 position, int32 group_size)
 #ifdef FX_IS_EDITOR
 	const EditOperationValue result = gEditor->PushEditOperation(EditOperation {
 		.Type = EditOperation::eType::Create,
-		.pObject = nullptr,
 		.ValueA = EditOperationValue(Vec3f(position)),
-		.ValueB = EditOperationValue(nullptr),
 		.GroupSize = group_size,
 	});
 
@@ -106,7 +104,6 @@ static Object* N_editor_op_dupe_object(Object* object_to_dupe, FLOAT4 position, 
 		.Type = EditOperation::eType::Dupe,
 		.pObject = object_to_dupe,
 		.ValueA = EditOperationValue(Vec3f(position)),
-		.ValueB = EditOperationValue(nullptr),
 		.GroupSize = group_size,
 	});
 
@@ -456,8 +453,6 @@ static Object* N_blockout_create_box(FLOAT4 min, FLOAT4 max)
 
 	EditOperation op {
 		.Type = EditOperation::eType::CreateBrush,
-		.ValueA = EditOperationValue(Vec3f::sZero),
-		.ValueB = EditOperationValue(Vec3f::sZero),
 	};
 
 	op.PlanesAfter = brush.Planes;
@@ -486,32 +481,25 @@ static bool N_blockout_clip(Object* object, FLOAT4 point_a, FLOAT4 point_b, FLOA
 	EditOperation clip_op {
 		.Type = EditOperation::eType::BrushEdit,
 		.pObject = object,
-		.ValueA = EditOperationValue(Vec3f::sZero),
-		.ValueB = EditOperationValue(Vec3f::sZero),
 		.GroupSize = 2,
 	};
 
-	clip_op.PushedObjectID = object->ID;
 	clip_op.PlanesBefore = brush->Planes;
 
 	EditOperation split_op {
 		.Type = EditOperation::eType::CreateBrush,
-		.ValueA = EditOperationValue(Vec3f::sZero),
-		.ValueB = EditOperationValue(Vec3f::sZero),
 		.GroupSize = 2,
 	};
+
+	split_op.ObjectSnapshot = EditOperation::Snapshot::Capture(*object,
+															   gEditor->GetSelection().GetStoredMaterial(object));
+	split_op.ObjectSnapshot.ObjectName = Name();
 
 	if (!gWorld->pBlockout->GetClipPieces(object, Vec3f(point_a), Vec3f(point_b), Vec3f(face_normal),
 										  clip_op.PlanesAfter, split_op.PlanesAfter,
 										  split_op.ObjectSnapshot.Position)) {
 		return false;
 	}
-
-	split_op.ObjectSnapshot.Rotation = object->mRotation;
-	split_op.ObjectSnapshot.Material = gEditor->GetSelection().GetStoredMaterial(object);
-	split_op.ObjectSnapshot.bIsProbeVolume = object->IsProbeVolume();
-	split_op.ObjectSnapshot.bIsReflectionProbe = object->IsReflectionProbe();
-	split_op.ObjectSnapshot.bIsDynamic = gWorld->pBlockout->IsDynamic(object);
 
 	gEditor->PushEditOperation(clip_op);
 	gEditor->PushEditOperation(split_op);
@@ -539,11 +527,8 @@ static void N_blockout_edit_face_texture(Object* object, FLOAT4 face, uint32 edi
 	EditOperation op {
 		.Type = EditOperation::eType::BrushEdit,
 		.pObject = object,
-		.ValueA = EditOperationValue(Vec3f::sZero),
-		.ValueB = EditOperationValue(Vec3f::sZero),
 	};
 
-	op.PushedObjectID = object->ID;
 	op.PlanesBefore = brush->Planes;
 
 	if (!gWorld->pBlockout->GetFaceTextureEdit(object, Vec3f(face), static_cast<eFaceTextureEdit>(edit),

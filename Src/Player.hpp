@@ -91,6 +91,11 @@ public:
 		Physics.Teleport(Position);
 	}
 
+	/**
+	 * @brief Puts the player at `position` (at its feet), looking along `direction`.
+	 */
+	void SpawnAt(const Vec3f& position, const Vec3f& direction);
+
 	void SetFlyMode(bool value);
 	bool IsFlyMode() const { return Physics.bDisableGravity; };
 

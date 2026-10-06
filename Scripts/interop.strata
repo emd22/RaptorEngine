@@ -19,6 +19,9 @@ enum OPTYPE
 	LIGHT_TRANSFORM,
 	LIGHT_CREATE,
 	LIGHT_DELETE,
+	BOUNDS_EDIT,
+	OBJECT_STATE_EDIT,
+	SPAWN_TRANSFORM,
 }
 
 /* This must match eFaceTextureEdit in Blockout.hpp! */
@@ -43,6 +46,7 @@ enum EDITORTOOL
 	LIGHT,
 	BOUNDS,
 	GRAB,
+	SPAWN,
 }
 
 

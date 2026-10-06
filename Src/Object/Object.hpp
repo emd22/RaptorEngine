@@ -37,6 +37,7 @@ enum class eObjectTag : uint32
 	ProbeVolume = (1 << 2),
 	ReflectionProbe = (1 << 3),
 	Bleeds = (1 << 4),
+	Spawn = (1 << 5),
 };
 
 FxEnumFlags(eObjectTag);
@@ -180,6 +181,7 @@ public:
 
 	void SetReflectionProbe(bool value);
 	FX_FORCE_INLINE bool Bleeds() const { return HasTags(eObjectTag::Bleeds); }
+	FX_FORCE_INLINE bool IsSpawn() const { return HasTags(eObjectTag::Spawn); }
 	FX_FORCE_INLINE bool IsReflectionProbe() const { return HasTags(eObjectTag::ReflectionProbe); }
 
 	float32 RaycastBounds(const Vec3f& origin, const Vec3f& direction, Vec3f& out_face);

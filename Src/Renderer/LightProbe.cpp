@@ -2137,7 +2137,7 @@ bool ProbeManager::LoadIrradianceProbes()
 
 namespace {
 
-constexpr float32 scReflectionBlendDistance = 0.25f;
+constexpr float32 scReflectionBlendDistance = 1.0f;
 constexpr float32 scReflectionMinHalfExtent = 0.05f;
 constexpr float32 scReflectionRelocation = 0.9f;
 constexpr uint32 scReflectionFileVersion = 1;
@@ -2588,6 +2588,15 @@ bool ProbeManager::LoadReflectionProbes()
 		!ReadExact(file, texels.data(), texel_bytes)) {
 		LogError("Could not read the reflection probes from {}", path.CStr());
 		return false;
+	}
+
+	for (uint32 probe = 0; probe < header.ProbeCount; probe++) {
+		const float32* world_to_box = probes[probe].WorldToBox;
+
+		for (uint32 axis = 0; axis < 3; axis++) {
+			const float32 scale = Vec3f(world_to_box[axis], world_to_box[4 + axis], world_to_box[8 + axis]).Length();
+			probes[probe].Fade[axis] = 1.0f / (std::max(scale, 1e-6f) * scReflectionBlendDistance);
+		}
 	}
 
 	memcpy(mReflectionProbes, probes, sizeof(mReflectionProbes));

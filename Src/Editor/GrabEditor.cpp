@@ -12,6 +12,7 @@
 #include <Renderer/Globals.hpp>
 #include <World.hpp>
 #include <algorithm>
+#include <cmath>
 
 namespace fx::editor {
 
@@ -20,7 +21,7 @@ static constexpr float32 scMinHoldDistance = 1.0f;
 
 static constexpr float32 scStiffness = 20.0f;
 static constexpr float32 scMaxSpeed = 20.0f;
-static constexpr float32 scAngularDamping = 1.5f;
+static constexpr float32 scAngularDamping = 8.0f;
 
 static const Color scGrabColor = Color::FromRGBA(255, 120, 40, 255);
 
@@ -84,7 +85,7 @@ void GrabEditor::Update(float32 delta_time)
 
 	bodies.ActivateBody(mBody);
 	bodies.SetLinearAndAngularVelocity(mBody, JPH::Vec3(velocity.X, velocity.Y, velocity.Z),
-									   bodies.GetAngularVelocity(mBody) * scAngularDamping);
+									   bodies.GetAngularVelocity(mBody) * std::exp(-scAngularDamping * delta_time));
 
 	renderer::gDebugDraw->Line(held_point, target, scGrabColor);
 }

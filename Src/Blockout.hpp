@@ -18,6 +18,8 @@
 #include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
 #include <Core/HashMap.hpp>
+#include <string>
+#include <vector>
 
 namespace fx {
 class World;
@@ -129,6 +131,14 @@ public:
 
 	bool IsDynamic(const Object* object) const;
 
+	bool HasBrush(const Object* object);
+
+	/**
+	 * @brief Rebuilds a brush's physics body as dynamic (and active) or static, keeping its mesh and transform.
+	 * @returns False if the object isn't a brush.
+	 */
+	bool SetDynamic(Object* object, bool dynamic);
+
 	void DestroyObject(Object* object);
 
 	const MaterialLibrary& GetMaterialLibrary() const { return mMaterials; }
@@ -142,10 +152,45 @@ public:
 	 */
 	Brush* GetBrush(const Object* object);
 
+	/**
+	 * @brief True if the loaded blockout file has an `objects` entry. Files saved before models moved into the
+	 * blockout don't, and get their models from the scene's info.prx instead (see LoadLegacyModels).
+	 */
+	bool HasModelsEntry() const { return mbHasModelsEntry; }
+
+	/**
+	 * @brief Loads the models from the `objects` entry of the scene's info.prx, which is where they lived before they
+	 * were saved in the blockout file. Does nothing until the scene path is known.
+	 */
+	void LoadLegacyModels();
+
+	/**
+	 * @brief Links models to the colliders their `collider` member names, for colliders made after the models
+	 */
+	void LinkModelColliders();
+
 	~Blockout();
 
 private:
+	struct Model
+	{
+		ObjectID Id = ObjectID::scNull;
+		std::string MeshPath;
+		std::string Collider;
+	};
+
 	ObjectID CreateBrushObject(ConfigEntry& entry);
+
+	/**
+	 * @brief Brings the models in the world in line with a list of model entries. Models that are already loaded are
+	 * updated in place, the rest are loaded, and models that are no longer listed are removed.
+	 * @param mesh_root Prefixed to each entry's `mesh` path
+	 */
+	void LoadModels(const ConfigEntry* list, const std::string& mesh_root);
+	void SaveModels(ConfigFile& info);
+	void ApplyModelProperties(Object& object, Model& model, const ConfigEntry& entry);
+	bool RemoveModelFromWorld(ObjectID id);
+	void RemovePendingModels();
 
 	/**
 	 * @brief Loads the sun and the point/spot lights from the blockout's `sun`/`lights` entries
@@ -154,6 +199,8 @@ private:
 	void SaveLights(ConfigFile& info);
 	void LoadCamera(ConfigFile& info);
 	void SaveCamera(ConfigFile& info);
+	void LoadPlayerSpawn(ConfigFile& info);
+	void SavePlayerSpawn(ConfigFile& info);
 	void AddOrUpdateLightFromEntry(const ConfigEntry& light_entry);
 
 	/**
@@ -191,6 +238,11 @@ public:
 private:
 	MaterialLibrary mMaterials;
 	HashMap<uint32, Brush> mBrushes;
+
+	std::vector<Model> mModels;
+	/// Models that were still loading when they had to be removed
+	std::vector<ObjectID> mModelsPendingRemoval;
+	bool mbHasModelsEntry = false;
 
 	Brush::PlaneList mPreviewPlanes;
 };

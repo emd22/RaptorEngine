@@ -212,8 +212,6 @@ void BoundsEditor::Finalize()
 	EditOperation op {
 		.Type = EditOperation::eType::BoundsEdit,
 		.pObject = object,
-		.ValueA = EditOperationValue(Vec3f::sZero),
-		.ValueB = EditOperationValue(Vec3f::sZero),
 	};
 
 	op.BoundsBefore = mBoundsBefore;

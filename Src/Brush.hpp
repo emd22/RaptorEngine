@@ -130,7 +130,8 @@ public:
 	 * @brief Generates a triangle mesh for rendering
 	 */
 	void GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normals, SizedArray<Vec3f>& tangents,
-					  SizedArray<Vec2f>& texcoords, SizedArray<uint32>& indices) const;
+					  SizedArray<float32>& tangent_handedness, SizedArray<Vec2f>& texcoords,
+					  SizedArray<uint32>& indices) const;
 
 public:
 	PlaneList Planes;

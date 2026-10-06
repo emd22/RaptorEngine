@@ -434,7 +434,7 @@ float3 ReflectionBoxProject(float3 pos_ws, float3 dir_ws, float3 pos_bs, float3 
 	const float3 t_far = max((1.0 - pos_bs) * inv_dir, (-1.0 - pos_bs) * inv_dir);
 	const float t = min(t_far.x, min(t_far.y, t_far.z));
 
-	return select(t <= 0.0, dir_ws, (pos_ws + (dir_ws * t)) - probe_pos);
+	return (pos_ws + (dir_ws * max(t, 0.0))) - probe_pos;
 }
 
 float ReflectionProbeWeight(float3 pos_bs, ReflectionProbe probe)
