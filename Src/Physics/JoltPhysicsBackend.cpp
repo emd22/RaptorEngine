@@ -7,11 +7,11 @@
 #include <algorithm>
 
 /* Additional Jolt includes */
+#include <Jolt/Physics/Body/BodyFilter.h>
 #include <Jolt/Physics/Collision/CastResult.h>
 #include <Jolt/Physics/Collision/CollisionCollector.h>
 #include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
 #include <Jolt/Physics/Collision/RayCast.h>
-#include <Jolt/Physics/Body/BodyFilter.h>
 #include <ThirdParty/Jolt/Core/Factory.h>
 #include <ThirdParty/Jolt/Core/JobSystemThreadPool.h>
 #include <ThirdParty/Jolt/Core/TempAllocator.h>
@@ -154,7 +154,7 @@ void JoltPhysicsBackend::Create()
 	mbIsInited = true;
 }
 
-RayResult JoltPhysicsBackend::Raycast(const Vec3f& origin, const Vec3f& direction, JPH::BodyID ignore_body) const
+RayResult JoltPhysicsBackend::Raycast(const Vec3f origin, const Vec3f direction, JPH::BodyID ignore_body) const
 {
 	JPH::RRayCast rc;
 
@@ -190,7 +190,7 @@ RayResult JoltPhysicsBackend::Raycast(const Vec3f& origin, const Vec3f& directio
 	return RayResult { false, Vec3f::sZero };
 }
 
-FLOAT4 JoltPhysicsBackend::RaycastGetFaceOfBox(JPH::Body* body, const Vec3f& origin, const Vec3f& direction) const
+FLOAT4 JoltPhysicsBackend::RaycastGetFaceOfBox(JPH::Body* body, const Vec3f origin, const Vec3f direction) const
 {
 	JPH::RayCastResult hit;
 	JPH::RRayCast rc;
@@ -219,7 +219,7 @@ FLOAT4 JoltPhysicsBackend::RaycastGetFaceOfBox(JPH::Body* body, const Vec3f& ori
 	return simd::LoadFloat4(0.0f);
 }
 
-SizedArray<JPH::BodyID> JoltPhysicsBackend::RaycastObjects(const Vec3f& origin, const Vec3f& direction) const
+SizedArray<JPH::BodyID> JoltPhysicsBackend::RaycastObjects(const Vec3f origin, const Vec3f direction) const
 {
 	JPH::RRayCast rc;
 	origin.ToJoltVec3(rc.mOrigin);

@@ -51,7 +51,7 @@ public:
 
 	/// Whether any part of the sphere is inside of the frustum. Can let through spheres that are just outside of a
 	/// corner.
-	bool IntersectsSphere(const Vec3f& center, float32 radius, uint32 plane_mask = scFrustumAllPlanes) const;
+	bool IntersectsSphere(const Vec3f center, float32 radius, uint32 plane_mask = scFrustumAllPlanes) const;
 
 	bool IntersectsAABB(const AABB& aabb, uint32 plane_mask = scFrustumAllPlanes) const;
 

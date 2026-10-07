@@ -320,6 +320,9 @@ void RaptorEditor::HandleHotkeys()
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_J)) {
 		SetTool(eEditorTool::Spawn);
 	}
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_N)) {
+		SetTool(eEditorTool::Subtract);
+	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_K)) {
 		if (mCurrentToolType == eEditorTool::Light) {
@@ -356,7 +359,7 @@ void RaptorEditor::HandleHotkeys()
 /////////////////////////////////////
 
 /// Picks the probe volume that the crosshair is on, if there is nothing solid in front of it
-static Object* PickProbeVolume(const PerspectiveCamera& camera, const Vec3f& pick_direction)
+static Object* PickProbeVolume(const PerspectiveCamera& camera, const Vec3f pick_direction)
 {
 	float32 volume_distance = 0.0f;
 	Object* volume = gWorld->RaycastProbeVolumes(camera.Position, pick_direction, scPickRange, volume_distance);
@@ -391,7 +394,7 @@ static Object* FindModelRoot(Object* object)
 	return object;
 }
 
-static Object* PickModel(const PerspectiveCamera& camera, const Vec3f& pick_direction, float32& out_distance)
+static Object* PickModel(const PerspectiveCamera& camera, const Vec3f pick_direction, float32& out_distance)
 {
 	Object* nearest = nullptr;
 	float32 nearest_distance = scPickRange;
@@ -585,6 +588,8 @@ void RaptorEditor::AddTools()
 	AddTool(eEditorTool::Spawn, nullptr, eEditorToolFlags::ClearsSelection);
 	GetTool(eEditorTool::Spawn)->SetNative(&mSpawnEditor);
 
+	AddTool(eEditorTool::Subtract, "./Scripts/editor/tools/tool_subtract.strata", eEditorToolFlags::UsesSelection);
+
 	mpCurrentTool = GetTool(mCurrentToolType);
 }
 
@@ -694,7 +699,7 @@ float32 RaptorEditor::GetAngleSnapStep() const
 	return scAngleSnapSteps[std::clamp(mToolState.ToolSnapLevel, 0, scSnapLevelCount - 1)];
 }
 
-Vec3f RaptorEditor::SnapToGrid(const Vec3f& position) const
+Vec3f RaptorEditor::SnapToGrid(const Vec3f position) const
 {
 	if (!mToolState.ToolSnapEnabled) {
 		return position;

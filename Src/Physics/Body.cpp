@@ -21,7 +21,7 @@ namespace physics {
 
 const BodyID BodyID::scNull = BodyID(UINT32_MAX);
 
-void Body::CreatePrimitiveBody(ePrimitiveType primitive_type, const Vec3f& dimensions, physics::eMotionType motion_type,
+void Body::CreatePrimitiveBody(ePrimitiveType primitive_type, const Vec3f dimensions, physics::eMotionType motion_type,
 							   const BodyProps& object_properties)
 {
 	mMotionType = motion_type;
@@ -99,7 +99,7 @@ void Body::CreateConvexHullBody(const SizedArray<Vec3f>& points, physics::eMotio
 	Vec3f max = points[0];
 
 	// TODO: Fix Vec3f::ToJoltVec3 to dupe the Z lane to W
-	for (const Vec3f& point : points) {
+	for (const Vec3f point : points) {
 		jolt_points.push_back(JPH::Vec3(point.X, point.Y, point.Z));
 
 		min = Vec3f::Min(min, point);
@@ -198,7 +198,7 @@ void Body::DestroyPhysicsBody()
 }
 
 
-void Body::SetMidpoint(const Vec3f& midpoint) { Midpoint = midpoint; }
+void Body::SetMidpoint(const Vec3f midpoint) { Midpoint = midpoint; }
 
 void Body::RemoveFromWorld()
 {
@@ -220,7 +220,7 @@ void Body::AddToWorld()
 	mbIsInWorld = true;
 }
 
-void Body::Teleport(const Vec3f& position, const Quat& rotation)
+void Body::Teleport(const Vec3f position, const Quat rotation)
 {
 	if (!mbHasPhysicsBody) {
 		return;

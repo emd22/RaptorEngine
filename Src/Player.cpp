@@ -82,7 +82,7 @@ void Player::Create()
 	Weapons.Create(this);
 }
 
-void Player::MoveBy(const Vec3f& by)
+void Player::MoveBy(const Vec3f by)
 {
 	Position += by;
 	RequirePhysicsUpdate();
@@ -118,7 +118,7 @@ void Player::Jump()
 	}
 }
 
-void Player::SpawnAt(const Vec3f& position, const Vec3f& direction)
+void Player::SpawnAt(const Vec3f position, const Vec3f direction)
 {
 	TeleportTo(position);
 
@@ -144,7 +144,7 @@ void Player::SetFlyMode(bool value)
 	Physics.bDisableGravity = value;
 }
 
-void Player::Move(float64 delta_time, const Vec3f& offset)
+void Player::Move(float64 delta_time, const Vec3f offset)
 {
 	const Vec3f forward = MovementDirection * offset.Z;
 	const Vec3f right = MovementDirection.Cross(Vec3f::sUp) * -offset.X;
@@ -232,8 +232,8 @@ void Player::UpdateViewModel(double delta_time)
 
 	// const float32 rotx = sin(gWorld->Player.mBobCounterY * 0.5f) * 0.05f;
 
-	mpViewModel->SetPosition(pCamera->Position - (forward * (0.05 + mViewKickValue[ViewKickBack])) + (up * (0.15 - mViewModelHolster * scHolsterDrop)) +
-							 (right * 0.0) + view_model_bob);
+	mpViewModel->SetPosition(pCamera->Position - (forward * (0.05 + mViewKickValue[ViewKickBack])) +
+							 (up * (0.15 - mViewModelHolster * scHolsterDrop)) + (right * 0.0) + view_model_bob);
 	const Quat kick = Quat::FromEulerAngles(
 		Vec3f(-mViewKickValue[ViewKickPitch], mViewKickValue[ViewKickYaw], mViewKickValue[ViewKickRoll]));
 

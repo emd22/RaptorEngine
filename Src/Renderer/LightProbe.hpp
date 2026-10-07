@@ -114,10 +114,7 @@ public:
 	Vec3f GetProbePosition(uint32 index) const;
 	uint32 GetGridPointCount() const { return mGridPointCount; }
 
-	uint32 GetCurrentProbeIndex() const
-	{
-		return (mBakePhase == eBakePhase::Irradiance) ? mCurrentProbe : UINT32_MAX;
-	}
+	uint32 GetCurrentProbeIndex() const { return (mBakePhase == eBakePhase::Irradiance) ? mCurrentProbe : UINT32_MAX; }
 
 	///////////////////////////////////
 	// Volumes
@@ -128,7 +125,7 @@ public:
 	void GetVolumeProbeRange(uint32 volume, uint32& out_first_probe, uint32& out_count) const;
 
 	void ClearVolumes();
-	bool AddVolume(const Vec3f& center, const Vec3f& size, const ProbeGridSize& grid = {});
+	bool AddVolume(const Vec3f center, const Vec3f size, const ProbeGridSize& grid = {});
 	bool AddLevelVolumes();
 
 	uint32 RebuildVolumesFromWorld();
@@ -147,7 +144,7 @@ public:
 
 	void BeginBake();
 	void BeginGridBake();
-	void BeginGridBakeAt(const Vec3f& center, const Vec3f& size, const ProbeGridSize& grid = {});
+	void BeginGridBakeAt(const Vec3f center, const Vec3f size, const ProbeGridSize& grid = {});
 
 	bool IsBaking() const { return mBakeState != eBakeState::Idle; }
 	bool IsCapturePending() const { return mBakeState == eBakeState::CapturePending; }
@@ -206,13 +203,13 @@ private:
 	};
 
 
-	bool AddVolumeAndPlaceProbes(const Vec3f& volume_min, const Vec3f& volume_size, const ProbeGridSize& grid,
+	bool AddVolumeAndPlaceProbes(const Vec3f volume_min, const Vec3f volume_size, const ProbeGridSize& grid,
 								 const ProbePlacementBoxes& boxes, eProbeFill fill);
 	bool AddLevelBaseVolume(const ProbePlacementBoxes& boxes);
 	bool AddLevelSurfaceVolume(const ProbePlacementBoxes& boxes);
-	bool AddSurfaceVolumeForBudget(const Vec3f& region_min, const Vec3f& region_max, float32 spacing,
+	bool AddSurfaceVolumeForBudget(const Vec3f region_min, const Vec3f region_max, float32 spacing,
 								   const ProbePlacementBoxes& boxes, bool cell_centred);
-	bool PlaceVolumeProbes(uint32 volume_index, const Vec3f& volume_min, const Vec3f& volume_size,
+	bool PlaceVolumeProbes(uint32 volume_index, const Vec3f volume_min, const Vec3f volume_size,
 						   const ProbeGridSize& grid, const ProbePlacementBoxes& boxes, eProbeFill fill);
 	void RefreshVolumeCounts();
 

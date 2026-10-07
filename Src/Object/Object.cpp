@@ -386,7 +386,7 @@ void Object::Update()
 	UpdateAnimation();
 }
 
-float32 Object::GetDirectionScale(const Vec3f& direction)
+float32 Object::GetDirectionScale(const Vec3f direction)
 {
 	if (direction.IsCloseTo(simd::LoadFloat4(0.0f))) {
 		return 0.0f;
@@ -518,7 +518,7 @@ void Object::SetReflectionProbe(bool value)
 	}
 }
 
-float32 Object::RaycastBounds(const Vec3f& origin, const Vec3f& direction, Vec3f& out_face)
+float32 Object::RaycastBounds(const Vec3f origin, const Vec3f direction, Vec3f& out_face)
 {
 	// Into the object's own space, so a rotated box is tested against the box it actually is rather than the
 	// looser one around it. An affine transform is linear in the ray parameter, so the distance that comes back
@@ -534,7 +534,7 @@ float32 Object::RaycastBounds(const Vec3f& origin, const Vec3f& direction, Vec3f
 	return RayCast(ray, Bounds, out_face);
 }
 
-bool Object::ContainsPoint(const Vec3f& point)
+bool Object::ContainsPoint(const Vec3f point)
 {
 	const Vec4f local = GetWorldMatrix().Inverse() * Vec4f(point.X, point.Y, point.Z, 1.0f);
 
@@ -564,7 +564,7 @@ void Object::SetBounds(const AABB& bounds)
 		const OBB world_box = node->GetWorldOBB();
 		const Mat4f parent_inverse = parent->GetWorldMatrix().Inverse();
 
-		for (const Vec3f& corner : world_box.Corners) {
+		for (const Vec3f corner : world_box.Corners) {
 			const Vec4f local = parent_inverse * Vec4f(corner.X, corner.Y, corner.Z, 1.0f);
 			const Vec3f local_corner(local.X, local.Y, local.Z);
 
@@ -588,7 +588,7 @@ void Object::SetCullable(bool value)
 }
 
 
-void Object::SetPosition(const Vec3f& position)
+void Object::SetPosition(const Vec3f position)
 {
 	const Vec3f delta = position - mPosition;
 
@@ -617,7 +617,7 @@ void Object::SetScale(const float scale)
 	gWorldGrid->UpdateObject(this);
 }
 
-void Object::SetRotation(const Quat& rotation)
+void Object::SetRotation(const Quat rotation)
 {
 	const Quat delta = rotation * mRotation.Conjugate();
 
@@ -706,7 +706,10 @@ void Object::Destroy()
 	if (!AttachedNodes.IsEmpty()) {
 		for (ObjectID& obj_id : AttachedNodes) {
 			Object* obj = gObjectManager->GetObject(obj_id);
-			obj->Destroy();
+
+			if (obj != nullptr) {
+				obj->Destroy();
+			}
 		}
 	}
 

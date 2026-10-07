@@ -10,7 +10,7 @@ struct Ray
 {
 	Ray() = default;
 
-	Ray(const Vec3f& origin, const Vec3f& direction)
+	Ray(const Vec3f origin, const Vec3f direction)
 		: Origin(origin), Direction(direction), InvDirection(1.0f / direction.X, 1.0f / direction.Y, 1.0f / direction.Z)
 	{
 	}

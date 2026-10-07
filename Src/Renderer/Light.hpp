@@ -3,8 +3,8 @@
 #include <Color.hpp>
 #include <Core/Hash.hpp>
 #include <Entity.hpp>
-#include <Math/Mat4.hpp>
 #include <Math/BoundingBox.hpp>
+#include <Math/Mat4.hpp>
 #include <Math/MathUtil.hpp>
 #include <Renderer/Exposure.hpp>
 #include <Renderer/LightID.hpp>
@@ -47,8 +47,8 @@ public:
 	LightBase(eLightFlags flags = LF_None);
 
 	void SetRadius(const float radius);
-	void SetPosition(const Vec3f& position) override;
-	void SetRotation(const Quat& rotation) override;
+	void SetPosition(const Vec3f position) override;
+	void SetRotation(const Quat rotation) override;
 
 	virtual AABB GetBounds() const;
 
@@ -140,7 +140,7 @@ public:
 	FX_FORCE_INLINE float32 GetInnerAngle() const { return mInnerAngle; }
 	FX_FORCE_INLINE float32 GetOuterAngle() const { return mOuterAngle; }
 
-	void SetDirection(const Vec3f& direction);
+	void SetDirection(const Vec3f direction);
 
 	Vec3f GetDirection() const;
 

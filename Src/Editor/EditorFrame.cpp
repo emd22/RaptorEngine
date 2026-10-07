@@ -23,8 +23,8 @@
 #include <Core/FilesystemIO.hpp>
 #include <Core/Log.hpp>
 #include <Engine.hpp>
-#include <Renderer/LightProbe.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/LightProbe.hpp>
 #include <World.hpp>
 #include <filesystem>
 
@@ -41,16 +41,12 @@ struct ToolButtonInfo
 };
 
 static constexpr ToolButtonInfo scToolButtons[] = {
-	{ "Simulate", "Textures/editor/simulate.png" },
-	{ "Transform", "Textures/editor/move.png" },
-	{ "Face", "Textures/editor/face.png" },
-	{ "Rotate", "Textures/editor/rotate.png" },
-	{ "Create", "Textures/editor/create.png" },
-	{ "Clip", "Textures/editor/clip.png" },
-	{ "Light", "Textures/editor/lamp.png" },
-	{ "Bounds", "Textures/editor/bounds.png" },
-	{ "Grab", "Textures/editor/grab.png" },
-	{ "Spawn", "Textures/editor/spawn.png" },
+	{ "Simulate", "Textures/editor/simulate.png" }, { "Transform", "Textures/editor/move.png" },
+	{ "Face", "Textures/editor/face.png" },			{ "Rotate", "Textures/editor/rotate.png" },
+	{ "Create", "Textures/editor/create.png" },		{ "Clip", "Textures/editor/clip.png" },
+	{ "Light", "Textures/editor/lamp.png" },		{ "Bounds", "Textures/editor/bounds.png" },
+	{ "Grab", "Textures/editor/grab.png" },			{ "Spawn", "Textures/editor/spawn.png" },
+	{ "Subtract", "Textures/editor/subtract.png" },
 };
 
 static_assert(std::size(scToolButtons) == static_cast<size_t>(eEditorTool::Count));
@@ -92,16 +88,18 @@ static std::string ToBlockoutPath(const std::filesystem::path& chosen)
 	return (error || relative.empty()) ? chosen.string() : relative.string();
 }
 
-void EditorFrame::OpenBlockout()
+void EditorFrame::OpenPrototype()
 {
 	if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
 		return;
 	}
 
+#if 0
 	if (wxMessageBox("Open another blockout? Anything you haven't saved will be lost.", "Open blockout",
 					 wxYES_NO | wxICON_QUESTION, this) != wxYES) {
 		return;
 	}
+#endif
 
 	const std::filesystem::path current = std::filesystem::absolute(
 		(gWorld->BlockoutPath.GetLength() > 0) ? gWorld->BlockoutPath.Str() : std::string(scDefaultBlockoutPath));
@@ -133,14 +131,23 @@ void EditorFrame::OpenBlockout()
 	}
 }
 
-void EditorFrame::SaveBlockout()
+void EditorFrame::NewPrototype()
+{
+	if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
+		return;
+	}
+
+	// gWorld->pBlockout->
+}
+
+void EditorFrame::SavePrototype()
 {
 	if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
 		return;
 	}
 
 	if (gWorld->BlockoutPath.GetLength() == 0) {
-		SaveBlockoutAs();
+		SaveProtoTypeAs();
 		return;
 	}
 
@@ -148,7 +155,7 @@ void EditorFrame::SaveBlockout()
 	gWorld->pBlockout->Save(gWorld->BlockoutPath);
 }
 
-void EditorFrame::SaveBlockoutAs()
+void EditorFrame::SaveProtoTypeAs()
 {
 	if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
 		return;
@@ -186,11 +193,13 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 
 	wxMenu* file_menu = new wxMenu;
 
-	wxMenuItem* open_item = file_menu->Append(wxID_ANY, "Open...\tCtrl+O", "Opens an existing blockout file");
+	wxMenuItem* new_item = file_menu->Append(wxID_ANY, "New", "Creates a new prototype");
+	wxMenuItem* open_item = file_menu->Append(wxID_ANY, "Open...\tCtrl+O", "Opens an existing prototype");
 	file_menu->AppendSeparator();
-	wxMenuItem* save_item = file_menu->Append(wxID_ANY, "Save", "Saves the blockout to its current file");
+
+	wxMenuItem* save_item = file_menu->Append(wxID_ANY, "Save", "Saves the prototype to its current file");
 	wxMenuItem* save_as_item = file_menu->Append(wxID_ANY, "Save As...\tCtrl+Shift+S",
-												 "Saves the blockout under a new name");
+												 "Saves the prototype under a new name");
 
 	menu_bar->Append(file_menu, "&File");
 
@@ -216,9 +225,9 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 
 	SetMenuBar(menu_bar);
 
-	Bind(wxEVT_MENU, [this](wxCommandEvent&) { OpenBlockout(); }, open_item->GetId());
-	Bind(wxEVT_MENU, [this](wxCommandEvent&) { SaveBlockout(); }, save_item->GetId());
-	Bind(wxEVT_MENU, [this](wxCommandEvent&) { SaveBlockoutAs(); }, save_as_item->GetId());
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { OpenPrototype(); }, open_item->GetId());
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { SavePrototype(); }, save_item->GetId());
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { SaveProtoTypeAs(); }, save_as_item->GetId());
 	Bind(
 		wxEVT_MENU, [](wxCommandEvent&) { gEditor->InvokeReloadHandler(eReloadTarget::World); },
 		reload_world_item->GetId());

@@ -89,7 +89,7 @@ void Blockout::Create(World* world)
 		Brush brush = Brush::FromBox(Vec3f(-0.25f), Vec3f(0.25f));
 		Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
 		brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
-					   mesh->Indices);
+						   mesh->Indices);
 		pPreviewObject->pMesh = mesh->AsDefaultMesh();
 		mPreviewPlanes = brush.Planes;
 
@@ -114,7 +114,7 @@ static physics::eMotionType GetMotionType(const Object* object)
 	return (body != nullptr) ? body->GetMotionType() : physics::eMotionType::Static;
 }
 
-bool Blockout::MoveFace(Object* object, const Vec3f& face_normal, float32 distance)
+bool Blockout::MoveFace(Object* object, const Vec3f face_normal, float32 distance)
 {
 	Brush* brush = GetBrush(object);
 	if (brush == nullptr) {
@@ -161,7 +161,7 @@ bool Blockout::SetBrushPlanes(Object* object, const Brush::PlaneList& planes)
 	return true;
 }
 
-static Vec3f GetOffsetToKeepInPlace(const Object* object, const Vec3f& old_center, const Vec3f& new_center)
+static Vec3f GetOffsetToKeepInPlace(const Object* object, const Vec3f old_center, const Vec3f new_center)
 {
 	const Vec3f center_delta = new_center - old_center;
 	return center_delta.Rotate(object->mRotation) - center_delta;
@@ -179,10 +179,10 @@ void Blockout::ApplyBrushInPlace(Object* object, Brush&& brush)
 		}
 	}
 
-	ApplyBrush(object, std::move(brush), GetMotionType(object));
+	RebuildBrush(object, std::move(brush), GetMotionType(object));
 }
 
-bool Blockout::GetClipPieces(Object* object, const Vec3f& point_a, const Vec3f& point_b, const Vec3f& face_normal,
+bool Blockout::GetClipPieces(Object* object, const Vec3f point_a, const Vec3f point_b, const Vec3f face_normal,
 							 Brush::PlaneList& out_kept, Brush::PlaneList& out_split, Vec3f& out_split_position)
 {
 	const Brush* brush = GetBrush(object);
@@ -221,7 +221,61 @@ bool Blockout::GetClipPieces(Object* object, const Vec3f& point_a, const Vec3f& 
 	return true;
 }
 
-Brush Blockout::MakeWorldBox(const Vec3f& min, const Vec3f& max, Vec3f& out_position) const
+bool Blockout::GetSubtractPieces(Object* target, Object* cutter, std::vector<Brush::PlaneList>& out_pieces,
+								 std::vector<Vec3f>& out_positions)
+{
+	const Brush* brush = GetBrush(target);
+	const Brush* cutter_brush = GetBrush(cutter);
+
+	if (brush == nullptr || cutter_brush == nullptr || target == cutter) {
+		return false;
+	}
+
+	const Mat4f to_world = cutter->GetWorldMatrix();
+	const Mat4f to_local = target->GetWorldMatrix().Inverse();
+
+	Brush::PlaneList cutter_planes;
+
+	for (const BrushPlane& plane : cutter_brush->Planes) {
+		const Vec3f point = plane.Normal * plane.Distance;
+
+		const Vec4f world_point = to_world * Vec4f(point.X, point.Y, point.Z, 1.0f);
+		const Vec4f world_normal = to_world * Vec4f(plane.Normal.X, plane.Normal.Y, plane.Normal.Z, 0.0f);
+
+		const Vec4f local_point = to_local * world_point;
+		const Vec4f local_normal = to_local * world_normal;
+
+		const Vec3f normal(local_normal.X, local_normal.Y, local_normal.Z);
+		const float32 length = normal.Length();
+
+		if (!(length > 0.0f)) {
+			continue;
+		}
+
+		BrushPlane cut;
+		cut.Normal = normal * (1.0f / length);
+		cut.Distance = cut.Normal.Dot(Vec3f(local_point.X, local_point.Y, local_point.Z));
+
+		cutter_planes.Insert(cut);
+	}
+
+	if (!brush->Subtract(cutter_planes, target->GetPosition(), out_pieces)) {
+		return false;
+	}
+
+	out_positions.clear();
+
+	for (const Brush::PlaneList& piece : out_pieces) {
+		const Brush shape = Brush::FromPlanes(piece);
+
+		out_positions.push_back(target->GetPosition() +
+								GetOffsetToKeepInPlace(target, brush->GetCenter(), shape.GetCenter()));
+	}
+
+	return true;
+}
+
+Brush Blockout::MakeWorldBox(const Vec3f min, const Vec3f max, Vec3f& out_position) const
 {
 	out_position = (min + max) * 0.5f;
 
@@ -233,7 +287,7 @@ Brush Blockout::MakeWorldBox(const Vec3f& min, const Vec3f& max, Vec3f& out_posi
 	return brush;
 }
 
-void Blockout::ShowPreview(const Vec3f& position, const Quat& rotation, const Brush& brush)
+void Blockout::ShowPreview(const Vec3f position, const Quat rotation, const Brush& brush)
 {
 	if (!brush.IsValid()) {
 		HidePreview();
@@ -251,7 +305,7 @@ void Blockout::ShowPreview(const Vec3f& position, const Quat& rotation, const Br
 	if (!is_same_brush) {
 		Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
 		brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
-					   mesh->Indices);
+						   mesh->Indices);
 
 		pPreviewObject->pMesh = mesh->AsDefaultMesh();
 		pPreviewObject->Bounds.Min = brush.GetBoundsMin();
@@ -271,7 +325,7 @@ void Blockout::HidePreview()
 	pPreviewObject->SetPosition(Vec3f(-200.0f));
 }
 
-bool Blockout::GetFaceTextureEdit(Object* object, const Vec3f& face_normal, eFaceTextureEdit edit, const Vec2f& amount,
+bool Blockout::GetFaceTextureEdit(Object* object, const Vec3f face_normal, eFaceTextureEdit edit, const Vec2f& amount,
 								  Brush::PlaneList& out_planes)
 {
 	Brush* brush = GetBrush(object);
@@ -309,7 +363,7 @@ bool Blockout::GetFaceTextureEdit(Object* object, const Vec3f& face_normal, eFac
 	return true;
 }
 
-Object* Blockout::RaycastBlockout(const Vec3f& origin, const Vec3f& direction, Vec3f& out_face_normal)
+Object* Blockout::RaycastBlockout(const Vec3f origin, const Vec3f direction, Vec3f& out_face_normal)
 {
 	// Sorted nearest first
 	SizedArray<JPH::BodyID> hits = gPhysics->pBackend->RaycastObjects(origin, direction);
@@ -330,7 +384,7 @@ Object* Blockout::RaycastBlockout(const Vec3f& origin, const Vec3f& direction, V
 	return nullptr;
 }
 
-bool Blockout::RaycastFace(Object* object, const Vec3f& origin, const Vec3f& direction, Vec3f& out_face_normal,
+bool Blockout::RaycastFace(Object* object, const Vec3f origin, const Vec3f direction, Vec3f& out_face_normal,
 						   Vec3f* out_point)
 {
 	const Brush* brush = GetBrush(object);
@@ -385,7 +439,7 @@ void Blockout::ReloadSingleObject(Object* object)
 	for (ConfigEntry& entry : blocks_entry->Members) {
 		if (entry.Name.GetHash() == object_name_hash) {
 			RemoveSingleObjectFromWorld(object);
-			new_object_id = CreateBrushObject(entry);
+			new_object_id = CreateBrush(entry);
 			break;
 		}
 	}
@@ -448,7 +502,7 @@ Brush* Blockout::GetBrush(const Object* object)
 	return mBrushes.Find(object->ID.GetID());
 }
 
-void Blockout::ApplyBrush(Object* object, Brush&& brush, physics::eMotionType motion_type)
+void Blockout::RebuildBrush(Object* object, Brush&& brush, physics::eMotionType motion_type)
 {
 	Assert(brush.IsValid());
 
@@ -473,7 +527,7 @@ void Blockout::ApplyBrush(Object* object, Brush&& brush, physics::eMotionType mo
 	hull_points.InitCapacity(brush.GetVertices().Size);
 
 	// The collider is centred on the midpoint so that it rotates the same way as the object
-	for (const Vec3f& vertex : brush.GetVertices()) {
+	for (const Vec3f vertex : brush.GetVertices()) {
 		hull_points.Insert(vertex - midpoint);
 	}
 
@@ -618,7 +672,35 @@ void Blockout::WriteBrushEntry(ConfigEntry& entry, const Object* object)
 	}
 }
 
-ObjectID Blockout::CreateBrushObject(ConfigEntry& entry)
+ObjectID Blockout::CreateBrush(const std::string& name, const Vec3f position, const Quat rotation,
+							   const MaterialID material_id, const AABB bounds)
+{
+	static constexpr eObjectTag scObjectTags = eObjectTag::Blockout;
+
+	Object* object = gObjectManager->NewObject(name, material_id, scObjectTags);
+
+	// The object could not be made (likely ran out of memory), so return a null id
+	if (object == nullptr) {
+		return ObjectID::scNull;
+	}
+
+	object->SetPosition(position);
+	object->SetRotation(rotation);
+
+	Brush brush = Brush::FromBox(bounds.Min, bounds.Max);
+	RebuildBrush(object, std::move(brush), physics::eMotionType::Static);
+
+	AssetTicket ticket(static_cast<void*>(object));
+	ticket.MarkAndSignalLoaded();
+
+	pWorld->Attach(ticket);
+
+	BlockoutObjects.NewItem(nullptr, object->ID);
+
+	return object->ID;
+}
+
+ObjectID Blockout::CreateBrush(ConfigEntry& entry)
 {
 	Vec3f position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
 
@@ -709,9 +791,10 @@ ObjectID Blockout::CreateBrushObject(ConfigEntry& entry)
 		object->SetTag(eObjectTag::Spawn);
 	}
 
-	bool is_dynamic = entry.GetMemberValue(HashStr32("dynamic"), 0) == 1;
+	physics::eMotionType is_dynamic = entry.GetMemberValue(HashStr32("dynamic"), 0) ? physics::eMotionType::Dynamic
+																					: physics::eMotionType::Static;
 
-	ApplyBrush(object, std::move(brush), is_dynamic ? physics::eMotionType::Dynamic : physics::eMotionType::Static);
+	RebuildBrush(object, std::move(brush), is_dynamic);
 
 	AssetTicket ticket(static_cast<void*>(object));
 	ticket.MarkAndSignalLoaded();
@@ -745,7 +828,7 @@ void Blockout::RebuildObject(Object* object)
 		return;
 	}
 
-	ApplyBrush(object, std::move(brush), body->GetMotionType());
+	RebuildBrush(object, std::move(brush), body->GetMotionType());
 }
 
 void Blockout::DestroyObject(Object* object)
@@ -784,7 +867,7 @@ void Blockout::DestroyObject(Object* object)
 	gObjectManager->DestroyObject(object->ID);
 }
 
-Object* Blockout::NewObject(const Vec3f& position)
+Object* Blockout::NewObject(const Vec3f position)
 {
 	std::string blockout_name = String::Fmt("{}", BlockoutObjects.Size).Str();
 	LogInfo("Creating new blockout object '{}'", blockout_name);
@@ -796,7 +879,7 @@ Object* Blockout::NewObject(const Vec3f& position)
 	object->MoveBy(position);
 	object->SetShadowCaster(true);
 
-	ApplyBrush(object, Brush::FromBox(Vec3f(-scale), Vec3f(scale)), physics::eMotionType::Static);
+	RebuildBrush(object, Brush::FromBox(Vec3f(-scale), Vec3f(scale)), physics::eMotionType::Static);
 
 	AssetTicket ticket(static_cast<void*>(object));
 	ticket.MarkAndSignalLoaded();
@@ -847,7 +930,7 @@ Object* Blockout::DupeObject(Object* object)
 		dupe->SetTag(eObjectTag::Spawn);
 	}
 
-	ApplyBrush(dupe, std::move(brush), motion_type);
+	RebuildBrush(dupe, std::move(brush), motion_type);
 
 	AssetTicket ticket(static_cast<void*>(dupe));
 	ticket.MarkAndSignalLoaded();
@@ -877,7 +960,7 @@ bool Blockout::SetDynamic(Object* object, bool dynamic)
 	}
 
 	if (IsDynamic(object) != dynamic) {
-		ApplyBrush(object, std::move(brush), dynamic ? physics::eMotionType::Dynamic : physics::eMotionType::Static);
+		RebuildBrush(object, std::move(brush), dynamic ? physics::eMotionType::Dynamic : physics::eMotionType::Static);
 	}
 
 	object->SetPhysicsEnabled(dynamic);
@@ -890,8 +973,8 @@ bool Blockout::IsDynamic(const Object* object) const
 	return object != nullptr && GetMotionType(object) == physics::eMotionType::Dynamic;
 }
 
-Object* Blockout::RestoreObject(const Vec3f& position, const Brush::PlaneList& planes, MaterialID material,
-								const Quat& rotation, const Name& name, bool is_dynamic)
+Object* Blockout::RestoreObject(const Vec3f position, const Brush::PlaneList& planes, MaterialID material,
+								const Quat rotation, const Name& name, bool is_dynamic)
 {
 	Brush brush = Brush::FromPlanes(planes);
 
@@ -921,7 +1004,7 @@ Object* Blockout::RestoreObject(const Vec3f& position, const Brush::PlaneList& p
 	object->SetShadowCaster(true);
 	object->SetRotation(rotation);
 
-	ApplyBrush(object, std::move(brush), is_dynamic ? physics::eMotionType::Dynamic : physics::eMotionType::Static);
+	RebuildBrush(object, std::move(brush), is_dynamic ? physics::eMotionType::Dynamic : physics::eMotionType::Static);
 
 	AssetTicket ticket(static_cast<void*>(object));
 	ticket.MarkAndSignalLoaded();
@@ -1171,7 +1254,8 @@ void Blockout::LoadPlayerSpawn(ConfigFile& info)
 		return;
 	}
 
-	gWorld->PlayerSpawn.Position = spawn->GetMemberValue<Vec3f>(HashStr32("pos"), World::PlayerSpawnPoint::DefaultPosition());
+	gWorld->PlayerSpawn.Position = spawn->GetMemberValue<Vec3f>(HashStr32("pos"),
+																World::PlayerSpawnPoint::DefaultPosition());
 	gWorld->PlayerSpawn.Direction = spawn->GetMemberValue<Vec3f>(HashStr32("dir"), Vec3f::sForward).Normalize();
 	gWorld->PlayerSpawn.bCustom = true;
 }
@@ -1292,7 +1376,7 @@ void Blockout::ApplyModelProperties(Object& object, Model& model, const ConfigEn
 void Blockout::LinkModelColliders()
 {
 	for (const Model& model : mModels) {
-		Object* object = gObjectManager->GetObject(model.Id);
+		Object* object = gObjectManager->GetObject(model.ID);
 
 		if (object == nullptr || model.Collider.empty() || !object->PhysicsID.IsNull()) {
 			continue;
@@ -1325,24 +1409,27 @@ void Blockout::LoadModels(const ConfigEntry* list, const std::string& mesh_root)
 
 			Model model { .MeshPath = mesh_root + mesh->Get<const char*>() };
 
-			const auto existing = std::find_if(previous.begin(), previous.end(), [&](const Model& other) {
-				const Object* object = gObjectManager->GetObject(other.Id);
+			const auto existing = std::find_if(previous.begin(), previous.end(),
+											   [&](const Model& other)
+											   {
+												   const Object* object = gObjectManager->GetObject(other.ID);
 
-				return object != nullptr && object->Name.GetHash() == entry.Name.GetHash() &&
-					   other.MeshPath == model.MeshPath;
-			});
+												   return object != nullptr &&
+														  object->Name.GetHash() == entry.Name.GetHash() &&
+														  other.MeshPath == model.MeshPath;
+											   });
 
 			if (existing != previous.end()) {
-				model.Id = existing->Id;
+				model.ID = existing->ID;
 				previous.erase(existing);
 
-				ApplyModelProperties(*gObjectManager->GetObject(model.Id), model, entry);
+				ApplyModelProperties(*gObjectManager->GetObject(model.ID), model, entry);
 			}
 			else {
 				AssetTicket ticket = gAssetManager->LoadObject(entry.Name.Get(), model.MeshPath);
 				Object* object = static_cast<Object*>(ticket.Get());
 
-				model.Id = object->ID;
+				model.ID = object->ID;
 
 				ApplyModelProperties(*object, model, entry);
 
@@ -1354,8 +1441,8 @@ void Blockout::LoadModels(const ConfigEntry* list, const std::string& mesh_root)
 	}
 
 	for (const Model& model : previous) {
-		if (!RemoveModelFromWorld(model.Id)) {
-			mModelsPendingRemoval.push_back(model.Id);
+		if (!RemoveModelFromWorld(model.ID)) {
+			mModelsPendingRemoval.push_back(model.ID);
 		}
 	}
 
@@ -1383,7 +1470,7 @@ void Blockout::SaveModels(ConfigFile& info)
 	ConfigEntry models_container = ConfigEntry::Struct("objects");
 
 	for (const Model& model : mModels) {
-		const Object* object = gObjectManager->GetObject(model.Id);
+		const Object* object = gObjectManager->GetObject(model.ID);
 
 		if (object == nullptr) {
 			continue;
@@ -1437,6 +1524,16 @@ void Blockout::SaveModels(ConfigFile& info)
 	mbHasModelsEntry = true;
 }
 
+void Blockout::ResetToTemplate()
+{
+	// No world to clear, ignore
+	if (pWorld == nullptr) {
+		return;
+	}
+
+	RemoveBlockoutFromWorld(pWorld);
+}
+
 bool Blockout::Load(const String& path)
 {
 	ConfigFile info {};
@@ -1466,7 +1563,7 @@ bool Blockout::Load(const String& path)
 	RemoveBlockoutFromWorld(pWorld);
 
 	for (ConfigEntry& entry : blocks_entry->Members) {
-		CreateBrushObject(entry);
+		CreateBrush(entry);
 	}
 
 	const ConfigEntry* models_entry = info.GetEntry(HashStr32("objects"));

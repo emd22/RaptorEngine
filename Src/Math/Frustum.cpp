@@ -73,7 +73,7 @@ bool Frustum::TileIntersectsAABB(const AABB& tile_aabb) const
 	return true;
 }
 
-bool Frustum::IntersectsSphere(const Vec3f& center, float32 radius, uint32 plane_mask) const
+bool Frustum::IntersectsSphere(const Vec3f center, float32 radius, uint32 plane_mask) const
 {
 	// Rebuild() writes the planes by index, so `mClipPlanes.Size` stays at zero
 	for (uint32 i = 0; i <= static_cast<uint32>(eFrustumPlane::Far); i++) {
@@ -153,7 +153,7 @@ AABB Frustum::GetFrustumBoundingBox(const PerspectiveCamera& camera)
 	Vec3f min_point(FLT_MAX, FLT_MAX, FLT_MAX);
 	Vec3f max_point(-FLT_MAX, -FLT_MAX, -FLT_MAX);
 
-	for (const Vec3f& corner : ndc_corners) {
+	for (const Vec3f corner : ndc_corners) {
 		Vec4f world = vp_inverse * Vec4f(corner.X, corner.Y, corner.Z, 1.0f);
 		world = (world / world.W);
 

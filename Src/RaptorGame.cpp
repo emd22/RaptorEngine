@@ -1054,7 +1054,7 @@ RaptorGame::~RaptorGame()
 /////////////////////////////////////
 
 
-// void EditorModeMoveCollider::Update(const World& scene, const Vec3f& movement_vector)
+// void EditorModeMoveCollider::Update(const World& scene, const Vec3f movement_vector)
 // {
 // 	physics::BodyID phys_id = scene.GetSelectedPhysicsObject();
 // 	if (phys_id != physics::BodyID::scNull) {
@@ -1072,7 +1072,7 @@ RaptorGame::~RaptorGame()
 
 // void EditorModeMoveCollider::OnLeave(const World& scene) {}
 
-// void EditorModeScaleCollider::Update(const World& scene, const Vec3f& movement_vector)
+// void EditorModeScaleCollider::Update(const World& scene, const Vec3f movement_vector)
 // {
 // 	physics::BodyID phys_id = scene.GetSelectedPhysicsObject();
 // 	if (phys_id != physics::BodyID::scNull) {

@@ -39,7 +39,7 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 	{
 		mpPositionField = new Vector3Field(this, "Position", Vec2f(-100000.0f, 100000.0f));
 		mpPositionField->SetOnChange(
-			[this](const Vec3f& value)
+			[this](const Vec3f value)
 			{
 				if (mpShownLight != nullptr) {
 					mpShownLight->SetPosition(value);

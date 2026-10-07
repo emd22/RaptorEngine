@@ -59,7 +59,7 @@ struct AnimationPlayback
 struct BoneTransform
 {
 	BoneTransform() = default;
-	BoneTransform(const fx::Vec3f& position, const Quat& rotation) : Position(position), Rotation(rotation) {}
+	BoneTransform(const fx::Vec3f& position, const Quat rotation) : Position(position), Rotation(rotation) {}
 
 	Vec3f Position = Vec3f::sZero;
 	Quat Rotation = Quat::scIdentity;

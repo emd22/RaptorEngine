@@ -1,10 +1,9 @@
 #include "ReflectionFilter.hpp"
 
+#include <Math/MathConsts.hpp>
 #include <algorithm>
 #include <bit>
 #include <cmath>
-
-#include <Math/MathConsts.hpp>
 #include <vector>
 
 namespace fx::ReflectionFilter {
@@ -58,7 +57,7 @@ void SampleFace(const CubeLevel& level, uint32 face, float32 u, float32 v, float
 	}
 }
 
-void SampleCube(const std::vector<CubeLevel>& levels, const Vec3f& direction, float32 lod, float32 out[3])
+void SampleCube(const std::vector<CubeLevel>& levels, const Vec3f direction, float32 lod, float32 out[3])
 {
 	uint32 face;
 	float32 u;
@@ -193,7 +192,7 @@ void WriteTexel(uint16*& out, const float32 rgb[3])
 	*out++ = FloatToHalf(1.0f);
 }
 
-}
+} // namespace
 
 Vec3f FaceUVToDirection(uint32 face, float32 u, float32 v)
 {
@@ -213,7 +212,7 @@ Vec3f FaceUVToDirection(uint32 face, float32 u, float32 v)
 	}
 }
 
-void DirectionToFaceUV(const Vec3f& direction, uint32& out_face, float32& out_u, float32& out_v)
+void DirectionToFaceUV(const Vec3f direction, uint32& out_face, float32& out_u, float32& out_v)
 {
 	const float32 x = direction.X;
 	const float32 y = direction.Y;
@@ -347,4 +346,4 @@ void Prefilter(const float32* const faces[scFaces], uint32 size, uint32 mip_coun
 	}
 }
 
-}
+} // namespace fx::ReflectionFilter

@@ -19,7 +19,7 @@ FX_FORCE_INLINE Vec3d::Vec3d(const double* values)
 	mIntrin = simd::LoadDouble4(values[0], values[1], values[2], 0.0);
 }
 
-FX_FORCE_INLINE Vec3d::Vec3d(const Vec3f& other) { mIntrin = _mm256_cvtps_pd(other.mIntrin); }
+FX_FORCE_INLINE Vec3d::Vec3d(const Vec3f other) { mIntrin = _mm256_cvtps_pd(other.mIntrin); }
 
 /////////////////////////////////////
 // Operator overloads

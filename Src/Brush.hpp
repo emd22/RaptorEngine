@@ -11,6 +11,7 @@
 #include <Core/StackArray.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
+#include <vector>
 
 namespace fx {
 
@@ -60,7 +61,7 @@ public:
 	/**
 	 * @brief Creates a box with its textures anchored to its minimum corner, matching MeshGen::MakeCube with bAlignUVs
 	 */
-	static Brush FromBox(const Vec3f& min, const Vec3f& max);
+	static Brush FromBox(const Vec3f min, const Vec3f max);
 	static Brush FromPlanes(const PlaneList& planes);
 
 	bool Rebuild();
@@ -77,17 +78,17 @@ public:
 	 */
 	const SizedArray<Vec3f>& GetVertices() const { return mVertices; }
 
-	bool ContainsPoint(const Vec3f& point, float32 tolerance = 0.0f) const;
+	bool ContainsPoint(const Vec3f point, float32 tolerance = 0.0f) const;
 
 	/**
 	 * @brief Returns the index of the plane facing along `normal`, or scNoPlane
 	 */
-	int32 FindPlane(const Vec3f& normal) const;
+	int32 FindPlane(const Vec3f normal) const;
 
 	/**
 	 * @brief Returns how far the brush reaches along `direction`. For a face normal this is the distance of its plane
 	 */
-	float32 GetSupport(const Vec3f& direction) const;
+	float32 GetSupport(const Vec3f direction) const;
 
 	/**
 	 * @brief Returns the average of the corners of the face on a plane
@@ -98,7 +99,7 @@ public:
 	 * @brief Finds where a ray starting outside the brush enters it
 	 * @param out_distance Distance to the hit in multiples of the length of `direction`
 	 */
-	bool Raycast(const Vec3f& origin, const Vec3f& direction, float32& out_distance, uint32& out_plane_index) const;
+	bool Raycast(const Vec3f origin, const Vec3f direction, float32& out_distance, uint32& out_plane_index) const;
 
 	/**
 	 * @brief Splits the brush in two along a plane. The new faces get the texture layout of the brush's local space.
@@ -108,8 +109,10 @@ public:
 	 * the world grid from it, like AlignTexturesToWorld(), instead of starting from the local origin.
 	 * @returns false if the plane misses the brush, or the brush has no room for another plane
 	 */
-	bool Split(const Vec3f& normal, float32 distance, const Vec3f& origin, PlaneList& out_back,
+	bool Split(const Vec3f normal, float32 distance, const Vec3f origin, PlaneList& out_back,
 			   PlaneList& out_front) const;
+
+	bool Subtract(const PlaneList& cutter, const Vec3f origin, std::vector<PlaneList>& out_pieces) const;
 
 	/**
 	 * @brief Resets a face's texture layout to the one FromBox() uses
@@ -119,7 +122,7 @@ public:
 	/**
 	 * @brief Lines every face's texture up with the world grid, for a brush on an unrotated object at `origin`.
 	 */
-	void AlignTexturesToWorld(const Vec3f& origin);
+	void AlignTexturesToWorld(const Vec3f origin);
 
 	/**
 	 * @brief Returns true if every face has the default layout from ResetFaceTexture()

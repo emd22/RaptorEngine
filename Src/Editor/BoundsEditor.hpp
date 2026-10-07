@@ -41,7 +41,7 @@ private:
 
 	Object* ResolveTarget() const;
 
-	void DrawTarget(Object& object, const Vec3f& face) const;
+	void DrawTarget(Object& object, const Vec3f face) const;
 
 private:
 	bool mbActive = false;

@@ -89,7 +89,7 @@ void LightBase::SetRadius(const float radius)
 	}
 }
 
-void LightBase::SetPosition(const Vec3f& position)
+void LightBase::SetPosition(const Vec3f position)
 {
 	Entity::SetPosition(position);
 
@@ -98,7 +98,7 @@ void LightBase::SetPosition(const Vec3f& position)
 	}
 }
 
-void LightBase::SetRotation(const Quat& rotation)
+void LightBase::SetRotation(const Quat rotation)
 {
 	Entity::SetRotation(rotation);
 
@@ -211,7 +211,7 @@ float32 LightSpot::GetLumens() const { return Intensity * GetEffectiveSolidAngle
 
 void LightSpot::SetLumens(float32 lumens) { Intensity = lumens / std::max(GetEffectiveSolidAngle(), 1e-4f); }
 
-void LightSpot::SetDirection(const Vec3f& direction)
+void LightSpot::SetDirection(const Vec3f direction)
 {
 	const Vec3f dir = direction.Normalize();
 

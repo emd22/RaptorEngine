@@ -86,7 +86,7 @@ constexpr float32 scCosineLobe[Limits::ProbeSHCoeffCount] = {
 };
 
 /// Real SH basis up to L2. The order must match EvalProbeIrradiance() in Shaders/ProbeCommon.hlsli.
-void EvalSHBasis(const Vec3f& d, float32 out[Limits::ProbeSHCoeffCount])
+void EvalSHBasis(const Vec3f d, float32 out[Limits::ProbeSHCoeffCount])
 {
 	out[0] = scSHNorm0;
 	out[1] = scSHNorm1 * d.Y;
@@ -125,7 +125,7 @@ constexpr int64 scMaxProbeBounces = 8;
 /// Surfaces closer than this to a probe are clipped out of its capture, so it sees straight through them
 constexpr float32 scCaptureNearPlane = 0.1f;
 
-PerspectiveCamera MakeCaptureCamera(const Vec3f& position, uint32 face)
+PerspectiveCamera MakeCaptureCamera(const Vec3f position, uint32 face)
 {
 	static const Vec3f scFaceDirections[ProbeManager::scCaptureFaces] = {
 		Vec3f(1.0f, 0.0f, 0.0f),  Vec3f(-1.0f, 0.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
@@ -152,7 +152,7 @@ float32 CaptureTexelToNdc(uint32 index)
 	return ((static_cast<float32>(index) + 0.5f) / static_cast<float32>(ProbeManager::scCaptureSize)) * 2.0f - 1.0f;
 }
 
-uint32 DirectionToMomentTexel(const Vec3f& d)
+uint32 DirectionToMomentTexel(const Vec3f d)
 {
 	const Vec3f a = d.Abs();
 
@@ -334,13 +334,13 @@ ProbePlacementBoxes GatherPlacementBoxes()
 	return boxes;
 }
 
-Vec3f ToBoxLocal(const Vec3f& point, const ProbePlacementBoxes::Box& box)
+Vec3f ToBoxLocal(const Vec3f point, const ProbePlacementBoxes::Box& box)
 {
 	const Vec4f local = box.WorldToLocal * Vec4f(point.X, point.Y, point.Z, 1.0f);
 	return Vec3f(local.X, local.Y, local.Z);
 }
 
-bool IsInsideBox(const Vec3f& point, const ProbePlacementBoxes::Box& box, float32 skin)
+bool IsInsideBox(const Vec3f point, const ProbePlacementBoxes::Box& box, float32 skin)
 {
 	const Vec3f local = ToBoxLocal(point, box);
 
@@ -364,7 +364,7 @@ bool IsInsideBox(const Vec3f& point, const ProbePlacementBoxes::Box& box, float3
 	return true;
 }
 
-bool IsInsideAnyBox(const Vec3f& point, const ProbePlacementBoxes& boxes)
+bool IsInsideAnyBox(const Vec3f point, const ProbePlacementBoxes& boxes)
 {
 	for (uint32 i = 0; i < boxes.Count; i++) {
 		if (IsInsideBox(point, boxes.Boxes[i], scProbeInsideSkin)) {
@@ -375,7 +375,7 @@ bool IsInsideAnyBox(const Vec3f& point, const ProbePlacementBoxes& boxes)
 	return false;
 }
 
-bool IsInsideLevel(const Vec3f& point, const ProbePlacementBoxes& boxes)
+bool IsInsideLevel(const Vec3f point, const ProbePlacementBoxes& boxes)
 {
 	for (uint32 axis = 0; axis < 3; axis++) {
 		if (point.mData[axis] < boxes.Min.mData[axis] || point.mData[axis] > boxes.Max.mData[axis]) {
@@ -387,7 +387,7 @@ bool IsInsideLevel(const Vec3f& point, const ProbePlacementBoxes& boxes)
 }
 
 /// The point of the box's solid nearest to `local`, in the box's local space
-Vec3f ClosestPointInBox(const Vec3f& local, const ProbePlacementBoxes::Box& box)
+Vec3f ClosestPointInBox(const Vec3f local, const ProbePlacementBoxes::Box& box)
 {
 	if (box.Planes.empty()) {
 		return Vec3f::Clamp(local, box.LocalBounds.Min, box.LocalBounds.Max);
@@ -429,7 +429,7 @@ Vec3f ClosestPointInBox(const Vec3f& local, const ProbePlacementBoxes::Box& box)
 	return closest;
 }
 
-float32 DistanceToBox(const Vec3f& point, const ProbePlacementBoxes::Box& box)
+float32 DistanceToBox(const Vec3f point, const ProbePlacementBoxes::Box& box)
 {
 	const Vec3f closest_local = ClosestPointInBox(ToBoxLocal(point, box), box);
 	const Vec4f closest = box.LocalToWorld * Vec4f(closest_local.X, closest_local.Y, closest_local.Z, 1.0f);
@@ -437,7 +437,7 @@ float32 DistanceToBox(const Vec3f& point, const ProbePlacementBoxes::Box& box)
 	return (point - Vec3f(closest.X, closest.Y, closest.Z)).Length();
 }
 
-bool SegmentCrossesBox(const Vec3f& from, const Vec3f& to, const ProbePlacementBoxes::Box& box, float32 skin)
+bool SegmentCrossesBox(const Vec3f from, const Vec3f to, const ProbePlacementBoxes::Box& box, float32 skin)
 {
 	const Vec3f local_from = ToBoxLocal(from, box);
 	const Vec3f local_to = ToBoxLocal(to, box);
@@ -509,7 +509,7 @@ bool SegmentCrossesBox(const Vec3f& from, const Vec3f& to, const ProbePlacementB
 	return true;
 }
 
-bool IsProbePlacementValid(const Vec3f& grid_position, const Vec3f& position, const ProbePlacementBoxes& boxes)
+bool IsProbePlacementValid(const Vec3f grid_position, const Vec3f position, const ProbePlacementBoxes& boxes)
 {
 	if (boxes.IsEmpty()) {
 		return true;
@@ -543,7 +543,7 @@ uint32 GetFaceCount(const ProbePlacementBoxes::Box& box)
 }
 
 /// How far `local` has to move to leave through a face. Box faces are numbered axis * 2 + (0 for min, 1 for max).
-float32 GetFacePenetration(const Vec3f& local, const ProbePlacementBoxes::Box& box, uint32 face)
+float32 GetFacePenetration(const Vec3f local, const ProbePlacementBoxes::Box& box, uint32 face)
 {
 	if (!box.Planes.empty()) {
 		const ProbePlacementBoxes::Plane& plane = box.Planes[face];
@@ -556,7 +556,7 @@ float32 GetFacePenetration(const Vec3f& local, const ProbePlacementBoxes::Box& b
 							 : local.mData[axis] - box.LocalBounds.Min.mData[axis];
 }
 
-Vec3f FaceExitPoint(const Vec3f& local, const ProbePlacementBoxes::Box& box, uint32 face, Vec3f& out_world_normal)
+Vec3f FaceExitPoint(const Vec3f local, const ProbePlacementBoxes::Box& box, uint32 face, Vec3f& out_world_normal)
 {
 	Vec3f exit_local = local;
 	Vec3f local_normal = Vec3f::sZero;
@@ -583,7 +583,7 @@ Vec3f FaceExitPoint(const Vec3f& local, const ProbePlacementBoxes::Box& box, uin
 	return Vec3f(exit_world.X, exit_world.Y, exit_world.Z);
 }
 
-Vec3f ExitThroughFace(const Vec3f& local, const ProbePlacementBoxes::Box& box, uint32 face)
+Vec3f ExitThroughFace(const Vec3f local, const ProbePlacementBoxes::Box& box, uint32 face)
 {
 	Vec3f world_normal;
 	const Vec3f exit = FaceExitPoint(local, box, face, world_normal);
@@ -591,7 +591,7 @@ Vec3f ExitThroughFace(const Vec3f& local, const ProbePlacementBoxes::Box& box, u
 	return exit + world_normal * scProbeSurfaceOffset;
 }
 
-float32 DistanceToBoxSurface(const Vec3f& point, const ProbePlacementBoxes::Box& box)
+float32 DistanceToBoxSurface(const Vec3f point, const ProbePlacementBoxes::Box& box)
 {
 	if (!IsInsideBox(point, box, 0.0f)) {
 		return DistanceToBox(point, box);
@@ -609,7 +609,7 @@ float32 DistanceToBoxSurface(const Vec3f& point, const ProbePlacementBoxes::Box&
 	return nearest;
 }
 
-bool CellTouchesSurface(const Vec3f& cell_min, const Vec3f& cell_max, float32 pad, const ProbePlacementBoxes& boxes)
+bool CellTouchesSurface(const Vec3f cell_min, const Vec3f cell_max, float32 pad, const ProbePlacementBoxes& boxes)
 {
 	const Vec3f padded_min = cell_min - Vec3f(pad);
 	const Vec3f padded_max = cell_max + Vec3f(pad);
@@ -651,13 +651,13 @@ bool CellTouchesSurface(const Vec3f& cell_min, const Vec3f& cell_max, float32 pa
 	return false;
 }
 
-float32 ShaderNormalBias(const Vec3f& cell_size)
+float32 ShaderNormalBias(const Vec3f cell_size)
 {
 	const float32 min_spacing = std::min({ cell_size.X, cell_size.Y, cell_size.Z });
 	return std::clamp(scShaderNormalBiasScale * min_spacing, scShaderNormalBiasMin, scShaderNormalBiasMax);
 }
 
-bool IsBuriedTooDeep(const Vec3f& point, const Vec3f& max_relocation, const ProbePlacementBoxes& boxes)
+bool IsBuriedTooDeep(const Vec3f point, const Vec3f max_relocation, const ProbePlacementBoxes& boxes)
 {
 	for (uint32 i = 0; i < boxes.Count; i++) {
 		const ProbePlacementBoxes::Box& box = boxes.Boxes[i];
@@ -691,7 +691,7 @@ bool IsBuriedTooDeep(const Vec3f& point, const Vec3f& max_relocation, const Prob
 	return false;
 }
 
-uint32 FindNeededGridPoints(const Vec3f& volume_min, const Vec3f& cell_size, const ProbeGridSize& grid,
+uint32 FindNeededGridPoints(const Vec3f volume_min, const Vec3f cell_size, const ProbeGridSize& grid,
 							const ProbePlacementBoxes& boxes, eProbeFill fill, std::vector<uint8>& out_needed)
 {
 	const uint32 dims[3] = { grid.X, grid.Y, grid.Z };
@@ -848,7 +848,7 @@ bool PushOutOfBoxes(Vec3f& point, const ProbePlacementBoxes& boxes)
 }
 
 /// Distance from `point` to the nearest box other than `skip_box`
-float32 DistanceToOtherBoxes(const Vec3f& point, const ProbePlacementBoxes& boxes, uint32 skip_box)
+float32 DistanceToOtherBoxes(const Vec3f point, const ProbePlacementBoxes& boxes, uint32 skip_box)
 {
 	float32 nearest = std::numeric_limits<float32>::max();
 
@@ -922,7 +922,7 @@ bool HugNearestSurface(Vec3f& point, const ProbePlacementBoxes& boxes, float32 m
 	return true;
 }
 
-bool FindValidProbePosition(const Vec3f& grid_position, const Vec3f& preferred, const Vec3f& max_relocation,
+bool FindValidProbePosition(const Vec3f grid_position, const Vec3f preferred, const Vec3f max_relocation,
 							const ProbePlacementBoxes& boxes, Vec3f& out_position)
 {
 	constexpr float32 cStepScale = 2.0f / static_cast<float32>(scRelocationSearchSteps - 1);
@@ -954,7 +954,7 @@ bool FindValidProbePosition(const Vec3f& grid_position, const Vec3f& preferred, 
 	return found;
 }
 
-void FitCellCentred(const Vec3f& region_min, const Vec3f& region_max, const ProbeGridSize& grid, Vec3f& out_min,
+void FitCellCentred(const Vec3f region_min, const Vec3f region_max, const ProbeGridSize& grid, Vec3f& out_min,
 					Vec3f& out_size)
 {
 	const Vec3f region_size = region_max - region_min;
@@ -965,7 +965,7 @@ void FitCellCentred(const Vec3f& region_min, const Vec3f& region_max, const Prob
 	out_size = region_size - inset * 2.0f;
 }
 
-ProbeGridSize GridForSpacing(const Vec3f& region_size, float32 spacing, bool cell_centred)
+ProbeGridSize GridForSpacing(const Vec3f region_size, float32 spacing, bool cell_centred)
 {
 	const uint32 extra = cell_centred ? 0 : 1;
 
@@ -976,7 +976,7 @@ ProbeGridSize GridForSpacing(const Vec3f& region_size, float32 spacing, bool cel
 	};
 }
 
-void LayoutGrid(const Vec3f& region_min, const Vec3f& region_max, const ProbeGridSize& grid, bool cell_centred,
+void LayoutGrid(const Vec3f region_min, const Vec3f region_max, const ProbeGridSize& grid, bool cell_centred,
 				Vec3f& out_min, Vec3f& out_size)
 {
 	if (cell_centred) {
@@ -988,7 +988,7 @@ void LayoutGrid(const Vec3f& region_min, const Vec3f& region_max, const ProbeGri
 	out_size = region_max - region_min;
 }
 
-Vec3f GridCellSize(const Vec3f& volume_size, const ProbeGridSize& grid)
+Vec3f GridCellSize(const Vec3f volume_size, const ProbeGridSize& grid)
 {
 	const Vec3f num_cells(static_cast<float32>(grid.X - 1), static_cast<float32>(grid.Y - 1),
 						  static_cast<float32>(grid.Z - 1));
@@ -1008,7 +1008,7 @@ bool CheckGridSize(const ProbeGridSize& grid)
 	return false;
 }
 
-void SetProbePosition(ProbeInfo& info, const Vec3f& position)
+void SetProbePosition(ProbeInfo& info, const Vec3f position)
 {
 	info.ProbePosition[0] = position.X;
 	info.ProbePosition[1] = position.Y;
@@ -1214,7 +1214,7 @@ uint32 ProbeManager::GetVolumeOfProbe(uint32 probe_index) const
 	return Limits::MaxProbeVolumes;
 }
 
-bool ProbeManager::AddVolume(const Vec3f& center, const Vec3f& size, const ProbeGridSize& grid)
+bool ProbeManager::AddVolume(const Vec3f center, const Vec3f size, const ProbeGridSize& grid)
 {
 	if (IsBaking()) {
 		LogWarning("Cannot add a probe volume while the probes are baking");
@@ -1269,7 +1269,7 @@ bool ProbeManager::AddLevelSurfaceVolume(const ProbePlacementBoxes& boxes)
 	return AddSurfaceVolumeForBudget(boxes.Min, boxes.Max, spacing, boxes, true);
 }
 
-bool ProbeManager::AddSurfaceVolumeForBudget(const Vec3f& region_min, const Vec3f& region_max, float32 spacing,
+bool ProbeManager::AddSurfaceVolumeForBudget(const Vec3f region_min, const Vec3f region_max, float32 spacing,
 											 const ProbePlacementBoxes& boxes, bool cell_centred)
 {
 	if (mVolumeCount >= Limits::MaxProbeVolumes) {
@@ -1403,7 +1403,7 @@ void ProbeManager::BeginGridBake()
 	}
 }
 
-void ProbeManager::BeginGridBakeAt(const Vec3f& center, const Vec3f& size, const ProbeGridSize& grid)
+void ProbeManager::BeginGridBakeAt(const Vec3f center, const Vec3f size, const ProbeGridSize& grid)
 {
 	if (IsBaking()) {
 		LogWarning("A probe bake is already in progress");
@@ -1429,7 +1429,7 @@ void ProbeManager::RefreshVolumeCounts()
 	}
 }
 
-bool ProbeManager::AddVolumeAndPlaceProbes(const Vec3f& volume_min, const Vec3f& volume_size, const ProbeGridSize& grid,
+bool ProbeManager::AddVolumeAndPlaceProbes(const Vec3f volume_min, const Vec3f volume_size, const ProbeGridSize& grid,
 										   const ProbePlacementBoxes& boxes, eProbeFill fill)
 {
 	if (!CheckGridSize(grid)) {
@@ -1464,7 +1464,7 @@ bool ProbeManager::AddVolumeAndPlaceProbes(const Vec3f& volume_min, const Vec3f&
 	return true;
 }
 
-bool ProbeManager::PlaceVolumeProbes(uint32 volume_index, const Vec3f& volume_min, const Vec3f& volume_size,
+bool ProbeManager::PlaceVolumeProbes(uint32 volume_index, const Vec3f volume_min, const Vec3f volume_size,
 									 const ProbeGridSize& grid, const ProbePlacementBoxes& boxes, eProbeFill fill)
 {
 	const uint32 dims[3] = { grid.X, grid.Y, grid.Z };
@@ -2163,7 +2163,7 @@ struct ReflectionFileHeader
 	uint32 ProbeCount = 0;
 };
 
-ReflectionBox MakeReflectionBox(const Vec3f& local_min, const Vec3f& local_max, const Mat4f& local_to_world)
+ReflectionBox MakeReflectionBox(const Vec3f local_min, const Vec3f local_max, const Mat4f& local_to_world)
 {
 	const Vec3f half_extent = Vec3f::Max((local_max - local_min) * 0.5f, Vec3f(scReflectionMinHalfExtent));
 	const Vec3f center = (local_max + local_min) * 0.5f;

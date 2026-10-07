@@ -571,7 +571,7 @@ void World::BakeSpotShadows()
 }
 
 
-void World::GatherSpotShadowCasters(const Vec3f& center, float32 radius, DynArray<ObjectID>& out_casters)
+void World::GatherSpotShadowCasters(const Vec3f center, float32 radius, DynArray<ObjectID>& out_casters)
 {
 	const uint32 first_caster = out_casters.Size;
 
@@ -620,7 +620,7 @@ void World::GatherSpotShadowCasters(const Vec3f& center, float32 radius, DynArra
 }
 
 
-static bool SkinnedCasterReachesSphere(Object& object, const Vec3f& center, float32 radius)
+static bool SkinnedCasterReachesSphere(Object& object, const Vec3f center, float32 radius)
 {
 	constexpr float32 scMeshPadding = 0.3f;
 
@@ -636,7 +636,7 @@ static bool SkinnedCasterReachesSphere(Object& object, const Vec3f& center, floa
 
 	const Skeleton& skeleton = *object.pSkeleton;
 	const float32* m = object.GetWorldMatrix().RawData;
-	const Vec3f& c = skeleton.PoseCenter;
+	const Vec3f c = skeleton.PoseCenter;
 
 	const Vec3f pose_center(c.X * m[0] + c.Y * m[4] + c.Z * m[8] + m[12], c.X * m[1] + c.Y * m[5] + c.Z * m[9] + m[13],
 							c.X * m[2] + c.Y * m[6] + c.Z * m[10] + m[14]);
@@ -646,7 +646,7 @@ static bool SkinnedCasterReachesSphere(Object& object, const Vec3f& center, floa
 	return (pose_center - center).Length() <= reach;
 }
 
-void World::AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, const Vec3f& center, float32 radius,
+void World::AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, const Vec3f center, float32 radius,
 										 DynArray<ObjectID>& out_casters)
 {
 	if (id.IsInvalid()) {
@@ -1080,7 +1080,7 @@ void World::Render(Camera* shadow_camera)
 /// be captured with it. Past that the shadow map is re-rendered around the probe.
 static constexpr float32 scProbeShadowEdgeMargin = 0.5f;
 
-bool World::RenderCaptureSunShadows(LightDirectional& sun, const Vec3f& center, OrthoCamera& out_shadow_camera,
+bool World::RenderCaptureSunShadows(LightDirectional& sun, const Vec3f center, OrthoCamera& out_shadow_camera,
 									uint32& out_light_slot)
 {
 	// Same projection as the player's shadow camera, only the placement changes
@@ -1263,7 +1263,7 @@ void World::DebugDrawPhysicsBodies()
 	}
 }
 
-Object* World::RaycastProbeVolumes(const Vec3f& origin, const Vec3f& direction, float32 max_distance,
+Object* World::RaycastProbeVolumes(const Vec3f origin, const Vec3f direction, float32 max_distance,
 								   float32& out_distance)
 {
 	Object* nearest = nullptr;

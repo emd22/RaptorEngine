@@ -45,9 +45,9 @@ public:
 
 	FX_FORCE_INLINE explicit Vec3f(float32 scalar);
 
-	FX_FORCE_INLINE static Vec3f MulAdd(const Vec3f& a, const Vec3f& b, const Vec3f& accum);
+	FX_FORCE_INLINE static Vec3f MulAdd(const Vec3f a, const Vec3f b, const Vec3f accum);
 
-	static Vec3f GetSurfaceNormal(const Vec3f& a, const Vec3f& b, const Vec3f& c)
+	static Vec3f GetSurfaceNormal(const Vec3f a, const Vec3f b, const Vec3f c)
 	{
 		Vec3f edge1 = b - a;
 		const Vec3f edge2 = c - b;
@@ -84,9 +84,9 @@ public:
 		output[2] = Z;
 	}
 
-	FX_FORCE_INLINE float32 DistanceTo(const Vec3f& other) const { return (other - *this).Length(); }
+	FX_FORCE_INLINE float32 DistanceTo(const Vec3f other) const { return (other - *this).Length(); }
 
-	FX_FORCE_INLINE bool IntersectsSphere(const Vec3f& sphere_center, float32 sphere_radius) const
+	FX_FORCE_INLINE bool IntersectsSphere(const Vec3f sphere_center, float32 sphere_radius) const
 	{
 		const Vec3f diff = (*this) - sphere_center;
 		const float dist2 = diff.Dot(diff);
@@ -95,12 +95,12 @@ public:
 	}
 
 
-	FX_FORCE_INLINE bool operator==(const Vec3f& other) const;
+	FX_FORCE_INLINE bool operator==(const Vec3f other) const;
 	bool operator==(const JPH::Vec3& other) const;
 
 	FX_FORCE_INLINE bool IsZero() const;
 	FX_FORCE_INLINE bool IsNearZero(const float32 tolerance = 0.00001) const;
-	FX_FORCE_INLINE bool IsCloseTo(const Vec3f& other, const float32 tolerance = 0.00001) const;
+	FX_FORCE_INLINE bool IsCloseTo(const Vec3f other, const float32 tolerance = 0.00001) const;
 #ifdef FX_USE_SIMD
 	FX_FORCE_INLINE bool IsCloseTo(const FLOAT4 other, const float32 tolerance = 0.00001) const;
 #endif
@@ -116,24 +116,24 @@ public:
 	FX_FORCE_INLINE Vec3f& NormalizeIP();
 
 	FX_FORCE_INLINE float32 Length() const;
-	Vec3f Cross(const Vec3f& other) const;
-	Vec3f CrossSlow(const Vec3f& other) const;
+	Vec3f Cross(const Vec3f other) const;
+	Vec3f CrossSlow(const Vec3f other) const;
 
-	Vec3f Rotate(const Quat& rotation) const;
+	Vec3f Rotate(const Quat rotation) const;
 
-	FX_FORCE_INLINE float32 Dot(const Vec3f& other) const;
+	FX_FORCE_INLINE float32 Dot(const Vec3f other) const;
 
 #ifdef FX_USE_SIMD
 	FX_FORCE_INLINE float32 Dot(FLOAT4 other) const;
 #endif
 
-	FX_FORCE_INLINE static Vec3f Min(const Vec3f& a, const Vec3f& b);
-	FX_FORCE_INLINE static Vec3f Max(const Vec3f& a, const Vec3f& b);
-	FX_FORCE_INLINE static Vec3f Clamp(const Vec3f& v, const Vec3f& min, const Vec3f& max);
-	FX_FORCE_INLINE static Vec3f Lerp(const Vec3f& a, const Vec3f& b, const float f);
-	FX_FORCE_INLINE Vec3f& LerpIP(const Vec3f& dest, const float step);
+	FX_FORCE_INLINE static Vec3f Min(const Vec3f a, const Vec3f b);
+	FX_FORCE_INLINE static Vec3f Max(const Vec3f a, const Vec3f b);
+	FX_FORCE_INLINE static Vec3f Clamp(const Vec3f v, const Vec3f min, const Vec3f max);
+	FX_FORCE_INLINE static Vec3f Lerp(const Vec3f a, const Vec3f b, const float f);
+	FX_FORCE_INLINE Vec3f& LerpIP(const Vec3f dest, const float step);
 
-	FX_FORCE_INLINE Vec3f& SmoothInterpolate(const Vec3f& dest, const float speed, const float delta_time)
+	FX_FORCE_INLINE Vec3f& SmoothInterpolate(const Vec3f dest, const float speed, const float delta_time)
 	{
 		LerpIP(dest, 1.0f - expf(-speed * delta_time));
 		return *this;
@@ -154,20 +154,20 @@ public:
 
 #ifdef FX_USE_NEON
 	template <int TX, int TY, int TZ, int TW>
-	FX_FORCE_INLINE static Vec3f FlipSigns(const Vec3f& vec)
+	FX_FORCE_INLINE static Vec3f FlipSigns(const Vec3f vec)
 	{
 		return Vec3f(Neon::FlipSigns<TX, TY, TZ, TW>(vec.mIntrin));
 	}
 
 #elif FX_USE_AVX
 	template <int TX, int TY, int TZ, int TW>
-	FX_FORCE_INLINE static Vec3f FlipSigns(const Vec3f& vec)
+	FX_FORCE_INLINE static Vec3f FlipSigns(const Vec3f vec)
 	{
 		return Vec3f(SSE::FlipSigns<TX, TY, TZ, TW>(vec.mIntrin));
 	}
 #else
 	template <int TX, int TY, int TZ, int TW>
-	FX_FORCE_INLINE static Vec3f FlipSigns(const Vec3f& vec)
+	FX_FORCE_INLINE static Vec3f FlipSigns(const Vec3f vec)
 	{
 		constexpr float rx = TX > 0.0 ? vec.X : -vec.X;
 		constexpr float ry = TY > 0.0 ? vec.Y : -vec.Y;
@@ -191,20 +191,20 @@ public:
 	// Operator overloads
 	/////////////////////////////////////
 
-	FX_FORCE_INLINE Vec3f operator+(const Vec3f& other) const;
-	FX_FORCE_INLINE Vec3f operator-(const Vec3f& other) const;
-	FX_FORCE_INLINE Vec3f operator*(const Vec3f& other) const;
-	FX_FORCE_INLINE Vec3f operator/(const Vec3f& other) const;
+	FX_FORCE_INLINE Vec3f operator+(const Vec3f other) const;
+	FX_FORCE_INLINE Vec3f operator-(const Vec3f other) const;
+	FX_FORCE_INLINE Vec3f operator*(const Vec3f other) const;
+	FX_FORCE_INLINE Vec3f operator/(const Vec3f other) const;
 
 	FX_FORCE_INLINE Vec3f operator*(float32 scalar) const;
 	FX_FORCE_INLINE Vec3f operator/(float32 scalar) const;
 
 	FX_FORCE_INLINE Vec3f operator-() const;
 
-	FX_FORCE_INLINE Vec3f& operator+=(const Vec3f& other);
+	FX_FORCE_INLINE Vec3f& operator+=(const Vec3f other);
 	FX_FORCE_INLINE Vec3f& operator-=(float32 scalar);
-	FX_FORCE_INLINE Vec3f& operator-=(const Vec3f& other);
-	FX_FORCE_INLINE Vec3f& operator*=(const Vec3f& other);
+	FX_FORCE_INLINE Vec3f& operator-=(const Vec3f other);
+	FX_FORCE_INLINE Vec3f& operator*=(const Vec3f other);
 
 #ifdef FX_USE_SIMD
 

@@ -307,7 +307,7 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 	return true;
 }
 
-void Ragdoll::Activate(const Vec3f& velocity)
+void Ragdoll::Activate(const Vec3f velocity)
 {
 	if (mpRagdoll == nullptr) {
 		return;
