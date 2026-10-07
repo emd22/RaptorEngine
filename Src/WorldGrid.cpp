@@ -88,7 +88,7 @@ void WorldGrid::GetObjectTileRect(Object* object, TileIndex* out_start, Vec2u* o
 	DebugAssert(out_span != nullptr);
 
 
-	const AABB world_bounds = object->GetWorldOBB().GetWorldAABB();
+	const BBox world_bounds = object->GetWorldOBB().GetWorldAABB();
 
 	const Vec2u tile_xy_start = TileToTileXY(WorldToTile(world_bounds.Min));
 	const Vec2u tile_xy_end = TileToTileXY(WorldToTile(world_bounds.Max));
@@ -150,6 +150,7 @@ void WorldGrid::AddObject(ObjectID id)
 	// The object isn't cullable, insert into global tile
 	if (!object->IsCullable()) {
 		InsertInto(scGlobalTileIndex, object->ID);
+		MarkObjectDirty(object);
 		return;
 	}
 
@@ -163,6 +164,8 @@ void WorldGrid::AddObject(ObjectID id)
 	// after inserting into every tile so UpdateObject/RemoveObject can clear all of them later.
 	object->mTileIndex = tile_start;
 	object->mTileSpan = tile_span;
+
+	MarkObjectDirty(object);
 }
 
 bool WorldGrid::GetLightPlacement(const LightBase* light, TileIndex* out_start, Vec2u* out_span) const
@@ -174,7 +177,7 @@ bool WorldGrid::GetLightPlacement(const LightBase* light, TileIndex* out_start, 
 		return true;
 	}
 
-	const AABB bounds = light->GetBounds();
+	const BBox bounds = light->GetBounds();
 
 	const Vec2u tile_xy_start = TileToTileXY(WorldToTile(bounds.Min));
 	const Vec2u tile_xy_end = TileToTileXY(WorldToTile(bounds.Max));
@@ -472,6 +475,70 @@ void WorldGrid::UpdateObject(Object* object, bool update_attached)
 		return;
 	}
 
+	// Whatever the object was casting into its old tiles is gone, and so is whatever it will cast into the new ones.
+	MarkObjectDirty(object);
+	RelocateObject(object, update_attached);
+	MarkObjectDirty(object);
+}
+
+void WorldGrid::MarkObjectDirty(const Object* object)
+{
+	if (object == nullptr || object->mTileIndex == TileIndexNull || !object->IsShadowCaster()) {
+		return;
+	}
+
+	const uint64 serial = ++mChangeSerial;
+
+	if (object->mTileIndex == scGlobalTileIndex) {
+		GlobalTile.ChangeSerial = serial;
+		return;
+	}
+
+	const Vec2u start_xy = TileToTileXY(object->mTileIndex);
+
+	for (uint32 y = 0; y < object->mTileSpan.Y; y++) {
+		for (uint32 x = 0; x < object->mTileSpan.X; x++) {
+			Tile* tile = GetTile(TileFromTileXY(start_xy + Vec2u(x, y)));
+			if (tile != nullptr) {
+				tile->ChangeSerial = serial;
+			}
+		}
+	}
+}
+
+bool WorldGrid::HasChangedSince(const Vec3f center, float32 radius, uint64 serial) const
+{
+	if (GlobalTile.ChangeSerial > serial) {
+		return true;
+	}
+
+	Vec2u min_tile;
+	Vec2u max_tile;
+	GetSphereTileRange(center, radius, &min_tile, &max_tile);
+
+	for (uint32 y = min_tile.Y; y <= max_tile.Y; y++) {
+		for (uint32 x = min_tile.X; x <= max_tile.X; x++) {
+			const Tile* tile = GetTile(TileFromTileXY(Vec2u(x, y)));
+
+			if (tile != nullptr && tile->ChangeSerial > serial) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+void WorldGrid::GetSphereTileRange(const Vec3f center, float32 radius, Vec2u* out_min, Vec2u* out_max) const
+{
+	const Vec3f extent(radius, radius, radius);
+
+	*out_min = TileToTileXY(WorldToTile(center - extent));
+	*out_max = TileToTileXY(WorldToTile(center + extent));
+}
+
+void WorldGrid::RelocateObject(Object* object, bool update_attached)
+{
 	mbNearbyObjectCacheValid = false;
 
 	if (!object->IsCullable()) {
@@ -603,6 +670,8 @@ void WorldGrid::RemoveObject(ObjectID id)
 	if (object->mTileIndex == TileIndexNull) {
 		return;
 	}
+
+	MarkObjectDirty(object);
 
 	if (object->mTileIndex == scGlobalTileIndex) {
 		const uint32 index = GlobalTile.FindObject(id);

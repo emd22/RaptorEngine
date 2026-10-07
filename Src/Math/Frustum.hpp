@@ -8,9 +8,8 @@
 #pragma once
 
 #include <Core/StackArray.hpp>
-#include <Math/BoundingBox.hpp>
+#include <Math/BBox.hpp>
 #include <Math/Mat4.hpp>
-#include <Math/OrientedBoundingBox.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec4.hpp>
 #include <Object/ObjectLayer.hpp>
@@ -47,22 +46,22 @@ public:
 
 	void Rebuild(const Mat4f& view_projection);
 
-	bool TileIntersectsAABB(const AABB& tile_aabb) const;
+	bool TileIntersectsAABB(const BBox& tile_aabb) const;
 
 	/// Whether any part of the sphere is inside of the frustum. Can let through spheres that are just outside of a
 	/// corner.
 	bool IntersectsSphere(const Vec3f center, float32 radius, uint32 plane_mask = scFrustumAllPlanes) const;
 
-	bool IntersectsAABB(const AABB& aabb, uint32 plane_mask = scFrustumAllPlanes) const;
+	bool IntersectsAABB(const BBox& aabb, uint32 plane_mask = scFrustumAllPlanes) const;
 
-	bool IntersectsOBB(const OBB& obb, uint32 plane_mask = scFrustumAllPlanes) const;
+	bool IntersectsOBB(const OBBox& obb, uint32 plane_mask = scFrustumAllPlanes) const;
 
 	FX_FORCE_INLINE const Vec4f& GetPlane(const eFrustumPlane plane) const
 	{
 		return mClipPlanes[static_cast<uint32>(plane)];
 	}
 
-	AABB GetFrustumBoundingBox(const PerspectiveCamera& camera);
+	BBox GetFrustumBoundingBox(const PerspectiveCamera& camera);
 
 private:
 	StackArray<Vec4f, 6> mClipPlanes;

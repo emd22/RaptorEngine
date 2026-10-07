@@ -46,7 +46,7 @@ void Frustum::Rebuild(const Mat4f& view_projection)
 	mFrustumY = 0.0f;
 }
 
-bool Frustum::TileIntersectsAABB(const AABB& tile_aabb) const
+bool Frustum::TileIntersectsAABB(const BBox& tile_aabb) const
 {
 	// We only need to check left right, near and far here since we treat tiles as 2D (X and Z).
 
@@ -92,7 +92,7 @@ bool Frustum::IntersectsSphere(const Vec3f center, float32 radius, uint32 plane_
 	return true;
 }
 
-bool Frustum::IntersectsAABB(const AABB& aabb, uint32 plane_mask) const
+bool Frustum::IntersectsAABB(const BBox& aabb, uint32 plane_mask) const
 {
 	const Vec3f center = (aabb.Min + aabb.Max) * 0.5f;
 	const Vec3f half_extent = (aabb.Max - aabb.Min) * 0.5f;
@@ -115,7 +115,7 @@ bool Frustum::IntersectsAABB(const AABB& aabb, uint32 plane_mask) const
 	return true;
 }
 
-bool Frustum::IntersectsOBB(const OBB& obb, uint32 plane_mask) const
+bool Frustum::IntersectsOBB(const OBBox& obb, uint32 plane_mask) const
 {
 	const Vec3f center = (obb.Corners[0] + obb.Corners[7]) * 0.5f;
 	const Vec3f half_x = (obb.Corners[1] - obb.Corners[0]) * 0.5f;
@@ -142,7 +142,7 @@ bool Frustum::IntersectsOBB(const OBB& obb, uint32 plane_mask) const
 }
 
 
-AABB Frustum::GetFrustumBoundingBox(const PerspectiveCamera& camera)
+BBox Frustum::GetFrustumBoundingBox(const PerspectiveCamera& camera)
 {
 	Mat4f vp_matrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 	Mat4f vp_inverse = vp_matrix.Inverse();
@@ -161,7 +161,7 @@ AABB Frustum::GetFrustumBoundingBox(const PerspectiveCamera& camera)
 		max_point = Vec3f::Max(max_point, Vec3f(world.X, world.Y, world.Z));
 	}
 
-	return AABB(min_point, max_point);
+	return BBox(min_point, max_point);
 }
 
 

@@ -29,8 +29,8 @@ public:
 public:
 	void Create();
 
-	ObjectID NewObjectID(const std::string& name, eObjectTag tags = eObjectTag::None);
-	Object* NewObject(const std::string& name, MaterialID material, eObjectTag tags = eObjectTag::None);
+	ObjectID NewObjectID(const String& name, eObjectTag tags = eObjectTag::None);
+	Object* NewObject(const String& name, MaterialID material, eObjectTag tags = eObjectTag::None);
 
 	Object* GetObject(ObjectID id);
 	void DestroyObject(ObjectID& id);
@@ -76,16 +76,7 @@ private:
 	ObjectGpuEntry* GetBufferAtFrame(uint32 object_id);
 
 public:
-	// renderer::DescriptorPool mDescriptorPool {};
-
-public:
 	renderer::RawGpuBuffer mObjectGpuBuffer {};
-	// Bitset mObjectSlotsInUse;
-
-	// renderer::DescriptorSet mObjectBufferDS {};
-	// VkDescriptorSetLayout DsLayoutObjectBuffer = nullptr;
-
-
 	std::mutex mInUse;
 
 private:

@@ -85,6 +85,10 @@ bool Object::CheckIfReady(bool require_material)
 
 	FinalizeWhenReady();
 
+	if (gWorldGrid != nullptr) {
+		gWorldGrid->MarkObjectDirty(this);
+	}
+
 	return true;
 }
 
@@ -136,6 +140,11 @@ void Object::UpdateAnimation()
 	skel.Update(gGraphics->DeltaTime);
 
 	BoneBufferBase = skel.BoneBufferBase;
+
+	if (skel.PoseHash != mLastPoseHash) {
+		mLastPoseHash = skel.PoseHash;
+		gWorldGrid->MarkObjectDirty(this);
+	}
 }
 
 void Object::MakeInstanceOf(const ObjectID& source_id)
@@ -159,7 +168,7 @@ struct SkeletonCloneMap
 	std::vector<std::pair<const Skeleton*, Ref<Skeleton>>> Entries;
 };
 
-Object* Object::CloneNode(const std::string& name, SkeletonCloneMap& skeletons) const
+Object* Object::CloneNode(const String& name, SkeletonCloneMap& skeletons) const
 {
 	Object* clone = gObjectManager->NewObject(name, mMaterialID, Tags);
 
@@ -200,7 +209,7 @@ Object* Object::CloneNode(const std::string& name, SkeletonCloneMap& skeletons) 
 				continue;
 			}
 
-			Object* child_clone = child->CloneNode(std::string(child->Name.Get()), skeletons);
+			Object* child_clone = child->CloneNode((child->Name.Get()), skeletons);
 			child_clone->ParentID = clone->ID;
 
 			clone->AttachedNodes.Insert(child_clone->ID);
@@ -542,7 +551,7 @@ bool Object::ContainsPoint(const Vec3f point)
 		   local.Z >= Bounds.Min.Z && local.Z <= Bounds.Max.Z;
 }
 
-void Object::SetBounds(const AABB& bounds)
+void Object::SetBounds(const BBox& bounds)
 {
 	Bounds = bounds;
 
@@ -561,14 +570,14 @@ void Object::SetBounds(const AABB& bounds)
 			break;
 		}
 
-		const OBB world_box = node->GetWorldOBB();
+		const OBBox world_box = node->GetWorldOBB();
 		const Mat4f parent_inverse = parent->GetWorldMatrix().Inverse();
 
 		for (const Vec3f corner : world_box.Corners) {
 			const Vec4f local = parent_inverse * Vec4f(corner.X, corner.Y, corner.Z, 1.0f);
 			const Vec3f local_corner(local.X, local.Y, local.Z);
 
-			parent->Bounds.Add(AABB(local_corner, local_corner));
+			parent->Bounds.Add(BBox(local_corner, local_corner));
 		}
 
 		node = parent;
@@ -587,6 +596,24 @@ void Object::SetCullable(bool value)
 	gWorldGrid->UpdateObject(this);
 }
 
+
+void Object::SetShadowCaster(const bool value)
+{
+	if (gWorldGrid != nullptr) {
+		gWorldGrid->MarkObjectDirty(this);
+	}
+
+	if (value) {
+		Flags |= eObjectFlags::ShadowCaster;
+	}
+	else {
+		Flags &= ~(eObjectFlags::ShadowCaster);
+	}
+
+	if (gWorldGrid != nullptr) {
+		gWorldGrid->MarkObjectDirty(this);
+	}
+}
 
 void Object::SetPosition(const Vec3f position)
 {

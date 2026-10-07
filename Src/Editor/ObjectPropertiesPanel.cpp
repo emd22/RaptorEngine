@@ -36,7 +36,8 @@ static constexpr FlagName scTagNames[] = {
 static constexpr FlagName scFlagNames[] = {
 	{ static_cast<uint32>(eObjectFlags::ReadyToRender), "Ready To Render",
 	  "Set by the renderer once the mesh and material have loaded" },
-	{ static_cast<uint32>(eObjectFlags::PhysicsEnabled), "Physics Enabled", "Blockout brushes: on is a dynamic body, off is static" },
+	{ static_cast<uint32>(eObjectFlags::PhysicsEnabled), "Physics Enabled",
+	  "Blockout brushes: on is a dynamic body, off is static" },
 	{ static_cast<uint32>(eObjectFlags::IsInstance), "Is Instance", "Set for instances of another object" },
 	{ static_cast<uint32>(eObjectFlags::ShadowCaster), "Shadow Caster", "Probe volumes never cast shadows" },
 	{ static_cast<uint32>(eObjectFlags::Unlit), "Unlit",
@@ -86,7 +87,8 @@ ObjectPropertiesPanel::ObjectPropertiesPanel(wxWindow* parent) : wxPanel(parent,
 	mpMaterialChoice = new wxChoice(this, wxID_ANY);
 	material_row->Add(mpMaterialChoice, wxSizerFlags().Border(wxLEFT, 6));
 
-	wxButton* browse_button = new wxButton(this, wxID_ANY, "Browse...", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+	wxButton* browse_button = new wxButton(this, wxID_ANY, "Browse...", wxDefaultPosition, wxDefaultSize,
+										   wxBU_EXACTFIT);
 	material_row->Add(browse_button, wxSizerFlags().Border(wxLEFT, 6));
 
 	browse_button->Bind(wxEVT_BUTTON,
@@ -117,9 +119,8 @@ void ObjectPropertiesPanel::BindRows(StackArray<FlagRow, scMaxRows>& rows, bool 
 	for (FlagRow& row : rows) {
 		const uint32 bit = row.Bit;
 
-		row.pCheckBox->Bind(wxEVT_CHECKBOX, [this, is_tag, bit](wxCommandEvent& event) {
-			OnRowToggled(is_tag, bit, event.IsChecked());
-		});
+		row.pCheckBox->Bind(wxEVT_CHECKBOX, [this, is_tag, bit](wxCommandEvent& event)
+							{ OnRowToggled(is_tag, bit, event.IsChecked()); });
 	}
 }
 
@@ -207,7 +208,7 @@ void ObjectPropertiesPanel::ShowObject(Object* object)
 
 	const uint32 tags = static_cast<uint32>(object->Tags);
 	const uint32 flags = static_cast<uint32>(object->GetFlags());
-	wxString name = wxString::Format("Selected '%s'", wxString::FromUTF8(object->Name.Get()));
+	wxString name = wxString::Format("Selected '%s'", wxString::FromUTF8(object->Name.Get().CStr()));
 
 	const uint32 selected_count = gEditor->GetSelection().GetCount();
 
@@ -243,7 +244,6 @@ void ObjectPropertiesPanel::ShowObject(Object* object)
 	mpNameLabel->SetLabel(name.IsEmpty() ? wxString("(unnamed)") : name);
 	SetRows(mTagRows, tags, object, true);
 	SetRows(mFlagRows, flags, object, false);
-
 }
 
 } // namespace fx::editor

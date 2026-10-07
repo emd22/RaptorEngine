@@ -150,7 +150,7 @@ void LightToolSettingsPanel::Refresh()
 	mbShowingAnything = true;
 	mpShownLight = light;
 
-	mpNameLabel->SetLabel(wxString::Format("Selected '%s'", wxString::FromUTF8(light->Name.Get())));
+	mpNameLabel->SetLabel(wxString::Format("Selected '%s'", wxString::FromUTF8(light->Name.Get().CStr())));
 
 	mpColorPicker->Enable();
 	mpPositionField->SetEnabled(true);

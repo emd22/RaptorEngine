@@ -1,6 +1,6 @@
 #include "RayCast.hpp"
 
-#include "BoundingBox.hpp"
+#include "BBox.hpp"
 #include "MathUtil.hpp"
 #include "Vec3.hpp"
 
@@ -17,13 +17,13 @@ constexpr float scParallelEpsilon = 1e-8f;
 
 } // namespace
 
-float RayCast(const Ray& ray, const AABB& aabb)
+float RayCast(const Ray& ray, const BBox& aabb)
 {
 	Vec3f face;
 	return RayCast(ray, aabb, face);
 }
 
-float RayCast(const Ray& ray, const AABB& aabb, Vec3f& out_face)
+float RayCast(const Ray& ray, const BBox& aabb, Vec3f& out_face)
 {
 	out_face = Vec3f::sZero;
 

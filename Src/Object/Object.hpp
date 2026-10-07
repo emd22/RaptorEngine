@@ -15,9 +15,8 @@
 #include <Entity.hpp>
 #include <FoxScript/FoxScript.hpp>
 #include <Material/MaterialID.hpp>
-#include <Math/BoundingBox.hpp>
+#include <Math/BBox.hpp>
 #include <Math/Frustum.hpp>
-#include <Math/OrientedBoundingBox.hpp>
 #include <WorldGrid.hpp>
 
 
@@ -149,15 +148,7 @@ public:
 	// Render options
 	/////////////////////////////////////
 
-	FX_FORCE_INLINE void SetShadowCaster(const bool value)
-	{
-		if (value) {
-			Flags |= eObjectFlags::ShadowCaster;
-		}
-		else {
-			Flags &= ~(eObjectFlags::ShadowCaster);
-		}
-	}
+	void SetShadowCaster(const bool value);
 
 	FX_FORCE_INLINE bool HasTags(eObjectTag tag) const { return HasFlag(Tags, tag); }
 	FX_FORCE_INLINE void SetTag(eObjectTag tag) { SetFlag(Tags, tag); }
@@ -188,9 +179,9 @@ public:
 
 	bool ContainsPoint(const Vec3f point);
 
-	void SetBounds(const AABB& bounds);
+	void SetBounds(const BBox& bounds);
 
-	FX_FORCE_INLINE OBB GetWorldOBB() { return OBB::FromLocalBounds(Bounds, GetWorldMatrix()); }
+	FX_FORCE_INLINE OBBox GetWorldOBB() { return OBBox::FromLocalBounds(Bounds, GetWorldMatrix()); }
 
 	bool CanBeFrustumCulled() const;
 
@@ -237,7 +228,7 @@ private:
 
 	void SyncObjectWithPhysics(physics::Body* phys);
 
-	Object* CloneNode(const std::string& name, SkeletonCloneMap& skeletons) const;
+	Object* CloneNode(const String& name, SkeletonCloneMap& skeletons) const;
 
 public:
 	Ref<PrimitiveMesh> pMesh { nullptr };
@@ -247,11 +238,13 @@ public:
 
 	Ref<Skeleton> pSkeleton { nullptr };
 	uint32 BoneBufferBase = Skeleton::scNoBones;
+	/// The skeleton's pose the last time this object told the world grid it changed.
+	uint32 mLastPoseHash = 0;
 
 	ObjectID ParentID = ObjectID::scNull;
 	PagedArray<ObjectID> AttachedNodes;
 
-	AABB Bounds { Vec3f::sZero, Vec3f::sZero };
+	BBox Bounds { Vec3f::sZero, Vec3f::sZero };
 
 	std::atomic_bool bIsAddedToWorld = false;
 

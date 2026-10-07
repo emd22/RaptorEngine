@@ -270,6 +270,56 @@ void AssetManager::ShutdownDeletionQueue()
 }
 
 
+enum class eKnownImageType
+{
+	Invalid,
+	Other,
+	Jpeg,
+	Ktx,
+};
+
+
+/**
+ * @brief Check if the memory uses an image type that is specially used
+ */
+inline eKnownImageType GetMemoryImageType(const uint8* data, uint32 data_size)
+{
+	// Invalid image
+	if (data == nullptr || data_size < 12) {
+		return eKnownImageType::Invalid;
+	}
+
+	// Check if the image is JPEG
+	{
+		// Note: I used to check the magic suffix as well, but apparently you can have a valid image with an invalid
+		// suffix. Weird.
+		const bool jpeg_header_correct = (data[0] == 0xFF && data[1] == 0xD8);
+
+		if (jpeg_header_correct) {
+			return eKnownImageType::Jpeg;
+		}
+	}
+
+
+	// Check if the image is KTX
+	{
+		static constexpr uint8 scKtxMagic[] = { 0xA8, 'K', 'T', 'X', ' ' };
+
+		const bool ktx_header_correct = (memcmp(data, scKtxMagic, sizeof(scKtxMagic)) == 0);
+
+		// Check for KTX1 and KTX2. There shouldn't really be anything encoded in KTX1 but w/e
+		const bool version_is_supported = (data[5] == '1' || data[5] == '2');
+
+		if (ktx_header_correct && version_is_supported) {
+			return eKnownImageType::Ktx;
+		}
+	}
+
+	// Some other image format that can be handled by STB
+	return eKnownImageType::Other;
+}
+
+
 inline bool IsMemoryJpeg(const uint8* data, uint32 data_size)
 {
 	if (data == nullptr || data_size < 2) {
@@ -294,9 +344,9 @@ inline bool IsMemoryKtx(const uint8* data, uint32 data_size)
 	return memcmp(data, scKtxMagic, sizeof(scKtxMagic)) == 0 && (data[5] == '1' || data[5] == '2');
 }
 
-inline bool IsFileKtx(const std::string& path)
+inline bool IsFileKtx(const String& path)
 {
-	FILE* fp = fopen(path.c_str(), "rb");
+	FILE* fp = fopen(path.CStr(), "rb");
 
 	if (fp == nullptr) {
 		return false;
@@ -311,9 +361,9 @@ inline bool IsFileKtx(const std::string& path)
 }
 
 
-inline bool IsFileJpeg(const std::string& path)
+inline bool IsFileJpeg(const String& path)
 {
-	const char* path_cstr = path.c_str();
+	const char* path_cstr = path.CStr();
 
 	FILE* fp = fopen(path_cstr, "rb");
 
@@ -342,7 +392,7 @@ inline bool IsFileJpeg(const std::string& path)
 // Object loading functions
 /////////////////////////////////////
 
-AssetTicket AssetManager::LoadObject(const std::string& name, const std::string& path)
+AssetTicket AssetManager::LoadObject(const String& name, const String& path)
 {
 	Object* object = gObjectManager->NewObject(name, MaterialID::scNull);
 	AssetTicket ticket { object };
@@ -352,7 +402,7 @@ AssetTicket AssetManager::LoadObject(const std::string& name, const std::string&
 	return ticket;
 }
 
-AssetTicket AssetManager::LoadObjectFromMemory(const std::string& name, const uint8* data, uint32 data_size)
+AssetTicket AssetManager::LoadObjectFromMemory(const String& name, const uint8* data, uint32 data_size)
 {
 	Object* object = gObjectManager->NewObject(name, MaterialID::scNull);
 	AssetTicket ticket { object };
@@ -367,7 +417,7 @@ AssetTicket AssetManager::LoadObjectFromMemory(const std::string& name, const ui
 // Image loading functions
 /////////////////////////////////////
 
-AssetTicket AssetManager::LoadImage(eImageType image_type, eImageFormat format, const std::string& path,
+AssetTicket AssetManager::LoadImage(eImageType image_type, eImageFormat format, const String& path,
 									eImageCreateFlags flags)
 {
 	AssetTicket ticket { gTextureManager->NewTexture() };

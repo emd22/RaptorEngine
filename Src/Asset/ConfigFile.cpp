@@ -83,20 +83,20 @@ bool IsValidNameChar(char ch)
 	return ch != 0 && !std::isspace(static_cast<unsigned char>(ch)) && cNameBreakers.find(ch) == std::string_view::npos;
 }
 
-std::string ValidName(const std::string& name)
+String ValidName(const String& name)
 {
-	if (!name.empty() && std::all_of(name.begin(), name.end(), IsValidNameChar)) {
+	if (!name.IsEmpty() && std::all_of(name.begin(), name.end(), IsValidNameChar)) {
 		return name;
 	}
 
-	std::string fixed = name;
+	String fixed = name;
 	for (char& ch : fixed) {
 		if (!IsValidNameChar(ch)) {
 			ch = '_';
 		}
 	}
 
-	if (fixed.empty()) {
+	if (fixed.IsEmpty()) {
 		fixed = "_";
 	}
 
@@ -170,7 +170,7 @@ void ConfigEntry::AddMember(ConfigEntry&& entry)
 	Type = ConfigEntry::ePrimitiveType::Struct;
 }
 
-std::string ConfigPrimitive::AsString() const
+String ConfigPrimitive::AsString() const
 {
 	switch (Type) {
 	case ePrimitiveType::None:
@@ -188,7 +188,7 @@ std::string ConfigPrimitive::AsString() const
 	return "";
 }
 
-std::string ConfigEntry::AsString(uint32 indent) const
+String ConfigEntry::AsString(uint32 indent) const
 {
 	std::string member_list = "";
 

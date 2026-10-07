@@ -19,6 +19,7 @@ class ToolSettingsBasePanel;
 class ObjectListWindow;
 class CVarListWindow;
 class MaterialPickerWindow;
+class AtlasPackerWindow;
 
 class EditorViewport;
 
@@ -49,6 +50,7 @@ public:
 	void ShowObjectListWindow();
 	void ShowCVarListWindow();
 	void ShowMaterialPickerWindow();
+	void ShowAtlasPackerWindow();
 
 	void NewPrototype();
 	void SavePrototype();
@@ -67,6 +69,7 @@ private:
 	ObjectListWindow* mpObjectListWindow = nullptr;
 	CVarListWindow* mpCVarListWindow = nullptr;
 	MaterialPickerWindow* mpMaterialPickerWindow = nullptr;
+	AtlasPackerWindow* mpAtlasPackerWindow = nullptr;
 
 	/// The tool settings slot: whatever ToolSettingsBasePanel is currently swapped in, below Object Properties
 	ToolSettingsBasePanel* mpToolSettingsPanel = nullptr;

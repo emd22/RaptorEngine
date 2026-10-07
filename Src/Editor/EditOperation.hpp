@@ -6,7 +6,7 @@
 #include <Core/Types.hpp>
 #include <Core/UndoStack.hpp>
 #include <Material/MaterialID.hpp>
-#include <Math/BoundingBox.hpp>
+#include <Math/BBox.hpp>
 #include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
@@ -126,8 +126,8 @@ public:
 	Brush::PlaneList PlanesBefore;
 	Brush::PlaneList PlanesAfter;
 
-	AABB BoundsBefore;
-	AABB BoundsAfter;
+	BBox BoundsBefore;
+	BBox BoundsAfter;
 
 	struct Snapshot
 	{

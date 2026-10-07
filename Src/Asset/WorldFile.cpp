@@ -99,7 +99,7 @@ void WorldFile::Load(const std::string& path)
 
 void WorldFile::AddColliderFromEntry(const std::string& scene_path, const ConfigEntry& collider_entry)
 {
-	const std::string& collider_name = collider_entry.Name.Get();
+	const String& collider_name = collider_entry.Name.Get();
 
 	physics::eMotionType motion_type = physics::eMotionType::Static;
 	physics::Body* phys = gPhysics->NewBody(collider_name);

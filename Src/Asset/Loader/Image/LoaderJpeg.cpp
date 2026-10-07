@@ -27,11 +27,11 @@ static constexpr J_COLOR_SPACE GetJpegColorspaceForFormat(eImageFormat format)
 }
 
 
-eLoaderStatus LoaderJpeg::Load(AssetTicket& ticket, const std::string& path)
+eLoaderStatus LoaderJpeg::Load(AssetTicket& ticket, const String& path)
 {
 	Image* image = static_cast<Image*>(ticket.Get());
 
-	const char* c_path = path.c_str();
+	const char* c_path = path.CStr();
 
 	FILE* fp = fopen(c_path, "rb");
 

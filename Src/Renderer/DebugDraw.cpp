@@ -57,7 +57,7 @@ void DebugDraw::WireBox(const Vec3f center, const Vec3f half_extent, const Quat 
 	WireBox(MakeBoxMatrix(center, half_extent, rotation), color);
 }
 
-void DebugDraw::WireBox(const AABB& box, Color color)
+void DebugDraw::WireBox(const BBox& box, Color color)
 {
 	WireBox((box.Min + box.Max) * 0.5f, (box.Max - box.Min) * 0.5f, Quat::scIdentity, color);
 }
@@ -67,7 +67,7 @@ void DebugDraw::SolidBox(const Vec3f center, const Vec3f half_extent, const Quat
 	SolidBox(MakeBoxMatrix(center, half_extent, rotation), color);
 }
 
-void DebugDraw::SolidBox(const AABB& box, Color color)
+void DebugDraw::SolidBox(const BBox& box, Color color)
 {
 	SolidBox((box.Min + box.Max) * 0.5f, (box.Max - box.Min) * 0.5f, Quat::scIdentity, color);
 }
