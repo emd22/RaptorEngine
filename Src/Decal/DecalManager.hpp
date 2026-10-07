@@ -12,6 +12,12 @@ namespace fx {
 class Image;
 class PerspectiveCamera;
 
+enum class eDecalAtlas : uint32
+{
+	BulletHoles = 0,
+	Blood = 1,
+};
+
 /**
  * @brief A decal to project onto the world, see DecalManager::AddDecal().
  */
@@ -39,6 +45,8 @@ struct DecalDesc
 
 	/// How far the normal atlas bends the lighting, 0 for a flat decal
 	float32 NormalStrength = 0.6f;
+
+	eDecalAtlas Atlas = eDecalAtlas::BulletHoles;
 };
 
 class DecalManager
@@ -55,13 +63,18 @@ public:
 	static constexpr float32 scBulletHoleDepth = 0.1f;
 	static constexpr float32 scBulletHoleNormalStrength = 1.0f;
 
+	static constexpr const char* scBloodAtlasPath = "Textures/blood_splat.png";
+	static constexpr float32 scBloodDepth = 0.2f;
+
 public:
 	DecalManager() = default;
 
 	void Create();
 
 	void AddDecal(const DecalDesc& desc);
-	void AddBulletHole(const Vec3f& hit_point, const Vec3f& hit_normal);
+	void AddBulletHole(const Vec3f hit_point, const Vec3f hit_normal);
+
+	void AddBloodSplat(const Vec3f hit_point, const Vec3f hit_normal, float32 size);
 
 	void Clear();
 
@@ -89,10 +102,12 @@ private:
 
 	AssetTicket mAtlasTicket { nullptr };
 	AssetTicket mNormalAtlasTicket { nullptr };
+	AssetTicket mBloodAtlasTicket { nullptr };
 
 	/// Set from the asset thread once each atlas is on the GPU
 	std::atomic<Image*> mpAtlas = nullptr;
 	std::atomic<Image*> mpNormalAtlas = nullptr;
+	std::atomic<Image*> mpBloodAtlas = nullptr;
 };
 
 } // namespace fx

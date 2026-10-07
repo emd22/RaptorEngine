@@ -28,7 +28,7 @@ void ObjectManager::Create()
 							eGpuBufferFlags::PersistentMapped);
 }
 
-ObjectID ObjectManager::NewObjectID(const std::string& name, eObjectTag tags)
+ObjectID ObjectManager::NewObjectID(const String& name, eObjectTag tags)
 {
 	std::lock_guard<std::mutex> guard(mInUse);
 
@@ -45,7 +45,7 @@ ObjectID ObjectManager::NewObjectID(const std::string& name, eObjectTag tags)
 }
 
 
-Object* ObjectManager::NewObject(const std::string& name, MaterialID material, eObjectTag tags)
+Object* ObjectManager::NewObject(const String& name, MaterialID material, eObjectTag tags)
 {
 	std::lock_guard<std::mutex> guard(mInUse);
 

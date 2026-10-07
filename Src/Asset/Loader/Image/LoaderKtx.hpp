@@ -24,7 +24,7 @@ public:
 	LoaderKtx(const LoaderKtx&) = delete;
 	LoaderKtx& operator=(const LoaderKtx&) = delete;
 
-	eLoaderStatus Load(AssetTicket& ticket, const std::string& path) override;
+	eLoaderStatus Load(AssetTicket& ticket, const String& path) override;
 	eLoaderStatus Load(AssetTicket& ticket, const uint8* data, uint32 size) override;
 
 	/// Loads a KTX file without an asset ticket. Returns whether the file was loaded.

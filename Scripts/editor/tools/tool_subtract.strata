@@ -1,0 +1,20 @@
+/*
+ * File:        tool_subtract.strata
+ * Author:      emd22
+ * Created:     06/10/2026
+ * Description: Subtract tool to cut the selected blockouts out of the blockouts they overlap
+ */
+
+import ../tool_common;
+
+
+void tool_controls()
+{
+	if (sel.selected_objects_count == 0) {
+		return;
+	}
+
+	if (KEY.K_RETURN.is_pressed()) {
+		blockout_subtract(KEY.K_LSHIFT.is_down());
+	}
+}

@@ -24,12 +24,12 @@ FX_FORCE_INLINE Vec3f::Vec3f(const float32* unaligned)
 
 FX_FORCE_INLINE Vec3f::Vec3f(float32 scalar) { mIntrin = _mm_blend_ps(_mm_set1_ps(scalar), _mm_setzero_ps(), 0b1000); }
 
-FX_FORCE_INLINE bool Vec3f::IsCloseTo(const Vec3f& other, const float32 tolerance) const
+FX_FORCE_INLINE bool Vec3f::IsCloseTo(const Vec3f other, const float32 tolerance) const
 {
 	return IsCloseTo(other.mIntrin, tolerance);
 }
 
-FX_FORCE_INLINE Vec3f Vec3f::MulAdd(const Vec3f& a, const Vec3f& b, const Vec3f& accum)
+FX_FORCE_INLINE Vec3f Vec3f::MulAdd(const Vec3f a, const Vec3f b, const Vec3f accum)
 {
 	return Vec3f(_mm_fmadd_ps(a.mIntrin, b.mIntrin, accum.mIntrin));
 }
@@ -46,7 +46,7 @@ FX_FORCE_INLINE bool Vec3f::IsCloseTo(const FLOAT4 other, const float32 toleranc
 	return static_cast<bool>(_mm_testz_si128(cmp_v, cmp_v));
 }
 
-FX_FORCE_INLINE float32 Vec3f::Dot(const Vec3f& other) const { return Dot(other.mIntrin); }
+FX_FORCE_INLINE float32 Vec3f::Dot(const Vec3f other) const { return Dot(other.mIntrin); }
 
 FX_FORCE_INLINE bool Vec3f::IsNearZero(const float32 tolerance) const { return IsCloseTo(sZero, tolerance); }
 
@@ -60,16 +60,16 @@ FX_FORCE_INLINE float32 Vec3f::Dot(FLOAT4 other) const
 	return _mm_cvtss_f32(_mm_dp_ps(mIntrin, other, 0b01110111));
 }
 
-FX_FORCE_INLINE Vec3f Vec3f::Min(const Vec3f& a, const Vec3f& b) { return Vec3f(_mm_min_ps(a.mIntrin, b.mIntrin)); }
+FX_FORCE_INLINE Vec3f Vec3f::Min(const Vec3f a, const Vec3f b) { return Vec3f(_mm_min_ps(a.mIntrin, b.mIntrin)); }
 
-FX_FORCE_INLINE Vec3f Vec3f::Max(const Vec3f& a, const Vec3f& b) { return Vec3f(_mm_max_ps(a.mIntrin, b.mIntrin)); }
+FX_FORCE_INLINE Vec3f Vec3f::Max(const Vec3f a, const Vec3f b) { return Vec3f(_mm_max_ps(a.mIntrin, b.mIntrin)); }
 
-FX_FORCE_INLINE Vec3f Vec3f::Clamp(const Vec3f& v, const Vec3f& min, const Vec3f& max)
+FX_FORCE_INLINE Vec3f Vec3f::Clamp(const Vec3f v, const Vec3f min, const Vec3f max)
 {
 	return Vec3f(_mm_min_ps(_mm_max_ps(v.mIntrin, min.mIntrin), max.mIntrin));
 }
 
-FX_FORCE_INLINE Vec3f Vec3f::Lerp(const Vec3f& a, const Vec3f& b, const float f)
+FX_FORCE_INLINE Vec3f Vec3f::Lerp(const Vec3f a, const Vec3f b, const float f)
 {
 	// a + f * (b - a);
 	__m128 d = _mm_sub_ps(b.mIntrin, a.mIntrin);
@@ -79,7 +79,7 @@ FX_FORCE_INLINE Vec3f Vec3f::Lerp(const Vec3f& a, const Vec3f& b, const float f)
 }
 
 
-FX_FORCE_INLINE Vec3f& Vec3f::LerpIP(const Vec3f& dest, const float step)
+FX_FORCE_INLINE Vec3f& Vec3f::LerpIP(const Vec3f dest, const float step)
 {
 	// a + f * (b - a);
 	__m128 d = _mm_sub_ps(dest.mIntrin, mIntrin);
@@ -132,7 +132,7 @@ FX_FORCE_INLINE float32 Vec3f::Length() const
 // Operator Overloads
 //////////////////////////////
 
-FX_FORCE_INLINE bool Vec3f::operator==(const Vec3f& other) const
+FX_FORCE_INLINE bool Vec3f::operator==(const Vec3f other) const
 {
 	__m128i cmp_v = _mm_castps_si128(_mm_cmpeq_ps(mIntrin, other.mIntrin));
 	// This is frequently done as a comparision against _mm_movemask, but _mm_test_all_ones potentially saves one extra
@@ -140,25 +140,25 @@ FX_FORCE_INLINE bool Vec3f::operator==(const Vec3f& other) const
 	return static_cast<bool>(_mm_test_all_ones(cmp_v));
 }
 
-FX_FORCE_INLINE Vec3f Vec3f::operator+(const Vec3f& other) const
+FX_FORCE_INLINE Vec3f Vec3f::operator+(const Vec3f other) const
 {
 	__m128 result = _mm_add_ps(mIntrin, other.mIntrin);
 	return Vec3f(result);
 }
 
-FX_FORCE_INLINE Vec3f Vec3f::operator-(const Vec3f& other) const
+FX_FORCE_INLINE Vec3f Vec3f::operator-(const Vec3f other) const
 {
 	__m128 result = _mm_sub_ps(mIntrin, other.mIntrin);
 	return Vec3f(result);
 }
 
-FX_FORCE_INLINE Vec3f Vec3f::operator*(const Vec3f& other) const
+FX_FORCE_INLINE Vec3f Vec3f::operator*(const Vec3f other) const
 {
 	__m128 result = _mm_mul_ps(mIntrin, other.mIntrin);
 	return Vec3f(result);
 }
 
-FX_FORCE_INLINE Vec3f Vec3f::operator/(const Vec3f& other) const
+FX_FORCE_INLINE Vec3f Vec3f::operator/(const Vec3f other) const
 {
 	__m128 result = _mm_div_ps(mIntrin, other.mIntrin);
 	return Vec3f(result);
@@ -185,13 +185,13 @@ FX_FORCE_INLINE Vec3f Vec3f::operator-() const
 }
 
 
-FX_FORCE_INLINE Vec3f& Vec3f::operator+=(const Vec3f& other)
+FX_FORCE_INLINE Vec3f& Vec3f::operator+=(const Vec3f other)
 {
 	mIntrin = _mm_add_ps(mIntrin, other.mIntrin);
 	return *this;
 }
 
-FX_FORCE_INLINE Vec3f& Vec3f::operator-=(const Vec3f& other)
+FX_FORCE_INLINE Vec3f& Vec3f::operator-=(const Vec3f other)
 {
 	mIntrin = _mm_sub_ps(mIntrin, other.mIntrin);
 	return *this;
@@ -203,7 +203,7 @@ FX_FORCE_INLINE Vec3f& Vec3f::operator-=(float32 scalar)
 	return *this;
 }
 
-FX_FORCE_INLINE Vec3f& Vec3f::operator*=(const Vec3f& other)
+FX_FORCE_INLINE Vec3f& Vec3f::operator*=(const Vec3f other)
 {
 	mIntrin = _mm_mul_ps(mIntrin, other.mIntrin);
 	return *this;

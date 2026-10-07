@@ -37,7 +37,9 @@ public:
 	void ShowObject(Object* object);
 
 private:
-	void SetRows(StackArray<FlagRow, scMaxRows>& rows, uint32 value, bool has_object);
+	void BindRows(StackArray<FlagRow, scMaxRows>& rows, bool is_tag);
+	void OnRowToggled(bool is_tag, uint32 bit, bool checked);
+	void SetRows(StackArray<FlagRow, scMaxRows>& rows, uint32 value, Object* object, bool is_tag);
 	void OnMaterialChoice(wxCommandEvent& event);
 	void RefreshMaterialChoices();
 
@@ -58,6 +60,7 @@ private:
 
 	// Show Anything ...is a real bool
 	bool mbShowingAnything = true;
+	bool mbRowsStale = false;
 };
 
 } // namespace fx::editor

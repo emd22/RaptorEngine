@@ -5,6 +5,7 @@
 #include <Core/MemPool/MemPool.hpp>
 #include <Engine.hpp>
 #include <cstring>
+#include <utility>
 
 namespace fx {
 
@@ -46,7 +47,7 @@ String::String(uint32 allocation_size)
 	}
 }
 
-String::String(String&& other) { (*this) = other; }
+String::String(String&& other) { (*this) = std::move(other); }
 
 String String::SubStrAbs(uint32 start, uint32 end) const
 {
@@ -75,14 +76,11 @@ String String::SubStr(uint32 start, uint32 length) const
 
 bool String::operator==(const String& other) const
 {
-	const char* a = GetInternalPtr();
-	const char* b = other.GetInternalPtr();
-
-	if (a == nullptr || b == nullptr) {
+	if (Length != other.Length) {
 		return false;
 	}
 
-	return (!std::strcmp(a, b));
+	return (std::memcmp(GetInternalPtr(), other.GetInternalPtr(), Length) == 0);
 }
 
 String String::operator+(const String& other) const
@@ -148,24 +146,29 @@ String& String::operator+=(const String& other)
 
 String& String::operator=(const char* str)
 {
-	const uint32 new_len = strlen(str) + 1;
+	const uint32 new_len = strlen(str);
 
 	char* dst = mpStackStr;
 
-	if (new_len >= scStackAllocSize && new_len > Length) {
+	if (new_len >= scStackAllocSize) {
 		if (mpHeapStr == nullptr) {
-			mpHeapStr = gEnginePool->Alloc<char>(new_len);
+			mpHeapStr = gEnginePool->Alloc<char>(new_len + 1);
 		}
-		else {
-			mpHeapStr = gEnginePool->Realloc(mpHeapStr, new_len);
+		else if (new_len > Length) {
+			mpHeapStr = gEnginePool->Realloc(mpHeapStr, new_len + 1);
 		}
 		dst = mpHeapStr;
 	}
 
-	memcpy(dst, str, new_len - 1);
+	memmove(dst, str, new_len);
+	dst[new_len] = 0;
 
-	Length = new_len - 1;
-	dst[Length] = 0;
+	if (dst == mpStackStr && mpHeapStr != nullptr) {
+		gEnginePool->Free<char>(mpHeapStr);
+		mpHeapStr = nullptr;
+	}
+
+	Length = new_len;
 
 	return *this;
 }
@@ -362,7 +365,7 @@ String String::ReplaceAll(const char* to_replace, char replacement)
 
 void String::Clear()
 {
-	if (mpHeapStr && Length > scStackAllocSize) {
+	if (mpHeapStr) {
 		gEnginePool->Free<char>(mpHeapStr);
 	}
 

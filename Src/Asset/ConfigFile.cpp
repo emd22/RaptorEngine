@@ -9,11 +9,102 @@
 #include <Math/Vec3.hpp>
 #include <Math/Vec4.hpp>
 #include <Util/Tokenizer.hpp>
+#include <algorithm>
+#include <charconv>
+#include <cmath>
+#include <cstdio>
 #include <string>
+#include <string_view>
 #include <unordered_set>
 
 
 namespace fx {
+
+namespace {
+
+std::string FormatFloat(float32 value)
+{
+	if (!std::isfinite(value)) {
+		LogError(LC_CORE, "Config: {} cannot be written to a config file, writing 0.0 instead", value);
+		return "0.000000";
+	}
+
+	char fixed[512];
+	snprintf(fixed, sizeof(fixed), "%.6f", static_cast<double>(value));
+
+	if (strtof(fixed, nullptr) == value) {
+		return fixed;
+	}
+
+	char shortest[512];
+	const auto result = std::to_chars(shortest, shortest + sizeof(shortest), value, std::chars_format::fixed);
+	std::string text(shortest, result.ptr);
+
+	if (text.find('.') == std::string::npos) {
+		text += ".0";
+	}
+
+	return text;
+}
+
+std::string EscapeString(const std::string& text)
+{
+	std::string out;
+	out.reserve(text.size());
+
+	for (const char ch : text) {
+		if (ch == '"' || ch == '\\') {
+			out += '\\';
+		}
+		out += ch;
+	}
+
+	return out;
+}
+
+std::string UnescapeString(const std::string& text)
+{
+	std::string out;
+	out.reserve(text.size());
+
+	for (size_t i = 0; i < text.size(); i++) {
+		if (text[i] == '\\' && i + 1 < text.size() && (text[i + 1] == '"' || text[i + 1] == '\\')) {
+			++i;
+		}
+		out += text[i];
+	}
+
+	return out;
+}
+
+bool IsValidNameChar(char ch)
+{
+	static constexpr std::string_view cNameBreakers = "=()[]{}<>+-*/$.,;:?!&\"#\\";
+	return ch != 0 && !std::isspace(static_cast<unsigned char>(ch)) && cNameBreakers.find(ch) == std::string_view::npos;
+}
+
+String ValidName(const String& name)
+{
+	if (!name.IsEmpty() && std::all_of(name.begin(), name.end(), IsValidNameChar)) {
+		return name;
+	}
+
+	String fixed = name;
+	for (char& ch : fixed) {
+		if (!IsValidNameChar(ch)) {
+			ch = '_';
+		}
+	}
+
+	if (fixed.IsEmpty()) {
+		fixed = "_";
+	}
+
+	LogWarning(LC_CORE, "Config: '{}' is not a valid entry name, writing '{}' instead", name, fixed);
+	return fixed;
+}
+
+} // namespace
 
 /////////////////////////////////////
 // Config entry functions
@@ -79,7 +170,7 @@ void ConfigEntry::AddMember(ConfigEntry&& entry)
 	Type = ConfigEntry::ePrimitiveType::Struct;
 }
 
-std::string ConfigPrimitive::AsString() const
+String ConfigPrimitive::AsString() const
 {
 	switch (Type) {
 	case ePrimitiveType::None:
@@ -87,9 +178,9 @@ std::string ConfigPrimitive::AsString() const
 	case ePrimitiveType::Int:
 		return std::to_string(mIntValue);
 	case ePrimitiveType::Float:
-		return std::to_string(mFloatValue);
+		return FormatFloat(mFloatValue);
 	case ePrimitiveType::String:
-		return std::format("\"{}\"", mStringValue);
+		return std::format("\"{}\"", EscapeString(mStringValue ? mStringValue : ""));
 	case ePrimitiveType::Struct:
 		break;
 	}
@@ -97,7 +188,7 @@ std::string ConfigPrimitive::AsString() const
 	return "";
 }
 
-std::string ConfigEntry::AsString(uint32 indent) const
+String ConfigEntry::AsString(uint32 indent) const
 {
 	std::string member_list = "";
 
@@ -110,7 +201,8 @@ std::string ConfigEntry::AsString(uint32 indent) const
 
 	if (Type == ePrimitiveType::Struct) {
 		for (const ConfigEntry& entry : Members) {
-			member_list += std::format("{}\t{} = {}\n", indent_str, entry.Name.Get(), entry.AsString(indent + 1));
+			member_list += std::format("{}\t{} = {}\n", indent_str, ValidName(entry.Name.Get()),
+									   entry.AsString(indent + 1));
 		}
 
 		return std::format("{{\n{}{}}}", member_list, indent_str);
@@ -149,7 +241,7 @@ ConfigEntry* ConfigEntry::GetMember(const Hash32 name_hash) const
 }
 
 
-void ConfigEntry::AppendValue(const Vec3f& vec)
+void ConfigEntry::AppendValue(const Vec3f vec)
 {
 	if (!ArrayData.IsInited()) {
 		ArrayData.Create(4);
@@ -173,7 +265,7 @@ void ConfigEntry::AppendValue(const Vec4f& vec)
 }
 
 
-void ConfigEntry::AppendValue(const Quat& quat)
+void ConfigEntry::AppendValue(const Quat quat)
 {
 	if (!ArrayData.IsInited()) {
 		ArrayData.Create(5);
@@ -418,7 +510,7 @@ bool ConfigFile::ParseValue(ConfigPrimitive& value)
 		}
 		return false;
 	case VType::String:
-		value.Set(value_token->GetStr());
+		value.Set(UnescapeString(value_token->GetStr()));
 		break;
 	case VType::Int:
 		value.Set<int64>(value_token->ToInt());
@@ -637,7 +729,7 @@ void ConfigFile::Write(const std::string& path)
 			continue;
 		}
 
-		file.WriteMulti(entry.Name.Get(), " = ", entry.AsString(), '\n');
+		file.WriteMulti(ValidName(entry.Name.Get()), " = ", entry.AsString(), '\n');
 	}
 
 	file.Close();

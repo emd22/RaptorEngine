@@ -5,6 +5,7 @@
 
 #include <Core/ArrayUtil.hpp>
 #include <Core/FilesystemIO.hpp>
+#include <Core/HashMap.hpp>
 #include <Core/Log.hpp>
 #include <Core/PagedArray.hpp>
 #include <FoxScript/FoxScript.hpp>
@@ -1438,7 +1439,7 @@ void FoxBytecodeCompiler::WriteHeaderFile(const String& script_path, FoxAstBlock
 	// Ensure the enclosing directory exists
 	header_path.CreateDirs();
 
-	std::unordered_map<std::string, FoxAstFunctionDecl*> discovered_symbols;
+	HashMap<std::string, FoxAstFunctionDecl*> discovered_symbols;
 
 	File file(header_path.Str(), File::eModType::Write, File::eDataType::Text);
 
@@ -1451,11 +1452,11 @@ void FoxBytecodeCompiler::WriteHeaderFile(const String& script_path, FoxAstBlock
 
 		std::string name = proc_decl->pNameToken->GetStr();
 
-		if (discovered_symbols.find(name) != discovered_symbols.end()) {
+		if (discovered_symbols.Contains(name)) {
 			continue;
 		}
 
-		discovered_symbols[name] = proc_decl;
+		discovered_symbols.Insert(name, proc_decl);
 
 		String param_str = "";
 
@@ -1482,7 +1483,7 @@ void FoxBytecodeCompiler::WriteHeaderFile(const String& script_path, FoxAstBlock
 
 void FoxBytecodeCompiler::EmitSymbolTable(FoxAstBlock* root)
 {
-	std::unordered_map<std::string, FoxAstFunctionDecl*> discovered_symbols;
+	HashMap<std::string, FoxAstFunctionDecl*> discovered_symbols;
 
 	for (FoxAstNode* stmt : root->Statements) {
 		if (stmt->NodeType == FX_AST_PROCDECL) {
@@ -1490,21 +1491,21 @@ void FoxBytecodeCompiler::EmitSymbolTable(FoxAstBlock* root)
 
 			std::string name = proc_decl->pNameToken->GetStr();
 
-			if (discovered_symbols.find(name) == discovered_symbols.end()) {
-				discovered_symbols[name] = proc_decl;
+			if (!discovered_symbols.Contains(name)) {
+				discovered_symbols.Insert(name, proc_decl);
 			}
 		}
 	}
 
 	// Number of symbols
-	Write32(discovered_symbols.size());
+	Write32(discovered_symbols.Size);
 
-	LogInfo("Emitting {} symbols", discovered_symbols.size());
+	LogInfo("Emitting {} symbols", discovered_symbols.Size);
 
 	// String table offset
 	Write32(0);
 
-	discovered_symbols.clear();
+	discovered_symbols.Clear();
 
 	for (FoxAstNode* stmt : root->Statements) {
 		if (stmt->NodeType == FX_AST_PROCDECL) {
@@ -1513,13 +1514,13 @@ void FoxBytecodeCompiler::EmitSymbolTable(FoxAstBlock* root)
 			std::string name = decl->pNameToken->GetStr();
 
 			// If the declaration has already been output before, skip output but make sure the data is up to date.
-			auto discovered_it = discovered_symbols.find(name);
-			if (discovered_it != discovered_symbols.end()) {
-				decl->SymbolTableOffset = discovered_it->second->SymbolTableOffset;
+			FoxAstFunctionDecl** discovered = discovered_symbols.Find(name);
+			if (discovered != nullptr) {
+				decl->SymbolTableOffset = (*discovered)->SymbolTableOffset;
 				continue;
 			}
 
-			discovered_symbols[name] = decl;
+			discovered_symbols.Insert(name, decl);
 
 			EmitDataString(decl->pNameToken->Start, decl->pNameToken->Length, true);
 			decl->SymbolTableOffset = mBytecode.Size();

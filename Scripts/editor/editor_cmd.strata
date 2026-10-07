@@ -124,6 +124,55 @@ void CMD_probesave()
 	}
 }
 
+int editor_mark_reflection_probes(bool enabled)
+{
+	if (!editor_has_object_selection()) {
+		printf("reflection probes: nothing selected\n");
+		return 0;
+	}
+
+	int changed = 0;
+
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		OBJECT obj = sel.selected_objects[i];
+
+		if (reflection_probe_is_marked(obj) == enabled) {
+			continue;
+		}
+
+		reflection_probe_mark(obj, enabled);
+		changed++;
+	}
+
+	return changed;
+}
+
+void CMD_reflprobe()
+{
+	int changed = editor_mark_reflection_probes(true);
+	int total = reflection_probe_rebuild();
+
+	printf("reflection probes: marked %d brush(es), %d probe(s) now defined, run reflbake\n", changed, total);
+}
+
+void CMD_reflprobeclear()
+{
+	int changed = editor_mark_reflection_probes(false);
+	int total = reflection_probe_rebuild();
+
+	printf("reflection probes: unmarked %d brush(es), %d probe(s) still defined\n", changed, total);
+}
+
+void CMD_reflbake()
+{
+	if (probe_is_baking()) {
+		printf("probe bake already running\n");
+		return;
+	}
+
+	reflection_probe_bake();
+}
+
 void CMD_lock()
 {
 	if (!editor_has_object_selection()) {

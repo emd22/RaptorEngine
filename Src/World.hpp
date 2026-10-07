@@ -15,6 +15,8 @@
 
 namespace fx {
 
+class CVarValue;
+
 class Player;
 class Blockout;
 
@@ -53,6 +55,8 @@ public:
 
 	void Detach(ObjectID id);
 
+	void AttachLoaded(Object* object);
+
 	void SelectCamera(const Ref<Camera>& camera) { mpCurrentCamera = camera; }
 
 	void Render(Camera* shadow_camera);
@@ -80,8 +84,7 @@ private:
 	void DebugDrawProbeVolumes();
 
 public:
-	Object* RaycastProbeVolumes(const Vec3f& origin, const Vec3f& direction, float32 max_distance,
-								float32& out_distance);
+	Object* RaycastProbeVolumes(const Vec3f origin, const Vec3f direction, float32 max_distance, float32& out_distance);
 
 private:
 	void DebugDrawObjectBounds();
@@ -105,7 +108,7 @@ private:
 	 * that reads it into a spare light buffer slot (the main view keeps the original slot and its shadow matrix).
 	 * @return False if the light buffer is full, in which case the shadow map is left alone.
 	 */
-	bool RenderCaptureSunShadows(LightDirectional& sun, const Vec3f& center, OrthoCamera& out_shadow_camera,
+	bool RenderCaptureSunShadows(LightDirectional& sun, const Vec3f center, OrthoCamera& out_shadow_camera,
 								 uint32& out_light_slot);
 
 	/**
@@ -125,13 +128,16 @@ private:
 	 * @brief Appends the shadow casters (and their attached nodes) from every tile that a sphere touches. Skinned
 	 * objects are skipped, the shadow pipeline cannot draw them.
 	 */
-	void GatherSpotShadowCasters(const Vec3f& center, float32 radius, DynArray<ObjectID>& out_casters);
-	void AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, DynArray<ObjectID>& out_casters);
+	void GatherSpotShadowCasters(const Vec3f center, float32 radius, DynArray<ObjectID>& out_casters);
+	void AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, const Vec3f center, float32 radius,
+									  DynArray<ObjectID>& out_casters);
 	/// Draws the objects of a forward pipeline's list into the prepass, with the prepass pipeline that goes with it
 	void ExecutePrepassRenderList(renderer::PipelineHandle forward_pipeline);
 
-	void AddTileToRenderList(bool clear, TileIndex new_tile);
-	void AddTileToLightList(TileIndex tile_index);
+	void AddLoadedObject(Object* object);
+
+	void AddTileToRenderList(bool clear, TileIndex new_tile, const Frustum* frustum = nullptr);
+	void AddTileToLightList(TileIndex tile_index, const Frustum* frustum = nullptr);
 	void AddUnculledLightsToLightList();
 	void ClearRenderList();
 
@@ -142,7 +148,7 @@ private:
 	 * of a multi-primitive mesh can each require a different pipeline, e.g. a skinned primitive attached to a
 	 * container object whose own material differs).
 	 */
-	void AddToRenderListRecursiveByMaterial(ObjectID* id);
+	void AddToRenderListRecursiveByMaterial(ObjectID* id, const Frustum* frustum);
 
 	void SortTransparentObjects(renderer::Pipeline& pipeline, renderer::RenderListSection& section);
 
@@ -154,8 +160,10 @@ public:
 
 	uint32 DebugBoundsMask = 0;
 	bool bRenderProbes = false;
+
 	renderer::RenderList mRenderList;
 	renderer::LightList mLightList;
+
 
 	/// Set once a scene file has populated its objects. Used by WorldFile to
 	/// tell a first load (add everything) from a hot reload (update in place)
@@ -163,8 +171,33 @@ public:
 
 	Player Player;
 
+	/// Where the player starts a level, and which way it looks. `bCustom` is false until the level sets one.
+	struct PlayerSpawnPoint
+	{
+		static Vec3f DefaultPosition() { return Vec3f(0.0f, -0.2f, -2.0f); }
+
+		Vec3f Position = DefaultPosition();
+		Vec3f Direction = Vec3f::sForward;
+		bool bCustom = false;
+
+		void Reset()
+		{
+			Position = DefaultPosition();
+			Direction = Vec3f::sForward;
+			bCustom = false;
+		}
+	} PlayerSpawn;
+
+	void RespawnPlayer() { Player.SpawnAt(PlayerSpawn.Position, PlayerSpawn.Direction); }
+
 	Blockout* pBlockout = nullptr;
 	String BlockoutPath;
+
+	CVarValue* pCVarShowProbeVolumes = nullptr;
+	CVarValue* pCVarFrustumCull = nullptr;
+
+	uint32 FrustumTestedObjects = 0;
+	uint32 FrustumCulledObjects = 0;
 
 private:
 	Ref<PerspectiveCamera> mpCurrentCamera { nullptr };

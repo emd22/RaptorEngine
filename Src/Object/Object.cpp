@@ -21,6 +21,9 @@
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
 #include <World.hpp>
+#include <algorithm>
+#include <utility>
+#include <vector>
 
 namespace fx {
 
@@ -82,6 +85,10 @@ bool Object::CheckIfReady(bool require_material)
 
 	FinalizeWhenReady();
 
+	if (gWorldGrid != nullptr) {
+		gWorldGrid->MarkObjectDirty(this);
+	}
+
 	return true;
 }
 
@@ -133,6 +140,11 @@ void Object::UpdateAnimation()
 	skel.Update(gGraphics->DeltaTime);
 
 	BoneBufferBase = skel.BoneBufferBase;
+
+	if (skel.PoseHash != mLastPoseHash) {
+		mLastPoseHash = skel.PoseHash;
+		gWorldGrid->MarkObjectDirty(this);
+	}
 }
 
 void Object::MakeInstanceOf(const ObjectID& source_id)
@@ -149,6 +161,68 @@ void Object::MakeInstanceOf(const ObjectID& source_id)
 	++source_obj->mInstanceSlotsInUse;
 
 	ID = ObjectID(source_obj->ID.GetID() + source_obj->mInstanceSlotsInUse);
+}
+
+struct SkeletonCloneMap
+{
+	std::vector<std::pair<const Skeleton*, Ref<Skeleton>>> Entries;
+};
+
+Object* Object::CloneNode(const String& name, SkeletonCloneMap& skeletons) const
+{
+	Object* clone = gObjectManager->NewObject(name, mMaterialID, Tags);
+
+	clone->pMesh = pMesh;
+	clone->Bounds = Bounds;
+	clone->mPosition = mPosition;
+	clone->mRotation = mRotation;
+	clone->mScale = mScale;
+	clone->mObjectLayer = mObjectLayer;
+
+	clone->Flags = Flags;
+	ClearFlag(clone->Flags, (eObjectFlags::ReadyToRender | eObjectFlags::IsInstance | eObjectFlags::PhysicsEnabled));
+	SetFlag(clone->Flags, eObjectFlags::SharedMesh);
+
+	clone->MarkTransformOutOfDate();
+
+	if (pSkeleton.IsValid()) {
+		const Skeleton* key = &(*pSkeleton);
+
+		auto found = std::find_if(skeletons.Entries.begin(), skeletons.Entries.end(),
+								  [key](const auto& entry) { return entry.first == key; });
+
+		if (found == skeletons.Entries.end()) {
+			skeletons.Entries.emplace_back(key, Skeleton::CreateInstance(pSkeleton));
+			found = skeletons.Entries.end() - 1;
+		}
+
+		clone->pSkeleton = found->second;
+	}
+
+	if (!AttachedNodes.IsEmpty()) {
+		clone->AttachedNodes.Create(8);
+
+		for (const ObjectID& child_id : AttachedNodes) {
+			const Object* child = gObjectManager->GetObject(child_id);
+
+			if (child == nullptr) {
+				continue;
+			}
+
+			Object* child_clone = child->CloneNode((child->Name.Get()), skeletons);
+			child_clone->ParentID = clone->ID;
+
+			clone->AttachedNodes.Insert(child_clone->ID);
+		}
+	}
+
+	return clone;
+}
+
+Object* Object::CloneWithOwnSkeleton(const std::string& name) const
+{
+	SkeletonCloneMap skeletons;
+	return CloneNode(name, skeletons);
 }
 
 void Object::ReserveInstances(uint32 num)
@@ -189,6 +263,10 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 		if (gProbeManager->IsCapturingBounce()) {
 			push_constants.Flags |= eDrawFlags::ProbeBounce;
 		}
+
+		if (gProbeManager->IsCapturingReflection()) {
+			push_constants.Flags |= eDrawFlags::ReflectionCapture;
+		}
 	}
 
 	const bool is_probe_capture = HasFlag(push_constants.Flags, eDrawFlags::ProbeCapture);
@@ -200,6 +278,18 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 
 	if (gGraphics->bRenderProbeVisibility) {
 		push_constants.Flags |= eDrawFlags::DebugProbeVisibility;
+	}
+
+	if (gGraphics->bDisableReflectionProbes) {
+		push_constants.Flags |= eDrawFlags::NoReflectionProbes;
+	}
+
+	if (!is_probe_capture && gGraphics->ReflectionDebugView == 1) {
+		push_constants.Flags |= eDrawFlags::DebugReflection;
+	}
+
+	if (!is_probe_capture && gGraphics->ReflectionDebugView == 2) {
+		push_constants.Flags |= eDrawFlags::DebugReflectionCoverage;
 	}
 
 	// Decals are placed in the world, and the view model only lines up with the world from the camera's position
@@ -244,6 +334,32 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 	pMesh->Render(cmd, (mInstanceSlotsInUse + 1));
 }
 
+bool Object::CanBeFrustumCulled() const
+{
+	if (!IsCullable() || !pMesh.IsValid() || mObjectLayer != eObjectLayer::WorldLayer) {
+		return false;
+	}
+
+	if (IsSkinned() || mInstanceSlotsInUse > 0 || HasFlag(Flags, eObjectFlags::IsInstance)) {
+		return false;
+	}
+
+	if (HasFlag(Flags, eObjectFlags::PhysicsEnabled)) {
+		return false;
+	}
+
+	return (Bounds.Max.X > Bounds.Min.X) || (Bounds.Max.Y > Bounds.Min.Y) || (Bounds.Max.Z > Bounds.Min.Z);
+}
+
+bool Object::IsOutsideFrustum(const Frustum& frustum, uint32 plane_mask)
+{
+	if (!CanBeFrustumCulled()) {
+		return false;
+	}
+
+	return !frustum.IntersectsOBB(GetWorldOBB(), plane_mask);
+}
+
 void Object::Update()
 {
 	if (HasFlag(Flags, eObjectFlags::PhysicsEnabled)) {
@@ -279,7 +395,7 @@ void Object::Update()
 	UpdateAnimation();
 }
 
-float32 Object::GetDirectionScale(const Vec3f& direction)
+float32 Object::GetDirectionScale(const Vec3f direction)
 {
 	if (direction.IsCloseTo(simd::LoadFloat4(0.0f))) {
 		return 0.0f;
@@ -382,6 +498,7 @@ void Object::SetProbeVolume(bool value)
 	}
 	else {
 		ClearTag(eObjectTag::ProbeVolume);
+		ClearTag(eObjectTag::ReflectionProbe);
 	}
 
 	// A marker is not geometry: it must not light the level, occlude it, or push probes out of itself
@@ -401,7 +518,16 @@ void Object::SetProbeVolume(bool value)
 	}
 }
 
-float32 Object::RaycastBounds(const Vec3f& origin, const Vec3f& direction, Vec3f& out_face)
+void Object::SetReflectionProbe(bool value)
+{
+	SetProbeVolume(value);
+
+	if (value) {
+		SetTag(eObjectTag::ReflectionProbe);
+	}
+}
+
+float32 Object::RaycastBounds(const Vec3f origin, const Vec3f direction, Vec3f& out_face)
 {
 	// Into the object's own space, so a rotated box is tested against the box it actually is rather than the
 	// looser one around it. An affine transform is linear in the ray parameter, so the distance that comes back
@@ -417,6 +543,47 @@ float32 Object::RaycastBounds(const Vec3f& origin, const Vec3f& direction, Vec3f
 	return RayCast(ray, Bounds, out_face);
 }
 
+bool Object::ContainsPoint(const Vec3f point)
+{
+	const Vec4f local = GetWorldMatrix().Inverse() * Vec4f(point.X, point.Y, point.Z, 1.0f);
+
+	return local.X >= Bounds.Min.X && local.X <= Bounds.Max.X && local.Y >= Bounds.Min.Y && local.Y <= Bounds.Max.Y &&
+		   local.Z >= Bounds.Min.Z && local.Z <= Bounds.Max.Z;
+}
+
+void Object::SetBounds(const BBox& bounds)
+{
+	Bounds = bounds;
+
+	Object* node = this;
+
+	while (node != nullptr) {
+		gWorldGrid->UpdateObject(node, false);
+
+		if (node->ParentID.IsNull() || node->ParentID.IsInvalid()) {
+			break;
+		}
+
+		Object* parent = gObjectManager->GetObject(node->ParentID);
+
+		if (parent == nullptr) {
+			break;
+		}
+
+		const OBBox world_box = node->GetWorldOBB();
+		const Mat4f parent_inverse = parent->GetWorldMatrix().Inverse();
+
+		for (const Vec3f corner : world_box.Corners) {
+			const Vec4f local = parent_inverse * Vec4f(corner.X, corner.Y, corner.Z, 1.0f);
+			const Vec3f local_corner(local.X, local.Y, local.Z);
+
+			parent->Bounds.Add(BBox(local_corner, local_corner));
+		}
+
+		node = parent;
+	}
+}
+
 void Object::SetCullable(bool value)
 {
 	if (!value) {
@@ -430,7 +597,25 @@ void Object::SetCullable(bool value)
 }
 
 
-void Object::SetPosition(const Vec3f& position)
+void Object::SetShadowCaster(const bool value)
+{
+	if (gWorldGrid != nullptr) {
+		gWorldGrid->MarkObjectDirty(this);
+	}
+
+	if (value) {
+		Flags |= eObjectFlags::ShadowCaster;
+	}
+	else {
+		Flags &= ~(eObjectFlags::ShadowCaster);
+	}
+
+	if (gWorldGrid != nullptr) {
+		gWorldGrid->MarkObjectDirty(this);
+	}
+}
+
+void Object::SetPosition(const Vec3f position)
 {
 	const Vec3f delta = position - mPosition;
 
@@ -459,7 +644,7 @@ void Object::SetScale(const float scale)
 	gWorldGrid->UpdateObject(this);
 }
 
-void Object::SetRotation(const Quat& rotation)
+void Object::SetRotation(const Quat rotation)
 {
 	const Quat delta = rotation * mRotation.Conjugate();
 
@@ -535,7 +720,7 @@ void Object::PrintDebug() const
 
 void Object::Destroy()
 {
-	if (pMesh) {
+	if (pMesh && !HasFlag(Flags, eObjectFlags::SharedMesh)) {
 		pMesh->Destroy();
 	}
 
@@ -548,7 +733,10 @@ void Object::Destroy()
 	if (!AttachedNodes.IsEmpty()) {
 		for (ObjectID& obj_id : AttachedNodes) {
 			Object* obj = gObjectManager->GetObject(obj_id);
-			obj->Destroy();
+
+			if (obj != nullptr) {
+				obj->Destroy();
+			}
 		}
 	}
 

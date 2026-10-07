@@ -2,6 +2,8 @@
 
 #include <Core/Types.hpp>
 
+#include <cmath>
+
 namespace fx {
 
 struct Color
@@ -36,6 +38,9 @@ public:
 	FX_FORCE_INLINE float32 GetBF() const { return static_cast<float32>(B) * scOneOver255; }
 	FX_FORCE_INLINE float32 GetAF() const { return static_cast<float32>(A) * scOneOver255; }
 
+	static FX_FORCE_INLINE float32 SrgbToLinear(float32 value);
+	FX_FORCE_INLINE void GetLinearRGB(float32 out_rgb[3]) const;
+
 	FX_FORCE_INLINE uint32 AsUInt() const { return Value; }
 
 public:
@@ -68,6 +73,18 @@ FX_FORCE_INLINE Color Color::FromFloats(float32 rgba[4])
 	colour.Value = ((static_cast<uint32>(rgba[3] * 255.0f) << 24) | (static_cast<uint32>(rgba[2] * 255.0f) << 16) |
 					(static_cast<uint32>(rgba[1] * 255.0f) << 8) | (static_cast<uint32>(rgba[0] * 255.0f)));
 	return colour;
+}
+
+FX_FORCE_INLINE float32 Color::SrgbToLinear(float32 value)
+{
+	return (value <= 0.04045f) ? (value / 12.92f) : std::pow((value + 0.055f) / 1.055f, 2.4f);
+}
+
+FX_FORCE_INLINE void Color::GetLinearRGB(float32 out_rgb[3]) const
+{
+	out_rgb[0] = SrgbToLinear(GetRF());
+	out_rgb[1] = SrgbToLinear(GetGF());
+	out_rgb[2] = SrgbToLinear(GetBF());
 }
 
 enum class eColorComponent

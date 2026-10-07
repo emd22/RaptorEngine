@@ -18,7 +18,7 @@ void OrthoCamera::UpdateCameraMatrix()
 	InvProjectionMatrix = ProjectionMatrix.Inverse();
 }
 
-void OrthoCamera::ResolveViewToTexels(Vec3f& eye, Vec3f& target, const Vec3f& world_up, float32 texture_res)
+void OrthoCamera::ResolveViewToTexels(Vec3f& eye, Vec3f& target, const Vec3f world_up, float32 texture_res)
 {
 	Assert(texture_res > 0.0f);
 

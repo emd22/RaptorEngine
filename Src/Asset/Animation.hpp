@@ -59,7 +59,7 @@ struct AnimationPlayback
 struct BoneTransform
 {
 	BoneTransform() = default;
-	BoneTransform(const fx::Vec3f& position, const Quat& rotation) : Position(position), Rotation(rotation) {}
+	BoneTransform(const fx::Vec3f& position, const Quat rotation) : Position(position), Rotation(rotation) {}
 
 	Vec3f Position = Vec3f::sZero;
 	Quat Rotation = Quat::scIdentity;
@@ -84,6 +84,8 @@ public:
 	static constexpr uint32 scMaxAnimationStack = 8;
 
 public:
+	static Ref<Skeleton> CreateInstance(const Ref<Skeleton>& source);
+
 	const Animation* FindAnimation(const String& name) const;
 
 	/**
@@ -118,6 +120,12 @@ public:
 	 * `SkinningMatrices`.
 	 */
 	void EvaluatePose(const Animation* anim, float32 time);
+
+	void SetExternalPose(bool enabled);
+	FX_FORCE_INLINE bool HasExternalPose() const { return mbExternalPose; }
+
+	void PoseFromDrivenBones(const Mat4f* driven_world, const uint8* is_driven);
+
 	BoneTransform GetBoneTransform(const Ref<Animation>& anim, float32 time, BoneId bone_id) const;
 	Mat4f GetBoneTransformMatrix(const Ref<Animation>& anim, float32 time, BoneId bone_id) const;
 
@@ -148,9 +156,19 @@ public:
 
 	uint32 BoneBufferBase = scNoBones;
 
+	uint32 PoseHash = 0;
+	Vec3f PoseCenter = Vec3f::sZero;
+	float32 PoseRadius = 0.0f;
+
+	Ref<Skeleton> pSource { nullptr };
+
 	uint32 LastUpdateFrame = UINT32_MAX;
 
 private:
+	void UpdatePoseSummary();
+
+	bool mbExternalPose = false;
+
 	/// Set once the rest pose has been evaluated, as it never changes and only needs posing once.
 	bool mbHoldingRestPose = false;
 };

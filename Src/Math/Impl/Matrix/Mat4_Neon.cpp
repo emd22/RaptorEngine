@@ -13,7 +13,7 @@ namespace fx {
 const Mat4f Mat4f::scIdentity = Mat4f((float32[16]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 });
 
 
-Mat4f Mat4f::AsRotation(const Quat& quat)
+Mat4f Mat4f::AsRotation(const Quat quat)
 {
 	float x = quat.GetX();
 	float y = quat.GetY();
@@ -234,7 +234,7 @@ Mat4f Mat4f::TransposeMat3()
 
 void Mat4f::CopyAsMat3To(float* dest) const { memcpy(dest, RawData, sizeof(float32) * 12); }
 
-void Mat4f::LookAt(const Vec3f& eye, const Vec3f& target, const Vec3f& upvec)
+void Mat4f::LookAt(const Vec3f eye, const Vec3f target, const Vec3f upvec)
 {
 	Vec3f forward = (target - eye);
 	forward.NormalizeIP();

@@ -35,6 +35,8 @@ public:
 
 	void HandleResize();
 
+	void SetTitle(const char* title);
+
 	/**
 	 * @brief Returns the instance extensions needed to create a surface for this kind of window.
 	 */

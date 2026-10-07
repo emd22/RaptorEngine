@@ -30,7 +30,7 @@ public:
     void CreateFrom(const SizedArray<Vec3f>& positions, const SizedArray<Vec3f>& normals, const SizedArray<Vec2f>& uvs,
                     const SizedArray<Vec3f>& tangents, const SizedArray<Vec4f>& bone_weights,
                     const SizedArray<Vec4u>& bone_ids, eVertexCreateFlags create_flags,
-                    float32 tangent_handedness = 1.0f);
+                    const SizedArray<float32>& tangent_handedness = {});
 
 
     void CreateFrom(const SizedArray<float32>& positions, const SizedArray<float32>& normals,

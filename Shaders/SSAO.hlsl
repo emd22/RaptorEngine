@@ -156,23 +156,17 @@ float ComputeSSAO(float2 uv)
 		float sample_raw_depth = 1.0 - F_Sample(tDepth, sample_uv).r;
 
 		// Skip offscreen samples
-		if (any(sample_uv < 0.0) || any(sample_uv > 1.0))
-		{
-			continue;
-		}
+		const bool offscreen = or(any(sample_uv < 0.0), any(sample_uv > 1.0));
 
 		float sample_scene_z = ReconstructViewPos(sample_uv, sample_raw_depth).z;
 
 		float delta = sample_position.z - sample_scene_z;
 
 		// Skip samples not occluded or occluded by unrelated foreground geometry (haloing)
-		if (delta < Consts.Bias || delta > Consts.Radius)
-		{
-			continue;
-		}
+		const bool out_of_range = or(delta < Consts.Bias, delta > Consts.Radius);
 
 		float attenuation = 1.0 - delta / Consts.Radius;
-		occlusion += attenuation;
+		occlusion += select(or(offscreen, out_of_range), 0.0, attenuation);
 	}
 
 	float ao = pow(saturate(1.0 - Consts.Strength * (occlusion / SSAO_KERNEL_SIZE)), Consts.Power);

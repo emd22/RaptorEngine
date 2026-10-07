@@ -9,6 +9,7 @@
 #include <Decal/DecalManager.hpp>
 #include <Engine.hpp>
 #include <Math/MathUtil.hpp>
+#include <Object/ObjectManager.hpp>
 #include <Physics/PhysicsManager.hpp>
 #include <Player.hpp>
 #include <Renderer/Globals.hpp>
@@ -331,7 +332,7 @@ void WeaponSystem::OnScriptsReloaded()
 void WeaponSystem::ApplyAnimations(const Weapon& weapon)
 {
 	mpPlayer->SetViewModelAnimations(weapon.IdleAnim.CStr(), weapon.FireAnim.CStr(), weapon.ReloadAnim.CStr());
-	mpPlayer->SetRecoilRecovery(MathUtil::DegreesToRadians(weapon.Def.RecoilRecovery));
+	mpPlayer->SetRecoilRecovery(weapon.Def.RecoilRecovery);
 }
 
 void WeaponSystem::SelectWeapon(uint32 index)
@@ -524,12 +525,24 @@ void WeaponSystem::ApplyHit(float32 damage, float32 force, bool decal)
 	JPH::BodyInterface& bodies = gPhysics->pBackend->GetBodyInterface();
 	const JPH::EMotionType motion = bodies.GetMotionType(mLastHit.Body);
 
-	if (motion == JPH::EMotionType::Static) {
+	const bool is_static = (motion == JPH::EMotionType::Static);
+
+	physics::Body* hit_body = gPhysics->FindBody(mLastHit.Body);
+	const Object* hit_object = (hit_body != nullptr) ? gObjectManager->GetObject(hit_body->GetObjectID()) : nullptr;
+	const bool bleeds = (hit_object != nullptr) && hit_object->Bleeds();
+
+	if (bleeds) {
+		if (decal) {
+			SpawnBloodSplatter(is_static);
+		}
+	}
+	else if (is_static) {
 		if (decal) {
 			gDecalManager->AddBulletHole(mLastHit.Point, mLastHit.Normal);
 		}
 	}
-	else if (force > 0.0f) {
+
+	if (!is_static && force > 0.0f) {
 		bodies.ActivateBody(mLastHit.Body);
 		bodies.AddImpulse(mLastHit.Body,
 						  JPH::Vec3(mLastDirection.X * force, mLastDirection.Y * force, mLastDirection.Z * force));
@@ -537,6 +550,39 @@ void WeaponSystem::ApplyHit(float32 damage, float32 force, bool decal)
 
 	if (gCVars->Get("b_weapon_debug", false)) {
 		LogInfo(LC_SCRIPT, "hit for {:.1f} damage at {}", damage, mLastHit.Point);
+	}
+}
+
+static float32 RandomUnit() { return static_cast<float32>(FastRand32() >> 8) * (1.0f / 16777216.0f); }
+
+void WeaponSystem::SpawnBloodSplatter(bool is_static)
+{
+	constexpr float32 exit_range = 3.0f;
+	constexpr float32 floor_range = 2.0f;
+
+	const Vec3f point = mLastHit.Point;
+
+	if (is_static) {
+		gDecalManager->AddBloodSplat(point, mLastHit.Normal, 0.5f);
+	}
+
+	const Vec3f scatter(RandomUnit() - 0.5f, RandomUnit() - 0.5f, RandomUnit() - 0.5f);
+	const Vec3f exit_direction = (mLastDirection + (scatter * 0.2f)).Normalize();
+
+	const physics::RayResult exit_hit = gPhysics->pBackend->Raycast(point, exit_direction * exit_range, mLastHit.Body);
+
+	if (exit_hit.bHit) {
+		const float32 distance_fade = 1.0f - (0.6f * ((exit_hit.Point - point).Length() / exit_range));
+		gDecalManager->AddBloodSplat(exit_hit.Point, exit_hit.Normal, 0.9f * distance_fade);
+	}
+
+	const Vec3f floor_origin = point + (mLastHit.Normal * 0.05f);
+	const physics::RayResult floor_hit = gPhysics->pBackend->Raycast(floor_origin, -Vec3f::sUp * floor_range,
+																	 mLastHit.Body);
+
+	if (floor_hit.bHit) {
+		const float32 distance_fade = 1.0f - (0.5f * ((floor_hit.Point - floor_origin).Length() / floor_range));
+		gDecalManager->AddBloodSplat(floor_hit.Point, floor_hit.Normal, 0.6f * distance_fade);
 	}
 }
 

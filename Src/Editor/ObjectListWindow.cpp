@@ -32,6 +32,8 @@ static constexpr TagName scTagNames[] = {
 	{ eObjectTag::Blockout, "Blockout" },
 	{ eObjectTag::LockTransform, "Lock Transform" },
 	{ eObjectTag::ProbeVolume, "Probe Volume" },
+	{ eObjectTag::ReflectionProbe, "Reflection Probe" },
+	{ eObjectTag::Spawn, "Spawn" },
 };
 
 static wxString BuildTagsList(eObjectTag tags)
@@ -99,7 +101,7 @@ void ObjectListWindow::RefreshList()
 			continue;
 		}
 
-		const wxString name = wxString::FromUTF8(object->Name.Get());
+		const wxString name = wxString::FromUTF8(object->Name.Get().CStr());
 		const Vec3f position = object->GetPosition();
 
 		const long row = mpList->InsertItem(mpList->GetItemCount(), name.IsEmpty() ? wxString("(unnamed)") : name);

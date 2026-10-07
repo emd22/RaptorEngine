@@ -8,13 +8,16 @@
 #pragma once
 
 #include <Core/StackArray.hpp>
-#include <Math/BoundingBox.hpp>
+#include <Math/BBox.hpp>
+#include <Math/Mat4.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec4.hpp>
+#include <Object/ObjectLayer.hpp>
 
 namespace fx {
 
 class PerspectiveCamera;
+class Camera;
 
 enum class eFrustumPlane
 {
@@ -26,25 +29,39 @@ enum class eFrustumPlane
 	Far = 5
 };
 
+constexpr uint32 FrustumPlaneBit(eFrustumPlane plane) { return 1U << static_cast<uint32>(plane); }
+
+constexpr uint32 scFrustumAllPlanes = 0x3F;
+
+constexpr uint32 scFrustumSidePlanes = FrustumPlaneBit(eFrustumPlane::Left) | FrustumPlaneBit(eFrustumPlane::Right) |
+									   FrustumPlaneBit(eFrustumPlane::Bottom) | FrustumPlaneBit(eFrustumPlane::Top);
+
 class Frustum
 {
 public:
 	Frustum() = default;
 
 	void Rebuild(const PerspectiveCamera& camera);
+	void Rebuild(const Camera& camera, eObjectLayer layer);
 
-	bool TileIntersectsAABB(const AABB& tile_aabb) const;
+	void Rebuild(const Mat4f& view_projection);
+
+	bool TileIntersectsAABB(const BBox& tile_aabb) const;
 
 	/// Whether any part of the sphere is inside of the frustum. Can let through spheres that are just outside of a
 	/// corner.
-	bool IntersectsSphere(const Vec3f& center, float32 radius) const;
+	bool IntersectsSphere(const Vec3f center, float32 radius, uint32 plane_mask = scFrustumAllPlanes) const;
+
+	bool IntersectsAABB(const BBox& aabb, uint32 plane_mask = scFrustumAllPlanes) const;
+
+	bool IntersectsOBB(const OBBox& obb, uint32 plane_mask = scFrustumAllPlanes) const;
 
 	FX_FORCE_INLINE const Vec4f& GetPlane(const eFrustumPlane plane) const
 	{
 		return mClipPlanes[static_cast<uint32>(plane)];
 	}
 
-	AABB GetFrustumBoundingBox(const PerspectiveCamera& camera);
+	BBox GetFrustumBoundingBox(const PerspectiveCamera& camera);
 
 private:
 	StackArray<Vec4f, 6> mClipPlanes;

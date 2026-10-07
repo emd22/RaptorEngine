@@ -13,6 +13,7 @@
 #include <Controls.hpp>
 #include <Core/Assert.hpp>
 #include <Core/Defer.hpp>
+#include <Core/Random.hpp>
 #include <Core/Ref.hpp>
 #include <Core/RefUtil.hpp>
 #include <Decal/DecalManager.hpp>
@@ -21,6 +22,7 @@
 #include <Material/MaterialManager.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
+#include <Physics/Ragdoll.hpp>
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Exposure.hpp>
 #include <Renderer/Globals.hpp>
@@ -32,8 +34,10 @@
 #include <Renderer/TextRenderer.hpp>
 #include <Script/ScriptManager.hpp>
 #include <Texture/TextureManager.hpp>
+#include <algorithm>
 #include <cmath>
 #include <csignal>
+#include <filesystem>
 
 #ifdef FX_IS_EDITOR
 #include <Editor/EditorFrame.hpp>
@@ -122,6 +126,8 @@ void RaptorGame::InitEngine()
 		window_title = window_entry->GetMember(HashStr32("Title"))->Get<const char*>();
 	}
 
+	mBaseWindowTitle = String(window_title);
+
 	Ref<Window> window = Window::New(window_title, Vec2u(window_width, window_height));
 
 	ConfigEntry* bob_entry = Config.GetEntry(HashStr32("HeadBob"));
@@ -193,8 +199,7 @@ void RaptorGame::CreateGame()
 {
 	gWorld->Player.Create();
 	gWorld->Player.pCamera->SetAspectRatio(gGraphics->GetWindow()->GetAspectRatio());
-	// Move the player up and behind the other objects
-	gWorld->Player.TeleportTo(Vec3f(0.0f, -0.2f, -2.0f));
+	gWorld->RespawnPlayer();
 	gWorld->Player.SetFlyMode(false);
 
 
@@ -215,11 +220,19 @@ void RaptorGame::CreateGame()
 	mpApertureCVar = gCVars->Set("r_aperture", gCVars->Get("r_aperture", 16.0f));
 	mpShutterCVar = gCVars->Set("r_shutter", gCVars->Get("r_shutter", 0.01f));
 	mpIsoCVar = gCVars->Set("r_iso", gCVars->Get("r_iso", 100.0f));
+	mpTonemapperCVar = gCVars->Set("r_tonemapper", 1);
 
 	// Metres between probes in a volume built from an editor brush. Set `$r_probe_spacing` in the console
 	gCVars->Set("r_probe_spacing", 2.5f);
+	gCVars->Set("r_probe_level_spacing", 0.5f);
 
 	gCVars->Set("r_probe_bounces", 3);
+	mpReflectionProbesCVar = gCVars->Set("r_reflection_probes", 1);
+	gCVars->Set("r_reflection_level_probe", 0);
+	mpReflectionDebugCVar = gCVars->Set("r_reflection_debug", 0);
+
+	mpRagdollBloodSpeedCVar = gCVars->Set("b_ragdoll_blood_speed",
+										  gCVars->Get("b_ragdoll_blood_speed", scDefaultRagdollBloodSpeed));
 
 	gCVars->Set("r_ssao_radius", gCVars->Get("r_ssao_radius", 0.25f));
 	gCVars->Set("r_ssao_bias", gCVars->Get("r_ssao_bias", 0.02f));
@@ -379,6 +392,10 @@ void RaptorGame::ProcessControls()
 		ControlManager::ReleaseMouse();
 	}
 
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_F8)) {
+		RequestRagdollDrop();
+	}
+
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_L)) {
 		gWorld->bRenderProbes = !gWorld->bRenderProbes;
 		LogInfo("Probe debug render {}", gWorld->bRenderProbes ? "enabled" : "disabled");
@@ -412,6 +429,13 @@ void RaptorGame::ProcessControls()
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_3)) {
 		gGraphics->bRenderProbeVisibility = !gGraphics->bRenderProbeVisibility;
 		LogInfo("Probe visibility debug view {}", gGraphics->bRenderProbeVisibility ? "enabled" : "disabled");
+	}
+
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_4) && mpReflectionDebugCVar != nullptr) {
+		static const char* const scViewNames[] = { "off", "mirror reflections", "probe coverage" };
+
+		mpReflectionDebugCVar->IntValue = (std::clamp<int64>(mpReflectionDebugCVar->IntValue, 0, 2) + 1) % 3;
+		LogInfo("Reflection probe debug view: {}", scViewNames[mpReflectionDebugCVar->IntValue]);
 	}
 
 	if (ControlManager::IsMouseLocked()) {
@@ -535,6 +559,241 @@ void RaptorGame::ProcessControls()
 	}
 }
 
+void RaptorGame::RequestRagdollDrop()
+{
+	++mRagdollDropsPending;
+
+	if (mbRagdollTemplateRequested) {
+		return;
+	}
+
+	mbRagdollTemplateRequested = true;
+
+	mRagdollTemplateTicket = gAssetManager->LoadObject("ragdoll_template",
+													   "RaptorData/Data/Demo/Models/ragdoll/ragdoll.glb");
+
+	mRagdollTemplateTicket.OnLoaded(
+		[this](void* item_ptr)
+		{
+			Object* object = static_cast<Object*>(item_ptr);
+
+			if (object != nullptr) {
+				object->SetShadowCaster(true);
+
+				mpRagdollTemplate.store(object);
+			}
+		});
+
+	LogInfo("Loading the ragdoll model, dummies drop once it has loaded");
+}
+
+static void DestroyObjectTree(ObjectID root_id)
+{
+	Object* root = gObjectManager->GetObject(root_id);
+
+	if (root == nullptr) {
+		return;
+	}
+
+	std::vector<ObjectID> children;
+	for (const ObjectID& child_id : root->AttachedNodes) {
+		children.push_back(child_id);
+	}
+
+	root->AttachedNodes.Clear();
+
+	for (const ObjectID& child_id : children) {
+		DestroyObjectTree(child_id);
+	}
+
+	gWorld->Detach(root_id);
+	gObjectManager->DestroyObject(root_id);
+}
+
+static void CollectObjectTree(Object* root, std::vector<Object*>& out_parts)
+{
+	out_parts.push_back(root);
+
+	for (ObjectID child_id : root->AttachedNodes) {
+		Object* child = gObjectManager->GetObject(child_id);
+
+		if (child != nullptr) {
+			CollectObjectTree(child, out_parts);
+		}
+	}
+}
+
+void RaptorGame::DropRagdollDummy(Object* model)
+{
+	if (mRagdollDummies.size() >= scMaxRagdollDummies) {
+		DestroyRagdollDummy(0);
+	}
+
+	Object* root = model->CloneWithOwnSkeleton(String::Fmt("ragdoll_dummy_{}", mRagdollSpawnCount).Str());
+
+	std::vector<Object*> parts;
+	CollectObjectTree(root, parts);
+
+	const auto skinned_part = std::find_if(parts.begin(), parts.end(),
+										   [](const Object* part) { return part->pSkeleton.IsValid(); });
+
+	if (skinned_part == parts.end()) {
+		LogWarning("The ragdoll model has no skeleton");
+		DestroyObjectTree(root->ID);
+		return;
+	}
+
+	Object* skinned = *skinned_part;
+
+	Vec3f forward = gWorld->Player.pCamera->GetForwardVector();
+	forward.Y = 0.0f;
+	forward = forward.Normalize();
+
+	const Vec3f right = gWorld->Player.pCamera->GetRightVector();
+
+	const float32 lateral = (static_cast<float32>(mRagdollSpawnCount % 3) - 1.0f) * 0.9f;
+	const float32 height = 1.0f + 0.3f * static_cast<float32>(mRagdollSpawnCount % 2);
+
+	++mRagdollSpawnCount;
+
+	root->SetPosition(gWorld->Player.Position + forward * 1.5f + right * lateral + Vec3f(0.0f, height, 0.0f));
+
+	for (Object* part : parts) {
+		part->SetCullable(false);
+	}
+
+	root->SetShadowCaster(true);
+	root->SetProbeVisible(false);
+
+	std::unique_ptr<physics::Ragdoll> ragdoll = std::make_unique<physics::Ragdoll>();
+
+	if (!ragdoll->Create(skinned->pSkeleton, skinned->GetWorldMatrix())) {
+		DestroyObjectTree(root->ID);
+		return;
+	}
+
+	gWorld->AttachLoaded(root);
+
+	ragdoll->Activate(forward * 2.0f);
+
+	mRagdollDummies.push_back(RagdollDummy { .RootID = root->ID, .pRagdoll = std::move(ragdoll) });
+}
+
+void RaptorGame::DestroyRagdollDummy(size_t index)
+{
+	RagdollDummy& dummy = mRagdollDummies[index];
+
+	dummy.pRagdoll->Destroy();
+
+	DestroyObjectTree(dummy.RootID);
+
+	mRagdollDummies.erase(mRagdollDummies.begin() + static_cast<std::ptrdiff_t>(index));
+}
+
+static float32 RandomUnit() { return static_cast<float32>(FastRand32() >> 8) * (1.0f / 16777216.0f); }
+
+void RaptorGame::SpawnRagdollBlood(RagdollDummy& dummy, const physics::RagdollImpact& impact, float32 min_speed)
+{
+	constexpr float32 scCooldown = 0.25f;
+	constexpr float32 scMinSize = 0.4f;
+	constexpr float32 scMaxSize = 1.0f;
+	constexpr float32 scSpeedRange = 8.0f;
+
+	if (dummy.BloodCooldown > 0.0f) {
+		return;
+	}
+
+	dummy.BloodCooldown = scCooldown;
+
+	const float32 strength = std::clamp((impact.Speed - min_speed) / scSpeedRange, 0.0f, 1.0f);
+	const float32 size = scMinSize + (scMaxSize - scMinSize) * strength;
+
+	gDecalManager->AddBloodSplat(impact.Point, impact.Normal, size);
+
+	const Vec3f reference = (std::abs(impact.Normal.Y) < 0.9f) ? Vec3f::sUp : Vec3f::sRight;
+	const Vec3f tangent = reference.Cross(impact.Normal).Normalize();
+	const Vec3f bitangent = impact.Normal.Cross(tangent);
+
+	const uint32 satellites = 2 + static_cast<uint32>(strength * 2.0f);
+
+	for (uint32 i = 0; i < satellites; i++) {
+		const float32 angle = RandomUnit() * 2.0f * static_cast<float32>(M_PI);
+		const float32 distance = size * (0.4f + 0.6f * RandomUnit());
+
+		const Vec3f offset = (tangent * std::cos(angle) + bitangent * std::sin(angle)) * distance;
+
+		gDecalManager->AddBloodSplat(impact.Point + offset, impact.Normal, size * (0.25f + 0.25f * RandomUnit()));
+	}
+}
+
+void RaptorGame::UpdateRagdollDummies()
+{
+	Object* model = mpRagdollTemplate.load();
+
+	while (mRagdollDropsPending > 0 && model != nullptr) {
+		--mRagdollDropsPending;
+		DropRagdollDummy(model);
+	}
+
+	if (mRagdollDummies.empty()) {
+		return;
+	}
+
+	const bool draw_debug = (gWorld->DebugBoundsMask & World::scDebugBoundsPhysics) != 0;
+	const float32 min_blood_speed = (mpRagdollBloodSpeedCVar != nullptr) ? mpRagdollBloodSpeedCVar->FloatValue
+																		 : scDefaultRagdollBloodSpeed;
+
+	gPhysics->pBackend->SetMinRagdollImpactSpeed(min_blood_speed);
+
+	mRagdollImpacts.clear();
+	gPhysics->pBackend->DrainRagdollImpacts(mRagdollImpacts);
+
+	for (RagdollDummy& dummy : mRagdollDummies) {
+		dummy.BloodCooldown = std::max(dummy.BloodCooldown - static_cast<float32>(DeltaTime), 0.0f);
+	}
+
+	for (const physics::RagdollImpact& impact : mRagdollImpacts) {
+		for (RagdollDummy& dummy : mRagdollDummies) {
+			if (dummy.pRagdoll->GetSerial() == impact.RagdollSerial) {
+				SpawnRagdollBlood(dummy, impact, min_blood_speed);
+				break;
+			}
+		}
+	}
+
+	for (RagdollDummy& dummy : mRagdollDummies) {
+		dummy.pRagdoll->WriteToSkeleton();
+
+		if (draw_debug) {
+			dummy.pRagdoll->DebugDraw();
+		}
+	}
+}
+
+void RaptorGame::UpdateWindowTitle()
+{
+	if (gWorld == nullptr || (mbTitleShown && gWorld->BlockoutPath == mTitleBlockoutPath)) {
+		return;
+	}
+
+	Ref<Window> window = gGraphics->GetWindow();
+	if (!window.IsValid()) {
+		return;
+	}
+
+	mTitleBlockoutPath = gWorld->BlockoutPath;
+	mbTitleShown = true;
+
+	if (mTitleBlockoutPath.GetLength() == 0) {
+		window->SetTitle(mBaseWindowTitle.CStr());
+		return;
+	}
+
+	const std::string file_name = std::filesystem::path(mTitleBlockoutPath.CStr()).filename().string();
+
+	window->SetTitle(String::Fmt("{} - {}", mBaseWindowTitle.CStr(), file_name).CStr());
+}
+
 void RaptorGame::ReloadWorldFile()
 {
 	LogInfo("Reloading world...");
@@ -598,10 +857,11 @@ void RaptorGame::RenderText()
 		}
 	}
 
-	gTextRenderer->DrawText(String::Fmt("Vis={} Lights={}/{}", gWorld->mRenderList.GetItemCount(),
-										 gWorld->mLightList.GetItemCount(), gLightManager->GetCache().Size)
-							.CStr(),
-					1.0f, scWhite);
+	gTextRenderer->DrawText(String::Fmt("Vis={} Culled={}/{} Lights={}/{}", gWorld->mRenderList.GetItemCount(),
+										gWorld->FrustumCulledObjects, gWorld->FrustumTestedObjects,
+										gWorld->mLightList.GetItemCount(), gLightManager->GetCache().Size)
+								.CStr(),
+							1.0f, scWhite);
 
 #ifdef FX_IS_EDITOR
 	gTextRenderer->DrawText(
@@ -707,8 +967,20 @@ void RaptorGame::Tick()
 	gGraphics->Profiler.ReadResults(gGraphics->GetFrameNumber(), DeltaTime);
 
 	gGraphics->bDisableProbes = (mpProbesCVar != nullptr) && (mpProbesCVar->IntValue == 0);
+	gGraphics->bDisableReflectionProbes = (mpReflectionProbesCVar != nullptr) &&
+										  (mpReflectionProbesCVar->IntValue == 0);
+	gGraphics->ReflectionDebugView = (mpReflectionDebugCVar != nullptr)
+										 ? static_cast<uint32>(std::clamp<int64>(mpReflectionDebugCVar->IntValue, 0, 2))
+										 : 0;
+	gGraphics->Tonemapper = (mpTonemapperCVar != nullptr)
+								? static_cast<uint32>(std::clamp<int64>(mpTonemapperCVar->IntValue, 0, 1))
+								: 1;
 	gGraphics->bDisableDecals = (mpDecalsCVar != nullptr) && (mpDecalsCVar->IntValue == 0);
+
+	UpdateWindowTitle();
 	gWorld->DebugBoundsMask = (mpDebugBoundsCVar != nullptr) ? static_cast<uint32>(mpDebugBoundsCVar->IntValue) : 0;
+
+	UpdateRagdollDummies();
 
 	UpdateExposure();
 
@@ -740,6 +1012,12 @@ void RaptorGame::Tick()
 void RaptorGame::DestroyGame()
 {
 	gGraphics->GetDevice()->WaitForIdle();
+
+	for (RagdollDummy& dummy : mRagdollDummies) {
+		dummy.pRagdoll->Destroy();
+	}
+
+	mRagdollDummies.clear();
 
 	delete gShadowRenderer;
 	gShadowRenderer = nullptr;
@@ -776,7 +1054,7 @@ RaptorGame::~RaptorGame()
 /////////////////////////////////////
 
 
-// void EditorModeMoveCollider::Update(const World& scene, const Vec3f& movement_vector)
+// void EditorModeMoveCollider::Update(const World& scene, const Vec3f movement_vector)
 // {
 // 	physics::BodyID phys_id = scene.GetSelectedPhysicsObject();
 // 	if (phys_id != physics::BodyID::scNull) {
@@ -794,7 +1072,7 @@ RaptorGame::~RaptorGame()
 
 // void EditorModeMoveCollider::OnLeave(const World& scene) {}
 
-// void EditorModeScaleCollider::Update(const World& scene, const Vec3f& movement_vector)
+// void EditorModeScaleCollider::Update(const World& scene, const Vec3f movement_vector)
 // {
 // 	physics::BodyID phys_id = scene.GetSelectedPhysicsObject();
 // 	if (phys_id != physics::BodyID::scNull) {

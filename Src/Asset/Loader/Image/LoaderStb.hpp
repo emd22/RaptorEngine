@@ -16,7 +16,7 @@ class LoaderStb final : public ImageLoaderBase
 public:
 	LoaderStb() = default;
 
-	eLoaderStatus Load(AssetTicket& asset, const std::string& path) override;
+	eLoaderStatus Load(AssetTicket& asset, const String& path) override;
 	eLoaderStatus Load(AssetTicket& asset, const uint8* data, uint32 size) override;
 
 	void CreateGpuResource(AssetTicket& asset) override;

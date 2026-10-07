@@ -10,6 +10,7 @@
 class wxCheckBox;
 class wxChoice;
 class wxStaticText;
+class wxSizer;
 
 namespace fx::editor {
 
@@ -24,6 +25,11 @@ public:
 	void Update();
 
 private:
+	void BuildReflectionPane(wxSizer* sizer);
+	void UpdateReflectionPane();
+	void OnPaneChanged();
+
+private:
 	wxStaticText* mpNameLabel = nullptr;
 	Vector3Field* mpPositionField = nullptr;
 
@@ -35,6 +41,15 @@ private:
 	FloatField* mpShutterField = nullptr;
 	FloatField* mpIsoField = nullptr;
 	FloatField* mpCompensationField = nullptr;
+
+	wxCollapsiblePane* mpReflectionPane = nullptr;
+	wxStaticText* mpReflectionStatus = nullptr;
+	wxCheckBox* mpReflectionEnabledCheck = nullptr;
+	wxCheckBox* mpReflectionFallbackCheck = nullptr;
+	wxCheckBox* mpShowProbeVolumesCheck = nullptr;
+	wxChoice* mpReflectionDebugChoice = nullptr;
+	wxString mShownReflectionStatus;
+	int64 mShownReflectionDebug = -1;
 
 	Vec3f mShownPosition = Vec3f::sZero;
 	bool mbShowingAnything = true;

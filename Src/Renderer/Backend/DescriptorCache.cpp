@@ -37,11 +37,11 @@ DsLayoutCache::Request(const SizedArray<DescriptorEntry>& requested_entries)
 {
 	DsLayoutID entries_hash = GetID(requested_entries);
 
-	auto it = Cache.find(entries_hash.ID);
+	VkDescriptorSetLayout* cached_layout = Cache.Find(entries_hash.ID);
 
 	// If the descriptor layout was not found in the cache, create it
-	if (it != Cache.end()) {
-		return std::make_pair(entries_hash, it->second);
+	if (cached_layout != nullptr) {
+		return std::make_pair(entries_hash, *cached_layout);
 	}
 
 	DsLayoutBuilder builder {};
@@ -58,19 +58,14 @@ DsLayoutCache::Request(const SizedArray<DescriptorEntry>& requested_entries)
 		builder.AddBinding(entry.Binding, entry.GetDescriptorType(), entry.ShaderStages);
 	}
 
-	Cache[entries_hash.ID] = builder.Build();
+	VkDescriptorSetLayout layout = Cache.Insert(entries_hash.ID, builder.Build());
 
-	return std::make_pair(entries_hash, Cache[entries_hash.ID]);
+	return std::make_pair(entries_hash, layout);
 }
 
 VkDescriptorSetLayout* DsLayoutCache::RequestExisting(DsLayoutID layout_id)
 {
-	auto it = Cache.find(layout_id.ID);
-	if (it == Cache.end()) {
-		return nullptr;
-	}
-
-	return &it->second;
+	return Cache.Find(layout_id.ID);
 }
 
 #define ID_HASH_HANDLE(handle_, size_)                                                                                 \
@@ -96,25 +91,25 @@ DsLayoutID DsLayoutCache::GetID(const SizedArray<DescriptorEntry>& entries)
 
 void DsLayoutCache::Free(DsLayoutID layout_id)
 {
-	auto it = Cache.find(layout_id.ID);
+	VkDescriptorSetLayout* layout = Cache.Find(layout_id.ID);
 
 	// Descriptor layout not found, skip
-	if (it == Cache.end()) {
+	if (layout == nullptr) {
 		return;
 	}
 
-	vkDestroyDescriptorSetLayout(GraphicsBackendFwd::GetDevice()->Device, it->second, nullptr);
+	vkDestroyDescriptorSetLayout(GraphicsBackendFwd::GetDevice()->Device, *layout, nullptr);
 
-	Cache.erase(it);
+	Cache.Remove(layout_id.ID);
 }
 
 void DsLayoutCache::Destroy()
 {
 	for (auto& item : Cache) {
-		vkDestroyDescriptorSetLayout(GraphicsBackendFwd::GetDevice()->Device, item.second, nullptr);
+		vkDestroyDescriptorSetLayout(GraphicsBackendFwd::GetDevice()->Device, item.Value, nullptr);
 	}
 
-	Cache.clear();
+	Cache.Clear();
 }
 
 /////////////////////////////////////

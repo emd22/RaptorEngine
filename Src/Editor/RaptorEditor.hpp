@@ -2,10 +2,13 @@
 
 #ifdef FX_IS_EDITOR
 
+#include "BoundsEditor.hpp"
 #include "EditOperation.hpp"
 #include "EditorSelection.hpp"
 #include "EditorTool.hpp"
+#include "GrabEditor.hpp"
 #include "LightEditor.hpp"
+#include "SpawnEditor.hpp"
 
 #include <wx/evtloop.h>
 
@@ -96,7 +99,7 @@ public:
 	float32 GetSnapStep() const;
 
 	/// Rounds a position (or a distance) to the snap step, if snapping is on
-	Vec3f SnapToGrid(const Vec3f& position) const;
+	Vec3f SnapToGrid(const Vec3f position) const;
 
 	float32 GetAngleSnapStep() const;
 
@@ -111,12 +114,19 @@ public:
 	bool SelectObject(Object* object, bool append_selection);
 	void ClearSelection();
 
+	void DeselectModels();
+
 	FX_FORCE_INLINE const EditorSelection& GetSelection() const { return mSelection; }
 
 	FX_FORCE_INLINE LightEditor& GetLightEditor() { return mLightEditor; }
 
 	/// Changes an object's material, and the material it goes back to once it is deselected
 	void SetStoredMaterial(Object* object, MaterialID material);
+
+	Object* CreateReflectionProbeAtPlayer();
+	uint32 SetSelectionReflectionProbe(bool enabled);
+
+	uint32 SetSelectionObjectBit(bool is_tag, uint32 bit, bool enabled);
 
 	/////////////////////////////////////
 	// Edit operations
@@ -154,6 +164,8 @@ private:
 	/// Selects the object under the crosshair
 	void PickObject();
 
+	void DrawModelSelection();
+
 	void BeginDrag();
 	/// Ends the drag in progress, letting the tool finish its operation
 	void EndDrag();
@@ -188,6 +200,12 @@ private:
 
 	/// Runs the Light tool
 	LightEditor mLightEditor;
+
+	BoundsEditor mBoundsEditor;
+
+	GrabEditor mGrabEditor;
+
+	SpawnEditor mSpawnEditor;
 
 	EditorSelection mSelection;
 	EditHistory mHistory { mSelection };

@@ -12,6 +12,9 @@
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
 #include <Math/Vec3.hpp>
+#include <atomic>
+#include <mutex>
+#include <vector>
 
 namespace JPH {
 class JobSystemThreadPool;
@@ -120,10 +123,37 @@ public:
 };
 
 
+namespace RagdollUserData {
+static constexpr uint64 scTag = 0x52474C4400000000ull;
+static constexpr uint64 scTagMask = 0xFFFFFFFF00000000ull;
+
+FX_FORCE_INLINE bool Matches(uint64 user_data) { return (user_data & scTagMask) == scTag; }
+FX_FORCE_INLINE uint32 GetSerial(uint64 user_data) { return static_cast<uint32>(user_data & 0xFFFFFFFFull); }
+} // namespace RagdollUserData
+
+struct RagdollImpact
+{
+	Vec3f Point = Vec3f::sZero;
+	Vec3f Normal = Vec3f::sZero;
+	float32 Speed = 0.0f;
+	uint32 RagdollSerial = 0;
+};
+
 // An example contact listener
 class PhContactListener : public JPH::ContactListener
 {
 public:
+	static constexpr size_t scMaxQueuedImpacts = 64;
+
+	void SetMinImpactSpeed(float32 speed) { mMinImpactSpeed.store(speed); }
+
+	void DrainImpacts(std::vector<RagdollImpact>& out_impacts)
+	{
+		std::lock_guard<std::mutex> guard(mImpactsMutex);
+		out_impacts.insert(out_impacts.end(), mImpacts.begin(), mImpacts.end());
+		mImpacts.clear();
+	}
+
 	// See: ContactListener
 	virtual JPH::ValidateResult OnContactValidate(const JPH::Body& inBody1, const JPH::Body& inBody2,
 												  JPH::RVec3Arg inBaseOffset,
@@ -138,6 +168,42 @@ public:
 	virtual void OnContactAdded(const JPH::Body& inBody1, const JPH::Body& inBody2,
 								const JPH::ContactManifold& inManifold, JPH::ContactSettings& ioSettings) override
 	{
+		const bool first_is_ragdoll = RagdollUserData::Matches(inBody1.GetUserData());
+		const bool second_is_ragdoll = RagdollUserData::Matches(inBody2.GetUserData());
+
+		if (first_is_ragdoll == second_is_ragdoll || inManifold.mRelativeContactPointsOn2.empty()) {
+			return;
+		}
+
+		const JPH::Body& ragdoll_body = first_is_ragdoll ? inBody1 : inBody2;
+		const JPH::Body& surface_body = first_is_ragdoll ? inBody2 : inBody1;
+
+		if (!surface_body.IsStatic()) {
+			return;
+		}
+
+		const JPH::Vec3 surface_normal = first_is_ragdoll ? -inManifold.mWorldSpaceNormal
+														  : inManifold.mWorldSpaceNormal;
+		const JPH::RVec3 point = first_is_ragdoll ? inManifold.GetWorldSpaceContactPointOn2(0)
+												  : inManifold.GetWorldSpaceContactPointOn1(0);
+
+		const float32 speed = -ragdoll_body.GetPointVelocity(point).Dot(surface_normal);
+
+		if (speed < mMinImpactSpeed.load()) {
+			return;
+		}
+
+		RagdollImpact impact;
+		impact.Point = Vec3f(point.GetX(), point.GetY(), point.GetZ());
+		impact.Normal = Vec3f(surface_normal.GetX(), surface_normal.GetY(), surface_normal.GetZ());
+		impact.Speed = speed;
+		impact.RagdollSerial = RagdollUserData::GetSerial(ragdoll_body.GetUserData());
+
+		std::lock_guard<std::mutex> guard(mImpactsMutex);
+
+		if (mImpacts.size() < scMaxQueuedImpacts) {
+			mImpacts.push_back(impact);
+		}
 	}
 
 	virtual void OnContactPersisted(const JPH::Body& inBody1, const JPH::Body& inBody2,
@@ -146,6 +212,11 @@ public:
 	}
 
 	virtual void OnContactRemoved(const JPH::SubShapeIDPair& inSubShapePair) override {}
+
+private:
+	std::atomic<float32> mMinImpactSpeed = 1.0e9f;
+	std::mutex mImpactsMutex;
+	std::vector<RagdollImpact> mImpacts;
 };
 
 // An example activation listener
@@ -181,12 +252,18 @@ public:
 
 	void OptimizeBroadPhase();
 
-	RayResult Raycast(const Vec3f& origin, const Vec3f& direction) const;
-	SizedArray<JPH::BodyID> RaycastObjects(const Vec3f& origin, const Vec3f& direction) const;
+	RayResult Raycast(const Vec3f origin, const Vec3f direction, JPH::BodyID ignore_body = JPH::BodyID()) const;
+	SizedArray<JPH::BodyID> RaycastObjects(const Vec3f origin, const Vec3f direction) const;
 
-	FLOAT4 RaycastGetFaceOfBox(JPH::Body* body, const Vec3f& origin, const Vec3f& direction) const;
+	FLOAT4 RaycastGetFaceOfBox(JPH::Body* body, const Vec3f origin, const Vec3f direction) const;
 
 	FX_FORCE_INLINE JPH::BodyInterface& GetBodyInterface() { return PhysicsSystem.GetBodyInterface(); }
+
+	FX_FORCE_INLINE void SetMinRagdollImpactSpeed(float32 speed) { mContactListener.SetMinImpactSpeed(speed); }
+	FX_FORCE_INLINE void DrainRagdollImpacts(std::vector<RagdollImpact>& out_impacts)
+	{
+		mContactListener.DrainImpacts(out_impacts);
+	}
 
 	~JoltPhysicsBackend();
 

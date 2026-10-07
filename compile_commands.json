@@ -259,6 +259,36 @@
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O2 -g -o CMakeFiles/raptor.dir/Src/Editor/AtlasExport.cpp.o -c /Users/emd22/Projects/raptor/Src/Editor/AtlasExport.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Editor/AtlasExport.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Editor/AtlasExport.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O2 -g -o CMakeFiles/raptor.dir/Src/Editor/AtlasPacker.cpp.o -c /Users/emd22/Projects/raptor/Src/Editor/AtlasPacker.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Editor/AtlasPacker.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Editor/AtlasPacker.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O2 -g -o CMakeFiles/raptor.dir/Src/Editor/AtlasPackerWindow.cpp.o -c /Users/emd22/Projects/raptor/Src/Editor/AtlasPackerWindow.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Editor/AtlasPackerWindow.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Editor/AtlasPackerWindow.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O2 -g -o CMakeFiles/raptor.dir/Src/Editor/BoundsEditor.cpp.o -c /Users/emd22/Projects/raptor/Src/Editor/BoundsEditor.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Editor/BoundsEditor.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Editor/BoundsEditor.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O2 -g -o CMakeFiles/raptor.dir/Src/Editor/CVarListWindow.cpp.o -c /Users/emd22/Projects/raptor/Src/Editor/CVarListWindow.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Editor/CVarListWindow.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Editor/CVarListWindow.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O2 -g -o CMakeFiles/raptor.dir/Src/Editor/Common.cpp.o -c /Users/emd22/Projects/raptor/Src/Editor/Common.cpp",
   "file": "/Users/emd22/Projects/raptor/Src/Editor/Common.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Editor/Common.cpp.o"
@@ -301,9 +331,21 @@
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O2 -g -o CMakeFiles/raptor.dir/Src/Editor/GrabEditor.cpp.o -c /Users/emd22/Projects/raptor/Src/Editor/GrabEditor.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Editor/GrabEditor.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Editor/GrabEditor.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O2 -g -o CMakeFiles/raptor.dir/Src/Editor/LightEditor.cpp.o -c /Users/emd22/Projects/raptor/Src/Editor/LightEditor.cpp",
   "file": "/Users/emd22/Projects/raptor/Src/Editor/LightEditor.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Editor/LightEditor.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O2 -g -o CMakeFiles/raptor.dir/Src/Editor/MaterialPickerWindow.cpp.o -c /Users/emd22/Projects/raptor/Src/Editor/MaterialPickerWindow.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Editor/MaterialPickerWindow.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Editor/MaterialPickerWindow.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
@@ -322,6 +364,12 @@
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O2 -g -o CMakeFiles/raptor.dir/Src/Editor/RaptorEditor.cpp.o -c /Users/emd22/Projects/raptor/Src/Editor/RaptorEditor.cpp",
   "file": "/Users/emd22/Projects/raptor/Src/Editor/RaptorEditor.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Editor/RaptorEditor.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O2 -g -o CMakeFiles/raptor.dir/Src/Editor/SpawnEditor.cpp.o -c /Users/emd22/Projects/raptor/Src/Editor/SpawnEditor.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Editor/SpawnEditor.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Editor/SpawnEditor.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
@@ -421,9 +469,9 @@
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O2 -g -o CMakeFiles/raptor.dir/Src/Math/BoundingBox.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/BoundingBox.cpp",
-  "file": "/Users/emd22/Projects/raptor/Src/Math/BoundingBox.cpp",
-  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Math/BoundingBox.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O2 -g -o CMakeFiles/raptor.dir/Src/Math/BBox.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/BBox.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Math/BBox.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Math/BBox.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
@@ -511,12 +559,6 @@
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O2 -g -o CMakeFiles/raptor.dir/Src/Math/OrientedBoundingBox.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/OrientedBoundingBox.cpp",
-  "file": "/Users/emd22/Projects/raptor/Src/Math/OrientedBoundingBox.cpp",
-  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Math/OrientedBoundingBox.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/raptor",
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O2 -g -o CMakeFiles/raptor.dir/Src/Math/RayCast.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/RayCast.cpp",
   "file": "/Users/emd22/Projects/raptor/Src/Math/RayCast.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Math/RayCast.cpp.o"
@@ -568,6 +610,12 @@
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O2 -g -o CMakeFiles/raptor.dir/Src/Physics/PhysicsPlayer.cpp.o -c /Users/emd22/Projects/raptor/Src/Physics/PhysicsPlayer.cpp",
   "file": "/Users/emd22/Projects/raptor/Src/Physics/PhysicsPlayer.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Physics/PhysicsPlayer.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O2 -g -o CMakeFiles/raptor.dir/Src/Physics/Ragdoll.cpp.o -c /Users/emd22/Projects/raptor/Src/Physics/Ragdoll.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Physics/Ragdoll.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Physics/Ragdoll.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
@@ -796,6 +844,12 @@
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O2 -g -o CMakeFiles/raptor.dir/Src/Renderer/PipelineNames.cpp.o -c /Users/emd22/Projects/raptor/Src/Renderer/PipelineNames.cpp",
   "file": "/Users/emd22/Projects/raptor/Src/Renderer/PipelineNames.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Renderer/PipelineNames.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Src/ThirdParty -I/Users/emd22/Projects/raptor/Lib/Include -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O2 -g -o CMakeFiles/raptor.dir/Src/Renderer/ReflectionFilter.cpp.o -c /Users/emd22/Projects/raptor/Src/Renderer/ReflectionFilter.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Renderer/ReflectionFilter.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Renderer/ReflectionFilter.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/raptor",

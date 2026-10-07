@@ -16,6 +16,9 @@ class LightSpot;
 
 namespace fx::editor {
 
+/// Rounds a direction's yaw and pitch to the editor's angle snap step
+Vec3f SnapDirection(const Vec3f direction);
+
 class LightEditor final : public NativeEditorTool
 {
 public:

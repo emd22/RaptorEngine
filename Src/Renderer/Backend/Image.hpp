@@ -86,6 +86,7 @@ enum class eImageType
 {
 	Flat,
 	Cubemap,
+	CubemapArray,
 };
 
 struct ImageInfo
@@ -337,7 +338,7 @@ struct ImageCubemapOptions
 };
 
 
-const ImageTypeProperties ImageTypeGetProperties(eImageType image_type);
+const ImageTypeProperties ImageTypeGetProperties(eImageType image_type, uint32 cube_count = 1);
 
 class Image
 {
@@ -356,10 +357,12 @@ public:
 	FX_FORCE_INLINE const ImageInfo& GetInfo() const { return Info; }
 
 	void Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format, VkImageTiling tiling,
-				VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags = eImageCreateFlags::None);
+				VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags = eImageCreateFlags::None,
+				uint32 cube_count = 1);
 
 	void Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format,
-				VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags = eImageCreateFlags::None);
+				VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags = eImageCreateFlags::None,
+				uint32 cube_count = 1);
 
 	void CreateFromData(renderer::CommandBuffer& cmd, const ImageInfo& info, eImageCreateFlags flags);
 

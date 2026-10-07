@@ -48,6 +48,10 @@ float4 F_UnpackUIntToFloat4(uint x);
     Texture2D F_TextureName(_name) : register(t##binding_, space##set_); \
     SamplerState _name : register(s##binding_, space##set_);
 
+#define F_TextureCubeArray(_name, binding_, set_) \
+    TextureCubeArray F_TextureName(_name) : register(t##binding_, space##set_); \
+    SamplerState _name : register(s##binding_, space##set_);
+
 #define F_DataTexture2D(_name, type_, binding_, set_) \
 	Texture2D<type_> F_TextureName(_name) : register(t##binding_, space##set_); \
 
@@ -91,3 +95,7 @@ float4 F_UnpackUIntToFloat4(uint x);
 #define DRAW_FLAG_DEBUG_PROBE_VISIBILITY 0x04
 #define DRAW_FLAG_NO_DECALS 0x08
 #define DRAW_FLAG_PROBE_BOUNCE 0x20
+#define DRAW_FLAG_NO_REFLECTION_PROBES 0x40
+#define DRAW_FLAG_REFLECTION_CAPTURE 0x80
+#define DRAW_FLAG_DEBUG_REFLECTION 0x100
+#define DRAW_FLAG_DEBUG_REFLECTION_COVERAGE 0x200

@@ -2,13 +2,12 @@
 
 namespace fx::renderer {
 
-ShadowDirectional::ShadowDirectional()
-	: ShadowMapSize(ShadowAtlas::scDirectionalSize, ShadowAtlas::scDirectionalSize)
+ShadowDirectional::ShadowDirectional() : ShadowMapSize(ShadowAtlas::scDirectionalSize, ShadowAtlas::scDirectionalSize)
 {
 	ShadowCamera.Update();
 }
 
-void ShadowDirectional::PlaceCamera(OrthoCamera& camera, const Vec3f& target, const Vec3f& sun_direction) const
+void ShadowDirectional::PlaceCamera(OrthoCamera& camera, const Vec3f target, const Vec3f sun_direction) const
 {
 	camera.Position = target + (sun_direction * scCameraDistance);
 
@@ -20,7 +19,7 @@ void ShadowDirectional::PlaceCamera(OrthoCamera& camera, const Vec3f& target, co
 	camera.mbRequireMatrixUpdate = false;
 }
 
-bool ShadowDirectional::IsWellCovered(const OrthoCamera& camera, const Vec3f& position, float32 edge_margin)
+bool ShadowDirectional::IsWellCovered(const OrthoCamera& camera, const Vec3f position, float32 edge_margin)
 {
 	const float32* m = camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData;
 

@@ -58,7 +58,7 @@ public:
 	void SetID(physics::BodyID id) { ID = id; }
 	physics::BodyID GetID() const { return ID; }
 
-	void CreatePrimitiveBody(ePrimitiveType primitive_type, const Vec3f& dimensions, physics::eMotionType motion_type,
+	void CreatePrimitiveBody(ePrimitiveType primitive_type, const Vec3f dimensions, physics::eMotionType motion_type,
 							 const BodyProps& object_properties);
 
 	void CreateMeshBody(const PrimitiveMesh& mesh, physics::eMotionType motion_type,
@@ -72,9 +72,9 @@ public:
 
 	void DestroyPhysicsBody();
 
-	void SetMidpoint(const Vec3f& midpoint);
+	void SetMidpoint(const Vec3f midpoint);
 
-	void Teleport(const Vec3f& position, const Quat& rotation);
+	void Teleport(const Vec3f position, const Quat rotation);
 
 	FX_FORCE_INLINE Vec3f GetPosition() { return Vec3f(mpPhysicsBody->GetPosition()); }
 	FX_FORCE_INLINE Quat GetRotation() { return Quat(mpPhysicsBody->GetRotation()); }

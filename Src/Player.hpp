@@ -33,7 +33,7 @@ class Player
 	/// Roll per radian of yaw sway, so the view model banks into horizontal turns.
 	static constexpr float32 scViewModelSwayRoll = 1.25f;
 
-	static constexpr const char* scViewModelIdleAnim = "BASE";
+	static constexpr const char* scViewModelIdleAnim = "IDLE";
 	static constexpr const char* scViewModelFireAnim = "Armature|Fire";
 	static constexpr const char* scViewModelReloadAnim = "Armature|ReloadClip";
 
@@ -50,6 +50,7 @@ class Player
 
 	static constexpr float32 scRecoilApplySpeed = 40.0f;
 	static constexpr float32 scRecoilRecoveryDelay = 0.1f;
+	static constexpr float32 scRecoilRecoveryRamp = 0.08f;
 
 public:
 	Player() = default;
@@ -57,7 +58,7 @@ public:
 	void Create();
 
 	void Update(float64 delta_time);
-	void MoveBy(const Vec3f& by);
+	void MoveBy(const Vec3f by);
 
 	void DoFireAnimation(float32 kick_degrees = scDefaultViewKickDegrees, float32 kickback = scDefaultViewKickback);
 	void DoReloadAnimation();
@@ -66,14 +67,14 @@ public:
 	void SetViewModelHolster(float32 amount) { mViewModelHolster = amount; }
 
 	void AddRecoil(float32 pitch, float32 yaw);
-	void SetRecoilRecovery(float32 radians_per_second) { mRecoilRecovery = radians_per_second; }
+	void SetRecoilRecovery(float32 rate_per_second) { mRecoilRecovery = rate_per_second; }
 
 	void Jump();
 
 	/**
 	 * @brief Move the player and its physics by `offset`.
 	 */
-	void TeleportBy(const Vec3f& offset)
+	void TeleportBy(const Vec3f offset)
 	{
 		SyncPhysicsToPlayer();
 
@@ -84,16 +85,21 @@ public:
 	/**
 	 * @brief Move the player and its physics by `offset`.
 	 */
-	void TeleportTo(const Vec3f& position)
+	void TeleportTo(const Vec3f position)
 	{
 		Position = position;
 		Physics.Teleport(Position);
 	}
 
+	/**
+	 * @brief Puts the player at `position` (at its feet), looking along `direction`.
+	 */
+	void SpawnAt(const Vec3f position, const Vec3f direction);
+
 	void SetFlyMode(bool value);
 	bool IsFlyMode() const { return Physics.bDisableGravity; };
 
-	void Move(float64 delta_time, const Vec3f& offset);
+	void Move(float64 delta_time, const Vec3f offset);
 
 	void RotateHead(const Vec2f& xy);
 
@@ -108,6 +114,7 @@ private:
 	FX_FORCE_INLINE void MarkApplyingUserForce() { mbIsApplyingUserForce = true; }
 
 	void UpdateViewModel(double delta_time);
+	void RotateCamera(const Vec2f& xy);
 	void UpdateRecoil(float32 delta_time);
 	void UpdateViewKick(float32 delta_time);
 	static float32 ViewKickImpulsePerPeak();
@@ -198,8 +205,8 @@ private:
 
 	float32 mRecoilPendingPitch = 0.0f;
 	float32 mRecoilPendingYaw = 0.0f;
-	float32 mRecoilAppliedPitch = 0.0f;
-	float32 mRecoilAppliedYaw = 0.0f;
+	float32 mRecoilOffsetPitch = 0.0f;
+	float32 mRecoilOffsetYaw = 0.0f;
 	float32 mRecoilRecovery = 0.0f;
 	float32 mRecoilIdleTime = 0.0f;
 

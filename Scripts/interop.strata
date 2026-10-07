@@ -19,6 +19,9 @@ enum OPTYPE
 	LIGHT_TRANSFORM,
 	LIGHT_CREATE,
 	LIGHT_DELETE,
+	BOUNDS_EDIT,
+	OBJECT_STATE_EDIT,
+	SPAWN_TRANSFORM,
 }
 
 /* This must match eFaceTextureEdit in Blockout.hpp! */
@@ -41,6 +44,10 @@ enum EDITORTOOL
 	CREATE,
 	CLIP,
 	LIGHT,
+	BOUNDS,
+	GRAB,
+	SPAWN,
+	SUBTRACT,
 }
 
 
@@ -82,6 +89,7 @@ const uint OBJ_TAG_BLOCKOUT = (1 << 0);
 const uint OBJ_TAG_LOCK = (1 << 1);
 /* Set through probe_volume_mark, not set_tags: marking also takes the brush out of the world. */
 const uint OBJ_TAG_PROBEVOLUME = (1 << 2);
+const uint OBJ_TAG_REFLECTIONPROBE = (1 << 3);
 
 impl OBJECT
 {
@@ -179,6 +187,10 @@ extern OBJECT blockout_create_box(float3 min, float3 max);
    space normal `face_normal`) that the line was drawn on. Both pieces are kept. Undoable. */
 extern bool blockout_clip(OBJECT object, float3 point_a, float3 point_b, float3 face_normal);
 
+/* Cuts every selected blockout out of the other blockouts it overlaps, as one undoable step per cutter. The cutters are
+   deleted unless `keep_cutters`. Returns how many blockouts were cut. */
+extern int blockout_subtract(bool keep_cutters);
+
 /* Light probes */
 
 extern void probe_volume_mark(OBJECT object, bool enabled);
@@ -196,6 +208,11 @@ extern void probe_bake();
 
 /* Saves the baked probes for the current scene, picked up automatically on the next run. */
 extern bool probe_save();
+
+extern void reflection_probe_mark(OBJECT object, bool enabled);
+extern bool reflection_probe_is_marked(OBJECT object);
+extern int reflection_probe_rebuild();
+extern void reflection_probe_bake();
 
 /* CVars */
 

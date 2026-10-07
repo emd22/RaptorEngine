@@ -58,6 +58,14 @@ static constexpr uint32 MaxIrradianceProbes = 4096;
 
 static constexpr uint32 MaxProbeVolumes = 8;
 
+/// Mirrored by PROBE_GRID_EMPTY in Shaders/ProbeCommon.hlsli.
+static constexpr uint16 ProbeGridEmpty = 0xFFFF;
+
+static constexpr uint32 MaxProbeGridPoints = 1u << 20;
+
+static_assert(MaxIrradianceProbes < ProbeGridEmpty);
+static_assert((MaxProbeGridPoints % 2) == 0);
+
 /// Default probe grid dimensions (X x Y x Z) of a volume fitted to the level.
 static constexpr uint32 ProbeGridDims[3] = { 16, 8, 16 };
 
@@ -99,6 +107,18 @@ static constexpr uint32 ProbeAtlasHeight = ProbeAtlasRows * ProbeDepthSize;
 // Vulkan only guarantees maxImageDimension2D of 4096
 static_assert(ProbeAtlasWidth <= 4096 && ProbeAtlasHeight <= 4096, "The probe moment atlas must fit a 4096 texture");
 static_assert(ProbeAtlasColumns * ProbeAtlasRows >= MaxIrradianceProbes, "The atlas must hold every probe");
+
+static constexpr uint32 MaxReflectionProbes = 16;
+
+static constexpr uint32 ReflectionProbeSize = 128;
+
+static constexpr uint32 ReflectionProbeMips = 6;
+
+static constexpr uint32 ReflectionProbeFaces = 6;
+
+static_assert((ReflectionProbeSize >> (ReflectionProbeMips - 1)) >= 1);
+
+static constexpr uint32 DfgLutSize = 32;
 
 
 } // namespace fx::Limits

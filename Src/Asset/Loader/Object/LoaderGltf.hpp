@@ -21,7 +21,7 @@ namespace fx {
 
 namespace loader {
 
-struct AxGltfMaterialToLoad
+struct GLTFMaterialToLoad
 {
 	TSRef<Object> pObject { nullptr };
 	int PrimitiveIndex = 0;
@@ -69,7 +69,7 @@ private:
 
 
 public:
-	std::vector<AxGltfMaterialToLoad> MaterialsToLoad;
+	std::vector<GLTFMaterialToLoad> MaterialsToLoad;
 	bool bKeepInMemory : 1 = false;
 	SizedArray<uint32> IndexBuffer;
 

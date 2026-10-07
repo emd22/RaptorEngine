@@ -50,8 +50,12 @@ void Console::ExecuteCommand(const DynArray<String>& tokens)
 			const String& value = tokens[1];
 
 			if (cv != nullptr) {
-				cv->SetFromString(value);
-				Output = cv->AsString();
+				if (cv->SetFromString(value)) {
+					Output = cv->AsString();
+				}
+				else {
+					Output = "invalid value";
+				}
 			}
 			else {
 				Output = "not defined";

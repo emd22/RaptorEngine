@@ -19,7 +19,9 @@ enum class ePipelineName : uint16
 	LightCulling,
 
 	TextRendering,
+	ImageRendering,
 	Composition,
+	CompositionAgx,
 
 	SSAO,
 	SSAOBlur,
