@@ -84,8 +84,7 @@ private:
 	void DebugDrawProbeVolumes();
 
 public:
-	Object* RaycastProbeVolumes(const Vec3f& origin, const Vec3f& direction, float32 max_distance,
-								float32& out_distance);
+	Object* RaycastProbeVolumes(const Vec3f origin, const Vec3f direction, float32 max_distance, float32& out_distance);
 
 private:
 	void DebugDrawObjectBounds();
@@ -109,7 +108,7 @@ private:
 	 * that reads it into a spare light buffer slot (the main view keeps the original slot and its shadow matrix).
 	 * @return False if the light buffer is full, in which case the shadow map is left alone.
 	 */
-	bool RenderCaptureSunShadows(LightDirectional& sun, const Vec3f& center, OrthoCamera& out_shadow_camera,
+	bool RenderCaptureSunShadows(LightDirectional& sun, const Vec3f center, OrthoCamera& out_shadow_camera,
 								 uint32& out_light_slot);
 
 	/**
@@ -129,8 +128,8 @@ private:
 	 * @brief Appends the shadow casters (and their attached nodes) from every tile that a sphere touches. Skinned
 	 * objects are skipped, the shadow pipeline cannot draw them.
 	 */
-	void GatherSpotShadowCasters(const Vec3f& center, float32 radius, DynArray<ObjectID>& out_casters);
-	void AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, const Vec3f& center, float32 radius,
+	void GatherSpotShadowCasters(const Vec3f center, float32 radius, DynArray<ObjectID>& out_casters);
+	void AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, const Vec3f center, float32 radius,
 									  DynArray<ObjectID>& out_casters);
 	/// Draws the objects of a forward pipeline's list into the prepass, with the prepass pipeline that goes with it
 	void ExecutePrepassRenderList(renderer::PipelineHandle forward_pipeline);

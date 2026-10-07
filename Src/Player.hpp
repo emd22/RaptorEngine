@@ -58,7 +58,7 @@ public:
 	void Create();
 
 	void Update(float64 delta_time);
-	void MoveBy(const Vec3f& by);
+	void MoveBy(const Vec3f by);
 
 	void DoFireAnimation(float32 kick_degrees = scDefaultViewKickDegrees, float32 kickback = scDefaultViewKickback);
 	void DoReloadAnimation();
@@ -74,7 +74,7 @@ public:
 	/**
 	 * @brief Move the player and its physics by `offset`.
 	 */
-	void TeleportBy(const Vec3f& offset)
+	void TeleportBy(const Vec3f offset)
 	{
 		SyncPhysicsToPlayer();
 
@@ -85,7 +85,7 @@ public:
 	/**
 	 * @brief Move the player and its physics by `offset`.
 	 */
-	void TeleportTo(const Vec3f& position)
+	void TeleportTo(const Vec3f position)
 	{
 		Position = position;
 		Physics.Teleport(Position);
@@ -94,12 +94,12 @@ public:
 	/**
 	 * @brief Puts the player at `position` (at its feet), looking along `direction`.
 	 */
-	void SpawnAt(const Vec3f& position, const Vec3f& direction);
+	void SpawnAt(const Vec3f position, const Vec3f direction);
 
 	void SetFlyMode(bool value);
 	bool IsFlyMode() const { return Physics.bDisableGravity; };
 
-	void Move(float64 delta_time, const Vec3f& offset);
+	void Move(float64 delta_time, const Vec3f offset);
 
 	void RotateHead(const Vec2f& xy);
 

@@ -16,6 +16,8 @@
 #include <Renderer/LightProbe.hpp>
 #include <Weapon/WeaponSystem.hpp>
 #include <World.hpp>
+#include <algorithm>
+#include <vector>
 
 namespace fx::script {
 
@@ -510,6 +512,167 @@ static bool N_blockout_clip(Object* object, FLOAT4 point_a, FLOAT4 point_b, FLOA
 #endif
 }
 
+#ifdef FX_IS_EDITOR
+static constexpr uint32 scMaxSubtractOperations = 200;
+
+static bool CanBeSubtractedFrom(const Object* object)
+{
+	return !object->IsProbeVolume() && !object->IsReflectionProbe() && !object->IsSpawn() &&
+		   !gWorld->pBlockout->IsDynamic(object);
+}
+
+static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter_ids, bool keep_cutter)
+{
+	const editor::EditorSelection& selection = gEditor->GetSelection();
+
+	std::vector<EditOperation> ops;
+	std::vector<ObjectID> op_object_ids;
+	uint32 cut_count = 0;
+
+	std::vector<ObjectID> target_ids;
+
+	for (ObjectID id : gWorld->pBlockout->BlockoutObjects) {
+		const bool is_cutter = std::any_of(cutter_ids.begin(), cutter_ids.end(),
+										   [&](ObjectID other) { return other.GetID() == id.GetID(); });
+
+		if (!is_cutter) {
+			target_ids.push_back(id);
+		}
+	}
+
+	for (ObjectID id : target_ids) {
+		Object* target = gObjectManager->GetObject(id);
+
+		if (target == nullptr || !CanBeSubtractedFrom(target)) {
+			continue;
+		}
+
+		std::vector<Brush::PlaneList> pieces;
+		std::vector<Vec3f> positions;
+
+		if (!gWorld->pBlockout->GetSubtractPieces(target, cutter, pieces, positions)) {
+			continue;
+		}
+
+		const Brush* brush = gWorld->pBlockout->GetBrush(target);
+		const MaterialID material = selection.GetStoredMaterial(target);
+
+		cut_count++;
+
+		if (pieces.empty()) {
+			EditOperation remove_op {
+				.Type = EditOperation::eType::Delete,
+				.pObject = target,
+			};
+
+			remove_op.PlanesBefore = brush->Planes;
+			remove_op.ObjectSnapshot = EditOperation::Snapshot::Capture(*target, material);
+
+			ops.push_back(remove_op);
+			op_object_ids.push_back(id);
+
+			continue;
+		}
+
+		EditOperation edit_op {
+			.Type = EditOperation::eType::BrushEdit,
+			.pObject = target,
+		};
+
+		edit_op.PlanesBefore = brush->Planes;
+		edit_op.PlanesAfter = pieces[0];
+
+		ops.push_back(edit_op);
+		op_object_ids.push_back(id);
+
+		for (uint32 i = 1; i < pieces.size(); i++) {
+			EditOperation create_op {
+				.Type = EditOperation::eType::CreateBrush,
+			};
+
+			create_op.PlanesAfter = pieces[i];
+			create_op.ObjectSnapshot = EditOperation::Snapshot::Capture(*target, material);
+			create_op.ObjectSnapshot.ObjectName = Name();
+			create_op.ObjectSnapshot.Position = positions[i];
+
+			ops.push_back(create_op);
+			op_object_ids.push_back(ObjectID::scNull);
+		}
+	}
+
+	if (cut_count == 0) {
+		return 0;
+	}
+
+	if (!keep_cutter) {
+		const Brush* cutter_brush = gWorld->pBlockout->GetBrush(cutter);
+
+		EditOperation remove_op {
+			.Type = EditOperation::eType::Delete,
+			.pObject = cutter,
+		};
+
+		remove_op.PlanesBefore = cutter_brush->Planes;
+		remove_op.ObjectSnapshot = EditOperation::Snapshot::Capture(*cutter, selection.GetStoredMaterial(cutter));
+
+		ops.push_back(remove_op);
+		op_object_ids.push_back(cutter->ID);
+	}
+
+	if (ops.size() > scMaxSubtractOperations) {
+		LogWarning("Subtracting '{}' would change too many blockouts at once", cutter->Name.Get());
+		return 0;
+	}
+
+	for (uint32 i = 0; i < ops.size(); i++) {
+		ops[i].GroupSize = static_cast<int32>(ops.size());
+
+		if (!op_object_ids[i].IsInvalid()) {
+			ops[i].pObject = gObjectManager->GetObject(op_object_ids[i]);
+		}
+
+		gEditor->PushEditOperation(ops[i]);
+	}
+
+	return cut_count;
+}
+#endif
+
+static int32 N_blockout_subtract(bool keep_cutters)
+{
+#ifdef FX_IS_EDITOR
+	if (gEditor->IsSimulationMode()) {
+		return 0;
+	}
+
+	const editor::EditorSelection& selection = gEditor->GetSelection();
+
+	std::vector<ObjectID> cutter_ids;
+
+	for (uint32 i = 0; i < selection.GetCount(); i++) {
+		Object* object = selection.GetObject(i);
+
+		if (gWorld->pBlockout->GetBrush(object) != nullptr) {
+			cutter_ids.push_back(object->ID);
+		}
+	}
+
+	uint32 cut_count = 0;
+
+	for (ObjectID id : cutter_ids) {
+		Object* cutter = gObjectManager->GetObject(id);
+
+		if (cutter != nullptr && gWorld->pBlockout->GetBrush(cutter) != nullptr) {
+			cut_count += SubtractCutter(cutter, cutter_ids, keep_cutters);
+		}
+	}
+
+	return static_cast<int32>(cut_count);
+#else
+	return 0;
+#endif
+}
+
 static void N_blockout_edit_face_texture(Object* object, FLOAT4 face, uint32 edit, FLOAT4 amount)
 {
 #ifdef FX_IS_EDITOR
@@ -694,6 +857,7 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("blockout_hide_preview", N_blockout_hide_preview),
 	PREDEF("blockout_create_box", N_blockout_create_box),
 	PREDEF("blockout_clip", N_blockout_clip),
+	PREDEF("blockout_subtract", N_blockout_subtract),
 	PREDEF("camera_ray_to_plane", N_camera_ray_to_plane),
 	PREDEF("blockout_new_object", N_blockout_new_object),
 	PREDEF("blockout_dupe_object", N_blockout_dupe_object),

@@ -50,9 +50,10 @@ public:
 	void ShowCVarListWindow();
 	void ShowMaterialPickerWindow();
 
-	void SaveBlockout();
-	void SaveBlockoutAs();
-	void OpenBlockout();
+	void NewPrototype();
+	void SavePrototype();
+	void SaveProtoTypeAs();
+	void OpenPrototype();
 
 private:
 	void OnClose(wxCloseEvent& event);

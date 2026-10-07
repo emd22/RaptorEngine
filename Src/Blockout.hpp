@@ -9,15 +9,16 @@
 
 #include <Brush.hpp>
 #include <Core/FreeArray.hpp>
+#include <Core/HashMap.hpp>
 #include <Core/Name.hpp>
 #include <Core/StackArray.hpp>
 #include <Core/String.hpp>
 #include <Material/MaterialID.hpp>
 #include <Material/MaterialLibrary.hpp>
+#include <Math/BoundingBox.hpp>
 #include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
-#include <Core/HashMap.hpp>
 #include <string>
 #include <vector>
 
@@ -60,7 +61,7 @@ public:
 	 * @brief Moves the face facing along `face_normal` out by `distance` (in by a negative distance), keeping the rest
 	 * of the brush where it is. The brush is kept at least scMinBlockoutThickness thick behind the face.
 	 */
-	bool MoveFace(Object* object, const Vec3f& face_normal, float32 distance);
+	bool MoveFace(Object* object, const Vec3f face_normal, float32 distance);
 
 	/**
 	 * @brief Rebuilds a blockout from a set of planes, e.g. to undo an edit. Anything the planes have in common with
@@ -74,26 +75,29 @@ public:
 	 * @param out_kept The blockout's brush after the split
 	 * @param out_split The piece that splits off, for a new blockout at `out_split_position`
 	 */
-	bool GetClipPieces(Object* object, const Vec3f& point_a, const Vec3f& point_b, const Vec3f& face_normal,
+	bool GetClipPieces(Object* object, const Vec3f point_a, const Vec3f point_b, const Vec3f face_normal,
 					   Brush::PlaneList& out_kept, Brush::PlaneList& out_split, Vec3f& out_split_position);
+
+	bool GetSubtractPieces(Object* target, Object* cutter, std::vector<Brush::PlaneList>& out_pieces,
+						   std::vector<Vec3f>& out_positions);
 
 	/**
 	 * @brief Returns the brush for a new blockout filling `min` to `max` in world space, with its textures lined up
 	 * with the world grid
 	 * @param out_position Where the blockout goes
 	 */
-	Brush MakeWorldBox(const Vec3f& min, const Vec3f& max, Vec3f& out_position) const;
+	Brush MakeWorldBox(const Vec3f min, const Vec3f max, Vec3f& out_position) const;
 
 	/**
 	 * @brief Shows a see-through preview of a brush on an object with the given transform
 	 */
-	void ShowPreview(const Vec3f& position, const Quat& rotation, const Brush& brush);
+	void ShowPreview(const Vec3f position, const Quat rotation, const Brush& brush);
 	void HidePreview();
 
 	/**
 	 * @brief Returns the planes of the object's brush with the texture on one face changed, without applying them
 	 */
-	bool GetFaceTextureEdit(Object* object, const Vec3f& face_normal, eFaceTextureEdit edit, const Vec2f& amount,
+	bool GetFaceTextureEdit(Object* object, const Vec3f face_normal, eFaceTextureEdit edit, const Vec2f& amount,
 							Brush::PlaneList& out_planes);
 
 	/**
@@ -101,14 +105,14 @@ public:
 	 * @param direction The direction of the ray, with the length of how far it reaches
 	 * @param out_face_normal The normal of the face that was hit, in the blockout's local space
 	 */
-	Object* RaycastBlockout(const Vec3f& origin, const Vec3f& direction, Vec3f& out_face_normal);
+	Object* RaycastBlockout(const Vec3f origin, const Vec3f direction, Vec3f& out_face_normal);
 
 	/**
 	 * @brief Finds the face of a blockout that a world space ray hits
 	 * @param out_face_normal The normal of the face that was hit, in the object's local space
 	 * @param out_point Where the face was hit, in world space
 	 */
-	bool RaycastFace(Object* object, const Vec3f& origin, const Vec3f& direction, Vec3f& out_face_normal,
+	bool RaycastFace(Object* object, const Vec3f origin, const Vec3f direction, Vec3f& out_face_normal,
 					 Vec3f* out_point = nullptr);
 
 	void ReloadSingleObject(Object* object);
@@ -116,9 +120,9 @@ public:
 	void RebuildObject(Object* object);
 
 	/**
-	 * @brief Creates a new blockout object
+	 * @brief Creates a new blockout objectC
 	 */
-	Object* NewObject(const Vec3f& position);
+	Object* NewObject(const Vec3f position);
 
 	Object* DupeObject(Object* object);
 
@@ -126,12 +130,17 @@ public:
 	 * @brief Recreates a destroyed blockout object from a snapshot (undo of Delete).
 	 * Falls back to a unique name if the original name is taken.
 	 */
-	Object* RestoreObject(const Vec3f& position, const Brush::PlaneList& planes, MaterialID material,
-						  const Quat& rotation, const Name& name, bool is_dynamic = false);
+	Object* RestoreObject(const Vec3f position, const Brush::PlaneList& planes, MaterialID material,
+						  const Quat rotation, const Name& name, bool is_dynamic = false);
 
 	bool IsDynamic(const Object* object) const;
 
 	bool HasBrush(const Object* object);
+
+	/**
+	 * @brief Clears the prototype of all brushes and objects, and creates the basis for a new prototype.
+	 */
+	void ResetToTemplate();
 
 	/**
 	 * @brief Rebuilds a brush's physics body as dynamic (and active) or static, keeping its mesh and transform.
@@ -174,12 +183,22 @@ public:
 private:
 	struct Model
 	{
-		ObjectID Id = ObjectID::scNull;
+		ObjectID ID = ObjectID::scNull;
 		std::string MeshPath;
 		std::string Collider;
 	};
 
-	ObjectID CreateBrushObject(ConfigEntry& entry);
+	/**
+	 * @brief Creates a new brush from a prototype entry
+	 */
+	ObjectID CreateBrush(ConfigEntry& entry);
+
+	/**
+	 * @brief Creates a new brush from values
+	 * @returns A null ObjectID on failure, the ObjectID of the brush otherwise
+	 */
+	ObjectID CreateBrush(const std::string& name, const Vec3f position, const Quat rotation,
+						 const MaterialID material_id, const AABB bounds);
 
 	/**
 	 * @brief Brings the models in the world in line with a list of model entries. Models that are already loaded are
@@ -213,7 +232,7 @@ private:
 	/**
 	 * @brief Builds the object's mesh, bounds and collider from the brush, and takes ownership of the brush.
 	 */
-	void ApplyBrush(Object* object, Brush&& brush, physics::eMotionType motion_type);
+	void RebuildBrush(Object* object, Brush&& brush, physics::eMotionType motion_type);
 
 	/**
 	 * @brief Applies a brush that replaces the object's current one, moving the object so the parts they share stay

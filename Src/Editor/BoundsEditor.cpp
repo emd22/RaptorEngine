@@ -41,12 +41,12 @@ static bool BoundsEqual(const AABB& a, const AABB& b)
 	return true;
 }
 
-static uint32 FaceAxis(const Vec3f& face)
+static uint32 FaceAxis(const Vec3f face)
 {
 	return (std::fabs(face.X) > 0.5f) ? 0 : ((std::fabs(face.Y) > 0.5f) ? 1 : 2);
 }
 
-static void FindNearestNode(Object& node, const Vec3f& origin, const Vec3f& direction, float32& nearest_distance,
+static void FindNearestNode(Object& node, const Vec3f origin, const Vec3f direction, float32& nearest_distance,
 							Object*& out_object, Vec3f& out_face)
 {
 	if (node.pMesh.IsValid() && HasVolume(node.Bounds)) {
@@ -102,7 +102,7 @@ Object* BoundsEditor::ResolveTarget() const
 	return (live == mpObject) ? live : nullptr;
 }
 
-void BoundsEditor::DrawTarget(Object& object, const Vec3f& face) const
+void BoundsEditor::DrawTarget(Object& object, const Vec3f face) const
 {
 	const Mat4f& world = object.GetWorldMatrix();
 
@@ -154,8 +154,7 @@ void BoundsEditor::Begin()
 	mAxis = FaceAxis(target.Face);
 	mSign = (target.Face.mData[mAxis] > 0.0f) ? 1.0f : -1.0f;
 
-	const Vec4f world_axis = mpObject->GetWorldMatrix() *
-							 Vec4f(target.Face.X, target.Face.Y, target.Face.Z, 0.0f);
+	const Vec4f world_axis = mpObject->GetWorldMatrix() * Vec4f(target.Face.X, target.Face.Y, target.Face.Z, 0.0f);
 	const Vec3f axis_vector(world_axis.X, world_axis.Y, world_axis.Z);
 
 	mAxisScale = std::max(axis_vector.Length(), 1e-4f);

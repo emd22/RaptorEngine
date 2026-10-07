@@ -201,7 +201,8 @@ std::string ConfigEntry::AsString(uint32 indent) const
 
 	if (Type == ePrimitiveType::Struct) {
 		for (const ConfigEntry& entry : Members) {
-			member_list += std::format("{}\t{} = {}\n", indent_str, ValidName(entry.Name.Get()), entry.AsString(indent + 1));
+			member_list += std::format("{}\t{} = {}\n", indent_str, ValidName(entry.Name.Get()),
+									   entry.AsString(indent + 1));
 		}
 
 		return std::format("{{\n{}{}}}", member_list, indent_str);
@@ -240,7 +241,7 @@ ConfigEntry* ConfigEntry::GetMember(const Hash32 name_hash) const
 }
 
 
-void ConfigEntry::AppendValue(const Vec3f& vec)
+void ConfigEntry::AppendValue(const Vec3f vec)
 {
 	if (!ArrayData.IsInited()) {
 		ArrayData.Create(4);
@@ -264,7 +265,7 @@ void ConfigEntry::AppendValue(const Vec4f& vec)
 }
 
 
-void ConfigEntry::AppendValue(const Quat& quat)
+void ConfigEntry::AppendValue(const Quat quat)
 {
 	if (!ArrayData.IsInited()) {
 		ArrayData.Create(5);

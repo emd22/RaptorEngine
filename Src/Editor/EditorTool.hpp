@@ -30,6 +30,7 @@ enum class eEditorTool : uint32
 	Bounds,
 	Grab,
 	Spawn,
+	Subtract,
 
 	Count,
 };

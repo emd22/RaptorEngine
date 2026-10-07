@@ -41,14 +41,14 @@ public:
 
 	void Draw(eDebugShape shape, const Mat4f& world_matrix, Color color);
 
-	void Line(const Vec3f& from, const Vec3f& to, Color color);
+	void Line(const Vec3f from, const Vec3f to, Color color);
 
 	void WireBox(const Mat4f& world_matrix, Color color) { Draw(eDebugShape::WireBox, world_matrix, color); }
-	void WireBox(const Vec3f& center, const Vec3f& half_extent, const Quat& rotation, Color color);
+	void WireBox(const Vec3f center, const Vec3f half_extent, const Quat rotation, Color color);
 	void WireBox(const AABB& box, Color color);
 
 	void SolidBox(const Mat4f& world_matrix, Color color) { Draw(eDebugShape::SolidBox, world_matrix, color); }
-	void SolidBox(const Vec3f& center, const Vec3f& half_extent, const Quat& rotation, Color color);
+	void SolidBox(const Vec3f center, const Vec3f half_extent, const Quat rotation, Color color);
 	void SolidBox(const AABB& box, Color color);
 
 

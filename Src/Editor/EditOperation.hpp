@@ -42,13 +42,13 @@ struct EditOperationValue
 
 	EditOperationValue() : Type(eValueType::Vec3), Position(Vec3f::sZero) {}
 
-	explicit EditOperationValue(const Vec3f& vec) : Type(eValueType::Vec3), Position(vec) {}
+	explicit EditOperationValue(const Vec3f vec) : Type(eValueType::Vec3), Position(vec) {}
 	explicit EditOperationValue(Object* obj) : Type(eValueType::Object), pObject(obj) {}
 	explicit EditOperationValue(LightBase* light) : Type(eValueType::Light), pLight(light) {}
 
 	explicit EditOperationValue(std::nullptr_t) : Type(eValueType::Object), pObject(nullptr) {}
 
-	void Set(const Vec3f& vec)
+	void Set(const Vec3f vec)
 	{
 		Type = eValueType::Vec3;
 		Position = vec;
@@ -93,7 +93,8 @@ struct EditOperation
 		BoundsEdit,
 		/// Toggles one of an object's tags or flags; `StateEdit` holds the bit and the state to go back to
 		ObjectStateEdit,
-		/// Moves and aims the player spawn: `ValueA`/`ValueB` are its position before and after, and `Spawn` holds the rest
+		/// Moves and aims the player spawn: `ValueA`/`ValueB` are its position before and after, and `Spawn` holds the
+		/// rest
 		SpawnTransform,
 	} Type;
 
@@ -105,10 +106,7 @@ public:
 	void Undo(EditorSelection& selection);
 
 	/// True if applying the operation creates an object
-	bool CreatesObject() const
-	{
-		return (Type == eType::Dupe || Type == eType::Create || Type == eType::CreateBrush);
-	}
+	bool CreatesObject() const { return (Type == eType::Dupe || Type == eType::Create || Type == eType::CreateBrush); }
 
 	/// True if applying or reverting the operation creates or destroys objects
 	bool ChangesObjects() const { return (CreatesObject() || Type == eType::Delete); }

@@ -560,7 +560,7 @@ void WeaponSystem::SpawnBloodSplatter(bool is_static)
 	constexpr float32 exit_range = 3.0f;
 	constexpr float32 floor_range = 2.0f;
 
-	const Vec3f& point = mLastHit.Point;
+	const Vec3f point = mLastHit.Point;
 
 	if (is_static) {
 		gDecalManager->AddBloodSplat(point, mLastHit.Normal, 0.5f);

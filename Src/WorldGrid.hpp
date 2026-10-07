@@ -55,7 +55,7 @@ public:
 	 */
 	void AddObject(ObjectID id);
 
-	TileIndex WorldToTile(const Vec3f& position) const;
+	TileIndex WorldToTile(const Vec3f position) const;
 	TileIndex TileFromTileXY(const Vec2u& xy) const;
 
 	const SizedArray<ObjectID>& GetNearbyObjects();

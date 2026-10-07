@@ -58,7 +58,7 @@ WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, w
 	sizer->Add(mpPositionField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
 
 	mpPositionField->SetOnChange(
-		[this](const Vec3f& value)
+		[this](const Vec3f value)
 		{
 			gWorld->Player.TeleportTo(value);
 			mShownPosition = value;

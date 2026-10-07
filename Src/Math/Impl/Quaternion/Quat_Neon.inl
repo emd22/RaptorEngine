@@ -18,7 +18,7 @@ FX_FORCE_INLINE Quat& Quat::operator=(const float32x4_t& other)
 	return *this;
 }
 
-FX_FORCE_INLINE bool Quat::IsCloseTo(const Quat& other, const float32 tolerance) const
+FX_FORCE_INLINE bool Quat::IsCloseTo(const Quat other, const float32 tolerance) const
 {
 	return IsCloseTo(other.mIntrin, tolerance);
 }
@@ -62,7 +62,7 @@ FX_FORCE_INLINE bool Quat::IsCloseTo(const float32x4_t& other, const float32 tol
 	return vmaxvq_u32(lt) == 0;
 }
 
-FX_FORCE_INLINE void Quat::NLerpIP(const Quat& dest, float32 time)
+FX_FORCE_INLINE void Quat::NLerpIP(const Quat dest, float32 time)
 {
 	// We can change (A + (B - A) * time) to ((1 - time) * A + time * B) to reduce floating point errors.
 
@@ -86,7 +86,7 @@ FX_FORCE_INLINE void Quat::NLerpIP(const Quat& dest, float32 time)
 
 // Based off of https://www.euclideanspace.com/maths/algebra/realNormedAlgebra/quaternions/slerp/index.htm and optimized
 // for Neon.
-FX_FORCE_INLINE Quat Quat::SLerp(const Quat& dest, const float32 step) const
+FX_FORCE_INLINE Quat Quat::SLerp(const Quat dest, const float32 step) const
 {
 	// Note: there are so many different ways to implement this and a lot of them online just straight up pro
 	float32x4_t a_v = mIntrin;

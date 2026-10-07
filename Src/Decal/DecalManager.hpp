@@ -72,9 +72,9 @@ public:
 	void Create();
 
 	void AddDecal(const DecalDesc& desc);
-	void AddBulletHole(const Vec3f& hit_point, const Vec3f& hit_normal);
+	void AddBulletHole(const Vec3f hit_point, const Vec3f hit_normal);
 
-	void AddBloodSplat(const Vec3f& hit_point, const Vec3f& hit_normal, float32 size);
+	void AddBloodSplat(const Vec3f hit_point, const Vec3f hit_normal, float32 size);
 
 	void Clear();
 

@@ -19,7 +19,7 @@ FX_FORCE_INLINE Vec3d::Vec3d(const double* values)
 	mIntrin.val[1] = vsetq_lane_f64(0.0, mIntrin.val[1], 1);
 }
 
-FX_FORCE_INLINE Vec3d::Vec3d(const Vec3f& other)
+FX_FORCE_INLINE Vec3d::Vec3d(const Vec3f other)
 {
 	// Widen the low (XY) and high (ZW) halves of the float vector
 	mIntrin.val[0] = vcvt_f64_f32(vget_low_f32(other.mIntrin));

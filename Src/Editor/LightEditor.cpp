@@ -51,7 +51,7 @@ static void ForEachSpotLight(TFunc&& func)
 	}
 }
 
-Vec3f SnapDirection(const Vec3f& direction)
+Vec3f SnapDirection(const Vec3f direction)
 {
 	const float32 step_degrees = gEditor->GetAngleSnapStep();
 
@@ -70,7 +70,7 @@ Vec3f SnapDirection(const Vec3f& direction)
 }
 
 /// The distance along a ray to where it enters a sphere, or a negative number if it misses. `direction` is normalized.
-static float32 RaySphereDistance(const Vec3f& origin, const Vec3f& direction, const Vec3f& center, float32 radius)
+static float32 RaySphereDistance(const Vec3f origin, const Vec3f direction, const Vec3f center, float32 radius)
 {
 	const Vec3f to_center = center - origin;
 	const float32 along = to_center.Dot(direction);

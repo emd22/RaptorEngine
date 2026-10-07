@@ -12,7 +12,6 @@
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
 #include <Math/Vec3.hpp>
-
 #include <atomic>
 #include <mutex>
 #include <vector>
@@ -183,7 +182,8 @@ public:
 			return;
 		}
 
-		const JPH::Vec3 surface_normal = first_is_ragdoll ? -inManifold.mWorldSpaceNormal : inManifold.mWorldSpaceNormal;
+		const JPH::Vec3 surface_normal = first_is_ragdoll ? -inManifold.mWorldSpaceNormal
+														  : inManifold.mWorldSpaceNormal;
 		const JPH::RVec3 point = first_is_ragdoll ? inManifold.GetWorldSpaceContactPointOn2(0)
 												  : inManifold.GetWorldSpaceContactPointOn1(0);
 
@@ -252,10 +252,10 @@ public:
 
 	void OptimizeBroadPhase();
 
-	RayResult Raycast(const Vec3f& origin, const Vec3f& direction, JPH::BodyID ignore_body = JPH::BodyID()) const;
-	SizedArray<JPH::BodyID> RaycastObjects(const Vec3f& origin, const Vec3f& direction) const;
+	RayResult Raycast(const Vec3f origin, const Vec3f direction, JPH::BodyID ignore_body = JPH::BodyID()) const;
+	SizedArray<JPH::BodyID> RaycastObjects(const Vec3f origin, const Vec3f direction) const;
 
-	FLOAT4 RaycastGetFaceOfBox(JPH::Body* body, const Vec3f& origin, const Vec3f& direction) const;
+	FLOAT4 RaycastGetFaceOfBox(JPH::Body* body, const Vec3f origin, const Vec3f direction) const;
 
 	FX_FORCE_INLINE JPH::BodyInterface& GetBodyInterface() { return PhysicsSystem.GetBodyInterface(); }
 

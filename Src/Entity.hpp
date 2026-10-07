@@ -34,13 +34,13 @@ enum class eTransformMode
 class Entity
 {
 public:
-	virtual void SetPosition(const Vec3f& position)
+	virtual void SetPosition(const Vec3f position)
 	{
 		mPosition = position;
 		MarkTransformOutOfDate();
 	}
 
-	virtual void SetRotation(const Quat& rotation)
+	virtual void SetRotation(const Quat rotation)
 	{
 		mRotation = rotation;
 		MarkTransformOutOfDate();
@@ -48,7 +48,7 @@ public:
 
 	virtual void SetScale(const float scale);
 
-	virtual void MoveBy(const Vec3f& offset) { SetPosition(mPosition + offset); }
+	virtual void MoveBy(const Vec3f offset) { SetPosition(mPosition + offset); }
 	void ScaleBy(const float scale);
 
 	virtual void OnAttached(World* scene) {}
@@ -66,7 +66,7 @@ public:
 	Mat4f& GetWorldMatrix();
 	// const Mat4f& GetNormalMatrix();
 
-	const Vec3f& GetPosition() const { return mPosition; }
+	const Vec3f GetPosition() const { return mPosition; }
 
 	FX_FORCE_INLINE void MarkTransformOutOfDate()
 	{
@@ -75,7 +75,7 @@ public:
 		MarkMatrixOutOfDate();
 	}
 
-	FX_FORCE_INLINE void SetRotationOrigin(const Vec3f& origin)
+	FX_FORCE_INLINE void SetRotationOrigin(const Vec3f origin)
 	{
 		RotationOrigin = origin;
 		TransformMode = eTransformMode::TransformFromOrigin;

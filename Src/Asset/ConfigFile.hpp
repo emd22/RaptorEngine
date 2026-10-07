@@ -329,14 +329,14 @@ public:
 		return entry;
 	}
 
-	static ConfigEntry Literal(const std::string& name, const Vec3f& value)
+	static ConfigEntry Literal(const std::string& name, const Vec3f value)
 	{
 		ConfigEntry entry = ConfigEntry::Array(name, ConfigPrimitive::ePrimitiveType::Float);
 		entry.AppendValue(value);
 		return entry;
 	}
 
-	static ConfigEntry Literal(const std::string& name, const Quat& value)
+	static ConfigEntry Literal(const std::string& name, const Quat value)
 	{
 		ConfigEntry entry = ConfigEntry::Array(name, ConfigPrimitive::ePrimitiveType::Float);
 		entry.AppendValue(value);
@@ -370,9 +370,9 @@ public:
 
 	void AppendValue(ConfigPrimitive&& value);
 
-	void AppendValue(const Vec3f& vec);
+	void AppendValue(const Vec3f vec);
 	void AppendValue(const Vec4f& vec);
-	void AppendValue(const Quat& quat);
+	void AppendValue(const Quat quat);
 
 	/////////////////////////////////////
 	// Value get functions

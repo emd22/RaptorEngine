@@ -2,10 +2,10 @@
 
 #include <Core/String.hpp>
 #include <Math/Quat.hpp>
+#include <Math/Vec3.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <World.hpp>
-
 #include <algorithm>
 #include <cmath>
 
@@ -13,17 +13,17 @@
 namespace fx {
 
 template <typename T>
-static T Interpolate(const T& a, const T& b, float32 t);
+static T Interpolate(const T a, const T b, float32 t);
 
 template <>
-Vec3f Interpolate(const Vec3f& a, const Vec3f& b, float32 t)
+Vec3f Interpolate(const Vec3f a, const Vec3f b, float32 t)
 {
 	// return b;
 	return Vec3f::Lerp(a, b, t);
 }
 
 template <>
-Quat Interpolate(const Quat& a, const Quat& b, float32 t)
+Quat Interpolate(const Quat a, const Quat b, float32 t)
 {
 	// return b;
 	return a.SLerp(b, t);

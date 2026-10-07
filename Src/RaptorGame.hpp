@@ -36,7 +36,7 @@ class CVarValue;
 // 	EditorModeMoveCollider() = delete;
 // 	EditorModeMoveCollider(Ref<PerspectiveCamera> camera) { this->pCamera = camera; }
 
-// 	void Update(const World& scene, const Vec3f& movement_vector) override;
+// 	void Update(const World& scene, const Vec3f movement_vector) override;
 // 	void OnLeave(const World& scene) override;
 
 // 	~EditorModeMoveCollider() override {};
@@ -49,7 +49,7 @@ class CVarValue;
 // 	EditorModeScaleCollider() = delete;
 // 	EditorModeScaleCollider(Ref<PerspectiveCamera> camera) { this->pCamera = camera; }
 
-// 	void Update(const World& scene, const Vec3f& movement_vector) override;
+// 	void Update(const World& scene, const Vec3f movement_vector) override;
 // 	void OnLeave(const World& scene) override;
 
 // 	~EditorModeScaleCollider() override {};

@@ -92,15 +92,15 @@ public:
 
 	void Update();
 
-	void SetPosition(const Vec3f& position) override;
-	void SetRotation(const Quat& rotation) override;
+	void SetPosition(const Vec3f position) override;
+	void SetRotation(const Quat rotation) override;
 	void SetScale(const float scale) override;
 
 	void OnAttached(World* scene) override;
 
 	void PrintDebug() const;
 
-	float32 GetDirectionScale(const Vec3f& direction);
+	float32 GetDirectionScale(const Vec3f direction);
 
 	// XXX: TEMP
 	void UpdateAnimation();
@@ -184,9 +184,9 @@ public:
 	FX_FORCE_INLINE bool IsSpawn() const { return HasTags(eObjectTag::Spawn); }
 	FX_FORCE_INLINE bool IsReflectionProbe() const { return HasTags(eObjectTag::ReflectionProbe); }
 
-	float32 RaycastBounds(const Vec3f& origin, const Vec3f& direction, Vec3f& out_face);
+	float32 RaycastBounds(const Vec3f origin, const Vec3f direction, Vec3f& out_face);
 
-	bool ContainsPoint(const Vec3f& point);
+	bool ContainsPoint(const Vec3f point);
 
 	void SetBounds(const AABB& bounds);
 

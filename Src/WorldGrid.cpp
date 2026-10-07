@@ -578,7 +578,7 @@ TileIndex WorldGrid::TileFromTileXY(const Vec2u& xy) const
 	return std::min(xy.Y, mGridSize.Y - 1) * mGridSize.X + std::min(xy.X, mGridSize.X - 1);
 }
 
-TileIndex WorldGrid::WorldToTile(const Vec3f& position) const
+TileIndex WorldGrid::WorldToTile(const Vec3f position) const
 {
 	const Vec3f adjusted = position + mPositionOffset;
 	const int32 tile_x = static_cast<int>(std::floor(adjusted.X / mTileSize.X));

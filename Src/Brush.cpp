@@ -36,6 +36,8 @@ struct DPlane
 /// Corners closer than this to a plane are treated as lying on it
 constexpr double scOnPlaneEpsilon = 1e-5;
 
+constexpr float32 scSubtractEpsilon = 1e-3f;
+
 constexpr double scDistanceToMerge = 1e-6;
 constexpr double scExtentTooBig = 1e5;
 
@@ -62,7 +64,7 @@ struct TextureProjection
 	Vec3f VAxis;
 };
 
-TextureProjection GetTextureProjection(const Vec3f& normal)
+TextureProjection GetTextureProjection(const Vec3f normal)
 {
 	const float32 abs_x = std::abs(normal.X);
 	const float32 abs_y = std::abs(normal.Y);
@@ -79,7 +81,7 @@ TextureProjection GetTextureProjection(const Vec3f& normal)
 	return { Vec3f(1.0f, 0.0f, 0.0f), Vec3f(0.0f, -1.0f, 0.0f) };
 }
 
-Vec2f GetDefaultTextureOffset(const Vec3f& normal, const Vec3f& bounds_min, const Vec3f& bounds_max)
+Vec2f GetDefaultTextureOffset(const Vec3f normal, const Vec3f bounds_min, const Vec3f bounds_max)
 {
 	const TextureProjection projection = GetTextureProjection(normal);
 
@@ -95,7 +97,7 @@ Vec2f GetDefaultTextureOffset(const Vec3f& normal, const Vec3f& bounds_min, cons
 
 /// The layout of a face on a brush at `origin`, lined up with the world grid. UVs use the brush's local corners, which
 /// are `origin` away from where they are in the world.
-BrushFaceTexture GetWorldAlignedTexture(const Vec3f& normal, const Vec3f& origin)
+BrushFaceTexture GetWorldAlignedTexture(const Vec3f normal, const Vec3f origin)
 {
 	const TextureProjection projection = GetTextureProjection(normal);
 
@@ -363,7 +365,7 @@ Polyhedron::eClipResult Polyhedron::Clip(const DPlane& plane, int32 plane_index)
 } // namespace
 
 
-Brush Brush::FromBox(const Vec3f& min, const Vec3f& max)
+Brush Brush::FromBox(const Vec3f min, const Vec3f max)
 {
 	Brush brush;
 
@@ -542,7 +544,7 @@ bool Brush::Rebuild()
 	mBoundsMin = mVertices[0];
 	mBoundsMax = mVertices[0];
 
-	for (const Vec3f& vertex : mVertices) {
+	for (const Vec3f vertex : mVertices) {
 		mBoundsMin = Vec3f::Min(mBoundsMin, vertex);
 		mBoundsMax = Vec3f::Max(mBoundsMax, vertex);
 	}
@@ -583,7 +585,7 @@ bool Brush::IsBox() const
 	return directions == 0x3F;
 }
 
-bool Brush::ContainsPoint(const Vec3f& point, float32 tolerance) const
+bool Brush::ContainsPoint(const Vec3f point, float32 tolerance) const
 {
 	if (!IsValid()) {
 		return false;
@@ -598,7 +600,7 @@ bool Brush::ContainsPoint(const Vec3f& point, float32 tolerance) const
 	return true;
 }
 
-int32 Brush::FindPlane(const Vec3f& normal) const
+int32 Brush::FindPlane(const Vec3f normal) const
 {
 	if (normal.IsCloseTo(simd::LoadFloat4(0.0f))) {
 		return scNoPlane;
@@ -622,7 +624,7 @@ int32 Brush::FindPlane(const Vec3f& normal) const
 	return best_plane;
 }
 
-float32 Brush::GetSupport(const Vec3f& direction) const
+float32 Brush::GetSupport(const Vec3f direction) const
 {
 	if (mVertices.IsEmpty()) {
 		return 0.0f;
@@ -630,7 +632,7 @@ float32 Brush::GetSupport(const Vec3f& direction) const
 
 	float32 support = direction.Dot(mVertices[0]);
 
-	for (const Vec3f& vertex : mVertices) {
+	for (const Vec3f vertex : mVertices) {
 		support = std::max(support, direction.Dot(vertex));
 	}
 
@@ -645,7 +647,7 @@ Vec3f Brush::GetFaceCenter(uint32 plane_index) const
 		}
 
 		Vec3f center = Vec3f::sZero;
-		for (const Vec3f& vertex : face.Vertices) {
+		for (const Vec3f vertex : face.Vertices) {
 			center = center + vertex;
 		}
 
@@ -655,7 +657,7 @@ Vec3f Brush::GetFaceCenter(uint32 plane_index) const
 	return Vec3f::sZero;
 }
 
-bool Brush::Raycast(const Vec3f& origin, const Vec3f& direction, float32& out_distance, uint32& out_plane_index) const
+bool Brush::Raycast(const Vec3f origin, const Vec3f direction, float32& out_distance, uint32& out_plane_index) const
 {
 	// Clip the ray against each plane in turn (Cyrus-Beck), keeping the latest entry and the earliest exit
 	float32 enter_distance = -std::numeric_limits<float32>::max();
@@ -700,7 +702,7 @@ bool Brush::Raycast(const Vec3f& origin, const Vec3f& direction, float32& out_di
 	return true;
 }
 
-bool Brush::Split(const Vec3f& normal, float32 distance, const Vec3f& origin, PlaneList& out_back,
+bool Brush::Split(const Vec3f normal, float32 distance, const Vec3f origin, PlaneList& out_back,
 				  PlaneList& out_front) const
 {
 	if (!IsValid() || Planes.Size >= scMaxPlanes) {
@@ -727,6 +729,54 @@ bool Brush::Split(const Vec3f& normal, float32 distance, const Vec3f& origin, Pl
 	return true;
 }
 
+bool Brush::Subtract(const PlaneList& cutter, const Vec3f origin, std::vector<PlaneList>& out_pieces) const
+{
+	out_pieces.clear();
+
+	if (!IsValid()) {
+		return false;
+	}
+
+	std::vector<PlaneList> pieces;
+	Brush remaining = FromPlanes(Planes);
+
+	for (const BrushPlane& cut : cutter) {
+		const float32 length = cut.Normal.Length();
+		if (!(length > 0.0f)) {
+			continue;
+		}
+
+		const Vec3f normal = cut.Normal * (1.0f / length);
+		const float32 distance = cut.Distance / length;
+
+		if (remaining.GetSupport(normal) <= distance + scSubtractEpsilon) {
+			continue;
+		}
+
+		if (-remaining.GetSupport(-normal) >= distance - scSubtractEpsilon) {
+			return false;
+		}
+
+		PlaneList inside;
+		PlaneList outside;
+
+		if (!remaining.Split(normal, distance, origin, inside, outside)) {
+			return false;
+		}
+
+		pieces.push_back(outside);
+		remaining = FromPlanes(inside);
+
+		if (!remaining.IsValid()) {
+			return false;
+		}
+	}
+
+	out_pieces = std::move(pieces);
+
+	return true;
+}
+
 void Brush::ResetFaceTexture(uint32 plane_index)
 {
 	BrushPlane& plane = Planes[plane_index];
@@ -736,7 +786,7 @@ void Brush::ResetFaceTexture(uint32 plane_index)
 	};
 }
 
-void Brush::AlignTexturesToWorld(const Vec3f& origin)
+void Brush::AlignTexturesToWorld(const Vec3f origin)
 {
 	for (BrushPlane& plane : Planes) {
 		plane.Texture = GetWorldAlignedTexture(plane.Normal, origin);
@@ -752,8 +802,7 @@ bool Brush::HasDefaultTextures() const
 		const Vec2f default_offset = GetDefaultTextureOffset(plane.Normal, mBoundsMin, mBoundsMax);
 
 		if (texture.Scale.X != scDefaultTexture.Scale.X || texture.Scale.Y != scDefaultTexture.Scale.Y ||
-			texture.Rotation != 0.0f ||
-			std::abs(texture.Offset.X - default_offset.X) > scTextureOffsetEpsilon ||
+			texture.Rotation != 0.0f || std::abs(texture.Offset.X - default_offset.X) > scTextureOffsetEpsilon ||
 			std::abs(texture.Offset.Y - default_offset.Y) > scTextureOffsetEpsilon) {
 			return false;
 		}
@@ -826,7 +875,7 @@ void Brush::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normal
 
 		const uint32 base = static_cast<uint32>(positions.Size);
 
-		for (const Vec3f& vertex : face.Vertices) {
+		for (const Vec3f vertex : face.Vertices) {
 			const float32 u = vertex.Dot(projection.UAxis);
 			const float32 v = vertex.Dot(projection.VAxis);
 
@@ -845,7 +894,6 @@ void Brush::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normal
 			indices.Insert(base + v);
 			indices.Insert(base + v + 1);
 		}
-
 	}
 }
 

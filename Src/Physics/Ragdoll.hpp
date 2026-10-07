@@ -22,7 +22,7 @@ public:
 
 	bool Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_matrix);
 
-	void Activate(const Vec3f& velocity);
+	void Activate(const Vec3f velocity);
 
 	void Destroy();
 

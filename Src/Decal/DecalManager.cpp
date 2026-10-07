@@ -18,7 +18,7 @@ FX_SET_MODULE_NAME("DecalManager")
 /// Uniform random value in [0, 1)
 static float32 RandomUnit() { return static_cast<float32>(FastRand32() >> 8) * (1.0f / 16777216.0f); }
 
-static void StoreFloat3(const Vec3f& value, float32* out)
+static void StoreFloat3(const Vec3f value, float32* out)
 {
 	out[0] = value.X;
 	out[1] = value.Y;
@@ -50,7 +50,7 @@ void DecalManager::AddDecal(const DecalDesc& desc)
 	const Vec3f forward = desc.Direction.Normalize();
 
 	// Anything that isn't parallel to the projection works as a reference for the decal's up axis
-	const Vec3f& reference = (std::abs(forward.Y) < 0.99f) ? Vec3f::sUp : Vec3f::sForward;
+	const Vec3f reference = (std::abs(forward.Y) < 0.99f) ? Vec3f::sUp : Vec3f::sForward;
 
 	const Vec3f unrolled_right = reference.Cross(forward).Normalize();
 	const Vec3f unrolled_up = forward.Cross(unrolled_right);
@@ -71,7 +71,7 @@ void DecalManager::AddDecal(const DecalDesc& desc)
 	};
 
 	for (uint32 axis = 0; axis < 3; axis++) {
-		const Vec3f& scaled_axis = scaled_axes[axis];
+		const Vec3f scaled_axis = scaled_axes[axis];
 
 		gpu_data.WorldToDecal[(0 * 4) + axis] = scaled_axis.X;
 		gpu_data.WorldToDecal[(1 * 4) + axis] = scaled_axis.Y;
@@ -115,7 +115,7 @@ void DecalManager::AddDecal(const DecalDesc& desc)
 	mNextSlot = static_cast<uint32>((mNextSlot + 1) % mDecals.Capacity);
 }
 
-void DecalManager::AddBulletHole(const Vec3f& hit_point, const Vec3f& hit_normal)
+void DecalManager::AddBulletHole(const Vec3f hit_point, const Vec3f hit_normal)
 {
 	constexpr uint32 variant_count = scBulletHoleAtlasColumns * scBulletHoleAtlasRows;
 	constexpr float32 cell_width = 1.0f / static_cast<float32>(scBulletHoleAtlasColumns);
@@ -148,7 +148,7 @@ void DecalManager::AddBulletHole(const Vec3f& hit_point, const Vec3f& hit_normal
 	AddDecal(desc);
 }
 
-void DecalManager::AddBloodSplat(const Vec3f& hit_point, const Vec3f& hit_normal, float32 size)
+void DecalManager::AddBloodSplat(const Vec3f hit_point, const Vec3f hit_normal, float32 size)
 {
 	const float32 width = size * (0.8f + (0.4f * RandomUnit()));
 	const float32 height = width * (0.85f + (0.3f * RandomUnit()));

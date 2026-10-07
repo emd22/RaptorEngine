@@ -16,8 +16,6 @@ class Quat;
 
 namespace fx {
 
-class Vec3f;
-
 class alignas(16) Quat
 {
 public:
@@ -29,8 +27,8 @@ public:
 	Quat(const float32* buffer);
 	Quat(const JPH::Quat& other);
 
-	static Quat FromAxisAngle(Vec3f axis, float32 angle);
-	static Quat FromEulerAngles(Vec3f angles);
+	static Quat FromAxisAngle(const Vec3f axis, float32 angle);
+	static Quat FromEulerAngles(const Vec3f angles);
 
 	Vec3f GetEulerAngles() const;
 
@@ -39,21 +37,21 @@ public:
 	 */
 	FX_FORCE_INLINE Vec3f GetDirection() const;
 
-	Quat operator*(const Quat& other) const;
+	Quat operator*(const Quat other) const;
 
 	void FromJoltQuaternion(const JPH::Quat& quat);
 	void ToJoltQuaternion(JPH::Quat& quat) const;
 
-	FX_FORCE_INLINE bool IsCloseTo(const Quat& other, const float32 tolerance = 0.0001) const;
+	FX_FORCE_INLINE bool IsCloseTo(const Quat other, const float32 tolerance = 0.0001) const;
 	bool IsCloseTo(const JPH::Quat& other, const float32 tolerance = 0.0001) const;
 
-	FX_FORCE_INLINE Quat SLerp(const Quat& dest, const float32 step) const;
-	FX_FORCE_INLINE void NLerpIP(const Quat& dest, float32 step);
+	FX_FORCE_INLINE Quat SLerp(const Quat dest, const float32 step) const;
+	FX_FORCE_INLINE void NLerpIP(const Quat dest, float32 step);
 
 	FX_FORCE_INLINE Quat Conjugate() const;
 	FX_FORCE_INLINE Quat Normalize() const;
 
-	FX_FORCE_INLINE Quat& SmoothInterpolate(const Quat& dest, const float speed, const float delta_time)
+	FX_FORCE_INLINE Quat& SmoothInterpolate(const Quat dest, const float speed, const float delta_time)
 	{
 		// Lerp with exp decay
 		NLerpIP(dest, 1.0f - expf(-speed * delta_time));

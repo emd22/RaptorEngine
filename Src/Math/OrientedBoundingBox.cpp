@@ -27,7 +27,7 @@ AABB OBB::GetWorldAABB() const
 	Vec3f out_min(std::numeric_limits<float32>::max());
 	Vec3f out_max(-std::numeric_limits<float32>::max());
 
-	for (const Vec3f& corner : Corners) {
+	for (const Vec3f corner : Corners) {
 		out_min = Vec3f::Min(out_min, corner);
 		out_max = Vec3f::Max(out_max, corner);
 	}
