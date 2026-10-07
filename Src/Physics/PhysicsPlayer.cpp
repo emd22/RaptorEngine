@@ -53,7 +53,7 @@ void PhysicsPlayer::Create()
 									   &gPhysics->pBackend->PhysicsSystem);
 }
 
-void PhysicsPlayer::Teleport(const Vec3f& position)
+void PhysicsPlayer::Teleport(const Vec3f position)
 {
 	JPH::RVec3 jolt_position;
 	position.ToJoltVec3(jolt_position);
@@ -68,7 +68,7 @@ void PhysicsPlayer::SetCollisionEnabled(bool value)
 	gPhysics->pBackend->GetBodyInterface().SetObjectLayer(pPlayerVirt->GetInnerBodyID(), PhLayer::Deactivated);
 }
 
-void PhysicsPlayer::ApplyMovement(const Vec3f& direction)
+void PhysicsPlayer::ApplyMovement(const Vec3f direction)
 {
 	Vec3 jolt_dir;
 	direction.ToJoltVec3(jolt_dir);

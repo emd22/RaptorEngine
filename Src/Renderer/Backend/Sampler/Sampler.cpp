@@ -4,6 +4,7 @@
 
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
+#include <algorithm>
 
 namespace fx::renderer {
 
@@ -102,6 +103,8 @@ void Sampler::Create(const SamplerProps& props)
 
 	VkSamplerAddressMode vk_addr_mode = GetVkAddressMode(props.AddressMode);
 
+	const float32 max_anisotropy = std::min(static_cast<float32>(props.MaxAnisotropy),
+											gGraphics->GetDevice()->MaxSamplerAnisotropy);
 
 	VkSamplerCreateInfo sampler_info {
 		.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
@@ -117,8 +120,8 @@ void Sampler::Create(const SamplerProps& props)
 
 		.mipLodBias = 0.0f,
 
-		.anisotropyEnable = VK_FALSE,
-		// .maxAnisotropy = 0,
+		.anisotropyEnable = static_cast<VkBool32>(max_anisotropy > 1.0f),
+		.maxAnisotropy = std::max(max_anisotropy, 1.0f),
 
 		.compareEnable = static_cast<VkBool32>(props.CompareOp != eSamplerCompareOp::None),
 		.compareOp = GetVkCompareOp(props.CompareOp),

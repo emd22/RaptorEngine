@@ -36,7 +36,7 @@ public:
 	FX_FORCE_INLINE Vec3d(double x, double y, double z) { mIntrin = simd::LoadDouble4(x, y, z, 0.0); }
 
 	FX_FORCE_INLINE explicit Vec3d(const double scalar) { mIntrin = simd::LoadDouble4(scalar); }
-	FX_FORCE_INLINE explicit Vec3d(const Vec3f& other);
+	FX_FORCE_INLINE explicit Vec3d(const Vec3f other);
 
 	FX_FORCE_INLINE Vec3d operator+(const Vec3d& other) const;
 	FX_FORCE_INLINE Vec3d operator-(const Vec3d& other) const;

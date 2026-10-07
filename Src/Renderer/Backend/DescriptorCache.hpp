@@ -7,6 +7,7 @@
 #include <Core/PagedArray.hpp>
 #include <Core/Types.hpp>
 #include <unordered_map>
+#include <Core/HashMap.hpp>
 
 
 namespace fx {
@@ -36,7 +37,7 @@ public:
 	~DsLayoutCache() { Destroy(); }
 
 public:
-	std::unordered_map<Hash32, VkDescriptorSetLayout, Hash32Stl> Cache;
+	HashMap<Hash32, VkDescriptorSetLayout> Cache;
 };
 
 

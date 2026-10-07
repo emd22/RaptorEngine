@@ -278,8 +278,16 @@ public:
 	RawGpuBuffer ProbeVolumeBuffer;
 	uint32 ProbeVolumePageSize = 0;
 
+	RawGpuBuffer ProbeGridBuffer;
+	uint32 ProbeGridPageSize = 0;
+
 	/// Depth moments for light probes
 	Image* pProbeMomentsAtlas = nullptr;
+
+	RawGpuBuffer ReflectionProbeBuffer;
+	uint32 ReflectionProbePageSize = 0;
+
+	Image* pReflectionProbes = nullptr;
 
 	Semaphore TransferSync;
 	std::atomic_uint64_t TransferCount = 0;
@@ -287,6 +295,8 @@ public:
 	DescriptorSet* pLightsDescriptor = nullptr;
 
 	Image* pNoiseTexture = nullptr;
+
+	Image* pDfgLut = nullptr;
 
 	/// Times the stages of the GPU frame
 	GpuProfiler Profiler;
@@ -296,15 +306,21 @@ public:
 
 	/// Turn off the probe lighting or the decals in every draw, to see what they cost in the GPU timings
 	bool bDisableProbes = false;
+	bool bDisableReflectionProbes = false;
+	uint32 ReflectionDebugView = 0;
 	bool bDisableDecals = false;
 
 	float32 PreExposure = 1.0f;
+
+	uint32 Tonemapper = 1;
 
 	/// Debug view: show blended probe irradiance instead of the lit result.
 	bool bOnlyRenderProbes = false;
 
 	/// Debug view: show blended probe visibility instead of the lit result.
 	bool bRenderProbeVisibility = false;
+
+	bool HasDebugView() const { return bOnlyRenderProbes || bRenderProbeVisibility || (ReflectionDebugView != 0); }
 
 private:
 	GpuDevice mDevice;

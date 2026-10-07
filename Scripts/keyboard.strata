@@ -27,6 +27,7 @@ enum KEY : uint
 	K_Y = 28,
 	K_Z = 29,
 
+	K_RETURN = 40,
     K_BACKSPACE = 42,
     K_MINUS = 45,
     K_EQUALS = 46,

@@ -30,7 +30,7 @@ Vec3f::Vec3f(const Vec4f& other) { mIntrin = other.mIntrin; }
 void Vec3f::Print() const { LogInfo("Vec3f {{ X={:.6f}, Y={:.6f}, Z={:.6f} }}", X, Y, Z); }
 
 
-Vec3f Vec3f::CrossSlow(const Vec3f& other) const
+Vec3f Vec3f::CrossSlow(const Vec3f other) const
 {
 	const float32 ax = mData[0];
 	const float32 bx = other.mData[0];
@@ -45,7 +45,7 @@ Vec3f Vec3f::CrossSlow(const Vec3f& other) const
 }
 
 
-Vec3f Vec3f::Rotate(const Quat& rotation) const
+Vec3f Vec3f::Rotate(const Quat rotation) const
 {
 	// v' = q * v * conj(q), with v as the pure quaternion (x, y, z, 0)
 	const Quat vec = Quat(vsetq_lane_f32(0.0f, mIntrin, 3));
@@ -56,7 +56,7 @@ Vec3f Vec3f::Rotate(const Quat& rotation) const
 }
 
 
-Vec3f Vec3f::Cross(const Vec3f& other) const { return Vec3f(Neon::Cross(mIntrin, other.mIntrin)); }
+Vec3f Vec3f::Cross(const Vec3f other) const { return Vec3f(Neon::Cross(mIntrin, other.mIntrin)); }
 
 void Vec3f::ToJoltVec3(JPH::RVec3& jolt_vec) const { jolt_vec.mValue = mIntrin; }
 void Vec3f::FromJoltVec3(const JPH::RVec3& jolt_vec) { mIntrin = jolt_vec.mValue; }

@@ -54,3 +54,9 @@ Testing
 
 
 private
+
+
+*.spack
+
+strata_struct_test.o
+cache/shaders

@@ -17,6 +17,7 @@ enum class ePipelineFeatures : uint32
 	Skinned = (1 << 1),
 	/// The material is alpha masked, so the pipeline has to sample its albedo and discard
 	AlphaMask = (1 << 2),
+	Unlit = (1 << 3),
 };
 
 FxEnumFlags(ePipelineFeatures);
@@ -38,6 +39,8 @@ enum class ePipelinePass : uint8
 	ForwardBlend,
 	/// Opaque geometry drawn into a light probe capture. Captures have no prepass, so these write their own depth.
 	ForwardCapture,
+	ForwardDebug,
+	ForwardBlendDebug,
 	/// Casters drawn into the shadow atlas
 	Shadow,
 
@@ -47,6 +50,6 @@ enum class ePipelinePass : uint8
 constexpr uint32 scNumPipelinePasses = static_cast<uint32>(ePipelinePass::Count);
 
 /// Every combination of the ePipelineFeatures bits
-constexpr uint32 scNumFeatureCombinations = 1U << 3;
+constexpr uint32 scNumFeatureCombinations = 1U << 4;
 
 } // namespace fx::renderer

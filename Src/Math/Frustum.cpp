@@ -5,6 +5,7 @@
 
 #include <Renderer/Camera.hpp>
 #include <cfloat>
+#include <cmath>
 
 #define PLANE(idx_) mClipPlanes[static_cast<uint32>(idx_)]
 
@@ -18,10 +19,14 @@ static Vec4f ToPlane(const Vec4f& vec)
 }
 
 
-void Frustum::Rebuild(const PerspectiveCamera& camera)
+void Frustum::Rebuild(const PerspectiveCamera& camera) { Rebuild(camera.GetCameraMatrix(eObjectLayer::WorldLayer)); }
+
+void Frustum::Rebuild(const Camera& camera, eObjectLayer layer) { Rebuild(camera.GetCameraMatrix(layer)); }
+
+void Frustum::Rebuild(const Mat4f& view_projection)
 {
 	// Note that `.Transposed()` is faster than rebuilding each vector manually.
-	Mat4f vp_m = camera.GetCameraMatrix(eObjectLayer::WorldLayer).Transposed();
+	Mat4f vp_m = view_projection.Transposed();
 
 	const Vec4f& vr_x = vp_m.Rows[0];
 	const Vec4f& vr_y = vp_m.Rows[1];
@@ -41,7 +46,7 @@ void Frustum::Rebuild(const PerspectiveCamera& camera)
 	mFrustumY = 0.0f;
 }
 
-bool Frustum::TileIntersectsAABB(const AABB& tile_aabb) const
+bool Frustum::TileIntersectsAABB(const BBox& tile_aabb) const
 {
 	// We only need to check left right, near and far here since we treat tiles as 2D (X and Z).
 
@@ -68,10 +73,14 @@ bool Frustum::TileIntersectsAABB(const AABB& tile_aabb) const
 	return true;
 }
 
-bool Frustum::IntersectsSphere(const Vec3f& center, float32 radius) const
+bool Frustum::IntersectsSphere(const Vec3f center, float32 radius, uint32 plane_mask) const
 {
 	// Rebuild() writes the planes by index, so `mClipPlanes.Size` stays at zero
 	for (uint32 i = 0; i <= static_cast<uint32>(eFrustumPlane::Far); i++) {
+		if ((plane_mask & (1U << i)) == 0) {
+			continue;
+		}
+
 		const Vec4f& plane = mClipPlanes[i];
 
 		// The planes are normalized, so this is the signed distance to the plane
@@ -83,8 +92,57 @@ bool Frustum::IntersectsSphere(const Vec3f& center, float32 radius) const
 	return true;
 }
 
+bool Frustum::IntersectsAABB(const BBox& aabb, uint32 plane_mask) const
+{
+	const Vec3f center = (aabb.Min + aabb.Max) * 0.5f;
+	const Vec3f half_extent = (aabb.Max - aabb.Min) * 0.5f;
 
-AABB Frustum::GetFrustumBoundingBox(const PerspectiveCamera& camera)
+	for (uint32 i = 0; i <= static_cast<uint32>(eFrustumPlane::Far); i++) {
+		if ((plane_mask & (1U << i)) == 0) {
+			continue;
+		}
+
+		const Vec4f& plane = mClipPlanes[i];
+		const Vec3f normal(plane);
+
+		const float32 reach = half_extent.Dot(normal.Abs());
+
+		if (normal.Dot(center) + plane.W < -reach) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+bool Frustum::IntersectsOBB(const OBBox& obb, uint32 plane_mask) const
+{
+	const Vec3f center = (obb.Corners[0] + obb.Corners[7]) * 0.5f;
+	const Vec3f half_x = (obb.Corners[1] - obb.Corners[0]) * 0.5f;
+	const Vec3f half_y = (obb.Corners[2] - obb.Corners[0]) * 0.5f;
+	const Vec3f half_z = (obb.Corners[4] - obb.Corners[0]) * 0.5f;
+
+	for (uint32 i = 0; i <= static_cast<uint32>(eFrustumPlane::Far); i++) {
+		if ((plane_mask & (1U << i)) == 0) {
+			continue;
+		}
+
+		const Vec4f& plane = mClipPlanes[i];
+		const Vec3f normal(plane);
+
+		const float32 reach = std::abs(half_x.Dot(normal)) + std::abs(half_y.Dot(normal)) +
+							  std::abs(half_z.Dot(normal));
+
+		if (normal.Dot(center) + plane.W < -reach) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+
+BBox Frustum::GetFrustumBoundingBox(const PerspectiveCamera& camera)
 {
 	Mat4f vp_matrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 	Mat4f vp_inverse = vp_matrix.Inverse();
@@ -95,7 +153,7 @@ AABB Frustum::GetFrustumBoundingBox(const PerspectiveCamera& camera)
 	Vec3f min_point(FLT_MAX, FLT_MAX, FLT_MAX);
 	Vec3f max_point(-FLT_MAX, -FLT_MAX, -FLT_MAX);
 
-	for (const Vec3f& corner : ndc_corners) {
+	for (const Vec3f corner : ndc_corners) {
 		Vec4f world = vp_inverse * Vec4f(corner.X, corner.Y, corner.Z, 1.0f);
 		world = (world / world.W);
 
@@ -103,7 +161,7 @@ AABB Frustum::GetFrustumBoundingBox(const PerspectiveCamera& camera)
 		max_point = Vec3f::Max(max_point, Vec3f(world.X, world.Y, world.Z));
 	}
 
-	return AABB(min_point, max_point);
+	return BBox(min_point, max_point);
 }
 
 

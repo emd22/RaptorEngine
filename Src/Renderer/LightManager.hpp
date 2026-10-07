@@ -5,9 +5,9 @@
 #include <Core/FreeArray.hpp>
 #include <Core/Hash.hpp>
 #include <Core/Ref.hpp>
+#include <Core/String.hpp>
 #include <Renderer/Limits.hpp>
 #include <mutex>
-#include <string>
 
 namespace fx {
 
@@ -23,7 +23,7 @@ public:
 	void Create();
 
 	template <typename TLightType, typename... TArgs>
-	TLightType* NewLight(const std::string& name, TArgs&&... args)
+	TLightType* NewLight(const String& name, TArgs&&... args)
 	{
 		TLightType* light = new TLightType(std::forward<TArgs>(args)...);
 		light->Name = name;

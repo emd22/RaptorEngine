@@ -249,15 +249,15 @@ Ref<ShaderProgram> Shader::GetProgram(eShaderType shader_type, const SizedArray<
 	ProgramCache& cached_type = mCachedTypes[static_cast<uint32>(shader_type)];
 
 	const Hash64 macro_hash = HashMacros(macros, FX_HASH64_FNV1A_INIT);
-	auto program_it = cached_type.Programs.find(macro_hash);
+	Ref<ShaderProgram>* cached_program = cached_type.Programs.Find(macro_hash);
 
-	if (program_it != cached_type.Programs.end()) {
-		return program_it->second;
+	if (cached_program != nullptr) {
+		return *cached_program;
 	}
 
 	// Program has not been cached, load it from the data pack or compile it, and save it back to the cache.
 	Ref<ShaderProgram> program = LoadUncachedProgram(shader_type, macros);
-	cached_type.Programs[macro_hash] = program;
+	cached_type.Programs.Insert(macro_hash, program);
 
 	return program;
 }
@@ -337,6 +337,8 @@ void ShaderProgram::Destroy()
 
 	GpuDevice* device = gGraphics->GetDevice();
 	vkDestroyShaderModule(device->Device, InternalShader, nullptr);
+
+	InternalShader = nullptr;
 }
 
 

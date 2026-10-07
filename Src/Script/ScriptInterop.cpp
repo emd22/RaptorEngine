@@ -16,6 +16,8 @@
 #include <Renderer/LightProbe.hpp>
 #include <Weapon/WeaponSystem.hpp>
 #include <World.hpp>
+#include <algorithm>
+#include <vector>
 
 namespace fx::script {
 
@@ -83,9 +85,7 @@ static Object* N_editor_op_create_object(FLOAT4 position, int32 group_size)
 #ifdef FX_IS_EDITOR
 	const EditOperationValue result = gEditor->PushEditOperation(EditOperation {
 		.Type = EditOperation::eType::Create,
-		.pObject = nullptr,
 		.ValueA = EditOperationValue(Vec3f(position)),
-		.ValueB = EditOperationValue(nullptr),
 		.GroupSize = group_size,
 	});
 
@@ -106,7 +106,6 @@ static Object* N_editor_op_dupe_object(Object* object_to_dupe, FLOAT4 position, 
 		.Type = EditOperation::eType::Dupe,
 		.pObject = object_to_dupe,
 		.ValueA = EditOperationValue(Vec3f(position)),
-		.ValueB = EditOperationValue(nullptr),
 		.GroupSize = group_size,
 	});
 
@@ -456,8 +455,6 @@ static Object* N_blockout_create_box(FLOAT4 min, FLOAT4 max)
 
 	EditOperation op {
 		.Type = EditOperation::eType::CreateBrush,
-		.ValueA = EditOperationValue(Vec3f::sZero),
-		.ValueB = EditOperationValue(Vec3f::sZero),
 	};
 
 	op.PlanesAfter = brush.Planes;
@@ -486,20 +483,19 @@ static bool N_blockout_clip(Object* object, FLOAT4 point_a, FLOAT4 point_b, FLOA
 	EditOperation clip_op {
 		.Type = EditOperation::eType::BrushEdit,
 		.pObject = object,
-		.ValueA = EditOperationValue(Vec3f::sZero),
-		.ValueB = EditOperationValue(Vec3f::sZero),
 		.GroupSize = 2,
 	};
 
-	clip_op.PushedObjectID = object->ID;
 	clip_op.PlanesBefore = brush->Planes;
 
 	EditOperation split_op {
 		.Type = EditOperation::eType::CreateBrush,
-		.ValueA = EditOperationValue(Vec3f::sZero),
-		.ValueB = EditOperationValue(Vec3f::sZero),
 		.GroupSize = 2,
 	};
+
+	split_op.ObjectSnapshot = EditOperation::Snapshot::Capture(*object,
+															   gEditor->GetSelection().GetStoredMaterial(object));
+	split_op.ObjectSnapshot.ObjectName = Name();
 
 	if (!gWorld->pBlockout->GetClipPieces(object, Vec3f(point_a), Vec3f(point_b), Vec3f(face_normal),
 										  clip_op.PlanesAfter, split_op.PlanesAfter,
@@ -507,17 +503,173 @@ static bool N_blockout_clip(Object* object, FLOAT4 point_a, FLOAT4 point_b, FLOA
 		return false;
 	}
 
-	split_op.ObjectSnapshot.Rotation = object->mRotation;
-	split_op.ObjectSnapshot.Material = gEditor->GetSelection().GetStoredMaterial(object);
-	split_op.ObjectSnapshot.bIsProbeVolume = object->IsProbeVolume();
-	split_op.ObjectSnapshot.bIsDynamic = gWorld->pBlockout->IsDynamic(object);
-
 	gEditor->PushEditOperation(clip_op);
 	gEditor->PushEditOperation(split_op);
 
 	return true;
 #else
 	return false;
+#endif
+}
+
+#ifdef FX_IS_EDITOR
+static constexpr uint32 scMaxSubtractOperations = 200;
+
+static bool CanBeSubtractedFrom(const Object* object)
+{
+	return !object->IsProbeVolume() && !object->IsReflectionProbe() && !object->IsSpawn() &&
+		   !gWorld->pBlockout->IsDynamic(object);
+}
+
+static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter_ids, bool keep_cutter)
+{
+	const editor::EditorSelection& selection = gEditor->GetSelection();
+
+	std::vector<EditOperation> ops;
+	std::vector<ObjectID> op_object_ids;
+	uint32 cut_count = 0;
+
+	std::vector<ObjectID> target_ids;
+
+	for (ObjectID id : gWorld->pBlockout->BlockoutObjects) {
+		const bool is_cutter = std::any_of(cutter_ids.begin(), cutter_ids.end(),
+										   [&](ObjectID other) { return other.GetID() == id.GetID(); });
+
+		if (!is_cutter) {
+			target_ids.push_back(id);
+		}
+	}
+
+	for (ObjectID id : target_ids) {
+		Object* target = gObjectManager->GetObject(id);
+
+		if (target == nullptr || !CanBeSubtractedFrom(target)) {
+			continue;
+		}
+
+		std::vector<Brush::PlaneList> pieces;
+		std::vector<Vec3f> positions;
+
+		if (!gWorld->pBlockout->GetSubtractPieces(target, cutter, pieces, positions)) {
+			continue;
+		}
+
+		const Brush* brush = gWorld->pBlockout->GetBrush(target);
+		const MaterialID material = selection.GetStoredMaterial(target);
+
+		cut_count++;
+
+		if (pieces.empty()) {
+			EditOperation remove_op {
+				.Type = EditOperation::eType::Delete,
+				.pObject = target,
+			};
+
+			remove_op.PlanesBefore = brush->Planes;
+			remove_op.ObjectSnapshot = EditOperation::Snapshot::Capture(*target, material);
+
+			ops.push_back(remove_op);
+			op_object_ids.push_back(id);
+
+			continue;
+		}
+
+		EditOperation edit_op {
+			.Type = EditOperation::eType::BrushEdit,
+			.pObject = target,
+		};
+
+		edit_op.PlanesBefore = brush->Planes;
+		edit_op.PlanesAfter = pieces[0];
+
+		ops.push_back(edit_op);
+		op_object_ids.push_back(id);
+
+		for (uint32 i = 1; i < pieces.size(); i++) {
+			EditOperation create_op {
+				.Type = EditOperation::eType::CreateBrush,
+			};
+
+			create_op.PlanesAfter = pieces[i];
+			create_op.ObjectSnapshot = EditOperation::Snapshot::Capture(*target, material);
+			create_op.ObjectSnapshot.ObjectName = Name();
+			create_op.ObjectSnapshot.Position = positions[i];
+
+			ops.push_back(create_op);
+			op_object_ids.push_back(ObjectID::scNull);
+		}
+	}
+
+	if (cut_count == 0) {
+		return 0;
+	}
+
+	if (!keep_cutter) {
+		const Brush* cutter_brush = gWorld->pBlockout->GetBrush(cutter);
+
+		EditOperation remove_op {
+			.Type = EditOperation::eType::Delete,
+			.pObject = cutter,
+		};
+
+		remove_op.PlanesBefore = cutter_brush->Planes;
+		remove_op.ObjectSnapshot = EditOperation::Snapshot::Capture(*cutter, selection.GetStoredMaterial(cutter));
+
+		ops.push_back(remove_op);
+		op_object_ids.push_back(cutter->ID);
+	}
+
+	if (ops.size() > scMaxSubtractOperations) {
+		LogWarning("Subtracting '{}' would change too many blockouts at once", cutter->Name.Get());
+		return 0;
+	}
+
+	for (uint32 i = 0; i < ops.size(); i++) {
+		ops[i].GroupSize = static_cast<int32>(ops.size());
+
+		if (!op_object_ids[i].IsInvalid()) {
+			ops[i].pObject = gObjectManager->GetObject(op_object_ids[i]);
+		}
+
+		gEditor->PushEditOperation(ops[i]);
+	}
+
+	return cut_count;
+}
+#endif
+
+static int32 N_blockout_subtract(bool keep_cutters)
+{
+#ifdef FX_IS_EDITOR
+	if (gEditor->IsSimulationMode()) {
+		return 0;
+	}
+
+	const editor::EditorSelection& selection = gEditor->GetSelection();
+
+	std::vector<ObjectID> cutter_ids;
+
+	for (uint32 i = 0; i < selection.GetCount(); i++) {
+		Object* object = selection.GetObject(i);
+
+		if (gWorld->pBlockout->GetBrush(object) != nullptr) {
+			cutter_ids.push_back(object->ID);
+		}
+	}
+
+	uint32 cut_count = 0;
+
+	for (ObjectID id : cutter_ids) {
+		Object* cutter = gObjectManager->GetObject(id);
+
+		if (cutter != nullptr && gWorld->pBlockout->GetBrush(cutter) != nullptr) {
+			cut_count += SubtractCutter(cutter, cutter_ids, keep_cutters);
+		}
+	}
+
+	return static_cast<int32>(cut_count);
+#else
+	return 0;
 #endif
 }
 
@@ -538,11 +690,8 @@ static void N_blockout_edit_face_texture(Object* object, FLOAT4 face, uint32 edi
 	EditOperation op {
 		.Type = EditOperation::eType::BrushEdit,
 		.pObject = object,
-		.ValueA = EditOperationValue(Vec3f::sZero),
-		.ValueB = EditOperationValue(Vec3f::sZero),
 	};
 
-	op.PushedObjectID = object->ID;
 	op.PlanesBefore = brush->Planes;
 
 	if (!gWorld->pBlockout->GetFaceTextureEdit(object, Vec3f(face), static_cast<eFaceTextureEdit>(edit),
@@ -569,7 +718,30 @@ static void N_probe_volume_mark(Object* obj, bool enabled)
 		return;
 	}
 
+	obj->ClearTag(eObjectTag::ReflectionProbe);
 	obj->SetProbeVolume(enabled);
+}
+
+static void N_reflection_probe_mark(Object* obj, bool enabled)
+{
+	if (obj == nullptr) {
+		return;
+	}
+
+	obj->SetReflectionProbe(enabled);
+}
+
+static bool N_reflection_probe_is_marked(Object* obj) { return obj != nullptr && obj->IsReflectionProbe(); }
+
+static int32 N_reflection_probe_rebuild()
+{
+	return static_cast<int32>(gProbeManager->RebuildReflectionProbesFromWorld());
+}
+
+static void N_reflection_probe_bake()
+{
+	gProbeManager->RebuildReflectionProbesFromWorld();
+	gProbeManager->BeginReflectionBake();
 }
 
 static bool N_probe_volume_is_marked(Object* obj) { return obj != nullptr && obj->IsProbeVolume(); }
@@ -685,6 +857,7 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("blockout_hide_preview", N_blockout_hide_preview),
 	PREDEF("blockout_create_box", N_blockout_create_box),
 	PREDEF("blockout_clip", N_blockout_clip),
+	PREDEF("blockout_subtract", N_blockout_subtract),
 	PREDEF("camera_ray_to_plane", N_camera_ray_to_plane),
 	PREDEF("blockout_new_object", N_blockout_new_object),
 	PREDEF("blockout_dupe_object", N_blockout_dupe_object),
@@ -719,6 +892,10 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("probe_is_baking", N_probe_is_baking),
 	PREDEF("probe_bake", N_probe_bake),
 	PREDEF("probe_save", N_probe_save),
+	PREDEF("reflection_probe_mark", N_reflection_probe_mark),
+	PREDEF("reflection_probe_is_marked", N_reflection_probe_is_marked),
+	PREDEF("reflection_probe_rebuild", N_reflection_probe_rebuild),
+	PREDEF("reflection_probe_bake", N_reflection_probe_bake),
 
 	PREDEF("cvar_set_int", N_cvar_set_int),
 	PREDEF("cvar_set_float", N_cvar_set_float),

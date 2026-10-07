@@ -206,10 +206,10 @@ bool PipelineCache::RegisterKey(const PipelineHandle handle, const PipelineKey& 
 
 	// The pipeline was rebuilt, so its old key no longer finds it
 	if (entry.bRegistered) {
-		auto old = mKeyLookup.find(entry.Hash);
+		const PipelineHandle* old = mKeyLookup.Find(entry.Hash);
 
-		if (old != mKeyLookup.end() && old->second == handle) {
-			mKeyLookup.erase(old);
+		if (old != nullptr && (*old) == handle) {
+			mKeyLookup.Remove(entry.Hash);
 		}
 	}
 
@@ -217,21 +217,26 @@ bool PipelineCache::RegisterKey(const PipelineHandle handle, const PipelineKey& 
 	entry.Hash = key.GetHash();
 	entry.bRegistered = true;
 
-	auto [it, inserted] = mKeyLookup.try_emplace(entry.Hash, handle);
+	const PipelineHandle* existing = mKeyLookup.Find(entry.Hash);
 
-	if (inserted || it->second == handle) {
+	if (existing == nullptr) {
+		mKeyLookup.Insert(entry.Hash, handle);
 		return true;
 	}
 
-	const KeyEntry& other = mKeys[it->second.Index];
+	if ((*existing) == handle) {
+		return true;
+	}
+
+	const KeyEntry& other = mKeys[existing->Index];
 
 	if (other.Key == key) {
 		LogWarning(LC_RENDER, "Pipelines {} and {} were built from identical keys (hash {:#x})", handle.Index,
-				   it->second.Index, entry.Hash);
+				   existing->Index, entry.Hash);
 	}
 	else {
 		LogError(LC_RENDER, "Pipelines {} and {} have different keys with the same hash {:#x}", handle.Index,
-				 it->second.Index, entry.Hash);
+				 existing->Index, entry.Hash);
 	}
 
 	return false;
@@ -241,14 +246,14 @@ PipelineHandle PipelineCache::Find(const PipelineKey& key) const
 {
 	std::lock_guard lock(mMutex);
 
-	auto it = mKeyLookup.find(key.GetHash());
+	const PipelineHandle* handle = mKeyLookup.Find(key.GetHash());
 
 	// Whatever the hash matched has to have the whole key, or it was a collision
-	if (it == mKeyLookup.end() || !(mKeys[it->second.Index].Key == key)) {
+	if (handle == nullptr || !(mKeys[handle->Index].Key == key)) {
 		return PipelineHandle {};
 	}
 
-	return it->second;
+	return *handle;
 }
 
 std::optional<PipelineKey> PipelineCache::GetKey(const PipelineHandle handle) const

@@ -46,7 +46,6 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${SOURCES})
 
 add_subdirectory(Submodules/strata)
 
-
 # Add shaders as a Visual Studio filter, borrowed from Hyperion Engine
 file(GLOB_RECURSE SHADER_FILES "${CMAKE_SOURCE_DIR}/Shaders/*")
 source_group("Shaders" FILES ${SHADER_FILES})
@@ -162,7 +161,6 @@ if(FX_EDITOR)
         target_sources(raptor PRIVATE "Src/Editor/raptor.rc")
     endif()
 
-    # TODO: test on macOS and Linux
     if(APPLE)
         # Metal layer and relative mouse helpers
         enable_language(OBJCXX)

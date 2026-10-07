@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Core/AnonArray.hpp>
-#include <Math/BoundingBox.hpp>
+#include <Math/BBox.hpp>
 #include <Math/Vec3.hpp>
 #include <Renderer/VertexList.hpp>
 #include <cfloat>
@@ -40,13 +40,13 @@ public:
 		return max_vertex;
 	}
 
-	static AABB CalculateBounds(const renderer::VertexList& vertex_list)
+	static BBox CalculateBounds(const renderer::VertexList& vertex_list)
 	{
 		const AnonArray& vertices = vertex_list.GetLocalBuffer();
 
 		if (vertices.IsEmpty()) {
 			LogWarning(LC_ASSET, "Cannot calculate dimensions as there are no vertices!");
-			return AABB {};
+			return BBox {};
 		}
 
 		Vec3f min_vertex = Vec3f(FLT_MAX);
@@ -63,7 +63,7 @@ public:
 			max_vertex = Vec3f::Max(max_vertex, position);
 		}
 
-		return AABB { min_vertex, max_vertex };
+		return BBox { min_vertex, max_vertex };
 	}
 };
 

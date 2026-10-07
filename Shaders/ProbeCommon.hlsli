@@ -7,6 +7,8 @@
 
 #define PROBE_MAX_VOLUMES 8
 
+#define PROBE_GRID_EMPTY 0xFFFF
+
 #define PROBE_MAX_PROBES 4096
 
 #define PROBE_DEPTH_SIZE 16
@@ -34,22 +36,19 @@
 #define PROBE_NORMAL_BIAS_MIN 0.02
 #define PROBE_NORMAL_BIAS_MAX 0.5
 
-/// Lowest weights a probe can be given for being occluded or behind the surface, so that no surface is left unlit
-#define PROBE_VISIBILITY_FLOOR 0.05
 #define PROBE_BACKFACE_FLOOR 0.2
+#define PROBE_MIN_WEIGHT 1e-6
+#define PROBE_WEIGHT_CRUSH 0.2
 
 struct ProbeSHData
 {
 	/// RGB per coefficient. The w lanes of the first three carry the probe's world position (ProbeSHPosition), the
-	/// fourth whether the probe is active (ProbeSHActive), the rest are padding.
+	/// rest are padding.
 	float4 SH[PROBE_SH_COEFF_COUNT];
 };
 
 
 float3 ProbeSHPosition(ProbeSHData probe) { return float3(probe.SH[0].w, probe.SH[1].w, probe.SH[2].w); }
-
-/// False for probes that placement left inside geometry, or could only have moved through a surface
-bool ProbeSHActive(ProbeSHData probe) { return probe.SH[3].w > 0.5; }
 
 struct ProbeVolume
 {
@@ -59,7 +58,7 @@ struct ProbeVolume
 
 	float4 vInvCellSize;
 
-	/// Grid dimensions in XYZ, and in W the index this volume's first probe has in the probe buffers
+	/// Grid dimensions in XYZ, and in W the index of this volume's first point in the probe grid table
 	uint4 vDimsAndFirst;
 
 	/// World space corner opposite vMinAndCount in xyz, and the volume of one grid cell in w. Derived from the
@@ -97,13 +96,12 @@ uint SelectProbeVolume(float3 pos_ws, StructuredBuffer<ProbeVolume> volumes, uin
 
 		// Closer wins outright; between volumes that both contain the position (both 0) the denser one does
 		const bool closer = distance_sq < best_distance_sq - 1e-4;
-		const bool denser = distance_sq <= best_distance_sq + 1e-4 && cell_volume < best_cell_volume;
+		const bool denser = and(distance_sq <= best_distance_sq + 1e-4, cell_volume < best_cell_volume);
+		const bool better = or(closer, denser);
 
-		if (closer || denser) {
-			best = i;
-			best_distance_sq = distance_sq;
-			best_cell_volume = cell_volume;
-		}
+		best = select(better, i, best);
+		best_distance_sq = select(better, distance_sq, best_distance_sq);
+		best_cell_volume = select(better, cell_volume, best_cell_volume);
 	}
 
 	return best;
@@ -160,21 +158,23 @@ float3 EvalProbeIrradiance(float3 normal, ProbeSHData probe)
 void ProbeDepthDirectionToFaceUV(float3 d, out uint face, out float2 uv01)
 {
 	const float3 a = abs(d);
-	float2 uv;
 
-	if (a.x >= a.y && a.x >= a.z) {
-		face = (d.x > 0.0) ? 0 : 1;
-		uv = float2((d.x > 0.0) ? -d.z : d.z, -d.y) / a.x;
-	}
-	else if (a.y >= a.z) {
-		face = (d.y > 0.0) ? 2 : 3;
-		uv = float2(d.x, (d.y > 0.0) ? d.z : -d.z) / a.y;
-	}
-	else {
-		face = (d.z > 0.0) ? 4 : 5;
-		uv = float2((d.z > 0.0) ? d.x : -d.x, -d.y) / a.z;
-	}
+	const bool x_major = and(a.x >= a.y, a.x >= a.z);
+	const bool y_major = a.y >= a.z;
+	const bool3 positive = d > 0.0;
 
+	const uint face_x = select(positive.x, 0u, 1u);
+	const uint face_y = select(positive.y, 2u, 3u);
+	const uint face_z = select(positive.z, 4u, 5u);
+
+	const float2 uv_x = float2(select(positive.x, -d.z, d.z), -d.y);
+	const float2 uv_y = float2(d.x, select(positive.y, d.z, -d.z));
+	const float2 uv_z = float2(select(positive.z, d.x, -d.x), -d.y);
+
+	const float major = select(x_major, a.x, select(y_major, a.y, a.z));
+	const float2 uv = select(x_major, uv_x, select(y_major, uv_y, uv_z)) / major;
+
+	face = select(x_major, face_x, select(y_major, face_y, face_z));
 	uv01 = uv * 0.5 + 0.5;
 }
 
@@ -189,19 +189,15 @@ float ProbeMinVariance(float mean)
 }
 
 
-float ProbeDepthChebyshev(float receiver_dist, float mean, float stddev)
+float ProbeDepthChebyshev(float receiver_dist, float mean, float variance)
 {
 	const float biased_dist = max(receiver_dist - PROBE_CHEBYSHEV_BIAS, 0.0);
 
-	// In front of the mean occluder distance: fully visible.
-	if (biased_dist <= mean) {
-		return 1.0;
-	}
-
-	const float variance = max(stddev * stddev, ProbeMinVariance(mean));
+	const float clamped_variance = max(variance, ProbeMinVariance(mean));
 	const float d = biased_dist - mean;
 
-	return variance / (variance + d * d);
+	// In front of the mean occluder distance: fully visible.
+	return select(biased_dist <= mean, 1.0, clamped_variance / (clamped_variance + d * d));
 }
 
 /// Where probe `index`'s strip for `face` starts in the atlas, in texels.
@@ -212,17 +208,35 @@ float2 ProbeAtlasFaceOrigin(uint index, uint face)
 	return float2((tile.x * PROBE_ATLAS_PROBE_WIDTH) + (face * PROBE_DEPTH_SIZE), tile.y * PROBE_DEPTH_SIZE);
 }
 
-/// Bilinear-filtered moments fetch from a single probe face, decoded to metres. One hardware filtered sample: the
-/// coordinate is clamped half a texel inside the face so the filter cannot reach into a neighbouring face or probe,
-/// which is what the old manual bilinear was doing by hand.
-float2 SampleProbeMoments(Texture2D moments_atlas, SamplerState moments_sampler, uint index, uint face, float2 uv01)
+struct ProbeMoments
 {
-	const float2 in_face = clamp(uv01 * float(PROBE_DEPTH_SIZE), 0.5, float(PROBE_DEPTH_SIZE) - 0.5);
+	float Mean;
+	float Variance;
+};
 
-	const float2 texel = ProbeAtlasFaceOrigin(index, face) + in_face;
-	const float2 uv = texel / float2(PROBE_ATLAS_WIDTH, PROBE_ATLAS_HEIGHT);
+ProbeMoments SampleProbeMoments(Texture2D moments_atlas, SamplerState moments_sampler, uint index, uint face,
+								float2 uv01)
+{
+	const float2 in_face = clamp(uv01 * float(PROBE_DEPTH_SIZE), 0.5, float(PROBE_DEPTH_SIZE) - 0.5) - 0.5;
+	const float2 base = floor(in_face);
+	const float2 f = in_face - base;
 
-	return moments_atlas.SampleLevel(moments_sampler, uv, 0).xy * PROBE_DEPTH_MAX_DISTANCE;
+	const float2 corner = ProbeAtlasFaceOrigin(index, face) + base + 1.0;
+	const float2 uv = corner / float2(PROBE_ATLAS_WIDTH, PROBE_ATLAS_HEIGHT);
+
+	const float4 means = moments_atlas.GatherRed(moments_sampler, uv) * PROBE_DEPTH_MAX_DISTANCE;
+	const float4 deviations = moments_atlas.GatherGreen(moments_sampler, uv) * PROBE_DEPTH_MAX_DISTANCE;
+
+	const float4 weights =
+		float4((1.0 - f.x) * f.y, f.x * f.y, f.x * (1.0 - f.y), (1.0 - f.x) * (1.0 - f.y));
+
+	ProbeMoments moments;
+	moments.Mean = dot(weights, means);
+
+	const float4 offsets = means - moments.Mean;
+	moments.Variance = dot(weights, deviations * deviations + offsets * offsets);
+
+	return moments;
 }
 
 /// Visibility of `pos_ws` as seen from probe `info_index` using its depth cubemap.
@@ -232,22 +246,22 @@ float SampleProbeVisibility(float3 pos_ws, float3 probe_pos, Texture2D moments_a
 	const float3 to_receiver = pos_ws - probe_pos;
 	const float raw_dist = length(to_receiver);
 
-	if (raw_dist < 1e-4) {
-		return 1.0;
-	}
+	const bool at_probe = raw_dist < 1e-4;
+	const float3 direction = select(at_probe, float3(0.0, 0.0, 1.0), to_receiver / max(raw_dist, 1e-4));
 
 	uint face;
 	float2 uv01;
-	ProbeDepthDirectionToFaceUV(to_receiver / raw_dist, face, uv01);
+	ProbeDepthDirectionToFaceUV(direction, face, uv01);
 
-	const float2 moments = SampleProbeMoments(moments_atlas, moments_sampler, index, face, uv01);
+	const ProbeMoments moments = SampleProbeMoments(moments_atlas, moments_sampler, index, face, uv01);
 
 	// Nothing was hit in this direction.
-	if (moments.x >= PROBE_DEPTH_MAX_DISTANCE) {
-		return 1.0;
-	}
+	const bool no_hit = moments.Mean >= PROBE_DEPTH_MAX_DISTANCE - 1e-3;
 
-	return ProbeDepthChebyshev(min(raw_dist, PROBE_DEPTH_MAX_DISTANCE), moments.x, moments.y);
+	const float visibility =
+		ProbeDepthChebyshev(min(raw_dist, PROBE_DEPTH_MAX_DISTANCE), moments.Mean, moments.Variance);
+
+	return select(or(at_probe, no_hit), 1.0, visibility);
 }
 
 /// Lower weight for probes behind the surface.
@@ -256,13 +270,9 @@ float ProbeBackfaceWeight(float3 pos_ws, float3 n, float3 probe_pos)
 	const float3 to_probe = probe_pos - pos_ws;
 	const float len = length(to_probe);
 
-	if (len < 1e-4) {
-		return 1.0 + PROBE_BACKFACE_FLOOR;
-	}
+	const float wrap = (dot(to_probe / max(len, 1e-4), n) + 1.0) * 0.5;
 
-	const float wrap = (dot(to_probe / len, n) + 1.0) * 0.5;
-
-	return wrap * wrap + PROBE_BACKFACE_FLOOR;
+	return select(len < 1e-4, 1.0 + PROBE_BACKFACE_FLOOR, wrap * wrap + PROBE_BACKFACE_FLOOR);
 }
 
 /// `pos_ws` moved off the surface along its normal, so that the surface doesn't occlude itself in the visibility test.
@@ -287,8 +297,15 @@ void ProbeVolumeCell(float3 pos_ws, ProbeVolume volume, out uint3 base, out floa
 }
 
 
+uint ProbeGridLookup(StructuredBuffer<uint> grid, uint point_index)
+{
+	const uint word = grid[point_index >> 1];
+	return select((point_index & 1) != 0, word >> 16, word & 0xFFFF);
+}
+
 /// Where corner `corner` (0-7, one bit per axis) of the cell at `base` is in the probe buffers, and its trilinear weight
-uint ProbeCellCorner(ProbeVolume volume, uint3 base, float3 cell_frac, uint corner, out float trilinear)
+uint ProbeCellCorner(ProbeVolume volume, StructuredBuffer<uint> grid, uint3 base, float3 cell_frac, uint corner,
+					 out float trilinear)
 {
 	const uint3 dims = volume.vDimsAndFirst.xyz;
 	const uint3 offset = uint3(corner, corner >> 1, corner >> 2) & uint3(1, 1, 1);
@@ -297,13 +314,13 @@ uint ProbeCellCorner(ProbeVolume volume, uint3 base, float3 cell_frac, uint corn
 	const float3 axis_weights = lerp(1.0 - cell_frac, cell_frac, float3(offset));
 	trilinear = axis_weights.x * axis_weights.y * axis_weights.z;
 
-	return volume.vDimsAndFirst.w + cell.x + dims.x * (cell.y + dims.y * cell.z);
+	return ProbeGridLookup(grid, volume.vDimsAndFirst.w + cell.x + dims.x * (cell.y + dims.y * cell.z));
 }
 
-void SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume volume,
-								 StructuredBuffer<ProbeSHData> probes, Texture2D moments_atlas,
-								 SamplerState moments_sampler, out float3 out_diffuse, out float3 out_specular,
-								 out float out_visibility)
+bool SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume volume,
+								 StructuredBuffer<ProbeSHData> probes, StructuredBuffer<uint> grid,
+								 Texture2D moments_atlas, SamplerState moments_sampler, out float3 out_diffuse,
+								 out float3 out_specular, out float out_visibility)
 {
 	const float3 biased_pos = ProbeBiasedPosition(pos_ws, n, volume);
 
@@ -319,16 +336,18 @@ void SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume 
 	float total_weight = 0.0;
 
 	float visibility_sum = 0.0;
-	float active_trilinear = 0.0;
+	float placed_trilinear = 0.0;
+	uint placed_count = 0;
 
 	for (uint corner = 0; corner < 8; corner++) {
 		float trilinear;
-		const uint index = ProbeCellCorner(volume, base, cell_frac, corner, trilinear);
+		const uint index = ProbeCellCorner(volume, grid, base, cell_frac, corner, trilinear);
 
-		// Checked before the rest of the probe is read, inactive probes cost a single load
-		if (!ProbeSHActive(probes[index])) {
+		if (index == PROBE_GRID_EMPTY) {
 			continue;
 		}
+
+		placed_count++;
 
 		const ProbeSHData probe = probes[index];
 		const float3 probe_pos = ProbeSHPosition(probe);
@@ -337,10 +356,15 @@ void SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume 
 			SampleProbeVisibility(biased_pos, probe_pos, moments_atlas, moments_sampler, index);
 
 		visibility_sum += visibility * trilinear;
-		active_trilinear += trilinear;
+		placed_trilinear += trilinear;
 
-		const float weight =
-			trilinear * ProbeBackfaceWeight(pos_ws, n, probe_pos) * max(visibility, PROBE_VISIBILITY_FLOOR);
+		float weight = max(ProbeBackfaceWeight(pos_ws, n, probe_pos) * visibility * visibility * visibility,
+						   PROBE_MIN_WEIGHT);
+
+		weight = select(weight < PROBE_WEIGHT_CRUSH,
+						weight * (weight * weight / (PROBE_WEIGHT_CRUSH * PROBE_WEIGHT_CRUSH)), weight);
+
+		weight *= trilinear;
 
 		diffuse += EvalProbeIrradianceRaw(n_basis, probe) * weight;
 		specular += EvalProbeIrradianceRaw(r_basis, probe) * weight;
@@ -348,29 +372,129 @@ void SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume 
 		total_weight += weight;
 	}
 
-	out_visibility = (active_trilinear > 1e-6) ? (visibility_sum / active_trilinear) : 1.0;
+	out_visibility = select(placed_trilinear > 1e-6, visibility_sum / placed_trilinear, 1.0);
 
-	if (total_weight > 1e-6) {
+	if (placed_count == 0) {
+		out_diffuse = float3(0.0, 0.0, 0.0);
+		out_specular = float3(0.0, 0.0, 0.0);
+		return false;
+	}
+
+	if (total_weight > 1e-30) {
 		diffuse /= total_weight;
 		specular /= total_weight;
 	}
 	else {
-		// None of the cell's active probes carry any weight: plain trilinear over every probe instead. Rare, so it is
-		// done here rather than accumulated alongside the loop above for every pixel.
 		diffuse = float3(0.0, 0.0, 0.0);
 		specular = float3(0.0, 0.0, 0.0);
 
 		for (uint corner = 0; corner < 8; corner++) {
 			float trilinear;
-			const uint index = ProbeCellCorner(volume, base, cell_frac, corner, trilinear);
+			const uint index = ProbeCellCorner(volume, grid, base, cell_frac, corner, trilinear);
+
+			if (index == PROBE_GRID_EMPTY) {
+				continue;
+			}
 
 			const ProbeSHData probe = probes[index];
 
-			diffuse += EvalProbeIrradianceRaw(n_basis, probe) * trilinear;
-			specular += EvalProbeIrradianceRaw(r_basis, probe) * trilinear;
+			diffuse += EvalProbeIrradianceRaw(n_basis, probe);
+			specular += EvalProbeIrradianceRaw(r_basis, probe);
 		}
+
+		diffuse /= float(placed_count);
+		specular /= float(placed_count);
 	}
 
 	out_diffuse = max(diffuse, float3(0.0, 0.0, 0.0));
 	out_specular = max(specular, float3(0.0, 0.0, 0.0));
+
+	return true;
+}
+
+#define REFLECTION_PROBE_MAX_LOD 5.0
+
+struct ReflectionProbe
+{
+	float4x4 mWorldToBox;
+	float4 vPositionAndCount;
+	float4 vFade;
+};
+
+uint GetReflectionProbeCount(StructuredBuffer<ReflectionProbe> probes)
+{
+	return (uint)probes[0].vPositionAndCount.w;
+}
+
+float3 ReflectionBoxProject(float3 pos_ws, float3 dir_ws, float3 pos_bs, float3 dir_bs, float3 probe_pos)
+{
+	const float3 safe_dir = dir_bs + (step(abs(dir_bs), float3(1e-6, 1e-6, 1e-6)) * 2e-6);
+	const float3 inv_dir = 1.0 / safe_dir;
+
+	const float3 t_far = max((1.0 - pos_bs) * inv_dir, (-1.0 - pos_bs) * inv_dir);
+	const float t = min(t_far.x, min(t_far.y, t_far.z));
+
+	return (pos_ws + (dir_ws * max(t, 0.0))) - probe_pos;
+}
+
+float ReflectionProbeWeight(float3 pos_bs, ReflectionProbe probe)
+{
+	const float3 edge = ((1.0 - abs(pos_bs)) * probe.vFade.xyz) + 1.0;
+
+	return saturate(min(edge.x, min(edge.y, edge.z)));
+}
+
+float3 ReflectionProbeCoverage(float3 pos_ws, StructuredBuffer<ReflectionProbe> probes)
+{
+	const uint probe_count = (uint)probes[0].vFade.w;
+
+	float3 color = float3(0.0, 0.0, 0.0);
+	float remaining = 1.0;
+
+	for (uint i = 0; i < probe_count; i++) {
+		const ReflectionProbe probe = probes[i];
+
+		const float3 pos_bs = mul(float4(pos_ws, 1.0), probe.mWorldToBox).xyz;
+		const float weight = ReflectionProbeWeight(pos_bs, probe);
+
+		const float3 probe_color = 0.5 + (0.5 * cos(6.2831853 * ((float(i) * 0.618034) + float3(0.0, 0.33, 0.67))));
+
+		color += probe_color * (weight * remaining);
+		remaining *= 1.0 - weight;
+	}
+
+	return color + (float3(0.03, 0.03, 0.03) * remaining);
+}
+
+float3 SampleReflectionProbes(float3 pos_ws, float3 r, float roughness, float3 fallback, uint probe_count,
+							  StructuredBuffer<ReflectionProbe> probes, TextureCubeArray cubemaps,
+							  SamplerState cubemap_sampler)
+{
+	const float lod = roughness * REFLECTION_PROBE_MAX_LOD;
+
+	float3 radiance = float3(0.0, 0.0, 0.0);
+	float remaining = 1.0;
+
+	for (uint i = 0; i < probe_count; i++) {
+		const ReflectionProbe probe = probes[i];
+
+		const float3 pos_bs = mul(float4(pos_ws, 1.0), probe.mWorldToBox).xyz;
+		const float weight = ReflectionProbeWeight(pos_bs, probe);
+
+		if (weight <= 0.0) {
+			continue;
+		}
+
+		const float3 dir_bs = mul(float4(r, 0.0), probe.mWorldToBox).xyz;
+		const float3 dir = ReflectionBoxProject(pos_ws, r, pos_bs, dir_bs, probe.vPositionAndCount.xyz);
+
+		radiance += cubemaps.SampleLevel(cubemap_sampler, float4(dir, float(i)), lod).rgb * (weight * remaining);
+		remaining *= 1.0 - weight;
+
+		if (remaining < 0.01) {
+			break;
+		}
+	}
+
+	return radiance + (fallback * remaining);
 }

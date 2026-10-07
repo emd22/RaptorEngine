@@ -7,11 +7,15 @@
 #include <Asset/AssetTicket.hpp>
 #include <Asset/ConfigFile.hpp>
 #include <Object/Object.hpp>
+#include <Physics/JoltPhysicsBackend.hpp>
+#include <Physics/Ragdoll.hpp>
 #include <Player.hpp>
 #include <Renderer/Exposure.hpp>
 #include <Script/ScriptManager.hpp>
 #include <World.hpp>
 #include <atomic>
+#include <memory>
+#include <vector>
 
 class ShadowDirectional;
 
@@ -32,7 +36,7 @@ class CVarValue;
 // 	EditorModeMoveCollider() = delete;
 // 	EditorModeMoveCollider(Ref<PerspectiveCamera> camera) { this->pCamera = camera; }
 
-// 	void Update(const World& scene, const Vec3f& movement_vector) override;
+// 	void Update(const World& scene, const Vec3f movement_vector) override;
 // 	void OnLeave(const World& scene) override;
 
 // 	~EditorModeMoveCollider() override {};
@@ -45,7 +49,7 @@ class CVarValue;
 // 	EditorModeScaleCollider() = delete;
 // 	EditorModeScaleCollider(Ref<PerspectiveCamera> camera) { this->pCamera = camera; }
 
-// 	void Update(const World& scene, const Vec3f& movement_vector) override;
+// 	void Update(const World& scene, const Vec3f movement_vector) override;
 // 	void OnLeave(const World& scene) override;
 
 // 	~EditorModeScaleCollider() override {};
@@ -75,6 +79,7 @@ private:
 
 	void ReloadWorldFile();
 	void ReloadBlockout();
+	void UpdateWindowTitle();
 	void ReloadScripts();
 
 	void DestroyGame();
@@ -83,6 +88,14 @@ private:
 
 	void RenderText();
 	void RenderCrosshair();
+
+	struct RagdollDummy;
+
+	void RequestRagdollDrop();
+	void UpdateRagdollDummies();
+	void DropRagdollDummy(Object* model);
+	void DestroyRagdollDummy(size_t index);
+	void SpawnRagdollBlood(RagdollDummy& dummy, const physics::RagdollImpact& impact, float32 min_speed);
 
 public:
 	Ref<LightDirectional> pSun { nullptr };
@@ -112,15 +125,22 @@ private:
 
 	CVarValue* mpShowFpsCVar = nullptr;
 
+	String mBaseWindowTitle;
+	String mTitleBlockoutPath;
+	bool mbTitleShown = false;
+
 	// $i_show_gpu shows the GPU time of each stage. $r_probes and $r_decals switch the probes and decals off when 0
 	CVarValue* mpShowGpuCVar = nullptr;
 	CVarValue* mpProbesCVar = nullptr;
+	CVarValue* mpReflectionProbesCVar = nullptr;
+	CVarValue* mpReflectionDebugCVar = nullptr;
 	CVarValue* mpDecalsCVar = nullptr;
 	CVarValue* mpDebugBoundsCVar = nullptr;
 	CVarValue* mpExposureCVar = nullptr;
 	CVarValue* mpApertureCVar = nullptr;
 	CVarValue* mpShutterCVar = nullptr;
 	CVarValue* mpIsoCVar = nullptr;
+	CVarValue* mpTonemapperCVar = nullptr;
 
 	void UpdateExposure();
 
@@ -132,6 +152,25 @@ private:
 	ConfigFile Config;
 
 	Console mCommandConsole;
+
+	struct RagdollDummy
+	{
+		ObjectID RootID = ObjectID::scNull;
+		std::unique_ptr<physics::Ragdoll> pRagdoll;
+		float32 BloodCooldown = 0.0f;
+	};
+
+	static constexpr size_t scMaxRagdollDummies = 8;
+	static constexpr float32 scDefaultRagdollBloodSpeed = 3.5f;
+
+	std::vector<RagdollDummy> mRagdollDummies;
+	std::vector<physics::RagdollImpact> mRagdollImpacts;
+	AssetTicket mRagdollTemplateTicket { nullptr };
+	std::atomic<Object*> mpRagdollTemplate = nullptr;
+	bool mbRagdollTemplateRequested = false;
+	uint32 mRagdollDropsPending = 0;
+	uint32 mRagdollSpawnCount = 0;
+	CVarValue* mpRagdollBloodSpeedCVar = nullptr;
 
 	AssetTicket mCrosshairTicket { nullptr };
 	std::atomic<Image*> mpCrosshair = nullptr;

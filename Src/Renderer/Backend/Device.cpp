@@ -259,10 +259,23 @@ void GpuDevice::CreateLogicalDevice()
 		.timelineSemaphore = VK_TRUE,
 	};
 
+	VkPhysicalDeviceFeatures supported_features;
+	vkGetPhysicalDeviceFeatures(Physical, &supported_features);
+
+	if (supported_features.samplerAnisotropy) {
+		VkPhysicalDeviceProperties properties;
+		vkGetPhysicalDeviceProperties(Physical, &properties);
+
+		MaxSamplerAnisotropy = properties.limits.maxSamplerAnisotropy;
+	}
+
+	bSupportsCubeArrays = (supported_features.imageCubeArray == VK_TRUE);
+
 	VkPhysicalDeviceFeatures2 features2 {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
 		.pNext = &timeline_semaphore_features,
-		.features = {},
+		.features = { .imageCubeArray = supported_features.imageCubeArray,
+					  .samplerAnisotropy = supported_features.samplerAnisotropy },
 	};
 
 

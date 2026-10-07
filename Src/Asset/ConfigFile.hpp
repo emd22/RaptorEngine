@@ -13,12 +13,12 @@
 #include <Core/Memory.hpp>
 #include <Core/Name.hpp>
 #include <Core/PagedArray.hpp>
+#include <Core/String.hpp>
 #include <Core/Types.hpp>
 #include <Math/Quat.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
 #include <Util/Tokenizer.hpp>
-#include <string>
 
 namespace fx {
 
@@ -227,13 +227,13 @@ public:
 
 
 	template <typename TType>
-		requires C_ConfigSupportsType<TType> && (!std::is_same_v<std::string, TType>)
+		requires C_ConfigSupportsType<TType> && (!std::is_same_v<String, TType>)
 	void Set(TType value)
 	{
 		static_assert(
 			C_ConfigSupportsType<TType>,
 			"ConfigPrimitive::Set does not support this type. Supported types are integral, floating point, and "
-			"string (char*, const char*, or std::string) types.");
+			"string (char*, const char*, or String) types.");
 
 		if (Type == ePrimitiveType::String && mStringValue) {
 			free(mStringValue);
@@ -253,17 +253,17 @@ public:
 		}
 	}
 
-	void Set(const std::string& str)
+	void Set(const String& str)
 	{
 		if (Type == ePrimitiveType::String && mStringValue) {
 			free(mStringValue);
 			mStringValue = nullptr;
 		}
 		Type = ePrimitiveType::String;
-		mStringValue = strdup(str.c_str());
+		mStringValue = strdup(str.CStr());
 	}
 
-	std::string AsString() const;
+	String AsString() const;
 
 
 public:
@@ -295,7 +295,7 @@ public:
 class ConfigEntry : public ConfigPrimitive
 {
 public:
-	static ConfigEntry Array(const std::string& name, ConfigPrimitive::ePrimitiveType type)
+	static ConfigEntry Array(const String& name, ConfigPrimitive::ePrimitiveType type)
 	{
 		ConfigEntry entry(name);
 		entry.Type = type;
@@ -304,7 +304,7 @@ public:
 	}
 
 	template <typename TType>
-	static ConfigEntry Array(const std::string& name, ConfigPrimitive::ePrimitiveType type, const Slice<TType>& data)
+	static ConfigEntry Array(const String& name, ConfigPrimitive::ePrimitiveType type, const Slice<TType>& data)
 	{
 		ConfigEntry entry = ConfigEntry::Array(name, type);
 
@@ -315,7 +315,7 @@ public:
 		return entry;
 	}
 
-	static ConfigEntry Struct(const std::string& name)
+	static ConfigEntry Struct(const String& name)
 	{
 		ConfigEntry entry(name);
 		entry.Type = ConfigPrimitive::ePrimitiveType::Struct;
@@ -323,27 +323,27 @@ public:
 	}
 
 	template <typename TType>
-	static ConfigEntry Literal(const std::string& name, const TType& literal)
+	static ConfigEntry Literal(const String& name, const TType& literal)
 	{
 		ConfigEntry entry(name, literal);
 		return entry;
 	}
 
-	static ConfigEntry Literal(const std::string& name, const Vec3f& value)
+	static ConfigEntry Literal(const String& name, const Vec3f value)
 	{
 		ConfigEntry entry = ConfigEntry::Array(name, ConfigPrimitive::ePrimitiveType::Float);
 		entry.AppendValue(value);
 		return entry;
 	}
 
-	static ConfigEntry Literal(const std::string& name, const Quat& value)
+	static ConfigEntry Literal(const String& name, const Quat value)
 	{
 		ConfigEntry entry = ConfigEntry::Array(name, ConfigPrimitive::ePrimitiveType::Float);
 		entry.AppendValue(value);
 		return entry;
 	}
 
-	static ConfigEntry DotReference(const std::string& name, const char* dot_ref)
+	static ConfigEntry DotReference(const String& name, const char* dot_ref)
 	{
 		ConfigEntry entry(name, dot_ref);
 		entry.bIsDotReference = true;
@@ -353,10 +353,10 @@ public:
 public:
 	ConfigEntry() = default;
 
-	ConfigEntry(const std::string& name) : Name(name) {}
+	ConfigEntry(const String& name) : Name(name) {}
 
 	template <typename TType>
-	ConfigEntry(const std::string& name, TType value) : ConfigEntry(name)
+	ConfigEntry(const String& name, TType value) : ConfigEntry(name)
 	{
 		Set(ConfigPrimitive::FromValue<TType>(value));
 	}
@@ -370,9 +370,9 @@ public:
 
 	void AppendValue(ConfigPrimitive&& value);
 
-	void AppendValue(const Vec3f& vec);
+	void AppendValue(const Vec3f vec);
 	void AppendValue(const Vec4f& vec);
-	void AppendValue(const Quat& quat);
+	void AppendValue(const Quat quat);
 
 	/////////////////////////////////////
 	// Value get functions
@@ -484,7 +484,7 @@ public:
 	ConfigEntry& operator=(const ConfigEntry& other) = delete;
 
 
-	std::string AsString(uint32 indent = 0) const;
+	String AsString(uint32 indent = 0) const;
 
 	~ConfigEntry();
 

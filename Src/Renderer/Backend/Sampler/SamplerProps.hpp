@@ -64,6 +64,8 @@ struct SamplerProps
     eSamplerBorderColor BorderColor = eSamplerBorderColor::IntBlack;
     eSamplerCompareOp CompareOp = eSamplerCompareOp::None;
 
+    uint8 MaxAnisotropy = 1;
+
     float32 MinLOD = 0.0f;
     float32 MaxLOD = 0.0f;
 };

@@ -19,8 +19,8 @@ public:
 	PhysicsPlayer() {}
 
 	void Create();
-	void Teleport(const Vec3f& position);
-	void ApplyMovement(const Vec3f& direction);
+	void Teleport(const Vec3f position);
+	void ApplyMovement(const Vec3f direction);
 
 	SizedArray<JPH::BodyID> RaycastBodies(Vec3f direction) const;
 

@@ -17,6 +17,9 @@ class ObjectPropertiesPanel;
 class WorldPropertiesPanel;
 class ToolSettingsBasePanel;
 class ObjectListWindow;
+class CVarListWindow;
+class MaterialPickerWindow;
+class AtlasPackerWindow;
 
 class EditorViewport;
 
@@ -45,10 +48,14 @@ public:
 	FX_FORCE_INLINE bool IsActive() const { return mbIsActive; }
 
 	void ShowObjectListWindow();
+	void ShowCVarListWindow();
+	void ShowMaterialPickerWindow();
+	void ShowAtlasPackerWindow();
 
-	void SaveBlockout();
-	void SaveBlockoutAs();
-	void OpenBlockout();
+	void NewPrototype();
+	void SavePrototype();
+	void SaveProtoTypeAs();
+	void OpenPrototype();
 
 private:
 	void OnClose(wxCloseEvent& event);
@@ -60,6 +67,9 @@ private:
 	ObjectPropertiesPanel* mpObjectPropertiesPanel = nullptr;
 	WorldPropertiesPanel* mpWorldPropertiesPanel = nullptr;
 	ObjectListWindow* mpObjectListWindow = nullptr;
+	CVarListWindow* mpCVarListWindow = nullptr;
+	MaterialPickerWindow* mpMaterialPickerWindow = nullptr;
+	AtlasPackerWindow* mpAtlasPackerWindow = nullptr;
 
 	/// The tool settings slot: whatever ToolSettingsBasePanel is currently swapped in, below Object Properties
 	ToolSettingsBasePanel* mpToolSettingsPanel = nullptr;

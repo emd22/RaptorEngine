@@ -398,13 +398,13 @@ void FoxVM::DoArith(uint8 op_base, uint8 op_spec)
 
 void FoxVM::CallExternalFunction(Hash32 hashed_name)
 {
-	auto it = ExternalProcs.find(hashed_name);
-	if (it == ExternalProcs.end()) {
+	VMExternalProcEntry* func_ptr = ExternalProcs.Find(hashed_name);
+	if (func_ptr == nullptr) {
 		LogWarning(LC_SCRIPT, "External function {} not found", hashed_name);
 		return;
 	}
 
-	VMExternalProcEntry& func = it->second;
+	VMExternalProcEntry& func = *func_ptr;
 
 	SizedArray<FoxValue> args {};
 
@@ -839,8 +839,7 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
 		uint16 var_index = Read16();
 		Hash32 name_hash = Read32();
 
-		auto it = Globals.find(name_hash);
-		if (it == Globals.end()) {
+		if (!Globals.Contains(name_hash)) {
 			Globals[name_hash].Set<int32>(0);
 		}
 
@@ -860,8 +859,7 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
 		uint16 var_index = Read16();
 		Hash32 name_hash = Read32();
 
-		auto it = Globals.find(name_hash);
-		if (it == Globals.end()) {
+		if (!Globals.Contains(name_hash)) {
 			Globals[name_hash].Set<int32>(0);
 		}
 
@@ -882,8 +880,7 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
 		uint16 var_index = Read16();
 		Hash32 name_hash = Read32();
 
-		auto it = Globals.find(name_hash);
-		if (it == Globals.end()) {
+		if (!Globals.Contains(name_hash)) {
 			Globals[name_hash].Set<int32>(0);
 		}
 

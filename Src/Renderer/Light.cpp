@@ -10,6 +10,7 @@
 #include "Camera.hpp"
 #include "Engine.hpp"
 
+#include <Math/Frustum.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
@@ -71,6 +72,7 @@ void LightBase::FillGpuData(LightGpuData& data, const PerspectiveCamera& camera,
 	data.Position[1] = mPosition.Y;
 	data.Position[2] = mPosition.Z;
 	data.Color = Color.Value;
+	Color.GetLinearRGB(data.LinearColor);
 	data.Intensity = Intensity;
 
 	data.Type = static_cast<uint32>(Type);
@@ -87,7 +89,7 @@ void LightBase::SetRadius(const float radius)
 	}
 }
 
-void LightBase::SetPosition(const Vec3f& position)
+void LightBase::SetPosition(const Vec3f position)
 {
 	Entity::SetPosition(position);
 
@@ -96,7 +98,7 @@ void LightBase::SetPosition(const Vec3f& position)
 	}
 }
 
-void LightBase::SetRotation(const Quat& rotation)
+void LightBase::SetRotation(const Quat rotation)
 {
 	Entity::SetRotation(rotation);
 
@@ -105,10 +107,19 @@ void LightBase::SetRotation(const Quat& rotation)
 	}
 }
 
-AABB LightBase::GetBounds() const
+BBox LightBase::GetBounds() const
 {
 	const Vec3f extent(mRadius);
-	return AABB(mPosition - extent, mPosition + extent);
+	return BBox(mPosition - extent, mPosition + extent);
+}
+
+bool LightBase::IsOutsideFrustum(const Frustum& frustum) const
+{
+	if (!IsCullable()) {
+		return false;
+	}
+
+	return !frustum.IntersectsSphere(mPosition, mRadius);
 }
 
 LightPoint::LightPoint() { Type = eLightType::Point; }
@@ -164,7 +175,7 @@ void LightSpot::SetConeAngles(float32 inner_angle, float32 outer_angle)
 	}
 }
 
-AABB LightSpot::GetBounds() const
+BBox LightSpot::GetBounds() const
 {
 	const Vec3f direction = GetDirection().Normalize();
 	const float32 axis_components[3] = { direction.X, direction.Y, direction.Z };
@@ -183,19 +194,24 @@ AABB LightSpot::GetBounds() const
 		low[axis] = -mRadius * std::max(reach_negative, 0.0f);
 	}
 
-	return AABB(mPosition + Vec3f(low[0], low[1], low[2]), mPosition + Vec3f(high[0], high[1], high[2]));
+	return BBox(mPosition + Vec3f(low[0], low[1], low[2]), mPosition + Vec3f(high[0], high[1], high[2]));
 }
 
-float32 LightSpot::GetSolidAngle() const
+bool LightSpot::IsOutsideFrustum(const Frustum& frustum) const { return !frustum.IntersectsAABB(GetBounds()); }
+
+float32 LightSpot::GetEffectiveSolidAngle() const
 {
-	return 2.0f * static_cast<float32>(M_PI) * (1.0f - cosf(mOuterAngle));
+	const float32 cos_inner = cosf(mInnerAngle);
+	const float32 cos_outer = cosf(mOuterAngle);
+
+	return 2.0f * static_cast<float32>(M_PI) * ((1.0f - cos_inner) + ((cos_inner - cos_outer) / 3.0f));
 }
 
-float32 LightSpot::GetLumens() const { return Intensity * GetSolidAngle(); }
+float32 LightSpot::GetLumens() const { return Intensity * GetEffectiveSolidAngle(); }
 
-void LightSpot::SetLumens(float32 lumens) { Intensity = lumens / std::max(GetSolidAngle(), 1e-4f); }
+void LightSpot::SetLumens(float32 lumens) { Intensity = lumens / std::max(GetEffectiveSolidAngle(), 1e-4f); }
 
-void LightSpot::SetDirection(const Vec3f& direction)
+void LightSpot::SetDirection(const Vec3f direction)
 {
 	const Vec3f dir = direction.Normalize();
 

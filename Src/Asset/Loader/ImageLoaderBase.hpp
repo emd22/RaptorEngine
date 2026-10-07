@@ -3,6 +3,7 @@
 #include "LoaderBase.hpp"
 
 #include <Asset/AssetTicket.hpp>
+#include <Core/String.hpp>
 #include <Renderer/Backend/Image.hpp>
 
 namespace fx {
@@ -17,7 +18,7 @@ public:
 public:
 	ImageLoaderBase() = default;
 
-	virtual eLoaderStatus Load(AssetTicket& ticket, const std::string& path) = 0;
+	virtual eLoaderStatus Load(AssetTicket& ticket, const String& path) = 0;
 	virtual eLoaderStatus Load(AssetTicket& ticket, const uint8* data, uint32 size) = 0;
 
 	virtual void CreateGpuResource(AssetTicket& ticket) = 0;

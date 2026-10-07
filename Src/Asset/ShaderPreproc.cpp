@@ -30,6 +30,7 @@ enum eStringId
 	FR_SAMPLER2D,
 
 	F_Texture2D,
+	F_TextureCubeArray,
 	F_DataTexture2D,
 	F_ShadowTexture2D,
 
@@ -56,6 +57,7 @@ static constexpr const char* scStrings[] = {
 	"FR_SAMPLER2D",
 
 	"F_Texture2D",
+	"F_TextureCubeArray",
 	"F_DataTexture2D",
 	"F_ShadowTexture2D",
 
@@ -348,6 +350,7 @@ static const PPFuncEntry PPFunctions[] = {
 
 	// Texture definition macros
 	PPFuncEntry(FStr(F_Texture2D), true, true, ParseTexture2DDefinition),
+	PPFuncEntry(FStr(F_TextureCubeArray), true, true, ParseTexture2DDefinition),
 	PPFuncEntry(FStr(F_DataTexture2D), true, true, ParseDataTexture2DDefinition),
 	PPFuncEntry(FStr(F_ShadowTexture2D), true, true, ParseTexture2DDefinition),
 

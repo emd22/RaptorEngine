@@ -19,6 +19,7 @@
 #include <Renderer/Backend/BarrierHelper.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
+#include <Renderer/ReflectionFilter.hpp>
 #include <World.hpp>
 #include <algorithm>
 #include <bit>
@@ -30,7 +31,7 @@
 #include <vector>
 
 /// Bump whenever the layout or meaning of the cached data changes
-#define FX_PROBE_CACHE_FILE_VERSION 11
+#define FX_PROBE_CACHE_FILE_VERSION 12
 
 namespace fx {
 
@@ -44,7 +45,9 @@ struct ProbePlacementBoxes
 
 	struct Box
 	{
-		AABB LocalBounds;
+		BBox LocalBounds;
+		BBox WorldBounds;
+		bool bAxisAligned = false;
 		Mat4f LocalToWorld;
 		Mat4f WorldToLocal;
 
@@ -83,7 +86,7 @@ constexpr float32 scCosineLobe[Limits::ProbeSHCoeffCount] = {
 };
 
 /// Real SH basis up to L2. The order must match EvalProbeIrradiance() in Shaders/ProbeCommon.hlsli.
-void EvalSHBasis(const Vec3f& d, float32 out[Limits::ProbeSHCoeffCount])
+void EvalSHBasis(const Vec3f d, float32 out[Limits::ProbeSHCoeffCount])
 {
 	out[0] = scSHNorm0;
 	out[1] = scSHNorm1 * d.Y;
@@ -122,7 +125,7 @@ constexpr int64 scMaxProbeBounces = 8;
 /// Surfaces closer than this to a probe are clipped out of its capture, so it sees straight through them
 constexpr float32 scCaptureNearPlane = 0.1f;
 
-PerspectiveCamera MakeCaptureCamera(const Vec3f& position, uint32 face)
+PerspectiveCamera MakeCaptureCamera(const Vec3f position, uint32 face)
 {
 	static const Vec3f scFaceDirections[ProbeManager::scCaptureFaces] = {
 		Vec3f(1.0f, 0.0f, 0.0f),  Vec3f(-1.0f, 0.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
@@ -149,7 +152,7 @@ float32 CaptureTexelToNdc(uint32 index)
 	return ((static_cast<float32>(index) + 0.5f) / static_cast<float32>(ProbeManager::scCaptureSize)) * 2.0f - 1.0f;
 }
 
-uint32 DirectionToMomentTexel(const Vec3f& d)
+uint32 DirectionToMomentTexel(const Vec3f d)
 {
 	const Vec3f a = d.Abs();
 
@@ -243,34 +246,32 @@ constexpr uint32 scRelocationSearchSteps = 5;
 constexpr float32 scMaxPlacementObjectSize = 100.0f;
 
 constexpr float32 scDefaultProbeSpacing = 2.5f;
+constexpr float32 scDefaultLevelProbeSpacing = 0.5f;
 constexpr float32 scMaxProbeSpacing = 64.0f;
+constexpr float32 scSurfaceSpacingStep = 1.25f;
+
+constexpr float32 scBaseProbeSpacing = 2.0f;
+constexpr uint32 scBaseProbeGridBudget = 512;
+
+constexpr float32 scSurfaceCellMargin = 0.05f;
+
+constexpr float32 scShaderNormalBiasScale = 0.2f;
+constexpr float32 scShaderNormalBiasMin = 0.02f;
+constexpr float32 scShaderNormalBiasMax = 0.5f;
 
 void GetObjectWorldBounds(Object& object, Vec3f& out_min, Vec3f& out_max)
 {
 	// OBB::FromLocalBounds() does the same per-corner transform this used to do inline
-	const AABB world_bounds = object.GetWorldOBB().GetWorldAABB();
+	const BBox world_bounds = object.GetWorldOBB().GetWorldAABB();
 
 	out_min = world_bounds.Min;
 	out_max = world_bounds.Max;
 }
 
-ProbeGridSize MakeGridForSize(const Vec3f& size, float32 spacing, uint32 budget)
+uint32 SlicesForExtent(float32 extent, float32 spacing)
 {
-	const auto axis_dim = [](float32 extent, float32 axis_spacing)
-	{
-		const float32 cells = std::max(extent, 0.0f) / std::max(axis_spacing, 1e-3f);
-		return std::max(static_cast<uint32>(std::lround(cells)) + 1, Limits::MinProbeGridDim);
-	};
-
-	for (float32 tried = std::max(spacing, 1e-3f); tried <= scMaxProbeSpacing; tried *= 1.5f) {
-		const ProbeGridSize grid { axis_dim(size.X, tried), axis_dim(size.Y, tried), axis_dim(size.Z, tried) };
-
-		if (grid.GetProbeCount() <= budget) {
-			return grid;
-		}
-	}
-
-	return ProbeGridSize { Limits::MinProbeGridDim, Limits::MinProbeGridDim, Limits::MinProbeGridDim };
+	const float32 slices = std::max(extent, 0.0f) / std::max(spacing, 1e-3f);
+	return std::max(static_cast<uint32>(std::lround(slices)), Limits::MinProbeGridDim);
 }
 
 ProbePlacementBoxes GatherPlacementBoxes()
@@ -285,7 +286,7 @@ ProbePlacementBoxes GatherPlacementBoxes()
 			continue;
 		}
 
-		const AABB world_bounds = object.GetWorldOBB().GetWorldAABB();
+		const BBox world_bounds = object.GetWorldOBB().GetWorldAABB();
 
 		if ((world_bounds.Max - world_bounds.Min).Length() > scMaxPlacementObjectSize) {
 			continue;
@@ -296,6 +297,7 @@ ProbePlacementBoxes GatherPlacementBoxes()
 
 			ProbePlacementBoxes::Box& box = boxes.Boxes[boxes.Count++];
 			box.LocalBounds = object.Bounds;
+			box.WorldBounds = world_bounds;
 			box.LocalToWorld = local_to_world;
 			box.WorldToLocal = local_to_world.Inverse();
 
@@ -310,6 +312,14 @@ ProbePlacementBoxes GatherPlacementBoxes()
 					box.Planes.push_back({ plane.Normal, plane.Distance });
 				}
 			}
+
+			constexpr float32 cAxisEpsilon = 1e-5f;
+
+			const Mat4f& m = local_to_world;
+			box.bAxisAligned = box.Planes.empty() && std::abs(m.Rows[0].Y) < cAxisEpsilon &&
+							   std::abs(m.Rows[0].Z) < cAxisEpsilon && std::abs(m.Rows[1].X) < cAxisEpsilon &&
+							   std::abs(m.Rows[1].Z) < cAxisEpsilon && std::abs(m.Rows[2].X) < cAxisEpsilon &&
+							   std::abs(m.Rows[2].Y) < cAxisEpsilon;
 		}
 
 		boxes.Min = Vec3f::Min(boxes.Min, world_bounds.Min);
@@ -324,13 +334,13 @@ ProbePlacementBoxes GatherPlacementBoxes()
 	return boxes;
 }
 
-Vec3f ToBoxLocal(const Vec3f& point, const ProbePlacementBoxes::Box& box)
+Vec3f ToBoxLocal(const Vec3f point, const ProbePlacementBoxes::Box& box)
 {
 	const Vec4f local = box.WorldToLocal * Vec4f(point.X, point.Y, point.Z, 1.0f);
 	return Vec3f(local.X, local.Y, local.Z);
 }
 
-bool IsInsideBox(const Vec3f& point, const ProbePlacementBoxes::Box& box, float32 skin)
+bool IsInsideBox(const Vec3f point, const ProbePlacementBoxes::Box& box, float32 skin)
 {
 	const Vec3f local = ToBoxLocal(point, box);
 
@@ -354,7 +364,7 @@ bool IsInsideBox(const Vec3f& point, const ProbePlacementBoxes::Box& box, float3
 	return true;
 }
 
-bool IsInsideAnyBox(const Vec3f& point, const ProbePlacementBoxes& boxes)
+bool IsInsideAnyBox(const Vec3f point, const ProbePlacementBoxes& boxes)
 {
 	for (uint32 i = 0; i < boxes.Count; i++) {
 		if (IsInsideBox(point, boxes.Boxes[i], scProbeInsideSkin)) {
@@ -365,7 +375,7 @@ bool IsInsideAnyBox(const Vec3f& point, const ProbePlacementBoxes& boxes)
 	return false;
 }
 
-bool IsInsideLevel(const Vec3f& point, const ProbePlacementBoxes& boxes)
+bool IsInsideLevel(const Vec3f point, const ProbePlacementBoxes& boxes)
 {
 	for (uint32 axis = 0; axis < 3; axis++) {
 		if (point.mData[axis] < boxes.Min.mData[axis] || point.mData[axis] > boxes.Max.mData[axis]) {
@@ -377,7 +387,7 @@ bool IsInsideLevel(const Vec3f& point, const ProbePlacementBoxes& boxes)
 }
 
 /// The point of the box's solid nearest to `local`, in the box's local space
-Vec3f ClosestPointInBox(const Vec3f& local, const ProbePlacementBoxes::Box& box)
+Vec3f ClosestPointInBox(const Vec3f local, const ProbePlacementBoxes::Box& box)
 {
 	if (box.Planes.empty()) {
 		return Vec3f::Clamp(local, box.LocalBounds.Min, box.LocalBounds.Max);
@@ -419,7 +429,7 @@ Vec3f ClosestPointInBox(const Vec3f& local, const ProbePlacementBoxes::Box& box)
 	return closest;
 }
 
-float32 DistanceToBox(const Vec3f& point, const ProbePlacementBoxes::Box& box)
+float32 DistanceToBox(const Vec3f point, const ProbePlacementBoxes::Box& box)
 {
 	const Vec3f closest_local = ClosestPointInBox(ToBoxLocal(point, box), box);
 	const Vec4f closest = box.LocalToWorld * Vec4f(closest_local.X, closest_local.Y, closest_local.Z, 1.0f);
@@ -427,7 +437,7 @@ float32 DistanceToBox(const Vec3f& point, const ProbePlacementBoxes::Box& box)
 	return (point - Vec3f(closest.X, closest.Y, closest.Z)).Length();
 }
 
-bool SegmentCrossesBox(const Vec3f& from, const Vec3f& to, const ProbePlacementBoxes::Box& box, float32 skin)
+bool SegmentCrossesBox(const Vec3f from, const Vec3f to, const ProbePlacementBoxes::Box& box, float32 skin)
 {
 	const Vec3f local_from = ToBoxLocal(from, box);
 	const Vec3f local_to = ToBoxLocal(to, box);
@@ -499,7 +509,7 @@ bool SegmentCrossesBox(const Vec3f& from, const Vec3f& to, const ProbePlacementB
 	return true;
 }
 
-bool IsProbePlacementValid(const Vec3f& grid_position, const Vec3f& position, const ProbePlacementBoxes& boxes)
+bool IsProbePlacementValid(const Vec3f grid_position, const Vec3f position, const ProbePlacementBoxes& boxes)
 {
 	if (boxes.IsEmpty()) {
 		return true;
@@ -533,7 +543,7 @@ uint32 GetFaceCount(const ProbePlacementBoxes::Box& box)
 }
 
 /// How far `local` has to move to leave through a face. Box faces are numbered axis * 2 + (0 for min, 1 for max).
-float32 GetFacePenetration(const Vec3f& local, const ProbePlacementBoxes::Box& box, uint32 face)
+float32 GetFacePenetration(const Vec3f local, const ProbePlacementBoxes::Box& box, uint32 face)
 {
 	if (!box.Planes.empty()) {
 		const ProbePlacementBoxes::Plane& plane = box.Planes[face];
@@ -546,7 +556,7 @@ float32 GetFacePenetration(const Vec3f& local, const ProbePlacementBoxes::Box& b
 							 : local.mData[axis] - box.LocalBounds.Min.mData[axis];
 }
 
-Vec3f ExitThroughFace(const Vec3f& local, const ProbePlacementBoxes::Box& box, uint32 face)
+Vec3f FaceExitPoint(const Vec3f local, const ProbePlacementBoxes::Box& box, uint32 face, Vec3f& out_world_normal)
 {
 	Vec3f exit_local = local;
 	Vec3f local_normal = Vec3f::sZero;
@@ -568,9 +578,182 @@ Vec3f ExitThroughFace(const Vec3f& local, const ProbePlacementBoxes::Box& box, u
 	const Vec4f exit_world = box.LocalToWorld * Vec4f(exit_local.X, exit_local.Y, exit_local.Z, 1.0f);
 
 	const Vec4f world_normal4 = box.LocalToWorld * Vec4f(local_normal.X, local_normal.Y, local_normal.Z, 0.0f);
-	const Vec3f world_normal = Vec3f(world_normal4.X, world_normal4.Y, world_normal4.Z).Normalize();
+	out_world_normal = Vec3f(world_normal4.X, world_normal4.Y, world_normal4.Z).Normalize();
 
-	return Vec3f(exit_world.X, exit_world.Y, exit_world.Z) + world_normal * scProbeSurfaceOffset;
+	return Vec3f(exit_world.X, exit_world.Y, exit_world.Z);
+}
+
+Vec3f ExitThroughFace(const Vec3f local, const ProbePlacementBoxes::Box& box, uint32 face)
+{
+	Vec3f world_normal;
+	const Vec3f exit = FaceExitPoint(local, box, face, world_normal);
+
+	return exit + world_normal * scProbeSurfaceOffset;
+}
+
+float32 DistanceToBoxSurface(const Vec3f point, const ProbePlacementBoxes::Box& box)
+{
+	if (!IsInsideBox(point, box, 0.0f)) {
+		return DistanceToBox(point, box);
+	}
+
+	const Vec3f local = ToBoxLocal(point, box);
+
+	float32 nearest = std::numeric_limits<float32>::max();
+
+	for (uint32 face = 0; face < GetFaceCount(box); face++) {
+		Vec3f world_normal;
+		nearest = std::min(nearest, (FaceExitPoint(local, box, face, world_normal) - point).Length());
+	}
+
+	return nearest;
+}
+
+bool CellTouchesSurface(const Vec3f cell_min, const Vec3f cell_max, float32 pad, const ProbePlacementBoxes& boxes)
+{
+	const Vec3f padded_min = cell_min - Vec3f(pad);
+	const Vec3f padded_max = cell_max + Vec3f(pad);
+
+	const Vec3f center = (cell_min + cell_max) * 0.5f;
+	const float32 radius = ((cell_max - cell_min) * 0.5f).Length() + pad;
+
+	for (uint32 i = 0; i < boxes.Count; i++) {
+		const ProbePlacementBoxes::Box& box = boxes.Boxes[i];
+		const BBox& bounds = box.WorldBounds;
+
+		bool overlaps = true;
+		bool contained = true;
+
+		for (uint32 axis = 0; axis < 3; axis++) {
+			overlaps &= padded_min.mData[axis] < bounds.Max.mData[axis] &&
+						padded_max.mData[axis] > bounds.Min.mData[axis];
+			contained &= padded_min.mData[axis] >= bounds.Min.mData[axis] &&
+						 padded_max.mData[axis] <= bounds.Max.mData[axis];
+		}
+
+		if (!overlaps) {
+			continue;
+		}
+
+		if (box.bAxisAligned) {
+			if (!contained) {
+				return true;
+			}
+
+			continue;
+		}
+
+		if (DistanceToBoxSurface(center, box) <= radius) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+float32 ShaderNormalBias(const Vec3f cell_size)
+{
+	const float32 min_spacing = std::min({ cell_size.X, cell_size.Y, cell_size.Z });
+	return std::clamp(scShaderNormalBiasScale * min_spacing, scShaderNormalBiasMin, scShaderNormalBiasMax);
+}
+
+bool IsBuriedTooDeep(const Vec3f point, const Vec3f max_relocation, const ProbePlacementBoxes& boxes)
+{
+	for (uint32 i = 0; i < boxes.Count; i++) {
+		const ProbePlacementBoxes::Box& box = boxes.Boxes[i];
+
+		if (!IsInsideBox(point, box, 0.0f)) {
+			continue;
+		}
+
+		if (!box.bAxisAligned) {
+			if (DistanceToBoxSurface(point, box) + scProbeMinClearance > max_relocation.Length()) {
+				return true;
+			}
+
+			continue;
+		}
+
+		bool can_escape = false;
+
+		for (uint32 axis = 0; axis < 3; axis++) {
+			const float32 to_min = point.mData[axis] - box.WorldBounds.Min.mData[axis];
+			const float32 to_max = box.WorldBounds.Max.mData[axis] - point.mData[axis];
+
+			can_escape |= std::min(to_min, to_max) + scProbeMinClearance <= max_relocation.mData[axis];
+		}
+
+		if (!can_escape) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+uint32 FindNeededGridPoints(const Vec3f volume_min, const Vec3f cell_size, const ProbeGridSize& grid,
+							const ProbePlacementBoxes& boxes, eProbeFill fill, std::vector<uint8>& out_needed)
+{
+	const uint32 dims[3] = { grid.X, grid.Y, grid.Z };
+	const uint32 num_points = grid.GetProbeCount();
+
+	out_needed.assign(num_points, (fill == eProbeFill::Dense || boxes.Count == 0) ? 1 : 0);
+
+	if (boxes.Count == 0) {
+		return num_points;
+	}
+
+	const float32 pad = ShaderNormalBias(cell_size) + scSurfaceCellMargin;
+
+	for (uint32 iz = 0; fill == eProbeFill::Surface && iz + 1 < dims[2]; iz++) {
+		for (uint32 iy = 0; iy + 1 < dims[1]; iy++) {
+			for (uint32 ix = 0; ix + 1 < dims[0]; ix++) {
+				const Vec3f cell_min = volume_min + cell_size * Vec3f(static_cast<float32>(ix),
+																	  static_cast<float32>(iy),
+																	  static_cast<float32>(iz));
+
+				if (!CellTouchesSurface(cell_min, cell_min + cell_size, pad, boxes)) {
+					continue;
+				}
+
+				for (uint32 corner = 0; corner < 8; corner++) {
+					const uint32 cx = ix + (corner & 1);
+					const uint32 cy = iy + ((corner >> 1) & 1);
+					const uint32 cz = iz + ((corner >> 2) & 1);
+
+					out_needed[cx + dims[0] * (cy + dims[1] * cz)] = 1;
+				}
+			}
+		}
+	}
+
+	const Vec3f max_relocation = cell_size * scMaxProbeRelocation;
+
+	uint32 count = 0;
+	uint32 point = 0;
+
+	for (uint32 iz = 0; iz < dims[2]; iz++) {
+		for (uint32 iy = 0; iy < dims[1]; iy++) {
+			for (uint32 ix = 0; ix < dims[0]; ix++, point++) {
+				if (out_needed[point] == 0) {
+					continue;
+				}
+
+				const Vec3f position = volume_min + cell_size * Vec3f(static_cast<float32>(ix),
+																	  static_cast<float32>(iy),
+																	  static_cast<float32>(iz));
+
+				if (IsBuriedTooDeep(position, max_relocation, boxes)) {
+					out_needed[point] = 0;
+					continue;
+				}
+
+				count++;
+			}
+		}
+	}
+
+	return count;
 }
 
 bool PushOutOfBox(Vec3f& point, const ProbePlacementBoxes::Box& box)
@@ -665,7 +848,7 @@ bool PushOutOfBoxes(Vec3f& point, const ProbePlacementBoxes& boxes)
 }
 
 /// Distance from `point` to the nearest box other than `skip_box`
-float32 DistanceToOtherBoxes(const Vec3f& point, const ProbePlacementBoxes& boxes, uint32 skip_box)
+float32 DistanceToOtherBoxes(const Vec3f point, const ProbePlacementBoxes& boxes, uint32 skip_box)
 {
 	float32 nearest = std::numeric_limits<float32>::max();
 
@@ -739,7 +922,7 @@ bool HugNearestSurface(Vec3f& point, const ProbePlacementBoxes& boxes, float32 m
 	return true;
 }
 
-bool FindValidProbePosition(const Vec3f& grid_position, const Vec3f& preferred, const Vec3f& max_relocation,
+bool FindValidProbePosition(const Vec3f grid_position, const Vec3f preferred, const Vec3f max_relocation,
 							const ProbePlacementBoxes& boxes, Vec3f& out_position)
 {
 	constexpr float32 cStepScale = 2.0f / static_cast<float32>(scRelocationSearchSteps - 1);
@@ -771,14 +954,46 @@ bool FindValidProbePosition(const Vec3f& grid_position, const Vec3f& preferred, 
 	return found;
 }
 
-void FitVolumeInsideLevel(const ProbePlacementBoxes& boxes, const ProbeGridSize& grid, Vec3f& out_min, Vec3f& out_size)
+void FitCellCentred(const Vec3f region_min, const Vec3f region_max, const ProbeGridSize& grid, Vec3f& out_min,
+					Vec3f& out_size)
 {
-	const Vec3f level_size = boxes.Max - boxes.Min;
+	const Vec3f region_size = region_max - region_min;
 	const Vec3f slices(static_cast<float32>(grid.X), static_cast<float32>(grid.Y), static_cast<float32>(grid.Z));
-	const Vec3f inset = level_size / (slices * 2.0f);
+	const Vec3f inset = region_size / (slices * 2.0f);
 
-	out_min = boxes.Min + inset;
-	out_size = level_size - inset * 2.0f;
+	out_min = region_min + inset;
+	out_size = region_size - inset * 2.0f;
+}
+
+ProbeGridSize GridForSpacing(const Vec3f region_size, float32 spacing, bool cell_centred)
+{
+	const uint32 extra = cell_centred ? 0 : 1;
+
+	return ProbeGridSize {
+		SlicesForExtent(region_size.X, spacing) + extra,
+		SlicesForExtent(region_size.Y, spacing) + extra,
+		SlicesForExtent(region_size.Z, spacing) + extra,
+	};
+}
+
+void LayoutGrid(const Vec3f region_min, const Vec3f region_max, const ProbeGridSize& grid, bool cell_centred,
+				Vec3f& out_min, Vec3f& out_size)
+{
+	if (cell_centred) {
+		FitCellCentred(region_min, region_max, grid, out_min, out_size);
+		return;
+	}
+
+	out_min = region_min;
+	out_size = region_max - region_min;
+}
+
+Vec3f GridCellSize(const Vec3f volume_size, const ProbeGridSize& grid)
+{
+	const Vec3f num_cells(static_cast<float32>(grid.X - 1), static_cast<float32>(grid.Y - 1),
+						  static_cast<float32>(grid.Z - 1));
+
+	return volume_size / num_cells;
 }
 
 bool CheckGridSize(const ProbeGridSize& grid)
@@ -793,12 +1008,12 @@ bool CheckGridSize(const ProbeGridSize& grid)
 	return false;
 }
 
-void SetProbePosition(ProbeInfo& info, const Vec3f& position, bool active)
+void SetProbePosition(ProbeInfo& info, const Vec3f position)
 {
 	info.ProbePosition[0] = position.X;
 	info.ProbePosition[1] = position.Y;
 	info.ProbePosition[2] = position.Z;
-	info.ProbePosition[3] = active ? 1.0f : 0.0f;
+	info.ProbePosition[3] = 1.0f;
 }
 
 void ResetDepthMoments(ProbeInfo& info)
@@ -840,17 +1055,9 @@ struct ProbeFileHeader
 
 	uint32 VolumeCount = 0;
 	uint32 ProbeCount = 0;
+	uint32 GridPointCount = 0;
 };
 
-
-struct ProbeVolumeDataV8
-{
-	float32 MinAndCount[4];
-	float32 InvCellSize[4];
-	uint32 DimsAndFirst[4];
-};
-
-static_assert(sizeof(ProbeVolumeDataV8) == 48, "The version 8 volume layout is fixed, it describes files on disk");
 
 void FinaliseVolumeBounds(ProbeVolumeData& volume)
 {
@@ -875,13 +1082,12 @@ void FinaliseVolumeBounds(ProbeVolumeData& volume)
 	volume.MaxAndCellVolume[3] = cell_volume;
 }
 
-static constexpr uint32 scOldestReadableCacheVersion = 11;
+static constexpr uint32 scOldestReadableCacheVersion = FX_PROBE_CACHE_FILE_VERSION;
 
-uint64 GetProbeFileSize(uint32 probe_count, uint32 version)
+uint64 GetProbeFileSize(uint32 probe_count, uint32 grid_point_count)
 {
-	const uint64 volume_stride = (version >= 9) ? sizeof(ProbeVolumeData) : sizeof(ProbeVolumeDataV8);
-
-	return sizeof(ProbeFileHeader) + Limits::MaxProbeVolumes * volume_stride +
+	return sizeof(ProbeFileHeader) + Limits::MaxProbeVolumes * (sizeof(ProbeVolumeData) + sizeof(ProbeVolumeRange)) +
+		   static_cast<uint64>(grid_point_count) * sizeof(uint16) +
 		   static_cast<uint64>(probe_count) * (sizeof(ProbeSHData) + sizeof(ProbeInfo));
 }
 
@@ -930,7 +1136,9 @@ void ProbeManager::Create()
 	ClearVolumes();
 
 	AddVolumeAndPlaceProbes(Vec3f(-20.0f, -2.0f, -20.0f), Vec3f(150.0f, 15.0f, 150.0f), ProbeGridSize { 4, 2, 4 },
-							ProbePlacementBoxes {});
+							ProbePlacementBoxes {}, eProbeFill::Dense);
+
+	UploadReflectionProbes(0);
 }
 
 void ProbeManager::Destroy()
@@ -948,6 +1156,10 @@ void ProbeManager::Destroy()
 			mColorStaging[slot][face].Destroy();
 			mDepthStaging[slot][face].Destroy();
 		}
+	}
+
+	for (renderer::RawGpuBuffer& staging : mReflectionStaging) {
+		staging.Destroy();
 	}
 
 	mCaptureTexels.Free();
@@ -974,6 +1186,8 @@ void ProbeManager::ClearVolumes()
 
 	mVolumeCount = 0;
 	mProbeCount = 0;
+	mGridPointCount = 0;
+	mbGridDirty = true;
 
 	RefreshVolumeCounts();
 	UploadToGpu(0, 0);
@@ -983,20 +1197,16 @@ void ProbeManager::GetVolumeProbeRange(uint32 volume, uint32& out_first_probe, u
 {
 	Assert(volume < mVolumeCount);
 
-	const uint32* dims = mVolumes[volume].DimsAndFirst;
-
-	out_first_probe = dims[3];
-	out_count = dims[0] * dims[1] * dims[2];
+	out_first_probe = mVolumeRanges[volume].FirstProbe;
+	out_count = mVolumeRanges[volume].ProbeCount;
 }
 
 uint32 ProbeManager::GetVolumeOfProbe(uint32 probe_index) const
 {
 	for (uint32 volume = 0; volume < mVolumeCount; volume++) {
-		uint32 first;
-		uint32 count;
-		GetVolumeProbeRange(volume, first, count);
+		const ProbeVolumeRange& range = mVolumeRanges[volume];
 
-		if (probe_index >= first && probe_index < first + count) {
+		if (probe_index >= range.FirstProbe && probe_index < range.FirstProbe + range.ProbeCount) {
 			return volume;
 		}
 	}
@@ -1004,17 +1214,17 @@ uint32 ProbeManager::GetVolumeOfProbe(uint32 probe_index) const
 	return Limits::MaxProbeVolumes;
 }
 
-bool ProbeManager::AddVolume(const Vec3f& center, const Vec3f& size, const ProbeGridSize& grid)
+bool ProbeManager::AddVolume(const Vec3f center, const Vec3f size, const ProbeGridSize& grid)
 {
 	if (IsBaking()) {
 		LogWarning("Cannot add a probe volume while the probes are baking");
 		return false;
 	}
 
-	return AddVolumeAndPlaceProbes(center - size * 0.5f, size, grid, GatherPlacementBoxes());
+	return AddVolumeAndPlaceProbes(center - size * 0.5f, size, grid, GatherPlacementBoxes(), eProbeFill::Dense);
 }
 
-bool ProbeManager::AddLevelVolume(const ProbeGridSize& grid)
+bool ProbeManager::AddLevelVolumes()
 {
 	if (IsBaking()) {
 		LogWarning("Cannot add a probe volume while the probes are baking");
@@ -1028,11 +1238,82 @@ bool ProbeManager::AddLevelVolume(const ProbeGridSize& grid)
 		return false;
 	}
 
+	const bool added_base = AddLevelBaseVolume(boxes);
+	const bool added_surface = AddLevelSurfaceVolume(boxes);
+
+	return added_base && added_surface;
+}
+
+bool ProbeManager::AddLevelBaseVolume(const ProbePlacementBoxes& boxes)
+{
+	const Vec3f level_size = boxes.Max - boxes.Min;
+
+	float32 spacing = scBaseProbeSpacing;
+	ProbeGridSize grid = GridForSpacing(level_size, spacing, true);
+
+	while (grid.GetProbeCount() > scBaseProbeGridBudget && spacing <= scMaxProbeSpacing) {
+		spacing *= 1.5f;
+		grid = GridForSpacing(level_size, spacing, true);
+	}
+
 	Vec3f volume_min;
 	Vec3f volume_size;
-	FitVolumeInsideLevel(boxes, grid, volume_min, volume_size);
+	FitCellCentred(boxes.Min, boxes.Max, grid, volume_min, volume_size);
 
-	return AddVolumeAndPlaceProbes(volume_min, volume_size, grid, boxes);
+	return AddVolumeAndPlaceProbes(volume_min, volume_size, grid, boxes, eProbeFill::Dense);
+}
+
+bool ProbeManager::AddLevelSurfaceVolume(const ProbePlacementBoxes& boxes)
+{
+	const float32 spacing = gCVars->Get("r_probe_level_spacing", scDefaultLevelProbeSpacing);
+	return AddSurfaceVolumeForBudget(boxes.Min, boxes.Max, spacing, boxes, true);
+}
+
+bool ProbeManager::AddSurfaceVolumeForBudget(const Vec3f region_min, const Vec3f region_max, float32 spacing,
+											 const ProbePlacementBoxes& boxes, bool cell_centred)
+{
+	if (mVolumeCount >= Limits::MaxProbeVolumes) {
+		LogError("Probe volume rejected: all {} volume slots are taken", Limits::MaxProbeVolumes);
+		return false;
+	}
+
+	const uint32 probe_budget = Limits::MaxIrradianceProbes - mProbeCount;
+	const uint32 point_budget = Limits::MaxProbeGridPoints - mGridPointCount;
+
+	std::vector<uint8> needed;
+
+	for (float32 tried = std::max(spacing, 1e-2f); tried <= scMaxProbeSpacing; tried *= scSurfaceSpacingStep) {
+		const ProbeGridSize grid = GridForSpacing(region_max - region_min, tried, cell_centred);
+
+		if (grid.GetProbeCount() > point_budget) {
+			continue;
+		}
+
+		Vec3f volume_min;
+		Vec3f volume_size;
+		LayoutGrid(region_min, region_max, grid, cell_centred, volume_min, volume_size);
+
+		const uint32 num_needed = FindNeededGridPoints(volume_min, GridCellSize(volume_size, grid), grid, boxes,
+													   eProbeFill::Surface, needed);
+
+		if (num_needed > probe_budget) {
+			continue;
+		}
+
+		if (!AddVolumeAndPlaceProbes(volume_min, volume_size, grid, boxes, eProbeFill::Surface)) {
+			continue;
+		}
+
+		if (tried > spacing) {
+			LogWarning("Probe volume spacing raised from {}m to {}m to fit the {} probes left", spacing, tried,
+					   probe_budget);
+		}
+
+		return true;
+	}
+
+	LogError("Probe volume rejected: no spacing up to {}m fits the {} probes left", scMaxProbeSpacing, probe_budget);
+	return false;
 }
 
 uint32 ProbeManager::RebuildVolumesFromWorld()
@@ -1044,15 +1325,21 @@ uint32 ProbeManager::RebuildVolumesFromWorld()
 
 	ClearVolumes();
 
-	AddLevelVolume();
+	const ProbePlacementBoxes boxes = GatherPlacementBoxes();
+
+	if (boxes.IsEmpty()) {
+		LogError("Cannot fit a probe volume to the level: there is no geometry to fit it to");
+		return 0;
+	}
+
+	AddLevelBaseVolume(boxes);
 
 	const float32 spacing = gCVars->Get("r_probe_spacing", scDefaultProbeSpacing);
-	const ProbePlacementBoxes boxes = GatherPlacementBoxes();
 
 	uint32 num_brush_volumes = 0;
 
 	for (Object& object : gObjectManager->GetCache()) {
-		if (!object.IsProbeVolume()) {
+		if (!object.IsProbeVolume() || object.IsReflectionProbe()) {
 			continue;
 		}
 
@@ -1060,10 +1347,7 @@ uint32 ProbeManager::RebuildVolumesFromWorld()
 		Vec3f max;
 		GetObjectWorldBounds(object, min, max);
 
-		const Vec3f size = max - min;
-		const uint32 budget = Limits::MaxIrradianceProbes - mProbeCount;
-
-		if (AddVolumeAndPlaceProbes(min, size, MakeGridForSize(size, spacing, budget), boxes)) {
+		if (AddSurfaceVolumeForBudget(min, max, spacing, boxes, false)) {
 			num_brush_volumes++;
 		}
 		else {
@@ -1071,8 +1355,13 @@ uint32 ProbeManager::RebuildVolumesFromWorld()
 		}
 	}
 
-	LogInfo("Probe volumes rebuilt: {} from editor brushes, {} in total, {} of {} probes used", num_brush_volumes,
-			mVolumeCount, mProbeCount, Limits::MaxIrradianceProbes);
+	AddLevelSurfaceVolume(boxes);
+
+	RebuildReflectionProbesFromWorld();
+
+	LogInfo("Probe volumes rebuilt: {} from editor brushes, {} in total, {} of {} probes and {} of {} grid points used",
+			num_brush_volumes, mVolumeCount, mProbeCount, Limits::MaxIrradianceProbes, mGridPointCount,
+			Limits::MaxProbeGridPoints);
 
 	return num_brush_volumes;
 }
@@ -1084,18 +1373,20 @@ void ProbeManager::BeginBake()
 		return;
 	}
 
-	if (mVolumeCount == 0) {
-		LogError("Probe bake failed: no probe volumes have been added");
+	if (mVolumeCount == 0 || mProbeCount == 0) {
+		LogError("Probe bake failed: no probes have been placed");
 		return;
 	}
 
 	mCurrentProbe = 0;
 	mCurrentBounce = 0;
-	mBounceCount = static_cast<uint32>(std::clamp<int64>(gCVars->Get("r_probe_bounces", scDefaultProbeBounces), 1, scMaxProbeBounces));
+	mBakePhase = eBakePhase::Irradiance;
+	mBounceCount = static_cast<uint32>(
+		std::clamp<int64>(gCVars->Get("r_probe_bounces", scDefaultProbeBounces), 1, scMaxProbeBounces));
 	mBakeState = eBakeState::CapturePending;
 
-	LogInfo("Probe bake started ({} probes across {} volume(s), {} per frame, {} bounce(s))", mProbeCount,
-			mVolumeCount, scProbesPerFrame, mBounceCount);
+	LogInfo("Probe bake started ({} probes across {} volume(s), {} per frame, {} bounce(s))", mProbeCount, mVolumeCount,
+			scProbesPerFrame, mBounceCount);
 }
 
 void ProbeManager::BeginGridBake()
@@ -1105,47 +1396,29 @@ void ProbeManager::BeginGridBake()
 		return;
 	}
 
-	const ProbePlacementBoxes boxes = GatherPlacementBoxes();
+	ClearVolumes();
 
-	if (boxes.IsEmpty()) {
-		LogError("Probe grid bake failed: there is no geometry to fit the probe volume to");
-		return;
+	if (AddLevelVolumes()) {
+		BeginBake();
 	}
-
-	const ProbeGridSize grid {};
-
-	Vec3f volume_min;
-	Vec3f volume_size;
-	FitVolumeInsideLevel(boxes, grid, volume_min, volume_size);
-
-	StartSingleVolumeBake(volume_min, volume_size, grid, boxes);
 }
 
-void ProbeManager::BeginGridBakeAt(const Vec3f& center, const Vec3f& size, const ProbeGridSize& grid)
+void ProbeManager::BeginGridBakeAt(const Vec3f center, const Vec3f size, const ProbeGridSize& grid)
 {
 	if (IsBaking()) {
 		LogWarning("A probe bake is already in progress");
 		return;
 	}
 
-	StartSingleVolumeBake(center - size * 0.5f, size, grid, GatherPlacementBoxes());
-}
-
-void ProbeManager::StartSingleVolumeBake(const Vec3f& volume_min, const Vec3f& volume_size, const ProbeGridSize& grid,
-										 const ProbePlacementBoxes& boxes)
-{
-	// Checked before the clear, so that a rejected grid leaves the volumes that were already there alone
 	if (!CheckGridSize(grid)) {
 		return;
 	}
 
 	ClearVolumes();
 
-	if (!AddVolumeAndPlaceProbes(volume_min, volume_size, grid, boxes)) {
-		return;
+	if (AddVolume(center, size, grid)) {
+		BeginBake();
 	}
-
-	BeginBake();
 }
 
 void ProbeManager::RefreshVolumeCounts()
@@ -1156,8 +1429,8 @@ void ProbeManager::RefreshVolumeCounts()
 	}
 }
 
-bool ProbeManager::AddVolumeAndPlaceProbes(const Vec3f& volume_min, const Vec3f& volume_size, const ProbeGridSize& grid,
-										   const ProbePlacementBoxes& boxes)
+bool ProbeManager::AddVolumeAndPlaceProbes(const Vec3f volume_min, const Vec3f volume_size, const ProbeGridSize& grid,
+										   const ProbePlacementBoxes& boxes, eProbeFill fill)
 {
 	if (!CheckGridSize(grid)) {
 		return false;
@@ -1168,31 +1441,31 @@ bool ProbeManager::AddVolumeAndPlaceProbes(const Vec3f& volume_min, const Vec3f&
 		return false;
 	}
 
-	const uint32 num_probes = grid.GetProbeCount();
-	const uint32 first_probe = mProbeCount;
+	const uint32 num_points = grid.GetProbeCount();
 
-	if (num_probes > Limits::MaxIrradianceProbes - first_probe) {
-		LogError("Probe volume rejected: it needs {} probes and only {} of the {} probe budget are left", num_probes,
-				 Limits::MaxIrradianceProbes - first_probe, Limits::MaxIrradianceProbes);
+	if (num_points > Limits::MaxProbeGridPoints - mGridPointCount) {
+		LogError("Probe volume rejected: its grid has {} points and only {} of the {} grid point budget are left",
+				 num_points, Limits::MaxProbeGridPoints - mGridPointCount, Limits::MaxProbeGridPoints);
 		return false;
 	}
 
-	const uint32 volume_index = mVolumeCount;
+	const uint32 first_probe = mProbeCount;
 
-	PlaceVolumeProbes(volume_index, first_probe, volume_min, volume_size, grid, boxes);
+	if (!PlaceVolumeProbes(mVolumeCount, volume_min, volume_size, grid, boxes, fill)) {
+		return false;
+	}
 
 	mVolumeCount++;
-	mProbeCount += num_probes;
+	mbGridDirty = true;
 
 	RefreshVolumeCounts();
-	UploadToGpu(first_probe, num_probes);
+	UploadToGpu(first_probe, mProbeCount - first_probe);
 
 	return true;
 }
 
-void ProbeManager::PlaceVolumeProbes(uint32 volume_index, uint32 first_probe, const Vec3f& volume_min,
-									 const Vec3f& volume_size, const ProbeGridSize& grid,
-									 const ProbePlacementBoxes& boxes)
+bool ProbeManager::PlaceVolumeProbes(uint32 volume_index, const Vec3f volume_min, const Vec3f volume_size,
+									 const ProbeGridSize& grid, const ProbePlacementBoxes& boxes, eProbeFill fill)
 {
 	const uint32 dims[3] = { grid.X, grid.Y, grid.Z };
 
@@ -1207,15 +1480,28 @@ void ProbeManager::PlaceVolumeProbes(uint32 volume_index, uint32 first_probe, co
 
 	const Vec3f max_relocation = cell_size * scMaxProbeRelocation;
 
+	std::vector<uint8> needed;
+	const uint32 num_needed = FindNeededGridPoints(volume_min, cell_size, grid, boxes, fill, needed);
+
+	const uint32 first_probe = mProbeCount;
+	const uint32 first_point = mGridPointCount;
+
 	uint32 num_pushed = 0;
 	uint32 num_hugged = 0;
 	uint32 num_relocated = 0;
-	uint32 num_inactive = 0;
+	uint32 num_unplaced = 0;
 	uint32 probe_index = first_probe;
+	uint32 point_index = first_point;
 
 	for (uint32 iz = 0; iz < dims[2]; iz++) {
 		for (uint32 iy = 0; iy < dims[1]; iy++) {
-			for (uint32 ix = 0; ix < dims[0]; ix++) {
+			for (uint32 ix = 0; ix < dims[0]; ix++, point_index++) {
+				mGridProbes[point_index] = Limits::ProbeGridEmpty;
+
+				if (needed[point_index - first_point] == 0) {
+					continue;
+				}
+
 				const Vec3f grid_position = volume_min + cell_size * Vec3f(static_cast<float32>(ix),
 																		   static_cast<float32>(iy),
 																		   static_cast<float32>(iz));
@@ -1233,27 +1519,30 @@ void ProbeManager::PlaceVolumeProbes(uint32 volume_index, uint32 first_probe, co
 
 				position = Vec3f::Clamp(position, grid_position - max_relocation, grid_position + max_relocation);
 
-				bool active = IsProbePlacementValid(grid_position, position, boxes);
-
-				// A missing probe leaves its neighbours on the far side of a wall to light the surfaces around it
-				if (!active) {
+				if (!IsProbePlacementValid(grid_position, position, boxes)) {
 					Vec3f fallback;
-					active = FindValidProbePosition(grid_position, position, max_relocation, boxes, fallback);
 
-					if (active) {
-						position = fallback;
-						num_relocated++;
+					if (!FindValidProbePosition(grid_position, position, max_relocation, boxes, fallback)) {
+						num_unplaced++;
+						continue;
 					}
-					else {
-						num_inactive++;
-					}
+
+					position = fallback;
+					num_relocated++;
+				}
+
+				if (probe_index >= Limits::MaxIrradianceProbes) {
+					LogWarning("Probe volume rejected: it needs more than the {} probes left of the {} probe budget",
+							   Limits::MaxIrradianceProbes - first_probe, Limits::MaxIrradianceProbes);
+					return false;
 				}
 
 				// The probes have moved, so whatever depth moments they hold were captured somewhere else. Reset
 				// them until the bake fills them in, or unbaked probes would report occluders that aren't there.
 				ResetDepthMoments(mProbeInfos[probe_index]);
+				SetProbePosition(mProbeInfos[probe_index], position);
 
-				SetProbePosition(mProbeInfos[probe_index++], position, active);
+				mGridProbes[point_index] = static_cast<uint16>(probe_index++);
 			}
 		}
 	}
@@ -1268,14 +1557,22 @@ void ProbeManager::PlaceVolumeProbes(uint32 volume_index, uint32 first_probe, co
 	}
 
 	volume.InvCellSize[3] = 0.0f;
-	volume.DimsAndFirst[3] = first_probe;
+	volume.DimsAndFirst[3] = first_point;
 
 	FinaliseVolumeBounds(volume);
 
-	LogInfo("Probe volume {}: min={} size={} grid={}x{}x{} ({} probes from index {}, {} pushed out, {} hugging, {} "
-			"relocated, {} inactive)",
-			volume_index, volume_min, volume_size, dims[0], dims[1], dims[2], grid.GetProbeCount(), first_probe,
-			num_pushed, num_hugged, num_relocated, num_inactive);
+	mVolumeRanges[volume_index] = ProbeVolumeRange { first_probe, probe_index - first_probe };
+
+	mProbeCount = probe_index;
+	mGridPointCount = point_index;
+
+	LogInfo("Probe volume {} ({}): min={} size={} grid={}x{}x{}, {} of {} grid points needed, {} probes from index {} "
+			"({} pushed out, {} hugging, {} relocated, {} unplaced)",
+			volume_index, (fill == eProbeFill::Dense) ? "dense" : "surface", volume_min, volume_size, dims[0], dims[1],
+			dims[2], num_needed, grid.GetProbeCount(), probe_index - first_probe, first_probe, num_pushed, num_hugged,
+			num_relocated, num_unplaced);
+
+	return true;
 }
 
 ///////////////////////////////////
@@ -1313,6 +1610,27 @@ void ProbeManager::CreateCaptureResources()
 		}
 	}
 
+	constexpr uint32 cReflectionSize = Limits::ReflectionProbeSize;
+
+	mReflectionStage.Create("ReflectionCapture", Vec2u(cReflectionSize, cReflectionSize), eSizeDivisor::FullRes);
+
+	mReflectionStage.AddTarget(eImageFormat::RGBA16_Float,
+							   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+								   VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+							   eImageAspectFlag::Color);
+
+	mReflectionStage.AddTarget(eImageFormat::D32_Float,
+							   VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+							   eImageAspectFlag::Depth);
+
+	mReflectionStage.BuildRenderStage();
+
+	for (renderer::RawGpuBuffer& staging : mReflectionStaging) {
+		staging.Create(renderer::eGpuBufferType::Transfer,
+					   static_cast<uint64>(cReflectionSize) * cReflectionSize * sizeof(uint16) * 4,
+					   VMA_MEMORY_USAGE_GPU_TO_CPU, eGpuBufferFlags::TransferReceiver);
+	}
+
 	BuildCaptureTexels();
 
 	mbCaptureResourcesCreated = true;
@@ -1332,6 +1650,7 @@ void ProbeManager::BuildCaptureTexels()
 		const Mat4f inv_view_projection = camera.InvProjectionMatrix * camera.InvViewMatrix;
 
 		mCaptureInvProjection = camera.InvProjectionMatrix;
+		mCaptureFaceToClip[face] = inv_view_projection.Inverse();
 
 		for (uint32 y = 0; y < scCaptureSize; y++) {
 			for (uint32 x = 0; x < scCaptureSize; x++, texel++) {
@@ -1365,6 +1684,11 @@ void ProbeManager::RecordCaptureBatch(renderer::CommandBuffer& cmd, const Render
 
 	CreateCaptureResources();
 
+	if (mBakePhase == eBakePhase::Reflection) {
+		RecordReflectionCapture(cmd, render_face);
+		return;
+	}
+
 	mBatchStart = mCurrentProbe;
 	const uint32 batch_end = std::min(mCurrentProbe + scProbesPerFrame, mProbeCount);
 
@@ -1378,8 +1702,9 @@ void ProbeManager::RecordCaptureBatch(renderer::CommandBuffer& cmd, const Render
 
 			render_face(camera, mCaptureStage);
 
-			CopyTargetToStaging(cmd, eImageFormat::RGBA16_Float, mColorStaging[slot][face]);
-			CopyTargetToStaging(cmd, eImageFormat::D32_Float, mDepthStaging[slot][face]);
+			CopyTargetToStaging(cmd, mCaptureStage, scCaptureSize, eImageFormat::RGBA16_Float,
+								mColorStaging[slot][face]);
+			CopyTargetToStaging(cmd, mCaptureStage, scCaptureSize, eImageFormat::D32_Float, mDepthStaging[slot][face]);
 		}
 	}
 
@@ -1387,10 +1712,10 @@ void ProbeManager::RecordCaptureBatch(renderer::CommandBuffer& cmd, const Render
 	mBakeState = eBakeState::CaptureRecorded;
 }
 
-void ProbeManager::CopyTargetToStaging(renderer::CommandBuffer& cmd, eImageFormat format,
-									   renderer::RawGpuBuffer& staging)
+void ProbeManager::CopyTargetToStaging(renderer::CommandBuffer& cmd, renderer::RenderStage& stage, uint32 size,
+									   eImageFormat format, renderer::RawGpuBuffer& staging)
 {
-	renderer::Target* target = mCaptureStage.GetTarget(format);
+	renderer::Target* target = stage.GetTarget(format);
 	Assert(target != nullptr);
 
 	Image& image = target->Image;
@@ -1402,7 +1727,7 @@ void ProbeManager::CopyTargetToStaging(renderer::CommandBuffer& cmd, eImageForma
 
 	const VkBufferImageCopy copy {
 		.imageSubresource { .aspectMask = aspect, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1 },
-		.imageExtent { .width = scCaptureSize, .height = scCaptureSize, .depth = 1 },
+		.imageExtent { .width = size, .height = size, .depth = 1 },
 	};
 
 	vkCmdCopyImageToBuffer(cmd, image.InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, staging.Buffer, 1, &copy);
@@ -1418,6 +1743,11 @@ void ProbeManager::ServiceCaptureBake()
 
 	// The batch was recorded into this frame's command buffer, so wait for it to land in the staging buffers
 	renderer::gGraphics->GetDevice()->WaitForIdle();
+
+	if (mBakePhase == eBakePhase::Reflection) {
+		ServiceReflectionBake();
+		return;
+	}
 
 	for (uint32 probe = mBatchStart; probe < mCurrentProbe; probe++) {
 		if (!ReadBackProbe(probe - mBatchStart, probe)) {
@@ -1446,6 +1776,10 @@ void ProbeManager::ServiceCaptureBake()
 	mBakeState = eBakeState::Idle;
 	LogInfo("Probe bake complete ({} probes across {} volume(s), {} bounce(s))", mProbeCount, mVolumeCount,
 			mBounceCount);
+
+	if (mReflectionProbeCount > 0) {
+		StartReflectionPhase();
+	}
 }
 
 bool ProbeManager::ReadBackProbe(uint32 batch_slot, uint32 probe_index)
@@ -1552,14 +1886,21 @@ void ProbeManager::UploadToGpu(uint32 first_probe, uint32 count)
 
 	UploadRange(graphics->ProbeVolumeBuffer, mVolumes, 0, sizeof(mVolumes));
 
+	if (mbGridDirty && mGridPointCount > 0) {
+		const uint64 grid_bytes = static_cast<uint64>((mGridPointCount + 1) / 2) * sizeof(uint32);
+		UploadRange(graphics->ProbeGridBuffer, mGridProbes, 0, grid_bytes);
+	}
+
+	mbGridDirty = false;
+
 	if (count == 0) {
 		return;
 	}
 
 
 	for (uint32 probe = first_probe; probe < first_probe + count; probe++) {
-		// Position in the first three w lanes, the active flag in the fourth
-		for (uint32 lane = 0; lane < 4; lane++) {
+		// Position in the first three w lanes
+		for (uint32 lane = 0; lane < 3; lane++) {
 			mProbes[probe].SH[lane][3] = mProbeInfos[probe].ProbePosition[lane];
 		}
 	}
@@ -1656,6 +1997,30 @@ void ProbeManager::UploadMomentsAtlas(uint32 first_probe, uint32 count)
 
 bool ProbeManager::SaveProbes()
 {
+	const bool saved = SaveIrradianceProbes();
+
+	if (saved) {
+		SaveReflectionProbes();
+	}
+
+	return saved;
+}
+
+bool ProbeManager::LoadProbes()
+{
+	const bool loaded = LoadIrradianceProbes();
+
+	if (!loaded || !LoadReflectionProbes()) {
+		mReflectionProbeCount = 0;
+		mbReflectionsBaked = false;
+		UploadReflectionProbes(0);
+	}
+
+	return loaded;
+}
+
+bool ProbeManager::SaveIrradianceProbes()
+{
 	if (IsBaking()) {
 		LogWarning("Cannot save the probes while they are baking");
 		return false;
@@ -1673,10 +2038,13 @@ bool ProbeManager::SaveProbes()
 	ProbeFileHeader header;
 	header.VolumeCount = mVolumeCount;
 	header.ProbeCount = mProbeCount;
+	header.GridPointCount = mGridPointCount;
 
 	// Only the probes the volumes use are written, so a scene with a handful of small volumes gets a small file
 	file.WriteRaw(&header, sizeof(header));
 	file.WriteRaw(mVolumes, sizeof(mVolumes));
+	file.WriteRaw(mVolumeRanges, sizeof(mVolumeRanges));
+	file.WriteRaw(mGridProbes, mGridPointCount * sizeof(uint16));
 	file.WriteRaw(mProbes, mProbeCount * sizeof(ProbeSHData));
 	file.WriteRaw(mProbeInfos, mProbeCount * sizeof(ProbeInfo));
 
@@ -1684,7 +2052,7 @@ bool ProbeManager::SaveProbes()
 	return true;
 }
 
-bool ProbeManager::LoadProbes()
+bool ProbeManager::LoadIrradianceProbes()
 {
 	const String path = GetProbeFilePath();
 
@@ -1702,40 +2070,44 @@ bool ProbeManager::LoadProbes()
 		return false;
 	}
 
-	if (header.VolumeCount > Limits::MaxProbeVolumes || header.ProbeCount > Limits::MaxIrradianceProbes) {
-		LogError("Probe file {} holds {} volumes and {} probes, past the limits of {} and {}", path.CStr(),
-				 header.VolumeCount, header.ProbeCount, Limits::MaxProbeVolumes, Limits::MaxIrradianceProbes);
+	if (header.VolumeCount > Limits::MaxProbeVolumes || header.ProbeCount > Limits::MaxIrradianceProbes ||
+		header.GridPointCount > Limits::MaxProbeGridPoints) {
+		LogError("Probe file {} holds {} volumes, {} probes and {} grid points, past the limits of {}, {} and {}",
+				 path.CStr(), header.VolumeCount, header.ProbeCount, header.GridPointCount, Limits::MaxProbeVolumes,
+				 Limits::MaxIrradianceProbes, Limits::MaxProbeGridPoints);
 		return false;
 	}
 
-	if (file.GetFileSize() != GetProbeFileSize(header.ProbeCount, header.Layout.Version)) {
+	if (file.GetFileSize() != GetProbeFileSize(header.ProbeCount, header.GridPointCount)) {
 		LogError("Probe file {} is {} bytes, not the {} its {} probes need", path.CStr(), file.GetFileSize(),
-				 GetProbeFileSize(header.ProbeCount, header.Layout.Version), header.ProbeCount);
+				 GetProbeFileSize(header.ProbeCount, header.GridPointCount), header.ProbeCount);
 		return false;
 	}
 
 	ProbeVolumeData volumes[Limits::MaxProbeVolumes] {};
+	ProbeVolumeRange ranges[Limits::MaxProbeVolumes] {};
+	std::vector<uint16> grid(header.GridPointCount);
 
-	if (header.Layout.Version == FX_PROBE_CACHE_FILE_VERSION) {
-		if (!ReadExact(file, volumes, sizeof(volumes))) {
-			LogError("Could not read the probe volumes from {}", path.CStr());
+	if (!ReadExact(file, volumes, sizeof(volumes)) || !ReadExact(file, ranges, sizeof(ranges)) ||
+		!ReadExact(file, grid.data(), grid.size() * sizeof(uint16))) {
+		LogError("Could not read the probe volumes from {}", path.CStr());
+		return false;
+	}
+
+	for (uint32 volume = 0; volume < header.VolumeCount; volume++) {
+		const uint32* dims = volumes[volume].DimsAndFirst;
+		const uint64 last_point = static_cast<uint64>(dims[3]) + static_cast<uint64>(dims[0]) * dims[1] * dims[2];
+		const uint64 last_probe = static_cast<uint64>(ranges[volume].FirstProbe) + ranges[volume].ProbeCount;
+
+		if (last_point > header.GridPointCount || last_probe > header.ProbeCount) {
+			LogError("Probe file {} has a volume that runs past the probes it holds, rebake the probes", path.CStr());
 			return false;
 		}
 	}
-	else {
-		LogError("Probe file version mismatch (found version {} but expected version {})", header.Layout.Version,
-				 FX_PROBE_CACHE_FILE_VERSION);
-		return false;
-		;
-	}
 
-	// A volume whose probes run past what the file holds would send the shader into probes that were never placed
-	for (uint32 volume = 0; volume < header.VolumeCount; volume++) {
-		const uint32* dims = volumes[volume].DimsAndFirst;
-		const uint64 last_probe = static_cast<uint64>(dims[3]) + dims[0] * dims[1] * dims[2];
-
-		if (last_probe > header.ProbeCount) {
-			LogError("Probe file {} has a volume whose probes run past the {} it holds, rebake the probes", path.CStr(),
+	for (uint16 probe : grid) {
+		if (probe != Limits::ProbeGridEmpty && probe >= header.ProbeCount) {
+			LogError("Probe file {} points at probe {} of {}, rebake the probes", path.CStr(), probe,
 					 header.ProbeCount);
 			return false;
 		}
@@ -1748,15 +2120,497 @@ bool ProbeManager::LoadProbes()
 	}
 
 	memcpy(mVolumes, volumes, sizeof(mVolumes));
+	memcpy(mVolumeRanges, ranges, sizeof(mVolumeRanges));
+	std::copy(grid.begin(), grid.end(), mGridProbes);
 	mVolumeCount = header.VolumeCount;
 	mProbeCount = header.ProbeCount;
-
+	mGridPointCount = header.GridPointCount;
+	mbGridDirty = true;
 
 	RefreshVolumeCounts();
 
 	UploadToGpu(0, mProbeCount);
 
 	LogInfo("Loaded {} light probes across {} volume(s) from {}", mProbeCount, mVolumeCount, path.CStr());
+	return true;
+}
+
+namespace {
+
+constexpr float32 scReflectionBlendDistance = 1.0f;
+constexpr float32 scReflectionMinHalfExtent = 0.05f;
+constexpr float32 scReflectionRelocation = 0.9f;
+constexpr uint32 scReflectionFileVersion = 1;
+
+constexpr uint64 scReflectionTexelsPerProbe = 6ull * (128 * 128 + 64 * 64 + 32 * 32 + 16 * 16 + 8 * 8 + 4 * 4);
+constexpr uint64 scReflectionHalfsPerProbe = scReflectionTexelsPerProbe * 4;
+
+static_assert(Limits::ReflectionProbeSize == 128 && Limits::ReflectionProbeMips == 6);
+
+struct ReflectionBox
+{
+	Mat4f BoxToWorld;
+	Vec3f HalfExtent;
+	float32 Volume;
+};
+
+struct ReflectionFileHeader
+{
+	char Magic[4] = { 'R', 'P', 'R', 'F' };
+	uint32 Version = scReflectionFileVersion;
+	uint32 Size = Limits::ReflectionProbeSize;
+	uint32 Mips = Limits::ReflectionProbeMips;
+	uint32 ProbeCount = 0;
+};
+
+ReflectionBox MakeReflectionBox(const Vec3f local_min, const Vec3f local_max, const Mat4f& local_to_world)
+{
+	const Vec3f half_extent = Vec3f::Max((local_max - local_min) * 0.5f, Vec3f(scReflectionMinHalfExtent));
+	const Vec3f center = (local_max + local_min) * 0.5f;
+
+	ReflectionBox box;
+	box.BoxToWorld = Mat4f::AsScale(half_extent) * Mat4f::AsTranslation(center) * local_to_world;
+	box.HalfExtent = half_extent;
+	box.Volume = half_extent.X * half_extent.Y * half_extent.Z;
+
+	return box;
+}
+
+String GetReflectionFilePath()
+{
+	std::filesystem::path path(GetProbeFilePath().CStr());
+	path.replace_extension(".fxrefl");
+
+	return String(path.string().c_str());
+}
+
+void SampleCaptureFace(const std::vector<float32>& face, uint32 size, float32 ndc_x, float32 ndc_y, float32 out[3])
+{
+	const float32 max_coord = static_cast<float32>(size - 1);
+
+	const float32 x = std::clamp((ndc_x * 0.5f + 0.5f) * static_cast<float32>(size) - 0.5f, 0.0f, max_coord);
+	const float32 y = std::clamp((ndc_y * 0.5f + 0.5f) * static_cast<float32>(size) - 0.5f, 0.0f, max_coord);
+
+	const uint32 x0 = static_cast<uint32>(x);
+	const uint32 y0 = static_cast<uint32>(y);
+	const uint32 x1 = std::min(x0 + 1, size - 1);
+	const uint32 y1 = std::min(y0 + 1, size - 1);
+
+	const float32 fx = x - static_cast<float32>(x0);
+	const float32 fy = y - static_cast<float32>(y0);
+
+	const float32* t00 = face.data() + (y0 * size + x0) * 3;
+	const float32* t10 = face.data() + (y0 * size + x1) * 3;
+	const float32* t01 = face.data() + (y1 * size + x0) * 3;
+	const float32* t11 = face.data() + (y1 * size + x1) * 3;
+
+	for (uint32 c = 0; c < 3; c++) {
+		const float32 top = t00[c] + (t10[c] - t00[c]) * fx;
+		const float32 bottom = t01[c] + (t11[c] - t01[c]) * fx;
+
+		out[c] = top + (bottom - top) * fy;
+	}
+}
+
+} // namespace
+
+Vec3f ProbeManager::GetReflectionProbePosition(uint32 index) const
+{
+	const float32* position = mReflectionProbes[index].PositionAndCount;
+	return Vec3f(position[0], position[1], position[2]);
+}
+
+uint32 ProbeManager::RebuildReflectionProbesFromWorld()
+{
+	if (IsBaking()) {
+		LogWarning("Cannot rebuild the reflection probes while the probes are baking");
+		return 0;
+	}
+
+	const ProbePlacementBoxes boxes = GatherPlacementBoxes();
+
+	std::vector<ReflectionBox> reflection_boxes;
+
+	for (Object& object : gObjectManager->GetCache()) {
+		if (object.IsReflectionProbe()) {
+			reflection_boxes.push_back(
+				MakeReflectionBox(object.Bounds.Min, object.Bounds.Max, object.GetWorldMatrix()));
+		}
+	}
+
+	std::sort(reflection_boxes.begin(), reflection_boxes.end(),
+			  [](const ReflectionBox& a, const ReflectionBox& b) { return a.Volume < b.Volume; });
+
+
+	const uint32 num_brush_probes = static_cast<uint32>(reflection_boxes.size());
+	const bool has_level_probe = !boxes.IsEmpty() && gCVars->Get("r_reflection_level_probe", int64(0)) != 0;
+
+	uint32 max_brush_probes = Limits::MaxReflectionProbes;
+
+	if (has_level_probe) {
+		--max_brush_probes;
+	}
+
+	if (reflection_boxes.size() > max_brush_probes) {
+		LogWarning("{} reflection probe brushes are placed but only {} fit, the largest are left out",
+				   reflection_boxes.size(), max_brush_probes);
+		reflection_boxes.resize(max_brush_probes);
+	}
+
+	if (has_level_probe) {
+		reflection_boxes.push_back(MakeReflectionBox(boxes.Min, boxes.Max, Mat4f::scIdentity));
+	}
+
+	mReflectionProbeCount = static_cast<uint32>(reflection_boxes.size());
+	mbReflectionsBaked = false;
+
+	for (uint32 i = 0; i < mReflectionProbeCount; i++) {
+		const ReflectionBox& box = reflection_boxes[i];
+		ReflectionProbeData& probe = mReflectionProbes[i];
+
+		const Vec4f center_h = box.BoxToWorld * Vec4f(0.0f, 0.0f, 0.0f, 1.0f);
+		const Vec3f center(center_h.X, center_h.Y, center_h.Z);
+
+		Vec3f position = center;
+
+		if (!IsProbePlacementValid(center, center, boxes) &&
+			!FindValidProbePosition(center, center, box.HalfExtent * scReflectionRelocation, boxes, position)) {
+			LogWarning("Reflection probe {} is captured from inside of the level's geometry, move its brush", i);
+			position = center;
+		}
+
+		memcpy(probe.WorldToBox, box.BoxToWorld.Inverse().RawData, sizeof(probe.WorldToBox));
+
+		probe.PositionAndCount[0] = position.X;
+		probe.PositionAndCount[1] = position.Y;
+		probe.PositionAndCount[2] = position.Z;
+		probe.PositionAndCount[3] = 0.0f;
+
+		probe.Fade[0] = box.HalfExtent.X / scReflectionBlendDistance;
+		probe.Fade[1] = box.HalfExtent.Y / scReflectionBlendDistance;
+		probe.Fade[2] = box.HalfExtent.Z / scReflectionBlendDistance;
+		probe.Fade[3] = 0.0f;
+	}
+
+	UploadReflectionProbes(0);
+
+	LogInfo("Reflection probes rebuilt: {} from editor brushes, {} in total",
+			std::min(num_brush_probes, max_brush_probes), mReflectionProbeCount);
+
+	return mReflectionProbeCount;
+}
+
+void ProbeManager::BeginReflectionBake()
+{
+	if (IsBaking()) {
+		LogWarning("A probe bake is already in progress");
+		return;
+	}
+
+	if (mReflectionProbeCount == 0) {
+		LogError("Reflection bake failed: no reflection probes have been placed");
+		return;
+	}
+
+	StartReflectionPhase();
+}
+
+void ProbeManager::StartReflectionPhase()
+{
+	mBakePhase = eBakePhase::Reflection;
+	mCurrentProbe = 0;
+	mbReflectionsBaked = false;
+	mBakeState = eBakeState::CapturePending;
+
+	mReflectionTexels.assign(mReflectionProbeCount * scReflectionHalfsPerProbe, 0);
+
+	UploadReflectionProbes(0);
+
+	LogInfo("Reflection probe bake started ({} probes)", mReflectionProbeCount);
+}
+
+void ProbeManager::RecordReflectionCapture(renderer::CommandBuffer& cmd, const RenderFaceFunc& render_face)
+{
+	mBatchStart = mCurrentProbe;
+
+	const Vec3f position = GetReflectionProbePosition(mCurrentProbe);
+
+	mbCapturingFaces = true;
+
+	for (uint32 face = 0; face < scCaptureFaces; face++) {
+		PerspectiveCamera camera = MakeCaptureCamera(position, face);
+
+		render_face(camera, mReflectionStage);
+
+		CopyTargetToStaging(cmd, mReflectionStage, Limits::ReflectionProbeSize, eImageFormat::RGBA16_Float,
+							mReflectionStaging[face]);
+	}
+
+	mbCapturingFaces = false;
+	mCurrentProbe++;
+	mBakeState = eBakeState::CaptureRecorded;
+}
+
+void ProbeManager::ServiceReflectionBake()
+{
+	const uint32 probe = mBatchStart;
+
+	if (!ReadBackReflectionProbe(probe)) {
+		LogError("Reflection probe bake failed: could not read back probe {}", probe);
+		mBakePhase = eBakePhase::Irradiance;
+		mBakeState = eBakeState::Idle;
+		return;
+	}
+
+	UploadReflectionCubemap(probe);
+
+	if (mCurrentProbe < mReflectionProbeCount) {
+		mBakeState = eBakeState::CapturePending;
+		LogInfo("Reflection probe bake progress: {}/{}", mCurrentProbe, mReflectionProbeCount);
+		return;
+	}
+
+	mBakePhase = eBakePhase::Irradiance;
+	mBakeState = eBakeState::Idle;
+	mbReflectionsBaked = true;
+
+	UploadReflectionProbes(mReflectionProbeCount);
+
+	LogInfo("Reflection probe bake complete ({} probes)", mReflectionProbeCount);
+}
+
+bool ProbeManager::ReadBackReflectionProbe(uint32 probe_index)
+{
+	constexpr uint32 cSize = Limits::ReflectionProbeSize;
+	constexpr uint32 cPixels = cSize * cSize;
+
+	std::vector<float32> captures[scCaptureFaces];
+	bool mapped = true;
+
+	for (uint32 face = 0; face < scCaptureFaces; face++) {
+		renderer::RawGpuBuffer& staging = mReflectionStaging[face];
+
+		staging.Map();
+		staging.InvalidateFromGpu();
+
+		const uint16* rgba = static_cast<const uint16*>(staging.pMappedBuffer);
+
+		if (rgba == nullptr) {
+			mapped = false;
+		}
+		else {
+			captures[face].resize(cPixels * 3);
+
+			for (uint32 pixel = 0; pixel < cPixels; pixel++) {
+				for (uint32 c = 0; c < 3; c++) {
+					captures[face][pixel * 3 + c] = std::clamp(HalfToFloat(rgba[pixel * 4 + c]), 0.0f, scRadianceClamp);
+				}
+			}
+		}
+
+		staging.UnMap();
+	}
+
+	if (!mapped) {
+		return false;
+	}
+
+	std::vector<float32> cube[scCaptureFaces];
+	const float32* cube_faces[scCaptureFaces];
+
+	for (uint32 face = 0; face < scCaptureFaces; face++) {
+		cube[face].resize(cPixels * 3);
+		float32* out = cube[face].data();
+
+		for (uint32 y = 0; y < cSize; y++) {
+			for (uint32 x = 0; x < cSize; x++, out += 3) {
+				const float32 u = ((static_cast<float32>(x) + 0.5f) / static_cast<float32>(cSize)) * 2.0f - 1.0f;
+				const float32 v = ((static_cast<float32>(y) + 0.5f) / static_cast<float32>(cSize)) * 2.0f - 1.0f;
+
+				const Vec3f direction = ReflectionFilter::FaceUVToDirection(face, u, v);
+
+				uint32 capture_face;
+				float32 unused_u;
+				float32 unused_v;
+				ReflectionFilter::DirectionToFaceUV(direction, capture_face, unused_u, unused_v);
+
+				const Vec4f clip = mCaptureFaceToClip[capture_face] *
+								   Vec4f(direction.X, direction.Y, direction.Z, 1.0f);
+
+				SampleCaptureFace(captures[capture_face], cSize, clip.X / clip.W, clip.Y / clip.W, out);
+			}
+		}
+
+		cube_faces[face] = cube[face].data();
+	}
+
+	ReflectionFilter::Prefilter(cube_faces, cSize, Limits::ReflectionProbeMips,
+								mReflectionTexels.data() + probe_index * scReflectionHalfsPerProbe);
+
+	return true;
+}
+
+void ProbeManager::UploadReflectionProbes(uint32 visible_count)
+{
+	renderer::GraphicsBackend* graphics = renderer::gGraphics;
+
+	graphics->GetDevice()->WaitForIdle();
+
+	ReflectionProbeData gpu_probes[Limits::MaxReflectionProbes];
+	memcpy(gpu_probes, mReflectionProbes, sizeof(gpu_probes));
+
+	for (ReflectionProbeData& probe : gpu_probes) {
+		probe.PositionAndCount[3] = static_cast<float32>(visible_count);
+		probe.Fade[3] = static_cast<float32>(mReflectionProbeCount);
+	}
+
+	UploadRange(graphics->ReflectionProbeBuffer, gpu_probes, 0, sizeof(gpu_probes));
+}
+
+void ProbeManager::UploadReflectionCubemap(uint32 probe_index)
+{
+	using namespace renderer;
+
+	GraphicsBackend* graphics = gGraphics;
+	Image* image = graphics->pReflectionProbes;
+	Assert(image != nullptr);
+
+	graphics->GetDevice()->WaitForIdle();
+
+	const uint64 bytes = scReflectionHalfsPerProbe * sizeof(uint16);
+
+	RawGpuBuffer staging;
+	staging.Create(eGpuBufferType::Transfer, bytes, VMA_MEMORY_USAGE_CPU_TO_GPU, eGpuBufferFlags::TransferReceiver);
+	staging.Upload(mReflectionTexels.data() + probe_index * scReflectionHalfsPerProbe, bytes);
+
+	VkBufferImageCopy regions[Limits::ReflectionProbeMips];
+	uint64 offset = 0;
+
+	for (uint32 mip = 0; mip < Limits::ReflectionProbeMips; mip++) {
+		const uint32 mip_size = Limits::ReflectionProbeSize >> mip;
+
+		regions[mip] = VkBufferImageCopy {
+			.bufferOffset = offset,
+			.imageSubresource {
+				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.mipLevel = mip,
+				.baseArrayLayer = probe_index * Limits::ReflectionProbeFaces,
+				.layerCount = Limits::ReflectionProbeFaces,
+			},
+			.imageExtent { .width = mip_size, .height = mip_size, .depth = 1 },
+		};
+
+		offset += static_cast<uint64>(mip_size) * mip_size * Limits::ReflectionProbeFaces * 4 * sizeof(uint16);
+	}
+
+	graphics->SubmitImmediateUploadCmd(
+		[&](CommandBuffer& cmd)
+		{
+			BarrierHelper::ImageLayoutTransition(image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 0,
+												 Limits::ReflectionProbeMips);
+
+			vkCmdCopyBufferToImage(cmd, staging.Buffer, image->InternalImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+								   Limits::ReflectionProbeMips, regions);
+
+			BarrierHelper::ImageLayoutTransition(image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 0,
+												 Limits::ReflectionProbeMips);
+		});
+
+	staging.Destroy();
+}
+
+bool ProbeManager::SaveReflectionProbes()
+{
+	if (mReflectionProbeCount > 0 && !mbReflectionsBaked) {
+		LogWarning("The reflection probes are not baked, so they were not saved");
+		return false;
+	}
+
+	const String path = GetReflectionFilePath();
+
+	if (mReflectionProbeCount == 0 && !File(path, File::eModType::Read, File::eDataType::Binary).IsFileOpen()) {
+		return true;
+	}
+
+	File file(path, File::eModType::Write, File::eDataType::Binary);
+
+	if (!file.IsFileOpen()) {
+		LogError("Could not open {} to save the reflection probes", path.CStr());
+		return false;
+	}
+
+	ReflectionFileHeader header;
+	header.ProbeCount = mReflectionProbeCount;
+
+	file.WriteRaw(&header, sizeof(header));
+	file.WriteRaw(mReflectionProbes, mReflectionProbeCount * sizeof(ReflectionProbeData));
+	file.WriteRaw(mReflectionTexels.data(), mReflectionProbeCount * scReflectionHalfsPerProbe * sizeof(uint16));
+
+	LogInfo("Saved {} reflection probes to {}", mReflectionProbeCount, path.CStr());
+	return true;
+}
+
+bool ProbeManager::LoadReflectionProbes()
+{
+	const String path = GetReflectionFilePath();
+
+	File file(path, File::eModType::Read, File::eDataType::Binary);
+
+	if (!file.IsFileOpen()) {
+		LogInfo("No reflection probe file at {}", path.CStr());
+		return false;
+	}
+
+	const ReflectionFileHeader expected {};
+	ReflectionFileHeader header;
+
+	if (!ReadExact(file, &header, sizeof(header)) || memcmp(header.Magic, expected.Magic, sizeof(header.Magic)) != 0 ||
+		header.Version != expected.Version || header.Size != expected.Size || header.Mips != expected.Mips ||
+		header.ProbeCount > Limits::MaxReflectionProbes) {
+		LogWarning("Reflection probe file {} is out of date or not a reflection probe file, rebake the probes",
+				   path.CStr());
+		return false;
+	}
+
+	const uint64 texel_bytes = header.ProbeCount * scReflectionHalfsPerProbe * sizeof(uint16);
+	const uint64 expected_size = sizeof(header) + header.ProbeCount * sizeof(ReflectionProbeData) + texel_bytes;
+
+	if (file.GetFileSize() != expected_size) {
+		LogError("Reflection probe file {} is {} bytes, not the {} its {} probes need", path.CStr(), file.GetFileSize(),
+				 expected_size, header.ProbeCount);
+		return false;
+	}
+
+	ReflectionProbeData probes[Limits::MaxReflectionProbes] {};
+	std::vector<uint16> texels(header.ProbeCount * scReflectionHalfsPerProbe);
+
+	if (!ReadExact(file, probes, header.ProbeCount * sizeof(ReflectionProbeData)) ||
+		!ReadExact(file, texels.data(), texel_bytes)) {
+		LogError("Could not read the reflection probes from {}", path.CStr());
+		return false;
+	}
+
+	for (uint32 probe = 0; probe < header.ProbeCount; probe++) {
+		const float32* world_to_box = probes[probe].WorldToBox;
+
+		for (uint32 axis = 0; axis < 3; axis++) {
+			const float32 scale = Vec3f(world_to_box[axis], world_to_box[4 + axis], world_to_box[8 + axis]).Length();
+			probes[probe].Fade[axis] = 1.0f / (std::max(scale, 1e-6f) * scReflectionBlendDistance);
+		}
+	}
+
+	memcpy(mReflectionProbes, probes, sizeof(mReflectionProbes));
+	mReflectionTexels = std::move(texels);
+	mReflectionProbeCount = header.ProbeCount;
+	mbReflectionsBaked = true;
+
+	for (uint32 probe = 0; probe < mReflectionProbeCount; probe++) {
+		UploadReflectionCubemap(probe);
+	}
+
+	UploadReflectionProbes(mReflectionProbeCount);
+
+	LogInfo("Loaded {} reflection probes from {}", mReflectionProbeCount, path.CStr());
 	return true;
 }
 

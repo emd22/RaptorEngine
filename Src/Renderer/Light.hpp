@@ -3,8 +3,8 @@
 #include <Color.hpp>
 #include <Core/Hash.hpp>
 #include <Entity.hpp>
+#include <Math/BBox.hpp>
 #include <Math/Mat4.hpp>
-#include <Math/BoundingBox.hpp>
 #include <Math/MathUtil.hpp>
 #include <Renderer/Exposure.hpp>
 #include <Renderer/LightID.hpp>
@@ -14,6 +14,7 @@
 
 namespace fx {
 class Camera;
+class Frustum;
 
 namespace renderer {
 class Pipeline;
@@ -46,10 +47,12 @@ public:
 	LightBase(eLightFlags flags = LF_None);
 
 	void SetRadius(const float radius);
-	void SetPosition(const Vec3f& position) override;
-	void SetRotation(const Quat& rotation) override;
+	void SetPosition(const Vec3f position) override;
+	void SetRotation(const Quat rotation) override;
 
-	virtual AABB GetBounds() const;
+	virtual BBox GetBounds() const;
+
+	virtual bool IsOutsideFrustum(const Frustum& frustum) const;
 
 	FX_FORCE_INLINE float32 GetRadius() const { return mRadius; }
 	FX_FORCE_INLINE bool IsCullable() const { return Type != eLightType::Directional; }
@@ -124,9 +127,14 @@ public:
 
 		Mat4f Matrix = Mat4f::scIdentity;
 
-		/// Hash of everything that went into the bake (the light, the atlas generation and the casters). The tile is
-		/// rebaked if this is updated
-		Hash32 BakeHash = 0;
+		/// WorldGrid::GetChangeSerial() when the tile was baked. The tile is rebaked once a shadow caster changes in a
+		/// world tile the light reaches after this.
+		uint64 BakedSerial = 0;
+
+		/// ShadowAtlas::GetGeneration() when the tile was baked
+		uint32 BakedGeneration = 0;
+
+		bool bBaked = false;
 	};
 
 public:
@@ -137,17 +145,19 @@ public:
 	FX_FORCE_INLINE float32 GetInnerAngle() const { return mInnerAngle; }
 	FX_FORCE_INLINE float32 GetOuterAngle() const { return mOuterAngle; }
 
-	void SetDirection(const Vec3f& direction);
+	void SetDirection(const Vec3f direction);
 
 	Vec3f GetDirection() const;
 
-	float32 GetSolidAngle() const;
+	float32 GetEffectiveSolidAngle() const;
 	float32 GetLumens() const;
 	void SetLumens(float32 lumens);
 
 	Mat4f CalculateShadowMatrix() const;
 
-	AABB GetBounds() const override;
+	BBox GetBounds() const override;
+
+	bool IsOutsideFrustum(const Frustum& frustum) const override;
 
 	/// Hands the light's shadow atlas tile back, the next bake allocates a new one.
 	void ReleaseShadowTile();

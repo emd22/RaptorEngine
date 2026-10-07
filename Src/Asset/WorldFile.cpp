@@ -1,6 +1,7 @@
 #include "WorldFile.hpp"
 
 #include <Asset/AssetManager.hpp>
+#include <Blockout.hpp>
 #include <Engine.hpp>
 #include <Physics/PhysicsManager.hpp>
 
@@ -79,24 +80,14 @@ void WorldFile::Load(const std::string& path)
 	}
 
 
-	// Load objects
-
-	ConfigEntry* object_list = info.GetEntry(HashStr32("objects"));
-
-	for (const ConfigEntry& object_entry : object_list->Members) {
-		if (first_time) {
-			AddObjectFromEntry(path, object_entry);
+	// Models are loaded from the blockout file as well (see Blockout::LoadModels). Blockouts saved before that keep
+	// getting them from this file's `objects` entry until they are saved again.
+	if (gWorld->pBlockout != nullptr) {
+		if (gWorld->pBlockout->HasModelsEntry()) {
+			gWorld->pBlockout->LinkModelColliders();
 		}
 		else {
-			Object* object = gObjectManager->FindObject(object_entry.Name.GetHash());
-			if (object != nullptr) {
-				ApplyPropertiesToObject(object, object_entry);
-			}
-			else {
-				// New since the first load (or never found): add instead of
-				// crashing on a null object.
-				AddObjectFromEntry(path, object_entry);
-			}
+			gWorld->pBlockout->LoadLegacyModels();
 		}
 	}
 
@@ -108,7 +99,7 @@ void WorldFile::Load(const std::string& path)
 
 void WorldFile::AddColliderFromEntry(const std::string& scene_path, const ConfigEntry& collider_entry)
 {
-	const std::string& collider_name = collider_entry.Name.Get();
+	const String& collider_name = collider_entry.Name.Get();
 
 	physics::eMotionType motion_type = physics::eMotionType::Static;
 	physics::Body* phys = gPhysics->NewBody(collider_name);
@@ -134,74 +125,6 @@ void WorldFile::AddColliderFromEntry(const std::string& scene_path, const Config
 
 
 	phys->Teleport(position, rotation);
-}
-
-void WorldFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEntry& object_entry)
-{
-	const char* mesh_path = object_entry.GetMember(HashStr32("mesh"))->Get<const char*>();
-
-	LoadObjectOptions load_options {};
-
-	String path = String::Fmt("{}/Models{}", (scene_path), mesh_path);
-	AssetTicket ticket = gAssetManager->LoadObject(object_entry.Name.Get(), path.CStr());
-
-	Object* object = static_cast<Object*>(ticket.Get());
-
-
-	ApplyPropertiesToObject(object, object_entry);
-
-	gWorld->Attach(ticket);
-}
-
-
-void WorldFile::ApplyPropertiesToObject(Object* object, const ConfigEntry& object_entry)
-{
-	ConfigEntry* shadow_caster = object_entry.GetMember(HashStr32("shadows"));
-	if (shadow_caster != nullptr) {
-		object->SetShadowCaster(static_cast<bool>(shadow_caster->Get<int64>()));
-	}
-
-	// Transforms
-
-	object->SetPosition(object_entry.GetMemberValue(HashStr32("pos"), object->mPosition));
-	object->SetRotation(object_entry.GetMemberValue(HashStr32("rot"), object->mRotation));
-	object->SetScale(object_entry.GetMemberValue(HashStr32("scale"), object->mScale));
-	object->MarkTransformOutOfDate();
-
-	// Render options
-
-	ConfigEntry* layer = object_entry.GetMember(HashStr32("layer"));
-	if (layer != nullptr) {
-		int64 layer_value = layer->Get<int64>();
-
-		if (layer_value == static_cast<int64>(eObjectLayer::PlayerLayer)) {
-			object->SetObjectLayer(eObjectLayer::PlayerLayer);
-		}
-	}
-
-	object->SetUnlit(static_cast<bool>(object_entry.GetMemberValue(HashStr32("unlit"), 0)));
-
-	ConfigEntry* nocull = object_entry.GetMember(HashStr32("nocull"));
-	if (nocull != nullptr) {
-		object->SetCullable(false);
-	}
-
-
-	physics::BodyProps physics_properties {};
-
-	// Physics
-
-	ConfigEntry* collider_ref = object_entry.GetMember(HashStr32("collider"));
-	if (collider_ref != nullptr) {
-		physics::Body* phys_object = gPhysics->FindBody(HashStr32(collider_ref->Get<const char*>()));
-		if (phys_object != nullptr) {
-			object->AttachCollider(phys_object);
-			object->SetPhysicsEnabled(true);
-		}
-		else {
-			object->SetPhysicsID(physics::BodyID::scNull);
-		}
-	}
 }
 
 } // namespace fx

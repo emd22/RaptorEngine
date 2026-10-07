@@ -16,7 +16,7 @@ class LoaderJpeg : public ImageLoaderBase
 public:
 	LoaderJpeg() = default;
 
-	eLoaderStatus Load(AssetTicket& ticket, const std::string& path) override;
+	eLoaderStatus Load(AssetTicket& ticket, const String& path) override;
 	eLoaderStatus Load(AssetTicket& ticket, const uint8* data, uint32 size) override;
 
 	void CreateGpuResource(AssetTicket& ticket) override;

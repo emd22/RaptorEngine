@@ -9,7 +9,7 @@
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
 #include <Renderer/Backend/Descriptors.hpp>
-#include <unordered_map>
+#include <Core/HashMap.hpp>
 
 
 namespace fx {
@@ -107,7 +107,7 @@ class Shader
 	 */
 	struct ProgramCache
 	{
-		std::unordered_map<ShaderId, Ref<ShaderProgram>, Hash64Stl> Programs;
+		HashMap<ShaderId, Ref<ShaderProgram>> Programs;
 	};
 
 public:

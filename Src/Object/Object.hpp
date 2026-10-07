@@ -15,8 +15,8 @@
 #include <Entity.hpp>
 #include <FoxScript/FoxScript.hpp>
 #include <Material/MaterialID.hpp>
-#include <Math/BoundingBox.hpp>
-#include <Math/OrientedBoundingBox.hpp>
+#include <Math/BBox.hpp>
+#include <Math/Frustum.hpp>
 #include <WorldGrid.hpp>
 
 
@@ -34,6 +34,9 @@ enum class eObjectTag : uint32
 	LockTransform = (1 << 1),
 	/// A blockout brush that marks out a light probe volume instead of level geometry
 	ProbeVolume = (1 << 2),
+	ReflectionProbe = (1 << 3),
+	Bleeds = (1 << 4),
+	Spawn = (1 << 5),
 };
 
 FxEnumFlags(eObjectTag);
@@ -49,12 +52,14 @@ enum class eObjectFlags : uint16
 	DisableCulling = (1 << 5),
 	/// Left out of light probe bakes (capture, capture shadows and probe placement). See Object::IsProbeVisible().
 	NotProbeVisible = (1 << 6),
+	SharedMesh = (1 << 7),
 };
 
 FxEnumFlags(eObjectFlags);
 
 
 class PrimitiveMesh;
+struct SkeletonCloneMap;
 
 class Object final : public Entity
 {
@@ -70,6 +75,8 @@ public:
 
 	void MakeInstanceOf(const ObjectID& source);
 
+	Object* CloneWithOwnSkeleton(const std::string& name) const;
+
 	void Create(const Ref<PrimitiveMesh>& mesh, const MaterialID& material);
 
 	/**
@@ -84,15 +91,15 @@ public:
 
 	void Update();
 
-	void SetPosition(const Vec3f& position) override;
-	void SetRotation(const Quat& rotation) override;
+	void SetPosition(const Vec3f position) override;
+	void SetRotation(const Quat rotation) override;
 	void SetScale(const float scale) override;
 
 	void OnAttached(World* scene) override;
 
 	void PrintDebug() const;
 
-	float32 GetDirectionScale(const Vec3f& direction);
+	float32 GetDirectionScale(const Vec3f direction);
 
 	// XXX: TEMP
 	void UpdateAnimation();
@@ -141,15 +148,7 @@ public:
 	// Render options
 	/////////////////////////////////////
 
-	FX_FORCE_INLINE void SetShadowCaster(const bool value)
-	{
-		if (value) {
-			Flags |= eObjectFlags::ShadowCaster;
-		}
-		else {
-			Flags &= ~(eObjectFlags::ShadowCaster);
-		}
-	}
+	void SetShadowCaster(const bool value);
 
 	FX_FORCE_INLINE bool HasTags(eObjectTag tag) const { return HasFlag(Tags, tag); }
 	FX_FORCE_INLINE void SetTag(eObjectTag tag) { SetFlag(Tags, tag); }
@@ -171,9 +170,22 @@ public:
 	/// True if this object marks out a probe volume rather than being level geometry
 	FX_FORCE_INLINE bool IsProbeVolume() const { return HasTags(eObjectTag::ProbeVolume); }
 
-	float32 RaycastBounds(const Vec3f& origin, const Vec3f& direction, Vec3f& out_face);
+	void SetReflectionProbe(bool value);
+	FX_FORCE_INLINE bool Bleeds() const { return HasTags(eObjectTag::Bleeds); }
+	FX_FORCE_INLINE bool IsSpawn() const { return HasTags(eObjectTag::Spawn); }
+	FX_FORCE_INLINE bool IsReflectionProbe() const { return HasTags(eObjectTag::ReflectionProbe); }
 
-	FX_FORCE_INLINE OBB GetWorldOBB() { return OBB::FromLocalBounds(Bounds, GetWorldMatrix()); }
+	float32 RaycastBounds(const Vec3f origin, const Vec3f direction, Vec3f& out_face);
+
+	bool ContainsPoint(const Vec3f point);
+
+	void SetBounds(const BBox& bounds);
+
+	FX_FORCE_INLINE OBBox GetWorldOBB() { return OBBox::FromLocalBounds(Bounds, GetWorldMatrix()); }
+
+	bool CanBeFrustumCulled() const;
+
+	bool IsOutsideFrustum(const Frustum& frustum, uint32 plane_mask = scFrustumAllPlanes);
 
 	/**
 	 * @brief True if light probe bakes should include this object. Objects on the player layer (the view model) are
@@ -216,6 +228,8 @@ private:
 
 	void SyncObjectWithPhysics(physics::Body* phys);
 
+	Object* CloneNode(const String& name, SkeletonCloneMap& skeletons) const;
+
 public:
 	Ref<PrimitiveMesh> pMesh { nullptr };
 	physics::BodyID PhysicsID = physics::BodyID::scNull;
@@ -224,11 +238,13 @@ public:
 
 	Ref<Skeleton> pSkeleton { nullptr };
 	uint32 BoneBufferBase = Skeleton::scNoBones;
+	/// The skeleton's pose the last time this object told the world grid it changed.
+	uint32 mLastPoseHash = 0;
 
 	ObjectID ParentID = ObjectID::scNull;
 	PagedArray<ObjectID> AttachedNodes;
 
-	AABB Bounds { Vec3f::sZero, Vec3f::sZero };
+	BBox Bounds { Vec3f::sZero, Vec3f::sZero };
 
 	std::atomic_bool bIsAddedToWorld = false;
 

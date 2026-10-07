@@ -81,7 +81,8 @@ Ref<PrimitiveMesh> MeshGen::GeneratedMesh::AsDefaultMesh()
 
 	mesh->bKeepInMemory = true;
 
-	mesh->VertexList.CreateFrom(Positions, Normals, Texcoords, Tangents, {}, {}, eVertexCreateFlags::None, 1.0f);
+	mesh->VertexList.CreateFrom(Positions, Normals, Texcoords, Tangents, {}, {}, eVertexCreateFlags::None,
+								TangentHandedness);
 	renderer::gGraphics->SubmitImmediateUploadCmd(
 		[&](renderer::CommandBuffer& cmd)
 		{
@@ -196,7 +197,7 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeIcoSphere(int resolution)
 }
 
 static void MC_EmitQuad(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normals, SizedArray<Vec3f>& tangents,
-						SizedArray<Vec2f>& uvs, SizedArray<uint32>& indices, const Vec3f (&verts)[4],
+						SizedArray<float32>& handedness, SizedArray<Vec2f>& uvs, SizedArray<uint32>& indices, const Vec3f (&verts)[4],
 						const MeshGenOptions& options, bool flip_u, bool flip_v)
 {
 	const Vec3f surface_normal = Vec3f::GetSurfaceNormal(verts[0], verts[1], verts[2]);
@@ -206,10 +207,14 @@ static void MC_EmitQuad(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normals
 	Vec3f tangent = flip_u ? (verts[0] - verts[1]) : (verts[1] - verts[0]);
 	tangent.NormalizeIP();
 
+	const Vec3f image_up = flip_v ? (verts[3] - verts[0]) : (verts[0] - verts[3]);
+	const float32 tangent_handedness = (surface_normal.Cross(tangent).Dot(image_up) < 0.0f) ? -1.0f : 1.0f;
+
 	for (int i = 0; i < 4; i++) {
 		positions.Insert(verts[i]);
 		normals.Insert(surface_normal);
 		tangents.Insert(tangent);
+		handedness.Insert(tangent_handedness);
 	}
 
 	// Measure the quad's actual world-space width/height so the UV span
@@ -263,6 +268,7 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeCube(CubeGenOptions options)
 	mesh->Positions.InitCapacity(24);
 	mesh->Normals.InitCapacity(24);
 	mesh->Tangents.InitCapacity(24);
+	mesh->TangentHandedness.InitCapacity(24);
 	mesh->Texcoords.InitCapacity(24);
 	mesh->Indices.InitCapacity(36);
 
@@ -277,27 +283,33 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeCube(CubeGenOptions options)
 
 	if (options.bAlignUVs) {
 		// Front face (+Z)
-		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
+					mesh->Indices,
 					{ f_tl, f_tr, f_br, f_bl }, options.Front, false, false);
 
 		// Back face (-Z)
-		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
+					mesh->Indices,
 					{ b_tr, b_tl, b_bl, b_br }, options.Back, true, false);
 
 		// Top face (+Y)
-		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
+					mesh->Indices,
 					{ b_tl, b_tr, f_tr, f_tl }, options.Top, false, false);
 
 		// Bottom face (-Y)
-		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
+					mesh->Indices,
 					{ f_bl, f_br, b_br, b_bl }, options.Bottom, false, true);
 
 		// Right face (+X)
-		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
+					mesh->Indices,
 					{ f_tr, b_tr, b_br, f_br }, options.Right, true, false);
 
 		// Left face (-X)
-		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
+					mesh->Indices,
 					{ b_tl, f_tl, f_bl, b_bl }, options.Left, false, false);
 
 		return mesh;
@@ -306,27 +318,33 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeCube(CubeGenOptions options)
 	// Do not flip UVs for any faces
 
 	// Front face (+Z)
-	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
+					mesh->Indices,
 				{ f_tl, f_tr, f_br, f_bl }, options.Front, false, false);
 
 	// Back face (-Z)
-	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
+					mesh->Indices,
 				{ b_tr, b_tl, b_bl, b_br }, options.Back, false, false);
 
 	// Top face (+Y)
-	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
+					mesh->Indices,
 				{ b_tl, b_tr, f_tr, f_tl }, options.Top, false, false);
 
 	// Bottom face (-Y)
-	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
+					mesh->Indices,
 				{ f_bl, f_br, b_br, b_bl }, options.Bottom, false, false);
 
 	// Right face (+X)
-	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
+					mesh->Indices,
 				{ f_tr, b_tr, b_br, f_br }, options.Right, false, false);
 
 	// Left face (-X)
-	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
+					mesh->Indices,
 				{ b_tl, f_tl, f_bl, b_bl }, options.Left, false, false);
 	return mesh;
 }
@@ -388,6 +406,7 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeQuad(Vec2f scale)
 	mesh->Positions.InitCapacity(4);
 	mesh->Normals.InitCapacity(4);
 	mesh->Tangents.InitCapacity(4);
+	mesh->TangentHandedness.InitCapacity(4);
 	mesh->Texcoords.InitCapacity(4);
 	mesh->Indices.InitCapacity(8);
 
@@ -398,7 +417,8 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeQuad(Vec2f scale)
 	const Vec3f b_bl { -scale.X, -scale.Y, -scale_z }; //  BL
 	const Vec3f b_br { scale.X, -scale.Y, -scale_z };  //  BR
 
-	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->Texcoords, mesh->Indices,
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
+					mesh->Indices,
 				{ b_tr, b_tl, b_bl, b_br }, {}, false, false);
 
 	return mesh;

@@ -7,11 +7,11 @@ namespace fx {
 
 namespace loader {
 
-eLoaderStatus LoaderStb::Load(AssetTicket& ticket, const std::string& path)
+eLoaderStatus LoaderStb::Load(AssetTicket& ticket, const String& path)
 {
 	Image* image = static_cast<Image*>(ticket.Get());
 
-	const char* c_path = path.c_str();
+	const char* c_path = path.CStr();
 
 	const int pixel_size = ImageFormatUtil::GetPixelStride(ImageFormat);
 	Assert(pixel_size > 0);

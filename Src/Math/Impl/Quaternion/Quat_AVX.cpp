@@ -24,7 +24,7 @@ Quat::Quat(float32 x, float32 y, float32 z, float32 w)
 
 Quat::Quat(const JPH::Quat& other) { mIntrin = other.mValue.mValue; }
 
-Quat Quat::FromAxisAngle(Vec3f axis, float32 angle)
+Quat Quat::FromAxisAngle(const Vec3f axis, float32 angle)
 {
 	float32 sv, cv;
 	MathUtil::SinCos(angle * 0.5f, &sv, &cv);
@@ -41,7 +41,7 @@ bool Quat::IsCloseTo(const JPH::Quat& other, const float32 tolerance) const { re
 void Quat::FromJoltQuaternion(const JPH::Quat& quat) { mIntrin = quat.mValue.mValue; }
 void Quat::ToJoltQuaternion(JPH::Quat& quat) const { quat.mValue.mValue = mIntrin; }
 
-Quat Quat::FromEulerAngles(Vec3f angles)
+Quat Quat::FromEulerAngles(const Vec3f angles)
 {
 	/*
 		Create the quaternion using
@@ -82,7 +82,7 @@ Quat Quat::FromEulerAngles(Vec3f angles)
 				cz * cx * cy + sz * sx * sy);
 }
 
-Quat Quat::operator*(const Quat& other) const
+Quat Quat::operator*(const Quat other) const
 {
 	const float lx = X;
 	const float ly = Y;

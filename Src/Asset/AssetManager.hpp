@@ -10,6 +10,7 @@
 
 #include <Asset/Loader/Object/LoaderGltf.hpp>
 #include <Core/DataNotifier.hpp>
+#include <Core/HashMap.hpp>
 #include <Core/Ref.hpp>
 #include <Core/TSQueue.hpp>
 #include <Core/TSRef.hpp>
@@ -163,19 +164,19 @@ public:
 	 * @brief Creates a new `Object` and loads the provided asset into it from
 	 * the path provided.
 	 */
-	AssetTicket LoadObject(const std::string& name, const std::string& path);
+	AssetTicket LoadObject(const String& name, const String& path);
 
 	/**
 	 * @brief Creates a new `Object` and loads the asset into it from
 	 * the data provided.
 	 */
-	AssetTicket LoadObjectFromMemory(const std::string& name, const uint8* data, uint32 data_size);
+	AssetTicket LoadObjectFromMemory(const String& name, const uint8* data, uint32 data_size);
 
 	/////////////////////////////////////
 	// Image loading
 	/////////////////////////////////////
 
-	AssetTicket LoadImage(eImageType image_type, eImageFormat format, const std::string& path, eImageCreateFlags flags);
+	AssetTicket LoadImage(eImageType image_type, eImageFormat format, const String& path, eImageCreateFlags flags);
 	AssetTicket LoadImageFromMemory(eImageType image_type, eImageFormat format, const Slice<const uint8>& data,
 									eImageCreateFlags flags);
 
@@ -218,7 +219,7 @@ public:
 	 */
 	template <typename TLoaderType>
 		requires loader::C_IsLoader<TLoaderType>
-	void LoadFromPath(AssetTicket& ticket, eAssetType asset_type, const std::string& path)
+	void LoadFromPath(AssetTicket& ticket, eAssetType asset_type, const String& path)
 	{
 		TSRef<TLoaderType> loader = TSRef<TLoaderType>::New();
 		SubmitLoadAssetFromPath<TLoaderType>(ticket, loader, asset_type, path);
@@ -271,24 +272,13 @@ private:
 
 	template <typename TLoaderType>
 	static void SubmitLoadAssetFromPath(AssetTicket& ticket, TSRef<TLoaderType>& loader, eAssetType asset_type,
-										const std::string& path)
+										const String& path)
 	{
 		AssetManager* mgr = GetInstance();
 
 		mgr->mLoadQueue.Push(AssetQueueItem::UploadFileToProcess(ticket, loader, path, asset_type));
 		mgr->SignalUpdate();
 	}
-
-
-	// template <typename TLoaderType>
-	// static void SubmitLoadObject(const AssetTicket& ticket, TSRef<TLoaderType>& loader, eAssetType asset_type,
-	// 							 const std::string& path)
-	// {
-	// 	AssetManager* mgr = GetInstance();
-
-	// 	mgr->mLoadQueue.Push(AxQueueItem::UploadFileToProcess<loader::LoaderGltf>(ticket, loader, asset_type, path));
-	// 	mgr->SignalUpdate();
-	// }
 
 	template <typename TLoaderType>
 	static void SubmitLoadAssetFromData(AssetTicket& ticket, TSRef<TLoaderType>& loader, eAssetType asset_type,
@@ -327,7 +317,7 @@ private:
 	std::atomic_uint mTickCounter = 0;
 	uint32 mLastActiveTick = 0;
 
-	std::unordered_map<eImageFormat, fx::Image*> mNullImageList;
+	HashMap<eImageFormat, fx::Image*> mNullImageList;
 	fx::Image* mpFlatNormalImage = nullptr;
 	std::mutex mNullImageMutex;
 

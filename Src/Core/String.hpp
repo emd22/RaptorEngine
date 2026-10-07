@@ -2,6 +2,7 @@
 
 #include <Core/Types.hpp>
 #include <format>
+#include <iterator>
 #include <string>
 
 namespace fx {
@@ -113,6 +114,8 @@ public:
 	 */
 	String SubStr(uint32 start, uint32 length) const;
 
+	bool IsEmpty() const { return (Length == 0); }
+
 	std::string Str() const { return std::string(CStr(), Length); }
 
 	String& operator=(const char* str);
@@ -128,6 +131,29 @@ public:
 
 	const char operator[](size_t index) const;
 	char& operator[](size_t index);
+
+	using Iterator = char*;
+	using ConstIterator = const char*;
+	using ReverseIterator = std::reverse_iterator<char*>;
+	using ConstReverseIterator = std::reverse_iterator<const char*>;
+
+	Iterator begin() { return GetInternalPtr(); }
+	Iterator end() { return GetInternalPtr() + Length; }
+
+	ConstIterator begin() const { return GetInternalPtr(); }
+	ConstIterator end() const { return GetInternalPtr() + Length; }
+
+	ConstIterator cbegin() const { return begin(); }
+	ConstIterator cend() const { return end(); }
+
+	ReverseIterator rbegin() { return ReverseIterator(end()); }
+	ReverseIterator rend() { return ReverseIterator(begin()); }
+
+	ConstReverseIterator rbegin() const { return ConstReverseIterator(end()); }
+	ConstReverseIterator rend() const { return ConstReverseIterator(begin()); }
+
+	ConstReverseIterator crbegin() const { return rbegin(); }
+	ConstReverseIterator crend() const { return rend(); }
 
 	~String();
 
@@ -200,7 +226,7 @@ struct hash<fx::ConstString>
 template <>
 struct std::formatter<fx::String>
 {
-	auto parse(format_parse_context& ctx) { return ctx.begin(); }
+	constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
 	auto format(const fx::String& str, std::format_context& ctx) const
 	{

@@ -9,6 +9,7 @@
 #include <Renderer/Limits.hpp>
 #include <Renderer/RenderStage.hpp>
 #include <functional>
+#include <vector>
 
 namespace fx {
 
@@ -30,7 +31,7 @@ struct ProbeVolumeData
 
 	float32 InvCellSize[4];
 
-	/// Grid dimensions in XYZ, and in W the index of this volume's first probe in the probe buffers
+	/// Grid dimensions in XYZ, and in W the index of this volume's first point in the probe grid table
 	uint32 DimsAndFirst[4];
 
 	float32 MaxAndCellVolume[4];
@@ -53,11 +54,23 @@ struct ProbeGridSize
 	}
 };
 
+enum class eProbeFill
+{
+	Dense,
+	Surface,
+};
+
+struct ProbeVolumeRange
+{
+	uint32 FirstProbe = 0;
+	uint32 ProbeCount = 0;
+};
+
 /// Where a probe ended up after placement, and its depth moments for visibility. Mirrors ProbeInfo in
 /// Shaders/ProbeCommon.hlsli.
 struct ProbeInfo
 {
-	/// World space position in XYZ. W is 1 for an active probe, 0 for one that placement couldn't put anywhere useful.
+	/// World space position in XYZ. W is unused.
 	float32 ProbePosition[4];
 	/// Mean distance and mean squared distance for each texel of a 6 face cubemap
 	float32 DepthMoments[Limits::ProbeDepthFloatCount];
@@ -65,6 +78,15 @@ struct ProbeInfo
 
 static_assert(sizeof(ProbeInfo) == Limits::ProbeDepthFloatCount * sizeof(float32) + sizeof(float32) * 4,
 			  "ProbeInfo must be tightly packed to mirror the HLSL struct");
+
+struct ReflectionProbeData
+{
+	float32 WorldToBox[16];
+	float32 PositionAndCount[4];
+	float32 Fade[4];
+};
+
+static_assert(sizeof(ReflectionProbeData) == 96, "ReflectionProbeData must mirror the HLSL ReflectionProbe struct");
 
 struct ProbePlacementBoxes;
 
@@ -90,9 +112,9 @@ public:
 
 	uint32 GetProbeCount() const { return mProbeCount; }
 	Vec3f GetProbePosition(uint32 index) const;
-	bool IsProbeActive(uint32 index) const { return mProbeInfos[index].ProbePosition[3] > 0.5f; }
+	uint32 GetGridPointCount() const { return mGridPointCount; }
 
-	uint32 GetCurrentProbeIndex() const { return mCurrentProbe; }
+	uint32 GetCurrentProbeIndex() const { return (mBakePhase == eBakePhase::Irradiance) ? mCurrentProbe : UINT32_MAX; }
 
 	///////////////////////////////////
 	// Volumes
@@ -103,10 +125,18 @@ public:
 	void GetVolumeProbeRange(uint32 volume, uint32& out_first_probe, uint32& out_count) const;
 
 	void ClearVolumes();
-	bool AddVolume(const Vec3f& center, const Vec3f& size, const ProbeGridSize& grid = {});
-	bool AddLevelVolume(const ProbeGridSize& grid = {});
+	bool AddVolume(const Vec3f center, const Vec3f size, const ProbeGridSize& grid = {});
+	bool AddLevelVolumes();
 
 	uint32 RebuildVolumesFromWorld();
+
+	uint32 GetReflectionProbeCount() const { return mReflectionProbeCount; }
+	Vec3f GetReflectionProbePosition(uint32 index) const;
+	bool AreReflectionsBaked() const { return mbReflectionsBaked; }
+	bool IsBakingReflections() const { return IsBaking() && mBakePhase == eBakePhase::Reflection; }
+
+	uint32 RebuildReflectionProbesFromWorld();
+	void BeginReflectionBake();
 
 	///////////////////////////////////
 	// Baking
@@ -114,7 +144,7 @@ public:
 
 	void BeginBake();
 	void BeginGridBake();
-	void BeginGridBakeAt(const Vec3f& center, const Vec3f& size, const ProbeGridSize& grid = {});
+	void BeginGridBakeAt(const Vec3f center, const Vec3f size, const ProbeGridSize& grid = {});
 
 	bool IsBaking() const { return mBakeState != eBakeState::Idle; }
 	bool IsCapturePending() const { return mBakeState == eBakeState::CapturePending; }
@@ -122,7 +152,19 @@ public:
 	/// True only while the capture faces are being drawn. The main view keeps its probe GI and SSAO during a bake.
 	bool IsCapturingFaces() const { return mbCapturingFaces; }
 
-	bool IsCapturingBounce() const { return mbCapturingFaces && mCurrentBounce > 0; }
+	bool IsCapturingBounce() const
+	{
+		return mbCapturingFaces && (mCurrentBounce > 0 || mBakePhase == eBakePhase::Reflection);
+	}
+
+	bool IsCapturingReflection() const { return mbCapturingFaces && mBakePhase == eBakePhase::Reflection; }
+
+	Vec2u GetCaptureExtent() const
+	{
+		const uint32 size = (mBakePhase == eBakePhase::Reflection) ? Limits::ReflectionProbeSize : scCaptureSize;
+		return Vec2u(size, size);
+	}
+
 	void RecordCaptureBatch(renderer::CommandBuffer& cmd, const RenderFaceFunc& render_face);
 	void ServiceCaptureBake();
 
@@ -144,6 +186,12 @@ private:
 		CaptureRecorded,
 	};
 
+	enum class eBakePhase
+	{
+		Irradiance,
+		Reflection,
+	};
+
 	/// Everything about a capture texel that is the same for every probe
 	struct CaptureTexel
 	{
@@ -155,23 +203,39 @@ private:
 	};
 
 
-	bool AddVolumeAndPlaceProbes(const Vec3f& volume_min, const Vec3f& volume_size, const ProbeGridSize& grid,
-								 const ProbePlacementBoxes& boxes);
-	void StartSingleVolumeBake(const Vec3f& volume_min, const Vec3f& volume_size, const ProbeGridSize& grid,
-							   const ProbePlacementBoxes& boxes);
-	void PlaceVolumeProbes(uint32 volume_index, uint32 first_probe, const Vec3f& volume_min, const Vec3f& volume_size,
-						   const ProbeGridSize& grid, const ProbePlacementBoxes& boxes);
+	bool AddVolumeAndPlaceProbes(const Vec3f volume_min, const Vec3f volume_size, const ProbeGridSize& grid,
+								 const ProbePlacementBoxes& boxes, eProbeFill fill);
+	bool AddLevelBaseVolume(const ProbePlacementBoxes& boxes);
+	bool AddLevelSurfaceVolume(const ProbePlacementBoxes& boxes);
+	bool AddSurfaceVolumeForBudget(const Vec3f region_min, const Vec3f region_max, float32 spacing,
+								   const ProbePlacementBoxes& boxes, bool cell_centred);
+	bool PlaceVolumeProbes(uint32 volume_index, const Vec3f volume_min, const Vec3f volume_size,
+						   const ProbeGridSize& grid, const ProbePlacementBoxes& boxes, eProbeFill fill);
 	void RefreshVolumeCounts();
 
 	void CreateCaptureResources();
 	void BuildCaptureTexels();
-	void CopyTargetToStaging(renderer::CommandBuffer& cmd, eImageFormat format, renderer::RawGpuBuffer& staging);
+	void CopyTargetToStaging(renderer::CommandBuffer& cmd, renderer::RenderStage& stage, uint32 size,
+							 eImageFormat format, renderer::RawGpuBuffer& staging);
+
+	void StartReflectionPhase();
+	void RecordReflectionCapture(renderer::CommandBuffer& cmd, const RenderFaceFunc& render_face);
+	void ServiceReflectionBake();
+	bool ReadBackReflectionProbe(uint32 probe_index);
+	void UploadReflectionProbes(uint32 visible_count);
+	void UploadReflectionCubemap(uint32 probe_index);
+
+	bool SaveIrradianceProbes();
+	bool LoadIrradianceProbes();
+	bool SaveReflectionProbes();
+	bool LoadReflectionProbes();
 
 	bool ReadBackProbe(uint32 batch_slot, uint32 probe_index);
 	void ProjectCapture(const uint16* const colors[scCaptureFaces], const float32* const depths[scCaptureFaces],
 						ProbeSHData& out_sh, ProbeInfo& out_info) const;
 
-	/// Copies the volumes, and the SH and depth moments of probes [`first_probe`, `first_probe + count`) to the GPU.
+	/// Copies the volumes, the probe grid table, and the SH and depth moments of probes [`first_probe`,
+	/// `first_probe + count`) to the GPU.
 	void UploadToGpu(uint32 first_probe, uint32 count);
 
 	void UploadMomentsAtlas(uint32 first_probe, uint32 count);
@@ -181,10 +245,15 @@ private:
 	ProbeInfo mProbeInfos[Limits::MaxIrradianceProbes] {};
 
 	ProbeVolumeData mVolumes[Limits::MaxProbeVolumes] {};
+	ProbeVolumeRange mVolumeRanges[Limits::MaxProbeVolumes] {};
 	uint32 mVolumeCount = 0;
 
 	/// Probes taken by `mVolumes`, which is where the next volume's range starts
 	uint32 mProbeCount = 0;
+
+	uint16 mGridProbes[Limits::MaxProbeGridPoints] {};
+	uint32 mGridPointCount = 0;
+	bool mbGridDirty = true;
 
 	eBakeState mBakeState = eBakeState::Idle;
 	bool mbCapturingFaces = false;
@@ -192,6 +261,12 @@ private:
 	uint32 mBatchStart = 0;
 	uint32 mCurrentBounce = 0;
 	uint32 mBounceCount = 1;
+	eBakePhase mBakePhase = eBakePhase::Irradiance;
+
+	ReflectionProbeData mReflectionProbes[Limits::MaxReflectionProbes] {};
+	uint32 mReflectionProbeCount = 0;
+	bool mbReflectionsBaked = false;
+	std::vector<uint16> mReflectionTexels;
 
 	// Capture resources, created by the first bake
 
@@ -202,6 +277,10 @@ private:
 	SizedArray<CaptureTexel> mCaptureTexels;
 	/// Inverse projection shared by every capture face
 	Mat4f mCaptureInvProjection = Mat4f::scIdentity;
+	Mat4f mCaptureFaceToClip[scCaptureFaces];
+
+	renderer::RenderStage mReflectionStage;
+	renderer::RawGpuBuffer mReflectionStaging[scCaptureFaces];
 };
 
 extern ProbeManager* gProbeManager;

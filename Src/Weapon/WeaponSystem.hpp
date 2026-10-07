@@ -187,6 +187,7 @@ private:
 	bool LoadWeapon(const char* path, Weapon& weapon);
 	void BindFunctions(Weapon& weapon);
 	void ApplyAnimations(const Weapon& weapon);
+	void SpawnBloodSplatter(bool is_static);
 	void UpdateSwitching();
 	void UpdateHolsterAmount();
 

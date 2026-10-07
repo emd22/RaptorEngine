@@ -1,11 +1,11 @@
 #include "LoaderKtx.hpp"
 
+#include <vulkan/vulkan.h>
+
 #include <Asset/AssetBase.hpp>
 #include <Core/ArrayUtil.hpp>
 #include <Renderer/Backend/GraphicsBackendFwd.hpp>
-
 #include <algorithm>
-#include <vulkan/vulkan.h>
 
 namespace fx {
 
@@ -81,8 +81,8 @@ bool LoaderKtx::Open(const char* path)
 {
 	ktxTexture* texture = nullptr;
 
-	const KTX_error_code result =
-		ktxTexture_CreateFromNamedFile(path, KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &texture);
+	const KTX_error_code result = ktxTexture_CreateFromNamedFile(path, KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT,
+																 &texture);
 
 	if (result != KTX_SUCCESS) {
 		LogError(LC_ASSET, "Could not load KTX file at '{}': {}", path, ktxErrorString(result));
@@ -92,9 +92,9 @@ bool LoaderKtx::Open(const char* path)
 	return AdoptTexture(texture);
 }
 
-eLoaderStatus LoaderKtx::Load(AssetTicket& ticket, const std::string& path)
+eLoaderStatus LoaderKtx::Load(AssetTicket& ticket, const String& path)
 {
-	if (!Open(path.c_str())) {
+	if (!Open(path.CStr())) {
 		return eLoaderStatus::Error;
 	}
 
@@ -111,8 +111,8 @@ bool LoaderKtx::OpenFromMemory(const uint8* data, uint32 size)
 	ktxTexture* texture = nullptr;
 
 	// LOAD_IMAGE_DATA copies the levels into the texture's own storage, so `data` is not referenced afterwards
-	const KTX_error_code result =
-		ktxTexture_CreateFromMemory(data, size, KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &texture);
+	const KTX_error_code result = ktxTexture_CreateFromMemory(data, size, KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT,
+															  &texture);
 
 	if (result != KTX_SUCCESS) {
 		LogError(LC_ASSET, "Could not load KTX from memory: {}", ktxErrorString(result));
@@ -204,11 +204,24 @@ void LoaderKtx::CreateGpuResource(AssetTicket& ticket)
 {
 	Image* image = static_cast<Image*>(ticket.Get());
 
-	// Only the base level is uploaded, matching the other image loaders.
-	ImageInfo image_info(GetImageSize(), mFormat, 0, 1, GetMipData(0));
-	image_info.ImageType = ImageType;
+	ImageInfo chain_info {};
 
-	image->CreateFromData(renderer::GraphicsBackendFwd::GetUploadCmd(), image_info, CreationFlags);
+	if (mpTexture->numLevels > 1 && ImageFormatUtil::GetPixelStride(mFormat) == 4) {
+		chain_info = MakeImageInfo();
+	}
+
+	if (chain_info.ImageData.pData != nullptr) {
+		chain_info.ImageType = ImageType;
+
+		image->Upload(renderer::GraphicsBackendFwd::GetUploadCmd(), chain_info);
+		chain_info.FreeOwnedData();
+	}
+	else {
+		ImageInfo image_info(GetImageSize(), mFormat, 0, 1, GetMipData(0));
+		image_info.ImageType = ImageType;
+
+		image->CreateFromData(renderer::GraphicsBackendFwd::GetUploadCmd(), image_info, CreationFlags);
+	}
 
 	ticket.SignalUploadedToGpu();
 }

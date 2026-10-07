@@ -170,9 +170,12 @@ FSOutput main(FSInput input)
     output.vNormal = float4(0.0, 0.0, 0.0, 0.0);
 
     // Double sided materials are lit from whichever side is seen
-    if (!input.bIsFrontFace) {
-        input.vNormalWS = -input.vNormalWS;
-    }
+    const float facing = select(input.bIsFrontFace, 1.0, -1.0);
+
+    input.vNormalWS *= facing;
+PERMIF(USE_NORMAL_MAPS);
+    input.vTangentWS *= facing;
+PERMEND();
 
     Material material = bMaterialBuffer[input.uiMaterialIndex];
 
@@ -186,10 +189,7 @@ FSOutput main(FSInput input)
     }
 
     // Ignore normals for unlit objects
-    if (HAS_FLAG(material.Flags, MF_UNLIT)) {
-        return output;
-    }
-
+PERMNOT(UNLIT);
 PERMIF(USE_NORMAL_MAPS);
     float3 normal_ts = F_Sample(tNormalMap, input.vUV).rgb * 2.0 - 1.0;
 
@@ -205,6 +205,7 @@ PERMIF(USE_NORMAL_MAPS);
     output.vNormal = float4(normalize(mul(normal_ts, TBN)), 0.0);
 PERMELSE()
     output.vNormal = float4(input.vNormalWS, 0.0);
+PERMEND();
 PERMEND();
 
     return output;

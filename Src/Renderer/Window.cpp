@@ -34,6 +34,8 @@ void Window::Create(const char* title, const Vec2u& size)
     HandleResize();
 }
 
+void Window::SetTitle(const char* title) { SDL_SetWindowTitle(mWindow, title); }
+
 void Window::HandleResize()
 {
     int width, height;

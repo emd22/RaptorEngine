@@ -5,74 +5,65 @@
 #ifdef FX_NO_SIMD
 #include <Math/Vec3.hpp>
 
-FX_FORCE_INLINE bool Vec3f::IsCloseTo(const Vec3f& other, const float32 threshold)
+FX_FORCE_INLINE bool Vec3f::IsCloseTo(const Vec3f other, const float32 threshold)
 {
-    const Vec3f diff = ((*this) - other);
+	const Vec3f diff = ((*this) - other);
 
-    const bool dx = abs(diff.X) > threshold;
-    const bool dy = abs(diff.Y) > threshold;
-    const bool dz = abs(diff.Z) > threshold;
+	const bool dx = abs(diff.X) > threshold;
+	const bool dy = abs(diff.Y) > threshold;
+	const bool dz = abs(diff.Z) > threshold;
 
-    if (dx || dy || dz) {
-        return false;
-    }
+	if (dx || dy || dz) {
+		return false;
+	}
 
-    return true;
+	return true;
 }
 
 
-FX_FORCE_INLINE bool Vec3f::operator==(const Vec3f& other) const
+FX_FORCE_INLINE bool Vec3f::operator==(const Vec3f other) const
 {
-    const bool dx = (diff.X) == other.X;
-    const bool dy = (diff.Y) == other.Y;
-    const bool dz = (diff.Z) == other.Z;
+	const bool dx = (diff.X) == other.X;
+	const bool dy = (diff.Y) == other.Y;
+	const bool dz = (diff.Z) == other.Z;
 
-    return dx && dy && dz;
+	return dx && dy && dz;
 }
 
 FX_FORCE_INLINE Vec3f::Set(float32 x, float32 y, float32 z)
 {
-    X = x;
-    Y = y;
-    Z = z;
+	X = x;
+	Y = y;
+	Z = z;
 }
 
-FX_FORCE_INLINE Vec3f Vec3f::Min(const Vec3f& a, const Vec3f& b)
+FX_FORCE_INLINE Vec3f Vec3f::Min(const Vec3f a, const Vec3f b)
 {
-    return Vec3f(min(a.X, b.X), min(a.Y, b.Y), min(a.Z, b.Z));
+	return Vec3f(min(a.X, b.X), min(a.Y, b.Y), min(a.Z, b.Z));
 }
 
-FX_FORCE_INLINE Vec3f Vec3f::Min(const Vec3f& a, const Vec3f& b)
+FX_FORCE_INLINE Vec3f Vec3f::Min(const Vec3f a, const Vec3f b)
 {
-    return Vec3f(max(a.X, b.X), max(a.Y, b.Y), max(a.Z, b.Z));
+	return Vec3f(max(a.X, b.X), max(a.Y, b.Y), max(a.Z, b.Z));
 }
 
 FX_FORCE_INLINE Vec3f& Vec3f::NormalizeIP()
 {
-    const float32 len = Length();
+	const float32 len = Length();
 
-    X /= len;
-    Y /= len;
-    Z /= len;
+	X /= len;
+	Y /= len;
+	Z /= len;
 
-    return *this;
+	return *this;
 }
 
 
-FX_FORCE_INLINE Vec3f Vec3f::operator+(const Vec3f& other) const
-{
-    return Vec3f(X + other.X, Y + other.Y, Z + other.Z);
-}
+FX_FORCE_INLINE Vec3f Vec3f::operator+(const Vec3f other) const { return Vec3f(X + other.X, Y + other.Y, Z + other.Z); }
 
-FX_FORCE_INLINE Vec3f Vec3f::operator-(const Vec3f& other) const
-{
-    return Vec3f(X - other.X, Y - other.Y, Z - other.Z);
-}
+FX_FORCE_INLINE Vec3f Vec3f::operator-(const Vec3f other) const { return Vec3f(X - other.X, Y - other.Y, Z - other.Z); }
 
-FX_FORCE_INLINE Vec3f Vec3f::operator*(const Vec3f& other) const
-{
-    return Vec3f(X * other.X, Y * other.Y, Z * other.Z);
-}
+FX_FORCE_INLINE Vec3f Vec3f::operator*(const Vec3f other) const { return Vec3f(X * other.X, Y * other.Y, Z * other.Z); }
 
 FX_FORCE_INLINE Vec3f Vec3f::operator*(float32 scalar) const { return Vec3f(X * scalar, Y * scalar, Z * scalar); }
 
@@ -80,25 +71,25 @@ FX_FORCE_INLINE Vec3f Vec3f::operator-() const { return Vec3f(-X, -Y, -Z); }
 
 FX_FORCE_INLINE Vec3f Vec3f::operator/(float32 scalar) const { return Vec3f(X / scalar, Y / scalar, Z / scalar); }
 
-FX_FORCE_INLINE Vec3f& Vec3f::operator+=(const Vec3f& other)
+FX_FORCE_INLINE Vec3f& Vec3f::operator+=(const Vec3f other)
 {
-    X += other.X;
-    Y += other.Y;
-    Z += other.Z;
+	X += other.X;
+	Y += other.Y;
+	Z += other.Z;
 }
 
-FX_FORCE_INLINE Vec3f& Vec3f::operator-=(const Vec3f& other)
+FX_FORCE_INLINE Vec3f& Vec3f::operator-=(const Vec3f other)
 {
-    X -= other.X;
-    Y -= other.Y;
-    Z -= other.Z;
+	X -= other.X;
+	Y -= other.Y;
+	Z -= other.Z;
 }
 
-FX_FORCE_INLINE Vec3f& Vec3f::operator*=(const Vec3f& other)
+FX_FORCE_INLINE Vec3f& Vec3f::operator*=(const Vec3f other)
 {
-    X *= other.X;
-    Y *= other.Y;
-    Z *= other.Z;
+	X *= other.X;
+	Y *= other.Y;
+	Z *= other.Z;
 }
 
 

@@ -1,6 +1,9 @@
 #include "EditorFrame.hpp"
 
+#include "AtlasPackerWindow.hpp"
+#include "CVarListWindow.hpp"
 #include "EditorViewport.hpp"
+#include "MaterialPickerWindow.hpp"
 #include "ObjectListWindow.hpp"
 #include "ObjectPropertiesPanel.hpp"
 #include "RaptorEditor.hpp"
@@ -21,8 +24,8 @@
 #include <Core/FilesystemIO.hpp>
 #include <Core/Log.hpp>
 #include <Engine.hpp>
-#include <Renderer/LightProbe.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/LightProbe.hpp>
 #include <World.hpp>
 #include <filesystem>
 
@@ -39,13 +42,12 @@ struct ToolButtonInfo
 };
 
 static constexpr ToolButtonInfo scToolButtons[] = {
-	{ "Simulate", "Textures/editor/simulate.png" },
-	{ "Transform", "Textures/editor/move.png" },
-	{ "Face", "Textures/editor/face.png" },
-	{ "Rotate", "Textures/editor/rotate.png" },
-	{ "Create", "Textures/editor/create.png" },
-	{ "Clip", "Textures/editor/clip.png" },
-	{ "Light", "Textures/editor/lamp.png" },
+	{ "Simulate", "Textures/editor/simulate.png" }, { "Transform", "Textures/editor/move.png" },
+	{ "Face", "Textures/editor/face.png" },			{ "Rotate", "Textures/editor/rotate.png" },
+	{ "Create", "Textures/editor/create.png" },		{ "Clip", "Textures/editor/clip.png" },
+	{ "Light", "Textures/editor/lamp.png" },		{ "Bounds", "Textures/editor/bounds.png" },
+	{ "Grab", "Textures/editor/grab.png" },			{ "Spawn", "Textures/editor/spawn.png" },
+	{ "Subtract", "Textures/editor/subtract.png" },
 };
 
 static_assert(std::size(scToolButtons) == static_cast<size_t>(eEditorTool::Count));
@@ -87,16 +89,18 @@ static std::string ToBlockoutPath(const std::filesystem::path& chosen)
 	return (error || relative.empty()) ? chosen.string() : relative.string();
 }
 
-void EditorFrame::OpenBlockout()
+void EditorFrame::OpenPrototype()
 {
 	if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
 		return;
 	}
 
+#if 0
 	if (wxMessageBox("Open another blockout? Anything you haven't saved will be lost.", "Open blockout",
 					 wxYES_NO | wxICON_QUESTION, this) != wxYES) {
 		return;
 	}
+#endif
 
 	const std::filesystem::path current = std::filesystem::absolute(
 		(gWorld->BlockoutPath.GetLength() > 0) ? gWorld->BlockoutPath.Str() : std::string(scDefaultBlockoutPath));
@@ -120,6 +124,7 @@ void EditorFrame::OpenBlockout()
 		gWorld->BlockoutPath = new_path;
 
 		gProbeManager->LoadProbes();
+		gWorld->RespawnPlayer();
 	}
 	else {
 		gWorld->BlockoutPath = previous_path;
@@ -127,14 +132,23 @@ void EditorFrame::OpenBlockout()
 	}
 }
 
-void EditorFrame::SaveBlockout()
+void EditorFrame::NewPrototype()
+{
+	if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
+		return;
+	}
+
+	// gWorld->pBlockout->
+}
+
+void EditorFrame::SavePrototype()
 {
 	if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
 		return;
 	}
 
 	if (gWorld->BlockoutPath.GetLength() == 0) {
-		SaveBlockoutAs();
+		SaveProtoTypeAs();
 		return;
 	}
 
@@ -142,7 +156,7 @@ void EditorFrame::SaveBlockout()
 	gWorld->pBlockout->Save(gWorld->BlockoutPath);
 }
 
-void EditorFrame::SaveBlockoutAs()
+void EditorFrame::SaveProtoTypeAs()
 {
 	if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
 		return;
@@ -180,11 +194,13 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 
 	wxMenu* file_menu = new wxMenu;
 
-	wxMenuItem* open_item = file_menu->Append(wxID_ANY, "Open...\tCtrl+O", "Opens an existing blockout file");
+	wxMenuItem* new_item = file_menu->Append(wxID_ANY, "New", "Creates a new prototype");
+	wxMenuItem* open_item = file_menu->Append(wxID_ANY, "Open...\tCtrl+O", "Opens an existing prototype");
 	file_menu->AppendSeparator();
-	wxMenuItem* save_item = file_menu->Append(wxID_ANY, "Save", "Saves the blockout to its current file");
+
+	wxMenuItem* save_item = file_menu->Append(wxID_ANY, "Save", "Saves the prototype to its current file");
 	wxMenuItem* save_as_item = file_menu->Append(wxID_ANY, "Save As...\tCtrl+Shift+S",
-												 "Saves the blockout under a new name");
+												 "Saves the prototype under a new name");
 
 	menu_bar->Append(file_menu, "&File");
 
@@ -200,14 +216,21 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	wxMenu* window_menu = new wxMenu;
 	wxMenuItem* object_list_item = window_menu->Append(wxID_ANY, "Open Object List",
 													   "View all objects currently in ObjectManager");
+	wxMenuItem* cvar_list_item = window_menu->Append(wxID_ANY, "Open CVar List",
+													 "View and edit all registered console variables");
+
+	wxMenuItem* material_picker_item = window_menu->Append(wxID_ANY, "Open Material Picker",
+														   "Search materials and preview their albedo");
+	wxMenuItem* atlas_packer_item = window_menu->Append(wxID_ANY, "Open Atlas Packer",
+														"Pack images into a tile atlas and export its config");
 
 	menu_bar->Append(window_menu, "&Tools");
 
 	SetMenuBar(menu_bar);
 
-	Bind(wxEVT_MENU, [this](wxCommandEvent&) { OpenBlockout(); }, open_item->GetId());
-	Bind(wxEVT_MENU, [this](wxCommandEvent&) { SaveBlockout(); }, save_item->GetId());
-	Bind(wxEVT_MENU, [this](wxCommandEvent&) { SaveBlockoutAs(); }, save_as_item->GetId());
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { OpenPrototype(); }, open_item->GetId());
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { SavePrototype(); }, save_item->GetId());
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { SaveProtoTypeAs(); }, save_as_item->GetId());
 	Bind(
 		wxEVT_MENU, [](wxCommandEvent&) { gEditor->InvokeReloadHandler(eReloadTarget::World); },
 		reload_world_item->GetId());
@@ -218,6 +241,9 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 		wxEVT_MENU, [](wxCommandEvent&) { gEditor->InvokeReloadHandler(eReloadTarget::Scripts); },
 		reload_scripts_item->GetId());
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowObjectListWindow(); }, object_list_item->GetId());
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowCVarListWindow(); }, cvar_list_item->GetId());
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowMaterialPickerWindow(); }, material_picker_item->GetId());
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowAtlasPackerWindow(); }, atlas_packer_item->GetId());
 
 	wxPanel* root = new wxPanel(this, wxID_ANY);
 	wxBoxSizer* root_sizer = new wxBoxSizer(wxVERTICAL);
@@ -325,6 +351,42 @@ void EditorFrame::ShowObjectListWindow()
 
 	mpObjectListWindow->Show();
 	mpObjectListWindow->Raise();
+}
+
+void EditorFrame::ShowCVarListWindow()
+{
+	if (mpCVarListWindow == nullptr) {
+		mpCVarListWindow = new CVarListWindow(this);
+	}
+	else {
+		mpCVarListWindow->RefreshList();
+	}
+
+	mpCVarListWindow->Show();
+	mpCVarListWindow->Raise();
+}
+
+void EditorFrame::ShowMaterialPickerWindow()
+{
+	if (mpMaterialPickerWindow == nullptr) {
+		mpMaterialPickerWindow = new MaterialPickerWindow(this);
+	}
+	else {
+		mpMaterialPickerWindow->RefreshList();
+	}
+
+	mpMaterialPickerWindow->Show();
+	mpMaterialPickerWindow->Raise();
+}
+
+void EditorFrame::ShowAtlasPackerWindow()
+{
+	if (mpAtlasPackerWindow == nullptr) {
+		mpAtlasPackerWindow = new AtlasPackerWindow(this);
+	}
+
+	mpAtlasPackerWindow->Show();
+	mpAtlasPackerWindow->Raise();
 }
 
 void EditorFrame::OnClose(wxCloseEvent& event) { mbCloseRequested = true; }
