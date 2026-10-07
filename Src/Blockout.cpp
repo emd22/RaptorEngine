@@ -672,8 +672,8 @@ void Blockout::WriteBrushEntry(ConfigEntry& entry, const Object* object)
 	}
 }
 
-ObjectID Blockout::CreateBrush(const std::string& name, const Vec3f position, const Quat rotation,
-							   const MaterialID material_id, const AABB bounds)
+ObjectID Blockout::CreateBrush(const String& name, const Vec3f position, const Quat rotation,
+							   const MaterialID material_id, const BBox bounds)
 {
 	static constexpr eObjectTag scObjectTags = eObjectTag::Blockout;
 
@@ -983,15 +983,16 @@ Object* Blockout::RestoreObject(const Vec3f position, const Brush::PlaneList& pl
 		return nullptr;
 	}
 
-	std::string base_name = name.Get().empty() ? String::Fmt("{}", BlockoutObjects.Size).Str() : name.Get();
+	String base_name = name.Get().IsEmpty() ? String::Fmt("{}", BlockoutObjects.Size).Str() : name.Get();
 
-	// The original name may have been reused since the delete; keep names unique.
-	std::string blockout_name = base_name;
-	if (gObjectManager->FindObject(HashStr32(blockout_name.c_str())) != nullptr) {
+	// Make sure the names are unique
+	String blockout_name = base_name;
+
+	if (gObjectManager->FindObject(HashStr32(blockout_name.CStr())) != nullptr) {
 		int suffix = 0;
 		do {
 			blockout_name = String::Fmt("{}_undo{}", base_name, suffix++).Str();
-		} while (gObjectManager->FindObject(HashStr32(blockout_name.c_str())) != nullptr);
+		} while (gObjectManager->FindObject(HashStr32(blockout_name.CStr())) != nullptr);
 	}
 
 	LogInfo("Restoring blockout object '{}'", blockout_name);
@@ -1370,7 +1371,7 @@ void Blockout::ApplyModelProperties(Object& object, Model& model, const ConfigEn
 	apply_tag("spawn", eObjectTag::Spawn);
 
 	const ConfigEntry* collider = entry.GetMember(HashStr32("collider"));
-	model.Collider = (collider != nullptr) ? collider->Get<const char*>() : "";
+	model.ColliderName = (collider != nullptr) ? collider->Get<const char*>() : "";
 }
 
 void Blockout::LinkModelColliders()
@@ -1378,11 +1379,11 @@ void Blockout::LinkModelColliders()
 	for (const Model& model : mModels) {
 		Object* object = gObjectManager->GetObject(model.ID);
 
-		if (object == nullptr || model.Collider.empty() || !object->PhysicsID.IsNull()) {
+		if (object == nullptr || model.ColliderName.IsEmpty() || !object->PhysicsID.IsNull()) {
 			continue;
 		}
 
-		physics::Body* body = gPhysics->FindBody(HashStr32(model.Collider.c_str()));
+		physics::Body* body = gPhysics->FindBody(HashStr32(model.ColliderName.CStr()));
 
 		if (body != nullptr) {
 			object->AttachCollider(body);
@@ -1478,7 +1479,7 @@ void Blockout::SaveModels(ConfigFile& info)
 
 		ConfigEntry model_entry = ConfigEntry::Struct(object->Name.Get());
 
-		model_entry.AddMember(ConfigEntry::Literal("mesh", model.MeshPath.c_str()));
+		model_entry.AddMember(ConfigEntry::Literal("mesh", model.MeshPath.CStr()));
 		model_entry.AddMember(ConfigEntry::Literal("pos", object->mPosition));
 		model_entry.AddMember(ConfigEntry::Literal("rotquat", object->mRotation));
 		model_entry.AddMember(ConfigEntry::Literal("scale", object->mScale));
@@ -1512,8 +1513,8 @@ void Blockout::SaveModels(ConfigFile& info)
 			model_entry.AddMember(ConfigEntry::Literal("spawn", 1));
 		}
 
-		if (!model.Collider.empty()) {
-			model_entry.AddMember(ConfigEntry::Literal("collider", model.Collider.c_str()));
+		if (!model.ColliderName.IsEmpty()) {
+			model_entry.AddMember(ConfigEntry::Literal("collider", model.ColliderName.CStr()));
 		}
 
 		models_container.AddMember(std::move(model_entry));

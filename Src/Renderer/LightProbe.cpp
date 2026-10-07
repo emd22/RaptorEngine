@@ -45,8 +45,8 @@ struct ProbePlacementBoxes
 
 	struct Box
 	{
-		AABB LocalBounds;
-		AABB WorldBounds;
+		BBox LocalBounds;
+		BBox WorldBounds;
 		bool bAxisAligned = false;
 		Mat4f LocalToWorld;
 		Mat4f WorldToLocal;
@@ -262,7 +262,7 @@ constexpr float32 scShaderNormalBiasMax = 0.5f;
 void GetObjectWorldBounds(Object& object, Vec3f& out_min, Vec3f& out_max)
 {
 	// OBB::FromLocalBounds() does the same per-corner transform this used to do inline
-	const AABB world_bounds = object.GetWorldOBB().GetWorldAABB();
+	const BBox world_bounds = object.GetWorldOBB().GetWorldAABB();
 
 	out_min = world_bounds.Min;
 	out_max = world_bounds.Max;
@@ -286,7 +286,7 @@ ProbePlacementBoxes GatherPlacementBoxes()
 			continue;
 		}
 
-		const AABB world_bounds = object.GetWorldOBB().GetWorldAABB();
+		const BBox world_bounds = object.GetWorldOBB().GetWorldAABB();
 
 		if ((world_bounds.Max - world_bounds.Min).Length() > scMaxPlacementObjectSize) {
 			continue;
@@ -619,7 +619,7 @@ bool CellTouchesSurface(const Vec3f cell_min, const Vec3f cell_max, float32 pad,
 
 	for (uint32 i = 0; i < boxes.Count; i++) {
 		const ProbePlacementBoxes::Box& box = boxes.Boxes[i];
-		const AABB& bounds = box.WorldBounds;
+		const BBox& bounds = box.WorldBounds;
 
 		bool overlaps = true;
 		bool contained = true;

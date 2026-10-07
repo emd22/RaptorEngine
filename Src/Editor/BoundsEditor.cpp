@@ -24,12 +24,12 @@ static constexpr float32 scEditTolerance = 0.00001f;
 static const Color scBoundsColor = Color::FromRGBA(80, 220, 255, 255);
 static const Color scFaceColor = Color::FromRGBA(255, 120, 40, 255);
 
-static bool HasVolume(const AABB& bounds)
+static bool HasVolume(const BBox& bounds)
 {
 	return (bounds.Max.X > bounds.Min.X) || (bounds.Max.Y > bounds.Min.Y) || (bounds.Max.Z > bounds.Min.Z);
 }
 
-static bool BoundsEqual(const AABB& a, const AABB& b)
+static bool BoundsEqual(const BBox& a, const BBox& b)
 {
 	for (uint32 axis = 0; axis < 3; axis++) {
 		if (std::fabs(a.Min.mData[axis] - b.Min.mData[axis]) > scEditTolerance ||
@@ -180,7 +180,7 @@ void BoundsEditor::Update(float32 delta_time)
 	const float32 extent_before = mBoundsBefore.Max.mData[mAxis] - mBoundsBefore.Min.mData[mAxis];
 	const float32 amount = std::max(snapped / mAxisScale, scMinExtent - extent_before);
 
-	AABB bounds = mBoundsBefore;
+	BBox bounds = mBoundsBefore;
 
 	if (mSign > 0.0f) {
 		bounds.Max.mData[mAxis] += amount;

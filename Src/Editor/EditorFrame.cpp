@@ -1,5 +1,6 @@
 #include "EditorFrame.hpp"
 
+#include "AtlasPackerWindow.hpp"
 #include "CVarListWindow.hpp"
 #include "EditorViewport.hpp"
 #include "MaterialPickerWindow.hpp"
@@ -220,6 +221,8 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 
 	wxMenuItem* material_picker_item = window_menu->Append(wxID_ANY, "Open Material Picker",
 														   "Search materials and preview their albedo");
+	wxMenuItem* atlas_packer_item = window_menu->Append(wxID_ANY, "Open Atlas Packer",
+														"Pack images into a tile atlas and export its config");
 
 	menu_bar->Append(window_menu, "&Tools");
 
@@ -240,6 +243,7 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowObjectListWindow(); }, object_list_item->GetId());
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowCVarListWindow(); }, cvar_list_item->GetId());
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowMaterialPickerWindow(); }, material_picker_item->GetId());
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowAtlasPackerWindow(); }, atlas_packer_item->GetId());
 
 	wxPanel* root = new wxPanel(this, wxID_ANY);
 	wxBoxSizer* root_sizer = new wxBoxSizer(wxVERTICAL);
@@ -373,6 +377,16 @@ void EditorFrame::ShowMaterialPickerWindow()
 
 	mpMaterialPickerWindow->Show();
 	mpMaterialPickerWindow->Raise();
+}
+
+void EditorFrame::ShowAtlasPackerWindow()
+{
+	if (mpAtlasPackerWindow == nullptr) {
+		mpAtlasPackerWindow = new AtlasPackerWindow(this);
+	}
+
+	mpAtlasPackerWindow->Show();
+	mpAtlasPackerWindow->Raise();
 }
 
 void EditorFrame::OnClose(wxCloseEvent& event) { mbCloseRequested = true; }

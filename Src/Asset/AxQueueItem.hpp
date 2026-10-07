@@ -12,7 +12,6 @@
 // #include <Object/ObjectID.hpp>
 #include <Renderer/Backend/Image.hpp>
 #include <mutex>
-#include <string>
 
 namespace fx {
 
@@ -110,7 +109,7 @@ struct AssetQueueItem
 
 	template <typename TLoaderType>
 	static AssetQueueItem UploadFileToProcess(const AssetTicket& ticket, const TSRef<TLoaderType>& loader,
-											  const std::string& path, eAssetType asset_type)
+											  const String& path, eAssetType asset_type)
 	{
 		AssetQueueItem item;
 
@@ -139,12 +138,14 @@ struct AssetQueueItem
 				item.pcRawData = copy;
 				item.DataSize = data.Size;
 				item.bOwnsRawData = true;
-			} else {
+			}
+			else {
 				item.pcRawData = nullptr;
 				item.DataSize = 0;
 				item.bOwnsRawData = false;
 			}
-		} else {
+		}
+		else {
 			item.pcRawData = nullptr;
 			item.DataSize = 0;
 			item.bOwnsRawData = false;
@@ -187,7 +188,8 @@ struct AssetQueueItem
 		}
 		// Lock both mutexes in address order to avoid deadlock
 		std::mutex *a = &mMutex, *b = &other.mMutex;
-		if (a > b) std::swap(a, b);
+		if (a > b)
+			std::swap(a, b);
 		std::scoped_lock lock(*a, *b);
 
 		Path = std::move(other.Path);
@@ -218,7 +220,7 @@ struct AssetQueueItem
 	LockContext<AssetItemData> GetDataContext() { return LockContext<AssetItemData>(mMutex, Data); }
 
 public:
-	std::string Path;
+	String Path;
 
 	std::mutex mMutex;
 

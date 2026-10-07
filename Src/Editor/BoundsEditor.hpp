@@ -5,7 +5,7 @@
 #include "EditorTool.hpp"
 
 #include <Core/Types.hpp>
-#include <Math/BoundingBox.hpp>
+#include <Math/BBox.hpp>
 #include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
 
@@ -49,7 +49,7 @@ private:
 	Object* mpObject = nullptr;
 	ObjectID mObjectID = ObjectID::scNull;
 
-	AABB mBoundsBefore;
+	BBox mBoundsBefore;
 
 	uint32 mAxis = 0;
 	float32 mSign = 1.0f;

@@ -107,10 +107,10 @@ void LightBase::SetRotation(const Quat rotation)
 	}
 }
 
-AABB LightBase::GetBounds() const
+BBox LightBase::GetBounds() const
 {
 	const Vec3f extent(mRadius);
-	return AABB(mPosition - extent, mPosition + extent);
+	return BBox(mPosition - extent, mPosition + extent);
 }
 
 bool LightBase::IsOutsideFrustum(const Frustum& frustum) const
@@ -175,7 +175,7 @@ void LightSpot::SetConeAngles(float32 inner_angle, float32 outer_angle)
 	}
 }
 
-AABB LightSpot::GetBounds() const
+BBox LightSpot::GetBounds() const
 {
 	const Vec3f direction = GetDirection().Normalize();
 	const float32 axis_components[3] = { direction.X, direction.Y, direction.Z };
@@ -194,7 +194,7 @@ AABB LightSpot::GetBounds() const
 		low[axis] = -mRadius * std::max(reach_negative, 0.0f);
 	}
 
-	return AABB(mPosition + Vec3f(low[0], low[1], low[2]), mPosition + Vec3f(high[0], high[1], high[2]));
+	return BBox(mPosition + Vec3f(low[0], low[1], low[2]), mPosition + Vec3f(high[0], high[1], high[2]));
 }
 
 bool LightSpot::IsOutsideFrustum(const Frustum& frustum) const { return !frustum.IntersectsAABB(GetBounds()); }

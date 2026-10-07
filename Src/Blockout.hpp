@@ -15,7 +15,7 @@
 #include <Core/String.hpp>
 #include <Material/MaterialID.hpp>
 #include <Material/MaterialLibrary.hpp>
-#include <Math/BoundingBox.hpp>
+#include <Math/BBox.hpp>
 #include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
@@ -184,8 +184,8 @@ private:
 	struct Model
 	{
 		ObjectID ID = ObjectID::scNull;
-		std::string MeshPath;
-		std::string Collider;
+		String MeshPath;
+		String ColliderName;
 	};
 
 	/**
@@ -197,8 +197,8 @@ private:
 	 * @brief Creates a new brush from values
 	 * @returns A null ObjectID on failure, the ObjectID of the brush otherwise
 	 */
-	ObjectID CreateBrush(const std::string& name, const Vec3f position, const Quat rotation,
-						 const MaterialID material_id, const AABB bounds);
+	ObjectID CreateBrush(const String& name, const Vec3f position, const Quat rotation, const MaterialID material_id,
+						 const BBox bounds);
 
 	/**
 	 * @brief Brings the models in the world in line with a list of model entries. Models that are already loaded are

@@ -469,33 +469,12 @@ void World::UpdateSpotShadows()
 		const uint32 first_caster = mSpotShadowCasters.Size;
 		GatherSpotShadowCasters(light->GetPosition(), light->GetRadius(), mSpotShadowCasters);
 
-		Hash32 bake_hash = HashObj32(gShadowAtlas->GetGeneration());
-		bake_hash = HashObj32(shadow.AtlasTile, bake_hash);
-		bake_hash = HashObj32(shadow_matrix.RawData, bake_hash);
-
-		for (uint32 index = first_caster; index < mSpotShadowCasters.Size; index++) {
-			const ObjectID caster_id = mSpotShadowCasters[index];
-			Object* caster = gObjectManager->GetObject(caster_id);
-
-			const PrimitiveMesh* mesh = caster->pMesh.IsValid() ? &(*caster->pMesh) : nullptr;
-
-			// The same test as Object::RenderPrimitive(), so a caster that finishes loading gets baked in
-			const bool is_drawable = (mesh != nullptr) && caster->CheckIfReady(false);
-
-			bake_hash = HashObj32(caster_id.GetID(), bake_hash);
-			bake_hash = HashObj32(mesh, bake_hash);
-			bake_hash = HashObj32(is_drawable, bake_hash);
-			bake_hash = HashObj32(caster->GetWorldMatrix().RawData, bake_hash);
-
-			if (caster->IsSkinned() && caster->pSkeleton.IsValid()) {
-				bake_hash = HashObj32(caster->pSkeleton->PoseHash, bake_hash);
-				bake_hash = HashObj32(caster->HasBonesForDraw(), bake_hash);
-			}
-		}
-
+		const uint64 grid_serial = gWorldGrid->GetChangeSerial();
 
 		// The tile already holds this exact bake
-		if (bake_hash == shadow.BakeHash) {
+		if (shadow.bBaked && shadow.BakedGeneration == gShadowAtlas->GetGeneration() &&
+			memcmp(shadow.Matrix.RawData, shadow_matrix.RawData, sizeof(shadow_matrix.RawData)) == 0 &&
+			!gWorldGrid->HasChangedSince(light->GetPosition(), light->GetRadius(), shadow.BakedSerial)) {
 			while (mSpotShadowCasters.Size > first_caster) {
 				mSpotShadowCasters.RemoveLast();
 			}
@@ -504,7 +483,9 @@ void World::UpdateSpotShadows()
 		}
 
 		shadow.Matrix = shadow_matrix;
-		shadow.BakeHash = bake_hash;
+		shadow.BakedSerial = grid_serial;
+		shadow.BakedGeneration = gShadowAtlas->GetGeneration();
+		shadow.bBaked = true;
 
 		mSpotShadowBakes.Insert(SpotShadowBake {
 			.pLight = light,
@@ -605,10 +586,9 @@ void World::GatherSpotShadowCasters(const Vec3f center, float32 radius, DynArray
 		}
 	};
 
-	const Vec3f extent(radius, radius, radius);
-
-	const Vec2u min_tile = gWorldGrid->TileToTileXY(gWorldGrid->WorldToTile(center - extent));
-	const Vec2u max_tile = gWorldGrid->TileToTileXY(gWorldGrid->WorldToTile(center + extent));
+	Vec2u min_tile;
+	Vec2u max_tile;
+	gWorldGrid->GetSphereTileRange(center, radius, &min_tile, &max_tile);
 
 	for (uint32 y = min_tile.Y; y <= max_tile.Y; y++) {
 		for (uint32 x = min_tile.X; x <= max_tile.X; x++) {
@@ -664,6 +644,9 @@ void World::AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, const
 			return;
 		}
 	}
+
+	// Polls for a mesh that finished loading, which marks the object's tiles as changed
+	object->CheckIfReady(false);
 
 	if (!object->IsSkinned() || SkinnedCasterReachesSphere(*object, center, radius)) {
 		out_casters.Insert(id);
@@ -913,7 +896,7 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 	mLightList.Clear();
 	AddTileToLightList(WorldGrid::scGlobalTileIndex, light_frustum);
 
-	AABB frustum_bounds = mFrustum.GetFrustumBoundingBox(cam);
+	BBox frustum_bounds = mFrustum.GetFrustumBoundingBox(cam);
 
 	uint32 num_visible = 0;
 
@@ -942,7 +925,7 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 		for (uint32 x = min_tile.X; x <= max_tile.X; x++) {
 			TileIndex ti = gWorldGrid->TileFromTileXY(Vec2u(x, y));
 
-			AABB tile_bounds = gWorldGrid->GetTileAABB(ti);
+			BBox tile_bounds = gWorldGrid->GetTileAABB(ti);
 
 			if (!mFrustum.TileIntersectsAABB(tile_bounds)) {
 				continue;
@@ -1259,7 +1242,7 @@ void World::DebugDrawPhysicsBodies()
 		const JPH::AABox bounds = body->GetWorldSpaceBounds();
 		const Color color = (phys->GetMotionType() == physics::eMotionType::Static) ? static_color : dynamic_color;
 
-		gDebugDraw->WireBox(AABB(Vec3f(bounds.mMin), Vec3f(bounds.mMax)), color);
+		gDebugDraw->WireBox(BBox(Vec3f(bounds.mMin), Vec3f(bounds.mMax)), color);
 	}
 }
 

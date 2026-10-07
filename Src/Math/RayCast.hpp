@@ -4,7 +4,7 @@
 
 namespace fx {
 
-class AABB;
+class BBox;
 
 struct Ray
 {
@@ -23,7 +23,7 @@ struct Ray
 /// Returned by RayCast() when the ray never meets the box
 inline constexpr float scRayCastMiss = -1.0f;
 
-float RayCast(const Ray& ray, const AABB& aabb);
+float RayCast(const Ray& ray, const BBox& aabb);
 
 /**
  * @brief As RayCast(), and also reports which face the ray met.
@@ -31,6 +31,6 @@ float RayCast(const Ray& ray, const AABB& aabb);
  * `out_face` is the outward normal of that face, axis aligned in the box's own space, and zero on a miss. A ray
  * starting inside the box gets the face it leaves through, which is the one it is pointing at.
  */
-float RayCast(const Ray& ray, const AABB& aabb, Vec3f& out_face);
+float RayCast(const Ray& ray, const BBox& aabb, Vec3f& out_face);
 
 } // namespace fx
