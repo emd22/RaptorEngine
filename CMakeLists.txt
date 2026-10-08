@@ -120,9 +120,21 @@ endif()
 
 target_include_directories(raptor PRIVATE
     "Src"
+)
+
+target_include_directories(raptor SYSTEM PRIVATE
     "Src/ThirdParty"
     "Lib/Include"
 )
+
+set(THIRDPARTY_SOURCES ${SOURCES})
+list(FILTER THIRDPARTY_SOURCES INCLUDE REGEX "/Src/ThirdParty/")
+if(MSVC)
+    set_source_files_properties(${THIRDPARTY_SOURCES} PROPERTIES COMPILE_OPTIONS "/W0")
+else()
+    set_source_files_properties(${THIRDPARTY_SOURCES} PROPERTIES COMPILE_OPTIONS "-w")
+    target_compile_options(raptor PRIVATE --system-header-prefix=ThirdParty/)
+endif()
 
 target_compile_definitions(raptor PRIVATE
     FX_BASE_DIR="${FX_BASE_DIR}"

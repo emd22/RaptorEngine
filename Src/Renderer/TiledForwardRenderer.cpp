@@ -218,16 +218,13 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 	ds_entries.Insert(DescriptorEntry::AsBuffer(10, eShaderType::Pixel, &gGraphics->DecalMaskBuffer, 0,
 												gGraphics->DecalMaskPageSize));
 
-	// tDecalAtlas, tDecalNormalAtlas and tDecalBloodAtlas, blank until DecalManager hands over the loaded atlases
+	// tDecalAtlas and tDecalNormalAtlas, blank until DecalManager hands over the loaded atlases
 	Image* null_image = gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm);
 	Image* decal_atlas = (mpDecalAtlas != nullptr) ? mpDecalAtlas : null_image;
 	Image* decal_normal_atlas = (mpDecalNormalAtlas != nullptr) ? mpDecalNormalAtlas : null_image;
 
 	ds_entries.Insert(DescriptorEntry::AsImage(11, eShaderType::Pixel, decal_atlas, gSamplerCache->Request({})));
 	ds_entries.Insert(DescriptorEntry::AsImage(12, eShaderType::Pixel, decal_normal_atlas, gSamplerCache->Request({})));
-
-	Image* decal_blood_atlas = (mpDecalBloodAtlas != nullptr) ? mpDecalBloodAtlas : null_image;
-	ds_entries.Insert(DescriptorEntry::AsImage(17, eShaderType::Pixel, decal_blood_atlas, gSamplerCache->Request({})));
 
 	result = gDescriptorCache->Request(ds_entries);
 	pPersistentDescriptor = result.second;
@@ -558,7 +555,7 @@ void TiledForwardRenderer::AddGlobalDescriptors()
 						gSamplerCache->Request({}));
 	gPSOBuild->AddImage(16, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
 						gSamplerCache->Request({}));
-	// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas, tDecalBloodAtlas
+	// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
 	AddDecalDescriptors();
 	// tShadowAtlas
 	gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
@@ -578,24 +575,21 @@ void TiledForwardRenderer::AddDecalDescriptors()
 	gPSOBuild->AddBuffer(9, 0, eShaderType::Pixel, &gGraphics->DecalBuffer, 0, gGraphics->DecalPageSize);
 	// bDecalMasks
 	gPSOBuild->AddBuffer(10, 0, eShaderType::Pixel, &gGraphics->DecalMaskBuffer, 0, gGraphics->DecalMaskPageSize);
-	// tDecalAtlas, tDecalNormalAtlas and tDecalBloodAtlas, the real atlases are only bound in the persistent descriptor set
+	// tDecalAtlas and tDecalNormalAtlas, the real atlases are only bound in the persistent descriptor set
 	gPSOBuild->AddImage(11, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
 						gSamplerCache->Request({}));
 	gPSOBuild->AddImage(12, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
 						gSamplerCache->Request({}));
-	gPSOBuild->AddImage(17, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-						gSamplerCache->Request({}));
 }
 
-void TiledForwardRenderer::SetDecalAtlases(Image* atlas, Image* normal_atlas, Image* blood_atlas)
+void TiledForwardRenderer::SetDecalAtlases(Image* atlas, Image* normal_atlas)
 {
-	if (atlas == mpDecalAtlas && normal_atlas == mpDecalNormalAtlas && blood_atlas == mpDecalBloodAtlas) {
+	if (atlas == mpDecalAtlas && normal_atlas == mpDecalNormalAtlas) {
 		return;
 	}
 
 	mpDecalAtlas = atlas;
 	mpDecalNormalAtlas = normal_atlas;
-	mpDecalBloodAtlas = blood_atlas;
 
 	// The old set may still be in use by a frame in flight, so this builds a new one rather than updating it
 	BuildPersistentDescriptor();

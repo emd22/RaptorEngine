@@ -2,7 +2,9 @@
 
 #include <Asset/AssetTicket.hpp>
 #include <Core/SizedArray.hpp>
+#include <Core/String.hpp>
 #include <Core/Types.hpp>
+#include <Math/Mat4.hpp>
 #include <Math/Vec3.hpp>
 #include <Renderer/Backend/Pipeline.hpp>
 #include <atomic>
@@ -11,12 +13,7 @@ namespace fx {
 
 class Image;
 class PerspectiveCamera;
-
-enum class eDecalAtlas : uint32
-{
-	BulletHoles = 0,
-	Blood = 1,
-};
+class Skeleton;
 
 /**
  * @brief A decal to project onto the world, see DecalManager::AddDecal().
@@ -45,16 +42,19 @@ struct DecalDesc
 
 	/// How far the normal atlas bends the lighting, 0 for a flat decal
 	float32 NormalStrength = 0.6f;
-
-	eDecalAtlas Atlas = eDecalAtlas::BulletHoles;
 };
 
 class DecalManager
 {
 public:
-	static constexpr const char* scBulletHoleAtlasPath = "Textures/bulletholes.png";
-	/// Tangent space normals (green up) laid out the same as the atlas above. Optional, without it decals are flat.
-	static constexpr const char* scBulletHoleNormalAtlasPath = "Textures/bulletholes_normal.png";
+	static constexpr const char* scAtlasDirectory = "Textures/";
+	static constexpr const char* scAtlasConfigPath = "Textures/decals.conf";
+	static constexpr const char* scDefaultAtlasImage = "decals.png";
+	static constexpr const char* scNormalAtlasPath = "Textures/decals_normal.png";
+
+	static constexpr const char* scBulletHoleGroup = "bulletholes";
+	static constexpr const char* scBloodGroup = "blood_splat";
+
 	static constexpr uint32 scBulletHoleAtlasColumns = 4;
 	static constexpr uint32 scBulletHoleAtlasRows = 4;
 
@@ -63,8 +63,13 @@ public:
 	static constexpr float32 scBulletHoleDepth = 0.1f;
 	static constexpr float32 scBulletHoleNormalStrength = 1.0f;
 
-	static constexpr const char* scBloodAtlasPath = "Textures/blood_splat.png";
 	static constexpr float32 scBloodDepth = 0.2f;
+
+	static constexpr float32 scSkinnedBloodDepth = 0.6f;
+
+	static constexpr float32 scReplaceDistanceFraction = 0.3f;
+	static constexpr float32 scReplaceMaxSizeRatio = 1.25f;
+	static constexpr float32 scReplaceMinFacing = 0.7f;
 
 public:
 	DecalManager() = default;
@@ -76,6 +81,13 @@ public:
 
 	void AddBloodSplat(const Vec3f hit_point, const Vec3f hit_normal, float32 size);
 
+	void AddSkinnedDecal(const Skeleton* skeleton, const Mat4f& rest_to_world, const DecalDesc& desc);
+	void AddSkinnedBloodSplat(const Skeleton* skeleton, const Mat4f& rest_to_world, const Vec3f hit_point,
+							  const Vec3f direction, float32 size);
+	void RemoveSkinnedDecals(const Skeleton* skeleton);
+
+	void GetSkinnedDecalRange(const Skeleton* skeleton, uint32& out_start, uint32& out_count) const;
+
 	void Clear();
 
 	void Update(const PerspectiveCamera& camera);
@@ -84,12 +96,32 @@ public:
 	FX_FORCE_INLINE uint32 GetCount() const { return mDecals.Size; }
 
 private:
+	struct AtlasRegion
+	{
+		float32 ScaleU = 1.0f;
+		float32 ScaleV = 1.0f;
+		float32 OffsetU = 0.0f;
+		float32 OffsetV = 0.0f;
+	};
+
 	struct DecalEntry
 	{
 		renderer::DecalGpuData GpuData;
 		/// Radius of the sphere around the decal's box, for frustum culling
 		float32 BoundsRadius = 0.0f;
+		bool bReplaced = false;
 	};
+
+	struct SkinnedDecalEntry
+	{
+		renderer::DecalGpuData GpuData;
+		const Skeleton* pSkeleton = nullptr;
+	};
+
+private:
+	String LoadAtlasConfig();
+	DecalEntry BuildEntry(const DecalDesc& desc) const;
+	void ReplaceCoveredDecals(const DecalDesc& desc, const Vec3f forward);
 
 private:
 	/// Ring buffer of decals
@@ -100,14 +132,18 @@ private:
 	SizedArray<uint32> mVisibleSlots;
 	uint32 mVisibleCount = 0;
 
+	SizedArray<SkinnedDecalEntry> mSkinnedDecals;
+	uint32 mSkinnedUploadedCount = 0;
+
 	AssetTicket mAtlasTicket { nullptr };
 	AssetTicket mNormalAtlasTicket { nullptr };
-	AssetTicket mBloodAtlasTicket { nullptr };
+
+	AtlasRegion mBulletHoleRegion;
+	AtlasRegion mBloodRegion;
 
 	/// Set from the asset thread once each atlas is on the GPU
 	std::atomic<Image*> mpAtlas = nullptr;
 	std::atomic<Image*> mpNormalAtlas = nullptr;
-	std::atomic<Image*> mpBloodAtlas = nullptr;
 };
 
 } // namespace fx

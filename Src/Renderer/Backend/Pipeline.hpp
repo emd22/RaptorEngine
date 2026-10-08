@@ -109,6 +109,8 @@ struct alignas(16) DrawPushConstants
 	/// Scale applied to the lit result before it is written to the HDR target, see GraphicsBackend::PreExposure
 	float32 PreExposure = 1.0f;
 
+	uint32 SkinnedDecalStart = 0;
+	uint32 SkinnedDecalCount = 0;
 };
 
 static_assert(sizeof(DrawPushConstants) <= 128, "DrawPushConstants exceeds the minimum guaranteed push constant size");
@@ -206,7 +208,7 @@ struct alignas(16) DecalGpuData
 
 	float32 AtlasRect[4];
 
-	/// World space half extents along each axis. W picks the atlas, see `DecalAtlas`.
+	/// World space half extents along each axis. W is unused
 	float32 HalfExtents[4];
 };
 

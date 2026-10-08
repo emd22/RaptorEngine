@@ -1,0 +1,38 @@
+/*
+ * File:        spin.strata
+ * Author:      emd22
+ * Created:     07/10/2026
+ * Description: Example object script. Attach it to an object from the Script field of the editor's properties panel.
+ *              Turns the object about its yaw axis while the game is running, and puts it back when the game stops.
+ */
+
+import ../interop;
+import ../common;
+
+/* Every object a script is attached to runs its own copy of the script, so these globals belong to that object. */
+const float SPIN_SPEED = ((90.0f * MATH_PI) / 180.0f);
+
+float3 spin_base_rotation;
+float spin_angle = 0.0f;
+
+
+/* Called on the first frame the object is simulated. */
+void object_start(OBJECT self)
+{
+	spin_base_rotation = self.get_rotation();
+	spin_angle = 0.0f;
+}
+
+/* Called every simulated frame. */
+void object_update(OBJECT self, float delta_time)
+{
+	spin_angle += delta_time * SPIN_SPEED;
+
+	self.rotate_to(float3(spin_base_rotation.x, spin_base_rotation.y + spin_angle, spin_base_rotation.z));
+}
+
+/* Called when simulation ends and the editor goes back to editing. */
+void object_stop(OBJECT self)
+{
+	self.rotate_to(spin_base_rotation);
+}

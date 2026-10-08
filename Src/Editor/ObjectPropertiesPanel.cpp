@@ -7,13 +7,17 @@
 #include <wx/button.h>
 #include <wx/checkbox.h>
 #include <wx/choice.h>
+#include <wx/filedlg.h>
 #include <wx/sizer.h>
 #include <wx/statbox.h>
 #include <wx/stattext.h>
+#include <wx/textctrl.h>
 
 #include <Blockout.hpp>
 #include <Engine.hpp>
+#include <Script/ObjectScripts.hpp>
 #include <World.hpp>
+#include <filesystem>
 
 namespace fx::editor {
 
@@ -31,6 +35,9 @@ static constexpr FlagName scTagNames[] = {
 	{ static_cast<uint32>(eObjectTag::ReflectionProbe), "Reflection Probe", "Blockout brushes only" },
 	{ static_cast<uint32>(eObjectTag::Bleeds), "Bleeds", nullptr },
 	{ static_cast<uint32>(eObjectTag::Spawn), "Spawn", nullptr },
+	{ static_cast<uint32>(eObjectTag::Trigger), "Trigger",
+	  "Blockout brushes only. Calls object_trigger_enter and object_trigger_exit in the object's script when the "
+	  "player enters and leaves it" },
 };
 
 static constexpr FlagName scFlagNames[] = {
@@ -103,6 +110,40 @@ ObjectPropertiesPanel::ObjectPropertiesPanel(wxWindow* parent) : wxPanel(parent,
 
 	mpMaterialChoice->Bind(wxEVT_CHOICE, &ObjectPropertiesPanel::OnMaterialChoice, this);
 
+	wxBoxSizer* script_row = new wxBoxSizer(wxHORIZONTAL);
+	script_row->Add(new wxStaticText(this, wxID_ANY, "Script"), wxSizerFlags().CenterVertical());
+
+	mpScriptText = new wxTextCtrl(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize,
+								  wxTE_PROCESS_ENTER);
+	mpScriptText->SetHint("Scripts/objects/example.strata");
+	script_row->Add(mpScriptText, wxSizerFlags(1).Border(wxLEFT, 6));
+
+	mpScriptBrowse = new wxButton(this, wxID_ANY, "Browse...", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+	script_row->Add(mpScriptBrowse, wxSizerFlags().Border(wxLEFT, 6));
+
+	mpScriptClear = new wxButton(this, wxID_ANY, "Clear", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+	script_row->Add(mpScriptClear, wxSizerFlags().Border(wxLEFT, 6));
+
+	sizer->Add(script_row, wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+
+	mpScriptStatus = new wxStaticText(this, wxID_ANY, wxEmptyString);
+	sizer->Add(mpScriptStatus, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+
+	mpScriptText->Bind(wxEVT_TEXT_ENTER, [this](wxCommandEvent&) { CommitScript(); });
+	mpScriptText->Bind(wxEVT_KILL_FOCUS,
+					   [this](wxFocusEvent& event)
+					   {
+						   CommitScript();
+						   event.Skip();
+					   });
+	mpScriptBrowse->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { BrowseScript(); });
+	mpScriptClear->Bind(wxEVT_BUTTON,
+						[this](wxCommandEvent&)
+						{
+							mpScriptText->ChangeValue(wxEmptyString);
+							CommitScript();
+						});
+
 	sizer->Add(MakeFlagGroup(this, "Tags", scTagNames, mTagRows), wxSizerFlags().Expand().Border(wxALL, 6));
 	sizer->Add(MakeFlagGroup(this, "Flags", scFlagNames, mFlagRows), wxSizerFlags().Expand().Border(wxALL, 6));
 
@@ -162,6 +203,70 @@ void ObjectPropertiesPanel::OnMaterialChoice(wxCommandEvent& event)
 	gEditor->SetStoredMaterial(mpShownObject, gWorld->pBlockout->GetMaterialForID(slot));
 }
 
+void ObjectPropertiesPanel::CommitScript()
+{
+	if (mpShownObject == nullptr || !CanAttachScript(mpShownObject)) {
+		return;
+	}
+
+	const String path(mpScriptText->GetValue().Trim().ToStdString());
+
+	if (gObjectScripts->GetPath(mpShownObject->ID) == path) {
+		return;
+	}
+
+	gEditor->SetSelectionScript(path);
+
+	mbRowsStale = true;
+	ShowObject(mpShownObject);
+}
+
+void ObjectPropertiesPanel::BrowseScript()
+{
+	if (mpShownObject == nullptr || !CanAttachScript(mpShownObject)) {
+		return;
+	}
+
+	std::error_code error;
+	const std::filesystem::path root = std::filesystem::current_path(error) / "Scripts";
+
+	wxFileDialog dialog(this, "Attach script", wxString::FromUTF8(root.string()), wxEmptyString,
+						"Strata scripts (*.strata)|*.strata", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+
+	if (dialog.ShowModal() != wxID_OK) {
+		return;
+	}
+
+	const std::filesystem::path chosen(dialog.GetPath().ToStdString());
+	const std::filesystem::path relative = std::filesystem::relative(chosen, std::filesystem::current_path(), error);
+
+	mpScriptText->ChangeValue(wxString::FromUTF8((error || relative.empty()) ? chosen.string() : relative.string()));
+
+	CommitScript();
+}
+
+void ObjectPropertiesPanel::RefreshScript(Object* object)
+{
+	const bool can_attach = CanAttachScript(object);
+	const bool has_errors = can_attach && gObjectScripts->HasErrors(object->ID);
+	const wxString path = can_attach ? wxString::FromUTF8(gObjectScripts->GetPath(object->ID).CStr()) : wxString();
+
+	mpScriptText->Enable(can_attach);
+	mpScriptBrowse->Enable(can_attach);
+	mpScriptClear->Enable(can_attach && !path.IsEmpty());
+
+	if (path != mShownScript || object != mpShownObject) {
+		mpScriptText->ChangeValue(path);
+		mShownScript = path;
+	}
+
+	if (has_errors != mbShownScriptErrors) {
+		mbShownScriptErrors = has_errors;
+		mpScriptStatus->SetLabel(has_errors ? wxString("Script failed to compile, see the log") : wxString());
+		Layout();
+	}
+}
+
 void ObjectPropertiesPanel::RefreshMaterialChoices()
 {
 	if (gWorld->pBlockout == nullptr) {
@@ -203,6 +308,14 @@ void ObjectPropertiesPanel::ShowObject(Object* object)
 		mpMaterialChoice->SetSelection(wxNOT_FOUND);
 		mpMaterialChoice->Disable();
 		mShownMaterialSlot = -1;
+
+		mpScriptText->ChangeValue(wxEmptyString);
+		mpScriptText->Disable();
+		mpScriptBrowse->Disable();
+		mpScriptClear->Disable();
+		mpScriptStatus->SetLabel(wxEmptyString);
+		mShownScript.clear();
+		mbShownScriptErrors = false;
 		return;
 	}
 
@@ -228,6 +341,8 @@ void ObjectPropertiesPanel::ShowObject(Object* object)
 	}
 
 	mpMaterialChoice->Enable(object->HasTags(eObjectTag::Blockout));
+
+	RefreshScript(object);
 
 	if (mbShowingAnything && !mbRowsStale && object == mpShownObject && tags == mShownTags && flags == mShownFlags &&
 		name == mShownName) {

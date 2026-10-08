@@ -35,11 +35,11 @@ SomeInt = 5
 
 Booleans are treated internally as integers and can be retrieved as any integral type.
 
-Defined in the script are the constants for `True` and `False`, which should be referenced using the dollar sign operator.
+Defined in the script are the constants for `true` and `false`, which should be referenced using the dollar sign operator.
 
 ```
-IsBoolean = $True
-IsCool = $False
+IsBoolean = $true
+IsCool = $false
 ```
 
 ### Arrays

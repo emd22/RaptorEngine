@@ -9,6 +9,7 @@
 #include <Decal/DecalManager.hpp>
 #include <Engine.hpp>
 #include <Math/MathUtil.hpp>
+#include <NPC.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Physics/PhysicsManager.hpp>
 #include <Player.hpp>
@@ -29,6 +30,7 @@ using namespace renderer;
 
 static constexpr const char* scWeaponDirectory = "RaptorData/Data/Weapons";
 static constexpr float32 scSprintSpeed = 5.0f;
+static constexpr float32 scWoundSize = 0.22f;
 
 namespace {
 
@@ -523,13 +525,30 @@ void WeaponSystem::ApplyHit(float32 damage, float32 force, bool decal)
 	}
 
 	JPH::BodyInterface& bodies = gPhysics->pBackend->GetBodyInterface();
+	const uint64 user_data = bodies.GetUserData(mLastHit.Body);
+	NPC* hit_npc = physics::RagdollUserData::Matches(user_data)
+					   ? gNPCManager->FindByRagdollSerial(physics::RagdollUserData::GetSerial(user_data))
+					   : nullptr;
+
+	if (hit_npc != nullptr) {
+		if (decal) {
+			hit_npc->AddWound(mLastHit.Body, mLastHit.Point, mLastDirection, scWoundSize);
+		}
+
+		hit_npc->Damage(damage, mLastHit.Body);
+
+		if (force > 0.0f) {
+			hit_npc->AddImpulse(mLastHit.Body, mLastDirection * force, mLastHit.Point);
+		}
+	}
+
 	const JPH::EMotionType motion = bodies.GetMotionType(mLastHit.Body);
 
 	const bool is_static = (motion == JPH::EMotionType::Static);
 
 	physics::Body* hit_body = gPhysics->FindBody(mLastHit.Body);
 	const Object* hit_object = (hit_body != nullptr) ? gObjectManager->GetObject(hit_body->GetObjectID()) : nullptr;
-	const bool bleeds = (hit_object != nullptr) && hit_object->Bleeds();
+	const bool bleeds = (hit_npc != nullptr) || ((hit_object != nullptr) && hit_object->Bleeds());
 
 	if (bleeds) {
 		if (decal) {
@@ -542,7 +561,7 @@ void WeaponSystem::ApplyHit(float32 damage, float32 force, bool decal)
 		}
 	}
 
-	if (!is_static && force > 0.0f) {
+	if (hit_npc == nullptr && motion == JPH::EMotionType::Dynamic && force > 0.0f) {
 		bodies.ActivateBody(mLastHit.Body);
 		bodies.AddImpulse(mLastHit.Body,
 						  JPH::Vec3(mLastDirection.X * force, mLastDirection.Y * force, mLastDirection.Z * force));

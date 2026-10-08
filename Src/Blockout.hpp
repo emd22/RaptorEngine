@@ -137,6 +137,8 @@ public:
 
 	bool HasBrush(const Object* object);
 
+	bool ContainsPoint(Object* object, const Vec3f point);
+
 	/**
 	 * @brief Clears the prototype of all brushes and objects, and creates the basis for a new prototype.
 	 */
@@ -166,6 +168,8 @@ public:
 	 * blockout don't, and get their models from the scene's info.prx instead (see LoadLegacyModels).
 	 */
 	bool HasModelsEntry() const { return mbHasModelsEntry; }
+
+	bool IsModel(const Object* object) const;
 
 	/**
 	 * @brief Loads the models from the `objects` entry of the scene's info.prx, which is where they lived before they

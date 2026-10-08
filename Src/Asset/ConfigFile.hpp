@@ -568,6 +568,8 @@ private:
 
 	bool ParseEntry(ConfigEntry* parent, ConfigEntry& out_entry);
 	bool ParseValue(ConfigPrimitive& value);
+	bool ParseTerm(ConfigPrimitive& value);
+	bool ParseExpression(ConfigPrimitive& value);
 	bool ParseReference(ConfigPrimitive& value);
 
 	/// Skip tokens until the start of the next `name =` entry (or a closing brace if `in_struct`).

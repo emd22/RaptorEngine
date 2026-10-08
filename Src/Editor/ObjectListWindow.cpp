@@ -34,6 +34,7 @@ static constexpr TagName scTagNames[] = {
 	{ eObjectTag::ProbeVolume, "Probe Volume" },
 	{ eObjectTag::ReflectionProbe, "Reflection Probe" },
 	{ eObjectTag::Spawn, "Spawn" },
+	{ eObjectTag::Trigger, "Trigger" },
 };
 
 static wxString BuildTagsList(eObjectTag tags)

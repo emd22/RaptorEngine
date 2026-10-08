@@ -54,6 +54,8 @@ enum class eTokenType
     GreaterEqual,
 
     DocComment,
+
+    Pipe,
 };
 
 
@@ -177,7 +179,7 @@ class Tokenizer
 {
 private:
 public:
-    const char* SingleCharOperators = "=()[]{}<>+-*/$.,;:?!&";
+    const char* SingleCharOperators = "=()[]{}<>+-*/$.,;:?!&|";
 
     struct State
     {

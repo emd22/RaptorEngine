@@ -14,6 +14,7 @@
 #include <Physics/PhysicsManager.hpp>
 #include <Renderer/LightManager.hpp>
 #include <Renderer/PipelineNames.hpp>
+#include <Script/ObjectScripts.hpp>
 #include <World.hpp>
 
 
@@ -23,6 +24,27 @@ static constexpr int32 scDefaultMaterialID = 0;
 static constexpr int32 scEditableMaterialID = 1;
 
 Blockout::Blockout() {}
+
+static void ReadScriptEntry(Object* object, const ConfigEntry& entry)
+{
+	const ConfigEntry* script = entry.GetMember(HashStr32("script"));
+
+	if (script != nullptr) {
+		gObjectScripts->Attach(object, String(script->Get<const char*>()));
+	}
+	else {
+		gObjectScripts->Detach(object->ID);
+	}
+}
+
+static void WriteScriptEntry(ConfigEntry& entry, const Object* object)
+{
+	const String& path = gObjectScripts->GetPath(object->ID);
+
+	if (!path.IsEmpty()) {
+		entry.AddMember(ConfigEntry::Literal("script", path.CStr()));
+	}
+}
 
 void Blockout::Create(World* world)
 {
@@ -535,7 +557,7 @@ void Blockout::RebuildBrush(Object* object, Brush&& brush, physics::eMotionType 
 	phys->CreateConvexHullBody(hull_points, motion_type,
 							   physics::BodyProps {
 								   .ConvexRadius = 0.05f,
-								   .Density = 20,
+								   .Density = 100,
 							   });
 
 	phys->SetMidpoint(midpoint);
@@ -546,6 +568,10 @@ void Blockout::RebuildBrush(Object* object, Brush&& brush, physics::eMotionType 
 	// A probe volume's collider has to be taken back out of the world
 	if (object->IsProbeVolume()) {
 		object->SetProbeVolume(true);
+	}
+
+	if (object->IsTrigger()) {
+		object->SetTrigger(true);
 	}
 
 	mBrushes.Insert(object->ID.GetID(), std::move(brush));
@@ -791,6 +817,12 @@ ObjectID Blockout::CreateBrush(ConfigEntry& entry)
 		object->SetTag(eObjectTag::Spawn);
 	}
 
+	if (entry.GetMemberValue(HashStr32("trigger"), 0) == 1) {
+		object->SetTag(eObjectTag::Trigger);
+	}
+
+	ReadScriptEntry(object, entry);
+
 	physics::eMotionType is_dynamic = entry.GetMemberValue(HashStr32("dynamic"), 0) ? physics::eMotionType::Dynamic
 																					: physics::eMotionType::Static;
 
@@ -930,6 +962,12 @@ Object* Blockout::DupeObject(Object* object)
 		dupe->SetTag(eObjectTag::Spawn);
 	}
 
+	if (object->IsTrigger()) {
+		dupe->SetTag(eObjectTag::Trigger);
+	}
+
+	gObjectScripts->Attach(dupe, gObjectScripts->GetPath(object->ID));
+
 	RebuildBrush(dupe, std::move(brush), motion_type);
 
 	AssetTicket ticket(static_cast<void*>(dupe));
@@ -943,6 +981,19 @@ Object* Blockout::DupeObject(Object* object)
 }
 
 bool Blockout::HasBrush(const Object* object) { return GetBrush(object) != nullptr; }
+
+bool Blockout::ContainsPoint(Object* object, const Vec3f point)
+{
+	const Brush* brush = GetBrush(object);
+
+	if (brush == nullptr) {
+		return object->ContainsPoint(point);
+	}
+
+	const Vec4f local = object->GetWorldMatrix().Inverse() * Vec4f(point.X, point.Y, point.Z, 1.0f);
+
+	return brush->ContainsPoint(Vec3f(local.X, local.Y, local.Z));
+}
 
 bool Blockout::SetDynamic(Object* object, bool dynamic)
 {
@@ -1189,7 +1240,7 @@ void Blockout::SaveLights(ConfigFile& info)
 		ConfigEntry light_entry = ConfigEntry::Struct(light->Name.Get());
 
 		light_entry.AddMember(
-			ConfigEntry::DotReference("type", light->Type == eLightType::Spot ? "$CLight.Spot" : "$CLight.Point"));
+			ConfigEntry::DotReference("type", light->Type == eLightType::Spot ? "$clight.spot" : "$clight.point"));
 
 		light_entry.AddMember(ConfigEntry::Literal("pos", light->GetPosition()));
 		WriteColorEntry(light_entry, "color", light->Color);
@@ -1319,6 +1370,16 @@ bool Blockout::RemoveModelFromWorld(ObjectID id)
 	return true;
 }
 
+bool Blockout::IsModel(const Object* object) const
+{
+	if (object == nullptr) {
+		return false;
+	}
+
+	return std::any_of(mModels.begin(), mModels.end(),
+					   [&](const Model& model) { return model.ID.GetID() == object->ID.GetID(); });
+}
+
 void Blockout::RemovePendingModels()
 {
 	std::erase_if(mModelsPendingRemoval, [this](ObjectID id) { return RemoveModelFromWorld(id); });
@@ -1369,6 +1430,8 @@ void Blockout::ApplyModelProperties(Object& object, Model& model, const ConfigEn
 	apply_tag("lock", eObjectTag::LockTransform);
 	apply_tag("bleeds", eObjectTag::Bleeds);
 	apply_tag("spawn", eObjectTag::Spawn);
+
+	ReadScriptEntry(&object, entry);
 
 	const ConfigEntry* collider = entry.GetMember(HashStr32("collider"));
 	model.ColliderName = (collider != nullptr) ? collider->Get<const char*>() : "";
@@ -1513,6 +1576,8 @@ void Blockout::SaveModels(ConfigFile& info)
 			model_entry.AddMember(ConfigEntry::Literal("spawn", 1));
 		}
 
+		WriteScriptEntry(model_entry, object);
+
 		if (!model.ColliderName.IsEmpty()) {
 			model_entry.AddMember(ConfigEntry::Literal("collider", model.ColliderName.CStr()));
 		}
@@ -1647,6 +1712,12 @@ void Blockout::Save(const String& path)
 			if (object->IsSpawn()) {
 				blockout_entry.AddMember(ConfigEntry::Literal("spawn", 1));
 			}
+
+			if (object->IsTrigger()) {
+				blockout_entry.AddMember(ConfigEntry::Literal("trigger", 1));
+			}
+
+			WriteScriptEntry(blockout_entry, object);
 
 			if (IsDynamic(object)) {
 				blockout_entry.AddMember(ConfigEntry::Literal("dynamic", 1));

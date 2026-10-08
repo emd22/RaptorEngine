@@ -7,6 +7,7 @@
 #include <wx/checkbox.h>
 #include <wx/choice.h>
 #include <wx/collpane.h>
+#include <wx/panel.h>
 #include <wx/sizer.h>
 #include <wx/statbox.h>
 #include <wx/stattext.h>
@@ -35,7 +36,9 @@ constexpr DebugLayer scDebugLayers[] = {
 	{ "Object Bounds", World::scDebugBoundsObjects },
 	{ "Light Bounds", World::scDebugBoundsLights },
 	{ "Physics Bounds", World::scDebugBoundsPhysics },
-	{ "All Bounds", World::scDebugBoundsObjects | World::scDebugBoundsLights | World::scDebugBoundsPhysics },
+	{ "Ragdolls", World::scDebugBoundsRagdolls },
+	{ "All Bounds", World::scDebugBoundsObjects | World::scDebugBoundsLights | World::scDebugBoundsPhysics |
+						World::scDebugBoundsRagdolls },
 };
 
 constexpr const char* scReflectionDebugViews[] = {
@@ -45,6 +48,22 @@ constexpr const char* scReflectionDebugViews[] = {
 };
 
 } // namespace
+
+static wxCollapsiblePane* MakeBorderedPane(wxWindow* parent, wxSizer* sizer, const char* title)
+{
+	wxPanel* frame = new wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_SIMPLE);
+	wxBoxSizer* frame_sizer = new wxBoxSizer(wxVERTICAL);
+
+	wxCollapsiblePane* pane = new wxCollapsiblePane(frame, wxID_ANY, title, wxDefaultPosition, wxDefaultSize,
+													wxCP_DEFAULT_STYLE | wxCP_NO_TLW_RESIZE);
+
+	frame_sizer->Add(pane, wxSizerFlags(1).Expand());
+	frame->SetSizer(frame_sizer);
+
+	sizer->Add(frame, wxSizerFlags().Expand().Border());
+
+	return pane;
+}
 
 WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, wxID_ANY)
 {
@@ -91,13 +110,10 @@ WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, w
 	}
 
 	{
-		mpCameraPane = new wxCollapsiblePane(this, wxID_ANY, "Camera", wxDefaultPosition, wxDefaultSize,
-											 wxCP_DEFAULT_STYLE | wxCP_NO_TLW_RESIZE);
+		mpCameraPane = MakeBorderedPane(this, sizer, "Camera");
 
 		wxWindow* cam_pane_win = mpCameraPane->GetPane();
 		wxSizer* cam_pane_sizer = new wxBoxSizer(wxVERTICAL);
-
-		sizer->Add(mpCameraPane, wxSizerFlags().Expand().Border());
 
 		mpApertureField = new FloatField(cam_pane_win, "Aperture (f/)", Vec2f(0.7f, 64.0f));
 		mpApertureField->SetOnChange([](const float value) { gCVars->Set("r_aperture", value); });
@@ -130,10 +146,13 @@ WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, w
 
 void WorldPropertiesPanel::OnPaneChanged()
 {
+	mpCameraPane->GetParent()->Layout();
+	mpReflectionPane->GetParent()->Layout();
 	Layout();
 
 	if (GetParent() != nullptr) {
 		GetParent()->Layout();
+		GetParent()->FitInside();
 	}
 
 	Update();
@@ -141,13 +160,10 @@ void WorldPropertiesPanel::OnPaneChanged()
 
 void WorldPropertiesPanel::BuildReflectionPane(wxSizer* sizer)
 {
-	mpReflectionPane = new wxCollapsiblePane(this, wxID_ANY, "Probes", wxDefaultPosition, wxDefaultSize,
-											 wxCP_DEFAULT_STYLE | wxCP_NO_TLW_RESIZE);
+	mpReflectionPane = MakeBorderedPane(this, sizer, "Probes");
 
 	wxWindow* pane = mpReflectionPane->GetPane();
 	wxSizer* pane_sizer = new wxBoxSizer(wxVERTICAL);
-
-	sizer->Add(mpReflectionPane, wxSizerFlags().Expand().Border());
 
 	mpReflectionStatus = new wxStaticText(pane, wxID_ANY, wxEmptyString);
 	pane_sizer->Add(mpReflectionStatus, wxSizerFlags().Expand().Border(wxALL, 6));

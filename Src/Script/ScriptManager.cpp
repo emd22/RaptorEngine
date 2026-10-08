@@ -7,7 +7,7 @@ namespace fx {
 ScriptManager::ScriptManager()
 {
 	mpCompiler = strataCompilerCreate();
-	mScripts.Init(64);
+	mScripts.Init(scMaxScripts);
 }
 
 script::Script* ScriptManager::LoadScript(const String& path) { return mScripts.NewItem(nullptr, path); }

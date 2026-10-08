@@ -823,7 +823,7 @@ void World::AddTileToRenderList(bool clear, TileIndex new_tile_index, const Frus
 			continue;
 		}
 
-		if (object->IsProbeVolume()) {
+		if (object->IsVolume()) {
 			++index;
 			continue;
 		}
@@ -1047,7 +1047,7 @@ void World::Render(Camera* shadow_camera)
 	}
 
 	// Probe volumes are edited as brushes, so the editor always shows them
-	if (pCVarShowProbeVolumes->IntValue != 0) {
+	if (pCVarShowProbeVolumes->IntValue != 0 || gEditor->IsDataMode()) {
 		DebugDrawProbeVolumes();
 	}
 #endif
@@ -1162,7 +1162,7 @@ void World::DebugDrawObjectBounds()
 	const Color debug_color = Color::FromRGBA(80, 200, 255, 255);
 
 	for (Object& object : gObjectManager->GetCache()) {
-		if (object.IsProbeVolume() || object.GetObjectLayer() == eObjectLayer::PlayerLayer) {
+		if (object.IsVolume() || object.GetObjectLayer() == eObjectLayer::PlayerLayer) {
 			continue;
 		}
 
@@ -1247,13 +1247,13 @@ void World::DebugDrawPhysicsBodies()
 }
 
 Object* World::RaycastProbeVolumes(const Vec3f origin, const Vec3f direction, float32 max_distance,
-								   float32& out_distance)
+								   float32& out_distance, const std::function<bool(const Object&)>& accept)
 {
 	Object* nearest = nullptr;
 	float32 nearest_distance = max_distance;
 
 	for (Object& object : gObjectManager->GetCache()) {
-		if (!object.IsProbeVolume()) {
+		if (!object.IsVolume() || (accept != nullptr && !accept(object))) {
 			continue;
 		}
 
@@ -1275,12 +1275,19 @@ void World::DebugDrawProbeVolumes()
 {
 	const Color volume_color = Color::FromRGBA(60, 220, 255, 255);
 	const Color reflection_color = Color::FromRGBA(255, 120, 220, 255);
+	const Color trigger_color = Color::FromRGBA(120, 255, 90, 255);
 	const Color selected_color = Color::FromRGBA(255, 220, 60, 255);
 
 	for (Object& object : gObjectManager->GetCache()) {
-		if (!object.IsProbeVolume()) {
+		if (!object.IsVolume()) {
 			continue;
 		}
+
+#ifdef FX_IS_EDITOR
+		if (gEditor->IsDataMode() && !gEditor->IsObjectSelectable(&object)) {
+			continue;
+		}
+#endif
 
 		const Vec3f half_extent = (object.Bounds.Max - object.Bounds.Min) * 0.5f;
 		const Vec3f center = (object.Bounds.Max + object.Bounds.Min) * 0.5f;
@@ -1293,7 +1300,11 @@ void World::DebugDrawProbeVolumes()
 		const bool is_selected = false;
 #endif
 
-		const Color color = object.IsReflectionProbe() ? reflection_color : volume_color;
+		Color color = object.IsReflectionProbe() ? reflection_color : volume_color;
+
+		if (object.IsTrigger() && !object.IsProbeVolume()) {
+			color = trigger_color;
+		}
 
 		gDebugDraw->WireBox(world_matrix, is_selected ? selected_color : color);
 	}

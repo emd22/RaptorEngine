@@ -145,7 +145,7 @@ void GraphicsBackend::Init(Vec2u window_size)
 								VMA_MEMORY_USAGE_GPU_ONLY);
 
 	// Decals are written from the CPU every frame, so they get a page per frame in flight like the lights
-	DecalPageSize = Limits::MaxVisibleDecals * sizeof(DecalGpuData);
+	DecalPageSize = (Limits::MaxVisibleDecals + Limits::MaxSkinnedDecals) * sizeof(DecalGpuData);
 	DecalMaskPageSize = Limits::MaxScreenTiles * Limits::DecalMaskWords * sizeof(uint32);
 
 	DecalBuffer.Create(eGpuBufferType::StorageWithOffset, DecalPageSize * FramesInFlight, VMA_MEMORY_USAGE_CPU_ONLY,

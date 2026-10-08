@@ -12,6 +12,9 @@ namespace fx {
 class ScriptManager
 {
 public:
+	static constexpr uint32 scMaxScripts = 1536;
+
+public:
 	ScriptManager();
 
 	script::Script* LoadScript(const String& path);

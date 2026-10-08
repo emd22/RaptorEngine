@@ -10,6 +10,7 @@
 #include <Engine.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
+#include <Math/RayCast.hpp>
 #include <Physics/PhysicsPlayer.hpp>
 #include <Renderer/DebugDraw.hpp>
 #include <Renderer/Globals.hpp>
@@ -29,6 +30,7 @@ static constexpr float32 scEditTolerance = 0.0005f;
 static constexpr float32 scHeightSnapStepsPerSecond = 8.0f;
 
 static const Color scSpawnColor = Color::FromRGBA(70, 220, 255, 255);
+static const Color scIdleSpawnColor = Color::FromRGBA(70, 130, 150, 255);
 static const Color scEditingSpawnColor = Color::FromRGBA(130, 255, 130, 255);
 
 void SpawnEditor::Enter() { mbMoving = false; }
@@ -87,13 +89,31 @@ void SpawnEditor::Tick(float32 delta_time)
 		CommitEdit();
 	}
 
-	DrawMarker();
+	DrawMarker(true);
 }
 
-void SpawnEditor::DrawMarker()
+bool SpawnEditor::Raycast(const Vec3f origin, const Vec3f direction, float32 max_distance, float32& out_distance) const
+{
+	const Vec3f position = gWorld->PlayerSpawn.Position;
+	const Vec3f half_extent(scPlayerHalfWidth, scEyeHeight * 0.5f, scPlayerHalfWidth);
+	const Vec3f center = position + Vec3f(0.0f, half_extent.Y, 0.0f);
+
+	Vec3f face;
+	const float32 distance = RayCast(Ray(origin, direction), BBox(center - half_extent, center + half_extent), face);
+
+	if (distance < 0.0f || distance > max_distance) {
+		return false;
+	}
+
+	out_distance = distance;
+
+	return true;
+}
+
+void SpawnEditor::DrawMarker(bool selected)
 {
 	const World::PlayerSpawnPoint& spawn = gWorld->PlayerSpawn;
-	const Color color = mbEditing ? scEditingSpawnColor : scSpawnColor;
+	const Color color = mbEditing ? scEditingSpawnColor : (selected ? scSpawnColor : scIdleSpawnColor);
 
 	const Vec3f half_extent(scPlayerHalfWidth, scEyeHeight * 0.5f, scPlayerHalfWidth);
 	const Vec3f body_center = spawn.Position + Vec3f(0.0f, half_extent.Y, 0.0f);

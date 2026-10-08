@@ -8,10 +8,12 @@
 #include <Decal/DecalManager.hpp>
 #include <Editor/RaptorEditor.hpp>
 #include <Material/MaterialManager.hpp>
+#include <NPC.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Physics/PhysicsManager.hpp>
 #include <Renderer/LightManager.hpp>
 #include <Renderer/LightProbe.hpp>
+#include <Script/ObjectScripts.hpp>
 #include <Script/ScriptManager.hpp>
 #include <Texture/TextureManager.hpp>
 #include <World.hpp>
@@ -40,6 +42,8 @@ DecalManager* gDecalManager = nullptr;
 ScriptManager* gScriptManager = nullptr;
 
 CVarManager* gCVars = nullptr;
+NPCManager* gNPCManager = nullptr;
+ObjectScriptManager* gObjectScripts = nullptr;
 
 #ifdef FX_IS_EDITOR
 editor::RaptorEditor* gEditor = nullptr;
@@ -68,11 +72,15 @@ void Init()
 	gProbeManager = new ProbeManager;
 	gDecalManager = new DecalManager;
 	gCVars = new CVarManager;
+	gNPCManager = new NPCManager;
+	gObjectScripts = new ObjectScriptManager;
 }
 
 
 void Destroy()
 {
+	DESTROY_GLOBAL(gNPCManager);
+	DESTROY_GLOBAL(gObjectScripts);
 	DESTROY_GLOBAL(gPhysics);
 	DESTROY_GLOBAL(gShaderCompiler);
 	DESTROY_GLOBAL(gMaterialManager);

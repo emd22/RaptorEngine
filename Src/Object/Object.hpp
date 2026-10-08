@@ -37,6 +37,7 @@ enum class eObjectTag : uint32
 	ReflectionProbe = (1 << 3),
 	Bleeds = (1 << 4),
 	Spawn = (1 << 5),
+	Trigger = (1 << 6),
 };
 
 FxEnumFlags(eObjectTag);
@@ -167,13 +168,19 @@ public:
 	 */
 	void SetProbeVolume(bool value);
 
+	void SetTrigger(bool value);
+
 	/// True if this object marks out a probe volume rather than being level geometry
 	FX_FORCE_INLINE bool IsProbeVolume() const { return HasTags(eObjectTag::ProbeVolume); }
+	FX_FORCE_INLINE bool IsTrigger() const { return HasTags(eObjectTag::Trigger); }
+	FX_FORCE_INLINE bool IsVolume() const { return HasTags(eObjectTag::ProbeVolume | eObjectTag::Trigger); }
+	FX_FORCE_INLINE bool IsDataBrush() const { return HasTags(eObjectTag::Blockout) && IsVolume(); }
 
 	void SetReflectionProbe(bool value);
 	FX_FORCE_INLINE bool Bleeds() const { return HasTags(eObjectTag::Bleeds); }
 	FX_FORCE_INLINE bool IsSpawn() const { return HasTags(eObjectTag::Spawn); }
 	FX_FORCE_INLINE bool IsReflectionProbe() const { return HasTags(eObjectTag::ReflectionProbe); }
+	FX_FORCE_INLINE bool IsDynamic() const { return HasFlag(Flags, eObjectFlags::PhysicsEnabled); }
 
 	float32 RaycastBounds(const Vec3f origin, const Vec3f direction, Vec3f& out_face);
 
@@ -227,6 +234,8 @@ private:
 	void RenderMesh(renderer::Pipeline* pipeline);
 
 	void SyncObjectWithPhysics(physics::Body* phys);
+
+	void ApplyVolumeState();
 
 	Object* CloneNode(const String& name, SkeletonCloneMap& skeletons) const;
 

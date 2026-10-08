@@ -7,6 +7,7 @@
 #include <Core/FreeArray.hpp>
 #include <Renderer/Backend/Descriptors.hpp>
 #include <Renderer/Backend/GpuBuffer.hpp>
+#include <vector>
 
 namespace fx {
 
@@ -82,5 +83,8 @@ public:
 private:
 	FreeArray<Object> mObjectList;
 };
+
+void DestroyObjectTree(ObjectID root_id);
+void CollectObjectTree(Object* root, std::vector<Object*>& out_parts);
 
 } // namespace fx

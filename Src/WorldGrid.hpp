@@ -128,6 +128,7 @@ public:
 
 	FX_FORCE_INLINE uint32 GetNumTiles() const { return mTileBuffer.Size; }
 
+
 	~WorldGrid() = default;
 
 private:
@@ -148,6 +149,7 @@ private:
 	void RelocateObject(Object* object, bool update_attached);
 
 	void AddObjectsFromTile(std::unordered_set<ObjectID>& object_buffer, const Tile* tile) const;
+
 
 public:
 	Vec2u mGridSize;

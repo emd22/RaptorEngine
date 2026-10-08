@@ -11,6 +11,7 @@
 #include <Renderer/Light.hpp>
 #include <Renderer/LightList.hpp>
 #include <Renderer/RenderList.hpp>
+#include <functional>
 
 
 namespace fx {
@@ -84,7 +85,8 @@ private:
 	void DebugDrawProbeVolumes();
 
 public:
-	Object* RaycastProbeVolumes(const Vec3f origin, const Vec3f direction, float32 max_distance, float32& out_distance);
+	Object* RaycastProbeVolumes(const Vec3f origin, const Vec3f direction, float32 max_distance, float32& out_distance,
+								const std::function<bool(const Object&)>& accept = nullptr);
 
 private:
 	void DebugDrawObjectBounds();
@@ -157,6 +159,7 @@ public:
 	static constexpr uint32 scDebugBoundsObjects = (1u << 0);
 	static constexpr uint32 scDebugBoundsLights = (1u << 1);
 	static constexpr uint32 scDebugBoundsPhysics = (1u << 2);
+	static constexpr uint32 scDebugBoundsRagdolls = (1u << 3);
 
 	uint32 DebugBoundsMask = 0;
 	bool bRenderProbes = false;

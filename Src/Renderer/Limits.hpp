@@ -38,6 +38,9 @@ static constexpr uint32 MaxDecals = 512;
 static constexpr uint32 MaxVisibleDecals = 512;
 
 /// Each screen tile has a bit per visible decal, packed into this many words. Mirrored by DECAL_MASK_WORDS.
+static constexpr uint32 MaxSkinnedDecals = 64;
+static constexpr uint32 MaxSkinnedDecalsPerSkeleton = 16;
+
 static constexpr uint32 DecalMaskWords = MaxVisibleDecals / 32;
 
 static_assert((MaxVisibleDecals % 32) == 0);

@@ -7,6 +7,7 @@
 #include <ThirdParty/Jolt/Physics/EActivation.h>
 
 #include <Core/RefUtil.hpp>
+#include <Decal/DecalManager.hpp>
 #include <Engine.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
@@ -20,6 +21,7 @@
 #include <Renderer/MeshUtil.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
+#include <Script/ObjectScripts.hpp>
 #include <World.hpp>
 #include <algorithm>
 #include <utility>
@@ -272,6 +274,11 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 	const bool is_probe_capture = HasFlag(push_constants.Flags, eDrawFlags::ProbeCapture);
 	push_constants.PreExposure = is_probe_capture ? 1.0f : gGraphics->PreExposure;
 
+	if (pSkeleton.IsValid() && !is_probe_capture) {
+		gDecalManager->GetSkinnedDecalRange(&(*pSkeleton), push_constants.SkinnedDecalStart,
+											push_constants.SkinnedDecalCount);
+	}
+
 	if (gGraphics->bOnlyRenderProbes) {
 		push_constants.Flags |= eDrawFlags::DebugIrradiance;
 	}
@@ -501,15 +508,34 @@ void Object::SetProbeVolume(bool value)
 		ClearTag(eObjectTag::ReflectionProbe);
 	}
 
+	ApplyVolumeState();
+}
+
+void Object::SetTrigger(bool value)
+{
+	if (value) {
+		SetTag(eObjectTag::Trigger);
+	}
+	else {
+		ClearTag(eObjectTag::Trigger);
+	}
+
+	ApplyVolumeState();
+}
+
+void Object::ApplyVolumeState()
+{
+	const bool is_volume = IsVolume();
+
 	// A marker is not geometry: it must not light the level, occlude it, or push probes out of itself
-	SetProbeVisible(!value);
-	SetShadowCaster(!value);
+	SetProbeVisible(!is_volume);
+	SetShadowCaster(!is_volume);
 
 	// Deactivating a body is not enough, a static one still collides, so take it out of the world entirely
 	physics::Body* body = gPhysics->GetBody(PhysicsID);
 
 	if (body != nullptr && body->mbHasPhysicsBody) {
-		if (value) {
+		if (is_volume) {
 			body->RemoveFromWorld();
 		}
 		else {
@@ -720,13 +746,16 @@ void Object::PrintDebug() const
 
 void Object::Destroy()
 {
+	if (gObjectScripts != nullptr) {
+		gObjectScripts->Detach(ID);
+	}
+
 	if (pMesh && !HasFlag(Flags, eObjectFlags::SharedMesh)) {
 		pMesh->Destroy();
 	}
 
-	physics::Body* phys = nullptr;
-	if ((phys = gPhysics->GetBody(PhysicsID)) != nullptr) {
-		phys->DestroyPhysicsBody();
+	if (gPhysics->GetBody(PhysicsID) != nullptr) {
+		gPhysics->DestroyBody(PhysicsID);
 	}
 
 

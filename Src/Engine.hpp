@@ -48,6 +48,12 @@ extern DecalManager* gDecalManager;
 class CVarManager;
 extern CVarManager* gCVars;
 
+class NPCManager;
+extern NPCManager* gNPCManager;
+
+class ObjectScriptManager;
+extern ObjectScriptManager* gObjectScripts;
+
 #ifdef FX_IS_EDITOR
 
 namespace editor {

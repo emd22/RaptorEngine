@@ -10,6 +10,7 @@
 #include <Renderer/Light.hpp>
 #include <Renderer/LightManager.hpp>
 #include <Renderer/LightProbe.hpp>
+#include <Script/ObjectScripts.hpp>
 #include <World.hpp>
 #include <algorithm>
 
@@ -21,6 +22,7 @@ static constexpr eObjectTag scEditableTags[] = {
 	eObjectTag::ReflectionProbe,
 	eObjectTag::Bleeds,
 	eObjectTag::Spawn,
+	eObjectTag::Trigger,
 };
 
 static constexpr eObjectFlags scEditableFlags[] = {
@@ -43,10 +45,20 @@ bool CanEditObjectTag(const Object* object, uint32 tag_bit)
 		return true;
 	case eObjectTag::ProbeVolume:
 	case eObjectTag::ReflectionProbe:
+	case eObjectTag::Trigger:
 		return object->HasTags(eObjectTag::Blockout);
 	default:
 		return false;
 	}
+}
+
+bool CanAttachScript(const Object* object)
+{
+	if (object == nullptr || gWorld->pBlockout == nullptr) {
+		return false;
+	}
+
+	return object->HasTags(eObjectTag::Blockout) || gWorld->pBlockout->IsModel(object);
 }
 
 bool CanEditObjectFlag(const Object* object, uint32 flag_bit)
@@ -60,16 +72,16 @@ bool CanEditObjectFlag(const Object* object, uint32 flag_bit)
 		return true;
 	case eObjectFlags::ShadowCaster:
 	case eObjectFlags::NotProbeVisible:
-		return !object->IsProbeVolume();
+		return !object->IsVolume();
 	case eObjectFlags::PhysicsEnabled: {
 		if (object->HasTags(eObjectTag::Blockout)) {
-			return !object->IsProbeVolume() && gWorld->pBlockout != nullptr && gWorld->pBlockout->HasBrush(object);
+			return !object->IsVolume() && gWorld->pBlockout != nullptr && gWorld->pBlockout->HasBrush(object);
 		}
 
 		const physics::Body* body = gPhysics->GetBody(object->GetPhysicsID());
 
 		return body != nullptr && body->mbHasPhysicsBody && body->GetMotionType() != physics::eMotionType::Static &&
-			   !object->IsProbeVolume();
+			   !object->IsVolume();
 	}
 	default:
 		return false;
@@ -103,6 +115,9 @@ static void SetObjectTag(Object& object, eObjectTag tag, bool enabled)
 		else {
 			object.ClearTag(eObjectTag::ReflectionProbe);
 		}
+		break;
+	case eObjectTag::Trigger:
+		object.SetTrigger(enabled);
 		break;
 	default:
 		if (enabled) {
@@ -280,6 +295,12 @@ static Object* RestoreBrush(const EditOperation::Snapshot& snapshot, const Brush
 		object->SetTag(eObjectTag::Spawn);
 	}
 
+	if (snapshot.bIsTrigger) {
+		object->SetTrigger(true);
+	}
+
+	gObjectScripts->Attach(object, snapshot.ScriptPath);
+
 	return object;
 }
 
@@ -320,7 +341,9 @@ EditOperation::Snapshot EditOperation::Snapshot::Capture(const Object& object, M
 		.bIsProbeVolume = object.IsProbeVolume(),
 		.bIsReflectionProbe = object.IsReflectionProbe(),
 		.bIsSpawn = object.IsSpawn(),
+		.bIsTrigger = object.IsTrigger(),
 		.bIsDynamic = gWorld->pBlockout->IsDynamic(&object),
+		.ScriptPath = gObjectScripts->GetPath(object.ID),
 	};
 }
 
@@ -415,6 +438,16 @@ EditOperationValue EditOperation::Execute(EditorSelection& selection)
 		else {
 			ApplyFlag(*target, StateEdit.Bit, StateEdit.bEnabled);
 		}
+
+		break;
+	}
+	case eType::ScriptEdit: {
+		Object* target = ResolveOpTarget(*this);
+		if (target == nullptr) {
+			break;
+		}
+
+		gObjectScripts->Attach(target, ScriptEdit.After);
 
 		break;
 	}
@@ -574,6 +607,16 @@ void EditOperation::Undo(EditorSelection& selection)
 		}
 
 		RestoreObjectState(*target, StateEdit);
+
+		break;
+	}
+	case eType::ScriptEdit: {
+		Object* target = ResolveOpTarget(*this);
+		if (target == nullptr) {
+			break;
+		}
+
+		gObjectScripts->Attach(target, ScriptEdit.Before);
 
 		break;
 	}

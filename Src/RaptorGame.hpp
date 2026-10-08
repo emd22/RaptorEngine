@@ -92,10 +92,16 @@ private:
 	struct RagdollDummy;
 
 	void RequestRagdollDrop();
+	void UpdateObjectScripts();
 	void UpdateRagdollDummies();
 	void DropRagdollDummy(Object* model);
 	void DestroyRagdollDummy(size_t index);
-	void SpawnRagdollBlood(RagdollDummy& dummy, const physics::RagdollImpact& impact, float32 min_speed);
+	void CleanWorld();
+	void AddDummyWound(RagdollDummy& dummy, const physics::RagdollHit& hit);
+	void SpawnRagdollBlood(float32& cooldown, const physics::RagdollImpact& impact, float32 min_speed);
+
+	void RequestRagdollTemplate();
+	void SpawnDebugNPC(Object* model);
 
 public:
 	Ref<LightDirectional> pSun { nullptr };
@@ -158,6 +164,7 @@ private:
 		ObjectID RootID = ObjectID::scNull;
 		std::unique_ptr<physics::Ragdoll> pRagdoll;
 		float32 BloodCooldown = 0.0f;
+		ObjectID SkinnedID = ObjectID::scNull;
 	};
 
 	static constexpr size_t scMaxRagdollDummies = 8;
@@ -170,7 +177,15 @@ private:
 	bool mbRagdollTemplateRequested = false;
 	uint32 mRagdollDropsPending = 0;
 	uint32 mRagdollSpawnCount = 0;
+
+	static constexpr size_t scMaxDebugNPCs = 8;
+
+	uint32 mNPCSpawnsPending = 0;
+	uint32 mNPCSpawnCount = 0;
 	CVarValue* mpRagdollBloodSpeedCVar = nullptr;
+	CVarValue* mpNPCImpactDamageCVar = nullptr;
+	CVarValue* mpNPCImpactSpeedCVar = nullptr;
+	CVarValue* mpNPCReactStrengthCVar = nullptr;
 
 	AssetTicket mCrosshairTicket { nullptr };
 	std::atomic<Image*> mpCrosshair = nullptr;
