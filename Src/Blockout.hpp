@@ -154,8 +154,8 @@ public:
 
 	const MaterialLibrary& GetMaterialLibrary() const { return mMaterials; }
 
-	MaterialID GetMaterialForID(int32 id) const;
-	int32 GetIDForMaterial(const MaterialID& material) const;
+	MaterialID GetMaterialForID(MaterialLibraryID id) const;
+	MaterialLibraryID GetIDForMaterial(const MaterialID& material) const;
 	MaterialID GetDefaultMaterial() const;
 
 	/**

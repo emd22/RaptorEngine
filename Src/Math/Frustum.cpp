@@ -12,7 +12,7 @@
 namespace fx {
 // We need to find the tiles that can possibly intersect with the frustum.
 
-static Vec4f ToPlane(const Vec4f& vec)
+static Vec4f ToPlane(const Vec4f vec)
 {
 	float32 length = Vec3f(vec.mIntrin).Length();
 	return (Vec4f(vec) / length);
@@ -28,10 +28,10 @@ void Frustum::Rebuild(const Mat4f& view_projection)
 	// Note that `.Transposed()` is faster than rebuilding each vector manually.
 	Mat4f vp_m = view_projection.Transposed();
 
-	const Vec4f& vr_x = vp_m.Rows[0];
-	const Vec4f& vr_y = vp_m.Rows[1];
-	const Vec4f& vr_z = vp_m.Rows[2];
-	const Vec4f& vr_w = vp_m.Rows[3];
+	const Vec4f vr_x = vp_m.Rows[0];
+	const Vec4f vr_y = vp_m.Rows[1];
+	const Vec4f vr_z = vp_m.Rows[2];
+	const Vec4f vr_w = vp_m.Rows[3];
 
 	PLANE(eFrustumPlane::Left) = ToPlane(vr_w + vr_x);
 	PLANE(eFrustumPlane::Right) = ToPlane(vr_w - vr_x);
@@ -58,7 +58,7 @@ bool Frustum::TileIntersectsAABB(const BBox& tile_aabb) const
 	};
 
 	for (int i : scPlanesToTest) {
-		const Vec4f& plane = mClipPlanes[i];
+		const Vec4f plane = mClipPlanes[i];
 
 		// Positive vertex: the AABB corner furthest along the plane normal.
 		Vec3f p_vertex(plane.X >= 0.0f ? tile_aabb.Max.X : tile_aabb.Min.X,
@@ -81,7 +81,7 @@ bool Frustum::IntersectsSphere(const Vec3f center, float32 radius, uint32 plane_
 			continue;
 		}
 
-		const Vec4f& plane = mClipPlanes[i];
+		const Vec4f plane = mClipPlanes[i];
 
 		// The planes are normalized, so this is the signed distance to the plane
 		if (Vec3f(plane).Dot(center) + plane.W < -radius) {
@@ -102,7 +102,7 @@ bool Frustum::IntersectsAABB(const BBox& aabb, uint32 plane_mask) const
 			continue;
 		}
 
-		const Vec4f& plane = mClipPlanes[i];
+		const Vec4f plane = mClipPlanes[i];
 		const Vec3f normal(plane);
 
 		const float32 reach = half_extent.Dot(normal.Abs());
@@ -127,7 +127,7 @@ bool Frustum::IntersectsOBB(const OBBox& obb, uint32 plane_mask) const
 			continue;
 		}
 
-		const Vec4f& plane = mClipPlanes[i];
+		const Vec4f plane = mClipPlanes[i];
 		const Vec3f normal(plane);
 
 		const float32 reach = std::abs(half_x.Dot(normal)) + std::abs(half_y.Dot(normal)) +

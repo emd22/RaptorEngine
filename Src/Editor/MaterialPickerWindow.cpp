@@ -2,6 +2,8 @@
 
 #include "RaptorEditor.hpp"
 
+#include <ktx.h>
+#include <vulkan/vulkan.h>
 #include <wx/button.h>
 #include <wx/image.h>
 #include <wx/listbox.h>
@@ -18,8 +20,6 @@
 #include <World.hpp>
 #include <algorithm>
 #include <cctype>
-#include <ktx.h>
-#include <vulkan/vulkan.h>
 
 namespace fx::editor {
 
@@ -27,19 +27,19 @@ static constexpr int scPreviewSize = 256;
 static constexpr uint32 scGlRgba8 = 0x8058;
 static constexpr uint32 scGlSrgb8Alpha8 = 0x8C43;
 
-static std::string ToLower(std::string text)
+static String ToLower(String text)
 {
 	std::transform(text.begin(), text.end(), text.begin(), [](unsigned char ch) { return std::tolower(ch); });
 	return text;
 }
 
 /// Reads the smallest mip that is at least the preview size (or the base level) of an uncompressed 8-bit KTX
-static wxBitmap LoadKtxBitmap(const std::string& path)
+static wxBitmap LoadKtxBitmap(const String& path)
 {
 	ktxTexture* texture = nullptr;
-	const std::string resolved = FilesystemIO::ResolvePath(path);
+	const String resolved = FilesystemIO::ResolvePath(path);
 
-	if (ktxTexture_CreateFromNamedFile(resolved.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &texture) !=
+	if (ktxTexture_CreateFromNamedFile(resolved.CStr(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &texture) !=
 		KTX_SUCCESS) {
 		return wxBitmap();
 	}
@@ -88,8 +88,8 @@ static wxBitmap LoadKtxBitmap(const std::string& path)
 			const double scale = std::min(1.0, static_cast<double>(scPreviewSize) / std::max(width, height));
 
 			if (scale < 1.0) {
-				image.Rescale(std::max(1, static_cast<int>(width * scale)), std::max(1, static_cast<int>(height * scale)),
-							  wxIMAGE_QUALITY_HIGH);
+				image.Rescale(std::max(1, static_cast<int>(width * scale)),
+							  std::max(1, static_cast<int>(height * scale)), wxIMAGE_QUALITY_HIGH);
 			}
 
 			bitmap = wxBitmap(image);
@@ -155,15 +155,15 @@ MaterialPickerWindow::MaterialPickerWindow(wxWindow* parent)
 
 void MaterialPickerWindow::RefreshList()
 {
-	mBitmaps.clear();
+	mBitmaps.Clear();
 	RebuildRows();
 }
 
 void MaterialPickerWindow::RebuildRows()
 {
-	int32 previous_slot = GetSelectedSlot();
+	MaterialLibraryID previous_slot = MaterialLibraryID(GetSelectedSlot());
 
-	if (previous_slot < 0 && gWorld != nullptr && gWorld->pBlockout != nullptr && gEditor != nullptr) {
+	if (!previous_slot.IsValid() && gWorld != nullptr && gWorld->pBlockout != nullptr && gEditor != nullptr) {
 		Object* last = gEditor->GetSelection().GetLast();
 
 		if (last != nullptr) {
@@ -175,28 +175,28 @@ void MaterialPickerWindow::RebuildRows()
 	mShownSlots.clear();
 
 	if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
-		ShowPreview(-1);
+		ShowPreview(MaterialLibraryID::scNull);
 		return;
 	}
 
 	const MaterialLibrary& library = gWorld->pBlockout->GetMaterialLibrary();
-	const std::string filter = ToLower(mpSearch->GetValue().ToStdString());
+	const String filter = ToLower(mpSearch->GetValue().ToStdString());
 
 	int selected_row = wxNOT_FOUND;
 
 	for (uint32 slot = 0; slot < library.GetCount(); slot++) {
-		const std::string name = library.GetName(slot).Str();
+		const std::string name = library.GetName(MaterialLibraryID(slot)).Str();
 
-		if (!filter.empty() && ToLower(name).find(filter) == std::string::npos) {
+		if (!filter.IsEmpty() && ToLower(name).FindNext(0, filter) == String::scNotFound) {
 			continue;
 		}
 
-		if (static_cast<int32>(slot) == previous_slot) {
+		if (static_cast<int32>(slot) == previous_slot.ID) {
 			selected_row = static_cast<int>(mShownSlots.size());
 		}
 
 		mpList->Append(wxString::FromUTF8(name));
-		mShownSlots.push_back(static_cast<int32>(slot));
+		mShownSlots.push_back(MaterialLibraryID(slot));
 	}
 
 	if (selected_row != wxNOT_FOUND) {
@@ -206,33 +206,33 @@ void MaterialPickerWindow::RebuildRows()
 	ShowPreview(GetSelectedSlot());
 }
 
-int32 MaterialPickerWindow::GetSelectedSlot() const
+MaterialLibraryID MaterialPickerWindow::GetSelectedSlot() const
 {
 	const int row = mpList->GetSelection();
 
 	if (row == wxNOT_FOUND || row < 0 || static_cast<size_t>(row) >= mShownSlots.size()) {
-		return -1;
+		return MaterialLibraryID::scNull;
 	}
 
 	return mShownSlots[static_cast<size_t>(row)];
 }
 
-const wxBitmap& MaterialPickerWindow::GetAlbedoBitmap(int32 material_slot)
+const wxBitmap& MaterialPickerWindow::GetAlbedoBitmap(MaterialLibraryID material_slot)
 {
-	auto found = mBitmaps.find(material_slot);
+	wxBitmap* found = mBitmaps.Find(material_slot);
 
-	if (found != mBitmaps.end()) {
-		return found->second;
+	if (found != nullptr) {
+		return *found;
 	}
 
-	const std::string& path = gWorld->pBlockout->GetMaterialLibrary().GetDiffusePath(static_cast<uint32>(material_slot));
+	const String& path = gWorld->pBlockout->GetMaterialLibrary().GetDiffusePath(material_slot);
 
-	return mBitmaps.emplace(material_slot, path.empty() ? wxBitmap() : LoadKtxBitmap(path)).first->second;
+	return mBitmaps.Insert(material_slot, path.IsEmpty() ? wxBitmap() : LoadKtxBitmap(path));
 }
 
-void MaterialPickerWindow::ShowPreview(int32 material_slot)
+void MaterialPickerWindow::ShowPreview(MaterialLibraryID material_slot)
 {
-	if (material_slot < 0 || gWorld == nullptr || gWorld->pBlockout == nullptr) {
+	if (!material_slot.IsValid() || gWorld == nullptr || gWorld->pBlockout == nullptr) {
 		mpNameLabel->SetLabel("(select a material)");
 		mpStatusLabel->SetLabel("");
 		mpPreview->SetBitmap(wxBitmap());
@@ -243,7 +243,7 @@ void MaterialPickerWindow::ShowPreview(int32 material_slot)
 	const MaterialLibrary& library = gWorld->pBlockout->GetMaterialLibrary();
 	const wxBitmap& bitmap = GetAlbedoBitmap(material_slot);
 
-	mpNameLabel->SetLabel(wxString::FromUTF8(library.GetName(static_cast<uint32>(material_slot)).Str()));
+	mpNameLabel->SetLabel(wxString::FromUTF8(library.GetName(material_slot).Str()));
 
 	if (bitmap.IsOk()) {
 		mpPreview->SetBitmap(bitmap);
@@ -251,9 +251,15 @@ void MaterialPickerWindow::ShowPreview(int32 material_slot)
 	}
 	else {
 		mpPreview->SetBitmap(wxBitmap());
-		mpStatusLabel->SetLabel(library.GetDiffusePath(static_cast<uint32>(material_slot)).empty()
-									? "No albedo texture"
-									: "Albedo preview unavailable");
+
+		const String& diffuse_path = library.GetDiffusePath(material_slot);
+
+		if (diffuse_path.IsEmpty()) {
+			mpStatusLabel->SetLabel("No albedo texture");
+		}
+		else {
+			mpStatusLabel->SetLabel("Preview unavailable");
+		}
 	}
 
 	mpApplyButton->Enable();
@@ -262,9 +268,9 @@ void MaterialPickerWindow::ShowPreview(int32 material_slot)
 
 void MaterialPickerWindow::ApplySelected()
 {
-	const int32 slot = GetSelectedSlot();
+	const MaterialLibraryID slot = GetSelectedSlot();
 
-	if (slot < 0 || gEditor == nullptr || gWorld == nullptr || gWorld->pBlockout == nullptr) {
+	if (!slot.IsValid() || gEditor == nullptr || gWorld == nullptr || gWorld->pBlockout == nullptr) {
 		return;
 	}
 

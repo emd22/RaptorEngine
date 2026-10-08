@@ -17,10 +17,6 @@ extern ObjectManager* gObjectManager;
 class MaterialManager;
 extern MaterialManager* gMaterialManager;
 
-class MemPool;
-extern MemPool* gEnginePool;
-extern MemPool* gScriptMemPool;
-
 class WorldGrid;
 extern WorldGrid* gWorldGrid;
 

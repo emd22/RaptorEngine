@@ -28,13 +28,13 @@ FX_FORCE_INLINE void Vec4f::Set(float32 scalar) { mIntrin = _mm_set1_ps(scalar);
 // Vec + Vec Operators
 ///////////////////////////////
 
-Vec4f Vec4f::operator+(const Vec4f& other) const { return Vec4f(_mm_add_ps(mIntrin, other.mIntrin)); }
+Vec4f Vec4f::operator+(const Vec4f other) const { return Vec4f(_mm_add_ps(mIntrin, other.mIntrin)); }
 
-Vec4f Vec4f::operator-(const Vec4f& other) const { return Vec4f(_mm_sub_ps(mIntrin, other.mIntrin)); }
+Vec4f Vec4f::operator-(const Vec4f other) const { return Vec4f(_mm_sub_ps(mIntrin, other.mIntrin)); }
 
-Vec4f Vec4f::operator*(const Vec4f& other) const { return Vec4f(_mm_mul_ps(mIntrin, other.mIntrin)); }
+Vec4f Vec4f::operator*(const Vec4f other) const { return Vec4f(_mm_mul_ps(mIntrin, other.mIntrin)); }
 
-Vec4f Vec4f::operator/(const Vec4f& other) const { return Vec4f(_mm_div_ps(mIntrin, other.mIntrin)); }
+Vec4f Vec4f::operator/(const Vec4f other) const { return Vec4f(_mm_div_ps(mIntrin, other.mIntrin)); }
 
 ///////////////////////////////
 // Vec + Scalar Operators
@@ -62,19 +62,19 @@ FX_FORCE_INLINE Vec4f Vec4f::operator/(float32 scalar) const
 FX_FORCE_INLINE Vec4f Vec4f::operator-() const { return Vec4f(_mm_xor_ps(mIntrin, _mm_set1_ps(-0.0f))); }
 
 
-FX_FORCE_INLINE Vec4f& Vec4f::operator+=(const Vec4f& other)
+FX_FORCE_INLINE Vec4f& Vec4f::operator+=(const Vec4f other)
 {
 	mIntrin = _mm_add_ps(mIntrin, other.mIntrin);
 	return *this;
 }
 
-FX_FORCE_INLINE Vec4f& Vec4f::operator-=(const Vec4f& other)
+FX_FORCE_INLINE Vec4f& Vec4f::operator-=(const Vec4f other)
 {
 	mIntrin = _mm_sub_ps(mIntrin, other.mIntrin);
 	return *this;
 }
 
-FX_FORCE_INLINE Vec4f& Vec4f::operator*=(const Vec4f& other)
+FX_FORCE_INLINE Vec4f& Vec4f::operator*=(const Vec4f other)
 {
 	mIntrin = _mm_mul_ps(mIntrin, other.mIntrin);
 	return *this;
@@ -87,7 +87,7 @@ FX_FORCE_INLINE Vec4f& Vec4f::operator*=(float32 scalar)
 	return *this;
 }
 
-FX_FORCE_INLINE Vec4f& Vec4f::operator=(const Vec4f& other)
+FX_FORCE_INLINE Vec4f& Vec4f::operator=(const Vec4f other)
 {
 	mIntrin = other.mIntrin;
 	return *this;

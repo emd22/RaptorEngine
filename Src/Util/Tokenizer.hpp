@@ -4,7 +4,7 @@
 //
 #include <Core/File.hpp>
 #include <Core/Hash.hpp>
-#include <Core/MemPool/MemPool.hpp>
+#include <Core/Allocator.hpp>
 #include <Engine.hpp>
 #include <cassert>
 #include <cstdlib>
@@ -100,7 +100,7 @@ public:
 
     FX_FORCE_INLINE char* GetHeapStr() const
     {
-        char* str = gEnginePool->Alloc<char>(Length + 1);
+        char* str = StdAllocator::Alloc<char>(Length + 1);
 
         if (str == nullptr) {
             Panic("FoxTokenizer", "Error allocating heap string!", 0);

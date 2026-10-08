@@ -1,7 +1,5 @@
 #include "MaterialLibrary.hpp"
 
-#include <cstring>
-
 #include <Asset/AssetManager.hpp>
 #include <Asset/ConfigFile.hpp>
 #include <Core/FilesystemIO.hpp>
@@ -10,9 +8,11 @@
 #include <Engine.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
+#include <cstring>
 #include <filesystem>
 
 namespace fx {
+
 
 static bool AttachTexture(Material* material, Material::eResourceType type, const std::string& texture_root,
 						  const char* relative_path, const char* material_name)
@@ -23,7 +23,7 @@ static bool AttachTexture(Material* material, Material::eResourceType type, cons
 
 	const std::string path = texture_root + relative_path;
 
-	if (!std::filesystem::exists(FilesystemIO::ResolvePath(path))) {
+	if (!FilesystemIO::FileExists(FilesystemIO::ResolvePath(path))) {
 		LogWarning(LC_ASSET, "Material '{}' is missing the texture '{}'", material_name, path);
 		return false;
 	}
@@ -72,7 +72,7 @@ bool MaterialLibrary::Load(const std::string& list_path, const std::string& text
 		const char* diffuse_path = item.GetMemberValue<const char*>(HashStr32("diffuse"), "");
 		const std::string diffuse = diffuse_path[0] != '\0' ? texture_root + diffuse_path : std::string();
 
-		mEntries.Insert(Entry { .Name = name, .Material = id, .DiffusePath = diffuse });
+		mEntries.Insert(Entry { .EntryName = Name(name), .Material = id, .DiffusePath = diffuse });
 	}
 
 	LogInfo(LC_ASSET, "Loaded {} materials from '{}'", mEntries.Size(), list_path);
@@ -80,65 +80,67 @@ bool MaterialLibrary::Load(const std::string& list_path, const std::string& text
 	return true;
 }
 
-const String& MaterialLibrary::GetName(uint32 id) const
+const String& MaterialLibrary::GetName(const MaterialLibraryID id) const
 {
 	static const String scEmpty = "unknown";
 
-	if (id >= mEntries.Size()) {
+	if (static_cast<size_t>(id.ID) >= mEntries.Size()) {
 		return scEmpty;
 	}
 
-	return mEntries[id].Name;
+	return mEntries[static_cast<size_t>(id.ID)].EntryName.Get();
 }
 
-const std::string& MaterialLibrary::GetDiffusePath(uint32 id) const
+const String& MaterialLibrary::GetDiffusePath(const MaterialLibraryID id) const
 {
-	static const std::string scEmpty;
+	static const String scEmpty {};
 
-	if (id >= mEntries.Size()) {
+	if (!id.IsValid() || static_cast<size_t>(id.ID) >= mEntries.Size()) {
 		return scEmpty;
 	}
 
-	return mEntries[id].DiffusePath;
+	return mEntries[static_cast<size_t>(id.ID)].DiffusePath;
 }
 
-MaterialID MaterialLibrary::GetMaterial(int32 id) const
+MaterialID MaterialLibrary::GetMaterial(const MaterialLibraryID id) const
 {
-	if (id < 0 || static_cast<size_t>(id) >= mEntries.Size()) {
+	if (!id.IsValid() || static_cast<size_t>(id.ID) >= mEntries.Size()) {
 		return MaterialID::scNull;
 	}
 
-	return mEntries[static_cast<size_t>(id)].Material;
+	return mEntries[static_cast<size_t>(id.ID)].Material;
 }
 
-int32 MaterialLibrary::FindID(const MaterialID& material) const
+MaterialLibraryID MaterialLibrary::FindID(const MaterialID material) const
 {
 	if (material.IsNull()) {
-		return -1;
+		return MaterialLibraryID::scNull;
 	}
 
 	for (size_t i = 0; i < mEntries.Size(); i++) {
 		if (mEntries[i].Material == material) {
-			return static_cast<int32>(i);
+			return MaterialLibraryID(i);
 		}
 	}
 
-	return -1;
+	return MaterialLibraryID::scNull;
 }
 
-int32 MaterialLibrary::FindIDByName(const char* name) const
+MaterialLibraryID MaterialLibrary::FindIDByName(const char* name) const
 {
 	if (name == nullptr) {
-		return -1;
+		return MaterialLibraryID::scNull;
 	}
 
+	Hash32 name_hash = HashStr32(name);
+
 	for (size_t i = 0; i < mEntries.Size(); i++) {
-		if (strcmp(mEntries[i].Name.CStr(), name) == 0) {
-			return static_cast<int32>(i);
+		if (mEntries[i].EntryName == name_hash) {
+			return MaterialLibraryID(i);
 		}
 	}
 
-	return -1;
+	return MaterialLibraryID::scNull;
 }
 
 } // namespace fx

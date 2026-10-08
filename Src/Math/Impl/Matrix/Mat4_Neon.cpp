@@ -102,7 +102,7 @@ Mat4f Mat4f::operator*(const Mat4f& other) const
 	return result;
 }
 
-Vec4f Mat4f::operator*(const Vec4f& other) const
+Vec4f Mat4f::operator*(const Vec4f other) const
 {
 #if 0
 	float32x4_t p0, p1, p2, p3;

@@ -70,12 +70,12 @@ static const wxColor scSelectedColor = wxColor(168, 50, 50);
 /// Creates an icon button for the tool, or a text button if its icon can't be loaded
 static OutlineToggleButton* MakeToolButton(wxWindow* parent, const ToolButtonInfo& info)
 {
-	const std::string icon_path = FilesystemIO::ResolvePath(info.pIconPath);
+	const String icon_path = FilesystemIO::ResolvePath(info.pIconPath);
 
 	// wx shows an error dialog for images it can't load, so check the icon is there first
 	wxBitmap icon;
 	if (FilesystemIO::FileExists(icon_path)) {
-		icon.LoadFile(wxString::FromUTF8(icon_path), wxBITMAP_TYPE_PNG);
+		icon.LoadFile(wxString::FromUTF8(icon_path.CStr()), wxBITMAP_TYPE_PNG);
 	}
 
 	if (!icon.IsOk()) {
@@ -146,7 +146,7 @@ void EditorFrame::NewPrototype()
 		return;
 	}
 
-	// gWorld->pBlockout->
+	gWorld->pBlockout->ResetToTemplate();
 }
 
 void EditorFrame::SavePrototype()
@@ -243,6 +243,7 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 
 	SetMenuBar(menu_bar);
 
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { NewPrototype(); }, new_item->GetId());
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { OpenPrototype(); }, open_item->GetId());
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { SavePrototype(); }, save_item->GetId());
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { SaveProtoTypeAs(); }, save_as_item->GetId());

@@ -2,7 +2,7 @@
 
 #include <Core/Bitset.hpp>
 #include <Core/Hash.hpp>
-#include <Core/MemPool/MemPool.hpp>
+#include <Core/Allocator.hpp>
 #include <Core/SizedArray.hpp>
 #include <Engine.hpp>
 #include <map>
@@ -75,7 +75,7 @@ struct ItemCacheSection_SingleItem
     bool bInUse : 1 = false;
 
 public:
-    void Create(uint32 max_items) { pItem = gEnginePool->Alloc<TItemType>(sizeof(TItemType)); }
+    void Create(uint32 max_items) { pItem = StdAllocator::Alloc<TItemType>(sizeof(TItemType)); }
 
     TItemType* Request()
     {

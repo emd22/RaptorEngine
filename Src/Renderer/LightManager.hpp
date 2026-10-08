@@ -37,7 +37,9 @@ public:
 	 * @brief Retrieves a light by its ID
 	 */
 	LightBase* GetLight(LightID id);
-	void DestroyLight(LightID& id);
+	void RemoveLight(LightID& id);
+
+	void Clear();
 
 	/**
 	 * @brief Finds an attached light by its name, returns a null ref if there is no match
@@ -56,6 +58,11 @@ public:
 private:
 	/// Gives `light` a slot and a LightID, and runs its OnAttached hook
 	void RegisterLight(LightBase* light);
+
+	/**
+	 * Internal function to destroy and dispose of a light.
+	 */
+	void DestroyLight(LightBase* light);
 
 private:
 	FreeArray<LightBase*> mLightList;

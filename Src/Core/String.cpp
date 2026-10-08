@@ -2,7 +2,7 @@
 
 #include <Core/Assert.hpp>
 #include <Core/Log.hpp>
-#include <Core/MemPool/MemPool.hpp>
+#include <Core/Allocator.hpp>
 #include <Engine.hpp>
 #include <cstring>
 #include <utility>
@@ -25,7 +25,7 @@ String::String(const char* str, uint32 length)
 
 	// If the size cannot fit into the stack string, allocate a buffer for it
 	if (length >= scStackAllocSize) {
-		mpHeapStr = gEnginePool->Alloc<char>(length + 1);
+		mpHeapStr = StdAllocator::Alloc<char>(length + 1);
 		dst = mpHeapStr;
 	}
 
@@ -43,7 +43,7 @@ String::String(uint32 allocation_size)
 
 	// If the size cannot fit into the stack string, allocate a buffer for it
 	if (Length >= scStackAllocSize) {
-		mpHeapStr = gEnginePool->Alloc<char>(Length + 1);
+		mpHeapStr = StdAllocator::Alloc<char>(Length + 1);
 	}
 }
 
@@ -123,13 +123,13 @@ String& String::operator+=(const String& other)
 	// Allocate heap string if there is not enough space remaining
 	if (final_length >= scStackAllocSize) {
 		if (mpHeapStr == nullptr) {
-			mpHeapStr = gEnginePool->Alloc<char>(final_length + 1);
+			mpHeapStr = StdAllocator::Alloc<char>(final_length + 1);
 
 			// Copy the existing stack string to the newly allocated buffer
 			memcpy(mpHeapStr, dst, existing_length);
 		}
 		else {
-			mpHeapStr = gEnginePool->Realloc(mpHeapStr, final_length + 1);
+			mpHeapStr = StdAllocator::Realloc(mpHeapStr, final_length + 1);
 		}
 
 		dst = mpHeapStr;
@@ -152,10 +152,10 @@ String& String::operator=(const char* str)
 
 	if (new_len >= scStackAllocSize) {
 		if (mpHeapStr == nullptr) {
-			mpHeapStr = gEnginePool->Alloc<char>(new_len + 1);
+			mpHeapStr = StdAllocator::Alloc<char>(new_len + 1);
 		}
 		else if (new_len > Length) {
-			mpHeapStr = gEnginePool->Realloc(mpHeapStr, new_len + 1);
+			mpHeapStr = StdAllocator::Realloc(mpHeapStr, new_len + 1);
 		}
 		dst = mpHeapStr;
 	}
@@ -164,7 +164,7 @@ String& String::operator=(const char* str)
 	dst[new_len] = 0;
 
 	if (dst == mpStackStr && mpHeapStr != nullptr) {
-		gEnginePool->Free<char>(mpHeapStr);
+		StdAllocator::Free<char>(mpHeapStr);
 		mpHeapStr = nullptr;
 	}
 
@@ -179,7 +179,7 @@ String& String::operator=(const String& other)
 	Clear();
 
 	if (other.IsHeapAllocated()) {
-		mpHeapStr = gEnginePool->Alloc<char>(other.Length + 1);
+		mpHeapStr = StdAllocator::Alloc<char>(other.Length + 1);
 		Length = other.Length;
 		memcpy(mpHeapStr, other.mpHeapStr, Length);
 		mpHeapStr[Length] = '\0';
@@ -366,7 +366,7 @@ String String::ReplaceAll(const char* to_replace, char replacement)
 void String::Clear()
 {
 	if (mpHeapStr) {
-		gEnginePool->Free<char>(mpHeapStr);
+		StdAllocator::Free<char>(mpHeapStr);
 	}
 
 	mpHeapStr = nullptr;
@@ -383,11 +383,11 @@ String& String::ShortenTo(uint32 new_length)
 		// The string is now able to fit into the stack allocated buffer, copy it to there and free the stack string.
 		if (new_length < scStackAllocSize) {
 			memcpy(mpStackStr, mpHeapStr, Length);
-			gEnginePool->Free<char>(mpHeapStr);
+			StdAllocator::Free<char>(mpHeapStr);
 			mpHeapStr = nullptr;
 		}
 		else {
-			mpHeapStr = gEnginePool->Realloc(mpHeapStr, new_length + 1);
+			mpHeapStr = StdAllocator::Realloc(mpHeapStr, new_length + 1);
 		}
 	}
 

@@ -56,7 +56,7 @@ public:
 
 	bool IntersectsOBB(const OBBox& obb, uint32 plane_mask = scFrustumAllPlanes) const;
 
-	FX_FORCE_INLINE const Vec4f& GetPlane(const eFrustumPlane plane) const
+	FX_FORCE_INLINE const Vec4f GetPlane(const eFrustumPlane plane) const
 	{
 		return mClipPlanes[static_cast<uint32>(plane)];
 	}

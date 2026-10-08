@@ -8,7 +8,7 @@
 #include <stdio.h>
 
 #include <Core/Allocator.hpp>
-#include <Core/MemPool/MemPool.hpp>
+#include <Core/Allocator.hpp>
 #include <Engine.hpp>
 #include <cstdlib>
 #include <initializer_list>
@@ -18,8 +18,6 @@
 #endif
 
 namespace fx {
-
-#define FX_SIZED_ARRAY_NO_MEMPOOL 1
 
 static inline void NoMemError()
 {
@@ -109,13 +107,7 @@ public:
 			return;
 		}
 
-#ifndef FX_SIZED_ARRAY_NO_MEMPOOL
-		if (gEnginePool) {
-			gEnginePool->FreeRaw(static_cast<void*>(pData));
-		}
-#else
-		std::free(reinterpret_cast<void*>(pData));
-#endif
+		TAllocator::FreeRaw(static_cast<void*>(pData));
 
 #ifdef FX_SIZED_ARRAY_DEBUG
 		LogDebug("Freeing SizedArray of size {:d} (type: {:s})", Size, typeid(TElementType).name());
@@ -411,11 +403,7 @@ protected:
 			return;
 		}
 
-#if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
-		pData = static_cast<TElementType*>(gEnginePool->AllocRaw(sizeof(TElementType) * element_count));
-#else
-		pData = reinterpret_cast<TElementType*>(std::malloc(sizeof(TElementType) * element_count));
-#endif
+		pData = static_cast<TElementType*>(TAllocator::AllocRaw(sizeof(TElementType) * element_count));
 
 		if (pData == nullptr) {
 			NoMemError();

@@ -252,7 +252,7 @@ void ConfigEntry::AppendValue(const Vec3f vec)
 	AppendValue(ConfigPrimitive::FromValue(vec.Z));
 }
 
-void ConfigEntry::AppendValue(const Vec4f& vec)
+void ConfigEntry::AppendValue(const Vec4f vec)
 {
 	if (!ArrayData.IsInited()) {
 		ArrayData.Create(5);
@@ -298,9 +298,9 @@ ConfigEntry::~ConfigEntry()
 
 void ConfigFile::Load(const std::string& path)
 {
-	const std::string resolved_path = FilesystemIO::ResolvePath(path);
+	const String resolved_path = FilesystemIO::ResolvePath(path);
 
-	File file(resolved_path.c_str(), File::eModType::Read, File::eDataType::Binary);
+	File file(resolved_path.CStr(), File::eModType::Read, File::eDataType::Binary);
 
 	if (!file.IsFileOpen()) {
 		return;
@@ -314,7 +314,7 @@ void ConfigFile::Load(const std::string& path)
 	if (file_buffer.pData == nullptr || file_buffer.Size == 0) {
 		LogWarning(LC_CORE, "Config '{}' is empty or could not be read", path);
 		if (file_buffer.pData) {
-			gEnginePool->Free(file_buffer.pData);
+			StdAllocator::Free(file_buffer.pData);
 		}
 		return;
 	}
@@ -325,12 +325,12 @@ void ConfigFile::Load(const std::string& path)
 
 	Tokenizer tokenizer(file_buffer.pData, file_buffer.Size);
 	tokenizer.SetFileExtension(".conf");
-	tokenizer.IncludeFile(FilesystemIO::ResolvePath("Config/Internal/Constants.conf").c_str());
+	tokenizer.IncludeFile(FilesystemIO::ResolvePath("Config/Internal/Constants.conf").CStr());
 	tokenizer.Tokenize();
 
 	Parse(tokenizer.GetTokens());
 
-	gEnginePool->Free(file_buffer.pData);
+	StdAllocator::Free(file_buffer.pData);
 }
 
 static ConfigEntry::ePrimitiveType GetValueTokenType(const Token& token)

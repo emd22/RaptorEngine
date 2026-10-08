@@ -3,8 +3,9 @@
 #include <wx/bitmap.h>
 #include <wx/frame.h>
 
+#include <Core/HashMap.hpp>
 #include <Core/Types.hpp>
-#include <unordered_map>
+#include <Material/MaterialLibrary.hpp>
 #include <vector>
 
 class wxButton;
@@ -28,11 +29,11 @@ public:
 
 private:
 	void RebuildRows();
-	void ShowPreview(int32 material_slot);
+	void ShowPreview(MaterialLibraryID material_slot);
 	void ApplySelected();
-	int32 GetSelectedSlot() const;
+	MaterialLibraryID GetSelectedSlot() const;
 
-	const wxBitmap& GetAlbedoBitmap(int32 material_slot);
+	const wxBitmap& GetAlbedoBitmap(MaterialLibraryID material_slot);
 
 	void OnShow(wxShowEvent& event);
 	void OnClose(wxCloseEvent& event);
@@ -46,9 +47,9 @@ private:
 	wxButton* mpApplyButton = nullptr;
 
 	/// Material library slots currently shown, in row order
-	std::vector<int32> mShownSlots;
+	std::vector<MaterialLibraryID> mShownSlots;
 
-	std::unordered_map<int32, wxBitmap> mBitmaps;
+	HashMap<MaterialLibraryID, wxBitmap> mBitmaps;
 };
 
 } // namespace fx::editor

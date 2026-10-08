@@ -8,7 +8,7 @@
 #include <Core/Log.hpp>
 #endif
 
-#include <Core/MemPool/MemPool.hpp>
+#include <Core/Allocator.hpp>
 #include <Engine.hpp>
 #include <Math/MathUtil.hpp>
 #include <cstddef>
@@ -43,7 +43,7 @@ public:
     /**
      * Constructs a new Ref from a pointer.
      */
-    Ref(T* ptr) : Ref(ptr, gEnginePool->Alloc<RefCount>(sizeof(RefCount))) {}
+    Ref(T* ptr) : Ref(ptr, StdAllocator::Alloc<RefCount>(sizeof(RefCount))) {}
 
     /**
      * Constructs a new Ref from a pointer and a pre-allocated ref count.
@@ -134,7 +134,7 @@ public:
         // Since we want to ensure aligned laod/store on the ref count object as well, we should ensure that the T
         // object is aligned on a 16 byte boundary.
         const size_t aligned_size = MathUtil::AlignValue<16>(sizeof(T));
-        uint8* raw_ptr = gEnginePool->Alloc<uint8>(aligned_size + sizeof(RefCount));
+        uint8* raw_ptr = StdAllocator::Alloc<uint8>(aligned_size + sizeof(RefCount));
 
         T* obj_ptr = reinterpret_cast<T*>(raw_ptr);
         RefCount* count_ptr = reinterpret_cast<RefCount*>(raw_ptr + aligned_size);
@@ -231,7 +231,7 @@ public:
             // using mpPtr + sizeof(T) == mpRefCnt to check if the allocation is combined.
 
             if (mbIsCombinedAllocation) {
-                // Call the destructor manually (we remove the type info so the MemPool::Free call won't call it)
+                // Call the destructor manually (we remove the type info so the StdAllocator::Free call won't call it)
                 if constexpr (std::is_destructible_v<T>) {
                     mpPtr->~T();
                 }
@@ -242,7 +242,7 @@ public:
                 }
 
                 // Free the bundled memory
-                gEnginePool->Free(reinterpret_cast<uint8*>(mpPtr));
+                StdAllocator::Free(reinterpret_cast<uint8*>(mpPtr));
 
                 mpRefCnt = nullptr;
                 mpPtr = nullptr;
@@ -254,7 +254,7 @@ public:
             if (!mbIsExternalPtr) {
                 // The pointer exists but the ref count ptr != the bundled ptr, so we will free the
                 // ptr normally.
-                gEnginePool->Free<T>(mpPtr);
+                StdAllocator::Free<T>(mpPtr);
             }
 
             mpPtr = nullptr;
@@ -262,7 +262,7 @@ public:
 
         if (mpRefCnt) {
             // Free the ref count
-            gEnginePool->Free<RefCount>(mpRefCnt);
+            StdAllocator::Free<RefCount>(mpRefCnt);
             mpRefCnt = nullptr;
         }
     }

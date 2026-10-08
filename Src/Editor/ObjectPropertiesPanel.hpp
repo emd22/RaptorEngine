@@ -4,6 +4,7 @@
 #include <wx/string.h>
 
 #include <Core/StackArray.hpp>
+#include <Material/MaterialLibrary.hpp>
 #include <Object/Object.hpp>
 
 class wxCheckBox;
@@ -64,7 +65,8 @@ private:
 	wxString mShownName;
 	uint32 mShownTags = 0;
 	uint32 mShownFlags = 0;
-	int32 mShownMaterialSlot = -1;
+
+	MaterialLibraryID mShownMaterialSlot = MaterialLibraryID::scNull;
 	uint32 mShownMaterialCount = 0;
 	wxString mShownScript;
 	bool mbShownScriptErrors = false;

@@ -127,7 +127,7 @@ void BasicDb::Parse()
         ++start;
     }
 
-    gEnginePool->Free(mpData);
+    StdAllocator::Free(mpData);
 }
 
 BasicDbEntry* BasicDb::FindEntry(Hash64 key)

@@ -36,7 +36,7 @@ FX_FORCE_INLINE float32 Vec4f::LengthSquared() const
 	return vaddvq_f32(vec);
 }
 
-FX_FORCE_INLINE bool Vec4f::IsCloseTo(const Vec4f& other, const float32 tolerance) const
+FX_FORCE_INLINE bool Vec4f::IsCloseTo(const Vec4f other, const float32 tolerance) const
 {
 	return IsCloseTo(other.mIntrin);
 }
@@ -74,13 +74,13 @@ FX_FORCE_INLINE void Vec4f::Set(float32 scalar) { mIntrin = vdupq_n_f32(scalar);
 // Vec + Vec Operators
 ///////////////////////////////
 
-Vec4f Vec4f::operator+(const Vec4f& other) const { return Vec4f(vaddq_f32(mIntrin, other.mIntrin)); }
+Vec4f Vec4f::operator+(const Vec4f other) const { return Vec4f(vaddq_f32(mIntrin, other.mIntrin)); }
 
-Vec4f Vec4f::operator-(const Vec4f& other) const { return Vec4f(vsubq_f32(mIntrin, other.mIntrin)); }
+Vec4f Vec4f::operator-(const Vec4f other) const { return Vec4f(vsubq_f32(mIntrin, other.mIntrin)); }
 
-Vec4f Vec4f::operator*(const Vec4f& other) const { return Vec4f(vmulq_f32(mIntrin, other.mIntrin)); }
+Vec4f Vec4f::operator*(const Vec4f other) const { return Vec4f(vmulq_f32(mIntrin, other.mIntrin)); }
 
-Vec4f Vec4f::operator/(const Vec4f& other) const { return Vec4f(vdivq_f32(mIntrin, other.mIntrin)); }
+Vec4f Vec4f::operator/(const Vec4f other) const { return Vec4f(vdivq_f32(mIntrin, other.mIntrin)); }
 
 
 ///////////////////////////////
@@ -103,25 +103,25 @@ FX_FORCE_INLINE Vec4f Vec4f::operator/(float scalar) const
 FX_FORCE_INLINE Vec4f Vec4f::operator-() const { return Vec4f(vnegq_f32(mIntrin)); }
 
 
-FX_FORCE_INLINE Vec4f& Vec4f::operator+=(const Vec4f& other)
+FX_FORCE_INLINE Vec4f& Vec4f::operator+=(const Vec4f other)
 {
 	this->mIntrin = vaddq_f32(this->mIntrin, other.mIntrin);
 	return *this;
 }
 
-FX_FORCE_INLINE Vec4f& Vec4f::operator-=(const Vec4f& other)
+FX_FORCE_INLINE Vec4f& Vec4f::operator-=(const Vec4f other)
 {
 	this->mIntrin = vsubq_f32(this->mIntrin, other.mIntrin);
 	return *this;
 }
 
-FX_FORCE_INLINE Vec4f& Vec4f::operator*=(const Vec4f& other)
+FX_FORCE_INLINE Vec4f& Vec4f::operator*=(const Vec4f other)
 {
 	this->mIntrin = vmulq_f32(this->mIntrin, other.mIntrin);
 	return *this;
 }
 
-FX_FORCE_INLINE Vec4f& Vec4f::operator=(const Vec4f& other)
+FX_FORCE_INLINE Vec4f& Vec4f::operator=(const Vec4f other)
 {
 	this->mIntrin = other.mIntrin;
 	return *this;

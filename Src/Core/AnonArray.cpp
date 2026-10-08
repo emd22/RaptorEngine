@@ -1,6 +1,6 @@
 #include "AnonArray.hpp"
 
-#include <Core/MemPool/MemPool.hpp>
+#include <Core/Allocator.hpp>
 #include <Engine.hpp>
 
 namespace fx {
@@ -12,7 +12,6 @@ void AnonArray::Create(uint32 object_size, uint32 size)
     Capacity = size;
     Size = 0;
 
-    // pData = gEnginePool->AllocRaw(object_size * size);
     pData = malloc(object_size * size);
 }
 
@@ -39,8 +38,6 @@ void AnonArray::Free()
         return;
     }
 
-    // MemPool::Free(pData);
-    // gEnginePool->FreeRaw(pData);
     free(pData);
 
     Capacity = 0;
