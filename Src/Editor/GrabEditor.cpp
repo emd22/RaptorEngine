@@ -5,6 +5,7 @@
 #include <ThirdParty/Jolt/Physics/Body/BodyInterface.h>
 
 #include <Color.hpp>
+#include <Controls.hpp>
 #include <Engine.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
@@ -21,7 +22,9 @@ static constexpr float32 scMinHoldDistance = 1.0f;
 
 static constexpr float32 scStiffness = 20.0f;
 static constexpr float32 scMaxSpeed = 20.0f;
+static constexpr float32 scMaxAcceleration = 60.0f;
 static constexpr float32 scAngularDamping = 8.0f;
+static constexpr float32 scLaunchSpeed = 25.0f;
 
 static const Color scGrabColor = Color::FromRGBA(255, 120, 40, 255);
 
@@ -72,6 +75,16 @@ void GrabEditor::Update(float32 delta_time)
 
 	PerspectiveCamera& camera = *gWorld->Player.pCamera;
 
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_Y)) {
+		const Vec3f launch = camera.GetForwardVector() * scLaunchSpeed;
+
+		bodies.ActivateBody(mBody);
+		bodies.SetLinearVelocity(mBody, JPH::Vec3(launch.X, launch.Y, launch.Z));
+
+		Release();
+		return;
+	}
+
 	const Vec3f target = camera.Position + camera.GetForwardVector() * mDistance;
 	const Vec3f held_point = Vec3f(bodies.GetCenterOfMassTransform(mBody) *
 								   JPH::Vec3(mLocalPoint.X, mLocalPoint.Y, mLocalPoint.Z));
@@ -82,6 +95,17 @@ void GrabEditor::Update(float32 delta_time)
 	if (speed > scMaxSpeed) {
 		velocity = velocity * (scMaxSpeed / speed);
 	}
+
+	const Vec3f current = Vec3f(bodies.GetLinearVelocity(mBody));
+	Vec3f change = velocity - current;
+	const float32 max_change = scMaxAcceleration * delta_time;
+	const float32 change_length = change.Length();
+
+	if (change_length > max_change) {
+		change = change * (max_change / change_length);
+	}
+
+	velocity = current + change;
 
 	bodies.ActivateBody(mBody);
 	bodies.SetLinearAndAngularVelocity(mBody, JPH::Vec3(velocity.X, velocity.Y, velocity.Z),

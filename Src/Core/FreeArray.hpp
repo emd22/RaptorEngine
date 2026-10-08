@@ -147,15 +147,11 @@ public:
 	 */
 	uint32 GetIndexFromPtr(const TItemType* ptr) const
 	{
-		if (ptr < pPtr || ptr > (pPtr + Capacity)) {
+		if (ptr < pPtr || ptr >= (pPtr + Capacity)) {
 			return UINT32_MAX;
 		}
 
-		uintptr_t potential_index = (ptr - pPtr);
-
-		Assert((potential_index % sizeof(TItemType)) == 0);
-
-		return (potential_index / sizeof(TItemType));
+		return static_cast<uint32>(ptr - pPtr);
 	}
 
 	~FreeArray() { Free(); }

@@ -55,6 +55,11 @@ void PhysicsManager::DestroyBody(physics::BodyID& id)
 
 	// Delete the body id at the definition
 	physics::Body* body = mBodies.GetItem(id.GetID());
+	if (body == nullptr) {
+		id.Invalidate();
+		return;
+	}
+
 	body->DestroyPhysicsBody();
 	body->ID.Invalidate();
 
@@ -97,6 +102,10 @@ physics::Body* PhysicsManager::FindBody(JPH::BodyID jolt_id)
 		}
 
 		physics::Body* body = mBodies.GetItem(i);
+
+		if (body->GetBody() == nullptr) {
+			continue;
+		}
 
 		if (body->GetBodyID() == jolt_id) {
 			return body;

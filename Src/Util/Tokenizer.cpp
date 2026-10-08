@@ -32,6 +32,8 @@ const char* Token::GetTypeName(eTokenType type)
         "Equality",   "NotEqual",    "LessEqual", "GreaterEqual",
 
         "DocComment",
+
+        "Pipe",
     };
 
     return type_names[static_cast<uint32>(type)];
@@ -131,6 +133,8 @@ eTokenType Tokenizer::GetTokenType(Token& token)
             return eTokenType::Asterisk;
         case '&':
             return eTokenType::Ampersand;
+        case '|':
+            return eTokenType::Pipe;
         case '.':
             return eTokenType::Dot;
         case ',':

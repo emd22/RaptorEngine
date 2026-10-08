@@ -29,8 +29,27 @@ enum class eEditorTool : uint32
 	Light,
 	Bounds,
 	Grab,
-	Spawn,
 	Subtract,
+
+	Count,
+};
+
+enum class eEditorMode : uint32
+{
+	Vis,
+	Data,
+
+	Count,
+};
+
+enum class eDataFilter : uint32
+{
+	All,
+	ProbeVolumes,
+	ReflectionProbes,
+	SpawnPoints,
+	Volumes,
+	Lights,
 
 	Count,
 };

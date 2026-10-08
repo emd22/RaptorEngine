@@ -40,6 +40,10 @@ PERMEND();
 
     uint uiMaterialIndex : ATTR0;
 
+PERMIF(USE_SKINNING);
+    float3 vPositionRest : ATTR1;
+    float3 vNormalRest : ATTR2;
+PERMEND();
 };
 
 struct VSPushConsts
@@ -82,6 +86,9 @@ PERMIF(USE_SKINNING);
 
     output.vPosition = mul(position_ms, MVP);
     output.vNormalWS = normalize(mul(mul(input.vNormal, (float3x3)skin_xform), (float3x3)world_matrix));
+
+    output.vPositionRest = input.vPosition;
+    output.vNormalRest = input.vNormal;
 PERMELSE();
     float4 position_ms = float4(input.vPosition, 1.0);
 
@@ -141,6 +148,11 @@ PERMEND();
 
 	uint uiMaterialIndex : ATTR0;
 
+PERMIF(USE_SKINNING);
+	float3 vPositionRest : ATTR1;
+	float3 vNormalRest : ATTR2;
+PERMEND();
+
 	/// False when a double sided material is seen from behind
 	bool bIsFrontFace : SV_IsFrontFace;
 
@@ -183,7 +195,6 @@ F_StructBuffer(bDecals, Decal, 9, 0);
 F_StructBuffer(bDecalMasks, uint, 10, 0);
 F_Texture2D(tDecalAtlas, 11, 0)
 F_Texture2D(tDecalNormalAtlas, 12, 0)
-F_Texture2D(tDecalBloodAtlas, 17, 0)
 
 F_Texture2D(tAlbedo, 0, 1)
 
@@ -210,6 +221,8 @@ struct FSPushConsts
 	/// Camera position in world space
 	float4 vEyePosition;
 	float fPreExposure;
+	uint uiSkinnedDecalStart;
+	uint uiSkinnedDecalCount;
 };
 
 [[vk::push_constant]] FSPushConsts FSConst;
@@ -349,6 +362,59 @@ float3 SafeNormalize(float3 v)
 	return v * rsqrt(max(dot(v, v), 1e-12));
 }
 
+void ApplyDecal(inout SurfaceParams surface, inout float3 shading_normal, Decal decal, float3 position_ws,
+				float3 geometric_normal, float3 position_ddx, float3 position_ddy)
+{
+	const float3 position_ds = mul(float4(position_ws, 1.0), decal.mWorldToDecal).xyz;
+
+	if (any(abs(position_ds) > 0.5)) {
+		return;
+	}
+
+	const float facing = dot(geometric_normal, -decal.vAxisZ);
+	const float angle_fade = saturate((facing - DECAL_FADE_COS_END) / (DECAL_FADE_COS_START - DECAL_FADE_COS_END));
+
+	const float depth_fade = saturate((0.5 - abs(position_ds.z)) * 4.0);
+
+	// Decal space +Y is up, atlas V goes down
+	const float2 decal_uv = float2(position_ds.x + 0.5, 0.5 - position_ds.y);
+	const float2 atlas_uv = (decal_uv * decal.vAtlasRect.xy) + decal.vAtlasRect.zw;
+
+	const float3x3 world_to_decal = (float3x3)decal.mWorldToDecal;
+	const float2 uv_scale = float2(1.0, -1.0) * decal.vAtlasRect.xy;
+
+	const float2 atlas_ddx = mul(position_ddx, world_to_decal).xy * uv_scale;
+	const float2 atlas_ddy = mul(position_ddy, world_to_decal).xy * uv_scale;
+
+	const float4 decal_sample = F_SampleGrad(tDecalAtlas, atlas_uv, atlas_ddx, atlas_ddy);
+	const float4 tint = F_UnpackUIntToFloat4(decal.uiColor);
+
+	const float alpha = decal_sample.a * tint.a * angle_fade * depth_fade;
+
+	if (alpha <= 0.0) {
+		return;
+	}
+
+	surface.vDiffuse = lerp(surface.vDiffuse, decal_sample.rgb * SrgbToLinear(tint.rgb), alpha);
+	surface.vF0 = lerp(surface.vF0, float3(0.04, 0.04, 0.04), alpha);
+	surface.fRoughness = lerp(surface.fRoughness, decal.fRoughness, alpha * decal.fRoughnessWeight);
+
+	if (decal.fNormalStrength > 0.0) {
+		// Tangent space, green up
+		const float2 normal_ts = F_SampleGrad(tDecalNormalAtlas, atlas_uv, atlas_ddx, atlas_ddy).xy * 2.0 - 1.0;
+		const float2 bend = normal_ts * (decal.fNormalStrength * alpha);
+
+		const float3 decal_right = decal.vAxisX;
+		const float3 decal_up = decal.vAxisY;
+
+		const float3 tangent = SafeNormalize(decal_right - shading_normal * dot(decal_right, shading_normal));
+		const float3 bitangent = SafeNormalize(decal_up - shading_normal * dot(decal_up, shading_normal) -
+											   tangent * dot(decal_up, tangent));
+
+		shading_normal = normalize(shading_normal + (tangent * bend.x) + (bitangent * bend.y));
+	}
+}
+
 void ApplyDecals(inout SurfaceParams surface, inout float3 shading_normal, TileLightData tile_data, uint tile_index,
 				 float3 position_ws, float3 geometric_normal, float3 position_ddx, float3 position_ddy)
 {
@@ -359,63 +425,20 @@ void ApplyDecals(inout SurfaceParams surface, inout float3 shading_normal, TileL
 			const uint decal_index = (word * 32) + firstbitlow(mask);
 			mask &= (mask - 1);
 
-			const Decal decal = bDecals[decal_index];
-
-			const float3 position_ds = mul(float4(position_ws, 1.0), decal.mWorldToDecal).xyz;
-
-			if (any(abs(position_ds) > 0.5)) {
-				continue;
-			}
-
-			const float facing = dot(geometric_normal, -decal.vAxisZ);
-			const float angle_fade = saturate((facing - DECAL_FADE_COS_END) / (DECAL_FADE_COS_START - DECAL_FADE_COS_END));
-
-			const float depth_fade = saturate((0.5 - abs(position_ds.z)) * 4.0);
-
-			// Decal space +Y is up, atlas V goes down
-			const float2 decal_uv = float2(position_ds.x + 0.5, 0.5 - position_ds.y);
-			const float2 atlas_uv = (decal_uv * decal.vAtlasRect.xy) + decal.vAtlasRect.zw;
-
-			const float3x3 world_to_decal = (float3x3)decal.mWorldToDecal;
-			const float2 uv_scale = float2(1.0, -1.0) * decal.vAtlasRect.xy;
-
-			const float2 atlas_ddx = mul(position_ddx, world_to_decal).xy * uv_scale;
-			const float2 atlas_ddy = mul(position_ddy, world_to_decal).xy * uv_scale;
-
-			float4 decal_sample;
-			if (decal.vHalfExtents.w > 0.5) {
-				decal_sample = F_SampleGrad(tDecalBloodAtlas, atlas_uv, atlas_ddx, atlas_ddy);
-			}
-			else {
-				decal_sample = F_SampleGrad(tDecalAtlas, atlas_uv, atlas_ddx, atlas_ddy);
-			}
-			const float4 tint = F_UnpackUIntToFloat4(decal.uiColor);
-
-			const float alpha = decal_sample.a * tint.a * angle_fade * depth_fade;
-
-			if (alpha <= 0.0) {
-				continue;
-			}
-
-			surface.vDiffuse = lerp(surface.vDiffuse, decal_sample.rgb * SrgbToLinear(tint.rgb), alpha);
-			surface.vF0 = lerp(surface.vF0, float3(0.04, 0.04, 0.04), alpha);
-			surface.fRoughness = lerp(surface.fRoughness, decal.fRoughness, alpha * decal.fRoughnessWeight);
-
-			if (decal.fNormalStrength > 0.0) {
-				// Tangent space, green up
-				const float2 normal_ts = F_SampleGrad(tDecalNormalAtlas, atlas_uv, atlas_ddx, atlas_ddy).xy * 2.0 - 1.0;
-				const float2 bend = normal_ts * (decal.fNormalStrength * alpha);
-
-				const float3 decal_right = decal.vAxisX;
-				const float3 decal_up = decal.vAxisY;
-
-				const float3 tangent = SafeNormalize(decal_right - shading_normal * dot(decal_right, shading_normal));
-				const float3 bitangent = SafeNormalize(decal_up - shading_normal * dot(decal_up, shading_normal) -
-													   tangent * dot(decal_up, tangent));
-
-				shading_normal = normalize(shading_normal + (tangent * bend.x) + (bitangent * bend.y));
-			}
+			ApplyDecal(surface, shading_normal, bDecals[decal_index], position_ws, geometric_normal, position_ddx,
+					   position_ddy);
 		}
+	}
+
+	surface.fRoughness = saturate(surface.fRoughness);
+}
+
+void ApplySkinnedDecals(inout SurfaceParams surface, inout float3 shading_normal, uint decal_start, uint decal_count,
+						float3 position_rest, float3 normal_rest, float3 position_ddx, float3 position_ddy)
+{
+	for (uint i = 0; i < decal_count; i++) {
+		ApplyDecal(surface, shading_normal, bDecals[decal_start + i], position_rest, normal_rest, position_ddx,
+				   position_ddy);
 	}
 
 	surface.fRoughness = saturate(surface.fRoughness);
@@ -449,8 +472,11 @@ PERMIF(USE_NORMAL_MAPS);
     input.vTangentWS *= facing;
 PERMEND();
 
-PERMNOT(USE_SKINNING);
     // Taken before anything can discard, for the decals' texture gradients
+PERMIF(USE_SKINNING);
+    const float3 position_ddx = ddx(input.vPositionRest);
+    const float3 position_ddy = ddy(input.vPositionRest);
+PERMELSE();
     const float3 position_ddx = ddx(input.vPositionWS);
     const float3 position_ddy = ddy(input.vPositionWS);
 PERMEND();
@@ -512,6 +538,13 @@ PERMNOT(PROBE_CAPTURE);
 	// ApplyDecals() leaves the shading normal normalized, so N_final stays unit length through this
 	ApplyDecals(surface, N_final, tile_data, tile_index, input.vPositionWS, normalize(input.vNormalWS),
 				position_ddx, position_ddy);
+PERMEND();
+PERMEND();
+
+PERMIF(USE_SKINNING);
+PERMNOT(PROBE_CAPTURE);
+	ApplySkinnedDecals(surface, N_final, FSConst.uiSkinnedDecalStart, FSConst.uiSkinnedDecalCount,
+					   input.vPositionRest, normalize(input.vNormalRest) * facing, position_ddx, position_ddy);
 PERMEND();
 PERMEND();
 

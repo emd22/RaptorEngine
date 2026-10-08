@@ -170,6 +170,8 @@ void Skeleton::PoseFromDrivenBones(const Mat4f* driven_world, const uint8* is_dr
 		SkinningMatrices[i] = InvBindTransforms[i] * WorldTransforms[i];
 	}
 
+	mbHoldingRestPose = false;
+
 	UpdatePoseSummary();
 }
 
@@ -299,6 +301,32 @@ void Skeleton::Update(float32 delta_time)
 
 	LastUpdateFrame = current_frame;
 
+	AdvancePose(delta_time);
+
+	// The bone buffer is rewritten every frame, so the pose is uploaded every frame even when it did not change
+	BoneBufferBase = renderer::gGraphics->BoneBuffer.CopySlots(SkinningMatrices.pData, SkinningMatrices.Size);
+
+	if (BoneBufferBase == Skeleton::scNoBones) {
+		static bool sbWarned = false;
+
+		if (!sbWarned) {
+			LogWarning(LC_RENDER, "Bone buffer is full ({} matrices), ({} bones) will not be drawn",
+					   Limits::MaxBoneMatrices, SkinningMatrices.Size);
+			sbWarned = true;
+		}
+	}
+}
+
+void Skeleton::AdvancePose(float32 delta_time)
+{
+	const uint32 current_frame = renderer::gGraphics->GetElapsedFrameCount();
+
+	if (LastPoseFrame == current_frame) {
+		return;
+	}
+
+	LastPoseFrame = current_frame;
+
 	AnimationPlayback* playback = mbExternalPose ? nullptr : GetActivePlayback();
 
 	if (playback != nullptr) {
@@ -328,19 +356,6 @@ void Skeleton::Update(float32 delta_time)
 	else if (!mbExternalPose && !mbHoldingRestPose) {
 		EvaluatePose(nullptr, 0.0f);
 		mbHoldingRestPose = true;
-	}
-
-	// The bone buffer is rewritten every frame, so the pose is uploaded every frame even when it did not change
-	BoneBufferBase = renderer::gGraphics->BoneBuffer.CopySlots(SkinningMatrices.pData, SkinningMatrices.Size);
-
-	if (BoneBufferBase == Skeleton::scNoBones) {
-		static bool sbWarned = false;
-
-		if (!sbWarned) {
-			LogWarning(LC_RENDER, "Bone buffer is full ({} matrices), ({} bones) will not be drawn",
-					   Limits::MaxBoneMatrices, SkinningMatrices.Size);
-			sbWarned = true;
-		}
 	}
 }
 

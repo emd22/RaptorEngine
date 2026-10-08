@@ -10,6 +10,7 @@
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/ShadowDirectional.hpp>
+#include <World.hpp>
 
 namespace fx {
 
@@ -248,5 +249,41 @@ ObjectID ObjectManager::ReserveInstances(const ObjectID& object_id, uint32 num_i
 
 
 void ObjectManager::Destroy() {}
+
+void DestroyObjectTree(ObjectID root_id)
+{
+	Object* root = gObjectManager->GetObject(root_id);
+
+	if (root == nullptr) {
+		return;
+	}
+
+	std::vector<ObjectID> children;
+	for (const ObjectID& child_id : root->AttachedNodes) {
+		children.push_back(child_id);
+	}
+
+	root->AttachedNodes.Clear();
+
+	for (const ObjectID& child_id : children) {
+		DestroyObjectTree(child_id);
+	}
+
+	gWorld->Detach(root_id);
+	gObjectManager->DestroyObject(root_id);
+}
+
+void CollectObjectTree(Object* root, std::vector<Object*>& out_parts)
+{
+	out_parts.push_back(root);
+
+	for (ObjectID child_id : root->AttachedNodes) {
+		Object* child = gObjectManager->GetObject(child_id);
+
+		if (child != nullptr) {
+			CollectObjectTree(child, out_parts);
+		}
+	}
+}
 
 } // namespace fx

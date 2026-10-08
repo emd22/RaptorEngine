@@ -7,9 +7,11 @@
 #include <Core/StackArray.hpp>
 #include <Core/Types.hpp>
 
-class wxToggleButton;
 class wxBoxSizer;
+class wxButton;
+class wxChoice;
 class wxPanel;
+class wxScrolledWindow;
 
 namespace fx::editor {
 
@@ -22,6 +24,7 @@ class MaterialPickerWindow;
 class AtlasPackerWindow;
 
 class EditorViewport;
+class OutlineToggleButton;
 
 class EditorFrame : public wxFrame
 {
@@ -44,6 +47,8 @@ public:
 	/// Highlights the button of the selected tool
 	void ShowSelectedTool(const eEditorTool tool);
 
+	void ShowMode(const eEditorMode mode, const eDataFilter filter);
+
 	/// False while the frame is minimized or another app is in front, so the render loop can throttle itself
 	FX_FORCE_INLINE bool IsActive() const { return mbIsActive; }
 
@@ -61,6 +66,7 @@ private:
 	void OnClose(wxCloseEvent& event);
 	void OnActivate(wxActivateEvent& event);
 	void OnIconize(wxIconizeEvent& event);
+	void SetSidePanelCollapsed(bool collapsed);
 
 private:
 	EditorViewport* mpViewport = nullptr;
@@ -74,12 +80,19 @@ private:
 	/// The tool settings slot: whatever ToolSettingsBasePanel is currently swapped in, below Object Properties
 	ToolSettingsBasePanel* mpToolSettingsPanel = nullptr;
 	wxBoxSizer* mpComponentSizer = nullptr;
-	wxPanel* mpComponentParent = nullptr;
+	wxScrolledWindow* mpSideScroller = nullptr;
+	wxButton* mpSideToggleButton = nullptr;
+	wxBoxSizer* mpSideColumn = nullptr;
 
-	StackArray<wxToggleButton*, static_cast<uint32>(eEditorTool::Count)> mToolButtons;
+	StackArray<OutlineToggleButton*, static_cast<uint32>(eEditorTool::Count)> mToolButtons;
+
+	OutlineToggleButton* mpVisButton = nullptr;
+	OutlineToggleButton* mpDataButton = nullptr;
+	wxChoice* mpDataFilterChoice = nullptr;
 
 	bool mbCloseRequested = false;
 	bool mbIsActive = true;
+	bool mbSidePanelCollapsed = false;
 };
 
 } // namespace fx::editor

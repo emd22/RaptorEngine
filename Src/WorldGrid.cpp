@@ -12,6 +12,7 @@
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Renderer/Light.hpp>
+#include <World.hpp>
 
 namespace fx {
 
@@ -461,6 +462,25 @@ TileIndex WorldGrid::InsertInto(TileIndex tile_index, ObjectID id)
 	return tile_index;
 }
 
+/**
+ * @brief Checks if a dynamic object is past the kill threshold, and removes it from the scene.
+ */
+static bool CheckIfDynamicShouldBeRemoved(Object* object)
+{
+	static constexpr float32 scMaxDistance = 50.0f;
+
+	// TODO: Save the object entry to disk, rebuild while tile is in view and distance is below threshold
+	if (object->mPosition.DistanceTo(gWorld->Player.Position) >= scMaxDistance) {
+		LogInfo("Removed dynamic object {}", object->Name.Get());
+
+		gWorld->Detach(object->ID);
+		gObjectManager->DestroyObject(object->ID);
+		return true;
+	}
+
+	return false;
+}
+
 void WorldGrid::UpdateObject(Object* object, bool update_attached)
 {
 	if (object == nullptr) {
@@ -472,6 +492,11 @@ void WorldGrid::UpdateObject(Object* object, bool update_attached)
 #ifdef FX_TILE_SYSTEM_LOG_ERRORS
 		LogError(LC_CORE, "Object ({}) has not been added to tile system!", id);
 #endif
+		return;
+	}
+
+	if (object->IsDynamic() && CheckIfDynamicShouldBeRemoved(object)) {
+		// Do not continue with update if it has been removed from the scene
 		return;
 	}
 

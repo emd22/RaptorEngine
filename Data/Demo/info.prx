@@ -84,7 +84,7 @@ colliders = {
 objects = {
     skybox = {
         mesh = "/skybox2.glb"
-        unlit = $True
-        nocull = $True
+        unlit = $true
+        nocull = $true
     }
 }

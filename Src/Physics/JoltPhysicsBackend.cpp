@@ -48,17 +48,21 @@ static void JoltTrace(const char* fmt, ...)
 using namespace JPH::literals;
 
 
-void JoltPhysicsBackend::Update()
+void JoltPhysicsBackend::Update(float32 delta_time)
 {
+	constexpr float32 scMaxSteps = 4.0f;
+	constexpr float32 scStepThreshold = 0.75f;
+
 	if (bPhysicsPaused) {
 		return;
 	}
 
-	// If you take larger steps than 1 / 60th of a second you need to do multiple collision steps in order to keep the
-	// simulation stable. Do 1 collision step per 1 / 60th of a second (round up).
-	const int collision_steps = 1;
+	StepAccumulator = std::min(StepAccumulator + delta_time, cTimeStep * scMaxSteps);
 
-	PhysicsSystem.Update(cTimeStep, collision_steps, pTempAllocator.pPtr, pJobSystem.pPtr);
+	while (StepAccumulator >= cTimeStep * scStepThreshold) {
+		PhysicsSystem.Update(cTimeStep, 1, pTempAllocator.pPtr, pJobSystem.pPtr);
+		StepAccumulator -= cTimeStep;
+	}
 }
 
 void JoltPhysicsBackend::OptimizeBroadPhase() { PhysicsSystem.OptimizeBroadPhase(); }

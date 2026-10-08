@@ -24,10 +24,12 @@ public:
 
 	void PlaceAtCrosshair();
 
+	void DrawMarker(bool selected);
+
+	bool Raycast(const Vec3f origin, const Vec3f direction, float32 max_distance, float32& out_distance) const;
+
 private:
 	void Tick(float32 delta_time);
-
-	void DrawMarker();
 
 	void BeginEdit();
 	void CommitEdit();

@@ -453,6 +453,10 @@ static Object* N_blockout_create_box(FLOAT4 min, FLOAT4 max)
 		return nullptr;
 	}
 
+	if (gEditor->IsDataMode()) {
+		return gEditor->CreateDataBrush(brush.Planes, position);
+	}
+
 	EditOperation op {
 		.Type = EditOperation::eType::CreateBrush,
 	};
@@ -517,7 +521,7 @@ static constexpr uint32 scMaxSubtractOperations = 200;
 
 static bool CanBeSubtractedFrom(const Object* object)
 {
-	return !object->IsProbeVolume() && !object->IsReflectionProbe() && !object->IsSpawn() &&
+	return !object->IsVolume() && !object->IsReflectionProbe() && !object->IsSpawn() &&
 		   !gWorld->pBlockout->IsDynamic(object);
 }
 

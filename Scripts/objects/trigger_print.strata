@@ -1,0 +1,20 @@
+/*
+ * File:        trigger_print.strata
+ * Author:      emd22
+ * Created:     07/10/2026
+ * Description: Example trigger script. Tick the Trigger tag on a blockout brush and attach this to it. The brush stops
+ *              being solid and is no longer drawn (turn on "show volumes" to see and pick it in the editor), and the
+ *              functions below are called when the player walks into and out of it while the game is running.
+ */
+
+import ../interop;
+
+void object_trigger_enter(OBJECT self)
+{
+	printf("trigger entered\n");
+}
+
+void object_trigger_exit(OBJECT self)
+{
+	printf("trigger left\n");
+}

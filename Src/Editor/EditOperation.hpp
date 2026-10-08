@@ -3,6 +3,7 @@
 #include <Brush.hpp>
 #include <Color.hpp>
 #include <Core/Name.hpp>
+#include <Core/String.hpp>
 #include <Core/Types.hpp>
 #include <Core/UndoStack.hpp>
 #include <Material/MaterialID.hpp>
@@ -96,6 +97,7 @@ struct EditOperation
 		/// Moves and aims the player spawn: `ValueA`/`ValueB` are its position before and after, and `Spawn` holds the
 		/// rest
 		SpawnTransform,
+		ScriptEdit,
 	} Type;
 
 public:
@@ -139,7 +141,9 @@ public:
 		bool bIsProbeVolume = false;
 		bool bIsReflectionProbe = false;
 		bool bIsSpawn = false;
+		bool bIsTrigger = false;
 		bool bIsDynamic = false;
+		String ScriptPath;
 
 		/// Records everything needed to bring `object` back. `material` is passed in as a selected object wears the
 		/// selection material instead of its own.
@@ -164,6 +168,12 @@ public:
 
 		void CaptureBefore(Object& object);
 	} StateEdit;
+
+	struct ScriptEditData
+	{
+		String Before;
+		String After;
+	} ScriptEdit;
 
 	struct SpawnEdit
 	{
@@ -207,6 +217,8 @@ public:
 
 bool CanEditObjectTag(const Object* object, uint32 tag_bit);
 bool CanEditObjectFlag(const Object* object, uint32 flag_bit);
+
+bool CanAttachScript(const Object* object);
 
 /**
  * @brief The undo/redo history of edit operations. Keeps the selection in step with objects that undoing and redoing

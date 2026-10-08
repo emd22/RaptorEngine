@@ -526,6 +526,59 @@ bool ConfigFile::ParseValue(ConfigPrimitive& value)
 	return true;
 }
 
+bool ConfigFile::ParseTerm(ConfigPrimitive& value)
+{
+	if (GetToken()->Type != eTokenType::LParen) {
+		return ParseValue(value);
+	}
+
+	if (mDepth >= cMaxDepth) {
+		LogError(LC_CORE, "Config({}): nesting too deep", mTokenIndex);
+		mbHasErrors = true;
+		return false;
+	}
+
+	EatToken(eTokenType::LParen);
+
+	++mDepth;
+	const bool ok = ParseExpression(value);
+	--mDepth;
+
+	if (!ok) {
+		return false;
+	}
+
+	return EatToken(eTokenType::RParen);
+}
+
+bool ConfigFile::ParseExpression(ConfigPrimitive& value)
+{
+	using VType = ConfigEntry::ePrimitiveType;
+
+	if (!ParseTerm(value)) {
+		return false;
+	}
+
+	while (GetToken()->Type == eTokenType::Pipe) {
+		EatToken(eTokenType::Pipe);
+
+		ConfigPrimitive rhs;
+		if (!ParseTerm(rhs)) {
+			return false;
+		}
+
+		if (value.Type != VType::Int || rhs.Type != VType::Int) {
+			LogError(LC_CORE, "Config({}): '|' can only combine integer values", mTokenIndex);
+			mbHasErrors = true;
+			return false;
+		}
+
+		value.Set<int64>(value.Get<int64>() | rhs.Get<int64>());
+	}
+
+	return true;
+}
+
 void ConfigEntry::AppendValue(ConfigPrimitive&& value)
 {
 	if (!ArrayData.IsInited()) {
@@ -631,7 +684,7 @@ bool ConfigFile::ParseEntry(ConfigEntry* parent, ConfigEntry& entry)
 
 		while (!IsAtEnd() && GetToken()->Type != eTokenType::RBracket) {
 			ConfigPrimitive value;
-			if (!ParseValue(value)) {
+			if (!ParseExpression(value)) {
 				return false;
 			}
 			entry.AppendValue(std::move(value));
@@ -649,9 +702,9 @@ bool ConfigFile::ParseEntry(ConfigEntry* parent, ConfigEntry& entry)
 	}
 
 	// Parse single value entry
-	// [IDENTIFIER] = [INT | FLOAT | STRING]
+	// [IDENTIFIER] = [INT | FLOAT | STRING | ( EXPR | EXPR )]
 
-	return ParseValue(entry);
+	return ParseExpression(entry);
 }
 
 void ConfigFile::Parse(PagedArray<Token>& tokens)

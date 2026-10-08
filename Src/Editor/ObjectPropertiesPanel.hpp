@@ -8,8 +8,10 @@
 
 class wxCheckBox;
 class wxChoice;
+class wxButton;
 class wxCommandEvent;
 class wxStaticText;
+class wxTextCtrl;
 
 namespace fx::editor {
 
@@ -42,10 +44,17 @@ private:
 	void SetRows(StackArray<FlagRow, scMaxRows>& rows, uint32 value, Object* object, bool is_tag);
 	void OnMaterialChoice(wxCommandEvent& event);
 	void RefreshMaterialChoices();
+	void CommitScript();
+	void BrowseScript();
+	void RefreshScript(Object* object);
 
 private:
 	wxStaticText* mpNameLabel = nullptr;
 	wxChoice* mpMaterialChoice = nullptr;
+	wxTextCtrl* mpScriptText = nullptr;
+	wxButton* mpScriptBrowse = nullptr;
+	wxButton* mpScriptClear = nullptr;
+	wxStaticText* mpScriptStatus = nullptr;
 
 	StackArray<FlagRow, scMaxRows> mTagRows;
 	StackArray<FlagRow, scMaxRows> mFlagRows;
@@ -57,6 +66,8 @@ private:
 	uint32 mShownFlags = 0;
 	int32 mShownMaterialSlot = -1;
 	uint32 mShownMaterialCount = 0;
+	wxString mShownScript;
+	bool mbShownScriptErrors = false;
 
 	// Show Anything ...is a real bool
 	bool mbShowingAnything = true;

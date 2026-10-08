@@ -17,6 +17,7 @@
 #undef LoadImage
 #endif
 
+#include <Brush.hpp>
 #include <Core/StackArray.hpp>
 #include <Core/Types.hpp>
 #include <Material/MaterialID.hpp>
@@ -38,12 +39,13 @@ namespace fx::editor {
 
 class EditorFrame;
 
-/// The File > Reload menu items
+/// The World menu items
 enum class eReloadTarget : uint32
 {
 	World,
 	Prototype,
 	Scripts,
+	Clean,
 
 	Count,
 };
@@ -87,6 +89,24 @@ public:
 
 	FX_FORCE_INLINE bool IsSimulationMode() const { return (mCurrentToolType == eEditorTool::None); }
 
+	/////////////////////////////////////
+	// Modes
+	/////////////////////////////////////
+
+	void SetMode(eEditorMode mode);
+	void SetDataFilter(eDataFilter filter);
+
+	FX_FORCE_INLINE eEditorMode GetMode() const { return mMode; }
+	FX_FORCE_INLINE eDataFilter GetDataFilter() const { return mDataFilter; }
+	FX_FORCE_INLINE bool IsDataMode() const { return (mMode == eEditorMode::Data); }
+
+	bool IsToolAvailable(eEditorTool tool) const;
+
+	FX_FORCE_INLINE bool IsSpawnSelected() const { return mbSpawnSelected; }
+
+	/// Vis mode selects everything but data brushes, Data mode only the data brushes the filter lets through
+	bool IsObjectSelectable(const Object* object) const;
+
 	/// Reloads every script, then picks the tools' functions back up
 	void ReloadScripts();
 
@@ -116,6 +136,10 @@ public:
 
 	void DeselectModels();
 
+	bool IsSpawnPointShown() const;
+	void SelectSpawn();
+	void DeselectSpawn();
+
 	FX_FORCE_INLINE const EditorSelection& GetSelection() const { return mSelection; }
 
 	FX_FORCE_INLINE LightEditor& GetLightEditor() { return mLightEditor; }
@@ -124,9 +148,14 @@ public:
 	void SetStoredMaterial(Object* object, MaterialID material);
 
 	Object* CreateReflectionProbeAtPlayer();
+
+	/// Creates a data brush of the kind the filter is set to, filling a world space box
+	Object* CreateDataBrush(const Brush::PlaneList& planes, const Vec3f position);
 	uint32 SetSelectionReflectionProbe(bool enabled);
 
 	uint32 SetSelectionObjectBit(bool is_tag, uint32 bit, bool enabled);
+
+	uint32 SetSelectionScript(const String& path);
 
 	/////////////////////////////////////
 	// Edit operations
@@ -182,15 +211,25 @@ private:
 	void SyncCurrentTool();
 
 	void CreateObjectAtCrosshair();
+	void CreateDataBrushAtCrosshair();
 	void DeleteSelection();
 	void DupeSelection();
 
 	void AdjustSnapLevel(int32 direction);
 
+	/// Drops anything from the selection that the mode and filter don't allow, such as after its tags changed
+	void PruneSelection();
+	/// Moves off a tool that the mode and filter don't allow
+	void EnsureToolAvailable();
+	void ShowMode();
+
 private:
 	EditorFrame* mpMainFrame = nullptr;
 
 	StackArray<EditorTool, static_cast<uint32>(eEditorTool::Count)> mTools;
+
+	eEditorMode mMode = eEditorMode::Vis;
+	eDataFilter mDataFilter = eDataFilter::All;
 
 	eEditorTool mCurrentToolType = eEditorTool::None;
 	EditorTool* mpCurrentTool = nullptr;
@@ -214,6 +253,8 @@ private:
 	script::Script* mpCommandScript = nullptr;
 
 	bool mbDragging = false;
+	bool mbDraggingSpawn = false;
+	bool mbSpawnSelected = false;
 	bool mbHadHeadbob = false;
 
 	wxGUIEventLoop* mpEventLoop = nullptr;

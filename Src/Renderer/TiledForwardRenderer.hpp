@@ -83,7 +83,7 @@ public:
 	 * @brief Sets the atlases that decals are sampled from, rebuilding the persistent descriptor set when either
 	 * changes. Null binds a blank image.
 	 */
-	void SetDecalAtlases(Image* atlas, Image* normal_atlas, Image* blood_atlas);
+	void SetDecalAtlases(Image* atlas, Image* normal_atlas);
 
 	void Destroy();
 	~TiledForwardRenderer() { Destroy(); }
@@ -163,7 +163,6 @@ private:
 	/// Decal atlases that the persistent descriptor set was built with
 	Image* mpDecalAtlas = nullptr;
 	Image* mpDecalNormalAtlas = nullptr;
-	Image* mpDecalBloodAtlas = nullptr;
 };
 
 } // namespace fx::renderer

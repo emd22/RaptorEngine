@@ -29,6 +29,7 @@
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/Light.hpp>
 #include <Renderer/LightProbe.hpp>
+#include <Script/ObjectScripts.hpp>
 #include <Script/Script.hpp>
 #include <Script/ScriptManager.hpp>
 #include <World.hpp>
@@ -67,6 +68,31 @@ static_assert(std::size(scAngleSnapSteps) == std::size(scSnapSteps));
 
 /// Where the transform marker is kept while it isn't in use, out of view
 static const Vec3f scHiddenMarkerPosition = Vec3f(200.0f);
+
+static constexpr float32 scDataPickRange = 32.0f;
+
+static const Vec3f scDefaultDataBrushHalfExtent(2.0f, 1.5f, 2.0f);
+
+static constexpr uint32 ToolBit(eEditorTool tool) { return 1u << static_cast<uint32>(tool); }
+
+static constexpr uint32 scVisTools = ToolBit(eEditorTool::Translate) | ToolBit(eEditorTool::Face) |
+									 ToolBit(eEditorTool::Rotate) | ToolBit(eEditorTool::Create) |
+									 ToolBit(eEditorTool::Clip) | ToolBit(eEditorTool::Bounds) |
+									 ToolBit(eEditorTool::Grab) | ToolBit(eEditorTool::Subtract);
+
+static constexpr uint32 scDataTools[static_cast<uint32>(eDataFilter::Count)] = {
+	ToolBit(eEditorTool::Translate) | ToolBit(eEditorTool::Face) | ToolBit(eEditorTool::Light),
+	ToolBit(eEditorTool::Translate) | ToolBit(eEditorTool::Face) | ToolBit(eEditorTool::Create),
+	ToolBit(eEditorTool::Translate) | ToolBit(eEditorTool::Face) | ToolBit(eEditorTool::Create),
+	ToolBit(eEditorTool::Translate),
+	ToolBit(eEditorTool::Translate) | ToolBit(eEditorTool::Face) | ToolBit(eEditorTool::Rotate) |
+		ToolBit(eEditorTool::Create),
+	ToolBit(eEditorTool::Light),
+};
+
+static constexpr eEditorTool scFallbackTools[] = {
+	eEditorTool::Translate, eEditorTool::Face, eEditorTool::Create, eEditorTool::Light,
+};
 
 static const char* const scCommandScriptPath = "./Scripts/editor/editor_cmd.strata";
 
@@ -119,6 +145,7 @@ EditorFrame* RaptorEditor::CreateMainFrame(const char* title, const Vec2u& viewp
 	platform::ActivateApp();
 #endif
 
+	mpMainFrame->ShowMode(mMode, mDataFilter);
 	mpMainFrame->GetViewport()->SetFocus();
 
 	// Get the frame on screen and laid out before the renderer creates its surface on the viewport
@@ -199,6 +226,10 @@ void RaptorEditor::Update(float32 delta_time)
 
 	HandleHotkeys();
 
+	if (!mbDragging) {
+		PruneSelection();
+	}
+
 	if (mpCurrentTool->UsesSelection() && ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
 		PickObject();
 	}
@@ -210,14 +241,19 @@ void RaptorEditor::Update(float32 delta_time)
 	}
 
 	// The selection went away (deleted, or deselected) partway through, so there is nothing left to finish
-	if (mbDragging && mpCurrentTool->UsesSelection() && mSelection.IsEmpty()) {
+	if (mbDragging && !mbDraggingSpawn && mpCurrentTool->UsesSelection() && mSelection.IsEmpty()) {
 		CancelDrag();
 	}
 
 	if (!mbDragging) {
-		mpCurrentTool->Controls();
+		if (mbSpawnSelected) {
+			mSpawnEditor.Controls();
+		}
+		else {
+			mpCurrentTool->Controls();
+		}
 
-		const bool has_target = (!mpCurrentTool->UsesSelection() || !mSelection.IsEmpty());
+		const bool has_target = mbSpawnSelected || (!mpCurrentTool->UsesSelection() || !mSelection.IsEmpty());
 
 		if (mouse_down && has_target) {
 			BeginDrag();
@@ -225,7 +261,16 @@ void RaptorEditor::Update(float32 delta_time)
 	}
 
 	if (mbDragging) {
-		mpCurrentTool->Update(delta_time);
+		if (mbDraggingSpawn) {
+			mSpawnEditor.Update(delta_time);
+		}
+		else {
+			mpCurrentTool->Update(delta_time);
+		}
+	}
+
+	if (!mbSpawnSelected && IsSpawnPointShown()) {
+		mSpawnEditor.DrawMarker(false);
 	}
 
 	DrawModelSelection();
@@ -317,23 +362,27 @@ void RaptorEditor::HandleHotkeys()
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_Y)) {
 		SetTool(eEditorTool::Grab);
 	}
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_J)) {
-		SetTool(eEditorTool::Spawn);
-	}
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_N)) {
-		SetTool(eEditorTool::Subtract);
-	}
+	// if (ControlManager::IsKeyPressed(eKey::FX_KEY_N)) {
+	// 	SetTool(eEditorTool::Subtract);
+	// }
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_K)) {
 		if (mCurrentToolType == eEditorTool::Light) {
 			mLightEditor.CreateAtCrosshair();
 		}
-		else if (mCurrentToolType == eEditorTool::Spawn) {
+		else if (IsDataMode() && (mbSpawnSelected || mDataFilter == eDataFilter::SpawnPoints)) {
 			mSpawnEditor.PlaceAtCrosshair();
+		}
+		else if (IsDataMode()) {
+			CreateDataBrushAtCrosshair();
 		}
 		else {
 			CreateObjectAtCrosshair();
 		}
+	}
+
+	if (mbSpawnSelected && ControlManager::IsKeyPressed(eKey::FX_KEY_TAB)) {
+		DeselectSpawn();
 	}
 
 	if (mSelection.IsEmpty()) {
@@ -357,27 +406,6 @@ void RaptorEditor::HandleHotkeys()
 /////////////////////////////////////
 // Object picking
 /////////////////////////////////////
-
-/// Picks the probe volume that the crosshair is on, if there is nothing solid in front of it
-static Object* PickProbeVolume(const PerspectiveCamera& camera, const Vec3f pick_direction)
-{
-	float32 volume_distance = 0.0f;
-	Object* volume = gWorld->RaycastProbeVolumes(camera.Position, pick_direction, scPickRange, volume_distance);
-
-	if (volume == nullptr) {
-		return nullptr;
-	}
-
-	// Geometry in front of the volume wins, so looking at a wall inside a volume still selects the wall. The
-	// volume's box is hollow, so standing inside one doesn't put it in front of everything it contains.
-	const physics::RayResult solid = gPhysics->pBackend->Raycast(camera.Position, pick_direction * scPickRange);
-
-	if (solid.bHit && (solid.Point - camera.Position).Length() <= volume_distance) {
-		return nullptr;
-	}
-
-	return volume;
-}
 
 static Object* FindModelRoot(Object* object)
 {
@@ -430,20 +458,33 @@ void RaptorEditor::PickObject()
 	const bool append_selection = ControlManager::IsKeyDown(eKey::FX_KEY_LALT);
 
 	// Clicking away from the selection keeps it. Alt adds to it, Tab clears it.
-	if (!mSelection.IsEmpty() && !append_selection) {
+	if ((!mSelection.IsEmpty() || mbSpawnSelected) && !append_selection) {
 		return;
 	}
 
 	Ref<PerspectiveCamera>& camera = gWorld->Player.pCamera;
 	const Vec3f pick_direction = camera->GetForwardVector();
 
-	Object* volume = nullptr;
+	if (IsDataMode()) {
+		float32 volume_distance = 0.0f;
+		Object* volume = gWorld->RaycastProbeVolumes(camera->Position, pick_direction, scDataPickRange,
+													 volume_distance,
+													 [this](const Object& object) { return IsObjectSelectable(&object); });
 
-	if (gWorld->pCVarShowProbeVolumes->IntValue != 0) {
-		volume = PickProbeVolume(*camera, pick_direction);
-	}
+		float32 spawn_distance = 0.0f;
+		const bool spawn_hit = IsSpawnPointShown() &&
+							   mSpawnEditor.Raycast(camera->Position, pick_direction, scDataPickRange, spawn_distance);
 
-	if (volume != nullptr && SelectObject(volume, append_selection)) {
+		if (spawn_hit && (volume == nullptr || spawn_distance <= volume_distance)) {
+			SelectSpawn();
+			return;
+		}
+
+		if (volume != nullptr && SelectObject(volume, append_selection)) {
+			return;
+		}
+
+		ClearSelection();
 		return;
 	}
 
@@ -495,8 +536,14 @@ void RaptorEditor::BeginDrag()
 	}
 
 	mbDragging = true;
+	mbDraggingSpawn = mbSpawnSelected;
 
-	mpCurrentTool->Begin();
+	if (mbDraggingSpawn) {
+		mSpawnEditor.Begin();
+	}
+	else {
+		mpCurrentTool->Begin();
+	}
 }
 
 void RaptorEditor::EndDrag()
@@ -506,7 +553,15 @@ void RaptorEditor::EndDrag()
 	}
 
 	mbDragging = false;
-	mpCurrentTool->Finalize();
+
+	if (mbDraggingSpawn) {
+		mSpawnEditor.Finalize();
+	}
+	else {
+		mpCurrentTool->Finalize();
+	}
+
+	mbDraggingSpawn = false;
 
 	if (!HasFlag(mpCurrentTool->Flags, eEditorToolFlags::KeepBob)) {
 		SetMovementDamped(false);
@@ -520,7 +575,15 @@ void RaptorEditor::CancelDrag()
 	}
 
 	mbDragging = false;
-	mpCurrentTool->Cancel();
+
+	if (mbDraggingSpawn) {
+		mSpawnEditor.Cancel();
+	}
+	else {
+		mpCurrentTool->Cancel();
+	}
+
+	mbDraggingSpawn = false;
 	HideToolMarkers();
 
 	if (!HasFlag(mpCurrentTool->Flags, eEditorToolFlags::KeepBob)) {
@@ -585,9 +648,6 @@ void RaptorEditor::AddTools()
 	AddTool(eEditorTool::Grab, nullptr, eEditorToolFlags::KeepBob);
 	GetTool(eEditorTool::Grab)->SetNative(&mGrabEditor);
 
-	AddTool(eEditorTool::Spawn, nullptr, eEditorToolFlags::ClearsSelection);
-	GetTool(eEditorTool::Spawn)->SetNative(&mSpawnEditor);
-
 	AddTool(eEditorTool::Subtract, "./Scripts/editor/tools/tool_subtract.strata", eEditorToolFlags::UsesSelection);
 
 	mpCurrentTool = GetTool(mCurrentToolType);
@@ -617,7 +677,7 @@ void RaptorEditor::SetTool(eEditorTool tool)
 {
 	EditorTool* new_tool = GetTool(tool);
 
-	if (new_tool == nullptr) {
+	if (new_tool == nullptr || (tool != eEditorTool::None && !IsToolAvailable(tool))) {
 		return;
 	}
 
@@ -630,6 +690,10 @@ void RaptorEditor::SetTool(eEditorTool tool)
 
 		mCurrentToolType = tool;
 		mpCurrentTool = new_tool;
+
+		if (tool != eEditorTool::Translate) {
+			DeselectSpawn();
+		}
 
 		// Nothing stays selected while simulating, and the Light tool works on lights instead of objects
 		if (IsSimulationMode() || HasFlag(new_tool->Flags, eEditorToolFlags::ClearsSelection)) {
@@ -651,6 +715,68 @@ void RaptorEditor::SetTool(eEditorTool tool)
 	if (mpMainFrame != nullptr) {
 		mpMainFrame->ShowSelectedTool(mCurrentToolType);
 	}
+}
+
+bool RaptorEditor::IsToolAvailable(eEditorTool tool) const
+{
+	if (tool == eEditorTool::None) {
+		return true;
+	}
+
+	const uint32 available = IsDataMode() ? scDataTools[static_cast<uint32>(mDataFilter)] : scVisTools;
+
+	return (available & ToolBit(tool)) != 0;
+}
+
+void RaptorEditor::EnsureToolAvailable()
+{
+	if (IsToolAvailable(mCurrentToolType)) {
+		return;
+	}
+
+	for (eEditorTool fallback : scFallbackTools) {
+		if (IsToolAvailable(fallback)) {
+			SetTool(fallback);
+			return;
+		}
+	}
+
+	SetTool(eEditorTool::None);
+}
+
+void RaptorEditor::ShowMode()
+{
+	if (mpMainFrame != nullptr) {
+		mpMainFrame->ShowMode(mMode, mDataFilter);
+	}
+}
+
+void RaptorEditor::SetMode(eEditorMode mode)
+{
+	if (mode != mMode) {
+		EndDrag();
+		ClearSelection();
+
+		mMode = mode;
+
+		EnsureToolAvailable();
+	}
+
+	ShowMode();
+}
+
+void RaptorEditor::SetDataFilter(eDataFilter filter)
+{
+	if (filter != mDataFilter) {
+		EndDrag();
+
+		mDataFilter = filter;
+
+		PruneSelection();
+		EnsureToolAvailable();
+	}
+
+	ShowMode();
 }
 
 void RaptorEditor::ReloadScripts()
@@ -740,12 +866,75 @@ void RaptorEditor::SyncCurrentTool()
 // Selection
 /////////////////////////////////////
 
+static bool MatchesDataFilter(const Object& object, eDataFilter filter)
+{
+	switch (filter) {
+	case eDataFilter::All:
+		return true;
+	case eDataFilter::ProbeVolumes:
+		return object.IsProbeVolume() && !object.IsReflectionProbe();
+	case eDataFilter::ReflectionProbes:
+		return object.IsReflectionProbe();
+	case eDataFilter::Volumes:
+		return object.IsTrigger() && !object.IsProbeVolume();
+	default:
+		return false;
+	}
+}
+
+bool RaptorEditor::IsObjectSelectable(const Object* object) const
+{
+	if (object == nullptr) {
+		return false;
+	}
+
+	if (!IsDataMode()) {
+		return !object->IsDataBrush();
+	}
+
+	return object->IsDataBrush() && MatchesDataFilter(*object, mDataFilter);
+}
+
+void RaptorEditor::PruneSelection()
+{
+	if (mbSpawnSelected && !IsSpawnPointShown()) {
+		DeselectSpawn();
+	}
+
+	Object* stale[scMaxSelectedObjects];
+	uint32 stale_count = 0;
+
+	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
+		Object* object = mSelection.GetObject(i);
+
+		if (!IsObjectSelectable(object)) {
+			stale[stale_count++] = object;
+		}
+	}
+
+	if (stale_count == 0) {
+		return;
+	}
+
+	for (uint32 i = 0; i < stale_count; i++) {
+		mSelection.Remove(stale[i]);
+	}
+
+	SyncSelection();
+}
+
 bool RaptorEditor::SelectObject(Object* object, bool append_selection)
 {
 	if (object == nullptr) {
 		ClearSelection();
 		return false;
 	}
+
+	if (!IsObjectSelectable(object)) {
+		return false;
+	}
+
+	DeselectSpawn();
 
 	if (object->HasTags(eObjectTag::LockTransform)) {
 		return false;
@@ -788,8 +977,41 @@ void RaptorEditor::DeselectModels()
 	}
 }
 
+bool RaptorEditor::IsSpawnPointShown() const
+{
+	return IsDataMode() && (mDataFilter == eDataFilter::All || mDataFilter == eDataFilter::SpawnPoints);
+}
+
+void RaptorEditor::SelectSpawn()
+{
+	if (mbSpawnSelected) {
+		return;
+	}
+
+	ClearSelection();
+
+	mbSpawnSelected = true;
+	mSpawnEditor.Enter();
+}
+
+void RaptorEditor::DeselectSpawn()
+{
+	if (!mbSpawnSelected) {
+		return;
+	}
+
+	if (mbDragging && mbDraggingSpawn) {
+		CancelDrag();
+	}
+
+	mbSpawnSelected = false;
+	mSpawnEditor.Leave();
+}
+
 void RaptorEditor::ClearSelection()
 {
+	DeselectSpawn();
+
 	if (mSelection.IsEmpty()) {
 		return;
 	}
@@ -859,10 +1081,68 @@ void RaptorEditor::CreateObjectAtCrosshair()
 	SelectObject(created.pObject, false);
 }
 
+static bool IsCreatableDataKind(eDataFilter filter)
+{
+	return filter == eDataFilter::ProbeVolumes || filter == eDataFilter::ReflectionProbes ||
+		   filter == eDataFilter::Volumes;
+}
+
+Object* RaptorEditor::CreateDataBrush(const Brush::PlaneList& planes, const Vec3f position)
+{
+	if (gWorld->pBlockout == nullptr || !IsCreatableDataKind(mDataFilter)) {
+		return nullptr;
+	}
+
+	EditOperation op {
+		.Type = EditOperation::eType::CreateBrush,
+	};
+
+	op.PlanesAfter = planes;
+	op.ObjectSnapshot.Position = position;
+	op.ObjectSnapshot.Material = gWorld->pBlockout->GetDefaultMaterial();
+	op.ObjectSnapshot.bIsProbeVolume = (mDataFilter != eDataFilter::Volumes);
+	op.ObjectSnapshot.bIsReflectionProbe = (mDataFilter == eDataFilter::ReflectionProbes);
+	op.ObjectSnapshot.bIsTrigger = (mDataFilter == eDataFilter::Volumes);
+
+	Object* created = PushEditOperation(op).pObject;
+
+	if (created != nullptr) {
+		SelectObject(created, false);
+
+		if (mDataFilter == eDataFilter::ReflectionProbes) {
+			gProbeManager->RebuildReflectionProbesFromWorld();
+		}
+	}
+
+	return created;
+}
+
+void RaptorEditor::CreateDataBrushAtCrosshair()
+{
+	if (!IsCreatableDataKind(mDataFilter)) {
+		LogWarning(LC_CORE, "Pick Probe Volumes, Reflection Probes or Volumes in the Data filter to create one");
+		return;
+	}
+
+	const Ref<PerspectiveCamera>& camera = gWorld->Player.pCamera;
+
+	const physics::RayResult hit = gPhysics->pBackend->Raycast(camera->Position,
+															   camera->GetForwardVector() * scCreateRange);
+
+	const Vec3f base = SnapToGrid(hit.bHit ? hit.Point : camera->Position);
+	const Vec3f center = base + Vec3f(0.0f, scDefaultDataBrushHalfExtent.Y, 0.0f);
+
+	Vec3f position;
+	const Brush brush = gWorld->pBlockout->MakeWorldBox(center - scDefaultDataBrushHalfExtent,
+														center + scDefaultDataBrushHalfExtent, position);
+
+	if (brush.IsValid()) {
+		CreateDataBrush(brush.Planes, position);
+	}
+}
+
 Object* RaptorEditor::CreateReflectionProbeAtPlayer()
 {
-	static const Vec3f scDefaultHalfExtent(2.0f, 1.5f, 2.0f);
-
 	if (gWorld->pBlockout == nullptr) {
 		return nullptr;
 	}
@@ -870,8 +1150,8 @@ Object* RaptorEditor::CreateReflectionProbeAtPlayer()
 	const Vec3f center = SnapToGrid(gWorld->Player.pCamera->Position);
 
 	Vec3f position;
-	const Brush brush = gWorld->pBlockout->MakeWorldBox(center - scDefaultHalfExtent, center + scDefaultHalfExtent,
-														position);
+	const Brush brush = gWorld->pBlockout->MakeWorldBox(center - scDefaultDataBrushHalfExtent,
+														center + scDefaultDataBrushHalfExtent, position);
 
 	if (!brush.IsValid()) {
 		return nullptr;
@@ -950,6 +1230,35 @@ uint32 RaptorEditor::SetSelectionObjectBit(bool is_tag, uint32 bit, bool enabled
 		op.StateEdit.bIsTag = is_tag;
 		op.StateEdit.bEnabled = enabled;
 		op.StateEdit.CaptureBefore(*targets[i]);
+
+		PushEditOperation(op);
+	}
+
+	return count;
+}
+
+uint32 RaptorEditor::SetSelectionScript(const String& path)
+{
+	Object* targets[scMaxSelectedObjects];
+	uint32 count = 0;
+
+	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
+		Object* object = mSelection.GetObject(i);
+
+		if (object != nullptr && CanAttachScript(object) && !(gObjectScripts->GetPath(object->ID) == path)) {
+			targets[count++] = object;
+		}
+	}
+
+	for (uint32 i = 0; i < count; i++) {
+		EditOperation op {
+			.Type = EditOperation::eType::ScriptEdit,
+			.pObject = targets[i],
+			.GroupSize = static_cast<int32>(count),
+		};
+
+		op.ScriptEdit.Before = gObjectScripts->GetPath(targets[i]->ID);
+		op.ScriptEdit.After = path;
 
 		PushEditOperation(op);
 	}
@@ -1042,6 +1351,7 @@ void RaptorEditor::Redo()
 void RaptorEditor::ForgetObjects()
 {
 	CancelDrag();
+	DeselectSpawn();
 
 	mSelection.Clear();
 	mHistory.Clear();

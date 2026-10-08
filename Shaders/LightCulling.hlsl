@@ -190,12 +190,14 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_GroupThreadID)
 			word_end = select(has_decals, word + 1, word_end);
 		}
 
-		bLightGrid[tile_index].DecalWordStart = min(word_start, word_end);
-		bLightGrid[tile_index].DecalWordEnd = word_end;
-	}
+		word_start = min(word_start, word_end);
 
-	for (uint mask_word = local_index; mask_word < DECAL_MASK_WORDS; mask_word += NUM_THREADS) {
-		bDecalMasks[(tile_index * DECAL_MASK_WORDS) + mask_word] = sTileDecalMask[mask_word];
+		bLightGrid[tile_index].DecalWordStart = word_start;
+		bLightGrid[tile_index].DecalWordEnd = word_end;
+
+		for (uint mask_word = word_start; mask_word < word_end; mask_word++) {
+			bDecalMasks[(tile_index * DECAL_MASK_WORDS) + mask_word] = sTileDecalMask[mask_word];
+		}
 	}
 
 	for (uint slot = local_index; slot < LIGHT_COUNT; slot += NUM_THREADS) {

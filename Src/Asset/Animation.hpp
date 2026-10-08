@@ -115,6 +115,8 @@ public:
 	 */
 	void Update(float32 delta_time);
 
+	void AdvancePose(float32 delta_time);
+
 	/**
 	 * @brief Poses the skeleton at `time` in `anim`, or in its rest pose if `anim` is null, and updates
 	 * `SkinningMatrices`.
@@ -163,6 +165,7 @@ public:
 	Ref<Skeleton> pSource { nullptr };
 
 	uint32 LastUpdateFrame = UINT32_MAX;
+	uint32 LastPoseFrame = UINT32_MAX;
 
 private:
 	void UpdatePoseSummary();
