@@ -20,8 +20,8 @@
 
 namespace fx {
 
-static constexpr int32 scDefaultMaterialID = 0;
-static constexpr int32 scEditableMaterialID = 1;
+static constexpr MaterialLibraryID scDefaultMaterialID = MaterialLibraryID(0);
+static constexpr MaterialLibraryID scEditableMaterialID = MaterialLibraryID(1);
 
 Blockout::Blockout() {}
 
@@ -504,14 +504,18 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	mBrushes.Clear();
 }
 
-MaterialID Blockout::GetMaterialForID(int32 id) const
+MaterialID Blockout::GetMaterialForID(MaterialLibraryID id) const
 {
 	const MaterialID material = mMaterials.GetMaterial(id);
 
-	return material.IsNull() ? GetDefaultMaterial() : material;
+	if (material.IsNull()) {
+		return GetDefaultMaterial();
+	}
+
+	return material;
 }
 
-int32 Blockout::GetIDForMaterial(const MaterialID& material) const { return mMaterials.FindID(material); }
+MaterialLibraryID Blockout::GetIDForMaterial(const MaterialID& material) const { return mMaterials.FindID(material); }
 
 MaterialID Blockout::GetDefaultMaterial() const { return mMaterials.GetMaterial(scDefaultMaterialID); }
 
@@ -755,26 +759,18 @@ ObjectID Blockout::CreateBrush(ConfigEntry& entry)
 
 	ConfigEntry* mat_entry = entry.GetMember(HashStr32("mat"));
 
-	if (mat_entry != nullptr) {
-		int32 mat_id = -1;
+	if (mat_entry != nullptr && mat_entry->Type == ConfigEntry::ePrimitiveType::String) {
+		MaterialLibraryID mat_id = MaterialLibraryID::scNull;
 
-		if (mat_entry->Type == ConfigEntry::ePrimitiveType::String) {
-			const char* mat_name = mat_entry->Get<const char*>();
-			mat_id = mMaterials.FindIDByName(mat_name);
+		const char* mat_name = mat_entry->Get<const char*>();
+		mat_id = mMaterials.FindIDByName(mat_name);
 
-			if (mat_id < 0) {
-				LogWarning(LC_ASSET, "Blockout '{}' uses the unknown material '{}'", entry.Name.Get(), mat_name);
-			}
+		if (mat_id.IsValid()) {
+			material_id = GetMaterialForID(mat_id);
 		}
 		else {
-			mat_id = mat_entry->Get<int32>();
-
-			if (mMaterials.GetMaterial(mat_id).IsNull()) {
-				LogWarning(LC_ASSET, "Blockout '{}' uses the unknown material {}", entry.Name.Get(), mat_id);
-			}
+			LogWarning(LC_ASSET, "Blockout '{}' uses the unknown material '{}'", entry.Name.Get(), mat_name);
 		}
-
-		material_id = GetMaterialForID(mat_id);
 	}
 
 	Object* object = gObjectManager->NewObject(blockout_id.Str(), material_id, object_tags);
@@ -1159,10 +1155,12 @@ void Blockout::AddOrUpdateLightFromEntry(const ConfigEntry& light_entry)
 
 void Blockout::LoadLights(ConfigFile& info)
 {
+	gLightManager->Clear();
+
 	// Load sun
 	Ref<LightDirectional> sun = gLightManager->GetDirectionalLight();
 	if (!sun.IsValid()) {
-		sun = gLightManager->NewLight<LightDirectional>("Sun");
+		sun = gLightManager->NewLight<LightDirectional>("sun");
 	}
 
 	ConfigEntry* sun_entry = info.GetEntry(HashStr32("sun"));
@@ -1187,29 +1185,29 @@ void Blockout::LoadLights(ConfigFile& info)
 		}
 	}
 
-	std::vector<LightID> stale_lights;
-
-	for (const Ref<LightBase>& light : gLightManager->GetCache()) {
-		if (!light.IsValid() || (light->Type != eLightType::Point && light->Type != eLightType::Spot)) {
-			continue;
-		}
-
-		bool in_file = false;
-
-		if (light_list) {
-			for (const ConfigEntry& light_entry : light_list->Members) {
-				in_file |= (light_entry.Name.GetHash() == light->Name.GetHash());
-			}
-		}
-
-		if (!in_file) {
-			stale_lights.push_back(light->ID);
-		}
-	}
-
-	for (LightID& id : stale_lights) {
-		gLightManager->DestroyLight(id);
-	}
+	// 	std::vector<LightID> stale_lights;
+	//
+	// 	for (const Ref<LightBase>& light : gLightManager->GetCache()) {
+	// 		if (!light.IsValid() || (light->Type != eLightType::Point && light->Type != eLightType::Spot)) {
+	// 			continue;
+	// 		}
+	//
+	// 		bool in_file = false;
+	//
+	// 		if (light_list) {
+	// 			for (const ConfigEntry& light_entry : light_list->Members) {
+	// 				in_file |= (light_entry.Name.GetHash() == light->Name.GetHash());
+	// 			}
+	// 		}
+	//
+	// 		if (!in_file) {
+	// 			stale_lights.push_back(light->ID);
+	// 		}
+	// 	}
+	//
+	// 	for (LightID& id : stale_lights) {
+	// 		gLightManager->RemoveLight(id);
+	// 	}
 }
 
 void Blockout::SaveLights(ConfigFile& info)
@@ -1598,6 +1596,32 @@ void Blockout::ResetToTemplate()
 	}
 
 	RemoveBlockoutFromWorld(pWorld);
+
+	MaterialLibraryID lib_base_material = gWorld->pBlockout->mMaterials.FindIDByName("white_tile");
+	MaterialID base_material = gWorld->pBlockout->mMaterials.GetMaterial(lib_base_material);
+
+	CreateBrush("base", Vec3f(0.0f, -2.0f, 0.0f), Quat::scIdentity, base_material,
+				BBox(Vec3f(-10.0f, -0.1f, -10.0f), Vec3f(10.0f, 0.0f, 10.0f)));
+
+	gLightManager->Clear();
+
+	// Create default light (sun)
+
+	LightDirectional* sun = gLightManager->GetDirectionalLight();
+
+	// Create a new sun
+	if (sun == nullptr) {
+		sun = gLightManager->NewLight<LightDirectional>("sun");
+		sun->bEnabled = true;
+		sun->SetPosition(Vec3f(1.0f, 0.0f, -1.0f));
+
+		gCVars->Set("b_sun_enabled", 1);
+	}
+
+	// Invalidate all shadows since we have replaced the lights
+	renderer::gShadowAtlas->Invalidate();
+
+	gWorld->Player.TeleportTo(Vec3f(0.0, 2.0, 0.0));
 }
 
 bool Blockout::Load(const String& path)
@@ -1729,9 +1753,9 @@ void Blockout::Save(const String& path)
 			const MaterialID object_material = object->GetMaterialID();
 #endif
 
-			const int32 material_id = GetIDForMaterial(object_material);
+			const MaterialLibraryID material_id = GetIDForMaterial(object_material);
 
-			if (material_id >= 0) {
+			if (material_id.IsValid()) {
 				blockout_entry.AddMember(ConfigEntry::Literal("mat", mMaterials.GetName(material_id).CStr()));
 			}
 		}

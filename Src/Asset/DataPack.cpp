@@ -3,7 +3,6 @@
 #include <Asset/AxPaths.hpp>
 #include <Core/File.hpp>
 #include <Core/Hash.hpp>
-#include <Core/MemPool/MemPool.hpp>
 #include <Math/MathUtil.hpp>
 
 namespace fx {

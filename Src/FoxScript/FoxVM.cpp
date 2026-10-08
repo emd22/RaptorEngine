@@ -122,7 +122,7 @@ void FoxVM::InitVM(SizedArray<uint8>&& bytecode, VMInitState* init_state)
 		StackPointer = init_state->StackPointer;
 	}
 	else {
-		pStack = gScriptMemPool->Alloc<uint8>(scStackSize);
+		pStack = StdAllocator::Alloc<uint8>(scStackSize);
 	}
 
 	if (init_state && init_state->pCallStack) {
@@ -134,11 +134,11 @@ void FoxVM::InitVM(SizedArray<uint8>&& bytecode, VMInitState* init_state)
 	}
 
 	if (init_state && init_state->pStack && !init_state->pCallStack) {
-		pCallStack = gScriptMemPool->Alloc<uint8>(scCallStackSize);
+		pCallStack = StdAllocator::Alloc<uint8>(scCallStackSize);
 		CallStackPointer = 0;
 	}
 
-	pVariables = gScriptMemPool->Alloc<VMVariable>(sizeof(VMVariable) * scMaxActiveVariables);
+	pVariables = StdAllocator::Alloc<VMVariable>(sizeof(VMVariable) * scMaxActiveVariables);
 
 	memset(ScopeVarCounts, 0, sizeof(ScopeVarCounts));
 }
@@ -1027,7 +1027,7 @@ FoxVM::~FoxVM()
 		delete mod.pVM;
 	}
 
-	gScriptMemPool->Free(pVariables);
+	StdAllocator::Free(pVariables);
 	pVariables = nullptr;
 }
 

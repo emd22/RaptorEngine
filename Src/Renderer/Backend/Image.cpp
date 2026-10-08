@@ -6,7 +6,7 @@
 #include <Core/Assert.hpp>
 #include <Core/Defines.hpp>
 #include <Core/File.hpp>
-#include <Core/MemPool/MemPool.hpp>
+#include <Core/Allocator.hpp>
 #include <Core/StackArray.hpp>
 #include <Engine.hpp>
 #include <Renderer/Backend/Fwd/Fwd_GetFrame.hpp>
@@ -50,7 +50,7 @@ static Vec2u GetMipDimensions(const Vec2u& ml_zero_size, uint32 mip_level)
 				 std::max(static_cast<uint32>(static_cast<float32>(ml_zero_size.Y) * mip_divisor), 1U));
 }
 
-Image::Image() { mpRefCnt = gEnginePool->Alloc<RefCount>(sizeof(RefCount)); }
+Image::Image() { mpRefCnt = StdAllocator::Alloc<RefCount>(sizeof(RefCount)); }
 
 Image::Image(const Image& other) { (*this) = other; }
 
@@ -91,7 +91,7 @@ Image& Image::operator=(const Image& other)
 	mpRefCnt = other.mpRefCnt;
 
 	if (!mpRefCnt) {
-		mpRefCnt = gEnginePool->Alloc<RefCount>(sizeof(RefCount));
+		mpRefCnt = StdAllocator::Alloc<RefCount>(sizeof(RefCount));
 	}
 	else {
 		mpRefCnt->Inc();
@@ -127,7 +127,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 	Info = ImageInfo { size, format, 0, mips_count, Slice<const uint8>(nullptr, 0) };
 
 	if (!mpRefCnt) {
-		mpRefCnt = gEnginePool->Alloc<RefCount>(sizeof(RefCount));
+		mpRefCnt = StdAllocator::Alloc<RefCount>(sizeof(RefCount));
 	}
 
 	// Get the vulkan values for the image type
@@ -617,7 +617,7 @@ void Image::DecRef()
 		return;
 	}
 
-	gEnginePool->Free(mpRefCnt);
+	StdAllocator::Free(mpRefCnt);
 	mpRefCnt = nullptr;
 
 	if (View != nullptr) {

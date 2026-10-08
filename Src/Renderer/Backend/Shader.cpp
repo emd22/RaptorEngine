@@ -7,7 +7,6 @@
 #include <Asset/ShaderCompiler.hpp>
 #include <Asset/ShaderPreproc.hpp>
 #include <Core/File.hpp>
-#include <Core/MemPool/MemPool.hpp>
 #include <Core/RefUtil.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>

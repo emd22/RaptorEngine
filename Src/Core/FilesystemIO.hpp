@@ -15,29 +15,29 @@ namespace fx {
 class FilePath
 {
 public:
-    FilePath() = default;
-    FilePath(String value) : Value(value) {};
+	FilePath() = default;
+	FilePath(String value) : Value(value) {};
 
-    FilePath operator/(const String& other) const;
+	FilePath operator/(const String& other) const;
 
-    FilePath RemoveExtension() const;
+	FilePath RemoveExtension() const;
 
-    /**
-     * @brief Removes the filename and the file extension from the path.
-     *
-     * Example: Some/Path/Filename.ext  becomes  Some/Path
-     */
-    FilePath RemoveFilename() const;
+	/**
+	 * @brief Removes the filename and the file extension from the path.
+	 *
+	 * Example: Some/Path/Filename.ext  becomes  Some/Path
+	 */
+	FilePath RemoveFilename() const;
 
-    FilePath GetFilename(bool keep_extension) const;
+	FilePath GetFilename(bool keep_extension) const;
 
-    FX_FORCE_INLINE String& Str() { return Value; }
-    FX_FORCE_INLINE const String& Str() const { return Value; }
+	FX_FORCE_INLINE String& Str() { return Value; }
+	FX_FORCE_INLINE const String& Str() const { return Value; }
 
-    FX_FORCE_INLINE const char* CStr() const { return Value.CStr(); }
+	FX_FORCE_INLINE const char* CStr() const { return Value.CStr(); }
 
 public:
-    String Value;
+	String Value;
 };
 
 
@@ -62,7 +62,7 @@ const char* GetBasePath();
  * `GetBasePath()` if no file exists there. Lets a packaged build ship assets next to the
  * executable while dev builds keep loading them from the repo root.
  */
-std::string ResolvePath(const std::string& relative_path);
+String ResolvePath(const String& relative_path);
 
 /////////////////////////////////////
 // File functions
@@ -78,7 +78,7 @@ bool FileExists(const String& path);
 PagedArray<std::string> DirList(const char* path, const char* ends_with = nullptr);
 std::string DirCurrent();
 PagedArray<std::string> DirListIfHasExtension(const char* path, const std::string& required_extension,
-                                              bool return_filename_only);
+											  bool return_filename_only);
 
 void DirCreate(const char* path);
 

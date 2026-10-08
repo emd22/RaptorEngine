@@ -73,6 +73,8 @@ public:
 		TValueType Value;
 	};
 
+	static_assert(alignof(Entry) <= __STDCPP_DEFAULT_NEW_ALIGNMENT__, "HashMap entries must not be over-aligned");
+
 public:
 	HashMap() = default;
 	HashMap(uint32 capacity) { Init(capacity); }
@@ -104,20 +106,25 @@ public:
 
 		uint32 index = FindIndex(key, hash);
 		if (index != scNotFound) {
+			TValueType new_value(std::forward<TArgs>(args)...);
+
 			TValueType* value = &pData[index].Value;
 
 			value->~TValueType();
-			new (value) TValueType(std::forward<TArgs>(args)...);
+			new (value) TValueType(std::move(new_value));
 
 			return *value;
 		}
+
+		TKeyType new_key(key);
+		TValueType new_value(std::forward<TArgs>(args)...);
 
 		GrowIfNeeded();
 
 		Entry* entry = &pData[FindFreeIndex(pData, Capacity, hash)];
 
-		new (&entry->Key) TKeyType(key);
-		new (&entry->Value) TValueType(std::forward<TArgs>(args)...);
+		new (&entry->Key) TKeyType(std::move(new_key));
+		new (&entry->Value) TValueType(std::move(new_value));
 		entry->Hash = hash;
 
 		++Size;

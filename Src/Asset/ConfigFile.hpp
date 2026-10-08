@@ -371,7 +371,7 @@ public:
 	void AppendValue(ConfigPrimitive&& value);
 
 	void AppendValue(const Vec3f vec);
-	void AppendValue(const Vec4f& vec);
+	void AppendValue(const Vec4f vec);
 	void AppendValue(const Quat quat);
 
 	/////////////////////////////////////

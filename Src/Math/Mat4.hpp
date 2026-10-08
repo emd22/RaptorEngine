@@ -86,7 +86,7 @@ public:
 		Rows[3].Set(scalar);
 	}
 
-	Mat4f(const Vec4f& r0, const Vec4f& r1, const Vec4f& r2, const Vec4f& r3) noexcept
+	Mat4f(const Vec4f r0, const Vec4f r1, const Vec4f r2, const Vec4f r3) noexcept
 	{
 		Rows[0] = r0;
 		Rows[1] = r1;
@@ -147,7 +147,7 @@ public:
 	void CopyAsMat3To(float* dest) const;
 
 	Mat4f operator*(const Mat4f& other) const;
-	Vec4f operator*(const Vec4f& other) const;
+	Vec4f operator*(const Vec4f other) const;
 
 	void Print() const
 	{

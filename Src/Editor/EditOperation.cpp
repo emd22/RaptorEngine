@@ -17,12 +17,8 @@
 namespace fx::editor {
 
 static constexpr eObjectTag scEditableTags[] = {
-	eObjectTag::LockTransform,
-	eObjectTag::ProbeVolume,
-	eObjectTag::ReflectionProbe,
-	eObjectTag::Bleeds,
-	eObjectTag::Spawn,
-	eObjectTag::Trigger,
+	eObjectTag::LockTransform, eObjectTag::ProbeVolume, eObjectTag::ReflectionProbe,
+	eObjectTag::Bleeds,		   eObjectTag::Spawn,		eObjectTag::Trigger,
 };
 
 static constexpr eObjectFlags scEditableFlags[] = {
@@ -230,9 +226,8 @@ void EditOperation::StateEditData::CaptureBefore(Object& object)
 
 	NodesBefore.clear();
 
-	ForEachNode(object, [this](Object& node) {
-		NodesBefore.push_back(NodeFlags { .Id = node.ID, .Flags = static_cast<uint32>(node.GetFlags()) });
-	});
+	ForEachNode(object, [this](Object& node)
+				{ NodesBefore.push_back(NodeFlags { .Id = node.ID, .Flags = static_cast<uint32>(node.GetFlags()) }); });
 }
 
 /// Returns the op's object only if it is still alive (guards against use-after-free
@@ -325,7 +320,7 @@ static void RestoreLight(EditOperation& op)
 static void DestroyLight(EditOperation& op)
 {
 	if (ResolveOpLight(op) != nullptr) {
-		gLightManager->DestroyLight(op.Light.Id);
+		gLightManager->RemoveLight(op.Light.Id);
 	}
 
 	op.Light.pLight = nullptr;

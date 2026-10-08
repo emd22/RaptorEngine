@@ -47,8 +47,6 @@ static inline eKey ConvertMouseButtonToKey(int32 mouse_button)
 
 void ControlManager::Init()
 {
-	// MemPool::GetGlobalPool().PrintAllocations();
-
 	ControlManager& inst = GetInstance();
 
 	inst.mKeyMap.InitSize(scMaxKeys);

@@ -42,12 +42,12 @@ public:
 
 	FX_FORCE_INLINE bool IsZero() const;
 	FX_FORCE_INLINE bool IsNearZero(const float32 tolerance = 0.00001) const;
-	FX_FORCE_INLINE bool IsCloseTo(const Vec4f& other, const float32 tolerance = 0.00001) const;
+	FX_FORCE_INLINE bool IsCloseTo(const Vec4f other, const float32 tolerance = 0.00001) const;
 #ifdef FX_USE_SIMD
 	FX_FORCE_INLINE bool IsCloseTo(const SimdType other, const float32 tolerance = 0.00001) const;
 #endif
 
-	Vec4f& operator=(const Vec4f& other);
+	Vec4f& operator=(const Vec4f other);
 
 	FX_FORCE_INLINE Vec4f Normalize() const;
 	FX_FORCE_INLINE Vec4f& NormalizeIP();
@@ -66,20 +66,20 @@ public:
 
 #ifdef FX_USE_NEON
 	template <int TX, int TY, int TZ, int TW>
-	FX_FORCE_INLINE static Vec4f FlipSigns(const Vec4f& vec)
+	FX_FORCE_INLINE static Vec4f FlipSigns(const Vec4f vec)
 	{
 		return Vec4f(Neon::FlipSigns<TX, TY, TZ, TW>(vec.mIntrin));
 	}
 
 #elif FX_USE_AVX
 	template <int TX, int TY, int TZ, int TW>
-	FX_FORCE_INLINE static Vec4f FlipSigns(const Vec4f& vec)
+	FX_FORCE_INLINE static Vec4f FlipSigns(const Vec4f vec)
 	{
 		return Vec4f(SSE::FlipSigns<TX, TY, TZ, TW>(vec.mIntrin));
 	}
 #else
 	template <int TX, int TY, int TZ, int TW>
-	FX_FORCE_INLINE static vec4f FlipSigns(const Vec4f& vec)
+	FX_FORCE_INLINE static vec4f FlipSigns(const Vec4f vec)
 	{
 		constexpr float rx = TX > 0.0 ? vec.X : -vec.X;
 		constexpr float ry = TY > 0.0 ? vec.Y : -vec.Y;
@@ -94,19 +94,19 @@ public:
 	// Operator overloads
 	/////////////////////////////////////
 
-	FX_FORCE_INLINE Vec4f operator+(const Vec4f& other) const;
-	FX_FORCE_INLINE Vec4f operator-(const Vec4f& other) const;
-	FX_FORCE_INLINE Vec4f operator*(const Vec4f& other) const;
-	FX_FORCE_INLINE Vec4f operator/(const Vec4f& other) const;
+	FX_FORCE_INLINE Vec4f operator+(const Vec4f other) const;
+	FX_FORCE_INLINE Vec4f operator-(const Vec4f other) const;
+	FX_FORCE_INLINE Vec4f operator*(const Vec4f other) const;
+	FX_FORCE_INLINE Vec4f operator/(const Vec4f other) const;
 
 	FX_FORCE_INLINE Vec4f operator*(float32 scalar) const;
 	FX_FORCE_INLINE Vec4f operator/(float32 scalar) const;
 
 	Vec4f operator-() const;
 
-	Vec4f& operator+=(const Vec4f& other);
-	Vec4f& operator-=(const Vec4f& other);
-	Vec4f& operator*=(const Vec4f& other);
+	Vec4f& operator+=(const Vec4f other);
+	Vec4f& operator-=(const Vec4f other);
+	Vec4f& operator*=(const Vec4f other);
 	FX_FORCE_INLINE Vec4f& operator*=(float32 scalar);
 
 

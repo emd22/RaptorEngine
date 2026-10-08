@@ -37,7 +37,7 @@ void Uniforms::SetAllValuesRaw(const void* data, uint32 value_size, bool all_fra
 	uint32 num_values = PageSize / value_size;
 
 	// Allocate a temporary buffer to copy once and reduce the amount of flushes to the GPU buffer
-	void* tmp_buffer = gEnginePool->AllocRaw(PageSize);
+	void* tmp_buffer = StdAllocator::AllocRaw(PageSize);
 
 	for (uint32 index = 0; index < num_values; index++) {
 		// Copy to the offset of the value for the current index
@@ -53,7 +53,7 @@ void Uniforms::SetAllValuesRaw(const void* data, uint32 value_size, bool all_fra
 		memcpy(dst, tmp_buffer, PageSize);
 	}
 
-	gEnginePool->FreeRaw(tmp_buffer);
+	StdAllocator::FreeRaw(tmp_buffer);
 }
 
 uint8* Uniforms::GetBasePtr() { return reinterpret_cast<uint8*>(mGpuBuffer.pMappedBuffer); }

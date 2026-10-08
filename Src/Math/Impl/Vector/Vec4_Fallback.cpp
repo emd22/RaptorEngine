@@ -8,75 +8,75 @@ Vec4f::Vec4f(float32 x, float32 y, float32 z, float32 w) : X(x), Y(y), Z(z), W(w
 
 inline Vec4f::Vec4f(float32 scalar) : X(scalar), Y(scalar), Z(scalar), W(scalar) {}
 
-inline Vec4f Vec4f::operator+(const Vec4f& other) const
+inline Vec4f Vec4f::operator+(const Vec4f other) const
 {
-    Vec4f result;
+	Vec4f result;
 
-    result.X = X + other.X;
-    result.Y = Y + other.Y;
-    result.Z = Z + other.Z;
-    result.W = W + other.W;
+	result.X = X + other.X;
+	result.Y = Y + other.Y;
+	result.Z = Z + other.Z;
+	result.W = W + other.W;
 
-    return result;
+	return result;
 }
 
-inline Vec4f Vec4f::operator*(const Vec4f& other) const
+inline Vec4f Vec4f::operator*(const Vec4f other) const
 {
-    Vec4f result;
+	Vec4f result;
 
-    result.X = X * other.X;
-    result.Y = Y * other.Y;
-    result.Z = Z * other.Z;
-    result.W = W * other.W;
+	result.X = X * other.X;
+	result.Y = Y * other.Y;
+	result.Z = Z * other.Z;
+	result.W = W * other.W;
 
-    return result;
+	return result;
 }
 
-inline Vec4f& Vec4f::operator+=(const Vec4f& other)
+inline Vec4f& Vec4f::operator+=(const Vec4f other)
 {
-    X += other.X;
-    Y += other.Y;
-    Z += other.Z;
-    W += other.W;
+	X += other.X;
+	Y += other.Y;
+	Z += other.Z;
+	W += other.W;
 
-    return *this;
+	return *this;
 }
 
-inline Vec4f& Vec4f::operator-=(const Vec4f& other)
+inline Vec4f& Vec4f::operator-=(const Vec4f other)
 {
-    X -= other.X;
-    Y -= other.Y;
-    Z -= other.Z;
-    W -= other.W;
+	X -= other.X;
+	Y -= other.Y;
+	Z -= other.Z;
+	W -= other.W;
 
-    return *this;
+	return *this;
 }
 
-inline Vec4f& Vec4f::operator*=(const Vec4f& other)
+inline Vec4f& Vec4f::operator*=(const Vec4f other)
 {
-    X *= other.X;
-    Y *= other.Y;
-    Z *= other.Z;
-    W *= other.W;
+	X *= other.X;
+	Y *= other.Y;
+	Z *= other.Z;
+	W *= other.W;
 
-    return *this;
+	return *this;
 }
 
-Vec4f& Vec4f::operator=(const Vec4f& other)
+Vec4f& Vec4f::operator=(const Vec4f other)
 {
-    X = other.X;
-    Y = other.Y;
-    Z = other.Z;
-    W = other.W;
+	X = other.X;
+	Y = other.Y;
+	Z = other.Z;
+	W = other.W;
 
-    return *this;
+	return *this;
 }
 
-inline Vec4f Vec4f::MulAdd(const Vec4f& add_value, const Vec4f& mul_a, const Vec4f& mul_b)
+inline Vec4f Vec4f::MulAdd(const Vec4f add_value, const Vec4f mul_a, const Vec4f mul_b)
 {
-    Vec4f result;
-    result = add_value + (mul_a * mul_b);
-    return result;
+	Vec4f result;
+	result = add_value + (mul_a * mul_b);
+	return result;
 }
 
 inline float32 Vec4f::GetX() const { return X; }

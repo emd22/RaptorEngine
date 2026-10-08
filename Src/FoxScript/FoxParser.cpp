@@ -7,15 +7,15 @@
 #include <Core/Defer.hpp>
 #include <Core/File.hpp>
 #include <Core/Log.hpp>
-#include <Core/MemPool/MemPool.hpp>
+#include <Core/Allocator.hpp>
 #include <Engine.hpp>
 #include <Util/Tokenizer.hpp>
 
 namespace fx::script {
 
-#define FX_SCRIPT_ALLOC_NODE(type_)          gScriptMemPool->Alloc<type_>(sizeof(type_))
-#define FX_SCRIPT_ALLOC_MEMORY(type_, size_) gScriptMemPool->Alloc<type_>(size_)
-#define FX_SCRIPT_FREE(type_, ptr_)          gScriptMemPool->Free<type_>(ptr_);
+#define FX_SCRIPT_ALLOC_NODE(type_)          StdAllocator::Alloc<type_>(sizeof(type_))
+#define FX_SCRIPT_ALLOC_MEMORY(type_, size_) StdAllocator::Alloc<type_>(size_)
+#define FX_SCRIPT_FREE(type_, ptr_)          StdAllocator::Free<type_>(ptr_);
 
 void FoxParser::Init(PagedArray<Token>&& tokens)
 {

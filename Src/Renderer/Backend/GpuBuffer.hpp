@@ -249,7 +249,7 @@ public:
 		// Size = data.Size * sizeof(TElementType);
 		// Type = buffer_type;
 
-		// pStagingBuffer = gEnginePool->Alloc<RawGpuBuffer>(sizeof(RawGpuBuffer));
+		// pStagingBuffer = StdAllocator::Alloc<RawGpuBuffer>(sizeof(RawGpuBuffer));
 		// pStagingBuffer->Create(eGpuBufferType::Transfer, Size, VMA_MEMORY_USAGE_CPU_TO_GPU);
 		// pStagingBuffer->Upload(data, Size);
 

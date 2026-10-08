@@ -113,8 +113,7 @@ ObjectPropertiesPanel::ObjectPropertiesPanel(wxWindow* parent) : wxPanel(parent,
 	wxBoxSizer* script_row = new wxBoxSizer(wxHORIZONTAL);
 	script_row->Add(new wxStaticText(this, wxID_ANY, "Script"), wxSizerFlags().CenterVertical());
 
-	mpScriptText = new wxTextCtrl(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize,
-								  wxTE_PROCESS_ENTER);
+	mpScriptText = new wxTextCtrl(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
 	mpScriptText->SetHint("Scripts/objects/example.strata");
 	script_row->Add(mpScriptText, wxSizerFlags(1).Border(wxLEFT, 6));
 
@@ -193,8 +192,9 @@ void ObjectPropertiesPanel::OnMaterialChoice(wxCommandEvent& event)
 		return;
 	}
 
-	const int32 slot = mpMaterialChoice->GetSelection();
-	if (slot < 0 || slot >= static_cast<int32>(gWorld->pBlockout->GetMaterialLibrary().GetCount())) {
+	const MaterialLibraryID slot = MaterialLibraryID(mpMaterialChoice->GetSelection());
+	if (!slot.IsValid() ||
+		static_cast<int32>(slot.ID) >= static_cast<int32>(gWorld->pBlockout->GetMaterialLibrary().GetCount())) {
 		return;
 	}
 
@@ -282,11 +282,11 @@ void ObjectPropertiesPanel::RefreshMaterialChoices()
 	mpMaterialChoice->Clear();
 
 	for (uint32 id = 0; id < library.GetCount(); id++) {
-		mpMaterialChoice->Append(wxString::FromUTF8(library.GetName(id).Str()));
+		mpMaterialChoice->Append(wxString::FromUTF8(library.GetName(MaterialLibraryID(id)).Str()));
 	}
 
 	mShownMaterialCount = library.GetCount();
-	mShownMaterialSlot = -1;
+	mShownMaterialSlot = MaterialLibraryID::scNull;
 }
 
 void ObjectPropertiesPanel::ShowObject(Object* object)
@@ -307,7 +307,7 @@ void ObjectPropertiesPanel::ShowObject(Object* object)
 
 		mpMaterialChoice->SetSelection(wxNOT_FOUND);
 		mpMaterialChoice->Disable();
-		mShownMaterialSlot = -1;
+		mShownMaterialSlot = MaterialLibraryID::scNull;
 
 		mpScriptText->ChangeValue(wxEmptyString);
 		mpScriptText->Disable();
@@ -329,7 +329,7 @@ void ObjectPropertiesPanel::ShowObject(Object* object)
 		name += wxString::Format(" (+%u more)", selected_count - 1);
 	}
 
-	int32 material_slot = -1;
+	MaterialLibraryID material_slot = MaterialLibraryID::scNull;
 
 	if (gWorld->pBlockout != nullptr) {
 		material_slot = gWorld->pBlockout->GetIDForMaterial(gEditor->GetSelection().GetStoredMaterial(object));
@@ -337,7 +337,7 @@ void ObjectPropertiesPanel::ShowObject(Object* object)
 
 	if (material_slot != mShownMaterialSlot) {
 		mShownMaterialSlot = material_slot;
-		mpMaterialChoice->SetSelection(material_slot);
+		mpMaterialChoice->SetSelection(material_slot.ID);
 	}
 
 	mpMaterialChoice->Enable(object->HasTags(eObjectTag::Blockout));

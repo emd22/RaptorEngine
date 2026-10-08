@@ -3,7 +3,6 @@
 #include <Asset/AssetManager.hpp>
 #include <Asset/ShaderCompiler.hpp>
 #include <CVar.hpp>
-#include <Core/MemPool/MemPool.hpp>
 #include <Core/Thread/ThreadManager.hpp>
 #include <Decal/DecalManager.hpp>
 #include <Editor/RaptorEditor.hpp>
@@ -30,9 +29,6 @@ ObjectManager* gObjectManager = nullptr;
 TextureManager* gTextureManager = nullptr;
 MaterialManager* gMaterialManager = nullptr;
 ThreadManager* gThreadManager = nullptr;
-
-MemPool* gEnginePool = nullptr;
-MemPool* gScriptMemPool = nullptr;
 
 WorldGrid* gWorldGrid = nullptr;
 World* gWorld = nullptr;

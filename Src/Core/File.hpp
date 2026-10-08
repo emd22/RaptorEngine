@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <Core/MemPool/MemPool.hpp>
+#include <Core/Allocator.hpp>
 #include <Core/Slice.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
@@ -69,7 +69,7 @@ public:
         }
 
         const uint64 buffer_size = MathUtil::AlignValue<sizeof(TDataType)>(GetFileSize());
-        TDataType* buffer = gEnginePool->Alloc<TDataType>(buffer_size);
+        TDataType* buffer = StdAllocator::Alloc<TDataType>(buffer_size);
 
         return Read(MakeSlice(buffer, buffer_size));
     }

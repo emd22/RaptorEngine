@@ -1,6 +1,6 @@
 #include "Tokenizer.hpp"
 
-#include <Core/MemPool/MemPool.hpp>
+#include <Core/Allocator.hpp>
 #include <Core/Path.hpp>
 #include <Engine.hpp>
 
@@ -355,7 +355,7 @@ void Tokenizer::IncludeFile(const char* path)
     // Tokenize all of the included file
     Tokenize();
 
-    // gEnginePool->Free<char>(mpData);
+    // StdAllocator::Free<char>(mpData);
 
     // Restore back to previous state
     RestoreState();

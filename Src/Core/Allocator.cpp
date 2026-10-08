@@ -9,7 +9,8 @@ namespace fx {
 // Standard Library allocator
 /////////////////////////////////////
 
-void* StdAllocator::AllocRaw(uint32 size) { return std::malloc(size); }
-void StdAllocator::FreeRaw(void* ptr) { return std::free(ptr); }
+void* StdAllocator::AllocRaw(size_t size) { return std::malloc(size); }
+void* StdAllocator::ReallocRaw(void* ptr, size_t size) { return std::realloc(ptr, size); }
+void StdAllocator::FreeRaw(void* ptr) { std::free(ptr); }
 
 } // namespace fx

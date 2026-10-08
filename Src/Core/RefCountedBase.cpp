@@ -1,11 +1,11 @@
 #include "RefCountedBase.hpp"
 
-#include <Core/MemPool/MemPool.hpp>
+#include <Core/Allocator.hpp>
 #include <Engine.hpp>
 
 namespace fx {
 
-RefCountedBase::RefCountedBase() { mpRefCnt = gEnginePool->Alloc<RefCount>(sizeof(RefCount)); }
+RefCountedBase::RefCountedBase() { mpRefCnt = StdAllocator::Alloc<RefCount>(sizeof(RefCount)); }
 
 void RefCountedBase::InheritRef(const RefCountedBase& other)
 {
@@ -19,7 +19,7 @@ void RefCountedBase::InheritRef(const RefCountedBase& other)
 
     // If that reference does not exist, create a new one.
     if (!mpRefCnt) {
-        mpRefCnt = gEnginePool->Alloc<RefCount>(sizeof(RefCount));
+        mpRefCnt = StdAllocator::Alloc<RefCount>(sizeof(RefCount));
     }
     else {
         mpRefCnt->Inc();
@@ -38,7 +38,7 @@ void RefCountedBase::ReleaseRef()
         return;
     }
 
-    gEnginePool->Free(mpRefCnt);
+    StdAllocator::Free(mpRefCnt);
     mpRefCnt = nullptr;
 
     // Destroy the object if it has no remaining refs.

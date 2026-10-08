@@ -47,34 +47,51 @@ LightBase* LightManager::GetLight(LightID id)
 	return (*slot);
 }
 
-void LightManager::DestroyLight(LightID& id)
+void LightManager::Clear()
 {
 	std::lock_guard<std::mutex> guard(mInUse);
 
+	for (LightBase* light : mLightList) {
+		DestroyLight(light);
+	}
+}
+
+void LightManager::DestroyLight(LightBase* light)
+{
+	Assert(light != nullptr);
+
+	// We are invalidating the ID below, make a temp copy
+	LightID id_copy = light->ID;
+
+	gWorldGrid->RemoveLight(light);
+
+	if (gWorld != nullptr) {
+		gWorld->mLightList.InvalidateLight(light->ID);
+	}
+
+	light->ID.Invalidate();
+	// Gross
+	delete light;
+
+	mLightList.FreeItem(id_copy.GetID());
+}
+
+void LightManager::RemoveLight(LightID& id)
+{
 	if (id.IsInvalid() || id.IsNull()) {
 		return;
 	}
 
-	// Same sort of thing as ObjectManager
-	LightID id_copy = id;
+	std::lock_guard<std::mutex> guard(mInUse);
 
 	LightBase** slot = mLightList.GetItem(id.GetID());
 	if (slot != nullptr) {
-		gWorldGrid->RemoveLight(*slot);
-
-		if (gWorld != nullptr) {
-			gWorld->mLightList.InvalidateLight(id);
-		}
-
-		(*slot)->ID.Invalidate();
-		// Gross
-		delete (*slot);
+		DestroyLight(*slot);
 	}
-
-	mLightList.FreeItem(id_copy.GetID());
 
 	id.Invalidate();
 }
+
 
 LightBase* LightManager::FindLight(Hash32 name_hash)
 {

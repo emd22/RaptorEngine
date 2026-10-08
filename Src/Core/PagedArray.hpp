@@ -1,21 +1,15 @@
 #pragma once
 
 #include <Core/Assert.hpp>
-#include <Core/MemPool/MemPool.hpp>
+#include <Core/Allocator.hpp>
 #include <Core/Types.hpp>
 #include <Engine.hpp>
 
 namespace fx {
 
-// There are going to likely be some instances where there are static variables that create paged arrays. Since they are
-// static and likely destroyed AFTER the memory pool, we will only allocate or free if the pool exists. This will not
-// leak any memory since the block has already been freed.
-#define FX_PAGED_ARRAY_ALLOC(type_, size_) (gEnginePool ? gEnginePool->Alloc<type_>(size_) : nullptr)
+#define FX_PAGED_ARRAY_ALLOC(type_, size_) StdAllocator::Alloc<type_>(size_)
 
-#define FX_PAGED_ARRAY_FREE(type_, ptr_)                                                                               \
-	if (gEnginePool) {                                                                                                 \
-		gEnginePool->Free<type_>(ptr_);                                                                                \
-	}
+#define FX_PAGED_ARRAY_FREE(type_, ptr_) StdAllocator::Free<type_>(ptr_)
 
 
 // The size that a paged array is initialized to if any modifying functions are called before `.Init()`.

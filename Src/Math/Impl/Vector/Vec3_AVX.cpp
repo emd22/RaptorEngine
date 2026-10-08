@@ -22,7 +22,7 @@ const Vec3f Vec3f::sForward = Vec3f(0.0f, 0.0f, 1.0f);
 
 
 Vec3f::Vec3f(const JPH::Vec3& other) { FromJoltVec3(other); }
-Vec3f::Vec3f(const Vec4f& other) { mIntrin = other.mIntrin; }
+Vec3f::Vec3f(const Vec4f other) { mIntrin = other.mIntrin; }
 
 void Vec3f::Print() const { LogInfo("Vec3f {{ X={:.6f}, Y={:.6f}, Z={:.6f} }}", X, Y, Z); }
 

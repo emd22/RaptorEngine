@@ -11,7 +11,6 @@
 #include <Core/Defer.hpp>
 #include <Core/FilesystemIO.hpp>
 #include <Core/FreeArray.hpp>
-#include <Core/MemPool/MemPool.hpp>
 #include <Core/Path.hpp>
 #include <Core/Queue.hpp>
 #include <Core/String.hpp>
@@ -33,13 +32,6 @@ using namespace fx::renderer;
 
 int main(int argc, char** argv)
 {
-	fx::gEnginePool = new fx::MemPool;
-	fx::gEnginePool->Create(FX_MEMORY_ENGINE_POOL_SIZE);
-
-	fx::gScriptMemPool = new fx::MemPool;
-	fx::gScriptMemPool->Create(1024 * 64);
-
-
 	gScriptManager = new ScriptManager;
 
 
@@ -72,13 +64,6 @@ int main(int argc, char** argv)
 	// Destroy the editor after the renderer is gone as its surface presents to the editor frame
 	gEditor->Destroy();
 #endif
-
-	Defer(
-		[]()
-		{
-			delete fx::gEnginePool;
-			fx::gEnginePool = nullptr;
-		});
 
 #ifdef FX_IS_EDITOR
 	delete gEditor;

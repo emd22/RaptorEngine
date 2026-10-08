@@ -267,14 +267,14 @@ void WeaponSystem::Create(Player* player)
 
 	gCVars->Set("b_weapon_debug", false);
 
-	const std::string directory = FilesystemIO::ResolvePath(scWeaponDirectory);
+	const String directory = FilesystemIO::ResolvePath(scWeaponDirectory);
 
-	if (!std::filesystem::exists(directory)) {
+	if (!FilesystemIO::FileExists(directory)) {
 		LogWarning(LC_SCRIPT, "Weapon directory '{}' does not exist", directory);
 		return;
 	}
 
-	PagedArray<std::string> files = FilesystemIO::DirListIfHasExtension(directory.c_str(), ".conf", false);
+	PagedArray<std::string> files = FilesystemIO::DirListIfHasExtension(directory.CStr(), ".conf", false);
 
 	for (const std::string& file : files) {
 		if (mWeaponCount >= scMaxWeapons) {
