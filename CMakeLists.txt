@@ -46,6 +46,13 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${SOURCES})
 
 add_subdirectory(Submodules/strata)
 
+set(MI_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(MI_BUILD_STATIC ON CACHE BOOL "" FORCE)
+set(MI_BUILD_OBJECT OFF CACHE BOOL "" FORCE)
+set(MI_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(MI_OVERRIDE OFF CACHE BOOL "" FORCE)
+add_subdirectory(Submodules/mimalloc EXCLUDE_FROM_ALL)
+
 # Add shaders as a Visual Studio filter, borrowed from Hyperion Engine
 file(GLOB_RECURSE SHADER_FILES "${CMAKE_SOURCE_DIR}/Shaders/*")
 source_group("Shaders" FILES ${SHADER_FILES})
@@ -197,6 +204,10 @@ endif()
 # Strata
 target_link_libraries(raptor PRIVATE strata)
 target_include_directories(raptor SYSTEM BEFORE PRIVATE "Submodules/strata/include")
+
+# mimalloc (per-subsystem heaps, see Core/Allocator.hpp)
+target_link_libraries(raptor PRIVATE mimalloc-static)
+target_include_directories(raptor SYSTEM PRIVATE "Submodules/mimalloc/include")
 
 
 target_link_libraries(raptor PRIVATE turbojpeg SDL3 freetype ktx)

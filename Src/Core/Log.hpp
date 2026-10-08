@@ -244,8 +244,12 @@ void LogDebug(std::string_view fmt, TTypes&&... args)
 template <typename... TTypes>
 void LogDebug(eLogCategory category, std::string_view fmt, TTypes&&... args)
 {
+#ifdef FX_BUILD_RELEASE
+    return;
+#else
     LogCategoryText(category);
     Log<eLogSeverity::Debug>(fmt, std::forward<TTypes>(args)...);
+#endif
 }
 
 template <typename... TTypes>
