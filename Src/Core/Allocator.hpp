@@ -82,4 +82,70 @@ public:
 FX_VALIDATE_ALLOCATOR(StdAllocator);
 
 
+enum class eMemHeap : uint8
+{
+    Script,
+    Physics,
+
+    Count,
+};
+
+
+class MemHeaps
+{
+public:
+    static void* AllocRaw(eMemHeap heap, size_t size);
+    static void* ReallocRaw(eMemHeap heap, void* ptr, size_t size);
+    static void FreeRaw(void* ptr);
+
+    static void Collect(eMemHeap heap, bool force = false);
+    static void Reset(eMemHeap heap);
+    static void Destroy();
+};
+
+
+template <eMemHeap THeap>
+class HeapAllocator
+{
+public:
+    static void* AllocRaw(size_t size) { return MemHeaps::AllocRaw(THeap, size); }
+    static void* ReallocRaw(void* ptr, size_t size) { return MemHeaps::ReallocRaw(THeap, ptr, size); }
+    static void FreeRaw(void* ptr) { MemHeaps::FreeRaw(ptr); }
+
+    template <typename T, typename... TArgs>
+    static T* Alloc(size_t size, TArgs&&... args)
+    {
+        T* ptr = static_cast<T*>(AllocRaw(size));
+
+        if constexpr (std::is_constructible_v<T, TArgs...>) {
+            ::new (ptr) T(std::forward<TArgs>(args)...);
+        }
+
+        return ptr;
+    }
+
+    template <typename T>
+    static T* Realloc(T* ptr, size_t size)
+    {
+        return static_cast<T*>(ReallocRaw(ptr, size));
+    }
+
+    template <typename T>
+    static void Free(T* ptr)
+    {
+        if constexpr (std::is_destructible_v<T>) {
+            ptr->~T();
+        }
+
+        FreeRaw(reinterpret_cast<void*>(ptr));
+    }
+};
+
+using ScriptAllocator = HeapAllocator<eMemHeap::Script>;
+using PhysicsAllocator = HeapAllocator<eMemHeap::Physics>;
+
+FX_VALIDATE_ALLOCATOR(ScriptAllocator);
+FX_VALIDATE_ALLOCATOR(PhysicsAllocator);
+
+
 } // namespace fx

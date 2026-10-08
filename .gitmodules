@@ -4,3 +4,6 @@
 [submodule "RaptorData"]
 	path = RaptorData
 	url = https://github.com/emd22/RaptorData
+[submodule "Submodules/mimalloc"]
+	path = Submodules/mimalloc
+	url = https://github.com/microsoft/mimalloc
