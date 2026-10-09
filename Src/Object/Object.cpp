@@ -39,6 +39,13 @@ Object::Object(const ObjectID id, const MaterialID material)
 	mMaterialID = material;
 }
 
+Object::Object(const ObjectID id, const MaterialID material, bool is_loading)
+{
+	ID = id;
+	mMaterialID = material;
+	bIsLoading.store(is_loading);
+}
+
 void Object::SetMaterial(const MaterialID& id)
 {
 	if (mMaterialID.GetID() == id.GetID()) {
@@ -99,7 +106,10 @@ void Object::FinalizeWhenReady()
 {
 	if (!ParentID.IsNull()) {
 		Object* parent_object = gObjectManager->GetObject(ParentID);
-		parent_object->Bounds.Add(Bounds);
+
+		if (parent_object != nullptr) {
+			parent_object->Bounds.Add(Bounds);
+		}
 	}
 
 	if (mMaterialID.IsNull()) {
@@ -183,7 +193,6 @@ Object* Object::CloneNode(const String& name, SkeletonCloneMap& skeletons) const
 
 	clone->Flags = Flags;
 	ClearFlag(clone->Flags, (eObjectFlags::ReadyToRender | eObjectFlags::IsInstance | eObjectFlags::PhysicsEnabled));
-	SetFlag(clone->Flags, eObjectFlags::SharedMesh);
 
 	clone->MarkTransformOutOfDate();
 
@@ -412,8 +421,6 @@ float32 Object::GetDirectionScale(const Vec3f direction)
 
 	Vec3f pos_extent = Bounds.Max;
 	Vec3f neg_extent = -Bounds.Min;
-
-	LogInfo("Bounds min: {}, Bounds Max: {}", Bounds.Min, Bounds.Max);
 
 	Vec3f extent((dir.X >= 0.0f) ? pos_extent.X : neg_extent.X, (dir.Y >= 0.0f) ? pos_extent.Y : neg_extent.Y,
 				 (dir.Z >= 0.0f) ? pos_extent.Z : neg_extent.Z);
@@ -665,9 +672,23 @@ void Object::SetPosition(const Vec3f position)
 
 void Object::SetScale(const float scale)
 {
+	const float previous_scale = mScale;
+
 	Entity::SetScale(scale);
 
 	gWorldGrid->UpdateObject(this);
+
+	if (previous_scale > 0.0f) {
+		const float ratio = scale / previous_scale;
+
+		for (ObjectID attached_id : AttachedNodes) {
+			Object* attached_object = gObjectManager->GetObject(attached_id);
+
+			if (attached_object != nullptr) {
+				attached_object->ScaleBy(ratio);
+			}
+		}
+	}
 }
 
 void Object::SetRotation(const Quat rotation)
@@ -748,11 +769,10 @@ void Object::Destroy()
 {
 	if (gObjectScripts != nullptr) {
 		gObjectScripts->Detach(ID);
+		gObjectScripts->ClearRequiredEnterDirection(ID);
 	}
 
-	if (pMesh && !HasFlag(Flags, eObjectFlags::SharedMesh)) {
-		pMesh->Destroy();
-	}
+	pMesh = nullptr;
 
 	if (gPhysics->GetBody(PhysicsID) != nullptr) {
 		gPhysics->DestroyBody(PhysicsID);

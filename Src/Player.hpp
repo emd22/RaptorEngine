@@ -15,9 +15,6 @@ class Object;
 
 class Player
 {
-	const Vec3f scMaxWalkSpeed = Vec3f(3.8f);
-	const Vec3f scMaxSprintSpeed = Vec3f(5.0f);
-
 	static constexpr float32 scMovementLerpSpeed = 10.0f;
 
 	// TODO: Break these out into config vars
@@ -48,9 +45,22 @@ class Player
 	static constexpr float32 scHolsterDrop = 0.35f;
 	static constexpr float32 scHolsterPitch = 0.6f;
 
+	static constexpr float32 scLandingMinImpactSpeed = 2.5f;
+	static constexpr float32 scLandingDipPerSpeed = 0.03f;
+	static constexpr float32 scLandingMaxDip = 0.28f;
+	static constexpr float32 scLandingFrequency = 18.0f;
+	static constexpr float32 scLandingDamping = 0.35f;
+	static constexpr float32 scLandingViewModelCounter = 0.25f;
+	static constexpr float32 scViewModelVelocityLag = 0.004f;
+	static constexpr float32 scViewModelVerticalLagSpeed = 12.0f;
+
 	static constexpr float32 scRecoilApplySpeed = 40.0f;
 	static constexpr float32 scRecoilRecoveryDelay = 0.1f;
 	static constexpr float32 scRecoilRecoveryRamp = 0.08f;
+
+public:
+	static constexpr float32 scWalkSpeed = 3.8f;
+	static constexpr float32 scSprintSpeed = 5.0f;
 
 public:
 	Player() = default;
@@ -58,7 +68,6 @@ public:
 	void Create();
 
 	void Update(float64 delta_time);
-	void MoveBy(const Vec3f by);
 
 	void DoFireAnimation(float32 kick_degrees = scDefaultViewKickDegrees, float32 kickback = scDefaultViewKickback);
 	void DoReloadAnimation();
@@ -79,15 +88,17 @@ public:
 		SyncPhysicsToPlayer();
 
 		Position += offset;
+		ResetMotion();
 		Physics.Teleport(Position);
 	}
 
 	/**
-	 * @brief Move the player and its physics by `offset`.
+	 * @brief Move the player and its physics to `position`, discarding any momentum.
 	 */
 	void TeleportTo(const Vec3f position)
 	{
 		Position = position;
+		ResetMotion();
 		Physics.Teleport(Position);
 	}
 
@@ -105,11 +116,15 @@ public:
 
 	FX_FORCE_INLINE Vec3f GetBob() const { return Vec3f(mHeadBobX, mHeadBobY, 0.0f); }
 
+	/**
+	 * @brief How fast the player actually moved horizontally last update, relative to the ground it stands on.
+	 */
+	FX_FORCE_INLINE float32 GetHorizontalSpeed() const { return mHorizontalSpeed; }
+
 	~Player();
 
 private:
 	FX_FORCE_INLINE void RequireDirectionUpdate() { mbUpdateDirection = true; }
-	FX_FORCE_INLINE void RequirePhysicsUpdate() { mbUpdatePhysicsTransform = true; }
 
 	FX_FORCE_INLINE void MarkApplyingUserForce() { mbIsApplyingUserForce = true; }
 
@@ -117,8 +132,12 @@ private:
 	void RotateCamera(const Vec2f& xy);
 	void UpdateRecoil(float32 delta_time);
 	void UpdateViewKick(float32 delta_time);
+	void UpdateLanding(float32 delta_time);
 	static float32 ViewKickImpulsePerPeak();
 	void UpdateViewModelSway(float32 delta_time);
+	void UpdateMeasuredMotion(const Vec3f& previous_position, float32 delta_time);
+	void UpdateFov(float32 delta_time, bool user_force_released);
+	void ResetMotion();
 
 	FX_FORCE_INLINE void UpdateDirection()
 	{
@@ -129,16 +148,17 @@ private:
 		float32 s_anglex, c_anglex;
 		MathUtil::SinCos(pCamera->mAngleX, &s_anglex, &c_anglex);
 
-		MovementDirection.Set(s_anglex, 0.0f, c_anglex);
+		mStrafeDirection.Set(c_anglex, 0.0f, -s_anglex);
+
 		if (mbIsFlymode) {
-			MovementDirection.Y = sin(pCamera->mAngleY);
+			float32 s_angley, c_angley;
+			MathUtil::SinCos(pCamera->mAngleY, &s_angley, &c_angley);
+
+			MovementDirection.Set(s_anglex * c_angley, s_angley, c_anglex * c_angley);
 		}
-
-		// MovementDirection = Vec3f(c_angley, s_angley, c_angley) * MovementDirection;
-		// Clear the movement direction's Y. This is because sin(mAngleY) = 0 when mAngleY is zero.
-		// MovementDirection.Y = 0.0f;
-
-		// CameraDirection.NormalizeIP();
+		else {
+			MovementDirection.Set(s_anglex, 0.0f, c_anglex);
+		}
 
 		mbUpdateDirection = false;
 	}
@@ -158,8 +178,6 @@ public:
 
 	Vec3f mViewModelOffset = Vec3f::sZero;
 
-	float JumpForce = 0.0f;
-
 	bool bIsSprinting : 1 = false;
 
 	Vec2f HeadBobStrength = Vec2f { 0.011, 0.018 };
@@ -177,8 +195,18 @@ private:
 
 	Vec3f mCameraOffset = Vec3f::sZero;
 
+	Vec3f mStrafeDirection = Vec3f(1.0f, 0.0f, 0.0f);
+
 	Vec3f mMovementGoal = Vec3f::sZero;
 	Vec3f mCameraGoal = Vec3f::sZero;
+
+	float32 mHorizontalSpeed = 0.0f;
+
+	float32 mViewModelVerticalLag = 0.0f;
+
+	float32 mLandingOffset = 0.0f;
+	float32 mLandingVelocity = 0.0f;
+	bool mbWasOnGround = false;
 
 	Vec3f mUserForce = Vec3f::sZero;
 
@@ -229,7 +257,6 @@ private:
 	bool bBobReverse = false;
 	bool mbIsApplyingUserForce : 1 = false;
 	bool mbUpdateDirection : 1 = true;
-	bool mbUpdatePhysicsTransform : 1 = true;
 
 	bool mbIsFlymode : 1 = false;
 };

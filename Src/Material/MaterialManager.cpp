@@ -133,6 +133,10 @@ Material* MaterialManager::GetNewMaterial()
 	uint32 material_index = 0;
 	Material* material = mMaterialList.NewItem(&material_index);
 
+	if (material == nullptr) {
+		return nullptr;
+	}
+
 	// Ensure that the null material does not get overwritten
 	Assert(material_index != 0);
 	material->ID = MaterialID(material_index);
@@ -157,7 +161,7 @@ Material* MaterialManager::GetMaterial(const MaterialID& id)
 	return mMaterialList.GetItem(id.GetID());
 }
 
-MaterialID MaterialManager::NewMaterial(const String& name, bool supports_skinning)
+MaterialID MaterialManager::TryNewMaterial(const String& name, bool supports_skinning)
 {
 	if (!mMaterialList.IsInited()) {
 		Create();
@@ -166,10 +170,25 @@ MaterialID MaterialManager::NewMaterial(const String& name, bool supports_skinni
 	std::lock_guard guard(mInUse);
 
 	Material* material = GetNewMaterial();
+
+	if (material == nullptr) {
+		LogError(LC_CORE, "Out of materials, all {} are in use", FX_MAX_BOUND_MATERIALS);
+		return MaterialID::scNull;
+	}
+
 	material->Name = name.Str();
 	material->SetSupportsSkinning(supports_skinning);
 
 	return material->ID;
+}
+
+MaterialID MaterialManager::NewMaterial(const String& name, bool supports_skinning)
+{
+	const MaterialID id = TryNewMaterial(name, supports_skinning);
+
+	AssertMsg(!id.IsNull(), "Out of materials");
+
+	return id;
 }
 
 void MaterialManager::DestroyMaterial(const MaterialID& id)

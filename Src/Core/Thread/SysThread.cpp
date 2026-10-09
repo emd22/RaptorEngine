@@ -51,7 +51,16 @@ void SysThreadImpl_PThread::Create(ThreadFunc thread_func)
 
 	pEntryFunction = std::move(thread_func);
 
-	const int result = pthread_create(&InternalThread, nullptr, &SysThreadImpl_PThread::InternalEntrypoint, this);
+	pthread_attr_t attributes;
+	pthread_attr_init(&attributes);
+
+	if (StackSize > 0) {
+		pthread_attr_setstacksize(&attributes, StackSize);
+	}
+
+	const int result = pthread_create(&InternalThread, &attributes, &SysThreadImpl_PThread::InternalEntrypoint, this);
+	pthread_attr_destroy(&attributes);
+
 	AssertMsg(result == 0, "Internal thread create failed");
 
 	bIsRunning = true;
@@ -143,7 +152,7 @@ void SysThreadImpl_Windows::Create(ThreadFunc func)
 	assert(!bIsRunning && "SysThreadImpl_Windows::Create called on an already-running thread");
 
 	pEntryFunction = func;
-	InternalThread = CreateThread(nullptr, 0, &SysThreadImpl_Windows::InternalEntrypoint, this, 0, &InternalID);
+	InternalThread = CreateThread(nullptr, StackSize, &SysThreadImpl_Windows::InternalEntrypoint, this, 0, &InternalID);
 
 	assert(InternalThread != nullptr && "CreateThread failed");
 

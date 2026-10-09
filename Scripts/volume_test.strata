@@ -1,0 +1,23 @@
+import ./interop;
+
+OBJECT OBJECT_NULL;
+OBJECT object_to_modify;
+
+
+void object_trigger_enter(OBJECT trig)
+{
+	if (object_to_modify == OBJECT_NULL) {
+		object_to_modify = object_find("22");
+	}
+
+	object_to_modify.move_by(float3(0.0f, 1.0f, 0.0f));
+}
+
+void object_trigger_exit(OBJECT trig)
+{
+	if (object_to_modify == OBJECT_NULL) {
+		object_to_modify = object_find("22");
+	}
+
+	object_to_modify.move_by(float3(0.0f, -1.0f, 0.0f));
+}

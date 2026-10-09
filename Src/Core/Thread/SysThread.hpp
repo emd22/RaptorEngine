@@ -52,6 +52,8 @@ public:
 	/// The created ID for the thread.
 	ThreadID ID = 0;
 
+	size_t StackSize = 0;
+
 	ThreadFunc pEntryFunction = nullptr;
 	bool bIsRunning = false;
 };

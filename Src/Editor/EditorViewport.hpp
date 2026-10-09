@@ -3,7 +3,9 @@
 #include <wx/window.h>
 
 #include <Core/Defines.hpp>
+#include <Core/Types.hpp>
 #include <Math/Vec2.hpp>
+#include <atomic>
 
 #if defined(FX_PLATFORM_MACOS)
 #include <vulkan/vulkan.h>
@@ -19,9 +21,6 @@
 
 namespace fx::editor {
 
-/**
- * @brief The panel the engine renders into
- */
 class EditorViewport : public wxWindow
 {
 public:
@@ -32,11 +31,13 @@ public:
 #endif
 
 	void SetRelativeMouseMode(bool enabled);
+
 	void PollRelativeMouse();
 
-	/**
-	 * @brief Returns true once if the viewport has changed size.
-	 */
+	Vec2u GetCachedSize() const { return Vec2u(mCachedWidth.load(), mCachedHeight.load()); }
+
+	void UpdateCachedSize();
+
 	bool ConsumeResize();
 
 private:
@@ -56,8 +57,14 @@ private:
 
 	wxPoint mLastMousePos = wxDefaultPosition;
 
+	wxPoint mSavedMousePos = wxDefaultPosition;
+
+	std::atomic<uint32> mCachedWidth = 1;
+	std::atomic<uint32> mCachedHeight = 1;
+
+	std::atomic<bool> mbResizePending = false;
+
 	bool mbRelativeMouse = false;
-	bool mbResizePending = false;
 };
 
 } // namespace fx::editor

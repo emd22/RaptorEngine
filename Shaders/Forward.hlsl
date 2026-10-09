@@ -105,7 +105,7 @@ PERMELSE();
 PERMEND();
 
     // The handedness rides along untouched; the pixel shader rebuilds the bitangent from it
-    output.vTangentWS = float4(normalize(tangent_ws), input.vTangent.w);
+    output.vTangentWS = float4(tangent_ws * rsqrt(max(dot(tangent_ws, tangent_ws), 1e-12)), input.vTangent.w);
 PERMEND();
 
     output.vUV = input.vUV;
@@ -197,6 +197,7 @@ F_Texture2D(tDecalAtlas, 11, 0)
 F_Texture2D(tDecalNormalAtlas, 12, 0)
 
 F_Texture2D(tAlbedo, 0, 1)
+F_Texture2D(tEmissive, 5, 1)
 
 PERMIF(USE_NORMAL_MAPS);
 F_Texture2D(tNormalMap, 1, 1)
@@ -491,7 +492,7 @@ PERMEND();
 
 PERMNOT(USE_PREPASS_DEPTH);
 	// With the prepass, its discard leaves the depth of whatever is behind, which fails the EQUAL test here
-    if (base_alpha < ALPHA_CUTOFF) {
+    if (base_alpha < GetAlphaCutoff(material)) {
         discard;
     }
 PERMEND();
@@ -499,6 +500,8 @@ PERMEND();
     output.vAlbedo = float4(albedo, base_alpha);
 
 PERMNOT(UNLIT);
+    const float3 emissive = F_Sample(tEmissive, input.vUV).rgb * material.vEmissiveFactor;
+
 PERMIF(USE_NORMAL_MAPS);
     float4 surface_sample = F_Sample(tORM, input.vUV);
     float3 normal_ts = F_Sample(tNormalMap, input.vUV).rgb * 2.0 - 1.0;
@@ -700,9 +703,9 @@ PERMIF(PROBE_CAPTURE);
 		select(HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_BOUNCE), capture_ambient + ambient, capture_ambient);
 	const float3 lp_ambient = select(HAS_FLAG(FSConst.Flags, DRAW_FLAG_REFLECTION_CAPTURE), ambient, bounce_ambient);
 
-	output.vAlbedo = float4((accumulated_light + lp_ambient) * FSConst.fPreExposure, 1.0f);
+	output.vAlbedo = float4(((accumulated_light + lp_ambient) * FSConst.fPreExposure) + emissive, 1.0f);
 PERMELSE();
-	output.vAlbedo = float4((accumulated_light + ambient) * FSConst.fPreExposure, base_alpha);
+	output.vAlbedo = float4(((accumulated_light + ambient) * FSConst.fPreExposure) + emissive, base_alpha);
 PERMEND();
 
 PERMIF(DEBUG_VIEWS);

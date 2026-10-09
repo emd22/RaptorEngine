@@ -33,38 +33,83 @@ void ObjectScriptManager::BindFunctions(Entry& entry)
 	entry.pFnTriggerExit = entry.pScript->GetFunction<void(Object*)>("object_trigger_exit");
 }
 
-void ObjectScriptManager::LeaveTrigger(Entry& entry, Object* object)
+Vec3f ObjectScriptManager::GetCrossingDirection(const Entry& entry, const Vec3f point)
+{
+	static constexpr float32 scMinCrossingDistance = 1e-4f;
+
+	if (!entry.bHasLastPoint) {
+		return Vec3f::sZero;
+	}
+
+	const Vec3f movement = point - entry.LastPoint;
+
+	if (movement.Length() < scMinCrossingDistance) {
+		return Vec3f::sZero;
+	}
+
+	return movement.Normalize();
+}
+
+void ObjectScriptManager::LeaveTrigger(Entry& entry, Object* object, const Vec3f direction)
 {
 	if (!entry.bTriggerInside) {
 		return;
 	}
 
 	entry.bTriggerInside = false;
+	entry.ExitDirection = direction;
 
 	if (entry.pFnTriggerExit != nullptr) {
 		entry.pScript->CallFunctionPtr<void(Object*)>(entry.pFnTriggerExit, object);
 	}
 }
 
+bool ObjectScriptManager::PassesEnterGate(const Entry& entry, Object* object, const Vec3f direction) const
+{
+	Vec3f local_direction;
+
+	if (!TryGetRequiredEnterDirection(entry.ID, local_direction)) {
+		return true;
+	}
+
+	if (direction.IsZero()) {
+		return false;
+	}
+
+	const Vec4f world = object->GetWorldMatrix() * Vec4f(local_direction.X, local_direction.Y, local_direction.Z, 0.0f);
+
+	return direction.Dot(Vec3f(world.X, world.Y, world.Z)) > 0.0f;
+}
+
 void ObjectScriptManager::UpdateTrigger(Entry& entry, Object* object, const Vec3f point)
 {
 	if (!object->IsTrigger() || gWorld->pBlockout == nullptr) {
+		entry.bWasInside = false;
 		LeaveTrigger(entry, object);
 		return;
 	}
 
 	const bool inside = gWorld->pBlockout->ContainsPoint(object, point);
 
-	if (inside == entry.bTriggerInside) {
+	if (inside == entry.bWasInside) {
 		return;
 	}
 
+	entry.bWasInside = inside;
+
+	const Vec3f direction = GetCrossingDirection(entry, point);
+
 	if (!inside) {
-		LeaveTrigger(entry, object);
+		LeaveTrigger(entry, object, direction);
+		return;
+	}
+
+	if (!PassesEnterGate(entry, object, direction)) {
 		return;
 	}
 
 	entry.bTriggerInside = true;
+	entry.EnterDirection = direction;
 
 	if (entry.pFnTriggerEnter != nullptr) {
 		entry.pScript->CallFunctionPtr<void(Object*)>(entry.pFnTriggerEnter, object);
@@ -157,6 +202,60 @@ const String& ObjectScriptManager::GetPath(ObjectID id) const
 	return (entry != nullptr) ? entry->Path : scNoPath;
 }
 
+Vec3f ObjectScriptManager::GetEnterDirection(ObjectID id) const
+{
+	const Entry* entry = FindEntry(id);
+
+	return (entry != nullptr) ? entry->EnterDirection : Vec3f::sZero;
+}
+
+Vec3f ObjectScriptManager::GetExitDirection(ObjectID id) const
+{
+	const Entry* entry = FindEntry(id);
+
+	return (entry != nullptr) ? entry->ExitDirection : Vec3f::sZero;
+}
+
+void ObjectScriptManager::SetRequiredEnterDirection(ObjectID id, const Vec3f local_direction)
+{
+	static constexpr float32 scMinDirectionLength = 1e-4f;
+
+	const bool has_direction = local_direction.Length() > scMinDirectionLength;
+
+	for (size_t i = 0; i < mEnterGates.size(); ++i) {
+		if (mEnterGates[i].ID.GetID() != id.GetID()) {
+			continue;
+		}
+
+		if (has_direction) {
+			mEnterGates[i].LocalDirection = local_direction.Normalize();
+		}
+		else {
+			mEnterGates.erase(mEnterGates.begin() + i);
+		}
+
+		return;
+	}
+
+	if (has_direction) {
+		mEnterGates.push_back(EnterGate { .ID = id, .LocalDirection = local_direction.Normalize() });
+	}
+}
+
+bool ObjectScriptManager::TryGetRequiredEnterDirection(ObjectID id, Vec3f& out_local_direction) const
+{
+	for (const EnterGate& gate : mEnterGates) {
+		if (gate.ID.GetID() == id.GetID()) {
+			out_local_direction = gate.LocalDirection;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void ObjectScriptManager::ClearRequiredEnterDirection(ObjectID id) { SetRequiredEnterDirection(id, Vec3f::sZero); }
+
 void ObjectScriptManager::Update(float32 delta_time, const Vec3f trigger_point)
 {
 	for (size_t i = 0; i < mEntries.size(); ++i) {
@@ -182,6 +281,9 @@ void ObjectScriptManager::Update(float32 delta_time, const Vec3f trigger_point)
 
 		UpdateTrigger(entry, object, trigger_point);
 
+		entry.LastPoint = trigger_point;
+		entry.bHasLastPoint = true;
+
 		if (entry.pFnUpdate != nullptr) {
 			entry.pScript->CallFunctionPtr<void(Object*, float32)>(entry.pFnUpdate, object, delta_time);
 		}
@@ -198,6 +300,8 @@ void ObjectScriptManager::Stop()
 		}
 
 		entry.bStarted = false;
+		entry.bHasLastPoint = false;
+		entry.bWasInside = false;
 
 		Object* object = gObjectManager->GetObject(entry.ID);
 
@@ -218,7 +322,9 @@ void ObjectScriptManager::OnScriptsReloaded()
 {
 	for (Entry& entry : mEntries) {
 		entry.bStarted = false;
+		entry.bWasInside = false;
 		entry.bTriggerInside = false;
+		entry.bHasLastPoint = false;
 
 		if (entry.pScript != nullptr) {
 			BindFunctions(entry);
@@ -233,6 +339,7 @@ void ObjectScriptManager::Clear()
 	}
 
 	mEntries.clear();
+	mEnterGates.clear();
 }
 
 } // namespace fx

@@ -28,26 +28,37 @@ FX_FORCE_INLINE void WriteOrZeroVec(TType* dst, const SizedArray<TVecType>& src,
 	memset(dst, 0, size);
 }
 
+static eVertexType ChooseVertexType(bool has_default_data, bool has_skinning, eVertexCreateFlags create_flags)
+{
+	eVertexType type = eVertexType::Slim;
+
+	if (has_default_data || (create_flags & eVertexCreateFlags::DefaultLayout) != 0) {
+		type = eVertexType::Default;
+	}
+
+	if (has_skinning) {
+		type = eVertexType::Skinned;
+	}
+
+	return type;
+}
+
 void VertexList::CreateFrom(const SizedArray<Vec3f>& positions, const SizedArray<Vec3f>& normals,
 							const SizedArray<Vec2f>& uvs, const SizedArray<Vec3f>& tangents,
 							const SizedArray<Vec4f>& bone_weights, const SizedArray<Vec4u>& bone_ids,
-							eVertexCreateFlags create_flags,
-							const SizedArray<float32>& tangent_handedness)
+							eVertexCreateFlags create_flags, const SizedArray<float32>& tangent_handedness)
 {
 	Assert(mLocalBuffer.IsEmpty());
 
-	VertexType = eVertexType::Slim;
+	const uint64 vertex_count = positions.Size;
 
-	// Assume default vertex is requested if there are non-null values passed in for the additional components
-	if (normals.IsInited() || uvs.IsInited() || tangents.IsInited()) {
-		VertexType = eVertexType::Default;
-	}
+	const bool has_normals = normals.Size >= vertex_count;
+	const bool has_uvs = uvs.Size >= vertex_count;
+	const bool has_tangents = tangents.Size >= vertex_count;
+	const bool has_handedness = tangent_handedness.Size >= vertex_count;
+	const bool has_skinning = bone_weights.Size >= vertex_count && bone_ids.Size >= vertex_count;
 
-	// Only switch to the skinned vertex if there is animation data passed in. Otherwise, the caller should fallback to
-	// the default vertex pipelines.
-	if (bone_weights.IsNotEmpty() && bone_ids.IsNotEmpty()) {
-		VertexType = eVertexType::Skinned;
-	}
+	VertexType = ChooseVertexType(has_normals || has_uvs || has_tangents, has_skinning, create_flags);
 
 	const uint32 vertex_size = VertexUtil::GetSize(VertexType);
 
@@ -55,34 +66,35 @@ void VertexList::CreateFrom(const SizedArray<Vec3f>& positions, const SizedArray
 
 	const bool supports_default = (VertexType != eVertexType::Slim);
 	const bool supports_skinning = (VertexType == eVertexType::Skinned);
+	const bool negate_x = (create_flags & eVertexCreateFlags::NegativeX) != 0;
 
-	bContainsNormals = normals.IsNotEmpty();
-	bContainsUVs = uvs.IsNotEmpty();
-	bContainsTangents = tangents.IsNotEmpty();
-
-	const bool has_handedness = tangent_handedness.IsNotEmpty();
+	bContainsNormals = has_normals;
+	bContainsUVs = has_uvs;
+	bContainsTangents = has_tangents;
 
 	for (uint64 vertex_index = 0; vertex_index < mLocalBuffer.Capacity; vertex_index++) {
 		Vertex<VertexLargestType> vertex;
 
 		memcpy(vertex.Position, &positions[vertex_index].mData, sizeof(vertex.Position));
 
-		if ((create_flags & eVertexCreateFlags::NegativeX) != 0) {
+		if (negate_x) {
 			vertex.Position[0] = -vertex.Position[0];
 		}
 
-		// Write the components for a default vertex if the type supports it
 		if (supports_default) {
-			WriteOrZeroVec<float32, Vec3f, 3>(vertex.Normal, normals, vertex_index, bContainsNormals);
-			WriteOrZeroVec<float32, Vec2f, 2>(vertex.UV, uvs, vertex_index, bContainsUVs);
-			WriteOrZeroVec<float32, Vec3f, 3>(vertex.Tangent, tangents, vertex_index, bContainsTangents);
+			WriteOrZeroVec<float32, Vec3f, 3>(vertex.Normal, normals, vertex_index, has_normals);
+			WriteOrZeroVec<float32, Vec2f, 2>(vertex.UV, uvs, vertex_index, has_uvs);
+			WriteOrZeroVec<float32, Vec3f, 3>(vertex.Tangent, tangents, vertex_index, has_tangents);
 
 			vertex.Tangent[3] = has_handedness ? tangent_handedness[vertex_index] : 1.0f;
 
-			if (supports_skinning) {
-				// To support skinned vertices, we enforce that there is data available above; this means we dont need
-				// to check in WriteOrZero.
+			if (negate_x) {
+				vertex.Normal[0] = -vertex.Normal[0];
+				vertex.Tangent[0] = -vertex.Tangent[0];
+				vertex.Tangent[3] = -vertex.Tangent[3];
+			}
 
+			if (supports_skinning) {
 				WriteOrZeroVec<uint32, Vec4u, 4>(vertex.BoneIds, bone_ids, vertex_index, true);
 				WriteOrZeroVec<float32, Vec4f, 4>(vertex.BoneWeights, bone_weights, vertex_index, true);
 			}
@@ -101,63 +113,53 @@ void VertexList::CreateFrom(const SizedArray<float32>& positions, const SizedArr
 	Assert(positions.Size > 0);
 	Assert(((positions.Size) % 3) == 0);
 
-	VertexType = eVertexType::Slim;
+	const uint32 amount_of_vertices = positions.Size / 3;
 
-	// Assume default vertex is requested if there are non-null values passed in for the additional components
-	if (normals.IsInited() || uvs.IsInited() || tangents.IsInited()) {
-		VertexType = eVertexType::Default;
-	}
+	const bool has_normals = normals.Size >= static_cast<uint64>(amount_of_vertices) * 3;
+	const bool has_uvs = uvs.Size >= static_cast<uint64>(amount_of_vertices) * 2;
+	const bool has_tangents = tangents.Size >= static_cast<uint64>(amount_of_vertices) * 4;
+	const bool has_skinning = bone_weights.Size >= static_cast<uint64>(amount_of_vertices) * 4 &&
+							  bone_ids.Size >= static_cast<uint64>(amount_of_vertices) * 4;
 
-	// Only switch to the skinned vertex if there is animation data passed in. Otherwise, the caller should fallback to
-	// the default vertex pipelines.
-	if (bone_weights.IsNotEmpty() && bone_ids.IsNotEmpty()) {
-		VertexType = eVertexType::Skinned;
-	}
+	VertexType = ChooseVertexType(has_normals || has_uvs || has_tangents, has_skinning, create_flags);
 
 	const uint32 vertex_size = VertexUtil::GetSize(VertexType);
-	const uint32 amount_of_vertices = positions.Size / 3;
 
 	mLocalBuffer.Create(vertex_size, amount_of_vertices);
 
 	const bool supports_default = (VertexType != eVertexType::Slim);
 	const bool supports_skinning = (VertexType == eVertexType::Skinned);
+	const bool negate_x = (create_flags & eVertexCreateFlags::NegativeX) != 0;
 
-	bContainsNormals = normals.IsNotEmpty();
-	bContainsUVs = uvs.IsNotEmpty();
-	bContainsTangents = tangents.IsNotEmpty();
+	bContainsNormals = has_normals;
+	bContainsUVs = has_uvs;
+	bContainsTangents = has_tangents;
 
 	for (uint64 vertex_index = 0; vertex_index < mLocalBuffer.Capacity; vertex_index++) {
 		Vertex<VertexLargestType> vertex;
 
 		memcpy(vertex.Position, &positions[vertex_index * 3], sizeof(vertex.Position));
 
-		if ((create_flags & eVertexCreateFlags::NegativeX) != 0) {
+		if (negate_x) {
 			vertex.Position[0] = -vertex.Position[0];
 		}
 
-		// Write the components for a default vertex if the type supports it
 		if (supports_default) {
-			WriteOrZero<float32, 3>(vertex.Normal, normals, vertex_index, bContainsNormals);
-			WriteOrZero<float32, 2>(vertex.UV, uvs, vertex_index, bContainsUVs);
+			WriteOrZero<float32, 3>(vertex.Normal, normals, vertex_index, has_normals);
+			WriteOrZero<float32, 2>(vertex.UV, uvs, vertex_index, has_uvs);
+			WriteOrZero<float32, 4>(vertex.Tangent, tangents, vertex_index, has_tangents);
 
-			WriteOrZero<float32, 4>(vertex.Tangent, tangents, vertex_index, bContainsTangents);
-
-			if (!bContainsTangents) {
+			if (!has_tangents) {
 				vertex.Tangent[3] = 1.0f;
 			}
 
-			if ((create_flags & eVertexCreateFlags::NegativeX) != 0) {
+			if (negate_x) {
 				vertex.Normal[0] = -vertex.Normal[0];
 				vertex.Tangent[0] = -vertex.Tangent[0];
-
-				// Negating X mirrors the basis, which flips the handedness the bitangent is built with
 				vertex.Tangent[3] = -vertex.Tangent[3];
 			}
 
-
 			if (supports_skinning) {
-				// To support skinned vertices, we enforce that there is data available above; this means we dont need
-				// to check in WriteOrZero.
 				WriteOrZero<uint32, 4>(vertex.BoneIds, bone_ids, vertex_index, true);
 				WriteOrZero<float32, 4>(vertex.BoneWeights, bone_weights, vertex_index, true);
 			}

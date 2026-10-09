@@ -190,6 +190,7 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeIcoSphere(int resolution)
 	}
 
 	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
+	mesh->Normals.InitAsCopyOf(positions);
 	mesh->Positions = std::move(positions);
 	mesh->Indices = std::move(indices);
 

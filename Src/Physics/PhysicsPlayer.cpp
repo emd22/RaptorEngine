@@ -23,6 +23,18 @@ static constexpr float32 scMaxSlopeAngle = MathUtil::DegreesToRadians(45.0f);
 
 using namespace JPH;
 
+static float32 ReadOptionalFloat(const ConfigFile& file, Hash32 name, float32 fallback)
+{
+	const ConfigEntry* entry = file.GetEntry(name);
+
+	return entry != nullptr ? entry->Get<float32>() : fallback;
+}
+
+static JPH::ObjectLayer CollisionLayerFor(bool collision_enabled)
+{
+	return collision_enabled ? PhLayer::Dynamic : PhLayer::Deactivated;
+}
+
 void PhysicsPlayer::Create()
 {
 	ConfigFile player_config;
@@ -30,11 +42,22 @@ void PhysicsPlayer::Create()
 
 	const float32 collider_radius = player_config.GetEntry(HashStr32("ColliderRadius"))->Get<float32>();
 
+	StepHeight = ReadOptionalFloat(player_config, HashStr32("StepHeight"), scDefaultStepHeight);
+
+	const float32 jump_height = ReadOptionalFloat(player_config, HashStr32("JumpHeight"), scDefaultJumpHeight);
+	const float32 gravity = (gPhysics->pBackend->PhysicsSystem.GetGravity() * scGravityScale).Length();
+
+	JumpSpeed = ReadOptionalFloat(player_config, HashStr32("JumpSpeed"), std::sqrt(2.0f * gravity * jump_height));
+
+	CoyoteTime = ReadOptionalFloat(player_config, HashStr32("CoyoteTime"), scDefaultCoyoteTime);
+
 	JPH::Ref<CharacterVirtualSettings> settings = new CharacterVirtualSettings;
 
-	pPhysicsShape = RotatedTranslatedShapeSettings(Vec3(0, 0.5f * scStandingHeight + collider_radius, 0),
+	const float32 cylinder_length = std::max(scStandingHeight - 2.0f * collider_radius, 0.01f);
+
+	pPhysicsShape = RotatedTranslatedShapeSettings(Vec3(0, 0.5f * cylinder_length + collider_radius, 0),
 												   JPH::Quat::sIdentity(),
-												   new CapsuleShape(0.5f * scStandingHeight, collider_radius))
+												   new CapsuleShape(0.5f * cylinder_length, collider_radius))
 						.Create()
 						.Get();
 
@@ -59,13 +82,32 @@ void PhysicsPlayer::Teleport(const Vec3f position)
 	position.ToJoltVec3(jolt_position);
 
 	pPlayerVirt->SetPosition(jolt_position);
+	pPlayerVirt->SetLinearVelocity(Vec3::sZero());
+	mMovementVector = Vec3::sZero();
+
+	mbJumpPending = false;
+	mbJumpConsumed = false;
+	mTimeSinceGrounded = CoyoteTime + 1.0f;
+
+	PhysicsSystem& phys = gPhysics->pBackend->PhysicsSystem;
+	const JPH::ObjectLayer collision_layer = CollisionLayerFor(bCollisionEnabled);
+
+	pPlayerVirt->RefreshContacts(phys.GetDefaultBroadPhaseLayerFilter(collision_layer),
+								 phys.GetDefaultLayerFilter(collision_layer), {}, {},
+								 *gPhysics->pBackend->pTempAllocator);
 }
 
 void PhysicsPlayer::SetCollisionEnabled(bool value)
 {
 	bCollisionEnabled = value;
 
-	gPhysics->pBackend->GetBodyInterface().SetObjectLayer(pPlayerVirt->GetInnerBodyID(), PhLayer::Deactivated);
+	const JPH::BodyID inner_body_id = pPlayerVirt->GetInnerBodyID();
+
+	if (inner_body_id.IsInvalid()) {
+		return;
+	}
+
+	gPhysics->pBackend->GetBodyInterface().SetObjectLayer(inner_body_id, CollisionLayerFor(value));
 }
 
 void PhysicsPlayer::ApplyMovement(const Vec3f direction)
@@ -104,15 +146,18 @@ void PhysicsPlayer::Update(float64 delta_time)
 
 	PhysicsSystem& phys = gPhysics->pBackend->PhysicsSystem;
 
-	Vec3 gravity = (phys.GetGravity() * 1.5f * delta_time);
+	const Vec3 gravity = phys.GetGravity() * scGravityScale;
 
 	// Apply gravity
 	Vec3 velocity = Vec3::sZero();
 
-	if (pPlayerVirt->GetGroundState() == CharacterVirtual::EGroundState::OnGround) {
-		velocity = Vec3::sZero();
+	const bool on_ground = pPlayerVirt->GetGroundState() == CharacterVirtual::EGroundState::OnGround;
 
-		bIsGrounded = true;
+	if (on_ground) {
+		velocity = pPlayerVirt->GetGroundVelocity();
+
+		mTimeSinceGrounded = 0.0f;
+		mbJumpConsumed = false;
 	}
 	else {
 		velocity = pPlayerVirt->GetLinearVelocity() * pPlayerVirt->GetUp();
@@ -120,25 +165,32 @@ void PhysicsPlayer::Update(float64 delta_time)
 			velocity.SetY(0);
 		}
 		else {
-			velocity += gravity;
+			velocity += gravity * static_cast<float32>(delta_time);
 		}
 
-		bIsGrounded = false;
+		mTimeSinceGrounded += static_cast<float32>(delta_time);
+	}
+
+	bIsGrounded = on_ground;
+
+	if (mbJumpPending) {
+		mbJumpPending = false;
+		mbJumpConsumed = true;
+
+		const float32 base_velocity = on_ground ? velocity.GetY() : 0.0f;
+		velocity.SetY(base_velocity + JumpSpeed);
 	}
 
 	velocity += mMovementVector;
 
 	pPlayerVirt->SetLinearVelocity(velocity);
 
-	JPH::ObjectLayer collision_layer = PhLayer::Dynamic;
-	if (bCollisionEnabled == false) {
-		collision_layer = PhLayer::Deactivated;
-	}
+	const JPH::ObjectLayer collision_layer = CollisionLayerFor(bCollisionEnabled);
 
 	// Move character
 	CharacterVirtual::ExtendedUpdateSettings update_settings {
-		.mStickToFloorStepDown = JPH::Vec3(0.0f, -0.01f, 0.0f),
-		.mWalkStairsStepUp = Vec3(0, 1, 0),
+		.mStickToFloorStepDown = JPH::Vec3(0.0f, -scStickToFloorDistance, 0.0f),
+		.mWalkStairsStepUp = Vec3(0.0f, StepHeight, 0.0f),
 		.mWalkStairsMinStepForward = 0.02f,
 		.mWalkStairsStepForwardTest = 0.1f,
 

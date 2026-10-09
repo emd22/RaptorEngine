@@ -7,7 +7,10 @@ namespace fx {
 
 void Terminate()
 {
-	gAssetManager->GetInstance()->Shutdown();
+	if (gAssetManager != nullptr) {
+		gAssetManager->Abort();
+	}
+
 	FX_BREAKPOINT;
 	std::terminate();
 }

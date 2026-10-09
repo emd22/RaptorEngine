@@ -1,11 +1,14 @@
 #pragma once
 
+#include "EditorPanelState.hpp"
+
 #include <wx/panel.h>
 #include <wx/string.h>
 
 #include <Core/StackArray.hpp>
-#include <Material/MaterialLibrary.hpp>
 #include <Object/Object.hpp>
+#include <string>
+#include <vector>
 
 class wxCheckBox;
 class wxChoice;
@@ -33,21 +36,17 @@ public:
 public:
 	explicit ObjectPropertiesPanel(wxWindow* parent);
 
-	/**
-	 * @brief Show a really basic properties panel for a selected blockout object. Should expand this to normal objects
-	 * as well, but I need to add better object picking.
-	 */
-	void ShowObject(Object* object);
+	void ApplyState(const ObjectPanelState& state, const MaterialLibraryState& materials);
 
 private:
 	void BindRows(StackArray<FlagRow, scMaxRows>& rows, bool is_tag);
 	void OnRowToggled(bool is_tag, uint32 bit, bool checked);
-	void SetRows(StackArray<FlagRow, scMaxRows>& rows, uint32 value, Object* object, bool is_tag);
+	void SetRows(StackArray<FlagRow, scMaxRows>& rows, uint32 value, uint32 editable, bool has_object);
 	void OnMaterialChoice(wxCommandEvent& event);
-	void RefreshMaterialChoices();
+	void RefreshMaterialChoices(const MaterialLibraryState& materials);
 	void CommitScript();
 	void BrowseScript();
-	void RefreshScript(Object* object);
+	void OnEnterDirectionChoice(wxCommandEvent& event);
 
 private:
 	wxStaticText* mpNameLabel = nullptr;
@@ -56,24 +55,18 @@ private:
 	wxButton* mpScriptBrowse = nullptr;
 	wxButton* mpScriptClear = nullptr;
 	wxStaticText* mpScriptStatus = nullptr;
+	wxChoice* mpEnterDirChoice = nullptr;
 
 	StackArray<FlagRow, scMaxRows> mTagRows;
 	StackArray<FlagRow, scMaxRows> mFlagRows;
 
-	// What is currently shown, to skip redundant updates
-	Object* mpShownObject = nullptr;
-	wxString mShownName;
-	uint32 mShownTags = 0;
-	uint32 mShownFlags = 0;
+	std::vector<std::string> mShownMaterialNames;
+	std::string mShownScript;
 
-	MaterialLibraryID mShownMaterialSlot = MaterialLibraryID::scNull;
-	uint32 mShownMaterialCount = 0;
-	wxString mShownScript;
+	bool mbHasObject = false;
+	bool mbCanAttachScript = false;
+	bool mbIsTrigger = false;
 	bool mbShownScriptErrors = false;
-
-	// Show Anything ...is a real bool
-	bool mbShowingAnything = true;
-	bool mbRowsStale = false;
 };
 
 } // namespace fx::editor

@@ -29,7 +29,6 @@ namespace fx::weapon {
 using namespace renderer;
 
 static constexpr const char* scWeaponDirectory = "RaptorData/Data/Weapons";
-static constexpr float32 scSprintSpeed = 5.0f;
 static constexpr float32 scWoundSize = 0.22f;
 
 namespace {
@@ -445,10 +444,6 @@ void WeaponSystem::Update(float32 delta_time)
 	Weapon& weapon = mWeapons[mActive];
 
 	if (weapon.pFnUpdate != nullptr) {
-		const JPH::Vec3 velocity = mpPlayer->Physics.pPlayerVirt->GetLinearVelocity();
-		const float32 horizontal_speed = std::sqrt(velocity.GetX() * velocity.GetX() +
-												   velocity.GetZ() * velocity.GetZ());
-
 		if ((mScriptInput.InputFlags & eWeaponInputFlags::FireHeld) != 0 && mbFireLatched) {
 			SetFlag(mScriptInput.InputFlags, eWeaponInputFlags::FireHeld);
 		}
@@ -460,7 +455,7 @@ void WeaponSystem::Update(float32 delta_time)
 			mScriptInput.InputFlags |= eWeaponInputFlags::Airborne;
 		}
 
-		mScriptInput.MoveAmount = std::clamp(horizontal_speed / scSprintSpeed, 0.0f, 1.0f);
+		mScriptInput.MoveAmount = std::clamp(mpPlayer->GetHorizontalSpeed() / Player::scSprintSpeed, 0.0f, 1.0f);
 
 		weapon.pScript->CallFunctionPtr<void(const ScriptDef*, ScriptState*, const ScriptInput*, float32)>(
 			weapon.pFnUpdate, &weapon.Def, &weapon.State, &mScriptInput, delta_time);

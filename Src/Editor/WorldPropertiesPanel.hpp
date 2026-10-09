@@ -1,5 +1,7 @@
 #pragma once
 
+#include "EditorPanelState.hpp"
+
 #include <wx/collpane.h>
 #include <wx/panel.h>
 #include <wx/string.h>
@@ -22,11 +24,11 @@ class WorldPropertiesPanel : public wxPanel
 public:
 	explicit WorldPropertiesPanel(wxWindow* parent);
 
-	void Update();
+	void ApplyState(const WorldPanelState& state);
 
 private:
 	void BuildReflectionPane(wxSizer* sizer);
-	void UpdateReflectionPane();
+	void ApplyReflectionState(const WorldPanelState& state);
 	void OnPaneChanged();
 
 private:

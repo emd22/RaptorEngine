@@ -67,18 +67,30 @@ void Body::CreatePrimitiveBody(ePrimitiveType primitive_type, const Vec3f dimens
 void Body::CreateMeshBody(const PrimitiveMesh& mesh, physics::eMotionType motion_type,
 						  const BodyProps& object_properties)
 {
+	if (mesh.VertexList.GetLocalBuffer().IsEmpty() || mesh.LocalIndexBuffer.IsEmpty()) {
+		LogError(LC_PHYSICS, "Cannot create a mesh collider without the cpu-side mesh data, set `bKeepInMemory`");
+		return;
+	}
+
+	if (motion_type == physics::eMotionType::Dynamic) {
+		LogWarning(LC_PHYSICS, "Mesh colliders cannot be dynamic, creating a static one");
+		motion_type = physics::eMotionType::Static;
+	}
+
 	mMotionType = motion_type;
 
 	PhMesh physics_mesh(mesh);
 
 	JPH::MeshShapeSettings mesh_settings = physics_mesh.GetShapeSettings();
 
-
 	JPH::ShapeSettings::ShapeResult mesh_shape_result = mesh_settings.Create();
-	JPH::ShapeRefC box_shape = mesh_shape_result.Get();
 
+	if (mesh_shape_result.HasError()) {
+		LogError(LC_PHYSICS, "Failed to create mesh collider: {}", mesh_shape_result.GetError().c_str());
+		return;
+	}
 
-	CreateJoltBody(box_shape, physics::Body::eFlags::None, motion_type, object_properties);
+	CreateJoltBody(mesh_shape_result.Get(), physics::Body::eFlags::None, motion_type, object_properties);
 }
 
 void Body::CreateConvexHullBody(const SizedArray<Vec3f>& points, physics::eMotionType motion_type,

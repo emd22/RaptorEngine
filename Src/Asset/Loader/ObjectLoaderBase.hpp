@@ -23,6 +23,8 @@ public:
 
 	virtual void CreateGpuResource(AssetTicket& ticket) = 0;
 
+	virtual void Publish(Object* root) {}
+
 	virtual void Destroy() = 0;
 	virtual ~ObjectLoaderBase() = default;
 

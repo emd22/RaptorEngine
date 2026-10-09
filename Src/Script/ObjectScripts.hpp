@@ -30,8 +30,19 @@ public:
 		FnStop pFnStop = nullptr;
 		FnTrigger pFnTriggerEnter = nullptr;
 		FnTrigger pFnTriggerExit = nullptr;
+		Vec3f LastPoint = Vec3f::sZero;
+		Vec3f EnterDirection = Vec3f::sZero;
+		Vec3f ExitDirection = Vec3f::sZero;
+		bool bHasLastPoint = false;
 		bool bStarted = false;
+		bool bWasInside = false;
 		bool bTriggerInside = false;
+	};
+
+	struct EnterGate
+	{
+		ObjectID ID;
+		Vec3f LocalDirection = Vec3f::sZero;
 	};
 
 public:
@@ -45,6 +56,13 @@ public:
 	bool HasScript(ObjectID id) const;
 	bool HasErrors(ObjectID id) const;
 	const String& GetPath(ObjectID id) const;
+
+	Vec3f GetEnterDirection(ObjectID id) const;
+	Vec3f GetExitDirection(ObjectID id) const;
+
+	void SetRequiredEnterDirection(ObjectID id, const Vec3f local_direction);
+	bool TryGetRequiredEnterDirection(ObjectID id, Vec3f& out_local_direction) const;
+	void ClearRequiredEnterDirection(ObjectID id);
 
 	void Update(float32 delta_time, const Vec3f trigger_point);
 	void Stop();
@@ -60,12 +78,15 @@ private:
 	const Entry* FindEntry(ObjectID id) const;
 
 	static void BindFunctions(Entry& entry);
-	static void UpdateTrigger(Entry& entry, Object* object, const Vec3f point);
-	static void LeaveTrigger(Entry& entry, Object* object);
+	void UpdateTrigger(Entry& entry, Object* object, const Vec3f point);
+	bool PassesEnterGate(const Entry& entry, Object* object, const Vec3f direction) const;
+	static Vec3f GetCrossingDirection(const Entry& entry, const Vec3f point);
+	static void LeaveTrigger(Entry& entry, Object* object, const Vec3f direction = Vec3f::sZero);
 	static void FreeEntry(Entry& entry);
 
 private:
 	std::vector<Entry> mEntries;
+	std::vector<EnterGate> mEnterGates;
 };
 
 } // namespace fx

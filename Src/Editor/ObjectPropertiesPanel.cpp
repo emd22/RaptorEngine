@@ -2,6 +2,7 @@
 
 #include "EditOperation.hpp"
 #include "EditorFrame.hpp"
+#include "EditorThread.hpp"
 #include "RaptorEditor.hpp"
 
 #include <wx/button.h>
@@ -20,6 +21,48 @@
 #include <filesystem>
 
 namespace fx::editor {
+
+struct EnterDirectionChoice
+{
+	const char* pName;
+	float32 X;
+	float32 Y;
+	float32 Z;
+};
+
+static constexpr EnterDirectionChoice scEnterDirections[] = {
+	{ "Any", 0.0f, 0.0f, 0.0f },
+	{ "+X (right)", 1.0f, 0.0f, 0.0f },
+	{ "-X (left)", -1.0f, 0.0f, 0.0f },
+	{ "+Y (up)", 0.0f, 1.0f, 0.0f },
+	{ "-Y (down)", 0.0f, -1.0f, 0.0f },
+	{ "+Z (forward)", 0.0f, 0.0f, 1.0f },
+	{ "-Z (back)", 0.0f, 0.0f, -1.0f },
+};
+
+static constexpr int32 scNumEnterDirections = static_cast<int32>(std::size(scEnterDirections));
+static constexpr int32 scCustomEnterDirectionIndex = scNumEnterDirections;
+
+static int32 GetEnterDirectionIndex(const ObjectPanelState& state)
+{
+	static constexpr float32 scAxisMatchDot = 0.9999f;
+
+	if (!state.bHasEnterDirection) {
+		return 0;
+	}
+
+	for (int32 i = 1; i < scNumEnterDirections; i++) {
+		const EnterDirectionChoice& choice = scEnterDirections[i];
+		const float32 dot = choice.X * state.EnterDirection[0] + choice.Y * state.EnterDirection[1] +
+							choice.Z * state.EnterDirection[2];
+
+		if (dot > scAxisMatchDot) {
+			return i;
+		}
+	}
+
+	return scCustomEnterDirectionIndex;
+}
 
 struct FlagName
 {
@@ -128,6 +171,25 @@ ObjectPropertiesPanel::ObjectPropertiesPanel(wxWindow* parent) : wxPanel(parent,
 	mpScriptStatus = new wxStaticText(this, wxID_ANY, wxEmptyString);
 	sizer->Add(mpScriptStatus, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
 
+	wxBoxSizer* enter_direction_row = new wxBoxSizer(wxHORIZONTAL);
+	enter_direction_row->Add(new wxStaticText(this, wxID_ANY, "Enter direction"), wxSizerFlags().CenterVertical());
+
+	mpEnterDirChoice = new wxChoice(this, wxID_ANY);
+
+	for (const EnterDirectionChoice& choice : scEnterDirections) {
+		mpEnterDirChoice->Append(choice.pName);
+	}
+
+	mpEnterDirChoice->SetSelection(0);
+	mpEnterDirChoice->SetToolTip("Triggers only. When set, the trigger only fires if the player enters it moving along "
+								 "this direction in the brush's local space (within 90 degrees). Any fires from every "
+								 "side");
+	enter_direction_row->Add(mpEnterDirChoice, wxSizerFlags(1).Border(wxLEFT, 6));
+
+	sizer->Add(enter_direction_row, wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+
+	mpEnterDirChoice->Bind(wxEVT_CHOICE, &ObjectPropertiesPanel::OnEnterDirectionChoice, this);
+
 	mpScriptText->Bind(wxEVT_TEXT_ENTER, [this](wxCommandEvent&) { CommitScript(); });
 	mpScriptText->Bind(wxEVT_KILL_FOCUS,
 					   [this](wxFocusEvent& event)
@@ -151,7 +213,7 @@ ObjectPropertiesPanel::ObjectPropertiesPanel(wxWindow* parent) : wxPanel(parent,
 
 	SetSizer(sizer);
 
-	ShowObject(nullptr);
+	ApplyState(ObjectPanelState {}, MaterialLibraryState {});
 }
 
 void ObjectPropertiesPanel::BindRows(StackArray<FlagRow, scMaxRows>& rows, bool is_tag)
@@ -166,64 +228,94 @@ void ObjectPropertiesPanel::BindRows(StackArray<FlagRow, scMaxRows>& rows, bool 
 
 void ObjectPropertiesPanel::OnRowToggled(bool is_tag, uint32 bit, bool checked)
 {
-	if (mpShownObject == nullptr) {
+	if (!mbHasObject) {
 		return;
 	}
 
-	gEditor->SetSelectionObjectBit(is_tag, bit, checked);
-
-	mbRowsStale = true;
-	ShowObject(mpShownObject);
+	thread::PostToGame([is_tag, bit, checked] { gEditor->SetSelectionObjectBit(is_tag, bit, checked); });
 }
 
-void ObjectPropertiesPanel::SetRows(StackArray<FlagRow, scMaxRows>& rows, uint32 value, Object* object, bool is_tag)
+void ObjectPropertiesPanel::SetRows(StackArray<FlagRow, scMaxRows>& rows, uint32 value, uint32 editable,
+									bool has_object)
 {
 	for (FlagRow& row : rows) {
-		const bool can_edit = is_tag ? CanEditObjectTag(object, row.Bit) : CanEditObjectFlag(object, row.Bit);
+		const bool checked = has_object && (value & row.Bit) != 0;
+		const bool can_edit = has_object && (editable & row.Bit) != 0;
 
-		row.pCheckBox->SetValue(object != nullptr && (value & row.Bit) != 0);
-		row.pCheckBox->Enable(can_edit);
+		if (row.pCheckBox->GetValue() != checked) {
+			row.pCheckBox->SetValue(checked);
+		}
+
+		if (row.pCheckBox->IsEnabled() != can_edit) {
+			row.pCheckBox->Enable(can_edit);
+		}
 	}
 }
 
 void ObjectPropertiesPanel::OnMaterialChoice(wxCommandEvent& event)
 {
-	if (mpShownObject == nullptr || gWorld->pBlockout == nullptr) {
+	const int32 slot = mpMaterialChoice->GetSelection();
+
+	if (!mbHasObject || slot < 0) {
 		return;
 	}
 
-	const MaterialLibraryID slot = MaterialLibraryID(mpMaterialChoice->GetSelection());
-	if (!slot.IsValid() ||
-		static_cast<int32>(slot.ID) >= static_cast<int32>(gWorld->pBlockout->GetMaterialLibrary().GetCount())) {
-		return;
-	}
+	thread::PostToGame(
+		[slot]
+		{
+			if (gWorld->pBlockout == nullptr) {
+				return;
+			}
 
-	mShownMaterialSlot = slot;
+			const MaterialLibraryID library_slot = MaterialLibraryID(slot);
 
-	gEditor->SetStoredMaterial(mpShownObject, gWorld->pBlockout->GetMaterialForID(slot));
+			if (!library_slot.IsValid() || static_cast<int32>(library_slot.ID) >=
+											   static_cast<int32>(gWorld->pBlockout->GetMaterialLibrary().GetCount())) {
+				return;
+			}
+
+			const MaterialID material = gWorld->pBlockout->GetMaterialForID(library_slot);
+			const EditorSelection& selection = gEditor->GetSelection();
+
+			if (Object* last = selection.GetLast(); last != nullptr) {
+				gEditor->SetStoredMaterial(last, material);
+			}
+		});
 }
 
 void ObjectPropertiesPanel::CommitScript()
 {
-	if (mpShownObject == nullptr || !CanAttachScript(mpShownObject)) {
+	if (!mbHasObject || !mbCanAttachScript) {
 		return;
 	}
 
-	const String path(mpScriptText->GetValue().Trim().ToStdString());
+	const std::string path = mpScriptText->GetValue().Trim().ToStdString();
 
-	if (gObjectScripts->GetPath(mpShownObject->ID) == path) {
+	if (path == mShownScript) {
 		return;
 	}
 
-	gEditor->SetSelectionScript(path);
+	mShownScript = path;
 
-	mbRowsStale = true;
-	ShowObject(mpShownObject);
+	thread::PostToGame([path] { gEditor->SetSelectionScript(String(path)); });
+}
+
+void ObjectPropertiesPanel::OnEnterDirectionChoice(wxCommandEvent& event)
+{
+	const int32 selection = event.GetSelection();
+
+	if (!mbHasObject || !mbIsTrigger || selection < 0 || selection >= scNumEnterDirections) {
+		return;
+	}
+
+	const EnterDirectionChoice choice = scEnterDirections[selection];
+
+	thread::PostToGame([choice] { gEditor->SetSelectionEnterDirection(Vec3f(choice.X, choice.Y, choice.Z)); });
 }
 
 void ObjectPropertiesPanel::BrowseScript()
 {
-	if (mpShownObject == nullptr || !CanAttachScript(mpShownObject)) {
+	if (!mbHasObject || !mbCanAttachScript) {
 		return;
 	}
 
@@ -245,120 +337,99 @@ void ObjectPropertiesPanel::BrowseScript()
 	CommitScript();
 }
 
-void ObjectPropertiesPanel::RefreshScript(Object* object)
+void ObjectPropertiesPanel::RefreshMaterialChoices(const MaterialLibraryState& materials)
 {
-	const bool can_attach = CanAttachScript(object);
-	const bool has_errors = can_attach && gObjectScripts->HasErrors(object->ID);
-	const wxString path = can_attach ? wxString::FromUTF8(gObjectScripts->GetPath(object->ID).CStr()) : wxString();
-
-	mpScriptText->Enable(can_attach);
-	mpScriptBrowse->Enable(can_attach);
-	mpScriptClear->Enable(can_attach && !path.IsEmpty());
-
-	if (path != mShownScript || object != mpShownObject) {
-		mpScriptText->ChangeValue(path);
-		mShownScript = path;
+	if (materials.Names == mShownMaterialNames) {
+		return;
 	}
+
+	mpMaterialChoice->Clear();
+
+	for (const std::string& name : materials.Names) {
+		mpMaterialChoice->Append(wxString::FromUTF8(name));
+	}
+
+	mShownMaterialNames = materials.Names;
+}
+
+void ObjectPropertiesPanel::ApplyState(const ObjectPanelState& state, const MaterialLibraryState& materials)
+{
+	RefreshMaterialChoices(materials);
+
+	mbHasObject = state.bHasObject;
+	mbCanAttachScript = state.bHasObject && state.bCanAttachScript;
+	mbIsTrigger = state.bHasObject && state.bIsTrigger;
+
+	if (!state.bHasObject) {
+		mpNameLabel->SetLabel("No block selected");
+	}
+	else {
+		wxString name = wxString::Format("Selected '%s'", wxString::FromUTF8(state.Name));
+
+		if (state.SelectedCount > 1) {
+			name += wxString::Format(" (+%u more)", state.SelectedCount - 1);
+		}
+
+		mpNameLabel->SetLabel(name);
+	}
+
+	SetRows(mTagRows, state.Tags, state.EditableTags, state.bHasObject);
+	SetRows(mFlagRows, state.Flags, state.EditableFlags, state.bHasObject);
+
+	const int32 material_selection = state.bHasObject ? state.MaterialSlot : wxNOT_FOUND;
+
+	if (mpMaterialChoice->GetSelection() != material_selection) {
+		mpMaterialChoice->SetSelection(material_selection);
+	}
+
+	mpMaterialChoice->Enable(state.bHasObject && state.bIsBlockout);
+
+	mpScriptText->Enable(mbCanAttachScript);
+	mpScriptBrowse->Enable(mbCanAttachScript);
+	mpScriptClear->Enable(mbCanAttachScript && !state.ScriptPath.empty());
+
+	if (state.ScriptPath != mShownScript || !mbCanAttachScript) {
+		if (!mpScriptText->HasFocus() || !mbCanAttachScript) {
+			mpScriptText->ChangeValue(wxString::FromUTF8(mbCanAttachScript ? state.ScriptPath : std::string()));
+			mShownScript = mbCanAttachScript ? state.ScriptPath : std::string();
+		}
+	}
+
+	mpEnterDirChoice->Enable(mbIsTrigger);
+
+	const int32 enter_direction_index = mbIsTrigger ? GetEnterDirectionIndex(state) : 0;
+	const bool has_custom_item = (static_cast<int32>(mpEnterDirChoice->GetCount()) > scNumEnterDirections);
+
+	if (enter_direction_index == scCustomEnterDirectionIndex) {
+		const wxString label = wxString::Format("Custom (%.2f, %.2f, %.2f)", state.EnterDirection[0],
+												state.EnterDirection[1], state.EnterDirection[2]);
+
+		if (!has_custom_item) {
+			mpEnterDirChoice->Append(label);
+		}
+		else if (mpEnterDirChoice->GetString(scCustomEnterDirectionIndex) != label) {
+			mpEnterDirChoice->SetString(scCustomEnterDirectionIndex, label);
+		}
+	}
+	else if (has_custom_item) {
+		if (mpEnterDirChoice->GetSelection() == scCustomEnterDirectionIndex) {
+			mpEnterDirChoice->SetSelection(enter_direction_index);
+		}
+
+		mpEnterDirChoice->Delete(scCustomEnterDirectionIndex);
+	}
+
+	if (mpEnterDirChoice->GetSelection() != enter_direction_index) {
+		mpEnterDirChoice->SetSelection(enter_direction_index);
+	}
+
+	const bool has_errors = mbCanAttachScript && state.bScriptErrors;
 
 	if (has_errors != mbShownScriptErrors) {
 		mbShownScriptErrors = has_errors;
 		mpScriptStatus->SetLabel(has_errors ? wxString("Script failed to compile, see the log") : wxString());
 		Layout();
 	}
-}
-
-void ObjectPropertiesPanel::RefreshMaterialChoices()
-{
-	if (gWorld->pBlockout == nullptr) {
-		return;
-	}
-
-	const MaterialLibrary& library = gWorld->pBlockout->GetMaterialLibrary();
-
-	if (library.GetCount() == mShownMaterialCount) {
-		return;
-	}
-
-	mpMaterialChoice->Clear();
-
-	for (uint32 id = 0; id < library.GetCount(); id++) {
-		mpMaterialChoice->Append(wxString::FromUTF8(library.GetName(MaterialLibraryID(id)).Str()));
-	}
-
-	mShownMaterialCount = library.GetCount();
-	mShownMaterialSlot = MaterialLibraryID::scNull;
-}
-
-void ObjectPropertiesPanel::ShowObject(Object* object)
-{
-	RefreshMaterialChoices();
-
-	if (object == nullptr) {
-		if (!mbShowingAnything) {
-			return;
-		}
-
-		mbShowingAnything = false;
-		mpShownObject = nullptr;
-
-		mpNameLabel->SetLabel("No block selected");
-		SetRows(mTagRows, 0, nullptr, true);
-		SetRows(mFlagRows, 0, nullptr, false);
-
-		mpMaterialChoice->SetSelection(wxNOT_FOUND);
-		mpMaterialChoice->Disable();
-		mShownMaterialSlot = MaterialLibraryID::scNull;
-
-		mpScriptText->ChangeValue(wxEmptyString);
-		mpScriptText->Disable();
-		mpScriptBrowse->Disable();
-		mpScriptClear->Disable();
-		mpScriptStatus->SetLabel(wxEmptyString);
-		mShownScript.clear();
-		mbShownScriptErrors = false;
-		return;
-	}
-
-	const uint32 tags = static_cast<uint32>(object->Tags);
-	const uint32 flags = static_cast<uint32>(object->GetFlags());
-	wxString name = wxString::Format("Selected '%s'", wxString::FromUTF8(object->Name.Get().CStr()));
-
-	const uint32 selected_count = gEditor->GetSelection().GetCount();
-
-	if (selected_count > 1) {
-		name += wxString::Format(" (+%u more)", selected_count - 1);
-	}
-
-	MaterialLibraryID material_slot = MaterialLibraryID::scNull;
-
-	if (gWorld->pBlockout != nullptr) {
-		material_slot = gWorld->pBlockout->GetIDForMaterial(gEditor->GetSelection().GetStoredMaterial(object));
-	}
-
-	if (material_slot != mShownMaterialSlot) {
-		mShownMaterialSlot = material_slot;
-		mpMaterialChoice->SetSelection(material_slot.ID);
-	}
-
-	mpMaterialChoice->Enable(object->HasTags(eObjectTag::Blockout));
-
-	RefreshScript(object);
-
-	if (mbShowingAnything && !mbRowsStale && object == mpShownObject && tags == mShownTags && flags == mShownFlags &&
-		name == mShownName) {
-		return;
-	}
-
-	mbShowingAnything = true;
-	mbRowsStale = false;
-	mpShownObject = object;
-	mShownTags = tags;
-	mShownFlags = flags;
-	mShownName = name;
-
-	mpNameLabel->SetLabel(name.IsEmpty() ? wxString("(unnamed)") : name);
-	SetRows(mTagRows, tags, object, true);
-	SetRows(mFlagRows, flags, object, false);
 }
 
 } // namespace fx::editor

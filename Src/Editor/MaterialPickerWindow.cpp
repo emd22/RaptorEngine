@@ -1,5 +1,7 @@
 #include "MaterialPickerWindow.hpp"
 
+#include "EditorFrame.hpp"
+#include "EditorThread.hpp"
 #include "RaptorEditor.hpp"
 
 #include <ktx.h>
@@ -101,8 +103,8 @@ static wxBitmap LoadKtxBitmap(const String& path)
 	return bitmap;
 }
 
-MaterialPickerWindow::MaterialPickerWindow(wxWindow* parent)
-	: wxFrame(parent, wxID_ANY, "Material Picker", wxDefaultPosition, wxSize(560, 440))
+MaterialPickerWindow::MaterialPickerWindow(EditorFrame* parent)
+	: wxFrame(parent, wxID_ANY, "Material Picker", wxDefaultPosition, wxSize(560, 440)), mpFrame(parent)
 {
 	wxPanel* root = new wxPanel(this, wxID_ANY);
 	wxBoxSizer* sizer = new wxBoxSizer(wxHORIZONTAL);
@@ -156,36 +158,39 @@ MaterialPickerWindow::MaterialPickerWindow(wxWindow* parent)
 void MaterialPickerWindow::RefreshList()
 {
 	mBitmaps.Clear();
+	mShownLibrary = mpFrame->GetState().Materials;
+
 	RebuildRows();
+}
+
+void MaterialPickerWindow::OnStateChanged()
+{
+	if (mpFrame->GetState().Materials != mShownLibrary) {
+		RefreshList();
+	}
 }
 
 void MaterialPickerWindow::RebuildRows()
 {
 	MaterialLibraryID previous_slot = MaterialLibraryID(GetSelectedSlot());
 
-	if (!previous_slot.IsValid() && gWorld != nullptr && gWorld->pBlockout != nullptr && gEditor != nullptr) {
-		Object* last = gEditor->GetSelection().GetLast();
+	if (!previous_slot.IsValid()) {
+		const int32 object_slot = mpFrame->GetState().Object.MaterialSlot;
 
-		if (last != nullptr) {
-			previous_slot = gWorld->pBlockout->GetIDForMaterial(gEditor->GetSelection().GetStoredMaterial(last));
+		if (object_slot >= 0) {
+			previous_slot = MaterialLibraryID(object_slot);
 		}
 	}
 
 	mpList->Clear();
 	mShownSlots.clear();
 
-	if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
-		ShowPreview(MaterialLibraryID::scNull);
-		return;
-	}
-
-	const MaterialLibrary& library = gWorld->pBlockout->GetMaterialLibrary();
 	const String filter = ToLower(mpSearch->GetValue().ToStdString());
 
 	int selected_row = wxNOT_FOUND;
 
-	for (uint32 slot = 0; slot < library.GetCount(); slot++) {
-		const std::string name = library.GetName(MaterialLibraryID(slot)).Str();
+	for (uint32 slot = 0; slot < mShownLibrary.Names.size(); slot++) {
+		const std::string& name = mShownLibrary.Names[slot];
 
 		if (!filter.IsEmpty() && ToLower(name).FindNext(0, filter) == String::scNotFound) {
 			continue;
@@ -225,14 +230,14 @@ const wxBitmap& MaterialPickerWindow::GetAlbedoBitmap(MaterialLibraryID material
 		return *found;
 	}
 
-	const String& path = gWorld->pBlockout->GetMaterialLibrary().GetDiffusePath(material_slot);
+	const String path(mShownLibrary.DiffusePaths[static_cast<size_t>(material_slot.ID)]);
 
 	return mBitmaps.Insert(material_slot, path.IsEmpty() ? wxBitmap() : LoadKtxBitmap(path));
 }
 
 void MaterialPickerWindow::ShowPreview(MaterialLibraryID material_slot)
 {
-	if (!material_slot.IsValid() || gWorld == nullptr || gWorld->pBlockout == nullptr) {
+	if (!material_slot.IsValid() || static_cast<size_t>(material_slot.ID) >= mShownLibrary.Names.size()) {
 		mpNameLabel->SetLabel("(select a material)");
 		mpStatusLabel->SetLabel("");
 		mpPreview->SetBitmap(wxBitmap());
@@ -240,10 +245,9 @@ void MaterialPickerWindow::ShowPreview(MaterialLibraryID material_slot)
 		return;
 	}
 
-	const MaterialLibrary& library = gWorld->pBlockout->GetMaterialLibrary();
 	const wxBitmap& bitmap = GetAlbedoBitmap(material_slot);
 
-	mpNameLabel->SetLabel(wxString::FromUTF8(library.GetName(material_slot).Str()));
+	mpNameLabel->SetLabel(wxString::FromUTF8(mShownLibrary.Names[static_cast<size_t>(material_slot.ID)]));
 
 	if (bitmap.IsOk()) {
 		mpPreview->SetBitmap(bitmap);
@@ -252,9 +256,7 @@ void MaterialPickerWindow::ShowPreview(MaterialLibraryID material_slot)
 	else {
 		mpPreview->SetBitmap(wxBitmap());
 
-		const String& diffuse_path = library.GetDiffusePath(material_slot);
-
-		if (diffuse_path.IsEmpty()) {
+		if (mShownLibrary.DiffusePaths[static_cast<size_t>(material_slot.ID)].empty()) {
 			mpStatusLabel->SetLabel("No albedo texture");
 		}
 		else {
@@ -263,6 +265,7 @@ void MaterialPickerWindow::ShowPreview(MaterialLibraryID material_slot)
 	}
 
 	mpApplyButton->Enable();
+
 	Layout();
 }
 
@@ -270,16 +273,24 @@ void MaterialPickerWindow::ApplySelected()
 {
 	const MaterialLibraryID slot = GetSelectedSlot();
 
-	if (!slot.IsValid() || gEditor == nullptr || gWorld == nullptr || gWorld->pBlockout == nullptr) {
+	if (!slot.IsValid()) {
 		return;
 	}
 
-	const MaterialID material = gWorld->pBlockout->GetMaterialForID(slot);
-	const EditorSelection& selection = gEditor->GetSelection();
+	thread::PostToGame(
+		[slot]
+		{
+			if (gEditor == nullptr || gWorld == nullptr || gWorld->pBlockout == nullptr) {
+				return;
+			}
 
-	for (uint32 i = 0; i < selection.GetCount(); i++) {
-		gEditor->SetStoredMaterial(selection.GetObject(i), material);
-	}
+			const MaterialID material = gWorld->pBlockout->GetMaterialForID(slot);
+			const EditorSelection& selection = gEditor->GetSelection();
+
+			for (uint32 i = 0; i < selection.GetCount(); i++) {
+				gEditor->SetStoredMaterial(selection.GetObject(i), material);
+			}
+		});
 }
 
 void MaterialPickerWindow::OnShow(wxShowEvent& event)

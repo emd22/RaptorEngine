@@ -1,11 +1,13 @@
 #pragma once
 
+#include "EditorPanelState.hpp"
 #include "EditorTool.hpp"
 
 #include <wx/frame.h>
 
 #include <Core/StackArray.hpp>
 #include <Core/Types.hpp>
+#include <atomic>
 
 class wxBoxSizer;
 class wxButton;
@@ -44,12 +46,17 @@ public:
 
 	FX_FORCE_INLINE bool IsCloseRequested() const { return mbCloseRequested; }
 
+	void SetInteractive(bool interactive);
+
 	/// Highlights the button of the selected tool
 	void ShowSelectedTool(const eEditorTool tool);
 
-	void ShowMode(const eEditorMode mode, const eDataFilter filter);
+	void ShowMode(const eEditorMode mode, const eDataFilter filter, const uint32 available_tools);
 
-	/// False while the frame is minimized or another app is in front, so the render loop can throttle itself
+	void ApplyState(const EditorPanelState& state);
+
+	FX_FORCE_INLINE const EditorPanelState& GetState() const { return mState; }
+
 	FX_FORCE_INLINE bool IsActive() const { return mbIsActive; }
 
 	void ShowObjectListWindow();
@@ -90,9 +97,11 @@ private:
 	OutlineToggleButton* mpDataButton = nullptr;
 	wxChoice* mpDataFilterChoice = nullptr;
 
-	bool mbCloseRequested = false;
-	bool mbIsActive = true;
+	std::atomic<bool> mbCloseRequested = false;
+	std::atomic<bool> mbIsActive = true;
 	bool mbSidePanelCollapsed = false;
+
+	EditorPanelState mState;
 };
 
 } // namespace fx::editor

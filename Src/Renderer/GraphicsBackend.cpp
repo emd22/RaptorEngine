@@ -565,6 +565,14 @@ void GraphicsBackend::SubmitImmediateUploadCmd(GraphicsBackend::SubmitFunc uploa
 {
 	std::lock_guard<std::mutex> lock(UploadContext.ImmediateMutex);
 
+	struct InFlightScope
+	{
+		explicit InFlightScope(std::atomic_uint32_t& count) : Count(count) { ++Count; }
+		~InFlightScope() { --Count; }
+
+		std::atomic_uint32_t& Count;
+	} in_flight { UploadContext.ImmediateUploadsInFlight };
+
 	CommandBuffer& cmd = UploadContext.ImmediateCmdBuffer;
 
 	cmd.Record(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -879,7 +887,7 @@ eFrameResult GraphicsBackend::GetNextSwapchainImage(FrameData* frame)
 	const VkResult result = vkAcquireNextImageKHR(GetDevice()->Device, Swapchain.GetSwapchain(), timeout,
 												  frame->ImageAvailable.Get(), nullptr, &mImageIndex);
 
-	if (result == VK_SUCCESS) {
+	if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
 		return eFrameResult::Success;
 	}
 	else if (result == VK_ERROR_OUT_OF_DATE_KHR) {

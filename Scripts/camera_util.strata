@@ -1,0 +1,23 @@
+import ./interop;
+
+struct CAMERASTATE
+{
+	float shutter;
+	float iso;
+	float aperture;
+}
+
+
+void camera_state_save(ref CAMERASTATE cs)
+{
+	cs.shutter = cvar_get_float("r_shutter", 300.0f);
+	cs.iso = cvar_get_float("r_iso", 100.0f);
+	cs.aperture = cvar_get_float("r_aperture", 9.0f);
+}
+
+void camera_state_load(ref CAMERASTATE cs)
+{
+	cvar_set_float("r_shutter", cs.shutter);
+	cvar_set_float("r_iso", cs.iso);
+	cvar_set_float("r_aperture", cs.aperture);
+}

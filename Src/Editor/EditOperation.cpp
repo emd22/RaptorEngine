@@ -187,85 +187,7 @@ static void ApplyFlag(Object& object, uint32 flag_bit, bool enabled)
 	SetObjectFlag(object, flag, enabled, true);
 }
 
-static void RestoreObjectState(Object& root, const EditOperation::StateEditData& state)
-{
-	for (const eObjectTag tag : scEditableTags) {
-		const uint32 tag_bit = static_cast<uint32>(tag);
-
-		ApplyTag(root, tag_bit, (state.TagsBefore & tag_bit) != 0);
-	}
-
-	for (const EditOperation::NodeFlags& saved : state.NodesBefore) {
-		Object* node = gObjectManager->GetObject(saved.Id);
-
-		if (node == nullptr) {
-			continue;
-		}
-
-		for (const eObjectFlags flag : scEditableFlags) {
-			const uint32 flag_bit = static_cast<uint32>(flag);
-			const bool wanted = (saved.Flags & flag_bit) != 0;
-
-			if (CanEditObjectFlag(node, flag_bit) && HasFlag(node->GetFlags(), flag) != wanted) {
-				if (flag == eObjectFlags::PhysicsEnabled && node == &root) {
-					node->SetPosition(state.PositionBefore);
-					node->SetRotation(state.RotationBefore);
-				}
-
-				SetObjectFlag(*node, flag, wanted, false);
-			}
-		}
-	}
-}
-
-void EditOperation::StateEditData::CaptureBefore(Object& object)
-{
-	TagsBefore = static_cast<uint32>(object.Tags);
-	PositionBefore = object.GetPosition();
-	RotationBefore = object.mRotation;
-
-	NodesBefore.clear();
-
-	ForEachNode(object, [this](Object& node)
-				{ NodesBefore.push_back(NodeFlags { .Id = node.ID, .Flags = static_cast<uint32>(node.GetFlags()) }); });
-}
-
-/// Returns the op's object only if it is still alive (guards against use-after-free
-/// when an object was destroyed outside of undo/redo).
-static Object* ResolveOpTarget(const EditOperation& op)
-{
-	if (op.pObject == nullptr || op.PushedObjectID.IsInvalid()) {
-		return nullptr;
-	}
-
-	Object* live = gObjectManager->GetObject(op.PushedObjectID);
-	return (live == op.pObject) ? live : nullptr;
-}
-
-/// Returns the op's `ValueB` object only if it is still alive (Dupe results).
-static Object* ResolveOpValue(const EditOperation& op)
-{
-	if (op.ValueB.Type != EditOperationValue::eValueType::Object || op.ValueB.pObject == nullptr ||
-		op.ValueObjectID.IsInvalid()) {
-		return nullptr;
-	}
-
-	Object* live = gObjectManager->GetObject(op.ValueObjectID);
-	return (live == op.ValueB.pObject) ? live : nullptr;
-}
-
-
-static LightSpot* ResolveOpLight(const EditOperation& op)
-{
-	if (op.Light.pLight == nullptr || op.Light.Id.IsInvalid()) {
-		return nullptr;
-	}
-
-	LightBase* live = gLightManager->GetLight(op.Light.Id);
-	return (live == op.Light.pLight) ? op.Light.pLight : nullptr;
-}
-
-static Object* RestoreBrush(const EditOperation::Snapshot& snapshot, const Brush::PlaneList& planes)
+static Object* RestoreBrush(const ObjectSnapshot& snapshot, const Brush::PlaneList& planes)
 {
 	if (gWorld->pBlockout == nullptr) {
 		return nullptr;
@@ -295,40 +217,17 @@ static Object* RestoreBrush(const EditOperation::Snapshot& snapshot, const Brush
 	}
 
 	gObjectScripts->Attach(object, snapshot.ScriptPath);
+	gObjectScripts->SetRequiredEnterDirection(object->ID, snapshot.EnterDirection);
 
 	return object;
 }
 
-static void RestoreLight(EditOperation& op)
+ObjectSnapshot ObjectSnapshot::Capture(const Object& object, MaterialID material)
 {
-	const EditOperation::LightSnapshot& snapshot = op.LightSnap;
+	Vec3f enter_direction = Vec3f::sZero;
+	gObjectScripts->TryGetRequiredEnterDirection(object.ID, enter_direction);
 
-	Ref<LightSpot> light = gLightManager->NewLight<LightSpot>(snapshot.LightName.Get());
-
-	light->SetPosition(snapshot.Position);
-	light->SetDirection(snapshot.Direction);
-	light->SetRadius(snapshot.Radius);
-	light->SetConeAngles(snapshot.InnerAngle, snapshot.OuterAngle);
-	light->bCastShadows = snapshot.bCastShadows;
-	light->Color = snapshot.Colour;
-	light->Intensity = snapshot.Intensity;
-
-	op.Light.pLight = &(*light);
-	op.Light.Id = light->ID;
-}
-
-static void DestroyLight(EditOperation& op)
-{
-	if (ResolveOpLight(op) != nullptr) {
-		gLightManager->RemoveLight(op.Light.Id);
-	}
-
-	op.Light.pLight = nullptr;
-}
-
-EditOperation::Snapshot EditOperation::Snapshot::Capture(const Object& object, MaterialID material)
-{
-	return Snapshot {
+	return ObjectSnapshot {
 		.Position = object.GetPosition(),
 		.Material = material,
 		.Rotation = object.mRotation,
@@ -339,10 +238,11 @@ EditOperation::Snapshot EditOperation::Snapshot::Capture(const Object& object, M
 		.bIsTrigger = object.IsTrigger(),
 		.bIsDynamic = gWorld->pBlockout->IsDynamic(&object),
 		.ScriptPath = gObjectScripts->GetPath(object.ID),
+		.EnterDirection = enter_direction,
 	};
 }
 
-EditOperation::LightSnapshot EditOperation::LightSnapshot::Capture(const LightSpot& light)
+LightSnapshot LightSnapshot::Capture(const LightSpot& light)
 {
 	return LightSnapshot {
 		.LightName = light.Name,
@@ -358,349 +258,493 @@ EditOperation::LightSnapshot EditOperation::LightSnapshot::Capture(const LightSp
 }
 
 /////////////////////////////////////
-// Edit Operations
+// Base classes
 /////////////////////////////////////
 
-EditOperationValue EditOperation::Execute(EditorSelection& selection)
+ObjectEditOperation::ObjectEditOperation(Object* object, int32 group_size) : EditOperation(group_size)
 {
-	switch (Type) {
-	case eType::Move: {
-		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
-		Assert(ValueB.Type == EditOperationValue::eValueType::Vec3);
-
-		Object* target = ResolveOpTarget(*this);
-		if (target == nullptr) {
-			break;
-		}
-
-		target->SetPosition(ValueB.Position);
-
-		return ValueB;
-	}
-	case eType::Scale: {
-		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
-		Assert(ValueB.Type == EditOperationValue::eValueType::Vec3);
-
-		Object* target = ResolveOpTarget(*this);
-		if (target == nullptr) {
-			break;
-		}
-
-		const Brush* brush = gWorld->pBlockout->GetBrush(target);
-		if (brush == nullptr) {
-			break;
-		}
-
-		PlanesBefore = brush->Planes;
-
-		// ValueA is the face's normal and ValueB.X how far to move it
-		gWorld->pBlockout->MoveFace(target, ValueA.Position, ValueB.Position.X);
-
-		break;
-	}
-	case eType::Rotate: {
-		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
-		Assert(ValueB.Type == EditOperationValue::eValueType::Vec3);
-
-		Object* target = ResolveOpTarget(*this);
-		if (target == nullptr) {
-			break;
-		}
-
-		target->SetRotation(Quat::FromEulerAngles(ValueB.Position));
-
-		return ValueB;
-	}
-	case eType::BoundsEdit: {
-		Object* target = ResolveOpTarget(*this);
-		if (target == nullptr) {
-			break;
-		}
-
-		target->SetBounds(BoundsAfter);
-
-		break;
-	}
-	case eType::ObjectStateEdit: {
-		Object* target = ResolveOpTarget(*this);
-		if (target == nullptr) {
-			break;
-		}
-
-		if (StateEdit.bIsTag) {
-			ApplyTag(*target, StateEdit.Bit, StateEdit.bEnabled);
-		}
-		else {
-			ApplyFlag(*target, StateEdit.Bit, StateEdit.bEnabled);
-		}
-
-		break;
-	}
-	case eType::ScriptEdit: {
-		Object* target = ResolveOpTarget(*this);
-		if (target == nullptr) {
-			break;
-		}
-
-		gObjectScripts->Attach(target, ScriptEdit.After);
-
-		break;
-	}
-	case eType::LightTransform: {
-		LightSpot* light = ResolveOpLight(*this);
-		if (light == nullptr) {
-			break;
-		}
-
-		light->SetPosition(ValueB.Position);
-		light->SetDirection(Light.DirectionAfter);
-
-		return ValueB;
-	}
-	case eType::SpawnTransform: {
-		gWorld->PlayerSpawn.Position = ValueB.Position;
-		gWorld->PlayerSpawn.Direction = Spawn.DirectionAfter;
-		gWorld->PlayerSpawn.bCustom = Spawn.bCustomAfter;
-
-		return ValueB;
-	}
-	case eType::LightCreate: {
-		RestoreLight(*this);
-
-		return EditOperationValue(static_cast<LightBase*>(Light.pLight));
-	}
-	case eType::LightDelete: {
-		DestroyLight(*this);
-
-		break;
-	}
-	case eType::BrushEdit: {
-		Object* target = ResolveOpTarget(*this);
-		if (target == nullptr) {
-			break;
-		}
-
-		gWorld->pBlockout->SetBrushPlanes(target, PlanesAfter);
-
-		break;
-	}
-	case eType::Dupe: {
-		// Origin point
-		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
-
-		// Object to dupe
-		Assert(pObject != nullptr);
-
-		Vec3f origin = ValueA.Position;
-
-		Object* dupe = gWorld->pBlockout->DupeObject(pObject);
-		if (dupe == nullptr) {
-			ValueB.Set(nullptr);
-			break;
-		}
-
-		dupe->SetPosition(origin);
-
-		// DupeObject copies the source's *current* material, which is the selection
-		// material while selected. Restore the original so dupes don't inherit it.
-		dupe->SetMaterial(selection.GetStoredMaterial(pObject));
-
-		ValueB.Set(dupe);
-		ValueObjectID = dupe->ID;
-
-		return ValueB;
-	}
-	case eType::Create: {
-		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
-
-		pObject = (gWorld->pBlockout->NewObject(ValueA.Position));
-		PushedObjectID = (pObject != nullptr) ? pObject->ID : ObjectID::scNull;
-
-		return EditOperationValue(pObject);
-	}
-	case eType::CreateBrush: {
-		pObject = RestoreBrush(ObjectSnapshot, PlanesAfter);
-		PushedObjectID = (pObject != nullptr) ? pObject->ID : ObjectID::scNull;
-
-		return EditOperationValue(pObject);
-	}
-	case eType::Delete: {
-		Object* target = ResolveOpTarget(*this);
-		if (target == nullptr) {
-			break;
-		}
-
-		selection.Remove(target);
-
-		gWorld->pBlockout->DestroyObject(target);
-
-		break;
-	}
-	}
-
-	return ValueB;
+	Retarget(object);
 }
 
-void EditOperation::Undo(EditorSelection& selection)
+void ObjectEditOperation::Retarget(Object* object)
 {
-	switch (Type) {
-	case eType::Move: {
-		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
-		Assert(ValueB.Type == EditOperationValue::eValueType::Vec3);
+	mpObject = object;
+	mObjectID = (object != nullptr) ? object->ID : ObjectID::scNull;
+}
 
-		Object* target = ResolveOpTarget(*this);
-		if (target == nullptr) {
-			break;
+/// Returns the op's object only if it is still alive (guards against use-after-free
+/// when an object was destroyed outside of undo/redo).
+Object* ObjectEditOperation::ResolveTarget() const
+{
+	if (mpObject == nullptr || mObjectID.IsInvalid()) {
+		return nullptr;
+	}
+
+	Object* live = gObjectManager->GetObject(mObjectID);
+	return (live == mpObject) ? live : nullptr;
+}
+
+void ObjectCreationOperation::Undo(EditorSelection& selection)
+{
+	Object* created = ResolveTarget();
+	if (created == nullptr) {
+		return;
+	}
+
+	selection.Remove(created);
+
+	gWorld->pBlockout->DestroyObject(created);
+
+	Retarget(nullptr);
+}
+
+void ObjectCreationOperation::Redo(EditorSelection& selection)
+{
+	Execute(selection);
+
+	selection.Add(ResolveTarget());
+}
+
+LightEditOperation::LightEditOperation(LightSpot* light, int32 group_size)
+	: EditOperation(group_size), mpLight(light), mLightID((light != nullptr) ? light->ID : LightID::scNull)
+{
+}
+
+LightSpot* LightEditOperation::ResolveLight() const
+{
+	if (mpLight == nullptr || mLightID.IsInvalid()) {
+		return nullptr;
+	}
+
+	LightBase* live = gLightManager->GetLight(mLightID);
+	return (live == mpLight) ? mpLight : nullptr;
+}
+
+void LightEditOperation::Restore(const LightSnapshot& snapshot)
+{
+	Ref<LightSpot> light = gLightManager->NewLight<LightSpot>(snapshot.LightName.Get());
+
+	light->SetPosition(snapshot.Position);
+	light->SetDirection(snapshot.Direction);
+	light->SetRadius(snapshot.Radius);
+	light->SetConeAngles(snapshot.InnerAngle, snapshot.OuterAngle);
+	light->bCastShadows = snapshot.bCastShadows;
+	light->Color = snapshot.Colour;
+	light->Intensity = snapshot.Intensity;
+
+	mpLight = &(*light);
+	mLightID = light->ID;
+}
+
+void LightEditOperation::Destroy()
+{
+	if (ResolveLight() != nullptr) {
+		gLightManager->RemoveLight(mLightID);
+	}
+
+	mpLight = nullptr;
+}
+
+/////////////////////////////////////
+// Object operations
+/////////////////////////////////////
+
+MoveOperation::MoveOperation(Object* object, const Vec3f& before, const Vec3f& after, int32 group_size)
+	: ObjectEditOperation(object, group_size), mBefore(before), mAfter(after)
+{
+}
+
+void MoveOperation::Execute(EditorSelection& selection)
+{
+	if (Object* target = ResolveTarget()) {
+		target->SetPosition(mAfter);
+	}
+}
+
+void MoveOperation::Undo(EditorSelection& selection)
+{
+	if (Object* target = ResolveTarget()) {
+		target->SetPosition(mBefore);
+	}
+}
+
+RotateOperation::RotateOperation(Object* object, const Vec3f& euler_before, const Vec3f& euler_after, int32 group_size)
+	: ObjectEditOperation(object, group_size), mEulerBefore(euler_before), mEulerAfter(euler_after)
+{
+}
+
+void RotateOperation::Execute(EditorSelection& selection)
+{
+	if (Object* target = ResolveTarget()) {
+		target->SetRotation(Quat::FromEulerAngles(mEulerAfter));
+	}
+}
+
+void RotateOperation::Undo(EditorSelection& selection)
+{
+	if (Object* target = ResolveTarget()) {
+		target->SetRotation(Quat::FromEulerAngles(mEulerBefore));
+	}
+}
+
+ScaleFaceOperation::ScaleFaceOperation(Object* object, const Vec3f& face_normal, float32 distance, int32 group_size)
+	: ObjectEditOperation(object, group_size), mFaceNormal(face_normal), mDistance(distance)
+{
+}
+
+void ScaleFaceOperation::Execute(EditorSelection& selection)
+{
+	Object* target = ResolveTarget();
+	if (target == nullptr) {
+		return;
+	}
+
+	const Brush* brush = gWorld->pBlockout->GetBrush(target);
+	if (brush == nullptr) {
+		return;
+	}
+
+	mPlanesBefore = brush->Planes;
+
+	gWorld->pBlockout->MoveFace(target, mFaceNormal, mDistance);
+}
+
+void ScaleFaceOperation::Undo(EditorSelection& selection)
+{
+	Object* target = ResolveTarget();
+	if (target == nullptr) {
+		return;
+	}
+
+	// Restore the planes from before, as moving the face back could leave planes it dropped behind. The object is
+	// put back where it was, as the brush is kept in place.
+	gWorld->pBlockout->SetBrushPlanes(target, mPlanesBefore);
+}
+
+BrushEditOperation::BrushEditOperation(Object* object, const Brush::PlaneList& before, const Brush::PlaneList& after,
+									   int32 group_size)
+	: ObjectEditOperation(object, group_size), mPlanesBefore(before), mPlanesAfter(after)
+{
+}
+
+void BrushEditOperation::Execute(EditorSelection& selection)
+{
+	if (Object* target = ResolveTarget()) {
+		gWorld->pBlockout->SetBrushPlanes(target, mPlanesAfter);
+	}
+}
+
+void BrushEditOperation::Undo(EditorSelection& selection)
+{
+	if (Object* target = ResolveTarget()) {
+		gWorld->pBlockout->SetBrushPlanes(target, mPlanesBefore);
+	}
+}
+
+BoundsEditOperation::BoundsEditOperation(Object* object, const BBox& before, const BBox& after, int32 group_size)
+	: ObjectEditOperation(object, group_size), mBoundsBefore(before), mBoundsAfter(after)
+{
+}
+
+void BoundsEditOperation::Execute(EditorSelection& selection)
+{
+	if (Object* target = ResolveTarget()) {
+		target->SetBounds(mBoundsAfter);
+	}
+}
+
+void BoundsEditOperation::Undo(EditorSelection& selection)
+{
+	if (Object* target = ResolveTarget()) {
+		target->SetBounds(mBoundsBefore);
+	}
+}
+
+ObjectStateEditOperation::ObjectStateEditOperation(Object* object, uint32 bit, bool is_tag, bool enabled,
+												   int32 group_size)
+	: ObjectEditOperation(object, group_size), mBit(bit), mbIsTag(is_tag), mbEnabled(enabled)
+{
+	mTagsBefore = static_cast<uint32>(object->Tags);
+	mPositionBefore = object->GetPosition();
+	mRotationBefore = object->mRotation;
+
+	ForEachNode(
+		*object, [this](Object& node)
+		{ mNodesBefore.push_back(NodeFlags { .Id = node.ID, .Flags = static_cast<uint32>(node.GetFlags()) }); });
+}
+
+void ObjectStateEditOperation::Execute(EditorSelection& selection)
+{
+	Object* target = ResolveTarget();
+	if (target == nullptr) {
+		return;
+	}
+
+	if (mbIsTag) {
+		ApplyTag(*target, mBit, mbEnabled);
+	}
+	else {
+		ApplyFlag(*target, mBit, mbEnabled);
+	}
+}
+
+void ObjectStateEditOperation::Undo(EditorSelection& selection)
+{
+	if (Object* target = ResolveTarget()) {
+		RestoreState(*target);
+	}
+}
+
+void ObjectStateEditOperation::RestoreState(Object& root) const
+{
+	for (const eObjectTag tag : scEditableTags) {
+		const uint32 tag_bit = static_cast<uint32>(tag);
+
+		ApplyTag(root, tag_bit, (mTagsBefore & tag_bit) != 0);
+	}
+
+	for (const NodeFlags& saved : mNodesBefore) {
+		Object* node = gObjectManager->GetObject(saved.Id);
+
+		if (node == nullptr) {
+			continue;
 		}
 
-		target->SetPosition(ValueA.Position);
+		for (const eObjectFlags flag : scEditableFlags) {
+			const uint32 flag_bit = static_cast<uint32>(flag);
+			const bool wanted = (saved.Flags & flag_bit) != 0;
 
-		break;
-	}
-	case eType::Scale: {
-		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
-		Assert(ValueB.Type == EditOperationValue::eValueType::Vec3);
+			if (CanEditObjectFlag(node, flag_bit) && HasFlag(node->GetFlags(), flag) != wanted) {
+				if (flag == eObjectFlags::PhysicsEnabled && node == &root) {
+					node->SetPosition(mPositionBefore);
+					node->SetRotation(mRotationBefore);
+				}
 
-		Object* target = ResolveOpTarget(*this);
-		if (target == nullptr) {
-			break;
+				SetObjectFlag(*node, flag, wanted, false);
+			}
 		}
-
-		// Restore the planes from before, as moving the face back could leave planes it dropped behind. The object is
-		// put back where it was, as the brush is kept in place.
-		gWorld->pBlockout->SetBrushPlanes(target, PlanesBefore);
-
-		break;
 	}
-	case eType::Rotate: {
-		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
-		Assert(ValueB.Type == EditOperationValue::eValueType::Vec3);
+}
 
-		Object* target = ResolveOpTarget(*this);
-		if (target == nullptr) {
-			break;
-		}
+ScriptEditOperation::ScriptEditOperation(Object* object, const String& before, const String& after, int32 group_size)
+	: ObjectEditOperation(object, group_size), mBefore(before), mAfter(after)
+{
+}
 
-		target->SetRotation(Quat::FromEulerAngles(ValueA.Position));
-
-		break;
+void ScriptEditOperation::Execute(EditorSelection& selection)
+{
+	if (Object* target = ResolveTarget()) {
+		gObjectScripts->Attach(target, mAfter);
 	}
-	case eType::BoundsEdit: {
-		Object* target = ResolveOpTarget(*this);
-		if (target == nullptr) {
-			break;
-		}
+}
 
-		target->SetBounds(BoundsBefore);
-
-		break;
+void ScriptEditOperation::Undo(EditorSelection& selection)
+{
+	if (Object* target = ResolveTarget()) {
+		gObjectScripts->Attach(target, mBefore);
 	}
-	case eType::ObjectStateEdit: {
-		Object* target = ResolveOpTarget(*this);
-		if (target == nullptr) {
-			break;
-		}
+}
 
-		RestoreObjectState(*target, StateEdit);
+TriggerDirectionEditOperation::TriggerDirectionEditOperation(Object* object, const Vec3f& before, const Vec3f& after,
+															 int32 group_size)
+	: ObjectEditOperation(object, group_size), mBefore(before), mAfter(after)
+{
+}
 
-		break;
+void TriggerDirectionEditOperation::Execute(EditorSelection& selection)
+{
+	if (Object* target = ResolveTarget()) {
+		gObjectScripts->SetRequiredEnterDirection(target->ID, mAfter);
 	}
-	case eType::ScriptEdit: {
-		Object* target = ResolveOpTarget(*this);
-		if (target == nullptr) {
-			break;
-		}
+}
 
-		gObjectScripts->Attach(target, ScriptEdit.Before);
-
-		break;
+void TriggerDirectionEditOperation::Undo(EditorSelection& selection)
+{
+	if (Object* target = ResolveTarget()) {
+		gObjectScripts->SetRequiredEnterDirection(target->ID, mBefore);
 	}
-	case eType::LightTransform: {
-		LightSpot* light = ResolveOpLight(*this);
-		if (light == nullptr) {
-			break;
-		}
+}
 
-		light->SetPosition(ValueA.Position);
-		light->SetDirection(Light.DirectionBefore);
+/////////////////////////////////////
+// Object creation and deletion
+/////////////////////////////////////
 
-		break;
+CreateOperation::CreateOperation(const Vec3f& position, int32 group_size)
+	: ObjectCreationOperation(group_size), mPosition(position)
+{
+}
+
+void CreateOperation::Execute(EditorSelection& selection) { Retarget(gWorld->pBlockout->NewObject(mPosition)); }
+
+CreateBrushOperation::CreateBrushOperation(const Brush::PlaneList& planes, const ObjectSnapshot& snapshot,
+										   int32 group_size)
+	: ObjectCreationOperation(group_size), mPlanes(planes), mSnapshot(snapshot)
+{
+}
+
+void CreateBrushOperation::Execute(EditorSelection& selection) { Retarget(RestoreBrush(mSnapshot, mPlanes)); }
+
+DupeOperation::DupeOperation(Object* original, const Vec3f& position, int32 group_size)
+	: ObjectEditOperation(original, group_size), mPosition(position)
+{
+}
+
+Object* DupeOperation::GetDupe() const
+{
+	if (mpDupe == nullptr || mDupeID.IsInvalid()) {
+		return nullptr;
 	}
-	case eType::SpawnTransform: {
-		gWorld->PlayerSpawn.Position = ValueA.Position;
-		gWorld->PlayerSpawn.Direction = Spawn.DirectionBefore;
-		gWorld->PlayerSpawn.bCustom = Spawn.bCustomBefore;
 
-		break;
+	Object* live = gObjectManager->GetObject(mDupeID);
+	return (live == mpDupe) ? live : nullptr;
+}
+
+void DupeOperation::Execute(EditorSelection& selection)
+{
+	mpDupe = nullptr;
+	mDupeID = ObjectID::scNull;
+
+	Object* original = ResolveTarget();
+	if (original == nullptr) {
+		return;
 	}
-	case eType::LightCreate: {
-		DestroyLight(*this);
 
-		break;
+	Object* dupe = gWorld->pBlockout->DupeObject(original);
+	if (dupe == nullptr) {
+		return;
 	}
-	case eType::LightDelete: {
-		RestoreLight(*this);
 
-		break;
-	}
-	case eType::BrushEdit: {
-		Object* target = ResolveOpTarget(*this);
-		if (target == nullptr) {
-			break;
-		}
+	dupe->SetPosition(mPosition);
 
-		gWorld->pBlockout->SetBrushPlanes(target, PlanesBefore);
+	// DupeObject copies the source's *current* material, which is the selection
+	// material while selected. Restore the original so dupes don't inherit it.
+	dupe->SetMaterial(selection.GetStoredMaterial(original));
 
-		break;
-	}
-	case eType::Dupe: {
-		Assert(pObject != nullptr);
+	mpDupe = dupe;
+	mDupeID = dupe->ID;
+}
 
-		Assert(ValueA.Type == EditOperationValue::eValueType::Vec3);
-		Assert(ValueB.Type == EditOperationValue::eValueType::Object);
+void DupeOperation::Undo(EditorSelection& selection)
+{
+	Object* dupe = GetDupe();
 
-		Object* dupe = ResolveOpValue(*this);
-		if (dupe == nullptr) {
-			break;
-		}
-
+	if (dupe != nullptr) {
 		selection.Remove(dupe);
 
 		gWorld->pBlockout->DestroyObject(dupe);
 
-		ValueB.Set(nullptr);
-		ValueObjectID = ObjectID::scNull;
-
-		break;
+		mpDupe = nullptr;
+		mDupeID = ObjectID::scNull;
 	}
-	case eType::Create:
-	case eType::CreateBrush: {
-		Object* created = ResolveOpTarget(*this);
-		if (created == nullptr) {
-			break;
-		}
 
-		selection.Remove(created);
+	selection.Add(ResolveTarget());
+}
 
-		gWorld->pBlockout->DestroyObject(created);
+void DupeOperation::Redo(EditorSelection& selection)
+{
+	Execute(selection);
 
-		pObject = nullptr;
-		PushedObjectID = ObjectID::scNull;
+	selection.Remove(ResolveTarget());
+	selection.Add(GetDupe());
+}
 
-		break;
+DeleteOperation::DeleteOperation(Object* object, const Brush::PlaneList& planes, const ObjectSnapshot& snapshot,
+								 int32 group_size)
+	: ObjectEditOperation(object, group_size), mPlanes(planes), mSnapshot(snapshot)
+{
+}
+
+void DeleteOperation::Execute(EditorSelection& selection)
+{
+	Object* target = ResolveTarget();
+	if (target == nullptr) {
+		return;
 	}
-	case eType::Delete: {
-		Object* restored = RestoreBrush(ObjectSnapshot, PlanesBefore);
-		if (restored == nullptr) {
-			break;
-		}
 
-		pObject = restored;
-		PushedObjectID = restored->ID;
+	selection.Remove(target);
 
-		break;
+	gWorld->pBlockout->DestroyObject(target);
+}
+
+void DeleteOperation::Undo(EditorSelection& selection)
+{
+	Object* restored = RestoreBrush(mSnapshot, mPlanes);
+	if (restored == nullptr) {
+		return;
 	}
+
+	Retarget(restored);
+
+	selection.Add(restored);
+}
+
+/////////////////////////////////////
+// Light operations
+/////////////////////////////////////
+
+LightTransformOperation::LightTransformOperation(LightSpot* light, const Vec3f& position_before,
+												 const Vec3f& position_after, const Vec3f& direction_before,
+												 const Vec3f& direction_after)
+	: LightEditOperation(light, 1), mPositionBefore(position_before), mPositionAfter(position_after),
+	  mDirectionBefore(direction_before), mDirectionAfter(direction_after)
+{
+}
+
+void LightTransformOperation::Execute(EditorSelection& selection)
+{
+	if (LightSpot* light = ResolveLight()) {
+		light->SetPosition(mPositionAfter);
+		light->SetDirection(mDirectionAfter);
 	}
+}
+
+void LightTransformOperation::Undo(EditorSelection& selection)
+{
+	if (LightSpot* light = ResolveLight()) {
+		light->SetPosition(mPositionBefore);
+		light->SetDirection(mDirectionBefore);
+	}
+}
+
+LightCreateOperation::LightCreateOperation(const LightSnapshot& snapshot)
+	: LightEditOperation(nullptr, 1), mSnapshot(snapshot)
+{
+}
+
+void LightCreateOperation::Execute(EditorSelection& selection) { Restore(mSnapshot); }
+
+void LightCreateOperation::Undo(EditorSelection& selection) { Destroy(); }
+
+LightDeleteOperation::LightDeleteOperation(LightSpot* light)
+	: LightEditOperation(light, 1), mSnapshot(LightSnapshot::Capture(*light))
+{
+}
+
+void LightDeleteOperation::Execute(EditorSelection& selection) { Destroy(); }
+
+void LightDeleteOperation::Undo(EditorSelection& selection) { Restore(mSnapshot); }
+
+/////////////////////////////////////
+// Player spawn
+/////////////////////////////////////
+
+SpawnTransformOperation::SpawnTransformOperation(const State& before, const State& after)
+	: EditOperation(1), mBefore(before), mAfter(after)
+{
+}
+
+void SpawnTransformOperation::Execute(EditorSelection& selection)
+{
+	gWorld->PlayerSpawn.Position = mAfter.Position;
+	gWorld->PlayerSpawn.Direction = mAfter.Direction;
+	gWorld->PlayerSpawn.bCustom = mAfter.bCustom;
+}
+
+void SpawnTransformOperation::Undo(EditorSelection& selection)
+{
+	gWorld->PlayerSpawn.Position = mBefore.Position;
+	gWorld->PlayerSpawn.Direction = mBefore.Direction;
+	gWorld->PlayerSpawn.bCustom = mBefore.bCustom;
 }
 
 
@@ -713,34 +757,25 @@ EditHistory::EditHistory(EditorSelection& selection) : mSelection(selection)
 	mOperations.InitCapacity(scMaxOperations);
 }
 
-EditOperationValue EditHistory::Push(const EditOperation& op)
+EditOperation& EditHistory::Push(std::unique_ptr<EditOperation> op)
 {
 	// Make room by dropping the oldest groups whole, so that no group is left half undoable
 	const uint32 capacity = mOperations.GetCapacity();
 
 	while (capacity > 0 && mOperations.GetSize() >= capacity) {
 		const uint32 size = mOperations.GetSize();
-		const uint32 evict = std::min(static_cast<uint32>(std::max(mOperations.First().GroupSize, 1)), size);
+		const uint32 evict = std::min(static_cast<uint32>(std::max(mOperations.First()->GroupSize, 1)), size);
 
 		for (uint32 i = 0; i < evict; i++) {
 			mOperations.PopFront();
 		}
 	}
 
-	EditOperation stamped = op;
+	EditOperation& pushed = *mOperations.Push(std::move(op));
 
-	if (stamped.pObject != nullptr && stamped.PushedObjectID.IsInvalid()) {
-		stamped.PushedObjectID = stamped.pObject->ID;
-	}
-	if (stamped.ValueB.Type == EditOperationValue::eValueType::Object && stamped.ValueB.pObject != nullptr &&
-		stamped.ValueObjectID.IsInvalid()) {
-		stamped.ValueObjectID = stamped.ValueB.pObject->ID;
-	}
-	if (stamped.Light.pLight != nullptr && stamped.Light.Id.IsInvalid()) {
-		stamped.Light.Id = stamped.Light.pLight->ID;
-	}
+	pushed.Execute(mSelection);
 
-	return mOperations.Push(std::move(stamped)).Execute(mSelection);
+	return pushed;
 }
 
 bool EditHistory::Undo()
@@ -752,29 +787,20 @@ bool EditHistory::Undo()
 	int32 remaining = 1;
 
 	for (bool first = true; remaining > 0; remaining--, first = false) {
-		EditOperation* op = mOperations.Undo();
-		if (op == nullptr) {
+		std::unique_ptr<EditOperation>* slot = mOperations.Undo();
+		if (slot == nullptr) {
 			break;
 		}
 
+		EditOperation& op = **slot;
+
 		if (first) {
-			remaining = std::max(op->GroupSize, 1);
+			remaining = std::max(op.GroupSize, 1);
 		}
 
-		op->Undo(mSelection);
+		op.Undo(mSelection);
 
-		// Undoing a dupe selects the original again, and undoing a delete selects the object it brings back
-		if (op->Type == EditOperation::eType::Dupe) {
-			Object* original = ResolveOpTarget(*op);
-			if (original != nullptr) {
-				mSelection.Add(original);
-			}
-		}
-		else if (op->Type == EditOperation::eType::Delete && op->pObject != nullptr) {
-			mSelection.Add(op->pObject);
-		}
-
-		selection_changed |= op->ChangesObjects();
+		selection_changed |= op.ChangesObjects();
 	}
 
 	return selection_changed;
@@ -787,27 +813,20 @@ bool EditHistory::Redo()
 	int32 remaining = 1;
 
 	for (bool first = true; remaining > 0; remaining--, first = false) {
-		EditOperation* op = mOperations.Redo();
-		if (op == nullptr) {
+		std::unique_ptr<EditOperation>* slot = mOperations.Redo();
+		if (slot == nullptr) {
 			break;
 		}
 
+		EditOperation& op = **slot;
+
 		if (first) {
-			remaining = std::max(op->GroupSize, 1);
+			remaining = std::max(op.GroupSize, 1);
 		}
 
-		const EditOperationValue result = op->Execute(mSelection);
+		op.Redo(mSelection);
 
-		// Redoing a dupe swaps the selection from the original over to its dupe
-		if (op->Type == EditOperation::eType::Dupe) {
-			mSelection.Remove(ResolveOpTarget(*op));
-		}
-
-		if (op->CreatesObject() && result.Type == EditOperationValue::eValueType::Object && result.pObject != nullptr) {
-			mSelection.Add(result.pObject);
-		}
-
-		selection_changed |= op->ChangesObjects();
+		selection_changed |= op.ChangesObjects();
 	}
 
 	return selection_changed;

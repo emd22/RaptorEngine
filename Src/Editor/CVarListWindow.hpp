@@ -3,6 +3,7 @@
 #include <wx/frame.h>
 #include <wx/timer.h>
 
+#include <string>
 #include <vector>
 
 class wxButton;
@@ -11,11 +12,7 @@ class wxListEvent;
 class wxStaticText;
 class wxTextCtrl;
 
-namespace fx {
-
-class CVarValue;
-
-namespace editor {
+namespace fx::editor {
 
 class CVarListWindow : public wxFrame
 {
@@ -24,13 +21,21 @@ public:
 
 	void RefreshList();
 
+	struct Row
+	{
+		std::string Name;
+		std::string Type;
+		std::string Value;
+	};
+
 private:
-	void RebuildRows(const CVarValue* previously_selected);
+	void ShowRows(std::vector<Row> rows);
+	void RebuildRows(const std::string& previously_selected);
 	void UpdateValues();
 	void ShowSelected();
 	void ApplyValue();
 
-	CVarValue* GetSelectedCVar() const;
+	const Row* GetSelectedRow() const;
 
 	void OnShow(wxShowEvent& event);
 	void OnTimer(wxTimerEvent& event);
@@ -46,9 +51,7 @@ private:
 
 	wxTimer mRefreshTimer;
 
-	/// CVars currently shown, in row order
-	std::vector<CVarValue*> mShown;
+	std::vector<Row> mShown;
 };
 
-} // namespace editor
-} // namespace fx
+} // namespace fx::editor

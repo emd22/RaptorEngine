@@ -97,7 +97,7 @@ PERMIF(USE_NORMAL_MAPS);
 	    const float3 tangent_ws = mul(input.vTangent.xyz, (float3x3)world_matrix);
 	PERMEND();
     // The handedness rides along untouched; the pixel shader rebuilds the bitangent from it
-    output.vTangentWS = float4(normalize(tangent_ws), input.vTangent.w);
+    output.vTangentWS = float4(tangent_ws * rsqrt(max(dot(tangent_ws, tangent_ws), 1e-12)), input.vTangent.w);
 PERMEND();
 
     output.vUV = input.vUV;
@@ -183,7 +183,7 @@ PERMEND();
         float tex_alpha = F_Sample(tAlbedo, input.vUV).a;
         float final_alpha = tex_alpha * material.fAlpha;
 
-        if (final_alpha < ALPHA_CUTOFF) {
+        if (final_alpha < GetAlphaCutoff(material)) {
             discard;
         }
     }

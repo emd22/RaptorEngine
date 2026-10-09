@@ -24,4 +24,12 @@ struct Material
 
 	/// How much of the surface texture's R channel is applied as ambient occlusion
 	float fOcclusionStrength;
+
+	float3 vEmissiveFactor;
+	float fAlphaCutoff;
 };
+
+float GetAlphaCutoff(Material material)
+{
+	return select(HAS_FLAG(material.Flags, MF_ALPHA_MASK), material.fAlphaCutoff, ALPHA_CUTOFF);
+}

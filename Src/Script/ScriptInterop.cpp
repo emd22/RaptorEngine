@@ -14,6 +14,7 @@
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
 #include <Renderer/LightProbe.hpp>
+#include <Script/ObjectScripts.hpp>
 #include <Weapon/WeaponSystem.hpp>
 #include <World.hpp>
 #include <algorithm>
@@ -31,12 +32,28 @@ static Object* N_object_get(uint32 id)
 	return gObjectManager->GetObject(obj_id);
 }
 
+static Object* N_object_find(const char* name)
+{
+	if (name == nullptr) {
+		return nullptr;
+	}
+
+	return gObjectManager->FindObject(HashStr32(name));
+}
+
 /////////////////////////////////////
 // Edit operations
 /////////////////////////////////////
 
-using editor::EditOperation;
-using editor::EditOperationValue;
+enum class eScriptOpType
+{
+	Move,
+	Scale,
+	Dupe,
+	Create,
+	Delete,
+	Rotate,
+};
 
 static Vec3f N_editor_push_op_vec3(Object* obj, int op_type, FLOAT4 original, FLOAT4 updated, int32 group_size)
 {
@@ -45,51 +62,34 @@ static Vec3f N_editor_push_op_vec3(Object* obj, int op_type, FLOAT4 original, FL
 		return Vec3f::sZero;
 	}
 
-	const EditOperationValue result = gEditor->PushEditOperation(EditOperation {
-		.Type = static_cast<EditOperation::eType>(op_type),
-		.pObject = obj,
-		.ValueA = EditOperationValue(Vec3f(original)),
-		.ValueB = EditOperationValue(Vec3f(updated)),
-		.GroupSize = group_size,
-	});
+	const Vec3f before(original);
+	const Vec3f after(updated);
 
-	return result.Position;
-#else
-	return Vec3f::sZero;
-#endif
-}
-
-static Object* N_editor_push_op_object(Object* obj, int op_type, Object* original, Object* updated, int32 group_size)
-{
-#ifdef FX_IS_EDITOR
-	if (obj == nullptr) {
-		return nullptr;
+	switch (static_cast<eScriptOpType>(op_type)) {
+	case eScriptOpType::Move:
+		gEditor->EmplaceEditOperation<editor::MoveOperation>(obj, before, after, group_size);
+		break;
+	case eScriptOpType::Rotate:
+		gEditor->EmplaceEditOperation<editor::RotateOperation>(obj, before, after, group_size);
+		break;
+	case eScriptOpType::Scale:
+		gEditor->EmplaceEditOperation<editor::ScaleFaceOperation>(obj, before, after.X, group_size);
+		break;
+	default:
+		LogWarning("Editor op type {} cannot be pushed with a vector", op_type);
+		return Vec3f::sZero;
 	}
 
-	const EditOperationValue result = gEditor->PushEditOperation(EditOperation {
-		.Type = static_cast<EditOperation::eType>(op_type),
-		.pObject = obj,
-		.ValueA = EditOperationValue(original),
-		.ValueB = EditOperationValue(updated),
-		.GroupSize = group_size,
-	});
-
-	return result.pObject;
+	return after;
 #else
-	return nullptr;
+	return Vec3f::sZero;
 #endif
 }
 
 static Object* N_editor_op_create_object(FLOAT4 position, int32 group_size)
 {
 #ifdef FX_IS_EDITOR
-	const EditOperationValue result = gEditor->PushEditOperation(EditOperation {
-		.Type = EditOperation::eType::Create,
-		.ValueA = EditOperationValue(Vec3f(position)),
-		.GroupSize = group_size,
-	});
-
-	return result.pObject;
+	return gEditor->EmplaceEditOperation<editor::CreateOperation>(Vec3f(position), group_size).GetCreated();
 #else
 	return nullptr;
 #endif
@@ -102,14 +102,7 @@ static Object* N_editor_op_dupe_object(Object* object_to_dupe, FLOAT4 position, 
 		return nullptr;
 	}
 
-	const EditOperationValue result = gEditor->PushEditOperation(EditOperation {
-		.Type = EditOperation::eType::Dupe,
-		.pObject = object_to_dupe,
-		.ValueA = EditOperationValue(Vec3f(position)),
-		.GroupSize = group_size,
-	});
-
-	return result.pObject;
+	return gEditor->EmplaceEditOperation<editor::DupeOperation>(object_to_dupe, Vec3f(position), group_size).GetDupe();
 #else
 	return nullptr;
 #endif
@@ -208,6 +201,24 @@ static float32 N_object_direction_scale(Object* obj, FLOAT4 direction)
 	}
 
 	return obj->GetDirectionScale(Vec3f(direction));
+}
+
+static FLOAT4 N_object_get_enter_direction(Object* obj)
+{
+	if (obj == nullptr) {
+		return simd::LoadFloat4(0.0f);
+	}
+
+	return gObjectScripts->GetEnterDirection(obj->ID).mIntrin;
+}
+
+static FLOAT4 N_object_get_exit_direction(Object* obj)
+{
+	if (obj == nullptr) {
+		return simd::LoadFloat4(0.0f);
+	}
+
+	return gObjectScripts->GetExitDirection(obj->ID).mIntrin;
 }
 
 static FLOAT4 N_object_local_to_world(Object* obj, FLOAT4 point)
@@ -457,15 +468,11 @@ static Object* N_blockout_create_box(FLOAT4 min, FLOAT4 max)
 		return gEditor->CreateDataBrush(brush.Planes, position);
 	}
 
-	EditOperation op {
-		.Type = EditOperation::eType::CreateBrush,
-	};
+	editor::ObjectSnapshot snapshot;
+	snapshot.Position = position;
+	snapshot.Material = gWorld->pBlockout->GetDefaultMaterial();
 
-	op.PlanesAfter = brush.Planes;
-	op.ObjectSnapshot.Position = position;
-	op.ObjectSnapshot.Material = gWorld->pBlockout->GetDefaultMaterial();
-
-	return gEditor->PushEditOperation(op).pObject;
+	return gEditor->EmplaceEditOperation<editor::CreateBrushOperation>(brush.Planes, snapshot).GetCreated();
 #else
 	return nullptr;
 #endif
@@ -484,31 +491,21 @@ static bool N_blockout_clip(Object* object, FLOAT4 point_a, FLOAT4 point_b, FLOA
 		return false;
 	}
 
-	EditOperation clip_op {
-		.Type = EditOperation::eType::BrushEdit,
-		.pObject = object,
-		.GroupSize = 2,
-	};
+	const Brush::PlaneList planes_before = brush->Planes;
+	Brush::PlaneList kept_planes;
+	Brush::PlaneList split_planes;
 
-	clip_op.PlanesBefore = brush->Planes;
+	editor::ObjectSnapshot split_snapshot = editor::ObjectSnapshot::Capture(
+		*object, gEditor->GetSelection().GetStoredMaterial(object));
+	split_snapshot.ObjectName = Name();
 
-	EditOperation split_op {
-		.Type = EditOperation::eType::CreateBrush,
-		.GroupSize = 2,
-	};
-
-	split_op.ObjectSnapshot = EditOperation::Snapshot::Capture(*object,
-															   gEditor->GetSelection().GetStoredMaterial(object));
-	split_op.ObjectSnapshot.ObjectName = Name();
-
-	if (!gWorld->pBlockout->GetClipPieces(object, Vec3f(point_a), Vec3f(point_b), Vec3f(face_normal),
-										  clip_op.PlanesAfter, split_op.PlanesAfter,
-										  split_op.ObjectSnapshot.Position)) {
+	if (!gWorld->pBlockout->GetClipPieces(object, Vec3f(point_a), Vec3f(point_b), Vec3f(face_normal), kept_planes,
+										  split_planes, split_snapshot.Position)) {
 		return false;
 	}
 
-	gEditor->PushEditOperation(clip_op);
-	gEditor->PushEditOperation(split_op);
+	gEditor->EmplaceEditOperation<editor::BrushEditOperation>(object, planes_before, kept_planes, 2);
+	gEditor->EmplaceEditOperation<editor::CreateBrushOperation>(split_planes, split_snapshot, 2);
 
 	return true;
 #else
@@ -529,7 +526,7 @@ static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter
 {
 	const editor::EditorSelection& selection = gEditor->GetSelection();
 
-	std::vector<EditOperation> ops;
+	std::vector<std::unique_ptr<editor::ObjectEditOperation>> ops;
 	std::vector<ObjectID> op_object_ids;
 	uint32 cut_count = 0;
 
@@ -564,42 +561,22 @@ static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter
 		cut_count++;
 
 		if (pieces.empty()) {
-			EditOperation remove_op {
-				.Type = EditOperation::eType::Delete,
-				.pObject = target,
-			};
-
-			remove_op.PlanesBefore = brush->Planes;
-			remove_op.ObjectSnapshot = EditOperation::Snapshot::Capture(*target, material);
-
-			ops.push_back(remove_op);
+			ops.push_back(std::make_unique<editor::DeleteOperation>(
+				target, brush->Planes, editor::ObjectSnapshot::Capture(*target, material)));
 			op_object_ids.push_back(id);
 
 			continue;
 		}
 
-		EditOperation edit_op {
-			.Type = EditOperation::eType::BrushEdit,
-			.pObject = target,
-		};
-
-		edit_op.PlanesBefore = brush->Planes;
-		edit_op.PlanesAfter = pieces[0];
-
-		ops.push_back(edit_op);
+		ops.push_back(std::make_unique<editor::BrushEditOperation>(target, brush->Planes, pieces[0]));
 		op_object_ids.push_back(id);
 
 		for (uint32 i = 1; i < pieces.size(); i++) {
-			EditOperation create_op {
-				.Type = EditOperation::eType::CreateBrush,
-			};
+			editor::ObjectSnapshot snapshot = editor::ObjectSnapshot::Capture(*target, material);
+			snapshot.ObjectName = Name();
+			snapshot.Position = positions[i];
 
-			create_op.PlanesAfter = pieces[i];
-			create_op.ObjectSnapshot = EditOperation::Snapshot::Capture(*target, material);
-			create_op.ObjectSnapshot.ObjectName = Name();
-			create_op.ObjectSnapshot.Position = positions[i];
-
-			ops.push_back(create_op);
+			ops.push_back(std::make_unique<editor::CreateBrushOperation>(pieces[i], snapshot));
 			op_object_ids.push_back(ObjectID::scNull);
 		}
 	}
@@ -611,15 +588,9 @@ static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter
 	if (!keep_cutter) {
 		const Brush* cutter_brush = gWorld->pBlockout->GetBrush(cutter);
 
-		EditOperation remove_op {
-			.Type = EditOperation::eType::Delete,
-			.pObject = cutter,
-		};
-
-		remove_op.PlanesBefore = cutter_brush->Planes;
-		remove_op.ObjectSnapshot = EditOperation::Snapshot::Capture(*cutter, selection.GetStoredMaterial(cutter));
-
-		ops.push_back(remove_op);
+		ops.push_back(std::make_unique<editor::DeleteOperation>(
+			cutter, cutter_brush->Planes,
+			editor::ObjectSnapshot::Capture(*cutter, selection.GetStoredMaterial(cutter))));
 		op_object_ids.push_back(cutter->ID);
 	}
 
@@ -629,13 +600,13 @@ static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter
 	}
 
 	for (uint32 i = 0; i < ops.size(); i++) {
-		ops[i].GroupSize = static_cast<int32>(ops.size());
+		ops[i]->GroupSize = static_cast<int32>(ops.size());
 
 		if (!op_object_ids[i].IsInvalid()) {
-			ops[i].pObject = gObjectManager->GetObject(op_object_ids[i]);
+			ops[i]->Retarget(gObjectManager->GetObject(op_object_ids[i]));
 		}
 
-		gEditor->PushEditOperation(ops[i]);
+		gEditor->PushEditOperation(std::move(ops[i]));
 	}
 
 	return cut_count;
@@ -691,19 +662,14 @@ static void N_blockout_edit_face_texture(Object* object, FLOAT4 face, uint32 edi
 
 	const Vec3f amount_vec(amount);
 
-	EditOperation op {
-		.Type = EditOperation::eType::BrushEdit,
-		.pObject = object,
-	};
-
-	op.PlanesBefore = brush->Planes;
+	Brush::PlaneList planes_after;
 
 	if (!gWorld->pBlockout->GetFaceTextureEdit(object, Vec3f(face), static_cast<eFaceTextureEdit>(edit),
-											   Vec2f(amount_vec.X, amount_vec.Y), op.PlanesAfter)) {
+											   Vec2f(amount_vec.X, amount_vec.Y), planes_after)) {
 		return;
 	}
 
-	gEditor->PushEditOperation(op);
+	gEditor->EmplaceEditOperation<editor::BrushEditOperation>(object, brush->Planes, planes_after);
 #endif
 }
 
@@ -769,6 +735,7 @@ static void N_cvar_set_float(const char* name, float32 value) { gCVars->Set(name
 static void N_cvar_set_string(const char* name, const char* value) { gCVars->Set(name, value); }
 
 static int64 N_cvar_get_int(const char* name, int64 fallback) { return gCVars->Get(name, fallback); }
+static float32 N_cvar_get_float(const char* name, float32 fallback) { return gCVars->Get(name, fallback); }
 
 static float32 N_random_range(float32 lo, float32 hi)
 {
@@ -831,9 +798,9 @@ static const PredefExtern scAvailableExterns[] = {
 
 	/* Object functions  */
 	PREDEF("object_get", N_object_get),
+	PREDEF("object_find", N_object_find),
 
 	PREDEF("editor_push_op_vec", N_editor_push_op_vec3),
-	PREDEF("editor_push_op_obj", N_editor_push_op_object),
 	PREDEF("editor_push_op_delete", N_editor_push_op_delete),
 	PREDEF("editor_op_create_object", N_editor_op_create_object),
 	PREDEF("editor_op_dupe_object", N_editor_op_dupe_object),
@@ -846,6 +813,8 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("OBJECT_get_tags", N_object_get_tags),
 	PREDEF("OBJECT_set_tags", N_object_set_tags),
 	PREDEF("OBJECT_ray_get_face", N_object_ray_get_face),
+	PREDEF("OBJECT_get_enter_direction", N_object_get_enter_direction),
+	PREDEF("OBJECT_get_exit_direction", N_object_get_exit_direction),
 	PREDEF("OBJECT_local_to_world", N_object_local_to_world),
 	PREDEF("OBJECT_local_dir_to_world", N_object_local_dir_to_world),
 	PREDEF("OBJECT_direction_scale", N_object_direction_scale),
@@ -906,6 +875,7 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("cvar_set_string", N_cvar_set_string),
 
 	PREDEF("cvar_get_int", N_cvar_get_int),
+	PREDEF("cvar_get_float", N_cvar_get_float),
 
 	PREDEF("random_range", N_random_range),
 

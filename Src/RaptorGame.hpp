@@ -104,8 +104,6 @@ private:
 	void SpawnDebugNPC(Object* model);
 
 public:
-	Ref<LightDirectional> pSun { nullptr };
-
 	// TODO: Player attachment system
 	TSRef<Object> pPistolObject { nullptr };
 	TSRef<Object> pArmsObject { nullptr };

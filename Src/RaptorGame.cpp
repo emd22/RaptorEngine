@@ -249,7 +249,7 @@ void RaptorGame::CreateGame()
 	mCrosshairTicket = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm, scCrosshairPath,
 												eImageCreateFlags::None);
 
-	// Runs on the asset thread, RenderCrosshair() starts drawing once it's set
+	// RenderCrosshair() starts drawing once it's set
 	mCrosshairTicket.OnLoaded([this](void* data) { mpCrosshair.store(static_cast<Image*>(data)); });
 
 	WorldFile scene_file;
@@ -262,9 +262,6 @@ void RaptorGame::CreateGame()
 	// Baked probes if the scene has them, procedural gradient otherwise.
 	gProbeManager->LoadProbes();
 
-	pSun = gLightManager->GetDirectionalLight();
-
-
 	gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(Vec3f(0, 8, 5), Vec3f(0.0f, 8.0f, -2.0f), Vec3f(0, 1, 0));
 	gShadowRenderer->ShadowCamera.SetFarPlane(400.0f);
 	gShadowRenderer->ShadowCamera.SetNearPlane(0.1f);
@@ -275,6 +272,8 @@ void RaptorGame::CreateGame()
 	CreateLights();
 
 #ifdef FX_IS_EDITOR
+	gEditor->BeginGameLoop();
+
 	gEditor->SetReloadHandler(editor::eReloadTarget::World, [this] { ReloadWorldFile(); });
 	gEditor->SetReloadHandler(editor::eReloadTarget::Prototype, [this] { ReloadBlockout(); });
 	gEditor->SetReloadHandler(editor::eReloadTarget::Scripts, [this] { ReloadScripts(); });
@@ -304,6 +303,10 @@ void RaptorGame::CreateGame()
 		}
 #endif
 	}
+
+#ifdef FX_IS_EDITOR
+	gEditor->EndGameLoop();
+#endif
 }
 
 
@@ -1005,6 +1008,11 @@ void RaptorGame::Tick()
 		mFpsWindowStartFrame = elapsed_frames;
 	}
 
+	gAssetManager->DispatchCallbacks();
+
+#ifdef FX_IS_EDITOR
+	gEditor->ProcessGUIOperations();
+#endif
 
 	ControlManager::Update();
 
@@ -1026,9 +1034,12 @@ void RaptorGame::Tick()
 		gEditor->Update(static_cast<float32>(DeltaTime));
 #endif
 	}
+	else {
+		gWorld->Player.Move(DeltaTime, Vec3f::sZero);
+	}
 
 #ifdef FX_IS_EDITOR
-	gEditor->RefreshPanels();
+	gEditor->SyncPanels();
 #endif
 
 	gWorld->Player.Update(DeltaTime);
@@ -1037,11 +1048,15 @@ void RaptorGame::Tick()
 	Ref<PerspectiveCamera> camera = gWorld->Player.pCamera;
 
 	// Set from the scene file (see WorldFile::Load), or from the console
-	pSun->bEnabled = gCVars->Get("b_sun_enabled", true);
+	LightDirectional* sun = gLightManager->GetDirectionalLight();
 
-	if (pSun->bEnabled) {
-		gShadowRenderer->PlaceCamera(gShadowRenderer->ShadowCamera, gWorld->Player.Position,
-									 pSun->GetPosition().Normalize());
+	if (sun != nullptr) {
+		sun->bEnabled = gCVars->Get("b_sun_enabled", true);
+
+		if (sun->bEnabled) {
+			gShadowRenderer->PlaceCamera(gShadowRenderer->ShadowCamera, gWorld->Player.Position,
+										 sun->GetPosition().Normalize());
+		}
 	}
 
 	if (gGraphics->BeginFrame() != eFrameResult::Success) {

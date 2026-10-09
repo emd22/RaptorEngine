@@ -215,6 +215,8 @@ struct AssetQueueItem
 			std::free(const_cast<uint8*>(pcRawData));
 			pcRawData = nullptr;
 		}
+
+		ImgInfo.FreeOwnedData();
 	}
 
 	LockContext<AssetItemData> GetDataContext() { return LockContext<AssetItemData>(mMutex, Data); }

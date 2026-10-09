@@ -49,6 +49,10 @@ static PipelineHandle GetPipelineForMaterial(const MaterialID& material_id)
 {
 	Material* material = MaterialManagerFwd::GetMaterial(material_id);
 
+	if (material == nullptr) {
+		material = MaterialManagerFwd::GetMaterial(MaterialID::scNull);
+	}
+
 	const ePipelinePass pass = IsTransparentMaterial(material) ? ePipelinePass::ForwardBlend : ePipelinePass::Forward;
 	const PipelineHandle pipeline = gPipelineCache->GetOrCreateVariant(pass, material->GetPipelineFeatures());
 
@@ -77,16 +81,17 @@ static void AddObjectToRenderList(Object* object, World* scene)
 	}
 
 	if (!object->AttachedNodes.IsEmpty()) {
-		LogInfo("Listing attached nodes for {}:", object->ID.GetID());
-
 		for (const ObjectID& attach_id : object->AttachedNodes) {
 			Object* attached_object = gObjectManager->GetObject(attach_id);
+
+			if (attached_object == nullptr) {
+				continue;
+			}
 
 			if (object->IsShadowCaster()) {
 				attached_object->SetShadowCaster(true);
 			}
 
-			LogInfo("   Object {}", attach_id.GetID());
 			AddObjectToRenderList(attached_object, scene);
 		}
 	}
@@ -116,7 +121,19 @@ void World::Attach(AssetTicket object_ticket)
 
 	object->OnAttached(this);
 
-	object_ticket.OnLoaded([this](void* item_ptr) { AddLoadedObject(static_cast<Object*>(item_ptr)); });
+	const ObjectID object_id = object->ID;
+
+	object_ticket.OnLoaded(
+		[this, object_id](void* item_ptr)
+		{
+			Object* loaded_object = static_cast<Object*>(item_ptr);
+
+			if (gObjectManager->GetObject(object_id) != loaded_object) {
+				return;
+			}
+
+			AddLoadedObject(loaded_object);
+		});
 }
 
 void World::Detach(ObjectID id)
@@ -418,6 +435,7 @@ void World::ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Cam
 		// Push the direct index for the object id
 		consts.ObjectIndex = object_id.GetID();
 		consts.BoneBase = object->BoneBufferBase;
+		consts.MaterialIndex = object->GetMaterialID().GetID();
 		gGraphics->SubmitPushConstants(cmd, selector.Select(object, cmd), eShaderType::Vertex, consts);
 		object->RenderPrimitive(cmd);
 	}
@@ -543,6 +561,7 @@ void World::BakeSpotShadows()
 
 			consts.ObjectIndex = caster_id.GetID();
 			consts.BoneBase = caster->BoneBufferBase;
+			consts.MaterialIndex = caster->GetMaterialID().GetID();
 			gGraphics->SubmitPushConstants(cmd, selector.Select(caster, cmd), eShaderType::Vertex, consts);
 			caster->RenderPrimitive(cmd);
 		}

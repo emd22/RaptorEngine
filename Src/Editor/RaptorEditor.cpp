@@ -4,6 +4,7 @@
 
 #include "EditorFrame.hpp"
 #include "EditorPlatform.hpp"
+#include "EditorThread.hpp"
 #include "EditorViewport.hpp"
 #include "ObjectPropertiesPanel.hpp"
 #include "ToolSettingsPanel.hpp"
@@ -13,6 +14,8 @@
 #include <wx/evtloop.h>
 #include <wx/image.h>
 #include <wx/init.h>
+#include <wx/timer.h>
+#include <wx/toplevel.h>
 
 #include <Blockout.hpp>
 #include <CVar.hpp>
@@ -25,6 +28,7 @@
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
 #include <Renderer/DebugDraw.hpp>
+#include <Renderer/Exposure.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/Light.hpp>
@@ -34,11 +38,12 @@
 #include <Script/ScriptManager.hpp>
 #include <World.hpp>
 #include <algorithm>
+#include <chrono>
+#include <format>
 
 
 namespace fx::editor {
 
-/// Raptor controls the frame loop, so the app has nothing to do on init
 class EditorApp : public wxApp
 {
 public:
@@ -50,8 +55,11 @@ public:
 };
 
 
-/// Upper bound on native events dispatched per frame, so a flood of them can't stall rendering
-static constexpr uint32 scMaxEventsPerFrame = 256;
+static constexpr uint32 scMaxEventsPerPump = 256;
+
+static constexpr unsigned long scUILoopWaitMs = 10;
+
+static constexpr std::chrono::milliseconds scPanelSyncInterval(100);
 
 /// How far away objects can be picked
 static constexpr float32 scPickRange = 4.0f;
@@ -91,7 +99,10 @@ static constexpr uint32 scDataTools[static_cast<uint32>(eDataFilter::Count)] = {
 };
 
 static constexpr eEditorTool scFallbackTools[] = {
-	eEditorTool::Translate, eEditorTool::Face, eEditorTool::Create, eEditorTool::Light,
+	eEditorTool::Translate,
+	eEditorTool::Face,
+	eEditorTool::Create,
+	eEditorTool::Light,
 };
 
 static const char* const scCommandScriptPath = "./Scripts/editor/editor_cmd.strata";
@@ -103,6 +114,8 @@ static const char* const scCommandScriptPath = "./Scripts/editor/editor_cmd.stra
 
 bool RaptorEditor::InitGUI(int argc, char** argv)
 {
+	thread::InitUIThread();
+
 	wxApp::SetInstance(new EditorApp);
 
 	if (!wxEntryStart(argc, argv)) {
@@ -125,17 +138,24 @@ bool RaptorEditor::InitGUI(int argc, char** argv)
 	mpEventLoop = new wxGUIEventLoop;
 	wxEventLoopBase::SetActive(mpEventLoop);
 
+	thread::SetUIWakeHandler([this] { mpEventLoop->WakeUp(); });
+
+	return true;
+}
+
+void RaptorEditor::InitTools()
+{
 	AddTools();
 
 	mpCommandScript = gScriptManager->LoadScript(scCommandScriptPath);
-
-	return true;
 }
 
 EditorFrame* RaptorEditor::CreateMainFrame(const char* title, const Vec2u& viewport_size)
 {
 	mpMainFrame = new EditorFrame(wxString::FromAscii(title),
 								  wxSize(static_cast<int>(viewport_size.X), static_cast<int>(viewport_size.Y)));
+
+	mpMainFrame->SetInteractive(false);
 
 	mpMainFrame->Show();
 	mpMainFrame->Raise();
@@ -145,58 +165,311 @@ EditorFrame* RaptorEditor::CreateMainFrame(const char* title, const Vec2u& viewp
 	platform::ActivateApp();
 #endif
 
-	mpMainFrame->ShowMode(mMode, mDataFilter);
+	mpMainFrame->ShowMode(mMode, mDataFilter, GetAvailableToolMask());
 	mpMainFrame->GetViewport()->SetFocus();
 
 	// Get the frame on screen and laid out before the renderer creates its surface on the viewport
-	PumpEvents();
+	DispatchEvents(0);
+
+	EditorViewport* viewport = mpMainFrame->GetViewport();
+	viewport->UpdateCachedSize();
+	viewport->ConsumeResize();
 
 	return mpMainFrame;
 }
 
-bool RaptorEditor::PumpEvents()
+bool RaptorEditor::IsCloseRequested() const { return mpMainFrame != nullptr && mpMainFrame->IsCloseRequested(); }
+
+
+void RaptorEditor::DispatchEvents(unsigned long wait_ms)
 {
-	if (mpEventLoop == nullptr || mpMainFrame == nullptr) {
-		return false;
+	if (mpEventLoop == nullptr) {
+		return;
 	}
 
-	for (uint32 i = 0; i < scMaxEventsPerFrame; i++) {
-		if (mpEventLoop->DispatchTimeout(0) != 1) {
-			break;
-		}
+	int dispatched = mpEventLoop->DispatchTimeout(wait_ms);
+
+	for (uint32 i = 1; i < scMaxEventsPerPump && dispatched == 1; i++) {
+		dispatched = mpEventLoop->DispatchTimeout(0);
 	}
 
 	wxTheApp->ProcessPendingEvents();
 	wxTheApp->ProcessIdle();
-
-	EditorViewport* viewport = mpMainFrame->GetViewport();
-
-	viewport->PollRelativeMouse();
-
-	// Rebuild once for however many size events arrived
-	if (viewport->ConsumeResize() && renderer::gGraphics != nullptr && renderer::gGraphics->GetWindow() != nullptr) {
-		const wxSize size = viewport->GetClientSize();
-
-		if (size.x > 0 && size.y > 0) {
-			renderer::gGraphics->RebuildToResizedWindow();
-		}
-	}
-
-	return !mpMainFrame->IsCloseRequested();
 }
 
-void RaptorEditor::RefreshPanels()
+
+void RaptorEditor::PumpUI(unsigned long wait_ms)
+{
+	DispatchEvents(wait_ms);
+
+	if (mpMainFrame != nullptr) {
+		mpMainFrame->GetViewport()->PollRelativeMouse();
+
+#ifdef FX_PLATFORM_MACOS
+		mbAppActive = platform::IsAppActive();
+#else
+		mbAppActive = mpMainFrame->IsActive();
+#endif
+	}
+
+	thread::RunUITasks();
+}
+
+void RaptorEditor::RunUILoop()
+{
+	while (!mbGameFinished) {
+		PumpUI(scUILoopWaitMs);
+	}
+}
+
+void RaptorEditor::NotifyGameFinished()
+{
+	mbGameFinished = true;
+
+	if (mpEventLoop != nullptr) {
+		mpEventLoop->WakeUp();
+	}
+}
+
+void RaptorEditor::LockdownGUI()
 {
 	if (mpMainFrame == nullptr) {
 		return;
 	}
 
-	mpMainFrame->GetWorldPropertiesPanel()->Update();
-	mpMainFrame->GetObjectPropertiesPanel()->ShowObject(mSelection.GetLast());
+	for (wxWindowList::compatibility_iterator node = wxTopLevelWindows.GetFirst(); node != nullptr;
+		 node = node->GetNext()) {
+		wxWindow* window = node->GetData();
 
-	if (ToolSettingsBasePanel* tool_settings = mpMainFrame->GetToolSettingsPanel(); tool_settings != nullptr) {
-		tool_settings->Refresh();
+		if (window != mpMainFrame) {
+			window->Hide();
+		}
 	}
+
+	mpMainFrame->SetInteractive(false);
+}
+
+
+void RaptorEditor::BeginGameLoop()
+{
+	mGamePhase = eGamePhase::Running;
+
+	thread::PostToUI([this] { mpMainFrame->SetInteractive(true); });
+}
+
+void RaptorEditor::EndGameLoop()
+{
+	thread::RunOnUIAndWait([this] { LockdownGUI(); });
+
+	mGamePhase = eGamePhase::Stopped;
+}
+
+void RaptorEditor::ProcessGUIOperations()
+{
+	if (thread::RunGameTasks() > 0) {
+		mbForcePanelSync = true;
+	}
+}
+
+void RaptorEditor::ServiceViewportResize()
+{
+	if (mpMainFrame == nullptr) {
+		return;
+	}
+
+	EditorViewport* viewport = mpMainFrame->GetViewport();
+
+	// Rebuild once for however many size events arrived
+	if (!viewport->ConsumeResize() || renderer::gGraphics == nullptr || renderer::gGraphics->GetWindow() == nullptr) {
+		return;
+	}
+
+	const Vec2u size = viewport->GetCachedSize();
+
+	if (size.X > 0 && size.Y > 0) {
+		renderer::gGraphics->RebuildToResizedWindow();
+	}
+}
+
+uint32 RaptorEditor::GetAvailableToolMask() const
+{
+	uint32 mask = 0;
+
+	for (uint32 i = 0; i < static_cast<uint32>(eEditorTool::Count); i++) {
+		if (IsToolAvailable(static_cast<eEditorTool>(i))) {
+			mask |= (1u << i);
+		}
+	}
+
+	return mask;
+}
+
+EditorPanelState RaptorEditor::BuildPanelState()
+{
+	EditorPanelState state;
+
+	if (gWorld->pBlockout != nullptr) {
+		const MaterialLibrary& library = gWorld->pBlockout->GetMaterialLibrary();
+
+		for (uint32 id = 0; id < library.GetCount(); id++) {
+			state.Materials.Names.push_back(library.GetName(MaterialLibraryID(id)).Str());
+			state.Materials.DiffusePaths.push_back(library.GetDiffusePath(MaterialLibraryID(id)).Str());
+		}
+	}
+
+	state.BlockoutPath = gWorld->BlockoutPath.Str();
+
+	if (Object* object = mSelection.GetLast(); object != nullptr) {
+		ObjectPanelState& panel = state.Object;
+
+		panel.bHasObject = true;
+		panel.bIsBlockout = object->HasTags(eObjectTag::Blockout);
+		panel.Name = object->Name.Get().Str();
+		panel.SelectedCount = mSelection.GetCount();
+		panel.Tags = static_cast<uint32>(object->Tags);
+		panel.Flags = static_cast<uint32>(object->GetFlags());
+
+		for (uint32 bit = 0; bit < 32; bit++) {
+			if (CanEditObjectTag(object, 1u << bit)) {
+				panel.EditableTags |= (1u << bit);
+			}
+
+			if (CanEditObjectFlag(object, 1u << bit)) {
+				panel.EditableFlags |= (1u << bit);
+			}
+		}
+
+		if (gWorld->pBlockout != nullptr) {
+			panel.MaterialSlot = gWorld->pBlockout->GetIDForMaterial(mSelection.GetStoredMaterial(object)).ID;
+		}
+
+		panel.bCanAttachScript = CanAttachScript(object);
+
+		if (panel.bCanAttachScript) {
+			panel.bScriptErrors = gObjectScripts->HasErrors(object->ID);
+			panel.ScriptPath = gObjectScripts->GetPath(object->ID).Str();
+		}
+
+		panel.bIsTrigger = object->IsTrigger();
+
+		Vec3f enter_direction;
+
+		if (panel.bIsTrigger && gObjectScripts->TryGetRequiredEnterDirection(object->ID, enter_direction)) {
+			panel.bHasEnterDirection = true;
+			panel.EnterDirection[0] = enter_direction.X;
+			panel.EnterDirection[1] = enter_direction.Y;
+			panel.EnterDirection[2] = enter_direction.Z;
+		}
+	}
+
+	WorldPanelState& world = state.World;
+
+	ExposureSettings exposure;
+
+	world.Aperture = gCVars->Get("r_aperture", exposure.Aperture);
+	world.ShutterTime = gCVars->Get("r_shutter", exposure.ShutterTime);
+	world.ISO = gCVars->Get("r_iso", exposure.ISO);
+	world.Compensation = gCVars->Get("r_exposure_ev", exposure.Compensation);
+
+	world.DebugMask = gCVars->Get("r_debug_bounds", int64 { 0 });
+	world.bReflectionsEnabled = gCVars->Get("r_reflection_probes", int64 { 1 }) != 0;
+	world.bReflectionFallback = gCVars->Get("r_reflection_level_probe", int64 { 0 }) != 0;
+	world.ReflectionDebugView = std::clamp<int64>(gCVars->Get("r_reflection_debug", int64 { 0 }), 0, 2);
+
+	const uint32 probe_count = gProbeManager->GetReflectionProbeCount();
+
+	if (gProbeManager->IsBakingReflections()) {
+		world.ReflectionStatus = std::format("Baking {} probe(s)...", probe_count);
+	}
+	else if (gProbeManager->IsBaking()) {
+		world.ReflectionStatus = "Baking irradiance...";
+	}
+	else if (probe_count == 0) {
+		world.ReflectionStatus = "No reflection probes";
+	}
+	else if (gProbeManager->AreReflectionsBaked()) {
+		world.ReflectionStatus = std::format("{} probe(s), baked", probe_count);
+	}
+	else {
+		world.ReflectionStatus = std::format("{} probe(s), needs a bake", probe_count);
+	}
+
+	if (LightSpot* light = mLightEditor.GetSelected(); light != nullptr) {
+		LightPanelState& panel = state.Light;
+
+		const Vec3f position = light->GetPosition();
+
+		panel.bHasLight = true;
+		panel.Name = light->Name.Get().Str();
+		panel.ColorR = light->Color.R;
+		panel.ColorG = light->Color.G;
+		panel.ColorB = light->Color.B;
+		panel.PositionX = position.X;
+		panel.PositionY = position.Y;
+		panel.PositionZ = position.Z;
+		panel.Radius = light->GetRadius();
+		panel.Intensity = light->Intensity;
+		panel.Lumens = light->GetLumens();
+		panel.OuterAngleDegrees = MathUtil::RadiansToDegrees(light->GetOuterAngle());
+		panel.InnerAngleDegrees = MathUtil::RadiansToDegrees(light->GetInnerAngle());
+	}
+
+	return state;
+}
+
+void RaptorEditor::SyncPanels()
+{
+	if (mpMainFrame == nullptr || mGamePhase != eGamePhase::Running) {
+		return;
+	}
+
+	const auto now = std::chrono::steady_clock::now();
+
+	if (!mbForcePanelSync && (now - mLastPanelSync) < scPanelSyncInterval) {
+		return;
+	}
+
+	mLastPanelSync = now;
+
+	EditorPanelState state = BuildPanelState();
+
+	if (!mbForcePanelSync && state == mLastSentState) {
+		return;
+	}
+
+	mbForcePanelSync = false;
+	mLastSentState = state;
+
+	bool needs_post = false;
+
+	{
+		std::lock_guard lock(mPendingStateMutex);
+
+		mPendingState = std::move(state);
+		needs_post = !mbStatePosted;
+		mbStatePosted = true;
+	}
+
+	if (!needs_post) {
+		return;
+	}
+
+	thread::PostToUI(
+		[this]
+		{
+			EditorPanelState latest;
+
+			{
+				std::lock_guard lock(mPendingStateMutex);
+
+				latest = std::move(mPendingState);
+				mbStatePosted = false;
+			}
+
+			if (mpMainFrame != nullptr) {
+				mpMainFrame->ApplyState(latest);
+			}
+		});
 }
 
 void RaptorEditor::SetReloadHandler(eReloadTarget target, std::function<void()> handler)
@@ -467,9 +740,9 @@ void RaptorEditor::PickObject()
 
 	if (IsDataMode()) {
 		float32 volume_distance = 0.0f;
-		Object* volume = gWorld->RaycastProbeVolumes(camera->Position, pick_direction, scDataPickRange,
-													 volume_distance,
-													 [this](const Object& object) { return IsObjectSelectable(&object); });
+		Object* volume = gWorld->RaycastProbeVolumes(camera->Position, pick_direction, scDataPickRange, volume_distance,
+													 [this](const Object& object)
+													 { return IsObjectSelectable(&object); });
 
 		float32 spawn_distance = 0.0f;
 		const bool spawn_hit = IsSpawnPointShown() &&
@@ -707,13 +980,14 @@ void RaptorEditor::SetTool(eEditorTool tool)
 		mpCurrentTool->Enter();
 
 		if (mpMainFrame != nullptr) {
-			mpMainFrame->SetToolSettingsPanel(mpCurrentTool->CreateSettingsPanel());
+			thread::PostToUI([this, tool = mpCurrentTool]
+							 { mpMainFrame->SetToolSettingsPanel(tool->CreateSettingsPanel()); });
 		}
 	}
 
 	// Also run when the tool is unchanged, as clicking the selected tool's button toggles it off
 	if (mpMainFrame != nullptr) {
-		mpMainFrame->ShowSelectedTool(mCurrentToolType);
+		thread::PostToUI([this, tool_type = mCurrentToolType] { mpMainFrame->ShowSelectedTool(tool_type); });
 	}
 }
 
@@ -747,7 +1021,8 @@ void RaptorEditor::EnsureToolAvailable()
 void RaptorEditor::ShowMode()
 {
 	if (mpMainFrame != nullptr) {
-		mpMainFrame->ShowMode(mMode, mDataFilter);
+		thread::PostToUI([this, mode = mMode, filter = mDataFilter, mask = GetAvailableToolMask()]
+						 { mpMainFrame->ShowMode(mode, filter, mask); });
 	}
 }
 
@@ -1030,16 +1305,16 @@ void RaptorEditor::SetStoredMaterial(Object* object, MaterialID material)
 // Edit operations
 /////////////////////////////////////
 
-EditOperationValue RaptorEditor::PushEditOperation(const EditOperation& op)
+EditOperation& RaptorEditor::PushEditOperation(std::unique_ptr<EditOperation> op)
 {
-	const EditOperationValue result = mHistory.Push(op);
+	EditOperation& pushed = mHistory.Push(std::move(op));
 
 	// Deleting an object takes it out of the selection
-	if (op.ChangesObjects()) {
+	if (pushed.ChangesObjects()) {
 		SyncSelection();
 	}
 
-	return result;
+	return pushed;
 }
 
 void RaptorEditor::DeleteObject(Object* object, int32 group_size)
@@ -1049,19 +1324,12 @@ void RaptorEditor::DeleteObject(Object* object, int32 group_size)
 	}
 
 	// Snapshot everything Undo needs before the Execute step destroys the object.
-	EditOperation op {
-		.Type = EditOperation::eType::Delete,
-		.pObject = object,
-		.GroupSize = group_size,
-	};
-
 	const Brush* brush = gWorld->pBlockout->GetBrush(object);
-	op.PlanesBefore = (brush != nullptr) ? brush->Planes
-										 : Brush::FromBox(object->Bounds.Min, object->Bounds.Max).Planes;
+	const Brush::PlaneList planes = (brush != nullptr) ? brush->Planes
+													   : Brush::FromBox(object->Bounds.Min, object->Bounds.Max).Planes;
 
-	op.ObjectSnapshot = EditOperation::Snapshot::Capture(*object, mSelection.GetStoredMaterial(object));
-
-	PushEditOperation(op);
+	EmplaceEditOperation<DeleteOperation>(
+		object, planes, ObjectSnapshot::Capture(*object, mSelection.GetStoredMaterial(object)), group_size);
 }
 
 void RaptorEditor::CreateObjectAtCrosshair()
@@ -1073,12 +1341,7 @@ void RaptorEditor::CreateObjectAtCrosshair()
 
 	const Vec3f origin = SnapToGrid(hit.bHit ? hit.Point : Vec3f::sZero);
 
-	const EditOperationValue created = PushEditOperation(EditOperation {
-		.Type = EditOperation::eType::Create,
-		.ValueA = EditOperationValue(origin),
-	});
-
-	SelectObject(created.pObject, false);
+	SelectObject(EmplaceEditOperation<CreateOperation>(origin).GetCreated(), false);
 }
 
 static bool IsCreatableDataKind(eDataFilter filter)
@@ -1093,18 +1356,14 @@ Object* RaptorEditor::CreateDataBrush(const Brush::PlaneList& planes, const Vec3
 		return nullptr;
 	}
 
-	EditOperation op {
-		.Type = EditOperation::eType::CreateBrush,
-	};
+	ObjectSnapshot snapshot;
+	snapshot.Position = position;
+	snapshot.Material = gWorld->pBlockout->GetDefaultMaterial();
+	snapshot.bIsProbeVolume = (mDataFilter != eDataFilter::Volumes);
+	snapshot.bIsReflectionProbe = (mDataFilter == eDataFilter::ReflectionProbes);
+	snapshot.bIsTrigger = (mDataFilter == eDataFilter::Volumes);
 
-	op.PlanesAfter = planes;
-	op.ObjectSnapshot.Position = position;
-	op.ObjectSnapshot.Material = gWorld->pBlockout->GetDefaultMaterial();
-	op.ObjectSnapshot.bIsProbeVolume = (mDataFilter != eDataFilter::Volumes);
-	op.ObjectSnapshot.bIsReflectionProbe = (mDataFilter == eDataFilter::ReflectionProbes);
-	op.ObjectSnapshot.bIsTrigger = (mDataFilter == eDataFilter::Volumes);
-
-	Object* created = PushEditOperation(op).pObject;
+	Object* created = EmplaceEditOperation<CreateBrushOperation>(planes, snapshot).GetCreated();
 
 	if (created != nullptr) {
 		SelectObject(created, false);
@@ -1157,17 +1416,13 @@ Object* RaptorEditor::CreateReflectionProbeAtPlayer()
 		return nullptr;
 	}
 
-	EditOperation op {
-		.Type = EditOperation::eType::CreateBrush,
-	};
+	ObjectSnapshot snapshot;
+	snapshot.Position = position;
+	snapshot.Material = gWorld->pBlockout->GetDefaultMaterial();
+	snapshot.bIsProbeVolume = true;
+	snapshot.bIsReflectionProbe = true;
 
-	op.PlanesAfter = brush.Planes;
-	op.ObjectSnapshot.Position = position;
-	op.ObjectSnapshot.Material = gWorld->pBlockout->GetDefaultMaterial();
-	op.ObjectSnapshot.bIsProbeVolume = true;
-	op.ObjectSnapshot.bIsReflectionProbe = true;
-
-	Object* created = PushEditOperation(op).pObject;
+	Object* created = EmplaceEditOperation<CreateBrushOperation>(brush.Planes, snapshot).GetCreated();
 
 	if (created != nullptr) {
 		SelectObject(created, false);
@@ -1220,18 +1475,7 @@ uint32 RaptorEditor::SetSelectionObjectBit(bool is_tag, uint32 bit, bool enabled
 	}
 
 	for (uint32 i = 0; i < count; i++) {
-		EditOperation op {
-			.Type = EditOperation::eType::ObjectStateEdit,
-			.pObject = targets[i],
-			.GroupSize = static_cast<int32>(count),
-		};
-
-		op.StateEdit.Bit = bit;
-		op.StateEdit.bIsTag = is_tag;
-		op.StateEdit.bEnabled = enabled;
-		op.StateEdit.CaptureBefore(*targets[i]);
-
-		PushEditOperation(op);
+		EmplaceEditOperation<ObjectStateEditOperation>(targets[i], bit, is_tag, enabled, static_cast<int32>(count));
 	}
 
 	return count;
@@ -1251,16 +1495,44 @@ uint32 RaptorEditor::SetSelectionScript(const String& path)
 	}
 
 	for (uint32 i = 0; i < count; i++) {
-		EditOperation op {
-			.Type = EditOperation::eType::ScriptEdit,
-			.pObject = targets[i],
-			.GroupSize = static_cast<int32>(count),
-		};
+		EmplaceEditOperation<ScriptEditOperation>(targets[i], gObjectScripts->GetPath(targets[i]->ID), path,
+												  static_cast<int32>(count));
+	}
 
-		op.ScriptEdit.Before = gObjectScripts->GetPath(targets[i]->ID);
-		op.ScriptEdit.After = path;
+	return count;
+}
 
-		PushEditOperation(op);
+uint32 RaptorEditor::SetSelectionEnterDirection(const Vec3f local_direction)
+{
+	static constexpr float32 scMinDirectionLength = 1e-4f;
+	static constexpr float32 scSameDirectionDistance = 1e-5f;
+
+	const Vec3f wanted = (local_direction.Length() > scMinDirectionLength) ? local_direction.Normalize() : Vec3f::sZero;
+
+	Object* targets[scMaxSelectedObjects];
+	Vec3f befores[scMaxSelectedObjects];
+	uint32 count = 0;
+
+	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
+		Object* object = mSelection.GetObject(i);
+
+		if (object == nullptr || !object->IsTrigger()) {
+			continue;
+		}
+
+		Vec3f current = Vec3f::sZero;
+		gObjectScripts->TryGetRequiredEnterDirection(object->ID, current);
+
+		if ((current - wanted).Length() < scSameDirectionDistance) {
+			continue;
+		}
+
+		befores[count] = current;
+		targets[count++] = object;
+	}
+
+	for (uint32 i = 0; i < count; i++) {
+		EmplaceEditOperation<TriggerDirectionEditOperation>(targets[i], befores[i], wanted, static_cast<int32>(count));
 	}
 
 	return count;
@@ -1312,15 +1584,12 @@ void RaptorEditor::DupeSelection()
 	for (uint32 i = 0; i < count; i++) {
 		Object* original = originals[i];
 
-		const EditOperationValue dupe = PushEditOperation(EditOperation {
-			.Type = EditOperation::eType::Dupe,
-			.pObject = original,
-			.ValueA = EditOperationValue(original->GetPosition()),
-			.GroupSize = static_cast<int32>(count),
-		});
+		Object* dupe = EmplaceEditOperation<DupeOperation>(original, original->GetPosition(),
+														   static_cast<int32>(count))
+						   .GetDupe();
 
-		if (dupe.pObject != nullptr) {
-			dupes[dupe_count++] = dupe.pObject;
+		if (dupe != nullptr) {
+			dupes[dupe_count++] = dupe;
 		}
 	}
 
@@ -1388,6 +1657,8 @@ bool RaptorEditor::RunCommand(const String& name)
 
 void RaptorEditor::Destroy()
 {
+	thread::SetUIWakeHandler(nullptr);
+
 	if (mpMainFrame != nullptr) {
 		mpMainFrame->Destroy();
 		mpMainFrame = nullptr;

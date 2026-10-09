@@ -123,10 +123,10 @@ DescriptorPool& DescriptorCache::FindPool()
 	// TODO: This should check to see if there is an open entry in a pool, move to the next if not.
 	if (Pools.Size() < 1) {
 		DescriptorPool* pool = Pools.Insert();
-		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 128);
-		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 64);
-		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 64);
-		pool->Create(GraphicsBackendFwd::GetDevice(), 128, true);
+		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 512);
+		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 256);
+		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 256);
+		pool->Create(GraphicsBackendFwd::GetDevice(), 256, true);
 		Pools.Insert(*pool);
 	}
 

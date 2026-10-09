@@ -208,15 +208,7 @@ void BoundsEditor::Finalize()
 		return;
 	}
 
-	EditOperation op {
-		.Type = EditOperation::eType::BoundsEdit,
-		.pObject = object,
-	};
-
-	op.BoundsBefore = mBoundsBefore;
-	op.BoundsAfter = object->Bounds;
-
-	gEditor->PushEditOperation(op);
+	gEditor->EmplaceEditOperation<BoundsEditOperation>(object, mBoundsBefore, object->Bounds);
 }
 
 void BoundsEditor::Cancel()

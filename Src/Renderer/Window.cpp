@@ -65,17 +65,20 @@ VkSurfaceKHR Window::CreateSurface(VkInstance instance)
     return surface;
 }
 
-void Window::SetRelativeMouseMode(bool enabled) { SDL_SetWindowRelativeMouseMode(mWindow, enabled); }
-
-Vec2f Window::GetMousePosition() const
+void Window::SetRelativeMouseMode(bool enabled)
 {
-    float32 x, y;
-    SDL_GetMouseState(&x, &y);
+    if (enabled) {
+        float32 x, y;
+        SDL_GetMouseState(&x, &y);
 
-    return Vec2f(x, y);
+        mSavedMousePos = Vec2f(x, y);
+    }
+    else {
+        SDL_WarpMouseInWindow(mWindow, mSavedMousePos.GetX(), mSavedMousePos.GetY());
+    }
+
+    SDL_SetWindowRelativeMouseMode(mWindow, enabled);
 }
-
-void Window::WarpMouse(const Vec2f& position) { SDL_WarpMouseInWindow(mWindow, position.GetX(), position.GetY()); }
 
 bool Window::IsFocused() const { return (SDL_GetWindowFlags(mWindow) & SDL_WINDOW_INPUT_FOCUS) != 0; }
 

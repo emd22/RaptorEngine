@@ -13,6 +13,7 @@ enum class eVertexCreateFlags
 {
     None = 0x00,
     NegativeX = 0x01,
+    DefaultLayout = 0x02,
 };
 
 FxEnumFlags(eVertexCreateFlags);

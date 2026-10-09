@@ -9,7 +9,7 @@
 #include <Core/Types.hpp>
 #include <Renderer/Backend/Descriptors.hpp>
 
-#define FX_MAX_BOUND_MATERIALS 64
+#define FX_MAX_BOUND_MATERIALS 256
 
 namespace fx {
 
@@ -27,6 +27,8 @@ public:
 	void Create();
 
 	MaterialID NewMaterial(const String& name, bool supports_skinning);
+
+	MaterialID TryNewMaterial(const String& name, bool supports_skinning);
 	Material* GetMaterial(const MaterialID& id);
 	void DestroyMaterial(const MaterialID& id);
 

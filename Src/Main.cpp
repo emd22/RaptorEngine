@@ -14,6 +14,7 @@
 #include <Core/Path.hpp>
 #include <Core/Queue.hpp>
 #include <Core/String.hpp>
+#include <Core/Thread/SysThread.hpp>
 #include <Engine.hpp>
 #ifdef FX_IS_EDITOR
 #include <Editor/RaptorEditor.hpp>
@@ -29,21 +30,17 @@ FX_SET_MODULE_NAME("Main")
 using namespace fx;
 using namespace fx::renderer;
 
+#ifdef FX_IS_EDITOR
+static constexpr size_t scGameThreadStackSize = 16 * 1024 * 1024;
+#endif
 
-int main(int argc, char** argv)
+
+static void RunGame()
 {
 	gScriptManager = new ScriptManager;
 
-
 #ifdef FX_IS_EDITOR
-	gEditor = new editor::RaptorEditor;
-#endif
-
-#ifdef FX_IS_EDITOR
-	// If there was an issue starting the editor, return with an error code
-	if (!gEditor->InitGUI(argc, argv)) {
-		return 1;
-	}
+	gEditor->InitTools();
 #endif
 
 	fx::renderer::Globals::Init();
@@ -59,15 +56,44 @@ int main(int argc, char** argv)
 		delete gAssetManager;
 		gAssetManager = nullptr;
 	}
+}
 
+
+int main(int argc, char** argv)
+{
 #ifdef FX_IS_EDITOR
+	gEditor = new editor::RaptorEditor;
+
+	// If there was an issue starting the editor, return with an error code
+	if (!gEditor->InitGUI(argc, argv)) {
+		return 1;
+	}
+
+	SysThread game_thread;
+	game_thread.StackSize = scGameThreadStackSize;
+
+	game_thread.Create(
+		[]
+		{
+			struct FinishNotifier
+			{
+				~FinishNotifier() { gEditor->NotifyGameFinished(); }
+			} notifier;
+
+			RunGame();
+		});
+
+	gEditor->RunUILoop();
+
+	game_thread.Join();
+
 	// Destroy the editor after the renderer is gone as its surface presents to the editor frame
 	gEditor->Destroy();
-#endif
 
-#ifdef FX_IS_EDITOR
 	delete gEditor;
 	gEditor = nullptr;
+#else
+	RunGame();
 #endif
 
 	return 0;

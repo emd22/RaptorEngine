@@ -29,6 +29,7 @@ struct VSOutput
 
 PERMIF(ALPHA_MASK);
     float2 vUV : TEXCOORD0;
+    uint uiMaterialIndex : ATTR0;
 PERMEND();
 };
 
@@ -38,6 +39,7 @@ struct VSPushConsts
     float4x4 mCameraMatrix;
     uint uiObjectIndex;
     uint uiBoneBase;
+    uint uiMaterialIndex;
 };
 
 
@@ -72,6 +74,7 @@ PERMEND();
 
 PERMIF(ALPHA_MASK);
     output.vUV = input.vUV;
+    output.uiMaterialIndex = VSConst.uiMaterialIndex;
 PERMEND();
 
 	return output;
@@ -98,13 +101,16 @@ struct FSInput
 PERMIF(ALPHA_MASK)
     float4 vPosition : SV_POSITION;
     float2 vUV : TEXCOORD0;
+    uint uiMaterialIndex : ATTR0;
 PERMEND();
 };
 
 void main(FSInput input)
 {
 PERMIF(ALPHA_MASK);
-    if (F_Sample(tAlbedo, input.vUV).a < ALPHA_CUTOFF) {
+    const Material material = bMaterialBuffer[input.uiMaterialIndex];
+
+    if (F_Sample(tAlbedo, input.vUV).a * material.fAlpha < GetAlphaCutoff(material)) {
         discard;
     }
 PERMEND();

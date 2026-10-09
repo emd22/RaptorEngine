@@ -1,5 +1,6 @@
 #include "ObjectListWindow.hpp"
 
+#include "EditorThread.hpp"
 #include "RaptorEditor.hpp"
 
 #include <wx/button.h>
@@ -11,6 +12,7 @@
 #include <Engine.hpp>
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
+#include <format>
 
 namespace fx::editor {
 
@@ -37,13 +39,13 @@ static constexpr TagName scTagNames[] = {
 	{ eObjectTag::Trigger, "Trigger" },
 };
 
-static wxString BuildTagsList(eObjectTag tags)
+static std::string BuildTagsList(eObjectTag tags)
 {
-	wxString description;
+	std::string description;
 
 	for (const TagName& tag_name : scTagNames) {
 		if (HasFlag(tags, tag_name.Tag)) {
-			if (!description.IsEmpty()) {
+			if (!description.empty()) {
 				description += ", ";
 			}
 
@@ -86,51 +88,74 @@ ObjectListWindow::ObjectListWindow(wxWindow* parent)
 
 void ObjectListWindow::RefreshList()
 {
-	if (gObjectManager == nullptr) {
-		return;
-	}
+	thread::PostToGame(
+		[this]
+		{
+			if (gObjectManager == nullptr) {
+				return;
+			}
 
-	SizedArray<Object*> objects = gObjectManager->CollectObjects();
+			SizedArray<Object*> objects = gObjectManager->CollectObjects();
 
+			std::vector<Row> rows;
+			rows.reserve(objects.Size);
+
+			for (uint32 i = 0; i < objects.Size; i++) {
+				Object* object = objects[i];
+
+				if (object == nullptr) {
+					continue;
+				}
+
+				const Vec3f position = object->GetPosition();
+
+				rows.push_back(Row {
+					.Name = object->Name.Get().Str(),
+					.Tags = BuildTagsList(object->Tags),
+					.Position = std::format("{:.2f}, {:.2f}, {:.2f}", position.X, position.Y, position.Z),
+					.ID = object->ID(),
+				});
+			}
+
+			thread::PostToUI([this, rows = std::move(rows)] { ShowRows(rows); });
+		});
+}
+
+void ObjectListWindow::ShowRows(const std::vector<Row>& rows)
+{
 	mpList->Freeze();
 	mpList->DeleteAllItems();
 
-	for (uint32 i = 0; i < objects.Size; i++) {
-		Object* object = objects[i];
-
-		if (object == nullptr) {
-			continue;
-		}
-
-		const wxString name = wxString::FromUTF8(object->Name.Get().CStr());
-		const Vec3f position = object->GetPosition();
+	for (const Row& entry : rows) {
+		const wxString name = wxString::FromUTF8(entry.Name);
 
 		const long row = mpList->InsertItem(mpList->GetItemCount(), name.IsEmpty() ? wxString("(unnamed)") : name);
 
-		mpList->SetItem(row, Column_Id, wxString::Format("%u", object->ID()));
-		mpList->SetItem(row, Column_Tags, BuildTagsList(object->Tags));
-		mpList->SetItem(row, Column_Position,
-						wxString::Format("%.2f, %.2f, %.2f", static_cast<double>(position.X),
-										 static_cast<double>(position.Y), static_cast<double>(position.Z)));
+		mpList->SetItem(row, Column_Id, wxString::Format("%u", entry.ID));
+		mpList->SetItem(row, Column_Tags, wxString::FromUTF8(entry.Tags));
+		mpList->SetItem(row, Column_Position, wxString::FromUTF8(entry.Position));
 
-		// Retrieved in OnItemActivated() to select the object it corresponds to
-		mpList->SetItemPtrData(row, reinterpret_cast<wxUIntPtr>(object));
+		mpList->SetItemData(row, static_cast<long>(entry.ID));
 	}
 
 	mpList->Thaw();
 
-	SetTitle(wxString::Format("Object List (%u)", objects.Size));
+	SetTitle(wxString::Format("Object List (%zu)", rows.size()));
 }
 
 void ObjectListWindow::OnRefreshButton(wxCommandEvent& event) { RefreshList(); }
 
 void ObjectListWindow::OnItemActivated(wxListEvent& event)
 {
-	Object* object = reinterpret_cast<Object*>(event.GetItem().GetData());
+	const uint32 id = static_cast<uint32>(event.GetItem().GetData());
 
-	if (object != nullptr) {
-		gEditor->SelectObject(object, false);
-	}
+	thread::PostToGame(
+		[id]
+		{
+			if (Object* object = gObjectManager->GetObject(ObjectID(id)); object != nullptr) {
+				gEditor->SelectObject(object, false);
+			}
+		});
 }
 
 void ObjectListWindow::OnClose(wxCloseEvent& event) { Hide(); }

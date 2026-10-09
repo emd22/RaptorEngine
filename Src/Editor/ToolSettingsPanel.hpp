@@ -1,5 +1,7 @@
 #pragma once
 
+#include "EditorPanelState.hpp"
+
 #include <wx/panel.h>
 #include <wx/string.h>
 
@@ -13,12 +15,6 @@ class wxBoxSizer;
 class wxSpinCtrl;
 class wxSpinCtrlDouble;
 
-namespace fx {
-
-class LightSpot;
-
-} // namespace fx
-
 namespace fx::editor {
 
 class Vector3Field;
@@ -30,7 +26,7 @@ public:
 	ToolSettingsBasePanel() = default;
 
 	virtual void Construct(wxBoxSizer* tool_panel) = 0;
-	virtual void Refresh() = 0;
+	virtual void ApplyState(const EditorPanelState& state) = 0;
 
 	virtual ~ToolSettingsBasePanel() = default;
 };
@@ -40,7 +36,7 @@ class LightToolSettingsPanel : public ToolSettingsBasePanel
 {
 public:
 	void Construct(wxBoxSizer* tool_panel) override;
-	void Refresh() override;
+	void ApplyState(const EditorPanelState& state) override;
 
 private:
 	void OnColorChange(wxColourPickerEvent& event);
@@ -56,7 +52,6 @@ private:
 	FloatField* mpOuterAngleField = nullptr;
 	FloatField* mpInnerAngleField = nullptr;
 
-	LightSpot* mpShownLight = nullptr;
 	bool mbShowingAnything = false;
 };
 
