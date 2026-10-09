@@ -12,8 +12,10 @@
 class wxBoxSizer;
 class wxButton;
 class wxChoice;
+class wxMenuItem;
 class wxPanel;
 class wxScrolledWindow;
+class wxSplitterWindow;
 
 namespace fx::editor {
 
@@ -27,6 +29,7 @@ class AtlasPackerWindow;
 
 class EditorViewport;
 class OutlineToggleButton;
+class TopViewPanel;
 
 class EditorFrame : public wxFrame
 {
@@ -34,6 +37,7 @@ public:
 	EditorFrame(const wxString& title, const wxSize& viewport_size);
 
 	FX_FORCE_INLINE EditorViewport* GetViewport() { return mpViewport; }
+	FX_FORCE_INLINE TopViewPanel* GetTopViewPanel() { return mpTopViewPanel; }
 	FX_FORCE_INLINE ObjectPropertiesPanel* GetObjectPropertiesPanel() { return mpObjectPropertiesPanel; }
 	FX_FORCE_INLINE WorldPropertiesPanel* GetWorldPropertiesPanel() { return mpWorldPropertiesPanel; }
 	FX_FORCE_INLINE ToolSettingsBasePanel* GetToolSettingsPanel() { return mpToolSettingsPanel; }
@@ -52,6 +56,8 @@ public:
 	void ShowSelectedTool(const eEditorTool tool);
 
 	void ShowMode(const eEditorMode mode, const eDataFilter filter, const uint32 available_tools);
+
+	void ShowView(const eEditorView view);
 
 	void ApplyState(const EditorPanelState& state);
 
@@ -74,9 +80,12 @@ private:
 	void OnActivate(wxActivateEvent& event);
 	void OnIconize(wxIconizeEvent& event);
 	void SetSidePanelCollapsed(bool collapsed);
+	void FocusActiveView();
+	void ApplySplitLayout(const eEditorView view);
 
 private:
 	EditorViewport* mpViewport = nullptr;
+	TopViewPanel* mpTopViewPanel = nullptr;
 	ObjectPropertiesPanel* mpObjectPropertiesPanel = nullptr;
 	WorldPropertiesPanel* mpWorldPropertiesPanel = nullptr;
 	ObjectListWindow* mpObjectListWindow = nullptr;
@@ -96,6 +105,25 @@ private:
 	OutlineToggleButton* mpVisButton = nullptr;
 	OutlineToggleButton* mpDataButton = nullptr;
 	wxChoice* mpDataFilterChoice = nullptr;
+
+	OutlineToggleButton* mpPerspectiveButton = nullptr;
+	OutlineToggleButton* mpTopButton = nullptr;
+	OutlineToggleButton* mpSplitButton = nullptr;
+	wxMenuItem* mpPerspectiveMenuItem = nullptr;
+	wxMenuItem* mpTopMenuItem = nullptr;
+	wxMenuItem* mpSplitMenuItem = nullptr;
+	wxMenuItem* mpStackMenuItem = nullptr;
+
+	wxSplitterWindow* mpSplitter = nullptr;
+	float32 mSashFraction = 0.5f;
+	bool mbStackedSplit = false;
+	bool mbSplitFocusOn2D = false;
+
+	wxPanel* mpRootPanel = nullptr;
+	wxBoxSizer* mpTopBarSizer = nullptr;
+	wxBoxSizer* mpToolsGroup = nullptr;
+
+	eEditorView mView = eEditorView::Perspective;
 
 	std::atomic<bool> mbCloseRequested = false;
 	std::atomic<bool> mbIsActive = true;

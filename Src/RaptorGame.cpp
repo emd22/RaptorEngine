@@ -47,12 +47,14 @@
 #include <Editor/RaptorEditor.hpp>
 #endif
 
+
 #define FX_LIMIT_FRAMERATE_ON_FOCUS_LOST 1
 
 
 FX_SET_MODULE_NAME("RaptorGame");
 
 namespace fx {
+
 
 using namespace renderer;
 
@@ -64,6 +66,8 @@ static constexpr double scFpsWindowSeconds = 0.25;
 /// Target frame time while the window doesn't have OS focus, so an unfocused/backgrounded window doesn't burn a full
 /// core rendering frames nobody's looking at
 static constexpr double scUnfocusedFrameTime = 1.0 / 10.0;
+
+static constexpr double scTopViewFrameTime = 1.0 / 30.0;
 
 
 static double sClockFreq = 1.0;
@@ -293,9 +297,20 @@ void RaptorGame::CreateGame()
 		Tick();
 
 #ifdef FX_LIMIT_FRAMERATE_ON_FOCUS_LOST
+		double frame_time_limit = 0.0;
+
 		if (!gGraphics->GetWindow()->IsFocused()) {
+			frame_time_limit = scUnfocusedFrameTime;
+		}
+#ifdef FX_IS_EDITOR
+		else if (gEditor->GetView() == editor::eEditorView::Top) {
+			frame_time_limit = scTopViewFrameTime;
+		}
+#endif
+
+		if (frame_time_limit > 0.0) {
 			const double elapsed = static_cast<double>(SDL_GetPerformanceCounter() - frame_start) / sClockFreq;
-			const double remaining = scUnfocusedFrameTime - elapsed;
+			const double remaining = frame_time_limit - elapsed;
 
 			if (remaining > 0.0) {
 				SDL_Delay(static_cast<uint32>(remaining * 1000.0));

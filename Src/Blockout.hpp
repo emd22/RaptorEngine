@@ -50,6 +50,9 @@ enum class eFaceTextureEdit : uint32
 class Blockout
 {
 public:
+	static constexpr float32 scMinThickness = 0.1f;
+
+public:
 	Blockout();
 
 	void Create(World* world);
@@ -122,7 +125,7 @@ public:
 	/**
 	 * @brief Creates a new blockout objectC
 	 */
-	Object* NewObject(const Vec3f position);
+	Object* NewObject(const Vec3f position, MaterialID material = MaterialID::scNull);
 
 	Object* DupeObject(Object* object);
 

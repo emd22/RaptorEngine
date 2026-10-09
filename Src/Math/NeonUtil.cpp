@@ -8,8 +8,8 @@
 namespace fx {
 namespace Neon {
 
-#define AsFloat(value_) vreinterpretq_u32_f32(value_)
-#define AsUInt(value_)	vreinterpretq_f32_u32(value_)
+#define AsFloat(value_) vreinterpretq_f32_u32(value_)
+#define AsUInt(value_)	vreinterpretq_u32_f32(value_)
 
 // Modified algorithm based off of the SSE version at SSEUtil, which is originally based off of DirectXMath's
 // implementation. Uses minimax algorithm for accuracy at small angles, with angles above 2pi(or below -2pi) being
@@ -44,9 +44,9 @@ void SinCos4(float32x4_t in_values, float32x4_t* ysin, float32x4_t* ycos)
 	const float32x4_t cvCosineCoeff0 = { -0.5f, +0.041666638f, -0.0013888378f, +2.4760495e-05f };
 
 	// Extract sign bit
-	uint32x4_t sign = vandq_u32(in_values, cvSignMask);
+	uint32x4_t sign = vandq_u32(AsUInt(in_values), cvSignMask);
 
-	float32x4_t pi_or_neg_pi = AsFloat(vorrq_u32(cvPi, sign));
+	float32x4_t pi_or_neg_pi = AsFloat(vorrq_u32(AsUInt(cvPi), sign));
 
 	// Compare |in_values| <= pi / 2.
 	// If the result is true, the component will be 0xFFFFFFFF, and 0x00000000 otherwise.
@@ -55,8 +55,8 @@ void SinCos4(float32x4_t in_values, float32x4_t* ysin, float32x4_t* ycos)
 
 	in_values = vbslq_f32(cmp_result, in_values, vsubq_f32(pi_or_neg_pi, in_values));
 
-	float32x4_t one_or_sign = AsFloat(vorrq_u32(AsUInt(cvOne), cvSignMask));
-	sign = vbslq_f32(cmp_result, cvOne, one_or_sign);
+	float32x4_t one_or_neg_one = AsFloat(vorrq_u32(AsUInt(cvOne), cvSignMask));
+	float32x4_t cos_sign = vbslq_f32(cmp_result, cvOne, one_or_neg_one);
 
 	float32x4_t values_sq = vmulq_f32(in_values, in_values);
 
@@ -78,7 +78,7 @@ void SinCos4(float32x4_t in_values, float32x4_t* ysin, float32x4_t* ycos)
 	result = vfmaq_f32(vdupq_laneq_f32(cvCosineCoeff0, 0), result, values_sq);
 	result = vfmaq_f32(cvOne, result, values_sq);
 
-	*ycos = vmulq_f32(result, sign);
+	*ycos = vmulq_f32(result, cos_sign);
 }
 
 

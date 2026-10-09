@@ -2,7 +2,10 @@
 
 #ifdef FX_IS_EDITOR
 
+#include "TopViewPlane.hpp"
+
 #include <Core/Types.hpp>
+#include <array>
 #include <string>
 #include <vector>
 
@@ -82,12 +85,85 @@ struct LightPanelState
 	bool operator==(const LightPanelState& other) const = default;
 };
 
+enum class eTopViewBrushKind : uint8
+{
+	Geometry,
+	ProbeVolume,
+	ReflectionProbe,
+	Volume,
+};
+
+struct TopViewFace
+{
+	float32 AU = 0.0f;
+	float32 AV = 0.0f;
+	float32 BU = 0.0f;
+	float32 BV = 0.0f;
+
+	float32 NormalU = 0.0f;
+	float32 NormalV = 0.0f;
+
+	bool operator==(const TopViewFace& other) const = default;
+};
+
+struct TopViewProjection
+{
+	float32 PivotU = 0.0f;
+	float32 PivotV = 0.0f;
+	float32 NearDepth = 0.0f;
+
+	std::vector<float32> Hull;
+	std::vector<float32> Edges;
+	std::vector<TopViewFace> Faces;
+
+	bool operator==(const TopViewProjection& other) const = default;
+};
+
+struct TopViewBrush
+{
+	uint32 ObjectId = 0;
+	eTopViewBrushKind Kind = eTopViewBrushKind::Geometry;
+
+	bool bSelected = false;
+	bool bSelectable = true;
+
+	std::array<TopViewProjection, scViewPlaneCount> Views;
+
+	bool operator==(const TopViewBrush& other) const = default;
+};
+
+struct TopViewState
+{
+	bool bActive = false;
+	bool bDataMode = false;
+	bool bSnapEnabled = true;
+	bool bCanCreate = true;
+	bool bCanRotate = true;
+	bool bCanFace = true;
+
+	float32 MinFaceThickness = 0.1f;
+
+	float32 SnapStep = 0.25f;
+	float32 AngleSnapDegrees = 15.0f;
+
+	bool bHasPlayer = false;
+	std::array<float32, 3> PlayerPosition = { 0.0f, 0.0f, 0.0f };
+	std::array<float32, 3> PlayerDirection = { 0.0f, 0.0f, 1.0f };
+
+	uint32 CommandSerial = 0;
+
+	std::vector<TopViewBrush> Brushes;
+
+	bool operator==(const TopViewState& other) const = default;
+};
+
 struct EditorPanelState
 {
 	ObjectPanelState Object;
 	MaterialLibraryState Materials;
 	WorldPanelState World;
 	LightPanelState Light;
+	TopViewState TopView;
 
 	std::string BlockoutPath;
 

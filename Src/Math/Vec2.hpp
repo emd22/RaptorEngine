@@ -1,6 +1,8 @@
 #pragma once
 
 #include <Core/Types.hpp>
+#include <cmath>
+#include <concepts>
 #include <format>
 
 namespace fx {
@@ -83,6 +85,25 @@ public:
 
 	Type Width() const { return GetX(); }
 	Type Height() const { return GetY(); }
+
+	FX_FORCE_INLINE Type Dot(const Vec2Base& other) const { return X * other.X + Y * other.Y; }
+	FX_FORCE_INLINE Type Cross(const Vec2Base& other) const { return X * other.Y - Y * other.X; }
+
+	FX_FORCE_INLINE Type LengthSquared() const { return Dot(*this); }
+
+	FX_FORCE_INLINE Type Length() const
+		requires std::floating_point<Type>
+	{
+		return std::hypotf(X, Y);
+	}
+
+	FX_FORCE_INLINE Vec2Base Perpendicular() const { return Vec2Base(-Y, X); }
+
+	FX_FORCE_INLINE bool IsCloseTo(const Vec2Base& other, Type tolerance = static_cast<Type>(0.00001)) const
+		requires std::floating_point<Type>
+	{
+		return std::abs(X - other.X) <= tolerance && std::abs(Y - other.Y) <= tolerance;
+	}
 
 public:
 	union alignas(16)

@@ -414,6 +414,10 @@ EditorPanelState RaptorEditor::BuildPanelState()
 		panel.InnerAngleDegrees = MathUtil::RadiansToDegrees(light->GetInnerAngle());
 	}
 
+	if (IsTopViewActive()) {
+		state.TopView = BuildTopViewState();
+	}
+
 	return state;
 }
 
@@ -1298,6 +1302,20 @@ void RaptorEditor::ClearSelection()
 void RaptorEditor::SetStoredMaterial(Object* object, MaterialID material)
 {
 	mSelection.SetStoredMaterial(object, material);
+	mLastUsedMaterial = material;
+}
+
+MaterialID RaptorEditor::GetNewBrushMaterial() const
+{
+	if (gWorld->pBlockout == nullptr) {
+		return MaterialID::scNull;
+	}
+
+	if (!mLastUsedMaterial.IsNull() && gWorld->pBlockout->GetIDForMaterial(mLastUsedMaterial).IsValid()) {
+		return mLastUsedMaterial;
+	}
+
+	return gWorld->pBlockout->GetDefaultMaterial();
 }
 
 
@@ -1341,7 +1359,7 @@ void RaptorEditor::CreateObjectAtCrosshair()
 
 	const Vec3f origin = SnapToGrid(hit.bHit ? hit.Point : Vec3f::sZero);
 
-	SelectObject(EmplaceEditOperation<CreateOperation>(origin).GetCreated(), false);
+	SelectObject(EmplaceEditOperation<CreateOperation>(origin, 1, GetNewBrushMaterial()).GetCreated(), false);
 }
 
 static bool IsCreatableDataKind(eDataFilter filter)
@@ -1584,8 +1602,7 @@ void RaptorEditor::DupeSelection()
 	for (uint32 i = 0; i < count; i++) {
 		Object* original = originals[i];
 
-		Object* dupe = EmplaceEditOperation<DupeOperation>(original, original->GetPosition(),
-														   static_cast<int32>(count))
+		Object* dupe = EmplaceEditOperation<DupeOperation>(original, original->GetPosition(), static_cast<int32>(count))
 						   .GetDupe();
 
 		if (dupe != nullptr) {

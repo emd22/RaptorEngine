@@ -89,7 +89,9 @@ static Vec3f N_editor_push_op_vec3(Object* obj, int op_type, FLOAT4 original, FL
 static Object* N_editor_op_create_object(FLOAT4 position, int32 group_size)
 {
 #ifdef FX_IS_EDITOR
-	return gEditor->EmplaceEditOperation<editor::CreateOperation>(Vec3f(position), group_size).GetCreated();
+	return gEditor->EmplaceEditOperation<editor::CreateOperation>(Vec3f(position), group_size,
+																  gEditor->GetNewBrushMaterial())
+		.GetCreated();
 #else
 	return nullptr;
 #endif
@@ -453,26 +455,7 @@ static void N_blockout_hide_preview() { gWorld->pBlockout->HidePreview(); }
 static Object* N_blockout_create_box(FLOAT4 min, FLOAT4 max)
 {
 #ifdef FX_IS_EDITOR
-	if (gEditor->IsSimulationMode()) {
-		return nullptr;
-	}
-
-	Vec3f position;
-	const Brush brush = gWorld->pBlockout->MakeWorldBox(Vec3f(min), Vec3f(max), position);
-
-	if (!brush.IsValid()) {
-		return nullptr;
-	}
-
-	if (gEditor->IsDataMode()) {
-		return gEditor->CreateDataBrush(brush.Planes, position);
-	}
-
-	editor::ObjectSnapshot snapshot;
-	snapshot.Position = position;
-	snapshot.Material = gWorld->pBlockout->GetDefaultMaterial();
-
-	return gEditor->EmplaceEditOperation<editor::CreateBrushOperation>(brush.Planes, snapshot).GetCreated();
+	return gEditor->CreateWorldBox(Vec3f(min), Vec3f(max));
 #else
 	return nullptr;
 #endif

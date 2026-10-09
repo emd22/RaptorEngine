@@ -64,6 +64,8 @@ public:
 	static Brush FromBox(const Vec3f min, const Vec3f max);
 	static Brush FromPlanes(const PlaneList& planes);
 
+	static Brush FromVertices(const SizedArray<Vec3f>& points, const PlaneList& reference);
+
 	bool Rebuild();
 
 	bool IsValid() const { return Faces.IsNotEmpty(); }

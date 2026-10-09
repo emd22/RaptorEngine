@@ -369,21 +369,26 @@ void MoveOperation::Undo(EditorSelection& selection)
 }
 
 RotateOperation::RotateOperation(Object* object, const Vec3f& euler_before, const Vec3f& euler_after, int32 group_size)
-	: ObjectEditOperation(object, group_size), mEulerBefore(euler_before), mEulerAfter(euler_after)
+	: RotateOperation(object, Quat::FromEulerAngles(euler_before), Quat::FromEulerAngles(euler_after), group_size)
+{
+}
+
+RotateOperation::RotateOperation(Object* object, const Quat& before, const Quat& after, int32 group_size)
+	: ObjectEditOperation(object, group_size), mBefore(before), mAfter(after)
 {
 }
 
 void RotateOperation::Execute(EditorSelection& selection)
 {
 	if (Object* target = ResolveTarget()) {
-		target->SetRotation(Quat::FromEulerAngles(mEulerAfter));
+		target->SetRotation(mAfter);
 	}
 }
 
 void RotateOperation::Undo(EditorSelection& selection)
 {
 	if (Object* target = ResolveTarget()) {
-		target->SetRotation(Quat::FromEulerAngles(mEulerBefore));
+		target->SetRotation(mBefore);
 	}
 }
 
@@ -569,12 +574,15 @@ void TriggerDirectionEditOperation::Undo(EditorSelection& selection)
 // Object creation and deletion
 /////////////////////////////////////
 
-CreateOperation::CreateOperation(const Vec3f& position, int32 group_size)
-	: ObjectCreationOperation(group_size), mPosition(position)
+CreateOperation::CreateOperation(const Vec3f& position, int32 group_size, MaterialID material)
+	: ObjectCreationOperation(group_size), mPosition(position), mMaterial(material)
 {
 }
 
-void CreateOperation::Execute(EditorSelection& selection) { Retarget(gWorld->pBlockout->NewObject(mPosition)); }
+void CreateOperation::Execute(EditorSelection& selection)
+{
+	Retarget(gWorld->pBlockout->NewObject(mPosition, mMaterial));
+}
 
 CreateBrushOperation::CreateBrushOperation(const Brush::PlaneList& planes, const ObjectSnapshot& snapshot,
 										   int32 group_size)
