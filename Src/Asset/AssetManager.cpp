@@ -20,6 +20,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
+#include <vector>
 
 namespace fx {
 
@@ -32,7 +33,16 @@ static constexpr std::chrono::seconds scTimeUntilSleep = std::chrono::seconds(3)
 // Asset Deletion Ticket
 /////////////////////////////////////
 
-void AssetDeletionTicket::DeleteImmediate() const
+void AssetDeletionTicket::WaitForGpu()
+{
+	// Wait for the graphics queue to become idle so that no submitted RenderCmd command buffer is still
+	// referencing the buffer. Because the ticket defers deletion by `scBufferDeletionFrameSpacing`
+	// rendered frames, this returns almost immediately
+	SpinLockContext<VkQueue> graphics_queue = renderer::gGraphics->GetDevice()->GetGraphicsQueue();
+	vkQueueWaitIdle(graphics_queue.Get());
+}
+
+void AssetDeletionTicket::Destroy() const
 {
 	switch (Type) {
 	case eType::None:
@@ -41,32 +51,17 @@ void AssetDeletionTicket::DeleteImmediate() const
 	case eType::Buffer: {
 		const BufferTicket& ticket = Value.Ticket;
 
-		// Wait for the graphics queue to become idle so that no submitted RenderCmd command buffer is still
-		// referencing the buffer. Because the ticket defers deletion by `scBufferDeletionFrameSpacing`
-		// rendered frames, this returns almost immediately
-		{
-			SpinLockContext<VkQueue> graphics_queue = renderer::gGraphics->GetDevice()->GetGraphicsQueue();
-			vkQueueWaitIdle(graphics_queue.Get());
-		}
-
 		vmaDestroyBuffer(renderer::gGraphics->GpuAllocator, ticket.Buffer, ticket.Allocation);
 	} break;
 	}
 }
 
-
-bool AssetDeletionTicket::TryDelete(uint32 current_frame) const
+bool AssetDeletionTicket::IsDue(uint32 current_frame) const
 {
 	const bool missed_or_overflow = ((MinDeletionFrame - current_frame) > (UINT32_MAX - 10000));
 
-	if (current_frame >= MinDeletionFrame || missed_or_overflow) {
-		DeleteImmediate();
-		return true;
-	}
-
-	return false;
+	return current_frame >= MinDeletionFrame || missed_or_overflow;
 }
-
 
 ////////////////////////////////////
 // Asset Worker
@@ -169,6 +164,7 @@ void AssetManager::Start(int32 min_threads)
 	mMinThreads = min_threads;
 	mbActive.test_and_set();
 
+	AssetCallbackQueue::Get().BindToCurrentThread();
 
 	// Allocate the workers
 	mWorkerThreads.InitCapacity(scMaxWorkerThreads);
@@ -211,7 +207,42 @@ void AssetManager::StopWorkers()
 
 	gThreadManager->Join(mAssetManagerTID);
 
+	FailOutstandingTickets();
+
 	mWorkerThreads.Free();
+}
+
+void AssetManager::FailOutstandingTickets()
+{
+	AssetQueueItem item;
+
+	while (mLoadQueue.PopIfAvailable(&item)) {
+		if (item.Data.Ticket.IsValid()) {
+			item.Data.Ticket.SignalFailed();
+		}
+	}
+
+	for (AssetWorker& worker : mWorkerThreads) {
+		AssetTicket& ticket = worker.Item.Data.Ticket;
+
+		if (ticket.IsValid()) {
+			ticket.SignalFailed();
+		}
+	}
+}
+
+void AssetManager::Abort()
+{
+	if (mbWorkersStopped) {
+		return;
+	}
+
+	mbActive.clear();
+	ManagerUpdateNotifier.Kill();
+
+	for (AssetWorker& worker : mWorkerThreads) {
+		worker.Kill();
+	}
 }
 
 void AssetManager::Shutdown()
@@ -229,6 +260,8 @@ void AssetManager::Shutdown()
 	}
 
 	mbShutdownDone = true;
+
+	AssetCallbackQueue::Get().Unbind();
 
 	// Cleanup all permutations of empty images that were created.
 	// PagedArray<AxImage>& empty_images_list = AxImage::GetEmptyImagesArray();
@@ -261,11 +294,23 @@ void AssetManager::RequestHigherDetail()
 
 void AssetManager::ShutdownDeletionQueue()
 {
-	SpinLockContext<Queue<AssetDeletionTicket>> queue = mDeletionTickets.GetQueue();
+	std::deque<AssetDeletionTicket> tickets;
 
-	while (!queue->IsEmpty()) {
-		queue->First().DeleteImmediate();
-		queue->Pop();
+	{
+		std::lock_guard<std::mutex> lock(mDeletionMutex);
+		tickets.swap(mDeletionTickets);
+	}
+
+	if (tickets.empty()) {
+		return;
+	}
+
+	AssetDeletionTicket::WaitForGpu();
+
+	for (const AssetDeletionTicket& ticket : tickets) {
+		if (!ticket.IsNull()) {
+			ticket.Destroy();
+		}
 	}
 }
 
@@ -394,7 +439,7 @@ inline bool IsFileJpeg(const String& path)
 
 AssetTicket AssetManager::LoadObject(const String& name, const String& path)
 {
-	Object* object = gObjectManager->NewObject(name, MaterialID::scNull);
+	Object* object = gObjectManager->NewObject(name, MaterialID::scNull, eObjectTag::None, true);
 	AssetTicket ticket { object };
 
 	LoadFromPath<loader::LoaderGltf>(ticket, eAssetType::Object, path);
@@ -404,7 +449,7 @@ AssetTicket AssetManager::LoadObject(const String& name, const String& path)
 
 AssetTicket AssetManager::LoadObjectFromMemory(const String& name, const uint8* data, uint32 data_size)
 {
-	Object* object = gObjectManager->NewObject(name, MaterialID::scNull);
+	Object* object = gObjectManager->NewObject(name, MaterialID::scNull, eObjectTag::None, true);
 	AssetTicket ticket { object };
 
 	LoadFromMemory<loader::LoaderGltf>(ticket, eAssetType::Object, Slice<const uint8>(data, data_size));
@@ -646,52 +691,58 @@ static void DoDirectUpload(AssetQueueItem& item, AssetItemData& asset_data)
 	ticket.SignalUploadedToGpu();
 }
 
+static void FinishObjectLoading(Object* root)
+{
+	std::vector<Object*> parts;
+	CollectObjectTree(root, parts);
+
+	for (Object* part : parts) {
+		part->bIsLoading.store(false);
+	}
+}
+
 static void ProcessLoadSuccess(LockContext<AssetItemData>& asset_data)
 {
 	AssetTicketData* ticket_data = asset_data->Ticket.pTicketData;
 
-	while (!ticket_data->bIsUploadedToGpu.load()) {
-		ticket_data->bIsUploadedToGpu.wait(false);
+	if (!ticket_data->bIsUploadedToGpu.load()) {
+		LogError(LC_ASSET, "Asset finished loading but was never uploaded to the GPU");
+		ticket_data->CompleteFailed();
 	}
+	else {
+		void* item = nullptr;
+		AssetTicketData::OnLoadFunc before = nullptr;
+		AssetTicketData::OnLoadFunc after = nullptr;
 
-	// Copy callbacks out under lock, then invoke without holding lock to avoid deadlock
-	std::vector<AssetTicketData::OnLoadFunc> callbacks;
-	void* callback_arg = nullptr;
+		if (asset_data->LoadType == eAssetType::Object || asset_data->LoadType == eAssetType::Image) {
+			item = asset_data->Ticket.Get();
+		}
 
-	switch (asset_data->LoadType) {
-	case eAssetType::Object: {
-		callback_arg = reinterpret_cast<void*>(asset_data->Ticket.Get());
-		{
-			std::lock_guard guard(ticket_data->mCallbackMutex);
-			callbacks = std::move(ticket_data->mOnLoadedCallbacks);
-			ticket_data->mOnLoadedCallbacks.clear();
+		if (asset_data->LoadType == eAssetType::Object && item != nullptr && asset_data->pLoader.IsValid()) {
+			TSRef<loader::ObjectLoaderBase> object_loader(asset_data->pLoader);
+			const ObjectID root_id = static_cast<Object*>(item)->ID;
+
+			before = [object_loader, root_id](void* root_ptr)
+			{
+				Object* root = static_cast<Object*>(root_ptr);
+
+				if (gObjectManager->GetObject(root_id) == root) {
+					object_loader->Publish(root);
+				}
+			};
+
+			after = [root_id](void* root_ptr)
+			{
+				Object* root = static_cast<Object*>(root_ptr);
+
+				if (gObjectManager->GetObject(root_id) == root) {
+					FinishObjectLoading(root);
+				}
+			};
 		}
-	} break;
-	case eAssetType::Image: {
-		// Image upload sets bIsUploadedToGpu; ensure it's signalled if not already
-		if (!ticket_data->bIsUploadedToGpu.load()) {
-			asset_data->Ticket.SignalUploadedToGpu();
-		}
-		callback_arg = reinterpret_cast<void*>(reinterpret_cast<Image*>(asset_data->Ticket.Get()));
-		{
-			std::lock_guard guard(ticket_data->mCallbackMutex);
-			callbacks = std::move(ticket_data->mOnLoadedCallbacks);
-			ticket_data->mOnLoadedCallbacks.clear();
-		}
-	} break;
-	default:
-		break;
+
+		ticket_data->CompleteLoaded(item, std::move(before), std::move(after));
 	}
-
-	for (auto& cb : callbacks) {
-		cb(callback_arg);
-	}
-
-	// Mark loaded before signalling finished so WaitUntilLoaded observers see consistent state
-	ticket_data->bIsLoaded.store(true);
-	ticket_data->IsFinishedNotifier.Signal();
-	ticket_data->bIsUploadedToGpu.store(true);
-	ticket_data->bIsUploadedToGpu.notify_all();
 
 	if (asset_data->pLoader.IsValid()) {
 		// Defer loader destruction until upload fence completes - staging buffers must stay alive
@@ -815,19 +866,12 @@ int32 AssetManager::CheckForUploadableData()
 			ProcessLoadSuccess(asset_data);
 		}
 		else if (worker->LoadStatus == loader::eLoaderStatus::Error) {
-			asset_data->Ticket.SignalFinished();
+			LogError(LC_ASSET, "Failed to load {} '{}'", AssetTypeToString(asset_data->LoadType), worker->Item.Path);
 
-			if (asset_data->LoadType == eAssetType::Object && asset_data->Ticket.pTicketData) {
-				AssetTicketData* ticket_data = asset_data->Ticket.pTicketData;
-
-				// There was an error, call the OnError callback if it was registered
-				if (ticket_data->mOnErrorCallback) {
-					ticket_data->mOnErrorCallback();
-				}
-			}
+			asset_data->Ticket.SignalFailed();
 		}
 		else if (worker->LoadStatus == loader::eLoaderStatus::None) {
-			asset_data->Ticket.SignalFinished();
+			asset_data->Ticket.SignalFailed();
 			Panic("AssetManager", "Worker status is none!");
 		}
 
@@ -891,29 +935,64 @@ int32 AssetManager::CheckForItemsToLoad()
 
 int32 AssetManager::CheckForItemsToDelete()
 {
-	int32 num_deletes = 0;
+	std::vector<AssetDeletionTicket> due;
 
-	SpinLockContext<Queue<fx::AssetDeletionTicket>> queue = mDeletionTickets.GetQueue();
+	{
+		std::lock_guard<std::mutex> lock(mDeletionMutex);
 
-	if (queue->IsEmpty()) {
+		if (mDeletionTickets.empty()) {
+			return 0;
+		}
+
+		if (renderer::gGraphics->UploadContext.ImmediateUploadsInFlight.load() > 0) {
+			return 0;
+		}
+
+		const uint32 current_frame = renderer::gGraphics->GetElapsedFrameCount();
+
+		while (!mDeletionTickets.empty() && mDeletionTickets.front().IsDue(current_frame)) {
+			due.push_back(mDeletionTickets.front());
+			mDeletionTickets.pop_front();
+		}
+	}
+
+	if (due.empty()) {
 		return 0;
 	}
 
 	// Wait for all uploads to finish. We cannot be actively loading the item we are deleting!
 	renderer::gGraphics->UploadContext.UploadFence.WaitFor();
 
-	AssetDeletionTicket& adt = queue->First();
-	if (adt.IsNull()) {
-		LogError(LC_ASSET, "Trying to delete a null asset!");
-		return num_deletes;
-	}
+	int32 num_deletes = 0;
 
-	if (adt.TryDelete(renderer::gGraphics->GetElapsedFrameCount())) {
+	for (const AssetDeletionTicket& ticket : due) {
+		if (ticket.IsNull()) {
+			LogError(LC_ASSET, "Trying to delete a null asset!");
+			continue;
+		}
+
+		ticket.Destroy();
 		++num_deletes;
-		queue->Pop();
 	}
 
 	return num_deletes;
+}
+
+bool AssetManager::HasPendingWork()
+{
+	if (mLoadQueue.Size() > 0) {
+		return true;
+	}
+
+	for (const AssetWorker& worker : mWorkerThreads) {
+		if (worker.bDataPendingUpload.load()) {
+			return true;
+		}
+	}
+
+	std::lock_guard<std::mutex> lock(mDeletionMutex);
+
+	return !mDeletionTickets.empty();
 }
 
 void AssetManager::AssetManagerUpdate()
@@ -981,7 +1060,7 @@ void AssetManager::AssetManagerUpdate()
 		// To wake it back up, ManagerUpdateNotifier will need to be signalled.
 		std::chrono::system_clock::duration time_since_active = std::chrono::system_clock::now() - mLastActiveTime;
 
-		if (time_since_active >= scTimeUntilSleep) {
+		if (time_since_active >= scTimeUntilSleep && !HasPendingWork()) {
 			mbShouldSleep = true;
 			LogInfo("Sleeping asset manager...");
 			continue;

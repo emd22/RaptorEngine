@@ -1,6 +1,7 @@
 #include "WorldPropertiesPanel.hpp"
 
 #include "Common.hpp"
+#include "EditorThread.hpp"
 #include "RaptorEditor.hpp"
 
 #include <wx/button.h>
@@ -79,8 +80,8 @@ WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, w
 	mpPositionField->SetOnChange(
 		[this](const Vec3f value)
 		{
-			gWorld->Player.TeleportTo(value);
 			mShownPosition = value;
+			thread::PostToGame([value] { gWorld->Player.TeleportTo(value); });
 		});
 
 	{
@@ -105,7 +106,8 @@ WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, w
 									 }
 
 									 mShownDebugMask = static_cast<int64>(scDebugLayers[selection].Mask);
-									 gCVars->Set("r_debug_bounds", mShownDebugMask);
+									 thread::PostToGame([mask = mShownDebugMask]
+														{ gCVars->Set("r_debug_bounds", mask); });
 								 });
 	}
 
@@ -116,19 +118,23 @@ WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, w
 		wxSizer* cam_pane_sizer = new wxBoxSizer(wxVERTICAL);
 
 		mpApertureField = new FloatField(cam_pane_win, "Aperture (f/)", Vec2f(0.7f, 64.0f));
-		mpApertureField->SetOnChange([](const float value) { gCVars->Set("r_aperture", value); });
+		mpApertureField->SetOnChange([](const float value)
+									 { thread::PostToGame([value] { gCVars->Set("r_aperture", value); }); });
 		cam_pane_sizer->Add(mpApertureField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
 
 		mpShutterField = new FloatField(cam_pane_win, "Shutter (1/s)", Vec2f(1.0f, 8000.0f));
-		mpShutterField->SetOnChange([](const float value) { gCVars->Set("r_shutter", 1.0f / value); });
+		mpShutterField->SetOnChange([](const float value)
+									{ thread::PostToGame([value] { gCVars->Set("r_shutter", 1.0f / value); }); });
 		cam_pane_sizer->Add(mpShutterField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
 
 		mpIsoField = new FloatField(cam_pane_win, "ISO", Vec2f(25.0f, 25600.0f));
-		mpIsoField->SetOnChange([](const float value) { gCVars->Set("r_iso", value); });
+		mpIsoField->SetOnChange([](const float value)
+								{ thread::PostToGame([value] { gCVars->Set("r_iso", value); }); });
 		cam_pane_sizer->Add(mpIsoField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
 
 		mpCompensationField = new FloatField(cam_pane_win, "Compensation (EV)", Vec2f(-10.0f, 10.0f));
-		mpCompensationField->SetOnChange([](const float value) { gCVars->Set("r_exposure_ev", value); });
+		mpCompensationField->SetOnChange([](const float value)
+										 { thread::PostToGame([value] { gCVars->Set("r_exposure_ev", value); }); });
 		cam_pane_sizer->Add(mpCompensationField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
 
 		cam_pane_win->SetSizer(cam_pane_sizer);
@@ -141,7 +147,7 @@ WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, w
 
 	SetSizer(sizer);
 
-	Update();
+	ApplyState(WorldPanelState {});
 }
 
 void WorldPropertiesPanel::OnPaneChanged()
@@ -154,8 +160,6 @@ void WorldPropertiesPanel::OnPaneChanged()
 		GetParent()->Layout();
 		GetParent()->FitInside();
 	}
-
-	Update();
 }
 
 void WorldPropertiesPanel::BuildReflectionPane(wxSizer* sizer)
@@ -171,9 +175,12 @@ void WorldPropertiesPanel::BuildReflectionPane(wxSizer* sizer)
 	mpReflectionEnabledCheck = new wxCheckBox(pane, wxID_ANY, "Enabled");
 	pane_sizer->Add(mpReflectionEnabledCheck, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
 
-	mpReflectionEnabledCheck->Bind(
-		wxEVT_CHECKBOX,
-		[this](wxCommandEvent&) { gCVars->Set("r_reflection_probes", mpReflectionEnabledCheck->GetValue() ? 1 : 0); });
+	mpReflectionEnabledCheck->Bind(wxEVT_CHECKBOX,
+								   [this](wxCommandEvent&)
+								   {
+									   thread::PostToGame([value = mpReflectionEnabledCheck->GetValue() ? 1 : 0]
+														  { gCVars->Set("r_reflection_probes", value); });
+								   });
 
 	mpReflectionFallbackCheck = new wxCheckBox(pane, wxID_ANY, "Reflection fallback probe");
 	pane_sizer->Add(mpReflectionFallbackCheck, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
@@ -181,16 +188,23 @@ void WorldPropertiesPanel::BuildReflectionPane(wxSizer* sizer)
 	mpReflectionFallbackCheck->Bind(wxEVT_CHECKBOX,
 									[this](wxCommandEvent&)
 									{
-										gCVars->Set("r_reflection_level_probe",
-													mpReflectionFallbackCheck->GetValue() ? 1 : 0);
-										gProbeManager->RebuildReflectionProbesFromWorld();
+										thread::PostToGame(
+											[value = mpReflectionFallbackCheck->GetValue() ? 1 : 0]
+											{
+												gCVars->Set("r_reflection_level_probe", value);
+												gProbeManager->RebuildReflectionProbesFromWorld();
+											});
 									});
 
 	mpShowProbeVolumesCheck = new wxCheckBox(pane, wxID_ANY, "Show probe volumes");
 	pane_sizer->Add(mpShowProbeVolumesCheck, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
 
-	mpShowProbeVolumesCheck->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&)
-								  { gCVars->Set("r_show_volumes", mpShowProbeVolumesCheck->GetValue() ? 1 : 0); });
+	mpShowProbeVolumesCheck->Bind(wxEVT_CHECKBOX,
+								  [this](wxCommandEvent&)
+								  {
+									  thread::PostToGame([value = mpShowProbeVolumesCheck->GetValue() ? 1 : 0]
+														 { gCVars->Set("r_show_volumes", value); });
+								  });
 
 
 	{
@@ -216,7 +230,8 @@ void WorldPropertiesPanel::BuildReflectionPane(wxSizer* sizer)
 										  }
 
 										  mShownReflectionDebug = selection;
-										  gCVars->Set("r_reflection_debug", selection);
+										  thread::PostToGame([selection]
+															 { gCVars->Set("r_reflection_debug", selection); });
 									  });
 	}
 
@@ -225,7 +240,7 @@ void WorldPropertiesPanel::BuildReflectionPane(wxSizer* sizer)
 	const auto add_button = [&](const char* label, std::function<void()> action)
 	{
 		wxButton* button = new wxButton(pane, wxID_ANY, label);
-		button->Bind(wxEVT_BUTTON, [action = std::move(action)](wxCommandEvent&) { action(); });
+		button->Bind(wxEVT_BUTTON, [action = std::move(action)](wxCommandEvent&) { thread::PostToGame(action); });
 		buttons->Add(button, wxSizerFlags().Expand());
 	};
 
@@ -254,80 +269,43 @@ void WorldPropertiesPanel::BuildReflectionPane(wxSizer* sizer)
 	mpReflectionPane->Bind(wxEVT_COLLAPSIBLEPANE_CHANGED, [this](wxCollapsiblePaneEvent&) { OnPaneChanged(); });
 }
 
-void WorldPropertiesPanel::UpdateReflectionPane()
+void WorldPropertiesPanel::ApplyReflectionState(const WorldPanelState& state)
 {
-	if (!mpReflectionPane->IsExpanded()) {
-		return;
-	}
-
-	const uint32 probe_count = gProbeManager->GetReflectionProbeCount();
-
-	wxString status;
-
-	if (gProbeManager->IsBakingReflections()) {
-		status = wxString::Format("Baking %u probe(s)...", probe_count);
-	}
-	else if (gProbeManager->IsBaking()) {
-		status = "Baking irradiance...";
-	}
-	else if (probe_count == 0) {
-		status = "No reflection probes";
-	}
-	else if (gProbeManager->AreReflectionsBaked()) {
-		status = wxString::Format("%u probe(s), baked", probe_count);
-	}
-	else {
-		status = wxString::Format("%u probe(s), needs a bake", probe_count);
-	}
+	const wxString status = wxString::FromUTF8(state.ReflectionStatus);
 
 	if (status != mShownReflectionStatus) {
 		mShownReflectionStatus = status;
 		mpReflectionStatus->SetLabel(status);
 	}
 
-	const bool enabled = gCVars->Get("r_reflection_probes", int64 { 1 }) != 0;
-
-	if (mpReflectionEnabledCheck->GetValue() != enabled) {
-		mpReflectionEnabledCheck->SetValue(enabled);
+	if (mpReflectionEnabledCheck->GetValue() != state.bReflectionsEnabled) {
+		mpReflectionEnabledCheck->SetValue(state.bReflectionsEnabled);
 	}
 
-	const bool level_probe = gCVars->Get("r_reflection_level_probe", int64 { 0 }) != 0;
-
-	if (mpReflectionFallbackCheck->GetValue() != level_probe) {
-		mpReflectionFallbackCheck->SetValue(level_probe);
+	if (mpReflectionFallbackCheck->GetValue() != state.bReflectionFallback) {
+		mpReflectionFallbackCheck->SetValue(state.bReflectionFallback);
 	}
 
-	const int64 debug_view = std::clamp<int64>(gCVars->Get("r_reflection_debug", int64 { 0 }), 0, 2);
-
-	if (debug_view != mShownReflectionDebug) {
-		mShownReflectionDebug = debug_view;
-		mpReflectionDebugChoice->SetSelection(static_cast<int32>(debug_view));
+	if (state.ReflectionDebugView != mShownReflectionDebug) {
+		mShownReflectionDebug = state.ReflectionDebugView;
+		mpReflectionDebugChoice->SetSelection(static_cast<int32>(state.ReflectionDebugView));
 	}
 }
 
-void WorldPropertiesPanel::Update()
+void WorldPropertiesPanel::ApplyState(const WorldPanelState& state)
 {
 	if (!mbShowingAnything) {
 		mbShowingAnything = true;
 		mpPositionField->SetEnabled(true);
 	}
 
-	const Vec3f position = gWorld->Player.Position;
-
-	// if (true) {
-	// 	mpPositionField->SetValue(position);
-	// 	mShownPosition = position;
-	// }
-
-	const int64 debug_mask = gCVars->Get("r_debug_bounds", int64 { 0 });
-
-	if (debug_mask != mShownDebugMask) {
-		mShownDebugMask = debug_mask;
+	if (state.DebugMask != mShownDebugMask) {
+		mShownDebugMask = state.DebugMask;
 
 		int32 selection = wxNOT_FOUND;
 
 		for (uint32 i = 0; i < std::size(scDebugLayers); i++) {
-			if (static_cast<int64>(scDebugLayers[i].Mask) == debug_mask) {
+			if (static_cast<int64>(scDebugLayers[i].Mask) == state.DebugMask) {
 				selection = static_cast<int32>(i);
 				break;
 			}
@@ -336,32 +314,22 @@ void WorldPropertiesPanel::Update()
 		mpDebugLayerChoice->SetSelection(selection);
 	}
 
-	UpdateReflectionPane();
-
-	if (!mpCameraPane->IsExpanded()) {
-		return;
-	}
-
-	ExposureSettings exposure;
-	exposure.Aperture = gCVars->Get("r_aperture", exposure.Aperture);
-	exposure.ShutterTime = gCVars->Get("r_shutter", exposure.ShutterTime);
-	exposure.ISO = gCVars->Get("r_iso", exposure.ISO);
-	exposure.Compensation = gCVars->Get("r_exposure_ev", exposure.Compensation);
+	ApplyReflectionState(state);
 
 	if (!mpApertureField->HasFocus()) {
-		mpApertureField->SetValue(exposure.Aperture);
+		mpApertureField->SetValue(state.Aperture);
 	}
 
 	if (!mpShutterField->HasFocus()) {
-		mpShutterField->SetValue(1.0f / std::max(exposure.ShutterTime, ExposureSettings::scMinValue));
+		mpShutterField->SetValue(1.0f / std::max(state.ShutterTime, ExposureSettings::scMinValue));
 	}
 
 	if (!mpIsoField->HasFocus()) {
-		mpIsoField->SetValue(exposure.ISO);
+		mpIsoField->SetValue(state.ISO);
 	}
 
 	if (!mpCompensationField->HasFocus()) {
-		mpCompensationField->SetValue(exposure.Compensation);
+		mpCompensationField->SetValue(state.Compensation);
 	}
 }
 

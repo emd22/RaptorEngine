@@ -41,7 +41,7 @@ void DecalManager::Create()
 	mNormalAtlasTicket = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm, scNormalAtlasPath,
 												  eImageCreateFlags::None);
 
-	// Runs on the asset thread, the renderer picks the atlases up in Update()
+	// The renderer picks the atlases up in Update()
 	mAtlasTicket.OnLoaded([this](void* data) { mpAtlas.store(static_cast<Image*>(data)); });
 	mNormalAtlasTicket.OnLoaded([this](void* data) { mpNormalAtlas.store(static_cast<Image*>(data)); });
 }

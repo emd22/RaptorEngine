@@ -14,11 +14,23 @@ namespace fx {
 using BoneId = uint32;
 static constexpr BoneId BoneNull = UINT32_MAX;
 
+enum class eAnimationInterpolation : uint8
+{
+	Linear,
+	Step,
+	CubicSpline,
+};
+
 template <typename T>
 struct BoneTransformTrack
 {
 	SizedArray<float32> Times;
 	SizedArray<T> Values;
+
+	SizedArray<T> InTangents;
+	SizedArray<T> OutTangents;
+
+	eAnimationInterpolation Interpolation = eAnimationInterpolation::Linear;
 };
 
 struct BoneTrack
@@ -54,15 +66,6 @@ struct AnimationPlayback
 	float32 Time = 0.0f;
 	float32 Speed = 1.0f;
 	eAnimationEnd OnEnd = eAnimationEnd::Pop;
-};
-
-struct BoneTransform
-{
-	BoneTransform() = default;
-	BoneTransform(const fx::Vec3f& position, const Quat rotation) : Position(position), Rotation(rotation) {}
-
-	Vec3f Position = Vec3f::sZero;
-	Quat Rotation = Quat::scIdentity;
 };
 
 /// The local transform a joint sits at when an animation does not drive it.
@@ -128,10 +131,7 @@ public:
 
 	void PoseFromDrivenBones(const Mat4f* driven_world, const uint8* is_driven);
 
-	BoneTransform GetBoneTransform(const Ref<Animation>& anim, float32 time, BoneId bone_id) const;
-	Mat4f GetBoneTransformMatrix(const Ref<Animation>& anim, float32 time, BoneId bone_id) const;
-
-	BoneId FindBone(const Ref<Animation>& anim, const String& name) const;
+	void BuildEvaluationOrder();
 
 public:
 	SizedArray<Mat4f> InvBindTransforms;
@@ -139,6 +139,7 @@ public:
 
 	SizedArray<Mat4f> RootTransforms;
 	SizedArray<uint32> ParentIndices;
+	SizedArray<uint32> EvaluationOrder;
 	SizedArray<String> BoneNames;
 	uint32 JointCount = 0;
 

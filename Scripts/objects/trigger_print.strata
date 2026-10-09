@@ -5,16 +5,20 @@
  * Description: Example trigger script. Tick the Trigger tag on a blockout brush and attach this to it. The brush stops
  *              being solid and is no longer drawn (turn on "show volumes" to see and pick it in the editor), and the
  *              functions below are called when the player walks into and out of it while the game is running.
+ *              enter_direction and exit_direction give the world space direction the player was moving when they
+ *              crossed the volume's edge.
  */
 
 import ../interop;
 
 void object_trigger_enter(OBJECT self)
 {
-	printf("trigger entered\n");
+	printf("trigger entered, moving along:\n");
+	print_float3(self.enter_direction);
 }
 
 void object_trigger_exit(OBJECT self)
 {
-	printf("trigger left\n");
+	printf("trigger left, moving along:\n");
+	print_float3(self.exit_direction);
 }

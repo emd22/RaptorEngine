@@ -7,58 +7,27 @@
 
 namespace fx {
 
-struct MeshBone
-{
-	Vec3f Position;
-	Quat Rotation;
-};
-
 class PrimitiveMesh
 {
 public:
 	PrimitiveMesh() = default;
 
-	template <renderer::eVertexType TVertexType>
-	PrimitiveMesh(SizedArray<renderer::Vertex<TVertexType>>& vertices)
-	{
-		UploadVertices(vertices);
-	}
-
-	template <renderer::eVertexType TVertexType>
-	PrimitiveMesh(SizedArray<renderer::Vertex<TVertexType>>& vertices, SizedArray<uint32>& indices)
-	{
-		CreateFromData(vertices, indices);
-	}
-
 	/**
-	 * @brief Recalculates normals if needed and uploads the vertex list to the GPU.
+	 * @brief Recalculates normals if needed and uploads the vertex list to the GPU. Unless `bKeepInMemory` is set, the
+	 * cpu-side vertices and indices are released once they have been copied into the upload.
 	 */
 	inline void UploadVertices(renderer::CommandBuffer& cmd)
 	{
 		if (VertexList.SupportsNormals() && !VertexList.HasNormals()) {
-			LogDebug("Calculating normals for mesh");
 			RecalculateNormals();
 		}
 
 		VertexList.UploadToGpu(cmd);
-	}
 
-	/**
-	 * @brief Uploads the vertices to the mesh's GPU buffers and copies the data into a cpu-side buffer if the property
-	 * `KeepInMemory` is true.
-	 */
-	template <renderer::eVertexType TVertexType>
-	void UploadVertices(renderer::CommandBuffer& cmd, const SizedArray<renderer::Vertex<TVertexType>>& vertices)
-	{
-		VertexList.CreateAsCopyOf<TVertexType>(vertices);
-		UploadVertices(cmd);
-	}
-
-	template <renderer::eVertexType TVertexType>
-	void UploadVertices(renderer::CommandBuffer& cmd, SizedArray<renderer::Vertex<TVertexType>>&& vertices)
-	{
-		VertexList.CreateFrom<TVertexType>(std::move(vertices));
-		UploadVertices(cmd);
+		if (!bKeepInMemory) {
+			VertexList.DestroyLocalBuffer();
+			LocalIndexBuffer.Free();
+		}
 	}
 
 	/**
@@ -66,16 +35,22 @@ public:
 	 */
 	void UploadIndices(renderer::CommandBuffer& cmd, const SizedArray<uint32>& indices)
 	{
+		if (indices.IsEmpty()) {
+			LogError(LC_ASSET, "Cannot upload a mesh without indices");
+			return;
+		}
+
 		LocalIndexBuffer.InitAsCopyOf(indices);
 		GpuIndexBuffer.Create(cmd, renderer::eGpuBufferType::IndexBuffer, Slice(indices));
 	}
 
-	/**
-	 * @brief Uploads mesh indices to a primtive mesh, and stores the indices without copy if the property
-	 * `KeepInMemory` is true.
-	 */
 	void UploadIndices(renderer::CommandBuffer& cmd)
 	{
+		if (LocalIndexBuffer.IsEmpty()) {
+			LogError(LC_ASSET, "Cannot upload a mesh without indices");
+			return;
+		}
+
 		GpuIndexBuffer.Create<uint32>(cmd, renderer::eGpuBufferType::IndexBuffer, LocalIndexBuffer);
 	}
 
@@ -87,7 +62,6 @@ public:
 			LogWarning(LC_ASSET, "Requesting vertices from a primitive mesh while `KeepInMemory` != true!");
 		}
 
-		// Note that VertexList.LocalBuffer will be empty given bKeepInMemory is false.
 		return VertexList;
 	}
 
@@ -97,7 +71,6 @@ public:
 			LogWarning(LC_ASSET, "Requesting indices from a primitive mesh while `KeepInMemory` != true!");
 		}
 
-		// This will return an empty array if `KeepInMemory` is false!
 		return LocalIndexBuffer;
 	}
 
@@ -108,6 +81,10 @@ public:
 
 	void Render(const renderer::CommandBuffer& cmd, uint32 num_instances)
 	{
+		if (!IsWritable()) {
+			return;
+		}
+
 		const VkDeviceSize offset = 0;
 
 		vkCmdBindVertexBuffers(cmd.Cmd, 0, 1, &VertexList.GpuBuffer.Buffer, &offset);
@@ -133,64 +110,57 @@ public:
 		}
 
 		const uint32 num_vertices = vertices.Size;
-		const uint32 num_faces = num_vertices / 3;
+		const uint32 num_faces = static_cast<uint32>(LocalIndexBuffer.Size / 3);
 
-		// Zero the mesh normals
+		uint8* const base = static_cast<uint8*>(vertices.pData);
+		const size_t stride = vertices.ObjectSize;
+
+		auto vertex_at = [&](uint32 index) -> VertexType&
+		{ return *reinterpret_cast<VertexType*>(base + (static_cast<size_t>(index) * stride)); };
+
 		for (uint32 index = 0; index < num_vertices; index++) {
-			memset(vertices.Get<VertexType>(index).Normal, 0, sizeof(VertexType::Normal));
+			memset(vertex_at(index).Normal, 0, sizeof(VertexType::Normal));
 		}
 
-		for (uint32 index = 0; index < num_faces; index++) {
-			// Indices for each vertex of the triangle
-			const uint32 index_a = LocalIndexBuffer.pData[index];
-			const uint32 index_b = LocalIndexBuffer.pData[index + 1];
-			const uint32 index_c = LocalIndexBuffer.pData[index + 2];
+		for (uint32 face = 0; face < num_faces; face++) {
+			const uint32 index_a = LocalIndexBuffer.pData[face * 3];
+			const uint32 index_b = LocalIndexBuffer.pData[face * 3 + 1];
+			const uint32 index_c = LocalIndexBuffer.pData[face * 3 + 2];
 
-			/*
-						A
-					  / |
-					/   |
-				  /     |
-				B-------C
+			if (index_a >= num_vertices || index_b >= num_vertices || index_c >= num_vertices) {
+				continue;
+			}
 
-				Get the edge between A and B and the edge between C and B.
-				then, we get the normal using:
+			VertexType& vertex_a = vertex_at(index_a);
+			VertexType& vertex_b = vertex_at(index_b);
+			VertexType& vertex_c = vertex_at(index_c);
 
-				Normal = EdgeA x EdgeB.
+			const Vec3f position_a(vertex_a.Position);
+			const Vec3f position_b(vertex_b.Position);
+			const Vec3f position_c(vertex_c.Position);
 
-				Average across vertices and normalize to remove scale.
-			 */
+			const Vec3f normal = (position_c - position_a).Cross(position_b - position_a);
 
-
-			VertexType& vertex_a = vertices.Get<VertexType>(index_a);
-			VertexType& vertex_b = vertices.Get<VertexType>(index_b);
-			VertexType& vertex_c = vertices.Get<VertexType>(index_c);
-
-			const Vec3f edge_a = Vec3f::FromDifference(vertex_a.Position, vertex_b.Position);
-			const Vec3f edge_b = Vec3f::FromDifference(vertex_c.Position, vertex_b.Position);
-
-			const Vec3f normal = edge_a.Cross(edge_b);
-
-			vertex_a.Normal[0] += normal.X;
-			vertex_a.Normal[1] += normal.Y;
-			vertex_a.Normal[2] += normal.Z;
-
-			vertex_b.Normal[0] += normal.X;
-			vertex_b.Normal[1] += normal.Y;
-			vertex_b.Normal[2] += normal.Z;
-
-			vertex_c.Normal[0] += normal.X;
-			vertex_c.Normal[1] += normal.Y;
-			vertex_c.Normal[2] += normal.Z;
+			for (VertexType* vertex : { &vertex_a, &vertex_b, &vertex_c }) {
+				vertex->Normal[0] += normal.X;
+				vertex->Normal[1] += normal.Y;
+				vertex->Normal[2] += normal.Z;
+			}
 		}
 
+		for (uint32 index = 0; index < num_vertices; index++) {
+			VertexType& vertex = vertex_at(index);
 
-		for (uint32 index = 0; index < vertices.Size; index++) {
-			VertexType& vertex = vertices.Get<VertexType>(index);
+			Vec3f normal(vertex.Normal);
 
-			Vec3f vec(vertex.Position);
-			vec.NormalizeIP();
-			vec.CopyTo(vertex.Normal);
+			if (normal.Length() < 1e-12f) {
+				normal = Vec3f(0.0f, 1.0f, 0.0f);
+			}
+			else {
+				normal.NormalizeIP();
+			}
+
+			normal.CopyTo(vertex.Normal);
 		}
 
 		VertexList.bContainsNormals = true;
@@ -215,8 +185,6 @@ public:
 
 public:
 	renderer::VertexList VertexList;
-
-	SizedArray<MeshBone> Bones;
 
 	std::atomic_bool bIsReady = { false };
 

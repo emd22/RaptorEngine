@@ -261,24 +261,22 @@ void LightEditor::CreateAtCrosshair()
 	const physics::RayResult hit = gPhysics->pBackend->Raycast(origin, forward * scAimRange);
 	const Vec3f position = gEditor->SnapToGrid(hit.bHit ? hit.Point : (origin + (forward * scAimFallbackDistance)));
 
-	EditOperation op {
-		.Type = EditOperation::eType::LightCreate,
-	};
+	LightSnapshot snapshot;
 
-	op.LightSnap.Position = position;
+	snapshot.Position = position;
 	// Aim er down
-	op.LightSnap.Direction = SnapDirection(Vec3f(0.0f, -1.0f, 0.0f));
+	snapshot.Direction = SnapDirection(Vec3f(0.0f, -1.0f, 0.0f));
 
-	op.LightSnap.LightName = String::Fmt("Light_{}", gLightManager->GetCache().Size).Str();
-	op.LightSnap.Radius = scNewLightRadius;
-	op.LightSnap.InnerAngle = scNewLightInnerAngle;
-	op.LightSnap.OuterAngle = scNewLightOuterAngle;
-	op.LightSnap.bCastShadows = true;
+	snapshot.LightName = String::Fmt("Light_{}", gLightManager->GetCache().Size).Str();
+	snapshot.Radius = scNewLightRadius;
+	snapshot.InnerAngle = scNewLightInnerAngle;
+	snapshot.OuterAngle = scNewLightOuterAngle;
+	snapshot.bCastShadows = true;
 
-	const EditOperationValue created = gEditor->PushEditOperation(op);
+	LightSpot* created = gEditor->EmplaceEditOperation<LightCreateOperation>(snapshot).GetCreated();
 
-	if (created.Type == EditOperationValue::eValueType::Light && created.pLight != nullptr) {
-		Select(static_cast<LightSpot*>(created.pLight));
+	if (created != nullptr) {
+		Select(created);
 	}
 }
 
@@ -310,15 +308,8 @@ void LightEditor::DeleteSelected()
 		return;
 	}
 
-	EditOperation op {
-		.Type = EditOperation::eType::LightDelete,
-	};
-
 	// Snapshot everything Undo needs before the Execute step destroys the light, same as RaptorEditor::DeleteObject
-	op.Light.pLight = light;
-	op.LightSnap = EditOperation::LightSnapshot::Capture(*light);
-
-	gEditor->PushEditOperation(op);
+	gEditor->EmplaceEditOperation<LightDeleteOperation>(light);
 
 	Deselect();
 }
@@ -338,17 +329,13 @@ void LightEditor::DuplicateSelected()
 		name = String::Fmt("Light_{}", index++).Str();
 	} while (gLightManager->FindLight(name.GetHash()) != nullptr);
 
-	EditOperation op {
-		.Type = EditOperation::eType::LightCreate,
-	};
+	LightSnapshot snapshot = LightSnapshot::Capture(*light);
+	snapshot.LightName = name;
 
-	op.LightSnap = EditOperation::LightSnapshot::Capture(*light);
-	op.LightSnap.LightName = name;
+	LightSpot* created = gEditor->EmplaceEditOperation<LightCreateOperation>(snapshot).GetCreated();
 
-	const EditOperationValue created = gEditor->PushEditOperation(op);
-
-	if (created.Type == EditOperationValue::eValueType::Light && created.pLight != nullptr) {
-		Select(static_cast<LightSpot*>(created.pLight));
+	if (created != nullptr) {
+		Select(created);
 	}
 }
 
@@ -387,17 +374,8 @@ void LightEditor::CommitEdit()
 		return;
 	}
 
-	EditOperation op {
-		.Type = EditOperation::eType::LightTransform,
-		.ValueA = EditOperationValue(mPositionBefore),
-		.ValueB = EditOperationValue(position_after),
-	};
-
-	op.Light.pLight = light;
-	op.Light.DirectionBefore = mDirectionBefore;
-	op.Light.DirectionAfter = direction_after;
-
-	gEditor->PushEditOperation(op);
+	gEditor->EmplaceEditOperation<LightTransformOperation>(light, mPositionBefore, position_after, mDirectionBefore,
+														   direction_after);
 }
 
 void LightEditor::MoveSelected(LightSpot& light, float32 delta_time)

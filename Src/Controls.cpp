@@ -66,9 +66,6 @@ void ControlManager::CaptureMouse()
 
 	Ref<Window> window = renderer::gGraphics->GetWindow();
 
-	// Get the position of the mouse on capture
-	inst.mCapturedMousePos = window->GetMousePosition();
-
 	window->SetRelativeMouseMode((inst.mMouseCaptured = true));
 }
 
@@ -79,9 +76,6 @@ void ControlManager::ReleaseMouse()
 	ControlManager& inst = GetInstance();
 
 	Ref<Window> window = renderer::gGraphics->GetWindow();
-
-	// Warp back to the original position
-	window->WarpMouse(inst.mCapturedMousePos);
 
 	window->SetRelativeMouseMode((inst.mMouseCaptured = false));
 }
@@ -187,10 +181,12 @@ void ControlManager::Update()
 	inst.mMouseDelta = Vec2f::sZero;
 	inst.mThisTick++;
 
+	inst.ApplyPostedEvents();
+
 #ifdef FX_IS_EDITOR
-	// The editor viewport forwards its key and mouse events through PostButtonEvent() and PostMouseMotion() while
-	// they are dispatched here
-	if (!gEditor->PumpEvents()) {
+	gEditor->ServiceViewportResize();
+
+	if (gEditor->IsCloseRequested()) {
 		inst.OnQuit();
 	}
 #else
@@ -227,9 +223,65 @@ void ControlManager::Update()
 #endif
 }
 
-void ControlManager::PostButtonEvent(eKey key_id, bool is_now_down) { UpdateButtonFromEvent(key_id, is_now_down); }
+void ControlManager::Post(const PostedEvent& event) { GetInstance().mPostedEvents.GetQueue()->Push(event); }
 
-void ControlManager::PostMouseMotion(const Vec2f& delta) { GetInstance().mMouseDelta += delta; }
+void ControlManager::PostButtonEvent(eKey key_id, bool is_now_down)
+{
+	Post(PostedEvent { .Type = PostedEvent::eType::Button, .Key = key_id, .bIsDown = is_now_down });
+}
+
+void ControlManager::PostMouseMotion(const Vec2f& delta)
+{
+	Post(PostedEvent { .Type = PostedEvent::eType::MouseMotion, .Delta = delta });
+}
+
+void ControlManager::PostReleaseAllKeys() { Post(PostedEvent { .Type = PostedEvent::eType::ReleaseAllKeys }); }
+
+void ControlManager::PostReleaseNonModifierKeys()
+{
+	Post(PostedEvent { .Type = PostedEvent::eType::ReleaseNonModifierKeys });
+}
+
+void ControlManager::PostFocusLost() { Post(PostedEvent { .Type = PostedEvent::eType::FocusLost }); }
+
+void ControlManager::ApplyPostedEvents()
+{
+	mAppliedEvents.clear();
+
+	{
+		auto posted = mPostedEvents.GetQueue();
+
+		while (posted->GetSize() > 0) {
+			mAppliedEvents.push_back(posted->PopValue());
+		}
+	}
+
+	for (const PostedEvent& event : mAppliedEvents) {
+		switch (event.Type) {
+		case PostedEvent::eType::Button:
+			UpdateButtonFromEvent(event.Key, event.bIsDown);
+			break;
+
+		case PostedEvent::eType::MouseMotion:
+			mMouseDelta += event.Delta;
+			break;
+
+		case PostedEvent::eType::ReleaseAllKeys:
+			ReleaseAllKeys();
+			break;
+
+		case PostedEvent::eType::ReleaseNonModifierKeys:
+			ReleaseNonModifierKeys();
+			break;
+
+		case PostedEvent::eType::FocusLost:
+			if (mMouseCaptured) {
+				ReleaseMouse();
+			}
+			break;
+		}
+	}
+}
 
 void ControlManager::ReleaseAllKeys()
 {

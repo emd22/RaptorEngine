@@ -46,13 +46,13 @@ ObjectID ObjectManager::NewObjectID(const String& name, eObjectTag tags)
 }
 
 
-Object* ObjectManager::NewObject(const String& name, MaterialID material, eObjectTag tags)
+Object* ObjectManager::NewObject(const String& name, MaterialID material, eObjectTag tags, bool is_loading)
 {
 	std::lock_guard<std::mutex> guard(mInUse);
 
 	uint32 index;
 
-	Object* obj = mObjectList.NewItem(&index, 0, material);
+	Object* obj = mObjectList.NewItem(&index, 0, material, is_loading);
 	Assert(obj != nullptr);
 
 	obj->ID = ObjectID(index);
@@ -86,7 +86,7 @@ Object* ObjectManager::FindObject(const Hash32 name_hash)
 
 		Object* object = mObjectList.GetItem(i);
 
-		if (object->Name.GetHash() == name_hash) {
+		if (!object->IsLoading() && object->Name.GetHash() == name_hash) {
 			return object;
 		}
 	}
@@ -162,7 +162,11 @@ SizedArray<Object*> ObjectManager::CollectObjects()
 			continue;
 		}
 
-		object_list.Insert(mObjectList.GetItem(i));
+		Object* object = mObjectList.GetItem(i);
+
+		if (!object->IsLoading()) {
+			object_list.Insert(object);
+		}
 	}
 
 	return object_list;
@@ -181,7 +185,7 @@ SizedArray<Object*> ObjectManager::CollectWithTags(eObjectTag tags)
 
 		Object* object = mObjectList.GetItem(i);
 
-		if (object->HasTags(tags)) {
+		if (!object->IsLoading() && object->HasTags(tags)) {
 			object_list.Insert(object);
 		}
 	}

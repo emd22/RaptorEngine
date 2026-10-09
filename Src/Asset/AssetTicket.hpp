@@ -3,10 +3,115 @@
 #include <Core/Assert.hpp>
 #include <Core/DataNotifier.hpp>
 #include <Core/Defines.hpp>
+#include <Core/Types.hpp>
 #include <atomic>
 #include <functional>
+#include <mutex>
+#include <thread>
+#include <vector>
 
 namespace fx {
+
+
+class AssetCallbackQueue
+{
+public:
+	using Task = std::function<void()>;
+
+public:
+	static AssetCallbackQueue& Get()
+	{
+		static AssetCallbackQueue sInstance;
+		return sInstance;
+	}
+
+	void BindToCurrentThread()
+	{
+		std::lock_guard guard(mMutex);
+
+		mOwner = std::this_thread::get_id();
+		mbBound = true;
+	}
+
+	void Unbind()
+	{
+		std::vector<Task> discarded;
+
+		{
+			std::lock_guard guard(mMutex);
+
+			mbBound = false;
+			discarded.swap(mPending);
+		}
+	}
+
+	void Run(Task task)
+	{
+		{
+			std::lock_guard guard(mMutex);
+
+			const bool on_owner_thread = (mOwner == std::this_thread::get_id());
+			const bool run_inline = !mbBound || (on_owner_thread && !mbDispatching && mPending.empty());
+
+			if (!run_inline) {
+				mPending.push_back(std::move(task));
+				return;
+			}
+		}
+
+		task();
+	}
+
+	uint32 Dispatch()
+	{
+		std::vector<Task> batch;
+		bool on_owner_thread = true;
+
+		{
+			std::lock_guard guard(mMutex);
+
+			if (!mbBound) {
+				return 0;
+			}
+
+			on_owner_thread = (mOwner == std::this_thread::get_id());
+
+			if (on_owner_thread) {
+				batch.swap(mPending);
+				mbDispatching = true;
+			}
+		}
+
+		AssertMsg(on_owner_thread, "Asset callbacks must be dispatched on the thread that started the asset manager");
+
+		struct DispatchScope
+		{
+			~DispatchScope()
+			{
+				std::lock_guard guard(Queue.mMutex);
+				Queue.mbDispatching = false;
+			}
+
+			AssetCallbackQueue& Queue;
+		} scope { *this };
+
+		for (Task& task : batch) {
+			task();
+		}
+
+		return static_cast<uint32>(batch.size());
+	}
+
+private:
+	AssetCallbackQueue() = default;
+
+private:
+	std::mutex mMutex;
+	std::vector<Task> mPending;
+	std::thread::id mOwner;
+	bool mbBound = false;
+	bool mbDispatching = false;
+};
 
 
 /**
@@ -19,26 +124,24 @@ public:
 	using OnLoadFunc = std::function<void(void*)>;
 	using OnErrorFunc = std::function<void()>;
 
+	enum class eState : uint8
+	{
+		Pending,
+		Loaded,
+		Failed,
+	};
+
 public:
 	AssetTicketData() = default;
 	AssetTicketData(const AssetTicketData&) = delete;
 
 	AssetTicketData& operator=(const AssetTicketData&) = delete;
 
-	void MarkAndSignalLoaded()
+	void MarkAndSignalLoaded(void* item)
 	{
-		if (bIsLoaded.load()) {
-			return;
-		}
-
-		bIsUploadedToGpu.store(true);
-		bIsUploadedToGpu.notify_all();
-
-		bIsLoaded.store(true);
-		IsFinishedNotifier.Signal();
+		SignalUploadedToGpu();
+		CompleteLoaded(item);
 	}
-
-	void SignalFinished() { IsFinishedNotifier.Signal(); }
 
 	void SignalUploadedToGpu()
 	{
@@ -46,37 +149,113 @@ public:
 		bIsUploadedToGpu.notify_all();
 	}
 
+	void CompleteLoaded(void* item, OnLoadFunc before = nullptr, OnLoadFunc after = nullptr)
+	{
+		std::vector<OnLoadFunc> callbacks;
+
+		{
+			std::lock_guard guard(mCallbackMutex);
+
+			if (mState.load() != eState::Pending) {
+				return;
+			}
+
+			mState.store(eState::Loaded);
+			bIsLoaded.store(true);
+
+			callbacks = std::move(mOnLoadedCallbacks);
+			mOnLoadedCallbacks.clear();
+			mOnErrorCallback = nullptr;
+		}
+
+		IsFinishedNotifier.Signal();
+
+		if (callbacks.empty() && !before && !after) {
+			return;
+		}
+
+		AssetCallbackQueue::Get().Run(
+			[before = std::move(before), callbacks = std::move(callbacks), after = std::move(after), item]()
+			{
+				if (before) {
+					before(item);
+				}
+
+				for (const OnLoadFunc& callback : callbacks) {
+					callback(item);
+				}
+
+				if (after) {
+					after(item);
+				}
+			});
+	}
+
+	void CompleteFailed()
+	{
+		OnErrorFunc on_error;
+
+		{
+			std::lock_guard guard(mCallbackMutex);
+
+			if (mState.load() != eState::Pending) {
+				return;
+			}
+
+			mState.store(eState::Failed);
+
+			mOnLoadedCallbacks.clear();
+			on_error = std::move(mOnErrorCallback);
+			mOnErrorCallback = nullptr;
+		}
+
+		IsFinishedNotifier.Signal();
+
+		if (on_error) {
+			AssetCallbackQueue::Get().Run([on_error = std::move(on_error)]() { on_error(); });
+		}
+	}
+
 	void OnLoaded(void* item, const OnLoadFunc& on_loaded_callback)
 	{
 		{
 			std::lock_guard guard(mCallbackMutex);
-			if (IsFinishedNotifier.IsSignalled()) {
-				// Unlock before invoking callback to avoid deadlock if callback re-enters OnLoaded
-			} else {
+
+			switch (mState.load()) {
+			case eState::Pending:
 				mOnLoadedCallbacks.push_back(on_loaded_callback);
 				return;
+			case eState::Failed:
+				return;
+			case eState::Loaded:
+				break;
 			}
 		}
-		on_loaded_callback(item);
+
+		AssetCallbackQueue::Get().Run([on_loaded_callback, item]() { on_loaded_callback(item); });
 	}
 
 
 	void OnError(const OnErrorFunc& on_error_callback)
 	{
-		OnErrorFunc to_call = nullptr;
 		{
 			std::lock_guard guard(mCallbackMutex);
-			if (IsFinishedNotifier.IsSignalled()) {
-				to_call = on_error_callback;
-			} else {
+
+			switch (mState.load()) {
+			case eState::Pending:
 				mOnErrorCallback = on_error_callback;
 				return;
+			case eState::Loaded:
+				return;
+			case eState::Failed:
+				break;
 			}
 		}
-		if (to_call) {
-			to_call();
-		}
+
+		AssetCallbackQueue::Get().Run([on_error_callback]() { on_error_callback(); });
 	}
+
+	bool IsFailed() const { return mState.load() == eState::Failed; }
 
 
 	~AssetTicketData() = default;
@@ -91,6 +270,7 @@ public:
 	std::mutex mCallbackMutex;
 	std::vector<OnLoadFunc> mOnLoadedCallbacks;
 	OnErrorFunc mOnErrorCallback = nullptr;
+	std::atomic<eState> mState = { eState::Pending };
 
 protected:
 	friend class LoaderGltf;
@@ -167,6 +347,15 @@ public:
 		return pTicketData->bIsLoaded.load();
 	}
 
+	FX_FORCE_INLINE bool IsFailed() const
+	{
+		if (pTicketData == nullptr) {
+			return false;
+		}
+
+		return pTicketData->IsFailed();
+	}
+
 	FX_FORCE_INLINE void* Get() { return mpData; }
 	FX_FORCE_INLINE const void* Get() const { return mpData; }
 
@@ -181,7 +370,7 @@ public:
 	{
 		Assert(pTicketData != nullptr);
 
-		pTicketData->MarkAndSignalLoaded();
+		pTicketData->MarkAndSignalLoaded(mpData);
 	}
 
 	void SignalUploadedToGpu() const
@@ -191,11 +380,11 @@ public:
 		pTicketData->SignalUploadedToGpu();
 	}
 
-	void SignalFinished()
+	void SignalFailed()
 	{
 		Assert(pTicketData != nullptr);
 
-		pTicketData->SignalFinished();
+		pTicketData->CompleteFailed();
 	}
 
 
@@ -204,6 +393,13 @@ public:
 		Assert(pTicketData != nullptr);
 
 		pTicketData->OnLoaded(reinterpret_cast<void*>(mpData), on_loaded_callback);
+	}
+
+	void OnError(const AssetTicketData::OnErrorFunc& on_error_callback)
+	{
+		Assert(pTicketData != nullptr);
+
+		pTicketData->OnError(on_error_callback);
 	}
 
 	void DecRef()

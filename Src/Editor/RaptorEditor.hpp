@@ -4,6 +4,7 @@
 
 #include "BoundsEditor.hpp"
 #include "EditOperation.hpp"
+#include "EditorPanelState.hpp"
 #include "EditorSelection.hpp"
 #include "EditorTool.hpp"
 #include "GrabEditor.hpp"
@@ -22,7 +23,10 @@
 #include <Core/Types.hpp>
 #include <Material/MaterialID.hpp>
 #include <Math/Vec2.hpp>
+#include <atomic>
+#include <chrono>
 #include <functional>
+#include <mutex>
 
 namespace fx {
 
@@ -56,25 +60,45 @@ class RaptorEditor
 public:
 	RaptorEditor() = default;
 
+
 	bool InitGUI(int argc, char** argv);
+
+	void RunUILoop();
+
+	void Destroy();
+
+
+	void InitTools();
+
 	EditorFrame* CreateMainFrame(const char* title, const Vec2u& viewport_size);
+
+	void BeginGameLoop();
+
+	void EndGameLoop();
+
+	void ProcessGUIOperations();
+
+	void SyncPanels();
+
+	void NotifyGameFinished();
+
+	void ServiceViewportResize();
 
 	FX_FORCE_INLINE EditorFrame* GetMainFrame() { return mpMainFrame; }
 	FX_FORCE_INLINE const EditorFrame* GetMainFrame() const { return mpMainFrame; }
 
+	bool IsCloseRequested() const;
+
+	FX_FORCE_INLINE bool IsAppActive() const { return mbAppActive; }
+
 	void SetReloadHandler(eReloadTarget target, std::function<void()> handler);
 	void InvokeReloadHandler(eReloadTarget target);
-
-	bool PumpEvents();
 
 	/**
 	 * @brief Runs the editor for a frame: its hotkeys, picking objects, and the selected tool. Does nothing while
 	 * simulating.
 	 */
 	void Update(float32 delta_time);
-
-	/// Updates the property panels to show the world and the last selected object
-	void RefreshPanels();
 
 	/////////////////////////////////////
 	// Tools
@@ -157,12 +181,25 @@ public:
 
 	uint32 SetSelectionScript(const String& path);
 
+	uint32 SetSelectionEnterDirection(const Vec3f local_direction);
+
 	/////////////////////////////////////
 	// Edit operations
 	/////////////////////////////////////
 
 	/// Applies an operation and records it so it can be undone
-	EditOperationValue PushEditOperation(const EditOperation& op);
+	EditOperation& PushEditOperation(std::unique_ptr<EditOperation> op);
+
+	template <typename TOp, typename... TArgs>
+	TOp& EmplaceEditOperation(TArgs&&... args)
+	{
+		std::unique_ptr<TOp> op = std::make_unique<TOp>(std::forward<TArgs>(args)...);
+		TOp& pushed = *op;
+
+		PushEditOperation(std::move(op));
+
+		return pushed;
+	}
 
 	/// Deletes an object as an undoable operation. `group_size` is the number of objects deleted together.
 	void DeleteObject(Object* object, int32 group_size);
@@ -180,11 +217,26 @@ public:
 	/// Runs `CMD_<name>` from the editor command script. Returns false if there is no such command.
 	bool RunCommand(const String& name);
 
-	void Destroy();
-
 	~RaptorEditor() = default;
 
 private:
+	enum class eGamePhase : uint8
+	{
+		Starting,
+		Running,
+		Stopped,
+	};
+
+	void DispatchEvents(unsigned long wait_ms);
+
+	void PumpUI(unsigned long wait_ms);
+
+	void LockdownGUI();
+
+	EditorPanelState BuildPanelState();
+
+	uint32 GetAvailableToolMask() const;
+
 	void AddTools();
 	void AddTool(const eEditorTool tool_type, const char* path, eEditorToolFlags flags);
 
@@ -258,6 +310,18 @@ private:
 	bool mbHadHeadbob = false;
 
 	wxGUIEventLoop* mpEventLoop = nullptr;
+
+	std::chrono::steady_clock::time_point mLastPanelSync = std::chrono::steady_clock::now();
+	EditorPanelState mLastSentState;
+	bool mbForcePanelSync = true;
+
+	std::mutex mPendingStateMutex;
+	EditorPanelState mPendingState;
+	bool mbStatePosted = false;
+
+	std::atomic<eGamePhase> mGamePhase = eGamePhase::Starting;
+	std::atomic<bool> mbGameFinished = false;
+	std::atomic<bool> mbAppActive = true;
 
 	std::function<void()> mpReloadHandlers[static_cast<uint32>(eReloadTarget::Count)];
 };

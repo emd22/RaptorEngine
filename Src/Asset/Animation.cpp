@@ -8,6 +8,7 @@
 #include <World.hpp>
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 
 namespace fx {
@@ -30,15 +31,48 @@ Quat Interpolate(const Quat a, const Quat b, float32 t)
 }
 
 template <typename T>
+static T Hermite(const T& p0, const T& out0, const T& p1, const T& in1, float32 t, float32 dt);
+
+template <>
+Vec3f Hermite(const Vec3f& p0, const Vec3f& out0, const Vec3f& p1, const Vec3f& in1, float32 t, float32 dt)
+{
+	const float32 t2 = t * t;
+	const float32 t3 = t2 * t;
+
+	return p0 * (2.0f * t3 - 3.0f * t2 + 1.0f) + out0 * (dt * (t3 - 2.0f * t2 + t)) + p1 * (-2.0f * t3 + 3.0f * t2) +
+		   in1 * (dt * (t3 - t2));
+}
+
+template <>
+Quat Hermite(const Quat& p0, const Quat& out0, const Quat& p1, const Quat& in1, float32 t, float32 dt)
+{
+	const float32 t2 = t * t;
+	const float32 t3 = t2 * t;
+
+	const float32 a = 2.0f * t3 - 3.0f * t2 + 1.0f;
+	const float32 b = dt * (t3 - 2.0f * t2 + t);
+	const float32 c = -2.0f * t3 + 3.0f * t2;
+	const float32 d = dt * (t3 - t2);
+
+	const float32 dot = p0.GetX() * p1.GetX() + p0.GetY() * p1.GetY() + p0.GetZ() * p1.GetZ() + p0.GetW() * p1.GetW();
+	const float32 sign = (dot < 0.0f) ? -1.0f : 1.0f;
+
+	return Quat(a * p0.GetX() + b * out0.GetX() + sign * (c * p1.GetX() + d * in1.GetX()),
+				a * p0.GetY() + b * out0.GetY() + sign * (c * p1.GetY() + d * in1.GetY()),
+				a * p0.GetZ() + b * out0.GetZ() + sign * (c * p1.GetZ() + d * in1.GetZ()),
+				a * p0.GetW() + b * out0.GetW() + sign * (c * p1.GetW() + d * in1.GetW()))
+		.Normalize();
+}
+
+template <typename T>
 static T GetComponentAtTime(float32 time, const BoneTransformTrack<T>& track, const T& empty_default)
 {
 	const uint32 count = static_cast<uint32>(track.Times.Size);
 
-	if (count == 0) {
+	if (count == 0 || track.Values.Size < count) {
 		return empty_default;
 	}
 
-	// Clamp to ends
 	if (time <= track.Times.pData[0]) {
 		return track.Values.pData[0];
 	}
@@ -47,20 +81,28 @@ static T GetComponentAtTime(float32 time, const BoneTransformTrack<T>& track, co
 		return track.Values.pData[count - 1];
 	}
 
-	// Find bracketing keyframes
-	for (uint32 i = 0; i < count - 1; i++) {
-		const float32 t0 = track.Times[i];
-		const float32 t1 = track.Times[i + 1];
+	const float32* times = track.Times.pData;
 
-		if (time >= t0 && time < t1) {
-			const float32 duration = t1 - t0;
-			const float32 alpha = (duration > 1e-6f) ? (time - t0) / duration : 0.0f;
+	const uint32 next = static_cast<uint32>(std::upper_bound(times, times + count, time) - times);
+	const uint32 current = next - 1;
 
-			return Interpolate(track.Values[i], track.Values[i + 1], alpha);
-		}
+	if (track.Interpolation == eAnimationInterpolation::Step) {
+		return track.Values.pData[current];
 	}
 
-	return track.Values.pData[count - 1];
+	const float32 t0 = times[current];
+	const float32 t1 = times[next];
+
+	const float32 duration = t1 - t0;
+	const float32 alpha = (duration > 1e-6f) ? (time - t0) / duration : 0.0f;
+
+	if (track.Interpolation == eAnimationInterpolation::CubicSpline && track.InTangents.Size >= count &&
+		track.OutTangents.Size >= count) {
+		return Hermite(track.Values.pData[current], track.OutTangents.pData[current], track.Values.pData[next],
+					   track.InTangents.pData[next], alpha, duration);
+	}
+
+	return Interpolate(track.Values.pData[current], track.Values.pData[next], alpha);
 }
 
 void Skeleton::EvaluatePose(const Animation* anim, float32 time)
@@ -92,8 +134,10 @@ void Skeleton::EvaluatePose(const Animation* anim, float32 time)
 	}
 
 	const bool has_root_transforms = (RootTransforms.Size == joint_count);
+	const bool has_order = (EvaluationOrder.Size == joint_count);
 
-	for (uint32 i = 0; i < joint_count; i++) {
+	for (uint32 k = 0; k < joint_count; k++) {
+		const uint32 i = has_order ? EvaluationOrder.pData[k] : k;
 		const int32 parent = ParentIndices.pData[i];
 
 		if (parent < 0) {
@@ -153,8 +197,10 @@ void Skeleton::SetExternalPose(bool enabled)
 void Skeleton::PoseFromDrivenBones(const Mat4f* driven_world, const uint8* is_driven)
 {
 	const bool has_root_transforms = (RootTransforms.Size == JointCount);
+	const bool has_order = (EvaluationOrder.Size == JointCount);
 
-	for (uint32 i = 0; i < JointCount; i++) {
+	for (uint32 k = 0; k < JointCount; k++) {
+		const uint32 i = has_order ? EvaluationOrder.pData[k] : k;
 		const uint32 parent = ParentIndices.pData[i];
 
 		if (is_driven[i]) {
@@ -200,6 +246,7 @@ Ref<Skeleton> Skeleton::CreateInstance(const Ref<Skeleton>& source)
 	inst.RestPose = MakeView(src.RestPose);
 	inst.RootTransforms = MakeView(src.RootTransforms);
 	inst.ParentIndices = MakeView(src.ParentIndices);
+	inst.EvaluationOrder = MakeView(src.EvaluationOrder);
 	inst.BoneNames = MakeView(src.BoneNames);
 	inst.Animations = MakeView(src.Animations);
 
@@ -359,61 +406,33 @@ void Skeleton::AdvancePose(float32 delta_time)
 	}
 }
 
-BoneTransform Skeleton::GetBoneTransform(const Ref<Animation>& anim, float32 time, BoneId bone_id) const
+void Skeleton::BuildEvaluationOrder()
 {
-	BoneTransform xform {};
-	if (!anim.IsValid() || bone_id == BoneNull) {
-		return xform;
-	}
+	const uint32 joint_count = JointCount;
 
-	if (bone_id >= anim->BoneTracks.Size) {
-		LogError(LC_ASSET, "Bone ID({}) out of range", bone_id);
-		return xform;
-	}
+	EvaluationOrder.Free();
+	EvaluationOrder.InitCapacity(joint_count);
 
-	const BoneTrack& track = anim->BoneTracks[bone_id];
+	std::vector<uint8> state(joint_count, 0);
+	std::vector<uint32> chain;
 
-	// The rotation should be taken from the matrix to have all of the parents propagated into the rotation. Currently
-	// thats a pretty gnarly function to have to write, so im just going with this mess for now.
-	//
-	// Another strange oddity (likely due to converting from GLTF's horrid coordinates) is that Z is
-	// negated. But also negating that component in the matrix causes spaghetti limbs.
+	for (uint32 joint = 0; joint < joint_count; joint++) {
+		chain.clear();
 
-	return BoneTransform(Vec3f::FlipSigns<1, 1, -1, 1>(SkinningMatrices[bone_id].GetTranslation()),
-						 GetComponentAtTime(time, track.Rotation, Quat::scIdentity));
-}
+		uint32 current = joint;
 
-Mat4f Skeleton::GetBoneTransformMatrix(const Ref<Animation>& anim, float32 time, BoneId bone_id) const
-{
-	Mat4f xform {};
-	if (!anim.IsValid() || bone_id == BoneNull) {
-		return xform;
-	}
+		while (current < joint_count && state[current] == 0) {
+			state[current] = 1;
+			chain.push_back(current);
 
-	if (bone_id >= anim->BoneTracks.Size) {
-		LogError(LC_ASSET, "Bone ID({}) out of range", bone_id);
-		return xform;
-	}
+			current = (ParentIndices.Size == joint_count) ? ParentIndices.pData[current] : BoneNull;
+		}
 
-	const BoneTrack& track = anim->BoneTracks[bone_id];
-	return SkinningMatrices[bone_id];
-}
-
-
-BoneId Skeleton::FindBone(const Ref<Animation>& anim, const String& name) const
-{
-	if (!anim.IsValid()) {
-		return BoneNull;
-	}
-
-	for (int32 index = 0; index < BoneNames.Size; index++) {
-		if (BoneNames[index] == name) {
-			return index;
-			break;
+		for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
+			state[*it] = 2;
+			EvaluationOrder.Insert(*it);
 		}
 	}
-
-	return BoneNull;
 }
 
 } // namespace fx

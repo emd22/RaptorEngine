@@ -47,22 +47,12 @@ public:
 	 */
 	VkSurfaceKHR CreateSurface(VkInstance instance);
 
-	/// Hides the cursor and reports mouse movement as deltas without the cursor moving
 	void SetRelativeMouseMode(bool enabled);
-
-	/// The cursor position in window coordinates
-	Vec2f GetMousePosition() const;
-
-	/// Moves the cursor to a position in window coordinates
-	void WarpMouse(const Vec2f& position);
 
 	/// True if the window currently has OS input focus (not minimized/backgrounded/alt-tabbed away from)
 	bool IsFocused() const;
 
-	float32 GetAspectRatio() const
-	{
-		return static_cast<float32>(mSize.X) / static_cast<float32>(mSize.Y);
-	}
+	float32 GetAspectRatio() const { return static_cast<float32>(mSize.X) / static_cast<float32>(mSize.Y); }
 
 	FX_FORCE_INLINE const Vec2u& GetSize() const { return mSize; }
 
@@ -82,6 +72,8 @@ private:
 	editor::EditorViewport* mpViewport = nullptr;
 #else
 	SDL_Window* mWindow = nullptr;
+
+	Vec2f mSavedMousePos = Vec2f::sZero;
 #endif
 };
 

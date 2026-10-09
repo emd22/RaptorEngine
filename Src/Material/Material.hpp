@@ -73,6 +73,7 @@ public:
 	MaterialComponent& operator=(const MaterialComponent& other);
 
 	MaterialComponent::Status Build();
+	void DropIfFailed();
 	FX_FORCE_INLINE void RequireUpdate() { mbRequiresUpdate = true; }
 
 	FX_FORCE_INLINE bool Exists() const { return (pImage != nullptr) || (ImageToUpload.ImageData.pData != nullptr); }
@@ -127,9 +128,13 @@ struct MaterialProperties
 
 	/// How much of the MetallicRoughness texture's R channel is applied as ambient occlusion, 0 ignores the channel.
 	float32 OcclusionStrength = 1.0f;
+
+	float32 EmissiveFactor[3] = { 0.0f, 0.0f, 0.0f };
+
+	float32 AlphaCutoff = 0.5f;
 };
 
-static_assert(sizeof(MaterialProperties) == 48,
+static_assert(sizeof(MaterialProperties) == 64,
 			  "MaterialProperties must match `Material` in Shaders/MaterialDef.hlsli");
 
 /**
@@ -224,13 +229,17 @@ public:
 
 	void SetOcclusionStrength(float32 strength);
 
+	void SetEmissive(const float32 color[3], float32 strength);
+
+	void SetAlphaCutoff(float32 cutoff);
+
 	/**
 	 * @brief Adds the descriptors of a material's set (set 1) to the pipeline being built, so that it can be drawn with
 	 * any material.
 	 *
-	 * Every material builds the same layout: albedo, normal map, metallic roughness, bone buffer and light buffer. The
-	 * ones a pipeline's shader does not read are left alone by it, so a material without a normal map, or that is not
-	 * skinned, fills them with stand-ins (a flat normal, the white null image and the bone buffer).
+	 * Every material builds the same layout: albedo, normal map, metallic roughness, bone buffer, light buffer and
+	 * emissive. The ones a pipeline's shader does not read are left alone by it, so a material without a normal map, or
+	 * that is not skinned, fills them with stand-ins (a flat normal, the white null image and the bone buffer).
 	 */
 	static void DeclareDescriptors(renderer::PSOBuild& pso);
 
@@ -249,6 +258,7 @@ public:
 	MaterialComponent Diffuse { eImageFormat::RGBA8_SRGB };
 	MaterialComponent NormalMap { eImageFormat::RGBA8_UNorm };
 	MaterialComponent MetallicRoughness { eImageFormat::RGBA8_UNorm };
+	MaterialComponent Emissive { eImageFormat::RGBA8_SRGB };
 
 	MaterialProperties Properties {};
 

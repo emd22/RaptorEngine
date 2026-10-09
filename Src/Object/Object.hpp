@@ -53,7 +53,6 @@ enum class eObjectFlags : uint16
 	DisableCulling = (1 << 5),
 	/// Left out of light probe bakes (capture, capture shadows and probe placement). See Object::IsProbeVisible().
 	NotProbeVisible = (1 << 6),
-	SharedMesh = (1 << 7),
 };
 
 FxEnumFlags(eObjectFlags);
@@ -73,6 +72,7 @@ public:
 	Object() = default;
 	Object(const ObjectID id);
 	Object(const ObjectID id, const MaterialID material);
+	Object(const ObjectID id, const MaterialID material, bool is_loading);
 
 	void MakeInstanceOf(const ObjectID& source);
 
@@ -217,6 +217,8 @@ public:
 
 	FX_FORCE_INLINE eObjectFlags GetFlags() const { return Flags; }
 
+	FX_FORCE_INLINE bool IsLoading() const { return bIsLoading.load(); }
+
 	void Destroy();
 	~Object() override { Destroy(); }
 
@@ -256,6 +258,7 @@ public:
 	BBox Bounds { Vec3f::sZero, Vec3f::sZero };
 
 	std::atomic_bool bIsAddedToWorld = false;
+	std::atomic_bool bIsLoading = false;
 
 
 private:

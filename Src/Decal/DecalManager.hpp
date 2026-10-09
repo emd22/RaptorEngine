@@ -141,7 +141,7 @@ private:
 	AtlasRegion mBulletHoleRegion;
 	AtlasRegion mBloodRegion;
 
-	/// Set from the asset thread once each atlas is on the GPU
+	/// Set once each atlas is on the GPU
 	std::atomic<Image*> mpAtlas = nullptr;
 	std::atomic<Image*> mpNormalAtlas = nullptr;
 };

@@ -5,7 +5,7 @@
 
 extern int printf(string fmt, ...);
 
-/* Must match EditOperation::eType in Src/Editor/EditOperation.hpp! */
+/* Must match eScriptOpType in Src/Script/ScriptInterop.cpp! Only MOVE, SCALE and ROTATE are pushed with editor_push_op_vec */
 enum OPTYPE
 {
 	MOVE,
@@ -23,6 +23,7 @@ enum OPTYPE
 	OBJECT_STATE_EDIT,
 	SPAWN_TRANSFORM,
 	SCRIPT_EDIT,
+	TRIGGER_DIRECTION_EDIT,
 }
 
 /* This must match eFaceTextureEdit in Blockout.hpp! */
@@ -107,6 +108,11 @@ impl OBJECT
 	extern float3 local_to_world(OBJECT obj, float3 point);
 	extern float3 local_dir_to_world(OBJECT obj, float3 direction);
 
+	/* The direction (unit length, world space) the player was moving when they last entered or left this trigger
+	   volume, or zero if they had not moved. Read them inside object_trigger_enter / object_trigger_exit. */
+	extern float3 get_enter_direction(OBJECT obj);
+	extern float3 get_exit_direction(OBJECT obj);
+
 	/* DO NOT CALL! (unless your name is `editor_select_object`). Selects the object in the editor, which then sends the
 	   new selection to the script. */
 	extern void _select_object_internal(OBJECT obj, bool is_selected, bool append_selection);
@@ -114,17 +120,25 @@ impl OBJECT
 	property float3 position {
 		get = OBJECT_get_position;
 	}
+
+	property float3 enter_direction {
+		get = OBJECT_get_enter_direction;
+	}
+
+	property float3 exit_direction {
+		get = OBJECT_get_exit_direction;
+	}
 }
 
 
 extern float3 editor_push_op_vec(OBJECT obj, OPTYPE op_type, float3 original, float3 updated, int group_size);
-extern OBJECT editor_push_op_obj(OBJECT obj, OPTYPE op_type, OBJECT original, OBJECT updated, int group_size);
 extern void editor_push_op_delete(OBJECT obj, int group_size);
 
 extern OBJECT editor_op_create_object(float3 position, int group_size);
 extern OBJECT editor_op_dupe_object(OBJECT object_to_dupe, float3 position, int group_size);
 
 extern OBJECT object_get(OBJECTID id);
+extern OBJECT object_find(cstring name);
 
 /*
 	Player
@@ -225,6 +239,7 @@ void cvar_set_bool(cstring name, bool value)
 	cvar_set_int(name, (long)value);
 }
 
+extern float cvar_get_float(cstring name, float fallback);
 extern long cvar_get_int(cstring name, long fallback);
 
 bool cvar_get_bool(cstring name, bool fallback)

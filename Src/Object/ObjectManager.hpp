@@ -21,6 +21,54 @@ class Mat4f;
 // using ObjectId = uint32;
 
 
+class LoadedObjectRange
+{
+public:
+	class Iterator
+	{
+	public:
+		Iterator(FreeArray<Object>::Iterator current, FreeArray<Object>::Iterator end) : mCurrent(current), mEnd(end)
+		{
+			SkipLoading();
+		}
+
+		Object& operator*() const { return *mCurrent; }
+		Object* operator->() const { return &(*mCurrent); }
+
+		Iterator& operator++()
+		{
+			++mCurrent;
+			SkipLoading();
+			return *this;
+		}
+
+		bool operator==(const Iterator& other) const { return mCurrent == other.mCurrent; }
+		bool operator!=(const Iterator& other) const { return mCurrent != other.mCurrent; }
+
+	private:
+		void SkipLoading()
+		{
+			while (mCurrent != mEnd && mCurrent->IsLoading()) {
+				++mCurrent;
+			}
+		}
+
+	private:
+		FreeArray<Object>::Iterator mCurrent;
+		FreeArray<Object>::Iterator mEnd;
+	};
+
+public:
+	explicit LoadedObjectRange(FreeArray<Object>& objects) : mObjects(objects) {}
+
+	Iterator begin() { return Iterator(mObjects.begin(), mObjects.end()); }
+	Iterator end() { return Iterator(mObjects.end(), mObjects.end()); }
+
+private:
+	FreeArray<Object>& mObjects;
+};
+
+
 class ObjectManager
 {
 public:
@@ -31,7 +79,8 @@ public:
 	void Create();
 
 	ObjectID NewObjectID(const String& name, eObjectTag tags = eObjectTag::None);
-	Object* NewObject(const String& name, MaterialID material, eObjectTag tags = eObjectTag::None);
+	Object* NewObject(const String& name, MaterialID material, eObjectTag tags = eObjectTag::None,
+					  bool is_loading = false);
 
 	Object* GetObject(ObjectID id);
 	void DestroyObject(ObjectID& id);
@@ -66,8 +115,7 @@ public:
 	 */
 	ObjectID ReserveInstances(const ObjectID& object_id, uint32 num_instances);
 
-	const FreeArray<Object>& GetCache() const { return mObjectList; }
-	FreeArray<Object>& GetCache() { return mObjectList; }
+	LoadedObjectRange GetCache() { return LoadedObjectRange(mObjectList); }
 
 	void Destroy();
 

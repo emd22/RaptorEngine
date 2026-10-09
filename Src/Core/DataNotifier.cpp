@@ -25,7 +25,7 @@ void DataNotifier::Signal()
     mbIsSignalled = true;
 
     // Notify the other thread
-    mCV.notify_one();
+    mCV.notify_all();
 }
 
 void DataNotifier::Wait(bool pass_if_already_done)
@@ -72,7 +72,7 @@ void DataNotifier::Kill()
     mbIsKilled = true;
     mbIsSignalled = true;
 
-    mCV.notify_one();
+    mCV.notify_all();
 }
 
 bool DataNotifier::IsSignalled() const

@@ -2,6 +2,7 @@
 
 #include "AtlasPackerWindow.hpp"
 #include "CVarListWindow.hpp"
+#include "EditorThread.hpp"
 #include "EditorViewport.hpp"
 #include "MaterialPickerWindow.hpp"
 #include "ObjectListWindow.hpp"
@@ -97,21 +98,14 @@ static std::string ToBlockoutPath(const std::filesystem::path& chosen)
 	return (error || relative.empty()) ? chosen.string() : relative.string();
 }
 
+static std::filesystem::path GetBlockoutDialogStart(const std::string& blockout_path)
+{
+	return std::filesystem::absolute(blockout_path.empty() ? std::string(scDefaultBlockoutPath) : blockout_path);
+}
+
 void EditorFrame::OpenPrototype()
 {
-	if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
-		return;
-	}
-
-#if 0
-	if (wxMessageBox("Open another blockout? Anything you haven't saved will be lost.", "Open blockout",
-					 wxYES_NO | wxICON_QUESTION, this) != wxYES) {
-		return;
-	}
-#endif
-
-	const std::filesystem::path current = std::filesystem::absolute(
-		(gWorld->BlockoutPath.GetLength() > 0) ? gWorld->BlockoutPath.Str() : std::string(scDefaultBlockoutPath));
+	const std::filesystem::path current = GetBlockoutDialogStart(mState.BlockoutPath);
 
 	wxFileDialog dialog(this, "Open blockout", wxString::FromUTF8(current.parent_path().lexically_normal().string()),
 						wxString::FromUTF8(current.filename().string()), "Blockout files (*.prx)|*.prx",
@@ -123,55 +117,70 @@ void EditorFrame::OpenPrototype()
 
 	const std::string path = ToBlockoutPath(std::filesystem::path(dialog.GetPath().ToStdString()));
 
-	LogInfo("Opening blockout '{}'", path);
+	thread::PostToGame(
+		[this, path]
+		{
+			if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
+				return;
+			}
 
-	const String previous_path = gWorld->BlockoutPath;
-	const String new_path(path.c_str());
+			LogInfo("Opening blockout '{}'", path);
 
-	if (gWorld->pBlockout->Load(new_path)) {
-		gWorld->BlockoutPath = new_path;
+			const String previous_path = gWorld->BlockoutPath;
+			const String new_path(path.c_str());
 
-		gProbeManager->LoadProbes();
-		gWorld->RespawnPlayer();
-	}
-	else {
-		gWorld->BlockoutPath = previous_path;
-		wxMessageBox("That file could not be loaded as a blockout.", "Open blockout", wxOK | wxICON_ERROR, this);
-	}
+			if (gWorld->pBlockout->Load(new_path)) {
+				gWorld->BlockoutPath = new_path;
+
+				gProbeManager->LoadProbes();
+				gWorld->RespawnPlayer();
+				return;
+			}
+
+			gWorld->BlockoutPath = previous_path;
+
+			thread::PostToUI(
+				[this]
+				{
+					wxMessageBox("That file could not be loaded as a blockout.", "Open blockout", wxOK | wxICON_ERROR,
+								 this);
+				});
+		});
 }
 
 void EditorFrame::NewPrototype()
 {
-	if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
-		return;
-	}
-
-	gWorld->pBlockout->ResetToTemplate();
+	thread::PostToGame(
+		[]
+		{
+			if (gWorld != nullptr && gWorld->pBlockout != nullptr) {
+				gWorld->pBlockout->ResetToTemplate();
+			}
+		});
 }
 
 void EditorFrame::SavePrototype()
 {
-	if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
-		return;
-	}
-
-	if (gWorld->BlockoutPath.GetLength() == 0) {
+	if (mState.BlockoutPath.empty()) {
 		SaveProtoTypeAs();
 		return;
 	}
 
-	LogInfo("Saving blockout to '{}'", gWorld->BlockoutPath);
-	gWorld->pBlockout->Save(gWorld->BlockoutPath);
+	thread::PostToGame(
+		[]
+		{
+			if (gWorld == nullptr || gWorld->pBlockout == nullptr || gWorld->BlockoutPath.GetLength() == 0) {
+				return;
+			}
+
+			LogInfo("Saving blockout to '{}'", gWorld->BlockoutPath);
+			gWorld->pBlockout->Save(gWorld->BlockoutPath);
+		});
 }
 
 void EditorFrame::SaveProtoTypeAs()
 {
-	if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
-		return;
-	}
-
-	const std::filesystem::path current = std::filesystem::absolute(
-		(gWorld->BlockoutPath.GetLength() > 0) ? gWorld->BlockoutPath.Str() : std::string(scDefaultBlockoutPath));
+	const std::filesystem::path current = GetBlockoutDialogStart(mState.BlockoutPath);
 
 	wxFileDialog dialog(this, "Save blockout as", wxString::FromUTF8(current.parent_path().lexically_normal().string()),
 						wxString::FromUTF8(current.filename().string()), "Blockout files (*.prx)|*.prx",
@@ -189,10 +198,18 @@ void EditorFrame::SaveProtoTypeAs()
 
 	const std::string path = ToBlockoutPath(chosen);
 
-	LogInfo("Saving blockout as '{}'", path);
+	thread::PostToGame(
+		[path]
+		{
+			if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
+				return;
+			}
 
-	gWorld->BlockoutPath = String(path.c_str());
-	gWorld->pBlockout->Save(gWorld->BlockoutPath);
+			LogInfo("Saving blockout as '{}'", path);
+
+			gWorld->BlockoutPath = String(path.c_str());
+			gWorld->pBlockout->Save(gWorld->BlockoutPath);
+		});
 }
 
 EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : wxFrame(nullptr, wxID_ANY, title)
@@ -247,24 +264,28 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { OpenPrototype(); }, open_item->GetId());
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { SavePrototype(); }, save_item->GetId());
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { SaveProtoTypeAs(); }, save_as_item->GetId());
-	Bind(
-		wxEVT_MENU, [](wxCommandEvent&) { gEditor->InvokeReloadHandler(eReloadTarget::World); },
-		reload_world_item->GetId());
-	Bind(
-		wxEVT_MENU, [](wxCommandEvent&) { gEditor->InvokeReloadHandler(eReloadTarget::Prototype); },
-		reload_prototype_item->GetId());
-	Bind(
-		wxEVT_MENU, [](wxCommandEvent&) { gEditor->InvokeReloadHandler(eReloadTarget::Scripts); },
-		reload_scripts_item->GetId());
+	const auto bind_reload = [this](wxMenuItem* item, eReloadTarget target)
+	{
+		Bind(
+			wxEVT_MENU, [target](wxCommandEvent&)
+			{ thread::PostToGame([target] { gEditor->InvokeReloadHandler(target); }); }, item->GetId());
+	};
 
-	Bind(wxEVT_MENU, [](wxCommandEvent&) { gEditor->InvokeReloadHandler(eReloadTarget::Clean); }, clean_item->GetId());
+	bind_reload(reload_world_item, eReloadTarget::World);
+	bind_reload(reload_prototype_item, eReloadTarget::Prototype);
+	bind_reload(reload_scripts_item, eReloadTarget::Scripts);
+	bind_reload(clean_item, eReloadTarget::Clean);
 
 	Bind(
 		wxEVT_MENU,
-		[this](wxCommandEvent&)
+		[](wxCommandEvent&)
 		{
-			gProbeManager->RebuildVolumesFromWorld();
-			gProbeManager->BeginBake();
+			thread::PostToGame(
+				[]
+				{
+					gProbeManager->RebuildVolumesFromWorld();
+					gProbeManager->BeginBake();
+				});
 		},
 		rebase_probes_item->GetId());
 
@@ -285,11 +306,13 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 
 	mpVisButton = new OutlineToggleButton(root, wxBitmap(), "V");
 	mpVisButton->SetToolTip("Select and edit visible brushes and models");
-	mpVisButton->Bind(wxEVT_TOGGLEBUTTON, [](wxCommandEvent&) { gEditor->SetMode(eEditorMode::Vis); });
+	mpVisButton->Bind(wxEVT_TOGGLEBUTTON,
+					  [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetMode(eEditorMode::Vis); }); });
 
 	mpDataButton = new OutlineToggleButton(root, wxBitmap(), "D");
 	mpDataButton->SetToolTip("Select and edit probe volumes, reflection probes, volumes, lights and spawn points");
-	mpDataButton->Bind(wxEVT_TOGGLEBUTTON, [](wxCommandEvent&) { gEditor->SetMode(eEditorMode::Data); });
+	mpDataButton->Bind(wxEVT_TOGGLEBUTTON,
+					   [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetMode(eEditorMode::Data); }); });
 
 	mode_buttons_sizer->Add(mpVisButton, wxSizerFlags(1).Expand());
 	mode_buttons_sizer->Add(mpDataButton, wxSizerFlags(1).Expand().Border(wxLEFT, 2));
@@ -319,7 +342,8 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 		OutlineToggleButton* button = MakeToolButton(root, scToolButtons[i]);
 
 		const eEditorTool tool = static_cast<eEditorTool>(i);
-		button->Bind(wxEVT_TOGGLEBUTTON, [tool](wxCommandEvent&) { gEditor->SetTool(tool); });
+		button->Bind(wxEVT_TOGGLEBUTTON,
+					 [tool](wxCommandEvent&) { thread::PostToGame([tool] { gEditor->SetTool(tool); }); });
 
 		tool_sizer->Add(button, wxSizerFlags().Border(wxALL, 2));
 		mToolButtons.Insert(button);
@@ -401,6 +425,21 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	Bind(wxEVT_ICONIZE, &EditorFrame::OnIconize, this);
 }
 
+void EditorFrame::SetInteractive(bool interactive)
+{
+	Enable(interactive);
+
+	if (wxMenuBar* menu_bar = GetMenuBar(); menu_bar != nullptr) {
+		for (size_t i = 0; i < menu_bar->GetMenuCount(); i++) {
+			menu_bar->EnableTop(i, interactive);
+		}
+	}
+
+	if (interactive && mpViewport != nullptr) {
+		mpViewport->SetFocus();
+	}
+}
+
 void EditorFrame::SetSidePanelCollapsed(bool collapsed)
 {
 	mbSidePanelCollapsed = collapsed;
@@ -433,6 +472,7 @@ void EditorFrame::SetToolSettingsPanel(ToolSettingsBasePanel* new_panel)
 		wxBoxSizer* inner_sizer = new wxBoxSizer(wxVERTICAL);
 		mpToolSettingsPanel->Construct(inner_sizer);
 		mpToolSettingsPanel->SetSizer(inner_sizer);
+		mpToolSettingsPanel->ApplyState(mState);
 
 		mpComponentSizer->Add(mpToolSettingsPanel, wxSizerFlags().Expand());
 	}
@@ -453,7 +493,23 @@ void EditorFrame::ShowSelectedTool(const eEditorTool tool)
 	}
 }
 
-void EditorFrame::ShowMode(const eEditorMode mode, const eDataFilter filter)
+void EditorFrame::ApplyState(const EditorPanelState& state)
+{
+	mState = state;
+
+	mpWorldPropertiesPanel->ApplyState(mState.World);
+	mpObjectPropertiesPanel->ApplyState(mState.Object, mState.Materials);
+
+	if (mpToolSettingsPanel != nullptr) {
+		mpToolSettingsPanel->ApplyState(mState);
+	}
+
+	if (mpMaterialPickerWindow != nullptr) {
+		mpMaterialPickerWindow->OnStateChanged();
+	}
+}
+
+void EditorFrame::ShowMode(const eEditorMode mode, const eDataFilter filter, const uint32 available_tools)
 {
 	const bool data_mode = (mode == eEditorMode::Data);
 
@@ -464,7 +520,7 @@ void EditorFrame::ShowMode(const eEditorMode mode, const eDataFilter filter)
 	mpDataFilterChoice->Enable(data_mode);
 
 	for (uint32 i = 0; i < mToolButtons.Size; i++) {
-		mToolButtons[i]->Enable(gEditor->IsToolAvailable(static_cast<eEditorTool>(i)));
+		mToolButtons[i]->Enable((available_tools & (1u << i)) != 0);
 	}
 
 	if (mpViewport != nullptr) {
@@ -528,8 +584,8 @@ void EditorFrame::OnActivate(wxActivateEvent& event)
 	mbIsActive = event.GetActive();
 
 	// Don't keep the cursor locked while another app is in front
-	if (!mbIsActive && ControlManager::IsMouseLocked()) {
-		ControlManager::ReleaseMouse();
+	if (!mbIsActive) {
+		ControlManager::PostFocusLost();
 	}
 
 	event.Skip();

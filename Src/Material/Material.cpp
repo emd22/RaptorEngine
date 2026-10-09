@@ -68,6 +68,21 @@ MaterialComponent::Status MaterialComponent::Build()
 	return Status::Ready;
 }
 
+void MaterialComponent::DropIfFailed()
+{
+	if (!Ticket.IsFailed()) {
+		return;
+	}
+
+	LogWarning(LC_ASSET, "A material texture failed to load, using the default texture instead");
+
+	Ticket = AssetTicket(nullptr);
+	pImage = nullptr;
+	UploadSrc = eMaterialComponentUploadSrc::None;
+	ImageToUpload = ImageInfo {};
+	mbRequiresUpdate = false;
+}
+
 void MaterialComponent::SetTicket(AssetTicket& ticket)
 {
 	Ticket = ticket;
@@ -139,6 +154,7 @@ bool Material::IsReady()
 	CHECK_COMPONENT_READY(Diffuse);
 	CHECK_COMPONENT_READY(NormalMap);
 	CHECK_COMPONENT_READY(MetallicRoughness);
+	CHECK_COMPONENT_READY(Emissive);
 
 	return (mbIsReady = true);
 }
@@ -171,6 +187,7 @@ Material& Material::operator=(const Material& other)
 	Diffuse = other.Diffuse;
 	NormalMap = other.NormalMap;
 	MetallicRoughness = other.MetallicRoughness;
+	Emissive = other.Emissive;
 
 	Properties = other.Properties;
 
@@ -309,6 +326,21 @@ void Material::SetOcclusionStrength(float32 strength)
 	mbRequiresSync = true;
 }
 
+void Material::SetEmissive(const float32 color[3], float32 strength)
+{
+	for (uint32 i = 0; i < 3; i++) {
+		Properties.EmissiveFactor[i] = color[i] * strength;
+	}
+
+	mbRequiresSync = true;
+}
+
+void Material::SetAlphaCutoff(float32 cutoff)
+{
+	Properties.AlphaCutoff = cutoff;
+	mbRequiresSync = true;
+}
+
 void Material::SetSpecularGlossiness(const float32 specular[3], float32 glossiness)
 {
 	SetFlag(Properties.Flags, eMaterialFlags::SpecularGlossiness);
@@ -342,11 +374,19 @@ void Material::DeclareDescriptors(renderer::PSOBuild& pso)
 	pso.AddBuffer(3, 1, eShaderType::Vertex, &gGraphics->BoneBuffer.GetGpuBuffer(), 0, gGraphics->BoneBuffer.PageSize);
 	// FSLightBuffer
 	pso.AddBuffer(4, 1, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0, gGraphics->LightBuffer.PageSize);
+	// tEmissive
+	pso.AddImage(5, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+				 gSamplerCache->Request({}));
 }
 
 
 void Material::Build()
 {
+	Diffuse.DropIfFailed();
+	NormalMap.DropIfFailed();
+	MetallicRoughness.DropIfFailed();
+	Emissive.DropIfFailed();
+
 	if (!Diffuse.Exists()) {
 		Diffuse.SetTicket(gAssetManager->GetNullImageTicket(eImageFormat::RGBA8_UNorm));
 	}
@@ -355,11 +395,12 @@ void Material::Build()
 	BUILD_REQUIRED_MATERIAL_COMPONENT(Diffuse);
 	BUILD_MATERIAL_COMPONENT(NormalMap);
 	BUILD_MATERIAL_COMPONENT(MetallicRoughness);
+	BUILD_MATERIAL_COMPONENT(Emissive);
 
 	AssertMsg(Diffuse.Ticket.IsValid(), "Diffuse texture must be valid");
 
-	const float32 max_lod = std::max(
-		{ GetComponentMaxLOD(Diffuse), GetComponentMaxLOD(NormalMap), GetComponentMaxLOD(MetallicRoughness) });
+	const float32 max_lod = std::max({ GetComponentMaxLOD(Diffuse), GetComponentMaxLOD(NormalMap),
+									   GetComponentMaxLOD(MetallicRoughness), GetComponentMaxLOD(Emissive) });
 
 	SamplerProps diffuse_sampler_props { .MinLOD = GetComponentMinLOD(Diffuse), .MaxLOD = max_lod };
 
@@ -378,13 +419,15 @@ void Material::Build()
 
 
 	if (mpDescriptorSet == nullptr) {
-		SizedArray<DescriptorEntry> ds_entries(6);
+		SizedArray<DescriptorEntry> ds_entries(7);
 
 		LogInfo(LC_RENDER, "** Building Material ({}) descriptor set", ID);
 
 		Image* normal_image = NormalMap.Exists() ? NormalMap.pImage : gAssetManager->GetFlatNormalImage();
 		Image* mr_image = MetallicRoughness.Exists() ? MetallicRoughness.pImage
 													 : gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm);
+		Image* emissive_image = Emissive.Exists() ? Emissive.pImage
+												  : gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm);
 
 		if (NormalMap.Exists()) {
 			LogInfo(LC_RENDER, "\tHas Normal maps");
@@ -404,6 +447,8 @@ void Material::Build()
 													 gGraphics->BoneBuffer.PageSize));
 		ds_entries.Emplace(DescriptorEntry::AsBuffer(4, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
 													 gGraphics->LightBuffer.PageSize));
+		ds_entries.Emplace(DescriptorEntry::AsImage(5, eShaderType::Pixel, emissive_image,
+													gSamplerCache->Request(diffuse_sampler_props)));
 
 		std::pair<DescriptorID, DescriptorSet*> result = gDescriptorCache->Request(ds_entries);
 		mpDescriptorSet = result.second;

@@ -1,10 +1,12 @@
 #pragma once
 
 #include <Core/SizedArray.hpp>
+#include <Core/TSQueue.hpp>
 #include <Core/Types.hpp>
 #include <Math/Vec2.hpp>
 #include <Util/Key.hpp>
 #include <cstring>
+#include <vector>
 
 union SDL_Event;
 
@@ -118,11 +120,13 @@ public:
 	static void PostMouseMotion(const Vec2f& delta);
 
 	/// Lifts every key and button, for when the window loses focus and won't see the key up events
-	static void ReleaseAllKeys();
+	static void PostReleaseAllKeys();
 
 	/// Lifts every standard (non-modifier) key. macOS doesn't deliver key-up events for other keys while Cmd is held,
 	/// so the editor viewport calls this once Cmd itself comes back up to flush anything left stuck down.
-	static void ReleaseNonModifierKeys();
+	static void PostReleaseNonModifierKeys();
+
+	static void PostFocusLost();
 
 private:
 	static void UpdateFromKeyboardEvent(SDL_Event* event);
@@ -132,17 +136,46 @@ private:
 	// General, used by UpdateFromKeyboardEvent and UpdateFromMouseButtonEvent
 	static void UpdateButtonFromEvent(eKey key_id, bool is_now_down);
 
+	static void ReleaseAllKeys();
+	static void ReleaseNonModifierKeys();
+
+	void ApplyPostedEvents();
+
 public:
 	using WindowEventFunc = void (*)();
 
 	WindowEventFunc OnQuit;
 
 private:
+	struct PostedEvent
+	{
+		enum class eType : uint8
+		{
+			Button,
+			MouseMotion,
+			ReleaseAllKeys,
+			ReleaseNonModifierKeys,
+			FocusLost,
+		};
+
+		eType Type = eType::Button;
+		eKey Key = eKey::FX_KEY_UNKNOWN;
+		bool bIsDown = false;
+		Vec2f Delta = Vec2f::sZero;
+	};
+
+	static void Post(const PostedEvent& event);
+
+private:
 	SizedArray<Control> mKeyMap;
 	bool mMouseCaptured = false;
 
 	Vec2f mMouseDelta = Vec2f::sZero;
-	Vec2f mCapturedMousePos = Vec2f::sZero;
+
+	static constexpr uint32 scMaxPostedEvents = 16384;
+
+	TSQueue<PostedEvent> mPostedEvents { scMaxPostedEvents };
+	std::vector<PostedEvent> mAppliedEvents;
 
 	uint8 mThisTick : 1 = 0;
 };

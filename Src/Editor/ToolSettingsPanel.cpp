@@ -1,6 +1,7 @@
 #include "ToolSettingsPanel.hpp"
 
 #include "Common.hpp"
+#include "EditorThread.hpp"
 #include "RaptorEditor.hpp"
 
 #include <wx/clrpicker.h>
@@ -39,11 +40,15 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 	{
 		mpPositionField = new Vector3Field(this, "Position", Vec2f(-100000.0f, 100000.0f));
 		mpPositionField->SetOnChange(
-			[this](const Vec3f value)
+			[](const Vec3f value)
 			{
-				if (mpShownLight != nullptr) {
-					mpShownLight->SetPosition(value);
-				}
+				thread::PostToGame(
+					[value]
+					{
+						if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
+							light->SetPosition(value);
+						}
+					});
 			});
 
 		tool_panel->Add(mpPositionField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
@@ -52,12 +57,15 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 	{
 		mpRadiusField = new FloatField(this, "Radius", Vec2f(3.0f, 150.0f));
 		mpRadiusField->SetOnChange(
-			[&](const float value)
+			[](const float value)
 			{
-				if (mpShownLight == nullptr) {
-					return;
-				}
-				mpShownLight->SetRadius(value);
+				thread::PostToGame(
+					[value]
+					{
+						if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
+							light->SetRadius(value);
+						}
+					});
 			});
 
 		tool_panel->Add(mpRadiusField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
@@ -66,11 +74,15 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 	{
 		mpIntensityField = new FloatField(this, "Intensity (cd)", Vec2f(0.0f, 100000000.0f));
 		mpIntensityField->SetOnChange(
-			[this](const float value)
+			[](const float value)
 			{
-				if (mpShownLight != nullptr) {
-					mpShownLight->Intensity = value;
-				}
+				thread::PostToGame(
+					[value]
+					{
+						if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
+							light->Intensity = value;
+						}
+					});
 			});
 
 		tool_panel->Add(mpIntensityField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
@@ -79,11 +91,15 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 	{
 		mpLumensField = new FloatField(this, "Lumens", Vec2f(0.0f, 100000000.0f));
 		mpLumensField->SetOnChange(
-			[this](const float value)
+			[](const float value)
 			{
-				if (mpShownLight != nullptr) {
-					mpShownLight->SetLumens(value);
-				}
+				thread::PostToGame(
+					[value]
+					{
+						if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
+							light->SetLumens(value);
+						}
+					});
 			});
 
 		tool_panel->Add(mpLumensField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
@@ -92,11 +108,15 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 	{
 		mpOuterAngleField = new FloatField(this, "Outer angle", Vec2f(1.0f, 90.0f));
 		mpOuterAngleField->SetOnChange(
-			[this](const float value)
+			[](const float value)
 			{
-				if (mpShownLight != nullptr) {
-					mpShownLight->SetConeAngles(mpShownLight->GetInnerAngle(), MathUtil::DegreesToRadians(value));
-				}
+				thread::PostToGame(
+					[value]
+					{
+						if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
+							light->SetConeAngles(light->GetInnerAngle(), MathUtil::DegreesToRadians(value));
+						}
+					});
 			});
 
 		tool_panel->Add(mpOuterAngleField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
@@ -105,41 +125,50 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 	{
 		mpInnerAngleField = new FloatField(this, "Inner angle", Vec2f(0.0f, 90.0f));
 		mpInnerAngleField->SetOnChange(
-			[this](const float value)
+			[](const float value)
 			{
-				if (mpShownLight != nullptr) {
-					mpShownLight->SetConeAngles(MathUtil::DegreesToRadians(value), mpShownLight->GetOuterAngle());
-				}
+				thread::PostToGame(
+					[value]
+					{
+						if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
+							light->SetConeAngles(MathUtil::DegreesToRadians(value), light->GetOuterAngle());
+						}
+					});
 			});
 
 		tool_panel->Add(mpInnerAngleField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
 	}
 
-	Refresh();
+	ApplyState(EditorPanelState {});
 }
 
 void LightToolSettingsPanel::OnColorChange(wxColourPickerEvent& event)
 {
-	if (mpShownLight == nullptr) {
+	if (!mbShowingAnything) {
 		return;
 	}
 
 	const wxColour colour = event.GetColour();
 
-	mpShownLight->Color = Color::FromRGBA(colour.Red(), colour.Green(), colour.Blue(), 255);
+	thread::PostToGame(
+		[red = colour.Red(), green = colour.Green(), blue = colour.Blue()]
+		{
+			if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
+				light->Color = Color::FromRGBA(red, green, blue, 255);
+			}
+		});
 }
 
-void LightToolSettingsPanel::Refresh()
+void LightToolSettingsPanel::ApplyState(const EditorPanelState& editor_state)
 {
-	LightSpot* light = gEditor->GetLightEditor().GetSelected();
+	const LightPanelState& state = editor_state.Light;
 
-	if (light == nullptr) {
+	if (!state.bHasLight) {
 		if (!mbShowingAnything) {
 			return;
 		}
 
 		mbShowingAnything = false;
-		mpShownLight = nullptr;
 
 		mpNameLabel->SetLabel("No light selected");
 		mpColorPicker->Disable();
@@ -148,38 +177,36 @@ void LightToolSettingsPanel::Refresh()
 	}
 
 	mbShowingAnything = true;
-	mpShownLight = light;
 
-	mpNameLabel->SetLabel(wxString::Format("Selected '%s'", wxString::FromUTF8(light->Name.Get().CStr())));
+	mpNameLabel->SetLabel(wxString::Format("Selected '%s'", wxString::FromUTF8(state.Name)));
 
 	mpColorPicker->Enable();
 	mpPositionField->SetEnabled(true);
 
-	mpColorPicker->SetColour(wxColour(light->Color.R, light->Color.G, light->Color.B));
+	mpColorPicker->SetColour(wxColour(state.ColorR, state.ColorG, state.ColorB));
 
-	// Skip the refresh while editing so typed keystrokes aren't clobbered
 	if (!mpPositionField->HasFocus()) {
-		mpPositionField->SetValue(light->GetPosition());
+		mpPositionField->SetValue(Vec3f(state.PositionX, state.PositionY, state.PositionZ));
 	}
 
 	if (!mpRadiusField->HasFocus()) {
-		mpRadiusField->SetValue(light->GetRadius());
+		mpRadiusField->SetValue(state.Radius);
 	}
 
 	if (!mpIntensityField->HasFocus()) {
-		mpIntensityField->SetValue(light->Intensity);
+		mpIntensityField->SetValue(state.Intensity);
 	}
 
 	if (!mpLumensField->HasFocus()) {
-		mpLumensField->SetValue(light->GetLumens());
+		mpLumensField->SetValue(state.Lumens);
 	}
 
 	if (!mpOuterAngleField->HasFocus()) {
-		mpOuterAngleField->SetValue(MathUtil::RadiansToDegrees(light->GetOuterAngle()));
+		mpOuterAngleField->SetValue(state.OuterAngleDegrees);
 	}
 
 	if (!mpInnerAngleField->HasFocus()) {
-		mpInnerAngleField->SetValue(MathUtil::RadiansToDegrees(light->GetInnerAngle()));
+		mpInnerAngleField->SetValue(state.InnerAngleDegrees);
 	}
 }
 

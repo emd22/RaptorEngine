@@ -46,6 +46,21 @@ static void WriteScriptEntry(ConfigEntry& entry, const Object* object)
 	}
 }
 
+static void ReadTriggerEntry(Object* object, const ConfigEntry& entry)
+{
+	gObjectScripts->SetRequiredEnterDirection(object->ID,
+											  entry.GetMemberValue<Vec3f>(HashStr32("enter_dir"), Vec3f::sZero));
+}
+
+static void WriteTriggerEntry(ConfigEntry& entry, const Object* object)
+{
+	Vec3f direction;
+
+	if (gObjectScripts->TryGetRequiredEnterDirection(object->ID, direction)) {
+		entry.AddMember(ConfigEntry::Literal("enter_dir", direction));
+	}
+}
+
 void Blockout::Create(World* world)
 {
 	BlockoutObjects.Init(256);
@@ -818,6 +833,7 @@ ObjectID Blockout::CreateBrush(ConfigEntry& entry)
 	}
 
 	ReadScriptEntry(object, entry);
+	ReadTriggerEntry(object, entry);
 
 	physics::eMotionType is_dynamic = entry.GetMemberValue(HashStr32("dynamic"), 0) ? physics::eMotionType::Dynamic
 																					: physics::eMotionType::Static;
@@ -963,6 +979,12 @@ Object* Blockout::DupeObject(Object* object)
 	}
 
 	gObjectScripts->Attach(dupe, gObjectScripts->GetPath(object->ID));
+
+	Vec3f enter_direction;
+
+	if (gObjectScripts->TryGetRequiredEnterDirection(object->ID, enter_direction)) {
+		gObjectScripts->SetRequiredEnterDirection(dupe->ID, enter_direction);
+	}
 
 	RebuildBrush(dupe, std::move(brush), motion_type);
 
@@ -1613,7 +1635,7 @@ void Blockout::ResetToTemplate()
 	if (sun == nullptr) {
 		sun = gLightManager->NewLight<LightDirectional>("sun");
 		sun->bEnabled = true;
-		sun->SetPosition(Vec3f(1.0f, 0.0f, -1.0f));
+		sun->SetPosition(Vec3f(1.0f, 5.0f, -1.0f));
 
 		gCVars->Set("b_sun_enabled", 1);
 	}
@@ -1666,6 +1688,8 @@ bool Blockout::Load(const String& path)
 	else {
 		LoadLegacyModels();
 	}
+
+	renderer::gShadowAtlas->Invalidate();
 
 	return true;
 }
@@ -1739,6 +1763,7 @@ void Blockout::Save(const String& path)
 
 			if (object->IsTrigger()) {
 				blockout_entry.AddMember(ConfigEntry::Literal("trigger", 1));
+				WriteTriggerEntry(blockout_entry, object);
 			}
 
 			WriteScriptEntry(blockout_entry, object);

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "EditorPanelState.hpp"
+
 #include <wx/bitmap.h>
 #include <wx/frame.h>
 
@@ -16,16 +18,19 @@ class wxTextCtrl;
 
 namespace fx::editor {
 
+class EditorFrame;
+
 /**
  * @brief Window for searching the blockout material library and previewing each material's albedo.
  */
 class MaterialPickerWindow : public wxFrame
 {
 public:
-	explicit MaterialPickerWindow(wxWindow* parent);
+	explicit MaterialPickerWindow(EditorFrame* parent);
 
-	/// Rebuilds the list from the blockout's material library and highlights the selected object's material
 	void RefreshList();
+
+	void OnStateChanged();
 
 private:
 	void RebuildRows();
@@ -46,7 +51,10 @@ private:
 	wxStaticText* mpStatusLabel = nullptr;
 	wxButton* mpApplyButton = nullptr;
 
-	/// Material library slots currently shown, in row order
+	EditorFrame* mpFrame = nullptr;
+
+	MaterialLibraryState mShownLibrary;
+
 	std::vector<MaterialLibraryID> mShownSlots;
 
 	HashMap<MaterialLibraryID, wxBitmap> mBitmaps;

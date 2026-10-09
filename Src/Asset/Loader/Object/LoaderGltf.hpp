@@ -6,6 +6,9 @@
 #include <Core/Path.hpp>
 #include <Material/Material.hpp>
 #include <Object/Object.hpp>
+#include <map>
+#include <string>
+#include <unordered_set>
 #include <vector>
 
 struct cgltf_data;
@@ -21,13 +24,12 @@ namespace fx {
 
 namespace loader {
 
-struct GLTFMaterialToLoad
+struct MeshNodeContext
 {
-	TSRef<Object> pObject { nullptr };
-	int PrimitiveIndex = 0;
-	int MeshIndex = 0;
+	cgltf_skin* pSkin = nullptr;
+	bool bBakeTransform = false;
+	float WorldMatrix[16] = {};
 };
-
 
 class LoaderGltf final : public ObjectLoaderBase
 {
@@ -40,27 +42,40 @@ public:
 	void CreateGpuResource(AssetTicket& object_id) override;
 	void UploadMeshToGpu(Object* object);
 
+	void Publish(Object* root) override;
+
 	void Destroy() override;
 
-	~LoaderGltf() override = default;
+	~LoaderGltf() override { Destroy(); }
 
 private:
-	// void MakeEmptyMaterialTexture(Ref<Material>& material, MaterialComponent& component);
-	void MakeMaterialForPrimitive(Object* object, cgltf_primitive* primitive, int32 primitive_index);
+	void MakeMaterialForPrimitive(Object* object, cgltf_primitive* primitive);
 
 	/**
-	 * @brief Unpacks the vertex attributes of `primitive` into `mesh`. Joints and weights are only loaded when
-	 * `is_skinned` is set, as a mesh on a node without a skin is drawn unskinned even when it carries them.
+	 * @brief Builds the vertex list and indices of `primitive` into `mesh`. Joints and weights are only loaded when the
+	 * node has a skin, as a mesh on a node without a skin is drawn unskinned even when it carries them.
+	 * @returns false if the primitive can not be drawn
 	 */
-	void UnpackMeshAttributes(Object* object, Ref<PrimitiveMesh>& mesh, cgltf_primitive* primitive, bool is_skinned);
+	bool BuildPrimitiveMesh(PrimitiveMesh& mesh, cgltf_primitive* primitive, const MeshNodeContext& context);
 
-	int32 FindJointIndex(cgltf_skin* skin, const cgltf_node* node) const;
+	std::vector<int32> BuildJointLookup(cgltf_skin* skin) const;
 
-	void LoadSkeleton(Skeleton& skel, cgltf_skin* skin); // now takes skel by ref
-	void LoadAnimation(Animation& out_anim, const cgltf_animation& anim, cgltf_skin* skin);
-	void LoadAnimations(Skeleton& skel, cgltf_skin* skin);
+	void LoadSkeleton(Skeleton& skel, cgltf_skin* skin, const std::vector<int32>& joint_lookup);
+	void LoadAnimation(Animation& out_anim, const cgltf_animation& anim, cgltf_skin* skin,
+					   const std::vector<int32>& joint_lookup);
+	void LoadAnimations(Skeleton& skel, cgltf_skin* skin, const std::vector<int32>& joint_lookup);
 
-	void BuildObjectsFromPrimitives(Object* container_object, cgltf_mesh* gltf_mesh, bool is_skinned);
+	bool BuildObjectsFromPrimitives(Object* container_object, cgltf_mesh* gltf_mesh, const MeshNodeContext& context,
+									BBox& out_bounds);
+
+	void AttachChild(Object* parent, ObjectID child_id);
+	std::vector<ObjectID> GetChildren(Object* parent) const;
+
+	void UploadObjectTree(Object* object);
+
+	bool ShouldWarn(const std::string& key);
+
+	bool ValidateData();
 
 	/**
 	 * @brief Process the GLTF data and build out the object tree.
@@ -69,15 +84,17 @@ private:
 
 
 public:
-	std::vector<GLTFMaterialToLoad> MaterialsToLoad;
 	bool bKeepInMemory : 1 = false;
-	SizedArray<uint32> IndexBuffer;
 
 private:
 	cgltf_data* mpGltfData = nullptr;
 	String mModelPath;
 
-	SizedArray<Mat4f> mBones;
+	Object* mpRootObject = nullptr;
+	std::vector<ObjectID> mRootChildren;
+
+	std::map<std::pair<const cgltf_material*, bool>, MaterialID> mMaterialCache;
+	std::unordered_set<std::string> mWarned;
 };
 
 } // namespace loader

@@ -49,6 +49,7 @@ struct GpuUploadContext
 	CommandBuffer ImmediateCmdBuffer;
 	Fence ImmediateUploadFence;
 	std::mutex ImmediateMutex;
+	std::atomic_uint32_t ImmediateUploadsInFlight = 0;
 
 	~GpuUploadContext() = default;
 };

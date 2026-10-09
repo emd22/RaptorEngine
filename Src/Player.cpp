@@ -23,8 +23,7 @@ void Player::Create()
 
 	Physics.Create();
 
-	// Since the physics position is the center of the capsule, we will use standing height / 2.
-	mCameraOffset = Vec3f(0, physics::PhysicsPlayer::scStandingHeight, 0);
+	mCameraOffset = Vec3f(0, physics::PhysicsPlayer::scEyeHeight, 0);
 
 	// Load the view model
 
@@ -82,10 +81,16 @@ void Player::Create()
 	Weapons.Create(this);
 }
 
-void Player::MoveBy(const Vec3f by)
+void Player::ResetMotion()
 {
-	Position += by;
-	RequirePhysicsUpdate();
+	mUserForce = Vec3f::sZero;
+	mMovementGoal = Vec3f::sZero;
+	mHorizontalSpeed = 0.0f;
+
+	mLandingOffset = 0.0f;
+	mLandingVelocity = 0.0f;
+	mViewModelVerticalLag = 0.0f;
+	mbWasOnGround = false;
 }
 
 static void CancelRecoilOffset(float32& offset, float32 input)
@@ -113,8 +118,8 @@ void Player::RotateHead(const Vec2f& xy)
 
 void Player::Jump()
 {
-	if (Physics.bIsGrounded && !mbIsFlymode) {
-		JumpForce = 2.5f;
+	if (!mbIsFlymode) {
+		Physics.Jump();
 	}
 }
 
@@ -133,7 +138,6 @@ void Player::SpawnAt(const Vec3f position, const Vec3f direction)
 	mPrevCameraPitch = pCamera->mAngleY;
 	mViewModelSwayYaw = 0.0f;
 	mViewModelSwayPitch = 0.0f;
-	JumpForce = 0.0f;
 
 	RequireDirectionUpdate();
 }
@@ -142,13 +146,18 @@ void Player::SetFlyMode(bool value)
 {
 	mbIsFlymode = value;
 	Physics.bDisableGravity = value;
+
+	mLandingOffset = 0.0f;
+	mLandingVelocity = 0.0f;
+
+	RequireDirectionUpdate();
 }
 
 void Player::Move(float64 delta_time, const Vec3f offset)
 {
 	const Vec3f forward = MovementDirection * offset.Z;
-	const Vec3f right = MovementDirection.Cross(Vec3f::sUp) * -offset.X;
-	const Vec3f up = Vec3f::sUp * offset.Y;
+	const Vec3f right = mStrafeDirection * offset.X;
+	const Vec3f up = mbIsFlymode ? Vec3f::sUp * offset.Y : Vec3f::sZero;
 
 	mMovementGoal = (forward + right + up);
 
@@ -156,9 +165,9 @@ void Player::Move(float64 delta_time, const Vec3f offset)
 		mMovementGoal.NormalizeIP();
 	}
 
-	mUserForce.SmoothInterpolate(mMovementGoal * (bIsSprinting ? scMaxSprintSpeed : scMaxWalkSpeed) *
-									 Vec3f(SpeedMultiplier),
-								 scMovementLerpSpeed, delta_time);
+	const float32 max_speed = (bIsSprinting ? scSprintSpeed : scWalkSpeed) * SpeedMultiplier;
+
+	mUserForce.SmoothInterpolate(mMovementGoal * max_speed, scMovementLerpSpeed, delta_time);
 
 	if (mMovementGoal.Length() <= 0.25) {
 		mBobCounterY = MathUtil::SmoothInterpolate(mBobCounterY, 0.0f, 10.0f, delta_time);
@@ -167,8 +176,7 @@ void Player::Move(float64 delta_time, const Vec3f offset)
 	Vec3f force = mUserForce;
 
 	if (!mbIsFlymode) {
-		force.Y = JumpForce;
-		JumpForce = 0;
+		force.Y = 0.0f;
 	}
 
 	Physics.ApplyMovement(force);
@@ -228,7 +236,15 @@ void Player::UpdateViewModel(double delta_time)
 	const Vec3f bob = -GetBob();
 
 	Vec3f view_model_bob = (right * (bob.X * horizontal_scale)) + (up * (bob.Y * vertical_scale));
-	view_model_bob += Vec3f(-Physics.pPlayerVirt->GetLinearVelocity() * 0.004f);
+	const JPH::Vec3 character_velocity = Physics.pPlayerVirt->GetLinearVelocity();
+
+	mViewModelVerticalLag = MathUtil::SmoothInterpolate(mViewModelVerticalLag,
+														-character_velocity.GetY() * scViewModelVelocityLag,
+														scViewModelVerticalLagSpeed, delta_time);
+
+	view_model_bob += Vec3f(-character_velocity.GetX() * scViewModelVelocityLag,
+							mViewModelVerticalLag - mLandingOffset * scLandingViewModelCounter,
+							-character_velocity.GetZ() * scViewModelVelocityLag);
 
 	// const float32 rotx = sin(gWorld->Player.mBobCounterY * 0.5f) * 0.05f;
 
@@ -245,16 +261,16 @@ static float32 RandomUnitClosed()
 	return static_cast<float32>(FastRand32() >> 8) * (2.0f / 16777215.0f) - 1.0f; // [-1.0, 1.0]
 }
 
-float32 Player::ViewKickImpulsePerPeak()
+static float32 SpringImpulsePerPeak(float32 omega, float32 zeta)
 {
-	const float32 omega = scViewKickFrequency;
-	const float32 zeta = scViewKickDamping;
 	const float32 damped = omega * std::sqrt(1.0f - zeta * zeta);
 	const float32 peak_time = std::atan2(damped, zeta * omega) / damped;
 	const float32 peak_per_impulse = std::exp(-zeta * omega * peak_time) * std::sin(damped * peak_time) / damped;
 
 	return 1.0f / peak_per_impulse;
 }
+
+float32 Player::ViewKickImpulsePerPeak() { return SpringImpulsePerPeak(scViewKickFrequency, scViewKickDamping); }
 
 void Player::UpdateViewKick(float32 delta_time)
 {
@@ -275,6 +291,45 @@ void Player::UpdateViewKick(float32 delta_time)
 
 		mViewKickValue[i] = std::clamp(next_x, -mViewKickBound[i], mViewKickBound[i]);
 		mViewKickVelocity[i] = next_v;
+	}
+}
+
+void Player::UpdateLanding(float32 delta_time)
+{
+	const JPH::CharacterVirtual& character = *Physics.pPlayerVirt;
+
+	const bool on_ground = character.GetGroundState() == JPH::CharacterVirtual::EGroundState::OnGround;
+
+	if (on_ground && !mbWasOnGround && !mbIsFlymode) {
+		const float32 impact_speed = character.GetGroundVelocity().GetY() - character.GetLinearVelocity().GetY();
+		const float32 dip = std::min((impact_speed - scLandingMinImpactSpeed) * scLandingDipPerSpeed, scLandingMaxDip);
+
+		if (dip > 0.0f) {
+			mLandingVelocity -= dip * SpringImpulsePerPeak(scLandingFrequency, scLandingDamping);
+		}
+	}
+
+	mbWasOnGround = on_ground;
+
+	const float32 omega = scLandingFrequency;
+	const float32 zeta = scLandingDamping;
+	const float32 damped = omega * std::sqrt(1.0f - zeta * zeta);
+
+	const float32 decay = std::exp(-zeta * omega * delta_time);
+	const float32 cos_step = std::cos(damped * delta_time);
+	const float32 sin_step = std::sin(damped * delta_time);
+
+	const float32 x = mLandingOffset;
+	const float32 v = mLandingVelocity;
+
+	mLandingOffset = decay * (x * cos_step + ((v + zeta * omega * x) / damped) * sin_step);
+	mLandingVelocity = decay * (v * cos_step - ((omega * omega * x + zeta * omega * v) / damped) * sin_step);
+
+	mLandingOffset = std::clamp(mLandingOffset, -scLandingMaxDip * 1.5f, scLandingMaxDip * 1.5f);
+
+	if (std::abs(mLandingOffset) < 1.0e-4f && std::abs(mLandingVelocity) < 1.0e-3f) {
+		mLandingOffset = 0.0f;
+		mLandingVelocity = 0.0f;
 	}
 }
 
@@ -420,15 +475,59 @@ void Player::UpdateRecoil(float32 delta_time)
 }
 
 
+void Player::UpdateMeasuredMotion(const Vec3f& previous_position, float32 delta_time)
+{
+	if (delta_time <= 1.0e-5f) {
+		return;
+	}
+
+	const JPH::Vec3 ground_velocity = Physics.pPlayerVirt->GetGroundVelocity();
+	const Vec3f moved = Position - previous_position;
+
+	const float32 velocity_x = moved.X / delta_time - ground_velocity.GetX();
+	const float32 velocity_z = moved.Z / delta_time - ground_velocity.GetZ();
+
+	mHorizontalSpeed = std::sqrt(velocity_x * velocity_x + velocity_z * velocity_z);
+}
+
+void Player::UpdateFov(float32 delta_time, bool user_force_released)
+{
+	const bool sprint_fov = bIsSprinting && !user_force_released;
+
+	const float32 target_fov = sprint_fov ? scSprintFov : scWalkingFov;
+	const float32 fov_speed = sprint_fov ? 8.0f : 13.0f;
+	const float32 current_fov = pCamera->GetFov();
+
+	if (std::abs(current_fov - target_fov) <= 0.001f) {
+		return;
+	}
+
+	float32 next_fov = MathUtil::SmoothInterpolate(current_fov, target_fov, fov_speed, delta_time);
+
+	if (std::abs(next_fov - target_fov) < 0.01f) {
+		next_fov = target_fov;
+	}
+
+	pCamera->SetFov(next_fov);
+}
+
 void Player::Update(float64 delta_time)
 {
-	Physics.Update(delta_time);
+	const float64 physics_time = std::min(delta_time, static_cast<float64>(physics::PhysicsPlayer::scMaxStepTime));
+
+	const Vec3f previous_position = Position;
+
+	Physics.Update(physics_time);
 	SyncPhysicsToPlayer();
+
+	UpdateMeasuredMotion(previous_position, static_cast<float32>(physics_time));
 
 	UpdateRecoil(static_cast<float32>(delta_time));
 
+	UpdateLanding(static_cast<float32>(delta_time));
+
 	UpdateDirection();
-	pCamera->MoveTo(Position + mCameraOffset);
+	pCamera->MoveTo(Position + mCameraOffset + Vec3f(0.0f, mLandingOffset, 0.0f));
 
 	const bool user_force_released = mUserForce.IsNearZero(0.1);
 
@@ -438,7 +537,7 @@ void Player::Update(float64 delta_time)
 	UpdateViewKick(static_cast<float32>(delta_time));
 
 	if (gCVars->Get("b_headbob_enabled", false) && (Physics.bIsGrounded)) {
-		float32 body_speed = mUserForce.Length();
+		float32 body_speed = mHorizontalSpeed;
 		float32 counter_speed = (bBobReverse ? -2.3f : 2.3f);
 
 		mBobCounterY += delta_time * counter_speed * body_speed;
@@ -462,20 +561,11 @@ void Player::Update(float64 delta_time)
 	Vec3f bob_vector = pCamera->GetUpVector() * mHeadBobY + pCamera->GetRightVector() * mHeadBobX;
 	pCamera->MoveBy(bob_vector);
 
-	if (user_force_released == false) {
-		if (bIsSprinting && pCamera->GetFov() < scSprintFov) {
-			pCamera->SetFov(MathUtil::SmoothInterpolate(pCamera->GetFov(), scSprintFov, 8.0f, delta_time));
-		}
-		else if (!bIsSprinting && pCamera->GetFov() > scWalkingFov) {
-			pCamera->SetFov(MathUtil::SmoothInterpolate(pCamera->GetFov(), scWalkingFov, 13.0f, delta_time));
-		}
-	}
+	UpdateFov(static_cast<float32>(delta_time), user_force_released);
 
 	pCamera->Update();
 
 	Weapons.Update(static_cast<float32>(delta_time));
-
-	mbUpdatePhysicsTransform = false;
 
 	UpdateViewModel(delta_time);
 }

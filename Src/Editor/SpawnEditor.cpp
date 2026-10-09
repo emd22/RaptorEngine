@@ -22,7 +22,8 @@ static constexpr float32 scAimFallbackDistance = 10.0f;
 static constexpr float32 scAimRange = 100.0f;
 
 static constexpr float32 scPlayerHalfWidth = 0.3f;
-static constexpr float32 scEyeHeight = physics::PhysicsPlayer::scStandingHeight;
+static constexpr float32 scBodyHeight = physics::PhysicsPlayer::scStandingHeight;
+static constexpr float32 scEyeHeight = physics::PhysicsPlayer::scEyeHeight;
 static constexpr float32 scDirectionLength = 1.5f;
 static constexpr float32 scDirectionTipHalfExtent = 0.05f;
 
@@ -95,7 +96,7 @@ void SpawnEditor::Tick(float32 delta_time)
 bool SpawnEditor::Raycast(const Vec3f origin, const Vec3f direction, float32 max_distance, float32& out_distance) const
 {
 	const Vec3f position = gWorld->PlayerSpawn.Position;
-	const Vec3f half_extent(scPlayerHalfWidth, scEyeHeight * 0.5f, scPlayerHalfWidth);
+	const Vec3f half_extent(scPlayerHalfWidth, scBodyHeight * 0.5f, scPlayerHalfWidth);
 	const Vec3f center = position + Vec3f(0.0f, half_extent.Y, 0.0f);
 
 	Vec3f face;
@@ -115,7 +116,7 @@ void SpawnEditor::DrawMarker(bool selected)
 	const World::PlayerSpawnPoint& spawn = gWorld->PlayerSpawn;
 	const Color color = mbEditing ? scEditingSpawnColor : (selected ? scSpawnColor : scIdleSpawnColor);
 
-	const Vec3f half_extent(scPlayerHalfWidth, scEyeHeight * 0.5f, scPlayerHalfWidth);
+	const Vec3f half_extent(scPlayerHalfWidth, scBodyHeight * 0.5f, scPlayerHalfWidth);
 	const Vec3f body_center = spawn.Position + Vec3f(0.0f, half_extent.Y, 0.0f);
 
 	const Vec3f eye = spawn.Position + Vec3f(0.0f, scEyeHeight, 0.0f);
@@ -154,18 +155,9 @@ void SpawnEditor::CommitEdit()
 		return;
 	}
 
-	EditOperation op {
-		.Type = EditOperation::eType::SpawnTransform,
-		.ValueA = EditOperationValue(mPositionBefore),
-		.ValueB = EditOperationValue(position_after),
-	};
-
-	op.Spawn.DirectionBefore = mDirectionBefore;
-	op.Spawn.DirectionAfter = direction_after;
-	op.Spawn.bCustomBefore = mbCustomBefore;
-	op.Spawn.bCustomAfter = true;
-
-	gEditor->PushEditOperation(op);
+	gEditor->EmplaceEditOperation<SpawnTransformOperation>(
+		SpawnTransformOperation::State { mPositionBefore, mDirectionBefore, mbCustomBefore },
+		SpawnTransformOperation::State { position_after, direction_after, true });
 }
 
 void SpawnEditor::MoveSpawn(float32 delta_time)
@@ -218,36 +210,21 @@ void SpawnEditor::PlaceAtCrosshair()
 	const physics::RayResult hit = gPhysics->pBackend->Raycast(origin, forward * scAimRange);
 	const Vec3f position = gEditor->SnapToGrid(hit.bHit ? hit.Point : (origin + (forward * scAimFallbackDistance)));
 
-	EditOperation op {
-		.Type = EditOperation::eType::SpawnTransform,
-		.ValueA = EditOperationValue(gWorld->PlayerSpawn.Position),
-		.ValueB = EditOperationValue(position),
-	};
+	const Vec3f direction = gWorld->PlayerSpawn.Direction.Normalize();
 
-	op.Spawn.DirectionBefore = gWorld->PlayerSpawn.Direction.Normalize();
-	op.Spawn.DirectionAfter = op.Spawn.DirectionBefore;
-	op.Spawn.bCustomBefore = gWorld->PlayerSpawn.bCustom;
-	op.Spawn.bCustomAfter = true;
-
-	gEditor->PushEditOperation(op);
+	gEditor->EmplaceEditOperation<SpawnTransformOperation>(
+		SpawnTransformOperation::State { gWorld->PlayerSpawn.Position, direction, gWorld->PlayerSpawn.bCustom },
+		SpawnTransformOperation::State { position, direction, true });
 }
 
 void SpawnEditor::ResetToDefault()
 {
 	World::PlayerSpawnPoint defaults;
 
-	EditOperation op {
-		.Type = EditOperation::eType::SpawnTransform,
-		.ValueA = EditOperationValue(gWorld->PlayerSpawn.Position),
-		.ValueB = EditOperationValue(defaults.Position),
-	};
-
-	op.Spawn.DirectionBefore = gWorld->PlayerSpawn.Direction.Normalize();
-	op.Spawn.DirectionAfter = defaults.Direction;
-	op.Spawn.bCustomBefore = gWorld->PlayerSpawn.bCustom;
-	op.Spawn.bCustomAfter = false;
-
-	gEditor->PushEditOperation(op);
+	gEditor->EmplaceEditOperation<SpawnTransformOperation>(
+		SpawnTransformOperation::State { gWorld->PlayerSpawn.Position, gWorld->PlayerSpawn.Direction.Normalize(),
+										 gWorld->PlayerSpawn.bCustom },
+		SpawnTransformOperation::State { defaults.Position, defaults.Direction, false });
 }
 
 } // namespace fx::editor

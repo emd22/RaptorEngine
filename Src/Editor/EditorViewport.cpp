@@ -7,6 +7,7 @@
 
 #include <Controls.hpp>
 #include <Util/Key.hpp>
+#include <algorithm>
 
 namespace fx::editor {
 
@@ -210,6 +211,8 @@ EditorViewport::EditorViewport(wxWindow* parent, const wxSize& size)
 	Bind(wxEVT_MOTION, &EditorViewport::OnMouseMove, this);
 	Bind(wxEVT_SIZE, &EditorViewport::OnSize, this);
 	Bind(wxEVT_KILL_FOCUS, &EditorViewport::OnKillFocus, this);
+
+	UpdateCachedSize();
 }
 
 void EditorViewport::OnKey(wxKeyEvent& event)
@@ -232,7 +235,7 @@ void EditorViewport::OnKey(wxKeyEvent& event)
 	// leaves it stuck down here. Once Cmd itself comes back up (which Cocoa always reports), flush anything left
 	// stuck.
 	if (!is_down && (key_id == eKey::FX_KEY_LMETA || key_id == eKey::FX_KEY_RMETA)) {
-		ControlManager::ReleaseNonModifierKeys();
+		ControlManager::PostReleaseNonModifierKeys();
 	}
 #endif
 }
@@ -270,14 +273,24 @@ void EditorViewport::OnMouseMove(wxMouseEvent& event)
 
 void EditorViewport::OnSize(wxSizeEvent& event)
 {
+	UpdateCachedSize();
+
 	mbResizePending = true;
 	event.Skip();
+}
+
+void EditorViewport::UpdateCachedSize()
+{
+	const wxSize size = GetClientSize();
+
+	mCachedWidth = static_cast<uint32>(std::max(size.x, 0));
+	mCachedHeight = static_cast<uint32>(std::max(size.y, 0));
 }
 
 void EditorViewport::OnKillFocus(wxFocusEvent& event)
 {
 	// The key up events go to whatever has focus now, so nothing would lift these
-	ControlManager::ReleaseAllKeys();
+	ControlManager::PostReleaseAllKeys();
 	event.Skip();
 }
 
@@ -291,6 +304,13 @@ void EditorViewport::SetRelativeMouseMode(bool enabled)
 {
 	if (enabled == mbRelativeMouse) {
 		return;
+	}
+
+	if (enabled) {
+		mSavedMousePos = ScreenToClient(wxGetMousePosition());
+	}
+	else if (mSavedMousePos != wxDefaultPosition) {
+		WarpPointer(mSavedMousePos.x, mSavedMousePos.y);
 	}
 
 	mbRelativeMouse = enabled;
@@ -341,12 +361,6 @@ void EditorViewport::PollRelativeMouse()
 #endif
 }
 
-bool EditorViewport::ConsumeResize()
-{
-	const bool resized = mbResizePending;
-	mbResizePending = false;
-
-	return resized;
-}
+bool EditorViewport::ConsumeResize() { return mbResizePending.exchange(false); }
 
 } // namespace fx::editor

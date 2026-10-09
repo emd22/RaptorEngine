@@ -8,34 +8,32 @@ namespace fx {
 PhMesh::PhMesh(const PrimitiveMesh& mesh)
 {
     const AnonArray& positions = mesh.VertexList.GetLocalBuffer();
-    Assert(positions.IsNotEmpty());
-
     const SizedArray<uint32>& index_buffer = mesh.LocalIndexBuffer;
 
     VertexList.reserve(positions.Size);
 
-    for (uint64 index = 0; index < positions.Size; index++) {
-        const renderer::Vertex<renderer::eVertexType::Default>& vertex =
-            positions.Get<renderer::Vertex<renderer::eVertexType::Default>>(index);
+    for (uint32 index = 0; index < positions.Size; index++) {
+        const float32* position = static_cast<const float32*>(positions.GetRaw(index));
 
         VertexList.emplace_back(JPH::Float3 {
-            vertex.Position[0],
-            vertex.Position[1],
-            vertex.Position[2],
+            position[0],
+            position[1],
+            position[2],
         });
     }
 
-    // Ensure that our vertex buffer is triangulated!
-    Assert((index_buffer.Size % 3) == 0);
-
     TriangleList.reserve(index_buffer.Size / 3);
 
-    for (uint64 index = 0; index < index_buffer.Size; index += 3) {
-        TriangleList.emplace_back(JPH::IndexedTriangle {
-            index_buffer.pData[index],
-            index_buffer.pData[index + 1],
-            index_buffer.pData[index + 2],
-        });
+    for (uint64 index = 0; index + 2 < index_buffer.Size; index += 3) {
+        const uint32 a = index_buffer.pData[index];
+        const uint32 b = index_buffer.pData[index + 1];
+        const uint32 c = index_buffer.pData[index + 2];
+
+        if (a >= positions.Size || b >= positions.Size || c >= positions.Size) {
+            continue;
+        }
+
+        TriangleList.emplace_back(JPH::IndexedTriangle { a, b, c });
     }
 }
 

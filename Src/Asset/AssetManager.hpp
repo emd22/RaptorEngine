@@ -12,7 +12,6 @@
 #include <Core/DataNotifier.hpp>
 #include <Core/HashMap.hpp>
 #include <Core/Ref.hpp>
-#include <Core/TSQueue.hpp>
 #include <Core/TSRef.hpp>
 #include <Core/Thread/ThreadID.hpp>
 #include <Core/Types.hpp>
@@ -21,6 +20,8 @@
 #include <Renderer/GraphicsBackend.hpp>
 #include <atomic>
 #include <chrono>
+#include <deque>
+#include <mutex>
 #include <thread>
 
 namespace fx {
@@ -55,8 +56,9 @@ public:
 	{
 	}
 
-	void DeleteImmediate() const;
-	bool TryDelete(uint32 current_frame) const;
+	bool IsDue(uint32 current_frame) const;
+	void Destroy() const;
+	static void WaitForGpu();
 
 	bool IsNull() const { return (Value.Ticket.Allocation == nullptr && Value.Ticket.Buffer == nullptr); }
 
@@ -137,6 +139,7 @@ public:
 
 	void Start(int32 min_threads);
 	void StopWorkers();
+	void Abort();
 	void Shutdown();
 
 	void WorkerUpdate();
@@ -234,19 +237,19 @@ public:
 
 	void DeleteBuffer(const renderer::RawGpuBuffer& buffer)
 	{
-		SpinLockContext<Queue<fx::AssetDeletionTicket>> queue = mDeletionTickets.GetQueue();
-
-		if (!queue->IsInited()) {
-			queue->InitCapacity(256);
+		{
+			std::lock_guard<std::mutex> lock(mDeletionMutex);
+			mDeletionTickets.emplace_back(renderer::gGraphics->GetElapsedFrameCount(), buffer);
 		}
 
-		queue->Emplace(renderer::gGraphics->GetElapsedFrameCount(), buffer);
 		ManagerUpdateNotifier.Signal();
 	}
 
 	void ShutdownDeletionQueue();
 
 	void SignalUpdate() { ManagerUpdateNotifier.Signal(); }
+
+	void DispatchCallbacks() { AssetCallbackQueue::Get().Dispatch(); }
 
 	~AssetManager() { Shutdown(); }
 
@@ -259,6 +262,8 @@ private:
 	int32 CheckForItemsToDelete();
 
 	bool CheckWorkersBusy();
+	bool HasPendingWork();
+	void FailOutstandingTickets();
 
 	void AssetManagerUpdate();
 
@@ -298,7 +303,8 @@ public:
 	//    DataNotifier DataLoaded;
 private:
 	AxQueue mLoadQueue;
-	TSQueue<AssetDeletionTicket> mDeletionTickets;
+	std::deque<AssetDeletionTicket> mDeletionTickets;
+	std::mutex mDeletionMutex;
 
 	SizedArray<AssetWorker*> WorkersWaitingToUpload;
 
