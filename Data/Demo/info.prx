@@ -12,7 +12,7 @@ sun = {
 
 lights = {
     /*spot0 = {
-        type = $CLight.Spot
+        type = $clight.spot
         pos = [4.0, 1.0, -4.0]
         dir = [-1.0, -0.2, -0.4]
         color = [255, 160, 120, 120]
@@ -21,7 +21,7 @@ lights = {
         outer = 50.0
     }
     spot2 = {
-        type = $CLight.Spot
+        type = $clight.spot
         pos = [4.0, 1.0, 0.0]
         dir = [-1.0, -0.2, 0.0]
         color = [160, 255, 120, 120]
@@ -30,7 +30,7 @@ lights = {
         outer = 50.0
     }*/
     /*spot1 = {
-        type = $CLight.Spot
+        type = $clight.spot
         pos = [-8.0, 2.5, 0.0]
         dir = [0.0, -1.0, 1.0]
         color = [40, 40, 255, 70]
@@ -39,7 +39,7 @@ lights = {
         outer = 50.0
     }
     spot2 = {
-        type = $CLight.Spot
+        type = $clight.spot
         pos = [-4.0, 2.5, 0.0]
         dir = [0.0, 0.0, 1.0]
         color = [50, 255, 70, 70]
@@ -60,7 +60,7 @@ lights = {
     }
 
     spot0 = {
-        type = $CLight.Spot
+        type = $clight.spot
         pos = [0.0, 2.0, 0.0]
         dir = [0.0, -1.0, 0.2]
         color = [255, 230, 200, 12]

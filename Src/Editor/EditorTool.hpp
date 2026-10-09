@@ -42,6 +42,22 @@ enum class eEditorMode : uint32
 	Count,
 };
 
+enum class eEditorView : uint32
+{
+	Perspective,
+	Top,
+	Split,
+
+	Count,
+};
+
+enum class eTopViewSelectMode : uint8
+{
+	Replace,
+	Add,
+	Toggle,
+};
+
 enum class eDataFilter : uint32
 {
 	All,

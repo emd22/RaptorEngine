@@ -165,13 +165,14 @@ class RotateOperation final : public ObjectEditOperation
 {
 public:
 	RotateOperation(Object* object, const Vec3f& euler_before, const Vec3f& euler_after, int32 group_size = 1);
+	RotateOperation(Object* object, const Quat& before, const Quat& after, int32 group_size = 1);
 
 	void Execute(EditorSelection& selection) override;
 	void Undo(EditorSelection& selection) override;
 
 private:
-	Vec3f mEulerBefore;
-	Vec3f mEulerAfter;
+	Quat mBefore;
+	Quat mAfter;
 };
 
 class ScaleFaceOperation final : public ObjectEditOperation
@@ -283,12 +284,13 @@ private:
 class CreateOperation final : public ObjectCreationOperation
 {
 public:
-	explicit CreateOperation(const Vec3f& position, int32 group_size = 1);
+	explicit CreateOperation(const Vec3f& position, int32 group_size = 1, MaterialID material = MaterialID::scNull);
 
 	void Execute(EditorSelection& selection) override;
 
 private:
 	Vec3f mPosition;
+	MaterialID mMaterial;
 };
 
 class CreateBrushOperation final : public ObjectCreationOperation

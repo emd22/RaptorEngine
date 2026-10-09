@@ -4,6 +4,7 @@
 #include <Math/MathUtil.hpp>
 #include <Math/Vec3d.hpp>
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 #include <limits>
 #include <unordered_map>
@@ -51,6 +52,10 @@ constexpr float32 scAxisAlignedEpsilon = 1e-6f;
 
 /// How close to 1 the dot product of two normals has to be for FindPlane() to match them
 constexpr float32 scFindPlaneEpsilon = 1e-3f;
+
+constexpr double scHullPlaneEpsilon = 1e-4;
+constexpr double scHullPlaneRelativeEpsilon = 1e-6;
+constexpr double scHullSameNormal = 1e-6;
 
 /// Offsets closer than this to the default layout count as the default
 constexpr float32 scTextureOffsetEpsilon = 1e-4f;
@@ -390,6 +395,127 @@ Brush Brush::FromPlanes(const PlaneList& planes)
 	Brush brush;
 	brush.Planes = planes;
 	brush.Rebuild();
+
+	return brush;
+}
+
+Brush Brush::FromVertices(const SizedArray<Vec3f>& points, const PlaneList& reference)
+{
+	if (points.Size < 4) {
+		return {};
+	}
+
+	std::vector<Vec3d> corners;
+	corners.reserve(points.Size);
+
+	double extent = 0.0;
+
+	for (const Vec3f& point : points) {
+		corners.push_back(Vec3d(point));
+		extent = std::max({ extent, std::fabs(static_cast<double>(point.X)), std::fabs(static_cast<double>(point.Y)),
+							std::fabs(static_cast<double>(point.Z)) });
+	}
+
+	const double epsilon = scHullPlaneEpsilon + extent * scHullPlaneRelativeEpsilon;
+
+	struct HullPlane
+	{
+		Vec3d Normal = Vec3d(0.0);
+		double Distance = 0.0;
+	};
+
+	std::vector<HullPlane> hull_planes;
+
+	for (size_t i = 0; i < corners.size(); i++) {
+		for (size_t j = i + 1; j < corners.size(); j++) {
+			for (size_t k = j + 1; k < corners.size(); k++) {
+				Vec3d normal = (corners[j] - corners[i]).Cross(corners[k] - corners[i]);
+				const double length = normal.Length();
+
+				if (!(length > scMinNormalLength)) {
+					continue;
+				}
+
+				normal = normal * (1.0 / length);
+				double distance = normal.Dot(corners[i]);
+
+				double lowest = DBL_MAX;
+				double highest = -DBL_MAX;
+
+				for (const Vec3d& corner : corners) {
+					const double side = normal.Dot(corner) - distance;
+
+					lowest = std::min(lowest, side);
+					highest = std::max(highest, side);
+				}
+
+				if (highest > epsilon) {
+					if (lowest < -epsilon) {
+						continue;
+					}
+
+					normal = normal * -1.0;
+					distance = -distance;
+				}
+
+				bool is_duplicate = false;
+
+				for (const HullPlane& existing : hull_planes) {
+					if (existing.Normal.Dot(normal) > 1.0 - scHullSameNormal && std::fabs(existing.Distance - distance) < epsilon) {
+						is_duplicate = true;
+						break;
+					}
+				}
+
+				if (is_duplicate) {
+					continue;
+				}
+
+				if (hull_planes.size() >= scMaxPlanes) {
+					return {};
+				}
+
+				hull_planes.push_back(HullPlane { normal, distance });
+			}
+		}
+	}
+
+	if (hull_planes.size() < 4) {
+		return {};
+	}
+
+	PlaneList planes;
+
+	for (const HullPlane& plane : hull_planes) {
+		planes.Insert(BrushPlane { plane.Normal.ToVec3f(), static_cast<float32>(plane.Distance), {} });
+	}
+
+	Brush brush = FromPlanes(planes);
+
+	if (!brush.IsValid()) {
+		return {};
+	}
+
+	for (uint32 i = 0; i < brush.Planes.Size; i++) {
+		int32 best = scNoPlane;
+		float32 best_dot = 1.0f - scFindPlaneEpsilon;
+
+		for (uint32 j = 0; j < reference.Size; j++) {
+			const float32 dot = reference[j].Normal.Dot(brush.Planes[i].Normal);
+
+			if (dot > best_dot) {
+				best_dot = dot;
+				best = static_cast<int32>(j);
+			}
+		}
+
+		if (best != scNoPlane) {
+			brush.Planes[i].Texture = reference[best].Texture;
+		}
+		else {
+			brush.ResetFaceTexture(i);
+		}
+	}
 
 	return brush;
 }

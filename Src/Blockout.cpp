@@ -140,7 +140,7 @@ void Blockout::Create(World* world)
 }
 
 
-constexpr float scMinBlockoutThickness = 0.1f;
+constexpr float scMinBlockoutThickness = Blockout::scMinThickness;
 
 /// Degrees per full turn, used to keep face texture rotations in [0, 360)
 constexpr float32 scDegreesPerTurn = 360.0f;
@@ -911,12 +911,13 @@ void Blockout::DestroyObject(Object* object)
 	gObjectManager->DestroyObject(object->ID);
 }
 
-Object* Blockout::NewObject(const Vec3f position)
+Object* Blockout::NewObject(const Vec3f position, MaterialID material)
 {
 	std::string blockout_name = String::Fmt("{}", BlockoutObjects.Size).Str();
 	LogInfo("Creating new blockout object '{}'", blockout_name);
 
-	Object* object = gObjectManager->NewObject(blockout_name, GetDefaultMaterial(), eObjectTag::Blockout);
+	Object* object = gObjectManager->NewObject(blockout_name, material.IsNull() ? GetDefaultMaterial() : material,
+											   eObjectTag::Blockout);
 
 	constexpr float32 scale = 0.25f;
 

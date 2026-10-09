@@ -1,6 +1,6 @@
 lights = {
 	spot0 = {
-        type = $CLight.Spot
+        type = $clight.spot
         pos = [4.0, 1.0, -4.0]
         dir = [-1.0, -0.2, -0.4]
         color = [255, 160, 120, 120]

@@ -5,6 +5,7 @@
 #ifdef FX_USE_NEON
 
 #include <arm_neon.h>
+#include <bit>
 #include <math.h>
 
 #include <Core/Types.hpp>

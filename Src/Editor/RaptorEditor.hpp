@@ -27,6 +27,7 @@
 #include <chrono>
 #include <functional>
 #include <mutex>
+#include <vector>
 
 namespace fx {
 
@@ -126,6 +127,31 @@ public:
 
 	bool IsToolAvailable(eEditorTool tool) const;
 
+	/////////////////////////////////////
+	// Views
+	/////////////////////////////////////
+
+	void SetView(eEditorView view);
+
+	FX_FORCE_INLINE eEditorView GetView() const { return mView; }
+	FX_FORCE_INLINE bool IsTopViewActive() const { return mView != eEditorView::Perspective; }
+
+	FX_FORCE_INLINE void NoteTopViewCommand() { ++mTopViewCommandSerial; }
+
+	void TopViewSelect(const std::vector<uint32>& object_ids, eTopViewSelectMode mode);
+	void TopViewMove(const Vec3f offset);
+	void TopViewRotate(const Vec3f axis, float32 angle, const Vec3f pivot);
+	void TopViewMoveFace(const Vec3f world_normal, float32 distance);
+	void TopViewMoveVertices(uint32 axis_u, uint32 axis_v, const std::vector<TopViewVertexHandle>& handles,
+							 const Vec3f offset);
+	void TopViewCreate(const Vec3f min, const Vec3f max);
+	void TopViewDelete();
+	void TopViewDuplicate();
+	void TopViewToggleSnap();
+	void TopViewAdjustSnap(int32 direction);
+
+	Object* CreateWorldBox(const Vec3f min, const Vec3f max);
+
 	FX_FORCE_INLINE bool IsSpawnSelected() const { return mbSpawnSelected; }
 
 	/// Vis mode selects everything but data brushes, Data mode only the data brushes the filter lets through
@@ -170,6 +196,9 @@ public:
 
 	/// Changes an object's material, and the material it goes back to once it is deselected
 	void SetStoredMaterial(Object* object, MaterialID material);
+
+	/// The material new brushes are made with: the last one chosen for an object, or the default one
+	MaterialID GetNewBrushMaterial() const;
 
 	Object* CreateReflectionProbeAtPlayer();
 
@@ -235,6 +264,11 @@ private:
 
 	EditorPanelState BuildPanelState();
 
+	TopViewState BuildTopViewState();
+
+	Object* FindTopViewObject(uint32 object_id);
+	uint32 CollectTopViewTargets(Object** out_targets);
+
 	uint32 GetAvailableToolMask() const;
 
 	void AddTools();
@@ -283,11 +317,16 @@ private:
 	eEditorMode mMode = eEditorMode::Vis;
 	eDataFilter mDataFilter = eDataFilter::All;
 
+	eEditorView mView = eEditorView::Perspective;
+	uint32 mTopViewCommandSerial = 0;
+
 	eEditorTool mCurrentToolType = eEditorTool::None;
 	EditorTool* mpCurrentTool = nullptr;
 
 	EditorToolState mToolState {};
 	EditorToolSelection mToolSelection {};
+
+	MaterialID mLastUsedMaterial = MaterialID::scNull;
 
 	/// Runs the Light tool
 	LightEditor mLightEditor;

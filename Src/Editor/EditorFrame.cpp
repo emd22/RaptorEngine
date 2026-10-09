@@ -10,6 +10,7 @@
 #include "OutlineToggleButton.hpp"
 #include "RaptorEditor.hpp"
 #include "ToolSettingsPanel.hpp"
+#include "TopViewPanel.hpp"
 #include "WorldPropertiesPanel.hpp"
 
 #include <wx/app.h>
@@ -23,6 +24,7 @@
 #include <wx/scrolwin.h>
 #include <wx/settings.h>
 #include <wx/sizer.h>
+#include <wx/splitter.h>
 #include <wx/statline.h>
 
 #include <Blockout.hpp>
@@ -39,7 +41,47 @@
 namespace fx::editor {
 
 static constexpr int32 scObjectPropertyPanelWidth = 240;
+static constexpr int32 scMinimumPaneSize = 160;
+
+static const wxColor scSashColor = wxColor(46, 46, 46);
+
+static const wxColor scSashGripColor = wxColor(110, 110, 110);
 static constexpr const char* scDefaultBlockoutPath = "RaptorData/Data/blockouts/btemp.prx";
+
+class EditorSplitter : public wxSplitterWindow
+{
+public:
+	EditorSplitter(wxWindow* parent, const wxSize& size)
+		: wxSplitterWindow(parent, wxID_ANY, wxDefaultPosition, size, wxSP_NOBORDER)
+	{
+	}
+
+	void DrawSash(wxDC& dc) override
+	{
+		if (!IsSplit()) {
+			return;
+		}
+
+		const wxSize size = GetClientSize();
+		const bool vertical = (GetSplitMode() == wxSPLIT_VERTICAL);
+		const int position = GetSashPosition();
+		const int thickness = GetSashSize();
+
+		dc.SetPen(*wxTRANSPARENT_PEN);
+		dc.SetBrush(wxBrush(scSashColor));
+
+		if (vertical) {
+			dc.DrawRectangle(position, 0, thickness, size.y);
+			dc.SetBrush(wxBrush(scSashGripColor));
+			dc.DrawRectangle(position + thickness / 2 - 1, 0, 2, size.y);
+		}
+		else {
+			dc.DrawRectangle(0, position, size.x, thickness);
+			dc.SetBrush(wxBrush(scSashGripColor));
+			dc.DrawRectangle(0, position + thickness / 2 - 1, size.x, 2);
+		}
+	}
+};
 
 struct ToolButtonInfo
 {
@@ -244,6 +286,19 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 
 	menu_bar->Append(world_menu, "&World");
 
+	wxMenu* view_menu = new wxMenu;
+
+	mpPerspectiveMenuItem = view_menu->AppendRadioItem(wxID_ANY, "3D View\tCtrl+1", "Fly around the level in 3D");
+	mpTopMenuItem = view_menu->AppendRadioItem(wxID_ANY, "2D Views\tCtrl+2",
+											   "Top, front and side wireframe views for laying out brushes");
+	mpSplitMenuItem = view_menu->AppendRadioItem(wxID_ANY, "Split View\tCtrl+3",
+												 "The 3D view and the 2D views side by side, with a draggable divider");
+	view_menu->AppendSeparator();
+	mpStackMenuItem = view_menu->AppendCheckItem(wxID_ANY, "Stack Split Panes",
+												 "Put the 2D view below the 3D view instead of beside it");
+
+	menu_bar->Append(view_menu, "&View");
+
 	wxMenu* window_menu = new wxMenu;
 	wxMenuItem* object_list_item = window_menu->Append(wxID_ANY, "Open Object List",
 													   "View all objects currently in ObjectManager");
@@ -289,6 +344,28 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 		},
 		rebase_probes_item->GetId());
 
+	Bind(
+		wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetView(eEditorView::Perspective); }); },
+		mpPerspectiveMenuItem->GetId());
+	Bind(
+		wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetView(eEditorView::Top); }); },
+		mpTopMenuItem->GetId());
+	Bind(
+		wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetView(eEditorView::Split); }); },
+		mpSplitMenuItem->GetId());
+	Bind(
+		wxEVT_MENU,
+		[this](wxCommandEvent&)
+		{
+			mbStackedSplit = mpStackMenuItem->IsChecked();
+
+			if (mView == eEditorView::Split) {
+				ApplySplitLayout(mView);
+				mpRootPanel->Layout();
+			}
+		},
+		mpStackMenuItem->GetId());
+
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowObjectListWindow(); }, object_list_item->GetId());
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowCVarListWindow(); }, cvar_list_item->GetId());
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowMaterialPickerWindow(); }, material_picker_item->GetId());
@@ -297,8 +374,33 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	SetBackgroundColour(scPanelColor);
 
 	wxPanel* root = new wxPanel(this, wxID_ANY);
+	mpRootPanel = root;
 	root->SetBackgroundColour(scPanelColor);
 	wxBoxSizer* root_sizer = new wxBoxSizer(wxVERTICAL);
+
+	// Views
+	wxBoxSizer* view_sizer = new wxBoxSizer(wxHORIZONTAL);
+
+	mpPerspectiveButton = new OutlineToggleButton(root, wxBitmap(), "3D");
+	mpPerspectiveButton->SetToolTip("Fly around the level in 3D (Ctrl+1)");
+	mpPerspectiveButton->SetValue(true);
+	mpPerspectiveButton->Bind(wxEVT_TOGGLEBUTTON,
+							  [](wxCommandEvent&)
+							  { thread::PostToGame([] { gEditor->SetView(eEditorView::Perspective); }); });
+
+	mpTopButton = new OutlineToggleButton(root, wxBitmap(), "2D");
+	mpTopButton->SetToolTip("Top, front and side wireframe views for laying out brushes (Ctrl+2)");
+	mpTopButton->Bind(wxEVT_TOGGLEBUTTON,
+					  [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetView(eEditorView::Top); }); });
+
+	mpSplitButton = new OutlineToggleButton(root, wxBitmap(), "Split");
+	mpSplitButton->SetToolTip("The 3D view and the 2D views together, with a draggable divider (Ctrl+3)");
+	mpSplitButton->Bind(wxEVT_TOGGLEBUTTON,
+						[](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetView(eEditorView::Split); }); });
+
+	view_sizer->Add(mpPerspectiveButton, wxSizerFlags(1).Expand());
+	view_sizer->Add(mpTopButton, wxSizerFlags(1).Expand().Border(wxLEFT, 2));
+	view_sizer->Add(mpSplitButton, wxSizerFlags(1).Expand().Border(wxLEFT, 2));
 
 	// Modes
 	wxBoxSizer* mode_sizer = new wxBoxSizer(wxHORIZONTAL);
@@ -355,16 +457,49 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	wxBoxSizer* body_sizer = new wxBoxSizer(wxHORIZONTAL);
 
 	wxBoxSizer* top_bar = new wxBoxSizer(wxHORIZONTAL);
-	top_bar->Add(mode_sizer, wxSizerFlags().CenterVertical());
+	mpTopBarSizer = top_bar;
+
+	top_bar->Add(view_sizer, wxSizerFlags().CenterVertical().Border(wxALL, 2));
 	top_bar->Add(new wxStaticLine(root, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL),
 				 wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT, 6));
-	top_bar->Add(tool_sizer, wxSizerFlags().CenterVertical());
+	top_bar->Add(mode_sizer, wxSizerFlags().CenterVertical());
+
+	mpToolsGroup = new wxBoxSizer(wxHORIZONTAL);
+	mpToolsGroup->Add(new wxStaticLine(root, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL),
+					  wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT, 6));
+	mpToolsGroup->Add(tool_sizer, wxSizerFlags().CenterVertical());
+	top_bar->Add(mpToolsGroup, wxSizerFlags().Expand());
 
 	root_sizer->Add(top_bar, wxSizerFlags().Border(wxALL, 4));
 
-	mpViewport = new EditorViewport(root, viewport_size);
+	mpSplitter = new EditorSplitter(root, viewport_size);
+	mpSplitter->SetMinimumPaneSize(scMinimumPaneSize);
+	mpSplitter->SetSashGravity(0.5);
+	mpSplitter->SetBackgroundColour(scPanelColor);
+
+	mpViewport = new EditorViewport(mpSplitter, viewport_size);
 	mpViewport->SetMinSize(viewport_size);
-	body_sizer->Add(mpViewport, wxSizerFlags(1).Expand());
+
+	mpTopViewPanel = new TopViewPanel(mpSplitter);
+	mpTopViewPanel->Hide();
+
+	mpSplitter->Initialize(mpViewport);
+	mpSplitter->SetMinSize(viewport_size);
+
+	body_sizer->Add(mpSplitter, wxSizerFlags(1).Expand());
+
+	mpViewport->Bind(wxEVT_SET_FOCUS,
+					 [this](wxFocusEvent& event)
+					 {
+						 mbSplitFocusOn2D = false;
+						 event.Skip();
+					 });
+	mpTopViewPanel->GetCanvas()->Bind(wxEVT_SET_FOCUS,
+									  [this](wxFocusEvent& event)
+									  {
+										  mbSplitFocusOn2D = true;
+										  event.Skip();
+									  });
 
 
 	mpSideColumn = new wxBoxSizer(wxVERTICAL);
@@ -418,6 +553,7 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	SetSizerAndFit(frame_sizer);
 
 	mpViewport->SetMinSize(wxSize(64, 64));
+	mpSplitter->SetMinSize(wxSize(64, 64));
 	SetMinSize(wxDefaultSize);
 
 	Bind(wxEVT_CLOSE_WINDOW, &EditorFrame::OnClose, this);
@@ -435,8 +571,8 @@ void EditorFrame::SetInteractive(bool interactive)
 		}
 	}
 
-	if (interactive && mpViewport != nullptr) {
-		mpViewport->SetFocus();
+	if (interactive) {
+		FocusActiveView();
 	}
 }
 
@@ -452,9 +588,101 @@ void EditorFrame::SetSidePanelCollapsed(bool collapsed)
 	mpSideColumn->Layout();
 	Layout();
 
-	if (mpViewport != nullptr) {
+	FocusActiveView();
+}
+
+void EditorFrame::FocusActiveView()
+{
+	const bool use_2d = (mView == eEditorView::Top) || (mView == eEditorView::Split && mbSplitFocusOn2D);
+
+	if (use_2d && mpTopViewPanel != nullptr) {
+		mpTopViewPanel->GetCanvas()->SetFocus();
+	}
+	else if (mpViewport != nullptr) {
 		mpViewport->SetFocus();
 	}
+}
+
+void EditorFrame::ShowView(const eEditorView view)
+{
+	mView = view;
+
+	mpPerspectiveButton->SetValue(view == eEditorView::Perspective);
+	mpTopButton->SetValue(view == eEditorView::Top);
+	mpSplitButton->SetValue(view == eEditorView::Split);
+
+	switch (view) {
+	case eEditorView::Top:
+		mpTopMenuItem->Check(true);
+		break;
+	case eEditorView::Split:
+		mpSplitMenuItem->Check(true);
+		break;
+	default:
+		mpPerspectiveMenuItem->Check(true);
+		break;
+	}
+
+	ApplySplitLayout(view);
+
+	mpTopBarSizer->Show(mpToolsGroup, view != eEditorView::Top, true);
+
+	mpRootPanel->Layout();
+
+	FocusActiveView();
+}
+
+void EditorFrame::ApplySplitLayout(const eEditorView view)
+{
+	const wxSplitMode wanted_mode = mbStackedSplit ? wxSPLIT_HORIZONTAL : wxSPLIT_VERTICAL;
+
+	const auto extent = [this](wxSplitMode mode)
+	{
+		const wxSize size = mpSplitter->GetClientSize();
+		return std::max((mode == wxSPLIT_HORIZONTAL) ? size.y : size.x, 1);
+	};
+
+	if (mpSplitter->IsSplit()) {
+		mSashFraction = std::clamp(static_cast<float32>(mpSplitter->GetSashPosition()) /
+									   static_cast<float32>(extent(mpSplitter->GetSplitMode())),
+								   0.1f, 0.9f);
+
+		if (view != eEditorView::Split || mpSplitter->GetSplitMode() != wanted_mode) {
+			wxWindow* removed = (view == eEditorView::Top) ? static_cast<wxWindow*>(mpViewport)
+														   : static_cast<wxWindow*>(mpTopViewPanel);
+
+			mpSplitter->Unsplit(removed);
+		}
+	}
+
+	if (view == eEditorView::Split) {
+		if (!mpSplitter->IsSplit()) {
+			const int position = static_cast<int>(mSashFraction * static_cast<float32>(extent(wanted_mode)));
+
+			if (mbStackedSplit) {
+				mpSplitter->SplitHorizontally(mpViewport, mpTopViewPanel, position);
+			}
+			else {
+				mpSplitter->SplitVertically(mpViewport, mpTopViewPanel, position);
+			}
+
+			mpViewport->Show();
+			mpTopViewPanel->Show();
+		}
+
+		return;
+	}
+
+	wxWindow* wanted = (view == eEditorView::Top) ? static_cast<wxWindow*>(mpTopViewPanel)
+												  : static_cast<wxWindow*>(mpViewport);
+	wxWindow* current = mpSplitter->GetWindow1();
+
+	if (current != wanted) {
+		mpSplitter->ReplaceWindow(current, wanted);
+		current->Hide();
+	}
+
+	wanted->Show();
 }
 
 void EditorFrame::SetToolSettingsPanel(ToolSettingsBasePanel* new_panel)
@@ -487,10 +715,7 @@ void EditorFrame::ShowSelectedTool(const eEditorTool tool)
 		mToolButtons[i]->SetValue(i == static_cast<uint32>(tool));
 	}
 
-	// Give the keyboard back to the viewport
-	if (mpViewport != nullptr) {
-		mpViewport->SetFocus();
-	}
+	FocusActiveView();
 }
 
 void EditorFrame::ApplyState(const EditorPanelState& state)
@@ -506,6 +731,10 @@ void EditorFrame::ApplyState(const EditorPanelState& state)
 
 	if (mpMaterialPickerWindow != nullptr) {
 		mpMaterialPickerWindow->OnStateChanged();
+	}
+
+	if (mState.TopView.bActive) {
+		mpTopViewPanel->ApplyState(mState.TopView);
 	}
 }
 
@@ -523,9 +752,7 @@ void EditorFrame::ShowMode(const eEditorMode mode, const eDataFilter filter, con
 		mToolButtons[i]->Enable((available_tools & (1u << i)) != 0);
 	}
 
-	if (mpViewport != nullptr) {
-		mpViewport->SetFocus();
-	}
+	FocusActiveView();
 }
 
 void EditorFrame::ShowObjectListWindow()

@@ -26,7 +26,7 @@ namespace SSE {
 void SinCos4(__m128 in_values, __m128* ysin, __m128* ycos)
 {
 	const __m128 cvOne = _mm_set1_ps(1.0);
-	const __m128 cvSignMask = _mm_set1_ps(SSE::scSignMask32);
+	const __m128 cvSignMask = _mm_castsi128_ps(_mm_set1_epi32(SSE::scSignMask32));
 
 	const __m128 cvSineCoeff1 = _mm_set1_ps(-2.3889859e-08f);
 	const __m128 cvSineCoeff0 = _mm_setr_ps(-0.16666667f, +0.0083333310f, -0.00019840874f, +2.7525562e-06f);
@@ -37,7 +37,11 @@ void SinCos4(__m128 in_values, __m128* ysin, __m128* ycos)
 	const __m128 cvPi = _mm_set1_ps(FX_PI);
 	const __m128 cvHalfPi = _mm_set1_ps(FX_HALF_PI);
 
-	__m128 sign = _mm_and_ps(in_values, cvSignMask);
+	const __m128 turns = _mm_round_ps(_mm_mul_ps(in_values, _mm_set1_ps(FX_1_OVER_2PI)),
+	                                  _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
+	in_values = _mm_fnmadd_ps(turns, _mm_set1_ps(FX_2PI), in_values);
+
+	__m128 sign =_mm_and_ps(in_values, cvSignMask);
 	__m128 pi_or_neg_pi = _mm_or_ps(cvPi, sign);
 	__m128 le_result = _mm_cmple_ps(_mm_andnot_ps(sign, in_values), cvHalfPi);
 
