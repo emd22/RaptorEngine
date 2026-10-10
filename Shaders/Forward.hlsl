@@ -230,7 +230,7 @@ struct FSPushConsts
 
 #define SHADOW_BIAS -0.000005f
 
-#define SHADOW_NORMAL_OFFSET_TEXELS 1.5
+#define SHADOW_NORMAL_OFFSET_TEXELS 1.0
 
 /// Taps per axis for the shadow PCF kernel
 #define SHADOW_PCF_TAPS 2

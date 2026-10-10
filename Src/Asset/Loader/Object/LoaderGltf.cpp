@@ -1534,7 +1534,8 @@ void LoaderGltf::ProcessData(AssetTicket& ticket)
 
 	// Skeletons (and their animations) built so far, indexed by skin. Meshes skinned to the same skin share one
 	// skeleton rather than each parsing their own copy.
-	SizedArray<Ref<Skeleton>> skeletons(mpGltfData->skins_count);
+	SizedArray<Ref<Skeleton>> skeletons;
+	skeletons.InitSize(mpGltfData->skins_count);
 
 	const auto get_skeleton = [&](cgltf_skin* skin) -> Ref<Skeleton>&
 	{
@@ -1551,7 +1552,9 @@ void LoaderGltf::ProcessData(AssetTicket& ticket)
 		return skeleton;
 	};
 
-	SizedArray<cgltf_skin*> drawn_joint_skin(mpGltfData->nodes_count);
+	SizedArray<cgltf_skin*> drawn_joint_skin;
+	drawn_joint_skin.InitSize(mpGltfData->nodes_count);
+
 	for (cgltf_skin*& skin : drawn_joint_skin) {
 		skin = nullptr;
 	}

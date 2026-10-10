@@ -75,15 +75,23 @@ TextureProjection GetTextureProjection(const Vec3f normal)
 	const float32 abs_y = std::abs(normal.Y);
 	const float32 abs_z = std::abs(normal.Z);
 
+	TextureProjection projection {};
+
 	if (abs_y >= abs_x && abs_y >= abs_z) {
-		return { Vec3f(1.0f, 0.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f) };
+		projection = { Vec3f(1.0f, 0.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f) };
+	}
+	else if (abs_x >= abs_z) {
+		projection = { Vec3f(0.0f, 0.0f, 1.0f), Vec3f(0.0f, -1.0f, 0.0f) };
+	}
+	else {
+		projection = { Vec3f(1.0f, 0.0f, 0.0f), Vec3f(0.0f, -1.0f, 0.0f) };
 	}
 
-	if (abs_x >= abs_z) {
-		return { Vec3f(0.0f, 0.0f, 1.0f), Vec3f(0.0f, -1.0f, 0.0f) };
+	if (projection.UAxis.Cross(projection.VAxis).Dot(normal) < 0.0f) {
+		projection.UAxis = projection.UAxis * -1.0f;
 	}
 
-	return { Vec3f(1.0f, 0.0f, 0.0f), Vec3f(0.0f, -1.0f, 0.0f) };
+	return projection;
 }
 
 Vec2f GetDefaultTextureOffset(const Vec3f normal, const Vec3f bounds_min, const Vec3f bounds_max)
@@ -91,7 +99,9 @@ Vec2f GetDefaultTextureOffset(const Vec3f normal, const Vec3f bounds_min, const 
 	const TextureProjection projection = GetTextureProjection(normal);
 
 	// V runs down walls, so the texture starts at the top of the brush
-	const Vec3f anchor(bounds_min.X, bounds_max.Y, bounds_min.Z);
+	const Vec3f direction = projection.UAxis + projection.VAxis;
+	const Vec3f anchor(direction.X < 0.0f ? bounds_max.X : bounds_min.X, bounds_max.Y,
+					   direction.Z < 0.0f ? bounds_max.Z : bounds_min.Z);
 
 
 	static const BrushFaceTexture scDefaultTexture {};

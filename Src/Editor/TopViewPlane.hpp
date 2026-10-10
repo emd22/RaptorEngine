@@ -35,10 +35,9 @@ struct ViewPlaneAxes
 };
 
 inline constexpr ViewPlaneAxes scViewPlaneAxes[scViewPlaneCount] = {
-	{ 0, 2, 1, 1.0f, 1.0f, -1.0f, "T", "Base Y", "Height" },
-	{ 0, 1, 2, 1.0f, -1.0f, 1.0f, "F", "Base Z", "Depth" },
-	{ 0, 1, 2, -1.0f, 1.0f, -1.0f, "B", "Base Z", "Depth" },
-	{ 2, 1, 0, -1.0f, -1.0f, 1.0f, "L", "Base X", "Width" },
+	{ 0, 2, 1, 1.0f, 1.0f, -1.0f, "T", "Base Y", "Height" }, { 0, 1, 2, 1.0f, -1.0f, 1.0f, "F", "Base Z", "Depth" },
+	{ 0, 1, 2, -1.0f, 1.0f, -1.0f, "B", "Base Z", "Depth" }, { 2, 1, 0, -1.0f, -1.0f, 1.0f, "L", "Base X", "Width" },
+	{ 2, 1, 0, 1.0f, 1.0f, -1.0f, "R", "Base X", "Width" },
 };
 
 struct TopViewVertexHandle

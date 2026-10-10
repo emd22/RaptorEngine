@@ -953,6 +953,8 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 			TileIndex ti = gWorldGrid->TileFromTileXY(Vec2u(x, y));
 
 			BBox tile_bounds = gWorldGrid->GetTileAABB(ti);
+			tile_bounds.Min.Y = frustum_bounds.Min.Y;
+			tile_bounds.Max.Y = frustum_bounds.Max.Y;
 
 			if (!mFrustum.TileIntersectsAABB(tile_bounds)) {
 				continue;
