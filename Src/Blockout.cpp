@@ -3,10 +3,13 @@
 #include <Asset/AssetManager.hpp>
 #include <Asset/ConfigFile.hpp>
 #include <Asset/MeshGen.hpp>
+#include <BrushEntry.hpp>
 #include <CVar.hpp>
+#include <Core/FilesystemIO.hpp>
 #include <Core/RefUtil.hpp>
 #include <Editor/RaptorEditor.hpp>
 #include <Engine.hpp>
+#include <Map/CompiledMap.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Math/SIMDHelper.hpp>
@@ -459,7 +462,7 @@ void Blockout::ReloadSingleObject(Object* object)
 	}
 
 	ConfigFile info {};
-	info.Load(gWorld->BlockoutPath.CStr());
+	info.Load(CompiledMap::GetPrototypePath(gWorld->BlockoutPath).CStr());
 
 	if (info.HasErrors()) {
 		return;
@@ -517,6 +520,152 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 
 	BlockoutObjects.Clear();
 	mBrushes.Clear();
+
+	for (ObjectID object_id : mCompiledObjects) {
+		gWorld->Detach(object_id);
+		gObjectManager->DestroyObject(object_id);
+	}
+
+	for (physics::BodyID& body_id : mCompiledBodies) {
+		gPhysics->DestroyBody(body_id);
+	}
+
+	mCompiledObjects.clear();
+	mCompiledBodies.clear();
+	mCompiledProbeLayout.Clear();
+	mbHasCompiledWorld = false;
+}
+
+bool Blockout::LoadCompiledMap(const String& prototype_path, CompiledMap& out_map) const
+{
+	const String resolved_path = FilesystemIO::ResolvePath(prototype_path);
+	const String compiled_path = CompiledMap::GetPathForPrototype(resolved_path);
+
+	if (!out_map.Load(compiled_path)) {
+		LogWarning(LC_ASSET, "There is no compiled map at '{}', loading the brushes of the prototype instead",
+				   compiled_path);
+		return false;
+	}
+
+	if (out_map.SourceHash != CompiledMap::HashFile(resolved_path)) {
+		LogWarning(LC_ASSET,
+				   "The compiled map '{}' is out of date with its prototype, loading the brushes of the prototype "
+				   "instead. Run mapc on the prototype to update it.",
+				   compiled_path);
+		return false;
+	}
+
+	return true;
+}
+
+void Blockout::CreateCompiledWorld(const CompiledMap& map)
+{
+	for (size_t surface_index = 0; surface_index < map.Surfaces.Size; surface_index++) {
+		const CompiledMapSurface& surface = map.Surfaces[surface_index];
+		const CompiledMapMaterial& material = map.Materials[surface.MaterialIndex];
+
+		MaterialLibraryID library_id = MaterialLibraryID(material.LibraryIndex);
+
+		if (!material.Name.IsEmpty()) {
+			library_id = mMaterials.FindIDByName(material.Name.CStr());
+
+			if (!library_id.IsValid()) {
+				LogWarning(LC_ASSET, "The compiled map uses the unknown material '{}'", material.Name);
+				library_id = MaterialLibraryID(material.LibraryIndex);
+			}
+		}
+
+		const MaterialID material_id = library_id.IsValid() ? GetMaterialForID(library_id) : GetDefaultMaterial();
+
+		Object* object = gObjectManager->NewObject(String::Fmt("WORLD_{}", surface_index), material_id,
+												   eObjectTag::LockTransform);
+
+		if (object == nullptr) {
+			continue;
+		}
+
+		Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
+
+		mesh->Positions.InitCapacity(surface.Vertices.Size);
+		mesh->Normals.InitCapacity(surface.Vertices.Size);
+		mesh->Tangents.InitCapacity(surface.Vertices.Size);
+		mesh->TangentHandedness.InitCapacity(surface.Vertices.Size);
+		mesh->Texcoords.InitCapacity(surface.Vertices.Size);
+		mesh->Indices.InitCapacity(surface.Indices.Size);
+
+		for (const CompiledMapVertex& vertex : surface.Vertices) {
+			mesh->Positions.Insert(Vec3f(vertex.Position[0], vertex.Position[1], vertex.Position[2]));
+			mesh->Normals.Insert(Vec3f(vertex.Normal[0], vertex.Normal[1], vertex.Normal[2]));
+			mesh->Tangents.Insert(Vec3f(vertex.Tangent[0], vertex.Tangent[1], vertex.Tangent[2]));
+			mesh->TangentHandedness.Insert(vertex.Tangent[3]);
+			mesh->Texcoords.Insert(Vec2f(vertex.Texcoord[0], vertex.Texcoord[1]));
+		}
+
+		for (const uint32 index : surface.Indices) {
+			mesh->Indices.Insert(index);
+		}
+
+		object->SetShadowCaster(true);
+		object->pMesh = mesh->AsDefaultMesh();
+
+		object->Bounds.Min = Vec3f(surface.BoundsMin[0], surface.BoundsMin[1], surface.BoundsMin[2]);
+		object->Bounds.Max = Vec3f(surface.BoundsMax[0], surface.BoundsMax[1], surface.BoundsMax[2]);
+
+		gWorldGrid->UpdateObject(object);
+
+		AssetTicket ticket(static_cast<void*>(object));
+		ticket.MarkAndSignalLoaded();
+
+		pWorld->Attach(ticket);
+
+		mCompiledObjects.push_back(object->ID);
+	}
+
+	for (size_t hull_index = 0; hull_index < map.Hulls.Size; hull_index++) {
+		const CompiledMapHull& hull = map.Hulls[hull_index];
+		const uint32 point_count = hull.GetPointCount();
+
+		if (point_count < 4) {
+			continue;
+		}
+
+		Vec3f min = Vec3f(hull.Points[0], hull.Points[1], hull.Points[2]);
+		Vec3f max = min;
+
+		for (uint32 i = 1; i < point_count; i++) {
+			const Vec3f point(hull.Points[i * 3], hull.Points[i * 3 + 1], hull.Points[i * 3 + 2]);
+
+			min = Vec3f::Min(min, point);
+			max = Vec3f::Max(max, point);
+		}
+
+		const Vec3f midpoint = (min + max) * 0.5f;
+
+		SizedArray<Vec3f> hull_points;
+		hull_points.InitCapacity(point_count);
+
+		for (uint32 i = 0; i < point_count; i++) {
+			hull_points.Insert(Vec3f(hull.Points[i * 3], hull.Points[i * 3 + 1], hull.Points[i * 3 + 2]) - midpoint);
+		}
+
+		physics::Body* body = gPhysics->NewBody(String::Fmt("WORLD_HULL_{}", hull_index));
+		body->CreateConvexHullBody(hull_points, physics::eMotionType::Static,
+								   physics::BodyProps {
+									   .ConvexRadius = 0.05f,
+									   .Density = 100,
+								   });
+
+		body->SetMidpoint(midpoint);
+		body->Teleport(Vec3f::sZero, Quat::scIdentity);
+
+		mCompiledBodies.push_back(body->GetID());
+	}
+
+	mCompiledProbeLayout.CopyFrom(map.Probes);
+	mbHasCompiledWorld = true;
+
+	LogInfo("Loaded the compiled map: {} surfaces and {} colliders replace {} brushes, {} light probes placed",
+			map.Surfaces.Size, map.Hulls.Size, map.BrushNames.Size, map.Probes.GetProbeCount());
 }
 
 MaterialID Blockout::GetMaterialForID(MaterialLibraryID id) const
@@ -533,6 +682,11 @@ MaterialID Blockout::GetMaterialForID(MaterialLibraryID id) const
 MaterialLibraryID Blockout::GetIDForMaterial(const MaterialID& material) const { return mMaterials.FindID(material); }
 
 MaterialID Blockout::GetDefaultMaterial() const { return mMaterials.GetMaterial(scDefaultMaterialID); }
+
+MaterialID Blockout::GetDBoundMaterial() const
+{
+	return GetMaterialForID(mMaterials.FindIDByName(scDBoundMaterialName));
+}
 
 Brush* Blockout::GetBrush(const Object* object)
 {
@@ -593,82 +747,18 @@ void Blockout::RebuildBrush(Object* object, Brush&& brush, physics::eMotionType 
 		object->SetTrigger(true);
 	}
 
+	if (object->IsNvBrush()) {
+		object->SetNvBrush(true);
+	}
+
+	if (object->IsDBound()) {
+		object->SetDBound(true);
+	}
+
 	mBrushes.Insert(object->ID.GetID(), std::move(brush));
 }
 
-/// Values stored per plane in a blockout's `uvs` array: offset U and V, scale U and V, then rotation
-constexpr uint32 scValuesPerFaceTexture = 5;
-
-Brush Blockout::ReadBrushEntry(ConfigEntry& entry) const
-{
-	ConfigEntry* scale_entry = entry.GetMember(HashStr32("scale"));
-
-	if (scale_entry != nullptr) {
-		const PagedArray<ConfigPrimitive>& scales = scale_entry->GetArrayData();
-
-		if (scales.Size() < 6) {
-			return {};
-		}
-
-		// Left, right, top, bottom, front, back extents
-		const Vec3f min = -Vec3f(scales[0].Get<float32>(), scales[3].Get<float32>(), scales[5].Get<float32>());
-		const Vec3f max = Vec3f(scales[1].Get<float32>(), scales[2].Get<float32>(), scales[4].Get<float32>());
-
-		return Brush::FromBox(min, max);
-	}
-
-	ConfigEntry* planes_entry = entry.GetMember(HashStr32("planes"));
-
-	if (planes_entry == nullptr) {
-		return {};
-	}
-
-	const PagedArray<ConfigPrimitive>& values = planes_entry->GetArrayData();
-
-	// Four values per plane: the outward normal, then the distance from the origin
-	const uint32 plane_count = static_cast<uint32>(values.Size() / 4);
-
-	if (plane_count > Brush::scMaxPlanes) {
-		LogError("Blockout '{}' has {} planes, the maximum is {}", entry.Name.Get(), plane_count, Brush::scMaxPlanes);
-		return {};
-	}
-
-	Brush::PlaneList planes;
-
-	for (uint32 i = 0; i < plane_count; i++) {
-		planes.Insert(BrushPlane {
-			.Normal = Vec3f(values[i * 4].Get<float32>(), values[i * 4 + 1].Get<float32>(),
-							values[i * 4 + 2].Get<float32>()),
-			.Distance = values[i * 4 + 3].Get<float32>(),
-		});
-	}
-
-	ConfigEntry* uvs_entry = entry.GetMember(HashStr32("uvs"));
-
-	if (uvs_entry == nullptr) {
-		// Without a layout of their own, the faces get the default one, which depends on the finished brush
-		Brush brush = Brush::FromPlanes(planes);
-
-		for (uint32 i = 0; i < brush.Planes.Size; i++) {
-			brush.ResetFaceTexture(i);
-		}
-
-		return brush;
-	}
-
-	const PagedArray<ConfigPrimitive>& uvs = uvs_entry->GetArrayData();
-
-	for (uint32 i = 0; i < plane_count && (i + 1) * scValuesPerFaceTexture <= uvs.Size(); i++) {
-		const uint32 base = i * scValuesPerFaceTexture;
-		BrushFaceTexture& texture = planes[i].Texture;
-
-		texture.Offset = Vec2f(uvs[base].Get<float32>(), uvs[base + 1].Get<float32>());
-		texture.Scale = Vec2f(uvs[base + 2].Get<float32>(), uvs[base + 3].Get<float32>());
-		texture.Rotation = uvs[base + 4].Get<float32>();
-	}
-
-	return Brush::FromPlanes(planes);
-}
+Brush Blockout::ReadBrushEntry(ConfigEntry& entry) const { return fx::ReadBrushEntry(entry); }
 
 void Blockout::WriteBrushEntry(ConfigEntry& entry, const Object* object)
 {
@@ -774,7 +864,14 @@ ObjectID Blockout::CreateBrush(ConfigEntry& entry)
 
 	ConfigEntry* mat_entry = entry.GetMember(HashStr32("mat"));
 
-	if (mat_entry != nullptr && mat_entry->Type == ConfigEntry::ePrimitiveType::String) {
+	const eBrushKind brush_kind = ReadBrushKind(entry);
+
+	if (brush_kind == eBrushKind::DBound) {
+		material_id = GetDBoundMaterial();
+	}
+
+	if (brush_kind == eBrushKind::Geometry && mat_entry != nullptr &&
+		mat_entry->Type == ConfigEntry::ePrimitiveType::String) {
 		MaterialLibraryID mat_id = MaterialLibraryID::scNull;
 
 		const char* mat_name = mat_entry->Get<const char*>();
@@ -820,9 +917,6 @@ ObjectID Blockout::CreateBrush(ConfigEntry& entry)
 		object->SetReflectionProbe(true);
 	}
 
-	if (entry.GetMemberValue(HashStr32("bleeds"), 0) == 1) {
-		object->SetTag(eObjectTag::Bleeds);
-	}
 
 	if (entry.GetMemberValue(HashStr32("spawn"), 0) == 1) {
 		object->SetTag(eObjectTag::Spawn);
@@ -830,6 +924,13 @@ ObjectID Blockout::CreateBrush(ConfigEntry& entry)
 
 	if (entry.GetMemberValue(HashStr32("trigger"), 0) == 1) {
 		object->SetTag(eObjectTag::Trigger);
+	}
+
+	if (brush_kind == eBrushKind::NvBrush) {
+		object->SetTag(eObjectTag::NvBrush);
+	}
+	else if (brush_kind == eBrushKind::DBound) {
+		object->SetTag(eObjectTag::DBound);
 	}
 
 	ReadScriptEntry(object, entry);
@@ -967,9 +1068,6 @@ Object* Blockout::DupeObject(Object* object)
 		dupe->SetReflectionProbe(true);
 	}
 
-	if (object->Bleeds()) {
-		dupe->SetTag(eObjectTag::Bleeds);
-	}
 
 	if (object->IsSpawn()) {
 		dupe->SetTag(eObjectTag::Spawn);
@@ -977,6 +1075,14 @@ Object* Blockout::DupeObject(Object* object)
 
 	if (object->IsTrigger()) {
 		dupe->SetTag(eObjectTag::Trigger);
+	}
+
+	if (object->IsNvBrush()) {
+		dupe->SetNvBrush(true);
+	}
+
+	if (object->IsDBound()) {
+		dupe->SetDBound(true);
 	}
 
 	gObjectScripts->Attach(dupe, gObjectScripts->GetPath(object->ID));
@@ -1449,7 +1555,6 @@ void Blockout::ApplyModelProperties(Object& object, Model& model, const ConfigEn
 	};
 
 	apply_tag("lock", eObjectTag::LockTransform);
-	apply_tag("bleeds", eObjectTag::Bleeds);
 	apply_tag("spawn", eObjectTag::Spawn);
 
 	ReadScriptEntry(&object, entry);
@@ -1589,10 +1694,6 @@ void Blockout::SaveModels(ConfigFile& info)
 			model_entry.AddMember(ConfigEntry::Literal("lock", 1));
 		}
 
-		if (object->Bleeds()) {
-			model_entry.AddMember(ConfigEntry::Literal("bleeds", 1));
-		}
-
 		if (object->IsSpawn()) {
 			model_entry.AddMember(ConfigEntry::Literal("spawn", 1));
 		}
@@ -1647,8 +1748,11 @@ void Blockout::ResetToTemplate()
 	gWorld->Player.TeleportTo(Vec3f(0.0, 2.0, 0.0));
 }
 
-bool Blockout::Load(const String& path)
+bool Blockout::Load(const String& opened_path)
 {
+	const bool wants_compiled_map = CompiledMap::IsCompiledMapPath(opened_path);
+	const String path = CompiledMap::GetPrototypePath(opened_path);
+
 	ConfigFile info {};
 	info.Load(path.CStr());
 
@@ -1675,8 +1779,19 @@ bool Blockout::Load(const String& path)
 	// Remove the current blockout from the world
 	RemoveBlockoutFromWorld(pWorld);
 
+	CompiledMap compiled_map;
+	const bool has_compiled_map = wants_compiled_map && LoadCompiledMap(path, compiled_map);
+
 	for (ConfigEntry& entry : blocks_entry->Members) {
+		if (has_compiled_map && compiled_map.HasBrush(entry.Name.Get())) {
+			continue;
+		}
+
 		CreateBrush(entry);
+	}
+
+	if (has_compiled_map) {
+		CreateCompiledWorld(compiled_map);
 	}
 
 	const ConfigEntry* models_entry = info.GetEntry(HashStr32("objects"));
@@ -1717,8 +1832,16 @@ static void StoreLastBlockoutPath(const String& path, const char* config_path)
 	config.Write(config_path);
 }
 
-void Blockout::Save(const String& path)
+void Blockout::Save(const String& save_path)
 {
+	if (mbHasCompiledWorld) {
+		LogError(LC_ASSET, "The prototype can't be saved while its compiled map is loaded, the compiled brushes "
+						   "would be lost. Open the prototype (.prx) to edit and save it.");
+		return;
+	}
+
+	const String path = CompiledMap::GetPrototypePath(save_path);
+
 	ConfigFile info {};
 
 	SaveLights(info);
@@ -1754,9 +1877,6 @@ void Blockout::Save(const String& path)
 				blockout_entry.AddMember(ConfigEntry::Literal("reflectionprobe", 1));
 			}
 
-			if (object->Bleeds()) {
-				blockout_entry.AddMember(ConfigEntry::Literal("bleeds", 1));
-			}
 
 			if (object->IsSpawn()) {
 				blockout_entry.AddMember(ConfigEntry::Literal("spawn", 1));
@@ -1765,6 +1885,14 @@ void Blockout::Save(const String& path)
 			if (object->IsTrigger()) {
 				blockout_entry.AddMember(ConfigEntry::Literal("trigger", 1));
 				WriteTriggerEntry(blockout_entry, object);
+			}
+
+			if (object->IsNvBrush()) {
+				blockout_entry.AddMember(ConfigEntry::Literal(scNvBrushName, 1));
+			}
+
+			if (object->IsDBound()) {
+				blockout_entry.AddMember(ConfigEntry::Literal(scDBoundName, 1));
 			}
 
 			WriteScriptEntry(blockout_entry, object);

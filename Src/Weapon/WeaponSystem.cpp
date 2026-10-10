@@ -543,14 +543,9 @@ void WeaponSystem::ApplyHit(float32 damage, float32 force, bool decal)
 
 	physics::Body* hit_body = gPhysics->FindBody(mLastHit.Body);
 	const Object* hit_object = (hit_body != nullptr) ? gObjectManager->GetObject(hit_body->GetObjectID()) : nullptr;
-	const bool bleeds = (hit_npc != nullptr) || ((hit_object != nullptr) && hit_object->Bleeds());
+	const bool bleeds = (hit_npc != nullptr);
 
-	if (bleeds) {
-		if (decal) {
-			SpawnBloodSplatter(is_static);
-		}
-	}
-	else if (is_static) {
+	if (is_static) {
 		if (decal) {
 			gDecalManager->AddBulletHole(mLastHit.Point, mLastHit.Normal);
 		}

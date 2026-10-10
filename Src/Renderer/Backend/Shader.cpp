@@ -13,6 +13,7 @@
 #include <Math/MathUtil.hpp>
 #include <Renderer/Backend/Descriptors.hpp>
 #include <Renderer/Backend/DsLayoutBuilder.hpp>
+#include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 

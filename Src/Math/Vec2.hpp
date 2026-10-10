@@ -92,9 +92,15 @@ public:
 	FX_FORCE_INLINE Type LengthSquared() const { return Dot(*this); }
 
 	FX_FORCE_INLINE Type Length() const
-		requires std::floating_point<Type>
+		requires std::is_same_v<Type, float>
 	{
 		return std::hypotf(X, Y);
+	}
+
+	FX_FORCE_INLINE Type Length() const
+		requires std::is_same_v<Type, double>
+	{
+		return std::hypot(X, Y);
 	}
 
 	FX_FORCE_INLINE Vec2Base Perpendicular() const { return Vec2Base(-Y, X); }

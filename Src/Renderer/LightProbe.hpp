@@ -7,6 +7,7 @@
 #include <Renderer/Backend/GpuBuffer.hpp>
 #include <Renderer/Camera.hpp>
 #include <Renderer/Limits.hpp>
+#include <Renderer/ProbePlacement.hpp>
 #include <Renderer/RenderStage.hpp>
 #include <functional>
 #include <vector>
@@ -23,48 +24,6 @@ struct ProbeSHData
 
 static_assert(sizeof(ProbeSHData) == Limits::ProbeSHCoeffCount * 4 * sizeof(float32),
 			  "ProbeSHData must be tightly packed as 9 float4s to mirror the HLSL struct");
-
-struct ProbeVolumeData
-{
-	/// World space min corner in XYZ. W holds the number of volumes in the buffer.
-	float32 MinAndCount[4];
-
-	float32 InvCellSize[4];
-
-	/// Grid dimensions in XYZ, and in W the index of this volume's first point in the probe grid table
-	uint32 DimsAndFirst[4];
-
-	float32 MaxAndCellVolume[4];
-};
-
-static_assert(sizeof(ProbeVolumeData) == 64, "ProbeVolumeData must mirror the HLSL ProbeVolume struct");
-
-/// Probe grid resolution of one volume, in probes along each axis
-struct ProbeGridSize
-{
-	uint32 X = Limits::ProbeGridDims[0];
-	uint32 Y = Limits::ProbeGridDims[1];
-	uint32 Z = Limits::ProbeGridDims[2];
-
-	uint32 GetProbeCount() const { return X * Y * Z; }
-
-	bool IsValid() const
-	{
-		return X >= Limits::MinProbeGridDim && Y >= Limits::MinProbeGridDim && Z >= Limits::MinProbeGridDim;
-	}
-};
-
-enum class eProbeFill
-{
-	Dense,
-	Surface,
-};
-
-struct ProbeVolumeRange
-{
-	uint32 FirstProbe = 0;
-	uint32 ProbeCount = 0;
-};
 
 /// Where a probe ended up after placement, and its depth moments for visibility. Mirrors ProbeInfo in
 /// Shaders/ProbeCommon.hlsli.
@@ -87,8 +46,6 @@ struct ReflectionProbeData
 };
 
 static_assert(sizeof(ReflectionProbeData) == 96, "ReflectionProbeData must mirror the HLSL ReflectionProbe struct");
-
-struct ProbePlacementBoxes;
 
 /**
  * @brief Grids of L2 SH irradiance probes, with depth moments so that probes behind walls don't light a surface.
@@ -203,14 +160,12 @@ private:
 	};
 
 
-	bool AddVolumeAndPlaceProbes(const Vec3f volume_min, const Vec3f volume_size, const ProbeGridSize& grid,
-								 const ProbePlacementBoxes& boxes, eProbeFill fill);
-	bool AddLevelBaseVolume(const ProbePlacementBoxes& boxes);
-	bool AddLevelSurfaceVolume(const ProbePlacementBoxes& boxes);
-	bool AddSurfaceVolumeForBudget(const Vec3f region_min, const Vec3f region_max, float32 spacing,
-								   const ProbePlacementBoxes& boxes, bool cell_centred);
-	bool PlaceVolumeProbes(uint32 volume_index, const Vec3f volume_min, const Vec3f volume_size,
-						   const ProbeGridSize& grid, const ProbePlacementBoxes& boxes, eProbeFill fill);
+	/**
+	 * @brief Copies the layout into the probe buffers and uploads it. Probes from `first_probe` on are new, so their
+	 * depth moments are reset.
+	 */
+	void SyncLayout(uint32 first_probe);
+	void CaptureLayout();
 	void RefreshVolumeCounts();
 
 	void CreateCaptureResources();
@@ -247,6 +202,9 @@ private:
 	ProbeVolumeData mVolumes[Limits::MaxProbeVolumes] {};
 	ProbeVolumeRange mVolumeRanges[Limits::MaxProbeVolumes] {};
 	uint32 mVolumeCount = 0;
+
+	/// Where every probe is. The arrays around it are the copy the GPU and the probe file get.
+	ProbeLayout mLayout;
 
 	/// Probes taken by `mVolumes`, which is where the next volume's range starts
 	uint32 mProbeCount = 0;

@@ -98,6 +98,13 @@ public:
 protected:
 	void RecalculateModelMatrix();
 
+	void SetPreTransform(const Mat4f& transform)
+	{
+		mPreTransform = transform;
+		mbHasPreTransform = true;
+		MarkMatrixOutOfDate();
+	}
+
 	/**
 	 * @brief Submit the matrix to the object gpu buffer if there have been changes, or if it has not been synched with
 	 * the current frame yet.
@@ -120,8 +127,10 @@ public:
 protected:
 	bool mbPhysicsTransformOutOfDate : 1 = true;
 	bool mbMatrixOutOfDate : 1 = true;
+	bool mbHasPreTransform : 1 = false;
 
 	Mat4f mWorldMatrix = Mat4f::scIdentity;
+	Mat4f mPreTransform = Mat4f::scIdentity;
 
 
 	uint8 mMatrixSubmittedFrames = 0;

@@ -338,18 +338,11 @@ void EditorViewport::SetRelativeMouseMode(bool enabled)
 
 void EditorViewport::PollRelativeMouse()
 {
+#ifndef FX_PLATFORM_MACOS
 	if (!mbRelativeMouse) {
 		return;
 	}
 
-#ifdef FX_PLATFORM_MACOS
-	const Vec2f delta = platform::ConsumeRelativeMouseDelta();
-
-	if (delta != Vec2f::sZero) {
-		ControlManager::PostMouseMotion(delta);
-	}
-
-#else
 	// Measure how far the cursor moved from the centre, then put it back
 	const wxPoint center = GetCenter();
 	const wxPoint delta = ScreenToClient(wxGetMousePosition()) - center;

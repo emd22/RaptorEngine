@@ -5,7 +5,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Core/Assert.hpp>
+#include <Renderer/Backend/Util.hpp>
 
 FX_SET_MODULE_NAME("Device")
 

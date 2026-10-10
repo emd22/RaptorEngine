@@ -16,118 +16,121 @@ namespace fx::renderer {
 class QueueFamilies
 {
 public:
-    static const uint32 scNullQueue = UINT32_MAX;
+	static const uint32 scNullQueue = UINT32_MAX;
 
-    void FindQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface);
+	void FindQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface);
 
-    /// Checks if the main graphics and presentation queues have been queried
-    bool IsComplete()
-    {
-        return (mGraphicsIndex != scNullQueue && mPresentIndex != scNullQueue && mTransferIndex != scNullQueue);
-    }
+	/// Checks if the main graphics and presentation queues have been queried
+	bool IsComplete()
+	{
+		return (mGraphicsIndex != scNullQueue && mPresentIndex != scNullQueue && mTransferIndex != scNullQueue);
+	}
 
-    /// Retrieves the available queue indices
-    std::vector<uint32> GetQueueIndexList() const
-    {
-        return std::vector<uint32>({
-            mGraphicsIndex,
-            mPresentIndex,
+	/// Retrieves the available queue indices
+	std::vector<uint32> GetQueueIndexList() const
+	{
+		return std::vector<uint32>({
+			mGraphicsIndex,
+			mPresentIndex,
 
-            mTransferIndex,
-        });
-    }
+			mTransferIndex,
+		});
+	}
 
-    FX_FORCE_INLINE bool HasIndependentTransfer() const { return mTransferIndex != mGraphicsIndex; }
+	FX_FORCE_INLINE bool HasIndependentTransfer() const { return mTransferIndex != mGraphicsIndex; }
 
-    uint32 GetGraphicsFamily() const { return mGraphicsIndex; }
-    uint32 GetPresentFamily() const { return mPresentIndex; }
-    uint32 GetTransferFamily() const { return mTransferIndex; }
+	uint32 GetGraphicsFamily() const { return mGraphicsIndex; }
+	uint32 GetPresentFamily() const { return mPresentIndex; }
+	uint32 GetTransferFamily() const { return mTransferIndex; }
 
 private:
-    void FindGraphicsFamily(VkPhysicalDevice device, VkSurfaceKHR surface);
-    void FindTransferFamily(VkPhysicalDevice device, VkSurfaceKHR surface);
+	void FindGraphicsFamily(VkPhysicalDevice device, VkSurfaceKHR surface);
+	void FindTransferFamily(VkPhysicalDevice device, VkSurfaceKHR surface);
 
-    bool FamilyHasPresentSupport(VkPhysicalDevice device, VkSurfaceKHR surface, uint32 family_index);
+	bool FamilyHasPresentSupport(VkPhysicalDevice device, VkSurfaceKHR surface, uint32 family_index);
 
 public:
-    SizedArray<VkQueueFamilyProperties> RawFamilies;
+	SizedArray<VkQueueFamilyProperties> RawFamilies;
 
 private:
-    uint32 mGraphicsIndex = scNullQueue;
-    uint32 mPresentIndex = scNullQueue;
-    uint32 mTransferIndex = scNullQueue;
+	uint32 mGraphicsIndex = scNullQueue;
+	uint32 mPresentIndex = scNullQueue;
+	uint32 mTransferIndex = scNullQueue;
 };
 
 class GpuDevice
 {
 public:
-    GpuDevice() = default;
-    GpuDevice(VkInstance instance, VkSurfaceKHR surface) { Create(instance, surface); }
+	GpuDevice() = default;
+	GpuDevice(VkInstance instance, VkSurfaceKHR surface) { Create(instance, surface); }
 
-    void Create(VkInstance instance, VkSurfaceKHR surface);
-    void Destroy();
+	void Create(VkInstance instance, VkSurfaceKHR surface);
+	void Destroy();
 
-    void PickPhysicalDevice();
-    void CreateLogicalDevice();
+	void PickPhysicalDevice();
+	void CreateLogicalDevice();
 
-    void WaitForIdle();
+	void WaitForIdle();
 
-    VkSurfaceFormatKHR GetSurfaceFormat();
+	VkSurfaceFormatKHR GetSurfaceFormat();
 
-    SpinLockContext<VkQueue> GetLockableQueue(VkQueue& queue) { return SpinLockContext<VkQueue>(mTransferMutex, queue); }
+	SpinLockContext<VkQueue> GetLockableQueue(VkQueue& queue)
+	{
+		return SpinLockContext<VkQueue>(mTransferMutex, queue);
+	}
 
-    FX_FORCE_INLINE SpinLockContext<VkQueue> GetGraphicsQueue()
-    {
+	FX_FORCE_INLINE SpinLockContext<VkQueue> GetGraphicsQueue()
+	{
 #ifdef FX_DEBUG_DEVICE_ASSERT_INITIALIZED
-        DebugAssert(Device != nullptr);
+		DebugAssert(Device != nullptr);
 #endif
-        return GetLockableQueue(mGraphicsQueue);
-    }
+		return GetLockableQueue(mGraphicsQueue);
+	}
 
-    FX_FORCE_INLINE SpinLockContext<VkQueue> GetTransferQueue()
-    {
+	FX_FORCE_INLINE SpinLockContext<VkQueue> GetTransferQueue()
+	{
 #ifdef FX_DEBUG_DEVICE_ASSERT_INITIALIZED
-        DebugAssert(Device != nullptr);
+		DebugAssert(Device != nullptr);
 #endif
-        return GetLockableQueue(mTransferQueue);
-    }
+		return GetLockableQueue(mTransferQueue);
+	}
 
-    FX_FORCE_INLINE SpinLockContext<VkQueue> GetPresentQueue()
-    {
+	FX_FORCE_INLINE SpinLockContext<VkQueue> GetPresentQueue()
+	{
 #ifdef FX_DEBUG_DEVICE_ASSERT_INITIALIZED
-        DebugAssert(Device != nullptr);
+		DebugAssert(Device != nullptr);
 #endif
-        return GetLockableQueue(mPresentQueue);
-    }
+		return GetLockableQueue(mPresentQueue);
+	}
 
-    operator VkDevice() const { return Device; }
-    operator VkPhysicalDevice() const { return Physical; }
+	operator VkDevice() const { return Device; }
+	operator VkPhysicalDevice() const { return Physical; }
 
-    ~GpuDevice();
+	~GpuDevice();
 
 private:
-    bool IsPhysicalDeviceSuitable(VkPhysicalDevice& device);
-    void QueryQueues();
-    bool SupportsPortabilityExtension() const;
+	bool IsPhysicalDeviceSuitable(VkPhysicalDevice& device);
+	void QueryQueues();
+	bool SupportsPortabilityExtension() const;
 
 public:
-    VkPhysicalDevice Physical = nullptr;
-    VkDevice Device = nullptr;
+	VkPhysicalDevice Physical = nullptr;
+	VkDevice Device = nullptr;
 
-    QueueFamilies mQueueFamilies;
+	QueueFamilies mQueueFamilies;
 
-    float32 MaxSamplerAnisotropy = 1.0f;
-    bool bSupportsCubeArrays = false;
+	float32 MaxSamplerAnisotropy = 1.0f;
+	bool bSupportsCubeArrays = false;
 
 private:
-    VkInstance mInstance;
-    VkSurfaceKHR mSurface;
+	VkInstance mInstance;
+	VkSurfaceKHR mSurface;
 
-    VkQueue mGraphicsQueue = nullptr;
-    VkQueue mTransferQueue = nullptr;
-    VkQueue mPresentQueue = nullptr;
+	VkQueue mGraphicsQueue = nullptr;
+	VkQueue mTransferQueue = nullptr;
+	VkQueue mPresentQueue = nullptr;
 
-    std::atomic_flag mTransferMutex;
+	std::atomic_flag mTransferMutex;
 };
 
 } // namespace fx::renderer

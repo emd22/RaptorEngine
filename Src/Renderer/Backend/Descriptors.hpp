@@ -12,7 +12,6 @@
 #include <Core/SizedArray.hpp>
 #include <Renderer/Constants.hpp>
 
-#include "vulkan/vulkan_core.h"
 
 namespace fx {
 

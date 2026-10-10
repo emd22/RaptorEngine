@@ -185,7 +185,7 @@ if(FX_EDITOR)
         enable_language(OBJCXX)
         target_sources(raptor PRIVATE "Src/Editor/EditorPlatformMac.mm")
         set_source_files_properties("Src/Editor/EditorPlatformMac.mm" PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
-        target_link_libraries(raptor PRIVATE "-framework Cocoa" "-framework QuartzCore")
+        target_link_libraries(raptor PRIVATE "-framework Cocoa" "-framework QuartzCore" "-framework GameController")
     endif()
 endif()
 
@@ -211,3 +211,95 @@ target_include_directories(raptor SYSTEM PRIVATE "Submodules/mimalloc/include")
 
 
 target_link_libraries(raptor PRIVATE turbojpeg SDL3 freetype ktx)
+
+
+# Map compiler (Tools/MapCompiler): turns the brushes of a prototype file into batched world geometry.
+# mapc_core holds the compiler, mapc is the command line tool and mapc-gui (Tools/MapCompilerGui) the wxWidgets frontend
+file(GLOB MAPC_SOURCES "Tools/MapCompiler/*.cpp" "Tools/MapCompiler/*.hpp")
+list(FILTER MAPC_SOURCES EXCLUDE REGEX "/Tools/MapCompiler/Main\\.cpp$")
+
+add_library(mapc_core STATIC
+    ${MAPC_SOURCES}
+    "Src/Map/CompiledMap.cpp"
+    "Src/Renderer/ProbePlacement.cpp"
+    "Src/Math/BBox.cpp"
+    "Src/BrushEntry.cpp"
+    "Src/Brush.cpp"
+    "Src/Asset/ConfigFile.cpp"
+    "Src/Core/Allocator.cpp"
+    "Src/Core/File.cpp"
+    "Src/Core/FilesystemIO.cpp"
+    "Src/Core/Log.cpp"
+    "Src/Core/Path.cpp"
+    "Src/Core/String.cpp"
+    "Src/Util/Tokenizer.cpp"
+    "Src/Math/MathUtil.cpp"
+    "Src/Math/NeonUtil.cpp"
+    "Src/Math/SSEUtil.cpp"
+    "Src/Math/Impl/Matrix/Mat4_Neon.cpp"
+    "Src/Math/Impl/Matrix/Mat4_AVX.cpp"
+    "Src/Math/Impl/Quaternion/Quat_Neon.cpp"
+    "Src/Math/Impl/Quaternion/Quat_AVX.cpp"
+    "Src/Math/Impl/Vector/Vec3_Neon.cpp"
+    "Src/Math/Impl/Vector/Vec3_AVX.cpp"
+    "Src/Math/Impl/Vector/Vec4_Neon.cpp"
+    "Src/Math/Impl/Vector/Vec4_AVX.cpp"
+)
+
+target_include_directories(mapc_core PUBLIC "Src" "Tools/MapCompiler")
+target_include_directories(mapc_core SYSTEM PUBLIC "Src/ThirdParty" "Lib/Include" "Submodules/mimalloc/include")
+target_link_libraries(mapc_core PUBLIC mimalloc-static)
+
+target_compile_definitions(mapc_core PUBLIC
+    FX_BASE_DIR="${FX_BASE_DIR}"
+    $<$<CONFIG:Debug>:DEBUG>
+    $<$<CONFIG:Release>:NDEBUG>
+    $<$<CONFIG:RelWithDebInfo>:NDEBUG>
+)
+
+if(USE_SIMDE)
+    target_compile_definitions(mapc_core PUBLIC FX_USE_SIMDE SIMDE_ENABLE_NATIVE_ALIASES)
+endif()
+
+if(MSVC)
+    target_compile_options(mapc_core PUBLIC /Oi /MP /arch:AVX2 $<$<CONFIG:Release>:/O2> $<$<CONFIG:RelWithDebInfo>:/Ob2>)
+    target_compile_definitions(mapc_core PUBLIC _USE_MATH_DEFINES)
+else()
+    target_compile_options(mapc_core PUBLIC
+        -Wshadow
+        --system-header-prefix=ThirdParty/
+        $<$<CONFIG:Release>:-O3>
+        $<$<CONFIG:RelWithDebInfo>:-O2 -g>
+    )
+endif()
+
+add_executable(mapc "Tools/MapCompiler/Main.cpp")
+target_link_libraries(mapc PRIVATE mapc_core)
+
+# The frontend is only built when wxWidgets is around, the command line tool never needs it
+if(NOT FX_EDITOR)
+    find_package(wxWidgets 3.3.3 CONFIG QUIET COMPONENTS core base)
+    if(NOT (wxWidgets_FOUND AND TARGET wx::core))
+        find_package(wxWidgets 3.3.3 QUIET COMPONENTS core base)
+    endif()
+endif()
+
+if(wxWidgets_FOUND)
+    file(GLOB MAPC_GUI_SOURCES "Tools/MapCompilerGui/*.cpp" "Tools/MapCompilerGui/*.hpp")
+
+    add_executable(mapc_gui WIN32 ${MAPC_GUI_SOURCES})
+    set_target_properties(mapc_gui PROPERTIES OUTPUT_NAME "mapc-gui")
+    target_link_libraries(mapc_gui PRIVATE mapc_core)
+
+    if(TARGET wx::core)
+        target_link_libraries(mapc_gui PRIVATE wx::core wx::base)
+    else()
+        target_link_libraries(mapc_gui PRIVATE wxWidgets::wxWidgets)
+    endif()
+
+    if(WIN32)
+        target_sources(mapc_gui PRIVATE "Src/Editor/raptor.rc")
+    endif()
+else()
+    message(STATUS "wxWidgets not found, mapc-gui will not be built")
+endif()

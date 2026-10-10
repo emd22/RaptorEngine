@@ -130,6 +130,8 @@ struct ObjectSnapshot
 	bool bIsReflectionProbe = false;
 	bool bIsSpawn = false;
 	bool bIsTrigger = false;
+	bool bIsNvBrush = false;
+	bool bIsDBound = false;
 	bool bIsDynamic = false;
 	String ScriptPath;
 	Vec3f EnterDirection = Vec3f::sZero;

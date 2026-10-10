@@ -521,6 +521,11 @@ PERMELSE();
     float3 N_final = normalize(input.vNormalWS);
 PERMEND();
 
+PERMIF(PROBE_CAPTURE);
+	albedo = select(HAS_FLAG(FSConst.Flags, DRAW_FLAG_REFLECTION_CAPTURE), albedo,
+					min(albedo, PROBE_CAPTURE_MAX_ALBEDO));
+PERMEND();
+
 	SurfaceParams surface = GetSurfaceParams(material, albedo, surface_sample);
 
 	uint2 tile_xy = uint2(input.vPosition.xy / LIGHT_TILE_SIZE);
@@ -654,24 +659,34 @@ PERMEND();
 		const uint probe_volume_count = GetProbeVolumeCount(bProbeVolume);
 
 		if (probe_volume_count > 0) {
-			uint volume_index = SelectProbeVolume(input.vPositionWS, bProbeVolume, probe_volume_count);
+			const uint volume_index = SelectProbeVolume(input.vPositionWS, bProbeVolume, probe_volume_count);
 
 			// An L2 SH probe is blurry (duh) and a rough surface's lobe is centred nearer the normal than the reflection.
 			// Sampling along R regardless is wrong for most instances where roughness sits at or near 1
 			const float3 R = GetSpecularDominantDir(N, reflect(-V, N), specular_alpha);
 
 			float3 probe_radiance;
+			float probe_coverage;
 
-			for (uint attempt = 0; attempt < 2; attempt++) {
-				const bool sampled = SampleProbeVolumeIrradiance(
-					input.vPositionWS, N, R, bProbeVolume[volume_index], bProbeBuffer, bProbeGrid,
-					F_TextureName(tProbeMoments), tProbeMoments, probe_irradiance, probe_radiance, probe_visibility);
+			SampleProbeVolumeIrradiance(input.vPositionWS, N, R, bProbeVolume[volume_index], bProbeBuffer, bProbeGrid,
+										F_TextureName(tProbeMoments), tProbeMoments, probe_irradiance, probe_radiance,
+										probe_visibility, probe_coverage);
 
-				if (sampled || volume_index == 0) {
-					break;
-				}
+			if (volume_index != 0 && probe_coverage < 0.999) {
+				float3 base_irradiance;
+				float3 base_radiance;
+				float base_visibility;
+				float base_coverage;
 
-				volume_index = 0;
+				const bool base_sampled = SampleProbeVolumeIrradiance(
+					input.vPositionWS, N, R, bProbeVolume[0], bProbeBuffer, bProbeGrid, F_TextureName(tProbeMoments),
+					tProbeMoments, base_irradiance, base_radiance, base_visibility, base_coverage);
+
+				const float base_blend = select(base_sampled, 1.0 - probe_coverage, 0.0);
+
+				probe_irradiance = lerp(probe_irradiance, base_irradiance, base_blend);
+				probe_radiance = lerp(probe_radiance, base_radiance, base_blend);
+				probe_visibility = lerp(probe_visibility, base_visibility, base_blend);
 			}
 
 PERMNOT(PROBE_CAPTURE);
@@ -698,12 +713,7 @@ PERMEND();
 	}
 
 PERMIF(PROBE_CAPTURE);
-	const float3 capture_ambient = albedo * (PROBE_CAPTURE_AMBIENT_ILLUMINANCE * FX_MATH_1_OVER_PI);
-	const float3 bounce_ambient =
-		select(HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_BOUNCE), capture_ambient + ambient, capture_ambient);
-	const float3 lp_ambient = select(HAS_FLAG(FSConst.Flags, DRAW_FLAG_REFLECTION_CAPTURE), ambient, bounce_ambient);
-
-	output.vAlbedo = float4(((accumulated_light + lp_ambient) * FSConst.fPreExposure) + emissive, 1.0f);
+	output.vAlbedo = float4(((accumulated_light + ambient) * FSConst.fPreExposure) + emissive, 1.0f);
 PERMELSE();
 	output.vAlbedo = float4(((accumulated_light + ambient) * FSConst.fPreExposure) + emissive, base_alpha);
 PERMEND();

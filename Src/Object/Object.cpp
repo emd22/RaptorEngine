@@ -138,8 +138,41 @@ void Object::OnAttached(World* scene)
 }
 
 
+void Object::AttachToBone(const Ref<Skeleton>& skeleton, BoneId bone, const Mat4f& offset)
+{
+	pAttachSkeleton = skeleton;
+	AttachBone = bone;
+	AttachOffset = offset;
+	mbAttachPosed = false;
+}
+
+void Object::UpdateBoneAttachment()
+{
+	Skeleton& skel = *pAttachSkeleton;
+
+	if (AttachBone >= skel.JointCount) {
+		return;
+	}
+
+	skel.AdvancePose(gGraphics->DeltaTime);
+
+	if (mbAttachPosed && skel.PoseHash == mLastAttachPoseHash) {
+		return;
+	}
+
+	mbAttachPosed = true;
+	mLastAttachPoseHash = skel.PoseHash;
+
+	SetPreTransform(AttachOffset * skel.WorldTransforms[AttachBone]);
+	gWorldGrid->MarkObjectDirty(this);
+}
+
 void Object::UpdateAnimation()
 {
+	if (pAttachSkeleton) {
+		UpdateBoneAttachment();
+	}
+
 	if (!pSkeleton) {
 		BoneBufferBase = Skeleton::scNoBones;
 		return;
@@ -196,18 +229,27 @@ Object* Object::CloneNode(const String& name, SkeletonCloneMap& skeletons) const
 
 	clone->MarkTransformOutOfDate();
 
-	if (pSkeleton.IsValid()) {
-		const Skeleton* key = &(*pSkeleton);
+	const auto clone_skeleton = [&skeletons](const Ref<Skeleton>& source) -> Ref<Skeleton>
+	{
+		const Skeleton* key = &(*source);
 
 		auto found = std::find_if(skeletons.Entries.begin(), skeletons.Entries.end(),
 								  [key](const auto& entry) { return entry.first == key; });
 
 		if (found == skeletons.Entries.end()) {
-			skeletons.Entries.emplace_back(key, Skeleton::CreateInstance(pSkeleton));
+			skeletons.Entries.emplace_back(key, Skeleton::CreateInstance(source));
 			found = skeletons.Entries.end() - 1;
 		}
 
-		clone->pSkeleton = found->second;
+		return found->second;
+	};
+
+	if (pSkeleton.IsValid()) {
+		clone->pSkeleton = clone_skeleton(pSkeleton);
+	}
+
+	if (pAttachSkeleton.IsValid()) {
+		clone->AttachToBone(clone_skeleton(pAttachSkeleton), AttachBone, AttachOffset);
 	}
 
 	if (!AttachedNodes.IsEmpty()) {
@@ -530,6 +572,30 @@ void Object::SetTrigger(bool value)
 	ApplyVolumeState();
 }
 
+void Object::SetNvBrush(bool value)
+{
+	if (value) {
+		SetTag(eObjectTag::NvBrush);
+	}
+	else {
+		ClearTag(eObjectTag::NvBrush);
+	}
+
+	ApplyVolumeState();
+}
+
+void Object::SetDBound(bool value)
+{
+	if (value) {
+		SetTag(eObjectTag::DBound);
+	}
+	else {
+		ClearTag(eObjectTag::DBound);
+	}
+
+	ApplyVolumeState();
+}
+
 void Object::ApplyVolumeState()
 {
 	const bool is_volume = IsVolume();
@@ -542,7 +608,8 @@ void Object::ApplyVolumeState()
 	physics::Body* body = gPhysics->GetBody(PhysicsID);
 
 	if (body != nullptr && body->mbHasPhysicsBody) {
-		if (is_volume) {
+		// An invisible collider is the one marker that still has to be solid
+		if (is_volume && !IsNvBrush()) {
 			body->RemoveFromWorld();
 		}
 		else {

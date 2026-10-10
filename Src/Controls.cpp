@@ -9,6 +9,7 @@
 #include <Renderer/GraphicsBackend.hpp>
 
 #ifdef FX_IS_EDITOR
+#include <Editor/EditorPlatform.hpp>
 #include <Editor/RaptorEditor.hpp>
 #endif
 
@@ -182,6 +183,11 @@ void ControlManager::Update()
 	inst.mThisTick++;
 
 	inst.ApplyPostedEvents();
+
+#if defined(FX_IS_EDITOR) && defined(FX_PLATFORM_MACOS)
+	// Read here instead of on the UI thread, so the GUI doesn't stall the mouse movement
+	inst.mMouseDelta += editor::platform::ConsumeRelativeMouseDelta();
+#endif
 
 #ifdef FX_IS_EDITOR
 	gEditor->ServiceViewportResize();

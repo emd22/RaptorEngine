@@ -19,6 +19,8 @@
 #include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
+#include <Physics/BodyID.hpp>
+#include <Renderer/ProbePlacement.hpp>
 #include <string>
 #include <vector>
 
@@ -27,6 +29,7 @@ class World;
 class ConfigFile;
 class ConfigEntry;
 class Object;
+class CompiledMap;
 
 namespace physics {
 enum class eMotionType;
@@ -57,7 +60,17 @@ public:
 
 	void Create(World* world);
 
+	/**
+	 * @brief Loads a level from either its prototype (.prx) or its compiled map (.fxmap). A prototype loads as
+	 * editable brushes. A compiled map loads the geometry the map compiler made, plus everything of its prototype
+	 * that the compiler leaves alone (lights, models, dynamic and data brushes); if it is missing or older than the
+	 * prototype, the prototype is loaded instead.
+	 */
 	bool Load(const String& path);
+
+	/**
+	 * @brief Saves the prototype. A compiled map path is saved to the prototype next to it.
+	 */
 	void Save(const String& path);
 
 	/**
@@ -162,6 +175,26 @@ public:
 	MaterialID GetDefaultMaterial() const;
 
 	/**
+	 * @brief The material that map bounds (dbound) are drawn with, or the default material if the library has none
+	 */
+	MaterialID GetDBoundMaterial() const;
+
+	/**
+	 * @brief True if the static world brushes were replaced by a map compiled with mapc. The prototype can't be saved
+	 * while they are, as those brushes aren't loaded.
+	 */
+	bool HasCompiledWorld() const { return mbHasCompiledWorld; }
+
+	/**
+	 * @brief Where the map compiler put the light probes, or nullptr unless a compiled world with probes is loaded.
+	 * The brushes that placement would test against are not loaded then, so the probe bake uses this instead.
+	 */
+	const ProbeLayout* GetCompiledProbeLayout() const
+	{
+		return (mbHasCompiledWorld && mCompiledProbeLayout.VolumeCount > 0) ? &mCompiledProbeLayout : nullptr;
+	}
+
+	/**
 	 * @brief The brush that a blockout object is built from, or nullptr if the object is not a blockout.
 	 */
 	Brush* GetBrush(const Object* object);
@@ -230,6 +263,12 @@ private:
 	void AddOrUpdateLightFromEntry(const ConfigEntry& light_entry);
 
 	/**
+	 * @brief Loads the compiled map that belongs to a prototype, if it was compiled from the prototype as it is now
+	 */
+	bool LoadCompiledMap(const String& prototype_path, CompiledMap& out_map) const;
+	void CreateCompiledWorld(const CompiledMap& map);
+
+	/**
 	 * @brief Reads a blockout's brush from either a box (`scale`) or a list of planes (`planes`, with optional face
 	 * textures in `uvs`)
 	 */
@@ -269,6 +308,11 @@ private:
 	/// Models that were still loading when they had to be removed
 	std::vector<ObjectID> mModelsPendingRemoval;
 	bool mbHasModelsEntry = false;
+
+	std::vector<ObjectID> mCompiledObjects;
+	std::vector<physics::BodyID> mCompiledBodies;
+	bool mbHasCompiledWorld = false;
+	ProbeLayout mCompiledProbeLayout;
 
 	Brush::PlaneList mPreviewPlanes;
 };

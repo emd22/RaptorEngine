@@ -142,9 +142,9 @@ public:
 	void TopViewMove(const Vec3f offset);
 	void TopViewRotate(const Vec3f axis, float32 angle, const Vec3f pivot);
 	void TopViewMoveFace(const Vec3f world_normal, float32 distance);
-	void TopViewMoveVertices(uint32 axis_u, uint32 axis_v, const std::vector<TopViewVertexHandle>& handles,
+	void TopViewMoveVertices(eViewPlane plane, const std::vector<TopViewVertexHandle>& handles,
 							 const Vec3f offset);
-	void TopViewCreate(const Vec3f min, const Vec3f max);
+	void TopViewCreate(Vec3f min, Vec3f max, bool drop_to_ground);
 	void TopViewDelete();
 	void TopViewDuplicate();
 	void TopViewToggleSnap();

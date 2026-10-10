@@ -66,6 +66,8 @@ enum class eDataFilter : uint32
 	SpawnPoints,
 	Volumes,
 	Lights,
+	NvBrushes,
+	DBounds,
 
 	Count,
 };

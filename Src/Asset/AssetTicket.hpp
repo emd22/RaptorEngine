@@ -411,7 +411,8 @@ public:
 		if (pTicketData->UsageCount.fetch_sub(1) <= 1) {
 			delete pTicketData;
 			pTicketData = nullptr;
-		} else {
+		}
+		else {
 			// Still shared, clear our pointer without freeing
 			pTicketData = nullptr;
 			mpData = nullptr;

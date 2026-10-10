@@ -2,7 +2,7 @@
 
 #include "Device.hpp"
 
-#include <Core/Assert.hpp>
+#include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 

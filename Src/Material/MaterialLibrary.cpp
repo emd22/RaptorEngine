@@ -67,6 +67,16 @@ bool MaterialLibrary::Load(const std::string& list_path, const std::string& text
 			material->SetMetallicRoughness(1.0f, 1.0f);
 		}
 
+		const float32 alpha = item.GetMemberValue<float32>(HashStr32("alpha"), 1.0f);
+
+		if (alpha < 1.0f) {
+			material->SetAlpha(alpha);
+		}
+
+		if (item.GetMemberValue(HashStr32("unlit"), 0) != 0) {
+			material->SetUnlit(true);
+		}
+
 		material->Finalize();
 
 		const char* diffuse_path = item.GetMemberValue<const char*>(HashStr32("diffuse"), "");

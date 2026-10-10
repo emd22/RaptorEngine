@@ -132,6 +132,7 @@ private:
 	String mBaseWindowTitle;
 	String mTitleBlockoutPath;
 	bool mbTitleShown = false;
+	bool mbTitleCompiled = false;
 
 	// $i_show_gpu shows the GPU time of each stage. $r_probes and $r_decals switch the probes and decals off when 0
 	CVarValue* mpShowGpuCVar = nullptr;

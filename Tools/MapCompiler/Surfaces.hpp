@@ -1,0 +1,78 @@
+/*
+ * File:        Surfaces.hpp
+ * Author:      emd22
+ * Created:     10/10/2026
+ * Description: Turns the visible parts of brush faces into batched triangle meshes
+ */
+
+#pragma once
+
+#include "Bsp.hpp"
+#include "MapSource.hpp"
+
+namespace fx::mapc {
+
+struct SurfaceOptions
+{
+	bool bCullHidden = true;
+	bool bMerge = true;
+	bool bFixTJunctions = true;
+	double ChunkSize = 32.0;
+};
+
+struct SurfaceStats
+{
+	uint32 SourceFaces = 0;
+	uint32 SourceTriangles = 0;
+
+	uint32 FacesRemoved = 0;
+	uint32 FacesClipped = 0;
+	uint32 OverlapsRemoved = 0;
+
+	uint32 PolygonsBeforeMerge = 0;
+	uint32 Polygons = 0;
+	uint32 TJunctionsFixed = 0;
+	uint32 MergeFallbacks = 0;
+
+	uint32 Triangles = 0;
+	uint32 Vertices = 0;
+
+	double SourceArea = 0.0;
+	double Area = 0.0;
+};
+
+struct SurfacePolygon
+{
+	int32 PlaneIndex = PlaneSet::scNone;
+	int32 MaterialIndex = 0;
+	int32 MapIndex = 0;
+
+	Winding Points;
+};
+
+class SurfaceBuilder
+{
+public:
+	void Build(const PlaneSet& planes, const Bsp& bsp, const MapSource& source, bool sealed,
+			   const SurfaceOptions& options, CompiledMap& out_map);
+
+public:
+	SurfaceStats Stats;
+
+	/// Three corners per triangle of everything that was written, for verification
+	Array<Vec3d> TrianglePoints;
+
+private:
+	int32 FindOrAddMap(const TextureMap& map);
+
+	void CullFaces(const PlaneSet& planes, const Bsp& bsp, const MapSource& source, bool sealed,
+				   const SurfaceOptions& options);
+	void Triangulate(const PlaneSet& planes, const MapSource& source, const SurfaceOptions& options,
+					 CompiledMap& out_map);
+
+private:
+	Array<SurfacePolygon> mPolygons;
+	Array<TextureMap> mMaps;
+};
+
+} // namespace fx::mapc

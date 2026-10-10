@@ -103,6 +103,10 @@ void Entity::RecalculateModelMatrix()
 					   Mat4f::AsTranslation(mPosition);
 	}
 
+	if (mbHasPreTransform) {
+		mWorldMatrix = mPreTransform * mWorldMatrix;
+	}
+
 	mMatrixSubmittedFrames = 0;
 
 	// mNormalMatrix = mWorldMatrix.Inverse().Transposed();

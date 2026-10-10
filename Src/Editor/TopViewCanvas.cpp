@@ -2,6 +2,7 @@
 
 #ifdef FX_IS_EDITOR
 
+#include "EditorPlatform.hpp"
 #include "EditorThread.hpp"
 #include "RaptorEditor.hpp"
 
@@ -39,6 +40,12 @@ constexpr double scSnapGridPixels = 8.0;
 constexpr uint32 scMaxSnapLines = 800;
 constexpr double scWheelZoomPerUnit = 0.08;
 constexpr double scWheelZoomLimit = 0.3;
+constexpr double scPreciseZoomPerPixel = 0.01;
+constexpr double scWheelPanPixelsPerUnit = 40.0;
+constexpr double scNudgeCoarseFactor = 4.0;
+constexpr double scNudgeFineFactor = 0.25;
+constexpr double scDimensionLabelMargin = 6.0;
+constexpr double scDimensionLabelTop = 18.0;
 
 constexpr double scPi = 3.14159265358979323846;
 
@@ -51,6 +58,22 @@ constexpr double scMinMarkerDirection = 0.15;
 constexpr double scVertexPickPixels = 7.0;
 constexpr double scHandleMergeDistance = 2e-3;
 constexpr double scHandleHalfSize = 3.5;
+
+#ifdef __WXMAC__
+#define FX_TOP_VIEW_FREE_KEY "Cmd"
+#else
+#define FX_TOP_VIEW_FREE_KEY "Ctrl"
+#endif
+
+constexpr const char* scToolHints[] = {
+	"Drag to move, Shift adds, " FX_TOP_VIEW_FREE_KEY " ignores snap, Z frames selection",
+	"Drag an edge to move its face, " FX_TOP_VIEW_FREE_KEY " ignores snap",
+	"Drag corners, Shift adds, " FX_TOP_VIEW_FREE_KEY " ignores snap",
+	"Drag to create a brush, " FX_TOP_VIEW_FREE_KEY " ignores snap",
+	"Drag around the pivot, " FX_TOP_VIEW_FREE_KEY " ignores snap",
+};
+
+static_assert(std::size(scToolHints) == static_cast<size_t>(eTopViewTool::Count));
 
 constexpr double scMetricSteps[] = { 0.1, 0.5, 1.0, 5.0, 10.0, 50.0, 100.0, 500.0, 1000.0, 5000.0, 10000.0 };
 
@@ -67,6 +90,8 @@ const wxColour scGeometryColour(206, 211, 221);
 const wxColour scProbeVolumeColour(60, 220, 255);
 const wxColour scReflectionColour(255, 120, 220);
 const wxColour scVolumeColour(120, 255, 90);
+const wxColour scNvBrushColour(255, 150, 40);
+const wxColour scDBoundColour(90, 130, 255);
 const wxColour scSelectedColour(255, 92, 72);
 const wxColour scSelectedFillColour(255, 92, 72, 46);
 const wxColour scCreateColour(120, 255, 140);
@@ -80,7 +105,7 @@ const wxColour scVertexColour(255, 205, 70);
 const wxColour scHandleColour(30, 32, 38);
 const wxColour scHandleOutlineColour(235, 240, 250);
 
-constexpr uint32 scKindCount = 4;
+constexpr uint32 scKindCount = 6;
 constexpr uint32 scBucketCount = scKindCount * 2;
 
 constexpr int scDimGeometryAlpha = 70;
@@ -96,6 +121,10 @@ wxColour GetKindColour(eTopViewBrushKind kind)
 		return scReflectionColour;
 	case eTopViewBrushKind::Volume:
 		return scVolumeColour;
+	case eTopViewBrushKind::NvBrush:
+		return scNvBrushColour;
+	case eTopViewBrushKind::DBound:
+		return scDBoundColour;
 	default:
 		return scGeometryColour;
 	}
@@ -431,6 +460,10 @@ TopViewCanvas::TopViewCanvas(wxWindow* parent)
 	Bind(wxEVT_MOTION, &TopViewCanvas::OnMotion, this);
 	Bind(wxEVT_MOUSEWHEEL, &TopViewCanvas::OnWheel, this);
 
+	if (EnableTouchEvents(wxTOUCH_ZOOM_GESTURE)) {
+		Bind(wxEVT_GESTURE_ZOOM, &TopViewCanvas::OnZoomGesture, this);
+	}
+
 	Bind(wxEVT_KEY_DOWN, &TopViewCanvas::OnKeyDown, this);
 	Bind(wxEVT_KEY_UP, &TopViewCanvas::OnKeyUp, this);
 	Bind(wxEVT_MOUSE_CAPTURE_LOST, &TopViewCanvas::OnCaptureLost, this);
@@ -455,7 +488,7 @@ Vec3f TopViewCanvas::ToWorldVector(double u, double v, double w) const
 	const ViewPlaneAxes& axes = Axes();
 
 	float32 components[3] = { 0.0f, 0.0f, 0.0f };
-	components[axes.U] = static_cast<float32>(u);
+	components[axes.U] = static_cast<float32>(u * axes.USign);
 	components[axes.V] = static_cast<float32>(v);
 	components[axes.W] = static_cast<float32>(w);
 
@@ -628,50 +661,70 @@ void TopViewCanvas::TryInitialFit()
 
 void TopViewCanvas::FitAll()
 {
+	ViewBounds bounds;
+	bounds.MinU = DBL_MAX;
+	bounds.MinV = DBL_MAX;
+	bounds.MaxU = -DBL_MAX;
+	bounds.MaxV = -DBL_MAX;
+
+	for (const TopViewBrush& brush : mState.Brushes) {
+		const TopViewProjection& projection = Projection(brush);
+
+		for (size_t i = 0; i + 1 < projection.Hull.size(); i += 2) {
+			bounds.MinU = std::min<double>(bounds.MinU, projection.Hull[i]);
+			bounds.MaxU = std::max<double>(bounds.MaxU, projection.Hull[i]);
+			bounds.MinV = std::min<double>(bounds.MinV, projection.Hull[i + 1]);
+			bounds.MaxV = std::max<double>(bounds.MaxV, projection.Hull[i + 1]);
+			bounds.bValid = true;
+		}
+	}
+
+	if (!bounds.bValid) {
+		const ViewPlaneAxes& axes = Axes();
+
+		const double center_u = mState.bHasPlayer ? mState.PlayerPosition[axes.U] * axes.USign : 0.0;
+		const double center_v = mState.bHasPlayer ? mState.PlayerPosition[axes.V] : 0.0;
+
+		bounds.MinU = center_u - 10.0;
+		bounds.MaxU = center_u + 10.0;
+		bounds.MinV = center_v - 10.0;
+		bounds.MaxV = center_v + 10.0;
+	}
+
+	FitBounds(bounds);
+}
+
+void TopViewCanvas::FitSelection()
+{
+	const ViewBounds bounds = GetSelectionBounds();
+
+	if (bounds.bValid) {
+		FitBounds(bounds);
+	}
+	else {
+		FitAll();
+	}
+}
+
+void TopViewCanvas::FitBounds(const ViewBounds& bounds)
+{
 	const wxSize size = GetViewSize();
 
 	if (size.x <= 16 || size.y <= 16) {
 		return;
 	}
 
-	double min_u = DBL_MAX;
-	double min_v = DBL_MAX;
-	double max_u = -DBL_MAX;
-	double max_v = -DBL_MAX;
+	const double width = std::max(bounds.MaxU - bounds.MinU, 1.0);
+	const double height = std::max(bounds.MaxV - bounds.MinV, 1.0);
 
-	for (const TopViewBrush& brush : mState.Brushes) {
-		const TopViewProjection& projection = Projection(brush);
-
-		for (size_t i = 0; i + 1 < projection.Hull.size(); i += 2) {
-			min_u = std::min<double>(min_u, projection.Hull[i]);
-			max_u = std::max<double>(max_u, projection.Hull[i]);
-			min_v = std::min<double>(min_v, projection.Hull[i + 1]);
-			max_v = std::max<double>(max_v, projection.Hull[i + 1]);
-		}
-	}
-
-	if (min_u > max_u) {
-		const ViewPlaneAxes& axes = Axes();
-
-		const double center_u = mState.bHasPlayer ? mState.PlayerPosition[axes.U] : 0.0;
-		const double center_v = mState.bHasPlayer ? mState.PlayerPosition[axes.V] : 0.0;
-
-		min_u = center_u - 10.0;
-		max_u = center_u + 10.0;
-		min_v = center_v - 10.0;
-		max_v = center_v + 10.0;
-	}
-
-	const double width = std::max(max_u - min_u, 1.0);
-	const double height = std::max(max_v - min_v, 1.0);
-
-	mCenterU = (min_u + max_u) * 0.5;
-	mCenterV = (min_v + max_v) * 0.5;
+	mCenterU = (bounds.MinU + bounds.MaxU) * 0.5;
+	mCenterV = (bounds.MinV + bounds.MaxV) * 0.5;
 	mScale = std::clamp(std::min(size.x / (width * scFitMargin), size.y / (height * scFitMargin)), scMinScale,
 						scMaxScale);
 
 	mbHasFitted = true;
 
+	UpdateStatus();
 	Refresh();
 }
 
@@ -717,9 +770,17 @@ void TopViewCanvas::ZoomAt(const wxPoint& anchor, double factor)
 	Refresh();
 }
 
+void TopViewCanvas::PanByPixels(double dx, double dy)
+{
+	mCenterU -= dx / mScale;
+	mCenterV += dy / mScale;
+
+	Refresh();
+}
+
 double TopViewCanvas::Snap(double value) const
 {
-	if (!mState.bSnapEnabled || mState.SnapStep <= 0.0f) {
+	if (mbSnapBypass || !mState.bSnapEnabled || mState.SnapStep <= 0.0f) {
 		return value;
 	}
 
@@ -728,7 +789,7 @@ double TopViewCanvas::Snap(double value) const
 
 double TopViewCanvas::SnapAngle(double radians) const
 {
-	if (!mState.bSnapEnabled || mState.AngleSnapDegrees <= 0.0f) {
+	if (mbSnapBypass || !mState.bSnapEnabled || mState.AngleSnapDegrees <= 0.0f) {
 		return radians;
 	}
 
@@ -857,14 +918,15 @@ void TopViewCanvas::DrawGrid(wxGraphicsContext& gc, const wxSize& size)
 	gc.SetFont(font, scLabelColour);
 
 	for (long i = static_cast<long>(std::ceil(left / major)); i * major <= right; i++) {
-		gc.DrawText(wxString::Format("%g", i * major), ToScreenX(i * major) + 3.0, 2.0);
+		gc.DrawText(wxString::Format("%g", (i == 0) ? 0.0 : i * major * axes.USign), ToScreenX(i * major) + 3.0, 2.0);
 	}
 
 	for (long i = static_cast<long>(std::ceil(bottom / major)); i * major <= top; i++) {
 		gc.DrawText(wxString::Format("%g", i * major), 3.0, ToScreenY(i * major) + 2.0);
 	}
 
-	const wxString view_label = wxString::Format("%s (%c / %c)", axes.pName, scAxisNames[axes.U], scAxisNames[axes.V]);
+	const wxString view_label = wxString::Format("%s (%s%c / %c)", axes.pName, (axes.USign < 0.0f) ? "-" : "",
+												 scAxisNames[axes.U], scAxisNames[axes.V]);
 
 	double label_width = 0.0;
 	double label_height = 0.0;
@@ -1194,8 +1256,32 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 
 		if (bounds.bValid) {
 			gc.SetFont(font, scSelectedColour);
-			gc.DrawText(wxString::Format("%+.2f, %+.2f", mPreview.OffsetU, mPreview.OffsetV),
+			gc.DrawText(wxString::Format("%+.2f, %+.2f", mPreview.OffsetU * Axes().USign, mPreview.OffsetV),
 						ToScreenX(bounds.MinU + mPreview.OffsetU), ToScreenY(bounds.MinV + mPreview.OffsetV) + 4.0);
+		}
+
+		return;
+	}
+
+	if (mPreview.Kind == eDrag::None) {
+		const ViewBounds bounds = GetSelectionBounds();
+
+		if (bounds.bValid) {
+			const wxString label = wxString::Format("%.2f x %.2f", bounds.MaxU - bounds.MinU,
+													bounds.MaxV - bounds.MinV);
+
+			double label_width = 0.0;
+			double label_height = 0.0;
+
+			gc.SetFont(font, scSelectedColour);
+			gc.GetTextExtent(label, &label_width, &label_height);
+
+			const double x = std::clamp(ToScreenX(bounds.MinU), scDimensionLabelMargin,
+										std::max(scDimensionLabelMargin, size.x - label_width - scDimensionLabelMargin));
+			const double y = std::clamp(ToScreenY(bounds.MinV) + 4.0, scDimensionLabelTop,
+										std::max(scDimensionLabelTop, size.y - label_height - scDimensionLabelMargin));
+
+			gc.DrawText(label, x, y);
 		}
 	}
 }
@@ -1208,10 +1294,10 @@ void TopViewCanvas::DrawPlayer(wxGraphicsContext& gc)
 
 	const ViewPlaneAxes& axes = Axes();
 
-	const double x = ToScreenX(mState.PlayerPosition[axes.U]);
+	const double x = ToScreenX(mState.PlayerPosition[axes.U] * axes.USign);
 	const double y = ToScreenY(mState.PlayerPosition[axes.V]);
 
-	double dir_x = mState.PlayerDirection[axes.U];
+	double dir_x = mState.PlayerDirection[axes.U] * axes.USign;
 	double dir_y = -mState.PlayerDirection[axes.V];
 
 	const double length = std::hypot(dir_x, dir_y);
@@ -1419,6 +1505,7 @@ void TopViewCanvas::OnKillFocus(wxFocusEvent& event)
 {
 	mbSpaceDown = false;
 	mbAltDown = false;
+	SetSnapBypass(false);
 
 	UpdateHover();
 	UpdateCursor();
@@ -1544,6 +1631,32 @@ void TopViewCanvas::SelectBrushes(const std::vector<uint32>& object_ids, eTopVie
 
 	UpdateStatus();
 	Refresh();
+}
+
+void TopViewCanvas::SelectAll()
+{
+	std::vector<uint32> ids;
+
+	for (const TopViewBrush& brush : mState.Brushes) {
+		if (brush.bSelectable) {
+			ids.push_back(brush.ObjectId);
+		}
+	}
+
+	SelectBrushes(ids, eTopViewSelectMode::Replace);
+}
+
+void TopViewCanvas::InvertSelection()
+{
+	std::vector<uint32> ids;
+
+	for (const TopViewBrush& brush : mState.Brushes) {
+		if (brush.bSelectable && !brush.bSelected) {
+			ids.push_back(brush.ObjectId);
+		}
+	}
+
+	SelectBrushes(ids, eTopViewSelectMode::Replace);
 }
 
 
@@ -1802,6 +1915,8 @@ void TopViewCanvas::OnMotion(wxMouseEvent& event)
 		mbAltDown = event.AltDown();
 		UpdateCursor();
 	}
+
+	mbSnapBypass = event.ControlDown();
 
 	if (mDrag == eDrag::Pan && !event.LeftIsDown() && !event.MiddleIsDown() && !event.RightIsDown()) {
 		EndPan();
@@ -2071,8 +2186,7 @@ void TopViewCanvas::FinishVertex()
 
 	const std::vector<TopViewVertexHandle> handles = mSelectedVertices;
 	const Vec3f offset = ToWorldVector(mPreview.OffsetU, mPreview.OffsetV, 0.0);
-	const uint32 axis_u = Axes().U;
-	const uint32 axis_v = Axes().V;
+	const eViewPlane plane = mPlane;
 
 	for (TopViewVertexHandle& handle : mSelectedVertices) {
 		handle.U += static_cast<float32>(mPreview.OffsetU);
@@ -2080,7 +2194,7 @@ void TopViewCanvas::FinishVertex()
 	}
 
 	HoldPreview();
-	SendCommand([axis_u, axis_v, handles, offset] { gEditor->TopViewMoveVertices(axis_u, axis_v, handles, offset); });
+	SendCommand([plane, handles, offset] { gEditor->TopViewMoveVertices(plane, handles, offset); });
 }
 
 void TopViewCanvas::FinishMarquee()
@@ -2237,11 +2351,18 @@ void TopViewCanvas::FinishCreate()
 	const double base = mCreateBase[plane_index];
 	const double depth = std::max<double>(mCreateSize[plane_index], scMinCreateDepth);
 
-	const Vec3f min = ToWorldVector(mPreview.MinU, mPreview.MinV, base);
-	const Vec3f max = ToWorldVector(mPreview.MaxU, mPreview.MaxV, base + depth);
+	const Vec3f first = ToWorldVector(mPreview.MinU, mPreview.MinV, base);
+	const Vec3f second = ToWorldVector(mPreview.MaxU, mPreview.MaxV, base + depth);
+
+	const Vec3f min(std::min<float32>(first.X, second.X), std::min<float32>(first.Y, second.Y),
+					std::min<float32>(first.Z, second.Z));
+	const Vec3f max(std::max<float32>(first.X, second.X), std::max<float32>(first.Y, second.Y),
+					std::max<float32>(first.Z, second.Z));
 
 	HoldPreview();
-	SendCommand([min, max] { gEditor->TopViewCreate(min, max); });
+	const bool drop_to_ground = mbDropToGround && (mPlane == eViewPlane::Top);
+
+	SendCommand([min, max, drop_to_ground] { gEditor->TopViewCreate(min, max, drop_to_ground); });
 }
 
 void TopViewCanvas::FinishRotate()
@@ -2261,15 +2382,40 @@ void TopViewCanvas::FinishRotate()
 
 void TopViewCanvas::OnWheel(wxMouseEvent& event)
 {
-	if (event.GetWheelAxis() != wxMOUSE_WHEEL_VERTICAL) {
+	const double delta = std::max(event.GetWheelDelta(), 1);
+	const double rotation = event.GetWheelRotation();
+	const bool horizontal = (event.GetWheelAxis() == wxMOUSE_WHEEL_HORIZONTAL);
+	const bool precise = platform::IsPreciseScrollEvent();
+
+	if ((precise && !event.ControlDown()) || horizontal) {
+		if (mDrag == eDrag::Pan) {
+			return;
+		}
+
+		const double pixels = precise ? rotation : (rotation / delta) * scWheelPanPixelsPerUnit;
+
+		PanByPixels(horizontal ? -pixels : 0.0, horizontal ? 0.0 : pixels);
+		ClientToWorld(event.GetPosition(), mHoverU, mHoverV);
+		UpdateStatus();
 		return;
 	}
 
-	const double delta = std::max(event.GetWheelDelta(), 1);
-	const double units = event.GetWheelRotation() / delta;
-	const double exponent = std::clamp(units * scWheelZoomPerUnit, -scWheelZoomLimit, scWheelZoomLimit);
+	const double amount = precise ? rotation * scPreciseZoomPerPixel : (rotation / delta) * scWheelZoomPerUnit;
+	const double exponent = std::clamp(amount, -scWheelZoomLimit, scWheelZoomLimit);
 
 	ZoomAt(event.GetPosition(), std::exp(exponent));
+	UpdateStatus();
+}
+
+void TopViewCanvas::OnZoomGesture(wxZoomGestureEvent& event)
+{
+	if (event.IsGestureStart()) {
+		mPinchStartScale = mScale;
+	}
+
+	const double wanted = std::clamp(mPinchStartScale * event.GetZoomFactor(), scMinScale, scMaxScale);
+
+	ZoomAt(event.GetPosition(), wanted / mScale);
 	UpdateStatus();
 }
 
@@ -2289,6 +2435,20 @@ void TopViewCanvas::NudgeSelection(double du, double dv)
 	SendCommand([offset] { gEditor->TopViewMove(offset); });
 }
 
+void TopViewCanvas::SetSnapBypass(bool bypass)
+{
+	if (bypass == mbSnapBypass) {
+		return;
+	}
+
+	mbSnapBypass = bypass;
+
+	if (mDrag != eDrag::None && mDrag != eDrag::Pan && mDrag != eDrag::Marquee) {
+		UpdatePreview();
+		Refresh();
+	}
+}
+
 void TopViewCanvas::SetToolFromKey(eTopViewTool tool)
 {
 	if (mDrag == eDrag::None) {
@@ -2306,6 +2466,9 @@ void TopViewCanvas::OnKeyUp(wxKeyEvent& event)
 		mbAltDown = false;
 		UpdateHover();
 		UpdateCursor();
+	}
+	else if (event.GetKeyCode() == WXK_CONTROL) {
+		SetSnapBypass(false);
 	}
 
 	event.Skip();
@@ -2331,6 +2494,24 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 		return;
 	}
 
+	if (key == WXK_CONTROL) {
+		SetSnapBypass(true);
+		event.Skip();
+		return;
+	}
+
+	const double step = (mState.bSnapEnabled && mState.SnapStep > 0.0f) ? mState.SnapStep : 0.25;
+
+	if (!command && mDrag == eDrag::None &&
+		(key == WXK_LEFT || key == WXK_RIGHT || key == WXK_UP || key == WXK_DOWN)) {
+		const double distance = step * (event.AltDown() ? scNudgeFineFactor : (shift ? scNudgeCoarseFactor : 1.0));
+		const double du = (key == WXK_RIGHT) ? distance : ((key == WXK_LEFT) ? -distance : 0.0);
+		const double dv = (key == WXK_UP) ? distance : ((key == WXK_DOWN) ? -distance : 0.0);
+
+		NudgeSelection(du, dv);
+		return;
+	}
+
 	if (command) {
 		if (key == 'Z') {
 			SendCommand(shift ? std::function<void()>([] { gEditor->Redo(); })
@@ -2343,6 +2524,16 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 			return;
 		}
 
+		if (key == 'A' && mDrag == eDrag::None) {
+			SelectAll();
+			return;
+		}
+
+		if (key == 'I' && mDrag == eDrag::None) {
+			InvertSelection();
+			return;
+		}
+
 		event.Skip();
 		return;
 	}
@@ -2352,8 +2543,6 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 		return;
 	}
 
-	const double step = (mState.bSnapEnabled && mState.SnapStep > 0.0f) ? mState.SnapStep : 0.25;
-
 	switch (key) {
 	case '1':
 		SetPlane(eViewPlane::Top);
@@ -2362,7 +2551,13 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 		SetPlane(eViewPlane::Front);
 		break;
 	case '3':
-		SetPlane(eViewPlane::Side);
+		SetPlane(eViewPlane::Back);
+		break;
+	case '4':
+		SetPlane(eViewPlane::Left);
+		break;
+	case '5':
+		SetPlane(eViewPlane::Right);
 		break;
 	case 'T':
 		SetToolFromKey(eTopViewTool::Select);
@@ -2391,7 +2586,15 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 		SendCommand([] { gEditor->TopViewAdjustSnap(1); });
 		break;
 	case WXK_HOME:
-		FitAll();
+		if (shift) {
+			FitSelection();
+		}
+		else {
+			FitAll();
+		}
+		break;
+	case 'Z':
+		FitSelection();
 		break;
 	case WXK_DELETE:
 	case WXK_BACK:
@@ -2410,26 +2613,6 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 		}
 		else if (GetSelectedCount() > 0) {
 			SelectBrushes({}, eTopViewSelectMode::Replace);
-		}
-		break;
-	case WXK_LEFT:
-		if (mDrag == eDrag::None) {
-			NudgeSelection(-step, 0.0);
-		}
-		break;
-	case WXK_RIGHT:
-		if (mDrag == eDrag::None) {
-			NudgeSelection(step, 0.0);
-		}
-		break;
-	case WXK_UP:
-		if (mDrag == eDrag::None) {
-			NudgeSelection(0.0, step);
-		}
-		break;
-	case WXK_DOWN:
-		if (mDrag == eDrag::None) {
-			NudgeSelection(0.0, -step);
 		}
 		break;
 	default:
@@ -2497,14 +2680,14 @@ void TopViewCanvas::UpdateStatus()
 	wxString text = wxString::Format("%s   |   ", axes.pName);
 
 	if (mbHovering) {
-		text += wxString::Format("%c %.2f   %c %.2f   |   ", scAxisNames[axes.U], mHoverU, scAxisNames[axes.V],
+		text += wxString::Format("%c %.2f   %c %.2f   |   ", scAxisNames[axes.U], mHoverU * axes.USign, scAxisNames[axes.V],
 								 mHoverV);
 	}
 
-	text += wxString::Format("%d brushes, %u selected   |   Snap %s %.2f   |   ",
+	text += wxString::Format("%d brushes, %u selected   |   Snap %s %.2f   |   Zoom %.0f%%   |   %s",
 							 static_cast<int>(mState.Brushes.size()), GetSelectedCount(),
-							 mState.bSnapEnabled ? "on" : "off", mState.SnapStep);
-
+							 mState.bSnapEnabled ? "on" : "off", mState.SnapStep, mScale / scDefaultScale * 100.0,
+							 scToolHints[static_cast<uint32>(mTool)]);
 
 	mpOnStatus(text);
 }

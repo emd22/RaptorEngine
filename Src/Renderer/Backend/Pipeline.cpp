@@ -5,9 +5,9 @@
 #include "Shader.hpp"
 #include "VertexDescription.hpp"
 
-#include <Core/Assert.hpp>
 #include <Core/Defines.hpp>
 #include <Core/StackArray.hpp>
+#include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/TiledForwardRenderer.hpp>
@@ -154,8 +154,8 @@ void Pipeline::Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shade
 		shader_create_info.Insert(create_info);
 	}
 
-	// Dynamic states. The viewport and scissor come from the render stage that is being drawn to (RenderStage::Begin()),
-	// so a pipeline can be used on a target of any size.
+	// Dynamic states. The viewport and scissor come from the render stage that is being drawn to
+	// (RenderStage::Begin()), so a pipeline can be used on a target of any size.
 	SizedArray<VkDynamicState> dynamic_states = {
 		VK_DYNAMIC_STATE_VIEWPORT,
 		VK_DYNAMIC_STATE_SCISSOR,

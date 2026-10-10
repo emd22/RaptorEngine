@@ -45,18 +45,18 @@ constexpr float32 scMinFaceLength = 1e-3f;
 constexpr float32 scFaceMatchDot = 0.999f;
 constexpr float32 scVertexMatchDistance = 2e-3f;
 constexpr float32 scMinBrushExtent = 0.01f;
+constexpr float32 scGroundFootprintInset = 1e-3f;
+constexpr float32 scGroundFitTolerance = 1e-3f;
 
 float32 GetAxis(const Vec3f& vector, uint32 axis)
 {
 	return (axis == 0) ? vector.X : ((axis == 1) ? vector.Y : vector.Z);
 }
 
-Vec2f Project(const Vec3f& vector, uint32 axis_u, uint32 axis_v)
+Vec2f Project(const Vec3f& vector, const ViewPlaneAxes& axes)
 {
-	return Vec2f(GetAxis(vector, axis_u), GetAxis(vector, axis_v));
+	return Vec2f(GetAxis(vector, axes.U) * axes.USign, GetAxis(vector, axes.V));
 }
-
-Vec2f Project(const Vec3f& vector, const ViewPlaneAxes& axes) { return Project(vector, axes.U, axes.V); }
 
 struct Segment
 {
@@ -155,7 +155,145 @@ eTopViewBrushKind GetBrushKind(const Object& object)
 		return eTopViewBrushKind::Volume;
 	}
 
+	if (object.IsNvBrush()) {
+		return eTopViewBrushKind::NvBrush;
+	}
+
+	if (object.IsDBound()) {
+		return eTopViewBrushKind::DBound;
+	}
+
 	return eTopViewBrushKind::Geometry;
+}
+
+struct HeightSpan
+{
+	float32 Bottom;
+	float32 Top;
+};
+
+void ClipToFootprintEdge(std::vector<Vec3f>& points, std::vector<Vec3f>& scratch, uint32 axis, float32 limit,
+						 float32 sign)
+{
+	scratch.clear();
+
+	for (size_t i = 0; i < points.size(); i++) {
+		const Vec3f current = points[i];
+		const Vec3f next = points[(i + 1) % points.size()];
+
+		const float32 current_distance = (GetAxis(current, axis) - limit) * sign;
+		const float32 next_distance = (GetAxis(next, axis) - limit) * sign;
+
+		if (current_distance >= 0.0f) {
+			scratch.push_back(current);
+		}
+
+		if ((current_distance >= 0.0f) != (next_distance >= 0.0f)) {
+			const float32 t = current_distance / (current_distance - next_distance);
+
+			scratch.push_back(current + (next - current) * t);
+		}
+	}
+
+	points.swap(scratch);
+}
+
+bool FindGroundHeight(const Vec3f min, const Vec3f max, float32& out_base)
+{
+	Blockout* blockout = gWorld->pBlockout;
+
+	if (blockout == nullptr) {
+		return false;
+	}
+
+	const float32 min_x = min.X + scGroundFootprintInset;
+	const float32 max_x = max.X - scGroundFootprintInset;
+	const float32 min_z = min.Z + scGroundFootprintInset;
+	const float32 max_z = max.Z - scGroundFootprintInset;
+
+	if (min_x >= max_x || min_z >= max_z) {
+		return false;
+	}
+
+	std::vector<HeightSpan> spans;
+	std::vector<Vec3f> points;
+	std::vector<Vec3f> scratch;
+
+	for (ObjectID id : blockout->BlockoutObjects) {
+		Object* object = gObjectManager->GetObject(id);
+
+		if (object == nullptr || object == blockout->pXFormObject || object == blockout->pPreviewObject ||
+			GetBrushKind(*object) != eTopViewBrushKind::Geometry) {
+			continue;
+		}
+
+		const Brush* brush = blockout->GetBrush(object);
+
+		if (brush == nullptr || !brush->IsValid()) {
+			continue;
+		}
+
+		const Mat4f world = object->GetWorldMatrix();
+
+		HeightSpan span { FLT_MAX, -FLT_MAX };
+
+		for (uint32 f = 0; f < brush->Faces.Size; f++) {
+			const Brush::Face& face = brush->Faces[f];
+
+			points.clear();
+
+			for (uint32 i = 0; i < face.Vertices.Size; i++) {
+				const Vec3f vertex = face.Vertices[i];
+				const Vec4f point = world * Vec4f(vertex.X, vertex.Y, vertex.Z, 1.0f);
+
+				points.push_back(Vec3f(point.X, point.Y, point.Z));
+			}
+
+			ClipToFootprintEdge(points, scratch, 0, min_x, 1.0f);
+			ClipToFootprintEdge(points, scratch, 0, max_x, -1.0f);
+			ClipToFootprintEdge(points, scratch, 2, min_z, 1.0f);
+			ClipToFootprintEdge(points, scratch, 2, max_z, -1.0f);
+
+			for (const Vec3f point : points) {
+				span.Bottom = std::min<float32>(span.Bottom, point.Y);
+				span.Top = std::max<float32>(span.Top, point.Y);
+			}
+		}
+
+		if (span.Top >= span.Bottom) {
+			spans.push_back(span);
+		}
+	}
+
+	if (spans.empty()) {
+		return false;
+	}
+
+	const float32 height = max.Y - min.Y;
+
+	bool found = false;
+
+	for (const HeightSpan& support : spans) {
+		const float32 base = support.Top;
+
+		if (found && base >= out_base) {
+			continue;
+		}
+
+		bool fits = true;
+
+		for (const HeightSpan& other : spans) {
+			fits = fits && !(base + height > other.Bottom + scGroundFitTolerance &&
+							 base < other.Top - scGroundFitTolerance);
+		}
+
+		if (fits) {
+			out_base = base;
+			found = true;
+		}
+	}
+
+	return found;
 }
 
 } // namespace
@@ -262,8 +400,10 @@ TopViewState RaptorEditor::BuildTopViewState()
 			const ViewPlaneAxes& axes = scViewPlaneAxes[plane_index];
 			TopViewProjection& projection = out.Views[plane_index];
 
-			projection.PivotU = GetAxis(pivot, axes.U);
-			projection.PivotV = GetAxis(pivot, axes.V);
+			const Vec2f plan_pivot = Project(pivot, axes);
+
+			projection.PivotU = plan_pivot.X;
+			projection.PivotV = plan_pivot.Y;
 
 			projected.Clear();
 
@@ -567,11 +707,11 @@ void RaptorEditor::TopViewMoveFace(const Vec3f world_normal, float32 distance)
 	}
 }
 
-void RaptorEditor::TopViewMoveVertices(uint32 axis_u, uint32 axis_v, const std::vector<TopViewVertexHandle>& handles,
+void RaptorEditor::TopViewMoveVertices(eViewPlane plane, const std::vector<TopViewVertexHandle>& handles,
 									   const Vec3f offset)
 {
 	if (IsSimulationMode() || !IsToolAvailable(eEditorTool::Face) || offset.Length() < scMinMoveDistance ||
-		axis_u > 2 || axis_v > 2) {
+		static_cast<uint32>(plane) >= scViewPlaneCount) {
 		return;
 	}
 
@@ -612,8 +752,8 @@ void RaptorEditor::TopViewMoveVertices(uint32 axis_u, uint32 axis_v, const std::
 
 		for (const Vec3f vertex : brush->GetVertices()) {
 			const Vec4f world_point = world * Vec4f(vertex.X, vertex.Y, vertex.Z, 1.0f);
-			const Vec2f projected_position = Project(Vec3f(world_point.X, world_point.Y, world_point.Z), axis_u,
-													 axis_v);
+			const Vec2f projected_position = Project(Vec3f(world_point.X, world_point.Y, world_point.Z),
+													 GetViewPlaneAxes(plane));
 
 			bool is_moved = false;
 
@@ -675,10 +815,19 @@ Object* RaptorEditor::CreateWorldBox(const Vec3f min, const Vec3f max)
 	return EmplaceEditOperation<CreateBrushOperation>(brush.Planes, snapshot).GetCreated();
 }
 
-void RaptorEditor::TopViewCreate(const Vec3f min, const Vec3f max)
+void RaptorEditor::TopViewCreate(Vec3f min, Vec3f max, bool drop_to_ground)
 {
 	if (IsSimulationMode() || !IsToolAvailable(eEditorTool::Create)) {
 		return;
+	}
+
+	float32 ground = 0.0f;
+
+	if (drop_to_ground && FindGroundHeight(min, max, ground)) {
+		const float32 height = max.Y - min.Y;
+
+		min.Y = ground;
+		max.Y = ground + height;
 	}
 
 	Object* created = CreateWorldBox(min, max);

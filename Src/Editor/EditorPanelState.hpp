@@ -91,6 +91,8 @@ enum class eTopViewBrushKind : uint8
 	ProbeVolume,
 	ReflectionProbe,
 	Volume,
+	NvBrush,
+	DBound,
 };
 
 struct TopViewFace

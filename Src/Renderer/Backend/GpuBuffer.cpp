@@ -1,8 +1,10 @@
 #include "GpuBuffer.hpp"
 
 #include <Asset/AssetManager.hpp>
+#include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
+
 
 namespace fx::renderer {
 

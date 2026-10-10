@@ -35,9 +35,12 @@ enum class eObjectTag : uint32
 	/// A blockout brush that marks out a light probe volume instead of level geometry
 	ProbeVolume = (1 << 2),
 	ReflectionProbe = (1 << 3),
-	Bleeds = (1 << 4),
-	Spawn = (1 << 5),
-	Trigger = (1 << 6),
+	Spawn = (1 << 4),
+	Trigger = (1 << 5),
+	/// A blockout brush that only collides: never drawn, and the map compiler keeps just its collider (nvbrush)
+	NvBrush = (1 << 6),
+	/// A blockout brush that only seals the map for the map compiler, and is otherwise not there (dbound)
+	DBound = (1 << 7),
 };
 
 FxEnumFlags(eObjectTag);
@@ -105,6 +108,8 @@ public:
 	// XXX: TEMP
 	void UpdateAnimation();
 
+	void AttachToBone(const Ref<Skeleton>& skeleton, BoneId bone, const Mat4f& offset);
+
 	/**
 	 * @brief Reserve `num_instances` amount of future instances in the object manager.
 	 * @note This may update the object id if there are not enough free slots following this object.
@@ -169,15 +174,23 @@ public:
 	void SetProbeVolume(bool value);
 
 	void SetTrigger(bool value);
+	void SetNvBrush(bool value);
+	void SetDBound(bool value);
 
 	/// True if this object marks out a probe volume rather than being level geometry
 	FX_FORCE_INLINE bool IsProbeVolume() const { return HasTags(eObjectTag::ProbeVolume); }
 	FX_FORCE_INLINE bool IsTrigger() const { return HasTags(eObjectTag::Trigger); }
-	FX_FORCE_INLINE bool IsVolume() const { return HasTags(eObjectTag::ProbeVolume | eObjectTag::Trigger); }
+	FX_FORCE_INLINE bool IsNvBrush() const { return HasTags(eObjectTag::NvBrush); }
+	FX_FORCE_INLINE bool IsDBound() const { return HasTags(eObjectTag::DBound); }
+
+	/// True if this object is a marker of some kind and not drawn as level geometry
+	FX_FORCE_INLINE bool IsVolume() const
+	{
+		return HasTags(eObjectTag::ProbeVolume | eObjectTag::Trigger | eObjectTag::NvBrush | eObjectTag::DBound);
+	}
 	FX_FORCE_INLINE bool IsDataBrush() const { return HasTags(eObjectTag::Blockout) && IsVolume(); }
 
 	void SetReflectionProbe(bool value);
-	FX_FORCE_INLINE bool Bleeds() const { return HasTags(eObjectTag::Bleeds); }
 	FX_FORCE_INLINE bool IsSpawn() const { return HasTags(eObjectTag::Spawn); }
 	FX_FORCE_INLINE bool IsReflectionProbe() const { return HasTags(eObjectTag::ReflectionProbe); }
 	FX_FORCE_INLINE bool IsDynamic() const { return HasFlag(Flags, eObjectFlags::PhysicsEnabled); }
@@ -241,6 +254,8 @@ private:
 
 	Object* CloneNode(const String& name, SkeletonCloneMap& skeletons) const;
 
+	void UpdateBoneAttachment();
+
 public:
 	Ref<PrimitiveMesh> pMesh { nullptr };
 	physics::BodyID PhysicsID = physics::BodyID::scNull;
@@ -251,6 +266,12 @@ public:
 	uint32 BoneBufferBase = Skeleton::scNoBones;
 	/// The skeleton's pose the last time this object told the world grid it changed.
 	uint32 mLastPoseHash = 0;
+
+	Ref<Skeleton> pAttachSkeleton { nullptr };
+	BoneId AttachBone = BoneNull;
+	Mat4f AttachOffset = Mat4f::scIdentity;
+	uint32 mLastAttachPoseHash = 0;
+	bool mbAttachPosed = false;
 
 	ObjectID ParentID = ObjectID::scNull;
 	PagedArray<ObjectID> AttachedNodes;

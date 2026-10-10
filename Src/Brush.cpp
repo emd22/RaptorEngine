@@ -937,6 +937,24 @@ bool Brush::HasDefaultTextures() const
 	return true;
 }
 
+void Brush::GetTextureGradients(const BrushPlane& plane, Vec3f& out_u_gradient, Vec3f& out_v_gradient)
+{
+	const BrushFaceTexture& texture = plane.Texture;
+	const TextureProjection projection = GetTextureProjection(plane.Normal);
+
+	float32 sine = 0.0f;
+	float32 cosine = 1.0f;
+
+	if (texture.Rotation != 0.0f) {
+		const float32 radians = MathUtil::DegreesToRadians(texture.Rotation);
+		sine = std::sin(radians);
+		cosine = std::cos(radians);
+	}
+
+	out_u_gradient = (projection.UAxis * cosine - projection.VAxis * sine) * (1.0f / texture.Scale.X);
+	out_v_gradient = (projection.UAxis * sine + projection.VAxis * cosine) * (1.0f / texture.Scale.Y);
+}
+
 void Brush::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normals, SizedArray<Vec3f>& tangents,
 						 SizedArray<float32>& tangent_handedness, SizedArray<Vec2f>& texcoords,
 						 SizedArray<uint32>& indices) const

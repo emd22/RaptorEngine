@@ -132,6 +132,12 @@ public:
 	bool HasDefaultTextures() const;
 
 	/**
+	 * @brief Returns how fast a plane's U and V change across the brush's local space. A point's texture coordinate is
+	 * its dot product with each gradient, plus the plane's texture offset.
+	 */
+	static void GetTextureGradients(const BrushPlane& plane, Vec3f& out_u_gradient, Vec3f& out_v_gradient);
+
+	/**
 	 * @brief Generates a triangle mesh for rendering
 	 */
 	void GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normals, SizedArray<Vec3f>& tangents,

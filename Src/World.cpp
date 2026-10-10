@@ -842,7 +842,15 @@ void World::AddTileToRenderList(bool clear, TileIndex new_tile_index, const Frus
 			continue;
 		}
 
-		if (object->IsVolume()) {
+		// Markers are drawn as wire boxes instead. A map bound is the exception: while the editor is showing data
+		// brushes it is drawn solid, so that it can be told apart from the geometry it seals
+#ifdef FX_IS_EDITOR
+		const bool shows_bound = object->IsDBound() && gEditor->IsDataMode();
+#else
+		const bool shows_bound = false;
+#endif
+
+		if (object->IsVolume() && !shows_bound) {
 			++index;
 			continue;
 		}
@@ -1295,10 +1303,12 @@ void World::DebugDrawProbeVolumes()
 	const Color volume_color = Color::FromRGBA(60, 220, 255, 255);
 	const Color reflection_color = Color::FromRGBA(255, 120, 220, 255);
 	const Color trigger_color = Color::FromRGBA(120, 255, 90, 255);
+	const Color nvbrush_color = Color::FromRGBA(255, 150, 40, 255);
 	const Color selected_color = Color::FromRGBA(255, 220, 60, 255);
 
 	for (Object& object : gObjectManager->GetCache()) {
-		if (!object.IsVolume()) {
+		// Map bounds are drawn solid with their own material instead
+		if (!object.IsVolume() || object.IsDBound()) {
 			continue;
 		}
 
@@ -1323,6 +1333,10 @@ void World::DebugDrawProbeVolumes()
 
 		if (object.IsTrigger() && !object.IsProbeVolume()) {
 			color = trigger_color;
+		}
+
+		if (object.IsNvBrush()) {
+			color = nvbrush_color;
 		}
 
 		gDebugDraw->WireBox(world_matrix, is_selected ? selected_color : color);

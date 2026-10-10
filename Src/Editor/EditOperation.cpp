@@ -1,6 +1,7 @@
 #include "EditOperation.hpp"
 
 #include "EditorSelection.hpp"
+#include "RaptorEditor.hpp"
 
 #include <Blockout.hpp>
 #include <Engine.hpp>
@@ -17,8 +18,8 @@
 namespace fx::editor {
 
 static constexpr eObjectTag scEditableTags[] = {
-	eObjectTag::LockTransform, eObjectTag::ProbeVolume, eObjectTag::ReflectionProbe,
-	eObjectTag::Bleeds,		   eObjectTag::Spawn,		eObjectTag::Trigger,
+	eObjectTag::LockTransform, eObjectTag::ProbeVolume, eObjectTag::ReflectionProbe, eObjectTag::Spawn,
+	eObjectTag::Trigger,	   eObjectTag::NvBrush,		eObjectTag::DBound,
 };
 
 static constexpr eObjectFlags scEditableFlags[] = {
@@ -36,12 +37,13 @@ bool CanEditObjectTag(const Object* object, uint32 tag_bit)
 
 	switch (static_cast<eObjectTag>(tag_bit)) {
 	case eObjectTag::LockTransform:
-	case eObjectTag::Bleeds:
 	case eObjectTag::Spawn:
 		return true;
 	case eObjectTag::ProbeVolume:
 	case eObjectTag::ReflectionProbe:
 	case eObjectTag::Trigger:
+	case eObjectTag::NvBrush:
+	case eObjectTag::DBound:
 		return object->HasTags(eObjectTag::Blockout);
 	default:
 		return false;
@@ -114,6 +116,17 @@ static void SetObjectTag(Object& object, eObjectTag tag, bool enabled)
 		break;
 	case eObjectTag::Trigger:
 		object.SetTrigger(enabled);
+		break;
+	case eObjectTag::NvBrush:
+		object.SetNvBrush(enabled);
+		break;
+	case eObjectTag::DBound:
+		object.SetDBound(enabled);
+
+		if (gWorld->pBlockout != nullptr) {
+			gEditor->SetStoredMaterial(&object, enabled ? gWorld->pBlockout->GetDBoundMaterial()
+														: gWorld->pBlockout->GetDefaultMaterial());
+		}
 		break;
 	default:
 		if (enabled) {
@@ -216,6 +229,14 @@ static Object* RestoreBrush(const ObjectSnapshot& snapshot, const Brush::PlaneLi
 		object->SetTrigger(true);
 	}
 
+	if (snapshot.bIsNvBrush) {
+		object->SetNvBrush(true);
+	}
+
+	if (snapshot.bIsDBound) {
+		object->SetDBound(true);
+	}
+
 	gObjectScripts->Attach(object, snapshot.ScriptPath);
 	gObjectScripts->SetRequiredEnterDirection(object->ID, snapshot.EnterDirection);
 
@@ -236,6 +257,8 @@ ObjectSnapshot ObjectSnapshot::Capture(const Object& object, MaterialID material
 		.bIsReflectionProbe = object.IsReflectionProbe(),
 		.bIsSpawn = object.IsSpawn(),
 		.bIsTrigger = object.IsTrigger(),
+		.bIsNvBrush = object.IsNvBrush(),
+		.bIsDBound = object.IsDBound(),
 		.bIsDynamic = gWorld->pBlockout->IsDynamic(&object),
 		.ScriptPath = gObjectScripts->GetPath(object.ID),
 		.EnterDirection = enter_direction,

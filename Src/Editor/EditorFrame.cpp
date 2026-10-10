@@ -101,7 +101,7 @@ static constexpr ToolButtonInfo scToolButtons[] = {
 static_assert(std::size(scToolButtons) == static_cast<size_t>(eEditorTool::Count));
 
 static constexpr const char* scDataFilterNames[] = {
-	"All", "Probe Volumes", "Reflection Probes", "Spawn Points", "Volumes", "Lights",
+	"All", "Probe Volumes", "Reflection Probes", "Spawn Points", "Volumes", "Lights", "nvbrush", "dbound",
 };
 
 static_assert(std::size(scDataFilterNames) == static_cast<size_t>(eDataFilter::Count));
@@ -149,8 +149,9 @@ void EditorFrame::OpenPrototype()
 {
 	const std::filesystem::path current = GetBlockoutDialogStart(mState.BlockoutPath);
 
-	wxFileDialog dialog(this, "Open blockout", wxString::FromUTF8(current.parent_path().lexically_normal().string()),
-						wxString::FromUTF8(current.filename().string()), "Blockout files (*.prx)|*.prx",
+	wxFileDialog dialog(this, "Open map", wxString::FromUTF8(current.parent_path().lexically_normal().string()),
+						wxString::FromUTF8(current.filename().string()),
+						"Maps (*.prx;*.fxmap)|*.prx;*.fxmap|Prototypes (*.prx)|*.prx|Compiled maps (*.fxmap)|*.fxmap",
 						wxFD_OPEN | wxFD_FILE_MUST_EXIST);
 
 	if (dialog.ShowModal() != wxID_OK) {
@@ -166,7 +167,7 @@ void EditorFrame::OpenPrototype()
 				return;
 			}
 
-			LogInfo("Opening blockout '{}'", path);
+			LogInfo("Opening map '{}'", path);
 
 			const String previous_path = gWorld->BlockoutPath;
 			const String new_path(path.c_str());
@@ -184,8 +185,9 @@ void EditorFrame::OpenPrototype()
 			thread::PostToUI(
 				[this]
 				{
-					wxMessageBox("That file could not be loaded as a blockout.", "Open blockout", wxOK | wxICON_ERROR,
-								 this);
+					wxMessageBox("That file could not be loaded. A compiled map (.fxmap) needs its prototype (.prx) "
+								 "next to it.",
+								 "Open map", wxOK | wxICON_ERROR, this);
 				});
 		});
 }
@@ -222,7 +224,8 @@ void EditorFrame::SavePrototype()
 
 void EditorFrame::SaveProtoTypeAs()
 {
-	const std::filesystem::path current = GetBlockoutDialogStart(mState.BlockoutPath);
+	std::filesystem::path current = GetBlockoutDialogStart(mState.BlockoutPath);
+	current.replace_extension(".prx");
 
 	wxFileDialog dialog(this, "Save blockout as", wxString::FromUTF8(current.parent_path().lexically_normal().string()),
 						wxString::FromUTF8(current.filename().string()), "Blockout files (*.prx)|*.prx",
@@ -384,8 +387,7 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	mpPerspectiveButton = new OutlineToggleButton(root, wxBitmap(), "3D");
 	mpPerspectiveButton->SetToolTip("Fly around the level in 3D (Ctrl+1)");
 	mpPerspectiveButton->SetValue(true);
-	mpPerspectiveButton->Bind(wxEVT_TOGGLEBUTTON,
-							  [](wxCommandEvent&)
+	mpPerspectiveButton->Bind(wxEVT_TOGGLEBUTTON, [](wxCommandEvent&)
 							  { thread::PostToGame([] { gEditor->SetView(eEditorView::Perspective); }); });
 
 	mpTopButton = new OutlineToggleButton(root, wxBitmap(), "2D");

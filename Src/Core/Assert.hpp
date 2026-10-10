@@ -2,7 +2,6 @@
 
 #include <Core/Defines.hpp>
 #include <Core/Log.hpp>
-#include <Renderer/Backend/Util.hpp>
 
 namespace fx {
 
@@ -28,23 +27,7 @@ void Panic(const char* module, const char* fmt, TTypes&&... items)
 	Terminate();
 }
 
-template <typename... TTypes>
-void PanicVulkan(const char* module, const char* fmt, VkResult result, TTypes&&... items)
-{
-	LogFatal(LC_RENDER, "An irrecoverable error has occurred");
-
-	if (module != nullptr) {
-		LogFatal(LC_RENDER, "{:s}: ", module);
-	}
-
-	LogFatal(LC_RENDER, fmt, std::forward<TTypes>(items)...);
-	LogFatal(LC_RENDER, "=> Vulkan Err: {:s}", renderer::Util::ResultToStr(result));
-
-	Terminate();
-}
-
-#define ModulePanic(...)	   Panic(ModuleName__, __VA_ARGS__)
-#define ModulePanicVulkan(...) PanicVulkan(ModuleName__, __VA_ARGS__)
+#define ModulePanic(...) Panic(ModuleName__, __VA_ARGS__)
 
 #define Assert(cond)                                                                                                   \
 	if (!(cond)) {                                                                                                     \

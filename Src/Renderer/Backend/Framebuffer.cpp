@@ -3,9 +3,9 @@
 #include "Device.hpp"
 #include "RenderPass.hpp"
 
-#include <Core/Assert.hpp>
 #include <Core/Defines.hpp>
 #include <Core/Types.hpp>
+#include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 

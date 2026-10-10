@@ -39,8 +39,10 @@ static_assert(std::size(scTools) == static_cast<size_t>(eTopViewTool::Count));
 
 constexpr const char* scPlaneToolTips[scViewPlaneCount] = {
 	"Look down on the level (1)",
-	"Look at the level from the front, along Z (2)",
-	"Look at the level from the side, along X (3)",
+	"Look at the level from the front, along +Z (2)",
+	"Look at the level from the back, along -Z (3)",
+	"Look at the level from the left, along +X (4)",
+	"Look at the level from the right, along -X (5)",
 };
 
 wxBoxSizer* WrapItem(wxWindow* window)
@@ -113,6 +115,21 @@ TopViewPanel::TopViewPanel(wxWindow* parent) : wxPanel(parent, wxID_ANY)
 		mpVolumeRows[i] = new wxBoxSizer(wxHORIZONTAL);
 		mpVolumeRows[i]->Add(base_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 4));
 		mpVolumeRows[i]->Add(size_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+
+		if (plane == eViewPlane::Top) {
+			OutlineToggleButton* ground_button = new OutlineToggleButton(this, wxBitmap(), "Ground");
+			ground_button->SetToolTip(
+				"New brushes rest on the lowest surface under them that they fit on. Base Y is used over empty space");
+			ground_button->SetValue(true);
+			ground_button->Bind(wxEVT_TOGGLEBUTTON,
+								[this, ground_button](wxCommandEvent&)
+								{
+									mpCanvas->SetDropToGround(ground_button->GetValue());
+									mpCanvas->SetFocus();
+								});
+
+			mpVolumeRows[i]->Add(ground_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+		}
 
 		mpToolbar->Add(mpVolumeRows[i], wxSizerFlags().CenterVertical().Border(wxTOP | wxBOTTOM, 2));
 	}

@@ -1,5 +1,6 @@
 #include "RenderStage.hpp"
 
+#include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 
@@ -147,8 +148,8 @@ void RenderStage::Begin(CommandBuffer& cmd, const VkRect2D& render_area, const V
 
 	mRenderPass.Begin(&cmd, framebuffer, ClearValues, render_area);
 
-	// Pipelines leave the viewport and scissor to whoever is drawing, and the target is what decides them. They stay set
-	// across pipeline binds, so this is the only place that sets them.
+	// Pipelines leave the viewport and scissor to whoever is drawing, and the target is what decides them. They stay
+	// set across pipeline binds, so this is the only place that sets them.
 	const VkViewport viewport = {
 		.x = static_cast<float32>(draw_area.offset.x),
 		.y = static_cast<float32>(draw_area.offset.y),

@@ -40,8 +40,8 @@ private:
 	wxBoxSizer* mpVolumeRows[scViewPlaneCount] = {};
 	wxStaticText* mpStatus = nullptr;
 
-	float32 mBase[scViewPlaneCount] = { 0.0f, 0.0f, 0.0f };
-	float32 mSize[scViewPlaneCount] = { 1.0f, 1.0f, 1.0f };
+	float32 mBase[scViewPlaneCount] = {};
+	float32 mSize[scViewPlaneCount] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
 };
 
 } // namespace fx::editor

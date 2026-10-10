@@ -31,12 +31,8 @@ struct EnterDirectionChoice
 };
 
 static constexpr EnterDirectionChoice scEnterDirections[] = {
-	{ "Any", 0.0f, 0.0f, 0.0f },
-	{ "+X (right)", 1.0f, 0.0f, 0.0f },
-	{ "-X (left)", -1.0f, 0.0f, 0.0f },
-	{ "+Y (up)", 0.0f, 1.0f, 0.0f },
-	{ "-Y (down)", 0.0f, -1.0f, 0.0f },
-	{ "+Z (forward)", 0.0f, 0.0f, 1.0f },
+	{ "Any", 0.0f, 0.0f, 0.0f },		{ "+X (right)", 1.0f, 0.0f, 0.0f }, { "-X (left)", -1.0f, 0.0f, 0.0f },
+	{ "+Y (up)", 0.0f, 1.0f, 0.0f },	{ "-Y (down)", 0.0f, -1.0f, 0.0f }, { "+Z (forward)", 0.0f, 0.0f, 1.0f },
 	{ "-Z (back)", 0.0f, 0.0f, -1.0f },
 };
 
@@ -76,11 +72,14 @@ static constexpr FlagName scTagNames[] = {
 	{ static_cast<uint32>(eObjectTag::LockTransform), "Lock Transform", nullptr },
 	{ static_cast<uint32>(eObjectTag::ProbeVolume), "Probe Volume", "Blockout brushes only" },
 	{ static_cast<uint32>(eObjectTag::ReflectionProbe), "Reflection Probe", "Blockout brushes only" },
-	{ static_cast<uint32>(eObjectTag::Bleeds), "Bleeds", nullptr },
 	{ static_cast<uint32>(eObjectTag::Spawn), "Spawn", nullptr },
 	{ static_cast<uint32>(eObjectTag::Trigger), "Trigger",
 	  "Blockout brushes only. Calls object_trigger_enter and object_trigger_exit in the object's script when the "
 	  "player enters and leaves it" },
+	{ static_cast<uint32>(eObjectTag::NvBrush), "nvbrush",
+	  "Blockout brushes only. Collides but is never drawn. The map compiler keeps only its collider" },
+	{ static_cast<uint32>(eObjectTag::DBound), "dbound",
+	  "Blockout brushes only. Seals the map for the map compiler: no faces, no collision" },
 };
 
 static constexpr FlagName scFlagNames[] = {

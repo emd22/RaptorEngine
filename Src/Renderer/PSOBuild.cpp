@@ -2,6 +2,7 @@
 
 #include "Backend/DescriptorCache.hpp"
 #include "Backend/RenderPass.hpp"
+#include "Backend/Util.hpp"
 #include "Backend/VertexDescription.hpp"
 #include "Globals.hpp"
 #include "PipelineCache.hpp"
@@ -156,8 +157,7 @@ void PSOBuild::BuildPipeline()
 	// If there are descriptors waiting to be built but there is already a built pipeline layout, then they will never
 	// be created or used. Notify incase that is a mistake.
 	else if (HasDescriptorsToBuild() && !HasFlag(mFlags, ePSOBuildFlags::ReuseDescriptors)) {
-		LogWarning(LC_RENDER, "PSOBuild: Descriptors will never be built for pipeline '{}'",
-				   mDebugName);
+		LogWarning(LC_RENDER, "PSOBuild: Descriptors will never be built for pipeline '{}'", mDebugName);
 		Panic("PSOBuild", "Oops!");
 	}
 

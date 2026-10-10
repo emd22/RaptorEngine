@@ -10,6 +10,7 @@
 #include <Asset/Font/Font.hpp>
 #include <Asset/WorldFile.hpp>
 #include <CVar.hpp>
+#include <Map/CompiledMap.hpp>
 #include <Controls.hpp>
 #include <Core/Assert.hpp>
 #include <Core/Defer.hpp>
@@ -879,7 +880,11 @@ void RaptorGame::UpdateRagdollDummies()
 
 void RaptorGame::UpdateWindowTitle()
 {
-	if (gWorld == nullptr || (mbTitleShown && gWorld->BlockoutPath == mTitleBlockoutPath)) {
+	const bool is_compiled = (gWorld != nullptr && gWorld->pBlockout != nullptr &&
+							  gWorld->pBlockout->HasCompiledWorld());
+
+	if (gWorld == nullptr ||
+		(mbTitleShown && gWorld->BlockoutPath == mTitleBlockoutPath && is_compiled == mbTitleCompiled)) {
 		return;
 	}
 
@@ -889,6 +894,7 @@ void RaptorGame::UpdateWindowTitle()
 	}
 
 	mTitleBlockoutPath = gWorld->BlockoutPath;
+	mbTitleCompiled = is_compiled;
 	mbTitleShown = true;
 
 	if (mTitleBlockoutPath.GetLength() == 0) {
@@ -896,9 +902,14 @@ void RaptorGame::UpdateWindowTitle()
 		return;
 	}
 
-	const std::string file_name = std::filesystem::path(mTitleBlockoutPath.CStr()).filename().string();
+	// What is loaded decides the name, not what was asked for: a compiled map that is out of date falls back to its
+	// prototype
+	std::filesystem::path file_name = std::filesystem::path(mTitleBlockoutPath.CStr()).filename();
+	file_name.replace_extension(is_compiled ? CompiledMap::scExtension : CompiledMap::scPrototypeExtension);
 
-	window->SetTitle(String::Fmt("{} - {}", mBaseWindowTitle.CStr(), file_name).CStr());
+	window->SetTitle(String::Fmt("{} - {}{}", mBaseWindowTitle.CStr(), file_name.string(),
+								 is_compiled ? "" : " (prototype)")
+						 .CStr());
 }
 
 void RaptorGame::ReloadWorldFile()

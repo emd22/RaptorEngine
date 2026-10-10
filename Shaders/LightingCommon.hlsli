@@ -55,7 +55,7 @@ struct TileLightData
 #define FX_MATH_PI 3.14159265359
 #define FX_MATH_1_OVER_PI 0.31830988618
 
-#define PROBE_CAPTURE_AMBIENT_ILLUMINANCE 1500.0
+#define PROBE_CAPTURE_MAX_ALBEDO 0.9
 
 /// Clamped dot product
 float DotC(float3 a, float3 b)

@@ -73,6 +73,7 @@ public:
 	void DoReloadAnimation();
 
 	void SetViewModelAnimations(const char* idle, const char* fire, const char* reload);
+	void ApplyViewModelIdleAnimation();
 	void SetViewModelHolster(float32 amount) { mViewModelHolster = amount; }
 
 	void AddRecoil(float32 pitch, float32 yaw);

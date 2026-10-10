@@ -65,9 +65,7 @@ void Player::Create()
 				}
 			}
 
-			if (mpViewModelSkeleton) {
-				mpViewModelSkeleton->SetRestAnimation(mpViewModelSkeleton->FindAnimation(mIdleAnim));
-			}
+			ApplyViewModelIdleAnimation();
 
 			// Start in line with the camera so the view model doesn't swing in when it first appears
 			mPrevCameraYaw = pCamera->mAngleX;
@@ -399,15 +397,29 @@ void Player::SetViewModelAnimations(const char* idle, const char* fire, const ch
 	mFireAnim = fire;
 	mReloadAnim = reload;
 
+	ApplyViewModelIdleAnimation();
+}
+
+void Player::ApplyViewModelIdleAnimation()
+{
 	if (!mpViewModelSkeleton) {
 		return;
 	}
 
 	const Animation* idle_anim = mpViewModelSkeleton->FindAnimation(mIdleAnim);
 
-	if (idle_anim != nullptr) {
-		mpViewModelSkeleton->SetRestAnimation(idle_anim);
+	if (idle_anim == nullptr) {
+		LogWarning(LC_ASSET, "View model has no idle animation named '{}', keeping its current one", mIdleAnim);
+
+		LogInfo(LC_ASSET, "The animations found are:");
+		for (const Animation& anim : mpViewModelSkeleton->Animations) {
+			LogInfo(LC_ASSET, "{}, duration {}", anim.Name, anim.Duration);
+		}
+
+		return;
 	}
+
+	mpViewModelSkeleton->SetRestAnimation(idle_anim);
 }
 
 void Player::AddRecoil(float32 pitch, float32 yaw)

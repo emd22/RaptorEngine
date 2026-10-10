@@ -96,6 +96,10 @@ static constexpr uint32 scDataTools[static_cast<uint32>(eDataFilter::Count)] = {
 	ToolBit(eEditorTool::Translate) | ToolBit(eEditorTool::Face) | ToolBit(eEditorTool::Rotate) |
 		ToolBit(eEditorTool::Create),
 	ToolBit(eEditorTool::Light),
+	ToolBit(eEditorTool::Translate) | ToolBit(eEditorTool::Face) | ToolBit(eEditorTool::Rotate) |
+		ToolBit(eEditorTool::Create),
+	ToolBit(eEditorTool::Translate) | ToolBit(eEditorTool::Face) | ToolBit(eEditorTool::Rotate) |
+		ToolBit(eEditorTool::Create),
 };
 
 static constexpr eEditorTool scFallbackTools[] = {
@@ -128,6 +132,7 @@ bool RaptorEditor::InitGUI(int argc, char** argv)
 
 #ifdef FX_PLATFORM_MACOS
 	platform::DisableWindowTabbing();
+	platform::InitRawMouse();
 #endif
 
 	if (!wxTheApp->CallOnInit()) {
@@ -1156,6 +1161,10 @@ static bool MatchesDataFilter(const Object& object, eDataFilter filter)
 		return object.IsReflectionProbe();
 	case eDataFilter::Volumes:
 		return object.IsTrigger() && !object.IsProbeVolume();
+	case eDataFilter::NvBrushes:
+		return object.IsNvBrush();
+	case eDataFilter::DBounds:
+		return object.IsDBound();
 	default:
 		return false;
 	}
@@ -1365,7 +1374,7 @@ void RaptorEditor::CreateObjectAtCrosshair()
 static bool IsCreatableDataKind(eDataFilter filter)
 {
 	return filter == eDataFilter::ProbeVolumes || filter == eDataFilter::ReflectionProbes ||
-		   filter == eDataFilter::Volumes;
+		   filter == eDataFilter::Volumes || filter == eDataFilter::NvBrushes || filter == eDataFilter::DBounds;
 }
 
 Object* RaptorEditor::CreateDataBrush(const Brush::PlaneList& planes, const Vec3f position)
@@ -1377,9 +1386,16 @@ Object* RaptorEditor::CreateDataBrush(const Brush::PlaneList& planes, const Vec3
 	ObjectSnapshot snapshot;
 	snapshot.Position = position;
 	snapshot.Material = gWorld->pBlockout->GetDefaultMaterial();
-	snapshot.bIsProbeVolume = (mDataFilter != eDataFilter::Volumes);
+	snapshot.bIsProbeVolume = (mDataFilter == eDataFilter::ProbeVolumes ||
+							   mDataFilter == eDataFilter::ReflectionProbes);
 	snapshot.bIsReflectionProbe = (mDataFilter == eDataFilter::ReflectionProbes);
 	snapshot.bIsTrigger = (mDataFilter == eDataFilter::Volumes);
+	snapshot.bIsNvBrush = (mDataFilter == eDataFilter::NvBrushes);
+	snapshot.bIsDBound = (mDataFilter == eDataFilter::DBounds);
+
+	if (snapshot.bIsDBound) {
+		snapshot.Material = gWorld->pBlockout->GetDBoundMaterial();
+	}
 
 	Object* created = EmplaceEditOperation<CreateBrushOperation>(planes, snapshot).GetCreated();
 
@@ -1397,7 +1413,8 @@ Object* RaptorEditor::CreateDataBrush(const Brush::PlaneList& planes, const Vec3
 void RaptorEditor::CreateDataBrushAtCrosshair()
 {
 	if (!IsCreatableDataKind(mDataFilter)) {
-		LogWarning(LC_CORE, "Pick Probe Volumes, Reflection Probes or Volumes in the Data filter to create one");
+		LogWarning(LC_CORE, "Pick Probe Volumes, Reflection Probes, Volumes, Collision or Map Bounds in the Data "
+							"filter to create one");
 		return;
 	}
 

@@ -37,6 +37,8 @@ static constexpr TagName scTagNames[] = {
 	{ eObjectTag::ReflectionProbe, "Reflection Probe" },
 	{ eObjectTag::Spawn, "Spawn" },
 	{ eObjectTag::Trigger, "Trigger" },
+	{ eObjectTag::NvBrush, "nvbrush" },
+	{ eObjectTag::DBound, "dbound" },
 };
 
 static std::string BuildTagsList(eObjectTag tags)

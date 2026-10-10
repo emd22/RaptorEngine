@@ -115,6 +115,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/raptor.dir/Src/BrushEntry.cpp.o -c /Users/emd22/Projects/raptor/Src/BrushEntry.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/BrushEntry.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/BrushEntry.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/raptor.dir/Src/CVar.cpp.o -c /Users/emd22/Projects/raptor/Src/CVar.cpp",
   "file": "/Users/emd22/Projects/raptor/Src/CVar.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/CVar.cpp.o"
@@ -454,6 +460,12 @@
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/raptor.dir/Src/Main.cpp.o -c /Users/emd22/Projects/raptor/Src/Main.cpp",
   "file": "/Users/emd22/Projects/raptor/Src/Main.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Main.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/raptor.dir/Src/Map/CompiledMap.cpp.o -c /Users/emd22/Projects/raptor/Src/Map/CompiledMap.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Map/CompiledMap.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Map/CompiledMap.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
@@ -862,6 +874,12 @@
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/raptor.dir/Src/Renderer/PipelineNames.cpp.o -c /Users/emd22/Projects/raptor/Src/Renderer/PipelineNames.cpp",
   "file": "/Users/emd22/Projects/raptor/Src/Renderer/PipelineNames.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Renderer/PipelineNames.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/raptor.dir/Src/Renderer/ProbePlacement.cpp.o -c /Users/emd22/Projects/raptor/Src/Renderer/ProbePlacement.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Renderer/ProbePlacement.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Renderer/ProbePlacement.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
@@ -1828,6 +1846,204 @@
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -x objective-c++ -O2 -g -DNDEBUG -std=gnu++2a -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics --system-header-prefix=ThirdParty/ -O2 -g -fobjc-arc -o CMakeFiles/raptor.dir/Src/Editor/EditorPlatformMac.mm.o -c /Users/emd22/Projects/raptor/Src/Editor/EditorPlatformMac.mm",
   "file": "/Users/emd22/Projects/raptor/Src/Editor/EditorPlatformMac.mm",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Editor/EditorPlatformMac.mm.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Tools/MapCompiler/Bsp.cpp.o -c /Users/emd22/Projects/raptor/Tools/MapCompiler/Bsp.cpp",
+  "file": "/Users/emd22/Projects/raptor/Tools/MapCompiler/Bsp.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Tools/MapCompiler/Bsp.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Tools/MapCompiler/Compiler.cpp.o -c /Users/emd22/Projects/raptor/Tools/MapCompiler/Compiler.cpp",
+  "file": "/Users/emd22/Projects/raptor/Tools/MapCompiler/Compiler.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Tools/MapCompiler/Compiler.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Tools/MapCompiler/Geometry.cpp.o -c /Users/emd22/Projects/raptor/Tools/MapCompiler/Geometry.cpp",
+  "file": "/Users/emd22/Projects/raptor/Tools/MapCompiler/Geometry.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Tools/MapCompiler/Geometry.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Tools/MapCompiler/MapSource.cpp.o -c /Users/emd22/Projects/raptor/Tools/MapCompiler/MapSource.cpp",
+  "file": "/Users/emd22/Projects/raptor/Tools/MapCompiler/MapSource.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Tools/MapCompiler/MapSource.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Tools/MapCompiler/Surfaces.cpp.o -c /Users/emd22/Projects/raptor/Tools/MapCompiler/Surfaces.cpp",
+  "file": "/Users/emd22/Projects/raptor/Tools/MapCompiler/Surfaces.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Tools/MapCompiler/Surfaces.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Tools/MapCompiler/Verify.cpp.o -c /Users/emd22/Projects/raptor/Tools/MapCompiler/Verify.cpp",
+  "file": "/Users/emd22/Projects/raptor/Tools/MapCompiler/Verify.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Tools/MapCompiler/Verify.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Map/CompiledMap.cpp.o -c /Users/emd22/Projects/raptor/Src/Map/CompiledMap.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Map/CompiledMap.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Map/CompiledMap.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Renderer/ProbePlacement.cpp.o -c /Users/emd22/Projects/raptor/Src/Renderer/ProbePlacement.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Renderer/ProbePlacement.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Renderer/ProbePlacement.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Math/BBox.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/BBox.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Math/BBox.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Math/BBox.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/BrushEntry.cpp.o -c /Users/emd22/Projects/raptor/Src/BrushEntry.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/BrushEntry.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/BrushEntry.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Brush.cpp.o -c /Users/emd22/Projects/raptor/Src/Brush.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Brush.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Brush.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Asset/ConfigFile.cpp.o -c /Users/emd22/Projects/raptor/Src/Asset/ConfigFile.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Asset/ConfigFile.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Asset/ConfigFile.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Core/Allocator.cpp.o -c /Users/emd22/Projects/raptor/Src/Core/Allocator.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Core/Allocator.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Core/Allocator.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Core/File.cpp.o -c /Users/emd22/Projects/raptor/Src/Core/File.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Core/File.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Core/File.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Core/FilesystemIO.cpp.o -c /Users/emd22/Projects/raptor/Src/Core/FilesystemIO.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Core/FilesystemIO.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Core/FilesystemIO.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Core/Log.cpp.o -c /Users/emd22/Projects/raptor/Src/Core/Log.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Core/Log.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Core/Log.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Core/Path.cpp.o -c /Users/emd22/Projects/raptor/Src/Core/Path.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Core/Path.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Core/Path.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Core/String.cpp.o -c /Users/emd22/Projects/raptor/Src/Core/String.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Core/String.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Core/String.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Util/Tokenizer.cpp.o -c /Users/emd22/Projects/raptor/Src/Util/Tokenizer.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Util/Tokenizer.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Util/Tokenizer.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Math/MathUtil.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/MathUtil.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Math/MathUtil.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Math/MathUtil.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Math/NeonUtil.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/NeonUtil.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Math/NeonUtil.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Math/NeonUtil.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Math/SSEUtil.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/SSEUtil.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Math/SSEUtil.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Math/SSEUtil.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Math/Impl/Matrix/Mat4_Neon.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/Impl/Matrix/Mat4_Neon.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Math/Impl/Matrix/Mat4_Neon.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Math/Impl/Matrix/Mat4_Neon.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Math/Impl/Matrix/Mat4_AVX.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/Impl/Matrix/Mat4_AVX.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Math/Impl/Matrix/Mat4_AVX.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Math/Impl/Matrix/Mat4_AVX.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Math/Impl/Quaternion/Quat_Neon.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/Impl/Quaternion/Quat_Neon.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Math/Impl/Quaternion/Quat_Neon.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Math/Impl/Quaternion/Quat_Neon.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Math/Impl/Quaternion/Quat_AVX.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/Impl/Quaternion/Quat_AVX.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Math/Impl/Quaternion/Quat_AVX.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Math/Impl/Quaternion/Quat_AVX.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Math/Impl/Vector/Vec3_Neon.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/Impl/Vector/Vec3_Neon.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Math/Impl/Vector/Vec3_Neon.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Math/Impl/Vector/Vec3_Neon.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Math/Impl/Vector/Vec3_AVX.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/Impl/Vector/Vec3_AVX.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Math/Impl/Vector/Vec3_AVX.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Math/Impl/Vector/Vec3_AVX.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Math/Impl/Vector/Vec4_Neon.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/Impl/Vector/Vec4_Neon.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Math/Impl/Vector/Vec4_Neon.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Math/Impl/Vector/Vec4_Neon.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Math/Impl/Vector/Vec4_AVX.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/Impl/Vector/Vec4_AVX.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Math/Impl/Vector/Vec4_AVX.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Math/Impl/Vector/Vec4_AVX.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc.dir/Tools/MapCompiler/Main.cpp.o -c /Users/emd22/Projects/raptor/Tools/MapCompiler/Main.cpp",
+  "file": "/Users/emd22/Projects/raptor/Tools/MapCompiler/Main.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc.dir/Tools/MapCompiler/Main.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_gui.dir/Tools/MapCompilerGui/CompilerApp.cpp.o -c /Users/emd22/Projects/raptor/Tools/MapCompilerGui/CompilerApp.cpp",
+  "file": "/Users/emd22/Projects/raptor/Tools/MapCompilerGui/CompilerApp.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_gui.dir/Tools/MapCompilerGui/CompilerApp.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_gui.dir/Tools/MapCompilerGui/CompilerFrame.cpp.o -c /Users/emd22/Projects/raptor/Tools/MapCompilerGui/CompilerFrame.cpp",
+  "file": "/Users/emd22/Projects/raptor/Tools/MapCompilerGui/CompilerFrame.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_gui.dir/Tools/MapCompilerGui/CompilerFrame.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/raptor",

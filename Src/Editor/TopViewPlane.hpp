@@ -10,7 +10,9 @@ enum class eViewPlane : uint8
 {
 	Top,
 	Front,
-	Side,
+	Back,
+	Left,
+	Right,
 
 	Count,
 };
@@ -23,6 +25,7 @@ struct ViewPlaneAxes
 	uint32 V;
 	uint32 W;
 
+	float32 USign;
 	float32 DepthSign;
 	float32 RotateSign;
 
@@ -32,9 +35,10 @@ struct ViewPlaneAxes
 };
 
 inline constexpr ViewPlaneAxes scViewPlaneAxes[scViewPlaneCount] = {
-	{ 0, 2, 1, 1.0f, -1.0f, "T", "Base Y", "Height" },
-	{ 0, 1, 2, -1.0f, 1.0f, "F", "Base Z", "Depth" },
-	{ 2, 1, 0, 1.0f, -1.0f, "S", "Base X", "Width" },
+	{ 0, 2, 1, 1.0f, 1.0f, -1.0f, "T", "Base Y", "Height" },
+	{ 0, 1, 2, 1.0f, -1.0f, 1.0f, "F", "Base Z", "Depth" },
+	{ 0, 1, 2, -1.0f, 1.0f, -1.0f, "B", "Base Z", "Depth" },
+	{ 2, 1, 0, -1.0f, -1.0f, 1.0f, "L", "Base X", "Width" },
 };
 
 struct TopViewVertexHandle

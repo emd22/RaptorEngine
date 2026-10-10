@@ -3,9 +3,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include <Core/Assert.hpp>
 #include <Core/Defines.hpp>
-
-// #include <Core/Types.hpp>
 
 namespace fx::renderer {
 
@@ -16,6 +15,7 @@ namespace fx::renderer {
 			ModulePanicVulkan((message), result__);                                                                    \
 		}                                                                                                              \
 	}
+
 
 class Util
 {
@@ -176,5 +176,27 @@ public:
 #endif
 	}
 };
+
+/////////////////////////////////////
+// Vulkan specific panic helpers
+/////////////////////////////////////
+
+template <typename... TTypes>
+void PanicVulkan(const char* module, const char* fmt, VkResult result, TTypes&&... items)
+{
+	LogFatal(LC_RENDER, "An irrecoverable error has occurred");
+
+	if (module != nullptr) {
+		LogFatal(LC_RENDER, "{:s}: ", module);
+	}
+
+	LogFatal(LC_RENDER, fmt, std::forward<TTypes>(items)...);
+	LogFatal(LC_RENDER, "=> Vulkan Err: {:s}", renderer::Util::ResultToStr(result));
+
+	Terminate();
+}
+
+#define ModulePanicVulkan(...) PanicVulkan(ModuleName__, __VA_ARGS__)
+
 
 } // namespace fx::renderer

@@ -15,6 +15,7 @@
 #include <vector>
 
 class wxGraphicsContext;
+class wxZoomGestureEvent;
 
 namespace fx::editor {
 
@@ -43,8 +44,10 @@ public:
 	FX_FORCE_INLINE eViewPlane GetPlane() const { return mPlane; }
 
 	void SetCreateVolume(eViewPlane plane, float32 base, float32 size);
+	void SetDropToGround(bool enabled) { mbDropToGround = enabled; }
 
 	void FitAll();
+	void FitSelection();
 
 	void SetOnToolChanged(std::function<void(eTopViewTool)> handler) { mpOnToolChanged = std::move(handler); }
 	void SetOnPlaneChanged(std::function<void(eViewPlane)> handler) { mpOnPlaneChanged = std::move(handler); }
@@ -126,6 +129,7 @@ private:
 	void EndPan();
 	void OnMotion(wxMouseEvent& event);
 	void OnWheel(wxMouseEvent& event);
+	void OnZoomGesture(wxZoomGestureEvent& event);
 	void OnKeyDown(wxKeyEvent& event);
 	void OnKeyUp(wxKeyEvent& event);
 	void OnCaptureLost(wxMouseCaptureLostEvent& event);
@@ -166,6 +170,8 @@ private:
 	void CancelDrag();
 
 	void ZoomAt(const wxPoint& anchor, double factor);
+	void PanByPixels(double dx, double dy);
+	void FitBounds(const ViewBounds& bounds);
 	void TryInitialFit();
 
 	double Snap(double value) const;
@@ -183,9 +189,12 @@ private:
 
 	void SelectBrushes(const std::vector<uint32>& object_ids, eTopViewSelectMode mode);
 	void ApplyLocalSelection();
+	void SelectAll();
+	void InvertSelection();
 	void SendCommand(std::function<void()> command);
 
 	void NudgeSelection(double du, double dv);
+	void SetSnapBypass(bool bypass);
 	void SetToolFromKey(eTopViewTool tool);
 	bool IsToolAvailable(eTopViewTool tool) const;
 	void UpdateCursor();
@@ -219,6 +228,9 @@ private:
 	bool mbAdditive = false;
 	bool mbSpaceDown = false;
 	bool mbAltDown = false;
+	bool mbSnapBypass = false;
+
+	double mPinchStartScale = 24.0;
 
 	double mPanStartCenterU = 0.0;
 	double mPanStartCenterV = 0.0;
@@ -255,8 +267,9 @@ private:
 	bool mbLocalSelection = false;
 	std::vector<uint32> mLocalSelection;
 
-	float32 mCreateBase[scViewPlaneCount] = { 0.0f, 0.0f, 0.0f };
-	float32 mCreateSize[scViewPlaneCount] = { 1.0f, 1.0f, 1.0f };
+	float32 mCreateBase[scViewPlaneCount] = {};
+	float32 mCreateSize[scViewPlaneCount] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+	bool mbDropToGround = true;
 
 	std::function<void(eTopViewTool)> mpOnToolChanged;
 	std::function<void(eViewPlane)> mpOnPlaneChanged;

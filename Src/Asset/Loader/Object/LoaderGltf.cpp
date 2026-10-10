@@ -1534,12 +1534,54 @@ void LoaderGltf::ProcessData(AssetTicket& ticket)
 
 	// Skeletons (and their animations) built so far, indexed by skin. Meshes skinned to the same skin share one
 	// skeleton rather than each parsing their own copy.
-	std::vector<Ref<Skeleton>> skeletons(mpGltfData->skins_count);
+	SizedArray<Ref<Skeleton>> skeletons(mpGltfData->skins_count);
+
+	const auto get_skeleton = [&](cgltf_skin* skin) -> Ref<Skeleton>&
+	{
+		Ref<Skeleton>& skeleton = skeletons[static_cast<uint64>(skin - mpGltfData->skins)];
+
+		if (!skeleton) {
+			const std::vector<int32> joint_lookup = BuildJointLookup(skin);
+
+			skeleton = Ref<Skeleton>::New();
+			LoadSkeleton(*skeleton, skin, joint_lookup);
+			LoadAnimations(*skeleton, skin, joint_lookup);
+		}
+
+		return skeleton;
+	};
+
+	SizedArray<cgltf_skin*> drawn_joint_skin(mpGltfData->nodes_count);
+	for (cgltf_skin*& skin : drawn_joint_skin) {
+		skin = nullptr;
+	}
+
+	for (cgltf_node* node : mesh_nodes) {
+		if (node->skin == nullptr) {
+			continue;
+		}
+
+		for (cgltf_size joint_index = 0; joint_index < node->skin->joints_count; joint_index++) {
+			cgltf_skin*& slot =
+				drawn_joint_skin[static_cast<uint64>(node->skin->joints[joint_index] - mpGltfData->nodes)];
+
+			if (slot == nullptr) {
+				slot = node->skin;
+			}
+		}
+	}
+
+	Mat4f reflection = Mat4f::scIdentity;
+	reflection.Rows[0].X = -1.0f;
 
 	// Load each mesh node in the GLTF as a new separate object.
 	for (cgltf_node* node : mesh_nodes) {
 		MeshNodeContext context;
 		context.pSkin = node->skin;
+
+		cgltf_skin* attach_skin = nullptr;
+		const cgltf_node* attach_joint = nullptr;
+		Mat4f attach_offset = Mat4f::scIdentity;
 
 		if (node->skin == nullptr) {
 			bool has_joint_ancestor = false;
@@ -1552,7 +1594,30 @@ void LoaderGltf::ProcessData(AssetTicket& ticket)
 			}
 
 			if (has_joint_ancestor) {
-				joint_attached_count++;
+				Mat4f chain;
+				cgltf_node_transform_local(node, chain.RawData);
+
+				for (const cgltf_node* ancestor = node->parent; ancestor != nullptr; ancestor = ancestor->parent) {
+					cgltf_skin* ancestor_skin = drawn_joint_skin[static_cast<uint64>(ancestor - mpGltfData->nodes)];
+
+					if (ancestor_skin != nullptr) {
+						attach_skin = ancestor_skin;
+						attach_joint = ancestor;
+						break;
+					}
+
+					Mat4f local;
+					cgltf_node_transform_local(ancestor, local.RawData);
+
+					chain = chain * local;
+				}
+
+				if (attach_skin != nullptr) {
+					attach_offset = reflection * chain * reflection;
+				}
+				else {
+					joint_attached_count++;
+				}
 			}
 			else {
 				cgltf_node_transform_world(node, context.WorldMatrix);
@@ -1574,15 +1639,7 @@ void LoaderGltf::ProcessData(AssetTicket& ticket)
 
 		// If the node has a skeleton, load it in.
 		if (node->skin) {
-			Ref<Skeleton>& skeleton = skeletons[node->skin - mpGltfData->skins];
-
-			if (!skeleton) {
-				const std::vector<int32> joint_lookup = BuildJointLookup(node->skin);
-
-				skeleton = Ref<Skeleton>::New();
-				LoadSkeleton(*skeleton, node->skin, joint_lookup);
-				LoadAnimations(*skeleton, node->skin, joint_lookup);
-			}
+			Ref<Skeleton>& skeleton = get_skeleton(node->skin);
 
 			current_object->pSkeleton = skeleton;
 
@@ -1590,6 +1647,25 @@ void LoaderGltf::ProcessData(AssetTicket& ticket)
 			// need the skeleton themselves.
 			for (ObjectID primitive_id : GetChildren(current_object)) {
 				gObjectManager->GetObject(primitive_id)->pSkeleton = skeleton;
+			}
+		}
+
+		if (attach_skin != nullptr) {
+			Ref<Skeleton>& skeleton = get_skeleton(attach_skin);
+
+			BoneId bone = BoneNull;
+
+			for (cgltf_size joint_index = 0; joint_index < attach_skin->joints_count; joint_index++) {
+				if (attach_skin->joints[joint_index] == attach_joint) {
+					bone = static_cast<BoneId>(joint_index);
+					break;
+				}
+			}
+
+			current_object->AttachToBone(skeleton, bone, attach_offset);
+
+			for (ObjectID primitive_id : GetChildren(current_object)) {
+				gObjectManager->GetObject(primitive_id)->AttachToBone(skeleton, bone, attach_offset);
 			}
 		}
 

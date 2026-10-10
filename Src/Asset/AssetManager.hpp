@@ -22,7 +22,6 @@
 #include <chrono>
 #include <deque>
 #include <mutex>
-#include <thread>
 
 namespace fx {
 

@@ -8,6 +8,7 @@
 #define PROBE_MAX_VOLUMES 8
 
 #define PROBE_GRID_EMPTY 0xFFFF
+#define PROBE_GRID_SOLID 0xFFFE
 
 #define PROBE_MAX_PROBES 4096
 
@@ -320,7 +321,7 @@ uint ProbeCellCorner(ProbeVolume volume, StructuredBuffer<uint> grid, uint3 base
 bool SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume volume,
 								 StructuredBuffer<ProbeSHData> probes, StructuredBuffer<uint> grid,
 								 Texture2D moments_atlas, SamplerState moments_sampler, out float3 out_diffuse,
-								 out float3 out_specular, out float out_visibility)
+								 out float3 out_specular, out float out_visibility, out float out_coverage)
 {
 	const float3 biased_pos = ProbeBiasedPosition(pos_ws, n, volume);
 
@@ -337,13 +338,15 @@ bool SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume 
 
 	float visibility_sum = 0.0;
 	float placed_trilinear = 0.0;
+	float open_trilinear = 0.0;
 	uint placed_count = 0;
 
 	for (uint corner = 0; corner < 8; corner++) {
 		float trilinear;
 		const uint index = ProbeCellCorner(volume, grid, base, cell_frac, corner, trilinear);
 
-		if (index == PROBE_GRID_EMPTY) {
+		if (index >= PROBE_GRID_SOLID) {
+			open_trilinear += select(index == PROBE_GRID_EMPTY, trilinear, 0.0);
 			continue;
 		}
 
@@ -373,6 +376,7 @@ bool SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume 
 	}
 
 	out_visibility = select(placed_trilinear > 1e-6, visibility_sum / placed_trilinear, 1.0);
+	out_coverage = placed_trilinear / max(placed_trilinear + open_trilinear, 1e-6);
 
 	if (placed_count == 0) {
 		out_diffuse = float3(0.0, 0.0, 0.0);
@@ -392,7 +396,7 @@ bool SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume 
 			float trilinear;
 			const uint index = ProbeCellCorner(volume, grid, base, cell_frac, corner, trilinear);
 
-			if (index == PROBE_GRID_EMPTY) {
+			if (index >= PROBE_GRID_SOLID) {
 				continue;
 			}
 
