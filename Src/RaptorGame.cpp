@@ -883,8 +883,14 @@ void RaptorGame::UpdateWindowTitle()
 	const bool is_compiled = (gWorld != nullptr && gWorld->pBlockout != nullptr &&
 							  gWorld->pBlockout->HasCompiledWorld());
 
-	if (gWorld == nullptr ||
-		(mbTitleShown && gWorld->BlockoutPath == mTitleBlockoutPath && is_compiled == mbTitleCompiled)) {
+#ifdef FX_IS_EDITOR
+	const bool is_modified = gEditor->HasUnsavedChanges();
+#else
+	const bool is_modified = false;
+#endif
+
+	if (gWorld == nullptr || (mbTitleShown && gWorld->BlockoutPath == mTitleBlockoutPath &&
+							  is_compiled == mbTitleCompiled && is_modified == mbTitleModified)) {
 		return;
 	}
 
@@ -895,10 +901,13 @@ void RaptorGame::UpdateWindowTitle()
 
 	mTitleBlockoutPath = gWorld->BlockoutPath;
 	mbTitleCompiled = is_compiled;
+	mbTitleModified = is_modified;
 	mbTitleShown = true;
 
+	const char* modified_mark = is_modified ? " *" : "";
+
 	if (mTitleBlockoutPath.GetLength() == 0) {
-		window->SetTitle(mBaseWindowTitle.CStr());
+		window->SetTitle(String::Fmt("{} - untitled{}", mBaseWindowTitle.CStr(), modified_mark).CStr());
 		return;
 	}
 
@@ -907,8 +916,8 @@ void RaptorGame::UpdateWindowTitle()
 	std::filesystem::path file_name = std::filesystem::path(mTitleBlockoutPath.CStr()).filename();
 	file_name.replace_extension(is_compiled ? CompiledMap::scExtension : CompiledMap::scPrototypeExtension);
 
-	window->SetTitle(String::Fmt("{} - {}{}", mBaseWindowTitle.CStr(), file_name.string(),
-								 is_compiled ? "" : " (prototype)")
+	window->SetTitle(String::Fmt("{} - {}{}{}", mBaseWindowTitle.CStr(), file_name.string(),
+								 is_compiled ? "" : " (prototype)", modified_mark)
 						 .CStr());
 }
 

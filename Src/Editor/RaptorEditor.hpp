@@ -239,6 +239,10 @@ public:
 	/// Drops the selection and edit history. Call before the objects in them are destroyed, such as on a reload.
 	void ForgetObjects();
 
+	bool HasUnsavedChanges() const;
+	void MarkSaved();
+	void MarkModified();
+
 	/////////////////////////////////////
 	// Commands
 	/////////////////////////////////////
@@ -339,6 +343,9 @@ private:
 
 	EditorSelection mSelection;
 	EditHistory mHistory { mSelection };
+
+	uint64 mSavedRevision = 0;
+	bool mbUntrackedChanges = false;
 
 	/// Provides the `CMD_*` console commands
 	script::Script* mpCommandScript = nullptr;

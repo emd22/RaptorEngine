@@ -514,7 +514,7 @@ public:
 	ConfigFile() = default;
 
 	void Load(const std::string& path);
-	void Write(const std::string& path);
+	bool Write(const std::string& path);
 
 	ConfigEntry* GetEntry(Hash32 requested_name_hash) const;
 	PagedArray<ConfigEntry>& GetEntries() { return mConfigEntries; }

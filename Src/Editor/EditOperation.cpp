@@ -798,9 +798,12 @@ EditOperation& EditHistory::Push(std::unique_ptr<EditOperation> op)
 		const uint32 evict = std::min(static_cast<uint32>(std::max(mOperations.First()->GroupSize, 1)), size);
 
 		for (uint32 i = 0; i < evict; i++) {
+			mBaseRevision = mOperations.First()->Revision;
 			mOperations.PopFront();
 		}
 	}
+
+	op->Revision = mNextRevision++;
 
 	EditOperation& pushed = *mOperations.Push(std::move(op));
 
@@ -863,6 +866,17 @@ bool EditHistory::Redo()
 	return selection_changed;
 }
 
-void EditHistory::Clear() { mOperations.Clear(); }
+void EditHistory::Clear()
+{
+	mBaseRevision = GetRevision();
+	mOperations.Clear();
+}
+
+uint64 EditHistory::GetRevision() const
+{
+	const std::unique_ptr<EditOperation>* last = mOperations.Last();
+
+	return (last != nullptr) ? (*last)->Revision : mBaseRevision;
+}
 
 } // namespace fx::editor

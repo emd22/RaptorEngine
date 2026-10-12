@@ -55,18 +55,14 @@ public:
 
 	void OnCommit(wxCommandEvent& event)
 	{
-		if (!mbUpdatingFields && mpOnChange) {
-			mpOnChange(GetValue());
-		}
+		Commit();
 
 		event.Skip();
 	}
 
 	void OnFocusLost(wxFocusEvent& event)
 	{
-		if (!mbUpdatingFields && mpOnChange) {
-			mpOnChange(GetValue());
-		}
+		Commit();
 
 		event.Skip();
 	}
@@ -75,8 +71,31 @@ public:
 
 	virtual ~FieldBase() = default;
 
+protected:
+	void RememberValue() { mLastValue = GetValue(); }
+
+private:
+	void Commit()
+	{
+		if (mbUpdatingFields || !mpOnChange) {
+			return;
+		}
+
+		const TType value = GetValue();
+
+		if (value == mLastValue) {
+			return;
+		}
+
+		mLastValue = value;
+		mpOnChange(value);
+	}
+
 public:
 	OnChangeFunc mpOnChange = nullptr;
+
+private:
+	TType mLastValue {};
 };
 
 /////////////////////////////////////

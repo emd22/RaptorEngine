@@ -278,6 +278,7 @@ void ObjectPropertiesPanel::OnMaterialChoice(wxCommandEvent& event)
 
 			if (Object* last = selection.GetLast(); last != nullptr) {
 				gEditor->SetStoredMaterial(last, material);
+				gEditor->MarkModified();
 			}
 		});
 }

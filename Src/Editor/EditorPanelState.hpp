@@ -169,6 +169,8 @@ struct EditorPanelState
 
 	std::string BlockoutPath;
 
+	bool bUnsavedChanges = false;
+
 	bool operator==(const EditorPanelState& other) const = default;
 };
 

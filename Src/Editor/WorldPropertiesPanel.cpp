@@ -50,6 +50,12 @@ constexpr const char* scReflectionDebugViews[] = {
 
 } // namespace
 
+static void SetCameraCVar(const char* name, float32 value)
+{
+	gCVars->Set(name, value);
+	gEditor->MarkModified();
+}
+
 static wxCollapsiblePane* MakeBorderedPane(wxWindow* parent, wxSizer* sizer, const char* title)
 {
 	wxPanel* frame = new wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_SIMPLE);
@@ -119,22 +125,22 @@ WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, w
 
 		mpApertureField = new FloatField(cam_pane_win, "Aperture (f/)", Vec2f(0.7f, 64.0f));
 		mpApertureField->SetOnChange([](const float value)
-									 { thread::PostToGame([value] { gCVars->Set("r_aperture", value); }); });
+									 { thread::PostToGame([value] { SetCameraCVar("r_aperture", value); }); });
 		cam_pane_sizer->Add(mpApertureField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
 
 		mpShutterField = new FloatField(cam_pane_win, "Shutter (1/s)", Vec2f(1.0f, 8000.0f));
 		mpShutterField->SetOnChange([](const float value)
-									{ thread::PostToGame([value] { gCVars->Set("r_shutter", 1.0f / value); }); });
+									{ thread::PostToGame([value] { SetCameraCVar("r_shutter", 1.0f / value); }); });
 		cam_pane_sizer->Add(mpShutterField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
 
 		mpIsoField = new FloatField(cam_pane_win, "ISO", Vec2f(25.0f, 25600.0f));
 		mpIsoField->SetOnChange([](const float value)
-								{ thread::PostToGame([value] { gCVars->Set("r_iso", value); }); });
+								{ thread::PostToGame([value] { SetCameraCVar("r_iso", value); }); });
 		cam_pane_sizer->Add(mpIsoField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
 
 		mpCompensationField = new FloatField(cam_pane_win, "Compensation (EV)", Vec2f(-10.0f, 10.0f));
 		mpCompensationField->SetOnChange([](const float value)
-										 { thread::PostToGame([value] { gCVars->Set("r_exposure_ev", value); }); });
+										 { thread::PostToGame([value] { SetCameraCVar("r_exposure_ev", value); }); });
 		cam_pane_sizer->Add(mpCompensationField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
 
 		cam_pane_win->SetSizer(cam_pane_sizer);

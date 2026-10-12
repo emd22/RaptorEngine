@@ -291,6 +291,10 @@ void MaterialPickerWindow::ApplySelected()
 			for (uint32 i = 0; i < selection.GetCount(); i++) {
 				gEditor->SetStoredMaterial(selection.GetObject(i), material);
 			}
+
+			if (selection.GetCount() > 0) {
+				gEditor->MarkModified();
+			}
 		});
 }
 

@@ -8,6 +8,7 @@
 #include <Core/StackArray.hpp>
 #include <Core/Types.hpp>
 #include <atomic>
+#include <functional>
 
 class wxBoxSizer;
 class wxButton;
@@ -71,9 +72,10 @@ public:
 	void ShowAtlasPackerWindow();
 
 	void NewPrototype();
-	void SavePrototype();
-	void SaveProtoTypeAs();
+	bool SavePrototype();
+	bool SaveProtoTypeAs();
 	void OpenPrototype();
+	void ReloadPrototype();
 
 private:
 	void OnClose(wxCloseEvent& event);
@@ -82,6 +84,8 @@ private:
 	void SetSidePanelCollapsed(bool collapsed);
 	void FocusActiveView();
 	void ApplySplitLayout(const eEditorView view);
+
+	void RunAfterUnsavedCheck(const wxString& question, std::function<void()> game_task);
 
 private:
 	EditorViewport* mpViewport = nullptr;
@@ -128,6 +132,7 @@ private:
 	std::atomic<bool> mbCloseRequested = false;
 	std::atomic<bool> mbIsActive = true;
 	bool mbSidePanelCollapsed = false;
+	bool mbAskingAboutChanges = false;
 
 	EditorPanelState mState;
 };

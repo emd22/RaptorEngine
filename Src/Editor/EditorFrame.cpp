@@ -160,8 +160,8 @@ void EditorFrame::OpenPrototype()
 
 	const std::string path = ToBlockoutPath(std::filesystem::path(dialog.GetPath().ToStdString()));
 
-	thread::PostToGame(
-		[this, path]
+	RunAfterUnsavedCheck(
+		"Save changes to the prototype before opening another map?", [this, path]
 		{
 			if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
 				return;
@@ -194,20 +194,71 @@ void EditorFrame::OpenPrototype()
 
 void EditorFrame::NewPrototype()
 {
+	RunAfterUnsavedCheck("Save changes to the prototype before starting a new one?", []
+						 {
+							 if (gWorld != nullptr && gWorld->pBlockout != nullptr) {
+								 gWorld->pBlockout->ResetToTemplate();
+								 gWorld->BlockoutPath = String("");
+							 }
+						 });
+}
+
+void EditorFrame::ReloadPrototype()
+{
+	RunAfterUnsavedCheck("Save changes to the prototype before reloading it from disk?",
+						 [] { gEditor->InvokeReloadHandler(eReloadTarget::Prototype); });
+}
+
+void EditorFrame::RunAfterUnsavedCheck(const wxString& question, std::function<void()> game_task)
+{
+	if (mbAskingAboutChanges) {
+		return;
+	}
+
+	bool save_first = false;
+
+	if (mState.bUnsavedChanges) {
+		wxMessageDialog dialog(this, question, "Unsaved changes", wxYES_NO | wxCANCEL | wxICON_WARNING);
+		dialog.SetYesNoCancelLabels("Save", "Don't Save", "Cancel");
+		dialog.SetExtendedMessage("Your changes will be lost if you don't save them.");
+
+		mbAskingAboutChanges = true;
+		const int choice = dialog.ShowModal();
+		mbAskingAboutChanges = false;
+
+		if (choice == wxID_CANCEL) {
+			return;
+		}
+
+		save_first = (choice == wxID_YES);
+	}
+
+	if (save_first && !SavePrototype()) {
+		return;
+	}
+
 	thread::PostToGame(
-		[]
+		[this, save_first, task = std::move(game_task)]
 		{
-			if (gWorld != nullptr && gWorld->pBlockout != nullptr) {
-				gWorld->pBlockout->ResetToTemplate();
+			if (save_first && gEditor->HasUnsavedChanges()) {
+				thread::PostToUI(
+					[this]
+					{
+						wxMessageBox("The prototype could not be saved, so it has been left open. The log has the "
+									 "details.",
+									 "Save", wxOK | wxICON_ERROR, this);
+					});
+				return;
 			}
+
+			task();
 		});
 }
 
-void EditorFrame::SavePrototype()
+bool EditorFrame::SavePrototype()
 {
 	if (mState.BlockoutPath.empty()) {
-		SaveProtoTypeAs();
-		return;
+		return SaveProtoTypeAs();
 	}
 
 	thread::PostToGame(
@@ -220,9 +271,11 @@ void EditorFrame::SavePrototype()
 			LogInfo("Saving blockout to '{}'", gWorld->BlockoutPath);
 			gWorld->pBlockout->Save(gWorld->BlockoutPath);
 		});
+
+	return true;
 }
 
-void EditorFrame::SaveProtoTypeAs()
+bool EditorFrame::SaveProtoTypeAs()
 {
 	std::filesystem::path current = GetBlockoutDialogStart(mState.BlockoutPath);
 	current.replace_extension(".prx");
@@ -232,7 +285,7 @@ void EditorFrame::SaveProtoTypeAs()
 						wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
 
 	if (dialog.ShowModal() != wxID_OK) {
-		return;
+		return false;
 	}
 
 	std::filesystem::path chosen(dialog.GetPath().ToStdString());
@@ -255,6 +308,8 @@ void EditorFrame::SaveProtoTypeAs()
 			gWorld->BlockoutPath = String(path.c_str());
 			gWorld->pBlockout->Save(gWorld->BlockoutPath);
 		});
+
+	return true;
 }
 
 EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : wxFrame(nullptr, wxID_ANY, title)
@@ -268,7 +323,7 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	wxMenuItem* open_item = file_menu->Append(wxID_ANY, "Open...\tCtrl+O", "Opens an existing prototype");
 	file_menu->AppendSeparator();
 
-	wxMenuItem* save_item = file_menu->Append(wxID_ANY, "Save", "Saves the prototype to its current file");
+	wxMenuItem* save_item = file_menu->Append(wxID_ANY, "Save\tCtrl+S", "Saves the prototype to its current file");
 	wxMenuItem* save_as_item = file_menu->Append(wxID_ANY, "Save As...\tCtrl+Shift+S",
 												 "Saves the prototype under a new name");
 
@@ -330,7 +385,7 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	};
 
 	bind_reload(reload_world_item, eReloadTarget::World);
-	bind_reload(reload_prototype_item, eReloadTarget::Prototype);
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ReloadPrototype(); }, reload_prototype_item->GetId());
 	bind_reload(reload_scripts_item, eReloadTarget::Scripts);
 	bind_reload(clean_item, eReloadTarget::Clean);
 
@@ -806,7 +861,17 @@ void EditorFrame::ShowAtlasPackerWindow()
 	mpAtlasPackerWindow->Raise();
 }
 
-void EditorFrame::OnClose(wxCloseEvent& event) { mbCloseRequested = true; }
+void EditorFrame::OnClose(wxCloseEvent& event)
+{
+	if (!event.CanVeto() || !mState.bUnsavedChanges) {
+		mbCloseRequested = true;
+		return;
+	}
+
+	event.Veto();
+
+	RunAfterUnsavedCheck("Save changes to the prototype before closing?", [this] { mbCloseRequested = true; });
+}
 
 void EditorFrame::OnActivate(wxActivateEvent& event)
 {

@@ -75,6 +75,8 @@ void Vector3Field::SetValue(Vector3Field::TRefType value)
 	mpFields[2]->ChangeValue(wxString::Format("%.*f", scFloatPrecision, static_cast<double>(value.Z)));
 
 	mbUpdatingFields = false;
+
+	RememberValue();
 }
 
 bool Vector3Field::HasFocus() const
@@ -141,6 +143,8 @@ void FloatField::SetValue(FloatField::TRefType value)
 	mpField->ChangeValue(wxString::Format("%.*f", scFloatPrecision, static_cast<double>(value)));
 
 	mbUpdatingFields = false;
+
+	RememberValue();
 }
 
 bool FloatField::HasFocus() const { return mpField->HasFocus(); }

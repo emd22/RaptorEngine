@@ -323,6 +323,7 @@ EditorPanelState RaptorEditor::BuildPanelState()
 	}
 
 	state.BlockoutPath = gWorld->BlockoutPath.Str();
+	state.bUnsavedChanges = HasUnsavedChanges();
 
 	if (Object* object = mSelection.GetLast(); object != nullptr) {
 		ObjectPanelState& panel = state.Object;
@@ -1661,6 +1662,19 @@ void RaptorEditor::ForgetObjects()
 
 	SyncSelection();
 }
+
+bool RaptorEditor::HasUnsavedChanges() const
+{
+	return mbUntrackedChanges || mHistory.GetRevision() != mSavedRevision;
+}
+
+void RaptorEditor::MarkSaved()
+{
+	mSavedRevision = mHistory.GetRevision();
+	mbUntrackedChanges = false;
+}
+
+void RaptorEditor::MarkModified() { mbUntrackedChanges = true; }
 
 
 /////////////////////////////////////

@@ -1719,6 +1719,10 @@ void Blockout::ResetToTemplate()
 		return;
 	}
 
+#ifdef FX_IS_EDITOR
+	gEditor->ForgetObjects();
+#endif
+
 	RemoveBlockoutFromWorld(pWorld);
 
 	MaterialLibraryID lib_base_material = gWorld->pBlockout->mMaterials.FindIDByName("white_tile");
@@ -1746,6 +1750,10 @@ void Blockout::ResetToTemplate()
 	renderer::gShadowAtlas->Invalidate();
 
 	gWorld->Player.TeleportTo(Vec3f(0.0, 2.0, 0.0));
+
+#ifdef FX_IS_EDITOR
+	gEditor->MarkSaved();
+#endif
 }
 
 bool Blockout::Load(const String& opened_path)
@@ -1806,6 +1814,10 @@ bool Blockout::Load(const String& opened_path)
 	}
 
 	renderer::gShadowAtlas->Invalidate();
+
+#ifdef FX_IS_EDITOR
+	gEditor->MarkSaved();
+#endif
 
 	return true;
 }
@@ -1916,9 +1928,16 @@ void Blockout::Save(const String& save_path)
 		all_entry->AddMember(std::move(blockout_entry));
 	}
 
-	info.Write(path.CStr());
+	if (!info.Write(path.CStr())) {
+		LogError(LC_ASSET, "The prototype could not be written to '{}'", path);
+		return;
+	}
 
 	StoreLastBlockoutPath(path, "Config/Main.conf");
+
+#ifdef FX_IS_EDITOR
+	gEditor->MarkSaved();
+#endif
 }
 
 

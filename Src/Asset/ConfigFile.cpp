@@ -1024,12 +1024,12 @@ static bool IsConstantEntry(const ConfigEntry& entry)
 	return constant_names.contains(entry.Name.GetHash());
 }
 
-void ConfigFile::Write(const std::string& path)
+bool ConfigFile::Write(const std::string& path)
 {
 	File file(path.c_str(), File::eModType::Write, File::eDataType::Text);
 
 	if (!file.IsFileOpen()) {
-		return;
+		return false;
 	}
 
 	for (const ConfigEntry& entry : mConfigEntries) {
@@ -1041,6 +1041,8 @@ void ConfigFile::Write(const std::string& path)
 	}
 
 	file.Close();
+
+	return true;
 }
 
 void ConfigFile::InitConstants()

@@ -49,6 +49,8 @@ public:
 	/// The size of the operation group this is in. For example, when moving 10 objects, there will be 10 operations(one
 	/// for each event) making the GroupSize = 10.
 	int32 GroupSize;
+
+	uint64 Revision = 0;
 };
 
 class ObjectEditOperation : public EditOperation
@@ -436,11 +438,16 @@ public:
 
 	void Clear();
 
+	uint64 GetRevision() const;
+
 	~EditHistory() = default;
 
 private:
 	EditorSelection& mSelection;
 	UndoStack<std::unique_ptr<EditOperation>> mOperations;
+
+	uint64 mBaseRevision = 0;
+	uint64 mNextRevision = 1;
 };
 
 } // namespace editor

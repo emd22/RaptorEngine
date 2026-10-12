@@ -47,6 +47,7 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 					{
 						if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
 							light->SetPosition(value);
+							gEditor->MarkModified();
 						}
 					});
 			});
@@ -64,6 +65,7 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 					{
 						if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
 							light->SetRadius(value);
+							gEditor->MarkModified();
 						}
 					});
 			});
@@ -81,6 +83,7 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 					{
 						if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
 							light->Intensity = value;
+							gEditor->MarkModified();
 						}
 					});
 			});
@@ -98,6 +101,7 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 					{
 						if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
 							light->SetLumens(value);
+							gEditor->MarkModified();
 						}
 					});
 			});
@@ -115,6 +119,7 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 					{
 						if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
 							light->SetConeAngles(light->GetInnerAngle(), MathUtil::DegreesToRadians(value));
+							gEditor->MarkModified();
 						}
 					});
 			});
@@ -132,6 +137,7 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 					{
 						if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
 							light->SetConeAngles(MathUtil::DegreesToRadians(value), light->GetOuterAngle());
+							gEditor->MarkModified();
 						}
 					});
 			});
@@ -155,6 +161,7 @@ void LightToolSettingsPanel::OnColorChange(wxColourPickerEvent& event)
 		{
 			if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
 				light->Color = Color::FromRGBA(red, green, blue, 255);
+				gEditor->MarkModified();
 			}
 		});
 }
