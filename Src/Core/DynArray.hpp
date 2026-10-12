@@ -53,7 +53,7 @@ public:
 	template <typename... Args>
 	TElementType& Emplace(Args&&... args)
 	{
-		ResizeIfNeeded();
+		EnsureCapacity(Size + 1);
 
 		TElementType* element = &pData[Size++];
 		new (element) TElementType(std::forward<Args>(args)...);
@@ -84,7 +84,7 @@ public:
 
 	void Insert(const TElementType& object)
 	{
-		ResizeIfNeeded();
+		EnsureCapacity(Size + 1);
 
 		TElementType* dst = &pData[Size++];
 		if constexpr (std::is_copy_constructible_v<TElementType>) {
@@ -97,15 +97,48 @@ public:
 
 	void Clear()
 	{
-		for (size_t i = 0; i < Size; i++) {
-			TElementType& element = pData[i];
-			element.~TElementType();
+		if constexpr (std::is_destructible_v<TElementType>) {
+			for (uint32 i = 0; i < Size; i++) {
+				pData[i].~TElementType();
+			}
 		}
+
 
 		Size = 0;
 	}
 
 	FX_FORCE_INLINE void SetPageSize(uint32 page_size) { PageSize = page_size; }
+
+
+	/**
+	 * @brief Copies `size` objects of type `TElementType` from `src` into a DynArray
+	 */
+	FX_FORCE_INLINE void Assign(const TElementType* src, uint32 size)
+	{
+		EnsureCapacity(size);
+
+		const uint32 old_size = Size;
+		const uint32 common_size = std::min(old_size, size);
+
+		// Overwrite existing elements that overlap
+		for (uint32 i = 0; i < common_size; i++) {
+			pData[i] = src[i];
+		}
+
+		// Destroy the leftover old elements if we are shrinking the size
+		if constexpr (std::is_destructible_v<TElementType>) {
+			for (uint32 i = size; i < old_size; i++) {
+				pData[i].~TElementType();
+			}
+		}
+
+		// Construct the new elements if we are growing
+		for (uint32 i = old_size; i < size; i++) {
+			::new (static_cast<void*>(pData + i)) TElementType(src[i]);
+		}
+
+		Size = size;
+	}
 
 	Iterator begin() { return pData; }
 	Iterator end() { return pData + Size; }
@@ -154,19 +187,32 @@ public:
 	}
 
 private:
-	void ResizeIfNeeded()
+	/**
+	 * @brief Ensure there is enough capacity in the array for `size` more elements to be stored
+	 */
+	FX_FORCE_INLINE void EnsureCapacity(const uint32 size)
 	{
-		// If the data has not been allocated yet, allocate it with a minimum size.
-		if (pData == nullptr) {
-			Capacity = PageSize;
-			pData = reinterpret_cast<TElementType*>(std::malloc(sizeof(TElementType) * Capacity));
+		const uint32 new_size = size;
+
+		// If we already have enough capacity, nothing more to do
+		if (Capacity >= new_size) {
+			return;
 		}
 
-		// If there is no remaining space, use the growth function and resize our buffer.
-		if (pData && Size + 1 >= Capacity) {
-			Capacity = TGrow(Capacity, PageSize);
-			pData = reinterpret_cast<TElementType*>(std::realloc(pData, sizeof(TElementType) * Capacity));
+		// If the data has not been allocated yet, allocate it with a minimum page size or the required size
+		if (pData == nullptr) {
+			Capacity = (new_size < PageSize) ? PageSize : new_size;
+			pData = reinterpret_cast<TElementType*>(std::malloc(sizeof(TElementType) * Capacity));
+			return;
 		}
+
+		// Keep growing the capacity until it can accommodate the requested new size
+		while (Capacity < new_size) {
+			Capacity = TGrow(Capacity, PageSize);
+		}
+
+		// Resize our buffer to the new capacity
+		pData = reinterpret_cast<TElementType*>(std::realloc(pData, sizeof(TElementType) * Capacity));
 	}
 
 public:

@@ -18,6 +18,7 @@ enum class ePipelineFeatures : uint32
 	/// The material is alpha masked, so the pipeline has to sample its albedo and discard
 	AlphaMask = (1 << 2),
 	Unlit = (1 << 3),
+	Lightmap = (1 << 4),
 };
 
 FxEnumFlags(ePipelineFeatures);
@@ -50,6 +51,6 @@ enum class ePipelinePass : uint8
 constexpr uint32 scNumPipelinePasses = static_cast<uint32>(ePipelinePass::Count);
 
 /// Every combination of the ePipelineFeatures bits
-constexpr uint32 scNumFeatureCombinations = 1U << 4;
+constexpr uint32 scNumFeatureCombinations = 1U << 5;
 
 } // namespace fx::renderer

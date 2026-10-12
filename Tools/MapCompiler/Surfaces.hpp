@@ -10,6 +10,8 @@
 #include "Bsp.hpp"
 #include "MapSource.hpp"
 
+#include <Math/Vec2.hpp>
+
 namespace fx::mapc {
 
 struct SurfaceOptions
@@ -18,6 +20,8 @@ struct SurfaceOptions
 	bool bMerge = true;
 	bool bFixTJunctions = true;
 	double ChunkSize = 32.0;
+
+	bool bMakeLightmapCharts = true;
 };
 
 struct SurfaceStats
@@ -50,6 +54,22 @@ struct SurfacePolygon
 	Winding Points;
 };
 
+struct LightmapChart
+{
+	int32 PlaneIndex = PlaneSet::scNone;
+
+	Vec3d U = Vec3d(0.0);
+	Vec3d V = Vec3d(0.0);
+
+	Array<Vec2d> TrianglePoints;
+};
+
+struct LightmapVertex
+{
+	int32 Chart = -1;
+	Vec2d Point = Vec2d(0.0, 0.0);
+};
+
 class SurfaceBuilder
 {
 public:
@@ -61,6 +81,9 @@ public:
 
 	/// Three corners per triangle of everything that was written, for verification
 	Array<Vec3d> TrianglePoints;
+
+	Array<LightmapChart> Charts;
+	Array<Array<LightmapVertex>> LightmapVertices;
 
 private:
 	int32 FindOrAddMap(const TextureMap& map);

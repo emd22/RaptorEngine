@@ -184,8 +184,8 @@ void Pipeline::Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shade
 	};
 
 	if (vertex_info != nullptr) {
-		vertex_input_info.vertexBindingDescriptionCount = 1;
-		vertex_input_info.pVertexBindingDescriptions = &vertex_info->Binding;
+		vertex_input_info.vertexBindingDescriptionCount = vertex_info->BindingCount;
+		vertex_input_info.pVertexBindingDescriptions = vertex_info->Bindings;
 		vertex_input_info.vertexAttributeDescriptionCount = static_cast<uint32>(vertex_info->Attributes.Size);
 		vertex_input_info.pVertexAttributeDescriptions = vertex_info->Attributes.pData;
 	}

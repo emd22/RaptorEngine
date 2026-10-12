@@ -58,6 +58,9 @@ public:
 	bool bHasPlayerSpawn = false;
 	Vec3d PlayerSpawn = Vec3d(0.0);
 
+	bool bHasSun = false;
+	Vec3d SunDirection = Vec3d(0.0, 1.0, 0.0);
+
 	/// Everything the engine keeps light probes out of, in the order the engine would gather it
 	ProbePlacementBoxes ProbeBoxes;
 	/// World bounds of the probe volume brushes

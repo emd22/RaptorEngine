@@ -978,9 +978,10 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 		uint32 MaterialIndex = 0;
 
 		Array<CompiledMapVertex> Vertices;
+		Array<LightmapVertex> LightmapVertices;
 		Array<uint32> Indices;
 
-		std::map<std::tuple<int32, int32, int32>, uint32> VertexLookup;
+		std::map<std::tuple<int32, int32, int32, int32>, uint32> VertexLookup;
 	};
 
 	std::map<std::tuple<int32, int64, int64, int64>, Batch> batches;
@@ -1059,12 +1060,29 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 			Batch& batch = batches[{ group.MaterialIndex, cell.X, cell.Y, cell.Z }];
 			batch.MaterialIndex = static_cast<uint32>(group.MaterialIndex);
 
+			int32 chart_index = -1;
+
+			if (options.bMakeLightmapCharts) {
+				const PlaneBasis basis(normal);
+
+				chart_index = static_cast<int32>(Charts.Size);
+
+				LightmapChart& chart = Charts.Emplace();
+				chart.PlaneIndex = group.PlaneIndex;
+				chart.U = basis.U;
+				chart.V = basis.V;
+
+				for (const int32 index : triangle_indices) {
+					chart.TrianglePoints.Emplace(group_points[index]);
+				}
+			}
+
 			for (size_t t = 0; t + 2 < triangle_indices.Size; t += 3) {
 				const int32 corners[3] = { triangle_indices[t], triangle_indices[t + 2], triangle_indices[t + 1] };
 
 				for (const int32 corner : corners) {
 					const Vec3d& point = points[static_cast<size_t>(corner)];
-					const auto vertex_key = std::make_tuple(corner, group.PlaneIndex, group.MapIndex);
+					const auto vertex_key = std::make_tuple(corner, group.PlaneIndex, group.MapIndex, chart_index);
 
 					auto found = batch.VertexLookup.find(vertex_key);
 
@@ -1091,6 +1109,7 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 									.emplace(vertex_key, batch.Vertices.Size)
 									.first;
 						batch.Vertices.Emplace(vertex);
+						batch.LightmapVertices.Emplace(LightmapVertex { chart_index, group_points[corner] });
 					}
 
 					batch.Indices.Emplace(found->second);
@@ -1131,6 +1150,7 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 		Stats.Vertices += static_cast<uint32>(surface.Vertices.Size);
 
 		out_map.Surfaces.Emplace(std::move(surface));
+		LightmapVertices.Emplace(std::move(batch.LightmapVertices));
 	}
 
 	out_map.Materials.InitAsCopyOf(source.Materials);
@@ -1141,6 +1161,8 @@ void SurfaceBuilder::Build(const PlaneSet& planes, const Bsp& bsp, const MapSour
 {
 	Stats = SurfaceStats {};
 	TrianglePoints.Clear();
+	Charts.Clear();
+	LightmapVertices.Clear();
 	mPolygons.Clear();
 	mMaps.Clear();
 

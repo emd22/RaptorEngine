@@ -15,7 +15,10 @@
 #include <Math/SIMDHelper.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/LightManager.hpp>
+#include <Renderer/LightProbe.hpp>
+#include <Renderer/Limits.hpp>
 #include <Renderer/PipelineNames.hpp>
 #include <Script/ObjectScripts.hpp>
 #include <World.hpp>
@@ -25,6 +28,8 @@ namespace fx {
 
 static constexpr MaterialLibraryID scDefaultMaterialID = MaterialLibraryID(0);
 static constexpr MaterialLibraryID scEditableMaterialID = MaterialLibraryID(1);
+
+static constexpr float32 scBakedSunMinCosine = 0.99999f;
 
 Blockout::Blockout() {}
 
@@ -534,6 +539,21 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	mCompiledBodies.clear();
 	mCompiledProbeLayout.Clear();
 	mbHasCompiledWorld = false;
+
+	if (mbHasBakedSun) {
+		gProbeManager->ClearSunVisibility();
+	}
+
+	mbHasBakedSun = false;
+}
+
+bool Blockout::IsBakedSunCurrent(const Vec3f sun_position) const
+{
+	if (!mbHasBakedSun || sun_position.Length() < 1e-6f) {
+		return false;
+	}
+
+	return sun_position.Normalize().Dot(mBakedSunDirection) > scBakedSunMinCosine;
 }
 
 bool Blockout::LoadCompiledMap(const String& prototype_path, CompiledMap& out_map) const
@@ -560,6 +580,19 @@ bool Blockout::LoadCompiledMap(const String& prototype_path, CompiledMap& out_ma
 
 void Blockout::CreateCompiledWorld(const CompiledMap& map)
 {
+	const CompiledMapLightmap& lightmap = map.Lightmap;
+
+	mbHasBakedSun = map.HasBakedSun() &&
+					renderer::gGraphics->UploadLightmap(Vec2u(lightmap.Width, lightmap.Height), lightmap.SunVisibility.pData);
+
+	if (map.HasBakedSun() && !mbHasBakedSun) {
+		LogWarning(LC_ASSET, "The compiled map's {}x{} lightmap does not fit in {}x{}, the sun's shadows stay dynamic",
+				   lightmap.Width, lightmap.Height, Limits::LightmapSize, Limits::LightmapSize);
+	}
+
+	const Vec2f lightmap_scale(static_cast<float32>(lightmap.Width) / static_cast<float32>(Limits::LightmapSize),
+							   static_cast<float32>(lightmap.Height) / static_cast<float32>(Limits::LightmapSize));
+
 	for (size_t surface_index = 0; surface_index < map.Surfaces.Size; surface_index++) {
 		const CompiledMapSurface& surface = map.Surfaces[surface_index];
 		const CompiledMapMaterial& material = map.Materials[surface.MaterialIndex];
@@ -607,6 +640,21 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 
 		object->SetShadowCaster(true);
 		object->pMesh = mesh->AsDefaultMesh();
+
+		if (mbHasBakedSun && surface.HasLightmapTexcoords()) {
+			SizedArray<float32> lightmap_uvs;
+			lightmap_uvs.InitSize(surface.LightmapTexcoords.Size);
+
+			for (size_t i = 0; i + 1 < lightmap_uvs.Size; i += 2) {
+				lightmap_uvs[i] = surface.LightmapTexcoords[i] * lightmap_scale.X;
+				lightmap_uvs[i + 1] = surface.LightmapTexcoords[i + 1] * lightmap_scale.Y;
+			}
+
+			renderer::gGraphics->SubmitImmediateUploadCmd(
+				[&](renderer::CommandBuffer& cmd) { object->pMesh->UploadLightmapUVs(cmd, lightmap_uvs); });
+
+			object->SetLightmapped(true);
+		}
 
 		object->Bounds.Min = Vec3f(surface.BoundsMin[0], surface.BoundsMin[1], surface.BoundsMin[2]);
 		object->Bounds.Max = Vec3f(surface.BoundsMax[0], surface.BoundsMax[1], surface.BoundsMax[2]);
@@ -663,6 +711,16 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 
 	mCompiledProbeLayout.CopyFrom(map.Probes);
 	mbHasCompiledWorld = true;
+
+	if (mbHasBakedSun) {
+		mBakedSunDirection = Vec3f(lightmap.SunDirection[0], lightmap.SunDirection[1], lightmap.SunDirection[2]);
+
+		gProbeManager->SetSunVisibility(Slice<const Vec3f>(map.Probes.Positions.pData, map.Probes.Positions.Size),
+										Slice<const uint8>(map.ProbeSunVisibility.pData, map.ProbeSunVisibility.Size));
+
+		LogInfo("The sun's shadows are baked: {}x{} lightmap, {} probes carry them to everything else", lightmap.Width,
+				lightmap.Height, map.ProbeSunVisibility.Size);
+	}
 
 	LogInfo("Loaded the compiled map: {} surfaces and {} colliders replace {} brushes, {} light probes placed",
 			map.Surfaces.Size, map.Hulls.Size, map.BrushNames.Size, map.Probes.GetProbeCount());

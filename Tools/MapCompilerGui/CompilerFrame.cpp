@@ -36,6 +36,13 @@ constexpr int scMaxVerifyRays = 1000000;
 constexpr double scMaxChunkSize = 1024.0;
 constexpr double scMinProbeSpacing = 0.1;
 constexpr double scMaxProbeSpacing = 64.0;
+constexpr double scProbeSpacingStep = 0.25;
+constexpr double scMinLightmapDensity = 1.0;
+constexpr double scMaxLightmapDensity = 128.0;
+constexpr double scLightmapDensityStep = 4.0;
+constexpr double scMinSunRadius = 0.0;
+constexpr double scMaxSunRadius = 10.0;
+constexpr double scSunRadiusStep = 0.25;
 
 } // namespace
 
@@ -106,14 +113,14 @@ CompilerFrame::CompilerFrame(const String& map_directory)
 								 "Work out where the light probes go. The engine bakes them from these positions "
 								 "when the compiled map is loaded");
 
-	const auto add_spacing = [&](const char* label, double value, const char* tooltip) {
+	const auto add_number = [&](const char* label, double min, double max, double value, double step,
+								const char* tooltip) {
 		wxBoxSizer* spacing_sizer = new wxBoxSizer(wxHORIZONTAL);
 		spacing_sizer->Add(new wxStaticText(options_box, wxID_ANY, label),
 						   wxSizerFlags().CenterVertical().Border(wxRIGHT, scBorder));
 
 		wxSpinCtrlDouble* spin = new wxSpinCtrlDouble(options_box, wxID_ANY, "", wxDefaultPosition, wxSize(90, -1),
-													  wxSP_ARROW_KEYS, scMinProbeSpacing, scMaxProbeSpacing, value,
-													  0.25);
+													  wxSP_ARROW_KEYS, min, max, value, step);
 		spin->SetDigits(2);
 		spin->SetToolTip(tooltip);
 		spacing_sizer->Add(spin, wxSizerFlags().CenterVertical());
@@ -122,11 +129,26 @@ CompilerFrame::CompilerFrame(const String& map_directory)
 		return spin;
 	};
 
-	mpProbeLevelSpacing = add_spacing("Probe spacing, level", ProbePlacementSettings::scDefaultLevelSpacing,
-									  "Spacing of the probes along the surfaces of the level. Raised automatically "
-									  "if the probes don't fit the budget");
-	mpProbeBrushSpacing = add_spacing("Probe spacing, volumes", ProbePlacementSettings::scDefaultBrushSpacing,
-									  "Spacing of the probes inside probe volume brushes");
+	mpProbeLevelSpacing = add_number("Probe spacing, level", scMinProbeSpacing, scMaxProbeSpacing,
+									 ProbePlacementSettings::scDefaultLevelSpacing, scProbeSpacingStep,
+									 "Spacing of the probes along the surfaces of the level. Raised automatically "
+									 "if the probes don't fit the budget");
+	mpProbeBrushSpacing = add_number("Probe spacing, volumes", scMinProbeSpacing, scMaxProbeSpacing,
+									 ProbePlacementSettings::scDefaultBrushSpacing, scProbeSpacingStep,
+									 "Spacing of the probes inside probe volume brushes");
+
+	const LightmapOptions default_lightmap {};
+
+	mpBakeLightmap = add_checkbox("Bake sun shadows", default_lightmap.bEnabled,
+								  "Trace the sun's shadows into a lightmap, which the engine uses in place of the "
+								  "sun's shadow map on the compiled surfaces");
+	mpLightmapDensity = add_number("Lightmap density", scMinLightmapDensity, scMaxLightmapDensity,
+								   default_lightmap.Density, scLightmapDensityStep,
+								   "Lightmap texels per metre of surface. Lowered automatically if the lightmap "
+								   "doesn't fit");
+	mpSunRadius = add_number("Sun radius, degrees", scMinSunRadius, scMaxSunRadius,
+							 default_lightmap.SunRadiusDegrees, scSunRadiusStep,
+							 "Half the angle the sun covers in the sky. Wider makes softer shadow edges");
 
 	wxBoxSizer* verify_sizer = new wxBoxSizer(wxHORIZONTAL);
 
@@ -171,6 +193,10 @@ CompilerFrame::CompilerFrame(const String& map_directory)
 	mpPlaceProbes->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
 		mpProbeLevelSpacing->Enable(mpPlaceProbes->GetValue());
 		mpProbeBrushSpacing->Enable(mpPlaceProbes->GetValue());
+	});
+	mpBakeLightmap->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
+		mpLightmapDensity->Enable(mpBakeLightmap->GetValue());
+		mpSunRadius->Enable(mpBakeLightmap->GetValue());
 	});
 	mpVerify->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) { mpVerifyRays->Enable(mpVerify->GetValue()); });
 	mpMaps->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) { StartCompile(GetSelectedMaps()); });
@@ -286,6 +312,9 @@ CompileOptions CompilerFrame::ReadOptions() const
 	options.bPlaceProbes = mpPlaceProbes->GetValue();
 	options.Probes.LevelSpacing = static_cast<float32>(mpProbeLevelSpacing->GetValue());
 	options.Probes.BrushSpacing = static_cast<float32>(mpProbeBrushSpacing->GetValue());
+	options.Lightmap.bEnabled = mpBakeLightmap->GetValue();
+	options.Lightmap.Density = mpLightmapDensity->GetValue();
+	options.Lightmap.SunRadiusDegrees = mpSunRadius->GetValue();
 	options.VerifyRays = mpVerify->GetValue() ? static_cast<uint32>(mpVerifyRays->GetValue()) : 0;
 
 	return options;

@@ -71,6 +71,7 @@ enum class eDrawFlags : uint32
 	ReflectionCapture = (1 << 7),
 	DebugReflection = (1 << 8),
 	DebugReflectionCoverage = (1 << 9),
+	BakedSun = (1 << 10),
 };
 
 FxEnumFlags(eDrawFlags);

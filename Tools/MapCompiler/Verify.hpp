@@ -21,7 +21,18 @@ struct VerifyResult
 	double LargestError = 0.0;
 };
 
+struct LightmapVerifyResult
+{
+	uint32 PointCount = 0;
+	uint32 EdgeCount = 0;
+	uint32 LitCount = 0;
+	uint32 WrongCount = 0;
+};
+
 VerifyResult VerifyTriangles(const PlaneSet& planes, const Bsp& bsp, const MapSource& source, bool sealed,
 							 const Array<Vec3d>& triangle_points, uint32 ray_count);
+
+LightmapVerifyResult VerifyLightmap(const PlaneSet& planes, const MapSource& source, const CompiledMap& map,
+									double density, uint32 point_count);
 
 } // namespace fx::mapc

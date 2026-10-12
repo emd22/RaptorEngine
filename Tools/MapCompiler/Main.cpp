@@ -27,6 +27,12 @@ void PrintUsage()
 				"  --no-probes      Do not place light probes\n"
 				"  --probe-spacing <m>        Probe spacing inside probe volume brushes (default: 2.5)\n"
 				"  --probe-level-spacing <m>  Probe spacing along the surfaces of the level (default: 0.5)\n"
+				"  --no-lightmap    Do not bake the sun's shadows\n"
+				"  --lightmap-density <n>     Lightmap texels per metre (default: 16)\n"
+				"  --lightmap-size <n>        Largest width and height of the lightmap (default: 4096)\n"
+				"  --lightmap-samples <n>     Rays per texel along each axis (default: 4)\n"
+				"  --sun-radius <degrees>     Half the angle the sun covers, wider is softer (default: 1)\n"
+				"  --lightmap-image <path>    Also write the lightmap as a PGM image\n"
 				"  --obj <path>     Also write the compiled triangles as a Wavefront OBJ\n"
 				"  --verify [rays]  Trace random rays through the brushes and the compiled triangles and compare them\n");
 }
@@ -51,6 +57,24 @@ bool ParseArguments(int argc, char** argv, CompileOptions& out_arguments)
 		}
 		else if (argument == "--probe-level-spacing" && has_value) {
 			out_arguments.Probes.LevelSpacing = static_cast<float32>(std::atof(argv[++i]));
+		}
+		else if (argument == "--lightmap-density" && has_value) {
+			out_arguments.Lightmap.Density = std::atof(argv[++i]);
+		}
+		else if (argument == "--lightmap-size" && has_value) {
+			out_arguments.Lightmap.MaxSize = static_cast<uint32>(std::atoi(argv[++i]));
+		}
+		else if (argument == "--lightmap-samples" && has_value) {
+			out_arguments.Lightmap.Samples = static_cast<uint32>(std::atoi(argv[++i]));
+		}
+		else if (argument == "--sun-radius" && has_value) {
+			out_arguments.Lightmap.SunRadiusDegrees = std::atof(argv[++i]);
+		}
+		else if (argument == "--lightmap-image" && has_value) {
+			out_arguments.Lightmap.ImagePath = argv[++i];
+		}
+		else if (argument == "--no-lightmap") {
+			out_arguments.Lightmap.bEnabled = false;
 		}
 		else if (argument == "--no-probes") {
 			out_arguments.bPlaceProbes = false;

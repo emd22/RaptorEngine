@@ -15,6 +15,7 @@ constexpr int32 scLockedMaterialIndex = 0;
 constexpr int32 scEditableMaterialIndex = 1;
 
 constexpr double scBrushExtent = 1e5;
+constexpr double scMinSunDistance = 1e-6;
 
 
 constexpr const char* scEntityBrushMembers[] = {
@@ -306,6 +307,17 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 		bHasPlayerSpawn = true;
 
 		Entities.Emplace(PlayerSpawn);
+	}
+
+	const ConfigEntry* sun_entry = info.GetEntry(HashStr32("sun"));
+
+	if (sun_entry != nullptr && sun_entry->GetMemberValue<int64>(HashStr32("enabled"), 1) != 0) {
+		const Vec3d sun_position = ToVec3d(sun_entry->GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero));
+
+		if (sun_position.Length() > scMinSunDistance) {
+			SunDirection = sun_position.Normalized();
+			bHasSun = true;
+		}
 	}
 
 	AddEntityPositions(info.GetEntry(HashStr32("lights")), Entities);

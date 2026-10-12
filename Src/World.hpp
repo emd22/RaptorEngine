@@ -103,7 +103,8 @@ private:
 	/// Draws the opaque geometry with every pipeline of the forward pass
 	void ExecuteForwardRenderLists(PerspectiveCamera& camera);
 	void ExecuteTransparentRenderLists();
-	void ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Camera& shadow_camera);
+	void ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Camera& shadow_camera,
+								 bool skip_lightmapped = false);
 
 	/**
 	 * @brief Re-renders the sun's shadow map centered on `center` for a probe capture, and writes a copy of the sun
@@ -198,6 +199,7 @@ public:
 
 	CVarValue* pCVarShowProbeVolumes = nullptr;
 	CVarValue* pCVarFrustumCull = nullptr;
+	CVarValue* pCVarBakedShadows = nullptr;
 
 	uint32 FrustumTestedObjects = 0;
 	uint32 FrustumCulledObjects = 0;

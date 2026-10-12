@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "Lightmap.hpp"
 #include "Surfaces.hpp"
 
 #include <functional>
@@ -29,6 +30,9 @@ struct CompileOptions
 
 	bool bPlaceProbes = true;
 	ProbePlacementSettings Probes;
+
+	LightmapOptions Lightmap;
+
 	uint32 VerifyRays = 0;
 };
 
@@ -49,6 +53,9 @@ struct CompileResult
 
 	uint32 ProbeCount = 0;
 	uint32 ProbeVolumeCount = 0;
+
+	bool bHasLightmap = false;
+	LightmapStats Lightmap;
 
 	String OutputPath;
 	String LeakPath;

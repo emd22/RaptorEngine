@@ -57,6 +57,7 @@ enum class eObjectFlags : uint16
 	/// Left out of light probe bakes (capture, capture shadows and probe placement). See Object::IsProbeVisible().
 	NotProbeVisible = (1 << 6),
 	Hidden = (1 << 7),
+	Lightmapped = (1 << 8),
 };
 
 FxEnumFlags(eObjectFlags);
@@ -225,6 +226,11 @@ public:
 
 	void SetUnlit(const bool value);
 	FX_FORCE_INLINE bool IsUnlit() const { return (Flags & eObjectFlags::Unlit) != 0; }
+	FX_FORCE_INLINE bool IsLightmapped() const { return (Flags & eObjectFlags::Lightmapped) != 0; }
+	FX_FORCE_INLINE void SetLightmapped(const bool value)
+	{
+		Flags = value ? (Flags | eObjectFlags::Lightmapped) : (Flags & ~eObjectFlags::Lightmapped);
+	}
 
 	FX_FORCE_INLINE bool IsSkinned() const { return (pMesh != nullptr) && pMesh->VertexList.IsSkinned(); }
 

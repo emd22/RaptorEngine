@@ -42,6 +42,22 @@ struct CompiledMapSurface
 
 	SizedArray<CompiledMapVertex> Vertices;
 	SizedArray<uint32> Indices;
+
+	SizedArray<float32> LightmapTexcoords;
+
+	bool HasLightmapTexcoords() const { return LightmapTexcoords.Size == Vertices.Size * 2 && Vertices.Size > 0; }
+};
+
+struct CompiledMapLightmap
+{
+	uint32 Width = 0;
+	uint32 Height = 0;
+
+	SizedArray<uint8> SunVisibility;
+
+	float32 SunDirection[3] = { 0.0f, 1.0f, 0.0f };
+
+	bool IsEmpty() const { return SunVisibility.Size == 0; }
 };
 
 /**
@@ -58,7 +74,7 @@ class CompiledMap
 {
 public:
 	static constexpr uint32 scMagic = 0x504D5846;
-	static constexpr uint32 scVersion = 2;
+	static constexpr uint32 scVersion = 3;
 	static constexpr const char* scExtension = ".fxmap";
 	static constexpr const char* scPrototypeExtension = ".prx";
 
@@ -105,6 +121,12 @@ public:
 	ProbePlacementSettings ProbeSettings;
 
 	bool HasProbeLayout() const { return Probes.VolumeCount > 0; }
+
+	CompiledMapLightmap Lightmap;
+
+	SizedArray<uint8> ProbeSunVisibility;
+
+	bool HasBakedSun() const { return !Lightmap.IsEmpty() && ProbeSunVisibility.Size == Probes.GetProbeCount(); }
 
 	/// The brushes of the prototype that the surfaces and hulls replace, sorted by Load()
 	SizedArray<String> BrushNames;

@@ -9,7 +9,14 @@ namespace fx::renderer {
 
 struct VertexDescription
 {
-    VkVertexInputBindingDescription Binding;
+    static constexpr uint32 scMaxBindings = 2;
+
+    static constexpr uint32 scLightmapBinding = scLightmapVertexBinding;
+    static constexpr uint32 scLightmapLocation = 4;
+
+    VkVertexInputBindingDescription Bindings[scMaxBindings];
+    uint32 BindingCount = 1;
+
     SizedArray<VkVertexInputAttributeDescription> Attributes;
 
     bool bIsInited : 1 = false;
@@ -124,7 +131,38 @@ VertexDescription BuildDescription()
         LogError(LC_RENDER, "Unsupported vertex type!");
     }
 
-    return { binding_desc, std::move(attribs), true };
+    return { { binding_desc }, 1, std::move(attribs), true };
+}
+
+inline VertexDescription BuildLightmappedDescription()
+{
+    VertexDescription base = VertexUtil::BuildDescription<eVertexType::Default>();
+
+    VertexDescription description;
+    description.Bindings[0] = base.Bindings[0];
+    description.Bindings[VertexDescription::scLightmapBinding] = {
+        .binding = VertexDescription::scLightmapBinding,
+        .stride = sizeof(float32) * 2,
+        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+    };
+    description.BindingCount = 2;
+
+    description.Attributes.InitCapacity(base.Attributes.Size + 1);
+
+    for (const VkVertexInputAttributeDescription& attrib : base.Attributes) {
+        description.Attributes.Insert(attrib);
+    }
+
+    description.Attributes.Insert(VkVertexInputAttributeDescription {
+        .location = VertexDescription::scLightmapLocation,
+        .binding = VertexDescription::scLightmapBinding,
+        .format = VK_FORMAT_R32G32_SFLOAT,
+        .offset = 0,
+    });
+
+    description.bIsInited = true;
+
+    return description;
 }
 
 FX_FORCE_INLINE VertexDescription BuildDescription(eVertexType vertex_type)
@@ -136,6 +174,8 @@ FX_FORCE_INLINE VertexDescription BuildDescription(eVertexType vertex_type)
         return VertexUtil::BuildDescription<eVertexType::Default>();
     case eVertexType::Skinned:
         return VertexUtil::BuildDescription<eVertexType::Skinned>();
+    case eVertexType::Lightmapped:
+        return VertexUtil::BuildLightmappedDescription();
     default:;
     }
 

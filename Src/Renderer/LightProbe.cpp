@@ -23,11 +23,9 @@
 #include <World.hpp>
 #include <algorithm>
 #include <bit>
-#include <cfloat>
 #include <cmath>
 #include <cstring>
 #include <filesystem>
-#include <limits>
 #include <vector>
 
 /// Bump whenever the layout or meaning of the cached data changes
@@ -398,6 +396,59 @@ void ProbeManager::ClearVolumes()
 	SyncLayout(0);
 }
 
+void ProbeManager::SetSunVisibility(Slice<const Vec3f> positions, Slice<const uint8> values)
+{
+	const size_t count = std::min<size_t>(positions.Size, values.Size);
+
+	mSunSamplePositions.Assign(positions.pData, count);
+	mSunSampleValues.Assign(values.pData, count);
+	mbSunVisibilityDirty = true;
+
+	UploadToGpu(0, mProbeCount);
+}
+
+void ProbeManager::ClearSunVisibility()
+{
+	mSunSamplePositions.Clear();
+	mSunSampleValues.Clear();
+	mbSunVisibilityDirty = true;
+
+	UploadToGpu(0, mProbeCount);
+}
+
+void ProbeManager::ResolveSunVisibility()
+{
+	constexpr float32 cSamePlace = 1e-4f;
+
+	const size_t sample_count = mSunSamplePositions.Size;
+
+	for (uint32 probe = 0; probe < mProbeCount; probe++) {
+		if (sample_count == 0) {
+			mSunVisibility[probe] = 1.0f;
+			continue;
+		}
+
+		const float32* values = mProbeInfos[probe].ProbePosition;
+		const Vec3f position(values[0], values[1], values[2]);
+
+		size_t nearest = std::min<size_t>(probe, sample_count - 1);
+		float32 nearest_distance = position.DistanceTo(mSunSamplePositions[nearest]);
+
+		for (size_t sample = 0; sample < sample_count && nearest_distance > cSamePlace; sample++) {
+			const float32 distance = position.DistanceTo(mSunSamplePositions[sample]);
+
+			if (distance < nearest_distance) {
+				nearest_distance = distance;
+				nearest = sample;
+			}
+		}
+
+		mSunVisibility[probe] = static_cast<float32>(mSunSampleValues[nearest]) / 255.0f;
+	}
+
+	mbSunVisibilityDirty = false;
+}
+
 void ProbeManager::SyncLayout(uint32 first_probe)
 {
 	mVolumeCount = mLayout.VolumeCount;
@@ -416,6 +467,7 @@ void ProbeManager::SyncLayout(uint32 first_probe)
 	}
 
 	mbGridDirty = true;
+	mbSunVisibilityDirty = true;
 
 	RefreshVolumeCounts();
 	UploadToGpu(first_probe, mProbeCount - std::min(first_probe, mProbeCount));
@@ -951,6 +1003,13 @@ void ProbeManager::UploadToGpu(uint32 first_probe, uint32 count)
 
 	mbGridDirty = false;
 
+	if (mbSunVisibilityDirty) {
+		ResolveSunVisibility();
+
+		first_probe = 0;
+		count = mProbeCount;
+	}
+
 	if (count == 0) {
 		return;
 	}
@@ -961,6 +1020,8 @@ void ProbeManager::UploadToGpu(uint32 first_probe, uint32 count)
 		for (uint32 lane = 0; lane < 3; lane++) {
 			mProbes[probe].SH[lane][3] = mProbeInfos[probe].ProbePosition[lane];
 		}
+
+		mProbes[probe].SH[3][3] = mSunVisibility[probe];
 	}
 
 	UploadRange(graphics->ProbeBuffer, mProbes, first_probe * sizeof(ProbeSHData), count * sizeof(ProbeSHData));
@@ -1184,6 +1245,7 @@ bool ProbeManager::LoadIrradianceProbes()
 	mProbeCount = header.ProbeCount;
 	mGridPointCount = header.GridPointCount;
 	mbGridDirty = true;
+	mbSunVisibilityDirty = true;
 
 	CaptureLayout();
 	RefreshVolumeCounts();
@@ -1334,7 +1396,7 @@ uint32 ProbeManager::RebuildReflectionProbesFromWorld()
 
 		if (!ProbePlacement::IsPositionValid(center, center, boxes) &&
 			!ProbePlacement::FindValidPosition(center, center, box.HalfExtent * scReflectionRelocation, boxes,
-													position)) {
+											   position)) {
 			LogWarning("Reflection probe {} is captured from inside of the level's geometry, move its brush", i);
 			position = center;
 		}

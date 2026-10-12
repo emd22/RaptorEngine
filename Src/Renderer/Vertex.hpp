@@ -12,9 +12,12 @@ enum class eVertexType
 	Slim,
 	Default,
 	Skinned,
+	Lightmapped,
 };
 
 constexpr eVertexType VertexLargestType = eVertexType::Skinned;
+
+constexpr uint32 scLightmapVertexBinding = 1;
 
 
 // Suppress clangd and its hate for #pragma pack
@@ -93,6 +96,9 @@ FX_FORCE_INLINE uint32 GetSize(fx::renderer::eVertexType type)
 	}
 	else if (type == eVertexType::Skinned) {
 		return sizeof(Vertex<eVertexType::Skinned>);
+	}
+	else if (type == eVertexType::Lightmapped) {
+		return sizeof(Vertex<eVertexType::Default>);
 	}
 
 	return 0;

@@ -325,6 +325,10 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 	const bool is_probe_capture = HasFlag(push_constants.Flags, eDrawFlags::ProbeCapture);
 	push_constants.PreExposure = is_probe_capture ? 1.0f : gGraphics->PreExposure;
 
+	if (gGraphics->bBakedSunActive && !is_probe_capture) {
+		push_constants.Flags |= eDrawFlags::BakedSun;
+	}
+
 	if (pSkeleton.IsValid() && !is_probe_capture) {
 		gDecalManager->GetSkinnedDecalRange(&(*pSkeleton), push_constants.SkinnedDecalStart,
 											push_constants.SkinnedDecalCount);

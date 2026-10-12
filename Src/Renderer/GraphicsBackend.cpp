@@ -189,6 +189,24 @@ void GraphicsBackend::Init(Vec2u window_size)
 	}
 
 
+	{
+		const Vec2u lightmap_size(Limits::LightmapSize, Limits::LightmapSize);
+
+		SizedArray<uint8> blank;
+		blank.InitSize(static_cast<uint64>(lightmap_size.X) * lightmap_size.Y);
+		memset(blank.pData, 0xFF, blank.Size);
+
+		pLightmap = gTextureManager->NewTexture();
+
+		SubmitImmediateUploadCmd(
+			[&](CommandBuffer& cmd)
+			{
+				ImageInfo info(lightmap_size, eImageFormat::R8_UNorm, 0, 1, Slice<const uint8>(blank.pData, blank.Size));
+
+				pLightmap->CreateFromData(cmd, info, eImageCreateFlags::None);
+			});
+	}
+
 	ReflectionProbePageSize = Limits::MaxReflectionProbes * sizeof(ReflectionProbeData);
 	ReflectionProbeBuffer.Create(eGpuBufferType::StorageWithOffset, ReflectionProbePageSize,
 								 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
@@ -659,6 +677,30 @@ eFrameResult GraphicsBackend::BeginFrame()
 	}
 
 	return eFrameResult::Success;
+}
+
+bool GraphicsBackend::UploadLightmap(const Vec2u& size, const uint8* texels)
+{
+	if (pLightmap == nullptr || texels == nullptr || size.X == 0 || size.Y == 0 || size.X > Limits::LightmapSize ||
+		size.Y > Limits::LightmapSize) {
+		return false;
+	}
+
+	mDevice.WaitForIdle();
+
+	const uint64 byte_count = static_cast<uint64>(size.X) * size.Y;
+
+	RawGpuBuffer staging;
+	staging.Create(eGpuBufferType::Transfer, byte_count, VMA_MEMORY_USAGE_CPU_TO_GPU, eGpuBufferFlags::TransferReceiver);
+	staging.Upload(texels, byte_count);
+
+	SubmitImmediateUploadCmd(
+		[&](CommandBuffer& cmd)
+		{ pLightmap->CopyFromBuffer(cmd, staging, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, size, 0, 0); });
+
+	staging.Destroy();
+
+	return true;
 }
 
 void GraphicsBackend::BeginLightCulling(Camera& render_cam) { pRenderer->DoLightCullingPass(render_cam); }

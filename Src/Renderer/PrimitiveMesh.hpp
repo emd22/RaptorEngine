@@ -56,6 +56,18 @@ public:
 
 	void SetIndices(SizedArray<uint32>&& indices) { LocalIndexBuffer = std::move(indices); }
 
+	void UploadLightmapUVs(renderer::CommandBuffer& cmd, const SizedArray<float32>& uvs)
+	{
+		if (uvs.IsEmpty()) {
+			LogError(LC_ASSET, "Cannot upload lightmap UVs without any values");
+			return;
+		}
+
+		GpuLightmapUVBuffer.Create(cmd, renderer::eGpuBufferType::VertexBuffer, Slice(uvs));
+	}
+
+	bool HasLightmapUVs() const { return GpuLightmapUVBuffer.Initialized; }
+
 	renderer::VertexList& GetVertices()
 	{
 		if (!bKeepInMemory) {
@@ -88,6 +100,10 @@ public:
 		const VkDeviceSize offset = 0;
 
 		vkCmdBindVertexBuffers(cmd.Cmd, 0, 1, &VertexList.GpuBuffer.Buffer, &offset);
+
+		if (GpuLightmapUVBuffer.Initialized) {
+			vkCmdBindVertexBuffers(cmd.Cmd, renderer::scLightmapVertexBinding, 1, &GpuLightmapUVBuffer.Buffer, &offset);
+		}
 		vkCmdBindIndexBuffer(cmd.Cmd, GpuIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
 		vkCmdDrawIndexed(cmd.Cmd, static_cast<uint32>(GpuIndexBuffer.Size / sizeof(uint32)), num_instances, 0, 0, 0);
@@ -176,6 +192,7 @@ public:
 
 		VertexList.Destroy();
 
+		GpuLightmapUVBuffer.Destroy();
 		GpuIndexBuffer.Destroy();
 		LocalIndexBuffer.Free();
 	}
@@ -193,6 +210,8 @@ public:
 
 	renderer::GpuBuffer GpuIndexBuffer;
 	SizedArray<uint32> LocalIndexBuffer;
+
+	renderer::GpuBuffer GpuLightmapUVBuffer;
 };
 
 } // namespace fx

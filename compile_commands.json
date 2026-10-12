@@ -1885,6 +1885,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Tools/MapCompiler/Lightmap.cpp.o -c /Users/emd22/Projects/raptor/Tools/MapCompiler/Lightmap.cpp",
+  "file": "/Users/emd22/Projects/raptor/Tools/MapCompiler/Lightmap.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Tools/MapCompiler/Lightmap.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Tools/MapCompiler/MapSource.cpp.o -c /Users/emd22/Projects/raptor/Tools/MapCompiler/MapSource.cpp",
   "file": "/Users/emd22/Projects/raptor/Tools/MapCompiler/MapSource.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Tools/MapCompiler/MapSource.cpp.o"

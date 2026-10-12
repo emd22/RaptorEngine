@@ -194,6 +194,9 @@ public:
 		return (mbHasCompiledWorld && mCompiledProbeLayout.VolumeCount > 0) ? &mCompiledProbeLayout : nullptr;
 	}
 
+	bool HasBakedSun() const { return mbHasBakedSun; }
+	bool IsBakedSunCurrent(const Vec3f sun_position) const;
+
 	/**
 	 * @brief The brush that a blockout object is built from, or nullptr if the object is not a blockout.
 	 */
@@ -313,6 +316,9 @@ private:
 	std::vector<physics::BodyID> mCompiledBodies;
 	bool mbHasCompiledWorld = false;
 	ProbeLayout mCompiledProbeLayout;
+
+	bool mbHasBakedSun = false;
+	Vec3f mBakedSunDirection = Vec3f::sUp;
 
 	Brush::PlaneList mPreviewPlanes;
 };

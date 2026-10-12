@@ -12,6 +12,7 @@ constexpr uint32 scFlagSealed = 1 << 0;
 
 constexpr uint32 scMaxStringLength = 4096;
 constexpr uint32 scMaxElementCount = 1 << 28;
+constexpr uint32 scMaxLightmapSize = 8192;
 
 bool IsNameBefore(const String& a, const String& b) { return std::strcmp(a.CStr(), b.CStr()) < 0; }
 
@@ -154,9 +155,18 @@ bool CompiledMap::Load(const String& path)
 		reader.Read(surface.Vertices.pData, vertex_count);
 		reader.Read(surface.Indices.pData, index_count);
 
+		const uint32 lightmap_texcoord_count = reader.ReadCount();
+
+		if (lightmap_texcoord_count != 0 && lightmap_texcoord_count != vertex_count * 2) {
+			reader.bFailed = true;
+		}
+
 		if (reader.bFailed) {
 			break;
 		}
+
+		surface.LightmapTexcoords.InitSize(lightmap_texcoord_count);
+		reader.Read(surface.LightmapTexcoords.pData, lightmap_texcoord_count);
 
 		if (surface.MaterialIndex >= Materials.Size) {
 			reader.bFailed = true;
@@ -234,6 +244,30 @@ bool CompiledMap::Load(const String& path)
 		}
 	}
 
+	Lightmap.Width = reader.Read<uint32>();
+	Lightmap.Height = reader.Read<uint32>();
+	reader.Read(Lightmap.SunDirection, 3);
+
+	const uint64 lightmap_texel_count = static_cast<uint64>(Lightmap.Width) * Lightmap.Height;
+
+	if (Lightmap.Width > scMaxLightmapSize || Lightmap.Height > scMaxLightmapSize) {
+		reader.bFailed = true;
+	}
+	else {
+		Lightmap.SunVisibility.InitSize(lightmap_texel_count);
+		reader.Read(Lightmap.SunVisibility.pData, lightmap_texel_count);
+	}
+
+	const uint32 probe_visibility_count = reader.ReadCount();
+
+	if (probe_visibility_count != 0 && probe_visibility_count != Probes.GetProbeCount()) {
+		reader.bFailed = true;
+	}
+	else {
+		ProbeSunVisibility.InitSize(probe_visibility_count);
+		reader.Read(ProbeSunVisibility.pData, probe_visibility_count);
+	}
+
 	std::fclose(file);
 
 	if (reader.bFailed) {
@@ -284,6 +318,8 @@ bool CompiledMap::Save(const String& path) const
 		writer.WriteCount(surface.Indices.Size);
 		writer.Write(surface.Vertices.pData, surface.Vertices.Size);
 		writer.Write(surface.Indices.pData, surface.Indices.Size);
+		writer.WriteCount(surface.LightmapTexcoords.Size);
+		writer.Write(surface.LightmapTexcoords.pData, surface.LightmapTexcoords.Size);
 	}
 
 	writer.WriteCount(Hulls.Size);
@@ -307,6 +343,14 @@ bool CompiledMap::Save(const String& path) const
 		const float32 values[3] = { position.X, position.Y, position.Z };
 		writer.Write(values, 3);
 	}
+
+	writer.Write(Lightmap.Width);
+	writer.Write(Lightmap.Height);
+	writer.Write(Lightmap.SunDirection, 3);
+	writer.Write(Lightmap.SunVisibility.pData, Lightmap.SunVisibility.Size);
+
+	writer.WriteCount(ProbeSunVisibility.Size);
+	writer.Write(ProbeSunVisibility.pData, ProbeSunVisibility.Size);
 
 	const bool closed = (std::fclose(file) == 0);
 

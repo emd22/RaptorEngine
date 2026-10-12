@@ -21,6 +21,10 @@ PERMIF(USE_SKINNING);
     uint4 vJointIndices : ATTR0;
     float4 vJointWeights : ATTR1;
 PERMEND()
+
+PERMIF(USE_LIGHTMAP);
+    float2 vLightmapUV : TEXCOORD1;
+PERMEND();
 };
 
 struct VSOutput
@@ -43,6 +47,10 @@ PERMEND();
 PERMIF(USE_SKINNING);
     float3 vPositionRest : ATTR1;
     float3 vNormalRest : ATTR2;
+PERMEND();
+
+PERMIF(USE_LIGHTMAP);
+    float2 vLightmapUV : TEXCOORD1;
 PERMEND();
 };
 
@@ -110,6 +118,10 @@ PERMEND();
 
     output.vUV = input.vUV;
 
+PERMIF(USE_LIGHTMAP);
+    output.vLightmapUV = input.vLightmapUV;
+PERMEND();
+
     // Uses the posed position so skinned meshes are lit (probes, lights, shadows) where they are drawn,
     // not at their bind pose.
     float4 position_ws = mul(position_ms, world_matrix);
@@ -151,6 +163,10 @@ PERMEND();
 PERMIF(USE_SKINNING);
 	float3 vPositionRest : ATTR1;
 	float3 vNormalRest : ATTR2;
+PERMEND();
+
+PERMIF(USE_LIGHTMAP);
+	float2 vLightmapUV : TEXCOORD1;
 PERMEND();
 
 	/// False when a double sided material is seen from behind
@@ -207,6 +223,8 @@ PERMEND();
 
 F_ShadowTexture2D(tShadowAtlas, 4, 0);
 F_Texture2D(tSSAO, 5, 0);
+
+F_Texture2D(tLightmap, 17, 0)
 
 struct FSPushConsts
 {
@@ -588,6 +606,69 @@ PERMIF(DEBUG_LIGHT_HEATMAP);
 	return output;
 PERMEND();
 
+	float3 probe_irradiance = float3(0.0f, 0.0f, 0.0f);
+	float3 probe_radiance = float3(0.0f, 0.0f, 0.0f);
+	float probe_visibility = 1.0f;
+	float probe_sun_visibility = 1.0f;
+	bool has_probes = false;
+
+	// An L2 SH probe is blurry (duh) and a rough surface's lobe is centred nearer the normal than the reflection.
+	// Sampling along R regardless is wrong for most instances where roughness sits at or near 1
+	const float3 R = GetSpecularDominantDir(N, reflect(-V, N), specular_alpha);
+
+PERMIF(PROBE_CAPTURE);
+	const bool use_probes = HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_BOUNCE);
+PERMELSE();
+	const bool use_probes = true;
+PERMEND();
+
+	if (use_probes) {
+		const uint probe_volume_count = GetProbeVolumeCount(bProbeVolume);
+
+		if (probe_volume_count > 0) {
+			const uint volume_index = SelectProbeVolume(input.vPositionWS, bProbeVolume, probe_volume_count);
+
+			float probe_coverage;
+
+			SampleProbeVolumeIrradiance(input.vPositionWS, N, R, bProbeVolume[volume_index], bProbeBuffer, bProbeGrid,
+										F_TextureName(tProbeMoments), tProbeMoments, probe_irradiance, probe_radiance,
+										probe_visibility, probe_coverage, probe_sun_visibility);
+
+			if (volume_index != 0 && probe_coverage < 0.999) {
+				float3 base_irradiance;
+				float3 base_radiance;
+				float base_visibility;
+				float base_coverage;
+				float base_sun_visibility;
+
+				const bool base_sampled = SampleProbeVolumeIrradiance(
+					input.vPositionWS, N, R, bProbeVolume[0], bProbeBuffer, bProbeGrid, F_TextureName(tProbeMoments),
+					tProbeMoments, base_irradiance, base_radiance, base_visibility, base_coverage,
+					base_sun_visibility);
+
+				const float base_blend = select(base_sampled, 1.0 - probe_coverage, 0.0);
+
+				probe_irradiance = lerp(probe_irradiance, base_irradiance, base_blend);
+				probe_radiance = lerp(probe_radiance, base_radiance, base_blend);
+				probe_visibility = lerp(probe_visibility, base_visibility, base_blend);
+				probe_sun_visibility = lerp(probe_sun_visibility, base_sun_visibility, base_blend);
+			}
+
+			has_probes = true;
+		}
+	}
+
+PERMIF(PROBE_CAPTURE);
+	const float baked_sun_visibility = 1.0;
+PERMELSE();
+PERMIF(USE_LIGHTMAP);
+	const float baked_sun_sample = F_SampleLevel(tLightmap, input.vLightmapUV, 0.0).r;
+PERMELSE();
+	const float baked_sun_sample = probe_sun_visibility;
+PERMEND();
+	const float baked_sun_visibility = select(HAS_FLAG(FSConst.Flags, DRAW_FLAG_BAKED_SUN), baked_sun_sample, 1.0);
+PERMEND();
+
 	for (uint tile_light = 0; tile_light < tile_data.Count; tile_light++) {
 		Light light = Lights[bLightIndexList[tile_data.StartIndex + tile_light]];
 
@@ -607,7 +688,8 @@ PERMEND();
 		attenuation *= select(is_spot, AttenuationSpot(L, light), 1.0);
 
 		/// How much light is visible (not occluded) at this pixel
-		const float visibility = SampleShadowAtlas(light, input.vPositionWS, geometric_normal, L);
+		const float visibility = SampleShadowAtlas(light, input.vPositionWS, geometric_normal, L) *
+								 select(is_directional, baked_sun_visibility, 1.0);
 
 		/// Visibility for the diffuse term only. The specular lobe peaks far above diffuse, so any floor on it shows
 		/// up as highlights in shadow. Let a little of the sun into its own shadows
@@ -646,70 +728,27 @@ PERMEND();
 
 	float3 ambient = float3(0.0f, 0.0f, 0.0f);
 
-	float3 probe_irradiance = float3(0.0f, 0.0f, 0.0f);
-	float probe_visibility = 1.0f;
-
-PERMIF(PROBE_CAPTURE);
-	const bool use_probes = HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_BOUNCE);
-PERMELSE();
-	const bool use_probes = true;
-PERMEND();
-
-	if (use_probes) {
-		const uint probe_volume_count = GetProbeVolumeCount(bProbeVolume);
-
-		if (probe_volume_count > 0) {
-			const uint volume_index = SelectProbeVolume(input.vPositionWS, bProbeVolume, probe_volume_count);
-
-			// An L2 SH probe is blurry (duh) and a rough surface's lobe is centred nearer the normal than the reflection.
-			// Sampling along R regardless is wrong for most instances where roughness sits at or near 1
-			const float3 R = GetSpecularDominantDir(N, reflect(-V, N), specular_alpha);
-
-			float3 probe_radiance;
-			float probe_coverage;
-
-			SampleProbeVolumeIrradiance(input.vPositionWS, N, R, bProbeVolume[volume_index], bProbeBuffer, bProbeGrid,
-										F_TextureName(tProbeMoments), tProbeMoments, probe_irradiance, probe_radiance,
-										probe_visibility, probe_coverage);
-
-			if (volume_index != 0 && probe_coverage < 0.999) {
-				float3 base_irradiance;
-				float3 base_radiance;
-				float base_visibility;
-				float base_coverage;
-
-				const bool base_sampled = SampleProbeVolumeIrradiance(
-					input.vPositionWS, N, R, bProbeVolume[0], bProbeBuffer, bProbeGrid, F_TextureName(tProbeMoments),
-					tProbeMoments, base_irradiance, base_radiance, base_visibility, base_coverage);
-
-				const float base_blend = select(base_sampled, 1.0 - probe_coverage, 0.0);
-
-				probe_irradiance = lerp(probe_irradiance, base_irradiance, base_blend);
-				probe_radiance = lerp(probe_radiance, base_radiance, base_blend);
-				probe_visibility = lerp(probe_visibility, base_visibility, base_blend);
-			}
-
+	if (has_probes) {
 PERMNOT(PROBE_CAPTURE);
-			const uint reflection_probe_count = select(HAS_FLAG(FSConst.Flags, DRAW_FLAG_NO_REFLECTION_PROBES), 0u,
-													   GetReflectionProbeCount(bReflectionProbes));
+		const uint reflection_probe_count = select(HAS_FLAG(FSConst.Flags, DRAW_FLAG_NO_REFLECTION_PROBES), 0u,
+												   GetReflectionProbeCount(bReflectionProbes));
 
-			probe_radiance = SampleReflectionProbes(input.vPositionWS, R, roughness, probe_radiance,
-													reflection_probe_count, bReflectionProbes,
-													F_TextureName(tReflectionProbes), tReflectionProbes);
+		probe_radiance = SampleReflectionProbes(input.vPositionWS, R, roughness, probe_radiance,
+												reflection_probe_count, bReflectionProbes,
+												F_TextureName(tReflectionProbes), tReflectionProbes);
 PERMEND();
 
-			const float3 single_scatter = (surface.vF0 * dfg.x) + dfg.y;
-			const float3 multi_scatter = MultiScatterReflectance(surface.vF0, single_scatter, dfg);
-			const float3 ambient_diffuse = surface.vDiffuse * (1.0 - single_scatter - multi_scatter);
+		const float3 single_scatter = (surface.vF0 * dfg.x) + dfg.y;
+		const float3 multi_scatter = MultiScatterReflectance(surface.vF0, single_scatter, dfg);
+		const float3 ambient_diffuse = surface.vDiffuse * (1.0 - single_scatter - multi_scatter);
 
-			const float occlusion = min(surface.fOcclusion, ssao);
-			const float3 diffuse_occlusion = MultiBounceOcclusion(occlusion, surface.vDiffuse);
-			const float3 specular_occlusion =
-				MultiBounceOcclusion(SpecularOcclusion(NdotV, occlusion, specular_alpha), surface.vF0);
+		const float occlusion = min(surface.fOcclusion, ssao);
+		const float3 diffuse_occlusion = MultiBounceOcclusion(occlusion, surface.vDiffuse);
+		const float3 specular_occlusion =
+			MultiBounceOcclusion(SpecularOcclusion(NdotV, occlusion, specular_alpha), surface.vF0);
 
-			ambient = (probe_irradiance * ambient_diffuse * diffuse_occlusion) +
-					  (((probe_radiance * single_scatter) + (probe_irradiance * multi_scatter)) * specular_occlusion);
-		}
+		ambient = (probe_irradiance * ambient_diffuse * diffuse_occlusion) +
+				  (((probe_radiance * single_scatter) + (probe_irradiance * multi_scatter)) * specular_occlusion);
 	}
 
 PERMIF(PROBE_CAPTURE);

@@ -23,6 +23,7 @@ namespace fx::mapc {
 namespace {
 
 constexpr float32 scHullPointEpsilon = 1e-5f;
+constexpr uint32 scMaxWrongLightmapPoints = 200;
 
 bool HasFloorBelow(const PlaneSet& planes, const MapSource& source, const Vec3d& point)
 {
@@ -261,7 +262,10 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 			}
 		}
 
-		surfaces.Build(planes, bsp, source, sealed, options.Surface, map);
+		SurfaceOptions surface_options = options.Surface;
+		surface_options.bMakeLightmapCharts = options.Lightmap.bEnabled && source.bHasSun;
+
+		surfaces.Build(planes, bsp, source, sealed, surface_options, map);
 		map.bSealed = sealed;
 
 		AddHulls(source, map);
@@ -284,6 +288,11 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 		result.ProbeCount = map.Probes.GetProbeCount();
 		result.ProbeVolumeCount = map.Probes.VolumeCount;
 	}
+
+	LightmapBaker lightmap;
+
+	result.bHasLightmap = lightmap.Bake(planes, source, surfaces, options.Lightmap, map);
+	result.Lightmap = lightmap.Stats;
 
 	const String leak_path = ReplaceExtension(result.OutputPath, ".leak");
 
@@ -356,6 +365,45 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 		}
 	}
 
+	if (result.bHasLightmap) {
+		const LightmapStats& baked = lightmap.Stats;
+
+		log(String::Fmt("  lightmap     {}x{}, {} charts at {:.1f} texels per metre, {:.1f}% of {} texels lit, {} rays "
+						"against {} brushes",
+						baked.Width, baked.Height, baked.ChartCount, baked.Density, baked.LitFraction * 100.0,
+						baked.TexelCount, baked.RayCount, baked.OccluderCount));
+
+		if (baked.Density < options.Lightmap.Density) {
+			log(String::Fmt("  warning      the lightmap did not fit in {}x{} at {:.1f} texels per metre, so it was "
+							"baked at {:.1f}",
+							options.Lightmap.MaxSize, options.Lightmap.MaxSize, options.Lightmap.Density,
+							baked.Density));
+		}
+
+		if (baked.ProbeCount > 0) {
+			log(String::Fmt("  sun probes   {} of {} light probes see the sun", baked.LitProbeCount, baked.ProbeCount));
+		}
+		else {
+			log("  warning      there are no light probes, so models and other objects without a lightmap are not "
+				"shadowed by the world");
+		}
+
+		if (source.ModelCount > 0) {
+			log(String::Fmt("  warning      {} models are not known to the compiler, so they cast no baked shadows",
+							source.ModelCount));
+		}
+	}
+	else if (!options.Lightmap.bEnabled) {
+		log("  lightmap     off");
+	}
+	else if (!source.bHasSun) {
+		log("  lightmap     none, the prototype has no sun or it is switched off");
+	}
+	else if (source.Brushes.Size != 0) {
+		log(String::Fmt("  warning      no lightmap, the surfaces do not fit in {}x{} texels", options.Lightmap.MaxSize,
+						options.Lightmap.MaxSize));
+	}
+
 	if (options.VerifyRays > 0 && source.Brushes.Size != 0) {
 		const VerifyResult verify = VerifyTriangles(planes, bsp, source, sealed, surfaces.TrianglePoints,
 													options.VerifyRays);
@@ -365,6 +413,19 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 
 		if (verify.MissingCount > 0 || verify.ExtraCount > 0) {
 			log("  verify       FAILED, the compiled triangles do not match the brushes");
+			result.bVerifyFailed = true;
+		}
+	}
+
+	if (options.VerifyRays > 0 && result.bHasLightmap) {
+		const LightmapVerifyResult verify = VerifyLightmap(planes, source, map, lightmap.Stats.Density,
+														   options.VerifyRays);
+
+		log(String::Fmt("  verify       {} lightmap points, {} lit, {} skipped beside a shadow edge, {} wrong",
+						verify.PointCount, verify.LitCount, verify.EdgeCount, verify.WrongCount));
+
+		if (verify.WrongCount * scMaxWrongLightmapPoints > verify.PointCount) {
+			log("  verify       FAILED, the lightmap does not match the sun");
 			result.bVerifyFailed = true;
 		}
 	}

@@ -87,6 +87,9 @@ public:
 
 	uint32 RebuildVolumesFromWorld();
 
+	void SetSunVisibility(Slice<const Vec3f> positions, Slice<const uint8> values);
+	void ClearSunVisibility();
+
 	uint32 GetReflectionProbeCount() const { return mReflectionProbeCount; }
 	Vec3f GetReflectionProbePosition(uint32 index) const;
 	bool AreReflectionsBaked() const { return mbReflectionsBaked; }
@@ -208,6 +211,13 @@ private:
 
 	/// Probes taken by `mVolumes`, which is where the next volume's range starts
 	uint32 mProbeCount = 0;
+
+	DynArray<Vec3f> mSunSamplePositions;
+	DynArray<uint8> mSunSampleValues;
+	float32 mSunVisibility[Limits::MaxIrradianceProbes] {};
+	bool mbSunVisibilityDirty = true;
+
+	void ResolveSunVisibility();
 
 	uint16 mGridProbes[Limits::MaxProbeGridPoints] {};
 	uint32 mGridPointCount = 0;

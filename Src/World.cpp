@@ -38,6 +38,7 @@ void World::Create()
 
 	pCVarShowProbeVolumes = gCVars->Set<int64>("r_show_volumes", 0);
 	pCVarFrustumCull = gCVars->Set<int64>("r_frustum_cull", 1);
+	pCVarBakedShadows = gCVars->Set<int64>("r_baked_shadows", 1);
 }
 
 static bool IsTransparentMaterial(Material* mat) { return (mat != nullptr && mat->Properties.Alpha < 0.999f); }
@@ -45,16 +46,22 @@ static bool IsTransparentMaterial(Material* mat) { return (mat != nullptr && mat
 /**
  * @brief The geometry pipeline that draws a material, including the transparent variants.
  */
-static PipelineHandle GetPipelineForMaterial(const MaterialID& material_id)
+static PipelineHandle GetPipelineForObject(const Object& object)
 {
-	Material* material = MaterialManagerFwd::GetMaterial(material_id);
+	Material* material = MaterialManagerFwd::GetMaterial(object.GetMaterialID());
 
 	if (material == nullptr) {
 		material = MaterialManagerFwd::GetMaterial(MaterialID::scNull);
 	}
 
 	const ePipelinePass pass = IsTransparentMaterial(material) ? ePipelinePass::ForwardBlend : ePipelinePass::Forward;
-	const PipelineHandle pipeline = gPipelineCache->GetOrCreateVariant(pass, material->GetPipelineFeatures());
+	ePipelineFeatures features = material->GetPipelineFeatures();
+
+	if (object.IsLightmapped()) {
+		features |= ePipelineFeatures::Lightmap;
+	}
+
+	const PipelineHandle pipeline = gPipelineCache->GetOrCreateVariant(pass, features);
 
 	AssertMsg(pipeline.IsValid(), "No forward pipeline draws this material");
 
@@ -77,7 +84,7 @@ static void AddObjectToRenderList(Object* object, World* scene)
 			gWorld->mRenderList.AddObject(GetShadowListPipeline(), object->ID);
 		}
 
-		gWorld->mRenderList.AddObject(GetPipelineForMaterial(object->GetMaterialID()), object->ID);
+		gWorld->mRenderList.AddObject(GetPipelineForObject(*object), object->ID);
 	}
 
 	if (!object->AttachedNodes.IsEmpty()) {
@@ -395,7 +402,8 @@ private:
 	PipelineHandle mBound = gPipelineCache->GetOrCreateVariant(ePipelinePass::Shadow, ePipelineFeatures::None);
 };
 
-void World::ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Camera& shadow_camera)
+void World::ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Camera& shadow_camera,
+									bool skip_lightmapped)
 {
 	const RenderListSection& section = mRenderList.GetSection(pipeline);
 
@@ -423,6 +431,10 @@ void World::ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Cam
 
 		Object* object = gObjectManager->GetObject(object_id);
 		if (object == nullptr || (is_probe_capture && !object->IsProbeVisible())) {
+			continue;
+		}
+
+		if (skip_lightmapped && object->IsLightmapped()) {
 			continue;
 		}
 
@@ -796,7 +808,7 @@ void World::AddToRenderListRecursiveByMaterial(ObjectID* id_ptr, const Frustum* 
 		}
 
 		if (is_visible) {
-			mRenderList.AddObject(GetPipelineForMaterial(obj->GetMaterialID()), obj->ID);
+			mRenderList.AddObject(GetPipelineForObject(*obj), obj->ID);
 		}
 	}
 
@@ -1018,12 +1030,16 @@ void World::Render(Camera* shadow_camera)
 	Ref<LightDirectional> sun = gLightManager->GetDirectionalLight();
 	const bool render_sun_shadows = sun.IsValid() && sun->bEnabled;
 
+	gGraphics->bBakedSunActive = render_sun_shadows && (pCVarBakedShadows->IntValue != 0) && pBlockout != nullptr &&
+								 pBlockout->IsBakedSunCurrent(sun->GetPosition());
+
 	// With the sun off its region is left alone, apart from the atlas's very first pass that makes it sampleable
 	if (render_sun_shadows || !gShadowAtlas->IsInitialized()) {
 		BeginShadowAtlasRegion(gShadowAtlas->GetDirectionalRegion());
 
 		if (render_sun_shadows) {
-			ExecuteShadowRenderList(GetShadowListPipeline(), gShadowRenderer->ShadowCamera);
+			ExecuteShadowRenderList(GetShadowListPipeline(), gShadowRenderer->ShadowCamera,
+									gGraphics->bBakedSunActive);
 		}
 
 		gShadowAtlas->EndRegion();

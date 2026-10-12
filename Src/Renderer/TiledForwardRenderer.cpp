@@ -185,6 +185,14 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 												   .AddressMode = eSamplerAddressMode::ClampToEdge,
 											   })));
 
+	ds_entries.Insert(DescriptorEntry::AsImage(17, eShaderType::Pixel, gGraphics->pLightmap,
+											   gSamplerCache->Request({
+												   eSamplerFilter::Linear,
+												   eSamplerFilter::Linear,
+												   eSamplerFilter::Linear,
+												   eSamplerAddressMode::ClampToEdge,
+											   })));
+
 	Target* shadow_target = gShadowAtlas->GetTarget();
 	Assert(shadow_target != nullptr);
 
@@ -343,8 +351,11 @@ constexpr ePipelineFeatures scStartupFeatures[] = {
 };
 
 ePipelineFeatures GetGeometryShaderVariant(ePipelineFeatures features, std::vector<ShaderMacro>& out_macros,
-										   eVertexType& out_vertex_type, const char*& out_suffix)
+										   eVertexType& out_vertex_type, const char*& out_suffix,
+										   bool samples_lightmap = false)
 {
+	static const ShaderMacro scLightmap { .pcName = "USE_LIGHTMAP", .pcValue = "1" };
+
 	static const ShaderMacro scNormalMaps { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" };
 	static const ShaderMacro scSkinning { .pcName = "USE_SKINNING", .pcValue = "1" };
 	static const ShaderMacro scUnlit { .pcName = "UNLIT", .pcValue = "1" };
@@ -369,6 +380,13 @@ ePipelineFeatures GetGeometryShaderVariant(ePipelineFeatures features, std::vect
 		}
 		else {
 			out_suffix = is_unlit ? "Unlit" : "";
+		}
+
+		if (samples_lightmap && !is_unlit && HasFlag(features, ePipelineFeatures::Lightmap)) {
+			out_macros.push_back(scLightmap);
+			out_vertex_type = eVertexType::Lightmapped;
+			out_suffix = HasFlag(variant, ePipelineFeatures::NormalMap) ? "NormalMapsLightmap" : "Lightmap";
+			variant |= ePipelineFeatures::Lightmap;
 		}
 	}
 
@@ -431,7 +449,8 @@ bool TiledForwardRenderer::MakeForwardDesc(ePipelinePass pass, ePipelineFeatures
 	}
 
 	const char* suffix = "";
-	out_desc.Features = GetGeometryShaderVariant(features, out_desc.Macros, out_desc.VertexType, suffix);
+	out_desc.Features = GetGeometryShaderVariant(features, out_desc.Macros, out_desc.VertexType, suffix,
+												 is_opaque || is_blended);
 
 	// Transparent geometry also discards what is nearly invisible
 	if (is_blended) {
@@ -554,6 +573,8 @@ void TiledForwardRenderer::AddGlobalDescriptors()
 	gPSOBuild->AddImage(15, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
 						gSamplerCache->Request({}));
 	gPSOBuild->AddImage(16, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
+						gSamplerCache->Request({}));
+	gPSOBuild->AddImage(17, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
 						gSamplerCache->Request({}));
 	// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
 	AddDecalDescriptors();

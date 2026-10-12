@@ -44,12 +44,14 @@
 struct ProbeSHData
 {
 	/// RGB per coefficient. The w lanes of the first three carry the probe's world position (ProbeSHPosition), the
-	/// rest are padding.
+	/// fourth how much of the sun reaches the probe (ProbeSHSunVisibility), the rest are padding.
 	float4 SH[PROBE_SH_COEFF_COUNT];
 };
 
 
 float3 ProbeSHPosition(ProbeSHData probe) { return float3(probe.SH[0].w, probe.SH[1].w, probe.SH[2].w); }
+
+float ProbeSHSunVisibility(ProbeSHData probe) { return probe.SH[3].w; }
 
 struct ProbeVolume
 {
@@ -321,7 +323,8 @@ uint ProbeCellCorner(ProbeVolume volume, StructuredBuffer<uint> grid, uint3 base
 bool SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume volume,
 								 StructuredBuffer<ProbeSHData> probes, StructuredBuffer<uint> grid,
 								 Texture2D moments_atlas, SamplerState moments_sampler, out float3 out_diffuse,
-								 out float3 out_specular, out float out_visibility, out float out_coverage)
+								 out float3 out_specular, out float out_visibility, out float out_coverage,
+								 out float out_sun_visibility)
 {
 	const float3 biased_pos = ProbeBiasedPosition(pos_ws, n, volume);
 
@@ -334,6 +337,7 @@ bool SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume 
 
 	float3 diffuse = float3(0.0, 0.0, 0.0);
 	float3 specular = float3(0.0, 0.0, 0.0);
+	float sun_visibility = 0.0;
 	float total_weight = 0.0;
 
 	float visibility_sum = 0.0;
@@ -371,6 +375,7 @@ bool SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume 
 
 		diffuse += EvalProbeIrradianceRaw(n_basis, probe) * weight;
 		specular += EvalProbeIrradianceRaw(r_basis, probe) * weight;
+		sun_visibility += ProbeSHSunVisibility(probe) * weight;
 
 		total_weight += weight;
 	}
@@ -381,16 +386,19 @@ bool SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume 
 	if (placed_count == 0) {
 		out_diffuse = float3(0.0, 0.0, 0.0);
 		out_specular = float3(0.0, 0.0, 0.0);
+		out_sun_visibility = 1.0;
 		return false;
 	}
 
 	if (total_weight > 1e-30) {
 		diffuse /= total_weight;
 		specular /= total_weight;
+		sun_visibility /= total_weight;
 	}
 	else {
 		diffuse = float3(0.0, 0.0, 0.0);
 		specular = float3(0.0, 0.0, 0.0);
+		sun_visibility = 0.0;
 
 		for (uint corner = 0; corner < 8; corner++) {
 			float trilinear;
@@ -404,11 +412,15 @@ bool SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume 
 
 			diffuse += EvalProbeIrradianceRaw(n_basis, probe);
 			specular += EvalProbeIrradianceRaw(r_basis, probe);
+			sun_visibility += ProbeSHSunVisibility(probe);
 		}
 
 		diffuse /= float(placed_count);
 		specular /= float(placed_count);
+		sun_visibility /= float(placed_count);
 	}
+
+	out_sun_visibility = saturate(sun_visibility);
 
 	out_diffuse = max(diffuse, float3(0.0, 0.0, 0.0));
 	out_specular = max(specular, float3(0.0, 0.0, 0.0));

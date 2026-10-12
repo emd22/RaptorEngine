@@ -66,6 +66,9 @@ private:
 	wxCheckBox* mpPlaceProbes = nullptr;
 	wxSpinCtrlDouble* mpProbeLevelSpacing = nullptr;
 	wxSpinCtrlDouble* mpProbeBrushSpacing = nullptr;
+	wxCheckBox* mpBakeLightmap = nullptr;
+	wxSpinCtrlDouble* mpLightmapDensity = nullptr;
+	wxSpinCtrlDouble* mpSunRadius = nullptr;
 
 	wxButton* mpCompileSelected = nullptr;
 	wxButton* mpCompileAll = nullptr;
