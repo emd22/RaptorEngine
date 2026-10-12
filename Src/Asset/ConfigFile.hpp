@@ -19,6 +19,8 @@
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
 #include <Util/Tokenizer.hpp>
+#include <string>
+#include <vector>
 
 namespace fx {
 
@@ -368,6 +370,10 @@ public:
 
 	void AddMember(ConfigEntry&& entry);
 
+	void CopyValueFrom(const ConfigEntry& other);
+
+	bool IsObjectArray() const { return bIsArray && Type == ePrimitiveType::Struct; }
+
 	void AppendValue(ConfigPrimitive&& value);
 
 	void AppendValue(const Vec3f vec);
@@ -567,10 +573,16 @@ private:
 	bool EatToken(const Slice<eTokenType>& expected_types);
 
 	bool ParseEntry(ConfigEntry* parent, ConfigEntry& out_entry);
+	bool ParseStruct(ConfigEntry& entry);
 	bool ParseValue(ConfigPrimitive& value);
 	bool ParseTerm(ConfigPrimitive& value);
 	bool ParseExpression(ConfigPrimitive& value);
 	bool ParseReference(ConfigPrimitive& value);
+	bool ScanReferencePath(std::string& out_path, uint32& out_end_index) const;
+
+	ConfigEntry* WalkReferencePath(const std::string& path, const ConfigPrimitive*& out_primitive,
+								   std::vector<ConfigEntry*>& resolving, bool report_failures);
+	bool ResolveEntryReferences(ConfigEntry& entry, std::vector<ConfigEntry*>& resolving, bool report_failures);
 
 	/// Skip tokens until the start of the next `name =` entry (or a closing brace if `in_struct`).
 	void SkipToNextEntry(bool in_struct);
@@ -598,6 +610,7 @@ private:
 	}
 
 	void InitConstants();
+	const ConfigEntry* FindConstant(Hash32 name_hash) const;
 
 
 private:
@@ -609,6 +622,7 @@ private:
 
 	bool mbHasErrors = false;
 	bool mbLoadedConstants = false;
+	bool mbHasEntryReferences = false;
 
 	static constexpr uint32 cMaxDepth = 64;
 	uint32 mDepth = 0;

@@ -121,6 +121,7 @@ public:
 
 	float32 MaxSamplerAnisotropy = 1.0f;
 	bool bSupportsCubeArrays = false;
+	bool bSupportsBC7 = false;
 
 private:
 	VkInstance mInstance;

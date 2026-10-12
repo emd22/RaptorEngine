@@ -15,7 +15,8 @@ namespace loader {
 /**
  * @brief Loads KTX (v1 and v2) images, including full mip chains.
  *
- * The pixel format is read from the file, so `ImageFormat` is ignored when loading.
+ * The pixel format is read from the file, so `ImageFormat` is ignored when loading. Basis Universal payloads (UASTC
+ * and ETC1S) are transcoded to BC7 on load, or to RGBA8 on devices without BC support, and BC7 files are used as is.
  */
 class LoaderKtx final : public ImageLoaderBase
 {
@@ -51,6 +52,11 @@ public:
 	 * `ImageData` is a malloc'd copy of the levels packed tightly one after another, owned by the caller.
 	 */
 	ImageInfo MakeImageInfo(uint32 first_mip = 0, uint32 mip_count = 0) const;
+
+	/// Whether any texel in the base level is not fully opaque. For BC7 this is decided from the block endpoints, so
+	/// a block that has a translucent endpoint it never selects still counts. The shared p-bit is ignored, as the
+	/// Basis transcoder leaves it clear in opaque blocks, which makes their alpha 254.
+	bool HasTranslucentTexels() const;
 
 	void Destroy() override;
 

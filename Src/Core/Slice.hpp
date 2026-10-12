@@ -4,6 +4,9 @@
 #include "StackArray.hpp"
 #include "Types.hpp"
 
+#include <string_view>
+
+
 namespace fx {
 
 template <typename T>
@@ -17,52 +20,59 @@ public:
 	using Iterator = T*;
 	using ConstIterator = T*;
 
-	Iterator begin() const { return pData; }
+	constexpr Iterator begin() const { return pData; }
+	constexpr Iterator end() const { return pData + Size; }
 
-	Iterator end() const { return pData + Size; }
-
-	Slice(const SizedArray<T>& sized_arr) : pData(sized_arr.pData), Size(sized_arr.Size) {}
-
-	Slice(const Slice<T>& other) { (*this) = other; }
+	constexpr Slice(const SizedArray<T>& sized_arr) : pData(sized_arr.pData), Size(sized_arr.Size) {}
+	constexpr Slice(const Slice<T>& other) { (*this) = other; }
 
 	template <typename U>
 		requires std::is_convertible_v<U*, T*>
-	Slice(const SizedArray<U>& sized_arr) : pData(sized_arr.pData), Size(sized_arr.Size)
+	constexpr Slice(const SizedArray<U>& sized_arr) : pData(sized_arr.pData), Size(sized_arr.Size)
+	{
+	}
+
+	/**
+	 * @brief StringView constructor (from const string literal)
+	 */
+	template <size_t N>
+		requires std::is_same_v<std::remove_cv_t<T>, char>
+	constexpr Slice(const char (&arr)[N]) : pData(arr), Size(N - 1)
 	{
 	}
 
 	template <typename U>
 		requires std::is_convertible_v<U*, T*>
-	Slice(const Slice<U>& other)
+	constexpr Slice(const Slice<U>& other)
 	{
 		(*this) = other;
 	}
 
 	template <typename TOther>
-	static Slice<T> FromArray(const SizedArray<TOther>& arr)
+	static constexpr Slice<T> FromArray(const SizedArray<TOther>& arr)
 	{
 		Slice<T> slice { .pData = static_cast<T*>(arr.pData), .Size = arr.Size };
 		return slice;
 	}
 
-	static Slice<T> FromArray(const SizedArray<T>& arr)
+	static constexpr Slice<T> FromArray(const SizedArray<T>& arr)
 	{
 		Slice<T> slice { .pData = arr.pData, .Size = arr.Size };
 		return slice;
 	}
 
 	template <uint32 TSize>
-	Slice(StackArray<T, TSize>& stack_arr) : pData(stack_arr.pData), Size(stack_arr.Size)
+	constexpr Slice(StackArray<T, TSize>& stack_arr) : pData(stack_arr.pData), Size(stack_arr.Size)
 	{
 	}
 
-	Slice(T* ptr, uint64 size) : pData(ptr), Size(size) {}
-	Slice(nullptr_t np) : pData(nullptr), Size(0) {}
+	constexpr Slice(T* ptr, uint64 size) : pData(ptr), Size(size) {}
+	constexpr Slice(nullptr_t np) : pData(nullptr), Size(0) {}
 
-	Slice(Slice<T>&& other) { (*this) = std::move(other); }
+	constexpr Slice(Slice<T>&& other) { (*this) = std::move(other); }
 
 	template <typename TOtherType>
-	Slice(const Slice<TOtherType>& other)
+	constexpr Slice(const Slice<TOtherType>& other)
 	{
 		pData = static_cast<T*>(other.pData);
 		Size = other.Size;
@@ -71,7 +81,7 @@ public:
 
 	Slice& operator=(T* value) = delete;
 
-	Slice& operator=(Slice<T>&& other)
+	constexpr Slice& operator=(Slice<T>&& other)
 	{
 		pData = other.pData;
 		Size = other.Size;
@@ -82,7 +92,7 @@ public:
 		return *this;
 	}
 
-	Slice& operator=(const Slice<T>& other)
+	constexpr Slice& operator=(const Slice<T>& other)
 	{
 		pData = other.pData;
 		Size = other.Size;
@@ -92,7 +102,7 @@ public:
 
 	template <typename U>
 		requires std::is_convertible_v<U*, T*>
-	Slice& operator=(const Slice<U>& other)
+	constexpr Slice& operator=(const Slice<U>& other)
 	{
 		pData = other.pData;
 		Size = other.Size;
@@ -100,34 +110,45 @@ public:
 		return *this;
 	}
 
-	bool operator==(nullptr_t np) { return pData == nullptr; }
+	constexpr bool operator==(nullptr_t np) { return pData == nullptr; }
 
-	operator T*() const { return pData; }
+	constexpr operator T*() const { return pData; }
 
-	T& operator[](size_t index)
+	constexpr T& operator[](size_t index) const
 	{
 		if (index > Size) {
 			Panic("Slice", "Index out of range! ({:d} > {:d})\n", index, Size);
 		}
+
 		return pData[index];
 	}
 
-	FX_FORCE_INLINE void SetNull()
+	FX_FORCE_INLINE constexpr void SetNull()
 	{
 		pData = nullptr;
 		Size = 0;
 	}
 
-	FX_FORCE_INLINE uint64 GetSizeInBytes() const { return sizeof(T) * Size; }
+	FX_FORCE_INLINE constexpr uint64 GetSizeInBytes() const { return sizeof(T) * Size; }
 };
 
 using StringView = Slice<const char>;
 
-FX_FORCE_INLINE StringView MakeStringView(const char* ptr, uint64 size) { return Slice<const char>(ptr, size); }
+
+FX_FORCE_INLINE constexpr StringView MakeStringView(const char* ptr, uint64 size)
+{
+	return Slice<const char>(ptr, size);
+}
+
+FX_FORCE_INLINE constexpr StringView MakeStringView(const char* ptr)
+{
+	// Use string_view to get the length (constexpr) as the header is a lot less thicc than string.
+	return Slice<const char>(ptr, std::string_view(ptr).length());
+}
 
 /** Creates a new Slice object */
 template <typename T>
-Slice<T> MakeSlice(T* ptr, uint64 size)
+constexpr Slice<T> MakeSlice(T* ptr, uint64 size)
 {
 	return Slice<T>(ptr, size);
 }
@@ -140,12 +161,12 @@ struct std::formatter<fx::Slice<fx::uint8>>
 {
 	auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-	auto format(const fx::Slice<fx::uint8>& slice, std::format_context& ctx) const
+	constexpr auto format(const fx::Slice<fx::uint8> slice, std::format_context& ctx) const
 	{
 		std::string str = "";
 
 		for (fx::uint64 i = 0; i < slice.Size; i++) {
-			const fx::uint8& value = slice.pData[i];
+			const fx::uint8 value = slice.pData[i];
 			if (i == slice.Size - 1) {
 				str += std::format("{:x}", static_cast<unsigned int>(value));
 			}
@@ -163,7 +184,7 @@ struct std::formatter<fx::StringView>
 {
 	auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-	auto format(const fx::StringView& sv, std::format_context& ctx) const
+	constexpr auto format(const fx::StringView sv, std::format_context& ctx) const
 	{
 		return std::format_to(ctx.out(), "{:.{}}", sv.pData, sv.Size);
 	}

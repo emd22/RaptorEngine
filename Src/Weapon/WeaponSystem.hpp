@@ -139,6 +139,9 @@ struct Weapon
 	int32 Slot = 0;
 	String ScriptPath;
 
+	String ViewModel;
+	Vec3f ViewOffset = Vec3f::sZero;
+
 	String IdleAnim;
 	String FireAnim;
 	String ReloadAnim;

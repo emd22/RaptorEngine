@@ -270,12 +270,14 @@ void GpuDevice::CreateLogicalDevice()
 	}
 
 	bSupportsCubeArrays = (supported_features.imageCubeArray == VK_TRUE);
+	bSupportsBC7 = (supported_features.textureCompressionBC == VK_TRUE);
 
 	VkPhysicalDeviceFeatures2 features2 {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
 		.pNext = &timeline_semaphore_features,
 		.features = { .imageCubeArray = supported_features.imageCubeArray,
-					  .samplerAnisotropy = supported_features.samplerAnisotropy },
+					  .samplerAnisotropy = supported_features.samplerAnisotropy,
+					  .textureCompressionBC = supported_features.textureCompressionBC },
 	};
 
 

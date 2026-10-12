@@ -167,6 +167,7 @@ bool WeaponSystem::LoadWeapon(const char* path, Weapon& weapon)
 
 	const ConfigEntry* name_entry = config.GetEntry(HashStr32("name"));
 	const ConfigEntry* slot_entry = config.GetEntry(HashStr32("slot"));
+	const ConfigEntry* view_model = config.GetEntry(HashStr32("viewmodel"));
 	const ConfigEntry* animations = config.GetEntry(HashStr32("animations"));
 	const ConfigEntry* fire = config.GetEntry(HashStr32("fire"));
 	const ConfigEntry* spread = config.GetEntry(HashStr32("spread"));
@@ -178,6 +179,12 @@ bool WeaponSystem::LoadWeapon(const char* path, Weapon& weapon)
 	weapon.ScriptPath = String(script_entry->GetValue<const char*>());
 	weapon.Name = name_entry != nullptr ? String(name_entry->GetValue<const char*>()) : String("Weapon");
 	weapon.Slot = slot_entry != nullptr ? slot_entry->GetValue<int32>() : 0;
+
+	weapon.ViewModel = view_model != nullptr ? String(view_model->GetValue<const char*>()) : String("");
+
+	if (const ConfigEntry* view_offset = config.GetEntry(HashStr32("view_offset"))) {
+		weapon.ViewOffset = view_offset->GetValue<Vec3f>();
+	}
 
 	weapon.IdleAnim = StringMember(animations, "idle", "BASE");
 	weapon.FireAnim = StringMember(animations, "fire", "Armature|Fire");
@@ -332,6 +339,8 @@ void WeaponSystem::OnScriptsReloaded()
 
 void WeaponSystem::ApplyAnimations(const Weapon& weapon)
 {
+	mpPlayer->SetViewModel(weapon.ViewModel.CStr());
+	mpPlayer->SetViewModelOffset(weapon.ViewOffset);
 	mpPlayer->SetViewModelAnimations(weapon.IdleAnim.CStr(), weapon.FireAnim.CStr(), weapon.ReloadAnim.CStr());
 	mpPlayer->SetRecoilRecovery(weapon.Def.RecoilRecovery);
 }

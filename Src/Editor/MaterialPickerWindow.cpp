@@ -35,7 +35,7 @@ static String ToLower(String text)
 	return text;
 }
 
-/// Reads the smallest mip that is at least the preview size (or the base level) of an uncompressed 8-bit KTX
+/// Reads the smallest mip that is at least the preview size (or the base level) of an 8-bit RGBA or Basis KTX
 static wxBitmap LoadKtxBitmap(const String& path)
 {
 	ktxTexture* texture = nullptr;
@@ -51,7 +51,8 @@ static wxBitmap LoadKtxBitmap(const String& path)
 
 	if (texture->classId == ktxTexture2_c) {
 		ktxTexture2* texture2 = reinterpret_cast<ktxTexture2*>(texture);
-		supported = !ktxTexture2_NeedsTranscoding(texture2) &&
+		supported = (!ktxTexture2_NeedsTranscoding(texture2) ||
+					 ktxTexture2_TranscodeBasis(texture2, KTX_TTF_RGBA32, 0) == KTX_SUCCESS) &&
 					(texture2->vkFormat == VK_FORMAT_R8G8B8A8_UNORM || texture2->vkFormat == VK_FORMAT_R8G8B8A8_SRGB ||
 					 texture2->vkFormat == VK_FORMAT_B8G8R8A8_UNORM || texture2->vkFormat == VK_FORMAT_B8G8R8A8_SRGB);
 		is_bgra = texture2->vkFormat == VK_FORMAT_B8G8R8A8_UNORM || texture2->vkFormat == VK_FORMAT_B8G8R8A8_SRGB;

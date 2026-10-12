@@ -553,30 +553,6 @@ static bool OpenGltfKtxImage(loader::LoaderKtx& ktx, const cgltf_image* image, c
 	return HasKtx2Magic(header, header_size) && ktx.Open(full_path.c_str());
 }
 
-static bool IsRgba8Format(eImageFormat format)
-{
-	return format == eImageFormat::RGBA8_UNorm || format == eImageFormat::RGBA8_SRGB;
-}
-
-/// Whether any texel in the base level of an 8-bit, 4 channel image is not fully opaque.
-static bool ImageHasTranslucentTexels(const ImageInfo& info)
-{
-	if (!IsRgba8Format(info.Format) && info.Format != eImageFormat::BGRA8_UNorm) {
-		return false;
-	}
-
-	// The base level comes first in the packed mip chain
-	const uint64 texel_count = std::min(uint64(info.Size.X) * info.Size.Y, info.ImageData.Size / 4);
-
-	for (uint64 i = 0; i < texel_count; i++) {
-		if (info.ImageData.pData[i * 4 + 3] != 0xFF) {
-			return true;
-		}
-	}
-
-	return false;
-}
-
 /**
  * @brief Loads a material texture's mip chain from its KTX2 image. Material textures must be KTX2, and anything else
  * logs an error and returns false.
@@ -609,16 +585,18 @@ static bool MakeMaterialTextureForPrimitive(const String& model_path, Material* 
 
 	// The component decides the colour space (albedo is sRGB, normal and surface maps are linear), not whatever the
 	// exporter tagged the file with. Both are the same bits.
-	if (IsRgba8Format(image_info.Format) && IsRgba8Format(component.ImageFormat) &&
-		image_info.Format != component.ImageFormat) {
+	const bool wants_srgb = ImageFormatUtil::IsSrgb(component.ImageFormat);
+	const eImageFormat wanted_format = wants_srgb ? ImageFormatUtil::ToSrgb(image_info.Format)
+												  : ImageFormatUtil::ToUNorm(image_info.Format);
+
+	if (image_info.Format != wanted_format) {
 		LogWarning(LC_ASSET, "glTF texture '{}' ({}) is stored as {}, expected {}", GetImageName(image), component_name,
-				   (image_info.Format == eImageFormat::RGBA8_SRGB) ? "sRGB" : "UNorm",
-				   (component.ImageFormat == eImageFormat::RGBA8_SRGB) ? "sRGB" : "UNorm");
-		image_info.Format = component.ImageFormat;
+				   wants_srgb ? "UNorm" : "sRGB", wants_srgb ? "sRGB" : "UNorm");
+		image_info.Format = wanted_format;
 	}
 
 	if (out_has_alpha != nullptr) {
-		*out_has_alpha = ImageHasTranslucentTexels(image_info);
+		*out_has_alpha = ktx.HasTranslucentTexels();
 	}
 
 	component.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;

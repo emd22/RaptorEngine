@@ -170,6 +170,46 @@ void ConfigEntry::AddMember(ConfigEntry&& entry)
 	Type = ConfigEntry::ePrimitiveType::Struct;
 }
 
+void ConfigEntry::CopyValueFrom(const ConfigEntry& other)
+{
+	if (this == &other) {
+		return;
+	}
+
+	ConfigPrimitive::Set(static_cast<const ConfigPrimitive&>(other));
+
+	bIsArray = other.bIsArray;
+	bIsDotReference = other.bIsDotReference;
+
+	if (Members.IsInited()) {
+		Members.Destroy();
+	}
+
+	if (ArrayData.IsInited()) {
+		ArrayData.Destroy();
+	}
+
+	if (other.ArrayData.IsInited()) {
+		ArrayData.Create(8);
+
+		for (const ConfigPrimitive& value : other.ArrayData) {
+			ArrayData.Insert(ConfigPrimitive(value));
+		}
+	}
+
+	if (other.Members.IsInited()) {
+		Members.Create();
+
+		for (const ConfigEntry& member : other.Members) {
+			ConfigEntry copy;
+			copy.Name = member.Name;
+			copy.CopyValueFrom(member);
+
+			Members.Insert(std::move(copy));
+		}
+	}
+}
+
 String ConfigPrimitive::AsString() const
 {
 	switch (Type) {
@@ -199,7 +239,14 @@ String ConfigEntry::AsString(uint32 indent) const
 	}
 
 
-	if (Type == ePrimitiveType::Struct) {
+	if (IsObjectArray()) {
+		for (const ConfigEntry& entry : Members) {
+			member_list += std::format("{}\t{},\n", indent_str, entry.AsString(indent + 1));
+		}
+
+		return std::format("[\n{}{}]", member_list, indent_str);
+	}
+	else if (Type == ePrimitiveType::Struct) {
 		for (const ConfigEntry& entry : Members) {
 			member_list += std::format("{}\t{} = {}\n", indent_str, ValidName(entry.Name.Get()),
 									   entry.AsString(indent + 1));
@@ -339,6 +386,10 @@ static ConfigEntry::ePrimitiveType GetValueTokenType(const Token& token)
 
 	VType current_type = VType::None;
 
+	if (token.Type == eTokenType::String) {
+		return VType::String;
+	}
+
 	Token::eIsNumericResult numeric_result = token.IsNumeric();
 	if (numeric_result != Token::eIsNumericResult::NaN) {
 		if (numeric_result == Token::eIsNumericResult::Integer) {
@@ -400,38 +451,195 @@ void ConfigFile::PrintEntries()
 	}
 }
 
-bool ConfigFile::ParseReference(ConfigPrimitive& value)
+bool ConfigFile::ScanReferencePath(std::string& out_path, uint32& out_end_index) const
 {
-	Token* ident_token = GetToken();
-	if (!EatToken(eTokenType::Identifier)) {
+	uint32 offset = 1;
+
+	if (PeekToken(offset)->Type != eTokenType::Identifier) {
 		return false;
 	}
 
-	ConfigEntry* value_entry = GetEntry(ident_token->GetHash());
+	out_path = PeekToken(offset)->GetStr();
+	++offset;
 
-	// If there is a dot following, search for a nested member
-	while (value_entry != nullptr) {
-		if (GetToken()->Type != eTokenType::Dot) {
+	while (true) {
+		const eTokenType type = PeekToken(offset)->Type;
+		const eTokenType next_type = PeekToken(offset + 1)->Type;
+
+		if (type == eTokenType::Dot && (next_type == eTokenType::Identifier || next_type == eTokenType::Integer)) {
+			out_path += '.';
+			out_path += PeekToken(offset + 1)->GetStr();
+			offset += 2;
+		}
+		else if (type == eTokenType::LBracket && next_type == eTokenType::Integer &&
+				 PeekToken(offset + 2)->Type == eTokenType::RBracket) {
+			out_path += '[';
+			out_path += PeekToken(offset + 1)->GetStr();
+			out_path += ']';
+			offset += 3;
+		}
+		else {
 			break;
 		}
-
-		NextToken();
-
-		ident_token = GetToken();
-		if (!EatToken(eTokenType::Identifier)) {
-			break;
-		}
-
-		value_entry = value_entry->GetMember(ident_token->GetHash());
 	}
 
-	if (!value_entry) {
-		LogError(LC_CORE, "Config({}): could not resolve reference", mTokenIndex);
+	out_end_index = mTokenIndex + offset;
+
+	return true;
+}
+
+ConfigEntry* ConfigFile::WalkReferencePath(const std::string& path, const ConfigPrimitive*& out_primitive,
+										   std::vector<ConfigEntry*>& resolving, bool report_failures)
+{
+	out_primitive = nullptr;
+
+	ConfigEntry* current = nullptr;
+	size_t position = 0;
+
+	while (position < path.size()) {
+		if (path[position] == '[') {
+			const size_t close = path.find(']', position);
+			const uint64 index = std::strtoull(path.c_str() + position + 1, nullptr, 10);
+
+			position = close + 1;
+
+			if (current->IsObjectArray()) {
+				if (index >= current->Members.Size()) {
+					return nullptr;
+				}
+
+				current = &current->Members[index];
+			}
+			else {
+				const bool is_last_step = (position >= path.size());
+
+				if (!current->bIsArray || !current->ArrayData.IsInited() || index >= current->ArrayData.Size() ||
+					!is_last_step) {
+					return nullptr;
+				}
+
+				out_primitive = &current->ArrayData[index];
+				return current;
+			}
+		}
+		else {
+			if (path[position] == '.') {
+				++position;
+			}
+
+			const size_t end = std::min(path.find_first_of(".[", position), path.size());
+			const Hash32 name_hash = HashStr32(path.substr(position, end - position).c_str());
+
+			current = (current == nullptr) ? GetEntry(name_hash) : current->GetMember(name_hash);
+			position = end;
+		}
+
+		if (current == nullptr) {
+			return nullptr;
+		}
+
+		if (current->bIsDotReference && !ResolveEntryReferences(*current, resolving, report_failures)) {
+			return nullptr;
+		}
+	}
+
+	return current;
+}
+
+bool ConfigFile::ResolveEntryReferences(ConfigEntry& entry, std::vector<ConfigEntry*>& resolving, bool report_failures)
+{
+	if (!entry.bIsDotReference) {
+		bool resolved = true;
+
+		if (entry.Members.IsInited()) {
+			for (ConfigEntry& member : entry.Members) {
+				resolved &= ResolveEntryReferences(member, resolving, report_failures);
+			}
+		}
+
+		return resolved;
+	}
+
+	if (std::find(resolving.begin(), resolving.end(), &entry) != resolving.end()) {
+		if (report_failures) {
+			LogError(LC_CORE, "Config: reference '{}' is part of a cycle", entry.Get<const char*>());
+			mbHasErrors = true;
+		}
+		return false;
+	}
+
+	const std::string path = entry.Get<const char*>() + 1;
+
+	resolving.push_back(&entry);
+
+	const ConfigPrimitive* primitive = nullptr;
+	ConfigEntry* target = WalkReferencePath(path, primitive, resolving, report_failures);
+
+	const bool resolved = target != nullptr &&
+						  (primitive != nullptr || ResolveEntryReferences(*target, resolving, report_failures));
+
+	resolving.pop_back();
+
+	if (resolved) {
+		entry.bIsDotReference = false;
+
+		if (primitive != nullptr) {
+			entry.ConfigPrimitive::Set(ConfigPrimitive(*primitive));
+		}
+		else {
+			entry.CopyValueFrom(*target);
+		}
+
+		return true;
+	}
+
+	if (target == nullptr && path.find_first_of(".[") == std::string::npos) {
+		if (const ConfigEntry* constant = FindConstant(HashStr32(path.c_str()))) {
+			entry.bIsDotReference = false;
+			entry.ConfigPrimitive::Set(static_cast<const ConfigPrimitive&>(*constant));
+			return true;
+		}
+	}
+
+	if (report_failures) {
+		LogError(LC_CORE, "Config: could not resolve reference '${}' assigned to '{}'", path, entry.Name.Get());
+		mbHasErrors = true;
+
+		entry.bIsDotReference = false;
+		entry.ConfigPrimitive::Set(ConfigPrimitive());
+	}
+
+	return false;
+}
+
+bool ConfigFile::ParseReference(ConfigPrimitive& value)
+{
+	std::string path;
+	uint32 end_index = 0;
+
+	if (!ScanReferencePath(path, end_index)) {
+		NextToken();
+		return EatToken(eTokenType::Identifier);
+	}
+
+	mTokenIndex = end_index;
+
+	std::vector<ConfigEntry*> resolving;
+
+	const ConfigPrimitive* primitive = nullptr;
+	const ConfigEntry* value_entry = WalkReferencePath(path, primitive, resolving, false);
+
+	if (value_entry == nullptr && path.find_first_of(".[") == std::string::npos) {
+		value_entry = FindConstant(HashStr32(path.c_str()));
+	}
+
+	if (value_entry == nullptr) {
+		LogError(LC_CORE, "Config({}): could not resolve reference '${}'", mTokenIndex, path);
 		mbHasErrors = true;
 		return false;
 	}
 
-	value = *value_entry;
+	value.Set((primitive != nullptr) ? *primitive : static_cast<const ConfigPrimitive&>(*value_entry));
 	return true;
 }
 
@@ -442,19 +650,15 @@ bool ConfigFile::ParseValue(ConfigPrimitive& value)
 	Token* value_token = GetToken();
 
 	if (value_token->Type == eTokenType::Dollar) {
-		EatToken(eTokenType::Dollar);
-
 		return ParseReference(value);
 	}
 
 	// Check for constants
 	if (value_token->Type == eTokenType::Identifier) {
-		for (const ConfigEntry& entry : mConstants) {
-			if (entry.Name == value_token->GetHash()) {
-				value.Set(entry);
-				NextToken();
-				return true;
-			}
+		if (const ConfigEntry* constant = FindConstant(value_token->GetHash())) {
+			value.Set(*constant);
+			NextToken();
+			return true;
 		}
 
 		LogError(LC_CORE, "Could not find reference to constant {}!", value_token->GetStr());
@@ -634,43 +838,7 @@ bool ConfigFile::ParseEntry(ConfigEntry* parent, ConfigEntry& entry)
 	// Parse struct
 	// [IDENTIFIER] = { [ENTRY]... }
 	if (GetToken()->Type == eTokenType::LBrace) {
-		if (mDepth >= cMaxDepth) {
-			LogError(LC_CORE, "Config({}): nesting too deep", mTokenIndex);
-			mbHasErrors = true;
-			return false;
-		}
-
-		EatToken(eTokenType::LBrace);
-
-		entry.Type = ConfigEntry::ePrimitiveType::Struct;
-
-		++mDepth;
-
-		// Add each entry as a member of the current entry
-		while (!IsAtEnd() && GetToken()->Type != eTokenType::RBrace) {
-			const uint32 start_index = mTokenIndex;
-
-			ConfigEntry member;
-			if (ParseEntry(&entry, member)) {
-				entry.AddMember(std::move(member));
-				continue;
-			}
-
-			// Malformed member, drop it and resume at the next entry
-			SkipToNextEntry(true);
-			if (mTokenIndex == start_index && !IsAtEnd() && GetToken()->Type != eTokenType::RBrace) {
-				NextToken();
-			}
-		}
-
-		--mDepth;
-
-		// Missing closing brace (truncated file). Keep what was parsed.
-		if (!EatToken(eTokenType::RBrace)) {
-			return false;
-		}
-
-		return true;
+		return ParseStruct(entry);
 	}
 
 	// Parse array
@@ -683,11 +851,23 @@ bool ConfigFile::ParseEntry(ConfigEntry* parent, ConfigEntry& entry)
 		entry.Type = GetValueTokenType(*value_token);
 
 		while (!IsAtEnd() && GetToken()->Type != eTokenType::RBracket) {
-			ConfigPrimitive value;
-			if (!ParseExpression(value)) {
-				return false;
+			if (GetToken()->Type == eTokenType::LBrace) {
+				ConfigEntry element;
+				element.Name = std::to_string(entry.Members.IsInited() ? entry.Members.Size() : 0);
+
+				if (!ParseStruct(element)) {
+					return false;
+				}
+
+				entry.AddMember(std::move(element));
 			}
-			entry.AppendValue(std::move(value));
+			else {
+				ConfigPrimitive value;
+				if (!ParseExpression(value)) {
+					return false;
+				}
+				entry.AppendValue(std::move(value));
+			}
 
 			if (GetToken()->Type == eTokenType::RBracket) {
 				break;
@@ -701,10 +881,70 @@ bool ConfigFile::ParseEntry(ConfigEntry* parent, ConfigEntry& entry)
 		return EatToken(eTokenType::RBracket);
 	}
 
+	// Parse a reference to another entry, which can be an object or an array and can be defined later in the file
+	// [IDENTIFIER] = $[IDENTIFIER](.[IDENTIFIER] | \[[INT]\])...
+	if (GetToken()->Type == eTokenType::Dollar) {
+		std::string path;
+		uint32 end_index = 0;
+
+		if (ScanReferencePath(path, end_index) && PeekToken(end_index - mTokenIndex)->Type != eTokenType::Pipe) {
+			mTokenIndex = end_index;
+
+			entry.Set(String("$" + path));
+			entry.bIsDotReference = true;
+
+			mbHasEntryReferences = true;
+
+			return true;
+		}
+	}
+
 	// Parse single value entry
 	// [IDENTIFIER] = [INT | FLOAT | STRING | ( EXPR | EXPR )]
 
 	return ParseExpression(entry);
+}
+
+bool ConfigFile::ParseStruct(ConfigEntry& entry)
+{
+	if (mDepth >= cMaxDepth) {
+		LogError(LC_CORE, "Config({}): nesting too deep", mTokenIndex);
+		mbHasErrors = true;
+		return false;
+	}
+
+	EatToken(eTokenType::LBrace);
+
+	entry.Type = ConfigEntry::ePrimitiveType::Struct;
+
+	++mDepth;
+
+	// Add each entry as a member of the current entry
+	while (!IsAtEnd() && GetToken()->Type != eTokenType::RBrace) {
+		if (GetToken()->Type == eTokenType::Semicolon) {
+			NextToken();
+			continue;
+		}
+
+		const uint32 start_index = mTokenIndex;
+
+		ConfigEntry member;
+		if (ParseEntry(&entry, member)) {
+			entry.AddMember(std::move(member));
+			continue;
+		}
+
+		// Malformed member, drop it and resume at the next entry
+		SkipToNextEntry(true);
+		if (mTokenIndex == start_index && !IsAtEnd() && GetToken()->Type != eTokenType::RBrace) {
+			NextToken();
+		}
+	}
+
+	--mDepth;
+
+	// Missing closing brace (truncated file). Keep what was parsed.
+	return EatToken(eTokenType::RBrace);
 }
 
 void ConfigFile::Parse(PagedArray<Token>& tokens)
@@ -716,6 +956,11 @@ void ConfigFile::Parse(PagedArray<Token>& tokens)
 	mpTokens = &tokens;
 
 	while (!IsAtEnd()) {
+		if (GetToken()->Type == eTokenType::Semicolon) {
+			NextToken();
+			continue;
+		}
+
 		const uint32 start_index = mTokenIndex;
 
 		ConfigEntry entry;
@@ -729,6 +974,16 @@ void ConfigFile::Parse(PagedArray<Token>& tokens)
 		if (mTokenIndex == start_index && !IsAtEnd()) {
 			NextToken();
 		}
+	}
+
+	if (mbHasEntryReferences) {
+		std::vector<ConfigEntry*> resolving;
+
+		for (ConfigEntry& entry : mConfigEntries) {
+			ResolveEntryReferences(entry, resolving, true);
+		}
+
+		mbHasEntryReferences = false;
 	}
 
 	if (mbHasErrors) {
@@ -794,14 +1049,22 @@ void ConfigFile::InitConstants()
 
 	mConstants.InitCapacity(cMaxConstants);
 
-	// mConstants.Insert(ConfigEntry("TRUE", 1));
-	// mConstants.Insert(ConfigEntry("FALSE", 0));
+	mConstants.Insert(ConfigEntry("true", int64(1)));
+	mConstants.Insert(ConfigEntry("false", int64(0)));
 
-	// mConstants.Insert(ConfigEntry("OBJLAYER_WORLD", 0));
-	// mConstants.Insert(ConfigEntry("OBJLAYER_PLAYER", 1));
+	mConstants.Insert(ConfigEntry("True", int64(1)));
+	mConstants.Insert(ConfigEntry("False", int64(0)));
+}
 
-	// mConstants.Insert(ConfigEntry("PHYS_STATIC", 0));
-	// mConstants.Insert(ConfigEntry("PHYS_DYNAMIC", 1));
+const ConfigEntry* ConfigFile::FindConstant(Hash32 name_hash) const
+{
+	for (const ConfigEntry& entry : mConstants) {
+		if (entry.Name == name_hash) {
+			return &entry;
+		}
+	}
+
+	return nullptr;
 }
 
 } // namespace fx

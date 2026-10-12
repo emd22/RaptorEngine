@@ -290,7 +290,7 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 {
 	UpdateIfOutOfDate();
 
-	if (!CheckIfReady(true) || !HasBonesForDraw()) {
+	if (IsHidden() || !CheckIfReady(true) || !HasBonesForDraw()) {
 		return;
 	}
 
@@ -367,7 +367,7 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 
 void Object::RenderPrimitive(const CommandBuffer& cmd)
 {
-	if (!pMesh || !CheckIfReady(false) || !HasBonesForDraw()) {
+	if (!pMesh || IsHidden() || !CheckIfReady(false) || !HasBonesForDraw()) {
 		return;
 	}
 
@@ -543,6 +543,23 @@ void Object::SetProbeVisible(bool value)
 		Object* attached_object = gObjectManager->GetObject(attached_id);
 		if (attached_object != nullptr) {
 			attached_object->SetProbeVisible(value);
+		}
+	}
+}
+
+void Object::SetHidden(bool value)
+{
+	if (value) {
+		SetFlag(Flags, eObjectFlags::Hidden);
+	}
+	else {
+		ClearFlag(Flags, eObjectFlags::Hidden);
+	}
+
+	for (ObjectID attached_id : AttachedNodes) {
+		Object* attached_object = gObjectManager->GetObject(attached_id);
+		if (attached_object != nullptr) {
+			attached_object->SetHidden(value);
 		}
 	}
 }

@@ -110,6 +110,18 @@ void File::SeekBy(uint32 by) { fseek(pFileHandle, by, SEEK_CUR); }
 uint64 File::GetPosition() const { return ftell(pFileHandle); }
 
 
+uint64 File::Read2(void* buffer, uint32 element_size)
+{
+	if (!pFileHandle) {
+		return 0;
+	}
+
+	const uint64 n_to_read = (GetFileSize() / static_cast<uint64>(element_size));
+	uint64 items_read = fread(buffer, static_cast<size_t>(element_size), n_to_read, pFileHandle);
+
+	return items_read;
+}
+
 void File::Flush()
 {
 	if (!pFileHandle) {

@@ -6,6 +6,7 @@
 #include "Loader/Image/LoaderKtx.hpp"
 #include "Loader/Image/LoaderStb.hpp"
 #include "Loader/Object/LoaderGltf.hpp"
+#include "Loader/Object/LoaderRxModel.hpp"
 
 #include <Core/Defines.hpp>
 #include <Core/Thread/ThreadManager.hpp>
@@ -433,6 +434,19 @@ inline bool IsFileJpeg(const String& path)
 	return false;
 }
 
+inline bool IsPathRxModel(const String& path)
+{
+	const std::string_view view(path.CStr(), path.GetLength());
+
+	for (const std::string_view extension : { std::string_view(".rxmodel"), std::string_view(".rxweapon") }) {
+		if (view.size() > extension.size() && view.substr(view.size() - extension.size()) == extension) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 /////////////////////////////////////
 // Object loading functions
 /////////////////////////////////////
@@ -442,7 +456,12 @@ AssetTicket AssetManager::LoadObject(const String& name, const String& path)
 	Object* object = gObjectManager->NewObject(name, MaterialID::scNull, eObjectTag::None, true);
 	AssetTicket ticket { object };
 
-	LoadFromPath<loader::LoaderGltf>(ticket, eAssetType::Object, path);
+	if (IsPathRxModel(path)) {
+		LoadFromPath<loader::LoaderRxModel>(ticket, eAssetType::Object, path);
+	}
+	else {
+		LoadFromPath<loader::LoaderGltf>(ticket, eAssetType::Object, path);
+	}
 
 	return ticket;
 }

@@ -25,57 +25,126 @@ void Player::Create()
 
 	mCameraOffset = Vec3f(0, physics::PhysicsPlayer::scEyeHeight, 0);
 
-	// Load the view model
+	Weapons.Create(this);
 
-	AssetTicket view_model = gAssetManager->LoadObject("view_model", "RaptorData/Data/viewmodel/viewmodel_baked.glb");
+	if (mActiveViewModel < 0) {
+		SetViewModel(scDefaultViewModel);
+	}
+}
+
+void Player::SetViewModel(const char* path)
+{
+	const String wanted = (path == nullptr || path[0] == '\0') ? String(scDefaultViewModel) : String(path);
+
+	for (uint32 i = 0; i < mViewModelCount; i++) {
+		if (mViewModels[i].Path == wanted) {
+			ActivateViewModel(i);
+			return;
+		}
+	}
+
+	if (mViewModelCount >= scMaxViewModels) {
+		LogWarning(LC_ASSET, "Too many view models, can not load '{}'", wanted);
+		return;
+	}
+
+	const uint32 index = mViewModelCount++;
+	mViewModels[index].Path = wanted;
+
+	ActivateViewModel(index);
+
+	AssetTicket view_model = gAssetManager->LoadObject(String::Fmt("view_model_{}", index), wanted);
 
 	// Registered before World::Attach() so these callbacks run first: the view model has to be set up before the world
 	// adds it to the grid, or a probe bake running on the main thread in between would capture it as level geometry.
-	view_model.OnLoaded(
-		[&](void* item_ptr)
-		{
-			Object* object = static_cast<Object*>(item_ptr);
-			if (object == nullptr) {
-				return;
-			}
-
-			object->SetShadowCaster(false);
-			object->SetCullable(false);
-			object->SetObjectLayer(eObjectLayer::PlayerLayer);
-			object->SetProbeVisible(false);
-
-			if (object->pSkeleton.IsValid()) {
-			}
-
-			mpViewModel = object;
-
-			// The skeleton lives on whichever mesh is skinned, which is one of the attached objects if the model has
-			// more than one mesh.
-			mpViewModelSkeleton = object->pSkeleton;
-
-			for (ObjectID child_id : object->AttachedNodes) {
-				if (mpViewModelSkeleton) {
-					break;
-				}
-
-				Object* child = gObjectManager->GetObject(child_id);
-				if (child != nullptr) {
-					mpViewModelSkeleton = child->pSkeleton;
-				}
-			}
-
-			ApplyViewModelIdleAnimation();
-
-			// Start in line with the camera so the view model doesn't swing in when it first appears
-			mPrevCameraYaw = pCamera->mAngleX;
-			mPrevCameraPitch = pCamera->mAngleY;
-			mViewModelSwayYaw = 0.0f;
-			mViewModelSwayPitch = 0.0f;
-		});
+	view_model.OnLoaded([this, index](void* item_ptr) { OnViewModelLoaded(index, static_cast<Object*>(item_ptr)); });
 
 	gWorld->Attach(view_model);
+}
 
-	Weapons.Create(this);
+void Player::OnViewModelLoaded(uint32 index, Object* object)
+{
+	if (object == nullptr) {
+		return;
+	}
+
+	object->SetShadowCaster(false);
+	object->SetCullable(false);
+	object->SetObjectLayer(eObjectLayer::PlayerLayer);
+	object->SetProbeVisible(false);
+
+	ViewModelSlot& slot = mViewModels[index];
+
+	slot.pObject = object;
+
+	// The skeleton lives on whichever mesh is skinned, which is one of the attached objects if the model has
+	// more than one mesh.
+	slot.pSkeleton = object->pSkeleton;
+
+	for (ObjectID child_id : object->AttachedNodes) {
+		if (slot.pSkeleton) {
+			break;
+		}
+
+		Object* child = gObjectManager->GetObject(child_id);
+		if (child != nullptr) {
+			slot.pSkeleton = child->pSkeleton;
+		}
+	}
+
+	if (slot.pSkeleton) {
+		const Skeleton& skeleton = *slot.pSkeleton;
+
+		for (uint32 i = 0; i < skeleton.JointCount && i < skeleton.BoneNames.Size; i++) {
+			if (skeleton.BoneNames[i] == scViewModelViewJoint) {
+				slot.ViewOrigin = skeleton.InvBindTransforms[i].Inverse().GetTranslation();
+				slot.bHasViewJoint = true;
+				break;
+			}
+		}
+	}
+
+	if (static_cast<int32>(index) == mActiveViewModel) {
+		ActivateViewModel(index);
+	}
+	else {
+		object->SetHidden(true);
+	}
+}
+
+void Player::ActivateViewModel(uint32 index)
+{
+	if (mActiveViewModel >= 0 && static_cast<uint32>(mActiveViewModel) != index) {
+		ViewModelSlot& previous = mViewModels[mActiveViewModel];
+
+		if (previous.pObject != nullptr) {
+			previous.pObject->SetHidden(true);
+		}
+
+		if (previous.pSkeleton) {
+			previous.pSkeleton->ClearAnimationStack();
+		}
+	}
+
+	ViewModelSlot& slot = mViewModels[index];
+
+	mActiveViewModel = static_cast<int32>(index);
+	mpViewModel = slot.pObject;
+	mpViewModelSkeleton = slot.pSkeleton;
+
+	if (mpViewModel == nullptr) {
+		return;
+	}
+
+	mpViewModel->SetHidden(false);
+
+	ApplyViewModelIdleAnimation();
+
+	// Start in line with the camera so the view model doesn't swing in when it first appears
+	mPrevCameraYaw = pCamera->mAngleX;
+	mPrevCameraPitch = pCamera->mAngleY;
+	mViewModelSwayYaw = 0.0f;
+	mViewModelSwayPitch = 0.0f;
 }
 
 void Player::ResetMotion()
@@ -245,11 +314,31 @@ void Player::UpdateViewModel(double delta_time)
 
 	// const float32 rotx = sin(gWorld->Player.mBobCounterY * 0.5f) * 0.05f;
 
-	mpViewModel->SetPosition(pCamera->Position - (forward * (0.05 + mViewKickValue[ViewKickBack])) +
-							 (up * (0.15 - mViewModelHolster * scHolsterDrop)) + (right * 0.0) + view_model_bob);
 	const Quat kick = Quat::FromEulerAngles(
 		Vec3f(-mViewKickValue[ViewKickPitch], mViewKickValue[ViewKickYaw], mViewKickValue[ViewKickRoll]));
 
+	const Vec3f view_offset = view_model_bob + (right * mViewModelOffset.X) + (up * mViewModelOffset.Y) +
+							  (forward * (mViewModelOffset.Z - mViewKickValue[ViewKickBack])) -
+							  (up * (mViewModelHolster * scHolsterDrop));
+
+	const ViewModelSlot& slot = mViewModels[mActiveViewModel];
+
+	if (slot.bHasViewJoint) {
+		const Quat rotation = mViewModelRotation * kick *
+							  Quat::FromEulerAngles(Vec3f(0.0f, static_cast<float32>(FX_PI), 0.0f));
+		const Mat4f basis = Mat4f::AsRotation(rotation);
+
+		const Vec3f view_origin = (Vec3f(basis.Rows[0]) * slot.ViewOrigin.X) +
+								  (Vec3f(basis.Rows[1]) * slot.ViewOrigin.Y) +
+								  (Vec3f(basis.Rows[2]) * slot.ViewOrigin.Z);
+
+
+		mpViewModel->SetPosition(pCamera->Position - view_origin + view_offset);
+		mpViewModel->SetRotation(rotation);
+		return;
+	}
+
+	mpViewModel->SetPosition(pCamera->Position + view_offset);
 	mpViewModel->SetRotation(mViewModelRotation * kick);
 }
 

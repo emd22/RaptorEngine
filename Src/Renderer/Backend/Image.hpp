@@ -80,6 +80,9 @@ enum class eImageFormat : uint16
 
 	R8_UInt,
 	R8_UNorm,
+
+	BC7_UNorm,
+	BC7_SRGB,
 };
 
 enum class eImageType
@@ -166,15 +169,13 @@ struct ImageFormatUtil
 	}
 
 
-	/**
-	 * @brief Get the size of the format in bytes. For example, RGBA8 would return 4.
-	 */
 	/// Whether sampling this format applies the sRGB transfer function, i.e. its contents are gamma encoded.
 	static constexpr bool IsSrgb(eImageFormat format)
 	{
 		switch (format) {
 		case eImageFormat::BGRA8_SRGB:
 		case eImageFormat::RGBA8_SRGB:
+		case eImageFormat::BC7_SRGB:
 			return true;
 		default:;
 		}
@@ -182,6 +183,43 @@ struct ImageFormatUtil
 		return false;
 	}
 
+	static constexpr bool IsBlockCompressed(eImageFormat format)
+	{
+		return format == eImageFormat::BC7_UNorm || format == eImageFormat::BC7_SRGB;
+	}
+
+	static constexpr eImageFormat ToSrgb(eImageFormat format)
+	{
+		switch (format) {
+		case eImageFormat::BGRA8_UNorm:
+			return eImageFormat::BGRA8_SRGB;
+		case eImageFormat::RGBA8_UNorm:
+			return eImageFormat::RGBA8_SRGB;
+		case eImageFormat::BC7_UNorm:
+			return eImageFormat::BC7_SRGB;
+		default:;
+		}
+
+		return format;
+	}
+
+	static constexpr eImageFormat ToUNorm(eImageFormat format)
+	{
+		switch (format) {
+		case eImageFormat::BGRA8_SRGB:
+			return eImageFormat::BGRA8_UNorm;
+		case eImageFormat::RGBA8_SRGB:
+			return eImageFormat::RGBA8_UNorm;
+		case eImageFormat::BC7_SRGB:
+			return eImageFormat::BC7_UNorm;
+		default:;
+		}
+
+		return format;
+	}
+
+	/// The size of a pixel in bytes. For example, RGBA8 would return 4. Block compressed formats have no per-pixel
+	/// size and return 0, use GetDataSize() for those.
 	static constexpr uint32 GetPixelStride(eImageFormat format)
 	{
 		switch (format) {
@@ -223,9 +261,23 @@ struct ImageFormatUtil
 		case eImageFormat::R8_UInt:
 		case eImageFormat::R8_UNorm:
 			return 1;
+
+		case eImageFormat::BC7_UNorm:
+		case eImageFormat::BC7_SRGB:
+			break;
 		}
 
 		return 0;
+	}
+
+	/// The size in bytes of one tightly packed level of `size` pixels.
+	static constexpr uint64 GetDataSize(eImageFormat format, const Vec2u& size)
+	{
+		if (IsBlockCompressed(format)) {
+			return uint64((size.X + 3) / 4) * ((size.Y + 3) / 4) * 16;
+		}
+
+		return uint64(size.X) * size.Y * GetPixelStride(format);
 	}
 
 	static constexpr VkImageAspectFlags GetAspectMask(const eImageFormat format)
@@ -262,6 +314,9 @@ struct ImageFormatUtil
 	{
 		if (IsDepth(format) || IsStencil(format)) {
 			return VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+		}
+		else if (IsBlockCompressed(format)) {
+			return 0;
 		}
 		else {
 			return VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -317,6 +372,11 @@ struct ImageFormatUtil
 			return VK_FORMAT_R8_UINT;
 		case eImageFormat::R8_UNorm:
 			return VK_FORMAT_R8_UNORM;
+
+		case eImageFormat::BC7_UNorm:
+			return VK_FORMAT_BC7_UNORM_BLOCK;
+		case eImageFormat::BC7_SRGB:
+			return VK_FORMAT_BC7_SRGB_BLOCK;
 		}
 
 		return VK_FORMAT_UNDEFINED;

@@ -35,11 +35,11 @@ SomeInt = 5
 
 Booleans are treated internally as integers and can be retrieved as any integral type.
 
-Defined in the script are the constants for `true` and `false`, which should be referenced using the dollar sign operator.
+`true` and `false` are built into the language and can be written directly. The older `$true` and `$false` reference form is still accepted.
 
 ```
-IsBoolean = $true
-IsCool = $false
+IsBoolean = true
+IsCool = false
 ```
 
 ### Arrays
@@ -58,6 +58,23 @@ Objects allow an entry to store a number of other named members inside of it.
 SomeObject = { X = 10 }
 ```
 
+Members are separated by whitespace. A semicolon can also be used, which helps when several members share a line.
+
+```
+SomeObject = { X = 10; Y = 20 }
+```
+
+### Arrays of objects
+
+An array can hold objects instead of values. Its elements are stored as members named by their index (`0`, `1`, ...).
+
+```
+Events = [
+	{ Time = 0.1; Name = "start" },
+	{ Time = 0.6; Name = "end" },
+]
+```
+
 ## Referencing other entries
 
 To reference other values in a config file, prefix an identifier with a dollar sign. Nested objects can be referenced by using the dot operator.
@@ -72,11 +89,19 @@ X = $DefinedValue
 Y = $DefinedObject.NestedValue
 ```
 
-The value referenced will be retrieved at call time as a copy of the value.
+An element of an array can be referenced with an index.
+
+```
+Z = $DefinedObject.Position[1]
+```
+
+When a reference is the whole value of an entry it can refer to anything, including an object or an array, and the entry becomes a deep copy of it. These references are resolved once the whole file has been read, so they can point at entries defined later in the file. A reference that cannot be found, or that is part of a cycle, is an error.
+
+References used inside an array or an expression (`$A | $B`) are resolved as they are read, and can only refer to single values that are already defined.
 
 ## Constants
 
-Builtin constant values are located at `/Config/Internal/Constants.conf`, which is automatically imported into all config files.
+`true` and `false` are built into the parser. All other builtin constant values are located at `/Config/Internal/Constants.conf`, which is automatically imported into all config files.
 
 ## Including other files
 

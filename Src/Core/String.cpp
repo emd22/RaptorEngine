@@ -1,8 +1,9 @@
 #include "String.hpp"
 
+#include <Core/Allocator.hpp>
 #include <Core/Assert.hpp>
 #include <Core/Log.hpp>
-#include <Core/Allocator.hpp>
+#include <Core/Slice.hpp>
 #include <Engine.hpp>
 #include <cstring>
 #include <utility>
@@ -56,7 +57,8 @@ String String::SubStrAbs(uint32 start, uint32 end) const
 	if (start == String::scNotFound) {
 		start = 0;
 	}
-	if (end == String::scNotFound) {
+
+	if (end == String::scFullString) {
 		end = Length - 1;
 	}
 
@@ -70,6 +72,10 @@ String String::SubStr(uint32 start, uint32 length) const
 		start = 0;
 	}
 
+	if (length == String::scFullString) {
+		length = Length - start - 1;
+	}
+
 	Assert(start <= Length && start + length <= Length);
 	return String(GetInternalPtr() + start, length);
 }
@@ -81,6 +87,36 @@ bool String::operator==(const String& other) const
 	}
 
 	return (std::memcmp(GetInternalPtr(), other.GetInternalPtr(), Length) == 0);
+}
+
+bool String::operator==(const Slice<const char>& other) const
+{
+	if (Length != other.Size) {
+		return false;
+	}
+
+	return (std::memcmp(GetInternalPtr(), other.pData, Length) == 0);
+}
+
+bool String::operator==(const char* other) const
+{
+	if (Length != strlen(other)) {
+		return false;
+	}
+
+	return (std::memcmp(GetInternalPtr(), other, Length) == 0);
+}
+
+bool String::operator<(const String& other) const
+{
+	const uint32 min_len = Length < other.Length ? Length : other.Length;
+	const int result = std::memcmp(GetInternalPtr(), other.GetInternalPtr(), min_len);
+
+	if (result != 0) {
+		return result < 0;
+	}
+
+	return Length < other.Length;
 }
 
 String String::operator+(const String& other) const
@@ -108,6 +144,20 @@ String String::operator+(const char* other) const
 	char* dst = result.GetInternalPtr();
 	memcpy(dst, CStr(), Length);
 	memcpy(dst + Length, other, other_len);
+	dst[result_len] = '\0';
+
+	return result;
+}
+
+String String::operator+(const Slice<const char> other) const
+{
+	// +1 for null terminator
+	const uint32 result_len = Length + other.Size;
+	String result(result_len);
+
+	char* dst = result.GetInternalPtr();
+	memcpy(dst, CStr(), Length);
+	memcpy(dst + Length, other.pData, other.Size);
 	dst[result_len] = '\0';
 
 	return result;
@@ -396,6 +446,8 @@ String& String::ShortenTo(uint32 new_length)
 
 	return *this;
 }
+
+const Slice<const char> String::GetView() const { return MakeStringView(GetInternalPtr(), Length); }
 
 
 const char String::operator[](size_t index) const { return CStr()[index]; }

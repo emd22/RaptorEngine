@@ -56,6 +56,7 @@ enum class eObjectFlags : uint16
 	DisableCulling = (1 << 5),
 	/// Left out of light probe bakes (capture, capture shadows and probe placement). See Object::IsProbeVisible().
 	NotProbeVisible = (1 << 6),
+	Hidden = (1 << 7),
 };
 
 FxEnumFlags(eObjectFlags);
@@ -167,6 +168,12 @@ public:
 	 * @brief Sets whether light probe bakes can see this object and everything attached to it.
 	 */
 	void SetProbeVisible(bool value);
+
+	/**
+	 * @brief Sets whether this object and everything attached to it is skipped by every render pass.
+	 */
+	void SetHidden(bool value);
+	FX_FORCE_INLINE bool IsHidden() const { return HasFlag(Flags, eObjectFlags::Hidden); }
 
 	/**
 	 * @brief Turns this object into a light probe volume marker, or back into normal geometry.

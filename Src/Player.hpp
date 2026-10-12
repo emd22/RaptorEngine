@@ -30,6 +30,10 @@ class Player
 	/// Roll per radian of yaw sway, so the view model banks into horizontal turns.
 	static constexpr float32 scViewModelSwayRoll = 1.25f;
 
+	static constexpr const char* scDefaultViewModel = "RaptorData/Data/viewmodel/p1911.rxweapon";
+	static constexpr const char* scViewModelViewJoint = "tag_view";
+	static constexpr uint32 scMaxViewModels = 8;
+
 	static constexpr const char* scViewModelIdleAnim = "IDLE";
 	static constexpr const char* scViewModelFireAnim = "Armature|Fire";
 	static constexpr const char* scViewModelReloadAnim = "Armature|ReloadClip";
@@ -59,8 +63,8 @@ class Player
 	static constexpr float32 scRecoilRecoveryRamp = 0.08f;
 
 public:
-	static constexpr float32 scWalkSpeed = 3.8f;
-	static constexpr float32 scSprintSpeed = 5.0f;
+	static constexpr float32 scWalkSpeed = 4.3f;
+	static constexpr float32 scSprintSpeed = 6.0f;
 
 public:
 	Player() = default;
@@ -72,9 +76,16 @@ public:
 	void DoFireAnimation(float32 kick_degrees = scDefaultViewKickDegrees, float32 kickback = scDefaultViewKickback);
 	void DoReloadAnimation();
 
+	/**
+	 * @brief Shows the view model at `path` (a .rxweapon, .rxmodel or glTF file), loading it on first use. An empty
+	 * path selects the default view model.
+	 */
+	void SetViewModel(const char* path);
 	void SetViewModelAnimations(const char* idle, const char* fire, const char* reload);
 	void ApplyViewModelIdleAnimation();
 	void SetViewModelHolster(float32 amount) { mViewModelHolster = amount; }
+	/// Moves the view model in view space: X is right, Y is up, Z is forward, in metres.
+	void SetViewModelOffset(const Vec3f offset) { mViewModelOffset = offset; }
 
 	void AddRecoil(float32 pitch, float32 yaw);
 	void SetRecoilRecovery(float32 rate_per_second) { mRecoilRecovery = rate_per_second; }
@@ -130,6 +141,8 @@ private:
 	FX_FORCE_INLINE void MarkApplyingUserForce() { mbIsApplyingUserForce = true; }
 
 	void UpdateViewModel(double delta_time);
+	void OnViewModelLoaded(uint32 index, Object* object);
+	void ActivateViewModel(uint32 index);
 	void RotateCamera(const Vec2f& xy);
 	void UpdateRecoil(float32 delta_time);
 	void UpdateViewKick(float32 delta_time);
@@ -239,6 +252,20 @@ private:
 	float32 mRecoilRecovery = 0.0f;
 	float32 mRecoilIdleTime = 0.0f;
 
+
+	struct ViewModelSlot
+	{
+		String Path;
+		Object* pObject = nullptr;
+		Ref<Skeleton> pSkeleton { nullptr };
+		/// Position of the view joint in model space. The joint sits at the camera and looks down the model's -Z.
+		Vec3f ViewOrigin = Vec3f::sZero;
+		bool bHasViewJoint = false;
+	};
+
+	ViewModelSlot mViewModels[scMaxViewModels];
+	uint32 mViewModelCount = 0;
+	int32 mActiveViewModel = -1;
 
 	Object* mpViewModel = nullptr;
 	/// Shared by every mesh in the view model. Null if the view model has no skeleton.

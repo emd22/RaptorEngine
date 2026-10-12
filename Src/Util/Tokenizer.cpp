@@ -87,6 +87,10 @@ eTokenType Tokenizer::GetTokenType(Token& token)
         return eTokenType::DocComment;
     }
 
+    if (token.Type == eTokenType::String) {
+        return eTokenType::String;
+    }
+
     // Check if the token is a number
     Token::eIsNumericResult is_numeric = token.IsNumeric();
 
@@ -97,10 +101,6 @@ eTokenType Tokenizer::GetTokenType(Token& token)
         return eTokenType::Float;
     case Token::eIsNumericResult::NaN:
         break;
-    }
-
-    if (token.Type == eTokenType::String) {
-        return eTokenType::String;
     }
 
     if (token.Length == 1) {

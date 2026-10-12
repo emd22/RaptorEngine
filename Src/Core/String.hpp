@@ -7,12 +7,16 @@
 
 namespace fx {
 
+template <typename T>
+class Slice;
+
 class String
 {
 	static constexpr uint32 scStackAllocSize = 16;
 
 public:
 	static constexpr uint32 scNotFound = UINT32_MAX;
+	static constexpr uint32 scFullString = UINT32_MAX;
 
 public:
 	static String NoCopy(char* ptr, uint32 length);
@@ -118,14 +122,24 @@ public:
 
 	std::string Str() const { return std::string(CStr(), Length); }
 
+	/**
+	 * @brief Returns a `StringView` (`Slice<const char>`) of a string.
+	 */
+	const Slice<const char> GetView() const;
+
 	String& operator=(const char* str);
 	String& operator=(const String& other);
 	String& operator=(String&& other);
 
 	bool operator==(const String& other) const;
+	bool operator==(const Slice<const char>& other) const;
+	bool operator==(const char* other) const;
+
+	bool operator<(const String& other) const;
 
 	String operator+(const String& other) const;
 	String operator+(const char* other) const;
+	String operator+(const Slice<const char> other) const;
 
 	String& operator+=(const String& other);
 

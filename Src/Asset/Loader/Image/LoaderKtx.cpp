@@ -4,8 +4,10 @@
 
 #include <Asset/AssetBase.hpp>
 #include <Core/ArrayUtil.hpp>
+#include <Renderer/Backend/Device.hpp>
 #include <Renderer/Backend/GraphicsBackendFwd.hpp>
 #include <algorithm>
+#include <bit>
 
 namespace fx {
 
@@ -25,10 +27,67 @@ static constexpr eImageFormat GetImageFormatFromVk(uint32 vk_format)
 		return eImageFormat::RGBA8_SRGB;
 	case VK_FORMAT_R8_UNORM:
 		return eImageFormat::R8_UNorm;
+	case VK_FORMAT_BC7_UNORM_BLOCK:
+		return eImageFormat::BC7_UNorm;
+	case VK_FORMAT_BC7_SRGB_BLOCK:
+		return eImageFormat::BC7_SRGB;
 	default:;
 	}
 
 	return eImageFormat::None;
+}
+
+static uint32 ReadBlockBits(const uint64 block[2], uint32 offset, uint32 count)
+{
+	const uint32 word = offset >> 6;
+	const uint32 shift = offset & 63;
+
+	uint64 bits = block[word] >> shift;
+
+	if (shift + count > 64) {
+		bits |= block[word + 1] << (64 - shift);
+	}
+
+	return static_cast<uint32>(bits & ((1ULL << count) - 1));
+}
+
+static bool IsBc7BlockOpaque(const uint8* data)
+{
+	uint64 block[2];
+	memcpy(block, data, sizeof(block));
+
+	const auto are_endpoints_opaque = [&block](uint32 offset, uint32 bits)
+	{
+		const uint32 max_value = (1U << bits) - 1;
+		return ReadBlockBits(block, offset, bits) == max_value && ReadBlockBits(block, offset + bits, bits) == max_value;
+	};
+
+	switch (std::countr_zero(static_cast<uint32>(block[0] & 0xFF) | 0x100U)) {
+	case 0:
+	case 1:
+	case 2:
+	case 3:
+		return true;
+	case 4:
+	{
+		static constexpr uint32 offsets[4] = { 38, 8, 18, 28 };
+		const uint32 rotation = ReadBlockBits(block, 5, 2);
+		return are_endpoints_opaque(offsets[rotation], (rotation == 0) ? 6 : 5);
+	}
+	case 5:
+	{
+		static constexpr uint32 offsets[4] = { 50, 8, 22, 36 };
+		const uint32 rotation = ReadBlockBits(block, 6, 2);
+		return are_endpoints_opaque(offsets[rotation], (rotation == 0) ? 8 : 7);
+	}
+	case 6:
+		return are_endpoints_opaque(49, 7);
+	case 7:
+		return ReadBlockBits(block, 74, 20) == 0xFFFFF;
+	default:;
+	}
+
+	return false;
 }
 
 bool LoaderKtx::AdoptTexture(ktxTexture* texture)
@@ -40,13 +99,27 @@ bool LoaderKtx::AdoptTexture(ktxTexture* texture)
 	if (texture->classId == ktxTexture2_c) {
 		ktxTexture2* texture2 = reinterpret_cast<ktxTexture2*>(texture);
 
+		const bool supports_bc7 = renderer::GraphicsBackendFwd::GetDevice()->bSupportsBC7;
+
 		if (ktxTexture2_NeedsTranscoding(texture2)) {
-			LogError(LC_ASSET, "KTX: GPU-compressed (Basis) textures are not supported");
-			ktxTexture_Destroy(texture);
-			return false;
+			const ktx_transcode_fmt_e target = supports_bc7 ? KTX_TTF_BC7_RGBA : KTX_TTF_RGBA32;
+			const KTX_error_code result = ktxTexture2_TranscodeBasis(texture2, target, 0);
+
+			if (result != KTX_SUCCESS) {
+				LogError(LC_ASSET, "KTX: could not transcode to {}: {}", ktxTranscodeFormatString(target),
+						 ktxErrorString(result));
+				ktxTexture_Destroy(texture);
+				return false;
+			}
 		}
 
 		format = GetImageFormatFromVk(texture2->vkFormat);
+
+		if (ImageFormatUtil::IsBlockCompressed(format) && !supports_bc7) {
+			LogError(LC_ASSET, "KTX: the texture is BC7 compressed, which this device does not support");
+			ktxTexture_Destroy(texture);
+			return false;
+		}
 	}
 	else {
 		ktxTexture1* texture1 = reinterpret_cast<ktxTexture1*>(texture);
@@ -200,13 +273,47 @@ ImageInfo LoaderKtx::MakeImageInfo(uint32 first_mip, uint32 mip_count) const
 	return info;
 }
 
+bool LoaderKtx::HasTranslucentTexels() const
+{
+	Assert(mpTexture != nullptr);
+
+	const Slice<const uint8> base = GetMipData(0);
+
+	if (base.pData == nullptr) {
+		return false;
+	}
+
+	if (ImageFormatUtil::IsBlockCompressed(mFormat)) {
+		for (uint64 offset = 0; offset + 16 <= base.Size; offset += 16) {
+			if (!IsBc7BlockOpaque(base.pData + offset)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	if (ImageFormatUtil::GetPixelStride(mFormat) != 4) {
+		return false;
+	}
+
+	for (uint64 offset = 3; offset < base.Size; offset += 4) {
+		if (base.pData[offset] != 0xFF) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 void LoaderKtx::CreateGpuResource(AssetTicket& ticket)
 {
 	Image* image = static_cast<Image*>(ticket.Get());
 
 	ImageInfo chain_info {};
 
-	if (mpTexture->numLevels > 1 && ImageFormatUtil::GetPixelStride(mFormat) == 4) {
+	if (mpTexture->numLevels > 1 &&
+		(ImageFormatUtil::GetPixelStride(mFormat) == 4 || ImageFormatUtil::IsBlockCompressed(mFormat))) {
 		chain_info = MakeImageInfo();
 	}
 
