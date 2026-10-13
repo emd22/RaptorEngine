@@ -2,16 +2,14 @@
 
 #ifdef FX_IS_EDITOR
 
+#include <Core/DynArray.hpp>
 #include <Core/TSQueue.hpp>
 #include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <thread>
-#include <vector>
 
 namespace fx::editor::thread {
-
-using Task = std::function<void()>;
 
 static constexpr uint32 scMaxQueuedTasks = 8192;
 
@@ -24,12 +22,12 @@ static std::mutex sWakeMutex;
 static std::function<void()> sWakeHandler;
 
 
-static void TakeAll(TSQueue<Task>& queue, std::vector<Task>& out)
+static void TakeAll(TSQueue<Task>& queue, DynArray<Task>& out)
 {
 	auto locked = queue.GetQueue();
 
 	while (locked->GetSize() > 0) {
-		out.push_back(locked->PopValue());
+		out.Insert(locked->PopValue());
 	}
 }
 
@@ -45,7 +43,7 @@ void SetUIWakeHandler(std::function<void()> handler)
 
 void RunUITasks()
 {
-	std::vector<Task> batch;
+	DynArray<Task> batch;
 	TakeAll(sUITasks, batch);
 
 	for (Task& task : batch) {
@@ -63,7 +61,7 @@ void PostToUI(Task task)
 
 	sUITasks.GetQueue()->Push(std::move(task));
 
-	Task wake;
+	std::function<void()> wake;
 
 	{
 		std::lock_guard lock(sWakeMutex);
@@ -93,7 +91,7 @@ void RunOnUIAndWait(Task task)
 	std::shared_ptr<Completion> completion = std::make_shared<Completion>();
 
 	PostToUI(
-		[task = std::move(task), completion]
+		[task = std::move(task), completion]() mutable
 		{
 			task();
 
@@ -113,14 +111,14 @@ void PostToGame(Task task) { sGameTasks.GetQueue()->Push(std::move(task)); }
 
 uint32 RunGameTasks()
 {
-	std::vector<Task> batch;
+	DynArray<Task> batch;
 	TakeAll(sGameTasks, batch);
 
 	for (Task& task : batch) {
 		task();
 	}
 
-	return static_cast<uint32>(batch.size());
+	return batch.Size;
 }
 
 } // namespace fx::editor::thread

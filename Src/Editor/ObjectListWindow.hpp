@@ -2,9 +2,9 @@
 
 #include <wx/frame.h>
 
+#include <Core/DynArray.hpp>
+#include <Core/String.hpp>
 #include <Core/Types.hpp>
-#include <string>
-#include <vector>
 
 class wxListCtrl;
 class wxListEvent;
@@ -20,14 +20,14 @@ public:
 
 	struct Row
 	{
-		std::string Name;
-		std::string Tags;
-		std::string Position;
+		String Name;
+		String Tags;
+		String Position;
 		uint32 ID = 0;
 	};
 
 private:
-	void ShowRows(const std::vector<Row>& rows);
+	void ShowRows(const DynArray<Row>& rows);
 
 	void OnRefreshButton(wxCommandEvent& event);
 	void OnItemActivated(wxListEvent& event);

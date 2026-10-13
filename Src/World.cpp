@@ -1030,16 +1030,15 @@ void World::Render(Camera* shadow_camera)
 	Ref<LightDirectional> sun = gLightManager->GetDirectionalLight();
 	const bool render_sun_shadows = sun.IsValid() && sun->bEnabled;
 
-	gGraphics->bBakedSunActive = render_sun_shadows && (pCVarBakedShadows->IntValue != 0) && pBlockout != nullptr &&
-								 pBlockout->IsBakedSunCurrent(sun->GetPosition());
+	gGraphics->bBakedSunActive = render_sun_shadows && (pCVarBakedShadows->IntValue != 0) && pPrototype != nullptr &&
+								 pPrototype->IsBakedSunCurrent(sun->GetPosition());
 
 	// With the sun off its region is left alone, apart from the atlas's very first pass that makes it sampleable
 	if (render_sun_shadows || !gShadowAtlas->IsInitialized()) {
 		BeginShadowAtlasRegion(gShadowAtlas->GetDirectionalRegion());
 
 		if (render_sun_shadows) {
-			ExecuteShadowRenderList(GetShadowListPipeline(), gShadowRenderer->ShadowCamera,
-									gGraphics->bBakedSunActive);
+			ExecuteShadowRenderList(GetShadowListPipeline(), gShadowRenderer->ShadowCamera, gGraphics->bBakedSunActive);
 		}
 
 		gShadowAtlas->EndRegion();
@@ -1405,9 +1404,9 @@ void World::DebugDrawProbes()
 
 void World::Destroy()
 {
-	if (pBlockout != nullptr) {
-		delete pBlockout;
-		pBlockout = nullptr;
+	if (pPrototype != nullptr) {
+		delete pPrototype;
+		pPrototype = nullptr;
 	}
 
 	// mPhysicsObjects.Destroy();

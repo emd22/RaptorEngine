@@ -31,6 +31,22 @@ public:
 	TElementType& operator[](uint32 index) noexcept { return pData[index]; }
 	const TElementType& operator[](uint32 index) const noexcept { return pData[index]; }
 
+
+	/**
+	 * @brief Explicit copy function
+	 */
+	DynArray Clone() const
+	{
+		DynArray result;
+		result.EnsureCapacity(Size);
+
+		for (uint32 i = 0; i < Size; i++) {
+			result.Insert(pData[i]);
+		}
+
+		return result;
+	}
+
 	TElementType* Get(uint32 index)
 	{
 		if (index > Size) {
@@ -94,6 +110,17 @@ public:
 			memcpy(dst, &object, sizeof(TElementType));
 		}
 	}
+
+	void Insert(TElementType&& object)
+	{
+		EnsureCapacity(Size + 1);
+
+		TElementType* dst = &pData[Size++];
+		new (dst) TElementType(std::move(object));
+	}
+
+	FX_FORCE_INLINE bool IsEmpty() const { return Size == 0; }
+	FX_FORCE_INLINE bool IsNotEmpty() const { return !IsEmpty(); }
 
 	void Clear()
 	{
@@ -168,6 +195,24 @@ public:
 		other.Capacity = 0;
 
 		return *this;
+	}
+
+	bool operator==(const DynArray& other) const
+	{
+		if (Size != other.Size) {
+			return false;
+		}
+
+		return std::ranges::equal(*this, other);
+	}
+
+	bool operator!=(const DynArray& other) const
+	{
+		if (Size != other.Size) {
+			return true;
+		}
+
+		return !std::ranges::equal(*this, other);
 	}
 
 	~DynArray()

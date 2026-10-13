@@ -3,8 +3,8 @@
 #include <wx/frame.h>
 #include <wx/timer.h>
 
-#include <string>
-#include <vector>
+#include <Core/DynArray.hpp>
+#include <Core/String.hpp>
 
 class wxButton;
 class wxListCtrl;
@@ -23,14 +23,14 @@ public:
 
 	struct Row
 	{
-		std::string Name;
-		std::string Type;
-		std::string Value;
+		String Name;
+		String Type;
+		String Value;
 	};
 
 private:
-	void ShowRows(std::vector<Row> rows);
-	void RebuildRows(const std::string& previously_selected);
+	void ShowRows(DynArray<Row> rows);
+	void RebuildRows(const String& previously_selected);
 	void UpdateValues();
 	void ShowSelected();
 	void ApplyValue();
@@ -51,7 +51,7 @@ private:
 
 	wxTimer mRefreshTimer;
 
-	std::vector<Row> mShown;
+	DynArray<Row> mShown;
 };
 
 } // namespace fx::editor

@@ -197,7 +197,7 @@ static float32 N_object_direction_scale(Object* obj, FLOAT4 direction)
 	}
 
 	// A brush's reach along a face normal is exactly where that face is, which its bounds only give for boxes
-	const Brush* brush = gWorld->pBlockout->GetBrush(obj);
+	const Brush* brush = gWorld->pPrototype->GetBrush(obj);
 	if (brush != nullptr) {
 		return brush->GetSupport(Vec3f(direction).Normalize());
 	}
@@ -267,10 +267,10 @@ static FLOAT4 N_object_ray_get_face(Object* obj)
 		return (distance >= 0.0f) ? face.mIntrin : simd::LoadFloat4(0.0f);
 	}
 
-	if (gWorld->pBlockout->GetBrush(obj) != nullptr) {
+	if (gWorld->pPrototype->GetBrush(obj) != nullptr) {
 		Vec3f face_normal;
 
-		if (!gWorld->pBlockout->RaycastFace(obj, gWorld->Player.pCamera->Position,
+		if (!gWorld->pPrototype->RaycastFace(obj, gWorld->Player.pCamera->Position,
 											gWorld->Player.pCamera->GetForwardVector(), face_normal)) {
 			return simd::LoadFloat4(0.0f);
 		}
@@ -388,17 +388,17 @@ static bool N_is_key_pressed(uint32 key) { return ControlManager::IsKeyPressed(s
 
 static float N_float_sign(float value) { return MathUtil::GetSign(value); }
 
-static void N_blockout_reload_object(Object* object) { gWorld->pBlockout->RebuildObject(object); }
+static void N_blockout_reload_object(Object* object) { gWorld->pPrototype->RebuildObject(object); }
 
 static void N_blockout_object_scale(Object* object, FLOAT4 face_dir, FLOAT4 magnitude)
 {
-	gWorld->pBlockout->MoveFace(object, Vec3f(face_dir), Vec3f(magnitude).X);
+	gWorld->pPrototype->MoveFace(object, Vec3f(face_dir), Vec3f(magnitude).X);
 }
 
 /// The centre of the face facing along `face`, in the object's local space
 static FLOAT4 N_blockout_face_center(Object* object, FLOAT4 face)
 {
-	const Brush* brush = gWorld->pBlockout->GetBrush(object);
+	const Brush* brush = gWorld->pPrototype->GetBrush(object);
 	if (brush == nullptr) {
 		return simd::LoadFloat4(0.0f);
 	}
@@ -418,7 +418,7 @@ static FLOAT4 N_blockout_ray_hit_point(Object* object)
 	Vec3f point;
 
 	if (object == nullptr ||
-		!gWorld->pBlockout->RaycastFace(object, gWorld->Player.pCamera->Position,
+		!gWorld->pPrototype->RaycastFace(object, gWorld->Player.pCamera->Position,
 										gWorld->Player.pCamera->GetForwardVector(), face_normal, &point)) {
 		return simd::LoadFloat4(0.0f);
 	}
@@ -429,9 +429,9 @@ static FLOAT4 N_blockout_ray_hit_point(Object* object)
 static void N_blockout_preview_box(FLOAT4 min, FLOAT4 max)
 {
 	Vec3f position;
-	const Brush brush = gWorld->pBlockout->MakeWorldBox(Vec3f(min), Vec3f(max), position);
+	const Brush brush = gWorld->pPrototype->MakeWorldBox(Vec3f(min), Vec3f(max), position);
 
-	gWorld->pBlockout->ShowPreview(position, Quat::scIdentity, brush);
+	gWorld->pPrototype->ShowPreview(position, Quat::scIdentity, brush);
 }
 
 /// Previews the piece that a clip would split off
@@ -441,16 +441,16 @@ static void N_blockout_preview_clip(Object* object, FLOAT4 point_a, FLOAT4 point
 	Brush::PlaneList split;
 	Vec3f split_position;
 
-	if (object == nullptr || !gWorld->pBlockout->GetClipPieces(object, Vec3f(point_a), Vec3f(point_b),
+	if (object == nullptr || !gWorld->pPrototype->GetClipPieces(object, Vec3f(point_a), Vec3f(point_b),
 															   Vec3f(face_normal), kept, split, split_position)) {
-		gWorld->pBlockout->HidePreview();
+		gWorld->pPrototype->HidePreview();
 		return;
 	}
 
-	gWorld->pBlockout->ShowPreview(split_position, object->mRotation, Brush::FromPlanes(split));
+	gWorld->pPrototype->ShowPreview(split_position, object->mRotation, Brush::FromPlanes(split));
 }
 
-static void N_blockout_hide_preview() { gWorld->pBlockout->HidePreview(); }
+static void N_blockout_hide_preview() { gWorld->pPrototype->HidePreview(); }
 
 static Object* N_blockout_create_box(FLOAT4 min, FLOAT4 max)
 {
@@ -469,7 +469,7 @@ static bool N_blockout_clip(Object* object, FLOAT4 point_a, FLOAT4 point_b, FLOA
 		return false;
 	}
 
-	const Brush* brush = gWorld->pBlockout->GetBrush(object);
+	const Brush* brush = gWorld->pPrototype->GetBrush(object);
 	if (brush == nullptr) {
 		return false;
 	}
@@ -482,7 +482,7 @@ static bool N_blockout_clip(Object* object, FLOAT4 point_a, FLOAT4 point_b, FLOA
 		*object, gEditor->GetSelection().GetStoredMaterial(object));
 	split_snapshot.ObjectName = Name();
 
-	if (!gWorld->pBlockout->GetClipPieces(object, Vec3f(point_a), Vec3f(point_b), Vec3f(face_normal), kept_planes,
+	if (!gWorld->pPrototype->GetClipPieces(object, Vec3f(point_a), Vec3f(point_b), Vec3f(face_normal), kept_planes,
 										  split_planes, split_snapshot.Position)) {
 		return false;
 	}
@@ -502,7 +502,7 @@ static constexpr uint32 scMaxSubtractOperations = 200;
 static bool CanBeSubtractedFrom(const Object* object)
 {
 	return !object->IsVolume() && !object->IsReflectionProbe() && !object->IsSpawn() &&
-		   !gWorld->pBlockout->IsDynamic(object);
+		   !gWorld->pPrototype->IsDynamic(object);
 }
 
 static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter_ids, bool keep_cutter)
@@ -515,7 +515,7 @@ static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter
 
 	std::vector<ObjectID> target_ids;
 
-	for (ObjectID id : gWorld->pBlockout->BlockoutObjects) {
+	for (ObjectID id : gWorld->pPrototype->BlockoutObjects) {
 		const bool is_cutter = std::any_of(cutter_ids.begin(), cutter_ids.end(),
 										   [&](ObjectID other) { return other.GetID() == id.GetID(); });
 
@@ -534,11 +534,11 @@ static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter
 		std::vector<Brush::PlaneList> pieces;
 		std::vector<Vec3f> positions;
 
-		if (!gWorld->pBlockout->GetSubtractPieces(target, cutter, pieces, positions)) {
+		if (!gWorld->pPrototype->GetSubtractPieces(target, cutter, pieces, positions)) {
 			continue;
 		}
 
-		const Brush* brush = gWorld->pBlockout->GetBrush(target);
+		const Brush* brush = gWorld->pPrototype->GetBrush(target);
 		const MaterialID material = selection.GetStoredMaterial(target);
 
 		cut_count++;
@@ -569,7 +569,7 @@ static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter
 	}
 
 	if (!keep_cutter) {
-		const Brush* cutter_brush = gWorld->pBlockout->GetBrush(cutter);
+		const Brush* cutter_brush = gWorld->pPrototype->GetBrush(cutter);
 
 		ops.push_back(std::make_unique<editor::DeleteOperation>(
 			cutter, cutter_brush->Planes,
@@ -610,7 +610,7 @@ static int32 N_blockout_subtract(bool keep_cutters)
 	for (uint32 i = 0; i < selection.GetCount(); i++) {
 		Object* object = selection.GetObject(i);
 
-		if (gWorld->pBlockout->GetBrush(object) != nullptr) {
+		if (gWorld->pPrototype->GetBrush(object) != nullptr) {
 			cutter_ids.push_back(object->ID);
 		}
 	}
@@ -620,7 +620,7 @@ static int32 N_blockout_subtract(bool keep_cutters)
 	for (ObjectID id : cutter_ids) {
 		Object* cutter = gObjectManager->GetObject(id);
 
-		if (cutter != nullptr && gWorld->pBlockout->GetBrush(cutter) != nullptr) {
+		if (cutter != nullptr && gWorld->pPrototype->GetBrush(cutter) != nullptr) {
 			cut_count += SubtractCutter(cutter, cutter_ids, keep_cutters);
 		}
 	}
@@ -638,7 +638,7 @@ static void N_blockout_edit_face_texture(Object* object, FLOAT4 face, uint32 edi
 		return;
 	}
 
-	const Brush* brush = gWorld->pBlockout->GetBrush(object);
+	const Brush* brush = gWorld->pPrototype->GetBrush(object);
 	if (brush == nullptr) {
 		return;
 	}
@@ -647,7 +647,7 @@ static void N_blockout_edit_face_texture(Object* object, FLOAT4 face, uint32 edi
 
 	Brush::PlaneList planes_after;
 
-	if (!gWorld->pBlockout->GetFaceTextureEdit(object, Vec3f(face), static_cast<eFaceTextureEdit>(edit),
+	if (!gWorld->pPrototype->GetFaceTextureEdit(object, Vec3f(face), static_cast<eFaceTextureEdit>(edit),
 											   Vec2f(amount_vec.X, amount_vec.Y), planes_after)) {
 		return;
 	}
@@ -656,9 +656,9 @@ static void N_blockout_edit_face_texture(Object* object, FLOAT4 face, uint32 edi
 #endif
 }
 
-static Object* N_blockout_new_object(FLOAT4 position) { return gWorld->pBlockout->NewObject(Vec3f(position)); }
-static Object* N_blockout_dupe_object(Object* object) { return gWorld->pBlockout->DupeObject(object); }
-static void N_blockout_destroy_object(Object* object) { gWorld->pBlockout->DestroyObject(object); }
+static Object* N_blockout_new_object(FLOAT4 position) { return gWorld->pPrototype->NewObject(Vec3f(position)); }
+static Object* N_blockout_dupe_object(Object* object) { return gWorld->pPrototype->DupeObject(object); }
+static void N_blockout_destroy_object(Object* object) { gWorld->pPrototype->DestroyObject(object); }
 
 
 /////////////////////////////////////

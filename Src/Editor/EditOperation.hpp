@@ -2,6 +2,7 @@
 
 #include <Brush.hpp>
 #include <Color.hpp>
+#include <Core/DynArray.hpp>
 #include <Core/Name.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
@@ -13,7 +14,6 @@
 #include <Object/ObjectID.hpp>
 #include <Renderer/LightID.hpp>
 #include <memory>
-#include <vector>
 
 namespace fx {
 
@@ -252,7 +252,7 @@ private:
 	uint32 mTagsBefore = 0;
 	Vec3f mPositionBefore = Vec3f::sZero;
 	Quat mRotationBefore = Quat::scIdentity;
-	std::vector<NodeFlags> mNodesBefore;
+	DynArray<NodeFlags> mNodesBefore;
 };
 
 class ScriptEditOperation final : public ObjectEditOperation

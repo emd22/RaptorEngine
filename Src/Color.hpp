@@ -43,6 +43,8 @@ public:
 
 	FX_FORCE_INLINE uint32 AsUInt() const { return Value; }
 
+	FX_FORCE_INLINE bool operator==(const Color& other) const { return Value == other.Value; }
+
 public:
 	union
 	{

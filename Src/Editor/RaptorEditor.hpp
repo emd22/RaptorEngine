@@ -19,6 +19,7 @@
 #endif
 
 #include <Brush.hpp>
+#include <Core/DynArray.hpp>
 #include <Core/StackArray.hpp>
 #include <Core/Types.hpp>
 #include <Material/MaterialID.hpp>
@@ -27,7 +28,6 @@
 #include <chrono>
 #include <functional>
 #include <mutex>
-#include <vector>
 
 namespace fx {
 
@@ -138,11 +138,11 @@ public:
 
 	FX_FORCE_INLINE void NoteTopViewCommand() { ++mTopViewCommandSerial; }
 
-	void TopViewSelect(const std::vector<uint32>& object_ids, eTopViewSelectMode mode);
+	void TopViewSelect(const DynArray<uint32>& object_ids, eTopViewSelectMode mode);
 	void TopViewMove(const Vec3f offset);
 	void TopViewRotate(const Vec3f axis, float32 angle, const Vec3f pivot);
 	void TopViewMoveFace(const Vec3f world_normal, float32 distance);
-	void TopViewMoveVertices(eViewPlane plane, const std::vector<TopViewVertexHandle>& handles,
+	void TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewVertexHandle>& handles,
 							 const Vec3f offset);
 	void TopViewCreate(Vec3f min, Vec3f max, bool drop_to_ground);
 	void TopViewDelete();

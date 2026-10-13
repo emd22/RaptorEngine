@@ -46,10 +46,10 @@ void Window::Create(const char* title, const Vec2u& size)
 void Window::SetTitle(const char* title)
 {
 	editor::thread::PostToUI(
-		[title = std::string(title)]
+		[title = String(title)]
 		{
 			if (gEditor != nullptr && gEditor->GetMainFrame() != nullptr) {
-				gEditor->GetMainFrame()->SetTitle(wxString::FromUTF8(title));
+				gEditor->GetMainFrame()->SetTitle(wxString::FromUTF8(title.CStr()));
 			}
 		});
 }

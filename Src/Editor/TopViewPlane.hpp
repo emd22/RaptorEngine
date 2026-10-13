@@ -3,6 +3,8 @@
 #ifdef FX_IS_EDITOR
 
 #include <Core/Types.hpp>
+#include <Math/Vec2.hpp>
+#include <Math/Vec3.hpp>
 
 namespace fx::editor {
 
@@ -43,13 +45,25 @@ inline constexpr ViewPlaneAxes scViewPlaneAxes[scViewPlaneCount] = {
 struct TopViewVertexHandle
 {
 	uint32 ObjectId = 0;
-	float32 U = 0.0f;
-	float32 V = 0.0f;
+	Vec2f Position = Vec2f::sZero;
 };
 
 inline constexpr const char* scAxisNames = "XYZ";
 
 inline const ViewPlaneAxes& GetViewPlaneAxes(eViewPlane plane) { return scViewPlaneAxes[static_cast<uint32>(plane)]; }
+
+inline float32 GetAxis(const Vec3f& vector, uint32 axis)
+{
+	if (axis == 0) {
+		return vector.X;
+	}
+
+	if (axis == 1) {
+		return vector.Y;
+	}
+
+	return vector.Z;
+}
 
 } // namespace fx::editor
 

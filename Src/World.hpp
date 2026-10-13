@@ -194,8 +194,8 @@ public:
 
 	void RespawnPlayer() { Player.SpawnAt(PlayerSpawn.Position, PlayerSpawn.Direction); }
 
-	Blockout* pBlockout = nullptr;
-	String BlockoutPath;
+	Blockout* pPrototype = nullptr;
+	String PrototypePath;
 
 	CVarValue* pCVarShowProbeVolumes = nullptr;
 	CVarValue* pCVarFrustumCull = nullptr;

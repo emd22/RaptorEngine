@@ -86,14 +86,14 @@ const CVarListWindow::Row* CVarListWindow::GetSelectedRow() const
 {
 	const long row = mpList->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
 
-	if (row < 0 || static_cast<size_t>(row) >= mShown.size()) {
+	if (row < 0 || static_cast<uint32>(row) >= mShown.Size) {
 		return nullptr;
 	}
 
-	return &mShown[static_cast<size_t>(row)];
+	return &mShown[static_cast<uint32>(row)];
 }
 
-static std::string ToLowerAscii(std::string text)
+static String ToLowerAscii(String text)
 {
 	for (char& ch : text) {
 		ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
@@ -105,25 +105,25 @@ static std::string ToLowerAscii(std::string text)
 void CVarListWindow::RefreshList()
 {
 	thread::PostToGame(
-		[this, filter = ToLowerAscii(mpFilter->GetValue().utf8_string())]
+		[this, filter = ToLowerAscii(String(mpFilter->GetValue().utf8_string()))]
 		{
 			if (gCVars == nullptr) {
 				return;
 			}
 
-			std::vector<Row> rows;
+			DynArray<Row> rows;
 
 			for (CVarValue* cvar : gCVars->CollectCVars()) {
-				std::string name = cvar->GetName().Str();
+				const String& name = cvar->GetName();
 
-				if (!filter.empty() && ToLowerAscii(name).find(filter) == std::string::npos) {
+				if (!filter.IsEmpty() && ToLowerAscii(name).FindNext(0, filter) == String::scNotFound) {
 					continue;
 				}
 
-				rows.push_back(Row {
-					.Name = std::move(name),
+				rows.Insert(Row {
+					.Name = name,
 					.Type = GetCVarTypeName(cvar->Type),
-					.Value = cvar->AsString().Str(),
+					.Value = cvar->AsString(),
 				});
 			}
 
@@ -131,16 +131,19 @@ void CVarListWindow::RefreshList()
 		});
 }
 
-void CVarListWindow::ShowRows(std::vector<Row> rows)
+void CVarListWindow::ShowRows(DynArray<Row> rows)
 {
-	bool same_rows = rows.size() == mShown.size();
+	bool same_rows = rows.Size == mShown.Size;
 
-	for (size_t i = 0; same_rows && i < rows.size(); i++) {
+	for (uint32 i = 0; same_rows && i < rows.Size; i++) {
 		same_rows = rows[i].Name == mShown[i].Name;
 	}
 
-	const Row* selected = GetSelectedRow();
-	const std::string selected_name = (selected != nullptr) ? selected->Name : std::string();
+	String selected_name;
+
+	if (const Row* selected = GetSelectedRow(); selected != nullptr) {
+		selected_name = selected->Name;
+	}
 
 	mShown = std::move(rows);
 
@@ -151,20 +154,20 @@ void CVarListWindow::ShowRows(std::vector<Row> rows)
 		RebuildRows(selected_name);
 	}
 
-	SetTitle(wxString::Format("CVar List (%zu)", mShown.size()));
+	SetTitle(wxString::Format("CVar List (%u)", mShown.Size));
 }
 
-void CVarListWindow::RebuildRows(const std::string& previously_selected)
+void CVarListWindow::RebuildRows(const String& previously_selected)
 {
 	mpList->Freeze();
 	mpList->DeleteAllItems();
 
 	for (const Row& entry : mShown) {
-		const long row = mpList->InsertItem(mpList->GetItemCount(), wxString::FromUTF8(entry.Name));
-		mpList->SetItem(row, Column_Type, wxString::FromUTF8(entry.Type));
-		mpList->SetItem(row, Column_Value, wxString::FromUTF8(entry.Value));
+		const long row = mpList->InsertItem(mpList->GetItemCount(), wxString::FromUTF8(entry.Name.CStr()));
+		mpList->SetItem(row, Column_Type, wxString::FromUTF8(entry.Type.CStr()));
+		mpList->SetItem(row, Column_Value, wxString::FromUTF8(entry.Value.CStr()));
 
-		if (!previously_selected.empty() && entry.Name == previously_selected) {
+		if (!previously_selected.IsEmpty() && entry.Name == previously_selected) {
 			mpList->SetItemState(row, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED);
 		}
 	}
@@ -176,8 +179,8 @@ void CVarListWindow::RebuildRows(const std::string& previously_selected)
 
 void CVarListWindow::UpdateValues()
 {
-	for (size_t i = 0; i < mShown.size(); i++) {
-		const wxString value = wxString::FromUTF8(mShown[i].Value);
+	for (uint32 i = 0; i < mShown.Size; i++) {
+		const wxString value = wxString::FromUTF8(mShown[i].Value.CStr());
 
 		if (mpList->GetItemText(i, Column_Value) != value) {
 			mpList->SetItem(i, Column_Value, value);
@@ -197,8 +200,8 @@ void CVarListWindow::ShowSelected()
 		mpValueField->Clear();
 	}
 	else {
-		mpSelectedLabel->SetLabel(wxString::FromUTF8(selected->Name));
-		mpValueField->ChangeValue(wxString::FromUTF8(selected->Value));
+		mpSelectedLabel->SetLabel(wxString::FromUTF8(selected->Name.CStr()));
+		mpValueField->ChangeValue(wxString::FromUTF8(selected->Value.CStr()));
 	}
 
 	mpStatus->SetLabel("");
@@ -214,30 +217,35 @@ void CVarListWindow::ApplyValue()
 	}
 
 	thread::PostToGame(
-		[this, name = selected->Name, text = mpValueField->GetValue().utf8_string()]
+		[this, name = selected->Name, text = String(mpValueField->GetValue().utf8_string())]
 		{
 			if (gCVars == nullptr) {
 				return;
 			}
 
 			for (CVarValue* cvar : gCVars->CollectCVars()) {
-				if (cvar->GetName().Str() != name) {
+				if (cvar->GetName() != name) {
 					continue;
 				}
 
-				const bool ok = cvar->SetFromString(String(text));
-				std::string type = GetCVarTypeName(cvar->Type);
-				std::string value = cvar->AsString().Str();
+				const bool ok = cvar->SetFromString(text);
+				const String type = GetCVarTypeName(cvar->Type);
+				const String value = cvar->AsString();
 
 				thread::PostToUI(
-					[this, name, ok, type = std::move(type), value = std::move(value)]
+					[this, name, ok, type, value]
 					{
-						mpStatus->SetLabel(ok ? wxString() : wxString::Format("Invalid %s value", type));
+						if (ok) {
+							mpStatus->SetLabel("");
+						}
+						else {
+							mpStatus->SetLabel(wxString::Format("Invalid %s value", type.CStr()));
+						}
 
 						const Row* current = GetSelectedRow();
 
 						if (current != nullptr && current->Name == name) {
-							mpValueField->ChangeValue(wxString::FromUTF8(value));
+							mpValueField->ChangeValue(wxString::FromUTF8(value.CStr()));
 						}
 
 						RefreshList();

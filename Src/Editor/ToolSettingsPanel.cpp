@@ -185,15 +185,15 @@ void LightToolSettingsPanel::ApplyState(const EditorPanelState& editor_state)
 
 	mbShowingAnything = true;
 
-	mpNameLabel->SetLabel(wxString::Format("Selected '%s'", wxString::FromUTF8(state.Name)));
+	mpNameLabel->SetLabel(wxString::Format("Selected '%s'", wxString::FromUTF8(state.Name.CStr())));
 
 	mpColorPicker->Enable();
 	mpPositionField->SetEnabled(true);
 
-	mpColorPicker->SetColour(wxColour(state.ColorR, state.ColorG, state.ColorB));
+	mpColorPicker->SetColour(wxColour(state.Color.R, state.Color.G, state.Color.B));
 
 	if (!mpPositionField->HasFocus()) {
-		mpPositionField->SetValue(Vec3f(state.PositionX, state.PositionY, state.PositionZ));
+		mpPositionField->SetValue(state.Position);
 	}
 
 	if (!mpRadiusField->HasFocus()) {

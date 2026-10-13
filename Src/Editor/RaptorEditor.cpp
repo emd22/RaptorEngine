@@ -313,16 +313,16 @@ EditorPanelState RaptorEditor::BuildPanelState()
 {
 	EditorPanelState state;
 
-	if (gWorld->pBlockout != nullptr) {
-		const MaterialLibrary& library = gWorld->pBlockout->GetMaterialLibrary();
+	if (gWorld->pPrototype != nullptr) {
+		const MaterialLibrary& library = gWorld->pPrototype->GetMaterialLibrary();
 
 		for (uint32 id = 0; id < library.GetCount(); id++) {
-			state.Materials.Names.push_back(library.GetName(MaterialLibraryID(id)).Str());
-			state.Materials.DiffusePaths.push_back(library.GetDiffusePath(MaterialLibraryID(id)).Str());
+			state.Materials.Names.Insert(library.GetName(MaterialLibraryID(id)));
+			state.Materials.DiffusePaths.Insert(library.GetDiffusePath(MaterialLibraryID(id)));
 		}
 	}
 
-	state.BlockoutPath = gWorld->BlockoutPath.Str();
+	state.BlockoutPath = gWorld->PrototypePath;
 	state.bUnsavedChanges = HasUnsavedChanges();
 
 	if (Object* object = mSelection.GetLast(); object != nullptr) {
@@ -330,7 +330,7 @@ EditorPanelState RaptorEditor::BuildPanelState()
 
 		panel.bHasObject = true;
 		panel.bIsBlockout = object->HasTags(eObjectTag::Blockout);
-		panel.Name = object->Name.Get().Str();
+		panel.Name = object->Name.Get();
 		panel.SelectedCount = mSelection.GetCount();
 		panel.Tags = static_cast<uint32>(object->Tags);
 		panel.Flags = static_cast<uint32>(object->GetFlags());
@@ -345,15 +345,15 @@ EditorPanelState RaptorEditor::BuildPanelState()
 			}
 		}
 
-		if (gWorld->pBlockout != nullptr) {
-			panel.MaterialSlot = gWorld->pBlockout->GetIDForMaterial(mSelection.GetStoredMaterial(object)).ID;
+		if (gWorld->pPrototype != nullptr) {
+			panel.MaterialSlot = gWorld->pPrototype->GetIDForMaterial(mSelection.GetStoredMaterial(object)).ID;
 		}
 
 		panel.bCanAttachScript = CanAttachScript(object);
 
 		if (panel.bCanAttachScript) {
 			panel.bScriptErrors = gObjectScripts->HasErrors(object->ID);
-			panel.ScriptPath = gObjectScripts->GetPath(object->ID).Str();
+			panel.ScriptPath = gObjectScripts->GetPath(object->ID);
 		}
 
 		panel.bIsTrigger = object->IsTrigger();
@@ -362,9 +362,7 @@ EditorPanelState RaptorEditor::BuildPanelState()
 
 		if (panel.bIsTrigger && gObjectScripts->TryGetRequiredEnterDirection(object->ID, enter_direction)) {
 			panel.bHasEnterDirection = true;
-			panel.EnterDirection[0] = enter_direction.X;
-			panel.EnterDirection[1] = enter_direction.Y;
-			panel.EnterDirection[2] = enter_direction.Z;
+			panel.EnterDirection = enter_direction;
 		}
 	}
 
@@ -385,7 +383,7 @@ EditorPanelState RaptorEditor::BuildPanelState()
 	const uint32 probe_count = gProbeManager->GetReflectionProbeCount();
 
 	if (gProbeManager->IsBakingReflections()) {
-		world.ReflectionStatus = std::format("Baking {} probe(s)...", probe_count);
+		world.ReflectionStatus = String::Fmt("Baking {} probe(s)...", probe_count);
 	}
 	else if (gProbeManager->IsBaking()) {
 		world.ReflectionStatus = "Baking irradiance...";
@@ -394,25 +392,19 @@ EditorPanelState RaptorEditor::BuildPanelState()
 		world.ReflectionStatus = "No reflection probes";
 	}
 	else if (gProbeManager->AreReflectionsBaked()) {
-		world.ReflectionStatus = std::format("{} probe(s), baked", probe_count);
+		world.ReflectionStatus = String::Fmt("{} probe(s), baked", probe_count);
 	}
 	else {
-		world.ReflectionStatus = std::format("{} probe(s), needs a bake", probe_count);
+		world.ReflectionStatus = String::Fmt("{} probe(s), needs a bake", probe_count);
 	}
 
 	if (LightSpot* light = mLightEditor.GetSelected(); light != nullptr) {
 		LightPanelState& panel = state.Light;
 
-		const Vec3f position = light->GetPosition();
-
 		panel.bHasLight = true;
-		panel.Name = light->Name.Get().Str();
-		panel.ColorR = light->Color.R;
-		panel.ColorG = light->Color.G;
-		panel.ColorB = light->Color.B;
-		panel.PositionX = position.X;
-		panel.PositionY = position.Y;
-		panel.PositionZ = position.Z;
+		panel.Name = light->Name.Get();
+		panel.Color = light->Color;
+		panel.Position = light->GetPosition();
 		panel.Radius = light->GetRadius();
 		panel.Intensity = light->Intensity;
 		panel.Lumens = light->GetLumens();
@@ -890,7 +882,7 @@ void RaptorEditor::SetMovementDamped(bool damped)
 
 void RaptorEditor::HideToolMarkers()
 {
-	Blockout* blockout = gWorld->pBlockout;
+	Blockout* blockout = gWorld->pPrototype;
 
 	if (blockout == nullptr) {
 		return;
@@ -1141,7 +1133,7 @@ void RaptorEditor::SyncSelection()
 void RaptorEditor::SyncCurrentTool()
 {
 	mToolState.SelectedTool = mCurrentToolType;
-	mToolState.pTransformMarkerObject = (gWorld->pBlockout != nullptr) ? gWorld->pBlockout->pXFormObject : nullptr;
+	mToolState.pTransformMarkerObject = (gWorld->pPrototype != nullptr) ? gWorld->pPrototype->pXFormObject : nullptr;
 
 	mpCurrentTool->Sync(mToolState, mToolSelection);
 }
@@ -1317,15 +1309,15 @@ void RaptorEditor::SetStoredMaterial(Object* object, MaterialID material)
 
 MaterialID RaptorEditor::GetNewBrushMaterial() const
 {
-	if (gWorld->pBlockout == nullptr) {
+	if (gWorld->pPrototype == nullptr) {
 		return MaterialID::scNull;
 	}
 
-	if (!mLastUsedMaterial.IsNull() && gWorld->pBlockout->GetIDForMaterial(mLastUsedMaterial).IsValid()) {
+	if (!mLastUsedMaterial.IsNull() && gWorld->pPrototype->GetIDForMaterial(mLastUsedMaterial).IsValid()) {
 		return mLastUsedMaterial;
 	}
 
-	return gWorld->pBlockout->GetDefaultMaterial();
+	return gWorld->pPrototype->GetDefaultMaterial();
 }
 
 
@@ -1352,7 +1344,7 @@ void RaptorEditor::DeleteObject(Object* object, int32 group_size)
 	}
 
 	// Snapshot everything Undo needs before the Execute step destroys the object.
-	const Brush* brush = gWorld->pBlockout->GetBrush(object);
+	const Brush* brush = gWorld->pPrototype->GetBrush(object);
 	const Brush::PlaneList planes = (brush != nullptr) ? brush->Planes
 													   : Brush::FromBox(object->Bounds.Min, object->Bounds.Max).Planes;
 
@@ -1380,13 +1372,13 @@ static bool IsCreatableDataKind(eDataFilter filter)
 
 Object* RaptorEditor::CreateDataBrush(const Brush::PlaneList& planes, const Vec3f position)
 {
-	if (gWorld->pBlockout == nullptr || !IsCreatableDataKind(mDataFilter)) {
+	if (gWorld->pPrototype == nullptr || !IsCreatableDataKind(mDataFilter)) {
 		return nullptr;
 	}
 
 	ObjectSnapshot snapshot;
 	snapshot.Position = position;
-	snapshot.Material = gWorld->pBlockout->GetDefaultMaterial();
+	snapshot.Material = gWorld->pPrototype->GetDefaultMaterial();
 	snapshot.bIsProbeVolume = (mDataFilter == eDataFilter::ProbeVolumes ||
 							   mDataFilter == eDataFilter::ReflectionProbes);
 	snapshot.bIsReflectionProbe = (mDataFilter == eDataFilter::ReflectionProbes);
@@ -1395,7 +1387,7 @@ Object* RaptorEditor::CreateDataBrush(const Brush::PlaneList& planes, const Vec3
 	snapshot.bIsDBound = (mDataFilter == eDataFilter::DBounds);
 
 	if (snapshot.bIsDBound) {
-		snapshot.Material = gWorld->pBlockout->GetDBoundMaterial();
+		snapshot.Material = gWorld->pPrototype->GetDBoundMaterial();
 	}
 
 	Object* created = EmplaceEditOperation<CreateBrushOperation>(planes, snapshot).GetCreated();
@@ -1428,8 +1420,8 @@ void RaptorEditor::CreateDataBrushAtCrosshair()
 	const Vec3f center = base + Vec3f(0.0f, scDefaultDataBrushHalfExtent.Y, 0.0f);
 
 	Vec3f position;
-	const Brush brush = gWorld->pBlockout->MakeWorldBox(center - scDefaultDataBrushHalfExtent,
-														center + scDefaultDataBrushHalfExtent, position);
+	const Brush brush = gWorld->pPrototype->MakeWorldBox(center - scDefaultDataBrushHalfExtent,
+														 center + scDefaultDataBrushHalfExtent, position);
 
 	if (brush.IsValid()) {
 		CreateDataBrush(brush.Planes, position);
@@ -1438,15 +1430,15 @@ void RaptorEditor::CreateDataBrushAtCrosshair()
 
 Object* RaptorEditor::CreateReflectionProbeAtPlayer()
 {
-	if (gWorld->pBlockout == nullptr) {
+	if (gWorld->pPrototype == nullptr) {
 		return nullptr;
 	}
 
 	const Vec3f center = SnapToGrid(gWorld->Player.pCamera->Position);
 
 	Vec3f position;
-	const Brush brush = gWorld->pBlockout->MakeWorldBox(center - scDefaultDataBrushHalfExtent,
-														center + scDefaultDataBrushHalfExtent, position);
+	const Brush brush = gWorld->pPrototype->MakeWorldBox(center - scDefaultDataBrushHalfExtent,
+														 center + scDefaultDataBrushHalfExtent, position);
 
 	if (!brush.IsValid()) {
 		return nullptr;
@@ -1454,7 +1446,7 @@ Object* RaptorEditor::CreateReflectionProbeAtPlayer()
 
 	ObjectSnapshot snapshot;
 	snapshot.Position = position;
-	snapshot.Material = gWorld->pBlockout->GetDefaultMaterial();
+	snapshot.Material = gWorld->pPrototype->GetDefaultMaterial();
 	snapshot.bIsProbeVolume = true;
 	snapshot.bIsReflectionProbe = true;
 
@@ -1663,10 +1655,7 @@ void RaptorEditor::ForgetObjects()
 	SyncSelection();
 }
 
-bool RaptorEditor::HasUnsavedChanges() const
-{
-	return mbUntrackedChanges || mHistory.GetRevision() != mSavedRevision;
-}
+bool RaptorEditor::HasUnsavedChanges() const { return mbUntrackedChanges || mHistory.GetRevision() != mSavedRevision; }
 
 void RaptorEditor::MarkSaved()
 {

@@ -49,8 +49,7 @@ static int32 GetEnterDirectionIndex(const ObjectPanelState& state)
 
 	for (int32 i = 1; i < scNumEnterDirections; i++) {
 		const EnterDirectionChoice& choice = scEnterDirections[i];
-		const float32 dot = choice.X * state.EnterDirection[0] + choice.Y * state.EnterDirection[1] +
-							choice.Z * state.EnterDirection[2];
+		const float32 dot = Vec3f(choice.X, choice.Y, choice.Z).Dot(state.EnterDirection);
 
 		if (dot > scAxisMatchDot) {
 			return i;
@@ -262,18 +261,19 @@ void ObjectPropertiesPanel::OnMaterialChoice(wxCommandEvent& event)
 	thread::PostToGame(
 		[slot]
 		{
-			if (gWorld->pBlockout == nullptr) {
+			if (gWorld->pPrototype == nullptr) {
 				return;
 			}
 
 			const MaterialLibraryID library_slot = MaterialLibraryID(slot);
 
-			if (!library_slot.IsValid() || static_cast<int32>(library_slot.ID) >=
-											   static_cast<int32>(gWorld->pBlockout->GetMaterialLibrary().GetCount())) {
+			if (!library_slot.IsValid() ||
+				static_cast<int32>(library_slot.ID) >=
+					static_cast<int32>(gWorld->pPrototype->GetMaterialLibrary().GetCount())) {
 				return;
 			}
 
-			const MaterialID material = gWorld->pBlockout->GetMaterialForID(library_slot);
+			const MaterialID material = gWorld->pPrototype->GetMaterialForID(library_slot);
 			const EditorSelection& selection = gEditor->GetSelection();
 
 			if (Object* last = selection.GetLast(); last != nullptr) {
@@ -289,7 +289,7 @@ void ObjectPropertiesPanel::CommitScript()
 		return;
 	}
 
-	const std::string path = mpScriptText->GetValue().Trim().ToStdString();
+	const String path(mpScriptText->GetValue().Trim().ToStdString());
 
 	if (path == mShownScript) {
 		return;
@@ -297,7 +297,7 @@ void ObjectPropertiesPanel::CommitScript()
 
 	mShownScript = path;
 
-	thread::PostToGame([path] { gEditor->SetSelectionScript(String(path)); });
+	thread::PostToGame([path] { gEditor->SetSelectionScript(path); });
 }
 
 void ObjectPropertiesPanel::OnEnterDirectionChoice(wxCommandEvent& event)
@@ -345,11 +345,11 @@ void ObjectPropertiesPanel::RefreshMaterialChoices(const MaterialLibraryState& m
 
 	mpMaterialChoice->Clear();
 
-	for (const std::string& name : materials.Names) {
-		mpMaterialChoice->Append(wxString::FromUTF8(name));
+	for (const String& name : materials.Names) {
+		mpMaterialChoice->Append(wxString::FromUTF8(name.CStr()));
 	}
 
-	mShownMaterialNames = materials.Names;
+	mShownMaterialNames = materials.Names.Clone();
 }
 
 void ObjectPropertiesPanel::ApplyState(const ObjectPanelState& state, const MaterialLibraryState& materials)
@@ -364,7 +364,7 @@ void ObjectPropertiesPanel::ApplyState(const ObjectPanelState& state, const Mate
 		mpNameLabel->SetLabel("No block selected");
 	}
 	else {
-		wxString name = wxString::Format("Selected '%s'", wxString::FromUTF8(state.Name));
+		wxString name = wxString::Format("Selected '%s'", wxString::FromUTF8(state.Name.CStr()));
 
 		if (state.SelectedCount > 1) {
 			name += wxString::Format(" (+%u more)", state.SelectedCount - 1);
@@ -386,12 +386,18 @@ void ObjectPropertiesPanel::ApplyState(const ObjectPanelState& state, const Mate
 
 	mpScriptText->Enable(mbCanAttachScript);
 	mpScriptBrowse->Enable(mbCanAttachScript);
-	mpScriptClear->Enable(mbCanAttachScript && !state.ScriptPath.empty());
+	mpScriptClear->Enable(mbCanAttachScript && !state.ScriptPath.IsEmpty());
 
 	if (state.ScriptPath != mShownScript || !mbCanAttachScript) {
 		if (!mpScriptText->HasFocus() || !mbCanAttachScript) {
-			mpScriptText->ChangeValue(wxString::FromUTF8(mbCanAttachScript ? state.ScriptPath : std::string()));
-			mShownScript = mbCanAttachScript ? state.ScriptPath : std::string();
+			if (mbCanAttachScript) {
+				mpScriptText->ChangeValue(wxString::FromUTF8(state.ScriptPath.CStr()));
+				mShownScript = state.ScriptPath;
+			}
+			else {
+				mpScriptText->ChangeValue(wxEmptyString);
+				mShownScript = String();
+			}
 		}
 	}
 
@@ -401,8 +407,8 @@ void ObjectPropertiesPanel::ApplyState(const ObjectPanelState& state, const Mate
 	const bool has_custom_item = (static_cast<int32>(mpEnterDirChoice->GetCount()) > scNumEnterDirections);
 
 	if (enter_direction_index == scCustomEnterDirectionIndex) {
-		const wxString label = wxString::Format("Custom (%.2f, %.2f, %.2f)", state.EnterDirection[0],
-												state.EnterDirection[1], state.EnterDirection[2]);
+		const wxString label = wxString::Format("Custom (%.2f, %.2f, %.2f)", state.EnterDirection.X,
+												state.EnterDirection.Y, state.EnterDirection.Z);
 
 		if (!has_custom_item) {
 			mpEnterDirChoice->Append(label);

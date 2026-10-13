@@ -75,6 +75,7 @@ public:
 	bool SavePrototype();
 	bool SaveProtoTypeAs();
 	void OpenPrototype();
+	void SwitchBakedOrProto();
 	void ReloadPrototype();
 
 private:

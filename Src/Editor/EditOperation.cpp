@@ -52,11 +52,11 @@ bool CanEditObjectTag(const Object* object, uint32 tag_bit)
 
 bool CanAttachScript(const Object* object)
 {
-	if (object == nullptr || gWorld->pBlockout == nullptr) {
+	if (object == nullptr || gWorld->pPrototype == nullptr) {
 		return false;
 	}
 
-	return object->HasTags(eObjectTag::Blockout) || gWorld->pBlockout->IsModel(object);
+	return object->HasTags(eObjectTag::Blockout) || gWorld->pPrototype->IsModel(object);
 }
 
 bool CanEditObjectFlag(const Object* object, uint32 flag_bit)
@@ -73,7 +73,7 @@ bool CanEditObjectFlag(const Object* object, uint32 flag_bit)
 		return !object->IsVolume();
 	case eObjectFlags::PhysicsEnabled: {
 		if (object->HasTags(eObjectTag::Blockout)) {
-			return !object->IsVolume() && gWorld->pBlockout != nullptr && gWorld->pBlockout->HasBrush(object);
+			return !object->IsVolume() && gWorld->pPrototype != nullptr && gWorld->pPrototype->HasBrush(object);
 		}
 
 		const physics::Body* body = gPhysics->GetBody(object->GetPhysicsID());
@@ -123,9 +123,9 @@ static void SetObjectTag(Object& object, eObjectTag tag, bool enabled)
 	case eObjectTag::DBound:
 		object.SetDBound(enabled);
 
-		if (gWorld->pBlockout != nullptr) {
-			gEditor->SetStoredMaterial(&object, enabled ? gWorld->pBlockout->GetDBoundMaterial()
-														: gWorld->pBlockout->GetDefaultMaterial());
+		if (gWorld->pPrototype != nullptr) {
+			gEditor->SetStoredMaterial(&object, enabled ? gWorld->pPrototype->GetDBoundMaterial()
+														: gWorld->pPrototype->GetDefaultMaterial());
 		}
 		break;
 	default:
@@ -143,8 +143,8 @@ static void SetObjectFlag(Object& object, eObjectFlags flag, bool enabled, bool 
 {
 	switch (flag) {
 	case eObjectFlags::PhysicsEnabled:
-		if (!object.HasTags(eObjectTag::Blockout) || gWorld->pBlockout == nullptr ||
-			!gWorld->pBlockout->SetDynamic(&object, enabled)) {
+		if (!object.HasTags(eObjectTag::Blockout) || gWorld->pPrototype == nullptr ||
+			!gWorld->pPrototype->SetDynamic(&object, enabled)) {
 			object.SetPhysicsEnabled(enabled);
 		}
 		break;
@@ -202,12 +202,12 @@ static void ApplyFlag(Object& object, uint32 flag_bit, bool enabled)
 
 static Object* RestoreBrush(const ObjectSnapshot& snapshot, const Brush::PlaneList& planes)
 {
-	if (gWorld->pBlockout == nullptr) {
+	if (gWorld->pPrototype == nullptr) {
 		return nullptr;
 	}
 
-	Object* object = gWorld->pBlockout->RestoreObject(snapshot.Position, planes, snapshot.Material, snapshot.Rotation,
-													  snapshot.ObjectName, snapshot.bIsDynamic);
+	Object* object = gWorld->pPrototype->RestoreObject(snapshot.Position, planes, snapshot.Material, snapshot.Rotation,
+													   snapshot.ObjectName, snapshot.bIsDynamic);
 
 	if (object == nullptr) {
 		return nullptr;
@@ -259,7 +259,7 @@ ObjectSnapshot ObjectSnapshot::Capture(const Object& object, MaterialID material
 		.bIsTrigger = object.IsTrigger(),
 		.bIsNvBrush = object.IsNvBrush(),
 		.bIsDBound = object.IsDBound(),
-		.bIsDynamic = gWorld->pBlockout->IsDynamic(&object),
+		.bIsDynamic = gWorld->pPrototype->IsDynamic(&object),
 		.ScriptPath = gObjectScripts->GetPath(object.ID),
 		.EnterDirection = enter_direction,
 	};
@@ -316,7 +316,7 @@ void ObjectCreationOperation::Undo(EditorSelection& selection)
 
 	selection.Remove(created);
 
-	gWorld->pBlockout->DestroyObject(created);
+	gWorld->pPrototype->DestroyObject(created);
 
 	Retarget(nullptr);
 }
@@ -427,14 +427,14 @@ void ScaleFaceOperation::Execute(EditorSelection& selection)
 		return;
 	}
 
-	const Brush* brush = gWorld->pBlockout->GetBrush(target);
+	const Brush* brush = gWorld->pPrototype->GetBrush(target);
 	if (brush == nullptr) {
 		return;
 	}
 
 	mPlanesBefore = brush->Planes;
 
-	gWorld->pBlockout->MoveFace(target, mFaceNormal, mDistance);
+	gWorld->pPrototype->MoveFace(target, mFaceNormal, mDistance);
 }
 
 void ScaleFaceOperation::Undo(EditorSelection& selection)
@@ -446,7 +446,7 @@ void ScaleFaceOperation::Undo(EditorSelection& selection)
 
 	// Restore the planes from before, as moving the face back could leave planes it dropped behind. The object is
 	// put back where it was, as the brush is kept in place.
-	gWorld->pBlockout->SetBrushPlanes(target, mPlanesBefore);
+	gWorld->pPrototype->SetBrushPlanes(target, mPlanesBefore);
 }
 
 BrushEditOperation::BrushEditOperation(Object* object, const Brush::PlaneList& before, const Brush::PlaneList& after,
@@ -458,14 +458,14 @@ BrushEditOperation::BrushEditOperation(Object* object, const Brush::PlaneList& b
 void BrushEditOperation::Execute(EditorSelection& selection)
 {
 	if (Object* target = ResolveTarget()) {
-		gWorld->pBlockout->SetBrushPlanes(target, mPlanesAfter);
+		gWorld->pPrototype->SetBrushPlanes(target, mPlanesAfter);
 	}
 }
 
 void BrushEditOperation::Undo(EditorSelection& selection)
 {
 	if (Object* target = ResolveTarget()) {
-		gWorld->pBlockout->SetBrushPlanes(target, mPlanesBefore);
+		gWorld->pPrototype->SetBrushPlanes(target, mPlanesBefore);
 	}
 }
 
@@ -496,9 +496,8 @@ ObjectStateEditOperation::ObjectStateEditOperation(Object* object, uint32 bit, b
 	mPositionBefore = object->GetPosition();
 	mRotationBefore = object->mRotation;
 
-	ForEachNode(
-		*object, [this](Object& node)
-		{ mNodesBefore.push_back(NodeFlags { .Id = node.ID, .Flags = static_cast<uint32>(node.GetFlags()) }); });
+	ForEachNode(*object, [this](Object& node)
+				{ mNodesBefore.Insert(NodeFlags { .Id = node.ID, .Flags = static_cast<uint32>(node.GetFlags()) }); });
 }
 
 void ObjectStateEditOperation::Execute(EditorSelection& selection)
@@ -604,7 +603,7 @@ CreateOperation::CreateOperation(const Vec3f& position, int32 group_size, Materi
 
 void CreateOperation::Execute(EditorSelection& selection)
 {
-	Retarget(gWorld->pBlockout->NewObject(mPosition, mMaterial));
+	Retarget(gWorld->pPrototype->NewObject(mPosition, mMaterial));
 }
 
 CreateBrushOperation::CreateBrushOperation(const Brush::PlaneList& planes, const ObjectSnapshot& snapshot,
@@ -640,7 +639,7 @@ void DupeOperation::Execute(EditorSelection& selection)
 		return;
 	}
 
-	Object* dupe = gWorld->pBlockout->DupeObject(original);
+	Object* dupe = gWorld->pPrototype->DupeObject(original);
 	if (dupe == nullptr) {
 		return;
 	}
@@ -662,7 +661,7 @@ void DupeOperation::Undo(EditorSelection& selection)
 	if (dupe != nullptr) {
 		selection.Remove(dupe);
 
-		gWorld->pBlockout->DestroyObject(dupe);
+		gWorld->pPrototype->DestroyObject(dupe);
 
 		mpDupe = nullptr;
 		mDupeID = ObjectID::scNull;
@@ -694,7 +693,7 @@ void DeleteOperation::Execute(EditorSelection& selection)
 
 	selection.Remove(target);
 
-	gWorld->pBlockout->DestroyObject(target);
+	gWorld->pPrototype->DestroyObject(target);
 }
 
 void DeleteOperation::Undo(EditorSelection& selection)

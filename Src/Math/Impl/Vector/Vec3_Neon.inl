@@ -133,7 +133,8 @@ FX_FORCE_INLINE float32 Vec3f::Dot(FLOAT4 other) const
 
 FX_FORCE_INLINE bool Vec3f::operator==(const Vec3f other) const
 {
-	return (vaddvq_u32(vceqq_f32(mIntrin, other.mIntrin))) != 0;
+	const uint32x4_t equal_mask = vsetq_lane_u32(UINT32_MAX, vceqq_f32(mIntrin, other.mIntrin), 3);
+	return vminvq_u32(equal_mask) == UINT32_MAX;
 }
 
 FX_FORCE_INLINE Vec3f Vec3f::operator+(const Vec3f other) const { return Vec3f(vaddq_f32(mIntrin, other.mIntrin)); }

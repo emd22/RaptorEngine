@@ -5,10 +5,10 @@
 #include <wx/panel.h>
 #include <wx/string.h>
 
+#include <Core/DynArray.hpp>
 #include <Core/StackArray.hpp>
 #include <Object/Object.hpp>
-#include <string>
-#include <vector>
+
 
 class wxCheckBox;
 class wxChoice;
@@ -60,8 +60,8 @@ private:
 	StackArray<FlagRow, scMaxRows> mTagRows;
 	StackArray<FlagRow, scMaxRows> mFlagRows;
 
-	std::vector<std::string> mShownMaterialNames;
-	std::string mShownScript;
+	DynArray<String> mShownMaterialNames;
+	String mShownScript;
 
 	bool mbHasObject = false;
 	bool mbCanAttachScript = false;

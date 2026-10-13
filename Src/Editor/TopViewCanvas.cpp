@@ -160,37 +160,44 @@ double DistanceToSegment(double pu, double pv, double au, double av, double bu, 
 	return std::hypot(pu - (au + du * t), pv - (av + dv * t));
 }
 
-double DistanceToHull(const std::vector<float32>& hull, double pu, double pv)
-{
-	const size_t count = hull.size() / 2;
+Vec2d ToVec2d(const Vec2f& vector) { return Vec2d(vector.X, vector.Y); }
 
-	if (count == 0) {
+Vec2f ToVec2f(const Vec2d& vector) { return Vec2f(static_cast<float32>(vector.X), static_cast<float32>(vector.Y)); }
+
+bool IsSameHandle(const Vec2d& a, const Vec2d& b)
+{
+	return std::fabs(a.X - b.X) < scHandleMergeDistance && std::fabs(a.Y - b.Y) < scHandleMergeDistance;
+}
+
+double DistanceToHull(const DynArray<Vec2f>& hull, double pu, double pv)
+{
+	if (hull.IsEmpty()) {
 		return DBL_MAX;
 	}
 
-	if (count == 1) {
-		return std::hypot(pu - hull[0], pv - hull[1]);
+	if (hull.Size == 1) {
+		return std::hypot(pu - hull[0].X, pv - hull[0].Y);
 	}
 
-	bool inside = (count >= 3);
+	bool inside = (hull.Size >= 3);
 	double best = DBL_MAX;
 
-	for (size_t i = 0; i < count; i++) {
-		const size_t next = (i + 1) % count;
+	for (uint32 i = 0; i < hull.Size; i++) {
+		const Vec2f& a = hull[i];
+		const Vec2f& b = hull[(i + 1) % hull.Size];
 
-		const double au = hull[i * 2];
-		const double av = hull[i * 2 + 1];
-		const double bu = hull[next * 2];
-		const double bv = hull[next * 2 + 1];
-
-		if ((bu - au) * (pv - av) - (bv - av) * (pu - au) < 0.0) {
+		if ((b.X - a.X) * (pv - a.Y) - (b.Y - a.Y) * (pu - a.X) < 0.0) {
 			inside = false;
 		}
 
-		best = std::min(best, DistanceToSegment(pu, pv, au, av, bu, bv));
+		best = std::min(best, DistanceToSegment(pu, pv, a.X, a.Y, b.X, b.Y));
 	}
 
-	return inside ? 0.0 : best;
+	if (inside) {
+		return 0.0;
+	}
+
+	return best;
 }
 
 double ThicknessAlong(const TopViewProjection& projection, double nu, double nv)
@@ -198,14 +205,18 @@ double ThicknessAlong(const TopViewProjection& projection, double nu, double nv)
 	double low = DBL_MAX;
 	double high = -DBL_MAX;
 
-	for (size_t i = 0; i + 1 < projection.Hull.size(); i += 2) {
-		const double along = projection.Hull[i] * nu + projection.Hull[i + 1] * nv;
+	for (const Vec2f& point : projection.Hull) {
+		const double along = point.X * nu + point.Y * nv;
 
 		low = std::min(low, along);
 		high = std::max(high, along);
 	}
 
-	return (low > high) ? 0.0 : high - low;
+	if (low > high) {
+		return 0.0;
+	}
+
+	return high - low;
 }
 
 const TopViewFace* FindMatchingFace(const TopViewProjection& projection, double nu, double nv)
@@ -214,7 +225,7 @@ const TopViewFace* FindMatchingFace(const TopViewProjection& projection, double 
 	double best_dot = scFaceMatchDot;
 
 	for (const TopViewFace& face : projection.Faces) {
-		const double dot = face.NormalU * nu + face.NormalV * nv;
+		const double dot = face.Normal.X * nu + face.Normal.Y * nv;
 
 		if (dot > best_dot) {
 			best_dot = dot;
@@ -225,180 +236,159 @@ const TopViewFace* FindMatchingFace(const TopViewProjection& projection, double 
 	return best;
 }
 
-std::vector<float32> BuildShiftedPolygon(const TopViewProjection& projection, const TopViewFace& face, double shift)
+DynArray<Vec2f> BuildShiftedPolygon(const TopViewProjection& projection, const TopViewFace& face, double shift)
 {
 	struct HalfPlane
 	{
-		double Nu;
-		double Nv;
-		double D;
+		Vec2d Normal;
+		double Offset;
 	};
 
-	struct Point
-	{
-		double U;
-		double V;
-	};
+	DynArray<Vec2f> result;
 
-	const size_t count = projection.Hull.size() / 2;
+	const DynArray<Vec2f>& hull = projection.Hull;
 
-	if (count < 3) {
-		return {};
+	if (hull.Size < 3) {
+		return result;
 	}
 
-	const double face_offset = face.NormalU * face.AU + face.NormalV * face.AV;
+	const Vec2d face_normal = ToVec2d(face.Normal);
+	const double face_offset = face_normal.Dot(ToVec2d(face.A));
 
-	std::vector<HalfPlane> planes;
-	double center_u = 0.0;
-	double center_v = 0.0;
+	DynArray<HalfPlane> planes;
+	Vec2d center(0.0, 0.0);
 
-	for (size_t i = 0; i < count; i++) {
-		const size_t next = (i + 1) % count;
+	for (uint32 i = 0; i < hull.Size; i++) {
+		const Vec2d from = ToVec2d(hull[i]);
+		const Vec2d along = ToVec2d(hull[(i + 1) % hull.Size]) - from;
+		const double length = along.Length();
 
-		const double au = projection.Hull[i * 2];
-		const double av = projection.Hull[i * 2 + 1];
-		const double du = projection.Hull[next * 2] - au;
-		const double dv = projection.Hull[next * 2 + 1] - av;
-		const double length = std::hypot(du, dv);
-
-		center_u += au / count;
-		center_v += av / count;
+		center += from / static_cast<double>(hull.Size);
 
 		if (length < 1e-6) {
 			continue;
 		}
 
-		const double nu = dv / length;
-		const double nv = -du / length;
-		const double offset = nu * au + nv * av;
+		const Vec2d normal(along.Y / length, -along.X / length);
+		const double offset = normal.Dot(from);
 
-		if (nu * face.NormalU + nv * face.NormalV > scFaceMatchDot &&
-			std::fabs(offset - face_offset) < scFaceSameLineTolerance) {
+		if (normal.Dot(face_normal) > scFaceMatchDot && std::fabs(offset - face_offset) < scFaceSameLineTolerance) {
 			continue;
 		}
 
-		planes.push_back(HalfPlane { nu, nv, offset });
+		planes.Insert(HalfPlane { normal, offset });
 	}
 
-	planes.push_back(HalfPlane { face.NormalU, face.NormalV, face_offset + shift });
+	planes.Insert(HalfPlane { face_normal, face_offset + shift });
 
-	std::vector<Point> polygon = {
-		{ center_u - scClipExtent, center_v - scClipExtent },
-		{ center_u + scClipExtent, center_v - scClipExtent },
-		{ center_u + scClipExtent, center_v + scClipExtent },
-		{ center_u - scClipExtent, center_v + scClipExtent },
-	};
+	DynArray<Vec2d> polygon;
+	polygon.Insert(Vec2d(center.X - scClipExtent, center.Y - scClipExtent));
+	polygon.Insert(Vec2d(center.X + scClipExtent, center.Y - scClipExtent));
+	polygon.Insert(Vec2d(center.X + scClipExtent, center.Y + scClipExtent));
+	polygon.Insert(Vec2d(center.X - scClipExtent, center.Y + scClipExtent));
 
 	for (const HalfPlane& plane : planes) {
-		std::vector<Point> clipped;
+		DynArray<Vec2d> clipped;
 
-		for (size_t i = 0; i < polygon.size(); i++) {
-			const Point& current = polygon[i];
-			const Point& previous = polygon[(i + polygon.size() - 1) % polygon.size()];
+		for (uint32 i = 0; i < polygon.Size; i++) {
+			const Vec2d& current = polygon[i];
+			const Vec2d& previous = polygon[(i + polygon.Size - 1) % polygon.Size];
 
-			const double current_side = plane.Nu * current.U + plane.Nv * current.V - plane.D;
-			const double previous_side = plane.Nu * previous.U + plane.Nv * previous.V - plane.D;
+			const double current_side = plane.Normal.Dot(current) - plane.Offset;
+			const double previous_side = plane.Normal.Dot(previous) - plane.Offset;
 
 			const bool current_inside = current_side <= 0.0;
 			const bool previous_inside = previous_side <= 0.0;
 
 			if (current_inside != previous_inside) {
 				const double t = previous_side / (previous_side - current_side);
-				clipped.push_back(
-					Point { previous.U + (current.U - previous.U) * t, previous.V + (current.V - previous.V) * t });
+				clipped.Insert(previous + (current - previous) * t);
 			}
 
 			if (current_inside) {
-				clipped.push_back(current);
+				clipped.Insert(current);
 			}
 		}
 
 		polygon = std::move(clipped);
 
-		if (polygon.size() < 3) {
-			return {};
+		if (polygon.Size < 3) {
+			return result;
 		}
 	}
 
-	std::vector<float32> result;
-
-	for (const Point& point : polygon) {
-		result.push_back(static_cast<float32>(point.U));
-		result.push_back(static_cast<float32>(point.V));
+	for (const Vec2d& point : polygon) {
+		result.Insert(ToVec2f(point));
 	}
 
 	return result;
 }
 
-struct HandlePoint
+DynArray<Vec2d> CollectHandles(const TopViewProjection& projection)
 {
-	double U;
-	double V;
-};
+	DynArray<Vec2d> handles;
 
-std::vector<HandlePoint> CollectHandles(const TopViewProjection& projection)
-{
-	std::vector<HandlePoint> handles;
-
-	const auto add = [&handles](double u, double v)
+	const auto add = [&handles](const Vec2f& position)
 	{
-		for (const HandlePoint& handle : handles) {
-			if (std::fabs(handle.U - u) < scHandleMergeDistance && std::fabs(handle.V - v) < scHandleMergeDistance) {
+		const Vec2d point = ToVec2d(position);
+
+		for (const Vec2d& handle : handles) {
+			if (IsSameHandle(handle, point)) {
 				return;
 			}
 		}
 
-		handles.push_back(HandlePoint { u, v });
+		handles.Insert(point);
 	};
 
-	for (size_t i = 0; i + 3 < projection.Edges.size(); i += 4) {
-		add(projection.Edges[i], projection.Edges[i + 1]);
-		add(projection.Edges[i + 2], projection.Edges[i + 3]);
+	for (const TopViewEdge& edge : projection.Edges) {
+		add(edge.A);
+		add(edge.B);
 	}
 
-	for (size_t i = 0; i + 1 < projection.Hull.size(); i += 2) {
-		add(projection.Hull[i], projection.Hull[i + 1]);
+	for (const Vec2f& point : projection.Hull) {
+		add(point);
 	}
 
 	return handles;
 }
 
-std::vector<float32> ConvexHull2D(std::vector<HandlePoint> points)
+DynArray<Vec2f> ConvexHull2D(DynArray<Vec2d> points)
 {
 	std::sort(points.begin(), points.end(),
-			  [](const HandlePoint& a, const HandlePoint& b) { return a.U < b.U || (a.U == b.U && a.V < b.V); });
+			  [](const Vec2d& a, const Vec2d& b) { return a.X < b.X || (a.X == b.X && a.Y < b.Y); });
 
-	if (points.size() < 3) {
-		return {};
+	DynArray<Vec2f> result;
+
+	if (points.Size < 3) {
+		return result;
 	}
 
-	const auto cross = [](const HandlePoint& o, const HandlePoint& a, const HandlePoint& b)
-	{ return (a.U - o.U) * (b.V - o.V) - (a.V - o.V) * (b.U - o.U); };
+	const auto is_non_left_turn = [](const Vec2d& origin, const Vec2d& a, const Vec2d& b)
+	{ return (a - origin).Cross(b - origin) <= 0.0; };
 
-	std::vector<HandlePoint> hull(points.size() * 2);
-	size_t size = 0;
+	DynArray<Vec2d> hull;
 
-	for (size_t i = 0; i < points.size(); i++) {
-		while (size >= 2 && cross(hull[size - 2], hull[size - 1], points[i]) <= 0.0) {
-			size--;
+	for (uint32 i = 0; i < points.Size; i++) {
+		while (hull.Size >= 2 && is_non_left_turn(hull[hull.Size - 2], hull[hull.Size - 1], points[i])) {
+			hull.RemoveLast();
 		}
 
-		hull[size++] = points[i];
+		hull.Insert(points[i]);
 	}
 
-	for (size_t i = points.size() - 1, lower_size = size + 1; i > 0; i--) {
-		while (size >= lower_size && cross(hull[size - 2], hull[size - 1], points[i - 1]) <= 0.0) {
-			size--;
+	const uint32 lower_size = hull.Size + 1;
+
+	for (uint32 i = points.Size - 1; i > 0; i--) {
+		while (hull.Size >= lower_size && is_non_left_turn(hull[hull.Size - 2], hull[hull.Size - 1], points[i - 1])) {
+			hull.RemoveLast();
 		}
 
-		hull[size++] = points[i - 1];
+		hull.Insert(points[i - 1]);
 	}
 
-	std::vector<float32> result;
-
-	for (size_t i = 0; i + 1 < size; i++) {
-		result.push_back(static_cast<float32>(hull[i].U));
-		result.push_back(static_cast<float32>(hull[i].V));
+	for (uint32 i = 0; i + 1 < hull.Size; i++) {
+		result.Insert(ToVec2f(hull[i]));
 	}
 
 	return result;
@@ -516,22 +506,21 @@ void TopViewCanvas::ApplyState(const TopViewState& state)
 		SetTool(eTopViewTool::Select);
 	}
 
-	if (!mbPreviewHeld && !mSelectedVertices.empty()) {
-		std::vector<TopViewVertexHandle> kept;
+	if (!mbPreviewHeld && mSelectedVertices.IsNotEmpty()) {
+		DynArray<TopViewVertexHandle> kept;
 
 		for (const TopViewVertexHandle& handle : mSelectedVertices) {
 			const TopViewBrush* brush = FindBrush(handle.ObjectId);
 			bool found = false;
 
 			if (brush != nullptr && brush->bSelected) {
-				for (const HandlePoint& point : CollectHandles(Projection(*brush))) {
-					found = found || (std::fabs(point.U - handle.U) < scHandleMergeDistance &&
-									  std::fabs(point.V - handle.V) < scHandleMergeDistance);
+				for (const Vec2d& point : CollectHandles(Projection(*brush))) {
+					found = found || IsSameHandle(point, ToVec2d(handle.Position));
 				}
 			}
 
 			if (found) {
-				kept.push_back(handle);
+				kept.Insert(handle);
 			}
 		}
 
@@ -580,7 +569,7 @@ void TopViewCanvas::SetTool(eTopViewTool tool)
 	mTool = tool;
 
 	if (tool != eTopViewTool::Vertex) {
-		mSelectedVertices.clear();
+		mSelectedVertices.Clear();
 	}
 
 	if (mpOnToolChanged) {
@@ -618,7 +607,7 @@ void TopViewCanvas::SetPlane(eViewPlane plane)
 		ClearPreview();
 		mbHoverFace = false;
 		mbHoverVertex = false;
-		mSelectedVertices.clear();
+		mSelectedVertices.Clear();
 	}
 
 	if (mpOnPlaneChanged) {
@@ -638,12 +627,12 @@ void TopViewCanvas::SetCreateVolume(eViewPlane plane, float32 base, float32 size
 	mCreateSize[static_cast<uint32>(plane)] = size;
 }
 
-void TopViewCanvas::SendCommand(std::function<void()> command)
+void TopViewCanvas::SendCommand(thread::Task command)
 {
 	++mSentCommands;
 
 	thread::PostToGame(
-		[command = std::move(command)]
+		[command = std::move(command)]() mutable
 		{
 			command();
 			gEditor->NoteTopViewCommand();
@@ -654,7 +643,7 @@ void TopViewCanvas::TryInitialFit()
 {
 	const wxSize size = GetViewSize();
 
-	if (!mbHasFitted && !mState.Brushes.empty() && size.x > 16 && size.y > 16) {
+	if (!mbHasFitted && mState.Brushes.IsNotEmpty() && size.x > 16 && size.y > 16) {
 		FitAll();
 	}
 }
@@ -670,11 +659,11 @@ void TopViewCanvas::FitAll()
 	for (const TopViewBrush& brush : mState.Brushes) {
 		const TopViewProjection& projection = Projection(brush);
 
-		for (size_t i = 0; i + 1 < projection.Hull.size(); i += 2) {
-			bounds.MinU = std::min<double>(bounds.MinU, projection.Hull[i]);
-			bounds.MaxU = std::max<double>(bounds.MaxU, projection.Hull[i]);
-			bounds.MinV = std::min<double>(bounds.MinV, projection.Hull[i + 1]);
-			bounds.MaxV = std::max<double>(bounds.MaxV, projection.Hull[i + 1]);
+		for (const Vec2f& point : projection.Hull) {
+			bounds.MinU = std::min<double>(bounds.MinU, point.X);
+			bounds.MaxU = std::max<double>(bounds.MaxU, point.X);
+			bounds.MinV = std::min<double>(bounds.MinV, point.Y);
+			bounds.MaxV = std::max<double>(bounds.MaxV, point.Y);
 			bounds.bValid = true;
 		}
 	}
@@ -682,8 +671,13 @@ void TopViewCanvas::FitAll()
 	if (!bounds.bValid) {
 		const ViewPlaneAxes& axes = Axes();
 
-		const double center_u = mState.bHasPlayer ? mState.PlayerPosition[axes.U] * axes.USign : 0.0;
-		const double center_v = mState.bHasPlayer ? mState.PlayerPosition[axes.V] : 0.0;
+		double center_u = 0.0;
+		double center_v = 0.0;
+
+		if (mState.bHasPlayer) {
+			center_u = GetAxis(mState.PlayerPosition, axes.U) * axes.USign;
+			center_v = GetAxis(mState.PlayerPosition, axes.V);
+		}
 
 		bounds.MinU = center_u - 10.0;
 		bounds.MaxU = center_u + 10.0;
@@ -954,14 +948,14 @@ void TopViewCanvas::DrawBrushes(wxGraphicsContext& gc, const wxSize& size)
 		transform.PivotV = mPreview.PivotV;
 	}
 
-	std::vector<int> order(mState.Brushes.size());
+	DynArray<int32> order;
 
-	for (size_t i = 0; i < order.size(); i++) {
-		order[i] = static_cast<int>(i);
+	for (uint32 i = 0; i < mState.Brushes.Size; i++) {
+		order.Insert(static_cast<int32>(i));
 	}
 
 	std::stable_sort(order.begin(), order.end(),
-					 [this](int a, int b)
+					 [this](int32 a, int32 b)
 					 {
 						 const TopViewBrush& brush_a = mState.Brushes[a];
 						 const TopViewBrush& brush_b = mState.Brushes[b];
@@ -1004,7 +998,7 @@ void TopViewCanvas::DrawBrushes(wxGraphicsContext& gc, const wxSize& size)
 		return nullptr;
 	};
 
-	for (const int index : order) {
+	for (const int32 index : order) {
 		const TopViewBrush& brush = mState.Brushes[index];
 		const TopViewProjection& projection = Projection(brush);
 
@@ -1015,10 +1009,10 @@ void TopViewCanvas::DrawBrushes(wxGraphicsContext& gc, const wxSize& size)
 		double min_v = DBL_MAX;
 		double max_v = -DBL_MAX;
 
-		for (size_t i = 0; i + 1 < projection.Hull.size(); i += 2) {
+		for (const Vec2f& point : projection.Hull) {
 			double u = 0.0;
 			double v = 0.0;
-			brush_transform.Apply(projection.Hull[i], projection.Hull[i + 1], u, v);
+			brush_transform.Apply(point.X, point.Y, u, v);
 
 			min_u = std::min(min_u, u);
 			max_u = std::max(max_u, u);
@@ -1032,18 +1026,18 @@ void TopViewCanvas::DrawBrushes(wxGraphicsContext& gc, const wxSize& size)
 		}
 
 		if (const OutlinePreview* face_preview = find_face_preview(brush.ObjectId); face_preview != nullptr) {
-			const std::vector<float32>& polygon = face_preview->Polygon;
+			const DynArray<Vec2f>& polygon = face_preview->Polygon;
 
-			for (size_t i = 0; i + 3 < projection.Edges.size(); i += 4) {
-				ghost_path.MoveToPoint(ToScreenX(projection.Edges[i]), ToScreenY(projection.Edges[i + 1]));
-				ghost_path.AddLineToPoint(ToScreenX(projection.Edges[i + 2]), ToScreenY(projection.Edges[i + 3]));
+			for (const TopViewEdge& edge : projection.Edges) {
+				ghost_path.MoveToPoint(ToScreenX(edge.A.X), ToScreenY(edge.A.Y));
+				ghost_path.AddLineToPoint(ToScreenX(edge.B.X), ToScreenY(edge.B.Y));
 			}
 
-			for (size_t i = 0; i + 1 < polygon.size(); i += 2) {
-				const size_t next = (i + 2) % polygon.size();
+			for (uint32 i = 0; i < polygon.Size; i++) {
+				const Vec2f& next = polygon[(i + 1) % polygon.Size];
 
-				const double x = ToScreenX(polygon[i]);
-				const double y = ToScreenY(polygon[i + 1]);
+				const double x = ToScreenX(polygon[i].X);
+				const double y = ToScreenY(polygon[i].Y);
 
 				if (i == 0) {
 					selected_fill.MoveToPoint(x, y);
@@ -1053,19 +1047,19 @@ void TopViewCanvas::DrawBrushes(wxGraphicsContext& gc, const wxSize& size)
 				}
 
 				selected_path.MoveToPoint(x, y);
-				selected_path.AddLineToPoint(ToScreenX(polygon[next]), ToScreenY(polygon[next + 1]));
+				selected_path.AddLineToPoint(ToScreenX(next.X), ToScreenY(next.Y));
 			}
 
 			selected_fill.CloseSubpath();
 			continue;
 		}
 
-		if (!brush.bSelected && brush.Kind != eTopViewBrushKind::Geometry && projection.Hull.size() >= 6) {
+		if (!brush.bSelected && brush.Kind != eTopViewBrushKind::Geometry && projection.Hull.Size >= 3) {
 			wxGraphicsPath& fill = volume_fills[static_cast<uint32>(brush.Kind)];
 
-			for (size_t i = 0; i + 1 < projection.Hull.size(); i += 2) {
-				const double x = ToScreenX(projection.Hull[i]);
-				const double y = ToScreenY(projection.Hull[i + 1]);
+			for (uint32 i = 0; i < projection.Hull.Size; i++) {
+				const double x = ToScreenX(projection.Hull[i].X);
+				const double y = ToScreenY(projection.Hull[i].Y);
 
 				if (i == 0) {
 					fill.MoveToPoint(x, y);
@@ -1082,31 +1076,31 @@ void TopViewCanvas::DrawBrushes(wxGraphicsContext& gc, const wxSize& size)
 								   ? selected_path
 								   : paths[static_cast<uint32>(brush.Kind) * 2 + (brush.bSelectable ? 0 : 1)];
 
-		for (size_t i = 0; i + 3 < projection.Edges.size(); i += 4) {
+		for (const TopViewEdge& edge : projection.Edges) {
 			double au = 0.0;
 			double av = 0.0;
 			double bu = 0.0;
 			double bv = 0.0;
 
-			brush_transform.Apply(projection.Edges[i], projection.Edges[i + 1], au, av);
-			brush_transform.Apply(projection.Edges[i + 2], projection.Edges[i + 3], bu, bv);
+			brush_transform.Apply(edge.A.X, edge.A.Y, au, av);
+			brush_transform.Apply(edge.B.X, edge.B.Y, bu, bv);
 
 			path.MoveToPoint(ToScreenX(au), ToScreenY(av));
 			path.AddLineToPoint(ToScreenX(bu), ToScreenY(bv));
 		}
 
 		if (brush.bSelected && transform.bActive) {
-			for (size_t i = 0; i + 3 < projection.Edges.size(); i += 4) {
-				ghost_path.MoveToPoint(ToScreenX(projection.Edges[i]), ToScreenY(projection.Edges[i + 1]));
-				ghost_path.AddLineToPoint(ToScreenX(projection.Edges[i + 2]), ToScreenY(projection.Edges[i + 3]));
+			for (const TopViewEdge& edge : projection.Edges) {
+				ghost_path.MoveToPoint(ToScreenX(edge.A.X), ToScreenY(edge.A.Y));
+				ghost_path.AddLineToPoint(ToScreenX(edge.B.X), ToScreenY(edge.B.Y));
 			}
 		}
 
-		if (brush.bSelected && projection.Hull.size() >= 6) {
-			for (size_t i = 0; i + 1 < projection.Hull.size(); i += 2) {
+		if (brush.bSelected && projection.Hull.Size >= 3) {
+			for (uint32 i = 0; i < projection.Hull.Size; i++) {
 				double u = 0.0;
 				double v = 0.0;
-				brush_transform.Apply(projection.Hull[i], projection.Hull[i + 1], u, v);
+				brush_transform.Apply(projection.Hull[i].X, projection.Hull[i].Y, u, v);
 
 				if (i == 0) {
 					selected_fill.MoveToPoint(ToScreenX(u), ToScreenY(v));
@@ -1165,14 +1159,13 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 				continue;
 			}
 
-			for (const HandlePoint& point : CollectHandles(Projection(brush))) {
-				const bool selected = IsVertexSelected(brush.ObjectId, point.U, point.V);
+			for (const Vec2d& point : CollectHandles(Projection(brush))) {
+				const bool selected = IsVertexSelected(brush.ObjectId, point.X, point.Y);
 				const bool hovered = mbHoverVertex && mHoverVertex.ObjectId == brush.ObjectId &&
-									 std::fabs(mHoverVertex.U - point.U) < scHandleMergeDistance &&
-									 std::fabs(mHoverVertex.V - point.V) < scHandleMergeDistance;
+									 IsSameHandle(point, ToVec2d(mHoverVertex.Position));
 
-				const double x = ToScreenX(point.U + ((live && selected) ? mPreview.OffsetU : 0.0));
-				const double y = ToScreenY(point.V + ((live && selected) ? mPreview.OffsetV : 0.0));
+				const double x = ToScreenX(point.X + ((live && selected) ? mPreview.OffsetU : 0.0));
+				const double y = ToScreenY(point.Y + ((live && selected) ? mPreview.OffsetV : 0.0));
 				const double half = hovered ? scHandleHalfSize + 1.5 : scHandleHalfSize;
 
 				gc.SetBrush(wxBrush(selected ? scVertexColour : scHandleColour));
@@ -1184,8 +1177,8 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 
 	if (mbHoverFace && mPreview.Kind == eDrag::None) {
 		gc.SetPen(wxPen(scFaceColour, 3));
-		gc.StrokeLine(ToScreenX(mHoverFace.AU), ToScreenY(mHoverFace.AV), ToScreenX(mHoverFace.BU),
-					  ToScreenY(mHoverFace.BV));
+		gc.StrokeLine(ToScreenX(mHoverFace.A.X), ToScreenY(mHoverFace.A.Y), ToScreenX(mHoverFace.B.X),
+					  ToScreenY(mHoverFace.B.Y));
 	}
 
 	if (mPreview.Kind == eDrag::Face) {
@@ -1193,10 +1186,10 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 		const double nv = mPreview.NormalV;
 		const double shift = mPreview.Shift;
 
-		const double ax = ToScreenX(mGrabbedFace.AU + nu * shift);
-		const double ay = ToScreenY(mGrabbedFace.AV + nv * shift);
-		const double bx = ToScreenX(mGrabbedFace.BU + nu * shift);
-		const double by = ToScreenY(mGrabbedFace.BV + nv * shift);
+		const double ax = ToScreenX(mGrabbedFace.A.X + nu * shift);
+		const double ay = ToScreenY(mGrabbedFace.A.Y + nv * shift);
+		const double bx = ToScreenX(mGrabbedFace.B.X + nu * shift);
+		const double by = ToScreenY(mGrabbedFace.B.Y + nv * shift);
 
 		gc.SetPen(wxPen(scFaceColour, 3));
 		gc.StrokeLine(ax, ay, bx, by);
@@ -1294,11 +1287,11 @@ void TopViewCanvas::DrawPlayer(wxGraphicsContext& gc)
 
 	const ViewPlaneAxes& axes = Axes();
 
-	const double x = ToScreenX(mState.PlayerPosition[axes.U] * axes.USign);
-	const double y = ToScreenY(mState.PlayerPosition[axes.V]);
+	const double x = ToScreenX(GetAxis(mState.PlayerPosition, axes.U) * axes.USign);
+	const double y = ToScreenY(GetAxis(mState.PlayerPosition, axes.V));
 
-	double dir_x = mState.PlayerDirection[axes.U] * axes.USign;
-	double dir_y = -mState.PlayerDirection[axes.V];
+	double dir_x = GetAxis(mState.PlayerDirection, axes.U) * axes.USign;
+	double dir_y = -GetAxis(mState.PlayerDirection, axes.V);
 
 	const double length = std::hypot(dir_x, dir_y);
 
@@ -1341,20 +1334,20 @@ void TopViewCanvas::OnSize(wxSizeEvent& event)
 // Picking
 /////////////////////////////////////
 
-std::vector<int> TopViewCanvas::PickAt(double u, double v) const
+DynArray<int32> TopViewCanvas::PickAt(double u, double v) const
 {
 	struct Candidate
 	{
-		int Index;
+		int32 Index;
 		double Distance;
 		float32 Depth;
 	};
 
-	std::vector<Candidate> candidates;
+	DynArray<Candidate> candidates;
 
 	const double tolerance = scPickTolerancePixels / mScale;
 
-	for (size_t i = 0; i < mState.Brushes.size(); i++) {
+	for (uint32 i = 0; i < mState.Brushes.Size; i++) {
 		const TopViewBrush& brush = mState.Brushes[i];
 
 		if (!brush.bSelectable) {
@@ -1365,7 +1358,7 @@ std::vector<int> TopViewCanvas::PickAt(double u, double v) const
 		const double distance = DistanceToHull(projection.Hull, u, v);
 
 		if (distance <= tolerance) {
-			candidates.push_back(Candidate { static_cast<int>(i), distance, projection.NearDepth });
+			candidates.Insert(Candidate { static_cast<int32>(i), distance, projection.NearDepth });
 		}
 	}
 
@@ -1379,10 +1372,10 @@ std::vector<int> TopViewCanvas::PickAt(double u, double v) const
 						 return a.Depth > b.Depth;
 					 });
 
-	std::vector<int> hits;
+	DynArray<int32> hits;
 
 	for (const Candidate& candidate : candidates) {
-		hits.push_back(candidate.Index);
+		hits.Insert(candidate.Index);
 	}
 
 	return hits;
@@ -1396,7 +1389,7 @@ int TopViewCanvas::PickFaceAt(double u, double v, int& out_face) const
 	double best_score = DBL_MAX;
 	int best_brush = -1;
 
-	for (size_t i = 0; i < mState.Brushes.size(); i++) {
+	for (uint32 i = 0; i < mState.Brushes.Size; i++) {
 		const TopViewBrush& brush = mState.Brushes[i];
 
 		if (!brush.bSelectable) {
@@ -1405,9 +1398,9 @@ int TopViewCanvas::PickFaceAt(double u, double v, int& out_face) const
 
 		const TopViewProjection& projection = Projection(brush);
 
-		for (size_t j = 0; j < projection.Faces.size(); j++) {
+		for (uint32 j = 0; j < projection.Faces.Size; j++) {
 			const TopViewFace& face = projection.Faces[j];
-			const double distance = DistanceToSegment(u, v, face.AU, face.AV, face.BU, face.BV);
+			const double distance = DistanceToSegment(u, v, face.A.X, face.A.Y, face.B.X, face.B.Y);
 
 			if (distance > tolerance) {
 				continue;
@@ -1429,8 +1422,7 @@ int TopViewCanvas::PickFaceAt(double u, double v, int& out_face) const
 bool TopViewCanvas::IsVertexSelected(uint32 object_id, double u, double v) const
 {
 	for (const TopViewVertexHandle& handle : mSelectedVertices) {
-		if (handle.ObjectId == object_id && std::fabs(handle.U - u) < scHandleMergeDistance &&
-			std::fabs(handle.V - v) < scHandleMergeDistance) {
+		if (handle.ObjectId == object_id && IsSameHandle(Vec2d(u, v), ToVec2d(handle.Position))) {
 			return true;
 		}
 	}
@@ -1450,14 +1442,13 @@ bool TopViewCanvas::PickVertexAt(double u, double v, TopViewVertexHandle& out_ha
 			continue;
 		}
 
-		for (const HandlePoint& point : CollectHandles(Projection(brush))) {
-			const double distance = std::hypot(point.U - u, point.V - v);
+		for (const Vec2d& point : CollectHandles(Projection(brush))) {
+			const double distance = std::hypot(point.X - u, point.Y - v);
 
 			if (distance <= best) {
 				best = distance;
 				found = true;
-				out_handle = TopViewVertexHandle { brush.ObjectId, static_cast<float32>(point.U),
-												   static_cast<float32>(point.V) };
+				out_handle = TopViewVertexHandle { brush.ObjectId, ToVec2f(point) };
 			}
 		}
 	}
@@ -1493,7 +1484,7 @@ void TopViewCanvas::UpdateHover()
 	const bool vertex_changed = (mbHoverVertex != had_vertex) ||
 								(mbHoverVertex &&
 								 (mHoverVertex.ObjectId != previous_vertex.ObjectId ||
-								  mHoverVertex.U != previous_vertex.U || mHoverVertex.V != previous_vertex.V));
+								  !(mHoverVertex.Position == previous_vertex.Position)));
 
 	if (mbHoverFace != had_face || (mbHoverFace && !(mHoverFace == previous_face)) || vertex_changed) {
 		UpdateCursor();
@@ -1546,11 +1537,11 @@ TopViewCanvas::ViewBounds TopViewCanvas::GetSelectionBounds() const
 
 		const TopViewProjection& projection = Projection(brush);
 
-		for (size_t i = 0; i + 1 < projection.Hull.size(); i += 2) {
-			bounds.MinU = std::min<double>(bounds.MinU, projection.Hull[i]);
-			bounds.MaxU = std::max<double>(bounds.MaxU, projection.Hull[i]);
-			bounds.MinV = std::min<double>(bounds.MinV, projection.Hull[i + 1]);
-			bounds.MaxV = std::max<double>(bounds.MaxV, projection.Hull[i + 1]);
+		for (const Vec2f& point : projection.Hull) {
+			bounds.MinU = std::min<double>(bounds.MinU, point.X);
+			bounds.MaxU = std::max<double>(bounds.MaxU, point.X);
+			bounds.MinV = std::min<double>(bounds.MinV, point.Y);
+			bounds.MaxV = std::max<double>(bounds.MaxV, point.Y);
 			bounds.bValid = true;
 		}
 	}
@@ -1575,8 +1566,8 @@ bool TopViewCanvas::GetSelectionPivot(double& out_u, double& out_v) const
 	}
 
 	if (count == 1) {
-		out_u = Projection(*only).PivotU;
-		out_v = Projection(*only).PivotV;
+		out_u = Projection(*only).Pivot.X;
+		out_v = Projection(*only).Pivot.Y;
 		return true;
 	}
 
@@ -1599,7 +1590,15 @@ uint32 TopViewCanvas::GetSelectedCount() const
 	return count;
 }
 
-void TopViewCanvas::SelectBrushes(const std::vector<uint32>& object_ids, eTopViewSelectMode mode)
+void TopViewCanvas::SelectBrush(uint32 object_id, eTopViewSelectMode mode)
+{
+	DynArray<uint32> object_ids;
+	object_ids.Insert(object_id);
+
+	SelectBrushes(std::move(object_ids), mode);
+}
+
+void TopViewCanvas::SelectBrushes(DynArray<uint32> object_ids, eTopViewSelectMode mode)
 {
 	for (TopViewBrush& brush : mState.Brushes) {
 		const bool listed = std::find(object_ids.begin(), object_ids.end(), brush.ObjectId) != object_ids.end();
@@ -1617,17 +1616,17 @@ void TopViewCanvas::SelectBrushes(const std::vector<uint32>& object_ids, eTopVie
 		}
 	}
 
-	mLocalSelection.clear();
+	mLocalSelection.Clear();
 
 	for (const TopViewBrush& brush : mState.Brushes) {
 		if (brush.bSelected) {
-			mLocalSelection.push_back(brush.ObjectId);
+			mLocalSelection.Insert(brush.ObjectId);
 		}
 	}
 
 	mbLocalSelection = true;
 
-	SendCommand([object_ids, mode] { gEditor->TopViewSelect(object_ids, mode); });
+	SendCommand([object_ids = std::move(object_ids), mode] { gEditor->TopViewSelect(object_ids, mode); });
 
 	UpdateStatus();
 	Refresh();
@@ -1635,28 +1634,28 @@ void TopViewCanvas::SelectBrushes(const std::vector<uint32>& object_ids, eTopVie
 
 void TopViewCanvas::SelectAll()
 {
-	std::vector<uint32> ids;
+	DynArray<uint32> ids;
 
 	for (const TopViewBrush& brush : mState.Brushes) {
 		if (brush.bSelectable) {
-			ids.push_back(brush.ObjectId);
+			ids.Insert(brush.ObjectId);
 		}
 	}
 
-	SelectBrushes(ids, eTopViewSelectMode::Replace);
+	SelectBrushes(std::move(ids), eTopViewSelectMode::Replace);
 }
 
 void TopViewCanvas::InvertSelection()
 {
-	std::vector<uint32> ids;
+	DynArray<uint32> ids;
 
 	for (const TopViewBrush& brush : mState.Brushes) {
 		if (brush.bSelectable && !brush.bSelected) {
-			ids.push_back(brush.ObjectId);
+			ids.Insert(brush.ObjectId);
 		}
 	}
 
-	SelectBrushes(ids, eTopViewSelectMode::Replace);
+	SelectBrushes(std::move(ids), eTopViewSelectMode::Replace);
 }
 
 
@@ -1759,18 +1758,18 @@ void TopViewCanvas::OnLeftDown(wxMouseEvent& event)
 
 void TopViewCanvas::BeginSelect()
 {
-	const std::vector<int> hits = PickAt(mPressU, mPressV);
+	const DynArray<int32> hits = PickAt(mPressU, mPressV);
 
 	mbHasPressedBrush = false;
 
-	if (hits.empty()) {
+	if (hits.IsEmpty()) {
 		mDrag = eDrag::Marquee;
 		return;
 	}
 
-	int pressed = hits.front();
+	int32 pressed = hits[0];
 
-	for (const int index : hits) {
+	for (const int32 index : hits) {
 		if (mState.Brushes[index].bSelected) {
 			pressed = index;
 			break;
@@ -1779,16 +1778,16 @@ void TopViewCanvas::BeginSelect()
 
 	mbHasPressedBrush = true;
 	mPressedId = mState.Brushes[pressed].ObjectId;
-	mPressedHitIds.clear();
+	mPressedHitIds.Clear();
 
-	for (const int index : hits) {
-		mPressedHitIds.push_back(mState.Brushes[index].ObjectId);
+	for (const int32 index : hits) {
+		mPressedHitIds.Insert(mState.Brushes[index].ObjectId);
 	}
 
 	mbPressedWasSelected = mState.Brushes[pressed].bSelected;
 
 	if (!mbPressedWasSelected) {
-		SelectBrushes({ mState.Brushes[pressed].ObjectId },
+		SelectBrush(mState.Brushes[pressed].ObjectId,
 					  mbAdditive ? eTopViewSelectMode::Add : eTopViewSelectMode::Replace);
 	}
 
@@ -1804,17 +1803,17 @@ void TopViewCanvas::BeginFace()
 	mbHasPressedBrush = false;
 
 	if (brush_index < 0) {
-		const std::vector<int> hits = PickAt(mPressU, mPressV);
+		const DynArray<int32> hits = PickAt(mPressU, mPressV);
 
-		if (hits.empty()) {
+		if (hits.IsEmpty()) {
 			mDrag = eDrag::Marquee;
 			return;
 		}
 
-		const TopViewBrush& clicked = mState.Brushes[hits.front()];
+		const TopViewBrush& clicked = mState.Brushes[hits[0]];
 
 		if (!clicked.bSelected || GetSelectedCount() > 1) {
-			SelectBrushes({ clicked.ObjectId }, mbAdditive ? eTopViewSelectMode::Add : eTopViewSelectMode::Replace);
+			SelectBrush(clicked.ObjectId, mbAdditive ? eTopViewSelectMode::Add : eTopViewSelectMode::Replace);
 		}
 
 		return;
@@ -1823,12 +1822,12 @@ void TopViewCanvas::BeginFace()
 	const TopViewBrush& brush = mState.Brushes[brush_index];
 
 	if (!brush.bSelected) {
-		SelectBrushes({ brush.ObjectId }, mbAdditive ? eTopViewSelectMode::Add : eTopViewSelectMode::Replace);
+		SelectBrush(brush.ObjectId, mbAdditive ? eTopViewSelectMode::Add : eTopViewSelectMode::Replace);
 	}
 
 	mGrabbedBrushId = brush.ObjectId;
 	mGrabbedFace = Projection(brush).Faces[face_index];
-	mFaceBaseOffset = mGrabbedFace.NormalU * mGrabbedFace.AU + mGrabbedFace.NormalV * mGrabbedFace.AV;
+	mFaceBaseOffset = mGrabbedFace.Normal.X * mGrabbedFace.A.X + mGrabbedFace.Normal.Y * mGrabbedFace.A.Y;
 	mbHoverFace = false;
 	mDrag = eDrag::Face;
 }
@@ -1841,12 +1840,12 @@ void TopViewCanvas::BeginVertex()
 	mbVertexToggleOnRelease = false;
 
 	if (PickVertexAt(mPressU, mPressV, handle)) {
-		if (!IsVertexSelected(handle.ObjectId, handle.U, handle.V)) {
+		if (!IsVertexSelected(handle.ObjectId, handle.Position.X, handle.Position.Y)) {
 			if (!mbAdditive) {
-				mSelectedVertices.clear();
+				mSelectedVertices.Clear();
 			}
 
-			mSelectedVertices.push_back(handle);
+			mSelectedVertices.Insert(handle);
 		}
 		else if (mbAdditive) {
 			mbVertexToggleOnRelease = true;
@@ -1858,19 +1857,19 @@ void TopViewCanvas::BeginVertex()
 		return;
 	}
 
-	const std::vector<int> hits = PickAt(mPressU, mPressV);
+	const DynArray<int32> hits = PickAt(mPressU, mPressV);
 
-	if (hits.empty()) {
+	if (hits.IsEmpty()) {
 		mDrag = eDrag::Marquee;
 		return;
 	}
 
-	mSelectedVertices.clear();
+	mSelectedVertices.Clear();
 
-	const TopViewBrush& clicked = mState.Brushes[hits.front()];
+	const TopViewBrush& clicked = mState.Brushes[hits[0]];
 
 	if (!clicked.bSelected || GetSelectedCount() > 1) {
-		SelectBrushes({ clicked.ObjectId }, mbAdditive ? eTopViewSelectMode::Add : eTopViewSelectMode::Replace);
+		SelectBrush(clicked.ObjectId, mbAdditive ? eTopViewSelectMode::Add : eTopViewSelectMode::Replace);
 	}
 }
 
@@ -1883,16 +1882,16 @@ void TopViewCanvas::BeginCreate()
 
 void TopViewCanvas::BeginRotate()
 {
-	const std::vector<int> hits = PickAt(mPressU, mPressV);
+	const DynArray<int32> hits = PickAt(mPressU, mPressV);
 
 	bool hit_selected = false;
 
-	for (const int index : hits) {
+	for (const int32 index : hits) {
 		hit_selected = hit_selected || mState.Brushes[index].bSelected;
 	}
 
-	if (!hits.empty() && !hit_selected) {
-		SelectBrushes({ mState.Brushes[hits.front()].ObjectId }, eTopViewSelectMode::Replace);
+	if (!hits.IsEmpty() && !hit_selected) {
+		SelectBrush(mState.Brushes[hits[0]].ObjectId, eTopViewSelectMode::Replace);
 		return;
 	}
 
@@ -1979,8 +1978,8 @@ void TopViewCanvas::UpdatePreview()
 		break;
 	}
 	case eDrag::Face: {
-		const double nu = mGrabbedFace.NormalU;
-		const double nv = mGrabbedFace.NormalV;
+		const double nu = mGrabbedFace.Normal.X;
+		const double nv = mGrabbedFace.Normal.Y;
 
 		double shift = (mCurrentU - mPressU) * nu + (mCurrentV - mPressV) * nv;
 
@@ -2013,36 +2012,36 @@ void TopViewCanvas::UpdatePreview()
 
 			const double brush_shift = std::max(shift,
 												std::min(0.0, min_thickness - ThicknessAlong(projection, nu, nv)));
-			std::vector<float32> polygon = BuildShiftedPolygon(projection, *face, brush_shift);
+			DynArray<Vec2f> polygon = BuildShiftedPolygon(projection, *face, brush_shift);
 
-			if (polygon.size() >= 6) {
-				mPreview.Outlines.push_back(OutlinePreview { brush.ObjectId, std::move(polygon) });
+			if (polygon.Size >= 3) {
+				mPreview.Outlines.Insert(OutlinePreview { brush.ObjectId, std::move(polygon) });
 			}
 		}
 
 		break;
 	}
 	case eDrag::Vertex: {
-		const double target_u = Snap(mGrabbedVertex.U + (mCurrentU - mPressU));
-		const double target_v = Snap(mGrabbedVertex.V + (mCurrentV - mPressV));
+		const double target_u = Snap(mGrabbedVertex.Position.X + (mCurrentU - mPressU));
+		const double target_v = Snap(mGrabbedVertex.Position.Y + (mCurrentV - mPressV));
 
 		mPreview = Preview();
 		mPreview.Kind = eDrag::Vertex;
-		mPreview.OffsetU = target_u - mGrabbedVertex.U;
-		mPreview.OffsetV = target_v - mGrabbedVertex.V;
+		mPreview.OffsetU = target_u - mGrabbedVertex.Position.X;
+		mPreview.OffsetV = target_v - mGrabbedVertex.Position.Y;
 
 		for (const TopViewBrush& brush : mState.Brushes) {
 			if (!brush.bSelected) {
 				continue;
 			}
 
-			std::vector<HandlePoint> points = CollectHandles(Projection(brush));
+			DynArray<Vec2d> points = CollectHandles(Projection(brush));
 			bool moves_any = false;
 
-			for (HandlePoint& point : points) {
-				if (IsVertexSelected(brush.ObjectId, point.U, point.V)) {
-					point.U += mPreview.OffsetU;
-					point.V += mPreview.OffsetV;
+			for (Vec2d& point : points) {
+				if (IsVertexSelected(brush.ObjectId, point.X, point.Y)) {
+					point.X += mPreview.OffsetU;
+					point.Y += mPreview.OffsetV;
 					moves_any = true;
 				}
 			}
@@ -2051,10 +2050,10 @@ void TopViewCanvas::UpdatePreview()
 				continue;
 			}
 
-			std::vector<float32> polygon = ConvexHull2D(std::move(points));
+			DynArray<Vec2f> polygon = ConvexHull2D(std::move(points));
 
-			if (polygon.size() >= 6) {
-				mPreview.Outlines.push_back(OutlinePreview { brush.ObjectId, std::move(polygon) });
+			if (polygon.Size >= 3) {
+				mPreview.Outlines.Insert(OutlinePreview { brush.ObjectId, std::move(polygon) });
 			}
 		}
 
@@ -2169,32 +2168,35 @@ void TopViewCanvas::FinishVertex()
 {
 	if (mPreview.Kind != eDrag::Vertex || (mPreview.OffsetU == 0.0 && mPreview.OffsetV == 0.0)) {
 		if (!mbDragMoved && mbVertexToggleOnRelease) {
-			mSelectedVertices.erase(
-				std::remove_if(mSelectedVertices.begin(), mSelectedVertices.end(),
-							   [this](const TopViewVertexHandle& handle)
-							   {
-								   return handle.ObjectId == mGrabbedVertex.ObjectId &&
-										  std::fabs(handle.U - mGrabbedVertex.U) < scHandleMergeDistance &&
-										  std::fabs(handle.V - mGrabbedVertex.V) < scHandleMergeDistance;
-							   }),
-				mSelectedVertices.end());
+			DynArray<TopViewVertexHandle> kept;
+
+			for (const TopViewVertexHandle& handle : mSelectedVertices) {
+				const bool is_grabbed = handle.ObjectId == mGrabbedVertex.ObjectId &&
+										IsSameHandle(ToVec2d(handle.Position), ToVec2d(mGrabbedVertex.Position));
+
+				if (!is_grabbed) {
+					kept.Insert(handle);
+				}
+			}
+
+			mSelectedVertices = std::move(kept);
 		}
 
 		ClearPreview();
 		return;
 	}
 
-	const std::vector<TopViewVertexHandle> handles = mSelectedVertices;
+	DynArray<TopViewVertexHandle> handles = mSelectedVertices.Clone();
 	const Vec3f offset = ToWorldVector(mPreview.OffsetU, mPreview.OffsetV, 0.0);
 	const eViewPlane plane = mPlane;
 
 	for (TopViewVertexHandle& handle : mSelectedVertices) {
-		handle.U += static_cast<float32>(mPreview.OffsetU);
-		handle.V += static_cast<float32>(mPreview.OffsetV);
+		handle.Position += Vec2f(static_cast<float32>(mPreview.OffsetU), static_cast<float32>(mPreview.OffsetV));
 	}
 
 	HoldPreview();
-	SendCommand([plane, handles, offset] { gEditor->TopViewMoveVertices(plane, handles, offset); });
+	SendCommand([plane, handles = std::move(handles), offset]
+				{ gEditor->TopViewMoveVertices(plane, handles, offset); });
 }
 
 void TopViewCanvas::FinishMarquee()
@@ -2202,7 +2204,7 @@ void TopViewCanvas::FinishMarquee()
 	if (mTool == eTopViewTool::Vertex) {
 		if (!mbDragMoved) {
 			if (!mbAdditive) {
-				mSelectedVertices.clear();
+				mSelectedVertices.Clear();
 			}
 
 			return;
@@ -2214,7 +2216,7 @@ void TopViewCanvas::FinishMarquee()
 		const double max_v = std::max(mPressV, mCurrentV);
 
 		if (!mbAdditive) {
-			mSelectedVertices.clear();
+			mSelectedVertices.Clear();
 		}
 
 		for (const TopViewBrush& brush : mState.Brushes) {
@@ -2222,11 +2224,10 @@ void TopViewCanvas::FinishMarquee()
 				continue;
 			}
 
-			for (const HandlePoint& point : CollectHandles(Projection(brush))) {
-				if (point.U >= min_u && point.U <= max_u && point.V >= min_v && point.V <= max_v &&
-					!IsVertexSelected(brush.ObjectId, point.U, point.V)) {
-					mSelectedVertices.push_back(TopViewVertexHandle { brush.ObjectId, static_cast<float32>(point.U),
-																	  static_cast<float32>(point.V) });
+			for (const Vec2d& point : CollectHandles(Projection(brush))) {
+				if (point.X >= min_u && point.X <= max_u && point.Y >= min_v && point.Y <= max_v &&
+					!IsVertexSelected(brush.ObjectId, point.X, point.Y)) {
+					mSelectedVertices.Insert(TopViewVertexHandle { brush.ObjectId, ToVec2f(point) });
 				}
 			}
 		}
@@ -2247,28 +2248,33 @@ void TopViewCanvas::FinishMarquee()
 	const double min_v = std::min(mPressV, mCurrentV);
 	const double max_v = std::max(mPressV, mCurrentV);
 
-	std::vector<uint32> inside;
+	DynArray<uint32> inside;
 
 	for (const TopViewBrush& brush : mState.Brushes) {
 		const TopViewProjection& projection = Projection(brush);
 
-		if (!brush.bSelectable || projection.Hull.empty()) {
+		if (!brush.bSelectable || projection.Hull.IsEmpty()) {
 			continue;
 		}
 
 		bool contained = true;
 
-		for (size_t i = 0; i + 1 < projection.Hull.size(); i += 2) {
-			contained = contained && projection.Hull[i] >= min_u && projection.Hull[i] <= max_u &&
-						projection.Hull[i + 1] >= min_v && projection.Hull[i + 1] <= max_v;
+		for (const Vec2f& point : projection.Hull) {
+			contained = contained && point.X >= min_u && point.X <= max_u && point.Y >= min_v && point.Y <= max_v;
 		}
 
 		if (contained) {
-			inside.push_back(brush.ObjectId);
+			inside.Insert(brush.ObjectId);
 		}
 	}
 
-	SelectBrushes(inside, mbAdditive ? eTopViewSelectMode::Add : eTopViewSelectMode::Replace);
+	eTopViewSelectMode mode = eTopViewSelectMode::Replace;
+
+	if (mbAdditive) {
+		mode = eTopViewSelectMode::Add;
+	}
+
+	SelectBrushes(std::move(inside), mode);
 }
 
 void TopViewCanvas::FinishMove()
@@ -2293,7 +2299,7 @@ void TopViewCanvas::FinishMove()
 
 	if (mbAdditive) {
 		if (mbPressedWasSelected) {
-			SelectBrushes({ pressed_id }, eTopViewSelectMode::Toggle);
+			SelectBrush(pressed_id, eTopViewSelectMode::Toggle);
 		}
 
 		return;
@@ -2306,14 +2312,14 @@ void TopViewCanvas::FinishMove()
 	const bool same_spot = std::hypot(mPressScreen.x - mLastClickScreen.x, mPressScreen.y - mLastClickScreen.y) <=
 						   scClickCycleRadiusPixels;
 
-	if (mPressedHitIds.size() > 1 && same_spot) {
-		const auto found = std::find(mPressedHitIds.begin(), mPressedHitIds.end(), pressed_id);
-		const size_t next = (static_cast<size_t>(found - mPressedHitIds.begin()) + 1) % mPressedHitIds.size();
+	if (mPressedHitIds.Size > 1 && same_spot) {
+		const uint32* found = std::find(mPressedHitIds.begin(), mPressedHitIds.end(), pressed_id);
+		const uint32 next = (static_cast<uint32>(found - mPressedHitIds.begin()) + 1) % mPressedHitIds.Size;
 
-		SelectBrushes({ mPressedHitIds[next] }, eTopViewSelectMode::Replace);
+		SelectBrush(mPressedHitIds[next], eTopViewSelectMode::Replace);
 	}
 	else if (GetSelectedCount() > 1) {
-		SelectBrushes({ pressed_id }, eTopViewSelectMode::Replace);
+		SelectBrush(pressed_id, eTopViewSelectMode::Replace);
 	}
 
 	mLastClickScreen = mPressScreen;
@@ -2607,8 +2613,8 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 			ClearPreview();
 			CancelDrag();
 		}
-		else if (!mSelectedVertices.empty()) {
-			mSelectedVertices.clear();
+		else if (mSelectedVertices.IsNotEmpty()) {
+			mSelectedVertices.Clear();
 			Refresh();
 		}
 		else if (GetSelectedCount() > 0) {
@@ -2642,10 +2648,10 @@ void TopViewCanvas::UpdateCursor()
 
 		const TopViewFace& face = (mDrag == eDrag::Face) ? mGrabbedFace : mHoverFace;
 
-		if (std::fabs(face.NormalU) > 0.9) {
+		if (std::fabs(face.Normal.X) > 0.9) {
 			SetCursor(wxCursor(wxCURSOR_SIZEWE));
 		}
-		else if (std::fabs(face.NormalV) > 0.9) {
+		else if (std::fabs(face.Normal.Y) > 0.9) {
 			SetCursor(wxCursor(wxCURSOR_SIZENS));
 		}
 		else {
@@ -2685,7 +2691,7 @@ void TopViewCanvas::UpdateStatus()
 	}
 
 	text += wxString::Format("%d brushes, %u selected   |   Snap %s %.2f   |   Zoom %.0f%%   |   %s",
-							 static_cast<int>(mState.Brushes.size()), GetSelectedCount(),
+							 static_cast<int>(mState.Brushes.Size), GetSelectedCount(),
 							 mState.bSnapEnabled ? "on" : "off", mState.SnapStep, mScale / scDefaultScale * 100.0,
 							 scToolHints[static_cast<uint32>(mTool)]);
 

@@ -10,7 +10,7 @@ namespace fx::editor {
 static void ShowAsSelected(Object* object)
 {
 	if (object->HasTags(eObjectTag::Blockout)) {
-		object->SetMaterial(gWorld->pBlockout->SelectionMaterialID);
+		object->SetMaterial(gWorld->pPrototype->SelectionMaterialID);
 	}
 }
 

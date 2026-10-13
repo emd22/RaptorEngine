@@ -73,6 +73,21 @@ public:
 		return pData[index];
 	}
 
+	bool operator==(const StackArray<T, TCapacity>& other) const
+	{
+		if (Size != other.Size) {
+			return false;
+		}
+
+		for (uint32 i = 0; i < Size; i++) {
+			if (!(pData[i] == other.pData[i])) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
 	Iterator begin() { return pData; }
 	Iterator end() { return pData + Size; }
 

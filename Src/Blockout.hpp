@@ -50,6 +50,16 @@ enum class eFaceTextureEdit : uint32
 	Reset,
 };
 
+enum class ePrototypeLoadStatus
+{
+	/// The prototype or compiled map was successfully loaded
+	Success,
+	/// There were errors when loading (corrupt prototype, missing files)
+	HasErrors,
+	/// Files are missing when requesting a compiled map
+	NotCompiled,
+};
+
 class Blockout
 {
 public:
@@ -66,7 +76,7 @@ public:
 	 * that the compiler leaves alone (lights, models, dynamic and data brushes); if it is missing or older than the
 	 * prototype, the prototype is loaded instead.
 	 */
-	bool Load(const String& path);
+	ePrototypeLoadStatus Load(const String& path);
 
 	/**
 	 * @brief Saves the prototype. A compiled map path is saved to the prototype next to it.
@@ -183,7 +193,7 @@ public:
 	 * @brief True if the static world brushes were replaced by a map compiled with mapc. The prototype can't be saved
 	 * while they are, as those brushes aren't loaded.
 	 */
-	bool HasCompiledWorld() const { return mbHasCompiledWorld; }
+	bool IsCompiledMap() const { return mbIsCompiledMap; }
 
 	/**
 	 * @brief Where the map compiler put the light probes, or nullptr unless a compiled world with probes is loaded.
@@ -191,7 +201,7 @@ public:
 	 */
 	const ProbeLayout* GetCompiledProbeLayout() const
 	{
-		return (mbHasCompiledWorld && mCompiledProbeLayout.VolumeCount > 0) ? &mCompiledProbeLayout : nullptr;
+		return (mbIsCompiledMap && mCompiledProbeLayout.VolumeCount > 0) ? &mCompiledProbeLayout : nullptr;
 	}
 
 	bool HasBakedSun() const { return mbHasBakedSun; }
@@ -314,7 +324,7 @@ private:
 
 	std::vector<ObjectID> mCompiledObjects;
 	std::vector<physics::BodyID> mCompiledBodies;
-	bool mbHasCompiledWorld = false;
+	bool mbIsCompiledMap = false;
 	ProbeLayout mCompiledProbeLayout;
 
 	bool mbHasBakedSun = false;

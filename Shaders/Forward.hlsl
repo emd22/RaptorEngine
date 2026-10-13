@@ -738,6 +738,9 @@ PERMNOT(PROBE_CAPTURE);
 												F_TextureName(tReflectionProbes), tReflectionProbes);
 PERMEND();
 
+		const float specular_horizon = saturate(1.0 + dot(R, geometric_normal));
+		probe_radiance *= specular_horizon * specular_horizon;
+
 		const float3 single_scatter = (surface.vF0 * dfg.x) + dfg.y;
 		const float3 multi_scatter = MultiScatterReflectance(surface.vF0, single_scatter, dfg);
 		const float3 ambient_diffuse = surface.vDiffuse * (1.0 - single_scatter - multi_scatter);

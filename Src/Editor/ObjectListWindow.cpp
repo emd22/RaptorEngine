@@ -41,13 +41,13 @@ static constexpr TagName scTagNames[] = {
 	{ eObjectTag::DBound, "dbound" },
 };
 
-static std::string BuildTagsList(eObjectTag tags)
+static String BuildTagsList(eObjectTag tags)
 {
-	std::string description;
+	String description;
 
 	for (const TagName& tag_name : scTagNames) {
 		if (HasFlag(tags, tag_name.Tag)) {
-			if (!description.empty()) {
+			if (!description.IsEmpty()) {
 				description += ", ";
 			}
 
@@ -99,8 +99,7 @@ void ObjectListWindow::RefreshList()
 
 			SizedArray<Object*> objects = gObjectManager->CollectObjects();
 
-			std::vector<Row> rows;
-			rows.reserve(objects.Size);
+			DynArray<Row> rows;
 
 			for (uint32 i = 0; i < objects.Size; i++) {
 				Object* object = objects[i];
@@ -111,10 +110,10 @@ void ObjectListWindow::RefreshList()
 
 				const Vec3f position = object->GetPosition();
 
-				rows.push_back(Row {
-					.Name = object->Name.Get().Str(),
+				rows.Insert(Row {
+					.Name = object->Name.Get(),
 					.Tags = BuildTagsList(object->Tags),
-					.Position = std::format("{:.2f}, {:.2f}, {:.2f}", position.X, position.Y, position.Z),
+					.Position = String::Fmt("{:.2f}, {:.2f}, {:.2f}", position.X, position.Y, position.Z),
 					.ID = object->ID(),
 				});
 			}
@@ -123,26 +122,30 @@ void ObjectListWindow::RefreshList()
 		});
 }
 
-void ObjectListWindow::ShowRows(const std::vector<Row>& rows)
+void ObjectListWindow::ShowRows(const DynArray<Row>& rows)
 {
 	mpList->Freeze();
 	mpList->DeleteAllItems();
 
 	for (const Row& entry : rows) {
-		const wxString name = wxString::FromUTF8(entry.Name);
+		wxString name = wxString::FromUTF8(entry.Name.CStr());
 
-		const long row = mpList->InsertItem(mpList->GetItemCount(), name.IsEmpty() ? wxString("(unnamed)") : name);
+		if (name.IsEmpty()) {
+			name = "(unnamed)";
+		}
+
+		const long row = mpList->InsertItem(mpList->GetItemCount(), name);
 
 		mpList->SetItem(row, Column_Id, wxString::Format("%u", entry.ID));
-		mpList->SetItem(row, Column_Tags, wxString::FromUTF8(entry.Tags));
-		mpList->SetItem(row, Column_Position, wxString::FromUTF8(entry.Position));
+		mpList->SetItem(row, Column_Tags, wxString::FromUTF8(entry.Tags.CStr()));
+		mpList->SetItem(row, Column_Position, wxString::FromUTF8(entry.Position.CStr()));
 
 		mpList->SetItemData(row, static_cast<long>(entry.ID));
 	}
 
 	mpList->Thaw();
 
-	SetTitle(wxString::Format("Object List (%zu)", rows.size()));
+	SetTitle(wxString::Format("Object List (%u)", rows.Size));
 }
 
 void ObjectListWindow::OnRefreshButton(wxCommandEvent& event) { RefreshList(); }

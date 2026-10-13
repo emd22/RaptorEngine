@@ -7,29 +7,21 @@
 #include <cmath>
 
 namespace fx {
-
 namespace {
-
-/// How far probes sit off a surface once they're pushed out of it
 constexpr float32 scProbeSurfaceOffset = 0.25f;
 constexpr float32 scProbeHugSurfaceOffset = 1.0f;
 
-/// Probes this close to the outside of a box still count as inside it
-
 constexpr float32 scProbeInsideSkin = 0.05f;
 
-/// Probes in open space further than this from a surface are left where they are
 constexpr float32 scProbeHugMaxDistance = 1.5f;
 constexpr uint32 scMaxPushOutIterations = 8;
 
-/// Furthest a probe can move from its grid point
 constexpr float32 scMaxProbeRelocation = 0.45f;
 
 constexpr float32 scProbeCrossingSkin = 0.01f;
 constexpr float32 scProbeMinClearance = 2.0f * ProbePlacement::scCaptureNearPlane;
 constexpr uint32 scRelocationSearchSteps = 5;
 
-/// Objects bigger than this (the sky) are left out of placement so that they can't blow up the volume
 constexpr float32 scMaxPlacementObjectSize = 100.0f;
 
 constexpr float32 scMaxProbeSpacing = 64.0f;
@@ -40,14 +32,11 @@ constexpr uint32 scBaseProbeGridBudget = 512;
 
 constexpr float32 scSurfaceCellMargin = 0.05f;
 
-/// Normals with a component past this are treated as pointing along an axis
 constexpr float32 scAxisAlignedNormal = 0.999f;
 
-/// Closest that lining a probe up with a slanted face may bring it to its neighbours, in cells
 constexpr float32 scMinAlignedSpacing = 0.5f;
 constexpr uint32 scAlignSteps = 4;
 
-/// The grid points around one, which is at most the 26 that share a cell with it
 using NeighbourList = StackArray<Vec3f, 26>;
 
 constexpr float32 scShaderNormalBiasScale = 0.2f;
@@ -58,24 +47,34 @@ constexpr uint8 scGridPointOpen = 0;
 constexpr uint8 scGridPointNeeded = 1;
 constexpr uint8 scGridPointSolid = 2;
 
+using Box = ProbePlacementBoxes::Box;
+using Plane = ProbePlacementBoxes::Plane;
+
+Vec3f TransformPoint(const Mat4f& matrix, const Vec3f point)
+{
+	const Vec4f result = matrix * Vec4f(point.X, point.Y, point.Z, 1.0f);
+	return Vec3f(result.X, result.Y, result.Z);
+}
+
+Vec3f GridPosition(const Vec3f volume_min, const Vec3f cell_size, uint32 ix, uint32 iy, uint32 iz)
+{
+	return volume_min + cell_size * Vec3f(static_cast<float32>(ix), static_cast<float32>(iy), static_cast<float32>(iz));
+}
+
 uint32 SlicesForExtent(float32 extent, float32 spacing)
 {
 	const float32 slices = std::max(extent, 0.0f) / std::max(spacing, 1e-3f);
 	return std::max(static_cast<uint32>(std::lround(slices)), Limits::MinProbeGridDim);
 }
 
-Vec3f ToBoxLocal(const Vec3f point, const ProbePlacementBoxes::Box& box)
-{
-	const Vec4f local = box.WorldToLocal * Vec4f(point.X, point.Y, point.Z, 1.0f);
-	return Vec3f(local.X, local.Y, local.Z);
-}
+Vec3f ToBoxLocal(const Vec3f point, const Box& box) { return TransformPoint(box.WorldToLocal, point); }
 
-bool IsInsideBox(const Vec3f point, const ProbePlacementBoxes::Box& box, float32 skin)
+bool IsInsideBox(const Vec3f point, const Box& box, float32 skin)
 {
 	const Vec3f local = ToBoxLocal(point, box);
 
 	if (!box.Planes.IsEmpty()) {
-		for (const ProbePlacementBoxes::Plane& plane : box.Planes) {
+		for (const Plane& plane : box.Planes) {
 			if (plane.Normal.Dot(local) - plane.Distance >= skin) {
 				return false;
 			}
@@ -96,8 +95,8 @@ bool IsInsideBox(const Vec3f point, const ProbePlacementBoxes::Box& box, float32
 
 bool IsInsideAnyBox(const Vec3f point, const ProbePlacementBoxes& boxes)
 {
-	for (uint32 i = 0; i < boxes.Count; i++) {
-		if (IsInsideBox(point, boxes.Boxes[i], scProbeInsideSkin)) {
+	for (const Box& box : boxes.Boxes) {
+		if (IsInsideBox(point, box, scProbeInsideSkin)) {
 			return true;
 		}
 	}
@@ -107,7 +106,7 @@ bool IsInsideAnyBox(const Vec3f point, const ProbePlacementBoxes& boxes)
 
 bool IsInsideAnyBound(const Vec3f point, const ProbePlacementBoxes& boxes)
 {
-	for (const ProbePlacementBoxes::Box& bound : boxes.Bounds) {
+	for (const Box& bound : boxes.Bounds) {
 		if (IsInsideBox(point, bound, 0.0f)) {
 			return true;
 		}
@@ -127,15 +126,12 @@ bool IsInsideLevel(const Vec3f point, const ProbePlacementBoxes& boxes)
 	return true;
 }
 
-/// The point of the box's solid nearest to `local`, in the box's local space
-Vec3f ClosestPointInBox(const Vec3f local, const ProbePlacementBoxes::Box& box)
+Vec3f ClosestPointInBox(const Vec3f local, const Box& box)
 {
 	if (box.Planes.IsEmpty()) {
 		return Vec3f::Clamp(local, box.LocalBounds.Min, box.LocalBounds.Max);
 	}
 
-	// Projecting onto the planes one after another gives a point inside the hull, but not necessarily the nearest one.
-	// Dykstra's correction terms make it converge on the nearest, and points that are already inside stop at once.
 	constexpr uint32 cMaxIterations = 32;
 	constexpr float32 cConvergedSquared = 1e-8f;
 
@@ -149,7 +145,7 @@ Vec3f ClosestPointInBox(const Vec3f local, const ProbePlacementBoxes::Box& box)
 		float32 moved_squared = 0.0f;
 
 		for (uint32 i = 0; i < plane_count; i++) {
-			const ProbePlacementBoxes::Plane& plane = box.Planes[i];
+			const Plane& plane = box.Planes[i];
 
 			const Vec3f shifted = closest + corrections[i];
 			const float32 outside = plane.Normal.Dot(shifted) - plane.Distance;
@@ -170,15 +166,14 @@ Vec3f ClosestPointInBox(const Vec3f local, const ProbePlacementBoxes::Box& box)
 	return closest;
 }
 
-float32 DistanceToBox(const Vec3f point, const ProbePlacementBoxes::Box& box)
+Vec3f ClosestPointOnBox(const Vec3f point, const Box& box)
 {
-	const Vec3f closest_local = ClosestPointInBox(ToBoxLocal(point, box), box);
-	const Vec4f closest = box.LocalToWorld * Vec4f(closest_local.X, closest_local.Y, closest_local.Z, 1.0f);
-
-	return (point - Vec3f(closest.X, closest.Y, closest.Z)).Length();
+	return TransformPoint(box.LocalToWorld, ClosestPointInBox(ToBoxLocal(point, box), box));
 }
 
-bool SegmentCrossesBox(const Vec3f from, const Vec3f to, const ProbePlacementBoxes::Box& box, float32 skin)
+float32 DistanceToBox(const Vec3f point, const Box& box) { return (point - ClosestPointOnBox(point, box)).Length(); }
+
+bool SegmentCrossesBox(const Vec3f from, const Vec3f to, const Box& box, float32 skin)
 {
 	const Vec3f local_from = ToBoxLocal(from, box);
 	const Vec3f local_to = ToBoxLocal(to, box);
@@ -187,8 +182,7 @@ bool SegmentCrossesBox(const Vec3f from, const Vec3f to, const ProbePlacementBox
 	float32 t_exit = 1.0f;
 
 	if (!box.Planes.IsEmpty()) {
-		// Clip the segment against each plane pulled in by the skin
-		for (const ProbePlacementBoxes::Plane& plane : box.Planes) {
+		for (const Plane& plane : box.Planes) {
 			const float32 limit = plane.Distance - skin;
 			const float32 start = plane.Normal.Dot(local_from);
 			const float32 delta = plane.Normal.Dot(local_to) - start;
@@ -264,14 +258,11 @@ bool IsProbePlacementValid(const Vec3f grid_position, const Vec3f position, cons
 		return false;
 	}
 
-	for (uint32 i = 0; i < boxes.Count; i++) {
-		const ProbePlacementBoxes::Box& box = boxes.Boxes[i];
-
+	for (const Box& box : boxes.Boxes) {
 		if (DistanceToBox(position, box) < scProbeMinClearance) {
 			return false;
 		}
 
-		// Leaving the box the grid point started in is what the push out is for
 		if (!IsInsideBox(grid_position, box, scProbeInsideSkin) &&
 			SegmentCrossesBox(grid_position, position, box, scProbeCrossingSkin)) {
 			return false;
@@ -281,17 +272,12 @@ bool IsProbePlacementValid(const Vec3f grid_position, const Vec3f position, cons
 	return true;
 }
 
-/// Boxes have six faces, and a brush has one per plane
-uint32 GetFaceCount(const ProbePlacementBoxes::Box& box)
-{
-	return box.Planes.IsEmpty() ? 6 : static_cast<uint32>(box.Planes.Size);
-}
+uint32 GetFaceCount(const Box& box) { return box.Planes.IsEmpty() ? 6 : static_cast<uint32>(box.Planes.Size); }
 
-/// How far `local` has to move to leave through a face. Box faces are numbered axis * 2 + (0 for min, 1 for max).
-float32 GetFacePenetration(const Vec3f local, const ProbePlacementBoxes::Box& box, uint32 face)
+float32 GetFacePenetration(const Vec3f local, const Box& box, uint32 face)
 {
 	if (!box.Planes.IsEmpty()) {
-		const ProbePlacementBoxes::Plane& plane = box.Planes[face];
+		const Plane& plane = box.Planes[face];
 		return plane.Distance - plane.Normal.Dot(local);
 	}
 
@@ -301,13 +287,13 @@ float32 GetFacePenetration(const Vec3f local, const ProbePlacementBoxes::Box& bo
 							 : local.mData[axis] - box.LocalBounds.Min.mData[axis];
 }
 
-Vec3f FaceExitPoint(const Vec3f local, const ProbePlacementBoxes::Box& box, uint32 face, Vec3f& out_world_normal)
+Vec3f FaceExitPoint(const Vec3f local, const Box& box, uint32 face, Vec3f& out_world_normal)
 {
 	Vec3f exit_local = local;
 	Vec3f local_normal = Vec3f::sZero;
 
 	if (!box.Planes.IsEmpty()) {
-		const ProbePlacementBoxes::Plane& plane = box.Planes[face];
+		const Plane& plane = box.Planes[face];
 
 		exit_local = local + plane.Normal * (plane.Distance - plane.Normal.Dot(local));
 		local_normal = plane.Normal;
@@ -320,15 +306,13 @@ Vec3f FaceExitPoint(const Vec3f local, const ProbePlacementBoxes::Box& box, uint
 		local_normal.mData[axis] = through_max ? 1.0f : -1.0f;
 	}
 
-	const Vec4f exit_world = box.LocalToWorld * Vec4f(exit_local.X, exit_local.Y, exit_local.Z, 1.0f);
+	const Vec4f world_normal = box.LocalToWorld * Vec4f(local_normal.X, local_normal.Y, local_normal.Z, 0.0f);
+	out_world_normal = Vec3f(world_normal.X, world_normal.Y, world_normal.Z).Normalize();
 
-	const Vec4f world_normal4 = box.LocalToWorld * Vec4f(local_normal.X, local_normal.Y, local_normal.Z, 0.0f);
-	out_world_normal = Vec3f(world_normal4.X, world_normal4.Y, world_normal4.Z).Normalize();
-
-	return Vec3f(exit_world.X, exit_world.Y, exit_world.Z);
+	return TransformPoint(box.LocalToWorld, exit_local);
 }
 
-Vec3f ExitThroughFace(const Vec3f local, const ProbePlacementBoxes::Box& box, uint32 face)
+Vec3f ExitThroughFace(const Vec3f local, const Box& box, uint32 face)
 {
 	Vec3f world_normal;
 	const Vec3f exit = FaceExitPoint(local, box, face, world_normal);
@@ -336,7 +320,7 @@ Vec3f ExitThroughFace(const Vec3f local, const ProbePlacementBoxes::Box& box, ui
 	return exit + world_normal * scProbeSurfaceOffset;
 }
 
-float32 DistanceToBoxSurface(const Vec3f point, const ProbePlacementBoxes::Box& box)
+float32 DistanceToBoxSurface(const Vec3f point, const Box& box)
 {
 	if (!IsInsideBox(point, box, 0.0f)) {
 		return DistanceToBox(point, box);
@@ -361,9 +345,7 @@ enum class eCellOverlap
 	Inside,
 };
 
-/// Where a world space cell is against the solid of a box that isn't axis aligned. Tests the cell's corners against
-/// each face of the solid, so a cell just past an edge of the solid can still come back as crossing.
-eCellOverlap ClassifyCell(const Vec3f cell_min, const Vec3f cell_max, const ProbePlacementBoxes::Box& box)
+eCellOverlap ClassifyCell(const Vec3f cell_min, const Vec3f cell_max, const Box& box)
 {
 	constexpr uint32 cCornerCount = 8;
 
@@ -379,7 +361,6 @@ eCellOverlap ClassifyCell(const Vec3f cell_min, const Vec3f cell_max, const Prob
 	bool inside = true;
 
 	for (uint32 face = 0; face < GetFaceCount(box); face++) {
-		// How deep each corner is behind the face, so a corner in front of it is negative
 		float32 deepest = -std::numeric_limits<float32>::max();
 		float32 shallowest = std::numeric_limits<float32>::max();
 
@@ -405,8 +386,7 @@ bool CellTouchesSurface(const Vec3f cell_min, const Vec3f cell_max, float32 pad,
 	const Vec3f padded_min = cell_min - Vec3f(pad);
 	const Vec3f padded_max = cell_max + Vec3f(pad);
 
-	for (uint32 i = 0; i < boxes.Count; i++) {
-		const ProbePlacementBoxes::Box& box = boxes.Boxes[i];
+	for (const Box& box : boxes.Boxes) {
 		const BBox& bounds = box.WorldBounds;
 
 		bool overlaps = true;
@@ -447,9 +427,7 @@ float32 ShaderNormalBias(const Vec3f cell_size)
 
 bool IsBuriedTooDeep(const Vec3f point, const Vec3f max_relocation, const ProbePlacementBoxes& boxes)
 {
-	for (uint32 i = 0; i < boxes.Count; i++) {
-		const ProbePlacementBoxes::Box& box = boxes.Boxes[i];
-
+	for (const Box& box : boxes.Boxes) {
 		if (!IsInsideBox(point, box, 0.0f)) {
 			continue;
 		}
@@ -492,9 +470,9 @@ uint32 FindNeededGridPoints(const Vec3f volume_min, const Vec3f cell_size, const
 	out_needed.MarkFull();
 
 	std::fill(out_needed.begin(), out_needed.end(),
-			  (fill == eProbeFill::Dense || boxes.Count == 0) ? scGridPointNeeded : scGridPointOpen);
+			  (fill == eProbeFill::Dense || boxes.Boxes.Size == 0) ? scGridPointNeeded : scGridPointOpen);
 
-	if (boxes.Count == 0) {
+	if (boxes.Boxes.Size == 0) {
 		return num_points;
 	}
 
@@ -503,9 +481,7 @@ uint32 FindNeededGridPoints(const Vec3f volume_min, const Vec3f cell_size, const
 	for (uint32 iz = 0; fill == eProbeFill::Surface && iz + 1 < dims[2]; iz++) {
 		for (uint32 iy = 0; iy + 1 < dims[1]; iy++) {
 			for (uint32 ix = 0; ix + 1 < dims[0]; ix++) {
-				const Vec3f cell_min = volume_min + cell_size * Vec3f(static_cast<float32>(ix),
-																	  static_cast<float32>(iy),
-																	  static_cast<float32>(iz));
+				const Vec3f cell_min = GridPosition(volume_min, cell_size, ix, iy, iz);
 
 				if (!CellTouchesSurface(cell_min, cell_min + cell_size, pad, boxes)) {
 					continue;
@@ -530,9 +506,7 @@ uint32 FindNeededGridPoints(const Vec3f volume_min, const Vec3f cell_size, const
 	for (uint32 iz = 0; iz < dims[2]; iz++) {
 		for (uint32 iy = 0; iy < dims[1]; iy++) {
 			for (uint32 ix = 0; ix < dims[0]; ix++, point++) {
-				const Vec3f position = volume_min + cell_size * Vec3f(static_cast<float32>(ix),
-																	  static_cast<float32>(iy),
-																	  static_cast<float32>(iz));
+				const Vec3f position = GridPosition(volume_min, cell_size, ix, iy, iz);
 
 				if (out_needed[point] == scGridPointOpen) {
 					if (IsInsideAnyBox(position, boxes)) {
@@ -565,7 +539,7 @@ uint32 FindNeededGridPoints(const Vec3f volume_min, const Vec3f cell_size, const
 	return count;
 }
 
-bool PushOutOfBox(Vec3f& point, const ProbePlacementBoxes::Box& box)
+bool PushOutOfBox(Vec3f& point, const Box& box)
 {
 	if (!IsInsideBox(point, box, scProbeInsideSkin)) {
 		return false;
@@ -599,9 +573,7 @@ bool PushOutOfBoxes(Vec3f& point, const ProbePlacementBoxes& boxes)
 	Vec3f best_exit = point;
 	bool inside = false;
 
-	for (uint32 i = 0; i < boxes.Count; i++) {
-		const ProbePlacementBoxes::Box& box = boxes.Boxes[i];
-
+	for (const Box& box : boxes.Boxes) {
 		if (!IsInsideBox(point, box, scProbeInsideSkin)) {
 			continue;
 		}
@@ -640,11 +612,10 @@ bool PushOutOfBoxes(Vec3f& point, const ProbePlacementBoxes& boxes)
 		return true;
 	}
 
-	// Every face leads into more geometry, so step out one box at a time and leave the result to the placement check
 	for (uint32 iteration = 0; iteration < scMaxPushOutIterations; iteration++) {
 		bool pushed = false;
 
-		for (uint32 i = 0; i < boxes.Count && !pushed; i++) {
+		for (uint32 i = 0; i < boxes.Boxes.Size && !pushed; i++) {
 			pushed = PushOutOfBox(point, boxes.Boxes[i]);
 		}
 
@@ -656,12 +627,11 @@ bool PushOutOfBoxes(Vec3f& point, const ProbePlacementBoxes& boxes)
 	return true;
 }
 
-/// Distance from `point` to the nearest box other than `skip_box`
 float32 DistanceToOtherBoxes(const Vec3f point, const ProbePlacementBoxes& boxes, uint32 skip_box)
 {
 	float32 nearest = std::numeric_limits<float32>::max();
 
-	for (uint32 i = 0; i < boxes.Count; i++) {
+	for (uint32 i = 0; i < boxes.Boxes.Size; i++) {
 		if (i != skip_box) {
 			nearest = std::min(nearest, DistanceToBox(point, boxes.Boxes[i]));
 		}
@@ -677,17 +647,10 @@ bool HugNearestSurface(Vec3f& point, const ProbePlacementBoxes& boxes, float32 m
 	Vec3f best_closest = point;
 	bool found = false;
 
-	for (uint32 i = 0; i < boxes.Count; i++) {
-		const ProbePlacementBoxes::Box& box = boxes.Boxes[i];
-
-		const Vec3f closest_local = ClosestPointInBox(ToBoxLocal(point, box), box);
-
-		const Vec4f closest_world4 = box.LocalToWorld * Vec4f(closest_local.X, closest_local.Y, closest_local.Z, 1.0f);
-		const Vec3f closest(closest_world4.X, closest_world4.Y, closest_world4.Z);
-
+	for (uint32 i = 0; i < boxes.Boxes.Size; i++) {
+		const Vec3f closest = ClosestPointOnBox(point, boxes.Boxes[i]);
 		const float32 distance = (point - closest).Length();
 
-		// Points on or inside a box are left to the push out
 		if (distance < 1e-6f || distance >= best_distance) {
 			continue;
 		}
@@ -731,9 +694,6 @@ bool HugNearestSurface(Vec3f& point, const ProbePlacementBoxes& boxes, float32 m
 	return true;
 }
 
-/// Probes sit on a grid that is lined up with the world, so beside a face that isn't they form a staircase. This slides
-/// a probe along the normal of the slanted face it is nearest to, towards the offset that the middle of the staircase
-/// has, as far as it is allowed to move from its grid point.
 bool AlignToSlantedSurface(Vec3f& point, const Vec3f grid_position, const Vec3f cell_size, const Vec3f max_relocation,
 						   const ProbePlacementBoxes& boxes, const NeighbourList& neighbours)
 {
@@ -741,14 +701,8 @@ bool AlignToSlantedSurface(Vec3f& point, const Vec3f grid_position, const Vec3f 
 	Vec3f best_closest = point;
 	bool found = false;
 
-	for (uint32 i = 0; i < boxes.Count; i++) {
-		const ProbePlacementBoxes::Box& box = boxes.Boxes[i];
-
-		const Vec3f closest_local = ClosestPointInBox(ToBoxLocal(point, box), box);
-
-		const Vec4f closest_world4 = box.LocalToWorld * Vec4f(closest_local.X, closest_local.Y, closest_local.Z, 1.0f);
-		const Vec3f closest(closest_world4.X, closest_world4.Y, closest_world4.Z);
-
+	for (const Box& box : boxes.Boxes) {
+		const Vec3f closest = ClosestPointOnBox(point, box);
 		const float32 distance = (point - closest).Length();
 
 		if (distance < 1e-6f || distance >= best_distance) {
@@ -770,7 +724,6 @@ bool AlignToSlantedSurface(Vec3f& point, const Vec3f grid_position, const Vec3f 
 		return false;
 	}
 
-	// How far apart along the normal the grid points of one cell are
 	const float32 staircase = std::abs(normal.X) * cell_size.X + std::abs(normal.Y) * cell_size.Y +
 							  std::abs(normal.Z) * cell_size.Z;
 
@@ -781,7 +734,6 @@ bool AlignToSlantedSurface(Vec3f& point, const Vec3f grid_position, const Vec3f 
 	const float32 target = std::max(0.5f * staircase, scProbeMinClearance + scSurfaceCellMargin);
 	const Vec3f move = normal * (target - best_distance);
 
-	// Shortened to stay within reach of the grid point, so the probe ends up on the same line through the face
 	float32 fraction = 1.0f;
 
 	for (uint32 axis = 0; axis < 3; axis++) {
@@ -797,11 +749,10 @@ bool AlignToSlantedSurface(Vec3f& point, const Vec3f grid_position, const Vec3f 
 		fraction = std::min(fraction, std::max((limit - point.mData[axis]) / step, 0.0f));
 	}
 
-	// Lining two rows of the staircase up puts their probes beside each other, and probes that end up too close
-	// together shade as creases. So the probe only goes as far as keeps it apart from the ones around it.
 	const float32 min_spacing = scMinAlignedSpacing * std::min({ cell_size.X, cell_size.Y, cell_size.Z });
 
-	const auto keeps_apart = [&](const Vec3f candidate) {
+	const auto keeps_apart = [&](const Vec3f candidate)
+	{
 		for (const Vec3f neighbour : neighbours) {
 			const float32 spacing = (candidate - neighbour).Length();
 
@@ -905,7 +856,6 @@ bool PlaceVolumeProbes(ProbeLayout& layout, const Vec3f volume_min, const Vec3f 
 	const uint32 volume_index = layout.VolumeCount;
 	const uint32 dims[3] = { grid.X, grid.Y, grid.Z };
 
-	// Probes sit on the volume's boundary, so there are (dim - 1) cells along each axis
 	const Vec3f num_cells(static_cast<float32>(dims[0] - 1), static_cast<float32>(dims[1] - 1),
 						  static_cast<float32>(dims[2] - 1));
 
@@ -945,9 +895,7 @@ bool PlaceVolumeProbes(ProbeLayout& layout, const Vec3f volume_min, const Vec3f 
 					continue;
 				}
 
-				const Vec3f grid_position = volume_min + cell_size * Vec3f(static_cast<float32>(ix),
-																		   static_cast<float32>(iy),
-																		   static_cast<float32>(iz));
+				const Vec3f grid_position = GridPosition(volume_min, cell_size, ix, iy, iz);
 				Vec3f position = grid_position;
 
 				if (PushOutOfBoxes(position, boxes)) {
@@ -955,7 +903,6 @@ bool PlaceVolumeProbes(ProbeLayout& layout, const Vec3f volume_min, const Vec3f 
 				}
 
 				if (HugNearestSurface(position, boxes, hug_distance)) {
-					// The surface of one box can be inside another
 					PushOutOfBoxes(position, boxes);
 					num_hugged++;
 				}
@@ -989,8 +936,6 @@ bool PlaceVolumeProbes(ProbeLayout& layout, const Vec3f volume_min, const Vec3f 
 		}
 	}
 
-	// Lining probes up with slanted faces is a pass of its own, so that each probe is kept apart from where all of
-	// its neighbours are, not only the ones placed before it
 	point_index = first_point;
 
 	for (uint32 iz = 0; fill == eProbeFill::Surface && iz < dims[2]; iz++) {
@@ -1017,9 +962,9 @@ bool PlaceVolumeProbes(ProbeLayout& layout, const Vec3f volume_min, const Vec3f 
 								continue;
 							}
 
-							const uint16 neighbour = layout.Grid[first_point + static_cast<uint32>(nx) +
-																 dims[0] * (static_cast<uint32>(ny) +
-																			dims[1] * static_cast<uint32>(nz))];
+							const uint16 neighbour =
+								layout.Grid[first_point + static_cast<uint32>(nx) +
+											dims[0] * (static_cast<uint32>(ny) + dims[1] * static_cast<uint32>(nz))];
 
 							if (neighbour < Limits::ProbeGridSolid) {
 								neighbours.Insert(layout.Positions[neighbour]);
@@ -1028,9 +973,7 @@ bool PlaceVolumeProbes(ProbeLayout& layout, const Vec3f volume_min, const Vec3f 
 					}
 				}
 
-				const Vec3f grid_position = volume_min + cell_size * Vec3f(static_cast<float32>(ix),
-																		   static_cast<float32>(iy),
-																		   static_cast<float32>(iz));
+				const Vec3f grid_position = GridPosition(volume_min, cell_size, ix, iy, iz);
 
 				if (AlignToSlantedSurface(layout.Positions[probe], grid_position, cell_size, max_relocation, boxes,
 										  neighbours)) {
@@ -1070,11 +1013,10 @@ bool PlaceVolumeProbes(ProbeLayout& layout, const Vec3f volume_min, const Vec3f 
 } // namespace
 
 namespace ProbePlacement {
-
 void AddBound(ProbePlacementBoxes& boxes, const BBox& local_bounds, const Mat4f& local_to_world,
 			  const SizedArray<ProbePlacementBoxes::Plane>& planes)
 {
-	ProbePlacementBoxes::Box& bound = boxes.Bounds.Emplace();
+	Box& bound = boxes.Bounds.Emplace();
 
 	bound.LocalBounds = local_bounds;
 	bound.WorldBounds = OBBox::FromLocalBounds(local_bounds, local_to_world).GetWorldAABB();
@@ -1092,8 +1034,8 @@ bool AddBox(ProbePlacementBoxes& boxes, const BBox& local_bounds, const Mat4f& l
 		return false;
 	}
 
-	if (boxes.Count < ProbePlacementBoxes::scMaxBoxes) {
-		ProbePlacementBoxes::Box& box = boxes.Boxes[boxes.Count++];
+	if (boxes.Boxes.Size < ProbePlacementBoxes::scMaxBoxes) {
+		Box& box = boxes.Boxes.Emplace();
 		box.LocalBounds = local_bounds;
 		box.WorldBounds = world_bounds;
 		box.LocalToWorld = local_to_world;

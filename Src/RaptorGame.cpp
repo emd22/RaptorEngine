@@ -10,7 +10,6 @@
 #include <Asset/Font/Font.hpp>
 #include <Asset/WorldFile.hpp>
 #include <CVar.hpp>
-#include <Map/CompiledMap.hpp>
 #include <Controls.hpp>
 #include <Core/Assert.hpp>
 #include <Core/Defer.hpp>
@@ -19,6 +18,7 @@
 #include <Core/RefUtil.hpp>
 #include <Decal/DecalManager.hpp>
 #include <Engine.hpp>
+#include <Map/CompiledMap.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
 #include <NPC.hpp>
@@ -155,13 +155,13 @@ void RaptorGame::InitEngine()
 
 	sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
 
-	gWorld->pBlockout = new Blockout;
-	gWorld->pBlockout->Create(gWorld);
+	gWorld->pPrototype = new Blockout;
+	gWorld->pPrototype->Create(gWorld);
 
 	ConfigEntry* blockout_entry = Config.GetEntry(HashStr32("blockout"));
 	if (blockout_entry) {
-		gWorld->BlockoutPath = String(blockout_entry->Get<const char*>());
-		gWorld->pBlockout->Load(gWorld->BlockoutPath);
+		gWorld->PrototypePath = String(blockout_entry->Get<const char*>());
+		gWorld->pPrototype->Load(gWorld->PrototypePath);
 	}
 }
 
@@ -245,11 +245,11 @@ void RaptorGame::CreateGame()
 	mpNPCImpactSpeedCVar = gCVars->Set("b_npc_impact_speed", gCVars->Get("b_npc_impact_speed", 1.5f));
 	mpNPCReactStrengthCVar = gCVars->Set("b_npc_react_strength", gCVars->Get("b_npc_react_strength", 0.25f));
 
-	gCVars->Set("r_ssao_radius", gCVars->Get("r_ssao_radius", 0.25f));
+	gCVars->Set("r_ssao_radius", gCVars->Get("r_ssao_radius", 0.5f));
 	gCVars->Set("r_ssao_bias", gCVars->Get("r_ssao_bias", 0.02f));
-	gCVars->Set("r_ssao_strength", gCVars->Get("r_ssao_strength", 1.5f));
-	gCVars->Set("r_ssao_power", gCVars->Get("r_ssao_power", 1.2f));
-	gCVars->Set("r_ssao_floor", gCVars->Get("r_ssao_floor", 0.35f));
+	gCVars->Set("r_ssao_strength", gCVars->Get("r_ssao_strength", 2.0f));
+	gCVars->Set("r_ssao_power", gCVars->Get("r_ssao_power", 1.5f));
+	gCVars->Set("r_ssao_floor", gCVars->Get("r_ssao_floor", 0.1f));
 
 	mCrosshairTicket = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm, scCrosshairPath,
 												eImageCreateFlags::None);
@@ -586,11 +586,11 @@ void RaptorGame::ProcessControls()
 	// Save the blockout to a file
 	if (ControlManager::IsComboPressed(eKey::FX_KEY_LMETA, eKey::FX_KEY_S) &&
 		!ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT)) {
-		const String path = (gWorld->BlockoutPath.GetLength() > 0) ? gWorld->BlockoutPath
-																   : String("RaptorData/Data/blockouts/btemp.prx");
+		const String path = (gWorld->PrototypePath.GetLength() > 0) ? gWorld->PrototypePath
+																	: String("RaptorData/Data/blockouts/btemp.prx");
 
 		LogInfo("Saving blockout to '{}'", path);
-		gWorld->pBlockout->Save(path);
+		gWorld->pPrototype->Save(path);
 	}
 }
 
@@ -880,8 +880,8 @@ void RaptorGame::UpdateRagdollDummies()
 
 void RaptorGame::UpdateWindowTitle()
 {
-	const bool is_compiled = (gWorld != nullptr && gWorld->pBlockout != nullptr &&
-							  gWorld->pBlockout->HasCompiledWorld());
+	const bool is_compiled = (gWorld != nullptr && gWorld->pPrototype != nullptr &&
+							  gWorld->pPrototype->IsCompiledMap());
 
 #ifdef FX_IS_EDITOR
 	const bool is_modified = gEditor->HasUnsavedChanges();
@@ -889,7 +889,7 @@ void RaptorGame::UpdateWindowTitle()
 	const bool is_modified = false;
 #endif
 
-	if (gWorld == nullptr || (mbTitleShown && gWorld->BlockoutPath == mTitleBlockoutPath &&
+	if (gWorld == nullptr || (mbTitleShown && gWorld->PrototypePath == mTitleBlockoutPath &&
 							  is_compiled == mbTitleCompiled && is_modified == mbTitleModified)) {
 		return;
 	}
@@ -899,7 +899,7 @@ void RaptorGame::UpdateWindowTitle()
 		return;
 	}
 
-	mTitleBlockoutPath = gWorld->BlockoutPath;
+	mTitleBlockoutPath = gWorld->PrototypePath;
 	mbTitleCompiled = is_compiled;
 	mbTitleModified = is_modified;
 	mbTitleShown = true;
@@ -933,7 +933,7 @@ void RaptorGame::ReloadWorldFile()
 void RaptorGame::ReloadBlockout()
 {
 	LogInfo("Reloading blockout...");
-	gWorld->pBlockout->Load(gWorld->BlockoutPath);
+	gWorld->pPrototype->Load(gWorld->PrototypePath);
 }
 
 void RaptorGame::ReloadScripts()

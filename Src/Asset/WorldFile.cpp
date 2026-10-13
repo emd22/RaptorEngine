@@ -82,12 +82,12 @@ void WorldFile::Load(const std::string& path)
 
 	// Models are loaded from the blockout file as well (see Blockout::LoadModels). Blockouts saved before that keep
 	// getting them from this file's `objects` entry until they are saved again.
-	if (gWorld->pBlockout != nullptr) {
-		if (gWorld->pBlockout->HasModelsEntry()) {
-			gWorld->pBlockout->LinkModelColliders();
+	if (gWorld->pPrototype != nullptr) {
+		if (gWorld->pPrototype->HasModelsEntry()) {
+			gWorld->pPrototype->LinkModelColliders();
 		}
 		else {
-			gWorld->pBlockout->LoadLegacyModels();
+			gWorld->pPrototype->LoadLegacyModels();
 		}
 	}
 

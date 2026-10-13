@@ -83,13 +83,13 @@ bool ObjectScriptManager::PassesEnterGate(const Entry& entry, Object* object, co
 
 void ObjectScriptManager::UpdateTrigger(Entry& entry, Object* object, const Vec3f point)
 {
-	if (!object->IsTrigger() || gWorld->pBlockout == nullptr) {
+	if (!object->IsTrigger() || gWorld->pPrototype == nullptr) {
 		entry.bWasInside = false;
 		LeaveTrigger(entry, object);
 		return;
 	}
 
-	const bool inside = gWorld->pBlockout->ContainsPoint(object, point);
+	const bool inside = gWorld->pPrototype->ContainsPoint(object, point);
 
 	if (inside == entry.bWasInside) {
 		return;

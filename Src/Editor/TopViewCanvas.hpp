@@ -3,16 +3,18 @@
 #ifdef FX_IS_EDITOR
 
 #include "EditorPanelState.hpp"
+#include "EditorThread.hpp"
 #include "EditorTool.hpp"
 #include "TopViewPlane.hpp"
 
 #include <wx/bitmap.h>
 #include <wx/window.h>
 
+#include <Core/DynArray.hpp>
 #include <Core/Types.hpp>
+#include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
 #include <functional>
-#include <vector>
 
 class wxGraphicsContext;
 class wxZoomGestureEvent;
@@ -77,7 +79,7 @@ private:
 	struct OutlinePreview
 	{
 		uint32 BrushId = 0;
-		std::vector<float32> Polygon;
+		DynArray<Vec2f> Polygon;
 	};
 
 	struct Preview
@@ -99,7 +101,7 @@ private:
 		double Shift = 0.0;
 		double NormalU = 0.0;
 		double NormalV = 0.0;
-		std::vector<OutlinePreview> Outlines;
+		DynArray<OutlinePreview> Outlines;
 	};
 
 	struct ViewBounds
@@ -177,7 +179,7 @@ private:
 	double Snap(double value) const;
 	double SnapAngle(double radians) const;
 
-	std::vector<int> PickAt(double u, double v) const;
+	DynArray<int32> PickAt(double u, double v) const;
 	int PickFaceAt(double u, double v, int& out_face) const;
 	void UpdateHover();
 	bool PickVertexAt(double u, double v, TopViewVertexHandle& out_handle) const;
@@ -187,11 +189,12 @@ private:
 	bool GetSelectionPivot(double& out_u, double& out_v) const;
 	uint32 GetSelectedCount() const;
 
-	void SelectBrushes(const std::vector<uint32>& object_ids, eTopViewSelectMode mode);
+	void SelectBrush(uint32 object_id, eTopViewSelectMode mode);
+	void SelectBrushes(DynArray<uint32> object_ids, eTopViewSelectMode mode);
 	void ApplyLocalSelection();
 	void SelectAll();
 	void InvertSelection();
-	void SendCommand(std::function<void()> command);
+	void SendCommand(thread::Task command);
 
 	void NudgeSelection(double du, double dv);
 	void SetSnapBypass(bool bypass);
@@ -238,7 +241,7 @@ private:
 	bool mbHasPressedBrush = false;
 	uint32 mPressedId = 0;
 	bool mbPressedWasSelected = false;
-	std::vector<uint32> mPressedHitIds;
+	DynArray<uint32> mPressedHitIds;
 	ViewBounds mDragBounds;
 	double mRotatePivotU = 0.0;
 	double mRotatePivotV = 0.0;
@@ -253,7 +256,7 @@ private:
 	bool mbHoverFace = false;
 	TopViewFace mHoverFace;
 
-	std::vector<TopViewVertexHandle> mSelectedVertices;
+	DynArray<TopViewVertexHandle> mSelectedVertices;
 	TopViewVertexHandle mGrabbedVertex;
 	bool mbVertexToggleOnRelease = false;
 	bool mbHoverVertex = false;
@@ -265,7 +268,7 @@ private:
 
 	uint32 mSentCommands = 0;
 	bool mbLocalSelection = false;
-	std::vector<uint32> mLocalSelection;
+	DynArray<uint32> mLocalSelection;
 
 	float32 mCreateBase[scViewPlaneCount] = {};
 	float32 mCreateSize[scViewPlaneCount] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };

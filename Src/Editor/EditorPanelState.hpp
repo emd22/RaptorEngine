@@ -4,10 +4,12 @@
 
 #include "TopViewPlane.hpp"
 
+#include <Color.hpp>
+#include <Core/DynArray.hpp>
+#include <Core/String.hpp>
 #include <Core/Types.hpp>
-#include <array>
-#include <string>
-#include <vector>
+#include <Math/Vec2.hpp>
+#include <Math/Vec3.hpp>
 
 namespace fx::editor {
 
@@ -20,10 +22,10 @@ struct ObjectPanelState
 	bool bIsTrigger = false;
 	bool bHasEnterDirection = false;
 
-	std::string Name;
-	std::string ScriptPath;
+	String Name;
+	String ScriptPath;
 
-	float32 EnterDirection[3] = { 0.0f, 0.0f, 0.0f };
+	Vec3f EnterDirection = Vec3f::sZero;
 
 	uint32 SelectedCount = 0;
 	uint32 Tags = 0;
@@ -38,8 +40,26 @@ struct ObjectPanelState
 
 struct MaterialLibraryState
 {
-	std::vector<std::string> Names;
-	std::vector<std::string> DiffusePaths;
+	DynArray<String> Names;
+	DynArray<String> DiffusePaths;
+
+	MaterialLibraryState() = default;
+	MaterialLibraryState(MaterialLibraryState&& other) = default;
+	MaterialLibraryState(const MaterialLibraryState& other) { (*this) = other; }
+
+	MaterialLibraryState& operator=(MaterialLibraryState&& other) = default;
+
+	MaterialLibraryState& operator=(const MaterialLibraryState& other)
+	{
+		if (this == &other) {
+			return *this;
+		}
+
+		Names = other.Names.Clone();
+		DiffusePaths = other.DiffusePaths.Clone();
+
+		return *this;
+	}
 
 	bool operator==(const MaterialLibraryState& other) const = default;
 };
@@ -52,7 +72,7 @@ struct WorldPanelState
 	int64 DebugMask = 0;
 	int64 ReflectionDebugView = 0;
 
-	std::string ReflectionStatus;
+	String ReflectionStatus;
 
 	float32 Aperture = 16.0f;
 	float32 ShutterTime = 0.01f;
@@ -66,15 +86,10 @@ struct LightPanelState
 {
 	bool bHasLight = false;
 
-	std::string Name;
+	String Name;
 
-	uint8 ColorR = 255;
-	uint8 ColorG = 255;
-	uint8 ColorB = 255;
-
-	float32 PositionX = 0.0f;
-	float32 PositionY = 0.0f;
-	float32 PositionZ = 0.0f;
+	struct Color Color = Color::sWhite;
+	Vec3f Position = Vec3f::sZero;
 
 	float32 Radius = 0.0f;
 	float32 Intensity = 0.0f;
@@ -95,28 +110,53 @@ enum class eTopViewBrushKind : uint8
 	DBound,
 };
 
+struct TopViewEdge
+{
+	Vec2f A = Vec2f::sZero;
+	Vec2f B = Vec2f::sZero;
+
+	bool operator==(const TopViewEdge& other) const = default;
+};
+
 struct TopViewFace
 {
-	float32 AU = 0.0f;
-	float32 AV = 0.0f;
-	float32 BU = 0.0f;
-	float32 BV = 0.0f;
-
-	float32 NormalU = 0.0f;
-	float32 NormalV = 0.0f;
+	Vec2f A = Vec2f::sZero;
+	Vec2f B = Vec2f::sZero;
+	Vec2f Normal = Vec2f::sZero;
 
 	bool operator==(const TopViewFace& other) const = default;
 };
 
 struct TopViewProjection
 {
-	float32 PivotU = 0.0f;
-	float32 PivotV = 0.0f;
+	Vec2f Pivot = Vec2f::sZero;
 	float32 NearDepth = 0.0f;
 
-	std::vector<float32> Hull;
-	std::vector<float32> Edges;
-	std::vector<TopViewFace> Faces;
+	DynArray<Vec2f> Hull;
+	DynArray<TopViewEdge> Edges;
+	DynArray<TopViewFace> Faces;
+
+	TopViewProjection() = default;
+	TopViewProjection(TopViewProjection&& other) = default;
+	TopViewProjection(const TopViewProjection& other) { (*this) = other; }
+
+	TopViewProjection& operator=(TopViewProjection&& other) = default;
+
+	TopViewProjection& operator=(const TopViewProjection& other)
+	{
+		if (this == &other) {
+			return *this;
+		}
+
+		Pivot = other.Pivot;
+		NearDepth = other.NearDepth;
+
+		Hull = other.Hull.Clone();
+		Edges = other.Edges.Clone();
+		Faces = other.Faces.Clone();
+
+		return *this;
+	}
 
 	bool operator==(const TopViewProjection& other) const = default;
 };
@@ -129,7 +169,7 @@ struct TopViewBrush
 	bool bSelected = false;
 	bool bSelectable = true;
 
-	std::array<TopViewProjection, scViewPlaneCount> Views;
+	TopViewProjection Views[scViewPlaneCount];
 
 	bool operator==(const TopViewBrush& other) const = default;
 };
@@ -149,12 +189,47 @@ struct TopViewState
 	float32 AngleSnapDegrees = 15.0f;
 
 	bool bHasPlayer = false;
-	std::array<float32, 3> PlayerPosition = { 0.0f, 0.0f, 0.0f };
-	std::array<float32, 3> PlayerDirection = { 0.0f, 0.0f, 1.0f };
+	Vec3f PlayerPosition = Vec3f::sZero;
+	Vec3f PlayerDirection = Vec3f(0.0f, 0.0f, 1.0f);
 
 	uint32 CommandSerial = 0;
 
-	std::vector<TopViewBrush> Brushes;
+	DynArray<TopViewBrush> Brushes;
+
+	TopViewState() = default;
+	TopViewState(TopViewState&& other) = default;
+	TopViewState(const TopViewState& other) { (*this) = other; }
+
+	TopViewState& operator=(TopViewState&& other) = default;
+
+	TopViewState& operator=(const TopViewState& other)
+	{
+		if (this == &other) {
+			return *this;
+		}
+
+		bActive = other.bActive;
+		bDataMode = other.bDataMode;
+		bSnapEnabled = other.bSnapEnabled;
+		bCanCreate = other.bCanCreate;
+		bCanRotate = other.bCanRotate;
+		bCanFace = other.bCanFace;
+
+		MinFaceThickness = other.MinFaceThickness;
+
+		SnapStep = other.SnapStep;
+		AngleSnapDegrees = other.AngleSnapDegrees;
+
+		bHasPlayer = other.bHasPlayer;
+		PlayerPosition = other.PlayerPosition;
+		PlayerDirection = other.PlayerDirection;
+
+		CommandSerial = other.CommandSerial;
+
+		Brushes = other.Brushes.Clone();
+
+		return *this;
+	}
 
 	bool operator==(const TopViewState& other) const = default;
 };
@@ -167,7 +242,7 @@ struct EditorPanelState
 	LightPanelState Light;
 	TopViewState TopView;
 
-	std::string BlockoutPath;
+	String BlockoutPath;
 
 	bool bUnsavedChanges = false;
 

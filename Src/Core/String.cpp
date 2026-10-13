@@ -432,9 +432,10 @@ String& String::ShortenTo(uint32 new_length)
 	if (mpHeapStr) {
 		// The string is now able to fit into the stack allocated buffer, copy it to there and free the stack string.
 		if (new_length < scStackAllocSize) {
-			memcpy(mpStackStr, mpHeapStr, Length);
-			StdAllocator::Free<char>(mpHeapStr);
+			char* heap_str = mpHeapStr;
 			mpHeapStr = nullptr;
+			memcpy(mpStackStr, heap_str, new_length);
+			StdAllocator::Free<char>(heap_str);
 		}
 		else {
 			mpHeapStr = StdAllocator::Realloc(mpHeapStr, new_length + 1);

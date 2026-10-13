@@ -277,7 +277,7 @@ void WorldPropertiesPanel::BuildReflectionPane(wxSizer* sizer)
 
 void WorldPropertiesPanel::ApplyReflectionState(const WorldPanelState& state)
 {
-	const wxString status = wxString::FromUTF8(state.ReflectionStatus);
+	const wxString status = wxString::FromUTF8(state.ReflectionStatus.CStr());
 
 	if (status != mShownReflectionStatus) {
 		mShownReflectionStatus = status;

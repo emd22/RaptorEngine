@@ -467,7 +467,7 @@ void Blockout::ReloadSingleObject(Object* object)
 	}
 
 	ConfigFile info {};
-	info.Load(CompiledMap::GetPrototypePath(gWorld->BlockoutPath).CStr());
+	info.Load(CompiledMap::GetPrototypePath(gWorld->PrototypePath).CStr());
 
 	if (info.HasErrors()) {
 		return;
@@ -538,7 +538,7 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	mCompiledObjects.clear();
 	mCompiledBodies.clear();
 	mCompiledProbeLayout.Clear();
-	mbHasCompiledWorld = false;
+	mbIsCompiledMap = false;
 
 	if (mbHasBakedSun) {
 		gProbeManager->ClearSunVisibility();
@@ -582,8 +582,8 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 {
 	const CompiledMapLightmap& lightmap = map.Lightmap;
 
-	mbHasBakedSun = map.HasBakedSun() &&
-					renderer::gGraphics->UploadLightmap(Vec2u(lightmap.Width, lightmap.Height), lightmap.SunVisibility.pData);
+	mbHasBakedSun = map.HasBakedSun() && renderer::gGraphics->UploadLightmap(Vec2u(lightmap.Width, lightmap.Height),
+																			 lightmap.SunVisibility.pData);
 
 	if (map.HasBakedSun() && !mbHasBakedSun) {
 		LogWarning(LC_ASSET, "The compiled map's {}x{} lightmap does not fit in {}x{}, the sun's shadows stay dynamic",
@@ -650,8 +650,8 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 				lightmap_uvs[i + 1] = surface.LightmapTexcoords[i + 1] * lightmap_scale.Y;
 			}
 
-			renderer::gGraphics->SubmitImmediateUploadCmd(
-				[&](renderer::CommandBuffer& cmd) { object->pMesh->UploadLightmapUVs(cmd, lightmap_uvs); });
+			renderer::gGraphics->SubmitImmediateUploadCmd([&](renderer::CommandBuffer& cmd)
+														  { object->pMesh->UploadLightmapUVs(cmd, lightmap_uvs); });
 
 			object->SetLightmapped(true);
 		}
@@ -710,7 +710,7 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 	}
 
 	mCompiledProbeLayout.CopyFrom(map.Probes);
-	mbHasCompiledWorld = true;
+	mbIsCompiledMap = true;
 
 	if (mbHasBakedSun) {
 		mBakedSunDirection = Vec3f(lightmap.SunDirection[0], lightmap.SunDirection[1], lightmap.SunDirection[2]);
@@ -1783,8 +1783,8 @@ void Blockout::ResetToTemplate()
 
 	RemoveBlockoutFromWorld(pWorld);
 
-	MaterialLibraryID lib_base_material = gWorld->pBlockout->mMaterials.FindIDByName("white_tile");
-	MaterialID base_material = gWorld->pBlockout->mMaterials.GetMaterial(lib_base_material);
+	MaterialLibraryID lib_base_material = gWorld->pPrototype->mMaterials.FindIDByName("white_tile");
+	MaterialID base_material = gWorld->pPrototype->mMaterials.GetMaterial(lib_base_material);
 
 	CreateBrush("base", Vec3f(0.0f, -2.0f, 0.0f), Quat::scIdentity, base_material,
 				BBox(Vec3f(-10.0f, -0.1f, -10.0f), Vec3f(10.0f, 0.0f, 10.0f)));
@@ -1814,7 +1814,7 @@ void Blockout::ResetToTemplate()
 #endif
 }
 
-bool Blockout::Load(const String& opened_path)
+ePrototypeLoadStatus Blockout::Load(const String& opened_path)
 {
 	const bool wants_compiled_map = CompiledMap::IsCompiledMapPath(opened_path);
 	const String path = CompiledMap::GetPrototypePath(opened_path);
@@ -1823,20 +1823,23 @@ bool Blockout::Load(const String& opened_path)
 	info.Load(path.CStr());
 
 	if (info.HasErrors()) {
-		return false;
+		return ePrototypeLoadStatus::HasErrors;
 	}
 
 	ConfigEntry* blocks_entry = info.GetEntry(HashStr32("all"));
 
 	if (blocks_entry == nullptr) {
 		LogError("Blockout '{}' could not be loaded or has no 'all' entry", path);
-		return false;
+		return ePrototypeLoadStatus::HasErrors;
 	}
 
 #ifdef FX_IS_EDITOR
 	// Everything is getting reloaded, so the editor can't hold on to any objects
 	gEditor->ForgetObjects();
 #endif
+
+	ePrototypeLoadStatus final_status = ePrototypeLoadStatus::Success;
+
 
 	LoadLights(info);
 	LoadCamera(info);
@@ -1846,17 +1849,26 @@ bool Blockout::Load(const String& opened_path)
 	RemoveBlockoutFromWorld(pWorld);
 
 	CompiledMap compiled_map;
-	const bool has_compiled_map = wants_compiled_map && LoadCompiledMap(path, compiled_map);
+	bool did_load_compiled_map = false;
+	if (wants_compiled_map) {
+		did_load_compiled_map = LoadCompiledMap(path, compiled_map);
+
+		// There was an error loading the compiled map, set the final status to be not compiled
+		if (!did_load_compiled_map) {
+			final_status = ePrototypeLoadStatus::NotCompiled;
+		}
+	}
 
 	for (ConfigEntry& entry : blocks_entry->Members) {
-		if (has_compiled_map && compiled_map.HasBrush(entry.Name.Get())) {
+		if (did_load_compiled_map && compiled_map.HasBrush(entry.Name.Get())) {
 			continue;
 		}
 
 		CreateBrush(entry);
 	}
 
-	if (has_compiled_map) {
+
+	if (did_load_compiled_map) {
 		CreateCompiledWorld(compiled_map);
 	}
 
@@ -1873,11 +1885,13 @@ bool Blockout::Load(const String& opened_path)
 
 	renderer::gShadowAtlas->Invalidate();
 
+	// We have overridden the previous prototype, mark it as saved as we are on the unmodified version of a new
+	// prototype.
 #ifdef FX_IS_EDITOR
 	gEditor->MarkSaved();
 #endif
 
-	return true;
+	return final_status;
 }
 
 static void StoreLastBlockoutPath(const String& path, const char* config_path)
@@ -1904,7 +1918,7 @@ static void StoreLastBlockoutPath(const String& path, const char* config_path)
 
 void Blockout::Save(const String& save_path)
 {
-	if (mbHasCompiledWorld) {
+	if (mbIsCompiledMap) {
 		LogError(LC_ASSET, "The prototype can't be saved while its compiled map is loaded, the compiled brushes "
 						   "would be lost. Open the prototype (.prx) to edit and save it.");
 		return;

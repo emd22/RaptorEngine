@@ -354,9 +354,9 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 						map.Probes.GetProbeCount(), Limits::MaxIrradianceProbes, map.Probes.VolumeCount,
 						source.ProbeRegions.Size, map.Probes.GetGridPointCount(), map.Probes.VoidPointCount));
 
-		if (source.ProbeBoxes.ObjectCount > source.ProbeBoxes.Count) {
+		if (source.ProbeBoxes.ObjectCount > source.ProbeBoxes.Boxes.Size) {
 			log(String::Fmt("  warning      probes are only kept out of the first {} of {} brushes",
-							source.ProbeBoxes.Count, source.ProbeBoxes.ObjectCount));
+							source.ProbeBoxes.Boxes.Size, source.ProbeBoxes.ObjectCount));
 		}
 
 		if (source.ModelCount > 0) {

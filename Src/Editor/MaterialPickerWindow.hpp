@@ -5,10 +5,10 @@
 #include <wx/bitmap.h>
 #include <wx/frame.h>
 
+#include <Core/DynArray.hpp>
 #include <Core/HashMap.hpp>
 #include <Core/Types.hpp>
 #include <Material/MaterialLibrary.hpp>
-#include <vector>
 
 class wxButton;
 class wxListBox;
@@ -55,7 +55,7 @@ private:
 
 	MaterialLibraryState mShownLibrary;
 
-	std::vector<MaterialLibraryID> mShownSlots;
+	DynArray<MaterialLibraryID> mShownSlots;
 
 	HashMap<MaterialLibraryID, wxBitmap> mBitmaps;
 };

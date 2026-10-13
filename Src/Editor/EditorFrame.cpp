@@ -31,6 +31,7 @@
 #include <Controls.hpp>
 #include <Core/FilesystemIO.hpp>
 #include <Core/Log.hpp>
+#include <Core/Path.hpp>
 #include <Engine.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/LightProbe.hpp>
@@ -132,17 +133,25 @@ static OutlineToggleButton* MakeToolButton(wxWindow* parent, const ToolButtonInf
 }
 
 
-static std::string ToBlockoutPath(const std::filesystem::path& chosen)
+static String ToBlockoutPath(const std::filesystem::path& chosen)
 {
 	std::error_code error;
 	const std::filesystem::path relative = std::filesystem::relative(chosen, std::filesystem::current_path(), error);
 
-	return (error || relative.empty()) ? chosen.string() : relative.string();
+	if (error || relative.empty()) {
+		return String(chosen.string());
+	}
+
+	return String(relative.string());
 }
 
-static std::filesystem::path GetBlockoutDialogStart(const std::string& blockout_path)
+static std::filesystem::path GetBlockoutDialogStart(const String& blockout_path)
 {
-	return std::filesystem::absolute(blockout_path.empty() ? std::string(scDefaultBlockoutPath) : blockout_path);
+	if (blockout_path.IsEmpty()) {
+		return std::filesystem::absolute(scDefaultBlockoutPath);
+	}
+
+	return std::filesystem::absolute(blockout_path.CStr());
 }
 
 void EditorFrame::OpenPrototype()
@@ -158,47 +167,147 @@ void EditorFrame::OpenPrototype()
 		return;
 	}
 
-	const std::string path = ToBlockoutPath(std::filesystem::path(dialog.GetPath().ToStdString()));
+	const String path = ToBlockoutPath(std::filesystem::path(dialog.GetPath().ToStdString()));
 
 	RunAfterUnsavedCheck(
-		"Save changes to the prototype before opening another map?", [this, path]
+		"Save changes to the prototype before opening another map?",
+		[this, path]
 		{
-			if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
+			if (gWorld == nullptr || gWorld->pPrototype == nullptr) {
 				return;
 			}
 
 			LogInfo("Opening map '{}'", path);
 
-			const String previous_path = gWorld->BlockoutPath;
-			const String new_path(path.c_str());
+			const String previous_path = gWorld->PrototypePath;
 
-			if (gWorld->pBlockout->Load(new_path)) {
-				gWorld->BlockoutPath = new_path;
+			ePrototypeLoadStatus load_status = gWorld->pPrototype->Load(path);
+
+			// We are requesting a compiled version but that is not what is loaded, notify the user
+			if (load_status == ePrototypeLoadStatus::NotCompiled) {
+				thread::PostToUI(
+					[this]
+					{
+						wxMessageBox("Compiled map could not be loaded, try rebaking with mapc.", "Open map",
+									 wxOK | wxICON_ERROR, this);
+					});
+			}
+			// The prototype could not be loaded, or there missing prototype files when loading a compiled map.
+			else if (load_status == ePrototypeLoadStatus::HasErrors) {
+				gWorld->PrototypePath = previous_path;
+
+				thread::PostToUI(
+					[this]
+					{
+						wxMessageBox(
+							"That file could not be loaded. A compiled map (.fxmap) needs its prototype (.prx) "
+							"next to it, or there are errors in that prototype.",
+							"Open map", wxOK | wxICON_ERROR, this);
+					});
+
+				return;
+			}
+
+
+			if (load_status != ePrototypeLoadStatus::HasErrors) {
+				gWorld->PrototypePath = path;
 
 				gProbeManager->LoadProbes();
 				gWorld->RespawnPlayer();
 				return;
 			}
+		});
+}
 
-			gWorld->BlockoutPath = previous_path;
 
-			thread::PostToUI(
-				[this]
-				{
-					wxMessageBox("That file could not be loaded. A compiled map (.fxmap) needs its prototype (.prx) "
-								 "next to it.",
-								 "Open map", wxOK | wxICON_ERROR, this);
-				});
+void EditorFrame::SwitchBakedOrProto()
+{
+	RunAfterUnsavedCheck(
+		"Save changes to the prototype before switching to its linked map?",
+		[this]
+		{
+			if (gWorld == nullptr || gWorld->pPrototype == nullptr || gWorld->PrototypePath.IsEmpty()) {
+				return;
+			}
+
+			const bool to_prototype = gWorld->pPrototype->IsCompiledMap();
+			const String previous_path = gWorld->PrototypePath;
+
+			Path path(previous_path);
+			if (to_prototype) {
+				path.SetExtension(".prx");
+			}
+			else {
+				path.SetExtension(".fxmap");
+			}
+
+			const String linked_path = path.Str();
+
+			if (!FilesystemIO::FileExists(linked_path)) {
+				LogWarning(LC_CORE, "There is no linked map at '{}'", linked_path);
+
+				thread::PostToUI(
+					[this, to_prototype]
+					{
+						if (to_prototype) {
+							wxMessageBox("There is no prototype (.prx) next to this compiled map.", "Open map",
+										 wxOK | wxICON_ERROR, this);
+						}
+						else {
+							wxMessageBox("There is no compiled map (.fxmap) next to this prototype, bake it with mapc.",
+										 "Open map", wxOK | wxICON_ERROR, this);
+						}
+					});
+
+				return;
+			}
+
+			LogInfo("Opening linked map '{}'...", linked_path);
+
+			const ePrototypeLoadStatus load_status = gWorld->pPrototype->Load(linked_path);
+
+			if (load_status == ePrototypeLoadStatus::HasErrors) {
+				gWorld->PrototypePath = previous_path;
+
+				thread::PostToUI(
+					[this, to_prototype]
+					{
+						if (to_prototype) {
+							wxMessageBox("Linked prototype could not be loaded.", "Open map", wxOK | wxICON_ERROR,
+										 this);
+						}
+						else {
+							wxMessageBox("Linked compiled map could not be loaded.", "Open map", wxOK | wxICON_ERROR,
+										 this);
+						}
+					});
+
+				return;
+			}
+
+			if (load_status == ePrototypeLoadStatus::NotCompiled) {
+				thread::PostToUI(
+					[this]
+					{
+						wxMessageBox("Compiled map could not be loaded, try rebaking with mapc.", "Open map",
+									 wxOK | wxICON_ERROR, this);
+					});
+			}
+
+			gWorld->PrototypePath = linked_path;
+			gProbeManager->LoadProbes();
+			// No need to respawn/move the player as we are going to be in the same map structurally
 		});
 }
 
 void EditorFrame::NewPrototype()
 {
-	RunAfterUnsavedCheck("Save changes to the prototype before starting a new one?", []
+	RunAfterUnsavedCheck("Save changes to the prototype before starting a new one?",
+						 []
 						 {
-							 if (gWorld != nullptr && gWorld->pBlockout != nullptr) {
-								 gWorld->pBlockout->ResetToTemplate();
-								 gWorld->BlockoutPath = String("");
+							 if (gWorld != nullptr && gWorld->pPrototype != nullptr) {
+								 gWorld->pPrototype->ResetToTemplate();
+								 gWorld->PrototypePath = String("");
 							 }
 						 });
 }
@@ -257,19 +366,19 @@ void EditorFrame::RunAfterUnsavedCheck(const wxString& question, std::function<v
 
 bool EditorFrame::SavePrototype()
 {
-	if (mState.BlockoutPath.empty()) {
+	if (mState.BlockoutPath.IsEmpty()) {
 		return SaveProtoTypeAs();
 	}
 
 	thread::PostToGame(
 		[]
 		{
-			if (gWorld == nullptr || gWorld->pBlockout == nullptr || gWorld->BlockoutPath.GetLength() == 0) {
+			if (gWorld == nullptr || gWorld->pPrototype == nullptr || gWorld->PrototypePath.GetLength() == 0) {
 				return;
 			}
 
-			LogInfo("Saving blockout to '{}'", gWorld->BlockoutPath);
-			gWorld->pBlockout->Save(gWorld->BlockoutPath);
+			LogInfo("Saving blockout to '{}'", gWorld->PrototypePath);
+			gWorld->pPrototype->Save(gWorld->PrototypePath);
 		});
 
 	return true;
@@ -294,19 +403,19 @@ bool EditorFrame::SaveProtoTypeAs()
 		chosen += ".prx";
 	}
 
-	const std::string path = ToBlockoutPath(chosen);
+	const String path = ToBlockoutPath(chosen);
 
 	thread::PostToGame(
 		[path]
 		{
-			if (gWorld == nullptr || gWorld->pBlockout == nullptr) {
+			if (gWorld == nullptr || gWorld->pPrototype == nullptr) {
 				return;
 			}
 
 			LogInfo("Saving blockout as '{}'", path);
 
-			gWorld->BlockoutPath = String(path.c_str());
-			gWorld->pBlockout->Save(gWorld->BlockoutPath);
+			gWorld->PrototypePath = path;
+			gWorld->pPrototype->Save(gWorld->PrototypePath);
 		});
 
 	return true;
@@ -323,6 +432,11 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	wxMenuItem* open_item = file_menu->Append(wxID_ANY, "Open...\tCtrl+O", "Opens an existing prototype");
 	file_menu->AppendSeparator();
 
+	wxMenuItem* load_baked_or_proto = file_menu->Append(
+		wxID_ANY, "Load baked/proto",
+		"Switch to the prototype version if on baked, or the baked version if on prototype");
+
+	file_menu->AppendSeparator();
 	wxMenuItem* save_item = file_menu->Append(wxID_ANY, "Save\tCtrl+S", "Saves the prototype to its current file");
 	wxMenuItem* save_as_item = file_menu->Append(wxID_ANY, "Save As...\tCtrl+Shift+S",
 												 "Saves the prototype under a new name");
@@ -377,6 +491,8 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { OpenPrototype(); }, open_item->GetId());
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { SavePrototype(); }, save_item->GetId());
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { SaveProtoTypeAs(); }, save_as_item->GetId());
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { SwitchBakedOrProto(); }, load_baked_or_proto->GetId());
+
 	const auto bind_reload = [this](wxMenuItem* item, eReloadTarget target)
 	{
 		Bind(
@@ -639,8 +755,7 @@ void EditorFrame::SetSidePanelCollapsed(bool collapsed)
 
 	mpSideColumn->Show(mpSideScroller, !collapsed);
 
-	mpSideToggleButton->SetLabel(collapsed ? wxString::FromUTF8("Open") : wxString::FromUTF8("Hide"));
-	mpSideToggleButton->SetToolTip(collapsed ? "Restore the side panel" : "Minimize the side panel");
+	mpSideToggleButton->SetLabel(collapsed ? wxString::FromUTF8("<") : wxString::FromUTF8(">"));
 
 	mpSideColumn->Layout();
 	Layout();

@@ -817,11 +817,11 @@ void GraphicsBackend::PresentFrame()
 }
 
 
-static constexpr float32 scDefaultSSAORadius = 0.25f;
+static constexpr float32 scDefaultSSAORadius = 0.5f;
 static constexpr float32 scDefaultSSAOBias = 0.02f;
-static constexpr float32 scDefaultSSAOStrength = 1.5f;
-static constexpr float32 scDefaultSSAOPower = 1.2f;
-static constexpr float32 scDefaultSSAOFloor = 0.35f;
+static constexpr float32 scDefaultSSAOStrength = 2.0f;
+static constexpr float32 scDefaultSSAOPower = 1.5f;
+static constexpr float32 scDefaultSSAOFloor = 0.1f;
 
 void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 {

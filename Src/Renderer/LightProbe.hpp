@@ -1,6 +1,8 @@
 #pragma once
 
+#include <Core/DynArray.hpp>
 #include <Core/SizedArray.hpp>
+#include <Core/Slice.hpp>
 #include <Core/Types.hpp>
 #include <Math/Vec3.hpp>
 #include <Renderer/Backend/Commands.hpp>
@@ -10,33 +12,25 @@
 #include <Renderer/ProbePlacement.hpp>
 #include <Renderer/RenderStage.hpp>
 #include <functional>
-#include <vector>
 
 namespace fx {
 
-/// L2 SH irradiance of one probe
+/// L2 SH irradiance, cosine convolved. Mirrors ProbeSHData in Shaders/ProbeCommon.hlsli.
 struct ProbeSHData
 {
-	/// Coefficients in the order of EvalProbeIrradiance(), already convolved with the cosine lobe so evaluating them
-	/// gives irradiance / pi. Only .rgb is used, .a is padding.
 	float32 SH[Limits::ProbeSHCoeffCount][4];
 };
 
-static_assert(sizeof(ProbeSHData) == Limits::ProbeSHCoeffCount * 4 * sizeof(float32),
-			  "ProbeSHData must be tightly packed as 9 float4s to mirror the HLSL struct");
+static_assert(sizeof(ProbeSHData) == Limits::ProbeSHCoeffCount * 4 * sizeof(float32));
 
-/// Where a probe ended up after placement, and its depth moments for visibility. Mirrors ProbeInfo in
-/// Shaders/ProbeCommon.hlsli.
 struct ProbeInfo
 {
-	/// World space position in XYZ. W is unused.
 	float32 ProbePosition[4];
-	/// Mean distance and mean squared distance for each texel of a 6 face cubemap
+	/// Mean distance and mean squared distance per texel
 	float32 DepthMoments[Limits::ProbeDepthFloatCount];
 };
 
-static_assert(sizeof(ProbeInfo) == Limits::ProbeDepthFloatCount * sizeof(float32) + sizeof(float32) * 4,
-			  "ProbeInfo must be tightly packed to mirror the HLSL struct");
+static_assert(sizeof(ProbeInfo) == (Limits::ProbeDepthFloatCount + 4) * sizeof(float32));
 
 struct ReflectionProbeData
 {
@@ -45,45 +39,27 @@ struct ReflectionProbeData
 	float32 Fade[4];
 };
 
-static_assert(sizeof(ReflectionProbeData) == 96, "ReflectionProbeData must mirror the HLSL ReflectionProbe struct");
+static_assert(sizeof(ReflectionProbeData) == 96);
 
-/**
- * @brief Grids of L2 SH irradiance probes, with depth moments so that probes behind walls don't light a surface.
- */
 class ProbeManager
 {
 public:
-	/// Resolution of each capture cubemap face
 	static constexpr uint32 scCaptureSize = 64;
 	static constexpr uint32 scCaptureFaces = 6;
-
-	/// Number of probes captured per frame during a bake
 	static constexpr uint32 scProbesPerFrame = 4;
 
-	/// Draws the scene from `camera` into `stage`, including any work needed before the render pass begins.
 	using RenderFaceFunc = std::function<void(PerspectiveCamera& camera, renderer::RenderStage& stage)>;
 
 public:
 	void Create();
 	void Destroy();
 
-	uint32 GetProbeCount() const { return mProbeCount; }
-	Vec3f GetProbePosition(uint32 index) const;
-	uint32 GetGridPointCount() const { return mGridPointCount; }
-
+	uint32 GetProbeCount() const { return mLayout.GetProbeCount(); }
+	Vec3f GetProbePosition(uint32 index) const { return mLayout.Positions[index]; }
 	uint32 GetCurrentProbeIndex() const { return (mBakePhase == eBakePhase::Irradiance) ? mCurrentProbe : UINT32_MAX; }
 
-	///////////////////////////////////
-	// Volumes
-	///////////////////////////////////
-
-	uint32 GetVolumeCount() const { return mVolumeCount; }
-	uint32 GetVolumeOfProbe(uint32 probe_index) const;
+	uint32 GetVolumeCount() const { return mLayout.VolumeCount; }
 	void GetVolumeProbeRange(uint32 volume, uint32& out_first_probe, uint32& out_count) const;
-
-	void ClearVolumes();
-	bool AddVolume(const Vec3f center, const Vec3f size, const ProbeGridSize& grid = {});
-	bool AddLevelVolumes();
 
 	uint32 RebuildVolumesFromWorld();
 
@@ -93,31 +69,18 @@ public:
 	uint32 GetReflectionProbeCount() const { return mReflectionProbeCount; }
 	Vec3f GetReflectionProbePosition(uint32 index) const;
 	bool AreReflectionsBaked() const { return mbReflectionsBaked; }
-	bool IsBakingReflections() const { return IsBaking() && mBakePhase == eBakePhase::Reflection; }
 
 	uint32 RebuildReflectionProbesFromWorld();
-	void BeginReflectionBake();
-
-	///////////////////////////////////
-	// Baking
-	///////////////////////////////////
 
 	void BeginBake();
-	void BeginGridBake();
-	void BeginGridBakeAt(const Vec3f center, const Vec3f size, const ProbeGridSize& grid = {});
+	void BeginReflectionBake();
 
 	bool IsBaking() const { return mBakeState != eBakeState::Idle; }
+	bool IsBakingReflections() const { return IsBaking() && mBakePhase == eBakePhase::Reflection; }
 	bool IsCapturePending() const { return mBakeState == eBakeState::CapturePending; }
-
-	/// True only while the capture faces are being drawn. The main view keeps its probe GI and SSAO during a bake.
 	bool IsCapturingFaces() const { return mbCapturingFaces; }
-
-	bool IsCapturingBounce() const
-	{
-		return mbCapturingFaces && (mCurrentBounce > 0 || mBakePhase == eBakePhase::Reflection);
-	}
-
 	bool IsCapturingReflection() const { return mbCapturingFaces && mBakePhase == eBakePhase::Reflection; }
+	bool IsCapturingBounce() const { return mbCapturingFaces && (mCurrentBounce > 0 || IsCapturingReflection()); }
 
 	Vec2u GetCaptureExtent() const
 	{
@@ -128,11 +91,6 @@ public:
 	void RecordCaptureBatch(renderer::CommandBuffer& cmd, const RenderFaceFunc& render_face);
 	void ServiceCaptureBake();
 
-	///////////////////////////////////
-	// Probe cache
-	///////////////////////////////////
-
-	/// Saves the probes for the current scene. They are picked up by LoadProbes() on the next run.
 	bool SaveProbes();
 	bool LoadProbes();
 
@@ -140,9 +98,7 @@ private:
 	enum class eBakeState
 	{
 		Idle,
-		/// A batch will be captured this frame
 		CapturePending,
-		/// A batch was recorded this frame and is waiting to be read back
 		CaptureRecorded,
 	};
 
@@ -152,29 +108,27 @@ private:
 		Reflection,
 	};
 
-	/// Everything about a capture texel that is the same for every probe
 	struct CaptureTexel
 	{
-		/// SH basis of the texel's direction, multiplied by the solid angle it covers
 		float32 WeightedBasis[Limits::ProbeSHCoeffCount];
 		float32 SolidAngle;
-		/// The depth moments texel that the texel's direction falls in
 		uint32 MomentTexel;
 	};
 
-
-	/**
-	 * @brief Copies the layout into the probe buffers and uploads it. Probes from `first_probe` on are new, so their
-	 * depth moments are reset.
-	 */
-	void SyncLayout(uint32 first_probe);
-	void CaptureLayout();
-	void RefreshVolumeCounts();
+	void ApplyLayout();
+	void ResolveSunVisibility();
 
 	void CreateCaptureResources();
 	void BuildCaptureTexels();
 	void CopyTargetToStaging(renderer::CommandBuffer& cmd, renderer::RenderStage& stage, uint32 size,
 							 eImageFormat format, renderer::RawGpuBuffer& staging);
+
+	bool ReadBackProbe(uint32 batch_slot, uint32 probe_index);
+	void ProjectCapture(const uint16* const colors[scCaptureFaces], const float32* const depths[scCaptureFaces],
+						ProbeSHData& out_sh, ProbeInfo& out_info) const;
+
+	void UploadToGpu(uint32 first_probe, uint32 count);
+	void UploadMomentsAtlas(uint32 first_probe, uint32 count);
 
 	void StartReflectionPhase();
 	void RecordReflectionCapture(renderer::CommandBuffer& cmd, const RenderFaceFunc& render_face);
@@ -188,62 +142,35 @@ private:
 	bool SaveReflectionProbes();
 	bool LoadReflectionProbes();
 
-	bool ReadBackProbe(uint32 batch_slot, uint32 probe_index);
-	void ProjectCapture(const uint16* const colors[scCaptureFaces], const float32* const depths[scCaptureFaces],
-						ProbeSHData& out_sh, ProbeInfo& out_info) const;
-
-	/// Copies the volumes, the probe grid table, and the SH and depth moments of probes [`first_probe`,
-	/// `first_probe + count`) to the GPU.
-	void UploadToGpu(uint32 first_probe, uint32 count);
-
-	void UploadMomentsAtlas(uint32 first_probe, uint32 count);
-
 private:
+	ProbeLayout mLayout;
 	ProbeSHData mProbes[Limits::MaxIrradianceProbes] {};
 	ProbeInfo mProbeInfos[Limits::MaxIrradianceProbes] {};
-
-	ProbeVolumeData mVolumes[Limits::MaxProbeVolumes] {};
-	ProbeVolumeRange mVolumeRanges[Limits::MaxProbeVolumes] {};
-	uint32 mVolumeCount = 0;
-
-	/// Where every probe is. The arrays around it are the copy the GPU and the probe file get.
-	ProbeLayout mLayout;
-
-	/// Probes taken by `mVolumes`, which is where the next volume's range starts
-	uint32 mProbeCount = 0;
+	bool mbGridDirty = true;
 
 	DynArray<Vec3f> mSunSamplePositions;
 	DynArray<uint8> mSunSampleValues;
 	float32 mSunVisibility[Limits::MaxIrradianceProbes] {};
 	bool mbSunVisibilityDirty = true;
 
-	void ResolveSunVisibility();
-
-	uint16 mGridProbes[Limits::MaxProbeGridPoints] {};
-	uint32 mGridPointCount = 0;
-	bool mbGridDirty = true;
-
 	eBakeState mBakeState = eBakeState::Idle;
+	eBakePhase mBakePhase = eBakePhase::Irradiance;
 	bool mbCapturingFaces = false;
 	uint32 mCurrentProbe = 0;
 	uint32 mBatchStart = 0;
 	uint32 mCurrentBounce = 0;
 	uint32 mBounceCount = 1;
-	eBakePhase mBakePhase = eBakePhase::Irradiance;
 
 	ReflectionProbeData mReflectionProbes[Limits::MaxReflectionProbes] {};
 	uint32 mReflectionProbeCount = 0;
 	bool mbReflectionsBaked = false;
-	std::vector<uint16> mReflectionTexels;
-
-	// Capture resources, created by the first bake
+	SizedArray<uint16> mReflectionTexels;
 
 	bool mbCaptureResourcesCreated = false;
 	renderer::RenderStage mCaptureStage;
 	renderer::RawGpuBuffer mColorStaging[scProbesPerFrame][scCaptureFaces];
 	renderer::RawGpuBuffer mDepthStaging[scProbesPerFrame][scCaptureFaces];
 	SizedArray<CaptureTexel> mCaptureTexels;
-	/// Inverse projection shared by every capture face
 	Mat4f mCaptureInvProjection = Mat4f::scIdentity;
 	Mat4f mCaptureFaceToClip[scCaptureFaces];
 
