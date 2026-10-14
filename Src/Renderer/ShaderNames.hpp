@@ -20,6 +20,7 @@ enum class eShaderName : uint32
 	BitmapText,
 	SSAO,
 	SSAOBlur,
+	Particle,
 
 	NumShaders,
 };
@@ -44,6 +45,7 @@ constexpr const char* GetName(const eShaderName id)
 		FX_ENUM_CASE_NAME(BitmapText);
 		FX_ENUM_CASE_NAME(SSAO);
 		FX_ENUM_CASE_NAME(SSAOBlur);
+		FX_ENUM_CASE_NAME(Particle);
 	default:
 		return "Unknown";
 	}

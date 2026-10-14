@@ -15,6 +15,9 @@
 #include <Renderer/GraphicsBackend.hpp>
 #include <Texture/TextureManager.hpp>
 
+#include <cmath>
+#include <limits>
+
 namespace fx {
 
 FX_SET_MODULE_NAME("Image")
@@ -632,88 +635,255 @@ void Image::DecRef()
 }
 
 
+static float32 HalfToFloat(uint16 value)
+{
+	const int32 exponent = (value >> 10) & 0x1F;
+	const uint32 mantissa = value & 0x3FF;
+
+	float32 magnitude = 0.0f;
+	if (exponent == 0) {
+		magnitude = std::ldexp(static_cast<float32>(mantissa), -24);
+	}
+	else if (exponent == 31) {
+		if (mantissa == 0) {
+			magnitude = std::numeric_limits<float32>::infinity();
+		}
+		else {
+			magnitude = std::numeric_limits<float32>::quiet_NaN();
+		}
+	}
+	else {
+		magnitude = std::ldexp(static_cast<float32>(mantissa | 0x400), exponent - 25);
+	}
+
+	if ((value & 0x8000) != 0) {
+		return -magnitude;
+	}
+	return magnitude;
+}
+
+static uint8 UnitToByte(float32 value)
+{
+	if (!(value > 0.0f)) {
+		return 0;
+	}
+	if (value >= 1.0f) {
+		return 255;
+	}
+	return static_cast<uint8>(value * 255.0f + 0.5f);
+}
+
+static uint8 LinearToSrgbByte(float32 value)
+{
+	if (!(value > 0.0f)) {
+		return 0;
+	}
+	if (value <= 0.0031308f) {
+		return UnitToByte(value * 12.92f);
+	}
+	return UnitToByte(1.055f * std::pow(value, 1.0f / 2.4f) - 0.055f);
+}
+
+static bool ConvertToRgba8(eImageFormat format, const uint8* src, uint32 pixel_count, uint8* dst)
+{
+	for (uint32 i = 0; i < pixel_count; i++) {
+		uint8* out = dst + i * 4;
+
+		switch (format) {
+		case eImageFormat::RGBA8_UNorm:
+		case eImageFormat::RGBA8_SRGB:
+			memcpy(out, src + i * 4, 4);
+			break;
+
+		case eImageFormat::BGRA8_UNorm:
+		case eImageFormat::BGRA8_SRGB:
+			out[0] = src[i * 4 + 2];
+			out[1] = src[i * 4 + 1];
+			out[2] = src[i * 4 + 0];
+			out[3] = src[i * 4 + 3];
+			break;
+
+		case eImageFormat::RGBA16_Float: {
+			uint16 texel[4];
+			memcpy(texel, src + i * 8, sizeof(texel));
+			out[0] = LinearToSrgbByte(HalfToFloat(texel[0]));
+			out[1] = LinearToSrgbByte(HalfToFloat(texel[1]));
+			out[2] = LinearToSrgbByte(HalfToFloat(texel[2]));
+			out[3] = UnitToByte(HalfToFloat(texel[3]));
+			break;
+		}
+
+		case eImageFormat::RG16_UNorm: {
+			uint16 texel[2];
+			memcpy(texel, src + i * 4, sizeof(texel));
+			out[0] = static_cast<uint8>(texel[0] >> 8);
+			out[1] = static_cast<uint8>(texel[1] >> 8);
+			out[2] = 0;
+			out[3] = 255;
+			break;
+		}
+
+		case eImageFormat::R32_SFloat:
+		case eImageFormat::D32_Float: {
+			float32 texel;
+			memcpy(&texel, src + i * 4, sizeof(texel));
+			const uint8 grey = UnitToByte(texel);
+			out[0] = grey;
+			out[1] = grey;
+			out[2] = grey;
+			out[3] = 255;
+			break;
+		}
+
+		case eImageFormat::R8_UNorm:
+			out[0] = src[i];
+			out[1] = src[i];
+			out[2] = src[i];
+			out[3] = 255;
+			break;
+
+		default:
+			return false;
+		}
+	}
+
+	return true;
+}
+
 void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
 {
-	const uint32 data_size = Info.Size.X * Info.Size.Y * ImageFormatUtil::GetPixelStride(Info.Format);
+	if (InternalImage == nullptr) {
+		LogError(LC_RENDER, "Cannot save image to '{}': image is not created", path.CStr());
+		return;
+	}
 
-	SizedArray<uint8> image_data;
-	image_data.InitSize(data_size);
+	if (ImageFormatUtil::IsStencil(Info.Format)) {
+		LogError(LC_RENDER, "Cannot save image to '{}': depth/stencil formats are not supported", path.CStr());
+		return;
+	}
+
+	VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+	if (ImageFormatUtil::IsDepth(Info.Format)) {
+		aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+	}
+
+	const uint32 mip_level = Info.MipLevel;
+	const Vec2u size = GetMipDimensions(Info.Size, mip_level);
+	const uint64 data_size = ImageFormatUtil::GetDataSize(Info.Format, size);
+
+	VkImageLayout original_layout = ImageLayout;
+	if (original_layout == VK_IMAGE_LAYOUT_UNDEFINED) {
+		LogWarning(LC_RENDER, "Image saved to '{}' has no tracked layout, assuming SHADER_READ_ONLY_OPTIMAL",
+				   path.CStr());
+		original_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	}
+
+	renderer::RawGpuBuffer staging_buffer;
+	staging_buffer.Create(renderer::eGpuBufferType::Transfer, data_size, VMA_MEMORY_USAGE_GPU_TO_CPU,
+						  eGpuBufferFlags::TransferReceiver);
+
+	const VkImageSubresourceRange subresource_range {
+		.aspectMask = aspect,
+		.baseMipLevel = mip_level,
+		.levelCount = 1,
+		.baseArrayLayer = 0,
+		.layerCount = 1,
+	};
 
 	renderer::gGraphics->SubmitOneTimeCmd(
 		[&](renderer::CommandBuffer& cmd)
 		{
-			renderer::RawGpuBuffer staging_buffer;
-			staging_buffer.Create(renderer::eGpuBufferType::Transfer, data_size, VMA_MEMORY_USAGE_GPU_TO_CPU,
-								  eGpuBufferFlags::TransferReceiver);
-
-			VkImageMemoryBarrier pre_barrier {
+			const VkImageMemoryBarrier pre_barrier {
 				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-				.srcAccessMask = 0,
+				.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+								 VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT,
 				.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-				.oldLayout = ImageLayout,
+				.oldLayout = original_layout,
 				.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.image = InternalImage,
-				.subresourceRange = {
-					.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-					.baseMipLevel = 0,
-					.levelCount = 1,
-					.baseArrayLayer = 0,
-					.layerCount = 1,
-				},
+				.subresourceRange = subresource_range,
 			};
 
-			vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr,
+			vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr,
 								 0, nullptr, 1, &pre_barrier);
 
-			VkBufferImageCopy copy {
+			const VkBufferImageCopy copy {
 				.bufferOffset = 0,
 				.bufferRowLength = 0,
 				.bufferImageHeight = 0,
 				.imageSubresource {
-					.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-					.mipLevel = 0,
+					.aspectMask = aspect,
+					.mipLevel = mip_level,
 					.baseArrayLayer = 0,
 					.layerCount = 1,
 				},
-				.imageExtent = VkExtent3D { .width = Info.Size.X, .height = Info.Size.Y, .depth = 1 },
+				.imageExtent = VkExtent3D { .width = size.X, .height = size.Y, .depth = 1 },
 			};
 
 			vkCmdCopyImageToBuffer(cmd, InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, staging_buffer.Buffer, 1,
 								   &copy);
 
-			VkImageMemoryBarrier post_barrier {
+			const VkImageMemoryBarrier post_barrier {
 				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-				.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-				.dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+				.srcAccessMask = 0,
+				.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
 				.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-				.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				.newLayout = original_layout,
 				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 				.image = InternalImage,
-				.subresourceRange = {
-					.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-					.baseMipLevel = 0,
-					.levelCount = 1,
-					.baseArrayLayer = 0,
-					.layerCount = 1,
-				},
+				.subresourceRange = subresource_range,
 			};
 
-			vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0,
-								 nullptr, 0, nullptr, 1, &post_barrier);
+			const VkBufferMemoryBarrier host_barrier {
+				.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+				.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+				.dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.buffer = staging_buffer.Buffer,
+				.offset = 0,
+				.size = VK_WHOLE_SIZE,
+			};
 
-			ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-			staging_buffer.Map();
-			memcpy(image_data.pData, staging_buffer.pMappedBuffer, data_size);
-			staging_buffer.UnMap();
-			staging_buffer.Destroy();
+			vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+								 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VK_PIPELINE_STAGE_HOST_BIT, 0, 0, nullptr, 1,
+								 &host_barrier, 1, &post_barrier);
 		});
 
+	ImageLayout = original_layout;
 
-	loader::LoaderStb::SaveToFile(file_format, image_data, Info.Size, path, eImageSaveFlags::None);
+	SizedArray<uint8> image_data;
+	image_data.InitSize(data_size);
+
+	staging_buffer.Map();
+	staging_buffer.InvalidateFromGpu();
+	memcpy(image_data.pData, staging_buffer.pMappedBuffer, data_size);
+	staging_buffer.UnMap();
+	staging_buffer.Destroy();
+
+	if (file_format == eImageSaveFormat::Raw) {
+		File file(path, File::eModType::Write, File::eDataType::Binary);
+		if (!file.IsFileOpen()) {
+			LogError(LC_RENDER, "Could not open '{}' to save raw image data", path.CStr());
+			return;
+		}
+		file.WriteRaw(image_data.pData, data_size);
+		return;
+	}
+
+	SizedArray<uint8> rgba_data;
+	rgba_data.InitSize(uint64(size.X) * size.Y * 4);
+
+	if (!ConvertToRgba8(Info.Format, image_data.pData, size.X * size.Y, rgba_data.pData)) {
+		LogError(LC_RENDER, "Cannot save image to '{}': no 8-bit conversion for this format, use eImageSaveFormat::Raw",
+				 path.CStr());
+		return;
+	}
+
+	loader::LoaderStb::SaveToFile(file_format, rgba_data, size, path, eImageSaveFlags::None);
 }
 
 

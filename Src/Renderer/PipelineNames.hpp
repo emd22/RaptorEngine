@@ -20,6 +20,7 @@ enum class ePipelineName : uint16
 
 	TextRendering,
 	ImageRendering,
+	Particles,
 	Composition,
 	CompositionAgx,
 

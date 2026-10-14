@@ -68,7 +68,7 @@ public:
 		{
 			++mCurrentIndex;
 
-			if (mCurrentIndex > mCurrentPage->Size) {
+			if (mCurrentIndex >= mCurrentPage->Size && mCurrentPage->pNext) {
 				mCurrentPage = mCurrentPage->pNext;
 				mCurrentIndex = 0;
 			}
@@ -214,9 +214,6 @@ public:
 
 		// There are no free slots left in the page, allocate a new page
 		if (pCurrentPage->Size >= PageNodeCapacity) {
-			// Since the size will be N + 1, decrement by one
-			--pCurrentPage->Size;
-
 			Page* new_page = AllocateNewPage(pCurrentPage, nullptr);
 
 			pCurrentPage->pNext = new_page;
@@ -245,9 +242,6 @@ public:
 
 		// There are no free slots left in the page, allocate a new page
 		if (pCurrentPage->Size >= PageNodeCapacity) {
-			// Since the size will be N + 1, decrement by one
-			--pCurrentPage->Size;
-
 			Page* new_page = AllocateNewPage(pCurrentPage, nullptr);
 
 			pCurrentPage->pNext = new_page;
@@ -276,9 +270,6 @@ public:
 
 		// There are no free slots left in the page, allocate a new page
 		if (pCurrentPage->Size >= PageNodeCapacity) {
-			// Since the size will be N + 1, decrement by one
-			--pCurrentPage->Size;
-
 			Page* new_page = AllocateNewPage(pCurrentPage, nullptr);
 
 			pCurrentPage->pNext = new_page;
@@ -307,7 +298,14 @@ public:
 		return nullptr;
 	}
 
-	TElementType& GetLast() { return pCurrentPage->pData[pCurrentPage->Size - 1]; }
+	TElementType& GetLast()
+	{
+		if (pCurrentPage->Size == 0 && pCurrentPage->pPrev) {
+			return pCurrentPage->pPrev->pData[pCurrentPage->pPrev->Size - 1];
+		}
+
+		return pCurrentPage->pData[pCurrentPage->Size - 1];
+	}
 
 	void RemoveLast()
 	{
@@ -326,26 +324,24 @@ public:
 			pCurrentPage = page_to_remove->pPrev;
 			pCurrentPage->pNext = nullptr;
 
-			if (page_to_remove != nullptr) {
-				page_to_remove->Destroy();
-			}
+			page_to_remove->Destroy();
 
 			FX_PAGED_ARRAY_FREE(Page, page_to_remove);
 
 			--CurrentPageIndex;
-
-			return;
 		}
 
-		if (pCurrentPage->Size == 0 && pCurrentPage->pPrev == nullptr) {
+		if (pCurrentPage->Size == 0) {
 			return;
 		}
 
 		--pCurrentPage->Size;
 
-		--TrackedSize;
+		if constexpr (std::is_destructible_v<TElementType>) {
+			pCurrentPage->pData[pCurrentPage->Size].~TElementType();
+		}
 
-		return;
+		--TrackedSize;
 	}
 
 	void Clear()
@@ -460,7 +456,7 @@ private:
 		page->pPrev = prev;
 
 		// Allocate the buffer of nodes in the page
-		void* allocated_nodes = FX_PAGED_ARRAY_ALLOC(TElementType, (sizeof(TElementType) * PageNodeCapacity));
+		void* allocated_nodes = FX_PAGED_ARRAY_ALLOC(void, (sizeof(TElementType) * PageNodeCapacity));
 
 		if (allocated_nodes == nullptr) {
 			Panic("PagedArray", "Memory error allocating page data");

@@ -75,10 +75,10 @@ void DataPack::AddEntry(Hash64 id, const Slice<uint8>& data)
 bool DataPack::BinaryReadHeader()
 {
 	uint16 header_start = 0;
-	File.Read<uint16>(MakeSlice(&header_start, 1));
+	File.Read2(MakeSlice(&header_start, 1));
 
 	uint16 number_of_entries;
-	File.Read<uint16>(MakeSlice(&number_of_entries, 1));
+	File.Read2(MakeSlice(&number_of_entries, 1));
 
 	if (!Entries.IsInited()) {
 		Entries.Create(number_of_entries);
@@ -90,20 +90,20 @@ bool DataPack::BinaryReadHeader()
 
 	for (int index = 0; index < number_of_entries; index++) {
 		Hash64 id;
-		File.Read<uint64>(MakeSlice(&id, 1));
+		File.Read2(MakeSlice(&id, 1));
 
 		uint32 offset;
-		File.Read<uint32>(MakeSlice(&offset, 1));
+		File.Read2(MakeSlice(&offset, 1));
 
 		uint32 size;
-		File.Read<uint32>(MakeSlice(&size, 1));
+		File.Read2(MakeSlice(&size, 1));
 
 		DataPackEntry entry { id, SizedArray<uint8>::CreateEmpty(), offset, size };
 		Entries.Insert(std::move(entry));
 	}
 
 	uint16 header_end;
-	File.Read<uint16>(MakeSlice(&header_end, 1));
+	File.Read2(MakeSlice(&header_end, 1));
 
 	if (header_end != scBinHeaderEnd) {
 		return false;
@@ -278,7 +278,7 @@ void DataPack::ReadInto(DataPackEntry* entry)
 	entry->Data.InitSize(entry->DataSize);
 
 	File.SeekTo(entry->DataOffset);
-	File.Read(Slice<uint8>(entry->Data));
+	File.Read2(Slice<uint8>(entry->Data));
 }
 
 // DataPackEntry* DataPack::GetEntry(Hash64 id)

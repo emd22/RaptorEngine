@@ -20,6 +20,7 @@
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
+#include <Particle/ParticleSystem.hpp>
 #include <Texture/TextureManager.hpp>
 #include <algorithm>
 
@@ -51,6 +52,7 @@ void TiledForwardRenderer::Create(const Vec2u& extent)
 	CreateForwardPSO();
 	CreateCompositionPSO();
 	CreateBitmapTextPSO();
+	CreateParticlePSO();
 	CreateLightCullingPSO();
 	CreateDebugLayerPSO();
 	CreateDebugSolidPSO();
@@ -788,6 +790,40 @@ void TiledForwardRenderer::CreateBitmapTextPSO()
 
 	BuildPipeline(ePipelineName::TextRendering, {});
 	BuildPipeline(ePipelineName::ImageRendering, { ShaderMacro { .pcName = "DRAW_IMAGE", .pcValue = "1" } });
+}
+
+void TiledForwardRenderer::CreateParticlePSO()
+{
+	gPSOBuild->BeginPipeline(ePipelineName::Particles);
+	gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(ParticlePushConstants));
+
+	gPSOBuild->UseRenderStage(ForwardPass);
+	gPSOBuild->SetShader(eShaderName::Particle, {});
+	gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
+	gPSOBuild->SetCullMode(eCullMode::None);
+	gPSOBuild->SetDepthTest(true);
+	gPSOBuild->SetDepthWrite(false);
+
+	BlendAttachment blend = BlendAttachment {
+		.Enabled = true,
+		.BlendOp = {
+			.Ops = {
+				.Alpha = VK_BLEND_OP_ADD,
+				.Color = VK_BLEND_OP_ADD,
+			},
+		},
+		.AlphaBlend { .Ops { .Src = VK_BLEND_FACTOR_ZERO, .Dst = VK_BLEND_FACTOR_ONE } },
+		.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_ONE, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
+	};
+	gPSOBuild->SetTargetBlend(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float), blend);
+
+	gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gParticleSystem->GetInstanceBuffer(), 0,
+						 sizeof(ParticleGpuData) * ParticleSystem::scMaxParticles);
+
+	gPSOBuild->AddImage(1, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+						gSamplerCache->Request(SamplerProps {}));
+
+	gPSOBuild->EndPipeline();
 }
 
 void TiledForwardRenderer::RenderComposition(Camera& camera)

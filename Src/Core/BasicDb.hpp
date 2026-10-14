@@ -38,7 +38,7 @@ private:
     File mInFile;
     File mOutFile;
 
-    char* mpData = nullptr;
+    SizedArray<char> mData;
 
     std::string mPath;
     PagedArray<BasicDbEntry> mEntryMarkers;

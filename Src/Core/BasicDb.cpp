@@ -24,7 +24,7 @@ void BasicDb::Open(const char* path)
 
 	mInFile.SeekTo(0);
 
-	mpData = mInFile.Read<char>();
+	mData = mInFile.Read2<char>();
 
 	Parse();
 
@@ -68,11 +68,8 @@ void BasicDb::SaveToFile()
 
 void BasicDb::Parse()
 {
-	mInFile.SeekTo(0);
-	uint64 file_size = mInFile.GetFileSize();
-
-	char* start = mpData;
-	char* end = start + file_size;
+	char* start = mData.pData;
+	char* end = start + mData.Size;
 
 	if (!mEntryMarkers.IsInited()) {
 		mEntryMarkers.Create(32);
@@ -127,7 +124,7 @@ void BasicDb::Parse()
 		++start;
 	}
 
-	StdAllocator::Free(mpData);
+	mData.Free();
 }
 
 BasicDbEntry* BasicDb::FindEntry(Hash64 key)
@@ -147,14 +144,13 @@ BasicDbEntry* BasicDb::FindEntry(Hash64 key)
 
 void BasicDb::Close()
 {
-	if (mpData == nullptr || !mbIsOpen) {
+	if (!mbIsOpen) {
 		return;
 	}
 
 	SaveToFile();
 	mOutFile.Close();
 
-	mpData = nullptr;
 	mbIsOpen = false;
 }
 

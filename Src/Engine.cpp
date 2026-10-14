@@ -9,6 +9,7 @@
 #include <Material/MaterialManager.hpp>
 #include <NPC.hpp>
 #include <Object/ObjectManager.hpp>
+#include <Particle/ParticleSystem.hpp>
 #include <Physics/PhysicsManager.hpp>
 #include <Renderer/LightManager.hpp>
 #include <Renderer/LightProbe.hpp>
@@ -35,6 +36,7 @@ World* gWorld = nullptr;
 LightManager* gLightManager = nullptr;
 ProbeManager* gProbeManager = nullptr;
 DecalManager* gDecalManager = nullptr;
+ParticleSystem* gParticleSystem = nullptr;
 ScriptManager* gScriptManager = nullptr;
 
 CVarManager* gCVars = nullptr;
@@ -67,6 +69,7 @@ void Init()
 	gLightManager->Create();
 	gProbeManager = new ProbeManager;
 	gDecalManager = new DecalManager;
+	gParticleSystem = new ParticleSystem;
 	gCVars = new CVarManager;
 	gNPCManager = new NPCManager;
 	gObjectScripts = new ObjectScriptManager;
@@ -87,6 +90,7 @@ void Destroy()
 	DESTROY_GLOBAL(gLightManager);
 	DESTROY_GLOBAL(gProbeManager);
 	DESTROY_GLOBAL(gDecalManager);
+	DESTROY_GLOBAL(gParticleSystem);
 	DESTROY_GLOBAL(gCVars);
 }
 

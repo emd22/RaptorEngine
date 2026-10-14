@@ -3,6 +3,7 @@
 #include <Blockout.hpp>
 #include <CVar.hpp>
 #include <Decal/DecalManager.hpp>
+#include <Particle/ParticleSystem.hpp>
 #include <Editor/RaptorEditor.hpp>
 #include <Engine.hpp>
 #include <Material/Material.hpp>
@@ -1116,6 +1117,8 @@ void World::Render(Camera* shadow_camera)
 
 	// Transparent after, back-to-front globally sorted, depth write disabled
 	ExecuteTransparentRenderLists();
+
+	gParticleSystem->Render(gGraphics->GetFrame()->CmdBuffer, camera);
 
 #ifdef FX_IS_EDITOR
 	if (DebugBoundsMask & scDebugBoundsObjects) {

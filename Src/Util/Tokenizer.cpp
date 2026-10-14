@@ -345,9 +345,7 @@ void Tokenizer::IncludeFile(const char* path)
 	// Save the current state of the tokenizer
 	SaveState();
 
-	Slice<char> include_data = file.Read<char>();
-
-	DataPtrs.Insert(include_data.pData);
+	SizedArray<char>& include_data = DataPtrs.Insert(file.Read2<char>());
 
 	SetDataPtr(include_data.pData);
 	mpDataEnd = include_data.pData + include_data.Size;

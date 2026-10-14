@@ -41,6 +41,9 @@ extern ProbeManager* gProbeManager;
 class DecalManager;
 extern DecalManager* gDecalManager;
 
+class ParticleSystem;
+extern ParticleSystem* gParticleSystem;
+
 class CVarManager;
 extern CVarManager* gCVars;
 

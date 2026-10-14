@@ -11,7 +11,8 @@ namespace fx::renderer {
 
 static const PipelineNameInfo scNameInfos[] = {
 	NAME_INFO("DebugLayer"),	 NAME_INFO("DebugSolid"),	  NAME_INFO("LightCulling"),
-	NAME_INFO("TextRendering"),	 NAME_INFO("ImageRendering"), NAME_INFO("Composition"),
+	NAME_INFO("TextRendering"),	 NAME_INFO("ImageRendering"), NAME_INFO("Particles"),
+	NAME_INFO("Composition"),
 	NAME_INFO("CompositionAgx"), NAME_INFO("SSAO"),			  NAME_INFO("SSAODenoise"),
 	NAME_INFO("SSAOBlur"),
 };

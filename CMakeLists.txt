@@ -298,7 +298,38 @@ if(wxWidgets_FOUND)
     endif()
 
     if(WIN32)
-        target_sources(mapc_gui PRIVATE "Src/Editor/raptor.rc")
+        target_sources(mapc_gui PRIVATE "Tools/MapCompilerGui/mapc.rc")
+    endif()
+
+    if(APPLE)
+        set(MAPC_ICON_SOURCE "${CMAKE_SOURCE_DIR}/Textures/mapc-icon.png")
+        set(MAPC_ICONSET "${CMAKE_BINARY_DIR}/build/mapc-icon/mapc.iconset")
+        set(MAPC_ICNS "${CMAKE_BINARY_DIR}/build/mapc-icon/mapc.icns")
+
+        set(MAPC_ICONSET_COMMANDS COMMAND ${CMAKE_COMMAND} -E make_directory "${MAPC_ICONSET}")
+        foreach(size 16 32 128 256 512)
+            math(EXPR size2x "${size} * 2")
+            list(APPEND MAPC_ICONSET_COMMANDS
+                COMMAND sips -z ${size} ${size} "${MAPC_ICON_SOURCE}" --out "${MAPC_ICONSET}/icon_${size}x${size}.png"
+                COMMAND sips -z ${size2x} ${size2x} "${MAPC_ICON_SOURCE}" --out "${MAPC_ICONSET}/icon_${size}x${size}@2x.png")
+        endforeach()
+
+        add_custom_command(
+            OUTPUT "${MAPC_ICNS}"
+            ${MAPC_ICONSET_COMMANDS}
+            COMMAND iconutil -c icns "${MAPC_ICONSET}" -o "${MAPC_ICNS}"
+            DEPENDS "${MAPC_ICON_SOURCE}"
+            VERBATIM
+        )
+
+        target_sources(mapc_gui PRIVATE "${MAPC_ICNS}")
+        set_source_files_properties("${MAPC_ICNS}" PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+        set_target_properties(mapc_gui PROPERTIES
+            MACOSX_BUNDLE TRUE
+            MACOSX_BUNDLE_BUNDLE_NAME "Raptor Map Compiler"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "com.raptor.mapc-gui"
+            MACOSX_BUNDLE_ICON_FILE "mapc.icns"
+        )
     endif()
 else()
     message(STATUS "wxWidgets not found, mapc-gui will not be built")

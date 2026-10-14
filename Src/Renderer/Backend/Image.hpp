@@ -32,6 +32,7 @@ enum class eImageSaveFormat
 {
 	Jpeg,
 	Png,
+	Raw,
 };
 
 enum class eImageSaveFlags

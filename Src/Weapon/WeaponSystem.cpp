@@ -11,6 +11,7 @@
 #include <Math/MathUtil.hpp>
 #include <NPC.hpp>
 #include <Object/ObjectManager.hpp>
+#include <Particle/ParticleSystem.hpp>
 #include <Physics/PhysicsManager.hpp>
 #include <Player.hpp>
 #include <Renderer/Globals.hpp>
@@ -29,6 +30,9 @@ namespace fx::weapon {
 using namespace renderer;
 
 static constexpr const char* scWeaponDirectory = "RaptorData/Data/Weapons";
+
+static constexpr Hash32 scImpactSparksEffect = HashStr32("impact_sparks");
+static constexpr Hash32 scImpactDustEffect = HashStr32("impact_dust");
 static constexpr float32 scWoundSize = 0.22f;
 
 namespace {
@@ -558,6 +562,15 @@ void WeaponSystem::ApplyHit(float32 damage, float32 force, bool decal)
 		if (decal) {
 			gDecalManager->AddBulletHole(mLastHit.Point, mLastHit.Normal);
 		}
+	}
+
+	if (!bleeds) {
+		const Vec3f normal = mLastHit.Normal;
+		const Vec3f reflected = mLastDirection - (normal * (2.0f * mLastDirection.Dot(normal)));
+		const Vec3f origin = mLastHit.Point + (normal * 0.01f);
+
+		gParticleSystem->Play(scImpactSparksEffect, origin, (normal + reflected).Normalize());
+		gParticleSystem->Play(scImpactDustEffect, origin, normal);
 	}
 
 	if (hit_npc == nullptr && motion == JPH::EMotionType::Dynamic && force > 0.0f) {

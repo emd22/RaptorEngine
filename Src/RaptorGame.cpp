@@ -22,6 +22,7 @@
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
 #include <NPC.hpp>
+#include <Particle/ParticleSystem.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
 #include <Physics/Ragdoll.hpp>
@@ -727,6 +728,7 @@ void RaptorGame::CleanWorld()
 
 	gNPCManager->ClearRagdolls();
 	gDecalManager->Clear();
+	gParticleSystem->Clear();
 }
 
 void RaptorGame::AddDummyWound(RagdollDummy& dummy, const physics::RagdollHit& hit)
@@ -993,6 +995,14 @@ void RaptorGame::RenderText()
 								.CStr(),
 							1.0f, scWhite);
 
+	if (gParticleSystem->GetParticleCount() > 0) {
+		gTextRenderer->DrawText(String::Fmt("Particles={} Drawn={} Effects={} Cpu={:.3f}ms",
+											gParticleSystem->GetParticleCount(), gParticleSystem->GetDrawnCount(),
+											gParticleSystem->GetEffectCount(), gParticleSystem->GetCpuMs())
+									.CStr(),
+								1.0f, scWhite);
+	}
+
 #ifdef FX_IS_EDITOR
 	gTextRenderer->DrawText(
 		String::Fmt("Q={}, QE={}", gEditor->GetSnapStep(), gEditor->GetToolState().ToolSnapEnabled).CStr(), 1.0,
@@ -1125,6 +1135,8 @@ void RaptorGame::Tick()
 	UpdateObjectScripts();
 	UpdateRagdollDummies();
 
+	gParticleSystem->Update(static_cast<float32>(DeltaTime));
+
 	UpdateExposure();
 
 	frame->CmdBuffer.Reset();
@@ -1162,6 +1174,7 @@ void RaptorGame::DestroyGame()
 
 	mRagdollDummies.clear();
 	gNPCManager->Clear();
+	gParticleSystem->Destroy();
 
 	delete gShadowRenderer;
 	gShadowRenderer = nullptr;

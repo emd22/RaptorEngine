@@ -13,7 +13,6 @@
 #include <Core/SizedArray.hpp>
 #include <Core/TSRef.hpp>
 #include <Entity.hpp>
-#include <FoxScript/FoxScript.hpp>
 #include <Material/MaterialID.hpp>
 #include <Math/BBox.hpp>
 #include <Math/Frustum.hpp>

@@ -26,7 +26,6 @@ Raptor is a 3D game engine being developed for an experimental game.
 
 | Name               | Document                                |
 | ------------------ | --------------------------------------- |
-| FoxScript (Legacy) | [FoxScript.md](Docs/FoxScript.md)       |
 | Config format      | [ConfigFormat.md](Docs/ConfigFormat.md) |
 
 ## Building

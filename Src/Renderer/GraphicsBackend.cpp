@@ -20,6 +20,7 @@
 #include <Core/RefUtil.hpp>
 #include <Core/Types.hpp>
 #include <Decal/DecalManager.hpp>
+#include <Particle/ParticleSystem.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Renderer/Backend/DescriptorCache.hpp>
 #include <Renderer/Backend/ExtensionHandles.hpp>
@@ -239,6 +240,8 @@ void GraphicsBackend::Init(Vec2u window_size)
 
 	// Starts loading the decal atlas, which the renderer binds once it's in
 	gDecalManager->Create();
+
+	gParticleSystem->Create();
 
 	gShadowAtlas = new ShadowAtlas;
 	gShadowRenderer = new ShadowDirectional;

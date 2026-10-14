@@ -19,7 +19,6 @@
 #ifdef FX_IS_EDITOR
 #include <Editor/RaptorEditor.hpp>
 #endif
-#include <FoxScript/FoxScript.hpp>
 #include <Math/MathConsts.hpp>
 #include <Math/MathUtil.hpp>
 #include <Renderer/Globals.hpp>

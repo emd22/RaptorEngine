@@ -395,7 +395,7 @@ String GetProbeFilePath(const char* extension)
 
 bool ReadExact(File& file, void* out, uint64 size)
 {
-	return file.Read(MakeSlice(static_cast<uint8*>(out), size)).Size == size;
+	return file.Read2(MakeSlice(static_cast<uint8*>(out), size)) == size;
 }
 
 void UploadRange(renderer::RawGpuBuffer& buffer, const void* data, uint64 offset, uint64 size)

@@ -1,7 +1,6 @@
 #include "DecalManager.hpp"
 
 #include <Asset/AssetManager.hpp>
-#include <Asset/ConfigFile.hpp>
 #include <Core/Random.hpp>
 #include <Engine.hpp>
 #include <Math/Frustum.hpp>
@@ -10,6 +9,7 @@
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/Limits.hpp>
 #include <Renderer/TiledForwardRenderer.hpp>
+#include <Texture/AtlasConfig.hpp>
 #include <algorithm>
 #include <cmath>
 
@@ -46,57 +46,16 @@ void DecalManager::Create()
 	mNormalAtlasTicket.OnLoaded([this](void* data) { mpNormalAtlas.store(static_cast<Image*>(data)); });
 }
 
-static bool ReadIntPair(const ConfigEntry* entry, float32* out)
-{
-	if (entry == nullptr || entry->GetArrayData().Size() < 2) {
-		return false;
-	}
-
-	out[0] = entry->GetArrayData()[0].Get<float32>();
-	out[1] = entry->GetArrayData()[1].Get<float32>();
-	return true;
-}
-
 String DecalManager::LoadAtlasConfig()
 {
-	ConfigFile config;
-	config.Load(scAtlasConfigPath);
+	AtlasConfig atlas;
 
-	String atlas_path = scAtlasDirectory;
-
-	const ConfigEntry* image_entry = config.GetEntry(HashStr32("image"));
-	atlas_path += (image_entry != nullptr) ? image_entry->GetValue<const char*>() : scDefaultAtlasImage;
-
-	const float32 tile_size = config.GetEntryValue<float32>(HashStr32("tile_size"), 0.0f);
-	const ConfigEntry* groups = config.GetEntry(HashStr32("groups"));
-
-	float32 atlas_size[2];
-	if (!ReadIntPair(config.GetEntry(HashStr32("atlas_size")), atlas_size) || tile_size <= 0.0f || groups == nullptr) {
-		LogError(LC_ASSET, "Could not read the decal atlas layout from {}", scAtlasConfigPath);
-		return atlas_path;
+	if (atlas.Load(scAtlasDirectory, scAtlasConfigPath, scDefaultAtlasImage)) {
+		atlas.GetRegion(scBulletHoleGroup, mBulletHoleRegion);
+		atlas.GetRegion(scBloodGroup, mBloodRegion);
 	}
 
-	const auto read_region = [&](const char* name, AtlasRegion& region) {
-		const ConfigEntry* group = groups->GetMember(HashStr32(name));
-
-		float32 tile[2];
-		float32 tiles[2];
-		if (group == nullptr || !ReadIntPair(group->GetMember(HashStr32("tile")), tile) ||
-			!ReadIntPair(group->GetMember(HashStr32("tiles")), tiles)) {
-			LogError(LC_ASSET, "Decal atlas {} has no group '{}'", scAtlasConfigPath, name);
-			return;
-		}
-
-		region.ScaleU = (tiles[0] * tile_size) / atlas_size[0];
-		region.ScaleV = (tiles[1] * tile_size) / atlas_size[1];
-		region.OffsetU = (tile[0] * tile_size) / atlas_size[0];
-		region.OffsetV = (tile[1] * tile_size) / atlas_size[1];
-	};
-
-	read_region(scBulletHoleGroup, mBulletHoleRegion);
-	read_region(scBloodGroup, mBloodRegion);
-
-	return atlas_path;
+	return atlas.GetImagePath();
 }
 
 DecalManager::DecalEntry DecalManager::BuildEntry(const DecalDesc& desc) const

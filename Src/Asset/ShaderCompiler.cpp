@@ -284,7 +284,7 @@ ShaderCompiler::eResult ShaderCompiler::Compile(const char* path, DataPack& pack
 												bool do_db_flush)
 {
 	File file(path, File::eModType::Read, File::eDataType::Binary);
-	Slice<char> file_data = file.Read<char>();
+	SizedArray<char> file_data = file.Read2<char>();
 
 	ShaderPreproc::Result preproc = ShaderPreproc::Process(file_data, macros);
 

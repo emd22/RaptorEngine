@@ -2,7 +2,11 @@
 
 #include <wx/button.h>
 #include <wx/checkbox.h>
+#include <wx/filefn.h>
 #include <wx/filepicker.h>
+#include <wx/icon.h>
+#include <wx/image.h>
+#include <wx/imagpng.h>
 #include <wx/listctrl.h>
 #include <wx/panel.h>
 #include <wx/sizer.h>
@@ -29,6 +33,7 @@ enum eColumn : int32
 };
 
 constexpr const char* scPrototypeExtension = ".prx";
+constexpr const char* scIconPath = "Textures/mapc-icon.png";
 
 constexpr int scBorder = 6;
 constexpr int scMinVerifyRays = 1000;
@@ -49,6 +54,15 @@ constexpr double scSunRadiusStep = 0.25;
 CompilerFrame::CompilerFrame(const String& map_directory)
 	: wxFrame(nullptr, wxID_ANY, "Raptor Map Compiler", wxDefaultPosition, wxSize(980, 760))
 {
+#if defined(__WXMSW__)
+	SetIcon(wxICON(aaaa));
+#elif defined(__WXGTK__)
+	if (wxFileExists(scIconPath)) {
+		wxImage::AddHandler(new wxPNGHandler);
+		SetIcon(wxIcon(scIconPath, wxBITMAP_TYPE_PNG));
+	}
+#endif
+
 	const SurfaceOptions default_options;
 
 	wxPanel* root = new wxPanel(this, wxID_ANY);

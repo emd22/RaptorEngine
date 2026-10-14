@@ -7,6 +7,7 @@
 #include <Math/Mat4.hpp>
 #include <Math/Vec3.hpp>
 #include <Renderer/Backend/Pipeline.hpp>
+#include <Texture/AtlasConfig.hpp>
 #include <atomic>
 
 namespace fx {
@@ -96,14 +97,6 @@ public:
 	FX_FORCE_INLINE uint32 GetCount() const { return mDecals.Size; }
 
 private:
-	struct AtlasRegion
-	{
-		float32 ScaleU = 1.0f;
-		float32 ScaleV = 1.0f;
-		float32 OffsetU = 0.0f;
-		float32 OffsetV = 0.0f;
-	};
-
 	struct DecalEntry
 	{
 		renderer::DecalGpuData GpuData;

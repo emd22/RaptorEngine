@@ -78,6 +78,9 @@ eLoaderStatus LoaderStb::SaveToFile(eImageSaveFormat file_format, const Slice<co
 		break;
 	case eImageSaveFormat::Png:
 		stbi_write_png(path.CStr(), size.GetX(), size.GetY(), 4, data.pData, size.GetX() * 4);
+		break;
+	case eImageSaveFormat::Raw:
+		return eLoaderStatus::Error;
 	}
 
 	return eLoaderStatus::Success;

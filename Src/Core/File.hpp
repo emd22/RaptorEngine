@@ -42,25 +42,6 @@ public:
 	void Open(const String& path, eModType mt, eDataType dt);
 	uint64 GetFileSize();
 
-	/**
-	 * @brief Reads data from the current position in the file into the provided buffer `out_buffer`.
-	 * The `out_buffer.Size` is expected to be the suggested amount of `TDataType` objects to be read.
-	 */
-	template <typename TDataType>
-	Slice<TDataType> Read(const Slice<TDataType>& out_buffer)
-	{
-		if (!pFileHandle) {
-			return nullptr;
-		}
-
-		constexpr uint32 type_size = sizeof(TDataType);
-
-		const uint64 n_to_read = std::fmin(GetFileSize() / type_size, out_buffer.Size);
-		uint64 items_read = fread(out_buffer.pData, type_size, n_to_read, pFileHandle);
-
-		return MakeSlice<TDataType>(out_buffer.pData, items_read);
-	}
-
 	uint64 Read2(void* buffer, uint64 element_size);
 
 	template <typename TType>
@@ -71,20 +52,6 @@ public:
 		}
 
 		return fread(out_buffer.pData, sizeof(TType), out_buffer.Size, pFileHandle);
-	}
-
-	template <typename TDataType>
-	Slice<TDataType> Read()
-	{
-		if (!pFileHandle) {
-			LogWarning(LC_CORE, spcErrCannotReadUnopened);
-			return nullptr;
-		}
-
-		const uint64 buffer_size = MathUtil::AlignValue<sizeof(TDataType)>(GetFileSize());
-		TDataType* buffer = StdAllocator::Alloc<TDataType>(buffer_size);
-
-		return Read(MakeSlice(buffer, buffer_size));
 	}
 
 	/**

@@ -110,7 +110,7 @@ public:
         entry->Data.InitSize(entry->DataSize);
 
         File.SeekTo(entry->DataOffset);
-        File.Read(Slice<uint8>(entry->Data));
+        File.Read2(Slice<uint8>(entry->Data));
 
         return Slice<TDataType>(static_cast<TDataType*>(entry->Data.pData), entry->Data.Size);
     }

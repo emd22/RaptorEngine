@@ -253,7 +253,7 @@ public:
         mpLinePtr = mSavedState.pStartOfLine;
     }
 
-    PagedArray<char*>& GetDataPtrs() { return DataPtrs; }
+    PagedArray<SizedArray<char>>& GetDataPtrs() { return DataPtrs; }
 
 
     ~Tokenizer();
@@ -274,7 +274,7 @@ private:
 
 public:
     PagedArray<Token> TokenBuffer;
-    PagedArray<char*> DataPtrs;
+    PagedArray<SizedArray<char>> DataPtrs;
 
 private:
     const char* mpExpectedFileExtension = "";
