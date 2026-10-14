@@ -143,7 +143,7 @@ ObjectPropertiesPanel::ObjectPropertiesPanel(wxWindow* parent) : wxPanel(parent,
 						[this](wxCommandEvent&)
 						{
 							if (EditorFrame* frame = dynamic_cast<EditorFrame*>(wxGetTopLevelParent(this))) {
-								frame->ShowMaterialPickerWindow();
+								frame->ShowMaterialPicker();
 							}
 						});
 
@@ -361,13 +361,27 @@ void ObjectPropertiesPanel::ApplyState(const ObjectPanelState& state, const Mate
 	mbIsTrigger = state.bHasObject && state.bIsTrigger;
 
 	if (!state.bHasObject) {
-		mpNameLabel->SetLabel("No block selected");
+		if (state.ActiveSubview.IsEmpty()) {
+			mpNameLabel->SetLabel("No block selected");
+		}
+		else {
+			mpNameLabel->SetLabel(
+				wxString::Format("Editing subview '%s'", wxString::FromUTF8(state.ActiveSubview.CStr())));
+		}
+	}
+	else if (!state.SubviewName.IsEmpty()) {
+		mpNameLabel->SetLabel(wxString::Format("Selected subview '%s' (%u brushes)",
+											   wxString::FromUTF8(state.SubviewName.CStr()), state.SubviewBrushCount));
 	}
 	else {
 		wxString name = wxString::Format("Selected '%s'", wxString::FromUTF8(state.Name.CStr()));
 
 		if (state.SelectedCount > 1) {
 			name += wxString::Format(" (+%u more)", state.SelectedCount - 1);
+		}
+
+		if (!state.ActiveSubview.IsEmpty()) {
+			name += wxString::Format(" in subview '%s'", wxString::FromUTF8(state.ActiveSubview.CStr()));
 		}
 
 		mpNameLabel->SetLabel(name);

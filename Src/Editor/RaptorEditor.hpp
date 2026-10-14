@@ -28,6 +28,7 @@
 #include <chrono>
 #include <functional>
 #include <mutex>
+#include <vector>
 
 namespace fx {
 
@@ -147,6 +148,9 @@ public:
 	void TopViewCreate(Vec3f min, Vec3f max, bool drop_to_ground);
 	void TopViewDelete();
 	void TopViewDuplicate();
+	/// Hides the selection from the 2D views. It stays in the level and in the 3D view.
+	void TopViewHideSelection();
+	void TopViewShowAll();
 	void TopViewToggleSnap();
 	void TopViewAdjustSnap(int32 direction);
 
@@ -182,6 +186,8 @@ public:
 	 * otherwise. Passing nullptr clears the selection. Returns true if the object is now selected.
 	 */
 	bool SelectObject(Object* object, bool append_selection);
+	/// Takes an object out of the selection, along with the rest of the subview it was placed with
+	void DeselectObject(Object* object);
 	void ClearSelection();
 
 	void DeselectModels();
@@ -211,6 +217,34 @@ public:
 	uint32 SetSelectionScript(const String& path);
 
 	uint32 SetSelectionEnterDirection(const Vec3f local_direction);
+
+	/////////////////////////////////////
+	// Subviews
+	/////////////////////////////////////
+
+	bool IsEditingSubview() const;
+
+	/**
+	 * @brief True if the object can be changed on its own right now. While a subview is being edited that is only
+	 * its brushes, and otherwise it is everything but the subviews placed in the level.
+	 */
+	bool CanEditObject(const Object* object) const;
+
+	/// Turns the selected brushes into a new subview, placed where they are
+	bool CreateSubviewFromSelection(const String& name);
+
+	/// Starts editing the selected subview
+	bool EnterSubview();
+	void LeaveSubview();
+
+	/// Places another copy of a subview at the crosshair
+	bool PlaceSubview(const String& name);
+
+	/// Turns the selected subviews back into brushes of the level
+	uint32 DissolveSelectedSubviews();
+
+	/// The subview instance that a dupe of `original` becomes, if it is a placed subview
+	uint32 AllocateDupeSubview(const Object* original);
 
 	/////////////////////////////////////
 	// Edit operations
@@ -284,6 +318,9 @@ private:
 	void PickObject();
 
 	void DrawModelSelection();
+	void DrawSubviews();
+
+	bool SelectSubview(uint32 instance, bool append_selection);
 
 	void BeginDrag();
 	/// Ends the drag in progress, letting the tool finish its operation

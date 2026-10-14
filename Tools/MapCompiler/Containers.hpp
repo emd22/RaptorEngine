@@ -36,19 +36,6 @@ Array<TElementType> CopyArray(const Array<TElementType>& source)
 }
 
 template <typename TElementType>
-SizedArray<TElementType> CopyToSizedArray(const Array<TElementType>& source)
-{
-	SizedArray<TElementType> copy;
-	copy.InitCapacity(source.Size);
-
-	for (const TElementType& element : source) {
-		copy.Insert(element);
-	}
-
-	return copy;
-}
-
-template <typename TElementType>
 void RemoveAt(Array<TElementType>& array, uint32 index)
 {
 	for (uint32 i = index; i + 1 < array.Size; i++) {

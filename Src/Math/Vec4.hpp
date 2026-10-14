@@ -15,6 +15,8 @@
 
 namespace fx {
 
+class Vec3f;
+
 class alignas(16) Vec4f
 {
 private:
@@ -34,6 +36,10 @@ public:
 	Vec4f() = default;
 	Vec4f(float32 x, float32 y, float32 z, float32 w);
 	Vec4f(const float32* values);
+	/**
+	 * @brief Create a Vec4 from an existing Vec3 and a W component.
+	 */
+	Vec4f(const Vec3f& xyz, float32 w);
 	explicit Vec4f(float32 scalar);
 
 	FX_FORCE_INLINE void Set(float32 x, float32 y, float32 z, float32 w);

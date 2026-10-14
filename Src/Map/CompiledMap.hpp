@@ -10,17 +10,25 @@
 #include <Core/SizedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
+#include <Math/Vec2.hpp>
+#include <Math/Vec3.hpp>
+#include <Math/Vec4.hpp>
 #include <Renderer/ProbePlacement.hpp>
 
 namespace fx {
 
 struct CompiledMapVertex
 {
-	float32 Position[3];
-	float32 Normal[3];
+	Vec3f Position;
+	Vec3f Normal;
 	/// The fourth value is the handedness
-	float32 Tangent[4];
-	float32 Texcoord[2];
+	Vec4f Tangent;
+	Vec2f Texcoord;
+
+	// float32 Position[3];
+	// float32 Normal[3];
+	// float32 Tangent[4];
+	// float32 Texcoord[2];
 };
 
 struct CompiledMapMaterial
@@ -37,8 +45,7 @@ struct CompiledMapSurface
 {
 	uint32 MaterialIndex = 0;
 
-	float32 BoundsMin[3] = { 0.0f, 0.0f, 0.0f };
-	float32 BoundsMax[3] = { 0.0f, 0.0f, 0.0f };
+	BBox Bounds;
 
 	SizedArray<CompiledMapVertex> Vertices;
 	SizedArray<uint32> Indices;
@@ -74,7 +81,7 @@ class CompiledMap
 {
 public:
 	static constexpr uint32 scMagic = 0x504D5846;
-	static constexpr uint32 scVersion = 3;
+	static constexpr uint32 scVersion = 4;
 	static constexpr const char* scExtension = ".fxmap";
 	static constexpr const char* scPrototypeExtension = ".prx";
 

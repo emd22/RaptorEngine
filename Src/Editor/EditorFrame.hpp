@@ -25,7 +25,7 @@ class WorldPropertiesPanel;
 class ToolSettingsBasePanel;
 class ObjectListWindow;
 class CVarListWindow;
-class MaterialPickerWindow;
+class MaterialPickerPanel;
 class AtlasPackerWindow;
 
 class EditorViewport;
@@ -68,10 +68,13 @@ public:
 
 	void ShowObjectListWindow();
 	void ShowCVarListWindow();
-	void ShowMaterialPickerWindow();
+	void ShowMaterialPicker();
 	void ShowAtlasPackerWindow();
 
 	void NewPrototype();
+
+	void CreateSubview();
+	void PlaceSubview();
 	bool SavePrototype();
 	bool SaveProtoTypeAs();
 	void OpenPrototype();
@@ -83,6 +86,7 @@ private:
 	void OnActivate(wxActivateEvent& event);
 	void OnIconize(wxIconizeEvent& event);
 	void SetSidePanelCollapsed(bool collapsed);
+	void SetMaterialPickerShown(bool shown);
 	void FocusActiveView();
 	void ApplySplitLayout(const eEditorView view);
 
@@ -95,7 +99,8 @@ private:
 	WorldPropertiesPanel* mpWorldPropertiesPanel = nullptr;
 	ObjectListWindow* mpObjectListWindow = nullptr;
 	CVarListWindow* mpCVarListWindow = nullptr;
-	MaterialPickerWindow* mpMaterialPickerWindow = nullptr;
+	MaterialPickerPanel* mpMaterialPickerPanel = nullptr;
+	wxMenuItem* mpMaterialPickerMenuItem = nullptr;
 	AtlasPackerWindow* mpAtlasPackerWindow = nullptr;
 
 	/// The tool settings slot: whatever ToolSettingsBasePanel is currently swapped in, below Object Properties

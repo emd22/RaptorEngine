@@ -29,18 +29,17 @@ struct alignas(16) SSAOPushConsts
 	float32 Projection[16];
 	float32 View[16];
 	float32 RenderSize[2];
-	float32 Radius;
-	float32 Bias;
-	float32 Strength;
-	float32 Power;
-	float32 Floor;
+	float32 EffectRadius;
+	float32 FalloffRange;
+	float32 SampleDistributionPower;
+	float32 ThinOccluderCompensation;
+	float32 FinalValuePower;
 };
 
 struct alignas(16) SSAOBlurPushConsts
 {
-	float32 ScreenSize[2];
 	float32 TexelSize[2];
-	float32 DepthSharpness;
+	float32 BlurBeta;
 };
 
 
@@ -144,6 +143,7 @@ public:
 	/// SSAO pass
 	RenderStage SSAOPass;
 	/// SSAO blur pass
+	RenderStage SSAODenoisePass;
 	RenderStage SSAOBlurPass;
 	/// Composition pass, combine results from all passes
 	RenderStage CompPass;

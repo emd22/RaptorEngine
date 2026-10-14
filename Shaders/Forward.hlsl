@@ -581,6 +581,7 @@ PERMEND();
 	const float light_alpha = max(specular_alpha, MIN_LIGHT_ROUGHNESS * MIN_LIGHT_ROUGHNESS);
 
 	float3 accumulated_light = float3(0.0, 0.0, 0.0);
+	float3 accumulated_specular = float3(0.0, 0.0, 0.0);
 
 	const float3 N = N_final;
 	const float3 V = normalize(FSConst.vEyePosition.xyz - input.vPositionWS);
@@ -722,11 +723,14 @@ PERMEND();
 		const float diffuse_visibility = max(visibility * horizon, diffuse_visibility_floor);
 		const float specular_visibility = visibility * horizon;
 
-		accumulated_light += attenuation * ((diffuse_visibility * diffuse_term) + (specular_visibility * specular_term)) *
-							 light_color * NdotL;
+		const float3 incoming_light = attenuation * light_color * NdotL;
+
+		accumulated_light += incoming_light * diffuse_visibility * diffuse_term;
+		accumulated_specular += incoming_light * specular_visibility * specular_term;
 	}
 
 	float3 ambient = float3(0.0f, 0.0f, 0.0f);
+	float3 ambient_specular = float3(0.0f, 0.0f, 0.0f);
 
 	if (has_probes) {
 PERMNOT(PROBE_CAPTURE);
@@ -750,14 +754,29 @@ PERMEND();
 		const float3 specular_occlusion =
 			MultiBounceOcclusion(SpecularOcclusion(NdotV, occlusion, specular_alpha), surface.vF0);
 
-		ambient = (probe_irradiance * ambient_diffuse * diffuse_occlusion) +
-				  (((probe_radiance * single_scatter) + (probe_irradiance * multi_scatter)) * specular_occlusion);
+		ambient = probe_irradiance * ambient_diffuse * diffuse_occlusion;
+		ambient_specular = ((probe_radiance * single_scatter) + (probe_irradiance * multi_scatter)) * specular_occlusion;
 	}
 
+	const float3 diffuse_light = accumulated_light + ambient;
+	const float3 specular_light = accumulated_specular + ambient_specular;
+
 PERMIF(PROBE_CAPTURE);
-	output.vAlbedo = float4(((accumulated_light + ambient) * FSConst.fPreExposure) + emissive, 1.0f);
+	output.vAlbedo = float4(((diffuse_light + specular_light) * FSConst.fPreExposure) + emissive, 1.0f);
 PERMELSE();
-	output.vAlbedo = float4(((accumulated_light + ambient) * FSConst.fPreExposure) + emissive, base_alpha);
+PERMIF(BLEND_PASS);
+	const bool is_glass = HAS_FLAG(material.Flags, MF_GLASS);
+	const float glass_fresnel = F_Schlick(surface.vF0, 1.0, NdotV).g;
+	const float glass_alpha = lerp(base_alpha, 1.0, glass_fresnel);
+	const float3 glass_light = ((diffuse_light * base_alpha) + specular_light) / max(glass_alpha, 1e-4);
+
+	const float out_alpha = select(is_glass, glass_alpha, base_alpha);
+	const float3 out_light = select(is_glass, glass_light, diffuse_light + specular_light);
+
+	output.vAlbedo = float4((out_light * FSConst.fPreExposure) + emissive, out_alpha);
+PERMELSE();
+	output.vAlbedo = float4(((diffuse_light + specular_light) * FSConst.fPreExposure) + emissive, base_alpha);
+PERMEND();
 PERMEND();
 
 PERMIF(DEBUG_VIEWS);

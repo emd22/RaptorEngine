@@ -223,6 +223,15 @@ ProbePlacementBoxes GatherPlacementBoxes()
 			continue;
 		}
 
+		// A compiled surface is every face of a material, so its bounds say nothing about where the level is solid
+		if (blockout != nullptr && blockout->IsCompiledObject(&object)) {
+			continue;
+		}
+
+		if (object.SubviewInstance != Blockout::scNoSubview && !object.HasTags(eObjectTag::Blockout)) {
+			continue;
+		}
+
 		const Brush* brush = (blockout != nullptr) ? blockout->GetBrush(&object) : nullptr;
 		const bool is_hull = brush != nullptr && brush->IsValid() && !brush->IsBox();
 
@@ -237,6 +246,27 @@ ProbePlacementBoxes GatherPlacementBoxes()
 		}
 		else {
 			ProbePlacement::AddBox(boxes, object.Bounds, object.GetWorldMatrix(), planes);
+		}
+	}
+
+	if (blockout != nullptr) {
+		std::vector<Blockout::SubviewSolid> solids;
+		blockout->GetSubviewSolids(solids);
+
+		for (const Blockout::SubviewSolid& solid : solids) {
+			if (solid.pOwner->IsUnlit() || !solid.pOwner->IsProbeVisible()) {
+				continue;
+			}
+
+			const Brush& brush = *solid.pBrush;
+
+			planes.InitCapacity(brush.IsBox() ? 0 : brush.Planes.Size);
+
+			for (uint32 i = 0; i < planes.Capacity; i++) {
+				planes.Insert({ brush.Planes[i].Normal, brush.Planes[i].Distance });
+			}
+
+			ProbePlacement::AddBox(boxes, BBox(brush.GetBoundsMin(), brush.GetBoundsMax()), solid.World, planes);
 		}
 	}
 

@@ -3,13 +3,16 @@
 #ifdef FX_IS_EDITOR
 
 #include "Common.hpp"
+#include "EditorThread.hpp"
 #include "OutlineToggleButton.hpp"
+#include "RaptorEditor.hpp"
 
 #include <wx/button.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/wrapsizer.h>
 
+#include <Engine.hpp>
 #include <Math/Vec2.hpp>
 
 namespace fx::editor {
@@ -142,8 +145,39 @@ TopViewPanel::TopViewPanel(wxWindow* parent) : wxPanel(parent, wxID_ANY)
 						 mpCanvas->FitAll();
 						 mpCanvas->SetFocus();
 					 });
+	wxButton* hide_button = new wxButton(this, wxID_ANY, "Hide", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+	hide_button->SetToolTip("Hide the selection from the 2D views, so what is behind it can be selected (H)");
+	hide_button->Bind(wxEVT_BUTTON,
+					  [this](wxCommandEvent&)
+					  {
+						  thread::PostToGame(
+							  []
+							  {
+								  gEditor->TopViewHideSelection();
+								  gEditor->NoteTopViewCommand();
+							  });
+						  mpCanvas->SetFocus();
+					  });
+
+	mpShowAllButton = new wxButton(this, wxID_ANY, "Show All", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+	mpShowAllButton->SetToolTip("Bring back everything hidden from the 2D views (Shift+H)");
+	mpShowAllButton->Enable(false);
+	mpShowAllButton->Bind(wxEVT_BUTTON,
+						  [this](wxCommandEvent&)
+						  {
+							  thread::PostToGame(
+								  []
+								  {
+									  gEditor->TopViewShowAll();
+									  gEditor->NoteTopViewCommand();
+								  });
+							  mpCanvas->SetFocus();
+						  });
+
 	wxBoxSizer* fit_row = new wxBoxSizer(wxHORIZONTAL);
 	fit_row->Add(fit_button, wxSizerFlags().CenterVertical().Border(wxALL, 4));
+	fit_row->Add(hide_button, wxSizerFlags().CenterVertical().Border(wxALL, 4));
+	fit_row->Add(mpShowAllButton, wxSizerFlags().CenterVertical().Border(wxALL, 4));
 	mpToolbar->Add(fit_row, wxSizerFlags().CenterVertical());
 
 	root_sizer->Add(mpToolbar, wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT, 2));
@@ -189,6 +223,20 @@ void TopViewPanel::ApplyState(const TopViewState& state)
 	mpToolButtons[static_cast<uint32>(eTopViewTool::Vertex)]->Enable(state.bCanFace);
 	mpToolButtons[static_cast<uint32>(eTopViewTool::Create)]->Enable(state.bCanCreate);
 	mpToolButtons[static_cast<uint32>(eTopViewTool::Rotate)]->Enable(state.bCanRotate);
+
+	if (state.HiddenCount != mShownHiddenCount) {
+		mShownHiddenCount = state.HiddenCount;
+
+		if (state.HiddenCount > 0) {
+			mpShowAllButton->SetLabel(wxString::Format("Show All (%u)", state.HiddenCount));
+		}
+		else {
+			mpShowAllButton->SetLabel("Show All");
+		}
+
+		mpShowAllButton->Enable(state.HiddenCount > 0);
+		Layout();
+	}
 
 	mpCanvas->ApplyState(state);
 }

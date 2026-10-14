@@ -109,8 +109,8 @@ void TiledForwardRenderer::CreateSSAOPass()
 {
 	SSAOPass.Create("SSAO", gGraphics->Swapchain.Extent, eSizeDivisor::HalfRes);
 
-	// SSAO output target
-	SSAOPass.AddTarget(eImageFormat::R8_UNorm, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+	// R is the visibility term, G the packed depth edges the denoise passes read
+	SSAOPass.AddTarget(eImageFormat::RG16_UNorm, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 					   eImageAspectFlag::Color);
 
 	SSAOPass.BuildRenderStage();
@@ -118,9 +118,17 @@ void TiledForwardRenderer::CreateSSAOPass()
 
 void TiledForwardRenderer::CreateSSAOBlurPass()
 {
+	SSAODenoisePass.Create("SSAODenoise", gGraphics->Swapchain.Extent, eSizeDivisor::HalfRes);
+
+	SSAODenoisePass.AddTarget(eImageFormat::RG16_UNorm,
+							  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+							  eImageAspectFlag::Color);
+
+	SSAODenoisePass.BuildRenderStage();
+
 	SSAOBlurPass.Create("SSAOBlur", gGraphics->Swapchain.Extent, eSizeDivisor::HalfRes);
 
-	// Blurred SSAO output target
+	// Denoised AO output target
 	SSAOBlurPass.AddTarget(eImageFormat::R8_UNorm, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 						   eImageAspectFlag::Color);
 
@@ -263,14 +271,6 @@ void TiledForwardRenderer::CreateSSAOPSO()
 		// tNormal
 		gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, Prepass.GetTarget(eImageFormat::RGBA16_Float),
 									  gSamplerCache->Request({}));
-		// tNoise
-		gPSOBuild->AddImage(2, 0, eShaderType::Pixel, gGraphics->pNoiseTexture,
-							gSamplerCache->Request({
-								.MinFilter = eSamplerFilter::Nearest,
-								.MagFilter = eSamplerFilter::Nearest,
-								.MipFilter = eSamplerFilter::Nearest,
-							}));
-
 
 		gPSOBuild->EndPipeline();
 	}
@@ -280,26 +280,19 @@ void TiledForwardRenderer::CreateSSAOBlurPSO()
 {
 	CreateSSAOBlurPass();
 
-	{
-		gPSOBuild->BeginPipeline(ePipelineName::SSAOBlur);
+	auto BuildPipeline = [this](ePipelineName name, RenderStage& stage, RenderStage& source,
+								const SizedArray<ShaderMacro>& macros) {
+		gPSOBuild->BeginPipeline(name);
 
-		gPSOBuild->UseRenderStage(SSAOBlurPass);
-		gPSOBuild->SetShader(eShaderName::SSAOBlur, {});
+		gPSOBuild->UseRenderStage(stage);
+		gPSOBuild->SetShader(eShaderName::SSAOBlur, macros);
 		gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
 		gPSOBuild->SetCullMode(eCullMode::None);
 
 		gPSOBuild->SetPushConstants(eShaderType::Pixel, sizeof(SSAOBlurPushConsts));
 
-		// tSSAO (input SSAO texture)
-		gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, SSAOPass.GetTarget(eImageFormat::R8_UNorm),
-									  gSamplerCache->Request(SamplerProps {
-										  eSamplerFilter::Nearest,
-										  eSamplerFilter::Nearest,
-										  eSamplerFilter::Nearest,
-									  }));
-
-		// tDepth (for bilateral edge preservation)
-		gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, Prepass.GetTarget(eImageFormat::D32_Float),
+		// tSSAO (visibility + packed edges)
+		gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, source.GetTarget(eImageFormat::RG16_UNorm),
 									  gSamplerCache->Request(SamplerProps {
 										  eSamplerFilter::Nearest,
 										  eSamplerFilter::Nearest,
@@ -307,7 +300,11 @@ void TiledForwardRenderer::CreateSSAOBlurPSO()
 									  }));
 
 		gPSOBuild->EndPipeline();
-	}
+	};
+
+	BuildPipeline(ePipelineName::SSAODenoise, SSAODenoisePass, SSAOPass, {});
+	BuildPipeline(ePipelineName::SSAOBlur, SSAOBlurPass, SSAODenoisePass,
+				  { ShaderMacro { .pcName = "FINAL_APPLY", .pcValue = "1" } });
 }
 
 void TiledForwardRenderer::CreateDebugLayerPSO()
@@ -438,6 +435,7 @@ bool TiledForwardRenderer::MakeForwardDesc(ePipelinePass pass, ePipelineFeatures
 	static const ShaderMacro scPrepassDepth { .pcName = "USE_PREPASS_DEPTH", .pcValue = "1" };
 	static const ShaderMacro scProbeCapture { .pcName = "PROBE_CAPTURE", .pcValue = "1" };
 	static const ShaderMacro scDebugViews { .pcName = "DEBUG_VIEWS", .pcValue = "1" };
+	static const ShaderMacro scBlendPass { .pcName = "BLEND_PASS", .pcValue = "1" };
 
 	const bool is_opaque = (pass == ePipelinePass::Forward || pass == ePipelinePass::ForwardDebug);
 	const bool is_blended = (pass == ePipelinePass::ForwardBlend || pass == ePipelinePass::ForwardBlendDebug);
@@ -455,6 +453,7 @@ bool TiledForwardRenderer::MakeForwardDesc(ePipelinePass pass, ePipelineFeatures
 	// Transparent geometry also discards what is nearly invisible
 	if (is_blended) {
 		out_desc.Macros.push_back(ShaderMacro { .pcName = "ALPHA_CUTOFF", .pcValue = "0.01" });
+		out_desc.Macros.push_back(scBlendPass);
 	}
 
 	const char* pass_suffix = "";

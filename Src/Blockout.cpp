@@ -22,6 +22,10 @@
 #include <Renderer/PipelineNames.hpp>
 #include <Script/ObjectScripts.hpp>
 #include <World.hpp>
+#include <algorithm>
+#include <cctype>
+#include <cfloat>
+#include <filesystem>
 
 
 namespace fx {
@@ -32,6 +36,13 @@ static constexpr MaterialLibraryID scEditableMaterialID = MaterialLibraryID(1);
 static constexpr float32 scBakedSunMinCosine = 0.99999f;
 
 Blockout::Blockout() {}
+
+static void DestroyObjectTree(Object& object);
+
+static bool DoesFileExist(const String& path)
+{
+	return std::filesystem::exists(FilesystemIO::ResolvePath(path).CStr());
+}
 
 static void ReadScriptEntry(Object* object, const ConfigEntry& entry)
 {
@@ -540,6 +551,19 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	mCompiledProbeLayout.Clear();
 	mbIsCompiledMap = false;
 
+	for (const SubviewInstance& instance : mSubviewInstances) {
+		Object* root = gObjectManager->GetObject(instance.RootID);
+
+		if (root != nullptr) {
+			DestroyObjectTree(*root);
+		}
+	}
+
+	mSubviews.Clear();
+	mSubviewInstances.Clear();
+	mNextSubviewInstance = 1;
+	mActiveSubview = scNoSubview;
+
 	if (mbHasBakedSun) {
 		gProbeManager->ClearSunVisibility();
 	}
@@ -556,7 +580,7 @@ bool Blockout::IsBakedSunCurrent(const Vec3f sun_position) const
 	return sun_position.Normalize().Dot(mBakedSunDirection) > scBakedSunMinCosine;
 }
 
-bool Blockout::LoadCompiledMap(const String& prototype_path, CompiledMap& out_map) const
+bool Blockout::LoadCompiledMap(const String& prototype_path, const ConfigFile& info, CompiledMap& out_map) const
 {
 	const String resolved_path = FilesystemIO::ResolvePath(prototype_path);
 	const String compiled_path = CompiledMap::GetPathForPrototype(resolved_path);
@@ -567,7 +591,7 @@ bool Blockout::LoadCompiledMap(const String& prototype_path, CompiledMap& out_ma
 		return false;
 	}
 
-	if (out_map.SourceHash != CompiledMap::HashFile(resolved_path)) {
+	if (out_map.SourceHash != HashPrototype(resolved_path, info)) {
 		LogWarning(LC_ASSET,
 				   "The compiled map '{}' is out of date with its prototype, loading the brushes of the prototype "
 				   "instead. Run mapc on the prototype to update it.",
@@ -627,11 +651,11 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 		mesh->Indices.InitCapacity(surface.Indices.Size);
 
 		for (const CompiledMapVertex& vertex : surface.Vertices) {
-			mesh->Positions.Insert(Vec3f(vertex.Position[0], vertex.Position[1], vertex.Position[2]));
-			mesh->Normals.Insert(Vec3f(vertex.Normal[0], vertex.Normal[1], vertex.Normal[2]));
-			mesh->Tangents.Insert(Vec3f(vertex.Tangent[0], vertex.Tangent[1], vertex.Tangent[2]));
-			mesh->TangentHandedness.Insert(vertex.Tangent[3]);
-			mesh->Texcoords.Insert(Vec2f(vertex.Texcoord[0], vertex.Texcoord[1]));
+			mesh->Positions.Insert(vertex.Position);
+			mesh->Normals.Insert(vertex.Normal);
+			mesh->Tangents.Insert(Vec3f(vertex.Tangent));
+			mesh->TangentHandedness.Insert(vertex.Tangent.W);
+			mesh->Texcoords.Insert(vertex.Texcoord);
 		}
 
 		for (const uint32 index : surface.Indices) {
@@ -656,8 +680,7 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 			object->SetLightmapped(true);
 		}
 
-		object->Bounds.Min = Vec3f(surface.BoundsMin[0], surface.BoundsMin[1], surface.BoundsMin[2]);
-		object->Bounds.Max = Vec3f(surface.BoundsMax[0], surface.BoundsMax[1], surface.BoundsMax[2]);
+		object->Bounds = surface.Bounds;
 
 		gWorldGrid->UpdateObject(object);
 
@@ -718,8 +741,8 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 		gProbeManager->SetSunVisibility(Slice<const Vec3f>(map.Probes.Positions.pData, map.Probes.Positions.Size),
 										Slice<const uint8>(map.ProbeSunVisibility.pData, map.ProbeSunVisibility.Size));
 
-		LogInfo("The sun's shadows are baked: {}x{} lightmap, {} probes carry them to everything else", lightmap.Width,
-				lightmap.Height, map.ProbeSunVisibility.Size);
+		LogInfo("Loaded baked sun shadows; {}x{} lightmap, {} probes", lightmap.Width, lightmap.Height,
+				map.ProbeSunVisibility.Size);
 	}
 
 	LogInfo("Loaded the compiled map: {} surfaces and {} colliders replace {} brushes, {} light probes placed",
@@ -744,6 +767,12 @@ MaterialID Blockout::GetDefaultMaterial() const { return mMaterials.GetMaterial(
 MaterialID Blockout::GetDBoundMaterial() const
 {
 	return GetMaterialForID(mMaterials.FindIDByName(scDBoundMaterialName));
+}
+
+bool Blockout::IsCompiledObject(const Object* object) const
+{
+	return object != nullptr &&
+		   std::find(mCompiledObjects.begin(), mCompiledObjects.end(), object->ID) != mCompiledObjects.end();
 }
 
 Brush* Blockout::GetBrush(const Object* object)
@@ -879,6 +908,7 @@ ObjectID Blockout::CreateBrush(const String& name, const Vec3f position, const Q
 
 	object->SetPosition(position);
 	object->SetRotation(rotation);
+	object->SubviewInstance = mActiveSubview;
 
 	Brush brush = Brush::FromBox(bounds.Min, bounds.Max);
 	RebuildBrush(object, std::move(brush), physics::eMotionType::Static);
@@ -891,6 +921,38 @@ ObjectID Blockout::CreateBrush(const String& name, const Vec3f position, const Q
 	BlockoutObjects.NewItem(nullptr, object->ID);
 
 	return object->ID;
+}
+
+MaterialID Blockout::ReadBrushMaterial(ConfigEntry& entry)
+{
+	MaterialID material_id = GetDefaultMaterial();
+
+	if (entry.GetMemberValue(HashStr32("lock"), 0) != 1) {
+		material_id = mMaterials.GetMaterial(scEditableMaterialID);
+	}
+
+	const ConfigEntry* mat_entry = entry.GetMember(HashStr32("mat"));
+
+	const eBrushKind brush_kind = ReadBrushKind(entry);
+
+	if (brush_kind == eBrushKind::DBound) {
+		material_id = GetDBoundMaterial();
+	}
+
+	if (brush_kind == eBrushKind::Geometry && mat_entry != nullptr &&
+		mat_entry->Type == ConfigEntry::ePrimitiveType::String) {
+		const char* mat_name = mat_entry->Get<const char*>();
+		const MaterialLibraryID mat_id = mMaterials.FindIDByName(mat_name);
+
+		if (mat_id.IsValid()) {
+			material_id = GetMaterialForID(mat_id);
+		}
+		else {
+			LogWarning(LC_ASSET, "Blockout '{}' uses the unknown material '{}'", entry.Name.Get(), mat_name);
+		}
+	}
+
+	return material_id;
 }
 
 ObjectID Blockout::CreateBrush(ConfigEntry& entry)
@@ -908,40 +970,15 @@ ObjectID Blockout::CreateBrush(ConfigEntry& entry)
 		return ObjectID::scNull;
 	}
 
-	MaterialID material_id = GetDefaultMaterial();
+	const MaterialID material_id = ReadBrushMaterial(entry);
 
 	eObjectTag object_tags = eObjectTag::Blockout;
 
-	bool is_locked = entry.GetMemberValue(HashStr32("lock"), 0) == 1;
-	if (is_locked) {
+	if (entry.GetMemberValue(HashStr32("lock"), 0) == 1) {
 		SetFlag(object_tags, eObjectTag::LockTransform);
 	}
-	else {
-		material_id = mMaterials.GetMaterial(scEditableMaterialID);
-	}
-
-	ConfigEntry* mat_entry = entry.GetMember(HashStr32("mat"));
 
 	const eBrushKind brush_kind = ReadBrushKind(entry);
-
-	if (brush_kind == eBrushKind::DBound) {
-		material_id = GetDBoundMaterial();
-	}
-
-	if (brush_kind == eBrushKind::Geometry && mat_entry != nullptr &&
-		mat_entry->Type == ConfigEntry::ePrimitiveType::String) {
-		MaterialLibraryID mat_id = MaterialLibraryID::scNull;
-
-		const char* mat_name = mat_entry->Get<const char*>();
-		mat_id = mMaterials.FindIDByName(mat_name);
-
-		if (mat_id.IsValid()) {
-			material_id = GetMaterialForID(mat_id);
-		}
-		else {
-			LogWarning(LC_ASSET, "Blockout '{}' uses the unknown material '{}'", entry.Name.Get(), mat_name);
-		}
-	}
 
 	Object* object = gObjectManager->NewObject(blockout_id.Str(), material_id, object_tags);
 	object->MoveBy(position);
@@ -1070,9 +1107,21 @@ void Blockout::DestroyObject(Object* object)
 	gObjectManager->DestroyObject(object->ID);
 }
 
+std::string Blockout::MakeUniqueBrushName() const
+{
+	uint32 index = BlockoutObjects.Size;
+	String name = String::Fmt("{}", index);
+
+	while (gObjectManager->FindObject(HashStr32(name.CStr())) != nullptr) {
+		name = String::Fmt("{}", ++index);
+	}
+
+	return name.Str();
+}
+
 Object* Blockout::NewObject(const Vec3f position, MaterialID material)
 {
-	std::string blockout_name = String::Fmt("{}", BlockoutObjects.Size).Str();
+	std::string blockout_name = MakeUniqueBrushName();
 	LogInfo("Creating new blockout object '{}'", blockout_name);
 
 	Object* object = gObjectManager->NewObject(blockout_name, material.IsNull() ? GetDefaultMaterial() : material,
@@ -1082,6 +1131,7 @@ Object* Blockout::NewObject(const Vec3f position, MaterialID material)
 
 	object->MoveBy(position);
 	object->SetShadowCaster(true);
+	object->SubviewInstance = mActiveSubview;
 
 	RebuildBrush(object, Brush::FromBox(Vec3f(-scale), Vec3f(scale)), physics::eMotionType::Static);
 
@@ -1101,7 +1151,7 @@ Object* Blockout::DupeObject(Object* object)
 		return nullptr;
 	}
 
-	std::string blockout_name = String::Fmt("{}", BlockoutObjects.Size).Str();
+	std::string blockout_name = MakeUniqueBrushName();
 	LogInfo("Creating new blockout object '{}'", blockout_name);
 
 	Object* dupe = gObjectManager->NewObject(blockout_name, object->GetMaterialID(), eObjectTag::Blockout);
@@ -1117,6 +1167,14 @@ Object* Blockout::DupeObject(Object* object)
 	dupe->SetPosition(object->GetPosition());
 	dupe->SetRotation(object->mRotation);
 	dupe->SetShadowCaster(true);
+
+	if (IsEditingSubview()) {
+		dupe->SubviewInstance = mActiveSubview;
+	}
+	else {
+		dupe->SubviewInstance = object->SubviewInstance;
+		dupe->SubviewMember = object->SubviewMember;
+	}
 
 	if (object->IsProbeVolume()) {
 		dupe->SetProbeVolume(true);
@@ -1238,6 +1296,7 @@ Object* Blockout::RestoreObject(const Vec3f position, const Brush::PlaneList& pl
 	object->MoveBy(position);
 	object->SetShadowCaster(true);
 	object->SetRotation(rotation);
+	object->SubviewInstance = mActiveSubview;
 
 	RebuildBrush(object, std::move(brush), is_dynamic ? physics::eMotionType::Dynamic : physics::eMotionType::Static);
 
@@ -1524,6 +1583,24 @@ static void CollectModelNodes(Object& object, std::vector<ObjectID>& out_nodes)
 	}
 }
 
+static void DestroyObjectTree(Object& object)
+{
+	std::vector<ObjectID> nodes;
+	CollectModelNodes(object, nodes);
+
+	object.Destroy();
+
+	// The object manager is locked while it destroys an object, so no object can be left to look up its nodes there
+	for (ObjectID node_id : nodes) {
+		gWorld->Detach(node_id);
+		gObjectManager->GetObject(node_id)->AttachedNodes.Clear();
+	}
+
+	for (ObjectID& node_id : nodes) {
+		gObjectManager->DestroyObject(node_id);
+	}
+}
+
 bool Blockout::RemoveModelFromWorld(ObjectID id)
 {
 	Object* object = gObjectManager->GetObject(id);
@@ -1537,20 +1614,7 @@ bool Blockout::RemoveModelFromWorld(ObjectID id)
 		return false;
 	}
 
-	std::vector<ObjectID> nodes;
-	CollectModelNodes(*object, nodes);
-
-	object->Destroy();
-
-	// The object manager is locked while it destroys an object, so no object can be left to look up its nodes there
-	for (ObjectID node_id : nodes) {
-		gWorld->Detach(node_id);
-		gObjectManager->GetObject(node_id)->AttachedNodes.Clear();
-	}
-
-	for (ObjectID& node_id : nodes) {
-		gObjectManager->DestroyObject(node_id);
-	}
+	DestroyObjectTree(*object);
 
 	return true;
 }
@@ -1770,6 +1834,1139 @@ void Blockout::SaveModels(ConfigFile& info)
 	mbHasModelsEntry = true;
 }
 
+ConfigEntry Blockout::MakeBrushEntry(Object* object, const String& name, const BrushPlacement& placement)
+{
+	ConfigEntry blockout_entry = ConfigEntry::Struct(name);
+	{
+		blockout_entry.AddMember(ConfigEntry::Literal("pos", placement.Position));
+
+		WriteBrushEntry(blockout_entry, object);
+
+		blockout_entry.AddMember(ConfigEntry::Literal("rotquat", placement.Rotation));
+
+		if (object->HasTags(eObjectTag::LockTransform)) {
+			blockout_entry.AddMember(ConfigEntry::Literal("lock", 1));
+		}
+
+		if (object->IsProbeVolume()) {
+			blockout_entry.AddMember(ConfigEntry::Literal("probevolume", 1));
+		}
+
+		if (object->IsReflectionProbe()) {
+			blockout_entry.AddMember(ConfigEntry::Literal("reflectionprobe", 1));
+		}
+
+
+		if (object->IsSpawn()) {
+			blockout_entry.AddMember(ConfigEntry::Literal("spawn", 1));
+		}
+
+		if (object->IsTrigger()) {
+			blockout_entry.AddMember(ConfigEntry::Literal("trigger", 1));
+			WriteTriggerEntry(blockout_entry, object);
+		}
+
+		if (object->IsNvBrush()) {
+			blockout_entry.AddMember(ConfigEntry::Literal(scNvBrushName, 1));
+		}
+
+		if (object->IsDBound()) {
+			blockout_entry.AddMember(ConfigEntry::Literal(scDBoundName, 1));
+		}
+
+		WriteScriptEntry(blockout_entry, object);
+
+		if (IsDynamic(object)) {
+			blockout_entry.AddMember(ConfigEntry::Literal("dynamic", 1));
+		}
+
+#ifdef FX_IS_EDITOR
+		const MaterialID object_material = gEditor->GetSelection().GetStoredMaterial(object);
+#else
+		const MaterialID object_material = object->GetMaterialID();
+#endif
+
+		const MaterialLibraryID material_id = GetIDForMaterial(object_material);
+
+		if (material_id.IsValid()) {
+			blockout_entry.AddMember(ConfigEntry::Literal("mat", mMaterials.GetName(material_id).CStr()));
+		}
+	}
+
+	return blockout_entry;
+}
+
+/////////////////////////////////////
+// Subviews
+/////////////////////////////////////
+
+static Mat4f MakeBrushMatrix(const BrushPlacement& placement, const Vec3f center)
+{
+	return Mat4f::AsTranslation(-center) * Mat4f::AsRotation(placement.Rotation) * Mat4f::AsTranslation(center) *
+		   Mat4f::AsTranslation(placement.Position);
+}
+
+static Vec3f TransformPoint(const Mat4f& matrix, const Vec3f point)
+{
+	const Vec4f moved = matrix * Vec4f(point.X, point.Y, point.Z, 1.0f);
+
+	return Vec3f(moved.X, moved.Y, moved.Z);
+}
+
+static Vec3f TransformDirection(const Mat4f& matrix, const Vec3f direction)
+{
+	const Vec4f turned = matrix * Vec4f(direction.X, direction.Y, direction.Z, 0.0f);
+
+	return Vec3f(turned.X, turned.Y, turned.Z);
+}
+
+static BrushPlacement ReadBrushPlacement(const ConfigEntry& entry)
+{
+	BrushPlacement placement;
+	placement.Position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
+	placement.Rotation = ReadBrushRotation(entry);
+
+	return placement;
+}
+
+template <typename TElement>
+static void CopyToSizedArray(const std::vector<TElement>& source, SizedArray<TElement>& out)
+{
+	out.InitCapacity(source.size());
+
+	for (const TElement& element : source) {
+		out.Insert(element);
+	}
+}
+
+Blockout::Subview* Blockout::FindSubview(const String& name)
+{
+	for (Subview& subview : mSubviews) {
+		if (subview.Name == name) {
+			return &subview;
+		}
+	}
+
+	return nullptr;
+}
+
+Blockout::Subview* Blockout::LoadSubview(const ConfigFile* info, const String& name)
+{
+	for (Subview& subview : mSubviews) {
+		if (subview.Name == name || (!subview.LegacyName.IsEmpty() && subview.LegacyName == name)) {
+			return &subview;
+		}
+	}
+
+	const ConfigFile no_info {};
+	const ConfigFile& source = (info != nullptr) ? *info : no_info;
+
+	ConfigEntry brushes;
+
+	if (!ReadSubviewBrushes(source, mPrototypePath, name, brushes)) {
+		return nullptr;
+	}
+
+	const ConfigEntry* inline_subviews = source.GetEntry(HashStr32(scSubviewsEntryName));
+	const bool is_inline = inline_subviews != nullptr && inline_subviews->GetMember(HashStr32(name.CStr())) != nullptr;
+
+	Subview subview;
+	subview.Name = name;
+	subview.bHasFile = true;
+
+	if (is_inline) {
+		subview.Name = MakeSubviewName(name);
+		subview.LegacyName = name;
+		subview.bHasFile = false;
+		subview.bDirty = true;
+	}
+
+	subview.Brushes = brushes.Clone(subview.Name);
+	BuildSubview(subview);
+
+	mSubviews.Insert(std::move(subview));
+
+	return mSubviews.GetLast();
+}
+
+Blockout::SubviewInstance* Blockout::FindSubviewInstance(uint32 instance)
+{
+	for (SubviewInstance& other : mSubviewInstances) {
+		if (other.ID == instance) {
+			return &other;
+		}
+	}
+
+	return nullptr;
+}
+
+const Blockout::SubviewInstance* Blockout::FindSubviewInstance(uint32 instance) const
+{
+	for (const SubviewInstance& other : mSubviewInstances) {
+		if (other.ID == instance) {
+			return &other;
+		}
+	}
+
+	return nullptr;
+}
+
+String Blockout::GetSubviewName(uint32 instance) const
+{
+	const SubviewInstance* found = FindSubviewInstance(instance);
+
+	if (found == nullptr) {
+		return "";
+	}
+
+	return found->SubviewName;
+}
+
+String Blockout::GetSubviewNames() const
+{
+	std::vector<std::string> names;
+
+	for (const Subview& subview : mSubviews) {
+		if (!subview.Members.empty()) {
+			names.push_back(subview.Name.CStr());
+		}
+	}
+
+	if (!mPrototypePath.IsEmpty()) {
+		const std::filesystem::path folder = std::filesystem::path(
+			FilesystemIO::ResolvePath(
+				(std::filesystem::path(mPrototypePath.CStr()).parent_path() / scSubviewDirectoryName).generic_string())
+				.CStr());
+
+		std::error_code error;
+
+		for (const std::filesystem::directory_entry& file : std::filesystem::directory_iterator(folder, error)) {
+			if (file.path().extension() != CompiledMap::scPrototypeExtension) {
+				continue;
+			}
+
+			const std::string name = (std::filesystem::path(scSubviewDirectoryName) / file.path().filename())
+										 .generic_string();
+
+			if (std::find(names.begin(), names.end(), name) == names.end()) {
+				names.push_back(name);
+			}
+		}
+	}
+
+	std::sort(names.begin(), names.end());
+
+	std::string joined;
+
+	for (const std::string& name : names) {
+		if (!joined.empty()) {
+			joined += '\n';
+		}
+
+		joined += name;
+	}
+
+	return String(joined);
+}
+
+String Blockout::MakeSubviewName(const String& wanted) const
+{
+	std::string base;
+
+	for (const char* c = wanted.CStr(); *c != '\0'; c++) {
+		if (std::isalnum(static_cast<unsigned char>(*c)) || *c == '_') {
+			base += *c;
+		}
+		else if (*c == ' ' || *c == '-') {
+			base += '_';
+		}
+	}
+
+	if (base.empty()) {
+		base = "subview";
+	}
+
+	const auto make_name = [](const std::string& stem)
+	{
+		return String((std::filesystem::path(scSubviewDirectoryName) / (stem + CompiledMap::scPrototypeExtension))
+						  .generic_string());
+	};
+
+	const auto is_taken = [this](const String& name)
+	{
+		if (std::any_of(mSubviews.begin(), mSubviews.end(),
+						[&](const Subview& subview) { return subview.Name == name; })) {
+			return true;
+		}
+
+		return !mPrototypePath.IsEmpty() && DoesFileExist(GetSubviewFilePath(mPrototypePath, name));
+	};
+
+	String name = make_name(base);
+
+	for (uint32 suffix = 2; is_taken(name); suffix++) {
+		name = make_name(base + "_" + std::to_string(suffix));
+	}
+
+	return name;
+}
+
+void Blockout::BuildSubview(Subview& subview)
+{
+	struct GroupBuilder
+	{
+		MaterialID Material = MaterialID::scNull;
+
+		std::vector<Vec3f> Positions;
+		std::vector<Vec3f> Normals;
+		std::vector<Vec3f> Tangents;
+		std::vector<float32> TangentHandedness;
+		std::vector<Vec2f> Texcoords;
+		std::vector<uint32> Indices;
+
+		Vec3f Min = Vec3f(FLT_MAX);
+		Vec3f Max = Vec3f(-FLT_MAX);
+	};
+
+	subview.Members.clear();
+	subview.Groups.clear();
+
+	std::vector<GroupBuilder> builders;
+	std::vector<SizedArray<Vec3f>> hulls;
+
+	Vec3f min(FLT_MAX);
+	Vec3f max(-FLT_MAX);
+
+	if (subview.Brushes.Members.IsInited()) {
+		for (ConfigEntry& entry : subview.Brushes.Members) {
+			SubviewMember& member = subview.Members.emplace_back();
+			member.LocalBrush = ReadBrushEntry(entry);
+
+			if (!member.LocalBrush.IsValid()) {
+				continue;
+			}
+
+			const Brush& brush = member.LocalBrush;
+
+			member.ToSubview = MakeBrushMatrix(ReadBrushPlacement(entry), brush.GetCenter());
+			member.bMerged = !IsEntityBrushEntry(entry) && ReadBrushKind(entry) == eBrushKind::Geometry;
+
+			if (!member.bMerged) {
+				continue;
+			}
+
+			const MaterialID material = ReadBrushMaterial(entry);
+
+			auto builder = std::find_if(builders.begin(), builders.end(),
+										[&](const GroupBuilder& other) { return other.Material == material; });
+
+			if (builder == builders.end()) {
+				builders.emplace_back().Material = material;
+				builder = builders.end() - 1;
+			}
+
+			MeshGen::GeneratedMesh mesh;
+			brush.GenerateMesh(mesh.Positions, mesh.Normals, mesh.Tangents, mesh.TangentHandedness, mesh.Texcoords,
+							   mesh.Indices);
+
+			const uint32 first_vertex = static_cast<uint32>(builder->Positions.size());
+
+			for (size_t i = 0; i < mesh.Positions.Size; i++) {
+				const Vec3f position = TransformPoint(member.ToSubview, mesh.Positions[i]);
+
+				builder->Positions.push_back(position);
+				builder->Normals.push_back(TransformDirection(member.ToSubview, mesh.Normals[i]));
+				builder->Tangents.push_back(TransformDirection(member.ToSubview, mesh.Tangents[i]));
+				builder->Texcoords.push_back(mesh.Texcoords[i]);
+
+				if (i < mesh.TangentHandedness.Size) {
+					builder->TangentHandedness.push_back(mesh.TangentHandedness[i]);
+				}
+				else {
+					builder->TangentHandedness.push_back(1.0f);
+				}
+
+				builder->Min = Vec3f::Min(builder->Min, position);
+				builder->Max = Vec3f::Max(builder->Max, position);
+			}
+
+			for (const uint32 index : mesh.Indices) {
+				builder->Indices.push_back(first_vertex + index);
+			}
+
+			SizedArray<Vec3f>& hull = hulls.emplace_back();
+			hull.InitCapacity(brush.GetVertices().Size);
+
+			for (const Vec3f vertex : brush.GetVertices()) {
+				hull.Insert(TransformPoint(member.ToSubview, vertex));
+			}
+
+			min = Vec3f::Min(min, builder->Min);
+			max = Vec3f::Max(max, builder->Max);
+		}
+	}
+
+	for (const GroupBuilder& builder : builders) {
+		Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
+
+		CopyToSizedArray(builder.Positions, mesh->Positions);
+		CopyToSizedArray(builder.Normals, mesh->Normals);
+		CopyToSizedArray(builder.Tangents, mesh->Tangents);
+		CopyToSizedArray(builder.TangentHandedness, mesh->TangentHandedness);
+		CopyToSizedArray(builder.Texcoords, mesh->Texcoords);
+		CopyToSizedArray(builder.Indices, mesh->Indices);
+
+		SubviewGroup& group = subview.Groups.emplace_back();
+		group.Material = builder.Material;
+		group.pMesh = mesh->AsDefaultMesh();
+		group.Bounds = BBox(builder.Min, builder.Max);
+	}
+
+	SizedArray<SizedArray<Vec3f>> subview_hulls;
+	subview_hulls.InitCapacity(hulls.size());
+
+	for (SizedArray<Vec3f>& hull : hulls) {
+		subview_hulls.Insert(std::move(hull));
+	}
+
+	subview.Hulls = std::move(subview_hulls);
+
+	if (builders.empty()) {
+		subview.Bounds = BBox(Vec3f::sZero, Vec3f::sZero);
+	}
+	else {
+		subview.Bounds = BBox(min, max);
+	}
+}
+
+bool Blockout::IsSubviewObject(const Object* object) const
+{
+	if (object == nullptr || object->SubviewInstance == scNoSubview) {
+		return false;
+	}
+
+	const SubviewInstance* found = FindSubviewInstance(object->SubviewInstance);
+
+	return found != nullptr && found->RootID == object->ID;
+}
+
+Object* Blockout::GetSubviewObject(uint32 instance) const
+{
+	const SubviewInstance* found = FindSubviewInstance(instance);
+
+	if (found == nullptr) {
+		return nullptr;
+	}
+
+	return gObjectManager->GetObject(found->RootID);
+}
+
+uint32 Blockout::GetSubviewBrushCount(uint32 instance) const
+{
+	const SubviewInstance* found = FindSubviewInstance(instance);
+
+	if (found == nullptr) {
+		return 0;
+	}
+
+	for (const Subview& subview : mSubviews) {
+		if (subview.Name == found->SubviewName) {
+			return static_cast<uint32>(subview.Members.size());
+		}
+	}
+
+	return 0;
+}
+
+void Blockout::GetSubviewMembers(uint32 instance, std::vector<Object*>& out_members) const
+{
+	out_members.clear();
+
+	if (instance == scNoSubview) {
+		return;
+	}
+
+	for (const ObjectID id : BlockoutObjects) {
+		Object* object = gObjectManager->GetObject(id);
+
+		if (object != nullptr && object->SubviewInstance == instance) {
+			out_members.push_back(object);
+		}
+	}
+}
+
+void Blockout::GetSubviewSolids(std::vector<SubviewSolid>& out_solids)
+{
+	out_solids.clear();
+
+	for (const SubviewInstance& instance : mSubviewInstances) {
+		Object* root = gObjectManager->GetObject(instance.RootID);
+		const Subview* subview = FindSubview(instance.SubviewName);
+
+		if (root == nullptr || subview == nullptr) {
+			continue;
+		}
+
+		const Mat4f world = root->GetWorldMatrix();
+
+		for (const SubviewMember& member : subview->Members) {
+			if (!member.bMerged) {
+				continue;
+			}
+
+			out_solids.push_back(SubviewSolid {
+				.pBrush = &member.LocalBrush,
+				.World = member.ToSubview * world,
+				.pOwner = root,
+			});
+		}
+	}
+}
+
+bool Blockout::GetSubviewPlacement(uint32 instance, BrushPlacement& out_placement)
+{
+	if (instance == scNoSubview) {
+		return false;
+	}
+
+	if (instance == mActiveSubview) {
+		out_placement = mActivePlacement;
+		return true;
+	}
+
+	const SubviewInstance* found = FindSubviewInstance(instance);
+
+	if (found == nullptr || !found->bPlaced) {
+		return false;
+	}
+
+	const Object* root = gObjectManager->GetObject(found->RootID);
+
+	if (root != nullptr) {
+		out_placement = BrushPlacement { root->GetPosition(), root->mRotation };
+	}
+	else {
+		out_placement = found->Placement;
+	}
+
+	return true;
+}
+
+bool Blockout::GetSubviewBounds(uint32 instance, BBox& out_bounds)
+{
+	Object* root = GetSubviewObject(instance);
+
+	if (root != nullptr) {
+		out_bounds = root->GetWorldOBB().GetWorldAABB();
+		return true;
+	}
+
+	std::vector<Object*> members;
+	GetSubviewMembers(instance, members);
+
+	return GetBrushBounds(members.data(), static_cast<uint32>(members.size()), out_bounds);
+}
+
+bool Blockout::GetBrushBounds(Object* const* objects, uint32 count, BBox& out_bounds)
+{
+	Vec3f min(FLT_MAX);
+	Vec3f max(-FLT_MAX);
+	bool has_bounds = false;
+
+	for (uint32 i = 0; i < count; i++) {
+		Object* member = objects[i];
+		const Brush* brush = GetBrush(member);
+
+		if (brush == nullptr) {
+			continue;
+		}
+
+		const Mat4f world = member->GetWorldMatrix();
+
+		for (const Vec3f vertex : brush->GetVertices()) {
+			const Vec4f point = world * Vec4f(vertex.X, vertex.Y, vertex.Z, 1.0f);
+
+			min = Vec3f(std::min(min.X, point.X), std::min(min.Y, point.Y), std::min(min.Z, point.Z));
+			max = Vec3f(std::max(max.X, point.X), std::max(max.Y, point.Y), std::max(max.Z, point.Z));
+			has_bounds = true;
+		}
+	}
+
+	if (has_bounds) {
+		out_bounds = BBox(min, max);
+	}
+
+	return has_bounds;
+}
+
+uint32 Blockout::CreateSubview(const String& name, Object* const* objects, uint32 count, const Vec3f origin)
+{
+	const String subview_name = MakeSubviewName(name);
+
+	BrushPlacement placement;
+	placement.Position = origin;
+
+	ConfigEntry brushes = ConfigEntry::Struct(subview_name);
+
+	for (uint32 i = 0; i < count; i++) {
+		Object* object = objects[i];
+		const Brush* brush = GetBrush(object);
+
+		if (brush == nullptr) {
+			LogError(LC_ASSET, "'{}' is not a brush, so it can't be part of a subview", object->Name.Get());
+			return scNoSubview;
+		}
+
+		const BrushPlacement local = RemoveFromSubview(BrushPlacement { object->GetPosition(), object->mRotation },
+													   brush->GetCenter(), placement);
+
+		brushes.AddMember(MakeBrushEntry(object, String::Fmt("{}", i), local));
+	}
+
+	Subview subview;
+	subview.Name = subview_name;
+	subview.Brushes = std::move(brushes);
+	subview.bDirty = true;
+
+	BuildSubview(subview);
+
+	mSubviews.Insert(std::move(subview));
+
+	return NewSubviewInstance(subview_name);
+}
+
+uint32 Blockout::NewSubviewInstance(const String& subview_name)
+{
+	const Subview* subview = LoadSubview(nullptr, subview_name);
+
+	if (subview == nullptr) {
+		return scNoSubview;
+	}
+
+	SubviewInstance instance;
+	instance.ID = mNextSubviewInstance++;
+	instance.SubviewName = subview->Name;
+
+	const auto is_taken = [this](const String& name)
+	{
+		return std::any_of(mSubviewInstances.begin(), mSubviewInstances.end(),
+						   [&](const SubviewInstance& other) { return other.Name == name; });
+	};
+
+	const String display_name = GetSubviewDisplayName(subview->Name);
+
+	uint32 suffix = instance.ID;
+
+	do {
+		instance.Name = String::Fmt("{}_{}", display_name, suffix++);
+	} while (is_taken(instance.Name));
+
+	mSubviewInstances.Insert(instance);
+
+	return instance.ID;
+}
+
+uint32 Blockout::CreateSubviewBrushes(const SubviewInstance& instance, const BrushPlacement& placement,
+									  bool entities_only, const CompiledMap* compiled_map)
+{
+	Subview* subview = FindSubview(instance.SubviewName);
+
+	if (subview == nullptr || !subview->Brushes.Members.IsInited()) {
+		return 0;
+	}
+
+	uint32 created_count = 0;
+	uint32 member_index = 0;
+
+	for (ConfigEntry& brush_entry : subview->Brushes.Members) {
+		const uint32 index = member_index++;
+		const String name = MakeSubviewBrushName(instance.Name, index);
+
+		if (entities_only && index < subview->Members.size() && subview->Members[index].bMerged) {
+			continue;
+		}
+
+		if (compiled_map != nullptr && compiled_map->HasBrush(name)) {
+			continue;
+		}
+
+		ConfigEntry placed = PlaceSubviewBrushEntry(brush_entry, name, placement);
+
+		if (!placed.Members.IsInited() || placed.Members.Size() == 0) {
+			LogError(LC_ASSET, "Brush {} of the subview '{}' is not a valid convex brush, skipping", index,
+					 subview->Name);
+			continue;
+		}
+
+		Object* object = gObjectManager->GetObject(CreateBrush(placed));
+
+		if (object == nullptr) {
+			continue;
+		}
+
+		object->SubviewInstance = instance.ID;
+		object->SubviewMember = index;
+
+		created_count++;
+	}
+
+	return created_count;
+}
+
+Object* Blockout::CreateSubviewObject(SubviewInstance& instance, Subview& subview, const BrushPlacement& placement)
+{
+	Object* root = gObjectManager->NewObject(instance.Name, GetDefaultMaterial(), eObjectTag::None);
+
+	if (root == nullptr) {
+		return nullptr;
+	}
+
+	root->SubviewInstance = instance.ID;
+	root->Bounds = subview.Bounds;
+	root->SetShadowCaster(true);
+
+	uint32 group_index = 0;
+
+	for (const SubviewGroup& group : subview.Groups) {
+		Object* node = gObjectManager->NewObject(String::Fmt("{}_g{}", instance.Name, group_index++), group.Material,
+												 eObjectTag::None);
+
+		if (node == nullptr) {
+			continue;
+		}
+
+		node->pMesh = group.pMesh;
+		node->Bounds = group.Bounds;
+		node->SubviewInstance = instance.ID;
+		node->SetShadowCaster(true);
+
+		root->AttachObject(node->ID);
+	}
+
+	if (subview.Hulls.Size > 0) {
+		physics::Body* body = gPhysics->NewBody(instance.Name);
+		body->CreateCompoundHullBody(subview.Hulls, physics::eMotionType::Static,
+									 physics::BodyProps {
+										 .ConvexRadius = 0.05f,
+										 .Density = 100,
+									 });
+
+		root->AttachCollider(body);
+	}
+
+	root->SetPosition(placement.Position);
+	root->SetRotation(placement.Rotation);
+
+	AssetTicket ticket(static_cast<void*>(root));
+	ticket.MarkAndSignalLoaded();
+
+	pWorld->Attach(ticket);
+
+	instance.RootID = root->ID;
+
+	return root;
+}
+
+Object* Blockout::PlaceSubviewInstance(uint32 instance, const BrushPlacement& placement)
+{
+	SubviewInstance* found = FindSubviewInstance(instance);
+
+	if (found == nullptr) {
+		return nullptr;
+	}
+
+	if (found->bPlaced) {
+		RemoveSubviewInstance(instance);
+	}
+
+	Subview* subview = FindSubview(found->SubviewName);
+
+	if (subview == nullptr || subview->Members.empty()) {
+		return nullptr;
+	}
+
+	found->Placement = placement;
+	found->bPlaced = true;
+
+	CreateSubviewBrushes(*found, placement, true, nullptr);
+
+	Object* root = CreateSubviewObject(*found, *subview, placement);
+
+	renderer::gShadowAtlas->Invalidate();
+
+	return root;
+}
+
+void Blockout::RemoveSubviewInstance(uint32 instance)
+{
+	SubviewInstance* found = FindSubviewInstance(instance);
+
+	if (found == nullptr) {
+		return;
+	}
+
+	Object* root = gObjectManager->GetObject(found->RootID);
+
+	if (root != nullptr) {
+		found->Placement = BrushPlacement { root->GetPosition(), root->mRotation };
+
+		DestroyObjectTree(*root);
+	}
+
+	found->RootID = ObjectID::scNull;
+	found->bPlaced = false;
+
+	std::vector<Object*> members;
+	GetSubviewMembers(instance, members);
+
+	for (Object* member : members) {
+		DestroyObject(member);
+	}
+
+	renderer::gShadowAtlas->Invalidate();
+}
+
+uint32 Blockout::DissolveSubviewInstance(uint32 instance, std::vector<ObjectID>& out_brushes)
+{
+	out_brushes.clear();
+
+	BrushPlacement placement;
+
+	if (instance == mActiveSubview || !GetSubviewPlacement(instance, placement)) {
+		return 0;
+	}
+
+	const SubviewInstance* found = FindSubviewInstance(instance);
+	const String instance_name = found->Name;
+	const String subview_name = found->SubviewName;
+
+	RemoveSubviewInstance(instance);
+
+	Subview* subview = FindSubview(subview_name);
+
+	if (subview == nullptr || !subview->Brushes.Members.IsInited()) {
+		return 0;
+	}
+
+	uint32 member_index = 0;
+
+	for (ConfigEntry& brush_entry : subview->Brushes.Members) {
+		String name = MakeSubviewBrushName(instance_name, member_index++);
+
+		if (gObjectManager->FindObject(HashStr32(name.CStr())) != nullptr) {
+			name = String(MakeUniqueBrushName());
+		}
+
+		ConfigEntry placed = PlaceSubviewBrushEntry(brush_entry, name, placement);
+
+		if (!placed.Members.IsInited() || placed.Members.Size() == 0) {
+			continue;
+		}
+
+		const ObjectID brush_id = CreateBrush(placed);
+
+		if (!brush_id.IsInvalid()) {
+			out_brushes.push_back(brush_id);
+		}
+	}
+
+	return static_cast<uint32>(out_brushes.size());
+}
+
+void Blockout::PlaceSubviewEntities(const SubviewInstance& instance)
+{
+	Subview* subview = FindSubview(instance.SubviewName);
+
+	if (subview == nullptr || !subview->Brushes.Members.IsInited()) {
+		return;
+	}
+
+	std::vector<Object*> members;
+	GetSubviewMembers(instance.ID, members);
+
+	for (Object* member : members) {
+		const Brush* brush = GetBrush(member);
+
+		if (brush == nullptr || member->SubviewMember >= subview->Brushes.Members.Size()) {
+			continue;
+		}
+
+		const BrushPlacement local = ReadBrushPlacement(subview->Brushes.Members[member->SubviewMember]);
+		const BrushPlacement world = PlaceInSubview(local, brush->GetCenter(), instance.Placement);
+
+		member->SetPosition(world.Position);
+		member->SetRotation(world.Rotation);
+	}
+}
+
+void Blockout::SyncSubviewInstances()
+{
+	for (SubviewInstance& instance : mSubviewInstances) {
+		const Object* root = gObjectManager->GetObject(instance.RootID);
+
+		if (root == nullptr) {
+			continue;
+		}
+
+		if (root->GetPosition().IsCloseTo(instance.Placement.Position) &&
+			root->mRotation.IsCloseTo(instance.Placement.Rotation)) {
+			continue;
+		}
+
+		instance.Placement = BrushPlacement { root->GetPosition(), root->mRotation };
+
+		PlaceSubviewEntities(instance);
+	}
+}
+
+bool Blockout::EnterSubview(uint32 instance)
+{
+	if (IsEditingSubview() || mbIsCompiledMap) {
+		return false;
+	}
+
+	BrushPlacement placement;
+
+	if (!GetSubviewPlacement(instance, placement)) {
+		return false;
+	}
+
+	RemoveSubviewInstance(instance);
+
+	SubviewInstance* found = FindSubviewInstance(instance);
+
+	found->Placement = placement;
+	found->bPlaced = true;
+
+	mActiveSubview = instance;
+	mActivePlacement = placement;
+
+	CreateSubviewBrushes(*found, placement, false, nullptr);
+
+	return true;
+}
+
+void Blockout::LeaveSubview()
+{
+	if (!IsEditingSubview()) {
+		return;
+	}
+
+	CommitActiveSubview();
+
+	const uint32 instance = mActiveSubview;
+
+	mActiveSubview = scNoSubview;
+
+	RemoveSubviewInstance(instance);
+	PlaceSubviewInstance(instance, mActivePlacement);
+}
+
+void Blockout::CommitActiveSubview()
+{
+	const SubviewInstance* active = FindSubviewInstance(mActiveSubview);
+
+	if (active == nullptr) {
+		return;
+	}
+
+	Subview* subview = FindSubview(active->SubviewName);
+
+	if (subview == nullptr) {
+		return;
+	}
+
+	std::vector<Object*> members;
+	GetSubviewMembers(mActiveSubview, members);
+
+	ConfigEntry brushes = ConfigEntry::Struct(subview->Name);
+	uint32 member_index = 0;
+
+	for (Object* member : members) {
+		const Brush* brush = GetBrush(member);
+
+		if (brush == nullptr) {
+			continue;
+		}
+
+		const BrushPlacement local = RemoveFromSubview(BrushPlacement { member->GetPosition(), member->mRotation },
+													   brush->GetCenter(), mActivePlacement);
+
+		brushes.AddMember(MakeBrushEntry(member, String::Fmt("{}", member_index), local));
+
+		member->SubviewMember = member_index++;
+	}
+
+	subview->Brushes = std::move(brushes);
+	subview->bDirty = true;
+
+	BuildSubview(*subview);
+
+	const String subview_name = subview->Name;
+
+	std::vector<uint32> others;
+
+	for (const SubviewInstance& instance : mSubviewInstances) {
+		if (instance.ID != mActiveSubview && instance.bPlaced && instance.SubviewName == subview_name) {
+			others.push_back(instance.ID);
+		}
+	}
+
+	for (const uint32 other : others) {
+		BrushPlacement placement;
+
+		if (GetSubviewPlacement(other, placement)) {
+			PlaceSubviewInstance(other, placement);
+		}
+	}
+}
+
+void Blockout::LoadSubviews(ConfigFile& info, const CompiledMap* compiled_map)
+{
+	const ConfigEntry* instances = info.GetEntry(HashStr32(scSubviewInstancesEntryName));
+
+	if (instances == nullptr) {
+		return;
+	}
+
+	for (const ConfigEntry& entry : instances->Members) {
+		const ConfigEntry* subview_name = entry.GetMember(HashStr32(scSubviewMemberName));
+
+		if (subview_name == nullptr || subview_name->Type != ConfigEntry::ePrimitiveType::String) {
+			LogWarning(LC_ASSET, "Subview instance '{}' does not name its subview", entry.Name.Get());
+			continue;
+		}
+
+		const Subview* subview = LoadSubview(&info, subview_name->Get<const char*>());
+
+		SubviewInstance instance;
+		instance.ID = mNextSubviewInstance++;
+		instance.Name = entry.Name.Get();
+		instance.Placement = ReadBrushPlacement(entry);
+
+		if (subview == nullptr) {
+			LogWarning(LC_ASSET, "Subview instance '{}' uses the subview '{}', which can't be read", entry.Name.Get(),
+					   subview_name->Get<const char*>());
+
+			instance.SubviewName = subview_name->Get<const char*>();
+			instance.bMissing = true;
+
+			mSubviewInstances.Insert(instance);
+			continue;
+		}
+
+		instance.SubviewName = subview->Name;
+
+		mSubviewInstances.Insert(instance);
+
+		if (compiled_map != nullptr) {
+			CreateSubviewBrushes(instance, instance.Placement, false, compiled_map);
+
+			SubviewInstance* inst = mSubviewInstances.GetLast();
+			if (inst) {
+				inst->bPlaced = true;
+			}
+		}
+		else {
+			PlaceSubviewInstance(instance.ID, instance.Placement);
+		}
+	}
+}
+
+bool Blockout::WriteSubviewFile(Subview& subview)
+{
+	if (mPrototypePath.IsEmpty()) {
+		return false;
+	}
+
+	if (!subview.bHasFile && DoesFileExist(GetSubviewFilePath(mPrototypePath, subview.Name))) {
+		const String previous_name = subview.Name;
+
+		subview.Name = MakeSubviewName(GetSubviewDisplayName(previous_name));
+
+		for (SubviewInstance& instance : mSubviewInstances) {
+			if (instance.SubviewName == previous_name) {
+				instance.SubviewName = subview.Name;
+			}
+		}
+	}
+
+	const String path = GetSubviewFilePath(mPrototypePath, subview.Name);
+
+	std::error_code error;
+	std::filesystem::create_directories(std::filesystem::path(path.CStr()).parent_path(), error);
+
+	ConfigFile file {};
+
+	if (DoesFileExist(path)) {
+		file.Load(path.CStr());
+
+		if (file.HasErrors()) {
+			LogError(LC_ASSET, "The subview '{}' could not be saved, its file has errors", path);
+			return false;
+		}
+	}
+
+	ConfigEntry brushes = subview.Brushes.Clone("all");
+	ConfigEntry* existing = file.GetEntry(HashStr32("all"));
+
+	if (existing != nullptr) {
+		*existing = std::move(brushes);
+	}
+	else {
+		file.AddEntry(std::move(brushes));
+	}
+
+	if (!file.Write(path.CStr())) {
+		LogError(LC_ASSET, "The subview could not be written to '{}'", path);
+		return false;
+	}
+
+	subview.LegacyName = "";
+	subview.bHasFile = true;
+	subview.bDirty = false;
+
+	return true;
+}
+
+void Blockout::SaveSubviews(ConfigFile& info)
+{
+	const auto is_placed = [this](const Subview& subview)
+	{
+		return std::any_of(mSubviewInstances.begin(), mSubviewInstances.end(), [&](const SubviewInstance& instance)
+						   { return instance.bPlaced && instance.SubviewName == subview.Name; });
+	};
+
+	for (Subview& subview : mSubviews) {
+		if (subview.bDirty && is_placed(subview)) {
+			WriteSubviewFile(subview);
+		}
+	}
+
+	ConfigEntry instances = ConfigEntry::Struct(scSubviewInstancesEntryName);
+	uint32 instance_count = 0;
+
+	for (const SubviewInstance& instance : mSubviewInstances) {
+		BrushPlacement placement = instance.Placement;
+
+		if (!instance.bMissing && !GetSubviewPlacement(instance.ID, placement)) {
+			continue;
+		}
+
+		ConfigEntry instance_entry = ConfigEntry::Struct(instance.Name);
+		instance_entry.AddMember(ConfigEntry::Literal(scSubviewMemberName, instance.SubviewName.CStr()));
+		instance_entry.AddMember(ConfigEntry::Literal("pos", placement.Position));
+		instance_entry.AddMember(ConfigEntry::Literal("rotquat", placement.Rotation));
+
+		instances.AddMember(std::move(instance_entry));
+		instance_count++;
+	}
+
+	if (instance_count > 0) {
+		info.AddEntry(std::move(instances));
+	}
+}
+
 void Blockout::ResetToTemplate()
 {
 	// No world to clear, ignore
@@ -1782,6 +2979,8 @@ void Blockout::ResetToTemplate()
 #endif
 
 	RemoveBlockoutFromWorld(pWorld);
+
+	mPrototypePath = "";
 
 	MaterialLibraryID lib_base_material = gWorld->pPrototype->mMaterials.FindIDByName("white_tile");
 	MaterialID base_material = gWorld->pPrototype->mMaterials.GetMaterial(lib_base_material);
@@ -1833,6 +3032,15 @@ ePrototypeLoadStatus Blockout::Load(const String& opened_path)
 		return ePrototypeLoadStatus::HasErrors;
 	}
 
+	const uint32 renamed_count = MakeBrushEntryNamesUnique(*blocks_entry);
+
+	if (renamed_count > 0) {
+		LogWarning(LC_ASSET,
+				   "{} brushes in '{}' shared a name with another brush and were renamed, save the "
+				   "prototype to keep the new names",
+				   renamed_count, path);
+	}
+
 #ifdef FX_IS_EDITOR
 	// Everything is getting reloaded, so the editor can't hold on to any objects
 	gEditor->ForgetObjects();
@@ -1848,10 +3056,12 @@ ePrototypeLoadStatus Blockout::Load(const String& opened_path)
 	// Remove the current blockout from the world
 	RemoveBlockoutFromWorld(pWorld);
 
+	mPrototypePath = path;
+
 	CompiledMap compiled_map;
 	bool did_load_compiled_map = false;
 	if (wants_compiled_map) {
-		did_load_compiled_map = LoadCompiledMap(path, compiled_map);
+		did_load_compiled_map = LoadCompiledMap(path, info, compiled_map);
 
 		// There was an error loading the compiled map, set the final status to be not compiled
 		if (!did_load_compiled_map) {
@@ -1865,6 +3075,13 @@ ePrototypeLoadStatus Blockout::Load(const String& opened_path)
 		}
 
 		CreateBrush(entry);
+	}
+
+	if (did_load_compiled_map) {
+		LoadSubviews(info, &compiled_map);
+	}
+	else {
+		LoadSubviews(info, nullptr);
 	}
 
 
@@ -1926,6 +3143,20 @@ void Blockout::Save(const String& save_path)
 
 	const String path = CompiledMap::GetPrototypePath(save_path);
 
+	const bool is_moved = std::filesystem::path(path.CStr()).parent_path() !=
+						  std::filesystem::path(mPrototypePath.CStr()).parent_path();
+
+	mPrototypePath = path;
+
+	if (is_moved) {
+		for (Subview& subview : mSubviews) {
+			if (!DoesFileExist(GetSubviewFilePath(path, subview.Name))) {
+				subview.bHasFile = false;
+				subview.bDirty = true;
+			}
+		}
+	}
+
 	ConfigFile info {};
 
 	SaveLights(info);
@@ -1933,72 +3164,23 @@ void Blockout::Save(const String& save_path)
 	SavePlayerSpawn(info);
 	SaveModels(info);
 
+	if (IsEditingSubview()) {
+		CommitActiveSubview();
+	}
+
 	ConfigEntry* all_entry = info.AddEntry("all");
 
 	for (const ObjectID box_id : BlockoutObjects) {
 		Object* object = gObjectManager->GetObject(box_id);
-		if (object == nullptr) {
+		if (object == nullptr || object->SubviewInstance != scNoSubview) {
 			continue;
 		}
 
-		ConfigEntry blockout_entry = ConfigEntry::Struct(object->Name.Get());
-		{
-			blockout_entry.AddMember(ConfigEntry::Literal("pos", object->mPosition));
-
-			WriteBrushEntry(blockout_entry, object);
-
-			blockout_entry.AddMember(ConfigEntry::Literal("rotquat", object->mRotation));
-
-			if (object->HasTags(eObjectTag::LockTransform)) {
-				blockout_entry.AddMember(ConfigEntry::Literal("lock", 1));
-			}
-
-			if (object->IsProbeVolume()) {
-				blockout_entry.AddMember(ConfigEntry::Literal("probevolume", 1));
-			}
-
-			if (object->IsReflectionProbe()) {
-				blockout_entry.AddMember(ConfigEntry::Literal("reflectionprobe", 1));
-			}
-
-
-			if (object->IsSpawn()) {
-				blockout_entry.AddMember(ConfigEntry::Literal("spawn", 1));
-			}
-
-			if (object->IsTrigger()) {
-				blockout_entry.AddMember(ConfigEntry::Literal("trigger", 1));
-				WriteTriggerEntry(blockout_entry, object);
-			}
-
-			if (object->IsNvBrush()) {
-				blockout_entry.AddMember(ConfigEntry::Literal(scNvBrushName, 1));
-			}
-
-			if (object->IsDBound()) {
-				blockout_entry.AddMember(ConfigEntry::Literal(scDBoundName, 1));
-			}
-
-			WriteScriptEntry(blockout_entry, object);
-
-			if (IsDynamic(object)) {
-				blockout_entry.AddMember(ConfigEntry::Literal("dynamic", 1));
-			}
-
-#ifdef FX_IS_EDITOR
-			const MaterialID object_material = gEditor->GetSelection().GetStoredMaterial(object);
-#else
-			const MaterialID object_material = object->GetMaterialID();
-#endif
-
-			const MaterialLibraryID material_id = GetIDForMaterial(object_material);
-
-			if (material_id.IsValid()) {
-				blockout_entry.AddMember(ConfigEntry::Literal("mat", mMaterials.GetName(material_id).CStr()));
-			}
-		}
-		all_entry->AddMember(std::move(blockout_entry));
+		all_entry->AddMember(
+			MakeBrushEntry(object, object->Name.Get(), BrushPlacement { object->mPosition, object->mRotation }));
 	}
+
+	SaveSubviews(info);
 
 	if (!info.Write(path.CStr())) {
 		LogError(LC_ASSET, "The prototype could not be written to '{}'", path);

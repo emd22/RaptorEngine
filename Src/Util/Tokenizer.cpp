@@ -8,72 +8,72 @@ namespace fx {
 
 const char* Token::GetTypeName(eTokenType type)
 {
-    const char* type_names[] = {
-        "Unknown",    "Identifier",
+	const char* type_names[] = {
+		"Unknown",	  "Identifier",
 
-        "String",     "Integer",     "Float",
+		"String",	  "Integer",	 "Float",
 
-        "Equals",
+		"Equals",
 
-        "LParen",     "RParen",
+		"LParen",	  "RParen",
 
-        "LBracket",   "RBracket",
+		"LBracket",	  "RBracket",
 
-        "LBrace",     "RBrace",
+		"LBrace",	  "RBrace",
 
-        "LessThan",   "GreaterThan",
+		"LessThan",	  "GreaterThan",
 
-        "Plus",       "Dollar",      "Minus",     "Asterisk",
+		"Plus",		  "Dollar",		 "Minus",	  "Asterisk",
 
-        "Question",   "Ampersand",
+		"Question",	  "Ampersand",
 
-        "Dot",        "Comma",       "Semicolon", "Colon",
+		"Dot",		  "Comma",		 "Semicolon", "Colon",
 
-        "Equality",   "NotEqual",    "LessEqual", "GreaterEqual",
+		"Equality",	  "NotEqual",	 "LessEqual", "GreaterEqual",
 
-        "DocComment",
+		"DocComment",
 
-        "Pipe",
-    };
+		"Pipe",
+	};
 
-    return type_names[static_cast<uint32>(type)];
+	return type_names[static_cast<uint32>(type)];
 }
 
 
 Token::eIsNumericResult Token::IsNumeric() const
 {
-    char ch;
+	char ch;
 
-    Token::eIsNumericResult result = Token::eIsNumericResult::NaN;
+	Token::eIsNumericResult result = Token::eIsNumericResult::NaN;
 
-    for (int i = 0; i < Length; i++) {
-        ch = Start[i];
+	for (int i = 0; i < Length; i++) {
+		ch = Start[i];
 
-        // If there is a number preceding the dot then we are a frfunctional
-        if (ch == '.' && result != Token::eIsNumericResult::NaN) {
-            result = Token::eIsNumericResult::Fractional;
-            continue;
-        }
+		// If there is a number preceding the dot then we are a frfunctional
+		if (ch == '.' && result != Token::eIsNumericResult::NaN) {
+			result = Token::eIsNumericResult::Fractional;
+			continue;
+		}
 
-        if ((ch >= '0' && ch <= '9')) {
-            // If no numbers have been found yet then set to integer
-            if (result == Token::eIsNumericResult::NaN) {
-                result = Token::eIsNumericResult::Integer;
-            }
-            continue;
-        }
+		if ((ch >= '0' && ch <= '9')) {
+			// If no numbers have been found yet then set to integer
+			if (result == Token::eIsNumericResult::NaN) {
+				result = Token::eIsNumericResult::Integer;
+			}
+			continue;
+		}
 
-        if (ch == 'f' && (i == Length - 1) && result != Token::eIsNumericResult::NaN) {
-            result = Token::eIsNumericResult::Fractional;
-            continue;
-        }
+		if (ch == 'f' && (i == Length - 1) && result != Token::eIsNumericResult::NaN) {
+			result = Token::eIsNumericResult::Fractional;
+			continue;
+		}
 
-        // Not a number
-        return Token::eIsNumericResult::NaN;
-    }
+		// Not a number
+		return Token::eIsNumericResult::NaN;
+	}
 
-    // Is numeric
-    return result;
+	// Is numeric
+	return result;
 }
 
 
@@ -83,408 +83,408 @@ Token::eIsNumericResult Token::IsNumeric() const
 
 eTokenType Tokenizer::GetTokenType(Token& token)
 {
-    if (token.Type == eTokenType::DocComment) {
-        return eTokenType::DocComment;
-    }
+	if (token.Type == eTokenType::DocComment) {
+		return eTokenType::DocComment;
+	}
 
-    if (token.Type == eTokenType::String) {
-        return eTokenType::String;
-    }
+	if (token.Type == eTokenType::String) {
+		return eTokenType::String;
+	}
 
-    // Check if the token is a number
-    Token::eIsNumericResult is_numeric = token.IsNumeric();
+	// Check if the token is a number
+	Token::eIsNumericResult is_numeric = token.IsNumeric();
 
-    switch (is_numeric) {
-    case Token::eIsNumericResult::Integer:
-        return eTokenType::Integer;
-    case Token::eIsNumericResult::Fractional:
-        return eTokenType::Float;
-    case Token::eIsNumericResult::NaN:
-        break;
-    }
+	switch (is_numeric) {
+	case Token::eIsNumericResult::Integer:
+		return eTokenType::Integer;
+	case Token::eIsNumericResult::Fractional:
+		return eTokenType::Float;
+	case Token::eIsNumericResult::NaN:
+		break;
+	}
 
-    if (token.Length == 1) {
-        switch (token.Start[0]) {
-        case '=':
-            return eTokenType::Equals;
-        case '(':
-            return eTokenType::LParen;
-        case ')':
-            return eTokenType::RParen;
-        case '[':
-            return eTokenType::LBracket;
-        case ']':
-            return eTokenType::RBracket;
-        case '{':
-            return eTokenType::LBrace;
-        case '}':
-            return eTokenType::RBrace;
-        case '<':
-            return eTokenType::LessThan;
-        case '>':
-            return eTokenType::GreaterThan;
-        case '+':
-            return eTokenType::Plus;
-        case '-':
-            return eTokenType::Minus;
-        case '$':
-            return eTokenType::Dollar;
-        case '*':
-            return eTokenType::Asterisk;
-        case '&':
-            return eTokenType::Ampersand;
-        case '|':
-            return eTokenType::Pipe;
-        case '.':
-            return eTokenType::Dot;
-        case ',':
-            return eTokenType::Comma;
-        case ';':
-            return eTokenType::Semicolon;
-        case ':':
-            return eTokenType::Colon;
-        }
-    }
+	if (token.Length == 1) {
+		switch (token.Start[0]) {
+		case '=':
+			return eTokenType::Equals;
+		case '(':
+			return eTokenType::LParen;
+		case ')':
+			return eTokenType::RParen;
+		case '[':
+			return eTokenType::LBracket;
+		case ']':
+			return eTokenType::RBracket;
+		case '{':
+			return eTokenType::LBrace;
+		case '}':
+			return eTokenType::RBrace;
+		case '<':
+			return eTokenType::LessThan;
+		case '>':
+			return eTokenType::GreaterThan;
+		case '+':
+			return eTokenType::Plus;
+		case '-':
+			return eTokenType::Minus;
+		case '$':
+			return eTokenType::Dollar;
+		case '*':
+			return eTokenType::Asterisk;
+		case '&':
+			return eTokenType::Ampersand;
+		case '|':
+			return eTokenType::Pipe;
+		case '.':
+			return eTokenType::Dot;
+		case ',':
+			return eTokenType::Comma;
+		case ';':
+			return eTokenType::Semicolon;
+		case ':':
+			return eTokenType::Colon;
+		}
+	}
 
-    else if (token.Length == 2) {
-        // Find equality tokens (e.g !=, >=, ==)
-        if (token.Start[1] == '=') {
-            switch (token.Start[0]) {
-            case '=':
-                return eTokenType::Equality;
-            case '!':
-                return eTokenType::NotEqual;
-            case '<':
-                return eTokenType::LessEqual;
-            case '>':
-                return eTokenType::GreaterEqual;
-            }
-        }
-    }
+	else if (token.Length == 2) {
+		// Find equality tokens (e.g !=, >=, ==)
+		if (token.Start[1] == '=') {
+			switch (token.Start[0]) {
+			case '=':
+				return eTokenType::Equality;
+			case '!':
+				return eTokenType::NotEqual;
+			case '<':
+				return eTokenType::LessEqual;
+			case '>':
+				return eTokenType::GreaterEqual;
+			}
+		}
+	}
 
-    return eTokenType::Identifier;
+	return eTokenType::Identifier;
 }
 
 
 void Tokenizer::SubmitTokenIfData(Token& token, char* end_ptr, char* start_ptr)
 {
-    if (token.IsEmpty()) {
-        return;
-    }
+	if (token.IsEmpty()) {
+		return;
+	}
 
-    if (end_ptr == nullptr) {
-        end_ptr = mpData;
-    }
+	if (end_ptr == nullptr) {
+		end_ptr = mpData;
+	}
 
-    if (start_ptr == nullptr) {
-        start_ptr = mpData;
-    }
+	if (start_ptr == nullptr) {
+		start_ptr = mpData;
+	}
 
-    token.End = mpData;
-    token.Type = GetTokenType(token);
+	token.End = mpData;
+	token.Type = GetTokenType(token);
 
-    TokenBuffer.Insert(token);
-    token.Clear();
+	TokenBuffer.Insert(token);
+	token.Clear();
 
-    token.Start = mpData;
+	token.Start = mpData;
 
-    uint16 column = 1;
-    if (mpLinePtr) {
-        column = static_cast<uint16>((mpData - mpLinePtr));
-    }
+	uint16 column = 1;
+	if (mpLinePtr) {
+		column = static_cast<uint16>((mpData - mpLinePtr));
+	}
 
-    token.FileColumn = column;
-    token.FileLine = mLineNumber + 1;
+	token.FileColumn = column;
+	token.FileLine = mLineNumber + 1;
 }
 
 
 bool Tokenizer::CheckOperators(Token& current_token, char ch)
 {
-    if (ch == '.' && current_token.IsNumeric() != Token::eIsNumericResult::NaN) {
-        return false;
-    }
+	if (ch == '.' && current_token.IsNumeric() != Token::eIsNumericResult::NaN) {
+		return false;
+	}
 
-    bool is_operator = (strchr(SingleCharOperators, ch) != NULL);
+	bool is_operator = (strchr(SingleCharOperators, ch) != NULL);
 
-    if (is_operator) {
-        const char* double_operators = "=!<>";
+	if (is_operator) {
+		const char* double_operators = "=!<>";
 
-        bool is_double_operator = (strchr(double_operators, ch) != NULL);
+		bool is_double_operator = (strchr(double_operators, ch) != NULL);
 
-        if ((is_double_operator && mpData[1] == '=')) {
-            // If there is data waiting, submit to the token list
-            SubmitTokenIfData(current_token, mpData);
+		if ((is_double_operator && mpData[1] == '=')) {
+			// If there is data waiting, submit to the token list
+			SubmitTokenIfData(current_token, mpData);
 
-            current_token.Increment();
-            current_token.Increment();
+			current_token.Increment();
+			current_token.Increment();
 
-            char* end_of_operator = mpData;
-            ++mpData;
-            ++mpData;
+			char* end_of_operator = mpData;
+			++mpData;
+			++mpData;
 
-            SubmitTokenIfData(current_token, end_of_operator, mpData);
-            return true;
-        }
-    }
+			SubmitTokenIfData(current_token, end_of_operator, mpData);
+			return true;
+		}
+	}
 
-    if (is_operator) {
-        // If there is data waiting, submit to the token list
-        SubmitTokenIfData(current_token, mpData);
+	if (is_operator) {
+		// If there is data waiting, submit to the token list
+		SubmitTokenIfData(current_token, mpData);
 
-        // Submit the operator as its own token
-        current_token.Increment();
+		// Submit the operator as its own token
+		current_token.Increment();
 
-        char* end_of_operator = mpData;
-        ++mpData;
+		char* end_of_operator = mpData;
+		++mpData;
 
-        SubmitTokenIfData(current_token, end_of_operator, mpData);
+		SubmitTokenIfData(current_token, end_of_operator, mpData);
 
-        return true;
-    }
+		return true;
+	}
 
-    return false;
+	return false;
 }
 
 
 uint32 Tokenizer::ReadQuotedString(char* buffer, uint32 max_size, bool skip_on_success)
 {
-    char ch;
-    char* data = mpData;
+	char ch;
+	char* data = mpData;
 
-    uint32 buf_size = 0;
+	uint32 buf_size = 0;
 
-    if (data >= mpDataEnd) {
-        return 0;
-    }
+	if (data >= mpDataEnd) {
+		return 0;
+	}
 
-    // Skip spaces and tabs
-    while ((ch = *(data)) && (ch == ' ' || ch == '\t'))
-        ++data;
+	// Skip spaces and tabs
+	while ((ch = *(data)) && (ch == ' ' || ch == '\t'))
+		++data;
 
-    // Check if this is a string
-    if (ch != '"') {
-        puts("Not a string!");
-        return 0;
-    }
+	// Check if this is a string
+	if (ch != '"') {
+		puts("Not a string!");
+		return 0;
+	}
 
-    // Eat the quote
-    ++data;
+	// Eat the quote
+	++data;
 
-    for (uint32 i = 0; i < max_size; i++) {
-        ch = *data;
+	for (uint32 i = 0; i < max_size; i++) {
+		ch = *data;
 
-        if (ch == '"') {
-            // Eat the quote
-            ++data;
-            break;
-        }
+		if (ch == '"') {
+			// Eat the quote
+			++data;
+			break;
+		}
 
-        buffer[buf_size++] = ch;
+		buffer[buf_size++] = ch;
 
-        ++data;
-    }
+		++data;
+	}
 
-    if (skip_on_success) {
-        mpData = data;
-    }
+	if (skip_on_success) {
+		mpData = data;
+	}
 
-    buffer[buf_size] = 0;
+	buffer[buf_size] = 0;
 
-    return buf_size;
+	return buf_size;
 }
 
 
 bool Tokenizer::ExpectString(const char* expected_value, bool skip_on_success)
 {
-    char ch;
-    int expected_index = 0;
+	char ch;
+	int expected_index = 0;
 
-    char* data = mpData;
+	char* data = mpData;
 
-    while (data < mpDataEnd && ((ch = *(data)))) {
-        if (!expected_value[expected_index]) {
-            break;
-        }
+	while (data < mpDataEnd && ((ch = *(data)))) {
+		if (!expected_value[expected_index]) {
+			break;
+		}
 
-        if (ch != expected_value[expected_index]) {
-            return false;
-        }
+		if (ch != expected_value[expected_index]) {
+			return false;
+		}
 
-        ++expected_index;
-        ++data;
-    }
+		++expected_index;
+		++data;
+	}
 
-    if (skip_on_success) {
-        mpData = data;
-    }
+	if (skip_on_success) {
+		mpData = data;
+	}
 
-    return true;
+	return true;
 }
 
 
 void Tokenizer::IncludeFile(const char* path)
 {
-    Path vpath(path);
+	Path vpath(path);
 
-    // If there is no extension on the file, add an expected extension
-    if (!vpath.HasExtension()) {
-        String* basename = vpath.BaseName();
-        (*basename) += mpExpectedFileExtension;
-        LogInfo("basename : {}", *basename);
-    }
+	// If there is no extension on the file, add an expected extension
+	if (!vpath.HasExtension()) {
+		String* basename = vpath.BaseName();
+		(*basename) += mpExpectedFileExtension;
+		LogInfo("basename : {}", *basename);
+	}
 
-    File file(vpath.Str(), File::eModType::Read, File::eDataType::Binary);
-
-
-    if (!file.IsFileOpen()) {
-        LogError(LC_SCRIPT, "Could not open include file '{}'", path);
-        return;
-    }
+	File file(vpath.Str(), File::eModType::Read, File::eDataType::Binary);
 
 
-    // Save the current state of the tokenizer
-    SaveState();
+	if (!file.IsFileOpen()) {
+		LogError(LC_SCRIPT, "Could not open include file '{}'", path);
+		return;
+	}
 
-    Slice<char> include_data = file.Read<char>();
 
-    DataPtrs.Insert(include_data.pData);
+	// Save the current state of the tokenizer
+	SaveState();
 
-    SetDataPtr(include_data.pData);
-    mpDataEnd = include_data.pData + include_data.Size;
+	Slice<char> include_data = file.Read<char>();
 
-    // Tokenize all of the included file
-    Tokenize();
+	DataPtrs.Insert(include_data.pData);
 
-    // StdAllocator::Free<char>(mpData);
+	SetDataPtr(include_data.pData);
+	mpDataEnd = include_data.pData + include_data.Size;
 
-    // Restore back to previous state
-    RestoreState();
+	// Tokenize all of the included file
+	Tokenize();
+
+	// StdAllocator::Free<char>(mpData);
+
+	// Restore back to previous state
+	RestoreState();
 }
 
 
 void Tokenizer::Tokenize()
 {
-    Token current_token;
-    current_token.Start = mpData;
+	Token current_token;
+	current_token.Start = mpData;
 
-    bool in_comment = false;
+	bool in_comment = false;
 
-    char ch;
+	char ch;
 
-    while (mpData < mpDataEnd && ((ch = *(mpData)))) {
-        if (ch == '\r') {
-            ++mpData;
-            continue;
-        }
+	while (mpData < mpDataEnd && ((ch = *(mpData)))) {
+		if (ch == '\r') {
+			++mpData;
+			continue;
+		}
 
-        if (ch == '/' && ((mpData + 1) < mpDataEnd) && ((*(mpData + 1)) == '/')) {
-            SubmitTokenIfData(current_token);
-            in_comment = true;
+		if (ch == '/' && ((mpData + 1) < mpDataEnd) && ((*(mpData + 1)) == '/')) {
+			SubmitTokenIfData(current_token);
+			in_comment = true;
 
-            ++mpData;
-        }
+			++mpData;
+		}
 
-        if (ch == '/' && ((mpData + 1) < mpDataEnd) && ((*(mpData + 1)) == '*')) {
-            SubmitTokenIfData(current_token);
-            in_comment = true;
+		if (ch == '/' && ((mpData + 1) < mpDataEnd) && ((*(mpData + 1)) == '*')) {
+			SubmitTokenIfData(current_token);
+			in_comment = true;
 
-            ++mpData;
+			++mpData;
 
-            while ((mpData + 1 < mpDataEnd) && (ch = *(++mpData))) {
-                if (ch == '*' && ((mpData + 1) < mpDataEnd) && (*(mpData + 1) == '/')) {
-                    current_token.Start = mpData;
-                    break;
-                }
-            }
-        }
+			while ((mpData + 1 < mpDataEnd) && (ch = *(++mpData))) {
+				if (ch == '*' && ((mpData + 1) < mpDataEnd) && (*(mpData + 1) == '/')) {
+					current_token.Start = mpData;
+					break;
+				}
+			}
+		}
 
-        // If we are in a comment, skip until we hit a newline. Carriage return is eaten by our
-        // below by the IsWhitespace check.
-        if (in_comment) {
-            if (!IsNewline(ch)) {
-                ++mpData;
-                continue;
-            }
+		// If we are in a comment, skip until we hit a newline. Carriage return is eaten by our
+		// below by the IsWhitespace check.
+		if (in_comment) {
+			if (!IsNewline(ch)) {
+				++mpData;
+				continue;
+			}
 
-            // We hit a newline, mark as no longer in comment
-            in_comment = false;
-        }
+			// We hit a newline, mark as no longer in comment
+			in_comment = false;
+		}
 
-        // Read in a string
-        if (ch == '"') {
-            // If we are not currently in a string, submit the token if there is data waiting
-            SubmitTokenIfData(current_token);
+		// Read in a string
+		if (ch == '"') {
+			// If we are not currently in a string, submit the token if there is data waiting
+			SubmitTokenIfData(current_token);
 
-            current_token.Type = eTokenType::String;
-            ++current_token.Start;
+			current_token.Type = eTokenType::String;
+			++current_token.Start;
 
-            // Skip quote
-            ++mpData;
+			// Skip quote
+			++mpData;
 
-            while (mpData < mpDataEnd && (*mpData) != '"') {
-                const bool is_escaped = (*mpData) == '\\' && (mpData + 1) < mpDataEnd &&
-                                        ((*(mpData + 1)) == '"' || (*(mpData + 1)) == '\\');
+			while (mpData < mpDataEnd && (*mpData) != '"') {
+				const bool is_escaped = (*mpData) == '\\' && (mpData + 1) < mpDataEnd &&
+										((*(mpData + 1)) == '"' || (*(mpData + 1)) == '\\');
 
-                current_token.Increment();
-                ++mpData;
+				current_token.Increment();
+				++mpData;
 
-                if (is_escaped) {
-                    current_token.Increment();
-                    ++mpData;
-                }
-            }
+				if (is_escaped) {
+					current_token.Increment();
+					++mpData;
+				}
+			}
 
-            if (mpData < mpDataEnd) {
-                ++mpData;
-            }
+			if (mpData < mpDataEnd) {
+				++mpData;
+			}
 
-            continue;
-        }
+			continue;
+		}
 
 
-        // Internal call
-        if (ch == '#') {
-            ++mpData;
-            TryReadInternalCall();
+		// Internal call
+		if (ch == '#') {
+			++mpData;
+			TryReadInternalCall();
 
-            current_token.Length = 0;
-            current_token.Start = mpData;
+			current_token.Length = 0;
+			current_token.Start = mpData;
 
-            continue;
-        }
+			continue;
+		}
 
-        if (IsWhitespace(ch)) {
-            SubmitTokenIfData(current_token);
+		if (IsWhitespace(ch)) {
+			SubmitTokenIfData(current_token);
 
-            mpData++;
-            current_token.Start = mpData;
-            continue;
-        }
+			mpData++;
+			current_token.Start = mpData;
+			continue;
+		}
 
-        if (CheckOperators(current_token, ch)) {
-            continue;
-        }
+		if (CheckOperators(current_token, ch)) {
+			continue;
+		}
 
-        mpData++;
-        current_token.Increment();
-    }
+		mpData++;
+		current_token.Increment();
+	}
 
-    SubmitTokenIfData(current_token);
+	SubmitTokenIfData(current_token);
 }
 
 
 void Tokenizer::TryReadInternalCall()
 {
-    if (ExpectString("include")) {
-        char include_path[512];
+	if (ExpectString("include")) {
+		char include_path[512];
 
-        if (!ReadQuotedString(include_path, 512)) {
-            puts("Error reading include path!");
-            return;
-        }
+		if (!ReadQuotedString(include_path, 512)) {
+			puts("Error reading include path!");
+			return;
+		}
 
-        IncludeFile(include_path);
-    }
+		IncludeFile(include_path);
+	}
 }
 
 Tokenizer::~Tokenizer() { TokenBuffer.Destroy(); }

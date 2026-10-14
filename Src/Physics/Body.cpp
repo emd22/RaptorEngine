@@ -10,6 +10,7 @@
 #include <ThirdParty/Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <ThirdParty/Jolt/Physics/Collision/Shape/ConvexHullShape.h>
 #include <ThirdParty/Jolt/Physics/Collision/Shape/MeshShape.h>
+#include <ThirdParty/Jolt/Physics/Collision/Shape/StaticCompoundShape.h>
 #include <ThirdParty/Jolt/Physics/EActivation.h>
 
 #include <Engine.hpp>
@@ -131,6 +132,57 @@ void Body::CreateConvexHullBody(const SizedArray<Vec3f>& points, physics::eMotio
 	}
 
 	UpdateJoltBody(hull_shape_result.Get(), physics::Body::eFlags::None, motion_type, object_properties);
+}
+
+void Body::CreateCompoundHullBody(const SizedArray<SizedArray<Vec3f>>& hulls, physics::eMotionType motion_type,
+								  const BodyProps& object_properties)
+{
+	mMotionType = motion_type;
+	PrimitiveType = ePrimitiveType::None;
+
+	JPH::StaticCompoundShapeSettings compound_settings;
+
+	Vec3f min(FLT_MAX);
+	Vec3f max(-FLT_MAX);
+	uint32 hull_count = 0;
+
+	for (const SizedArray<Vec3f>& points : hulls) {
+		if (points.Size < 4) {
+			continue;
+		}
+
+		JPH::Array<JPH::Vec3> jolt_points;
+		jolt_points.reserve(points.Size);
+
+		for (const Vec3f point : points) {
+			jolt_points.push_back(JPH::Vec3(point.X, point.Y, point.Z));
+
+			min = Vec3f::Min(min, point);
+			max = Vec3f::Max(max, point);
+		}
+
+		JPH::Ref<JPH::ConvexHullShapeSettings> hull_settings = new JPH::ConvexHullShapeSettings(
+			jolt_points, object_properties.ConvexRadius);
+		hull_settings->SetDensity(object_properties.Density);
+
+		compound_settings.AddShape(JPH::Vec3::sZero(), JPH::Quat::sIdentity(), hull_settings);
+		hull_count++;
+	}
+
+	if (hull_count == 0) {
+		LogError(LC_PHYSICS, "Cannot create a compound collider without any convex hulls");
+		return;
+	}
+
+	Dimensions = max - min;
+
+	JPH::ShapeSettings::ShapeResult compound_result = compound_settings.Create();
+	if (compound_result.HasError()) {
+		LogError(LC_PHYSICS, "Failed to create compound collider: {}", compound_result.GetError().c_str());
+		return;
+	}
+
+	UpdateJoltBody(compound_result.Get(), physics::Body::eFlags::None, motion_type, object_properties);
 }
 
 void Body::CreateJoltBody(JPH::ShapeRefC shape, physics::Body::eFlags flags, physics::eMotionType motion_type,

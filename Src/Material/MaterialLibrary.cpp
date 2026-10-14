@@ -77,6 +77,26 @@ bool MaterialLibrary::Load(const std::string& list_path, const std::string& text
 			material->SetUnlit(true);
 		}
 
+		if (item.GetMemberValue(HashStr32("glass"), 0) != 0) {
+			material->SetGlass(true);
+		}
+
+		if (!has_orm) {
+			const float32 metallic = item.GetMemberValue<float32>(HashStr32("metallic"),
+																  material->Properties.MetallicFactor);
+			const float32 roughness = item.GetMemberValue<float32>(HashStr32("roughness"),
+																   material->Properties.RoughnessFactor);
+
+			material->SetMetallicRoughness(metallic, roughness);
+		}
+
+		if (item.GetMember(HashStr32("color")) != nullptr) {
+			const Vec3f color = item.GetMemberValue<Vec3f>(HashStr32("color"), Vec3f(1.0f, 1.0f, 1.0f));
+			const float32 base_color[3] = { color.X, color.Y, color.Z };
+
+			material->SetBaseColorFactor(base_color);
+		}
+
 		material->Finalize();
 
 		const char* diffuse_path = item.GetMemberValue<const char*>(HashStr32("diffuse"), "");

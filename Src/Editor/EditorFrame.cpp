@@ -4,7 +4,7 @@
 #include "CVarListWindow.hpp"
 #include "EditorThread.hpp"
 #include "EditorViewport.hpp"
-#include "MaterialPickerWindow.hpp"
+#include "MaterialPickerPanel.hpp"
 #include "ObjectListWindow.hpp"
 #include "ObjectPropertiesPanel.hpp"
 #include "OutlineToggleButton.hpp"
@@ -25,7 +25,9 @@
 #include <wx/settings.h>
 #include <wx/sizer.h>
 #include <wx/splitter.h>
+#include <wx/choicdlg.h>
 #include <wx/statline.h>
+#include <wx/textdlg.h>
 
 #include <Blockout.hpp>
 #include <Controls.hpp>
@@ -42,6 +44,7 @@
 namespace fx::editor {
 
 static constexpr int32 scObjectPropertyPanelWidth = 240;
+static constexpr size_t scToolSettingsSlotIndex = 2;
 static constexpr int32 scMinimumPaneSize = 160;
 
 static const wxColor scSashColor = wxColor(46, 46, 46);
@@ -477,15 +480,45 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	wxMenuItem* cvar_list_item = window_menu->Append(wxID_ANY, "Open CVar List",
 													 "View and edit all registered console variables");
 
-	wxMenuItem* material_picker_item = window_menu->Append(wxID_ANY, "Open Material Picker",
-														   "Search materials and preview their albedo");
+	mpMaterialPickerMenuItem = window_menu->AppendCheckItem(wxID_ANY, "Show Material Picker",
+															 "Show the material search and preview in the side panel");
+	mpMaterialPickerMenuItem->Check(true);
 	wxMenuItem* atlas_packer_item = window_menu->Append(wxID_ANY, "Open Atlas Packer",
 														"Pack images into a tile atlas and export its config");
 
 
 	menu_bar->Append(window_menu, "&Tools");
 
+	wxMenu* subview_menu = new wxMenu;
+
+	wxMenuItem* create_subview_item = subview_menu->Append(
+		wxID_ANY, "Create from Selection...", "Groups the selected brushes into a new subview (Ctrl+G)");
+	wxMenuItem* place_subview_item = subview_menu->Append(wxID_ANY, "Place Subview...",
+														  "Places another copy of a subview at the crosshair");
+	subview_menu->AppendSeparator();
+	wxMenuItem* enter_subview_item = subview_menu->Append(
+		wxID_ANY, "Enter Subview", "Edits the selected subview on its own, leaving the level alone (G)");
+	wxMenuItem* leave_subview_item = subview_menu->Append(
+		wxID_ANY, "Leave Subview", "Goes back to the level and updates every copy of the subview (G)");
+	subview_menu->AppendSeparator();
+	wxMenuItem* dissolve_subview_item = subview_menu->Append(
+		wxID_ANY, "Dissolve into Level", "Turns the selected subview back into brushes of the level");
+
+	menu_bar->Append(subview_menu, "&Subview");
+
 	SetMenuBar(menu_bar);
+
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { CreateSubview(); }, create_subview_item->GetId());
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { PlaceSubview(); }, place_subview_item->GetId());
+	Bind(
+		wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->EnterSubview(); }); },
+		enter_subview_item->GetId());
+	Bind(
+		wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->LeaveSubview(); }); },
+		leave_subview_item->GetId());
+	Bind(
+		wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->DissolveSelectedSubviews(); }); },
+		dissolve_subview_item->GetId());
 
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { NewPrototype(); }, new_item->GetId());
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { OpenPrototype(); }, open_item->GetId());
@@ -542,7 +575,9 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowObjectListWindow(); }, object_list_item->GetId());
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowCVarListWindow(); }, cvar_list_item->GetId());
-	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowMaterialPickerWindow(); }, material_picker_item->GetId());
+	Bind(
+		wxEVT_MENU, [this](wxCommandEvent& event) { SetMaterialPickerShown(event.IsChecked()); },
+		mpMaterialPickerMenuItem->GetId());
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowAtlasPackerWindow(); }, atlas_packer_item->GetId());
 
 	SetBackgroundColour(scPanelColor);
@@ -695,7 +730,11 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	mpObjectPropertiesPanel->SetMinSize(wxSize(scObjectPropertyPanelWidth, -1));
 	component_panel->Add(mpObjectPropertiesPanel, wxSizerFlags().Expand());
 
-	// The tool settings slot starts empty - RaptorEditor::SetTool swaps in a panel for tools that have one
+	mpMaterialPickerPanel = new MaterialPickerPanel(mpSideScroller, this);
+	component_panel->Add(mpMaterialPickerPanel, wxSizerFlags().Expand());
+
+	// The tool settings slot starts empty - RaptorEditor::SetTool swaps in a panel for tools that have one. It sits
+	// above the material picker, right below Object Properties
 	mpComponentSizer = component_panel;
 	mpSideScroller->SetSizer(component_panel);
 	component_panel->FitInside(mpSideScroller);
@@ -732,6 +771,80 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	Bind(wxEVT_CLOSE_WINDOW, &EditorFrame::OnClose, this);
 	Bind(wxEVT_ACTIVATE, &EditorFrame::OnActivate, this);
 	Bind(wxEVT_ICONIZE, &EditorFrame::OnIconize, this);
+}
+
+void EditorFrame::CreateSubview()
+{
+	if (!mState.ActiveSubview.IsEmpty()) {
+		wxMessageBox("A subview can't hold another subview. Leave the subview being edited first.", "Subview",
+					 wxOK | wxICON_INFORMATION, this);
+		return;
+	}
+
+	if (!mState.Object.bHasObject) {
+		wxMessageBox("Select the brushes to make a subview from first.", "Subview", wxOK | wxICON_INFORMATION, this);
+		return;
+	}
+
+	wxTextEntryDialog dialog(this, "Name of the new subview:", "Create Subview", "subview");
+
+	if (dialog.ShowModal() != wxID_OK) {
+		return;
+	}
+
+	const String name(dialog.GetValue().ToStdString());
+
+	thread::PostToGame([name] { gEditor->CreateSubviewFromSelection(name); });
+}
+
+void EditorFrame::PlaceSubview()
+{
+	static const wxString scBrowseChoice = "Browse for a map...";
+
+	wxArrayString names = wxSplit(wxString::FromUTF8(mState.SubviewNames.CStr()), '\n');
+	names.Add(scBrowseChoice);
+
+	wxSingleChoiceDialog dialog(this, "Subview to place at the crosshair:", "Place Subview", names);
+
+	if (dialog.ShowModal() != wxID_OK) {
+		return;
+	}
+
+	if (dialog.GetStringSelection() != scBrowseChoice) {
+		const String name(dialog.GetStringSelection().ToStdString());
+
+		thread::PostToGame([name] { gEditor->PlaceSubview(name); });
+		return;
+	}
+
+	if (mState.BlockoutPath.IsEmpty()) {
+		wxMessageBox("Save the prototype first, a subview is found from where the prototype is.", "Subview",
+					 wxOK | wxICON_INFORMATION, this);
+		return;
+	}
+
+	const std::filesystem::path folder = GetBlockoutDialogStart(mState.BlockoutPath).parent_path();
+
+	wxFileDialog file_dialog(this, "Place Map as Subview", folder.string(), "", "Prototype files (*.prx)|*.prx",
+							 wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+
+	if (file_dialog.ShowModal() != wxID_OK) {
+		return;
+	}
+
+	std::error_code error;
+	const std::filesystem::path relative = std::filesystem::relative(
+		std::filesystem::path(file_dialog.GetPath().ToStdString()), folder, error);
+
+	if (error || relative.empty()) {
+		wxMessageBox("That map can't be reached from the folder of this prototype.", "Subview",
+					 wxOK | wxICON_INFORMATION, this);
+		return;
+	}
+
+	const String name(relative.generic_string());
+
+	thread::PostToGame([name] { gEditor->PlaceSubview(name); });
 }
 
 void EditorFrame::SetInteractive(bool interactive)
@@ -874,7 +987,7 @@ void EditorFrame::SetToolSettingsPanel(ToolSettingsBasePanel* new_panel)
 		mpToolSettingsPanel->SetSizer(inner_sizer);
 		mpToolSettingsPanel->ApplyState(mState);
 
-		mpComponentSizer->Add(mpToolSettingsPanel, wxSizerFlags().Expand());
+		mpComponentSizer->Insert(scToolSettingsSlotIndex, mpToolSettingsPanel, wxSizerFlags().Expand());
 	}
 
 	mpComponentSizer->FitInside(mpSideScroller);
@@ -901,9 +1014,7 @@ void EditorFrame::ApplyState(const EditorPanelState& state)
 		mpToolSettingsPanel->ApplyState(mState);
 	}
 
-	if (mpMaterialPickerWindow != nullptr) {
-		mpMaterialPickerWindow->OnStateChanged();
-	}
+	mpMaterialPickerPanel->OnStateChanged();
 
 	if (mState.TopView.bActive) {
 		mpTopViewPanel->ApplyState(mState.TopView);
@@ -953,17 +1064,28 @@ void EditorFrame::ShowCVarListWindow()
 	mpCVarListWindow->Raise();
 }
 
-void EditorFrame::ShowMaterialPickerWindow()
+void EditorFrame::SetMaterialPickerShown(bool shown)
 {
-	if (mpMaterialPickerWindow == nullptr) {
-		mpMaterialPickerWindow = new MaterialPickerWindow(this);
-	}
-	else {
-		mpMaterialPickerWindow->RefreshList();
+	mpMaterialPickerMenuItem->Check(shown);
+	mpComponentSizer->Show(mpMaterialPickerPanel, shown);
+	mpComponentSizer->FitInside(mpSideScroller);
+}
+
+void EditorFrame::ShowMaterialPicker()
+{
+	if (mbSidePanelCollapsed) {
+		SetSidePanelCollapsed(false);
 	}
 
-	mpMaterialPickerWindow->Show();
-	mpMaterialPickerWindow->Raise();
+	SetMaterialPickerShown(true);
+
+	int32 scroll_unit_y = 1;
+	mpSideScroller->GetScrollPixelsPerUnit(nullptr, &scroll_unit_y);
+
+	const int32 panel_top = mpSideScroller->CalcUnscrolledPosition(mpMaterialPickerPanel->GetPosition()).y;
+	mpSideScroller->Scroll(-1, panel_top / std::max(scroll_unit_y, 1));
+
+	mpMaterialPickerPanel->FocusSearch();
 }
 
 void EditorFrame::ShowAtlasPackerWindow()

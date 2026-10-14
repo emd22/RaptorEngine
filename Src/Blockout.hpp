@@ -7,15 +7,20 @@
 
 #pragma once
 
+#include <Asset/ConfigFile.hpp>
 #include <Brush.hpp>
+#include <BrushEntry.hpp>
 #include <Core/FreeArray.hpp>
 #include <Core/HashMap.hpp>
 #include <Core/Name.hpp>
+#include <Core/Ref.hpp>
+#include <Core/SizedArray.hpp>
 #include <Core/StackArray.hpp>
 #include <Core/String.hpp>
 #include <Material/MaterialID.hpp>
 #include <Material/MaterialLibrary.hpp>
 #include <Math/BBox.hpp>
+#include <Math/Mat4.hpp>
 #include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
@@ -26,10 +31,9 @@
 
 namespace fx {
 class World;
-class ConfigFile;
-class ConfigEntry;
 class Object;
 class CompiledMap;
+class PrimitiveMesh;
 
 namespace physics {
 enum class eMotionType;
@@ -152,6 +156,9 @@ public:
 
 	Object* DupeObject(Object* object);
 
+	/// A name for a new brush that no other object has
+	std::string MakeUniqueBrushName() const;
+
 	/**
 	 * @brief Recreates a destroyed blockout object from a snapshot (undo of Delete).
 	 * Falls back to a unique name if the original name is taken.
@@ -204,6 +211,9 @@ public:
 		return (mbIsCompiledMap && mCompiledProbeLayout.VolumeCount > 0) ? &mCompiledProbeLayout : nullptr;
 	}
 
+	/// True for the surfaces of a compiled map, which stand in for many brushes each
+	bool IsCompiledObject(const Object* object) const;
+
 	bool HasBakedSun() const { return mbHasBakedSun; }
 	bool IsBakedSunCurrent(const Vec3f sun_position) const;
 
@@ -231,6 +241,74 @@ public:
 	 */
 	void LinkModelColliders();
 
+	/////////////////////////////////////
+	// Subviews
+	/////////////////////////////////////
+
+	static constexpr uint32 scNoSubview = 0;
+
+	struct SubviewSolid
+	{
+		const Brush* pBrush = nullptr;
+		Mat4f World = Mat4f::scIdentity;
+		Object* pOwner = nullptr;
+	};
+
+	/// The subview instance that is being edited, or scNoSubview while the level itself is
+	uint32 GetActiveSubview() const { return mActiveSubview; }
+	bool IsEditingSubview() const { return mActiveSubview != scNoSubview; }
+
+	/// The name of the subview that an instance places, which is empty if there is no such instance
+	String GetSubviewName(uint32 instance) const;
+
+	/// The names of every subview that can be placed, one per line
+	String GetSubviewNames() const;
+
+	/// Turns a name into one that can be saved and that no other subview has
+	String MakeSubviewName(const String& wanted) const;
+
+	bool IsSubviewObject(const Object* object) const;
+	Object* GetSubviewObject(uint32 instance) const;
+	uint32 GetSubviewBrushCount(uint32 instance) const;
+
+	void GetSubviewMembers(uint32 instance, std::vector<Object*>& out_members) const;
+	void GetSubviewSolids(std::vector<SubviewSolid>& out_solids);
+
+	bool GetSubviewPlacement(uint32 instance, BrushPlacement& out_placement);
+
+	/// The world space bounds of every brush of an instance
+	bool GetSubviewBounds(uint32 instance, BBox& out_bounds);
+
+	/// The world space bounds of a set of brushes
+	bool GetBrushBounds(Object* const* objects, uint32 count, BBox& out_bounds);
+
+	/**
+	 * @brief Makes a subview out of brushes that are in the level, and an instance of it that is not placed yet.
+	 * The brushes themselves are left as they are.
+	 * @param origin The point of the level that becomes the origin of the subview
+	 */
+	uint32 CreateSubview(const String& name, Object* const* objects, uint32 count, const Vec3f origin);
+
+	/// Makes an instance of a subview that is not placed yet. Returns scNoSubview if there is no such subview.
+	uint32 NewSubviewInstance(const String& subview_name);
+
+	Object* PlaceSubviewInstance(uint32 instance, const BrushPlacement& placement);
+	void RemoveSubviewInstance(uint32 instance);
+
+	uint32 DissolveSubviewInstance(uint32 instance, std::vector<ObjectID>& out_brushes);
+
+	void SyncSubviewInstances();
+
+	/**
+	 * @brief Starts editing the subview through one of its instances. Brushes made from here on belong to it.
+	 */
+	bool EnterSubview(uint32 instance);
+
+	/**
+	 * @brief Stops editing the subview, and rebuilds every other instance of it to match
+	 */
+	void LeaveSubview();
+
 	~Blockout();
 
 private:
@@ -240,6 +318,72 @@ private:
 		String MeshPath;
 		String ColliderName;
 	};
+
+	struct SubviewMember
+	{
+		Brush LocalBrush;
+		Mat4f ToSubview = Mat4f::scIdentity;
+		bool bMerged = false;
+	};
+
+	struct SubviewGroup
+	{
+		MaterialID Material = MaterialID::scNull;
+		Ref<PrimitiveMesh> pMesh { nullptr };
+		BBox Bounds { Vec3f::sZero, Vec3f::sZero };
+	};
+
+	struct Subview
+	{
+		String Name;
+		String LegacyName;
+		/// The brushes as they are saved, placed in the subview's own space
+		ConfigEntry Brushes;
+
+		std::vector<SubviewMember> Members;
+		std::vector<SubviewGroup> Groups;
+		SizedArray<SizedArray<Vec3f>> Hulls;
+		BBox Bounds { Vec3f::sZero, Vec3f::sZero };
+
+		bool bHasFile = false;
+		bool bDirty = false;
+	};
+
+	struct SubviewInstance
+	{
+		uint32 ID = scNoSubview;
+		String Name;
+		String SubviewName;
+
+		ObjectID RootID = ObjectID::scNull;
+		BrushPlacement Placement;
+		bool bPlaced = false;
+		/// The subview could not be read, so the instance is only kept to be saved again
+		bool bMissing = false;
+	};
+
+	Subview* FindSubview(const String& name);
+	Subview* LoadSubview(const ConfigFile* info, const String& name);
+	SubviewInstance* FindSubviewInstance(uint32 instance);
+	const SubviewInstance* FindSubviewInstance(uint32 instance) const;
+
+	void BuildSubview(Subview& subview);
+	bool WriteSubviewFile(Subview& subview);
+
+	/// Takes the subview's brushes from the instance being edited, then rebuilds its other instances
+	void CommitActiveSubview();
+
+	uint32 CreateSubviewBrushes(const SubviewInstance& instance, const BrushPlacement& placement, bool entities_only,
+								const CompiledMap* compiled_map);
+	Object* CreateSubviewObject(SubviewInstance& instance, Subview& subview, const BrushPlacement& placement);
+	void PlaceSubviewEntities(const SubviewInstance& instance);
+
+	void LoadSubviews(ConfigFile& info, const CompiledMap* compiled_map);
+	void SaveSubviews(ConfigFile& info);
+
+	MaterialID ReadBrushMaterial(ConfigEntry& entry);
+
+	ConfigEntry MakeBrushEntry(Object* object, const String& name, const BrushPlacement& placement);
 
 	/**
 	 * @brief Creates a new brush from a prototype entry
@@ -278,7 +422,7 @@ private:
 	/**
 	 * @brief Loads the compiled map that belongs to a prototype, if it was compiled from the prototype as it is now
 	 */
-	bool LoadCompiledMap(const String& prototype_path, CompiledMap& out_map) const;
+	bool LoadCompiledMap(const String& prototype_path, const ConfigFile& info, CompiledMap& out_map) const;
 	void CreateCompiledWorld(const CompiledMap& map);
 
 	/**
@@ -331,6 +475,15 @@ private:
 	Vec3f mBakedSunDirection = Vec3f::sUp;
 
 	Brush::PlaneList mPreviewPlanes;
+
+	DynArray<Subview> mSubviews;
+	DynArray<SubviewInstance> mSubviewInstances;
+	uint32 mNextSubviewInstance = 1;
+
+	uint32 mActiveSubview = scNoSubview;
+	BrushPlacement mActivePlacement;
+
+	String mPrototypePath;
 };
 
 

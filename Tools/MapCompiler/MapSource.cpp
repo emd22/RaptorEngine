@@ -4,7 +4,6 @@
 #include <BrushEntry.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/Quat.hpp>
-#include <format>
 #include <unordered_set>
 
 namespace fx::mapc {
@@ -14,13 +13,13 @@ namespace {
 constexpr int32 scLockedMaterialIndex = 0;
 constexpr int32 scEditableMaterialIndex = 1;
 
+constexpr const char* scMaterialListPath = "RaptorData/Data/materials/list.prx";
+
+constexpr float32 scOpaqueAlpha = 0.999f;
+
 constexpr double scBrushExtent = 1e5;
 constexpr double scMinSunDistance = 1e-6;
 
-
-constexpr const char* scEntityBrushMembers[] = {
-	"dynamic", "probevolume", "reflectionprobe", "spawn", "trigger",
-};
 
 struct Transform
 {
@@ -79,17 +78,6 @@ Mat4f MakeObjectMatrix(const Quat rotation, const Vec3f pivot, const Vec3f posit
 		   Mat4f::AsTranslation(pivot) * Mat4f::AsTranslation(position);
 }
 
-bool IsEntityBrush(ConfigEntry& entry)
-{
-	for (const char* member : scEntityBrushMembers) {
-		if (entry.GetMemberValue(HashStr32(member), 0) != 0) {
-			return true;
-		}
-	}
-
-	return entry.GetMember(HashStr32("script")) != nullptr;
-}
-
 void AddEntityPositions(const ConfigEntry* list, Array<Vec3d>& out_entities)
 {
 	if (list == nullptr) {
@@ -103,6 +91,31 @@ void AddEntityPositions(const ConfigEntry* list, Array<Vec3d>& out_entities)
 			out_entities.Emplace(ToVec3d(position->GetValue<Vec3f>()));
 		}
 	}
+}
+
+std::unordered_set<String> ReadTransparentMaterials()
+{
+	std::unordered_set<String> names;
+
+	ConfigFile file {};
+	file.Load(scMaterialListPath);
+
+	const ConfigEntry* list = file.GetEntry(HashStr32("list"));
+
+	if (list == nullptr) {
+		return names;
+	}
+
+	for (const ConfigEntry& item : list->Members) {
+		const bool is_glass = item.GetMemberValue(HashStr32("glass"), 0) != 0;
+		const float32 alpha = item.GetMemberValue<float32>(HashStr32("alpha"), 1.0f);
+
+		if (is_glass || alpha < scOpaqueAlpha) {
+			names.insert(item.GetMemberValue<const char*>(HashStr32("name"), ""));
+		}
+	}
+
+	return names;
 }
 
 } // namespace
@@ -148,6 +161,8 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 		return false;
 	}
 
+	const uint32 renamed_count = MakeBrushEntryNamesUnique(*blocks_entry);
+
 	std::unordered_set<String> model_colliders;
 
 	const ConfigEntry* models_entry = info.GetEntry(HashStr32("objects"));
@@ -162,16 +177,25 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 		}
 	}
 
-	const size_t entry_count = blocks_entry->Members.Size();
+	const std::unordered_set<String> transparent_materials = ReadTransparentMaterials();
+
+	const size_t entry_count = blocks_entry->Members.Size() + CountSubviewBrushes(info, path);
 
 	Brushes.InitCapacity(entry_count);
 	Materials.InitCapacity(entry_count);
-	Warnings.InitCapacity(entry_count);
+	Warnings.InitCapacity(entry_count + 1);
+
+	if (renamed_count > 0) {
+		Warnings.Emplace(String::Fmt("{} brushes shared a name with another brush and were renamed, save the "
+									 "prototype from the editor to keep the new names",
+									 renamed_count));
+	}
 
 	Min = Vec3d(1e30, 1e30, 1e30);
 	Max = Vec3d(-1e30, -1e30, -1e30);
 
-	for (ConfigEntry& entry : blocks_entry->Members) {
+	const auto add_brush = [&](ConfigEntry& entry)
+	{
 		const String name = entry.Name.Get().CStr();
 
 		const Brush brush = ReadBrushEntry(entry);
@@ -179,7 +203,7 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 		if (!brush.IsValid()) {
 			Warnings.Emplace(String::Fmt("brush '{}' does not describe a valid convex brush, skipped", name));
 			InvalidBrushCount++;
-			continue;
+			return;
 		}
 
 		const Vec3f position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
@@ -188,9 +212,9 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 
 		const ConfigEntry* material_entry = entry.GetMember(HashStr32("mat"));
 		const String material_name = (material_entry != nullptr &&
-										   material_entry->Type == ConfigEntry::ePrimitiveType::String)
-											  ? material_entry->Get<const char*>()
-											  : "";
+									  material_entry->Type == ConfigEntry::ePrimitiveType::String)
+										 ? material_entry->Get<const char*>()
+										 : "";
 
 		const eBrushKind brush_kind = ReadBrushKind(entry);
 
@@ -221,14 +245,14 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 			}
 		}
 
-		if (IsEntityBrush(entry) || model_colliders.contains(name)) {
+		if (IsEntityBrushEntry(entry) || model_colliders.contains(name)) {
 			EntityBrushCount++;
 
 			if (!is_marker) {
 				Entities.Emplace(transform.Apply(transform.Pivot));
 			}
 
-			continue;
+			return;
 		}
 
 		SourceBrush source;
@@ -249,6 +273,12 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 		else if (!material_name.IsEmpty()) {
 			source.MaterialIndex = FindOrAddMaterial(material_name,
 													 is_locked ? scLockedMaterialIndex : scEditableMaterialIndex);
+
+			if (transparent_materials.contains(material_name)) {
+				source.bSolid = false;
+				source.bCastsShadow = false;
+				TransparentBrushCount++;
+			}
 		}
 		else {
 			source.MaterialIndex = FindOrAddMaterial("", is_locked ? scLockedMaterialIndex : scEditableMaterialIndex);
@@ -289,7 +319,7 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 		if (!MakePolyhedron(planes, source.PlaneIndices, scBrushExtent, source.Shape)) {
 			Warnings.Emplace(String::Fmt("brush '{}' has no volume, skipped", name));
 			InvalidBrushCount++;
-			continue;
+			return;
 		}
 
 		source.Shape.Source = static_cast<int32>(Brushes.Size);
@@ -298,7 +328,13 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 		Max = MaxVec(Max, source.Shape.Max);
 
 		Brushes.Emplace(std::move(source));
+	};
+
+	for (ConfigEntry& entry : blocks_entry->Members) {
+		add_brush(entry);
 	}
+
+	ForEachSubviewBrush(info, path, [&](ConfigEntry& entry, const ConfigEntry&, uint32) { add_brush(entry); });
 
 	const ConfigEntry* spawn_entry = info.GetEntry(HashStr32("player_spawn"));
 

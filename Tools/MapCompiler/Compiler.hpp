@@ -65,6 +65,8 @@ struct CompileResult
 
 using LogFunction = std::function<void(const String&)>;
 
+uint64 HashPrototypeFile(const String& prototype_path);
+
 CompileResult CompileMap(const CompileOptions& options, const LogFunction& log);
 
 } // namespace fx::mapc

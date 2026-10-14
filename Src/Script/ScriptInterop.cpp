@@ -104,7 +104,10 @@ static Object* N_editor_op_dupe_object(Object* object_to_dupe, FLOAT4 position, 
 		return nullptr;
 	}
 
-	return gEditor->EmplaceEditOperation<editor::DupeOperation>(object_to_dupe, Vec3f(position), group_size).GetDupe();
+	return gEditor
+		->EmplaceEditOperation<editor::DupeOperation>(object_to_dupe, Vec3f(position), group_size,
+													  gEditor->AllocateDupeSubview(object_to_dupe))
+		.GetDupe();
 #else
 	return nullptr;
 #endif
@@ -465,7 +468,7 @@ static Object* N_blockout_create_box(FLOAT4 min, FLOAT4 max)
 static bool N_blockout_clip(Object* object, FLOAT4 point_a, FLOAT4 point_b, FLOAT4 face_normal)
 {
 #ifdef FX_IS_EDITOR
-	if (object == nullptr || gEditor->IsSimulationMode()) {
+	if (object == nullptr || gEditor->IsSimulationMode() || !gEditor->CanEditObject(object)) {
 		return false;
 	}
 
@@ -527,7 +530,7 @@ static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter
 	for (ObjectID id : target_ids) {
 		Object* target = gObjectManager->GetObject(id);
 
-		if (target == nullptr || !CanBeSubtractedFrom(target)) {
+		if (target == nullptr || !gEditor->CanEditObject(target) || !CanBeSubtractedFrom(target)) {
 			continue;
 		}
 
@@ -634,7 +637,7 @@ static int32 N_blockout_subtract(bool keep_cutters)
 static void N_blockout_edit_face_texture(Object* object, FLOAT4 face, uint32 edit, FLOAT4 amount)
 {
 #ifdef FX_IS_EDITOR
-	if (object == nullptr || gEditor->IsSimulationMode()) {
+	if (object == nullptr || gEditor->IsSimulationMode() || !gEditor->CanEditObject(object)) {
 		return;
 	}
 

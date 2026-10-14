@@ -63,7 +63,7 @@ public:
 	void Build(const PlaneSet& planes, const MapSource& source)
 	{
 		for (const SourceBrush& brush : source.Brushes) {
-			if (!brush.bVisible) {
+			if (!brush.bVisible || !brush.bCastsShadow) {
 				continue;
 			}
 

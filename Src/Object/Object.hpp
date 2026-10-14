@@ -275,6 +275,14 @@ public:
 
 	eObjectTag Tags = eObjectTag::None;
 
+	/// The subview instance a blockout brush is part of, or 0 if it belongs to the level itself
+	uint32 SubviewInstance = 0;
+	/// Which of the subview's brushes this is
+	uint32 SubviewMember = 0;
+
+	/// Left out of the editor's 2D views, so it is not in the way of selecting what is behind it
+	bool bHiddenInTopView = false;
+
 	Ref<Skeleton> pSkeleton { nullptr };
 	uint32 BoneBufferBase = Skeleton::scNoBones;
 	/// The skeleton's pose the last time this object told the world grid it changed.

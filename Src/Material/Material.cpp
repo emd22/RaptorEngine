@@ -305,6 +305,17 @@ void Material::SetDoubleSided(bool value)
 	mbRequiresSync = true;
 }
 
+void Material::SetGlass(bool value)
+{
+	if (value) {
+		SetFlag(Properties.Flags, eMaterialFlags::Glass);
+	}
+	else {
+		ClearFlag(Properties.Flags, eMaterialFlags::Glass);
+	}
+	mbRequiresSync = true;
+}
+
 void Material::SetAlpha(float32 alpha)
 {
 	Properties.Alpha = alpha;

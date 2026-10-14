@@ -280,7 +280,7 @@ void CompilerFrame::ShowMapState(size_t index)
 		return;
 	}
 
-	const bool up_to_date = (map.SourceHash == CompiledMap::HashFile(entry.Path));
+	const bool up_to_date = (map.SourceHash == mapc::HashPrototypeFile(entry.Path));
 
 	mpMaps->SetItem(row, Column_State, up_to_date ? "Up to date" : "Out of date");
 	mpMaps->SetItem(row, Column_Seal, map.bSealed ? "Sealed" : "Not sealed");

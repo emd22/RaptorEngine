@@ -26,20 +26,20 @@ struct SurfaceOptions
 
 struct SurfaceStats
 {
-	uint32 SourceFaces = 0;
-	uint32 SourceTriangles = 0;
+	uint32 NumSrcFaces = 0;
+	uint32 NumSrcTriangles = 0;
 
 	uint32 FacesRemoved = 0;
 	uint32 FacesClipped = 0;
 	uint32 OverlapsRemoved = 0;
 
-	uint32 PolygonsBeforeMerge = 0;
-	uint32 Polygons = 0;
+	uint32 NumPolygonsBeforeMerge = 0;
+	uint32 NumPolygons = 0;
 	uint32 TJunctionsFixed = 0;
 	uint32 MergeFallbacks = 0;
 
-	uint32 Triangles = 0;
-	uint32 Vertices = 0;
+	uint32 NumTriangles = 0;
+	uint32 NumVertices = 0;
 
 	double SourceArea = 0.0;
 	double Area = 0.0;

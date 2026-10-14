@@ -245,11 +245,13 @@ void RaptorGame::CreateGame()
 	mpNPCImpactSpeedCVar = gCVars->Set("b_npc_impact_speed", gCVars->Get("b_npc_impact_speed", 1.5f));
 	mpNPCReactStrengthCVar = gCVars->Set("b_npc_react_strength", gCVars->Get("b_npc_react_strength", 0.25f));
 
-	gCVars->Set("r_ssao_radius", gCVars->Get("r_ssao_radius", 0.5f));
-	gCVars->Set("r_ssao_bias", gCVars->Get("r_ssao_bias", 0.02f));
-	gCVars->Set("r_ssao_strength", gCVars->Get("r_ssao_strength", 2.0f));
-	gCVars->Set("r_ssao_power", gCVars->Get("r_ssao_power", 1.5f));
-	gCVars->Set("r_ssao_floor", gCVars->Get("r_ssao_floor", 0.1f));
+	gCVars->Set("r_gtao_radius", gCVars->Get("r_gtao_radius", 0.5f));
+	gCVars->Set("r_gtao_radius_multiplier", gCVars->Get("r_gtao_radius_multiplier", 1.457f));
+	gCVars->Set("r_gtao_falloff_range", gCVars->Get("r_gtao_falloff_range", 0.615f));
+	gCVars->Set("r_gtao_sample_distribution_power", gCVars->Get("r_gtao_sample_distribution_power", 2.0f));
+	gCVars->Set("r_gtao_thin_occluder_compensation", gCVars->Get("r_gtao_thin_occluder_compensation", 0.0f));
+	gCVars->Set("r_gtao_final_value_power", gCVars->Get("r_gtao_final_value_power", 2.2f));
+	gCVars->Set("r_gtao_denoise_blur_beta", gCVars->Get("r_gtao_denoise_blur_beta", 1.2f));
 
 	mCrosshairTicket = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm, scCrosshairPath,
 												eImageCreateFlags::None);

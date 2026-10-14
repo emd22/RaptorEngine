@@ -39,6 +39,8 @@ private:
 	wxWrapSizer* mpToolbar = nullptr;
 	wxBoxSizer* mpVolumeRows[scViewPlaneCount] = {};
 	wxStaticText* mpStatus = nullptr;
+	wxButton* mpShowAllButton = nullptr;
+	uint32 mShownHiddenCount = 0;
 
 	float32 mBase[scViewPlaneCount] = {};
 	float32 mSize[scViewPlaneCount] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };

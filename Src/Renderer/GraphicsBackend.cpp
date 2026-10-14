@@ -339,6 +339,7 @@ void GraphicsBackend::RebuildRenderStages()
 	rd->Prepass.Rebuild(size);
 	rd->ForwardPass.Rebuild(size);
 	rd->SSAOPass.Rebuild(size);
+	rd->SSAODenoisePass.Rebuild(size);
 	rd->SSAOBlurPass.Rebuild(size);
 	rd->CompPass.Rebuild(size);
 
@@ -817,11 +818,13 @@ void GraphicsBackend::PresentFrame()
 }
 
 
-static constexpr float32 scDefaultSSAORadius = 0.5f;
-static constexpr float32 scDefaultSSAOBias = 0.02f;
-static constexpr float32 scDefaultSSAOStrength = 2.0f;
-static constexpr float32 scDefaultSSAOPower = 1.5f;
-static constexpr float32 scDefaultSSAOFloor = 0.1f;
+static constexpr float32 scDefaultGTAORadius = 0.5f;
+static constexpr float32 scDefaultGTAORadiusMultiplier = 1.457f;
+static constexpr float32 scDefaultGTAOFalloffRange = 0.615f;
+static constexpr float32 scDefaultGTAOSampleDistributionPower = 2.0f;
+static constexpr float32 scDefaultGTAOThinOccluderCompensation = 0.0f;
+static constexpr float32 scDefaultGTAOFinalValuePower = 2.2f;
+static constexpr float32 scDefaultGTAODenoiseBlurBeta = 1.2f;
 
 void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 {
@@ -831,22 +834,28 @@ void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 
 	gPipelineCache->Bind(ePipelineName::SSAO, frame->CmdBuffer);
 
-	Target* target = pRenderer->SSAOPass.GetTarget(eImageFormat::R8_UNorm);
+	Target* target = pRenderer->SSAOPass.GetTarget(eImageFormat::RG16_UNorm);
 	Assert(target != nullptr);
 
+	const float32 target_width = static_cast<float32>(target->Image.Info.Size.X);
+	const float32 target_height = static_cast<float32>(target->Image.Info.Size.Y);
+
 	SSAOPushConsts consts = {
-		.RenderSize = { static_cast<float32>(target->Image.Info.Size.X), static_cast<float32>(target->Image.Info.Size.Y), },
+		.RenderSize = { target_width, target_height },
 	};
 
 	memcpy(consts.InvProjection, camera.InvProjectionMatrix.RawData, sizeof(float32) * 16);
 	memcpy(consts.Projection, camera.ProjectionMatrix.RawData, sizeof(float32) * 16);
 	memcpy(consts.View, camera.ViewMatrix.RawData, sizeof(float32) * 16);
 
-	consts.Radius = gCVars->Get("r_ssao_radius", scDefaultSSAORadius);
-	consts.Bias = gCVars->Get("r_ssao_bias", scDefaultSSAOBias);
-	consts.Strength = gCVars->Get("r_ssao_strength", scDefaultSSAOStrength);
-	consts.Power = gCVars->Get("r_ssao_power", scDefaultSSAOPower);
-	consts.Floor = gCVars->Get("r_ssao_floor", scDefaultSSAOFloor);
+	consts.EffectRadius = gCVars->Get("r_gtao_radius", scDefaultGTAORadius) *
+						  gCVars->Get("r_gtao_radius_multiplier", scDefaultGTAORadiusMultiplier);
+	consts.FalloffRange = gCVars->Get("r_gtao_falloff_range", scDefaultGTAOFalloffRange);
+	consts.SampleDistributionPower =
+		gCVars->Get("r_gtao_sample_distribution_power", scDefaultGTAOSampleDistributionPower);
+	consts.ThinOccluderCompensation =
+		gCVars->Get("r_gtao_thin_occluder_compensation", scDefaultGTAOThinOccluderCompensation);
+	consts.FinalValuePower = gCVars->Get("r_gtao_final_value_power", scDefaultGTAOFinalValuePower);
 
 	SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::SSAO), eShaderType::Pixel, consts);
 
@@ -854,21 +863,25 @@ void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 
 	pRenderer->SSAOPass.End();
 
-	// Bilateral blur pass to smooth SSAO output
+	SSAOBlurPushConsts blur_consts = {
+		.TexelSize = { 1.0f / target_width, 1.0f / target_height },
+		.BlurBeta = gCVars->Get("r_gtao_denoise_blur_beta", scDefaultGTAODenoiseBlurBeta),
+	};
+
+	pRenderer->SSAODenoisePass.Begin(frame->CmdBuffer);
+
+	gPipelineCache->Bind(ePipelineName::SSAODenoise, frame->CmdBuffer);
+
+	SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::SSAODenoise), eShaderType::Pixel,
+						blur_consts);
+
+	vkCmdDraw(frame->CmdBuffer.Get(), 3, 1, 0, 0);
+
+	pRenderer->SSAODenoisePass.End();
+
 	pRenderer->SSAOBlurPass.Begin(frame->CmdBuffer);
 
 	gPipelineCache->Bind(ePipelineName::SSAOBlur, frame->CmdBuffer);
-
-	Target* blur_target = pRenderer->SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm);
-	Assert(blur_target != nullptr);
-
-	SSAOBlurPushConsts blur_consts = {
-		.ScreenSize = { static_cast<float32>(blur_target->Image.Info.Size.X),
-						static_cast<float32>(blur_target->Image.Info.Size.Y) },
-		.TexelSize = { 1.0f / static_cast<float32>(blur_target->Image.Info.Size.X),
-					   1.0f / static_cast<float32>(blur_target->Image.Info.Size.Y) },
-		.DepthSharpness = 100.0f,
-	};
 
 	SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::SSAOBlur), eShaderType::Pixel,
 						blur_consts);

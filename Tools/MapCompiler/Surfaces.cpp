@@ -1,7 +1,7 @@
 #include "Surfaces.hpp"
 
+#include <Core/ArrayUtil.hpp>
 #include <Math/Vec2.hpp>
-
 #include <algorithm>
 #include <map>
 #include <tuple>
@@ -655,7 +655,8 @@ public:
 
 			mInserts.Clear();
 
-			const auto test_point = [&](int32 index) {
+			const auto test_point = [&](int32 index)
+			{
 				double fraction = 0.0;
 
 				if (index != from_index && index != to_index &&
@@ -735,7 +736,8 @@ struct SurfaceGroup
 
 int32 SurfaceBuilder::FindOrAddMap(const TextureMap& map)
 {
-	const auto is_near = [](const Vec3d& a, const Vec3d& b) {
+	const auto is_near = [](const Vec3d& a, const Vec3d& b)
+	{
 		return std::abs(a.X - b.X) < scGradientEpsilon && std::abs(a.Y - b.Y) < scGradientEpsilon &&
 			   std::abs(a.Z - b.Z) < scGradientEpsilon;
 	};
@@ -788,8 +790,8 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 
 			const double original_area = GetWindingArea(side.Points);
 
-			Stats.SourceFaces++;
-			Stats.SourceTriangles += static_cast<uint32>(side.Points.Size - 2);
+			Stats.NumSrcFaces++;
+			Stats.NumSrcTriangles += static_cast<uint32>(side.Points.Size - 2);
 			Stats.SourceArea += original_area;
 
 			if (!options.bCullHidden) {
@@ -1036,7 +1038,7 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 			}
 		}
 
-		Stats.Polygons += static_cast<uint32>(triangle_lists.Size);
+		Stats.NumPolygons += static_cast<uint32>(triangle_lists.Size);
 
 		for (const Array<int32>& triangle_indices : triangle_lists) {
 			if (triangle_indices.Size == 0) {
@@ -1089,25 +1091,14 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 					if (found == batch.VertexLookup.end()) {
 						CompiledMapVertex vertex {};
 
-						vertex.Position[0] = static_cast<float32>(point.X);
-						vertex.Position[1] = static_cast<float32>(point.Y);
-						vertex.Position[2] = static_cast<float32>(point.Z);
+						vertex.Position = point.ToVec3f();
+						vertex.Normal = normal.ToVec3f();
+						vertex.Tangent = Vec4f(frame.Tangent.ToVec3f(), frame.Handedness);
 
-						vertex.Normal[0] = static_cast<float32>(normal.X);
-						vertex.Normal[1] = static_cast<float32>(normal.Y);
-						vertex.Normal[2] = static_cast<float32>(normal.Z);
+						vertex.Texcoord = Vec2f(static_cast<float32>(map.GradientU.Dot(point) + map.OffsetU),
+												static_cast<float32>(map.GradientV.Dot(point) + map.OffsetV));
 
-						vertex.Tangent[0] = static_cast<float32>(frame.Tangent.X);
-						vertex.Tangent[1] = static_cast<float32>(frame.Tangent.Y);
-						vertex.Tangent[2] = static_cast<float32>(frame.Tangent.Z);
-						vertex.Tangent[3] = static_cast<float32>(frame.Handedness);
-
-						vertex.Texcoord[0] = static_cast<float32>(map.GradientU.Dot(point) + map.OffsetU);
-						vertex.Texcoord[1] = static_cast<float32>(map.GradientV.Dot(point) + map.OffsetV);
-
-						found = batch.VertexLookup
-									.emplace(vertex_key, batch.Vertices.Size)
-									.first;
+						found = batch.VertexLookup.emplace(vertex_key, batch.Vertices.Size).first;
 						batch.Vertices.Emplace(vertex);
 						batch.LightmapVertices.Emplace(LightmapVertex { chart_index, group_points[corner] });
 					}
@@ -1131,23 +1122,32 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 	for (auto& [key, batch] : batches) {
 		CompiledMapSurface surface;
 		surface.MaterialIndex = batch.MaterialIndex;
-		surface.Vertices = CopyToSizedArray(batch.Vertices);
-		surface.Indices = CopyToSizedArray(batch.Indices);
 
-		for (int32 axis = 0; axis < 3; axis++) {
-			surface.BoundsMin[axis] = surface.Vertices[0].Position[axis];
-			surface.BoundsMax[axis] = surface.Vertices[0].Position[axis];
-		}
+		// surface.Vertices = CopyToSizedArray(batch.Vertices);
+		// surface.Indices = CopyToSizedArray(batch.Indices);
+
+		surface.Vertices = ArrayUtil::DynToSizedArray(batch.Vertices);
+		surface.Indices = ArrayUtil::DynToSizedArray(batch.Indices);
+
+		// for (int32 axis = 0; axis < 3; axis++) {
+		// 	surface.BoundsMin[axis] = surface.Vertices[0].Position[axis];
+		// 	surface.BoundsMax[axis] = surface.Vertices[0].Position[axis];
+		// }
+
+		surface.Bounds = BBox(surface.Vertices[0].Position, surface.Vertices[0].Position);
 
 		for (const CompiledMapVertex& vertex : surface.Vertices) {
-			for (int32 axis = 0; axis < 3; axis++) {
-				surface.BoundsMin[axis] = std::min(surface.BoundsMin[axis], vertex.Position[axis]);
-				surface.BoundsMax[axis] = std::max(surface.BoundsMax[axis], vertex.Position[axis]);
-			}
+			surface.Bounds = BBox(Vec3f::Min(surface.Bounds.Min, vertex.Position),
+								  Vec3f::Max(surface.Bounds.Max, vertex.Position));
+
+			// for (int32 axis = 0; axis < 3; axis++) {
+			// 	surface.BoundsMin[axis] = std::min(surface.BoundsMin[axis], vertex.Position[axis]);
+			// 	surface.BoundsMax[axis] = std::max(surface.BoundsMax[axis], vertex.Position[axis]);
+			// }
 		}
 
-		Stats.Triangles += static_cast<uint32>(surface.Indices.Size / 3);
-		Stats.Vertices += static_cast<uint32>(surface.Vertices.Size);
+		Stats.NumTriangles += static_cast<uint32>(surface.Indices.Size / 3);
+		Stats.NumVertices += static_cast<uint32>(surface.Vertices.Size);
 
 		out_map.Surfaces.Emplace(std::move(surface));
 		LightmapVertices.Emplace(std::move(batch.LightmapVertices));
@@ -1168,7 +1168,7 @@ void SurfaceBuilder::Build(const PlaneSet& planes, const Bsp& bsp, const MapSour
 
 	CullFaces(planes, bsp, source, sealed, options);
 
-	Stats.PolygonsBeforeMerge = static_cast<uint32>(mPolygons.Size);
+	Stats.NumPolygonsBeforeMerge = static_cast<uint32>(mPolygons.Size);
 
 	Triangulate(planes, source, options, out_map);
 }

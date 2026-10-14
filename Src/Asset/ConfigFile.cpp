@@ -324,6 +324,13 @@ void ConfigEntry::AppendValue(const Quat quat)
 	AppendValue(ConfigPrimitive::FromValue(quat.W));
 }
 
+ConfigEntry ConfigEntry::Clone(const String& clone_name) const
+{
+	ConfigEntry clone(clone_name);
+	clone.CopyValueFrom(*this);
+	return clone;
+}
+
 
 ConfigEntry::~ConfigEntry()
 {
@@ -356,13 +363,10 @@ void ConfigFile::Load(const std::string& path)
 	InitConstants();
 	mbLoadedConstants = true;
 
-	Slice<char> file_buffer = file.Read<char>();
+	SizedArray<char> file_buffer = file.Read2<char>();
 
 	if (file_buffer.pData == nullptr || file_buffer.Size == 0) {
 		LogWarning(LC_CORE, "Config '{}' is empty or could not be read", path);
-		if (file_buffer.pData) {
-			StdAllocator::Free(file_buffer.pData);
-		}
 		return;
 	}
 
@@ -376,8 +380,6 @@ void ConfigFile::Load(const std::string& path)
 	tokenizer.Tokenize();
 
 	Parse(tokenizer.GetTokens());
-
-	StdAllocator::Free(file_buffer.pData);
 }
 
 static ConfigEntry::ePrimitiveType GetValueTokenType(const Token& token)

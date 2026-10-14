@@ -145,6 +145,7 @@ private:
 	void ClearRenderList();
 
 	void AddToRenderListRecursive(renderer::PipelineHandle pipeline, ObjectID* id);
+	void AddShadowCasterRecursive(ObjectID id);
 	/**
 	 * @brief Recursively adds `id` and its attached nodes to the geometry render list, deriving each node's own
 	 * pipeline from its own material rather than inheriting the pipeline chosen for the root (attached primitives

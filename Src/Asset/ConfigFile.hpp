@@ -352,6 +352,7 @@ public:
 		return entry;
 	}
 
+
 public:
 	ConfigEntry() = default;
 
@@ -379,6 +380,11 @@ public:
 	void AppendValue(const Vec3f vec);
 	void AppendValue(const Vec4f vec);
 	void AppendValue(const Quat quat);
+
+	/**
+	 * @brief Clones the values inside of a config entry to a new config entry under a new name.
+	 */
+	ConfigEntry Clone(const String& clone_name) const;
 
 	/////////////////////////////////////
 	// Value get functions

@@ -39,6 +39,7 @@ enum class eMaterialFlags : uint32
 	AlphaMask = (1 << 2),
 	/// Both faces are drawn (glTF doubleSided), with the back face lit with a flipped normal.
 	DoubleSided = (1 << 3),
+	Glass = (1 << 4),
 };
 
 FxEnumFlags(eMaterialFlags);
@@ -195,6 +196,8 @@ public:
 
 	void SetSupportsSkinning(bool value) { bSupportsSkinning = value; }
 
+	FX_FORCE_INLINE bool IsGlass() const { return HasFlag(Properties.Flags, eMaterialFlags::Glass); }
+
 	FX_FORCE_INLINE MaterialID GetID() const { return ID; }
 
 	/**
@@ -216,6 +219,7 @@ public:
 	void SetUnlit(bool value);
 	void SetAlphaMask(bool value);
 	void SetDoubleSided(bool value);
+	void SetGlass(bool value);
 	void SetAlpha(float32 alpha);
 	void SetMetallicRoughness(float32 metallic, float32 roughness);
 

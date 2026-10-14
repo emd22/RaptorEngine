@@ -1,5 +1,6 @@
 #include "CompiledMap.hpp"
 
+#include <Core/File.hpp>
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -18,17 +19,22 @@ bool IsNameBefore(const String& a, const String& b) { return std::strcmp(a.CStr(
 
 struct Reader
 {
-	std::FILE* pFile = nullptr;
-	bool bFailed = false;
+public:
+	Reader() = delete;
+	Reader(File* file_to_read) : mpFile(file_to_read) {}
 
 	template <typename TType>
 	void Read(TType* values, size_t count)
 	{
+		Assert(mpFile != nullptr);
+
 		if (bFailed || count == 0) {
 			return;
 		}
 
-		if (std::fread(values, sizeof(TType), count, pFile) != count) {
+		const uint64 bytes_read = mpFile->Read2(Slice(values, count));
+
+		if (bytes_read != count) {
 			bFailed = true;
 		}
 	}
@@ -50,11 +56,17 @@ struct Reader
 			return 0;
 		}
 
-		return bFailed ? 0 : count;
+		if (bFailed) {
+			return 0;
+		}
+
+		return count;
 	}
 
 	String ReadString()
 	{
+		Assert(mpFile != nullptr);
+
 		const uint32 length = Read<uint32>();
 
 		if (bFailed || length > scMaxStringLength) {
@@ -65,23 +77,38 @@ struct Reader
 		char buffer[scMaxStringLength];
 		Read(buffer, length);
 
-		return bFailed ? String() : String(buffer, length);
+		if (bFailed) {
+			return String {};
+		}
+
+		return String(buffer, length);
 	}
+
+public:
+	bool bFailed = false;
+
+private:
+	File* mpFile = nullptr;
 };
 
 struct Writer
 {
-	std::FILE* pFile = nullptr;
-	bool bFailed = false;
+public:
+	Writer() = delete;
+	Writer(File* file_to_write) : mpFile(file_to_write) {}
 
 	template <typename TType>
 	void Write(const TType* values, size_t count)
 	{
+		Assert(mpFile != nullptr);
+
 		if (bFailed || count == 0) {
 			return;
 		}
 
-		if (std::fwrite(values, sizeof(TType), count, pFile) != count) {
+		const size_t bytes_written = mpFile->WriteSlice(Slice(values, count));
+
+		if (bytes_written != count) {
 			bFailed = true;
 		}
 	}
@@ -92,6 +119,23 @@ struct Writer
 		Write(&value, 1);
 	}
 
+	template <typename TType>
+		requires std::same_as<TType, Vec3f>
+	void Write(const Vec3f& value)
+	{
+		Assert(mpFile != nullptr);
+
+		if (bFailed) {
+			return;
+		}
+
+		const size_t bytes_written = mpFile->WriteSlice(Slice(value.mData, 3));
+
+		if (bytes_written != 3) {
+			bFailed = true;
+		}
+	}
+
 	void WriteCount(size_t count) { Write(static_cast<uint32>(count)); }
 
 	void WriteString(const String& value)
@@ -99,6 +143,13 @@ struct Writer
 		WriteCount(value.GetLength());
 		Write(value.CStr(), value.GetLength());
 	}
+
+
+public:
+	bool bFailed = false;
+
+private:
+	File* mpFile;
 };
 
 } // namespace
@@ -107,19 +158,18 @@ bool CompiledMap::Load(const String& path)
 {
 	*this = CompiledMap {};
 
-	std::FILE* file = std::fopen(path.CStr(), "rb");
-
-	if (file == nullptr) {
+	File file_to_read(path, File::eModType::Read, File::eDataType::Binary);
+	if (!file_to_read.IsFileOpen()) {
 		return false;
 	}
 
-	Reader reader { file };
+	Reader reader { &file_to_read };
 
 	const uint32 magic = reader.Read<uint32>();
 	const uint32 version = reader.Read<uint32>();
 
 	if (reader.bFailed || magic != scMagic || version != scVersion) {
-		std::fclose(file);
+		file_to_read.Close();
 		return false;
 	}
 
@@ -143,8 +193,14 @@ bool CompiledMap::Load(const String& path)
 
 	for (CompiledMapSurface& surface : Surfaces) {
 		surface.MaterialIndex = reader.Read<uint32>();
-		reader.Read(surface.BoundsMin, 3);
-		reader.Read(surface.BoundsMax, 3);
+
+		const Vec3f bounds_min = reader.Read<Vec3f>();
+		const Vec3f bounds_max = reader.Read<Vec3f>();
+		//
+		// reader.Read(surface.BoundsMin, 3);
+		// reader.Read(surface.BoundsMax, 3);
+
+		surface.Bounds = BBox(bounds_min, bounds_max);
 
 		const uint32 vertex_count = reader.ReadCount();
 		const uint32 index_count = reader.ReadCount();
@@ -268,8 +324,6 @@ bool CompiledMap::Load(const String& path)
 		reader.Read(ProbeSunVisibility.pData, probe_visibility_count);
 	}
 
-	std::fclose(file);
-
 	if (reader.bFailed) {
 		*this = CompiledMap {};
 		return false;
@@ -282,13 +336,13 @@ bool CompiledMap::Load(const String& path)
 
 bool CompiledMap::Save(const String& path) const
 {
-	std::FILE* file = std::fopen(path.CStr(), "wb");
+	File file_to_write(path, File::eModType::Write, File::eDataType::Binary);
 
-	if (file == nullptr) {
+	if (!file_to_write.IsFileOpen()) {
 		return false;
 	}
 
-	Writer writer { file };
+	Writer writer { &file_to_write };
 
 	writer.Write(scMagic);
 	writer.Write(scVersion);
@@ -312,12 +366,16 @@ bool CompiledMap::Save(const String& path) const
 
 	for (const CompiledMapSurface& surface : Surfaces) {
 		writer.Write(surface.MaterialIndex);
-		writer.Write(surface.BoundsMin, 3);
-		writer.Write(surface.BoundsMax, 3);
+
+		writer.Write(surface.Bounds.Min);
+		writer.Write(surface.Bounds.Max);
+
 		writer.WriteCount(surface.Vertices.Size);
 		writer.WriteCount(surface.Indices.Size);
+
 		writer.Write(surface.Vertices.pData, surface.Vertices.Size);
 		writer.Write(surface.Indices.pData, surface.Indices.Size);
+
 		writer.WriteCount(surface.LightmapTexcoords.Size);
 		writer.Write(surface.LightmapTexcoords.pData, surface.LightmapTexcoords.Size);
 	}
@@ -352,9 +410,7 @@ bool CompiledMap::Save(const String& path) const
 	writer.WriteCount(ProbeSunVisibility.Size);
 	writer.Write(ProbeSunVisibility.pData, ProbeSunVisibility.Size);
 
-	const bool closed = (std::fclose(file) == 0);
-
-	return !writer.bFailed && closed;
+	return (writer.bFailed == false);
 }
 
 bool CompiledMap::HasBrush(const String& name) const

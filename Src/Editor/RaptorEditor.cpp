@@ -325,6 +325,13 @@ EditorPanelState RaptorEditor::BuildPanelState()
 	state.BlockoutPath = gWorld->PrototypePath;
 	state.bUnsavedChanges = HasUnsavedChanges();
 
+	if (gWorld->pPrototype != nullptr) {
+		state.ActiveSubview = gWorld->pPrototype->GetSubviewName(gWorld->pPrototype->GetActiveSubview());
+		state.SubviewNames = gWorld->pPrototype->GetSubviewNames();
+
+		state.Object.ActiveSubview = state.ActiveSubview;
+	}
+
 	if (Object* object = mSelection.GetLast(); object != nullptr) {
 		ObjectPanelState& panel = state.Object;
 
@@ -334,6 +341,11 @@ EditorPanelState RaptorEditor::BuildPanelState()
 		panel.SelectedCount = mSelection.GetCount();
 		panel.Tags = static_cast<uint32>(object->Tags);
 		panel.Flags = static_cast<uint32>(object->GetFlags());
+
+		if (!CanEditObject(object) && gWorld->pPrototype != nullptr) {
+			panel.SubviewName = gWorld->pPrototype->GetSubviewName(object->SubviewInstance);
+			panel.SubviewBrushCount = gWorld->pPrototype->GetSubviewBrushCount(object->SubviewInstance);
+		}
 
 		for (uint32 bit = 0; bit < 32; bit++) {
 			if (CanEditObjectTag(object, 1u << bit)) {
@@ -495,6 +507,10 @@ void RaptorEditor::InvokeReloadHandler(eReloadTarget target)
 
 void RaptorEditor::Update(float32 delta_time)
 {
+	if (gWorld->pPrototype != nullptr) {
+		gWorld->pPrototype->SyncSubviewInstances();
+	}
+
 	if (IsSimulationMode()) {
 		return;
 	}
@@ -549,6 +565,7 @@ void RaptorEditor::Update(float32 delta_time)
 	}
 
 	DrawModelSelection();
+	DrawSubviews();
 }
 
 static void DrawModelBounds(Object* object, const Color& color)
@@ -658,6 +675,18 @@ void RaptorEditor::HandleHotkeys()
 
 	if (mbSpawnSelected && ControlManager::IsKeyPressed(eKey::FX_KEY_TAB)) {
 		DeselectSpawn();
+	}
+
+	if (ControlManager::IsComboPressed(eKey::FX_KEY_LCTRL, eKey::FX_KEY_G)) {
+		CreateSubviewFromSelection("");
+	}
+	else if (ControlManager::IsKeyPressed(eKey::FX_KEY_G) && !ControlManager::IsKeyDown(eKey::FX_KEY_LCTRL)) {
+		if (IsEditingSubview()) {
+			LeaveSubview();
+		}
+		else {
+			EnterSubview();
+		}
 	}
 
 	if (mSelection.IsEmpty()) {
@@ -978,6 +1007,7 @@ void RaptorEditor::SetTool(eEditorTool tool)
 			DeselectModels();
 		}
 
+		PruneSelection();
 		SyncSelection();
 		mpCurrentTool->Enter();
 
@@ -1169,6 +1199,13 @@ bool RaptorEditor::IsObjectSelectable(const Object* object) const
 		return false;
 	}
 
+	if (!CanEditObject(object)) {
+		// A placed subview is one object, which only the Translate and Rotate tools can work with. Nothing outside
+		// of the subview being edited can be selected.
+		return !IsEditingSubview() &&
+			   (mCurrentToolType == eEditorTool::Translate || mCurrentToolType == eEditorTool::Rotate);
+	}
+
 	if (!IsDataMode()) {
 		return !object->IsDataBrush();
 	}
@@ -1217,6 +1254,10 @@ bool RaptorEditor::SelectObject(Object* object, bool append_selection)
 
 	DeselectSpawn();
 
+	if (!CanEditObject(object)) {
+		return SelectSubview(object->SubviewInstance, append_selection);
+	}
+
 	if (object->HasTags(eObjectTag::LockTransform)) {
 		return false;
 	}
@@ -1238,6 +1279,49 @@ bool RaptorEditor::SelectObject(Object* object, bool append_selection)
 	SyncSelection();
 
 	return selected;
+}
+
+bool RaptorEditor::SelectSubview(uint32 instance, bool append_selection)
+{
+	Object* root = gWorld->pPrototype->GetSubviewObject(instance);
+
+	if (root == nullptr) {
+		return false;
+	}
+
+	if (mSelection.Contains(root)) {
+		return true;
+	}
+
+	if (!append_selection) {
+		mSelection.Clear();
+	}
+
+	const bool selected = mSelection.Add(root);
+
+	if (!selected) {
+		LogWarning(LC_CORE, "Cannot select '{}', the selection is full", root->Name.Get());
+	}
+
+	SyncSelection();
+
+	return selected;
+}
+
+void RaptorEditor::DeselectObject(Object* object)
+{
+	if (object == nullptr) {
+		return;
+	}
+
+	if (CanEditObject(object)) {
+		mSelection.Remove(object);
+	}
+	else {
+		mSelection.Remove(gWorld->pPrototype->GetSubviewObject(object->SubviewInstance));
+	}
+
+	SyncSelection();
 }
 
 void RaptorEditor::DeselectModels()
@@ -1303,6 +1387,10 @@ void RaptorEditor::ClearSelection()
 
 void RaptorEditor::SetStoredMaterial(Object* object, MaterialID material)
 {
+	if (!CanEditObject(object)) {
+		return;
+	}
+
 	mSelection.SetStoredMaterial(object, material);
 	mLastUsedMaterial = material;
 }
@@ -1467,7 +1555,7 @@ uint32 RaptorEditor::SetSelectionReflectionProbe(bool enabled)
 	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
 		Object* object = mSelection.GetObject(i);
 
-		if (object == nullptr || object->IsReflectionProbe() == enabled) {
+		if (object == nullptr || !CanEditObject(object) || object->IsReflectionProbe() == enabled) {
 			continue;
 		}
 
@@ -1490,7 +1578,7 @@ uint32 RaptorEditor::SetSelectionObjectBit(bool is_tag, uint32 bit, bool enabled
 	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
 		Object* object = mSelection.GetObject(i);
 
-		if (object == nullptr) {
+		if (object == nullptr || !CanEditObject(object)) {
 			continue;
 		}
 
@@ -1517,7 +1605,8 @@ uint32 RaptorEditor::SetSelectionScript(const String& path)
 	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
 		Object* object = mSelection.GetObject(i);
 
-		if (object != nullptr && CanAttachScript(object) && !(gObjectScripts->GetPath(object->ID) == path)) {
+		if (object != nullptr && CanEditObject(object) && CanAttachScript(object) &&
+			!(gObjectScripts->GetPath(object->ID) == path)) {
 			targets[count++] = object;
 		}
 	}
@@ -1544,7 +1633,7 @@ uint32 RaptorEditor::SetSelectionEnterDirection(const Vec3f local_direction)
 	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
 		Object* object = mSelection.GetObject(i);
 
-		if (object == nullptr || !object->IsTrigger()) {
+		if (object == nullptr || !CanEditObject(object) || !object->IsTrigger()) {
 			continue;
 		}
 
@@ -1576,13 +1665,18 @@ void RaptorEditor::DeleteSelection()
 	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
 		Object* object = mSelection.GetObject(i);
 
-		if (object->HasTags(eObjectTag::Blockout)) {
+		if (object->HasTags(eObjectTag::Blockout) || gWorld->pPrototype->IsSubviewObject(object)) {
 			objects[count++] = object;
 		}
 	}
 
 	for (uint32 i = 0; i < count; i++) {
-		DeleteObject(objects[i], static_cast<int32>(count));
+		if (gWorld->pPrototype->IsSubviewObject(objects[i])) {
+			EmplaceEditOperation<SubviewRemoveOperation>(objects[i]->SubviewInstance, static_cast<int32>(count));
+		}
+		else {
+			DeleteObject(objects[i], static_cast<int32>(count));
+		}
 	}
 }
 
@@ -1595,7 +1689,7 @@ void RaptorEditor::DupeSelection()
 	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
 		Object* object = mSelection.GetObject(i);
 
-		if (object->HasTags(eObjectTag::Blockout)) {
+		if (object->HasTags(eObjectTag::Blockout) || gWorld->pPrototype->IsSubviewObject(object)) {
 			originals[count++] = object;
 		}
 	}
@@ -1612,7 +1706,8 @@ void RaptorEditor::DupeSelection()
 	for (uint32 i = 0; i < count; i++) {
 		Object* original = originals[i];
 
-		Object* dupe = EmplaceEditOperation<DupeOperation>(original, original->GetPosition(), static_cast<int32>(count))
+		Object* dupe = EmplaceEditOperation<DupeOperation>(original, original->GetPosition(), static_cast<int32>(count),
+														   AllocateDupeSubview(original))
 						   .GetDupe();
 
 		if (dupe != nullptr) {
@@ -1628,6 +1723,259 @@ void RaptorEditor::DupeSelection()
 	}
 
 	SyncSelection();
+}
+
+/////////////////////////////////////
+// Subviews
+/////////////////////////////////////
+
+bool RaptorEditor::IsEditingSubview() const
+{
+	return gWorld->pPrototype != nullptr && gWorld->pPrototype->IsEditingSubview();
+}
+
+bool RaptorEditor::CanEditObject(const Object* object) const
+{
+	if (object == nullptr || gWorld->pPrototype == nullptr) {
+		return false;
+	}
+
+	return object->SubviewInstance == gWorld->pPrototype->GetActiveSubview();
+}
+
+uint32 RaptorEditor::AllocateDupeSubview(const Object* original)
+{
+	Blockout* blockout = gWorld->pPrototype;
+
+	if (blockout == nullptr || !blockout->IsSubviewObject(original)) {
+		return Blockout::scNoSubview;
+	}
+
+	return blockout->NewSubviewInstance(blockout->GetSubviewName(original->SubviewInstance));
+}
+
+bool RaptorEditor::CreateSubviewFromSelection(const String& name)
+{
+	Blockout* blockout = gWorld->pPrototype;
+
+	if (blockout == nullptr || IsSimulationMode()) {
+		return false;
+	}
+
+	if (blockout->IsCompiledMap()) {
+		LogWarning(LC_CORE, "Open the prototype (.prx) to make subviews, a compiled map can't be edited");
+		return false;
+	}
+
+	if (blockout->IsEditingSubview()) {
+		LogWarning(LC_CORE, "A subview can't hold another subview. Leave the subview being edited first.");
+		return false;
+	}
+
+	Object* objects[scMaxSelectedObjects];
+	uint32 count = 0;
+
+	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
+		Object* object = mSelection.GetObject(i);
+
+		if (!blockout->HasBrush(object)) {
+			LogWarning(LC_CORE, "Only brushes can be part of a subview, '{}' is not one", object->Name.Get());
+			return false;
+		}
+
+		if (object->SubviewInstance != Blockout::scNoSubview) {
+			LogWarning(LC_CORE, "'{}' is already part of the subview '{}'", object->Name.Get(),
+					   blockout->GetSubviewName(object->SubviewInstance));
+			return false;
+		}
+
+		objects[count++] = object;
+	}
+
+	if (count == 0) {
+		LogWarning(LC_CORE, "Select the brushes to make a subview from first");
+		return false;
+	}
+
+	EndDrag();
+
+	BBox bounds;
+
+	if (!blockout->GetBrushBounds(objects, count, bounds)) {
+		return false;
+	}
+
+	BrushPlacement placement;
+	placement.Position = SnapToGrid(
+		Vec3f((bounds.Min.X + bounds.Max.X) * 0.5f, bounds.Min.Y, (bounds.Min.Z + bounds.Max.Z) * 0.5f));
+
+	String wanted_name = name;
+
+	if (wanted_name.IsEmpty()) {
+		wanted_name = "subview";
+	}
+
+	const uint32 instance = blockout->CreateSubview(wanted_name, objects, count, placement.Position);
+
+	if (instance == Blockout::scNoSubview) {
+		return false;
+	}
+
+	EmplaceEditOperation<SubviewCreateOperation>(instance, objects, count, placement);
+
+	LogInfo(LC_CORE, "Made the subview '{}' from {} brush(es)", blockout->GetSubviewName(instance), count);
+
+	SetTool(eEditorTool::Translate);
+	SelectSubview(instance, false);
+
+	mbForcePanelSync = true;
+
+	return true;
+}
+
+bool RaptorEditor::EnterSubview()
+{
+	Blockout* blockout = gWorld->pPrototype;
+
+	if (blockout == nullptr || IsSimulationMode() || blockout->IsEditingSubview()) {
+		return false;
+	}
+
+	const Object* selected = mSelection.GetLast();
+
+	if (selected == nullptr || selected->SubviewInstance == Blockout::scNoSubview) {
+		LogWarning(LC_CORE, "Select a subview with the Translate tool to enter it");
+		return false;
+	}
+
+	const uint32 instance = selected->SubviewInstance;
+
+	EndDrag();
+
+	// Edits made from here on are to the subview, so they can't be mixed with undoing edits to the level
+	ForgetObjects();
+
+	if (!blockout->EnterSubview(instance)) {
+		LogWarning(LC_CORE, "Could not enter the subview '{}'", blockout->GetSubviewName(instance));
+		return false;
+	}
+
+	LogInfo(LC_CORE, "Editing the subview '{}'", blockout->GetSubviewName(instance));
+
+	mbForcePanelSync = true;
+
+	return true;
+}
+
+void RaptorEditor::LeaveSubview()
+{
+	Blockout* blockout = gWorld->pPrototype;
+
+	if (blockout == nullptr || !blockout->IsEditingSubview()) {
+		return;
+	}
+
+	EndDrag();
+
+	// The other copies of the subview are rebuilt, which the history can't follow
+	ForgetObjects();
+
+	blockout->LeaveSubview();
+
+	MarkModified();
+
+	mbForcePanelSync = true;
+}
+
+bool RaptorEditor::PlaceSubview(const String& name)
+{
+	Blockout* blockout = gWorld->pPrototype;
+
+	if (blockout == nullptr || IsSimulationMode()) {
+		return false;
+	}
+
+	if (blockout->IsEditingSubview()) {
+		LogWarning(LC_CORE, "A subview can't hold another subview. Leave the subview being edited first.");
+		return false;
+	}
+
+	const uint32 instance = blockout->NewSubviewInstance(name);
+
+	if (instance == Blockout::scNoSubview) {
+		LogWarning(LC_CORE, "There is no subview called '{}'", name);
+		return false;
+	}
+
+	EndDrag();
+
+	const Ref<PerspectiveCamera>& camera = gWorld->Player.pCamera;
+
+	const physics::RayResult hit = gPhysics->pBackend->Raycast(camera->Position,
+															   camera->GetForwardVector() * scCreateRange);
+
+	BrushPlacement placement;
+
+	if (hit.bHit) {
+		placement.Position = SnapToGrid(hit.Point);
+	}
+	else {
+		placement.Position = SnapToGrid(camera->Position + camera->GetForwardVector() * scPickRange);
+	}
+
+	EmplaceEditOperation<SubviewPlaceOperation>(instance, placement);
+
+	SetTool(eEditorTool::Translate);
+	SelectSubview(instance, false);
+
+	return true;
+}
+
+uint32 RaptorEditor::DissolveSelectedSubviews()
+{
+	Blockout* blockout = gWorld->pPrototype;
+
+	if (blockout == nullptr || IsSimulationMode() || IsEditingSubview()) {
+		return 0;
+	}
+
+	uint32 instances[scMaxSelectedObjects];
+	uint32 count = 0;
+
+	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
+		Object* object = mSelection.GetObject(i);
+
+		if (blockout->IsSubviewObject(object)) {
+			instances[count++] = object->SubviewInstance;
+		}
+	}
+
+	EndDrag();
+
+	for (uint32 i = 0; i < count; i++) {
+		EmplaceEditOperation<SubviewDissolveOperation>(instances[i], static_cast<int32>(count));
+	}
+
+	mbForcePanelSync = true;
+
+	return count;
+}
+
+void RaptorEditor::DrawSubviews()
+{
+	static const Color scEditedColor = Color::FromRGBA(60, 220, 255, 255);
+
+	Blockout* blockout = gWorld->pPrototype;
+
+	if (blockout == nullptr || !blockout->IsEditingSubview()) {
+		return;
+	}
+
+	BBox bounds;
+
+	if (blockout->GetSubviewBounds(blockout->GetActiveSubview(), bounds)) {
+		renderer::gDebugDraw->WireBox(bounds, scEditedColor);
+	}
 }
 
 void RaptorEditor::Undo()

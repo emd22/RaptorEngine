@@ -24,6 +24,11 @@ struct ObjectPanelState
 
 	String Name;
 	String ScriptPath;
+	/// The subview that the selected object was placed with
+	String SubviewName;
+	uint32 SubviewBrushCount = 0;
+	/// The subview being edited
+	String ActiveSubview;
 
 	Vec3f EnterDirection = Vec3f::sZero;
 
@@ -194,6 +199,9 @@ struct TopViewState
 
 	uint32 CommandSerial = 0;
 
+	/// How many brushes are hidden from the 2D views
+	uint32 HiddenCount = 0;
+
 	DynArray<TopViewBrush> Brushes;
 
 	TopViewState() = default;
@@ -225,6 +233,7 @@ struct TopViewState
 		PlayerDirection = other.PlayerDirection;
 
 		CommandSerial = other.CommandSerial;
+		HiddenCount = other.HiddenCount;
 
 		Brushes = other.Brushes.Clone();
 
@@ -243,6 +252,11 @@ struct EditorPanelState
 	TopViewState TopView;
 
 	String BlockoutPath;
+
+	/// The subview being edited, empty while the level itself is
+	String ActiveSubview;
+	/// Every subview of the prototype, one per line
+	String SubviewNames;
 
 	bool bUnsavedChanges = false;
 

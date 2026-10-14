@@ -290,7 +290,7 @@ void Player::UpdateViewModel(double delta_time)
 	const Vec3f up = Vec3f(view_model_basis.Rows[1]);
 	const Vec3f forward = Vec3f(view_model_basis.Rows[2]);
 
-	float32 horizontal_scale = 0.24f;
+	float32 horizontal_scale = 0.34f;
 	float32 vertical_scale = 0.20f;
 
 	// if (bIsSprinting) {
@@ -638,7 +638,7 @@ void Player::Update(float64 delta_time)
 
 	if (gCVars->Get("b_headbob_enabled", false) && (Physics.bIsGrounded)) {
 		float32 body_speed = mHorizontalSpeed;
-		float32 counter_speed = (bBobReverse ? -1.6f : 1.6f);
+		float32 counter_speed = (bBobReverse ? -2.0f : 2.0f);
 
 		mBobCounterY += delta_time * counter_speed * body_speed;
 

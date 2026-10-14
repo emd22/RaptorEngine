@@ -4,6 +4,7 @@
 #define MF_SPECULAR_GLOSSINESS (1 << 1)
 #define MF_ALPHA_MASK (1 << 2)
 #define MF_DOUBLE_SIDED (1 << 3)
+#define MF_GLASS (1 << 4)
 
 /// Mirrors MaterialProperties in Src/Material/Material.hpp
 struct Material

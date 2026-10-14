@@ -24,6 +24,7 @@ enum class ePipelineName : uint16
 	CompositionAgx,
 
 	SSAO,
+	SSAODenoise,
 	SSAOBlur,
 
 	NumPipelines

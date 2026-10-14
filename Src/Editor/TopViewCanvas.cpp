@@ -2583,6 +2583,18 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 	case 'U':
 		SendCommand([] { gEditor->TopViewToggleSnap(); });
 		break;
+	case 'H':
+		if (mDrag != eDrag::None) {
+			break;
+		}
+
+		if (shift) {
+			SendCommand([] { gEditor->TopViewShowAll(); });
+		}
+		else {
+			SendCommand([] { gEditor->TopViewHideSelection(); });
+		}
+		break;
 	case '-':
 	case WXK_NUMPAD_SUBTRACT:
 		SendCommand([] { gEditor->TopViewAdjustSnap(-1); });

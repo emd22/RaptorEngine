@@ -61,7 +61,17 @@ public:
 		return MakeSlice<TDataType>(out_buffer.pData, items_read);
 	}
 
-	uint64 Read2(void* buffer, uint32 element_size);
+	uint64 Read2(void* buffer, uint64 element_size);
+
+	template <typename TType>
+	uint64 Read2(const Slice<TType>& out_buffer)
+	{
+		if (!pFileHandle) {
+			return 0;
+		}
+
+		return fread(out_buffer.pData, sizeof(TType), out_buffer.Size, pFileHandle);
+	}
 
 	template <typename TDataType>
 	Slice<TDataType> Read()
@@ -99,7 +109,7 @@ public:
 	}
 
 
-	void WriteRaw(const void* data, uint64 size);
+	size_t WriteRaw(const void* data, uint64 size);
 
 	void Write(const char* str);
 	void Write(const std::string& str) { Write(str.c_str()); }
@@ -127,6 +137,12 @@ public:
 			std::string str_value = std::to_string(value);
 			fputs(str_value.c_str(), pFileHandle);
 		}
+	}
+
+	template <typename TType>
+	size_t WriteSlice(const Slice<TType> data)
+	{
+		return WriteRaw(reinterpret_cast<const void*>(data.pData), data.GetSizeInBytes()) / sizeof(TType);
 	}
 
 	template <typename TType>

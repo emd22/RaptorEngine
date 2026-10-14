@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
+#include <vector>
 
 namespace fx::editor {
 
@@ -193,6 +194,53 @@ void ClipToFootprintEdge(DoublingArray<Vec3f>& points, DoublingArray<Vec3f>& scr
 	std::swap(points, scratch);
 }
 
+struct BrushSource
+{
+	Object* pObject = nullptr;
+	const Brush* pBrush = nullptr;
+	Mat4f World = Mat4f::scIdentity;
+	Vec3f Pivot = Vec3f::sZero;
+	eTopViewBrushKind Kind = eTopViewBrushKind::Geometry;
+};
+
+void GatherBrushSources(Blockout& blockout, std::vector<BrushSource>& out_sources)
+{
+	for (ObjectID id : blockout.BlockoutObjects) {
+		Object* object = gObjectManager->GetObject(id);
+
+		if (object == nullptr || object == blockout.pXFormObject || object == blockout.pPreviewObject) {
+			continue;
+		}
+
+		const Brush* brush = blockout.GetBrush(object);
+
+		if (brush == nullptr || !brush->IsValid()) {
+			continue;
+		}
+
+		out_sources.push_back(BrushSource {
+			.pObject = object,
+			.pBrush = brush,
+			.World = object->GetWorldMatrix(),
+			.Pivot = object->GetPosition() + brush->GetCenter(),
+			.Kind = GetBrushKind(*object),
+		});
+	}
+
+	std::vector<Blockout::SubviewSolid> solids;
+	blockout.GetSubviewSolids(solids);
+
+	for (const Blockout::SubviewSolid& solid : solids) {
+		out_sources.push_back(BrushSource {
+			.pObject = solid.pOwner,
+			.pBrush = solid.pBrush,
+			.World = solid.World,
+			.Pivot = solid.pOwner->GetPosition(),
+			.Kind = eTopViewBrushKind::Geometry,
+		});
+	}
+}
+
 bool FindGroundHeight(const Vec3f min, const Vec3f max, float32& out_base)
 {
 	Blockout* blockout = gWorld->pPrototype;
@@ -214,21 +262,16 @@ bool FindGroundHeight(const Vec3f min, const Vec3f max, float32& out_base)
 	DoublingArray<Vec3f> points;
 	DoublingArray<Vec3f> scratch;
 
-	for (ObjectID id : blockout->BlockoutObjects) {
-		Object* object = gObjectManager->GetObject(id);
+	std::vector<BrushSource> sources;
+	GatherBrushSources(*blockout, sources);
 
-		if (object == nullptr || object == blockout->pXFormObject || object == blockout->pPreviewObject ||
-			GetBrushKind(*object) != eTopViewBrushKind::Geometry) {
+	for (const BrushSource& source : sources) {
+		if (source.Kind != eTopViewBrushKind::Geometry) {
 			continue;
 		}
 
-		const Brush* brush = blockout->GetBrush(object);
-
-		if (brush == nullptr || !brush->IsValid()) {
-			continue;
-		}
-
-		const Mat4f world = object->GetWorldMatrix();
+		const Brush* brush = source.pBrush;
+		const Mat4f world = source.World;
 
 		HeightSpan span { FLT_MAX, -FLT_MAX };
 
@@ -341,29 +384,34 @@ TopViewState RaptorEditor::BuildTopViewState()
 	DoublingArray<Vec2f> hull;
 	DoublingArray<Segment> segments;
 
-	for (ObjectID id : blockout->BlockoutObjects) {
-		Object* object = gObjectManager->GetObject(id);
+	std::vector<BrushSource> sources;
+	GatherBrushSources(*blockout, sources);
 
-		if (object == nullptr || object == blockout->pXFormObject || object == blockout->pPreviewObject) {
+	Object* last_hidden = nullptr;
+
+	for (const BrushSource& source : sources) {
+		Object* object = source.pObject;
+		const Brush* brush = source.pBrush;
+
+		if (object->bHiddenInTopView) {
+			if (object != last_hidden) {
+				view.HiddenCount++;
+			}
+
+			last_hidden = object;
 			continue;
 		}
 
-		const Brush* brush = blockout->GetBrush(object);
-
-		if (brush == nullptr || !brush->IsValid()) {
-			continue;
-		}
-
-		const Mat4f world = object->GetWorldMatrix();
+		const Mat4f world = source.World;
 
 		TopViewBrush& out = view.Brushes.Emplace();
 
 		out.ObjectId = object->ID.ID;
-		out.Kind = GetBrushKind(*object);
+		out.Kind = source.Kind;
 		out.bSelected = mSelection.Contains(object);
 		out.bSelectable = IsObjectSelectable(object);
 
-		const Vec3f pivot = object->GetPosition() + brush->GetCenter();
+		const Vec3f pivot = source.Pivot;
 
 		corners.Clear();
 
@@ -526,6 +574,14 @@ Object* RaptorEditor::FindTopViewObject(uint32 object_id)
 		return nullptr;
 	}
 
+	if (object->bHiddenInTopView) {
+		return nullptr;
+	}
+
+	if (blockout->IsSubviewObject(object)) {
+		return object;
+	}
+
 	if (!object->HasTags(eObjectTag::Blockout) || blockout->GetBrush(object) == nullptr) {
 		return nullptr;
 	}
@@ -540,8 +596,11 @@ uint32 RaptorEditor::CollectTopViewTargets(Object** out_targets)
 	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
 		Object* object = mSelection.GetObject(i);
 
-		if (object == nullptr || object->HasTags(eObjectTag::LockTransform) ||
-			gWorld->pPrototype->GetBrush(object) == nullptr) {
+		if (object == nullptr || object->HasTags(eObjectTag::LockTransform)) {
+			continue;
+		}
+
+		if (gWorld->pPrototype->GetBrush(object) == nullptr && !gWorld->pPrototype->IsSubviewObject(object)) {
 			continue;
 		}
 
@@ -561,7 +620,15 @@ void RaptorEditor::TopViewSelect(const DynArray<uint32>& object_ids, eTopViewSel
 		ClearSelection();
 	}
 
+	DoublingArray<uint32> seen_ids;
+
 	for (const uint32 object_id : object_ids) {
+		if (std::find(seen_ids.begin(), seen_ids.end(), object_id) != seen_ids.end()) {
+			continue;
+		}
+
+		seen_ids.Insert(object_id);
+
 		Object* object = FindTopViewObject(object_id);
 
 		if (object == nullptr) {
@@ -569,8 +636,7 @@ void RaptorEditor::TopViewSelect(const DynArray<uint32>& object_ids, eTopViewSel
 		}
 
 		if (mode == eTopViewSelectMode::Toggle && mSelection.Contains(object)) {
-			mSelection.Remove(object);
-			SyncSelection();
+			DeselectObject(object);
 			continue;
 		}
 
@@ -623,7 +689,12 @@ void RaptorEditor::TopViewRotate(const Vec3f axis, float32 angle, const Vec3f pi
 		Object* object = targets[i];
 		const Brush* brush = gWorld->pPrototype->GetBrush(object);
 
-		const Vec3f center = object->GetPosition() + brush->GetCenter();
+		Vec3f center = object->GetPosition();
+
+		if (brush != nullptr) {
+			center = center + brush->GetCenter();
+		}
+
 		const Vec3f new_center = pivot + (center - pivot).Rotate(rotation);
 
 		Change& change = changes.Emplace();
@@ -665,6 +736,10 @@ void RaptorEditor::TopViewMoveFace(const Vec3f world_normal, float32 distance)
 	DoublingArray<FaceMove> moves;
 
 	for (uint32 i = 0; i < count; i++) {
+		if (!CanEditObject(targets[i])) {
+			continue;
+		}
+
 		const Brush* brush = gWorld->pPrototype->GetBrush(targets[i]);
 		const Vec3f local_direction = world_normal.Rotate(targets[i]->mRotation.Conjugate());
 		const int32 plane_index = brush->FindPlane(local_direction);
@@ -716,7 +791,7 @@ void RaptorEditor::TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewV
 	for (const uint32 object_id : object_ids) {
 		Object* object = FindTopViewObject(object_id);
 
-		if (object == nullptr || object->HasTags(eObjectTag::LockTransform)) {
+		if (object == nullptr || !CanEditObject(object) || object->HasTags(eObjectTag::LockTransform)) {
 			continue;
 		}
 
@@ -836,6 +911,42 @@ void RaptorEditor::TopViewDuplicate()
 	if (!IsSimulationMode()) {
 		DupeSelection();
 	}
+}
+
+void RaptorEditor::TopViewHideSelection()
+{
+	if (IsSimulationMode() || mSelection.IsEmpty()) {
+		return;
+	}
+
+	EndDrag();
+
+	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
+		mSelection.GetObject(i)->bHiddenInTopView = true;
+	}
+
+	ClearSelection();
+
+	mbForcePanelSync = true;
+}
+
+void RaptorEditor::TopViewShowAll()
+{
+	Blockout* blockout = gWorld->pPrototype;
+
+	if (blockout == nullptr) {
+		return;
+	}
+
+	for (ObjectID id : blockout->BlockoutObjects) {
+		Object* object = gObjectManager->GetObject(id);
+
+		if (object != nullptr) {
+			object->bHiddenInTopView = false;
+		}
+	}
+
+	mbForcePanelSync = true;
 }
 
 void RaptorEditor::TopViewToggleSnap()

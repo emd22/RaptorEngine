@@ -41,7 +41,21 @@ void World::Create()
 	pCVarBakedShadows = gCVars->Set<int64>("r_baked_shadows", 1);
 }
 
-static bool IsTransparentMaterial(Material* mat) { return (mat != nullptr && mat->Properties.Alpha < 0.999f); }
+static bool IsTransparentMaterial(Material* mat)
+{
+	return (mat != nullptr && (mat->Properties.Alpha < 0.999f || mat->IsGlass()));
+}
+
+static bool CastsShadows(const Object& object)
+{
+	if (!object.IsShadowCaster()) {
+		return false;
+	}
+
+	const Material* material = MaterialManagerFwd::GetMaterial(object.GetMaterialID());
+
+	return (material == nullptr || !material->IsGlass());
+}
 
 /**
  * @brief The geometry pipeline that draws a material, including the transparent variants.
@@ -80,7 +94,7 @@ static void AddObjectToRenderList(Object* object, World* scene)
 {
 	if (object->pMesh.IsValid()) {
 		// If the object casts shadows as well, add it to the shadow section
-		if (object->IsShadowCaster()) {
+		if (CastsShadows(*object)) {
 			gWorld->mRenderList.AddObject(GetShadowListPipeline(), object->ID);
 		}
 
@@ -679,7 +693,7 @@ void World::AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, const
 	// Polls for a mesh that finished loading, which marks the object's tiles as changed
 	object->CheckIfReady(false);
 
-	if (!object->IsSkinned() || SkinnedCasterReachesSphere(*object, center, radius)) {
+	if (CastsShadows(*object) && (!object->IsSkinned() || SkinnedCasterReachesSphere(*object, center, radius))) {
 		out_casters.Insert(id);
 	}
 
@@ -780,6 +794,36 @@ void World::AddToRenderListRecursive(renderer::PipelineHandle pipeline, ObjectID
 }
 
 
+void World::AddShadowCasterRecursive(ObjectID id)
+{
+	Object* object = gObjectManager->GetObject(id);
+	if (object == nullptr) {
+		return;
+	}
+
+	if (CastsShadows(*object)) {
+		RenderListSection& section = mRenderList.GetSection(GetShadowListPipeline());
+
+		bool is_listed = false;
+
+		for (ObjectID object_id : section.Objects) {
+			if (object_id == id) {
+				is_listed = true;
+				break;
+			}
+		}
+
+		if (!is_listed) {
+			mRenderList.AddObject(GetShadowListPipeline(), id);
+		}
+	}
+
+	for (ObjectID attached_id : object->AttachedNodes) {
+		AddShadowCasterRecursive(attached_id);
+	}
+}
+
+
 void World::AddToRenderListRecursiveByMaterial(ObjectID* id_ptr, const Frustum* frustum)
 {
 	if (id_ptr == nullptr) {
@@ -868,7 +912,7 @@ void World::AddTileToRenderList(bool clear, TileIndex new_tile_index, const Frus
 		}
 
 		if (object->IsShadowCaster()) {
-			AddToRenderListRecursive(GetShadowListPipeline(), object_id);
+			AddShadowCasterRecursive(*object_id);
 		}
 
 		AddToRenderListRecursiveByMaterial(object_id, frustum);

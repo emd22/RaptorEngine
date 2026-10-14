@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Brush.hpp>
+#include <BrushEntry.hpp>
 #include <Color.hpp>
 #include <Core/DynArray.hpp>
 #include <Core/Name.hpp>
@@ -14,6 +15,7 @@
 #include <Object/ObjectID.hpp>
 #include <Renderer/LightID.hpp>
 #include <memory>
+#include <vector>
 
 namespace fx {
 
@@ -137,6 +139,9 @@ struct ObjectSnapshot
 	bool bIsDynamic = false;
 	String ScriptPath;
 	Vec3f EnterDirection = Vec3f::sZero;
+	/// So that undoing the delete of a placed subview brings its brushes back as that subview
+	uint32 SubviewInstance = 0;
+	uint32 SubviewMember = 0;
 
 	/// Records everything needed to bring `object` back. `material` is passed in as a selected object wears the
 	/// selection material instead of its own.
@@ -312,7 +317,8 @@ private:
 class DupeOperation final : public ObjectEditOperation
 {
 public:
-	DupeOperation(Object* original, const Vec3f& position, int32 group_size = 1);
+	/// `dupe_subview` is the subview instance that the dupe becomes, when a placed subview is being copied
+	DupeOperation(Object* original, const Vec3f& position, int32 group_size = 1, uint32 dupe_subview = 0);
 
 	void Execute(EditorSelection& selection) override;
 	void Undo(EditorSelection& selection) override;
@@ -324,6 +330,7 @@ public:
 
 private:
 	Vec3f mPosition;
+	uint32 mDupeSubview = 0;
 	Object* mpDupe = nullptr;
 	ObjectID mDupeID = ObjectID::scNull;
 };
@@ -342,6 +349,79 @@ public:
 private:
 	Brush::PlaneList mPlanes;
 	ObjectSnapshot mSnapshot;
+};
+
+/////////////////////////////////////
+// Subviews
+/////////////////////////////////////
+
+struct SubviewBrushRef
+{
+	Object* pObject = nullptr;
+	ObjectID ID = ObjectID::scNull;
+};
+
+/// Places a subview in the level
+class SubviewPlaceOperation final : public EditOperation
+{
+public:
+	SubviewPlaceOperation(uint32 instance, const BrushPlacement& placement, int32 group_size = 1);
+
+	void Execute(EditorSelection& selection) override;
+	void Undo(EditorSelection& selection) override;
+
+	bool ChangesObjects() const override { return true; }
+
+private:
+	uint32 mInstance;
+	BrushPlacement mPlacement;
+};
+
+class SubviewRemoveOperation final : public EditOperation
+{
+public:
+	explicit SubviewRemoveOperation(uint32 instance, int32 group_size = 1);
+
+	void Execute(EditorSelection& selection) override;
+	void Undo(EditorSelection& selection) override;
+
+	bool ChangesObjects() const override { return true; }
+
+private:
+	uint32 mInstance;
+	BrushPlacement mPlacement;
+};
+
+class SubviewCreateOperation final : public EditOperation
+{
+public:
+	SubviewCreateOperation(uint32 instance, Object* const* brushes, uint32 count, const BrushPlacement& placement);
+
+	void Execute(EditorSelection& selection) override;
+	void Undo(EditorSelection& selection) override;
+
+	bool ChangesObjects() const override { return true; }
+
+private:
+	uint32 mInstance;
+	BrushPlacement mPlacement;
+	std::vector<SubviewBrushRef> mBrushes;
+};
+
+class SubviewDissolveOperation final : public EditOperation
+{
+public:
+	explicit SubviewDissolveOperation(uint32 instance, int32 group_size = 1);
+
+	void Execute(EditorSelection& selection) override;
+	void Undo(EditorSelection& selection) override;
+
+	bool ChangesObjects() const override { return true; }
+
+private:
+	uint32 mInstance;
+	BrushPlacement mPlacement;
+	std::vector<SubviewBrushRef> mBrushes;
 };
 
 /////////////////////////////////////

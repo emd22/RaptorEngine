@@ -33,6 +33,7 @@ struct SourceBrush
 	bool bCollides = true;
 	/// Takes part in the BSP, so it seals the map and hides the faces buried in it
 	bool bSolid = true;
+	bool bCastsShadow = true;
 
 	Array<int32> PlaneIndices;
 	Array<TextureMap> Maps;
@@ -73,6 +74,7 @@ public:
 	uint32 EntityBrushCount = 0;
 	uint32 ClipBrushCount = 0;
 	uint32 BoundBrushCount = 0;
+	uint32 TransparentBrushCount = 0;
 	uint32 InvalidBrushCount = 0;
 
 private:

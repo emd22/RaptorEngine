@@ -4,13 +4,16 @@
 #include "MapSource.hpp"
 #include "Verify.hpp"
 
+#include <Asset/ConfigFile.hpp>
+#include <BrushEntry.hpp>
+#include <Core/ArrayUtil.hpp>
+#include <Core/File.hpp>
 #include <Core/FilesystemIO.hpp>
 #include <Map/CompiledMap.hpp>
 #include <chrono>
 #include <cstdio>
 #include <exception>
 #include <filesystem>
-#include <format>
 
 namespace fx {
 
@@ -107,7 +110,7 @@ void AddHulls(const MapSource& source, CompiledMap& map)
 		}
 
 		CompiledMapHull hull;
-		hull.Points = CopyToSizedArray(points);
+		hull.Points = ArrayUtil::DynToSizedArray(points);
 
 		map.Hulls.Emplace(std::move(hull));
 	}
@@ -115,9 +118,11 @@ void AddHulls(const MapSource& source, CompiledMap& map)
 
 bool WriteObj(const String& path, const CompiledMap& map)
 {
-	std::FILE* file = std::fopen(path.CStr(), "w");
+	// std::FILE* file = std::fopen(path.CStr(), "w");
 
-	if (file == nullptr) {
+	File file(path, File::eModType::Write, File::eDataType::Binary);
+
+	if (!file.IsFileOpen()) {
 		return false;
 	}
 
@@ -130,18 +135,22 @@ bool WriteObj(const String& path, const CompiledMap& map)
 		const String material_name = material.Name.IsEmpty() ? String::Fmt("library_{}", material.LibraryIndex)
 															 : material.Name;
 
-		std::fprintf(file, "o surface_%zu\nusemtl %s\n", i, material_name.CStr());
+		// std::fprintf(file, "o surface_%zu\nusemtl %s\n", i, material_name.CStr());
+		file.Write(String::Fmt("o surface_%zu\nusemtl %s\n", i, material_name));
 
 		for (const CompiledMapVertex& vertex : surface.Vertices) {
-			std::fprintf(file, "v %.6f %.6f %.6f\n", vertex.Position[0], vertex.Position[1], vertex.Position[2]);
+			// std::fprintf(file, "v %.6f %.6f %.6f\n", vertex.Position[0], vertex.Position[1], vertex.Position[2]);
+			file.Write(String::Fmt("v {}\n", vertex.Position));
 		}
 
 		for (const CompiledMapVertex& vertex : surface.Vertices) {
-			std::fprintf(file, "vt %.6f %.6f\n", vertex.Texcoord[0], 1.0f - vertex.Texcoord[1]);
+			// std::fprintf(file, "vt %.6f %.6f\n", vertex.Texcoord[0], 1.0f - vertex.Texcoord[1]);
+			file.Write(String::Fmt("vt {} {}\n", vertex.Texcoord.X, 1.0f - vertex.Texcoord.Y));
 		}
 
 		for (const CompiledMapVertex& vertex : surface.Vertices) {
-			std::fprintf(file, "vn %.6f %.6f %.6f\n", vertex.Normal[0], vertex.Normal[1], vertex.Normal[2]);
+			// std::fprintf(file, "vn %.6f %.6f %.6f\n", vertex.Normal[0], vertex.Normal[1], vertex.Normal[2]);
+			file.Write(String::Fmt("vn {} {} {}\n", vertex.Normal));
 		}
 
 		for (size_t index = 0; index + 2 < surface.Indices.Size; index += 3) {
@@ -149,13 +158,13 @@ bool WriteObj(const String& path, const CompiledMap& map)
 			const uint32 b = base + surface.Indices[index + 1];
 			const uint32 c = base + surface.Indices[index + 2];
 
-			std::fprintf(file, "f %u/%u/%u %u/%u/%u %u/%u/%u\n", a, a, a, b, b, b, c, c, c);
+			file.Write(String::Fmt("f {}/{}/{} {}/{}/{} {}/{}/{}\n", a, a, a, b, b, b, c, c, c));
 		}
 
 		base += static_cast<uint32>(surface.Vertices.Size);
 	}
 
-	std::fclose(file);
+	file.Close();
 
 	return true;
 }
@@ -174,6 +183,20 @@ double GetPercentRemoved(double before, double after) { return (before > 0.0) ? 
 
 } // namespace
 
+uint64 HashPrototypeFile(const String& prototype_path)
+{
+	std::error_code error;
+
+	const std::filesystem::path input_path = std::filesystem::absolute(prototype_path.CStr(), error);
+	const std::filesystem::path base_path = std::filesystem::absolute(FilesystemIO::GetBasePath(), error);
+	const String engine_path = std::filesystem::relative(input_path, base_path, error).generic_string();
+
+	ConfigFile info {};
+	info.Load(engine_path.CStr());
+
+	return HashPrototype(String(input_path.string()), info);
+}
+
 CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 {
 	CompileResult result;
@@ -188,7 +211,7 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 	}
 
 	result.OutputPath = options.OutputPath.IsEmpty() ? CompiledMap::GetPathForPrototype(String(input_path.string()))
-												   : options.OutputPath;
+													 : options.OutputPath;
 
 	const std::filesystem::path base_path = std::filesystem::absolute(FilesystemIO::GetBasePath(), error);
 	const String engine_path = std::filesystem::relative(input_path, base_path, error).generic_string();
@@ -209,12 +232,13 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 		log(String::Fmt("  warning      {}", warning));
 	}
 
-	log(String::Fmt("  brushes      {} world ({} nvbrush, {} dbound), {} left to the engine, {} invalid",
-					source.Brushes.Size, source.ClipBrushCount, source.BoundBrushCount, source.EntityBrushCount,
-					source.InvalidBrushCount));
+	log(String::Fmt(
+		"  brushes      {} world ({} nvbrush, {} dbound, {} transparent), {} left to the engine, {} invalid",
+		source.Brushes.Size, source.ClipBrushCount, source.BoundBrushCount, source.TransparentBrushCount,
+		source.EntityBrushCount, source.InvalidBrushCount));
 
 	CompiledMap map;
-	map.SourceHash = CompiledMap::HashFile(String(input_path.string()));
+	map.SourceHash = HashPrototypeFile(String(input_path.string()));
 
 	if (source.Brushes.Size == 0) {
 		log("  nothing to compile");
@@ -275,14 +299,15 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 		ProbePlacementBoxes& boxes = source.ProbeBoxes;
 
 		if (sealed) {
-			boxes.IsOpen = [&bsp](const Vec3f point) {
+			boxes.IsOpen = [&bsp](const Vec3f point)
+			{
 				const Node& leaf = bsp.Nodes[static_cast<size_t>(bsp.FindLeaf(Vec3d(point.X, point.Y, point.Z)))];
 				return leaf.bSolid || leaf.bReached;
 			};
 		}
 
-		ProbePlacement::BuildLevelLayout(map.Probes, boxes,
-										 Slice<BBox>(source.ProbeRegions.pData, source.ProbeRegions.Size), options.Probes);
+		ProbePlacement::BuildLevelLayout(
+			map.Probes, boxes, Slice<BBox>(source.ProbeRegions.pData, source.ProbeRegions.Size), options.Probes);
 		map.ProbeSettings = options.Probes;
 
 		result.ProbeCount = map.Probes.GetProbeCount();
@@ -331,19 +356,19 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 	const SurfaceStats& stats = surfaces.Stats;
 	result.Stats = stats;
 
-	log(String::Fmt("  faces        {}, {} removed, {} clipped, {} overlaps cut", stats.SourceFaces, stats.FacesRemoved,
+	log(String::Fmt("  faces        {}, {} removed, {} clipped, {} overlaps cut", stats.NumSrcFaces, stats.FacesRemoved,
 					stats.FacesClipped, stats.OverlapsRemoved));
-	log(String::Fmt("  polygons     {} pieces merged into {}, {} T-junctions fixed", stats.PolygonsBeforeMerge,
-					stats.Polygons, stats.TJunctionsFixed));
+	log(String::Fmt("  polygons     {} pieces merged into {}, {} T-junctions fixed", stats.NumPolygonsBeforeMerge,
+					stats.NumPolygons, stats.TJunctionsFixed));
 
 	if (stats.MergeFallbacks > 0) {
 		log(String::Fmt("  warning      {} groups of faces could not be merged and were left as separate pieces",
 						stats.MergeFallbacks));
 	}
 
-	log(String::Fmt("  triangles    {} -> {} ({:+.1f}%), {} vertices in {} surfaces", stats.SourceTriangles,
-					stats.Triangles, -GetPercentRemoved(stats.SourceTriangles, stats.Triangles), stats.Vertices,
-					map.Surfaces.Size));
+	log(String::Fmt("  triangles    {} -> {} ({:+.1f}%), {} vertices in {} surfaces", stats.NumSrcTriangles,
+					stats.NumTriangles, -GetPercentRemoved(stats.NumSrcTriangles, stats.NumTriangles),
+					stats.NumVertices, map.Surfaces.Size));
 	log(String::Fmt("  area         {:.1f} -> {:.1f} m2 ({:+.1f}%)", stats.SourceArea, stats.Area,
 					-GetPercentRemoved(stats.SourceArea, stats.Area)));
 	log(String::Fmt("  collision    {} hulls", map.Hulls.Size));
@@ -360,8 +385,9 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 		}
 
 		if (source.ModelCount > 0) {
-			log(String::Fmt("  warning      {} models are not known to the compiler, so probes are not kept out of them",
-							source.ModelCount));
+			log(String::Fmt(
+				"  warning      {} models are not known to the compiler, so probes are not kept out of them",
+				source.ModelCount));
 		}
 	}
 
