@@ -396,6 +396,13 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 	pMesh->Render(cmd, (mInstanceSlotsInUse + 1));
 }
 
+bool Object::HasTransparentMaterial() const
+{
+	const Material* material = gMaterialManager->GetMaterial(mMaterialID);
+
+	return (material != nullptr && material->IsTransparent());
+}
+
 bool Object::CanBeFrustumCulled() const
 {
 	if (!IsCullable() || !pMesh.IsValid() || mObjectLayer != eObjectLayer::WorldLayer) {

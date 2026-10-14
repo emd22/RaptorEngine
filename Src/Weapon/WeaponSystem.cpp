@@ -31,8 +31,8 @@ using namespace renderer;
 
 static constexpr const char* scWeaponDirectory = "RaptorData/Data/Weapons";
 
-static constexpr Hash32 scImpactSparksEffect = HashStr32("impact_sparks");
-static constexpr Hash32 scImpactDustEffect = HashStr32("impact_dust");
+static constexpr const char* scDefaultImpactEffects[] = { "impact_dust" };
+static constexpr const char* scDefaultMuzzleJoint = "tag_flash";
 static constexpr float32 scWoundSize = 0.22f;
 
 namespace {
@@ -153,6 +153,40 @@ uint32 PackColor(uint8 r, uint8 g, uint8 b) { return Color::FromRGBA(r, g, b, 25
 
 } // namespace
 
+void WeaponSystem::LoadEffects(const ConfigEntry* effects, Weapon& weapon)
+{
+	weapon.ImpactEffectCount = 0;
+
+	const ConfigEntry* impact = Child(effects, "impact");
+
+	if (impact == nullptr) {
+		for (const char* name : scDefaultImpactEffects) {
+			weapon.ImpactEffects[weapon.ImpactEffectCount++] = HashStr32(name);
+		}
+	}
+	else if (impact->bIsArray && impact->ArrayData.IsInited()) {
+		for (const ConfigPrimitive& primitive : impact->GetArrayData()) {
+			if (weapon.ImpactEffectCount >= scMaxImpactEffects) {
+				LogWarning(LC_SCRIPT, "Weapon '{}' has more than {} impact effects", weapon.Name, scMaxImpactEffects);
+				break;
+			}
+
+			weapon.ImpactEffects[weapon.ImpactEffectCount++] = HashStr32(primitive.Get<const char*>());
+		}
+	}
+	else if (!impact->bIsArray) {
+		weapon.ImpactEffects[weapon.ImpactEffectCount++] = HashStr32(impact->GetValue<const char*>());
+	}
+
+	weapon.MuzzleEffect = 0;
+
+	if (const ConfigEntry* muzzle = Child(effects, "muzzle")) {
+		weapon.MuzzleEffect = HashStr32(muzzle->GetValue<const char*>());
+	}
+
+	weapon.MuzzleJoint = StringMember(effects, "muzzle_joint", scDefaultMuzzleJoint);
+}
+
 bool WeaponSystem::LoadWeapon(const char* path, Weapon& weapon)
 {
 	ConfigFile config;
@@ -179,6 +213,7 @@ bool WeaponSystem::LoadWeapon(const char* path, Weapon& weapon)
 	const ConfigEntry* falloff = config.GetEntry(HashStr32("falloff"));
 	const ConfigEntry* ammo = config.GetEntry(HashStr32("ammo"));
 	const ConfigEntry* switching = config.GetEntry(HashStr32("switch"));
+	const ConfigEntry* effects = config.GetEntry(HashStr32("effects"));
 
 	weapon.ScriptPath = String(script_entry->GetValue<const char*>());
 	weapon.Name = name_entry != nullptr ? String(name_entry->GetValue<const char*>()) : String("Weapon");
@@ -189,6 +224,8 @@ bool WeaponSystem::LoadWeapon(const char* path, Weapon& weapon)
 	if (const ConfigEntry* view_offset = config.GetEntry(HashStr32("view_offset"))) {
 		weapon.ViewOffset = view_offset->GetValue<Vec3f>();
 	}
+
+	LoadEffects(effects, weapon);
 
 	weapon.IdleAnim = StringMember(animations, "idle", "BASE");
 	weapon.FireAnim = StringMember(animations, "fire", "Armature|Fire");
@@ -478,6 +515,36 @@ void WeaponSystem::Update(float32 delta_time)
 	UpdateHolsterAmount();
 }
 
+void WeaponSystem::PlayMuzzleEffect(const Weapon& weapon)
+{
+	if (weapon.MuzzleEffect == 0) {
+		return;
+	}
+
+	Vec3f position;
+
+	if (!mpPlayer->GetViewModelJointPosition(weapon.MuzzleJoint.CStr(), position)) {
+		return;
+	}
+
+	gParticleSystem->Stop(mMuzzleEffect);
+	mMuzzleEffect = gParticleSystem->Play(weapon.MuzzleEffect, position, mpPlayer->pCamera->Direction,
+										  eObjectLayer::PlayerLayer);
+}
+
+void WeaponSystem::UpdateEffects()
+{
+	if (!gParticleSystem->IsAlive(mMuzzleEffect) || mWeaponCount == 0) {
+		return;
+	}
+
+	Vec3f position;
+
+	if (mpPlayer->GetViewModelJointPosition(mWeapons[mActive].MuzzleJoint.CStr(), position)) {
+		gParticleSystem->SetTransform(mMuzzleEffect, position, mpPlayer->pCamera->Direction);
+	}
+}
+
 void WeaponSystem::HandleEvent(eEvent event)
 {
 	if (mpPlayer == nullptr || mWeaponCount == 0) {
@@ -489,6 +556,7 @@ void WeaponSystem::HandleEvent(eEvent event)
 	switch (event) {
 	case eEvent::Fire:
 		mpPlayer->DoFireAnimation(weapon.ViewKickback);
+		PlayMuzzleEffect(weapon);
 		break;
 	case eEvent::ReloadBegin:
 		mpPlayer->DoReloadAnimation();
@@ -565,12 +633,16 @@ void WeaponSystem::ApplyHit(float32 damage, float32 force, bool decal)
 	}
 
 	if (!bleeds) {
+		const Weapon& weapon = mWeapons[mActive];
+
 		const Vec3f normal = mLastHit.Normal;
 		const Vec3f reflected = mLastDirection - (normal * (2.0f * mLastDirection.Dot(normal)));
 		const Vec3f origin = mLastHit.Point + (normal * 0.01f);
+		const Vec3f direction = (normal + reflected).Normalize();
 
-		gParticleSystem->Play(scImpactSparksEffect, origin, (normal + reflected).Normalize());
-		gParticleSystem->Play(scImpactDustEffect, origin, normal);
+		for (uint32 i = 0; i < weapon.ImpactEffectCount; i++) {
+			gParticleSystem->Play(weapon.ImpactEffects[i], origin, direction);
+		}
 	}
 
 	if (hit_npc == nullptr && motion == JPH::EMotionType::Dynamic && force > 0.0f) {

@@ -23,6 +23,7 @@
 #include <Renderer/ReflectionFilter.hpp>
 #include <World.hpp>
 #include <algorithm>
+#include <limits>
 #include <bit>
 #include <cmath>
 #include <cstring>
@@ -219,7 +220,8 @@ ProbePlacementBoxes GatherPlacementBoxes()
 	for (Object& object : gObjectManager->GetCache()) {
 		const bool is_bound = object.IsDBound();
 
-		if (!object.pMesh.IsValid() || object.IsUnlit() || (!object.IsProbeVisible() && !is_bound)) {
+		if (!object.pMesh.IsValid() || object.IsUnlit() ||
+			((!object.IsProbeVisible() || object.HasTransparentMaterial()) && !is_bound)) {
 			continue;
 		}
 
@@ -254,7 +256,7 @@ ProbePlacementBoxes GatherPlacementBoxes()
 		blockout->GetSubviewSolids(solids);
 
 		for (const Blockout::SubviewSolid& solid : solids) {
-			if (solid.pOwner->IsUnlit() || !solid.pOwner->IsProbeVisible()) {
+			if (solid.pOwner->IsUnlit() || !solid.pOwner->IsProbeVisible() || solid.bTransparent) {
 				continue;
 			}
 
@@ -427,6 +429,136 @@ void ProbeManager::Create()
 	ApplyLayout();
 
 	UploadReflectionProbes(0);
+}
+
+uint32 ProbeManager::SelectVolume(const Vec3f position) const
+{
+	uint32 best = 0;
+	float32 best_distance_sq = std::numeric_limits<float32>::max();
+	float32 best_cell_volume = std::numeric_limits<float32>::max();
+
+	const float32 point[3] = { position.X, position.Y, position.Z };
+
+	for (uint32 i = 0; i < mLayout.VolumeCount; i++) {
+		const ProbeVolumeData& volume = mLayout.Volumes[i];
+
+		float32 distance_sq = 0.0f;
+
+		for (uint32 axis = 0; axis < 3; axis++) {
+			const float32 outside = std::max(
+				std::max(volume.MinAndCount[axis] - point[axis], point[axis] - volume.MaxAndCellVolume[axis]), 0.0f);
+			distance_sq += outside * outside;
+		}
+
+		const float32 cell_volume = volume.MaxAndCellVolume[3];
+
+		const bool is_closer = distance_sq < best_distance_sq - 1e-4f;
+		const bool is_denser = distance_sq <= best_distance_sq + 1e-4f && cell_volume < best_cell_volume;
+
+		if (is_closer || is_denser) {
+			best = i;
+			best_distance_sq = distance_sq;
+			best_cell_volume = cell_volume;
+		}
+	}
+
+	return best;
+}
+
+bool ProbeManager::SampleVolume(const Vec3f position, uint32 volume_index, const float32* basis,
+								Vec3f& out_irradiance) const
+{
+	const ProbeVolumeData& volume = mLayout.Volumes[volume_index];
+
+	const float32 point[3] = { position.X, position.Y, position.Z };
+
+	uint32 dims[3];
+	uint32 base[3];
+	float32 fraction[3];
+
+	for (uint32 axis = 0; axis < 3; axis++) {
+		dims[axis] = std::max(volume.DimsAndFirst[axis], 2U);
+
+		const float32 local = std::clamp((point[axis] - volume.MinAndCount[axis]) * volume.InvCellSize[axis], 0.0f,
+										 static_cast<float32>(dims[axis] - 1));
+
+		base[axis] = std::min(static_cast<uint32>(local), dims[axis] - 2);
+		fraction[axis] = std::clamp(local - static_cast<float32>(base[axis]), 0.0f, 1.0f);
+	}
+
+	float32 irradiance[3] = { 0.0f, 0.0f, 0.0f };
+	float32 total_weight = 0.0f;
+
+	for (uint32 corner = 0; corner < 8; corner++) {
+		const uint32 offset[3] = { corner & 1U, (corner >> 1) & 1U, (corner >> 2) & 1U };
+
+		float32 weight = 1.0f;
+
+		for (uint32 axis = 0; axis < 3; axis++) {
+			if (offset[axis] != 0) {
+				weight *= fraction[axis];
+			}
+			else {
+				weight *= 1.0f - fraction[axis];
+			}
+		}
+
+		const uint32 grid_index = volume.DimsAndFirst[3] + (base[0] + offset[0]) +
+								  dims[0] * ((base[1] + offset[1]) + dims[1] * (base[2] + offset[2]));
+
+		if (grid_index >= mLayout.Grid.Size) {
+			continue;
+		}
+
+		const uint16 probe_index = mLayout.Grid[grid_index];
+
+		if (probe_index >= Limits::ProbeGridSolid || weight <= 0.0f) {
+			continue;
+		}
+
+		const ProbeSHData& probe = mProbes[probe_index];
+
+		for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
+			for (uint32 c = 0; c < 3; c++) {
+				irradiance[c] += probe.SH[k][c] * basis[k] * weight;
+			}
+		}
+
+		total_weight += weight;
+	}
+
+	if (total_weight <= 1e-6f) {
+		return false;
+	}
+
+	const float32 scale = 1.0f / total_weight;
+
+	out_irradiance = Vec3f(std::max(irradiance[0] * scale, 0.0f), std::max(irradiance[1] * scale, 0.0f),
+						   std::max(irradiance[2] * scale, 0.0f));
+
+	return true;
+}
+
+bool ProbeManager::SampleIrradiance(const Vec3f position, const Vec3f normal, Vec3f& out_irradiance) const
+{
+	if (mLayout.VolumeCount == 0 || GetProbeCount() == 0) {
+		return false;
+	}
+
+	float32 basis[Limits::ProbeSHCoeffCount];
+	EvalSHBasis(normal, basis);
+
+	const uint32 volume_index = SelectVolume(position);
+
+	if (SampleVolume(position, volume_index, basis, out_irradiance)) {
+		return true;
+	}
+
+	if (volume_index != 0) {
+		return SampleVolume(position, 0, basis, out_irradiance);
+	}
+
+	return false;
 }
 
 void ProbeManager::Destroy()

@@ -11,6 +11,7 @@
 #include <Math/SIMDHelper.hpp>
 #include <Object/ObjectID.hpp>
 #include <Object/ObjectManager.hpp>
+#include <Particle/ParticleSystem.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
 #include <Renderer/LightProbe.hpp>
@@ -729,6 +730,20 @@ static float32 N_random_range(float32 lo, float32 hi)
 	return lo + (hi - lo) * unit;
 }
 
+static int64 N_particle_play(const char* name, FLOAT4 position, FLOAT4 direction)
+{
+	return gParticleSystem->Play(name, Vec3f(position), Vec3f(direction)).Pack();
+}
+
+static void N_particle_move(int64 effect, FLOAT4 position, FLOAT4 direction)
+{
+	gParticleSystem->SetTransform(ParticleEffectID::Unpack(effect), Vec3f(position), Vec3f(direction));
+}
+
+static void N_particle_stop(int64 effect) { gParticleSystem->Stop(ParticleEffectID::Unpack(effect)); }
+static void N_particle_kill(int64 effect) { gParticleSystem->Kill(ParticleEffectID::Unpack(effect)); }
+static bool N_particle_alive(int64 effect) { return gParticleSystem->IsAlive(ParticleEffectID::Unpack(effect)); }
+
 static float32 N_weapon_trace(float32 yaw, float32 pitch, float32 range)
 {
 	return gWorld->Player.Weapons.Trace(yaw, pitch, range);
@@ -864,6 +879,12 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("cvar_get_float", N_cvar_get_float),
 
 	PREDEF("random_range", N_random_range),
+
+	PREDEF("particle_play", N_particle_play),
+	PREDEF("particle_move", N_particle_move),
+	PREDEF("particle_stop", N_particle_stop),
+	PREDEF("particle_kill", N_particle_kill),
+	PREDEF("particle_alive", N_particle_alive),
 
 	PREDEF("weapon_trace", N_weapon_trace),
 	PREDEF("weapon_hit_apply", N_weapon_hit_apply),

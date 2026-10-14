@@ -1,11 +1,15 @@
 #pragma once
 
+#include <Core/Hash.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
+#include <Particle/ParticleSystem.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Script/Script.hpp>
 
 namespace fx {
+
+class ConfigEntry;
 
 class Player;
 
@@ -35,6 +39,7 @@ FxEnumFlags(eWeaponInputFlags);
 namespace weapon {
 
 static constexpr uint32 scMaxWeapons = 8;
+static constexpr uint32 scMaxImpactEffects = 4;
 
 enum class ePhase : int32
 {
@@ -149,6 +154,11 @@ struct Weapon
 	float32 ViewKickDegrees = 2.5f;
 	float32 ViewKickback = 0.025f;
 
+	Hash32 ImpactEffects[scMaxImpactEffects] {};
+	uint32 ImpactEffectCount = 0;
+	Hash32 MuzzleEffect = 0;
+	String MuzzleJoint;
+
 	ScriptDef Def;
 	ScriptState State;
 
@@ -171,6 +181,7 @@ public:
 	void SetInput(const eWeaponInputFlags input_flags) { mScriptInput.InputFlags = input_flags; }
 
 	void Update(float32 delta_time);
+	void UpdateEffects();
 	void RenderHud();
 
 	void OnScriptsReloaded();
@@ -191,6 +202,8 @@ private:
 	void BindFunctions(Weapon& weapon);
 	void ApplyAnimations(const Weapon& weapon);
 	void SpawnBloodSplatter(bool is_static);
+	void LoadEffects(const ConfigEntry* effects, Weapon& weapon);
+	void PlayMuzzleEffect(const Weapon& weapon);
 	void UpdateSwitching();
 	void UpdateHolsterAmount();
 
@@ -210,6 +223,8 @@ private:
 
 	physics::RayResult mLastHit;
 	Vec3f mLastDirection = Vec3f::sZero;
+
+	ParticleEffectID mMuzzleEffect {};
 };
 
 } // namespace weapon

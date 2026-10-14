@@ -975,10 +975,11 @@ void RaptorGame::RenderText()
 
 	if (gpu.IsEnabled() && (mpShowGpuCVar == nullptr || mpShowGpuCVar->IntValue != 0)) {
 		gTextRenderer->DrawText(String::Fmt("GPU={:.2f}ms", gpu.GetTotalMs()).CStr(), 1.0f, scWhite);
-		gTextRenderer->DrawText(String::Fmt("Sh {:.2f} Pre {:.2f} Cull {:.2f} SSAO {:.2f} Fwd {:.2f} Comp {:.2f}",
+		gTextRenderer->DrawText(String::Fmt("Sh {:.2f} Pre {:.2f} Cull {:.2f} SSAO {:.2f} Fwd {:.2f} Pfx {:.2f} Comp {:.2f}",
 											gpu.GetMs(eGpuMarker::Shadows), gpu.GetMs(eGpuMarker::Prepass),
 											gpu.GetMs(eGpuMarker::LightCulling), gpu.GetMs(eGpuMarker::SSAO),
-											gpu.GetMs(eGpuMarker::Forward), gpu.GetMs(eGpuMarker::Composition))
+											gpu.GetMs(eGpuMarker::Forward), gpu.GetMs(eGpuMarker::Particles),
+											gpu.GetMs(eGpuMarker::Composition))
 									.CStr(),
 								1.0f, scWhite);
 
@@ -996,9 +997,10 @@ void RaptorGame::RenderText()
 							1.0f, scWhite);
 
 	if (gParticleSystem->GetParticleCount() > 0) {
-		gTextRenderer->DrawText(String::Fmt("Particles={} Drawn={} Effects={} Cpu={:.3f}ms",
+		gTextRenderer->DrawText(String::Fmt("Particles={} Drawn={} Effects={} Rays={} Cpu={:.3f}ms",
 											gParticleSystem->GetParticleCount(), gParticleSystem->GetDrawnCount(),
-											gParticleSystem->GetEffectCount(), gParticleSystem->GetCpuMs())
+											gParticleSystem->GetEffectCount(), gParticleSystem->GetCollisionRayCount(),
+											gParticleSystem->GetCpuMs())
 									.CStr(),
 								1.0f, scWhite);
 	}

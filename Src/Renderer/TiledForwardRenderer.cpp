@@ -91,6 +91,23 @@ void TiledForwardRenderer::CreateForwardPass()
 	ForwardPass.BuildRenderStage();
 }
 
+void TiledForwardRenderer::CreateParticlePass()
+{
+	ParticlePass.Create("Particles", gGraphics->Swapchain.Extent, eSizeDivisor::FullRes);
+
+	Target* lit_target = ForwardPass.GetTarget(eImageFormat::RGBA16_Float);
+	AssertMsg(lit_target != nullptr, "The forward pass must be created before the particle pass");
+
+	Target lit(eImageFormat::RGBA16_Float, gGraphics->Swapchain.Extent, true,
+			   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
+	lit.UseImageFromTarget(lit_target);
+	lit.LoadOp = eLoadOp::Load;
+	lit.InitialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	ParticlePass.AddTarget(lit);
+
+	ParticlePass.BuildRenderStage();
+}
+
 void TiledForwardRenderer::CreateDepthNormalPass()
 {
 	// Depth + normal prepass
@@ -794,14 +811,16 @@ void TiledForwardRenderer::CreateBitmapTextPSO()
 
 void TiledForwardRenderer::CreateParticlePSO()
 {
-	gPSOBuild->BeginPipeline(ePipelineName::Particles);
-	gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(ParticlePushConstants));
+	CreateParticlePass();
 
-	gPSOBuild->UseRenderStage(ForwardPass);
+	gPSOBuild->BeginPipeline(ePipelineName::Particles);
+	gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(ParticlePushConstants));
+
+	gPSOBuild->UseRenderStage(ParticlePass);
 	gPSOBuild->SetShader(eShaderName::Particle, {});
 	gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
 	gPSOBuild->SetCullMode(eCullMode::None);
-	gPSOBuild->SetDepthTest(true);
+	gPSOBuild->SetDepthTest(false);
 	gPSOBuild->SetDepthWrite(false);
 
 	BlendAttachment blend = BlendAttachment {
@@ -815,13 +834,20 @@ void TiledForwardRenderer::CreateParticlePSO()
 		.AlphaBlend { .Ops { .Src = VK_BLEND_FACTOR_ZERO, .Dst = VK_BLEND_FACTOR_ONE } },
 		.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_ONE, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
 	};
-	gPSOBuild->SetTargetBlend(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float), blend);
+	gPSOBuild->SetTargetBlend(ParticlePass.GetTargetIndex(eImageFormat::RGBA16_Float), blend);
 
 	gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gParticleSystem->GetInstanceBuffer(), 0,
 						 sizeof(ParticleGpuData) * ParticleSystem::scMaxParticles);
 
 	gPSOBuild->AddImage(1, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
 						gSamplerCache->Request(SamplerProps {}));
+
+	gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Pixel, Prepass.GetTarget(eImageFormat::D32_Float),
+								  gSamplerCache->Request(SamplerProps {
+									  eSamplerFilter::Nearest,
+									  eSamplerFilter::Nearest,
+									  eSamplerFilter::Nearest,
+								  }));
 
 	gPSOBuild->EndPipeline();
 }

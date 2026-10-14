@@ -3,7 +3,6 @@
 #include <Blockout.hpp>
 #include <CVar.hpp>
 #include <Decal/DecalManager.hpp>
-#include <Particle/ParticleSystem.hpp>
 #include <Editor/RaptorEditor.hpp>
 #include <Engine.hpp>
 #include <Material/Material.hpp>
@@ -44,7 +43,7 @@ void World::Create()
 
 static bool IsTransparentMaterial(Material* mat)
 {
-	return (mat != nullptr && (mat->Properties.Alpha < 0.999f || mat->IsGlass()));
+	return (mat != nullptr && mat->IsTransparent());
 }
 
 static bool CastsShadows(const Object& object)
@@ -445,7 +444,7 @@ void World::ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Cam
 		}
 
 		Object* object = gObjectManager->GetObject(object_id);
-		if (object == nullptr || (is_probe_capture && !object->IsProbeVisible())) {
+		if (object == nullptr || (is_probe_capture && (!object->IsProbeVisible() || object->HasTransparentMaterial()))) {
 			continue;
 		}
 
@@ -1117,8 +1116,6 @@ void World::Render(Camera* shadow_camera)
 
 	// Transparent after, back-to-front globally sorted, depth write disabled
 	ExecuteTransparentRenderLists();
-
-	gParticleSystem->Render(gGraphics->GetFrame()->CmdBuffer, camera);
 
 #ifdef FX_IS_EDITOR
 	if (DebugBoundsMask & scDebugBoundsObjects) {

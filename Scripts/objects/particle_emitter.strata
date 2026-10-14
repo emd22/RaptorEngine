@@ -1,0 +1,19 @@
+import ../interop;
+import ../common;
+
+long effect = 0;
+
+void object_start(OBJECT self)
+{
+	effect = particle_play("smoke_column", self.position, float3(0.0f, 1.0f, 0.0f));
+}
+
+void object_update(OBJECT self, float delta_time)
+{
+	particle_move(effect, self.position, float3(0.0f, 1.0f, 0.0f));
+}
+
+void object_stop(OBJECT self)
+{
+	particle_stop(effect);
+}

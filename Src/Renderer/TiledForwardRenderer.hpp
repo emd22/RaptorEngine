@@ -102,6 +102,7 @@ private:
 	void CreateDepthNormalPass();
 	void CreateSSAOPass();
 	void CreateSSAOBlurPass();
+	void CreateParticlePass();
 
 	// Lighting
 	// void CreateLightVolumePipeline();
@@ -141,6 +142,8 @@ public:
 	RenderStage Prepass;
 	/// Main Forward+ lit pass
 	RenderStage ForwardPass;
+	/// Particles over the lit target, sampling the prepass depth for soft edges
+	RenderStage ParticlePass;
 	/// SSAO pass
 	RenderStage SSAOPass;
 	/// SSAO blur pass

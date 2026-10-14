@@ -223,13 +223,16 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 		const bool is_marker = is_probe_volume || is_reflection_probe ||
 							   entry.GetMemberValue(HashStr32("trigger"), 0) != 0;
 
+		const bool is_transparent = brush_kind == eBrushKind::Geometry && !material_name.IsEmpty() &&
+									transparent_materials.contains(material_name);
+
 		const BBox local_bounds(brush.GetBoundsMin(), brush.GetBoundsMax());
 		const Mat4f object_matrix = MakeObjectMatrix(rotation, brush.GetCenter(), position);
 
 		if (is_probe_volume && !is_reflection_probe) {
 			ProbeRegions.Emplace(OBBox::FromLocalBounds(local_bounds, object_matrix).GetWorldAABB());
 		}
-		else if (!is_marker && brush_kind != eBrushKind::NvBrush) {
+		else if (!is_marker && !is_transparent && brush_kind != eBrushKind::NvBrush) {
 			SizedArray<ProbePlacementBoxes::Plane> hull_planes;
 			hull_planes.InitCapacity(brush.IsBox() ? 0 : brush.Planes.Size);
 
@@ -274,7 +277,7 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 			source.MaterialIndex = FindOrAddMaterial(material_name,
 													 is_locked ? scLockedMaterialIndex : scEditableMaterialIndex);
 
-			if (transparent_materials.contains(material_name)) {
+			if (is_transparent) {
 				source.bSolid = false;
 				source.bCastsShadow = false;
 				TransparentBrushCount++;

@@ -9,7 +9,8 @@
 #include <Engine.hpp>
 #include <Math/Frustum.hpp>
 #include <Math/Vec2.hpp>
-#include <Object/ObjectLayer.hpp>
+#include <Physics/JoltPhysicsBackend.hpp>
+#include <Physics/PhysicsManager.hpp>
 #include <Renderer/Backend/Commands.hpp>
 #include <Renderer/Backend/DescriptorCache.hpp>
 #include <Renderer/Backend/Descriptors.hpp>
@@ -20,11 +21,17 @@
 #include <Renderer/Constants.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
+#include <Renderer/Light.hpp>
+#include <Renderer/LightManager.hpp>
+#include <Renderer/LightProbe.hpp>
 #include <Renderer/PipelineCache.hpp>
+#include <Renderer/RenderStage.hpp>
+#include <Renderer/TiledForwardRenderer.hpp>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#include <World.hpp>
 
 namespace fx {
 
@@ -32,9 +39,13 @@ FX_SET_MODULE_NAME("ParticleSystem")
 
 namespace {
 
+constexpr float32 scPi = 3.14159265359f;
 constexpr float32 scTwoPi = 6.28318530718f;
 constexpr float32 scDegToRad = 0.01745329252f;
 constexpr float32 scMaxHalf = 65000.0f;
+constexpr float32 scSunScatter = 0.5f / scPi;
+constexpr float32 scCollisionOffset = 0.005f;
+constexpr float32 scLightingSampleOffset = 0.25f;
 
 using Clock = std::chrono::steady_clock;
 
@@ -49,8 +60,8 @@ float32 RandomInRange(const ParticleRange& range) { return range.Min + (range.Ma
 
 uint32 PackHalf2(float32 low, float32 high)
 {
-	const _Float16 half_low = static_cast<_Float16>(std::min(low, scMaxHalf));
-	const _Float16 half_high = static_cast<_Float16>(std::min(high, scMaxHalf));
+	const _Float16 half_low = static_cast<_Float16>(std::clamp(low, -scMaxHalf, scMaxHalf));
+	const _Float16 half_high = static_cast<_Float16>(std::clamp(high, -scMaxHalf, scMaxHalf));
 
 	uint16 low_bits;
 	uint16 high_bits;
@@ -67,6 +78,8 @@ uint32 PackUnorm2(float32 low, float32 high)
 
 	return low_bits | (high_bits << 16);
 }
+
+float32 WrapAngle(float32 angle) { return angle - scTwoPi * std::floor((angle + scPi) / scTwoPi); }
 
 void StoreFloat3(const Vec3f value, float32* out)
 {
@@ -181,6 +194,8 @@ void ParticleSystem::Create()
 	mSortEntries.InitCapacity(scMaxParticles);
 
 	mpEnabledCVar = gCVars->Set("r_particles", 1);
+	mpSoftCVar = gCVars->Set("r_particles_soft", 1);
+	mpCollisionCVar = gCVars->Set("r_particles_collide", 1);
 
 	mInstanceBuffer.Create(renderer::eGpuBufferType::StorageWithOffset,
 						   static_cast<uint64>(scMaxParticles) * sizeof(renderer::ParticleGpuData) *
@@ -219,14 +234,21 @@ void ParticleSystem::BuildDescriptorSet(Image* atlas)
 {
 	using namespace renderer;
 
-	SamplerProps sampler_props {};
-	sampler_props.SetLinear();
-	sampler_props.AddressMode = eSamplerAddressMode::ClampToEdge;
+	SamplerProps atlas_sampler {};
+	atlas_sampler.SetLinear();
+	atlas_sampler.AddressMode = eSamplerAddressMode::ClampToEdge;
+
+	SamplerProps depth_sampler {};
+	depth_sampler.SetNearest();
+	depth_sampler.AddressMode = eSamplerAddressMode::ClampToEdge;
+
+	Target* depth = gGraphics->pRenderer->Prepass.GetTarget(eImageFormat::D32_Float);
 
 	SizedArray<DescriptorEntry> entries = {
 		DescriptorEntry::AsBuffer(0, eShaderType::Vertex, &mInstanceBuffer, 0,
 								  sizeof(ParticleGpuData) * scMaxParticles),
-		DescriptorEntry::AsImage(1, eShaderType::Pixel, atlas, gSamplerCache->Request(sampler_props)),
+		DescriptorEntry::AsImage(1, eShaderType::Pixel, atlas, gSamplerCache->Request(atlas_sampler)),
+		DescriptorEntry::AsImage(2, eShaderType::Pixel, &depth->GetImage(), gSamplerCache->Request(depth_sampler)),
 	};
 
 	mpDescriptorSet = gDescriptorCache->Request(entries).second;
@@ -308,12 +330,26 @@ bool ParticleSystem::LoadEffect(const char* path, const String& name, ParticleEf
 
 		emitter.GravityScale = Member<float32>(entry, "gravity", 0.0f);
 		emitter.Drag = std::max(Member<float32>(entry, "drag", 0.0f), 0.0f);
+		emitter.bLocalSpace = Member<int32>(entry, "local", 0) != 0;
+
+		emitter.bCollide = Member<int32>(entry, "collide", 0) != 0;
+		emitter.bCollideKill = Member<int32>(entry, "collide_kill", 0) != 0;
+		emitter.Bounce = std::clamp(Member<float32>(entry, "bounce", 0.3f), 0.0f, 1.0f);
+		emitter.Friction = std::clamp(Member<float32>(entry, "friction", 0.5f), 0.0f, 1.0f);
+
+		if (emitter.bCollide && emitter.bLocalSpace) {
+			LogWarning(LC_ASSET, "Particle effect '{}' has a local space emitter with collision, which is ignored",
+					   path);
+			emitter.bCollide = false;
+		}
 
 		ColorMember(entry, "color_start", emitter.ColorStart);
 		ColorMember(entry, "color_end", emitter.ColorEnd);
 		emitter.Intensity = Member<float32>(entry, "intensity", 1.0f);
 		emitter.FadeIn = std::clamp(Member<float32>(entry, "fade_in", 0.0f), 0.0f, 1.0f);
 		emitter.bAdditive = strcmp(Member<const char*>(entry, "blend", "alpha"), "additive") == 0;
+		emitter.bLit = Member<int32>(entry, "lit", 0) != 0;
+		emitter.Softness = std::max(Member<float32>(entry, "soft", 0.0f), 0.0f);
 
 		emitter.Stretch = std::max(Member<float32>(entry, "stretch", 0.0f), 0.0f);
 
@@ -342,6 +378,10 @@ bool ParticleSystem::LoadEffect(const char* path, const String& name, ParticleEf
 			continue;
 		}
 
+		if (emitter.bLit) {
+			out_def.bHasLitEmitters = true;
+		}
+
 		out_def.Emitters.push_back(std::move(emitter));
 	}
 
@@ -353,12 +393,14 @@ bool ParticleSystem::LoadEffect(const char* path, const String& name, ParticleEf
 	return true;
 }
 
-ParticleEffectID ParticleSystem::Play(const char* name, const Vec3f position, const Vec3f direction)
+ParticleEffectID ParticleSystem::Play(const char* name, const Vec3f position, const Vec3f direction,
+									  eObjectLayer layer)
 {
-	return Play(HashStr32(name), position, direction);
+	return Play(HashStr32(name), position, direction, layer);
 }
 
-ParticleEffectID ParticleSystem::Play(Hash32 name_hash, const Vec3f position, const Vec3f direction)
+ParticleEffectID ParticleSystem::Play(Hash32 name_hash, const Vec3f position, const Vec3f direction,
+									  eObjectLayer layer)
 {
 	uint32 def_index = UINT32_MAX;
 
@@ -402,6 +444,7 @@ ParticleEffectID ParticleSystem::Play(Hash32 name_hash, const Vec3f position, co
 	effect.DefIndex = def_index;
 	effect.Position = position;
 	effect.Direction = direction.Normalize();
+	effect.Layer = layer;
 	effect.bActive = true;
 
 	++mActiveEffectCount;
@@ -433,6 +476,20 @@ ParticleSystem::EffectInstance* ParticleSystem::GetInstance(ParticleEffectID id)
 const ParticleSystem::EffectInstance* ParticleSystem::GetInstance(ParticleEffectID id) const
 {
 	return const_cast<ParticleSystem*>(this)->GetInstance(id);
+}
+
+const ParticleEmitterDef& ParticleSystem::GetEmitter(const Particle& particle) const
+{
+	return mEffectDefs[mEffects[particle.EffectSlot].DefIndex].Emitters[particle.EmitterIndex];
+}
+
+Vec3f ParticleSystem::GetWorldPosition(const Particle& particle) const
+{
+	if (GetEmitter(particle).bLocalSpace) {
+		return mEffects[particle.EffectSlot].Position + particle.Position;
+	}
+
+	return particle.Position;
 }
 
 void ParticleSystem::SetTransform(ParticleEffectID id, const Vec3f position, const Vec3f direction)
@@ -510,6 +567,12 @@ void ParticleSystem::SpawnParticles(uint32 effect_slot, uint32 emitter_index, ui
 
 	const uint32 frame_count = emitter.FramesX * emitter.FramesY;
 
+	Vec3f origin = effect.Position;
+
+	if (emitter.bLocalSpace) {
+		origin = Vec3f::sZero;
+	}
+
 	for (uint32 i = 0; i < count; i++) {
 		if (mParticles.Size >= scMaxParticles) {
 			if (!bWarnedAboutOverflow) {
@@ -540,7 +603,7 @@ void ParticleSystem::SpawnParticles(uint32 effect_slot, uint32 emitter_index, ui
 		}
 
 		Particle* particle = mParticles.Insert();
-		particle->Position = effect.Position + offset;
+		particle->Position = origin + offset;
 		particle->Velocity = direction * RandomInRange(emitter.Speed);
 		particle->Age = 0.0f;
 		particle->Lifetime = RandomInRange(emitter.Lifetime);
@@ -569,14 +632,63 @@ void ParticleSystem::Update(float32 delta_time)
 
 	UpdateParticles(delta_time);
 	UpdateEmitters(delta_time);
+	UpdateLighting(delta_time);
 	RetireEffects();
 
 	mUpdateMs = MillisecondsSince(start);
 }
 
+bool ParticleSystem::CollideParticle(Particle& particle, const ParticleEmitterDef& emitter,
+									 const Vec3f previous_position)
+{
+	const Vec3f travel = particle.Position - previous_position;
+
+	if (travel.Dot(travel) < 1e-10f) {
+		return false;
+	}
+
+	++mCollisionRayCount;
+
+	const physics::RayResult hit = gPhysics->pBackend->Raycast(previous_position, travel);
+
+	if (!hit.bHit) {
+		return false;
+	}
+
+	const Vec3f normal = hit.Normal;
+	const float32 normal_speed = particle.Velocity.Dot(normal);
+
+	if (normal_speed < 0.0f) {
+		const Vec3f normal_velocity = normal * normal_speed;
+		const Vec3f tangent_velocity = particle.Velocity - normal_velocity;
+
+		particle.Velocity = (tangent_velocity * (1.0f - emitter.Friction)) - (normal_velocity * emitter.Bounce);
+	}
+
+	particle.Position = hit.Point + (normal * scCollisionOffset);
+
+	if (emitter.bCollideKill) {
+		particle.Age = particle.Lifetime;
+	}
+
+	return true;
+}
+
 void ParticleSystem::UpdateParticles(float32 delta_time)
 {
 	const Vec3f gravity = Vec3f(0.0f, -scGravity * delta_time, 0.0f);
+
+	const bool can_collide = (mpCollisionCVar == nullptr || mpCollisionCVar->IntValue != 0) && gPhysics != nullptr &&
+							 gPhysics->pBackend != nullptr;
+
+	mCollisionRayCount = 0;
+
+	const uint32 start_count = mParticles.Size;
+	uint32 collision_start = 0;
+
+	if (start_count > 0) {
+		collision_start = mCollisionCursor % start_count;
+	}
 
 	uint32 index = 0;
 
@@ -593,15 +705,26 @@ void ParticleSystem::UpdateParticles(float32 delta_time)
 			continue;
 		}
 
-		const EffectInstance& effect = mEffects[particle.EffectSlot];
-		const ParticleEmitterDef& emitter = mEffectDefs[effect.DefIndex].Emitters[particle.EmitterIndex];
+		const ParticleEmitterDef& emitter = GetEmitter(particle);
+		const Vec3f previous_position = particle.Position;
 
 		particle.Velocity += gravity * emitter.GravityScale;
 		particle.Velocity = particle.Velocity * (1.0f / (1.0f + emitter.Drag * delta_time));
 		particle.Position += particle.Velocity * delta_time;
-		particle.Rotation += particle.Spin * delta_time;
+		particle.Rotation = WrapAngle(particle.Rotation + particle.Spin * delta_time);
+
+		const bool is_in_budget = index >= collision_start && mCollisionRayCount < scMaxCollisionRays;
+
+		if (can_collide && emitter.bCollide && is_in_budget) {
+			CollideParticle(particle, emitter, previous_position);
+			mCollisionCursor = index + 1;
+		}
 
 		++index;
+	}
+
+	if (mCollisionRayCount < scMaxCollisionRays) {
+		mCollisionCursor = 0;
 	}
 }
 
@@ -647,6 +770,82 @@ void ParticleSystem::UpdateEmitters(float32 delta_time)
 	}
 }
 
+void ParticleSystem::UpdateLighting(float32 delta_time)
+{
+	using namespace renderer;
+
+	Vec3f sun_direction = Vec3f::sUp;
+	Vec3f sun_irradiance = Vec3f::sZero;
+	bool has_sun = false;
+
+	LightDirectional* sun = gLightManager->GetDirectionalLight();
+
+	if (sun != nullptr && sun->bEnabled) {
+		float32 sun_color[3];
+		sun->Color.GetLinearRGB(sun_color);
+
+		sun_direction = sun->GetPosition().Normalize();
+		sun_irradiance = Vec3f(sun_color[0], sun_color[1], sun_color[2]) * sun->Intensity;
+		has_sun = true;
+	}
+
+	const Camera* camera = nullptr;
+
+	if (gWorld->GetCurrentCamera().IsValid()) {
+		camera = &(*gWorld->GetCurrentCamera());
+	}
+	const bool can_raycast = gPhysics != nullptr && gPhysics->pBackend != nullptr;
+	const bool use_probes = !gGraphics->bDisableProbes;
+	const float32 pre_exposure = gGraphics->PreExposure;
+	const float32 blend = std::min(delta_time * scSunVisibilityRate, 1.0f);
+
+	for (EffectInstance& effect : mEffects) {
+		if (!effect.bActive || !mEffectDefs[effect.DefIndex].bHasLitEmitters) {
+			continue;
+		}
+
+		const Vec3f sample_position = effect.Position + (effect.Direction * scLightingSampleOffset);
+
+		Vec3f ambient = Vec3f::sZero;
+
+		if (use_probes) {
+			Vec3f to_camera = effect.Direction;
+
+			if (camera != nullptr && camera->Position.DistanceTo(sample_position) > 1e-3f) {
+				to_camera = (camera->Position - sample_position).Normalize();
+			}
+
+			gProbeManager->SampleIrradiance(sample_position, to_camera, ambient);
+		}
+
+		float32 target_visibility = 0.0f;
+
+		if (has_sun) {
+			target_visibility = 1.0f;
+
+			if (can_raycast) {
+				const physics::RayResult hit = gPhysics->pBackend->Raycast(sample_position,
+																		   sun_direction * scSunRayLength);
+				if (hit.bHit) {
+					target_visibility = 0.0f;
+				}
+			}
+		}
+
+		if (effect.bHasSunVisibility) {
+			effect.SunVisibility += (target_visibility - effect.SunVisibility) * blend;
+		}
+		else {
+			effect.SunVisibility = target_visibility;
+			effect.bHasSunVisibility = true;
+		}
+
+		const Vec3f sun_light = sun_irradiance * (effect.SunVisibility * scSunScatter);
+
+		effect.Lighting = (ambient + sun_light) * pre_exposure;
+	}
+}
+
 void ParticleSystem::RetireEffects()
 {
 	for (EffectInstance& effect : mEffects) {
@@ -675,77 +874,58 @@ void ParticleSystem::RetireEffects()
 	}
 }
 
-void ParticleSystem::Render(const renderer::CommandBuffer& cmd, const Camera& camera)
+uint32 ParticleSystem::GatherLayer(eObjectLayer layer, const Mat4f& view_projection, const Vec3f eye,
+								   const Vec3f forward)
 {
-	using namespace renderer;
-
-	const Clock::time_point start = Clock::now();
-
-	mDrawnCount = 0;
-	mCpuMs = mUpdateMs;
-
-	if (mParticles.Size == 0 || mpDescriptorSet == nullptr || mpAtlas.load() == nullptr) {
-		return;
-	}
-
-	if (mpEnabledCVar != nullptr && mpEnabledCVar->IntValue == 0) {
-		return;
-	}
-
-	const Pipeline& pipeline = gPipelineCache->Request(ePipelineName::Particles);
-
-	if (!pipeline.IsBuilt()) {
-		return;
-	}
-
-	const Mat4f& view_projection = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
-
 	Frustum frustum;
 	frustum.Rebuild(view_projection);
 
-	const Vec3f eye = camera.Position;
-	const Vec3f forward = camera.Direction.Normalize();
-	const Vec3f right = Vec3f::sUp.Cross(forward).Normalize();
-	const Vec3f up = forward.Cross(right).Normalize();
-
-	mSortEntries.Clear();
-
+	const uint32 first = mSortEntries.Size;
 	bool needs_sort = false;
 
 	for (uint32 i = 0; i < mParticles.Size; i++) {
 		const Particle& particle = mParticles[i];
-		const ParticleEmitterDef& emitter = mEffectDefs[mEffects[particle.EffectSlot].DefIndex]
-												.Emitters[particle.EmitterIndex];
+
+		if (mEffects[particle.EffectSlot].Layer != layer) {
+			continue;
+		}
+
+		const ParticleEmitterDef& emitter = GetEmitter(particle);
+		const Vec3f position = GetWorldPosition(particle);
 
 		const float32 radius = (particle.Size * std::max(emitter.SizeEndScale, 1.0f)) +
 							   (particle.Velocity.Length() * emitter.Stretch);
 
-		if (!frustum.IntersectsSphere(particle.Position, radius)) {
+		if (!frustum.IntersectsSphere(position, radius)) {
 			continue;
 		}
 
 		needs_sort = needs_sort || !emitter.bAdditive;
 
-		mSortEntries.Insert(SortEntry { .Depth = (particle.Position - eye).Dot(forward), .Index = i });
+		mSortEntries.Insert(SortEntry { .Depth = (position - eye).Dot(forward), .Index = i });
 	}
 
-	if (mSortEntries.Size == 0) {
-		return;
-	}
+	const uint32 count = mSortEntries.Size - first;
 
 	if (needs_sort) {
-		std::sort(mSortEntries.pData, mSortEntries.pData + mSortEntries.Size,
+		std::sort(mSortEntries.pData + first, mSortEntries.pData + mSortEntries.Size,
 				  [](const SortEntry& a, const SortEntry& b) { return a.Depth > b.Depth; });
 	}
 
-	const uint32 base_offset = gGraphics->GetFrameNumber() * scMaxParticles * sizeof(ParticleGpuData);
-	ParticleGpuData* instances = reinterpret_cast<ParticleGpuData*>(static_cast<uint8*>(mInstanceBuffer.pMappedBuffer) +
-																	base_offset);
+	return count;
+}
+
+void ParticleSystem::WriteInstances(uint32 base_offset, const Vec3f eye)
+{
+	using namespace renderer;
+
+	ParticleGpuData* instances = reinterpret_cast<ParticleGpuData*>(
+		static_cast<uint8*>(mInstanceBuffer.pMappedBuffer) + base_offset);
 
 	for (uint32 i = 0; i < mSortEntries.Size; i++) {
 		const Particle& particle = mParticles[mSortEntries[i].Index];
-		const ParticleEmitterDef& emitter = mEffectDefs[mEffects[particle.EffectSlot].DefIndex]
-												.Emitters[particle.EmitterIndex];
+		const EffectInstance& effect = mEffects[particle.EffectSlot];
+		const ParticleEmitterDef& emitter = GetEmitter(particle);
 
 		const float32 t = std::clamp(particle.Age / particle.Lifetime, 0.0f, 1.0f);
 
@@ -753,6 +933,12 @@ void ParticleSystem::Render(const renderer::CommandBuffer& cmd, const Camera& ca
 
 		for (uint32 c = 0; c < 4; c++) {
 			color[c] = emitter.ColorStart[c] + (emitter.ColorEnd[c] - emitter.ColorStart[c]) * t;
+		}
+
+		Vec3f light = Vec3f::sOne;
+
+		if (emitter.bLit) {
+			light = effect.Lighting;
 		}
 
 		float32 alpha = std::clamp(color[3], 0.0f, 1.0f);
@@ -785,39 +971,110 @@ void ParticleSystem::Render(const renderer::CommandBuffer& cmd, const Camera& ca
 		const float32 frame_offset_v = emitter.Region.OffsetV +
 									   frame_scale_v * static_cast<float32>(frame / emitter.FramesX);
 
+		const Vec3f position = GetWorldPosition(particle);
 		const Vec3f stretch = particle.Velocity * emitter.Stretch;
 
 		ParticleGpuData& instance = instances[i];
-		instance.Position[0] = particle.Position.X;
-		instance.Position[1] = particle.Position.Y;
-		instance.Position[2] = particle.Position.Z;
+		StoreFloat3(position, instance.Position);
 		instance.Size = particle.Size * (1.0f + (emitter.SizeEndScale - 1.0f) * t);
-		instance.Stretch[0] = stretch.X;
-		instance.Stretch[1] = stretch.Y;
-		instance.Stretch[2] = stretch.Z;
-		instance.Rotation = particle.Rotation;
-		instance.Color[0] = PackHalf2(color[0] * color_scale, color[1] * color_scale);
-		instance.Color[1] = PackHalf2(color[2] * color_scale, coverage);
+		StoreFloat3(stretch, instance.Stretch);
+		instance.RotationSoftness = PackHalf2(particle.Rotation, emitter.Softness);
+		instance.Color[0] = PackHalf2(color[0] * light.X * color_scale, color[1] * light.Y * color_scale);
+		instance.Color[1] = PackHalf2(color[2] * light.Z * color_scale, coverage);
 		instance.UvRect[0] = PackUnorm2(frame_offset_u, frame_offset_v);
 		instance.UvRect[1] = PackUnorm2(frame_scale_u, frame_scale_v);
 	}
+}
 
-	mDrawnCount = mSortEntries.Size;
+void ParticleSystem::Render(renderer::CommandBuffer& cmd, const Camera& camera, renderer::RenderStage& stage)
+{
+	using namespace renderer;
 
-	ParticlePushConstants push_constants {};
-	memcpy(push_constants.ViewProjection, view_projection.RawData, sizeof(push_constants.ViewProjection));
-	StoreFloat3(right, push_constants.CameraRight);
-	StoreFloat3(up, push_constants.CameraUp);
-	StoreFloat3(eye, push_constants.EyePosition);
+	const Clock::time_point start = Clock::now();
+
+	mDrawnCount = 0;
+	mCpuMs = mUpdateMs;
+
+	if (mParticles.Size == 0 || mpDescriptorSet == nullptr || mpAtlas.load() == nullptr) {
+		return;
+	}
+
+	if (mpEnabledCVar != nullptr && mpEnabledCVar->IntValue == 0) {
+		return;
+	}
+
+	const Pipeline& pipeline = gPipelineCache->Request(ePipelineName::Particles);
+
+	if (!pipeline.IsBuilt()) {
+		return;
+	}
+
+	const Vec3f eye = camera.Position;
+	const Vec3f forward = camera.Direction.Normalize();
+	const Vec3f right = Vec3f::sUp.Cross(forward).Normalize();
+	const Vec3f up = forward.Cross(right).Normalize();
+
+	const Mat4f& world_view_projection = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
+	const Mat4f& player_view_projection = camera.GetCameraMatrix(eObjectLayer::PlayerLayer);
+
+	mSortEntries.Clear();
+
+	const uint32 world_count = GatherLayer(eObjectLayer::WorldLayer, world_view_projection, eye, forward);
+	const uint32 player_count = GatherLayer(eObjectLayer::PlayerLayer, player_view_projection, eye, forward);
+
+	mDrawnCount = world_count + player_count;
+
+	if (mDrawnCount == 0) {
+		mCpuMs += MillisecondsSince(start);
+		return;
+	}
+
+	const uint32 base_offset = gGraphics->GetFrameNumber() * scMaxParticles * sizeof(ParticleGpuData);
+
+	WriteInstances(base_offset, eye);
+
+	stage.Begin(cmd);
 
 	gPipelineCache->AddBufferOffset(0, base_offset);
 	gPipelineCache->Bind(ePipelineName::Particles, cmd);
 
 	mpDescriptorSet->Bind(0, cmd, pipeline, Slice<const uint32>(&base_offset, 1));
 
-	gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
+	const float32* projection = camera.ProjectionMatrix.RawData;
+	const bool is_soft = mpSoftCVar == nullptr || mpSoftCVar->IntValue != 0;
 
-	vkCmdDraw(cmd.Get(), 6, mDrawnCount, 0, 0);
+	ParticlePushConstants push_constants {};
+	StoreFloat3(right, push_constants.CameraRight);
+	StoreFloat3(up, push_constants.CameraUp);
+	StoreFloat3(eye, push_constants.EyePosition);
+	push_constants.DepthParams[0] = projection[10];
+	push_constants.DepthParams[1] = projection[14];
+
+	if (world_count > 0) {
+		memcpy(push_constants.ViewProjection, world_view_projection.RawData, sizeof(push_constants.ViewProjection));
+		push_constants.InstanceBase = 0;
+		push_constants.DepthParams[2] = 1.0f;
+		push_constants.DepthParams[3] = 0.0f;
+
+		if (is_soft) {
+			push_constants.DepthParams[3] = 1.0f;
+		}
+
+		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex | eShaderType::Pixel, push_constants);
+		vkCmdDraw(cmd.Get(), 6, world_count, 0, 0);
+	}
+
+	if (player_count > 0) {
+		memcpy(push_constants.ViewProjection, player_view_projection.RawData, sizeof(push_constants.ViewProjection));
+		push_constants.InstanceBase = world_count;
+		push_constants.DepthParams[2] = 2.0f;
+		push_constants.DepthParams[3] = 0.0f;
+
+		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex | eShaderType::Pixel, push_constants);
+		vkCmdDraw(cmd.Get(), 6, player_count, 0, 0);
+	}
+
+	stage.End();
 
 	mCpuMs += MillisecondsSince(start);
 }

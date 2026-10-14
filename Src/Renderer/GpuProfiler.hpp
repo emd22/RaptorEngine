@@ -21,6 +21,7 @@ enum class eGpuMarker : uint32
 	LightCulling,
 	SSAO,
 	Forward,
+	Particles,
 	ProbeCapture,
 	Composition,
 

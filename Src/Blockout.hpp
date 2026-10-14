@@ -252,6 +252,7 @@ public:
 		const Brush* pBrush = nullptr;
 		Mat4f World = Mat4f::scIdentity;
 		Object* pOwner = nullptr;
+		bool bTransparent = false;
 	};
 
 	/// The subview instance that is being edited, or scNoSubview while the level itself is
@@ -323,6 +324,7 @@ private:
 	{
 		Brush LocalBrush;
 		Mat4f ToSubview = Mat4f::scIdentity;
+		MaterialID Material = MaterialID::scNull;
 		bool bMerged = false;
 	};
 

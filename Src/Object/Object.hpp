@@ -130,6 +130,7 @@ public:
 	 * @brief Returns the ID of the material assigned to this object.
 	 */
 	FX_FORCE_INLINE const MaterialID& GetMaterialID() const { return mMaterialID; };
+	bool HasTransparentMaterial() const;
 
 	void SetMaterial(const MaterialID& id);
 

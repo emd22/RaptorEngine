@@ -341,6 +341,7 @@ void GraphicsBackend::RebuildRenderStages()
 	// The forward pass shares the prepass's depth image, so the prepass has to be rebuilt first
 	rd->Prepass.Rebuild(size);
 	rd->ForwardPass.Rebuild(size);
+	rd->ParticlePass.Rebuild(size);
 	rd->SSAOPass.Rebuild(size);
 	rd->SSAODenoisePass.Rebuild(size);
 	rd->SSAOBlurPass.Rebuild(size);
@@ -901,6 +902,9 @@ void GraphicsBackend::DoComposition(Camera& render_cam)
 
 	pRenderer->ForwardPass.End();
 	MarkGpu(eGpuMarker::Forward);
+
+	gParticleSystem->Render(frame->CmdBuffer, render_cam, pRenderer->ParticlePass);
+	MarkGpu(eGpuMarker::Particles);
 
 	// Probe capture bake faces render here: the main forward pass is done, so
 	// the capture can reuse its pipelines + light grid page before composition.

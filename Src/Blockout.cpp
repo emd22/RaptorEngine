@@ -2156,6 +2156,7 @@ void Blockout::BuildSubview(Subview& subview)
 			}
 
 			const MaterialID material = ReadBrushMaterial(entry);
+			member.Material = material;
 
 			auto builder = std::find_if(builders.begin(), builders.end(),
 										[&](const GroupBuilder& other) { return other.Material == material; });
@@ -2314,10 +2315,13 @@ void Blockout::GetSubviewSolids(std::vector<SubviewSolid>& out_solids)
 				continue;
 			}
 
+			const Material* material = gMaterialManager->GetMaterial(member.Material);
+
 			out_solids.push_back(SubviewSolid {
 				.pBrush = &member.LocalBrush,
 				.World = member.ToSubview * world,
 				.pOwner = root,
+				.bTransparent = (material != nullptr && material->IsTransparent()),
 			});
 		}
 	}

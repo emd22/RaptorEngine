@@ -87,6 +87,8 @@ public:
 	/// Moves the view model in view space: X is right, Y is up, Z is forward, in metres.
 	void SetViewModelOffset(const Vec3f offset) { mViewModelOffset = offset; }
 
+	bool GetViewModelJointPosition(const char* joint_name, Vec3f& out_position);
+
 	void AddRecoil(float32 pitch, float32 yaw);
 	void SetRecoilRecovery(float32 rate_per_second) { mRecoilRecovery = rate_per_second; }
 

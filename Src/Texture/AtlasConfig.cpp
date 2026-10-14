@@ -63,8 +63,11 @@ bool AtlasConfig::GetRegion(const char* group_name, AtlasRegion& out_region) con
 		return false;
 	}
 
-	out_region.ScaleU = (tiles[0] * mTileSize) / mAtlasSize[0];
-	out_region.ScaleV = (tiles[1] * mTileSize) / mAtlasSize[1];
+	float32 size[2] = { tiles[0] * mTileSize, tiles[1] * mTileSize };
+	ReadIntPair(group->GetMember(HashStr32("source_size")), size);
+
+	out_region.ScaleU = size[0] / mAtlasSize[0];
+	out_region.ScaleV = size[1] / mAtlasSize[1];
 	out_region.OffsetU = (tile[0] * mTileSize) / mAtlasSize[0];
 	out_region.OffsetV = (tile[1] * mTileSize) / mAtlasSize[1];
 

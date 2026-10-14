@@ -197,6 +197,7 @@ public:
 	void SetSupportsSkinning(bool value) { bSupportsSkinning = value; }
 
 	FX_FORCE_INLINE bool IsGlass() const { return HasFlag(Properties.Flags, eMaterialFlags::Glass); }
+	FX_FORCE_INLINE bool IsTransparent() const { return Properties.Alpha < 0.999f || IsGlass(); }
 
 	FX_FORCE_INLINE MaterialID GetID() const { return ID; }
 

@@ -228,6 +228,14 @@ extern bool reflection_probe_is_marked(OBJECT object);
 extern int reflection_probe_rebuild();
 extern void reflection_probe_bake();
 
+/* Particles */
+
+extern long particle_play(cstring name, float3 position, float3 direction);
+extern void particle_move(long effect, float3 position, float3 direction);
+extern void particle_stop(long effect);
+extern void particle_kill(long effect);
+extern bool particle_alive(long effect);
+
 /* CVars */
 
 extern void cvar_set_int(cstring name, long value);

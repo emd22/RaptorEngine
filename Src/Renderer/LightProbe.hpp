@@ -59,6 +59,8 @@ public:
 	uint32 GetCurrentProbeIndex() const { return (mBakePhase == eBakePhase::Irradiance) ? mCurrentProbe : UINT32_MAX; }
 
 	uint32 GetVolumeCount() const { return mLayout.VolumeCount; }
+
+	bool SampleIrradiance(const Vec3f position, const Vec3f normal, Vec3f& out_irradiance) const;
 	void GetVolumeProbeRange(uint32 volume, uint32& out_first_probe, uint32& out_count) const;
 
 	uint32 RebuildVolumesFromWorld();
@@ -116,6 +118,9 @@ private:
 	};
 
 	void ApplyLayout();
+
+	uint32 SelectVolume(const Vec3f position) const;
+	bool SampleVolume(const Vec3f position, uint32 volume_index, const float32* basis, Vec3f& out_irradiance) const;
 	void ResolveSunVisibility();
 
 	void CreateCaptureResources();

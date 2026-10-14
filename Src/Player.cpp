@@ -479,6 +479,34 @@ void Player::DoReloadAnimation()
 	mpViewModelSkeleton->PushAnimation(reload);
 }
 
+bool Player::GetViewModelJointPosition(const char* joint_name, Vec3f& out_position)
+{
+	if (mpViewModel == nullptr || mActiveViewModel < 0) {
+		return false;
+	}
+
+	const ViewModelSlot& slot = mViewModels[mActiveViewModel];
+
+	if (!slot.pSkeleton) {
+		return false;
+	}
+
+	const Skeleton& skeleton = *slot.pSkeleton;
+	const uint32 joint_count = std::min<uint32>(skeleton.JointCount, skeleton.BoneNames.Size);
+
+	for (uint32 i = 0; i < joint_count && i < skeleton.WorldTransforms.Size; i++) {
+		if (!(skeleton.BoneNames[i] == joint_name)) {
+			continue;
+		}
+
+		const Mat4f joint_world = skeleton.WorldTransforms[i] * mpViewModel->GetWorldMatrix();
+		out_position = Vec3f(joint_world.Rows[3]);
+		return true;
+	}
+
+	return false;
+}
+
 void Player::SetViewModelAnimations(const char* idle, const char* fire, const char* reload)
 {
 	mIdleAnim = idle;
@@ -668,6 +696,8 @@ void Player::Update(float64 delta_time)
 	Weapons.Update(static_cast<float32>(delta_time));
 
 	UpdateViewModel(delta_time);
+
+	Weapons.UpdateEffects();
 }
 
 Player::~Player() {}
