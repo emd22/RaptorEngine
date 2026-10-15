@@ -14,36 +14,10 @@ import tool_common;
 /////////////////////////////////////
 
 
-/* Snap selected object to world (undoable: pushes one Move op per moved object). */
+/* Snap the selected objects to the world grid, by the minimum corner of their bounds (undoable as one step). */
 void CMD_snap2w()
 {
-	if (!editor_has_object_selection()) {
-		return;
-	}
-
-	int count = sel.selected_objects_count;
-
-	int snaps = 0;
-	for (int i = 0; i < count; i++) {
-		OBJECT obj = sel.selected_objects[i];
-		if (!editor_vec_equal(obj.position, editor_transform_snap(obj.position))) {
-			snaps++;
-		}
-	}
-
-	if (snaps == 0) {
-		return;
-	}
-
-	// Snap all objects to world grid
-	for (int i = 0; i < count; i++) {
-		OBJECT obj = sel.selected_objects[i];
-		float3 snapped = editor_transform_snap(obj.position);
-		if (editor_vec_equal(obj.position, snapped)) {
-			continue;
-		}
-		editor_push_op_vec(obj, OPTYPE.MOVE, obj.position, snapped, snaps);
-	}
+	editor_snap_selection_to_grid();
 }
 
 /////////////////////////////////////

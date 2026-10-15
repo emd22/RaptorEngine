@@ -220,7 +220,7 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 
 		const bool is_probe_volume = entry.GetMemberValue(HashStr32("probevolume"), 0) != 0;
 		const bool is_reflection_probe = entry.GetMemberValue(HashStr32("reflectionprobe"), 0) != 0;
-		const bool is_marker = is_probe_volume || is_reflection_probe ||
+		const bool is_marker = is_probe_volume || is_reflection_probe || brush_kind == eBrushKind::Decal ||
 							   entry.GetMemberValue(HashStr32("trigger"), 0) != 0;
 
 		const bool is_transparent = brush_kind == eBrushKind::Geometry && !material_name.IsEmpty() &&

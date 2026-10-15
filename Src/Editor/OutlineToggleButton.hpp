@@ -1,5 +1,7 @@
 #pragma once
 
+#include "EditorTheme.hpp"
+
 #include <wx/bitmap.h>
 #include <wx/control.h>
 #include <wx/dcbuffer.h>
@@ -13,7 +15,7 @@ namespace fx::editor {
 class OutlineToggleButton : public wxControl
 {
 public:
-	static constexpr int32 scPadding = 6;
+	static constexpr int32 scPadding = 5;
 	static constexpr int32 scOutlineWidth = 2;
 
 	OutlineToggleButton(wxWindow* parent, const wxBitmap& icon, const wxString& label)
@@ -59,6 +61,14 @@ public:
 
 	bool AcceptsFocus() const override { return false; }
 
+	void SetButtonSize(const wxSize& size)
+	{
+		mButtonSize = size;
+		InvalidateBestSize();
+		SetMinSize(GetBestSize());
+		Refresh();
+	}
+
 protected:
 	wxSize DoGetBestSize() const override
 	{
@@ -71,7 +81,17 @@ protected:
 			content = GetTextExtent(mLabel);
 		}
 
-		return wxSize(content.x + (scPadding * 2), content.y + (scPadding * 2));
+		wxSize best(content.x + (scPadding * 2), content.y + (scPadding * 2));
+
+		if (mButtonSize.x != wxDefaultCoord) {
+			best.x = mButtonSize.x;
+		}
+
+		if (mButtonSize.y != wxDefaultCoord) {
+			best.y = mButtonSize.y;
+		}
+
+		return best;
 	}
 
 private:
@@ -83,16 +103,29 @@ private:
 		const wxSize size = GetClientSize();
 		const bool enabled = IsEnabled();
 
-		dc.SetBackground(wxBrush(GetBackgroundColour()));
+		const EditorTheme& theme = GetEditorTheme();
+		const wxColour background = ToWxColour(theme.Frame.Background);
+
+		dc.SetBackground(wxBrush(background));
 		dc.Clear();
 
-		wxColour fill = GetBackgroundColour().ChangeLightness(mbPressed ? 85 : (mbHovered && enabled) ? 125 : 112);
-		wxColour outline = GetBackgroundColour().ChangeLightness(75);
+		int32 lightness = theme.Button.Lightness;
 
-		const wxColour selection_colour = wxColour(100, 200, 120);
+		if (mbPressed) {
+			lightness = theme.Button.PressedLightness;
+		}
+		else if (mbHovered && enabled) {
+			lightness = theme.Button.HoverLightness;
+		}
+
+		const wxColour fill = background.ChangeLightness(lightness);
+		// const wxColour outline = GetBackgroundColour().ChangeLightness(125);
+		const wxColour outline = background;
+
+		const wxColour selection_colour = ToWxColour(theme.Button.Selected);
 
 		dc.SetBrush(wxBrush(fill));
-		dc.SetPen(wxPen(outline, 1));
+		dc.SetPen(wxPen(outline, scOutlineWidth));
 		dc.DrawRoundedRectangle(wxRect(0, 0, size.x, size.y).Deflate(1), 5.0);
 
 		if (mbValue) {
@@ -108,7 +141,7 @@ private:
 		else {
 			const wxSize text = dc.GetTextExtent(mLabel);
 
-			dc.SetTextForeground(enabled ? *wxWHITE : wxColour(150, 150, 150));
+			dc.SetTextForeground(ToWxColour(enabled ? theme.Button.Text : theme.Button.DisabledText));
 			dc.DrawText(mLabel, (size.x - text.x) / 2, (size.y - text.y) / 2);
 		}
 	}
@@ -145,6 +178,7 @@ private:
 private:
 	wxBitmap mIcon;
 	wxString mLabel;
+	wxSize mButtonSize = wxDefaultSize;
 
 	bool mbValue = false;
 	bool mbHovered = false;

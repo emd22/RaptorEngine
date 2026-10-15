@@ -44,7 +44,7 @@ bool CanEditObjectTag(const Object* object, eObjectTag tag)
 	case eObjectTag::Trigger:
 	case eObjectTag::NvBrush:
 	case eObjectTag::DBound:
-		return object->HasTags(eObjectTag::Blockout);
+		return object->HasTags(eObjectTag::Blockout) && !object->IsDecal();
 	default:
 		return false;
 	}
@@ -96,8 +96,12 @@ bool CanEditObjectFlag(const Object* object, eObjectFlags flag)
 		return true;
 	case eObjectFlags::ShadowCaster:
 	case eObjectFlags::NotProbeVisible:
-		return !object->IsVolume();
+		return !object->IsVolume() && !object->IsDecal();
 	case eObjectFlags::PhysicsEnabled: {
+		if (object->IsDecal()) {
+			return false;
+		}
+
 		if (object->HasTags(eObjectTag::Blockout)) {
 			return !object->IsVolume() && gWorld->pPrototype != nullptr && gWorld->pPrototype->HasBrush(object);
 		}
@@ -229,7 +233,7 @@ static Object* RestoreBrush(const ObjectSnapshot& snapshot, const Brush::PlaneLi
 	}
 
 	Object* object = gWorld->pPrototype->RestoreObject(snapshot.Position, planes, snapshot.Material, snapshot.Rotation,
-													   snapshot.ObjectName, snapshot.bIsDynamic);
+													   snapshot.ObjectName, snapshot.bIsDynamic, snapshot.bIsDecal);
 
 	if (object == nullptr) {
 		return nullptr;
@@ -286,6 +290,7 @@ ObjectSnapshot ObjectSnapshot::Capture(const Object& object, MaterialID material
 		.bIsTrigger = object.IsTrigger(),
 		.bIsNvBrush = object.IsNvBrush(),
 		.bIsDBound = object.IsDBound(),
+		.bIsDecal = object.IsDecal(),
 		.bIsDynamic = gWorld->pPrototype->IsDynamic(&object),
 		.ScriptPath = gObjectScripts->GetPath(object.ID),
 		.EnterDirection = enter_direction,
@@ -495,25 +500,6 @@ void BrushEditOperation::Undo(EditorSelection& selection)
 {
 	if (Object* target = ResolveTarget()) {
 		gWorld->pPrototype->SetBrushPlanes(target, mPlanesBefore);
-	}
-}
-
-BoundsEditOperation::BoundsEditOperation(Object* object, const BBox& before, const BBox& after, int32 group_size)
-	: ObjectEditOperation(object, group_size), mBoundsBefore(before), mBoundsAfter(after)
-{
-}
-
-void BoundsEditOperation::Execute(EditorSelection& selection)
-{
-	if (Object* target = ResolveTarget()) {
-		target->SetBounds(mBoundsAfter);
-	}
-}
-
-void BoundsEditOperation::Undo(EditorSelection& selection)
-{
-	if (Object* target = ResolveTarget()) {
-		target->SetBounds(mBoundsBefore);
 	}
 }
 

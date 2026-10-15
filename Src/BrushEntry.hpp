@@ -25,12 +25,14 @@ enum class eBrushKind
 	NvBrush,
 	/// Seals the map for the map compiler, and is otherwise not there
 	DBound,
+	Decal,
 };
 
 /// Members of a blockout entry that set its kind. Brushes saved before the kinds existed used a material of the same
 /// name instead, which is still read.
 constexpr const char* scNvBrushName = "nvbrush";
 constexpr const char* scDBoundName = "dbound";
+constexpr const char* scDecalName = "decal";
 
 /// Material that map bounds are drawn with while the prototype is loaded. They are not in a compiled map at all.
 constexpr const char* scDBoundMaterialName = "DNU_dbound";

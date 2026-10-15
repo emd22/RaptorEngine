@@ -19,6 +19,7 @@ namespace fx::editor {
 class EditorFrame;
 class MaterialThumbnailGrid;
 class PaginatedView;
+class PropertySection;
 
 /**
  * @brief Side panel section for searching the blockout material library, shown as pages of albedo thumbnails.
@@ -46,6 +47,7 @@ private:
 	void OnIdle(wxIdleEvent& event);
 
 private:
+	PropertySection* mpSection = nullptr;
 	wxTextCtrl* mpSearch = nullptr;
 	PaginatedView* mpPages = nullptr;
 	MaterialThumbnailGrid* mpGrid = nullptr;

@@ -1,0 +1,622 @@
+#include "EditorToolbar.hpp"
+
+#ifdef FX_IS_EDITOR
+
+#include "Common.hpp"
+#include "EditorThread.hpp"
+#include "OutlineToggleButton.hpp"
+#include "RaptorEditor.hpp"
+
+#include <wx/bitmap.h>
+#include <wx/button.h>
+#include <wx/choice.h>
+#include <wx/sizer.h>
+#include <wx/statline.h>
+#include <wx/utils.h>
+#include <wx/wrapsizer.h>
+
+#include <Core/FilesystemIO.hpp>
+#include <Core/Log.hpp>
+#include <Engine.hpp>
+#include <Math/Vec2.hpp>
+#include <cmath>
+
+namespace fx::editor {
+
+namespace {
+
+constexpr int scItemBorder = 2;
+constexpr int scSeparatorBorder = 6;
+constexpr int scLetterButtonSize = 28;
+
+struct ToolButtonInfo
+{
+	const char* pName;
+	const char* pToolTip;
+	const char* pIconPath;
+};
+
+constexpr ToolButtonInfo scToolButtons[] = {
+	{ "Select", "Select and move brushes (T)", "Textures/editor_new/translate.png" },
+	{ "Face", "Drag a brush edge to move its face (F)", "Textures/editor_new/face.png" },
+	{ "Vertex", "Drag the corners of the selected brushes (V)", "Textures/editor_new/vertex.png" },
+	{ "Create", "Drag to create a brush (B)", "Textures/editor_new/brush.png" },
+	{ "Arch", "Drag a box to fill it with an arch made of brushes (A)", "Textures/editor_new/arch.png" },
+	{ "Bend", "Curve the selected brushes by dragging the knobs at their ends (N)", "Textures/editor_new/bend.png" },
+	{ "Decal", "Drag a box to project a decal onto the surfaces behind it (D)", "Textures/editor_new/decal.png" },
+	{ "Rotate", "Rotate the selected brushes (R)", "Textures/editor_new/rotate.png" },
+	{ "Clip", "Drag a line across the selected brushes to split them in two (C)", "Textures/editor_new/cut.png" },
+	{ "Light", "Select, move, aim and add spot lights (I)", "Textures/editor_new/light.png" },
+};
+
+static_assert(std::size(scToolButtons) == static_cast<size_t>(eEditorTool::Count));
+
+constexpr ToolButtonInfo scSimulateButton = {
+	"Simulate", "Play the level in the 3D view. Nothing can be edited while simulating (X in the 3D view)",
+	"Textures/editor_new/simulate.png"
+};
+
+constexpr ToolButtonInfo scSubtractButton = {
+	"Subtract", "Cut the selected brushes out of the brushes they overlap (S). Hold Shift to keep the cutters",
+	"Textures/editor_new/subtract.png"
+};
+
+constexpr const char* scPlaneNames[scViewPlaneCount] = {
+	"Top", "Forward", "Back", "Left", "Right",
+};
+
+constexpr const char* scDataFilterNames[] = {
+	"All", "Probe Volumes", "Reflection Probes", "Spawn Points", "Volumes", "Lights", "nvbrush", "dbound",
+};
+
+static_assert(std::size(scDataFilterNames) == static_cast<size_t>(eDataFilter::Count));
+
+OutlineToggleButton* MakeButton(wxWindow* parent, const ToolButtonInfo& info)
+{
+	wxBitmap icon;
+
+	if (info.pIconPath != nullptr) {
+		const String icon_path = FilesystemIO::ResolvePath(info.pIconPath);
+
+		// wx shows an error dialog for images it can't load, so check the icon is there first
+		if (FilesystemIO::FileExists(icon_path)) {
+			icon.LoadFile(wxString::FromUTF8(icon_path.CStr()), wxBITMAP_TYPE_PNG);
+		}
+
+		if (!icon.IsOk()) {
+			LogWarning(LC_CORE, "Could not load editor icon '{}'", icon_path);
+		}
+	}
+
+	OutlineToggleButton* button = new OutlineToggleButton(parent, icon, info.pName);
+	button->SetToolTip(info.pToolTip);
+
+	return button;
+}
+
+} // namespace
+
+
+EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent(parent), mpCanvas(canvas)
+{
+	mpSizer = new wxBoxSizer(wxVERTICAL);
+	mpViewRow = new wxWrapSizer(wxHORIZONTAL);
+	mpToolRow = new wxWrapSizer(wxHORIZONTAL);
+	mpSizer->Add(mpViewRow, wxSizerFlags().Expand());
+	mpSizer->Add(mpToolRow, wxSizerFlags().Expand());
+
+	{
+		wxBoxSizer* group = AddGroup(mpViewRow, false);
+
+		mpSimulateButton = MakeButton(parent, scSimulateButton);
+		mpSimulateButton->Bind(wxEVT_TOGGLEBUTTON, [](wxCommandEvent&)
+							   { thread::PostToGame([] { gEditor->SetSimulating(!gEditor->IsSimulationMode()); }); });
+
+		group->Add(mpSimulateButton, wxSizerFlags().CenterVertical().Border(wxALL, scItemBorder));
+	}
+
+	{
+		wxBoxSizer* group = AddGroup(mpViewRow, true);
+
+		mpPerspectiveButton = new OutlineToggleButton(parent, wxBitmap(), "3D");
+		mpPerspectiveButton->SetButtonSize(wxSize(scLetterButtonSize, scLetterButtonSize));
+		mpPerspectiveButton->SetToolTip("Fly around the level in 3D (Ctrl+1)");
+		mpPerspectiveButton->Bind(wxEVT_TOGGLEBUTTON, [](wxCommandEvent&)
+								  { thread::PostToGame([] { gEditor->SetView(eEditorView::Perspective); }); });
+
+		mpTopButton = new OutlineToggleButton(parent, wxBitmap(), "2D");
+		mpTopButton->SetButtonSize(wxSize(scLetterButtonSize, scLetterButtonSize));
+		mpTopButton->SetToolTip("Top, front and side wireframe views for laying out brushes (Ctrl+2)");
+		mpTopButton->Bind(wxEVT_TOGGLEBUTTON,
+						  [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetView(eEditorView::Top); }); });
+
+		mpSplitButton = new OutlineToggleButton(parent, wxBitmap(), "Split");
+		mpSplitButton->SetToolTip("The 3D view and the 2D views together, with a draggable divider (Ctrl+3)");
+		mpSplitButton->Bind(wxEVT_TOGGLEBUTTON,
+							[](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetView(eEditorView::Split); }); });
+
+		group->Add(mpPerspectiveButton, wxSizerFlags().Expand().Border(wxALL, scItemBorder));
+		group->Add(mpTopButton, wxSizerFlags().Expand().Border(wxALL, scItemBorder));
+		group->Add(mpSplitButton, wxSizerFlags().Expand().Border(wxALL, scItemBorder));
+	}
+
+	{
+		wxBoxSizer* group = AddGroup(mpViewRow, true);
+
+		mpVisButton = new OutlineToggleButton(parent, wxBitmap(), "V");
+		mpVisButton->SetButtonSize(wxSize(scLetterButtonSize, scLetterButtonSize));
+		mpVisButton->SetToolTip("Select and edit visible brushes and models");
+		mpVisButton->Bind(wxEVT_TOGGLEBUTTON,
+						  [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetMode(eEditorMode::Vis); }); });
+
+		mpDataButton = new OutlineToggleButton(parent, wxBitmap(), "D");
+		mpDataButton->SetButtonSize(wxSize(scLetterButtonSize, scLetterButtonSize));
+		mpDataButton->SetToolTip("Select and edit probe volumes, reflection probes, volumes, lights and spawn points");
+		mpDataButton->Bind(wxEVT_TOGGLEBUTTON,
+						   [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetMode(eEditorMode::Data); }); });
+
+		mpDataFilterChoice = new wxChoice(parent, wxID_ANY);
+
+		for (const char* name : scDataFilterNames) {
+			mpDataFilterChoice->Append(name);
+		}
+
+		mpDataFilterChoice->SetSelection(0);
+		mpDataFilterChoice->SetToolTip("Which data brushes can be selected");
+		mpDataFilterChoice->Bind(
+			wxEVT_CHOICE,
+			[this](wxCommandEvent&)
+			{
+				const int32 selection = mpDataFilterChoice->GetSelection();
+
+				if (selection != wxNOT_FOUND) {
+					thread::PostToGame([selection] { gEditor->SetDataFilter(static_cast<eDataFilter>(selection)); });
+				}
+			});
+
+		wxButton* fit_bounds_button = new wxButton(parent, wxID_ANY, "Fit Bounds", wxDefaultPosition, wxDefaultSize,
+												   wxBU_EXACTFIT);
+		fit_bounds_button->SetToolTip("Replace the map bounds (dbound) with six boxes sealing the level, each one "
+									  "touching the edge of the level geometry");
+		fit_bounds_button->Bind(wxEVT_BUTTON,
+								[](wxCommandEvent&) { thread::PostToGame([] { gEditor->FitDBoundsToLevel(); }); });
+
+		group->Add(mpVisButton, wxSizerFlags().Expand().Border(wxALL, scItemBorder));
+		group->Add(mpDataButton, wxSizerFlags().Expand().Border(wxALL, scItemBorder));
+		group->Add(mpDataFilterChoice, wxSizerFlags().CenterVertical().Border(wxALL, scItemBorder));
+		group->Add(fit_bounds_button, wxSizerFlags().CenterVertical().Border(wxALL, scItemBorder));
+	}
+
+	{
+		mpPlaneGroup = AddGroup(mpToolRow, false);
+
+		mpPlaneChoice = new wxChoice(parent, wxID_ANY);
+
+		for (const char* name : scPlaneNames) {
+			mpPlaneChoice->Append(name);
+		}
+
+		mpPlaneChoice->SetToolTip("Which way the 2D view looks at the level: top (1), forward along +Z (2), back along "
+								  "-Z (3), left along +X (4) or right along -X (5)");
+		mpPlaneChoice->Bind(wxEVT_CHOICE,
+							[this](wxCommandEvent&)
+							{
+								const int32 selection = mpPlaneChoice->GetSelection();
+
+								if (selection != wxNOT_FOUND) {
+									mpCanvas->SetPlane(static_cast<eViewPlane>(selection));
+								}
+
+								mpCanvas->SetFocus();
+							});
+
+		mpPlaneGroup->Add(mpPlaneChoice, wxSizerFlags().CenterVertical().Border(wxALL, scItemBorder));
+	}
+
+	{
+		mpToolGroup = AddGroup(mpToolRow, true);
+
+		for (uint32 i = 0; i < static_cast<uint32>(eEditorTool::Count); i++) {
+			OutlineToggleButton* button = MakeButton(parent, scToolButtons[i]);
+
+			const eEditorTool tool = static_cast<eEditorTool>(i);
+			button->Bind(wxEVT_TOGGLEBUTTON,
+						 [this, tool](wxCommandEvent&)
+						 {
+							 mpCanvas->SetTool(tool);
+							 mpCanvas->SetFocus();
+						 });
+
+			mpToolButtons[i] = button;
+			mpToolGroup->Add(button, wxSizerFlags().CenterVertical().Border(wxALL, scItemBorder));
+		}
+
+		mpSubtractButton = MakeButton(parent, scSubtractButton);
+		mpSubtractButton->Bind(wxEVT_TOGGLEBUTTON,
+							   [this](wxCommandEvent&)
+							   {
+								   mpSubtractButton->SetValue(false);
+								   mpCanvas->Subtract(wxGetKeyState(WXK_SHIFT));
+								   mpCanvas->SetFocus();
+							   });
+
+		mpToolGroup->Add(mpSubtractButton, wxSizerFlags().CenterVertical().Border(wxLEFT, scSeparatorBorder));
+
+		mpSnapButton = new wxButton(parent, wxID_ANY, "Snap to Grid", wxDefaultPosition, wxDefaultSize,
+									wxBU_EXACTFIT);
+		mpSnapButton->SetToolTip("Move the selected brushes so their corners line up with the grid again, even when "
+								 "snapping is off (Ctrl+B)");
+		mpSnapButton->Enable(false);
+		mpSnapButton->Bind(wxEVT_BUTTON,
+						   [this](wxCommandEvent&)
+						   {
+							   thread::PostToGame(
+								   []
+								   {
+									   gEditor->SnapSelectionToGrid();
+									   gEditor->NoteTopViewCommand();
+								   });
+							   mpCanvas->SetFocus();
+						   });
+
+		mpToolGroup->Add(mpSnapButton, wxSizerFlags().CenterVertical().Border(wxLEFT, scSeparatorBorder));
+	}
+
+	for (uint32 i = 0; i < scViewPlaneCount; i++) {
+		const eViewPlane plane = static_cast<eViewPlane>(i);
+
+		FloatField* base_field = new FloatField(parent, scViewPlaneAxes[i].pBaseLabel, Vec2f(-100000.0f, 100000.0f));
+		base_field->SetValue(mBase[i]);
+		base_field->SetOnChange(
+			[this, i, plane](const float32 value)
+			{
+				mBase[i] = value;
+				mpCanvas->SetCreateVolume(plane, mBase[i], mSize[i]);
+			});
+
+		FloatField* size_field = new FloatField(parent, scViewPlaneAxes[i].pSizeLabel, Vec2f(0.05f, 100000.0f));
+		size_field->SetValue(mSize[i]);
+		size_field->SetOnChange(
+			[this, i, plane](const float32 value)
+			{
+				mSize[i] = value;
+				mpCanvas->SetCreateVolume(plane, mBase[i], mSize[i]);
+			});
+
+		mpVolumeRows[i] = new wxBoxSizer(wxHORIZONTAL);
+		mpVolumeRows[i]->Add(new wxStaticLine(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL),
+							 wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT, scSeparatorBorder));
+		mpVolumeRows[i]->Add(base_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 4));
+		mpVolumeRows[i]->Add(size_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+
+		OutlineToggleButton* ground_button = new OutlineToggleButton(parent, wxBitmap(), "Ground");
+
+		ground_button->SetToolTip(wxString::Format("New brushes rest on the furthest surface the view faces that they "
+												   "fit on. %s is used over empty space",
+												   scViewPlaneAxes[i].pBaseLabel));
+
+		ground_button->SetValue(true);
+		ground_button->Bind(wxEVT_TOGGLEBUTTON,
+							[this, ground_button](wxCommandEvent&)
+							{
+								const bool enabled = ground_button->GetValue();
+
+								for (OutlineToggleButton* button : mpGroundButtons) {
+									button->SetValue(enabled);
+								}
+
+								mpCanvas->SetDropToGround(enabled);
+								mpCanvas->SetFocus();
+							});
+
+		mpGroundButtons[i] = ground_button;
+		mpVolumeRows[i]->Add(ground_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+
+		mpToolRow->Add(mpVolumeRows[i], wxSizerFlags().Expand().Border(wxTOP | wxBOTTOM, scItemBorder));
+	}
+
+	{
+		FloatField* sides_field = new FloatField(parent, "Sides", Vec2f(3.0f, 128.0f));
+		sides_field->SetValue(static_cast<float32>(mArch.Sides));
+		sides_field->SetOnChange(
+			[this](const float32 value)
+			{
+				mArch.Sides = static_cast<uint32>(std::lround(value));
+				mpCanvas->SetArchSettings(mArch);
+			});
+
+		FloatField* wall_field = new FloatField(parent, "Wall", Vec2f(0.01f, 100000.0f));
+		wall_field->SetValue(mArch.WallWidth);
+		wall_field->SetOnChange(
+			[this](const float32 value)
+			{
+				mArch.WallWidth = value;
+				mpCanvas->SetArchSettings(mArch);
+			});
+
+		FloatField* arc_field = new FloatField(parent, "Arc", Vec2f(1.0f, 360.0f));
+		arc_field->SetValue(mArch.ArcDegrees);
+		arc_field->SetOnChange(
+			[this](const float32 value)
+			{
+				mArch.ArcDegrees = value;
+				mpCanvas->SetArchSettings(mArch);
+			});
+
+		FloatField* start_field = new FloatField(parent, "Start", Vec2f(-360.0f, 360.0f));
+		start_field->SetValue(mArch.StartDegrees);
+		start_field->SetOnChange(
+			[this](const float32 value)
+			{
+				mArch.StartDegrees = value;
+				mpCanvas->SetArchSettings(mArch);
+			});
+
+		mpArchRow = new wxBoxSizer(wxHORIZONTAL);
+		mpArchRow->Add(new wxStaticLine(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL),
+					   wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT, scSeparatorBorder));
+		mpArchRow->Add(sides_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 4));
+		mpArchRow->Add(wall_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+		mpArchRow->Add(arc_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+		mpArchRow->Add(start_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+
+		wxButton* build_button =
+			new wxButton(parent, wxID_ANY, "Build", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+		build_button->SetToolTip("Build the pending arch (Enter)");
+		build_button->Bind(wxEVT_BUTTON,
+						   [this](wxCommandEvent&)
+						   {
+							   mpCanvas->CommitArch();
+							   mpCanvas->SetFocus();
+						   });
+
+		mpArchRow->Add(build_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+		mpToolRow->Add(mpArchRow, wxSizerFlags().Expand().Border(wxTOP | wxBOTTOM, scItemBorder));
+
+		mpArchSidesField = sides_field;
+		mpArchWallField = wall_field;
+		mpArchArcField = arc_field;
+		mpArchStartField = start_field;
+
+		mpCanvas->SetArchSettings(mArch);
+		mpCanvas->SetOnArchChanged(
+			[this](const ArchSettings& settings)
+			{
+				mArch = settings;
+				mpArchSidesField->SetValue(static_cast<float32>(settings.Sides));
+				mpArchWallField->SetValue(settings.WallWidth);
+				mpArchArcField->SetValue(settings.ArcDegrees);
+				mpArchStartField->SetValue(settings.StartDegrees);
+			});
+	}
+
+	{
+		FloatField* segments_field = new FloatField(parent, "Segments", Vec2f(1.0f, static_cast<float32>(scMaxBendSegments)));
+		segments_field->SetValue(static_cast<float32>(mBend.Segments));
+		segments_field->SetOnChange(
+			[this](const float32 value)
+			{
+				mBend.Segments = static_cast<uint32>(std::lround(value));
+				mpCanvas->SetBendSettings(mBend);
+			});
+
+		FloatField* angle_field = new FloatField(parent, "Angle", Vec2f(-360.0f, 360.0f));
+		angle_field->SetValue(mBend.AngleDegrees);
+		angle_field->SetOnChange(
+			[this](const float32 value)
+			{
+				mBend.AngleDegrees = value;
+				mpCanvas->SetBendSettings(mBend);
+			});
+
+		wxButton* swap_button =
+			new wxButton(parent, wxID_ANY, "Swap Axis", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+		swap_button->SetToolTip("Bend along the other axis of the selection (Tab)");
+		swap_button->Bind(wxEVT_BUTTON,
+						  [this](wxCommandEvent&)
+						  {
+							  mpCanvas->SwapBendAxis();
+							  mpCanvas->SetFocus();
+						  });
+
+		wxButton* bend_button = new wxButton(parent, wxID_ANY, "Bend", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+		bend_button->SetToolTip("Replace the selected brushes with the bent segments (Enter)");
+		bend_button->Bind(wxEVT_BUTTON,
+						  [this](wxCommandEvent&)
+						  {
+							  mpCanvas->CommitBend();
+							  mpCanvas->SetFocus();
+						  });
+
+		mpBendRow = new wxBoxSizer(wxHORIZONTAL);
+		mpBendRow->Add(new wxStaticLine(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL),
+					   wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT, scSeparatorBorder));
+		mpBendRow->Add(segments_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 4));
+		mpBendRow->Add(angle_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+		mpBendRow->Add(swap_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+		mpBendRow->Add(bend_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+		mpToolRow->Add(mpBendRow, wxSizerFlags().Expand().Border(wxTOP | wxBOTTOM, scItemBorder));
+
+		mpBendSegmentsField = segments_field;
+		mpBendAngleField = angle_field;
+
+		mpCanvas->SetBendSettings(mBend);
+		mpCanvas->SetOnBendChanged(
+			[this](const BendSettings& settings)
+			{
+				mBend = settings;
+				mpBendSegmentsField->SetValue(static_cast<float32>(settings.Segments));
+				mpBendAngleField->SetValue(settings.AngleDegrees);
+			});
+	}
+
+	{
+		mpViewGroup = AddGroup(mpToolRow, true);
+
+		wxButton* fit_button = new wxButton(parent, wxID_ANY, "Fit", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+		fit_button->SetToolTip("Frame every brush (Home)");
+		fit_button->Bind(wxEVT_BUTTON,
+						 [this](wxCommandEvent&)
+						 {
+							 mpCanvas->FitAll();
+							 mpCanvas->SetFocus();
+						 });
+
+		wxButton* hide_button = new wxButton(parent, wxID_ANY, "Hide", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+		hide_button->SetToolTip("Hide the selection from the 2D views, so what is behind it can be selected (H)");
+		hide_button->Bind(wxEVT_BUTTON,
+						  [this](wxCommandEvent&)
+						  {
+							  thread::PostToGame(
+								  []
+								  {
+									  gEditor->TopViewHideSelection();
+									  gEditor->NoteTopViewCommand();
+								  });
+							  mpCanvas->SetFocus();
+						  });
+
+		mpShowAllButton = new wxButton(parent, wxID_ANY, "Show All", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+		mpShowAllButton->SetToolTip("Bring back everything hidden from the 2D views (Shift+H)");
+		mpShowAllButton->Enable(false);
+		mpShowAllButton->Bind(wxEVT_BUTTON,
+							  [this](wxCommandEvent&)
+							  {
+								  thread::PostToGame(
+									  []
+									  {
+										  gEditor->TopViewShowAll();
+										  gEditor->NoteTopViewCommand();
+									  });
+								  mpCanvas->SetFocus();
+							  });
+
+		mpViewGroup->Add(fit_button, wxSizerFlags().CenterVertical().Border(wxALL, scItemBorder));
+		mpViewGroup->Add(hide_button, wxSizerFlags().CenterVertical().Border(wxALL, scItemBorder));
+		mpViewGroup->Add(mpShowAllButton, wxSizerFlags().CenterVertical().Border(wxALL, scItemBorder));
+	}
+
+	mpCanvas->SetOnToolChanged([this](eEditorTool tool) { ShowTool(tool); });
+	mpCanvas->SetOnPlaneChanged([this](eViewPlane plane) { ShowPlane(plane); });
+
+	ShowTool(mpCanvas->GetTool());
+	ShowPlane(mpCanvas->GetPlane());
+	ShowView(eEditorView::Perspective);
+}
+
+wxSizer* EditorToolbar::GetSizer() { return mpSizer; }
+
+wxBoxSizer* EditorToolbar::AddGroup(wxWrapSizer* row, bool separated)
+{
+	wxBoxSizer* group = new wxBoxSizer(wxHORIZONTAL);
+
+	if (separated) {
+		group->Add(new wxStaticLine(mpParent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL),
+				   wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT, scSeparatorBorder));
+	}
+
+	row->Add(group, wxSizerFlags().Expand().Border(wxTOP | wxBOTTOM, scItemBorder));
+
+	return group;
+}
+
+void EditorToolbar::UpdateVisibility()
+{
+	mpSizer->Show(mpToolRow, mbShows2D);
+
+	for (uint32 i = 0; i < scViewPlaneCount; i++) {
+		mpToolRow->Show(mpVolumeRows[i], mbShows2D && i == static_cast<uint32>(mPlane), true);
+	}
+
+	mpToolRow->Show(mpArchRow, mbShows2D && mTool == eEditorTool::Arch, true);
+	mpToolRow->Show(mpBendRow, mbShows2D && mTool == eEditorTool::Bend, true);
+
+	mpParent->Layout();
+}
+
+void EditorToolbar::ShowView(eEditorView view)
+{
+	mpPerspectiveButton->SetValue(view == eEditorView::Perspective);
+	mpTopButton->SetValue(view == eEditorView::Top);
+	mpSplitButton->SetValue(view == eEditorView::Split);
+
+	mbShows2D = (view != eEditorView::Perspective);
+
+	UpdateVisibility();
+}
+
+void EditorToolbar::ShowMode(eEditorMode mode, eDataFilter filter, uint32 available_tools)
+{
+	const bool data_mode = (mode == eEditorMode::Data);
+
+	mpVisButton->SetValue(!data_mode);
+	mpDataButton->SetValue(data_mode);
+
+	mpDataFilterChoice->SetSelection(static_cast<int32>(filter));
+	mpDataFilterChoice->Enable(data_mode);
+
+	for (uint32 i = 0; i < static_cast<uint32>(eEditorTool::Count); i++) {
+		mpToolButtons[i]->Enable((available_tools & (1u << i)) != 0);
+	}
+
+	mpSubtractButton->Enable(!data_mode);
+}
+
+void EditorToolbar::ShowSimulating(bool simulating) { mpSimulateButton->SetValue(simulating); }
+
+void EditorToolbar::ShowTool(eEditorTool tool)
+{
+	mTool = tool;
+
+	for (uint32 i = 0; i < static_cast<uint32>(eEditorTool::Count); i++) {
+		mpToolButtons[i]->SetValue(i == static_cast<uint32>(tool));
+	}
+
+	UpdateVisibility();
+}
+
+void EditorToolbar::ShowPlane(eViewPlane plane)
+{
+	mPlane = plane;
+
+	mpPlaneChoice->SetSelection(static_cast<int32>(plane));
+
+	UpdateVisibility();
+}
+
+void EditorToolbar::ApplyState(const TopViewState& state)
+{
+	bool has_selection = false;
+
+	for (const TopViewBrush& brush : state.Brushes) {
+		if (brush.bSelected) {
+			has_selection = true;
+			break;
+		}
+	}
+
+	if (has_selection != mbShownHasSelection) {
+		mbShownHasSelection = has_selection;
+		mpSnapButton->Enable(has_selection);
+	}
+
+	if (state.HiddenCount == mShownHiddenCount) {
+		return;
+	}
+
+	mShownHiddenCount = state.HiddenCount;
+
+	if (state.HiddenCount > 0) {
+		mpShowAllButton->SetLabel(wxString::Format("Show All (%u)", state.HiddenCount));
+	}
+	else {
+		mpShowAllButton->SetLabel("Show All");
+	}
+
+	mpShowAllButton->Enable(state.HiddenCount > 0);
+	mpParent->Layout();
+}
+
+} // namespace fx::editor
+
+#endif

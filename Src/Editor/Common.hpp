@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include <wx/panel.h>
 #include <wx/sizer.h>
 
 #include <Core/Types.hpp>
@@ -9,6 +10,10 @@
 #include <functional>
 
 
+class wxGridBagSizer;
+class wxMouseEvent;
+class wxPaintEvent;
+class wxStaticText;
 class wxTextCtrl;
 class wxWindow;
 class wxString;
@@ -24,10 +29,14 @@ class FieldBaseImpl
 public:
 	FieldBaseImpl(wxWindow* parent, const wxString& label);
 
-	wxSizer* GetSizer() { return mpSizer; }
-	const wxSizer* GetSizer() const { return mpSizer; }
+	wxSizer* GetSizer();
+
+	wxStaticText* GetLabel() { return mpLabel; }
+	wxSizer* GetControlSizer() { return mpControls; }
 
 protected:
+	wxStaticText* mpLabel = nullptr;
+	wxBoxSizer* mpControls = nullptr;
 	wxBoxSizer* mpSizer = nullptr;
 	bool mbUpdatingFields = false;
 };
@@ -37,6 +46,7 @@ class FieldBase : public FieldBaseImpl
 {
 public:
 	static constexpr int32 scFieldWidth = 56;
+	static constexpr int32 scVectorFieldWidth = 40;
 	static constexpr uint32 scFloatPrecision = 3;
 
 	using TRefType = TGetConstRef<T>;
@@ -147,5 +157,44 @@ private:
 	wxTextCtrl* mpField = nullptr;
 };
 
+/////////////////////////////////////
+// Property sections
+/////////////////////////////////////
+
+void RelayoutToScroller(wxWindow* window);
+
+class PropertySection : public wxPanel
+{
+public:
+	static constexpr int32 scMinLabelWidth = 96;
+
+public:
+	PropertySection(wxWindow* parent, const wxString& title, bool expanded = true);
+
+	wxWindow* GetBody() { return mpBody; }
+
+	void AddRow(const wxString& label, wxWindow* control);
+	void AddRow(const wxString& label, wxSizer* controls);
+	void AddRow(FieldBaseImpl& field);
+
+	void AddWide(wxWindow* control);
+	void AddWide(wxSizer* controls);
+
+	bool IsExpanded() const { return mbExpanded; }
+	void SetExpanded(bool expanded);
+
+private:
+	void AddLabel(wxStaticText* label);
+	void OnHeaderPaint(wxPaintEvent& event);
+	void OnHeaderClick(wxMouseEvent& event);
+
+private:
+	wxString mTitle;
+	wxWindow* mpHeader = nullptr;
+	wxPanel* mpBody = nullptr;
+	wxGridBagSizer* mpGrid = nullptr;
+	int32 mRow = 0;
+	bool mbExpanded = true;
+};
 
 } // namespace fx::editor

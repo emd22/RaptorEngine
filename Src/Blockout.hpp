@@ -164,7 +164,7 @@ public:
 	 * Falls back to a unique name if the original name is taken.
 	 */
 	Object* RestoreObject(const Vec3f position, const Brush::PlaneList& planes, MaterialID material,
-						  const Quat rotation, const Name& name, bool is_dynamic = false);
+						  const Quat rotation, const Name& name, bool is_dynamic = false, bool is_decal = false);
 
 	bool IsDynamic(const Object* object) const;
 
@@ -184,6 +184,14 @@ public:
 	bool SetDynamic(Object* object, bool dynamic);
 
 	void DestroyObject(Object* object);
+
+	/**
+	 * @brief Rebuilds the mesh of every decal whose volume or receiving brushes changed since it was last built
+	 */
+	void RefreshDecals(bool force = false);
+
+	void RaycastDecalSurfaces(const Vec3f origin, const Vec3f direction, float32 max_distance,
+							  std::vector<float32>& out_distances);
 
 	const MaterialLibrary& GetMaterialLibrary() const { return mMaterials; }
 
@@ -448,6 +456,27 @@ private:
 	void RemoveBlockoutFromWorld(World* world);
 	void RemoveSingleObjectFromWorld(Object* object);
 
+	struct DecalReceiver
+	{
+		const Brush* pBrush = nullptr;
+		Mat4f World = Mat4f::scIdentity;
+		ObjectID ID = ObjectID::scNull;
+	};
+
+	struct CompiledDecalReceiver
+	{
+		BBox Bounds;
+		SizedArray<Vec3f> Positions;
+		SizedArray<Vec3f> Normals;
+		SizedArray<uint32> Indices;
+	};
+
+	bool IsDecalReceiver(Object* object);
+	void GatherDecalReceivers(const BBox& bounds, std::vector<DecalReceiver>& out_receivers);
+	uint64 HashDecal(Object* decal, const Brush& volume, const BBox& bounds,
+					 const std::vector<DecalReceiver>& receivers) const;
+	void RebuildDecalMesh(Object* decal, const Brush& volume);
+
 public:
 	FreeArray<ObjectID> BlockoutObjects;
 	World* pWorld = nullptr;
@@ -477,6 +506,9 @@ private:
 	Vec3f mBakedSunDirection = Vec3f::sUp;
 
 	Brush::PlaneList mPreviewPlanes;
+
+	std::vector<CompiledDecalReceiver> mCompiledDecalReceivers;
+	HashMap<uint32, uint64> mDecalHashes;
 
 	DynArray<Subview> mSubviews;
 	DynArray<SubviewInstance> mSubviewInstances;

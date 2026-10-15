@@ -3,6 +3,7 @@
 #ifdef FX_IS_EDITOR
 
 #include "EditorPlatform.hpp"
+#include "EditorTheme.hpp"
 #include "EditorThread.hpp"
 #include "RaptorEditor.hpp"
 
@@ -36,6 +37,17 @@ constexpr double scMinCreateDepth = 0.05;
 constexpr uint32 scArchCornersPerSegment = 4;
 constexpr uint32 scMinArchSides = 3;
 constexpr uint32 scMaxArchSides = 128;
+constexpr double scMinArchWall = 0.01;
+constexpr double scArchHandleRadius = 4.0;
+constexpr double scArchCenterCross = 5.0;
+constexpr double scArchKnobPixels = 16.0;
+constexpr double scBendHandleRadius = 4.5;
+constexpr uint32 scBendCurveSamples = 48;
+constexpr int32 scBendSearchSteps = 720;
+constexpr double scBendSearchStep = FX_PI / 360.0;
+constexpr int32 scBendRefineSteps = 50;
+constexpr double scBendRegionOffset = 18.0;
+constexpr double scBendRegionHandleRadius = 5.0;
 constexpr double scMinRotateAngle = 1e-4;
 constexpr long long scHoldMilliseconds = 1500;
 
@@ -48,6 +60,7 @@ constexpr double scPreciseZoomPerPixel = 0.01;
 constexpr double scWheelPanPixelsPerUnit = 40.0;
 constexpr double scNudgeCoarseFactor = 4.0;
 constexpr double scNudgeFineFactor = 0.25;
+constexpr double scNudgeSnapTolerance = 1e-3;
 constexpr double scDimensionLabelMargin = 6.0;
 constexpr double scDimensionLabelTop = 18.0;
 
@@ -62,6 +75,15 @@ constexpr double scVertexPickPixels = 7.0;
 constexpr double scHandleMergeDistance = 2e-3;
 constexpr double scHandleHalfSize = 3.5;
 
+constexpr double scMarkerPickPixels = 7.0;
+constexpr double scMarkerHalfSize = 4.0;
+constexpr double scMarkerArrowPixels = 34.0;
+constexpr double scMarkerMinArrow = 0.35;
+constexpr double scMarkerTipRadius = 4.0;
+constexpr double scMinAimPlanar = 0.15;
+constexpr double scMinClipLength = 1e-3;
+constexpr double scClipHandleRadius = 3.5;
+
 #ifdef __WXMAC__
 #define FX_TOP_VIEW_FREE_KEY "Cmd"
 #else
@@ -73,65 +95,65 @@ constexpr const char* scToolHints[] = {
 	"Drag an edge to move its face, " FX_TOP_VIEW_FREE_KEY " ignores snap",
 	"Drag corners, Shift adds, " FX_TOP_VIEW_FREE_KEY " ignores snap",
 	"Drag to create a brush, " FX_TOP_VIEW_FREE_KEY " ignores snap",
-	"Drag a box to fill with an arch, " FX_TOP_VIEW_FREE_KEY " ignores snap",
+	"Drag a box to lay out an arch, then shape it with the handles, " FX_TOP_VIEW_FREE_KEY " ignores snap",
+	"Drag an end knob of the selection to bend it, the bar handles set where it curves, [ ] segments, Tab swaps "
+	"the axis, " FX_TOP_VIEW_FREE_KEY " ignores snap",
+	"Drag a box to project a decal onto the surface behind it, " FX_TOP_VIEW_FREE_KEY " ignores snap",
 	"Drag around the pivot, " FX_TOP_VIEW_FREE_KEY " ignores snap",
+	"Drag a line across the selected brushes to split them, Esc deselects, " FX_TOP_VIEW_FREE_KEY " ignores snap",
+	"Click a light to select it, drag to move, drag its handle to aim, double-click to add one",
 };
 
-static_assert(std::size(scToolHints) == static_cast<size_t>(eTopViewTool::Count));
+static_assert(std::size(scToolHints) == static_cast<size_t>(eEditorTool::Count));
+
+constexpr const char* scArchPendingHint = "Drag the handles to reshape, [ ] sides, arrows nudge, Enter or double-click "
+										  "builds, Esc cancels, " FX_TOP_VIEW_FREE_KEY " ignores snap";
+
+constexpr const char* scBendPendingHint = "Drag a knob to bend that end (the square end stays put), the bar handles set where it curves, [ ] segments, Tab swaps the axis, Enter or "
+										  "double-click bends, Esc straightens, " FX_TOP_VIEW_FREE_KEY " ignores snap";
 
 constexpr double scMetricSteps[] = { 0.1, 0.5, 1.0, 5.0, 10.0, 50.0, 100.0, 500.0, 1000.0, 5000.0, 10000.0 };
 
-const wxColour scBackground(24, 26, 30);
-const wxColour scSnapGridColour(34, 38, 44);
-const wxColour scMinorGridColour(44, 49, 57);
-const wxColour scMajorGridColour(66, 74, 86);
-const wxColour scLabelColour(110, 120, 134);
-const wxColour scViewLabelColour(150, 160, 176);
+constexpr int scDimMarkerAlpha = 110;
 
-const wxColour scAxisColours[3] = { wxColour(150, 62, 62), wxColour(66, 140, 76), wxColour(62, 100, 170) };
-
-const wxColour scGeometryColour(206, 211, 221);
-const wxColour scProbeVolumeColour(60, 220, 255);
-const wxColour scReflectionColour(255, 120, 220);
-const wxColour scVolumeColour(120, 255, 90);
-const wxColour scNvBrushColour(255, 150, 40);
-const wxColour scDBoundColour(90, 130, 255);
-const wxColour scSelectedColour(255, 92, 72);
-const wxColour scSelectedFillColour(255, 92, 72, 46);
-const wxColour scCreateColour(120, 255, 140);
-const wxColour scCreateFillColour(120, 255, 140, 36);
-const wxColour scMarqueeColour(120, 170, 255);
-const wxColour scMarqueeFillColour(120, 170, 255, 28);
-const wxColour scRotateColour(255, 205, 70);
-const wxColour scFaceColour(255, 205, 70);
-const wxColour scPlayerColour(255, 220, 60);
-const wxColour scVertexColour(255, 205, 70);
-const wxColour scHandleColour(30, 32, 38);
-const wxColour scHandleOutlineColour(235, 240, 250);
-
-constexpr uint32 scKindCount = 6;
+constexpr uint32 scKindCount = 7;
 constexpr uint32 scBucketCount = scKindCount * 2;
 
 constexpr int scDimGeometryAlpha = 70;
 constexpr int scDimVolumeAlpha = 170;
 constexpr int scVolumeFillAlpha = 16;
 
-wxColour GetKindColour(eTopViewBrushKind kind)
+wxColour GetKindColour(const EditorTheme& theme, eTopViewBrushKind kind)
 {
 	switch (kind) {
 	case eTopViewBrushKind::ProbeVolume:
-		return scProbeVolumeColour;
+		return ToWxColour(theme.Brush.ProbeVolume);
 	case eTopViewBrushKind::ReflectionProbe:
-		return scReflectionColour;
+		return ToWxColour(theme.Brush.Reflection);
 	case eTopViewBrushKind::Volume:
-		return scVolumeColour;
+		return ToWxColour(theme.Brush.Volume);
 	case eTopViewBrushKind::NvBrush:
-		return scNvBrushColour;
+		return ToWxColour(theme.Brush.NvBrush);
 	case eTopViewBrushKind::DBound:
-		return scDBoundColour;
+		return ToWxColour(theme.Brush.DBound);
+	case eTopViewBrushKind::Decal:
+		return ToWxColour(theme.Brush.Decal);
 	default:
-		return scGeometryColour;
+		return ToWxColour(theme.Brush.Geometry);
 	}
+}
+
+wxColour GetAxisColour(const EditorTheme& theme, uint32 axis)
+{
+	if (axis == 0) {
+		return ToWxColour(theme.Grid.AxisX);
+	}
+
+	if (axis == 1) {
+		return ToWxColour(theme.Grid.AxisY);
+	}
+
+	return ToWxColour(theme.Grid.AxisZ);
 }
 
 long long NowMilliseconds() { return wxGetLocalTimeMillis().GetValue(); }
@@ -165,7 +187,62 @@ double DistanceToSegment(const Vec2d point, const Vec2d a, const Vec2d b)
 
 Vec2d ToVec2d(const Vec2f& vector) { return Vec2d(vector.X, vector.Y); }
 
+double GetArchArc(const ArchSettings& arch) { return std::clamp<double>(arch.ArcDegrees, 1.0, 360.0) * FX_PI / 180.0; }
+
+Vec2d GetArchDirection(const ArchSettings& arch, double index)
+{
+	const double angle = arch.StartDegrees * FX_PI / 180.0 +
+						 GetArchArc(arch) * index / static_cast<double>(arch.Sides);
+
+	return Vec2d(std::cos(angle), std::sin(angle));
+}
+
+Vec2d GetArchWallDirection(const ArchSettings& arch)
+{
+	const double middle = static_cast<double>(arch.Sides) * 0.5;
+
+	return (GetArchDirection(arch, std::floor(middle)) + GetArchDirection(arch, std::ceil(middle))) * 0.5;
+}
+
+void GetArchDirectionBounds(const ArchSettings& arch, Vec2d& out_low, Vec2d& out_high)
+{
+	out_low = Vec2d::sZero;
+	out_high = Vec2d::sZero;
+
+	for (uint32 i = 0; i <= arch.Sides; i++) {
+		const Vec2d direction = GetArchDirection(arch, static_cast<double>(i));
+
+		out_low = Vec2d::Min(out_low, direction);
+		out_high = Vec2d::Max(out_high, direction);
+	}
+}
+
 Vec2f ToVec2f(const Vec2d& vector) { return Vec2f(static_cast<float32>(vector.X), static_cast<float32>(vector.Y)); }
+
+double GetComponent(const Vec2d& vector, uint32 index)
+{
+	if (index == 0) {
+		return vector.X;
+	}
+
+	return vector.Y;
+}
+
+Vec2d FromBendComponents(uint32 along_index, double along, double across)
+{
+	if (along_index == 0) {
+		return Vec2d(along, across);
+	}
+
+	return Vec2d(across, along);
+}
+
+uint32 GetMinBendSegments(double angle_degrees)
+{
+	const double angle = std::fabs(angle_degrees) * FX_PI / 180.0;
+
+	return static_cast<uint32>(std::floor(angle / scMaxBendSegmentAngle)) + 1;
+}
 
 bool IsSameHandle(const Vec2d& a, const Vec2d& b)
 {
@@ -397,6 +474,38 @@ DynArray<Vec2f> ConvexHull2D(DynArray<Vec2d> points)
 	return result;
 }
 
+DynArray<Vec2f> ClipPolygon(const DynArray<Vec2f>& polygon, const Vec2d normal, double offset)
+{
+	DynArray<Vec2f> clipped;
+
+	for (uint32 i = 0; i < polygon.Size; i++) {
+		const Vec2d current = ToVec2d(polygon[i]);
+		const Vec2d previous = ToVec2d(polygon[(i + polygon.Size - 1) % polygon.Size]);
+
+		const double current_side = normal.Dot(current) - offset;
+		const double previous_side = normal.Dot(previous) - offset;
+
+		const bool current_inside = current_side <= 0.0;
+		const bool previous_inside = previous_side <= 0.0;
+
+		if (current_inside != previous_inside) {
+			const double t = previous_side / (previous_side - current_side);
+			clipped.Insert(ToVec2f(previous + (current - previous) * t));
+		}
+
+		if (current_inside) {
+			clipped.Insert(ToVec2f(current));
+		}
+	}
+
+	return clipped;
+}
+
+wxColour WithAlpha(const wxColour& colour, int alpha)
+{
+	return wxColour(colour.Red(), colour.Green(), colour.Blue(), alpha);
+}
+
 struct ViewTransform
 {
 	bool bActive = false;
@@ -431,7 +540,7 @@ struct ViewTransform
 			// out_u = PivotU + Cos * ru - Sin * rv;
 			// out_v = PivotV + Sin * ru + Cos * rv;
 
-			return PivotUV + Vec2d(Cos * rel_uv.X - Sin * rel_uv.Y, Sin * rel_uv.X + Cos * rel_uv.Y);
+			return PivotUV + Vec2d(Cos * rel_uv.X - Sin * rel_uv.Y, Sin * rel_uv.X + Cos * rel_uv.Y) + OffsetUV;
 		}
 
 		return (uv + OffsetUV);
@@ -496,10 +605,20 @@ Vec3f TopViewCanvas::ToWorldVector(const Vec2d uv, double w) const
 	return Vec3f(components[0], components[1], components[2]);
 }
 
+Vec2d TopViewCanvas::ProjectPoint(const Vec3f& point) const
+{
+	const ViewPlaneAxes& axes = Axes();
+
+	return Vec2d(GetAxis(point, axes.U) * axes.USign, GetAxis(point, axes.V));
+}
+
+double TopViewCanvas::DepthOf(const Vec3f& vector) const { return GetAxis(vector, Axes().W); }
+
 void TopViewCanvas::ApplyState(const TopViewState& state)
 {
 	if (state.CommandSerial >= mSentCommands) {
 		mbLocalSelection = false;
+		mbLocalMarkerSelection = false;
 
 		if (mbPreviewHeld) {
 			mbPreviewHeld = false;
@@ -508,13 +627,14 @@ void TopViewCanvas::ApplyState(const TopViewState& state)
 	}
 
 	mState = state;
+	mAvailableTools = state.AvailableTools;
 
 	if (mbLocalSelection) {
 		ApplyLocalSelection();
 	}
 
-	if (!IsToolAvailable(mTool)) {
-		SetTool(eTopViewTool::Select);
+	if (mbLocalMarkerSelection) {
+		ApplyLocalMarkerSelection();
 	}
 
 	if (!mbPreviewHeld && mSelectedVertices.IsNotEmpty()) {
@@ -544,22 +664,12 @@ void TopViewCanvas::ApplyState(const TopViewState& state)
 	Refresh();
 }
 
-bool TopViewCanvas::IsToolAvailable(eTopViewTool tool) const
+bool TopViewCanvas::IsToolAvailable(eEditorTool tool) const
 {
-	switch (tool) {
-	case eTopViewTool::Face:
-	case eTopViewTool::Vertex:
-		return mState.bCanFace;
-	case eTopViewTool::Create:
-		return mState.bCanCreate;
-	case eTopViewTool::Arch:
-		return mState.bCanCreate && !mState.bDataMode;
-	case eTopViewTool::Rotate:
-		return mState.bCanRotate;
-	default:
-		return true;
-	}
+	return tool == eEditorTool::Select || (mAvailableTools & (1u << static_cast<uint32>(tool))) != 0;
 }
+
+void TopViewCanvas::SetAvailableTools(uint32 available_tools) { mAvailableTools = available_tools; }
 
 void TopViewCanvas::ApplyLocalSelection()
 {
@@ -569,20 +679,65 @@ void TopViewCanvas::ApplyLocalSelection()
 	}
 }
 
-void TopViewCanvas::SetTool(eTopViewTool tool)
+void TopViewCanvas::ApplyLocalMarkerSelection()
+{
+	for (TopViewMarker& marker : mState.Markers) {
+		const bool same_kind = (marker.Kind == mLocalMarkerKind);
+		const bool same_light = (marker.Kind == eTopViewMarkerKind::Spawn) || (marker.LightId == mLocalMarkerLightId);
+
+		marker.bSelected = mbLocalMarkerSelected && same_kind && same_light;
+	}
+}
+
+void TopViewCanvas::SetTool(eEditorTool tool)
 {
 	if (!IsToolAvailable(tool)) {
-		tool = eTopViewTool::Select;
+		return;
 	}
 
+	if (tool != mTool) {
+		SendCommand([tool] { gEditor->SetTool(tool); });
+	}
+
+	ApplyTool(tool);
+}
+
+void TopViewCanvas::ShowTool(eEditorTool tool)
+{
+	if (tool != mTool) {
+		ApplyTool(tool);
+	}
+	else if (mpOnToolChanged) {
+		mpOnToolChanged(tool);
+	}
+}
+
+void TopViewCanvas::Subtract(bool keep_cutters)
+{
+	SendCommand([keep_cutters] { gEditor->TopViewSubtract(keep_cutters); });
+}
+
+void TopViewCanvas::ApplyTool(eEditorTool tool)
+{
 	if (mDrag != eDrag::None) {
 		CancelDrag();
 	}
 
 	mTool = tool;
 
-	if (tool != eTopViewTool::Vertex) {
+	if (tool != eEditorTool::Vertex) {
 		mSelectedVertices.Clear();
+	}
+
+	if (tool != eEditorTool::Arch) {
+		mbArchPending = false;
+		mArchHover = eArchHandle::None;
+	}
+
+	mBendHover = -1;
+
+	if (tool != eEditorTool::Bend) {
+		ClearBendShape();
 	}
 
 	if (mpOnToolChanged) {
@@ -627,6 +782,11 @@ void TopViewCanvas::SetPlane(eViewPlane plane)
 		mbHoverFace = false;
 		mbHoverVertex = false;
 		mSelectedVertices.Clear();
+		mbArchPending = false;
+		mArchHover = eArchHandle::None;
+		mBendHover = -1;
+
+		ClearBendShape();
 	}
 
 	if (mpOnPlaneChanged) {
@@ -651,10 +811,109 @@ void TopViewCanvas::SetArchSettings(const ArchSettings& settings)
 	mArch = settings;
 	mArch.Sides = std::clamp(mArch.Sides, scMinArchSides, scMaxArchSides);
 
-	if (mDrag == eDrag::Arch) {
-		UpdatePreview();
+	if (mbArchPending) {
+		UpdateHover();
 		Refresh();
 	}
+}
+
+void TopViewCanvas::SetArchSides(int32 sides)
+{
+	mArch.Sides = static_cast<uint32>(
+		std::clamp<int32>(sides, static_cast<int32>(scMinArchSides), static_cast<int32>(scMaxArchSides)));
+
+	NotifyArchChanged();
+	UpdateHover();
+	Refresh();
+}
+
+void TopViewCanvas::NotifyArchChanged()
+{
+	if (mpOnArchChanged) {
+		mpOnArchChanged(mArch);
+	}
+
+	UpdateStatus();
+}
+
+void TopViewCanvas::SetBendSettings(const BendSettings& settings)
+{
+	mBend = settings;
+	mBend.AngleDegrees = std::clamp(mBend.AngleDegrees, -360.0f, 360.0f);
+	mBend.Segments = std::clamp<uint32>(mBend.Segments, 1, scMaxBendSegments);
+	mBend.RegionStart = std::clamp(mBend.RegionStart, 0.0f, 1.0f);
+	mBend.RegionEnd = std::clamp(mBend.RegionEnd, mBend.RegionStart, 1.0f);
+
+	const uint32 min_segments = GetMinBendSegments(mBend.AngleDegrees);
+
+	if (mBend.Segments < min_segments) {
+		mBend.Segments = min_segments;
+		NotifyBendChanged();
+	}
+
+	UpdateHover();
+	UpdateStatus();
+	Refresh();
+}
+
+void TopViewCanvas::SetBendSegments(int32 segments)
+{
+	const int32 min_segments = static_cast<int32>(GetMinBendSegments(mBend.AngleDegrees));
+
+	mBend.Segments = static_cast<uint32>(
+		std::clamp<int32>(segments, min_segments, static_cast<int32>(scMaxBendSegments)));
+
+	NotifyBendChanged();
+	Refresh();
+}
+
+void TopViewCanvas::NotifyBendChanged()
+{
+	mBend.Segments = std::clamp(mBend.Segments, GetMinBendSegments(mBend.AngleDegrees), scMaxBendSegments);
+
+	if (mpOnBendChanged) {
+		mpOnBendChanged(mBend);
+	}
+
+	UpdateStatus();
+}
+
+void TopViewCanvas::ClearBendShape()
+{
+	if (mBend.AngleDegrees == 0.0f && mBend.RegionStart == 0.0f && mBend.RegionEnd == 1.0f) {
+		return;
+	}
+
+	mBend.AngleDegrees = 0.0f;
+	mBend.RegionStart = 0.0f;
+	mBend.RegionEnd = 1.0f;
+	NotifyBendChanged();
+}
+
+void TopViewCanvas::ResetBend()
+{
+	if (mDrag == eDrag::Bend) {
+		CancelDrag();
+	}
+
+	ClearBendShape();
+
+	UpdateHover();
+	UpdateCursor();
+	Refresh();
+}
+
+void TopViewCanvas::SwapBendAxis()
+{
+	if (mDrag == eDrag::Bend) {
+		return;
+	}
+
+	mBend.bSwapAxis = !mBend.bSwapAxis;
+	NotifyBendChanged();
+
+	UpdateHover();
+	Refresh();
 }
 
 void TopViewCanvas::SendCommand(thread::Task command)
@@ -888,6 +1147,8 @@ wxBitmap TopViewCanvas::Render(const wxSize& size)
 
 void TopViewCanvas::Paint(wxGraphicsContext& gc, const wxSize& size)
 {
+	const EditorTheme& theme = GetEditorTheme();
+
 	if (mbPreviewHeld && NowMilliseconds() > mHoldDeadline) {
 		mbPreviewHeld = false;
 		mbLocalSelection = false;
@@ -895,18 +1156,21 @@ void TopViewCanvas::Paint(wxGraphicsContext& gc, const wxSize& size)
 	}
 
 	gc.SetAntialiasMode(wxANTIALIAS_DEFAULT);
-	gc.SetBrush(wxBrush(scBackground));
+	gc.SetBrush(wxBrush(ToWxColour(theme.Grid.Background)));
 	gc.SetPen(*wxTRANSPARENT_PEN);
 	gc.DrawRectangle(0, 0, size.x, size.y);
 
 	DrawGrid(gc, size);
 	DrawBrushes(gc, size);
+	DrawMarkers(gc);
 	DrawOverlays(gc, size);
 	DrawPlayer(gc);
 }
 
 void TopViewCanvas::DrawGrid(wxGraphicsContext& gc, const wxSize& size)
 {
+	const EditorTheme& theme = GetEditorTheme();
+
 	const Vec2d left_bottom = ClientToWorld(wxPoint(0, size.y));
 	const Vec2d right_top = ClientToWorld(wxPoint(size.x, 0));
 
@@ -939,7 +1203,7 @@ void TopViewCanvas::DrawGrid(wxGraphicsContext& gc, const wxSize& size)
 		const double lines = (extent.X + extent.Y) / snap_step;
 
 		if (lines <= scMaxSnapLines) {
-			draw_lines(snap_step, scSnapGridColour, 1);
+			draw_lines(snap_step, ToWxColour(theme.Grid.Snap), 1);
 		}
 	}
 
@@ -952,8 +1216,8 @@ void TopViewCanvas::DrawGrid(wxGraphicsContext& gc, const wxSize& size)
 	const double minor = scMetricSteps[minor_index];
 	const double major = scMetricSteps[minor_index + 1];
 
-	draw_lines(minor, scMinorGridColour, 1);
-	draw_lines(major, scMajorGridColour, 1);
+	draw_lines(minor, ToWxColour(theme.Grid.Minor), 1);
+	draw_lines(major, ToWxColour(theme.Grid.Major), 1);
 
 	const ViewPlaneAxes& axes = Axes();
 
@@ -961,14 +1225,14 @@ void TopViewCanvas::DrawGrid(wxGraphicsContext& gc, const wxSize& size)
 	const double origin_x = std::floor(origin.X) + 0.5;
 	const double origin_y = std::floor(origin.Y) + 0.5;
 
-	gc.SetPen(wxPen(scAxisColours[axes.U], 1));
+	gc.SetPen(wxPen(GetAxisColour(theme, axes.U), 1));
 	gc.StrokeLine(0.0, origin_y, size.x, origin_y);
 
-	gc.SetPen(wxPen(scAxisColours[axes.V], 1));
+	gc.SetPen(wxPen(GetAxisColour(theme, axes.V), 1));
 	gc.StrokeLine(origin_x, 0.0, origin_x, size.y);
 
 	wxFont font = wxFont(wxFontInfo(9));
-	gc.SetFont(font, scLabelColour);
+	gc.SetFont(font, ToWxColour(theme.Grid.Label));
 
 	for (long i = static_cast<long>(std::ceil(left_bottom.X / major)); i * major <= right_top.X; i++) {
 		const double x = ToScreenCoords(Vec2d(i * major, 0.0)).X;
@@ -986,13 +1250,15 @@ void TopViewCanvas::DrawGrid(wxGraphicsContext& gc, const wxSize& size)
 	double label_width = 0.0;
 	double label_height = 0.0;
 
-	gc.SetFont(wxFont(wxFontInfo(11).Bold()), scViewLabelColour);
+	gc.SetFont(wxFont(wxFontInfo(11).Bold()), ToWxColour(theme.Grid.ViewLabel));
 	gc.GetTextExtent(view_label, &label_width, &label_height);
 	gc.DrawText(view_label, size.x - label_width - 10.0, size.y - label_height - 8.0);
 }
 
 void TopViewCanvas::DrawBrushes(wxGraphicsContext& gc, const wxSize& size)
 {
+	const EditorTheme& theme = GetEditorTheme();
+
 	ViewTransform transform;
 
 	if (mPreview.Kind == eDrag::Move) {
@@ -1010,6 +1276,7 @@ void TopViewCanvas::DrawBrushes(wxGraphicsContext& gc, const wxSize& size)
 		transform.Sin = std::sin(mPreview.Angle);
 
 		transform.PivotUV = mPreview.PivotUV;
+		transform.OffsetUV = mPreview.OffsetUV;
 		// 		transform.PivotU = mPreview.PivotU;
 		// 		transform.PivotV = mPreview.PivotV;
 	}
@@ -1185,14 +1452,14 @@ void TopViewCanvas::DrawBrushes(wxGraphicsContext& gc, const wxSize& size)
 	gc.SetPen(*wxTRANSPARENT_PEN);
 
 	for (uint32 kind = 1; kind < scKindCount; kind++) {
-		const wxColour colour = GetKindColour(static_cast<eTopViewBrushKind>(kind));
+		const wxColour colour = GetKindColour(theme, static_cast<eTopViewBrushKind>(kind));
 
 		gc.SetBrush(wxBrush(wxColour(colour.Red(), colour.Green(), colour.Blue(), scVolumeFillAlpha)));
 		gc.FillPath(volume_fills[kind], wxWINDING_RULE);
 	}
 
 	for (uint32 kind = 0; kind < scKindCount; kind++) {
-		const wxColour colour = GetKindColour(static_cast<eTopViewBrushKind>(kind));
+		const wxColour colour = GetKindColour(theme, static_cast<eTopViewBrushKind>(kind));
 		const bool is_geometry = (kind == static_cast<uint32>(eTopViewBrushKind::Geometry));
 
 		gc.SetPen(wxPen(colour, 1));
@@ -1204,19 +1471,21 @@ void TopViewCanvas::DrawBrushes(wxGraphicsContext& gc, const wxSize& size)
 		gc.StrokePath(paths[kind * 2 + 1]);
 	}
 
-	gc.SetPen(wxPen(wxColour(scSelectedColour.Red(), scSelectedColour.Green(), scSelectedColour.Blue(), 80), 1));
+	gc.SetPen(wxPen(WithAlpha(ToWxColour(theme.Tool.Selected), 80), 1));
 	gc.StrokePath(ghost_path);
 
-	gc.SetBrush(wxBrush(scSelectedFillColour));
+	gc.SetBrush(wxBrush(ToWxColour(theme.Tool.SelectedFill)));
 	gc.SetPen(*wxTRANSPARENT_PEN);
 	gc.FillPath(selected_fill, wxWINDING_RULE);
 
-	gc.SetPen(wxPen(scSelectedColour, 2));
+	gc.SetPen(wxPen(ToWxColour(theme.Tool.Selected), 2));
 	gc.StrokePath(selected_path);
 }
 
 void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 {
+	const EditorTheme& theme = GetEditorTheme();
+
 	wxFont font = wxFont(wxFontInfo(10));
 
 	const auto to_screen_rect = [this](const DRect& rect)
@@ -1227,7 +1496,7 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 		return DRect(top_left, bottom_right);
 	};
 
-	if (mTool == eTopViewTool::Vertex) {
+	if (mTool == eEditorTool::Vertex) {
 		const bool live = (mDrag == eDrag::Vertex) && (mPreview.Kind == eDrag::Vertex);
 
 		for (const TopViewBrush& brush : mState.Brushes) {
@@ -1249,15 +1518,16 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 				const Vec2d screen = ToScreenCoords(position);
 				const double half = hovered ? scHandleHalfSize + 1.5 : scHandleHalfSize;
 
-				gc.SetBrush(wxBrush(selected ? scVertexColour : scHandleColour));
-				gc.SetPen(wxPen(hovered ? scVertexColour : scHandleOutlineColour, hovered ? 2 : 1));
+				gc.SetBrush(wxBrush(selected ? ToWxColour(theme.Tool.Vertex) : ToWxColour(theme.Tool.Handle)));
+				gc.SetPen(wxPen(hovered ? ToWxColour(theme.Tool.Vertex) : ToWxColour(theme.Tool.HandleOutline),
+								hovered ? 2 : 1));
 				gc.DrawRectangle(screen.X - half, screen.Y - half, half * 2.0, half * 2.0);
 			}
 		}
 	}
 
 	if (mbHoverFace && mPreview.Kind == eDrag::None) {
-		gc.SetPen(wxPen(scFaceColour, 3));
+		gc.SetPen(wxPen(ToWxColour(theme.Tool.Face), 3));
 		const Vec2d a = ToScreenCoords(ToVec2d(mHoverFace.A));
 		const Vec2d b = ToScreenCoords(ToVec2d(mHoverFace.B));
 
@@ -1272,11 +1542,69 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 		const Vec2d b = ToScreenCoords(ToVec2d(mGrabbedFace.B) + shift_uv);
 		const Vec2d middle = (a + b) * 0.5;
 
-		gc.SetPen(wxPen(scFaceColour, 3));
+		gc.SetPen(wxPen(ToWxColour(theme.Tool.Face), 3));
 		gc.StrokeLine(a.X, a.Y, b.X, b.Y);
 
-		gc.SetFont(font, scFaceColour);
+		gc.SetFont(font, ToWxColour(theme.Tool.Face));
 		gc.DrawText(wxString::Format("%+.2f", shift), middle.X + 8.0, middle.Y + 6.0);
+		return;
+	}
+
+	if (mPreview.Kind == eDrag::Clip) {
+		wxGraphicsPath pieces[2] = { gc.CreatePath(), gc.CreatePath() };
+
+		for (uint32 i = 0; i < mPreview.Outlines.Size; i++) {
+			const DynArray<Vec2f>& polygon = mPreview.Outlines[i].Polygon;
+			wxGraphicsPath& path = pieces[i % 2];
+
+			for (uint32 j = 0; j < polygon.Size; j++) {
+				const Vec2d screen = ToScreenCoords(ToVec2d(polygon[j]));
+
+				if (j == 0) {
+					path.MoveToPoint(screen.X, screen.Y);
+				}
+				else {
+					path.AddLineToPoint(screen.X, screen.Y);
+				}
+			}
+
+			path.CloseSubpath();
+		}
+
+		gc.SetPen(*wxTRANSPARENT_PEN);
+
+		for (uint32 i = 0; i < 2; i++) {
+			gc.SetBrush(wxBrush(ToWxColour(i == 0 ? theme.Tool.ClipFrontFill : theme.Tool.ClipBackFill)));
+			gc.FillPath(pieces[i], wxWINDING_RULE);
+		}
+
+		const Vec2d a = ToScreenCoords(mPreview.ClipA);
+		const Vec2d b = ToScreenCoords(mPreview.ClipB);
+		const Vec2d along = b - a;
+		const double length = along.Length();
+
+		if (length > 0.0) {
+			const Vec2d unit = along / length;
+			const double reach = static_cast<double>(size.x + size.y);
+
+			gc.SetPen(wxPen(WithAlpha(ToWxColour(theme.Tool.Clip), 120), 1, wxPENSTYLE_SHORT_DASH));
+			gc.StrokeLine(a.X - unit.X * reach, a.Y - unit.Y * reach, b.X + unit.X * reach, b.Y + unit.Y * reach);
+		}
+
+		gc.SetPen(wxPen(ToWxColour(theme.Tool.Clip), 2));
+		gc.StrokeLine(a.X, a.Y, b.X, b.Y);
+
+		gc.SetBrush(wxBrush(ToWxColour(theme.Tool.Clip)));
+		gc.SetPen(*wxTRANSPARENT_PEN);
+		gc.DrawEllipse(a.X - scClipHandleRadius, a.Y - scClipHandleRadius, scClipHandleRadius * 2.0,
+					   scClipHandleRadius * 2.0);
+		gc.DrawEllipse(b.X - scClipHandleRadius, b.Y - scClipHandleRadius, scClipHandleRadius * 2.0,
+					   scClipHandleRadius * 2.0);
+
+		const Vec2d delta = mPreview.ClipB - mPreview.ClipA;
+
+		gc.SetFont(font, ToWxColour(theme.Tool.Clip));
+		gc.DrawText(wxString::Format("%.2f", delta.Length()), b.X + 8.0, b.Y + 6.0);
 		return;
 	}
 
@@ -1284,8 +1612,8 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 		const DRect screen = to_screen_rect(DRect(Vec2d::Min(mPress, mCurrent), Vec2d::Max(mPress, mCurrent)));
 		const Vec2d screen_extent = screen.GetExtent();
 
-		gc.SetBrush(wxBrush(scMarqueeFillColour));
-		gc.SetPen(wxPen(scMarqueeColour, 1));
+		gc.SetBrush(wxBrush(ToWxColour(theme.Tool.MarqueeFill)));
+		gc.SetPen(wxPen(ToWxColour(theme.Tool.Marquee), 1));
 		gc.DrawRectangle(screen.Min.X, screen.Min.Y, screen_extent.X, screen_extent.Y);
 		return;
 	}
@@ -1295,46 +1623,32 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 		const Vec2d screen_extent = screen.GetExtent();
 		const Vec2d extent = mPreview.RectUV.GetExtent();
 
-		gc.SetBrush(wxBrush(scCreateFillColour));
-		gc.SetPen(wxPen(scCreateColour, 2));
+		gc.SetBrush(wxBrush(ToWxColour(theme.Tool.CreateFill)));
+		gc.SetPen(wxPen(ToWxColour(theme.Tool.Create), 2));
 		gc.DrawRectangle(screen.Min.X, screen.Min.Y, screen_extent.X, screen_extent.Y);
 
-		gc.SetFont(font, scCreateColour);
+		gc.SetFont(font, ToWxColour(theme.Tool.Create));
 		gc.DrawText(wxString::Format("%.2f x %.2f", extent.X, extent.Y), screen.Min.X + 4.0, screen.Max.Y + 4.0);
 		return;
 	}
 
+	if (mbArchPending) {
+		DrawArch(gc, mArchRect, mDrag != eDrag::Arch);
+		return;
+	}
+
 	if (mPreview.Kind == eDrag::Arch) {
-		wxGraphicsPath outlines = gc.CreatePath();
+		DrawArch(gc, mPreview.RectUV, false);
+		return;
+	}
 
-		for (const OutlinePreview& outline : mPreview.Outlines) {
-			const Vec2d first = ToScreenCoords(ToVec2d(outline.Polygon[0]));
-			outlines.MoveToPoint(first.X, first.Y);
+	if (mPreview.Kind == eDrag::Bend) {
+		DrawBendOutlines(gc, mPreview.Outlines);
+		return;
+	}
 
-			for (uint32 i = 1; i < outline.Polygon.Size; i++) {
-				const Vec2d screen_point = ToScreenCoords(ToVec2d(outline.Polygon[i]));
-				outlines.AddLineToPoint(screen_point.X, screen_point.Y);
-			}
-
-			outlines.CloseSubpath();
-		}
-
-		const DRect screen = to_screen_rect(mPreview.RectUV);
-		const Vec2d screen_extent = screen.GetExtent();
-		const Vec2d extent = mPreview.RectUV.GetExtent();
-
-		gc.SetPen(wxPen(scCreateColour, 1, wxPENSTYLE_SHORT_DASH));
-		gc.SetBrush(*wxTRANSPARENT_BRUSH);
-		gc.DrawRectangle(screen.Min.X, screen.Min.Y, screen_extent.X, screen_extent.Y);
-
-		gc.SetBrush(wxBrush(scCreateFillColour));
-		gc.SetPen(wxPen(scCreateColour, 1));
-		gc.FillPath(outlines, wxWINDING_RULE);
-		gc.StrokePath(outlines);
-
-		gc.SetFont(font, scCreateColour);
-		gc.DrawText(wxString::Format("%.2f x %.2f, %u sides", extent.X, extent.Y, mArch.Sides), screen.Min.X + 4.0,
-					screen.Max.Y + 4.0);
+	if (mTool == eEditorTool::Bend && (mDrag == eDrag::None || mDrag == eDrag::Bend) &&
+		mPreview.Kind == eDrag::None && DrawBend(gc)) {
 		return;
 	}
 
@@ -1343,7 +1657,7 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 		const double pivot_x = pivot.X;
 		const double pivot_y = pivot.Y;
 
-		gc.SetPen(wxPen(scRotateColour, 1));
+		gc.SetPen(wxPen(ToWxColour(theme.Tool.Rotate), 1));
 		gc.StrokeLine(pivot_x - 7.0, pivot_y, pivot_x + 7.0, pivot_y);
 		gc.StrokeLine(pivot_x, pivot_y - 7.0, pivot_x, pivot_y + 7.0);
 
@@ -1352,7 +1666,7 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 			gc.StrokeLine(pivot_x, pivot_y, current.X, current.Y);
 		}
 
-		gc.SetFont(font, scRotateColour);
+		gc.SetFont(font, ToWxColour(theme.Tool.Rotate));
 		gc.DrawText(wxString::Format("%.1f deg", mPreview.Angle * 180.0 / FX_PI), pivot_x + 10.0, pivot_y + 8.0);
 		return;
 	}
@@ -1363,7 +1677,7 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 		if (bounds.bValid) {
 			const Vec2d anchor = ToScreenCoords(bounds.Rect.Min + mPreview.OffsetUV);
 
-			gc.SetFont(font, scSelectedColour);
+			gc.SetFont(font, ToWxColour(theme.Tool.Selected));
 			gc.DrawText(wxString::Format("%+.2f, %+.2f", mPreview.OffsetUV.X * Axes().USign, mPreview.OffsetUV.Y),
 						anchor.X, anchor.Y + 4.0);
 		}
@@ -1382,11 +1696,12 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 			double label_width = 0.0;
 			double label_height = 0.0;
 
-			gc.SetFont(font, scSelectedColour);
+			gc.SetFont(font, ToWxColour(theme.Tool.Selected));
 			gc.GetTextExtent(label, &label_width, &label_height);
 
-			const double x = std::clamp(anchor.X, scDimensionLabelMargin,
-										std::max(scDimensionLabelMargin, size.x - label_width - scDimensionLabelMargin));
+			const double x = std::clamp(
+				anchor.X, scDimensionLabelMargin,
+				std::max(scDimensionLabelMargin, size.x - label_width - scDimensionLabelMargin));
 			const double y = std::clamp(anchor.Y + 4.0, scDimensionLabelTop,
 										std::max(scDimensionLabelTop, size.y - label_height - scDimensionLabelMargin));
 
@@ -1395,8 +1710,103 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 	}
 }
 
+Vec2d TopViewCanvas::GetMarkerTip(const TopViewMarker& marker, const Vec2d direction_uv) const
+{
+	const double planar = direction_uv.Length();
+
+	Vec2d unit(1.0, 0.0);
+
+	if (planar > 1e-6) {
+		unit = direction_uv / planar;
+	}
+
+	const double length = std::max(planar, scMarkerMinArrow) * scMarkerArrowPixels / mScale;
+
+	return ProjectPoint(marker.AimOrigin) + unit * length;
+}
+
+void TopViewCanvas::DrawMarkers(wxGraphicsContext& gc)
+{
+	const EditorTheme& theme = GetEditorTheme();
+
+	for (const TopViewMarker& marker : mState.Markers) {
+		Vec2d offset = Vec2d::sZero;
+		Vec2d direction_uv = ProjectPoint(marker.Direction);
+
+		if (marker.bSelected && mPreview.Kind == eDrag::MarkerMove) {
+			offset = mPreview.OffsetUV;
+		}
+
+		if (marker.bSelected && mPreview.Kind == eDrag::MarkerAim) {
+			direction_uv = mPreview.AimUV;
+		}
+
+		wxColour colour = ToWxColour(theme.Marker.Light);
+		wxColour outline = ToWxColour(theme.Tool.Handle);
+		int fill_alpha = 24;
+		int width = 1;
+
+		if (marker.Kind == eTopViewMarkerKind::Spawn) {
+			colour = ToWxColour(theme.Marker.SpawnIdle);
+		}
+
+		if (marker.bSelected) {
+			colour = ToWxColour(theme.Marker.LightSelected);
+			outline = ToWxColour(theme.Marker.SelectedOutline);
+			fill_alpha = 60;
+			width = 2;
+		}
+
+		if (marker.bSelected && marker.Kind == eTopViewMarkerKind::Spawn) {
+			colour = ToWxColour(theme.Marker.Spawn);
+		}
+
+		if (!marker.bSelectable) {
+			colour = WithAlpha(colour, scDimMarkerAlpha);
+		}
+
+		const Vec2d origin = ToScreenCoords(ProjectPoint(marker.AimOrigin) + offset);
+		const Vec2d tip = ToScreenCoords(GetMarkerTip(marker, direction_uv) + offset);
+
+		if (marker.Kind == eTopViewMarkerKind::Spawn) {
+			const Vec2d corner_a = ToScreenCoords(ProjectPoint(marker.BoundsMin) + offset);
+			const Vec2d corner_b = ToScreenCoords(ProjectPoint(marker.BoundsMax) + offset);
+			const Vec2d low = Vec2d::Min(corner_a, corner_b);
+			const Vec2d extent = Vec2d::Max(corner_a, corner_b) - low;
+
+			gc.SetBrush(wxBrush(WithAlpha(colour, fill_alpha)));
+			gc.SetPen(wxPen(colour, width));
+			gc.DrawRectangle(low.X, low.Y, std::max(extent.X, 2.0), std::max(extent.Y, 2.0));
+		}
+		else {
+			gc.SetBrush(wxBrush(colour));
+			gc.SetPen(wxPen(outline, 1));
+			gc.DrawRectangle(origin.X - scMarkerHalfSize, origin.Y - scMarkerHalfSize, scMarkerHalfSize * 2.0,
+							 scMarkerHalfSize * 2.0);
+		}
+
+		gc.SetPen(wxPen(colour, width));
+		gc.StrokeLine(origin.X, origin.Y, tip.X, tip.Y);
+
+		if (ProjectPoint(marker.Direction).Length() < scMinAimPlanar && mPreview.Kind != eDrag::MarkerAim) {
+			gc.SetBrush(*wxTRANSPARENT_BRUSH);
+			gc.DrawEllipse(origin.X - scMarkerHalfSize * 2.0, origin.Y - scMarkerHalfSize * 2.0, scMarkerHalfSize * 4.0,
+						   scMarkerHalfSize * 4.0);
+		}
+
+		if (marker.bSelected) {
+			gc.SetBrush(wxBrush(ToWxColour(theme.Tool.Handle)));
+			gc.SetPen(wxPen(colour, 2));
+			gc.DrawEllipse(tip.X - scMarkerTipRadius, tip.Y - scMarkerTipRadius, scMarkerTipRadius * 2.0,
+						   scMarkerTipRadius * 2.0);
+		}
+	}
+}
+
 void TopViewCanvas::DrawPlayer(wxGraphicsContext& gc)
 {
+	const EditorTheme& theme = GetEditorTheme();
+
 	if (!mState.bHasPlayer) {
 		return;
 	}
@@ -1414,8 +1824,8 @@ void TopViewCanvas::DrawPlayer(wxGraphicsContext& gc)
 	const double length = std::hypot(dir_x, dir_y);
 
 	if (length < scMinMarkerDirection) {
-		gc.SetBrush(wxBrush(wxColour(scPlayerColour.Red(), scPlayerColour.Green(), scPlayerColour.Blue(), 90)));
-		gc.SetPen(wxPen(scPlayerColour, 2));
+		gc.SetBrush(wxBrush(WithAlpha(ToWxColour(theme.Marker.Player), 90)));
+		gc.SetPen(wxPen(ToWxColour(theme.Marker.Player), 2));
 		gc.DrawEllipse(x - 7.0, y - 7.0, 14.0, 14.0);
 		return;
 	}
@@ -1435,8 +1845,8 @@ void TopViewCanvas::DrawPlayer(wxGraphicsContext& gc)
 	path.AddLineToPoint(x - dir_x * scSize - side_x * scSize * 0.8, y - dir_y * scSize - side_y * scSize * 0.8);
 	path.CloseSubpath();
 
-	gc.SetBrush(wxBrush(wxColour(scPlayerColour.Red(), scPlayerColour.Green(), scPlayerColour.Blue(), 90)));
-	gc.SetPen(wxPen(scPlayerColour, 2));
+	gc.SetBrush(wxBrush(WithAlpha(ToWxColour(theme.Marker.Player), 90)));
+	gc.SetPen(wxPen(ToWxColour(theme.Marker.Player), 2));
 	gc.DrawPath(path);
 }
 
@@ -1580,12 +1990,16 @@ void TopViewCanvas::UpdateHover()
 	const TopViewFace previous_face = mHoverFace;
 	const bool had_vertex = mbHoverVertex;
 	const TopViewVertexHandle previous_vertex = mHoverVertex;
+	const eArchHandle previous_arch = mArchHover;
+	const int32 previous_bend = mBendHover;
 
 	mbHoverFace = false;
 	mbHoverVertex = false;
+	mArchHover = eArchHandle::None;
+	mBendHover = -1;
 
 	if (mDrag == eDrag::None && mbHovering && !mbSpaceDown && !mbAltDown) {
-		if (mTool == eTopViewTool::Face) {
+		if (mTool == eEditorTool::Face) {
 			int face_index = -1;
 			const int brush_index = PickFaceAt(mHover, face_index);
 
@@ -1594,8 +2008,14 @@ void TopViewCanvas::UpdateHover()
 				mHoverFace = Projection(mState.Brushes[brush_index]).Faces[face_index];
 			}
 		}
-		else if (mTool == eTopViewTool::Vertex) {
+		else if (mTool == eEditorTool::Vertex) {
 			mbHoverVertex = PickVertexAt(mHover, mHoverVertex);
+		}
+		else if (mTool == eEditorTool::Arch) {
+			mArchHover = PickArchHandle(mHover);
+		}
+		else if (mTool == eEditorTool::Bend) {
+			mBendHover = PickBendKnob(mHover);
 		}
 	}
 
@@ -1603,7 +2023,8 @@ void TopViewCanvas::UpdateHover()
 								(mbHoverVertex && (mHoverVertex.ObjectId != previous_vertex.ObjectId ||
 												   !(mHoverVertex.Position == previous_vertex.Position)));
 
-	if (mbHoverFace != had_face || (mbHoverFace && !(mHoverFace == previous_face)) || vertex_changed) {
+	if (mbHoverFace != had_face || (mbHoverFace && !(mHoverFace == previous_face)) || vertex_changed ||
+		mArchHover != previous_arch || mBendHover != previous_bend) {
 		UpdateCursor();
 		Refresh();
 	}
@@ -1687,6 +2108,67 @@ bool TopViewCanvas::GetSelectionPivot(Vec2d& out_pivot) const
 	return bounds.bValid;
 }
 
+Vec2d TopViewCanvas::GetRotateSnapOffset(const Vec2d pivot, double angle) const
+{
+	const double cos_angle = std::cos(angle);
+	const double sin_angle = std::sin(angle);
+
+	bool valid = false;
+	Vec2d min = Vec2d::sZero;
+
+	for (const TopViewBrush& brush : mState.Brushes) {
+		if (!brush.bSelected) {
+			continue;
+		}
+
+		for (const Vec2f& point : Projection(brush).Hull) {
+			const Vec2d relative = Vec2d(point) - pivot;
+			const Vec2d rotated = pivot + Vec2d(cos_angle * relative.X - sin_angle * relative.Y,
+												sin_angle * relative.X + cos_angle * relative.Y);
+
+			if (valid) {
+				min = Vec2d::Min(min, rotated);
+			}
+			else {
+				min = rotated;
+				valid = true;
+			}
+		}
+	}
+
+	if (!valid) {
+		return Vec2d::sZero;
+	}
+
+	return Snap(min) - min;
+}
+
+Vec2d TopViewCanvas::SnapNudge(const Vec2d origin, const Vec2d delta) const
+{
+	if (!mState.bSnapEnabled || mState.SnapStep <= 0.0f) {
+		return delta;
+	}
+
+	const double step = mState.SnapStep;
+
+	const auto snap_axis = [step](double from, double distance)
+	{
+		if (distance == 0.0) {
+			return 0.0;
+		}
+
+		const double target = (from + distance) / step;
+
+		if (distance > 0.0) {
+			return std::floor(target + scNudgeSnapTolerance) * step - from;
+		}
+
+		return std::ceil(target - scNudgeSnapTolerance) * step - from;
+	};
+
+	return Vec2d(snap_axis(origin.X, delta.X), snap_axis(origin.Y, delta.Y));
+}
+
 uint32 TopViewCanvas::GetSelectedCount() const
 {
 	uint32 count = 0;
@@ -1696,6 +2178,135 @@ uint32 TopViewCanvas::GetSelectedCount() const
 	}
 
 	return count;
+}
+
+int32 TopViewCanvas::PickMarkerAt(const Vec2d uv, bool& out_tip) const
+{
+	const double tolerance = scMarkerPickPixels / mScale;
+
+	out_tip = false;
+
+	for (uint32 i = 0; i < mState.Markers.Size; i++) {
+		const TopViewMarker& marker = mState.Markers[i];
+
+		if (marker.bSelected && marker.bSelectable &&
+			(GetMarkerTip(marker, ProjectPoint(marker.Direction)) - uv).Length() <= tolerance) {
+			out_tip = true;
+			return static_cast<int32>(i);
+		}
+	}
+
+	int32 best = -1;
+	double best_distance = tolerance;
+
+	for (uint32 i = 0; i < mState.Markers.Size; i++) {
+		const TopViewMarker& marker = mState.Markers[i];
+
+		if (!marker.bSelectable) {
+			continue;
+		}
+
+		double distance = (ProjectPoint(marker.AimOrigin) - uv).Length();
+
+		if (marker.Kind == eTopViewMarkerKind::Spawn) {
+			const Vec2d corner_a = ProjectPoint(marker.BoundsMin);
+			const Vec2d corner_b = ProjectPoint(marker.BoundsMax);
+			const DRect rect(Vec2d::Min(corner_a, corner_b) - Vec2d(tolerance),
+							 Vec2d::Max(corner_a, corner_b) + Vec2d(tolerance));
+
+			if (rect.Contains(uv)) {
+				distance = 0.0;
+			}
+		}
+
+		if (distance < best_distance || (distance <= best_distance && marker.bSelected)) {
+			best = static_cast<int32>(i);
+			best_distance = distance;
+		}
+	}
+
+	return best;
+}
+
+int32 TopViewCanvas::FindMarker(eTopViewMarkerKind kind, uint32 light_id) const
+{
+	for (uint32 i = 0; i < mState.Markers.Size; i++) {
+		const TopViewMarker& marker = mState.Markers[i];
+
+		if (marker.Kind == kind && (kind == eTopViewMarkerKind::Spawn || marker.LightId == light_id)) {
+			return static_cast<int32>(i);
+		}
+	}
+
+	return -1;
+}
+
+int32 TopViewCanvas::FindSelectedMarker() const
+{
+	for (uint32 i = 0; i < mState.Markers.Size; i++) {
+		if (mState.Markers[i].bSelected && mState.Markers[i].bSelectable) {
+			return static_cast<int32>(i);
+		}
+	}
+
+	return -1;
+}
+
+void TopViewCanvas::SelectMarker(int32 index)
+{
+	const eTopViewMarkerKind kind = mState.Markers[index].Kind;
+	const uint32 light_id = mState.Markers[index].LightId;
+
+	for (uint32 i = 0; i < mState.Markers.Size; i++) {
+		mState.Markers[i].bSelected = (static_cast<int32>(i) == index);
+	}
+
+	mbLocalMarkerSelection = true;
+	mbLocalMarkerSelected = true;
+	mLocalMarkerKind = kind;
+	mLocalMarkerLightId = light_id;
+
+	if (kind == eTopViewMarkerKind::Spawn) {
+		for (TopViewBrush& brush : mState.Brushes) {
+			brush.bSelected = false;
+		}
+
+		mLocalSelection.Clear();
+		mbLocalSelection = true;
+
+		SendCommand([] { gEditor->TopViewSelectSpawn(); });
+	}
+	else {
+		SendCommand([light_id] { gEditor->TopViewSelectLight(light_id); });
+	}
+
+	UpdateStatus();
+	Refresh();
+}
+
+void TopViewCanvas::DeselectMarkers()
+{
+	const int32 selected = FindSelectedMarker();
+
+	if (selected < 0) {
+		return;
+	}
+
+	if (mState.Markers[selected].Kind == eTopViewMarkerKind::Spawn) {
+		SelectBrushes({}, eTopViewSelectMode::Replace);
+		return;
+	}
+
+	for (TopViewMarker& marker : mState.Markers) {
+		marker.bSelected = false;
+	}
+
+	mbLocalMarkerSelection = true;
+	mbLocalMarkerSelected = false;
+
+	SendCommand([] { gEditor->TopViewSelectLight(LightID::scNull.ID); });
+
+	Refresh();
 }
 
 void TopViewCanvas::SelectBrush(ObjectID object_id, eTopViewSelectMode mode)
@@ -1708,6 +2319,16 @@ void TopViewCanvas::SelectBrush(ObjectID object_id, eTopViewSelectMode mode)
 
 void TopViewCanvas::SelectBrushes(DynArray<ObjectID> object_ids, eTopViewSelectMode mode)
 {
+	if (mode == eTopViewSelectMode::Replace || object_ids.IsNotEmpty()) {
+		for (TopViewMarker& marker : mState.Markers) {
+			if (marker.Kind == eTopViewMarkerKind::Spawn && marker.bSelected) {
+				marker.bSelected = false;
+				mbLocalMarkerSelection = true;
+				mbLocalMarkerSelected = false;
+			}
+		}
+	}
+
 	for (TopViewBrush& brush : mState.Brushes) {
 		const bool listed = std::find(object_ids.begin(), object_ids.end(), brush.ObjectId) != object_ids.end();
 
@@ -1831,30 +2452,16 @@ void TopViewCanvas::OnLeftDown(wxMouseEvent& event)
 	mbDragMoved = false;
 	mbAdditive = event.ShiftDown();
 
-	if (mbSpaceDown || event.AltDown()) {
+	if (mbSpaceDown || mState.bSimulating) {
 		BeginPan(position);
 		return;
 	}
 
-	switch (mTool) {
-	case eTopViewTool::Face:
-		BeginFace();
-		break;
-	case eTopViewTool::Vertex:
-		BeginVertex();
-		break;
-	case eTopViewTool::Create:
-		BeginCreate();
-		break;
-	case eTopViewTool::Arch:
-		BeginArch();
-		break;
-	case eTopViewTool::Rotate:
-		BeginRotate();
-		break;
-	default:
-		BeginSelect();
-		break;
+	if (event.AltDown()) {
+		mDrag = eDrag::Marquee;
+	}
+	else {
+		BeginTool(event);
 	}
 
 	if (mDrag != eDrag::None && !HasCapture()) {
@@ -1865,8 +2472,119 @@ void TopViewCanvas::OnLeftDown(wxMouseEvent& event)
 	Refresh();
 }
 
+void TopViewCanvas::BeginTool(const wxMouseEvent& event)
+{
+	switch (mTool) {
+	case eEditorTool::Face:
+		BeginFace();
+		break;
+	case eEditorTool::Vertex:
+		BeginVertex();
+		break;
+	case eEditorTool::Create:
+	case eEditorTool::Decal:
+		BeginCreate();
+		break;
+	case eEditorTool::Arch:
+		BeginArch(event.ButtonDClick());
+		break;
+	case eEditorTool::Bend:
+		BeginBend(event.ButtonDClick());
+		break;
+	case eEditorTool::Rotate:
+		BeginRotate();
+		break;
+	case eEditorTool::Clip:
+		BeginClip();
+		break;
+	case eEditorTool::Light:
+		BeginLight(event.ButtonDClick());
+		break;
+	default:
+		BeginSelect();
+		break;
+	}
+}
+
+bool TopViewCanvas::BeginMarker()
+{
+	bool tip = false;
+	const int32 index = PickMarkerAt(mPress, tip);
+
+	if (index < 0) {
+		return false;
+	}
+
+	const TopViewMarker& marker = mState.Markers[index];
+
+	mGrabbedMarkerKind = marker.Kind;
+	mGrabbedMarkerLightId = marker.LightId;
+
+	if (tip && marker.bSelected) {
+		mDrag = eDrag::MarkerAim;
+		return true;
+	}
+
+	if (!marker.bSelected) {
+		SelectMarker(index);
+	}
+
+	mDrag = eDrag::MarkerMove;
+
+	return true;
+}
+
+void TopViewCanvas::BeginLight(bool double_click)
+{
+	if (BeginMarker()) {
+		return;
+	}
+
+	if (!double_click) {
+		DeselectMarkers();
+		return;
+	}
+
+	double depth = 0.0;
+	const int32 selected = FindSelectedMarker();
+
+	if (selected >= 0) {
+		depth = DepthOf(mState.Markers[selected].Position);
+	}
+	else if (mState.bHasPlayer) {
+		depth = DepthOf(mState.PlayerPosition);
+	}
+
+	const Vec3f position = ToWorldVector(Snap(mPress), depth);
+
+	SendCommand([position] { gEditor->TopViewCreateLight(position); });
+}
+
+void TopViewCanvas::BeginClip()
+{
+	if (GetSelectedCount() == 0 || mbAdditive) {
+		const DynArray<int32> hits = PickAt(mPress);
+
+		if (hits.IsEmpty()) {
+			mDrag = eDrag::Marquee;
+			return;
+		}
+
+		SelectBrush(mState.Brushes[hits[0]].ObjectId,
+					mbAdditive ? eTopViewSelectMode::Toggle : eTopViewSelectMode::Replace);
+		return;
+	}
+
+	mPress = Snap(mPress);
+	mDrag = eDrag::Clip;
+}
+
 void TopViewCanvas::BeginSelect()
 {
+	if (BeginMarker()) {
+		return;
+	}
+
 	const DynArray<int32> hits = PickAt(mPress);
 
 	mbHasPressedBrush = false;
@@ -1988,10 +2706,68 @@ void TopViewCanvas::BeginCreate()
 	mDrag = eDrag::Create;
 }
 
-void TopViewCanvas::BeginArch()
+void TopViewCanvas::BeginArch(bool double_click)
 {
+	const eArchHandle handle = PickArchHandle(mPress);
+
+	if (double_click && HasPendingArch() && mArchRect.Contains(mPress)) {
+		CommitArch();
+		return;
+	}
+
+	if (handle != eArchHandle::None) {
+		BeginArchEdit(handle);
+		return;
+	}
+
+	mbArchPending = false;
+	mArchHover = eArchHandle::None;
+
 	mPress = Snap(mPress);
 	mDrag = eDrag::Arch;
+}
+
+void TopViewCanvas::BeginArchEdit(eArchHandle handle)
+{
+	mDrag = eDrag::ArchEdit;
+	mArchGrab = handle;
+	mArchGrabRect = mArchRect;
+	mArchGrabSettings = mArch;
+	mArchGrabEllipse = FitArch(mArchRect);
+	mArchAngleTravel = 0.0;
+
+	if (mArchGrabEllipse.bValid) {
+		const Vec2d local = (mPress - mArchGrabEllipse.Center) / mArchGrabEllipse.Radius;
+		mArchLastAngle = std::atan2(local.Y, local.X);
+	}
+}
+
+void TopViewCanvas::BeginBend(bool double_click)
+{
+	const int32 knob = PickBendKnob(mPress);
+
+	if (knob >= 0) {
+		mDrag = eDrag::Bend;
+		mBendGrab = knob;
+		mBendGrabSettings = mBend;
+
+		if (knob < 2) {
+			mBend.bPinEnd = (knob == 0);
+		}
+
+		return;
+	}
+
+	if (double_click && HasPendingBend()) {
+		const ViewBounds bounds = GetSelectionBounds();
+
+		if (bounds.bValid && bounds.Rect.Contains(mPress)) {
+			CommitBend();
+			return;
+		}
+	}
+
+	BeginSelect();
 }
 
 void TopViewCanvas::BeginRotate()
@@ -2078,6 +2854,9 @@ void TopViewCanvas::UpdatePreview()
 	}
 
 	switch (mDrag) {
+	case eDrag::Bend:
+		UpdateBendDrag();
+		break;
 	case eDrag::Move: {
 		Vec2d delta = mCurrent - mPress;
 
@@ -2177,28 +2956,13 @@ void TopViewCanvas::UpdatePreview()
 	case eDrag::Arch: {
 		const Vec2d current = Snap(mCurrent);
 
-		mPreview.Kind = eDrag::Arch;
-		mPreview.RectUV = DRect(Vec2d::Min(mPress, current), Vec2d::Max(mPress, current));
-		mPreview.Outlines.Clear();
-
-		const DynArray<Vec2d> corners = BuildArchSegments(mPreview.RectUV);
-
-		for (uint32 i = 0; i + scArchCornersPerSegment <= corners.Size; i += scArchCornersPerSegment) {
-			DynArray<Vec2d> points;
-
-			for (uint32 j = 0; j < scArchCornersPerSegment; j++) {
-				points.Insert(corners[i + j]);
-			}
-
-			DynArray<Vec2f> polygon = ConvexHull2D(std::move(points));
-
-			if (polygon.Size >= 3) {
-				mPreview.Outlines.Insert(OutlinePreview { ObjectID::scNull, std::move(polygon) });
-			}
-		}
-
+		mArchRect = DRect(Vec2d::Min(mPress, current), Vec2d::Max(mPress, current));
+		mbArchPending = true;
 		break;
 	}
+	case eDrag::ArchEdit:
+		UpdateArchEdit();
+		break;
 	case eDrag::Rotate: {
 		const Vec2d from_pivot = mCurrent - mRotatePivot;
 		const double angle = std::atan2(from_pivot.Y, from_pivot.X);
@@ -2206,6 +2970,84 @@ void TopViewCanvas::UpdatePreview()
 		mPreview.Kind = eDrag::Rotate;
 		mPreview.Angle = SnapAngle(WrapAngle(angle - mRotateStartAngle));
 		mPreview.PivotUV = mRotatePivot;
+		mPreview.OffsetUV = GetRotateSnapOffset(mRotatePivot, mPreview.Angle);
+		break;
+	}
+	case eDrag::Clip: {
+		const Vec2d current = Snap(mCurrent);
+
+		mPreview = Preview();
+		mPreview.Kind = eDrag::Clip;
+		mPreview.ClipA = mPress;
+		mPreview.ClipB = current;
+
+		const Vec2d along = current - mPress;
+		const double length = along.Length();
+
+		if (length < scMinClipLength) {
+			break;
+		}
+
+		const Vec2d normal(along.Y / length, -along.X / length);
+		const double offset = normal.Dot(mPress);
+
+		for (const TopViewBrush& brush : mState.Brushes) {
+			const DynArray<Vec2f>& hull = Projection(brush).Hull;
+
+			if (!brush.bSelected || hull.Size < 3) {
+				continue;
+			}
+
+			DynArray<Vec2f> front = ClipPolygon(hull, normal, offset);
+			DynArray<Vec2f> back = ClipPolygon(hull, normal * -1.0, -offset);
+
+			if (front.Size >= 3 && back.Size >= 3) {
+				mPreview.Outlines.Insert(OutlinePreview { brush.ObjectId, std::move(front) });
+				mPreview.Outlines.Insert(OutlinePreview { brush.ObjectId, std::move(back) });
+			}
+		}
+
+		break;
+	}
+	case eDrag::MarkerMove: {
+		const int32 index = FindMarker(mGrabbedMarkerKind, mGrabbedMarkerLightId);
+
+		if (index < 0) {
+			break;
+		}
+
+		const Vec2d position = ProjectPoint(mState.Markers[index].Position);
+
+		mPreview.Kind = eDrag::MarkerMove;
+		mPreview.OffsetUV = Snap(position + (mCurrent - mPress)) - position;
+		break;
+	}
+	case eDrag::MarkerAim: {
+		const int32 index = FindMarker(mGrabbedMarkerKind, mGrabbedMarkerLightId);
+
+		if (index < 0) {
+			break;
+		}
+
+		const TopViewMarker& marker = mState.Markers[index];
+		const Vec2d to_cursor = mCurrent - ProjectPoint(marker.AimOrigin);
+		const double distance = to_cursor.Length();
+
+		if (distance * mScale < 2.0) {
+			break;
+		}
+
+		double depth = DepthOf(marker.Direction);
+		double planar = std::sqrt(std::max(0.0, 1.0 - depth * depth));
+
+		if (planar < scMinAimPlanar) {
+			planar = 1.0;
+			depth = 0.0;
+		}
+
+		mPreview.Kind = eDrag::MarkerAim;
+		mPreview.AimUV = (to_cursor / distance) * planar;
+		mPreview.AimDepth = depth;
 		break;
 	}
 	default:
@@ -2223,6 +3065,21 @@ void TopViewCanvas::HoldPreview()
 
 void TopViewCanvas::CancelDrag()
 {
+	if (mDrag == eDrag::Arch) {
+		mbArchPending = false;
+	}
+	else if (mDrag == eDrag::ArchEdit) {
+		mArchRect = mArchGrabRect;
+		mArch = mArchGrabSettings;
+		mArchGrab = eArchHandle::None;
+		NotifyArchChanged();
+	}
+	else if (mDrag == eDrag::Bend) {
+		mBend = mBendGrabSettings;
+		mBendGrab = -1;
+		NotifyBendChanged();
+	}
+
 	mDrag = eDrag::None;
 
 	if (HasCapture()) {
@@ -2239,6 +3096,18 @@ void TopViewCanvas::CancelDrag()
 
 void TopViewCanvas::OnCaptureLost(wxMouseCaptureLostEvent&)
 {
+	if (mDrag == eDrag::Arch) {
+		mDrag = eDrag::None;
+		FinishArch();
+	}
+	else if (mDrag == eDrag::ArchEdit) {
+		mDrag = eDrag::None;
+		FinishArchEdit();
+	}
+	else if (mDrag == eDrag::Bend) {
+		mBendGrab = -1;
+	}
+
 	if (mDrag != eDrag::None) {
 		mDrag = eDrag::None;
 		ClearPreview();
@@ -2279,8 +3148,23 @@ void TopViewCanvas::OnLeftUp(wxMouseEvent&)
 	case eDrag::Arch:
 		FinishArch();
 		break;
+	case eDrag::ArchEdit:
+		FinishArchEdit();
+		break;
+	case eDrag::Bend:
+		mBendGrab = -1;
+		break;
 	case eDrag::Rotate:
 		FinishRotate();
+		break;
+	case eDrag::Clip:
+		FinishClip();
+		break;
+	case eDrag::MarkerMove:
+		FinishMarkerMove();
+		break;
+	case eDrag::MarkerAim:
+		FinishMarkerAim();
 		break;
 	default:
 		break;
@@ -2333,7 +3217,7 @@ void TopViewCanvas::FinishVertex()
 
 void TopViewCanvas::FinishMarquee()
 {
-	if (mTool == eTopViewTool::Vertex) {
+	if (mTool == eEditorTool::Vertex) {
 		if (!mbDragMoved) {
 			if (!mbAdditive) {
 				mSelectedVertices.Clear();
@@ -2479,7 +3363,8 @@ void TopViewCanvas::FinishCreate()
 
 	const uint32 plane_index = static_cast<uint32>(mPlane);
 	const double base = mCreateBase[plane_index];
-	const double depth = std::max<double>(mCreateSize[plane_index], scMinCreateDepth);
+	const bool is_decal = (mTool == eEditorTool::Decal);
+	const double depth = is_decal ? 0.0 : std::max<double>(mCreateSize[plane_index], scMinCreateDepth);
 
 	const Vec3f first = ToWorldVector(mPreview.RectUV.Min, base);
 	const Vec3f second = ToWorldVector(mPreview.RectUV.Max, base + depth);
@@ -2490,83 +3375,326 @@ void TopViewCanvas::FinishCreate()
 					std::max<float32>(first.Z, second.Z));
 
 	HoldPreview();
-	const bool drop_to_ground = mbDropToGround && (mPlane == eViewPlane::Top);
+	const bool drop_to_ground = mbDropToGround;
+	const eViewPlane plane = mPlane;
 
-	SendCommand([min, max, drop_to_ground] { gEditor->TopViewCreate(min, max, drop_to_ground); });
+	if (is_decal) {
+		SendCommand([plane, min, max, drop_to_ground] { gEditor->TopViewCreateDecal(plane, min, max, drop_to_ground); });
+		return;
+	}
+
+	SendCommand([plane, min, max, drop_to_ground] { gEditor->TopViewCreate(plane, min, max, drop_to_ground); });
+}
+
+TopViewCanvas::ArchEllipse TopViewCanvas::FitArch(const DRect& rect) const
+{
+	ArchEllipse ellipse;
+
+	Vec2d low;
+	Vec2d high;
+	GetArchDirectionBounds(mArch, low, high);
+
+	const Vec2d span = high - low;
+
+	if (span.X < 1e-6 || span.Y < 1e-6) {
+		return ellipse;
+	}
+
+	const Vec2d extent = rect.GetExtent();
+
+	ellipse.Radius = extent / span;
+	ellipse.Center = rect.Min - low * ellipse.Radius;
+	ellipse.bValid = ellipse.Radius.X > 0.0 && ellipse.Radius.Y > 0.0;
+
+	return ellipse;
+}
+
+DRect TopViewCanvas::GetArchRect(const ArchEllipse& ellipse) const
+{
+	Vec2d low;
+	Vec2d high;
+	GetArchDirectionBounds(mArch, low, high);
+
+	return DRect(ellipse.Center + low * ellipse.Radius, ellipse.Center + high * ellipse.Radius);
 }
 
 DynArray<Vec2d> TopViewCanvas::BuildArchSegments(const DRect& rect) const
 {
 	DynArray<Vec2d> corners;
 
-	const uint32 sides = mArch.Sides;
-	const double arc = std::clamp<double>(mArch.ArcDegrees, 1.0, 360.0) * FX_PI / 180.0;
-	const double start = mArch.StartDegrees * FX_PI / 180.0;
+	const ArchEllipse ellipse = FitArch(rect);
 
-	DynArray<Vec2d> directions;
-
-	double low_x = 0.0;
-	double high_x = 0.0;
-	double low_y = 0.0;
-	double high_y = 0.0;
-
-	for (uint32 i = 0; i <= sides; i++) {
-		const double angle = start + arc * static_cast<double>(i) / static_cast<double>(sides);
-		const Vec2d direction(std::cos(angle), std::sin(angle));
-
-		low_x = std::min(low_x, direction.X);
-		high_x = std::max(high_x, direction.X);
-		low_y = std::min(low_y, direction.Y);
-		high_y = std::max(high_y, direction.Y);
-
-		directions.Insert(direction);
-	}
-
-	if (high_x - low_x < 1e-6 || high_y - low_y < 1e-6) {
+	if (!ellipse.bValid) {
 		return corners;
 	}
 
-	const Vec2d extent = rect.GetExtent();
-	const double radius_u = extent.X / (high_x - low_x);
-	const double radius_v = extent.Y / (high_y - low_y);
-	const Vec2d center(rect.Min.X - low_x * radius_u, rect.Min.Y - low_y * radius_v);
-
 	const double wall = std::max<double>(mArch.WallWidth, 0.0);
-	const double inner_u = std::max(radius_u - wall, 0.0);
-	const double inner_v = std::max(radius_v - wall, 0.0);
+	const Vec2d inner_radius = Vec2d::Max(ellipse.Radius - Vec2d(wall), Vec2d::sZero);
 
-	const auto outer = [&](const Vec2d& direction)
-	{ return Vec2d(center.X + direction.X * radius_u, center.Y + direction.Y * radius_v); };
-	const auto inner = [&](const Vec2d& direction)
-	{ return Vec2d(center.X + direction.X * inner_u, center.Y + direction.Y * inner_v); };
+	const auto outer = [&](uint32 index)
+	{ return ellipse.Center + GetArchDirection(mArch, static_cast<double>(index)) * ellipse.Radius; };
+	const auto inner = [&](uint32 index)
+	{ return ellipse.Center + GetArchDirection(mArch, static_cast<double>(index)) * inner_radius; };
 
-	for (uint32 i = 0; i < sides; i++) {
-		corners.Insert(outer(directions[i]));
-		corners.Insert(outer(directions[i + 1]));
-		corners.Insert(inner(directions[i + 1]));
-		corners.Insert(inner(directions[i]));
+	for (uint32 i = 0; i < mArch.Sides; i++) {
+		corners.Insert(outer(i));
+		corners.Insert(outer(i + 1));
+		corners.Insert(inner(i + 1));
+		corners.Insert(inner(i));
 	}
 
 	return corners;
 }
 
+Vec2d TopViewCanvas::GetArchHandle(eArchHandle handle) const
+{
+	const DRect& rect = mArchRect;
+	const Vec2d middle = rect.GetCenter();
+
+	switch (handle) {
+	case eArchHandle::Wall:
+	case eArchHandle::Start:
+	case eArchHandle::End: {
+		const ArchEllipse ellipse = FitArch(rect);
+
+		if (handle == eArchHandle::Start || handle == eArchHandle::End) {
+			const double index = (handle == eArchHandle::Start) ? 0.0 : static_cast<double>(mArch.Sides);
+			const Vec2d direction = GetArchDirection(mArch, index);
+
+			return ellipse.Center + direction * ellipse.Radius + direction * (scArchKnobPixels / mScale);
+		}
+
+		const double wall = std::max<double>(mArch.WallWidth, 0.0);
+		const Vec2d inner_radius = Vec2d::Max(ellipse.Radius - Vec2d(wall), Vec2d::sZero);
+
+		return ellipse.Center + GetArchWallDirection(mArch) * inner_radius;
+	}
+	case eArchHandle::MinMin:
+		return rect.Min;
+	case eArchHandle::MaxMin:
+		return Vec2d(rect.Max.X, rect.Min.Y);
+	case eArchHandle::MaxMax:
+		return rect.Max;
+	case eArchHandle::MinMax:
+		return Vec2d(rect.Min.X, rect.Max.Y);
+	case eArchHandle::Left:
+		return Vec2d(rect.Min.X, middle.Y);
+	case eArchHandle::Right:
+		return Vec2d(rect.Max.X, middle.Y);
+	case eArchHandle::Bottom:
+		return Vec2d(middle.X, rect.Min.Y);
+	case eArchHandle::Top:
+		return Vec2d(middle.X, rect.Max.Y);
+	default:
+		return middle;
+	}
+}
+
+TopViewCanvas::eArchHandle TopViewCanvas::PickArchHandle(const Vec2d uv) const
+{
+	if (!mbArchPending || mDrag == eDrag::Arch) {
+		return eArchHandle::None;
+	}
+
+	const Vec2d screen = ToScreenCoords(uv);
+
+	constexpr eArchHandle point_handles[] = {
+		eArchHandle::End,	 eArchHandle::Start,  eArchHandle::Wall,
+		eArchHandle::MinMin, eArchHandle::MaxMin, eArchHandle::MaxMax, eArchHandle::MinMax,
+	};
+
+	for (const eArchHandle handle : point_handles) {
+		if ((ToScreenCoords(GetArchHandle(handle)) - screen).Length() <= scVertexPickPixels) {
+			return handle;
+		}
+	}
+
+	const Vec2d corner_a = ToScreenCoords(mArchRect.Min);
+	const Vec2d corner_b = ToScreenCoords(Vec2d(mArchRect.Max.X, mArchRect.Min.Y));
+	const Vec2d corner_c = ToScreenCoords(mArchRect.Max);
+	const Vec2d corner_d = ToScreenCoords(Vec2d(mArchRect.Min.X, mArchRect.Max.Y));
+
+	if (DistanceToSegment(screen, corner_d, corner_a) <= scPickTolerancePixels) {
+		return eArchHandle::Left;
+	}
+
+	if (DistanceToSegment(screen, corner_b, corner_c) <= scPickTolerancePixels) {
+		return eArchHandle::Right;
+	}
+
+	if (DistanceToSegment(screen, corner_a, corner_b) <= scPickTolerancePixels) {
+		return eArchHandle::Bottom;
+	}
+
+	if (DistanceToSegment(screen, corner_c, corner_d) <= scPickTolerancePixels) {
+		return eArchHandle::Top;
+	}
+
+	if (mArchRect.Contains(uv)) {
+		return eArchHandle::Body;
+	}
+
+	return eArchHandle::None;
+}
+
+void TopViewCanvas::UpdateArchEdit()
+{
+	const Vec2d delta = mCurrent - mPress;
+	const ArchEllipse& ellipse = mArchGrabEllipse;
+
+	switch (mArchGrab) {
+	case eArchHandle::Body: {
+		const Vec2d min = Snap(mArchGrabRect.Min + delta);
+		mArchRect = DRect(min, min + mArchGrabRect.GetExtent());
+		break;
+	}
+	case eArchHandle::Wall: {
+		if (!ellipse.bValid) {
+			break;
+		}
+
+		const Vec2d direction = GetArchWallDirection(mArch);
+		const double length_sq = direction.LengthSquared();
+
+		if (length_sq < 1e-9) {
+			break;
+		}
+
+		const Vec2d outer = ellipse.Center + direction * ellipse.Radius;
+		const double wall = Snap((outer - mCurrent).Dot(direction) / length_sq);
+
+		mArch.WallWidth = static_cast<float32>(
+			std::clamp(wall, scMinArchWall, std::max(std::max(ellipse.Radius.X, ellipse.Radius.Y), scMinArchWall)));
+		NotifyArchChanged();
+		break;
+	}
+	case eArchHandle::Start:
+	case eArchHandle::End: {
+		if (!ellipse.bValid) {
+			break;
+		}
+
+		const Vec2d local = (mCurrent - ellipse.Center) / ellipse.Radius;
+		const double angle = std::atan2(local.Y, local.X);
+
+		mArchAngleTravel += WrapAngle(angle - mArchLastAngle);
+		mArchLastAngle = angle;
+
+		const double to_degrees = 180.0 / FX_PI;
+		const double travel = mArchAngleTravel * to_degrees;
+		const double grab_start = mArchGrabSettings.StartDegrees;
+		const double grab_end = grab_start + std::clamp<double>(mArchGrabSettings.ArcDegrees, 1.0, 360.0);
+
+		double start = grab_start;
+		double arc = grab_end - grab_start;
+
+		if (mArchGrab == eArchHandle::End) {
+			const double end = SnapAngle((grab_end + travel) / to_degrees) * to_degrees;
+			arc = std::clamp(end - start, 1.0, 360.0);
+		}
+		else {
+			start = SnapAngle((grab_start + travel) / to_degrees) * to_degrees;
+			arc = std::clamp(grab_end - start, 1.0, 360.0);
+			start = grab_end - arc;
+		}
+
+		mArch.StartDegrees = static_cast<float32>(std::fmod(start, 360.0));
+		mArch.ArcDegrees = static_cast<float32>(arc);
+		mArchRect = GetArchRect(ellipse);
+		NotifyArchChanged();
+		break;
+	}
+	default: {
+		const bool left = mArchGrab == eArchHandle::MinMin || mArchGrab == eArchHandle::MinMax ||
+						  mArchGrab == eArchHandle::Left;
+		const bool right = mArchGrab == eArchHandle::MaxMin || mArchGrab == eArchHandle::MaxMax ||
+						   mArchGrab == eArchHandle::Right;
+		const bool bottom = mArchGrab == eArchHandle::MinMin || mArchGrab == eArchHandle::MaxMin ||
+							mArchGrab == eArchHandle::Bottom;
+		const bool top = mArchGrab == eArchHandle::MinMax || mArchGrab == eArchHandle::MaxMax ||
+						 mArchGrab == eArchHandle::Top;
+
+		Vec2d a = mArchGrabRect.Min;
+		Vec2d b = mArchGrabRect.Max;
+
+		if (left) {
+			a.X = Snap(a.X + delta.X);
+		}
+
+		if (right) {
+			b.X = Snap(b.X + delta.X);
+		}
+
+		if (bottom) {
+			a.Y = Snap(a.Y + delta.Y);
+		}
+
+		if (top) {
+			b.Y = Snap(b.Y + delta.Y);
+		}
+
+		mArchRect = DRect(Vec2d::Min(a, b), Vec2d::Max(a, b));
+		break;
+	}
+	}
+}
+
 void TopViewCanvas::FinishArch()
 {
-	if (mPreview.Kind != eDrag::Arch) {
+	if (!mbArchPending) {
 		return;
 	}
 
-	const Vec2d extent = mPreview.RectUV.GetExtent();
+	const Vec2d extent = mArchRect.GetExtent();
 
-	if (extent.X < scMinCreateSize || extent.Y < scMinCreateSize) {
-		ClearPreview();
+	if (extent.X < scMinCreateSize || extent.Y < scMinCreateSize || !FitArch(mArchRect).bValid) {
+		mbArchPending = false;
+	}
+}
+
+void TopViewCanvas::FinishArchEdit()
+{
+	const Vec2d extent = mArchRect.GetExtent();
+
+	if (extent.X < scMinCreateSize || extent.Y < scMinCreateSize || !FitArch(mArchRect).bValid) {
+		mArchRect = mArchGrabRect;
+		mArch = mArchGrabSettings;
+		NotifyArchChanged();
+	}
+
+	mArchGrab = eArchHandle::None;
+}
+
+void TopViewCanvas::DiscardArch()
+{
+	if (mDrag == eDrag::Arch || mDrag == eDrag::ArchEdit) {
+		CancelDrag();
+	}
+
+	mbArchPending = false;
+	mArchHover = eArchHandle::None;
+
+	UpdateCursor();
+	UpdateStatus();
+	Refresh();
+}
+
+void TopViewCanvas::CommitArch()
+{
+	if (!HasPendingArch() || mDrag == eDrag::ArchEdit) {
 		return;
 	}
 
-	const DynArray<Vec2d> corners = BuildArchSegments(mPreview.RectUV);
+	const DRect rect = mArchRect;
+
+	mbArchPending = false;
+	mArchHover = eArchHandle::None;
+
+	const DynArray<Vec2d> corners = BuildArchSegments(rect);
 
 	if (corners.IsEmpty()) {
-		ClearPreview();
+		UpdateStatus();
+		Refresh();
 		return;
 	}
 
@@ -2586,11 +3714,578 @@ void TopViewCanvas::FinishArch()
 		}
 	}
 
+	mPreview = Preview();
+	mPreview.Kind = eDrag::Arch;
+	mPreview.RectUV = rect;
 	HoldPreview();
-	const bool drop_to_ground = mbDropToGround && (mPlane == eViewPlane::Top);
 
-	SendCommand([points = std::move(points), drop_to_ground]() mutable
-				{ gEditor->TopViewCreateArch(std::move(points), drop_to_ground); });
+	const bool drop_to_ground = mbDropToGround;
+	const eViewPlane plane = mPlane;
+
+	SendCommand([plane, points = std::move(points), drop_to_ground]() mutable
+				{ gEditor->TopViewCreateArch(plane, std::move(points), drop_to_ground); });
+
+	UpdateCursor();
+	UpdateStatus();
+	Refresh();
+}
+
+void TopViewCanvas::DrawArch(wxGraphicsContext& gc, const DRect& rect, bool show_handles)
+{
+	const EditorTheme& theme = GetEditorTheme();
+	const wxColour colour = ToWxColour(theme.Tool.Create);
+	const wxFont font = wxFont(wxFontInfo(10));
+
+	const DynArray<Vec2d> corners = BuildArchSegments(rect);
+
+	wxGraphicsPath outlines = gc.CreatePath();
+
+	for (uint32 i = 0; i + scArchCornersPerSegment <= corners.Size; i += scArchCornersPerSegment) {
+		DynArray<Vec2d> points;
+
+		for (uint32 j = 0; j < scArchCornersPerSegment; j++) {
+			points.Insert(corners[i + j]);
+		}
+
+		const DynArray<Vec2f> polygon = ConvexHull2D(std::move(points));
+
+		if (polygon.Size < 3) {
+			continue;
+		}
+
+		const Vec2d first = ToScreenCoords(ToVec2d(polygon[0]));
+		outlines.MoveToPoint(first.X, first.Y);
+
+		for (uint32 j = 1; j < polygon.Size; j++) {
+			const Vec2d screen_point = ToScreenCoords(ToVec2d(polygon[j]));
+			outlines.AddLineToPoint(screen_point.X, screen_point.Y);
+		}
+
+		outlines.CloseSubpath();
+	}
+
+	const Vec2d top_left = ToScreenCoords(Vec2d(rect.Min.X, rect.Max.Y));
+	const Vec2d bottom_right = ToScreenCoords(Vec2d(rect.Max.X, rect.Min.Y));
+	const Vec2d screen_extent = bottom_right - top_left;
+	const Vec2d extent = rect.GetExtent();
+
+	gc.SetPen(wxPen(colour, 1, wxPENSTYLE_SHORT_DASH));
+	gc.SetBrush(*wxTRANSPARENT_BRUSH);
+	gc.DrawRectangle(top_left.X, top_left.Y, screen_extent.X, screen_extent.Y);
+
+	gc.SetBrush(wxBrush(ToWxColour(theme.Tool.CreateFill)));
+	gc.SetPen(wxPen(colour, 1));
+	gc.FillPath(outlines, wxWINDING_RULE);
+	gc.StrokePath(outlines);
+
+	gc.SetFont(font, colour);
+	gc.DrawText(wxString::Format("%.2f x %.2f   %u sides   wall %.2f   arc %.0f   start %.0f", extent.X, extent.Y,
+								 mArch.Sides, mArch.WallWidth, mArch.ArcDegrees, mArch.StartDegrees),
+				top_left.X + 4.0, bottom_right.Y + 4.0);
+
+	if (!show_handles) {
+		return;
+	}
+
+	const ArchEllipse ellipse = FitArch(rect);
+
+	if (ellipse.bValid) {
+		const Vec2d center = ToScreenCoords(ellipse.Center);
+		const Vec2d start = ToScreenCoords(GetArchHandle(eArchHandle::Start));
+		const Vec2d end = ToScreenCoords(GetArchHandle(eArchHandle::End));
+
+		gc.SetPen(wxPen(WithAlpha(colour, 140), 1, wxPENSTYLE_SHORT_DASH));
+		gc.StrokeLine(center.X, center.Y, start.X, start.Y);
+		gc.StrokeLine(center.X, center.Y, end.X, end.Y);
+
+		gc.SetPen(wxPen(colour, 1));
+		gc.StrokeLine(center.X - scArchCenterCross, center.Y, center.X + scArchCenterCross, center.Y);
+		gc.StrokeLine(center.X, center.Y - scArchCenterCross, center.X, center.Y + scArchCenterCross);
+	}
+
+	const eArchHandle active = (mDrag == eDrag::ArchEdit) ? mArchGrab : mArchHover;
+
+	constexpr eArchHandle box_handles[] = {
+		eArchHandle::MinMin,
+		eArchHandle::MaxMin,
+		eArchHandle::MaxMax,
+		eArchHandle::MinMax,
+	};
+
+	for (const eArchHandle handle : box_handles) {
+		const Vec2d screen = ToScreenCoords(GetArchHandle(handle));
+		const bool hot = (handle == active);
+		const double half = hot ? scHandleHalfSize + 1.5 : scHandleHalfSize;
+
+		gc.SetBrush(wxBrush(hot ? colour : ToWxColour(theme.Tool.Handle)));
+		gc.SetPen(wxPen(hot ? colour : ToWxColour(theme.Tool.HandleOutline), 1));
+		gc.DrawRectangle(screen.X - half, screen.Y - half, half * 2.0, half * 2.0);
+	}
+
+	if (!ellipse.bValid) {
+		return;
+	}
+
+	constexpr eArchHandle shape_handles[] = { eArchHandle::Wall, eArchHandle::Start, eArchHandle::End };
+
+	for (const eArchHandle handle : shape_handles) {
+		const Vec2d screen = ToScreenCoords(GetArchHandle(handle));
+		const bool hot = (handle == active);
+		const double radius = hot ? scArchHandleRadius + 1.5 : scArchHandleRadius;
+
+		gc.SetBrush(wxBrush(hot ? ToWxColour(theme.Tool.Handle) : colour));
+		gc.SetPen(wxPen(ToWxColour(theme.Tool.HandleOutline), 1));
+		gc.DrawEllipse(screen.X - radius, screen.Y - radius, radius * 2.0, radius * 2.0);
+	}
+
+	if (active == eArchHandle::Wall || active == eArchHandle::Start || active == eArchHandle::End) {
+		const Vec2d screen = ToScreenCoords(GetArchHandle(active));
+		wxString label = wxString::Format("%.0f", mArch.StartDegrees);
+
+		if (active == eArchHandle::Wall) {
+			label = wxString::Format("wall %.2f", mArch.WallWidth);
+		}
+		else if (active == eArchHandle::End) {
+			label = wxString::Format("%.0f", mArch.StartDegrees + mArch.ArcDegrees);
+		}
+
+		gc.SetFont(font, colour);
+		gc.DrawText(label, screen.X + 8.0, screen.Y - scDimensionLabelTop);
+	}
+}
+
+bool TopViewCanvas::GetBendFrame(BendFrame& out_frame, uint32& out_along_index) const
+{
+	const ViewBounds bounds = GetSelectionBounds();
+
+	if (!bounds.bValid) {
+		return false;
+	}
+
+	const Vec2d extent = bounds.Rect.GetExtent();
+	const Vec2d centre = bounds.Rect.GetCenter();
+
+	uint32 along_index = 0;
+
+	if (extent.Y > extent.X) {
+		along_index = 1;
+	}
+
+	if (mBend.bSwapAxis) {
+		along_index = 1 - along_index;
+	}
+
+	const uint32 across_index = 1 - along_index;
+	const double length = GetComponent(extent, along_index);
+
+	if (length < scMinCreateSize) {
+		return false;
+	}
+
+	out_frame.Along = ToWorldVector(FromBendComponents(along_index, 1.0, 0.0), 0.0);
+	out_frame.Across = ToWorldVector(FromBendComponents(along_index, 0.0, 1.0), 0.0);
+	out_frame.Start = static_cast<float32>(GetComponent(bounds.Rect.Min, along_index));
+	out_frame.Length = static_cast<float32>(length);
+	out_frame.Middle = static_cast<float32>(GetComponent(centre, across_index));
+	out_frame.CurveStart = static_cast<float32>(out_frame.Start + length * mBend.RegionStart);
+	out_frame.CurveEnd = static_cast<float32>(out_frame.Start + length * mBend.RegionEnd);
+	out_frame.bPinEnd = mBend.bPinEnd;
+
+	out_frame.Angle = static_cast<float32>(mBend.AngleDegrees * FX_PI / 180.0);
+	out_frame.Segments = std::max<uint32>(mBend.Segments, 1);
+	out_along_index = along_index;
+
+	return true;
+}
+
+Vec2d TopViewCanvas::BendViewPoint(const BendFrame& frame, uint32 along_index, const Vec2d uv) const
+{
+	const Vec2d bent = BendCoordinates(frame, GetComponent(uv, along_index), GetComponent(uv, 1 - along_index));
+
+	return FromBendComponents(along_index, bent.X, bent.Y);
+}
+
+Vec2d TopViewCanvas::GetBendKnob(const BendFrame& frame, uint32 along_index, int32 knob) const
+{
+	double along = frame.Start;
+
+	if (knob == 1) {
+		along += frame.Length;
+	}
+
+	return BendViewPoint(frame, along_index, FromBendComponents(along_index, along, frame.Middle));
+}
+
+double TopViewCanvas::GetBendRegionAcross(uint32 along_index) const
+{
+	return GetComponent(GetSelectionBounds().Rect.Min, 1 - along_index) - scBendRegionOffset / mScale;
+}
+
+int32 TopViewCanvas::PickBendKnob(const Vec2d uv) const
+{
+	if (mTool != eEditorTool::Bend) {
+		return -1;
+	}
+
+	BendFrame frame;
+	uint32 along_index = 0;
+
+	if (!GetBendFrame(frame, along_index)) {
+		return -1;
+	}
+
+	const Vec2d screen = ToScreenCoords(uv);
+
+	for (int32 knob = 1; knob >= 0; knob--) {
+		if ((ToScreenCoords(GetBendKnob(frame, along_index, knob)) - screen).Length() <= scVertexPickPixels) {
+			return knob;
+		}
+	}
+
+	const double region_across = GetBendRegionAcross(along_index);
+
+	int32 order[2] = { 2, 3 };
+
+	if (mBend.RegionEnd < 1.0f) {
+		order[0] = 3;
+		order[1] = 2;
+	}
+
+	for (const int32 knob : order) {
+		double along = frame.CurveStart;
+
+		if (knob == 3) {
+			along = frame.CurveEnd;
+		}
+
+		const Vec2d handle = FromBendComponents(along_index, along, region_across);
+
+		if ((ToScreenCoords(handle) - screen).Length() <= scVertexPickPixels) {
+			return knob;
+		}
+	}
+
+	return -1;
+}
+
+DynArray<TopViewCanvas::OutlinePreview> TopViewCanvas::BuildBendOutlines(const BendFrame& frame,
+																		  uint32 along_index) const
+{
+	DynArray<OutlinePreview> outlines;
+
+	const Vec2d along_normal = FromBendComponents(along_index, 1.0, 0.0);
+	const uint32 slice_count = GetBendSliceCount(frame);
+
+	for (const TopViewBrush& brush : mState.Brushes) {
+		if (!brush.bSelected) {
+			continue;
+		}
+
+		const DynArray<Vec2f>& hull = Projection(brush).Hull;
+
+		if (hull.Size < 3) {
+			continue;
+		}
+
+		for (uint32 slice_index = 0; slice_index < slice_count; slice_index++) {
+			const BendSlice slice = GetBendSlice(frame, slice_index);
+
+			double low_limit = DBL_MAX;
+			double high_limit = DBL_MAX;
+
+			if (slice.bHasLow) {
+				low_limit = -slice.Low;
+			}
+
+			if (slice.bHasHigh) {
+				high_limit = slice.High;
+			}
+
+			const DynArray<Vec2f> polygon = ClipPolygon(ClipPolygon(hull, along_normal * -1.0, low_limit), along_normal,
+														high_limit);
+
+			if (polygon.Size < 3) {
+				continue;
+			}
+
+			DynArray<Vec2d> points;
+
+			for (const Vec2f& point : polygon) {
+				points.Insert(BendViewPoint(frame, along_index, ToVec2d(point)));
+			}
+
+			OutlinePreview outline;
+			outline.BrushId = brush.ObjectId;
+			outline.Polygon = ConvexHull2D(std::move(points));
+
+			if (outline.Polygon.Size >= 3) {
+				outlines.Insert(std::move(outline));
+			}
+		}
+	}
+
+	return outlines;
+}
+
+void TopViewCanvas::UpdateBendDrag()
+{
+	BendFrame frame;
+	uint32 along_index = 0;
+
+	if (mBendGrab < 0 || !GetBendFrame(frame, along_index)) {
+		return;
+	}
+
+	if (mBendGrab >= 2) {
+		const double along = Snap(GetComponent(mCurrent, along_index));
+		const double fraction = std::clamp((along - frame.Start) / frame.Length, 0.0, 1.0);
+		const float32 gap = static_cast<float32>(std::min(1.0, scMinCreateSize / frame.Length));
+
+		if (mBendGrab == 2) {
+			mBend.RegionStart = std::min(static_cast<float32>(fraction), mBend.RegionEnd - gap);
+			mBend.RegionStart = std::max(mBend.RegionStart, 0.0f);
+		}
+		else {
+			mBend.RegionEnd = std::max(static_cast<float32>(fraction), mBend.RegionStart + gap);
+			mBend.RegionEnd = std::min(mBend.RegionEnd, 1.0f);
+		}
+
+		NotifyBendChanged();
+		return;
+	}
+
+	double end = frame.Start;
+
+	if (mBendGrab == 1) {
+		end += frame.Length;
+	}
+
+	const Vec2d target(GetComponent(mCurrent, along_index), GetComponent(mCurrent, 1 - along_index));
+
+	const auto distance_at = [&frame, end, target](double angle)
+	{
+		frame.Angle = static_cast<float32>(angle);
+		return (BendCoordinates(frame, end, frame.Middle) - target).LengthSquared();
+	};
+
+	double best_angle = 0.0;
+	double best_distance = distance_at(0.0);
+
+	for (int32 step = -scBendSearchSteps; step <= scBendSearchSteps; step++) {
+		const double angle = step * scBendSearchStep;
+		const double distance = distance_at(angle);
+
+		if (distance < best_distance) {
+			best_distance = distance;
+			best_angle = angle;
+		}
+	}
+
+	const double coarse_angle = best_angle;
+
+	for (int32 step = -scBendRefineSteps; step <= scBendRefineSteps; step++) {
+		const double angle = coarse_angle + step * scBendSearchStep / scBendRefineSteps;
+		const double distance = distance_at(angle);
+
+		if (distance < best_distance) {
+			best_distance = distance;
+			best_angle = angle;
+		}
+	}
+
+	best_angle = std::clamp(SnapAngle(best_angle), -2.0 * FX_PI, 2.0 * FX_PI);
+
+	mBend.AngleDegrees = static_cast<float32>(best_angle * 180.0 / FX_PI);
+	NotifyBendChanged();
+}
+
+void TopViewCanvas::DrawBendOutlines(wxGraphicsContext& gc, const DynArray<OutlinePreview>& outlines)
+{
+	const EditorTheme& theme = GetEditorTheme();
+
+	wxGraphicsPath path = gc.CreatePath();
+
+	for (const OutlinePreview& outline : outlines) {
+		for (uint32 i = 0; i < outline.Polygon.Size; i++) {
+			const Vec2d screen = ToScreenCoords(ToVec2d(outline.Polygon[i]));
+
+			if (i == 0) {
+				path.MoveToPoint(screen.X, screen.Y);
+			}
+			else {
+				path.AddLineToPoint(screen.X, screen.Y);
+			}
+		}
+
+		path.CloseSubpath();
+	}
+
+	gc.SetBrush(wxBrush(ToWxColour(theme.Tool.CreateFill)));
+	gc.SetPen(wxPen(ToWxColour(theme.Tool.Create), 1));
+	gc.FillPath(path, wxWINDING_RULE);
+	gc.StrokePath(path);
+}
+
+bool TopViewCanvas::DrawBend(wxGraphicsContext& gc)
+{
+	BendFrame frame;
+	uint32 along_index = 0;
+
+	if (!GetBendFrame(frame, along_index)) {
+		return false;
+	}
+
+	const EditorTheme& theme = GetEditorTheme();
+	const wxColour colour = ToWxColour(theme.Tool.Create);
+
+	if (!IsBendStraight(frame)) {
+		DrawBendOutlines(gc, BuildBendOutlines(frame, along_index));
+	}
+
+	wxGraphicsPath curve = gc.CreatePath();
+
+	const auto add_curve_point = [&](double along, bool first)
+	{
+		const Vec2d screen =
+			ToScreenCoords(BendViewPoint(frame, along_index, FromBendComponents(along_index, along, frame.Middle)));
+
+		if (first) {
+			curve.MoveToPoint(screen.X, screen.Y);
+		}
+		else {
+			curve.AddLineToPoint(screen.X, screen.Y);
+		}
+	};
+
+	add_curve_point(frame.Start, true);
+
+	for (uint32 i = 0; i <= scBendCurveSamples; i++) {
+		add_curve_point(frame.CurveStart + (frame.CurveEnd - frame.CurveStart) * static_cast<double>(i) /
+												scBendCurveSamples,
+						false);
+	}
+
+	add_curve_point(frame.Start + frame.Length, false);
+
+	gc.SetPen(wxPen(WithAlpha(colour, 160), 1, wxPENSTYLE_SHORT_DASH));
+	gc.SetBrush(*wxTRANSPARENT_BRUSH);
+	gc.StrokePath(curve);
+
+	int32 active = mBendHover;
+
+	if (mDrag == eDrag::Bend) {
+		active = mBendGrab;
+	}
+
+	for (int32 knob = 0; knob < 2; knob++) {
+		const Vec2d screen = ToScreenCoords(GetBendKnob(frame, along_index, knob));
+		const bool hot = (knob == active);
+
+		double radius = scBendHandleRadius;
+		wxColour fill = colour;
+
+		if (hot) {
+			radius += 1.5;
+			fill = ToWxColour(theme.Tool.Handle);
+		}
+
+		gc.SetBrush(wxBrush(fill));
+		gc.SetPen(wxPen(ToWxColour(theme.Tool.HandleOutline), 1));
+
+		if ((knob == 1) == mBend.bPinEnd) {
+			gc.DrawRectangle(screen.X - radius, screen.Y - radius, radius * 2.0, radius * 2.0);
+		}
+		else {
+			gc.DrawEllipse(screen.X - radius, screen.Y - radius, radius * 2.0, radius * 2.0);
+		}
+	}
+
+	const double region_across = GetBendRegionAcross(along_index);
+	const Vec2d bar_start = ToScreenCoords(FromBendComponents(along_index, frame.Start, region_across));
+	const Vec2d bar_end = ToScreenCoords(FromBendComponents(along_index, frame.Start + frame.Length, region_across));
+	const Vec2d region_start = ToScreenCoords(FromBendComponents(along_index, frame.CurveStart, region_across));
+	const Vec2d region_end = ToScreenCoords(FromBendComponents(along_index, frame.CurveEnd, region_across));
+
+	gc.SetPen(wxPen(WithAlpha(colour, 110), 1));
+	gc.StrokeLine(bar_start.X, bar_start.Y, bar_end.X, bar_end.Y);
+	gc.SetPen(wxPen(colour, 3));
+	gc.StrokeLine(region_start.X, region_start.Y, region_end.X, region_end.Y);
+
+	for (int32 knob = 2; knob < 4; knob++) {
+		Vec2d screen = region_start;
+
+		if (knob == 3) {
+			screen = region_end;
+		}
+
+		double radius = scBendRegionHandleRadius;
+		wxColour fill = colour;
+
+		if (knob == active) {
+			radius += 1.5;
+			fill = ToWxColour(theme.Tool.Handle);
+		}
+
+		wxGraphicsPath diamond = gc.CreatePath();
+		diamond.MoveToPoint(screen.X, screen.Y - radius);
+		diamond.AddLineToPoint(screen.X + radius, screen.Y);
+		diamond.AddLineToPoint(screen.X, screen.Y + radius);
+		diamond.AddLineToPoint(screen.X - radius, screen.Y);
+		diamond.CloseSubpath();
+
+		gc.SetBrush(wxBrush(fill));
+		gc.SetPen(wxPen(ToWxColour(theme.Tool.HandleOutline), 1));
+		gc.DrawPath(diamond);
+	}
+
+	const Vec2d label = ToScreenCoords(GetBendKnob(frame, along_index, 1));
+
+	uint32 along_axis = Axes().U;
+
+	if (along_index == 1) {
+		along_axis = Axes().V;
+	}
+
+	gc.SetFont(wxFont(wxFontInfo(10)), colour);
+	wxString text = wxString::Format("%.1f deg   %u segments   along %c", mBend.AngleDegrees, frame.Segments,
+									 scAxisNames[along_axis]);
+
+	if (!IsBendStraight(frame)) {
+		const double radius = std::fabs((frame.CurveEnd - frame.CurveStart) / frame.Angle);
+		text += wxString::Format("   radius %.2f", radius);
+	}
+
+	gc.DrawText(text, label.X + 10.0, label.Y - scDimensionLabelTop);
+
+	return true;
+}
+
+void TopViewCanvas::CommitBend()
+{
+	if (!HasPendingBend() || mDrag == eDrag::Bend) {
+		return;
+	}
+
+	BendFrame frame;
+	uint32 along_index = 0;
+
+	if (!GetBendFrame(frame, along_index)) {
+		return;
+	}
+
+	mPreview = Preview();
+	mPreview.Kind = eDrag::Bend;
+	mPreview.Outlines = BuildBendOutlines(frame, along_index);
+	HoldPreview();
+
+	ClearBendShape();
+
+	SendCommand([frame] { gEditor->TopViewBend(frame); });
+
+	UpdateHover();
+	UpdateCursor();
+	UpdateStatus();
+	Refresh();
 }
 
 void TopViewCanvas::FinishRotate()
@@ -2603,9 +4298,61 @@ void TopViewCanvas::FinishRotate()
 	const Vec3f axis = ToWorldVector(Vec2d::sZero, 1.0);
 	const float32 angle = static_cast<float32>(Axes().RotateSign * mPreview.Angle);
 	const Vec3f pivot = ToWorldVector(mPreview.PivotUV, 0.0);
+	const Vec3f offset = ToWorldVector(mPreview.OffsetUV, 0.0);
 
 	HoldPreview();
-	SendCommand([axis, angle, pivot] { gEditor->TopViewRotate(axis, angle, pivot); });
+	SendCommand([axis, angle, pivot, offset] { gEditor->TopViewRotate(axis, angle, pivot, offset); });
+}
+
+void TopViewCanvas::FinishClip()
+{
+	if (mPreview.Kind != eDrag::Clip || (mPreview.ClipB - mPreview.ClipA).Length() < scMinClipLength) {
+		ClearPreview();
+		return;
+	}
+
+	const Vec3f point_a = ToWorldVector(mPreview.ClipA, 0.0);
+	const Vec3f point_b = ToWorldVector(mPreview.ClipB, 0.0);
+	const Vec3f view_axis = ToWorldVector(Vec2d::sZero, 1.0);
+
+	HoldPreview();
+	SendCommand([point_a, point_b, view_axis] { gEditor->TopViewClip(point_a, point_b, view_axis); });
+}
+
+void TopViewCanvas::FinishMarkerMove()
+{
+	if (!mbDragMoved || mPreview.Kind != eDrag::MarkerMove || mPreview.OffsetUV == Vec2d::sZero) {
+		return;
+	}
+
+	const Vec3f offset = ToWorldVector(mPreview.OffsetUV, 0.0);
+
+	HoldPreview();
+
+	if (mGrabbedMarkerKind == eTopViewMarkerKind::Spawn) {
+		SendCommand([offset] { gEditor->TopViewMoveSpawn(offset); });
+	}
+	else {
+		SendCommand([offset] { gEditor->TopViewMoveLight(offset); });
+	}
+}
+
+void TopViewCanvas::FinishMarkerAim()
+{
+	if (mPreview.Kind != eDrag::MarkerAim) {
+		return;
+	}
+
+	const Vec3f direction = ToWorldVector(mPreview.AimUV, mPreview.AimDepth);
+
+	HoldPreview();
+
+	if (mGrabbedMarkerKind == eTopViewMarkerKind::Spawn) {
+		SendCommand([direction] { gEditor->TopViewAimSpawn(direction); });
+	}
+	else {
+		SendCommand([direction] { gEditor->TopViewAimLight(direction); });
+	}
 }
 
 void TopViewCanvas::OnWheel(wxMouseEvent& event)
@@ -2658,13 +4405,46 @@ void TopViewCanvas::OnZoomGesture(wxZoomGestureEvent& event)
 // Keyboard
 /////////////////////////////////////
 
-void TopViewCanvas::NudgeSelection(const Vec2d delta)
+void TopViewCanvas::NudgeMarker(const TopViewMarker& marker, const Vec2d delta)
 {
-	if (GetSelectedCount() == 0) {
+	const Vec3f offset = ToWorldVector(delta, 0.0);
+
+	if (marker.Kind == eTopViewMarkerKind::Spawn) {
+		SendCommand([offset] { gEditor->TopViewMoveSpawn(offset); });
+	}
+	else {
+		SendCommand([offset] { gEditor->TopViewMoveLight(offset); });
+	}
+}
+
+void TopViewCanvas::NudgeSelection(const Vec2d delta, bool snap)
+{
+	if (const int32 marker = FindSelectedMarker(); marker >= 0) {
+		const TopViewMarker& selected = mState.Markers[marker];
+
+		if (snap) {
+			NudgeMarker(selected, SnapNudge(ProjectPoint(selected.Position), delta));
+		}
+		else {
+			NudgeMarker(selected, delta);
+		}
+
 		return;
 	}
 
-	const Vec3f offset = ToWorldVector(delta, 0.0);
+	const ViewBounds bounds = GetSelectionBounds();
+
+	if (!bounds.bValid) {
+		return;
+	}
+
+	Vec2d moved = delta;
+
+	if (snap) {
+		moved = SnapNudge(bounds.Rect.Min, delta);
+	}
+
+	const Vec3f offset = ToWorldVector(moved, 0.0);
 
 	SendCommand([offset] { gEditor->TopViewMove(offset); });
 }
@@ -2683,7 +4463,7 @@ void TopViewCanvas::SetSnapBypass(bool bypass)
 	}
 }
 
-void TopViewCanvas::SetToolFromKey(eTopViewTool tool)
+void TopViewCanvas::SetToolFromKey(eEditorTool tool)
 {
 	if (mDrag == eDrag::None) {
 		SetTool(tool);
@@ -2737,11 +4517,25 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 	const double step = (mState.bSnapEnabled && mState.SnapStep > 0.0f) ? mState.SnapStep : 0.25;
 
 	if (!command && mDrag == eDrag::None && (key == WXK_LEFT || key == WXK_RIGHT || key == WXK_UP || key == WXK_DOWN)) {
-		const double distance = step * (event.AltDown() ? scNudgeFineFactor : (shift ? scNudgeCoarseFactor : 1.0));
+		const bool fine = event.AltDown();
+		const double distance = step * (fine ? scNudgeFineFactor : (shift ? scNudgeCoarseFactor : 1.0));
 		const double du = (key == WXK_RIGHT) ? distance : ((key == WXK_LEFT) ? -distance : 0.0);
 		const double dv = (key == WXK_UP) ? distance : ((key == WXK_DOWN) ? -distance : 0.0);
 
-		NudgeSelection(Vec2d(du, dv));
+		if (HasPendingArch()) {
+			Vec2d moved = Vec2d(du, dv);
+
+			if (!fine) {
+				moved = SnapNudge(mArchRect.Min, moved);
+			}
+
+			mArchRect = DRect(mArchRect.Min + moved, mArchRect.Max + moved);
+			UpdateHover();
+			Refresh();
+			return;
+		}
+
+		NudgeSelection(Vec2d(du, dv), !fine);
 		return;
 	}
 
@@ -2764,6 +4558,16 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 
 		if (key == 'I' && mDrag == eDrag::None) {
 			InvertSelection();
+			return;
+		}
+
+		if (key == 'G' && mDrag == eDrag::None) {
+			SendCommand([] { gEditor->CreateSubviewFromSelection(""); });
+			return;
+		}
+
+		if (key == 'B' && mDrag == eDrag::None) {
+			SendCommand([] { gEditor->SnapSelectionToGrid(); });
 			return;
 		}
 
@@ -2793,22 +4597,61 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 		SetPlane(eViewPlane::Right);
 		break;
 	case 'T':
-		SetToolFromKey(eTopViewTool::Select);
+		SetToolFromKey(eEditorTool::Select);
 		break;
 	case 'F':
-		SetToolFromKey(eTopViewTool::Face);
+		SetToolFromKey(eEditorTool::Face);
 		break;
 	case 'V':
-		SetToolFromKey(eTopViewTool::Vertex);
+		SetToolFromKey(eEditorTool::Vertex);
 		break;
 	case 'B':
-		SetToolFromKey(eTopViewTool::Create);
+		SetToolFromKey(eEditorTool::Create);
 		break;
 	case 'A':
-		SetToolFromKey(eTopViewTool::Arch);
+		SetToolFromKey(eEditorTool::Arch);
+		break;
+	case 'N':
+		SetToolFromKey(eEditorTool::Bend);
+		break;
+	case 'D':
+		SetToolFromKey(eEditorTool::Decal);
 		break;
 	case 'R':
-		SetToolFromKey(eTopViewTool::Rotate);
+		SetToolFromKey(eEditorTool::Rotate);
+		break;
+	case 'C':
+		SetToolFromKey(eEditorTool::Clip);
+		break;
+	case 'I':
+		SetToolFromKey(eEditorTool::Light);
+		break;
+	case 'S':
+		if (mDrag == eDrag::None) {
+			Subtract(shift);
+		}
+		break;
+	case 'G':
+		if (mDrag == eDrag::None) {
+			SendCommand([] { gEditor->TopViewToggleSubview(); });
+		}
+		break;
+	case WXK_RETURN:
+	case WXK_NUMPAD_ENTER:
+		if (HasPendingArch()) {
+			if (mDrag == eDrag::None) {
+				CommitArch();
+			}
+		}
+		else if (HasPendingBend()) {
+			if (mDrag == eDrag::None) {
+				CommitBend();
+			}
+		}
+		else if (const int32 marker = FindSelectedMarker();
+			marker >= 0 && mState.Markers[marker].Kind == eTopViewMarkerKind::Spawn) {
+			SendCommand([] { gEditor->TopViewRespawn(); });
+		}
 		break;
 	case 'U':
 		SendCommand([] { gEditor->TopViewToggleSnap(); });
@@ -2846,8 +4689,31 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 		break;
 	case WXK_DELETE:
 	case WXK_BACK:
-		if (mDrag == eDrag::None) {
+		if (HasPendingArch()) {
+			DiscardArch();
+		}
+		else if (mDrag == eDrag::None) {
 			SendCommand([] { gEditor->TopViewDelete(); });
+		}
+		break;
+	case '[':
+	case ']':
+		if (mTool == eEditorTool::Arch && mDrag != eDrag::ArchEdit) {
+			SetArchSides(static_cast<int32>(mArch.Sides) + ((key == ']') ? 1 : -1));
+		}
+		else if (mTool == eEditorTool::Bend && mDrag != eDrag::Bend) {
+			SetBendSegments(static_cast<int32>(mBend.Segments) + ((key == ']') ? 1 : -1));
+		}
+		else {
+			event.Skip();
+		}
+		break;
+	case WXK_TAB:
+		if (mTool == eEditorTool::Bend && mDrag == eDrag::None) {
+			SwapBendAxis();
+		}
+		else {
+			event.Skip();
 		}
 		break;
 	case WXK_ESCAPE:
@@ -2855,9 +4721,18 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 			ClearPreview();
 			CancelDrag();
 		}
+		else if (HasPendingArch()) {
+			DiscardArch();
+		}
+		else if (HasPendingBend()) {
+			ResetBend();
+		}
 		else if (mSelectedVertices.IsNotEmpty()) {
 			mSelectedVertices.Clear();
 			Refresh();
+		}
+		else if (FindSelectedMarker() >= 0) {
+			DeselectMarkers();
 		}
 		else if (GetSelectedCount() > 0) {
 			SelectBrushes({}, eTopViewSelectMode::Replace);
@@ -2876,13 +4751,18 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 
 void TopViewCanvas::UpdateCursor()
 {
-	if (mDrag == eDrag::Pan || mbSpaceDown || mbAltDown) {
+	if (mDrag == eDrag::Pan || mbSpaceDown) {
 		SetCursor(wxCursor(wxCURSOR_SIZING));
 		return;
 	}
 
+	if (mDrag == eDrag::Marquee || mbAltDown) {
+		SetCursor(wxCursor(wxCURSOR_CROSS));
+		return;
+	}
+
 	switch (mTool) {
-	case eTopViewTool::Face: {
+	case eEditorTool::Face: {
 		if (!mbHoverFace && mDrag != eDrag::Face) {
 			SetCursor(wxNullCursor);
 			break;
@@ -2902,14 +4782,58 @@ void TopViewCanvas::UpdateCursor()
 
 		break;
 	}
-	case eTopViewTool::Vertex:
+	case eEditorTool::Vertex:
 		SetCursor((mbHoverVertex || mDrag == eDrag::Vertex) ? wxCursor(wxCURSOR_SIZING) : wxNullCursor);
 		break;
-	case eTopViewTool::Create:
-	case eTopViewTool::Arch:
+	case eEditorTool::Arch: {
+		const eArchHandle handle = (mDrag == eDrag::ArchEdit) ? mArchGrab : mArchHover;
+
+		switch (handle) {
+		case eArchHandle::Body:
+			SetCursor(wxCursor(wxCURSOR_SIZING));
+			break;
+		case eArchHandle::Wall:
+		case eArchHandle::Start:
+		case eArchHandle::End:
+			SetCursor(wxCursor(wxCURSOR_HAND));
+			break;
+		case eArchHandle::MinMin:
+		case eArchHandle::MaxMax:
+			SetCursor(wxCursor(wxCURSOR_SIZENESW));
+			break;
+		case eArchHandle::MaxMin:
+		case eArchHandle::MinMax:
+			SetCursor(wxCursor(wxCURSOR_SIZENWSE));
+			break;
+		case eArchHandle::Left:
+		case eArchHandle::Right:
+			SetCursor(wxCursor(wxCURSOR_SIZEWE));
+			break;
+		case eArchHandle::Bottom:
+		case eArchHandle::Top:
+			SetCursor(wxCursor(wxCURSOR_SIZENS));
+			break;
+		default:
+			SetCursor(wxCursor(wxCURSOR_CROSS));
+			break;
+		}
+
+		break;
+	}
+	case eEditorTool::Bend:
+		if (mBendHover >= 0 || mDrag == eDrag::Bend) {
+			SetCursor(wxCursor(wxCURSOR_HAND));
+		}
+		else {
+			SetCursor(wxNullCursor);
+		}
+		break;
+	case eEditorTool::Create:
+	case eEditorTool::Decal:
+	case eEditorTool::Clip:
 		SetCursor(wxCursor(wxCURSOR_CROSS));
 		break;
-	case eTopViewTool::Rotate:
+	case eEditorTool::Rotate:
 		SetCursor(wxCursor(wxCURSOR_HAND));
 		break;
 	default:
@@ -2928,15 +4852,28 @@ void TopViewCanvas::UpdateStatus()
 
 	wxString text = wxString::Format("%s   |   ", axes.pName);
 
+	if (mState.bSimulating) {
+		text += "Simulating, editing is paused   |   ";
+	}
+
 	if (mbHovering) {
 		text += wxString::Format("%c %.2f   %c %.2f   |   ", scAxisNames[axes.U], mHover.X * axes.USign,
 								 scAxisNames[axes.V], mHover.Y);
 	}
 
+	const char* hint = scToolHints[static_cast<uint32>(mTool)];
+
+	if (mTool == eEditorTool::Arch && HasPendingArch()) {
+		hint = scArchPendingHint;
+	}
+
+	if (HasPendingBend()) {
+		hint = scBendPendingHint;
+	}
+
 	text += wxString::Format("%d brushes, %u selected   |   Snap %s %.2f   |   Zoom %.0f%%   |   %s",
 							 static_cast<int>(mState.Brushes.Size), GetSelectedCount(),
-							 mState.bSnapEnabled ? "on" : "off", mState.SnapStep, mScale / scDefaultScale * 100.0,
-							 scToolHints[static_cast<uint32>(mTool)]);
+							 mState.bSnapEnabled ? "on" : "off", mState.SnapStep, mScale / scDefaultScale * 100.0, hint);
 
 	mpOnStatus(text);
 }

@@ -1,6 +1,8 @@
 #include "MaterialPickerPanel.hpp"
 
+#include "Common.hpp"
 #include "EditorFrame.hpp"
+#include "EditorTheme.hpp"
 #include "EditorThread.hpp"
 #include "PaginatedView.hpp"
 #include "RaptorEditor.hpp"
@@ -10,7 +12,6 @@
 #include <wx/button.h>
 #include <wx/dcclient.h>
 #include <wx/image.h>
-#include <wx/settings.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
@@ -177,14 +178,16 @@ private:
 	{
 		wxPaintDC dc(this);
 
-		dc.SetBackground(wxBrush(GetBackgroundColour()));
+		const EditorTheme::MaterialPickerColors& colors = GetEditorTheme().MaterialPicker;
+
+		dc.SetBackground(wxBrush(ToWxColour(colors.Background)));
 		dc.Clear();
 		dc.SetFont(mLabelFont);
 
-		const wxColour text_colour = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT);
-		const wxColour highlight_colour = wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHT);
-		const wxColour highlight_text_colour = wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHTTEXT);
-		const wxColour placeholder_colour = wxSystemSettings::GetColour(wxSYS_COLOUR_GRAYTEXT);
+		const wxColour text_colour = ToWxColour(colors.Text);
+		const wxColour highlight_colour = ToWxColour(colors.Highlight);
+		const wxColour highlight_text_colour = ToWxColour(colors.HighlightText);
+		const wxColour placeholder_colour = ToWxColour(colors.Placeholder);
 
 		const int first_row = static_cast<int>(mpPages->GetFirstItem());
 		const int count = static_cast<int>(mpPages->GetPageItemCount());
@@ -299,27 +302,27 @@ MaterialPickerPanel::MaterialPickerPanel(wxWindow* parent, EditorFrame* frame)
 {
 	wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
 
-	wxStaticText* title = new wxStaticText(this, wxID_ANY, "Materials");
-	title->SetFont(title->GetFont().Bold());
-	sizer->Add(title, wxSizerFlags().Border(wxALL, 6));
+	mpSection = new PropertySection(this, "Materials");
+	wxWindow* body = mpSection->GetBody();
+	sizer->Add(mpSection, wxSizerFlags().Expand());
 
-	mpSearch = new wxTextCtrl(this, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
+	mpSearch = new wxTextCtrl(body, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
 	mpSearch->SetHint("Search materials...");
-	sizer->Add(mpSearch, wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+	mpSection->AddWide(mpSearch);
 
-	mpPages = new PaginatedView(this);
+	mpPages = new PaginatedView(body);
 	mpGrid = new MaterialThumbnailGrid(mpPages, this);
 	mpPages->SetContent(mpGrid);
 	mpPages->OnPageChanged = [this] { mpGrid->Refresh(); };
-	sizer->Add(mpPages, wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+	mpSection->AddWide(mpPages);
 
-	mpNameLabel = new wxStaticText(this, wxID_ANY, "(select a material)", wxDefaultPosition, wxDefaultSize,
+	mpNameLabel = new wxStaticText(body, wxID_ANY, "(select a material)", wxDefaultPosition, wxDefaultSize,
 								   wxST_ELLIPSIZE_END);
-	sizer->Add(mpNameLabel, wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+	mpSection->AddWide(mpNameLabel);
 
-	mpApplyButton = new wxButton(this, wxID_ANY, "Apply to Selection");
+	mpApplyButton = new wxButton(body, wxID_ANY, "Apply to Selection");
 	mpApplyButton->Disable();
-	sizer->Add(mpApplyButton, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+	mpSection->AddWide(mpApplyButton);
 
 	SetSizer(sizer);
 
@@ -334,6 +337,7 @@ MaterialPickerPanel::MaterialPickerPanel(wxWindow* parent, EditorFrame* frame)
 
 void MaterialPickerPanel::FocusSearch()
 {
+	mpSection->SetExpanded(true);
 	mpSearch->SetFocus();
 	mpSearch->SelectAll();
 }

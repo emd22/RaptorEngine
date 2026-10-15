@@ -40,6 +40,7 @@
 #include <algorithm>
 #include <chrono>
 #include <format>
+#include <vector>
 
 
 namespace fx::editor {
@@ -61,10 +62,10 @@ static constexpr unsigned long scUILoopWaitMs = 10;
 
 static constexpr std::chrono::milliseconds scPanelSyncInterval(100);
 
-/// How far away objects can be picked
-static constexpr float32 scPickRange = 4.0f;
+/// How far away a subview is placed when nothing is under the crosshair
+static constexpr float32 scPlaceDistance = 4.0f;
 
-/// How far away the crosshair can place a new object
+/// How far away the crosshair can place a new subview
 static constexpr float32 scCreateRange = 20.0f;
 
 /// Size of a snap step for each snap level. Mirrors tool_get_snap_multiplier() in `tool_common.strata`.
@@ -74,39 +75,27 @@ static constexpr int32 scSnapLevelCount = static_cast<int32>(std::size(scSnapSte
 static constexpr float32 scAngleSnapSteps[] = { 5.0f, 15.0f, 45.0f, 90.0f };
 static_assert(std::size(scAngleSnapSteps) == std::size(scSnapSteps));
 
-/// Where the transform marker is kept while it isn't in use, out of view
-static const Vec3f scHiddenMarkerPosition = Vec3f(200.0f);
-
-static constexpr float32 scDataPickRange = 32.0f;
-
 static const Vec3f scDefaultDataBrushHalfExtent(2.0f, 1.5f, 2.0f);
+
+static constexpr uint32 scMaxSubtractOperations = 200;
 
 static constexpr uint32 ToolBit(eEditorTool tool) { return 1u << static_cast<uint32>(tool); }
 
-static constexpr uint32 scVisTools = ToolBit(eEditorTool::Translate) | ToolBit(eEditorTool::Face) |
-									 ToolBit(eEditorTool::Rotate) | ToolBit(eEditorTool::Create) |
-									 ToolBit(eEditorTool::Clip) | ToolBit(eEditorTool::Bounds) |
-									 ToolBit(eEditorTool::Grab) | ToolBit(eEditorTool::Subtract);
+static constexpr uint32 scBrushEditTools = ToolBit(eEditorTool::Face) | ToolBit(eEditorTool::Vertex);
+
+static constexpr uint32 scVisTools = ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Rotate) |
+									 ToolBit(eEditorTool::Create) | ToolBit(eEditorTool::Arch) |
+									 ToolBit(eEditorTool::Bend) | ToolBit(eEditorTool::Decal) | ToolBit(eEditorTool::Clip);
 
 static constexpr uint32 scDataTools[static_cast<uint32>(eDataFilter::Count)] = {
-	ToolBit(eEditorTool::Translate) | ToolBit(eEditorTool::Face) | ToolBit(eEditorTool::Light),
-	ToolBit(eEditorTool::Translate) | ToolBit(eEditorTool::Face) | ToolBit(eEditorTool::Create),
-	ToolBit(eEditorTool::Translate) | ToolBit(eEditorTool::Face) | ToolBit(eEditorTool::Create),
-	ToolBit(eEditorTool::Translate),
-	ToolBit(eEditorTool::Translate) | ToolBit(eEditorTool::Face) | ToolBit(eEditorTool::Rotate) |
-		ToolBit(eEditorTool::Create),
-	ToolBit(eEditorTool::Light),
-	ToolBit(eEditorTool::Translate) | ToolBit(eEditorTool::Face) | ToolBit(eEditorTool::Rotate) |
-		ToolBit(eEditorTool::Create),
-	ToolBit(eEditorTool::Translate) | ToolBit(eEditorTool::Face) | ToolBit(eEditorTool::Rotate) |
-		ToolBit(eEditorTool::Create),
-};
-
-static constexpr eEditorTool scFallbackTools[] = {
-	eEditorTool::Translate,
-	eEditorTool::Face,
-	eEditorTool::Create,
-	eEditorTool::Light,
+	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Light),
+	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Create),
+	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Create),
+	ToolBit(eEditorTool::Select),
+	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Rotate) | ToolBit(eEditorTool::Create),
+	ToolBit(eEditorTool::Select) | ToolBit(eEditorTool::Light),
+	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Rotate) | ToolBit(eEditorTool::Create),
+	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Rotate) | ToolBit(eEditorTool::Create),
 };
 
 static const char* const scCommandScriptPath = "./Scripts/editor/editor_cmd.strata";
@@ -148,12 +137,7 @@ bool RaptorEditor::InitGUI(int argc, char** argv)
 	return true;
 }
 
-void RaptorEditor::InitTools()
-{
-	AddTools();
-
-	mpCommandScript = gScriptManager->LoadScript(scCommandScriptPath);
-}
+void RaptorEditor::InitTools() { mpCommandScript = gScriptManager->LoadScript(scCommandScriptPath); }
 
 EditorFrame* RaptorEditor::CreateMainFrame(const char* title, const Vec2u& viewport_size)
 {
@@ -501,59 +485,30 @@ void RaptorEditor::Update(float32 delta_time)
 {
 	if (gWorld->pPrototype != nullptr) {
 		gWorld->pPrototype->SyncSubviewInstances();
+
+		const uint64 revision = mHistory.GetRevision();
+
+		if (revision != mDecalRevision || mUntrackedEditCount != mDecalUntrackedEditCount) {
+			mDecalRevision = revision;
+			mDecalUntrackedEditCount = mUntrackedEditCount;
+
+			gWorld->pPrototype->RefreshDecals();
+		}
 	}
 
-	if (IsSimulationMode()) {
+	if (mbSimulating) {
+		mGrabEditor.Update(delta_time);
 		return;
 	}
 
-	HandleHotkeys();
+	PruneSelection();
 
-	if (!mbDragging) {
-		PruneSelection();
+	if (mCurrentTool == eEditorTool::Light) {
+		mLightEditor.DrawMarkers();
 	}
 
-	if (mpCurrentTool->UsesSelection() && ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
-		PickObject();
-	}
-
-	const bool mouse_down = ControlManager::IsKeyDown(eKey::FX_MOUSE_LEFT);
-
-	if (mbDragging && !mouse_down) {
-		EndDrag();
-	}
-
-	// The selection went away (deleted, or deselected) partway through, so there is nothing left to finish
-	if (mbDragging && !mbDraggingSpawn && mpCurrentTool->UsesSelection() && mSelection.IsEmpty()) {
-		CancelDrag();
-	}
-
-	if (!mbDragging) {
-		if (mbSpawnSelected) {
-			mSpawnEditor.Controls();
-		}
-		else {
-			mpCurrentTool->Controls();
-		}
-
-		const bool has_target = mbSpawnSelected || (!mpCurrentTool->UsesSelection() || !mSelection.IsEmpty());
-
-		if (mouse_down && has_target) {
-			BeginDrag();
-		}
-	}
-
-	if (mbDragging) {
-		if (mbDraggingSpawn) {
-			mSpawnEditor.Update(delta_time);
-		}
-		else {
-			mpCurrentTool->Update(delta_time);
-		}
-	}
-
-	if (!mbSpawnSelected && IsSpawnPointShown()) {
-		mSpawnEditor.DrawMarker(false);
+	if (IsSpawnPointShown()) {
+		mSpawnEditor.DrawMarker(mbSpawnSelected);
 	}
 
 	DrawModelSelection();
@@ -581,446 +536,96 @@ static void DrawModelBounds(Object* object, const Color& color)
 
 void RaptorEditor::DrawModelSelection()
 {
-	static const Color scSelectedColor = Color::FromRGBA(255, 220, 60, 255);
-
 	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
 		Object* object = mSelection.GetObject(i);
 
 		if (!object->HasTags(eObjectTag::Blockout)) {
-			DrawModelBounds(object, scSelectedColor);
+			DrawModelBounds(object, mTheme.Viewport.ModelSelected);
 		}
 	}
 }
-
-void RaptorEditor::HandleHotkeys()
-{
-	// Snap
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_U)) {
-		mToolState.ToolSnapEnabled = !mToolState.ToolSnapEnabled;
-		SyncCurrentTool();
-	}
-
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_MINUS)) {
-		AdjustSnapLevel(-1);
-	}
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_EQUALS)) {
-		AdjustSnapLevel(1);
-	}
-
-	// Nothing below can happen partway through a drag
-	if (mbDragging) {
-		return;
-	}
-
-	if (ControlManager::IsComboPressed(eKey::FX_KEY_LCTRL, eKey::FX_KEY_Z)) {
-		if (ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT)) {
-			Redo();
-		}
-		else {
-			Undo();
-		}
-	}
-
-	// Tools. Shift+R is left alone as it reloads the blockout.
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_T)) {
-		SetTool(eEditorTool::Translate);
-	}
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_F)) {
-		SetTool(eEditorTool::Face);
-	}
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_R) && !ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT)) {
-		SetTool(eEditorTool::Rotate);
-	}
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_B)) {
-		SetTool(eEditorTool::Create);
-	}
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_C)) {
-		SetTool(eEditorTool::Clip);
-	}
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_I)) {
-		SetTool(eEditorTool::Light);
-	}
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_O)) {
-		SetTool(eEditorTool::Bounds);
-	}
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_Y)) {
-		SetTool(eEditorTool::Grab);
-	}
-	// if (ControlManager::IsKeyPressed(eKey::FX_KEY_N)) {
-	// 	SetTool(eEditorTool::Subtract);
-	// }
-
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_K)) {
-		if (mCurrentToolType == eEditorTool::Light) {
-			mLightEditor.CreateAtCrosshair();
-		}
-		else if (IsDataMode() && (mbSpawnSelected || mDataFilter == eDataFilter::SpawnPoints)) {
-			mSpawnEditor.PlaceAtCrosshair();
-		}
-		else if (IsDataMode()) {
-			CreateDataBrushAtCrosshair();
-		}
-		else {
-			CreateObjectAtCrosshair();
-		}
-	}
-
-	if (mbSpawnSelected && ControlManager::IsKeyPressed(eKey::FX_KEY_TAB)) {
-		DeselectSpawn();
-	}
-
-	if (ControlManager::IsComboPressed(eKey::FX_KEY_LCTRL, eKey::FX_KEY_G)) {
-		CreateSubviewFromSelection("");
-	}
-	else if (ControlManager::IsKeyPressed(eKey::FX_KEY_G) && !ControlManager::IsKeyDown(eKey::FX_KEY_LCTRL)) {
-		if (IsEditingSubview()) {
-			LeaveSubview();
-		}
-		else {
-			EnterSubview();
-		}
-	}
-
-	if (mSelection.IsEmpty()) {
-		return;
-	}
-
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_TAB)) {
-		ClearSelection();
-	}
-
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_BACKSPACE)) {
-		DeleteSelection();
-	}
-
-	if (ControlManager::IsComboPressed(eKey::FX_KEY_LCTRL, eKey::FX_KEY_D)) {
-		DupeSelection();
-	}
-}
-
-
-/////////////////////////////////////
-// Object picking
-/////////////////////////////////////
-
-static Object* FindModelRoot(Object* object)
-{
-	while (!object->ParentID.IsInvalid()) {
-		Object* parent = gObjectManager->GetObject(object->ParentID);
-
-		if (parent == nullptr) {
-			break;
-		}
-
-		object = parent;
-	}
-
-	return object;
-}
-
-static Object* PickModel(const PerspectiveCamera& camera, const Vec3f pick_direction, float32& out_distance)
-{
-	Object* nearest = nullptr;
-	float32 nearest_distance = scPickRange;
-
-	for (Object& object : gObjectManager->GetCache()) {
-		if (object.HasTags(eObjectTag::Blockout) || !object.pMesh.IsValid() ||
-			object.GetObjectLayer() == eObjectLayer::PlayerLayer) {
-			continue;
-		}
-
-		Vec3f face;
-		const float32 distance = object.RaycastBounds(camera.Position, pick_direction, face);
-
-		if (distance < 0.0f || distance >= nearest_distance) {
-			continue;
-		}
-
-		if (object.ContainsPoint(camera.Position) || !FindModelRoot(&object)->bIsAddedToWorld.load()) {
-			continue;
-		}
-
-		nearest = &object;
-		nearest_distance = distance;
-	}
-
-	out_distance = nearest_distance;
-
-	return (nearest != nullptr) ? FindModelRoot(nearest) : nullptr;
-}
-
-void RaptorEditor::PickObject()
-{
-	const bool append_selection = ControlManager::IsKeyDown(eKey::FX_KEY_LALT);
-
-	// Clicking away from the selection keeps it. Alt adds to it, Tab clears it.
-	if ((!mSelection.IsEmpty() || mbSpawnSelected) && !append_selection) {
-		return;
-	}
-
-	Ref<PerspectiveCamera>& camera = gWorld->Player.pCamera;
-	const Vec3f pick_direction = camera->GetForwardVector();
-
-	if (IsDataMode()) {
-		float32 volume_distance = 0.0f;
-		Object* volume = gWorld->RaycastProbeVolumes(camera->Position, pick_direction, scDataPickRange, volume_distance,
-													 [this](const Object& object)
-													 { return IsObjectSelectable(&object); });
-
-		float32 spawn_distance = 0.0f;
-		const bool spawn_hit = IsSpawnPointShown() &&
-							   mSpawnEditor.Raycast(camera->Position, pick_direction, scDataPickRange, spawn_distance);
-
-		if (spawn_hit && (volume == nullptr || spawn_distance <= volume_distance)) {
-			SelectSpawn();
-			return;
-		}
-
-		if (volume != nullptr && SelectObject(volume, append_selection)) {
-			return;
-		}
-
-		ClearSelection();
-		return;
-	}
-
-	if (mpCurrentTool->UsesModels()) {
-		float32 model_distance = 0.0f;
-		Object* model = PickModel(*camera, pick_direction, model_distance);
-
-		if (model != nullptr) {
-			const physics::RayResult solid = gPhysics->pBackend->Raycast(camera->Position,
-																		 pick_direction * scPickRange);
-
-			if (!solid.bHit || model_distance <= (solid.Point - camera->Position).Length()) {
-				if (SelectObject(model, append_selection)) {
-					return;
-				}
-			}
-		}
-	}
-
-	SizedArray<JPH::BodyID> hits = gPhysics->pBackend->RaycastObjects(camera->Position, pick_direction * scPickRange);
-
-	for (uint32 i = 0; i < hits.Size; i++) {
-		physics::Body* body = gPhysics->FindBody(hits[i]);
-
-		if (body == nullptr) {
-			continue;
-		}
-
-		if (SelectObject(gObjectManager->GetObject(body->GetObjectID()), append_selection)) {
-			return;
-		}
-	}
-
-	ClearSelection();
-}
-
-
-/////////////////////////////////////
-// Dragging
-/////////////////////////////////////
-
-void RaptorEditor::BeginDrag()
-{
-	// Captures where everything starts from
-	SyncSelection();
-
-	if (!HasFlag(mpCurrentTool->Flags, eEditorToolFlags::KeepBob)) {
-		SetMovementDamped(true);
-	}
-
-	mbDragging = true;
-	mbDraggingSpawn = mbSpawnSelected;
-
-	if (mbDraggingSpawn) {
-		mSpawnEditor.Begin();
-	}
-	else {
-		mpCurrentTool->Begin();
-	}
-}
-
-void RaptorEditor::EndDrag()
-{
-	if (!mbDragging) {
-		return;
-	}
-
-	mbDragging = false;
-
-	if (mbDraggingSpawn) {
-		mSpawnEditor.Finalize();
-	}
-	else {
-		mpCurrentTool->Finalize();
-	}
-
-	mbDraggingSpawn = false;
-
-	if (!HasFlag(mpCurrentTool->Flags, eEditorToolFlags::KeepBob)) {
-		SetMovementDamped(false);
-	}
-}
-
-void RaptorEditor::CancelDrag()
-{
-	if (!mbDragging) {
-		return;
-	}
-
-	mbDragging = false;
-
-	if (mbDraggingSpawn) {
-		mSpawnEditor.Cancel();
-	}
-	else {
-		mpCurrentTool->Cancel();
-	}
-
-	mbDraggingSpawn = false;
-	HideToolMarkers();
-
-	if (!HasFlag(mpCurrentTool->Flags, eEditorToolFlags::KeepBob)) {
-		SetMovementDamped(false);
-	}
-}
-
-void RaptorEditor::SetMovementDamped(bool damped)
-{
-	if (damped) {
-		mbHadHeadbob = gCVars->Get("b_headbob_enabled", false);
-
-		// gWorld->Player.SpeedMultiplier = 0.5f;
-		gCVars->Set("b_headbob_enabled", false);
-	}
-	else {
-		// gWorld->Player.SpeedMultiplier = 1.0f;
-		gCVars->Set("b_headbob_enabled", mbHadHeadbob);
-	}
-}
-
-void RaptorEditor::HideToolMarkers()
-{
-	Blockout* blockout = gWorld->pPrototype;
-
-	if (blockout == nullptr) {
-		return;
-	}
-
-	blockout->HidePreview();
-
-	if (blockout->pXFormObject != nullptr) {
-		blockout->pXFormObject->SetPosition(scHiddenMarkerPosition);
-	}
-}
-
 
 /////////////////////////////////////
 // Tools
 /////////////////////////////////////
 
-void RaptorEditor::AddTools()
-{
-	AddTool(eEditorTool::None, nullptr, eEditorToolFlags::None);
-	AddTool(eEditorTool::Translate, "./Scripts/editor/tools/tool_translate.strata",
-			eEditorToolFlags::UsesSelection | eEditorToolFlags::UsesModels);
-	AddTool(eEditorTool::Face, "./Scripts/editor/tools/tool_face.strata", eEditorToolFlags::UsesSelection);
-	AddTool(eEditorTool::Rotate, "./Scripts/editor/tools/tool_rotate.strata",
-			eEditorToolFlags::UsesSelection | eEditorToolFlags::UsesModels);
-	AddTool(eEditorTool::Create, "./Scripts/editor/tools/tool_create.strata", eEditorToolFlags::None);
-	AddTool(eEditorTool::Clip, "./Scripts/editor/tools/tool_clip.strata", eEditorToolFlags::UsesSelection);
-
-	// The lights can't be reached from scripts, so this tool is written in C++
-	AddTool(eEditorTool::Light, nullptr, eEditorToolFlags::ClearsSelection);
-	GetTool(eEditorTool::Light)->SetNative(&mLightEditor);
-	GetTool(eEditorTool::Light)
-		->SetSettingsPanel([]() -> ToolSettingsBasePanel* { return new LightToolSettingsPanel(); });
-
-	AddTool(eEditorTool::Bounds, nullptr, eEditorToolFlags::UsesSelection | eEditorToolFlags::UsesModels);
-	GetTool(eEditorTool::Bounds)->SetNative(&mBoundsEditor);
-
-	AddTool(eEditorTool::Grab, nullptr, eEditorToolFlags::KeepBob);
-	GetTool(eEditorTool::Grab)->SetNative(&mGrabEditor);
-
-	AddTool(eEditorTool::Subtract, "./Scripts/editor/tools/tool_subtract.strata", eEditorToolFlags::UsesSelection);
-
-	mpCurrentTool = GetTool(mCurrentToolType);
-}
-
-void RaptorEditor::AddTool(const eEditorTool tool_type, const char* path, eEditorToolFlags flags)
-{
-	// Tools are looked up by their index, so they have to be added in order
-	Assert(static_cast<uint32>(tool_type) == mTools.Size);
-
-	mTools.Insert(EditorTool(tool_type, path, flags));
-}
-
-EditorTool* RaptorEditor::GetTool(const eEditorTool tool_type)
-{
-	const uint32 tool_index = static_cast<uint32>(tool_type);
-
-	if (tool_index >= mTools.Size) {
-		LogError(LC_CORE, "Tool {} has not been registered", tool_index);
-		return nullptr;
-	}
-
-	return &mTools[tool_index];
-}
-
 void RaptorEditor::SetTool(eEditorTool tool)
 {
-	EditorTool* new_tool = GetTool(tool);
-
-	if (new_tool == nullptr || (tool != eEditorTool::None && !IsToolAvailable(tool))) {
+	if (tool >= eEditorTool::Count || !IsToolAvailable(tool)) {
+		ShowTool();
 		return;
 	}
 
-	if (tool != mCurrentToolType) {
-		// Switching tools keeps what the current drag has done so far
-		EndDrag();
+	if (tool != mCurrentTool) {
+		const bool was_light = (mCurrentTool == eEditorTool::Light);
+		const bool is_light = (tool == eEditorTool::Light);
 
-		mpCurrentTool->Leave();
-		HideToolMarkers();
+		mCurrentTool = tool;
 
-		mCurrentToolType = tool;
-		mpCurrentTool = new_tool;
+		if (was_light) {
+			mLightEditor.Deselect();
+		}
 
-		if (tool != eEditorTool::Translate) {
+		if (tool != eEditorTool::Select) {
 			DeselectSpawn();
 		}
 
-		// Nothing stays selected while simulating, and the Light tool works on lights instead of objects
-		if (IsSimulationMode() || HasFlag(new_tool->Flags, eEditorToolFlags::ClearsSelection)) {
-			mSelection.Clear();
-		}
-		else if (!new_tool->UsesModels()) {
-			DeselectModels();
-		}
-
 		PruneSelection();
-		SyncSelection();
-		mpCurrentTool->Enter();
 
-		if (mpMainFrame != nullptr) {
-			thread::PostToUI([this, tool = mpCurrentTool]
-							 { mpMainFrame->SetToolSettingsPanel(tool->CreateSettingsPanel()); });
+		if (was_light != is_light && mpMainFrame != nullptr) {
+			thread::PostToUI(
+				[this, is_light]
+				{
+					ToolSettingsBasePanel* panel = nullptr;
+
+					if (is_light) {
+						panel = new LightToolSettingsPanel();
+					}
+
+					mpMainFrame->SetToolSettingsPanel(panel);
+				});
 		}
+
+		mbForcePanelSync = true;
 	}
 
-	// Also run when the tool is unchanged, as clicking the selected tool's button toggles it off
+	ShowTool();
+}
+
+void RaptorEditor::ShowTool()
+{
 	if (mpMainFrame != nullptr) {
-		thread::PostToUI([this, tool_type = mCurrentToolType] { mpMainFrame->ShowSelectedTool(tool_type); });
+		thread::PostToUI([this, tool = mCurrentTool] { mpMainFrame->ShowSelectedTool(tool); });
+	}
+}
+
+void RaptorEditor::SetSimulating(bool simulating)
+{
+	if (simulating != mbSimulating) {
+		mbSimulating = simulating;
+
+		if (simulating) {
+			ClearSelection();
+			mLightEditor.Deselect();
+
+			if (mView == eEditorView::Top) {
+				SetView(eEditorView::Perspective);
+			}
+		}
+		else {
+			mGrabEditor.Release();
+		}
+
+		mbForcePanelSync = true;
+	}
+
+	if (mpMainFrame != nullptr) {
+		thread::PostToUI([this, shown = mbSimulating] { mpMainFrame->ShowSimulating(shown); });
 	}
 }
 
 bool RaptorEditor::IsToolAvailable(eEditorTool tool) const
 {
-	if (tool == eEditorTool::None) {
-		return true;
-	}
-
 	const uint32 available = IsDataMode() ? scDataTools[static_cast<uint32>(mDataFilter)] : scVisTools;
 
 	return (available & ToolBit(tool)) != 0;
@@ -1028,18 +633,9 @@ bool RaptorEditor::IsToolAvailable(eEditorTool tool) const
 
 void RaptorEditor::EnsureToolAvailable()
 {
-	if (IsToolAvailable(mCurrentToolType)) {
-		return;
+	if (!IsToolAvailable(mCurrentTool)) {
+		SetTool(eEditorTool::Select);
 	}
-
-	for (eEditorTool fallback : scFallbackTools) {
-		if (IsToolAvailable(fallback)) {
-			SetTool(fallback);
-			return;
-		}
-	}
-
-	SetTool(eEditorTool::None);
 }
 
 void RaptorEditor::ShowMode()
@@ -1053,7 +649,6 @@ void RaptorEditor::ShowMode()
 void RaptorEditor::SetMode(eEditorMode mode)
 {
 	if (mode != mMode) {
-		EndDrag();
 		ClearSelection();
 
 		mMode = mode;
@@ -1067,8 +662,6 @@ void RaptorEditor::SetMode(eEditorMode mode)
 void RaptorEditor::SetDataFilter(eDataFilter filter)
 {
 	if (filter != mDataFilter) {
-		EndDrag();
-
 		mDataFilter = filter;
 
 		PruneSelection();
@@ -1078,29 +671,13 @@ void RaptorEditor::SetDataFilter(eDataFilter filter)
 	ShowMode();
 }
 
-void RaptorEditor::ReloadScripts()
-{
-	// The drag's state is in the scripts that are about to be reloaded
-	EndDrag();
-
-	gScriptManager->ReloadAllScripts();
-
-	for (EditorTool& tool : mTools) {
-		tool.ReloadHotFunctions();
-	}
-
-	// The scripts start over with fresh globals
-	SyncSelection();
-	mpCurrentTool->Enter();
-}
+void RaptorEditor::ReloadScripts() { gScriptManager->ReloadAllScripts(); }
 
 void RaptorEditor::SubmitToolState(const EditorToolState& state)
 {
 	// The selected tool and the transform marker belong to the editor, so only the snap settings are taken
 	mToolState.ToolSnapLevel = std::clamp(state.ToolSnapLevel, 0, scSnapLevelCount - 1);
 	mToolState.ToolSnapEnabled = state.ToolSnapEnabled;
-
-	SyncCurrentTool();
 }
 
 float32 RaptorEditor::GetSnapStep() const
@@ -1111,8 +688,6 @@ float32 RaptorEditor::GetSnapStep() const
 void RaptorEditor::AdjustSnapLevel(int32 direction)
 {
 	mToolState.ToolSnapLevel = std::clamp(mToolState.ToolSnapLevel + direction, 0, scSnapLevelCount - 1);
-
-	SyncCurrentTool();
 }
 
 float32 RaptorEditor::GetAngleSnapStep() const
@@ -1130,6 +705,11 @@ Vec3f RaptorEditor::SnapToGrid(const Vec3f position) const
 		return position;
 	}
 
+	return RoundToGrid(position);
+}
+
+Vec3f RaptorEditor::RoundToGrid(const Vec3f position) const
+{
 	const float32 step = GetSnapStep();
 
 	return Vec3f(simd::Round((position / step).mIntrin)) * step;
@@ -1148,16 +728,6 @@ void RaptorEditor::SyncSelection()
 	}
 
 	mToolSelection.SelectionSize = static_cast<int32>(count);
-
-	SyncCurrentTool();
-}
-
-void RaptorEditor::SyncCurrentTool()
-{
-	mToolState.SelectedTool = mCurrentToolType;
-	mToolState.pTransformMarkerObject = (gWorld->pPrototype != nullptr) ? gWorld->pPrototype->pXFormObject : nullptr;
-
-	mpCurrentTool->Sync(mToolState, mToolSelection);
 }
 
 
@@ -1191,11 +761,14 @@ bool RaptorEditor::IsObjectSelectable(const Object* object) const
 		return false;
 	}
 
+	if (mCurrentTool == eEditorTool::Light) {
+		return false;
+	}
+
 	if (!CanEditObject(object)) {
-		// A placed subview is one object, which only the Translate and Rotate tools can work with. Nothing outside
+		// A placed subview is one object, which only the Select and Rotate tools can work with. Nothing outside
 		// of the subview being edited can be selected.
-		return !IsEditingSubview() &&
-			   (mCurrentToolType == eEditorTool::Translate || mCurrentToolType == eEditorTool::Rotate);
+		return !IsEditingSubview() && (mCurrentTool == eEditorTool::Select || mCurrentTool == eEditorTool::Rotate);
 	}
 
 	if (!IsDataMode()) {
@@ -1341,29 +914,16 @@ bool RaptorEditor::IsSpawnPointShown() const
 
 void RaptorEditor::SelectSpawn()
 {
-	if (mbSpawnSelected) {
+	if (mbSpawnSelected || !IsSpawnPointShown() || mCurrentTool != eEditorTool::Select) {
 		return;
 	}
 
 	ClearSelection();
 
 	mbSpawnSelected = true;
-	mSpawnEditor.Enter();
 }
 
-void RaptorEditor::DeselectSpawn()
-{
-	if (!mbSpawnSelected) {
-		return;
-	}
-
-	if (mbDragging && mbDraggingSpawn) {
-		CancelDrag();
-	}
-
-	mbSpawnSelected = false;
-	mSpawnEditor.Leave();
-}
+void RaptorEditor::DeselectSpawn() { mbSpawnSelected = false; }
 
 void RaptorEditor::ClearSelection()
 {
@@ -1384,7 +944,26 @@ void RaptorEditor::SetStoredMaterial(Object* object, MaterialID material)
 	}
 
 	mSelection.SetStoredMaterial(object, material);
-	mLastUsedMaterial = material;
+
+	if (object->IsDecal()) {
+		mLastDecalMaterial = material;
+	}
+	else {
+		mLastUsedMaterial = material;
+	}
+}
+
+MaterialID RaptorEditor::GetNewDecalMaterial() const
+{
+	if (gWorld->pPrototype == nullptr) {
+		return MaterialID::scNull;
+	}
+
+	if (!mLastDecalMaterial.IsNull() && gWorld->pPrototype->GetIDForMaterial(mLastDecalMaterial).IsValid()) {
+		return mLastDecalMaterial;
+	}
+
+	return gWorld->pPrototype->GetDefaultMaterial();
 }
 
 MaterialID RaptorEditor::GetNewBrushMaterial() const
@@ -1432,18 +1011,6 @@ void RaptorEditor::DeleteObject(Object* object, int32 group_size)
 		object, planes, ObjectSnapshot::Capture(*object, mSelection.GetStoredMaterial(object)), group_size);
 }
 
-void RaptorEditor::CreateObjectAtCrosshair()
-{
-	const Ref<PerspectiveCamera>& camera = gWorld->Player.pCamera;
-
-	const physics::RayResult hit = gPhysics->pBackend->Raycast(camera->Position,
-															   camera->GetForwardVector() * scCreateRange);
-
-	const Vec3f origin = SnapToGrid(hit.bHit ? hit.Point : Vec3f::sZero);
-
-	SelectObject(EmplaceEditOperation<CreateOperation>(origin, 1, GetNewBrushMaterial()).GetCreated(), false);
-}
-
 static bool IsCreatableDataKind(eDataFilter filter)
 {
 	return filter == eDataFilter::ProbeVolumes || filter == eDataFilter::ReflectionProbes ||
@@ -1481,31 +1048,6 @@ Object* RaptorEditor::CreateDataBrush(const Brush::PlaneList& planes, const Vec3
 	}
 
 	return created;
-}
-
-void RaptorEditor::CreateDataBrushAtCrosshair()
-{
-	if (!IsCreatableDataKind(mDataFilter)) {
-		LogWarning(LC_CORE, "Pick Probe Volumes, Reflection Probes, Volumes, Collision or Map Bounds in the Data "
-							"filter to create one");
-		return;
-	}
-
-	const Ref<PerspectiveCamera>& camera = gWorld->Player.pCamera;
-
-	const physics::RayResult hit = gPhysics->pBackend->Raycast(camera->Position,
-															   camera->GetForwardVector() * scCreateRange);
-
-	const Vec3f base = SnapToGrid(hit.bHit ? hit.Point : camera->Position);
-	const Vec3f center = base + Vec3f(0.0f, scDefaultDataBrushHalfExtent.Y, 0.0f);
-
-	Vec3f position;
-	const Brush brush = gWorld->pPrototype->MakeWorldBox(center - scDefaultDataBrushHalfExtent,
-														 center + scDefaultDataBrushHalfExtent, position);
-
-	if (brush.IsValid()) {
-		CreateDataBrush(brush.Planes, position);
-	}
 }
 
 Object* RaptorEditor::CreateReflectionProbeAtPlayer()
@@ -1731,6 +1273,164 @@ void RaptorEditor::DupeSelection()
 	SyncSelection();
 }
 
+bool RaptorEditor::ClipObject(Object* object, const Vec3f point_a, const Vec3f point_b, const Vec3f direction)
+{
+	Blockout* blockout = gWorld->pPrototype;
+
+	if (object == nullptr || blockout == nullptr || IsSimulationMode() || !CanEditObject(object)) {
+		return false;
+	}
+
+	const Brush* brush = blockout->GetBrush(object);
+
+	if (brush == nullptr) {
+		return false;
+	}
+
+	const Brush::PlaneList planes_before = brush->Planes;
+	Brush::PlaneList kept_planes;
+	Brush::PlaneList split_planes;
+
+	ObjectSnapshot split_snapshot = ObjectSnapshot::Capture(*object, mSelection.GetStoredMaterial(object));
+	split_snapshot.ObjectName = Name();
+
+	if (!blockout->GetClipPieces(object, point_a, point_b, direction, kept_planes, split_planes,
+								 split_snapshot.Position)) {
+		return false;
+	}
+
+	EmplaceEditOperation<BrushEditOperation>(object, planes_before, kept_planes, 2);
+	EmplaceEditOperation<CreateBrushOperation>(split_planes, split_snapshot, 2);
+
+	return true;
+}
+
+static bool CanBeSubtractedFrom(const Object* object)
+{
+	return !object->IsVolume() && !object->IsReflectionProbe() && !object->IsSpawn() && !object->IsDecal() &&
+		   !gWorld->pPrototype->IsDynamic(object);
+}
+
+static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter_ids, bool keep_cutter)
+{
+	const EditorSelection& selection = gEditor->GetSelection();
+
+	std::vector<std::unique_ptr<ObjectEditOperation>> ops;
+	std::vector<ObjectID> op_object_ids;
+	uint32 cut_count = 0;
+
+	std::vector<ObjectID> target_ids;
+
+	for (ObjectID id : gWorld->pPrototype->BlockoutObjects) {
+		const bool is_cutter = std::any_of(cutter_ids.begin(), cutter_ids.end(),
+										   [&](ObjectID other) { return other.GetID() == id.GetID(); });
+
+		if (!is_cutter) {
+			target_ids.push_back(id);
+		}
+	}
+
+	for (ObjectID id : target_ids) {
+		Object* target = gObjectManager->GetObject(id);
+
+		if (target == nullptr || !gEditor->CanEditObject(target) || !CanBeSubtractedFrom(target)) {
+			continue;
+		}
+
+		std::vector<Brush::PlaneList> pieces;
+		std::vector<Vec3f> positions;
+
+		if (!gWorld->pPrototype->GetSubtractPieces(target, cutter, pieces, positions)) {
+			continue;
+		}
+
+		const Brush* brush = gWorld->pPrototype->GetBrush(target);
+		const MaterialID material = selection.GetStoredMaterial(target);
+
+		cut_count++;
+
+		if (pieces.empty()) {
+			ops.push_back(
+				std::make_unique<DeleteOperation>(target, brush->Planes, ObjectSnapshot::Capture(*target, material)));
+			op_object_ids.push_back(id);
+
+			continue;
+		}
+
+		ops.push_back(std::make_unique<BrushEditOperation>(target, brush->Planes, pieces[0]));
+		op_object_ids.push_back(id);
+
+		for (uint32 i = 1; i < pieces.size(); i++) {
+			ObjectSnapshot snapshot = ObjectSnapshot::Capture(*target, material);
+			snapshot.ObjectName = Name();
+			snapshot.Position = positions[i];
+
+			ops.push_back(std::make_unique<CreateBrushOperation>(pieces[i], snapshot));
+			op_object_ids.push_back(ObjectID::scNull);
+		}
+	}
+
+	if (cut_count == 0) {
+		return 0;
+	}
+
+	if (!keep_cutter) {
+		const Brush* cutter_brush = gWorld->pPrototype->GetBrush(cutter);
+
+		ops.push_back(std::make_unique<DeleteOperation>(
+			cutter, cutter_brush->Planes, ObjectSnapshot::Capture(*cutter, selection.GetStoredMaterial(cutter))));
+		op_object_ids.push_back(cutter->ID);
+	}
+
+	if (ops.size() > scMaxSubtractOperations) {
+		LogWarning("Subtracting '{}' would change too many blockouts at once", cutter->Name.Get());
+		return 0;
+	}
+
+	for (uint32 i = 0; i < ops.size(); i++) {
+		ops[i]->GroupSize = static_cast<int32>(ops.size());
+
+		if (!op_object_ids[i].IsInvalid()) {
+			ops[i]->Retarget(gObjectManager->GetObject(op_object_ids[i]));
+		}
+
+		gEditor->PushEditOperation(std::move(ops[i]));
+	}
+
+	return cut_count;
+}
+
+uint32 RaptorEditor::SubtractSelection(bool keep_cutters)
+{
+	Blockout* blockout = gWorld->pPrototype;
+
+	if (blockout == nullptr || IsSimulationMode()) {
+		return 0;
+	}
+
+	std::vector<ObjectID> cutter_ids;
+
+	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
+		Object* object = mSelection.GetObject(i);
+
+		if (blockout->GetBrush(object) != nullptr && !object->IsDecal()) {
+			cutter_ids.push_back(object->ID);
+		}
+	}
+
+	uint32 cut_count = 0;
+
+	for (ObjectID id : cutter_ids) {
+		Object* cutter = gObjectManager->GetObject(id);
+
+		if (cutter != nullptr && blockout->GetBrush(cutter) != nullptr) {
+			cut_count += SubtractCutter(cutter, cutter_ids, keep_cutters);
+		}
+	}
+
+	return cut_count;
+}
+
 /////////////////////////////////////
 // Subviews
 /////////////////////////////////////
@@ -1803,8 +1503,6 @@ bool RaptorEditor::CreateSubviewFromSelection(const String& name)
 		return false;
 	}
 
-	EndDrag();
-
 	BBox bounds;
 
 	if (!blockout->GetBrushBounds(objects, count, bounds)) {
@@ -1831,7 +1529,7 @@ bool RaptorEditor::CreateSubviewFromSelection(const String& name)
 
 	LogInfo(LC_CORE, "Made the subview '{}' from {} brush(es)", blockout->GetSubviewName(instance), count);
 
-	SetTool(eEditorTool::Translate);
+	SetTool(eEditorTool::Select);
 	SelectSubview(instance, false);
 
 	mbForcePanelSync = true;
@@ -1850,13 +1548,11 @@ bool RaptorEditor::EnterSubview()
 	const Object* selected = mSelection.GetLast();
 
 	if (selected == nullptr || selected->SubviewInstance == Blockout::scNoSubview) {
-		LogWarning(LC_CORE, "Select a subview with the Translate tool to enter it");
+		LogWarning(LC_CORE, "Select a placed subview to enter it");
 		return false;
 	}
 
 	const uint32 instance = selected->SubviewInstance;
-
-	EndDrag();
 
 	// Edits made from here on are to the subview, so they can't be mixed with undoing edits to the level
 	ForgetObjects();
@@ -1880,8 +1576,6 @@ void RaptorEditor::LeaveSubview()
 	if (blockout == nullptr || !blockout->IsEditingSubview()) {
 		return;
 	}
-
-	EndDrag();
 
 	// The other copies of the subview are rebuilt, which the history can't follow
 	ForgetObjects();
@@ -1913,8 +1607,6 @@ bool RaptorEditor::PlaceSubview(const String& name)
 		return false;
 	}
 
-	EndDrag();
-
 	const Ref<PerspectiveCamera>& camera = gWorld->Player.pCamera;
 
 	const physics::RayResult hit = gPhysics->pBackend->Raycast(camera->Position,
@@ -1926,12 +1618,12 @@ bool RaptorEditor::PlaceSubview(const String& name)
 		placement.Position = SnapToGrid(hit.Point);
 	}
 	else {
-		placement.Position = SnapToGrid(camera->Position + camera->GetForwardVector() * scPickRange);
+		placement.Position = SnapToGrid(camera->Position + camera->GetForwardVector() * scPlaceDistance);
 	}
 
 	EmplaceEditOperation<SubviewPlaceOperation>(instance, placement);
 
-	SetTool(eEditorTool::Translate);
+	SetTool(eEditorTool::Select);
 	SelectSubview(instance, false);
 
 	return true;
@@ -1956,8 +1648,6 @@ uint32 RaptorEditor::DissolveSelectedSubviews()
 		}
 	}
 
-	EndDrag();
-
 	for (uint32 i = 0; i < count; i++) {
 		EmplaceEditOperation<SubviewDissolveOperation>(instances[i], static_cast<int32>(count));
 	}
@@ -1969,8 +1659,6 @@ uint32 RaptorEditor::DissolveSelectedSubviews()
 
 void RaptorEditor::DrawSubviews()
 {
-	static const Color scEditedColor = Color::FromRGBA(60, 220, 255, 255);
-
 	Blockout* blockout = gWorld->pPrototype;
 
 	if (blockout == nullptr || !blockout->IsEditingSubview()) {
@@ -1980,7 +1668,7 @@ void RaptorEditor::DrawSubviews()
 	BBox bounds;
 
 	if (blockout->GetSubviewBounds(blockout->GetActiveSubview(), bounds)) {
-		renderer::gDebugDraw->WireBox(bounds, scEditedColor);
+		renderer::gDebugDraw->WireBox(bounds, mTheme.Viewport.EditedBounds);
 	}
 }
 
@@ -2000,7 +1688,6 @@ void RaptorEditor::Redo()
 
 void RaptorEditor::ForgetObjects()
 {
-	CancelDrag();
 	DeselectSpawn();
 
 	mSelection.Clear();
@@ -2017,7 +1704,11 @@ void RaptorEditor::MarkSaved()
 	mbUntrackedChanges = false;
 }
 
-void RaptorEditor::MarkModified() { mbUntrackedChanges = true; }
+void RaptorEditor::MarkModified()
+{
+	mbUntrackedChanges = true;
+	++mUntrackedEditCount;
+}
 
 
 /////////////////////////////////////
@@ -2035,6 +1726,11 @@ bool RaptorEditor::RunCommand(const String& name)
 	if (command == nullptr) {
 		return false;
 	}
+
+	mToolState.SelectedTool = mCurrentTool;
+	mToolState.pTransformMarkerObject = (gWorld->pPrototype != nullptr) ? gWorld->pPrototype->pXFormObject : nullptr;
+
+	SyncSelection();
 
 	// Commands work on the selection, so give the script the current one
 	mpCommandScript->CallFunction<void(const EditorToolState*)>("tool_state_receive", &mToolState);

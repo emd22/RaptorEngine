@@ -2,6 +2,7 @@
 
 #ifdef FX_IS_EDITOR
 
+#include "EditorTool.hpp"
 #include "TopViewPlane.hpp"
 
 #include <Color.hpp>
@@ -114,6 +115,7 @@ enum class eTopViewBrushKind : uint8
 	Volume,
 	NvBrush,
 	DBound,
+	Decal,
 };
 
 struct TopViewEdge
@@ -180,14 +182,38 @@ struct TopViewBrush
 	bool operator==(const TopViewBrush& other) const = default;
 };
 
+enum class eTopViewMarkerKind : uint8
+{
+	Light,
+	Spawn,
+};
+
+struct TopViewMarker
+{
+	eTopViewMarkerKind Kind = eTopViewMarkerKind::Light;
+	uint32 LightId = 0;
+
+	Vec3f Position = Vec3f::sZero;
+	Vec3f AimOrigin = Vec3f::sZero;
+	Vec3f Direction = Vec3f(0.0f, 0.0f, 1.0f);
+
+	Vec3f BoundsMin = Vec3f::sZero;
+	Vec3f BoundsMax = Vec3f::sZero;
+
+	bool bSelected = false;
+	bool bSelectable = false;
+
+	bool operator==(const TopViewMarker& other) const = default;
+};
+
 struct TopViewState
 {
 	bool bActive = false;
 	bool bDataMode = false;
+	bool bSimulating = false;
 	bool bSnapEnabled = true;
-	bool bCanCreate = true;
-	bool bCanRotate = true;
-	bool bCanFace = true;
+
+	uint32 AvailableTools = 0;
 
 	float32 MinFaceThickness = 0.1f;
 
@@ -204,6 +230,7 @@ struct TopViewState
 	uint32 HiddenCount = 0;
 
 	DynArray<TopViewBrush> Brushes;
+	DynArray<TopViewMarker> Markers;
 
 	TopViewState() = default;
 	TopViewState(TopViewState&& other) = default;
@@ -219,10 +246,9 @@ struct TopViewState
 
 		bActive = other.bActive;
 		bDataMode = other.bDataMode;
+		bSimulating = other.bSimulating;
 		bSnapEnabled = other.bSnapEnabled;
-		bCanCreate = other.bCanCreate;
-		bCanRotate = other.bCanRotate;
-		bCanFace = other.bCanFace;
+		AvailableTools = other.AvailableTools;
 
 		MinFaceThickness = other.MinFaceThickness;
 
@@ -237,6 +263,7 @@ struct TopViewState
 		HiddenCount = other.HiddenCount;
 
 		Brushes = other.Brushes.Clone();
+		Markers = other.Markers.Clone();
 
 		return *this;
 	}

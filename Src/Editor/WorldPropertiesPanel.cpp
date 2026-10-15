@@ -7,10 +7,8 @@
 #include <wx/button.h>
 #include <wx/checkbox.h>
 #include <wx/choice.h>
-#include <wx/collpane.h>
 #include <wx/panel.h>
 #include <wx/sizer.h>
-#include <wx/statbox.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
 #include <wx/valnum.h>
@@ -56,32 +54,16 @@ static void SetCameraCVar(const char* name, float32 value)
 	gEditor->MarkModified();
 }
 
-static wxCollapsiblePane* MakeBorderedPane(wxWindow* parent, wxSizer* sizer, const char* title)
-{
-	wxPanel* frame = new wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_SIMPLE);
-	wxBoxSizer* frame_sizer = new wxBoxSizer(wxVERTICAL);
-
-	wxCollapsiblePane* pane = new wxCollapsiblePane(frame, wxID_ANY, title, wxDefaultPosition, wxDefaultSize,
-													wxCP_DEFAULT_STYLE | wxCP_NO_TLW_RESIZE);
-
-	frame_sizer->Add(pane, wxSizerFlags(1).Expand());
-	frame->SetSizer(frame_sizer);
-
-	sizer->Add(frame, wxSizerFlags().Expand().Border());
-
-	return pane;
-}
-
 WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, wxID_ANY)
 {
 	wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
 
-	wxStaticText* title = new wxStaticText(this, wxID_ANY, "World");
-	title->SetFont(title->GetFont().Bold());
-	sizer->Add(title, wxSizerFlags().Border(wxALL, 6));
+	PropertySection* world_section = new PropertySection(this, "World");
+	wxWindow* world_body = world_section->GetBody();
+	sizer->Add(world_section, wxSizerFlags().Expand());
 
-	mpPositionField = new Vector3Field(this, "Player", Vec2f(-100000.0f, 100000.0f));
-	sizer->Add(mpPositionField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
+	mpPositionField = new Vector3Field(world_body, "Player", Vec2f(-100000.0f, 100000.0f));
+	world_section->AddRow(*mpPositionField);
 
 	mpPositionField->SetOnChange(
 		[this](const Vec3f value)
@@ -90,96 +72,70 @@ WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, w
 			thread::PostToGame([value] { gWorld->Player.TeleportTo(value); });
 		});
 
-	{
-		wxBoxSizer* debug_row = new wxBoxSizer(wxHORIZONTAL);
-		debug_row->Add(new wxStaticText(this, wxID_ANY, "Debug Layer"), wxSizerFlags().CenterVertical());
+	mpDebugLayerChoice = new wxChoice(world_body, wxID_ANY);
 
-		mpDebugLayerChoice = new wxChoice(this, wxID_ANY);
-
-		for (const DebugLayer& layer : scDebugLayers) {
-			mpDebugLayerChoice->Append(wxString::FromUTF8(layer.pcName));
-		}
-
-		debug_row->Add(mpDebugLayerChoice, wxSizerFlags().Border(wxLEFT, 6));
-		sizer->Add(debug_row, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
-
-		mpDebugLayerChoice->Bind(wxEVT_CHOICE,
-								 [this](wxCommandEvent&)
-								 {
-									 const int32 selection = mpDebugLayerChoice->GetSelection();
-									 if (selection < 0 || selection >= static_cast<int32>(std::size(scDebugLayers))) {
-										 return;
-									 }
-
-									 mShownDebugMask = static_cast<int64>(scDebugLayers[selection].Mask);
-									 thread::PostToGame([mask = mShownDebugMask]
-														{ gCVars->Set("r_debug_bounds", mask); });
-								 });
+	for (const DebugLayer& layer : scDebugLayers) {
+		mpDebugLayerChoice->Append(wxString::FromUTF8(layer.pcName));
 	}
 
+	world_section->AddRow("Debug Layer", mpDebugLayerChoice);
+
+	mpDebugLayerChoice->Bind(wxEVT_CHOICE,
+							 [this](wxCommandEvent&)
+							 {
+								 const int32 selection = mpDebugLayerChoice->GetSelection();
+								 if (selection < 0 || selection >= static_cast<int32>(std::size(scDebugLayers))) {
+									 return;
+								 }
+
+								 mShownDebugMask = static_cast<int64>(scDebugLayers[selection].Mask);
+								 thread::PostToGame([mask = mShownDebugMask] { gCVars->Set("r_debug_bounds", mask); });
+							 });
+
 	{
-		mpCameraPane = MakeBorderedPane(this, sizer, "Camera");
+		PropertySection* camera_section = new PropertySection(this, "Camera", false);
+		wxWindow* camera_body = camera_section->GetBody();
+		sizer->Add(camera_section, wxSizerFlags().Expand());
 
-		wxWindow* cam_pane_win = mpCameraPane->GetPane();
-		wxSizer* cam_pane_sizer = new wxBoxSizer(wxVERTICAL);
-
-		mpApertureField = new FloatField(cam_pane_win, "Aperture (f/)", Vec2f(0.7f, 64.0f));
+		mpApertureField = new FloatField(camera_body, "Aperture (f/)", Vec2f(0.7f, 64.0f));
 		mpApertureField->SetOnChange([](const float value)
 									 { thread::PostToGame([value] { SetCameraCVar("r_aperture", value); }); });
-		cam_pane_sizer->Add(mpApertureField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
+		camera_section->AddRow(*mpApertureField);
 
-		mpShutterField = new FloatField(cam_pane_win, "Shutter (1/s)", Vec2f(1.0f, 8000.0f));
+		mpShutterField = new FloatField(camera_body, "Shutter (1/s)", Vec2f(1.0f, 8000.0f));
 		mpShutterField->SetOnChange([](const float value)
 									{ thread::PostToGame([value] { SetCameraCVar("r_shutter", 1.0f / value); }); });
-		cam_pane_sizer->Add(mpShutterField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
+		camera_section->AddRow(*mpShutterField);
 
-		mpIsoField = new FloatField(cam_pane_win, "ISO", Vec2f(25.0f, 25600.0f));
+		mpIsoField = new FloatField(camera_body, "ISO", Vec2f(25.0f, 25600.0f));
 		mpIsoField->SetOnChange([](const float value)
 								{ thread::PostToGame([value] { SetCameraCVar("r_iso", value); }); });
-		cam_pane_sizer->Add(mpIsoField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
+		camera_section->AddRow(*mpIsoField);
 
-		mpCompensationField = new FloatField(cam_pane_win, "Compensation (EV)", Vec2f(-10.0f, 10.0f));
+		mpCompensationField = new FloatField(camera_body, "Compensation (EV)", Vec2f(-10.0f, 10.0f));
 		mpCompensationField->SetOnChange([](const float value)
 										 { thread::PostToGame([value] { SetCameraCVar("r_exposure_ev", value); }); });
-		cam_pane_sizer->Add(mpCompensationField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
-
-		cam_pane_win->SetSizer(cam_pane_sizer);
-		cam_pane_sizer->SetSizeHints(cam_pane_win);
-
-		mpCameraPane->Bind(wxEVT_COLLAPSIBLEPANE_CHANGED, [this](wxCollapsiblePaneEvent&) { OnPaneChanged(); });
+		camera_section->AddRow(*mpCompensationField);
 	}
 
-	BuildReflectionPane(sizer);
+	BuildReflectionSection(sizer);
 
 	SetSizer(sizer);
 
 	ApplyState(WorldPanelState {});
 }
 
-void WorldPropertiesPanel::OnPaneChanged()
+void WorldPropertiesPanel::BuildReflectionSection(wxSizer* sizer)
 {
-	mpCameraPane->GetParent()->Layout();
-	mpReflectionPane->GetParent()->Layout();
-	Layout();
+	PropertySection* section = new PropertySection(this, "Probes", false);
+	wxWindow* body = section->GetBody();
+	sizer->Add(section, wxSizerFlags().Expand());
 
-	if (GetParent() != nullptr) {
-		GetParent()->Layout();
-		GetParent()->FitInside();
-	}
-}
+	mpReflectionStatus = new wxStaticText(body, wxID_ANY, wxEmptyString);
+	section->AddWide(mpReflectionStatus);
 
-void WorldPropertiesPanel::BuildReflectionPane(wxSizer* sizer)
-{
-	mpReflectionPane = MakeBorderedPane(this, sizer, "Probes");
-
-	wxWindow* pane = mpReflectionPane->GetPane();
-	wxSizer* pane_sizer = new wxBoxSizer(wxVERTICAL);
-
-	mpReflectionStatus = new wxStaticText(pane, wxID_ANY, wxEmptyString);
-	pane_sizer->Add(mpReflectionStatus, wxSizerFlags().Expand().Border(wxALL, 6));
-
-	mpReflectionEnabledCheck = new wxCheckBox(pane, wxID_ANY, "Enabled");
-	pane_sizer->Add(mpReflectionEnabledCheck, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+	mpReflectionEnabledCheck = new wxCheckBox(body, wxID_ANY, "Enabled");
+	section->AddWide(mpReflectionEnabledCheck);
 
 	mpReflectionEnabledCheck->Bind(wxEVT_CHECKBOX,
 								   [this](wxCommandEvent&)
@@ -188,8 +144,8 @@ void WorldPropertiesPanel::BuildReflectionPane(wxSizer* sizer)
 														  { gCVars->Set("r_reflection_probes", value); });
 								   });
 
-	mpReflectionFallbackCheck = new wxCheckBox(pane, wxID_ANY, "Reflection fallback probe");
-	pane_sizer->Add(mpReflectionFallbackCheck, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+	mpReflectionFallbackCheck = new wxCheckBox(body, wxID_ANY, "Reflection fallback probe");
+	section->AddWide(mpReflectionFallbackCheck);
 
 	mpReflectionFallbackCheck->Bind(wxEVT_CHECKBOX,
 									[this](wxCommandEvent&)
@@ -202,8 +158,8 @@ void WorldPropertiesPanel::BuildReflectionPane(wxSizer* sizer)
 											});
 									});
 
-	mpShowProbeVolumesCheck = new wxCheckBox(pane, wxID_ANY, "Show probe volumes");
-	pane_sizer->Add(mpShowProbeVolumesCheck, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+	mpShowProbeVolumesCheck = new wxCheckBox(body, wxID_ANY, "Show probe volumes");
+	section->AddWide(mpShowProbeVolumesCheck);
 
 	mpShowProbeVolumesCheck->Bind(wxEVT_CHECKBOX,
 								  [this](wxCommandEvent&)
@@ -212,40 +168,31 @@ void WorldPropertiesPanel::BuildReflectionPane(wxSizer* sizer)
 														 { gCVars->Set("r_show_volumes", value); });
 								  });
 
+	mpReflectionDebugChoice = new wxChoice(body, wxID_ANY);
 
-	{
-		wxBoxSizer* debug_row = new wxBoxSizer(wxHORIZONTAL);
-		debug_row->Add(new wxStaticText(pane, wxID_ANY, "Reflection View"), wxSizerFlags().CenterVertical());
-
-		mpReflectionDebugChoice = new wxChoice(pane, wxID_ANY);
-
-		for (const char* view : scReflectionDebugViews) {
-			mpReflectionDebugChoice->Append(wxString::FromUTF8(view));
-		}
-
-		debug_row->Add(mpReflectionDebugChoice, wxSizerFlags().Border(wxLEFT, 6));
-		pane_sizer->Add(debug_row, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
-
-
-		mpReflectionDebugChoice->Bind(wxEVT_CHOICE,
-									  [this](wxCommandEvent&)
-									  {
-										  const int32 selection = mpReflectionDebugChoice->GetSelection();
-										  if (selection < 0) {
-											  return;
-										  }
-
-										  mShownReflectionDebug = selection;
-										  thread::PostToGame([selection]
-															 { gCVars->Set("r_reflection_debug", selection); });
-									  });
+	for (const char* view : scReflectionDebugViews) {
+		mpReflectionDebugChoice->Append(wxString::FromUTF8(view));
 	}
+
+	section->AddRow("Reflection View", mpReflectionDebugChoice);
+
+	mpReflectionDebugChoice->Bind(wxEVT_CHOICE,
+								  [this](wxCommandEvent&)
+								  {
+									  const int32 selection = mpReflectionDebugChoice->GetSelection();
+									  if (selection < 0) {
+										  return;
+									  }
+
+									  mShownReflectionDebug = selection;
+									  thread::PostToGame([selection] { gCVars->Set("r_reflection_debug", selection); });
+								  });
 
 	wxGridSizer* buttons = new wxGridSizer(2, 4, 4);
 
 	const auto add_button = [&](const char* label, std::function<void()> action)
 	{
-		wxButton* button = new wxButton(pane, wxID_ANY, label);
+		wxButton* button = new wxButton(body, wxID_ANY, label);
 		button->Bind(wxEVT_BUTTON, [action = std::move(action)](wxCommandEvent&) { thread::PostToGame(action); });
 		buttons->Add(button, wxSizerFlags().Expand());
 	};
@@ -267,12 +214,7 @@ void WorldPropertiesPanel::BuildReflectionPane(wxSizer* sizer)
 			   });
 	add_button("Save Probes", [] { gProbeManager->SaveProbes(); });
 
-	pane_sizer->Add(buttons, wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
-
-	pane->SetSizer(pane_sizer);
-	pane_sizer->SetSizeHints(pane);
-
-	mpReflectionPane->Bind(wxEVT_COLLAPSIBLEPANE_CHANGED, [this](wxCollapsiblePaneEvent&) { OnPaneChanged(); });
+	section->AddWide(buttons);
 }
 
 void WorldPropertiesPanel::ApplyReflectionState(const WorldPanelState& state)

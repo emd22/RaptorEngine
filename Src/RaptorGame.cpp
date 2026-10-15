@@ -288,7 +288,7 @@ void RaptorGame::CreateGame()
 	gEditor->SetReloadHandler(editor::eReloadTarget::Clean, [this] { CleanWorld(); });
 
 	// Start out editing
-	gEditor->SetTool(editor::eEditorTool::Translate);
+	gEditor->SetView(editor::eEditorView::Split);
 #endif
 
 	// Start the frame timer now, otherwise the first Tick() measures from counter zero (time since boot) and steps
@@ -391,7 +391,7 @@ static FX_FORCE_INLINE Vec3f GetEditorMovementVector()
 void RaptorGame::ToggleEditorMode()
 {
 #ifdef FX_IS_EDITOR
-	gEditor->SetTool(gEditor->IsSimulationMode() ? editor::eEditorTool::Translate : editor::eEditorTool::None);
+	gEditor->SetSimulating(!gEditor->IsSimulationMode());
 #endif
 }
 
@@ -505,14 +505,20 @@ void RaptorGame::ProcessControls()
 
 	gWorld->Player.Weapons.SetEnabled(is_simulation_mode);
 
+#ifdef FX_IS_EDITOR
+	const bool is_grabbing = gEditor->IsGrabbing();
+#else
+	const bool is_grabbing = false;
+#endif
+
 	if (is_simulation_mode) {
 		eWeaponInputFlags input_flags = eWeaponInputFlags::None;
 
-		if (was_mouse_locked && ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
+		if (was_mouse_locked && !is_grabbing && ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
 			input_flags |= eWeaponInputFlags::FirePressed;
 		}
 
-		if (ControlManager::IsMouseLocked() && ControlManager::IsKeyDown(eKey::FX_MOUSE_LEFT)) {
+		if (ControlManager::IsMouseLocked() && !is_grabbing && ControlManager::IsKeyDown(eKey::FX_MOUSE_LEFT)) {
 			input_flags |= eWeaponInputFlags::FireHeld;
 		}
 

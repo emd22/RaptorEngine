@@ -5,14 +5,13 @@
 
 #include <wx/frame.h>
 
-#include <Core/StackArray.hpp>
 #include <Core/Types.hpp>
 #include <atomic>
 #include <functional>
+#include <memory>
 
 class wxBoxSizer;
 class wxButton;
-class wxChoice;
 class wxMenuItem;
 class wxPanel;
 class wxScrolledWindow;
@@ -28,14 +27,15 @@ class CVarListWindow;
 class MaterialPickerPanel;
 class AtlasPackerWindow;
 
+class EditorToolbar;
 class EditorViewport;
-class OutlineToggleButton;
 class TopViewPanel;
 
 class EditorFrame : public wxFrame
 {
 public:
 	EditorFrame(const wxString& title, const wxSize& viewport_size);
+	~EditorFrame() override;
 
 	FX_FORCE_INLINE EditorViewport* GetViewport() { return mpViewport; }
 	FX_FORCE_INLINE TopViewPanel* GetTopViewPanel() { return mpTopViewPanel; }
@@ -55,6 +55,7 @@ public:
 
 	/// Highlights the button of the selected tool
 	void ShowSelectedTool(const eEditorTool tool);
+	void ShowSimulating(bool simulating);
 
 	void ShowMode(const eEditorMode mode, const eDataFilter filter, const uint32 available_tools);
 
@@ -81,6 +82,9 @@ public:
 	void SwitchBakedOrProto();
 	void ReloadPrototype();
 
+	void SelectTheme(uint32 index);
+	void ReloadTheme();
+
 private:
 	void OnClose(wxCloseEvent& event);
 	void OnActivate(wxActivateEvent& event);
@@ -88,6 +92,7 @@ private:
 	void SetSidePanelCollapsed(bool collapsed);
 	void SetMaterialPickerShown(bool shown);
 	void FocusActiveView();
+	void ApplyTheme();
 	void ApplySplitLayout(const eEditorView view);
 
 	void RunAfterUnsavedCheck(const wxString& question, std::function<void()> game_task);
@@ -108,17 +113,13 @@ private:
 	wxBoxSizer* mpComponentSizer = nullptr;
 	wxScrolledWindow* mpSideScroller = nullptr;
 	wxButton* mpSideToggleButton = nullptr;
-	wxBoxSizer* mpSideColumn = nullptr;
+	wxButton* mpSideExpandButton = nullptr;
+	wxPanel* mpSidePanel = nullptr;
+	wxSplitterWindow* mpSideSplitter = nullptr;
+	int32 mSidePanelWidth = 0;
 
-	StackArray<OutlineToggleButton*, static_cast<uint32>(eEditorTool::Count)> mToolButtons;
+	std::unique_ptr<EditorToolbar> mpToolbar;
 
-	OutlineToggleButton* mpVisButton = nullptr;
-	OutlineToggleButton* mpDataButton = nullptr;
-	wxChoice* mpDataFilterChoice = nullptr;
-
-	OutlineToggleButton* mpPerspectiveButton = nullptr;
-	OutlineToggleButton* mpTopButton = nullptr;
-	OutlineToggleButton* mpSplitButton = nullptr;
 	wxMenuItem* mpPerspectiveMenuItem = nullptr;
 	wxMenuItem* mpTopMenuItem = nullptr;
 	wxMenuItem* mpSplitMenuItem = nullptr;
@@ -130,8 +131,6 @@ private:
 	bool mbSplitFocusOn2D = false;
 
 	wxPanel* mpRootPanel = nullptr;
-	wxBoxSizer* mpTopBarSizer = nullptr;
-	wxBoxSizer* mpToolsGroup = nullptr;
 
 	eEditorView mView = eEditorView::Perspective;
 

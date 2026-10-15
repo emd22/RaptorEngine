@@ -68,7 +68,12 @@ static PipelineHandle GetPipelineForObject(const Object& object)
 		material = MaterialManagerFwd::GetMaterial(MaterialID::scNull);
 	}
 
-	const ePipelinePass pass = IsTransparentMaterial(material) ? ePipelinePass::ForwardBlend : ePipelinePass::Forward;
+	ePipelinePass pass = ePipelinePass::Forward;
+
+	if (IsTransparentMaterial(material) || object.IsDecal()) {
+		pass = ePipelinePass::ForwardBlend;
+	}
+
 	ePipelineFeatures features = material->GetPipelineFeatures();
 
 	if (object.IsLightmapped()) {
@@ -1140,6 +1145,8 @@ void World::Render(Camera* shadow_camera)
 	if (pCVarShowProbeVolumes->IntValue != 0 || gEditor->IsDataMode()) {
 		DebugDrawProbeVolumes();
 	}
+
+	DebugDrawSelectedDecals();
 #endif
 
 	// DebugDrawWorldGrid();
@@ -1359,6 +1366,29 @@ Object* World::RaycastProbeVolumes(const Vec3f origin, const Vec3f direction, fl
 	out_distance = nearest_distance;
 
 	return nearest;
+}
+
+void World::DebugDrawSelectedDecals()
+{
+#ifdef FX_IS_EDITOR
+	const Color decal_color = Color::FromRGBA(255, 120, 200, 255);
+
+	const auto& selection = gEditor->GetSelection();
+
+	for (uint32 i = 0; i < selection.GetCount(); i++) {
+		Object* object = selection.GetObject(i);
+
+		if (object == nullptr || !object->IsDecal()) {
+			continue;
+		}
+
+		const Vec3f half_extent = (object->Bounds.Max - object->Bounds.Min) * 0.5f;
+		const Vec3f center = (object->Bounds.Max + object->Bounds.Min) * 0.5f;
+
+		gDebugDraw->WireBox(Mat4f::AsScale(half_extent) * Mat4f::AsTranslation(center) * object->GetWorldMatrix(),
+							decal_color);
+	}
+#endif
 }
 
 void World::DebugDrawProbeVolumes()

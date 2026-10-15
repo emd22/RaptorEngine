@@ -2,6 +2,8 @@
 
 #ifdef FX_IS_EDITOR
 
+#include "RaptorEditor.hpp"
+
 #include <ThirdParty/Jolt/Physics/Body/BodyInterface.h>
 
 #include <Color.hpp>
@@ -26,13 +28,33 @@ static constexpr float32 scMaxAcceleration = 60.0f;
 static constexpr float32 scAngularDamping = 8.0f;
 static constexpr float32 scLaunchSpeed = 25.0f;
 
-static const Color scGrabColor = Color::FromRGBA(255, 120, 40, 255);
 
-void GrabEditor::Enter() { Release(); }
+void GrabEditor::Update(float32 delta_time)
+{
+	const bool key_down = ControlManager::IsKeyDown(eKey::FX_KEY_Y);
 
-void GrabEditor::Leave() { Release(); }
+	if (!mbHolding) {
+		if (key_down && ControlManager::IsKeyPressed(eKey::FX_KEY_Y)) {
+			Grab();
+		}
 
-void GrabEditor::Begin()
+		return;
+	}
+
+	if (!key_down) {
+		Release();
+		return;
+	}
+
+	if (ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
+		Launch();
+		return;
+	}
+
+	Hold(delta_time);
+}
+
+void GrabEditor::Grab()
 {
 	Release();
 
@@ -60,12 +82,22 @@ void GrabEditor::Begin()
 	mbHolding = true;
 }
 
-void GrabEditor::Update(float32 delta_time)
+void GrabEditor::Launch()
 {
-	if (!mbHolding) {
-		return;
+	JPH::BodyInterface& bodies = gPhysics->pBackend->GetBodyInterface();
+
+	if (bodies.IsAdded(mBody) && bodies.GetMotionType(mBody) == JPH::EMotionType::Dynamic) {
+		const Vec3f launch = gWorld->Player.pCamera->GetForwardVector() * scLaunchSpeed;
+
+		bodies.ActivateBody(mBody);
+		bodies.SetLinearVelocity(mBody, JPH::Vec3(launch.X, launch.Y, launch.Z));
 	}
 
+	Release();
+}
+
+void GrabEditor::Hold(float32 delta_time)
+{
 	JPH::BodyInterface& bodies = gPhysics->pBackend->GetBodyInterface();
 
 	if (!bodies.IsAdded(mBody) || bodies.GetMotionType(mBody) != JPH::EMotionType::Dynamic) {
@@ -74,16 +106,6 @@ void GrabEditor::Update(float32 delta_time)
 	}
 
 	PerspectiveCamera& camera = *gWorld->Player.pCamera;
-
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_Y)) {
-		const Vec3f launch = camera.GetForwardVector() * scLaunchSpeed;
-
-		bodies.ActivateBody(mBody);
-		bodies.SetLinearVelocity(mBody, JPH::Vec3(launch.X, launch.Y, launch.Z));
-
-		Release();
-		return;
-	}
 
 	const Vec3f target = camera.Position + camera.GetForwardVector() * mDistance;
 	const Vec3f held_point = Vec3f(bodies.GetCenterOfMassTransform(mBody) *
@@ -111,12 +133,8 @@ void GrabEditor::Update(float32 delta_time)
 	bodies.SetLinearAndAngularVelocity(mBody, JPH::Vec3(velocity.X, velocity.Y, velocity.Z),
 									   bodies.GetAngularVelocity(mBody) * std::exp(-scAngularDamping * delta_time));
 
-	renderer::gDebugDraw->Line(held_point, target, scGrabColor);
+	renderer::gDebugDraw->Line(held_point, target, gEditor->GetTheme().Viewport.Grab);
 }
-
-void GrabEditor::Finalize() { Release(); }
-
-void GrabEditor::Cancel() { Release(); }
 
 void GrabEditor::Release()
 {

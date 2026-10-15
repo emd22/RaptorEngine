@@ -5,11 +5,8 @@
 #include "RaptorEditor.hpp"
 
 #include <Color.hpp>
-#include <Controls.hpp>
 #include <Core/String.hpp>
 #include <Engine.hpp>
-#include <Physics/JoltPhysicsBackend.hpp>
-#include <Physics/PhysicsManager.hpp>
 #include <Renderer/DebugDraw.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/Light.hpp>
@@ -20,36 +17,16 @@
 
 namespace fx::editor {
 
-static constexpr float32 scLightPickRange = 40.0f;
-static constexpr float32 scLightPickRadius = 0.3f;
-
-static constexpr float32 scAimFallbackDistance = 10.0f;
-static constexpr float32 scAimRange = 100.0f;
-
 static constexpr float32 scMarkerHalfExtent = 0.12f;
 static constexpr float32 scDirectionLength = 1.5f;
 static constexpr float32 scDirectionTipHalfExtent = 0.05f;
 
 static constexpr float32 scEditTolerance = 0.0005f;
 
-static constexpr float32 scHeightSnapStepsPerSecond = 8.0f;
-
 static constexpr float32 scNewLightRadius = 8.0f;
 static const float32 scNewLightInnerAngle = MathUtil::DegreesToRadians(30.0f);
 static const float32 scNewLightOuterAngle = MathUtil::DegreesToRadians(40.0f);
 
-static const Color scLightColor = Color::FromRGBA(255, 170, 40, 255);
-static const Color scSelectedLightColor = Color::FromRGBA(255, 255, 90, 255);
-
-template <typename TFunc>
-static void ForEachSpotLight(TFunc&& func)
-{
-	for (const Ref<LightBase>& light : gLightManager->GetCache()) {
-		if (light.IsValid() && light->Type == eLightType::Spot) {
-			func(static_cast<LightSpot&>(*light));
-		}
-	}
-}
 
 Vec3f SnapDirection(const Vec3f direction)
 {
@@ -69,205 +46,81 @@ Vec3f SnapDirection(const Vec3f direction)
 	return Vec3f(std::sin(yaw) * horizontal, std::sin(pitch), std::cos(yaw) * horizontal);
 }
 
-/// The distance along a ray to where it enters a sphere, or a negative number if it misses. `direction` is normalized.
-static float32 RaySphereDistance(const Vec3f origin, const Vec3f direction, const Vec3f center, float32 radius)
+LightSpot* LightEditor::GetSelected()
 {
-	const Vec3f to_center = center - origin;
-	const float32 along = to_center.Dot(direction);
-
-	if (along < 0.0f) {
-		return -1.0f;
+	if (mSelectedID.IsNull() || mSelectedID.IsInvalid()) {
+		return nullptr;
 	}
 
-	const float32 closest_sq = to_center.Dot(to_center) - (along * along);
-	const float32 radius_sq = radius * radius;
+	LightBase* light = gLightManager->GetLight(mSelectedID);
 
-	if (closest_sq > radius_sq) {
-		return -1.0f;
+	if (light == nullptr || light->Type != eLightType::Spot) {
+		mSelectedID = LightID::scNull;
+		return nullptr;
 	}
 
-	return along - std::sqrt(radius_sq - closest_sq);
+	return static_cast<LightSpot*>(light);
 }
 
+void LightEditor::Select(LightID id) { mSelectedID = id; }
 
-/////////////////////////////////////
-// Light Editor
-/////////////////////////////////////
+void LightEditor::Deselect() { mSelectedID = LightID::scNull; }
 
-void LightEditor::Enter() { Deselect(); }
-
-void LightEditor::Leave()
+void LightEditor::MoveSelected(const Vec3f offset)
 {
-	mbMoving = false;
-
-	// Nothing is left showing that a light is selected once the tool is gone
-	Deselect();
-}
-
-void LightEditor::Begin()
-{
-	// Clicking a light picks it, and clicking anywhere else moves the light that is already selected
-	LightSpot* picked = PickLight();
-
-	if (picked != nullptr && picked->ID != mSelectedID) {
-		Select(picked);
-	}
-
 	LightSpot* light = GetSelected();
 
 	if (light == nullptr) {
 		return;
 	}
 
-	mbMoving = true;
-	mMoveOrigin = light->GetPosition();
-	mPlayerOrigin = gWorld->Player.Position;
-	mHeightOffset = 0.0f;
+	const Vec3f before = light->GetPosition();
+	const Vec3f after = before + offset;
 
-	BeginEdit(*light);
-}
-
-void LightEditor::Update(float32 delta_time) { Tick(delta_time); }
-
-void LightEditor::Finalize() { mbMoving = false; }
-
-void LightEditor::Cancel()
-{
-	mbMoving = false;
-	mbEditing = false;
-}
-
-void LightEditor::Controls() { Tick(0.0f); }
-
-LightSpot* LightEditor::GetSelected()
-{
-	if (mSelectedID.IsInvalid()) {
-		return nullptr;
+	if (after.IsCloseTo(before, scEditTolerance)) {
+		return;
 	}
 
-	LightBase* light = gLightManager->GetLight(mSelectedID);
+	const Vec3f direction = light->GetDirection().Normalize();
 
-	// Require a spotlight (for now)
-	if (light == nullptr || light->Type != eLightType::Spot) {
-		mSelectedID.Invalidate();
-		mbMoving = false;
-		mbEditing = false;
-	}
-
-	return static_cast<LightSpot*>(light);
+	gEditor->EmplaceEditOperation<LightTransformOperation>(light, before, after, direction, direction);
 }
 
-void LightEditor::Tick(float32 delta_time)
+void LightEditor::AimSelected(const Vec3f direction)
 {
 	LightSpot* light = GetSelected();
 
-	// Deselect the light
-	if (light != nullptr && ControlManager::IsKeyPressed(eKey::FX_KEY_TAB)) {
-		CommitEdit();
-		Deselect();
-		light = nullptr;
+	if (light == nullptr || direction.Length() < scEditTolerance) {
+		return;
 	}
 
-	if (light != nullptr && ControlManager::IsComboPressed(eKey::FX_KEY_LCTRL, eKey::FX_KEY_D)) {
-		CommitEdit();
-		DuplicateSelected();
-		light = GetSelected();
+	const Vec3f before = light->GetDirection().Normalize();
+	const Vec3f after = SnapDirection(direction).Normalize();
+
+	if (after.IsCloseTo(before, scEditTolerance)) {
+		return;
 	}
 
-	// Delete the light
-	if (light != nullptr && ControlManager::IsKeyPressed(eKey::FX_KEY_BACKSPACE)) {
-		mbEditing = false;
-		DeleteSelected();
-		light = nullptr;
-	}
+	const Vec3f position = light->GetPosition();
 
-	// Check for directional aiming or translation
-	if (light != nullptr) {
-		const bool aiming = ControlManager::IsKeyDown(eKey::FX_MOUSE_RIGHT);
-
-		if (aiming) {
-			BeginEdit(*light);
-			AimSelected(*light);
-		}
-
-		if (mbMoving) {
-			MoveSelected(*light, delta_time);
-		}
-
-		// When the LMOUSE or RMOUSE is up, commit the edit
-		if (!aiming && !mbMoving) {
-			CommitEdit();
-		}
-	}
-
-	DrawMarkers();
+	gEditor->EmplaceEditOperation<LightTransformOperation>(light, position, position, before, after);
 }
 
-
-/////////////////////////////////////
-// Markers
-/////////////////////////////////////
-
-void LightEditor::DrawMarkers()
+LightSpot* LightEditor::Create(const Vec3f position)
 {
-	ForEachSpotLight(
-		[&](LightSpot& light)
-		{
-			const Color color = (light.ID == mSelectedID) ? scSelectedLightColor : scLightColor;
-			const Vec3f position = light.GetPosition();
-			const Vec3f tip = position + (light.GetDirection().Normalize() * scDirectionLength);
+	uint32 index = gLightManager->GetCache().Size;
+	Name name;
 
-			// Box for the light, icospheres are for the dogs
-			renderer::gDebugDraw->SolidBox(position, Vec3f(scMarkerHalfExtent), Quat::scIdentity, color);
-			renderer::gDebugDraw->Line(position, tip, color);
-
-			// The Tip(TM)
-			renderer::gDebugDraw->SolidBox(tip, Vec3f(scDirectionTipHalfExtent), Quat::scIdentity, color);
-		});
-}
-
-LightSpot* LightEditor::PickLight()
-{
-	Ref<PerspectiveCamera>& camera = gWorld->Player.pCamera;
-
-	const Vec3f origin = camera->Position;
-	const Vec3f direction = camera->GetForwardVector().Normalize();
-
-	LightSpot* nearest = nullptr;
-	float32 nearest_distance = scLightPickRange;
-
-
-	ForEachSpotLight(
-		[&](LightSpot& light)
-		{
-			const float32 distance = RaySphereDistance(origin, direction, light.GetPosition(), scLightPickRadius);
-
-			if (distance >= 0.0f && distance < nearest_distance) {
-				nearest = &light;
-				nearest_distance = distance;
-			}
-		});
-
-	return nearest;
-}
-
-void LightEditor::CreateAtCrosshair()
-{
-	Ref<PerspectiveCamera>& camera = gWorld->Player.pCamera;
-
-	const Vec3f origin = camera->Position;
-	const Vec3f forward = camera->GetForwardVector().Normalize();
-
-	const physics::RayResult hit = gPhysics->pBackend->Raycast(origin, forward * scAimRange);
-	const Vec3f position = gEditor->SnapToGrid(hit.bHit ? hit.Point : (origin + (forward * scAimFallbackDistance)));
+	do {
+		name = String::Fmt("Light_{}", index++).Str();
+	} while (gLightManager->FindLight(name.GetHash()) != nullptr);
 
 	LightSnapshot snapshot;
 
 	snapshot.Position = position;
-	// Aim er down
 	snapshot.Direction = SnapDirection(Vec3f(0.0f, -1.0f, 0.0f));
 
-	snapshot.LightName = String::Fmt("Light_{}", gLightManager->GetCache().Size).Str();
+	snapshot.LightName = name;
 	snapshot.Radius = scNewLightRadius;
 	snapshot.InnerAngle = scNewLightInnerAngle;
 	snapshot.OuterAngle = scNewLightOuterAngle;
@@ -276,28 +129,10 @@ void LightEditor::CreateAtCrosshair()
 	LightSpot* created = gEditor->EmplaceEditOperation<LightCreateOperation>(snapshot).GetCreated();
 
 	if (created != nullptr) {
-		Select(created);
+		Select(created->ID);
 	}
-}
 
-
-/////////////////////////////////////
-// Selection
-/////////////////////////////////////
-
-void LightEditor::Select(LightSpot* light)
-{
-	CommitEdit();
-
-	mSelectedID = (light != nullptr) ? light->ID : LightID::scNull;
-	mbMoving = false;
-}
-
-void LightEditor::Deselect()
-{
-	mSelectedID = LightID::scNull;
-	mbMoving = false;
-	mbEditing = false;
+	return created;
 }
 
 void LightEditor::DeleteSelected()
@@ -308,7 +143,6 @@ void LightEditor::DeleteSelected()
 		return;
 	}
 
-	// Snapshot everything Undo needs before the Execute step destroys the light, same as RaptorEditor::DeleteObject
 	gEditor->EmplaceEditOperation<LightDeleteOperation>(light);
 
 	Deselect();
@@ -335,85 +169,29 @@ void LightEditor::DuplicateSelected()
 	LightSpot* created = gEditor->EmplaceEditOperation<LightCreateOperation>(snapshot).GetCreated();
 
 	if (created != nullptr) {
-		Select(created);
+		Select(created->ID);
 	}
 }
 
-
-/////////////////////////////////////
-// Editing
-/////////////////////////////////////
-
-void LightEditor::BeginEdit(LightSpot& light)
+void LightEditor::DrawMarkers()
 {
-	if (mbEditing) {
-		return;
+	const EditorTheme::MarkerColors& colors = gEditor->GetTheme().Marker;
+
+	for (const Ref<LightBase>& base : gLightManager->GetCache()) {
+		if (!base.IsValid() || base->Type != eLightType::Spot) {
+			continue;
+		}
+
+		LightSpot& light = static_cast<LightSpot&>(*base);
+
+		const Color color = (light.ID == mSelectedID) ? colors.LightSelected : colors.Light;
+		const Vec3f position = light.GetPosition();
+		const Vec3f tip = position + (light.GetDirection().Normalize() * scDirectionLength);
+
+		renderer::gDebugDraw->SolidBox(position, Vec3f(scMarkerHalfExtent), Quat::scIdentity, color);
+		renderer::gDebugDraw->Line(position, tip, color);
+		renderer::gDebugDraw->SolidBox(tip, Vec3f(scDirectionTipHalfExtent), Quat::scIdentity, color);
 	}
-
-	mbEditing = true;
-	mPositionBefore = light.GetPosition();
-	mDirectionBefore = light.GetDirection().Normalize();
-}
-
-void LightEditor::CommitEdit()
-{
-	LightSpot* light = mbEditing ? GetSelected() : nullptr;
-
-	mbEditing = false;
-
-	if (light == nullptr) {
-		return;
-	}
-
-	const Vec3f position_after = light->GetPosition();
-	const Vec3f direction_after = light->GetDirection().Normalize();
-
-	// Clicks without any movement are not worth an undo step
-	if (position_after.IsCloseTo(mPositionBefore, scEditTolerance) &&
-		direction_after.IsCloseTo(mDirectionBefore, scEditTolerance)) {
-		return;
-	}
-
-	gEditor->EmplaceEditOperation<LightTransformOperation>(light, mPositionBefore, position_after, mDirectionBefore,
-														   direction_after);
-}
-
-void LightEditor::MoveSelected(LightSpot& light, float32 delta_time)
-{
-	const Vec3f player_delta = gWorld->Player.Position - mPlayerOrigin;
-
-	const float32 height_speed = delta_time * gEditor->GetSnapStep() * scHeightSnapStepsPerSecond;
-
-	if (ControlManager::IsKeyDown(eKey::FX_KEY_E)) {
-		mHeightOffset += height_speed;
-	}
-	if (ControlManager::IsKeyDown(eKey::FX_KEY_Q)) {
-		mHeightOffset -= height_speed;
-	}
-
-	const Vec3f movement = gEditor->SnapToGrid(Vec3f(player_delta.X, mHeightOffset, player_delta.Z));
-
-	light.SetPosition(mMoveOrigin + movement);
-}
-
-void LightEditor::AimSelected(LightSpot& light)
-{
-	Ref<PerspectiveCamera>& camera = gWorld->Player.pCamera;
-
-	const Vec3f origin = camera->Position;
-	const Vec3f forward = camera->GetForwardVector().Normalize();
-
-	const physics::RayResult hit = gPhysics->pBackend->Raycast(origin, forward * scAimRange);
-	const Vec3f target = hit.bHit ? hit.Point : (origin + (forward * scAimFallbackDistance));
-
-	const Vec3f to_target = target - light.GetPosition();
-
-	// The light is on top of the target, so there is no direction to point in
-	if (to_target.Length() < 0.05f) {
-		return;
-	}
-
-	light.SetDirection(SnapDirection(to_target));
 }
 
 } // namespace fx::editor

@@ -19,7 +19,6 @@ enum OPTYPE
 	LIGHT_TRANSFORM,
 	LIGHT_CREATE,
 	LIGHT_DELETE,
-	BOUNDS_EDIT,
 	OBJECT_STATE_EDIT,
 	SPAWN_TRANSFORM,
 	SCRIPT_EDIT,
@@ -38,17 +37,16 @@ enum FACETEXTUREEDIT : uint
 /* This must match eEditorTool in Src/Editor/EditorTool.hpp! */
 enum EDITORTOOL
 {
-	NONE,
-
-	TRANSLATE,
+	SELECT,
 	FACE,
-	ROTATE,
+	VERTEX,
 	CREATE,
+	ARCH,
+	BEND,
+	DECAL,
+	ROTATE,
 	CLIP,
 	LIGHT,
-	BOUNDS,
-	GRAB,
-	SUBTRACT,
 }
 
 
@@ -136,6 +134,7 @@ extern void editor_push_op_delete(OBJECT obj, int group_size);
 
 extern OBJECT editor_op_create_object(float3 position, int group_size);
 extern OBJECT editor_op_dupe_object(OBJECT object_to_dupe, float3 position, int group_size);
+extern int editor_snap_selection_to_grid();
 
 extern OBJECT object_get(OBJECTID id);
 extern OBJECT object_find(cstring name);
@@ -258,7 +257,3 @@ bool cvar_get_bool(cstring name, bool fallback)
 
 extern void script_error(cstring str);
 
-
-/* GUI Editor */
-
-extern void GUI_set_editor_tool(EDITORTOOL mode);

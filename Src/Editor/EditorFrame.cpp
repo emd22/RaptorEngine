@@ -2,12 +2,13 @@
 
 #include "AtlasPackerWindow.hpp"
 #include "CVarListWindow.hpp"
+#include "EditorTheme.hpp"
 #include "EditorThread.hpp"
+#include "EditorToolbar.hpp"
 #include "EditorViewport.hpp"
 #include "MaterialPickerPanel.hpp"
 #include "ObjectListWindow.hpp"
 #include "ObjectPropertiesPanel.hpp"
-#include "OutlineToggleButton.hpp"
 #include "RaptorEditor.hpp"
 #include "ToolSettingsPanel.hpp"
 #include "TopViewPanel.hpp"
@@ -16,17 +17,18 @@
 #include <wx/app.h>
 #include <wx/bitmap.h>
 #include <wx/button.h>
-#include <wx/choice.h>
+#include <wx/checkbox.h>
 #include <wx/filedlg.h>
 #include <wx/menu.h>
 #include <wx/msgdlg.h>
 #include <wx/panel.h>
+#include <wx/radiobut.h>
 #include <wx/scrolwin.h>
 #include <wx/settings.h>
 #include <wx/sizer.h>
 #include <wx/splitter.h>
+#include <wx/stattext.h>
 #include <wx/choicdlg.h>
-#include <wx/statline.h>
 #include <wx/textdlg.h>
 
 #include <Blockout.hpp>
@@ -43,13 +45,11 @@
 
 namespace fx::editor {
 
-static constexpr int32 scObjectPropertyPanelWidth = 240;
-static constexpr size_t scToolSettingsSlotIndex = 2;
+static constexpr int32 scSidePanelWidth = 300;
+static constexpr int32 scMinimumSidePanelWidth = 220;
+static constexpr size_t scToolSettingsSlotIndex = 3;
 static constexpr int32 scMinimumPaneSize = 160;
 
-static const wxColor scSashColor = wxColor(46, 46, 46);
-
-static const wxColor scSashGripColor = wxColor(110, 110, 110);
 static constexpr const char* scDefaultBlockoutPath = "RaptorData/Data/blockouts/btemp.prx";
 
 class EditorSplitter : public wxSplitterWindow
@@ -71,69 +71,23 @@ public:
 		const int position = GetSashPosition();
 		const int thickness = GetSashSize();
 
+		const EditorTheme& theme = GetEditorTheme();
+
 		dc.SetPen(*wxTRANSPARENT_PEN);
-		dc.SetBrush(wxBrush(scSashColor));
+		dc.SetBrush(wxBrush(ToWxColour(theme.Frame.Sash)));
 
 		if (vertical) {
 			dc.DrawRectangle(position, 0, thickness, size.y);
-			dc.SetBrush(wxBrush(scSashGripColor));
+			dc.SetBrush(wxBrush(ToWxColour(theme.Frame.SashGrip)));
 			dc.DrawRectangle(position + thickness / 2 - 1, 0, 2, size.y);
 		}
 		else {
 			dc.DrawRectangle(0, position, size.x, thickness);
-			dc.SetBrush(wxBrush(scSashGripColor));
+			dc.SetBrush(wxBrush(ToWxColour(theme.Frame.SashGrip)));
 			dc.DrawRectangle(0, position + thickness / 2 - 1, size.x, 2);
 		}
 	}
 };
-
-struct ToolButtonInfo
-{
-	/// Shown as the tool tip, and as the label if the icon can't be loaded
-	const char* pName;
-	const char* pIconPath;
-};
-
-static constexpr ToolButtonInfo scToolButtons[] = {
-	{ "Simulate", "Textures/editor_new/simulate.png" }, { "Transform", "Textures/editor_new/translate.png" },
-	{ "Face", "Textures/editor_new/face.png" },			{ "Rotate", "Textures/editor_new/rotate.png" },
-	{ "Create", "Textures/editor_new/brush.png" },		{ "Clip", "Textures/editor_new/cut.png" },
-	{ "Light", "Textures/editor_new/light.png" },		{ "Bounds", "Textures/editor_new/bounds.png" },
-	{ "Grab", "Textures/editor_new/grab.png" },			{ "Subtract", "Textures/editor_new/subtract.png" },
-};
-
-static_assert(std::size(scToolButtons) == static_cast<size_t>(eEditorTool::Count));
-
-static constexpr const char* scDataFilterNames[] = {
-	"All", "Probe Volumes", "Reflection Probes", "Spawn Points", "Volumes", "Lights", "nvbrush", "dbound",
-};
-
-static_assert(std::size(scDataFilterNames) == static_cast<size_t>(eDataFilter::Count));
-
-static const wxColor scPanelColor = wxColor(30, 30, 30);
-
-static const wxColor scSelectedColor = wxColor(168, 50, 50);
-
-/// Creates an icon button for the tool, or a text button if its icon can't be loaded
-static OutlineToggleButton* MakeToolButton(wxWindow* parent, const ToolButtonInfo& info)
-{
-	const String icon_path = FilesystemIO::ResolvePath(info.pIconPath);
-
-	// wx shows an error dialog for images it can't load, so check the icon is there first
-	wxBitmap icon;
-	if (FilesystemIO::FileExists(icon_path)) {
-		icon.LoadFile(wxString::FromUTF8(icon_path.CStr()), wxBITMAP_TYPE_PNG);
-	}
-
-	if (!icon.IsOk()) {
-		LogWarning(LC_CORE, "Could not load editor icon '{}'", icon_path);
-	}
-
-	OutlineToggleButton* button = new OutlineToggleButton(parent, icon, info.pName);
-	button->SetToolTip(info.pName);
-
-	return button;
-}
 
 
 static String ToBlockoutPath(const std::filesystem::path& chosen)
@@ -424,8 +378,12 @@ bool EditorFrame::SaveProtoTypeAs()
 	return true;
 }
 
+EditorFrame::~EditorFrame() = default;
+
 EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : wxFrame(nullptr, wxID_ANY, title)
 {
+	GetThemeLibrary().Load();
+
 	// Top bar
 	wxMenuBar* menu_bar = new wxMenuBar;
 
@@ -471,6 +429,10 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	view_menu->AppendSeparator();
 	mpStackMenuItem = view_menu->AppendCheckItem(wxID_ANY, "Stack Split Panes",
 												 "Put the 2D view below the 3D view instead of beside it");
+	view_menu->AppendSeparator();
+	wxMenuItem* reload_theme_item = view_menu->Append(wxID_ANY, "Reload Theme",
+													  "Re-reads the current theme from Config/EditorThemes");
+	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ReloadTheme(); }, reload_theme_item->GetId());
 
 	menu_bar->Append(view_menu, "&View");
 
@@ -486,6 +448,20 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	wxMenuItem* atlas_packer_item = window_menu->Append(wxID_ANY, "Open Atlas Packer",
 														"Pack images into a tile atlas and export its config");
 
+	window_menu->AppendSeparator();
+
+	wxMenu* theme_menu = new wxMenu;
+	const std::vector<EditorTheme>& themes = GetThemeLibrary().GetThemes();
+
+	for (uint32 index = 0; index < themes.size(); index++) {
+		wxMenuItem* theme_item = theme_menu->AppendRadioItem(wxID_ANY, wxString::FromUTF8(themes[index].Name.CStr()),
+															 "Recolours the editor");
+		theme_item->Check(index == GetThemeLibrary().GetActiveIndex());
+
+		Bind(wxEVT_MENU, [this, index](wxCommandEvent&) { SelectTheme(index); }, theme_item->GetId());
+	}
+
+	window_menu->AppendSubMenu(theme_menu, "Theme", "Picks the editor colour theme from Config/EditorThemes");
 
 	menu_bar->Append(window_menu, "&Tools");
 
@@ -580,118 +556,19 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 		mpMaterialPickerMenuItem->GetId());
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowAtlasPackerWindow(); }, atlas_packer_item->GetId());
 
-	SetBackgroundColour(scPanelColor);
-
 	wxPanel* root = new wxPanel(this, wxID_ANY);
 	mpRootPanel = root;
-	root->SetBackgroundColour(scPanelColor);
 	wxBoxSizer* root_sizer = new wxBoxSizer(wxVERTICAL);
 
-	// Views
-	wxBoxSizer* view_sizer = new wxBoxSizer(wxHORIZONTAL);
-
-	mpPerspectiveButton = new OutlineToggleButton(root, wxBitmap(), "3D");
-	mpPerspectiveButton->SetToolTip("Fly around the level in 3D (Ctrl+1)");
-	mpPerspectiveButton->SetValue(true);
-	mpPerspectiveButton->Bind(wxEVT_TOGGLEBUTTON, [](wxCommandEvent&)
-							  { thread::PostToGame([] { gEditor->SetView(eEditorView::Perspective); }); });
-
-	mpTopButton = new OutlineToggleButton(root, wxBitmap(), "2D");
-	mpTopButton->SetToolTip("Top, front and side wireframe views for laying out brushes (Ctrl+2)");
-	mpTopButton->Bind(wxEVT_TOGGLEBUTTON,
-					  [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetView(eEditorView::Top); }); });
-
-	mpSplitButton = new OutlineToggleButton(root, wxBitmap(), "Split");
-	mpSplitButton->SetToolTip("The 3D view and the 2D views together, with a draggable divider (Ctrl+3)");
-	mpSplitButton->Bind(wxEVT_TOGGLEBUTTON,
-						[](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetView(eEditorView::Split); }); });
-
-	view_sizer->Add(mpPerspectiveButton, wxSizerFlags(1).Expand());
-	view_sizer->Add(mpTopButton, wxSizerFlags(1).Expand().Border(wxLEFT, 2));
-	view_sizer->Add(mpSplitButton, wxSizerFlags(1).Expand().Border(wxLEFT, 2));
-
-	// Modes
-	wxBoxSizer* mode_sizer = new wxBoxSizer(wxHORIZONTAL);
-	wxBoxSizer* mode_buttons_sizer = new wxBoxSizer(wxHORIZONTAL);
-
-	mpVisButton = new OutlineToggleButton(root, wxBitmap(), "V");
-	mpVisButton->SetToolTip("Select and edit visible brushes and models");
-	mpVisButton->Bind(wxEVT_TOGGLEBUTTON,
-					  [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetMode(eEditorMode::Vis); }); });
-
-	mpDataButton = new OutlineToggleButton(root, wxBitmap(), "D");
-	mpDataButton->SetToolTip("Select and edit probe volumes, reflection probes, volumes, lights and spawn points");
-	mpDataButton->Bind(wxEVT_TOGGLEBUTTON,
-					   [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetMode(eEditorMode::Data); }); });
-
-	mode_buttons_sizer->Add(mpVisButton, wxSizerFlags(1).Expand());
-	mode_buttons_sizer->Add(mpDataButton, wxSizerFlags(1).Expand().Border(wxLEFT, 2));
-	mode_sizer->Add(mode_buttons_sizer, wxSizerFlags().CenterVertical().Border(wxALL, 2));
-
-	mpDataFilterChoice = new wxChoice(root, wxID_ANY);
-	for (const char* name : scDataFilterNames) {
-		mpDataFilterChoice->Append(name);
-	}
-	mpDataFilterChoice->SetSelection(0);
-	mpDataFilterChoice->SetToolTip("Which data brushes can be selected");
-	mpDataFilterChoice->Bind(wxEVT_CHOICE,
-							 [this](wxCommandEvent&)
-							 {
-								 const int32 selection = mpDataFilterChoice->GetSelection();
-
-								 if (selection != wxNOT_FOUND) {
-									 gEditor->SetDataFilter(static_cast<eDataFilter>(selection));
-								 }
-							 });
-	mode_sizer->Add(mpDataFilterChoice, wxSizerFlags().CenterVertical().Border(wxALL, 2));
-
-	wxButton* fit_bounds_button = new wxButton(root, wxID_ANY, "Fit Bounds", wxDefaultPosition, wxDefaultSize,
-											   wxBU_EXACTFIT);
-	fit_bounds_button->SetToolTip("Replace the map bounds (dbound) with six boxes sealing the level, each one touching "
-								  "the edge of the level geometry");
-	fit_bounds_button->Bind(wxEVT_BUTTON,
-							[](wxCommandEvent&) { thread::PostToGame([] { gEditor->FitDBoundsToLevel(); }); });
-	mode_sizer->Add(fit_bounds_button, wxSizerFlags().CenterVertical().Border(wxALL, 2));
-
-	// Tools
-	wxBoxSizer* tool_sizer = new wxBoxSizer(wxHORIZONTAL);
-
-	for (uint32 i = 0; i < static_cast<uint32>(eEditorTool::Count); i++) {
-		OutlineToggleButton* button = MakeToolButton(root, scToolButtons[i]);
-
-		const eEditorTool tool = static_cast<eEditorTool>(i);
-		button->Bind(wxEVT_TOGGLEBUTTON,
-					 [tool](wxCommandEvent&) { thread::PostToGame([tool] { gEditor->SetTool(tool); }); });
-
-		tool_sizer->Add(button, wxSizerFlags().Border(wxALL, 2));
-		mToolButtons.Insert(button);
-	}
-
-	// root_sizer->Add(tool_sizer, wxSizerFlags().Border(wxALL, 6));
-
-	// Viewport and component panel
 	wxBoxSizer* body_sizer = new wxBoxSizer(wxHORIZONTAL);
 
-	wxBoxSizer* top_bar = new wxBoxSizer(wxHORIZONTAL);
-	mpTopBarSizer = top_bar;
+	mpSideSplitter = new EditorSplitter(root, viewport_size);
+	mpSideSplitter->SetMinimumPaneSize(scMinimumSidePanelWidth);
+	mpSideSplitter->SetSashGravity(1.0);
 
-	top_bar->Add(view_sizer, wxSizerFlags().CenterVertical().Border(wxALL, 2));
-	top_bar->Add(new wxStaticLine(root, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL),
-				 wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT, 6));
-	top_bar->Add(mode_sizer, wxSizerFlags().CenterVertical());
-
-	mpToolsGroup = new wxBoxSizer(wxHORIZONTAL);
-	mpToolsGroup->Add(new wxStaticLine(root, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL),
-					  wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT, 6));
-	mpToolsGroup->Add(tool_sizer, wxSizerFlags().CenterVertical());
-	top_bar->Add(mpToolsGroup, wxSizerFlags().Expand());
-
-	root_sizer->Add(top_bar, wxSizerFlags().Border(wxALL, 4));
-
-	mpSplitter = new EditorSplitter(root, viewport_size);
+	mpSplitter = new EditorSplitter(mpSideSplitter, viewport_size);
 	mpSplitter->SetMinimumPaneSize(scMinimumPaneSize);
 	mpSplitter->SetSashGravity(0.5);
-	mpSplitter->SetBackgroundColour(scPanelColor);
 
 	mpViewport = new EditorViewport(mpSplitter, viewport_size);
 	mpViewport->SetMinSize(viewport_size);
@@ -700,9 +577,11 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	mpTopViewPanel->Hide();
 
 	mpSplitter->Initialize(mpViewport);
-	mpSplitter->SetMinSize(viewport_size);
 
-	body_sizer->Add(mpSplitter, wxSizerFlags(1).Expand());
+	mpToolbar = std::make_unique<EditorToolbar>(root, mpTopViewPanel->GetCanvas());
+	root_sizer->Add(mpToolbar->GetSizer(), wxSizerFlags().Expand().Border(wxALL, 4));
+
+	body_sizer->Add(mpSideSplitter, wxSizerFlags(1).Expand());
 
 	mpViewport->Bind(wxEVT_SET_FOCUS,
 					 [this](wxFocusEvent& event)
@@ -717,32 +596,31 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 										  event.Skip();
 									  });
 
+	mpSidePanel = new wxPanel(mpSideSplitter, wxID_ANY);
+	wxBoxSizer* side_sizer = new wxBoxSizer(wxVERTICAL);
 
-	mpSideColumn = new wxBoxSizer(wxVERTICAL);
-
-	mpSideToggleButton = new wxButton(root, wxID_ANY, wxString::FromUTF8("Hide"), wxDefaultPosition, wxDefaultSize,
-									  wxBU_EXACTFIT);
+	mpSideToggleButton = new wxButton(mpSidePanel, wxID_ANY, wxString::FromUTF8("Hide"), wxDefaultPosition,
+									  wxDefaultSize, wxBU_EXACTFIT);
 	mpSideToggleButton->SetToolTip("Minimize the side panel");
-	mpSideToggleButton->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { SetSidePanelCollapsed(!mbSidePanelCollapsed); });
-	mpSideColumn->Add(mpSideToggleButton, wxSizerFlags().Right().Border(wxALL, 2));
+	mpSideToggleButton->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { SetSidePanelCollapsed(true); });
+	side_sizer->Add(mpSideToggleButton, wxSizerFlags().Right().Border(wxALL, 2));
 
-	mpSideScroller = new wxScrolledWindow(root, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxVSCROLL);
+	mpSideScroller = new wxScrolledWindow(mpSidePanel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxVSCROLL);
 	mpSideScroller->SetScrollRate(0, 12);
 
 	wxBoxSizer* component_panel = new wxBoxSizer(wxVERTICAL);
+
+	mpMaterialPickerPanel = new MaterialPickerPanel(mpSideScroller, this);
+	component_panel->Add(mpMaterialPickerPanel, wxSizerFlags().Expand());
 
 	mpWorldPropertiesPanel = new WorldPropertiesPanel(mpSideScroller);
 	component_panel->Add(mpWorldPropertiesPanel, wxSizerFlags().Expand());
 
 	mpObjectPropertiesPanel = new ObjectPropertiesPanel(mpSideScroller);
-	mpObjectPropertiesPanel->SetMinSize(wxSize(scObjectPropertyPanelWidth, -1));
 	component_panel->Add(mpObjectPropertiesPanel, wxSizerFlags().Expand());
 
-	mpMaterialPickerPanel = new MaterialPickerPanel(mpSideScroller, this);
-	component_panel->Add(mpMaterialPickerPanel, wxSizerFlags().Expand());
-
 	// The tool settings slot starts empty - RaptorEditor::SetTool swaps in a panel for tools that have one. It sits
-	// above the material picker, right below Object Properties
+	// right below Object Properties
 	mpComponentSizer = component_panel;
 	mpSideScroller->SetSizer(component_panel);
 	component_panel->FitInside(mpSideScroller);
@@ -754,14 +632,23 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 							 event.Skip();
 						 });
 
+	side_sizer->Add(mpSideScroller, wxSizerFlags(1).Expand());
+	mpSidePanel->SetSizer(side_sizer);
+
 	// Only the height scrolls, so reserve room for the scroll bar next to the widest content
-	const int32 scroller_width = std::max(component_panel->GetMinSize().x, scObjectPropertyPanelWidth) +
-								 wxSystemSettings::GetMetric(wxSYS_VSCROLL_X, mpSideScroller);
-	mpSideScroller->SetMinSize(wxSize(scroller_width, 64));
+	mSidePanelWidth = std::max(component_panel->GetMinSize().x, scSidePanelWidth) +
+					  wxSystemSettings::GetMetric(wxSYS_VSCROLL_X, mpSideScroller);
 
-	mpSideColumn->Add(mpSideScroller, wxSizerFlags(1).Expand());
+	mpSideSplitter->SplitVertically(mpSplitter, mpSidePanel, -mSidePanelWidth);
+	mpSideSplitter->SetMinSize(
+		wxSize(viewport_size.x + mpSideSplitter->GetSashSize() + mSidePanelWidth, viewport_size.y));
 
-	body_sizer->Add(mpSideColumn, wxSizerFlags().Expand());
+	mpSideExpandButton = new wxButton(root, wxID_ANY, wxString::FromUTF8("<"), wxDefaultPosition, wxDefaultSize,
+									  wxBU_EXACTFIT);
+	mpSideExpandButton->SetToolTip("Show the side panel");
+	mpSideExpandButton->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { SetSidePanelCollapsed(false); });
+	mpSideExpandButton->Hide();
+	body_sizer->Add(mpSideExpandButton, wxSizerFlags().Top().Border(wxALL, 2));
 
 	root_sizer->Add(body_sizer, wxSizerFlags(1).Expand());
 
@@ -774,11 +661,86 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 
 	mpViewport->SetMinSize(wxSize(64, 64));
 	mpSplitter->SetMinSize(wxSize(64, 64));
+	mpSideSplitter->SetMinSize(wxSize(64, 64));
+
+	mpSideSplitter->SetSashPosition(-(mSidePanelWidth + mpSideSplitter->GetSashSize()));
 	SetMinSize(wxDefaultSize);
+
+	ApplyTheme();
 
 	Bind(wxEVT_CLOSE_WINDOW, &EditorFrame::OnClose, this);
 	Bind(wxEVT_ACTIVATE, &EditorFrame::OnActivate, this);
 	Bind(wxEVT_ICONIZE, &EditorFrame::OnIconize, this);
+}
+
+static void ApplyThemeToTree(wxWindow* window, const wxColour& text)
+{
+	if (wxDynamicCast(window, wxStaticText) || wxDynamicCast(window, wxCheckBox) ||
+		wxDynamicCast(window, wxRadioButton)) {
+		window->SetForegroundColour(text);
+	}
+
+	window->Refresh();
+
+	for (wxWindow* child : window->GetChildren()) {
+		if (!child->IsTopLevel()) {
+			ApplyThemeToTree(child, text);
+		}
+	}
+}
+
+static wxApp::Appearance ToWxAppearance(EditorTheme::eAppearance appearance)
+{
+	switch (appearance) {
+	case EditorTheme::eAppearance::Light:
+		return wxApp::Appearance::Light;
+	case EditorTheme::eAppearance::System:
+		return wxApp::Appearance::System;
+	case EditorTheme::eAppearance::Dark:
+		break;
+	}
+
+	return wxApp::Appearance::Dark;
+}
+
+void EditorFrame::ApplyTheme()
+{
+	const EditorTheme& theme = GetEditorTheme();
+
+	if (wxTheApp->SetAppearance(ToWxAppearance(theme.Appearance)) != wxApp::AppearanceResult::Ok) {
+		LogWarning(LC_CORE, "Could not set the editor appearance for theme '{}'", theme.ID.CStr());
+	}
+	const wxColour background = ToWxColour(theme.Frame.Background);
+
+	SetBackgroundColour(background);
+	mpRootPanel->SetBackgroundColour(background);
+	mpSideSplitter->SetBackgroundColour(background);
+	mpSplitter->SetBackgroundColour(background);
+	mpTopViewPanel->ApplyTheme();
+
+	ApplyThemeToTree(this, ToWxColour(theme.Frame.Text));
+
+	thread::PostToGame([theme] { gEditor->SetTheme(theme); });
+}
+
+void EditorFrame::SelectTheme(uint32 index)
+{
+	EditorThemeLibrary& library = GetThemeLibrary();
+	library.Select(index);
+
+	ApplyTheme();
+
+	thread::PostToGame([id = library.GetActive().ID] { StoreThemeChoice(id); });
+}
+
+void EditorFrame::ReloadTheme()
+{
+	if (!GetThemeLibrary().ReloadActive()) {
+		LogWarning(LC_CORE, "Could not reload editor theme '{}'", GetEditorTheme().ID.CStr());
+		return;
+	}
+
+	ApplyTheme();
 }
 
 void EditorFrame::CreateSubview()
@@ -872,14 +834,24 @@ void EditorFrame::SetInteractive(bool interactive)
 
 void EditorFrame::SetSidePanelCollapsed(bool collapsed)
 {
+	if (collapsed == mbSidePanelCollapsed) {
+		return;
+	}
+
 	mbSidePanelCollapsed = collapsed;
 
-	mpSideColumn->Show(mpSideScroller, !collapsed);
+	if (collapsed) {
+		mSidePanelWidth = mpSidePanel->GetSize().x;
+		mpSideSplitter->Unsplit(mpSidePanel);
+	}
+	else {
+		mpSideSplitter->SplitVertically(mpSplitter, mpSidePanel,
+										-(mSidePanelWidth + mpSideSplitter->GetSashSize()));
+		mpSidePanel->Show();
+	}
 
-	mpSideToggleButton->SetLabel(collapsed ? wxString::FromUTF8("<") : wxString::FromUTF8(">"));
-
-	mpSideColumn->Layout();
-	Layout();
+	mpSideExpandButton->Show(collapsed);
+	mpRootPanel->Layout();
 
 	FocusActiveView();
 }
@@ -900,9 +872,7 @@ void EditorFrame::ShowView(const eEditorView view)
 {
 	mView = view;
 
-	mpPerspectiveButton->SetValue(view == eEditorView::Perspective);
-	mpTopButton->SetValue(view == eEditorView::Top);
-	mpSplitButton->SetValue(view == eEditorView::Split);
+	mpToolbar->ShowView(view);
 
 	switch (view) {
 	case eEditorView::Top:
@@ -917,8 +887,6 @@ void EditorFrame::ShowView(const eEditorView view)
 	}
 
 	ApplySplitLayout(view);
-
-	mpTopBarSizer->Show(mpToolsGroup, view != eEditorView::Top, true);
 
 	mpRootPanel->Layout();
 
@@ -1001,12 +969,11 @@ void EditorFrame::SetToolSettingsPanel(ToolSettingsBasePanel* new_panel)
 	mpComponentSizer->FitInside(mpSideScroller);
 }
 
-void EditorFrame::ShowSelectedTool(const eEditorTool tool)
+void EditorFrame::ShowSelectedTool(const eEditorTool tool) { mpTopViewPanel->GetCanvas()->ShowTool(tool); }
+
+void EditorFrame::ShowSimulating(bool simulating)
 {
-	// Only one tool at a time, and clicking the selected one again keeps it selected
-	for (uint32 i = 0; i < mToolButtons.Size; i++) {
-		mToolButtons[i]->SetValue(i == static_cast<uint32>(tool));
-	}
+	mpToolbar->ShowSimulating(simulating);
 
 	FocusActiveView();
 }
@@ -1026,22 +993,14 @@ void EditorFrame::ApplyState(const EditorPanelState& state)
 
 	if (mState.TopView.bActive) {
 		mpTopViewPanel->ApplyState(mState.TopView);
+		mpToolbar->ApplyState(mState.TopView);
 	}
 }
 
 void EditorFrame::ShowMode(const eEditorMode mode, const eDataFilter filter, const uint32 available_tools)
 {
-	const bool data_mode = (mode == eEditorMode::Data);
-
-	mpVisButton->SetValue(!data_mode);
-	mpDataButton->SetValue(data_mode);
-
-	mpDataFilterChoice->SetSelection(static_cast<int32>(filter));
-	mpDataFilterChoice->Enable(data_mode);
-
-	for (uint32 i = 0; i < mToolButtons.Size; i++) {
-		mToolButtons[i]->Enable((available_tools & (1u << i)) != 0);
-	}
+	mpToolbar->ShowMode(mode, filter, available_tools);
+	mpTopViewPanel->GetCanvas()->SetAvailableTools(available_tools);
 
 	FocusActiveView();
 }

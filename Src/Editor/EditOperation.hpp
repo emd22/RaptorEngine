@@ -137,6 +137,7 @@ struct ObjectSnapshot
 	bool bIsTrigger = false;
 	bool bIsNvBrush = false;
 	bool bIsDBound = false;
+	bool bIsDecal = false;
 	bool bIsDynamic = false;
 	String ScriptPath;
 	Vec3f EnterDirection = Vec3f::sZero;
@@ -218,20 +219,6 @@ public:
 private:
 	Brush::PlaneList mPlanesBefore;
 	Brush::PlaneList mPlanesAfter;
-};
-
-/// Resizes an object's bounding box
-class BoundsEditOperation final : public ObjectEditOperation
-{
-public:
-	BoundsEditOperation(Object* object, const BBox& before, const BBox& after, int32 group_size = 1);
-
-	void Execute(EditorSelection& selection) override;
-	void Undo(EditorSelection& selection) override;
-
-private:
-	BBox mBoundsBefore;
-	BBox mBoundsAfter;
 };
 
 /// Toggles one of an object's tags or flags

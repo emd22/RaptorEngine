@@ -19,6 +19,7 @@ enum class eObjectTag : uint32
 	NvBrush = (1 << 6),
 	/// A blockout brush that only seals the map for the map compiler, and is otherwise not there (dbound)
 	DBound = (1 << 7),
+	Decal = (1 << 8),
 };
 
 FxEnumFlags(eObjectTag);

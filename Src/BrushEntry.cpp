@@ -24,6 +24,10 @@ eBrushKind ReadBrushKind(const ConfigEntry& entry)
 		return eBrushKind::DBound;
 	}
 
+	if (entry.GetMemberValue(HashStr32(scDecalName), 0) != 0) {
+		return eBrushKind::Decal;
+	}
+
 	return eBrushKind::Geometry;
 }
 
@@ -226,7 +230,7 @@ ConfigEntry PlaceSubviewBrushEntry(ConfigEntry& brush_entry, const String& name,
 }
 
 constexpr const char* scEntityBrushMembers[] = {
-	"dynamic", "probevolume", "reflectionprobe", "spawn", "trigger",
+	"dynamic", "probevolume", "reflectionprobe", "spawn", "trigger", scDecalName,
 };
 
 bool IsEntityBrushEntry(const ConfigEntry& entry)

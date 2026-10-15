@@ -2,7 +2,6 @@
 
 #include "EditorPanelState.hpp"
 
-#include <wx/collpane.h>
 #include <wx/panel.h>
 #include <wx/string.h>
 
@@ -27,9 +26,8 @@ public:
 	void ApplyState(const WorldPanelState& state);
 
 private:
-	void BuildReflectionPane(wxSizer* sizer);
+	void BuildReflectionSection(wxSizer* sizer);
 	void ApplyReflectionState(const WorldPanelState& state);
-	void OnPaneChanged();
 
 private:
 	wxStaticText* mpNameLabel = nullptr;
@@ -38,13 +36,11 @@ private:
 	wxChoice* mpDebugLayerChoice = nullptr;
 	int64 mShownDebugMask = -1;
 
-	wxCollapsiblePane* mpCameraPane = nullptr;
 	FloatField* mpApertureField = nullptr;
 	FloatField* mpShutterField = nullptr;
 	FloatField* mpIsoField = nullptr;
 	FloatField* mpCompensationField = nullptr;
 
-	wxCollapsiblePane* mpReflectionPane = nullptr;
 	wxStaticText* mpReflectionStatus = nullptr;
 	wxCheckBox* mpReflectionEnabledCheck = nullptr;
 	wxCheckBox* mpReflectionFallbackCheck = nullptr;

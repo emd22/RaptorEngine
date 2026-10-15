@@ -114,6 +114,15 @@ static Object* N_editor_op_dupe_object(Object* object_to_dupe, FLOAT4 position, 
 #endif
 }
 
+static int32 N_editor_snap_selection_to_grid()
+{
+#ifdef FX_IS_EDITOR
+	return static_cast<int32>(gEditor->SnapSelectionToGrid());
+#else
+	return 0;
+#endif
+}
+
 static void N_editor_push_op_delete(Object* obj, int32 group_size)
 {
 #ifdef FX_IS_EDITOR
@@ -469,167 +478,16 @@ static Object* N_blockout_create_box(FLOAT4 min, FLOAT4 max)
 static bool N_blockout_clip(Object* object, FLOAT4 point_a, FLOAT4 point_b, FLOAT4 face_normal)
 {
 #ifdef FX_IS_EDITOR
-	if (object == nullptr || gEditor->IsSimulationMode() || !gEditor->CanEditObject(object)) {
-		return false;
-	}
-
-	const Brush* brush = gWorld->pPrototype->GetBrush(object);
-	if (brush == nullptr) {
-		return false;
-	}
-
-	const Brush::PlaneList planes_before = brush->Planes;
-	Brush::PlaneList kept_planes;
-	Brush::PlaneList split_planes;
-
-	editor::ObjectSnapshot split_snapshot = editor::ObjectSnapshot::Capture(
-		*object, gEditor->GetSelection().GetStoredMaterial(object));
-	split_snapshot.ObjectName = Name();
-
-	if (!gWorld->pPrototype->GetClipPieces(object, Vec3f(point_a), Vec3f(point_b), Vec3f(face_normal), kept_planes,
-										  split_planes, split_snapshot.Position)) {
-		return false;
-	}
-
-	gEditor->EmplaceEditOperation<editor::BrushEditOperation>(object, planes_before, kept_planes, 2);
-	gEditor->EmplaceEditOperation<editor::CreateBrushOperation>(split_planes, split_snapshot, 2);
-
-	return true;
+	return gEditor->ClipObject(object, Vec3f(point_a), Vec3f(point_b), Vec3f(face_normal));
 #else
 	return false;
 #endif
 }
 
-#ifdef FX_IS_EDITOR
-static constexpr uint32 scMaxSubtractOperations = 200;
-
-static bool CanBeSubtractedFrom(const Object* object)
-{
-	return !object->IsVolume() && !object->IsReflectionProbe() && !object->IsSpawn() &&
-		   !gWorld->pPrototype->IsDynamic(object);
-}
-
-static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter_ids, bool keep_cutter)
-{
-	const editor::EditorSelection& selection = gEditor->GetSelection();
-
-	std::vector<std::unique_ptr<editor::ObjectEditOperation>> ops;
-	std::vector<ObjectID> op_object_ids;
-	uint32 cut_count = 0;
-
-	std::vector<ObjectID> target_ids;
-
-	for (ObjectID id : gWorld->pPrototype->BlockoutObjects) {
-		const bool is_cutter = std::any_of(cutter_ids.begin(), cutter_ids.end(),
-										   [&](ObjectID other) { return other.GetID() == id.GetID(); });
-
-		if (!is_cutter) {
-			target_ids.push_back(id);
-		}
-	}
-
-	for (ObjectID id : target_ids) {
-		Object* target = gObjectManager->GetObject(id);
-
-		if (target == nullptr || !gEditor->CanEditObject(target) || !CanBeSubtractedFrom(target)) {
-			continue;
-		}
-
-		std::vector<Brush::PlaneList> pieces;
-		std::vector<Vec3f> positions;
-
-		if (!gWorld->pPrototype->GetSubtractPieces(target, cutter, pieces, positions)) {
-			continue;
-		}
-
-		const Brush* brush = gWorld->pPrototype->GetBrush(target);
-		const MaterialID material = selection.GetStoredMaterial(target);
-
-		cut_count++;
-
-		if (pieces.empty()) {
-			ops.push_back(std::make_unique<editor::DeleteOperation>(
-				target, brush->Planes, editor::ObjectSnapshot::Capture(*target, material)));
-			op_object_ids.push_back(id);
-
-			continue;
-		}
-
-		ops.push_back(std::make_unique<editor::BrushEditOperation>(target, brush->Planes, pieces[0]));
-		op_object_ids.push_back(id);
-
-		for (uint32 i = 1; i < pieces.size(); i++) {
-			editor::ObjectSnapshot snapshot = editor::ObjectSnapshot::Capture(*target, material);
-			snapshot.ObjectName = Name();
-			snapshot.Position = positions[i];
-
-			ops.push_back(std::make_unique<editor::CreateBrushOperation>(pieces[i], snapshot));
-			op_object_ids.push_back(ObjectID::scNull);
-		}
-	}
-
-	if (cut_count == 0) {
-		return 0;
-	}
-
-	if (!keep_cutter) {
-		const Brush* cutter_brush = gWorld->pPrototype->GetBrush(cutter);
-
-		ops.push_back(std::make_unique<editor::DeleteOperation>(
-			cutter, cutter_brush->Planes,
-			editor::ObjectSnapshot::Capture(*cutter, selection.GetStoredMaterial(cutter))));
-		op_object_ids.push_back(cutter->ID);
-	}
-
-	if (ops.size() > scMaxSubtractOperations) {
-		LogWarning("Subtracting '{}' would change too many blockouts at once", cutter->Name.Get());
-		return 0;
-	}
-
-	for (uint32 i = 0; i < ops.size(); i++) {
-		ops[i]->GroupSize = static_cast<int32>(ops.size());
-
-		if (!op_object_ids[i].IsInvalid()) {
-			ops[i]->Retarget(gObjectManager->GetObject(op_object_ids[i]));
-		}
-
-		gEditor->PushEditOperation(std::move(ops[i]));
-	}
-
-	return cut_count;
-}
-#endif
-
 static int32 N_blockout_subtract(bool keep_cutters)
 {
 #ifdef FX_IS_EDITOR
-	if (gEditor->IsSimulationMode()) {
-		return 0;
-	}
-
-	const editor::EditorSelection& selection = gEditor->GetSelection();
-
-	std::vector<ObjectID> cutter_ids;
-
-	for (uint32 i = 0; i < selection.GetCount(); i++) {
-		Object* object = selection.GetObject(i);
-
-		if (gWorld->pPrototype->GetBrush(object) != nullptr) {
-			cutter_ids.push_back(object->ID);
-		}
-	}
-
-	uint32 cut_count = 0;
-
-	for (ObjectID id : cutter_ids) {
-		Object* cutter = gObjectManager->GetObject(id);
-
-		if (cutter != nullptr && gWorld->pPrototype->GetBrush(cutter) != nullptr) {
-			cut_count += SubtractCutter(cutter, cutter_ids, keep_cutters);
-		}
-	}
-
-	return static_cast<int32>(cut_count);
+	return static_cast<int32>(gEditor->SubtractSelection(keep_cutters));
 #else
 	return 0;
 #endif
@@ -760,17 +618,6 @@ static void N_weapon_event(int32 event) { gWorld->Player.Weapons.HandleEvent(sta
 
 static void N_script_error(const char* str) { LogError(LC_SCRIPT, "{}", str); }
 
-static void N_GUI_set_editor_tool(editor::eEditorTool tool)
-{
-#ifdef FX_IS_EDITOR
-	if (tool >= editor::eEditorTool::Count) {
-		return;
-	}
-
-	gEditor->SetTool(tool);
-#endif
-}
-
 static void N_tool_state_send(const editor::EditorToolState* state)
 {
 #ifdef FX_IS_EDITOR
@@ -805,6 +652,7 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("editor_push_op_delete", N_editor_push_op_delete),
 	PREDEF("editor_op_create_object", N_editor_op_create_object),
 	PREDEF("editor_op_dupe_object", N_editor_op_dupe_object),
+	PREDEF("editor_snap_selection_to_grid", N_editor_snap_selection_to_grid),
 
 	PREDEF("OBJECT_move_to", N_object_move_to),
 	PREDEF("OBJECT_move_by", N_object_move_by),
@@ -893,7 +741,6 @@ static const PredefExtern scAvailableExterns[] = {
 
 	PREDEF("script_error", N_script_error),
 
-	PREDEF("GUI_set_editor_tool", N_GUI_set_editor_tool),
 	PREDEF("tool_state_send", N_tool_state_send),
 
 }; // namespace fx::script

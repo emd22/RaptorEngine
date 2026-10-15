@@ -6,11 +6,7 @@
 #include "RaptorEditor.hpp"
 
 #include <Color.hpp>
-#include <Controls.hpp>
 #include <Engine.hpp>
-#include <Physics/JoltPhysicsBackend.hpp>
-#include <Physics/PhysicsManager.hpp>
-#include <Math/RayCast.hpp>
 #include <Physics/PhysicsPlayer.hpp>
 #include <Renderer/DebugDraw.hpp>
 #include <Renderer/Globals.hpp>
@@ -18,213 +14,72 @@
 
 namespace fx::editor {
 
-static constexpr float32 scAimFallbackDistance = 10.0f;
-static constexpr float32 scAimRange = 100.0f;
-
-static constexpr float32 scPlayerHalfWidth = 0.3f;
-static constexpr float32 scBodyHeight = physics::PhysicsPlayer::scStandingHeight;
-static constexpr float32 scEyeHeight = physics::PhysicsPlayer::scEyeHeight;
 static constexpr float32 scDirectionLength = 1.5f;
 static constexpr float32 scDirectionTipHalfExtent = 0.05f;
 
 static constexpr float32 scEditTolerance = 0.0005f;
-static constexpr float32 scHeightSnapStepsPerSecond = 8.0f;
 
-static const Color scSpawnColor = Color::FromRGBA(70, 220, 255, 255);
-static const Color scIdleSpawnColor = Color::FromRGBA(70, 130, 150, 255);
-static const Color scEditingSpawnColor = Color::FromRGBA(130, 255, 130, 255);
 
-void SpawnEditor::Enter() { mbMoving = false; }
+float32 SpawnEditor::GetBodyHeight() { return physics::PhysicsPlayer::scStandingHeight; }
 
-void SpawnEditor::Leave()
-{
-	CommitEdit();
-	mbMoving = false;
-}
+float32 SpawnEditor::GetEyeHeight() { return physics::PhysicsPlayer::scEyeHeight; }
 
-void SpawnEditor::Begin()
-{
-	mbMoving = true;
-	mMoveOrigin = gWorld->PlayerSpawn.Position;
-	mPlayerOrigin = gWorld->Player.Position;
-	mHeightOffset = 0.0f;
-
-	BeginEdit();
-}
-
-void SpawnEditor::Update(float32 delta_time) { Tick(delta_time); }
-
-void SpawnEditor::Finalize() { mbMoving = false; }
-
-void SpawnEditor::Cancel()
-{
-	mbMoving = false;
-	mbEditing = false;
-}
-
-void SpawnEditor::Controls() { Tick(0.0f); }
-
-void SpawnEditor::Tick(float32 delta_time)
-{
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_BACKSPACE)) {
-		CommitEdit();
-		ResetToDefault();
-	}
-
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_RETURN)) {
-		gWorld->RespawnPlayer();
-	}
-
-	const bool aiming = ControlManager::IsKeyDown(eKey::FX_MOUSE_RIGHT);
-
-	if (aiming) {
-		BeginEdit();
-		AimSpawn();
-	}
-
-	if (mbMoving) {
-		MoveSpawn(delta_time);
-	}
-
-	if (!aiming && !mbMoving) {
-		CommitEdit();
-	}
-
-	DrawMarker(true);
-}
-
-bool SpawnEditor::Raycast(const Vec3f origin, const Vec3f direction, float32 max_distance, float32& out_distance) const
-{
-	const Vec3f position = gWorld->PlayerSpawn.Position;
-	const Vec3f half_extent(scPlayerHalfWidth, scBodyHeight * 0.5f, scPlayerHalfWidth);
-	const Vec3f center = position + Vec3f(0.0f, half_extent.Y, 0.0f);
-
-	Vec3f face;
-	const float32 distance = RayCast(Ray(origin, direction), BBox(center - half_extent, center + half_extent), face);
-
-	if (distance < 0.0f || distance > max_distance) {
-		return false;
-	}
-
-	out_distance = distance;
-
-	return true;
-}
-
-void SpawnEditor::DrawMarker(bool selected)
+void SpawnEditor::Move(const Vec3f offset)
 {
 	const World::PlayerSpawnPoint& spawn = gWorld->PlayerSpawn;
-	const Color color = mbEditing ? scEditingSpawnColor : (selected ? scSpawnColor : scIdleSpawnColor);
 
-	const Vec3f half_extent(scPlayerHalfWidth, scBodyHeight * 0.5f, scPlayerHalfWidth);
-	const Vec3f body_center = spawn.Position + Vec3f(0.0f, half_extent.Y, 0.0f);
-
-	const Vec3f eye = spawn.Position + Vec3f(0.0f, scEyeHeight, 0.0f);
-	const Vec3f tip = eye + (spawn.Direction.Normalize() * scDirectionLength);
-
-	renderer::gDebugDraw->WireBox(body_center, half_extent, Quat::scIdentity, color);
-	renderer::gDebugDraw->Line(eye, tip, color);
-	renderer::gDebugDraw->SolidBox(tip, Vec3f(scDirectionTipHalfExtent), Quat::scIdentity, color);
+	Push(spawn.Position + offset, spawn.Direction.Normalize(), true);
 }
 
-void SpawnEditor::BeginEdit()
+void SpawnEditor::Aim(const Vec3f direction)
 {
-	if (mbEditing) {
+	if (direction.Length() < scEditTolerance) {
 		return;
 	}
 
-	mbEditing = true;
-	mPositionBefore = gWorld->PlayerSpawn.Position;
-	mDirectionBefore = gWorld->PlayerSpawn.Direction.Normalize();
-	mbCustomBefore = gWorld->PlayerSpawn.bCustom;
-}
-
-void SpawnEditor::CommitEdit()
-{
-	if (!mbEditing) {
-		return;
-	}
-
-	mbEditing = false;
-
-	const Vec3f position_after = gWorld->PlayerSpawn.Position;
-	const Vec3f direction_after = gWorld->PlayerSpawn.Direction.Normalize();
-
-	if (position_after.IsCloseTo(mPositionBefore, scEditTolerance) &&
-		direction_after.IsCloseTo(mDirectionBefore, scEditTolerance)) {
-		return;
-	}
-
-	gEditor->EmplaceEditOperation<SpawnTransformOperation>(
-		SpawnTransformOperation::State { mPositionBefore, mDirectionBefore, mbCustomBefore },
-		SpawnTransformOperation::State { position_after, direction_after, true });
-}
-
-void SpawnEditor::MoveSpawn(float32 delta_time)
-{
-	const Vec3f player_delta = gWorld->Player.Position - mPlayerOrigin;
-
-	const float32 height_speed = delta_time * gEditor->GetSnapStep() * scHeightSnapStepsPerSecond;
-
-	if (ControlManager::IsKeyDown(eKey::FX_KEY_E)) {
-		mHeightOffset += height_speed;
-	}
-	if (ControlManager::IsKeyDown(eKey::FX_KEY_Q)) {
-		mHeightOffset -= height_speed;
-	}
-
-	const Vec3f movement = gEditor->SnapToGrid(Vec3f(player_delta.X, mHeightOffset, player_delta.Z));
-
-	gWorld->PlayerSpawn.Position = mMoveOrigin + movement;
-}
-
-void SpawnEditor::AimSpawn()
-{
-	Ref<PerspectiveCamera>& camera = gWorld->Player.pCamera;
-
-	const Vec3f origin = camera->Position;
-	const Vec3f forward = camera->GetForwardVector().Normalize();
-
-	const physics::RayResult hit = gPhysics->pBackend->Raycast(origin, forward * scAimRange);
-	const Vec3f target = hit.bHit ? hit.Point : (origin + (forward * scAimFallbackDistance));
-
-	const Vec3f eye = gWorld->PlayerSpawn.Position + Vec3f(0.0f, scEyeHeight, 0.0f);
-	const Vec3f to_target = target - eye;
-
-	if (to_target.Length() < 0.05f) {
-		return;
-	}
-
-	gWorld->PlayerSpawn.Direction = SnapDirection(to_target);
-}
-
-void SpawnEditor::PlaceAtCrosshair()
-{
-	CommitEdit();
-
-	Ref<PerspectiveCamera>& camera = gWorld->Player.pCamera;
-
-	const Vec3f origin = camera->Position;
-	const Vec3f forward = camera->GetForwardVector().Normalize();
-
-	const physics::RayResult hit = gPhysics->pBackend->Raycast(origin, forward * scAimRange);
-	const Vec3f position = gEditor->SnapToGrid(hit.bHit ? hit.Point : (origin + (forward * scAimFallbackDistance)));
-
-	const Vec3f direction = gWorld->PlayerSpawn.Direction.Normalize();
-
-	gEditor->EmplaceEditOperation<SpawnTransformOperation>(
-		SpawnTransformOperation::State { gWorld->PlayerSpawn.Position, direction, gWorld->PlayerSpawn.bCustom },
-		SpawnTransformOperation::State { position, direction, true });
+	Push(gWorld->PlayerSpawn.Position, SnapDirection(direction).Normalize(), true);
 }
 
 void SpawnEditor::ResetToDefault()
 {
 	World::PlayerSpawnPoint defaults;
 
+	Push(defaults.Position, defaults.Direction, false);
+}
+
+void SpawnEditor::Push(const Vec3f position, const Vec3f direction, bool custom)
+{
+	const World::PlayerSpawnPoint& spawn = gWorld->PlayerSpawn;
+	const Vec3f direction_before = spawn.Direction.Normalize();
+
+	if (position.IsCloseTo(spawn.Position, scEditTolerance) && direction.IsCloseTo(direction_before, scEditTolerance) &&
+		custom == spawn.bCustom) {
+		return;
+	}
+
 	gEditor->EmplaceEditOperation<SpawnTransformOperation>(
-		SpawnTransformOperation::State { gWorld->PlayerSpawn.Position, gWorld->PlayerSpawn.Direction.Normalize(),
-										 gWorld->PlayerSpawn.bCustom },
-		SpawnTransformOperation::State { defaults.Position, defaults.Direction, false });
+		SpawnTransformOperation::State { spawn.Position, direction_before, spawn.bCustom },
+		SpawnTransformOperation::State { position, direction, custom });
+}
+
+void SpawnEditor::DrawMarker(bool selected)
+{
+	const World::PlayerSpawnPoint& spawn = gWorld->PlayerSpawn;
+	Color color = gEditor->GetTheme().Marker.SpawnIdle;
+
+	if (selected) {
+		color = gEditor->GetTheme().Marker.Spawn;
+	}
+
+	const Vec3f half_extent(scHalfWidth, GetBodyHeight() * 0.5f, scHalfWidth);
+	const Vec3f body_center = spawn.Position + Vec3f(0.0f, half_extent.Y, 0.0f);
+
+	const Vec3f eye = spawn.Position + Vec3f(0.0f, GetEyeHeight(), 0.0f);
+	const Vec3f tip = eye + (spawn.Direction.Normalize() * scDirectionLength);
+
+	renderer::gDebugDraw->WireBox(body_center, half_extent, Quat::scIdentity, color);
+	renderer::gDebugDraw->Line(eye, tip, color);
+	renderer::gDebugDraw->SolidBox(tip, Vec3f(scDirectionTipHalfExtent), Quat::scIdentity, color);
 }
 
 } // namespace fx::editor

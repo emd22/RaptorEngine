@@ -20,25 +20,23 @@ namespace fx::editor {
 
 void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 {
-	wxStaticText* title = new wxStaticText(this, wxID_ANY, "Light");
-	title->SetFont(title->GetFont().Bold());
-	tool_panel->Add(title, wxSizerFlags().Border(wxALL, 6));
+	PropertySection* section = new PropertySection(this, "Light");
+	wxWindow* body = section->GetBody();
+	tool_panel->Add(section, wxSizerFlags().Expand());
 
-	mpNameLabel = new wxStaticText(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_END);
-	tool_panel->Add(mpNameLabel, wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+	mpNameLabel = new wxStaticText(body, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_END);
+	section->AddWide(mpNameLabel);
 
 	wxBoxSizer* color_row = new wxBoxSizer(wxHORIZONTAL);
-	color_row->Add(new wxStaticText(this, wxID_ANY, "Colour"), wxSizerFlags().CenterVertical());
+	mpColorPicker = new wxColourPickerCtrl(body, wxID_ANY, *wxWHITE);
+	color_row->Add(mpColorPicker, wxSizerFlags().CenterVertical());
 
-	mpColorPicker = new wxColourPickerCtrl(this, wxID_ANY, *wxWHITE);
-	color_row->Add(mpColorPicker, wxSizerFlags().Border(wxLEFT, 6));
-
-	tool_panel->Add(color_row, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+	section->AddRow("Colour", color_row);
 
 	mpColorPicker->Bind(wxEVT_COLOURPICKER_CHANGED, &LightToolSettingsPanel::OnColorChange, this);
 
 	{
-		mpPositionField = new Vector3Field(this, "Position", Vec2f(-100000.0f, 100000.0f));
+		mpPositionField = new Vector3Field(body, "Position", Vec2f(-100000.0f, 100000.0f));
 		mpPositionField->SetOnChange(
 			[](const Vec3f value)
 			{
@@ -52,11 +50,11 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 					});
 			});
 
-		tool_panel->Add(mpPositionField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
+		section->AddRow(*mpPositionField);
 	}
 
 	{
-		mpRadiusField = new FloatField(this, "Radius", Vec2f(3.0f, 150.0f));
+		mpRadiusField = new FloatField(body, "Radius", Vec2f(3.0f, 150.0f));
 		mpRadiusField->SetOnChange(
 			[](const float value)
 			{
@@ -70,11 +68,11 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 					});
 			});
 
-		tool_panel->Add(mpRadiusField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
+		section->AddRow(*mpRadiusField);
 	}
 
 	{
-		mpIntensityField = new FloatField(this, "Intensity (cd)", Vec2f(0.0f, 100000000.0f));
+		mpIntensityField = new FloatField(body, "Intensity (cd)", Vec2f(0.0f, 100000000.0f));
 		mpIntensityField->SetOnChange(
 			[](const float value)
 			{
@@ -88,11 +86,11 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 					});
 			});
 
-		tool_panel->Add(mpIntensityField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
+		section->AddRow(*mpIntensityField);
 	}
 
 	{
-		mpLumensField = new FloatField(this, "Lumens", Vec2f(0.0f, 100000000.0f));
+		mpLumensField = new FloatField(body, "Lumens", Vec2f(0.0f, 100000000.0f));
 		mpLumensField->SetOnChange(
 			[](const float value)
 			{
@@ -106,11 +104,11 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 					});
 			});
 
-		tool_panel->Add(mpLumensField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
+		section->AddRow(*mpLumensField);
 	}
 
 	{
-		mpOuterAngleField = new FloatField(this, "Outer angle", Vec2f(1.0f, 90.0f));
+		mpOuterAngleField = new FloatField(body, "Outer angle", Vec2f(1.0f, 90.0f));
 		mpOuterAngleField->SetOnChange(
 			[](const float value)
 			{
@@ -124,11 +122,11 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 					});
 			});
 
-		tool_panel->Add(mpOuterAngleField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
+		section->AddRow(*mpOuterAngleField);
 	}
 
 	{
-		mpInnerAngleField = new FloatField(this, "Inner angle", Vec2f(0.0f, 90.0f));
+		mpInnerAngleField = new FloatField(body, "Inner angle", Vec2f(0.0f, 90.0f));
 		mpInnerAngleField->SetOnChange(
 			[](const float value)
 			{
@@ -142,7 +140,7 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 					});
 			});
 
-		tool_panel->Add(mpInnerAngleField->GetSizer(), wxSizerFlags().Border(wxALL, 6));
+		section->AddRow(*mpInnerAngleField);
 	}
 
 	ApplyState(EditorPanelState {});

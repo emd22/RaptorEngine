@@ -162,12 +162,14 @@ public:
 	void SetTrigger(bool value);
 	void SetNvBrush(bool value);
 	void SetDBound(bool value);
+	void SetDecal(bool value);
 
 	/// True if this object marks out a probe volume rather than being level geometry
 	FX_FORCE_INLINE bool IsProbeVolume() const { return HasTags(eObjectTag::ProbeVolume); }
 	FX_FORCE_INLINE bool IsTrigger() const { return HasTags(eObjectTag::Trigger); }
 	FX_FORCE_INLINE bool IsNvBrush() const { return HasTags(eObjectTag::NvBrush); }
 	FX_FORCE_INLINE bool IsDBound() const { return HasTags(eObjectTag::DBound); }
+	FX_FORCE_INLINE bool IsDecal() const { return HasTags(eObjectTag::Decal); }
 
 	/// True if this object is a marker of some kind and not drawn as level geometry
 	FX_FORCE_INLINE bool IsVolume() const
@@ -185,7 +187,6 @@ public:
 
 	bool ContainsPoint(const Vec3f point);
 
-	void SetBounds(const BBox& bounds);
 
 	FX_FORCE_INLINE OBBox GetWorldOBB() { return OBBox::FromLocalBounds(Bounds, GetWorldMatrix()); }
 

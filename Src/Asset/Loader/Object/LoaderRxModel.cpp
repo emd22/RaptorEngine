@@ -1075,7 +1075,7 @@ bool LoaderRxModel::BuildObjects(const RxBinaryFile& mesh_file)
 		}
 		else if (submesh.ParentJoint != rx::scNoJoint || mStaticJoint >= 0) {
 			const uint32 joint = (submesh.ParentJoint != rx::scNoJoint) ? mJointOffset + submesh.ParentJoint
-																		 : static_cast<uint32>(mStaticJoint);
+																		: static_cast<uint32>(mStaticJoint);
 
 			current_object->AttachToBone(mpSkeleton, joint, mpSkeleton->InvBindTransforms[joint]);
 		}
@@ -1399,7 +1399,7 @@ bool LoaderRxModel::LoadWeapon(const String& path)
 
 	LoadClips(weapon.Clips);
 
-	LogInfo(LC_ASSET, "Loaded weapon '{}': {} viewhands joints, {} weapon joints, '{}' rides '{}'", path,
+	LogInfo(LC_ASSET, "Loaded weapon '{}': {} viewhands joints, {} weapon joints, '{}' sits on '{}'", path,
 			weapon.ViewhandsJoints, weapon.WeaponJoints, weapon.RootJoint, weapon.AttachJoint);
 
 	return true;

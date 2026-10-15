@@ -1,5 +1,6 @@
 #include "ObjectPropertiesPanel.hpp"
 
+#include "Common.hpp"
 #include "EditOperation.hpp"
 #include "EditorFrame.hpp"
 #include "EditorThread.hpp"
@@ -10,7 +11,6 @@
 #include <wx/choice.h>
 #include <wx/filedlg.h>
 #include <wx/sizer.h>
-#include <wx/statbox.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
 
@@ -93,47 +93,46 @@ static constexpr FlagName<eObjectFlags> scFlagNames[] = {
 };
 
 template <typename TState, size_t TCount>
-static wxStaticBoxSizer* MakeFlagGroup(wxWindow* parent, const char* title, const FlagName<TState> (&names)[TCount],
-									   ObjectPropertiesPanel::FlagRows<TState>& out_rows)
+static PropertySection* MakeFlagSection(wxWindow* parent, const char* title, const FlagName<TState> (&names)[TCount],
+										ObjectPropertiesPanel::FlagRows<TState>& out_rows)
 {
 	static_assert(TCount <= ObjectPropertiesPanel::scMaxRows);
 
-	wxStaticBoxSizer* group = new wxStaticBoxSizer(wxVERTICAL, parent, title);
+	PropertySection* section = new PropertySection(parent, title);
 
 	for (const FlagName<TState>& name : names) {
-		wxCheckBox* check_box = new wxCheckBox(group->GetStaticBox(), wxID_ANY, name.pName);
+		wxCheckBox* check_box = new wxCheckBox(section->GetBody(), wxID_ANY, name.pName);
 
 		if (name.pHint != nullptr) {
 			check_box->SetToolTip(name.pHint);
 		}
 
-		group->Add(check_box, wxSizerFlags().Border(wxALL, 2));
+		section->AddWide(check_box);
 		out_rows.Insert(ObjectPropertiesPanel::FlagRow<TState> { .Bit = name.Bit, .pCheckBox = check_box });
 	}
 
-	return group;
+	return section;
 }
 
 ObjectPropertiesPanel::ObjectPropertiesPanel(wxWindow* parent) : wxPanel(parent, wxID_ANY)
 {
 	wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
 
-	wxStaticText* title = new wxStaticText(this, wxID_ANY, "Properties");
-	title->SetFont(title->GetFont().Bold());
-	sizer->Add(title, wxSizerFlags().Border(wxALL, 6));
+	PropertySection* section = new PropertySection(this, "Object");
+	wxWindow* body = section->GetBody();
+	sizer->Add(section, wxSizerFlags().Expand());
 
-	mpNameLabel = new wxStaticText(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_END);
-	sizer->Add(mpNameLabel, wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+	mpNameLabel = new wxStaticText(body, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_END);
+	section->AddWide(mpNameLabel);
 
 	wxBoxSizer* material_row = new wxBoxSizer(wxHORIZONTAL);
-	material_row->Add(new wxStaticText(this, wxID_ANY, "Material"), wxSizerFlags().CenterVertical());
 
-	mpMaterialChoice = new wxChoice(this, wxID_ANY);
-	material_row->Add(mpMaterialChoice, wxSizerFlags().Border(wxLEFT, 6));
+	mpMaterialChoice = new wxChoice(body, wxID_ANY);
+	material_row->Add(mpMaterialChoice, wxSizerFlags(1).CenterVertical());
 
-	wxButton* browse_button = new wxButton(this, wxID_ANY, "Browse...", wxDefaultPosition, wxDefaultSize,
-										   wxBU_EXACTFIT);
-	material_row->Add(browse_button, wxSizerFlags().Border(wxLEFT, 6));
+	wxButton* browse_button = new wxButton(body, wxID_ANY, "...", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+	browse_button->SetToolTip("Browse materials");
+	material_row->Add(browse_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 4));
 
 	browse_button->Bind(wxEVT_BUTTON,
 						[this](wxCommandEvent&)
@@ -143,32 +142,32 @@ ObjectPropertiesPanel::ObjectPropertiesPanel(wxWindow* parent) : wxPanel(parent,
 							}
 						});
 
-	sizer->Add(material_row, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+	section->AddRow("Material", material_row);
 
 	mpMaterialChoice->Bind(wxEVT_CHOICE, &ObjectPropertiesPanel::OnMaterialChoice, this);
 
 	wxBoxSizer* script_row = new wxBoxSizer(wxHORIZONTAL);
-	script_row->Add(new wxStaticText(this, wxID_ANY, "Script"), wxSizerFlags().CenterVertical());
 
-	mpScriptText = new wxTextCtrl(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
+	mpScriptText = new wxTextCtrl(body, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(40, -1),
+								  wxTE_PROCESS_ENTER);
 	mpScriptText->SetHint("Scripts/objects/example.strata");
-	script_row->Add(mpScriptText, wxSizerFlags(1).Border(wxLEFT, 6));
+	script_row->Add(mpScriptText, wxSizerFlags(1).CenterVertical());
 
-	mpScriptBrowse = new wxButton(this, wxID_ANY, "Browse...", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
-	script_row->Add(mpScriptBrowse, wxSizerFlags().Border(wxLEFT, 6));
+	mpScriptBrowse = new wxButton(body, wxID_ANY, "...", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+	mpScriptBrowse->SetToolTip("Browse for a script");
+	script_row->Add(mpScriptBrowse, wxSizerFlags().CenterVertical().Border(wxLEFT, 4));
 
-	mpScriptClear = new wxButton(this, wxID_ANY, "Clear", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
-	script_row->Add(mpScriptClear, wxSizerFlags().Border(wxLEFT, 6));
+	mpScriptClear = new wxButton(body, wxID_ANY, "Clear", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+	mpScriptClear->SetToolTip("Detach the script");
+	script_row->Add(mpScriptClear, wxSizerFlags().CenterVertical().Border(wxLEFT, 4));
 
-	sizer->Add(script_row, wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+	section->AddRow("Script", script_row);
 
-	mpScriptStatus = new wxStaticText(this, wxID_ANY, wxEmptyString);
-	sizer->Add(mpScriptStatus, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+	mpScriptStatus = new wxStaticText(body, wxID_ANY, wxEmptyString);
+	mpScriptStatus->Hide();
+	section->AddWide(mpScriptStatus);
 
-	wxBoxSizer* enter_direction_row = new wxBoxSizer(wxHORIZONTAL);
-	enter_direction_row->Add(new wxStaticText(this, wxID_ANY, "Enter direction"), wxSizerFlags().CenterVertical());
-
-	mpEnterDirChoice = new wxChoice(this, wxID_ANY);
+	mpEnterDirChoice = new wxChoice(body, wxID_ANY);
 
 	for (const EnterDirectionChoice& choice : scEnterDirections) {
 		mpEnterDirChoice->Append(choice.pName);
@@ -178,9 +177,7 @@ ObjectPropertiesPanel::ObjectPropertiesPanel(wxWindow* parent) : wxPanel(parent,
 	mpEnterDirChoice->SetToolTip("Triggers only. When set, the trigger only fires if the player enters it moving along "
 								 "this direction in the brush's local space (within 90 degrees). Any fires from every "
 								 "side");
-	enter_direction_row->Add(mpEnterDirChoice, wxSizerFlags(1).Border(wxLEFT, 6));
-
-	sizer->Add(enter_direction_row, wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT | wxBOTTOM, 6));
+	section->AddRow("Enter direction", mpEnterDirChoice);
 
 	mpEnterDirChoice->Bind(wxEVT_CHOICE, &ObjectPropertiesPanel::OnEnterDirectionChoice, this);
 
@@ -199,8 +196,8 @@ ObjectPropertiesPanel::ObjectPropertiesPanel(wxWindow* parent) : wxPanel(parent,
 							CommitScript();
 						});
 
-	sizer->Add(MakeFlagGroup(this, "Tags", scTagNames, mTagRows), wxSizerFlags().Expand().Border(wxALL, 6));
-	sizer->Add(MakeFlagGroup(this, "Flags", scFlagNames, mFlagRows), wxSizerFlags().Expand().Border(wxALL, 6));
+	sizer->Add(MakeFlagSection(this, "Tags", scTagNames, mTagRows), wxSizerFlags().Expand());
+	sizer->Add(MakeFlagSection(this, "Flags", scFlagNames, mFlagRows), wxSizerFlags().Expand());
 
 	BindRows(mTagRows);
 	BindRows(mFlagRows);
@@ -446,7 +443,8 @@ void ObjectPropertiesPanel::ApplyState(const ObjectPanelState& state, const Mate
 	if (has_errors != mbShownScriptErrors) {
 		mbShownScriptErrors = has_errors;
 		mpScriptStatus->SetLabel(has_errors ? wxString("Script failed to compile, see the log") : wxString());
-		Layout();
+		mpScriptStatus->Show(has_errors);
+		RelayoutToScroller(mpScriptStatus->GetParent());
 	}
 }
 

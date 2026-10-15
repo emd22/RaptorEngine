@@ -7,6 +7,7 @@
 #include <CVar.hpp>
 #include <Core/FilesystemIO.hpp>
 #include <Core/RefUtil.hpp>
+#include <Decal/MeshDecal.hpp>
 #include <Editor/RaptorEditor.hpp>
 #include <Engine.hpp>
 #include <Map/CompiledMap.hpp>
@@ -34,6 +35,7 @@ static constexpr MaterialLibraryID scDefaultMaterialID = MaterialLibraryID(0);
 static constexpr MaterialLibraryID scEditableMaterialID = MaterialLibraryID(1);
 
 static constexpr float32 scBakedSunMinCosine = 0.99999f;
+static constexpr float32 scDecalBuriedTolerance = 1e-4f;
 
 Blockout::Blockout() {}
 
@@ -524,6 +526,7 @@ void Blockout::RemoveSingleObjectFromWorld(Object* object)
 	}
 
 	mBrushes.Remove(object->ID.GetID());
+	mDecalHashes.Remove(object->ID.GetID());
 
 	gObjectManager->DestroyObject(object->ID);
 }
@@ -536,6 +539,8 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 
 	BlockoutObjects.Clear();
 	mBrushes.Clear();
+	mDecalHashes.Clear();
+	mCompiledDecalReceivers.clear();
 
 	for (ObjectID object_id : mCompiledObjects) {
 		gWorld->Detach(object_id);
@@ -617,6 +622,8 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 	const Vec2f lightmap_scale(static_cast<float32>(lightmap.Width) / static_cast<float32>(Limits::LightmapSize),
 							   static_cast<float32>(lightmap.Height) / static_cast<float32>(Limits::LightmapSize));
 
+	mCompiledDecalReceivers.reserve(map.Surfaces.Size);
+
 	for (size_t surface_index = 0; surface_index < map.Surfaces.Size; surface_index++) {
 		const CompiledMapSurface& surface = map.Surfaces[surface_index];
 		const CompiledMapMaterial& material = map.Materials[surface.MaterialIndex];
@@ -681,6 +688,25 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 		}
 
 		object->Bounds = surface.Bounds;
+
+		const Material* surface_material = gMaterialManager->GetMaterial(material_id);
+
+		if (surface_material == nullptr || !surface_material->IsTransparent()) {
+			CompiledDecalReceiver& receiver = mCompiledDecalReceivers.emplace_back();
+			receiver.Bounds = surface.Bounds;
+			receiver.Positions.InitCapacity(surface.Vertices.Size);
+			receiver.Normals.InitCapacity(surface.Vertices.Size);
+			receiver.Indices.InitCapacity(surface.Indices.Size);
+
+			for (const CompiledMapVertex& vertex : surface.Vertices) {
+				receiver.Positions.Insert(vertex.Position);
+				receiver.Normals.Insert(vertex.Normal);
+			}
+
+			for (const uint32 index : surface.Indices) {
+				receiver.Indices.Insert(index);
+			}
+		}
 
 		gWorldGrid->UpdateObject(object);
 
@@ -784,9 +810,364 @@ Brush* Blockout::GetBrush(const Object* object)
 	return mBrushes.Find(object->ID.GetID());
 }
 
+static void HashBytes(uint64& hash, const void* data, size_t size)
+{
+	const uint8* bytes = static_cast<const uint8*>(data);
+
+	for (size_t i = 0; i < size; i++) {
+		hash ^= bytes[i];
+		hash *= 0x100000001B3ULL;
+	}
+}
+
+static void HashFloat(uint64& hash, float32 value) { HashBytes(hash, &value, sizeof(value)); }
+
+static void HashMatrix(uint64& hash, const Mat4f& matrix) { HashBytes(hash, matrix.RawData, sizeof(matrix.RawData)); }
+
+static void HashPlanes(uint64& hash, const Brush& brush)
+{
+	for (const BrushPlane& plane : brush.Planes) {
+		HashFloat(hash, plane.Normal.X);
+		HashFloat(hash, plane.Normal.Y);
+		HashFloat(hash, plane.Normal.Z);
+		HashFloat(hash, plane.Distance);
+	}
+}
+
+static Vec3f TransformPoint(const Mat4f& matrix, const Vec3f point)
+{
+	const Vec4f moved = matrix * Vec4f(point.X, point.Y, point.Z, 1.0f);
+
+	return Vec3f(moved.X, moved.Y, moved.Z);
+}
+
+static Vec3f TransformDirection(const Mat4f& matrix, const Vec3f direction)
+{
+	const Vec4f turned = matrix * Vec4f(direction.X, direction.Y, direction.Z, 0.0f);
+
+	return Vec3f(turned.X, turned.Y, turned.Z);
+}
+
+static bool BoundsOverlap(const BBox& a, const BBox& b)
+{
+	return a.Min.X <= b.Max.X && a.Max.X >= b.Min.X && a.Min.Y <= b.Max.Y && a.Max.Y >= b.Min.Y &&
+		   a.Min.Z <= b.Max.Z && a.Max.Z >= b.Min.Z;
+}
+
+static BBox GetBrushWorldBounds(const Brush& brush, const Mat4f& world)
+{
+	return OBBox::FromLocalBounds(BBox(brush.GetBoundsMin(), brush.GetBoundsMax()), world).GetWorldAABB();
+}
+
+static bool HasOpaqueMaterial(Object* object)
+{
+#ifdef FX_IS_EDITOR
+	const MaterialID material_id = gEditor->GetSelection().GetStoredMaterial(object);
+#else
+	const MaterialID material_id = object->GetMaterialID();
+#endif
+
+	const Material* material = gMaterialManager->GetMaterial(material_id);
+
+	return material == nullptr || !material->IsTransparent();
+}
+
+bool Blockout::IsDecalReceiver(Object* object)
+{
+	return object != nullptr && object != pXFormObject && object != pPreviewObject && !object->IsDecal() &&
+		   !object->IsVolume() && !object->IsHidden() && !IsDynamic(object) && HasOpaqueMaterial(object);
+}
+
+void Blockout::GatherDecalReceivers(const BBox& bounds, std::vector<DecalReceiver>& out_receivers)
+{
+	out_receivers.clear();
+
+	for (const ObjectID id : BlockoutObjects) {
+		Object* object = gObjectManager->GetObject(id);
+		const Brush* brush = GetBrush(object);
+
+		if (brush == nullptr || !brush->IsValid() || !IsDecalReceiver(object)) {
+			continue;
+		}
+
+		const Mat4f world = object->GetWorldMatrix();
+
+		if (BoundsOverlap(GetBrushWorldBounds(*brush, world), bounds)) {
+			out_receivers.push_back(DecalReceiver { .pBrush = brush, .World = world, .ID = object->ID });
+		}
+	}
+
+	std::vector<SubviewSolid> solids;
+	GetSubviewSolids(solids);
+
+	for (const SubviewSolid& solid : solids) {
+		if (solid.bTransparent || solid.pOwner->IsHidden() || !solid.pBrush->IsValid()) {
+			continue;
+		}
+
+		if (BoundsOverlap(GetBrushWorldBounds(*solid.pBrush, solid.World), bounds)) {
+			out_receivers.push_back(DecalReceiver { .pBrush = solid.pBrush, .World = solid.World, .ID = solid.pOwner->ID });
+		}
+	}
+}
+
+uint64 Blockout::HashDecal(Object* decal, const Brush& volume, const BBox& bounds,
+						   const std::vector<DecalReceiver>& receivers) const
+{
+	uint64 hash = FX_HASH64_FNV1A_INIT;
+
+	HashMatrix(hash, decal->GetWorldMatrix());
+	HashPlanes(hash, volume);
+
+	for (const DecalReceiver& receiver : receivers) {
+		const uint32 id = receiver.ID.GetID();
+
+		HashBytes(hash, &id, sizeof(id));
+		HashMatrix(hash, receiver.World);
+		HashPlanes(hash, *receiver.pBrush);
+	}
+
+	const uint64 compiled_count = mCompiledDecalReceivers.size();
+	HashBytes(hash, &compiled_count, sizeof(compiled_count));
+
+	return hash;
+}
+
+void Blockout::RebuildDecalMesh(Object* decal, const Brush& volume)
+{
+	const Mat4f world = decal->GetWorldMatrix();
+	const BBox bounds = GetBrushWorldBounds(volume, world);
+
+	MeshDecalBuilder builder(volume, world);
+
+	std::vector<DecalReceiver> receivers;
+	GatherDecalReceivers(bounds, receivers);
+
+	for (const DecalReceiver& receiver : receivers) {
+		builder.AddBrush(*receiver.pBrush, receiver.World);
+	}
+
+	builder.ClipBrushes();
+
+	for (const CompiledDecalReceiver& receiver : mCompiledDecalReceivers) {
+		if (BoundsOverlap(receiver.Bounds, bounds)) {
+			builder.AddTriangles(receiver.Positions.pData, receiver.Normals.pData, receiver.Indices.pData,
+								 static_cast<uint32>(receiver.Indices.Size));
+		}
+	}
+
+	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
+
+	if (builder.IsEmpty()) {
+		LogWarning(LC_ASSET, "Decal '{}' does not cover any surface that can receive it", decal->Name.Get());
+		MeshDecalBuilder::BuildPlaceholder(volume, *mesh);
+	}
+	else {
+		builder.Build(*mesh);
+	}
+
+	decal->pMesh = mesh->AsDefaultMesh();
+
+	mDecalHashes.Insert(decal->ID.GetID(), HashDecal(decal, volume, bounds, receivers));
+}
+
+void Blockout::RefreshDecals(bool force)
+{
+	std::vector<DecalReceiver> receivers;
+
+	for (const ObjectID id : BlockoutObjects) {
+		Object* decal = gObjectManager->GetObject(id);
+
+		if (decal == nullptr || !decal->IsDecal()) {
+			continue;
+		}
+
+		const Brush* volume = GetBrush(decal);
+
+		if (volume == nullptr || !volume->IsValid()) {
+			continue;
+		}
+
+		if (!force) {
+			const BBox bounds = GetBrushWorldBounds(*volume, decal->GetWorldMatrix());
+			GatherDecalReceivers(bounds, receivers);
+
+			const uint64* previous = mDecalHashes.Find(decal->ID.GetID());
+
+			if (previous != nullptr && *previous == HashDecal(decal, *volume, bounds, receivers)) {
+				continue;
+			}
+		}
+
+		RebuildDecalMesh(decal, *volume);
+	}
+}
+
+static bool RayEntersBrush(const Brush& brush, const Mat4f& world, const Vec3f origin, const Vec3f direction,
+						   float32& out_distance)
+{
+	const Mat4f to_local = world.Inverse();
+	const Vec3f local_origin = TransformPoint(to_local, origin);
+	const Vec3f local_direction = TransformDirection(to_local, direction);
+
+	float32 enter = -FLT_MAX;
+	float32 exit = FLT_MAX;
+
+	for (const BrushPlane& plane : brush.Planes) {
+		const float32 side = plane.Normal.Dot(local_origin) - plane.Distance;
+		const float32 approach = plane.Normal.Dot(local_direction);
+
+		if (std::fabs(approach) < 1e-8f) {
+			if (side > 0.0f) {
+				return false;
+			}
+
+			continue;
+		}
+
+		const float32 distance = -side / approach;
+
+		if (approach < 0.0f) {
+			enter = std::max(enter, distance);
+		}
+		else {
+			exit = std::min(exit, distance);
+		}
+	}
+
+	if (enter < 0.0f || enter > exit) {
+		return false;
+	}
+
+	out_distance = enter;
+	return true;
+}
+
+static bool RayHitsTriangle(const Vec3f origin, const Vec3f direction, const Vec3f a, const Vec3f b, const Vec3f c,
+							float32& out_distance)
+{
+	const Vec3f edge_ab = b - a;
+	const Vec3f edge_ac = c - a;
+	const Vec3f p = direction.Cross(edge_ac);
+	const float32 determinant = edge_ab.Dot(p);
+
+	if (std::fabs(determinant) < 1e-12f) {
+		return false;
+	}
+
+	const float32 inverse = 1.0f / determinant;
+	const Vec3f to_origin = origin - a;
+	const float32 u = to_origin.Dot(p) * inverse;
+
+	if (u < 0.0f || u > 1.0f) {
+		return false;
+	}
+
+	const Vec3f q = to_origin.Cross(edge_ab);
+	const float32 v = direction.Dot(q) * inverse;
+
+	if (v < 0.0f || u + v > 1.0f) {
+		return false;
+	}
+
+	const float32 distance = edge_ac.Dot(q) * inverse;
+
+	if (distance < 0.0f) {
+		return false;
+	}
+
+	out_distance = distance;
+	return true;
+}
+
+void Blockout::RaycastDecalSurfaces(const Vec3f origin, const Vec3f direction, float32 max_distance,
+									std::vector<float32>& out_distances)
+{
+	out_distances.clear();
+
+	const Vec3f end = origin + direction * max_distance;
+	const BBox bounds(Vec3f::Min(origin, end), Vec3f::Max(origin, end));
+
+	std::vector<DecalReceiver> receivers;
+	GatherDecalReceivers(bounds, receivers);
+
+	std::vector<float32> candidates;
+
+	for (const DecalReceiver& receiver : receivers) {
+		float32 distance = 0.0f;
+
+		if (RayEntersBrush(*receiver.pBrush, receiver.World, origin, direction, distance) && distance <= max_distance) {
+			candidates.push_back(distance);
+		}
+	}
+
+	for (const CompiledDecalReceiver& receiver : mCompiledDecalReceivers) {
+		if (!BoundsOverlap(receiver.Bounds, bounds)) {
+			continue;
+		}
+
+		for (size_t i = 0; i + 2 < receiver.Indices.Size; i += 3) {
+			const uint32 a = receiver.Indices[i];
+			const uint32 b = receiver.Indices[i + 1];
+			const uint32 c = receiver.Indices[i + 2];
+
+			const Vec3f normal = receiver.Normals[a] + receiver.Normals[b] + receiver.Normals[c];
+
+			if (normal.Dot(direction) >= 0.0f) {
+				continue;
+			}
+
+			float32 distance = 0.0f;
+
+			if (RayHitsTriangle(origin, direction, receiver.Positions[a], receiver.Positions[b], receiver.Positions[c],
+								distance) &&
+				distance <= max_distance) {
+				candidates.push_back(distance);
+			}
+		}
+	}
+
+	for (const float32 distance : candidates) {
+		const Vec3f above = origin + direction * (distance - MeshDecalBuilder::scSurfaceOffset);
+
+		bool is_buried = false;
+
+		for (const DecalReceiver& receiver : receivers) {
+			const Vec3f local = TransformPoint(receiver.World.Inverse(), above);
+
+			if (receiver.pBrush->ContainsPoint(local, -scDecalBuriedTolerance)) {
+				is_buried = true;
+				break;
+			}
+		}
+
+		if (!is_buried) {
+			out_distances.push_back(distance);
+		}
+	}
+}
+
 void Blockout::RebuildBrush(Object* object, Brush&& brush, physics::eMotionType motion_type)
 {
 	Assert(brush.IsValid());
+
+	if (object->IsDecal()) {
+		object->Bounds.Min = brush.GetBoundsMin();
+		object->Bounds.Max = brush.GetBoundsMax();
+		object->SetRotationOrigin(-brush.GetCenter());
+
+		gPhysics->DestroyBody(object->PhysicsID);
+		object->PhysicsID = physics::BodyID::scNull;
+
+		object->SetDecal(true);
+
+		RebuildDecalMesh(object, brush);
+
+		gWorldGrid->UpdateObject(object);
+
+		mBrushes.Insert(object->ID.GetID(), std::move(brush));
+		return;
+	}
 
 	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
 	brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
@@ -939,8 +1320,9 @@ MaterialID Blockout::ReadBrushMaterial(ConfigEntry& entry)
 		material_id = GetDBoundMaterial();
 	}
 
-	if (brush_kind == eBrushKind::Geometry && mat_entry != nullptr &&
-		mat_entry->Type == ConfigEntry::ePrimitiveType::String) {
+	const bool has_material = brush_kind == eBrushKind::Geometry || brush_kind == eBrushKind::Decal;
+
+	if (has_material && mat_entry != nullptr && mat_entry->Type == ConfigEntry::ePrimitiveType::String) {
 		const char* mat_name = mat_entry->Get<const char*>();
 		const MaterialLibraryID mat_id = mMaterials.FindIDByName(mat_name);
 
@@ -1026,6 +1408,9 @@ ObjectID Blockout::CreateBrush(ConfigEntry& entry)
 	}
 	else if (brush_kind == eBrushKind::DBound) {
 		object->SetTag(eObjectTag::DBound);
+	}
+	else if (brush_kind == eBrushKind::Decal) {
+		object->SetTag(eObjectTag::Decal);
 	}
 
 	ReadScriptEntry(object, entry);
@@ -1201,6 +1586,10 @@ Object* Blockout::DupeObject(Object* object)
 		dupe->SetDBound(true);
 	}
 
+	if (object->IsDecal()) {
+		dupe->SetTag(eObjectTag::Decal);
+	}
+
 	gObjectScripts->Attach(dupe, gObjectScripts->GetPath(object->ID));
 
 	Vec3f enter_direction;
@@ -1266,7 +1655,7 @@ bool Blockout::IsDynamic(const Object* object) const
 }
 
 Object* Blockout::RestoreObject(const Vec3f position, const Brush::PlaneList& planes, MaterialID material,
-								const Quat rotation, const Name& name, bool is_dynamic)
+								const Quat rotation, const Name& name, bool is_dynamic, bool is_decal)
 {
 	Brush brush = Brush::FromPlanes(planes);
 
@@ -1297,6 +1686,10 @@ Object* Blockout::RestoreObject(const Vec3f position, const Brush::PlaneList& pl
 	object->SetShadowCaster(true);
 	object->SetRotation(rotation);
 	object->SubviewInstance = mActiveSubview;
+
+	if (is_decal) {
+		object->SetTag(eObjectTag::Decal);
+	}
 
 	RebuildBrush(object, std::move(brush), is_dynamic ? physics::eMotionType::Dynamic : physics::eMotionType::Static);
 
@@ -1874,6 +2267,10 @@ ConfigEntry Blockout::MakeBrushEntry(Object* object, const String& name, const B
 			blockout_entry.AddMember(ConfigEntry::Literal(scDBoundName, 1));
 		}
 
+		if (object->IsDecal()) {
+			blockout_entry.AddMember(ConfigEntry::Literal(scDecalName, 1));
+		}
+
 		WriteScriptEntry(blockout_entry, object);
 
 		if (IsDynamic(object)) {
@@ -1904,20 +2301,6 @@ static Mat4f MakeBrushMatrix(const BrushPlacement& placement, const Vec3f center
 {
 	return Mat4f::AsTranslation(-center) * Mat4f::AsRotation(placement.Rotation) * Mat4f::AsTranslation(center) *
 		   Mat4f::AsTranslation(placement.Position);
-}
-
-static Vec3f TransformPoint(const Mat4f& matrix, const Vec3f point)
-{
-	const Vec4f moved = matrix * Vec4f(point.X, point.Y, point.Z, 1.0f);
-
-	return Vec3f(moved.X, moved.Y, moved.Z);
-}
-
-static Vec3f TransformDirection(const Mat4f& matrix, const Vec3f direction)
-{
-	const Vec4f turned = matrix * Vec4f(direction.X, direction.Y, direction.Z, 0.0f);
-
-	return Vec3f(turned.X, turned.Y, turned.Z);
 }
 
 static BrushPlacement ReadBrushPlacement(const ConfigEntry& entry)
@@ -3103,6 +3486,8 @@ ePrototypeLoadStatus Blockout::Load(const String& opened_path)
 	else {
 		LoadLegacyModels();
 	}
+
+	RefreshDecals(true);
 
 	renderer::gShadowAtlas->Invalidate();
 

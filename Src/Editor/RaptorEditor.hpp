@@ -2,10 +2,10 @@
 
 #ifdef FX_IS_EDITOR
 
-#include "BoundsEditor.hpp"
 #include "EditOperation.hpp"
 #include "EditorPanelState.hpp"
 #include "EditorSelection.hpp"
+#include "EditorTheme.hpp"
 #include "EditorTool.hpp"
 #include "GrabEditor.hpp"
 #include "LightEditor.hpp"
@@ -97,8 +97,8 @@ public:
 	void InvokeReloadHandler(eReloadTarget target);
 
 	/**
-	 * @brief Runs the editor for a frame: its hotkeys, picking objects, and the selected tool. Does nothing while
-	 * simulating.
+	 * @brief Runs the editor for a frame: draws the selection and markers in the 3D view while editing, and the grab
+	 * helper while simulating.
 	 */
 	void Update(float32 delta_time);
 
@@ -106,14 +106,18 @@ public:
 	// Tools
 	/////////////////////////////////////
 
-	/// Selects a tool, or `eEditorTool::None` to leave the editor and simulate the game
 	void SetTool(eEditorTool tool);
 
-	FX_FORCE_INLINE eEditorTool GetCurrentToolType() const { return mCurrentToolType; }
-	FX_FORCE_INLINE EditorTool* GetCurrentTool() { return mpCurrentTool; }
-	EditorTool* GetTool(const eEditorTool tool_type);
+	FX_FORCE_INLINE eEditorTool GetCurrentTool() const { return mCurrentTool; }
 
-	FX_FORCE_INLINE bool IsSimulationMode() const { return (mCurrentToolType == eEditorTool::None); }
+	/////////////////////////////////////
+	// Simulation
+	/////////////////////////////////////
+
+	void SetSimulating(bool simulating);
+
+	FX_FORCE_INLINE bool IsSimulationMode() const { return mbSimulating; }
+	FX_FORCE_INLINE bool IsGrabbing() const { return mGrabEditor.IsHolding(); }
 
 	/////////////////////////////////////
 	// Modes
@@ -141,12 +145,25 @@ public:
 
 	void TopViewSelect(const DynArray<ObjectID>& object_ids, eTopViewSelectMode mode);
 	void TopViewMove(const Vec3f offset);
-	void TopViewRotate(const Vec3f axis, float32 angle, const Vec3f pivot);
+	void TopViewRotate(const Vec3f axis, float32 angle, const Vec3f pivot, const Vec3f offset);
 	void TopViewMoveFace(const Vec3f world_normal, float32 distance);
 	void TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewVertexHandle>& handles,
 							 const Vec3f offset);
-	void TopViewCreate(Vec3f min, Vec3f max, bool drop_to_ground);
-	void TopViewCreateArch(DynArray<Vec3f> points, bool drop_to_ground);
+	void TopViewCreate(eViewPlane plane, Vec3f min, Vec3f max, bool drop_to_ground);
+	void TopViewCreateArch(eViewPlane plane, DynArray<Vec3f> points, bool drop_to_ground);
+	void TopViewCreateDecal(eViewPlane plane, Vec3f min, Vec3f max, bool drop_to_ground);
+	void TopViewBend(const BendFrame& frame);
+	void TopViewClip(const Vec3f point_a, const Vec3f point_b, const Vec3f view_axis);
+	void TopViewSubtract(bool keep_cutters);
+	void TopViewSelectLight(uint32 light_id);
+	void TopViewMoveLight(const Vec3f offset);
+	void TopViewAimLight(const Vec3f direction);
+	void TopViewCreateLight(const Vec3f position);
+	void TopViewSelectSpawn();
+	void TopViewMoveSpawn(const Vec3f offset);
+	void TopViewAimSpawn(const Vec3f direction);
+	void TopViewRespawn();
+	void TopViewToggleSubview();
 	void TopViewDelete();
 	void TopViewDuplicate();
 	/// Hides the selection from the 2D views. It stays in the level and in the 3D view.
@@ -155,20 +172,25 @@ public:
 	void TopViewToggleSnap();
 	void TopViewAdjustSnap(int32 direction);
 
+	uint32 SnapSelectionToGrid();
+
 	Object* CreateWorldBox(const Vec3f min, const Vec3f max);
 	void FitDBoundsToLevel();
 
 	FX_FORCE_INLINE bool IsSpawnSelected() const { return mbSpawnSelected; }
 
+	bool ClipObject(Object* object, const Vec3f point_a, const Vec3f point_b, const Vec3f direction);
+
+	uint32 SubtractSelection(bool keep_cutters);
+
 	/// Vis mode selects everything but data brushes, Data mode only the data brushes the filter lets through
 	bool IsObjectSelectable(const Object* object) const;
 
-	/// Reloads every script, then picks the tools' functions back up
 	void ReloadScripts();
 
 	FX_FORCE_INLINE const EditorToolState& GetToolState() const { return mToolState; }
 
-	/// Takes the snap settings from a tool script
+	/// Takes the snap settings from the command script
 	void SubmitToolState(const EditorToolState& state);
 
 	/// The size of a snap step, in metres
@@ -177,7 +199,12 @@ public:
 	/// Rounds a position (or a distance) to the snap step, if snapping is on
 	Vec3f SnapToGrid(const Vec3f position) const;
 
+	Vec3f RoundToGrid(const Vec3f position) const;
+
 	float32 GetAngleSnapStep() const;
+
+	const EditorTheme& GetTheme() const { return mTheme; }
+	void SetTheme(const EditorTheme& theme) { mTheme = theme; }
 
 	/////////////////////////////////////
 	// Selection
@@ -207,6 +234,7 @@ public:
 
 	/// The material new brushes are made with: the last one chosen for an object, or the default one
 	MaterialID GetNewBrushMaterial() const;
+	MaterialID GetNewDecalMaterial() const;
 
 	Object* CreateReflectionProbeAtPlayer();
 
@@ -315,36 +343,14 @@ private:
 
 	uint32 GetAvailableToolMask() const;
 
-	void AddTools();
-	void AddTool(const eEditorTool tool_type, const char* path, eEditorToolFlags flags);
-
-	void HandleHotkeys();
-
-	/// Selects the object under the crosshair
-	void PickObject();
-
 	void DrawModelSelection();
 	void DrawSubviews();
 
 	bool SelectSubview(uint32 instance, bool append_selection);
 
-	void BeginDrag();
-	/// Ends the drag in progress, letting the tool finish its operation
-	void EndDrag();
-	/// Ends the drag in progress without letting the tool finish it
-	void CancelDrag();
-
-	/// Slows the player down and turns off head bob, so a dragged object can be placed precisely
-	void SetMovementDamped(bool damped);
-
-	void HideToolMarkers();
-
-	/// Copies the selection over to the scripts, capturing where each object is now
+	/// Copies the selection over to the command script
 	void SyncSelection();
-	void SyncCurrentTool();
 
-	void CreateObjectAtCrosshair();
-	void CreateDataBrushAtCrosshair();
 	void DeleteSelection();
 	void DupeSelection();
 
@@ -355,11 +361,10 @@ private:
 	/// Moves off a tool that the mode and filter don't allow
 	void EnsureToolAvailable();
 	void ShowMode();
+	void ShowTool();
 
 private:
 	EditorFrame* mpMainFrame = nullptr;
-
-	StackArray<EditorTool, static_cast<uint32>(eEditorTool::Count)> mTools;
 
 	eEditorMode mMode = eEditorMode::Vis;
 	eDataFilter mDataFilter = eDataFilter::All;
@@ -367,18 +372,18 @@ private:
 	eEditorView mView = eEditorView::Perspective;
 	uint32 mTopViewCommandSerial = 0;
 
-	eEditorTool mCurrentToolType = eEditorTool::None;
-	EditorTool* mpCurrentTool = nullptr;
+	eEditorTool mCurrentTool = eEditorTool::Select;
+	bool mbSimulating = false;
 
 	EditorToolState mToolState {};
 	EditorToolSelection mToolSelection {};
 
 	MaterialID mLastUsedMaterial = MaterialID::scNull;
+	MaterialID mLastDecalMaterial = MaterialID::scNull;
 
-	/// Runs the Light tool
+	EditorTheme mTheme {};
+
 	LightEditor mLightEditor;
-
-	BoundsEditor mBoundsEditor;
 
 	GrabEditor mGrabEditor;
 
@@ -389,14 +394,15 @@ private:
 
 	uint64 mSavedRevision = 0;
 	bool mbUntrackedChanges = false;
+	uint32 mUntrackedEditCount = 0;
+
+	uint64 mDecalRevision = UINT64_MAX;
+	uint32 mDecalUntrackedEditCount = 0;
 
 	/// Provides the `CMD_*` console commands
 	script::Script* mpCommandScript = nullptr;
 
-	bool mbDragging = false;
-	bool mbDraggingSpawn = false;
 	bool mbSpawnSelected = false;
-	bool mbHadHeadbob = false;
 
 	wxGUIEventLoop* mpEventLoop = nullptr;
 

@@ -861,6 +861,19 @@ void Object::SetDBound(bool value)
 	ApplyVolumeState();
 }
 
+void Object::SetDecal(bool value)
+{
+	if (value) {
+		SetTag(eObjectTag::Decal);
+	}
+	else {
+		ClearTag(eObjectTag::Decal);
+	}
+
+	SetProbeVisible(!value);
+	SetShadowCaster(!value);
+}
+
 void Object::ApplyVolumeState()
 {
 	const bool is_volume = IsVolume();
@@ -914,40 +927,6 @@ bool Object::ContainsPoint(const Vec3f point)
 
 	return local.X >= Bounds.Min.X && local.X <= Bounds.Max.X && local.Y >= Bounds.Min.Y && local.Y <= Bounds.Max.Y &&
 		   local.Z >= Bounds.Min.Z && local.Z <= Bounds.Max.Z;
-}
-
-void Object::SetBounds(const BBox& bounds)
-{
-	Bounds = bounds;
-
-	Object* node = this;
-
-	while (node != nullptr) {
-		node->InvalidateDrawCopies();
-		gWorldGrid->UpdateObject(node, false);
-
-		if (node->ParentID.IsNull() || node->ParentID.IsInvalid()) {
-			break;
-		}
-
-		Object* parent = gObjectManager->GetObject(node->ParentID);
-
-		if (parent == nullptr) {
-			break;
-		}
-
-		const OBBox world_box = node->GetWorldOBB();
-		const Mat4f parent_inverse = parent->GetWorldMatrix().Inverse();
-
-		for (const Vec3f corner : world_box.Corners) {
-			const Vec4f local = parent_inverse * Vec4f(corner.X, corner.Y, corner.Z, 1.0f);
-			const Vec3f local_corner(local.X, local.Y, local.Z);
-
-			parent->Bounds.Add(BBox(local_corner, local_corner));
-		}
-
-		node = parent;
-	}
 }
 
 void Object::SetCullable(bool value)

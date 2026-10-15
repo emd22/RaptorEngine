@@ -2,9 +2,9 @@
  * File:        tool_common.strata
  * Author:      emd22
  * Created:     23/09/2026
- * Description: State and helpers shared by the editor tools. Each tool is a script of its own with its own copy of
- *              these globals, which the editor (Src/Editor/RaptorEditor.cpp) keeps up to date by calling
- *              `tool_state_receive` and `tool_selection_receive`.
+ * Description: State and helpers for the editor command script. The editor (Src/Editor/RaptorEditor.cpp) sends
+ *              its state and selection with `tool_state_receive` and `tool_selection_receive` before each
+ *              command.
  */
 
 import ../interop;
@@ -116,7 +116,7 @@ void hide_transform_marker_object()
    Mirrored by scSnapSteps in Src/Editor/RaptorEditor.cpp. */
 float tool_get_snap_multiplier()
 {
-	float[4] snap_values = { 0.10f, 0.25f, 0.50f, 1.0f };
+	float[4] snap_values = { 0.05f, 0.10f, 0.25f, 0.50f };
 	uint index = fclamp(state.tool_snap_level, 0, 3);
 	return snap_values[index];
 }

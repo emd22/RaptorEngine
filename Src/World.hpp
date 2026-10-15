@@ -83,6 +83,7 @@ private:
 
 	/// Draws a wireframe box for each probe volume brush, which is otherwise not drawn at all
 	void DebugDrawProbeVolumes();
+	void DebugDrawSelectedDecals();
 
 public:
 	Object* RaycastProbeVolumes(const Vec3f origin, const Vec3f direction, float32 max_distance, float32& out_distance,

@@ -4,20 +4,14 @@
 
 #include "EditorPanelState.hpp"
 #include "TopViewCanvas.hpp"
-#include "TopViewPlane.hpp"
 
 #include <wx/panel.h>
 
 #include <Core/Types.hpp>
 
-class wxBoxSizer;
 class wxStaticText;
-class wxWrapSizer;
 
 namespace fx::editor {
-
-class FloatField;
-class OutlineToggleButton;
 
 class TopViewPanel : public wxPanel
 {
@@ -28,25 +22,11 @@ public:
 
 	void ApplyState(const TopViewState& state);
 
-private:
-	void ShowTool(eTopViewTool tool);
-	void ShowPlane(eViewPlane plane);
+	void ApplyTheme();
 
 private:
 	TopViewCanvas* mpCanvas = nullptr;
-	OutlineToggleButton* mpToolButtons[static_cast<uint32>(eTopViewTool::Count)] = {};
-	OutlineToggleButton* mpPlaneButtons[scViewPlaneCount] = {};
-	wxWrapSizer* mpToolbar = nullptr;
-	wxBoxSizer* mpVolumeRows[scViewPlaneCount] = {};
-	wxBoxSizer* mpArchRow = nullptr;
 	wxStaticText* mpStatus = nullptr;
-	wxButton* mpShowAllButton = nullptr;
-	uint32 mShownHiddenCount = 0;
-
-	float32 mBase[scViewPlaneCount] = {};
-	float32 mSize[scViewPlaneCount] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
-
-	ArchSettings mArch;
 };
 
 } // namespace fx::editor

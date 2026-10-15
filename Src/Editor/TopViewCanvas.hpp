@@ -22,24 +22,22 @@ class wxZoomGestureEvent;
 
 namespace fx::editor {
 
-enum class eTopViewTool : uint8
-{
-	Select,
-	Face,
-	Vertex,
-	Create,
-	Arch,
-	Rotate,
-
-	Count,
-};
-
 struct ArchSettings
 {
 	uint32 Sides = 8;
 	float32 WallWidth = 0.25f;
 	float32 ArcDegrees = 180.0f;
 	float32 StartDegrees = 0.0f;
+};
+
+struct BendSettings
+{
+	uint32 Segments = 8;
+	float32 AngleDegrees = 0.0f;
+	float32 RegionStart = 0.0f;
+	float32 RegionEnd = 1.0f;
+	bool bSwapAxis = false;
+	bool bPinEnd = false;
 };
 
 class TopViewCanvas : public wxWindow
@@ -49,8 +47,13 @@ public:
 
 	void ApplyState(const TopViewState& state);
 
-	void SetTool(eTopViewTool tool);
-	FX_FORCE_INLINE eTopViewTool GetTool() const { return mTool; }
+	void SetTool(eEditorTool tool);
+	void ShowTool(eEditorTool tool);
+	FX_FORCE_INLINE eEditorTool GetTool() const { return mTool; }
+
+	void SetAvailableTools(uint32 available_tools);
+
+	void Subtract(bool keep_cutters);
 
 	void SetPlane(eViewPlane plane);
 	FX_FORCE_INLINE eViewPlane GetPlane() const { return mPlane; }
@@ -58,13 +61,23 @@ public:
 	void SetCreateVolume(eViewPlane plane, float32 base, float32 size);
 	void SetDropToGround(bool enabled) { mbDropToGround = enabled; }
 	void SetArchSettings(const ArchSettings& settings);
+	FX_FORCE_INLINE bool HasPendingArch() const { return mbArchPending && mDrag != eDrag::Arch; }
+	void CommitArch();
+	void DiscardArch();
+	void SetBendSettings(const BendSettings& settings);
+	FX_FORCE_INLINE bool HasPendingBend() const { return mTool == eEditorTool::Bend && mBend.AngleDegrees != 0.0f; }
+	void CommitBend();
+	void ResetBend();
+	void SwapBendAxis();
 
 	void FitAll();
 	void FitSelection();
 
-	void SetOnToolChanged(std::function<void(eTopViewTool)> handler) { mpOnToolChanged = std::move(handler); }
+	void SetOnToolChanged(std::function<void(eEditorTool)> handler) { mpOnToolChanged = std::move(handler); }
 	void SetOnPlaneChanged(std::function<void(eViewPlane)> handler) { mpOnPlaneChanged = std::move(handler); }
 	void SetOnStatus(std::function<void(const wxString&)> handler) { mpOnStatus = std::move(handler); }
+	void SetOnArchChanged(std::function<void(const ArchSettings&)> handler) { mpOnArchChanged = std::move(handler); }
+	void SetOnBendChanged(std::function<void(const BendSettings&)> handler) { mpOnBendChanged = std::move(handler); }
 
 	wxBitmap Render(const wxSize& size);
 
@@ -85,7 +98,36 @@ private:
 		Vertex,
 		Create,
 		Arch,
+		ArchEdit,
+		Bend,
 		Rotate,
+		Clip,
+		MarkerMove,
+		MarkerAim,
+	};
+
+	enum class eArchHandle : uint8
+	{
+		None,
+		Body,
+		Wall,
+		Start,
+		End,
+		MinMin,
+		MaxMin,
+		MaxMax,
+		MinMax,
+		Left,
+		Right,
+		Bottom,
+		Top,
+	};
+
+	struct ArchEllipse
+	{
+		Vec2d Center { Vec2d::sZero };
+		Vec2d Radius { Vec2d::sZero };
+		bool bValid = false;
 	};
 
 	struct OutlinePreview
@@ -122,6 +164,12 @@ private:
 		// double NormalU = 0.0;
 		// double NormalV = 0.0;
 		DynArray<OutlinePreview> Outlines;
+
+		Vec2d ClipA { Vec2d::sZero };
+		Vec2d ClipB { Vec2d::sZero };
+
+		Vec2d AimUV { Vec2d::sZero };
+		double AimDepth = 0.0;
 	};
 
 	struct ViewBounds
@@ -167,6 +215,7 @@ private:
 	void DrawGrid(wxGraphicsContext& gc, const wxSize& size);
 	void DrawBrushes(wxGraphicsContext& gc, const wxSize& size);
 	void DrawOverlays(wxGraphicsContext& gc, const wxSize& size);
+	void DrawMarkers(wxGraphicsContext& gc);
 	void DrawPlayer(wxGraphicsContext& gc);
 
 	wxSize GetViewSize() const;
@@ -176,14 +225,21 @@ private:
 	const ViewPlaneAxes& Axes() const;
 	const TopViewProjection& Projection(const TopViewBrush& brush) const;
 	Vec3f ToWorldVector(const Vec2d uv, double w) const;
+	Vec2d ProjectPoint(const Vec3f& point) const;
+	double DepthOf(const Vec3f& vector) const;
 
 	void BeginPan(const wxPoint& position);
 	void BeginSelect();
 	void BeginFace();
 	void BeginVertex();
 	void BeginCreate();
-	void BeginArch();
+	void BeginArch(bool double_click);
+	void BeginBend(bool double_click);
 	void BeginRotate();
+	void BeginClip();
+	void BeginLight(bool double_click);
+	void BeginTool(const wxMouseEvent& event);
+	bool BeginMarker();
 
 	void FinishFace();
 	void FinishVertex();
@@ -191,9 +247,35 @@ private:
 	void FinishMove();
 	void FinishCreate();
 	void FinishArch();
+	void FinishArchEdit();
 	void FinishRotate();
+	void FinishClip();
+	void FinishMarkerMove();
+	void FinishMarkerAim();
 
 	DynArray<Vec2d> BuildArchSegments(const DRect& rect) const;
+	ArchEllipse FitArch(const DRect& rect) const;
+	DRect GetArchRect(const ArchEllipse& ellipse) const;
+	Vec2d GetArchHandle(eArchHandle handle) const;
+	eArchHandle PickArchHandle(const Vec2d uv) const;
+	void BeginArchEdit(eArchHandle handle);
+	void UpdateArchEdit();
+	void DrawArch(wxGraphicsContext& gc, const DRect& rect, bool show_handles);
+	void SetArchSides(int32 sides);
+	void NotifyArchChanged();
+
+	bool GetBendFrame(BendFrame& out_frame, uint32& out_along_index) const;
+	Vec2d BendViewPoint(const BendFrame& frame, uint32 along_index, const Vec2d uv) const;
+	Vec2d GetBendKnob(const BendFrame& frame, uint32 along_index, int32 knob) const;
+	double GetBendRegionAcross(uint32 along_index) const;
+	int32 PickBendKnob(const Vec2d uv) const;
+	DynArray<OutlinePreview> BuildBendOutlines(const BendFrame& frame, uint32 along_index) const;
+	void UpdateBendDrag();
+	void DrawBendOutlines(wxGraphicsContext& gc, const DynArray<OutlinePreview>& outlines);
+	bool DrawBend(wxGraphicsContext& gc);
+	void SetBendSegments(int32 segments);
+	void NotifyBendChanged();
+	void ClearBendShape();
 
 	void UpdatePreview();
 	void ClearPreview();
@@ -217,7 +299,18 @@ private:
 	const TopViewBrush* FindBrush(ObjectID object_id) const;
 	ViewBounds GetSelectionBounds() const;
 	bool GetSelectionPivot(Vec2d& out_pivot) const;
+	Vec2d GetRotateSnapOffset(const Vec2d pivot, double angle) const;
+	Vec2d SnapNudge(const Vec2d origin, const Vec2d delta) const;
 	uint32 GetSelectedCount() const;
+
+	int32 PickMarkerAt(const Vec2d uv, bool& out_tip) const;
+	int32 FindMarker(eTopViewMarkerKind kind, uint32 light_id) const;
+	int32 FindSelectedMarker() const;
+	Vec2d GetMarkerTip(const TopViewMarker& marker, const Vec2d direction_uv) const;
+	void SelectMarker(int32 index);
+	void DeselectMarkers();
+	void ApplyLocalMarkerSelection();
+	void NudgeMarker(const TopViewMarker& marker, const Vec2d delta);
 
 	void SelectBrush(ObjectID object_id, eTopViewSelectMode mode);
 	void SelectBrushes(DynArray<ObjectID> object_ids, eTopViewSelectMode mode);
@@ -226,17 +319,19 @@ private:
 	void InvertSelection();
 	void SendCommand(thread::Task command);
 
-	void NudgeSelection(const Vec2d delta);
+	void NudgeSelection(const Vec2d delta, bool snap);
 	void SetSnapBypass(bool bypass);
-	void SetToolFromKey(eTopViewTool tool);
-	bool IsToolAvailable(eTopViewTool tool) const;
+	void SetToolFromKey(eEditorTool tool);
+	void ApplyTool(eEditorTool tool);
+	bool IsToolAvailable(eEditorTool tool) const;
 	void UpdateCursor();
 	void UpdateStatus();
 
 private:
 	TopViewState mState;
 
-	eTopViewTool mTool = eTopViewTool::Select;
+	eEditorTool mTool = eEditorTool::Select;
+	uint32 mAvailableTools = 0;
 	eViewPlane mPlane = eViewPlane::Top;
 
 	// double mCenterU = 0.0;
@@ -298,15 +393,39 @@ private:
 	bool mbLocalSelection = false;
 	DynArray<ObjectID> mLocalSelection;
 
+	eTopViewMarkerKind mGrabbedMarkerKind = eTopViewMarkerKind::Light;
+	uint32 mGrabbedMarkerLightId = 0;
+
+	bool mbLocalMarkerSelection = false;
+	bool mbLocalMarkerSelected = false;
+	eTopViewMarkerKind mLocalMarkerKind = eTopViewMarkerKind::Light;
+	uint32 mLocalMarkerLightId = 0;
+
 	float32 mCreateBase[scViewPlaneCount] = {};
 	float32 mCreateSize[scViewPlaneCount] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
 	bool mbDropToGround = true;
 
 	ArchSettings mArch;
+	bool mbArchPending = false;
+	DRect mArchRect {};
+	eArchHandle mArchGrab = eArchHandle::None;
+	eArchHandle mArchHover = eArchHandle::None;
+	DRect mArchGrabRect {};
+	ArchSettings mArchGrabSettings;
+	ArchEllipse mArchGrabEllipse;
+	double mArchLastAngle = 0.0;
+	double mArchAngleTravel = 0.0;
 
-	std::function<void(eTopViewTool)> mpOnToolChanged;
+	BendSettings mBend;
+	BendSettings mBendGrabSettings;
+	int32 mBendGrab = -1;
+	int32 mBendHover = -1;
+
+	std::function<void(eEditorTool)> mpOnToolChanged;
 	std::function<void(eViewPlane)> mpOnPlaneChanged;
 	std::function<void(const wxString&)> mpOnStatus;
+	std::function<void(const ArchSettings&)> mpOnArchChanged;
+	std::function<void(const BendSettings&)> mpOnBendChanged;
 };
 
 } // namespace fx::editor

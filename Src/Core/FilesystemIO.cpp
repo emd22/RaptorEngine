@@ -101,6 +101,10 @@ const char* GetBasePath() { return FX_BASE_DIR; }
 
 String ResolvePath(const String& relative_path)
 {
+	if (std::filesystem::path(relative_path.CStr()).is_absolute()) {
+		return relative_path;
+	}
+
 	const String exe_relative = String::Fmt("{}/{}", GetExecutablePath(), relative_path);
 
 	if (FileExists(exe_relative)) {
