@@ -22,7 +22,7 @@ void ObjectManager::Create()
 
 	mObjectList.Init(scMaxObjects);
 
-	uint32 buffer_size = (sizeof(ObjectGpuEntry) * scMaxObjects) * renderer::FramesInFlight;
+	uint32 buffer_size = (sizeof(ObjectGpuEntry) * scSlotsPerFrame) * renderer::FramesInFlight;
 
 	// TODO: replace with DescriptorCache'd version
 	mObjectGpuBuffer.Create(eGpuBufferType::StorageWithOffset, buffer_size, VMA_MEMORY_USAGE_CPU_ONLY,
@@ -120,10 +120,10 @@ void ObjectManager::DestroyObject(ObjectID& id)
 
 uint32 ObjectManager::GetBaseOffset() const
 {
-	return (renderer::gGraphics->GetFrameNumber() * scMaxObjects * sizeof(ObjectGpuEntry));
+	return (renderer::gGraphics->GetFrameNumber() * scSlotsPerFrame * sizeof(ObjectGpuEntry));
 }
 
-uint32 ObjectManager::GetPageSize() const { return scMaxObjects * sizeof(ObjectGpuEntry); }
+uint32 ObjectManager::GetPageSize() const { return scSlotsPerFrame * sizeof(ObjectGpuEntry); }
 
 uint32 ObjectManager::GetOffsetObjectIndex(uint32 object_id) const
 {
@@ -226,29 +226,41 @@ void ObjectManager::PrintActive(uint32 limit)
 	}
 }
 
-ObjectID ObjectManager::ReserveInstances(const ObjectID& object_id, uint32 num_instances)
+ObjectGpuEntry* ObjectManager::ReserveInstanceSlots(uint32 count, uint32* out_first_slot)
 {
-	// Unset the current object to determine if the current span of slots can contain the instances
-	mObjectList.SlotsInUse.Unset(object_id.GetID());
+	const uint32 frame = renderer::gGraphics->GetElapsedFrameCount();
 
-	// Find the new bit group (+1 for the current object)
-	uint32 start_index = mObjectList.SlotsInUse.FindNextFreeBitGroup(num_instances + 1);
-	Assert(start_index != Bit::scBitNotFound);
-
-	// There is not enough room after our current object, move it
-	if (start_index != object_id.GetID()) {
-		Submit(start_index, *GetBufferAtFrame(object_id.GetID()));
-
-		// The object id is already 'freed', so we do not need to call FreeObjectId.
+	if (mInstanceSlotsFrame != frame) {
+		mInstanceSlotsFrame = frame;
+		mInstanceSlotsUsed = 0;
 	}
 
-	// Mark the following bits as 'in use' to prevent other future objects from snatching them.
-	for (uint32 i = start_index; i < start_index + num_instances; i++) {
-		mObjectList.SlotsInUse.Set(i);
+	if (count == 0 || count > scMaxInstances - mInstanceSlotsUsed) {
+		return nullptr;
 	}
 
-	// Return the new slot block
-	return ObjectID(start_index);
+	const uint32 first_slot = scMaxObjects + mInstanceSlotsUsed;
+	mInstanceSlotsUsed += count;
+
+	*out_first_slot = first_slot;
+
+	return GetBufferAtFrame(first_slot);
+}
+
+
+void ObjectManager::QueueInstanceUpdate(ObjectID id) { mPendingInstanceUpdates.Insert(id); }
+
+void ObjectManager::FlushInstanceUpdates()
+{
+	for (ObjectID id : mPendingInstanceUpdates) {
+		Object* object = GetObject(id);
+
+		if (object != nullptr && object->mbInstancesPending) {
+			object->ApplyInstanceChanges();
+		}
+	}
+
+	mPendingInstanceUpdates.Clear();
 }
 
 

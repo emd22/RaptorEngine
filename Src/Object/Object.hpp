@@ -7,6 +7,7 @@
 // #include <ThirdParty/Jolt/Physics/Body/BodyID.h>
 
 #include <Asset/Animation.hpp>
+#include <Core/DynArray.hpp>
 #include <Core/Name.hpp>
 #include <Core/PagedArray.hpp>
 #include <Core/Ref.hpp>
@@ -16,6 +17,7 @@
 #include <Material/MaterialID.hpp>
 #include <Math/BBox.hpp>
 #include <Math/Frustum.hpp>
+#include <Object/ObjectFlags.hpp>
 #include <WorldGrid.hpp>
 
 
@@ -24,42 +26,6 @@ namespace fx {
 namespace renderer {
 class Pipeline;
 };
-
-enum class eObjectTag : uint32
-{
-	None = 0,
-	Blockout = (1 << 0),
-	/// Locks rotation and transformation for scripts
-	LockTransform = (1 << 1),
-	/// A blockout brush that marks out a light probe volume instead of level geometry
-	ProbeVolume = (1 << 2),
-	ReflectionProbe = (1 << 3),
-	Spawn = (1 << 4),
-	Trigger = (1 << 5),
-	/// A blockout brush that only collides: never drawn, and the map compiler keeps just its collider (nvbrush)
-	NvBrush = (1 << 6),
-	/// A blockout brush that only seals the map for the map compiler, and is otherwise not there (dbound)
-	DBound = (1 << 7),
-};
-
-FxEnumFlags(eObjectTag);
-
-enum class eObjectFlags : uint16
-{
-	None = 0,
-	ReadyToRender = (1 << 0),
-	PhysicsEnabled = (1 << 1),
-	IsInstance = (1 << 2),
-	ShadowCaster = (1 << 3),
-	Unlit = (1 << 4),
-	DisableCulling = (1 << 5),
-	/// Left out of light probe bakes (capture, capture shadows and probe placement). See Object::IsProbeVisible().
-	NotProbeVisible = (1 << 6),
-	Hidden = (1 << 7),
-	Lightmapped = (1 << 8),
-};
-
-FxEnumFlags(eObjectFlags);
 
 
 class PrimitiveMesh;
@@ -77,8 +43,6 @@ public:
 	Object(const ObjectID id);
 	Object(const ObjectID id, const MaterialID material);
 	Object(const ObjectID id, const MaterialID material, bool is_loading);
-
-	void MakeInstanceOf(const ObjectID& source);
 
 	Object* CloneWithOwnSkeleton(const std::string& name) const;
 
@@ -111,11 +75,25 @@ public:
 
 	void AttachToBone(const Ref<Skeleton>& skeleton, BoneId bone, const Mat4f& offset);
 
-	/**
-	 * @brief Reserve `num_instances` amount of future instances in the object manager.
-	 * @note This may update the object id if there are not enough free slots following this object.
-	 */
-	void ReserveInstances(uint32 num_instances);
+	/////////////////////////////////////
+	// Instancing
+	/////////////////////////////////////
+
+	uint32 AddInstance(const Vec3f position, const Quat rotation = Quat::scIdentity, float32 scale = 1.0f);
+	uint32 AddInstance(const Mat4f& transform);
+
+	void SetInstance(uint32 index, const Vec3f position, const Quat rotation = Quat::scIdentity, float32 scale = 1.0f);
+	void SetInstance(uint32 index, const Mat4f& transform);
+
+	void RemoveInstance(uint32 index);
+	void ClearInstances();
+
+	FX_FORCE_INLINE uint32 GetInstanceCount() const { return mInstances.Size; }
+	FX_FORCE_INLINE bool HasInstances() const { return mInstances.IsNotEmpty(); }
+	FX_FORCE_INLINE const Mat4f& GetInstance(uint32 index) const { return mInstances[index]; }
+
+	uint32 GetDrawIndex();
+	BBox GetDrawBounds();
 
 	/////////////////////////////////////
 	// Script
@@ -269,6 +247,16 @@ private:
 
 	void UpdateBoneAttachment();
 
+	Object* FindInstanceSource();
+	void QueueInstanceRefresh();
+	void ApplyInstanceChanges();
+	void UpdateInstanceCollider();
+	void InvalidateDrawCopies();
+	Mat4f GetNodeToSource(Object& source);
+	const BBox& GetInstancedDrawBounds(Object& source);
+	void UpdateDrawSlots();
+	uint32 GetDrawCount();
+
 public:
 	Ref<PrimitiveMesh> pMesh { nullptr };
 	physics::BodyID PhysicsID = physics::BodyID::scNull;
@@ -305,9 +293,16 @@ public:
 
 private:
 	MaterialID mMaterialID = MaterialID::scNull;
-	/// Object slots allocated following this object. Used by other instances of this object.
-	uint16 mInstanceSlots = 0;
-	uint16 mInstanceSlotsInUse = 0;
+
+	DynArray<Mat4f> mInstances;
+	bool mbInstancesPending = false;
+
+	BBox mDrawBounds;
+	bool mbDrawBoundsDirty = true;
+
+	uint32 mDrawSlotsFrame = UINT32_MAX;
+	uint32 mDrawFirstSlot = 0;
+	uint32 mDrawCount = 1;
 
 	TileIndex mTileIndex = TileIndexNull;
 	/// Number of tiles (width, height) this object spans starting at mTileIndex's XY.
@@ -317,6 +312,7 @@ private:
 	eObjectLayer mObjectLayer = eObjectLayer::WorldLayer;
 
 	friend class WorldGrid;
+	friend class ObjectManager;
 };
 
 

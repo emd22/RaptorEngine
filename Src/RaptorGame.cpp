@@ -975,13 +975,14 @@ void RaptorGame::RenderText()
 
 	if (gpu.IsEnabled() && (mpShowGpuCVar == nullptr || mpShowGpuCVar->IntValue != 0)) {
 		gTextRenderer->DrawText(String::Fmt("GPU={:.2f}ms", gpu.GetTotalMs()).CStr(), 1.0f, scWhite);
-		gTextRenderer->DrawText(String::Fmt("Sh {:.2f} Pre {:.2f} Cull {:.2f} SSAO {:.2f} Fwd {:.2f} Pfx {:.2f} Comp {:.2f}",
-											gpu.GetMs(eGpuMarker::Shadows), gpu.GetMs(eGpuMarker::Prepass),
-											gpu.GetMs(eGpuMarker::LightCulling), gpu.GetMs(eGpuMarker::SSAO),
-											gpu.GetMs(eGpuMarker::Forward), gpu.GetMs(eGpuMarker::Particles),
-											gpu.GetMs(eGpuMarker::Composition))
-									.CStr(),
-								1.0f, scWhite);
+		gTextRenderer->DrawText(
+			String::Fmt("shadow {:.2f} pre {:.2f} lightcull {:.2f} ao {:.2f} fwd {:.2f} part {:.2f} comp {:.2f}",
+						gpu.GetMs(eGpuMarker::Shadows), gpu.GetMs(eGpuMarker::Prepass),
+						gpu.GetMs(eGpuMarker::LightCulling), gpu.GetMs(eGpuMarker::SSAO),
+						gpu.GetMs(eGpuMarker::Forward), gpu.GetMs(eGpuMarker::Particles),
+						gpu.GetMs(eGpuMarker::Composition))
+				.CStr(),
+			1.0f, scWhite);
 
 		// Only bakes have this
 		if (gpu.GetMs(eGpuMarker::ProbeCapture) > 0.005) {
@@ -990,14 +991,14 @@ void RaptorGame::RenderText()
 		}
 	}
 
-	gTextRenderer->DrawText(String::Fmt("Vis={} Culled={}/{} Lights={}/{}", gWorld->mRenderList.GetItemCount(),
+	gTextRenderer->DrawText(String::Fmt("gridvis {} frusvis {}/{} lights {}/{}", gWorld->mRenderList.GetItemCount(),
 										gWorld->FrustumCulledObjects, gWorld->FrustumTestedObjects,
 										gWorld->mLightList.GetItemCount(), gLightManager->GetCache().Size)
 								.CStr(),
 							1.0f, scWhite);
 
 	if (gParticleSystem->GetParticleCount() > 0) {
-		gTextRenderer->DrawText(String::Fmt("Particles={} Drawn={} Effects={} Rays={} Cpu={:.3f}ms",
+		gTextRenderer->DrawText(String::Fmt("part {} ndrawn {} effects {} collrays {} cputime {:.3f}",
 											gParticleSystem->GetParticleCount(), gParticleSystem->GetDrawnCount(),
 											gParticleSystem->GetEffectCount(), gParticleSystem->GetCollisionRayCount(),
 											gParticleSystem->GetCpuMs())

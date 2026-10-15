@@ -428,7 +428,7 @@ void NPC::SetYaw(float32 yaw)
 	mbTeleported = true;
 }
 
-void NPC::SetIdleAnimation(const String& name, float32 speed)
+void NPC::SetIdleAnimation(const String& name, float32 speed, float32 blend_time)
 {
 	if (!mpSkeleton.IsValid()) {
 		return;
@@ -441,16 +441,16 @@ void NPC::SetIdleAnimation(const String& name, float32 speed)
 		return;
 	}
 
-	mpSkeleton->SetRestAnimation(anim, speed);
+	mpSkeleton->SetRestAnimation(anim, speed, blend_time);
 }
 
-bool NPC::PlayAnimation(const String& name, eAnimationEnd on_end, float32 speed)
+bool NPC::PlayAnimation(const String& name, eAnimationEnd on_end, float32 speed, float32 blend_time)
 {
 	if (!mpSkeleton.IsValid() || mState == eState::Ragdoll) {
 		return false;
 	}
 
-	return mpSkeleton->PushAnimation(name, on_end, speed);
+	return mpSkeleton->PushAnimation(name, on_end, speed, blend_time);
 }
 
 NPC* NPCManager::Spawn(const Object* model, const NPCDesc& desc)

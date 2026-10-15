@@ -122,7 +122,7 @@ void Player::ActivateViewModel(uint32 index)
 		}
 
 		if (previous.pSkeleton) {
-			previous.pSkeleton->ClearAnimationStack();
+			previous.pSkeleton->ClearAnimationStack(0.0f);
 		}
 	}
 
@@ -458,10 +458,10 @@ void Player::DoFireAnimation(float32 kick_degrees, float32 kickback)
 
 	// Firing again mid-shot restarts the shot rather than stacking another one on top of it
 	if (mpViewModelSkeleton->GetActiveAnimation() == fire) {
-		mpViewModelSkeleton->PopAnimation();
+		mpViewModelSkeleton->PopAnimation(scFireBlendTime);
 	}
 
-	mpViewModelSkeleton->PushAnimation(fire);
+	mpViewModelSkeleton->PushAnimation(fire, eAnimationEnd::Pop, 1.0f, scFireBlendTime);
 }
 
 void Player::DoReloadAnimation()

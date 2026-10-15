@@ -39,7 +39,7 @@ public:
 
 	IDType operator()() const { return ID; }
 
-	bool operator==(const ObjectID& other) const { return ID == (other.ID & scIDMask); }
+	bool operator==(const ObjectID& other) const { return ID == other.ID; }
 	bool operator<(const ObjectID& other) const { return ID < other.ID; }
 
 	FX_FORCE_INLINE IDType GetID() const { return (ID & scIDMask); }

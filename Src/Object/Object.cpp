@@ -109,6 +109,7 @@ void Object::FinalizeWhenReady()
 
 		if (parent_object != nullptr) {
 			parent_object->Bounds.Add(Bounds);
+			parent_object->InvalidateDrawCopies();
 		}
 	}
 
@@ -164,6 +165,7 @@ void Object::UpdateBoneAttachment()
 	mLastAttachPoseHash = skel.PoseHash;
 
 	SetPreTransform(AttachOffset * skel.WorldTransforms[AttachBone]);
+	InvalidateDrawCopies();
 	gWorldGrid->MarkObjectDirty(this);
 }
 
@@ -192,22 +194,6 @@ void Object::UpdateAnimation()
 	}
 }
 
-void Object::MakeInstanceOf(const ObjectID& source_id)
-{
-	Object* source_obj = gObjectManager->GetObject(source_id);
-
-	AssertMsg((source_obj->mInstanceSlots - source_obj->mInstanceSlotsInUse) > 0,
-			  "Object has no instance slots remaining! Did you reserve any instances on the source object?");
-
-
-	gObjectManager->DestroyObject(ID);
-	Flags |= eObjectFlags::IsInstance;
-
-	++source_obj->mInstanceSlotsInUse;
-
-	ID = ObjectID(source_obj->ID.GetID() + source_obj->mInstanceSlotsInUse);
-}
-
 struct SkeletonCloneMap
 {
 	std::vector<std::pair<const Skeleton*, Ref<Skeleton>>> Entries;
@@ -225,7 +211,9 @@ Object* Object::CloneNode(const String& name, SkeletonCloneMap& skeletons) const
 	clone->mObjectLayer = mObjectLayer;
 
 	clone->Flags = Flags;
-	ClearFlag(clone->Flags, (eObjectFlags::ReadyToRender | eObjectFlags::IsInstance | eObjectFlags::PhysicsEnabled));
+	ClearFlag(clone->Flags, (eObjectFlags::ReadyToRender | eObjectFlags::PhysicsEnabled));
+
+	clone->mInstances.Assign(mInstances.pData, mInstances.Size);
 
 	clone->MarkTransformOutOfDate();
 
@@ -278,11 +266,240 @@ Object* Object::CloneWithOwnSkeleton(const std::string& name) const
 	return CloneNode(name, skeletons);
 }
 
-void Object::ReserveInstances(uint32 num)
+static Mat4f MakeInstanceTransform(const Vec3f position, const Quat rotation, float32 scale)
 {
-	ID = gObjectManager->ReserveInstances(ID, num);
-	mInstanceSlots = num;
-	mInstanceSlotsInUse = 0;
+	return Mat4f::AsScale(Vec3f(scale)) * Mat4f::AsRotation(rotation) * Mat4f::AsTranslation(position);
+}
+
+uint32 Object::AddInstance(const Vec3f position, const Quat rotation, float32 scale)
+{
+	return AddInstance(MakeInstanceTransform(position, rotation, scale));
+}
+
+uint32 Object::AddInstance(const Mat4f& transform)
+{
+	mInstances.Insert(transform);
+	QueueInstanceRefresh();
+
+	return mInstances.Size - 1;
+}
+
+void Object::SetInstance(uint32 index, const Vec3f position, const Quat rotation, float32 scale)
+{
+	SetInstance(index, MakeInstanceTransform(position, rotation, scale));
+}
+
+void Object::SetInstance(uint32 index, const Mat4f& transform)
+{
+	AssertMsg(index < mInstances.Size, "Instance index out of range");
+
+	mInstances[index] = transform;
+	QueueInstanceRefresh();
+}
+
+void Object::RemoveInstance(uint32 index)
+{
+	AssertMsg(index < mInstances.Size, "Instance index out of range");
+
+	mInstances[index] = mInstances[mInstances.Size - 1];
+	mInstances.RemoveLast();
+	QueueInstanceRefresh();
+}
+
+void Object::ClearInstances()
+{
+	if (mInstances.IsEmpty()) {
+		return;
+	}
+
+	mInstances.Clear();
+	QueueInstanceRefresh();
+}
+
+void Object::QueueInstanceRefresh()
+{
+	if (mbInstancesPending) {
+		return;
+	}
+
+	mbInstancesPending = true;
+	gObjectManager->QueueInstanceUpdate(ID);
+}
+
+void Object::ApplyInstanceChanges()
+{
+	mbInstancesPending = false;
+
+	InvalidateDrawCopies();
+	gWorldGrid->UpdateObject(this, false);
+	UpdateInstanceCollider();
+
+	for (ObjectID attached_id : AttachedNodes) {
+		Object* attached_object = gObjectManager->GetObject(attached_id);
+
+		if (attached_object != nullptr) {
+			attached_object->ApplyInstanceChanges();
+		}
+	}
+}
+
+void Object::UpdateInstanceCollider()
+{
+	physics::Body* body = gPhysics->GetBody(PhysicsID);
+
+	if (body == nullptr || !body->mbHasPhysicsBody) {
+		return;
+	}
+
+	Object* source = FindInstanceSource();
+
+	if (source == nullptr) {
+		body->SetInstanceTransforms(nullptr, 0);
+		return;
+	}
+
+	const Mat4f body_world = Mat4f::AsRotation(body->GetRotation()) * Mat4f::AsTranslation(body->GetPosition());
+	const Mat4f& source_world = source->GetWorldMatrix();
+
+	const Mat4f to_source = body_world * source_world.Inverse();
+	const Mat4f from_source = source_world * body_world.Inverse();
+
+	SizedArray<Mat4f> transforms;
+	transforms.InitCapacity(source->mInstances.Size);
+
+	for (const Mat4f& instance : source->mInstances) {
+		transforms.Insert(to_source * instance * from_source);
+	}
+
+	body->SetInstanceTransforms(transforms.pData, transforms.Size);
+}
+
+Object* Object::FindInstanceSource()
+{
+	Object* node = this;
+
+	while (node != nullptr) {
+		if (node->HasInstances()) {
+			return node;
+		}
+
+		if (node->ParentID.IsNull() || node->ParentID.IsInvalid()) {
+			return nullptr;
+		}
+
+		node = gObjectManager->GetObject(node->ParentID);
+	}
+
+	return nullptr;
+}
+
+void Object::InvalidateDrawCopies()
+{
+	mbDrawBoundsDirty = true;
+	mDrawSlotsFrame = UINT32_MAX;
+}
+
+Mat4f Object::GetNodeToSource(Object& source)
+{
+	if (&source == this) {
+		return Mat4f::scIdentity;
+	}
+
+	return GetWorldMatrix() * source.GetWorldMatrix().Inverse();
+}
+
+const BBox& Object::GetInstancedDrawBounds(Object& source)
+{
+	if (!mbDrawBoundsDirty) {
+		return mDrawBounds;
+	}
+
+	const Mat4f node_to_source = GetNodeToSource(source);
+	const Mat4f& source_world = source.GetWorldMatrix();
+
+	for (uint32 index = 0; index < source.mInstances.Size; index++) {
+		const Mat4f world = node_to_source * source.mInstances[index] * source_world;
+		const BBox copy_bounds = OBBox::FromLocalBounds(Bounds, world).GetWorldAABB();
+
+		if (index == 0) {
+			mDrawBounds = copy_bounds;
+		}
+		else {
+			mDrawBounds.Add(copy_bounds);
+		}
+	}
+
+	mbDrawBoundsDirty = false;
+
+	return mDrawBounds;
+}
+
+BBox Object::GetDrawBounds()
+{
+	Object* source = FindInstanceSource();
+
+	if (source == nullptr) {
+		return GetWorldOBB().GetWorldAABB();
+	}
+
+	return GetInstancedDrawBounds(*source);
+}
+
+void Object::UpdateDrawSlots()
+{
+	const uint32 frame = gGraphics->GetElapsedFrameCount();
+
+	if (mDrawSlotsFrame == frame) {
+		return;
+	}
+
+	mDrawSlotsFrame = frame;
+	mDrawFirstSlot = ID.GetID();
+	mDrawCount = 1;
+
+	Object* source = FindInstanceSource();
+
+	if (source == nullptr) {
+		return;
+	}
+
+	const uint32 count = source->mInstances.Size;
+	ObjectGpuEntry* slots = gObjectManager->ReserveInstanceSlots(count, &mDrawFirstSlot);
+
+	if (slots == nullptr) {
+		static bool sbWarned = false;
+
+		if (!sbWarned) {
+			LogWarning(LC_RENDER, "Out of instance slots ({}), '{}' will not be drawn", ObjectManager::scMaxInstances,
+					   Name.Get());
+			sbWarned = true;
+		}
+
+		mDrawCount = 0;
+		return;
+	}
+
+	const Mat4f node_to_source = GetNodeToSource(*source);
+	const Mat4f& source_world = source->GetWorldMatrix();
+
+	for (uint32 index = 0; index < count; index++) {
+		const Mat4f world = node_to_source * source->mInstances[index] * source_world;
+		memcpy(slots[index].ModelMatrix, world.RawData, sizeof(Mat4f));
+	}
+
+	mDrawCount = count;
+}
+
+uint32 Object::GetDrawIndex()
+{
+	UpdateDrawSlots();
+	return mDrawFirstSlot;
+}
+
+uint32 Object::GetDrawCount()
+{
+	UpdateDrawSlots();
+	return mDrawCount;
 }
 
 
@@ -299,7 +516,7 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 	FrameData* frame = gGraphics->GetFrame();
 
 	DrawPushConstants push_constants { .TargetSize = { gGraphics->Swapchain.Extent.X, gGraphics->Swapchain.Extent.Y } };
-	push_constants.ObjectId = ID.GetID();
+	push_constants.ObjectId = GetDrawIndex();
 
 	push_constants.MaterialIndex = mMaterialID.GetID();
 	push_constants.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
@@ -375,7 +592,11 @@ void Object::RenderPrimitive(const CommandBuffer& cmd)
 		return;
 	}
 
-	pMesh->Render(cmd, (mInstanceSlotsInUse + 1));
+	const uint32 draw_count = GetDrawCount();
+
+	if (draw_count > 0) {
+		pMesh->Render(cmd, draw_count);
+	}
 }
 
 void Object::RenderMesh(renderer::Pipeline* pipeline)
@@ -392,8 +613,11 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 		return;
 	}
 
-	// + 1 for source object
-	pMesh->Render(cmd, (mInstanceSlotsInUse + 1));
+	const uint32 draw_count = GetDrawCount();
+
+	if (draw_count > 0) {
+		pMesh->Render(cmd, draw_count);
+	}
 }
 
 bool Object::HasTransparentMaterial() const
@@ -409,7 +633,7 @@ bool Object::CanBeFrustumCulled() const
 		return false;
 	}
 
-	if (IsSkinned() || mInstanceSlotsInUse > 0 || HasFlag(Flags, eObjectFlags::IsInstance)) {
+	if (IsSkinned()) {
 		return false;
 	}
 
@@ -424,6 +648,12 @@ bool Object::IsOutsideFrustum(const Frustum& frustum, uint32 plane_mask)
 {
 	if (!CanBeFrustumCulled()) {
 		return false;
+	}
+
+	Object* source = FindInstanceSource();
+
+	if (source != nullptr) {
+		return !frustum.IntersectsAABB(GetInstancedDrawBounds(*source), plane_mask);
 	}
 
 	return !frustum.IntersectsOBB(GetWorldOBB(), plane_mask);
@@ -444,6 +674,7 @@ void Object::Update()
 
 	// The transformation has changed, we should tell the worldgrid
 	if (mbMatrixOutOfDate) {
+		InvalidateDrawCopies();
 		gWorldGrid->UpdateObject(this);
 	}
 
@@ -527,6 +758,12 @@ void Object::AttachCollider(physics::Body* body)
 
 	PhysicsID = body->GetID();
 	body->SetObjectID(ID);
+
+	Object* source = FindInstanceSource();
+
+	if (source != nullptr) {
+		source->QueueInstanceRefresh();
+	}
 }
 
 void Object::SetObjectLayer(eObjectLayer layer)
@@ -686,6 +923,7 @@ void Object::SetBounds(const BBox& bounds)
 	Object* node = this;
 
 	while (node != nullptr) {
+		node->InvalidateDrawCopies();
 		gWorldGrid->UpdateObject(node, false);
 
 		if (node->ParentID.IsNull() || node->ParentID.IsInvalid()) {
@@ -748,6 +986,7 @@ void Object::SetPosition(const Vec3f position)
 	const Vec3f delta = position - mPosition;
 
 	Entity::SetPosition(position);
+	InvalidateDrawCopies();
 
 	// Move the object to its new tile now. Object::Update() does this as well, but it only runs for objects that are
 	// being drawn, which means an object moved away from a tile that isn't visible would never be found again.
@@ -770,6 +1009,11 @@ void Object::SetScale(const float scale)
 	const float previous_scale = mScale;
 
 	Entity::SetScale(scale);
+	InvalidateDrawCopies();
+
+	if (HasInstances()) {
+		QueueInstanceRefresh();
+	}
 
 	gWorldGrid->UpdateObject(this);
 
@@ -791,6 +1035,7 @@ void Object::SetRotation(const Quat rotation)
 	const Quat delta = rotation * mRotation.Conjugate();
 
 	Entity::SetRotation(rotation);
+	InvalidateDrawCopies();
 
 	gWorldGrid->UpdateObject(this);
 
@@ -844,10 +1089,9 @@ void Object::PrintDebug() const
 				(phys->GetMotionType() == physics::eMotionType::Static) ? "Static" : "Dynamic");
 	}
 
-	LogInfo(LC_CORE, "\tIsInstance?={}, ReadyToRender?={}, ShadowCaster?={}, Skinned?={}",
-			HasFlag(Flags, eObjectFlags::IsInstance),	 /* */
-			HasFlag(Flags, eObjectFlags::ReadyToRender), /* */
-			HasFlag(Flags, eObjectFlags::ShadowCaster),	 /* */
+	LogInfo(LC_CORE, "\tInstances={}, ReadyToRender?={}, ShadowCaster?={}, Skinned?={}", mInstances.Size, /* */
+			HasFlag(Flags, eObjectFlags::ReadyToRender),												  /* */
+			HasFlag(Flags, eObjectFlags::ShadowCaster),													  /* */
 			(pMesh && pMesh->VertexList.IsSkinned()));
 
 	LogInfo(LC_CORE, "}}");
@@ -884,7 +1128,9 @@ void Object::Destroy()
 		}
 	}
 
-	ClearFlag(Flags, (eObjectFlags::ReadyToRender | eObjectFlags::IsInstance | eObjectFlags::PhysicsEnabled));
+	mInstances.Clear();
+
+	ClearFlag(Flags, (eObjectFlags::ReadyToRender | eObjectFlags::PhysicsEnabled));
 }
 
 

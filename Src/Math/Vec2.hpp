@@ -17,9 +17,21 @@ public:
 public:
 	constexpr Vec2Base() = default;
 
-	constexpr explicit Vec2Base(Type x, Type y) : X(x), Y(y) {}
-	constexpr explicit Vec2Base(Type scalar) : X(scalar), Y(scalar) {}
+	constexpr Vec2Base(Type x, Type y) : X(x), Y(y) {}
+	constexpr Vec2Base(Type scalar) : X(scalar), Y(scalar) {}
 
+	constexpr Vec2Base(const Vec2Base& other) : X(other.X), Y(other.Y) {}
+	constexpr explicit Vec2Base(const Vec2Base<float>& fvec)
+		requires std::is_same_v<Type, double>
+		: X(static_cast<double>(fvec.X)), Y(static_cast<double>(fvec.Y))
+	{
+	}
+
+	constexpr explicit Vec2Base(const Vec2Base<double>& dvec)
+		requires std::is_same_v<Type, float>
+		: X(static_cast<float>(dvec.X)), Y(static_cast<float>(dvec.Y))
+	{
+	}
 
 	Vec2Base operator-() const { return Vec2Base(-X, -Y); }
 
@@ -64,12 +76,39 @@ public:
 	 */
 	bool operator==(const Vec2Base<Type>& other) const { return (X == other.X && Y == other.Y); }
 
-	Vec2Base<Type>& operator=(const Vec2Base<Type>& other)
+	Vec2Base& operator=(const Vec2Base& other)
 	{
 		X = other.X;
 		Y = other.Y;
 		return *this;
 	}
+
+	constexpr Vec2Base& operator=(const Vec2Base<float>& fvec)
+		requires std::is_same_v<Type, double>
+
+	{
+		X = (static_cast<double>(fvec.X));
+		Y = (static_cast<double>(fvec.Y));
+		return *this;
+	}
+
+	constexpr Vec2Base& operator=(const Vec2Base<double>& dvec)
+		requires std::is_same_v<Type, float>
+	{
+		X = (static_cast<float>(dvec.X));
+		Y = (static_cast<float>(dvec.Y));
+		return *this;
+	}
+
+	template <int TX, int TY>
+	static FX_FORCE_INLINE Vec2Base FlipSigns(const Vec2Base vec)
+	{
+		const Type rx = TX > 0 ? vec.X : -vec.X;
+		const Type ry = TY > 0 ? vec.Y : -vec.Y;
+
+		return Vec2Base(rx, ry);
+	}
+
 
 	void Set(Type x, Type y)
 	{
@@ -103,6 +142,17 @@ public:
 		return std::hypot(X, Y);
 	}
 
+	static FX_FORCE_INLINE Vec2Base Min(Vec2Base a, Vec2Base b)
+	{
+		return Vec2Base(std::min(a.X, b.X), std::min(a.Y, b.Y));
+	}
+
+
+	static FX_FORCE_INLINE Vec2Base Max(Vec2Base a, Vec2Base b)
+	{
+		return Vec2Base(std::max(a.X, b.X), std::max(a.Y, b.Y));
+	}
+
 	FX_FORCE_INLINE Vec2Base Perpendicular() const { return Vec2Base(-Y, X); }
 
 	FX_FORCE_INLINE bool IsCloseTo(const Vec2Base& other, Type tolerance = static_cast<Type>(0.00001)) const
@@ -112,7 +162,7 @@ public:
 	}
 
 public:
-	union alignas(16)
+	union
 	{
 		Type mData[2];
 

@@ -72,8 +72,10 @@ private:
 class ObjectManager
 {
 public:
-	static constexpr uint32 scMaxObjects = 1024;
-	static constexpr uint32 scBoundSize = scMaxObjects * sizeof(ObjectGpuEntry);
+	static constexpr uint32 scMaxObjects = 4096;
+	static constexpr uint32 scMaxInstances = 16384;
+	static constexpr uint32 scSlotsPerFrame = scMaxObjects + scMaxInstances;
+	static constexpr uint32 scBoundSize = scSlotsPerFrame * sizeof(ObjectGpuEntry);
 
 public:
 	void Create();
@@ -104,16 +106,10 @@ public:
 	uint32 GetBaseOffset() const;
 	uint32 GetPageSize() const;
 
-	/**
-	 * @brief Finds an object slot with `num_instances` free slots following.
-	 *
-	 * @note This does not update the object's object id or set the reserved instances counter, use
-	 * Object::ReserveInstances() for that!
-	 *
-	 * @param object_id An object id of the current object if it needs to be moved.
-	 * @returns The object id for the first slot of the block.
-	 */
-	ObjectID ReserveInstances(const ObjectID& object_id, uint32 num_instances);
+	ObjectGpuEntry* ReserveInstanceSlots(uint32 count, uint32* out_first_slot);
+
+	void QueueInstanceUpdate(ObjectID id);
+	void FlushInstanceUpdates();
 
 	LoadedObjectRange GetCache() { return LoadedObjectRange(mObjectList); }
 
@@ -130,6 +126,11 @@ public:
 
 private:
 	FreeArray<Object> mObjectList;
+
+	DynArray<ObjectID> mPendingInstanceUpdates;
+
+	uint32 mInstanceSlotsFrame = UINT32_MAX;
+	uint32 mInstanceSlotsUsed = 0;
 };
 
 void DestroyObjectTree(ObjectID root_id);

@@ -14,6 +14,7 @@
 
 #include <Engine.hpp>
 #include <Math/Vec2.hpp>
+#include <cmath>
 
 namespace fx::editor {
 
@@ -35,6 +36,7 @@ constexpr ToolInfo scTools[] = {
 	{ "Face", "Drag a brush edge to move its face (F)" },
 	{ "Vertex", "Drag the corners of the selected brushes (V)" },
 	{ "Create", "Drag to create a brush (B)" },
+	{ "Arch", "Drag a box to fill it with an arch made of brushes (A)" },
 	{ "Rotate", "Rotate the selected brushes (R)" },
 };
 
@@ -137,6 +139,51 @@ TopViewPanel::TopViewPanel(wxWindow* parent) : wxPanel(parent, wxID_ANY)
 		mpToolbar->Add(mpVolumeRows[i], wxSizerFlags().CenterVertical().Border(wxTOP | wxBOTTOM, 2));
 	}
 
+	FloatField* sides_field = new FloatField(this, "Sides", Vec2f(3.0f, 128.0f));
+	sides_field->SetValue(static_cast<float32>(mArch.Sides));
+	sides_field->SetOnChange(
+		[this](const float32 value)
+		{
+			mArch.Sides = static_cast<uint32>(std::lround(value));
+			mpCanvas->SetArchSettings(mArch);
+		});
+
+	FloatField* wall_field = new FloatField(this, "Wall", Vec2f(0.01f, 100000.0f));
+	wall_field->SetValue(mArch.WallWidth);
+	wall_field->SetOnChange(
+		[this](const float32 value)
+		{
+			mArch.WallWidth = value;
+			mpCanvas->SetArchSettings(mArch);
+		});
+
+	FloatField* arc_field = new FloatField(this, "Arc", Vec2f(1.0f, 360.0f));
+	arc_field->SetValue(mArch.ArcDegrees);
+	arc_field->SetOnChange(
+		[this](const float32 value)
+		{
+			mArch.ArcDegrees = value;
+			mpCanvas->SetArchSettings(mArch);
+		});
+
+	FloatField* start_field = new FloatField(this, "Start", Vec2f(-360.0f, 360.0f));
+	start_field->SetValue(mArch.StartDegrees);
+	start_field->SetOnChange(
+		[this](const float32 value)
+		{
+			mArch.StartDegrees = value;
+			mpCanvas->SetArchSettings(mArch);
+		});
+
+	mpArchRow = new wxBoxSizer(wxHORIZONTAL);
+	mpArchRow->Add(sides_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 4));
+	mpArchRow->Add(wall_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+	mpArchRow->Add(arc_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+	mpArchRow->Add(start_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+	mpToolbar->Add(mpArchRow, wxSizerFlags().CenterVertical().Border(wxTOP | wxBOTTOM, 2));
+
+	mpCanvas->SetArchSettings(mArch);
+
 	wxButton* fit_button = new wxButton(this, wxID_ANY, "Fit", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
 	fit_button->SetToolTip("Frame every brush (Home)");
 	fit_button->Bind(wxEVT_BUTTON,
@@ -203,6 +250,9 @@ void TopViewPanel::ShowTool(eTopViewTool tool)
 	for (uint32 i = 0; i < static_cast<uint32>(eTopViewTool::Count); i++) {
 		mpToolButtons[i]->SetValue(i == static_cast<uint32>(tool));
 	}
+
+	mpToolbar->Show(mpArchRow, tool == eTopViewTool::Arch, true);
+	Layout();
 }
 
 void TopViewPanel::ShowPlane(eViewPlane plane)
@@ -222,6 +272,7 @@ void TopViewPanel::ApplyState(const TopViewState& state)
 	mpToolButtons[static_cast<uint32>(eTopViewTool::Face)]->Enable(state.bCanFace);
 	mpToolButtons[static_cast<uint32>(eTopViewTool::Vertex)]->Enable(state.bCanFace);
 	mpToolButtons[static_cast<uint32>(eTopViewTool::Create)]->Enable(state.bCanCreate);
+	mpToolButtons[static_cast<uint32>(eTopViewTool::Arch)]->Enable(state.bCanCreate && !state.bDataMode);
 	mpToolButtons[static_cast<uint32>(eTopViewTool::Rotate)]->Enable(state.bCanRotate);
 
 	if (state.HiddenCount != mShownHiddenCount) {

@@ -38,12 +38,15 @@ private:
 	OutlineToggleButton* mpPlaneButtons[scViewPlaneCount] = {};
 	wxWrapSizer* mpToolbar = nullptr;
 	wxBoxSizer* mpVolumeRows[scViewPlaneCount] = {};
+	wxBoxSizer* mpArchRow = nullptr;
 	wxStaticText* mpStatus = nullptr;
 	wxButton* mpShowAllButton = nullptr;
 	uint32 mShownHiddenCount = 0;
 
 	float32 mBase[scViewPlaneCount] = {};
 	float32 mSize[scViewPlaneCount] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+
+	ArchSettings mArch;
 };
 
 } // namespace fx::editor

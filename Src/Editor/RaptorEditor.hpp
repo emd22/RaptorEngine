@@ -139,13 +139,14 @@ public:
 
 	FX_FORCE_INLINE void NoteTopViewCommand() { ++mTopViewCommandSerial; }
 
-	void TopViewSelect(const DynArray<uint32>& object_ids, eTopViewSelectMode mode);
+	void TopViewSelect(const DynArray<ObjectID>& object_ids, eTopViewSelectMode mode);
 	void TopViewMove(const Vec3f offset);
 	void TopViewRotate(const Vec3f axis, float32 angle, const Vec3f pivot);
 	void TopViewMoveFace(const Vec3f world_normal, float32 distance);
 	void TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewVertexHandle>& handles,
 							 const Vec3f offset);
 	void TopViewCreate(Vec3f min, Vec3f max, bool drop_to_ground);
+	void TopViewCreateArch(DynArray<Vec3f> points, bool drop_to_ground);
 	void TopViewDelete();
 	void TopViewDuplicate();
 	/// Hides the selection from the 2D views. It stays in the level and in the 3D view.
@@ -155,6 +156,7 @@ public:
 	void TopViewAdjustSnap(int32 direction);
 
 	Object* CreateWorldBox(const Vec3f min, const Vec3f max);
+	void FitDBoundsToLevel();
 
 	FX_FORCE_INLINE bool IsSpawnSelected() const { return mbSpawnSelected; }
 
@@ -212,7 +214,8 @@ public:
 	Object* CreateDataBrush(const Brush::PlaneList& planes, const Vec3f position);
 	uint32 SetSelectionReflectionProbe(bool enabled);
 
-	uint32 SetSelectionObjectBit(bool is_tag, uint32 bit, bool enabled);
+	uint32 SetSelectionObjectState(eObjectTag tag, bool enabled);
+	uint32 SetSelectionObjectState(eObjectFlags flag, bool enabled);
 
 	uint32 SetSelectionScript(const String& path);
 
@@ -287,6 +290,9 @@ public:
 	~RaptorEditor() = default;
 
 private:
+	template <typename TState>
+	uint32 SetSelectionObjectStateImpl(TState state, bool enabled);
+
 	enum class eGamePhase : uint8
 	{
 		Starting,
@@ -304,7 +310,7 @@ private:
 
 	TopViewState BuildTopViewState();
 
-	Object* FindTopViewObject(uint32 object_id);
+	Object* FindTopViewObject(ObjectID object_id);
 	uint32 CollectTopViewTargets(Object** out_targets);
 
 	uint32 GetAvailableToolMask() const;

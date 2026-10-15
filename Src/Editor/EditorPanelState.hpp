@@ -10,6 +10,7 @@
 #include <Core/Types.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
+#include <Object/ObjectFlags.hpp>
 
 namespace fx::editor {
 
@@ -33,10 +34,10 @@ struct ObjectPanelState
 	Vec3f EnterDirection = Vec3f::sZero;
 
 	uint32 SelectedCount = 0;
-	uint32 Tags = 0;
-	uint32 Flags = 0;
-	uint32 EditableTags = 0;
-	uint32 EditableFlags = 0;
+	eObjectTag Tags = eObjectTag::None;
+	eObjectFlags Flags = eObjectFlags::None;
+	eObjectTag EditableTags = eObjectTag::None;
+	eObjectFlags EditableFlags = eObjectFlags::None;
 
 	int32 MaterialSlot = -1;
 
@@ -168,7 +169,7 @@ struct TopViewProjection
 
 struct TopViewBrush
 {
-	uint32 ObjectId = 0;
+	ObjectID ObjectId = ObjectID::scNull;
 	eTopViewBrushKind Kind = eTopViewBrushKind::Geometry;
 
 	bool bSelected = false;

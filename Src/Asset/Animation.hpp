@@ -66,25 +66,31 @@ struct AnimationPlayback
 	float32 Time = 0.0f;
 	float32 Speed = 1.0f;
 	eAnimationEnd OnEnd = eAnimationEnd::Pop;
+	float32 BlendTime = 0.0f;
 };
 
-/// The local transform a joint sits at when an animation does not drive it.
-///
-/// GLTF animations only contain channels for the joints (and the components of those joints) that
-/// actually move, so anything not present in an animation has to fall back to the joint node's own
-/// transform. Falling back to identity instead collapses every bone onto its parent's origin.
-struct BoneRestPose
+struct BoneTransform
 {
 	Vec3f Translation = Vec3f::sZero;
 	Quat Rotation = Quat::scIdentity;
 	Vec3f Scale = Vec3f::sOne;
 };
 
+struct BoneDelta
+{
+	Vec3f Translation = Vec3f::sZero;
+	Vec3f Rotation = Vec3f::sZero;
+	Vec3f Scale = Vec3f::sZero;
+};
+
+void BlendPoses(const BoneTransform* a, const BoneTransform* b, float32 weight, BoneTransform* out, uint32 count);
+
 struct Skeleton
 {
 public:
 	static constexpr uint32 scNoBones = UINT32_MAX;
 	static constexpr uint32 scMaxAnimationStack = 8;
+	static constexpr float32 scDefaultBlendTime = 0.2f;
 
 public:
 	static Ref<Skeleton> CreateInstance(const Ref<Skeleton>& source);
@@ -94,7 +100,7 @@ public:
 	/**
 	 * @brief Sets the animation that loops whenever the stack is empty. Pass null to hold the rest (bind) pose instead.
 	 */
-	void SetRestAnimation(const Animation* anim, float32 speed = 1.0f);
+	void SetRestAnimation(const Animation* anim, float32 speed = 1.0f, float32 blend_time = scDefaultBlendTime);
 
 	/**
 	 * @brief Plays `anim` on top of whatever is currently playing. The animation beneath it is paused, and resumes from
@@ -102,11 +108,16 @@ public:
 	 *
 	 * @returns false if `anim` is null or the stack is full.
 	 */
-	bool PushAnimation(const Animation* anim, eAnimationEnd on_end = eAnimationEnd::Pop, float32 speed = 1.0f);
-	bool PushAnimation(const String& name, eAnimationEnd on_end = eAnimationEnd::Pop, float32 speed = 1.0f);
+	bool PushAnimation(const Animation* anim, eAnimationEnd on_end = eAnimationEnd::Pop, float32 speed = 1.0f,
+					   float32 blend_time = scDefaultBlendTime);
+	bool PushAnimation(const String& name, eAnimationEnd on_end = eAnimationEnd::Pop, float32 speed = 1.0f,
+					   float32 blend_time = scDefaultBlendTime);
 
-	void PopAnimation();
-	void ClearAnimationStack();
+	void PopAnimation(float32 blend_time = scDefaultBlendTime);
+	void ClearAnimationStack(float32 blend_time = scDefaultBlendTime);
+
+	void BeginTransition(float32 blend_time);
+	FX_FORCE_INLINE bool IsTransitioning() const { return mBlendDuration > 0.0f; }
 
 	/// The top of the animation stack, or the rest animation if the stack is empty. Null when holding the rest pose.
 	AnimationPlayback* GetActivePlayback();
@@ -126,6 +137,9 @@ public:
 	 */
 	void EvaluatePose(const Animation* anim, float32 time);
 
+	void SampleLocalPose(const Animation* anim, float32 time, BoneTransform* out) const;
+	void ComposePose(const BoneTransform* pose);
+
 	void SetExternalPose(bool enabled);
 	FX_FORCE_INLINE bool HasExternalPose() const { return mbExternalPose; }
 
@@ -135,7 +149,13 @@ public:
 
 public:
 	SizedArray<Mat4f> InvBindTransforms;
-	SizedArray<BoneRestPose> RestPose;
+
+	/// The local transform each joint sits at when an animation does not drive it.
+	///
+	/// GLTF animations only contain channels for the joints (and the components of those joints) that
+	/// actually move, so anything not present in an animation has to fall back to the joint node's own
+	/// transform. Falling back to identity instead collapses every bone onto its parent's origin.
+	SizedArray<BoneTransform> RestPose;
 
 	SizedArray<Mat4f> RootTransforms;
 	SizedArray<uint32> ParentIndices;
@@ -170,11 +190,30 @@ public:
 
 private:
 	void UpdatePoseSummary();
+	void EnsurePoseBuffers();
+	void StartInertialization(const AnimationPlayback* playback, float32 delta_time);
+	void ApplyInertialization(float32 delta_time);
+	void StoreOutputPose(const BoneTransform* pose, float32 delta_time);
 
 	bool mbExternalPose = false;
 
 	/// Set once the rest pose has been evaluated, as it never changes and only needs posing once.
 	bool mbHoldingRestPose = false;
+
+	SizedArray<BoneTransform> mSourcePose;
+	SizedArray<BoneTransform> mScratchPose;
+	SizedArray<BoneTransform> mBlendedPose;
+	SizedArray<BoneTransform> mOutputPoses[2];
+	SizedArray<BoneDelta> mOffsets;
+	SizedArray<BoneDelta> mOffsetVelocities;
+
+	uint32 mOutputIndex = 0;
+	uint32 mOutputHistory = 0;
+	float32 mLastOutputDeltaTime = 0.0f;
+
+	float32 mPendingBlendTime = -1.0f;
+	float32 mBlendDuration = 0.0f;
+	float32 mBlendElapsed = 0.0f;
 };
 
 } // namespace fx

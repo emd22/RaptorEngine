@@ -29,7 +29,7 @@ public:
 	IDType operator()() const { return ID; }
 
 	bool operator==(const LightID& other) const { return GetID() == other.GetID(); }
-	bool operator<(const LightID& other) const { return ID < other.ID; }
+	bool operator<(const LightID& other) const { return GetID() < other.GetID(); }
 
 	FX_FORCE_INLINE IDType GetID() const { return (ID & ~scInvalidBit); }
 	FX_FORCE_INLINE bool IsNull() const { return ID == UINT32_MAX; }
@@ -47,7 +47,7 @@ namespace std {
 template <>
 struct hash<fx::LightID>
 {
-	std::size_t operator()(const fx::LightID& id) const noexcept { return id.ID; }
+	std::size_t operator()(const fx::LightID& id) const noexcept { return id.GetID(); }
 };
 } // namespace std
 

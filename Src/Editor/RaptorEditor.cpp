@@ -339,22 +339,14 @@ EditorPanelState RaptorEditor::BuildPanelState()
 		panel.bIsBlockout = object->HasTags(eObjectTag::Blockout);
 		panel.Name = object->Name.Get();
 		panel.SelectedCount = mSelection.GetCount();
-		panel.Tags = static_cast<uint32>(object->Tags);
-		panel.Flags = static_cast<uint32>(object->GetFlags());
+		panel.Tags = object->Tags;
+		panel.Flags = object->GetFlags();
+		panel.EditableTags = GetEditableTags(object);
+		panel.EditableFlags = GetEditableFlags(object);
 
 		if (!CanEditObject(object) && gWorld->pPrototype != nullptr) {
 			panel.SubviewName = gWorld->pPrototype->GetSubviewName(object->SubviewInstance);
 			panel.SubviewBrushCount = gWorld->pPrototype->GetSubviewBrushCount(object->SubviewInstance);
-		}
-
-		for (uint32 bit = 0; bit < 32; bit++) {
-			if (CanEditObjectTag(object, 1u << bit)) {
-				panel.EditableTags |= (1u << bit);
-			}
-
-			if (CanEditObjectFlag(object, 1u << bit)) {
-				panel.EditableFlags |= (1u << bit);
-			}
 		}
 
 		if (gWorld->pPrototype != nullptr) {
@@ -1570,7 +1562,14 @@ uint32 RaptorEditor::SetSelectionReflectionProbe(bool enabled)
 	return changed;
 }
 
-uint32 RaptorEditor::SetSelectionObjectBit(bool is_tag, uint32 bit, bool enabled)
+static bool CanEditObjectState(const Object* object, eObjectTag tag) { return CanEditObjectTag(object, tag); }
+static bool CanEditObjectState(const Object* object, eObjectFlags flag) { return CanEditObjectFlag(object, flag); }
+
+static bool HasObjectState(const Object* object, eObjectTag tag) { return object->HasTags(tag); }
+static bool HasObjectState(const Object* object, eObjectFlags flag) { return HasFlag(object->GetFlags(), flag); }
+
+template <typename TState>
+uint32 RaptorEditor::SetSelectionObjectStateImpl(TState state, bool enabled)
 {
 	Object* targets[scMaxSelectedObjects];
 	uint32 count = 0;
@@ -1582,19 +1581,26 @@ uint32 RaptorEditor::SetSelectionObjectBit(bool is_tag, uint32 bit, bool enabled
 			continue;
 		}
 
-		const bool can_edit = is_tag ? CanEditObjectTag(object, bit) : CanEditObjectFlag(object, bit);
-		const uint32 current = is_tag ? static_cast<uint32>(object->Tags) : static_cast<uint32>(object->GetFlags());
-
-		if (can_edit && ((current & bit) != 0) != enabled) {
+		if (CanEditObjectState(object, state) && HasObjectState(object, state) != enabled) {
 			targets[count++] = object;
 		}
 	}
 
 	for (uint32 i = 0; i < count; i++) {
-		EmplaceEditOperation<ObjectStateEditOperation>(targets[i], bit, is_tag, enabled, static_cast<int32>(count));
+		EmplaceEditOperation<ObjectStateEditOperation>(targets[i], state, enabled, static_cast<int32>(count));
 	}
 
 	return count;
+}
+
+uint32 RaptorEditor::SetSelectionObjectState(eObjectTag tag, bool enabled)
+{
+	return SetSelectionObjectStateImpl(tag, enabled);
+}
+
+uint32 RaptorEditor::SetSelectionObjectState(eObjectFlags flag, bool enabled)
+{
+	return SetSelectionObjectStateImpl(flag, enabled);
 }
 
 uint32 RaptorEditor::SetSelectionScript(const String& path)

@@ -9,7 +9,9 @@
 #include <ThirdParty/Jolt/Physics/Body/MotionType.h>
 #include <ThirdParty/Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <ThirdParty/Jolt/Physics/Collision/Shape/ConvexHullShape.h>
+#include <ThirdParty/Jolt/Physics/Collision/Shape/EmptyShape.h>
 #include <ThirdParty/Jolt/Physics/Collision/Shape/MeshShape.h>
+#include <ThirdParty/Jolt/Physics/Collision/Shape/ScaledShape.h>
 #include <ThirdParty/Jolt/Physics/Collision/Shape/StaticCompoundShape.h>
 #include <ThirdParty/Jolt/Physics/EActivation.h>
 
@@ -243,7 +245,67 @@ void Body::UpdateJoltBody(JPH::ShapeRefC shape, physics::Body::eFlags flags, phy
 	mpPhysicsBody = body_interface.CreateBody(body_settings);
 	AddToWorld();
 
+	mBaseShape = shape;
+	mbHasInstanceShape = false;
 	mbHasPhysicsBody = true;
+}
+
+void Body::SetInstanceTransforms(const Mat4f* transforms, uint32 count)
+{
+	if (!mbHasPhysicsBody || mBaseShape == nullptr) {
+		return;
+	}
+
+	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
+	const bool update_mass = (mMotionType == physics::eMotionType::Dynamic);
+
+	if (count == 0) {
+		if (mbHasInstanceShape) {
+			body_interface.SetShape(GetBodyID(), mBaseShape, update_mass, JPH::EActivation::DontActivate);
+			mbHasInstanceShape = false;
+		}
+
+		return;
+	}
+
+	JPH::StaticCompoundShapeSettings compound_settings;
+
+	for (uint32 index = 0; index < count; index++) {
+		const float32* m = transforms[index].RawData;
+
+		const JPH::Mat44 matrix(JPH::Vec4(m[0], m[1], m[2], m[3]), JPH::Vec4(m[4], m[5], m[6], m[7]),
+								JPH::Vec4(m[8], m[9], m[10], m[11]), JPH::Vec4(m[12], m[13], m[14], m[15]));
+
+		JPH::Vec3 scale;
+		const JPH::Mat44 rotation_translation = matrix.Decompose(scale);
+
+		if (JPH::ScaleHelpers::IsZeroScale(scale)) {
+			continue;
+		}
+
+		JPH::ShapeRefC shape = mBaseShape;
+
+		if (!JPH::ScaleHelpers::IsNotScaled(scale)) {
+			shape = new JPH::ScaledShape(mBaseShape, mBaseShape->MakeScaleValid(scale));
+		}
+
+		compound_settings.AddShape(rotation_translation.GetTranslation(), rotation_translation.GetQuaternion(), shape);
+	}
+
+	if (compound_settings.mSubShapes.empty()) {
+		body_interface.SetShape(GetBodyID(), new JPH::EmptyShape(), update_mass, JPH::EActivation::DontActivate);
+		mbHasInstanceShape = true;
+		return;
+	}
+
+	JPH::ShapeSettings::ShapeResult compound_result = compound_settings.Create();
+	if (compound_result.HasError()) {
+		LogError(LC_PHYSICS, "Failed to create instance collider: {}", compound_result.GetError().c_str());
+		return;
+	}
+
+	body_interface.SetShape(GetBodyID(), compound_result.Get(), update_mass, JPH::EActivation::DontActivate);
+	mbHasInstanceShape = true;
 }
 
 void Body::DestroyPhysicsBody()

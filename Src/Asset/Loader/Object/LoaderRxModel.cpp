@@ -552,7 +552,7 @@ bool LoaderRxModel::ReadSkeleton(const RxFileRef& file_ref, Ref<Skeleton>& out_s
 		skel.BoneNames[i] = (name[0] != '\0') ? String(name) : String::Fmt("joint_{}", i);
 		skel.ParentIndices[i] = (joint.Parent < 0) ? BoneNull : static_cast<uint32>(joint.Parent);
 
-		BoneRestPose rest {};
+		BoneTransform rest {};
 		rest.Translation = Vec3f(bind_pose[i].Translation[0], bind_pose[i].Translation[1], bind_pose[i].Translation[2]);
 		rest.Rotation = Quat(bind_pose[i].Rotation[0], bind_pose[i].Rotation[1], bind_pose[i].Rotation[2],
 							 bind_pose[i].Rotation[3]);

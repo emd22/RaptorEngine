@@ -169,10 +169,10 @@ public:
 	template <int TX, int TY, int TZ, int TW>
 	FX_FORCE_INLINE static Vec3f FlipSigns(const Vec3f vec)
 	{
-		constexpr float rx = TX > 0.0 ? vec.X : -vec.X;
-		constexpr float ry = TY > 0.0 ? vec.Y : -vec.Y;
-		constexpr float rz = TZ > 0.0 ? vec.Z : -vec.Z;
-		constexpr float rw = TW > 0.0 ? vec.W : -vec.W;
+		constexpr float rx = TX > 0 ? vec.X : -vec.X;
+		constexpr float ry = TY > 0 ? vec.Y : -vec.Y;
+		constexpr float rz = TZ > 0 ? vec.Z : -vec.Z;
+		constexpr float rw = TW > 0 ? vec.W : -vec.W;
 
 		return Vec3f(rx, ry, rz, rw);
 	}

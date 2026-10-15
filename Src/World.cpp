@@ -459,7 +459,7 @@ void World::ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Cam
 		object->Update();
 
 		// Push the direct index for the object id
-		consts.ObjectIndex = object_id.GetID();
+		consts.ObjectIndex = object->GetDrawIndex();
 		consts.BoneBase = object->BoneBufferBase;
 		consts.MaterialIndex = object->GetMaterialID().GetID();
 		gGraphics->SubmitPushConstants(cmd, selector.Select(object, cmd), eShaderType::Vertex, consts);
@@ -585,7 +585,7 @@ void World::BakeSpotShadows()
 			// Casters out of view skip the forward pass, which is what normally uploads their matrix for this frame
 			gObjectManager->Submit(caster_id, caster->GetWorldMatrix());
 
-			consts.ObjectIndex = caster_id.GetID();
+			consts.ObjectIndex = caster->GetDrawIndex();
 			consts.BoneBase = caster->BoneBufferBase;
 			consts.MaterialIndex = caster->GetMaterialID().GetID();
 			gGraphics->SubmitPushConstants(cmd, selector.Select(caster, cmd), eShaderType::Vertex, consts);
@@ -741,7 +741,7 @@ void World::ExecutePrepassRenderList(renderer::PipelineHandle forward_pipeline)
 		object->Update();
 
 		DrawPushConstants consts { .TargetSize = { gGraphics->Swapchain.Extent.X, gGraphics->Swapchain.Extent.Y } };
-		consts.ObjectId = object_id.GetID();
+		consts.ObjectId = object->GetDrawIndex();
 		consts.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
 		consts.TileRows = gGraphics->pRenderer->GetLightTileRows();
 		consts.BoneBase = object->BoneBufferBase;
@@ -969,6 +969,8 @@ void World::AddUnculledLightsToLightList()
 
 void World::CullWorldTiles(const PerspectiveCamera& cam)
 {
+	gObjectManager->FlushInstanceUpdates();
+
 	mFrustum.Rebuild(cam);
 	mVisibleTiles.Clear();
 
@@ -1254,7 +1256,7 @@ void World::DebugDrawObjectBounds()
 			continue;
 		}
 
-		gDebugDraw->WireBox(object.GetWorldOBB().GetWorldAABB(), debug_color);
+		gDebugDraw->WireBox(object.GetDrawBounds(), debug_color);
 	}
 }
 

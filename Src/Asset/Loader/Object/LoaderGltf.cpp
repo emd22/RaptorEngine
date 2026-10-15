@@ -1098,9 +1098,9 @@ std::vector<int32> LoaderGltf::BuildJointLookup(cgltf_skin* skin) const
 ///
 /// Every component an animation does not drive has to fall back to this, otherwise the joint lands at
 /// identity: bones collapse onto their parent's origin and the skin smears across the model.
-static BoneRestPose MakeRestPoseForJoint(const cgltf_node* joint)
+static BoneTransform MakeRestPoseForJoint(const cgltf_node* joint)
 {
-	BoneRestPose rest {};
+	BoneTransform rest {};
 
 	if (joint->has_matrix) {
 		// Decompose the raw matrix. GLTF stores matrices column-major, which lines up directly with

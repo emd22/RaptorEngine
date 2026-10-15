@@ -89,7 +89,7 @@ void WorldGrid::GetObjectTileRect(Object* object, TileIndex* out_start, Vec2u* o
 	DebugAssert(out_span != nullptr);
 
 
-	const BBox world_bounds = object->GetWorldOBB().GetWorldAABB();
+	const BBox world_bounds = object->GetDrawBounds();
 
 	const Vec2u tile_xy_start = TileToTileXY(WorldToTile(world_bounds.Min));
 	const Vec2u tile_xy_end = TileToTileXY(WorldToTile(world_bounds.Max));

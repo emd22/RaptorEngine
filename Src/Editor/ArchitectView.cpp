@@ -48,6 +48,8 @@ constexpr float32 scVertexMatchDistance = 2e-3f;
 constexpr float32 scMinBrushExtent = 0.01f;
 constexpr float32 scGroundFootprintInset = 1e-3f;
 constexpr float32 scGroundFitTolerance = 1e-3f;
+constexpr float32 scDBoundThickness = 1.0f;
+constexpr uint32 scDBoundSideCount = 6;
 
 Vec2f Project(const Vec3f& vector, const ViewPlaneAxes& axes)
 {
@@ -406,7 +408,7 @@ TopViewState RaptorEditor::BuildTopViewState()
 
 		TopViewBrush& out = view.Brushes.Emplace();
 
-		out.ObjectId = object->ID.ID;
+		out.ObjectId = object->ID;
 		out.Kind = source.Kind;
 		out.bSelected = mSelection.Contains(object);
 		out.bSelectable = IsObjectSelectable(object);
@@ -560,7 +562,7 @@ void RaptorEditor::SetView(eEditorView view)
 // Top view commands
 /////////////////////////////////////
 
-Object* RaptorEditor::FindTopViewObject(uint32 object_id)
+Object* RaptorEditor::FindTopViewObject(ObjectID object_id)
 {
 	Blockout* blockout = gWorld->pPrototype;
 
@@ -568,7 +570,7 @@ Object* RaptorEditor::FindTopViewObject(uint32 object_id)
 		return nullptr;
 	}
 
-	Object* object = gObjectManager->GetObject(ObjectID(object_id));
+	Object* object = gObjectManager->GetObject(object_id);
 
 	if (object == nullptr || object == blockout->pXFormObject || object == blockout->pPreviewObject) {
 		return nullptr;
@@ -610,7 +612,7 @@ uint32 RaptorEditor::CollectTopViewTargets(Object** out_targets)
 	return count;
 }
 
-void RaptorEditor::TopViewSelect(const DynArray<uint32>& object_ids, eTopViewSelectMode mode)
+void RaptorEditor::TopViewSelect(const DynArray<ObjectID>& object_ids, eTopViewSelectMode mode)
 {
 	if (IsSimulationMode()) {
 		return;
@@ -620,9 +622,9 @@ void RaptorEditor::TopViewSelect(const DynArray<uint32>& object_ids, eTopViewSel
 		ClearSelection();
 	}
 
-	DoublingArray<uint32> seen_ids;
+	DoublingArray<ObjectID> seen_ids;
 
-	for (const uint32 object_id : object_ids) {
+	for (const ObjectID object_id : object_ids) {
 		if (std::find(seen_ids.begin(), seen_ids.end(), object_id) != seen_ids.end()) {
 			continue;
 		}
@@ -778,7 +780,7 @@ void RaptorEditor::TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewV
 		Brush::PlaneList After;
 	};
 
-	DoublingArray<uint32> object_ids;
+	DoublingArray<ObjectID> object_ids;
 
 	for (const TopViewVertexHandle& handle : handles) {
 		if (std::find(object_ids.begin(), object_ids.end(), handle.ObjectId) == object_ids.end()) {
@@ -788,7 +790,7 @@ void RaptorEditor::TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewV
 
 	DoublingArray<Edit> edits;
 
-	for (const uint32 object_id : object_ids) {
+	for (const ObjectID object_id : object_ids) {
 		Object* object = FindTopViewObject(object_id);
 
 		if (object == nullptr || !CanEditObject(object) || object->HasTags(eObjectTag::LockTransform)) {
@@ -897,6 +899,199 @@ void RaptorEditor::TopViewCreate(Vec3f min, Vec3f max, bool drop_to_ground)
 	}
 
 	SelectObject(created, false);
+}
+
+void RaptorEditor::TopViewCreateArch(DynArray<Vec3f> points, bool drop_to_ground)
+{
+	if (IsSimulationMode() || !IsToolAvailable(eEditorTool::Create) || gWorld->pPrototype == nullptr) {
+		return;
+	}
+
+	if (IsDataMode()) {
+		LogWarning(LC_CORE, "Arches can only be made from geometry brushes, switch to Vis mode");
+		return;
+	}
+
+	const uint32 segment_count = points.Size / scArchPointsPerSegment;
+
+	if (segment_count == 0) {
+		return;
+	}
+
+	if (drop_to_ground) {
+		Vec3f min = points[0];
+		Vec3f max = points[0];
+
+		for (const Vec3f& point : points) {
+			min = Vec3f::Min(min, point);
+			max = Vec3f::Max(max, point);
+		}
+
+		float32 ground = 0.0f;
+
+		if (FindGroundHeight(min, max, ground)) {
+			const Vec3f lift(0.0f, ground - min.Y, 0.0f);
+
+			for (Vec3f& point : points) {
+				point += lift;
+			}
+		}
+	}
+
+	struct Piece
+	{
+		Brush::PlaneList Planes;
+		Vec3f Position;
+	};
+
+	DoublingArray<Piece> pieces;
+
+	for (uint32 segment = 0; segment < segment_count; segment++) {
+		const Vec3f* segment_points = &points[segment * scArchPointsPerSegment];
+
+		Vec3f min = segment_points[0];
+		Vec3f max = segment_points[0];
+
+		for (uint32 i = 1; i < scArchPointsPerSegment; i++) {
+			min = Vec3f::Min(min, segment_points[i]);
+			max = Vec3f::Max(max, segment_points[i]);
+		}
+
+		const Vec3f position = (min + max) * 0.5f;
+
+		SizedArray<Vec3f> local_points;
+		local_points.InitCapacity(scArchPointsPerSegment);
+
+		for (uint32 i = 0; i < scArchPointsPerSegment; i++) {
+			local_points.Insert(segment_points[i] - position);
+		}
+
+		Brush brush = Brush::FromVertices(local_points, Brush::PlaneList());
+		const Vec3f extent = brush.GetBoundsMax() - brush.GetBoundsMin();
+
+		if (!brush.IsValid() || extent.X < scMinBrushExtent || extent.Y < scMinBrushExtent ||
+			extent.Z < scMinBrushExtent) {
+			continue;
+		}
+
+		brush.AlignTexturesToWorld(position);
+		pieces.Insert(Piece { brush.Planes, position });
+	}
+
+	if (pieces.Size < segment_count) {
+		LogWarning(LC_CORE, "Skipped {} arch segments that were too thin to make into brushes",
+				   segment_count - pieces.Size);
+	}
+
+	if (pieces.IsEmpty()) {
+		return;
+	}
+
+	const MaterialID material = GetNewBrushMaterial();
+	bool append = false;
+
+	for (const Piece& piece : pieces) {
+		ObjectSnapshot snapshot;
+		snapshot.Position = piece.Position;
+		snapshot.Material = material;
+
+		Object* created = EmplaceEditOperation<CreateBrushOperation>(piece.Planes, snapshot,
+																	 static_cast<int32>(pieces.Size))
+							  .GetCreated();
+
+		if (created != nullptr) {
+			SelectObject(created, append);
+			append = true;
+		}
+	}
+}
+
+void RaptorEditor::FitDBoundsToLevel()
+{
+	Blockout* blockout = gWorld->pPrototype;
+
+	if (IsSimulationMode() || blockout == nullptr) {
+		return;
+	}
+
+	std::vector<BrushSource> sources;
+	GatherBrushSources(*blockout, sources);
+
+	Vec3f level_min(FLT_MAX);
+	Vec3f level_max(-FLT_MAX);
+	bool has_geometry = false;
+
+	DoublingArray<Object*> old_bounds;
+
+	for (const BrushSource& source : sources) {
+		if (source.Kind == eTopViewBrushKind::DBound) {
+			if (source.pObject->SubviewInstance == Blockout::scNoSubview && CanEditObject(source.pObject)) {
+				old_bounds.Insert(source.pObject);
+			}
+
+			continue;
+		}
+
+		if (source.Kind != eTopViewBrushKind::Geometry) {
+			continue;
+		}
+
+		for (const Vec3f vertex : source.pBrush->GetVertices()) {
+			const Vec4f point = source.World * Vec4f(vertex.X, vertex.Y, vertex.Z, 1.0f);
+			const Vec3f world_point(point.X, point.Y, point.Z);
+
+			level_min = Vec3f::Min(level_min, world_point);
+			level_max = Vec3f::Max(level_max, world_point);
+			has_geometry = true;
+		}
+	}
+
+	if (!has_geometry) {
+		LogWarning(LC_CORE, "There is no level geometry to fit the map bounds to");
+		return;
+	}
+
+	const Vec3f outer_min = level_min - Vec3f(scDBoundThickness);
+	const Vec3f outer_max = level_max + Vec3f(scDBoundThickness);
+
+	const Vec3f boxes[scDBoundSideCount][2] = {
+		{ Vec3f(outer_min.X, outer_min.Y, outer_min.Z), Vec3f(outer_max.X, level_min.Y, outer_max.Z) },
+		{ Vec3f(outer_min.X, level_max.Y, outer_min.Z), Vec3f(outer_max.X, outer_max.Y, outer_max.Z) },
+		{ Vec3f(outer_min.X, level_min.Y, outer_min.Z), Vec3f(level_min.X, level_max.Y, outer_max.Z) },
+		{ Vec3f(level_max.X, level_min.Y, outer_min.Z), Vec3f(outer_max.X, level_max.Y, outer_max.Z) },
+		{ Vec3f(level_min.X, level_min.Y, outer_min.Z), Vec3f(level_max.X, level_max.Y, level_min.Z) },
+		{ Vec3f(level_min.X, level_min.Y, level_max.Z), Vec3f(level_max.X, level_max.Y, outer_max.Z) },
+	};
+
+	EndDrag();
+	ClearSelection();
+
+	const int32 group_size = static_cast<int32>(old_bounds.Size + scDBoundSideCount);
+
+	for (Object* object : old_bounds) {
+		DeleteObject(object, group_size);
+	}
+
+	for (const auto& box : boxes) {
+		Vec3f position;
+		const Brush brush = blockout->MakeWorldBox(box[0], box[1], position);
+
+		ObjectSnapshot snapshot;
+		snapshot.Position = position;
+		snapshot.Material = blockout->GetDBoundMaterial();
+		snapshot.bIsDBound = true;
+
+		Object* created = EmplaceEditOperation<CreateBrushOperation>(brush.Planes, snapshot, group_size).GetCreated();
+
+		if (created != nullptr && IsDataMode()) {
+			SelectObject(created, true);
+		}
+	}
+
+	LogInfo("Fitted the map bounds to the level, {} to {} (replaced {} old map bounds)", level_min, level_max,
+			old_bounds.Size);
+
+	mbForcePanelSync = true;
 }
 
 void RaptorEditor::TopViewDelete()

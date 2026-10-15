@@ -75,6 +75,8 @@ public:
 
 	void DestroyPhysicsBody();
 
+	void SetInstanceTransforms(const Mat4f* transforms, uint32 count);
+
 	void SetMidpoint(const Vec3f midpoint);
 
 	void Teleport(const Vec3f position, const Quat rotation);
@@ -126,6 +128,9 @@ public:
 
 
 private:
+	JPH::ShapeRefC mBaseShape;
+	bool mbHasInstanceShape = false;
+
 	Name mColliderName;
 	ObjectID mObjectID = ObjectID::scNull;
 

@@ -40,7 +40,7 @@ class LightBase;
 class WorldGrid
 {
 public:
-	static constexpr uint32 scMaxObjectsPerTile = 64;
+	static constexpr uint32 scMaxObjectsPerTile = 256;
 	static constexpr uint32 scMaxGlobalObjects = 64;
 	static constexpr uint32 scMaxLightsPerTile = 64;
 	static constexpr uint32 scMaxGlobalLights = 64;

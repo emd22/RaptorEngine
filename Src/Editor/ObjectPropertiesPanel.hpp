@@ -7,7 +7,7 @@
 
 #include <Core/DynArray.hpp>
 #include <Core/StackArray.hpp>
-#include <Object/Object.hpp>
+#include <Object/ObjectFlags.hpp>
 
 
 class wxCheckBox;
@@ -27,11 +27,15 @@ class ObjectPropertiesPanel : public wxPanel
 public:
 	static constexpr uint32 scMaxRows = 16;
 
+	template <typename TState>
 	struct FlagRow
 	{
-		uint32 Bit = 0;
+		TState Bit = TState::None;
 		wxCheckBox* pCheckBox = nullptr;
 	};
+
+	template <typename TState>
+	using FlagRows = StackArray<FlagRow<TState>, scMaxRows>;
 
 public:
 	explicit ObjectPropertiesPanel(wxWindow* parent);
@@ -39,9 +43,15 @@ public:
 	void ApplyState(const ObjectPanelState& state, const MaterialLibraryState& materials);
 
 private:
-	void BindRows(StackArray<FlagRow, scMaxRows>& rows, bool is_tag);
-	void OnRowToggled(bool is_tag, uint32 bit, bool checked);
-	void SetRows(StackArray<FlagRow, scMaxRows>& rows, uint32 value, uint32 editable, bool has_object);
+	template <typename TState>
+	void BindRows(FlagRows<TState>& rows);
+
+	template <typename TState>
+	void OnRowToggled(TState bit, bool checked);
+
+	template <typename TState>
+	void SetRows(FlagRows<TState>& rows, TState value, TState editable, bool has_object);
+
 	void OnMaterialChoice(wxCommandEvent& event);
 	void RefreshMaterialChoices(const MaterialLibraryState& materials);
 	void CommitScript();
@@ -57,8 +67,8 @@ private:
 	wxStaticText* mpScriptStatus = nullptr;
 	wxChoice* mpEnterDirChoice = nullptr;
 
-	StackArray<FlagRow, scMaxRows> mTagRows;
-	StackArray<FlagRow, scMaxRows> mFlagRows;
+	FlagRows<eObjectTag> mTagRows;
+	FlagRows<eObjectFlags> mFlagRows;
 
 	DynArray<String> mShownMaterialNames;
 	String mShownScript;

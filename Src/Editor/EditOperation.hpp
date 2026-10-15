@@ -12,6 +12,7 @@
 #include <Math/BBox.hpp>
 #include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
+#include <Object/ObjectFlags.hpp>
 #include <Object/ObjectID.hpp>
 #include <Renderer/LightID.hpp>
 #include <memory>
@@ -148,8 +149,11 @@ struct ObjectSnapshot
 	static ObjectSnapshot Capture(const Object& object, MaterialID material);
 };
 
-bool CanEditObjectTag(const Object* object, uint32 tag_bit);
-bool CanEditObjectFlag(const Object* object, uint32 flag_bit);
+bool CanEditObjectTag(const Object* object, eObjectTag tag);
+bool CanEditObjectFlag(const Object* object, eObjectFlags flag);
+
+eObjectTag GetEditableTags(const Object* object);
+eObjectFlags GetEditableFlags(const Object* object);
 
 bool CanAttachScript(const Object* object);
 
@@ -234,7 +238,8 @@ private:
 class ObjectStateEditOperation final : public ObjectEditOperation
 {
 public:
-	ObjectStateEditOperation(Object* object, uint32 bit, bool is_tag, bool enabled, int32 group_size = 1);
+	ObjectStateEditOperation(Object* object, eObjectTag tag, bool enabled, int32 group_size = 1);
+	ObjectStateEditOperation(Object* object, eObjectFlags flag, bool enabled, int32 group_size = 1);
 
 	void Execute(EditorSelection& selection) override;
 	void Undo(EditorSelection& selection) override;
@@ -243,18 +248,19 @@ private:
 	struct NodeFlags
 	{
 		ObjectID Id = ObjectID::scNull;
-		uint32 Flags = 0;
+		eObjectFlags Flags = eObjectFlags::None;
 	};
 
 private:
+	void CaptureState(Object& object);
 	void RestoreState(Object& root) const;
 
 private:
-	uint32 mBit;
-	bool mbIsTag;
+	eObjectTag mTag = eObjectTag::None;
+	eObjectFlags mFlag = eObjectFlags::None;
 	bool mbEnabled;
 
-	uint32 mTagsBefore = 0;
+	eObjectTag mTagsBefore = eObjectTag::None;
 	Vec3f mPositionBefore = Vec3f::sZero;
 	Quat mRotationBefore = Quat::scIdentity;
 	DynArray<NodeFlags> mNodesBefore;

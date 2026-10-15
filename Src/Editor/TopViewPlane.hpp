@@ -5,6 +5,7 @@
 #include <Core/Types.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
+#include <Object/ObjectID.hpp>
 
 namespace fx::editor {
 
@@ -44,11 +45,13 @@ inline constexpr ViewPlaneAxes scViewPlaneAxes[scViewPlaneCount] = {
 
 struct TopViewVertexHandle
 {
-	uint32 ObjectId = 0;
+	ObjectID ObjectId = ObjectID::scNull;
 	Vec2f Position = Vec2f::sZero;
 };
 
 inline constexpr const char* scAxisNames = "XYZ";
+
+inline constexpr uint32 scArchPointsPerSegment = 8;
 
 inline const ViewPlaneAxes& GetViewPlaneAxes(eViewPlane plane) { return scViewPlaneAxes[static_cast<uint32>(plane)]; }
 

@@ -61,8 +61,9 @@ public:
 	void SetPosition(const Vec3f position);
 	void SetYaw(float32 yaw);
 
-	void SetIdleAnimation(const String& name, float32 speed = 1.0f);
-	bool PlayAnimation(const String& name, eAnimationEnd on_end = eAnimationEnd::Pop, float32 speed = 1.0f);
+	void SetIdleAnimation(const String& name, float32 speed = 1.0f, float32 blend_time = Skeleton::scDefaultBlendTime);
+	bool PlayAnimation(const String& name, eAnimationEnd on_end = eAnimationEnd::Pop, float32 speed = 1.0f,
+					   float32 blend_time = Skeleton::scDefaultBlendTime);
 
 	FX_FORCE_INLINE bool IsCreated() const { return !mRootID.IsInvalid(); }
 	FX_FORCE_INLINE bool IsRagdoll() const { return mState == eState::Ragdoll; }

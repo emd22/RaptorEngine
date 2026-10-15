@@ -645,6 +645,14 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 							 });
 	mode_sizer->Add(mpDataFilterChoice, wxSizerFlags().CenterVertical().Border(wxALL, 2));
 
+	wxButton* fit_bounds_button = new wxButton(root, wxID_ANY, "Fit Bounds", wxDefaultPosition, wxDefaultSize,
+											   wxBU_EXACTFIT);
+	fit_bounds_button->SetToolTip("Replace the map bounds (dbound) with six boxes sealing the level, each one touching "
+								  "the edge of the level geometry");
+	fit_bounds_button->Bind(wxEVT_BUTTON,
+							[](wxCommandEvent&) { thread::PostToGame([] { gEditor->FitDBoundsToLevel(); }); });
+	mode_sizer->Add(fit_bounds_button, wxSizerFlags().CenterVertical().Border(wxALL, 2));
+
 	// Tools
 	wxBoxSizer* tool_sizer = new wxBoxSizer(wxHORIZONTAL);
 

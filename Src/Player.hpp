@@ -33,6 +33,7 @@ class Player
 	static constexpr const char* scDefaultViewModel = "RaptorData/Data/viewmodel/p1911.rxweapon";
 	static constexpr const char* scViewModelViewJoint = "tag_view";
 	static constexpr uint32 scMaxViewModels = 8;
+	static constexpr float32 scFireBlendTime = 0.05f;
 
 	static constexpr const char* scViewModelIdleAnim = "IDLE";
 	static constexpr const char* scViewModelFireAnim = "Armature|Fire";

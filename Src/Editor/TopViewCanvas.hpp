@@ -12,6 +12,7 @@
 
 #include <Core/DynArray.hpp>
 #include <Core/Types.hpp>
+#include <Math/Rect.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
 #include <functional>
@@ -27,9 +28,18 @@ enum class eTopViewTool : uint8
 	Face,
 	Vertex,
 	Create,
+	Arch,
 	Rotate,
 
 	Count,
+};
+
+struct ArchSettings
+{
+	uint32 Sides = 8;
+	float32 WallWidth = 0.25f;
+	float32 ArcDegrees = 180.0f;
+	float32 StartDegrees = 0.0f;
 };
 
 class TopViewCanvas : public wxWindow
@@ -47,6 +57,7 @@ public:
 
 	void SetCreateVolume(eViewPlane plane, float32 base, float32 size);
 	void SetDropToGround(bool enabled) { mbDropToGround = enabled; }
+	void SetArchSettings(const ArchSettings& settings);
 
 	void FitAll();
 	void FitSelection();
@@ -57,8 +68,8 @@ public:
 
 	wxBitmap Render(const wxSize& size);
 
-	wxPoint WorldToClient(double u, double v) const;
-	void ClientToWorld(const wxPoint& point, double& out_u, double& out_v) const;
+	wxPoint WorldToClient(const Vec2d uv) const;
+	Vec2d ClientToWorld(const wxPoint& point) const;
 
 	FX_FORCE_INLINE const TopViewState& GetState() const { return mState; }
 	FX_FORCE_INLINE double GetScale() const { return mScale; }
@@ -73,50 +84,64 @@ private:
 		Face,
 		Vertex,
 		Create,
+		Arch,
 		Rotate,
 	};
 
 	struct OutlinePreview
 	{
-		uint32 BrushId = 0;
+		ObjectID BrushId = ObjectID::scNull;
 		DynArray<Vec2f> Polygon;
 	};
 
 	struct Preview
 	{
 		eDrag Kind = eDrag::None;
+		//
+		// 		double OffsetU = 0.0;
+		// 		double OffsetV = 0.0;
 
-		double OffsetU = 0.0;
-		double OffsetV = 0.0;
+		Vec2d OffsetUV { Vec2d::sZero };
+		Vec2d PivotUV { Vec2d::sZero };
+		Vec2d NormalUV { Vec2d::sZero };
 
 		double Angle = 0.0;
-		double PivotU = 0.0;
-		double PivotV = 0.0;
+		//
+		// 		double PivotU = 0.0;
+		// 		double PivotV = 0.0;
 
-		double MinU = 0.0;
-		double MinV = 0.0;
-		double MaxU = 0.0;
-		double MaxV = 0.0;
+		// double MinU = 0.0;
+		// double MinV = 0.0;
+		// double MaxU = 0.0;
+		// double MaxV = 0.0;
+
+		DRect RectUV {};
+
 
 		double Shift = 0.0;
-		double NormalU = 0.0;
-		double NormalV = 0.0;
+		// double NormalU = 0.0;
+		// double NormalV = 0.0;
 		DynArray<OutlinePreview> Outlines;
 	};
 
 	struct ViewBounds
 	{
-		double MinU = 0.0;
-		double MinV = 0.0;
-		double MaxU = 0.0;
-		double MaxV = 0.0;
+		// double MinU = 0.0;
+		// double MinV = 0.0;
+		// double MaxU = 0.0;
+		// double MaxV = 0.0;
+
+		DRect Rect {};
+
 		bool bValid = false;
 	};
 
 	struct SavedView
 	{
-		double CenterU = 0.0;
-		double CenterV = 0.0;
+		// double CenterU = 0.0;
+		// double CenterV = 0.0;
+		Vec2d Center { Vec2d::sZero };
+
 		double Scale = 24.0;
 		bool bFitted = false;
 	};
@@ -145,18 +170,19 @@ private:
 	void DrawPlayer(wxGraphicsContext& gc);
 
 	wxSize GetViewSize() const;
-	double ToScreenX(double u) const;
-	double ToScreenY(double v) const;
+
+	Vec2d ToScreenCoords(const Vec2d uv) const;
 
 	const ViewPlaneAxes& Axes() const;
 	const TopViewProjection& Projection(const TopViewBrush& brush) const;
-	Vec3f ToWorldVector(double u, double v, double w) const;
+	Vec3f ToWorldVector(const Vec2d uv, double w) const;
 
 	void BeginPan(const wxPoint& position);
 	void BeginSelect();
 	void BeginFace();
 	void BeginVertex();
 	void BeginCreate();
+	void BeginArch();
 	void BeginRotate();
 
 	void FinishFace();
@@ -164,7 +190,10 @@ private:
 	void FinishMarquee();
 	void FinishMove();
 	void FinishCreate();
+	void FinishArch();
 	void FinishRotate();
+
+	DynArray<Vec2d> BuildArchSegments(const DRect& rect) const;
 
 	void UpdatePreview();
 	void ClearPreview();
@@ -172,31 +201,32 @@ private:
 	void CancelDrag();
 
 	void ZoomAt(const wxPoint& anchor, double factor);
-	void PanByPixels(double dx, double dy);
+	void PanByPixels(const Vec2d delta);
 	void FitBounds(const ViewBounds& bounds);
 	void TryInitialFit();
 
 	double Snap(double value) const;
+	Vec2d Snap(const Vec2d uv) const;
 	double SnapAngle(double radians) const;
 
-	DynArray<int32> PickAt(double u, double v) const;
-	int PickFaceAt(double u, double v, int& out_face) const;
+	DynArray<int32> PickAt(const Vec2d uv) const;
+	int PickFaceAt(const Vec2d uv, int& out_face) const;
 	void UpdateHover();
-	bool PickVertexAt(double u, double v, TopViewVertexHandle& out_handle) const;
-	bool IsVertexSelected(uint32 object_id, double u, double v) const;
-	const TopViewBrush* FindBrush(uint32 object_id) const;
+	bool PickVertexAt(const Vec2d uv, TopViewVertexHandle& out_handle) const;
+	bool IsVertexSelected(ObjectID object_id, const Vec2d uv) const;
+	const TopViewBrush* FindBrush(ObjectID object_id) const;
 	ViewBounds GetSelectionBounds() const;
-	bool GetSelectionPivot(double& out_u, double& out_v) const;
+	bool GetSelectionPivot(Vec2d& out_pivot) const;
 	uint32 GetSelectedCount() const;
 
-	void SelectBrush(uint32 object_id, eTopViewSelectMode mode);
-	void SelectBrushes(DynArray<uint32> object_ids, eTopViewSelectMode mode);
+	void SelectBrush(ObjectID object_id, eTopViewSelectMode mode);
+	void SelectBrushes(DynArray<ObjectID> object_ids, eTopViewSelectMode mode);
 	void ApplyLocalSelection();
 	void SelectAll();
 	void InvertSelection();
 	void SendCommand(thread::Task command);
 
-	void NudgeSelection(double du, double dv);
+	void NudgeSelection(const Vec2d delta);
 	void SetSnapBypass(bool bypass);
 	void SetToolFromKey(eTopViewTool tool);
 	bool IsToolAvailable(eTopViewTool tool) const;
@@ -209,8 +239,11 @@ private:
 	eTopViewTool mTool = eTopViewTool::Select;
 	eViewPlane mPlane = eViewPlane::Top;
 
-	double mCenterU = 0.0;
-	double mCenterV = 0.0;
+	// double mCenterU = 0.0;
+	// double mCenterV = 0.0;
+
+	Vec2d mCenter { Vec2d::sZero };
+
 	double mScale = 24.0;
 	bool mbHasFitted = false;
 
@@ -220,12 +253,9 @@ private:
 
 	eDrag mDrag = eDrag::None;
 	wxPoint mPressScreen;
-	double mPressU = 0.0;
-	double mPressV = 0.0;
-	double mCurrentU = 0.0;
-	double mCurrentV = 0.0;
-	double mHoverU = 0.0;
-	double mHoverV = 0.0;
+	Vec2d mPress { Vec2d::sZero };
+	Vec2d mCurrent { Vec2d::sZero };
+	Vec2d mHover { Vec2d::sZero };
 	bool mbHovering = false;
 	bool mbDragMoved = false;
 	bool mbAdditive = false;
@@ -235,21 +265,19 @@ private:
 
 	double mPinchStartScale = 24.0;
 
-	double mPanStartCenterU = 0.0;
-	double mPanStartCenterV = 0.0;
+	Vec2d mPanStartCenter { Vec2d::sZero };
 
 	bool mbHasPressedBrush = false;
-	uint32 mPressedId = 0;
+	ObjectID mPressedId = ObjectID::scNull;
 	bool mbPressedWasSelected = false;
-	DynArray<uint32> mPressedHitIds;
+	DynArray<ObjectID> mPressedHitIds;
 	ViewBounds mDragBounds;
-	double mRotatePivotU = 0.0;
-	double mRotatePivotV = 0.0;
+	Vec2d mRotatePivot { Vec2d::sZero };
 	double mRotateStartAngle = 0.0;
 
 	wxPoint mLastClickScreen = wxPoint(-1000, -1000);
 
-	uint32 mGrabbedBrushId = 0;
+	ObjectID mGrabbedBrushId = ObjectID::scNull;
 	TopViewFace mGrabbedFace;
 	double mFaceBaseOffset = 0.0;
 
@@ -268,11 +296,13 @@ private:
 
 	uint32 mSentCommands = 0;
 	bool mbLocalSelection = false;
-	DynArray<uint32> mLocalSelection;
+	DynArray<ObjectID> mLocalSelection;
 
 	float32 mCreateBase[scViewPlaneCount] = {};
 	float32 mCreateSize[scViewPlaneCount] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
 	bool mbDropToGround = true;
+
+	ArchSettings mArch;
 
 	std::function<void(eTopViewTool)> mpOnToolChanged;
 	std::function<void(eViewPlane)> mpOnPlaneChanged;

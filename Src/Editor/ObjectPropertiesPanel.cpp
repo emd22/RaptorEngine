@@ -59,52 +59,48 @@ static int32 GetEnterDirectionIndex(const ObjectPanelState& state)
 	return scCustomEnterDirectionIndex;
 }
 
+template <typename TState>
 struct FlagName
 {
-	uint32 Bit;
+	TState Bit;
 	const char* pName;
 	const char* pHint;
 };
 
-static constexpr FlagName scTagNames[] = {
-	{ static_cast<uint32>(eObjectTag::Blockout), "Blockout", "Marks level geometry. Set when the brush is created" },
-	{ static_cast<uint32>(eObjectTag::LockTransform), "Lock Transform", nullptr },
-	{ static_cast<uint32>(eObjectTag::ProbeVolume), "Probe Volume", "Blockout brushes only" },
-	{ static_cast<uint32>(eObjectTag::ReflectionProbe), "Reflection Probe", "Blockout brushes only" },
-	{ static_cast<uint32>(eObjectTag::Spawn), "Spawn", nullptr },
-	{ static_cast<uint32>(eObjectTag::Trigger), "Trigger",
+static constexpr FlagName<eObjectTag> scTagNames[] = {
+	{ eObjectTag::Blockout, "Blockout", "Marks level geometry. Set when the brush is created" },
+	{ eObjectTag::LockTransform, "Lock Transform", nullptr },
+	{ eObjectTag::ProbeVolume, "Probe Volume", "Blockout brushes only" },
+	{ eObjectTag::ReflectionProbe, "Reflection Probe", "Blockout brushes only" },
+	{ eObjectTag::Spawn, "Spawn", nullptr },
+	{ eObjectTag::Trigger, "Trigger",
 	  "Blockout brushes only. Calls object_trigger_enter and object_trigger_exit in the object's script when the "
 	  "player enters and leaves it" },
-	{ static_cast<uint32>(eObjectTag::NvBrush), "nvbrush",
+	{ eObjectTag::NvBrush, "nvbrush",
 	  "Blockout brushes only. Collides but is never drawn. The map compiler keeps only its collider" },
-	{ static_cast<uint32>(eObjectTag::DBound), "dbound",
+	{ eObjectTag::DBound, "dbound",
 	  "Blockout brushes only. Seals the map for the map compiler: no faces, no collision" },
 };
 
-static constexpr FlagName scFlagNames[] = {
-	{ static_cast<uint32>(eObjectFlags::ReadyToRender), "Ready To Render",
-	  "Set by the renderer once the mesh and material have loaded" },
-	{ static_cast<uint32>(eObjectFlags::PhysicsEnabled), "Physics Enabled",
-	  "Blockout brushes: on is a dynamic body, off is static" },
-	{ static_cast<uint32>(eObjectFlags::IsInstance), "Is Instance", "Set for instances of another object" },
-	{ static_cast<uint32>(eObjectFlags::ShadowCaster), "Shadow Caster", "Probe volumes never cast shadows" },
-	{ static_cast<uint32>(eObjectFlags::Unlit), "Unlit",
+static constexpr FlagName<eObjectFlags> scFlagNames[] = {
+	{ eObjectFlags::ReadyToRender, "Ready To Render", "Set by the renderer once the mesh and material have loaded" },
+	{ eObjectFlags::PhysicsEnabled, "Physics Enabled", "Blockout brushes: on is a dynamic body, off is static" },
+	{ eObjectFlags::ShadowCaster, "Shadow Caster", "Probe volumes never cast shadows" },
+	{ eObjectFlags::Unlit, "Unlit",
 	  "Applied to the shared material when the object loads, so it can't be changed here" },
-	{ static_cast<uint32>(eObjectFlags::DisableCulling), "Disable Culling", nullptr },
-	{ static_cast<uint32>(eObjectFlags::NotProbeVisible), "Not Probe Visible",
-	  "Probe volumes are never visible to probes" },
+	{ eObjectFlags::DisableCulling, "Disable Culling", nullptr },
+	{ eObjectFlags::NotProbeVisible, "Not Probe Visible", "Probe volumes are never visible to probes" },
 };
 
-template <size_t TCount>
-static wxStaticBoxSizer*
-MakeFlagGroup(wxWindow* parent, const char* title, const FlagName (&names)[TCount],
-			  StackArray<ObjectPropertiesPanel::FlagRow, ObjectPropertiesPanel::scMaxRows>& out_rows)
+template <typename TState, size_t TCount>
+static wxStaticBoxSizer* MakeFlagGroup(wxWindow* parent, const char* title, const FlagName<TState> (&names)[TCount],
+									   ObjectPropertiesPanel::FlagRows<TState>& out_rows)
 {
 	static_assert(TCount <= ObjectPropertiesPanel::scMaxRows);
 
 	wxStaticBoxSizer* group = new wxStaticBoxSizer(wxVERTICAL, parent, title);
 
-	for (const FlagName& name : names) {
+	for (const FlagName<TState>& name : names) {
 		wxCheckBox* check_box = new wxCheckBox(group->GetStaticBox(), wxID_ANY, name.pName);
 
 		if (name.pHint != nullptr) {
@@ -112,7 +108,7 @@ MakeFlagGroup(wxWindow* parent, const char* title, const FlagName (&names)[TCoun
 		}
 
 		group->Add(check_box, wxSizerFlags().Border(wxALL, 2));
-		out_rows.Insert(ObjectPropertiesPanel::FlagRow { .Bit = name.Bit, .pCheckBox = check_box });
+		out_rows.Insert(ObjectPropertiesPanel::FlagRow<TState> { .Bit = name.Bit, .pCheckBox = check_box });
 	}
 
 	return group;
@@ -206,39 +202,41 @@ ObjectPropertiesPanel::ObjectPropertiesPanel(wxWindow* parent) : wxPanel(parent,
 	sizer->Add(MakeFlagGroup(this, "Tags", scTagNames, mTagRows), wxSizerFlags().Expand().Border(wxALL, 6));
 	sizer->Add(MakeFlagGroup(this, "Flags", scFlagNames, mFlagRows), wxSizerFlags().Expand().Border(wxALL, 6));
 
-	BindRows(mTagRows, true);
-	BindRows(mFlagRows, false);
+	BindRows(mTagRows);
+	BindRows(mFlagRows);
 
 	SetSizer(sizer);
 
 	ApplyState(ObjectPanelState {}, MaterialLibraryState {});
 }
 
-void ObjectPropertiesPanel::BindRows(StackArray<FlagRow, scMaxRows>& rows, bool is_tag)
+template <typename TState>
+void ObjectPropertiesPanel::BindRows(FlagRows<TState>& rows)
 {
-	for (FlagRow& row : rows) {
-		const uint32 bit = row.Bit;
+	for (FlagRow<TState>& row : rows) {
+		const TState bit = row.Bit;
 
-		row.pCheckBox->Bind(wxEVT_CHECKBOX, [this, is_tag, bit](wxCommandEvent& event)
-							{ OnRowToggled(is_tag, bit, event.IsChecked()); });
+		row.pCheckBox->Bind(wxEVT_CHECKBOX,
+							[this, bit](wxCommandEvent& event) { OnRowToggled(bit, event.IsChecked()); });
 	}
 }
 
-void ObjectPropertiesPanel::OnRowToggled(bool is_tag, uint32 bit, bool checked)
+template <typename TState>
+void ObjectPropertiesPanel::OnRowToggled(TState bit, bool checked)
 {
 	if (!mbHasObject) {
 		return;
 	}
 
-	thread::PostToGame([is_tag, bit, checked] { gEditor->SetSelectionObjectBit(is_tag, bit, checked); });
+	thread::PostToGame([bit, checked] { gEditor->SetSelectionObjectState(bit, checked); });
 }
 
-void ObjectPropertiesPanel::SetRows(StackArray<FlagRow, scMaxRows>& rows, uint32 value, uint32 editable,
-									bool has_object)
+template <typename TState>
+void ObjectPropertiesPanel::SetRows(FlagRows<TState>& rows, TState value, TState editable, bool has_object)
 {
-	for (FlagRow& row : rows) {
-		const bool checked = has_object && (value & row.Bit) != 0;
-		const bool can_edit = has_object && (editable & row.Bit) != 0;
+	for (FlagRow<TState>& row : rows) {
+		const bool checked = has_object && fx::HasFlag(value, row.Bit);
+		const bool can_edit = has_object && fx::HasFlag(editable, row.Bit);
 
 		if (row.pCheckBox->GetValue() != checked) {
 			row.pCheckBox->SetValue(checked);

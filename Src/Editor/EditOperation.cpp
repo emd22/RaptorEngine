@@ -29,13 +29,13 @@ static constexpr eObjectFlags scEditableFlags[] = {
 	eObjectFlags::NotProbeVisible,
 };
 
-bool CanEditObjectTag(const Object* object, uint32 tag_bit)
+bool CanEditObjectTag(const Object* object, eObjectTag tag)
 {
 	if (object == nullptr) {
 		return false;
 	}
 
-	switch (static_cast<eObjectTag>(tag_bit)) {
+	switch (tag) {
 	case eObjectTag::LockTransform:
 	case eObjectTag::Spawn:
 		return true;
@@ -50,6 +50,32 @@ bool CanEditObjectTag(const Object* object, uint32 tag_bit)
 	}
 }
 
+eObjectTag GetEditableTags(const Object* object)
+{
+	eObjectTag editable = eObjectTag::None;
+
+	for (const eObjectTag tag : scEditableTags) {
+		if (CanEditObjectTag(object, tag)) {
+			editable |= tag;
+		}
+	}
+
+	return editable;
+}
+
+eObjectFlags GetEditableFlags(const Object* object)
+{
+	eObjectFlags editable = eObjectFlags::None;
+
+	for (const eObjectFlags flag : scEditableFlags) {
+		if (CanEditObjectFlag(object, flag)) {
+			editable |= flag;
+		}
+	}
+
+	return editable;
+}
+
 bool CanAttachScript(const Object* object)
 {
 	if (object == nullptr || gWorld->pPrototype == nullptr) {
@@ -59,13 +85,13 @@ bool CanAttachScript(const Object* object)
 	return object->HasTags(eObjectTag::Blockout) || gWorld->pPrototype->IsModel(object);
 }
 
-bool CanEditObjectFlag(const Object* object, uint32 flag_bit)
+bool CanEditObjectFlag(const Object* object, eObjectFlags flag)
 {
 	if (object == nullptr) {
 		return false;
 	}
 
-	switch (static_cast<eObjectFlags>(flag_bit)) {
+	switch (flag) {
 	case eObjectFlags::DisableCulling:
 		return true;
 	case eObjectFlags::ShadowCaster:
@@ -172,11 +198,9 @@ static void SetObjectFlag(Object& object, eObjectFlags flag, bool enabled, bool 
 	}
 }
 
-static void ApplyTag(Object& object, uint32 tag_bit, bool enabled)
+static void ApplyTag(Object& object, eObjectTag tag, bool enabled)
 {
-	const eObjectTag tag = static_cast<eObjectTag>(tag_bit);
-
-	if (!CanEditObjectTag(&object, tag_bit) || object.HasTags(tag) == enabled) {
+	if (!CanEditObjectTag(&object, tag) || object.HasTags(tag) == enabled) {
 		return;
 	}
 
@@ -189,11 +213,9 @@ static void ApplyTag(Object& object, uint32 tag_bit, bool enabled)
 	}
 }
 
-static void ApplyFlag(Object& object, uint32 flag_bit, bool enabled)
+static void ApplyFlag(Object& object, eObjectFlags flag, bool enabled)
 {
-	const eObjectFlags flag = static_cast<eObjectFlags>(flag_bit);
-
-	if (!CanEditObjectFlag(&object, flag_bit) || HasFlag(object.GetFlags(), flag) == enabled) {
+	if (!CanEditObjectFlag(&object, flag) || HasFlag(object.GetFlags(), flag) == enabled) {
 		return;
 	}
 
@@ -495,16 +517,26 @@ void BoundsEditOperation::Undo(EditorSelection& selection)
 	}
 }
 
-ObjectStateEditOperation::ObjectStateEditOperation(Object* object, uint32 bit, bool is_tag, bool enabled,
-												   int32 group_size)
-	: ObjectEditOperation(object, group_size), mBit(bit), mbIsTag(is_tag), mbEnabled(enabled)
+ObjectStateEditOperation::ObjectStateEditOperation(Object* object, eObjectTag tag, bool enabled, int32 group_size)
+	: ObjectEditOperation(object, group_size), mTag(tag), mbEnabled(enabled)
 {
-	mTagsBefore = static_cast<uint32>(object->Tags);
-	mPositionBefore = object->GetPosition();
-	mRotationBefore = object->mRotation;
+	CaptureState(*object);
+}
 
-	ForEachNode(*object, [this](Object& node)
-				{ mNodesBefore.Insert(NodeFlags { .Id = node.ID, .Flags = static_cast<uint32>(node.GetFlags()) }); });
+ObjectStateEditOperation::ObjectStateEditOperation(Object* object, eObjectFlags flag, bool enabled, int32 group_size)
+	: ObjectEditOperation(object, group_size), mFlag(flag), mbEnabled(enabled)
+{
+	CaptureState(*object);
+}
+
+void ObjectStateEditOperation::CaptureState(Object& object)
+{
+	mTagsBefore = object.Tags;
+	mPositionBefore = object.GetPosition();
+	mRotationBefore = object.mRotation;
+
+	ForEachNode(object,
+				[this](Object& node) { mNodesBefore.Insert(NodeFlags { .Id = node.ID, .Flags = node.GetFlags() }); });
 }
 
 void ObjectStateEditOperation::Execute(EditorSelection& selection)
@@ -514,11 +546,11 @@ void ObjectStateEditOperation::Execute(EditorSelection& selection)
 		return;
 	}
 
-	if (mbIsTag) {
-		ApplyTag(*target, mBit, mbEnabled);
+	if (mTag != eObjectTag::None) {
+		ApplyTag(*target, mTag, mbEnabled);
 	}
 	else {
-		ApplyFlag(*target, mBit, mbEnabled);
+		ApplyFlag(*target, mFlag, mbEnabled);
 	}
 }
 
@@ -532,9 +564,7 @@ void ObjectStateEditOperation::Undo(EditorSelection& selection)
 void ObjectStateEditOperation::RestoreState(Object& root) const
 {
 	for (const eObjectTag tag : scEditableTags) {
-		const uint32 tag_bit = static_cast<uint32>(tag);
-
-		ApplyTag(root, tag_bit, (mTagsBefore & tag_bit) != 0);
+		ApplyTag(root, tag, HasFlag(mTagsBefore, tag));
 	}
 
 	for (const NodeFlags& saved : mNodesBefore) {
@@ -545,10 +575,9 @@ void ObjectStateEditOperation::RestoreState(Object& root) const
 		}
 
 		for (const eObjectFlags flag : scEditableFlags) {
-			const uint32 flag_bit = static_cast<uint32>(flag);
-			const bool wanted = (saved.Flags & flag_bit) != 0;
+			const bool wanted = HasFlag(saved.Flags, flag);
 
-			if (CanEditObjectFlag(node, flag_bit) && HasFlag(node->GetFlags(), flag) != wanted) {
+			if (CanEditObjectFlag(node, flag) && HasFlag(node->GetFlags(), flag) != wanted) {
 				if (flag == eObjectFlags::PhysicsEnabled && node == &root) {
 					node->SetPosition(mPositionBefore);
 					node->SetRotation(mRotationBefore);
