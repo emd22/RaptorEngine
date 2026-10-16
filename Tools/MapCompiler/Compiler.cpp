@@ -74,7 +74,18 @@ void AddHulls(const MapSource& source, CompiledMap& map)
 		hull_count += brush.bCollides ? 1 : 0;
 	}
 
-	map.BrushNames.InitCapacity(source.Brushes.Size);
+	map.BrushNames.InitCapacity(source.Brushes.Size + source.Patches.Size);
+
+	for (uint32 index = 0; index < source.Patches.Size; index++) {
+		const SourcePatch& patch = source.Patches[index];
+
+		if (index > 0 && source.Patches[index - 1].Name == patch.Name) {
+			continue;
+		}
+
+		map.BrushNames.Emplace(patch.Name);
+	}
+
 	map.Hulls.InitCapacity(hull_count);
 
 	Array<float32> points;
@@ -136,11 +147,11 @@ bool WriteObj(const String& path, const CompiledMap& map)
 															 : material.Name;
 
 		// std::fprintf(file, "o surface_%zu\nusemtl %s\n", i, material_name.CStr());
-		file.Write(String::Fmt("o surface_%zu\nusemtl %s\n", i, material_name));
+		file.Write(String::Fmt("o surface_{}\nusemtl {}\n", i, material_name));
 
 		for (const CompiledMapVertex& vertex : surface.Vertices) {
 			// std::fprintf(file, "v %.6f %.6f %.6f\n", vertex.Position[0], vertex.Position[1], vertex.Position[2]);
-			file.Write(String::Fmt("v {}\n", vertex.Position));
+			file.Write(String::Fmt("v {} {} {}\n", vertex.Position.X, vertex.Position.Y, vertex.Position.Z));
 		}
 
 		for (const CompiledMapVertex& vertex : surface.Vertices) {
@@ -150,7 +161,7 @@ bool WriteObj(const String& path, const CompiledMap& map)
 
 		for (const CompiledMapVertex& vertex : surface.Vertices) {
 			// std::fprintf(file, "vn %.6f %.6f %.6f\n", vertex.Normal[0], vertex.Normal[1], vertex.Normal[2]);
-			file.Write(String::Fmt("vn {} {} {}\n", vertex.Normal));
+			file.Write(String::Fmt("vn {} {} {}\n", vertex.Normal.X, vertex.Normal.Y, vertex.Normal.Z));
 		}
 
 		for (size_t index = 0; index + 2 < surface.Indices.Size; index += 3) {
@@ -237,6 +248,7 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 		source.Brushes.Size, source.ClipBrushCount, source.BoundBrushCount, source.TransparentBrushCount,
 		source.EntityBrushCount, source.InvalidBrushCount));
 
+
 	CompiledMap map;
 	map.SourceHash = HashPrototypeFile(String(input_path.string()));
 
@@ -247,6 +259,7 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 	Bsp bsp;
 	FloodResult flood;
 	SurfaceBuilder surfaces;
+	PatchBuilder patches;
 
 	bool sealed = false;
 
@@ -289,10 +302,13 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 		SurfaceOptions surface_options = options.Surface;
 		surface_options.bMakeLightmapCharts = options.Lightmap.bEnabled && source.bHasSun;
 
-		surfaces.Build(planes, bsp, source, sealed, surface_options, map);
+		patches.Build(source, bsp, sealed, surface_options.bCullHidden);
+
+		surfaces.Build(planes, bsp, source, sealed, surface_options, &patches, map);
 		map.bSealed = sealed;
 
 		AddHulls(source, map);
+		patches.WriteCollision(surface_options.ChunkSize, map);
 	}
 
 	if (options.bPlaceProbes && !source.ProbeBoxes.IsEmpty()) {
@@ -316,7 +332,7 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 
 	LightmapBaker lightmap;
 
-	result.bHasLightmap = lightmap.Bake(planes, source, surfaces, options.Lightmap, map);
+	result.bHasLightmap = lightmap.Bake(planes, source, surfaces, &patches, options.Lightmap, map);
 	result.Lightmap = lightmap.Stats;
 
 	const String leak_path = ReplaceExtension(result.OutputPath, ".leak");
@@ -371,7 +387,17 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 					stats.NumVertices, map.Surfaces.Size));
 	log(String::Fmt("  area         {:.1f} -> {:.1f} m2 ({:+.1f}%)", stats.SourceArea, stats.Area,
 					-GetPercentRemoved(stats.SourceArea, stats.Area)));
-	log(String::Fmt("  collision    {} hulls", map.Hulls.Size));
+	if (source.Patches.Size > 0) {
+		const PatchStats& patch_stats = patches.Stats;
+
+		log(String::Fmt("  patches      {} patches, {} triangles ({} buried or facing the void removed), {} vertices "
+						"smoothed across seams, {} T-junctions fixed",
+						patch_stats.PatchCount, patch_stats.Triangles, patch_stats.CulledTriangles,
+						patch_stats.SmoothedVertices, patch_stats.TJunctionsFixed));
+	}
+
+	log(String::Fmt("  collision    {} hulls, {} triangle meshes ({} triangles)", map.Hulls.Size,
+					map.CollisionMeshes.Size, patches.Stats.CollisionTriangles));
 
 	if (map.HasProbeLayout()) {
 		log(String::Fmt("  probes       {} of {} in {} volumes ({} from probe volume brushes), {} grid points, {} left "
@@ -398,6 +424,10 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 						"against {} brushes",
 						baked.Width, baked.Height, baked.ChartCount, baked.Density, baked.LitFraction * 100.0,
 						baked.TexelCount, baked.RayCount, baked.OccluderCount));
+
+		if (baked.OccluderTriangleCount > 0) {
+			log(String::Fmt("  lightmap     {} patch triangles also cast shadows", baked.OccluderTriangleCount));
+		}
 
 		if (baked.Density < options.Lightmap.Density) {
 			log(String::Fmt("  warning      the lightmap did not fit in {}x{} at {:.1f} texels per metre, so it was "
@@ -432,7 +462,7 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 
 	if (options.VerifyRays > 0 && source.Brushes.Size != 0) {
 		const VerifyResult verify = VerifyTriangles(planes, bsp, source, sealed, surfaces.TrianglePoints,
-													options.VerifyRays);
+													patches.ReferencePoints, options.VerifyRays);
 
 		log(String::Fmt("  verify       {} rays, {} hit geometry, {} missing, {} extra, largest error {:.2e}",
 						verify.RayCount, verify.HitCount, verify.MissingCount, verify.ExtraCount, verify.LargestError));
@@ -444,8 +474,8 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 	}
 
 	if (options.VerifyRays > 0 && result.bHasLightmap) {
-		const LightmapVerifyResult verify = VerifyLightmap(planes, source, map, lightmap.Stats.Density,
-														   options.VerifyRays);
+		const LightmapVerifyResult verify = VerifyLightmap(planes, source, map, patches.ReferencePoints,
+														   lightmap.Stats.Density, options.VerifyRays);
 
 		log(String::Fmt("  verify       {} lightmap points, {} lit, {} skipped beside a shadow edge, {} wrong",
 						verify.PointCount, verify.LitCount, verify.EdgeCount, verify.WrongCount));

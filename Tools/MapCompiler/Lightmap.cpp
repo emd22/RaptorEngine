@@ -20,6 +20,7 @@ constexpr double scMinDensity = 0.25;
 constexpr double scSizeEpsilon = 1e-6;
 constexpr double scSurfaceBias = 1e-3;
 constexpr double scParallelEpsilon = 1e-14;
+constexpr double scTriangleMinDistance = 1e-6;
 constexpr double scCoverageEpsilon = 1e-9;
 constexpr double scTwoPi = 6.283185307179586;
 constexpr double scNoHit = std::numeric_limits<double>::infinity();
@@ -41,6 +42,8 @@ struct Occluder
 	uint32 FirstPlane = 0;
 	uint32 PlaneCount = 0;
 
+	int32 FirstCorner = -1;
+
 	Vec3d Min = Vec3d(0.0);
 	Vec3d Max = Vec3d(0.0);
 };
@@ -60,7 +63,7 @@ struct BvhNode
 class OccluderSet
 {
 public:
-	void Build(const PlaneSet& planes, const MapSource& source)
+	void Build(const PlaneSet& planes, const MapSource& source, const PatchBuilder* patches)
 	{
 		for (const SourceBrush& brush : source.Brushes) {
 			if (!brush.bVisible || !brush.bCastsShadow) {
@@ -81,12 +84,44 @@ public:
 			mOccluders.Emplace(occluder);
 		}
 
+		if (patches != nullptr) {
+			for (const PatchSurface& surface : patches->Surfaces) {
+				if (!surface.bCastsShadow) {
+					continue;
+				}
+
+				for (size_t index = 0; index + 2 < surface.Indices.Size; index += 3) {
+					Occluder occluder;
+					occluder.FirstCorner = static_cast<int32>(mCorners.Size);
+
+					for (uint32 corner = 0; corner < 3; corner++) {
+						const Vec3d& point = surface.Vertices[static_cast<size_t>(surface.Indices[index + corner])]
+												 .Position;
+
+						mCorners.Emplace(point);
+
+						if (corner == 0) {
+							occluder.Min = point;
+							occluder.Max = point;
+						}
+
+						occluder.Min = MinVec(occluder.Min, point);
+						occluder.Max = MaxVec(occluder.Max, point);
+					}
+
+					mOccluders.Emplace(occluder);
+					mTriangleCount++;
+				}
+			}
+		}
+
 		if (mOccluders.Size > 0) {
 			BuildNode(0, mOccluders.Size);
 		}
 	}
 
-	uint32 GetCount() const { return mOccluders.Size; }
+	uint32 GetCount() const { return mOccluders.Size - mTriangleCount; }
+	uint32 GetTriangleCount() const { return mTriangleCount; }
 
 	bool IsOccluded(const Vec3d& origin, const Vec3d& direction) const
 	{
@@ -153,8 +188,43 @@ private:
 		return enter <= exit;
 	}
 
+	bool HitsTriangle(const Occluder& occluder, const Vec3d& origin, const Vec3d& direction) const
+	{
+		const Vec3d& a = mCorners[static_cast<uint32>(occluder.FirstCorner)];
+		const Vec3d edge_ab = mCorners[static_cast<uint32>(occluder.FirstCorner) + 1] - a;
+		const Vec3d edge_ac = mCorners[static_cast<uint32>(occluder.FirstCorner) + 2] - a;
+
+		const Vec3d p = direction.Cross(edge_ac);
+		const double determinant = edge_ab.Dot(p);
+
+		if (std::abs(determinant) < scParallelEpsilon) {
+			return false;
+		}
+
+		const double inverse = 1.0 / determinant;
+		const Vec3d offset = origin - a;
+		const double u = offset.Dot(p) * inverse;
+
+		if (u < 0.0 || u > 1.0) {
+			return false;
+		}
+
+		const Vec3d q = offset.Cross(edge_ab);
+		const double v = direction.Dot(q) * inverse;
+
+		if (v < 0.0 || u + v > 1.0) {
+			return false;
+		}
+
+		return edge_ac.Dot(q) * inverse > scTriangleMinDistance;
+	}
+
 	bool HitsOccluder(const Occluder& occluder, const Vec3d& origin, const Vec3d& direction) const
 	{
+		if (occluder.FirstCorner >= 0) {
+			return HitsTriangle(occluder, origin, direction);
+		}
+
 		double enter = 0.0;
 		double exit = scNoHit;
 
@@ -248,8 +318,10 @@ private:
 
 private:
 	Array<OccluderPlane> mPlanes;
+	Array<Vec3d> mCorners;
 	Array<Occluder> mOccluders;
 	Array<BvhNode> mNodes;
+	uint32 mTriangleCount = 0;
 };
 
 struct SunSampler
@@ -484,10 +556,13 @@ bool IsInsideTriangle(const Vec2d corners[3], double x, double y)
 struct RowScratch
 {
 	Array<uint8> Coverage;
+	Array<int32> CoverageTriangles;
 	Array<Vec2d> Corners;
+	Array<int32> CornerTriangles;
 };
 
-bool FindPointInTexel(const Array<Vec2d>& corners, double center_x, double center_y, Vec2d& out_point)
+bool FindPointInTexel(const Array<Vec2d>& corners, double center_x, double center_y, Vec2d& out_point,
+					  uint32& out_corner)
 {
 	const Vec2d center(center_x, center_y);
 
@@ -503,6 +578,7 @@ bool FindPointInTexel(const Array<Vec2d>& corners, double center_x, double cente
 			if (distance < best_distance) {
 				best_distance = distance;
 				out_point = closest;
+				out_corner = triangle;
 			}
 		}
 	}
@@ -510,11 +586,67 @@ bool FindPointInTexel(const Array<Vec2d>& corners, double center_x, double cente
 	return best_distance <= 0.5;
 }
 
+struct SurfacePoint
+{
+	Vec3d Position = Vec3d(0.0);
+	Vec3d Normal = Vec3d(0.0);
+};
+
+SurfacePoint InterpolateChart(const LightmapChart& chart, const Vec2d texel_corners[3], uint32 first_corner, double x,
+							  double y)
+{
+	const auto signed_area = [](const Vec2d& a, const Vec2d& b, double px, double py)
+	{ return (b.X - a.X) * (py - a.Y) - (b.Y - a.Y) * (px - a.X); };
+
+	const double total = signed_area(texel_corners[0], texel_corners[1], texel_corners[2].X, texel_corners[2].Y);
+
+	double weights[3] = { 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0 };
+
+	if (std::abs(total) > scCoverageEpsilon) {
+		weights[0] = signed_area(texel_corners[1], texel_corners[2], x, y) / total;
+		weights[1] = signed_area(texel_corners[2], texel_corners[0], x, y) / total;
+		weights[2] = 1.0 - weights[0] - weights[1];
+
+		double sum = 0.0;
+
+		for (double& weight : weights) {
+			weight = std::fmax(weight, 0.0);
+			sum += weight;
+		}
+
+		for (double& weight : weights) {
+			weight /= sum;
+		}
+	}
+
+	SurfacePoint point;
+	Vec3d normal = Vec3d(0.0);
+
+	for (uint32 corner = 0; corner < 3; corner++) {
+		point.Position = point.Position + chart.WorldPoints[first_corner + corner] * weights[corner];
+		normal = normal + chart.Normals[first_corner + corner] * weights[corner];
+	}
+
+	point.Normal = normal.Normalized();
+
+	return point;
+}
+
 void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 {
 	const LightmapChart& chart = context.Charts[job.Chart];
 	const ChartLayout& layout = context.Layouts[job.Chart];
-	const Plane& plane = context.Planes[chart.PlaneIndex];
+	const bool is_planar = chart.IsPlanar();
+
+	Vec3d plane_normal = Vec3d(0.0);
+	Vec3d plane_origin = Vec3d(0.0);
+
+	if (is_planar) {
+		const Plane& plane = context.Planes[chart.PlaneIndex];
+
+		plane_normal = plane.Normal;
+		plane_origin = plane.Normal * (plane.Distance + scSurfaceBias);
+	}
 
 	const uint32 samples = context.Samples;
 	const uint32 padded_width = layout.GetPaddedWidth();
@@ -526,7 +658,9 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 	Array<uint8>& coverage = scratch.Coverage;
 
 	Fill(coverage, sample_columns * samples, static_cast<uint8>(0));
+	Fill(scratch.CoverageTriangles, sample_columns * samples, -1);
 	scratch.Corners.Clear();
+	scratch.CornerTriangles.Clear();
 
 	const double row_min = static_cast<double>(job.Row);
 	const double row_max = row_min + 1.0;
@@ -554,6 +688,8 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 			scratch.Corners.Emplace(corner);
 		}
 
+		scratch.CornerTriangles.Emplace(static_cast<int32>(triangle));
+
 		const int64 first_column = std::max<int64>(0, static_cast<int64>(std::floor(min_x * samples - 0.5)));
 		const int64 last_column = std::min<int64>(static_cast<int64>(sample_columns) - 1,
 												  static_cast<int64>(std::ceil(max_x * samples - 0.5)));
@@ -570,12 +706,13 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 
 				if (IsInsideTriangle(corners, x, y)) {
 					coverage[sample_row * sample_columns + static_cast<uint32>(column)] = 1;
+					scratch.CoverageTriangles[sample_row * sample_columns + static_cast<uint32>(column)] =
+						static_cast<int32>(triangle);
 				}
 			}
 		}
 	}
 
-	const Vec3d plane_origin = plane.Normal * (plane.Distance + scSurfaceBias);
 	const uint32 sample_count = samples * samples;
 
 	uint64 ray_count = 0;
@@ -590,14 +727,35 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 
 	const uint32 direction_count = context.DirectionsPerSample;
 
-	const auto count_lit = [&](const Vec3d& origin, uint32 sample)
+	const auto texel_corners = [&](uint32 first_corner, Vec2d out_corners[3])
+	{
+		for (uint32 corner = 0; corner < 3; corner++) {
+			const Vec2d& point = chart.TrianglePoints[first_corner + corner];
+
+			out_corners[corner] = Vec2d((point.X - layout.Min.X) * density + scChartPadding,
+										(point.Y - layout.Min.Y) * density + scChartPadding);
+		}
+	};
+
+	const auto get_surface = [&](double texel_x, double texel_y, uint32 first_corner)
+	{
+		Vec2d corners[3];
+		texel_corners(first_corner, corners);
+
+		SurfacePoint point = InterpolateChart(chart, corners, first_corner, texel_x, texel_y);
+		point.Position = point.Position + point.Normal * scSurfaceBias;
+
+		return point;
+	};
+
+	const auto count_lit = [&](const Vec3d& origin, const Vec3d& normal, uint32 sample)
 	{
 		const Vec3d* directions = context.pDirections + sample * direction_count;
 
 		uint32 lit_count = 0;
 
 		for (uint32 i = 0; i < direction_count; i++) {
-			if (plane.Normal.Dot(directions[i]) > 0.0 && !context.Occluders.IsOccluded(origin, directions[i])) {
+			if (normal.Dot(directions[i]) > 0.0 && !context.Occluders.IsOccluded(origin, directions[i])) {
 				lit_count++;
 			}
 		}
@@ -625,22 +783,47 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 
 			covered += direction_count;
 
-			if (layout.bFacesSun) {
-				lit += count_lit(
-					get_origin(column + (sample_x + 0.5) * sample_step, job.Row + (sample_y + 0.5) * sample_step),
-					sample);
+			if (!layout.bFacesSun) {
+				continue;
+			}
+
+			const double texel_x = column + (sample_x + 0.5) * sample_step;
+			const double texel_y = job.Row + (sample_y + 0.5) * sample_step;
+
+			if (is_planar) {
+				lit += count_lit(get_origin(texel_x, texel_y), plane_normal, sample);
+			}
+			else {
+				const int32 triangle = scratch
+										   .CoverageTriangles[sample_y * sample_columns + column * samples + sample_x];
+				const SurfacePoint point = get_surface(texel_x, texel_y, static_cast<uint32>(triangle));
+
+				lit += count_lit(point.Position, point.Normal, sample);
 			}
 		}
 
 		Vec2d thin_point(0.0, 0.0);
+		uint32 thin_corner = 0;
 
-		if (covered == 0 && FindPointInTexel(scratch.Corners, column + 0.5, job.Row + 0.5, thin_point)) {
+		if (covered == 0 && FindPointInTexel(scratch.Corners, column + 0.5, job.Row + 0.5, thin_point, thin_corner)) {
 			covered = sample_count * direction_count;
 
-			const Vec3d origin = get_origin(thin_point.X, thin_point.Y);
+			Vec3d origin = Vec3d(0.0);
+			Vec3d normal = plane_normal;
+
+			if (is_planar) {
+				origin = get_origin(thin_point.X, thin_point.Y);
+			}
+			else {
+				const uint32 triangle = static_cast<uint32>(scratch.CornerTriangles[thin_corner / 3]);
+				const SurfacePoint point = get_surface(thin_point.X, thin_point.Y, triangle);
+
+				origin = point.Position;
+				normal = point.Normal;
+			}
 
 			for (uint32 sample = 0; sample < sample_count && layout.bFacesSun; sample++) {
-				lit += count_lit(origin, sample);
+				lit += count_lit(origin, normal, sample);
 			}
 		}
 
@@ -738,7 +921,7 @@ bool WriteImage(const String& path, const CompiledMapLightmap& lightmap)
 } // namespace
 
 bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const SurfaceBuilder& surfaces,
-						 const LightmapOptions& options, CompiledMap& out_map)
+						 const PatchBuilder* patches, const LightmapOptions& options, CompiledMap& out_map)
 {
 	Stats = LightmapStats {};
 
@@ -759,14 +942,21 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 	}
 
 	OccluderSet occluders;
-	occluders.Build(planes, source);
+	occluders.Build(planes, source, patches);
 
 	const SunSampler sun(source.SunDirection, options.SunRadiusDegrees);
 
 	Array<RowJob> jobs;
 
 	for (uint32 i = 0; i < charts.Size; i++) {
-		layouts[i].bFacesSun = planes[charts[i].PlaneIndex].Normal.Dot(source.SunDirection) > 0.0;
+		if (charts[i].IsPlanar()) {
+			layouts[i].bFacesSun = planes[charts[i].PlaneIndex].Normal.Dot(source.SunDirection) > 0.0;
+		}
+		else {
+			for (const Vec3d& normal : charts[i].Normals) {
+				layouts[i].bFacesSun = layouts[i].bFacesSun || normal.Dot(source.SunDirection) > 0.0;
+			}
+		}
 
 		for (uint32 row = 0; row < layouts[i].GetPaddedHeight(); row++) {
 			jobs.Emplace(RowJob { i, row });
@@ -866,6 +1056,16 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 		CompiledMapSurface& surface = out_map.Surfaces[surface_index];
 		const Array<LightmapVertex>& vertices = surfaces.LightmapVertices[static_cast<uint32>(surface_index)];
 
+		bool has_charts = vertices.Size == surface.Vertices.Size;
+
+		for (const LightmapVertex& vertex : vertices) {
+			has_charts = has_charts && vertex.Chart >= 0;
+		}
+
+		if (!has_charts) {
+			continue;
+		}
+
 		surface.LightmapTexcoords.InitSize(surface.Vertices.Size * 2);
 
 		for (uint32 i = 0; i < vertices.Size; i++) {
@@ -908,6 +1108,7 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 	Stats.Height = height;
 	Stats.ChartCount = charts.Size;
 	Stats.OccluderCount = occluders.GetCount();
+	Stats.OccluderTriangleCount = occluders.GetTriangleCount();
 	Stats.Density = density;
 	Stats.TexelCount = valid_count;
 	Stats.RayCount = context.RayCount.load() + static_cast<uint64>(probe_count) * probe_rays;

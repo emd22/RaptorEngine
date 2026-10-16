@@ -22,7 +22,6 @@
 #include <Math/MathConsts.hpp>
 #include <Math/Quat.hpp>
 #include <Math/Vec2.hpp>
-#include <Math/Vec3d.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/Light.hpp>
@@ -58,8 +57,6 @@ constexpr float32 scDBoundThickness = 1.0f;
 constexpr uint32 scDBoundSideCount = 6;
 constexpr float32 scDecalDepth = 0.5f;
 constexpr float32 scDecalRayReach = 1000.0f;
-constexpr double scBendOverlap = 1e-4;
-constexpr double scBendPointMergeSq = 1e-10;
 
 Vec2f Project(const Vec3f& vector, const ViewPlaneAxes& axes)
 {
@@ -151,6 +148,10 @@ Segment MakeSegment(const Vec2f& a, const Vec2f& b)
 
 eTopViewBrushKind GetBrushKind(const Object& object)
 {
+	if (object.IsPatch()) {
+		return eTopViewBrushKind::Patch;
+	}
+
 	if (object.IsReflectionProbe()) {
 		return eTopViewBrushKind::ReflectionProbe;
 	}
@@ -255,53 +256,6 @@ void GatherBrushSources(Blockout& blockout, std::vector<BrushSource>& out_source
 			.Kind = eTopViewBrushKind::Geometry,
 		});
 	}
-}
-
-void ClipToHalfSpace(DoublingArray<Vec3d>& points, DoublingArray<Vec3d>& scratch, const Vec3d& normal, double limit)
-{
-	scratch.Clear();
-
-	for (uint32 i = 0; i < points.Size; i++) {
-		const Vec3d& current = points[i];
-		const Vec3d& next = points[(i + 1) % points.Size];
-
-		const double current_side = normal.Dot(current) - limit;
-		const double next_side = normal.Dot(next) - limit;
-
-		if (current_side <= 0.0) {
-			scratch.Insert(current);
-		}
-
-		if ((current_side <= 0.0) != (next_side <= 0.0)) {
-			const double t = current_side / (current_side - next_side);
-
-			scratch.Insert(current + (next - current) * t);
-		}
-	}
-
-	std::swap(points, scratch);
-}
-
-void InsertUniquePoint(DoublingArray<Vec3d>& points, const Vec3d& point)
-{
-	for (const Vec3d& existing : points) {
-		const Vec3d delta = existing - point;
-
-		if (delta.Dot(delta) < scBendPointMergeSq) {
-			return;
-		}
-	}
-
-	points.Insert(point);
-}
-
-Vec3d BendWorldPoint(const BendFrame& frame, const Vec3d& along_axis, const Vec3d& across_axis, const Vec3d& point)
-{
-	const double along = along_axis.Dot(point);
-	const double across = across_axis.Dot(point);
-	const Vec2d bent = BendCoordinates(frame, along, across);
-
-	return point + along_axis * (bent.X - along) + across_axis * (bent.Y - across);
 }
 
 Vec3f DepthAxisVector(const eViewPlane plane, const float32 value)
@@ -718,6 +672,157 @@ TopViewState RaptorEditor::BuildTopViewState()
 		}
 	}
 
+	struct PatchGrid
+	{
+		uint32 Base = 0;
+		uint32 Columns = 0;
+		uint32 Rows = 0;
+	};
+
+	PatchMesh patch_mesh;
+	DoublingArray<Vec3f> control_points;
+	DoublingArray<PatchGrid> grids;
+
+	for (ObjectID id : blockout->BlockoutObjects) {
+		Object* object = gObjectManager->GetObject(id);
+		const Patch* patch = blockout->GetPatch(object);
+
+		if (patch == nullptr) {
+			continue;
+		}
+
+		if (object->bHiddenInTopView) {
+			view.HiddenCount++;
+			continue;
+		}
+
+		const Mat4f world = object->GetWorldMatrix();
+
+		Patch pieces[Patch::scMaxClosurePieces];
+		const uint32 piece_count = patch->BuildClosure(pieces);
+
+		corners.Clear();
+		grids.Clear();
+
+		for (uint32 piece = 0; piece <= piece_count; piece++) {
+			const Patch* shape = patch;
+
+			if (piece > 0) {
+				shape = &pieces[piece - 1];
+			}
+
+			Patch grid = shape->Clone();
+			grid.bSmooth = true;
+			grid.Tessellate(patch_mesh);
+
+			if (patch_mesh.Vertices.IsEmpty()) {
+				continue;
+			}
+
+			grids.Insert(PatchGrid {
+				.Base = static_cast<uint32>(corners.Size),
+				.Columns = patch_mesh.Columns,
+				.Rows = patch_mesh.Rows,
+			});
+
+			for (const PatchVertex& vertex : patch_mesh.Vertices) {
+				const Vec4f point = world * Vec4f(static_cast<float32>(vertex.Position.X),
+												  static_cast<float32>(vertex.Position.Y),
+												  static_cast<float32>(vertex.Position.Z), 1.0f);
+				corners.Insert(Vec3f(point.X, point.Y, point.Z));
+			}
+		}
+
+		if (grids.IsEmpty()) {
+			continue;
+		}
+
+		TopViewBrush& out = view.Brushes.Emplace();
+
+		out.ObjectId = object->ID;
+		out.Kind = eTopViewBrushKind::Patch;
+		out.bSelected = mSelection.Contains(object);
+		out.bSelectable = IsObjectSelectable(object);
+		out.PatchWidth = static_cast<uint16>(patch->Width);
+		out.PatchHeight = static_cast<uint16>(patch->Height);
+		out.PatchSubdivisionsU = static_cast<uint16>(patch->SubdivisionsU);
+		out.PatchSubdivisionsV = static_cast<uint16>(patch->SubdivisionsV);
+		out.bPatchSmooth = patch->bSmooth;
+		out.PatchClosure = patch->Closure;
+		out.PatchThickness = patch->Thickness;
+
+		control_points.Clear();
+
+		for (const PatchPoint& point : patch->Points) {
+			const Vec4f moved = world * Vec4f(point.Position.X, point.Position.Y, point.Position.Z, 1.0f);
+			control_points.Insert(Vec3f(moved.X, moved.Y, moved.Z));
+		}
+
+		const Vec3f pivot = object->GetPosition() + patch->GetCenter();
+
+		for (uint32 plane_index = 0; plane_index < scViewPlaneCount; plane_index++) {
+			const ViewPlaneAxes& axes = scViewPlaneAxes[plane_index];
+			TopViewProjection& projection = out.Views[plane_index];
+
+			projection.Pivot = Project(pivot, axes);
+
+			for (const Vec3f& control_point : control_points) {
+				projection.ControlPoints.Insert(Project(control_point, axes));
+			}
+
+			projected.Clear();
+
+			float32 near_depth = -FLT_MAX;
+
+			for (const Vec3f& corner : corners) {
+				projected.Insert(Project(corner, axes));
+				near_depth = std::max(near_depth, axes.DepthSign * GetAxis(corner, axes.W));
+			}
+
+			projection.NearDepth = near_depth;
+
+			segments.Clear();
+
+			const auto add_edge = [&](uint32 from, uint32 to)
+			{
+				const Vec2f a = projected[from];
+				const Vec2f b = projected[to];
+
+				if ((b - a).LengthSquared() >= scMinSegmentLengthSq) {
+					segments.Insert(MakeSegment(a, b));
+				}
+			};
+
+			for (const PatchGrid& grid : grids) {
+				const uint32 columns = grid.Columns;
+
+				for (uint32 row = 0; row < grid.Rows; row++) {
+					for (uint32 column = 0; column + 1 < columns; column++) {
+						add_edge(grid.Base + row * columns + column, grid.Base + row * columns + column + 1);
+					}
+				}
+
+				for (uint32 column = 0; column < columns; column++) {
+					for (uint32 row = 0; row + 1 < grid.Rows; row++) {
+						add_edge(grid.Base + row * columns + column, grid.Base + (row + 1) * columns + column);
+					}
+				}
+			}
+
+			std::sort(segments.begin(), segments.end(), IsSegmentKeyLess);
+
+			const Segment* const unique_end = std::unique(segments.begin(), segments.end(), IsSegmentKeyEqual);
+
+			for (const Segment* segment = segments.begin(); segment != unique_end; segment++) {
+				projection.Edges.Insert(TopViewEdge { .A = segment->A, .B = segment->B });
+			}
+
+			ConvexHull(projected, hull);
+
+			projection.Hull.Assign(hull.pData, hull.Size);
+		}
+	}
+
 	return view;
 }
 
@@ -774,7 +879,8 @@ Object* RaptorEditor::FindTopViewObject(ObjectID object_id)
 		return object;
 	}
 
-	if (!object->HasTags(eObjectTag::Blockout) || blockout->GetBrush(object) == nullptr) {
+	if (!object->HasTags(eObjectTag::Blockout) ||
+		(blockout->GetBrush(object) == nullptr && blockout->GetPatch(object) == nullptr)) {
 		return nullptr;
 	}
 
@@ -792,7 +898,8 @@ uint32 RaptorEditor::CollectTopViewTargets(Object** out_targets)
 			continue;
 		}
 
-		if (gWorld->pPrototype->GetBrush(object) == nullptr && !gWorld->pPrototype->IsSubviewObject(object)) {
+		if (gWorld->pPrototype->GetBrush(object) == nullptr && gWorld->pPrototype->GetPatch(object) == nullptr &&
+			!gWorld->pPrototype->IsSubviewObject(object)) {
 			continue;
 		}
 
@@ -879,12 +986,12 @@ void RaptorEditor::TopViewRotate(const Vec3f axis, float32 angle, const Vec3f pi
 
 	for (uint32 i = 0; i < count; i++) {
 		Object* object = targets[i];
-		const Brush* brush = gWorld->pPrototype->GetBrush(object);
 
 		Vec3f center = object->GetPosition();
+		Vec3f local_center;
 
-		if (brush != nullptr) {
-			center = center + brush->GetCenter();
+		if (gWorld->pPrototype->GetLocalCenter(object, local_center)) {
+			center = center + local_center;
 		}
 
 		const Vec3f new_center = pivot + (center - pivot).Rotate(rotation);
@@ -933,6 +1040,11 @@ void RaptorEditor::TopViewMoveFace(const Vec3f world_normal, float32 distance)
 		}
 
 		const Brush* brush = gWorld->pPrototype->GetBrush(targets[i]);
+
+		if (brush == nullptr) {
+			continue;
+		}
+
 		const Vec3f local_direction = world_normal.Rotate(targets[i]->mRotation.Conjugate());
 		const int32 plane_index = brush->FindPlane(local_direction);
 
@@ -958,8 +1070,8 @@ void RaptorEditor::TopViewMoveFace(const Vec3f world_normal, float32 distance)
 void RaptorEditor::TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewVertexHandle>& handles,
 									   const Vec3f offset)
 {
-	if (IsSimulationMode() || !IsToolAvailable(eEditorTool::Vertex) || offset.Length() < scMinMoveDistance ||
-		static_cast<uint32>(plane) >= scViewPlaneCount) {
+	if (IsSimulationMode() || (!IsToolAvailable(eEditorTool::Vertex) && !IsToolAvailable(eEditorTool::Curve)) ||
+		offset.Length() < scMinMoveDistance || static_cast<uint32>(plane) >= scViewPlaneCount) {
 		return;
 	}
 
@@ -969,6 +1081,15 @@ void RaptorEditor::TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewV
 		Brush::PlaneList Before;
 		Brush::PlaneList After;
 	};
+
+	struct PatchEdit
+	{
+		Object* pObject = nullptr;
+		Patch Before;
+		Patch After;
+	};
+
+	std::vector<PatchEdit> patch_edits;
 
 	DoublingArray<ObjectID> object_ids;
 
@@ -987,11 +1108,43 @@ void RaptorEditor::TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewV
 			continue;
 		}
 
-		const Brush* brush = gWorld->pPrototype->GetBrush(object);
-
 		const Mat4f world = object->GetWorldMatrix();
 		const Vec4f local_offset = world.Inverse() * Vec4f(offset.X, offset.Y, offset.Z, 0.0f);
 		const Vec3f local_move(local_offset.X, local_offset.Y, local_offset.Z);
+
+		const Patch* patch = gWorld->pPrototype->GetPatch(object);
+
+		if (patch != nullptr) {
+			Patch moved = patch->Clone();
+			uint32 moved_count = 0;
+
+			for (PatchPoint& point : moved.Points) {
+				const Vec4f world_point = world * Vec4f(point.Position.X, point.Position.Y, point.Position.Z, 1.0f);
+				const Vec2f projected_position = Project(Vec3f(world_point.X, world_point.Y, world_point.Z),
+														 GetViewPlaneAxes(plane));
+
+				for (const TopViewVertexHandle& handle : handles) {
+					if (handle.ObjectId == object_id &&
+						projected_position.IsCloseTo(handle.Position, scVertexMatchDistance)) {
+						point.Position = point.Position + local_move;
+						moved_count++;
+						break;
+					}
+				}
+			}
+
+			if (moved_count > 0) {
+				patch_edits.push_back(PatchEdit { object, patch->Clone(), std::move(moved) });
+			}
+
+			continue;
+		}
+
+		const Brush* brush = gWorld->pPrototype->GetBrush(object);
+
+		if (brush == nullptr) {
+			continue;
+		}
 
 		SizedArray<Vec3f> points;
 		points.InitCapacity(brush->GetVertices().Size);
@@ -1034,8 +1187,206 @@ void RaptorEditor::TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewV
 		edits.Insert(Edit { object, brush->Planes, moved.Planes });
 	}
 
+	const int32 group_size = static_cast<int32>(edits.Size + patch_edits.size());
+
 	for (const Edit& edit : edits) {
-		EmplaceEditOperation<BrushEditOperation>(edit.pObject, edit.Before, edit.After, static_cast<int32>(edits.Size));
+		EmplaceEditOperation<BrushEditOperation>(edit.pObject, edit.Before, edit.After, group_size);
+	}
+
+	for (PatchEdit& edit : patch_edits) {
+		EmplaceEditOperation<PatchEditOperation>(edit.pObject, std::move(edit.Before), std::move(edit.After),
+												 group_size);
+	}
+}
+
+void RaptorEditor::TopViewCreatePatch(eViewPlane plane, ePatchPrimitive primitive, Vec3f min, Vec3f max,
+									  bool drop_to_ground, const PatchCommand& settings)
+{
+	if (IsSimulationMode() || !IsToolAvailable(eEditorTool::Curve) || static_cast<uint32>(plane) >= scViewPlaneCount) {
+		return;
+	}
+
+	float32 offset = 0.0f;
+
+	if (drop_to_ground && FindGroundOffset(min, max, plane, offset)) {
+		const Vec3f shift = DepthAxisVector(plane, offset);
+
+		min += shift;
+		max += shift;
+	}
+
+	Patch patch = Patch::MakePrimitive(primitive, min, max, GetViewPlaneAxes(plane).W);
+
+	if (!patch.IsValid()) {
+		return;
+	}
+
+	patch.SubdivisionsU = std::clamp(settings.SubdivisionsU, Patch::scMinSubdivisions, Patch::scMaxSubdivisions);
+	patch.SubdivisionsV = std::clamp(settings.SubdivisionsV, Patch::scMinSubdivisions, Patch::scMaxSubdivisions);
+	patch.bSmooth = settings.bSmooth;
+	patch.Closure = settings.Closure;
+	patch.Thickness = settings.Thickness;
+
+	Object* created = CreateWorldPatch(std::move(patch));
+
+	if (created != nullptr) {
+		SelectObject(created, false);
+	}
+}
+
+static bool FindHandledControlPoint(const Patch& patch, const Mat4f& world, eViewPlane plane, ObjectID object_id,
+									const DynArray<TopViewVertexHandle>& handles, uint32& out_column, uint32& out_row)
+{
+	for (const TopViewVertexHandle& handle : handles) {
+		if (handle.ObjectId != object_id) {
+			continue;
+		}
+
+		for (uint32 row = 0; row < patch.Height; row++) {
+			for (uint32 column = 0; column < patch.Width; column++) {
+				const Vec3f local = patch.GetPoint(column, row).Position;
+				const Vec4f point = world * Vec4f(local.X, local.Y, local.Z, 1.0f);
+
+				if (Project(Vec3f(point.X, point.Y, point.Z), GetViewPlaneAxes(plane))
+						.IsCloseTo(handle.Position, scVertexMatchDistance)) {
+					out_column = column;
+					out_row = row;
+					return true;
+				}
+			}
+		}
+	}
+
+	return false;
+}
+
+static uint32 PickSubPatch(uint32 control_index, bool has_control, uint32 sub_patch_count, bool for_removal)
+{
+	uint32 index = sub_patch_count / 2;
+
+	if (has_control) {
+		index = std::min(control_index / 2, sub_patch_count - 1);
+	}
+
+	if (for_removal && index + 1 >= sub_patch_count && index > 0) {
+		index--;
+	}
+
+	return index;
+}
+
+static bool IsSamePatch(const Patch& a, const Patch& b)
+{
+	if (a.Width != b.Width || a.Height != b.Height || a.SubdivisionsU != b.SubdivisionsU ||
+		a.SubdivisionsV != b.SubdivisionsV || a.bSmooth != b.bSmooth || a.SmoothingGroup != b.SmoothingGroup ||
+		a.Closure != b.Closure || a.Thickness != b.Thickness) {
+		return false;
+	}
+
+	for (uint32 i = 0; i < a.Points.Size; i++) {
+		if (!(a.Points[i].Position == b.Points[i].Position) || !(a.Points[i].Texcoord == b.Points[i].Texcoord)) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+static bool ApplyPatchCommand(Patch& patch, const PatchCommand& command, bool has_control, uint32 column, uint32 row)
+{
+	switch (command.Type) {
+	case ePatchCommand::Invert:
+		patch.Invert();
+		return true;
+	case ePatchCommand::Transpose:
+		patch.Transpose();
+		return true;
+	case ePatchCommand::InsertColumns:
+		return patch.InsertColumns(PickSubPatch(column, has_control, patch.GetSubPatchColumns(), false));
+	case ePatchCommand::InsertRows:
+		return patch.InsertRows(PickSubPatch(row, has_control, patch.GetSubPatchRows(), false));
+	case ePatchCommand::RemoveColumns:
+		return patch.RemoveColumns(PickSubPatch(column, has_control, patch.GetSubPatchColumns(), true));
+	case ePatchCommand::RemoveRows:
+		return patch.RemoveRows(PickSubPatch(row, has_control, patch.GetSubPatchRows(), true));
+	case ePatchCommand::NaturalTexture:
+		patch.NaturalTexture();
+		return true;
+	case ePatchCommand::SetSubdivisions:
+		patch.SubdivisionsU = std::clamp(command.SubdivisionsU, Patch::scMinSubdivisions, Patch::scMaxSubdivisions);
+		patch.SubdivisionsV = std::clamp(command.SubdivisionsV, Patch::scMinSubdivisions, Patch::scMaxSubdivisions);
+		return true;
+	case ePatchCommand::SetSmooth:
+		patch.bSmooth = command.bSmooth;
+		return true;
+	case ePatchCommand::SetClosure:
+		patch.Closure = command.Closure;
+
+		if (command.Closure == ePatchClosure::Thicken) {
+			patch.Thickness = command.Thickness;
+		}
+
+		return true;
+	default:
+		return false;
+	}
+}
+
+void RaptorEditor::TopViewPatchCommand(eViewPlane plane, const PatchCommand& command,
+									   const DynArray<TopViewVertexHandle>& handles)
+{
+	if (IsSimulationMode() || gWorld->pPrototype == nullptr || static_cast<uint32>(plane) >= scViewPlaneCount) {
+		return;
+	}
+
+	struct PatchEdit
+	{
+		Object* pObject = nullptr;
+		Patch Before;
+		Patch After;
+	};
+
+	std::vector<PatchEdit> edits;
+
+	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
+		Object* object = mSelection.GetObject(i);
+		const Patch* patch = gWorld->pPrototype->GetPatch(object);
+
+		if (patch == nullptr || !CanEditObject(object)) {
+			continue;
+		}
+
+		uint32 column = 0;
+		uint32 row = 0;
+		const bool has_control = FindHandledControlPoint(*patch, object->GetWorldMatrix(), plane, object->ID, handles,
+														 column, row);
+
+		Patch changed = patch->Clone();
+
+		if (!ApplyPatchCommand(changed, command, has_control, column, row)) {
+			LogWarning(LC_CORE, "Patch '{}' can't be changed that way, it is at its smallest or largest size",
+					   object->Name.Get());
+			continue;
+		}
+
+		if (IsSamePatch(changed, *patch)) {
+			continue;
+		}
+
+		if (command.Type == ePatchCommand::SetClosure && command.Closure == ePatchClosure::Cap) {
+			Patch pieces[Patch::scMaxClosurePieces];
+
+			if (changed.BuildClosure(pieces) == 0) {
+				LogWarning(LC_CORE, "Patch '{}' has no curved open edge to cap", object->Name.Get());
+			}
+		}
+
+		edits.push_back(PatchEdit { object, patch->Clone(), std::move(changed) });
+	}
+
+	for (PatchEdit& edit : edits) {
+		EmplaceEditOperation<PatchEditOperation>(edit.pObject, std::move(edit.Before), std::move(edit.After),
+												 static_cast<int32>(edits.size()));
 	}
 }
 
@@ -1061,6 +1412,30 @@ Object* RaptorEditor::CreateWorldBox(const Vec3f min, const Vec3f max)
 	snapshot.Material = GetNewBrushMaterial();
 
 	return EmplaceEditOperation<CreateBrushOperation>(brush.Planes, snapshot).GetCreated();
+}
+
+Object* RaptorEditor::CreateWorldPatch(Patch&& world_patch, int32 group_size, MaterialID material)
+{
+	if (IsSimulationMode() || gWorld->pPrototype == nullptr || !world_patch.IsValid()) {
+		return nullptr;
+	}
+
+	const Vec3f position = world_patch.GetCenter();
+
+	for (PatchPoint& point : world_patch.Points) {
+		point.Position = point.Position - position;
+	}
+
+	ObjectSnapshot snapshot;
+	snapshot.Position = position;
+	snapshot.Material = material;
+	snapshot.pPatch = std::make_shared<const Patch>(std::move(world_patch));
+
+	if (material.IsNull()) {
+		snapshot.Material = GetNewBrushMaterial();
+	}
+
+	return EmplaceEditOperation<CreateBrushOperation>(Brush::PlaneList {}, snapshot, group_size).GetCreated();
 }
 
 void RaptorEditor::TopViewCreate(eViewPlane plane, Vec3f min, Vec3f max, bool drop_to_ground)
@@ -1277,223 +1652,6 @@ void RaptorEditor::TopViewCreateArch(eViewPlane plane, DynArray<Vec3f> points, b
 		Object* created = EmplaceEditOperation<CreateBrushOperation>(piece.Planes, snapshot,
 																	 static_cast<int32>(pieces.Size))
 							  .GetCreated();
-
-		if (created != nullptr) {
-			SelectObject(created, append);
-			append = true;
-		}
-	}
-}
-
-void RaptorEditor::TopViewBend(const BendFrame& frame)
-{
-	Blockout* blockout = gWorld->pPrototype;
-
-	if (IsSimulationMode() || !IsToolAvailable(eEditorTool::Bend) || blockout == nullptr) {
-		return;
-	}
-
-	if (frame.Segments == 0 || frame.Segments > scMaxBendSegments || frame.Length < scMinBrushExtent ||
-		IsBendStraight(frame)) {
-		return;
-	}
-
-	if (std::fabs(frame.Angle) / frame.Segments >= scMaxBendSegmentAngle) {
-		LogWarning(LC_CORE, "Bending by {:.0f} degrees needs more than {} segments",
-				   std::fabs(frame.Angle) * 180.0f / FX_PI, frame.Segments);
-		return;
-	}
-
-	struct Source
-	{
-		Object* pObject = nullptr;
-		ObjectSnapshot Snapshot;
-	};
-
-	struct Piece
-	{
-		uint32 SourceIndex = 0;
-		Brush::PlaneList Planes;
-		Vec3f Position;
-	};
-
-	const Vec3d along_axis(frame.Along);
-	const Vec3d across_axis(frame.Across);
-	const uint32 slice_count = GetBendSliceCount(frame);
-
-	DoublingArray<Source> sources;
-	DoublingArray<Piece> pieces;
-	DoublingArray<Vec3d> world_vertices;
-	DoublingArray<Vec3d> polygon;
-	DoublingArray<Vec3d> scratch;
-	DoublingArray<Vec3d> slice;
-	uint32 failed_count = 0;
-
-	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
-		Object* object = mSelection.GetObject(i);
-
-		if (object == nullptr || !CanEditObject(object) || object->HasTags(eObjectTag::LockTransform) ||
-			GetBrushKind(*object) != eTopViewBrushKind::Geometry) {
-			continue;
-		}
-
-		const Brush* brush = blockout->GetBrush(object);
-
-		if (brush == nullptr || !brush->IsValid()) {
-			continue;
-		}
-
-		const Mat4f world = object->GetWorldMatrix();
-
-		const auto to_world = [&world](const Vec3f& local)
-		{
-			const Vec4f point = world * Vec4f(local.X, local.Y, local.Z, 1.0f);
-			return Vec3d(point.X, point.Y, point.Z);
-		};
-
-		double brush_low = DBL_MAX;
-		double brush_high = -DBL_MAX;
-
-		for (const Vec3f& vertex : brush->GetVertices()) {
-			const double along = along_axis.Dot(to_world(vertex));
-
-			brush_low = std::min(brush_low, along);
-			brush_high = std::max(brush_high, along);
-		}
-
-		if (IsUnbentByBend(frame, brush_low, brush_high)) {
-			continue;
-		}
-
-		const uint32 first_piece = pieces.Size;
-		bool failed = false;
-
-		for (uint32 slice_index = 0; slice_index < slice_count && !failed; slice_index++) {
-			const BendSlice bend_slice = GetBendSlice(frame, slice_index);
-			const double low = bend_slice.Low;
-			const double high = bend_slice.High;
-			const bool has_low = bend_slice.bHasLow;
-			const bool has_high = bend_slice.bHasHigh;
-
-			if ((has_high && high <= brush_low + scBendOverlap) || (has_low && low >= brush_high - scBendOverlap)) {
-				continue;
-			}
-
-			slice.Clear();
-
-			for (const Brush::Face& face : brush->Faces) {
-				polygon.Clear();
-
-				for (const Vec3f& vertex : face.Vertices) {
-					polygon.Insert(to_world(vertex));
-				}
-
-				if (has_low) {
-					ClipToHalfSpace(polygon, scratch, along_axis * -1.0, -low);
-				}
-
-				if (has_high) {
-					ClipToHalfSpace(polygon, scratch, along_axis, high);
-				}
-
-				for (const Vec3d& point : polygon) {
-					InsertUniquePoint(slice, BendWorldPoint(frame, along_axis, across_axis, point));
-				}
-			}
-
-			if (slice.Size < 4) {
-				continue;
-			}
-
-			Vec3d min = slice[0];
-			Vec3d max = slice[0];
-
-			for (const Vec3d& point : slice) {
-				min = Vec3d(std::min(min.X, point.X), std::min(min.Y, point.Y), std::min(min.Z, point.Z));
-				max = Vec3d(std::max(max.X, point.X), std::max(max.Y, point.Y), std::max(max.Z, point.Z));
-			}
-
-			const Vec3f position = ((min + max) * 0.5).ToVec3f();
-
-			SizedArray<Vec3f> local_points;
-			local_points.InitCapacity(slice.Size);
-
-			for (const Vec3d& point : slice) {
-				local_points.Insert(point.ToVec3f() - position);
-			}
-
-			Brush piece = Brush::FromVertices(local_points, Brush::PlaneList());
-			const Vec3f extent = piece.GetBoundsMax() - piece.GetBoundsMin();
-
-			if (!piece.IsValid()) {
-				failed = true;
-				break;
-			}
-
-			if (extent.X < scMinBrushExtent || extent.Y < scMinBrushExtent || extent.Z < scMinBrushExtent) {
-				continue;
-			}
-
-			piece.AlignTexturesToWorld(position);
-			pieces.Insert(Piece { sources.Size, piece.Planes, position });
-		}
-
-		if (failed || pieces.Size == first_piece) {
-			while (pieces.Size > first_piece) {
-				pieces.RemoveLast();
-			}
-
-			if (failed) {
-				failed_count++;
-			}
-
-			continue;
-		}
-
-		sources.Insert(Source { object, ObjectSnapshot::Capture(*object, mSelection.GetStoredMaterial(object)) });
-	}
-
-	if (failed_count > 0) {
-		LogWarning(LC_CORE, "Left {} brushes unbent, their segments would need more than {} faces", failed_count,
-				   Brush::scMaxPlanes);
-	}
-
-	if (pieces.IsEmpty()) {
-		if (failed_count == 0) {
-			LogWarning(LC_CORE, "Select the brushes to bend first");
-		}
-
-		return;
-	}
-
-	const int32 group_size = static_cast<int32>(sources.Size + pieces.Size);
-
-	ClearSelection();
-
-	for (const Source& source : sources) {
-		DeleteObject(source.pObject, group_size);
-	}
-
-	DoublingArray<bool> named;
-
-	for (uint32 i = 0; i < sources.Size; i++) {
-		named.Insert(false);
-	}
-
-	bool append = false;
-
-	for (const Piece& piece : pieces) {
-		ObjectSnapshot snapshot = sources[piece.SourceIndex].Snapshot;
-		snapshot.Position = piece.Position;
-		snapshot.Rotation = Quat::scIdentity;
-
-		if (named[piece.SourceIndex]) {
-			snapshot.ObjectName = Name();
-		}
-
-		named[piece.SourceIndex] = true;
-
-		Object* created = EmplaceEditOperation<CreateBrushOperation>(piece.Planes, snapshot, group_size).GetCreated();
 
 		if (created != nullptr) {
 			SelectObject(created, append);

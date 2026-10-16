@@ -85,7 +85,7 @@ static constexpr uint32 scBrushEditTools = ToolBit(eEditorTool::Face) | ToolBit(
 
 static constexpr uint32 scVisTools = ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Rotate) |
 									 ToolBit(eEditorTool::Create) | ToolBit(eEditorTool::Arch) |
-									 ToolBit(eEditorTool::Bend) | ToolBit(eEditorTool::Decal) | ToolBit(eEditorTool::Clip);
+									 ToolBit(eEditorTool::Curve) | ToolBit(eEditorTool::Decal) | ToolBit(eEditorTool::Clip);
 
 static constexpr uint32 scDataTools[static_cast<uint32>(eDataFilter::Count)] = {
 	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Light),
@@ -1484,8 +1484,9 @@ bool RaptorEditor::CreateSubviewFromSelection(const String& name)
 	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
 		Object* object = mSelection.GetObject(i);
 
-		if (!blockout->HasBrush(object)) {
-			LogWarning(LC_CORE, "Only brushes can be part of a subview, '{}' is not one", object->Name.Get());
+		if (!blockout->HasBrush(object) && !blockout->HasPatch(object)) {
+			LogWarning(LC_CORE, "Only brushes and patches can be part of a subview, '{}' is neither",
+					   object->Name.Get());
 			return false;
 		}
 

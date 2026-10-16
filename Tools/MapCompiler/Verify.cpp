@@ -95,10 +95,17 @@ double TraceTriangle(const Vec3d& a, const Vec3d& b, const Vec3d& c, const Vec3d
 	return (time > 0.0) ? time : scNoHit;
 }
 
-bool SeesSun(const PlaneSet& planes, const MapSource& source, const Vec3d& origin)
+bool SeesSun(const PlaneSet& planes, const MapSource& source, const Array<Vec3d>& patch_points, const Vec3d& origin)
 {
 	for (const SourceBrush& brush : source.Brushes) {
 		if (brush.bVisible && brush.bCastsShadow && TraceBrush(planes, brush, origin, source.SunDirection) != scNoHit) {
+			return false;
+		}
+	}
+
+	for (size_t i = 0; i + 2 < patch_points.Size; i += 3) {
+		if (TraceTriangle(patch_points[i], patch_points[i + 1], patch_points[i + 2], origin, source.SunDirection) !=
+			scNoHit) {
 			return false;
 		}
 	}
@@ -152,7 +159,7 @@ double SampleLightmap(const CompiledMapLightmap& lightmap, double u, double v)
 } // namespace
 
 LightmapVerifyResult VerifyLightmap(const PlaneSet& planes, const MapSource& source, const CompiledMap& map,
-									double density, uint32 point_count)
+									const Array<Vec3d>& patch_points, double density, uint32 point_count)
 {
 	LightmapVerifyResult result;
 
@@ -200,8 +207,14 @@ LightmapVerifyResult VerifyLightmap(const PlaneSet& planes, const MapSource& sou
 			v += surface.LightmapTexcoords[index * 2 + 1] * weights[corner];
 		}
 
-		const CompiledMapVertex& first = surface.Vertices[surface.Indices[triangle * 3]];
-		const Vec3d normal(first.Normal);
+		Vec3d weighted_normal = Vec3d(0.0);
+
+		for (uint32 corner = 0; corner < 3; corner++) {
+			const CompiledMapVertex& vertex = surface.Vertices[surface.Indices[triangle * 3 + corner]];
+			weighted_normal = weighted_normal + Vec3d(vertex.Normal) * weights[corner];
+		}
+
+		const Vec3d normal = weighted_normal.Normalized();
 
 		Vec3d reference = Vec3d(1.0, 0.0, 0.0);
 		if (std::abs(normal.Y) < 0.9) {
@@ -221,7 +234,7 @@ LightmapVerifyResult VerifyLightmap(const PlaneSet& planes, const MapSource& sou
 		uint32 lit_count = 0;
 
 		for (const Vec3d& offset : offsets) {
-			lit_count += (faces_sun && SeesSun(planes, source, origin + offset)) ? 1 : 0;
+			lit_count += (faces_sun && SeesSun(planes, source, patch_points, origin + offset)) ? 1 : 0;
 		}
 
 		result.PointCount++;
@@ -242,7 +255,7 @@ LightmapVerifyResult VerifyLightmap(const PlaneSet& planes, const MapSource& sou
 }
 
 VerifyResult VerifyTriangles(const PlaneSet& planes, const Bsp& bsp, const MapSource& source, bool sealed,
-							 const Array<Vec3d>& triangle_points, uint32 ray_count)
+							 const Array<Vec3d>& triangle_points, const Array<Vec3d>& patch_points, uint32 ray_count)
 {
 	VerifyResult result;
 
@@ -295,6 +308,11 @@ VerifyResult VerifyTriangles(const PlaneSet& planes, const Bsp& bsp, const MapSo
 			else if (brush.bSolid) {
 				bound = std::fmin(bound, TraceBrush(planes, brush, origin, direction));
 			}
+		}
+
+		for (size_t i = 0; i + 2 < patch_points.Size; i += 3) {
+			expected = std::fmin(
+				expected, TraceTriangle(patch_points[i], patch_points[i + 1], patch_points[i + 2], origin, direction));
 		}
 
 		double actual = scNoHit;

@@ -77,11 +77,19 @@ struct CompiledMapHull
 	uint32 GetPointCount() const { return static_cast<uint32>(Points.Size / 3); }
 };
 
+struct CompiledMapCollisionMesh
+{
+	SizedArray<float32> Points;
+	SizedArray<uint32> Indices;
+
+	uint32 GetPointCount() const { return static_cast<uint32>(Points.Size / 3); }
+};
+
 class CompiledMap
 {
 public:
 	static constexpr uint32 scMagic = 0x504D5846;
-	static constexpr uint32 scVersion = 4;
+	static constexpr uint32 scVersion = 5;
 	static constexpr const char* scExtension = ".fxmap";
 	static constexpr const char* scPrototypeExtension = ".prx";
 
@@ -122,6 +130,7 @@ public:
 	SizedArray<CompiledMapMaterial> Materials;
 	SizedArray<CompiledMapSurface> Surfaces;
 	SizedArray<CompiledMapHull> Hulls;
+	SizedArray<CompiledMapCollisionMesh> CollisionMeshes;
 
 	/// Where the light probes go, worked out from the brushes. Empty if the map was compiled without probes.
 	ProbeLayout Probes;

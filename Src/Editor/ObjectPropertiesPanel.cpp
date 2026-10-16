@@ -80,6 +80,7 @@ static constexpr FlagName<eObjectTag> scTagNames[] = {
 	  "Blockout brushes only. Collides but is never drawn. The map compiler keeps only its collider" },
 	{ eObjectTag::DBound, "dbound",
 	  "Blockout brushes only. Seals the map for the map compiler: no faces, no collision" },
+	{ eObjectTag::Patch, "Patch", "Marks a curve patch. Set when the patch is created" },
 };
 
 static constexpr FlagName<eObjectFlags> scFlagNames[] = {

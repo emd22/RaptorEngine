@@ -42,7 +42,8 @@ constexpr ToolButtonInfo scToolButtons[] = {
 	{ "Vertex", "Drag the corners of the selected brushes (V)", "Textures/editor_new/vertex.png" },
 	{ "Create", "Drag to create a brush (B)", "Textures/editor_new/brush.png" },
 	{ "Arch", "Drag a box to fill it with an arch made of brushes (A)", "Textures/editor_new/arch.png" },
-	{ "Bend", "Curve the selected brushes by dragging the knobs at their ends (N)", "Textures/editor_new/bend.png" },
+	{ "Curve", "Drag to create a curve patch, drag the control points of the selected patches (N)",
+	  "Textures/editor_new/bend.png" },
 	{ "Decal", "Drag a box to project a decal onto the surfaces behind it (D)", "Textures/editor_new/decal.png" },
 	{ "Rotate", "Rotate the selected brushes (R)", "Textures/editor_new/rotate.png" },
 	{ "Clip", "Drag a line across the selected brushes to split them in two (C)", "Textures/editor_new/cut.png" },
@@ -63,6 +64,30 @@ constexpr ToolButtonInfo scSubtractButton = {
 
 constexpr const char* scPlaneNames[scViewPlaneCount] = {
 	"Top", "Forward", "Back", "Left", "Right",
+};
+
+constexpr const char* scPatchPrimitiveNames[] = { "Flat", "Cylinder", "Cone", "Bevel", "Endcap" };
+
+static_assert(std::size(scPatchPrimitiveNames) == static_cast<size_t>(ePatchPrimitive::Count));
+
+struct PatchCommandButtonInfo
+{
+	const char* pName;
+	const char* pToolTip;
+	ePatchCommand Command;
+};
+
+constexpr PatchCommandButtonInfo scPatchCommandButtons[] = {
+	{ "Invert", "Flip which side of the selected patches faces out", ePatchCommand::Invert },
+	{ "Transpose", "Swap the rows and columns of the selected patches", ePatchCommand::Transpose },
+	{ "+Col", "Split a column of the selected patches in two, at the selected control point",
+	  ePatchCommand::InsertColumns },
+	{ "-Col", "Merge two columns of the selected patches, at the selected control point",
+	  ePatchCommand::RemoveColumns },
+	{ "+Row", "Split a row of the selected patches in two, at the selected control point", ePatchCommand::InsertRows },
+	{ "-Row", "Merge two rows of the selected patches, at the selected control point", ePatchCommand::RemoveRows },
+	{ "Natural", "Lay the texture along the surface of the selected patches at its natural scale",
+	  ePatchCommand::NaturalTexture },
 };
 
 constexpr const char* scDataFilterNames[] = {
@@ -391,62 +416,158 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 	}
 
 	{
-		FloatField* segments_field = new FloatField(parent, "Segments", Vec2f(1.0f, static_cast<float32>(scMaxBendSegments)));
-		segments_field->SetValue(static_cast<float32>(mBend.Segments));
-		segments_field->SetOnChange(
+		wxChoice* primitive_choice = new wxChoice(parent, wxID_ANY);
+
+		for (const char* name : scPatchPrimitiveNames) {
+			primitive_choice->Append(name);
+		}
+
+		primitive_choice->SetSelection(static_cast<int>(mCurve.Primitive));
+		primitive_choice->SetToolTip("The shape a drag creates. Round shapes go around the axis the view looks along");
+		primitive_choice->Bind(wxEVT_CHOICE,
+							   [this, primitive_choice](wxCommandEvent&)
+							   {
+								   const int32 selection = primitive_choice->GetSelection();
+
+								   if (selection != wxNOT_FOUND) {
+									   mCurve.Primitive = static_cast<ePatchPrimitive>(selection);
+									   mpCanvas->SetCurveSettings(mCurve);
+								   }
+
+								   mpCanvas->SetFocus();
+							   });
+
+		const Vec2f subdivision_range(static_cast<float32>(Patch::scMinSubdivisions),
+									  static_cast<float32>(Patch::scMaxSubdivisions));
+
+		FloatField* subdivisions_u_field = new FloatField(parent, "Subdiv U", subdivision_range);
+		subdivisions_u_field->SetValue(static_cast<float32>(mCurve.SubdivisionsU));
+		subdivisions_u_field->SetOnChange(
 			[this](const float32 value)
 			{
-				mBend.Segments = static_cast<uint32>(std::lround(value));
-				mpCanvas->SetBendSettings(mBend);
+				mCurve.SubdivisionsU = static_cast<uint32>(std::lround(value));
+				mpCanvas->SetCurveSettings(mCurve);
+				mpCanvas->RunPatchCommand(ePatchCommand::SetSubdivisions);
 			});
 
-		FloatField* angle_field = new FloatField(parent, "Angle", Vec2f(-360.0f, 360.0f));
-		angle_field->SetValue(mBend.AngleDegrees);
-		angle_field->SetOnChange(
+		FloatField* subdivisions_v_field = new FloatField(parent, "Subdiv V", subdivision_range);
+		subdivisions_v_field->SetValue(static_cast<float32>(mCurve.SubdivisionsV));
+		subdivisions_v_field->SetOnChange(
 			[this](const float32 value)
 			{
-				mBend.AngleDegrees = value;
-				mpCanvas->SetBendSettings(mBend);
+				mCurve.SubdivisionsV = static_cast<uint32>(std::lround(value));
+				mpCanvas->SetCurveSettings(mCurve);
+				mpCanvas->RunPatchCommand(ePatchCommand::SetSubdivisions);
 			});
 
-		wxButton* swap_button =
-			new wxButton(parent, wxID_ANY, "Swap Axis", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
-		swap_button->SetToolTip("Bend along the other axis of the selection (Tab)");
-		swap_button->Bind(wxEVT_BUTTON,
-						  [this](wxCommandEvent&)
-						  {
-							  mpCanvas->SwapBendAxis();
-							  mpCanvas->SetFocus();
-						  });
+		OutlineToggleButton* smooth_button = new OutlineToggleButton(parent, wxBitmap(), "Smooth");
+		smooth_button->SetToolTip("Smooth normals across the patch. Off shows every triangle as a flat facet");
+		smooth_button->SetValue(mCurve.bSmooth);
+		smooth_button->Bind(wxEVT_TOGGLEBUTTON,
+							[this, smooth_button](wxCommandEvent&)
+							{
+								mCurve.bSmooth = smooth_button->GetValue();
+								mpCanvas->SetCurveSettings(mCurve);
+								mpCanvas->RunPatchCommand(ePatchCommand::SetSmooth);
+								mpCanvas->SetFocus();
+							});
 
-		wxButton* bend_button = new wxButton(parent, wxID_ANY, "Bend", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
-		bend_button->SetToolTip("Replace the selected brushes with the bent segments (Enter)");
-		bend_button->Bind(wxEVT_BUTTON,
-						  [this](wxCommandEvent&)
-						  {
-							  mpCanvas->CommitBend();
-							  mpCanvas->SetFocus();
-						  });
+		mpCurveRow = new wxBoxSizer(wxHORIZONTAL);
+		mpCurveRow->Add(new wxStaticLine(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL),
+						wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT, scSeparatorBorder));
+		mpCurveRow->Add(primitive_choice, wxSizerFlags().CenterVertical().Border(wxLEFT, 4));
+		mpCurveRow->Add(subdivisions_u_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+		mpCurveRow->Add(subdivisions_v_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+		mpCurveRow->Add(smooth_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
 
-		mpBendRow = new wxBoxSizer(wxHORIZONTAL);
-		mpBendRow->Add(new wxStaticLine(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL),
-					   wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT, scSeparatorBorder));
-		mpBendRow->Add(segments_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 4));
-		mpBendRow->Add(angle_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
-		mpBendRow->Add(swap_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
-		mpBendRow->Add(bend_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
-		mpToolRow->Add(mpBendRow, wxSizerFlags().Expand().Border(wxTOP | wxBOTTOM, scItemBorder));
-
-		mpBendSegmentsField = segments_field;
-		mpBendAngleField = angle_field;
-
-		mpCanvas->SetBendSettings(mBend);
-		mpCanvas->SetOnBendChanged(
-			[this](const BendSettings& settings)
+		FloatField* thickness_field = new FloatField(parent, "Thickness", Vec2f(0.01f, 100.0f));
+		thickness_field->SetValue(mCurve.Thickness);
+		thickness_field->SetOnChange(
+			[this](const float32 value)
 			{
-				mBend = settings;
-				mpBendSegmentsField->SetValue(static_cast<float32>(settings.Segments));
-				mpBendAngleField->SetValue(settings.AngleDegrees);
+				mCurve.Thickness = value;
+				mpCanvas->SetCurveSettings(mCurve);
+
+				if (mCurve.Closure == ePatchClosure::Thicken) {
+					mpCanvas->RunPatchCommand(ePatchCommand::SetClosure);
+				}
+			});
+
+		OutlineToggleButton* thicken_button = new OutlineToggleButton(parent, wxBitmap(), "Thicken");
+		thicken_button->SetToolTip("Give the selected patches a back face Thickness behind them, joined to them along "
+								   "the open edges. It follows the patch as it is edited");
+		thicken_button->SetValue(mCurve.Closure == ePatchClosure::Thicken);
+
+		OutlineToggleButton* cap_button = new OutlineToggleButton(parent, wxBitmap(), "Cap");
+		cap_button->SetToolTip("Close the open ends of the selected patches: cylinder ends become discs, bevel and "
+							   "endcap ends are filled out to their square corners. It follows the patch as it is edited");
+		cap_button->SetValue(mCurve.Closure == ePatchClosure::Cap);
+
+		const auto set_closure = [this](ePatchClosure closure, bool enabled)
+		{
+			mCurve.Closure = ePatchClosure::None;
+
+			if (enabled) {
+				mCurve.Closure = closure;
+			}
+
+			mpCurveThickenButton->SetValue(mCurve.Closure == ePatchClosure::Thicken);
+			mpCurveCapButton->SetValue(mCurve.Closure == ePatchClosure::Cap);
+			mpCanvas->SetCurveSettings(mCurve);
+			mpCanvas->RunPatchCommand(ePatchCommand::SetClosure);
+			mpCanvas->SetFocus();
+		};
+
+		thicken_button->Bind(wxEVT_TOGGLEBUTTON, [set_closure, thicken_button](wxCommandEvent&)
+							 { set_closure(ePatchClosure::Thicken, thicken_button->GetValue()); });
+		cap_button->Bind(wxEVT_TOGGLEBUTTON, [set_closure, cap_button](wxCommandEvent&)
+						 { set_closure(ePatchClosure::Cap, cap_button->GetValue()); });
+
+		mpCurveRow->Add(thickness_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+		mpCurveRow->Add(thicken_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 6));
+		mpCurveRow->Add(cap_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 6));
+
+		for (const PatchCommandButtonInfo& info : scPatchCommandButtons) {
+			wxButton* button = new wxButton(parent, wxID_ANY, info.pName, wxDefaultPosition, wxDefaultSize,
+											wxBU_EXACTFIT);
+			button->SetToolTip(info.pToolTip);
+
+			const ePatchCommand command = info.Command;
+
+			button->Bind(wxEVT_BUTTON,
+						 [this, command](wxCommandEvent&)
+						 {
+							 mpCanvas->RunPatchCommand(command);
+							 mpCanvas->SetFocus();
+						 });
+
+			mpCurveRow->Add(button, wxSizerFlags().CenterVertical().Border(wxLEFT, 6));
+		}
+
+		mpToolRow->Add(mpCurveRow, wxSizerFlags().Expand().Border(wxTOP | wxBOTTOM, scItemBorder));
+
+		mpCurveSubdivisionsUField = subdivisions_u_field;
+		mpCurveSubdivisionsVField = subdivisions_v_field;
+		mpCurveSmoothButton = smooth_button;
+		mpCurveThicknessField = thickness_field;
+		mpCurveThickenButton = thicken_button;
+		mpCurveCapButton = cap_button;
+
+		mpCanvas->SetCurveSettings(mCurve);
+		mpCanvas->SetOnCurveChanged(
+			[this](const CurveSettings& settings)
+			{
+				mCurve.SubdivisionsU = settings.SubdivisionsU;
+				mCurve.SubdivisionsV = settings.SubdivisionsV;
+				mCurve.bSmooth = settings.bSmooth;
+				mCurve.Closure = settings.Closure;
+				mCurve.Thickness = settings.Thickness;
+				mpCurveSubdivisionsUField->SetValue(static_cast<float32>(settings.SubdivisionsU));
+				mpCurveSubdivisionsVField->SetValue(static_cast<float32>(settings.SubdivisionsV));
+				mpCurveSmoothButton->SetValue(settings.bSmooth);
+				mpCurveThicknessField->SetValue(settings.Thickness);
+				mpCurveThickenButton->SetValue(settings.Closure == ePatchClosure::Thicken);
+				mpCurveCapButton->SetValue(settings.Closure == ePatchClosure::Cap);
 			});
 	}
 
@@ -529,7 +650,7 @@ void EditorToolbar::UpdateVisibility()
 	}
 
 	mpToolRow->Show(mpArchRow, mbShows2D && mTool == eEditorTool::Arch, true);
-	mpToolRow->Show(mpBendRow, mbShows2D && mTool == eEditorTool::Bend, true);
+	mpToolRow->Show(mpCurveRow, mbShows2D && mTool == eEditorTool::Curve, true);
 
 	mpParent->Layout();
 }

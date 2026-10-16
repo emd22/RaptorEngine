@@ -166,6 +166,11 @@ public:
 	Object* RestoreObject(const Vec3f position, const Brush::PlaneList& planes, MaterialID material,
 						  const Quat rotation, const Name& name, bool is_dynamic = false, bool is_decal = false);
 
+	Object* RestorePatch(const Vec3f position, const Patch& patch, MaterialID material, const Quat rotation,
+						 const Name& name);
+
+	bool SetPatch(Object* object, Patch&& patch);
+
 	bool IsDynamic(const Object* object) const;
 
 	bool HasBrush(const Object* object);
@@ -229,6 +234,10 @@ public:
 	 * @brief The brush that a blockout object is built from, or nullptr if the object is not a blockout.
 	 */
 	Brush* GetBrush(const Object* object);
+	Patch* GetPatch(const Object* object);
+	bool HasPatch(const Object* object) { return GetPatch(object) != nullptr; }
+
+	bool GetLocalCenter(const Object* object, Vec3f& out_center);
 
 	/**
 	 * @brief True if the loaded blockout file has an `objects` entry. Files saved before models moved into the
@@ -453,6 +462,10 @@ private:
 	 */
 	void ApplyBrushInPlace(Object* object, Brush&& brush);
 
+	void RebuildPatch(Object* object, Patch&& patch);
+	bool RaycastPatch(Object* object, const Vec3f origin, const Vec3f direction, Vec3f& out_face_normal,
+					  Vec3f* out_point);
+
 	void RemoveBlockoutFromWorld(World* world);
 	void RemoveSingleObjectFromWorld(Object* object);
 
@@ -491,6 +504,7 @@ public:
 private:
 	MaterialLibrary mMaterials;
 	HashMap<uint32, Brush> mBrushes;
+	HashMap<uint32, Patch> mPatches;
 
 	std::vector<Model> mModels;
 	/// Models that were still loading when they had to be removed

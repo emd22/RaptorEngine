@@ -14,6 +14,7 @@
 #include <Math/Vec3.hpp>
 #include <Object/ObjectFlags.hpp>
 #include <Object/ObjectID.hpp>
+#include <Patch.hpp>
 #include <Renderer/LightID.hpp>
 #include <memory>
 #include <vector>
@@ -145,6 +146,8 @@ struct ObjectSnapshot
 	uint32 SubviewInstance = 0;
 	uint32 SubviewMember = 0;
 
+	std::shared_ptr<const Patch> pPatch;
+
 	/// Records everything needed to bring `object` back. `material` is passed in as a selected object wears the
 	/// selection material instead of its own.
 	static ObjectSnapshot Capture(const Object& object, MaterialID material);
@@ -219,6 +222,19 @@ public:
 private:
 	Brush::PlaneList mPlanesBefore;
 	Brush::PlaneList mPlanesAfter;
+};
+
+class PatchEditOperation final : public ObjectEditOperation
+{
+public:
+	PatchEditOperation(Object* object, Patch&& before, Patch&& after, int32 group_size = 1);
+
+	void Execute(EditorSelection& selection) override;
+	void Undo(EditorSelection& selection) override;
+
+private:
+	std::shared_ptr<const Patch> mpBefore;
+	std::shared_ptr<const Patch> mpAfter;
 };
 
 /// Toggles one of an object's tags or flags

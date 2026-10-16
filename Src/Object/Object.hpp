@@ -170,6 +170,7 @@ public:
 	FX_FORCE_INLINE bool IsNvBrush() const { return HasTags(eObjectTag::NvBrush); }
 	FX_FORCE_INLINE bool IsDBound() const { return HasTags(eObjectTag::DBound); }
 	FX_FORCE_INLINE bool IsDecal() const { return HasTags(eObjectTag::Decal); }
+	FX_FORCE_INLINE bool IsPatch() const { return HasTags(eObjectTag::Patch); }
 
 	/// True if this object is a marker of some kind and not drawn as level geometry
 	FX_FORCE_INLINE bool IsVolume() const

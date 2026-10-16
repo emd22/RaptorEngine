@@ -44,7 +44,7 @@ bool CanEditObjectTag(const Object* object, eObjectTag tag)
 	case eObjectTag::Trigger:
 	case eObjectTag::NvBrush:
 	case eObjectTag::DBound:
-		return object->HasTags(eObjectTag::Blockout) && !object->IsDecal();
+		return object->HasTags(eObjectTag::Blockout) && !object->IsDecal() && !object->IsPatch();
 	default:
 		return false;
 	}
@@ -232,8 +232,16 @@ static Object* RestoreBrush(const ObjectSnapshot& snapshot, const Brush::PlaneLi
 		return nullptr;
 	}
 
-	Object* object = gWorld->pPrototype->RestoreObject(snapshot.Position, planes, snapshot.Material, snapshot.Rotation,
-													   snapshot.ObjectName, snapshot.bIsDynamic, snapshot.bIsDecal);
+	Object* object = nullptr;
+
+	if (snapshot.pPatch != nullptr) {
+		object = gWorld->pPrototype->RestorePatch(snapshot.Position, *snapshot.pPatch, snapshot.Material,
+												  snapshot.Rotation, snapshot.ObjectName);
+	}
+	else {
+		object = gWorld->pPrototype->RestoreObject(snapshot.Position, planes, snapshot.Material, snapshot.Rotation,
+												   snapshot.ObjectName, snapshot.bIsDynamic, snapshot.bIsDecal);
+	}
 
 	if (object == nullptr) {
 		return nullptr;
@@ -279,6 +287,13 @@ ObjectSnapshot ObjectSnapshot::Capture(const Object& object, MaterialID material
 	Vec3f enter_direction = Vec3f::sZero;
 	gObjectScripts->TryGetRequiredEnterDirection(object.ID, enter_direction);
 
+	std::shared_ptr<const Patch> patch;
+	const Patch* live_patch = gWorld->pPrototype->GetPatch(&object);
+
+	if (live_patch != nullptr) {
+		patch = std::make_shared<const Patch>(live_patch->Clone());
+	}
+
 	return ObjectSnapshot {
 		.Position = object.GetPosition(),
 		.Material = material,
@@ -296,6 +311,7 @@ ObjectSnapshot ObjectSnapshot::Capture(const Object& object, MaterialID material
 		.EnterDirection = enter_direction,
 		.SubviewInstance = object.SubviewInstance,
 		.SubviewMember = object.SubviewMember,
+		.pPatch = std::move(patch),
 	};
 }
 
@@ -493,6 +509,30 @@ void BrushEditOperation::Execute(EditorSelection& selection)
 {
 	if (Object* target = ResolveTarget()) {
 		gWorld->pPrototype->SetBrushPlanes(target, mPlanesAfter);
+	}
+}
+
+PatchEditOperation::PatchEditOperation(Object* object, Patch&& before, Patch&& after, int32 group_size)
+	: ObjectEditOperation(object, group_size), mpBefore(std::make_shared<const Patch>(std::move(before))),
+	  mpAfter(std::make_shared<const Patch>(std::move(after)))
+{
+}
+
+void PatchEditOperation::Execute(EditorSelection& selection)
+{
+	Object* target = ResolveTarget();
+
+	if (target != nullptr) {
+		gWorld->pPrototype->SetPatch(target, mpAfter->Clone());
+	}
+}
+
+void PatchEditOperation::Undo(EditorSelection& selection)
+{
+	Object* target = ResolveTarget();
+
+	if (target != nullptr) {
+		gWorld->pPrototype->SetPatch(target, mpBefore->Clone());
 	}
 }
 

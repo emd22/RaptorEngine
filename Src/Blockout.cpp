@@ -445,6 +445,10 @@ Object* Blockout::RaycastBlockout(const Vec3f origin, const Vec3f direction, Vec
 bool Blockout::RaycastFace(Object* object, const Vec3f origin, const Vec3f direction, Vec3f& out_face_normal,
 						   Vec3f* out_point)
 {
+	if (GetPatch(object) != nullptr) {
+		return RaycastPatch(object, origin, direction, out_face_normal, out_point);
+	}
+
 	const Brush* brush = GetBrush(object);
 	if (brush == nullptr) {
 		return false;
@@ -526,6 +530,7 @@ void Blockout::RemoveSingleObjectFromWorld(Object* object)
 	}
 
 	mBrushes.Remove(object->ID.GetID());
+	mPatches.Remove(object->ID.GetID());
 	mDecalHashes.Remove(object->ID.GetID());
 
 	gObjectManager->DestroyObject(object->ID);
@@ -539,6 +544,7 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 
 	BlockoutObjects.Clear();
 	mBrushes.Clear();
+	mPatches.Clear();
 	mDecalHashes.Clear();
 	mCompiledDecalReceivers.clear();
 
@@ -758,6 +764,42 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 		mCompiledBodies.push_back(body->GetID());
 	}
 
+	for (size_t mesh_index = 0; mesh_index < map.CollisionMeshes.Size; mesh_index++) {
+		const CompiledMapCollisionMesh& mesh = map.CollisionMeshes[mesh_index];
+		const uint32 point_count = mesh.GetPointCount();
+
+		if (point_count < 3 || mesh.Indices.Size < 3) {
+			continue;
+		}
+
+		Vec3f min = Vec3f(mesh.Points[0], mesh.Points[1], mesh.Points[2]);
+		Vec3f max = min;
+
+		for (uint32 i = 1; i < point_count; i++) {
+			const Vec3f point(mesh.Points[i * 3], mesh.Points[i * 3 + 1], mesh.Points[i * 3 + 2]);
+
+			min = Vec3f::Min(min, point);
+			max = Vec3f::Max(max, point);
+		}
+
+		const Vec3f midpoint = (min + max) * 0.5f;
+
+		SizedArray<Vec3f> positions;
+		positions.InitCapacity(point_count);
+
+		for (uint32 i = 0; i < point_count; i++) {
+			positions.Insert(Vec3f(mesh.Points[i * 3], mesh.Points[i * 3 + 1], mesh.Points[i * 3 + 2]) - midpoint);
+		}
+
+		physics::Body* body = gPhysics->NewBody(String::Fmt("WORLD_MESH_{}", mesh_index));
+		body->CreateTriangleMeshBody(positions, mesh.Indices, physics::BodyProps {});
+
+		body->SetMidpoint(midpoint);
+		body->Teleport(Vec3f::sZero, Quat::scIdentity);
+
+		mCompiledBodies.push_back(body->GetID());
+	}
+
 	mCompiledProbeLayout.CopyFrom(map.Probes);
 	mbIsCompiledMap = true;
 
@@ -771,8 +813,10 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 				map.ProbeSunVisibility.Size);
 	}
 
-	LogInfo("Loaded the compiled map: {} surfaces and {} colliders replace {} brushes, {} light probes placed",
-			map.Surfaces.Size, map.Hulls.Size, map.BrushNames.Size, map.Probes.GetProbeCount());
+	LogInfo("Loaded the compiled map: {} surfaces, {} hulls and {} triangle meshes replace {} brushes and patches, {} "
+			"light probes placed",
+			map.Surfaces.Size, map.Hulls.Size, map.CollisionMeshes.Size, map.BrushNames.Size,
+			map.Probes.GetProbeCount());
 }
 
 MaterialID Blockout::GetMaterialForID(MaterialLibraryID id) const
@@ -808,6 +852,34 @@ Brush* Blockout::GetBrush(const Object* object)
 	}
 
 	return mBrushes.Find(object->ID.GetID());
+}
+
+Patch* Blockout::GetPatch(const Object* object)
+{
+	if (object == nullptr) {
+		return nullptr;
+	}
+
+	return mPatches.Find(object->ID.GetID());
+}
+
+bool Blockout::GetLocalCenter(const Object* object, Vec3f& out_center)
+{
+	const Brush* brush = GetBrush(object);
+
+	if (brush != nullptr) {
+		out_center = brush->GetCenter();
+		return true;
+	}
+
+	const Patch* patch = GetPatch(object);
+
+	if (patch != nullptr) {
+		out_center = patch->GetCenter();
+		return true;
+	}
+
+	return false;
 }
 
 static void HashBytes(uint64& hash, const void* data, size_t size)
@@ -850,8 +922,8 @@ static Vec3f TransformDirection(const Mat4f& matrix, const Vec3f direction)
 
 static bool BoundsOverlap(const BBox& a, const BBox& b)
 {
-	return a.Min.X <= b.Max.X && a.Max.X >= b.Min.X && a.Min.Y <= b.Max.Y && a.Max.Y >= b.Min.Y &&
-		   a.Min.Z <= b.Max.Z && a.Max.Z >= b.Min.Z;
+	return a.Min.X <= b.Max.X && a.Max.X >= b.Min.X && a.Min.Y <= b.Max.Y && a.Max.Y >= b.Min.Y && a.Min.Z <= b.Max.Z &&
+		   a.Max.Z >= b.Min.Z;
 }
 
 static BBox GetBrushWorldBounds(const Brush& brush, const Mat4f& world)
@@ -906,7 +978,8 @@ void Blockout::GatherDecalReceivers(const BBox& bounds, std::vector<DecalReceive
 		}
 
 		if (BoundsOverlap(GetBrushWorldBounds(*solid.pBrush, solid.World), bounds)) {
-			out_receivers.push_back(DecalReceiver { .pBrush = solid.pBrush, .World = solid.World, .ID = solid.pOwner->ID });
+			out_receivers.push_back(
+				DecalReceiver { .pBrush = solid.pBrush, .World = solid.World, .ID = solid.pOwner->ID });
 		}
 	}
 }
@@ -1226,10 +1299,180 @@ void Blockout::RebuildBrush(Object* object, Brush&& brush, physics::eMotionType 
 	mBrushes.Insert(object->ID.GetID(), std::move(brush));
 }
 
+void Blockout::RebuildPatch(Object* object, Patch&& patch)
+{
+	Assert(patch.IsValid());
+
+	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
+	patch.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
+					   mesh->Indices);
+
+	const Vec3f center = patch.GetCenter();
+
+	if (mesh->Indices.IsEmpty()) {
+		LogWarning(LC_ASSET, "Patch '{}' has no area, it is not drawn", object->Name.Get());
+
+		mesh->Positions = { center, center, center };
+		mesh->Normals = { Vec3f::sUp, Vec3f::sUp, Vec3f::sUp };
+		mesh->Tangents = { Vec3f(1.0f, 0.0f, 0.0f), Vec3f(1.0f, 0.0f, 0.0f), Vec3f(1.0f, 0.0f, 0.0f) };
+		mesh->TangentHandedness = { 1.0f, 1.0f, 1.0f };
+		mesh->Texcoords = { Vec2f::sZero, Vec2f::sZero, Vec2f::sZero };
+		mesh->Indices = { 0, 1, 2 };
+	}
+
+	Vec3f min = mesh->Positions[0];
+	Vec3f max = mesh->Positions[0];
+
+	for (const Vec3f position : mesh->Positions) {
+		min = Vec3f::Min(min, position);
+		max = Vec3f::Max(max, position);
+	}
+
+	object->pMesh = mesh->AsDefaultMesh();
+
+	object->Bounds.Min = min;
+	object->Bounds.Max = max;
+	object->SetRotationOrigin(-center);
+	object->SetTag(eObjectTag::Patch);
+
+	gWorldGrid->UpdateObject(object);
+
+	gPhysics->DestroyBody(object->PhysicsID);
+	object->PhysicsID = physics::BodyID::scNull;
+
+	SizedArray<Vec3f> collider_points;
+	collider_points.InitCapacity(mesh->Positions.Size);
+
+	for (const Vec3f position : mesh->Positions) {
+		collider_points.Insert(position - center);
+	}
+
+	physics::Body* phys = gPhysics->NewBody(object->Name.Get());
+	phys->CreateTriangleMeshBody(collider_points, mesh->Indices, physics::BodyProps {});
+
+	phys->SetMidpoint(center);
+	phys->Teleport(object->GetPosition(), object->mRotation);
+
+	object->AttachCollider(phys);
+
+	mPatches.Insert(object->ID.GetID(), std::move(patch));
+}
+
+bool Blockout::SetPatch(Object* object, Patch&& patch)
+{
+	const Patch* current = GetPatch(object);
+
+	if (current == nullptr || !patch.IsValid()) {
+		return false;
+	}
+
+	const Vec3f offset = GetOffsetToKeepInPlace(object, current->GetCenter(), patch.GetCenter());
+
+	if (!offset.IsCloseTo(simd::LoadFloat4(0.0f))) {
+		object->SetPosition(object->GetPosition() + offset);
+	}
+
+	RebuildPatch(object, std::move(patch));
+
+	return true;
+}
+
+bool Blockout::RaycastPatch(Object* object, const Vec3f origin, const Vec3f direction, Vec3f& out_face_normal,
+							Vec3f* out_point)
+{
+	const Patch* patch = GetPatch(object);
+
+	if (patch == nullptr) {
+		return false;
+	}
+
+	const Mat4f to_local = object->GetWorldMatrix().Inverse();
+	const Vec4f local_origin4 = to_local * Vec4f(origin.X, origin.Y, origin.Z, 1.0f);
+	const Vec4f local_direction4 = to_local * Vec4f(direction.X, direction.Y, direction.Z, 0.0f);
+
+	const Vec3d local_origin(local_origin4.X, local_origin4.Y, local_origin4.Z);
+	const Vec3d local_direction(local_direction4.X, local_direction4.Y, local_direction4.Z);
+
+	SizedArray<Vec3f> positions;
+	SizedArray<Vec3f> normals;
+	SizedArray<Vec3f> tangents;
+	SizedArray<float32> handedness;
+	SizedArray<Vec2f> texcoords;
+	SizedArray<uint32> indices;
+
+	patch->GenerateMesh(positions, normals, tangents, handedness, texcoords, indices);
+
+	const auto to_double = [](const Vec3f value) { return Vec3d(value.X, value.Y, value.Z); };
+
+	double nearest = DBL_MAX;
+
+	for (size_t index = 0; index + 2 < indices.Size; index += 3) {
+		const Vec3d a = to_double(positions[indices[index]]);
+		const Vec3d b = to_double(positions[indices[index + 1]]);
+		const Vec3d c = to_double(positions[indices[index + 2]]);
+
+		const Vec3d edge_a = b - a;
+		const Vec3d edge_b = c - a;
+		const Vec3d p = local_direction.Cross(edge_b);
+		const double determinant = edge_a.Dot(p);
+
+		if (std::fabs(determinant) < 1e-14) {
+			continue;
+		}
+
+		const double inverse = 1.0 / determinant;
+		const Vec3d to_origin = local_origin - a;
+		const double u = to_origin.Dot(p) * inverse;
+
+		if (u < 0.0 || u > 1.0) {
+			continue;
+		}
+
+		const Vec3d q = to_origin.Cross(edge_a);
+		const double v = local_direction.Dot(q) * inverse;
+
+		if (v < 0.0 || u + v > 1.0) {
+			continue;
+		}
+
+		const double distance = edge_b.Dot(q) * inverse;
+
+		if (distance < 0.0 || distance >= nearest) {
+			continue;
+		}
+
+		Vec3d normal = edge_b.Cross(edge_a).Normalized();
+
+		if (normal.Dot(local_direction) > 0.0) {
+			normal = normal * -1.0;
+		}
+
+		nearest = distance;
+		out_face_normal = normal.ToVec3f();
+	}
+
+	if (nearest == DBL_MAX) {
+		return false;
+	}
+
+	if (out_point != nullptr) {
+		*out_point = origin + direction * static_cast<float32>(nearest);
+	}
+
+	return true;
+}
+
 Brush Blockout::ReadBrushEntry(ConfigEntry& entry) const { return fx::ReadBrushEntry(entry); }
 
 void Blockout::WriteBrushEntry(ConfigEntry& entry, const Object* object)
 {
+	const Patch* patch = GetPatch(object);
+
+	if (patch != nullptr) {
+		WritePatchEntry(entry, *patch);
+		return;
+	}
+
 	const Brush* brush = GetBrush(object);
 
 	// Plain boxes are stored as their extents in each direction
@@ -1345,11 +1588,26 @@ ObjectID Blockout::CreateBrush(ConfigEntry& entry)
 
 	LogInfo("Adding blockout '{}'", blockout_id);
 
-	Brush brush = ReadBrushEntry(entry);
+	const bool is_patch = IsPatchEntry(entry);
 
-	if (!brush.IsValid()) {
-		LogError("Blockout '{}' does not describe a valid convex brush, skipping", blockout_id);
-		return ObjectID::scNull;
+	Brush brush;
+	Patch patch;
+
+	if (is_patch) {
+		patch = ReadPatchEntry(entry);
+
+		if (!patch.IsValid()) {
+			LogError("Blockout '{}' does not describe a valid patch, skipping", blockout_id);
+			return ObjectID::scNull;
+		}
+	}
+	else {
+		brush = ReadBrushEntry(entry);
+
+		if (!brush.IsValid()) {
+			LogError("Blockout '{}' does not describe a valid convex brush, skipping", blockout_id);
+			return ObjectID::scNull;
+		}
 	}
 
 	const MaterialID material_id = ReadBrushMaterial(entry);
@@ -1419,7 +1677,12 @@ ObjectID Blockout::CreateBrush(ConfigEntry& entry)
 	physics::eMotionType is_dynamic = entry.GetMemberValue(HashStr32("dynamic"), 0) ? physics::eMotionType::Dynamic
 																					: physics::eMotionType::Static;
 
-	RebuildBrush(object, std::move(brush), is_dynamic);
+	if (is_patch) {
+		RebuildPatch(object, std::move(patch));
+	}
+	else {
+		RebuildBrush(object, std::move(brush), is_dynamic);
+	}
 
 	AssetTicket ticket(static_cast<void*>(object));
 	ticket.MarkAndSignalLoaded();
@@ -1440,6 +1703,13 @@ void Blockout::RebuildObject(Object* object)
 
 	physics::Body* body = gPhysics->GetBody(object->PhysicsID);
 	if (body == nullptr) {
+		return;
+	}
+
+	const Patch* existing_patch = GetPatch(object);
+
+	if (existing_patch != nullptr) {
+		RebuildPatch(object, existing_patch->Clone());
 		return;
 	}
 
@@ -1487,6 +1757,7 @@ void Blockout::DestroyObject(Object* object)
 	}
 
 	mBrushes.Remove(object->ID.GetID());
+	mPatches.Remove(object->ID.GetID());
 
 	gWorld->Detach(object->ID);
 	gObjectManager->DestroyObject(object->ID);
@@ -1598,7 +1869,14 @@ Object* Blockout::DupeObject(Object* object)
 		gObjectScripts->SetRequiredEnterDirection(dupe->ID, enter_direction);
 	}
 
-	RebuildBrush(dupe, std::move(brush), motion_type);
+	const Patch* source_patch = GetPatch(object);
+
+	if (source_patch != nullptr) {
+		RebuildPatch(dupe, source_patch->Clone());
+	}
+	else {
+		RebuildBrush(dupe, std::move(brush), motion_type);
+	}
 
 	AssetTicket ticket(static_cast<void*>(dupe));
 	ticket.MarkAndSignalLoaded();
@@ -1654,6 +1932,54 @@ bool Blockout::IsDynamic(const Object* object) const
 	return object != nullptr && GetMotionType(object) == physics::eMotionType::Dynamic;
 }
 
+static String MakeRestoredName(const Name& name, uint32 object_count)
+{
+	const String base_name = name.Get().IsEmpty() ? String::Fmt("{}", object_count).Str() : name.Get();
+
+	String restored_name = base_name;
+
+	if (gObjectManager->FindObject(HashStr32(restored_name.CStr())) != nullptr) {
+		int suffix = 0;
+		do {
+			restored_name = String::Fmt("{}_undo{}", base_name, suffix++).Str();
+		} while (gObjectManager->FindObject(HashStr32(restored_name.CStr())) != nullptr);
+	}
+
+	return restored_name;
+}
+
+Object* Blockout::RestorePatch(const Vec3f position, const Patch& patch, MaterialID material, const Quat rotation,
+							   const Name& name)
+{
+	if (!patch.IsValid()) {
+		LogError("Cannot restore patch '{}', it is invalid", name.Get());
+		return nullptr;
+	}
+
+	const String patch_name = MakeRestoredName(name, BlockoutObjects.Size);
+
+	LogInfo("Restoring patch '{}'", patch_name);
+
+	Object* object = gObjectManager->NewObject(
+		patch_name, material.IsNull() ? mMaterials.GetMaterial(scEditableMaterialID) : material, eObjectTag::Blockout);
+
+	object->MoveBy(position);
+	object->SetShadowCaster(true);
+	object->SetRotation(rotation);
+	object->SubviewInstance = mActiveSubview;
+
+	RebuildPatch(object, patch.Clone());
+
+	AssetTicket ticket(static_cast<void*>(object));
+	ticket.MarkAndSignalLoaded();
+
+	pWorld->Attach(ticket);
+
+	BlockoutObjects.NewItem(nullptr, object->ID);
+
+	return object;
+}
+
 Object* Blockout::RestoreObject(const Vec3f position, const Brush::PlaneList& planes, MaterialID material,
 								const Quat rotation, const Name& name, bool is_dynamic, bool is_decal)
 {
@@ -1664,17 +1990,7 @@ Object* Blockout::RestoreObject(const Vec3f position, const Brush::PlaneList& pl
 		return nullptr;
 	}
 
-	String base_name = name.Get().IsEmpty() ? String::Fmt("{}", BlockoutObjects.Size).Str() : name.Get();
-
-	// Make sure the names are unique
-	String blockout_name = base_name;
-
-	if (gObjectManager->FindObject(HashStr32(blockout_name.CStr())) != nullptr) {
-		int suffix = 0;
-		do {
-			blockout_name = String::Fmt("{}_undo{}", base_name, suffix++).Str();
-		} while (gObjectManager->FindObject(HashStr32(blockout_name.CStr())) != nullptr);
-	}
+	const String blockout_name = MakeRestoredName(name, BlockoutObjects.Size);
 
 	LogInfo("Restoring blockout object '{}'", blockout_name);
 
@@ -1824,29 +2140,9 @@ void Blockout::LoadLights(ConfigFile& info)
 		}
 	}
 
-	// 	std::vector<LightID> stale_lights;
-	//
-	// 	for (const Ref<LightBase>& light : gLightManager->GetCache()) {
-	// 		if (!light.IsValid() || (light->Type != eLightType::Point && light->Type != eLightType::Spot)) {
-	// 			continue;
-	// 		}
-	//
-	// 		bool in_file = false;
-	//
-	// 		if (light_list) {
-	// 			for (const ConfigEntry& light_entry : light_list->Members) {
-	// 				in_file |= (light_entry.Name.GetHash() == light->Name.GetHash());
-	// 			}
-	// 		}
-	//
-	// 		if (!in_file) {
-	// 			stale_lights.push_back(light->ID);
-	// 		}
-	// 	}
-	//
-	// 	for (LightID& id : stale_lights) {
-	// 		gLightManager->RemoveLight(id);
-	// 	}
+	if (renderer::gShadowAtlas != nullptr) {
+		renderer::gShadowAtlas->Invalidate();
+	}
 }
 
 void Blockout::SaveLights(ConfigFile& info)
@@ -2763,12 +3059,23 @@ bool Blockout::GetBrushBounds(Object* const* objects, uint32 count, BBox& out_bo
 	for (uint32 i = 0; i < count; i++) {
 		Object* member = objects[i];
 		const Brush* brush = GetBrush(member);
+		const Patch* patch = GetPatch(member);
 
-		if (brush == nullptr) {
+		if (brush == nullptr && patch == nullptr) {
 			continue;
 		}
 
 		const Mat4f world = member->GetWorldMatrix();
+
+		if (patch != nullptr) {
+			const OBBox box = OBBox::FromLocalBounds(member->Bounds, world);
+			const BBox world_bounds = box.GetWorldAABB();
+
+			min = Vec3f::Min(min, world_bounds.Min);
+			max = Vec3f::Max(max, world_bounds.Max);
+			has_bounds = true;
+			continue;
+		}
 
 		for (const Vec3f vertex : brush->GetVertices()) {
 			const Vec4f point = world * Vec4f(vertex.X, vertex.Y, vertex.Z, 1.0f);
@@ -2797,15 +3104,15 @@ uint32 Blockout::CreateSubview(const String& name, Object* const* objects, uint3
 
 	for (uint32 i = 0; i < count; i++) {
 		Object* object = objects[i];
-		const Brush* brush = GetBrush(object);
+		Vec3f center;
 
-		if (brush == nullptr) {
+		if (!GetLocalCenter(object, center)) {
 			LogError(LC_ASSET, "'{}' is not a brush, so it can't be part of a subview", object->Name.Get());
 			return scNoSubview;
 		}
 
 		const BrushPlacement local = RemoveFromSubview(BrushPlacement { object->GetPosition(), object->mRotation },
-													   brush->GetCenter(), placement);
+													   center, placement);
 
 		brushes.AddMember(MakeBrushEntry(object, String::Fmt("{}", i), local));
 	}
@@ -3072,14 +3379,14 @@ void Blockout::PlaceSubviewEntities(const SubviewInstance& instance)
 	GetSubviewMembers(instance.ID, members);
 
 	for (Object* member : members) {
-		const Brush* brush = GetBrush(member);
+		Vec3f center;
 
-		if (brush == nullptr || member->SubviewMember >= subview->Brushes.Members.Size()) {
+		if (!GetLocalCenter(member, center) || member->SubviewMember >= subview->Brushes.Members.Size()) {
 			continue;
 		}
 
 		const BrushPlacement local = ReadBrushPlacement(subview->Brushes.Members[member->SubviewMember]);
-		const BrushPlacement world = PlaceInSubview(local, brush->GetCenter(), instance.Placement);
+		const BrushPlacement world = PlaceInSubview(local, center, instance.Placement);
 
 		member->SetPosition(world.Position);
 		member->SetRotation(world.Rotation);
@@ -3170,14 +3477,14 @@ void Blockout::CommitActiveSubview()
 	uint32 member_index = 0;
 
 	for (Object* member : members) {
-		const Brush* brush = GetBrush(member);
+		Vec3f center;
 
-		if (brush == nullptr) {
+		if (!GetLocalCenter(member, center)) {
 			continue;
 		}
 
 		const BrushPlacement local = RemoveFromSubview(BrushPlacement { member->GetPosition(), member->mRotation },
-													   brush->GetCenter(), mActivePlacement);
+													   center, mActivePlacement);
 
 		brushes.AddMember(MakeBrushEntry(member, String::Fmt("{}", member_index), local));
 

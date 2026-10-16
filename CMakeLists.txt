@@ -225,6 +225,7 @@ add_library(mapc_core STATIC
     "Src/Math/BBox.cpp"
     "Src/BrushEntry.cpp"
     "Src/Brush.cpp"
+    "Src/Patch.cpp"
     "Src/Asset/ConfigFile.cpp"
     "Src/Core/Allocator.cpp"
     "Src/Core/File.cpp"

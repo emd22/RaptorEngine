@@ -230,6 +230,10 @@ ProbePlacementBoxes GatherPlacementBoxes()
 			continue;
 		}
 
+		if (object.IsPatch()) {
+			continue;
+		}
+
 		if (object.SubviewInstance != Blockout::scNoSubview && !object.HasTags(eObjectTag::Blockout)) {
 			continue;
 		}

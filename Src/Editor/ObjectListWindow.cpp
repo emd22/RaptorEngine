@@ -40,6 +40,7 @@ static constexpr TagName scTagNames[] = {
 	{ eObjectTag::NvBrush, "nvbrush" },
 	{ eObjectTag::DBound, "dbound" },
 	{ eObjectTag::Decal, "decal" },
+	{ eObjectTag::Patch, "patch" },
 };
 
 static String BuildTagsList(eObjectTag tags)

@@ -10,6 +10,7 @@
 #include "Geometry.hpp"
 
 #include <Map/CompiledMap.hpp>
+#include <Patch.hpp>
 #include <Renderer/ProbePlacement.hpp>
 
 namespace fx::mapc {
@@ -43,6 +44,17 @@ struct SourceBrush
 	const TextureMap* FindMap(int32 plane_index) const;
 };
 
+struct SourcePatch
+{
+	String Name;
+	int32 MaterialIndex = 0;
+
+	bool bCollides = true;
+	bool bCastsShadow = true;
+
+	Patch Shape;
+};
+
 class MapSource
 {
 public:
@@ -51,6 +63,7 @@ public:
 public:
 	/// These three hold strings, so they are sized once from the number of brushes in the prototype and never grow
 	SizedArray<SourceBrush> Brushes;
+	SizedArray<SourcePatch> Patches;
 	SizedArray<CompiledMapMaterial> Materials;
 	SizedArray<String> Warnings;
 
@@ -76,6 +89,7 @@ public:
 	uint32 BoundBrushCount = 0;
 	uint32 TransparentBrushCount = 0;
 	uint32 InvalidBrushCount = 0;
+	uint32 PatchCount = 0;
 
 private:
 	int32 FindOrAddMaterial(const String& name, int32 library_index);

@@ -75,9 +75,13 @@ private:
 	FloatField* mpArchWallField = nullptr;
 	FloatField* mpArchArcField = nullptr;
 	FloatField* mpArchStartField = nullptr;
-	wxBoxSizer* mpBendRow = nullptr;
-	FloatField* mpBendSegmentsField = nullptr;
-	FloatField* mpBendAngleField = nullptr;
+	wxBoxSizer* mpCurveRow = nullptr;
+	FloatField* mpCurveSubdivisionsUField = nullptr;
+	FloatField* mpCurveSubdivisionsVField = nullptr;
+	OutlineToggleButton* mpCurveSmoothButton = nullptr;
+	FloatField* mpCurveThicknessField = nullptr;
+	OutlineToggleButton* mpCurveThickenButton = nullptr;
+	OutlineToggleButton* mpCurveCapButton = nullptr;
 
 	bool mbShows2D = false;
 	eEditorTool mTool = eEditorTool::Select;
@@ -89,7 +93,7 @@ private:
 	float32 mSize[scViewPlaneCount] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
 
 	ArchSettings mArch;
-	BendSettings mBend;
+	CurveSettings mCurve;
 };
 
 } // namespace fx::editor

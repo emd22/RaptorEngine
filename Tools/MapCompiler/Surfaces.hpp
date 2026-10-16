@@ -9,6 +9,7 @@
 
 #include "Bsp.hpp"
 #include "MapSource.hpp"
+#include "Patches.hpp"
 
 #include <Math/Vec2.hpp>
 
@@ -62,6 +63,11 @@ struct LightmapChart
 	Vec3d V = Vec3d(0.0);
 
 	Array<Vec2d> TrianglePoints;
+
+	Array<Vec3d> WorldPoints;
+	Array<Vec3d> Normals;
+
+	bool IsPlanar() const { return WorldPoints.Size == 0; }
 };
 
 struct LightmapVertex
@@ -74,7 +80,7 @@ class SurfaceBuilder
 {
 public:
 	void Build(const PlaneSet& planes, const Bsp& bsp, const MapSource& source, bool sealed,
-			   const SurfaceOptions& options, CompiledMap& out_map);
+			   const SurfaceOptions& options, PatchBuilder* patches, CompiledMap& out_map);
 
 public:
 	SurfaceStats Stats;
@@ -91,7 +97,7 @@ private:
 	void CullFaces(const PlaneSet& planes, const Bsp& bsp, const MapSource& source, bool sealed,
 				   const SurfaceOptions& options);
 	void Triangulate(const PlaneSet& planes, const MapSource& source, const SurfaceOptions& options,
-					 CompiledMap& out_map);
+					 PatchBuilder* patches, CompiledMap& out_map);
 
 private:
 	Array<SurfacePolygon> mPolygons;

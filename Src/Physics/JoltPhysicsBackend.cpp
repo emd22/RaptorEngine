@@ -231,6 +231,8 @@ SizedArray<JPH::BodyID> JoltPhysicsBackend::RaycastObjects(const Vec3f origin, c
 
 
 	JPH::RayCastSettings settings;
+	settings.mBackFaceModeTriangles = JPH::EBackFaceMode::CollideWithBackFaces;
+
 	JPH::AllHitCollisionCollector<JPH::CastRayCollector> collector;
 
 	PhysicsSystem.GetNarrowPhaseQuery().CastRay(rc, settings, collector);

@@ -96,6 +96,51 @@ void Body::CreateMeshBody(const PrimitiveMesh& mesh, physics::eMotionType motion
 	CreateJoltBody(mesh_shape_result.Get(), physics::Body::eFlags::None, motion_type, object_properties);
 }
 
+void Body::CreateTriangleMeshBody(const SizedArray<Vec3f>& positions, const SizedArray<uint32>& indices,
+								  const BodyProps& object_properties)
+{
+	mMotionType = physics::eMotionType::Static;
+	PrimitiveType = ePrimitiveType::None;
+
+	if (positions.IsEmpty() || indices.Size < 3) {
+		LogError(LC_PHYSICS, "Cannot create a triangle mesh collider without triangles");
+		return;
+	}
+
+	JPH::VertexList vertices;
+	vertices.reserve(positions.Size);
+
+	Vec3f min = positions[0];
+	Vec3f max = positions[0];
+
+	for (const Vec3f position : positions) {
+		vertices.push_back(JPH::Float3(position.X, position.Y, position.Z));
+
+		min = Vec3f::Min(min, position);
+		max = Vec3f::Max(max, position);
+	}
+
+	Dimensions = max - min;
+
+	JPH::IndexedTriangleList triangles;
+	triangles.reserve(indices.Size / 3);
+
+	for (size_t index = 0; index + 2 < indices.Size; index += 3) {
+		triangles.push_back(JPH::IndexedTriangle(indices[index], indices[index + 2], indices[index + 1]));
+	}
+
+	JPH::MeshShapeSettings mesh_settings(std::move(vertices), std::move(triangles));
+	JPH::ShapeSettings::ShapeResult mesh_shape_result = mesh_settings.Create();
+
+	if (mesh_shape_result.HasError()) {
+		LogError(LC_PHYSICS, "Failed to create triangle mesh collider: {}", mesh_shape_result.GetError().c_str());
+		return;
+	}
+
+	UpdateJoltBody(mesh_shape_result.Get(), physics::Body::eFlags::None, physics::eMotionType::Static,
+				   object_properties);
+}
+
 void Body::CreateConvexHullBody(const SizedArray<Vec3f>& points, physics::eMotionType motion_type,
 								const BodyProps& object_properties)
 {

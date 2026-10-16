@@ -194,9 +194,82 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 	Min = Vec3d(1e30, 1e30, 1e30);
 	Max = Vec3d(-1e30, -1e30, -1e30);
 
+	Patches.InitCapacity(entry_count);
+
+	const auto add_patch = [&](ConfigEntry& entry, const String& name)
+	{
+		if (IsEntityBrushEntry(entry) || model_colliders.contains(name)) {
+			EntityBrushCount++;
+			return;
+		}
+
+		Patch patch = ReadPatchEntry(entry);
+
+		if (!patch.IsValid()) {
+			Warnings.Emplace(String::Fmt("patch '{}' is not a valid patch, skipped", name));
+			InvalidBrushCount++;
+			return;
+		}
+
+		const Vec3f position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
+		const Transform transform = MakeTransform(ReadRotation(entry), patch.GetCenter(), position);
+
+		for (PatchPoint& point : patch.Points) {
+			const Vec3d world = transform.Apply(ToVec3d(point.Position));
+
+			point.Position = world.ToVec3f();
+
+			Min = MinVec(Min, world);
+			Max = MaxVec(Max, world);
+		}
+
+		const ConfigEntry* material_entry = entry.GetMember(HashStr32("mat"));
+		String material_name;
+
+		if (material_entry != nullptr && material_entry->Type == ConfigEntry::ePrimitiveType::String) {
+			material_name = material_entry->Get<const char*>();
+		}
+
+		const bool is_locked = entry.GetMemberValue(HashStr32("lock"), 0) == 1;
+		const bool is_transparent = !material_name.IsEmpty() && transparent_materials.contains(material_name);
+
+		const int32 material_index = FindOrAddMaterial(material_name,
+													   is_locked ? scLockedMaterialIndex : scEditableMaterialIndex);
+
+		Patch pieces[Patch::scMaxClosurePieces];
+		const uint32 piece_count = patch.BuildClosure(pieces);
+
+		for (uint32 piece = 0; piece <= piece_count; piece++) {
+			SourcePatch& source = Patches.Emplace();
+			source.Name = name;
+			source.MaterialIndex = material_index;
+			source.bCastsShadow = !is_transparent;
+
+			if (piece == 0) {
+				source.Shape = patch.Clone();
+				source.Shape.Closure = ePatchClosure::None;
+			}
+			else {
+				source.Shape = std::move(pieces[piece - 1]);
+
+				for (const PatchPoint& point : source.Shape.Points) {
+					Min = MinVec(Min, ToVec3d(point.Position));
+					Max = MaxVec(Max, ToVec3d(point.Position));
+				}
+			}
+		}
+
+		PatchCount++;
+	};
+
 	const auto add_brush = [&](ConfigEntry& entry)
 	{
 		const String name = entry.Name.Get().CStr();
+
+		if (IsPatchEntry(entry)) {
+			add_patch(entry, name);
+			return;
+		}
 
 		const Brush brush = ReadBrushEntry(entry);
 

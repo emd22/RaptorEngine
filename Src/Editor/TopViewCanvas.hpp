@@ -15,6 +15,7 @@
 #include <Math/Rect.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
+#include <Patch.hpp>
 #include <functional>
 
 class wxGraphicsContext;
@@ -30,14 +31,14 @@ struct ArchSettings
 	float32 StartDegrees = 0.0f;
 };
 
-struct BendSettings
+struct CurveSettings
 {
-	uint32 Segments = 8;
-	float32 AngleDegrees = 0.0f;
-	float32 RegionStart = 0.0f;
-	float32 RegionEnd = 1.0f;
-	bool bSwapAxis = false;
-	bool bPinEnd = false;
+	ePatchPrimitive Primitive = ePatchPrimitive::Cylinder;
+	uint32 SubdivisionsU = Patch::scDefaultSubdivisions;
+	uint32 SubdivisionsV = Patch::scDefaultSubdivisions;
+	bool bSmooth = true;
+	ePatchClosure Closure = ePatchClosure::None;
+	float32 Thickness = Patch::scDefaultThickness;
 };
 
 class TopViewCanvas : public wxWindow
@@ -64,11 +65,8 @@ public:
 	FX_FORCE_INLINE bool HasPendingArch() const { return mbArchPending && mDrag != eDrag::Arch; }
 	void CommitArch();
 	void DiscardArch();
-	void SetBendSettings(const BendSettings& settings);
-	FX_FORCE_INLINE bool HasPendingBend() const { return mTool == eEditorTool::Bend && mBend.AngleDegrees != 0.0f; }
-	void CommitBend();
-	void ResetBend();
-	void SwapBendAxis();
+	void SetCurveSettings(const CurveSettings& settings);
+	void RunPatchCommand(ePatchCommand type);
 
 	void FitAll();
 	void FitSelection();
@@ -77,7 +75,7 @@ public:
 	void SetOnPlaneChanged(std::function<void(eViewPlane)> handler) { mpOnPlaneChanged = std::move(handler); }
 	void SetOnStatus(std::function<void(const wxString&)> handler) { mpOnStatus = std::move(handler); }
 	void SetOnArchChanged(std::function<void(const ArchSettings&)> handler) { mpOnArchChanged = std::move(handler); }
-	void SetOnBendChanged(std::function<void(const BendSettings&)> handler) { mpOnBendChanged = std::move(handler); }
+	void SetOnCurveChanged(std::function<void(const CurveSettings&)> handler) { mpOnCurveChanged = std::move(handler); }
 
 	wxBitmap Render(const wxSize& size);
 
@@ -99,7 +97,6 @@ private:
 		Create,
 		Arch,
 		ArchEdit,
-		Bend,
 		Rotate,
 		Clip,
 		MarkerMove,
@@ -168,6 +165,9 @@ private:
 		Vec2d ClipA { Vec2d::sZero };
 		Vec2d ClipB { Vec2d::sZero };
 
+		bool bSnappedToPatch = false;
+		Vec2d PatchSnapUV { Vec2d::sZero };
+
 		Vec2d AimUV { Vec2d::sZero };
 		double AimDepth = 0.0;
 	};
@@ -224,6 +224,7 @@ private:
 
 	const ViewPlaneAxes& Axes() const;
 	const TopViewProjection& Projection(const TopViewBrush& brush) const;
+	DynArray<Vec2d> CollectVertexHandles(const TopViewBrush& brush) const;
 	Vec3f ToWorldVector(const Vec2d uv, double w) const;
 	Vec2d ProjectPoint(const Vec3f& point) const;
 	double DepthOf(const Vec3f& vector) const;
@@ -234,7 +235,8 @@ private:
 	void BeginVertex();
 	void BeginCreate();
 	void BeginArch(bool double_click);
-	void BeginBend(bool double_click);
+	void BeginCurve();
+	bool BeginHandleDrag();
 	void BeginRotate();
 	void BeginClip();
 	void BeginLight(bool double_click);
@@ -264,18 +266,10 @@ private:
 	void SetArchSides(int32 sides);
 	void NotifyArchChanged();
 
-	bool GetBendFrame(BendFrame& out_frame, uint32& out_along_index) const;
-	Vec2d BendViewPoint(const BendFrame& frame, uint32 along_index, const Vec2d uv) const;
-	Vec2d GetBendKnob(const BendFrame& frame, uint32 along_index, int32 knob) const;
-	double GetBendRegionAcross(uint32 along_index) const;
-	int32 PickBendKnob(const Vec2d uv) const;
-	DynArray<OutlinePreview> BuildBendOutlines(const BendFrame& frame, uint32 along_index) const;
-	void UpdateBendDrag();
-	void DrawBendOutlines(wxGraphicsContext& gc, const DynArray<OutlinePreview>& outlines);
-	bool DrawBend(wxGraphicsContext& gc);
-	void SetBendSegments(int32 segments);
-	void NotifyBendChanged();
-	void ClearBendShape();
+	bool UsesHandles() const;
+	void DrawPatchLattices(wxGraphicsContext& gc);
+	void NotifyCurveChanged();
+	void SyncCurveFromSelection();
 
 	void UpdatePreview();
 	void ClearPreview();
@@ -296,6 +290,7 @@ private:
 	void UpdateHover();
 	bool PickVertexAt(const Vec2d uv, TopViewVertexHandle& out_handle) const;
 	bool IsVertexSelected(ObjectID object_id, const Vec2d uv) const;
+	bool FindPatchSnapPoint(const Vec2d uv, Vec2d& out_point) const;
 	const TopViewBrush* FindBrush(ObjectID object_id) const;
 	ViewBounds GetSelectionBounds() const;
 	bool GetSelectionPivot(Vec2d& out_pivot) const;
@@ -416,16 +411,13 @@ private:
 	double mArchLastAngle = 0.0;
 	double mArchAngleTravel = 0.0;
 
-	BendSettings mBend;
-	BendSettings mBendGrabSettings;
-	int32 mBendGrab = -1;
-	int32 mBendHover = -1;
+	CurveSettings mCurve;
 
 	std::function<void(eEditorTool)> mpOnToolChanged;
 	std::function<void(eViewPlane)> mpOnPlaneChanged;
 	std::function<void(const wxString&)> mpOnStatus;
 	std::function<void(const ArchSettings&)> mpOnArchChanged;
-	std::function<void(const BendSettings&)> mpOnBendChanged;
+	std::function<void(const CurveSettings&)> mpOnCurveChanged;
 };
 
 } // namespace fx::editor

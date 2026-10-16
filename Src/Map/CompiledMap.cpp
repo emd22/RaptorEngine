@@ -250,6 +250,35 @@ bool CompiledMap::Load(const String& path)
 		}
 	}
 
+	CollisionMeshes.InitSize(reader.ReadCount());
+
+	for (CompiledMapCollisionMesh& mesh : CollisionMeshes) {
+		const uint32 point_count = reader.ReadCount();
+		const uint32 index_count = reader.ReadCount();
+
+		if (reader.bFailed || index_count % 3 != 0) {
+			reader.bFailed = true;
+			break;
+		}
+
+		mesh.Points.InitSize(static_cast<size_t>(point_count) * 3);
+		mesh.Indices.InitSize(index_count);
+
+		reader.Read(mesh.Points.pData, mesh.Points.Size);
+		reader.Read(mesh.Indices.pData, mesh.Indices.Size);
+
+		for (const uint32 index : mesh.Indices) {
+			if (index >= point_count) {
+				reader.bFailed = true;
+				break;
+			}
+		}
+
+		if (reader.bFailed) {
+			break;
+		}
+	}
+
 	Probes.VolumeCount = reader.ReadCount();
 
 	if (Probes.VolumeCount > Limits::MaxProbeVolumes) {
@@ -385,6 +414,15 @@ bool CompiledMap::Save(const String& path) const
 	for (const CompiledMapHull& hull : Hulls) {
 		writer.WriteCount(hull.GetPointCount());
 		writer.Write(hull.Points.pData, hull.Points.Size);
+	}
+
+	writer.WriteCount(CollisionMeshes.Size);
+
+	for (const CompiledMapCollisionMesh& mesh : CollisionMeshes) {
+		writer.WriteCount(mesh.GetPointCount());
+		writer.WriteCount(mesh.Indices.Size);
+		writer.Write(mesh.Points.pData, mesh.Points.Size);
+		writer.Write(mesh.Indices.pData, mesh.Indices.Size);
 	}
 
 	writer.WriteCount(Probes.VolumeCount);

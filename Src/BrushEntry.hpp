@@ -11,6 +11,7 @@
 #include <Core/String.hpp>
 #include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
+#include <Patch.hpp>
 #include <functional>
 
 namespace fx {
@@ -44,6 +45,12 @@ eBrushKind ReadBrushKind(const ConfigEntry& entry);
  * textures in `uvs`)
  */
 Brush ReadBrushEntry(ConfigEntry& entry);
+
+constexpr const char* scPatchName = "patch";
+
+bool IsPatchEntry(const ConfigEntry& entry);
+Patch ReadPatchEntry(ConfigEntry& entry);
+void WritePatchEntry(ConfigEntry& entry, const Patch& patch);
 
 /////////////////////////////////////
 // Subviews

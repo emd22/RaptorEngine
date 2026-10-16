@@ -32,6 +32,7 @@ struct LightmapStats
 	uint32 Height = 0;
 	uint32 ChartCount = 0;
 	uint32 OccluderCount = 0;
+	uint32 OccluderTriangleCount = 0;
 
 	double Density = 0.0;
 
@@ -48,7 +49,7 @@ class LightmapBaker
 {
 public:
 	bool Bake(const PlaneSet& planes, const MapSource& source, const SurfaceBuilder& surfaces,
-			  const LightmapOptions& options, CompiledMap& out_map);
+			  const PatchBuilder* patches, const LightmapOptions& options, CompiledMap& out_map);
 
 public:
 	LightmapStats Stats;

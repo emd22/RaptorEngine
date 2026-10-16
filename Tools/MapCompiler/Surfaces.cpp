@@ -642,59 +642,12 @@ public:
 	{
 		uint32 fixed_count = 0;
 
-		const Vec3d padding(scOnEdgeEpsilon, scOnEdgeEpsilon, scOnEdgeEpsilon);
-
 		mFixedLoop.Clear();
 
 		for (size_t i = 0; i < loop.Size; i++) {
 			const int32 from_index = loop[i];
-			const int32 to_index = loop[(i + 1) % loop.Size];
 
-			const Vec3d& from = mPoints[static_cast<size_t>(from_index)];
-			const Vec3d& to = mPoints[static_cast<size_t>(to_index)];
-
-			mInserts.Clear();
-
-			const auto test_point = [&](int32 index)
-			{
-				double fraction = 0.0;
-
-				if (index != from_index && index != to_index &&
-					IsOnSegment(mPoints[static_cast<size_t>(index)], from, to, fraction)) {
-					mInserts.Emplace(fraction, index);
-				}
-			};
-
-			const CellKey min_cell = GetCell(MinVec(from, to) - padding, scEdgeGridCellSize);
-			const CellKey max_cell = GetCell(MaxVec(from, to) + padding, scEdgeGridCellSize);
-
-			const int64 cell_count = (max_cell.X - min_cell.X + 1) * (max_cell.Y - min_cell.Y + 1) *
-									 (max_cell.Z - min_cell.Z + 1);
-
-			if (cell_count > scMaxEdgeGridCells) {
-				for (const int32 index : mCandidates) {
-					test_point(index);
-				}
-			}
-			else {
-				for (int64 x = min_cell.X; x <= max_cell.X; x++) {
-					for (int64 y = min_cell.Y; y <= max_cell.Y; y++) {
-						for (int64 z = min_cell.Z; z <= max_cell.Z; z++) {
-							const auto found = mGrid.find(CellKey { x, y, z });
-
-							if (found == mGrid.end()) {
-								continue;
-							}
-
-							for (const int32 index : found->second) {
-								test_point(index);
-							}
-						}
-					}
-				}
-			}
-
-			std::sort(mInserts.begin(), mInserts.end());
+			FindInserts(from_index, loop[(i + 1) % loop.Size]);
 
 			mFixedLoop.Emplace(from_index);
 
@@ -711,6 +664,59 @@ public:
 		return fixed_count;
 	}
 
+	const Array<std::pair<double, int32>>& FindInserts(int32 from_index, int32 to_index)
+	{
+		const Vec3d padding(scOnEdgeEpsilon, scOnEdgeEpsilon, scOnEdgeEpsilon);
+
+		const Vec3d& from = mPoints[static_cast<size_t>(from_index)];
+		const Vec3d& to = mPoints[static_cast<size_t>(to_index)];
+
+		mInserts.Clear();
+
+		const auto test_point = [&](int32 index)
+		{
+			double fraction = 0.0;
+
+			if (index != from_index && index != to_index &&
+				IsOnSegment(mPoints[static_cast<size_t>(index)], from, to, fraction)) {
+				mInserts.Emplace(fraction, index);
+			}
+		};
+
+		const CellKey min_cell = GetCell(MinVec(from, to) - padding, scEdgeGridCellSize);
+		const CellKey max_cell = GetCell(MaxVec(from, to) + padding, scEdgeGridCellSize);
+
+		const int64 cell_count = (max_cell.X - min_cell.X + 1) * (max_cell.Y - min_cell.Y + 1) *
+								 (max_cell.Z - min_cell.Z + 1);
+
+		if (cell_count > scMaxEdgeGridCells) {
+			for (const int32 index : mCandidates) {
+				test_point(index);
+			}
+		}
+		else {
+			for (int64 x = min_cell.X; x <= max_cell.X; x++) {
+				for (int64 y = min_cell.Y; y <= max_cell.Y; y++) {
+					for (int64 z = min_cell.Z; z <= max_cell.Z; z++) {
+						const auto found = mGrid.find(CellKey { x, y, z });
+
+						if (found == mGrid.end()) {
+							continue;
+						}
+
+						for (const int32 index : found->second) {
+							test_point(index);
+						}
+					}
+				}
+			}
+		}
+
+		std::sort(mInserts.begin(), mInserts.end());
+
+		return mInserts;
+	}
+
 private:
 	const Array<Vec3d>& mPoints;
 	const Array<int32>& mCandidates;
@@ -719,6 +725,129 @@ private:
 	Array<std::pair<double, int32>> mInserts;
 	Loop mFixedLoop;
 };
+
+PatchSurfaceVertex BlendPatchVertices(const PatchSurfaceVertex& a, const PatchSurfaceVertex& b, double weight)
+{
+	PatchSurfaceVertex vertex;
+	vertex.Position = a.Position + (b.Position - a.Position) * weight;
+	vertex.Texcoord = a.Texcoord + (b.Texcoord - a.Texcoord) * weight;
+	vertex.Chart = a.Chart + (b.Chart - a.Chart) * weight;
+	vertex.Handedness = a.Handedness;
+
+	const Vec3d normal = a.Normal + (b.Normal - a.Normal) * weight;
+	const double normal_length = normal.Length();
+
+	vertex.Normal = a.Normal;
+
+	if (normal_length > 0.0) {
+		vertex.Normal = normal * (1.0 / normal_length);
+	}
+
+	const Vec3d tangent = a.Tangent + (b.Tangent - a.Tangent) * weight;
+	const Vec3d projected = tangent - vertex.Normal * vertex.Normal.Dot(tangent);
+	const double tangent_length = projected.Length();
+
+	vertex.Tangent = a.Tangent;
+
+	if (tangent_length > 0.0) {
+		vertex.Tangent = projected * (1.0 / tangent_length);
+	}
+
+	return vertex;
+}
+
+uint32 StitchPatch(PatchSurface& surface, const Array<int32>& weld, TJunctionFixer& fixer, const Array<Vec3d>& points)
+{
+	uint32 inserted_count = 0;
+
+	Array<int32> indices;
+	Array<int32> polygon;
+
+	for (size_t triangle = 0; triangle + 2 < surface.Indices.Size; triangle += 3) {
+		const int32 corners[3] = { surface.Indices[triangle], surface.Indices[triangle + 1],
+								   surface.Indices[triangle + 2] };
+
+		polygon.Clear();
+
+		uint32 split_edges = 0;
+		uint32 split_edge = 0;
+
+		for (uint32 edge = 0; edge < 3; edge++) {
+			const int32 from = corners[edge];
+			const int32 to = corners[(edge + 1) % 3];
+
+			polygon.Emplace(from);
+
+			const int32 weld_from = weld[static_cast<size_t>(from)];
+			const int32 weld_to = weld[static_cast<size_t>(to)];
+
+			if (weld_from < 0 || weld_to < 0) {
+				continue;
+			}
+
+			const Array<std::pair<double, int32>>& inserts = fixer.FindInserts(weld_from, weld_to);
+
+			if (inserts.Size == 0) {
+				continue;
+			}
+
+			split_edges++;
+			split_edge = edge;
+
+			for (const auto& [fraction, point_index] : inserts) {
+				PatchSurfaceVertex vertex = BlendPatchVertices(surface.Vertices[static_cast<size_t>(from)],
+															   surface.Vertices[static_cast<size_t>(to)], fraction);
+				vertex.Position = points[static_cast<size_t>(point_index)];
+
+				polygon.Emplace(static_cast<int32>(surface.Vertices.Size));
+				surface.Vertices.Emplace(vertex);
+
+				inserted_count++;
+			}
+		}
+
+		if (split_edges == 0) {
+			indices.Emplace(corners[0]);
+			indices.Emplace(corners[1]);
+			indices.Emplace(corners[2]);
+			continue;
+		}
+
+		if (split_edges == 1) {
+			const int32 apex = corners[(split_edge + 2) % 3];
+			size_t start = 0;
+
+			while (polygon[start] != apex) {
+				start++;
+			}
+
+			for (size_t i = 1; i + 1 < polygon.Size; i++) {
+				indices.Emplace(apex);
+				indices.Emplace(polygon[(start + i) % polygon.Size]);
+				indices.Emplace(polygon[(start + i + 1) % polygon.Size]);
+			}
+
+			continue;
+		}
+
+		PatchSurfaceVertex center = BlendPatchVertices(surface.Vertices[static_cast<size_t>(corners[0])],
+													   surface.Vertices[static_cast<size_t>(corners[1])], 0.5);
+		center = BlendPatchVertices(center, surface.Vertices[static_cast<size_t>(corners[2])], 1.0 / 3.0);
+
+		const int32 center_index = static_cast<int32>(surface.Vertices.Size);
+		surface.Vertices.Emplace(center);
+
+		for (size_t i = 0; i < polygon.Size; i++) {
+			indices.Emplace(center_index);
+			indices.Emplace(polygon[i]);
+			indices.Emplace(polygon[(i + 1) % polygon.Size]);
+		}
+	}
+
+	surface.Indices = std::move(indices);
+
+	return inserted_count;
+}
 
 struct SurfaceGroup
 {
@@ -888,7 +1017,7 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 }
 
 void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source, const SurfaceOptions& options,
-								 CompiledMap& out_map)
+								 PatchBuilder* patches, CompiledMap& out_map)
 {
 	VertexWelder welder;
 
@@ -916,7 +1045,41 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 		group.Polygons.Emplace(std::move(loop));
 	}
 
+	Array<Array<int32>> patch_welds;
+
+	if (patches != nullptr) {
+		Array<std::pair<int32, int32>> boundary;
+
+		for (PatchSurface& surface : patches->Surfaces) {
+			Array<int32>& weld = patch_welds.Emplace();
+			Fill(weld, static_cast<uint32>(surface.Vertices.Size), -1);
+
+			PatchBuilder::FindBoundaryEdges(surface, boundary);
+
+			for (const auto& [from, to] : boundary) {
+				for (const int32 vertex : { from, to }) {
+					if (weld[static_cast<size_t>(vertex)] < 0) {
+						weld[static_cast<size_t>(vertex)] = welder.Add(
+							surface.Vertices[static_cast<size_t>(vertex)].Position);
+					}
+				}
+			}
+		}
+	}
+
 	const Array<Vec3d>& points = welder.Points;
+
+	for (uint32 surface_index = 0; surface_index < patch_welds.Size; surface_index++) {
+		PatchSurface& surface = patches->Surfaces[surface_index];
+
+		for (uint32 vertex = 0; vertex < patch_welds[surface_index].Size; vertex++) {
+			const int32 index = patch_welds[surface_index][vertex];
+
+			if (index >= 0) {
+				surface.Vertices[vertex].Position = points[static_cast<size_t>(index)];
+			}
+		}
+	}
 
 	Array<int32> all_points;
 
@@ -958,6 +1121,14 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 			}
 		}
 
+		for (const Array<int32>& weld : patch_welds) {
+			for (const int32 index : weld) {
+				if (index >= 0) {
+					is_corner[static_cast<size_t>(index)] = true;
+				}
+			}
+		}
+
 		Array<int32> corners;
 
 		for (size_t i = 0; i < points.Size; i++) {
@@ -973,6 +1144,11 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 				Stats.TJunctionsFixed += fixer.Fix(loop);
 			}
 		}
+
+		for (uint32 surface_index = 0; surface_index < patch_welds.Size; surface_index++) {
+			patches->Stats.TJunctionsFixed += StitchPatch(patches->Surfaces[surface_index], patch_welds[surface_index],
+														  fixer, points);
+		}
 	}
 
 	struct Batch
@@ -984,6 +1160,7 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 		Array<uint32> Indices;
 
 		std::map<std::tuple<int32, int32, int32, int32>, uint32> VertexLookup;
+		std::map<std::pair<uint32, int32>, uint32> PatchVertexLookup;
 	};
 
 	std::map<std::tuple<int32, int64, int64, int64>, Batch> batches;
@@ -1117,6 +1294,81 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 		}
 	}
 
+	uint32 patch_triangle_count = 0;
+	uint32 patch_vertex_count = 0;
+
+	if (patches != nullptr) {
+		for (uint32 surface_index = 0; surface_index < patches->Surfaces.Size; surface_index++) {
+			const PatchSurface& surface = patches->Surfaces[surface_index];
+
+			int32 chart_index = -1;
+
+			if (options.bMakeLightmapCharts && surface.Indices.Size >= 3) {
+				chart_index = static_cast<int32>(Charts.Size);
+
+				LightmapChart& chart = Charts.Emplace();
+
+				for (const int32 index : surface.Indices) {
+					const PatchSurfaceVertex& vertex = surface.Vertices[static_cast<size_t>(index)];
+
+					chart.TrianglePoints.Emplace(vertex.Chart);
+					chart.WorldPoints.Emplace(vertex.Position);
+					chart.Normals.Emplace(vertex.Normal);
+				}
+			}
+
+			for (size_t triangle = 0; triangle + 2 < surface.Indices.Size; triangle += 3) {
+				Vec3d center = Vec3d(0.0);
+
+				for (uint32 corner = 0; corner < 3; corner++) {
+					center = center +
+							 surface.Vertices[static_cast<size_t>(surface.Indices[triangle + corner])].Position;
+				}
+
+				CellKey cell;
+
+				if (options.ChunkSize > 0.0) {
+					cell = GetCell(center * (1.0 / 3.0), options.ChunkSize);
+				}
+
+				Batch& batch = batches[{ surface.MaterialIndex, cell.X, cell.Y, cell.Z }];
+				batch.MaterialIndex = static_cast<uint32>(surface.MaterialIndex);
+
+				for (uint32 corner = 0; corner < 3; corner++) {
+					const int32 vertex_index = surface.Indices[triangle + corner];
+					const PatchSurfaceVertex& source_vertex = surface.Vertices[static_cast<size_t>(vertex_index)];
+
+					auto found = batch.PatchVertexLookup.find({ surface_index, vertex_index });
+
+					if (found == batch.PatchVertexLookup.end()) {
+						CompiledMapVertex vertex {};
+						vertex.Position = source_vertex.Position.ToVec3f();
+						vertex.Normal = source_vertex.Normal.ToVec3f();
+						vertex.Tangent = Vec4f(source_vertex.Tangent.ToVec3f(),
+											   static_cast<float32>(source_vertex.Handedness));
+						vertex.Texcoord = Vec2f(static_cast<float32>(source_vertex.Texcoord.X),
+												static_cast<float32>(source_vertex.Texcoord.Y));
+
+						found = batch.PatchVertexLookup
+									.emplace(std::make_pair(surface_index, vertex_index), batch.Vertices.Size)
+									.first;
+						batch.Vertices.Emplace(vertex);
+						batch.LightmapVertices.Emplace(LightmapVertex { chart_index, source_vertex.Chart });
+
+						patch_vertex_count++;
+					}
+
+					batch.Indices.Emplace(found->second);
+					TrianglePoints.Emplace(source_vertex.Position);
+				}
+
+				patch_triangle_count++;
+			}
+		}
+
+		patches->Stats.Triangles = patch_triangle_count;
+	}
+
 	out_map.Surfaces.InitCapacity(batches.size());
 
 	for (auto& [key, batch] : batches) {
@@ -1153,11 +1405,14 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 		LightmapVertices.Emplace(std::move(batch.LightmapVertices));
 	}
 
+	Stats.NumTriangles -= patch_triangle_count;
+	Stats.NumVertices -= patch_vertex_count;
+
 	out_map.Materials.InitAsCopyOf(source.Materials);
 }
 
 void SurfaceBuilder::Build(const PlaneSet& planes, const Bsp& bsp, const MapSource& source, bool sealed,
-						   const SurfaceOptions& options, CompiledMap& out_map)
+						   const SurfaceOptions& options, PatchBuilder* patches, CompiledMap& out_map)
 {
 	Stats = SurfaceStats {};
 	TrianglePoints.Clear();
@@ -1170,7 +1425,7 @@ void SurfaceBuilder::Build(const PlaneSet& planes, const Bsp& bsp, const MapSour
 
 	Stats.NumPolygonsBeforeMerge = static_cast<uint32>(mPolygons.Size);
 
-	Triangulate(planes, source, options, out_map);
+	Triangulate(planes, source, options, patches, out_map);
 }
 
 } // namespace fx::mapc

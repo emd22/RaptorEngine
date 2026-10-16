@@ -2,6 +2,7 @@
 
 #include <Asset/ConfigFile.hpp>
 #include <Map/CompiledMap.hpp>
+#include <algorithm>
 #include <cstring>
 #include <filesystem>
 #include <unordered_map>
@@ -105,6 +106,112 @@ Brush ReadBrushEntry(ConfigEntry& entry)
 	return Brush::FromPlanes(planes);
 }
 
+constexpr uint32 scValuesPerPatchPoint = 5;
+
+bool IsPatchEntry(const ConfigEntry& entry) { return entry.GetMember(HashStr32(scPatchName)) != nullptr; }
+
+Patch ReadPatchEntry(ConfigEntry& entry)
+{
+	ConfigEntry* size_entry = entry.GetMember(HashStr32(scPatchName));
+	ConfigEntry* points_entry = entry.GetMember(HashStr32("points"));
+
+	if (size_entry == nullptr || points_entry == nullptr) {
+		return {};
+	}
+
+	const PagedArray<ConfigPrimitive>& size = size_entry->GetArrayData();
+
+	if (size.Size() < 2) {
+		return {};
+	}
+
+	Patch patch = Patch::FromGrid(size[0].Get<uint32>(), size[1].Get<uint32>());
+
+	if (patch.Points.IsEmpty()) {
+		LogError("Patch '{}' has an invalid size", entry.Name.Get());
+		return {};
+	}
+
+	const PagedArray<ConfigPrimitive>& values = points_entry->GetArrayData();
+
+	if (values.Size() != patch.Points.Size * scValuesPerPatchPoint) {
+		LogError("Patch '{}' has {} point values, expected {}", entry.Name.Get(), values.Size(),
+				 patch.Points.Size * scValuesPerPatchPoint);
+		return {};
+	}
+
+	for (uint32 i = 0; i < patch.Points.Size; i++) {
+		const uint32 base = i * scValuesPerPatchPoint;
+		PatchPoint& point = patch.Points[i];
+
+		point.Position = Vec3f(values[base].Get<float32>(), values[base + 1].Get<float32>(),
+							   values[base + 2].Get<float32>());
+		point.Texcoord = Vec2f(values[base + 3].Get<float32>(), values[base + 4].Get<float32>());
+	}
+
+	ConfigEntry* subdivisions_entry = entry.GetMember(HashStr32("subdiv"));
+
+	if (subdivisions_entry != nullptr && subdivisions_entry->GetArrayData().Size() >= 2) {
+		const PagedArray<ConfigPrimitive>& subdivisions = subdivisions_entry->GetArrayData();
+
+		patch.SubdivisionsU = std::clamp(subdivisions[0].Get<uint32>(), Patch::scMinSubdivisions,
+										 Patch::scMaxSubdivisions);
+		patch.SubdivisionsV = std::clamp(subdivisions[1].Get<uint32>(), Patch::scMinSubdivisions,
+										 Patch::scMaxSubdivisions);
+	}
+
+	patch.bSmooth = entry.GetMemberValue<int32>(HashStr32("smooth"), 1) != 0;
+	patch.SmoothingGroup = static_cast<uint32>(entry.GetMemberValue<int32>(HashStr32("smoothgroup"), 0));
+
+	if (entry.GetMember(HashStr32("thicken")) != nullptr) {
+		patch.Closure = ePatchClosure::Thicken;
+		patch.Thickness = entry.GetMemberValue<float32>(HashStr32("thicken"), Patch::scDefaultThickness);
+	}
+	else if (entry.GetMemberValue<int32>(HashStr32("cap"), 0) != 0) {
+		patch.Closure = ePatchClosure::Cap;
+	}
+
+	return patch;
+}
+
+void WritePatchEntry(ConfigEntry& entry, const Patch& patch)
+{
+	ConfigEntry size_array = ConfigEntry::Array(scPatchName, ConfigPrimitive::ePrimitiveType::Int);
+	size_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(patch.Width)));
+	size_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(patch.Height)));
+	entry.AddMember(std::move(size_array));
+
+	ConfigEntry points_array = ConfigEntry::Array("points", ConfigPrimitive::ePrimitiveType::Float);
+
+	for (const PatchPoint& point : patch.Points) {
+		points_array.AppendValue(ConfigPrimitive::FromValue(point.Position.X));
+		points_array.AppendValue(ConfigPrimitive::FromValue(point.Position.Y));
+		points_array.AppendValue(ConfigPrimitive::FromValue(point.Position.Z));
+		points_array.AppendValue(ConfigPrimitive::FromValue(point.Texcoord.X));
+		points_array.AppendValue(ConfigPrimitive::FromValue(point.Texcoord.Y));
+	}
+
+	entry.AddMember(std::move(points_array));
+
+	ConfigEntry subdivisions_array = ConfigEntry::Array("subdiv", ConfigPrimitive::ePrimitiveType::Int);
+	subdivisions_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(patch.SubdivisionsU)));
+	subdivisions_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(patch.SubdivisionsV)));
+	entry.AddMember(std::move(subdivisions_array));
+
+	entry.AddMember(ConfigEntry::Literal("smooth", static_cast<int32>(patch.bSmooth)));
+
+	if (patch.SmoothingGroup != 0) {
+		entry.AddMember(ConfigEntry::Literal("smoothgroup", static_cast<int32>(patch.SmoothingGroup)));
+	}
+
+	if (patch.Closure == ePatchClosure::Cap) {
+		entry.AddMember(ConfigEntry::Literal("cap", static_cast<int32>(1)));
+	}
+	else if (patch.Closure == ePatchClosure::Thicken) {
+		entry.AddMember(ConfigEntry::Literal("thicken", patch.Thickness));
+	}
+}
+
 /////////////////////////////////////
 // Subviews
 /////////////////////////////////////
@@ -201,17 +308,32 @@ ConfigEntry PlaceSubviewBrushEntry(ConfigEntry& brush_entry, const String& name,
 {
 	ConfigEntry placed(name);
 
-	const Brush brush = ReadBrushEntry(brush_entry);
+	Vec3f center = Vec3f::sZero;
 
-	if (!brush.IsValid()) {
-		return placed;
+	if (IsPatchEntry(brush_entry)) {
+		const Patch patch = ReadPatchEntry(brush_entry);
+
+		if (!patch.IsValid()) {
+			return placed;
+		}
+
+		center = patch.GetCenter();
+	}
+	else {
+		const Brush brush = ReadBrushEntry(brush_entry);
+
+		if (!brush.IsValid()) {
+			return placed;
+		}
+
+		center = brush.GetCenter();
 	}
 
 	BrushPlacement local;
 	local.Position = brush_entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
 	local.Rotation = ReadBrushRotation(brush_entry);
 
-	const BrushPlacement world = PlaceInSubview(local, brush.GetCenter(), instance);
+	const BrushPlacement world = PlaceInSubview(local, center, instance);
 
 	placed.AddMember(ConfigEntry::Literal("pos", world.Position));
 	placed.AddMember(ConfigEntry::Literal("rotquat", world.Rotation));

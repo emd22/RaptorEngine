@@ -41,13 +41,6 @@ constexpr double scMinArchWall = 0.01;
 constexpr double scArchHandleRadius = 4.0;
 constexpr double scArchCenterCross = 5.0;
 constexpr double scArchKnobPixels = 16.0;
-constexpr double scBendHandleRadius = 4.5;
-constexpr uint32 scBendCurveSamples = 48;
-constexpr int32 scBendSearchSteps = 720;
-constexpr double scBendSearchStep = FX_PI / 360.0;
-constexpr int32 scBendRefineSteps = 50;
-constexpr double scBendRegionOffset = 18.0;
-constexpr double scBendRegionHandleRadius = 5.0;
 constexpr double scMinRotateAngle = 1e-4;
 constexpr long long scHoldMilliseconds = 1500;
 
@@ -96,8 +89,8 @@ constexpr const char* scToolHints[] = {
 	"Drag corners, Shift adds, " FX_TOP_VIEW_FREE_KEY " ignores snap",
 	"Drag to create a brush, " FX_TOP_VIEW_FREE_KEY " ignores snap",
 	"Drag a box to lay out an arch, then shape it with the handles, " FX_TOP_VIEW_FREE_KEY " ignores snap",
-	"Drag an end knob of the selection to bend it, the bar handles set where it curves, [ ] segments, Tab swaps "
-	"the axis, " FX_TOP_VIEW_FREE_KEY " ignores snap",
+	"Drag to create a patch, drag the control points of the selected patches, Shift adds, [ ] "
+	"subdivisions, " FX_TOP_VIEW_FREE_KEY " ignores snap",
 	"Drag a box to project a decal onto the surface behind it, " FX_TOP_VIEW_FREE_KEY " ignores snap",
 	"Drag around the pivot, " FX_TOP_VIEW_FREE_KEY " ignores snap",
 	"Drag a line across the selected brushes to split them, Esc deselects, " FX_TOP_VIEW_FREE_KEY " ignores snap",
@@ -109,14 +102,11 @@ static_assert(std::size(scToolHints) == static_cast<size_t>(eEditorTool::Count))
 constexpr const char* scArchPendingHint = "Drag the handles to reshape, [ ] sides, arrows nudge, Enter or double-click "
 										  "builds, Esc cancels, " FX_TOP_VIEW_FREE_KEY " ignores snap";
 
-constexpr const char* scBendPendingHint = "Drag a knob to bend that end (the square end stays put), the bar handles set where it curves, [ ] segments, Tab swaps the axis, Enter or "
-										  "double-click bends, Esc straightens, " FX_TOP_VIEW_FREE_KEY " ignores snap";
-
 constexpr double scMetricSteps[] = { 0.1, 0.5, 1.0, 5.0, 10.0, 50.0, 100.0, 500.0, 1000.0, 5000.0, 10000.0 };
 
 constexpr int scDimMarkerAlpha = 110;
 
-constexpr uint32 scKindCount = 7;
+constexpr uint32 scKindCount = 8;
 constexpr uint32 scBucketCount = scKindCount * 2;
 
 constexpr int scDimGeometryAlpha = 70;
@@ -138,9 +128,16 @@ wxColour GetKindColour(const EditorTheme& theme, eTopViewBrushKind kind)
 		return ToWxColour(theme.Brush.DBound);
 	case eTopViewBrushKind::Decal:
 		return ToWxColour(theme.Brush.Decal);
+	case eTopViewBrushKind::Patch:
+		return ToWxColour(theme.Brush.Patch);
 	default:
 		return ToWxColour(theme.Brush.Geometry);
 	}
+}
+
+bool IsSolidKind(eTopViewBrushKind kind)
+{
+	return kind == eTopViewBrushKind::Geometry || kind == eTopViewBrushKind::Patch;
 }
 
 wxColour GetAxisColour(const EditorTheme& theme, uint32 axis)
@@ -218,31 +215,6 @@ void GetArchDirectionBounds(const ArchSettings& arch, Vec2d& out_low, Vec2d& out
 }
 
 Vec2f ToVec2f(const Vec2d& vector) { return Vec2f(static_cast<float32>(vector.X), static_cast<float32>(vector.Y)); }
-
-double GetComponent(const Vec2d& vector, uint32 index)
-{
-	if (index == 0) {
-		return vector.X;
-	}
-
-	return vector.Y;
-}
-
-Vec2d FromBendComponents(uint32 along_index, double along, double across)
-{
-	if (along_index == 0) {
-		return Vec2d(along, across);
-	}
-
-	return Vec2d(across, along);
-}
-
-uint32 GetMinBendSegments(double angle_degrees)
-{
-	const double angle = std::fabs(angle_degrees) * FX_PI / 180.0;
-
-	return static_cast<uint32>(std::floor(angle / scMaxBendSegmentAngle)) + 1;
-}
 
 bool IsSameHandle(const Vec2d& a, const Vec2d& b)
 {
@@ -593,6 +565,34 @@ const TopViewProjection& TopViewCanvas::Projection(const TopViewBrush& brush) co
 	return brush.Views[static_cast<uint32>(mPlane)];
 }
 
+DynArray<Vec2d> TopViewCanvas::CollectVertexHandles(const TopViewBrush& brush) const
+{
+	if (brush.Kind == eTopViewBrushKind::Patch) {
+		DynArray<Vec2d> handles;
+
+		for (const Vec2f& control_point : Projection(brush).ControlPoints) {
+			const Vec2d point = ToVec2d(control_point);
+			bool is_merged = false;
+
+			for (const Vec2d& handle : handles) {
+				is_merged = is_merged || IsSameHandle(handle, point);
+			}
+
+			if (!is_merged) {
+				handles.Insert(point);
+			}
+		}
+
+		return handles;
+	}
+
+	if (mTool == eEditorTool::Curve) {
+		return {};
+	}
+
+	return CollectHandles(Projection(brush));
+}
+
 Vec3f TopViewCanvas::ToWorldVector(const Vec2d uv, double w) const
 {
 	const ViewPlaneAxes& axes = Axes();
@@ -645,7 +645,7 @@ void TopViewCanvas::ApplyState(const TopViewState& state)
 			bool found = false;
 
 			if (brush != nullptr && brush->bSelected) {
-				for (const Vec2d& point : CollectHandles(Projection(*brush))) {
+				for (const Vec2d& point : CollectVertexHandles(*brush)) {
 					found = found || IsSameHandle(point, ToVec2d(handle.Position));
 				}
 			}
@@ -657,6 +657,8 @@ void TopViewCanvas::ApplyState(const TopViewState& state)
 
 		mSelectedVertices = std::move(kept);
 	}
+
+	SyncCurveFromSelection();
 
 	TryInitialFit();
 	UpdateHover();
@@ -725,19 +727,13 @@ void TopViewCanvas::ApplyTool(eEditorTool tool)
 
 	mTool = tool;
 
-	if (tool != eEditorTool::Vertex) {
+	if (tool != eEditorTool::Vertex && tool != eEditorTool::Curve) {
 		mSelectedVertices.Clear();
 	}
 
 	if (tool != eEditorTool::Arch) {
 		mbArchPending = false;
 		mArchHover = eArchHandle::None;
-	}
-
-	mBendHover = -1;
-
-	if (tool != eEditorTool::Bend) {
-		ClearBendShape();
 	}
 
 	if (mpOnToolChanged) {
@@ -784,9 +780,6 @@ void TopViewCanvas::SetPlane(eViewPlane plane)
 		mSelectedVertices.Clear();
 		mbArchPending = false;
 		mArchHover = eArchHandle::None;
-		mBendHover = -1;
-
-		ClearBendShape();
 	}
 
 	if (mpOnPlaneChanged) {
@@ -836,85 +829,73 @@ void TopViewCanvas::NotifyArchChanged()
 	UpdateStatus();
 }
 
-void TopViewCanvas::SetBendSettings(const BendSettings& settings)
+void TopViewCanvas::SetCurveSettings(const CurveSettings& settings)
 {
-	mBend = settings;
-	mBend.AngleDegrees = std::clamp(mBend.AngleDegrees, -360.0f, 360.0f);
-	mBend.Segments = std::clamp<uint32>(mBend.Segments, 1, scMaxBendSegments);
-	mBend.RegionStart = std::clamp(mBend.RegionStart, 0.0f, 1.0f);
-	mBend.RegionEnd = std::clamp(mBend.RegionEnd, mBend.RegionStart, 1.0f);
+	mCurve = settings;
+	mCurve.SubdivisionsU = std::clamp(mCurve.SubdivisionsU, Patch::scMinSubdivisions, Patch::scMaxSubdivisions);
+	mCurve.SubdivisionsV = std::clamp(mCurve.SubdivisionsV, Patch::scMinSubdivisions, Patch::scMaxSubdivisions);
+}
 
-	const uint32 min_segments = GetMinBendSegments(mBend.AngleDegrees);
+void TopViewCanvas::NotifyCurveChanged()
+{
+	if (mpOnCurveChanged) {
+		mpOnCurveChanged(mCurve);
+	}
+}
 
-	if (mBend.Segments < min_segments) {
-		mBend.Segments = min_segments;
-		NotifyBendChanged();
+void TopViewCanvas::RunPatchCommand(ePatchCommand type)
+{
+	PatchCommand command;
+	command.Type = type;
+	command.SubdivisionsU = mCurve.SubdivisionsU;
+	command.SubdivisionsV = mCurve.SubdivisionsV;
+	command.bSmooth = mCurve.bSmooth;
+	command.Closure = mCurve.Closure;
+	command.Thickness = mCurve.Thickness;
+
+	DynArray<TopViewVertexHandle> handles = mSelectedVertices.Clone();
+	const eViewPlane plane = mPlane;
+
+	if (type != ePatchCommand::SetSubdivisions && type != ePatchCommand::SetSmooth &&
+		type != ePatchCommand::NaturalTexture && type != ePatchCommand::SetClosure) {
+		mSelectedVertices.Clear();
 	}
 
-	UpdateHover();
-	UpdateStatus();
+	SendCommand([plane, command, handles = std::move(handles)]
+				{ gEditor->TopViewPatchCommand(plane, command, handles); });
+
 	Refresh();
 }
 
-void TopViewCanvas::SetBendSegments(int32 segments)
+void TopViewCanvas::SyncCurveFromSelection()
 {
-	const int32 min_segments = static_cast<int32>(GetMinBendSegments(mBend.AngleDegrees));
+	for (const TopViewBrush& brush : mState.Brushes) {
+		if (!brush.bSelected || brush.Kind != eTopViewBrushKind::Patch) {
+			continue;
+		}
 
-	mBend.Segments = static_cast<uint32>(
-		std::clamp<int32>(segments, min_segments, static_cast<int32>(scMaxBendSegments)));
+		float32 thickness = mCurve.Thickness;
 
-	NotifyBendChanged();
-	Refresh();
-}
+		if (brush.PatchClosure == ePatchClosure::Thicken) {
+			thickness = brush.PatchThickness;
+		}
 
-void TopViewCanvas::NotifyBendChanged()
-{
-	mBend.Segments = std::clamp(mBend.Segments, GetMinBendSegments(mBend.AngleDegrees), scMaxBendSegments);
+		if (brush.PatchSubdivisionsU != mCurve.SubdivisionsU || brush.PatchSubdivisionsV != mCurve.SubdivisionsV ||
+			brush.bPatchSmooth != mCurve.bSmooth || brush.PatchClosure != mCurve.Closure ||
+			thickness != mCurve.Thickness) {
+			mCurve.SubdivisionsU = brush.PatchSubdivisionsU;
+			mCurve.SubdivisionsV = brush.PatchSubdivisionsV;
+			mCurve.bSmooth = brush.bPatchSmooth;
+			mCurve.Closure = brush.PatchClosure;
+			mCurve.Thickness = thickness;
+			NotifyCurveChanged();
+		}
 
-	if (mpOnBendChanged) {
-		mpOnBendChanged(mBend);
-	}
-
-	UpdateStatus();
-}
-
-void TopViewCanvas::ClearBendShape()
-{
-	if (mBend.AngleDegrees == 0.0f && mBend.RegionStart == 0.0f && mBend.RegionEnd == 1.0f) {
 		return;
 	}
-
-	mBend.AngleDegrees = 0.0f;
-	mBend.RegionStart = 0.0f;
-	mBend.RegionEnd = 1.0f;
-	NotifyBendChanged();
 }
 
-void TopViewCanvas::ResetBend()
-{
-	if (mDrag == eDrag::Bend) {
-		CancelDrag();
-	}
-
-	ClearBendShape();
-
-	UpdateHover();
-	UpdateCursor();
-	Refresh();
-}
-
-void TopViewCanvas::SwapBendAxis()
-{
-	if (mDrag == eDrag::Bend) {
-		return;
-	}
-
-	mBend.bSwapAxis = !mBend.bSwapAxis;
-	NotifyBendChanged();
-
-	UpdateHover();
-	Refresh();
-}
+bool TopViewCanvas::UsesHandles() const { return mTool == eEditorTool::Vertex || mTool == eEditorTool::Curve; }
 
 void TopViewCanvas::SendCommand(thread::Task command)
 {
@@ -1394,7 +1375,7 @@ void TopViewCanvas::DrawBrushes(wxGraphicsContext& gc, const wxSize& size)
 			continue;
 		}
 
-		if (!brush.bSelected && brush.Kind != eTopViewBrushKind::Geometry && projection.Hull.Size >= 3) {
+		if (!brush.bSelected && !IsSolidKind(brush.Kind) && projection.Hull.Size >= 3) {
 			wxGraphicsPath& fill = volume_fills[static_cast<uint32>(brush.Kind)];
 
 			for (uint32 i = 0; i < projection.Hull.Size; i++) {
@@ -1460,7 +1441,7 @@ void TopViewCanvas::DrawBrushes(wxGraphicsContext& gc, const wxSize& size)
 
 	for (uint32 kind = 0; kind < scKindCount; kind++) {
 		const wxColour colour = GetKindColour(theme, static_cast<eTopViewBrushKind>(kind));
-		const bool is_geometry = (kind == static_cast<uint32>(eTopViewBrushKind::Geometry));
+		const bool is_geometry = IsSolidKind(static_cast<eTopViewBrushKind>(kind));
 
 		gc.SetPen(wxPen(colour, 1));
 		gc.StrokePath(paths[kind * 2]);
@@ -1496,7 +1477,9 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 		return DRect(top_left, bottom_right);
 	};
 
-	if (mTool == eEditorTool::Vertex) {
+	if (UsesHandles()) {
+		DrawPatchLattices(gc);
+
 		const bool live = (mDrag == eDrag::Vertex) && (mPreview.Kind == eDrag::Vertex);
 
 		for (const TopViewBrush& brush : mState.Brushes) {
@@ -1504,7 +1487,7 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 				continue;
 			}
 
-			for (const Vec2d& point : CollectHandles(Projection(brush))) {
+			for (const Vec2d& point : CollectVertexHandles(brush)) {
 				const bool selected = IsVertexSelected(brush.ObjectId, point);
 				const bool hovered = mbHoverVertex && mHoverVertex.ObjectId == brush.ObjectId &&
 									 IsSameHandle(point, ToVec2d(mHoverVertex.Position));
@@ -1523,6 +1506,15 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 								hovered ? 2 : 1));
 				gc.DrawRectangle(screen.X - half, screen.Y - half, half * 2.0, half * 2.0);
 			}
+		}
+
+		if (live && mPreview.bSnappedToPatch) {
+			const Vec2d screen = ToScreenCoords(mPreview.PatchSnapUV);
+			const double radius = scHandleHalfSize + 4.0;
+
+			gc.SetBrush(*wxTRANSPARENT_BRUSH);
+			gc.SetPen(wxPen(ToWxColour(theme.Tool.Vertex), 2));
+			gc.DrawEllipse(screen.X - radius, screen.Y - radius, radius * 2.0, radius * 2.0);
 		}
 	}
 
@@ -1639,16 +1631,6 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 
 	if (mPreview.Kind == eDrag::Arch) {
 		DrawArch(gc, mPreview.RectUV, false);
-		return;
-	}
-
-	if (mPreview.Kind == eDrag::Bend) {
-		DrawBendOutlines(gc, mPreview.Outlines);
-		return;
-	}
-
-	if (mTool == eEditorTool::Bend && (mDrag == eDrag::None || mDrag == eDrag::Bend) &&
-		mPreview.Kind == eDrag::None && DrawBend(gc)) {
 		return;
 	}
 
@@ -1970,13 +1952,60 @@ bool TopViewCanvas::PickVertexAt(const Vec2d uv, TopViewVertexHandle& out_handle
 			continue;
 		}
 
-		for (const Vec2d& point : CollectHandles(Projection(brush))) {
+		for (const Vec2d& point : CollectVertexHandles(brush)) {
 			const double distance = (point - uv).Length();
 
 			if (distance <= best) {
 				best = distance;
 				found = true;
 				out_handle = TopViewVertexHandle { brush.ObjectId, ToVec2f(point) };
+			}
+		}
+	}
+
+	return found;
+}
+
+bool TopViewCanvas::FindPatchSnapPoint(const Vec2d uv, Vec2d& out_point) const
+{
+	if (mbSnapBypass) {
+		return false;
+	}
+
+	const double tolerance = scVertexPickPixels / mScale;
+
+	double best = tolerance;
+	bool found = false;
+
+	for (const TopViewBrush& brush : mState.Brushes) {
+		if (brush.Kind != eTopViewBrushKind::Patch) {
+			continue;
+		}
+
+		const TopViewProjection& projection = Projection(brush);
+		bool is_moving = false;
+
+		if (brush.bSelected) {
+			for (const Vec2f& control_point : projection.ControlPoints) {
+				is_moving = is_moving || IsVertexSelected(brush.ObjectId, ToVec2d(control_point));
+			}
+		}
+
+		if (is_moving) {
+			continue;
+		}
+
+		for (const TopViewEdge& edge : projection.Edges) {
+			const Vec2d ends[2] = { ToVec2d(edge.A), ToVec2d(edge.B) };
+
+			for (const Vec2d& point : ends) {
+				const double distance = (point - uv).Length();
+
+				if (distance <= best) {
+					best = distance;
+					found = true;
+					out_point = point;
+				}
 			}
 		}
 	}
@@ -1991,12 +2020,10 @@ void TopViewCanvas::UpdateHover()
 	const bool had_vertex = mbHoverVertex;
 	const TopViewVertexHandle previous_vertex = mHoverVertex;
 	const eArchHandle previous_arch = mArchHover;
-	const int32 previous_bend = mBendHover;
 
 	mbHoverFace = false;
 	mbHoverVertex = false;
 	mArchHover = eArchHandle::None;
-	mBendHover = -1;
 
 	if (mDrag == eDrag::None && mbHovering && !mbSpaceDown && !mbAltDown) {
 		if (mTool == eEditorTool::Face) {
@@ -2008,14 +2035,11 @@ void TopViewCanvas::UpdateHover()
 				mHoverFace = Projection(mState.Brushes[brush_index]).Faces[face_index];
 			}
 		}
-		else if (mTool == eEditorTool::Vertex) {
+		else if (UsesHandles()) {
 			mbHoverVertex = PickVertexAt(mHover, mHoverVertex);
 		}
 		else if (mTool == eEditorTool::Arch) {
 			mArchHover = PickArchHandle(mHover);
-		}
-		else if (mTool == eEditorTool::Bend) {
-			mBendHover = PickBendKnob(mHover);
 		}
 	}
 
@@ -2024,7 +2048,7 @@ void TopViewCanvas::UpdateHover()
 												   !(mHoverVertex.Position == previous_vertex.Position)));
 
 	if (mbHoverFace != had_face || (mbHoverFace && !(mHoverFace == previous_face)) || vertex_changed ||
-		mArchHover != previous_arch || mBendHover != previous_bend) {
+		mArchHover != previous_arch) {
 		UpdateCursor();
 		Refresh();
 	}
@@ -2488,8 +2512,8 @@ void TopViewCanvas::BeginTool(const wxMouseEvent& event)
 	case eEditorTool::Arch:
 		BeginArch(event.ButtonDClick());
 		break;
-	case eEditorTool::Bend:
-		BeginBend(event.ButtonDClick());
+	case eEditorTool::Curve:
+		BeginCurve();
 		break;
 	case eEditorTool::Rotate:
 		BeginRotate();
@@ -2659,7 +2683,7 @@ void TopViewCanvas::BeginFace()
 	mDrag = eDrag::Face;
 }
 
-void TopViewCanvas::BeginVertex()
+bool TopViewCanvas::BeginHandleDrag()
 {
 	TopViewVertexHandle handle;
 
@@ -2681,6 +2705,15 @@ void TopViewCanvas::BeginVertex()
 		mGrabbedVertex = handle;
 		mbHoverVertex = false;
 		mDrag = eDrag::Vertex;
+		return true;
+	}
+
+	return false;
+}
+
+void TopViewCanvas::BeginVertex()
+{
+	if (BeginHandleDrag()) {
 		return;
 	}
 
@@ -2742,32 +2775,30 @@ void TopViewCanvas::BeginArchEdit(eArchHandle handle)
 	}
 }
 
-void TopViewCanvas::BeginBend(bool double_click)
+void TopViewCanvas::BeginCurve()
 {
-	const int32 knob = PickBendKnob(mPress);
+	if (BeginHandleDrag()) {
+		return;
+	}
 
-	if (knob >= 0) {
-		mDrag = eDrag::Bend;
-		mBendGrab = knob;
-		mBendGrabSettings = mBend;
+	for (const int32 hit : PickAt(mPress)) {
+		const TopViewBrush& clicked = mState.Brushes[hit];
 
-		if (knob < 2) {
-			mBend.bPinEnd = (knob == 0);
+		if (clicked.Kind != eTopViewBrushKind::Patch) {
+			continue;
+		}
+
+		mSelectedVertices.Clear();
+
+		if (!clicked.bSelected || GetSelectedCount() > 1) {
+			SelectBrush(clicked.ObjectId, mbAdditive ? eTopViewSelectMode::Add : eTopViewSelectMode::Replace);
 		}
 
 		return;
 	}
 
-	if (double_click && HasPendingBend()) {
-		const ViewBounds bounds = GetSelectionBounds();
-
-		if (bounds.bValid && bounds.Rect.Contains(mPress)) {
-			CommitBend();
-			return;
-		}
-	}
-
-	BeginSelect();
+	mSelectedVertices.Clear();
+	BeginCreate();
 }
 
 void TopViewCanvas::BeginRotate()
@@ -2854,9 +2885,6 @@ void TopViewCanvas::UpdatePreview()
 	}
 
 	switch (mDrag) {
-	case eDrag::Bend:
-		UpdateBendDrag();
-		break;
 	case eDrag::Move: {
 		Vec2d delta = mCurrent - mPress;
 
@@ -2912,18 +2940,29 @@ void TopViewCanvas::UpdatePreview()
 	}
 	case eDrag::Vertex: {
 		const Vec2d grabbed = ToVec2d(mGrabbedVertex.Position);
-		const Vec2d target = Snap(grabbed + (mCurrent - mPress));
+		const Vec2d moved = grabbed + (mCurrent - mPress);
+
+		Vec2d patch_point = Vec2d::sZero;
+		const bool snapped_to_patch = FindPatchSnapPoint(moved, patch_point);
+
+		Vec2d target = patch_point;
+
+		if (!snapped_to_patch) {
+			target = Snap(moved);
+		}
 
 		mPreview = Preview();
 		mPreview.Kind = eDrag::Vertex;
 		mPreview.OffsetUV = target - grabbed;
+		mPreview.bSnappedToPatch = snapped_to_patch;
+		mPreview.PatchSnapUV = patch_point;
 
 		for (const TopViewBrush& brush : mState.Brushes) {
-			if (!brush.bSelected) {
+			if (!brush.bSelected || brush.Kind == eTopViewBrushKind::Patch) {
 				continue;
 			}
 
-			DynArray<Vec2d> points = CollectHandles(Projection(brush));
+			DynArray<Vec2d> points = CollectVertexHandles(brush);
 			bool moves_any = false;
 
 			for (Vec2d& point : points) {
@@ -3074,11 +3113,6 @@ void TopViewCanvas::CancelDrag()
 		mArchGrab = eArchHandle::None;
 		NotifyArchChanged();
 	}
-	else if (mDrag == eDrag::Bend) {
-		mBend = mBendGrabSettings;
-		mBendGrab = -1;
-		NotifyBendChanged();
-	}
 
 	mDrag = eDrag::None;
 
@@ -3103,9 +3137,6 @@ void TopViewCanvas::OnCaptureLost(wxMouseCaptureLostEvent&)
 	else if (mDrag == eDrag::ArchEdit) {
 		mDrag = eDrag::None;
 		FinishArchEdit();
-	}
-	else if (mDrag == eDrag::Bend) {
-		mBendGrab = -1;
 	}
 
 	if (mDrag != eDrag::None) {
@@ -3150,9 +3181,6 @@ void TopViewCanvas::OnLeftUp(wxMouseEvent&)
 		break;
 	case eDrag::ArchEdit:
 		FinishArchEdit();
-		break;
-	case eDrag::Bend:
-		mBendGrab = -1;
 		break;
 	case eDrag::Rotate:
 		FinishRotate();
@@ -3217,7 +3245,7 @@ void TopViewCanvas::FinishVertex()
 
 void TopViewCanvas::FinishMarquee()
 {
-	if (mTool == eEditorTool::Vertex) {
+	if (UsesHandles()) {
 		if (!mbDragMoved) {
 			if (!mbAdditive) {
 				mSelectedVertices.Clear();
@@ -3237,7 +3265,7 @@ void TopViewCanvas::FinishMarquee()
 				continue;
 			}
 
-			for (const Vec2d& point : CollectHandles(Projection(brush))) {
+			for (const Vec2d& point : CollectVertexHandles(brush)) {
 				if (rect.Contains(point) && !IsVertexSelected(brush.ObjectId, point)) {
 					mSelectedVertices.Insert(TopViewVertexHandle { brush.ObjectId, ToVec2f(point) });
 				}
@@ -3380,6 +3408,21 @@ void TopViewCanvas::FinishCreate()
 
 	if (is_decal) {
 		SendCommand([plane, min, max, drop_to_ground] { gEditor->TopViewCreateDecal(plane, min, max, drop_to_ground); });
+		return;
+	}
+
+	if (mTool == eEditorTool::Curve) {
+		const ePatchPrimitive primitive = mCurve.Primitive;
+
+		PatchCommand settings;
+		settings.SubdivisionsU = mCurve.SubdivisionsU;
+		settings.SubdivisionsV = mCurve.SubdivisionsV;
+		settings.bSmooth = mCurve.bSmooth;
+		settings.Closure = mCurve.Closure;
+		settings.Thickness = mCurve.Thickness;
+
+		SendCommand([plane, primitive, min, max, drop_to_ground, settings]
+					{ gEditor->TopViewCreatePatch(plane, primitive, min, max, drop_to_ground, settings); });
 		return;
 	}
 
@@ -3854,438 +3897,59 @@ void TopViewCanvas::DrawArch(wxGraphicsContext& gc, const DRect& rect, bool show
 	}
 }
 
-bool TopViewCanvas::GetBendFrame(BendFrame& out_frame, uint32& out_along_index) const
-{
-	const ViewBounds bounds = GetSelectionBounds();
-
-	if (!bounds.bValid) {
-		return false;
-	}
-
-	const Vec2d extent = bounds.Rect.GetExtent();
-	const Vec2d centre = bounds.Rect.GetCenter();
-
-	uint32 along_index = 0;
-
-	if (extent.Y > extent.X) {
-		along_index = 1;
-	}
-
-	if (mBend.bSwapAxis) {
-		along_index = 1 - along_index;
-	}
-
-	const uint32 across_index = 1 - along_index;
-	const double length = GetComponent(extent, along_index);
-
-	if (length < scMinCreateSize) {
-		return false;
-	}
-
-	out_frame.Along = ToWorldVector(FromBendComponents(along_index, 1.0, 0.0), 0.0);
-	out_frame.Across = ToWorldVector(FromBendComponents(along_index, 0.0, 1.0), 0.0);
-	out_frame.Start = static_cast<float32>(GetComponent(bounds.Rect.Min, along_index));
-	out_frame.Length = static_cast<float32>(length);
-	out_frame.Middle = static_cast<float32>(GetComponent(centre, across_index));
-	out_frame.CurveStart = static_cast<float32>(out_frame.Start + length * mBend.RegionStart);
-	out_frame.CurveEnd = static_cast<float32>(out_frame.Start + length * mBend.RegionEnd);
-	out_frame.bPinEnd = mBend.bPinEnd;
-
-	out_frame.Angle = static_cast<float32>(mBend.AngleDegrees * FX_PI / 180.0);
-	out_frame.Segments = std::max<uint32>(mBend.Segments, 1);
-	out_along_index = along_index;
-
-	return true;
-}
-
-Vec2d TopViewCanvas::BendViewPoint(const BendFrame& frame, uint32 along_index, const Vec2d uv) const
-{
-	const Vec2d bent = BendCoordinates(frame, GetComponent(uv, along_index), GetComponent(uv, 1 - along_index));
-
-	return FromBendComponents(along_index, bent.X, bent.Y);
-}
-
-Vec2d TopViewCanvas::GetBendKnob(const BendFrame& frame, uint32 along_index, int32 knob) const
-{
-	double along = frame.Start;
-
-	if (knob == 1) {
-		along += frame.Length;
-	}
-
-	return BendViewPoint(frame, along_index, FromBendComponents(along_index, along, frame.Middle));
-}
-
-double TopViewCanvas::GetBendRegionAcross(uint32 along_index) const
-{
-	return GetComponent(GetSelectionBounds().Rect.Min, 1 - along_index) - scBendRegionOffset / mScale;
-}
-
-int32 TopViewCanvas::PickBendKnob(const Vec2d uv) const
-{
-	if (mTool != eEditorTool::Bend) {
-		return -1;
-	}
-
-	BendFrame frame;
-	uint32 along_index = 0;
-
-	if (!GetBendFrame(frame, along_index)) {
-		return -1;
-	}
-
-	const Vec2d screen = ToScreenCoords(uv);
-
-	for (int32 knob = 1; knob >= 0; knob--) {
-		if ((ToScreenCoords(GetBendKnob(frame, along_index, knob)) - screen).Length() <= scVertexPickPixels) {
-			return knob;
-		}
-	}
-
-	const double region_across = GetBendRegionAcross(along_index);
-
-	int32 order[2] = { 2, 3 };
-
-	if (mBend.RegionEnd < 1.0f) {
-		order[0] = 3;
-		order[1] = 2;
-	}
-
-	for (const int32 knob : order) {
-		double along = frame.CurveStart;
-
-		if (knob == 3) {
-			along = frame.CurveEnd;
-		}
-
-		const Vec2d handle = FromBendComponents(along_index, along, region_across);
-
-		if ((ToScreenCoords(handle) - screen).Length() <= scVertexPickPixels) {
-			return knob;
-		}
-	}
-
-	return -1;
-}
-
-DynArray<TopViewCanvas::OutlinePreview> TopViewCanvas::BuildBendOutlines(const BendFrame& frame,
-																		  uint32 along_index) const
-{
-	DynArray<OutlinePreview> outlines;
-
-	const Vec2d along_normal = FromBendComponents(along_index, 1.0, 0.0);
-	const uint32 slice_count = GetBendSliceCount(frame);
-
-	for (const TopViewBrush& brush : mState.Brushes) {
-		if (!brush.bSelected) {
-			continue;
-		}
-
-		const DynArray<Vec2f>& hull = Projection(brush).Hull;
-
-		if (hull.Size < 3) {
-			continue;
-		}
-
-		for (uint32 slice_index = 0; slice_index < slice_count; slice_index++) {
-			const BendSlice slice = GetBendSlice(frame, slice_index);
-
-			double low_limit = DBL_MAX;
-			double high_limit = DBL_MAX;
-
-			if (slice.bHasLow) {
-				low_limit = -slice.Low;
-			}
-
-			if (slice.bHasHigh) {
-				high_limit = slice.High;
-			}
-
-			const DynArray<Vec2f> polygon = ClipPolygon(ClipPolygon(hull, along_normal * -1.0, low_limit), along_normal,
-														high_limit);
-
-			if (polygon.Size < 3) {
-				continue;
-			}
-
-			DynArray<Vec2d> points;
-
-			for (const Vec2f& point : polygon) {
-				points.Insert(BendViewPoint(frame, along_index, ToVec2d(point)));
-			}
-
-			OutlinePreview outline;
-			outline.BrushId = brush.ObjectId;
-			outline.Polygon = ConvexHull2D(std::move(points));
-
-			if (outline.Polygon.Size >= 3) {
-				outlines.Insert(std::move(outline));
-			}
-		}
-	}
-
-	return outlines;
-}
-
-void TopViewCanvas::UpdateBendDrag()
-{
-	BendFrame frame;
-	uint32 along_index = 0;
-
-	if (mBendGrab < 0 || !GetBendFrame(frame, along_index)) {
-		return;
-	}
-
-	if (mBendGrab >= 2) {
-		const double along = Snap(GetComponent(mCurrent, along_index));
-		const double fraction = std::clamp((along - frame.Start) / frame.Length, 0.0, 1.0);
-		const float32 gap = static_cast<float32>(std::min(1.0, scMinCreateSize / frame.Length));
-
-		if (mBendGrab == 2) {
-			mBend.RegionStart = std::min(static_cast<float32>(fraction), mBend.RegionEnd - gap);
-			mBend.RegionStart = std::max(mBend.RegionStart, 0.0f);
-		}
-		else {
-			mBend.RegionEnd = std::max(static_cast<float32>(fraction), mBend.RegionStart + gap);
-			mBend.RegionEnd = std::min(mBend.RegionEnd, 1.0f);
-		}
-
-		NotifyBendChanged();
-		return;
-	}
-
-	double end = frame.Start;
-
-	if (mBendGrab == 1) {
-		end += frame.Length;
-	}
-
-	const Vec2d target(GetComponent(mCurrent, along_index), GetComponent(mCurrent, 1 - along_index));
-
-	const auto distance_at = [&frame, end, target](double angle)
-	{
-		frame.Angle = static_cast<float32>(angle);
-		return (BendCoordinates(frame, end, frame.Middle) - target).LengthSquared();
-	};
-
-	double best_angle = 0.0;
-	double best_distance = distance_at(0.0);
-
-	for (int32 step = -scBendSearchSteps; step <= scBendSearchSteps; step++) {
-		const double angle = step * scBendSearchStep;
-		const double distance = distance_at(angle);
-
-		if (distance < best_distance) {
-			best_distance = distance;
-			best_angle = angle;
-		}
-	}
-
-	const double coarse_angle = best_angle;
-
-	for (int32 step = -scBendRefineSteps; step <= scBendRefineSteps; step++) {
-		const double angle = coarse_angle + step * scBendSearchStep / scBendRefineSteps;
-		const double distance = distance_at(angle);
-
-		if (distance < best_distance) {
-			best_distance = distance;
-			best_angle = angle;
-		}
-	}
-
-	best_angle = std::clamp(SnapAngle(best_angle), -2.0 * FX_PI, 2.0 * FX_PI);
-
-	mBend.AngleDegrees = static_cast<float32>(best_angle * 180.0 / FX_PI);
-	NotifyBendChanged();
-}
-
-void TopViewCanvas::DrawBendOutlines(wxGraphicsContext& gc, const DynArray<OutlinePreview>& outlines)
+void TopViewCanvas::DrawPatchLattices(wxGraphicsContext& gc)
 {
 	const EditorTheme& theme = GetEditorTheme();
+	const bool live = (mDrag == eDrag::Vertex) && (mPreview.Kind == eDrag::Vertex);
 
 	wxGraphicsPath path = gc.CreatePath();
 
-	for (const OutlinePreview& outline : outlines) {
-		for (uint32 i = 0; i < outline.Polygon.Size; i++) {
-			const Vec2d screen = ToScreenCoords(ToVec2d(outline.Polygon[i]));
+	for (const TopViewBrush& brush : mState.Brushes) {
+		if (!brush.bSelected || brush.Kind != eTopViewBrushKind::Patch) {
+			continue;
+		}
 
-			if (i == 0) {
-				path.MoveToPoint(screen.X, screen.Y);
+		const TopViewProjection& projection = Projection(brush);
+		const uint32 width = brush.PatchWidth;
+		const uint32 height = brush.PatchHeight;
+
+		if (width == 0 || projection.ControlPoints.Size != width * height) {
+			continue;
+		}
+
+		DynArray<Vec2d> points;
+
+		for (const Vec2f& control_point : projection.ControlPoints) {
+			Vec2d point = ToVec2d(control_point);
+
+			if (live && IsVertexSelected(brush.ObjectId, point)) {
+				point += mPreview.OffsetUV;
 			}
-			else {
-				path.AddLineToPoint(screen.X, screen.Y);
+
+			points.Insert(ToScreenCoords(point));
+		}
+
+		const auto add_line = [&](uint32 from, uint32 to)
+		{
+			path.MoveToPoint(points[from].X, points[from].Y);
+			path.AddLineToPoint(points[to].X, points[to].Y);
+		};
+
+		for (uint32 row = 0; row < height; row++) {
+			for (uint32 column = 0; column + 1 < width; column++) {
+				add_line(row * width + column, row * width + column + 1);
 			}
 		}
 
-		path.CloseSubpath();
+		for (uint32 column = 0; column < width; column++) {
+			for (uint32 row = 0; row + 1 < height; row++) {
+				add_line(row * width + column, (row + 1) * width + column);
+			}
+		}
 	}
 
-	gc.SetBrush(wxBrush(ToWxColour(theme.Tool.CreateFill)));
-	gc.SetPen(wxPen(ToWxColour(theme.Tool.Create), 1));
-	gc.FillPath(path, wxWINDING_RULE);
+	gc.SetPen(wxPen(WithAlpha(ToWxColour(theme.Tool.Vertex), 140), 1, wxPENSTYLE_SHORT_DASH));
 	gc.StrokePath(path);
-}
-
-bool TopViewCanvas::DrawBend(wxGraphicsContext& gc)
-{
-	BendFrame frame;
-	uint32 along_index = 0;
-
-	if (!GetBendFrame(frame, along_index)) {
-		return false;
-	}
-
-	const EditorTheme& theme = GetEditorTheme();
-	const wxColour colour = ToWxColour(theme.Tool.Create);
-
-	if (!IsBendStraight(frame)) {
-		DrawBendOutlines(gc, BuildBendOutlines(frame, along_index));
-	}
-
-	wxGraphicsPath curve = gc.CreatePath();
-
-	const auto add_curve_point = [&](double along, bool first)
-	{
-		const Vec2d screen =
-			ToScreenCoords(BendViewPoint(frame, along_index, FromBendComponents(along_index, along, frame.Middle)));
-
-		if (first) {
-			curve.MoveToPoint(screen.X, screen.Y);
-		}
-		else {
-			curve.AddLineToPoint(screen.X, screen.Y);
-		}
-	};
-
-	add_curve_point(frame.Start, true);
-
-	for (uint32 i = 0; i <= scBendCurveSamples; i++) {
-		add_curve_point(frame.CurveStart + (frame.CurveEnd - frame.CurveStart) * static_cast<double>(i) /
-												scBendCurveSamples,
-						false);
-	}
-
-	add_curve_point(frame.Start + frame.Length, false);
-
-	gc.SetPen(wxPen(WithAlpha(colour, 160), 1, wxPENSTYLE_SHORT_DASH));
-	gc.SetBrush(*wxTRANSPARENT_BRUSH);
-	gc.StrokePath(curve);
-
-	int32 active = mBendHover;
-
-	if (mDrag == eDrag::Bend) {
-		active = mBendGrab;
-	}
-
-	for (int32 knob = 0; knob < 2; knob++) {
-		const Vec2d screen = ToScreenCoords(GetBendKnob(frame, along_index, knob));
-		const bool hot = (knob == active);
-
-		double radius = scBendHandleRadius;
-		wxColour fill = colour;
-
-		if (hot) {
-			radius += 1.5;
-			fill = ToWxColour(theme.Tool.Handle);
-		}
-
-		gc.SetBrush(wxBrush(fill));
-		gc.SetPen(wxPen(ToWxColour(theme.Tool.HandleOutline), 1));
-
-		if ((knob == 1) == mBend.bPinEnd) {
-			gc.DrawRectangle(screen.X - radius, screen.Y - radius, radius * 2.0, radius * 2.0);
-		}
-		else {
-			gc.DrawEllipse(screen.X - radius, screen.Y - radius, radius * 2.0, radius * 2.0);
-		}
-	}
-
-	const double region_across = GetBendRegionAcross(along_index);
-	const Vec2d bar_start = ToScreenCoords(FromBendComponents(along_index, frame.Start, region_across));
-	const Vec2d bar_end = ToScreenCoords(FromBendComponents(along_index, frame.Start + frame.Length, region_across));
-	const Vec2d region_start = ToScreenCoords(FromBendComponents(along_index, frame.CurveStart, region_across));
-	const Vec2d region_end = ToScreenCoords(FromBendComponents(along_index, frame.CurveEnd, region_across));
-
-	gc.SetPen(wxPen(WithAlpha(colour, 110), 1));
-	gc.StrokeLine(bar_start.X, bar_start.Y, bar_end.X, bar_end.Y);
-	gc.SetPen(wxPen(colour, 3));
-	gc.StrokeLine(region_start.X, region_start.Y, region_end.X, region_end.Y);
-
-	for (int32 knob = 2; knob < 4; knob++) {
-		Vec2d screen = region_start;
-
-		if (knob == 3) {
-			screen = region_end;
-		}
-
-		double radius = scBendRegionHandleRadius;
-		wxColour fill = colour;
-
-		if (knob == active) {
-			radius += 1.5;
-			fill = ToWxColour(theme.Tool.Handle);
-		}
-
-		wxGraphicsPath diamond = gc.CreatePath();
-		diamond.MoveToPoint(screen.X, screen.Y - radius);
-		diamond.AddLineToPoint(screen.X + radius, screen.Y);
-		diamond.AddLineToPoint(screen.X, screen.Y + radius);
-		diamond.AddLineToPoint(screen.X - radius, screen.Y);
-		diamond.CloseSubpath();
-
-		gc.SetBrush(wxBrush(fill));
-		gc.SetPen(wxPen(ToWxColour(theme.Tool.HandleOutline), 1));
-		gc.DrawPath(diamond);
-	}
-
-	const Vec2d label = ToScreenCoords(GetBendKnob(frame, along_index, 1));
-
-	uint32 along_axis = Axes().U;
-
-	if (along_index == 1) {
-		along_axis = Axes().V;
-	}
-
-	gc.SetFont(wxFont(wxFontInfo(10)), colour);
-	wxString text = wxString::Format("%.1f deg   %u segments   along %c", mBend.AngleDegrees, frame.Segments,
-									 scAxisNames[along_axis]);
-
-	if (!IsBendStraight(frame)) {
-		const double radius = std::fabs((frame.CurveEnd - frame.CurveStart) / frame.Angle);
-		text += wxString::Format("   radius %.2f", radius);
-	}
-
-	gc.DrawText(text, label.X + 10.0, label.Y - scDimensionLabelTop);
-
-	return true;
-}
-
-void TopViewCanvas::CommitBend()
-{
-	if (!HasPendingBend() || mDrag == eDrag::Bend) {
-		return;
-	}
-
-	BendFrame frame;
-	uint32 along_index = 0;
-
-	if (!GetBendFrame(frame, along_index)) {
-		return;
-	}
-
-	mPreview = Preview();
-	mPreview.Kind = eDrag::Bend;
-	mPreview.Outlines = BuildBendOutlines(frame, along_index);
-	HoldPreview();
-
-	ClearBendShape();
-
-	SendCommand([frame] { gEditor->TopViewBend(frame); });
-
-	UpdateHover();
-	UpdateCursor();
-	UpdateStatus();
-	Refresh();
 }
 
 void TopViewCanvas::FinishRotate()
@@ -4612,7 +4276,7 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 		SetToolFromKey(eEditorTool::Arch);
 		break;
 	case 'N':
-		SetToolFromKey(eEditorTool::Bend);
+		SetToolFromKey(eEditorTool::Curve);
 		break;
 	case 'D':
 		SetToolFromKey(eEditorTool::Decal);
@@ -4641,11 +4305,6 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 		if (HasPendingArch()) {
 			if (mDrag == eDrag::None) {
 				CommitArch();
-			}
-		}
-		else if (HasPendingBend()) {
-			if (mDrag == eDrag::None) {
-				CommitBend();
 			}
 		}
 		else if (const int32 marker = FindSelectedMarker();
@@ -4701,16 +4360,17 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 		if (mTool == eEditorTool::Arch && mDrag != eDrag::ArchEdit) {
 			SetArchSides(static_cast<int32>(mArch.Sides) + ((key == ']') ? 1 : -1));
 		}
-		else if (mTool == eEditorTool::Bend && mDrag != eDrag::Bend) {
-			SetBendSegments(static_cast<int32>(mBend.Segments) + ((key == ']') ? 1 : -1));
-		}
-		else {
-			event.Skip();
-		}
-		break;
-	case WXK_TAB:
-		if (mTool == eEditorTool::Bend && mDrag == eDrag::None) {
-			SwapBendAxis();
+		else if (mTool == eEditorTool::Curve && mDrag == eDrag::None) {
+			const int32 change = (key == ']') ? 1 : -1;
+			const int32 subdivisions = static_cast<int32>(std::max(mCurve.SubdivisionsU, mCurve.SubdivisionsV)) +
+									   change;
+			const uint32 clamped = static_cast<uint32>(
+				std::clamp<int32>(subdivisions, Patch::scMinSubdivisions, Patch::scMaxSubdivisions));
+
+			mCurve.SubdivisionsU = clamped;
+			mCurve.SubdivisionsV = clamped;
+			NotifyCurveChanged();
+			RunPatchCommand(ePatchCommand::SetSubdivisions);
 		}
 		else {
 			event.Skip();
@@ -4723,9 +4383,6 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 		}
 		else if (HasPendingArch()) {
 			DiscardArch();
-		}
-		else if (HasPendingBend()) {
-			ResetBend();
 		}
 		else if (mSelectedVertices.IsNotEmpty()) {
 			mSelectedVertices.Clear();
@@ -4820,12 +4477,12 @@ void TopViewCanvas::UpdateCursor()
 
 		break;
 	}
-	case eEditorTool::Bend:
-		if (mBendHover >= 0 || mDrag == eDrag::Bend) {
+	case eEditorTool::Curve:
+		if (mbHoverVertex || mDrag == eDrag::Vertex) {
 			SetCursor(wxCursor(wxCURSOR_HAND));
 		}
 		else {
-			SetCursor(wxNullCursor);
+			SetCursor(wxCursor(wxCURSOR_CROSS));
 		}
 		break;
 	case eEditorTool::Create:
@@ -4865,10 +4522,6 @@ void TopViewCanvas::UpdateStatus()
 
 	if (mTool == eEditorTool::Arch && HasPendingArch()) {
 		hint = scArchPendingHint;
-	}
-
-	if (HasPendingBend()) {
-		hint = scBendPendingHint;
 	}
 
 	text += wxString::Format("%d brushes, %u selected   |   Snap %s %.2f   |   Zoom %.0f%%   |   %s",

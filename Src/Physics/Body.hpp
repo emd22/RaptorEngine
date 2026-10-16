@@ -70,6 +70,9 @@ public:
 	void CreateConvexHullBody(const SizedArray<Vec3f>& points, physics::eMotionType motion_type,
 							  const BodyProps& object_properties);
 
+	void CreateTriangleMeshBody(const SizedArray<Vec3f>& positions, const SizedArray<uint32>& indices,
+								const BodyProps& object_properties);
+
 	void CreateCompoundHullBody(const SizedArray<SizedArray<Vec3f>>& hulls, physics::eMotionType motion_type,
 								const BodyProps& object_properties);
 

@@ -116,6 +116,7 @@ enum class eTopViewBrushKind : uint8
 	NvBrush,
 	DBound,
 	Decal,
+	Patch,
 };
 
 struct TopViewEdge
@@ -143,6 +144,7 @@ struct TopViewProjection
 	DynArray<Vec2f> Hull;
 	DynArray<TopViewEdge> Edges;
 	DynArray<TopViewFace> Faces;
+	DynArray<Vec2f> ControlPoints;
 
 	TopViewProjection() = default;
 	TopViewProjection(TopViewProjection&& other) = default;
@@ -162,6 +164,7 @@ struct TopViewProjection
 		Hull = other.Hull.Clone();
 		Edges = other.Edges.Clone();
 		Faces = other.Faces.Clone();
+		ControlPoints = other.ControlPoints.Clone();
 
 		return *this;
 	}
@@ -176,6 +179,14 @@ struct TopViewBrush
 
 	bool bSelected = false;
 	bool bSelectable = true;
+
+	uint16 PatchWidth = 0;
+	uint16 PatchHeight = 0;
+	uint16 PatchSubdivisionsU = 0;
+	uint16 PatchSubdivisionsV = 0;
+	bool bPatchSmooth = false;
+	ePatchClosure PatchClosure = ePatchClosure::None;
+	float32 PatchThickness = Patch::scDefaultThickness;
 
 	TopViewProjection Views[scViewPlaneCount];
 

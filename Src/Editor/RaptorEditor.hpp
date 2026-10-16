@@ -152,7 +152,10 @@ public:
 	void TopViewCreate(eViewPlane plane, Vec3f min, Vec3f max, bool drop_to_ground);
 	void TopViewCreateArch(eViewPlane plane, DynArray<Vec3f> points, bool drop_to_ground);
 	void TopViewCreateDecal(eViewPlane plane, Vec3f min, Vec3f max, bool drop_to_ground);
-	void TopViewBend(const BendFrame& frame);
+	void TopViewCreatePatch(eViewPlane plane, ePatchPrimitive primitive, Vec3f min, Vec3f max, bool drop_to_ground,
+							const PatchCommand& settings);
+	void TopViewPatchCommand(eViewPlane plane, const PatchCommand& command,
+							 const DynArray<TopViewVertexHandle>& handles);
 	void TopViewClip(const Vec3f point_a, const Vec3f point_b, const Vec3f view_axis);
 	void TopViewSubtract(bool keep_cutters);
 	void TopViewSelectLight(uint32 light_id);
@@ -175,6 +178,7 @@ public:
 	uint32 SnapSelectionToGrid();
 
 	Object* CreateWorldBox(const Vec3f min, const Vec3f max);
+	Object* CreateWorldPatch(Patch&& world_patch, int32 group_size = 1, MaterialID material = MaterialID::scNull);
 	void FitDBoundsToLevel();
 
 	FX_FORCE_INLINE bool IsSpawnSelected() const { return mbSpawnSelected; }
