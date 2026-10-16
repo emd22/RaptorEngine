@@ -2,13 +2,14 @@
 
 #ifdef FX_IS_EDITOR
 
-#include "EditOperation.hpp"
 #include "EditorPanelState.hpp"
 #include "EditorSelection.hpp"
 #include "EditorTheme.hpp"
 #include "EditorTool.hpp"
 #include "GrabEditor.hpp"
 #include "LightEditor.hpp"
+#include "Operation/BaseOperation.hpp"
+#include "Operation/History.hpp"
 #include "SpawnEditor.hpp"
 
 #include <wx/evtloop.h>
@@ -147,8 +148,7 @@ public:
 	void TopViewMove(const Vec3f offset);
 	void TopViewRotate(const Vec3f axis, float32 angle, const Vec3f pivot, const Vec3f offset);
 	void TopViewMoveFace(const Vec3f world_normal, float32 distance);
-	void TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewVertexHandle>& handles,
-							 const Vec3f offset);
+	void TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewVertexHandle>& handles, const Vec3f offset);
 	void TopViewCreate(eViewPlane plane, Vec3f min, Vec3f max, bool drop_to_ground);
 	void TopViewCreateArch(eViewPlane plane, DynArray<Vec3f> points, bool drop_to_ground);
 	void TopViewCreateDecal(eViewPlane plane, Vec3f min, Vec3f max, bool drop_to_ground);

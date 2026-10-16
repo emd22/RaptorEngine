@@ -6,6 +6,7 @@
 
 #include <Color.hpp>
 #include <Core/String.hpp>
+#include <Editor/Operation/LightOperation.hpp>
 #include <Engine.hpp>
 #include <Renderer/DebugDraw.hpp>
 #include <Renderer/Globals.hpp>

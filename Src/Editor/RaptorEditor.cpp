@@ -38,9 +38,18 @@
 #include <Script/ScriptManager.hpp>
 #include <World.hpp>
 #include <algorithm>
-#include <chrono>
-#include <format>
 #include <vector>
+
+
+/////////////////////////////////////
+// Operation includes
+/////////////////////////////////////
+
+#include "Operation/History.hpp"
+#include "Operation/LightOperation.hpp"
+#include "Operation/ObjectOperation.hpp"
+#include "Operation/SubviewOperation.hpp"
+#include "Operation/WorldOperation.hpp"
 
 
 namespace fx::editor {
@@ -85,7 +94,8 @@ static constexpr uint32 scBrushEditTools = ToolBit(eEditorTool::Face) | ToolBit(
 
 static constexpr uint32 scVisTools = ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Rotate) |
 									 ToolBit(eEditorTool::Create) | ToolBit(eEditorTool::Arch) |
-									 ToolBit(eEditorTool::Curve) | ToolBit(eEditorTool::Decal) | ToolBit(eEditorTool::Clip);
+									 ToolBit(eEditorTool::Curve) | ToolBit(eEditorTool::Decal) |
+									 ToolBit(eEditorTool::Clip);
 
 static constexpr uint32 scDataTools[static_cast<uint32>(eDataFilter::Count)] = {
 	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Light),

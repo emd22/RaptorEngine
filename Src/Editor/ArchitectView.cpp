@@ -32,6 +32,17 @@
 #include <cmath>
 #include <vector>
 
+/////////////////////////////////////
+// Operation includes
+/////////////////////////////////////
+
+#include "Operation/History.hpp"
+#include "Operation/LightOperation.hpp"
+#include "Operation/ObjectOperation.hpp"
+#include "Operation/SubviewOperation.hpp"
+#include "Operation/WorldOperation.hpp"
+
+
 namespace fx::editor {
 
 namespace {
@@ -1551,8 +1562,8 @@ void RaptorEditor::TopViewCreateDecal(eViewPlane plane, Vec3f min, Vec3f max, bo
 	snapshot.Material = GetNewDecalMaterial();
 	snapshot.bIsDecal = true;
 
-	Object* created = EmplaceEditOperation<CreateBrushOperation>(Brush::FromBox(half_extent * -1.0f, half_extent).Planes,
-																 snapshot)
+	Object* created = EmplaceEditOperation<CreateBrushOperation>(
+						  Brush::FromBox(half_extent * -1.0f, half_extent).Planes, snapshot)
 						  .GetCreated();
 
 	if (created != nullptr) {
@@ -1979,10 +1990,7 @@ void RaptorEditor::TopViewShowAll()
 	mbForcePanelSync = true;
 }
 
-void RaptorEditor::TopViewToggleSnap()
-{
-	mToolState.ToolSnapEnabled = !mToolState.ToolSnapEnabled;
-}
+void RaptorEditor::TopViewToggleSnap() { mToolState.ToolSnapEnabled = !mToolState.ToolSnapEnabled; }
 
 void RaptorEditor::TopViewAdjustSnap(int32 direction) { AdjustSnapLevel(direction); }
 

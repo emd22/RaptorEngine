@@ -6,6 +6,7 @@
 #include "RaptorEditor.hpp"
 
 #include <Color.hpp>
+#include <Editor/Operation/WorldOperation.hpp>
 #include <Engine.hpp>
 #include <Physics/PhysicsPlayer.hpp>
 #include <Renderer/DebugDraw.hpp>

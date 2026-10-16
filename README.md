@@ -1,36 +1,36 @@
-![](Screenshots/raptor-logo2.png)
+<img src="Screenshots/raptor-logo2.png" width="200px">
 
-Raptor is a 3D game engine being developed for an experimental game.
+Raptor is a 3D game engine being developed for an experimental game. It features a full brush and patch system (with map compilation!) to build out levels quickly and optimize geometry.
 
 ## Screenshots
 
-|          Global Illumination (Bright)          |       Global Illumination (Dark)        |
-| :--------------------------------------------: | :-------------------------------------: |
-| ![GI test scene](Screenshots/11_GI_Bright.png) | ![After GI](Screenshots/12_GI_Dark.png) |
+|            Integrated Level Builder             |    Global Illumination and Baked Shadows    |
+| :---------------------------------------------: | :-----------------------------------------: |
+| ![Brush Editor](Screenshots/13_BrushEditor.png) | ![Updated GI](Screenshots/14_UpdatedGI.png) |
 
 ## Features
 
 - Tiled forward renderer (Forward+) with Vulkan
-- Blockout editor for building prototype levels fast
-- Baked light probe global illumination
+- Full level editor with game view and 2D architect view
+    - supports brushes and mesh patches
+- Map compilation with baked shadows and polygon/face discard
+- Baked irradiance and reflection probes
 - Fast math library using SIMD
-    - Supports Arm NEON and AVX processors.
-
+    - Supports Arm NEON and AVX processors
 - Scripting with [Strata](https://github.com/StrataLanguage/stratac), compiled JIT
-    - All in-game editor modes are written in Strata.
 - Custom core library and containers
 - Multithreaded and extensible asset manager that works seamlessly in the background
 - Jolt Physics integration
 
 ## Docs
 
-| Name               | Document                                |
-| ------------------ | --------------------------------------- |
-| Config format      | [ConfigFormat.md](Docs/ConfigFormat.md) |
+| Name          | Document                                |
+| ------------- | --------------------------------------- |
+| Config format | [ConfigFormat.md](Docs/ConfigFormat.md) |
 
 ## Building
 
-To build the engine, make sure you have CMake installed.
+_Note: I would not recommend using this engine for your own game. This is designed specifically for my purposes and the game I am working on, and most of the game-specific assets and scripts are private. This respository is public to use as a learning tool and give back to the community that I have learned so much from._
 
 ### Building for MacOS
 

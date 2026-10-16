@@ -6,6 +6,7 @@
 #include <Core/Random.hpp>
 #include <Editor/EditOperation.hpp>
 #include <Editor/EditorTool.hpp>
+#include <Editor/Operation/ObjectOperation.hpp>
 #include <Editor/RaptorEditor.hpp>
 #include <Engine.hpp>
 #include <Math/SIMDHelper.hpp>
@@ -18,7 +19,6 @@
 #include <Script/ObjectScripts.hpp>
 #include <Weapon/WeaponSystem.hpp>
 #include <World.hpp>
-#include <algorithm>
 #include <vector>
 
 namespace fx::script {
@@ -90,8 +90,8 @@ static Vec3f N_editor_push_op_vec3(Object* obj, int op_type, FLOAT4 original, FL
 static Object* N_editor_op_create_object(FLOAT4 position, int32 group_size)
 {
 #ifdef FX_IS_EDITOR
-	return gEditor->EmplaceEditOperation<editor::CreateOperation>(Vec3f(position), group_size,
-																  gEditor->GetNewBrushMaterial())
+	return gEditor
+		->EmplaceEditOperation<editor::CreateOperation>(Vec3f(position), group_size, gEditor->GetNewBrushMaterial())
 		.GetCreated();
 #else
 	return nullptr;
@@ -284,7 +284,7 @@ static FLOAT4 N_object_ray_get_face(Object* obj)
 		Vec3f face_normal;
 
 		if (!gWorld->pPrototype->RaycastFace(obj, gWorld->Player.pCamera->Position,
-											gWorld->Player.pCamera->GetForwardVector(), face_normal)) {
+											 gWorld->Player.pCamera->GetForwardVector(), face_normal)) {
 			return simd::LoadFloat4(0.0f);
 		}
 
@@ -432,7 +432,7 @@ static FLOAT4 N_blockout_ray_hit_point(Object* object)
 
 	if (object == nullptr ||
 		!gWorld->pPrototype->RaycastFace(object, gWorld->Player.pCamera->Position,
-										gWorld->Player.pCamera->GetForwardVector(), face_normal, &point)) {
+										 gWorld->Player.pCamera->GetForwardVector(), face_normal, &point)) {
 		return simd::LoadFloat4(0.0f);
 	}
 
@@ -455,7 +455,7 @@ static void N_blockout_preview_clip(Object* object, FLOAT4 point_a, FLOAT4 point
 	Vec3f split_position;
 
 	if (object == nullptr || !gWorld->pPrototype->GetClipPieces(object, Vec3f(point_a), Vec3f(point_b),
-															   Vec3f(face_normal), kept, split, split_position)) {
+																Vec3f(face_normal), kept, split, split_position)) {
 		gWorld->pPrototype->HidePreview();
 		return;
 	}
@@ -510,7 +510,7 @@ static void N_blockout_edit_face_texture(Object* object, FLOAT4 face, uint32 edi
 	Brush::PlaneList planes_after;
 
 	if (!gWorld->pPrototype->GetFaceTextureEdit(object, Vec3f(face), static_cast<eFaceTextureEdit>(edit),
-											   Vec2f(amount_vec.X, amount_vec.Y), planes_after)) {
+												Vec2f(amount_vec.X, amount_vec.Y), planes_after)) {
 		return;
 	}
 
