@@ -286,6 +286,7 @@ public:
 	String MakeSubviewName(const String& wanted) const;
 
 	bool IsSubviewObject(const Object* object) const;
+	bool IsPlacedInActiveSubview(uint32 instance) const;
 	Object* GetSubviewObject(uint32 instance) const;
 	uint32 GetSubviewBrushCount(uint32 instance) const;
 
@@ -313,7 +314,8 @@ public:
 	Object* PlaceSubviewInstance(uint32 instance, const BrushPlacement& placement);
 	void RemoveSubviewInstance(uint32 instance);
 
-	uint32 DissolveSubviewInstance(uint32 instance, std::vector<ObjectID>& out_brushes);
+	uint32 DissolveSubviewInstance(uint32 instance, std::vector<ObjectID>& out_brushes,
+								   std::vector<uint32>& out_instances);
 
 	void SyncSubviewInstances();
 
@@ -358,6 +360,8 @@ private:
 		String LegacyName;
 		/// The brushes as they are saved, placed in the subview's own space
 		ConfigEntry Brushes;
+		ConfigEntry Instances;
+		ConfigEntry Flat;
 
 		std::vector<SubviewMember> Members;
 		std::vector<SubviewGroup> Groups;
@@ -374,6 +378,8 @@ private:
 		String Name;
 		String SubviewName;
 
+		uint32 Parent = scNoSubview;
+
 		ObjectID RootID = ObjectID::scNull;
 		BrushPlacement Placement;
 		bool bPlaced = false;
@@ -382,18 +388,29 @@ private:
 	};
 
 	Subview* FindSubview(const String& name);
+	const Subview* FindSubview(const String& name) const;
 	Subview* LoadSubview(const ConfigFile* info, const String& name);
 	SubviewInstance* FindSubviewInstance(uint32 instance);
 	const SubviewInstance* FindSubviewInstance(uint32 instance) const;
 
+	uint32 AddSubviewInstance(const String& subview_name, const String& wanted_name);
+	uint32 AddNestedSubviewInstance(const ConfigEntry& entry, const BrushPlacement& parent);
+	bool IsEnteredSubview(uint32 instance) const;
+	bool SubviewContains(const String& outer, const String& inner) const;
+	bool CanPlaceSubview(const String& subview_name) const;
+
 	void BuildSubview(Subview& subview);
 	bool WriteSubviewFile(Subview& subview);
+	void RenameSubview(const String& previous_name, const String& name);
 
 	/// Takes the subview's brushes from the instance being edited, then rebuilds its other instances
-	void CommitActiveSubview();
+	void CommitEnteredSubviews();
+	void CommitSubview(uint32 instance, const BrushPlacement& placement);
+	void RebuildSubviewUsers(const String& subview_name);
+	void RemoveNestedSubviewInstances(uint32 parent);
 
 	uint32 CreateSubviewBrushes(const SubviewInstance& instance, const BrushPlacement& placement, bool entities_only,
-								const CompiledMap* compiled_map);
+								bool own_only, const CompiledMap* compiled_map);
 	Object* CreateSubviewObject(SubviewInstance& instance, Subview& subview, const BrushPlacement& placement);
 	void PlaceSubviewEntities(const SubviewInstance& instance);
 
@@ -528,8 +545,16 @@ private:
 	DynArray<SubviewInstance> mSubviewInstances;
 	uint32 mNextSubviewInstance = 1;
 
+	struct EnteredSubview
+	{
+		uint32 Instance = scNoSubview;
+		BrushPlacement Placement;
+	};
+
 	uint32 mActiveSubview = scNoSubview;
 	BrushPlacement mActivePlacement;
+	std::vector<EnteredSubview> mOuterSubviews;
+	std::vector<String> mLoadingSubviews;
 
 	String mPrototypePath;
 };

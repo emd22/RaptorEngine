@@ -745,12 +745,6 @@ void EditorFrame::ReloadTheme()
 
 void EditorFrame::CreateSubview()
 {
-	if (!mState.ActiveSubview.IsEmpty()) {
-		wxMessageBox("A subview can't hold another subview. Leave the subview being edited first.", "Subview",
-					 wxOK | wxICON_INFORMATION, this);
-		return;
-	}
-
 	if (!mState.Object.bHasObject) {
 		wxMessageBox("Select the brushes to make a subview from first.", "Subview", wxOK | wxICON_INFORMATION, this);
 		return;

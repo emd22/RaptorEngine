@@ -110,6 +110,7 @@ struct LightSnapshot
 /////////////////////////////////////
 // Light Edits
 /////////////////////////////////////
+
 class LightEditOperation : public EditOperation
 {
 protected:
@@ -311,6 +312,9 @@ private:
 	MaterialID mMaterial;
 };
 
+/**
+ * @brief Creates a new brish from the given planes.
+ */
 class CreateBrushOperation final : public ObjectCreationOperation
 {
 public:
@@ -323,6 +327,9 @@ private:
 	ObjectSnapshot mSnapshot;
 };
 
+/**
+ * @brief Duplicates all items in a selection.
+ */
 class DupeOperation final : public ObjectEditOperation
 {
 public:
@@ -370,7 +377,9 @@ struct SubviewBrushRef
 	ObjectID ID = ObjectID::scNull;
 };
 
-/// Places a subview in the level
+/**
+ * @brief Places an existing subview into the current prototype.
+ */
 class SubviewPlaceOperation final : public EditOperation
 {
 public:
@@ -386,6 +395,9 @@ private:
 	BrushPlacement mPlacement;
 };
 
+/**
+ * @brief Removes a subview from the current prototype.
+ */
 class SubviewRemoveOperation final : public EditOperation
 {
 public:
@@ -401,10 +413,13 @@ private:
 	BrushPlacement mPlacement;
 };
 
+/**
+ * @brief Creates a new subview from a list of objects (e.g. from selection).
+ */
 class SubviewCreateOperation final : public EditOperation
 {
 public:
-	SubviewCreateOperation(uint32 instance, Object* const* brushes, uint32 count, const BrushPlacement& placement);
+	SubviewCreateOperation(uint32 instance, Object* const* objects, uint32 count, const BrushPlacement& placement);
 
 	void Execute(EditorSelection& selection) override;
 	void Undo(EditorSelection& selection) override;
@@ -415,8 +430,13 @@ private:
 	uint32 mInstance;
 	BrushPlacement mPlacement;
 	std::vector<SubviewBrushRef> mBrushes;
+	std::vector<uint32> mInstances;
 };
 
+/**
+ * @brief Copies all objects in a subview into the current prototype to be modified locally without modifying all
+ * copies.
+ */
 class SubviewDissolveOperation final : public EditOperation
 {
 public:
@@ -431,13 +451,16 @@ private:
 	uint32 mInstance;
 	BrushPlacement mPlacement;
 	std::vector<SubviewBrushRef> mBrushes;
+	std::vector<uint32> mInstances;
 };
 
 /////////////////////////////////////
 // Light operations
 /////////////////////////////////////
 
-/// Moves and aims a spot light
+/**
+ * @brief Transform a spotlight in the scene. This can be movement or direction.
+ */
 class LightTransformOperation final : public LightEditOperation
 {
 public:

@@ -34,7 +34,7 @@ enum OBJECTTAG
 
 
 /* Must match scMaxSelectedObjects in Src/Editor/EditorTool.hpp! */
-const int LIMIT_SELECTION_OBJECTS = 64;
+const int LIMIT_SELECTION_OBJECTS = 128;
 
 /* The selection, along with where each object was when the current drag started.
    Must match EditorToolSelection in Src/Editor/EditorTool.hpp! */

@@ -269,6 +269,7 @@ public:
 	bool CreateSubviewFromSelection(const String& name);
 
 	/// Starts editing the selected subview
+	bool IsSubviewSelected() const;
 	bool EnterSubview();
 	void LeaveSubview();
 

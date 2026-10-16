@@ -574,6 +574,8 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	mSubviewInstances.Clear();
 	mNextSubviewInstance = 1;
 	mActiveSubview = scNoSubview;
+	mOuterSubviews.clear();
+	mLoadingSubviews.clear();
 
 	if (mbHasBakedSun) {
 		gProbeManager->ClearSunVisibility();
@@ -2599,13 +2601,32 @@ static Mat4f MakeBrushMatrix(const BrushPlacement& placement, const Vec3f center
 		   Mat4f::AsTranslation(placement.Position);
 }
 
-static BrushPlacement ReadBrushPlacement(const ConfigEntry& entry)
+static ConfigEntry MakeSubviewInstanceEntry(const String& name, const String& subview_name,
+											const BrushPlacement& placement)
 {
-	BrushPlacement placement;
-	placement.Position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
-	placement.Rotation = ReadBrushRotation(entry);
+	ConfigEntry entry = ConfigEntry::Struct(name);
+	entry.AddMember(ConfigEntry::Literal(scSubviewMemberName, subview_name.CStr()));
+	entry.AddMember(ConfigEntry::Literal("pos", placement.Position));
+	entry.AddMember(ConfigEntry::Literal("rotquat", placement.Rotation));
 
-	return placement;
+	return entry;
+}
+
+static bool PlacesSubview(const ConfigEntry& instances, const String& subview_name)
+{
+	if (!instances.Members.IsInited()) {
+		return false;
+	}
+
+	for (const ConfigEntry& instance : instances.Members) {
+		const char* name = ReadInstanceSubviewName(instance);
+
+		if (name != nullptr && subview_name == String(name)) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 template <typename TElement>
@@ -2629,20 +2650,37 @@ Blockout::Subview* Blockout::FindSubview(const String& name)
 	return nullptr;
 }
 
+const Blockout::Subview* Blockout::FindSubview(const String& name) const
+{
+	for (const Subview& subview : mSubviews) {
+		if (subview.Name == name) {
+			return &subview;
+		}
+	}
+
+	return nullptr;
+}
+
 Blockout::Subview* Blockout::LoadSubview(const ConfigFile* info, const String& name)
 {
+	// If the subview is already loaded, return the currently loaded version
 	for (Subview& subview : mSubviews) {
 		if (subview.Name == name || (!subview.LegacyName.IsEmpty() && subview.LegacyName == name)) {
 			return &subview;
 		}
 	}
 
+	if (std::find(mLoadingSubviews.begin(), mLoadingSubviews.end(), name) != mLoadingSubviews.end()) {
+		return nullptr;
+	}
+
 	const ConfigFile no_info {};
 	const ConfigFile& source = (info != nullptr) ? *info : no_info;
 
 	ConfigEntry brushes;
+	ConfigEntry instances;
 
-	if (!ReadSubviewBrushes(source, mPrototypePath, name, brushes)) {
+	if (!ReadSubviewFile(source, mPrototypePath, name, brushes, instances)) {
 		return nullptr;
 	}
 
@@ -2661,6 +2699,31 @@ Blockout::Subview* Blockout::LoadSubview(const ConfigFile* info, const String& n
 	}
 
 	subview.Brushes = brushes.Clone(subview.Name);
+	subview.Instances = ConfigEntry::Struct(scSubviewInstancesEntryName);
+
+	mLoadingSubviews.push_back(name);
+
+	if (instances.Members.IsInited()) {
+		for (const ConfigEntry& instance : instances.Members) {
+			const String child_name = ReadInstanceSubviewName(instance);
+
+			if (std::find(mLoadingSubviews.begin(), mLoadingSubviews.end(), child_name) != mLoadingSubviews.end()) {
+				LogWarning(LC_ASSET, "The subview '{}' places '{}', which already holds it, so it is left out", name,
+						   child_name);
+				continue;
+			}
+
+			if (LoadSubview(nullptr, child_name) == nullptr) {
+				LogWarning(LC_ASSET, "Subview instance '{}' in '{}' uses the subview '{}', which can't be read",
+						   instance.Name.Get(), name, child_name);
+			}
+
+			subview.Instances.AddMember(instance.Clone(instance.Name.Get()));
+		}
+	}
+
+	mLoadingSubviews.pop_back();
+
 	BuildSubview(subview);
 
 	mSubviews.Insert(std::move(subview));
@@ -2688,6 +2751,147 @@ const Blockout::SubviewInstance* Blockout::FindSubviewInstance(uint32 instance) 
 	}
 
 	return nullptr;
+}
+
+uint32 Blockout::AddSubviewInstance(const String& subview_name, const String& wanted_name)
+{
+	SubviewInstance instance;
+	instance.ID = mNextSubviewInstance++;
+	instance.SubviewName = subview_name;
+	instance.Parent = mActiveSubview;
+
+	const auto is_taken = [this](const String& name)
+	{
+		return std::any_of(mSubviewInstances.begin(), mSubviewInstances.end(),
+						   [&](const SubviewInstance& other) { return other.Name == name; });
+	};
+
+	instance.Name = wanted_name;
+
+	if (instance.Name.IsEmpty() || is_taken(instance.Name)) {
+		const String display_name = GetSubviewDisplayName(subview_name);
+
+		uint32 suffix = instance.ID;
+
+		do {
+			instance.Name = String::Fmt("{}_{}", display_name, suffix++);
+		} while (is_taken(instance.Name));
+	}
+
+	mSubviewInstances.Insert(instance);
+
+	return instance.ID;
+}
+
+uint32 Blockout::AddNestedSubviewInstance(const ConfigEntry& entry, const BrushPlacement& parent)
+{
+	const char* subview_name = ReadInstanceSubviewName(entry);
+
+	if (subview_name == nullptr) {
+		return scNoSubview;
+	}
+
+	const uint32 instance = AddSubviewInstance(subview_name, entry.Name.Get());
+	const BrushPlacement placement = PlaceInSubview(ReadBrushPlacement(entry), Vec3f::sZero, parent);
+
+	if (FindSubview(subview_name) == nullptr) {
+		SubviewInstance* found = FindSubviewInstance(instance);
+		found->Placement = placement;
+		found->bMissing = true;
+
+		return instance;
+	}
+
+	PlaceSubviewInstance(instance, placement);
+
+	return instance;
+}
+
+bool Blockout::IsEnteredSubview(uint32 instance) const
+{
+	if (instance == scNoSubview) {
+		return false;
+	}
+
+	if (instance == mActiveSubview) {
+		return true;
+	}
+
+	return std::any_of(mOuterSubviews.begin(), mOuterSubviews.end(),
+					   [&](const EnteredSubview& entered) { return entered.Instance == instance; });
+}
+
+bool Blockout::IsPlacedInActiveSubview(uint32 instance) const
+{
+	const SubviewInstance* found = FindSubviewInstance(instance);
+
+	return found != nullptr && found->Parent == mActiveSubview;
+}
+
+bool Blockout::SubviewContains(const String& outer, const String& inner) const
+{
+	std::vector<String> pending { outer };
+	std::vector<String> seen;
+
+	while (!pending.empty()) {
+		const String name = pending.back();
+		pending.pop_back();
+
+		if (std::find(seen.begin(), seen.end(), name) != seen.end()) {
+			continue;
+		}
+
+		seen.push_back(name);
+
+		const Subview* subview = FindSubview(name);
+
+		if (subview == nullptr || !subview->Instances.Members.IsInited()) {
+			continue;
+		}
+
+		for (const ConfigEntry& instance : subview->Instances.Members) {
+			const char* child_name = ReadInstanceSubviewName(instance);
+
+			if (child_name == nullptr) {
+				continue;
+			}
+
+			if (inner == String(child_name)) {
+				return true;
+			}
+
+			pending.push_back(child_name);
+		}
+	}
+
+	return false;
+}
+
+bool Blockout::CanPlaceSubview(const String& subview_name) const
+{
+	std::vector<uint32> entered;
+
+	if (mActiveSubview != scNoSubview) {
+		entered.push_back(mActiveSubview);
+	}
+
+	for (const EnteredSubview& outer : mOuterSubviews) {
+		entered.push_back(outer.Instance);
+	}
+
+	for (const uint32 instance : entered) {
+		const SubviewInstance* found = FindSubviewInstance(instance);
+
+		if (found == nullptr) {
+			continue;
+		}
+
+		if (found->SubviewName == subview_name || SubviewContains(subview_name, found->SubviewName)) {
+			return false;
+		}
+	}
+
+	return true;
 }
 
 String Blockout::GetSubviewName(uint32 instance) const
@@ -2810,14 +3014,35 @@ void Blockout::BuildSubview(Subview& subview)
 	subview.Members.clear();
 	subview.Groups.clear();
 
+	subview.Flat = subview.Brushes.Clone(subview.Name);
+
+	if (subview.Instances.Members.IsInited()) {
+		for (const ConfigEntry& instance : subview.Instances.Members) {
+			const char* child_name = ReadInstanceSubviewName(instance);
+
+			if (child_name == nullptr) {
+				continue;
+			}
+
+			Subview* child = FindSubview(child_name);
+
+			if (child == nullptr || child == &subview) {
+				continue;
+			}
+
+			AppendPlacedSubviewBrushes(subview.Flat, child->Flat, instance.Name.Get(), ReadBrushPlacement(instance));
+		}
+	}
+
 	std::vector<GroupBuilder> builders;
 	std::vector<SizedArray<Vec3f>> hulls;
 
 	Vec3f min(FLT_MAX);
 	Vec3f max(-FLT_MAX);
 
-	if (subview.Brushes.Members.IsInited()) {
-		for (ConfigEntry& entry : subview.Brushes.Members) {
+
+	if (subview.Flat.Members.IsInited()) {
+		for (ConfigEntry& entry : subview.Flat.Members) {
 			SubviewMember& member = subview.Members.emplace_back();
 			member.LocalBrush = ReadBrushEntry(entry);
 
@@ -3017,6 +3242,13 @@ bool Blockout::GetSubviewPlacement(uint32 instance, BrushPlacement& out_placemen
 		return true;
 	}
 
+	for (const EnteredSubview& outer : mOuterSubviews) {
+		if (outer.Instance == instance) {
+			out_placement = outer.Placement;
+			return true;
+		}
+	}
+
 	const SubviewInstance* found = FindSubviewInstance(instance);
 
 	if (found == nullptr || !found->bPlaced) {
@@ -3047,6 +3279,18 @@ bool Blockout::GetSubviewBounds(uint32 instance, BBox& out_bounds)
 	std::vector<Object*> members;
 	GetSubviewMembers(instance, members);
 
+	for (const SubviewInstance& child : mSubviewInstances) {
+		if (child.Parent != instance) {
+			continue;
+		}
+
+		Object* child_root = gObjectManager->GetObject(child.RootID);
+
+		if (child_root != nullptr) {
+			members.push_back(child_root);
+		}
+	}
+
 	return GetBrushBounds(members.data(), static_cast<uint32>(members.size()), out_bounds);
 }
 
@@ -3058,6 +3302,16 @@ bool Blockout::GetBrushBounds(Object* const* objects, uint32 count, BBox& out_bo
 
 	for (uint32 i = 0; i < count; i++) {
 		Object* member = objects[i];
+
+		if (IsSubviewObject(member)) {
+			const BBox world_bounds = member->GetWorldOBB().GetWorldAABB();
+
+			min = Vec3f::Min(min, world_bounds.Min);
+			max = Vec3f::Max(max, world_bounds.Max);
+			has_bounds = true;
+			continue;
+		}
+
 		const Brush* brush = GetBrush(member);
 		const Patch* patch = GetPatch(member);
 
@@ -3101,9 +3355,24 @@ uint32 Blockout::CreateSubview(const String& name, Object* const* objects, uint3
 	placement.Position = origin;
 
 	ConfigEntry brushes = ConfigEntry::Struct(subview_name);
+	ConfigEntry instances = ConfigEntry::Struct(scSubviewInstancesEntryName);
 
 	for (uint32 i = 0; i < count; i++) {
 		Object* object = objects[i];
+
+		if (IsSubviewObject(object)) {
+			const SubviewInstance* child = FindSubviewInstance(object->SubviewInstance);
+			BrushPlacement world;
+
+			if (child == nullptr || !GetSubviewPlacement(child->ID, world)) {
+				continue;
+			}
+
+			instances.AddMember(MakeSubviewInstanceEntry(child->Name, child->SubviewName,
+														 RemoveFromSubview(world, Vec3f::sZero, placement)));
+			continue;
+		}
+
 		Vec3f center;
 
 		if (!GetLocalCenter(object, center)) {
@@ -3120,6 +3389,7 @@ uint32 Blockout::CreateSubview(const String& name, Object* const* objects, uint3
 	Subview subview;
 	subview.Name = subview_name;
 	subview.Brushes = std::move(brushes);
+	subview.Instances = std::move(instances);
 	subview.bDirty = true;
 
 	BuildSubview(subview);
@@ -3137,42 +3407,37 @@ uint32 Blockout::NewSubviewInstance(const String& subview_name)
 		return scNoSubview;
 	}
 
-	SubviewInstance instance;
-	instance.ID = mNextSubviewInstance++;
-	instance.SubviewName = subview->Name;
+	if (!CanPlaceSubview(subview->Name)) {
+		LogWarning(LC_ASSET, "The subview '{}' can't be placed here, it holds the subview being edited", subview->Name);
+		return scNoSubview;
+	}
 
-	const auto is_taken = [this](const String& name)
-	{
-		return std::any_of(mSubviewInstances.begin(), mSubviewInstances.end(),
-						   [&](const SubviewInstance& other) { return other.Name == name; });
-	};
-
-	const String display_name = GetSubviewDisplayName(subview->Name);
-
-	uint32 suffix = instance.ID;
-
-	do {
-		instance.Name = String::Fmt("{}_{}", display_name, suffix++);
-	} while (is_taken(instance.Name));
-
-	mSubviewInstances.Insert(instance);
-
-	return instance.ID;
+	return AddSubviewInstance(subview->Name, "");
 }
 
 uint32 Blockout::CreateSubviewBrushes(const SubviewInstance& instance, const BrushPlacement& placement,
-									  bool entities_only, const CompiledMap* compiled_map)
+									  bool entities_only, bool own_only, const CompiledMap* compiled_map)
 {
 	Subview* subview = FindSubview(instance.SubviewName);
 
-	if (subview == nullptr || !subview->Brushes.Members.IsInited()) {
+	if (subview == nullptr) {
+		return 0;
+	}
+
+	ConfigEntry* brushes = &subview->Flat;
+
+	if (own_only) {
+		brushes = &subview->Brushes;
+	}
+
+	if (!brushes->Members.IsInited()) {
 		return 0;
 	}
 
 	uint32 created_count = 0;
 	uint32 member_index = 0;
 
-	for (ConfigEntry& brush_entry : subview->Brushes.Members) {
+	for (ConfigEntry& brush_entry : brushes->Members) {
 		const uint32 index = member_index++;
 		const String name = MakeSubviewBrushName(instance.Name, index);
 
@@ -3282,7 +3547,7 @@ Object* Blockout::PlaceSubviewInstance(uint32 instance, const BrushPlacement& pl
 	found->Placement = placement;
 	found->bPlaced = true;
 
-	CreateSubviewBrushes(*found, placement, true, nullptr);
+	CreateSubviewBrushes(*found, placement, true, false, nullptr);
 
 	Object* root = CreateSubviewObject(*found, *subview, placement);
 
@@ -3309,6 +3574,7 @@ void Blockout::RemoveSubviewInstance(uint32 instance)
 
 	found->RootID = ObjectID::scNull;
 	found->bPlaced = false;
+	found->bMissing = false;
 
 	std::vector<Object*> members;
 	GetSubviewMembers(instance, members);
@@ -3320,13 +3586,15 @@ void Blockout::RemoveSubviewInstance(uint32 instance)
 	renderer::gShadowAtlas->Invalidate();
 }
 
-uint32 Blockout::DissolveSubviewInstance(uint32 instance, std::vector<ObjectID>& out_brushes)
+uint32 Blockout::DissolveSubviewInstance(uint32 instance, std::vector<ObjectID>& out_brushes,
+										 std::vector<uint32>& out_instances)
 {
 	out_brushes.clear();
+	out_instances.clear();
 
 	BrushPlacement placement;
 
-	if (instance == mActiveSubview || !GetSubviewPlacement(instance, placement)) {
+	if (IsEnteredSubview(instance) || !GetSubviewPlacement(instance, placement)) {
 		return 0;
 	}
 
@@ -3338,40 +3606,52 @@ uint32 Blockout::DissolveSubviewInstance(uint32 instance, std::vector<ObjectID>&
 
 	Subview* subview = FindSubview(subview_name);
 
-	if (subview == nullptr || !subview->Brushes.Members.IsInited()) {
+	if (subview == nullptr) {
 		return 0;
 	}
 
-	uint32 member_index = 0;
+	if (subview->Brushes.Members.IsInited()) {
+		uint32 member_index = 0;
 
-	for (ConfigEntry& brush_entry : subview->Brushes.Members) {
-		String name = MakeSubviewBrushName(instance_name, member_index++);
+		for (ConfigEntry& brush_entry : subview->Brushes.Members) {
+			String name = MakeSubviewBrushName(instance_name, member_index++);
 
-		if (gObjectManager->FindObject(HashStr32(name.CStr())) != nullptr) {
-			name = String(MakeUniqueBrushName());
-		}
+			if (gObjectManager->FindObject(HashStr32(name.CStr())) != nullptr) {
+				name = String(MakeUniqueBrushName());
+			}
 
-		ConfigEntry placed = PlaceSubviewBrushEntry(brush_entry, name, placement);
+			ConfigEntry placed = PlaceSubviewBrushEntry(brush_entry, name, placement);
 
-		if (!placed.Members.IsInited() || placed.Members.Size() == 0) {
-			continue;
-		}
+			if (!placed.Members.IsInited() || placed.Members.Size() == 0) {
+				continue;
+			}
 
-		const ObjectID brush_id = CreateBrush(placed);
+			const ObjectID brush_id = CreateBrush(placed);
 
-		if (!brush_id.IsInvalid()) {
-			out_brushes.push_back(brush_id);
+			if (!brush_id.IsInvalid()) {
+				out_brushes.push_back(brush_id);
+			}
 		}
 	}
 
-	return static_cast<uint32>(out_brushes.size());
+	if (subview->Instances.Members.IsInited()) {
+		for (const ConfigEntry& entry : subview->Instances.Members) {
+			const uint32 child = AddNestedSubviewInstance(entry, placement);
+
+			if (child != scNoSubview) {
+				out_instances.push_back(child);
+			}
+		}
+	}
+
+	return static_cast<uint32>(out_brushes.size() + out_instances.size());
 }
 
 void Blockout::PlaceSubviewEntities(const SubviewInstance& instance)
 {
 	Subview* subview = FindSubview(instance.SubviewName);
 
-	if (subview == nullptr || !subview->Brushes.Members.IsInited()) {
+	if (subview == nullptr || !subview->Flat.Members.IsInited()) {
 		return;
 	}
 
@@ -3381,11 +3661,11 @@ void Blockout::PlaceSubviewEntities(const SubviewInstance& instance)
 	for (Object* member : members) {
 		Vec3f center;
 
-		if (!GetLocalCenter(member, center) || member->SubviewMember >= subview->Brushes.Members.Size()) {
+		if (!GetLocalCenter(member, center) || member->SubviewMember >= subview->Flat.Members.Size()) {
 			continue;
 		}
 
-		const BrushPlacement local = ReadBrushPlacement(subview->Brushes.Members[member->SubviewMember]);
+		const BrushPlacement local = ReadBrushPlacement(subview->Flat.Members[member->SubviewMember]);
 		const BrushPlacement world = PlaceInSubview(local, center, instance.Placement);
 
 		member->SetPosition(world.Position);
@@ -3415,7 +3695,13 @@ void Blockout::SyncSubviewInstances()
 
 bool Blockout::EnterSubview(uint32 instance)
 {
-	if (IsEditingSubview() || mbIsCompiledMap) {
+	if (mbIsCompiledMap || IsEnteredSubview(instance)) {
+		return false;
+	}
+
+	const SubviewInstance* entered = FindSubviewInstance(instance);
+
+	if (entered == nullptr || entered->Parent != mActiveSubview || FindSubview(entered->SubviewName) == nullptr) {
 		return false;
 	}
 
@@ -3432,10 +3718,22 @@ bool Blockout::EnterSubview(uint32 instance)
 	found->Placement = placement;
 	found->bPlaced = true;
 
+	if (mActiveSubview != scNoSubview) {
+		mOuterSubviews.push_back(EnteredSubview { mActiveSubview, mActivePlacement });
+	}
+
 	mActiveSubview = instance;
 	mActivePlacement = placement;
 
-	CreateSubviewBrushes(*found, placement, false, nullptr);
+	CreateSubviewBrushes(*found, placement, false, true, nullptr);
+
+	const Subview* subview = FindSubview(found->SubviewName);
+
+	if (subview->Instances.Members.IsInited()) {
+		for (const ConfigEntry& entry : subview->Instances.Members) {
+			AddNestedSubviewInstance(entry, placement);
+		}
+	}
 
 	return true;
 }
@@ -3446,32 +3744,54 @@ void Blockout::LeaveSubview()
 		return;
 	}
 
-	CommitActiveSubview();
-
 	const uint32 instance = mActiveSubview;
+	const BrushPlacement placement = mActivePlacement;
 
-	mActiveSubview = scNoSubview;
+	CommitSubview(instance, placement);
+	RemoveNestedSubviewInstances(instance);
+
+	if (mOuterSubviews.empty()) {
+		mActiveSubview = scNoSubview;
+	}
+	else {
+		mActiveSubview = mOuterSubviews.back().Instance;
+		mActivePlacement = mOuterSubviews.back().Placement;
+		mOuterSubviews.pop_back();
+	}
 
 	RemoveSubviewInstance(instance);
-	PlaceSubviewInstance(instance, mActivePlacement);
+	PlaceSubviewInstance(instance, placement);
 }
 
-void Blockout::CommitActiveSubview()
+void Blockout::CommitEnteredSubviews()
 {
-	const SubviewInstance* active = FindSubviewInstance(mActiveSubview);
-
-	if (active == nullptr) {
+	if (!IsEditingSubview()) {
 		return;
 	}
 
-	Subview* subview = FindSubview(active->SubviewName);
+	CommitSubview(mActiveSubview, mActivePlacement);
+
+	for (auto outer = mOuterSubviews.rbegin(); outer != mOuterSubviews.rend(); ++outer) {
+		CommitSubview(outer->Instance, outer->Placement);
+	}
+}
+
+void Blockout::CommitSubview(uint32 instance, const BrushPlacement& placement)
+{
+	const SubviewInstance* entered = FindSubviewInstance(instance);
+
+	if (entered == nullptr) {
+		return;
+	}
+
+	Subview* subview = FindSubview(entered->SubviewName);
 
 	if (subview == nullptr) {
 		return;
 	}
 
 	std::vector<Object*> members;
-	GetSubviewMembers(mActiveSubview, members);
+	GetSubviewMembers(instance, members);
 
 	ConfigEntry brushes = ConfigEntry::Struct(subview->Name);
 	uint32 member_index = 0;
@@ -3484,34 +3804,116 @@ void Blockout::CommitActiveSubview()
 		}
 
 		const BrushPlacement local = RemoveFromSubview(BrushPlacement { member->GetPosition(), member->mRotation },
-													   center, mActivePlacement);
+													   center, placement);
 
 		brushes.AddMember(MakeBrushEntry(member, String::Fmt("{}", member_index), local));
 
 		member->SubviewMember = member_index++;
 	}
 
+	ConfigEntry instances = ConfigEntry::Struct(scSubviewInstancesEntryName);
+
+	for (const SubviewInstance& child : mSubviewInstances) {
+		if (child.Parent != instance) {
+			continue;
+		}
+
+		BrushPlacement world = child.Placement;
+
+		if (!child.bMissing && !GetSubviewPlacement(child.ID, world)) {
+			continue;
+		}
+
+		instances.AddMember(MakeSubviewInstanceEntry(child.Name, child.SubviewName,
+													 RemoveFromSubview(world, Vec3f::sZero, placement)));
+	}
+
 	subview->Brushes = std::move(brushes);
+	subview->Instances = std::move(instances);
 	subview->bDirty = true;
 
 	BuildSubview(*subview);
 
-	const String subview_name = subview->Name;
+	RebuildSubviewUsers(subview->Name);
+}
 
-	std::vector<uint32> others;
+void Blockout::RebuildSubviewUsers(const String& subview_name)
+{
+	std::vector<String> changed { subview_name };
+	std::vector<String> path;
+
+	const auto rebuild_users = [&](const auto& self, const String& name) -> void
+	{
+		path.push_back(name);
+
+		for (Subview& subview : mSubviews) {
+			if (std::find(path.begin(), path.end(), subview.Name) != path.end() ||
+				!PlacesSubview(subview.Instances, name)) {
+				continue;
+			}
+
+			BuildSubview(subview);
+
+			if (std::find(changed.begin(), changed.end(), subview.Name) == changed.end()) {
+				changed.push_back(subview.Name);
+			}
+
+			self(self, subview.Name);
+		}
+
+		path.pop_back();
+	};
+
+	rebuild_users(rebuild_users, subview_name);
+
+	std::vector<uint32> instances;
 
 	for (const SubviewInstance& instance : mSubviewInstances) {
-		if (instance.ID != mActiveSubview && instance.bPlaced && instance.SubviewName == subview_name) {
-			others.push_back(instance.ID);
+		if (instance.bPlaced && !IsEnteredSubview(instance.ID) &&
+			std::find(changed.begin(), changed.end(), instance.SubviewName) != changed.end()) {
+			instances.push_back(instance.ID);
 		}
 	}
 
-	for (const uint32 other : others) {
+	for (const uint32 instance : instances) {
 		BrushPlacement placement;
 
-		if (GetSubviewPlacement(other, placement)) {
-			PlaceSubviewInstance(other, placement);
+		if (GetSubviewPlacement(instance, placement)) {
+			PlaceSubviewInstance(instance, placement);
 		}
+	}
+}
+
+void Blockout::RemoveNestedSubviewInstances(uint32 parent)
+{
+	std::vector<uint32> nested;
+
+	for (const SubviewInstance& instance : mSubviewInstances) {
+		if (instance.Parent == parent) {
+			nested.push_back(instance.ID);
+		}
+	}
+
+	for (const uint32 instance : nested) {
+		RemoveSubviewInstance(instance);
+	}
+
+	uint32 kept_count = 0;
+
+	for (uint32 i = 0; i < mSubviewInstances.Size; i++) {
+		if (mSubviewInstances[i].Parent == parent) {
+			continue;
+		}
+
+		if (kept_count != i) {
+			mSubviewInstances[kept_count] = std::move(mSubviewInstances[i]);
+		}
+
+		kept_count++;
+	}
+
+	while (mSubviewInstances.Size > kept_count) {
+		mSubviewInstances.RemoveLast();
 	}
 }
 
@@ -3554,7 +3956,7 @@ void Blockout::LoadSubviews(ConfigFile& info, const CompiledMap* compiled_map)
 		mSubviewInstances.Insert(instance);
 
 		if (compiled_map != nullptr) {
-			CreateSubviewBrushes(instance, instance.Placement, false, compiled_map);
+			CreateSubviewBrushes(instance, instance.Placement, false, false, compiled_map);
 
 			SubviewInstance* inst = mSubviewInstances.GetLast();
 			if (inst) {
@@ -3567,22 +3969,37 @@ void Blockout::LoadSubviews(ConfigFile& info, const CompiledMap* compiled_map)
 	}
 }
 
+void Blockout::RenameSubview(const String& previous_name, const String& name)
+{
+	for (SubviewInstance& instance : mSubviewInstances) {
+		if (instance.SubviewName == previous_name) {
+			instance.SubviewName = name;
+		}
+	}
+
+	for (Subview& subview : mSubviews) {
+		if (!subview.Instances.Members.IsInited()) {
+			continue;
+		}
+
+		for (ConfigEntry& instance : subview.Instances.Members) {
+			ConfigEntry* member = instance.GetMember(HashStr32(scSubviewMemberName));
+
+			if (member == nullptr || member->Type != ConfigEntry::ePrimitiveType::String ||
+				previous_name != String(member->Get<const char*>())) {
+				continue;
+			}
+
+			member->Set(name);
+			subview.bDirty = true;
+		}
+	}
+}
+
 bool Blockout::WriteSubviewFile(Subview& subview)
 {
 	if (mPrototypePath.IsEmpty()) {
 		return false;
-	}
-
-	if (!subview.bHasFile && DoesFileExist(GetSubviewFilePath(mPrototypePath, subview.Name))) {
-		const String previous_name = subview.Name;
-
-		subview.Name = MakeSubviewName(GetSubviewDisplayName(previous_name));
-
-		for (SubviewInstance& instance : mSubviewInstances) {
-			if (instance.SubviewName == previous_name) {
-				instance.SubviewName = subview.Name;
-			}
-		}
 	}
 
 	const String path = GetSubviewFilePath(mPrototypePath, subview.Name);
@@ -3601,14 +4018,70 @@ bool Blockout::WriteSubviewFile(Subview& subview)
 		}
 	}
 
-	ConfigEntry brushes = subview.Brushes.Clone("all");
-	ConfigEntry* existing = file.GetEntry(HashStr32("all"));
+	const bool has_instances = subview.Instances.Members.IsInited() && subview.Instances.Members.Size() > 0;
+	const bool has_brushes = (subview.Brushes.Members.IsInited() && subview.Brushes.Members.Size() > 0) ||
+							 !has_instances;
 
-	if (existing != nullptr) {
-		*existing = std::move(brushes);
+	const auto make_instances = [&subview]
+	{
+		ConfigEntry instances = ConfigEntry::Struct(scSubviewInstancesEntryName);
+
+		for (const ConfigEntry& instance : subview.Instances.Members) {
+			ConfigEntry saved = instance.Clone(instance.Name.Get());
+			ConfigEntry* member = saved.GetMember(HashStr32(scSubviewMemberName));
+
+			if (member != nullptr && member->Type == ConfigEntry::ePrimitiveType::String) {
+				const String reference = MakeNestedSubviewReference(subview.Name, member->Get<const char*>());
+				member->Set(reference);
+			}
+
+			instances.AddMember(std::move(saved));
+		}
+
+		return instances;
+	};
+
+	std::vector<ConfigEntry> entries;
+
+	if (file.GetEntries().IsInited()) {
+		for (ConfigEntry& entry : file.GetEntries()) {
+			entries.push_back(std::move(entry));
+		}
+
+		file.GetEntries().Clear();
 	}
-	else {
-		file.AddEntry(std::move(brushes));
+
+	bool wrote_brushes = false;
+	bool wrote_instances = false;
+
+	for (ConfigEntry& entry : entries) {
+		const Hash32 entry_name = entry.Name.GetHash();
+
+		if (entry_name == HashStr32("all")) {
+			if (has_brushes) {
+				file.AddEntry(subview.Brushes.Clone("all"));
+			}
+
+			wrote_brushes = true;
+		}
+		else if (entry_name == HashStr32(scSubviewInstancesEntryName)) {
+			if (has_instances) {
+				file.AddEntry(make_instances());
+			}
+
+			wrote_instances = true;
+		}
+		else {
+			file.AddEntry(std::move(entry));
+		}
+	}
+
+	if (!wrote_brushes && has_brushes) {
+		file.AddEntry(subview.Brushes.Clone("all"));
+	}
+
+	if (!wrote_instances && has_instances) {
+		file.AddEntry(make_instances());
 	}
 
 	if (!file.Write(path.CStr())) {
@@ -3625,14 +4098,52 @@ bool Blockout::WriteSubviewFile(Subview& subview)
 
 void Blockout::SaveSubviews(ConfigFile& info)
 {
-	const auto is_placed = [this](const Subview& subview)
-	{
-		return std::any_of(mSubviewInstances.begin(), mSubviewInstances.end(), [&](const SubviewInstance& instance)
-						   { return instance.bPlaced && instance.SubviewName == subview.Name; });
-	};
+	std::vector<String> reachable;
+
+	for (const SubviewInstance& instance : mSubviewInstances) {
+		if (instance.Parent == scNoSubview && instance.bPlaced &&
+			std::find(reachable.begin(), reachable.end(), instance.SubviewName) == reachable.end()) {
+			reachable.push_back(instance.SubviewName);
+		}
+	}
+
+	for (size_t i = 0; i < reachable.size(); i++) {
+		const Subview* subview = FindSubview(reachable[i]);
+
+		if (subview == nullptr || !subview->Instances.Members.IsInited()) {
+			continue;
+		}
+
+		for (const ConfigEntry& instance : subview->Instances.Members) {
+			const char* child_name = ReadInstanceSubviewName(instance);
+
+			if (child_name != nullptr &&
+				std::find(reachable.begin(), reachable.end(), String(child_name)) == reachable.end()) {
+				reachable.push_back(child_name);
+			}
+		}
+	}
+
+	const auto is_reachable = [&reachable](const String& name)
+	{ return std::find(reachable.begin(), reachable.end(), name) != reachable.end(); };
 
 	for (Subview& subview : mSubviews) {
-		if (subview.bDirty && is_placed(subview)) {
+		if (!subview.bDirty || subview.bHasFile || !is_reachable(subview.Name) ||
+			!DoesFileExist(GetSubviewFilePath(mPrototypePath, subview.Name))) {
+			continue;
+		}
+
+		const String previous_name = subview.Name;
+		const String name = MakeSubviewName(GetSubviewDisplayName(previous_name));
+
+		subview.Name = name;
+		RenameSubview(previous_name, name);
+
+		std::replace(reachable.begin(), reachable.end(), previous_name, name);
+	}
+
+	for (Subview& subview : mSubviews) {
+		if (subview.bDirty && is_reachable(subview.Name)) {
 			WriteSubviewFile(subview);
 		}
 	}
@@ -3641,18 +4152,17 @@ void Blockout::SaveSubviews(ConfigFile& info)
 	uint32 instance_count = 0;
 
 	for (const SubviewInstance& instance : mSubviewInstances) {
+		if (instance.Parent != scNoSubview) {
+			continue;
+		}
+
 		BrushPlacement placement = instance.Placement;
 
 		if (!instance.bMissing && !GetSubviewPlacement(instance.ID, placement)) {
 			continue;
 		}
 
-		ConfigEntry instance_entry = ConfigEntry::Struct(instance.Name);
-		instance_entry.AddMember(ConfigEntry::Literal(scSubviewMemberName, instance.SubviewName.CStr()));
-		instance_entry.AddMember(ConfigEntry::Literal("pos", placement.Position));
-		instance_entry.AddMember(ConfigEntry::Literal("rotquat", placement.Rotation));
-
-		instances.AddMember(std::move(instance_entry));
+		instances.AddMember(MakeSubviewInstanceEntry(instance.Name, instance.SubviewName, placement));
 		instance_count++;
 	}
 
@@ -3860,9 +4370,7 @@ void Blockout::Save(const String& save_path)
 	SavePlayerSpawn(info);
 	SaveModels(info);
 
-	if (IsEditingSubview()) {
-		CommitActiveSubview();
-	}
+	CommitEnteredSubviews();
 
 	ConfigEntry* all_entry = info.AddEntry("all");
 

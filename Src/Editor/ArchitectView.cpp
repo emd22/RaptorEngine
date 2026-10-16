@@ -1904,7 +1904,7 @@ void RaptorEditor::TopViewRespawn()
 
 void RaptorEditor::TopViewToggleSubview()
 {
-	if (IsEditingSubview()) {
+	if (IsEditingSubview() && !IsSubviewSelected()) {
 		LeaveSubview();
 	}
 	else {

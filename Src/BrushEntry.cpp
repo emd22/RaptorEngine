@@ -235,6 +235,15 @@ Quat ReadBrushRotation(const ConfigEntry& entry)
 	return rotation;
 }
 
+BrushPlacement ReadBrushPlacement(const ConfigEntry& entry)
+{
+	BrushPlacement placement;
+	placement.Position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
+	placement.Rotation = ReadBrushRotation(entry);
+
+	return placement;
+}
+
 BrushPlacement PlaceInSubview(const BrushPlacement& local, const Vec3f brush_center, const BrushPlacement& instance)
 {
 	BrushPlacement world;
@@ -382,9 +391,46 @@ String GetSubviewFilePath(const String& prototype_path, const String& subview_na
 	return String(path.generic_string());
 }
 
-bool ReadSubviewBrushes(const ConfigFile& info, const String& prototype_path, const String& subview_name,
-						ConfigEntry& out_brushes)
+String ResolveNestedSubviewName(const String& parent_name, const String& reference)
 {
+	const std::filesystem::path folder = std::filesystem::path(parent_name.CStr()).parent_path();
+
+	return String((folder / reference.CStr()).lexically_normal().generic_string());
+}
+
+String MakeNestedSubviewReference(const String& parent_name, const String& subview_name)
+{
+	const std::filesystem::path folder = std::filesystem::path(parent_name.CStr()).parent_path();
+
+	if (folder.empty()) {
+		return subview_name;
+	}
+
+	const std::filesystem::path reference = std::filesystem::path(subview_name.CStr()).lexically_relative(folder);
+
+	if (reference.empty()) {
+		return subview_name;
+	}
+
+	return String(reference.generic_string());
+}
+
+const char* ReadInstanceSubviewName(const ConfigEntry& instance)
+{
+	const ConfigEntry* subview_name = instance.GetMember(HashStr32(scSubviewMemberName));
+
+	if (subview_name == nullptr || subview_name->Type != ConfigEntry::ePrimitiveType::String) {
+		return nullptr;
+	}
+
+	return subview_name->Get<const char*>();
+}
+
+bool ReadSubviewFile(const ConfigFile& info, const String& prototype_path, const String& subview_name,
+					 ConfigEntry& out_brushes, ConfigEntry& out_instances)
+{
+	out_instances = ConfigEntry::Struct(scSubviewInstancesEntryName);
+
 	const ConfigEntry* subviews = info.GetEntry(HashStr32(scSubviewsEntryName));
 
 	if (subviews != nullptr) {
@@ -406,35 +452,144 @@ bool ReadSubviewBrushes(const ConfigFile& info, const String& prototype_path, co
 	}
 
 	const ConfigEntry* brushes = file.GetEntry(HashStr32("all"));
+	const ConfigEntry* instances = file.GetEntry(HashStr32(scSubviewInstancesEntryName));
 
-	if (brushes == nullptr) {
+	if (brushes == nullptr && instances == nullptr) {
 		return false;
 	}
 
-	if (file.GetEntry(HashStr32(scSubviewInstancesEntryName)) != nullptr) {
-		LogWarning(LC_ASSET, "The subview '{}' places subviews of its own, which are left out", subview_name);
+	if (brushes != nullptr) {
+		out_brushes = brushes->Clone(subview_name);
+	}
+	else {
+		out_brushes = ConfigEntry::Struct(subview_name);
 	}
 
-	out_brushes = brushes->Clone(subview_name);
+	if (instances == nullptr || !instances->Members.IsInited()) {
+		return true;
+	}
+
+	for (const ConfigEntry& instance : instances->Members) {
+		const char* reference = ReadInstanceSubviewName(instance);
+
+		if (reference == nullptr) {
+			LogWarning(LC_ASSET, "Subview instance '{}' in '{}' does not name its subview", instance.Name.Get(),
+					   subview_name);
+			continue;
+		}
+
+		ConfigEntry resolved = instance.Clone(instance.Name.Get());
+		resolved.GetMember(HashStr32(scSubviewMemberName))
+			->Set(ResolveNestedSubviewName(subview_name, reference));
+
+		out_instances.AddMember(std::move(resolved));
+	}
 
 	return true;
 }
 
-static const char* ReadInstanceSubviewName(const ConfigEntry& instance)
+void AppendPlacedSubviewBrushes(ConfigEntry& out_brushes, ConfigEntry& subview_brushes, const String& instance_name,
+								const BrushPlacement& instance)
 {
-	const ConfigEntry* subview_name = instance.GetMember(HashStr32(scSubviewMemberName));
-
-	if (subview_name == nullptr || subview_name->Type != ConfigEntry::ePrimitiveType::String) {
-		return nullptr;
+	if (!subview_brushes.Members.IsInited()) {
+		return;
 	}
 
-	return subview_name->Get<const char*>();
+	uint32 member_index = 0;
+
+	for (ConfigEntry& brush_entry : subview_brushes.Members) {
+		ConfigEntry placed = PlaceSubviewBrushEntry(brush_entry, MakeSubviewBrushName(instance_name, member_index++),
+													instance);
+
+		if (placed.Members.IsInited() && placed.Members.Size() > 0) {
+			out_brushes.AddMember(std::move(placed));
+		}
+	}
+}
+
+static bool FlattenSubview(const ConfigFile& info, const String& prototype_path, const String& subview_name,
+						   std::vector<String>& stack, ConfigEntry& out_brushes)
+{
+	ConfigEntry instances;
+
+	if (!ReadSubviewFile(info, prototype_path, subview_name, out_brushes, instances)) {
+		return false;
+	}
+
+	if (!instances.Members.IsInited()) {
+		return true;
+	}
+
+	stack.push_back(subview_name);
+
+	for (const ConfigEntry& instance : instances.Members) {
+		const String child_name = ReadInstanceSubviewName(instance);
+
+		if (std::find(stack.begin(), stack.end(), child_name) != stack.end()) {
+			LogWarning(LC_ASSET, "The subview '{}' places '{}', which already holds it, so it is left out",
+					   subview_name, child_name);
+			continue;
+		}
+
+		ConfigEntry child_brushes;
+
+		if (!FlattenSubview(info, prototype_path, child_name, stack, child_brushes)) {
+			LogWarning(LC_ASSET, "Subview instance '{}' in '{}' uses the subview '{}', which can't be read",
+					   instance.Name.Get(), subview_name, child_name);
+			continue;
+		}
+
+		AppendPlacedSubviewBrushes(out_brushes, child_brushes, instance.Name.Get(), ReadBrushPlacement(instance));
+	}
+
+	stack.pop_back();
+
+	return true;
+}
+
+bool ReadSubviewBrushes(const ConfigFile& info, const String& prototype_path, const String& subview_name,
+						ConfigEntry& out_brushes)
+{
+	std::vector<String> stack;
+
+	return FlattenSubview(info, prototype_path, subview_name, stack, out_brushes);
+}
+
+static void HashSubviewFiles(const ConfigFile& info, const String& prototype_path, const ConfigEntry& instances,
+							 std::unordered_set<String>& seen, uint64& hash)
+{
+	constexpr uint64 scHashPrime = 1099511628211ull;
+
+	if (!instances.Members.IsInited()) {
+		return;
+	}
+
+	const ConfigEntry* inline_subviews = info.GetEntry(HashStr32(scSubviewsEntryName));
+
+	for (const ConfigEntry& instance : instances.Members) {
+		const char* subview_name = ReadInstanceSubviewName(instance);
+
+		if (subview_name == nullptr || !seen.insert(subview_name).second) {
+			continue;
+		}
+
+		if (inline_subviews != nullptr && inline_subviews->GetMember(HashStr32(subview_name)) != nullptr) {
+			continue;
+		}
+
+		hash = (hash ^ CompiledMap::HashFile(GetSubviewFilePath(prototype_path, subview_name))) * scHashPrime;
+
+		ConfigEntry brushes;
+		ConfigEntry nested;
+
+		if (ReadSubviewFile(info, prototype_path, subview_name, brushes, nested)) {
+			HashSubviewFiles(info, prototype_path, nested, seen, hash);
+		}
+	}
 }
 
 uint64 HashPrototype(const String& prototype_path, const ConfigFile& info)
 {
-	constexpr uint64 scHashPrime = 1099511628211ull;
-
 	uint64 hash = CompiledMap::HashFile(prototype_path);
 
 	if (hash == 0) {
@@ -447,23 +602,9 @@ uint64 HashPrototype(const String& prototype_path, const ConfigFile& info)
 		return hash;
 	}
 
-	const ConfigEntry* inline_subviews = info.GetEntry(HashStr32(scSubviewsEntryName));
-
 	std::unordered_set<String> seen;
 
-	for (const ConfigEntry& instance : instances->Members) {
-		const char* subview_name = ReadInstanceSubviewName(instance);
-
-		if (subview_name == nullptr || !seen.insert(subview_name).second) {
-			continue;
-		}
-
-		if (inline_subviews != nullptr && inline_subviews->GetMember(HashStr32(subview_name)) != nullptr) {
-			continue;
-		}
-
-		hash = (hash ^ CompiledMap::HashFile(GetSubviewFilePath(prototype_path, subview_name))) * scHashPrime;
-	}
+	HashSubviewFiles(info, prototype_path, *instances, seen, hash);
 
 	return hash;
 }
@@ -515,9 +656,7 @@ void ForEachSubviewBrush(const ConfigFile& info, const String& prototype_path,
 			continue;
 		}
 
-		BrushPlacement placement;
-		placement.Position = instance.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
-		placement.Rotation = ReadBrushRotation(instance);
+		const BrushPlacement placement = ReadBrushPlacement(instance);
 
 		uint32 member_index = 0;
 

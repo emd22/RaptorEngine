@@ -73,6 +73,7 @@ struct BrushPlacement
 };
 
 Quat ReadBrushRotation(const ConfigEntry& entry);
+BrushPlacement ReadBrushPlacement(const ConfigEntry& entry);
 
 /// Takes a brush from its subview's space to the world, for a subview placed at `instance`
 BrushPlacement PlaceInSubview(const BrushPlacement& local, const Vec3f brush_center, const BrushPlacement& instance);
@@ -106,6 +107,18 @@ String GetSubviewFilePath(const String& prototype_path, const String& subview_na
 
 bool ReadSubviewBrushes(const ConfigFile& info, const String& prototype_path, const String& subview_name,
 						ConfigEntry& out_brushes);
+
+bool ReadSubviewFile(const ConfigFile& info, const String& prototype_path, const String& subview_name,
+					 ConfigEntry& out_brushes, ConfigEntry& out_instances);
+
+String ResolveNestedSubviewName(const String& parent_name, const String& reference);
+
+String MakeNestedSubviewReference(const String& parent_name, const String& subview_name);
+
+const char* ReadInstanceSubviewName(const ConfigEntry& instance);
+
+void AppendPlacedSubviewBrushes(ConfigEntry& out_brushes, ConfigEntry& subview_brushes, const String& instance_name,
+								const BrushPlacement& instance);
 
 uint64 HashPrototype(const String& prototype_path, const ConfigFile& info);
 

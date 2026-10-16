@@ -768,7 +768,8 @@ bool RaptorEditor::IsObjectSelectable(const Object* object) const
 	if (!CanEditObject(object)) {
 		// A placed subview is one object, which only the Select and Rotate tools can work with. Nothing outside
 		// of the subview being edited can be selected.
-		return !IsEditingSubview() && (mCurrentTool == eEditorTool::Select || mCurrentTool == eEditorTool::Rotate);
+		return gWorld->pPrototype != nullptr && gWorld->pPrototype->IsPlacedInActiveSubview(object->SubviewInstance) &&
+			   (mCurrentTool == eEditorTool::Select || mCurrentTool == eEditorTool::Rotate);
 	}
 
 	if (!IsDataMode()) {
@@ -1473,24 +1474,24 @@ bool RaptorEditor::CreateSubviewFromSelection(const String& name)
 		return false;
 	}
 
-	if (blockout->IsEditingSubview()) {
-		LogWarning(LC_CORE, "A subview can't hold another subview. Leave the subview being edited first.");
-		return false;
-	}
-
 	Object* objects[scMaxSelectedObjects];
 	uint32 count = 0;
 
 	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
 		Object* object = mSelection.GetObject(i);
 
+		if (blockout->IsSubviewObject(object) && blockout->IsPlacedInActiveSubview(object->SubviewInstance)) {
+			objects[count++] = object;
+			continue;
+		}
+
 		if (!blockout->HasBrush(object) && !blockout->HasPatch(object)) {
-			LogWarning(LC_CORE, "Only brushes and patches can be part of a subview, '{}' is neither",
+			LogWarning(LC_CORE, "Only brushes, patches and subviews can be part of a subview, '{}' is none of them",
 					   object->Name.Get());
 			return false;
 		}
 
-		if (object->SubviewInstance != Blockout::scNoSubview) {
+		if (!CanEditObject(object)) {
 			LogWarning(LC_CORE, "'{}' is already part of the subview '{}'", object->Name.Get(),
 					   blockout->GetSubviewName(object->SubviewInstance));
 			return false;
@@ -1528,7 +1529,7 @@ bool RaptorEditor::CreateSubviewFromSelection(const String& name)
 
 	EmplaceEditOperation<SubviewCreateOperation>(instance, objects, count, placement);
 
-	LogInfo(LC_CORE, "Made the subview '{}' from {} brush(es)", blockout->GetSubviewName(instance), count);
+	LogInfo(LC_CORE, "Made the subview '{}' from {} object(s)", blockout->GetSubviewName(instance), count);
 
 	SetTool(eEditorTool::Select);
 	SelectSubview(instance, false);
@@ -1538,20 +1539,29 @@ bool RaptorEditor::CreateSubviewFromSelection(const String& name)
 	return true;
 }
 
+bool RaptorEditor::IsSubviewSelected() const
+{
+	const Blockout* blockout = gWorld->pPrototype;
+	const Object* selected = mSelection.GetLast();
+
+	return blockout != nullptr && selected != nullptr && selected->SubviewInstance != Blockout::scNoSubview &&
+		   blockout->IsPlacedInActiveSubview(selected->SubviewInstance);
+}
+
 bool RaptorEditor::EnterSubview()
 {
 	Blockout* blockout = gWorld->pPrototype;
 
-	if (blockout == nullptr || IsSimulationMode() || blockout->IsEditingSubview()) {
+	if (blockout == nullptr || IsSimulationMode()) {
+		return false;
+	}
+
+	if (!IsSubviewSelected()) {
+		LogWarning(LC_CORE, "Select a placed subview to enter it");
 		return false;
 	}
 
 	const Object* selected = mSelection.GetLast();
-
-	if (selected == nullptr || selected->SubviewInstance == Blockout::scNoSubview) {
-		LogWarning(LC_CORE, "Select a placed subview to enter it");
-		return false;
-	}
 
 	const uint32 instance = selected->SubviewInstance;
 
@@ -1596,15 +1606,10 @@ bool RaptorEditor::PlaceSubview(const String& name)
 		return false;
 	}
 
-	if (blockout->IsEditingSubview()) {
-		LogWarning(LC_CORE, "A subview can't hold another subview. Leave the subview being edited first.");
-		return false;
-	}
-
 	const uint32 instance = blockout->NewSubviewInstance(name);
 
 	if (instance == Blockout::scNoSubview) {
-		LogWarning(LC_CORE, "There is no subview called '{}'", name);
+		LogWarning(LC_CORE, "The subview '{}' could not be placed", name);
 		return false;
 	}
 
@@ -1634,7 +1639,7 @@ uint32 RaptorEditor::DissolveSelectedSubviews()
 {
 	Blockout* blockout = gWorld->pPrototype;
 
-	if (blockout == nullptr || IsSimulationMode() || IsEditingSubview()) {
+	if (blockout == nullptr || IsSimulationMode()) {
 		return 0;
 	}
 
@@ -1644,7 +1649,7 @@ uint32 RaptorEditor::DissolveSelectedSubviews()
 	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
 		Object* object = mSelection.GetObject(i);
 
-		if (blockout->IsSubviewObject(object)) {
+		if (blockout->IsSubviewObject(object) && blockout->IsPlacedInActiveSubview(object->SubviewInstance)) {
 			instances[count++] = object->SubviewInstance;
 		}
 	}

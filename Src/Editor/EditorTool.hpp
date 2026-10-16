@@ -67,7 +67,7 @@ enum class eDataFilter : uint32
 };
 
 /// Mirrored by LIMIT_SELECTION_OBJECTS in `tool_common.strata`
-static constexpr uint32 scMaxSelectedObjects = 64;
+static constexpr uint32 scMaxSelectedObjects = 128;
 
 /**
  * @brief Configuration information to be sent to all editor scripts. Mirrored by TOOLSTATE in `tool_common.strata`.
