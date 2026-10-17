@@ -898,10 +898,12 @@ void World::AddTileToRenderList(bool clear, TileIndex new_tile_index, const Frus
 		}
 
 		Object* object = gObjectManager->GetObject(*object_id);
-		if (object == nullptr) {
+		if (object == nullptr || object->mCullSerial == mCullSerial) {
 			++index;
 			continue;
 		}
+
+		object->mCullSerial = mCullSerial;
 
 		// Markers are drawn as wire boxes instead. A map bound is the exception: while the editor is showing data
 		// brushes it is drawn solid, so that it can be told apart from the geometry it seals
@@ -978,6 +980,8 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 
 	mFrustum.Rebuild(cam);
 	mVisibleTiles.Clear();
+
+	++mCullSerial;
 
 	const bool frustum_cull = (pCVarFrustumCull->IntValue != 0);
 	const Frustum* object_frustum = frustum_cull ? &mFrustum : nullptr;
@@ -1201,6 +1205,8 @@ void World::RenderProbeCapture()
 
 	// The render list was culled to the player's view, but the probes need to see the whole level
 	ClearRenderList();
+
+	++mCullSerial;
 
 	const Vec2u grid_size = gWorldGrid->GetGridSize();
 

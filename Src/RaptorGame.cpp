@@ -7,7 +7,7 @@
 
 #include <Asset/AssetManager.hpp>
 #include <Asset/ConfigFile.hpp>
-#include <Asset/Font/Font.hpp>
+// #include <Asset/Font/Font.hpp>
 #include <Asset/WorldFile.hpp>
 #include <CVar.hpp>
 #include <Controls.hpp>

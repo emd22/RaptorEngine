@@ -310,11 +310,14 @@ private:
 	/// Number of tiles (width, height) this object spans starting at mTileIndex's XY.
 	Vec2u mTileSpan = Vec2u(1, 1);
 
+	uint64 mCullSerial = 0;
+
 	eObjectFlags Flags = eObjectFlags::None;
 	eObjectLayer mObjectLayer = eObjectLayer::WorldLayer;
 
 	friend class WorldGrid;
 	friend class ObjectManager;
+	friend class World;
 };
 
 

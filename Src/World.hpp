@@ -225,6 +225,7 @@ private:
 	Frustum mFrustum;
 
 	SizedArray<TileIndex> mVisibleTiles;
+	uint64 mCullSerial = 0;
 };
 
 } // namespace fx

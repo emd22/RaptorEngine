@@ -1,3 +1,5 @@
+#if 0
+
 #include "Font.hpp"
 
 #include <Asset/ConfigFile.hpp>
@@ -344,3 +346,5 @@ void FontAtlas::Destroy()
 
 
 } // namespace fx::renderer
+
+#endif

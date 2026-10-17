@@ -5,6 +5,9 @@
 
 namespace fx {
 
+/**
+ * @brief Axis-aligned bounding box (e.g. just minimum point and maximum point)
+ */
 class BBox
 {
 public:
@@ -32,6 +35,10 @@ public:
 	Vec3f Max = Vec3f::sZero;
 };
 
+/**
+ * @brief Oriented bounding box. A bounding box that has points oriented with scale, rotation and position built from
+ * points.
+ */
 class OBBox
 {
 public:

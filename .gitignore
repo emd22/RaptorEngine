@@ -19,6 +19,7 @@ Data/Demo/Models/**/*
 # Windows builds
 vcpkg_installed/**/*
 bin
+cache
 *.dir
 x64
 obj

@@ -29,7 +29,8 @@ public:
 	FreeArray<LightID> Lights;
 
 	/// WorldGrid::GetChangeSerial() at the last time a shadow casting object in this tile was added, removed, moved,
-	/// rotated, scaled or reposed.
+	/// rotated, scaled or reposed. When this changes we need to rebuild the shadows for the lights that cross these
+	/// tiles.
 	uint64 ChangeSerial = 0;
 };
 

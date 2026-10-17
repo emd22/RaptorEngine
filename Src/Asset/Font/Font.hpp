@@ -1,3 +1,5 @@
+#if 0
+
 #pragma once
 
 #include <ft2build.h>
@@ -109,3 +111,5 @@ private:
 };
 
 } // namespace fx::renderer
+
+#endif
