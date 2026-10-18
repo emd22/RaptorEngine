@@ -417,6 +417,10 @@ bool PackCharts(Array<ChartLayout>& layouts, const Array<uint32>& order, uint32 
 	for (const uint32 index : order) {
 		ChartLayout& layout = layouts[index];
 
+		if (layout.GetPaddedWidth() > width) {
+			return false;
+		}
+
 		if (shelf_x + layout.GetPaddedWidth() > width) {
 			shelf_y += shelf_height;
 			shelf_x = 0;

@@ -137,7 +137,7 @@ static String ReadStoredThemeID()
 
 void EditorThemeLibrary::Load()
 {
-	mThemes.clear();
+	mThemes.Clear();
 	mActiveIndex = 0;
 
 	const std::filesystem::path directory(FilesystemIO::ResolvePath(scThemeDirectory).CStr());
@@ -161,22 +161,22 @@ void EditorThemeLibrary::Load()
 		const std::string relative_path = std::string(scThemeDirectory) + "/" + file.filename().string();
 
 		if (theme.Load(String(relative_path))) {
-			mThemes.push_back(std::move(theme));
+			mThemes.Insert(std::move(theme));
 		}
 	}
 
-	if (mThemes.empty()) {
+	if (mThemes.IsEmpty()) {
 		LogWarning(LC_CORE, "No editor themes found in {}, using the built-in colours", scThemeDirectory);
 
 		EditorTheme theme;
 		theme.ID = String(scDefaultThemeID);
 		theme.Name = theme.ID;
-		mThemes.push_back(std::move(theme));
+		mThemes.Insert(std::move(theme));
 	}
 
 	const String stored_id = ReadStoredThemeID();
 
-	for (uint32 index = 0; index < mThemes.size(); index++) {
+	for (uint32 index = 0; index < mThemes.Size; index++) {
 		if (mThemes[index].ID == stored_id) {
 			mActiveIndex = index;
 		}
@@ -187,7 +187,7 @@ const EditorTheme& EditorThemeLibrary::GetActive() const
 {
 	static const EditorTheme sDefault {};
 
-	if (mActiveIndex >= mThemes.size()) {
+	if (mActiveIndex >= mThemes.Size) {
 		return sDefault;
 	}
 
@@ -196,7 +196,7 @@ const EditorTheme& EditorThemeLibrary::GetActive() const
 
 bool EditorThemeLibrary::ReloadActive()
 {
-	if (mActiveIndex >= mThemes.size()) {
+	if (mActiveIndex >= mThemes.Size) {
 		return false;
 	}
 
@@ -219,7 +219,7 @@ bool EditorThemeLibrary::ReloadActive()
 
 void EditorThemeLibrary::Select(uint32 index)
 {
-	if (index < mThemes.size()) {
+	if (index < mThemes.Size) {
 		mActiveIndex = index;
 	}
 }

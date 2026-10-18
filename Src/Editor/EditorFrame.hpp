@@ -97,6 +97,17 @@ private:
 
 	void RunAfterUnsavedCheck(const wxString& question, std::function<void()> game_task);
 
+	/////////////////////////////////////
+	// Menu Builders
+	/////////////////////////////////////
+
+	wxMenu* CreateFileMenu();
+	wxMenu* CreateWorldMenu();
+	wxMenu* CreateViewMenu();
+	wxMenu* CreateToolsMenu();
+	wxMenu* CreateSubviewMenu();
+
+
 private:
 	EditorViewport* mpViewport = nullptr;
 	TopViewPanel* mpTopViewPanel = nullptr;
@@ -108,7 +119,7 @@ private:
 	wxMenuItem* mpMaterialPickerMenuItem = nullptr;
 	AtlasPackerWindow* mpAtlasPackerWindow = nullptr;
 
-	/// The tool settings slot: whatever ToolSettingsBasePanel is currently swapped in, below Object Properties
+	/// Tool specific settings
 	ToolSettingsBasePanel* mpToolSettingsPanel = nullptr;
 	wxBoxSizer* mpComponentSizer = nullptr;
 	wxScrolledWindow* mpSideScroller = nullptr;

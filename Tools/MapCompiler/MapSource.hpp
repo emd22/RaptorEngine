@@ -13,12 +13,22 @@
 #include <Patch.hpp>
 #include <Renderer/ProbePlacement.hpp>
 
+namespace fx {
+
+class ConfigEntry;
+class String;
+
+} // namespace fx
+
 namespace fx::mapc {
+
+struct CachedMaterials;
 
 struct TextureMap
 {
-	Vec3d GradientU = Vec3d(0.0);
-	Vec3d GradientV = Vec3d(0.0);
+	Vec3d GradientU = Vec3d::scZero;
+	Vec3d GradientV = Vec3d::scZero;
+
 	double OffsetU = 0.0;
 	double OffsetV = 0.0;
 };
@@ -32,6 +42,7 @@ struct SourceBrush
 	bool bVisible = true;
 	/// Emits a collision hull
 	bool bCollides = true;
+
 	/// Takes part in the BSP, so it seals the map and hides the faces buried in it
 	bool bSolid = true;
 	bool bCastsShadow = true;
@@ -60,6 +71,9 @@ class MapSource
 public:
 	bool Load(const String& path, PlaneSet& planes);
 
+	void AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& name, const CachedMaterials& mc);
+	void AddPatch(ConfigEntry& entry, const String& name, const CachedMaterials& mc);
+
 public:
 	/// These three hold strings, so they are sized once from the number of brushes in the prototype and never grow
 	SizedArray<SourceBrush> Brushes;
@@ -70,10 +84,10 @@ public:
 	Array<Vec3d> Entities;
 
 	bool bHasPlayerSpawn = false;
-	Vec3d PlayerSpawn = Vec3d(0.0);
+	Vec3d PlayerSpawn = Vec3d::scZero;
 
 	bool bHasSun = false;
-	Vec3d SunDirection = Vec3d(0.0, 1.0, 0.0);
+	Vec3d SunDirection = Vec3d::scUp;
 
 	/// Everything the engine keeps light probes out of, in the order the engine would gather it
 	ProbePlacementBoxes ProbeBoxes;
@@ -81,8 +95,8 @@ public:
 	Array<BBox> ProbeRegions;
 	uint32 ModelCount = 0;
 
-	Vec3d Min = Vec3d(0.0);
-	Vec3d Max = Vec3d(0.0);
+	Vec3d Min = Vec3d::scZero;
+	Vec3d Max = Vec3d::scZero;
 
 	uint32 EntityBrushCount = 0;
 	uint32 ClipBrushCount = 0;

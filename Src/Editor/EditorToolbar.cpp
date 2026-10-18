@@ -12,6 +12,7 @@
 #include <wx/choice.h>
 #include <wx/sizer.h>
 #include <wx/statline.h>
+#include <wx/stattext.h>
 #include <wx/utils.h>
 #include <wx/wrapsizer.h>
 
@@ -527,6 +528,33 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 		mpCurveRow->Add(thicken_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 6));
 		mpCurveRow->Add(cap_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 6));
 
+		FloatField* weight_field = new FloatField(parent, "Weight", Vec2f(Patch::scMinWeight, 100.0f));
+		weight_field->SetValue(mCurve.Weight);
+		weight_field->GetLabel()->SetToolTip(
+			"How strongly the selected control points pull the curve toward them. Below 1 rounds it off, above 1 "
+			"tightens it into the corner");
+		weight_field->SetOnChange(
+			[this](const float32 value)
+			{
+				mCurve.Weight = value;
+				mpCanvas->SetCurveSettings(mCurve);
+				mpCanvas->RunPatchCommand(ePatchCommand::SetWeight);
+			});
+
+		wxButton* round_button = new wxButton(parent, wxID_ANY, "Round", wxDefaultPosition, wxDefaultSize,
+											  wxBU_EXACTFIT);
+		round_button->SetToolTip("Weight the selected control points (or every point of the selected patches) so each "
+								 "corner becomes a true circular arc");
+		round_button->Bind(wxEVT_BUTTON,
+						   [this](wxCommandEvent&)
+						   {
+							   mpCanvas->RunPatchCommand(ePatchCommand::RoundWeights);
+							   mpCanvas->SetFocus();
+						   });
+
+		mpCurveRow->Add(weight_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+		mpCurveRow->Add(round_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 6));
+
 		for (const PatchCommandButtonInfo& info : scPatchCommandButtons) {
 			wxButton* button = new wxButton(parent, wxID_ANY, info.pName, wxDefaultPosition, wxDefaultSize,
 											wxBU_EXACTFIT);
@@ -550,6 +578,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 		mpCurveSubdivisionsVField = subdivisions_v_field;
 		mpCurveSmoothButton = smooth_button;
 		mpCurveThicknessField = thickness_field;
+		mpCurveWeightField = weight_field;
 		mpCurveThickenButton = thicken_button;
 		mpCurveCapButton = cap_button;
 
@@ -562,6 +591,8 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 				mCurve.bSmooth = settings.bSmooth;
 				mCurve.Closure = settings.Closure;
 				mCurve.Thickness = settings.Thickness;
+				mCurve.Weight = settings.Weight;
+				mpCurveWeightField->SetValue(settings.Weight);
 				mpCurveSubdivisionsUField->SetValue(static_cast<float32>(settings.SubdivisionsU));
 				mpCurveSubdivisionsVField->SetValue(static_cast<float32>(settings.SubdivisionsV));
 				mpCurveSmoothButton->SetValue(settings.bSmooth);

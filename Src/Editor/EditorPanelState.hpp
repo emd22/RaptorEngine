@@ -145,6 +145,7 @@ struct TopViewProjection
 	DynArray<TopViewEdge> Edges;
 	DynArray<TopViewFace> Faces;
 	DynArray<Vec2f> ControlPoints;
+	DynArray<float32> ControlWeights;
 
 	TopViewProjection() = default;
 	TopViewProjection(TopViewProjection&& other) = default;
@@ -165,6 +166,7 @@ struct TopViewProjection
 		Edges = other.Edges.Clone();
 		Faces = other.Faces.Clone();
 		ControlPoints = other.ControlPoints.Clone();
+		ControlWeights = other.ControlWeights.Clone();
 
 		return *this;
 	}

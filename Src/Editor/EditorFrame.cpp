@@ -18,6 +18,7 @@
 #include <wx/bitmap.h>
 #include <wx/button.h>
 #include <wx/checkbox.h>
+#include <wx/choicdlg.h>
 #include <wx/filedlg.h>
 #include <wx/menu.h>
 #include <wx/msgdlg.h>
@@ -28,7 +29,6 @@
 #include <wx/sizer.h>
 #include <wx/splitter.h>
 #include <wx/stattext.h>
-#include <wx/choicdlg.h>
 #include <wx/textdlg.h>
 
 #include <Blockout.hpp>
@@ -380,30 +380,38 @@ bool EditorFrame::SaveProtoTypeAs()
 
 EditorFrame::~EditorFrame() = default;
 
-EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : wxFrame(nullptr, wxID_ANY, title)
+
+wxMenu* EditorFrame::CreateFileMenu()
 {
-	GetThemeLibrary().Load();
-
-	// Top bar
-	wxMenuBar* menu_bar = new wxMenuBar;
-
 	wxMenu* file_menu = new wxMenu;
 
 	wxMenuItem* new_item = file_menu->Append(wxID_ANY, "New", "Creates a new prototype");
 	wxMenuItem* open_item = file_menu->Append(wxID_ANY, "Open...\tCtrl+O", "Opens an existing prototype");
+
 	file_menu->AppendSeparator();
 
 	wxMenuItem* load_baked_or_proto = file_menu->Append(
-		wxID_ANY, "Load baked/proto",
+		wxID_ANY, "Load linked project",
 		"Switch to the prototype version if on baked, or the baked version if on prototype");
 
 	file_menu->AppendSeparator();
+
 	wxMenuItem* save_item = file_menu->Append(wxID_ANY, "Save\tCtrl+S", "Saves the prototype to its current file");
 	wxMenuItem* save_as_item = file_menu->Append(wxID_ANY, "Save As...\tCtrl+Shift+S",
 												 "Saves the prototype under a new name");
+	{
+		Bind(wxEVT_MENU, [this](wxCommandEvent&) { NewPrototype(); }, new_item->GetId());
+		Bind(wxEVT_MENU, [this](wxCommandEvent&) { OpenPrototype(); }, open_item->GetId());
+		Bind(wxEVT_MENU, [this](wxCommandEvent&) { SavePrototype(); }, save_item->GetId());
+		Bind(wxEVT_MENU, [this](wxCommandEvent&) { SaveProtoTypeAs(); }, save_as_item->GetId());
+		Bind(wxEVT_MENU, [this](wxCommandEvent&) { SwitchBakedOrProto(); }, load_baked_or_proto->GetId());
+	}
 
-	menu_bar->Append(file_menu, "&File");
+	return file_menu;
+}
 
+wxMenu* EditorFrame::CreateWorldMenu()
+{
 	wxMenu* world_menu = new wxMenu;
 
 	wxMenuItem* reload_world_item = world_menu->Append(wxID_ANY, "Reload World", "Reloads the world from disk");
@@ -416,59 +424,130 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	wxMenuItem* rebase_probes_item = world_menu->Append(wxID_ANY, "Rebake Probes",
 														"Rebakes all irradiance and reflection probes for the world");
 
+	{
+		const auto bind_reload = [this](wxMenuItem* item, eReloadTarget target)
+		{
+			Bind(
+				wxEVT_MENU, [target](wxCommandEvent&)
+				{ thread::PostToGame([target] { gEditor->InvokeReloadHandler(target); }); }, item->GetId());
+		};
 
-	menu_bar->Append(world_menu, "&World");
+		bind_reload(reload_world_item, eReloadTarget::World);
+		Bind(wxEVT_MENU, [this](wxCommandEvent&) { ReloadPrototype(); }, reload_prototype_item->GetId());
+		bind_reload(reload_scripts_item, eReloadTarget::Scripts);
+		bind_reload(clean_item, eReloadTarget::Clean);
 
+		Bind(
+			wxEVT_MENU,
+			[](wxCommandEvent&)
+			{
+				thread::PostToGame(
+					[]
+					{
+						gProbeManager->RebuildVolumesFromWorld();
+						gProbeManager->BeginBake();
+					});
+			},
+			rebase_probes_item->GetId());
+	}
+
+	return world_menu;
+}
+
+
+wxMenu* EditorFrame::CreateViewMenu()
+{
 	wxMenu* view_menu = new wxMenu;
 
 	mpPerspectiveMenuItem = view_menu->AppendRadioItem(wxID_ANY, "3D View\tCtrl+1", "Fly around the level in 3D");
-	mpTopMenuItem = view_menu->AppendRadioItem(wxID_ANY, "2D Views\tCtrl+2",
+	mpTopMenuItem = view_menu->AppendRadioItem(wxID_ANY, "Architect View\tCtrl+2",
 											   "Top, front and side wireframe views for laying out brushes");
 	mpSplitMenuItem = view_menu->AppendRadioItem(wxID_ANY, "Split View\tCtrl+3",
 												 "The 3D view and the 2D views side by side, with a draggable divider");
-	view_menu->AppendSeparator();
-	mpStackMenuItem = view_menu->AppendCheckItem(wxID_ANY, "Stack Split Panes",
+	mpStackMenuItem = view_menu->AppendCheckItem(wxID_ANY, "Stack Vertically",
 												 "Put the 2D view below the 3D view instead of beside it");
+
 	view_menu->AppendSeparator();
-	wxMenuItem* reload_theme_item = view_menu->Append(wxID_ANY, "Reload Theme",
-													  "Re-reads the current theme from Config/EditorThemes");
+
+	wxMenuItem* reload_theme_item = view_menu->Append(wxID_ANY, "Reload Theme", "Reloads the currently selected theme");
 	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ReloadTheme(); }, reload_theme_item->GetId());
 
-	menu_bar->Append(view_menu, "&View");
+	{
+		wxMenu* theme_menu = new wxMenu;
+		const DynArray<EditorTheme>& themes = GetThemeLibrary().GetThemes();
 
-	wxMenu* window_menu = new wxMenu;
-	wxMenuItem* object_list_item = window_menu->Append(wxID_ANY, "Open Object List",
-													   "View all objects currently in ObjectManager");
-	wxMenuItem* cvar_list_item = window_menu->Append(wxID_ANY, "Open CVar List",
-													 "View and edit all registered console variables");
+		for (uint32 index = 0; index < themes.Size; index++) {
+			wxMenuItem* theme_item = theme_menu->AppendRadioItem(
+				wxID_ANY, wxString::FromUTF8(themes[index].Name.CStr()), "Set the editor theme");
 
-	mpMaterialPickerMenuItem = window_menu->AppendCheckItem(wxID_ANY, "Show Material Picker",
-															 "Show the material search and preview in the side panel");
-	mpMaterialPickerMenuItem->Check(true);
-	wxMenuItem* atlas_packer_item = window_menu->Append(wxID_ANY, "Open Atlas Packer",
-														"Pack images into a tile atlas and export its config");
+			theme_item->Check(index == GetThemeLibrary().GetActiveIndex());
 
-	window_menu->AppendSeparator();
+			Bind(wxEVT_MENU, [this, index](wxCommandEvent&) { SelectTheme(index); }, theme_item->GetId());
+		}
 
-	wxMenu* theme_menu = new wxMenu;
-	const std::vector<EditorTheme>& themes = GetThemeLibrary().GetThemes();
-
-	for (uint32 index = 0; index < themes.size(); index++) {
-		wxMenuItem* theme_item = theme_menu->AppendRadioItem(wxID_ANY, wxString::FromUTF8(themes[index].Name.CStr()),
-															 "Recolours the editor");
-		theme_item->Check(index == GetThemeLibrary().GetActiveIndex());
-
-		Bind(wxEVT_MENU, [this, index](wxCommandEvent&) { SelectTheme(index); }, theme_item->GetId());
+		view_menu->AppendSubMenu(theme_menu, "Theme", "Changes the editor theme");
 	}
 
-	window_menu->AppendSubMenu(theme_menu, "Theme", "Picks the editor colour theme from Config/EditorThemes");
+	{
+		Bind(
+			wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetView(eEditorView::Perspective); }); },
+			mpPerspectiveMenuItem->GetId());
+		Bind(
+			wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetView(eEditorView::Top); }); },
+			mpTopMenuItem->GetId());
+		Bind(
+			wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetView(eEditorView::Split); }); },
+			mpSplitMenuItem->GetId());
+		Bind(
+			wxEVT_MENU,
+			[this](wxCommandEvent&)
+			{
+				mbStackedSplit = mpStackMenuItem->IsChecked();
 
-	menu_bar->Append(window_menu, "&Tools");
+				if (mView == eEditorView::Split) {
+					ApplySplitLayout(mView);
+					mpRootPanel->Layout();
+				}
+			},
+			mpStackMenuItem->GetId());
+	}
 
+	return view_menu;
+}
+
+
+wxMenu* EditorFrame::CreateToolsMenu()
+{
+	wxMenu* tools_menu = new wxMenu;
+	wxMenuItem* object_list_item = tools_menu->Append(wxID_ANY, "Open Object List",
+													  "View all objects currently in ObjectManager");
+	wxMenuItem* cvar_list_item = tools_menu->Append(wxID_ANY, "Open CVar List",
+													"View and edit all registered console variables");
+
+	mpMaterialPickerMenuItem = tools_menu->AppendCheckItem(wxID_ANY, "Show Material Picker",
+														   "Show the material search and preview in the side panel");
+	mpMaterialPickerMenuItem->Check(true);
+	wxMenuItem* atlas_packer_item = tools_menu->Append(wxID_ANY, "Open Atlas Packer",
+													   "Pack images into a tile atlas and export its config");
+
+	{
+		Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowObjectListWindow(); }, object_list_item->GetId());
+		Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowCVarListWindow(); }, cvar_list_item->GetId());
+		Bind(
+			wxEVT_MENU, [this](wxCommandEvent& event) { SetMaterialPickerShown(event.IsChecked()); },
+			mpMaterialPickerMenuItem->GetId());
+		Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowAtlasPackerWindow(); }, atlas_packer_item->GetId());
+	}
+
+	return tools_menu;
+}
+
+wxMenu* EditorFrame::CreateSubviewMenu()
+{
 	wxMenu* subview_menu = new wxMenu;
 
-	wxMenuItem* create_subview_item = subview_menu->Append(
-		wxID_ANY, "Create from Selection...", "Groups the selected brushes into a new subview (Ctrl+G)");
+	wxMenuItem* create_subview_item = subview_menu->Append(wxID_ANY, "Create from Selection...",
+														   "Groups the selected brushes into a new subview (Ctrl+G)");
 	wxMenuItem* place_subview_item = subview_menu->Append(wxID_ANY, "Place Subview...",
 														  "Places another copy of a subview at the crosshair");
 	subview_menu->AppendSeparator();
@@ -480,81 +559,39 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	wxMenuItem* dissolve_subview_item = subview_menu->Append(
 		wxID_ANY, "Dissolve into Level", "Turns the selected subview back into brushes of the level");
 
-	menu_bar->Append(subview_menu, "&Subview");
+	{
+		Bind(wxEVT_MENU, [this](wxCommandEvent&) { CreateSubview(); }, create_subview_item->GetId());
+		Bind(wxEVT_MENU, [this](wxCommandEvent&) { PlaceSubview(); }, place_subview_item->GetId());
+		Bind(
+			wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->EnterSubview(); }); },
+			enter_subview_item->GetId());
+		Bind(
+			wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->LeaveSubview(); }); },
+			leave_subview_item->GetId());
+		Bind(
+			wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->DissolveSelectedSubviews(); }); },
+			dissolve_subview_item->GetId());
+	}
+
+	return subview_menu;
+}
+
+
+EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : wxFrame(nullptr, wxID_ANY, title)
+{
+	GetThemeLibrary().Load();
+
+	wxMenuBar* menu_bar = new wxMenuBar;
+
+	// Create all menus for the top bar
+	menu_bar->Append(CreateFileMenu(), "&File");
+	menu_bar->Append(CreateWorldMenu(), "&World");
+	menu_bar->Append(CreateViewMenu(), "&View");
+	menu_bar->Append(CreateToolsMenu(), "&Tools");
+	menu_bar->Append(CreateSubviewMenu(), "&Subview");
 
 	SetMenuBar(menu_bar);
 
-	Bind(wxEVT_MENU, [this](wxCommandEvent&) { CreateSubview(); }, create_subview_item->GetId());
-	Bind(wxEVT_MENU, [this](wxCommandEvent&) { PlaceSubview(); }, place_subview_item->GetId());
-	Bind(
-		wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->EnterSubview(); }); },
-		enter_subview_item->GetId());
-	Bind(
-		wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->LeaveSubview(); }); },
-		leave_subview_item->GetId());
-	Bind(
-		wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->DissolveSelectedSubviews(); }); },
-		dissolve_subview_item->GetId());
-
-	Bind(wxEVT_MENU, [this](wxCommandEvent&) { NewPrototype(); }, new_item->GetId());
-	Bind(wxEVT_MENU, [this](wxCommandEvent&) { OpenPrototype(); }, open_item->GetId());
-	Bind(wxEVT_MENU, [this](wxCommandEvent&) { SavePrototype(); }, save_item->GetId());
-	Bind(wxEVT_MENU, [this](wxCommandEvent&) { SaveProtoTypeAs(); }, save_as_item->GetId());
-	Bind(wxEVT_MENU, [this](wxCommandEvent&) { SwitchBakedOrProto(); }, load_baked_or_proto->GetId());
-
-	const auto bind_reload = [this](wxMenuItem* item, eReloadTarget target)
-	{
-		Bind(
-			wxEVT_MENU, [target](wxCommandEvent&)
-			{ thread::PostToGame([target] { gEditor->InvokeReloadHandler(target); }); }, item->GetId());
-	};
-
-	bind_reload(reload_world_item, eReloadTarget::World);
-	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ReloadPrototype(); }, reload_prototype_item->GetId());
-	bind_reload(reload_scripts_item, eReloadTarget::Scripts);
-	bind_reload(clean_item, eReloadTarget::Clean);
-
-	Bind(
-		wxEVT_MENU,
-		[](wxCommandEvent&)
-		{
-			thread::PostToGame(
-				[]
-				{
-					gProbeManager->RebuildVolumesFromWorld();
-					gProbeManager->BeginBake();
-				});
-		},
-		rebase_probes_item->GetId());
-
-	Bind(
-		wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetView(eEditorView::Perspective); }); },
-		mpPerspectiveMenuItem->GetId());
-	Bind(
-		wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetView(eEditorView::Top); }); },
-		mpTopMenuItem->GetId());
-	Bind(
-		wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetView(eEditorView::Split); }); },
-		mpSplitMenuItem->GetId());
-	Bind(
-		wxEVT_MENU,
-		[this](wxCommandEvent&)
-		{
-			mbStackedSplit = mpStackMenuItem->IsChecked();
-
-			if (mView == eEditorView::Split) {
-				ApplySplitLayout(mView);
-				mpRootPanel->Layout();
-			}
-		},
-		mpStackMenuItem->GetId());
-
-	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowObjectListWindow(); }, object_list_item->GetId());
-	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowCVarListWindow(); }, cvar_list_item->GetId());
-	Bind(
-		wxEVT_MENU, [this](wxCommandEvent& event) { SetMaterialPickerShown(event.IsChecked()); },
-		mpMaterialPickerMenuItem->GetId());
-	Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowAtlasPackerWindow(); }, atlas_packer_item->GetId());
 
 	wxPanel* root = new wxPanel(this, wxID_ANY);
 	mpRootPanel = root;
@@ -619,8 +656,7 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	mpObjectPropertiesPanel = new ObjectPropertiesPanel(mpSideScroller);
 	component_panel->Add(mpObjectPropertiesPanel, wxSizerFlags().Expand());
 
-	// The tool settings slot starts empty - RaptorEditor::SetTool swaps in a panel for tools that have one. It sits
-	// right below Object Properties
+
 	mpComponentSizer = component_panel;
 	mpSideScroller->SetSizer(component_panel);
 	component_panel->FitInside(mpSideScroller);
@@ -710,6 +746,7 @@ void EditorFrame::ApplyTheme()
 	if (wxTheApp->SetAppearance(ToWxAppearance(theme.Appearance)) != wxApp::AppearanceResult::Ok) {
 		LogWarning(LC_CORE, "Could not set the editor appearance for theme '{}'", theme.ID.CStr());
 	}
+
 	const wxColour background = ToWxColour(theme.Frame.Background);
 
 	SetBackgroundColour(background);
@@ -839,8 +876,7 @@ void EditorFrame::SetSidePanelCollapsed(bool collapsed)
 		mpSideSplitter->Unsplit(mpSidePanel);
 	}
 	else {
-		mpSideSplitter->SplitVertically(mpSplitter, mpSidePanel,
-										-(mSidePanelWidth + mpSideSplitter->GetSashSize()));
+		mpSideSplitter->SplitVertically(mpSplitter, mpSidePanel, -(mSidePanelWidth + mpSideSplitter->GetSashSize()));
 		mpSidePanel->Show();
 	}
 

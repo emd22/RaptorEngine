@@ -7,7 +7,8 @@
 #include <Color.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
-#include <vector>
+// #include <vector>
+#include <Core/DynArray.hpp>
 
 namespace fx::editor {
 
@@ -207,11 +208,11 @@ void EditorTheme::ForEachInt(TFunc&& func)
 class EditorThemeLibrary
 {
 public:
-	static constexpr const char* scThemeDirectory = "Config/EditorThemes";
+	static constexpr const char* scThemeDirectory = "Config/themes";
 
 	void Load();
 
-	const std::vector<EditorTheme>& GetThemes() const { return mThemes; }
+	const DynArray<EditorTheme>& GetThemes() const { return mThemes; }
 	uint32 GetActiveIndex() const { return mActiveIndex; }
 	const EditorTheme& GetActive() const;
 
@@ -219,7 +220,7 @@ public:
 	bool ReloadActive();
 
 private:
-	std::vector<EditorTheme> mThemes;
+	DynArray<EditorTheme> mThemes;
 	uint32 mActiveIndex = 0;
 };
 

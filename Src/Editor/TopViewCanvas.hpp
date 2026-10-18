@@ -39,6 +39,7 @@ struct CurveSettings
 	bool bSmooth = true;
 	ePatchClosure Closure = ePatchClosure::None;
 	float32 Thickness = Patch::scDefaultThickness;
+	float32 Weight = 1.0f;
 };
 
 class TopViewCanvas : public wxWindow
@@ -270,6 +271,7 @@ private:
 	void DrawPatchLattices(wxGraphicsContext& gc);
 	void NotifyCurveChanged();
 	void SyncCurveFromSelection();
+	void SyncWeightFromHandles();
 
 	void UpdatePreview();
 	void ClearPreview();

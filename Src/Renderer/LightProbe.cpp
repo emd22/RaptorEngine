@@ -231,6 +231,12 @@ ProbePlacementBoxes GatherPlacementBoxes()
 		}
 
 		if (object.IsPatch()) {
+			const Patch* patch = (blockout != nullptr) ? blockout->GetPatch(&object) : nullptr;
+
+			if (patch != nullptr) {
+				ProbePlacement::AddPatchSurfaces(boxes, *patch, object.GetWorldMatrix());
+			}
+
 			continue;
 		}
 

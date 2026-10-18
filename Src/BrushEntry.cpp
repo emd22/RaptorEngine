@@ -149,6 +149,21 @@ Patch ReadPatchEntry(ConfigEntry& entry)
 		point.Texcoord = Vec2f(values[base + 3].Get<float32>(), values[base + 4].Get<float32>());
 	}
 
+	ConfigEntry* weights_entry = entry.GetMember(HashStr32("weights"));
+
+	if (weights_entry != nullptr) {
+		const PagedArray<ConfigPrimitive>& weights = weights_entry->GetArrayData();
+
+		if (weights.Size() == patch.Points.Size) {
+			for (uint32 i = 0; i < patch.Points.Size; i++) {
+				patch.Points[i].Weight = std::max(weights[i].Get<float32>(), Patch::scMinWeight);
+			}
+		}
+		else {
+			LogError("Patch '{}' has {} weights, expected {}", entry.Name.Get(), weights.Size(), patch.Points.Size);
+		}
+	}
+
 	ConfigEntry* subdivisions_entry = entry.GetMember(HashStr32("subdiv"));
 
 	if (subdivisions_entry != nullptr && subdivisions_entry->GetArrayData().Size() >= 2) {
@@ -192,6 +207,19 @@ void WritePatchEntry(ConfigEntry& entry, const Patch& patch)
 	}
 
 	entry.AddMember(std::move(points_array));
+
+	const bool is_rational = std::any_of(patch.Points.begin(), patch.Points.end(),
+										 [](const PatchPoint& point) { return point.Weight != 1.0f; });
+
+	if (is_rational) {
+		ConfigEntry weights_array = ConfigEntry::Array("weights", ConfigPrimitive::ePrimitiveType::Float);
+
+		for (const PatchPoint& point : patch.Points) {
+			weights_array.AppendValue(ConfigPrimitive::FromValue(point.Weight));
+		}
+
+		entry.AddMember(std::move(weights_array));
+	}
 
 	ConfigEntry subdivisions_array = ConfigEntry::Array("subdiv", ConfigPrimitive::ePrimitiveType::Int);
 	subdivisions_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(patch.SubdivisionsU)));

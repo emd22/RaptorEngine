@@ -68,6 +68,8 @@ enum class ePatchCommand : uint8
 	SetSubdivisions,
 	SetSmooth,
 	SetClosure,
+	SetWeight,
+	RoundWeights,
 };
 
 struct PatchCommand
@@ -78,6 +80,7 @@ struct PatchCommand
 	bool bSmooth = true;
 	ePatchClosure Closure = ePatchClosure::None;
 	float32 Thickness = Patch::scDefaultThickness;
+	float32 Weight = 1.0f;
 };
 
 inline const ViewPlaneAxes& GetViewPlaneAxes(eViewPlane plane) { return scViewPlaneAxes[static_cast<uint32>(plane)]; }

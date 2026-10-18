@@ -28,6 +28,19 @@ namespace fx {
 class Vec3d
 {
 public:
+	// Constants are defined in source files for each platform.
+
+	/// Vec3d with all components of 0.0.
+	static const Vec3d scZero;
+	/// Vec3d with all components of 1.0.
+	static const Vec3d scOne;
+
+	static const Vec3d scUp;
+	static const Vec3d scRight;
+	static const Vec3d scForward;
+
+
+public:
 	Vec3d() = default;
 	Vec3d(DOUBLE4 vec) : mIntrin(vec) {}
 

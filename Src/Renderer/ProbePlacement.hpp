@@ -18,6 +18,10 @@
 #include <Math/Vec3.hpp>
 #include <Renderer/Limits.hpp>
 #include <functional>
+
+namespace fx {
+class Patch;
+}
 #include <limits>
 
 namespace fx {
@@ -87,6 +91,8 @@ struct ProbePlacementBoxes
 	DynArray<Box, GrowthFunctions::Double> Boxes;
 	/// Unlit solids (dbound). Probes are only kept out of them.
 	DynArray<Box, GrowthFunctions::Double> Bounds;
+	/// World bounds of thin lit surfaces (patches). Probes are placed around them but not kept out of them.
+	DynArray<BBox, GrowthFunctions::Double> Surfaces;
 
 	Vec3f Min = Vec3f(std::numeric_limits<float32>::max());
 	Vec3f Max = Vec3f(-std::numeric_limits<float32>::max());
@@ -180,6 +186,8 @@ bool AddBox(ProbePlacementBoxes& boxes, const BBox& local_bounds, const Mat4f& l
 			const SizedArray<ProbePlacementBoxes::Plane>& planes);
 void AddBound(ProbePlacementBoxes& boxes, const BBox& local_bounds, const Mat4f& local_to_world,
 			  const SizedArray<ProbePlacementBoxes::Plane>& planes);
+void AddSurface(ProbePlacementBoxes& boxes, const BBox& world_bounds);
+void AddPatchSurfaces(ProbePlacementBoxes& boxes, const Patch& patch, const Mat4f& local_to_world);
 
 bool CheckGridSize(const ProbeGridSize& grid);
 void FinaliseVolumeBounds(ProbeVolumeData& volume);

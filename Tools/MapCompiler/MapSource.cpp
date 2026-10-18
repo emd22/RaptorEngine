@@ -2,11 +2,20 @@
 
 #include <Asset/ConfigFile.hpp>
 #include <BrushEntry.hpp>
+#include <Core/String.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/Quat.hpp>
+#include <cfloat>
 #include <unordered_set>
 
 namespace fx::mapc {
+
+struct CachedMaterials
+{
+	std::unordered_set<String> ModelColliders;
+	std::unordered_set<String> TransparentMaterials;
+};
+
 
 namespace {
 
@@ -144,6 +153,216 @@ int32 MapSource::FindOrAddMaterial(const String& name, int32 library_index)
 	return static_cast<int32>(Materials.Size - 1);
 }
 
+
+void MapSource::AddPatch(ConfigEntry& entry, const String& name, const CachedMaterials& mc)
+{
+	if (IsEntityBrushEntry(entry) || mc.ModelColliders.contains(name)) {
+		EntityBrushCount++;
+		return;
+	}
+
+	Patch patch = ReadPatchEntry(entry);
+
+	if (!patch.IsValid()) {
+		Warnings.Emplace(String::Fmt("patch '{}' is not a valid patch, skipped", name));
+		InvalidBrushCount++;
+		return;
+	}
+
+	const Vec3f position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
+	const Transform transform = MakeTransform(ReadRotation(entry), patch.GetCenter(), position);
+
+	for (PatchPoint& point : patch.Points) {
+		const Vec3d world = transform.Apply(ToVec3d(point.Position));
+
+		point.Position = world.ToVec3f();
+
+		Min = MinVec(Min, world);
+		Max = MaxVec(Max, world);
+	}
+
+	const ConfigEntry* material_entry = entry.GetMember(HashStr32("mat"));
+	String material_name;
+
+	if (material_entry != nullptr && material_entry->Type == ConfigEntry::ePrimitiveType::String) {
+		material_name = material_entry->Get<const char*>();
+	}
+
+	const bool is_locked = entry.GetMemberValue(HashStr32("lock"), 0) == 1;
+	const bool is_transparent = !material_name.IsEmpty() && mc.TransparentMaterials.contains(material_name);
+
+	const int32 material_index = FindOrAddMaterial(material_name,
+												   is_locked ? scLockedMaterialIndex : scEditableMaterialIndex);
+
+	// Ignore transparent surfaces as they are excempt from probe baking
+	if (!is_transparent) {
+		ProbePlacement::AddPatchSurfaces(ProbeBoxes, patch, Mat4f::scIdentity);
+	}
+
+	Patch pieces[Patch::scMaxClosurePieces];
+	const uint32 piece_count = patch.BuildClosure(pieces);
+
+	for (uint32 piece = 0; piece <= piece_count; piece++) {
+		SourcePatch& source = Patches.Emplace();
+
+		source.Name = name;
+		source.MaterialIndex = material_index;
+		source.bCastsShadow = !is_transparent;
+
+		if (piece == 0) {
+			source.Shape = patch.Clone();
+			source.Shape.Closure = ePatchClosure::None;
+		}
+		else {
+			source.Shape = std::move(pieces[piece - 1]);
+
+			for (const PatchPoint& point : source.Shape.Points) {
+				Min = MinVec(Min, ToVec3d(point.Position));
+				Max = MaxVec(Max, ToVec3d(point.Position));
+			}
+		}
+	}
+
+	PatchCount++;
+}
+
+void MapSource::AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& name, const CachedMaterials& mc)
+{
+	const Brush brush = ReadBrushEntry(entry);
+
+	if (!brush.IsValid()) {
+		Warnings.Emplace(String::Fmt("brush '{}' does not describe a valid convex brush, skipped", name));
+		InvalidBrushCount++;
+		return;
+	}
+
+	const Vec3f position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
+	const Quat rotation = ReadRotation(entry);
+	const Transform transform = MakeTransform(rotation, brush.GetCenter(), position);
+
+	const ConfigEntry* material_entry = entry.GetMember(HashStr32("mat"));
+	const String material_name = (material_entry != nullptr &&
+								  material_entry->Type == ConfigEntry::ePrimitiveType::String)
+									 ? material_entry->Get<const char*>()
+									 : "";
+
+	const eBrushKind brush_kind = ReadBrushKind(entry);
+
+	const bool is_probe_volume = entry.GetMemberValue(HashStr32("probevolume"), 0) != 0;
+	const bool is_reflection_probe = entry.GetMemberValue(HashStr32("reflectionprobe"), 0) != 0;
+	const bool is_marker = is_probe_volume || is_reflection_probe || brush_kind == eBrushKind::Decal ||
+						   entry.GetMemberValue(HashStr32("trigger"), 0) != 0;
+
+	const bool is_transparent = brush_kind == eBrushKind::Geometry && !material_name.IsEmpty() &&
+								mc.TransparentMaterials.contains(material_name);
+
+	const BBox local_bounds(brush.GetBoundsMin(), brush.GetBoundsMax());
+	const Mat4f object_matrix = MakeObjectMatrix(rotation, brush.GetCenter(), position);
+
+	if (is_probe_volume && !is_reflection_probe) {
+		ProbeRegions.Emplace(OBBox::FromLocalBounds(local_bounds, object_matrix).GetWorldAABB());
+	}
+	else if (!is_marker && !is_transparent && brush_kind != eBrushKind::NvBrush) {
+		SizedArray<ProbePlacementBoxes::Plane> hull_planes;
+		hull_planes.InitCapacity(brush.IsBox() ? 0 : brush.Planes.Size);
+
+		for (uint32 i = 0; i < hull_planes.Capacity; i++) {
+			hull_planes.Insert({ brush.Planes[i].Normal, brush.Planes[i].Distance });
+		}
+
+		if (brush_kind == eBrushKind::DBound) {
+			ProbePlacement::AddBound(ProbeBoxes, local_bounds, object_matrix, hull_planes);
+		}
+		else {
+			ProbePlacement::AddBox(ProbeBoxes, local_bounds, object_matrix, hull_planes);
+		}
+	}
+
+	if (IsEntityBrushEntry(entry) || mc.ModelColliders.contains(name)) {
+		EntityBrushCount++;
+
+		if (!is_marker) {
+			Entities.Emplace(transform.Apply(transform.Pivot));
+		}
+
+		return;
+	}
+
+	SourceBrush source;
+	source.Name = name;
+
+	const bool is_locked = entry.GetMemberValue(HashStr32("lock"), 0) == 1;
+
+	if (brush_kind == eBrushKind::NvBrush) {
+		source.bVisible = false;
+		source.bSolid = false;
+		ClipBrushCount++;
+	}
+	else if (brush_kind == eBrushKind::DBound) {
+		source.bVisible = false;
+		source.bCollides = false;
+		BoundBrushCount++;
+	}
+	else if (!material_name.IsEmpty()) {
+		source.MaterialIndex = FindOrAddMaterial(material_name,
+												 is_locked ? scLockedMaterialIndex : scEditableMaterialIndex);
+
+		if (is_transparent) {
+			source.bSolid = false;
+			source.bCastsShadow = false;
+			TransparentBrushCount++;
+		}
+	}
+	else {
+		source.MaterialIndex = FindOrAddMaterial("", is_locked ? scLockedMaterialIndex : scEditableMaterialIndex);
+	}
+
+	const Vec3d offset = transform.Pivot + transform.Position;
+
+	for (const BrushPlane& plane : brush.Planes) {
+		const Vec3d local_normal = ToVec3d(plane.Normal);
+		const Vec3d rotated_normal = transform.Rotate(local_normal);
+		const double length = rotated_normal.Length();
+
+		if (length <= 0.0) {
+			continue;
+		}
+
+		const Vec3d world_normal = rotated_normal * (1.0 / length);
+		const double world_distance = (static_cast<double>(plane.Distance) - local_normal.Dot(transform.Pivot)) /
+										  length +
+									  world_normal.Dot(offset);
+
+		Vec3f u_gradient;
+		Vec3f v_gradient;
+		Brush::GetTextureGradients(plane, u_gradient, v_gradient);
+
+		TextureMap map;
+		map.GradientU = transform.Rotate(ToVec3d(u_gradient));
+		map.GradientV = transform.Rotate(ToVec3d(v_gradient));
+		map.OffsetU = static_cast<double>(plane.Texture.Offset.X) + ToVec3d(u_gradient).Dot(transform.Pivot) -
+					  map.GradientU.Dot(offset);
+		map.OffsetV = static_cast<double>(plane.Texture.Offset.Y) + ToVec3d(v_gradient).Dot(transform.Pivot) -
+					  map.GradientV.Dot(offset);
+
+		source.PlaneIndices.Emplace(planes.FindOrAdd(world_normal, world_distance));
+		source.Maps.Emplace(map);
+	}
+
+	if (!MakePolyhedron(planes, source.PlaneIndices, scBrushExtent, source.Shape)) {
+		Warnings.Emplace(String::Fmt("brush '{}' has no volume, skipped", name));
+		InvalidBrushCount++;
+		return;
+	}
+
+	source.Shape.Source = static_cast<int32>(Brushes.Size);
+
+	Min = MinVec(Min, source.Shape.Min);
+	Max = MaxVec(Max, source.Shape.Max);
+
+	Brushes.Emplace(std::move(source));
+}
+
 bool MapSource::Load(const String& path, PlaneSet& planes)
 {
 	ConfigFile info {};
@@ -163,21 +382,22 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 
 	const uint32 renamed_count = MakeBrushEntryNamesUnique(*blocks_entry);
 
-	std::unordered_set<String> model_colliders;
-
 	const ConfigEntry* models_entry = info.GetEntry(HashStr32("objects"));
+
+	CachedMaterials cached_materials {};
+
 
 	if (models_entry != nullptr) {
 		for (const ConfigEntry& model : models_entry->Members) {
 			const ConfigEntry* collider = model.GetMember(HashStr32("collider"));
 
 			if (collider != nullptr && collider->Type == ConfigEntry::ePrimitiveType::String) {
-				model_colliders.insert(collider->Get<const char*>());
+				cached_materials.ModelColliders.insert(collider->Get<const char*>());
 			}
 		}
 	}
 
-	const std::unordered_set<String> transparent_materials = ReadTransparentMaterials();
+	cached_materials.TransparentMaterials = ReadTransparentMaterials();
 
 	const size_t entry_count = blocks_entry->Members.Size() + CountSubviewBrushes(info, path);
 
@@ -191,226 +411,28 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 									 renamed_count));
 	}
 
-	Min = Vec3d(1e30, 1e30, 1e30);
-	Max = Vec3d(-1e30, -1e30, -1e30);
+	Min = Vec3d(DBL_MAX);
+	Max = Vec3d(-DBL_MAX);
 
 	Patches.InitCapacity(entry_count);
 
-	const auto add_patch = [&](ConfigEntry& entry, const String& name)
-	{
-		if (IsEntityBrushEntry(entry) || model_colliders.contains(name)) {
-			EntityBrushCount++;
-			return;
-		}
-
-		Patch patch = ReadPatchEntry(entry);
-
-		if (!patch.IsValid()) {
-			Warnings.Emplace(String::Fmt("patch '{}' is not a valid patch, skipped", name));
-			InvalidBrushCount++;
-			return;
-		}
-
-		const Vec3f position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
-		const Transform transform = MakeTransform(ReadRotation(entry), patch.GetCenter(), position);
-
-		for (PatchPoint& point : patch.Points) {
-			const Vec3d world = transform.Apply(ToVec3d(point.Position));
-
-			point.Position = world.ToVec3f();
-
-			Min = MinVec(Min, world);
-			Max = MaxVec(Max, world);
-		}
-
-		const ConfigEntry* material_entry = entry.GetMember(HashStr32("mat"));
-		String material_name;
-
-		if (material_entry != nullptr && material_entry->Type == ConfigEntry::ePrimitiveType::String) {
-			material_name = material_entry->Get<const char*>();
-		}
-
-		const bool is_locked = entry.GetMemberValue(HashStr32("lock"), 0) == 1;
-		const bool is_transparent = !material_name.IsEmpty() && transparent_materials.contains(material_name);
-
-		const int32 material_index = FindOrAddMaterial(material_name,
-													   is_locked ? scLockedMaterialIndex : scEditableMaterialIndex);
-
-		Patch pieces[Patch::scMaxClosurePieces];
-		const uint32 piece_count = patch.BuildClosure(pieces);
-
-		for (uint32 piece = 0; piece <= piece_count; piece++) {
-			SourcePatch& source = Patches.Emplace();
-			source.Name = name;
-			source.MaterialIndex = material_index;
-			source.bCastsShadow = !is_transparent;
-
-			if (piece == 0) {
-				source.Shape = patch.Clone();
-				source.Shape.Closure = ePatchClosure::None;
-			}
-			else {
-				source.Shape = std::move(pieces[piece - 1]);
-
-				for (const PatchPoint& point : source.Shape.Points) {
-					Min = MinVec(Min, ToVec3d(point.Position));
-					Max = MaxVec(Max, ToVec3d(point.Position));
-				}
-			}
-		}
-
-		PatchCount++;
-	};
-
-	const auto add_brush = [&](ConfigEntry& entry)
-	{
-		const String name = entry.Name.Get().CStr();
+	for (ConfigEntry& entry : blocks_entry->Members) {
+		const String name = entry.Name.Get();
 
 		if (IsPatchEntry(entry)) {
-			add_patch(entry, name);
-			return;
-		}
-
-		const Brush brush = ReadBrushEntry(entry);
-
-		if (!brush.IsValid()) {
-			Warnings.Emplace(String::Fmt("brush '{}' does not describe a valid convex brush, skipped", name));
-			InvalidBrushCount++;
-			return;
-		}
-
-		const Vec3f position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
-		const Quat rotation = ReadRotation(entry);
-		const Transform transform = MakeTransform(rotation, brush.GetCenter(), position);
-
-		const ConfigEntry* material_entry = entry.GetMember(HashStr32("mat"));
-		const String material_name = (material_entry != nullptr &&
-									  material_entry->Type == ConfigEntry::ePrimitiveType::String)
-										 ? material_entry->Get<const char*>()
-										 : "";
-
-		const eBrushKind brush_kind = ReadBrushKind(entry);
-
-		const bool is_probe_volume = entry.GetMemberValue(HashStr32("probevolume"), 0) != 0;
-		const bool is_reflection_probe = entry.GetMemberValue(HashStr32("reflectionprobe"), 0) != 0;
-		const bool is_marker = is_probe_volume || is_reflection_probe || brush_kind == eBrushKind::Decal ||
-							   entry.GetMemberValue(HashStr32("trigger"), 0) != 0;
-
-		const bool is_transparent = brush_kind == eBrushKind::Geometry && !material_name.IsEmpty() &&
-									transparent_materials.contains(material_name);
-
-		const BBox local_bounds(brush.GetBoundsMin(), brush.GetBoundsMax());
-		const Mat4f object_matrix = MakeObjectMatrix(rotation, brush.GetCenter(), position);
-
-		if (is_probe_volume && !is_reflection_probe) {
-			ProbeRegions.Emplace(OBBox::FromLocalBounds(local_bounds, object_matrix).GetWorldAABB());
-		}
-		else if (!is_marker && !is_transparent && brush_kind != eBrushKind::NvBrush) {
-			SizedArray<ProbePlacementBoxes::Plane> hull_planes;
-			hull_planes.InitCapacity(brush.IsBox() ? 0 : brush.Planes.Size);
-
-			for (uint32 i = 0; i < hull_planes.Capacity; i++) {
-				hull_planes.Insert({ brush.Planes[i].Normal, brush.Planes[i].Distance });
-			}
-
-			if (brush_kind == eBrushKind::DBound) {
-				ProbePlacement::AddBound(ProbeBoxes, local_bounds, object_matrix, hull_planes);
-			}
-			else {
-				ProbePlacement::AddBox(ProbeBoxes, local_bounds, object_matrix, hull_planes);
-			}
-		}
-
-		if (IsEntityBrushEntry(entry) || model_colliders.contains(name)) {
-			EntityBrushCount++;
-
-			if (!is_marker) {
-				Entities.Emplace(transform.Apply(transform.Pivot));
-			}
-
-			return;
-		}
-
-		SourceBrush source;
-		source.Name = name;
-
-		const bool is_locked = entry.GetMemberValue(HashStr32("lock"), 0) == 1;
-
-		if (brush_kind == eBrushKind::NvBrush) {
-			source.bVisible = false;
-			source.bSolid = false;
-			ClipBrushCount++;
-		}
-		else if (brush_kind == eBrushKind::DBound) {
-			source.bVisible = false;
-			source.bCollides = false;
-			BoundBrushCount++;
-		}
-		else if (!material_name.IsEmpty()) {
-			source.MaterialIndex = FindOrAddMaterial(material_name,
-													 is_locked ? scLockedMaterialIndex : scEditableMaterialIndex);
-
-			if (is_transparent) {
-				source.bSolid = false;
-				source.bCastsShadow = false;
-				TransparentBrushCount++;
-			}
+			AddPatch(entry, name, cached_materials);
 		}
 		else {
-			source.MaterialIndex = FindOrAddMaterial("", is_locked ? scLockedMaterialIndex : scEditableMaterialIndex);
+			AddBrush(planes, entry, name, cached_materials);
 		}
-
-		const Vec3d offset = transform.Pivot + transform.Position;
-
-		for (const BrushPlane& plane : brush.Planes) {
-			const Vec3d local_normal = ToVec3d(plane.Normal);
-			const Vec3d rotated_normal = transform.Rotate(local_normal);
-			const double length = rotated_normal.Length();
-
-			if (length <= 0.0) {
-				continue;
-			}
-
-			const Vec3d world_normal = rotated_normal * (1.0 / length);
-			const double world_distance = (static_cast<double>(plane.Distance) - local_normal.Dot(transform.Pivot)) /
-											  length +
-										  world_normal.Dot(offset);
-
-			Vec3f u_gradient;
-			Vec3f v_gradient;
-			Brush::GetTextureGradients(plane, u_gradient, v_gradient);
-
-			TextureMap map;
-			map.GradientU = transform.Rotate(ToVec3d(u_gradient));
-			map.GradientV = transform.Rotate(ToVec3d(v_gradient));
-			map.OffsetU = static_cast<double>(plane.Texture.Offset.X) + ToVec3d(u_gradient).Dot(transform.Pivot) -
-						  map.GradientU.Dot(offset);
-			map.OffsetV = static_cast<double>(plane.Texture.Offset.Y) + ToVec3d(v_gradient).Dot(transform.Pivot) -
-						  map.GradientV.Dot(offset);
-
-			source.PlaneIndices.Emplace(planes.FindOrAdd(world_normal, world_distance));
-			source.Maps.Emplace(map);
-		}
-
-		if (!MakePolyhedron(planes, source.PlaneIndices, scBrushExtent, source.Shape)) {
-			Warnings.Emplace(String::Fmt("brush '{}' has no volume, skipped", name));
-			InvalidBrushCount++;
-			return;
-		}
-
-		source.Shape.Source = static_cast<int32>(Brushes.Size);
-
-		Min = MinVec(Min, source.Shape.Min);
-		Max = MaxVec(Max, source.Shape.Max);
-
-		Brushes.Emplace(std::move(source));
-	};
-
-	for (ConfigEntry& entry : blocks_entry->Members) {
-		add_brush(entry);
 	}
 
-	ForEachSubviewBrush(info, path, [&](ConfigEntry& entry, const ConfigEntry&, uint32) { add_brush(entry); });
+	ForEachSubviewBrush(info, path,
+						[&](ConfigEntry& entry, const ConfigEntry&, uint32)
+						{
+							const String name = entry.Name.Get();
+							AddBrush(planes, entry, name, cached_materials);
+						});
 
 	const ConfigEntry* spawn_entry = info.GetEntry(HashStr32("player_spawn"));
 

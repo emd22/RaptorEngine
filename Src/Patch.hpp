@@ -2,7 +2,7 @@
  * File:        Patch.hpp
  * Author:      emd22
  * Created:     15/10/2026
- * Description: Curved surfaces made of biquadratic Bezier patches, tessellated into triangles
+ * Description: Curved surfaces made of rational biquadratic Bezier patches, tessellated into triangles
  */
 
 #pragma once
@@ -18,6 +18,7 @@ struct PatchPoint
 {
 	Vec3f Position = Vec3f::sZero;
 	Vec2f Texcoord = Vec2f(0.0f, 0.0f);
+	float32 Weight = 1.0f;
 };
 
 struct PatchVertex
@@ -70,6 +71,9 @@ public:
 	static constexpr uint32 scDefaultSubdivisions = 4;
 
 	static constexpr float32 scDefaultTextureScale = 2.0f;
+
+	static constexpr float32 scMinWeight = 1e-3f;
+	static constexpr float32 scQuarterArcWeight = 0.70710678f;
 
 	static constexpr uint32 scEdgeCount = 4;
 	static constexpr uint32 scMaxThickenPieces = scEdgeCount + 1;

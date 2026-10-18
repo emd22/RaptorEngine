@@ -153,6 +153,14 @@ constexpr Slice<T> MakeSlice(T* ptr, uint64 size)
 	return Slice<T>(ptr, size);
 }
 
+
+template <typename T, std::size_t N>
+constexpr Slice<T> MakeSlice(T (&ptr)[N])
+{
+	return Slice<T>(ptr, N);
+}
+
+
 } // namespace fx
 
 

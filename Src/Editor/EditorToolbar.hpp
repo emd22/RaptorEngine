@@ -80,6 +80,7 @@ private:
 	FloatField* mpCurveSubdivisionsVField = nullptr;
 	OutlineToggleButton* mpCurveSmoothButton = nullptr;
 	FloatField* mpCurveThicknessField = nullptr;
+	FloatField* mpCurveWeightField = nullptr;
 	OutlineToggleButton* mpCurveThickenButton = nullptr;
 	OutlineToggleButton* mpCurveCapButton = nullptr;
 

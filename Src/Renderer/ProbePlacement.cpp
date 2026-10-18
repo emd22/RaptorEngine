@@ -2,6 +2,7 @@
 
 #include <Brush.hpp>
 #include <Core/Log.hpp>
+#include <Patch.hpp>
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
@@ -416,6 +417,19 @@ bool CellTouchesSurface(const Vec3f cell_min, const Vec3f cell_max, float32 pad,
 		}
 	}
 
+	for (const BBox& surface : boxes.Surfaces) {
+		bool overlaps = true;
+
+		for (uint32 axis = 0; axis < 3; axis++) {
+			overlaps &= padded_min.mData[axis] < surface.Max.mData[axis] &&
+						padded_max.mData[axis] > surface.Min.mData[axis];
+		}
+
+		if (overlaps) {
+			return true;
+		}
+	}
+
 	return false;
 }
 
@@ -470,9 +484,10 @@ uint32 FindNeededGridPoints(const Vec3f volume_min, const Vec3f cell_size, const
 	out_needed.MarkFull();
 
 	std::fill(out_needed.begin(), out_needed.end(),
-			  (fill == eProbeFill::Dense || boxes.Boxes.Size == 0) ? scGridPointNeeded : scGridPointOpen);
+			  (fill == eProbeFill::Dense || (boxes.Boxes.Size == 0 && boxes.Surfaces.Size == 0)) ? scGridPointNeeded
+																								: scGridPointOpen);
 
-	if (boxes.Boxes.Size == 0) {
+	if (boxes.Boxes.Size == 0 && boxes.Surfaces.Size == 0) {
 		return num_points;
 	}
 
@@ -1023,6 +1038,51 @@ void AddBound(ProbePlacementBoxes& boxes, const BBox& local_bounds, const Mat4f&
 	bound.LocalToWorld = local_to_world;
 	bound.WorldToLocal = local_to_world.Inverse();
 	bound.Planes.InitAsCopyOf(planes);
+}
+
+void AddSurface(ProbePlacementBoxes& boxes, const BBox& world_bounds)
+{
+	boxes.Surfaces.Insert(world_bounds);
+
+	boxes.Min = Vec3f::Min(boxes.Min, world_bounds.Min);
+	boxes.Max = Vec3f::Max(boxes.Max, world_bounds.Max);
+}
+
+void AddPatchSurfaces(ProbePlacementBoxes& boxes, const Patch& patch, const Mat4f& local_to_world)
+{
+	Patch pieces[Patch::scMaxClosurePieces];
+	const uint32 piece_count = patch.BuildClosure(pieces);
+
+	for (uint32 piece = 0; piece <= piece_count; piece++) {
+		const Patch* shape = &patch;
+
+		if (piece > 0) {
+			shape = &pieces[piece - 1];
+		}
+
+		if (!shape->IsValid()) {
+			continue;
+		}
+
+		for (uint32 sub_row = 0; sub_row < shape->GetSubPatchRows(); sub_row++) {
+			for (uint32 sub_column = 0; sub_column < shape->GetSubPatchColumns(); sub_column++) {
+				Vec3f min(FLT_MAX);
+				Vec3f max(-FLT_MAX);
+
+				for (uint32 row = sub_row * 2; row <= sub_row * 2 + 2; row++) {
+					for (uint32 column = sub_column * 2; column <= sub_column * 2 + 2; column++) {
+						const Vec3f local = shape->GetPoint(column, row).Position;
+						const Vec4f point = local_to_world * Vec4f(local.X, local.Y, local.Z, 1.0f);
+
+						min = Vec3f::Min(min, Vec3f(point.X, point.Y, point.Z));
+						max = Vec3f::Max(max, Vec3f(point.X, point.Y, point.Z));
+					}
+				}
+
+				AddSurface(boxes, BBox(min, max));
+			}
+		}
+	}
 }
 
 bool AddBox(ProbePlacementBoxes& boxes, const BBox& local_bounds, const Mat4f& local_to_world,

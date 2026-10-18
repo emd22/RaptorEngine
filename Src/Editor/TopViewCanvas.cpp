@@ -834,6 +834,7 @@ void TopViewCanvas::SetCurveSettings(const CurveSettings& settings)
 	mCurve = settings;
 	mCurve.SubdivisionsU = std::clamp(mCurve.SubdivisionsU, Patch::scMinSubdivisions, Patch::scMaxSubdivisions);
 	mCurve.SubdivisionsV = std::clamp(mCurve.SubdivisionsV, Patch::scMinSubdivisions, Patch::scMaxSubdivisions);
+	mCurve.Weight = std::max(mCurve.Weight, Patch::scMinWeight);
 }
 
 void TopViewCanvas::NotifyCurveChanged()
@@ -852,12 +853,14 @@ void TopViewCanvas::RunPatchCommand(ePatchCommand type)
 	command.bSmooth = mCurve.bSmooth;
 	command.Closure = mCurve.Closure;
 	command.Thickness = mCurve.Thickness;
+	command.Weight = mCurve.Weight;
 
 	DynArray<TopViewVertexHandle> handles = mSelectedVertices.Clone();
 	const eViewPlane plane = mPlane;
 
 	if (type != ePatchCommand::SetSubdivisions && type != ePatchCommand::SetSmooth &&
-		type != ePatchCommand::NaturalTexture && type != ePatchCommand::SetClosure) {
+		type != ePatchCommand::NaturalTexture && type != ePatchCommand::SetClosure &&
+		type != ePatchCommand::SetWeight && type != ePatchCommand::RoundWeights) {
 		mSelectedVertices.Clear();
 	}
 
@@ -867,8 +870,37 @@ void TopViewCanvas::RunPatchCommand(ePatchCommand type)
 	Refresh();
 }
 
+void TopViewCanvas::SyncWeightFromHandles()
+{
+	for (const TopViewVertexHandle& handle : mSelectedVertices) {
+		const TopViewBrush* brush = FindBrush(handle.ObjectId);
+
+		if (brush == nullptr || brush->Kind != eTopViewBrushKind::Patch) {
+			continue;
+		}
+
+		const TopViewProjection& projection = Projection(*brush);
+		const size_t count = std::min(projection.ControlPoints.Size, projection.ControlWeights.Size);
+
+		for (size_t i = 0; i < count; i++) {
+			if (!IsSameHandle(ToVec2d(projection.ControlPoints[i]), ToVec2d(handle.Position))) {
+				continue;
+			}
+
+			if (projection.ControlWeights[i] != mCurve.Weight) {
+				mCurve.Weight = projection.ControlWeights[i];
+				NotifyCurveChanged();
+			}
+
+			return;
+		}
+	}
+}
+
 void TopViewCanvas::SyncCurveFromSelection()
 {
+	SyncWeightFromHandles();
+
 	for (const TopViewBrush& brush : mState.Brushes) {
 		if (!brush.bSelected || brush.Kind != eTopViewBrushKind::Patch) {
 			continue;
@@ -3202,6 +3234,7 @@ void TopViewCanvas::OnLeftUp(wxMouseEvent&)
 		ClearPreview();
 	}
 
+	SyncWeightFromHandles();
 	UpdateHover();
 	UpdateCursor();
 	UpdateStatus();

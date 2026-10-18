@@ -52,7 +52,7 @@ constexpr double scSunRadiusStep = 0.25;
 } // namespace
 
 CompilerFrame::CompilerFrame(const String& map_directory)
-	: wxFrame(nullptr, wxID_ANY, "Raptor Map Compiler", wxDefaultPosition, wxSize(980, 760))
+	: wxFrame(nullptr, wxID_ANY, "RMC", wxDefaultPosition, wxSize(980, 760))
 {
 #if defined(__WXMSW__)
 	SetIcon(wxICON(aaaa));
@@ -65,6 +65,8 @@ CompilerFrame::CompilerFrame(const String& map_directory)
 
 	const SurfaceOptions default_options;
 
+	this->SetTitle(wxString::Format("Raptor Map Compiler (Map v%d)", CompiledMap::scVersion));
+
 	wxPanel* root = new wxPanel(this, wxID_ANY);
 	wxBoxSizer* root_sizer = new wxBoxSizer(wxVERTICAL);
 
@@ -73,8 +75,9 @@ CompilerFrame::CompilerFrame(const String& map_directory)
 	directory_sizer->Add(new wxStaticText(root, wxID_ANY, "Prototypes"),
 						 wxSizerFlags().CenterVertical().Border(wxRIGHT, scBorder));
 
-	mpDirectory = new wxDirPickerCtrl(root, wxID_ANY, wxString::FromUTF8(map_directory.CStr()), "Choose a folder of prototypes",
-									  wxDefaultPosition, wxDefaultSize, wxDIRP_USE_TEXTCTRL | wxDIRP_DIR_MUST_EXIST);
+	mpDirectory = new wxDirPickerCtrl(root, wxID_ANY, wxString::FromUTF8(map_directory.CStr()),
+									  "Choose a folder of prototypes", wxDefaultPosition, wxDefaultSize,
+									  wxDIRP_USE_TEXTCTRL | wxDIRP_DIR_MUST_EXIST);
 	directory_sizer->Add(mpDirectory, wxSizerFlags(1).CenterVertical().Border(wxRIGHT, scBorder));
 
 	mpRefresh = new wxButton(root, wxID_ANY, "Refresh");
@@ -93,7 +96,8 @@ CompilerFrame::CompilerFrame(const String& map_directory)
 	wxStaticBoxSizer* options_sizer = new wxStaticBoxSizer(wxVERTICAL, root, "Options");
 	wxWindow* options_box = options_sizer->GetStaticBox();
 
-	const auto add_checkbox = [&](const char* label, bool value, const char* tooltip) {
+	const auto add_checkbox = [&](const char* label, bool value, const char* tooltip)
+	{
 		wxCheckBox* checkbox = new wxCheckBox(options_box, wxID_ANY, label);
 		checkbox->SetValue(value);
 		checkbox->SetToolTip(tooltip);
@@ -127,8 +131,9 @@ CompilerFrame::CompilerFrame(const String& map_directory)
 								 "Work out where the light probes go. The engine bakes them from these positions "
 								 "when the compiled map is loaded");
 
-	const auto add_number = [&](const char* label, double min, double max, double value, double step,
-								const char* tooltip) {
+	const auto add_number =
+		[&](const char* label, double min, double max, double value, double step, const char* tooltip)
+	{
 		wxBoxSizer* spacing_sizer = new wxBoxSizer(wxHORIZONTAL);
 		spacing_sizer->Add(new wxStaticText(options_box, wxID_ANY, label),
 						   wxSizerFlags().CenterVertical().Border(wxRIGHT, scBorder));
@@ -160,8 +165,8 @@ CompilerFrame::CompilerFrame(const String& map_directory)
 								   default_lightmap.Density, scLightmapDensityStep,
 								   "Lightmap texels per metre of surface. Lowered automatically if the lightmap "
 								   "doesn't fit");
-	mpSunRadius = add_number("Sun radius, degrees", scMinSunRadius, scMaxSunRadius,
-							 default_lightmap.SunRadiusDegrees, scSunRadiusStep,
+	mpSunRadius = add_number("Sun radius, degrees", scMinSunRadius, scMaxSunRadius, default_lightmap.SunRadiusDegrees,
+							 scSunRadiusStep,
 							 "Half the angle the sun covers in the sky. Wider makes softer shadow edges");
 
 	wxBoxSizer* verify_sizer = new wxBoxSizer(wxHORIZONTAL);
@@ -204,27 +209,33 @@ CompilerFrame::CompilerFrame(const String& map_directory)
 
 	mpRefresh->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { RefreshMaps(); });
 	mpDirectory->Bind(wxEVT_DIRPICKER_CHANGED, [this](wxFileDirPickerEvent&) { RefreshMaps(); });
-	mpPlaceProbes->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
-		mpProbeLevelSpacing->Enable(mpPlaceProbes->GetValue());
-		mpProbeBrushSpacing->Enable(mpPlaceProbes->GetValue());
-	});
-	mpBakeLightmap->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
-		mpLightmapDensity->Enable(mpBakeLightmap->GetValue());
-		mpSunRadius->Enable(mpBakeLightmap->GetValue());
-	});
+	mpPlaceProbes->Bind(wxEVT_CHECKBOX,
+						[this](wxCommandEvent&)
+						{
+							mpProbeLevelSpacing->Enable(mpPlaceProbes->GetValue());
+							mpProbeBrushSpacing->Enable(mpPlaceProbes->GetValue());
+						});
+	mpBakeLightmap->Bind(wxEVT_CHECKBOX,
+						 [this](wxCommandEvent&)
+						 {
+							 mpLightmapDensity->Enable(mpBakeLightmap->GetValue());
+							 mpSunRadius->Enable(mpBakeLightmap->GetValue());
+						 });
 	mpVerify->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) { mpVerifyRays->Enable(mpVerify->GetValue()); });
 	mpMaps->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) { StartCompile(GetSelectedMaps()); });
 	mpCompileSelected->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { StartCompile(GetSelectedMaps()); });
 
-	mpCompileAll->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-		Array<size_t> indices;
+	mpCompileAll->Bind(wxEVT_BUTTON,
+					   [this](wxCommandEvent&)
+					   {
+						   Array<size_t> indices;
 
-		for (size_t i = 0; i < mMaps.Size; i++) {
-			indices.Emplace(i);
-		}
+						   for (size_t i = 0; i < mMaps.Size; i++) {
+							   indices.Emplace(i);
+						   }
 
-		StartCompile(indices);
-	});
+						   StartCompile(indices);
+					   });
 
 	Bind(wxEVT_CLOSE_WINDOW, &CompilerFrame::OnClose, this);
 
@@ -250,9 +261,8 @@ void CompilerFrame::RefreshMaps()
 
 	std::error_code error;
 
-	const auto is_prototype = [&error](const std::filesystem::directory_entry& entry) {
-		return entry.is_regular_file(error) && entry.path().extension() == scPrototypeExtension;
-	};
+	const auto is_prototype = [&error](const std::filesystem::directory_entry& entry)
+	{ return entry.is_regular_file(error) && entry.path().extension() == scPrototypeExtension; };
 
 	size_t prototype_count = 0;
 
@@ -269,9 +279,8 @@ void CompilerFrame::RefreshMaps()
 		}
 	}
 
-	std::sort(mMaps.begin(), mMaps.end(), [](const MapEntry& a, const MapEntry& b) {
-		return std::strcmp(a.Name.CStr(), b.Name.CStr()) < 0;
-	});
+	std::sort(mMaps.begin(), mMaps.end(),
+			  [](const MapEntry& a, const MapEntry& b) { return std::strcmp(a.Name.CStr(), b.Name.CStr()) < 0; });
 
 	for (size_t i = 0; i < mMaps.Size; i++) {
 		mpMaps->InsertItem(static_cast<long>(i), wxString::FromUTF8(mMaps[i].Name.CStr()));
@@ -379,17 +388,18 @@ void CompilerFrame::StartCompile(const Array<size_t>& indices)
 	SetBusy(true);
 	SetStatusText(wxString::FromUTF8(String::Fmt("Compiling {} maps...", jobs.Size).CStr()));
 
-	mWorker = std::thread([this, jobs = std::move(jobs)]() {
-		for (const auto& [index, options] : jobs) {
-			const CompileResult result = CompileMap(options, [this](const String& line) {
-				CallAfter([this, line]() { AppendLog(line); });
-			});
+	mWorker = std::thread(
+		[this, jobs = std::move(jobs)]()
+		{
+			for (const auto& [index, options] : jobs) {
+				const CompileResult result = CompileMap(options, [this](const String& line)
+														{ CallAfter([this, line]() { AppendLog(line); }); });
 
-			CallAfter([this, map_index = index, result]() { OnMapCompiled(map_index, result); });
-		}
+				CallAfter([this, map_index = index, result]() { OnMapCompiled(map_index, result); });
+			}
 
-		CallAfter([this]() { OnAllCompiled(); });
-	});
+			CallAfter([this]() { OnAllCompiled(); });
+		});
 }
 
 void CompilerFrame::OnMapCompiled(size_t index, const CompileResult& result)

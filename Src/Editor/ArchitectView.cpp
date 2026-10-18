@@ -781,6 +781,10 @@ TopViewState RaptorEditor::BuildTopViewState()
 				projection.ControlPoints.Insert(Project(control_point, axes));
 			}
 
+			for (const PatchPoint& point : patch->Points) {
+				projection.ControlWeights.Insert(point.Weight);
+			}
+
 			projected.Clear();
 
 			float32 near_depth = -FLT_MAX;
@@ -1271,6 +1275,91 @@ static bool FindHandledControlPoint(const Patch& patch, const Mat4f& world, eVie
 	return false;
 }
 
+static bool IsHandledControlPoint(const Patch& patch, const Mat4f& world, eViewPlane plane, ObjectID object_id,
+								  const DynArray<TopViewVertexHandle>& handles, uint32 column, uint32 row)
+{
+	const Vec3f local = patch.GetPoint(column, row).Position;
+	const Vec4f point = world * Vec4f(local.X, local.Y, local.Z, 1.0f);
+	const Vec2f projected = Project(Vec3f(point.X, point.Y, point.Z), GetViewPlaneAxes(plane));
+
+	for (const TopViewVertexHandle& handle : handles) {
+		if (handle.ObjectId == object_id && projected.IsCloseTo(handle.Position, scVertexMatchDistance)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static float32 GetArcWeight(const Vec3f corner, const Vec3f start, const Vec3f end)
+{
+	const Vec3f to_start = start - corner;
+	const Vec3f to_end = end - corner;
+	const float32 lengths = to_start.Length() * to_end.Length();
+
+	if (lengths <= 1e-8f) {
+		return 1.0f;
+	}
+
+	const float32 cos_angle = std::clamp(to_start.Dot(to_end) / lengths, -1.0f, 1.0f);
+
+	return std::max(std::sqrt((1.0f - cos_angle) * 0.5f), Patch::scMinWeight);
+}
+
+static float32 GetRoundWeight(const Patch& patch, uint32 column, uint32 row)
+{
+	const Vec3f corner = patch.GetPoint(column, row).Position;
+	float32 weight = 1.0f;
+
+	if ((column & 1) == 1) {
+		weight *= GetArcWeight(corner, patch.GetPoint(column - 1, row).Position,
+							   patch.GetPoint(column + 1, row).Position);
+	}
+
+	if ((row & 1) == 1) {
+		weight *= GetArcWeight(corner, patch.GetPoint(column, row - 1).Position,
+							   patch.GetPoint(column, row + 1).Position);
+	}
+
+	return weight;
+}
+
+static bool ApplyWeightCommand(Patch& patch, const PatchCommand& command, const Mat4f& world, eViewPlane plane,
+							   ObjectID object_id, const DynArray<TopViewVertexHandle>& handles)
+{
+	bool has_handle = false;
+
+	for (const TopViewVertexHandle& handle : handles) {
+		has_handle = has_handle || handle.ObjectId == object_id;
+	}
+
+	if (!has_handle && command.Type == ePatchCommand::SetWeight) {
+		return false;
+	}
+
+	const Patch source = patch.Clone();
+	bool changed = false;
+
+	for (uint32 row = 0; row < patch.Height; row++) {
+		for (uint32 column = 0; column < patch.Width; column++) {
+			if (has_handle && !IsHandledControlPoint(source, world, plane, object_id, handles, column, row)) {
+				continue;
+			}
+
+			float32 weight = std::max(command.Weight, Patch::scMinWeight);
+
+			if (command.Type == ePatchCommand::RoundWeights) {
+				weight = GetRoundWeight(source, column, row);
+			}
+
+			patch.GetPoint(column, row).Weight = weight;
+			changed = true;
+		}
+	}
+
+	return changed;
+}
+
 static uint32 PickSubPatch(uint32 control_index, bool has_control, uint32 sub_patch_count, bool for_removal)
 {
 	uint32 index = sub_patch_count / 2;
@@ -1295,7 +1384,8 @@ static bool IsSamePatch(const Patch& a, const Patch& b)
 	}
 
 	for (uint32 i = 0; i < a.Points.Size; i++) {
-		if (!(a.Points[i].Position == b.Points[i].Position) || !(a.Points[i].Texcoord == b.Points[i].Texcoord)) {
+		if (!(a.Points[i].Position == b.Points[i].Position) || !(a.Points[i].Texcoord == b.Points[i].Texcoord) ||
+			a.Points[i].Weight != b.Points[i].Weight) {
 			return false;
 		}
 	}
@@ -1374,7 +1464,13 @@ void RaptorEditor::TopViewPatchCommand(eViewPlane plane, const PatchCommand& com
 
 		Patch changed = patch->Clone();
 
-		if (!ApplyPatchCommand(changed, command, has_control, column, row)) {
+		if (command.Type == ePatchCommand::SetWeight || command.Type == ePatchCommand::RoundWeights) {
+			if (!ApplyWeightCommand(changed, command, object->GetWorldMatrix(), plane, object->ID, handles)) {
+				LogWarning(LC_CORE, "Select control points of patch '{}' to set their weight", object->Name.Get());
+				continue;
+			}
+		}
+		else if (!ApplyPatchCommand(changed, command, has_control, column, row)) {
 			LogWarning(LC_CORE, "Patch '{}' can't be changed that way, it is at its smallest or largest size",
 					   object->Name.Get());
 			continue;
@@ -1671,6 +1767,38 @@ void RaptorEditor::TopViewCreateArch(eViewPlane plane, DynArray<Vec3f> points, b
 	}
 }
 
+static bool ExtendBoundsByPatch(const Patch& patch, const Mat4f& world, Vec3f& min, Vec3f& max)
+{
+	Patch pieces[Patch::scMaxClosurePieces];
+	const uint32 piece_count = patch.BuildClosure(pieces);
+
+	bool extended = false;
+	PatchMesh mesh;
+
+	for (uint32 piece = 0; piece <= piece_count; piece++) {
+		const Patch* shape = &patch;
+
+		if (piece > 0) {
+			shape = &pieces[piece - 1];
+		}
+
+		shape->Tessellate(mesh);
+
+		for (const PatchVertex& vertex : mesh.Vertices) {
+			const Vec4f point = world * Vec4f(static_cast<float32>(vertex.Position.X),
+											  static_cast<float32>(vertex.Position.Y),
+											  static_cast<float32>(vertex.Position.Z), 1.0f);
+			const Vec3f world_point(point.X, point.Y, point.Z);
+
+			min = Vec3f::Min(min, world_point);
+			max = Vec3f::Max(max, world_point);
+			extended = true;
+		}
+	}
+
+	return extended;
+}
+
 void RaptorEditor::FitDBoundsToLevel()
 {
 	Blockout* blockout = gWorld->pPrototype;
@@ -1707,6 +1835,21 @@ void RaptorEditor::FitDBoundsToLevel()
 
 			level_min = Vec3f::Min(level_min, world_point);
 			level_max = Vec3f::Max(level_max, world_point);
+			has_geometry = true;
+		}
+	}
+
+	for (ObjectID id : blockout->BlockoutObjects) {
+		Object* object = gObjectManager->GetObject(id);
+
+		if (object == nullptr || object == blockout->pXFormObject || object == blockout->pPreviewObject) {
+			continue;
+		}
+
+		const Patch* patch = blockout->GetPatch(object);
+
+		if (patch != nullptr && patch->IsValid() &&
+			ExtendBoundsByPatch(*patch, object->GetWorldMatrix(), level_min, level_max)) {
 			has_geometry = true;
 		}
 	}
