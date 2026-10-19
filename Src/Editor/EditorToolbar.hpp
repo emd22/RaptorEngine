@@ -64,6 +64,7 @@ private:
 	OutlineToggleButton* mpSubtractButton = nullptr;
 	wxButton* mpShowAllButton = nullptr;
 	wxButton* mpSnapButton = nullptr;
+	wxButton* mpHollowButton = nullptr;
 
 	wxBoxSizer* mpPlaneGroup = nullptr;
 	wxBoxSizer* mpToolGroup = nullptr;
@@ -76,6 +77,7 @@ private:
 	FloatField* mpArchArcField = nullptr;
 	FloatField* mpArchStartField = nullptr;
 	wxBoxSizer* mpCurveRow = nullptr;
+	wxBoxSizer* mpFaceRow = nullptr;
 	FloatField* mpCurveSubdivisionsUField = nullptr;
 	FloatField* mpCurveSubdivisionsVField = nullptr;
 	OutlineToggleButton* mpCurveSmoothButton = nullptr;

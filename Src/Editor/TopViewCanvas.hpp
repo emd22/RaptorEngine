@@ -16,6 +16,7 @@
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
 #include <Patch.hpp>
+#include <chrono>
 #include <functional>
 
 class wxGraphicsContext;
@@ -40,6 +41,7 @@ struct CurveSettings
 	ePatchClosure Closure = ePatchClosure::None;
 	float32 Thickness = Patch::scDefaultThickness;
 	float32 Weight = 1.0f;
+	PatchTextureSettings Texture;
 };
 
 class TopViewCanvas : public wxWindow
@@ -68,6 +70,7 @@ public:
 	void DiscardArch();
 	void SetCurveSettings(const CurveSettings& settings);
 	void RunPatchCommand(ePatchCommand type);
+	void RunTextureCommand(const TextureCommand& command);
 
 	void FitAll();
 	void FitSelection();
@@ -376,6 +379,10 @@ private:
 	bool mbHoverFace = false;
 	TopViewFace mHoverFace;
 
+	bool mbHasPickedFace = false;
+	ObjectID mPickedFaceBrushId = ObjectID::scNull;
+	Vec2f mPickedFaceNormal = Vec2f::sZero;
+
 	DynArray<TopViewVertexHandle> mSelectedVertices;
 	TopViewVertexHandle mGrabbedVertex;
 	bool mbVertexToggleOnRelease = false;
@@ -418,6 +425,10 @@ private:
 	std::function<void(eEditorTool)> mpOnToolChanged;
 	std::function<void(eViewPlane)> mpOnPlaneChanged;
 	std::function<void(const wxString&)> mpOnStatus;
+
+	wxString mNotice;
+	uint32 mNoticeSerial = 0;
+	std::chrono::steady_clock::time_point mNoticeTime;
 	std::function<void(const ArchSettings&)> mpOnArchChanged;
 	std::function<void(const CurveSettings&)> mpOnCurveChanged;
 };

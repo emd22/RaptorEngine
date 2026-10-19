@@ -1,113 +1,100 @@
 #include "MaterialLibrary.hpp"
 
 #include <Asset/AssetManager.hpp>
-#include <Asset/ConfigFile.hpp>
 #include <Core/FilesystemIO.hpp>
 #include <Core/Hash.hpp>
 #include <Core/Log.hpp>
 #include <Engine.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
-#include <cstring>
-#include <filesystem>
 
 namespace fx {
 
 
-static bool AttachTexture(Material* material, Material::eResourceType type, const std::string& texture_root,
-						  const char* relative_path, const char* material_name)
+static bool AttachTexture(Material* material, Material::eResourceType type, const String& path,
+						  const char* material_name)
 {
-	if (relative_path[0] == '\0') {
+	if (path.IsEmpty()) {
 		return false;
 	}
-
-	const std::string path = texture_root + relative_path;
 
 	if (!FilesystemIO::FileExists(FilesystemIO::ResolvePath(path))) {
 		LogWarning(LC_ASSET, "Material '{}' is missing the texture '{}'", material_name, path);
 		return false;
 	}
 
-	AssetTicket ticket = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm, path,
+	AssetTicket ticket = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm, path.Str(),
 												  eImageCreateFlags::None);
 	material->Attach(type, ticket);
 
 	return true;
 }
 
-bool MaterialLibrary::Load(const std::string& list_path, const std::string& texture_root)
+bool MaterialLibrary::Load(const std::string& root)
 {
 	mEntries.Clear();
 	mEntries.Create(64);
 
-	ConfigFile file {};
-	file.Load(list_path);
+	std::vector<MaterialDefinition> definitions = LoadMaterialDefinitions(root);
 
-	ConfigEntry* list = file.GetEntry(HashStr32("list"));
+	for (MaterialDefinition& definition : definitions) {
+		const Name entry_name(definition.Name.CStr());
 
-	if (list == nullptr) {
-		LogError(LC_ASSET, "The material list '{}' has no `list` entry", list_path);
-		return false;
+		mEntries.Insert(Entry { .EntryName = entry_name, .Definition = std::move(definition) });
 	}
 
-	for (const ConfigEntry& item : list->GetAllMembers()) {
-		const char* name = item.GetMemberValue<const char*>(HashStr32("name"), "unnamed");
+	LogInfo(LC_ASSET, "Found {} materials in '{}'", mEntries.Size(), root);
 
-		const MaterialID id = gMaterialManager->NewMaterial(name, false);
-		Material* material = gMaterialManager->GetMaterial(id);
+	return mEntries.Size() > 0;
+}
 
-		AttachTexture(material, Material::eResourceType::Diffuse, texture_root,
-					  item.GetMemberValue<const char*>(HashStr32("diffuse"), ""), name);
-		AttachTexture(material, Material::eResourceType::Normal, texture_root,
-					  item.GetMemberValue<const char*>(HashStr32("normal"), ""), name);
-		const bool has_orm = AttachTexture(material, Material::eResourceType::ORM, texture_root,
-										   item.GetMemberValue<const char*>(HashStr32("orm"), ""), name);
+MaterialID MaterialLibrary::CreateMaterial(Entry& entry) const
+{
+	const MaterialDefinition& definition = entry.Definition;
+	const char* name = definition.Name.CStr();
 
-		if (has_orm) {
-			material->SetMetallicRoughness(1.0f, 1.0f);
-		}
+	const MaterialID id = gMaterialManager->NewMaterial(definition.Name, false);
+	Material* material = gMaterialManager->GetMaterial(id);
 
-		const float32 alpha = item.GetMemberValue<float32>(HashStr32("alpha"), 1.0f);
+	AttachTexture(material, Material::eResourceType::Diffuse, definition.DiffusePath, name);
+	AttachTexture(material, Material::eResourceType::Normal, definition.NormalPath, name);
+	const bool has_orm = AttachTexture(material, Material::eResourceType::ORM, definition.OrmPath, name);
 
-		if (alpha < 1.0f) {
-			material->SetAlpha(alpha);
-		}
-
-		if (item.GetMemberValue(HashStr32("unlit"), 0) != 0) {
-			material->SetUnlit(true);
-		}
-
-		if (item.GetMemberValue(HashStr32("glass"), 0) != 0) {
-			material->SetGlass(true);
-		}
-
-		if (!has_orm) {
-			const float32 metallic = item.GetMemberValue<float32>(HashStr32("metallic"),
-																  material->Properties.MetallicFactor);
-			const float32 roughness = item.GetMemberValue<float32>(HashStr32("roughness"),
-																   material->Properties.RoughnessFactor);
-
-			material->SetMetallicRoughness(metallic, roughness);
-		}
-
-		if (item.GetMember(HashStr32("color")) != nullptr) {
-			const Vec3f color = item.GetMemberValue<Vec3f>(HashStr32("color"), Vec3f(1.0f, 1.0f, 1.0f));
-			const float32 base_color[3] = { color.X, color.Y, color.Z };
-
-			material->SetBaseColorFactor(base_color);
-		}
-
-		material->Finalize();
-
-		const char* diffuse_path = item.GetMemberValue<const char*>(HashStr32("diffuse"), "");
-		const std::string diffuse = diffuse_path[0] != '\0' ? texture_root + diffuse_path : std::string();
-
-		mEntries.Insert(Entry { .EntryName = Name(name), .Material = id, .DiffusePath = diffuse });
+	if (has_orm) {
+		material->SetMetallicRoughness(1.0f, 1.0f);
 	}
 
-	LogInfo(LC_ASSET, "Loaded {} materials from '{}'", mEntries.Size(), list_path);
+	if (definition.Alpha < 1.0f) {
+		material->SetAlpha(definition.Alpha);
+	}
 
-	return true;
+	if (definition.bUnlit) {
+		material->SetUnlit(true);
+	}
+
+	if (definition.bGlass) {
+		material->SetGlass(true);
+	}
+
+	if (!has_orm) {
+		const float32 metallic = definition.Metallic.value_or(material->Properties.MetallicFactor);
+		const float32 roughness = definition.Roughness.value_or(material->Properties.RoughnessFactor);
+
+		material->SetMetallicRoughness(metallic, roughness);
+	}
+
+	if (definition.BaseColor.has_value()) {
+		const Vec3f color = *definition.BaseColor;
+		const float32 base_color[3] = { color.X, color.Y, color.Z };
+
+		material->SetBaseColorFactor(base_color);
+	}
+
+	material->Finalize();
+
+	entry.Material = id;
+
+	return id;
 }
 
 const String& MaterialLibrary::GetName(const MaterialLibraryID id) const
@@ -129,7 +116,7 @@ const String& MaterialLibrary::GetDiffusePath(const MaterialLibraryID id) const
 		return scEmpty;
 	}
 
-	return mEntries[static_cast<size_t>(id.ID)].DiffusePath;
+	return mEntries[static_cast<size_t>(id.ID)].Definition.DiffusePath;
 }
 
 MaterialID MaterialLibrary::GetMaterial(const MaterialLibraryID id) const
@@ -138,7 +125,13 @@ MaterialID MaterialLibrary::GetMaterial(const MaterialLibraryID id) const
 		return MaterialID::scNull;
 	}
 
-	return mEntries[static_cast<size_t>(id.ID)].Material;
+	Entry& entry = mEntries[static_cast<size_t>(id.ID)];
+
+	if (entry.Material.IsNull()) {
+		return CreateMaterial(entry);
+	}
+
+	return entry.Material;
 }
 
 MaterialLibraryID MaterialLibrary::FindID(const MaterialID material) const

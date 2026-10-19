@@ -3,6 +3,7 @@
 #include <Asset/ConfigFile.hpp>
 #include <BrushEntry.hpp>
 #include <Core/String.hpp>
+#include <Material/MaterialDefinition.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/Quat.hpp>
 #include <cfloat>
@@ -22,9 +23,8 @@ namespace {
 constexpr int32 scLockedMaterialIndex = 0;
 constexpr int32 scEditableMaterialIndex = 1;
 
-constexpr const char* scMaterialListPath = "RaptorData/Data/materials/list.prx";
+constexpr const char* scMaterialRoot = "RaptorData/Data/materials";
 
-constexpr float32 scOpaqueAlpha = 0.999f;
 
 constexpr double scBrushExtent = 1e5;
 constexpr double scMinSunDistance = 1e-6;
@@ -106,21 +106,9 @@ std::unordered_set<String> ReadTransparentMaterials()
 {
 	std::unordered_set<String> names;
 
-	ConfigFile file {};
-	file.Load(scMaterialListPath);
-
-	const ConfigEntry* list = file.GetEntry(HashStr32("list"));
-
-	if (list == nullptr) {
-		return names;
-	}
-
-	for (const ConfigEntry& item : list->Members) {
-		const bool is_glass = item.GetMemberValue(HashStr32("glass"), 0) != 0;
-		const float32 alpha = item.GetMemberValue<float32>(HashStr32("alpha"), 1.0f);
-
-		if (is_glass || alpha < scOpaqueAlpha) {
-			names.insert(item.GetMemberValue<const char*>(HashStr32("name"), ""));
+	for (const MaterialDefinition& definition : LoadMaterialDefinitions(scMaterialRoot)) {
+		if (definition.IsTransparent()) {
+			names.insert(definition.Name);
 		}
 	}
 

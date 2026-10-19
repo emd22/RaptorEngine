@@ -503,6 +503,7 @@ void RaptorEditor::Update(float32 delta_time)
 			mDecalUntrackedEditCount = mUntrackedEditCount;
 
 			gWorld->pPrototype->RefreshDecals();
+			gWorld->pPrototype->RefreshCappedPatches();
 		}
 	}
 
@@ -849,7 +850,7 @@ bool RaptorEditor::SelectObject(Object* object, bool append_selection)
 	const bool selected = mSelection.Add(object);
 
 	if (!selected) {
-		LogWarning(LC_CORE, "Cannot select '{}', the selection is full", object->Name.Get());
+		Warn("Cannot select '{}', the selection is full", object->Name.Get());
 	}
 
 	SyncSelection();
@@ -876,7 +877,7 @@ bool RaptorEditor::SelectSubview(uint32 instance, bool append_selection)
 	const bool selected = mSelection.Add(root);
 
 	if (!selected) {
-		LogWarning(LC_CORE, "Cannot select '{}', the selection is full", root->Name.Get());
+		Warn("Cannot select '{}', the selection is full", root->Name.Get());
 	}
 
 	SyncSelection();
@@ -1394,7 +1395,7 @@ static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter
 	}
 
 	if (ops.size() > scMaxSubtractOperations) {
-		LogWarning("Subtracting '{}' would change too many blockouts at once", cutter->Name.Get());
+		gEditor->Warn("Subtracting '{}' would change too many blockouts at once", cutter->Name.Get());
 		return 0;
 	}
 
@@ -1442,6 +1443,94 @@ uint32 RaptorEditor::SubtractSelection(bool keep_cutters)
 	return cut_count;
 }
 
+uint32 RaptorEditor::HollowSelection()
+{
+	Blockout* blockout = gWorld->pPrototype;
+
+	if (blockout == nullptr || IsSimulationMode()) {
+		return 0;
+	}
+
+	struct Hollow
+	{
+		Object* pObject = nullptr;
+		Brush::PlaneList Before;
+		std::vector<Brush::PlaneList> Pieces;
+		std::vector<Vec3f> Positions;
+	};
+
+	const float32 thickness = GetSnapStep();
+
+	std::vector<Hollow> hollows;
+	uint32 operation_count = 0;
+	uint32 too_thin_count = 0;
+
+	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
+		Object* object = mSelection.GetObject(i);
+		const Brush* brush = blockout->GetBrush(object);
+
+		if (brush == nullptr || !CanEditObject(object) || object->HasTags(eObjectTag::LockTransform) ||
+			!CanBeSubtractedFrom(object)) {
+			continue;
+		}
+
+		Hollow hollow;
+		hollow.pObject = object;
+		hollow.Before = brush->Planes;
+
+		if (!blockout->GetHollowPieces(object, thickness, hollow.Pieces, hollow.Positions)) {
+			Warn("'{}' is too thin to hollow out with {} thick walls", object->Name.Get(), thickness);
+			too_thin_count++;
+			continue;
+		}
+
+		operation_count += static_cast<uint32>(hollow.Pieces.size());
+		hollows.push_back(std::move(hollow));
+	}
+
+	if (hollows.empty()) {
+		if (too_thin_count == 0) {
+			Warn("Select the brushes to hollow out first");
+		}
+
+		return 0;
+	}
+
+	if (operation_count > scMaxSubtractOperations) {
+		Warn("Hollowing the selection would make too many brushes at once");
+		return 0;
+	}
+
+	const int32 group_size = static_cast<int32>(operation_count);
+
+	std::vector<Object*> walls;
+
+	for (const Hollow& hollow : hollows) {
+		EmplaceEditOperation<BrushEditOperation>(hollow.pObject, hollow.Before, hollow.Pieces[0], group_size);
+		walls.push_back(hollow.pObject);
+
+		for (uint32 piece = 1; piece < hollow.Pieces.size(); piece++) {
+			ObjectSnapshot snapshot = ObjectSnapshot::Capture(*hollow.pObject,
+															  mSelection.GetStoredMaterial(hollow.pObject));
+			snapshot.ObjectName = Name();
+			snapshot.Position = hollow.Positions[piece];
+
+			Object* created = EmplaceEditOperation<CreateBrushOperation>(hollow.Pieces[piece], snapshot, group_size)
+								  .GetCreated();
+
+			if (created != nullptr) {
+				walls.push_back(created);
+			}
+		}
+	}
+
+	for (Object* wall : walls) {
+		SelectObject(wall, true);
+	}
+
+	return static_cast<uint32>(hollows.size());
+}
+
 /////////////////////////////////////
 // Subviews
 /////////////////////////////////////
@@ -1480,7 +1569,7 @@ bool RaptorEditor::CreateSubviewFromSelection(const String& name)
 	}
 
 	if (blockout->IsCompiledMap()) {
-		LogWarning(LC_CORE, "Open the prototype (.prx) to make subviews, a compiled map can't be edited");
+		Warn("Open the prototype (.prx) to make subviews, a compiled map can't be edited");
 		return false;
 	}
 
@@ -1496,14 +1585,14 @@ bool RaptorEditor::CreateSubviewFromSelection(const String& name)
 		}
 
 		if (!blockout->HasBrush(object) && !blockout->HasPatch(object)) {
-			LogWarning(LC_CORE, "Only brushes, patches and subviews can be part of a subview, '{}' is none of them",
-					   object->Name.Get());
+			Warn("Only brushes, patches and subviews can be part of a subview, '{}' is none of them",
+				 object->Name.Get());
 			return false;
 		}
 
 		if (!CanEditObject(object)) {
-			LogWarning(LC_CORE, "'{}' is already part of the subview '{}'", object->Name.Get(),
-					   blockout->GetSubviewName(object->SubviewInstance));
+			Warn("'{}' is already part of the subview '{}'", object->Name.Get(),
+				 blockout->GetSubviewName(object->SubviewInstance));
 			return false;
 		}
 
@@ -1511,7 +1600,7 @@ bool RaptorEditor::CreateSubviewFromSelection(const String& name)
 	}
 
 	if (count == 0) {
-		LogWarning(LC_CORE, "Select the brushes to make a subview from first");
+		Warn("Select the brushes to make a subview from first");
 		return false;
 	}
 
@@ -1567,7 +1656,7 @@ bool RaptorEditor::EnterSubview()
 	}
 
 	if (!IsSubviewSelected()) {
-		LogWarning(LC_CORE, "Select a placed subview to enter it");
+		Warn("Select a placed subview to enter it");
 		return false;
 	}
 
@@ -1579,7 +1668,7 @@ bool RaptorEditor::EnterSubview()
 	ForgetObjects();
 
 	if (!blockout->EnterSubview(instance)) {
-		LogWarning(LC_CORE, "Could not enter the subview '{}'", blockout->GetSubviewName(instance));
+		Warn("Could not enter the subview '{}'", blockout->GetSubviewName(instance));
 		return false;
 	}
 
@@ -1619,7 +1708,7 @@ bool RaptorEditor::PlaceSubview(const String& name)
 	const uint32 instance = blockout->NewSubviewInstance(name);
 
 	if (instance == Blockout::scNoSubview) {
-		LogWarning(LC_CORE, "The subview '{}' could not be placed", name);
+		Warn("The subview '{}' could not be placed", name);
 		return false;
 	}
 
@@ -1710,6 +1799,13 @@ void RaptorEditor::ForgetObjects()
 	mHistory.Clear();
 
 	SyncSelection();
+}
+
+void RaptorEditor::ShowNotice(const String& message)
+{
+	mNotice = message;
+	mNoticeSerial++;
+	mbForcePanelSync = true;
 }
 
 bool RaptorEditor::HasUnsavedChanges() const { return mbUntrackedChanges || mHistory.GetRevision() != mSavedRevision; }

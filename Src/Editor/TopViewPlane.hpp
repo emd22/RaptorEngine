@@ -64,12 +64,39 @@ enum class ePatchCommand : uint8
 	InsertRows,
 	RemoveColumns,
 	RemoveRows,
-	NaturalTexture,
+	MapTexture,
 	SetSubdivisions,
 	SetSmooth,
 	SetClosure,
 	SetWeight,
 	RoundWeights,
+};
+
+enum class ePatchTextureMapping : uint8
+{
+	Natural,
+	World,
+	Fit,
+
+	Count,
+};
+
+enum class ePatchTextureAxis : uint8
+{
+	Auto,
+	X,
+	Y,
+	Z,
+
+	Count,
+};
+
+struct PatchTextureSettings
+{
+	ePatchTextureMapping Mapping = ePatchTextureMapping::Natural;
+	ePatchTextureAxis Axis = ePatchTextureAxis::Auto;
+	float32 Scale = Patch::scDefaultTextureScale;
+	Vec2f Repeats = Vec2f(1.0f, 1.0f);
 };
 
 struct PatchCommand
@@ -81,6 +108,22 @@ struct PatchCommand
 	ePatchClosure Closure = ePatchClosure::None;
 	float32 Thickness = Patch::scDefaultThickness;
 	float32 Weight = 1.0f;
+	PatchTextureSettings Texture;
+};
+
+enum class eTextureCommand : uint8
+{
+	Shift,
+	Scale,
+	Rotate,
+	Reset,
+	WorldAlign,
+};
+
+struct TextureCommand
+{
+	eTextureCommand Type = eTextureCommand::Shift;
+	Vec2f Amount = Vec2f::sZero;
 };
 
 inline const ViewPlaneAxes& GetViewPlaneAxes(eViewPlane plane) { return scViewPlaneAxes[static_cast<uint32>(plane)]; }

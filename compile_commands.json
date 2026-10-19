@@ -493,6 +493,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/raptor.dir/Src/Material/MaterialDefinition.cpp.o -c /Users/emd22/Projects/raptor/Src/Material/MaterialDefinition.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Material/MaterialDefinition.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Material/MaterialDefinition.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Submodules/strata/src -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/raptor.dir/Src/Material/MaterialLibrary.cpp.o -c /Users/emd22/Projects/raptor/Src/Material/MaterialLibrary.cpp",
   "file": "/Users/emd22/Projects/raptor/Src/Material/MaterialLibrary.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Material/MaterialLibrary.cpp.o"
@@ -1987,6 +1993,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Material/MaterialDefinition.cpp.o -c /Users/emd22/Projects/raptor/Src/Material/MaterialDefinition.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Material/MaterialDefinition.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Material/MaterialDefinition.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Core/Allocator.cpp.o -c /Users/emd22/Projects/raptor/Src/Core/Allocator.cpp",
   "file": "/Users/emd22/Projects/raptor/Src/Core/Allocator.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Core/Allocator.cpp.o"
@@ -2080,6 +2092,18 @@
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Math/Impl/Vector/Vec3_AVX.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/Impl/Vector/Vec3_AVX.cpp",
   "file": "/Users/emd22/Projects/raptor/Src/Math/Impl/Vector/Vec3_AVX.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Math/Impl/Vector/Vec3_AVX.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Math/Impl/Vector/Vec3d_Neon.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/Impl/Vector/Vec3d_Neon.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Math/Impl/Vector/Vec3d_Neon.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Math/Impl/Vector/Vec3d_Neon.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Math/Impl/Vector/Vec3d_AVX.cpp.o -c /Users/emd22/Projects/raptor/Src/Math/Impl/Vector/Vec3d_AVX.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Math/Impl/Vector/Vec3d_AVX.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Math/Impl/Vector/Vec3d_AVX.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/raptor",

@@ -111,6 +111,11 @@ public:
 	bool GetSubtractPieces(Object* target, Object* cutter, std::vector<Brush::PlaneList>& out_pieces,
 						   std::vector<Vec3f>& out_positions);
 
+	void RefreshCappedPatches();
+
+	bool GetHollowPieces(Object* object, float32 thickness, std::vector<Brush::PlaneList>& out_pieces,
+						 std::vector<Vec3f>& out_positions);
+
 	/**
 	 * @brief Returns the brush for a new blockout filling `min` to `max` in world space, with its textures lined up
 	 * with the world grid
@@ -489,6 +494,7 @@ private:
 	struct DecalReceiver
 	{
 		const Brush* pBrush = nullptr;
+		const Patch* pPatch = nullptr;
 		Mat4f World = Mat4f::scIdentity;
 		ObjectID ID = ObjectID::scNull;
 	};
@@ -519,7 +525,12 @@ public:
 	Object* pPreviewObject = nullptr;
 
 private:
+	MaterialLibraryID GetCompiledFallbackMaterial(int32 library_index) const;
+
+private:
 	MaterialLibrary mMaterials;
+	MaterialLibraryID mDefaultMaterialID = MaterialLibraryID::scNull;
+	MaterialLibraryID mEditableMaterialID = MaterialLibraryID::scNull;
 	HashMap<uint32, Brush> mBrushes;
 	HashMap<uint32, Patch> mPatches;
 
@@ -540,6 +551,7 @@ private:
 
 	std::vector<CompiledDecalReceiver> mCompiledDecalReceivers;
 	HashMap<uint32, uint64> mDecalHashes;
+	HashMap<uint32, uint64> mPatchMeshFrames;
 
 	DynArray<Subview> mSubviews;
 	DynArray<SubviewInstance> mSubviewInstances;

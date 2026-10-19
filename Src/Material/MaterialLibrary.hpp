@@ -4,6 +4,7 @@
 #include <Core/PagedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
+#include <Material/MaterialDefinition.hpp>
 #include <Material/MaterialID.hpp>
 
 namespace fx {
@@ -33,12 +34,12 @@ public:
 	struct Entry
 	{
 		Name EntryName;
+		MaterialDefinition Definition;
 		MaterialID Material = MaterialID::scNull;
-		String DiffusePath;
 	};
 
 public:
-	bool Load(const std::string& list_path, const std::string& texture_root);
+	bool Load(const std::string& root);
 
 	FX_FORCE_INLINE uint32 GetCount() const { return static_cast<uint32>(mEntries.Size()); }
 
@@ -50,7 +51,10 @@ public:
 	MaterialLibraryID FindIDByName(const char* name) const;
 
 private:
-	PagedArray<Entry> mEntries;
+	MaterialID CreateMaterial(Entry& entry) const;
+
+private:
+	mutable PagedArray<Entry> mEntries;
 };
 
 } // namespace fx

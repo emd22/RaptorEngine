@@ -227,6 +227,7 @@ add_library(mapc_core STATIC
     "Src/Brush.cpp"
     "Src/Patch.cpp"
     "Src/Asset/ConfigFile.cpp"
+    "Src/Material/MaterialDefinition.cpp"
     "Src/Core/Allocator.cpp"
     "Src/Core/File.cpp"
     "Src/Core/FilesystemIO.cpp"
@@ -243,6 +244,8 @@ add_library(mapc_core STATIC
     "Src/Math/Impl/Quaternion/Quat_AVX.cpp"
     "Src/Math/Impl/Vector/Vec3_Neon.cpp"
     "Src/Math/Impl/Vector/Vec3_AVX.cpp"
+    "Src/Math/Impl/Vector/Vec3d_Neon.cpp"
+    "Src/Math/Impl/Vector/Vec3d_AVX.cpp"
     "Src/Math/Impl/Vector/Vec4_Neon.cpp"
     "Src/Math/Impl/Vector/Vec4_AVX.cpp"
 )

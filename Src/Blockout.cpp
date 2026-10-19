@@ -31,8 +31,12 @@
 
 namespace fx {
 
-static constexpr MaterialLibraryID scDefaultMaterialID = MaterialLibraryID(0);
-static constexpr MaterialLibraryID scEditableMaterialID = MaterialLibraryID(1);
+static constexpr const char* scMaterialRoot = "RaptorData/Data/materials";
+static constexpr const char* scDefaultMaterialName = "proto_white";
+static constexpr const char* scEditableMaterialName = "proto_grey";
+
+static constexpr int32 scCompiledLockedMaterialIndex = 0;
+static constexpr int32 scCompiledEditableMaterialIndex = 1;
 
 static constexpr float32 scBakedSunMinCosine = 0.99999f;
 static constexpr float32 scDecalBuriedTolerance = 1e-4f;
@@ -88,7 +92,20 @@ void Blockout::Create(World* world)
 
 	pWorld = world;
 
-	mMaterials.Load("RaptorData/Data/materials/list.prx", "RaptorData/Data/materials");
+	mMaterials.Load(scMaterialRoot);
+
+	mDefaultMaterialID = mMaterials.FindIDByName(scDefaultMaterialName);
+	mEditableMaterialID = mMaterials.FindIDByName(scEditableMaterialName);
+
+	if (!mDefaultMaterialID.IsValid()) {
+		LogError(LC_ASSET, "The default material '{}' is missing", scDefaultMaterialName);
+		mDefaultMaterialID = MaterialLibraryID(0);
+	}
+
+	if (!mEditableMaterialID.IsValid()) {
+		LogError(LC_ASSET, "The editable material '{}' is missing", scEditableMaterialName);
+		mEditableMaterialID = mDefaultMaterialID;
+	}
 
 	// Selection material
 	{
@@ -333,6 +350,38 @@ bool Blockout::GetSubtractPieces(Object* target, Object* cutter, std::vector<Bru
 	return true;
 }
 
+bool Blockout::GetHollowPieces(Object* object, float32 thickness, std::vector<Brush::PlaneList>& out_pieces,
+							   std::vector<Vec3f>& out_positions)
+{
+	const Brush* brush = GetBrush(object);
+
+	if (brush == nullptr || !(thickness > 0.0f)) {
+		return false;
+	}
+
+	Brush::PlaneList inner = brush->Planes;
+
+	for (BrushPlane& plane : inner) {
+		plane.Distance -= thickness;
+	}
+
+	if (!Brush::FromPlanes(inner).IsValid() || !brush->Subtract(inner, object->GetPosition(), out_pieces) ||
+		out_pieces.empty()) {
+		return false;
+	}
+
+	out_positions.clear();
+
+	for (const Brush::PlaneList& piece : out_pieces) {
+		const Brush shape = Brush::FromPlanes(piece);
+
+		out_positions.push_back(object->GetPosition() +
+								GetOffsetToKeepInPlace(object, brush->GetCenter(), shape.GetCenter()));
+	}
+
+	return true;
+}
+
 Brush Blockout::MakeWorldBox(const Vec3f min, const Vec3f max, Vec3f& out_position) const
 {
 	out_position = (min + max) * 0.5f;
@@ -531,6 +580,7 @@ void Blockout::RemoveSingleObjectFromWorld(Object* object)
 
 	mBrushes.Remove(object->ID.GetID());
 	mPatches.Remove(object->ID.GetID());
+	mPatchMeshFrames.Remove(object->ID.GetID());
 	mDecalHashes.Remove(object->ID.GetID());
 
 	gObjectManager->DestroyObject(object->ID);
@@ -545,6 +595,7 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	BlockoutObjects.Clear();
 	mBrushes.Clear();
 	mPatches.Clear();
+	mPatchMeshFrames.Clear();
 	mDecalHashes.Clear();
 	mCompiledDecalReceivers.clear();
 
@@ -636,14 +687,14 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 		const CompiledMapSurface& surface = map.Surfaces[surface_index];
 		const CompiledMapMaterial& material = map.Materials[surface.MaterialIndex];
 
-		MaterialLibraryID library_id = MaterialLibraryID(material.LibraryIndex);
+		MaterialLibraryID library_id = GetCompiledFallbackMaterial(material.LibraryIndex);
 
 		if (!material.Name.IsEmpty()) {
 			library_id = mMaterials.FindIDByName(material.Name.CStr());
 
 			if (!library_id.IsValid()) {
 				LogWarning(LC_ASSET, "The compiled map uses the unknown material '{}'", material.Name);
-				library_id = MaterialLibraryID(material.LibraryIndex);
+				library_id = GetCompiledFallbackMaterial(material.LibraryIndex);
 			}
 		}
 
@@ -834,7 +885,20 @@ MaterialID Blockout::GetMaterialForID(MaterialLibraryID id) const
 
 MaterialLibraryID Blockout::GetIDForMaterial(const MaterialID& material) const { return mMaterials.FindID(material); }
 
-MaterialID Blockout::GetDefaultMaterial() const { return mMaterials.GetMaterial(scDefaultMaterialID); }
+MaterialLibraryID Blockout::GetCompiledFallbackMaterial(int32 library_index) const
+{
+	if (library_index == scCompiledEditableMaterialIndex) {
+		return mEditableMaterialID;
+	}
+
+	if (library_index == scCompiledLockedMaterialIndex) {
+		return mDefaultMaterialID;
+	}
+
+	return MaterialLibraryID::scNull;
+}
+
+MaterialID Blockout::GetDefaultMaterial() const { return mMaterials.GetMaterial(mDefaultMaterialID); }
 
 MaterialID Blockout::GetDBoundMaterial() const
 {
@@ -922,6 +986,52 @@ static Vec3f TransformDirection(const Mat4f& matrix, const Vec3f direction)
 	return Vec3f(turned.X, turned.Y, turned.Z);
 }
 
+static void HashPatch(uint64& hash, const Patch& patch)
+{
+	for (const PatchPoint& point : patch.Points) {
+		HashFloat(hash, point.Position.X);
+		HashFloat(hash, point.Position.Y);
+		HashFloat(hash, point.Position.Z);
+		HashFloat(hash, point.Weight);
+	}
+
+	const uint32 settings[] = {
+		patch.Width,
+		patch.Height,
+		patch.SubdivisionsU,
+		patch.SubdivisionsV,
+		static_cast<uint32>(patch.bSmooth),
+		static_cast<uint32>(patch.Closure),
+	};
+
+	HashBytes(hash, settings, sizeof(settings));
+	HashFloat(hash, patch.Thickness);
+}
+
+struct PatchWorldMesh
+{
+	SizedArray<Vec3f> Positions;
+	SizedArray<Vec3f> Normals;
+	SizedArray<uint32> Indices;
+};
+
+static void MakePatchWorldMesh(const Patch& patch, const Mat4f& world, PatchWorldMesh& out_mesh)
+{
+	SizedArray<Vec3f> tangents;
+	SizedArray<float32> handedness;
+	SizedArray<Vec2f> texcoords;
+
+	patch.GenerateMesh(out_mesh.Positions, out_mesh.Normals, tangents, handedness, texcoords, out_mesh.Indices);
+
+	for (Vec3f& position : out_mesh.Positions) {
+		position = TransformPoint(world, position);
+	}
+
+	for (Vec3f& normal : out_mesh.Normals) {
+		normal = TransformDirection(world, normal);
+	}
+}
+
 static bool BoundsOverlap(const BBox& a, const BBox& b)
 {
 	return a.Min.X <= b.Max.X && a.Max.X >= b.Min.X && a.Min.Y <= b.Max.Y && a.Max.Y >= b.Min.Y && a.Min.Z <= b.Max.Z &&
@@ -971,6 +1081,21 @@ void Blockout::GatherDecalReceivers(const BBox& bounds, std::vector<DecalReceive
 		}
 	}
 
+	for (const ObjectID id : BlockoutObjects) {
+		Object* object = gObjectManager->GetObject(id);
+		const Patch* patch = GetPatch(object);
+
+		if (patch == nullptr || !patch->IsValid() || !IsDecalReceiver(object)) {
+			continue;
+		}
+
+		const Mat4f world = object->GetWorldMatrix();
+
+		if (BoundsOverlap(OBBox::FromLocalBounds(object->Bounds, world).GetWorldAABB(), bounds)) {
+			out_receivers.push_back(DecalReceiver { .pPatch = patch, .World = world, .ID = object->ID });
+		}
+	}
+
 	std::vector<SubviewSolid> solids;
 	GetSubviewSolids(solids);
 
@@ -999,7 +1124,14 @@ uint64 Blockout::HashDecal(Object* decal, const Brush& volume, const BBox& bound
 
 		HashBytes(hash, &id, sizeof(id));
 		HashMatrix(hash, receiver.World);
-		HashPlanes(hash, *receiver.pBrush);
+
+		if (receiver.pBrush != nullptr) {
+			HashPlanes(hash, *receiver.pBrush);
+		}
+
+		if (receiver.pPatch != nullptr) {
+			HashPatch(hash, *receiver.pPatch);
+		}
 	}
 
 	const uint64 compiled_count = mCompiledDecalReceivers.size();
@@ -1019,10 +1151,24 @@ void Blockout::RebuildDecalMesh(Object* decal, const Brush& volume)
 	GatherDecalReceivers(bounds, receivers);
 
 	for (const DecalReceiver& receiver : receivers) {
-		builder.AddBrush(*receiver.pBrush, receiver.World);
+		if (receiver.pBrush != nullptr) {
+			builder.AddBrush(*receiver.pBrush, receiver.World);
+		}
 	}
 
 	builder.ClipBrushes();
+
+	for (const DecalReceiver& receiver : receivers) {
+		if (receiver.pPatch == nullptr) {
+			continue;
+		}
+
+		PatchWorldMesh mesh;
+		MakePatchWorldMesh(*receiver.pPatch, receiver.World, mesh);
+
+		builder.AddTriangles(mesh.Positions.pData, mesh.Normals.pData, mesh.Indices.pData,
+							 static_cast<uint32>(mesh.Indices.Size));
+	}
 
 	for (const CompiledDecalReceiver& receiver : mCompiledDecalReceivers) {
 		if (BoundsOverlap(receiver.Bounds, bounds)) {
@@ -1171,8 +1317,33 @@ void Blockout::RaycastDecalSurfaces(const Vec3f origin, const Vec3f direction, f
 	for (const DecalReceiver& receiver : receivers) {
 		float32 distance = 0.0f;
 
-		if (RayEntersBrush(*receiver.pBrush, receiver.World, origin, direction, distance) && distance <= max_distance) {
+		if (receiver.pBrush != nullptr &&
+			RayEntersBrush(*receiver.pBrush, receiver.World, origin, direction, distance) && distance <= max_distance) {
 			candidates.push_back(distance);
+		}
+
+		if (receiver.pPatch == nullptr) {
+			continue;
+		}
+
+		PatchWorldMesh mesh;
+		MakePatchWorldMesh(*receiver.pPatch, receiver.World, mesh);
+
+		for (size_t i = 0; i + 2 < mesh.Indices.Size; i += 3) {
+			const uint32 a = mesh.Indices[i];
+			const uint32 b = mesh.Indices[i + 1];
+			const uint32 c = mesh.Indices[i + 2];
+
+			const Vec3f normal = mesh.Normals[a] + mesh.Normals[b] + mesh.Normals[c];
+
+			if (normal.Dot(direction) >= 0.0f) {
+				continue;
+			}
+
+			if (RayHitsTriangle(origin, direction, mesh.Positions[a], mesh.Positions[b], mesh.Positions[c], distance) &&
+				distance <= max_distance) {
+				candidates.push_back(distance);
+			}
 		}
 	}
 
@@ -1208,6 +1379,10 @@ void Blockout::RaycastDecalSurfaces(const Vec3f origin, const Vec3f direction, f
 		bool is_buried = false;
 
 		for (const DecalReceiver& receiver : receivers) {
+			if (receiver.pBrush == nullptr) {
+				continue;
+			}
+
 			const Vec3f local = TransformPoint(receiver.World.Inverse(), above);
 
 			if (receiver.pBrush->ContainsPoint(local, -scDecalBuriedTolerance)) {
@@ -1305,11 +1480,14 @@ void Blockout::RebuildPatch(Object* object, Patch&& patch)
 {
 	Assert(patch.IsValid());
 
+	const Vec3f center = patch.GetCenter();
+	object->SetRotationOrigin(-center);
+
+	const Mat4f world = object->GetWorldMatrix();
+
 	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
 	patch.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
-					   mesh->Indices);
-
-	const Vec3f center = patch.GetCenter();
+					   mesh->Indices, world);
 
 	if (mesh->Indices.IsEmpty()) {
 		LogWarning(LC_ASSET, "Patch '{}' has no area, it is not drawn", object->Name.Get());
@@ -1334,7 +1512,6 @@ void Blockout::RebuildPatch(Object* object, Patch&& patch)
 
 	object->Bounds.Min = min;
 	object->Bounds.Max = max;
-	object->SetRotationOrigin(-center);
 	object->SetTag(eObjectTag::Patch);
 
 	gWorldGrid->UpdateObject(object);
@@ -1357,7 +1534,44 @@ void Blockout::RebuildPatch(Object* object, Patch&& patch)
 
 	object->AttachCollider(phys);
 
+	uint64 frame = FX_HASH64_FNV1A_INIT;
+	HashMatrix(frame, world);
+	mPatchMeshFrames.Insert(object->ID.GetID(), frame);
+
 	mPatches.Insert(object->ID.GetID(), std::move(patch));
+}
+
+void Blockout::RefreshCappedPatches()
+{
+	for (const ObjectID id : BlockoutObjects) {
+		Object* object = gObjectManager->GetObject(id);
+		const Patch* patch = GetPatch(object);
+
+		if (patch == nullptr || patch->Closure != ePatchClosure::Cap) {
+			continue;
+		}
+
+		const Mat4f world = object->GetWorldMatrix();
+
+		uint64 frame = FX_HASH64_FNV1A_INIT;
+		HashMatrix(frame, world);
+
+		const uint64* previous = mPatchMeshFrames.Find(id.GetID());
+
+		if (previous != nullptr && *previous == frame) {
+			continue;
+		}
+
+		Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
+		patch->GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
+							mesh->Indices, world);
+
+		if (mesh->Indices.IsNotEmpty()) {
+			object->pMesh = mesh->AsDefaultMesh();
+		}
+
+		mPatchMeshFrames.Insert(id.GetID(), frame);
+	}
 }
 
 bool Blockout::SetPatch(Object* object, Patch&& patch)
@@ -1554,7 +1768,7 @@ MaterialID Blockout::ReadBrushMaterial(ConfigEntry& entry)
 	MaterialID material_id = GetDefaultMaterial();
 
 	if (entry.GetMemberValue(HashStr32("lock"), 0) != 1) {
-		material_id = mMaterials.GetMaterial(scEditableMaterialID);
+		material_id = mMaterials.GetMaterial(mEditableMaterialID);
 	}
 
 	const ConfigEntry* mat_entry = entry.GetMember(HashStr32("mat"));
@@ -1760,6 +1974,7 @@ void Blockout::DestroyObject(Object* object)
 
 	mBrushes.Remove(object->ID.GetID());
 	mPatches.Remove(object->ID.GetID());
+	mPatchMeshFrames.Remove(object->ID.GetID());
 
 	gWorld->Detach(object->ID);
 	gObjectManager->DestroyObject(object->ID);
@@ -1963,7 +2178,7 @@ Object* Blockout::RestorePatch(const Vec3f position, const Patch& patch, Materia
 	LogInfo("Restoring patch '{}'", patch_name);
 
 	Object* object = gObjectManager->NewObject(
-		patch_name, material.IsNull() ? mMaterials.GetMaterial(scEditableMaterialID) : material, eObjectTag::Blockout);
+		patch_name, material.IsNull() ? mMaterials.GetMaterial(mEditableMaterialID) : material, eObjectTag::Blockout);
 
 	object->MoveBy(position);
 	object->SetShadowCaster(true);
@@ -1997,7 +2212,7 @@ Object* Blockout::RestoreObject(const Vec3f position, const Brush::PlaneList& pl
 	LogInfo("Restoring blockout object '{}'", blockout_name);
 
 	Object* object = gObjectManager->NewObject(
-		blockout_name, material.IsNull() ? mMaterials.GetMaterial(scEditableMaterialID) : material,
+		blockout_name, material.IsNull() ? mMaterials.GetMaterial(mEditableMaterialID) : material,
 		eObjectTag::Blockout);
 
 	object->MoveBy(position);

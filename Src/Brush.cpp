@@ -94,6 +94,14 @@ TextureProjection GetTextureProjection(const Vec3f normal)
 	return projection;
 }
 
+bool HasSameTextureProjection(const Vec3f a, const Vec3f b)
+{
+	const TextureProjection projection_a = GetTextureProjection(a);
+	const TextureProjection projection_b = GetTextureProjection(b);
+
+	return projection_a.UAxis == projection_b.UAxis && projection_a.VAxis == projection_b.VAxis;
+}
+
 Vec2f GetDefaultTextureOffset(const Vec3f normal, const Vec3f bounds_min, const Vec3f bounds_max)
 {
 	const TextureProjection projection = GetTextureProjection(normal);
@@ -507,15 +515,30 @@ Brush Brush::FromVertices(const SizedArray<Vec3f>& points, const PlaneList& refe
 	}
 
 	for (uint32 i = 0; i < brush.Planes.Size; i++) {
+		const Vec3f normal = brush.Planes[i].Normal;
+
 		int32 best = scNoPlane;
 		float32 best_dot = 1.0f - scFindPlaneEpsilon;
 
 		for (uint32 j = 0; j < reference.Size; j++) {
-			const float32 dot = reference[j].Normal.Dot(brush.Planes[i].Normal);
+			const float32 dot = reference[j].Normal.Dot(normal);
 
 			if (dot > best_dot) {
 				best_dot = dot;
 				best = static_cast<int32>(j);
+			}
+		}
+
+		if (best == scNoPlane) {
+			best_dot = -FLT_MAX;
+
+			for (uint32 j = 0; j < reference.Size; j++) {
+				const float32 dot = reference[j].Normal.Dot(normal);
+
+				if (dot > best_dot && HasSameTextureProjection(reference[j].Normal, normal)) {
+					best_dot = dot;
+					best = static_cast<int32>(j);
+				}
 			}
 		}
 
@@ -889,23 +912,29 @@ bool Brush::Subtract(const PlaneList& cutter, const Vec3f origin, std::vector<Pl
 			continue;
 		}
 
-		if (-remaining.GetSupport(-normal) >= distance - scSubtractEpsilon) {
+		if (-remaining.GetSupport(-normal) >= distance - scSubtractEpsilon || remaining.Planes.Size >= scMaxPlanes) {
 			return false;
 		}
 
-		PlaneList inside;
-		PlaneList outside;
+		PlaneList inside = remaining.Planes;
+		inside.Insert({ normal, distance, GetWorldAlignedTexture(normal, origin) });
 
-		if (!remaining.Split(normal, distance, origin, inside, outside)) {
+		PlaneList outside = remaining.Planes;
+		outside.Insert({ -normal, -distance, GetWorldAlignedTexture(-normal, origin) });
+
+		Brush inside_brush = FromPlanes(inside);
+
+		if (!inside_brush.IsValid()) {
 			return false;
 		}
 
-		pieces.push_back(outside);
-		remaining = FromPlanes(inside);
+		const Brush outside_brush = FromPlanes(outside);
 
-		if (!remaining.IsValid()) {
-			return false;
+		if (outside_brush.IsValid()) {
+			pieces.push_back(outside_brush.Planes);
 		}
+
+		remaining = std::move(inside_brush);
 	}
 
 	out_pieces = std::move(pieces);
@@ -927,6 +956,11 @@ void Brush::AlignTexturesToWorld(const Vec3f origin)
 	for (BrushPlane& plane : Planes) {
 		plane.Texture = GetWorldAlignedTexture(plane.Normal, origin);
 	}
+}
+
+void Brush::AlignFaceTextureToWorld(uint32 plane_index, const Vec3f origin)
+{
+	Planes[plane_index].Texture = GetWorldAlignedTexture(Planes[plane_index].Normal, origin);
 }
 
 bool Brush::HasDefaultTextures() const

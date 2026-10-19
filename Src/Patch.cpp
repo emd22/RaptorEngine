@@ -293,8 +293,6 @@ Patch Patch::MakeCone(const Vec3f min, const Vec3f max, uint32 axis)
 Patch Patch::MakeBevel(const Vec3f min, const Vec3f max, uint32 axis)
 {
 	static constexpr SectionPoint scSection[] = { { 0.0f, 1.0f }, { 1.0f, 1.0f }, { 1.0f, 0.0f } };
-	// static constexpr SectionPoint scSection[] = { { 0.0f, 0.0f }, { 1.0f, 0.5f }, { 0.0f, 1.0f } };
-	// LogInfo("Making bevel from points {} to {}", min, max);
 
 	Patch patch = MakeExtrusion(min, max, axis, MakeSlice(scSection), false);
 
@@ -766,10 +764,10 @@ void Patch::Tessellate(PatchMesh& out_mesh) const
 
 void Patch::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normals, SizedArray<Vec3f>& tangents,
 						 SizedArray<float32>& tangent_handedness, SizedArray<Vec2f>& texcoords,
-						 SizedArray<uint32>& indices) const
+						 SizedArray<uint32>& indices, const Mat4f& to_world) const
 {
 	Patch pieces[scMaxClosurePieces];
-	const uint32 piece_count = BuildClosure(pieces);
+	const uint32 piece_count = BuildClosure(pieces, to_world);
 
 	SizedArray<PatchMesh> meshes;
 	meshes.InitCapacity(piece_count + 1);
@@ -1006,7 +1004,7 @@ void OrientOutward(Patch& patch, const Vec3d& outward)
 }
 
 Patch MakeCornerCap(const PatchPoint& start, const PatchPoint& corner, const PatchPoint& end, const Vec3f fill,
-					uint32 subdivisions, const Vec3d& outward)
+					uint32 subdivisions, const Vec3d& outward, const Mat4f& to_world)
 {
 	const Vec3f chord = end.Position - start.Position;
 	const Vec3f to_corner = corner.Position - start.Position;
@@ -1048,7 +1046,7 @@ Patch MakeCornerCap(const PatchPoint& start, const PatchPoint& corner, const Pat
 	cap.bSmooth = false;
 
 	OrientOutward(cap, outward);
-	cap.WorldTexture();
+	cap.WorldTexture(to_world);
 
 	return cap;
 }
@@ -1079,7 +1077,7 @@ Patch MakeBridge(const SizedArray<PatchPoint>& from, const SizedArray<PatchPoint
 
 } // namespace
 
-void Patch::WorldTexture(float32 scale)
+void Patch::WorldTexture(const Mat4f& to_world, float32 scale, uint32 axis)
 {
 	if (!IsValid() || scale == 0.0f) {
 		return;
@@ -1087,23 +1085,48 @@ void Patch::WorldTexture(float32 scale)
 
 	const PatchVertex middle = Evaluate(static_cast<double>(GetSubPatchColumns()) * 0.5,
 										static_cast<double>(GetSubPatchRows()) * 0.5);
+	const Vec4f turned = to_world * Vec4f(static_cast<float32>(middle.Normal.X), static_cast<float32>(middle.Normal.Y),
+										  static_cast<float32>(middle.Normal.Z), 0.0f);
+	const float32 normal[3] = { turned.X, turned.Y, turned.Z };
 
-	const double x = std::fabs(middle.Normal.X);
-	const double y = std::fabs(middle.Normal.Y);
-	const double z = std::fabs(middle.Normal.Z);
+	uint32 dominant = axis;
+
+	if (axis >= scAutoTextureAxis) {
+		dominant = 1;
+
+		if (std::fabs(normal[0]) > std::fabs(normal[1]) && std::fabs(normal[0]) >= std::fabs(normal[2])) {
+			dominant = 0;
+		}
+		else if (std::fabs(normal[2]) > std::fabs(normal[1]) && std::fabs(normal[2]) > std::fabs(normal[0])) {
+			dominant = 2;
+		}
+	}
+
+	Vec3f u_axis(1.0f, 0.0f, 0.0f);
+	Vec3f v_axis(0.0f, -1.0f, 0.0f);
+
+	if (dominant == 0) {
+		u_axis = Vec3f(0.0f, 0.0f, 1.0f);
+	}
+	else if (dominant == 1) {
+		v_axis = Vec3f(0.0f, 0.0f, 1.0f);
+	}
+
+	float32 facing = 1.0f;
+
+	if (normal[dominant] < 0.0f) {
+		facing = -1.0f;
+	}
+
+	if (GetAxis(u_axis.Cross(v_axis), dominant) * facing < 0.0f) {
+		u_axis = u_axis * -1.0f;
+	}
 
 	for (PatchPoint& point : Points) {
-		const Vec3f position = point.Position;
+		const Vec4f moved = to_world * Vec4f(point.Position.X, point.Position.Y, point.Position.Z, 1.0f);
+		const Vec3f world_position(moved.X, moved.Y, moved.Z);
 
-		if (y >= x && y >= z) {
-			point.Texcoord = Vec2f(position.X / scale, position.Z / scale);
-		}
-		else if (x >= z) {
-			point.Texcoord = Vec2f(position.Z / scale, -position.Y / scale);
-		}
-		else {
-			point.Texcoord = Vec2f(position.X / scale, -position.Y / scale);
-		}
+		point.Texcoord = Vec2f(world_position.Dot(u_axis) / scale, world_position.Dot(v_axis) / scale);
 	}
 }
 
@@ -1261,7 +1284,7 @@ Patch Patch::MakeOffset(float32 distance) const
 	return offset;
 }
 
-Patch Patch::MakeCap(uint32 edge) const
+Patch Patch::MakeCap(uint32 edge, const Mat4f& to_world) const
 {
 	SizedArray<PatchPoint> ring;
 	GetEdgePoints(edge, ring);
@@ -1295,7 +1318,7 @@ Patch Patch::MakeCap(uint32 edge) const
 	cap.bSmooth = false;
 
 	OrientOutward(cap, GetEdgeOutward(edge));
-	cap.WorldTexture();
+	cap.WorldTexture(to_world);
 
 	return cap;
 }
@@ -1341,7 +1364,7 @@ uint32 Patch::Thicken(float32 distance, Patch out_pieces[scMaxThickenPieces]) co
 	return count + 1;
 }
 
-uint32 Patch::Cap(Patch out_caps[scMaxCapPieces]) const
+uint32 Patch::Cap(Patch out_caps[scMaxCapPieces], const Mat4f& to_world) const
 {
 	uint32 count = 0;
 
@@ -1353,7 +1376,7 @@ uint32 Patch::Cap(Patch out_caps[scMaxCapPieces]) const
 		}
 
 		if (IsEdgeRing(edge)) {
-			Patch cap = MakeCap(edge);
+			Patch cap = MakeCap(edge, to_world);
 
 			if (cap.IsValid()) {
 				out_caps[count++] = std::move(cap);
@@ -1404,7 +1427,7 @@ uint32 Patch::Cap(Patch out_caps[scMaxCapPieces]) const
 				fill = start.Position + end.Position - corner.Position;
 			}
 
-			Patch cap = MakeCornerCap(start, corner, end, fill, subdivisions, outward);
+			Patch cap = MakeCornerCap(start, corner, end, fill, subdivisions, outward, to_world);
 
 			if (cap.IsValid()) {
 				out_caps[count++] = std::move(cap);
@@ -1415,12 +1438,12 @@ uint32 Patch::Cap(Patch out_caps[scMaxCapPieces]) const
 	return count;
 }
 
-uint32 Patch::BuildClosure(Patch out_pieces[scMaxClosurePieces]) const
+uint32 Patch::BuildClosure(Patch out_pieces[scMaxClosurePieces], const Mat4f& to_world) const
 {
 	uint32 count = 0;
 
 	if (Closure == ePatchClosure::Cap) {
-		count = Cap(out_pieces);
+		count = Cap(out_pieces, to_world);
 	}
 	else if (Closure == ePatchClosure::Thicken) {
 		count = Thicken(Thickness, out_pieces);

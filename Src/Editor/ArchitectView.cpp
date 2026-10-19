@@ -62,12 +62,17 @@ constexpr float32 scMinFaceLength = 1e-3f;
 constexpr float32 scFaceMatchDot = 0.999f;
 constexpr float32 scVertexMatchDistance = 2e-3f;
 constexpr float32 scMinBrushExtent = 0.01f;
+constexpr float32 scHullEdgeTolerance = 1e-3f;
 constexpr float32 scGroundFootprintInset = 1e-3f;
 constexpr float32 scGroundFitTolerance = 1e-3f;
 constexpr float32 scDBoundThickness = 1.0f;
 constexpr uint32 scDBoundSideCount = 6;
 constexpr float32 scDecalDepth = 0.5f;
 constexpr float32 scDecalRayReach = 1000.0f;
+constexpr float32 scMinTextureScale = 1.0f / 64.0f;
+constexpr float32 scMinPatchTextureScale = 1e-3f;
+constexpr float32 scMaxTextureScale = 1024.0f;
+constexpr float32 scDegreesPerTurn = 360.0f;
 
 Vec2f Project(const Vec3f& vector, const ViewPlaneAxes& axes)
 {
@@ -222,6 +227,29 @@ void ClipToFootprintEdge(DoublingArray<Vec3f>& points, DoublingArray<Vec3f>& scr
 	std::swap(points, scratch);
 }
 
+bool IsOnBrushEdge(const Brush& brush, const Vec3f point)
+{
+	for (const Brush::Face& face : brush.Faces) {
+		for (uint32 i = 0; i < face.Vertices.Size; i++) {
+			const Vec3f start = face.Vertices[i];
+			const Vec3f edge = face.Vertices[(i + 1) % face.Vertices.Size] - start;
+			const float32 length_squared = edge.Dot(edge);
+
+			float32 along = 0.0f;
+
+			if (length_squared > 0.0f) {
+				along = std::clamp((point - start).Dot(edge) / length_squared, 0.0f, 1.0f);
+			}
+
+			if ((start + edge * along - point).Length() <= scHullEdgeTolerance) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
 struct BrushSource
 {
 	Object* pObject = nullptr;
@@ -339,6 +367,57 @@ bool FindGroundOffset(const Vec3f min, const Vec3f max, const eViewPlane plane, 
 		}
 
 		if (span.Top >= span.Bottom) {
+			spans.Insert(span);
+		}
+	}
+
+	for (ObjectID id : blockout->BlockoutObjects) {
+		Object* object = gObjectManager->GetObject(id);
+		const Patch* patch = blockout->GetPatch(object);
+
+		if (patch == nullptr || !patch->IsValid()) {
+			continue;
+		}
+
+		SizedArray<Vec3f> positions;
+		SizedArray<Vec3f> normals;
+		SizedArray<Vec3f> tangents;
+		SizedArray<float32> handedness;
+		SizedArray<Vec2f> texcoords;
+		SizedArray<uint32> indices;
+
+		patch->GenerateMesh(positions, normals, tangents, handedness, texcoords, indices);
+
+		const Mat4f world = object->GetWorldMatrix();
+
+		for (size_t index = 0; index + 2 < indices.Size; index += 3) {
+			points.Clear();
+
+			for (uint32 corner = 0; corner < 3; corner++) {
+				const Vec3f vertex = positions[indices[index + corner]];
+				const Vec4f point = world * Vec4f(vertex.X, vertex.Y, vertex.Z, 1.0f);
+
+				points.Insert(Vec3f(point.X, point.Y, point.Z));
+			}
+
+			ClipToFootprintEdge(points, scratch, axes.U, min_u, 1.0f);
+			ClipToFootprintEdge(points, scratch, axes.U, max_u, -1.0f);
+			ClipToFootprintEdge(points, scratch, axes.V, min_v, 1.0f);
+			ClipToFootprintEdge(points, scratch, axes.V, max_v, -1.0f);
+
+			if (points.IsEmpty()) {
+				continue;
+			}
+
+			HeightSpan span { FLT_MAX, -FLT_MAX };
+
+			for (const Vec3f point : points) {
+				const float32 height = axes.DepthSign * GetAxis(point, axes.W);
+
+				span.Bottom = std::min<float32>(span.Bottom, height);
+				span.Top = std::max<float32>(span.Top, height);
+			}
+
 			spans.Insert(span);
 		}
 	}
@@ -477,6 +556,8 @@ TopViewState RaptorEditor::BuildTopViewState()
 	view.SnapStep = GetSnapStep();
 	view.AngleSnapDegrees = GetAngleSnapStep();
 	view.CommandSerial = mTopViewCommandSerial;
+	view.Notice = mNotice;
+	view.NoticeSerial = mNoticeSerial;
 
 	const Ref<PerspectiveCamera>& camera = gWorld->Player.pCamera;
 
@@ -1164,6 +1245,7 @@ void RaptorEditor::TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewV
 		SizedArray<Vec3f> points;
 		points.InitCapacity(brush->GetVertices().Size);
 
+		DoublingArray<Vec3f> moved_points;
 		uint32 moved_count = 0;
 
 		for (const Vec3f vertex : brush->GetVertices()) {
@@ -1181,8 +1263,14 @@ void RaptorEditor::TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewV
 				}
 			}
 
-			points.Insert(is_moved ? vertex + local_move : vertex);
-			moved_count += is_moved ? 1 : 0;
+			if (is_moved) {
+				points.Insert(vertex + local_move);
+				moved_points.Insert(vertex + local_move);
+				moved_count++;
+			}
+			else {
+				points.Insert(vertex);
+			}
 		}
 
 		if (moved_count == 0) {
@@ -1194,8 +1282,16 @@ void RaptorEditor::TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewV
 
 		if (!moved.IsValid() || extent.X < scMinBrushExtent || extent.Y < scMinBrushExtent ||
 			extent.Z < scMinBrushExtent) {
-			LogWarning(LC_CORE, "Cannot move those vertices of '{}', the brush would collapse or have too many faces",
-					   object->Name.Get());
+			Warn("Cannot move those vertices of '{}', the brush would collapse or have too many faces",
+				 object->Name.Get());
+			continue;
+		}
+
+		const bool is_concave = std::any_of(moved_points.begin(), moved_points.end(),
+											[&](const Vec3f point) { return !IsOnBrushEdge(moved, point); });
+
+		if (is_concave) {
+			Warn("Cannot move those vertices of '{}', the brush would no longer be convex", object->Name.Get());
 			continue;
 		}
 
@@ -1393,7 +1489,41 @@ static bool IsSamePatch(const Patch& a, const Patch& b)
 	return true;
 }
 
-static bool ApplyPatchCommand(Patch& patch, const PatchCommand& command, bool has_control, uint32 column, uint32 row)
+static bool ApplyTextureMapping(Patch& patch, const PatchTextureSettings& settings, const Mat4f& world)
+{
+	if (std::fabs(settings.Scale) < scMinPatchTextureScale) {
+		return false;
+	}
+
+	switch (settings.Mapping) {
+	case ePatchTextureMapping::Natural:
+		patch.NaturalTexture(settings.Scale);
+		return true;
+	case ePatchTextureMapping::World: {
+		uint32 axis = Patch::scAutoTextureAxis;
+
+		if (settings.Axis != ePatchTextureAxis::Auto) {
+			axis = static_cast<uint32>(settings.Axis) - static_cast<uint32>(ePatchTextureAxis::X);
+		}
+
+		patch.WorldTexture(world, settings.Scale, axis);
+		return true;
+	}
+	case ePatchTextureMapping::Fit:
+		if (std::fabs(settings.Repeats.X) < scMinPatchTextureScale ||
+			std::fabs(settings.Repeats.Y) < scMinPatchTextureScale) {
+			return false;
+		}
+
+		patch.FitTexture(settings.Repeats.X, settings.Repeats.Y);
+		return true;
+	default:
+		return false;
+	}
+}
+
+static bool ApplyPatchCommand(Patch& patch, const PatchCommand& command, const Mat4f& world, bool has_control,
+							  uint32 column, uint32 row)
 {
 	switch (command.Type) {
 	case ePatchCommand::Invert:
@@ -1410,9 +1540,8 @@ static bool ApplyPatchCommand(Patch& patch, const PatchCommand& command, bool ha
 		return patch.RemoveColumns(PickSubPatch(column, has_control, patch.GetSubPatchColumns(), true));
 	case ePatchCommand::RemoveRows:
 		return patch.RemoveRows(PickSubPatch(row, has_control, patch.GetSubPatchRows(), true));
-	case ePatchCommand::NaturalTexture:
-		patch.NaturalTexture();
-		return true;
+	case ePatchCommand::MapTexture:
+		return ApplyTextureMapping(patch, command.Texture, world);
 	case ePatchCommand::SetSubdivisions:
 		patch.SubdivisionsU = std::clamp(command.SubdivisionsU, Patch::scMinSubdivisions, Patch::scMaxSubdivisions);
 		patch.SubdivisionsV = std::clamp(command.SubdivisionsV, Patch::scMinSubdivisions, Patch::scMaxSubdivisions);
@@ -1448,6 +1577,7 @@ void RaptorEditor::TopViewPatchCommand(eViewPlane plane, const PatchCommand& com
 	};
 
 	std::vector<PatchEdit> edits;
+	uint32 patch_count = 0;
 
 	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
 		Object* object = mSelection.GetObject(i);
@@ -1456,6 +1586,8 @@ void RaptorEditor::TopViewPatchCommand(eViewPlane plane, const PatchCommand& com
 		if (patch == nullptr || !CanEditObject(object)) {
 			continue;
 		}
+
+		patch_count++;
 
 		uint32 column = 0;
 		uint32 row = 0;
@@ -1466,13 +1598,17 @@ void RaptorEditor::TopViewPatchCommand(eViewPlane plane, const PatchCommand& com
 
 		if (command.Type == ePatchCommand::SetWeight || command.Type == ePatchCommand::RoundWeights) {
 			if (!ApplyWeightCommand(changed, command, object->GetWorldMatrix(), plane, object->ID, handles)) {
-				LogWarning(LC_CORE, "Select control points of patch '{}' to set their weight", object->Name.Get());
+				Warn("Select control points of patch '{}' to set their weight", object->Name.Get());
 				continue;
 			}
 		}
-		else if (!ApplyPatchCommand(changed, command, has_control, column, row)) {
-			LogWarning(LC_CORE, "Patch '{}' can't be changed that way, it is at its smallest or largest size",
-					   object->Name.Get());
+		else if (!ApplyPatchCommand(changed, command, object->GetWorldMatrix(), has_control, column, row)) {
+			if (command.Type == ePatchCommand::MapTexture) {
+				Warn("The texture scale and repeats can't be 0");
+				break;
+			}
+
+			Warn("Patch '{}' can't be changed that way, it is at its smallest or largest size", object->Name.Get());
 			continue;
 		}
 
@@ -1484,11 +1620,15 @@ void RaptorEditor::TopViewPatchCommand(eViewPlane plane, const PatchCommand& com
 			Patch pieces[Patch::scMaxClosurePieces];
 
 			if (changed.BuildClosure(pieces) == 0) {
-				LogWarning(LC_CORE, "Patch '{}' has no curved open edge to cap", object->Name.Get());
+				Warn("Patch '{}' has no curved open edge to cap", object->Name.Get());
 			}
 		}
 
 		edits.push_back(PatchEdit { object, patch->Clone(), std::move(changed) });
+	}
+
+	if (patch_count == 0 && command.Type == ePatchCommand::MapTexture) {
+		Warn("Select the patches to change the texture of first");
 	}
 
 	for (PatchEdit& edit : edits) {
@@ -1564,7 +1704,7 @@ void RaptorEditor::TopViewCreate(eViewPlane plane, Vec3f min, Vec3f max, bool dr
 
 	if (created == nullptr) {
 		if (IsDataMode()) {
-			LogWarning(LC_CORE, "Pick Probe Volumes, Reflection Probes or Volumes in the Data filter to create one");
+			Warn("Pick Probe Volumes, Reflection Probes or Volumes in the Data filter to create one");
 		}
 
 		return;
@@ -1635,7 +1775,7 @@ void RaptorEditor::TopViewCreateDecal(eViewPlane plane, Vec3f min, Vec3f max, bo
 			max += shift;
 		}
 		else {
-			LogWarning(LC_CORE, "There is no surface under the decal to project onto, it was left at the base");
+			Warn("There is no surface under the decal to project onto, it was left at the base");
 		}
 	}
 
@@ -1740,8 +1880,7 @@ void RaptorEditor::TopViewCreateArch(eViewPlane plane, DynArray<Vec3f> points, b
 	}
 
 	if (pieces.Size < segment_count) {
-		LogWarning(LC_CORE, "Skipped {} arch segments that were too thin to make into brushes",
-				   segment_count - pieces.Size);
+		Warn("Skipped {} arch segments that were too thin to make into brushes", segment_count - pieces.Size);
 	}
 
 	if (pieces.IsEmpty()) {
@@ -1855,7 +1994,7 @@ void RaptorEditor::FitDBoundsToLevel()
 	}
 
 	if (!has_geometry) {
-		LogWarning(LC_CORE, "There is no level geometry to fit the map bounds to");
+		Warn("There is no level geometry to fit the map bounds to");
 		return;
 	}
 
@@ -1947,7 +2086,7 @@ void RaptorEditor::TopViewClip(const Vec3f point_a, const Vec3f point_b, const V
 	}
 
 	if (clips.IsEmpty()) {
-		LogWarning(LC_CORE, "The clip line does not cross any of the selected brushes");
+		Warn("The clip line does not cross any of the selected brushes");
 		return;
 	}
 
@@ -1981,12 +2120,154 @@ void RaptorEditor::TopViewSubtract(bool keep_cutters)
 	}
 
 	if (mSelection.IsEmpty()) {
-		LogWarning(LC_CORE, "Select the brushes to subtract first");
+		Warn("Select the brushes to subtract first");
 		return;
 	}
 
 	if (SubtractSelection(keep_cutters) == 0) {
-		LogWarning(LC_CORE, "The selected brushes do not overlap any other brushes");
+		Warn("The selected brushes do not overlap any other brushes");
+	}
+}
+
+static bool ApplyTextureCommand(Brush& brush, uint32 plane_index, const TextureCommand& command, float32 step,
+								const Vec3f origin)
+{
+	BrushFaceTexture& texture = brush.Planes[plane_index].Texture;
+	const BrushFaceTexture before = texture;
+
+	switch (command.Type) {
+	case eTextureCommand::Shift:
+		texture.Offset = texture.Offset - command.Amount * step / texture.Scale;
+		break;
+	case eTextureCommand::Scale: {
+		const Vec2f scale = texture.Scale * command.Amount;
+
+		if (std::fabs(scale.X) < scMinTextureScale || std::fabs(scale.Y) < scMinTextureScale ||
+			std::fabs(scale.X) > scMaxTextureScale || std::fabs(scale.Y) > scMaxTextureScale) {
+			return false;
+		}
+
+		texture.Offset = texture.Offset * texture.Scale / scale;
+		texture.Scale = scale;
+		break;
+	}
+	case eTextureCommand::Rotate:
+		texture.Rotation = std::fmod(texture.Rotation + command.Amount.X, scDegreesPerTurn);
+
+		if (texture.Rotation < 0.0f) {
+			texture.Rotation += scDegreesPerTurn;
+		}
+		break;
+	case eTextureCommand::Reset:
+		brush.ResetFaceTexture(plane_index);
+		break;
+	case eTextureCommand::WorldAlign:
+		brush.AlignFaceTextureToWorld(plane_index, origin);
+		break;
+	}
+
+	return !(texture.Offset == before.Offset) || !(texture.Scale == before.Scale) ||
+		   texture.Rotation != before.Rotation;
+}
+
+void RaptorEditor::TopViewEditTextures(ObjectID face_object, const Vec3f face_normal, const TextureCommand& command)
+{
+	Blockout* blockout = gWorld->pPrototype;
+
+	if (IsSimulationMode() || blockout == nullptr || !IsToolAvailable(eEditorTool::Face)) {
+		return;
+	}
+
+	struct Edit
+	{
+		Object* pObject = nullptr;
+		Brush::PlaneList Before;
+		Brush::PlaneList After;
+	};
+
+	const bool has_face = !face_object.IsInvalid();
+
+	DoublingArray<Object*> targets;
+
+	if (has_face) {
+		Object* object = FindTopViewObject(face_object);
+
+		if (object != nullptr) {
+			targets.Insert(object);
+		}
+	}
+	else {
+		for (uint32 i = 0; i < mSelection.GetCount(); i++) {
+			targets.Insert(mSelection.GetObject(i));
+		}
+	}
+
+	const float32 step = GetSnapStep();
+
+	DoublingArray<Edit> edits;
+	uint32 brush_count = 0;
+	uint32 limited_count = 0;
+
+	for (Object* object : targets) {
+		const Brush* brush = blockout->GetBrush(object);
+
+		if (brush == nullptr || object->IsDecal() || !CanEditObject(object)) {
+			continue;
+		}
+
+		brush_count++;
+
+		if (command.Type == eTextureCommand::WorldAlign && !object->mRotation.IsCloseTo(Quat::scIdentity)) {
+			Warn("'{}' is rotated, so its textures can't be lined up with the world grid", object->Name.Get());
+			continue;
+		}
+
+		Brush changed = Brush::FromPlanes(brush->Planes);
+
+		uint32 first_plane = 0;
+		uint32 end_plane = changed.Planes.Size;
+
+		if (has_face) {
+			const Vec3f local_direction = face_normal.Rotate(object->mRotation.Conjugate());
+			const int32 plane_index = changed.FindPlane(local_direction);
+
+			if (plane_index == Brush::scNoPlane ||
+				changed.Planes[plane_index].Normal.Dot(local_direction.Normalize()) < scFaceMatchDot) {
+				Warn("The picked face of '{}' is no longer there, pick it again", object->Name.Get());
+				continue;
+			}
+
+			first_plane = static_cast<uint32>(plane_index);
+			end_plane = first_plane + 1;
+		}
+
+		bool is_changed = false;
+
+		for (uint32 plane = first_plane; plane < end_plane; plane++) {
+			if (ApplyTextureCommand(changed, plane, command, step, object->GetPosition())) {
+				is_changed = true;
+			}
+			else if (command.Type == eTextureCommand::Scale) {
+				limited_count++;
+			}
+		}
+
+		if (is_changed) {
+			edits.Insert(Edit { object, brush->Planes, changed.Planes });
+		}
+	}
+
+	if (brush_count == 0) {
+		Warn("Pick a face with the Face tool, or select brushes, to change their textures");
+		return;
+	}
+
+	if (limited_count > 0) {
+		Warn("Some textures are already at their smallest or largest scale");
+	}
+
+	for (const Edit& edit : edits) {
+		EmplaceEditOperation<BrushEditOperation>(edit.pObject, edit.Before, edit.After, static_cast<int32>(edits.Size));
 	}
 }
 
@@ -2172,6 +2453,26 @@ uint32 RaptorEditor::SnapSelectionToGrid()
 
 			for (const Vec3f vertex : source.pBrush->GetVertices()) {
 				const Vec4f point = source.World * Vec4f(vertex.X, vertex.Y, vertex.Z, 1.0f);
+				const Vec3f world_point(point.X, point.Y, point.Z);
+
+				if (has_bounds) {
+					anchor = Vec3f::Min(anchor, world_point);
+				}
+				else {
+					anchor = world_point;
+					has_bounds = true;
+				}
+			}
+		}
+
+		const Patch* patch = gWorld->pPrototype->GetPatch(object);
+
+		if (patch != nullptr) {
+			const Mat4f world = object->GetWorldMatrix();
+
+			for (const PatchPoint& control_point : patch->Points) {
+				const Vec3f local = control_point.Position;
+				const Vec4f point = world * Vec4f(local.X, local.Y, local.Z, 1.0f);
 				const Vec3f world_point(point.X, point.Y, point.Z);
 
 				if (has_bounds) {

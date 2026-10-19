@@ -158,6 +158,7 @@ public:
 							 const DynArray<TopViewVertexHandle>& handles);
 	void TopViewClip(const Vec3f point_a, const Vec3f point_b, const Vec3f view_axis);
 	void TopViewSubtract(bool keep_cutters);
+	void TopViewEditTextures(ObjectID face_object, const Vec3f face_normal, const TextureCommand& command);
 	void TopViewSelectLight(uint32 light_id);
 	void TopViewMoveLight(const Vec3f offset);
 	void TopViewAimLight(const Vec3f direction);
@@ -186,6 +187,8 @@ public:
 	bool ClipObject(Object* object, const Vec3f point_a, const Vec3f point_b, const Vec3f direction);
 
 	uint32 SubtractSelection(bool keep_cutters);
+
+	uint32 HollowSelection();
 
 	/// Vis mode selects everything but data brushes, Data mode only the data brushes the filter lets through
 	bool IsObjectSelectable(const Object* object) const;
@@ -313,6 +316,17 @@ public:
 	void MarkSaved();
 	void MarkModified();
 
+	template <typename... TTypes>
+	void Warn(const char* fmt, TTypes&&... args)
+	{
+		const String message = String::Fmt(fmt, args...);
+
+		LogWarning(LC_CORE, "{}", message.CStr());
+		ShowNotice(message);
+	}
+
+	void ShowNotice(const String& message);
+
 	/////////////////////////////////////
 	// Commands
 	/////////////////////////////////////
@@ -376,6 +390,9 @@ private:
 
 	eEditorView mView = eEditorView::Perspective;
 	uint32 mTopViewCommandSerial = 0;
+
+	String mNotice;
+	uint32 mNoticeSerial = 0;
 
 	eEditorTool mCurrentTool = eEditorTool::Select;
 	bool mbSimulating = false;

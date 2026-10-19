@@ -3,6 +3,7 @@
 #include <Asset/ConfigFile.hpp>
 #include <Map/CompiledMap.hpp>
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <filesystem>
 #include <unordered_map>
@@ -34,6 +35,8 @@ eBrushKind ReadBrushKind(const ConfigEntry& entry)
 
 /// Values stored per plane in a blockout's `uvs` array: offset U and V, scale U and V, then rotation
 constexpr uint32 scValuesPerFaceTexture = 5;
+
+constexpr float32 scMinFaceTextureScale = 1e-4f;
 
 Brush ReadBrushEntry(ConfigEntry& entry)
 {
@@ -98,9 +101,25 @@ Brush ReadBrushEntry(ConfigEntry& entry)
 		const uint32 base = i * scValuesPerFaceTexture;
 		BrushFaceTexture& texture = planes[i].Texture;
 
-		texture.Offset = Vec2f(uvs[base].Get<float32>(), uvs[base + 1].Get<float32>());
-		texture.Scale = Vec2f(uvs[base + 2].Get<float32>(), uvs[base + 3].Get<float32>());
-		texture.Rotation = uvs[base + 4].Get<float32>();
+		const float32 layout[scValuesPerFaceTexture] = {
+			uvs[base].Get<float32>(),	  uvs[base + 1].Get<float32>(), uvs[base + 2].Get<float32>(),
+			uvs[base + 3].Get<float32>(), uvs[base + 4].Get<float32>(),
+		};
+
+		const bool is_finite = std::all_of(std::begin(layout), std::end(layout),
+										   [](float32 value) { return std::isfinite(value); });
+
+		if (!is_finite || std::fabs(layout[2]) < scMinFaceTextureScale ||
+			std::fabs(layout[3]) < scMinFaceTextureScale) {
+			LogWarning(LC_ASSET,
+					   "Blockout '{}' has a broken texture layout on face {}, so it was given the default one",
+					   entry.Name.Get(), i);
+			continue;
+		}
+
+		texture.Offset = Vec2f(layout[0], layout[1]);
+		texture.Scale = Vec2f(layout[2], layout[3]);
+		texture.Rotation = layout[4];
 	}
 
 	return Brush::FromPlanes(planes);

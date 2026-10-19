@@ -8,6 +8,7 @@
 #pragma once
 
 #include <Core/SizedArray.hpp>
+#include <Math/Mat4.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
 #include <Math/Vec3d.hpp>
@@ -82,6 +83,8 @@ public:
 
 	static constexpr float32 scDefaultThickness = 0.25f;
 
+	static constexpr uint32 scAutoTextureAxis = 3;
+
 public:
 	static Patch FromGrid(uint32 width, uint32 height);
 
@@ -114,7 +117,7 @@ public:
 
 	void GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normals, SizedArray<Vec3f>& tangents,
 					  SizedArray<float32>& tangent_handedness, SizedArray<Vec2f>& texcoords,
-					  SizedArray<uint32>& indices) const;
+					  SizedArray<uint32>& indices, const Mat4f& to_world = Mat4f::scIdentity) const;
 
 	void Invert();
 	void Transpose();
@@ -126,7 +129,8 @@ public:
 
 	void NaturalTexture(float32 scale = scDefaultTextureScale);
 	void FitTexture(float32 repeats_u, float32 repeats_v);
-	void WorldTexture(float32 scale = scDefaultTextureScale);
+	void WorldTexture(const Mat4f& to_world = Mat4f::scIdentity, float32 scale = scDefaultTextureScale,
+					  uint32 axis = scAutoTextureAxis);
 
 	void GetEdgePoints(uint32 edge, SizedArray<PatchPoint>& out_points) const;
 	bool IsEdgeClosed(uint32 edge) const;
@@ -134,12 +138,12 @@ public:
 	Vec3d GetEdgeOutward(uint32 edge) const;
 
 	Patch MakeOffset(float32 distance) const;
-	Patch MakeCap(uint32 edge) const;
+	Patch MakeCap(uint32 edge, const Mat4f& to_world = Mat4f::scIdentity) const;
 
 	uint32 Thicken(float32 distance, Patch out_pieces[scMaxThickenPieces]) const;
-	uint32 Cap(Patch out_caps[scMaxCapPieces]) const;
+	uint32 Cap(Patch out_caps[scMaxCapPieces], const Mat4f& to_world = Mat4f::scIdentity) const;
 
-	uint32 BuildClosure(Patch out_pieces[scMaxClosurePieces]) const;
+	uint32 BuildClosure(Patch out_pieces[scMaxClosurePieces], const Mat4f& to_world = Mat4f::scIdentity) const;
 
 public:
 	uint32 Width = 0;

@@ -10,7 +10,11 @@
 #include <wx/bitmap.h>
 #include <wx/button.h>
 #include <wx/choice.h>
+#include <wx/dialog.h>
+#include <wx/radiobut.h>
+#include <wx/settings.h>
 #include <wx/sizer.h>
+#include <wx/spinctrl.h>
 #include <wx/statline.h>
 #include <wx/stattext.h>
 #include <wx/utils.h>
@@ -39,7 +43,8 @@ struct ToolButtonInfo
 
 constexpr ToolButtonInfo scToolButtons[] = {
 	{ "Select", "Select and move brushes (T)", "Textures/editor_new/translate.png" },
-	{ "Face", "Drag a brush edge to move its face (F)", "Textures/editor_new/face.png" },
+	{ "Face", "Drag a brush edge to move its face, click an edge to pick the face for texturing (F)",
+	  "Textures/editor_new/face.png" },
 	{ "Vertex", "Drag the corners of the selected brushes (V)", "Textures/editor_new/vertex.png" },
 	{ "Create", "Drag to create a brush (B)", "Textures/editor_new/brush.png" },
 	{ "Arch", "Drag a box to fill it with an arch made of brushes (A)", "Textures/editor_new/arch.png" },
@@ -87,9 +92,199 @@ constexpr PatchCommandButtonInfo scPatchCommandButtons[] = {
 	  ePatchCommand::RemoveColumns },
 	{ "+Row", "Split a row of the selected patches in two, at the selected control point", ePatchCommand::InsertRows },
 	{ "-Row", "Merge two rows of the selected patches, at the selected control point", ePatchCommand::RemoveRows },
-	{ "Natural", "Lay the texture along the surface of the selected patches at its natural scale",
-	  ePatchCommand::NaturalTexture },
 };
+
+struct TextureButtonInfo
+{
+	const char* pLabel;
+	const char* pToolTip;
+	TextureCommand Command;
+	bool bSeparated;
+};
+
+const TextureButtonInfo scTextureButtons[] = {
+	{ "\u25C0 U",
+	  "Slide the texture back along U by one grid step (Alt+Left)",
+	  { eTextureCommand::Shift, Vec2f(-1.0f, 0.0f) },
+	  false },
+	{ "U \u25B6",
+	  "Slide the texture along U by one grid step (Alt+Right)",
+	  { eTextureCommand::Shift, Vec2f(1.0f, 0.0f) },
+	  false },
+	{ "\u25B2 V",
+	  "Slide the texture back along V by one grid step, up on walls (Alt+Up)",
+	  { eTextureCommand::Shift, Vec2f(0.0f, -1.0f) },
+	  false },
+	{ "V \u25BC",
+	  "Slide the texture along V by one grid step, down on walls (Alt+Down)",
+	  { eTextureCommand::Shift, Vec2f(0.0f, 1.0f) },
+	  false },
+	{ "\u00F72", "Halve the size of the texture (Alt+[)", { eTextureCommand::Scale, Vec2f(0.5f) }, true },
+	{ "\u00D72", "Double the size of the texture (Alt+])", { eTextureCommand::Scale, Vec2f(2.0f) }, false },
+	{ "\u21BA 15\u00B0",
+	  "Turn the texture 15 degrees one way (Alt+,)",
+	  { eTextureCommand::Rotate, Vec2f(-15.0f, 0.0f) },
+	  true },
+	{ "\u21BB 15\u00B0",
+	  "Turn the texture 15 degrees the other way (Alt+.)",
+	  { eTextureCommand::Rotate, Vec2f(15.0f, 0.0f) },
+	  false },
+	{ "Reset", "Put the texture back to how a new box of this size lays it out", { eTextureCommand::Reset }, true },
+	{ "World Align",
+	  "Line the texture up with the world grid, so it carries on across neighbouring brushes",
+	  { eTextureCommand::WorldAlign },
+	  false },
+};
+
+struct PatchMappingInfo
+{
+	const char* pName;
+	const char* pDescription;
+};
+
+constexpr PatchMappingInfo scPatchMappings[] = {
+	{ "Natural", "Follow the surface" },
+	{ "World", "Projected from world space along one axis" },
+	{ "Fit", "Stretched a set number of times across the patch" },
+};
+
+static_assert(std::size(scPatchMappings) == static_cast<size_t>(ePatchTextureMapping::Count));
+
+constexpr const char* scPatchAxisNames[] = { "Auto", "X", "Y", "Z" };
+
+static_assert(std::size(scPatchAxisNames) == static_cast<size_t>(ePatchTextureAxis::Count));
+
+constexpr int scDialogBorder = 10;
+constexpr int scDescriptionIndent = 22;
+constexpr int scDescriptionWrapWidth = 320;
+
+bool ShowPatchTextureDialog(wxWindow* parent, PatchTextureSettings& settings)
+{
+	wxDialog dialog(parent, wxID_ANY, "Patch Texture");
+
+	wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
+
+	sizer->Add(new wxStaticText(&dialog, wxID_ANY, "Lay out the texture on the selected patches:"),
+			   wxSizerFlags().Border(wxALL, scDialogBorder));
+
+	wxRadioButton* mapping_buttons[static_cast<uint32>(ePatchTextureMapping::Count)] = {};
+
+	for (uint32 i = 0; i < static_cast<uint32>(ePatchTextureMapping::Count); i++) {
+		long style = 0;
+
+		if (i == 0) {
+			style = wxRB_GROUP;
+		}
+
+		mapping_buttons[i] = new wxRadioButton(&dialog, wxID_ANY, scPatchMappings[i].pName, wxDefaultPosition,
+											   wxDefaultSize, style);
+		mapping_buttons[i]->SetValue(i == static_cast<uint32>(settings.Mapping));
+
+		wxStaticText* description = new wxStaticText(&dialog, wxID_ANY, scPatchMappings[i].pDescription);
+		description->Wrap(scDescriptionWrapWidth);
+		description->SetForegroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_GRAYTEXT));
+
+		sizer->Add(mapping_buttons[i], wxSizerFlags().Border(wxLEFT | wxRIGHT, scDialogBorder));
+		wxBoxSizer* description_row = new wxBoxSizer(wxHORIZONTAL);
+		description_row->AddSpacer(scDialogBorder + scDescriptionIndent);
+		description_row->Add(description);
+		description_row->AddSpacer(scDialogBorder);
+
+		sizer->Add(description_row);
+		sizer->AddSpacer(6);
+	}
+
+	wxFlexGridSizer* options = new wxFlexGridSizer(2, 6, 10);
+
+	wxSpinCtrlDouble* scale_field = new wxSpinCtrlDouble(&dialog, wxID_ANY, "", wxDefaultPosition, wxDefaultSize,
+														 wxSP_ARROW_KEYS, 0.01, 1000.0, settings.Scale, 0.25);
+	scale_field->SetDigits(2);
+	scale_field->SetToolTip("Units of the surface per repeat of the texture. Brushes use 2");
+
+	wxChoice* axis_choice = new wxChoice(&dialog, wxID_ANY);
+
+	for (const char* name : scPatchAxisNames) {
+		axis_choice->Append(name);
+	}
+
+	axis_choice->SetSelection(static_cast<int32>(settings.Axis));
+	axis_choice->SetToolTip("The world axis the texture is projected along. Auto picks the one the patch faces most");
+
+	wxSpinCtrlDouble* repeats_u_field = new wxSpinCtrlDouble(&dialog, wxID_ANY, "", wxDefaultPosition, wxDefaultSize,
+															 wxSP_ARROW_KEYS, 0.01, 1000.0, settings.Repeats.X, 0.5);
+	repeats_u_field->SetDigits(2);
+	repeats_u_field->SetToolTip("How many times the texture repeats across the patch's columns");
+
+	wxSpinCtrlDouble* repeats_v_field = new wxSpinCtrlDouble(&dialog, wxID_ANY, "", wxDefaultPosition, wxDefaultSize,
+															 wxSP_ARROW_KEYS, 0.01, 1000.0, settings.Repeats.Y, 0.5);
+	repeats_v_field->SetDigits(2);
+	repeats_v_field->SetToolTip("How many times the texture repeats across the patch's rows");
+
+	options->Add(new wxStaticText(&dialog, wxID_ANY, "Scale"), wxSizerFlags().CenterVertical());
+	options->Add(scale_field);
+	options->Add(new wxStaticText(&dialog, wxID_ANY, "Axis"), wxSizerFlags().CenterVertical());
+	options->Add(axis_choice);
+	options->Add(new wxStaticText(&dialog, wxID_ANY, "Repeats U"), wxSizerFlags().CenterVertical());
+	options->Add(repeats_u_field);
+	options->Add(new wxStaticText(&dialog, wxID_ANY, "Repeats V"), wxSizerFlags().CenterVertical());
+	options->Add(repeats_v_field);
+
+	sizer->Add(options, wxSizerFlags().Border(wxALL, scDialogBorder));
+
+	const auto get_mapping = [&]()
+	{
+		for (uint32 i = 0; i < static_cast<uint32>(ePatchTextureMapping::Count); i++) {
+			if (mapping_buttons[i]->GetValue()) {
+				return static_cast<ePatchTextureMapping>(i);
+			}
+		}
+
+		return ePatchTextureMapping::Natural;
+	};
+
+	const auto update_fields = [&]()
+	{
+		const ePatchTextureMapping mapping = get_mapping();
+
+		scale_field->Enable(mapping != ePatchTextureMapping::Fit);
+		axis_choice->Enable(mapping == ePatchTextureMapping::World);
+		repeats_u_field->Enable(mapping == ePatchTextureMapping::Fit);
+		repeats_v_field->Enable(mapping == ePatchTextureMapping::Fit);
+	};
+
+	for (wxRadioButton* button : mapping_buttons) {
+		button->Bind(wxEVT_RADIOBUTTON, [&](wxCommandEvent&) { update_fields(); });
+	}
+
+	update_fields();
+
+	wxStdDialogButtonSizer* buttons = new wxStdDialogButtonSizer();
+	wxButton* finish_button = new wxButton(&dialog, wxID_OK, "Finish");
+	finish_button->SetDefault();
+	buttons->AddButton(finish_button);
+	buttons->AddButton(new wxButton(&dialog, wxID_CANCEL, "Cancel"));
+	buttons->Realize();
+
+	sizer->Add(buttons, wxSizerFlags().Expand().Border(wxALL, scDialogBorder));
+
+	dialog.SetSizerAndFit(sizer);
+	dialog.CentreOnParent();
+
+	if (dialog.ShowModal() != wxID_OK) {
+		return false;
+	}
+
+	settings.Mapping = get_mapping();
+	settings.Scale = static_cast<float32>(scale_field->GetValue());
+	settings.Repeats = Vec2f(static_cast<float32>(repeats_u_field->GetValue()),
+							 static_cast<float32>(repeats_v_field->GetValue()));
+
+	if (axis_choice->GetSelection() != wxNOT_FOUND) {
+		settings.Axis = static_cast<ePatchTextureAxis>(axis_choice->GetSelection());
+	}
+
+	return true;
+}
 
 constexpr const char* scDataFilterNames[] = {
 	"All", "Probe Volumes", "Reflection Probes", "Spawn Points", "Volumes", "Lights", "nvbrush", "dbound",
@@ -268,8 +463,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 
 		mpToolGroup->Add(mpSubtractButton, wxSizerFlags().CenterVertical().Border(wxLEFT, scSeparatorBorder));
 
-		mpSnapButton = new wxButton(parent, wxID_ANY, "Snap to Grid", wxDefaultPosition, wxDefaultSize,
-									wxBU_EXACTFIT);
+		mpSnapButton = new wxButton(parent, wxID_ANY, "Snap to Grid", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
 		mpSnapButton->SetToolTip("Move the selected brushes so their corners line up with the grid again, even when "
 								 "snapping is off (Ctrl+B)");
 		mpSnapButton->Enable(false);
@@ -286,6 +480,23 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 						   });
 
 		mpToolGroup->Add(mpSnapButton, wxSizerFlags().CenterVertical().Border(wxLEFT, scSeparatorBorder));
+
+		mpHollowButton = new wxButton(parent, wxID_ANY, "Hollow", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+		mpHollowButton->SetToolTip("Turn the selected brushes into rooms, with walls as thick as the grid step");
+		mpHollowButton->Enable(false);
+		mpHollowButton->Bind(wxEVT_BUTTON,
+							 [this](wxCommandEvent&)
+							 {
+								 thread::PostToGame(
+									 []
+									 {
+										 gEditor->HollowSelection();
+										 gEditor->NoteTopViewCommand();
+									 });
+								 mpCanvas->SetFocus();
+							 });
+
+		mpToolGroup->Add(mpHollowButton, wxSizerFlags().CenterVertical().Border(wxLEFT, scItemBorder));
 	}
 
 	for (uint32 i = 0; i < scViewPlaneCount; i++) {
@@ -386,8 +597,8 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 		mpArchRow->Add(arc_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
 		mpArchRow->Add(start_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
 
-		wxButton* build_button =
-			new wxButton(parent, wxID_ANY, "Build", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+		wxButton* build_button = new wxButton(parent, wxID_ANY, "Build", wxDefaultPosition, wxDefaultSize,
+											  wxBU_EXACTFIT);
 		build_button->SetToolTip("Build the pending arch (Enter)");
 		build_button->Bind(wxEVT_BUTTON,
 						   [this](wxCommandEvent&)
@@ -500,8 +711,9 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 		thicken_button->SetValue(mCurve.Closure == ePatchClosure::Thicken);
 
 		OutlineToggleButton* cap_button = new OutlineToggleButton(parent, wxBitmap(), "Cap");
-		cap_button->SetToolTip("Close the open ends of the selected patches: cylinder ends become discs, bevel and "
-							   "endcap ends are filled out to their square corners. It follows the patch as it is edited");
+		cap_button->SetToolTip(
+			"Close the open ends of the selected patches: cylinder ends become discs, bevel and "
+			"endcap ends are filled out to their square corners. It follows the patch as it is edited");
 		cap_button->SetValue(mCurve.Closure == ePatchClosure::Cap);
 
 		const auto set_closure = [this](ePatchClosure closure, bool enabled)
@@ -572,7 +784,61 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 			mpCurveRow->Add(button, wxSizerFlags().CenterVertical().Border(wxLEFT, 6));
 		}
 
+		wxButton* texture_button = new wxButton(parent, wxID_ANY, "Texture...", wxDefaultPosition, wxDefaultSize,
+												wxBU_EXACTFIT);
+		texture_button->SetToolTip("Choose how the texture is laid out on the selected patches: natural, world "
+								   "projected or fitted");
+		texture_button->Bind(wxEVT_BUTTON,
+							 [this](wxCommandEvent&)
+							 {
+								 PatchTextureSettings settings = mCurve.Texture;
+
+								 if (ShowPatchTextureDialog(mpParent, settings)) {
+									 mCurve.Texture = settings;
+									 mpCanvas->SetCurveSettings(mCurve);
+									 mpCanvas->RunPatchCommand(ePatchCommand::MapTexture);
+								 }
+
+								 mpCanvas->SetFocus();
+							 });
+
+		mpCurveRow->Add(texture_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 6));
+
 		mpToolRow->Add(mpCurveRow, wxSizerFlags().Expand().Border(wxTOP | wxBOTTOM, scItemBorder));
+
+		mpFaceRow = new wxBoxSizer(wxHORIZONTAL);
+		mpFaceRow->Add(new wxStaticLine(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL),
+					   wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT, scSeparatorBorder));
+
+		wxStaticText* texture_label = new wxStaticText(parent, wxID_ANY, "Texture");
+		texture_label->SetToolTip("Changes the face picked with the Face tool, or every face of the selected brushes "
+								  "when no face is picked");
+		mpFaceRow->Add(texture_label, wxSizerFlags().CenterVertical().Border(wxLEFT, 4));
+
+		for (const TextureButtonInfo& info : scTextureButtons) {
+			wxButton* button = new wxButton(parent, wxID_ANY, wxString::FromUTF8(info.pLabel), wxDefaultPosition,
+											wxDefaultSize, wxBU_EXACTFIT);
+			button->SetToolTip(info.pToolTip);
+
+			const TextureCommand command = info.Command;
+
+			button->Bind(wxEVT_BUTTON,
+						 [this, command](wxCommandEvent&)
+						 {
+							 mpCanvas->RunTextureCommand(command);
+							 mpCanvas->SetFocus();
+						 });
+
+			int border = 2;
+
+			if (info.bSeparated) {
+				border = 10;
+			}
+
+			mpFaceRow->Add(button, wxSizerFlags().CenterVertical().Border(wxLEFT, border));
+		}
+
+		mpToolRow->Add(mpFaceRow, wxSizerFlags().Expand().Border(wxTOP | wxBOTTOM, scItemBorder));
 
 		mpCurveSubdivisionsUField = subdivisions_u_field;
 		mpCurveSubdivisionsVField = subdivisions_v_field;
@@ -682,6 +948,7 @@ void EditorToolbar::UpdateVisibility()
 
 	mpToolRow->Show(mpArchRow, mbShows2D && mTool == eEditorTool::Arch, true);
 	mpToolRow->Show(mpCurveRow, mbShows2D && mTool == eEditorTool::Curve, true);
+	mpToolRow->Show(mpFaceRow, mbShows2D && mTool == eEditorTool::Face, true);
 
 	mpParent->Layout();
 }
@@ -750,6 +1017,7 @@ void EditorToolbar::ApplyState(const TopViewState& state)
 	if (has_selection != mbShownHasSelection) {
 		mbShownHasSelection = has_selection;
 		mpSnapButton->Enable(has_selection);
+		mpHollowButton->Enable(has_selection);
 	}
 
 	if (state.HiddenCount == mShownHiddenCount) {

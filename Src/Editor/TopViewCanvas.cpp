@@ -30,6 +30,8 @@ constexpr double scDefaultScale = 24.0;
 constexpr double scFitMargin = 1.25;
 
 constexpr double scPickTolerancePixels = 5.0;
+constexpr std::chrono::seconds scNoticeDuration(6);
+constexpr float32 scTextureRotateDegrees = 15.0f;
 constexpr double scDragThresholdPixels = 4.0;
 constexpr double scClickCycleRadiusPixels = 4.0;
 constexpr double scMinCreateSize = 0.05;
@@ -85,7 +87,8 @@ constexpr double scClipHandleRadius = 3.5;
 
 constexpr const char* scToolHints[] = {
 	"Drag to move, Shift adds, " FX_TOP_VIEW_FREE_KEY " ignores snap, Z frames selection",
-	"Drag an edge to move its face, " FX_TOP_VIEW_FREE_KEY " ignores snap",
+	"Drag an edge to move its face, click an edge to pick that face for texturing, " FX_TOP_VIEW_FREE_KEY
+	" ignores snap",
 	"Drag corners, Shift adds, " FX_TOP_VIEW_FREE_KEY " ignores snap",
 	"Drag to create a brush, " FX_TOP_VIEW_FREE_KEY " ignores snap",
 	"Drag a box to lay out an arch, then shape it with the handles, " FX_TOP_VIEW_FREE_KEY " ignores snap",
@@ -98,6 +101,9 @@ constexpr const char* scToolHints[] = {
 };
 
 static_assert(std::size(scToolHints) == static_cast<size_t>(eEditorTool::Count));
+
+constexpr const char* scPickedFaceHint = "Face picked: the texture buttons change it, Alt+arrows shift, Alt+[ ] "
+										 "scale, Alt+, . rotate, Esc unpicks";
 
 constexpr const char* scArchPendingHint = "Drag the handles to reshape, [ ] sides, arrows nudge, Enter or double-click "
 										  "builds, Esc cancels, " FX_TOP_VIEW_FREE_KEY " ignores snap";
@@ -629,6 +635,12 @@ void TopViewCanvas::ApplyState(const TopViewState& state)
 	mState = state;
 	mAvailableTools = state.AvailableTools;
 
+	if (state.NoticeSerial != mNoticeSerial) {
+		mNoticeSerial = state.NoticeSerial;
+		mNotice = wxString::FromUTF8(state.Notice.CStr());
+		mNoticeTime = std::chrono::steady_clock::now();
+	}
+
 	if (mbLocalSelection) {
 		ApplyLocalSelection();
 	}
@@ -656,6 +668,15 @@ void TopViewCanvas::ApplyState(const TopViewState& state)
 		}
 
 		mSelectedVertices = std::move(kept);
+	}
+
+	if (mbHasPickedFace) {
+		const TopViewBrush* brush = FindBrush(mPickedFaceBrushId);
+
+		if (brush == nullptr || !brush->bSelected ||
+			FindMatchingFace(Projection(*brush), ToVec2d(mPickedFaceNormal)) == nullptr) {
+			mbHasPickedFace = false;
+		}
 	}
 
 	SyncCurveFromSelection();
@@ -736,6 +757,10 @@ void TopViewCanvas::ApplyTool(eEditorTool tool)
 		mArchHover = eArchHandle::None;
 	}
 
+	if (tool != eEditorTool::Face) {
+		mbHasPickedFace = false;
+	}
+
 	if (mpOnToolChanged) {
 		mpOnToolChanged(tool);
 	}
@@ -776,6 +801,7 @@ void TopViewCanvas::SetPlane(eViewPlane plane)
 		mbPreviewHeld = false;
 		ClearPreview();
 		mbHoverFace = false;
+		mbHasPickedFace = false;
 		mbHoverVertex = false;
 		mSelectedVertices.Clear();
 		mbArchPending = false;
@@ -854,18 +880,35 @@ void TopViewCanvas::RunPatchCommand(ePatchCommand type)
 	command.Closure = mCurve.Closure;
 	command.Thickness = mCurve.Thickness;
 	command.Weight = mCurve.Weight;
+	command.Texture = mCurve.Texture;
 
 	DynArray<TopViewVertexHandle> handles = mSelectedVertices.Clone();
 	const eViewPlane plane = mPlane;
 
 	if (type != ePatchCommand::SetSubdivisions && type != ePatchCommand::SetSmooth &&
-		type != ePatchCommand::NaturalTexture && type != ePatchCommand::SetClosure &&
-		type != ePatchCommand::SetWeight && type != ePatchCommand::RoundWeights) {
+		type != ePatchCommand::MapTexture && type != ePatchCommand::SetClosure && type != ePatchCommand::SetWeight &&
+		type != ePatchCommand::RoundWeights) {
 		mSelectedVertices.Clear();
 	}
 
 	SendCommand([plane, command, handles = std::move(handles)]
 				{ gEditor->TopViewPatchCommand(plane, command, handles); });
+
+	Refresh();
+}
+
+void TopViewCanvas::RunTextureCommand(const TextureCommand& command)
+{
+	ObjectID face_object = ObjectID::scNull;
+	Vec3f face_normal = Vec3f::sZero;
+
+	if (mbHasPickedFace) {
+		face_object = mPickedFaceBrushId;
+		face_normal = ToWorldVector(ToVec2d(mPickedFaceNormal), 0.0);
+	}
+
+	SendCommand([face_object, face_normal, command]
+				{ gEditor->TopViewEditTextures(face_object, face_normal, command); });
 
 	Refresh();
 }
@@ -1547,6 +1590,23 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 			gc.SetBrush(*wxTRANSPARENT_BRUSH);
 			gc.SetPen(wxPen(ToWxColour(theme.Tool.Vertex), 2));
 			gc.DrawEllipse(screen.X - radius, screen.Y - radius, radius * 2.0, radius * 2.0);
+		}
+	}
+
+	if (mTool == eEditorTool::Face && mbHasPickedFace && mPreview.Kind == eDrag::None) {
+		const TopViewBrush* brush = FindBrush(mPickedFaceBrushId);
+		const TopViewFace* face = nullptr;
+
+		if (brush != nullptr) {
+			face = FindMatchingFace(Projection(*brush), ToVec2d(mPickedFaceNormal));
+		}
+
+		if (face != nullptr) {
+			const Vec2d a = ToScreenCoords(ToVec2d(face->A));
+			const Vec2d b = ToScreenCoords(ToVec2d(face->B));
+
+			gc.SetPen(wxPen(ToWxColour(theme.Tool.Face), 5));
+			gc.StrokeLine(a.X, a.Y, b.X, b.Y);
 		}
 	}
 
@@ -2686,6 +2746,8 @@ void TopViewCanvas::BeginFace()
 	mbHasPressedBrush = false;
 
 	if (brush_index < 0) {
+		mbHasPickedFace = false;
+
 		const DynArray<int32> hits = PickAt(mPress);
 
 		if (hits.IsEmpty()) {
@@ -3397,6 +3459,12 @@ void TopViewCanvas::FinishMove()
 
 void TopViewCanvas::FinishFace()
 {
+	if (!mbDragMoved) {
+		mbHasPickedFace = true;
+		mPickedFaceBrushId = mGrabbedBrushId;
+		mPickedFaceNormal = mGrabbedFace.Normal;
+	}
+
 	if (mPreview.Kind != eDrag::Face || std::fabs(mPreview.Shift) < 1e-6) {
 		ClearPreview();
 		return;
@@ -4211,6 +4279,52 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 		return;
 	}
 
+	if (event.AltDown() && !command && mTool == eEditorTool::Face && mbHasPickedFace && mDrag == eDrag::None) {
+		TextureCommand texture_command;
+		bool is_texture_key = true;
+
+		if (key == WXK_LEFT || key == WXK_RIGHT || key == WXK_UP || key == WXK_DOWN) {
+			texture_command.Type = eTextureCommand::Shift;
+
+			if (key == WXK_LEFT) {
+				texture_command.Amount = Vec2f(-1.0f, 0.0f);
+			}
+			else if (key == WXK_RIGHT) {
+				texture_command.Amount = Vec2f(1.0f, 0.0f);
+			}
+			else if (key == WXK_UP) {
+				texture_command.Amount = Vec2f(0.0f, -1.0f);
+			}
+			else {
+				texture_command.Amount = Vec2f(0.0f, 1.0f);
+			}
+		}
+		else if (key == '[' || key == ']') {
+			texture_command.Type = eTextureCommand::Scale;
+			texture_command.Amount = Vec2f(2.0f);
+
+			if (key == '[') {
+				texture_command.Amount = Vec2f(0.5f);
+			}
+		}
+		else if (key == ',' || key == '.') {
+			texture_command.Type = eTextureCommand::Rotate;
+			texture_command.Amount = Vec2f(scTextureRotateDegrees, 0.0f);
+
+			if (key == ',') {
+				texture_command.Amount = Vec2f(-scTextureRotateDegrees, 0.0f);
+			}
+		}
+		else {
+			is_texture_key = false;
+		}
+
+		if (is_texture_key) {
+			RunTextureCommand(texture_command);
+			return;
+		}
+	}
+
 	const double step = (mState.bSnapEnabled && mState.SnapStep > 0.0f) ? mState.SnapStep : 0.25;
 
 	if (!command && mDrag == eDrag::None && (key == WXK_LEFT || key == WXK_RIGHT || key == WXK_UP || key == WXK_DOWN)) {
@@ -4414,6 +4528,11 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 			ClearPreview();
 			CancelDrag();
 		}
+		else if (mbHasPickedFace) {
+			mbHasPickedFace = false;
+			UpdateStatus();
+			Refresh();
+		}
 		else if (HasPendingArch()) {
 			DiscardArch();
 		}
@@ -4542,6 +4661,10 @@ void TopViewCanvas::UpdateStatus()
 
 	wxString text = wxString::Format("%s   |   ", axes.pName);
 
+	if (!mNotice.IsEmpty() && std::chrono::steady_clock::now() - mNoticeTime < scNoticeDuration) {
+		text += mNotice + "   |   ";
+	}
+
 	if (mState.bSimulating) {
 		text += "Simulating, editing is paused   |   ";
 	}
@@ -4555,6 +4678,10 @@ void TopViewCanvas::UpdateStatus()
 
 	if (mTool == eEditorTool::Arch && HasPendingArch()) {
 		hint = scArchPendingHint;
+	}
+
+	if (mTool == eEditorTool::Face && mbHasPickedFace) {
+		hint = scPickedFaceHint;
 	}
 
 	text += wxString::Format("%d brushes, %u selected   |   Snap %s %.2f   |   Zoom %.0f%%   |   %s",

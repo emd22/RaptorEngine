@@ -242,6 +242,9 @@ struct TopViewState
 	/// How many brushes are hidden from the 2D views
 	uint32 HiddenCount = 0;
 
+	String Notice;
+	uint32 NoticeSerial = 0;
+
 	DynArray<TopViewBrush> Brushes;
 	DynArray<TopViewMarker> Markers;
 
@@ -274,6 +277,9 @@ struct TopViewState
 
 		CommandSerial = other.CommandSerial;
 		HiddenCount = other.HiddenCount;
+
+		Notice = other.Notice;
+		NoticeSerial = other.NoticeSerial;
 
 		Brushes = other.Brushes.Clone();
 		Markers = other.Markers.Clone();

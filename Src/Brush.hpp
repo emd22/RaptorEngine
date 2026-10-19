@@ -125,6 +125,7 @@ public:
 	 * @brief Lines every face's texture up with the world grid, for a brush on an unrotated object at `origin`.
 	 */
 	void AlignTexturesToWorld(const Vec3f origin);
+	void AlignFaceTextureToWorld(uint32 plane_index, const Vec3f origin);
 
 	/**
 	 * @brief Returns true if every face has the default layout from ResetFaceTexture()
