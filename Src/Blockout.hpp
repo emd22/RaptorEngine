@@ -178,6 +178,14 @@ public:
 
 	bool IsDynamic(const Object* object) const;
 
+	void ShowFaceMaterialsSelected(Object* object, bool is_selected);
+
+	MaterialID GetFaceMaterial(const String& name) const;
+
+	bool IsFaceNode(const Object* object) const;
+
+	const String& GetMaterialName(MaterialLibraryID id) const { return mMaterials.GetName(id); }
+
 	bool HasBrush(const Object* object);
 
 	bool ContainsPoint(Object* object, const Vec3f point);
@@ -513,6 +521,11 @@ private:
 					 const std::vector<DecalReceiver>& receivers) const;
 	void RebuildDecalMesh(Object* decal, const Brush& volume);
 
+	void CreateCompiledShadows(const CompiledMap& map);
+
+	void RebuildFaceMeshes(Object* object, const Brush& brush);
+	void DestroyFaceNodes(Object* object);
+
 public:
 	FreeArray<ObjectID> BlockoutObjects;
 	World* pWorld = nullptr;
@@ -552,6 +565,8 @@ private:
 	std::vector<CompiledDecalReceiver> mCompiledDecalReceivers;
 	HashMap<uint32, uint64> mDecalHashes;
 	HashMap<uint32, uint64> mPatchMeshFrames;
+
+	HashMap<uint32, String> mFaceNodeMaterials;
 
 	DynArray<Subview> mSubviews;
 	DynArray<SubviewInstance> mSubviewInstances;

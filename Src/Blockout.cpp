@@ -572,6 +572,8 @@ void Blockout::RemoveSingleObjectFromWorld(Object* object)
 		return;
 	}
 
+	DestroyFaceNodes(object);
+
 	gWorld->Detach(object->ID);
 
 	if (!object->PhysicsID.IsNull()) {
@@ -594,6 +596,7 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 
 	BlockoutObjects.Clear();
 	mBrushes.Clear();
+	mFaceNodeMaterials.Clear();
 	mPatches.Clear();
 	mPatchMeshFrames.Clear();
 	mDecalHashes.Clear();
@@ -666,6 +669,60 @@ bool Blockout::LoadCompiledMap(const String& prototype_path, const ConfigFile& i
 	return true;
 }
 
+void Blockout::CreateCompiledShadows(const CompiledMap& map)
+{
+	for (size_t surface_index = 0; surface_index < map.ShadowSurfaces.Size; surface_index++) {
+		const CompiledMapShadowSurface& surface = map.ShadowSurfaces[surface_index];
+
+		Object* object = gObjectManager->NewObject(String::Fmt("WORLD_SHADOW_{}", surface_index), GetDefaultMaterial(),
+												   eObjectTag::LockTransform);
+
+		if (object == nullptr) {
+			continue;
+		}
+
+		const uint32 point_count = surface.GetPointCount();
+
+		Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
+
+		mesh->Positions.InitCapacity(point_count);
+		mesh->Normals.InitCapacity(point_count);
+		mesh->Tangents.InitCapacity(point_count);
+		mesh->TangentHandedness.InitCapacity(point_count);
+		mesh->Texcoords.InitCapacity(point_count);
+		mesh->Indices.InitCapacity(surface.Indices.Size);
+
+		for (uint32 point = 0; point < point_count; point++) {
+			mesh->Positions.Insert(
+				Vec3f(surface.Points[point * 3], surface.Points[point * 3 + 1], surface.Points[point * 3 + 2]));
+			mesh->Normals.Insert(Vec3f::sUp);
+			mesh->Tangents.Insert(Vec3f::sRight);
+			mesh->TangentHandedness.Insert(1.0f);
+			mesh->Texcoords.Insert(Vec2f(0.0f, 0.0f));
+		}
+
+		for (const uint32 index : surface.Indices) {
+			mesh->Indices.Insert(index);
+		}
+
+		object->pMesh = mesh->AsDefaultMesh();
+		object->Bounds = surface.Bounds;
+
+		object->SetShadowCaster(true);
+		object->SetShadowOnly(true);
+		object->SetLightmapped(mbHasBakedSun);
+
+		gWorldGrid->UpdateObject(object);
+
+		AssetTicket ticket(static_cast<void*>(object));
+		ticket.MarkAndSignalLoaded();
+
+		pWorld->Attach(ticket);
+
+		mCompiledObjects.push_back(object->ID);
+	}
+}
+
 void Blockout::CreateCompiledWorld(const CompiledMap& map)
 {
 	const CompiledMapLightmap& lightmap = map.Lightmap;
@@ -728,7 +785,10 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 			mesh->Indices.Insert(index);
 		}
 
-		object->SetShadowCaster(true);
+		const Material* surface_material = gMaterialManager->GetMaterial(material_id);
+		const bool is_transparent = surface_material != nullptr && surface_material->IsTransparent();
+
+		object->SetShadowCaster(is_transparent);
 		object->pMesh = mesh->AsDefaultMesh();
 
 		if (mbHasBakedSun && surface.HasLightmapTexcoords()) {
@@ -748,9 +808,7 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 
 		object->Bounds = surface.Bounds;
 
-		const Material* surface_material = gMaterialManager->GetMaterial(material_id);
-
-		if (surface_material == nullptr || !surface_material->IsTransparent()) {
+		if (!is_transparent) {
 			CompiledDecalReceiver& receiver = mCompiledDecalReceivers.emplace_back();
 			receiver.Bounds = surface.Bounds;
 			receiver.Positions.InitCapacity(surface.Vertices.Size);
@@ -776,6 +834,8 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 
 		mCompiledObjects.push_back(object->ID);
 	}
+
+	CreateCompiledShadows(map);
 
 	for (size_t hull_index = 0; hull_index < map.Hulls.Size; hull_index++) {
 		const CompiledMapHull& hull = map.Hulls[hull_index];
@@ -1397,6 +1457,162 @@ void Blockout::RaycastDecalSurfaces(const Vec3f origin, const Vec3f direction, f
 	}
 }
 
+MaterialID Blockout::GetFaceMaterial(const String& name) const
+{
+	const MaterialLibraryID id = mMaterials.FindIDByName(name.CStr());
+
+	if (!id.IsValid()) {
+		return GetDefaultMaterial();
+	}
+
+	return GetMaterialForID(id);
+}
+
+bool Blockout::IsFaceNode(const Object* object) const { return mFaceNodeMaterials.Contains(object->ID.GetID()); }
+
+void Blockout::DestroyFaceNodes(Object* object)
+{
+	if (object->AttachedNodes.IsEmpty()) {
+		return;
+	}
+
+	for (ObjectID node_id : object->AttachedNodes) {
+		mFaceNodeMaterials.Remove(node_id.GetID());
+		gWorld->Detach(node_id);
+		gObjectManager->DestroyObject(node_id);
+	}
+
+	object->AttachedNodes.Clear();
+}
+
+void Blockout::ShowFaceMaterialsSelected(Object* object, bool is_selected)
+{
+	if (object == nullptr) {
+		return;
+	}
+
+	for (ObjectID node_id : object->AttachedNodes) {
+		Object* node = gObjectManager->GetObject(node_id);
+		const String* name = mFaceNodeMaterials.Find(node_id.GetID());
+
+		if (node == nullptr || name == nullptr) {
+			continue;
+		}
+
+		if (is_selected) {
+			node->SetMaterial(SelectionMaterialID);
+		}
+		else {
+			node->SetMaterial(GetFaceMaterial(*name));
+		}
+	}
+}
+
+static Ref<PrimitiveMesh> MakeFaceMesh(const Brush& brush, const String* material, BBox& out_bounds)
+{
+	MeshGen::GeneratedMesh mesh;
+	brush.GenerateMesh(mesh.Positions, mesh.Normals, mesh.Tangents, mesh.TangentHandedness, mesh.Texcoords,
+					   mesh.Indices, material);
+
+	if (mesh.Positions.Size == 0) {
+		return nullptr;
+	}
+
+	out_bounds = BBox(mesh.Positions[0], mesh.Positions[0]);
+
+	for (const Vec3f position : mesh.Positions) {
+		out_bounds = BBox(Vec3f::Min(out_bounds.Min, position), Vec3f::Max(out_bounds.Max, position));
+	}
+
+	return mesh.AsDefaultMesh();
+}
+
+void Blockout::RebuildFaceMeshes(Object* object, const Brush& brush)
+{
+	StackArray<String, Brush::scMaxPlanes> materials;
+	brush.GetFaceMaterials(materials);
+
+	BBox bounds;
+
+	if (materials.Size == 0) {
+		DestroyFaceNodes(object);
+		object->pMesh = MakeFaceMesh(brush, nullptr, bounds);
+		return;
+	}
+
+	const String brush_faces {};
+	object->pMesh = MakeFaceMesh(brush, &brush_faces, bounds);
+
+	StackArray<ObjectID, Brush::scMaxPlanes> nodes;
+	nodes.Size = materials.Size;
+
+	for (ObjectID& node_id : nodes) {
+		node_id = ObjectID::scNull;
+	}
+
+	StackArray<ObjectID, Brush::scMaxPlanes> unused_nodes;
+
+	for (ObjectID node_id : object->AttachedNodes) {
+		const String* name = mFaceNodeMaterials.Find(node_id.GetID());
+		bool is_used = false;
+
+		for (uint32 i = 0; name != nullptr && i < materials.Size; i++) {
+			if (nodes[i].IsNull() && materials[i] == *name) {
+				nodes[i] = node_id;
+				is_used = true;
+				break;
+			}
+		}
+
+		if (!is_used && unused_nodes.Size < unused_nodes.Capacity) {
+			unused_nodes.Insert(node_id);
+		}
+	}
+
+	for (ObjectID node_id : unused_nodes) {
+		mFaceNodeMaterials.Remove(node_id.GetID());
+		gWorld->Detach(node_id);
+		gObjectManager->DestroyObject(node_id);
+	}
+
+	if (!object->AttachedNodes.IsInited()) {
+		object->AttachedNodes.Create(8);
+	}
+
+	object->AttachedNodes.Clear();
+
+	const bool is_selected = object->GetMaterialID() == SelectionMaterialID;
+
+	for (uint32 i = 0; i < materials.Size; i++) {
+		Object* node = nodes[i].IsNull() ? nullptr : gObjectManager->GetObject(nodes[i]);
+		const MaterialID material = is_selected ? SelectionMaterialID : GetFaceMaterial(materials[i]);
+
+		if (node == nullptr) {
+			node = gObjectManager->NewObject(String::Fmt("{}_face{}", object->Name.Get(), i), material,
+											 eObjectTag::None);
+
+			if (node == nullptr) {
+				continue;
+			}
+
+			node->SetRotation(object->mRotation);
+			object->AttachObject(node->ID);
+
+			mFaceNodeMaterials.Insert(node->ID.GetID(), materials[i]);
+		}
+		else {
+			node->SetMaterial(material);
+			object->AttachedNodes.Insert(node->ID);
+		}
+
+		node->pMesh = MakeFaceMesh(brush, &materials[i], node->Bounds);
+		node->SetRotationOrigin(object->RotationOrigin);
+		node->SetShadowCaster(object->IsShadowCaster());
+		node->SetHidden(object->IsHidden());
+		node->SubviewInstance = object->SubviewInstance;
+	}
+}
+
 void Blockout::RebuildBrush(Object* object, Brush&& brush, physics::eMotionType motion_type)
 {
 	Assert(brush.IsValid());
@@ -1411,6 +1627,7 @@ void Blockout::RebuildBrush(Object* object, Brush&& brush, physics::eMotionType 
 
 		object->SetDecal(true);
 
+		DestroyFaceNodes(object);
 		RebuildDecalMesh(object, brush);
 
 		gWorldGrid->UpdateObject(object);
@@ -1419,18 +1636,14 @@ void Blockout::RebuildBrush(Object* object, Brush&& brush, physics::eMotionType 
 		return;
 	}
 
-	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
-	brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
-					   mesh->Indices);
-
-	object->pMesh = mesh->AsDefaultMesh();
-
 	object->Bounds.Min = brush.GetBoundsMin();
 	object->Bounds.Max = brush.GetBoundsMax();
 
 	// Blockouts rotate about the centre of their bounds
 	const Vec3f midpoint = brush.GetCenter();
 	object->SetRotationOrigin(-midpoint);
+
+	RebuildFaceMeshes(object, brush);
 
 	gWorldGrid->UpdateObject(object);
 
@@ -1692,7 +1905,7 @@ void Blockout::WriteBrushEntry(ConfigEntry& entry, const Object* object)
 	const Brush* brush = GetBrush(object);
 
 	// Plain boxes are stored as their extents in each direction
-	if (brush == nullptr || (brush->IsBox() && brush->HasDefaultTextures())) {
+	if (brush == nullptr || (brush->IsBox() && brush->HasDefaultTextures() && !brush->HasFaceMaterials())) {
 		ConfigEntry scales_array = ConfigEntry::Array("scale", ConfigPrimitive::ePrimitiveType::Float);
 
 		scales_array.AppendValue(ConfigPrimitive::FromValue(-object->Bounds.Min.X));
@@ -1732,6 +1945,8 @@ void Blockout::WriteBrushEntry(ConfigEntry& entry, const Object* object)
 
 		entry.AddMember(std::move(uvs_array));
 	}
+
+	WriteFaceMaterials(entry, *brush);
 }
 
 ObjectID Blockout::CreateBrush(const String& name, const Vec3f position, const Quat rotation,
@@ -1971,6 +2186,8 @@ void Blockout::DestroyObject(Object* object)
 
 		++index;
 	}
+
+	DestroyFaceNodes(object);
 
 	mBrushes.Remove(object->ID.GetID());
 	mPatches.Remove(object->ID.GetID());
@@ -3274,44 +3491,70 @@ void Blockout::BuildSubview(Subview& subview)
 				continue;
 			}
 
-			const MaterialID material = ReadBrushMaterial(entry);
-			member.Material = material;
+			member.Material = ReadBrushMaterial(entry);
 
-			auto builder = std::find_if(builders.begin(), builders.end(),
-										[&](const GroupBuilder& other) { return other.Material == material; });
+			StackArray<String, Brush::scMaxPlanes> face_materials;
+			brush.GetFaceMaterials(face_materials);
 
-			if (builder == builders.end()) {
-				builders.emplace_back().Material = material;
-				builder = builders.end() - 1;
-			}
+			const String brush_faces {};
 
-			MeshGen::GeneratedMesh mesh;
-			brush.GenerateMesh(mesh.Positions, mesh.Normals, mesh.Tangents, mesh.TangentHandedness, mesh.Texcoords,
-							   mesh.Indices);
+			const uint32 group_count = face_materials.Size + 1;
 
-			const uint32 first_vertex = static_cast<uint32>(builder->Positions.size());
+			for (uint32 group = 0; group < group_count; group++) {
+				const String* faces = nullptr;
+				MaterialID material = member.Material;
 
-			for (size_t i = 0; i < mesh.Positions.Size; i++) {
-				const Vec3f position = TransformPoint(member.ToSubview, mesh.Positions[i]);
-
-				builder->Positions.push_back(position);
-				builder->Normals.push_back(TransformDirection(member.ToSubview, mesh.Normals[i]));
-				builder->Tangents.push_back(TransformDirection(member.ToSubview, mesh.Tangents[i]));
-				builder->Texcoords.push_back(mesh.Texcoords[i]);
-
-				if (i < mesh.TangentHandedness.Size) {
-					builder->TangentHandedness.push_back(mesh.TangentHandedness[i]);
+				if (group > 0) {
+					faces = &face_materials[group - 1];
+					material = GetFaceMaterial(*faces);
 				}
-				else {
-					builder->TangentHandedness.push_back(1.0f);
+				else if (face_materials.Size > 0) {
+					faces = &brush_faces;
 				}
 
-				builder->Min = Vec3f::Min(builder->Min, position);
-				builder->Max = Vec3f::Max(builder->Max, position);
-			}
+				MeshGen::GeneratedMesh mesh;
+				brush.GenerateMesh(mesh.Positions, mesh.Normals, mesh.Tangents, mesh.TangentHandedness,
+								   mesh.Texcoords, mesh.Indices, faces);
 
-			for (const uint32 index : mesh.Indices) {
-				builder->Indices.push_back(first_vertex + index);
+				if (mesh.Positions.Size == 0) {
+					continue;
+				}
+
+				auto builder = std::find_if(builders.begin(), builders.end(),
+											[&](const GroupBuilder& other) { return other.Material == material; });
+
+				if (builder == builders.end()) {
+					builders.emplace_back().Material = material;
+					builder = builders.end() - 1;
+				}
+
+				const uint32 first_vertex = static_cast<uint32>(builder->Positions.size());
+
+				for (size_t i = 0; i < mesh.Positions.Size; i++) {
+					const Vec3f position = TransformPoint(member.ToSubview, mesh.Positions[i]);
+
+					builder->Positions.push_back(position);
+					builder->Normals.push_back(TransformDirection(member.ToSubview, mesh.Normals[i]));
+					builder->Tangents.push_back(TransformDirection(member.ToSubview, mesh.Tangents[i]));
+					builder->Texcoords.push_back(mesh.Texcoords[i]);
+
+					if (i < mesh.TangentHandedness.Size) {
+						builder->TangentHandedness.push_back(mesh.TangentHandedness[i]);
+					}
+					else {
+						builder->TangentHandedness.push_back(1.0f);
+					}
+
+					builder->Min = Vec3f::Min(builder->Min, position);
+					builder->Max = Vec3f::Max(builder->Max, position);
+
+					min = Vec3f::Min(min, position);
+					max = Vec3f::Max(max, position);
+				}
+
+				for (const uint32 index : mesh.Indices) {
+					builder->Indices.push_back(first_vertex + index);
+				}
 			}
 
 			SizedArray<Vec3f>& hull = hulls.emplace_back();
@@ -3320,9 +3563,6 @@ void Blockout::BuildSubview(Subview& subview)
 			for (const Vec3f vertex : brush.GetVertices()) {
 				hull.Insert(TransformPoint(member.ToSubview, vertex));
 			}
-
-			min = Vec3f::Min(min, builder->Min);
-			max = Vec3f::Max(max, builder->Max);
 		}
 	}
 

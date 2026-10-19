@@ -898,7 +898,8 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 		}
 
 		for (const PolyhedronSide& side : brush.Shape.Sides) {
-			const TextureMap* map = brush.FindMap(side.PlaneIndex);
+			int32 material_index = SourceBrush::scDroppedFace;
+			const TextureMap* map = brush.FindMap(side.PlaneIndex, material_index);
 
 			if (map == nullptr) {
 				continue;
@@ -906,7 +907,7 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 
 			Face face;
 			face.PlaneIndex = side.PlaneIndex;
-			face.MaterialIndex = brush.MaterialIndex;
+			face.MaterialIndex = material_index;
 			face.MapIndex = FindOrAddMap(*map);
 			face.Original = CopyWinding(side.Points);
 			face.Min = Vec3d(1e30, 1e30, 1e30);
@@ -976,6 +977,11 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 			}
 
 			const Face& earlier = faces[earlier_index];
+
+			if (earlier.MaterialIndex == SourceBrush::scDroppedFace &&
+				face.MaterialIndex != SourceBrush::scDroppedFace) {
+				continue;
+			}
 
 			bool overlaps = true;
 
@@ -1165,6 +1171,17 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 
 	std::map<std::tuple<int32, int64, int64, int64>, Batch> batches;
 
+	struct ShadowBatch
+	{
+		Array<Vec3d> Points;
+		Array<uint32> Indices;
+
+		std::map<int32, uint32> PointLookup;
+		std::map<std::pair<uint32, int32>, uint32> PatchPointLookup;
+	};
+
+	std::map<std::tuple<int64, int64, int64>, ShadowBatch> shadow_batches;
+
 	Array<int32> loop_indices;
 	Array<int32> polygon_indices;
 
@@ -1234,6 +1251,32 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 
 			if (options.ChunkSize > 0.0) {
 				cell = GetCell(center, options.ChunkSize);
+			}
+
+			const bool is_caulk = group.MaterialIndex == SourceBrush::scDroppedFace;
+
+			if (is_caulk || source.OpaqueMaterials[static_cast<size_t>(group.MaterialIndex)] != 0) {
+				ShadowBatch& shadow = shadow_batches[{ cell.X, cell.Y, cell.Z }];
+
+				for (size_t t = 0; t + 2 < triangle_indices.Size; t += 3) {
+					const int32 corners[3] = { triangle_indices[t], triangle_indices[t + 2], triangle_indices[t + 1] };
+
+					for (const int32 corner : corners) {
+						auto found = shadow.PointLookup.find(corner);
+
+						if (found == shadow.PointLookup.end()) {
+							found = shadow.PointLookup.emplace(corner, static_cast<uint32>(shadow.Points.Size)).first;
+							shadow.Points.Emplace(points[static_cast<size_t>(corner)]);
+						}
+
+						shadow.Indices.Emplace(found->second);
+					}
+				}
+			}
+
+			if (is_caulk) {
+				Stats.NumCaulkTriangles += static_cast<uint32>(triangle_indices.Size / 3);
+				continue;
 			}
 
 			Batch& batch = batches[{ group.MaterialIndex, cell.X, cell.Y, cell.Z }];
@@ -1331,6 +1374,25 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 					cell = GetCell(center * (1.0 / 3.0), options.ChunkSize);
 				}
 
+				if (surface.bCastsShadow) {
+					ShadowBatch& shadow = shadow_batches[{ cell.X, cell.Y, cell.Z }];
+
+					for (uint32 corner = 0; corner < 3; corner++) {
+						const int32 vertex_index = surface.Indices[triangle + corner];
+						auto found = shadow.PatchPointLookup.find({ surface_index, vertex_index });
+
+						if (found == shadow.PatchPointLookup.end()) {
+							found = shadow.PatchPointLookup
+										.emplace(std::make_pair(surface_index, vertex_index),
+												 static_cast<uint32>(shadow.Points.Size))
+										.first;
+							shadow.Points.Emplace(surface.Vertices[static_cast<size_t>(vertex_index)].Position);
+						}
+
+						shadow.Indices.Emplace(found->second);
+					}
+				}
+
 				Batch& batch = batches[{ surface.MaterialIndex, cell.X, cell.Y, cell.Z }];
 				batch.MaterialIndex = static_cast<uint32>(surface.MaterialIndex);
 
@@ -1407,6 +1469,35 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 
 	Stats.NumTriangles -= patch_triangle_count;
 	Stats.NumVertices -= patch_vertex_count;
+
+	out_map.ShadowSurfaces.InitCapacity(shadow_batches.size());
+
+	for (auto& [key, shadow] : shadow_batches) {
+		if (shadow.Indices.Size == 0) {
+			continue;
+		}
+
+		CompiledMapShadowSurface surface;
+		surface.Points.InitSize(shadow.Points.Size * 3);
+		surface.Indices = ArrayUtil::DynToSizedArray(shadow.Indices);
+
+		const Vec3f first = shadow.Points[0].ToVec3f();
+		surface.Bounds = BBox(first, first);
+
+		for (size_t i = 0; i < shadow.Points.Size; i++) {
+			const Vec3f point = shadow.Points[i].ToVec3f();
+
+			surface.Points[i * 3] = point.X;
+			surface.Points[i * 3 + 1] = point.Y;
+			surface.Points[i * 3 + 2] = point.Z;
+
+			surface.Bounds = BBox(Vec3f::Min(surface.Bounds.Min, point), Vec3f::Max(surface.Bounds.Max, point));
+		}
+
+		Stats.NumShadowTriangles += static_cast<uint32>(surface.Indices.Size / 3);
+
+		out_map.ShadowSurfaces.Emplace(std::move(surface));
+	}
 
 	out_map.Materials.InitAsCopyOf(source.Materials);
 }

@@ -2271,6 +2271,54 @@ void RaptorEditor::TopViewEditTextures(ObjectID face_object, const Vec3f face_no
 	}
 }
 
+void RaptorEditor::TopViewSetFaceMaterial(ObjectID face_object, const Vec3f face_normal, MaterialID material)
+{
+	Blockout* blockout = gWorld->pPrototype;
+
+	if (IsSimulationMode() || blockout == nullptr || !IsToolAvailable(eEditorTool::Face)) {
+		return;
+	}
+
+	Object* object = FindTopViewObject(face_object);
+	const Brush* brush = blockout->GetBrush(object);
+
+	if (brush == nullptr || object->IsDecal() || !CanEditObject(object)) {
+		Warn("Only the faces of brushes can have a material of their own");
+		return;
+	}
+
+	Brush changed = Brush::FromPlanes(brush->Planes);
+
+	const Vec3f local_direction = face_normal.Rotate(object->mRotation.Conjugate());
+	const int32 plane_index = changed.FindPlane(local_direction);
+
+	if (plane_index == Brush::scNoPlane ||
+		changed.Planes[plane_index].Normal.Dot(local_direction.Normalize()) < scFaceMatchDot) {
+		Warn("The picked face of '{}' is no longer there, pick it again", object->Name.Get());
+		return;
+	}
+
+	const MaterialLibraryID library_id = blockout->GetIDForMaterial(material);
+
+	if (!library_id.IsValid()) {
+		return;
+	}
+
+	String name = blockout->GetMaterialName(library_id);
+
+	if (blockout->GetIDForMaterial(mSelection.GetStoredMaterial(object)) == library_id) {
+		name.Clear();
+	}
+
+	if (changed.Planes[plane_index].Material == name) {
+		return;
+	}
+
+	changed.Planes[plane_index].Material = name;
+
+	EmplaceEditOperation<BrushEditOperation>(object, brush->Planes, changed.Planes, 1);
+}
+
 void RaptorEditor::TopViewSelectLight(uint32 light_id)
 {
 	if (IsSimulationMode() || mCurrentTool != eEditorTool::Light) {

@@ -67,6 +67,7 @@ static MaterialDefinition ReadDefinition(const std::filesystem::path& file_path,
 	definition.Alpha = entry->GetMemberValue<float32>(HashStr32("alpha"), 1.0f);
 	definition.bUnlit = entry->GetMemberValue(HashStr32("unlit"), 0) != 0;
 	definition.bGlass = entry->GetMemberValue(HashStr32("glass"), 0) != 0;
+	definition.bCaulk = entry->GetMemberValue(HashStr32("caulk"), 0) != 0;
 
 	if (entry->GetMember(HashStr32("metallic")) != nullptr) {
 		definition.Metallic = entry->GetMemberValue<float32>(HashStr32("metallic"), 0.0f);

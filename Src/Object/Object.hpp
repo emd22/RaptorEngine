@@ -212,6 +212,17 @@ public:
 		Flags = value ? (Flags | eObjectFlags::Lightmapped) : (Flags & ~eObjectFlags::Lightmapped);
 	}
 
+	FX_FORCE_INLINE bool IsShadowOnly() const { return (Flags & eObjectFlags::ShadowOnly) != 0; }
+	FX_FORCE_INLINE void SetShadowOnly(const bool value)
+	{
+		if (value) {
+			Flags = Flags | eObjectFlags::ShadowOnly;
+		}
+		else {
+			Flags = Flags & ~eObjectFlags::ShadowOnly;
+		}
+	}
+
 	FX_FORCE_INLINE bool IsSkinned() const { return (pMesh != nullptr) && pMesh->VertexList.IsSkinned(); }
 
 	/// A skinned mesh can only be drawn once its pose is in the bone buffer this frame. Otherwise the shader would read

@@ -11,6 +11,7 @@ static void ShowAsSelected(Object* object)
 {
 	if (object->HasTags(eObjectTag::Blockout)) {
 		object->SetMaterial(gWorld->pPrototype->SelectionMaterialID);
+		gWorld->pPrototype->ShowFaceMaterialsSelected(object, true);
 	}
 }
 
@@ -18,6 +19,7 @@ static void ShowAsDeselected(Object* object, const MaterialID& material)
 {
 	if (object->HasTags(eObjectTag::Blockout)) {
 		object->SetMaterial(material);
+		gWorld->pPrototype->ShowFaceMaterialsSelected(object, false);
 	}
 }
 

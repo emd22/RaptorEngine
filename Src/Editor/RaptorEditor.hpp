@@ -159,6 +159,7 @@ public:
 	void TopViewClip(const Vec3f point_a, const Vec3f point_b, const Vec3f view_axis);
 	void TopViewSubtract(bool keep_cutters);
 	void TopViewEditTextures(ObjectID face_object, const Vec3f face_normal, const TextureCommand& command);
+	void TopViewSetFaceMaterial(ObjectID face_object, const Vec3f face_normal, MaterialID material);
 	void TopViewSelectLight(uint32 light_id);
 	void TopViewMoveLight(const Vec3f offset);
 	void TopViewAimLight(const Vec3f direction);

@@ -55,6 +55,16 @@ struct CompiledMapSurface
 	bool HasLightmapTexcoords() const { return LightmapTexcoords.Size == Vertices.Size * 2 && Vertices.Size > 0; }
 };
 
+struct CompiledMapShadowSurface
+{
+	BBox Bounds;
+
+	SizedArray<float32> Points;
+	SizedArray<uint32> Indices;
+
+	uint32 GetPointCount() const { return static_cast<uint32>(Points.Size / 3); }
+};
+
 struct CompiledMapLightmap
 {
 	uint32 Width = 0;
@@ -89,7 +99,7 @@ class CompiledMap
 {
 public:
 	static constexpr uint32 scMagic = 0x504D5846;
-	static constexpr uint32 scVersion = 5;
+	static constexpr uint32 scVersion = 6;
 	static constexpr const char* scExtension = ".fxmap";
 	static constexpr const char* scPrototypeExtension = ".prx";
 
@@ -129,6 +139,7 @@ public:
 
 	SizedArray<CompiledMapMaterial> Materials;
 	SizedArray<CompiledMapSurface> Surfaces;
+	SizedArray<CompiledMapShadowSurface> ShadowSurfaces;
 	SizedArray<CompiledMapHull> Hulls;
 	SizedArray<CompiledMapCollisionMesh> CollisionMeshes;
 

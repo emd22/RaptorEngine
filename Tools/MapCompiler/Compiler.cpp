@@ -175,6 +175,24 @@ bool WriteObj(const String& path, const CompiledMap& map)
 		base += static_cast<uint32>(surface.Vertices.Size);
 	}
 
+	for (size_t i = 0; i < map.ShadowSurfaces.Size; i++) {
+		const CompiledMapShadowSurface& surface = map.ShadowSurfaces[i];
+
+		file.Write(String::Fmt("o shadow_{}\nusemtl shadow\n", i));
+
+		for (uint32 point = 0; point < surface.GetPointCount(); point++) {
+			file.Write(String::Fmt("v {} {} {}\n", surface.Points[point * 3], surface.Points[point * 3 + 1],
+								   surface.Points[point * 3 + 2]));
+		}
+
+		for (size_t index = 0; index + 2 < surface.Indices.Size; index += 3) {
+			file.Write(String::Fmt("f {} {} {}\n", base + surface.Indices[index], base + surface.Indices[index + 1],
+								   base + surface.Indices[index + 2]));
+		}
+
+		base += surface.GetPointCount();
+	}
+
 	file.Close();
 
 	return true;
@@ -247,6 +265,10 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 		"  brushes      {} world ({} nvbrush, {} dbound, {} transparent), {} left to the engine, {} invalid",
 		source.Brushes.Size, source.ClipBrushCount, source.BoundBrushCount, source.TransparentBrushCount,
 		source.EntityBrushCount, source.InvalidBrushCount));
+
+	if (source.CaulkFaceCount > 0) {
+		log(String::Fmt("  caulk        {} faces dropped", source.CaulkFaceCount));
+	}
 
 
 	CompiledMap map;
@@ -385,6 +407,8 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 	log(String::Fmt("  triangles    {} -> {} ({:+.1f}%), {} vertices in {} surfaces", stats.NumSrcTriangles,
 					stats.NumTriangles, -GetPercentRemoved(stats.NumSrcTriangles, stats.NumTriangles),
 					stats.NumVertices, map.Surfaces.Size));
+	log(String::Fmt("  shadows      {} triangles in {} surfaces, {} of them caulk", stats.NumShadowTriangles,
+					map.ShadowSurfaces.Size, stats.NumCaulkTriangles));
 	log(String::Fmt("  area         {:.1f} -> {:.1f} m2 ({:+.1f}%)", stats.SourceArea, stats.Area,
 					-GetPercentRemoved(stats.SourceArea, stats.Area)));
 	if (source.Patches.Size > 0) {

@@ -103,7 +103,9 @@ static void AddObjectToRenderList(Object* object, World* scene)
 			gWorld->mRenderList.AddObject(GetShadowListPipeline(), object->ID);
 		}
 
-		gWorld->mRenderList.AddObject(GetPipelineForObject(*object), object->ID);
+		if (!object->IsShadowOnly()) {
+			gWorld->mRenderList.AddObject(GetPipelineForObject(*object), object->ID);
+		}
 	}
 
 	if (!object->AttachedNodes.IsEmpty()) {
@@ -844,7 +846,7 @@ void World::AddToRenderListRecursiveByMaterial(ObjectID* id_ptr, const Frustum* 
 
 	// Container objects (e.g. the root of a multi-primitive mesh) have no mesh/material of their own; only the
 	// attached primitives that actually own a mesh need placing in a geometry section.
-	if (obj->pMesh.IsValid()) {
+	if (obj->pMesh.IsValid() && !obj->IsShadowOnly()) {
 		bool is_visible = true;
 
 		if (frustum != nullptr && obj->CanBeFrustumCulled()) {

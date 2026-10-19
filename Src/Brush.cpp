@@ -544,6 +544,7 @@ Brush Brush::FromVertices(const SizedArray<Vec3f>& points, const PlaneList& refe
 
 		if (best != scNoPlane) {
 			brush.Planes[i].Texture = reference[best].Texture;
+			brush.Planes[i].Material = reference[best].Material;
 		}
 		else {
 			brush.ResetFaceTexture(i);
@@ -682,8 +683,9 @@ bool Brush::Rebuild()
 		}
 
 		const DPlane& plane = planes[loop.PlaneIndex];
-		kept_planes.Insert(
-			{ plane.Normal.ToVec3f(), static_cast<float32>(plane.Distance), Planes[plane.SourceIndex].Texture });
+		const BrushPlane& source_plane = Planes[plane.SourceIndex];
+		kept_planes.Insert({ plane.Normal.ToVec3f(), static_cast<float32>(plane.Distance), source_plane.Texture,
+							 source_plane.Material });
 		faces.Insert(std::move(face));
 	}
 
@@ -981,6 +983,41 @@ bool Brush::HasDefaultTextures() const
 	return true;
 }
 
+bool Brush::HasFaceMaterials() const
+{
+	for (const BrushPlane& plane : Planes) {
+		if (!plane.Material.IsEmpty()) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void Brush::GetFaceMaterials(StackArray<String, scMaxPlanes>& out_materials) const
+{
+	out_materials.Clear();
+
+	for (const BrushPlane& plane : Planes) {
+		if (plane.Material.IsEmpty()) {
+			continue;
+		}
+
+		bool is_listed = false;
+
+		for (const String& listed : out_materials) {
+			if (listed == plane.Material) {
+				is_listed = true;
+				break;
+			}
+		}
+
+		if (!is_listed) {
+			out_materials.Insert(plane.Material);
+		}
+	}
+}
+
 void Brush::GetTextureGradients(const BrushPlane& plane, Vec3f& out_u_gradient, Vec3f& out_v_gradient)
 {
 	const BrushFaceTexture& texture = plane.Texture;
@@ -1001,16 +1038,23 @@ void Brush::GetTextureGradients(const BrushPlane& plane, Vec3f& out_u_gradient, 
 
 void Brush::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normals, SizedArray<Vec3f>& tangents,
 						 SizedArray<float32>& tangent_handedness, SizedArray<Vec2f>& texcoords,
-						 SizedArray<uint32>& indices) const
+						 SizedArray<uint32>& indices, const String* only_material) const
 {
 	if (!IsValid()) {
 		return;
 	}
 
+	const auto is_included = [&](const Face& face)
+	{ return only_material == nullptr || Planes[face.PlaneIndex].Material == *only_material; };
+
 	size_t vertex_count = 0;
 	size_t index_count = 0;
 
 	for (const Face& face : Faces) {
+		if (!is_included(face)) {
+			continue;
+		}
+
 		vertex_count += face.Vertices.Size;
 		index_count += (face.Vertices.Size - 2) * 3;
 	}
@@ -1024,6 +1068,11 @@ void Brush::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normal
 
 	for (uint32 face_index = 0; face_index < Faces.Size; face_index++) {
 		const Face& face = Faces[face_index];
+
+		if (!is_included(face)) {
+			continue;
+		}
+
 		const BrushPlane& plane = Planes[face.PlaneIndex];
 		const BrushFaceTexture& texture = plane.Texture;
 

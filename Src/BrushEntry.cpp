@@ -38,6 +38,49 @@ constexpr uint32 scValuesPerFaceTexture = 5;
 
 constexpr float32 scMinFaceTextureScale = 1e-4f;
 
+static void ReadFaceMaterials(ConfigEntry& entry, Brush::PlaneList& planes)
+{
+	ConfigEntry* materials_entry = entry.GetMember(HashStr32(scFaceMaterialsName));
+
+	if (materials_entry == nullptr) {
+		return;
+	}
+
+	const PagedArray<ConfigPrimitive>& materials = materials_entry->GetArrayData();
+
+	for (uint32 i = 0; i < planes.Size && i < materials.Size(); i++) {
+		if (materials[i].Type != ConfigPrimitive::ePrimitiveType::String) {
+			continue;
+		}
+
+		const char* name = materials[i].Get<const char*>();
+
+		if (name != nullptr && std::strcmp(name, scBrushMaterialName) != 0) {
+			planes[i].Material = name;
+		}
+	}
+}
+
+void WriteFaceMaterials(ConfigEntry& entry, const Brush& brush)
+{
+	if (!brush.HasFaceMaterials()) {
+		return;
+	}
+
+	ConfigEntry materials_array = ConfigEntry::Array(scFaceMaterialsName, ConfigPrimitive::ePrimitiveType::String);
+
+	for (const BrushPlane& plane : brush.Planes) {
+		if (plane.Material.IsEmpty()) {
+			materials_array.AppendValue(ConfigPrimitive::FromValue(scBrushMaterialName));
+		}
+		else {
+			materials_array.AppendValue(ConfigPrimitive::FromValue(plane.Material.CStr()));
+		}
+	}
+
+	entry.AddMember(std::move(materials_array));
+}
+
 Brush ReadBrushEntry(ConfigEntry& entry)
 {
 	ConfigEntry* scale_entry = entry.GetMember(HashStr32("scale"));
@@ -81,6 +124,8 @@ Brush ReadBrushEntry(ConfigEntry& entry)
 			.Distance = values[i * 4 + 3].Get<float32>(),
 		});
 	}
+
+	ReadFaceMaterials(entry, planes);
 
 	ConfigEntry* uvs_entry = entry.GetMember(HashStr32("uvs"));
 

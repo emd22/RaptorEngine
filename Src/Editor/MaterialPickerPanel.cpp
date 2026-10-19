@@ -6,6 +6,8 @@
 #include "EditorThread.hpp"
 #include "PaginatedView.hpp"
 #include "RaptorEditor.hpp"
+#include "TopViewCanvas.hpp"
+#include "TopViewPanel.hpp"
 
 #include <ktx.h>
 #include <vulkan/vulkan.h>
@@ -430,6 +432,24 @@ void MaterialPickerPanel::ApplySelected()
 	const MaterialLibraryID slot = GetSelectedSlot();
 
 	if (!slot.IsValid()) {
+		return;
+	}
+
+	ObjectID face_object = ObjectID::scNull;
+	Vec3f face_normal = Vec3f::sZero;
+
+	if (mpFrame->GetTopViewPanel()->GetCanvas()->GetPickedFace(face_object, face_normal)) {
+		thread::PostToGame(
+			[slot, face_object, face_normal]
+			{
+				if (gEditor == nullptr || gWorld == nullptr || gWorld->pPrototype == nullptr) {
+					return;
+				}
+
+				gEditor->TopViewSetFaceMaterial(face_object, face_normal,
+												gWorld->pPrototype->GetMaterialForID(slot));
+			});
+
 		return;
 	}
 

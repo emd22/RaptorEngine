@@ -9,6 +9,7 @@
 
 #include <Core/SizedArray.hpp>
 #include <Core/StackArray.hpp>
+#include <Core/String.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
 #include <vector>
@@ -35,6 +36,8 @@ struct BrushPlane
 	float32 Distance = 0.0f;
 
 	BrushFaceTexture Texture;
+
+	String Material;
 };
 
 /**
@@ -132,6 +135,10 @@ public:
 	 */
 	bool HasDefaultTextures() const;
 
+	bool HasFaceMaterials() const;
+
+	void GetFaceMaterials(StackArray<String, scMaxPlanes>& out_materials) const;
+
 	/**
 	 * @brief Returns how fast a plane's U and V change across the brush's local space. A point's texture coordinate is
 	 * its dot product with each gradient, plus the plane's texture offset.
@@ -143,7 +150,7 @@ public:
 	 */
 	void GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normals, SizedArray<Vec3f>& tangents,
 					  SizedArray<float32>& tangent_handedness, SizedArray<Vec2f>& texcoords,
-					  SizedArray<uint32>& indices) const;
+					  SizedArray<uint32>& indices, const String* only_material = nullptr) const;
 
 public:
 	PlaneList Planes;

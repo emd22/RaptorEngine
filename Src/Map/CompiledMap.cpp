@@ -237,6 +237,40 @@ bool CompiledMap::Load(const String& path)
 		}
 	}
 
+	ShadowSurfaces.InitSize(reader.ReadCount());
+
+	for (CompiledMapShadowSurface& surface : ShadowSurfaces) {
+		const Vec3f bounds_min = reader.Read<Vec3f>();
+		const Vec3f bounds_max = reader.Read<Vec3f>();
+
+		surface.Bounds = BBox(bounds_min, bounds_max);
+
+		const uint32 point_count = reader.ReadCount();
+		const uint32 index_count = reader.ReadCount();
+
+		if (reader.bFailed || index_count % 3 != 0) {
+			reader.bFailed = true;
+			break;
+		}
+
+		surface.Points.InitSize(static_cast<size_t>(point_count) * 3);
+		surface.Indices.InitSize(index_count);
+
+		reader.Read(surface.Points.pData, surface.Points.Size);
+		reader.Read(surface.Indices.pData, surface.Indices.Size);
+
+		for (const uint32 index : surface.Indices) {
+			if (index >= point_count) {
+				reader.bFailed = true;
+				break;
+			}
+		}
+
+		if (reader.bFailed) {
+			break;
+		}
+	}
+
 	Hulls.InitSize(reader.ReadCount());
 
 	for (CompiledMapHull& hull : Hulls) {
@@ -407,6 +441,19 @@ bool CompiledMap::Save(const String& path) const
 
 		writer.WriteCount(surface.LightmapTexcoords.Size);
 		writer.Write(surface.LightmapTexcoords.pData, surface.LightmapTexcoords.Size);
+	}
+
+	writer.WriteCount(ShadowSurfaces.Size);
+
+	for (const CompiledMapShadowSurface& surface : ShadowSurfaces) {
+		writer.Write(surface.Bounds.Min);
+		writer.Write(surface.Bounds.Max);
+
+		writer.WriteCount(surface.GetPointCount());
+		writer.WriteCount(surface.Indices.Size);
+
+		writer.Write(surface.Points.pData, surface.Points.Size);
+		writer.Write(surface.Indices.pData, surface.Indices.Size);
 	}
 
 	writer.WriteCount(Hulls.Size);

@@ -37,6 +37,7 @@ enum class eObjectFlags : uint16
 	NotProbeVisible = (1 << 6),
 	Hidden = (1 << 7),
 	Lightmapped = (1 << 8),
+	ShadowOnly = (1 << 9),
 };
 
 FxEnumFlags(eObjectFlags);

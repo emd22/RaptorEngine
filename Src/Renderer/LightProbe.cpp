@@ -226,7 +226,7 @@ ProbePlacementBoxes GatherPlacementBoxes()
 		}
 
 		// A compiled surface is every face of a material, so its bounds say nothing about where the level is solid
-		if (blockout != nullptr && blockout->IsCompiledObject(&object)) {
+		if (blockout != nullptr && (blockout->IsCompiledObject(&object) || blockout->IsFaceNode(&object))) {
 			continue;
 		}
 

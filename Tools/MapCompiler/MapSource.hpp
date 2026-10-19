@@ -50,9 +50,13 @@ struct SourceBrush
 	Array<int32> PlaneIndices;
 	Array<TextureMap> Maps;
 
+	Array<int32> FaceMaterials;
+
 	Polyhedron Shape;
 
-	const TextureMap* FindMap(int32 plane_index) const;
+	static constexpr int32 scDroppedFace = -1;
+
+	const TextureMap* FindMap(int32 plane_index, int32& out_material) const;
 };
 
 struct SourcePatch
@@ -79,6 +83,7 @@ public:
 	SizedArray<SourceBrush> Brushes;
 	SizedArray<SourcePatch> Patches;
 	SizedArray<CompiledMapMaterial> Materials;
+	Array<uint8> OpaqueMaterials;
 	SizedArray<String> Warnings;
 
 	Array<Vec3d> Entities;
@@ -102,11 +107,12 @@ public:
 	uint32 ClipBrushCount = 0;
 	uint32 BoundBrushCount = 0;
 	uint32 TransparentBrushCount = 0;
+	uint32 CaulkFaceCount = 0;
 	uint32 InvalidBrushCount = 0;
 	uint32 PatchCount = 0;
 
 private:
-	int32 FindOrAddMaterial(const String& name, int32 library_index);
+	int32 FindOrAddMaterial(const String& name, int32 library_index, const CachedMaterials& mc);
 };
 
 } // namespace fx::mapc

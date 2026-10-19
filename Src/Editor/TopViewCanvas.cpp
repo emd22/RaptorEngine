@@ -102,8 +102,7 @@ constexpr const char* scToolHints[] = {
 
 static_assert(std::size(scToolHints) == static_cast<size_t>(eEditorTool::Count));
 
-constexpr const char* scPickedFaceHint = "Face picked: the texture buttons change it, Alt+arrows shift, Alt+[ ] "
-										 "scale, Alt+, . rotate, Esc unpicks";
+constexpr const char* scPickedFaceHint = "Alt+Left/Right Shift UVs, Alt+[ ] scale, Alt+, . rotate";
 
 constexpr const char* scArchPendingHint = "Drag the handles to reshape, [ ] sides, arrows nudge, Enter or double-click "
 										  "builds, Esc cancels, " FX_TOP_VIEW_FREE_KEY " ignores snap";
@@ -194,8 +193,7 @@ double GetArchArc(const ArchSettings& arch) { return std::clamp<double>(arch.Arc
 
 Vec2d GetArchDirection(const ArchSettings& arch, double index)
 {
-	const double angle = arch.StartDegrees * FX_PI / 180.0 +
-						 GetArchArc(arch) * index / static_cast<double>(arch.Sides);
+	const double angle = arch.StartDegrees * FX_PI / 180.0 + GetArchArc(arch) * index / static_cast<double>(arch.Sides);
 
 	return Vec2d(std::cos(angle), std::sin(angle));
 }
@@ -911,6 +909,18 @@ void TopViewCanvas::RunTextureCommand(const TextureCommand& command)
 				{ gEditor->TopViewEditTextures(face_object, face_normal, command); });
 
 	Refresh();
+}
+
+bool TopViewCanvas::GetPickedFace(ObjectID& out_object, Vec3f& out_normal) const
+{
+	if (mTool != eEditorTool::Face || !mbHasPickedFace) {
+		return false;
+	}
+
+	out_object = mPickedFaceBrushId;
+	out_normal = ToWorldVector(ToVec2d(mPickedFaceNormal), 0.0);
+
+	return true;
 }
 
 void TopViewCanvas::SyncWeightFromHandles()
@@ -3508,7 +3518,8 @@ void TopViewCanvas::FinishCreate()
 	const eViewPlane plane = mPlane;
 
 	if (is_decal) {
-		SendCommand([plane, min, max, drop_to_ground] { gEditor->TopViewCreateDecal(plane, min, max, drop_to_ground); });
+		SendCommand([plane, min, max, drop_to_ground]
+					{ gEditor->TopViewCreateDecal(plane, min, max, drop_to_ground); });
 		return;
 	}
 
@@ -3643,8 +3654,8 @@ TopViewCanvas::eArchHandle TopViewCanvas::PickArchHandle(const Vec2d uv) const
 	const Vec2d screen = ToScreenCoords(uv);
 
 	constexpr eArchHandle point_handles[] = {
-		eArchHandle::End,	 eArchHandle::Start,  eArchHandle::Wall,
-		eArchHandle::MinMin, eArchHandle::MaxMin, eArchHandle::MaxMax, eArchHandle::MinMax,
+		eArchHandle::End,	 eArchHandle::Start,  eArchHandle::Wall,   eArchHandle::MinMin,
+		eArchHandle::MaxMin, eArchHandle::MaxMax, eArchHandle::MinMax,
 	};
 
 	for (const eArchHandle handle : point_handles) {
@@ -4455,7 +4466,7 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 			}
 		}
 		else if (const int32 marker = FindSelectedMarker();
-			marker >= 0 && mState.Markers[marker].Kind == eTopViewMarkerKind::Spawn) {
+				 marker >= 0 && mState.Markers[marker].Kind == eTopViewMarkerKind::Spawn) {
 			SendCommand([] { gEditor->TopViewRespawn(); });
 		}
 		break;
@@ -4684,9 +4695,9 @@ void TopViewCanvas::UpdateStatus()
 		hint = scPickedFaceHint;
 	}
 
-	text += wxString::Format("%d brushes, %u selected   |   Snap %s %.2f   |   Zoom %.0f%%   |   %s",
-							 static_cast<int>(mState.Brushes.Size), GetSelectedCount(),
-							 mState.bSnapEnabled ? "on" : "off", mState.SnapStep, mScale / scDefaultScale * 100.0, hint);
+	text += wxString::Format(
+		"%d brushes, %u selected   |   Snap %s %.2f   |   Zoom %.0f%%   |   %s", static_cast<int>(mState.Brushes.Size),
+		GetSelectedCount(), mState.bSnapEnabled ? "on" : "off", mState.SnapStep, mScale / scDefaultScale * 100.0, hint);
 
 	mpOnStatus(text);
 }

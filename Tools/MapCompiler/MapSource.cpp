@@ -15,6 +15,7 @@ struct CachedMaterials
 {
 	std::unordered_set<String> ModelColliders;
 	std::unordered_set<String> TransparentMaterials;
+	std::unordered_set<String> CaulkMaterials;
 };
 
 
@@ -102,25 +103,26 @@ void AddEntityPositions(const ConfigEntry* list, Array<Vec3d>& out_entities)
 	}
 }
 
-std::unordered_set<String> ReadTransparentMaterials()
+void ReadMaterialFlags(CachedMaterials& out_materials)
 {
-	std::unordered_set<String> names;
-
 	for (const MaterialDefinition& definition : LoadMaterialDefinitions(scMaterialRoot)) {
 		if (definition.IsTransparent()) {
-			names.insert(definition.Name);
+			out_materials.TransparentMaterials.insert(definition.Name);
+		}
+
+		if (definition.bCaulk) {
+			out_materials.CaulkMaterials.insert(definition.Name);
 		}
 	}
-
-	return names;
 }
 
 } // namespace
 
-const TextureMap* SourceBrush::FindMap(int32 plane_index) const
+const TextureMap* SourceBrush::FindMap(int32 plane_index, int32& out_material) const
 {
 	for (size_t i = 0; i < PlaneIndices.Size; i++) {
 		if (PlaneIndices[i] == plane_index) {
+			out_material = FaceMaterials[i];
 			return &Maps[i];
 		}
 	}
@@ -128,7 +130,7 @@ const TextureMap* SourceBrush::FindMap(int32 plane_index) const
 	return nullptr;
 }
 
-int32 MapSource::FindOrAddMaterial(const String& name, int32 library_index)
+int32 MapSource::FindOrAddMaterial(const String& name, int32 library_index, const CachedMaterials& mc)
 {
 	for (size_t i = 0; i < Materials.Size; i++) {
 		if (Materials[i].Name == name && Materials[i].LibraryIndex == library_index) {
@@ -137,6 +139,7 @@ int32 MapSource::FindOrAddMaterial(const String& name, int32 library_index)
 	}
 
 	Materials.Emplace(CompiledMapMaterial { name, library_index });
+	OpaqueMaterials.Emplace(static_cast<uint8>(!mc.TransparentMaterials.contains(name)));
 
 	return static_cast<int32>(Materials.Size - 1);
 }
@@ -180,7 +183,7 @@ void MapSource::AddPatch(ConfigEntry& entry, const String& name, const CachedMat
 	const bool is_transparent = !material_name.IsEmpty() && mc.TransparentMaterials.contains(material_name);
 
 	const int32 material_index = FindOrAddMaterial(material_name,
-												   is_locked ? scLockedMaterialIndex : scEditableMaterialIndex);
+												   is_locked ? scLockedMaterialIndex : scEditableMaterialIndex, mc);
 
 	// Ignore transparent surfaces as they are excempt from probe baking
 	if (!is_transparent) {
@@ -293,7 +296,7 @@ void MapSource::AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& nam
 	}
 	else if (!material_name.IsEmpty()) {
 		source.MaterialIndex = FindOrAddMaterial(material_name,
-												 is_locked ? scLockedMaterialIndex : scEditableMaterialIndex);
+												 is_locked ? scLockedMaterialIndex : scEditableMaterialIndex, mc);
 
 		if (is_transparent) {
 			source.bSolid = false;
@@ -302,8 +305,28 @@ void MapSource::AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& nam
 		}
 	}
 	else {
-		source.MaterialIndex = FindOrAddMaterial("", is_locked ? scLockedMaterialIndex : scEditableMaterialIndex);
+		source.MaterialIndex = FindOrAddMaterial("", is_locked ? scLockedMaterialIndex : scEditableMaterialIndex, mc);
 	}
+
+	const int32 library_index = is_locked ? scLockedMaterialIndex : scEditableMaterialIndex;
+	const bool is_caulk = mc.CaulkMaterials.contains(material_name);
+
+	const auto get_face_material = [&](const BrushPlane& plane)
+	{
+		if (plane.Material.IsEmpty()) {
+			if (is_caulk) {
+				return SourceBrush::scDroppedFace;
+			}
+
+			return source.MaterialIndex;
+		}
+
+		if (mc.CaulkMaterials.contains(plane.Material)) {
+			return SourceBrush::scDroppedFace;
+		}
+
+		return FindOrAddMaterial(plane.Material, library_index, mc);
+	};
 
 	const Vec3d offset = transform.Pivot + transform.Position;
 
@@ -335,6 +358,11 @@ void MapSource::AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& nam
 
 		source.PlaneIndices.Emplace(planes.FindOrAdd(world_normal, world_distance));
 		source.Maps.Emplace(map);
+		source.FaceMaterials.Emplace(get_face_material(plane));
+
+		if (source.bVisible && GetLast(source.FaceMaterials) == SourceBrush::scDroppedFace) {
+			CaulkFaceCount++;
+		}
 	}
 
 	if (!MakePolyhedron(planes, source.PlaneIndices, scBrushExtent, source.Shape)) {
@@ -385,12 +413,12 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 		}
 	}
 
-	cached_materials.TransparentMaterials = ReadTransparentMaterials();
+	ReadMaterialFlags(cached_materials);
 
 	const size_t entry_count = blocks_entry->Members.Size() + CountSubviewBrushes(info, path);
 
 	Brushes.InitCapacity(entry_count);
-	Materials.InitCapacity(entry_count);
+	Materials.InitCapacity(entry_count * (Brush::scMaxPlanes + 1));
 	Warnings.InitCapacity(entry_count + 1);
 
 	if (renamed_count > 0) {

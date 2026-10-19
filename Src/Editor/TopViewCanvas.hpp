@@ -72,6 +72,8 @@ public:
 	void RunPatchCommand(ePatchCommand type);
 	void RunTextureCommand(const TextureCommand& command);
 
+	bool GetPickedFace(ObjectID& out_object, Vec3f& out_normal) const;
+
 	void FitAll();
 	void FitSelection();
 
