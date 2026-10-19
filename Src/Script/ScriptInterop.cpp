@@ -19,6 +19,7 @@
 #include <Script/ObjectScripts.hpp>
 #include <Weapon/WeaponSystem.hpp>
 #include <World.hpp>
+#include <WorldGrid.hpp>
 #include <vector>
 
 namespace fx::script {
@@ -602,6 +603,32 @@ static void N_particle_stop(int64 effect) { gParticleSystem->Stop(ParticleEffect
 static void N_particle_kill(int64 effect) { gParticleSystem->Kill(ParticleEffectID::Unpack(effect)); }
 static bool N_particle_alive(int64 effect) { return gParticleSystem->IsAlive(ParticleEffectID::Unpack(effect)); }
 
+static bool N_portal_set_open(const char* name, bool open)
+{
+	AreaGraph& graph = gWorldGrid->GetAreaGraph();
+	const int32 portal = graph.FindPortal(name);
+
+	if (portal < 0) {
+		return false;
+	}
+
+	graph.SetPortalOpen(static_cast<uint32>(portal), open);
+
+	return true;
+}
+
+static bool N_portal_is_open(const char* name)
+{
+	const AreaGraph& graph = gWorldGrid->GetAreaGraph();
+	const int32 portal = graph.FindPortal(name);
+
+	if (portal < 0) {
+		return true;
+	}
+
+	return graph.GetPortal(static_cast<uint32>(portal)).bOpen;
+}
+
 static float32 N_weapon_trace(float32 yaw, float32 pitch, float32 range)
 {
 	return gWorld->Player.Weapons.Trace(yaw, pitch, range);
@@ -733,6 +760,9 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("particle_stop", N_particle_stop),
 	PREDEF("particle_kill", N_particle_kill),
 	PREDEF("particle_alive", N_particle_alive),
+
+	PREDEF("portal_set_open", N_portal_set_open),
+	PREDEF("portal_is_open", N_portal_is_open),
 
 	PREDEF("weapon_trace", N_weapon_trace),
 	PREDEF("weapon_hit_apply", N_weapon_hit_apply),

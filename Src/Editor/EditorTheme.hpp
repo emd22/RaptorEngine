@@ -71,6 +71,7 @@ struct EditorTheme
 		Color Volume = Color::FromRGBA(120, 255, 90, 255);
 		Color NvBrush = Color::FromRGBA(255, 150, 40, 255);
 		Color DBound = Color::FromRGBA(90, 130, 255, 255);
+		Color Portal = Color::FromRGBA(255, 225, 60, 255);
 		Color Decal = Color::FromRGBA(255, 120, 200, 255);
 		Color Patch = Color::FromRGBA(120, 200, 255, 255);
 	};
@@ -167,6 +168,7 @@ void EditorTheme::ForEachColor(TFunc&& func)
 	func("brush", "volume", Brush.Volume);
 	func("brush", "nvbrush", Brush.NvBrush);
 	func("brush", "dbound", Brush.DBound);
+	func("brush", "portal", Brush.Portal);
 	func("brush", "decal", Brush.Decal);
 	func("brush", "patch", Brush.Patch);
 

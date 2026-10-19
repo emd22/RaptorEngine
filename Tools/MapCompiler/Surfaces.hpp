@@ -53,6 +53,7 @@ struct SurfacePolygon
 	int32 PlaneIndex = PlaneSet::scNone;
 	int32 MaterialIndex = 0;
 	int32 MapIndex = 0;
+	int32 Area = scNoMapArea;
 
 	Winding Points;
 };
@@ -98,7 +99,7 @@ private:
 
 	void CullFaces(const PlaneSet& planes, const Bsp& bsp, const MapSource& source, bool sealed,
 				   const SurfaceOptions& options);
-	void Triangulate(const PlaneSet& planes, const MapSource& source, const SurfaceOptions& options,
+	void Triangulate(const PlaneSet& planes, const Bsp& bsp, const MapSource& source, const SurfaceOptions& options,
 					 PatchBuilder* patches, CompiledMap& out_map);
 
 private:

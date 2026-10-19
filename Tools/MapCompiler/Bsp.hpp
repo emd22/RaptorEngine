@@ -14,6 +14,7 @@ namespace fx::mapc {
 struct Portal
 {
 	int32 Leaf = -1;
+	int32 PlaneIndex = PlaneSet::scNone;
 	Winding Points;
 };
 
@@ -28,6 +29,9 @@ struct Node
 	bool bSolid = false;
 	bool bOutside = false;
 	bool bReached = false;
+
+	int32 PortalBrush = -1;
+	int32 Area = -1;
 
 	Polyhedron Cell;
 	Array<Portal> Portals;
@@ -55,7 +59,8 @@ public:
 	/**
 	 * @param brushes The solids to build the tree from. They are taken apart while it is built.
 	 */
-	void Build(PlaneSet& planes, Array<Polyhedron> brushes, const Vec3d& min, const Vec3d& max);
+	void Build(PlaneSet& planes, Array<Polyhedron> brushes, Array<Polyhedron> portal_brushes, const Vec3d& min,
+			   const Vec3d& max);
 
 	int32 FindLeaf(const Vec3d& point) const;
 
@@ -73,7 +78,7 @@ public:
 	uint32 MaxDepth = 0;
 
 private:
-	int32 ChooseSplitPlane(const Array<Polyhedron>& fragments) const;
+	int32 ChooseSplitPlane(const Array<Polyhedron>& fragments, const Array<Polyhedron>& portal_fragments) const;
 
 private:
 	const PlaneSet* mpPlanes = nullptr;

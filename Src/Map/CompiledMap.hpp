@@ -17,6 +17,8 @@
 
 namespace fx {
 
+constexpr int32 scNoMapArea = -1;
+
 struct CompiledMapVertex
 {
 	Vec3f Position;
@@ -44,6 +46,7 @@ struct CompiledMapMaterial
 struct CompiledMapSurface
 {
 	uint32 MaterialIndex = 0;
+	int32 Area = scNoMapArea;
 
 	BBox Bounds;
 
@@ -95,11 +98,38 @@ struct CompiledMapCollisionMesh
 	uint32 GetPointCount() const { return static_cast<uint32>(Points.Size / 3); }
 };
 
+struct CompiledMapArea
+{
+	BBox Bounds;
+};
+
+struct CompiledMapAreaPortal
+{
+	String Name;
+
+	uint32 BackArea = 0;
+	uint32 FrontArea = 0;
+
+	BBox Bounds;
+
+	SizedArray<float32> Points;
+	SizedArray<uint32> PolygonSizes;
+
+	uint32 GetPointCount() const { return static_cast<uint32>(Points.Size / 3); }
+};
+
+struct CompiledMapAreaNode
+{
+	float32 Plane[4] = {};
+	int32 Front = 0;
+	int32 Back = 0;
+};
+
 class CompiledMap
 {
 public:
 	static constexpr uint32 scMagic = 0x504D5846;
-	static constexpr uint32 scVersion = 6;
+	static constexpr uint32 scVersion = 7;
 	static constexpr const char* scExtension = ".fxmap";
 	static constexpr const char* scPrototypeExtension = ".prx";
 
@@ -157,6 +187,18 @@ public:
 
 	/// The brushes of the prototype that the surfaces and hulls replace, sorted by Load()
 	SizedArray<String> BrushNames;
+
+	SizedArray<CompiledMapArea> Areas;
+	SizedArray<CompiledMapAreaPortal> AreaPortals;
+	SizedArray<CompiledMapAreaNode> AreaNodes;
+	int32 AreaRoot = MakeLeafChild(scNoMapArea);
+
+	bool HasAreas() const { return Areas.Size > 0; }
+
+	int32 FindArea(const Vec3f& point) const;
+
+	static constexpr int32 MakeLeafChild(int32 area) { return -2 - area; }
+	static constexpr int32 GetLeafArea(int32 child) { return -2 - child; }
 };
 
 } // namespace fx

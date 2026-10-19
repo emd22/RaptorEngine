@@ -185,6 +185,8 @@ eTopViewBrushKind GetBrushKind(const Object& object)
 		return eTopViewBrushKind::NvBrush;
 	case eSpecialMaterial::DBound:
 		return eTopViewBrushKind::DBound;
+	case eSpecialMaterial::Portal:
+		return eTopViewBrushKind::Portal;
 	default:
 		break;
 	}

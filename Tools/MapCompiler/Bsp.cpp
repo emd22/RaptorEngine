@@ -15,7 +15,9 @@ struct BuildTask
 	int32 NodeIndex = 0;
 	uint32 Depth = 0;
 	Array<Polyhedron> Fragments;
+	Array<Polyhedron> PortalFragments;
 	Polyhedron Cell;
+	int32 PortalBrush = -1;
 };
 
 bool IsAxial(const Plane& plane)
@@ -23,21 +25,79 @@ bool IsAxial(const Plane& plane)
 	return std::abs(plane.Normal.X) == 1.0 || std::abs(plane.Normal.Y) == 1.0 || std::abs(plane.Normal.Z) == 1.0;
 }
 
+bool ResolveEnclosed(BuildTask& task)
+{
+	for (const Polyhedron& fragment : task.Fragments) {
+		if (!fragment.HasUnusedOriginalSide()) {
+			return true;
+		}
+	}
+
+	for (const Polyhedron& fragment : task.PortalFragments) {
+		if (!fragment.HasUnusedOriginalSide()) {
+			task.PortalBrush = fragment.Source;
+			task.PortalFragments.Clear();
+			break;
+		}
+	}
+
+	return false;
+}
+
+void SplitFragments(const PlaneSet& planes, Array<Polyhedron>& fragments, int32 split_plane,
+					Array<Polyhedron>& out_front, Array<Polyhedron>& out_back)
+{
+	Polyhedron front;
+	Polyhedron back;
+
+	for (Polyhedron& fragment : fragments) {
+		const eSide side = SplitPolyhedron(planes, fragment, split_plane, front, back);
+
+		if (side == eSide::Both) {
+			out_front.Emplace(std::move(front));
+			out_back.Emplace(std::move(back));
+			continue;
+		}
+
+		fragment.MarkPlaneUsed(split_plane);
+
+		if (side == eSide::Front) {
+			out_front.Emplace(std::move(fragment));
+		}
+		else {
+			out_back.Emplace(std::move(fragment));
+		}
+	}
+}
+
 } // namespace
 
-int32 Bsp::ChooseSplitPlane(const Array<Polyhedron>& fragments) const
+int32 Bsp::ChooseSplitPlane(const Array<Polyhedron>& fragments, const Array<Polyhedron>& portal_fragments) const
 {
 	const PlaneSet& planes = *mpPlanes;
 
+	const auto for_each_fragment = [&](const auto& func)
+	{
+		for (const Polyhedron& fragment : fragments) {
+			func(fragment);
+		}
+
+		for (const Polyhedron& fragment : portal_fragments) {
+			func(fragment);
+		}
+	};
+
 	Array<int32> candidates;
 
-	for (const Polyhedron& fragment : fragments) {
-		for (const PolyhedronSide& side : fragment.Sides) {
-			if (side.bOriginal && !side.bUsed) {
-				candidates.Emplace(side.PlaneIndex & ~1);
+	for_each_fragment(
+		[&](const Polyhedron& fragment)
+		{
+			for (const PolyhedronSide& side : fragment.Sides) {
+				if (side.bOriginal && !side.bUsed) {
+					candidates.Emplace(side.PlaneIndex & ~1);
+				}
 			}
-		}
-	}
+		});
 
 	std::sort(candidates.begin(), candidates.end());
 
@@ -63,24 +123,26 @@ int32 Bsp::ChooseSplitPlane(const Array<Polyhedron>& fragments) const
 		int64 back_count = 0;
 		int64 split_count = 0;
 
-		for (const Polyhedron& fragment : fragments) {
-			const Vec3d center = (fragment.Min + fragment.Max) * 0.5;
-			const Vec3d half = (fragment.Max - fragment.Min) * 0.5;
+		for_each_fragment(
+			[&](const Polyhedron& fragment)
+			{
+				const Vec3d center = (fragment.Min + fragment.Max) * 0.5;
+				const Vec3d half = (fragment.Max - fragment.Min) * 0.5;
 
-			const double radius = std::abs(plane.Normal.X) * half.X + std::abs(plane.Normal.Y) * half.Y +
-								  std::abs(plane.Normal.Z) * half.Z;
-			const double distance = plane.DistanceTo(center);
+				const double radius = std::abs(plane.Normal.X) * half.X + std::abs(plane.Normal.Y) * half.Y +
+									  std::abs(plane.Normal.Z) * half.Z;
+				const double distance = plane.DistanceTo(center);
 
-			if (distance - radius >= -scOnEpsilon) {
-				front_count++;
-			}
-			else if (distance + radius <= scOnEpsilon) {
-				back_count++;
-			}
-			else {
-				split_count++;
-			}
-		}
+				if (distance - radius >= -scOnEpsilon) {
+					front_count++;
+				}
+				else if (distance + radius <= scOnEpsilon) {
+					back_count++;
+				}
+				else {
+					split_count++;
+				}
+			});
 
 		int64 score = -(split_count * scSplitPenalty) - std::abs(front_count - back_count);
 
@@ -97,7 +159,8 @@ int32 Bsp::ChooseSplitPlane(const Array<Polyhedron>& fragments) const
 	return best_plane;
 }
 
-void Bsp::Build(PlaneSet& planes, Array<Polyhedron> brushes, const Vec3d& min, const Vec3d& max)
+void Bsp::Build(PlaneSet& planes, Array<Polyhedron> brushes, Array<Polyhedron> portal_brushes, const Vec3d& min,
+				const Vec3d& max)
 {
 	mpPlanes = &planes;
 
@@ -133,6 +196,7 @@ void Bsp::Build(PlaneSet& planes, Array<Polyhedron> brushes, const Vec3d& min, c
 	}
 
 	root.Fragments = std::move(brushes);
+	root.PortalFragments = std::move(portal_brushes);
 
 	Nodes.Emplace();
 
@@ -145,27 +209,19 @@ void Bsp::Build(PlaneSet& planes, Array<Polyhedron> brushes, const Vec3d& min, c
 
 		MaxDepth = std::max(MaxDepth, task.Depth);
 
-		bool is_leaf = task.Fragments.Size == 0;
-		bool is_solid = false;
-
-		for (const Polyhedron& fragment : task.Fragments) {
-			if (!fragment.HasUnusedOriginalSide()) {
-				is_leaf = true;
-				is_solid = true;
-				break;
-			}
-		}
+		bool is_solid = ResolveEnclosed(task);
+		bool is_leaf = is_solid || (task.Fragments.Size == 0 && task.PortalFragments.Size == 0);
 
 		BuildTask front_task;
 		BuildTask back_task;
 		int32 split_plane = PlaneSet::scNone;
 
 		while (!is_leaf) {
-			split_plane = ChooseSplitPlane(task.Fragments);
+			split_plane = ChooseSplitPlane(task.Fragments, task.PortalFragments);
 
 			if (split_plane == PlaneSet::scNone) {
 				is_leaf = true;
-				is_solid = true;
+				is_solid = task.Fragments.Size != 0;
 				break;
 			}
 
@@ -177,17 +233,20 @@ void Bsp::Build(PlaneSet& planes, Array<Polyhedron> brushes, const Vec3d& min, c
 
 			for (Polyhedron& fragment : task.Fragments) {
 				fragment.MarkPlaneUsed(split_plane);
-
-				if (!fragment.HasUnusedOriginalSide()) {
-					is_leaf = true;
-					is_solid = true;
-				}
 			}
+
+			for (Polyhedron& fragment : task.PortalFragments) {
+				fragment.MarkPlaneUsed(split_plane);
+			}
+
+			is_solid = ResolveEnclosed(task);
+			is_leaf = is_solid || (task.Fragments.Size == 0 && task.PortalFragments.Size == 0);
 		}
 
 		if (is_leaf) {
 			Node& node = Nodes[static_cast<size_t>(task.NodeIndex)];
 			node.bSolid = is_solid;
+			node.PortalBrush = is_solid ? -1 : task.PortalBrush;
 			node.Cell = std::move(task.Cell);
 
 			if (is_solid) {
@@ -200,32 +259,16 @@ void Bsp::Build(PlaneSet& planes, Array<Polyhedron> brushes, const Vec3d& min, c
 			continue;
 		}
 
-		Polyhedron front;
-		Polyhedron back;
-
-		for (Polyhedron& fragment : task.Fragments) {
-			const eSide side = SplitPolyhedron(planes, fragment, split_plane, front, back);
-
-			if (side == eSide::Both) {
-				front_task.Fragments.Emplace(std::move(front));
-				back_task.Fragments.Emplace(std::move(back));
-				continue;
-			}
-
-			fragment.MarkPlaneUsed(split_plane);
-
-			if (side == eSide::Front) {
-				front_task.Fragments.Emplace(std::move(fragment));
-			}
-			else {
-				back_task.Fragments.Emplace(std::move(fragment));
-			}
-		}
+		SplitFragments(planes, task.Fragments, split_plane, front_task.Fragments, back_task.Fragments);
+		SplitFragments(planes, task.PortalFragments, split_plane, front_task.PortalFragments,
+					   back_task.PortalFragments);
 
 		front_task.NodeIndex = static_cast<int32>(Nodes.Size);
 		back_task.NodeIndex = front_task.NodeIndex + 1;
 		front_task.Depth = task.Depth + 1;
 		back_task.Depth = task.Depth + 1;
+		front_task.PortalBrush = task.PortalBrush;
+		back_task.PortalBrush = task.PortalBrush;
 
 		Nodes.Emplace();
 		Nodes.Emplace();
@@ -339,7 +382,7 @@ void Bsp::BuildPortals()
 					continue;
 				}
 
-				portals.Emplace(Portal { fragment.Leaf, std::move(fragment.Points) });
+				portals.Emplace(Portal { fragment.Leaf, side.PlaneIndex, std::move(fragment.Points) });
 			}
 		}
 

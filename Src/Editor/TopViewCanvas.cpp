@@ -131,6 +131,8 @@ wxColour GetKindColour(const EditorTheme& theme, eTopViewBrushKind kind)
 		return ToWxColour(theme.Brush.NvBrush);
 	case eTopViewBrushKind::DBound:
 		return ToWxColour(theme.Brush.DBound);
+	case eTopViewBrushKind::Portal:
+		return ToWxColour(theme.Brush.Portal);
 	case eTopViewBrushKind::Decal:
 		return ToWxColour(theme.Brush.Decal);
 	case eTopViewBrushKind::Patch:

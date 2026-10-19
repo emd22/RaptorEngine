@@ -38,6 +38,9 @@ void World::Create()
 
 	pCVarShowProbeVolumes = gCVars->Set<int64>("r_show_volumes", 0);
 	pCVarFrustumCull = gCVars->Set<int64>("r_frustum_cull", 1);
+	pCVarPortalCull = gCVars->Set<int64>("r_portal_cull", 1);
+	pCVarPortalLock = gCVars->Set<int64>("r_portal_lock", 0);
+	pCVarPortalDebug = gCVars->Set<int64>("r_portal_debug", 0);
 	pCVarBakedShadows = gCVars->Set<int64>("r_baked_shadows", 1);
 }
 
@@ -831,7 +834,8 @@ void World::AddShadowCasterRecursive(ObjectID id)
 }
 
 
-void World::AddToRenderListRecursiveByMaterial(ObjectID* id_ptr, const Frustum* frustum)
+void World::AddToRenderListRecursiveByMaterial(ObjectID* id_ptr, const Frustum* frustum,
+											   const PortalVisibility* portals)
 {
 	if (id_ptr == nullptr) {
 		return;
@@ -858,13 +862,19 @@ void World::AddToRenderListRecursiveByMaterial(ObjectID* id_ptr, const Frustum* 
 			}
 		}
 
+		if (is_visible && portals != nullptr && obj->CanBePortalCulled() &&
+			!portals->IsVisible(obj->GetAreas(), obj->GetDrawBounds())) {
+			PortalCulledObjects++;
+			is_visible = false;
+		}
+
 		if (is_visible) {
 			mRenderList.AddObject(GetPipelineForObject(*obj), obj->ID);
 		}
 	}
 
 	for (ObjectID& attached_id : obj->AttachedNodes) {
-		AddToRenderListRecursiveByMaterial(&attached_id, frustum);
+		AddToRenderListRecursiveByMaterial(&attached_id, frustum, portals);
 	}
 }
 
@@ -878,7 +888,8 @@ void World::ClearRenderList()
 	mRenderList.ClearSection(GetShadowListPipeline());
 }
 
-void World::AddTileToRenderList(bool clear, TileIndex new_tile_index, const Frustum* frustum)
+void World::AddTileToRenderList(bool clear, TileIndex new_tile_index, const Frustum* frustum,
+								const PortalVisibility* portals)
 {
 	Tile* tile = gWorldGrid->GetTile(new_tile_index);
 
@@ -924,14 +935,14 @@ void World::AddTileToRenderList(bool clear, TileIndex new_tile_index, const Frus
 			AddShadowCasterRecursive(*object_id);
 		}
 
-		AddToRenderListRecursiveByMaterial(object_id, frustum);
+		AddToRenderListRecursiveByMaterial(object_id, frustum, portals);
 
 		++index;
 	}
 }
 
 
-void World::AddTileToLightList(TileIndex tile_index, const Frustum* frustum)
+void World::AddTileToLightList(TileIndex tile_index, const Frustum* frustum, const PortalVisibility* portals)
 {
 	const Tile* tile = gWorldGrid->GetTile(tile_index);
 
@@ -957,6 +968,15 @@ void World::AddTileToLightList(TileIndex tile_index, const Frustum* frustum)
 			const LightBase* light = gLightManager->GetLight(*light_id);
 
 			if (light != nullptr && light->IsOutsideFrustum(*frustum)) {
+				continue;
+			}
+		}
+
+		if (portals != nullptr) {
+			const LightBase* light = gLightManager->GetLight(*light_id);
+
+			if (light != nullptr && !portals->IsVisible(light->mAreas, light->GetBounds())) {
+				PortalCulledLights++;
 				continue;
 			}
 		}
@@ -989,8 +1009,40 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 	const Frustum* object_frustum = frustum_cull ? &mFrustum : nullptr;
 	const Frustum* light_frustum = (frustum_cull && !gProbeManager->IsBaking()) ? &mFrustum : nullptr;
 
+	PortalCulledObjects = 0;
+	PortalCulledLights = 0;
+
+	const PortalVisibility* portals = nullptr;
+
+	if (pCVarPortalLock->IntValue == 0) {
+		mbPortalLocked = false;
+	}
+	else if (!mbPortalLocked) {
+		mbPortalLocked = true;
+		mLockedViewProjection = cam.GetCameraMatrix(eObjectLayer::WorldLayer);
+		mLockedCameraPosition = cam.Position;
+		mLockedCameraDirection = cam.Direction;
+	}
+
+	if (pCVarPortalCull->IntValue != 0 && !gProbeManager->IsBaking()) {
+		if (mbPortalLocked) {
+			mPortalVisibility.Update(gWorldGrid->GetAreaGraph(), mLockedViewProjection, mLockedCameraPosition);
+		}
+		else {
+			mPortalVisibility.Update(gWorldGrid->GetAreaGraph(), cam.GetCameraMatrix(eObjectLayer::WorldLayer),
+									 cam.Position);
+		}
+	}
+	else {
+		mPortalVisibility.Disable();
+	}
+
+	if (mPortalVisibility.IsActive()) {
+		portals = &mPortalVisibility;
+	}
+
 	mLightList.Clear();
-	AddTileToLightList(WorldGrid::scGlobalTileIndex, light_frustum);
+	AddTileToLightList(WorldGrid::scGlobalTileIndex, light_frustum, portals);
 
 	BBox frustum_bounds = mFrustum.GetFrustumBoundingBox(cam);
 
@@ -1033,12 +1085,12 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 
 			mVisibleTiles.Emplace(ti);
 
-			AddTileToRenderList(false, ti, object_frustum);
-			AddTileToLightList(ti, light_frustum);
+			AddTileToRenderList(false, ti, object_frustum, portals);
+			AddTileToLightList(ti, light_frustum, portals);
 		}
 	}
 
-	AddTileToRenderList(false, WorldGrid::scGlobalTileIndex, object_frustum);
+	AddTileToRenderList(false, WorldGrid::scGlobalTileIndex, object_frustum, portals);
 
 	AddUnculledLightsToLightList();
 }
@@ -1156,6 +1208,8 @@ void World::Render(Camera* shadow_camera)
 #endif
 
 	// DebugDrawWorldGrid();
+
+	DebugDrawPortals();
 
 	// Everything queued this frame, by the calls above or by anything else, is drawn on top of the geometry
 	gDebugDraw->Render(gGraphics->GetFrame()->CmdBuffer, camera);
@@ -1496,6 +1550,144 @@ void World::Destroy()
 	}
 
 	// mPhysicsObjects.Destroy();
+}
+
+static Vec3f UnprojectScreenPoint(const Mat4f& inverse_view_projection, float32 x, float32 y, const Vec3f& eye,
+								  const Vec3f& forward, float32 distance)
+{
+	const Vec4f& row_x = inverse_view_projection.Rows[0];
+	const Vec4f& row_y = inverse_view_projection.Rows[1];
+	const Vec4f& row_z = inverse_view_projection.Rows[2];
+	const Vec4f& row_w = inverse_view_projection.Rows[3];
+
+	constexpr float32 depth = 0.5f;
+
+	const float32 w = x * row_x.W + y * row_y.W + depth * row_z.W + row_w.W;
+	const Vec3f point((x * row_x.X + y * row_y.X + depth * row_z.X + row_w.X) / w,
+					  (x * row_x.Y + y * row_y.Y + depth * row_z.Y + row_w.Y) / w,
+					  (x * row_x.Z + y * row_y.Z + depth * row_z.Z + row_w.Z) / w);
+
+	const Vec3f direction = (point - eye).Normalize();
+
+	return eye + direction * (distance / std::max(direction.Dot(forward), 0.1f));
+}
+
+void World::DebugDrawPortals()
+{
+	const int64 debug_level = pCVarPortalDebug->IntValue;
+	const AreaGraph& graph = gWorldGrid->GetAreaGraph();
+
+	if (debug_level == 0 || graph.IsEmpty()) {
+		return;
+	}
+
+	const Color passed_color = Color::FromRGBA(80, 255, 120, 255);
+	const Color rejected_color = Color::FromRGBA(255, 80, 60, 255);
+	const Color unreached_color = Color::FromRGBA(120, 120, 120, 255);
+	const Color closed_color = Color::FromRGBA(255, 150, 40, 255);
+	const Color visible_area_color = Color::FromRGBA(255, 215, 60, 255);
+	const Color hidden_area_color = Color::FromRGBA(70, 70, 90, 255);
+	const Color rect_color = Color::FromRGBA(60, 220, 255, 255);
+
+	constexpr float32 scNormalLength = 0.3f;
+
+	for (uint32 portal_index = 0; portal_index < graph.GetPortalCount(); portal_index++) {
+		const MapPortal& portal = graph.GetPortal(portal_index);
+
+		Color color = unreached_color;
+
+		switch (mPortalVisibility.GetPortalState(portal_index)) {
+		case ePortalState::Passed:
+			color = passed_color;
+			break;
+		case ePortalState::Rejected:
+			color = rejected_color;
+			break;
+		case ePortalState::Closed:
+			color = closed_color;
+			break;
+		default:
+			break;
+		}
+
+		if (!portal.bOpen) {
+			color = closed_color;
+		}
+
+		uint32 first_point = 0;
+
+		for (size_t polygon = 0; polygon < portal.PolygonSizes.Size; polygon++) {
+			const uint32 size = portal.PolygonSizes[polygon];
+			Vec3f center = Vec3f::sZero;
+
+			for (uint32 point = 0; point < size; point++) {
+				const Vec3f& from = portal.Points[first_point + point];
+				const Vec3f& to = portal.Points[first_point + (point + 1) % size];
+
+				gDebugDraw->Line(from, to, color);
+				center += from;
+			}
+
+			center = center * (1.0f / static_cast<float32>(size));
+
+			gDebugDraw->Line(center, center + portal.PolygonPlanes[polygon].Normal * scNormalLength, color);
+
+			first_point += size;
+		}
+	}
+
+	if (debug_level >= 2) {
+		for (uint32 area = 0; area < graph.GetAreaCount(); area++) {
+			Color color = hidden_area_color;
+
+			if (mPortalVisibility.IsActive() && mPortalVisibility.IsAreaVisible(area)) {
+				color = visible_area_color;
+			}
+
+			gDebugDraw->WireBox(graph.GetArea(area).Bounds, color);
+		}
+	}
+
+	if (!mPortalVisibility.IsActive()) {
+		return;
+	}
+
+	Vec3f eye = mpCurrentCamera->Position;
+	Vec3f forward = mpCurrentCamera->Direction;
+	float32 distance = 0.5f;
+
+	if (mbPortalLocked) {
+		eye = mLockedCameraPosition;
+		forward = mLockedCameraDirection;
+		distance = 2.0f;
+
+		gDebugDraw->WireBox(BBox(eye - Vec3f(0.1f), eye + Vec3f(0.1f)), rect_color);
+	}
+
+	const Mat4f inverse_view_projection = mPortalVisibility.GetViewProjection().Inverse();
+
+	for (uint32 area = 0; area < graph.GetAreaCount(); area++) {
+		if (static_cast<int32>(area) == mPortalVisibility.GetCameraArea() || !mPortalVisibility.IsAreaVisible(area)) {
+			continue;
+		}
+
+		const ScreenRect& rect = mPortalVisibility.GetAreaRect(area);
+
+		const Vec3f corners[4] = {
+			UnprojectScreenPoint(inverse_view_projection, rect.MinX, rect.MinY, eye, forward, distance),
+			UnprojectScreenPoint(inverse_view_projection, rect.MaxX, rect.MinY, eye, forward, distance),
+			UnprojectScreenPoint(inverse_view_projection, rect.MaxX, rect.MaxY, eye, forward, distance),
+			UnprojectScreenPoint(inverse_view_projection, rect.MinX, rect.MaxY, eye, forward, distance),
+		};
+
+		for (uint32 corner = 0; corner < 4; corner++) {
+			gDebugDraw->Line(corners[corner], corners[(corner + 1) % 4], rect_color);
+
+			if (mbPortalLocked) {
+				gDebugDraw->Line(eye, corners[corner], rect_color);
+			}
+		}
+	}
 }
 
 } // namespace fx

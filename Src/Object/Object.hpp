@@ -191,6 +191,7 @@ public:
 	FX_FORCE_INLINE OBBox GetWorldOBB() { return OBBox::FromLocalBounds(Bounds, GetWorldMatrix()); }
 
 	bool CanBeFrustumCulled() const;
+	bool CanBePortalCulled();
 
 	bool IsOutsideFrustum(const Frustum& frustum, uint32 plane_mask = scFrustumAllPlanes);
 
@@ -230,6 +231,9 @@ public:
 
 	void SetCullable(bool value);
 	FX_FORCE_INLINE bool IsCullable() const { return !HasFlag(Flags, eObjectFlags::DisableCulling); }
+
+	FX_FORCE_INLINE const AreaSet& GetAreas() const { return mAreas; }
+	void SetFixedArea(int32 area);
 
 	FX_FORCE_INLINE eObjectFlags GetFlags() const { return Flags; }
 
@@ -319,6 +323,8 @@ private:
 	Vec2u mTileSpan = Vec2u(1, 1);
 
 	uint64 mCullSerial = 0;
+
+	AreaSet mAreas;
 
 	eObjectFlags Flags = eObjectFlags::None;
 	eObjectLayer mObjectLayer = eObjectLayer::WorldLayer;

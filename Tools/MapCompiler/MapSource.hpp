@@ -47,6 +47,8 @@ struct SourceBrush
 	bool bSolid = true;
 	bool bCastsShadow = true;
 
+	bool bPortal = false;
+
 	Array<int32> PlaneIndices;
 	Array<TextureMap> Maps;
 
@@ -106,6 +108,7 @@ public:
 	uint32 EntityBrushCount = 0;
 	uint32 ClipBrushCount = 0;
 	uint32 BoundBrushCount = 0;
+	uint32 PortalBrushCount = 0;
 	uint32 TransparentBrushCount = 0;
 	uint32 CaulkFaceCount = 0;
 	uint32 InvalidBrushCount = 0;

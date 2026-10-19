@@ -440,6 +440,20 @@ const BBox& Object::GetInstancedDrawBounds(Object& source)
 	return mDrawBounds;
 }
 
+void Object::SetFixedArea(int32 area)
+{
+	mAreas = AreaSet::MakeEmpty();
+
+	if (area < 0) {
+		mAreas = AreaSet {};
+	}
+	else {
+		mAreas.Add(static_cast<uint32>(area));
+	}
+
+	mAreas.bFixed = true;
+}
+
 BBox Object::GetDrawBounds()
 {
 	Object* source = FindInstanceSource();
@@ -649,6 +663,8 @@ bool Object::CanBeFrustumCulled() const
 
 	return (Bounds.Max.X > Bounds.Min.X) || (Bounds.Max.Y > Bounds.Min.Y) || (Bounds.Max.Z > Bounds.Min.Z);
 }
+
+bool Object::CanBePortalCulled() { return CanBeFrustumCulled() && FindInstanceSource() == nullptr; }
 
 bool Object::IsOutsideFrustum(const Frustum& frustum, uint32 plane_mask)
 {

@@ -16,7 +16,8 @@ bool IsDecalEntry(const ConfigEntry& entry) { return entry.GetMemberValue(HashSt
 
 const char* ReadBrushMaterialName(const ConfigEntry& entry)
 {
-	for (const eSpecialMaterial special : { eSpecialMaterial::NvBrush, eSpecialMaterial::DBound }) {
+	for (const eSpecialMaterial special :
+		 { eSpecialMaterial::NvBrush, eSpecialMaterial::DBound, eSpecialMaterial::Portal }) {
 		const char* name = GetSpecialMaterialName(special);
 
 		if (entry.GetMemberValue(HashStr32(name), 0) != 0) {

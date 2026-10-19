@@ -22,6 +22,13 @@ constexpr double scEdgeGridCellSize = 2.0;
 constexpr int64 scMaxEdgeGridCells = 4096;
 constexpr double scMinTangentDeterminant = 1e-20;
 constexpr double scAreaTolerance = 1e-6;
+constexpr double scAreaProbeDistance = 1e-3;
+
+struct FacePiece
+{
+	Winding Points;
+	int32 Area = scNoMapArea;
+};
 
 struct Face
 {
@@ -33,7 +40,7 @@ struct Face
 	Vec3d Min = Vec3d(0.0);
 	Vec3d Max = Vec3d(0.0);
 
-	Array<Winding> Visible;
+	Array<FacePiece> Visible;
 };
 
 struct CellKey
@@ -854,12 +861,26 @@ struct SurfaceGroup
 	int32 PlaneIndex = PlaneSet::scNone;
 	int32 MaterialIndex = 0;
 	int32 MapIndex = 0;
+	int32 Area = scNoMapArea;
 
 	Array<Loop> Polygons;
 	Array<Loop> Loops;
 
 	Vec3d Center = Vec3d(0.0);
 };
+
+int32 FindPointArea(const Bsp& bsp, const Vec3d& point, const Vec3d& normal)
+{
+	for (const double offset : { scAreaProbeDistance, -scAreaProbeDistance, 0.0 }) {
+		const Node& leaf = bsp.Nodes[static_cast<size_t>(bsp.FindLeaf(point + normal * offset))];
+
+		if (leaf.Area != scNoMapArea) {
+			return leaf.Area;
+		}
+	}
+
+	return scNoMapArea;
+}
 
 } // namespace
 
@@ -925,7 +946,9 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 			Stats.SourceArea += original_area;
 
 			if (!options.bCullHidden) {
-				face.Visible.Emplace(CopyWinding(side.Points));
+				const int32 area = FindPointArea(bsp, GetWindingCenter(side.Points), planes[side.PlaneIndex].Normal);
+
+				face.Visible.Emplace(FacePiece { CopyWinding(side.Points), area });
 				faces.Emplace(std::move(face));
 				continue;
 			}
@@ -934,6 +957,7 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 			bsp.FilterWinding(side.Points, side.PlaneIndex, fragments);
 
 			double visible_area = 0.0;
+			bool is_one_area = true;
 
 			for (LeafFragment& fragment : fragments) {
 				const Node& leaf = bsp.Nodes[static_cast<size_t>(fragment.Leaf)];
@@ -942,8 +966,12 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 					continue;
 				}
 
+				if (face.Visible.Size > 0 && face.Visible[0].Area != leaf.Area) {
+					is_one_area = false;
+				}
+
 				visible_area += GetWindingArea(fragment.Points);
-				face.Visible.Emplace(std::move(fragment.Points));
+				face.Visible.Emplace(FacePiece { std::move(fragment.Points), leaf.Area });
 			}
 
 			if (face.Visible.Size == 0) {
@@ -951,9 +979,11 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 				continue;
 			}
 
-			if (visible_area >= original_area * (1.0 - scFullFaceTolerance)) {
+			if (is_one_area && visible_area >= original_area * (1.0 - scFullFaceTolerance)) {
+				const int32 area = face.Visible[0].Area;
+
 				face.Visible.Clear();
-				face.Visible.Emplace(CopyWinding(side.Points));
+				face.Visible.Emplace(FacePiece { CopyWinding(side.Points), area });
 			}
 			else {
 				Stats.FacesClipped++;
@@ -994,11 +1024,18 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 				continue;
 			}
 
-			Array<Winding> remaining;
+			Array<FacePiece> remaining;
+			Array<Winding> cut_pieces;
 
-			for (Winding& piece : face.Visible) {
-				if (SubtractConvex(piece, earlier.Original, normal, remaining)) {
+			for (FacePiece& piece : face.Visible) {
+				cut_pieces.Clear();
+
+				if (SubtractConvex(piece.Points, earlier.Original, normal, cut_pieces)) {
 					Stats.OverlapsRemoved++;
+
+					for (Winding& cut_piece : cut_pieces) {
+						remaining.Emplace(FacePiece { std::move(cut_piece), piece.Area });
+					}
 				}
 				else {
 					remaining.Emplace(std::move(piece));
@@ -1012,22 +1049,23 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 	}
 
 	for (Face& face : faces) {
-		for (Winding& piece : face.Visible) {
-			if (IsWindingTiny(piece)) {
+		for (FacePiece& piece : face.Visible) {
+			if (IsWindingTiny(piece.Points)) {
 				continue;
 			}
 
-			mPolygons.Emplace(SurfacePolygon { face.PlaneIndex, face.MaterialIndex, face.MapIndex, std::move(piece) });
+			mPolygons.Emplace(SurfacePolygon { face.PlaneIndex, face.MaterialIndex, face.MapIndex, piece.Area,
+											   std::move(piece.Points) });
 		}
 	}
 }
 
-void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source, const SurfaceOptions& options,
-								 PatchBuilder* patches, CompiledMap& out_map)
+void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const MapSource& source,
+								 const SurfaceOptions& options, PatchBuilder* patches, CompiledMap& out_map)
 {
 	VertexWelder welder;
 
-	std::map<std::tuple<int32, int32, int32>, SurfaceGroup> groups;
+	std::map<std::tuple<int32, int32, int32, int32>, SurfaceGroup> groups;
 
 	for (const SurfacePolygon& polygon : mPolygons) {
 		Loop loop;
@@ -1044,10 +1082,11 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 			continue;
 		}
 
-		SurfaceGroup& group = groups[{ polygon.PlaneIndex, polygon.MaterialIndex, polygon.MapIndex }];
+		SurfaceGroup& group = groups[{ polygon.PlaneIndex, polygon.MaterialIndex, polygon.MapIndex, polygon.Area }];
 		group.PlaneIndex = polygon.PlaneIndex;
 		group.MaterialIndex = polygon.MaterialIndex;
 		group.MapIndex = polygon.MapIndex;
+		group.Area = polygon.Area;
 		group.Polygons.Emplace(std::move(loop));
 	}
 
@@ -1160,6 +1199,7 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 	struct Batch
 	{
 		uint32 MaterialIndex = 0;
+		int32 Area = scNoMapArea;
 
 		Array<CompiledMapVertex> Vertices;
 		Array<LightmapVertex> LightmapVertices;
@@ -1169,7 +1209,7 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 		std::map<std::pair<uint32, int32>, uint32> PatchVertexLookup;
 	};
 
-	std::map<std::tuple<int32, int64, int64, int64>, Batch> batches;
+	std::map<std::tuple<int32, int32, int64, int64, int64>, Batch> batches;
 
 	struct ShadowBatch
 	{
@@ -1279,8 +1319,9 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 				continue;
 			}
 
-			Batch& batch = batches[{ group.MaterialIndex, cell.X, cell.Y, cell.Z }];
+			Batch& batch = batches[{ group.MaterialIndex, group.Area, cell.X, cell.Y, cell.Z }];
 			batch.MaterialIndex = static_cast<uint32>(group.MaterialIndex);
+			batch.Area = group.Area;
 
 			int32 chart_index = -1;
 
@@ -1393,8 +1434,24 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 					}
 				}
 
-				Batch& batch = batches[{ surface.MaterialIndex, cell.X, cell.Y, cell.Z }];
+				const Vec3d& a = surface.Vertices[static_cast<size_t>(surface.Indices[triangle])].Position;
+				const Vec3d& b = surface.Vertices[static_cast<size_t>(surface.Indices[triangle + 1])].Position;
+				const Vec3d& c = surface.Vertices[static_cast<size_t>(surface.Indices[triangle + 2])].Position;
+
+				const Vec3d triangle_normal = (b - a).Cross(c - a);
+				const double normal_length = triangle_normal.Length();
+
+				Vec3d unit_normal = Vec3d(0.0);
+
+				if (normal_length > 0.0) {
+					unit_normal = triangle_normal * (1.0 / normal_length);
+				}
+
+				const int32 area = FindPointArea(bsp, center * (1.0 / 3.0), unit_normal);
+
+				Batch& batch = batches[{ surface.MaterialIndex, area, cell.X, cell.Y, cell.Z }];
 				batch.MaterialIndex = static_cast<uint32>(surface.MaterialIndex);
+				batch.Area = area;
 
 				for (uint32 corner = 0; corner < 3; corner++) {
 					const int32 vertex_index = surface.Indices[triangle + corner];
@@ -1436,6 +1493,7 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const MapSource& source
 	for (auto& [key, batch] : batches) {
 		CompiledMapSurface surface;
 		surface.MaterialIndex = batch.MaterialIndex;
+		surface.Area = batch.Area;
 
 		// surface.Vertices = CopyToSizedArray(batch.Vertices);
 		// surface.Indices = CopyToSizedArray(batch.Indices);
@@ -1516,7 +1574,7 @@ void SurfaceBuilder::Build(const PlaneSet& planes, const Bsp& bsp, const MapSour
 
 	Stats.NumPolygonsBeforeMerge = static_cast<uint32>(mPolygons.Size);
 
-	Triangulate(planes, source, options, patches, out_map);
+	Triangulate(planes, bsp, source, options, patches, out_map);
 }
 
 } // namespace fx::mapc

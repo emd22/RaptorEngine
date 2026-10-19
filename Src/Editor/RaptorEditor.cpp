@@ -106,6 +106,7 @@ static constexpr uint32 scDataTools[static_cast<uint32>(eDataFilter::Count)] = {
 	ToolBit(eEditorTool::Select) | ToolBit(eEditorTool::Light),
 	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Rotate) | ToolBit(eEditorTool::Create),
 	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Rotate) | ToolBit(eEditorTool::Create),
+	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Rotate) | ToolBit(eEditorTool::Create),
 };
 
 static const char* const scCommandScriptPath = "./Scripts/editor/editor_cmd.strata";
@@ -761,6 +762,8 @@ static bool MatchesDataFilter(const Object& object, eDataFilter filter)
 		return object.GetSpecialMaterial() == eSpecialMaterial::NvBrush;
 	case eDataFilter::DBounds:
 		return object.GetSpecialMaterial() == eSpecialMaterial::DBound;
+	case eDataFilter::Portals:
+		return object.GetSpecialMaterial() == eSpecialMaterial::Portal;
 	default:
 		return false;
 	}
@@ -1026,7 +1029,8 @@ void RaptorEditor::DeleteObject(Object* object, int32 group_size)
 static bool IsCreatableDataKind(eDataFilter filter)
 {
 	return filter == eDataFilter::ProbeVolumes || filter == eDataFilter::ReflectionProbes ||
-		   filter == eDataFilter::Volumes || filter == eDataFilter::NvBrushes || filter == eDataFilter::DBounds;
+		   filter == eDataFilter::Volumes || filter == eDataFilter::NvBrushes || filter == eDataFilter::DBounds ||
+		   filter == eDataFilter::Portals;
 }
 
 Object* RaptorEditor::CreateDataBrush(const Brush::PlaneList& planes, const Vec3f position)
@@ -1048,6 +1052,9 @@ Object* RaptorEditor::CreateDataBrush(const Brush::PlaneList& planes, const Vec3
 	}
 	else if (mDataFilter == eDataFilter::DBounds) {
 		snapshot.Material = gWorld->pPrototype->GetSpecialMaterial(eSpecialMaterial::DBound);
+	}
+	else if (mDataFilter == eDataFilter::Portals) {
+		snapshot.Material = gWorld->pPrototype->GetSpecialMaterial(eSpecialMaterial::Portal);
 	}
 
 	Object* created = EmplaceEditOperation<CreateBrushOperation>(planes, snapshot).GetCreated();

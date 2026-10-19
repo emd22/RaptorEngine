@@ -8,10 +8,12 @@
 #include "WorldGrid.hpp"
 
 #include <Engine.hpp>
+#include <Map/CompiledMap.hpp>
 #include <Material/MaterialManagerFwd.hpp>
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Renderer/Light.hpp>
+#include <Renderer/LightManager.hpp>
 #include <World.hpp>
 
 namespace fx {
@@ -151,6 +153,7 @@ void WorldGrid::AddObject(ObjectID id)
 	// The object isn't cullable, insert into global tile
 	if (!object->IsCullable()) {
 		InsertInto(scGlobalTileIndex, object->ID);
+		UpdateObjectAreas(object, true);
 		MarkObjectDirty(object);
 		return;
 	}
@@ -166,6 +169,7 @@ void WorldGrid::AddObject(ObjectID id)
 	object->mTileIndex = tile_start;
 	object->mTileSpan = tile_span;
 
+	UpdateObjectAreas(object, true);
 	MarkObjectDirty(object);
 }
 
@@ -270,6 +274,7 @@ void WorldGrid::AddLight(LightBase* light)
 
 		light->mTileIndex = scGlobalTileIndex;
 		light->mTileSpan = Vec2u(1, 1);
+		UpdateLightAreas(light);
 		return;
 	}
 
@@ -277,6 +282,7 @@ void WorldGrid::AddLight(LightBase* light)
 
 	light->mTileIndex = tile_start;
 	light->mTileSpan = tile_span;
+	UpdateLightAreas(light);
 }
 
 void WorldGrid::UpdateLight(LightBase* light)
@@ -284,6 +290,8 @@ void WorldGrid::UpdateLight(LightBase* light)
 	if (light == nullptr || light->mTileIndex == TileIndexNull) {
 		return;
 	}
+
+	UpdateLightAreas(light);
 
 	TileIndex tile_start = TileIndexNull;
 	Vec2u tile_span = Vec2u(1, 1);
@@ -503,7 +511,71 @@ void WorldGrid::UpdateObject(Object* object, bool update_attached)
 	// Whatever the object was casting into its old tiles is gone, and so is whatever it will cast into the new ones.
 	MarkObjectDirty(object);
 	RelocateObject(object, update_attached);
+	UpdateObjectAreas(object, update_attached);
 	MarkObjectDirty(object);
+}
+
+void WorldGrid::UpdateObjectAreas(Object* object, bool update_attached)
+{
+	if (!object->mAreas.bFixed) {
+		if (mAreaGraph.IsEmpty() || !object->IsCullable()) {
+			object->mAreas = AreaSet {};
+		}
+		else {
+			object->mAreas = mAreaGraph.FindAreas(object->GetDrawBounds());
+		}
+	}
+
+	if (!update_attached) {
+		return;
+	}
+
+	for (ObjectID attached_id : object->AttachedNodes) {
+		Object* attached_object = gObjectManager->GetObject(attached_id);
+
+		if (attached_object != nullptr) {
+			UpdateObjectAreas(attached_object, true);
+		}
+	}
+}
+
+void WorldGrid::UpdateLightAreas(LightBase* light) const
+{
+	if (mAreaGraph.IsEmpty() || !light->IsCullable() || light->mTileIndex == TileIndexNull) {
+		light->mAreas = AreaSet {};
+		return;
+	}
+
+	light->mAreas = mAreaGraph.FindAreas(light->GetBounds());
+}
+
+void WorldGrid::UpdateAllAreas()
+{
+	for (Object& object : gObjectManager->GetCache()) {
+		UpdateObjectAreas(&object, false);
+	}
+
+	for (LightBase* light : gLightManager->GetCache()) {
+		if (light != nullptr) {
+			UpdateLightAreas(light);
+		}
+	}
+}
+
+void WorldGrid::SetAreaGraph(const CompiledMap& map)
+{
+	mAreaGraph.Load(map);
+	UpdateAllAreas();
+}
+
+void WorldGrid::ClearAreaGraph()
+{
+	if (mAreaGraph.IsEmpty()) {
+		return;
+	}
+
+	mAreaGraph.Clear();
+	UpdateAllAreas();
 }
 
 void WorldGrid::MarkObjectDirty(const Object* object)

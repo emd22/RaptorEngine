@@ -59,6 +59,8 @@ static Vec3f GetSpecialMaterialColor(eSpecialMaterial special)
 		return Vec3f(1.0f, 0.6f, 0.15f);
 	case eSpecialMaterial::DBound:
 		return Vec3f(0.35f, 0.5f, 1.0f);
+	case eSpecialMaterial::Portal:
+		return Vec3f(1.0f, 0.9f, 0.2f);
 	default:
 		return Vec3f(1.0f, 1.0f, 1.0f);
 	}

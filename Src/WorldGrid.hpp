@@ -3,6 +3,7 @@
 #include <Core/FreeArray.hpp>
 #include <Core/PagedArray.hpp>
 #include <Core/SizedArray.hpp>
+#include <Map/AreaGraph.hpp>
 #include <Math/BBox.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
@@ -37,6 +38,7 @@ public:
 
 class Object;
 class LightBase;
+class CompiledMap;
 
 class WorldGrid
 {
@@ -129,6 +131,12 @@ public:
 
 	FX_FORCE_INLINE uint32 GetNumTiles() const { return mTileBuffer.Size; }
 
+	void SetAreaGraph(const CompiledMap& map);
+	void ClearAreaGraph();
+
+	FX_FORCE_INLINE const AreaGraph& GetAreaGraph() const { return mAreaGraph; }
+	FX_FORCE_INLINE AreaGraph& GetAreaGraph() { return mAreaGraph; }
+
 
 	~WorldGrid() = default;
 
@@ -148,6 +156,10 @@ private:
 	TileIndex InsertInto(TileIndex tile_index, ObjectID id);
 
 	void RelocateObject(Object* object, bool update_attached);
+
+	void UpdateObjectAreas(Object* object, bool update_attached);
+	void UpdateLightAreas(LightBase* light) const;
+	void UpdateAllAreas();
 
 	void AddObjectsFromTile(std::unordered_set<ObjectID>& object_buffer, const Tile* tile) const;
 
@@ -169,6 +181,8 @@ private:
 
 	SizedArray<ObjectID> mNearbyObjectCache;
 	bool mbNearbyObjectCacheValid = false;
+
+	AreaGraph mAreaGraph;
 };
 
 } // namespace fx

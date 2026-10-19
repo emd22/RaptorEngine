@@ -616,6 +616,8 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	mCompiledProbeLayout.Clear();
 	mbIsCompiledMap = false;
 
+	gWorldGrid->ClearAreaGraph();
+
 	for (const SubviewInstance& instance : mSubviewInstances) {
 		Object* root = gObjectManager->GetObject(instance.RootID);
 
@@ -808,6 +810,10 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 
 		object->Bounds = surface.Bounds;
 
+		if (map.HasAreas()) {
+			object->SetFixedArea(surface.Area);
+		}
+
 		if (!is_transparent) {
 			CompiledDecalReceiver& receiver = mCompiledDecalReceivers.emplace_back();
 			receiver.Bounds = surface.Bounds;
@@ -836,6 +842,8 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 	}
 
 	CreateCompiledShadows(map);
+
+	gWorldGrid->SetAreaGraph(map);
 
 	for (size_t hull_index = 0; hull_index < map.Hulls.Size; hull_index++) {
 		const CompiledMapHull& hull = map.Hulls[hull_index];

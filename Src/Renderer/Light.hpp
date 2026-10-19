@@ -82,6 +82,8 @@ public:
 	TileIndex mTileIndex = TileIndexNull;
 	Vec2u mTileSpan = Vec2u(1, 1);
 
+	AreaSet mAreas;
+
 protected:
 	float32 mRadius = 1.0f;
 };

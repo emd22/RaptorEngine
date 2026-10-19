@@ -243,7 +243,8 @@ void MapSource::AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& nam
 	if (is_probe_volume && !is_reflection_probe) {
 		ProbeRegions.Emplace(OBBox::FromLocalBounds(local_bounds, object_matrix).GetWorldAABB());
 	}
-	else if (!is_marker && !is_transparent && special != eSpecialMaterial::NvBrush) {
+	else if (!is_marker && !is_transparent && special != eSpecialMaterial::NvBrush &&
+			 special != eSpecialMaterial::Portal) {
 		SizedArray<ProbePlacementBoxes::Plane> hull_planes;
 		hull_planes.InitCapacity(brush.IsBox() ? 0 : brush.Planes.Size);
 
@@ -287,6 +288,14 @@ void MapSource::AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& nam
 		source.bCollides = false;
 		BoundBrushCount++;
 		break;
+	case eSpecialMaterial::Portal:
+		source.bVisible = false;
+		source.bCollides = false;
+		source.bSolid = false;
+		source.bCastsShadow = false;
+		source.bPortal = true;
+		PortalBrushCount++;
+		break;
 	case eSpecialMaterial::Caulk:
 		break;
 	default:
@@ -308,6 +317,7 @@ void MapSource::AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& nam
 		case eSpecialMaterial::Caulk:
 		case eSpecialMaterial::NvBrush:
 		case eSpecialMaterial::DBound:
+		case eSpecialMaterial::Portal:
 			return SourceBrush::scDroppedFace;
 		default:
 			break;

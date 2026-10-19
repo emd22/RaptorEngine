@@ -62,6 +62,7 @@ enum class eDataFilter : uint32
 	Lights,
 	NvBrushes,
 	DBounds,
+	Portals,
 
 	Count,
 };

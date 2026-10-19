@@ -1003,6 +1003,17 @@ void RaptorGame::RenderText()
 								.CStr(),
 							1.0f, scWhite);
 
+	const PortalVisibility& portals = gWorld->GetPortalVisibility();
+
+	if (portals.IsActive()) {
+		gTextRenderer->DrawText(
+			String::Fmt("area {} areas {}/{} portals {}/{} portal culled {} lights {}", portals.GetCameraArea(),
+						portals.VisibleAreaCount, gWorldGrid->GetAreaGraph().GetAreaCount(), portals.PortalsPassed,
+						portals.PortalsTested, gWorld->PortalCulledObjects, gWorld->PortalCulledLights)
+				.CStr(),
+			1.0f, scWhite);
+	}
+
 	if (gParticleSystem->GetParticleCount() > 0) {
 		gTextRenderer->DrawText(String::Fmt("part {} ndrawn {} effects {} collrays {} cputime {:.3f}",
 											gParticleSystem->GetParticleCount(), gParticleSystem->GetDrawnCount(),

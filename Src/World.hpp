@@ -4,6 +4,7 @@
 #include "WorldGrid.hpp"
 
 #include <Asset/AssetTicket.hpp>
+#include <Map/PortalVisibility.hpp>
 #include <Math/Frustum.hpp>
 #include <Object/Object.hpp>
 #include <Player.hpp>
@@ -93,6 +94,7 @@ private:
 	void DebugDrawObjectBounds();
 	void DebugDrawLightBounds();
 	void DebugDrawWorldGrid();
+	void DebugDrawPortals();
 
 	void CullWorldTiles(const PerspectiveCamera& cam);
 
@@ -140,8 +142,10 @@ private:
 
 	void AddLoadedObject(Object* object);
 
-	void AddTileToRenderList(bool clear, TileIndex new_tile, const Frustum* frustum = nullptr);
-	void AddTileToLightList(TileIndex tile_index, const Frustum* frustum = nullptr);
+	void AddTileToRenderList(bool clear, TileIndex new_tile, const Frustum* frustum = nullptr,
+							 const PortalVisibility* portals = nullptr);
+	void AddTileToLightList(TileIndex tile_index, const Frustum* frustum = nullptr,
+							const PortalVisibility* portals = nullptr);
 	void AddUnculledLightsToLightList();
 	void ClearRenderList();
 
@@ -153,7 +157,7 @@ private:
 	 * of a multi-primitive mesh can each require a different pipeline, e.g. a skinned primitive attached to a
 	 * container object whose own material differs).
 	 */
-	void AddToRenderListRecursiveByMaterial(ObjectID* id, const Frustum* frustum);
+	void AddToRenderListRecursiveByMaterial(ObjectID* id, const Frustum* frustum, const PortalVisibility* portals);
 
 	void SortTransparentObjects(renderer::Pipeline& pipeline, renderer::RenderListSection& section);
 
@@ -201,10 +205,17 @@ public:
 
 	CVarValue* pCVarShowProbeVolumes = nullptr;
 	CVarValue* pCVarFrustumCull = nullptr;
+	CVarValue* pCVarPortalCull = nullptr;
+	CVarValue* pCVarPortalLock = nullptr;
+	CVarValue* pCVarPortalDebug = nullptr;
 	CVarValue* pCVarBakedShadows = nullptr;
 
 	uint32 FrustumTestedObjects = 0;
 	uint32 FrustumCulledObjects = 0;
+	uint32 PortalCulledObjects = 0;
+	uint32 PortalCulledLights = 0;
+
+	const PortalVisibility& GetPortalVisibility() const { return mPortalVisibility; }
 
 private:
 	Ref<PerspectiveCamera> mpCurrentCamera { nullptr };
@@ -223,6 +234,12 @@ private:
 	DynArray<ObjectID> mSpotShadowCasters;
 
 	Frustum mFrustum;
+	PortalVisibility mPortalVisibility;
+
+	bool mbPortalLocked = false;
+	Mat4f mLockedViewProjection;
+	Vec3f mLockedCameraPosition = Vec3f::sZero;
+	Vec3f mLockedCameraDirection = Vec3f::sForward;
 
 	SizedArray<TileIndex> mVisibleTiles;
 	uint64 mCullSerial = 0;

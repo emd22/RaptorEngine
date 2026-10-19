@@ -13,6 +13,7 @@ enum class eSpecialMaterial : uint32
 	Caulk,
 	NvBrush,
 	DBound,
+	Portal,
 
 	Count,
 	None = Count,
@@ -25,6 +26,7 @@ constexpr const char* scSpecialMaterialNames[] = {
 	"caulk",
 	"nvbrush",
 	"dbound",
+	"portal",
 };
 
 static_assert(std::size(scSpecialMaterialNames) == static_cast<size_t>(eSpecialMaterial::Count));
@@ -59,6 +61,7 @@ constexpr bool IsBrushMarkerMaterial(eSpecialMaterial material)
 	switch (material) {
 	case eSpecialMaterial::NvBrush:
 	case eSpecialMaterial::DBound:
+	case eSpecialMaterial::Portal:
 		return true;
 	default:
 		return false;

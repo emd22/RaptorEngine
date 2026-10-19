@@ -193,6 +193,7 @@ bool CompiledMap::Load(const String& path)
 
 	for (CompiledMapSurface& surface : Surfaces) {
 		surface.MaterialIndex = reader.Read<uint32>();
+		surface.Area = reader.Read<int32>();
 
 		const Vec3f bounds_min = reader.Read<Vec3f>();
 		const Vec3f bounds_max = reader.Read<Vec3f>();
@@ -387,6 +388,92 @@ bool CompiledMap::Load(const String& path)
 		reader.Read(ProbeSunVisibility.pData, probe_visibility_count);
 	}
 
+	Areas.InitSize(reader.ReadCount());
+
+	for (CompiledMapArea& area : Areas) {
+		const Vec3f bounds_min = reader.Read<Vec3f>();
+		const Vec3f bounds_max = reader.Read<Vec3f>();
+
+		area.Bounds = BBox(bounds_min, bounds_max);
+	}
+
+	AreaPortals.InitSize(reader.ReadCount());
+
+	for (CompiledMapAreaPortal& portal : AreaPortals) {
+		portal.Name = reader.ReadString();
+		portal.BackArea = reader.Read<uint32>();
+		portal.FrontArea = reader.Read<uint32>();
+
+		const Vec3f bounds_min = reader.Read<Vec3f>();
+		const Vec3f bounds_max = reader.Read<Vec3f>();
+
+		portal.Bounds = BBox(bounds_min, bounds_max);
+
+		const uint32 point_count = reader.ReadCount();
+		const uint32 polygon_count = reader.ReadCount();
+
+		if (reader.bFailed || portal.BackArea >= Areas.Size || portal.FrontArea >= Areas.Size) {
+			reader.bFailed = true;
+			break;
+		}
+
+		portal.Points.InitSize(static_cast<size_t>(point_count) * 3);
+		portal.PolygonSizes.InitSize(polygon_count);
+
+		reader.Read(portal.Points.pData, portal.Points.Size);
+		reader.Read(portal.PolygonSizes.pData, portal.PolygonSizes.Size);
+
+		uint64 total_size = 0;
+
+		for (const uint32 size : portal.PolygonSizes) {
+			if (size < 3) {
+				reader.bFailed = true;
+			}
+
+			total_size += size;
+		}
+
+		if (total_size != point_count) {
+			reader.bFailed = true;
+		}
+
+		if (reader.bFailed) {
+			break;
+		}
+	}
+
+	AreaNodes.InitSize(reader.ReadCount());
+	reader.Read(AreaNodes.pData, AreaNodes.Size);
+	AreaRoot = reader.Read<int32>();
+
+	const auto is_valid_child = [&](int32 child, size_t limit)
+	{
+		if (child >= 0) {
+			return static_cast<size_t>(child) < limit;
+		}
+
+		const int32 area = GetLeafArea(child);
+		return area == scNoMapArea || (area >= 0 && static_cast<size_t>(area) < Areas.Size);
+	};
+
+	for (size_t i = 0; i < AreaNodes.Size; i++) {
+		if (!is_valid_child(AreaNodes[i].Front, i) || !is_valid_child(AreaNodes[i].Back, i)) {
+			reader.bFailed = true;
+			break;
+		}
+	}
+
+	if (!is_valid_child(AreaRoot, AreaNodes.Size)) {
+		reader.bFailed = true;
+	}
+
+	for (const CompiledMapSurface& surface : Surfaces) {
+		if (surface.Area != scNoMapArea && (surface.Area < 0 || static_cast<size_t>(surface.Area) >= Areas.Size)) {
+			reader.bFailed = true;
+			break;
+		}
+	}
+
 	if (reader.bFailed) {
 		*this = CompiledMap {};
 		return false;
@@ -429,6 +516,7 @@ bool CompiledMap::Save(const String& path) const
 
 	for (const CompiledMapSurface& surface : Surfaces) {
 		writer.Write(surface.MaterialIndex);
+		writer.Write(surface.Area);
 
 		writer.Write(surface.Bounds.Min);
 		writer.Write(surface.Bounds.Max);
@@ -495,7 +583,52 @@ bool CompiledMap::Save(const String& path) const
 	writer.WriteCount(ProbeSunVisibility.Size);
 	writer.Write(ProbeSunVisibility.pData, ProbeSunVisibility.Size);
 
+	writer.WriteCount(Areas.Size);
+
+	for (const CompiledMapArea& area : Areas) {
+		writer.Write(area.Bounds.Min);
+		writer.Write(area.Bounds.Max);
+	}
+
+	writer.WriteCount(AreaPortals.Size);
+
+	for (const CompiledMapAreaPortal& portal : AreaPortals) {
+		writer.WriteString(portal.Name);
+		writer.Write(portal.BackArea);
+		writer.Write(portal.FrontArea);
+		writer.Write(portal.Bounds.Min);
+		writer.Write(portal.Bounds.Max);
+		writer.WriteCount(portal.GetPointCount());
+		writer.WriteCount(portal.PolygonSizes.Size);
+		writer.Write(portal.Points.pData, portal.Points.Size);
+		writer.Write(portal.PolygonSizes.pData, portal.PolygonSizes.Size);
+	}
+
+	writer.WriteCount(AreaNodes.Size);
+	writer.Write(AreaNodes.pData, AreaNodes.Size);
+	writer.Write(AreaRoot);
+
 	return (writer.bFailed == false);
+}
+
+int32 CompiledMap::FindArea(const Vec3f& point) const
+{
+	int32 child = AreaRoot;
+
+	while (child >= 0) {
+		const CompiledMapAreaNode& node = AreaNodes[static_cast<size_t>(child)];
+		const float32 distance = node.Plane[0] * point.X + node.Plane[1] * point.Y + node.Plane[2] * point.Z -
+								 node.Plane[3];
+
+		if (distance >= 0.0f) {
+			child = node.Front;
+		}
+		else {
+			child = node.Back;
+		}
+	}
+
+	return GetLeafArea(child);
 }
 
 bool CompiledMap::HasBrush(const String& name) const

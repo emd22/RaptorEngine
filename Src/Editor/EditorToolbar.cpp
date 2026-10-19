@@ -287,7 +287,7 @@ bool ShowPatchTextureDialog(wxWindow* parent, PatchTextureSettings& settings)
 }
 
 constexpr const char* scDataFilterNames[] = {
-	"All", "Probe Volumes", "Reflection Probes", "Spawn Points", "Volumes", "Lights", "nvbrush", "dbound",
+	"All", "Probe Volumes", "Reflection Probes", "Spawn Points", "Volumes", "Lights", "nvbrush", "dbound", "portal",
 };
 
 static_assert(std::size(scDataFilterNames) == static_cast<size_t>(eDataFilter::Count));

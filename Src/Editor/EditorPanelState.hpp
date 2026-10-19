@@ -115,6 +115,7 @@ enum class eTopViewBrushKind : uint8
 	Volume,
 	NvBrush,
 	DBound,
+	Portal,
 	Decal,
 	Patch,
 };

@@ -1,5 +1,6 @@
 #include "Compiler.hpp"
 
+#include "Areas.hpp"
 #include "Bsp.hpp"
 #include "MapSource.hpp"
 #include "Verify.hpp"
@@ -262,9 +263,9 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 	}
 
 	log(String::Fmt(
-		"  brushes      {} world ({} nvbrush, {} dbound, {} transparent), {} left to the engine, {} invalid",
-		source.Brushes.Size, source.ClipBrushCount, source.BoundBrushCount, source.TransparentBrushCount,
-		source.EntityBrushCount, source.InvalidBrushCount));
+		"  brushes      {} world ({} nvbrush, {} dbound, {} portal, {} transparent), {} left to the engine, {} invalid",
+		source.Brushes.Size, source.ClipBrushCount, source.BoundBrushCount, source.PortalBrushCount,
+		source.TransparentBrushCount, source.EntityBrushCount, source.InvalidBrushCount));
 
 	if (source.CaulkFaceCount > 0) {
 		log(String::Fmt("  caulk        {} faces dropped", source.CaulkFaceCount));
@@ -280,6 +281,7 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 
 	Bsp bsp;
 	FloodResult flood;
+	AreaBuilder areas;
 	SurfaceBuilder surfaces;
 	PatchBuilder patches;
 
@@ -287,14 +289,18 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 
 	if (source.Brushes.Size != 0) {
 		Array<Polyhedron> shapes;
+		Array<Polyhedron> portal_shapes;
 
 		for (const SourceBrush& brush : source.Brushes) {
 			if (brush.bSolid) {
 				shapes.Emplace(brush.Shape.Clone());
 			}
+			else if (brush.bPortal) {
+				portal_shapes.Emplace(brush.Shape.Clone());
+			}
 		}
 
-		bsp.Build(planes, std::move(shapes), source.Min, source.Max);
+		bsp.Build(planes, std::move(shapes), std::move(portal_shapes), source.Min, source.Max);
 		bsp.BuildPortals();
 
 		flood = bsp.FloodFill(source.Entities);
@@ -321,6 +327,17 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 			}
 		}
 
+		areas.Build(planes, bsp, source, sealed);
+
+		for (const String& warning : areas.Warnings) {
+			log(String::Fmt("  warning      {}", warning));
+		}
+
+		if (areas.Stats.AreaCount > 0) {
+			log(String::Fmt("  areas        {} areas, {} portals ({} portal brushes ignored)", areas.Stats.AreaCount,
+							areas.Stats.PortalCount, areas.Stats.IgnoredPortalCount));
+		}
+
 		SurfaceOptions surface_options = options.Surface;
 		surface_options.bMakeLightmapCharts = options.Lightmap.bEnabled && source.bHasSun;
 
@@ -328,6 +345,8 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 
 		surfaces.Build(planes, bsp, source, sealed, surface_options, &patches, map);
 		map.bSealed = sealed;
+
+		areas.Write(planes, bsp, source, map);
 
 		AddHulls(source, map);
 		patches.WriteCollision(surface_options.ChunkSize, map);

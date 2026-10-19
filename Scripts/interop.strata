@@ -235,6 +235,11 @@ extern void particle_stop(long effect);
 extern void particle_kill(long effect);
 extern bool particle_alive(long effect);
 
+/* Portals */
+
+extern bool portal_set_open(cstring name, bool open);
+extern bool portal_is_open(cstring name);
+
 /* CVars */
 
 extern void cvar_set_int(cstring name, long value);
