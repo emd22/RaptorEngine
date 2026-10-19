@@ -218,7 +218,7 @@ ProbePlacementBoxes GatherPlacementBoxes()
 	Blockout* blockout = GetBlockout();
 
 	for (Object& object : gObjectManager->GetCache()) {
-		const bool is_bound = object.IsDBound();
+		const bool is_bound = object.GetSpecialMaterial() == eSpecialMaterial::DBound;
 
 		if (!object.pMesh.IsValid() || object.IsUnlit() ||
 			((!object.IsProbeVisible() || object.HasTransparentMaterial()) && !is_bound)) {

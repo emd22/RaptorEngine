@@ -92,8 +92,6 @@ struct ObjectSnapshot
 	bool bIsReflectionProbe = false;
 	bool bIsSpawn = false;
 	bool bIsTrigger = false;
-	bool bIsNvBrush = false;
-	bool bIsDBound = false;
 	bool bIsDecal = false;
 	bool bIsDynamic = false;
 

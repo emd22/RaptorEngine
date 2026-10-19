@@ -45,7 +45,42 @@ bool MaterialLibrary::Load(const std::string& root)
 
 	LogInfo(LC_ASSET, "Found {} materials in '{}'", mEntries.Size(), root);
 
+	AddMissingSpecialMaterials();
+
 	return mEntries.Size() > 0;
+}
+
+static Vec3f GetSpecialMaterialColor(eSpecialMaterial special)
+{
+	switch (special) {
+	case eSpecialMaterial::Caulk:
+		return Vec3f(0.55f, 0.3f, 0.75f);
+	case eSpecialMaterial::NvBrush:
+		return Vec3f(1.0f, 0.6f, 0.15f);
+	case eSpecialMaterial::DBound:
+		return Vec3f(0.35f, 0.5f, 1.0f);
+	default:
+		return Vec3f(1.0f, 1.0f, 1.0f);
+	}
+}
+
+void MaterialLibrary::AddMissingSpecialMaterials()
+{
+	for (uint32 i = static_cast<uint32>(scFirstNamedSpecialMaterial); i < static_cast<uint32>(eSpecialMaterial::Count);
+		 i++) {
+		const eSpecialMaterial special = static_cast<eSpecialMaterial>(i);
+		const char* name = GetSpecialMaterialName(special);
+
+		if (FindIDByName(name).IsValid()) {
+			continue;
+		}
+
+		MaterialDefinition definition {};
+		definition.Name = name;
+		definition.BaseColor = GetSpecialMaterialColor(special);
+
+		mEntries.Insert(Entry { .EntryName = Name(name), .Definition = std::move(definition) });
+	}
 }
 
 MaterialID MaterialLibrary::CreateMaterial(Entry& entry) const
@@ -53,8 +88,24 @@ MaterialID MaterialLibrary::CreateMaterial(Entry& entry) const
 	const MaterialDefinition& definition = entry.Definition;
 	const char* name = definition.Name.CStr();
 
-	const MaterialID id = gMaterialManager->NewMaterial(definition.Name, false);
-	Material* material = gMaterialManager->GetMaterial(id);
+	const eSpecialMaterial special = FindSpecialMaterial(name);
+
+	MaterialID id = MaterialID::scNull;
+	Material* material = nullptr;
+
+	if (special != eSpecialMaterial::None) {
+		id = MaterialID(special);
+		material = gMaterialManager->ClaimSpecialMaterial(special);
+
+		if (material == nullptr) {
+			entry.Material = id;
+			return id;
+		}
+	}
+	else {
+		id = gMaterialManager->NewMaterial(definition.Name, false);
+		material = gMaterialManager->GetMaterial(id);
+	}
 
 	AttachTexture(material, Material::eResourceType::Diffuse, definition.DiffusePath, name);
 	AttachTexture(material, Material::eResourceType::Normal, definition.NormalPath, name);
@@ -132,6 +183,11 @@ MaterialID MaterialLibrary::GetMaterial(const MaterialLibraryID id) const
 	}
 
 	return entry.Material;
+}
+
+MaterialID MaterialLibrary::GetSpecialMaterial(const eSpecialMaterial special) const
+{
+	return GetMaterial(FindIDByName(GetSpecialMaterialName(special)));
 }
 
 MaterialLibraryID MaterialLibrary::FindID(const MaterialID material) const

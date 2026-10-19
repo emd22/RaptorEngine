@@ -2,6 +2,7 @@
 
 #include <Asset/ConfigFile.hpp>
 #include <Map/CompiledMap.hpp>
+#include <Material/SpecialMaterial.hpp>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -11,26 +12,31 @@
 
 namespace fx {
 
-eBrushKind ReadBrushKind(const ConfigEntry& entry)
+bool IsDecalEntry(const ConfigEntry& entry) { return entry.GetMemberValue(HashStr32(scDecalName), 0) != 0; }
+
+const char* ReadBrushMaterialName(const ConfigEntry& entry)
 {
+	for (const eSpecialMaterial special : { eSpecialMaterial::NvBrush, eSpecialMaterial::DBound }) {
+		const char* name = GetSpecialMaterialName(special);
+
+		if (entry.GetMemberValue(HashStr32(name), 0) != 0) {
+			return name;
+		}
+	}
+
 	const ConfigEntry* material = entry.GetMember(HashStr32("mat"));
-	const char* material_name = (material != nullptr && material->Type == ConfigEntry::ePrimitiveType::String)
-									? material->Get<const char*>()
-									: "";
 
-	if (entry.GetMemberValue(HashStr32(scNvBrushName), 0) != 0 || std::strcmp(material_name, scNvBrushName) == 0) {
-		return eBrushKind::NvBrush;
+	if (material == nullptr || material->Type != ConfigEntry::ePrimitiveType::String) {
+		return "";
 	}
 
-	if (entry.GetMemberValue(HashStr32(scDBoundName), 0) != 0 || std::strcmp(material_name, scDBoundName) == 0) {
-		return eBrushKind::DBound;
+	const char* name = material->Get<const char*>();
+
+	if (name == nullptr) {
+		return "";
 	}
 
-	if (entry.GetMemberValue(HashStr32(scDecalName), 0) != 0) {
-		return eBrushKind::Decal;
-	}
-
-	return eBrushKind::Geometry;
+	return name;
 }
 
 /// Values stored per plane in a blockout's `uvs` array: offset U and V, scale U and V, then rotation

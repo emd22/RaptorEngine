@@ -76,10 +76,6 @@ static constexpr FlagName<eObjectTag> scTagNames[] = {
 	{ eObjectTag::Trigger, "Trigger",
 	  "Blockout brushes only. Calls object_trigger_enter and object_trigger_exit in the object's script when the "
 	  "player enters and leaves it" },
-	{ eObjectTag::NvBrush, "nvbrush",
-	  "Blockout brushes only. Collides but is never drawn. The map compiler keeps only its collider" },
-	{ eObjectTag::DBound, "dbound",
-	  "Blockout brushes only. Seals the map for the map compiler: no faces, no collision" },
 	{ eObjectTag::Patch, "Patch", "Marks a curve patch. Set when the patch is created" },
 };
 

@@ -108,6 +108,7 @@ public:
 	 * @brief Returns the ID of the material assigned to this object.
 	 */
 	FX_FORCE_INLINE const MaterialID& GetMaterialID() const { return mMaterialID; };
+	FX_FORCE_INLINE eSpecialMaterial GetSpecialMaterial() const { return mMaterialID.GetSpecial(); }
 	bool HasTransparentMaterial() const;
 
 	void SetMaterial(const MaterialID& id);
@@ -160,22 +161,20 @@ public:
 	void SetProbeVolume(bool value);
 
 	void SetTrigger(bool value);
-	void SetNvBrush(bool value);
-	void SetDBound(bool value);
 	void SetDecal(bool value);
+
+	void ApplyVolumeState();
 
 	/// True if this object marks out a probe volume rather than being level geometry
 	FX_FORCE_INLINE bool IsProbeVolume() const { return HasTags(eObjectTag::ProbeVolume); }
 	FX_FORCE_INLINE bool IsTrigger() const { return HasTags(eObjectTag::Trigger); }
-	FX_FORCE_INLINE bool IsNvBrush() const { return HasTags(eObjectTag::NvBrush); }
-	FX_FORCE_INLINE bool IsDBound() const { return HasTags(eObjectTag::DBound); }
 	FX_FORCE_INLINE bool IsDecal() const { return HasTags(eObjectTag::Decal); }
 	FX_FORCE_INLINE bool IsPatch() const { return HasTags(eObjectTag::Patch); }
 
 	/// True if this object is a marker of some kind and not drawn as level geometry
 	FX_FORCE_INLINE bool IsVolume() const
 	{
-		return HasTags(eObjectTag::ProbeVolume | eObjectTag::Trigger | eObjectTag::NvBrush | eObjectTag::DBound);
+		return HasTags(eObjectTag::ProbeVolume | eObjectTag::Trigger) || IsBrushMarkerMaterial(GetSpecialMaterial());
 	}
 	FX_FORCE_INLINE bool IsDataBrush() const { return HasTags(eObjectTag::Blockout) && IsVolume(); }
 
@@ -253,8 +252,6 @@ private:
 	void RenderMesh(renderer::Pipeline* pipeline);
 
 	void SyncObjectWithPhysics(physics::Body* phys);
-
-	void ApplyVolumeState();
 
 	Object* CloneNode(const String& name, SkeletonCloneMap& skeletons) const;
 

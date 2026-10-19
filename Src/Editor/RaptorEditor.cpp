@@ -758,9 +758,9 @@ static bool MatchesDataFilter(const Object& object, eDataFilter filter)
 	case eDataFilter::Volumes:
 		return object.IsTrigger() && !object.IsProbeVolume();
 	case eDataFilter::NvBrushes:
-		return object.IsNvBrush();
+		return object.GetSpecialMaterial() == eSpecialMaterial::NvBrush;
 	case eDataFilter::DBounds:
-		return object.IsDBound();
+		return object.GetSpecialMaterial() == eSpecialMaterial::DBound;
 	default:
 		return false;
 	}
@@ -1042,11 +1042,12 @@ Object* RaptorEditor::CreateDataBrush(const Brush::PlaneList& planes, const Vec3
 							   mDataFilter == eDataFilter::ReflectionProbes);
 	snapshot.bIsReflectionProbe = (mDataFilter == eDataFilter::ReflectionProbes);
 	snapshot.bIsTrigger = (mDataFilter == eDataFilter::Volumes);
-	snapshot.bIsNvBrush = (mDataFilter == eDataFilter::NvBrushes);
-	snapshot.bIsDBound = (mDataFilter == eDataFilter::DBounds);
 
-	if (snapshot.bIsDBound) {
-		snapshot.Material = gWorld->pPrototype->GetDBoundMaterial();
+	if (mDataFilter == eDataFilter::NvBrushes) {
+		snapshot.Material = gWorld->pPrototype->GetSpecialMaterial(eSpecialMaterial::NvBrush);
+	}
+	else if (mDataFilter == eDataFilter::DBounds) {
+		snapshot.Material = gWorld->pPrototype->GetSpecialMaterial(eSpecialMaterial::DBound);
 	}
 
 	Object* created = EmplaceEditOperation<CreateBrushOperation>(planes, snapshot).GetCreated();

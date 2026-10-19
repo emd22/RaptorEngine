@@ -4,6 +4,7 @@
 #include <BrushEntry.hpp>
 #include <Core/String.hpp>
 #include <Material/MaterialDefinition.hpp>
+#include <Material/SpecialMaterial.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/Quat.hpp>
 #include <cfloat>
@@ -15,7 +16,6 @@ struct CachedMaterials
 {
 	std::unordered_set<String> ModelColliders;
 	std::unordered_set<String> TransparentMaterials;
-	std::unordered_set<String> CaulkMaterials;
 };
 
 
@@ -106,12 +106,8 @@ void AddEntityPositions(const ConfigEntry* list, Array<Vec3d>& out_entities)
 void ReadMaterialFlags(CachedMaterials& out_materials)
 {
 	for (const MaterialDefinition& definition : LoadMaterialDefinitions(scMaterialRoot)) {
-		if (definition.IsTransparent()) {
+		if (definition.IsTransparent() && FindSpecialMaterial(definition.Name.CStr()) == eSpecialMaterial::None) {
 			out_materials.TransparentMaterials.insert(definition.Name);
-		}
-
-		if (definition.bCaulk) {
-			out_materials.CaulkMaterials.insert(definition.Name);
 		}
 	}
 }
@@ -231,21 +227,15 @@ void MapSource::AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& nam
 	const Quat rotation = ReadRotation(entry);
 	const Transform transform = MakeTransform(rotation, brush.GetCenter(), position);
 
-	const ConfigEntry* material_entry = entry.GetMember(HashStr32("mat"));
-	const String material_name = (material_entry != nullptr &&
-								  material_entry->Type == ConfigEntry::ePrimitiveType::String)
-									 ? material_entry->Get<const char*>()
-									 : "";
-
-	const eBrushKind brush_kind = ReadBrushKind(entry);
+	const String material_name = ReadBrushMaterialName(entry);
+	const eSpecialMaterial special = FindSpecialMaterial(material_name.CStr());
 
 	const bool is_probe_volume = entry.GetMemberValue(HashStr32("probevolume"), 0) != 0;
 	const bool is_reflection_probe = entry.GetMemberValue(HashStr32("reflectionprobe"), 0) != 0;
-	const bool is_marker = is_probe_volume || is_reflection_probe || brush_kind == eBrushKind::Decal ||
+	const bool is_marker = is_probe_volume || is_reflection_probe || IsDecalEntry(entry) ||
 						   entry.GetMemberValue(HashStr32("trigger"), 0) != 0;
 
-	const bool is_transparent = brush_kind == eBrushKind::Geometry && !material_name.IsEmpty() &&
-								mc.TransparentMaterials.contains(material_name);
+	const bool is_transparent = !IsDecalEntry(entry) && mc.TransparentMaterials.contains(material_name);
 
 	const BBox local_bounds(brush.GetBoundsMin(), brush.GetBoundsMax());
 	const Mat4f object_matrix = MakeObjectMatrix(rotation, brush.GetCenter(), position);
@@ -253,7 +243,7 @@ void MapSource::AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& nam
 	if (is_probe_volume && !is_reflection_probe) {
 		ProbeRegions.Emplace(OBBox::FromLocalBounds(local_bounds, object_matrix).GetWorldAABB());
 	}
-	else if (!is_marker && !is_transparent && brush_kind != eBrushKind::NvBrush) {
+	else if (!is_marker && !is_transparent && special != eSpecialMaterial::NvBrush) {
 		SizedArray<ProbePlacementBoxes::Plane> hull_planes;
 		hull_planes.InitCapacity(brush.IsBox() ? 0 : brush.Planes.Size);
 
@@ -261,7 +251,7 @@ void MapSource::AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& nam
 			hull_planes.Insert({ brush.Planes[i].Normal, brush.Planes[i].Distance });
 		}
 
-		if (brush_kind == eBrushKind::DBound) {
+		if (special == eSpecialMaterial::DBound) {
 			ProbePlacement::AddBound(ProbeBoxes, local_bounds, object_matrix, hull_planes);
 		}
 		else {
@@ -284,45 +274,47 @@ void MapSource::AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& nam
 
 	const bool is_locked = entry.GetMemberValue(HashStr32("lock"), 0) == 1;
 
-	if (brush_kind == eBrushKind::NvBrush) {
+	const int32 library_index = is_locked ? scLockedMaterialIndex : scEditableMaterialIndex;
+
+	switch (special) {
+	case eSpecialMaterial::NvBrush:
 		source.bVisible = false;
 		source.bSolid = false;
 		ClipBrushCount++;
-	}
-	else if (brush_kind == eBrushKind::DBound) {
+		break;
+	case eSpecialMaterial::DBound:
 		source.bVisible = false;
 		source.bCollides = false;
 		BoundBrushCount++;
-	}
-	else if (!material_name.IsEmpty()) {
-		source.MaterialIndex = FindOrAddMaterial(material_name,
-												 is_locked ? scLockedMaterialIndex : scEditableMaterialIndex, mc);
+		break;
+	case eSpecialMaterial::Caulk:
+		break;
+	default:
+		source.MaterialIndex = FindOrAddMaterial(material_name, library_index, mc);
 
 		if (is_transparent) {
 			source.bSolid = false;
 			source.bCastsShadow = false;
 			TransparentBrushCount++;
 		}
+		break;
 	}
-	else {
-		source.MaterialIndex = FindOrAddMaterial("", is_locked ? scLockedMaterialIndex : scEditableMaterialIndex, mc);
-	}
-
-	const int32 library_index = is_locked ? scLockedMaterialIndex : scEditableMaterialIndex;
-	const bool is_caulk = mc.CaulkMaterials.contains(material_name);
 
 	const auto get_face_material = [&](const BrushPlane& plane)
 	{
-		if (plane.Material.IsEmpty()) {
-			if (is_caulk) {
-				return SourceBrush::scDroppedFace;
-			}
+		const String& face_material = plane.Material.IsEmpty() ? material_name : plane.Material;
 
-			return source.MaterialIndex;
+		switch (FindSpecialMaterial(face_material.CStr())) {
+		case eSpecialMaterial::Caulk:
+		case eSpecialMaterial::NvBrush:
+		case eSpecialMaterial::DBound:
+			return SourceBrush::scDroppedFace;
+		default:
+			break;
 		}
 
-		if (mc.CaulkMaterials.contains(plane.Material)) {
-			return SourceBrush::scDroppedFace;
+		if (plane.Material.IsEmpty()) {
+			return source.MaterialIndex;
 		}
 
 		return FindOrAddMaterial(plane.Material, library_index, mc);

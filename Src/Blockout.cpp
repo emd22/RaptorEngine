@@ -960,9 +960,9 @@ MaterialLibraryID Blockout::GetCompiledFallbackMaterial(int32 library_index) con
 
 MaterialID Blockout::GetDefaultMaterial() const { return mMaterials.GetMaterial(mDefaultMaterialID); }
 
-MaterialID Blockout::GetDBoundMaterial() const
+MaterialID Blockout::GetSpecialMaterial(eSpecialMaterial special) const
 {
-	return GetMaterialForID(mMaterials.FindIDByName(scDBoundMaterialName));
+	return mMaterials.GetSpecialMaterial(special);
 }
 
 bool Blockout::IsCompiledObject(const Object* object) const
@@ -1678,12 +1678,8 @@ void Blockout::RebuildBrush(Object* object, Brush&& brush, physics::eMotionType 
 		object->SetTrigger(true);
 	}
 
-	if (object->IsNvBrush()) {
-		object->SetNvBrush(true);
-	}
-
-	if (object->IsDBound()) {
-		object->SetDBound(true);
+	if (IsBrushMarkerMaterial(object->GetSpecialMaterial())) {
+		object->ApplyVolumeState();
 	}
 
 	mBrushes.Insert(object->ID.GetID(), std::move(brush));
@@ -1986,26 +1982,19 @@ MaterialID Blockout::ReadBrushMaterial(ConfigEntry& entry)
 		material_id = mMaterials.GetMaterial(mEditableMaterialID);
 	}
 
-	const ConfigEntry* mat_entry = entry.GetMember(HashStr32("mat"));
+	const char* mat_name = ReadBrushMaterialName(entry);
 
-	const eBrushKind brush_kind = ReadBrushKind(entry);
-
-	if (brush_kind == eBrushKind::DBound) {
-		material_id = GetDBoundMaterial();
+	if (mat_name[0] == '\0') {
+		return material_id;
 	}
 
-	const bool has_material = brush_kind == eBrushKind::Geometry || brush_kind == eBrushKind::Decal;
+	const MaterialLibraryID mat_id = mMaterials.FindIDByName(mat_name);
 
-	if (has_material && mat_entry != nullptr && mat_entry->Type == ConfigEntry::ePrimitiveType::String) {
-		const char* mat_name = mat_entry->Get<const char*>();
-		const MaterialLibraryID mat_id = mMaterials.FindIDByName(mat_name);
-
-		if (mat_id.IsValid()) {
-			material_id = GetMaterialForID(mat_id);
-		}
-		else {
-			LogWarning(LC_ASSET, "Blockout '{}' uses the unknown material '{}'", entry.Name.Get(), mat_name);
-		}
+	if (mat_id.IsValid()) {
+		material_id = GetMaterialForID(mat_id);
+	}
+	else {
+		LogWarning(LC_ASSET, "Blockout '{}' uses the unknown material '{}'", entry.Name.Get(), mat_name);
 	}
 
 	return material_id;
@@ -2049,8 +2038,6 @@ ObjectID Blockout::CreateBrush(ConfigEntry& entry)
 		SetFlag(object_tags, eObjectTag::LockTransform);
 	}
 
-	const eBrushKind brush_kind = ReadBrushKind(entry);
-
 	Object* object = gObjectManager->NewObject(blockout_id.Str(), material_id, object_tags);
 	object->MoveBy(position);
 	object->SetShadowCaster(true);
@@ -2092,13 +2079,7 @@ ObjectID Blockout::CreateBrush(ConfigEntry& entry)
 		object->SetTag(eObjectTag::Trigger);
 	}
 
-	if (brush_kind == eBrushKind::NvBrush) {
-		object->SetTag(eObjectTag::NvBrush);
-	}
-	else if (brush_kind == eBrushKind::DBound) {
-		object->SetTag(eObjectTag::DBound);
-	}
-	else if (brush_kind == eBrushKind::Decal) {
+	if (IsDecalEntry(entry)) {
 		object->SetTag(eObjectTag::Decal);
 	}
 
@@ -2281,14 +2262,6 @@ Object* Blockout::DupeObject(Object* object)
 
 	if (object->IsTrigger()) {
 		dupe->SetTag(eObjectTag::Trigger);
-	}
-
-	if (object->IsNvBrush()) {
-		dupe->SetNvBrush(true);
-	}
-
-	if (object->IsDBound()) {
-		dupe->SetDBound(true);
 	}
 
 	if (object->IsDecal()) {
@@ -2989,14 +2962,6 @@ ConfigEntry Blockout::MakeBrushEntry(Object* object, const String& name, const B
 			WriteTriggerEntry(blockout_entry, object);
 		}
 
-		if (object->IsNvBrush()) {
-			blockout_entry.AddMember(ConfigEntry::Literal(scNvBrushName, 1));
-		}
-
-		if (object->IsDBound()) {
-			blockout_entry.AddMember(ConfigEntry::Literal(scDBoundName, 1));
-		}
-
 		if (object->IsDecal()) {
 			blockout_entry.AddMember(ConfigEntry::Literal(scDecalName, 1));
 		}
@@ -3485,7 +3450,8 @@ void Blockout::BuildSubview(Subview& subview)
 			const Brush& brush = member.LocalBrush;
 
 			member.ToSubview = MakeBrushMatrix(ReadBrushPlacement(entry), brush.GetCenter());
-			member.bMerged = !IsEntityBrushEntry(entry) && ReadBrushKind(entry) == eBrushKind::Geometry;
+			member.bMerged = !IsEntityBrushEntry(entry) &&
+							 !IsBrushMarkerMaterial(FindSpecialMaterial(ReadBrushMaterialName(entry)));
 
 			if (!member.bMerged) {
 				continue;

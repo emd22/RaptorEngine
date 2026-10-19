@@ -25,8 +25,6 @@ struct MaterialDefinition
 	bool bUnlit = false;
 	bool bGlass = false;
 
-	bool bCaulk = false;
-
 	std::optional<float32> Metallic;
 	std::optional<float32> Roughness;
 	std::optional<Vec3f> BaseColor;

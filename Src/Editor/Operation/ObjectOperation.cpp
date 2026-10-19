@@ -17,8 +17,8 @@ namespace editor {
 
 
 static constexpr eObjectTag scEditableTags[] = {
-	eObjectTag::LockTransform, eObjectTag::ProbeVolume, eObjectTag::ReflectionProbe, eObjectTag::Spawn,
-	eObjectTag::Trigger,	   eObjectTag::NvBrush,		eObjectTag::DBound,
+	eObjectTag::LockTransform, eObjectTag::ProbeVolume, eObjectTag::ReflectionProbe,
+	eObjectTag::Spawn,		   eObjectTag::Trigger,
 };
 
 static constexpr eObjectFlags scEditableFlags[] = {
@@ -41,8 +41,6 @@ bool CanEditObjectTag(const Object* object, eObjectTag tag)
 	case eObjectTag::ProbeVolume:
 	case eObjectTag::ReflectionProbe:
 	case eObjectTag::Trigger:
-	case eObjectTag::NvBrush:
-	case eObjectTag::DBound:
 		return object->HasTags(eObjectTag::Blockout) && !object->IsDecal() && !object->IsPatch();
 	default:
 		return false;
@@ -145,17 +143,6 @@ static void SetObjectTag(Object& object, eObjectTag tag, bool enabled)
 		break;
 	case eObjectTag::Trigger:
 		object.SetTrigger(enabled);
-		break;
-	case eObjectTag::NvBrush:
-		object.SetNvBrush(enabled);
-		break;
-	case eObjectTag::DBound:
-		object.SetDBound(enabled);
-
-		if (gWorld->pPrototype != nullptr) {
-			gEditor->SetStoredMaterial(&object, enabled ? gWorld->pPrototype->GetDBoundMaterial()
-														: gWorld->pPrototype->GetDefaultMaterial());
-		}
 		break;
 	default:
 		if (enabled) {
@@ -262,14 +249,6 @@ static Object* RestoreBrush(const ObjectSnapshot& snapshot, const Brush::PlaneLi
 		object->SetTrigger(true);
 	}
 
-	if (snapshot.bIsNvBrush) {
-		object->SetNvBrush(true);
-	}
-
-	if (snapshot.bIsDBound) {
-		object->SetDBound(true);
-	}
-
 	gObjectScripts->Attach(object, snapshot.ScriptPath);
 	gObjectScripts->SetRequiredEnterDirection(object->ID, snapshot.EnterDirection);
 
@@ -303,8 +282,6 @@ ObjectSnapshot ObjectSnapshot::Capture(const Object& object, MaterialID material
 		.bIsReflectionProbe = object.IsReflectionProbe(),
 		.bIsSpawn = object.IsSpawn(),
 		.bIsTrigger = object.IsTrigger(),
-		.bIsNvBrush = object.IsNvBrush(),
-		.bIsDBound = object.IsDBound(),
 		.bIsDecal = object.IsDecal(),
 		.bIsDynamic = gWorld->pPrototype->IsDynamic(&object),
 		.ScriptPath = gObjectScripts->GetPath(object.ID),

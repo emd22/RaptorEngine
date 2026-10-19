@@ -13,7 +13,7 @@
 
 namespace fx {
 
-const MaterialID MaterialID::scNull = MaterialID(0);
+const MaterialID MaterialID::scNull = MaterialID(eSpecialMaterial::Null);
 
 void MaterialManager::Create()
 {
@@ -54,6 +54,7 @@ void MaterialManager::Create()
 	// mMaterialPropertiesDS.Build();
 
 	MakeNullMaterial();
+	ReserveSpecialMaterials();
 
 	mbInitialized = true;
 }
@@ -82,7 +83,7 @@ void MaterialManager::MakeNullMaterial()
 {
 	Material* material = mMaterialList.NewItem();
 
-	material->ID = MaterialID(0);
+	material->ID = MaterialID::scNull;
 	material->Name = "NullMaterial";
 	material->Properties = MaterialProperties {};
 	material->mbRequiresSync = true;
@@ -137,9 +138,17 @@ Material* MaterialManager::GetNewMaterial()
 		return nullptr;
 	}
 
-	// Ensure that the null material does not get overwritten
-	Assert(material_index != 0);
-	material->ID = MaterialID(material_index);
+	// Ensure that the null and special materials do not get overwritten
+	Assert(material_index >= static_cast<uint32>(eSpecialMaterial::Count));
+
+	ResetMaterial(material, material_index);
+
+	return material;
+}
+
+void MaterialManager::ResetMaterial(Material* material, uint32 index)
+{
+	material->ID = MaterialID(index);
 	// FreeArray may not call Material ctor, ensure defaults and mark for GPU sync
 	material->Properties = MaterialProperties {};
 	material->bIsBuilt.store(false);
@@ -151,8 +160,45 @@ Material* MaterialManager::GetNewMaterial()
 	material->mbIsReady = false;
 	material->mbIsBeingBuilt = false;
 	material->mbRequiresSync = true;
+}
 
-	return material;
+void MaterialManager::ReserveSpecialMaterials()
+{
+	for (uint32 i = static_cast<uint32>(scFirstNamedSpecialMaterial); i < static_cast<uint32>(eSpecialMaterial::Count);
+		 i++) {
+		uint32 index = 0;
+		Material* material = mMaterialList.NewItem(&index);
+
+		Assert(material != nullptr && index == i);
+
+		ResetMaterial(material, index);
+		material->Name = GetSpecialMaterialName(static_cast<eSpecialMaterial>(i));
+	}
+
+	mClaimedSpecialMaterials = 0;
+}
+
+Material* MaterialManager::ClaimSpecialMaterial(eSpecialMaterial special)
+{
+	if (!mMaterialList.IsInited()) {
+		Create();
+	}
+
+	if (special < scFirstNamedSpecialMaterial || special >= eSpecialMaterial::Count) {
+		return nullptr;
+	}
+
+	std::lock_guard guard(mInUse);
+
+	const uint32 bit = 1u << static_cast<uint32>(special);
+
+	if ((mClaimedSpecialMaterials & bit) != 0) {
+		return nullptr;
+	}
+
+	mClaimedSpecialMaterials |= bit;
+
+	return mMaterialList.GetItem(static_cast<uint32>(special));
 }
 
 Material* MaterialManager::GetMaterial(const MaterialID& id)

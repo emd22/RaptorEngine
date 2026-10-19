@@ -29,6 +29,9 @@ public:
 	MaterialID NewMaterial(const String& name, bool supports_skinning);
 
 	MaterialID TryNewMaterial(const String& name, bool supports_skinning);
+
+	Material* ClaimSpecialMaterial(eSpecialMaterial special);
+
 	Material* GetMaterial(const MaterialID& id);
 	void DestroyMaterial(const MaterialID& id);
 
@@ -42,6 +45,7 @@ public:
 
 private:
 	Material* GetNewMaterial();
+	void ResetMaterial(Material* material, uint32 index);
 
 	/**
 	 * @brief Syncs the properties of material `id` to be accessible in shader.
@@ -49,6 +53,7 @@ private:
 	void SyncMaterialToGpu(Material* material);
 
 	void MakeNullMaterial();
+	void ReserveSpecialMaterials();
 
 public:
 	/**
@@ -65,6 +70,8 @@ public:
 
 private:
 	FreeArray<Material> mMaterialList;
+
+	uint32 mClaimedSpecialMaterials = 0;
 
 	renderer::DescriptorPool mDescriptorPool;
 

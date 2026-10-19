@@ -19,26 +19,11 @@ namespace fx {
 class ConfigEntry;
 class ConfigFile;
 
-enum class eBrushKind
-{
-	Geometry,
-	/// Collides, never drawn
-	NvBrush,
-	/// Seals the map for the map compiler, and is otherwise not there
-	DBound,
-	Decal,
-};
-
-/// Members of a blockout entry that set its kind. Brushes saved before the kinds existed used a material of the same
-/// name instead, which is still read.
-constexpr const char* scNvBrushName = "nvbrush";
-constexpr const char* scDBoundName = "dbound";
 constexpr const char* scDecalName = "decal";
 
-/// Material that map bounds are drawn with while the prototype is loaded. They are not in a compiled map at all.
-constexpr const char* scDBoundMaterialName = "DNU_dbound";
+bool IsDecalEntry(const ConfigEntry& entry);
 
-eBrushKind ReadBrushKind(const ConfigEntry& entry);
+const char* ReadBrushMaterialName(const ConfigEntry& entry);
 
 /**
  * @brief Reads a blockout's brush from either a box (`scale`) or a list of planes (`planes`, with optional face

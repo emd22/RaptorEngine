@@ -9,7 +9,7 @@ namespace fx::editor {
 
 static void ShowAsSelected(Object* object)
 {
-	if (object->HasTags(eObjectTag::Blockout)) {
+	if (object->HasTags(eObjectTag::Blockout) && !IsBrushMarkerMaterial(object->GetSpecialMaterial())) {
 		object->SetMaterial(gWorld->pPrototype->SelectionMaterialID);
 		gWorld->pPrototype->ShowFaceMaterialsSelected(object, true);
 	}

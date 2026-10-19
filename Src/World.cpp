@@ -910,7 +910,7 @@ void World::AddTileToRenderList(bool clear, TileIndex new_tile_index, const Frus
 		// Markers are drawn as wire boxes instead. A map bound is the exception: while the editor is showing data
 		// brushes it is drawn solid, so that it can be told apart from the geometry it seals
 #ifdef FX_IS_EDITOR
-		const bool shows_bound = object->IsDBound() && gEditor->IsDataMode();
+		const bool shows_bound = object->GetSpecialMaterial() == eSpecialMaterial::DBound && gEditor->IsDataMode();
 #else
 		const bool shows_bound = false;
 #endif
@@ -1408,8 +1408,7 @@ void World::DebugDrawProbeVolumes()
 	const Color selected_color = Color::FromRGBA(255, 220, 60, 255);
 
 	for (Object& object : gObjectManager->GetCache()) {
-		// Map bounds are drawn solid with their own material instead
-		if (!object.IsVolume() || object.IsDBound()) {
+		if (!object.IsVolume()) {
 			continue;
 		}
 
@@ -1417,18 +1416,21 @@ void World::DebugDrawProbeVolumes()
 		if (gEditor->IsDataMode() && !gEditor->IsObjectSelectable(&object)) {
 			continue;
 		}
+
+		const bool is_selected = gEditor->GetSelection().Contains(&object);
+#else
+		const bool is_selected = false;
 #endif
+
+		// Map bounds are drawn solid with their own material instead, and only get a wire box to show selection
+		if (object.GetSpecialMaterial() == eSpecialMaterial::DBound && !is_selected) {
+			continue;
+		}
 
 		const Vec3f half_extent = (object.Bounds.Max - object.Bounds.Min) * 0.5f;
 		const Vec3f center = (object.Bounds.Max + object.Bounds.Min) * 0.5f;
 
 		Mat4f world_matrix = Mat4f::AsScale(half_extent) * Mat4f::AsTranslation(center) * object.GetWorldMatrix();
-
-#ifdef FX_IS_EDITOR
-		const bool is_selected = gEditor->GetSelection().Contains(&object);
-#else
-		const bool is_selected = false;
-#endif
 
 		Color color = object.IsReflectionProbe() ? reflection_color : volume_color;
 
@@ -1436,7 +1438,7 @@ void World::DebugDrawProbeVolumes()
 			color = trigger_color;
 		}
 
-		if (object.IsNvBrush()) {
+		if (object.GetSpecialMaterial() == eSpecialMaterial::NvBrush) {
 			color = nvbrush_color;
 		}
 

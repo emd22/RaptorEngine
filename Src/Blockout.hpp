@@ -217,10 +217,7 @@ public:
 	MaterialLibraryID GetIDForMaterial(const MaterialID& material) const;
 	MaterialID GetDefaultMaterial() const;
 
-	/**
-	 * @brief The material that map bounds (dbound) are drawn with, or the default material if the library has none
-	 */
-	MaterialID GetDBoundMaterial() const;
+	MaterialID GetSpecialMaterial(eSpecialMaterial special) const;
 
 	/**
 	 * @brief True if the static world brushes were replaced by a map compiled with mapc. The prototype can't be saved

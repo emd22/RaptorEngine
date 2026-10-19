@@ -52,7 +52,13 @@ void Object::SetMaterial(const MaterialID& id)
 		return;
 	}
 
+	const eSpecialMaterial previous_special = GetSpecialMaterial();
+
 	mMaterialID = id;
+
+	if (IsBrushMarkerMaterial(previous_special) || IsBrushMarkerMaterial(GetSpecialMaterial())) {
+		ApplyVolumeState();
+	}
 
 	// if (bIsAddedToWorld && !ID.IsInvalid() && pMesh.IsValid()) {
 	// 	gWorld->NotifyObjectMaterialChanged(ID);
@@ -837,30 +843,6 @@ void Object::SetTrigger(bool value)
 	ApplyVolumeState();
 }
 
-void Object::SetNvBrush(bool value)
-{
-	if (value) {
-		SetTag(eObjectTag::NvBrush);
-	}
-	else {
-		ClearTag(eObjectTag::NvBrush);
-	}
-
-	ApplyVolumeState();
-}
-
-void Object::SetDBound(bool value)
-{
-	if (value) {
-		SetTag(eObjectTag::DBound);
-	}
-	else {
-		ClearTag(eObjectTag::DBound);
-	}
-
-	ApplyVolumeState();
-}
-
 void Object::SetDecal(bool value)
 {
 	if (value) {
@@ -887,7 +869,7 @@ void Object::ApplyVolumeState()
 
 	if (body != nullptr && body->mbHasPhysicsBody) {
 		// An invisible collider is the one marker that still has to be solid
-		if (is_volume && !IsNvBrush()) {
+		if (is_volume && GetSpecialMaterial() != eSpecialMaterial::NvBrush) {
 			body->RemoveFromWorld();
 		}
 		else {

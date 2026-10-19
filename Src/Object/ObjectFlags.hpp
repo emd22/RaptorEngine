@@ -15,10 +15,6 @@ enum class eObjectTag : uint32
 	ReflectionProbe = (1 << 3),
 	Spawn = (1 << 4),
 	Trigger = (1 << 5),
-	/// A blockout brush that only collides: never drawn, and the map compiler keeps just its collider (nvbrush)
-	NvBrush = (1 << 6),
-	/// A blockout brush that only seals the map for the map compiler, and is otherwise not there (dbound)
-	DBound = (1 << 7),
 	Decal = (1 << 8),
 	Patch = (1 << 9),
 };

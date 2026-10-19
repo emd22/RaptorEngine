@@ -47,10 +47,12 @@ public:
 	const String& GetDiffusePath(const MaterialLibraryID id) const;
 
 	MaterialID GetMaterial(const MaterialLibraryID id) const;
+	MaterialID GetSpecialMaterial(const eSpecialMaterial special) const;
 	MaterialLibraryID FindID(const MaterialID material) const;
 	MaterialLibraryID FindIDByName(const char* name) const;
 
 private:
+	void AddMissingSpecialMaterials();
 	MaterialID CreateMaterial(Entry& entry) const;
 
 private:

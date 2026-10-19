@@ -180,12 +180,13 @@ eTopViewBrushKind GetBrushKind(const Object& object)
 		return eTopViewBrushKind::Volume;
 	}
 
-	if (object.IsNvBrush()) {
+	switch (object.GetSpecialMaterial()) {
+	case eSpecialMaterial::NvBrush:
 		return eTopViewBrushKind::NvBrush;
-	}
-
-	if (object.IsDBound()) {
+	case eSpecialMaterial::DBound:
 		return eTopViewBrushKind::DBound;
+	default:
+		break;
 	}
 
 	if (object.IsDecal()) {
@@ -2024,8 +2025,7 @@ void RaptorEditor::FitDBoundsToLevel()
 
 		ObjectSnapshot snapshot;
 		snapshot.Position = position;
-		snapshot.Material = blockout->GetDBoundMaterial();
-		snapshot.bIsDBound = true;
+		snapshot.Material = blockout->GetSpecialMaterial(eSpecialMaterial::DBound);
 
 		Object* created = EmplaceEditOperation<CreateBrushOperation>(brush.Planes, snapshot, group_size).GetCreated();
 
@@ -2282,8 +2282,14 @@ void RaptorEditor::TopViewSetFaceMaterial(ObjectID face_object, const Vec3f face
 	Object* object = FindTopViewObject(face_object);
 	const Brush* brush = blockout->GetBrush(object);
 
-	if (brush == nullptr || object->IsDecal() || !CanEditObject(object)) {
+	if (brush == nullptr || object->IsDecal() || !CanEditObject(object) ||
+		IsBrushMarkerMaterial(object->GetSpecialMaterial())) {
 		Warn("Only the faces of brushes can have a material of their own");
+		return;
+	}
+
+	if (IsBrushMarkerMaterial(material.GetSpecial())) {
+		Warn("'{}' can only be given to a whole brush", GetSpecialMaterialName(material.GetSpecial()));
 		return;
 	}
 
