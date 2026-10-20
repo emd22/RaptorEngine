@@ -267,8 +267,8 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 		source.Brushes.Size, source.ClipBrushCount, source.BoundBrushCount, source.PortalBrushCount,
 		source.TransparentBrushCount, source.EntityBrushCount, source.InvalidBrushCount));
 
-	if (source.CaulkFaceCount > 0) {
-		log(String::Fmt("  caulk        {} faces dropped", source.CaulkFaceCount));
+	if (source.NonVisFaceCount > 0) {
+		log(String::Fmt("  nonvis       {} faces dropped", source.NonVisFaceCount));
 	}
 
 
@@ -426,8 +426,8 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 	log(String::Fmt("  triangles    {} -> {} ({:+.1f}%), {} vertices in {} surfaces", stats.NumSrcTriangles,
 					stats.NumTriangles, -GetPercentRemoved(stats.NumSrcTriangles, stats.NumTriangles),
 					stats.NumVertices, map.Surfaces.Size));
-	log(String::Fmt("  shadows      {} triangles in {} surfaces, {} of them caulk", stats.NumShadowTriangles,
-					map.ShadowSurfaces.Size, stats.NumCaulkTriangles));
+	log(String::Fmt("  shadows      {} triangles in {} surfaces, {} of them nonvis", stats.NumShadowTriangles,
+					map.ShadowSurfaces.Size, stats.NumNonVisTriangles));
 	log(String::Fmt("  area         {:.1f} -> {:.1f} m2 ({:+.1f}%)", stats.SourceArea, stats.Area,
 					-GetPercentRemoved(stats.SourceArea, stats.Area)));
 	if (source.Patches.Size > 0) {

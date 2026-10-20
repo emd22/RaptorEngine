@@ -118,6 +118,8 @@ enum class eTopViewBrushKind : uint8
 	Portal,
 	Decal,
 	Patch,
+
+	Count,
 };
 
 struct TopViewEdge
@@ -133,6 +135,10 @@ struct TopViewFace
 	Vec2f A = Vec2f::sZero;
 	Vec2f B = Vec2f::sZero;
 	Vec2f Normal = Vec2f::sZero;
+
+	Vec2f TextureOffset = Vec2f::sZero;
+	float32 TextureScale = 2.0f;
+	float32 TextureRotation = 0.0f;
 
 	bool operator==(const TopViewFace& other) const = default;
 };

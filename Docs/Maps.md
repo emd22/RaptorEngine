@@ -18,8 +18,8 @@ Data brushes are solely for storing data and bounds, or portraying an abstract c
 
 As well as these two categories of brushes, there are two other brushes that are special to the engine.
 
-- DBounds: A brush that have no visibility and no collision, but mark an end of a map to the map compiler.
-- NVBrush: A Non-Visible Brush that has collision but is omitted from mesh construction during map compilation. This is somewhat equivalent to a caulk brush in Quake/CoD radiant.
+- dbounds: A brush that have no visibility and no collision, but mark an end of a map to the map compiler.
+- nonvis: A Non-Visible Brush that has collision but is omitted from mesh construction during map compilation. This is somewhat equivalent to a caulk brush in Quake/CoD radiant.
 
 # Maps
 

@@ -4,7 +4,7 @@
 #include <Core/FilesystemIO.hpp>
 #include <Core/Hash.hpp>
 #include <Core/Log.hpp>
-
+#include <Material/SpecialMaterial.hpp>
 #include <algorithm>
 #include <filesystem>
 #include <system_error>
@@ -41,6 +41,17 @@ static String ReadTexturePath(const ConfigEntry* entry, const char* key, const s
 	return String(directory + "/" + conventional_name);
 }
 
+static String GetDefinitionName(const String& stem)
+{
+	const eSpecialMaterial special = FindSystemMaterial(stem.CStr());
+
+	if (special != eSpecialMaterial::None) {
+		return GetSpecialMaterialName(special);
+	}
+
+	return stem;
+}
+
 static MaterialDefinition ReadDefinition(const std::filesystem::path& file_path, const std::string& directory,
 										 const std::string& source_path)
 {
@@ -53,7 +64,7 @@ static MaterialDefinition ReadDefinition(const std::filesystem::path& file_path,
 	const ConfigEntry* entry = file.GetEntry(HashStr32("material"));
 
 	MaterialDefinition definition {};
-	definition.Name = String(stem);
+	definition.Name = String(GetDefinitionName(stem));
 	definition.SourcePath = String(source_path);
 
 	definition.DiffusePath = ReadTexturePath(entry, "diffuse", directory, resolved_directory, stem, "diffuse");
@@ -108,7 +119,8 @@ std::vector<MaterialDefinition> LoadMaterialDefinitions(const std::string& root)
 			  { return a.stem().string() < b.stem().string(); });
 
 	for (const std::filesystem::path& file_path : files) {
-		const std::string relative_directory = file_path.parent_path().lexically_relative(resolved_root).generic_string();
+		const std::string relative_directory =
+			file_path.parent_path().lexically_relative(resolved_root).generic_string();
 
 		std::string directory = root;
 
@@ -117,14 +129,14 @@ std::vector<MaterialDefinition> LoadMaterialDefinitions(const std::string& root)
 		}
 
 		const std::string source_path = directory + "/" + file_path.filename().string();
-		const std::string stem = file_path.stem().string();
+		const String name = GetDefinitionName(file_path.stem().string());
 
 		const bool is_duplicate = std::any_of(definitions.begin(), definitions.end(),
-											  [&stem](const MaterialDefinition& other)
-											  { return other.Name == stem.c_str(); });
+											  [&name](const MaterialDefinition& other)
+											  { return other.Name == name.CStr(); });
 
 		if (is_duplicate) {
-			LogWarning(LC_ASSET, "Skipping the material '{}': the name '{}' is already defined", source_path, stem);
+			LogWarning(LC_ASSET, "Skipping the material '{}': the name '{}' is already defined", source_path, name);
 			continue;
 		}
 

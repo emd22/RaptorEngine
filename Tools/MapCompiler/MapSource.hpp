@@ -110,7 +110,7 @@ public:
 	uint32 BoundBrushCount = 0;
 	uint32 PortalBrushCount = 0;
 	uint32 TransparentBrushCount = 0;
-	uint32 CaulkFaceCount = 0;
+	uint32 NonVisFaceCount = 0;
 	uint32 InvalidBrushCount = 0;
 	uint32 PatchCount = 0;
 

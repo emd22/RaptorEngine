@@ -546,7 +546,7 @@ void WorldGrid::UpdateLightAreas(LightBase* light) const
 		return;
 	}
 
-	light->mAreas = mAreaGraph.FindAreas(light->GetBounds());
+	light->mAreas = mAreaGraph.FindLightAreas(light->GetPosition(), light->GetBounds());
 }
 
 void WorldGrid::UpdateAllAreas()

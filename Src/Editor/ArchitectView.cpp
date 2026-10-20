@@ -621,6 +621,7 @@ TopViewState RaptorEditor::BuildTopViewState()
 	{
 		Vec3f Normal;
 		SizedArray<Vec3f> Points;
+		BrushFaceTexture Texture;
 	};
 
 	DoublingArray<WorldFace> faces;
@@ -675,6 +676,7 @@ TopViewState RaptorEditor::BuildTopViewState()
 
 			WorldFace& out_face = faces.Emplace();
 			out_face.Normal = normal * (1.0f / std::max(normal.Length(), 1e-6f));
+			out_face.Texture = brush->Planes[face.PlaneIndex].Texture;
 			out_face.Points.InitCapacity(face.Vertices.Size);
 
 			for (uint32 i = 0; i < face.Vertices.Size; i++) {
@@ -753,7 +755,12 @@ TopViewState RaptorEditor::BuildTopViewState()
 				}
 
 				if (max_along - min_along >= scMinFaceLength) {
-					projection.Faces.Insert(TopViewFace { .A = min_point, .B = max_point, .Normal = unit });
+					projection.Faces.Insert(TopViewFace { .A = min_point,
+														  .B = max_point,
+														  .Normal = unit,
+														  .TextureOffset = -face.Texture.Offset * face.Texture.Scale,
+														  .TextureScale = std::fabs(face.Texture.Scale.X),
+														  .TextureRotation = face.Texture.Rotation });
 				}
 			}
 
@@ -2141,8 +2148,20 @@ static bool ApplyTextureCommand(Brush& brush, uint32 plane_index, const TextureC
 	case eTextureCommand::Shift:
 		texture.Offset = texture.Offset - command.Amount * step / texture.Scale;
 		break;
-	case eTextureCommand::Scale: {
-		const Vec2f scale = texture.Scale * command.Amount;
+	case eTextureCommand::SetOffsetU:
+		texture.Offset.X = -command.Amount.X / texture.Scale.X;
+		break;
+	case eTextureCommand::SetOffsetV:
+		texture.Offset.Y = -command.Amount.X / texture.Scale.Y;
+		break;
+	case eTextureCommand::Scale:
+	case eTextureCommand::SetScale: {
+		Vec2f scale = texture.Scale + command.Amount;
+
+		if (command.Type == eTextureCommand::SetScale) {
+			scale = Vec2f(std::copysign(command.Amount.X, texture.Scale.X),
+						  std::copysign(command.Amount.Y, texture.Scale.Y));
+		}
 
 		if (std::fabs(scale.X) < scMinTextureScale || std::fabs(scale.Y) < scMinTextureScale ||
 			std::fabs(scale.X) > scMaxTextureScale || std::fabs(scale.Y) > scMaxTextureScale) {
@@ -2154,7 +2173,13 @@ static bool ApplyTextureCommand(Brush& brush, uint32 plane_index, const TextureC
 		break;
 	}
 	case eTextureCommand::Rotate:
-		texture.Rotation = std::fmod(texture.Rotation + command.Amount.X, scDegreesPerTurn);
+	case eTextureCommand::SetRotation:
+		if (command.Type == eTextureCommand::SetRotation) {
+			texture.Rotation = std::fmod(command.Amount.X, scDegreesPerTurn);
+		}
+		else {
+			texture.Rotation = std::fmod(texture.Rotation + command.Amount.X, scDegreesPerTurn);
+		}
 
 		if (texture.Rotation < 0.0f) {
 			texture.Rotation += scDegreesPerTurn;

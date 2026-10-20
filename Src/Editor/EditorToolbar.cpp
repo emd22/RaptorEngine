@@ -102,39 +102,17 @@ struct TextureButtonInfo
 	bool bSeparated;
 };
 
-const TextureButtonInfo scTextureButtons[] = {
-	{ "< U",
-	  "Slide the texture back along U by one grid step (Alt+Left)",
-	  { eTextureCommand::Shift, Vec2f(-1.0f, 0.0f) },
-	  false },
-	{ "U >",
-	  "Slide the texture along U by one grid step (Alt+Right)",
-	  { eTextureCommand::Shift, Vec2f(1.0f, 0.0f) },
-	  false },
-	{ "< V",
-	  "Slide the texture back along V by one grid step, up on walls (Alt+Up)",
-	  { eTextureCommand::Shift, Vec2f(0.0f, -1.0f) },
-	  false },
-	{ "V >",
-	  "Slide the texture along V by one grid step, down on walls (Alt+Down)",
-	  { eTextureCommand::Shift, Vec2f(0.0f, 1.0f) },
-	  false },
-	{ "Tile -", "Halve the size of the texture (Alt+[)", { eTextureCommand::Scale, Vec2f(0.5f) }, true },
-	{ "Tile +", "Double the size of the texture (Alt+])", { eTextureCommand::Scale, Vec2f(2.0f) }, false },
-	{ "\u21BA 15\u00B0",
-	  "Turn the texture 15 degrees CW (Alt+,)",
-	  { eTextureCommand::Rotate, Vec2f(-15.0f, 0.0f) },
-	  true },
-	{ "\u21BB 15\u00B0",
-	  "Turn the texture 15 degrees CCWy (Alt+.)",
-	  { eTextureCommand::Rotate, Vec2f(15.0f, 0.0f) },
-	  false },
+const TextureButtonInfo scTextureAlignButtons[] = {
 	{ "Reset", "Put the texture back to how a new box of this size lays it out", { eTextureCommand::Reset }, true },
 	{ "World Align",
 	  "Line the texture up with the world grid, so it carries on across neighbouring brushes",
 	  { eTextureCommand::WorldAlign },
 	  false },
 };
+
+constexpr Vec2f scTextureOffsetLimits = Vec2f(-100000.0f, 100000.0f);
+constexpr Vec2f scTextureScaleLimits = Vec2f(1.0f / 64.0f, 1024.0f);
+constexpr Vec2f scTextureRotationLimits = Vec2f(-360.0f, 360.0f);
 
 struct PatchMappingInfo
 {
@@ -815,7 +793,43 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 								  "when no face is picked");
 		mpFaceRow->Add(texture_label, wxSizerFlags().CenterVertical().Border(wxLEFT, 4));
 
-		for (const TextureButtonInfo& info : scTextureButtons) {
+		mpTextureOffsetUField = new FloatField(parent, "U", scTextureOffsetLimits);
+		mpTextureOffsetUField->SetValue(0.0f);
+		mpTextureOffsetUField->GetLabel()->SetToolTip("How far the texture is slid along U, in world units "
+													  "(Alt+Left and Alt+Right slide it by one grid step)");
+		mpTextureOffsetUField->SetOnChange(
+			[this](const float32 value)
+			{ mpCanvas->RunTextureCommand(TextureCommand { eTextureCommand::SetOffsetU, Vec2f(value, 0.0f) }); });
+
+		mpTextureOffsetVField = new FloatField(parent, "V", scTextureOffsetLimits);
+		mpTextureOffsetVField->SetValue(0.0f);
+		mpTextureOffsetVField->GetLabel()->SetToolTip("How far the texture is slid along V, in world units, down on "
+													  "walls (Alt+Up and Alt+Down slide it by one grid step)");
+		mpTextureOffsetVField->SetOnChange(
+			[this](const float32 value)
+			{ mpCanvas->RunTextureCommand(TextureCommand { eTextureCommand::SetOffsetV, Vec2f(value, 0.0f) }); });
+
+		mpTextureScaleField = new FloatField(parent, "Tile", scTextureScaleLimits);
+		mpTextureScaleField->SetValue(BrushFaceTexture {}.Scale.X);
+		mpTextureScaleField->GetLabel()->SetToolTip("World units per repeat of the texture. Larger values make the "
+													"texture bigger (Alt+[ and Alt+])");
+		mpTextureScaleField->SetOnChange(
+			[this](const float32 value)
+			{ mpCanvas->RunTextureCommand(TextureCommand { eTextureCommand::SetScale, Vec2f(value) }); });
+
+		mpTextureRotationField = new FloatField(parent, "Rotate", scTextureRotationLimits);
+		mpTextureRotationField->SetValue(BrushFaceTexture {}.Rotation);
+		mpTextureRotationField->GetLabel()->SetToolTip("How far the texture is turned, in degrees (Alt+, and Alt+.)");
+		mpTextureRotationField->SetOnChange(
+			[this](const float32 value)
+			{ mpCanvas->RunTextureCommand(TextureCommand { eTextureCommand::SetRotation, Vec2f(value, 0.0f) }); });
+
+		mpFaceRow->Add(mpTextureOffsetUField->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+		mpFaceRow->Add(mpTextureOffsetVField->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+		mpFaceRow->Add(mpTextureScaleField->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+		mpFaceRow->Add(mpTextureRotationField->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+
+		for (const TextureButtonInfo& info : scTextureAlignButtons) {
 			wxButton* button = new wxButton(parent, wxID_ANY, wxString::FromUTF8(info.pLabel), wxDefaultPosition,
 											wxDefaultSize, wxBU_EXACTFIT);
 			button->SetToolTip(info.pToolTip);
@@ -837,6 +851,26 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 
 			mpFaceRow->Add(button, wxSizerFlags().CenterVertical().Border(wxLEFT, border));
 		}
+
+		mpCanvas->SetOnFaceTextureChanged(
+			[this](const TopViewFace& face)
+			{
+				if (!mpTextureOffsetUField->HasFocus()) {
+					mpTextureOffsetUField->SetValue(face.TextureOffset.X);
+				}
+
+				if (!mpTextureOffsetVField->HasFocus()) {
+					mpTextureOffsetVField->SetValue(face.TextureOffset.Y);
+				}
+
+				if (!mpTextureScaleField->HasFocus()) {
+					mpTextureScaleField->SetValue(face.TextureScale);
+				}
+
+				if (!mpTextureRotationField->HasFocus()) {
+					mpTextureRotationField->SetValue(face.TextureRotation);
+				}
+			});
 
 		mpToolRow->Add(mpFaceRow, wxSizerFlags().Expand().Border(wxTOP | wxBOTTOM, scItemBorder));
 

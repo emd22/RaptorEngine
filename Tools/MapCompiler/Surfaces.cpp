@@ -1293,9 +1293,9 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 				cell = GetCell(center, options.ChunkSize);
 			}
 
-			const bool is_caulk = group.MaterialIndex == SourceBrush::scDroppedFace;
+			const bool is_nonvis = group.MaterialIndex == SourceBrush::scDroppedFace;
 
-			if (is_caulk || source.OpaqueMaterials[static_cast<size_t>(group.MaterialIndex)] != 0) {
+			if (is_nonvis || source.OpaqueMaterials[static_cast<size_t>(group.MaterialIndex)] != 0) {
 				ShadowBatch& shadow = shadow_batches[{ cell.X, cell.Y, cell.Z }];
 
 				for (size_t t = 0; t + 2 < triangle_indices.Size; t += 3) {
@@ -1314,8 +1314,8 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 				}
 			}
 
-			if (is_caulk) {
-				Stats.NumCaulkTriangles += static_cast<uint32>(triangle_indices.Size / 3);
+			if (is_nonvis) {
+				Stats.NumNonVisTriangles += static_cast<uint32>(triangle_indices.Size / 3);
 				continue;
 			}
 

@@ -111,7 +111,7 @@ constexpr double scMetricSteps[] = { 0.1, 0.5, 1.0, 5.0, 10.0, 50.0, 100.0, 500.
 
 constexpr int scDimMarkerAlpha = 110;
 
-constexpr uint32 scKindCount = 8;
+constexpr uint32 scKindCount = static_cast<uint32>(eTopViewBrushKind::Count);
 constexpr uint32 scBucketCount = scKindCount * 2;
 
 constexpr int scDimGeometryAlpha = 70;
@@ -680,6 +680,7 @@ void TopViewCanvas::ApplyState(const TopViewState& state)
 	}
 
 	SyncCurveFromSelection();
+	SyncTextureFromPickedFace();
 
 	TryInitialFit();
 	UpdateHover();
@@ -979,6 +980,25 @@ void TopViewCanvas::SyncCurveFromSelection()
 		}
 
 		return;
+	}
+}
+
+void TopViewCanvas::SyncTextureFromPickedFace()
+{
+	if (!mbHasPickedFace || !mpOnFaceTextureChanged) {
+		return;
+	}
+
+	const TopViewBrush* brush = FindBrush(mPickedFaceBrushId);
+
+	if (brush == nullptr) {
+		return;
+	}
+
+	const TopViewFace* face = FindMatchingFace(Projection(*brush), ToVec2d(mPickedFaceNormal));
+
+	if (face != nullptr) {
+		mpOnFaceTextureChanged(*face);
 	}
 }
 
@@ -3475,6 +3495,7 @@ void TopViewCanvas::FinishFace()
 		mbHasPickedFace = true;
 		mPickedFaceBrushId = mGrabbedBrushId;
 		mPickedFaceNormal = mGrabbedFace.Normal;
+		SyncTextureFromPickedFace();
 	}
 
 	if (mPreview.Kind != eDrag::Face || std::fabs(mPreview.Shift) < 1e-6) {

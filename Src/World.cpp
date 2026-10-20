@@ -467,6 +467,7 @@ void World::ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Cam
 		}
 
 		object->Update();
+		object->UpdateIfOutOfDate();
 
 		// Push the direct index for the object id
 		consts.ObjectIndex = object->GetDrawIndex();
@@ -918,10 +919,12 @@ void World::AddTileToRenderList(bool clear, TileIndex new_tile_index, const Frus
 
 		object->mCullSerial = mCullSerial;
 
-		// Markers are drawn as wire boxes instead. A map bound is the exception: while the editor is showing data
-		// brushes it is drawn solid, so that it can be told apart from the geometry it seals
+		// Markers are drawn as wire boxes instead. Map bounds and portals are the exception: while the editor is
+		// showing data brushes they are drawn solid, so that they can be told apart from the geometry around them
 #ifdef FX_IS_EDITOR
-		const bool shows_bound = object->GetSpecialMaterial() == eSpecialMaterial::DBound && gEditor->IsDataMode();
+		const eSpecialMaterial special = object->GetSpecialMaterial();
+		const bool shows_bound = (special == eSpecialMaterial::DBound || special == eSpecialMaterial::Portal) &&
+								 gEditor->IsDataMode();
 #else
 		const bool shows_bound = false;
 #endif
@@ -1476,8 +1479,11 @@ void World::DebugDrawProbeVolumes()
 		const bool is_selected = false;
 #endif
 
-		// Map bounds are drawn solid with their own material instead, and only get a wire box to show selection
-		if (object.GetSpecialMaterial() == eSpecialMaterial::DBound && !is_selected) {
+		// Map bounds and portals are drawn solid with their own material instead, and only get a wire box to show
+		// selection
+		const eSpecialMaterial special = object.GetSpecialMaterial();
+
+		if ((special == eSpecialMaterial::DBound || special == eSpecialMaterial::Portal) && !is_selected) {
 			continue;
 		}
 

@@ -82,6 +82,10 @@ public:
 	void SetOnStatus(std::function<void(const wxString&)> handler) { mpOnStatus = std::move(handler); }
 	void SetOnArchChanged(std::function<void(const ArchSettings&)> handler) { mpOnArchChanged = std::move(handler); }
 	void SetOnCurveChanged(std::function<void(const CurveSettings&)> handler) { mpOnCurveChanged = std::move(handler); }
+	void SetOnFaceTextureChanged(std::function<void(const TopViewFace&)> handler)
+	{
+		mpOnFaceTextureChanged = std::move(handler);
+	}
 
 	wxBitmap Render(const wxSize& size);
 
@@ -276,6 +280,7 @@ private:
 	void DrawPatchLattices(wxGraphicsContext& gc);
 	void NotifyCurveChanged();
 	void SyncCurveFromSelection();
+	void SyncTextureFromPickedFace();
 	void SyncWeightFromHandles();
 
 	void UpdatePreview();
@@ -433,6 +438,7 @@ private:
 	std::chrono::steady_clock::time_point mNoticeTime;
 	std::function<void(const ArchSettings&)> mpOnArchChanged;
 	std::function<void(const CurveSettings&)> mpOnCurveChanged;
+	std::function<void(const TopViewFace&)> mpOnFaceTextureChanged;
 };
 
 } // namespace fx::editor

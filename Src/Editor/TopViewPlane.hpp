@@ -114,8 +114,12 @@ struct PatchCommand
 enum class eTextureCommand : uint8
 {
 	Shift,
+	SetOffsetU,
+	SetOffsetV,
 	Scale,
+	SetScale,
 	Rotate,
+	SetRotation,
 	Reset,
 	WorldAlign,
 };

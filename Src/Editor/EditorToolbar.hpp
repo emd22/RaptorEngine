@@ -85,6 +85,10 @@ private:
 	FloatField* mpCurveWeightField = nullptr;
 	OutlineToggleButton* mpCurveThickenButton = nullptr;
 	OutlineToggleButton* mpCurveCapButton = nullptr;
+	FloatField* mpTextureOffsetUField = nullptr;
+	FloatField* mpTextureOffsetVField = nullptr;
+	FloatField* mpTextureScaleField = nullptr;
+	FloatField* mpTextureRotationField = nullptr;
 
 	bool mbShows2D = false;
 	eEditorTool mTool = eEditorTool::Select;

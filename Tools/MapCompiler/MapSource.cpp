@@ -296,7 +296,7 @@ void MapSource::AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& nam
 		source.bPortal = true;
 		PortalBrushCount++;
 		break;
-	case eSpecialMaterial::Caulk:
+	case eSpecialMaterial::NonVis:
 		break;
 	default:
 		source.MaterialIndex = FindOrAddMaterial(material_name, library_index, mc);
@@ -314,7 +314,7 @@ void MapSource::AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& nam
 		const String& face_material = plane.Material.IsEmpty() ? material_name : plane.Material;
 
 		switch (FindSpecialMaterial(face_material.CStr())) {
-		case eSpecialMaterial::Caulk:
+		case eSpecialMaterial::NonVis:
 		case eSpecialMaterial::NvBrush:
 		case eSpecialMaterial::DBound:
 		case eSpecialMaterial::Portal:
@@ -363,7 +363,7 @@ void MapSource::AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& nam
 		source.FaceMaterials.Emplace(get_face_material(plane));
 
 		if (source.bVisible && GetLast(source.FaceMaterials) == SourceBrush::scDroppedFace) {
-			CaulkFaceCount++;
+			NonVisFaceCount++;
 		}
 	}
 

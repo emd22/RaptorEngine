@@ -42,7 +42,7 @@ struct SurfaceStats
 	uint32 NumTriangles = 0;
 	uint32 NumVertices = 0;
 	uint32 NumShadowTriangles = 0;
-	uint32 NumCaulkTriangles = 0;
+	uint32 NumNonVisTriangles = 0;
 
 	double SourceArea = 0.0;
 	double Area = 0.0;

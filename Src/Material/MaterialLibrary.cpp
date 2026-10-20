@@ -53,7 +53,7 @@ bool MaterialLibrary::Load(const std::string& root)
 static Vec3f GetSpecialMaterialColor(eSpecialMaterial special)
 {
 	switch (special) {
-	case eSpecialMaterial::Caulk:
+	case eSpecialMaterial::NonVis:
 		return Vec3f(0.55f, 0.3f, 0.75f);
 	case eSpecialMaterial::NvBrush:
 		return Vec3f(1.0f, 0.6f, 0.15f);

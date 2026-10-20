@@ -22,6 +22,7 @@
 #include <Core/FilesystemIO.hpp>
 #include <Core/Log.hpp>
 #include <Engine.hpp>
+#include <Material/SpecialMaterial.hpp>
 #include <World.hpp>
 #include <algorithm>
 #include <cctype>
@@ -380,6 +381,10 @@ void MaterialPickerPanel::RebuildRows()
 
 	for (uint32 slot = 0; slot < mShownLibrary.Names.Size; slot++) {
 		const String& name = mShownLibrary.Names[slot];
+
+		if (IsSystemMaterialName(name.CStr()) || IsBrushMarkerMaterial(FindSpecialMaterial(name.CStr()))) {
+			continue;
+		}
 
 		if (!filter.IsEmpty() && ToLower(name).FindNext(0, filter) == String::scNotFound) {
 			continue;

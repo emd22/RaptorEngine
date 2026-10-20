@@ -206,4 +206,67 @@ AreaSet AreaGraph::FindAreas(const BBox& bounds) const
 	return set;
 }
 
+static bool BoundsOverlap(const BBox& a, const BBox& b)
+{
+	return a.Min.X <= b.Max.X && a.Max.X >= b.Min.X && a.Min.Y <= b.Max.Y && a.Max.Y >= b.Min.Y &&
+		   a.Min.Z <= b.Max.Z && a.Max.Z >= b.Min.Z;
+}
+
+void AreaGraph::AddLightSeedArea(const Vec3f& point, AreaSet& out_set) const
+{
+	const int32 area = FindArea(point);
+
+	if (area >= 0 && static_cast<uint32>(area) < mAreas.Size) {
+		out_set.Add(static_cast<uint32>(area));
+	}
+}
+
+AreaSet AreaGraph::FindLightAreas(const Vec3f& origin, const BBox& bounds) const
+{
+	if (IsEmpty()) {
+		return AreaSet {};
+	}
+
+	AreaSet set = AreaSet::MakeEmpty();
+
+	AddLightSeedArea(origin, set);
+
+	static constexpr float32 scSeedOffsets[] = { 0.05f, 0.25f };
+
+	for (const float32 offset : scSeedOffsets) {
+		if (set.Count != 0) {
+			break;
+		}
+
+		const Vec3f steps[] = { Vec3f(offset, 0.0f, 0.0f), Vec3f(0.0f, offset, 0.0f), Vec3f(0.0f, 0.0f, offset) };
+
+		for (const Vec3f& step : steps) {
+			AddLightSeedArea(origin + step, set);
+			AddLightSeedArea(origin - step, set);
+		}
+	}
+
+	if (set.Count == 0) {
+		return FindAreas(bounds);
+	}
+
+	for (uint32 i = 0; i < set.Count && !set.bEverywhere; i++) {
+		const MapArea& area = mAreas[set.Areas[i]];
+
+		for (const uint32 portal_index : area.Portals) {
+			const MapPortal& portal = mPortals[portal_index];
+
+			if (BoundsOverlap(portal.Bounds, bounds)) {
+				set.Add(portal.GetOtherArea(set.Areas[i]));
+			}
+
+			if (set.bEverywhere) {
+				break;
+			}
+		}
+	}
+
+	return set;
+}
+
 } // namespace fx

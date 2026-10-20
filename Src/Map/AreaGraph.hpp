@@ -73,9 +73,11 @@ public:
 
 	int32 FindArea(const Vec3f& point) const;
 	AreaSet FindAreas(const BBox& bounds) const;
+	AreaSet FindLightAreas(const Vec3f& origin, const BBox& bounds) const;
 
 private:
 	void CollectAreas(int32 child, const Vec3f& center, const Vec3f& extent, AreaSet& out_set) const;
+	void AddLightSeedArea(const Vec3f& point, AreaSet& out_set) const;
 
 private:
 	SizedArray<MapAreaNode> mNodes;

@@ -1,16 +1,16 @@
 #pragma once
 
 #include <Core/Types.hpp>
-
 #include <cstring>
 #include <iterator>
+#include <string>
 
 namespace fx {
 
 enum class eSpecialMaterial : uint32
 {
 	Null = 0,
-	Caulk,
+	NonVis,
 	NvBrush,
 	DBound,
 	Portal,
@@ -19,14 +19,10 @@ enum class eSpecialMaterial : uint32
 	None = Count,
 };
 
-constexpr eSpecialMaterial scFirstNamedSpecialMaterial = eSpecialMaterial::Caulk;
+constexpr eSpecialMaterial scFirstNamedSpecialMaterial = eSpecialMaterial::NonVis;
 
 constexpr const char* scSpecialMaterialNames[] = {
-	"null",
-	"caulk",
-	"nvbrush",
-	"dbound",
-	"portal",
+	"null", "nonvis", "nvbrush", "dbound", "portal",
 };
 
 static_assert(std::size(scSpecialMaterialNames) == static_cast<size_t>(eSpecialMaterial::Count));
@@ -54,6 +50,23 @@ inline eSpecialMaterial FindSpecialMaterial(const char* name)
 	}
 
 	return eSpecialMaterial::None;
+}
+
+constexpr const char* scSystemMaterialPrefix = "SYS_";
+constexpr size_t scSystemMaterialPrefixLength = std::char_traits<char>::length(scSystemMaterialPrefix);
+
+inline bool IsSystemMaterialName(const char* name)
+{
+	return name != nullptr && std::strncmp(name, scSystemMaterialPrefix, scSystemMaterialPrefixLength) == 0;
+}
+
+inline eSpecialMaterial FindSystemMaterial(const char* name)
+{
+	if (!IsSystemMaterialName(name)) {
+		return eSpecialMaterial::None;
+	}
+
+	return FindSpecialMaterial(name + scSystemMaterialPrefixLength);
 }
 
 constexpr bool IsBrushMarkerMaterial(eSpecialMaterial material)
