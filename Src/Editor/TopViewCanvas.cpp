@@ -884,6 +884,7 @@ void TopViewCanvas::RunPatchCommand(ePatchCommand type)
 	command.Closure = mCurve.Closure;
 	command.Thickness = mCurve.Thickness;
 	command.Weight = mCurve.Weight;
+	command.Color = mCurve.Color;
 	command.Texture = mCurve.Texture;
 
 	DynArray<TopViewVertexHandle> handles = mSelectedVertices.Clone();
@@ -891,7 +892,8 @@ void TopViewCanvas::RunPatchCommand(ePatchCommand type)
 
 	if (type != ePatchCommand::SetSubdivisions && type != ePatchCommand::SetSmooth &&
 		type != ePatchCommand::MapTexture && type != ePatchCommand::SetClosure && type != ePatchCommand::SetWeight &&
-		type != ePatchCommand::RoundWeights) {
+		type != ePatchCommand::RoundWeights && type != ePatchCommand::TurnCells && type != ePatchCommand::SetColor &&
+		type != ePatchCommand::SetAlpha) {
 		mSelectedVertices.Clear();
 	}
 
@@ -946,8 +948,19 @@ void TopViewCanvas::SyncWeightFromHandles()
 				continue;
 			}
 
+			bool changed = false;
+
 			if (projection.ControlWeights[i] != mCurve.Weight) {
 				mCurve.Weight = projection.ControlWeights[i];
+				changed = true;
+			}
+
+			if (i < projection.ControlColors.Size && !(projection.ControlColors[i] == mCurve.Color)) {
+				mCurve.Color = projection.ControlColors[i];
+				changed = true;
+			}
+
+			if (changed) {
 				NotifyCurveChanged();
 			}
 
@@ -4406,6 +4419,30 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 		return;
 	}
 
+	if (!command && mDrag == eDrag::None && (key == WXK_PAGEUP || key == WXK_PAGEDOWN) && UsesHandles() &&
+		mSelectedVertices.IsNotEmpty()) {
+		double distance = step;
+
+		if (event.AltDown()) {
+			distance *= scNudgeFineFactor;
+		}
+		else if (shift) {
+			distance *= scNudgeCoarseFactor;
+		}
+
+		if (key == WXK_PAGEDOWN) {
+			distance = -distance;
+		}
+
+		DynArray<TopViewVertexHandle> handles = mSelectedVertices.Clone();
+		const Vec3f offset = ToWorldVector(Vec2d(0.0, 0.0), distance * Axes().DepthSign);
+		const eViewPlane plane = mPlane;
+
+		SendCommand([plane, handles = std::move(handles), offset]
+					{ gEditor->TopViewMoveVertices(plane, handles, offset); });
+		return;
+	}
+
 	if (command) {
 		if (key == 'Z') {
 			SendCommand(shift ? std::function<void()>([] { gEditor->Redo(); })
@@ -4517,6 +4554,14 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 		break;
 	case 'U':
 		SendCommand([] { gEditor->TopViewToggleSnap(); });
+		break;
+	case 'E':
+		if (mTool == eEditorTool::Curve && mDrag == eDrag::None) {
+			RunPatchCommand(ePatchCommand::TurnCells);
+		}
+		else {
+			event.Skip();
+		}
 		break;
 	case 'H':
 		if (mDrag != eDrag::None) {

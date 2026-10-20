@@ -196,7 +196,16 @@ Patch ReadPatchEntry(ConfigEntry& entry)
 		return {};
 	}
 
-	Patch patch = Patch::FromGrid(size[0].Get<uint32>(), size[1].Get<uint32>());
+	const bool is_detail_mesh = entry.GetMemberValue<int32>(HashStr32("detailmesh"), 0) != 0;
+
+	Patch patch;
+
+	if (is_detail_mesh) {
+		patch = Patch::FromDetailMesh(size[0].Get<uint32>(), size[1].Get<uint32>());
+	}
+	else {
+		patch = Patch::FromGrid(size[0].Get<uint32>(), size[1].Get<uint32>());
+	}
 
 	if (patch.Points.IsEmpty()) {
 		LogError("Patch '{}' has an invalid size", entry.Name.Get());
@@ -235,9 +244,48 @@ Patch ReadPatchEntry(ConfigEntry& entry)
 		}
 	}
 
+	ConfigEntry* colors_entry = entry.GetMember(HashStr32("colors"));
+
+	if (colors_entry != nullptr) {
+		const PagedArray<ConfigPrimitive>& colors = colors_entry->GetArrayData();
+
+		if (colors.Size() == patch.Points.Size * 4) {
+			for (uint32 i = 0; i < patch.Points.Size; i++) {
+				PatchColor& color = patch.Points[i].Color;
+
+				color.R = std::clamp(colors[i * 4].Get<float32>(), 0.0f, 1.0f);
+				color.G = std::clamp(colors[i * 4 + 1].Get<float32>(), 0.0f, 1.0f);
+				color.B = std::clamp(colors[i * 4 + 2].Get<float32>(), 0.0f, 1.0f);
+				color.A = std::clamp(colors[i * 4 + 3].Get<float32>(), 0.0f, 1.0f);
+			}
+		}
+		else {
+			LogError("Patch '{}' has {} colour values, expected {}", entry.Name.Get(), colors.Size(),
+					 patch.Points.Size * 4);
+		}
+	}
+
+	ConfigEntry* turned_entry = entry.GetMember(HashStr32("turned"));
+
+	if (is_detail_mesh && turned_entry != nullptr) {
+		const PagedArray<ConfigPrimitive>& turned = turned_entry->GetArrayData();
+
+		for (uint32 i = 0; i < turned.Size(); i++) {
+			const uint32 cell = turned[i].Get<uint32>();
+
+			if (cell < patch.TurnedCells.Size) {
+				patch.TurnedCells[cell] = 1;
+			}
+			else {
+				LogError("Patch '{}' turns cell {}, which is outside its {} cells", entry.Name.Get(), cell,
+						 patch.TurnedCells.Size);
+			}
+		}
+	}
+
 	ConfigEntry* subdivisions_entry = entry.GetMember(HashStr32("subdiv"));
 
-	if (subdivisions_entry != nullptr && subdivisions_entry->GetArrayData().Size() >= 2) {
+	if (!is_detail_mesh && subdivisions_entry != nullptr && subdivisions_entry->GetArrayData().Size() >= 2) {
 		const PagedArray<ConfigPrimitive>& subdivisions = subdivisions_entry->GetArrayData();
 
 		patch.SubdivisionsU = std::clamp(subdivisions[0].Get<uint32>(), Patch::scMinSubdivisions,
@@ -292,10 +340,43 @@ void WritePatchEntry(ConfigEntry& entry, const Patch& patch)
 		entry.AddMember(std::move(weights_array));
 	}
 
-	ConfigEntry subdivisions_array = ConfigEntry::Array("subdiv", ConfigPrimitive::ePrimitiveType::Int);
-	subdivisions_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(patch.SubdivisionsU)));
-	subdivisions_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(patch.SubdivisionsV)));
-	entry.AddMember(std::move(subdivisions_array));
+	if (patch.HasVertexColors()) {
+		ConfigEntry colors_array = ConfigEntry::Array("colors", ConfigPrimitive::ePrimitiveType::Float);
+
+		for (const PatchPoint& point : patch.Points) {
+			colors_array.AppendValue(ConfigPrimitive::FromValue(point.Color.R));
+			colors_array.AppendValue(ConfigPrimitive::FromValue(point.Color.G));
+			colors_array.AppendValue(ConfigPrimitive::FromValue(point.Color.B));
+			colors_array.AppendValue(ConfigPrimitive::FromValue(point.Color.A));
+		}
+
+		entry.AddMember(std::move(colors_array));
+	}
+
+	if (patch.bIsDetailMesh) {
+		entry.AddMember(ConfigEntry::Literal("detailmesh", static_cast<int32>(1)));
+
+		const bool has_turned = std::any_of(patch.TurnedCells.begin(), patch.TurnedCells.end(),
+											[](uint8 flag) { return flag != 0; });
+
+		if (has_turned) {
+			ConfigEntry turned_array = ConfigEntry::Array("turned", ConfigPrimitive::ePrimitiveType::Int);
+
+			for (uint32 cell = 0; cell < patch.TurnedCells.Size; cell++) {
+				if (patch.TurnedCells[cell] != 0) {
+					turned_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(cell)));
+				}
+			}
+
+			entry.AddMember(std::move(turned_array));
+		}
+	}
+	else {
+		ConfigEntry subdivisions_array = ConfigEntry::Array("subdiv", ConfigPrimitive::ePrimitiveType::Int);
+		subdivisions_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(patch.SubdivisionsU)));
+		subdivisions_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(patch.SubdivisionsV)));
+		entry.AddMember(std::move(subdivisions_array));
+	}
 
 	entry.AddMember(ConfigEntry::Literal("smooth", static_cast<int32>(patch.bSmooth)));
 
@@ -578,8 +659,7 @@ bool ReadSubviewFile(const ConfigFile& info, const String& prototype_path, const
 		}
 
 		ConfigEntry resolved = instance.Clone(instance.Name.Get());
-		resolved.GetMember(HashStr32(scSubviewMemberName))
-			->Set(ResolveNestedSubviewName(subview_name, reference));
+		resolved.GetMember(HashStr32(scSubviewMemberName))->Set(ResolveNestedSubviewName(subview_name, reference));
 
 		out_instances.AddMember(std::move(resolved));
 	}

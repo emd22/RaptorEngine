@@ -212,6 +212,12 @@ public:
 		Flags = value ? (Flags | eObjectFlags::Lightmapped) : (Flags & ~eObjectFlags::Lightmapped);
 	}
 
+	FX_FORCE_INLINE bool IsVertexColored() const { return (Flags & eObjectFlags::VertexColored) != 0; }
+	FX_FORCE_INLINE void SetVertexColored(const bool value)
+	{
+		Flags = value ? (Flags | eObjectFlags::VertexColored) : (Flags & ~eObjectFlags::VertexColored);
+	}
+
 	FX_FORCE_INLINE bool IsShadowOnly() const { return (Flags & eObjectFlags::ShadowOnly) != 0; }
 	FX_FORCE_INLINE void SetShadowOnly(const bool value)
 	{

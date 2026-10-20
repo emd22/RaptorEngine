@@ -393,10 +393,11 @@ constexpr ePipelineFeatures scStartupFeatures[] = {
 };
 
 ePipelineFeatures GetGeometryShaderVariant(ePipelineFeatures features, std::vector<ShaderMacro>& out_macros,
-										   eVertexType& out_vertex_type, const char*& out_suffix,
-										   bool samples_lightmap = false)
+										   eVertexType& out_vertex_type, std::string& out_suffix,
+										   bool samples_lightmap = false, bool samples_vertex_colors = false)
 {
 	static const ShaderMacro scLightmap { .pcName = "USE_LIGHTMAP", .pcValue = "1" };
+	static const ShaderMacro scVertexColor { .pcName = "USE_VERTEX_COLOR", .pcValue = "1" };
 
 	static const ShaderMacro scNormalMaps { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" };
 	static const ShaderMacro scSkinning { .pcName = "USE_SKINNING", .pcValue = "1" };
@@ -409,7 +410,7 @@ ePipelineFeatures GetGeometryShaderVariant(ePipelineFeatures features, std::vect
 	if (HasFlag(features, ePipelineFeatures::Skinned)) {
 		out_macros = { scNormalMaps, scSkinning };
 		out_vertex_type = eVertexType::Skinned;
-		out_suffix = is_unlit ? "SkinnedUnlit" : "Skinned";
+		out_suffix = "Skinned";
 		variant = ePipelineFeatures::Skinned;
 	}
 	else {
@@ -420,20 +421,33 @@ ePipelineFeatures GetGeometryShaderVariant(ePipelineFeatures features, std::vect
 			out_suffix = "NormalMaps";
 			variant = ePipelineFeatures::NormalMap;
 		}
-		else {
-			out_suffix = is_unlit ? "Unlit" : "";
-		}
 
-		if (samples_lightmap && !is_unlit && HasFlag(features, ePipelineFeatures::Lightmap)) {
+		const bool has_lightmap = samples_lightmap && !is_unlit && HasFlag(features, ePipelineFeatures::Lightmap);
+		const bool has_color = samples_vertex_colors && HasFlag(features, ePipelineFeatures::VertexColor);
+
+		if (has_lightmap) {
 			out_macros.push_back(scLightmap);
 			out_vertex_type = eVertexType::Lightmapped;
-			out_suffix = HasFlag(variant, ePipelineFeatures::NormalMap) ? "NormalMapsLightmap" : "Lightmap";
+			out_suffix += "Lightmap";
 			variant |= ePipelineFeatures::Lightmap;
+		}
+
+		if (has_color) {
+			out_macros.push_back(scVertexColor);
+			out_vertex_type = eVertexType::Colored;
+
+			if (has_lightmap) {
+				out_vertex_type = eVertexType::LightmappedColored;
+			}
+
+			out_suffix += "VertexColor";
+			variant |= ePipelineFeatures::VertexColor;
 		}
 	}
 
 	if (is_unlit) {
 		out_macros.push_back(scUnlit);
+		out_suffix += "Unlit";
 		variant |= ePipelineFeatures::Unlit;
 	}
 
@@ -491,9 +505,9 @@ bool TiledForwardRenderer::MakeForwardDesc(ePipelinePass pass, ePipelineFeatures
 		return false;
 	}
 
-	const char* suffix = "";
+	std::string suffix;
 	out_desc.Features = GetGeometryShaderVariant(features, out_desc.Macros, out_desc.VertexType, suffix,
-												 is_opaque || is_blended);
+												 is_opaque || is_blended, true);
 
 	// Transparent geometry also discards what is nearly invisible
 	if (is_blended) {
@@ -561,7 +575,7 @@ bool TiledForwardRenderer::MakePrepassDesc(ePipelineFeatures features, PipelineD
 		return false;
 	}
 
-	const char* suffix = "";
+	std::string suffix;
 	out_desc.Features = GetGeometryShaderVariant(features, out_desc.Macros, out_desc.VertexType, suffix);
 
 	out_desc.DebugName = std::string("DepthNormal") + suffix;

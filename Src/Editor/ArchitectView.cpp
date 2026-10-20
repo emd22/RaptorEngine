@@ -781,6 +781,7 @@ TopViewState RaptorEditor::BuildTopViewState()
 		uint32 Base = 0;
 		uint32 Columns = 0;
 		uint32 Rows = 0;
+		const Patch* pDetailMesh = nullptr;
 	};
 
 	PatchMesh patch_mesh;
@@ -823,10 +824,17 @@ TopViewState RaptorEditor::BuildTopViewState()
 				continue;
 			}
 
+			const Patch* detail_mesh = nullptr;
+
+			if (shape->bIsDetailMesh) {
+				detail_mesh = shape;
+			}
+
 			grids.Insert(PatchGrid {
 				.Base = static_cast<uint32>(corners.Size),
 				.Columns = patch_mesh.Columns,
 				.Rows = patch_mesh.Rows,
+				.pDetailMesh = detail_mesh,
 			});
 
 			for (const PatchVertex& vertex : patch_mesh.Vertices) {
@@ -852,6 +860,12 @@ TopViewState RaptorEditor::BuildTopViewState()
 		out.PatchSubdivisionsU = static_cast<uint16>(patch->SubdivisionsU);
 		out.PatchSubdivisionsV = static_cast<uint16>(patch->SubdivisionsV);
 		out.bPatchSmooth = patch->bSmooth;
+		out.bPatchDetailMesh = patch->bIsDetailMesh;
+
+		if (patch->bIsDetailMesh) {
+			out.PatchSubdivisionsU = static_cast<uint16>(patch->Width - 1);
+			out.PatchSubdivisionsV = static_cast<uint16>(patch->Height - 1);
+		}
 		out.PatchClosure = patch->Closure;
 		out.PatchThickness = patch->Thickness;
 
@@ -876,6 +890,7 @@ TopViewState RaptorEditor::BuildTopViewState()
 
 			for (const PatchPoint& point : patch->Points) {
 				projection.ControlWeights.Insert(point.Weight);
+				projection.ControlColors.Insert(point.Color);
 			}
 
 			projected.Clear();
@@ -913,6 +928,23 @@ TopViewState RaptorEditor::BuildTopViewState()
 				for (uint32 column = 0; column < columns; column++) {
 					for (uint32 row = 0; row + 1 < grid.Rows; row++) {
 						add_edge(grid.Base + row * columns + column, grid.Base + (row + 1) * columns + column);
+					}
+				}
+
+				if (grid.pDetailMesh == nullptr) {
+					continue;
+				}
+
+				for (uint32 row = 0; row + 1 < grid.Rows; row++) {
+					for (uint32 column = 0; column + 1 < columns; column++) {
+						const uint32 first = grid.Base + row * columns + column;
+
+						if (grid.pDetailMesh->IsCellTurned(column, row)) {
+							add_edge(first + 1, first + columns);
+						}
+						else {
+							add_edge(first, first + columns + 1);
+						}
 					}
 				}
 			}
@@ -1338,17 +1370,28 @@ void RaptorEditor::TopViewCreatePatch(eViewPlane plane, ePatchPrimitive primitiv
 		max += shift;
 	}
 
-	Patch patch = Patch::MakePrimitive(primitive, min, max, GetViewPlaneAxes(plane).W);
+	Patch patch;
+
+	if (primitive == ePatchPrimitive::DetailMesh) {
+		patch = Patch::MakeDetailMesh(min, max, GetViewPlaneAxes(plane).W, settings.SubdivisionsU,
+									  settings.SubdivisionsV);
+	}
+	else {
+		patch = Patch::MakePrimitive(primitive, min, max, GetViewPlaneAxes(plane).W);
+	}
 
 	if (!patch.IsValid()) {
 		return;
 	}
 
-	patch.SubdivisionsU = std::clamp(settings.SubdivisionsU, Patch::scMinSubdivisions, Patch::scMaxSubdivisions);
-	patch.SubdivisionsV = std::clamp(settings.SubdivisionsV, Patch::scMinSubdivisions, Patch::scMaxSubdivisions);
+	if (!patch.bIsDetailMesh) {
+		patch.SubdivisionsU = std::clamp(settings.SubdivisionsU, Patch::scMinSubdivisions, Patch::scMaxSubdivisions);
+		patch.SubdivisionsV = std::clamp(settings.SubdivisionsV, Patch::scMinSubdivisions, Patch::scMaxSubdivisions);
+		patch.Closure = settings.Closure;
+		patch.Thickness = settings.Thickness;
+	}
+
 	patch.bSmooth = settings.bSmooth;
-	patch.Closure = settings.Closure;
-	patch.Thickness = settings.Thickness;
 
 	Object* created = CreateWorldPatch(std::move(patch));
 
@@ -1487,13 +1530,20 @@ static bool IsSamePatch(const Patch& a, const Patch& b)
 {
 	if (a.Width != b.Width || a.Height != b.Height || a.SubdivisionsU != b.SubdivisionsU ||
 		a.SubdivisionsV != b.SubdivisionsV || a.bSmooth != b.bSmooth || a.SmoothingGroup != b.SmoothingGroup ||
-		a.Closure != b.Closure || a.Thickness != b.Thickness) {
+		a.Closure != b.Closure || a.Thickness != b.Thickness || a.bIsDetailMesh != b.bIsDetailMesh ||
+		a.TurnedCells.Size != b.TurnedCells.Size) {
 		return false;
+	}
+
+	for (uint32 i = 0; i < a.TurnedCells.Size; i++) {
+		if (a.TurnedCells[i] != b.TurnedCells[i]) {
+			return false;
+		}
 	}
 
 	for (uint32 i = 0; i < a.Points.Size; i++) {
 		if (!(a.Points[i].Position == b.Points[i].Position) || !(a.Points[i].Texcoord == b.Points[i].Texcoord) ||
-			a.Points[i].Weight != b.Points[i].Weight) {
+			a.Points[i].Weight != b.Points[i].Weight || !(a.Points[i].Color == b.Points[i].Color)) {
 			return false;
 		}
 	}
@@ -1534,9 +1584,117 @@ static bool ApplyTextureMapping(Patch& patch, const PatchTextureSettings& settin
 	}
 }
 
+static uint32 PickDetailMeshCell(uint32 control_index, bool has_control, uint32 cell_count, bool for_removal)
+{
+	uint32 index = cell_count / 2;
+
+	if (has_control) {
+		index = std::min(control_index, cell_count - 1);
+
+		if (for_removal && index > 0) {
+			index--;
+		}
+	}
+
+	if (for_removal && index + 2 > cell_count) {
+		index = cell_count - 2;
+	}
+
+	return index;
+}
+
+static bool ApplyDetailMeshCommand(Patch& patch, const PatchCommand& command, bool has_control, uint32 column,
+								   uint32 row, bool& out_handled)
+{
+	out_handled = true;
+
+	switch (command.Type) {
+	case ePatchCommand::InsertColumns:
+		return patch.InsertColumns(PickDetailMeshCell(column, has_control, patch.GetSubPatchColumns(), false));
+	case ePatchCommand::InsertRows:
+		return patch.InsertRows(PickDetailMeshCell(row, has_control, patch.GetSubPatchRows(), false));
+	case ePatchCommand::RemoveColumns:
+		return patch.GetSubPatchColumns() >= 2 &&
+			   patch.RemoveColumns(PickDetailMeshCell(column, has_control, patch.GetSubPatchColumns(), true));
+	case ePatchCommand::RemoveRows:
+		return patch.GetSubPatchRows() >= 2 &&
+			   patch.RemoveRows(PickDetailMeshCell(row, has_control, patch.GetSubPatchRows(), true));
+	case ePatchCommand::SetSubdivisions:
+		return patch.ResampleDetailMesh(command.SubdivisionsU, command.SubdivisionsV);
+	default:
+		out_handled = false;
+		return false;
+	}
+}
+
+static bool ApplyColorCommand(Patch& patch, const PatchCommand& command, const Mat4f& world, eViewPlane plane,
+							  ObjectID object_id, const DynArray<TopViewVertexHandle>& handles)
+{
+	bool has_handle = false;
+
+	for (const TopViewVertexHandle& handle : handles) {
+		has_handle = has_handle || handle.ObjectId == object_id;
+	}
+
+	const Patch source = patch.Clone();
+	bool changed = false;
+
+	for (uint32 row = 0; row < patch.Height; row++) {
+		for (uint32 column = 0; column < patch.Width; column++) {
+			if (has_handle && !IsHandledControlPoint(source, world, plane, object_id, handles, column, row)) {
+				continue;
+			}
+
+			PatchColor& color = patch.GetPoint(column, row).Color;
+
+			if (command.Type == ePatchCommand::SetAlpha) {
+				color.A = std::clamp(command.Color.A, 0.0f, 1.0f);
+			}
+			else {
+				color.R = std::clamp(command.Color.R, 0.0f, 1.0f);
+				color.G = std::clamp(command.Color.G, 0.0f, 1.0f);
+				color.B = std::clamp(command.Color.B, 0.0f, 1.0f);
+			}
+
+			changed = true;
+		}
+	}
+
+	return changed;
+}
+
+static bool ApplyTurnCommand(Patch& patch, const Mat4f& world, eViewPlane plane, ObjectID object_id,
+							 const DynArray<TopViewVertexHandle>& handles)
+{
+	bool changed = false;
+
+	for (uint32 row = 0; row + 1 < patch.Height; row++) {
+		for (uint32 column = 0; column + 1 < patch.Width; column++) {
+			if (IsHandledControlPoint(patch, world, plane, object_id, handles, column, row) &&
+				IsHandledControlPoint(patch, world, plane, object_id, handles, column + 1, row) &&
+				IsHandledControlPoint(patch, world, plane, object_id, handles, column, row + 1) &&
+				IsHandledControlPoint(patch, world, plane, object_id, handles, column + 1, row + 1)) {
+				patch.TurnCell(column, row);
+				changed = true;
+			}
+		}
+	}
+
+	return changed;
+}
+
 static bool ApplyPatchCommand(Patch& patch, const PatchCommand& command, const Mat4f& world, bool has_control,
 							  uint32 column, uint32 row)
 {
+	if (patch.bIsDetailMesh) {
+		bool handled = false;
+		const bool applied = ApplyDetailMeshCommand(patch, command, has_control, column, row, handled);
+
+		if (handled) {
+			return applied;
+		}
+	}
+
 	switch (command.Type) {
 	case ePatchCommand::Invert:
 		patch.Invert();
@@ -1608,7 +1766,31 @@ void RaptorEditor::TopViewPatchCommand(eViewPlane plane, const PatchCommand& com
 
 		Patch changed = patch->Clone();
 
-		if (command.Type == ePatchCommand::SetWeight || command.Type == ePatchCommand::RoundWeights) {
+		const bool is_weight_command = command.Type == ePatchCommand::SetWeight ||
+									   command.Type == ePatchCommand::RoundWeights;
+
+		if (patch->bIsDetailMesh && (is_weight_command || command.Type == ePatchCommand::SetClosure)) {
+			if (is_weight_command || command.Closure != ePatchClosure::None) {
+				Warn("Detail mesh patch '{}' has no weights, caps or thickness", object->Name.Get());
+			}
+
+			continue;
+		}
+
+		if (command.Type == ePatchCommand::SetColor || command.Type == ePatchCommand::SetAlpha) {
+			ApplyColorCommand(changed, command, object->GetWorldMatrix(), plane, object->ID, handles);
+		}
+		else if (command.Type == ePatchCommand::TurnCells) {
+			if (!patch->bIsDetailMesh) {
+				continue;
+			}
+
+			if (!ApplyTurnCommand(changed, object->GetWorldMatrix(), plane, object->ID, handles)) {
+				Warn("Select all four corners of the detail mesh cells to turn on patch '{}'", object->Name.Get());
+				continue;
+			}
+		}
+		else if (is_weight_command) {
 			if (!ApplyWeightCommand(changed, command, object->GetWorldMatrix(), plane, object->ID, handles)) {
 				Warn("Select control points of patch '{}' to set their weight", object->Name.Get());
 				continue;

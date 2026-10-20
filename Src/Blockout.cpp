@@ -793,6 +793,13 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 		object->SetShadowCaster(is_transparent);
 		object->pMesh = mesh->AsDefaultMesh();
 
+		if (surface.HasVertexColors()) {
+			renderer::gGraphics->SubmitImmediateUploadCmd([&](renderer::CommandBuffer& cmd)
+														  { object->pMesh->UploadVertexColors(cmd, surface.Colors); });
+
+			object->SetVertexColored(true);
+		}
+
 		if (mbHasBakedSun && surface.HasLightmapTexcoords()) {
 			SizedArray<float32> lightmap_uvs;
 			lightmap_uvs.InitSize(surface.LightmapTexcoords.Size);
@@ -1070,10 +1077,15 @@ static void HashPatch(uint64& hash, const Patch& patch)
 		patch.SubdivisionsV,
 		static_cast<uint32>(patch.bSmooth),
 		static_cast<uint32>(patch.Closure),
+		static_cast<uint32>(patch.bIsDetailMesh),
 	};
 
 	HashBytes(hash, settings, sizeof(settings));
 	HashFloat(hash, patch.Thickness);
+
+	if (patch.TurnedCells.IsNotEmpty()) {
+		HashBytes(hash, patch.TurnedCells.pData, patch.TurnedCells.Size);
+	}
 }
 
 struct PatchWorldMesh
@@ -1082,6 +1094,20 @@ struct PatchWorldMesh
 	SizedArray<Vec3f> Normals;
 	SizedArray<uint32> Indices;
 };
+
+static void AttachPatchMesh(Object* object, MeshGen::GeneratedMesh& mesh, const SizedArray<uint32>& colors)
+{
+	object->pMesh = mesh.AsDefaultMesh();
+
+	const bool has_colors = colors.IsNotEmpty() && colors.Size == mesh.Positions.Size;
+
+	if (has_colors) {
+		renderer::gGraphics->SubmitImmediateUploadCmd([&](renderer::CommandBuffer& cmd)
+													  { object->pMesh->UploadVertexColors(cmd, colors); });
+	}
+
+	object->SetVertexColored(has_colors);
+}
 
 static void MakePatchWorldMesh(const Patch& patch, const Mat4f& world, PatchWorldMesh& out_mesh)
 {
@@ -1673,8 +1699,15 @@ void Blockout::RebuildPatch(Object* object, Patch&& patch)
 	const Mat4f world = object->GetWorldMatrix();
 
 	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
+	SizedArray<uint32> colors;
+	SizedArray<uint32>* color_output = nullptr;
+
+	if (patch.HasVertexColors()) {
+		color_output = &colors;
+	}
+
 	patch.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
-					   mesh->Indices, world);
+					   mesh->Indices, world, color_output);
 
 	if (mesh->Indices.IsEmpty()) {
 		LogWarning(LC_ASSET, "Patch '{}' has no area, it is not drawn", object->Name.Get());
@@ -1695,7 +1728,7 @@ void Blockout::RebuildPatch(Object* object, Patch&& patch)
 		max = Vec3f::Max(max, position);
 	}
 
-	object->pMesh = mesh->AsDefaultMesh();
+	AttachPatchMesh(object, *mesh, colors);
 
 	object->Bounds.Min = min;
 	object->Bounds.Max = max;
@@ -1750,11 +1783,18 @@ void Blockout::RefreshCappedPatches()
 		}
 
 		Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
+		SizedArray<uint32> colors;
+		SizedArray<uint32>* color_output = nullptr;
+
+		if (patch->HasVertexColors()) {
+			color_output = &colors;
+		}
+
 		patch->GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
-							mesh->Indices, world);
+							mesh->Indices, world, color_output);
 
 		if (mesh->Indices.IsNotEmpty()) {
-			object->pMesh = mesh->AsDefaultMesh();
+			AttachPatchMesh(object, *mesh, colors);
 		}
 
 		mPatchMeshFrames.Insert(id.GetID(), frame);
@@ -3461,8 +3501,8 @@ void Blockout::BuildSubview(Subview& subview)
 				}
 
 				MeshGen::GeneratedMesh mesh;
-				brush.GenerateMesh(mesh.Positions, mesh.Normals, mesh.Tangents, mesh.TangentHandedness,
-								   mesh.Texcoords, mesh.Indices, faces);
+				brush.GenerateMesh(mesh.Positions, mesh.Normals, mesh.Tangents, mesh.TangentHandedness, mesh.Texcoords,
+								   mesh.Indices, faces);
 
 				if (mesh.Positions.Size == 0) {
 					continue;
@@ -4227,8 +4267,8 @@ void Blockout::CommitSubview(uint32 instance, const BrushPlacement& placement)
 			continue;
 		}
 
-		instances.AddMember(MakeSubviewInstanceEntry(child.Name, child.SubviewName,
-													 RemoveFromSubview(world, Vec3f::sZero, placement)));
+		instances.AddMember(
+			MakeSubviewInstanceEntry(child.Name, child.SubviewName, RemoveFromSubview(world, Vec3f::sZero, placement)));
 	}
 
 	subview->Brushes = std::move(brushes);

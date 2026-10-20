@@ -742,6 +742,15 @@ PatchSurfaceVertex BlendPatchVertices(const PatchSurfaceVertex& a, const PatchSu
 	vertex.Chart = a.Chart + (b.Chart - a.Chart) * weight;
 	vertex.Handedness = a.Handedness;
 
+	const float32 color_weight = static_cast<float32>(weight);
+
+	vertex.Color = PatchColor {
+		.R = a.Color.R + (b.Color.R - a.Color.R) * color_weight,
+		.G = a.Color.G + (b.Color.G - a.Color.G) * color_weight,
+		.B = a.Color.B + (b.Color.B - a.Color.B) * color_weight,
+		.A = a.Color.A + (b.Color.A - a.Color.A) * color_weight,
+	};
+
 	const Vec3d normal = a.Normal + (b.Normal - a.Normal) * weight;
 	const double normal_length = normal.Length();
 
@@ -1208,7 +1217,10 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 
 		Array<CompiledMapVertex> Vertices;
 		Array<LightmapVertex> LightmapVertices;
+		Array<uint32> Colors;
 		Array<uint32> Indices;
+
+		bool bHasColors = false;
 
 		std::map<std::tuple<int32, int32, int32, int32>, uint32> VertexLookup;
 		std::map<std::pair<uint32, int32>, uint32> PatchVertexLookup;
@@ -1368,6 +1380,7 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 						found = batch.VertexLookup.emplace(vertex_key, batch.Vertices.Size).first;
 						batch.Vertices.Emplace(vertex);
 						batch.LightmapVertices.Emplace(LightmapVertex { chart_index, group_points[corner] });
+						batch.Colors.Emplace(PatchColor {}.Pack());
 					}
 
 					batch.Indices.Emplace(found->second);
@@ -1479,6 +1492,12 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 									.first;
 						batch.Vertices.Emplace(vertex);
 						batch.LightmapVertices.Emplace(LightmapVertex { chart_index, source_vertex.Chart });
+						const uint32 color = source_vertex.Color.Pack();
+						batch.Colors.Emplace(color);
+
+						if (color != PatchColor {}.Pack()) {
+							batch.bHasColors = true;
+						}
 
 						patch_vertex_count++;
 					}
@@ -1506,6 +1525,10 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 
 		surface.Vertices = ArrayUtil::DynToSizedArray(batch.Vertices);
 		surface.Indices = ArrayUtil::DynToSizedArray(batch.Indices);
+
+		if (batch.bHasColors) {
+			surface.Colors = ArrayUtil::DynToSizedArray(batch.Colors);
+		}
 
 		// for (int32 axis = 0; axis < 3; axis++) {
 		// 	surface.BoundsMin[axis] = surface.Vertices[0].Position[axis];

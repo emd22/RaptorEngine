@@ -19,6 +19,8 @@ enum class ePipelineFeatures : uint32
 	AlphaMask = (1 << 2),
 	Unlit = (1 << 3),
 	Lightmap = (1 << 4),
+	/// The object has a per-vertex colour stream that tints its albedo and scales its opacity
+	VertexColor = (1 << 5),
 };
 
 FxEnumFlags(ePipelineFeatures);
@@ -51,6 +53,6 @@ enum class ePipelinePass : uint8
 constexpr uint32 scNumPipelinePasses = static_cast<uint32>(ePipelinePass::Count);
 
 /// Every combination of the ePipelineFeatures bits
-constexpr uint32 scNumFeatureCombinations = 1U << 5;
+constexpr uint32 scNumFeatureCombinations = 1U << 6;
 
 } // namespace fx::renderer

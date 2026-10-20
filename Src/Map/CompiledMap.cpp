@@ -225,6 +225,16 @@ bool CompiledMap::Load(const String& path)
 		surface.LightmapTexcoords.InitSize(lightmap_texcoord_count);
 		reader.Read(surface.LightmapTexcoords.pData, lightmap_texcoord_count);
 
+		const uint32 color_count = reader.ReadCount();
+
+		if (color_count != 0 && color_count != vertex_count) {
+			reader.bFailed = true;
+			break;
+		}
+
+		surface.Colors.InitSize(color_count);
+		reader.Read(surface.Colors.pData, color_count);
+
 		if (surface.MaterialIndex >= Materials.Size) {
 			reader.bFailed = true;
 			break;
@@ -529,6 +539,9 @@ bool CompiledMap::Save(const String& path) const
 
 		writer.WriteCount(surface.LightmapTexcoords.Size);
 		writer.Write(surface.LightmapTexcoords.pData, surface.LightmapTexcoords.Size);
+
+		writer.WriteCount(surface.Colors.Size);
+		writer.Write(surface.Colors.pData, surface.Colors.Size);
 	}
 
 	writer.WriteCount(ShadowSurfaces.Size);

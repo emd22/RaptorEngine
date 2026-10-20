@@ -195,6 +195,7 @@ void PatchBuilder::Build(const MapSource& source, const Bsp& bsp, bool sealed, b
 				.Handedness = vertex.Handedness,
 				.Texcoord = vertex.Texcoord,
 				.Chart = chart.Find(patch.Shape, vertex.Parameter),
+				.Color = vertex.Color,
 			});
 		}
 

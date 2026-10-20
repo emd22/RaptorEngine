@@ -12,6 +12,7 @@
 class wxBoxSizer;
 class wxButton;
 class wxChoice;
+class wxColourPickerCtrl;
 class wxSizer;
 class wxWindow;
 class wxWrapSizer;
@@ -83,6 +84,8 @@ private:
 	OutlineToggleButton* mpCurveSmoothButton = nullptr;
 	FloatField* mpCurveThicknessField = nullptr;
 	FloatField* mpCurveWeightField = nullptr;
+	wxColourPickerCtrl* mpCurveColorPicker = nullptr;
+	FloatField* mpCurveAlphaField = nullptr;
 	OutlineToggleButton* mpCurveThickenButton = nullptr;
 	OutlineToggleButton* mpCurveCapButton = nullptr;
 	FloatField* mpTextureOffsetUField = nullptr;

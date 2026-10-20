@@ -9,10 +9,12 @@ namespace fx::renderer {
 
 struct VertexDescription
 {
-    static constexpr uint32 scMaxBindings = 2;
+    static constexpr uint32 scMaxBindings = 3;
 
     static constexpr uint32 scLightmapBinding = scLightmapVertexBinding;
     static constexpr uint32 scLightmapLocation = 4;
+
+    static constexpr uint32 scColorBinding = scColorVertexBinding;
 
     VkVertexInputBindingDescription Bindings[scMaxBindings];
     uint32 BindingCount = 1;
@@ -134,31 +136,55 @@ VertexDescription BuildDescription()
     return { { binding_desc }, 1, std::move(attribs), true };
 }
 
-inline VertexDescription BuildLightmappedDescription()
+/**
+ * @brief The default vertex plus extra per-vertex streams. The shader declares the lightmap UV before the vertex
+ * colour, so the colour takes the location after the lightmap UV when both are there.
+ */
+inline VertexDescription BuildStreamDescription(bool has_lightmap, bool has_color)
 {
     VertexDescription base = VertexUtil::BuildDescription<eVertexType::Default>();
 
     VertexDescription description;
     description.Bindings[0] = base.Bindings[0];
-    description.Bindings[VertexDescription::scLightmapBinding] = {
-        .binding = VertexDescription::scLightmapBinding,
-        .stride = sizeof(float32) * 2,
-        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-    };
-    description.BindingCount = 2;
+    description.BindingCount = 1;
 
-    description.Attributes.InitCapacity(base.Attributes.Size + 1);
+    description.Attributes.InitCapacity(base.Attributes.Size + 2);
 
     for (const VkVertexInputAttributeDescription& attrib : base.Attributes) {
         description.Attributes.Insert(attrib);
     }
 
-    description.Attributes.Insert(VkVertexInputAttributeDescription {
-        .location = VertexDescription::scLightmapLocation,
-        .binding = VertexDescription::scLightmapBinding,
-        .format = VK_FORMAT_R32G32_SFLOAT,
-        .offset = 0,
-    });
+    uint32 location = VertexDescription::scLightmapLocation;
+
+    if (has_lightmap) {
+        description.Bindings[description.BindingCount++] = {
+            .binding = VertexDescription::scLightmapBinding,
+            .stride = sizeof(float32) * 2,
+            .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+        };
+
+        description.Attributes.Insert(VkVertexInputAttributeDescription {
+            .location = location++,
+            .binding = VertexDescription::scLightmapBinding,
+            .format = VK_FORMAT_R32G32_SFLOAT,
+            .offset = 0,
+        });
+    }
+
+    if (has_color) {
+        description.Bindings[description.BindingCount++] = {
+            .binding = VertexDescription::scColorBinding,
+            .stride = sizeof(uint32),
+            .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+        };
+
+        description.Attributes.Insert(VkVertexInputAttributeDescription {
+            .location = location++,
+            .binding = VertexDescription::scColorBinding,
+            .format = VK_FORMAT_R8G8B8A8_UNORM,
+            .offset = 0,
+        });
+    }
 
     description.bIsInited = true;
 
@@ -175,7 +201,11 @@ FX_FORCE_INLINE VertexDescription BuildDescription(eVertexType vertex_type)
     case eVertexType::Skinned:
         return VertexUtil::BuildDescription<eVertexType::Skinned>();
     case eVertexType::Lightmapped:
-        return VertexUtil::BuildLightmappedDescription();
+        return VertexUtil::BuildStreamDescription(true, false);
+    case eVertexType::Colored:
+        return VertexUtil::BuildStreamDescription(false, true);
+    case eVertexType::LightmappedColored:
+        return VertexUtil::BuildStreamDescription(true, true);
     default:;
     }
 

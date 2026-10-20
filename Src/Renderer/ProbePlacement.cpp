@@ -485,7 +485,7 @@ uint32 FindNeededGridPoints(const Vec3f volume_min, const Vec3f cell_size, const
 
 	std::fill(out_needed.begin(), out_needed.end(),
 			  (fill == eProbeFill::Dense || (boxes.Boxes.Size == 0 && boxes.Surfaces.Size == 0)) ? scGridPointNeeded
-																								: scGridPointOpen);
+																								 : scGridPointOpen);
 
 	if (boxes.Boxes.Size == 0 && boxes.Surfaces.Size == 0) {
 		return num_points;
@@ -1064,13 +1064,19 @@ void AddPatchSurfaces(ProbePlacementBoxes& boxes, const Patch& patch, const Mat4
 			continue;
 		}
 
+		uint32 span = 2;
+
+		if (shape->bIsDetailMesh) {
+			span = 1;
+		}
+
 		for (uint32 sub_row = 0; sub_row < shape->GetSubPatchRows(); sub_row++) {
 			for (uint32 sub_column = 0; sub_column < shape->GetSubPatchColumns(); sub_column++) {
 				Vec3f min(FLT_MAX);
 				Vec3f max(-FLT_MAX);
 
-				for (uint32 row = sub_row * 2; row <= sub_row * 2 + 2; row++) {
-					for (uint32 column = sub_column * 2; column <= sub_column * 2 + 2; column++) {
+				for (uint32 row = sub_row * span; row <= sub_row * span + span; row++) {
+					for (uint32 column = sub_column * span; column <= sub_column * span + span; column++) {
 						const Vec3f local = shape->GetPoint(column, row).Position;
 						const Vec4f point = local_to_world * Vec4f(local.X, local.Y, local.Z, 1.0f);
 

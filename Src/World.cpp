@@ -83,6 +83,10 @@ static PipelineHandle GetPipelineForObject(const Object& object)
 		features |= ePipelineFeatures::Lightmap;
 	}
 
+	if (object.IsVertexColored() && object.pMesh.IsValid() && object.pMesh->HasVertexColors()) {
+		features |= ePipelineFeatures::VertexColor;
+	}
+
 	const PipelineHandle pipeline = gPipelineCache->GetOrCreateVariant(pass, features);
 
 	AssertMsg(pipeline.IsValid(), "No forward pipeline draws this material");

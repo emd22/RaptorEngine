@@ -22,6 +22,7 @@ struct PatchSurfaceVertex
 	double Handedness = 1.0;
 	Vec2d Texcoord = Vec2d(0.0, 0.0);
 	Vec2d Chart = Vec2d(0.0, 0.0);
+	PatchColor Color;
 };
 
 struct PatchSurface

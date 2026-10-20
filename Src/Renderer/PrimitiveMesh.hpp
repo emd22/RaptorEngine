@@ -68,6 +68,18 @@ public:
 
 	bool HasLightmapUVs() const { return GpuLightmapUVBuffer.Initialized; }
 
+	void UploadVertexColors(renderer::CommandBuffer& cmd, const SizedArray<uint32>& colors)
+	{
+		if (colors.IsEmpty()) {
+			LogError(LC_ASSET, "Cannot upload vertex colours without any values");
+			return;
+		}
+
+		GpuVertexColorBuffer.Create(cmd, renderer::eGpuBufferType::VertexBuffer, Slice(colors));
+	}
+
+	bool HasVertexColors() const { return GpuVertexColorBuffer.Initialized; }
+
 	renderer::VertexList& GetVertices()
 	{
 		if (!bKeepInMemory) {
@@ -103,6 +115,10 @@ public:
 
 		if (GpuLightmapUVBuffer.Initialized) {
 			vkCmdBindVertexBuffers(cmd.Cmd, renderer::scLightmapVertexBinding, 1, &GpuLightmapUVBuffer.Buffer, &offset);
+		}
+
+		if (GpuVertexColorBuffer.Initialized) {
+			vkCmdBindVertexBuffers(cmd.Cmd, renderer::scColorVertexBinding, 1, &GpuVertexColorBuffer.Buffer, &offset);
 		}
 		vkCmdBindIndexBuffer(cmd.Cmd, GpuIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
@@ -193,6 +209,7 @@ public:
 		VertexList.Destroy();
 
 		GpuLightmapUVBuffer.Destroy();
+		GpuVertexColorBuffer.Destroy();
 		GpuIndexBuffer.Destroy();
 		LocalIndexBuffer.Free();
 	}
@@ -212,6 +229,7 @@ public:
 	SizedArray<uint32> LocalIndexBuffer;
 
 	renderer::GpuBuffer GpuLightmapUVBuffer;
+	renderer::GpuBuffer GpuVertexColorBuffer;
 };
 
 } // namespace fx

@@ -10,6 +10,7 @@
 #include <wx/bitmap.h>
 #include <wx/button.h>
 #include <wx/choice.h>
+#include <wx/clrpicker.h>
 #include <wx/dialog.h>
 #include <wx/radiobut.h>
 #include <wx/settings.h>
@@ -72,7 +73,7 @@ constexpr const char* scPlaneNames[scViewPlaneCount] = {
 	"Top", "Forward", "Back", "Left", "Right",
 };
 
-constexpr const char* scPatchPrimitiveNames[] = { "Flat", "Cylinder", "Cone", "Bevel", "Endcap" };
+constexpr const char* scPatchPrimitiveNames[] = { "Flat", "Cylinder", "Cone", "Bevel", "Endcap", "DetailMesh" };
 
 static_assert(std::size(scPatchPrimitiveNames) == static_cast<size_t>(ePatchPrimitive::Count));
 
@@ -92,6 +93,8 @@ constexpr PatchCommandButtonInfo scPatchCommandButtons[] = {
 	  ePatchCommand::RemoveColumns },
 	{ "+Row", "Split a row of the selected patches in two, at the selected control point", ePatchCommand::InsertRows },
 	{ "-Row", "Merge two rows of the selected patches, at the selected control point", ePatchCommand::RemoveRows },
+	{ "Turn", "Flip the diagonal of every detail mesh cell whose four corners are selected (E)",
+	  ePatchCommand::TurnCells },
 };
 
 struct TextureButtonInfo
@@ -613,7 +616,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 		}
 
 		primitive_choice->SetSelection(static_cast<int>(mCurve.Primitive));
-		primitive_choice->SetToolTip("The shape a drag creates. Round shapes go around the axis the view looks along");
+		primitive_choice->SetToolTip("");
 		primitive_choice->Bind(wxEVT_CHOICE,
 							   [this, primitive_choice](wxCommandEvent&)
 							   {
@@ -744,6 +747,42 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 
 		mpCurveRow->Add(weight_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
 		mpCurveRow->Add(round_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 6));
+
+		const auto to_byte = [](float32 value)
+		{ return static_cast<unsigned char>(std::lround(std::clamp(value, 0.0f, 1.0f) * 255.0f)); };
+
+		wxColourPickerCtrl* color_picker = new wxColourPickerCtrl(
+			parent, wxID_ANY, wxColour(to_byte(mCurve.Color.R), to_byte(mCurve.Color.G), to_byte(mCurve.Color.B)));
+		color_picker->SetToolTip("Tint the selected control points (or every point of the selected patches). The "
+								 "colour blends across the surface between points");
+		color_picker->Bind(wxEVT_COLOURPICKER_CHANGED,
+						   [this, color_picker](wxColourPickerEvent&)
+						   {
+							   const wxColour colour = color_picker->GetColour();
+
+							   mCurve.Color.R = static_cast<float32>(colour.Red()) / 255.0f;
+							   mCurve.Color.G = static_cast<float32>(colour.Green()) / 255.0f;
+							   mCurve.Color.B = static_cast<float32>(colour.Blue()) / 255.0f;
+							   mpCanvas->SetCurveSettings(mCurve);
+							   mpCanvas->RunPatchCommand(ePatchCommand::SetColor);
+							   mpCanvas->SetFocus();
+						   });
+
+		FloatField* alpha_field = new FloatField(parent, "Alpha", Vec2f(0.0f, 1.0f));
+		alpha_field->SetValue(mCurve.Color.A);
+		alpha_field->GetLabel()->SetToolTip(
+			"Opacity of the selected control points (or every point of the selected patches). Only blended "
+			"(transparent) materials fade out, so lay a transparent patch over another to blend between them");
+		alpha_field->SetOnChange(
+			[this](const float32 value)
+			{
+				mCurve.Color.A = value;
+				mpCanvas->SetCurveSettings(mCurve);
+				mpCanvas->RunPatchCommand(ePatchCommand::SetAlpha);
+			});
+
+		mpCurveRow->Add(color_picker, wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+		mpCurveRow->Add(alpha_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 6));
 
 		for (const PatchCommandButtonInfo& info : scPatchCommandButtons) {
 			wxButton* button = new wxButton(parent, wxID_ANY, info.pName, wxDefaultPosition, wxDefaultSize,
@@ -879,6 +918,8 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 		mpCurveSmoothButton = smooth_button;
 		mpCurveThicknessField = thickness_field;
 		mpCurveWeightField = weight_field;
+		mpCurveColorPicker = color_picker;
+		mpCurveAlphaField = alpha_field;
 		mpCurveThickenButton = thicken_button;
 		mpCurveCapButton = cap_button;
 
@@ -892,7 +933,13 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 				mCurve.Closure = settings.Closure;
 				mCurve.Thickness = settings.Thickness;
 				mCurve.Weight = settings.Weight;
+				mCurve.Color = settings.Color;
 				mpCurveWeightField->SetValue(settings.Weight);
+				mpCurveAlphaField->SetValue(settings.Color.A);
+				mpCurveColorPicker->SetColour(wxColour(
+					static_cast<unsigned char>(std::lround(std::clamp(settings.Color.R, 0.0f, 1.0f) * 255.0f)),
+					static_cast<unsigned char>(std::lround(std::clamp(settings.Color.G, 0.0f, 1.0f) * 255.0f)),
+					static_cast<unsigned char>(std::lround(std::clamp(settings.Color.B, 0.0f, 1.0f) * 255.0f))));
 				mpCurveSubdivisionsUField->SetValue(static_cast<float32>(settings.SubdivisionsU));
 				mpCurveSubdivisionsVField->SetValue(static_cast<float32>(settings.SubdivisionsV));
 				mpCurveSmoothButton->SetValue(settings.bSmooth);

@@ -41,6 +41,7 @@ struct CurveSettings
 	ePatchClosure Closure = ePatchClosure::None;
 	float32 Thickness = Patch::scDefaultThickness;
 	float32 Weight = 1.0f;
+	PatchColor Color;
 	PatchTextureSettings Texture;
 };
 

@@ -16,6 +16,7 @@ constexpr uint32 scArcLengthSamples = 16;
 
 struct SurfaceSample
 {
+	double Color[4] = { 1.0, 1.0, 1.0, 1.0 };
 	Vec3d Position = Vec3d(0.0);
 	Vec3d DerivU = Vec3d(0.0);
 	Vec3d DerivV = Vec3d(0.0);
@@ -31,6 +32,34 @@ Vec2d ToDouble(const Vec2f value) { return Vec2d(value.X, value.Y); }
 Vec3f ToFloat(const Vec3d& value)
 {
 	return Vec3f(static_cast<float32>(value.X), static_cast<float32>(value.Y), static_cast<float32>(value.Z));
+}
+
+PatchColor MixColors(const PatchColor& a, float32 weight_a, const PatchColor& b, float32 weight_b)
+{
+	return PatchColor {
+		.R = a.R * weight_a + b.R * weight_b,
+		.G = a.G * weight_a + b.G * weight_b,
+		.B = a.B * weight_a + b.B * weight_b,
+		.A = a.A * weight_a + b.A * weight_b,
+	};
+}
+
+PatchColor MakeColor(const double values[4])
+{
+	return PatchColor {
+		.R = static_cast<float32>(values[0]),
+		.G = static_cast<float32>(values[1]),
+		.B = static_cast<float32>(values[2]),
+		.A = static_cast<float32>(values[3]),
+	};
+}
+
+void AddColor(double sum[4], const PatchColor& color, double weight)
+{
+	sum[0] += static_cast<double>(color.R) * weight;
+	sum[1] += static_cast<double>(color.G) * weight;
+	sum[2] += static_cast<double>(color.B) * weight;
+	sum[3] += static_cast<double>(color.A) * weight;
 }
 
 void GetBasis(double t, double out_basis[3], double out_derivative[3])
@@ -185,6 +214,7 @@ void SplitCurve(const PatchPoint& a, const PatchPoint& b, const PatchPoint& c, P
 
 		point.Position = (x.Position * x.Weight + y.Position * y.Weight) * scale;
 		point.Texcoord = (x.Texcoord * x.Weight + y.Texcoord * y.Weight) * scale;
+		point.Color = MixColors(x.Color, x.Weight * scale, y.Color, y.Weight * scale);
 		return point;
 	};
 
@@ -207,6 +237,8 @@ PatchPoint JoinCurves(const PatchPoint& a, const PatchPoint& left, const PatchPo
 		point.Weight = 1.0f;
 		point.Position = (left.Position * 2.0f - a.Position + right.Position * 2.0f - c.Position) * 0.5f;
 		point.Texcoord = (left.Texcoord * 2.0f - a.Texcoord + right.Texcoord * 2.0f - c.Texcoord) * 0.5f;
+		point.Color = MixColors(MixColors(left.Color, 1.0f, a.Color, -0.5f), 1.0f,
+								MixColors(right.Color, 1.0f, c.Color, -0.5f), 1.0f);
 		return point;
 	}
 
@@ -218,6 +250,8 @@ PatchPoint JoinCurves(const PatchPoint& a, const PatchPoint& left, const PatchPo
 	point.Texcoord = (left.Texcoord * (left.Weight * 2.0f) - a.Texcoord * a.Weight +
 					  right.Texcoord * (right.Weight * 2.0f) - c.Texcoord * c.Weight) *
 					 scale;
+	point.Color = MixColors(MixColors(left.Color, left.Weight * 2.0f * scale, a.Color, -a.Weight * scale), 1.0f,
+							MixColors(right.Color, right.Weight * 2.0f * scale, c.Color, -c.Weight * scale), 1.0f);
 	return point;
 }
 
@@ -234,6 +268,29 @@ Patch Patch::FromGrid(uint32 width, uint32 height)
 	patch.Width = width;
 	patch.Height = height;
 	patch.Points.InitSize(width * height);
+
+	return patch;
+}
+
+Patch Patch::FromDetailMesh(uint32 width, uint32 height)
+{
+	Patch patch;
+
+	if (!IsValidDetailMeshSize(width) || !IsValidDetailMeshSize(height)) {
+		return patch;
+	}
+
+	patch.Width = width;
+	patch.Height = height;
+	patch.bIsDetailMesh = true;
+	patch.SubdivisionsU = 1;
+	patch.SubdivisionsV = 1;
+	patch.Points.InitSize(width * height);
+	patch.TurnedCells.InitCapacity((width - 1) * (height - 1));
+
+	for (uint32 cell = 0; cell < (width - 1) * (height - 1); cell++) {
+		patch.TurnedCells.Insert(static_cast<uint8>(0));
+	}
 
 	return patch;
 }
@@ -316,6 +373,39 @@ Patch Patch::MakeEndcap(const Vec3f min, const Vec3f max, uint32 axis)
 	return patch;
 }
 
+Patch Patch::MakeDetailMesh(const Vec3f min, const Vec3f max, uint32 axis, uint32 cells_u, uint32 cells_v)
+{
+	axis = axis % 3;
+	cells_u = std::clamp(cells_u, scMinDetailMeshSize - 1, scMaxDetailMeshSize - 1);
+	cells_v = std::clamp(cells_v, scMinDetailMeshSize - 1, scMaxDetailMeshSize - 1);
+
+	const uint32 axis_a = (axis + 1) % 3;
+	const uint32 axis_b = (axis + 2) % 3;
+
+	const float32 height = GetAxis(min, axis);
+
+	Patch patch = FromDetailMesh(cells_u + 1, cells_v + 1);
+
+	for (uint32 row = 0; row <= cells_v; row++) {
+		const float32 t = static_cast<float32>(row) / static_cast<float32>(cells_v);
+		const float32 b = GetAxis(max, axis_b) + (GetAxis(min, axis_b) - GetAxis(max, axis_b)) * t;
+
+		for (uint32 column = 0; column <= cells_u; column++) {
+			const float32 s = static_cast<float32>(column) / static_cast<float32>(cells_u);
+			const float32 a = GetAxis(min, axis_a) + (GetAxis(max, axis_a) - GetAxis(min, axis_a)) * s;
+
+			patch.GetPoint(column, row).Position = MakeAxisPoint(axis, height, a, b);
+		}
+	}
+
+	OrientAwayFrom(patch,
+				   ToDouble(GetBoxPoint(min, max, axis, 0.0f, 0.5f, 0.5f) - MakeAxisPoint(axis, 1.0f, 0.0f, 0.0f)));
+	std::fill(patch.TurnedCells.begin(), patch.TurnedCells.end(), static_cast<uint8>(0));
+	patch.WorldTexture();
+
+	return patch;
+}
+
 Patch Patch::MakePrimitive(ePatchPrimitive primitive, const Vec3f min, const Vec3f max, uint32 axis)
 {
 	switch (primitive) {
@@ -329,6 +419,8 @@ Patch Patch::MakePrimitive(ePatchPrimitive primitive, const Vec3f min, const Vec
 		return MakeBevel(min, max, axis);
 	case ePatchPrimitive::Endcap:
 		return MakeEndcap(min, max, axis);
+	case ePatchPrimitive::DetailMesh:
+		return MakeDetailMesh(min, max, axis);
 	default:
 		return {};
 	}
@@ -340,6 +432,8 @@ Patch Patch::Clone() const
 	patch.Width = Width;
 	patch.Height = Height;
 	patch.Points = SizedArray<PatchPoint>::Clone(Points);
+	patch.bIsDetailMesh = bIsDetailMesh;
+	patch.TurnedCells = SizedArray<uint8>::Clone(TurnedCells);
 	patch.SubdivisionsU = SubdivisionsU;
 	patch.SubdivisionsV = SubdivisionsV;
 	patch.bSmooth = bSmooth;
@@ -352,9 +446,36 @@ Patch Patch::Clone() const
 
 bool Patch::IsValid() const
 {
+	if (bIsDetailMesh) {
+		return IsValidDetailMeshSize(Width) && IsValidDetailMeshSize(Height) && Points.Size == Width * Height &&
+			   TurnedCells.Size == (Width - 1) * (Height - 1);
+	}
+
 	return IsValidSize(Width) && IsValidSize(Height) && Points.Size == Width * Height &&
 		   SubdivisionsU >= scMinSubdivisions && SubdivisionsU <= scMaxSubdivisions &&
 		   SubdivisionsV >= scMinSubdivisions && SubdivisionsV <= scMaxSubdivisions;
+}
+
+bool Patch::IsCellTurned(uint32 column, uint32 row) const
+{
+	const size_t index = static_cast<size_t>(row) * (Width - 1) + column;
+
+	if (!bIsDetailMesh || column + 1 >= Width || row + 1 >= Height || index >= TurnedCells.Size) {
+		return false;
+	}
+
+	return TurnedCells[index] != 0;
+}
+
+void Patch::TurnCell(uint32 column, uint32 row)
+{
+	const size_t index = static_cast<size_t>(row) * (Width - 1) + column;
+
+	if (!bIsDetailMesh || column + 1 >= Width || row + 1 >= Height || index >= TurnedCells.Size) {
+		return;
+	}
+
+	TurnedCells[index] = static_cast<uint8>(TurnedCells[index] == 0);
 }
 
 Vec3f Patch::GetBoundsMin() const
@@ -400,6 +521,10 @@ SurfaceSample SampleSubPatch(const Patch& patch, uint32 sub_column, uint32 sub_r
 	GetBasis(v, basis_v, derivative_v);
 
 	SurfaceSample sample;
+	sample.Color[0] = 0.0;
+	sample.Color[1] = 0.0;
+	sample.Color[2] = 0.0;
+	sample.Color[3] = 0.0;
 
 	double total = 0.0;
 	double total_u = 0.0;
@@ -422,6 +547,7 @@ SurfaceSample SampleSubPatch(const Patch& patch, uint32 sub_column, uint32 sub_r
 
 			sample.Texcoord += texcoord * weight;
 			sample.TexcoordDerivU += texcoord * weight_u;
+			AddColor(sample.Color, point.Color, weight);
 			sample.TexcoordDerivV += texcoord * weight_v;
 
 			total += weight;
@@ -437,6 +563,11 @@ SurfaceSample SampleSubPatch(const Patch& patch, uint32 sub_column, uint32 sub_r
 	sample.DerivV = (sample.DerivV - sample.Position * total_v) * inverse;
 
 	sample.Texcoord = sample.Texcoord * inverse;
+
+	for (double& channel : sample.Color) {
+		channel *= inverse;
+	}
+
 	sample.TexcoordDerivU = (sample.TexcoordDerivU - sample.Texcoord * total_u) * inverse;
 	sample.TexcoordDerivV = (sample.TexcoordDerivV - sample.Texcoord * total_v) * inverse;
 
@@ -568,6 +699,22 @@ void MeasureNaturalDistances(const Patch& patch, bool along_columns, SizedArray<
 	out_distances.InitCapacity(count);
 	out_distances.Insert(0.0);
 
+	if (patch.bIsDetailMesh) {
+		for (uint32 index = 0; index + 1 < count; index++) {
+			double length = 0.0;
+
+			for (uint32 line = 0; line < lines; line++) {
+				length += (ToDouble(GetLinePoint(patch, along_columns, index + 1, line).Position) -
+						   ToDouble(GetLinePoint(patch, along_columns, index, line).Position))
+							  .Length();
+			}
+
+			out_distances.Insert(out_distances[index] + length / static_cast<double>(lines));
+		}
+
+		return;
+	}
+
 	for (uint32 index = 0; index + 2 < count; index += 2) {
 		double length = 0.0;
 
@@ -585,6 +732,316 @@ void MeasureNaturalDistances(const Patch& patch, bool along_columns, SizedArray<
 	}
 }
 
+struct CellCorners
+{
+	uint32 Index00 = 0;
+	uint32 Index10 = 0;
+	uint32 Index01 = 0;
+	uint32 Index11 = 0;
+};
+
+CellCorners GetCellCorners(const Patch& patch, uint32 column, uint32 row)
+{
+	CellCorners corners;
+	corners.Index00 = row * patch.Width + column;
+	corners.Index10 = corners.Index00 + 1;
+	corners.Index01 = corners.Index00 + patch.Width;
+	corners.Index11 = corners.Index01 + 1;
+
+	return corners;
+}
+
+void GetCellTriangles(const Patch& patch, uint32 column, uint32 row, uint32 out_corners[6])
+{
+	const CellCorners cell = GetCellCorners(patch, column, row);
+
+	if (patch.IsCellTurned(column, row)) {
+		const uint32 corners[6] = {
+			cell.Index00, cell.Index10, cell.Index01, cell.Index10, cell.Index11, cell.Index01
+		};
+		std::copy(std::begin(corners), std::end(corners), out_corners);
+		return;
+	}
+
+	const uint32 corners[6] = { cell.Index00, cell.Index10, cell.Index11, cell.Index00, cell.Index11, cell.Index01 };
+	std::copy(std::begin(corners), std::end(corners), out_corners);
+}
+
+bool SolveTriangleFrame(const PatchPoint& a, const PatchPoint& b, const PatchPoint& c, Vec3d& out_normal,
+						Vec3d& out_tangent, double& out_handedness)
+{
+	SurfaceSample sample;
+	sample.DerivU = ToDouble(b.Position) - ToDouble(a.Position);
+	sample.DerivV = ToDouble(c.Position) - ToDouble(a.Position);
+	sample.TexcoordDerivU = ToDouble(b.Texcoord) - ToDouble(a.Texcoord);
+	sample.TexcoordDerivV = ToDouble(c.Texcoord) - ToDouble(a.Texcoord);
+
+	const Vec3d normal = sample.DerivU.Cross(sample.DerivV);
+	const double length = normal.Length();
+
+	if (length <= scDegenerateCross) {
+		return false;
+	}
+
+	out_normal = normal * (1.0 / length);
+
+	SolveTangent(sample, out_normal, out_tangent, out_handedness);
+
+	return true;
+}
+
+PatchVertex EvaluateDetailMesh(const Patch& patch, double u, double v)
+{
+	PatchVertex vertex;
+
+	u = std::clamp(u, 0.0, static_cast<double>(patch.Width - 1));
+	v = std::clamp(v, 0.0, static_cast<double>(patch.Height - 1));
+
+	const uint32 column = std::min(static_cast<uint32>(u), patch.Width - 2);
+	const uint32 row = std::min(static_cast<uint32>(v), patch.Height - 2);
+
+	const double s = u - static_cast<double>(column);
+	const double t = v - static_cast<double>(row);
+
+	const CellCorners cell = GetCellCorners(patch, column, row);
+
+	uint32 corners[3] = { cell.Index00, cell.Index10, cell.Index11 };
+	double weights[3] = { 1.0 - s, s - t, t };
+
+	if (patch.IsCellTurned(column, row)) {
+		if (s + t <= 1.0) {
+			corners[2] = cell.Index01;
+			weights[0] = 1.0 - s - t;
+			weights[1] = s;
+			weights[2] = t;
+		}
+		else {
+			corners[0] = cell.Index10;
+			corners[1] = cell.Index11;
+			corners[2] = cell.Index01;
+			weights[0] = 1.0 - t;
+			weights[1] = s + t - 1.0;
+			weights[2] = 1.0 - s;
+		}
+	}
+	else if (t > s) {
+		corners[1] = cell.Index11;
+		corners[2] = cell.Index01;
+		weights[0] = 1.0 - t;
+		weights[1] = s;
+		weights[2] = t - s;
+	}
+
+	double color[4] = { 0.0, 0.0, 0.0, 0.0 };
+
+	for (uint32 corner = 0; corner < 3; corner++) {
+		const PatchPoint& point = patch.Points[corners[corner]];
+
+		vertex.Position = vertex.Position + ToDouble(point.Position) * weights[corner];
+		vertex.Texcoord += ToDouble(point.Texcoord) * weights[corner];
+		AddColor(color, point.Color, weights[corner]);
+	}
+
+	vertex.Color = MakeColor(color);
+
+	vertex.Parameter = Vec2d(u, v);
+
+	if (!SolveTriangleFrame(patch.Points[corners[0]], patch.Points[corners[1]], patch.Points[corners[2]], vertex.Normal,
+							vertex.Tangent, vertex.Handedness)) {
+		vertex.Normal = Vec3d(0.0, 1.0, 0.0);
+		vertex.Tangent = Vec3d(1.0, 0.0, 0.0);
+	}
+
+	return vertex;
+}
+
+bool AddGridTriangle(const SizedArray<PatchVertex>& grid, SizedArray<uint32>& triangles, uint32 a, uint32 b, uint32 c)
+{
+	const Vec3d& pa = grid[a].Position;
+	const Vec3d cross = (grid[b].Position - pa).Cross(grid[c].Position - pa);
+
+	if (cross.Length() <= scDegenerateCross) {
+		return false;
+	}
+
+	triangles.Insert(a);
+	triangles.Insert(c);
+	triangles.Insert(b);
+
+	return true;
+}
+
+void BuildCurveGrid(const Patch& patch, SizedArray<PatchVertex>& out_grid, SizedArray<uint32>& out_triangles,
+					uint32& out_columns, uint32& out_rows)
+{
+	const uint32 columns = patch.GetSubPatchColumns() * patch.SubdivisionsU + 1;
+	const uint32 rows = patch.GetSubPatchRows() * patch.SubdivisionsV + 1;
+
+	out_grid.InitCapacity(columns * rows);
+
+	for (uint32 row = 0; row < rows; row++) {
+		const double v = static_cast<double>(row) / static_cast<double>(patch.SubdivisionsV);
+
+		for (uint32 column = 0; column < columns; column++) {
+			const double u = static_cast<double>(column) / static_cast<double>(patch.SubdivisionsU);
+
+			out_grid.Insert(patch.Evaluate(u, v));
+		}
+	}
+
+	out_triangles.InitCapacity((columns - 1) * (rows - 1) * 6);
+
+	for (uint32 row = 0; row + 1 < rows; row++) {
+		for (uint32 column = 0; column + 1 < columns; column++) {
+			const uint32 i00 = row * columns + column;
+			const uint32 i10 = i00 + 1;
+			const uint32 i01 = i00 + columns;
+			const uint32 i11 = i01 + 1;
+
+			const double diagonal_a = (out_grid[i11].Position - out_grid[i00].Position).Length();
+			const double diagonal_b = (out_grid[i01].Position - out_grid[i10].Position).Length();
+
+			if (diagonal_a <= diagonal_b) {
+				AddGridTriangle(out_grid, out_triangles, i00, i10, i11);
+				AddGridTriangle(out_grid, out_triangles, i00, i11, i01);
+			}
+			else {
+				AddGridTriangle(out_grid, out_triangles, i00, i10, i01);
+				AddGridTriangle(out_grid, out_triangles, i10, i11, i01);
+			}
+		}
+	}
+
+	out_columns = columns;
+	out_rows = rows;
+}
+
+void BuildDetailMeshGrid(const Patch& patch, SizedArray<PatchVertex>& out_grid, SizedArray<uint32>& out_triangles)
+{
+	out_grid.InitCapacity(patch.Points.Size);
+
+	for (uint32 row = 0; row < patch.Height; row++) {
+		for (uint32 column = 0; column < patch.Width; column++) {
+			const PatchPoint& point = patch.GetPoint(column, row);
+
+			PatchVertex vertex;
+			vertex.Position = ToDouble(point.Position);
+			vertex.Texcoord = ToDouble(point.Texcoord);
+			vertex.Color = point.Color;
+			vertex.Parameter = Vec2d(static_cast<double>(column), static_cast<double>(row));
+
+			out_grid.Insert(vertex);
+		}
+	}
+
+	SizedArray<Vec3d> bitangents(patch.Points.Size);
+
+	for (size_t i = 0; i < patch.Points.Size; i++) {
+		bitangents.Insert(Vec3d(0.0));
+	}
+
+	out_triangles.InitCapacity((patch.Width - 1) * (patch.Height - 1) * 6);
+
+	for (uint32 row = 0; row + 1 < patch.Height; row++) {
+		for (uint32 column = 0; column + 1 < patch.Width; column++) {
+			uint32 corners[6];
+			GetCellTriangles(patch, column, row, corners);
+
+			for (uint32 triangle = 0; triangle < 2; triangle++) {
+				const uint32 a = corners[triangle * 3];
+				const uint32 b = corners[triangle * 3 + 1];
+				const uint32 c = corners[triangle * 3 + 2];
+
+				if (!AddGridTriangle(out_grid, out_triangles, a, b, c)) {
+					continue;
+				}
+
+				const Vec3d edge_b = out_grid[b].Position - out_grid[a].Position;
+				const Vec3d edge_c = out_grid[c].Position - out_grid[a].Position;
+				const Vec2d texture_b = out_grid[b].Texcoord - out_grid[a].Texcoord;
+				const Vec2d texture_c = out_grid[c].Texcoord - out_grid[a].Texcoord;
+
+				const Vec3d normal = edge_b.Cross(edge_c);
+				const double determinant = texture_b.X * texture_c.Y - texture_c.X * texture_b.Y;
+
+				Vec3d along_s = edge_b;
+				Vec3d along_t = Vec3d(0.0);
+
+				if (std::fabs(determinant) > scDegenerateTexture) {
+					along_s = (edge_b * texture_c.Y - edge_c * texture_b.Y) * (1.0 / determinant);
+					along_t = (edge_c * texture_b.X - edge_b * texture_c.X) * (1.0 / determinant);
+				}
+
+				for (const uint32 corner : { a, b, c }) {
+					out_grid[corner].Normal = out_grid[corner].Normal + normal;
+					out_grid[corner].Tangent = out_grid[corner].Tangent + along_s;
+					bitangents[corner] = bitangents[corner] + along_t;
+				}
+			}
+		}
+	}
+
+	for (size_t i = 0; i < out_grid.Size; i++) {
+		PatchVertex& vertex = out_grid[i];
+		const double normal_length = vertex.Normal.Length();
+
+		if (normal_length <= scDegenerateCross) {
+			vertex.Normal = Vec3d(0.0, 1.0, 0.0);
+		}
+		else {
+			vertex.Normal = vertex.Normal * (1.0 / normal_length);
+		}
+
+		const Vec3d tangent = vertex.Tangent - vertex.Normal * vertex.Normal.Dot(vertex.Tangent);
+		const double tangent_length = tangent.Length();
+
+		if (tangent_length > scDegenerateLength) {
+			vertex.Tangent = tangent * (1.0 / tangent_length);
+		}
+		else {
+			vertex.Tangent = GetAnyPerpendicular(vertex.Normal);
+		}
+
+		vertex.Handedness = 1.0;
+
+		if (vertex.Normal.Cross(vertex.Tangent).Dot(bitangents[i]) > 0.0) {
+			vertex.Handedness = -1.0;
+		}
+	}
+}
+
+Vec3d GetFacingNormal(const Patch& patch)
+{
+	if (!patch.bIsDetailMesh) {
+		return patch
+			.Evaluate(static_cast<double>(patch.GetSubPatchColumns()) * 0.5,
+					  static_cast<double>(patch.GetSubPatchRows()) * 0.5)
+			.Normal;
+	}
+
+	Vec3d sum = Vec3d(0.0);
+
+	for (uint32 row = 0; row + 1 < patch.Height; row++) {
+		for (uint32 column = 0; column + 1 < patch.Width; column++) {
+			const CellCorners cell = GetCellCorners(patch, column, row);
+			const Vec3d diagonal_a = ToDouble(patch.Points[cell.Index11].Position) -
+									 ToDouble(patch.Points[cell.Index00].Position);
+			const Vec3d diagonal_b = ToDouble(patch.Points[cell.Index01].Position) -
+									 ToDouble(patch.Points[cell.Index10].Position);
+
+			sum = sum + diagonal_a.Cross(diagonal_b);
+		}
+	}
+
+	const double length = sum.Length();
+
+	if (length <= scDegenerateCross) {
+		return Vec3d(0.0, 1.0, 0.0);
+	}
+
+	return sum * (1.0 / length);
+}
+
 } // namespace
 
 PatchVertex Patch::Evaluate(double u, double v) const
@@ -593,6 +1050,10 @@ PatchVertex Patch::Evaluate(double u, double v) const
 
 	if (!IsValid()) {
 		return vertex;
+	}
+
+	if (bIsDetailMesh) {
+		return EvaluateDetailMesh(*this, u, v);
 	}
 
 	const uint32 sub_columns = GetSubPatchColumns();
@@ -612,6 +1073,7 @@ PatchVertex Patch::Evaluate(double u, double v) const
 
 	vertex.Position = sample.Position;
 	vertex.Texcoord = sample.Texcoord;
+	vertex.Color = MakeColor(sample.Color);
 	vertex.Parameter = Vec2d(u, v);
 
 	Vec3d normal_sum = Vec3d(0.0);
@@ -670,56 +1132,17 @@ void Patch::Tessellate(PatchMesh& out_mesh) const
 		return;
 	}
 
-	const uint32 columns = GetSubPatchColumns() * SubdivisionsU + 1;
-	const uint32 rows = GetSubPatchRows() * SubdivisionsV + 1;
+	SizedArray<PatchVertex> grid;
+	SizedArray<uint32> triangles;
 
-	SizedArray<PatchVertex> grid(columns * rows);
+	uint32 columns = Width;
+	uint32 rows = Height;
 
-	for (uint32 row = 0; row < rows; row++) {
-		const double v = static_cast<double>(row) / static_cast<double>(SubdivisionsV);
-
-		for (uint32 column = 0; column < columns; column++) {
-			const double u = static_cast<double>(column) / static_cast<double>(SubdivisionsU);
-
-			grid.Insert(Evaluate(u, v));
-		}
+	if (bIsDetailMesh) {
+		BuildDetailMeshGrid(*this, grid, triangles);
 	}
-
-	SizedArray<uint32> triangles((columns - 1) * (rows - 1) * 6);
-
-	const auto add_triangle = [&grid, &triangles](uint32 a, uint32 b, uint32 c)
-	{
-		const Vec3d& pa = grid[a].Position;
-		const Vec3d cross = (grid[b].Position - pa).Cross(grid[c].Position - pa);
-
-		if (cross.Length() <= scDegenerateCross) {
-			return;
-		}
-
-		triangles.Insert(a);
-		triangles.Insert(c);
-		triangles.Insert(b);
-	};
-
-	for (uint32 row = 0; row + 1 < rows; row++) {
-		for (uint32 column = 0; column + 1 < columns; column++) {
-			const uint32 i00 = row * columns + column;
-			const uint32 i10 = i00 + 1;
-			const uint32 i01 = i00 + columns;
-			const uint32 i11 = i01 + 1;
-
-			const double diagonal_a = (grid[i11].Position - grid[i00].Position).Length();
-			const double diagonal_b = (grid[i01].Position - grid[i10].Position).Length();
-
-			if (diagonal_a <= diagonal_b) {
-				add_triangle(i00, i10, i11);
-				add_triangle(i00, i11, i01);
-			}
-			else {
-				add_triangle(i00, i10, i01);
-				add_triangle(i10, i11, i01);
-			}
-		}
+	else {
+		BuildCurveGrid(*this, grid, triangles, columns, rows);
 	}
 
 	out_mesh.Columns = columns;
@@ -762,9 +1185,22 @@ void Patch::Tessellate(PatchMesh& out_mesh) const
 	}
 }
 
+uint32 PatchColor::Pack() const
+{
+	const auto to_byte = [](float32 value)
+	{ return static_cast<uint32>(std::lround(std::clamp(value, 0.0f, 1.0f) * 255.0f)); };
+
+	return to_byte(R) | (to_byte(G) << 8) | (to_byte(B) << 16) | (to_byte(A) << 24);
+}
+
+bool Patch::HasVertexColors() const
+{
+	return std::any_of(Points.begin(), Points.end(), [](const PatchPoint& point) { return !point.Color.IsWhite(); });
+}
+
 void Patch::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normals, SizedArray<Vec3f>& tangents,
 						 SizedArray<float32>& tangent_handedness, SizedArray<Vec2f>& texcoords,
-						 SizedArray<uint32>& indices, const Mat4f& to_world) const
+						 SizedArray<uint32>& indices, const Mat4f& to_world, SizedArray<uint32>* packed_colors) const
 {
 	Patch pieces[scMaxClosurePieces];
 	const uint32 piece_count = BuildClosure(pieces, to_world);
@@ -802,6 +1238,10 @@ void Patch::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normal
 	texcoords.InitCapacity(vertex_count);
 	indices.InitCapacity(index_count);
 
+	if (packed_colors != nullptr) {
+		packed_colors->InitCapacity(vertex_count);
+	}
+
 	for (const PatchMesh& mesh : meshes) {
 		const uint32 base = static_cast<uint32>(positions.Size);
 
@@ -811,6 +1251,10 @@ void Patch::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normal
 			tangents.Insert(ToFloat(vertex.Tangent));
 			tangent_handedness.Insert(static_cast<float32>(vertex.Handedness));
 			texcoords.Insert(Vec2f(static_cast<float32>(vertex.Texcoord.X), static_cast<float32>(vertex.Texcoord.Y)));
+
+			if (packed_colors != nullptr) {
+				packed_colors->Insert(vertex.Color.Pack());
+			}
 		}
 
 		for (const uint32 index : mesh.Indices) {
@@ -826,6 +1270,22 @@ void Patch::Invert()
 			std::swap(GetPoint(column, row), GetPoint(Width - 1 - column, row));
 		}
 	}
+
+	if (!bIsDetailMesh || TurnedCells.Size != (Width - 1) * (Height - 1)) {
+		return;
+	}
+
+	const uint32 cells = Width - 1;
+
+	for (uint32 row = 0; row + 1 < Height; row++) {
+		uint8* line = &TurnedCells[row * cells];
+
+		std::reverse(line, line + cells);
+
+		for (uint32 column = 0; column < cells; column++) {
+			line[column] = static_cast<uint8>(line[column] == 0);
+		}
+	}
 }
 
 void Patch::Transpose()
@@ -838,14 +1298,116 @@ void Patch::Transpose()
 		}
 	}
 
+	if (bIsDetailMesh && TurnedCells.Size == (Width - 1) * (Height - 1)) {
+		SizedArray<uint8> turned(TurnedCells.Size);
+
+		for (uint32 column = 0; column + 1 < Width; column++) {
+			for (uint32 row = 0; row + 1 < Height; row++) {
+				turned.Insert(static_cast<uint8>(TurnedCells[row * (Width - 1) + column]));
+			}
+		}
+
+		TurnedCells = std::move(turned);
+	}
+
 	std::swap(Width, Height);
 	std::swap(SubdivisionsU, SubdivisionsV);
 
 	Points = std::move(points);
 }
 
+namespace {
+
+PatchPoint GetMidpoint(const PatchPoint& a, const PatchPoint& b)
+{
+	PatchPoint point;
+	point.Position = (a.Position + b.Position) * 0.5f;
+	point.Texcoord = (a.Texcoord + b.Texcoord) * 0.5f;
+	point.Color = MixColors(a.Color, 0.5f, b.Color, 0.5f);
+
+	return point;
+}
+
+} // namespace
+
+bool Patch::ResampleDetailMesh(uint32 cells_u, uint32 cells_v)
+{
+	if (!bIsDetailMesh || !IsValid()) {
+		return false;
+	}
+
+	cells_u = std::clamp(cells_u, scMinDetailMeshSize - 1, scMaxDetailMeshSize - 1);
+	cells_v = std::clamp(cells_v, scMinDetailMeshSize - 1, scMaxDetailMeshSize - 1);
+
+	if (cells_u + 1 == Width && cells_v + 1 == Height) {
+		return true;
+	}
+
+	Patch resampled = FromDetailMesh(cells_u + 1, cells_v + 1);
+
+	const double scale_u = static_cast<double>(Width - 1) / static_cast<double>(cells_u);
+	const double scale_v = static_cast<double>(Height - 1) / static_cast<double>(cells_v);
+
+	for (uint32 row = 0; row <= cells_v; row++) {
+		for (uint32 column = 0; column <= cells_u; column++) {
+			const PatchVertex vertex = Evaluate(static_cast<double>(column) * scale_u,
+												static_cast<double>(row) * scale_v);
+			PatchPoint& point = resampled.GetPoint(column, row);
+
+			point.Position = ToFloat(vertex.Position);
+			point.Texcoord = Vec2f(static_cast<float32>(vertex.Texcoord.X), static_cast<float32>(vertex.Texcoord.Y));
+			point.Color = vertex.Color;
+		}
+	}
+
+	Width = resampled.Width;
+	Height = resampled.Height;
+	Points = std::move(resampled.Points);
+	TurnedCells = std::move(resampled.TurnedCells);
+
+	return true;
+}
+
 bool Patch::InsertColumns(uint32 sub_column)
 {
+	if (bIsDetailMesh) {
+		if (!IsValid() || sub_column >= GetSubPatchColumns() || Width + 1 > scMaxDetailMeshSize) {
+			return false;
+		}
+
+		const uint32 width = Width + 1;
+		SizedArray<PatchPoint> points(width * Height);
+		SizedArray<uint8> turned((width - 1) * (Height - 1));
+
+		for (uint32 row = 0; row < Height; row++) {
+			for (uint32 column = 0; column < Width; column++) {
+				points.Insert(GetPoint(column, row));
+
+				if (column == sub_column) {
+					points.Insert(GetMidpoint(GetPoint(column, row), GetPoint(column + 1, row)));
+				}
+			}
+		}
+
+		for (uint32 row = 0; row + 1 < Height; row++) {
+			for (uint32 column = 0; column + 1 < Width; column++) {
+				const uint8 flag = TurnedCells[row * (Width - 1) + column];
+
+				turned.Insert(static_cast<uint8>(flag));
+
+				if (column == sub_column) {
+					turned.Insert(static_cast<uint8>(flag));
+				}
+			}
+		}
+
+		Width = width;
+		Points = std::move(points);
+		TurnedCells = std::move(turned);
+
+		return true;
+	}
+
 	if (!IsValid() || sub_column >= GetSubPatchColumns() || Width + 2 > scMaxSize) {
 		return false;
 	}
@@ -890,6 +1452,36 @@ bool Patch::RemoveColumns(uint32 sub_column)
 {
 	if (!IsValid() || sub_column + 1 >= GetSubPatchColumns()) {
 		return false;
+	}
+
+	if (bIsDetailMesh) {
+		const uint32 width = Width - 1;
+		const uint32 removed = sub_column + 1;
+
+		SizedArray<PatchPoint> points(width * Height);
+		SizedArray<uint8> turned((width - 1) * (Height - 1));
+
+		for (uint32 row = 0; row < Height; row++) {
+			for (uint32 column = 0; column < Width; column++) {
+				if (column != removed) {
+					points.Insert(GetPoint(column, row));
+				}
+			}
+		}
+
+		for (uint32 row = 0; row + 1 < Height; row++) {
+			for (uint32 column = 0; column + 1 < Width; column++) {
+				if (column != removed) {
+					turned.Insert(static_cast<uint8>(TurnedCells[row * (Width - 1) + column]));
+				}
+			}
+		}
+
+		Width = width;
+		Points = std::move(points);
+		TurnedCells = std::move(turned);
+
+		return true;
 	}
 
 	const uint32 width = Width - 2;
@@ -1038,6 +1630,7 @@ Patch MakeCornerCap(const PatchPoint& start, const PatchPoint& corner, const Pat
 
 		for (uint32 row = 0; row < cap.Height; row++) {
 			cap.GetPoint(column, row).Weight = weight;
+			cap.GetPoint(column, row).Color = ring[column]->Color;
 		}
 	}
 
@@ -1067,6 +1660,10 @@ Patch MakeBridge(const SizedArray<PatchPoint>& from, const SizedArray<PatchPoint
 		bridge.GetPoint(column, 0).Weight = from[column].Weight;
 		bridge.GetPoint(column, 1).Weight = (from[column].Weight + to[column].Weight) * 0.5f;
 		bridge.GetPoint(column, 2).Weight = to[column].Weight;
+
+		bridge.GetPoint(column, 0).Color = from[column].Color;
+		bridge.GetPoint(column, 1).Color = MixColors(from[column].Color, 0.5f, to[column].Color, 0.5f);
+		bridge.GetPoint(column, 2).Color = to[column].Color;
 	}
 
 	bridge.SubdivisionsU = subdivisions;
@@ -1083,10 +1680,9 @@ void Patch::WorldTexture(const Mat4f& to_world, float32 scale, uint32 axis)
 		return;
 	}
 
-	const PatchVertex middle = Evaluate(static_cast<double>(GetSubPatchColumns()) * 0.5,
-										static_cast<double>(GetSubPatchRows()) * 0.5);
-	const Vec4f turned = to_world * Vec4f(static_cast<float32>(middle.Normal.X), static_cast<float32>(middle.Normal.Y),
-										  static_cast<float32>(middle.Normal.Z), 0.0f);
+	const Vec3d facing_normal = GetFacingNormal(*this);
+	const Vec4f turned = to_world * Vec4f(static_cast<float32>(facing_normal.X), static_cast<float32>(facing_normal.Y),
+										  static_cast<float32>(facing_normal.Z), 0.0f);
 	const float32 normal[3] = { turned.X, turned.Y, turned.Z };
 
 	uint32 dominant = axis;
@@ -1310,6 +1906,7 @@ Patch Patch::MakeCap(uint32 edge, const Mat4f& to_world) const
 
 		for (uint32 row = 0; row < cap.Height; row++) {
 			cap.GetPoint(column, row).Weight = ring[column].Weight;
+			cap.GetPoint(column, row).Color = ring[column].Color;
 		}
 	}
 
@@ -1441,6 +2038,10 @@ uint32 Patch::Cap(Patch out_caps[scMaxCapPieces], const Mat4f& to_world) const
 uint32 Patch::BuildClosure(Patch out_pieces[scMaxClosurePieces], const Mat4f& to_world) const
 {
 	uint32 count = 0;
+
+	if (bIsDetailMesh) {
+		return count;
+	}
 
 	if (Closure == ePatchClosure::Cap) {
 		count = Cap(out_pieces, to_world);

@@ -25,6 +25,11 @@ PERMEND()
 PERMIF(USE_LIGHTMAP);
     float2 vLightmapUV : TEXCOORD1;
 PERMEND();
+
+PERMIF(USE_VERTEX_COLOR);
+    /// Declared after the lightmap UV so its location follows it. See BuildStreamDescription().
+    float4 vColor : COLOR0;
+PERMEND();
 };
 
 struct VSOutput
@@ -51,6 +56,10 @@ PERMEND();
 
 PERMIF(USE_LIGHTMAP);
     float2 vLightmapUV : TEXCOORD1;
+PERMEND();
+
+PERMIF(USE_VERTEX_COLOR);
+    float4 vColor : COLOR0;
 PERMEND();
 };
 
@@ -122,6 +131,10 @@ PERMIF(USE_LIGHTMAP);
     output.vLightmapUV = input.vLightmapUV;
 PERMEND();
 
+PERMIF(USE_VERTEX_COLOR);
+    output.vColor = input.vColor;
+PERMEND();
+
     // Uses the posed position so skinned meshes are lit (probes, lights, shadows) where they are drawn,
     // not at their bind pose.
     float4 position_ws = mul(position_ms, world_matrix);
@@ -167,6 +180,10 @@ PERMEND();
 
 PERMIF(USE_LIGHTMAP);
 	float2 vLightmapUV : TEXCOORD1;
+PERMEND();
+
+PERMIF(USE_VERTEX_COLOR);
+	float4 vColor : COLOR0;
 PERMEND();
 
 	/// False when a double sided material is seen from behind
@@ -507,6 +524,15 @@ PERMEND();
     float tex_alpha = albedo_sample.a;
 
     float base_alpha = saturate(tex_alpha * material.fAlpha);
+
+PERMIF(USE_VERTEX_COLOR);
+    albedo *= input.vColor.rgb;
+
+PERMIF(BLEND_PASS);
+    // Only blended surfaces fade out with the vertex alpha. Opaque ones keep the depth their prepass wrote.
+    base_alpha *= input.vColor.a;
+PERMEND();
+PERMEND();
 
 PERMNOT(USE_PREPASS_DEPTH);
 	// With the prepass, its discard leaves the depth of whatever is behind, which fails the EQUAL test here

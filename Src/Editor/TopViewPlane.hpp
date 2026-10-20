@@ -70,6 +70,9 @@ enum class ePatchCommand : uint8
 	SetClosure,
 	SetWeight,
 	RoundWeights,
+	TurnCells,
+	SetColor,
+	SetAlpha,
 };
 
 enum class ePatchTextureMapping : uint8
@@ -108,6 +111,7 @@ struct PatchCommand
 	ePatchClosure Closure = ePatchClosure::None;
 	float32 Thickness = Patch::scDefaultThickness;
 	float32 Weight = 1.0f;
+	PatchColor Color;
 	PatchTextureSettings Texture;
 };
 

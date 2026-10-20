@@ -154,6 +154,7 @@ struct TopViewProjection
 	DynArray<TopViewFace> Faces;
 	DynArray<Vec2f> ControlPoints;
 	DynArray<float32> ControlWeights;
+	DynArray<PatchColor> ControlColors;
 
 	TopViewProjection() = default;
 	TopViewProjection(TopViewProjection&& other) = default;
@@ -175,6 +176,7 @@ struct TopViewProjection
 		Faces = other.Faces.Clone();
 		ControlPoints = other.ControlPoints.Clone();
 		ControlWeights = other.ControlWeights.Clone();
+		ControlColors = other.ControlColors.Clone();
 
 		return *this;
 	}
@@ -195,6 +197,7 @@ struct TopViewBrush
 	uint16 PatchSubdivisionsU = 0;
 	uint16 PatchSubdivisionsV = 0;
 	bool bPatchSmooth = false;
+	bool bPatchDetailMesh = false;
 	ePatchClosure PatchClosure = ePatchClosure::None;
 	float32 PatchThickness = Patch::scDefaultThickness;
 

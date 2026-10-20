@@ -2,7 +2,8 @@
  * File:        Patch.hpp
  * Author:      emd22
  * Created:     15/10/2026
- * Description: Curved surfaces made of rational biquadratic Bezier patches, tessellated into triangles
+ * Description: Curved surfaces made of Bezier patches or vertex grids (detail meshes) which are tessellated
+ *              into triangles
  */
 
 #pragma once
@@ -15,11 +16,26 @@
 
 namespace fx {
 
+struct PatchColor
+{
+	float32 R = 1.0f;
+	float32 G = 1.0f;
+	float32 B = 1.0f;
+	float32 A = 1.0f;
+
+	bool IsWhite() const { return R == 1.0f && G == 1.0f && B == 1.0f && A == 1.0f; }
+
+	uint32 Pack() const;
+
+	bool operator==(const PatchColor& other) const = default;
+};
+
 struct PatchPoint
 {
 	Vec3f Position = Vec3f::sZero;
 	Vec2f Texcoord = Vec2f(0.0f, 0.0f);
 	float32 Weight = 1.0f;
+	PatchColor Color;
 };
 
 struct PatchVertex
@@ -30,6 +46,7 @@ struct PatchVertex
 	double Handedness = 1.0;
 	Vec2d Texcoord = Vec2d(0.0, 0.0);
 	Vec2d Parameter = Vec2d(0.0, 0.0);
+	PatchColor Color;
 };
 
 struct PatchMesh
@@ -48,6 +65,7 @@ enum class ePatchPrimitive : uint8
 	Cone,
 	Bevel,
 	Endcap,
+	DetailMesh,
 
 	Count,
 };
@@ -66,6 +84,9 @@ class Patch
 public:
 	static constexpr uint32 scMinSize = 3;
 	static constexpr uint32 scMaxSize = 31;
+
+	static constexpr uint32 scMinDetailMeshSize = 2;
+	static constexpr uint32 scMaxDetailMeshSize = 33;
 
 	static constexpr uint32 scMinSubdivisions = 1;
 	static constexpr uint32 scMaxSubdivisions = 16;
@@ -87,22 +108,44 @@ public:
 
 public:
 	static Patch FromGrid(uint32 width, uint32 height);
+	static Patch FromDetailMesh(uint32 width, uint32 height);
 
 	static Patch MakeFlat(const Vec3f min, const Vec3f max, uint32 axis);
 	static Patch MakeCylinder(const Vec3f min, const Vec3f max, uint32 axis);
 	static Patch MakeCone(const Vec3f min, const Vec3f max, uint32 axis);
 	static Patch MakeBevel(const Vec3f min, const Vec3f max, uint32 axis);
 	static Patch MakeEndcap(const Vec3f min, const Vec3f max, uint32 axis);
+	static Patch MakeDetailMesh(const Vec3f min, const Vec3f max, uint32 axis, uint32 cells_u = scDefaultSubdivisions,
+								uint32 cells_v = scDefaultSubdivisions);
 	static Patch MakePrimitive(ePatchPrimitive primitive, const Vec3f min, const Vec3f max, uint32 axis);
 
 	static bool IsValidSize(uint32 size) { return size >= scMinSize && size <= scMaxSize && (size & 1) == 1; }
+	static bool IsValidDetailMeshSize(uint32 size)
+	{
+		return size >= scMinDetailMeshSize && size <= scMaxDetailMeshSize;
+	}
 
 	Patch Clone() const;
 
 	bool IsValid() const;
 
-	uint32 GetSubPatchColumns() const { return (Width - 1) / 2; }
-	uint32 GetSubPatchRows() const { return (Height - 1) / 2; }
+	uint32 GetSubPatchColumns() const
+	{
+		if (bIsDetailMesh) {
+			return Width - 1;
+		}
+
+		return (Width - 1) / 2;
+	}
+
+	uint32 GetSubPatchRows() const
+	{
+		if (bIsDetailMesh) {
+			return Height - 1;
+		}
+
+		return (Height - 1) / 2;
+	}
 
 	PatchPoint& GetPoint(uint32 column, uint32 row) { return Points[row * Width + column]; }
 	const PatchPoint& GetPoint(uint32 column, uint32 row) const { return Points[row * Width + column]; }
@@ -111,13 +154,20 @@ public:
 	Vec3f GetBoundsMax() const;
 	Vec3f GetCenter() const { return (GetBoundsMin() + GetBoundsMax()) * 0.5f; }
 
+	bool IsCellTurned(uint32 column, uint32 row) const;
+	void TurnCell(uint32 column, uint32 row);
+	bool ResampleDetailMesh(uint32 cells_u, uint32 cells_v);
+
 	PatchVertex Evaluate(double u, double v) const;
 
 	void Tessellate(PatchMesh& out_mesh) const;
 
 	void GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normals, SizedArray<Vec3f>& tangents,
 					  SizedArray<float32>& tangent_handedness, SizedArray<Vec2f>& texcoords,
-					  SizedArray<uint32>& indices, const Mat4f& to_world = Mat4f::scIdentity) const;
+					  SizedArray<uint32>& indices, const Mat4f& to_world = Mat4f::scIdentity,
+					  SizedArray<uint32>* packed_colors = nullptr) const;
+
+	bool HasVertexColors() const;
 
 	void Invert();
 	void Transpose();
@@ -150,6 +200,9 @@ public:
 	uint32 Height = 0;
 
 	SizedArray<PatchPoint> Points;
+
+	bool bIsDetailMesh = false;
+	SizedArray<uint8> TurnedCells;
 
 	uint32 SubdivisionsU = scDefaultSubdivisions;
 	uint32 SubdivisionsV = scDefaultSubdivisions;

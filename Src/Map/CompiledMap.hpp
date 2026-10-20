@@ -55,7 +55,11 @@ struct CompiledMapSurface
 
 	SizedArray<float32> LightmapTexcoords;
 
+	/// RGBA8 per vertex (red in the lowest byte), or empty when every vertex is white and opaque
+	SizedArray<uint32> Colors;
+
 	bool HasLightmapTexcoords() const { return LightmapTexcoords.Size == Vertices.Size * 2 && Vertices.Size > 0; }
+	bool HasVertexColors() const { return Colors.Size == Vertices.Size && Vertices.Size > 0; }
 };
 
 struct CompiledMapShadowSurface
@@ -129,7 +133,7 @@ class CompiledMap
 {
 public:
 	static constexpr uint32 scMagic = 0x504D5846;
-	static constexpr uint32 scVersion = 7;
+	static constexpr uint32 scVersion = 8;
 	static constexpr const char* scExtension = ".fxmap";
 	static constexpr const char* scPrototypeExtension = ".prx";
 
