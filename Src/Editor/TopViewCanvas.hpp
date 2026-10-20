@@ -281,6 +281,7 @@ private:
 	void NotifyCurveChanged();
 	void SyncCurveFromSelection();
 	void SyncTextureFromPickedFace();
+	void SyncPickedFaceToGame();
 	void SyncWeightFromHandles();
 
 	void UpdatePreview();
@@ -389,6 +390,9 @@ private:
 	bool mbHasPickedFace = false;
 	ObjectID mPickedFaceBrushId = ObjectID::scNull;
 	Vec2f mPickedFaceNormal = Vec2f::sZero;
+
+	ObjectID mSentPickedFaceId = ObjectID::scNull;
+	Vec3f mSentPickedFaceNormal = Vec3f::sZero;
 
 	DynArray<TopViewVertexHandle> mSelectedVertices;
 	TopViewVertexHandle mGrabbedVertex;

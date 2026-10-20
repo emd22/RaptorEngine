@@ -194,7 +194,7 @@ void MapSource::AddPatch(ConfigEntry& entry, const String& name, const CachedMat
 
 		source.Name = name;
 		source.MaterialIndex = material_index;
-		source.bCastsShadow = !is_transparent;
+		source.bCastsShadow = !is_transparent && entry.GetMemberValue(HashStr32("shadows"), 1) != 0;
 
 		if (piece == 0) {
 			source.Shape = patch.Clone();
@@ -307,6 +307,10 @@ void MapSource::AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& nam
 			TransparentBrushCount++;
 		}
 		break;
+	}
+
+	if (entry.GetMemberValue(HashStr32("shadows"), 1) == 0) {
+		source.bCastsShadow = false;
 	}
 
 	const auto get_face_material = [&](const BrushPlane& plane)

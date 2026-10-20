@@ -109,6 +109,8 @@ struct EditorTheme
 		Color Grab = Color::FromRGBA(255, 120, 40, 255);
 		Color ModelSelected = Color::FromRGBA(255, 220, 60, 255);
 		Color EditedBounds = Color::FromRGBA(60, 220, 255, 255);
+		Color Selection = Color::FromRGBA(60, 200, 255, 70);
+		Color SelectedFace = Color::FromRGBA(255, 205, 70, 110);
 	};
 
 	bool Load(const String& path);
@@ -197,6 +199,8 @@ void EditorTheme::ForEachColor(TFunc&& func)
 	func("viewport", "grab", Viewport.Grab);
 	func("viewport", "model_selected", Viewport.ModelSelected);
 	func("viewport", "edited_bounds", Viewport.EditedBounds);
+	func("viewport", "selection", Viewport.Selection);
+	func("viewport", "selected_face", Viewport.SelectedFace);
 }
 
 template <typename TFunc>

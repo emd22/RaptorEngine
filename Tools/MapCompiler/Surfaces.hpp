@@ -54,6 +54,7 @@ struct SurfacePolygon
 	int32 MaterialIndex = 0;
 	int32 MapIndex = 0;
 	int32 Area = scNoMapArea;
+	bool bCastsShadow = true;
 
 	Winding Points;
 };

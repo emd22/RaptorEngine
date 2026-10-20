@@ -32,7 +32,7 @@ namespace {
 
 constexpr int scItemBorder = 2;
 constexpr int scSeparatorBorder = 6;
-constexpr int scLetterButtonSize = 28;
+constexpr int scLetterButtonSize = 32;
 
 struct ToolButtonInfo
 {

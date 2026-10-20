@@ -25,6 +25,7 @@
 #include <Core/Types.hpp>
 #include <Material/MaterialID.hpp>
 #include <Math/Vec2.hpp>
+#include <Renderer/PrimitiveMesh.hpp>
 #include <atomic>
 #include <chrono>
 #include <functional>
@@ -160,6 +161,7 @@ public:
 	void TopViewSubtract(bool keep_cutters);
 	void TopViewEditTextures(ObjectID face_object, const Vec3f face_normal, const TextureCommand& command);
 	void TopViewSetFaceMaterial(ObjectID face_object, const Vec3f face_normal, MaterialID material);
+	void TopViewSetPickedFace(ObjectID face_object, const Vec3f face_normal);
 	void TopViewSelectLight(uint32 light_id);
 	void TopViewMoveLight(const Vec3f offset);
 	void TopViewAimLight(const Vec3f direction);
@@ -237,8 +239,8 @@ public:
 
 	FX_FORCE_INLINE LightEditor& GetLightEditor() { return mLightEditor; }
 
-	/// Changes an object's material, and the material it goes back to once it is deselected
-	void SetStoredMaterial(Object* object, MaterialID material);
+	/// Changes a brush's material, and makes it the one new brushes are made with
+	void SetObjectMaterial(Object* object, MaterialID material);
 
 	/// The material new brushes are made with: the last one chosen for an object, or the default one
 	MaterialID GetNewBrushMaterial() const;
@@ -256,6 +258,9 @@ public:
 	uint32 SetSelectionScript(const String& path);
 
 	uint32 SetSelectionEnterDirection(const Vec3f local_direction);
+
+	bool CanRenameObject(const Object* object) const;
+	bool RenameObject(Object* object, const String& name);
 
 	/////////////////////////////////////
 	// Subviews
@@ -364,6 +369,8 @@ private:
 	uint32 GetAvailableToolMask() const;
 
 	void DrawModelSelection();
+	void DrawSelectionOverlay();
+	void DrawPickedFace();
 	void DrawSubviews();
 
 	bool SelectSubview(uint32 instance, bool append_selection);
@@ -414,6 +421,11 @@ private:
 
 	EditorSelection mSelection;
 	EditHistory mHistory { mSelection };
+
+	ObjectID mPickedFaceObject = ObjectID::scNull;
+	Vec3f mPickedFaceNormal = Vec3f::sZero;
+	Ref<PrimitiveMesh> mPickedFaceMesh;
+	SizedArray<Vec3f> mPickedFaceVertices;
 
 	uint64 mSavedRevision = 0;
 	bool mbUntrackedChanges = false;

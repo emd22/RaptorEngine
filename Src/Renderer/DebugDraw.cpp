@@ -72,6 +72,23 @@ void DebugDraw::SolidBox(const BBox& box, Color color)
 	SolidBox((box.Min + box.Max) * 0.5f, (box.Max - box.Min) * 0.5f, Quat::scIdentity, color);
 }
 
+void DebugDraw::Overlay(const Ref<PrimitiveMesh>& mesh, const Mat4f& world_matrix, Color color)
+{
+	if (!mesh.IsValid() || mesh->VertexList.VertexType == eVertexType::Slim || mesh->VertexList.IsSkinned()) {
+		return;
+	}
+
+	if (mOverlays.Size >= scMaxShapes) {
+		if (!bWarnedAboutOverflow) {
+			LogWarning("Debug overlay queue is full ({} meshes), dropping the rest until it is drawn", scMaxShapes);
+			bWarnedAboutOverflow = true;
+		}
+		return;
+	}
+
+	mOverlays.Insert(QueuedOverlay { .Mesh = mesh, .WorldMatrix = world_matrix, .Color = color.AsUInt() });
+}
+
 PrimitiveMesh& DebugDraw::GetMesh(eDebugShape shape)
 {
 	Ref<PrimitiveMesh>& mesh = mMeshes[static_cast<uint32>(shape)];
@@ -94,10 +111,32 @@ PrimitiveMesh& DebugDraw::GetMesh(eDebugShape shape)
 	return *mesh;
 }
 
+void DebugDraw::RenderOverlays(const CommandBuffer& cmd, const Mat4f& camera_matrix)
+{
+	Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugOverlay);
+	pipeline.Bind(cmd);
+
+	DebugLayerPushConstants push_constants {};
+
+	for (const QueuedOverlay& overlay : mOverlays) {
+		const Mat4f combined_matrix = overlay.WorldMatrix * camera_matrix;
+		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
+		push_constants.DebugColor = overlay.Color;
+
+		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
+		overlay.Mesh->Render(cmd, 1);
+	}
+}
+
 void DebugDraw::Render(const CommandBuffer& cmd, const Camera& camera)
 {
+	const Mat4f& camera_matrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
+
+	if (mOverlays.Size > 0) {
+		RenderOverlays(cmd, camera_matrix);
+	}
+
 	if (mShapes.Size > 0) {
-		const Mat4f& camera_matrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 
 		DebugLayerPushConstants push_constants {};
 
@@ -136,6 +175,7 @@ void DebugDraw::Render(const CommandBuffer& cmd, const Camera& camera)
 void DebugDraw::Clear()
 {
 	mShapes.Clear();
+	mOverlays.Clear();
 	bWarnedAboutOverflow = false;
 }
 

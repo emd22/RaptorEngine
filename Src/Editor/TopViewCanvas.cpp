@@ -681,6 +681,7 @@ void TopViewCanvas::ApplyState(const TopViewState& state)
 
 	SyncCurveFromSelection();
 	SyncTextureFromPickedFace();
+	SyncPickedFaceToGame();
 
 	TryInitialFit();
 	UpdateHover();
@@ -765,6 +766,8 @@ void TopViewCanvas::ApplyTool(eEditorTool tool)
 	if (mpOnToolChanged) {
 		mpOnToolChanged(tool);
 	}
+
+	SyncPickedFaceToGame();
 
 	UpdateHover();
 	UpdateCursor();
@@ -1002,6 +1005,23 @@ void TopViewCanvas::SyncTextureFromPickedFace()
 	}
 }
 
+void TopViewCanvas::SyncPickedFaceToGame()
+{
+	ObjectID face_object = ObjectID::scNull;
+	Vec3f face_normal = Vec3f::sZero;
+
+	GetPickedFace(face_object, face_normal);
+
+	if (face_object == mSentPickedFaceId && face_normal == mSentPickedFaceNormal) {
+		return;
+	}
+
+	mSentPickedFaceId = face_object;
+	mSentPickedFaceNormal = face_normal;
+
+	thread::PostToGame([face_object, face_normal] { gEditor->TopViewSetPickedFace(face_object, face_normal); });
+}
+
 bool TopViewCanvas::UsesHandles() const { return mTool == eEditorTool::Vertex || mTool == eEditorTool::Curve; }
 
 void TopViewCanvas::SendCommand(thread::Task command)
@@ -1205,6 +1225,8 @@ double TopViewCanvas::SnapAngle(double radians) const
 
 void TopViewCanvas::OnPaint(wxPaintEvent&)
 {
+	SyncPickedFaceToGame();
+
 	wxAutoBufferedPaintDC buffered(this);
 	wxGCDC dc(buffered);
 

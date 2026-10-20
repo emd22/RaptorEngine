@@ -51,10 +51,12 @@ public:
 	void SolidBox(const Vec3f center, const Vec3f half_extent, const Quat rotation, Color color);
 	void SolidBox(const BBox& box, Color color);
 
+	void Overlay(const Ref<PrimitiveMesh>& mesh, const Mat4f& world_matrix, Color color);
+
 
 	void Render(const CommandBuffer& cmd, const Camera& camera);
 
-	uint32 GetQueuedCount() const { return static_cast<uint32>(mShapes.Size); }
+	uint32 GetQueuedCount() const { return static_cast<uint32>(mShapes.Size + mOverlays.Size); }
 
 	void Clear();
 	void Destroy();
@@ -67,6 +69,15 @@ private:
 		eDebugShape Shape;
 	};
 
+	struct QueuedOverlay
+	{
+		Ref<PrimitiveMesh> Mesh;
+		Mat4f WorldMatrix;
+		uint32 Color;
+	};
+
+	void RenderOverlays(const CommandBuffer& cmd, const Mat4f& camera_matrix);
+
 	/**
 	 * @brief Makes the meshes a shape needs on first use, as this is created before there is a device to upload to.
 	 */
@@ -74,6 +85,7 @@ private:
 
 private:
 	DynArray<QueuedShape> mShapes;
+	DynArray<QueuedOverlay> mOverlays;
 
 	Ref<PrimitiveMesh> mMeshes[static_cast<uint32>(eDebugShape::Count)];
 

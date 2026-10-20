@@ -16,6 +16,7 @@
 
 #include <Blockout.hpp>
 #include <Engine.hpp>
+#include <Object/ObjectManager.hpp>
 #include <Script/ObjectScripts.hpp>
 #include <World.hpp>
 #include <filesystem>
@@ -121,6 +122,31 @@ ObjectPropertiesPanel::ObjectPropertiesPanel(wxWindow* parent) : wxPanel(parent,
 
 	mpNameLabel = new wxStaticText(body, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_END);
 	section->AddWide(mpNameLabel);
+
+	mpNameText = new wxTextCtrl(body, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(40, -1),
+								wxTE_PROCESS_ENTER);
+	mpNameText->SetToolTip("Unique name, used by object_find in scripts and as the key in the prototype file. "
+						   "Spaces and symbols become underscores");
+	section->AddRow("Name", mpNameText);
+
+	mpNameText->Bind(wxEVT_TEXT_ENTER, [this](wxCommandEvent&) { CommitName(); });
+	mpNameText->Bind(wxEVT_KILL_FOCUS,
+					 [this](wxFocusEvent& event)
+					 {
+						 CommitName();
+						 event.Skip();
+					 });
+	mpNameText->Bind(wxEVT_KEY_DOWN,
+					 [this](wxKeyEvent& event)
+					 {
+						 if (event.GetKeyCode() == WXK_ESCAPE) {
+							 mpNameText->ChangeValue(wxString::FromUTF8(mShownName.CStr()));
+							 mpNameText->SelectAll();
+							 return;
+						 }
+
+						 event.Skip();
+					 });
 
 	wxBoxSizer* material_row = new wxBoxSizer(wxHORIZONTAL);
 
@@ -269,8 +295,33 @@ void ObjectPropertiesPanel::OnMaterialChoice(wxCommandEvent& event)
 			const EditorSelection& selection = gEditor->GetSelection();
 
 			if (Object* last = selection.GetLast(); last != nullptr) {
-				gEditor->SetStoredMaterial(last, material);
+				gEditor->SetObjectMaterial(last, material);
 				gEditor->MarkModified();
+			}
+		});
+}
+
+void ObjectPropertiesPanel::CommitName()
+{
+	if (!mbHasObject || !mbCanRename) {
+		return;
+	}
+
+	const String name(mpNameText->GetValue().Trim().Trim(false).ToStdString());
+
+	if (name == mShownName) {
+		return;
+	}
+
+	const String old_name = mShownName;
+
+	thread::PostToGame(
+		[old_name, name]
+		{
+			Object* object = gObjectManager->FindObject(HashStr32(old_name.CStr()));
+
+			if (object != nullptr) {
+				gEditor->RenameObject(object, name);
 			}
 		});
 }
@@ -389,6 +440,22 @@ void ObjectPropertiesPanel::ApplyState(const ObjectPanelState& state, const Mate
 	}
 
 	mpMaterialChoice->Enable(state.bHasObject && state.bIsBlockout);
+
+	mbCanRename = state.bHasObject && state.bCanRename;
+	mpNameText->Enable(mbCanRename);
+
+	String object_name;
+
+	if (state.bHasObject) {
+		object_name = state.Name;
+	}
+
+	const wxString shown_name = wxString::FromUTF8(object_name.CStr());
+
+	if (!(object_name == mShownName) || (!mpNameText->HasFocus() && mpNameText->GetValue() != shown_name)) {
+		mpNameText->ChangeValue(shown_name);
+		mShownName = object_name;
+	}
 
 	mpScriptText->Enable(mbCanAttachScript);
 	mpScriptBrowse->Enable(mbCanAttachScript);

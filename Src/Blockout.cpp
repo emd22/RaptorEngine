@@ -1113,13 +1113,7 @@ static BBox GetBrushWorldBounds(const Brush& brush, const Mat4f& world)
 
 static bool HasOpaqueMaterial(Object* object)
 {
-#ifdef FX_IS_EDITOR
-	const MaterialID material_id = gEditor->GetSelection().GetStoredMaterial(object);
-#else
-	const MaterialID material_id = object->GetMaterialID();
-#endif
-
-	const Material* material = gMaterialManager->GetMaterial(material_id);
+	const Material* material = gMaterialManager->GetMaterial(object->GetMaterialID());
 
 	return material == nullptr || !material->IsTransparent();
 }
@@ -1493,29 +1487,6 @@ void Blockout::DestroyFaceNodes(Object* object)
 	object->AttachedNodes.Clear();
 }
 
-void Blockout::ShowFaceMaterialsSelected(Object* object, bool is_selected)
-{
-	if (object == nullptr) {
-		return;
-	}
-
-	for (ObjectID node_id : object->AttachedNodes) {
-		Object* node = gObjectManager->GetObject(node_id);
-		const String* name = mFaceNodeMaterials.Find(node_id.GetID());
-
-		if (node == nullptr || name == nullptr) {
-			continue;
-		}
-
-		if (is_selected) {
-			node->SetMaterial(SelectionMaterialID);
-		}
-		else {
-			node->SetMaterial(GetFaceMaterial(*name));
-		}
-	}
-}
-
 static Ref<PrimitiveMesh> MakeFaceMesh(const Brush& brush, const String* material, BBox& out_bounds)
 {
 	MeshGen::GeneratedMesh mesh;
@@ -1589,11 +1560,9 @@ void Blockout::RebuildFaceMeshes(Object* object, const Brush& brush)
 
 	object->AttachedNodes.Clear();
 
-	const bool is_selected = object->GetMaterialID() == SelectionMaterialID;
-
 	for (uint32 i = 0; i < materials.Size; i++) {
 		Object* node = nodes[i].IsNull() ? nullptr : gObjectManager->GetObject(nodes[i]);
-		const MaterialID material = is_selected ? SelectionMaterialID : GetFaceMaterial(materials[i]);
+		const MaterialID material = GetFaceMaterial(materials[i]);
 
 		if (node == nullptr) {
 			node = gObjectManager->NewObject(String::Fmt("{}_face{}", object->Name.Get(), i), material,
@@ -1616,6 +1585,7 @@ void Blockout::RebuildFaceMeshes(Object* object, const Brush& brush)
 		node->pMesh = MakeFaceMesh(brush, &materials[i], node->Bounds);
 		node->SetRotationOrigin(object->RotationOrigin);
 		node->SetShadowCaster(object->IsShadowCaster());
+		node->SetCullable(object->IsCullable());
 		node->SetHidden(object->IsHidden());
 		node->SubviewInstance = object->SubviewInstance;
 	}
@@ -2048,7 +2018,8 @@ ObjectID Blockout::CreateBrush(ConfigEntry& entry)
 
 	Object* object = gObjectManager->NewObject(blockout_id.Str(), material_id, object_tags);
 	object->MoveBy(position);
-	object->SetShadowCaster(true);
+	object->SetShadowCaster(entry.GetMemberValue(HashStr32("shadows"), 1) != 0);
+	object->SetCullable(entry.GetMemberValue(HashStr32("nocull"), 0) == 0);
 
 	Quat rotation = Quat::scIdentity;
 
@@ -2245,7 +2216,8 @@ Object* Blockout::DupeObject(Object* object)
 
 	dupe->SetPosition(object->GetPosition());
 	dupe->SetRotation(object->mRotation);
-	dupe->SetShadowCaster(true);
+	dupe->SetShadowCaster(object->IsShadowCaster());
+	dupe->SetCullable(object->IsCullable());
 
 	if (IsEditingSubview()) {
 		dupe->SubviewInstance = mActiveSubview;
@@ -2965,6 +2937,14 @@ ConfigEntry Blockout::MakeBrushEntry(Object* object, const String& name, const B
 			blockout_entry.AddMember(ConfigEntry::Literal("spawn", 1));
 		}
 
+		if (!object->IsShadowCaster() && !object->IsVolume() && !object->IsDecal()) {
+			blockout_entry.AddMember(ConfigEntry::Literal("shadows", static_cast<int64>(0)));
+		}
+
+		if (!object->IsCullable()) {
+			blockout_entry.AddMember(ConfigEntry::Literal("nocull", 1));
+		}
+
 		if (object->IsTrigger()) {
 			blockout_entry.AddMember(ConfigEntry::Literal("trigger", 1));
 			WriteTriggerEntry(blockout_entry, object);
@@ -2980,13 +2960,7 @@ ConfigEntry Blockout::MakeBrushEntry(Object* object, const String& name, const B
 			blockout_entry.AddMember(ConfigEntry::Literal("dynamic", 1));
 		}
 
-#ifdef FX_IS_EDITOR
-		const MaterialID object_material = gEditor->GetSelection().GetStoredMaterial(object);
-#else
-		const MaterialID object_material = object->GetMaterialID();
-#endif
-
-		const MaterialLibraryID material_id = GetIDForMaterial(object_material);
+		const MaterialLibraryID material_id = GetIDForMaterial(object->GetMaterialID());
 
 		if (material_id.IsValid()) {
 			blockout_entry.AddMember(ConfigEntry::Literal("mat", mMaterials.GetName(material_id).CStr()));

@@ -469,7 +469,7 @@ void MaterialPickerPanel::ApplySelected()
 			const EditorSelection& selection = gEditor->GetSelection();
 
 			for (uint32 i = 0; i < selection.GetCount(); i++) {
-				gEditor->SetStoredMaterial(selection.GetObject(i), material);
+				gEditor->SetObjectMaterial(selection.GetObject(i), material);
 			}
 
 			if (selection.GetCount() > 0) {

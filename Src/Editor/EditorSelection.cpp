@@ -1,28 +1,8 @@
 #include "EditorSelection.hpp"
 
-#include <Blockout.hpp>
-#include <Engine.hpp>
 #include <Object/Object.hpp>
-#include <World.hpp>
 
 namespace fx::editor {
-
-static void ShowAsSelected(Object* object)
-{
-	if (object->HasTags(eObjectTag::Blockout) && !IsBrushMarkerMaterial(object->GetSpecialMaterial())) {
-		object->SetMaterial(gWorld->pPrototype->SelectionMaterialID);
-		gWorld->pPrototype->ShowFaceMaterialsSelected(object, true);
-	}
-}
-
-static void ShowAsDeselected(Object* object, const MaterialID& material)
-{
-	if (object->HasTags(eObjectTag::Blockout)) {
-		object->SetMaterial(material);
-		gWorld->pPrototype->ShowFaceMaterialsSelected(object, false);
-	}
-}
-
 
 bool EditorSelection::Add(Object* object)
 {
@@ -34,8 +14,7 @@ bool EditorSelection::Add(Object* object)
 		return false;
 	}
 
-	mEntries.Insert(Entry { .pObject = object, .StoredMaterial = object->GetMaterialID() });
-	ShowAsSelected(object);
+	mEntries.Insert(object);
 
 	return true;
 }
@@ -47,11 +26,9 @@ void EditorSelection::Remove(Object* object)
 	}
 
 	for (uint32 i = 0; i < mEntries.Size; i++) {
-		if (mEntries[i].pObject != object) {
+		if (mEntries[i] != object) {
 			continue;
 		}
-
-		ShowAsDeselected(object, mEntries[i].StoredMaterial);
 
 		// Keep the order so that the last selected object stays last
 		for (uint32 j = i + 1; j < mEntries.Size; j++) {
@@ -63,19 +40,12 @@ void EditorSelection::Remove(Object* object)
 	}
 }
 
-void EditorSelection::Clear()
-{
-	for (Entry& entry : mEntries) {
-		ShowAsDeselected(entry.pObject, entry.StoredMaterial);
-	}
-
-	mEntries.Clear();
-}
+void EditorSelection::Clear() { mEntries.Clear(); }
 
 bool EditorSelection::Contains(const Object* object) const
 {
-	for (const Entry& entry : mEntries) {
-		if (entry.pObject == object) {
+	for (const Object* entry : mEntries) {
+		if (entry == object) {
 			return true;
 		}
 	}
@@ -89,39 +59,7 @@ Object* EditorSelection::GetLast() const
 		return nullptr;
 	}
 
-	return mEntries[mEntries.Size - 1].pObject;
-}
-
-MaterialID EditorSelection::GetStoredMaterial(Object* object) const
-{
-	if (object == nullptr) {
-		return MaterialID::scNull;
-	}
-
-	for (const Entry& entry : mEntries) {
-		if (entry.pObject == object) {
-			return entry.StoredMaterial;
-		}
-	}
-
-	return object->GetMaterialID();
-}
-
-void EditorSelection::SetStoredMaterial(Object* object, MaterialID material)
-{
-	if (object == nullptr || !object->HasTags(eObjectTag::Blockout)) {
-		return;
-	}
-
-	for (Entry& entry : mEntries) {
-		if (entry.pObject == object) {
-			entry.StoredMaterial = material;
-			break;
-		}
-	}
-
-	// Shown straight away, even over the selection highlight, as a preview of the change
-	object->SetMaterial(material);
+	return mEntries[mEntries.Size - 1];
 }
 
 } // namespace fx::editor

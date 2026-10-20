@@ -12,6 +12,7 @@ enum class ePipelineName : uint16
 {
 	DebugLayer,
 	DebugSolid,
+	DebugOverlay,
 
 	/**
 	 * @brief Forward+ compute pass that culls lights into 2D screen space tiles

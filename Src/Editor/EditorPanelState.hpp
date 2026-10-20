@@ -19,6 +19,7 @@ struct ObjectPanelState
 {
 	bool bHasObject = false;
 	bool bIsBlockout = false;
+	bool bCanRename = false;
 	bool bCanAttachScript = false;
 	bool bScriptErrors = false;
 	bool bIsTrigger = false;

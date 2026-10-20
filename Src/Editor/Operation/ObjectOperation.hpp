@@ -151,6 +151,19 @@ private:
 	String mAfter;
 };
 
+class RenameEditOperation final : public ObjectEditOperation
+{
+public:
+	RenameEditOperation(Object* object, const String& before, const String& after, int32 group_size = 1);
+
+	void Execute(EditorSelection& selection) override;
+	void Undo(EditorSelection& selection) override;
+
+private:
+	String mBefore;
+	String mAfter;
+};
+
 class TriggerDirectionEditOperation final : public ObjectEditOperation
 {
 public:

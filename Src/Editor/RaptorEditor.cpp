@@ -17,6 +17,7 @@
 #include <wx/timer.h>
 #include <wx/toplevel.h>
 
+#include <Asset/ConfigFile.hpp>
 #include <Blockout.hpp>
 #include <CVar.hpp>
 #include <Controls.hpp>
@@ -261,6 +262,8 @@ void RaptorEditor::EndGameLoop()
 {
 	thread::RunOnUIAndWait([this] { LockdownGUI(); });
 
+	TopViewSetPickedFace(ObjectID::scNull, Vec3f::sZero);
+
 	mGamePhase = eGamePhase::Stopped;
 }
 
@@ -345,9 +348,10 @@ EditorPanelState RaptorEditor::BuildPanelState()
 		}
 
 		if (gWorld->pPrototype != nullptr) {
-			panel.MaterialSlot = gWorld->pPrototype->GetIDForMaterial(mSelection.GetStoredMaterial(object)).ID;
+			panel.MaterialSlot = gWorld->pPrototype->GetIDForMaterial(object->GetMaterialID()).ID;
 		}
 
+		panel.bCanRename = CanRenameObject(object);
 		panel.bCanAttachScript = CanAttachScript(object);
 
 		if (panel.bCanAttachScript) {
@@ -523,6 +527,8 @@ void RaptorEditor::Update(float32 delta_time)
 		mSpawnEditor.DrawMarker(mbSpawnSelected);
 	}
 
+	DrawSelectionOverlay();
+	DrawPickedFace();
 	DrawModelSelection();
 	DrawSubviews();
 }
@@ -543,6 +549,32 @@ static void DrawModelBounds(Object* object, const Color& color)
 		if (attached != nullptr) {
 			DrawModelBounds(attached, color);
 		}
+	}
+}
+
+static void DrawOverlay(Object* object, const Color& color)
+{
+	if (object->IsHidden()) {
+		return;
+	}
+
+	if (object->pMesh.IsValid()) {
+		renderer::gDebugDraw->Overlay(object->pMesh, object->GetWorldMatrix(), color);
+	}
+
+	for (ObjectID attached_id : object->AttachedNodes) {
+		Object* attached = gObjectManager->GetObject(attached_id);
+
+		if (attached != nullptr) {
+			DrawOverlay(attached, color);
+		}
+	}
+}
+
+void RaptorEditor::DrawSelectionOverlay()
+{
+	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
+		DrawOverlay(mSelection.GetObject(i), mTheme.Viewport.Selection);
 	}
 }
 
@@ -952,13 +984,13 @@ void RaptorEditor::ClearSelection()
 	SyncSelection();
 }
 
-void RaptorEditor::SetStoredMaterial(Object* object, MaterialID material)
+void RaptorEditor::SetObjectMaterial(Object* object, MaterialID material)
 {
-	if (!CanEditObject(object)) {
+	if (!CanEditObject(object) || !object->HasTags(eObjectTag::Blockout)) {
 		return;
 	}
 
-	mSelection.SetStoredMaterial(object, material);
+	object->SetMaterial(material);
 
 	if (object->IsDecal()) {
 		mLastDecalMaterial = material;
@@ -1023,7 +1055,7 @@ void RaptorEditor::DeleteObject(Object* object, int32 group_size)
 													   : Brush::FromBox(object->Bounds.Min, object->Bounds.Max).Planes;
 
 	EmplaceEditOperation<DeleteOperation>(
-		object, planes, ObjectSnapshot::Capture(*object, mSelection.GetStoredMaterial(object)), group_size);
+		object, planes, ObjectSnapshot::Capture(*object, object->GetMaterialID()), group_size);
 }
 
 static bool IsCreatableDataKind(eDataFilter filter)
@@ -1223,6 +1255,40 @@ uint32 RaptorEditor::SetSelectionEnterDirection(const Vec3f local_direction)
 	return count;
 }
 
+bool RaptorEditor::CanRenameObject(const Object* object) const
+{
+	return CanEditObject(object) && object->SubviewInstance == Blockout::scNoSubview;
+}
+
+bool RaptorEditor::RenameObject(Object* object, const String& name)
+{
+	if (!CanRenameObject(object)) {
+		return false;
+	}
+
+	if (name.IsEmpty()) {
+		Warn("Objects need a name");
+		return false;
+	}
+
+	const String valid_name = ConfigFile::MakeValidName(name);
+
+	if (valid_name == object->Name.Get()) {
+		return false;
+	}
+
+	const Object* existing = gObjectManager->FindObject(HashStr32(valid_name.CStr()));
+
+	if (existing != nullptr && existing != object) {
+		Warn("There is already an object named '{}'", valid_name);
+		return false;
+	}
+
+	EmplaceEditOperation<RenameEditOperation>(object, object->Name.Get(), valid_name);
+
+	return true;
+}
+
 void RaptorEditor::DeleteSelection()
 {
 	// Each delete takes its object out of the selection, so work from a copy
@@ -1311,7 +1377,7 @@ bool RaptorEditor::ClipObject(Object* object, const Vec3f point_a, const Vec3f p
 	Brush::PlaneList kept_planes;
 	Brush::PlaneList split_planes;
 
-	ObjectSnapshot split_snapshot = ObjectSnapshot::Capture(*object, mSelection.GetStoredMaterial(object));
+	ObjectSnapshot split_snapshot = ObjectSnapshot::Capture(*object, object->GetMaterialID());
 	split_snapshot.ObjectName = Name();
 
 	if (!blockout->GetClipPieces(object, point_a, point_b, direction, kept_planes, split_planes,
@@ -1365,7 +1431,7 @@ static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter
 		}
 
 		const Brush* brush = gWorld->pPrototype->GetBrush(target);
-		const MaterialID material = selection.GetStoredMaterial(target);
+		const MaterialID material = target->GetMaterialID();
 
 		cut_count++;
 
@@ -1398,7 +1464,7 @@ static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter
 		const Brush* cutter_brush = gWorld->pPrototype->GetBrush(cutter);
 
 		ops.push_back(std::make_unique<DeleteOperation>(
-			cutter, cutter_brush->Planes, ObjectSnapshot::Capture(*cutter, selection.GetStoredMaterial(cutter))));
+			cutter, cutter_brush->Planes, ObjectSnapshot::Capture(*cutter, cutter->GetMaterialID())));
 		op_object_ids.push_back(cutter->ID);
 	}
 
@@ -1519,7 +1585,7 @@ uint32 RaptorEditor::HollowSelection()
 
 		for (uint32 piece = 1; piece < hollow.Pieces.size(); piece++) {
 			ObjectSnapshot snapshot = ObjectSnapshot::Capture(*hollow.pObject,
-															  mSelection.GetStoredMaterial(hollow.pObject));
+															  hollow.pObject->GetMaterialID());
 			snapshot.ObjectName = Name();
 			snapshot.Position = hollow.Positions[piece];
 

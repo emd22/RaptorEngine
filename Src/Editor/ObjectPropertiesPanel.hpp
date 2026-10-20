@@ -54,12 +54,14 @@ private:
 
 	void OnMaterialChoice(wxCommandEvent& event);
 	void RefreshMaterialChoices(const MaterialLibraryState& materials);
+	void CommitName();
 	void CommitScript();
 	void BrowseScript();
 	void OnEnterDirectionChoice(wxCommandEvent& event);
 
 private:
 	wxStaticText* mpNameLabel = nullptr;
+	wxTextCtrl* mpNameText = nullptr;
 	wxChoice* mpMaterialChoice = nullptr;
 	wxTextCtrl* mpScriptText = nullptr;
 	wxButton* mpScriptBrowse = nullptr;
@@ -72,9 +74,11 @@ private:
 
 	DynArray<String> mShownMaterialNames;
 	String mShownScript;
+	String mShownName;
 
 	bool mbHasObject = false;
 	bool mbCanAttachScript = false;
+	bool mbCanRename = false;
 	bool mbIsTrigger = false;
 	bool mbShownScriptErrors = false;
 };

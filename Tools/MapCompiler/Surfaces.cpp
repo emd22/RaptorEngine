@@ -35,6 +35,7 @@ struct Face
 	int32 PlaneIndex = PlaneSet::scNone;
 	int32 MaterialIndex = 0;
 	int32 MapIndex = 0;
+	bool bCastsShadow = true;
 
 	Winding Original;
 	Vec3d Min = Vec3d(0.0);
@@ -862,6 +863,7 @@ struct SurfaceGroup
 	int32 MaterialIndex = 0;
 	int32 MapIndex = 0;
 	int32 Area = scNoMapArea;
+	bool bCastsShadow = true;
 
 	Array<Loop> Polygons;
 	Array<Loop> Loops;
@@ -930,6 +932,7 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 			face.PlaneIndex = side.PlaneIndex;
 			face.MaterialIndex = material_index;
 			face.MapIndex = FindOrAddMap(*map);
+			face.bCastsShadow = brush.bCastsShadow;
 			face.Original = CopyWinding(side.Points);
 			face.Min = Vec3d(1e30, 1e30, 1e30);
 			face.Max = Vec3d(-1e30, -1e30, -1e30);
@@ -1055,7 +1058,7 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 			}
 
 			mPolygons.Emplace(SurfacePolygon { face.PlaneIndex, face.MaterialIndex, face.MapIndex, piece.Area,
-											   std::move(piece.Points) });
+											   face.bCastsShadow, std::move(piece.Points) });
 		}
 	}
 }
@@ -1065,7 +1068,7 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 {
 	VertexWelder welder;
 
-	std::map<std::tuple<int32, int32, int32, int32>, SurfaceGroup> groups;
+	std::map<std::tuple<int32, int32, int32, int32, bool>, SurfaceGroup> groups;
 
 	for (const SurfacePolygon& polygon : mPolygons) {
 		Loop loop;
@@ -1082,8 +1085,10 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 			continue;
 		}
 
-		SurfaceGroup& group = groups[{ polygon.PlaneIndex, polygon.MaterialIndex, polygon.MapIndex, polygon.Area }];
+		SurfaceGroup& group = groups[{ polygon.PlaneIndex, polygon.MaterialIndex, polygon.MapIndex, polygon.Area,
+									   polygon.bCastsShadow }];
 		group.PlaneIndex = polygon.PlaneIndex;
+		group.bCastsShadow = polygon.bCastsShadow;
 		group.MaterialIndex = polygon.MaterialIndex;
 		group.MapIndex = polygon.MapIndex;
 		group.Area = polygon.Area;
@@ -1295,7 +1300,8 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 
 			const bool is_nonvis = group.MaterialIndex == SourceBrush::scDroppedFace;
 
-			if (is_nonvis || source.OpaqueMaterials[static_cast<size_t>(group.MaterialIndex)] != 0) {
+			if (group.bCastsShadow &&
+				(is_nonvis || source.OpaqueMaterials[static_cast<size_t>(group.MaterialIndex)] != 0)) {
 				ShadowBatch& shadow = shadow_batches[{ cell.X, cell.Y, cell.Z }];
 
 				for (size_t t = 0; t + 2 < triangle_indices.Size; t += 3) {

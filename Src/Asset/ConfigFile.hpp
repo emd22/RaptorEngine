@@ -519,6 +519,8 @@ class ConfigFile
 public:
 	ConfigFile() = default;
 
+	static String MakeValidName(const String& name);
+
 	void Load(const std::string& path);
 	bool Write(const std::string& path);
 

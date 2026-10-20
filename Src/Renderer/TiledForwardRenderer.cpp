@@ -56,6 +56,7 @@ void TiledForwardRenderer::Create(const Vec2u& extent)
 	CreateLightCullingPSO();
 	CreateDebugLayerPSO();
 	CreateDebugSolidPSO();
+	CreateDebugOverlayPSO();
 
 
 	BuildPersistentDescriptor();
@@ -352,6 +353,31 @@ void TiledForwardRenderer::CreateDebugSolidPSO()
 	gPSOBuild->SetVertexType(eVertexType::Slim);
 	gPSOBuild->SetRenderLines(false);
 	gPSOBuild->SetCullMode(eCullMode::Back);
+	gPSOBuild->EndPipeline();
+}
+
+void TiledForwardRenderer::CreateDebugOverlayPSO()
+{
+	gPSOBuild->BeginPipeline(ePipelineName::DebugOverlay);
+	gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DebugLayerPushConstants));
+
+	gPSOBuild->UseRenderStage(ForwardPass);
+	gPSOBuild->SetShader(eShaderName::DebugLayer, { ShaderMacro { .pcName = "BLENDED", .pcValue = "1" } });
+	gPSOBuild->SetVertexType(eVertexType::Default);
+	gPSOBuild->SetRenderLines(false);
+	gPSOBuild->SetCullMode(eCullMode::Back);
+	gPSOBuild->SetDepthTest(false);
+	gPSOBuild->SetDepthWrite(false);
+
+	gPSOBuild->SetTargetBlend(static_cast<uint32>(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float)),
+							  BlendAttachment {
+								  .Enabled = true,
+								  .BlendOp = { .Ops = { .Alpha = VK_BLEND_OP_ADD, .Color = VK_BLEND_OP_ADD } },
+								  .AlphaBlend { .Ops { .Src = VK_BLEND_FACTOR_ZERO, .Dst = VK_BLEND_FACTOR_ONE } },
+								  .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA,
+													   .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
+							  });
+
 	gPSOBuild->EndPipeline();
 }
 
@@ -793,7 +819,7 @@ void TiledForwardRenderer::CreateBitmapTextPSO()
 			} },
 			.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
 		};
-		gPSOBuild->SetTargetBlend(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float), blend);
+		gPSOBuild->SetTargetBlend(static_cast<uint32>(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float)), blend);
 
 		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gTextRenderer->GetInstanceBuffer(), 0,
 							 sizeof(TextRenderer::InstanceData) * TextRenderer::scMaxGlyphs);

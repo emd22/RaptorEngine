@@ -178,8 +178,6 @@ public:
 
 	bool IsDynamic(const Object* object) const;
 
-	void ShowFaceMaterialsSelected(Object* object, bool is_selected);
-
 	MaterialID GetFaceMaterial(const String& name) const;
 
 	bool IsFaceNode(const Object* object) const;

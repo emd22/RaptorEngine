@@ -89,6 +89,16 @@ String ValidName(const String& name)
 		return name;
 	}
 
+	const String fixed = ConfigFile::MakeValidName(name);
+
+	LogWarning(LC_CORE, "Config: '{}' is not a valid entry name, writing '{}' instead", name, fixed);
+	return fixed;
+}
+
+} // namespace
+
+String ConfigFile::MakeValidName(const String& name)
+{
 	String fixed = name;
 	for (char& ch : fixed) {
 		if (!IsValidNameChar(ch)) {
@@ -100,11 +110,8 @@ String ValidName(const String& name)
 		fixed = "_";
 	}
 
-	LogWarning(LC_CORE, "Config: '{}' is not a valid entry name, writing '{}' instead", name, fixed);
 	return fixed;
 }
-
-} // namespace
 
 /////////////////////////////////////
 // Config entry functions

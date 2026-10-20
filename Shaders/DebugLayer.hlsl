@@ -59,6 +59,10 @@ struct FSOutput {
 FSOutput main(FSInput input)
 {
     FSOutput output;
+#ifdef BLENDED
+    output.vAlbedo = input.vDebugColor;
+#else
     output.vAlbedo = float4(input.vDebugColor.rgb, 1.0);
+#endif
     return output;
 }

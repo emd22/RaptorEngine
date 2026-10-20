@@ -554,6 +554,25 @@ void ScriptEditOperation::Undo(EditorSelection& selection)
 	}
 }
 
+RenameEditOperation::RenameEditOperation(Object* object, const String& before, const String& after, int32 group_size)
+	: ObjectEditOperation(object, group_size), mBefore(before), mAfter(after)
+{
+}
+
+void RenameEditOperation::Execute(EditorSelection& selection)
+{
+	if (Object* target = ResolveTarget()) {
+		target->Name.Set(mAfter);
+	}
+}
+
+void RenameEditOperation::Undo(EditorSelection& selection)
+{
+	if (Object* target = ResolveTarget()) {
+		target->Name.Set(mBefore);
+	}
+}
+
 TriggerDirectionEditOperation::TriggerDirectionEditOperation(Object* object, const Vec3f& before, const Vec3f& after,
 															 int32 group_size)
 	: ObjectEditOperation(object, group_size), mBefore(before), mAfter(after)
@@ -639,10 +658,6 @@ void DupeOperation::Execute(EditorSelection& selection)
 	}
 
 	dupe->SetPosition(mPosition);
-
-	// DupeObject copies the source's *current* material, which is the selection
-	// material while selected. Restore the original so dupes don't inherit it.
-	dupe->SetMaterial(selection.GetStoredMaterial(original));
 
 	mpDupe = dupe;
 	mDupeID = dupe->ID;

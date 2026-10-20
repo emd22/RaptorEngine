@@ -13,6 +13,7 @@
 #include "EditorFrame.hpp"
 #include "EditorThread.hpp"
 
+#include <Asset/MeshGen.hpp>
 #include <Blockout.hpp>
 #include <Controls.hpp>
 #include <Core/DynArray.hpp>
@@ -23,6 +24,7 @@
 #include <Math/Quat.hpp>
 #include <Math/Vec2.hpp>
 #include <Object/ObjectManager.hpp>
+#include <Renderer/DebugDraw.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/Light.hpp>
 #include <Renderer/LightManager.hpp>
@@ -2085,7 +2087,7 @@ void RaptorEditor::TopViewClip(const Vec3f point_a, const Vec3f point_b, const V
 		Clip clip;
 		clip.pObject = object;
 		clip.Before = brush->Planes;
-		clip.SplitSnapshot = ObjectSnapshot::Capture(*object, mSelection.GetStoredMaterial(object));
+		clip.SplitSnapshot = ObjectSnapshot::Capture(*object, object->GetMaterialID());
 		clip.SplitSnapshot.ObjectName = Name();
 
 		if (blockout->GetClipPieces(object, point_a, point_b, view_axis, clip.Kept, clip.Split,
@@ -2298,6 +2300,103 @@ void RaptorEditor::TopViewEditTextures(ObjectID face_object, const Vec3f face_no
 	}
 }
 
+void RaptorEditor::TopViewSetPickedFace(ObjectID face_object, const Vec3f face_normal)
+{
+	mPickedFaceObject = face_object;
+	mPickedFaceNormal = face_normal;
+
+	if (face_object.IsNull()) {
+		mPickedFaceMesh = nullptr;
+		mPickedFaceVertices.Free();
+	}
+}
+
+static bool HasSameVertices(const SizedArray<Vec3f>& a, const SizedArray<Vec3f>& b)
+{
+	if (a.Size != b.Size) {
+		return false;
+	}
+
+	for (uint32 i = 0; i < a.Size; i++) {
+		if (a[i] != b[i]) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+static Ref<PrimitiveMesh> MakeFaceOverlayMesh(const SizedArray<Vec3f>& vertices, const Vec3f normal)
+{
+	const uint32 count = static_cast<uint32>(vertices.Size);
+
+	MeshGen::GeneratedMesh mesh;
+	mesh.Positions.InitAsCopyOf(vertices);
+	mesh.Normals.InitCapacity(count);
+	mesh.Indices.InitCapacity((count - 2) * 6);
+
+	for (uint32 i = 0; i < count; i++) {
+		mesh.Normals.Insert(normal);
+	}
+
+	for (uint32 i = 1; i + 1 < count; i++) {
+		for (const uint32 index : { 0U, i, i + 1, 0U, i + 1, i }) {
+			mesh.Indices.Insert(index);
+		}
+	}
+
+	return mesh.AsDefaultMesh();
+}
+
+void RaptorEditor::DrawPickedFace()
+{
+	Blockout* blockout = gWorld->pPrototype;
+
+	if (mPickedFaceObject.IsNull() || blockout == nullptr || IsSimulationMode()) {
+		return;
+	}
+
+	Object* object = FindTopViewObject(mPickedFaceObject);
+
+	if (object == nullptr || object->IsHidden()) {
+		return;
+	}
+
+	const Brush* brush = blockout->GetBrush(object);
+
+	if (brush == nullptr) {
+		return;
+	}
+
+	const Vec3f local_direction = mPickedFaceNormal.Rotate(object->mRotation.Conjugate()).Normalize();
+	const int32 plane_index = brush->FindPlane(local_direction);
+
+	if (plane_index == Brush::scNoPlane || brush->Planes[plane_index].Normal.Dot(local_direction) < scFaceMatchDot) {
+		return;
+	}
+
+	const Brush::Face* face = nullptr;
+
+	for (const Brush::Face& candidate : brush->Faces) {
+		if (candidate.PlaneIndex == static_cast<uint32>(plane_index)) {
+			face = &candidate;
+			break;
+		}
+	}
+
+	if (face == nullptr || face->Vertices.Size < 3) {
+		return;
+	}
+
+	if (!mPickedFaceMesh.IsValid() || !HasSameVertices(mPickedFaceVertices, face->Vertices)) {
+		mPickedFaceVertices.Free();
+		mPickedFaceVertices.InitAsCopyOf(face->Vertices);
+		mPickedFaceMesh = MakeFaceOverlayMesh(face->Vertices, brush->Planes[plane_index].Normal);
+	}
+
+	renderer::gDebugDraw->Overlay(mPickedFaceMesh, object->GetWorldMatrix(), mTheme.Viewport.SelectedFace);
+}
+
 void RaptorEditor::TopViewSetFaceMaterial(ObjectID face_object, const Vec3f face_normal, MaterialID material)
 {
 	Blockout* blockout = gWorld->pPrototype;
@@ -2339,7 +2438,7 @@ void RaptorEditor::TopViewSetFaceMaterial(ObjectID face_object, const Vec3f face
 
 	String name = blockout->GetMaterialName(library_id);
 
-	if (blockout->GetIDForMaterial(mSelection.GetStoredMaterial(object)) == library_id) {
+	if (blockout->GetIDForMaterial(object->GetMaterialID()) == library_id) {
 		name.Clear();
 	}
 
