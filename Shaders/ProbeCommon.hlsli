@@ -320,13 +320,13 @@ uint ProbeCellCorner(ProbeVolume volume, StructuredBuffer<uint> grid, uint3 base
 	return ProbeGridLookup(grid, volume.vDimsAndFirst.w + cell.x + dims.x * (cell.y + dims.y * cell.z));
 }
 
-bool SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume volume,
+bool SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 geometric_n, float3 r, ProbeVolume volume,
 								 StructuredBuffer<ProbeSHData> probes, StructuredBuffer<uint> grid,
 								 Texture2D moments_atlas, SamplerState moments_sampler, out float3 out_diffuse,
 								 out float3 out_specular, out float out_visibility, out float out_coverage,
 								 out float out_sun_visibility)
 {
-	const float3 biased_pos = ProbeBiasedPosition(pos_ws, n, volume);
+	const float3 biased_pos = ProbeBiasedPosition(pos_ws, geometric_n, volume);
 
 	uint3 base;
 	float3 cell_frac;
@@ -365,7 +365,7 @@ bool SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 r, ProbeVolume 
 		visibility_sum += visibility * trilinear;
 		placed_trilinear += trilinear;
 
-		float weight = max(ProbeBackfaceWeight(pos_ws, n, probe_pos) * visibility * visibility * visibility,
+		float weight = max(ProbeBackfaceWeight(pos_ws, geometric_n, probe_pos) * visibility * visibility * visibility,
 						   PROBE_MIN_WEIGHT);
 
 		weight = select(weight < PROBE_WEIGHT_CRUSH,

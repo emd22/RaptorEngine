@@ -113,6 +113,8 @@ public:
 
 	LoadedObjectRange GetCache() { return LoadedObjectRange(mObjectList); }
 
+	bool HasLoadingObjects();
+
 	void Destroy();
 
 	~ObjectManager() { Destroy(); }

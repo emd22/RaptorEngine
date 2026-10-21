@@ -1180,6 +1180,7 @@ void RaptorGame::Tick()
 	// Progressive probe bakes (single captures finish in one call, grid bakes
 	// advance one probe per frame).
 	gProbeManager->ServiceCaptureBake();
+	gProbeManager->ServiceStaleCheck();
 
 	mLastTick = current_tick;
 }

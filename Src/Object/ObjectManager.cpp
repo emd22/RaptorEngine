@@ -151,6 +151,17 @@ void ObjectManager::Submit(const ObjectID& object_id, const Mat4f& model_matrix)
 }
 
 
+bool ObjectManager::HasLoadingObjects()
+{
+	for (Object& object : mObjectList) {
+		if (object.IsLoading()) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 SizedArray<Object*> ObjectManager::CollectObjects()
 {
 	std::lock_guard<std::mutex> guard(mInUse);

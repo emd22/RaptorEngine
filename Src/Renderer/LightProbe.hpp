@@ -92,6 +92,7 @@ public:
 
 	void RecordCaptureBatch(renderer::CommandBuffer& cmd, const RenderFaceFunc& render_face);
 	void ServiceCaptureBake();
+	void ServiceStaleCheck();
 
 	bool SaveProbes();
 	bool LoadProbes();
@@ -118,6 +119,7 @@ private:
 	};
 
 	void ApplyLayout();
+	bool BuildLayoutFromWorld(ProbeLayout& out_layout, uint32& out_brush_volumes) const;
 
 	uint32 SelectVolume(const Vec3f position) const;
 	bool SampleVolume(const Vec3f position, uint32 volume_index, const float32* basis, Vec3f& out_irradiance) const;
@@ -152,6 +154,10 @@ private:
 	ProbeSHData mProbes[Limits::MaxIrradianceProbes] {};
 	ProbeInfo mProbeInfos[Limits::MaxIrradianceProbes] {};
 	bool mbGridDirty = true;
+
+	static constexpr uint32 scStaleCheckMaxWaitFrames = 600;
+	bool mbStaleCheckPending = false;
+	uint32 mStaleCheckWaitFrames = 0;
 
 	DynArray<Vec3f> mSunSamplePositions;
 	DynArray<uint8> mSunSampleValues;

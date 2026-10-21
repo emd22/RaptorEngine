@@ -657,9 +657,10 @@ PERMEND();
 
 			float probe_coverage;
 
-			SampleProbeVolumeIrradiance(input.vPositionWS, N, R, bProbeVolume[volume_index], bProbeBuffer, bProbeGrid,
-										F_TextureName(tProbeMoments), tProbeMoments, probe_irradiance, probe_radiance,
-										probe_visibility, probe_coverage, probe_sun_visibility);
+			SampleProbeVolumeIrradiance(input.vPositionWS, N, geometric_normal, R, bProbeVolume[volume_index],
+										bProbeBuffer, bProbeGrid, F_TextureName(tProbeMoments), tProbeMoments,
+										probe_irradiance, probe_radiance, probe_visibility, probe_coverage,
+										probe_sun_visibility);
 
 			if (volume_index != 0 && probe_coverage < 0.999) {
 				float3 base_irradiance;
@@ -669,9 +670,9 @@ PERMEND();
 				float base_sun_visibility;
 
 				const bool base_sampled = SampleProbeVolumeIrradiance(
-					input.vPositionWS, N, R, bProbeVolume[0], bProbeBuffer, bProbeGrid, F_TextureName(tProbeMoments),
-					tProbeMoments, base_irradiance, base_radiance, base_visibility, base_coverage,
-					base_sun_visibility);
+					input.vPositionWS, N, geometric_normal, R, bProbeVolume[0], bProbeBuffer, bProbeGrid,
+					F_TextureName(tProbeMoments), tProbeMoments, base_irradiance, base_radiance, base_visibility,
+					base_coverage, base_sun_visibility);
 
 				const float base_blend = select(base_sampled, 1.0 - probe_coverage, 0.0);
 

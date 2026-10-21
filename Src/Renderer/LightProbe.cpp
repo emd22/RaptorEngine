@@ -14,6 +14,9 @@
 #include <CVar.hpp>
 #include <Core/File.hpp>
 #include <Core/Path.hpp>
+#ifdef FX_IS_EDITOR
+#include <Editor/RaptorEditor.hpp>
+#endif
 #include <Engine.hpp>
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
@@ -631,6 +634,42 @@ void ProbeManager::ApplyLayout()
 	UploadToGpu(0, probe_count);
 }
 
+bool ProbeManager::BuildLayoutFromWorld(ProbeLayout& out_layout, uint32& out_brush_volumes) const
+{
+	out_brush_volumes = 0;
+
+	Blockout* blockout = GetBlockout();
+	const ProbeLayout* compiled_layout = (blockout != nullptr) ? blockout->GetCompiledProbeLayout() : nullptr;
+
+	if (compiled_layout != nullptr) {
+		out_layout.CopyFrom(*compiled_layout);
+		return true;
+	}
+
+	const ProbePlacementBoxes boxes = GatherPlacementBoxes();
+
+	if (boxes.IsEmpty()) {
+		out_layout.Clear();
+		return false;
+	}
+
+	DynArray<BBox, GrowthFunctions::Double> brush_regions;
+
+	for (Object& object : gObjectManager->GetCache()) {
+		if (object.IsProbeVolume() && !object.IsReflectionProbe()) {
+			brush_regions.Emplace(object.GetWorldOBB().GetWorldAABB());
+		}
+	}
+
+	ProbePlacementSettings settings;
+	settings.BrushSpacing = gCVars->Get("r_probe_spacing", ProbePlacementSettings::scDefaultBrushSpacing);
+	settings.LevelSpacing = gCVars->Get("r_probe_level_spacing", ProbePlacementSettings::scDefaultLevelSpacing);
+
+	out_brush_volumes = ProbePlacement::BuildLevelLayout(out_layout, boxes,
+														 Slice<BBox>(brush_regions.pData, brush_regions.Size), settings);
+	return true;
+}
+
 uint32 ProbeManager::RebuildVolumesFromWorld()
 {
 	if (IsBaking()) {
@@ -638,39 +677,18 @@ uint32 ProbeManager::RebuildVolumesFromWorld()
 		return 0;
 	}
 
+	mbStaleCheckPending = false;
+
 	Blockout* blockout = GetBlockout();
-	const ProbeLayout* compiled_layout = (blockout != nullptr) ? blockout->GetCompiledProbeLayout() : nullptr;
+	const bool from_compiled = (blockout != nullptr) && blockout->GetCompiledProbeLayout() != nullptr;
 
 	uint32 num_brush_volumes = 0;
 
-	if (compiled_layout != nullptr) {
-		mLayout.CopyFrom(*compiled_layout);
-	}
-	else {
-		const ProbePlacementBoxes boxes = GatherPlacementBoxes();
+	if (!BuildLayoutFromWorld(mLayout, num_brush_volumes)) {
+		ApplyLayout();
 
-		if (boxes.IsEmpty()) {
-			mLayout.Clear();
-			ApplyLayout();
-
-			LogError("Cannot fit a probe volume to the level: there is no geometry to fit it to");
-			return 0;
-		}
-
-		DynArray<BBox, GrowthFunctions::Double> brush_regions;
-
-		for (Object& object : gObjectManager->GetCache()) {
-			if (object.IsProbeVolume() && !object.IsReflectionProbe()) {
-				brush_regions.Emplace(object.GetWorldOBB().GetWorldAABB());
-			}
-		}
-
-		ProbePlacementSettings settings;
-		settings.BrushSpacing = gCVars->Get("r_probe_spacing", ProbePlacementSettings::scDefaultBrushSpacing);
-		settings.LevelSpacing = gCVars->Get("r_probe_level_spacing", ProbePlacementSettings::scDefaultLevelSpacing);
-
-		num_brush_volumes = ProbePlacement::BuildLevelLayout(
-			mLayout, boxes, Slice<BBox>(brush_regions.pData, brush_regions.Size), settings);
+		LogError("Cannot fit a probe volume to the level: there is no geometry to fit it to");
+		return 0;
 	}
 
 	ApplyLayout();
@@ -678,11 +696,131 @@ uint32 ProbeManager::RebuildVolumesFromWorld()
 	RebuildReflectionProbesFromWorld();
 
 	LogInfo("Probe volumes {}: {} volumes ({} from editor brushes), {} of {} probes and {} of {} grid points used",
-			(compiled_layout != nullptr) ? "taken from the compiled map" : "rebuilt", mLayout.VolumeCount,
-			num_brush_volumes, GetProbeCount(), Limits::MaxIrradianceProbes, mLayout.GetGridPointCount(),
-			Limits::MaxProbeGridPoints);
+			from_compiled ? "taken from the compiled map" : "rebuilt", mLayout.VolumeCount, num_brush_volumes,
+			GetProbeCount(), Limits::MaxIrradianceProbes, mLayout.GetGridPointCount(), Limits::MaxProbeGridPoints);
 
 	return num_brush_volumes;
+}
+
+///////////////////////////////////
+// Stale bake check
+///////////////////////////////////
+
+namespace {
+
+constexpr float32 scStaleVolumeTolerance = 1e-3f;
+constexpr float32 scStaleProbeTolerance = 0.01f;
+
+bool VolumesMatch(const ProbeVolumeData& a, const ProbeVolumeData& b)
+{
+	for (uint32 axis = 0; axis < 3; axis++) {
+		if (a.DimsAndFirst[axis] != b.DimsAndFirst[axis] ||
+			std::abs(a.MinAndCount[axis] - b.MinAndCount[axis]) > scStaleVolumeTolerance ||
+			std::abs(a.MaxAndCellVolume[axis] - b.MaxAndCellVolume[axis]) > scStaleVolumeTolerance) {
+			return false;
+		}
+	}
+
+	return a.DimsAndFirst[3] == b.DimsAndFirst[3];
+}
+
+struct LayoutDifference
+{
+	bool bVolumesChanged = false;
+	uint32 ChangedGridPoints = 0;
+	uint32 MovedProbes = 0;
+
+	bool IsEmpty() const { return !bVolumesChanged && ChangedGridPoints == 0 && MovedProbes == 0; }
+};
+
+LayoutDifference CompareLayouts(const ProbeLayout& baked, const ProbeLayout& current)
+{
+	LayoutDifference difference;
+
+	if (baked.VolumeCount != current.VolumeCount || baked.GetGridPointCount() != current.GetGridPointCount() ||
+		baked.GetProbeCount() != current.GetProbeCount()) {
+		difference.bVolumesChanged = true;
+		return difference;
+	}
+
+	for (uint32 volume = 0; volume < baked.VolumeCount; volume++) {
+		if (!VolumesMatch(baked.Volumes[volume], current.Volumes[volume])) {
+			difference.bVolumesChanged = true;
+			return difference;
+		}
+	}
+
+	for (uint32 point = 0; point < baked.GetGridPointCount(); point++) {
+		if (baked.Grid[point] != current.Grid[point]) {
+			difference.ChangedGridPoints++;
+		}
+	}
+
+	for (uint32 probe = 0; probe < baked.GetProbeCount(); probe++) {
+		const Vec3f offset = baked.Positions[probe] - current.Positions[probe];
+
+		if (std::abs(offset.X) > scStaleProbeTolerance || std::abs(offset.Y) > scStaleProbeTolerance ||
+			std::abs(offset.Z) > scStaleProbeTolerance) {
+			difference.MovedProbes++;
+		}
+	}
+
+	return difference;
+}
+
+template <typename... TTypes>
+void WarnStaleBake(const char* fmt, TTypes&&... args)
+{
+#ifdef FX_IS_EDITOR
+	if (gEditor != nullptr) {
+		gEditor->Warn(fmt, std::forward<TTypes>(args)...);
+		return;
+	}
+#endif
+
+	LogWarning("{}", String::Fmt(fmt, std::forward<TTypes>(args)...).CStr());
+}
+
+} // namespace
+
+void ProbeManager::ServiceStaleCheck()
+{
+	if (!mbStaleCheckPending || IsBaking()) {
+		return;
+	}
+
+	if (gObjectManager->HasLoadingObjects() && mStaleCheckWaitFrames < scStaleCheckMaxWaitFrames) {
+		mStaleCheckWaitFrames++;
+		return;
+	}
+
+	mbStaleCheckPending = false;
+
+	ProbeLayout current;
+	uint32 num_brush_volumes = 0;
+
+	if (!BuildLayoutFromWorld(current, num_brush_volumes)) {
+		WarnStaleBake("The baked light probes don't match the map: it has no geometry to place probes around");
+		return;
+	}
+
+	const LayoutDifference difference = CompareLayouts(mLayout, current);
+
+	if (difference.IsEmpty()) {
+		LogInfo("The baked light probes match the map ({} probes)", GetProbeCount());
+		return;
+	}
+
+	if (difference.bVolumesChanged) {
+		WarnStaleBake("The baked light probes are out of date: the map now places {} probes in {} volume(s), the bake "
+					  "has {} in {}. Rebake and save the probes.",
+					  current.GetProbeCount(), current.VolumeCount, GetProbeCount(), mLayout.VolumeCount);
+		return;
+	}
+
+	WarnStaleBake("The baked light probes are out of date: {} of {} probes moved and {} grid points changed since the "
+				  "bake. Rebake and save the probes.",
+				  difference.MovedProbes, GetProbeCount(), difference.ChangedGridPoints);
 }
 
 ///////////////////////////////////
@@ -756,6 +894,8 @@ void ProbeManager::BeginBake()
 		LogError("Probe bake failed: no probes have been placed");
 		return;
 	}
+
+	mbStaleCheckPending = false;
 
 	mCurrentProbe = 0;
 	mCurrentBounce = 0;
@@ -1587,6 +1727,9 @@ bool ProbeManager::LoadIrradianceProbes()
 	mbSunVisibilityDirty = true;
 
 	UploadToGpu(0, header.ProbeCount);
+
+	mbStaleCheckPending = true;
+	mStaleCheckWaitFrames = 0;
 
 	LogInfo("Loaded {} light probes across {} volume(s) from {}", header.ProbeCount, header.VolumeCount, path.CStr());
 	return true;
