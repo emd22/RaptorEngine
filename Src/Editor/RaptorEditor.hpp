@@ -248,6 +248,13 @@ public:
 
 	Object* CreateReflectionProbeAtPlayer();
 
+	void SetSunEnabled(bool enabled);
+	void SetSunColor(Color color);
+	void SetSunIntensity(float32 intensity);
+	void SetSunAngles(float32 azimuth_degrees, float32 elevation_degrees);
+	void SetSunAzimuth(float32 azimuth_degrees);
+	void SetSunElevation(float32 elevation_degrees);
+
 	/// Creates a data brush of the kind the filter is set to, filling a world space box
 	Object* CreateDataBrush(const Brush::PlaneList& planes, const Vec3f position);
 	uint32 SetSelectionReflectionProbe(bool enabled);

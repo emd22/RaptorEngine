@@ -61,6 +61,10 @@ public:
 
 	void SelectCamera(const Ref<Camera>& camera) { mpCurrentCamera = camera; }
 
+	void SetCullCamera(const Ref<PerspectiveCamera>& camera) { mpCullCamera = camera; }
+
+	bool HasDetachedCullCamera() const { return mpCullCamera.IsValid(); }
+
 	void Render(Camera* shadow_camera);
 
 	/**
@@ -95,6 +99,9 @@ private:
 	void DebugDrawLightBounds();
 	void DebugDrawWorldGrid();
 	void DebugDrawPortals();
+	void DebugDrawCullFrustum();
+
+	PerspectiveCamera& GetCullCamera();
 
 	void CullWorldTiles(const PerspectiveCamera& cam);
 
@@ -220,6 +227,7 @@ public:
 
 private:
 	Ref<PerspectiveCamera> mpCurrentCamera { nullptr };
+	Ref<PerspectiveCamera> mpCullCamera { nullptr };
 
 	physics::BodyID mSelectedPhysicsObjectId = physics::BodyID::scNull;
 

@@ -10,6 +10,7 @@
 
 class wxCheckBox;
 class wxChoice;
+class wxColourPickerCtrl;
 class wxStaticText;
 class wxSizer;
 
@@ -26,6 +27,9 @@ public:
 	void ApplyState(const WorldPanelState& state);
 
 private:
+	void BuildSunSection(wxSizer* sizer);
+	void ApplySunState(const WorldPanelState& state);
+
 	void BuildReflectionSection(wxSizer* sizer);
 	void ApplyReflectionState(const WorldPanelState& state);
 
@@ -40,6 +44,15 @@ private:
 	FloatField* mpShutterField = nullptr;
 	FloatField* mpIsoField = nullptr;
 	FloatField* mpCompensationField = nullptr;
+
+	wxCheckBox* mpSunEnabledCheck = nullptr;
+	wxColourPickerCtrl* mpSunColorPicker = nullptr;
+	FloatField* mpSunIntensityField = nullptr;
+	FloatField* mpSunAzimuthField = nullptr;
+	FloatField* mpSunElevationField = nullptr;
+	wxStaticText* mpSunStatus = nullptr;
+	bool mbShowingSun = true;
+	bool mbShowingSunStale = true;
 
 	wxStaticText* mpReflectionStatus = nullptr;
 	wxCheckBox* mpReflectionEnabledCheck = nullptr;

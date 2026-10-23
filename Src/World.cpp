@@ -1107,10 +1107,11 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 void World::Render(Camera* shadow_camera)
 {
 	PerspectiveCamera& camera = *mpCurrentCamera;
+	PerspectiveCamera& cull_camera = GetCullCamera();
 
-	CullWorldTiles(camera);
+	CullWorldTiles(cull_camera);
 
-	TileIndex tile_index = gWorldGrid->WorldToTile(mpCurrentCamera->Position);
+	TileIndex tile_index = gWorldGrid->WorldToTile(cull_camera.Position);
 
 	if (tile_index != gWorldGrid->ViewTileIndex) {
 		gWorldGrid->SetViewTileIndex(tile_index);
@@ -1227,6 +1228,7 @@ void World::Render(Camera* shadow_camera)
 	// DebugDrawWorldGrid();
 
 	DebugDrawPortals();
+	DebugDrawCullFrustum();
 
 	// Everything queued this frame, by the calls above or by anything else, is drawn on top of the geometry
 	gDebugDraw->Render(gGraphics->GetFrame()->CmdBuffer, camera);
@@ -1592,6 +1594,57 @@ static Vec3f UnprojectScreenPoint(const Mat4f& inverse_view_projection, float32 
 	return eye + direction * (distance / std::max(direction.Dot(forward), 0.1f));
 }
 
+PerspectiveCamera& World::GetCullCamera()
+{
+	if (mpCullCamera.IsValid()) {
+		return *mpCullCamera;
+	}
+
+	return *mpCurrentCamera;
+}
+
+void World::DebugDrawCullFrustum()
+{
+	if (!mpCullCamera.IsValid()) {
+		return;
+	}
+
+	const Color frustum_color = Color::FromRGBA(255, 60, 200, 255);
+
+	const PerspectiveCamera& camera = *mpCullCamera;
+	const Mat4f inverse_view_projection = camera.GetCameraMatrix(eObjectLayer::WorldLayer).Inverse();
+
+	const float32 distances[] = { 0.25f, 5.0f, 25.0f };
+	const Vec2f ndc_corners[] = { { -1.0f, -1.0f }, { 1.0f, -1.0f }, { 1.0f, 1.0f }, { -1.0f, 1.0f } };
+
+	Vec3f previous_ring[4];
+
+	for (uint32 ring = 0; ring < std::size(distances); ring++) {
+		Vec3f corners[4];
+
+		for (uint32 corner = 0; corner < 4; corner++) {
+			corners[corner] = UnprojectScreenPoint(inverse_view_projection, ndc_corners[corner].X,
+												   ndc_corners[corner].Y, camera.Position, camera.Direction,
+												   distances[ring]);
+		}
+
+		for (uint32 corner = 0; corner < 4; corner++) {
+			gDebugDraw->Line(corners[corner], corners[(corner + 1) % 4], frustum_color);
+
+			if (ring == 0) {
+				gDebugDraw->Line(camera.Position, corners[corner], frustum_color);
+			}
+			else {
+				gDebugDraw->Line(previous_ring[corner], corners[corner], frustum_color);
+			}
+
+			previous_ring[corner] = corners[corner];
+		}
+	}
+
+	gDebugDraw->WireBox(BBox(camera.Position - Vec3f(0.1f), camera.Position + Vec3f(0.1f)), frustum_color);
+}
+
 void World::DebugDrawPortals()
 {
 	const int64 debug_level = pCVarPortalDebug->IntValue;
@@ -1672,8 +1725,8 @@ void World::DebugDrawPortals()
 		return;
 	}
 
-	Vec3f eye = mpCurrentCamera->Position;
-	Vec3f forward = mpCurrentCamera->Direction;
+	Vec3f eye = GetCullCamera().Position;
+	Vec3f forward = GetCullCamera().Direction;
 	float32 distance = 0.5f;
 
 	if (mbPortalLocked) {

@@ -6,6 +6,7 @@
 
 #include <Asset/AssetTicket.hpp>
 #include <Asset/ConfigFile.hpp>
+#include <Controller/NoClipController.hpp>
 #include <Object/Object.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/Ragdoll.hpp>
@@ -85,6 +86,8 @@ private:
 	void DestroyGame();
 
 	void ToggleEditorMode();
+	void ToggleFlyCamera();
+	void MoveFlyCamera();
 
 	void RenderText();
 	void RenderCrosshair();
@@ -186,6 +189,10 @@ private:
 	CVarValue* mpNPCImpactDamageCVar = nullptr;
 	CVarValue* mpNPCImpactSpeedCVar = nullptr;
 	CVarValue* mpNPCReactStrengthCVar = nullptr;
+
+	Ref<PerspectiveCamera> mpFlyCamera { nullptr };
+	NoClipController mFlyController;
+	bool mbFlyCameraDetached = false;
 
 	AssetTicket mCrosshairTicket { nullptr };
 	std::atomic<Image*> mpCrosshair = nullptr;

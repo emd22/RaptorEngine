@@ -9,7 +9,7 @@
 
 #include <wx/frame.h>
 
-#include <Compiler.hpp>
+#include <Presets.hpp>
 #include <thread>
 
 class wxButton;
@@ -42,6 +42,12 @@ private:
 
 	Array<size_t> GetSelectedMaps() const;
 	CompileOptions ReadOptions() const;
+	void WriteOptions(const CompileOptions& options);
+
+	void RefreshPresets(const String& selected_name);
+	void ApplySelectedPreset();
+	void SavePreset();
+	void DeletePreset();
 
 	void StartCompile(const Array<size_t>& indices);
 	void OnMapCompiled(size_t index, const CompileResult& result);
@@ -50,12 +56,17 @@ private:
 	void AppendLog(const String& line);
 	void SetBusy(bool busy);
 	void UpdateLightmapControls();
+	void UpdateProbeControls();
 
 	void OnClose(wxCloseEvent& event);
 
 private:
 	wxDirPickerCtrl* mpDirectory = nullptr;
 	wxListCtrl* mpMaps = nullptr;
+
+	wxChoice* mpPreset = nullptr;
+	wxButton* mpSavePreset = nullptr;
+	wxButton* mpDeletePreset = nullptr;
 
 	wxCheckBox* mpCullHidden = nullptr;
 	wxCheckBox* mpMerge = nullptr;
@@ -85,6 +96,9 @@ private:
 
 	/// Sized once per refresh from the number of prototypes in the folder
 	SizedArray<MapEntry> mMaps;
+
+	PresetLibrary mPresets;
+	CompileOptions mBaseOptions;
 
 	std::thread mWorker;
 	bool mbBusy = false;

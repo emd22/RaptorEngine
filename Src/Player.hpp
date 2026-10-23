@@ -1,6 +1,8 @@
 #pragma once
 
 #include <Asset/Animation.hpp>
+#include <Controller/NoClipController.hpp>
+#include <Controller/PlayerController.hpp>
 #include <Core/Ref.hpp>
 #include <Core/String.hpp>
 #include <Math/MathUtil.hpp>
@@ -15,8 +17,6 @@ class Object;
 
 class Player
 {
-	static constexpr float32 scMovementLerpSpeed = 10.0f;
-
 	// TODO: Break these out into config vars
 	static constexpr float32 scSprintFov = 85.0f;
 	static constexpr float32 scWalkingFov = 80.0f;
@@ -139,8 +139,6 @@ public:
 	~Player();
 
 private:
-	FX_FORCE_INLINE void RequireDirectionUpdate() { mbUpdateDirection = true; }
-
 	FX_FORCE_INLINE void MarkApplyingUserForce() { mbIsApplyingUserForce = true; }
 
 	void UpdateViewModel(double delta_time);
@@ -156,28 +154,13 @@ private:
 	void UpdateFov(float32 delta_time, bool user_force_released);
 	void ResetMotion();
 
-	FX_FORCE_INLINE void UpdateDirection()
+	FX_FORCE_INLINE BaseController& GetController()
 	{
-		if (!mbUpdateDirection) {
-			return;
-		}
-
-		float32 s_anglex, c_anglex;
-		MathUtil::SinCos(pCamera->mAngleX, &s_anglex, &c_anglex);
-
-		mStrafeDirection.Set(c_anglex, 0.0f, -s_anglex);
-
 		if (mbIsFlymode) {
-			float32 s_angley, c_angley;
-			MathUtil::SinCos(pCamera->mAngleY, &s_angley, &c_angley);
-
-			MovementDirection.Set(s_anglex * c_angley, s_angley, c_anglex * c_angley);
-		}
-		else {
-			MovementDirection.Set(s_anglex, 0.0f, c_anglex);
+			return mNoClipController;
 		}
 
-		mbUpdateDirection = false;
+		return mWalkController;
 	}
 
 	FX_FORCE_INLINE void SyncPhysicsToPlayer() { Position.FromJoltVec3(Physics.pPlayerVirt->GetPosition()); }
@@ -186,11 +169,6 @@ public:
 	physics::PhysicsPlayer Physics;
 	Ref<PerspectiveCamera> pCamera { nullptr };
 
-	/**
-	 * @brief The direction that the player is facing. This is the direction the player moves in and disregards the
-	 * pitch of the camera.
-	 */
-	Vec3f MovementDirection = Vec3f::sForward;
 	Vec3f Position = Vec3f::sZero;
 
 	Vec3f mViewModelOffset = Vec3f::sZero;
@@ -212,9 +190,6 @@ private:
 
 	Vec3f mCameraOffset = Vec3f::sZero;
 
-	Vec3f mStrafeDirection = Vec3f(1.0f, 0.0f, 0.0f);
-
-	Vec3f mMovementGoal = Vec3f::sZero;
 	Vec3f mCameraGoal = Vec3f::sZero;
 
 	float32 mHorizontalSpeed = 0.0f;
@@ -225,7 +200,8 @@ private:
 	float32 mLandingVelocity = 0.0f;
 	bool mbWasOnGround = false;
 
-	Vec3f mUserForce = Vec3f::sZero;
+	PlayerController mWalkController;
+	NoClipController mNoClipController;
 
 	enum eViewKickChannel : uint32
 	{
@@ -287,7 +263,6 @@ private:
 
 	bool bBobReverse = false;
 	bool mbIsApplyingUserForce : 1 = false;
-	bool mbUpdateDirection : 1 = true;
 
 	bool mbIsFlymode : 1 = false;
 };

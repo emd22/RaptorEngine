@@ -33,6 +33,7 @@
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/Light.hpp>
+#include <Renderer/LightManager.hpp>
 #include <Renderer/LightProbe.hpp>
 #include <Script/ObjectScripts.hpp>
 #include <Script/Script.hpp>
@@ -307,6 +308,19 @@ uint32 RaptorEditor::GetAvailableToolMask() const
 	return mask;
 }
 
+static Vec2f GetSunAngles(const Vec3f position)
+{
+	const float32 length = position.Length();
+	if (length < 1e-6f) {
+		return Vec2f::scZero;
+	}
+
+	const Vec3f direction = position / length;
+
+	return Vec2f(MathUtil::RadiansToDegrees(std::atan2(direction.X, direction.Z)),
+				 MathUtil::RadiansToDegrees(std::asin(std::clamp(direction.Y, -1.0f, 1.0f))));
+}
+
 EditorPanelState RaptorEditor::BuildPanelState()
 {
 	EditorPanelState state;
@@ -382,6 +396,21 @@ EditorPanelState RaptorEditor::BuildPanelState()
 	world.bReflectionsEnabled = gCVars->Get("r_reflection_probes", int64 { 1 }) != 0;
 	world.bReflectionFallback = gCVars->Get("r_reflection_level_probe", int64 { 0 }) != 0;
 	world.ReflectionDebugView = std::clamp<int64>(gCVars->Get("r_reflection_debug", int64 { 0 }), 0, 2);
+
+	if (LightDirectional* sun = gLightManager->GetDirectionalLight(); sun != nullptr) {
+		const Vec3f position = sun->GetPosition();
+		const Vec2f angles = GetSunAngles(position);
+
+		world.bHasSun = true;
+		world.bSunEnabled = gCVars->Get("b_sun_enabled", true);
+		world.SunColor = sun->Color;
+		world.SunIntensity = sun->Intensity;
+		world.SunAzimuthDegrees = angles.X;
+		world.SunElevationDegrees = angles.Y;
+
+		world.bSunBakeStale = gWorld->pPrototype != nullptr && gWorld->pPrototype->HasBakedSun() &&
+							  !gWorld->pPrototype->IsBakedSunCurrent(position);
+	}
 
 	const uint32 probe_count = gProbeManager->GetReflectionProbeCount();
 
@@ -1100,6 +1129,84 @@ Object* RaptorEditor::CreateDataBrush(const Brush::PlaneList& planes, const Vec3
 	}
 
 	return created;
+}
+
+void RaptorEditor::SetSunEnabled(bool enabled)
+{
+	gCVars->Set("b_sun_enabled", enabled ? 1 : 0);
+
+	if (LightDirectional* sun = gLightManager->GetDirectionalLight(); sun != nullptr) {
+		sun->bEnabled = enabled;
+	}
+
+	MarkModified();
+}
+
+void RaptorEditor::SetSunColor(Color color)
+{
+	LightDirectional* sun = gLightManager->GetDirectionalLight();
+	if (sun == nullptr) {
+		return;
+	}
+
+	sun->Color = Color::FromRGBA(color.R, color.G, color.B, 255);
+	MarkModified();
+}
+
+void RaptorEditor::SetSunIntensity(float32 intensity)
+{
+	LightDirectional* sun = gLightManager->GetDirectionalLight();
+	if (sun == nullptr) {
+		return;
+	}
+
+	sun->Intensity = std::max(intensity, 0.0f);
+	MarkModified();
+}
+
+void RaptorEditor::SetSunAngles(float32 azimuth_degrees, float32 elevation_degrees)
+{
+	LightDirectional* sun = gLightManager->GetDirectionalLight();
+	if (sun == nullptr) {
+		return;
+	}
+
+	float32 azimuth_sin, azimuth_cos;
+	float32 elevation_sin, elevation_cos;
+
+	MathUtil::SinCos(MathUtil::DegreesToRadians(azimuth_degrees), &azimuth_sin, &azimuth_cos);
+	MathUtil::SinCos(MathUtil::DegreesToRadians(std::clamp(elevation_degrees, -90.0f, 90.0f)), &elevation_sin,
+					 &elevation_cos);
+
+	float32 length = sun->GetPosition().Length();
+	if (length < 1e-6f) {
+		length = 1.0f;
+	}
+
+	const Vec3f direction(elevation_cos * azimuth_sin, elevation_sin, elevation_cos * azimuth_cos);
+
+	sun->SetPosition(direction * length);
+	MarkModified();
+}
+
+void RaptorEditor::SetSunAzimuth(float32 azimuth_degrees)
+{
+	LightDirectional* sun = gLightManager->GetDirectionalLight();
+	if (sun == nullptr) {
+		return;
+	}
+
+	SetSunAngles(azimuth_degrees, GetSunAngles(sun->GetPosition()).Y);
+}
+
+void RaptorEditor::SetSunElevation(float32 elevation_degrees)
+{
+	LightDirectional* sun = gLightManager->GetDirectionalLight();
+	if (sun == nullptr) {
+		return;
+	}
+
+	SetSunAngles(GetSunAngles(sun->GetPosition()).X, elevation_degrees);
 }
 
 Object* RaptorEditor::CreateReflectionProbeAtPlayer()

@@ -1,4 +1,5 @@
 #include "Compiler.hpp"
+#include "Presets.hpp"
 
 #include <cctype>
 #include <cstdio>
@@ -43,10 +44,22 @@ void PrintUsage()
 				"  --probe-texel-rays <n>     Rays per probe visibility texel along each axis when baking probes, 0 to "
 				"leave the probes to the engine (default: 4)\n"
 				"  --obj <path>     Also write the compiled triangles as a Wavefront OBJ\n"
-				"  --verify [rays]  Trace random rays through the brushes and the compiled triangles and compare them\n");
+				"  --verify [rays]  Trace random rays through the brushes and the compiled triangles and compare them\n"
+				"  --preset <name>  Start from a saved preset, the other options change it\n"
+				"  --save-preset <name>       Save the options as a preset, the prototype can be left out\n"
+				"  --list-presets   Print the saved presets\n"
+				"\n"
+				"Presets are kept in %s\n",
+				PresetLibrary::scDefaultPath);
 }
 
-bool ParseArguments(int argc, char** argv, CompileOptions& out_arguments)
+struct PresetArguments
+{
+	String SavePreset;
+	bool bList = false;
+};
+
+bool ParseArguments(int argc, char** argv, CompileOptions& out_arguments, PresetArguments& out_presets)
 {
 	for (int i = 1; i < argc; i++) {
 		const String argument = argv[i];
@@ -94,25 +107,22 @@ bool ParseArguments(int argc, char** argv, CompileOptions& out_arguments)
 		else if (argument == "--indirect-denoise" && has_value) {
 			const String level = argv[++i];
 
-			if (level == "off") {
-				out_arguments.Lightmap.IndirectDenoise = eDenoiseQuality::Off;
-			}
-			else if (level == "low") {
-				out_arguments.Lightmap.IndirectDenoise = eDenoiseQuality::Low;
-			}
-			else if (level == "medium") {
-				out_arguments.Lightmap.IndirectDenoise = eDenoiseQuality::Medium;
-			}
-			else if (level == "high") {
-				out_arguments.Lightmap.IndirectDenoise = eDenoiseQuality::High;
-			}
-			else {
+			if (!ParseDenoiseQuality(level, out_arguments.Lightmap.IndirectDenoise)) {
 				std::printf("Unknown denoise level '%s', expected off, low, medium or high\n\n", level.CStr());
 				return false;
 			}
 		}
 		else if (argument == "--probe-texel-rays" && has_value) {
 			out_arguments.Lightmap.ProbeTexelRays = static_cast<uint32>(std::atoi(argv[++i]));
+		}
+		else if (argument == "--preset" && has_value) {
+			i++;
+		}
+		else if (argument == "--save-preset" && has_value) {
+			out_presets.SavePreset = argv[++i];
+		}
+		else if (argument == "--list-presets") {
+			out_presets.bList = true;
 		}
 		else if (argument == "--no-indirect") {
 			out_arguments.Lightmap.bIndirect = false;
@@ -151,7 +161,32 @@ bool ParseArguments(int argc, char** argv, CompileOptions& out_arguments)
 		}
 	}
 
-	return !out_arguments.InputPath.IsEmpty();
+	return !out_arguments.InputPath.IsEmpty() || !out_presets.SavePreset.IsEmpty() || out_presets.bList;
+}
+
+String FindPresetArgument(int argc, char** argv)
+{
+	String preset;
+
+	for (int i = 1; i + 1 < argc; i++) {
+		if (String(argv[i]) == "--preset") {
+			preset = argv[++i];
+		}
+	}
+
+	return preset;
+}
+
+void PrintPresets(const PresetLibrary& presets)
+{
+	if (presets.GetPresets().Size == 0) {
+		std::printf("No presets saved in %s\n", PresetLibrary::scDefaultPath);
+		return;
+	}
+
+	for (const CompilePreset& preset : presets.GetPresets()) {
+		std::printf("  %s\n", preset.Name.CStr());
+	}
 }
 
 } // namespace
@@ -159,10 +194,50 @@ bool ParseArguments(int argc, char** argv, CompileOptions& out_arguments)
 int main(int argc, char** argv)
 {
 	CompileOptions options;
+	PresetArguments preset_arguments;
 
-	if (!ParseArguments(argc, argv, options)) {
+	PresetLibrary presets;
+
+	if (!presets.Load()) {
+		std::printf("Could not read the presets in %s\n", PresetLibrary::scDefaultPath);
+	}
+
+	const String preset_name = FindPresetArgument(argc, argv);
+
+	if (!preset_name.IsEmpty()) {
+		const CompilePreset* preset = presets.Find(preset_name);
+
+		if (preset == nullptr) {
+			std::printf("There is no preset named '%s'. The saved presets are:\n", preset_name.CStr());
+			PrintPresets(presets);
+			return scExitUsage;
+		}
+
+		options = preset->Options;
+	}
+
+	if (!ParseArguments(argc, argv, options, preset_arguments)) {
 		PrintUsage();
 		return scExitUsage;
+	}
+
+	if (preset_arguments.bList) {
+		PrintPresets(presets);
+	}
+
+	if (!preset_arguments.SavePreset.IsEmpty()) {
+		presets.Store(preset_arguments.SavePreset, options);
+
+		if (!presets.Save()) {
+			std::printf("Could not write the presets to %s\n", PresetLibrary::scDefaultPath);
+			return 1;
+		}
+
+		std::printf("Saved preset '%s'\n", preset_arguments.SavePreset.CStr());
+	}
+
+	if (options.InputPath.IsEmpty()) {
+		return 0;
 	}
 
 	const CompileResult result = CompileMap(options, [](const String& line) { std::printf("%s\n", line.CStr()); });

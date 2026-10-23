@@ -396,6 +396,48 @@ void RaptorGame::ToggleEditorMode()
 #endif
 }
 
+void RaptorGame::ToggleFlyCamera()
+{
+	Ref<PerspectiveCamera>& player_camera = gWorld->Player.pCamera;
+
+	mbFlyCameraDetached = !mbFlyCameraDetached;
+
+	if (!mbFlyCameraDetached) {
+		gWorld->SelectCamera(player_camera);
+		gWorld->SetCullCamera(nullptr);
+
+		LogInfo("Fly camera attached to the player");
+		return;
+	}
+
+	if (!mpFlyCamera.IsValid()) {
+		mpFlyCamera = MakeRef<PerspectiveCamera>();
+	}
+
+	mpFlyCamera->SetFovRad(player_camera->GetFovRad());
+	mpFlyCamera->SetAspectRatio(gGraphics->GetWindow()->GetAspectRatio());
+	mpFlyCamera->SetPlanes(player_camera->mZNearClip, player_camera->mZFarClip);
+	mpFlyCamera->Rotate(player_camera->mAngleX - mpFlyCamera->mAngleX, player_camera->mAngleY - mpFlyCamera->mAngleY);
+	mpFlyCamera->MoveTo(player_camera->Position);
+	mpFlyCamera->Update();
+
+	mFlyController.Reset();
+
+	gWorld->SelectCamera(mpFlyCamera);
+	gWorld->SetCullCamera(player_camera);
+
+	LogInfo("Fly camera detached, culling from the player's camera");
+}
+
+void RaptorGame::MoveFlyCamera()
+{
+	const bool sprinting = ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT);
+	const Vec3f velocity = mFlyController.Update(DeltaTime, GetMovementVector(), *mpFlyCamera, sprinting);
+
+	mpFlyCamera->MoveBy(velocity * static_cast<float32>(DeltaTime));
+	mpFlyCamera->Update();
+}
+
 void RaptorGame::ProcessControls()
 {
 #ifdef FX_IS_EDITOR
@@ -426,6 +468,10 @@ void RaptorGame::ProcessControls()
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_F8)) {
 		RequestRagdollDrop();
+	}
+
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_F3)) {
+		ToggleFlyCamera();
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_F9)) {
@@ -482,11 +528,16 @@ void RaptorGame::ProcessControls()
 		mouse_delta.X *= scMouseRadiansPerPixel;
 		mouse_delta.Y *= -scMouseRadiansPerPixel;
 
-		gWorld->Player.RotateHead(mouse_delta);
+		if (mbFlyCameraDetached) {
+			mpFlyCamera->Rotate(mouse_delta.X, mouse_delta.Y);
+		}
+		else {
+			gWorld->Player.RotateHead(mouse_delta);
+		}
 	}
 
 
-	if (ControlManager::IsKeyDown(eKey::FX_KEY_SPACE)) {
+	if (ControlManager::IsKeyDown(eKey::FX_KEY_SPACE) && !mbFlyCameraDetached) {
 		if (!gWorld->Player.IsFlyMode()) {
 			gWorld->Player.Jump();
 		}
@@ -534,6 +585,10 @@ void RaptorGame::ProcessControls()
 
 		if (ControlManager::ControlManager::IsKeyPressed(eKey::FX_KEY_TAB)) {
 			input_flags |= eWeaponInputFlags::SwitchWeapon;
+		}
+
+		if (mbFlyCameraDetached) {
+			input_flags = eWeaponInputFlags::None;
 		}
 
 		gWorld->Player.Weapons.SetInput(input_flags);
@@ -1004,6 +1059,10 @@ void RaptorGame::RenderText()
 								.CStr(),
 							1.0f, scWhite);
 
+	if (mbFlyCameraDetached) {
+		gTextRenderer->DrawText("FLY CAMERA (F3) - culling from the player", 1.0f, scGreen);
+	}
+
 	const PortalVisibility& portals = gWorld->GetPortalVisibility();
 
 	if (portals.IsActive()) {
@@ -1096,7 +1155,13 @@ void RaptorGame::Tick()
 	}
 
 	if (!bInCommandMode) {
-		gWorld->Player.Move(DeltaTime, GetMovementVector());
+		if (mbFlyCameraDetached) {
+			gWorld->Player.Move(DeltaTime, Vec3f::sZero);
+			MoveFlyCamera();
+		}
+		else {
+			gWorld->Player.Move(DeltaTime, GetMovementVector());
+		}
 
 #ifdef FX_IS_EDITOR
 		gEditor->Update(static_cast<float32>(DeltaTime));
@@ -1170,9 +1235,14 @@ void RaptorGame::Tick()
 	if (gGraphics->DidResize()) {
 		LogInfo("Setting aspect ratio");
 		camera->SetAspectRatio(gGraphics->GetWindow()->GetAspectRatio());
+
+		if (mpFlyCamera.IsValid()) {
+			mpFlyCamera->SetAspectRatio(gGraphics->GetWindow()->GetAspectRatio());
+		}
 	}
 
 	RenderText();
+
 	RenderCrosshair();
 	gWorld->Player.Weapons.RenderHud();
 

@@ -9,12 +9,14 @@
 #include <wx/image.h>
 #include <wx/imagpng.h>
 #include <wx/listctrl.h>
+#include <wx/msgdlg.h>
 #include <wx/panel.h>
 #include <wx/sizer.h>
 #include <wx/spinctrl.h>
 #include <wx/statbox.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
+#include <wx/textdlg.h>
 
 #include <Map/CompiledMap.hpp>
 #include <algorithm>
@@ -35,6 +37,8 @@ enum eColumn : int32
 
 constexpr const char* scPrototypeExtension = ".prx";
 constexpr const char* scIconPath = "Textures/mapc-icon.png";
+
+constexpr const char* scDefaultPresetLabel = "Defaults";
 
 constexpr int scBorder = 6;
 constexpr int scMinVerifyRays = 1000;
@@ -103,6 +107,25 @@ CompilerFrame::CompilerFrame(const String& map_directory)
 
 	wxStaticBoxSizer* options_sizer = new wxStaticBoxSizer(wxVERTICAL, root, "Options");
 	wxWindow* options_box = options_sizer->GetStaticBox();
+
+	wxBoxSizer* preset_sizer = new wxBoxSizer(wxHORIZONTAL);
+	preset_sizer->Add(new wxStaticText(options_box, wxID_ANY, "Preset"),
+					  wxSizerFlags().CenterVertical().Border(wxRIGHT, scBorder));
+
+	mpPreset = new wxChoice(options_box, wxID_ANY);
+	mpPreset->SetToolTip(wxString::Format("Fill in the options from a saved preset. Presets are kept in %s",
+										  PresetLibrary::scDefaultPath));
+	preset_sizer->Add(mpPreset, wxSizerFlags(1).CenterVertical().Border(wxRIGHT, scBorder));
+
+	mpSavePreset = new wxButton(options_box, wxID_ANY, "Save...", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+	mpSavePreset->SetToolTip("Save the options below as a preset");
+	preset_sizer->Add(mpSavePreset, wxSizerFlags().CenterVertical().Border(wxRIGHT, scBorder));
+
+	mpDeletePreset = new wxButton(options_box, wxID_ANY, "Delete", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+	mpDeletePreset->SetToolTip("Delete the selected preset");
+	preset_sizer->Add(mpDeletePreset, wxSizerFlags().CenterVertical());
+
+	options_sizer->Add(preset_sizer, wxSizerFlags().Expand().Border(wxALL, scBorder));
 
 	const auto add_checkbox = [&](const char* label, bool value, const char* tooltip)
 	{
@@ -265,12 +288,10 @@ CompilerFrame::CompilerFrame(const String& map_directory)
 
 	mpRefresh->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { RefreshMaps(); });
 	mpDirectory->Bind(wxEVT_DIRPICKER_CHANGED, [this](wxFileDirPickerEvent&) { RefreshMaps(); });
-	mpPlaceProbes->Bind(wxEVT_CHECKBOX,
-						[this](wxCommandEvent&)
-						{
-							mpProbeLevelSpacing->Enable(mpPlaceProbes->GetValue());
-							mpProbeBrushSpacing->Enable(mpPlaceProbes->GetValue());
-						});
+	mpPreset->Bind(wxEVT_CHOICE, [this](wxCommandEvent&) { ApplySelectedPreset(); });
+	mpSavePreset->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { SavePreset(); });
+	mpDeletePreset->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { DeletePreset(); });
+	mpPlaceProbes->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) { UpdateProbeControls(); });
 	mpBakeLightmap->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) { UpdateLightmapControls(); });
 	mpBakeIndirect->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) { UpdateLightmapControls(); });
 	mpVerify->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) { mpVerifyRays->Enable(mpVerify->GetValue()); });
@@ -291,6 +312,11 @@ CompilerFrame::CompilerFrame(const String& map_directory)
 
 	Bind(wxEVT_CLOSE_WINDOW, &CompilerFrame::OnClose, this);
 
+	if (!mPresets.Load()) {
+		SetStatusText(wxString::Format("Could not read the presets in %s", PresetLibrary::scDefaultPath));
+	}
+
+	RefreshPresets("");
 	RefreshMaps();
 }
 
@@ -375,7 +401,7 @@ Array<size_t> CompilerFrame::GetSelectedMaps() const
 
 CompileOptions CompilerFrame::ReadOptions() const
 {
-	CompileOptions options;
+	CompileOptions options = mBaseOptions;
 
 	options.Surface.bCullHidden = mpCullHidden->GetValue();
 	options.Surface.bMerge = mpMerge->GetValue();
@@ -398,6 +424,154 @@ CompileOptions CompilerFrame::ReadOptions() const
 	options.VerifyRays = mpVerify->GetValue() ? static_cast<uint32>(mpVerifyRays->GetValue()) : 0;
 
 	return options;
+}
+
+void CompilerFrame::WriteOptions(const CompileOptions& options)
+{
+	mpCullHidden->SetValue(options.Surface.bCullHidden);
+	mpMerge->SetValue(options.Surface.bMerge);
+	mpFixTJunctions->SetValue(options.Surface.bFixTJunctions);
+	mpChunkSize->SetValue(options.Surface.ChunkSize);
+
+	mpKeepOutside->SetValue(options.bKeepOutside);
+
+	mpPlaceProbes->SetValue(options.bPlaceProbes);
+	mpProbeLevelSpacing->SetValue(options.Probes.LevelSpacing);
+	mpProbeBrushSpacing->SetValue(options.Probes.BrushSpacing);
+	mpBakeLightmap->SetValue(options.Lightmap.bEnabled);
+	mpLightmapDensity->SetValue(options.Lightmap.Density);
+	mpSunRadius->SetValue(options.Lightmap.SunRadiusDegrees);
+	mpBakeIndirect->SetValue(options.Lightmap.bIndirect);
+	mpIndirectRays->SetValue(static_cast<int>(options.Lightmap.IndirectRays));
+	mpIndirectBounces->SetValue(static_cast<int>(options.Lightmap.IndirectBounces));
+	mpIndirectCache->SetValue(static_cast<int>(options.Lightmap.IndirectCacheMegabytes));
+	mpIndirectDenoise->SetSelection(static_cast<int>(options.Lightmap.IndirectDenoise));
+
+	mpVerify->SetValue(options.VerifyRays > 0);
+
+	if (options.VerifyRays > 0) {
+		mpVerifyRays->SetValue(static_cast<int>(options.VerifyRays));
+	}
+
+	mpVerifyRays->Enable(mpVerify->GetValue());
+	UpdateProbeControls();
+	UpdateLightmapControls();
+}
+
+void CompilerFrame::RefreshPresets(const String& selected_name)
+{
+	mpPreset->Clear();
+	mpPreset->Append(scDefaultPresetLabel);
+	mpPreset->SetSelection(0);
+
+	const Array<CompilePreset>& presets = mPresets.GetPresets();
+
+	for (uint32 i = 0; i < presets.Size; i++) {
+		mpPreset->Append(wxString::FromUTF8(presets[i].Name.CStr()));
+
+		if (presets[i].Name == selected_name) {
+			mpPreset->SetSelection(static_cast<int>(i) + 1);
+		}
+	}
+
+	mpDeletePreset->Enable(mpPreset->GetSelection() > 0);
+}
+
+void CompilerFrame::ApplySelectedPreset()
+{
+	const int selection = mpPreset->GetSelection();
+
+	mpDeletePreset->Enable(selection > 0);
+
+	if (selection <= 0) {
+		mBaseOptions = CompileOptions {};
+		WriteOptions(mBaseOptions);
+		SetStatusText("Using the default options");
+		return;
+	}
+
+	const CompilePreset& preset = mPresets.GetPresets()[static_cast<uint32>(selection - 1)];
+
+	mBaseOptions = preset.Options;
+	WriteOptions(mBaseOptions);
+
+	SetStatusText(wxString::FromUTF8(String::Fmt("Using preset '{}'", preset.Name).CStr()));
+}
+
+void CompilerFrame::SavePreset()
+{
+	wxString suggested_name;
+
+	if (mpPreset->GetSelection() > 0) {
+		suggested_name = mpPreset->GetStringSelection();
+	}
+
+	wxTextEntryDialog dialog(this, "Name of the preset", "Save Preset", suggested_name);
+
+	if (dialog.ShowModal() != wxID_OK) {
+		return;
+	}
+
+	const String name(dialog.GetValue().Strip(wxString::both).utf8_string());
+
+	if (name.IsEmpty() || name == scDefaultPresetLabel) {
+		wxMessageBox(wxString::Format("Choose a name other than '%s'.", scDefaultPresetLabel), "Save Preset",
+					 wxOK | wxICON_WARNING, this);
+		return;
+	}
+
+	if (mPresets.Find(name) != nullptr) {
+		const int answer = wxMessageBox(wxString::Format("Replace the preset '%s'?", wxString::FromUTF8(name.CStr())),
+										"Save Preset", wxYES_NO | wxICON_QUESTION, this);
+
+		if (answer != wxYES) {
+			return;
+		}
+	}
+
+	const CompileOptions options = ReadOptions();
+	mPresets.Store(name, options);
+
+	if (!mPresets.Save()) {
+		wxMessageBox(wxString::Format("Could not write the presets to %s", PresetLibrary::scDefaultPath),
+					 "Save Preset", wxOK | wxICON_ERROR, this);
+		return;
+	}
+
+	mBaseOptions = options;
+	RefreshPresets(name);
+
+	SetStatusText(wxString::FromUTF8(String::Fmt("Saved preset '{}'", name).CStr()));
+}
+
+void CompilerFrame::DeletePreset()
+{
+	const int selection = mpPreset->GetSelection();
+
+	if (selection <= 0) {
+		return;
+	}
+
+	const String name(mpPreset->GetStringSelection().utf8_string());
+
+	const int answer = wxMessageBox(wxString::Format("Delete the preset '%s'?", wxString::FromUTF8(name.CStr())),
+									"Delete Preset", wxYES_NO | wxICON_QUESTION, this);
+
+	if (answer != wxYES) {
+		return;
+	}
+
+	mPresets.Remove(name);
+
+	if (!mPresets.Save()) {
+		wxMessageBox(wxString::Format("Could not write the presets to %s", PresetLibrary::scDefaultPath),
+					 "Delete Preset", wxOK | wxICON_ERROR, this);
+	}
+
+	RefreshPresets("");
+	ApplySelectedPreset();
+
+	SetStatusText(wxString::FromUTF8(String::Fmt("Deleted preset '{}'", name).CStr()));
 }
 
 void CompilerFrame::StartCompile(const Array<size_t>& indices)
@@ -533,6 +707,12 @@ void CompilerFrame::UpdateLightmapControls()
 	mpIndirectBounces->Enable(indirect);
 	mpIndirectCache->Enable(indirect);
 	mpIndirectDenoise->Enable(indirect);
+}
+
+void CompilerFrame::UpdateProbeControls()
+{
+	mpProbeLevelSpacing->Enable(mpPlaceProbes->GetValue());
+	mpProbeBrushSpacing->Enable(mpPlaceProbes->GetValue());
 }
 
 void CompilerFrame::OnClose(wxCloseEvent& event)

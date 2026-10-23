@@ -38,7 +38,7 @@ constexpr uint32 scMaxStackDepth = 128;
 constexpr uint32 scBinCount = 16;
 constexpr int32 scEmptyChild = std::numeric_limits<int32>::min();
 constexpr uint32 scTexelsPerClaim = 64;
-constexpr uint32 scAlbedoMipSize = 256;
+constexpr uint32 scAlbedoMipSize = 128;
 
 constexpr int32 scFilterRadius = 2;
 constexpr int32 scFilterWidth = scFilterRadius * 2 + 1;
@@ -111,7 +111,34 @@ uint8 EncodeDirection(float32 value)
 	return static_cast<uint8>(std::lround(std::clamp(value * 0.5f + 0.5f, 0.0f, 1.0f) * 255.0f));
 }
 
-bool ReadAverageColor(const String& path, Vec3f& out_color)
+struct AlbedoTexture
+{
+	uint32 Width = 1;
+	uint32 Height = 1;
+	SizedArray<Vec3f> Texels;
+
+	void InitConstant(const Vec3f& color)
+	{
+		Width = 1;
+		Height = 1;
+		Texels.Free();
+		Texels.InitSize(1);
+		Texels[0] = color;
+	}
+
+	Vec3f Sample(float32 u, float32 v) const
+	{
+		const float32 x = (u - std::floor(u)) * static_cast<float32>(Width);
+		const float32 y = (v - std::floor(v)) * static_cast<float32>(Height);
+
+		const uint32 texel_x = std::min(static_cast<uint32>(x), Width - 1);
+		const uint32 texel_y = std::min(static_cast<uint32>(y), Height - 1);
+
+		return Texels[static_cast<size_t>(texel_y) * Width + texel_x];
+	}
+};
+
+bool ReadAlbedoTexture(const String& path, AlbedoTexture& out_texture)
 {
 	ktxTexture* texture = nullptr;
 
@@ -160,45 +187,64 @@ bool ReadAverageColor(const String& path, Vec3f& out_color)
 	const uint32 row_pitch = ktxTexture_GetRowPitch(texture, level);
 	const bool is_srgb = (format == scFormatRGBA8Srgb);
 
-	double sum[3] = { 0.0, 0.0, 0.0 };
+	float32 decode[256];
 
-	for (uint32 y = 0; y < height; y++) {
-		for (uint32 x = 0; x < width; x++) {
-			const uint8* texel = texels + static_cast<size_t>(y) * row_pitch + static_cast<size_t>(x) * 4;
+	for (uint32 value = 0; value < 256; value++) {
+		decode[value] = static_cast<float32>(value) / 255.0f;
 
-			for (uint32 channel = 0; channel < 3; channel++) {
-				const float32 value = static_cast<float32>(texel[channel]) / 255.0f;
-				if (is_srgb) {
-					sum[channel] += Color::SrgbToLinear(value);
-				}
-				else {
-					sum[channel] += value;
-				}
-			}
+		if (is_srgb) {
+			decode[value] = Color::SrgbToLinear(decode[value]);
 		}
 	}
 
-	const double count = static_cast<double>(width) * height;
+	uint32 factor = 1;
 
-	out_color = Vec3f(static_cast<float32>(sum[0] / count), static_cast<float32>(sum[1] / count),
-					  static_cast<float32>(sum[2] / count));
+	while (std::max(width / factor, height / factor) > scAlbedoMipSize) {
+		factor *= 2;
+	}
+
+	out_texture.Width = std::max<uint32>(width / factor, 1);
+	out_texture.Height = std::max<uint32>(height / factor, 1);
+	out_texture.Texels.Free();
+	out_texture.Texels.InitSize(static_cast<size_t>(out_texture.Width) * out_texture.Height);
+
+	for (uint32 out_y = 0; out_y < out_texture.Height; out_y++) {
+		for (uint32 out_x = 0; out_x < out_texture.Width; out_x++) {
+			const uint32 last_x = std::min((out_x + 1) * factor, width);
+			const uint32 last_y = std::min((out_y + 1) * factor, height);
+
+			Vec3f sum(0.0f);
+
+			for (uint32 y = out_y * factor; y < last_y; y++) {
+				for (uint32 x = out_x * factor; x < last_x; x++) {
+					const uint8* texel = texels + static_cast<size_t>(y) * row_pitch + static_cast<size_t>(x) * 4;
+					sum += Vec3f(decode[texel[0]], decode[texel[1]], decode[texel[2]]);
+				}
+			}
+
+			const float32 count = static_cast<float32>((last_x - out_x * factor) * (last_y - out_y * factor));
+
+			out_texture.Texels[static_cast<size_t>(out_y) * out_texture.Width + out_x] = sum * (1.0f / count);
+		}
+	}
 
 	ktxTexture_Destroy(texture);
 
 	return true;
 }
 
-SizedArray<Vec3f> LoadAlbedos(const SizedArray<CompiledMapMaterial>& materials, uint32& out_missing)
+SizedArray<AlbedoTexture> LoadAlbedos(const SizedArray<CompiledMapMaterial>& materials, uint32& out_missing)
 {
 	const std::vector<MaterialDefinition> definitions = LoadMaterialDefinitions(scMaterialRoot);
 
-	SizedArray<Vec3f> albedos;
+	SizedArray<AlbedoTexture> albedos;
 	albedos.InitSize(materials.Size);
 
 	for (size_t i = 0; i < materials.Size; i++) {
 		const CompiledMapMaterial& material = materials[i];
+		AlbedoTexture& albedo = albedos[i];
 
-		albedos[i] = Vec3f(scDefaultAlbedo);
+		albedo.InitConstant(Vec3f(scDefaultAlbedo));
 
 		const auto found = std::find_if(definitions.begin(), definitions.end(),
 										[&material](const MaterialDefinition& definition)
@@ -212,22 +258,27 @@ SizedArray<Vec3f> LoadAlbedos(const SizedArray<CompiledMapMaterial>& materials, 
 			continue;
 		}
 
-		Vec3f color(1.0f);
-
-		if (!found->DiffusePath.IsEmpty() && !ReadAverageColor(found->DiffusePath, color)) {
-			color = Vec3f(scDefaultAlbedo);
+		if (found->DiffusePath.IsEmpty()) {
+			albedo.InitConstant(Vec3f(1.0f));
+		}
+		else if (!ReadAlbedoTexture(found->DiffusePath, albedo)) {
+			albedo.InitConstant(Vec3f(scDefaultAlbedo));
 			out_missing++;
 		}
 
+		Vec3f tint(1.0f);
+
 		if (found->BaseColor.has_value()) {
-			color = color * *found->BaseColor;
+			tint = tint * *found->BaseColor;
 		}
 
 		if (found->Metallic.has_value() && found->OrmPath.IsEmpty()) {
-			color = color * (1.0f - std::clamp(*found->Metallic, 0.0f, 1.0f));
+			tint = tint * (1.0f - std::clamp(*found->Metallic, 0.0f, 1.0f));
 		}
 
-		albedos[i] = color;
+		for (Vec3f& texel : albedo.Texels) {
+			texel = texel * tint;
+		}
 	}
 
 	return albedos;
@@ -246,7 +297,9 @@ struct TriangleShading
 {
 	float32 U[3] = {};
 	float32 V[3] = {};
-	Vec3f Albedo[3];
+	Vec2f Texcoord[3];
+	Vec3f Tint[3];
+	uint32 Material = 0;
 };
 
 struct SceneTriangle
@@ -1392,8 +1445,8 @@ class IndirectBake
 {
 public:
 	IndirectBake(const MapSource& source, const IndirectInput& input, const Scene& scene,
-				 const Array<TriangleShading>& shadings)
-		: mSource(source), mInput(input), mScene(scene), mShadings(shadings)
+				 const Array<TriangleShading>& shadings, const SizedArray<AlbedoTexture>& albedos)
+		: mSource(source), mInput(input), mScene(scene), mShadings(shadings), mAlbedos(albedos)
 	{
 	}
 
@@ -1482,7 +1535,9 @@ public:
 			std::clamp(static_cast<int64>(std::floor(x)), static_cast<int64>(0), static_cast<int64>(mInput.Width) - 1));
 		const uint32 texel_y = static_cast<uint32>(std::clamp(static_cast<int64>(std::floor(y)), static_cast<int64>(0),
 															  static_cast<int64>(mInput.Height) - 1));
-		const Vec3f albedo = shading.Albedo[0] * w + shading.Albedo[1] * hit.U + shading.Albedo[2] * hit.V;
+		const Vec2f texcoord = shading.Texcoord[0] * w + shading.Texcoord[1] * hit.U + shading.Texcoord[2] * hit.V;
+		const Vec3f tint = shading.Tint[0] * w + shading.Tint[1] * hit.U + shading.Tint[2] * hit.V;
+		const Vec3f albedo = CapAlbedo(mAlbedos[shading.Material].Sample(texcoord.X, texcoord.Y) * tint);
 
 		cached.Texel = texel_y * mInput.Width + texel_x;
 		cached.Albedo = albedo;
@@ -1615,6 +1670,7 @@ private:
 	const IndirectInput& mInput;
 	const Scene& mScene;
 	const Array<TriangleShading>& mShadings;
+	const SizedArray<AlbedoTexture>& mAlbedos;
 };
 
 } // namespace
@@ -1626,7 +1682,7 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 		return false;
 	}
 
-	const SizedArray<Vec3f> albedos = LoadAlbedos(out_map.Materials, out_stats.MissingAlbedoCount);
+	const SizedArray<AlbedoTexture> albedos = LoadAlbedos(out_map.Materials, out_stats.MissingAlbedoCount);
 
 	Scene scene;
 	Array<TriangleShading> shadings;
@@ -1637,7 +1693,6 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 		}
 
 		const bool has_texels = surface.HasLightmapTexcoords();
-		const Vec3f material_albedo = albedos[surface.MaterialIndex];
 
 		for (size_t index = 0; index + 2 < surface.Indices.Size; index += 3) {
 			const uint32 corners[3] = { surface.Indices[index], surface.Indices[index + 1],
@@ -1649,6 +1704,7 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 				shading_index = shadings.Size;
 
 				TriangleShading& shading = shadings.Emplace();
+				shading.Material = surface.MaterialIndex;
 
 				for (uint32 corner = 0; corner < 3; corner++) {
 					const uint32 vertex = corners[corner];
@@ -1656,13 +1712,12 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 					shading.U[corner] = surface.LightmapTexcoords[vertex * 2] * static_cast<float32>(input.Width);
 					shading.V[corner] = surface.LightmapTexcoords[vertex * 2 + 1] * static_cast<float32>(input.Height);
 
-					Vec3f albedo = material_albedo;
+					shading.Texcoord[corner] = surface.Vertices[vertex].Texcoord;
+					shading.Tint[corner] = Vec3f(1.0f);
 
 					if (surface.HasVertexColors()) {
-						albedo = albedo * UnpackColor(surface.Colors[vertex]);
+						shading.Tint[corner] = UnpackColor(surface.Colors[vertex]);
 					}
-
-					shading.Albedo[corner] = CapAlbedo(albedo);
 				}
 			}
 
@@ -1711,7 +1766,7 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 	std::fill(directions.begin(), directions.end(), Vec3f(0.0f));
 	std::fill(variance.begin(), variance.end(), 0.0f);
 
-	const IndirectBake bake(source, input, scene, shadings);
+	const IndirectBake bake(source, input, scene, shadings, albedos);
 
 	RunParallel(texels.Size, [&](uint32 i) { direct[texels[i]] = bake.GetDirect(texels[i]); });
 

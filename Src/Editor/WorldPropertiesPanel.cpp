@@ -7,6 +7,7 @@
 #include <wx/button.h>
 #include <wx/checkbox.h>
 #include <wx/choice.h>
+#include <wx/clrpicker.h>
 #include <wx/panel.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
@@ -118,11 +119,103 @@ WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, w
 		camera_section->AddRow(*mpCompensationField);
 	}
 
+	BuildSunSection(sizer);
 	BuildReflectionSection(sizer);
 
 	SetSizer(sizer);
 
 	ApplyState(WorldPanelState {});
+}
+
+void WorldPropertiesPanel::BuildSunSection(wxSizer* sizer)
+{
+	PropertySection* section = new PropertySection(this, "Sun");
+	wxWindow* body = section->GetBody();
+	sizer->Add(section, wxSizerFlags().Expand());
+
+	mpSunEnabledCheck = new wxCheckBox(body, wxID_ANY, "Enabled");
+	section->AddWide(mpSunEnabledCheck);
+
+	mpSunEnabledCheck->Bind(
+		wxEVT_CHECKBOX, [this](wxCommandEvent&)
+		{ thread::PostToGame([enabled = mpSunEnabledCheck->GetValue()] { gEditor->SetSunEnabled(enabled); }); });
+
+	wxBoxSizer* color_row = new wxBoxSizer(wxHORIZONTAL);
+	mpSunColorPicker = new wxColourPickerCtrl(body, wxID_ANY, *wxWHITE);
+	color_row->Add(mpSunColorPicker, wxSizerFlags().CenterVertical());
+	section->AddRow("Colour", color_row);
+
+	mpSunColorPicker->Bind(wxEVT_COLOURPICKER_CHANGED,
+						   [](wxColourPickerEvent& event)
+						   {
+							   const wxColour colour = event.GetColour();
+
+							   thread::PostToGame([color = Color::FromRGBA(colour.Red(), colour.Green(), colour.Blue(),
+																		   255)] { gEditor->SetSunColor(color); });
+						   });
+
+	mpSunIntensityField = new FloatField(body, "Lux", Vec2f(0.0f, 1000000.0f));
+	mpSunIntensityField->SetOnChange([](const float value)
+									 { thread::PostToGame([value] { gEditor->SetSunIntensity(value); }); });
+	section->AddRow(*mpSunIntensityField);
+
+	mpSunAzimuthField = new FloatField(body, "Azimuth", Vec2f(-360.0f, 360.0f));
+	mpSunAzimuthField->SetOnChange([](const float value)
+								   { thread::PostToGame([value] { gEditor->SetSunAzimuth(value); }); });
+	section->AddRow(*mpSunAzimuthField);
+
+	mpSunElevationField = new FloatField(body, "Elevation", Vec2f(-90.0f, 90.0f));
+	mpSunElevationField->SetOnChange([](const float value)
+									 { thread::PostToGame([value] { gEditor->SetSunElevation(value); }); });
+	section->AddRow(*mpSunElevationField);
+
+	mpSunStatus = new wxStaticText(body, wxID_ANY, "Baked sun is out of date, recompile the map");
+	section->AddWide(mpSunStatus);
+}
+
+void WorldPropertiesPanel::ApplySunState(const WorldPanelState& state)
+{
+	if (state.bHasSun != mbShowingSun) {
+		mbShowingSun = state.bHasSun;
+
+		mpSunEnabledCheck->Enable(state.bHasSun);
+		mpSunColorPicker->Enable(state.bHasSun);
+		mpSunIntensityField->SetEnabled(state.bHasSun);
+		mpSunAzimuthField->SetEnabled(state.bHasSun);
+		mpSunElevationField->SetEnabled(state.bHasSun);
+	}
+
+	if (state.bSunBakeStale != mbShowingSunStale) {
+		mbShowingSunStale = state.bSunBakeStale;
+		mpSunStatus->Show(state.bSunBakeStale);
+		RelayoutToScroller(mpSunStatus);
+	}
+
+	if (!state.bHasSun) {
+		return;
+	}
+
+	if (mpSunEnabledCheck->GetValue() != state.bSunEnabled) {
+		mpSunEnabledCheck->SetValue(state.bSunEnabled);
+	}
+
+	const wxColour colour(state.SunColor.R, state.SunColor.G, state.SunColor.B);
+
+	if (mpSunColorPicker->GetColour() != colour) {
+		mpSunColorPicker->SetColour(colour);
+	}
+
+	if (!mpSunIntensityField->HasFocus()) {
+		mpSunIntensityField->SetValue(state.SunIntensity);
+	}
+
+	if (!mpSunAzimuthField->HasFocus()) {
+		mpSunAzimuthField->SetValue(state.SunAzimuthDegrees);
+	}
+
+	if (!mpSunElevationField->HasFocus()) {
+		mpSunElevationField->SetValue(state.SunElevationDegrees);
+	}
 }
 
 void WorldPropertiesPanel::BuildReflectionSection(wxSizer* sizer)
@@ -262,6 +355,7 @@ void WorldPropertiesPanel::ApplyState(const WorldPanelState& state)
 		mpDebugLayerChoice->SetSelection(selection);
 	}
 
+	ApplySunState(state);
 	ApplyReflectionState(state);
 
 	if (!mpApertureField->HasFocus()) {

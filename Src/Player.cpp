@@ -25,6 +25,12 @@ void Player::Create()
 
 	mCameraOffset = Vec3f(0, physics::PhysicsPlayer::scEyeHeight, 0);
 
+	mWalkController.Speed = scWalkSpeed;
+	mWalkController.SprintSpeed = scSprintSpeed;
+
+	mNoClipController.Speed = scWalkSpeed * 1.75f;
+	mNoClipController.SprintSpeed = scSprintSpeed * 2.0f;
+
 	Weapons.Create(this);
 
 	if (mActiveViewModel < 0) {
@@ -149,8 +155,8 @@ void Player::ActivateViewModel(uint32 index)
 
 void Player::ResetMotion()
 {
-	mUserForce = Vec3f::sZero;
-	mMovementGoal = Vec3f::sZero;
+	mWalkController.Reset();
+	mNoClipController.Reset();
 	mHorizontalSpeed = 0.0f;
 
 	mLandingOffset = 0.0f;
@@ -170,8 +176,6 @@ void Player::RotateCamera(const Vec2f& xy)
 {
 	pCamera->Rotate(xy.X, xy.Y);
 	mCameraGoal = pCamera->GetRotation();
-
-	RequireDirectionUpdate();
 }
 
 void Player::RotateHead(const Vec2f& xy)
@@ -204,48 +208,33 @@ void Player::SpawnAt(const Vec3f position, const Vec3f direction)
 	mPrevCameraPitch = pCamera->mAngleY;
 	mViewModelSwayYaw = 0.0f;
 	mViewModelSwayPitch = 0.0f;
-
-	RequireDirectionUpdate();
 }
 
 void Player::SetFlyMode(bool value)
 {
+	const Vec3f velocity = GetController().GetVelocity();
+
 	mbIsFlymode = value;
 	Physics.bDisableGravity = value;
 
+	GetController().SetVelocity(velocity);
+
 	mLandingOffset = 0.0f;
 	mLandingVelocity = 0.0f;
-
-	RequireDirectionUpdate();
 }
 
 void Player::Move(float64 delta_time, const Vec3f offset)
 {
-	const Vec3f forward = MovementDirection * offset.Z;
-	const Vec3f right = mStrafeDirection * offset.X;
-	const Vec3f up = mbIsFlymode ? Vec3f::sUp * offset.Y : Vec3f::sZero;
+	BaseController& controller = GetController();
+	controller.SpeedMultiplier = SpeedMultiplier;
 
-	mMovementGoal = (forward + right + up);
+	const Vec3f velocity = controller.Update(delta_time, offset, *pCamera, bIsSprinting);
 
-	if (mMovementGoal.Length() > 1e-3) {
-		mMovementGoal.NormalizeIP();
-	}
-
-	const float32 max_speed = (bIsSprinting ? scSprintSpeed : scWalkSpeed) * SpeedMultiplier;
-
-	mUserForce.SmoothInterpolate(mMovementGoal * max_speed, scMovementLerpSpeed, delta_time);
-
-	if (mMovementGoal.Length() <= 0.25) {
+	if (!mbIsFlymode && controller.GetGoal().Length() <= 0.25) {
 		mBobCounterY = MathUtil::SmoothInterpolate(mBobCounterY, 0.0f, 10.0f, delta_time);
 	}
 
-	Vec3f force = mUserForce;
-
-	if (!mbIsFlymode) {
-		force.Y = 0.0f;
-	}
-
-	Physics.ApplyMovement(force);
+	Physics.ApplyMovement(velocity);
 }
 
 void Player::UpdateViewModelSway(float32 delta_time)
@@ -654,10 +643,9 @@ void Player::Update(float64 delta_time)
 
 	UpdateLanding(static_cast<float32>(delta_time));
 
-	UpdateDirection();
 	pCamera->MoveTo(Position + mCameraOffset + Vec3f(0.0f, mLandingOffset, 0.0f));
 
-	const bool user_force_released = mUserForce.IsNearZero(0.1);
+	const bool user_force_released = GetController().GetVelocity().IsNearZero(0.1);
 
 	// const bool should_reset_center = ((user_force_released || Physics.bIsGrounded) &&
 	// 								  (MathUtil::IsCloseTo(mBobCounterY, 0.0f) == false));

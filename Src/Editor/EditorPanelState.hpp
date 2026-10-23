@@ -87,6 +87,15 @@ struct WorldPanelState
 	float32 ISO = 100.0f;
 	float32 Compensation = 0.0f;
 
+	bool bHasSun = false;
+	bool bSunEnabled = false;
+	bool bSunBakeStale = false;
+
+	struct Color SunColor = Color::sWhite;
+	float32 SunIntensity = 0.0f;
+	float32 SunAzimuthDegrees = 0.0f;
+	float32 SunElevationDegrees = 0.0f;
+
 	bool operator==(const WorldPanelState& other) const = default;
 };
 
