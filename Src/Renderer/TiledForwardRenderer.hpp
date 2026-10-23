@@ -84,6 +84,8 @@ public:
 	 */
 	void SetDecalAtlases(Image* atlas, Image* normal_atlas);
 
+	void RebuildPersistentDescriptor();
+
 	void Destroy();
 	~TiledForwardRenderer() { Destroy(); }
 

@@ -61,6 +61,7 @@ public:
 	Array<PatchSurface> Surfaces;
 
 	Array<Vec3d> ReferencePoints;
+	Array<Vec3d> ReferenceFacings;
 
 	PatchStats Stats;
 

@@ -49,7 +49,7 @@ inline constexpr ViewPlaneAxes scViewPlaneAxes[scViewPlaneCount] = {
 struct TopViewVertexHandle
 {
 	ObjectID ObjectId = ObjectID::scNull;
-	Vec2f Position = Vec2f::sZero;
+	Vec2f Position = Vec2f::scZero;
 };
 
 inline constexpr const char* scAxisNames = "XYZ";
@@ -131,7 +131,7 @@ enum class eTextureCommand : uint8
 struct TextureCommand
 {
 	eTextureCommand Type = eTextureCommand::Shift;
-	Vec2f Amount = Vec2f::sZero;
+	Vec2f Amount = Vec2f::scZero;
 };
 
 inline const ViewPlaneAxes& GetViewPlaneAxes(eViewPlane plane) { return scViewPlaneAxes[static_cast<uint32>(plane)]; }

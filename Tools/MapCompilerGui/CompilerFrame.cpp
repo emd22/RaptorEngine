@@ -2,6 +2,7 @@
 
 #include <wx/button.h>
 #include <wx/checkbox.h>
+#include <wx/choice.h>
 #include <wx/filefn.h>
 #include <wx/filepicker.h>
 #include <wx/icon.h>
@@ -48,11 +49,18 @@ constexpr double scLightmapDensityStep = 4.0;
 constexpr double scMinSunRadius = 0.0;
 constexpr double scMaxSunRadius = 10.0;
 constexpr double scSunRadiusStep = 0.25;
+constexpr int scMinIndirectRays = 16;
+constexpr int scMaxIndirectRays = 4096;
+constexpr int scIndirectRayStep = 64;
+constexpr int scMinIndirectBounces = 1;
+constexpr int scMaxIndirectBounces = 8;
+constexpr int scMaxIndirectCacheMegabytes = 65536;
+constexpr int scIndirectCacheStep = 256;
 
 } // namespace
 
 CompilerFrame::CompilerFrame(const String& map_directory)
-	: wxFrame(nullptr, wxID_ANY, "RMC", wxDefaultPosition, wxSize(980, 760))
+	: wxFrame(nullptr, wxID_ANY, "RMC", wxDefaultPosition, wxSize(980, 860))
 {
 #if defined(__WXMSW__)
 	SetIcon(wxICON(aaaa));
@@ -156,6 +164,22 @@ CompilerFrame::CompilerFrame(const String& map_directory)
 									 ProbePlacementSettings::scDefaultBrushSpacing, scProbeSpacingStep,
 									 "Spacing of the probes inside probe volume brushes");
 
+	const auto add_integer = [&](const char* label, int min, int max, int value, int step, const char* tooltip)
+	{
+		wxBoxSizer* integer_sizer = new wxBoxSizer(wxHORIZONTAL);
+		integer_sizer->Add(new wxStaticText(options_box, wxID_ANY, label),
+						   wxSizerFlags().CenterVertical().Border(wxRIGHT, scBorder));
+
+		wxSpinCtrl* spin = new wxSpinCtrl(options_box, wxID_ANY, "", wxDefaultPosition, wxSize(90, -1),
+										  wxSP_ARROW_KEYS, min, max, value);
+		spin->SetIncrement(step);
+		spin->SetToolTip(tooltip);
+		integer_sizer->Add(spin, wxSizerFlags().CenterVertical());
+
+		options_sizer->Add(integer_sizer, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, scBorder));
+		return spin;
+	};
+
 	const LightmapOptions default_lightmap {};
 
 	mpBakeLightmap = add_checkbox("Bake sun shadows", default_lightmap.bEnabled,
@@ -168,6 +192,38 @@ CompilerFrame::CompilerFrame(const String& map_directory)
 	mpSunRadius = add_number("Sun radius, degrees", scMinSunRadius, scMaxSunRadius, default_lightmap.SunRadiusDegrees,
 							 scSunRadiusStep,
 							 "Half the angle the sun covers in the sky. Wider makes softer shadow edges");
+
+	mpBakeIndirect = add_checkbox("Bake bounced light", default_lightmap.bIndirect,
+								  "Gather the light that bounces between surfaces into the lightmap. The engine uses it "
+								  "in place of the light probes' diffuse light on the compiled surfaces");
+	mpIndirectRays = add_integer("Bounce rays per texel", scMinIndirectRays, scMaxIndirectRays,
+								 static_cast<int>(default_lightmap.IndirectRays), scIndirectRayStep,
+								 "Rays each lightmap texel traces for every bounce. More is smoother and slower");
+	mpIndirectBounces = add_integer("Bounces", scMinIndirectBounces, scMaxIndirectBounces,
+									static_cast<int>(default_lightmap.IndirectBounces), 1,
+									"How many times light bounces between surfaces");
+	mpIndirectCache = add_integer("Hit cache, MB", 0, scMaxIndirectCacheMegabytes,
+								  static_cast<int>(default_lightmap.IndirectCacheMegabytes), scIndirectCacheStep,
+								  "Memory for keeping the first bounce's ray hits, so later bounces skip tracing them. "
+								  "Costs 8 bytes per ray (2 MB per 1000 texels at 256 rays); texels past the budget "
+								  "are traced as usual. Later bounces see the surface colour at 8 bits per channel, "
+								  "a tiny difference from tracing. 0 turns it off");
+
+	wxBoxSizer* denoise_sizer = new wxBoxSizer(wxHORIZONTAL);
+	denoise_sizer->Add(new wxStaticText(options_box, wxID_ANY, "Bounce denoise"),
+					   wxSizerFlags().CenterVertical().Border(wxRIGHT, scBorder));
+
+	const wxString denoise_levels[] = { "Off", "Low", "Medium", "High" };
+
+	mpIndirectDenoise = new wxChoice(options_box, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+									 WXSIZEOF(denoise_levels), denoise_levels);
+	mpIndirectDenoise->SetSelection(static_cast<int>(default_lightmap.IndirectDenoise));
+	mpIndirectDenoise->SetToolTip("How far the bounced light is smoothed across each surface to hide the noise of the "
+								  "rays. Edges, corners and real changes in brightness are kept. Higher reaches "
+								  "further and costs a little more time");
+	denoise_sizer->Add(mpIndirectDenoise, wxSizerFlags().CenterVertical());
+
+	options_sizer->Add(denoise_sizer, wxSizerFlags().Border(wxLEFT | wxRIGHT | wxBOTTOM, scBorder));
 
 	wxBoxSizer* verify_sizer = new wxBoxSizer(wxHORIZONTAL);
 
@@ -215,12 +271,8 @@ CompilerFrame::CompilerFrame(const String& map_directory)
 							mpProbeLevelSpacing->Enable(mpPlaceProbes->GetValue());
 							mpProbeBrushSpacing->Enable(mpPlaceProbes->GetValue());
 						});
-	mpBakeLightmap->Bind(wxEVT_CHECKBOX,
-						 [this](wxCommandEvent&)
-						 {
-							 mpLightmapDensity->Enable(mpBakeLightmap->GetValue());
-							 mpSunRadius->Enable(mpBakeLightmap->GetValue());
-						 });
+	mpBakeLightmap->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) { UpdateLightmapControls(); });
+	mpBakeIndirect->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) { UpdateLightmapControls(); });
 	mpVerify->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) { mpVerifyRays->Enable(mpVerify->GetValue()); });
 	mpMaps->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) { StartCompile(GetSelectedMaps()); });
 	mpCompileSelected->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { StartCompile(GetSelectedMaps()); });
@@ -338,6 +390,11 @@ CompileOptions CompilerFrame::ReadOptions() const
 	options.Lightmap.bEnabled = mpBakeLightmap->GetValue();
 	options.Lightmap.Density = mpLightmapDensity->GetValue();
 	options.Lightmap.SunRadiusDegrees = mpSunRadius->GetValue();
+	options.Lightmap.bIndirect = mpBakeIndirect->GetValue();
+	options.Lightmap.IndirectRays = static_cast<uint32>(mpIndirectRays->GetValue());
+	options.Lightmap.IndirectBounces = static_cast<uint32>(mpIndirectBounces->GetValue());
+	options.Lightmap.IndirectCacheMegabytes = static_cast<uint32>(mpIndirectCache->GetValue());
+	options.Lightmap.IndirectDenoise = static_cast<eDenoiseQuality>(mpIndirectDenoise->GetSelection());
 	options.VerifyRays = mpVerify->GetValue() ? static_cast<uint32>(mpVerifyRays->GetValue()) : 0;
 
 	return options;
@@ -462,6 +519,20 @@ void CompilerFrame::SetBusy(bool busy)
 	mpCompileAll->Enable(!busy);
 	mpRefresh->Enable(!busy);
 	mpDirectory->Enable(!busy);
+}
+
+void CompilerFrame::UpdateLightmapControls()
+{
+	const bool lightmap = mpBakeLightmap->GetValue();
+	const bool indirect = lightmap && mpBakeIndirect->GetValue();
+
+	mpLightmapDensity->Enable(lightmap);
+	mpSunRadius->Enable(lightmap);
+	mpBakeIndirect->Enable(lightmap);
+	mpIndirectRays->Enable(indirect);
+	mpIndirectBounces->Enable(indirect);
+	mpIndirectCache->Enable(indirect);
+	mpIndirectDenoise->Enable(indirect);
 }
 
 void CompilerFrame::OnClose(wxCloseEvent& event)

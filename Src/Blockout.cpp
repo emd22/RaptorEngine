@@ -614,6 +614,8 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	mCompiledObjects.clear();
 	mCompiledBodies.clear();
 	mCompiledProbeLayout.Clear();
+	mCompiledProbeIrradiance.Free();
+	mCompiledProbeMoments.Free();
 	mbIsCompiledMap = false;
 
 	gWorldGrid->ClearAreaGraph();
@@ -638,11 +640,30 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	}
 
 	mbHasBakedSun = false;
+	mbHasBakedIndirect = false;
+	mbBakedWithSun = false;
 }
 
 bool Blockout::IsBakedSunCurrent(const Vec3f sun_position) const
 {
 	if (!mbHasBakedSun || sun_position.Length() < 1e-6f) {
+		return false;
+	}
+
+	return sun_position.Normalize().Dot(mBakedSunDirection) > scBakedSunMinCosine;
+}
+
+bool Blockout::IsBakedIndirectCurrent(bool sun_enabled, const Vec3f sun_position) const
+{
+	if (!mbHasBakedIndirect) {
+		return false;
+	}
+
+	if (!mbBakedWithSun) {
+		return !sun_enabled;
+	}
+
+	if (!sun_enabled || sun_position.Length() < 1e-6f) {
 		return false;
 	}
 
@@ -728,17 +749,31 @@ void Blockout::CreateCompiledShadows(const CompiledMap& map)
 void Blockout::CreateCompiledWorld(const CompiledMap& map)
 {
 	const CompiledMapLightmap& lightmap = map.Lightmap;
+	const bool has_indirect = lightmap.HasIndirect();
 
-	mbHasBakedSun = map.HasBakedSun() && renderer::gGraphics->UploadLightmap(Vec2u(lightmap.Width, lightmap.Height),
-																			 lightmap.SunVisibility.pData);
+	const uint16* irradiance = nullptr;
+	const uint8* directions = nullptr;
 
-	if (map.HasBakedSun() && !mbHasBakedSun) {
-		LogWarning(LC_ASSET, "The compiled map's {}x{} lightmap does not fit in {}x{}, the sun's shadows stay dynamic",
-				   lightmap.Width, lightmap.Height, Limits::LightmapSize, Limits::LightmapSize);
+	if (has_indirect) {
+		irradiance = lightmap.Irradiance.pData;
+		directions = lightmap.Directions.pData;
 	}
 
-	const Vec2f lightmap_scale(static_cast<float32>(lightmap.Width) / static_cast<float32>(Limits::LightmapSize),
-							   static_cast<float32>(lightmap.Height) / static_cast<float32>(Limits::LightmapSize));
+	bool has_lightmap = false;
+
+	if (map.HasLightmap()) {
+		has_lightmap = renderer::gGraphics->UploadLightmap(Vec2u(lightmap.Width, lightmap.Height),
+														   lightmap.SunVisibility.pData, irradiance, directions);
+
+		if (!has_lightmap) {
+			LogWarning(LC_ASSET, "The compiled map's {}x{} lightmap is larger than {}x{}, its lighting stays dynamic",
+					   lightmap.Width, lightmap.Height, Limits::LightmapSize, Limits::LightmapSize);
+		}
+	}
+
+	mbHasBakedSun = has_lightmap && map.HasBakedSun();
+	mbHasBakedIndirect = has_lightmap && has_indirect;
+	mbBakedWithSun = lightmap.HasSun();
 
 	mCompiledDecalReceivers.reserve(map.Surfaces.Size);
 
@@ -800,17 +835,10 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 			object->SetVertexColored(true);
 		}
 
-		if (mbHasBakedSun && surface.HasLightmapTexcoords()) {
-			SizedArray<float32> lightmap_uvs;
-			lightmap_uvs.InitSize(surface.LightmapTexcoords.Size);
-
-			for (size_t i = 0; i + 1 < lightmap_uvs.Size; i += 2) {
-				lightmap_uvs[i] = surface.LightmapTexcoords[i] * lightmap_scale.X;
-				lightmap_uvs[i + 1] = surface.LightmapTexcoords[i + 1] * lightmap_scale.Y;
-			}
-
-			renderer::gGraphics->SubmitImmediateUploadCmd([&](renderer::CommandBuffer& cmd)
-														  { object->pMesh->UploadLightmapUVs(cmd, lightmap_uvs); });
+		if (has_lightmap && surface.HasLightmapTexcoords()) {
+			renderer::gGraphics->SubmitImmediateUploadCmd(
+				[&](renderer::CommandBuffer& cmd)
+				{ object->pMesh->UploadLightmapUVs(cmd, surface.LightmapTexcoords); });
 
 			object->SetLightmapped(true);
 		}
@@ -931,9 +959,22 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 	mCompiledProbeLayout.CopyFrom(map.Probes);
 	mbIsCompiledMap = true;
 
-	if (mbHasBakedSun) {
-		mBakedSunDirection = Vec3f(lightmap.SunDirection[0], lightmap.SunDirection[1], lightmap.SunDirection[2]);
+	if (map.HasBakedProbes()) {
+		mCompiledProbeIrradiance.InitAsCopyOf(map.ProbeIrradiance);
+		mCompiledProbeMoments.InitAsCopyOf(map.ProbeMoments);
+	}
+	else {
+		mCompiledProbeIrradiance.Free();
+		mCompiledProbeMoments.Free();
+	}
 
+	mBakedSunDirection = Vec3f(lightmap.SunDirection[0], lightmap.SunDirection[1], lightmap.SunDirection[2]);
+
+	if (mbHasBakedIndirect) {
+		LogInfo("Loaded baked indirect light; {}x{} lightmap", lightmap.Width, lightmap.Height);
+	}
+
+	if (mbHasBakedSun) {
 		gProbeManager->SetSunVisibility(Slice<const Vec3f>(map.Probes.Positions.pData, map.Probes.Positions.Size),
 										Slice<const uint8>(map.ProbeSunVisibility.pData, map.ProbeSunVisibility.Size));
 
@@ -1716,7 +1757,7 @@ void Blockout::RebuildPatch(Object* object, Patch&& patch)
 		mesh->Normals = { Vec3f::sUp, Vec3f::sUp, Vec3f::sUp };
 		mesh->Tangents = { Vec3f(1.0f, 0.0f, 0.0f), Vec3f(1.0f, 0.0f, 0.0f), Vec3f(1.0f, 0.0f, 0.0f) };
 		mesh->TangentHandedness = { 1.0f, 1.0f, 1.0f };
-		mesh->Texcoords = { Vec2f::sZero, Vec2f::sZero, Vec2f::sZero };
+		mesh->Texcoords = { Vec2f::scZero, Vec2f::scZero, Vec2f::scZero };
 		mesh->Indices = { 0, 1, 2 };
 	}
 

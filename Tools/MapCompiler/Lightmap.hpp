@@ -11,6 +11,14 @@
 
 namespace fx::mapc {
 
+enum class eDenoiseQuality : uint32
+{
+	Off,
+	Low,
+	Medium,
+	High,
+};
+
 struct LightmapOptions
 {
 	bool bEnabled = true;
@@ -22,6 +30,14 @@ struct LightmapOptions
 	double SunRadiusDegrees = 1.0;
 
 	uint32 ProbeRays = 64;
+
+	bool bIndirect = true;
+	uint32 IndirectRays = 256;
+	uint32 IndirectBounces = 3;
+	uint32 IndirectCacheMegabytes = 0;
+	eDenoiseQuality IndirectDenoise = eDenoiseQuality::Medium;
+
+	uint32 ProbeTexelRays = 4;
 
 	String ImagePath;
 };
@@ -43,6 +59,21 @@ struct LightmapStats
 	uint32 LitProbeCount = 0;
 
 	double LitFraction = 0.0;
+
+	bool bHasIndirect = false;
+	uint32 IndirectTriangleCount = 0;
+	uint32 IndirectBlockerCount = 0;
+	uint32 IndirectLightCount = 0;
+	uint32 MissingAlbedoCount = 0;
+	uint64 IndirectRayCount = 0;
+	uint64 IndirectTexelCount = 0;
+	uint64 IndirectCachedTexelCount = 0;
+	double IndirectCacheMegabytes = 0.0;
+	double MeanIndirect = 0.0;
+
+	uint32 BakedProbeCount = 0;
+	uint64 ProbeRayCount = 0;
+	double MeanProbeIrradiance = 0.0;
 };
 
 class LightmapBaker

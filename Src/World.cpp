@@ -42,6 +42,7 @@ void World::Create()
 	pCVarPortalLock = gCVars->Set<int64>("r_portal_lock", 0);
 	pCVarPortalDebug = gCVars->Set<int64>("r_portal_debug", 0);
 	pCVarBakedShadows = gCVars->Set<int64>("r_baked_shadows", 1);
+	pCVarBakedIndirect = gCVars->Set<int64>("r_baked_indirect", 1);
 }
 
 static bool IsTransparentMaterial(Material* mat)
@@ -1148,6 +1149,15 @@ void World::Render(Camera* shadow_camera)
 
 	gGraphics->bBakedSunActive = render_sun_shadows && (pCVarBakedShadows->IntValue != 0) && pPrototype != nullptr &&
 								 pPrototype->IsBakedSunCurrent(sun->GetPosition());
+
+	Vec3f sun_position = Vec3f::sZero;
+
+	if (sun.IsValid()) {
+		sun_position = sun->GetPosition();
+	}
+
+	gGraphics->bBakedIndirectActive = (pCVarBakedIndirect->IntValue != 0) && pPrototype != nullptr &&
+									  pPrototype->IsBakedIndirectCurrent(render_sun_shadows, sun_position);
 
 	// With the sun off its region is left alone, apart from the atlas's very first pass that makes it sampleable
 	if (render_sun_shadows || !gShadowAtlas->IsInitialized()) {

@@ -51,6 +51,7 @@ using ExtensionNames = GraphicsBackend::ExtensionNames;
 using ExtensionList = GraphicsBackend::ExtensionList;
 
 static constexpr bool scEnableValidationLayers = false;
+static constexpr uint16 scHalfOne = 0x3C00;
 
 FX_SET_MODULE_NAME("RenderBackend")
 
@@ -191,21 +192,14 @@ void GraphicsBackend::Init(Vec2u window_size)
 
 
 	{
-		const Vec2u lightmap_size(Limits::LightmapSize, Limits::LightmapSize);
+		const uint8 neutral_lightmap[4] = { 128, 128, 128, 255 };
+		const uint16 black_irradiance[4] = { 0, 0, 0, scHalfOne };
 
-		SizedArray<uint8> blank;
-		blank.InitSize(static_cast<uint64>(lightmap_size.X) * lightmap_size.Y);
-		memset(blank.pData, 0xFF, blank.Size);
-
-		pLightmap = gTextureManager->NewTexture();
-
-		SubmitImmediateUploadCmd(
-			[&](CommandBuffer& cmd)
-			{
-				ImageInfo info(lightmap_size, eImageFormat::R8_UNorm, 0, 1, Slice<const uint8>(blank.pData, blank.Size));
-
-				pLightmap->CreateFromData(cmd, info, eImageCreateFlags::None);
-			});
+		pLightmap = CreateLightmapImage(Vec2u(1, 1), eImageFormat::RGBA8_UNorm,
+										Slice<const uint8>(neutral_lightmap, sizeof(neutral_lightmap)));
+		pLightmapIrradiance = CreateLightmapImage(
+			Vec2u(1, 1), eImageFormat::RGBA16_Float,
+			Slice<const uint8>(reinterpret_cast<const uint8*>(black_irradiance), sizeof(black_irradiance)));
 	}
 
 	ReflectionProbePageSize = Limits::MaxReflectionProbes * sizeof(ReflectionProbeData);
@@ -684,26 +678,88 @@ eFrameResult GraphicsBackend::BeginFrame()
 	return eFrameResult::Success;
 }
 
-bool GraphicsBackend::UploadLightmap(const Vec2u& size, const uint8* texels)
+Image* GraphicsBackend::CreateLightmapImage(const Vec2u& size, eImageFormat format, const Slice<const uint8>& texels)
 {
-	if (pLightmap == nullptr || texels == nullptr || size.X == 0 || size.Y == 0 || size.X > Limits::LightmapSize ||
-		size.Y > Limits::LightmapSize) {
+	Image* image = gTextureManager->NewTexture();
+
+	SubmitImmediateUploadCmd(
+		[&](CommandBuffer& cmd)
+		{
+			ImageInfo info(size, format, 0, 1, texels);
+
+			image->CreateFromData(cmd, info, eImageCreateFlags::None);
+		});
+
+	return image;
+}
+
+bool GraphicsBackend::UploadLightmap(const Vec2u& size, const uint8* sun_visibility, const uint16* irradiance,
+									 const uint8* directions)
+{
+	if (pRenderer == nullptr || sun_visibility == nullptr || size.X == 0 || size.Y == 0 ||
+		size.X > Limits::LightmapSize || size.Y > Limits::LightmapSize) {
 		return false;
+	}
+
+	const uint64 texel_count = static_cast<uint64>(size.X) * size.Y;
+
+	SizedArray<uint8> lightmap_texels;
+	lightmap_texels.InitSize(texel_count * 4);
+
+	for (uint64 texel = 0; texel < texel_count; texel++) {
+		for (uint32 channel = 0; channel < 3; channel++) {
+			uint8 direction = 128;
+
+			if (directions != nullptr) {
+				direction = directions[texel * 3 + channel];
+			}
+
+			lightmap_texels[texel * 4 + channel] = direction;
+		}
+
+		lightmap_texels[texel * 4 + 3] = sun_visibility[texel];
+	}
+
+	Vec2u irradiance_size(1, 1);
+
+	if (irradiance != nullptr) {
+		irradiance_size = size;
+	}
+
+	const uint64 irradiance_count = static_cast<uint64>(irradiance_size.X) * irradiance_size.Y;
+
+	SizedArray<uint16> irradiance_texels;
+	irradiance_texels.InitSize(irradiance_count * 4);
+
+	for (uint64 texel = 0; texel < irradiance_count; texel++) {
+		for (uint32 channel = 0; channel < 3; channel++) {
+			uint16 value = 0;
+
+			if (irradiance != nullptr) {
+				value = irradiance[texel * 3 + channel];
+			}
+
+			irradiance_texels[texel * 4 + channel] = value;
+		}
+
+		irradiance_texels[texel * 4 + 3] = scHalfOne;
 	}
 
 	mDevice.WaitForIdle();
 
-	const uint64 byte_count = static_cast<uint64>(size.X) * size.Y;
+	Image* old_lightmap = pLightmap;
+	Image* old_irradiance = pLightmapIrradiance;
 
-	RawGpuBuffer staging;
-	staging.Create(eGpuBufferType::Transfer, byte_count, VMA_MEMORY_USAGE_CPU_TO_GPU, eGpuBufferFlags::TransferReceiver);
-	staging.Upload(texels, byte_count);
+	pLightmap = CreateLightmapImage(size, eImageFormat::RGBA8_UNorm,
+									Slice<const uint8>(lightmap_texels.pData, lightmap_texels.Size));
+	pLightmapIrradiance = CreateLightmapImage(
+		irradiance_size, eImageFormat::RGBA16_Float,
+		Slice<const uint8>(reinterpret_cast<const uint8*>(irradiance_texels.pData), irradiance_texels.Size * 2));
 
-	SubmitImmediateUploadCmd(
-		[&](CommandBuffer& cmd)
-		{ pLightmap->CopyFromBuffer(cmd, staging, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, size, 0, 0); });
+	pRenderer->RebuildPersistentDescriptor();
 
-	staging.Destroy();
+	gTextureManager->DestroyTexture(old_lightmap->ID);
+	gTextureManager->DestroyTexture(old_irradiance->ID);
 
 	return true;
 }

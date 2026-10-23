@@ -4,6 +4,7 @@
 #include <cmath>
 #include <concepts>
 #include <format>
+#include <limits>
 
 namespace fx {
 
@@ -12,13 +13,27 @@ template <typename Type>
 class Vec2Base
 {
 public:
-	static const Vec2Base<Type> sZero;
+	static const Vec2Base<Type> scZero;
+
+	static const Vec2Base<Type> scMaxValue;
+	static const Vec2Base<Type> scMinValue;
 
 public:
 	constexpr Vec2Base() = default;
 
 	constexpr Vec2Base(Type x, Type y) : X(x), Y(y) {}
 	constexpr Vec2Base(Type scalar) : X(scalar), Y(scalar) {}
+
+	/**
+	 * @brief Create a Vec2 from one type (e.g. float) from a Vec2 of another type (e.g. uint). Casts the values to the
+	 * new vector type.
+	 */
+	template <typename TSrc>
+		requires(!std::same_as<TSrc, Type>)
+	constexpr static Vec2Base From(Vec2Base<TSrc> src)
+	{
+		return Vec2Base { static_cast<Type>(src.X), static_cast<Type>(src.Y) };
+	}
 
 	constexpr Vec2Base(const Vec2Base& other) : X(other.X), Y(other.Y) {}
 	constexpr explicit Vec2Base(const Vec2Base<float>& fvec)
@@ -161,6 +176,7 @@ public:
 		return std::abs(X - other.X) <= tolerance && std::abs(Y - other.Y) <= tolerance;
 	}
 
+
 public:
 	union
 	{
@@ -173,15 +189,21 @@ public:
 	};
 };
 
-// Declaration of Vec2::sZero
-template <typename Type>
-const Vec2Base<Type> Vec2Base<Type>::sZero = Vec2Base<Type>(0, 0);
+template <typename T>
+inline constexpr Vec2Base<T> Vec2Base<T>::scZero = Vec2Base<T>(static_cast<T>(0));
+
+template <typename T>
+inline constexpr Vec2Base<T> Vec2Base<T>::scMinValue = Vec2Base<T>(std::numeric_limits<T>::lowest());
+
+template <typename T>
+inline constexpr Vec2Base<T> Vec2Base<T>::scMaxValue = Vec2Base<T>(std::numeric_limits<T>::max());
 
 using Vec2f = Vec2Base<float32>;
 using Vec2d = Vec2Base<float64>;
 
 using Vec2i = Vec2Base<int32>;
 using Vec2u = Vec2Base<uint32>;
+
 
 } // namespace fx
 

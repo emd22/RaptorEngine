@@ -133,8 +133,8 @@ private:
 
 	struct ArchEllipse
 	{
-		Vec2d Center { Vec2d::sZero };
-		Vec2d Radius { Vec2d::sZero };
+		Vec2d Center { Vec2d::scZero };
+		Vec2d Radius { Vec2d::scZero };
 		bool bValid = false;
 	};
 
@@ -151,9 +151,9 @@ private:
 		// 		double OffsetU = 0.0;
 		// 		double OffsetV = 0.0;
 
-		Vec2d OffsetUV { Vec2d::sZero };
-		Vec2d PivotUV { Vec2d::sZero };
-		Vec2d NormalUV { Vec2d::sZero };
+		Vec2d OffsetUV { Vec2d::scZero };
+		Vec2d PivotUV { Vec2d::scZero };
+		Vec2d NormalUV { Vec2d::scZero };
 
 		double Angle = 0.0;
 		//
@@ -173,13 +173,13 @@ private:
 		// double NormalV = 0.0;
 		DynArray<OutlinePreview> Outlines;
 
-		Vec2d ClipA { Vec2d::sZero };
-		Vec2d ClipB { Vec2d::sZero };
+		Vec2d ClipA { Vec2d::scZero };
+		Vec2d ClipB { Vec2d::scZero };
 
 		bool bSnappedToPatch = false;
-		Vec2d PatchSnapUV { Vec2d::sZero };
+		Vec2d PatchSnapUV { Vec2d::scZero };
 
-		Vec2d AimUV { Vec2d::sZero };
+		Vec2d AimUV { Vec2d::scZero };
 		double AimDepth = 0.0;
 	};
 
@@ -199,7 +199,7 @@ private:
 	{
 		// double CenterU = 0.0;
 		// double CenterV = 0.0;
-		Vec2d Center { Vec2d::sZero };
+		Vec2d Center { Vec2d::scZero };
 
 		double Scale = 24.0;
 		bool bFitted = false;
@@ -346,7 +346,7 @@ private:
 	// double mCenterU = 0.0;
 	// double mCenterV = 0.0;
 
-	Vec2d mCenter { Vec2d::sZero };
+	Vec2d mCenter { Vec2d::scZero };
 
 	double mScale = 24.0;
 	bool mbHasFitted = false;
@@ -357,9 +357,9 @@ private:
 
 	eDrag mDrag = eDrag::None;
 	wxPoint mPressScreen;
-	Vec2d mPress { Vec2d::sZero };
-	Vec2d mCurrent { Vec2d::sZero };
-	Vec2d mHover { Vec2d::sZero };
+	Vec2d mPress { Vec2d::scZero };
+	Vec2d mCurrent { Vec2d::scZero };
+	Vec2d mHover { Vec2d::scZero };
 	bool mbHovering = false;
 	bool mbDragMoved = false;
 	bool mbAdditive = false;
@@ -369,14 +369,14 @@ private:
 
 	double mPinchStartScale = 24.0;
 
-	Vec2d mPanStartCenter { Vec2d::sZero };
+	Vec2d mPanStartCenter { Vec2d::scZero };
 
 	bool mbHasPressedBrush = false;
 	ObjectID mPressedId = ObjectID::scNull;
 	bool mbPressedWasSelected = false;
 	DynArray<ObjectID> mPressedHitIds;
 	ViewBounds mDragBounds;
-	Vec2d mRotatePivot { Vec2d::sZero };
+	Vec2d mRotatePivot { Vec2d::scZero };
 	double mRotateStartAngle = 0.0;
 
 	wxPoint mLastClickScreen = wxPoint(-1000, -1000);
@@ -390,7 +390,7 @@ private:
 
 	bool mbHasPickedFace = false;
 	ObjectID mPickedFaceBrushId = ObjectID::scNull;
-	Vec2f mPickedFaceNormal = Vec2f::sZero;
+	Vec2f mPickedFaceNormal = Vec2f::scZero;
 
 	ObjectID mSentPickedFaceId = ObjectID::scNull;
 	Vec3f mSentPickedFaceNormal = Vec3f::sZero;

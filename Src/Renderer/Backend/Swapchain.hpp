@@ -52,7 +52,7 @@ public:
     Sampler NormalsSampler;
     Sampler LightsSampler;
 
-    Vec2u Extent = Vec2u::sZero;
+    Vec2u Extent = Vec2u::scZero;
 
     // VkSurfaceFormatKHR SurfaceFormat;
     struct

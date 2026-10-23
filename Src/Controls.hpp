@@ -161,7 +161,7 @@ private:
 		eType Type = eType::Button;
 		eKey Key = eKey::FX_KEY_UNKNOWN;
 		bool bIsDown = false;
-		Vec2f Delta = Vec2f::sZero;
+		Vec2f Delta = Vec2f::scZero;
 	};
 
 	static void Post(const PostedEvent& event);
@@ -170,7 +170,7 @@ private:
 	SizedArray<Control> mKeyMap;
 	bool mMouseCaptured = false;
 
-	Vec2f mMouseDelta = Vec2f::sZero;
+	Vec2f mMouseDelta = Vec2f::scZero;
 
 	static constexpr uint32 scMaxPostedEvents = 16384;
 

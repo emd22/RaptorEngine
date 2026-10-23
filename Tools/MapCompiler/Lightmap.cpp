@@ -1,5 +1,8 @@
 #include "Lightmap.hpp"
 
+#include "IndirectLight.hpp"
+
+#include <Math/MathConsts.hpp>
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -22,14 +25,14 @@ constexpr double scSurfaceBias = 1e-3;
 constexpr double scParallelEpsilon = 1e-14;
 constexpr double scTriangleMinDistance = 1e-6;
 constexpr double scCoverageEpsilon = 1e-9;
-constexpr double scTwoPi = 6.283185307179586;
 constexpr double scNoHit = std::numeric_limits<double>::infinity();
 constexpr uint32 scLeafSize = 4;
 constexpr uint32 scMaxStackDepth = 64;
-constexpr uint32 scDilatePasses = 4;
 constexpr uint32 scRowsPerClaim = 8;
 constexpr uint32 scDirectionShuffle = 7919;
 constexpr uint8 scFullyLit = 255;
+constexpr double scThinInset = 0.05;
+constexpr uint32 scBuriedRays = 16;
 
 struct OccluderPlane
 {
@@ -43,6 +46,7 @@ struct Occluder
 	uint32 PlaneCount = 0;
 
 	int32 FirstCorner = -1;
+	Vec3d Facing = Vec3d(0.0);
 
 	Vec3d Min = Vec3d(0.0);
 	Vec3d Max = Vec3d(0.0);
@@ -95,10 +99,12 @@ public:
 					occluder.FirstCorner = static_cast<int32>(mCorners.Size);
 
 					for (uint32 corner = 0; corner < 3; corner++) {
-						const Vec3d& point = surface.Vertices[static_cast<size_t>(surface.Indices[index + corner])]
-												 .Position;
+						const PatchSurfaceVertex& vertex =
+							surface.Vertices[static_cast<size_t>(surface.Indices[index + corner])];
+						const Vec3d& point = vertex.Position;
 
 						mCorners.Emplace(point);
+						occluder.Facing = occluder.Facing + vertex.Normal;
 
 						if (corner == 0) {
 							occluder.Min = point;
@@ -160,11 +166,150 @@ public:
 		return false;
 	}
 
+	bool IsInsideBrush(const Vec3d& point) const
+	{
+		if (mNodes.Size == 0) {
+			return false;
+		}
+
+		int32 stack[scMaxStackDepth];
+		uint32 stack_size = 0;
+
+		stack[stack_size++] = 0;
+
+		while (stack_size > 0) {
+			const BvhNode& node = mNodes[static_cast<uint32>(stack[--stack_size])];
+
+			if (!ContainsPoint(node.Min, node.Max, point)) {
+				continue;
+			}
+
+			if (node.Left < 0) {
+				for (uint32 i = 0; i < node.Count; i++) {
+					const Occluder& occluder = mOccluders[node.First + i];
+
+					if (occluder.FirstCorner < 0 && ContainsPoint(occluder.Min, occluder.Max, point) &&
+						IsInsideOccluder(occluder, point)) {
+						return true;
+					}
+				}
+
+				continue;
+			}
+
+			if (stack_size + 2 <= scMaxStackDepth) {
+				stack[stack_size++] = node.Left;
+				stack[stack_size++] = node.Right;
+			}
+		}
+
+		return false;
+	}
+
+	bool HitsBackFace(const Vec3d& origin, const Vec3d& direction) const
+	{
+		if (mNodes.Size == 0) {
+			return false;
+		}
+
+		int32 stack[scMaxStackDepth];
+		uint32 stack_size = 0;
+
+		stack[stack_size++] = 0;
+
+		double closest = scNoHit;
+		bool is_back_face = false;
+
+		while (stack_size > 0) {
+			const BvhNode& node = mNodes[static_cast<uint32>(stack[--stack_size])];
+
+			if (!HitsBox(node, origin, direction, closest)) {
+				continue;
+			}
+
+			if (node.Left < 0) {
+				for (uint32 i = 0; i < node.Count; i++) {
+					const Occluder& occluder = mOccluders[node.First + i];
+
+					double time = scNoHit;
+
+					if (!IntersectOccluder(occluder, origin, direction, time) || time >= closest) {
+						continue;
+					}
+
+					closest = time;
+					is_back_face = occluder.FirstCorner >= 0 && occluder.Facing.Dot(direction) > 0.0;
+				}
+
+				continue;
+			}
+
+			if (stack_size + 2 <= scMaxStackDepth) {
+				stack[stack_size++] = node.Left;
+				stack[stack_size++] = node.Right;
+			}
+		}
+
+		return is_back_face;
+	}
+
+	bool IsBuried(const Vec3d& point, const Vec3d& normal, const Vec3d* local_directions, uint32 direction_count) const
+	{
+		if (IsInsideBrush(point)) {
+			return true;
+		}
+
+		if (mTriangleCount == 0) {
+			return false;
+		}
+
+		const Vec3d reference = (std::abs(normal.Y) < 0.9) ? Vec3d(0.0, 1.0, 0.0) : Vec3d(1.0, 0.0, 0.0);
+		const Vec3d tangent = reference.Cross(normal).Normalized();
+		const Vec3d bitangent = normal.Cross(tangent);
+
+		uint32 back_faces = 0;
+
+		for (uint32 i = 0; i < direction_count; i++) {
+			const Vec3d& local = local_directions[i];
+			const Vec3d direction = tangent * local.X + bitangent * local.Y + normal * local.Z;
+
+			if (HitsBackFace(point, direction)) {
+				back_faces++;
+			}
+		}
+
+		return back_faces * 2 > direction_count;
+	}
+
 private:
-	static bool HitsBox(const BvhNode& node, const Vec3d& origin, const Vec3d& direction)
+	static bool ContainsPoint(const Vec3d& min, const Vec3d& max, const Vec3d& point)
+	{
+		for (int32 axis = 0; axis < 3; axis++) {
+			if (point.mData[axis] < min.mData[axis] || point.mData[axis] > max.mData[axis]) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	bool IsInsideOccluder(const Occluder& occluder, const Vec3d& point) const
+	{
+		for (uint32 i = 0; i < occluder.PlaneCount; i++) {
+			const OccluderPlane& plane = mPlanes[occluder.FirstPlane + i];
+
+			if (plane.Normal.Dot(point) - plane.Distance >= 0.0) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	static bool HitsBox(const BvhNode& node, const Vec3d& origin, const Vec3d& direction, double max_time = scNoHit)
 	{
 		double enter = 0.0;
-		double exit = scNoHit;
+		double exit = max_time;
 
 		for (int32 axis = 0; axis < 3; axis++) {
 			const double start = origin.mData[axis];
@@ -188,7 +333,7 @@ private:
 		return enter <= exit;
 	}
 
-	bool HitsTriangle(const Occluder& occluder, const Vec3d& origin, const Vec3d& direction) const
+	bool HitsTriangle(const Occluder& occluder, const Vec3d& origin, const Vec3d& direction, double& out_time) const
 	{
 		const Vec3d& a = mCorners[static_cast<uint32>(occluder.FirstCorner)];
 		const Vec3d edge_ab = mCorners[static_cast<uint32>(occluder.FirstCorner) + 1] - a;
@@ -216,13 +361,23 @@ private:
 			return false;
 		}
 
-		return edge_ac.Dot(q) * inverse > scTriangleMinDistance;
+		out_time = edge_ac.Dot(q) * inverse;
+
+		return out_time > scTriangleMinDistance;
 	}
 
 	bool HitsOccluder(const Occluder& occluder, const Vec3d& origin, const Vec3d& direction) const
 	{
+		double time = scNoHit;
+
+		return IntersectOccluder(occluder, origin, direction, time);
+	}
+
+	bool IntersectOccluder(const Occluder& occluder, const Vec3d& origin, const Vec3d& direction,
+						   double& out_time) const
+	{
 		if (occluder.FirstCorner >= 0) {
-			return HitsTriangle(occluder, origin, direction);
+			return HitsTriangle(occluder, origin, direction, out_time);
 		}
 
 		double enter = 0.0;
@@ -255,6 +410,8 @@ private:
 				return false;
 			}
 		}
+
+		out_time = enter;
 
 		return true;
 	}
@@ -324,14 +481,30 @@ private:
 	uint32 mTriangleCount = 0;
 };
 
+double GetRadicalInverse(uint32 index)
+{
+	uint32 bits = index;
+	bits = (bits << 16) | (bits >> 16);
+	bits = ((bits & 0x55555555U) << 1) | ((bits & 0xAAAAAAAAU) >> 1);
+	bits = ((bits & 0x33333333U) << 2) | ((bits & 0xCCCCCCCCU) >> 2);
+	bits = ((bits & 0x0F0F0F0FU) << 4) | ((bits & 0xF0F0F0F0U) >> 4);
+	bits = ((bits & 0x00FF00FFU) << 8) | ((bits & 0xFF00FF00U) >> 8);
+
+	return static_cast<double>(bits) * (1.0 / 4294967296.0);
+}
+
+Vec3d GetHemisphereDirection(uint32 index, uint32 count)
+{
+	const double u = (static_cast<double>(index) + 0.5) / count;
+	const double radius = std::sqrt(u);
+	const double angle = GetRadicalInverse(index) * FX_2PI;
+
+	return Vec3d(std::cos(angle) * radius, std::sin(angle) * radius, std::sqrt(1.0 - u));
+}
+
 struct SunSampler
 {
-	Vec3d Direction = Vec3d(0.0, 1.0, 0.0);
-	Vec3d Right = Vec3d(1.0, 0.0, 0.0);
-	Vec3d Up = Vec3d(0.0, 0.0, 1.0);
-
-	double Spread = 0.0;
-
+public:
 	SunSampler(const Vec3d& direction, double radius_degrees) : Direction(direction)
 	{
 		const Vec3d reference = (std::abs(direction.Y) < 0.9) ? Vec3d(0.0, 1.0, 0.0) : Vec3d(1.0, 0.0, 0.0);
@@ -339,31 +512,50 @@ struct SunSampler
 		Right = reference.Cross(direction).Normalized();
 		Up = direction.Cross(Right);
 
-		Spread = std::tan(radius_degrees * (scTwoPi / 360.0));
+		Spread = std::tan(radius_degrees * (FX_2PI / 360.0));
 	}
 
 	Vec3d Sample(uint32 index, uint32 count) const
 	{
-		uint32 bits = index;
-		bits = (bits << 16) | (bits >> 16);
-		bits = ((bits & 0x55555555U) << 1) | ((bits & 0xAAAAAAAAU) >> 1);
-		bits = ((bits & 0x33333333U) << 2) | ((bits & 0xCCCCCCCCU) >> 2);
-		bits = ((bits & 0x0F0F0F0FU) << 4) | ((bits & 0xF0F0F0F0U) >> 4);
-		bits = ((bits & 0x00FF00FFU) << 8) | ((bits & 0xFF00FF00U) >> 8);
-
 		const double u = (static_cast<double>(index) + 0.5) / count;
-		const double v = static_cast<double>(bits) * (1.0 / 4294967296.0);
+		const double v = GetRadicalInverse(index);
 
 		const double radius = std::sqrt(u) * Spread;
-		const double angle = v * scTwoPi;
+		const double angle = v * FX_2PI;
 
 		return (Direction + Right * (std::cos(angle) * radius) + Up * (std::sin(angle) * radius)).Normalized();
 	}
+
+public:
+	Vec3d Direction = Vec3d(0.0, 1.0, 0.0);
+	Vec3d Right = Vec3d(1.0, 0.0, 0.0);
+	Vec3d Up = Vec3d(0.0, 0.0, 1.0);
+
+	double Spread = 0.0;
 };
 
 struct ChartLayout
 {
+public:
+	uint32 GetPaddedWidth() const { return Width + scChartPadding * 2; }
+	uint32 GetPaddedHeight() const { return Height + scChartPadding * 2; }
+
+	Vec2u GetSize() const { return Vec2u { Width, Height }; }
+	Vec2u GetPosition() const { return Vec2u { X, Y }; }
+
+
+	Vec2u GetPaddedSize() const
+	{
+		// Padding is for all sides of the chart. Multiply by 2 for this.
+		// e.g. Padding on left and right, padding on top and bottom
+		const Vec2u padding_size = Vec2u(scChartPadding * 2u);
+		return (GetSize() + padding_size);
+	}
+
+public:
 	Vec2d Min = Vec2d(0.0, 0.0);
+
+	// TODO: Convert to Vec2u's. Note that floats would cause us to lose a good amount of precision here.
 
 	uint32 Width = 0;
 	uint32 Height = 0;
@@ -371,10 +563,8 @@ struct ChartLayout
 	uint32 X = 0;
 	uint32 Y = 0;
 
-	bool bFacesSun = false;
 
-	uint32 GetPaddedWidth() const { return Width + scChartPadding * 2; }
-	uint32 GetPaddedHeight() const { return Height + scChartPadding * 2; }
+	bool bFacesSun = false;
 };
 
 bool MeasureCharts(const Array<LightmapChart>& charts, double density, uint32 max_size, Array<ChartLayout>& out_layouts)
@@ -511,8 +701,13 @@ struct BakeContext
 	const Vec3d* pDirections = nullptr;
 	uint32 DirectionsPerSample = 1;
 
+	const Vec3d* pBuriedDirections = nullptr;
+
 	uint8* pTexels = nullptr;
 	uint8* pValid = nullptr;
+
+	Vec3f* pPositions = nullptr;
+	Vec3f* pNormals = nullptr;
 
 	std::atomic<uint64> RayCount { 0 };
 };
@@ -752,6 +947,13 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 		return point;
 	};
 
+	const auto is_buried = [&](const Vec3d& origin, const Vec3d& normal)
+	{
+		ray_count += scBuriedRays;
+
+		return context.Occluders.IsBuried(origin, normal, context.pBuriedDirections, scBuriedRays);
+	};
+
 	const auto count_lit = [&](const Vec3d& origin, const Vec3d& normal, uint32 sample)
 	{
 		const Vec3d* directions = context.pDirections + sample * direction_count;
@@ -776,6 +978,11 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 
 		uint32 covered = 0;
 		uint32 lit = 0;
+		bool touches_polygon = false;
+
+		Vec3d position_sum = Vec3d(0.0);
+		Vec3d normal_sum = Vec3d(0.0);
+		uint32 position_count = 0;
 
 		for (uint32 sample = 0; sample < sample_count; sample++) {
 			const uint32 sample_x = sample % samples;
@@ -785,32 +992,55 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 				continue;
 			}
 
-			covered += direction_count;
-
-			if (!layout.bFacesSun) {
-				continue;
-			}
+			touches_polygon = true;
 
 			const double texel_x = column + (sample_x + 0.5) * sample_step;
 			const double texel_y = job.Row + (sample_y + 0.5) * sample_step;
 
+			Vec3d origin = Vec3d(0.0);
+			Vec3d normal = plane_normal;
+
 			if (is_planar) {
-				lit += count_lit(get_origin(texel_x, texel_y), plane_normal, sample);
+				origin = get_origin(texel_x, texel_y);
 			}
 			else {
 				const int32 triangle = scratch
 										   .CoverageTriangles[sample_y * sample_columns + column * samples + sample_x];
 				const SurfacePoint point = get_surface(texel_x, texel_y, static_cast<uint32>(triangle));
 
-				lit += count_lit(point.Position, point.Normal, sample);
+				origin = point.Position;
+				normal = point.Normal;
+			}
+
+			if (is_buried(origin, normal)) {
+				continue;
+			}
+
+			covered += direction_count;
+
+			position_sum = position_sum + origin;
+			normal_sum = normal_sum + normal;
+			position_count++;
+
+			if (layout.bFacesSun) {
+				lit += count_lit(origin, normal, sample);
 			}
 		}
 
 		Vec2d thin_point(0.0, 0.0);
 		uint32 thin_corner = 0;
 
-		if (covered == 0 && FindPointInTexel(scratch.Corners, column + 0.5, job.Row + 0.5, thin_point, thin_corner)) {
-			covered = sample_count * direction_count;
+		if (!touches_polygon &&
+			FindPointInTexel(scratch.Corners, column + 0.5, job.Row + 0.5, thin_point, thin_corner)) {
+			const Vec2d* thin_corners = &scratch.Corners[thin_corner];
+			const double inward_x = (thin_corners[0].X + thin_corners[1].X + thin_corners[2].X) / 3.0 - thin_point.X;
+			const double inward_y = (thin_corners[0].Y + thin_corners[1].Y + thin_corners[2].Y) / 3.0 - thin_point.Y;
+			const double inward_length = std::sqrt(inward_x * inward_x + inward_y * inward_y);
+
+			if (inward_length > 0.0) {
+				const double step = std::fmin(scThinInset, inward_length * 0.5) / inward_length;
+				thin_point = Vec2d(thin_point.X + inward_x * step, thin_point.Y + inward_y * step);
+			}
 
 			Vec3d origin = Vec3d(0.0);
 			Vec3d normal = plane_normal;
@@ -826,8 +1056,16 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 				normal = point.Normal;
 			}
 
-			for (uint32 sample = 0; sample < sample_count && layout.bFacesSun; sample++) {
-				lit += count_lit(origin, normal, sample);
+			if (!is_buried(origin, normal)) {
+				covered = sample_count * direction_count;
+
+				position_sum = origin;
+				normal_sum = normal;
+				position_count = 1;
+
+				for (uint32 sample = 0; sample < sample_count && layout.bFacesSun; sample++) {
+					lit += count_lit(origin, normal, sample);
+				}
 			}
 		}
 
@@ -837,6 +1075,11 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 
 		context.pValid[texel] = 1;
 		context.pTexels[texel] = static_cast<uint8>((lit * 255 + covered / 2) / covered);
+
+		if (context.pPositions != nullptr) {
+			context.pPositions[texel] = (position_sum * (1.0 / position_count)).ToVec3f();
+			context.pNormals[texel] = normal_sum.Normalized().ToVec3f();
+		}
 	}
 
 	context.RayCount.fetch_add(ray_count, std::memory_order_relaxed);
@@ -850,7 +1093,7 @@ void DilateChart(const ChartLayout& layout, uint32 atlas_width, uint8* texels, u
 
 	const auto at = [&](uint32 x, uint32 y) { return static_cast<uint64>(layout.Y + y) * atlas_width + layout.X + x; };
 
-	for (uint32 pass = 0; pass < scDilatePasses; pass++) {
+	for (uint32 pass = 0; pass < width + height; pass++) {
 		Fill(scratch_texels, width * height, static_cast<uint8>(0));
 		Fill(scratch_valid, width * height, static_cast<uint8>(0));
 
@@ -931,7 +1174,7 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 
 	const Array<LightmapChart>& charts = surfaces.Charts;
 
-	if (!options.bEnabled || !source.bHasSun || charts.Size == 0) {
+	if (!options.bEnabled || charts.Size == 0 || (!source.bHasSun && !options.bIndirect)) {
 		return false;
 	}
 
@@ -952,7 +1195,7 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 
 	Array<RowJob> jobs;
 
-	for (uint32 i = 0; i < charts.Size; i++) {
+	for (uint32 i = 0; i < charts.Size && source.bHasSun; i++) {
 		if (charts[i].IsPlanar()) {
 			layouts[i].bFacesSun = planes[charts[i].PlaneIndex].Normal.Dot(source.SunDirection) > 0.0;
 		}
@@ -961,7 +1204,9 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 				layouts[i].bFacesSun = layouts[i].bFacesSun || normal.Dot(source.SunDirection) > 0.0;
 			}
 		}
+	}
 
+	for (uint32 i = 0; i < charts.Size; i++) {
 		for (uint32 row = 0; row < layouts[i].GetPaddedHeight(); row++) {
 			jobs.Emplace(RowJob { i, row });
 		}
@@ -972,6 +1217,11 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 	CompiledMapLightmap& lightmap = out_map.Lightmap;
 	lightmap.Width = width;
 	lightmap.Height = height;
+	lightmap.Flags = 0;
+
+	if (source.bHasSun) {
+		lightmap.Flags |= CompiledMapLightmap::scFlagSun;
+	}
 	lightmap.SunVisibility.InitSize(texel_count);
 
 	SizedArray<uint8> valid;
@@ -991,6 +1241,17 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 	context.pTexels = lightmap.SunVisibility.pData;
 	context.pValid = valid.pData;
 
+	SizedArray<Vec3f> positions;
+	SizedArray<Vec3f> normals;
+
+	if (options.bIndirect) {
+		positions.InitSize(texel_count);
+		normals.InitSize(texel_count);
+
+		context.pPositions = positions.pData;
+		context.pNormals = normals.pData;
+	}
+
 	const uint32 direction_total = context.Samples * context.Samples * context.Samples;
 
 	SizedArray<Vec3d> directions;
@@ -1002,6 +1263,15 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 
 	context.pDirections = directions.pData;
 	context.DirectionsPerSample = context.Samples;
+
+	SizedArray<Vec3d> buried_directions;
+	buried_directions.InitSize(scBuriedRays);
+
+	for (uint32 i = 0; i < scBuriedRays; i++) {
+		buried_directions[i] = GetHemisphereDirection(i, scBuriedRays);
+	}
+
+	context.pBuriedDirections = buried_directions.pData;
 
 	std::atomic<uint32> next_job { 0 };
 
@@ -1049,6 +1319,9 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 		}
 	}
 
+	SizedArray<uint8> covered;
+	covered.InitAsCopyOf(valid);
+
 	Array<uint8> scratch_texels;
 	Array<uint8> scratch_valid;
 
@@ -1084,7 +1357,37 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 		}
 	}
 
-	const uint32 probe_count = out_map.Probes.GetProbeCount();
+	if (options.bIndirect) {
+		// Array<LightmapRect> rects;
+		IndirectInput input;
+		input.LightmapRects.InitCapacity(layouts.Size);
+
+		for (const ChartLayout& layout : layouts) {
+			input.LightmapRects.Insert(URect::FromRelative(layout.GetPosition(), layout.GetPaddedSize()));
+
+			// rects.Emplace(LightmapRect { layout.X, layout.Y, layout.GetPaddedWidth(), layout.GetPaddedHeight() });
+		}
+
+		input.Width = width;
+		input.Height = height;
+		input.TexelSize = static_cast<float32>(1.0 / density);
+		input.pCovered = covered.pData;
+		input.pSunVisibility = lightmap.SunVisibility.pData;
+		input.pPositions = positions.pData;
+		input.pNormals = normals.pData;
+
+		// input.pRects = rects.pData;
+		// input.RectCount = rects.Size;
+
+		BakeIndirectLight(source, surfaces, input, options, out_map, Stats);
+	}
+
+	uint32 probe_count = 0;
+
+	if (source.bHasSun) {
+		probe_count = out_map.Probes.GetProbeCount();
+	}
+
 	const uint32 probe_strata = std::max<uint32>(
 		static_cast<uint32>(std::ceil(std::sqrt(static_cast<double>(std::max<uint32>(options.ProbeRays, 1))))), 1);
 	const uint32 probe_rays = probe_strata * probe_strata;
@@ -1116,7 +1419,7 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 	Stats.Density = density;
 	Stats.TexelCount = valid_count;
 	Stats.RayCount = context.RayCount.load() + static_cast<uint64>(probe_count) * probe_rays;
-	Stats.ProbeCount = probe_count;
+	Stats.ProbeCount = out_map.Probes.GetProbeCount();
 	Stats.LitFraction = 0.0;
 
 	if (valid_count > 0) {

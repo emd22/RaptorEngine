@@ -209,6 +209,7 @@ public:
 	CVarValue* pCVarPortalLock = nullptr;
 	CVarValue* pCVarPortalDebug = nullptr;
 	CVarValue* pCVarBakedShadows = nullptr;
+	CVarValue* pCVarBakedIndirect = nullptr;
 
 	uint32 FrustumTestedObjects = 0;
 	uint32 FrustumCulledObjects = 0;

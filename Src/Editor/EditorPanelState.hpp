@@ -125,19 +125,19 @@ enum class eTopViewBrushKind : uint8
 
 struct TopViewEdge
 {
-	Vec2f A = Vec2f::sZero;
-	Vec2f B = Vec2f::sZero;
+	Vec2f A = Vec2f::scZero;
+	Vec2f B = Vec2f::scZero;
 
 	bool operator==(const TopViewEdge& other) const = default;
 };
 
 struct TopViewFace
 {
-	Vec2f A = Vec2f::sZero;
-	Vec2f B = Vec2f::sZero;
-	Vec2f Normal = Vec2f::sZero;
+	Vec2f A = Vec2f::scZero;
+	Vec2f B = Vec2f::scZero;
+	Vec2f Normal = Vec2f::scZero;
 
-	Vec2f TextureOffset = Vec2f::sZero;
+	Vec2f TextureOffset = Vec2f::scZero;
 	float32 TextureScale = 2.0f;
 	float32 TextureRotation = 0.0f;
 
@@ -146,7 +146,7 @@ struct TopViewFace
 
 struct TopViewProjection
 {
-	Vec2f Pivot = Vec2f::sZero;
+	Vec2f Pivot = Vec2f::scZero;
 	float32 NearDepth = 0.0f;
 
 	DynArray<Vec2f> Hull;

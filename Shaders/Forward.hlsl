@@ -242,6 +242,9 @@ F_ShadowTexture2D(tShadowAtlas, 4, 0);
 F_Texture2D(tSSAO, 5, 0);
 
 F_Texture2D(tLightmap, 17, 0)
+F_Texture2D(tLightmapIrradiance, 18, 0)
+
+#define LIGHTMAP_DIRECTIONALITY 1.5
 
 struct FSPushConsts
 {
@@ -686,11 +689,26 @@ PERMEND();
 		}
 	}
 
+PERMIF(USE_LIGHTMAP);
+	const float4 lightmap_sample = F_SampleLevel(tLightmap, input.vLightmapUV, 0.0);
+	const float3 lightmap_irradiance = F_SampleLevel(tLightmapIrradiance, input.vLightmapUV, 0.0).rgb;
+
+	const float3 indirect_direction = (lightmap_sample.rgb * 2.0 - 1.0) * LIGHTMAP_DIRECTIONALITY;
+	const float indirect_balance = max(1.0 + dot(indirect_direction, geometric_normal), 1e-2);
+	const float3 baked_irradiance = lightmap_irradiance *
+									(max(1.0 + dot(indirect_direction, N), 0.0) / indirect_balance);
+
+	const bool use_baked_indirect = HAS_FLAG(FSConst.Flags, DRAW_FLAG_BAKED_INDIRECT);
+
+	probe_irradiance = select(use_baked_indirect, baked_irradiance, probe_irradiance);
+	has_probes = or(has_probes, use_baked_indirect);
+PERMEND();
+
 PERMIF(PROBE_CAPTURE);
 	const float baked_sun_visibility = 1.0;
 PERMELSE();
 PERMIF(USE_LIGHTMAP);
-	const float baked_sun_sample = F_SampleLevel(tLightmap, input.vLightmapUV, 0.0).r;
+	const float baked_sun_sample = lightmap_sample.a;
 PERMELSE();
 	const float baked_sun_sample = probe_sun_visibility;
 PERMEND();
@@ -719,10 +737,6 @@ PERMEND();
 		const float visibility = SampleShadowAtlas(light, input.vPositionWS, geometric_normal, L) *
 								 select(is_directional, baked_sun_visibility, 1.0);
 
-		/// Visibility for the diffuse term only. The specular lobe peaks far above diffuse, so any floor on it shows
-		/// up as highlights in shadow. Let a little of the sun into its own shadows
-		const float diffuse_visibility_floor = select(is_directional, 0.05, 0.0);
-
 		// A normal map can tilt a texel towards a light that the surface itself faces away from (the top edges of
 		// bricks on the back of a sunlit wall). Fade the light out as the geometric surface turns away from it.
 		const float horizon = saturate(dot(geometric_normal, L) * 4.0);
@@ -747,13 +761,10 @@ PERMEND();
 		float3 diffuse_term = Fd * diffuse_reflectance * FX_MATH_1_OVER_PI;
 		float3 specular_term = Fr;
 
-		const float diffuse_visibility = max(visibility * horizon, diffuse_visibility_floor);
-		const float specular_visibility = visibility * horizon;
+		const float3 incoming_light = attenuation * light_color * NdotL * (visibility * horizon);
 
-		const float3 incoming_light = attenuation * light_color * NdotL;
-
-		accumulated_light += incoming_light * diffuse_visibility * diffuse_term;
-		accumulated_specular += incoming_light * specular_visibility * specular_term;
+		accumulated_light += incoming_light * diffuse_term;
+		accumulated_specular += incoming_light * specular_term;
 	}
 
 	float3 ambient = float3(0.0f, 0.0f, 0.0f);

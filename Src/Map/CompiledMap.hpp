@@ -13,6 +13,7 @@
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
 #include <Math/Vec4.hpp>
+#include <Renderer/Limits.hpp>
 #include <Renderer/ProbePlacement.hpp>
 
 namespace fx {
@@ -74,14 +75,27 @@ struct CompiledMapShadowSurface
 
 struct CompiledMapLightmap
 {
+	static constexpr uint32 scFlagSun = 1 << 0;
+
 	uint32 Width = 0;
 	uint32 Height = 0;
+	uint32 Flags = 0;
 
 	SizedArray<uint8> SunVisibility;
 
+	SizedArray<uint16> Irradiance;
+	SizedArray<uint8> Directions;
+
 	float32 SunDirection[3] = { 0.0f, 1.0f, 0.0f };
 
+	uint64 GetTexelCount() const { return static_cast<uint64>(Width) * Height; }
+
 	bool IsEmpty() const { return SunVisibility.Size == 0; }
+	bool HasSun() const { return (Flags & scFlagSun) != 0; }
+	bool HasIndirect() const
+	{
+		return !IsEmpty() && Irradiance.Size == GetTexelCount() * 3 && Directions.Size == GetTexelCount() * 3;
+	}
 };
 
 /**
@@ -133,7 +147,7 @@ class CompiledMap
 {
 public:
 	static constexpr uint32 scMagic = 0x504D5846;
-	static constexpr uint32 scVersion = 8;
+	static constexpr uint32 scVersion = 10;
 	static constexpr const char* scExtension = ".fxmap";
 	static constexpr const char* scPrototypeExtension = ".prx";
 
@@ -187,7 +201,23 @@ public:
 
 	SizedArray<uint8> ProbeSunVisibility;
 
-	bool HasBakedSun() const { return !Lightmap.IsEmpty() && ProbeSunVisibility.Size == Probes.GetProbeCount(); }
+	static constexpr uint32 scProbeSHFloats = Limits::ProbeSHCoeffCount * 3;
+	static constexpr uint32 scProbeMomentValues = Limits::ProbeDepthFaces * Limits::ProbeDepthTexelsPerFace * 2;
+
+	SizedArray<float32> ProbeIrradiance;
+	SizedArray<uint16> ProbeMoments;
+
+	bool HasLightmap() const { return !Lightmap.IsEmpty(); }
+	bool HasBakedSun() const
+	{
+		return HasLightmap() && Lightmap.HasSun() && ProbeSunVisibility.Size == Probes.GetProbeCount();
+	}
+	bool HasBakedProbes() const
+	{
+		const uint64 probe_count = Probes.GetProbeCount();
+		return probe_count > 0 && ProbeIrradiance.Size == probe_count * scProbeSHFloats &&
+			   ProbeMoments.Size == probe_count * scProbeMomentValues;
+	}
 
 	/// The brushes of the prototype that the surfaces and hulls replace, sorted by Load()
 	SizedArray<String> BrushNames;

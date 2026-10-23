@@ -388,6 +388,21 @@ bool CompiledMap::Load(const String& path)
 		reader.Read(Lightmap.SunVisibility.pData, lightmap_texel_count);
 	}
 
+	Lightmap.Flags = reader.Read<uint32>();
+
+	const uint32 irradiance_count = reader.ReadCount();
+	const uint32 direction_count = reader.ReadCount();
+
+	if ((irradiance_count != 0 && irradiance_count != lightmap_texel_count * 3) || direction_count != irradiance_count) {
+		reader.bFailed = true;
+	}
+	else {
+		Lightmap.Irradiance.InitSize(irradiance_count);
+		Lightmap.Directions.InitSize(direction_count);
+		reader.Read(Lightmap.Irradiance.pData, irradiance_count);
+		reader.Read(Lightmap.Directions.pData, direction_count);
+	}
+
 	const uint32 probe_visibility_count = reader.ReadCount();
 
 	if (probe_visibility_count != 0 && probe_visibility_count != Probes.GetProbeCount()) {
@@ -396,6 +411,21 @@ bool CompiledMap::Load(const String& path)
 	else {
 		ProbeSunVisibility.InitSize(probe_visibility_count);
 		reader.Read(ProbeSunVisibility.pData, probe_visibility_count);
+	}
+
+	const uint32 probe_irradiance_count = reader.ReadCount();
+	const uint32 probe_moment_count = reader.ReadCount();
+	const uint64 baked_probe_count = Probes.GetProbeCount();
+
+	if ((probe_irradiance_count != 0 && probe_irradiance_count != baked_probe_count * scProbeSHFloats) ||
+		(probe_moment_count != 0 && probe_moment_count != baked_probe_count * scProbeMomentValues)) {
+		reader.bFailed = true;
+	}
+	else {
+		ProbeIrradiance.InitSize(probe_irradiance_count);
+		ProbeMoments.InitSize(probe_moment_count);
+		reader.Read(ProbeIrradiance.pData, probe_irradiance_count);
+		reader.Read(ProbeMoments.pData, probe_moment_count);
 	}
 
 	Areas.InitSize(reader.ReadCount());
@@ -592,9 +622,19 @@ bool CompiledMap::Save(const String& path) const
 	writer.Write(Lightmap.Height);
 	writer.Write(Lightmap.SunDirection, 3);
 	writer.Write(Lightmap.SunVisibility.pData, Lightmap.SunVisibility.Size);
+	writer.Write(Lightmap.Flags);
+	writer.WriteCount(Lightmap.Irradiance.Size);
+	writer.WriteCount(Lightmap.Directions.Size);
+	writer.Write(Lightmap.Irradiance.pData, Lightmap.Irradiance.Size);
+	writer.Write(Lightmap.Directions.pData, Lightmap.Directions.Size);
 
 	writer.WriteCount(ProbeSunVisibility.Size);
 	writer.Write(ProbeSunVisibility.pData, ProbeSunVisibility.Size);
+
+	writer.WriteCount(ProbeIrradiance.Size);
+	writer.WriteCount(ProbeMoments.Size);
+	writer.Write(ProbeIrradiance.pData, ProbeIrradiance.Size);
+	writer.Write(ProbeMoments.pData, ProbeMoments.Size);
 
 	writer.WriteCount(Areas.Size);
 

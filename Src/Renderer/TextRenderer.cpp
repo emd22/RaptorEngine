@@ -104,7 +104,7 @@ void TextRenderer::BeginFrameIfNeeded()
 	if (frame_number != mLastFrameNumber) {
 		mLastFrameNumber = frame_number;
 		mTapeOffset = 0;
-		mCursorPosition = Vec2f::sZero;
+		mCursorPosition = Vec2f::scZero;
 	}
 }
 

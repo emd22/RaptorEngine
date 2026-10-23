@@ -23,8 +23,8 @@ struct alignas(16) ShadowPushConstants
 /// A rectangle of the shadow atlas, in texels
 struct ShadowAtlasRegion
 {
-	Vec2u Offset = Vec2u::sZero;
-	Vec2u Size = Vec2u::sZero;
+	Vec2u Offset = Vec2u::scZero;
+	Vec2u Size = Vec2u::scZero;
 };
 
 class ShadowAtlas

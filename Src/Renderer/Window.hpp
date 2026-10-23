@@ -66,7 +66,7 @@ public:
 
 public:
 private:
-	Vec2u mSize = Vec2u::sZero;
+	Vec2u mSize = Vec2u::scZero;
 
 #ifdef FX_IS_EDITOR
 	editor::EditorViewport* mpViewport = nullptr;

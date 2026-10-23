@@ -116,7 +116,7 @@ struct ImageInfo
 	}
 
 public:
-	Vec2u Size = Vec2u::sZero;
+	Vec2u Size = Vec2u::scZero;
 
 	eImageType ImageType = eImageType::Flat;
 	eImageFormat Format = eImageFormat::RGBA8_UNorm;
@@ -442,7 +442,7 @@ public:
 
 	/// `dst_offset` places the copied region inside the image, for updating part of an atlas.
 	void CopyFromBuffer(renderer::CommandBuffer& cmd, const renderer::RawGpuBuffer& buffer, VkImageLayout final_layout,
-						Vec2u size, uint32 base_layer, uint32 mip_level, Vec2u dst_offset = Vec2u::sZero);
+						Vec2u size, uint32 base_layer, uint32 mip_level, Vec2u dst_offset = Vec2u::scZero);
 
 	void CreateLayeredImageFromCubemap(Image& cubemap, eImageFormat image_format, VkImageAspectFlags aspect_flags,
 									   ImageCubemapOptions options);

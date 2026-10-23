@@ -300,7 +300,9 @@ public:
 	Image* pDfgLut = nullptr;
 
 	Image* pLightmap = nullptr;
+	Image* pLightmapIrradiance = nullptr;
 	bool bBakedSunActive = false;
+	bool bBakedIndirectActive = false;
 
 	/// Times the stages of the GPU frame
 	GpuProfiler Profiler;
@@ -324,7 +326,9 @@ public:
 	/// Debug view: show blended probe visibility instead of the lit result.
 	bool bRenderProbeVisibility = false;
 
-	bool UploadLightmap(const Vec2u& size, const uint8* texels);
+	bool UploadLightmap(const Vec2u& size, const uint8* sun_visibility, const uint16* irradiance,
+						const uint8* directions);
+	Image* CreateLightmapImage(const Vec2u& size, eImageFormat format, const Slice<const uint8>& texels);
 
 	bool HasDebugView() const { return bOnlyRenderProbes || bRenderProbeVisibility || (ReflectionDebugView != 0); }
 

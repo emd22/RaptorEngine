@@ -252,7 +252,13 @@ add_library(mapc_core STATIC
 
 target_include_directories(mapc_core PUBLIC "Src" "Tools/MapCompiler")
 target_include_directories(mapc_core SYSTEM PUBLIC "Src/ThirdParty" "Lib/Include" "Submodules/mimalloc/include")
-target_link_libraries(mapc_core PUBLIC mimalloc-static)
+target_link_libraries(mapc_core PUBLIC mimalloc-static ktx)
+
+if(WIN32)
+    target_link_directories(mapc_core PUBLIC "${CMAKE_SOURCE_DIR}/Lib/Win32")
+elseif(APPLE)
+    target_link_directories(mapc_core PUBLIC "${CMAKE_SOURCE_DIR}/Lib/macOS")
+endif()
 
 target_compile_definitions(mapc_core PUBLIC
     FX_BASE_DIR="${FX_BASE_DIR}"

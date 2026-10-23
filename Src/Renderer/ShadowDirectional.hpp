@@ -40,7 +40,7 @@ public:
 	OrthoCamera ShadowCamera;
 
 	/// Size of the directional region of the shadow atlas
-	Vec2u ShadowMapSize = Vec2u::sZero;
+	Vec2u ShadowMapSize = Vec2u::scZero;
 };
 
 } // namespace fx::renderer

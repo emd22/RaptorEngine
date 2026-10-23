@@ -59,6 +59,21 @@ FX_FORCE_INLINE FLOAT4 Max(FLOAT4 a, FLOAT4 b) { return vmaxq_f32(a, b); }
 
 FX_FORCE_INLINE FLOAT4 Select(UINT4 mask, FLOAT4 a, FLOAT4 b) { return vbslq_f32(mask, a, b); }
 
+FX_FORCE_INLINE FLOAT4 Add(FLOAT4 a, FLOAT4 b) { return vaddq_f32(a, b); }
+FX_FORCE_INLINE FLOAT4 Mul(FLOAT4 a, FLOAT4 b) { return vmulq_f32(a, b); }
+FX_FORCE_INLINE FLOAT4 Div(FLOAT4 a, FLOAT4 b) { return vdivq_f32(a, b); }
+FX_FORCE_INLINE FLOAT4 Abs(FLOAT4 value) { return vabsq_f32(value); }
+
+FX_FORCE_INLINE UINT4 CompareLess(FLOAT4 a, FLOAT4 b) { return vcltq_f32(a, b); }
+FX_FORCE_INLINE UINT4 CompareLessEqual(FLOAT4 a, FLOAT4 b) { return vcleq_f32(a, b); }
+FX_FORCE_INLINE UINT4 And(UINT4 a, UINT4 b) { return vandq_u32(a, b); }
+
+FX_FORCE_INLINE uint32 GetMask(UINT4 mask)
+{
+	const uint32 weights alignas(16)[4] = { 1, 2, 4, 8 };
+	return vaddvq_u32(vandq_u32(mask, vld1q_u32(weights)));
+}
+
 /**
  * @brief Returns the signs of a vector. 1.0 if the component is positive or -1.0 if negative.
  * Follows the same logic as the version I wrote in MathUtil
@@ -172,6 +187,17 @@ FX_FORCE_INLINE FLOAT4 Min(FLOAT4 a, FLOAT4 b) { return _mm_min_ps(a, b); }
 FX_FORCE_INLINE FLOAT4 Max(FLOAT4 a, FLOAT4 b) { return _mm_max_ps(a, b); }
 
 FX_FORCE_INLINE FLOAT4 Select(UINT4 mask, FLOAT4 a, FLOAT4 b) { return _mm_blendv_ps(b, a, _mm_castsi128_ps(mask)); }
+
+FX_FORCE_INLINE FLOAT4 Add(FLOAT4 a, FLOAT4 b) { return _mm_add_ps(a, b); }
+FX_FORCE_INLINE FLOAT4 Mul(FLOAT4 a, FLOAT4 b) { return _mm_mul_ps(a, b); }
+FX_FORCE_INLINE FLOAT4 Div(FLOAT4 a, FLOAT4 b) { return _mm_div_ps(a, b); }
+FX_FORCE_INLINE FLOAT4 Abs(FLOAT4 value) { return _mm_and_ps(value, _mm_castsi128_ps(_mm_set1_epi32(0x7FFFFFFF))); }
+
+FX_FORCE_INLINE UINT4 CompareLess(FLOAT4 a, FLOAT4 b) { return _mm_castps_si128(_mm_cmplt_ps(a, b)); }
+FX_FORCE_INLINE UINT4 CompareLessEqual(FLOAT4 a, FLOAT4 b) { return _mm_castps_si128(_mm_cmple_ps(a, b)); }
+FX_FORCE_INLINE UINT4 And(UINT4 a, UINT4 b) { return _mm_and_si128(a, b); }
+
+FX_FORCE_INLINE uint32 GetMask(UINT4 mask) { return static_cast<uint32>(_mm_movemask_ps(_mm_castsi128_ps(mask))); }
 
 /**
  * @brief Returns the signs of a vector. 1.0 if the component is positive or -1.0 if negative.

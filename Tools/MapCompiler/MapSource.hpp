@@ -72,6 +72,19 @@ struct SourcePatch
 	Patch Shape;
 };
 
+struct SourceLight
+{
+	Vec3d Position = Vec3d::scZero;
+	Vec3d Direction = Vec3d(0.0, -1.0, 0.0);
+	Vec3d Color = Vec3d::scZero;
+
+	double InvRadiusSq = 0.0;
+
+	bool bSpot = false;
+	double SpotCosOuter = 0.0;
+	double SpotAngleScale = 0.0;
+};
+
 class MapSource
 {
 public:
@@ -95,6 +108,9 @@ public:
 
 	bool bHasSun = false;
 	Vec3d SunDirection = Vec3d::scUp;
+	Vec3d SunColor = Vec3d::scZero;
+
+	Array<SourceLight> Lights;
 
 	/// Everything the engine keeps light probes out of, in the order the engine would gather it
 	ProbePlacementBoxes ProbeBoxes;

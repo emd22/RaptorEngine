@@ -167,6 +167,7 @@ void PatchBuilder::Build(const MapSource& source, const Bsp& bsp, bool sealed, b
 	Stats = PatchStats {};
 	Surfaces.Clear();
 	ReferencePoints.Clear();
+	ReferenceFacings.Clear();
 
 	for (uint32 patch_index = 0; patch_index < source.Patches.Size; patch_index++) {
 		const SourcePatch& patch = source.Patches[patch_index];
@@ -202,6 +203,12 @@ void PatchBuilder::Build(const MapSource& source, const Bsp& bsp, bool sealed, b
 		for (const uint32 index : mesh.Indices) {
 			surface.Indices.Emplace(static_cast<int32>(index));
 			ReferencePoints.Emplace(mesh.Vertices[index].Position);
+		}
+
+		for (size_t index = 0; index + 2 < mesh.Indices.Size; index += 3) {
+			ReferenceFacings.Emplace(mesh.Vertices[mesh.Indices[index]].Normal +
+									 mesh.Vertices[mesh.Indices[index + 1]].Normal +
+									 mesh.Vertices[mesh.Indices[index + 2]].Normal);
 		}
 
 		Stats.PatchCount++;

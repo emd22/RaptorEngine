@@ -179,7 +179,7 @@ void ControlManager::Update()
 {
 	ControlManager& inst = GetInstance();
 
-	inst.mMouseDelta = Vec2f::sZero;
+	inst.mMouseDelta = Vec2f::scZero;
 	inst.mThisTick++;
 
 	inst.ApplyPostedEvents();

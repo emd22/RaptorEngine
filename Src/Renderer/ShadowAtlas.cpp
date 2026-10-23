@@ -173,7 +173,7 @@ void ShadowAtlas::BeginRegion(const ShadowAtlasRegion& region)
 	VkRect2D render_area = rect;
 
 	if (mbNeedsClear) {
-		render_area = RegionToRect(ShadowAtlasRegion { .Offset = Vec2u::sZero, .Size = Vec2u(scWidth, scHeight) });
+		render_area = RegionToRect(ShadowAtlasRegion { .Offset = Vec2u::scZero, .Size = Vec2u(scWidth, scHeight) });
 		mbNeedsClear = false;
 	}
 
@@ -191,7 +191,7 @@ void ShadowAtlas::EndRegion()
 
 ShadowAtlasRegion ShadowAtlas::GetDirectionalRegion() const
 {
-	return ShadowAtlasRegion { .Offset = Vec2u::sZero, .Size = Vec2u(scDirectionalSize, scDirectionalSize) };
+	return ShadowAtlasRegion { .Offset = Vec2u::scZero, .Size = Vec2u(scDirectionalSize, scDirectionalSize) };
 }
 
 ShadowAtlasRegion ShadowAtlas::GetSpotTileRegion(ShadowTileIndex tile) const

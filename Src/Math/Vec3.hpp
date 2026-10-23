@@ -116,7 +116,7 @@ public:
 	FX_FORCE_INLINE Vec3f& NormalizeIP();
 
 	FX_FORCE_INLINE float32 Length() const;
-	Vec3f Cross(const Vec3f other) const;
+	FX_FORCE_INLINE Vec3f Cross(const Vec3f other) const;
 	Vec3f CrossSlow(const Vec3f other) const;
 
 	Vec3f Rotate(const Quat rotation) const;

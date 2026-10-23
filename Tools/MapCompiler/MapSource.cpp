@@ -7,7 +7,9 @@
 #include <Material/SpecialMaterial.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/Quat.hpp>
+#include <algorithm>
 #include <cfloat>
+#include <cmath>
 #include <unordered_set>
 
 namespace fx::mapc {
@@ -29,6 +31,10 @@ constexpr const char* scMaterialRoot = "RaptorData/Data/materials";
 
 constexpr double scBrushExtent = 1e5;
 constexpr double scMinSunDistance = 1e-6;
+constexpr float32 scDefaultLightIntensity = 100000.0f;
+constexpr float32 scDefaultLightRadius = 5.0f;
+constexpr int64 scSpotLightType = 1;
+constexpr double scHalfTurnDegrees = 180.0;
 
 
 struct Transform
@@ -100,6 +106,62 @@ void AddEntityPositions(const ConfigEntry* list, Array<Vec3d>& out_entities)
 		if (position != nullptr) {
 			out_entities.Emplace(ToVec3d(position->GetValue<Vec3f>()));
 		}
+	}
+}
+
+Vec3d ReadLightColor(const ConfigEntry& entry)
+{
+	const Color color = entry.GetMemberValue(HashStr32("color"), Color::FromRGBA(255, 255, 255, 255));
+	const double intensity = entry.GetMemberValue<float32>(HashStr32("intensity"), scDefaultLightIntensity);
+
+	float32 linear[3];
+	color.GetLinearRGB(linear);
+
+	return Vec3d(linear[0], linear[1], linear[2]) * intensity;
+}
+
+void AddLights(const ConfigEntry* list, Array<SourceLight>& out_lights)
+{
+	if (list == nullptr) {
+		return;
+	}
+
+	for (const ConfigEntry& entry : list->Members) {
+		const ConfigEntry* position = entry.GetMember(HashStr32("pos"));
+
+		if (position == nullptr) {
+			continue;
+		}
+
+		const double radius = entry.GetMemberValue<float32>(HashStr32("radius"), scDefaultLightRadius);
+
+		SourceLight light;
+		light.Position = ToVec3d(position->GetValue<Vec3f>());
+		light.Color = ReadLightColor(entry);
+		light.InvRadiusSq = 1.0 / std::max(radius * radius, 1e-8);
+		light.bSpot = entry.GetMemberValue<int64>(HashStr32("type"), 0) == scSpotLightType;
+
+		if (light.bSpot) {
+			const ConfigEntry* direction = entry.GetMember(HashStr32("dir"));
+
+			if (direction != nullptr && ToVec3d(direction->GetValue<Vec3f>()).Length() > scMinSunDistance) {
+				light.Direction = ToVec3d(direction->GetValue<Vec3f>()).Normalized();
+			}
+
+			const double max_angle = scHalfTurnDegrees * 0.5;
+			const double outer = std::clamp<double>(entry.GetMemberValue<float32>(HashStr32("outer"), 30.0f), 0.0,
+													max_angle);
+			const double inner = std::clamp<double>(entry.GetMemberValue<float32>(HashStr32("inner"), 20.0f), 0.0,
+													outer);
+
+			const double cos_inner = std::cos(inner * (M_PI / scHalfTurnDegrees));
+			const double cos_outer = std::cos(outer * (M_PI / scHalfTurnDegrees));
+
+			light.SpotCosOuter = cos_outer;
+			light.SpotAngleScale = 1.0 / std::max(cos_inner - cos_outer, 1e-4);
+		}
+
+		out_lights.Emplace(light);
 	}
 }
 
@@ -472,10 +534,12 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 
 		if (sun_position.Length() > scMinSunDistance) {
 			SunDirection = sun_position.Normalized();
+			SunColor = ReadLightColor(*sun_entry);
 			bHasSun = true;
 		}
 	}
 
+	AddLights(info.GetEntry(HashStr32("lights")), Lights);
 	AddEntityPositions(info.GetEntry(HashStr32("lights")), Entities);
 	AddEntityPositions(models_entry, Entities);
 

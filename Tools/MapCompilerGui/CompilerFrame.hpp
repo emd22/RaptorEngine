@@ -14,6 +14,7 @@
 
 class wxButton;
 class wxCheckBox;
+class wxChoice;
 class wxCloseEvent;
 class wxDirPickerCtrl;
 class wxListCtrl;
@@ -48,6 +49,7 @@ private:
 
 	void AppendLog(const String& line);
 	void SetBusy(bool busy);
+	void UpdateLightmapControls();
 
 	void OnClose(wxCloseEvent& event);
 
@@ -69,6 +71,11 @@ private:
 	wxCheckBox* mpBakeLightmap = nullptr;
 	wxSpinCtrlDouble* mpLightmapDensity = nullptr;
 	wxSpinCtrlDouble* mpSunRadius = nullptr;
+	wxCheckBox* mpBakeIndirect = nullptr;
+	wxSpinCtrl* mpIndirectRays = nullptr;
+	wxSpinCtrl* mpIndirectBounces = nullptr;
+	wxSpinCtrl* mpIndirectCache = nullptr;
+	wxChoice* mpIndirectDenoise = nullptr;
 
 	wxButton* mpCompileSelected = nullptr;
 	wxButton* mpCompileAll = nullptr;

@@ -235,6 +235,7 @@ void RaptorGame::CreateGame()
 	gCVars->Set("r_probe_level_spacing", 0.5f);
 
 	gCVars->Set("r_probe_bounces", 3);
+	gCVars->Set("r_compiled_probes", 1);
 	mpReflectionProbesCVar = gCVars->Set("r_reflection_probes", 1);
 	gCVars->Set("r_reflection_level_probe", 0);
 	mpReflectionDebugCVar = gCVars->Set("r_reflection_debug", 0);

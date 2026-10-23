@@ -158,7 +158,7 @@ void TiledForwardRenderer::CreateSSAOBlurPass()
 
 void TiledForwardRenderer::BuildPersistentDescriptor()
 {
-	SizedArray<DescriptorEntry> ds_entries(20);
+	SizedArray<DescriptorEntry> ds_entries(21);
 
 	ds_entries.Insert(DescriptorEntry::AsBuffer(0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 												ObjectManager::scBoundSize));
@@ -221,6 +221,14 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 												   eSamplerAddressMode::ClampToEdge,
 											   })));
 
+	ds_entries.Insert(DescriptorEntry::AsImage(18, eShaderType::Pixel, gGraphics->pLightmapIrradiance,
+											   gSamplerCache->Request({
+												   eSamplerFilter::Linear,
+												   eSamplerFilter::Linear,
+												   eSamplerFilter::Linear,
+												   eSamplerAddressMode::ClampToEdge,
+											   })));
+
 	Target* shadow_target = gShadowAtlas->GetTarget();
 	Assert(shadow_target != nullptr);
 
@@ -264,6 +272,17 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 
 	result = gDescriptorCache->Request(ds_entries);
 	pPersistentDescriptor = result.second;
+}
+
+void TiledForwardRenderer::RebuildPersistentDescriptor()
+{
+	DescriptorSet* old_descriptor = pPersistentDescriptor;
+
+	BuildPersistentDescriptor();
+
+	if (old_descriptor != nullptr && old_descriptor != pPersistentDescriptor) {
+		gDescriptorCache->Free(old_descriptor->ID);
+	}
 }
 
 void TiledForwardRenderer::CreateSSAOPSO()
@@ -633,6 +652,8 @@ void TiledForwardRenderer::AddGlobalDescriptors()
 	gPSOBuild->AddImage(16, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
 						gSamplerCache->Request({}));
 	gPSOBuild->AddImage(17, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
+						gSamplerCache->Request({}));
+	gPSOBuild->AddImage(18, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
 						gSamplerCache->Request({}));
 	// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
 	AddDecalDescriptors();

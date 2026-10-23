@@ -116,7 +116,7 @@ private:
 
 	Framebuffer mFramebuffer;
 	RenderPass mRenderPass;
-	Vec2u mSize = Vec2u::sZero;
+	Vec2u mSize = Vec2u::scZero;
 
 	bool mbIsFullscreen = false;
 

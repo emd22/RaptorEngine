@@ -232,11 +232,22 @@ public:
 		return (mbIsCompiledMap && mCompiledProbeLayout.VolumeCount > 0) ? &mCompiledProbeLayout : nullptr;
 	}
 
+	bool HasCompiledProbes() const
+	{
+		return GetCompiledProbeLayout() != nullptr && mCompiledProbeIrradiance.Size > 0 &&
+			   mCompiledProbeMoments.Size > 0;
+	}
+
+	const SizedArray<float32>& GetCompiledProbeIrradiance() const { return mCompiledProbeIrradiance; }
+	const SizedArray<uint16>& GetCompiledProbeMoments() const { return mCompiledProbeMoments; }
+
 	/// True for the surfaces of a compiled map, which stand in for many brushes each
 	bool IsCompiledObject(const Object* object) const;
 
 	bool HasBakedSun() const { return mbHasBakedSun; }
 	bool IsBakedSunCurrent(const Vec3f sun_position) const;
+
+	bool IsBakedIndirectCurrent(bool sun_enabled, const Vec3f sun_position) const;
 
 	/**
 	 * @brief The brush that a blockout object is built from, or nullptr if the object is not a blockout.
@@ -551,8 +562,12 @@ private:
 	std::vector<physics::BodyID> mCompiledBodies;
 	bool mbIsCompiledMap = false;
 	ProbeLayout mCompiledProbeLayout;
+	SizedArray<float32> mCompiledProbeIrradiance;
+	SizedArray<uint16> mCompiledProbeMoments;
 
 	bool mbHasBakedSun = false;
+	bool mbHasBakedIndirect = false;
+	bool mbBakedWithSun = false;
 	Vec3f mBakedSunDirection = Vec3f::sUp;
 
 	Brush::PlaneList mPreviewPlanes;

@@ -63,8 +63,8 @@ struct LightmapChart
 {
 	int32 PlaneIndex = PlaneSet::scNone;
 
-	Vec3d U = Vec3d(0.0);
-	Vec3d V = Vec3d(0.0);
+	Vec3d U = Vec3d::scZero;
+	Vec3d V = Vec3d::scZero;
 
 	Array<Vec2d> TrianglePoints;
 
@@ -91,6 +91,8 @@ public:
 
 	/// Three corners per triangle of everything that was written, for verification
 	Array<Vec3d> TrianglePoints;
+
+	Array<Vec3d> BlockerPoints;
 
 	Array<LightmapChart> Charts;
 	Array<Array<LightmapVertex>> LightmapVertices;

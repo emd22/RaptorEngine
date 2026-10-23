@@ -90,7 +90,7 @@ private:
 	/// Think of it as an ink ribbon, where the characters are used and the cursor moves forward.
 	uint32 mTapeOffset = 0;
 
-	Vec2f mCursorPosition = Vec2f::sZero;
+	Vec2f mCursorPosition = Vec2f::scZero;
 
 	Mat4f mOrthoProjection = Mat4f::scIdentity;
 };

@@ -1,6 +1,7 @@
 #include "Verify.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <random>
 
@@ -18,6 +19,8 @@ constexpr uint32 scSeed = 0x52415054;
 constexpr double scLightmapBias = 1e-3;
 constexpr double scLightmapEdgeTexels = 2.0;
 constexpr double scLightmapLitThreshold = 0.5;
+constexpr uint32 scHiddenRays = 16;
+constexpr double scTwoPi = 6.283185307179586;
 
 bool IsNearBrush(const PlaneSet& planes, const SourceBrush& brush, const Vec3d& point)
 {
@@ -134,6 +137,56 @@ bool IsInsideVisibleBrush(const PlaneSet& planes, const MapSource& source, const
 	return false;
 }
 
+bool IsHiddenByPatches(const PlaneSet& planes, const MapSource& source, const Array<Vec3d>& patch_points,
+					   const Array<Vec3d>& patch_facings, const Vec3d& origin, const Vec3d& normal, const Vec3d& right,
+					   const Vec3d& up)
+{
+	if (patch_facings.Size == 0) {
+		return false;
+	}
+
+	uint32 back_faces = 0;
+
+	for (uint32 ray = 0; ray < scHiddenRays; ray++) {
+		uint32 bits = ray;
+		bits = (bits << 16) | (bits >> 16);
+		bits = ((bits & 0x55555555U) << 1) | ((bits & 0xAAAAAAAAU) >> 1);
+		bits = ((bits & 0x33333333U) << 2) | ((bits & 0xCCCCCCCCU) >> 2);
+		bits = ((bits & 0x0F0F0F0FU) << 4) | ((bits & 0xF0F0F0F0U) >> 4);
+		bits = ((bits & 0x00FF00FFU) << 8) | ((bits & 0xFF00FF00U) >> 8);
+
+		const double u = (static_cast<double>(ray) + 0.5) / scHiddenRays;
+		const double angle = static_cast<double>(bits) * (scTwoPi / 4294967296.0);
+		const double radius = std::sqrt(u);
+
+		const Vec3d direction = right * (std::cos(angle) * radius) + up * (std::sin(angle) * radius) +
+								normal * std::sqrt(1.0 - u);
+
+		double closest = scNoHit;
+		bool is_back_face = false;
+
+		for (const SourceBrush& brush : source.Brushes) {
+			if (brush.bVisible && brush.bCastsShadow) {
+				closest = std::fmin(closest, TraceBrush(planes, brush, origin, direction));
+			}
+		}
+
+		for (size_t i = 0; i + 2 < patch_points.Size; i += 3) {
+			const double time = TraceTriangle(patch_points[i], patch_points[i + 1], patch_points[i + 2], origin,
+											  direction);
+
+			if (time < closest) {
+				closest = time;
+				is_back_face = patch_facings[i / 3].Dot(direction) > 0.0;
+			}
+		}
+
+		back_faces += is_back_face ? 1 : 0;
+	}
+
+	return back_faces * 2 > scHiddenRays;
+}
+
 double SampleLightmap(const CompiledMapLightmap& lightmap, double u, double v)
 {
 	const double x = std::fmin(std::fmax(u * lightmap.Width - 0.5, 0.0), lightmap.Width - 1.0);
@@ -159,7 +212,8 @@ double SampleLightmap(const CompiledMapLightmap& lightmap, double u, double v)
 } // namespace
 
 LightmapVerifyResult VerifyLightmap(const PlaneSet& planes, const MapSource& source, const CompiledMap& map,
-									const Array<Vec3d>& patch_points, double density, uint32 point_count)
+									const Array<Vec3d>& patch_points, const Array<Vec3d>& patch_facings, double density,
+									uint32 point_count)
 {
 	LightmapVerifyResult result;
 
@@ -238,6 +292,11 @@ LightmapVerifyResult VerifyLightmap(const PlaneSet& planes, const MapSource& sou
 		}
 
 		result.PointCount++;
+
+		if (IsHiddenByPatches(planes, source, patch_points, patch_facings, origin, normal, right, up)) {
+			result.HiddenCount++;
+			continue;
+		}
 
 		if ((lit_count != 0 && lit_count != 5) || IsInsideVisibleBrush(planes, source, origin)) {
 			result.EdgeCount++;

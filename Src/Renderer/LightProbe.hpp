@@ -146,6 +146,7 @@ private:
 
 	bool SaveIrradianceProbes();
 	bool LoadIrradianceProbes();
+	bool LoadCompiledProbes();
 	bool SaveReflectionProbes();
 	bool LoadReflectionProbes();
 

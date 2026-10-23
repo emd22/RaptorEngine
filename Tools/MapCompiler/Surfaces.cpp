@@ -1334,6 +1334,13 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 
 			if (is_nonvis) {
 				Stats.NumNonVisTriangles += static_cast<uint32>(triangle_indices.Size / 3);
+
+				if (group.bCastsShadow) {
+					for (const int32 index : triangle_indices) {
+						BlockerPoints.Emplace(points[static_cast<size_t>(index)]);
+					}
+				}
+
 				continue;
 			}
 
@@ -1594,6 +1601,7 @@ void SurfaceBuilder::Build(const PlaneSet& planes, const Bsp& bsp, const MapSour
 {
 	Stats = SurfaceStats {};
 	TrianglePoints.Clear();
+	BlockerPoints.Clear();
 	Charts.Clear();
 	LightmapVertices.Clear();
 	mPolygons.Clear();

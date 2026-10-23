@@ -566,6 +566,10 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 		push_constants.Flags |= eDrawFlags::BakedSun;
 	}
 
+	if (gGraphics->bBakedIndirectActive && !is_probe_capture) {
+		push_constants.Flags |= eDrawFlags::BakedIndirect;
+	}
+
 	if (pSkeleton.IsValid() && !is_probe_capture) {
 		gDecalManager->GetSkinnedDecalRange(&(*pSkeleton), push_constants.SkinnedDecalStart,
 											push_constants.SkinnedDecalCount);

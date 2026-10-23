@@ -56,8 +56,6 @@ Vec3f Vec3f::Rotate(const Quat rotation) const
 }
 
 
-Vec3f Vec3f::Cross(const Vec3f other) const { return Vec3f(Neon::Cross(mIntrin, other.mIntrin)); }
-
 void Vec3f::ToJoltVec3(JPH::RVec3& jolt_vec) const { jolt_vec.mValue = mIntrin; }
 void Vec3f::FromJoltVec3(const JPH::RVec3& jolt_vec) { mIntrin = jolt_vec.mValue; }
 

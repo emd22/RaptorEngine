@@ -209,8 +209,8 @@ Vec2d GetArchWallDirection(const ArchSettings& arch)
 
 void GetArchDirectionBounds(const ArchSettings& arch, Vec2d& out_low, Vec2d& out_high)
 {
-	out_low = Vec2d::sZero;
-	out_high = Vec2d::sZero;
+	out_low = Vec2d::scZero;
+	out_high = Vec2d::scZero;
 
 	for (uint32 i = 0; i <= arch.Sides; i++) {
 		const Vec2d direction = GetArchDirection(arch, static_cast<double>(i));
@@ -491,12 +491,12 @@ struct ViewTransform
 
 	// double OffsetU = 0.0;
 	// double OffsetV = 0.0;
-	Vec2d OffsetUV = Vec2d::sZero;
+	Vec2d OffsetUV = Vec2d::scZero;
 
 	double Cos = 1.0;
 	double Sin = 0.0;
 
-	Vec2d PivotUV = Vec2d::sZero;
+	Vec2d PivotUV = Vec2d::scZero;
 	// double PivotU = 0.0;
 	// double PivotV = 0.0;
 
@@ -1088,7 +1088,7 @@ void TopViewCanvas::FitAll()
 		// 		double center_u = 0.0;
 		// 		double center_v = 0.0;
 
-		Vec2d center { Vec2d::sZero };
+		Vec2d center { Vec2d::scZero };
 
 		if (mState.bHasPlayer) {
 			center = Vec2d(GetAxis(mState.PlayerPosition, axes.U) * axes.USign, GetAxis(mState.PlayerPosition, axes.V));
@@ -1344,7 +1344,7 @@ void TopViewCanvas::DrawGrid(wxGraphicsContext& gc, const wxSize& size)
 
 	const ViewPlaneAxes& axes = Axes();
 
-	const Vec2d origin = ToScreenCoords(Vec2d::sZero);
+	const Vec2d origin = ToScreenCoords(Vec2d::scZero);
 	const double origin_x = std::floor(origin.X) + 0.5;
 	const double origin_y = std::floor(origin.Y) + 0.5;
 
@@ -1871,7 +1871,7 @@ void TopViewCanvas::DrawMarkers(wxGraphicsContext& gc)
 	const EditorTheme& theme = GetEditorTheme();
 
 	for (const TopViewMarker& marker : mState.Markers) {
-		Vec2d offset = Vec2d::sZero;
+		Vec2d offset = Vec2d::scZero;
 		Vec2d direction_uv = ProjectPoint(marker.Direction);
 
 		if (marker.bSelected && mPreview.Kind == eDrag::MarkerMove) {
@@ -2297,7 +2297,7 @@ Vec2d TopViewCanvas::GetRotateSnapOffset(const Vec2d pivot, double angle) const
 	const double sin_angle = std::sin(angle);
 
 	bool valid = false;
-	Vec2d min = Vec2d::sZero;
+	Vec2d min = Vec2d::scZero;
 
 	for (const TopViewBrush& brush : mState.Brushes) {
 		if (!brush.bSelected) {
@@ -2320,7 +2320,7 @@ Vec2d TopViewCanvas::GetRotateSnapOffset(const Vec2d pivot, double angle) const
 	}
 
 	if (!valid) {
-		return Vec2d::sZero;
+		return Vec2d::scZero;
 	}
 
 	return Snap(min) - min;
@@ -3103,7 +3103,7 @@ void TopViewCanvas::UpdatePreview()
 		const Vec2d grabbed = ToVec2d(mGrabbedVertex.Position);
 		const Vec2d moved = grabbed + (mCurrent - mPress);
 
-		Vec2d patch_point = Vec2d::sZero;
+		Vec2d patch_point = Vec2d::scZero;
 		const bool snapped_to_patch = FindPatchSnapPoint(moved, patch_point);
 
 		Vec2d target = patch_point;
@@ -3372,7 +3372,7 @@ void TopViewCanvas::OnLeftUp(wxMouseEvent&)
 
 void TopViewCanvas::FinishVertex()
 {
-	if (mPreview.Kind != eDrag::Vertex || mPreview.OffsetUV == Vec2d::sZero) {
+	if (mPreview.Kind != eDrag::Vertex || mPreview.OffsetUV == Vec2d::scZero) {
 		if (!mbDragMoved && mbVertexToggleOnRelease) {
 			DynArray<TopViewVertexHandle> kept;
 
@@ -3479,7 +3479,7 @@ void TopViewCanvas::FinishMarquee()
 void TopViewCanvas::FinishMove()
 {
 	if (mbDragMoved) {
-		if (mPreview.Kind != eDrag::Move || mPreview.OffsetUV == Vec2d::sZero) {
+		if (mPreview.Kind != eDrag::Move || mPreview.OffsetUV == Vec2d::scZero) {
 			return;
 		}
 
@@ -3642,7 +3642,7 @@ DynArray<Vec2d> TopViewCanvas::BuildArchSegments(const DRect& rect) const
 	}
 
 	const double wall = std::max<double>(mArch.WallWidth, 0.0);
-	const Vec2d inner_radius = Vec2d::Max(ellipse.Radius - Vec2d(wall), Vec2d::sZero);
+	const Vec2d inner_radius = Vec2d::Max(ellipse.Radius - Vec2d(wall), Vec2d::scZero);
 
 	const auto outer = [&](uint32 index)
 	{ return ellipse.Center + GetArchDirection(mArch, static_cast<double>(index)) * ellipse.Radius; };
@@ -3678,7 +3678,7 @@ Vec2d TopViewCanvas::GetArchHandle(eArchHandle handle) const
 		}
 
 		const double wall = std::max<double>(mArch.WallWidth, 0.0);
-		const Vec2d inner_radius = Vec2d::Max(ellipse.Radius - Vec2d(wall), Vec2d::sZero);
+		const Vec2d inner_radius = Vec2d::Max(ellipse.Radius - Vec2d(wall), Vec2d::scZero);
 
 		return ellipse.Center + GetArchWallDirection(mArch) * inner_radius;
 	}
@@ -4129,7 +4129,7 @@ void TopViewCanvas::FinishRotate()
 		return;
 	}
 
-	const Vec3f axis = ToWorldVector(Vec2d::sZero, 1.0);
+	const Vec3f axis = ToWorldVector(Vec2d::scZero, 1.0);
 	const float32 angle = static_cast<float32>(Axes().RotateSign * mPreview.Angle);
 	const Vec3f pivot = ToWorldVector(mPreview.PivotUV, 0.0);
 	const Vec3f offset = ToWorldVector(mPreview.OffsetUV, 0.0);
@@ -4147,7 +4147,7 @@ void TopViewCanvas::FinishClip()
 
 	const Vec3f point_a = ToWorldVector(mPreview.ClipA, 0.0);
 	const Vec3f point_b = ToWorldVector(mPreview.ClipB, 0.0);
-	const Vec3f view_axis = ToWorldVector(Vec2d::sZero, 1.0);
+	const Vec3f view_axis = ToWorldVector(Vec2d::scZero, 1.0);
 
 	HoldPreview();
 	SendCommand([point_a, point_b, view_axis] { gEditor->TopViewClip(point_a, point_b, view_axis); });
@@ -4155,7 +4155,7 @@ void TopViewCanvas::FinishClip()
 
 void TopViewCanvas::FinishMarkerMove()
 {
-	if (!mbDragMoved || mPreview.Kind != eDrag::MarkerMove || mPreview.OffsetUV == Vec2d::sZero) {
+	if (!mbDragMoved || mPreview.Kind != eDrag::MarkerMove || mPreview.OffsetUV == Vec2d::scZero) {
 		return;
 	}
 

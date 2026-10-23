@@ -48,6 +48,8 @@ FX_FORCE_INLINE bool Vec3f::IsCloseTo(const FLOAT4 other, const float32 toleranc
 
 FX_FORCE_INLINE float32 Vec3f::Dot(const Vec3f other) const { return Dot(other.mIntrin); }
 
+FX_FORCE_INLINE Vec3f Vec3f::Cross(const Vec3f other) const { return Vec3f(SSE::Cross(mIntrin, other.mIntrin)); }
+
 FX_FORCE_INLINE bool Vec3f::IsNearZero(const float32 tolerance) const { return IsCloseTo(sZero, tolerance); }
 
 FX_FORCE_INLINE void Vec3f::Set(float32 x, float32 y, float32 z) { mIntrin = _mm_setr_ps(x, y, z, 0.0f); }

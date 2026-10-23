@@ -16,7 +16,7 @@ class CommandBuffer;
 class RenderPass
 {
 public:
-    void Create(TargetList& color_attachments, Vec2u size, const Vec2u& offset = Vec2u::sZero);
+    void Create(TargetList& color_attachments, Vec2u size, const Vec2u& offset = Vec2u::scZero);
 
     void Begin(CommandBuffer* cmd, VkFramebuffer framebuffer, const Slice<VkClearValue>& clear_colors);
 
@@ -38,8 +38,8 @@ public:
     VkRenderPass InternalRenderPass = nullptr;
     CommandBuffer* pCommandBuffer = nullptr;
 
-    Vec2u Size = Vec2u::sZero;
-    Vec2u Offset = Vec2u::sZero;
+    Vec2u Size = Vec2u::scZero;
+    Vec2u Offset = Vec2u::scZero;
 
     uint32 AttachmentCount = 0;
 

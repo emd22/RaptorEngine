@@ -339,7 +339,7 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 		}
 
 		SurfaceOptions surface_options = options.Surface;
-		surface_options.bMakeLightmapCharts = options.Lightmap.bEnabled && source.bHasSun;
+		surface_options.bMakeLightmapCharts = options.Lightmap.bEnabled && (source.bHasSun || options.Lightmap.bIndirect);
 
 		patches.Build(source, bsp, sealed, surface_options.bCullHidden);
 
@@ -472,6 +472,41 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 			log(String::Fmt("  lightmap     {} patch triangles also cast shadows", baked.OccluderTriangleCount));
 		}
 
+		if (baked.bHasIndirect) {
+			uint32 light_count = baked.IndirectLightCount;
+
+			if (source.bHasSun) {
+				light_count++;
+			}
+
+			log(String::Fmt("  indirect     {} bounces, {} rays against {} triangles and {} nonvis triangles, {} lights, "
+							"{:.0f} lux on average",
+							options.Lightmap.IndirectBounces, baked.IndirectRayCount, baked.IndirectTriangleCount,
+							baked.IndirectBlockerCount, light_count,
+							baked.MeanIndirect));
+
+			if (baked.IndirectCachedTexelCount > 0) {
+				log(String::Fmt("  hit cache    {} of {} texels ({:.1f}%) reuse their first bounce hits, {:.0f} MB",
+								baked.IndirectCachedTexelCount, baked.IndirectTexelCount,
+								100.0 * static_cast<double>(baked.IndirectCachedTexelCount) /
+									static_cast<double>(baked.IndirectTexelCount),
+								baked.IndirectCacheMegabytes));
+			}
+
+			if (baked.BakedProbeCount > 0) {
+				log(String::Fmt("  probes       {} light probes baked with {} rays, {:.0f} lux on average",
+								baked.BakedProbeCount, baked.ProbeRayCount, baked.MeanProbeIrradiance));
+			}
+
+			if (baked.MissingAlbedoCount > 0) {
+				log(String::Fmt("  warning      {} materials have no readable diffuse texture, they bounce light as grey",
+								baked.MissingAlbedoCount));
+			}
+		}
+		else if (!options.Lightmap.bIndirect) {
+			log("  indirect     off");
+		}
+
 		if (baked.Density < options.Lightmap.Density) {
 			log(String::Fmt("  warning      the lightmap did not fit in {}x{} at {:.1f} texels per metre, so it was "
 							"baked at {:.1f}",
@@ -479,7 +514,10 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 							baked.Density));
 		}
 
-		if (baked.ProbeCount > 0) {
+		if (!source.bHasSun) {
+			log("  lightmap     no sun, the prototype has none or it is switched off");
+		}
+		else if (baked.ProbeCount > 0) {
 			log(String::Fmt("  sun probes   {} of {} light probes see the sun", baked.LitProbeCount, baked.ProbeCount));
 		}
 		else {
@@ -488,14 +526,15 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 		}
 
 		if (source.ModelCount > 0) {
-			log(String::Fmt("  warning      {} models are not known to the compiler, so they cast no baked shadows",
+			log(String::Fmt("  warning      {} models are not known to the compiler, so they cast no baked shadows or "
+							"bounced light",
 							source.ModelCount));
 		}
 	}
 	else if (!options.Lightmap.bEnabled) {
 		log("  lightmap     off");
 	}
-	else if (!source.bHasSun) {
+	else if (!source.bHasSun && !options.Lightmap.bIndirect) {
 		log("  lightmap     none, the prototype has no sun or it is switched off");
 	}
 	else if (source.Brushes.Size != 0) {
@@ -516,12 +555,14 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 		}
 	}
 
-	if (options.VerifyRays > 0 && result.bHasLightmap) {
+	if (options.VerifyRays > 0 && result.bHasLightmap && source.bHasSun) {
 		const LightmapVerifyResult verify = VerifyLightmap(planes, source, map, patches.ReferencePoints,
-														   lightmap.Stats.Density, options.VerifyRays);
+														   patches.ReferenceFacings, lightmap.Stats.Density,
+														   options.VerifyRays);
 
-		log(String::Fmt("  verify       {} lightmap points, {} lit, {} skipped beside a shadow edge, {} wrong",
-						verify.PointCount, verify.LitCount, verify.EdgeCount, verify.WrongCount));
+		log(String::Fmt("  verify       {} lightmap points, {} lit, {} skipped beside a shadow edge, {} hidden "
+						"behind patches, {} wrong",
+						verify.PointCount, verify.LitCount, verify.EdgeCount, verify.HiddenCount, verify.WrongCount));
 
 		if (verify.WrongCount * scMaxWrongLightmapPoints > verify.PointCount) {
 			log("  verify       FAILED, the lightmap does not match the sun");

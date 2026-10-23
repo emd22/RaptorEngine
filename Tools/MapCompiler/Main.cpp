@@ -27,12 +27,21 @@ void PrintUsage()
 				"  --no-probes      Do not place light probes\n"
 				"  --probe-spacing <m>        Probe spacing inside probe volume brushes (default: 2.5)\n"
 				"  --probe-level-spacing <m>  Probe spacing along the surfaces of the level (default: 0.5)\n"
-				"  --no-lightmap    Do not bake the sun's shadows\n"
+				"  --no-lightmap    Do not bake a lightmap (sun shadows and bounced light)\n"
 				"  --lightmap-density <n>     Lightmap texels per metre (default: 16)\n"
 				"  --lightmap-size <n>        Largest width and height of the lightmap (default: 4096)\n"
 				"  --lightmap-samples <n>     Rays per texel along each axis (default: 4)\n"
 				"  --sun-radius <degrees>     Half the angle the sun covers, wider is softer (default: 1)\n"
 				"  --lightmap-image <path>    Also write the lightmap as a PGM image\n"
+				"  --no-indirect    Do not bake the light that bounces between surfaces into the lightmap\n"
+				"  --indirect-rays <n>        Rays per lightmap texel for each bounce (default: 256)\n"
+				"  --indirect-bounces <n>     How many times light bounces (default: 3)\n"
+				"  --indirect-cache <MB>      Memory for keeping the first bounce's ray hits so later bounces skip tracing "
+				"them, 8 bytes per ray (default: 0, off)\n"
+				"  --indirect-denoise <level> How hard to smooth the noise out of the bounced light: off, low, medium "
+				"or high (default: medium)\n"
+				"  --probe-texel-rays <n>     Rays per probe visibility texel along each axis when baking probes, 0 to "
+				"leave the probes to the engine (default: 4)\n"
 				"  --obj <path>     Also write the compiled triangles as a Wavefront OBJ\n"
 				"  --verify [rays]  Trace random rays through the brushes and the compiled triangles and compare them\n");
 }
@@ -72,6 +81,41 @@ bool ParseArguments(int argc, char** argv, CompileOptions& out_arguments)
 		}
 		else if (argument == "--lightmap-image" && has_value) {
 			out_arguments.Lightmap.ImagePath = argv[++i];
+		}
+		else if (argument == "--indirect-rays" && has_value) {
+			out_arguments.Lightmap.IndirectRays = static_cast<uint32>(std::atoi(argv[++i]));
+		}
+		else if (argument == "--indirect-bounces" && has_value) {
+			out_arguments.Lightmap.IndirectBounces = static_cast<uint32>(std::atoi(argv[++i]));
+		}
+		else if (argument == "--indirect-cache" && has_value) {
+			out_arguments.Lightmap.IndirectCacheMegabytes = static_cast<uint32>(std::atoi(argv[++i]));
+		}
+		else if (argument == "--indirect-denoise" && has_value) {
+			const String level = argv[++i];
+
+			if (level == "off") {
+				out_arguments.Lightmap.IndirectDenoise = eDenoiseQuality::Off;
+			}
+			else if (level == "low") {
+				out_arguments.Lightmap.IndirectDenoise = eDenoiseQuality::Low;
+			}
+			else if (level == "medium") {
+				out_arguments.Lightmap.IndirectDenoise = eDenoiseQuality::Medium;
+			}
+			else if (level == "high") {
+				out_arguments.Lightmap.IndirectDenoise = eDenoiseQuality::High;
+			}
+			else {
+				std::printf("Unknown denoise level '%s', expected off, low, medium or high\n\n", level.CStr());
+				return false;
+			}
+		}
+		else if (argument == "--probe-texel-rays" && has_value) {
+			out_arguments.Lightmap.ProbeTexelRays = static_cast<uint32>(std::atoi(argv[++i]));
+		}
+		else if (argument == "--no-indirect") {
+			out_arguments.Lightmap.bIndirect = false;
 		}
 		else if (argument == "--no-lightmap") {
 			out_arguments.Lightmap.bEnabled = false;
