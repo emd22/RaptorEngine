@@ -440,19 +440,17 @@ void MaterialPickerPanel::ApplySelected()
 		return;
 	}
 
-	ObjectID face_object = ObjectID::scNull;
-	Vec3f face_normal = Vec3f::sZero;
+	DynArray<TopViewFaceRef> faces = mpFrame->GetTopViewPanel()->GetCanvas()->GetPickedFaces();
 
-	if (mpFrame->GetTopViewPanel()->GetCanvas()->GetPickedFace(face_object, face_normal)) {
+	if (faces.IsNotEmpty()) {
 		thread::PostToGame(
-			[slot, face_object, face_normal]
+			[slot, faces = std::move(faces)]
 			{
 				if (gEditor == nullptr || gWorld == nullptr || gWorld->pPrototype == nullptr) {
 					return;
 				}
 
-				gEditor->TopViewSetFaceMaterial(face_object, face_normal,
-												gWorld->pPrototype->GetMaterialForID(slot));
+				gEditor->TopViewSetFaceMaterial(faces, gWorld->pPrototype->GetMaterialForID(slot));
 			});
 
 		return;

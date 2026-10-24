@@ -285,9 +285,9 @@ String ConfigEntry::AsString(uint32 indent) const
 
 ConfigEntry* ConfigEntry::GetMember(const Hash32 name_hash) const
 {
-	for (ConfigEntry& entry : Members) {
+	for (const ConfigEntry& entry : Members) {
 		if (entry.Name == name_hash) {
-			return &entry;
+			return const_cast<ConfigEntry*>(&entry);
 		}
 	}
 
@@ -1004,9 +1004,9 @@ void ConfigFile::Parse(PagedArray<Token>& tokens)
 
 ConfigEntry* ConfigFile::GetEntry(Hash32 requested_name_hash) const
 {
-	for (ConfigEntry& entry : mConfigEntries) {
+	for (const ConfigEntry& entry : mConfigEntries) {
 		if (entry.Name == requested_name_hash) {
-			return &entry;
+			return const_cast<ConfigEntry*>(&entry);
 		}
 	}
 

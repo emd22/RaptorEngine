@@ -6,6 +6,8 @@ void PerspectiveCamera::UpdateProjectionMatrix()
 {
 	ProjectionMatrix.LoadPerspectiveMatrix(mFovRad, mAspectRatio, mZNearClip, mZFarClip);
 	mWeaponProjectionMatrix.LoadPerspectiveMatrix(mWeaponFov, mAspectRatio, scWeaponNearPlane, scWeaponFarPlane);
+	mWeaponProjectionMatrix.Rows[2].Z *= scWeaponDepthScale;
+	mWeaponProjectionMatrix.Rows[3].Z *= scWeaponDepthScale;
 
 	mbRequireMatrixUpdate = false;
 }

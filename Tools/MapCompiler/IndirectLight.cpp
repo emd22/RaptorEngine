@@ -1097,7 +1097,8 @@ void BleedEdges(const IndirectInput& input, Vec3f* values, Array<uint8>& filled,
 		// for (uint32 rect_index = 0; rect_index < input.RectCount; rect_index++) {
 		// const LightmapRect& rect = input.pRects[rect_index];
 
-		const auto at = [&](uint32 x, uint32 y) { return static_cast<uint64>(rect.Min.Y + y) * input.Width + rect.Min.X + x; };
+		const auto at = [&](uint32 x, uint32 y)
+		{ return static_cast<uint64>(rect.Min.Y + y) * input.Width + rect.Min.X + x; };
 
 
 		// Get the total size of the chart rect
@@ -1135,7 +1136,8 @@ void BleedEdges(const IndirectInput& input, Vec3f* values, Array<uint8>& filled,
 								continue;
 							}
 
-							const uint32 local = static_cast<uint32>(near_y) * rect_size.X + static_cast<uint32>(near_x);
+							const uint32 local = static_cast<uint32>(near_y) * rect_size.X +
+												 static_cast<uint32>(near_x);
 
 							if (filled[local] != 0) {
 								sum += values[at(static_cast<uint32>(near_x), static_cast<uint32>(near_y))];
@@ -1837,11 +1839,7 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 
 	for (uint64 texel = 0; texel < texel_count; texel++) {
 		for (uint32 channel = 0; channel < 3; channel++) {
-			float32 value = result[texel].mData[channel];
-
-			if (!(value >= 0.0f)) {
-				value = 0.0f;
-			}
+			float32 value = std::max(result[texel].mData[channel], 0.0f);
 
 			lightmap.Irradiance[texel * 3 + channel] = FloatToHalf(std::fmin(value, scMaxIrradiance));
 			lightmap.Directions[texel * 3 + channel] = EncodeDirection(directions[texel].mData[channel]);

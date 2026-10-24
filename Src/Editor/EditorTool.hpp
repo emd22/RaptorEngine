@@ -19,6 +19,7 @@ enum class eEditorTool : uint32
 	Vertex,
 	Create,
 	Arch,
+	Room,
 	Curve,
 	Decal,
 	Rotate,

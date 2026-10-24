@@ -1010,6 +1010,13 @@ void EditorFrame::ShowSimulating(bool simulating)
 
 void EditorFrame::ApplyState(const EditorPanelState& state)
 {
+	if (state.bIsCompiledMap != mState.bIsCompiledMap || !mbAppliedState) {
+		mpToolbar->Set2DViewsEnabled(!state.bIsCompiledMap);
+		mpTopMenuItem->Enable(!state.bIsCompiledMap);
+		mpSplitMenuItem->Enable(!state.bIsCompiledMap);
+		mbAppliedState = true;
+	}
+
 	mState = state;
 
 	mpWorldPropertiesPanel->ApplyState(mState.World);

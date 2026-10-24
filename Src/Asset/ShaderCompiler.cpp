@@ -129,7 +129,19 @@ ProgramData ShaderCompiler::GetProgramData(const Hash64 program_id, DataPack& pa
 	ByteBuffer bb = ByteBuffer::FromData(entry_data.pData, entry_data.Size);
 
 #ifndef FX_SHADER_NO_REFLECTION
+	if (bb.GetRemainingSize() < sizeof(uint32)) {
+		LogError(LC_SHADER, "Shader pack entry is too small for a reflection header (Id={})", program_id);
+		return program;
+	}
+
 	uint32 num_reflected_entries = bb.Get<uint32>();
+
+	if (num_reflected_entries > bb.GetRemainingSize() / sizeof(uint32)) {
+		LogError(LC_SHADER, "Shader pack entry has {} reflection entries but only {} bytes (Id={})",
+				 num_reflected_entries, bb.GetRemainingSize(), program_id);
+		return program;
+	}
+
 	program.Reflection.InitCapacity(num_reflected_entries);
 
 	for (uint32 i = 0; i < num_reflected_entries; i++) {

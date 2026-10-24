@@ -113,8 +113,6 @@ public:
 
 	void RefreshCappedPatches();
 
-	bool GetHollowPieces(Object* object, float32 thickness, std::vector<Brush::PlaneList>& out_pieces,
-						 std::vector<Vec3f>& out_positions);
 
 	/**
 	 * @brief Returns the brush for a new blockout filling `min` to `max` in world space, with its textures lined up

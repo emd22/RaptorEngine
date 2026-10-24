@@ -64,6 +64,7 @@ constexpr float32 scMinFaceLength = 1e-3f;
 constexpr float32 scFaceMatchDot = 0.999f;
 constexpr float32 scVertexMatchDistance = 2e-3f;
 constexpr float32 scMinBrushExtent = 0.01f;
+constexpr uint32 scMaxRoomOperations = 200;
 constexpr float32 scHullEdgeTolerance = 1e-3f;
 constexpr float32 scGroundFootprintInset = 1e-3f;
 constexpr float32 scGroundFitTolerance = 1e-3f;
@@ -635,6 +636,27 @@ TopViewState RaptorEditor::BuildTopViewState()
 	std::vector<BrushSource> sources;
 	GatherBrushSources(*blockout, sources);
 
+	const Object* last_selected = mSelection.GetLast();
+
+	const auto note_create_reference = [&](const DoublingArray<Vec3f>& points)
+	{
+		if (points.IsEmpty()) {
+			return;
+		}
+
+		Vec3f min = points[0];
+		Vec3f max = points[0];
+
+		for (const Vec3f& point : points) {
+			min = Vec3f::Min(min, point);
+			max = Vec3f::Max(max, point);
+		}
+
+		mbHasCreateReference = true;
+		mCreateReferenceMin = min;
+		mCreateReferenceMax = max;
+	};
+
 	Object* last_hidden = nullptr;
 
 	for (const BrushSource& source : sources) {
@@ -656,6 +678,7 @@ TopViewState RaptorEditor::BuildTopViewState()
 
 		out.ObjectId = object->ID;
 		out.Kind = source.Kind;
+		out.Name = object->Name.Get();
 		out.bSelected = mSelection.Contains(object);
 		out.bSelectable = IsObjectSelectable(object);
 
@@ -666,6 +689,10 @@ TopViewState RaptorEditor::BuildTopViewState()
 		for (const Vec3f vertex : brush->GetVertices()) {
 			const Vec4f point = world * Vec4f(vertex.X, vertex.Y, vertex.Z, 1.0f);
 			corners.Insert(Vec3f(point.X, point.Y, point.Z));
+		}
+
+		if (object == last_selected) {
+			note_create_reference(corners);
 		}
 
 		faces.Clear();
@@ -727,9 +754,24 @@ TopViewState RaptorEditor::BuildTopViewState()
 
 				const Vec2f plan_normal = Project(face.Normal, axes);
 				const float32 plan_length = plan_normal.Length();
+				const float32 depth_component = GetAxis(face.Normal, axes.W);
 
-				if (std::fabs(GetAxis(face.Normal, axes.W)) > scVerticalFaceTolerance * plan_length ||
+				TopViewFace view_face { .WorldNormal = face.Normal,
+										.TextureOffset = -face.Texture.Offset * face.Texture.Scale,
+										.TextureScale = std::fabs(face.Texture.Scale.X),
+										.TextureRotation = face.Texture.Rotation };
+
+				if (std::fabs(depth_component) > scVerticalFaceTolerance * plan_length ||
 					plan_length < scMinPlanNormalLength) {
+					if (axes.DepthSign * depth_component > 0.0f && point_count >= 3) {
+						TopViewFrontFace& front = projection.FrontFaces.Emplace();
+						front.Face = view_face;
+
+						for (const Vec3f& world_point : face.Points) {
+							front.Polygon.Insert(Project(world_point, axes));
+						}
+					}
+
 					continue;
 				}
 
@@ -757,12 +799,10 @@ TopViewState RaptorEditor::BuildTopViewState()
 				}
 
 				if (max_along - min_along >= scMinFaceLength) {
-					projection.Faces.Insert(TopViewFace { .A = min_point,
-														  .B = max_point,
-														  .Normal = unit,
-														  .TextureOffset = -face.Texture.Offset * face.Texture.Scale,
-														  .TextureScale = std::fabs(face.Texture.Scale.X),
-														  .TextureRotation = face.Texture.Rotation });
+					view_face.A = min_point;
+					view_face.B = max_point;
+					view_face.Normal = unit;
+					projection.Faces.Insert(view_face);
 				}
 			}
 
@@ -849,10 +889,15 @@ TopViewState RaptorEditor::BuildTopViewState()
 			continue;
 		}
 
+		if (object == last_selected) {
+			note_create_reference(corners);
+		}
+
 		TopViewBrush& out = view.Brushes.Emplace();
 
 		out.ObjectId = object->ID;
 		out.Kind = eTopViewBrushKind::Patch;
+		out.Name = object->Name.Get();
 		out.bSelected = mSelection.Contains(object);
 		out.bSelectable = IsObjectSelectable(object);
 		out.PatchWidth = static_cast<uint16>(patch->Width);
@@ -963,6 +1008,14 @@ TopViewState RaptorEditor::BuildTopViewState()
 		}
 	}
 
+	if (last_selected != nullptr) {
+		view.SelectionName = last_selected->Name.Get();
+	}
+
+	view.bHasCreateReference = mbHasCreateReference;
+	view.CreateReferenceMin = mCreateReferenceMin;
+	view.CreateReferenceMax = mCreateReferenceMax;
+
 	return view;
 }
 
@@ -971,8 +1024,35 @@ TopViewState RaptorEditor::BuildTopViewState()
 // View
 /////////////////////////////////////
 
+bool RaptorEditor::IsCompiledMapOpen() const
+{
+	return gWorld != nullptr && gWorld->pPrototype != nullptr && gWorld->pPrototype->IsCompiledMap();
+}
+
+void RaptorEditor::UpdateCompiledMapViewLock()
+{
+	const bool is_compiled = IsCompiledMapOpen();
+
+	if (is_compiled && mView != eEditorView::Perspective) {
+		mViewBeforeCompiledMap = mView;
+		mbViewLockedByCompiledMap = true;
+		SetView(eEditorView::Perspective);
+	}
+	else if (!is_compiled && mbViewLockedByCompiledMap) {
+		mbViewLockedByCompiledMap = false;
+		SetView(mViewBeforeCompiledMap);
+	}
+}
+
 void RaptorEditor::SetView(eEditorView view)
 {
+	if (view != eEditorView::Perspective && IsCompiledMapOpen()) {
+		LogWarning(LC_CORE, "The 2D views edit the prototype, open the .prx to use them");
+		mViewBeforeCompiledMap = view;
+		mbViewLockedByCompiledMap = true;
+		view = eEditorView::Perspective;
+	}
+
 	if (view != mView) {
 		mView = view;
 
@@ -1157,7 +1237,19 @@ void RaptorEditor::TopViewRotate(const Vec3f axis, float32 angle, const Vec3f pi
 	}
 }
 
-void RaptorEditor::TopViewMoveFace(const Vec3f world_normal, float32 distance)
+static int32 FindWorldFacePlane(const Brush& brush, const Object& object, const Vec3f world_normal)
+{
+	const Vec3f local_direction = world_normal.Rotate(object.mRotation.Conjugate()).Normalize();
+	const int32 plane_index = brush.FindPlane(local_direction);
+
+	if (plane_index == Brush::scNoPlane || brush.Planes[plane_index].Normal.Dot(local_direction) < scFaceMatchDot) {
+		return Brush::scNoPlane;
+	}
+
+	return plane_index;
+}
+
+void RaptorEditor::TopViewMoveFace(const Vec3f world_normal, float32 distance, const DynArray<ObjectID>& object_ids)
 {
 	if (IsSimulationMode() || !IsToolAvailable(eEditorTool::Face) || std::fabs(distance) < scMinMoveDistance) {
 		return;
@@ -1169,36 +1261,34 @@ void RaptorEditor::TopViewMoveFace(const Vec3f world_normal, float32 distance)
 		Vec3f LocalNormal;
 	};
 
-	Object* targets[scMaxSelectedObjects];
-	const uint32 count = CollectTopViewTargets(targets);
-
 	DoublingArray<FaceMove> moves;
 
-	for (uint32 i = 0; i < count; i++) {
-		if (!CanEditObject(targets[i])) {
+	for (const ObjectID object_id : object_ids) {
+		Object* object = FindTopViewObject(object_id);
+
+		if (object == nullptr || object->HasTags(eObjectTag::LockTransform) || !CanEditObject(object)) {
 			continue;
 		}
 
-		const Brush* brush = gWorld->pPrototype->GetBrush(targets[i]);
+		bool is_listed = false;
 
-		if (brush == nullptr) {
+		for (const FaceMove& move : moves) {
+			is_listed = is_listed || (move.pObject == object);
+		}
+
+		const Brush* brush = gWorld->pPrototype->GetBrush(object);
+
+		if (is_listed || brush == nullptr) {
 			continue;
 		}
 
-		const Vec3f local_direction = world_normal.Rotate(targets[i]->mRotation.Conjugate());
-		const int32 plane_index = brush->FindPlane(local_direction);
+		const int32 plane_index = FindWorldFacePlane(*brush, *object, world_normal);
 
 		if (plane_index == Brush::scNoPlane) {
 			continue;
 		}
 
-		const Vec3f plane_normal = brush->Planes[plane_index].Normal;
-
-		if (plane_normal.Dot(local_direction) < scFaceMatchDot) {
-			continue;
-		}
-
-		moves.Insert(FaceMove { targets[i], plane_normal });
+		moves.Insert(FaceMove { object, brush->Planes[plane_index].Normal });
 	}
 
 	for (const FaceMove& move : moves) {
@@ -1907,6 +1997,160 @@ void RaptorEditor::TopViewCreate(eViewPlane plane, Vec3f min, Vec3f max, bool dr
 	SelectObject(created, false);
 }
 
+void RaptorEditor::TopViewCreateRoom(eViewPlane plane, Vec3f min, Vec3f max, bool drop_to_ground,
+									 const RoomSettings& settings)
+{
+	if (IsSimulationMode() || !IsToolAvailable(eEditorTool::Room) || gWorld->pPrototype == nullptr) {
+		return;
+	}
+
+	float32 offset = 0.0f;
+
+	if (drop_to_ground && FindGroundOffset(min, max, plane, offset)) {
+		const Vec3f shift = DepthAxisVector(plane, offset);
+
+		min += shift;
+		max += shift;
+	}
+
+	RoomPiece pieces[scMaxRoomPieces];
+	const uint32 piece_count = BuildRoomPieces(min, max, settings, pieces);
+
+	if (piece_count == 0) {
+		Warn("The room is too small for {} thick walls, make it bigger or check the depth field", settings.WallThickness);
+		return;
+	}
+
+	const MaterialID material = GetNewBrushMaterial();
+	bool append = false;
+
+	for (uint32 i = 0; i < piece_count; i++) {
+		ObjectSnapshot snapshot;
+		snapshot.Material = material;
+
+		const Brush brush = gWorld->pPrototype->MakeWorldBox(pieces[i].Min, pieces[i].Max, snapshot.Position);
+
+		Object* created = EmplaceEditOperation<CreateBrushOperation>(brush.Planes, snapshot,
+																	 static_cast<int32>(piece_count))
+							  .GetCreated();
+
+		if (created != nullptr) {
+			SelectObject(created, append);
+			append = true;
+		}
+	}
+}
+
+void RaptorEditor::TopViewHollowSelection(const RoomSettings& settings)
+{
+	Blockout* blockout = gWorld->pPrototype;
+
+	if (blockout == nullptr || IsSimulationMode() || IsDataMode()) {
+		return;
+	}
+
+	struct Hollow
+	{
+		Object* pObject = nullptr;
+		Brush::PlaneList Before;
+		RoomPiece Pieces[scMaxRoomPieces];
+		uint32 PieceCount = 0;
+	};
+
+	DoublingArray<Hollow> hollows;
+	uint32 operation_count = 0;
+	uint32 skipped_count = 0;
+	uint32 too_small_count = 0;
+
+	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
+		Object* object = mSelection.GetObject(i);
+		const Brush* brush = blockout->GetBrush(object);
+
+		if (brush == nullptr || object->IsDecal() || !CanEditObject(object) ||
+			object->HasTags(eObjectTag::LockTransform)) {
+			continue;
+		}
+
+		if (!brush->IsBox() || !object->mRotation.IsCloseTo(Quat::scIdentity)) {
+			skipped_count++;
+			continue;
+		}
+
+		const Vec3f position = object->GetPosition();
+
+		Hollow hollow;
+		hollow.pObject = object;
+		hollow.Before = brush->Planes;
+		hollow.PieceCount = BuildRoomPieces(position + brush->GetBoundsMin(), position + brush->GetBoundsMax(),
+											settings, hollow.Pieces);
+
+		if (hollow.PieceCount == 0) {
+			too_small_count++;
+			continue;
+		}
+
+		operation_count += hollow.PieceCount;
+		hollows.Insert(hollow);
+	}
+
+	if (skipped_count > 0) {
+		Warn("Skipped {} brushes, only boxes that aren't rotated can be hollowed into rooms", skipped_count);
+	}
+
+	if (too_small_count > 0) {
+		Warn("Skipped {} brushes that are too small for {} thick walls", too_small_count, settings.WallThickness);
+	}
+
+	if (hollows.IsEmpty()) {
+		if (skipped_count == 0 && too_small_count == 0) {
+			Warn("Select the boxes to hollow out first");
+		}
+
+		return;
+	}
+
+	if (operation_count > scMaxRoomOperations) {
+		Warn("Hollowing the selection would make too many brushes at once");
+		return;
+	}
+
+	const int32 group_size = static_cast<int32>(operation_count);
+
+	DoublingArray<Object*> walls;
+
+	for (const Hollow& hollow : hollows) {
+		Object* object = hollow.pObject;
+		const Vec3f position = object->GetPosition();
+
+		Brush first = Brush::FromBox(hollow.Pieces[0].Min - position, hollow.Pieces[0].Max - position);
+		first.AlignTexturesToWorld(position);
+
+		const ObjectSnapshot template_snapshot = ObjectSnapshot::Capture(*object, object->GetMaterialID());
+
+		EmplaceEditOperation<BrushEditOperation>(object, hollow.Before, first.Planes, group_size);
+		walls.Insert(object);
+
+		for (uint32 piece = 1; piece < hollow.PieceCount; piece++) {
+			ObjectSnapshot snapshot = template_snapshot;
+			snapshot.ObjectName = Name();
+
+			const Brush brush = blockout->MakeWorldBox(hollow.Pieces[piece].Min, hollow.Pieces[piece].Max,
+													   snapshot.Position);
+
+			Object* created = EmplaceEditOperation<CreateBrushOperation>(brush.Planes, snapshot, group_size)
+								  .GetCreated();
+
+			if (created != nullptr) {
+				walls.Insert(created);
+			}
+		}
+	}
+
+	for (Object* wall : walls) {
+		SelectObject(wall, true);
+	}
+}
+
 static Vec3f UnitAxis(uint32 axis, float32 sign)
 {
 	float32 components[3] = { 0.0f, 0.0f, 0.0f };
@@ -2381,7 +2625,7 @@ static bool ApplyTextureCommand(Brush& brush, uint32 plane_index, const TextureC
 		   texture.Rotation != before.Rotation;
 }
 
-void RaptorEditor::TopViewEditTextures(ObjectID face_object, const Vec3f face_normal, const TextureCommand& command)
+void RaptorEditor::TopViewEditTextures(const DynArray<TopViewFaceRef>& faces, const TextureCommand& command)
 {
 	Blockout* blockout = gWorld->pPrototype;
 
@@ -2396,20 +2640,43 @@ void RaptorEditor::TopViewEditTextures(ObjectID face_object, const Vec3f face_no
 		Brush::PlaneList After;
 	};
 
-	const bool has_face = !face_object.IsInvalid();
+	struct Target
+	{
+		Object* pObject = nullptr;
+		DoublingArray<Vec3f> Normals;
+	};
 
-	DoublingArray<Object*> targets;
+	const bool has_faces = faces.IsNotEmpty();
 
-	if (has_face) {
-		Object* object = FindTopViewObject(face_object);
+	DoublingArray<Target> targets;
 
-		if (object != nullptr) {
-			targets.Insert(object);
+	if (has_faces) {
+		for (const TopViewFaceRef& face : faces) {
+			Object* object = FindTopViewObject(face.ObjectId);
+
+			if (object == nullptr) {
+				continue;
+			}
+
+			Target* target = nullptr;
+
+			for (Target& existing : targets) {
+				if (existing.pObject == object) {
+					target = &existing;
+				}
+			}
+
+			if (target == nullptr) {
+				target = &targets.Emplace();
+				target->pObject = object;
+			}
+
+			target->Normals.Insert(face.Normal);
 		}
 	}
 	else {
 		for (uint32 i = 0; i < mSelection.GetCount(); i++) {
-			targets.Insert(mSelection.GetObject(i));
+			targets.Emplace().pObject = mSelection.GetObject(i);
 		}
 	}
 
@@ -2419,7 +2686,8 @@ void RaptorEditor::TopViewEditTextures(ObjectID face_object, const Vec3f face_no
 	uint32 brush_count = 0;
 	uint32 limited_count = 0;
 
-	for (Object* object : targets) {
+	for (const Target& target : targets) {
+		Object* object = target.pObject;
 		const Brush* brush = blockout->GetBrush(object);
 
 		if (brush == nullptr || object->IsDecal() || !CanEditObject(object)) {
@@ -2435,26 +2703,33 @@ void RaptorEditor::TopViewEditTextures(ObjectID face_object, const Vec3f face_no
 
 		Brush changed = Brush::FromPlanes(brush->Planes);
 
-		uint32 first_plane = 0;
-		uint32 end_plane = changed.Planes.Size;
+		uint32 plane_mask = 0;
 
-		if (has_face) {
-			const Vec3f local_direction = face_normal.Rotate(object->mRotation.Conjugate());
-			const int32 plane_index = changed.FindPlane(local_direction);
+		if (has_faces) {
+			for (const Vec3f& normal : target.Normals) {
+				const int32 plane_index = FindWorldFacePlane(changed, *object, normal);
 
-			if (plane_index == Brush::scNoPlane ||
-				changed.Planes[plane_index].Normal.Dot(local_direction.Normalize()) < scFaceMatchDot) {
-				Warn("The picked face of '{}' is no longer there, pick it again", object->Name.Get());
-				continue;
+				if (plane_index == Brush::scNoPlane) {
+					Warn("A picked face of '{}' is no longer there, pick it again", object->Name.Get());
+					continue;
+				}
+
+				plane_mask |= (1u << static_cast<uint32>(plane_index));
 			}
-
-			first_plane = static_cast<uint32>(plane_index);
-			end_plane = first_plane + 1;
+		}
+		else {
+			for (uint32 plane = 0; plane < changed.Planes.Size; plane++) {
+				plane_mask |= (1u << plane);
+			}
 		}
 
 		bool is_changed = false;
 
-		for (uint32 plane = first_plane; plane < end_plane; plane++) {
+		for (uint32 plane = 0; plane < changed.Planes.Size; plane++) {
+			if ((plane_mask & (1u << plane)) == 0) {
+				continue;
+			}
+
 			if (ApplyTextureCommand(changed, plane, command, step, object->GetPosition())) {
 				is_changed = true;
 			}
@@ -2482,14 +2757,12 @@ void RaptorEditor::TopViewEditTextures(ObjectID face_object, const Vec3f face_no
 	}
 }
 
-void RaptorEditor::TopViewSetPickedFace(ObjectID face_object, const Vec3f face_normal)
+void RaptorEditor::TopViewSetPickedFaces(const DynArray<TopViewFaceRef>& faces)
 {
-	mPickedFaceObject = face_object;
-	mPickedFaceNormal = face_normal;
+	mPickedFaces.Clear();
 
-	if (face_object.IsNull()) {
-		mPickedFaceMesh = nullptr;
-		mPickedFaceVertices.Free();
+	for (const TopViewFaceRef& face : faces) {
+		mPickedFaces.Emplace().Face = face;
 	}
 }
 
@@ -2530,56 +2803,57 @@ static Ref<PrimitiveMesh> MakeFaceOverlayMesh(const SizedArray<Vec3f>& vertices,
 	return mesh.AsDefaultMesh();
 }
 
-void RaptorEditor::DrawPickedFace()
+void RaptorEditor::DrawPickedFaces()
 {
 	Blockout* blockout = gWorld->pPrototype;
 
-	if (mPickedFaceObject.IsNull() || blockout == nullptr || IsSimulationMode()) {
+	if (mPickedFaces.IsEmpty() || blockout == nullptr || IsSimulationMode()) {
 		return;
 	}
 
-	Object* object = FindTopViewObject(mPickedFaceObject);
+	for (PickedFaceOverlay& picked : mPickedFaces) {
+		Object* object = FindTopViewObject(picked.Face.ObjectId);
 
-	if (object == nullptr || object->IsHidden()) {
-		return;
-	}
-
-	const Brush* brush = blockout->GetBrush(object);
-
-	if (brush == nullptr) {
-		return;
-	}
-
-	const Vec3f local_direction = mPickedFaceNormal.Rotate(object->mRotation.Conjugate()).Normalize();
-	const int32 plane_index = brush->FindPlane(local_direction);
-
-	if (plane_index == Brush::scNoPlane || brush->Planes[plane_index].Normal.Dot(local_direction) < scFaceMatchDot) {
-		return;
-	}
-
-	const Brush::Face* face = nullptr;
-
-	for (const Brush::Face& candidate : brush->Faces) {
-		if (candidate.PlaneIndex == static_cast<uint32>(plane_index)) {
-			face = &candidate;
-			break;
+		if (object == nullptr || object->IsHidden()) {
+			continue;
 		}
-	}
 
-	if (face == nullptr || face->Vertices.Size < 3) {
-		return;
-	}
+		const Brush* brush = blockout->GetBrush(object);
 
-	if (!mPickedFaceMesh.IsValid() || !HasSameVertices(mPickedFaceVertices, face->Vertices)) {
-		mPickedFaceVertices.Free();
-		mPickedFaceVertices.InitAsCopyOf(face->Vertices);
-		mPickedFaceMesh = MakeFaceOverlayMesh(face->Vertices, brush->Planes[plane_index].Normal);
-	}
+		if (brush == nullptr) {
+			continue;
+		}
 
-	renderer::gDebugDraw->Overlay(mPickedFaceMesh, object->GetWorldMatrix(), mTheme.Viewport.SelectedFace);
+		const int32 plane_index = FindWorldFacePlane(*brush, *object, picked.Face.Normal);
+
+		if (plane_index == Brush::scNoPlane) {
+			continue;
+		}
+
+		const Brush::Face* face = nullptr;
+
+		for (const Brush::Face& candidate : brush->Faces) {
+			if (candidate.PlaneIndex == static_cast<uint32>(plane_index)) {
+				face = &candidate;
+				break;
+			}
+		}
+
+		if (face == nullptr || face->Vertices.Size < 3) {
+			continue;
+		}
+
+		if (!picked.pMesh.IsValid() || !HasSameVertices(picked.Vertices, face->Vertices)) {
+			picked.Vertices.Free();
+			picked.Vertices.InitAsCopyOf(face->Vertices);
+			picked.pMesh = MakeFaceOverlayMesh(face->Vertices, brush->Planes[plane_index].Normal);
+		}
+
+		renderer::gDebugDraw->Overlay(picked.pMesh, object->GetWorldMatrix(), mTheme.Viewport.SelectedFace);
+	}
 }
 
-void RaptorEditor::TopViewSetFaceMaterial(ObjectID face_object, const Vec3f face_normal, MaterialID material)
+void RaptorEditor::TopViewSetFaceMaterial(const DynArray<TopViewFaceRef>& faces, MaterialID material)
 {
 	Blockout* blockout = gWorld->pPrototype;
 
@@ -2587,28 +2861,8 @@ void RaptorEditor::TopViewSetFaceMaterial(ObjectID face_object, const Vec3f face
 		return;
 	}
 
-	Object* object = FindTopViewObject(face_object);
-	const Brush* brush = blockout->GetBrush(object);
-
-	if (brush == nullptr || object->IsDecal() || !CanEditObject(object) ||
-		IsBrushMarkerMaterial(object->GetSpecialMaterial())) {
-		Warn("Only the faces of brushes can have a material of their own");
-		return;
-	}
-
 	if (IsBrushMarkerMaterial(material.GetSpecial())) {
 		Warn("'{}' can only be given to a whole brush", GetSpecialMaterialName(material.GetSpecial()));
-		return;
-	}
-
-	Brush changed = Brush::FromPlanes(brush->Planes);
-
-	const Vec3f local_direction = face_normal.Rotate(object->mRotation.Conjugate());
-	const int32 plane_index = changed.FindPlane(local_direction);
-
-	if (plane_index == Brush::scNoPlane ||
-		changed.Planes[plane_index].Normal.Dot(local_direction.Normalize()) < scFaceMatchDot) {
-		Warn("The picked face of '{}' is no longer there, pick it again", object->Name.Get());
 		return;
 	}
 
@@ -2618,19 +2872,74 @@ void RaptorEditor::TopViewSetFaceMaterial(ObjectID face_object, const Vec3f face
 		return;
 	}
 
-	String name = blockout->GetMaterialName(library_id);
+	struct Edit
+	{
+		Object* pObject = nullptr;
+		Brush::PlaneList Before;
+		Brush Changed;
+	};
 
-	if (blockout->GetIDForMaterial(object->GetMaterialID()) == library_id) {
-		name.Clear();
+	DoublingArray<Edit> edits;
+
+	for (const TopViewFaceRef& face_ref : faces) {
+		Object* object = FindTopViewObject(face_ref.ObjectId);
+		const Brush* brush = blockout->GetBrush(object);
+
+		if (brush == nullptr || object->IsDecal() || !CanEditObject(object) ||
+			IsBrushMarkerMaterial(object->GetSpecialMaterial())) {
+			Warn("Only the faces of brushes can have a material of their own");
+			continue;
+		}
+
+		Edit* edit = nullptr;
+
+		for (Edit& existing : edits) {
+			if (existing.pObject == object) {
+				edit = &existing;
+			}
+		}
+
+		if (edit == nullptr) {
+			edit = &edits.Emplace();
+			edit->pObject = object;
+			edit->Before = brush->Planes;
+			edit->Changed = Brush::FromPlanes(brush->Planes);
+		}
+
+		const int32 plane_index = FindWorldFacePlane(edit->Changed, *object, face_ref.Normal);
+
+		if (plane_index == Brush::scNoPlane) {
+			Warn("A picked face of '{}' is no longer there, pick it again", object->Name.Get());
+			continue;
+		}
+
+		String name = blockout->GetMaterialName(library_id);
+
+		if (blockout->GetIDForMaterial(object->GetMaterialID()) == library_id) {
+			name.Clear();
+		}
+
+		edit->Changed.Planes[plane_index].Material = name;
 	}
 
-	if (changed.Planes[plane_index].Material == name) {
-		return;
+	DoublingArray<const Edit*> changed_edits;
+
+	for (const Edit& edit : edits) {
+		bool is_changed = false;
+
+		for (uint32 plane = 0; plane < edit.Changed.Planes.Size; plane++) {
+			is_changed = is_changed || !(edit.Changed.Planes[plane].Material == edit.Before[plane].Material);
+		}
+
+		if (is_changed) {
+			changed_edits.Insert(&edit);
+		}
 	}
 
-	changed.Planes[plane_index].Material = name;
-
-	EmplaceEditOperation<BrushEditOperation>(object, brush->Planes, changed.Planes, 1);
+	for (const Edit* edit : changed_edits) {
+		EmplaceEditOperation<BrushEditOperation>(edit->pObject, edit->Before, edit->Changed.Planes,
+												 static_cast<int32>(changed_edits.Size));
+	}
 }
 
 void RaptorEditor::TopViewSelectLight(uint32 light_id)

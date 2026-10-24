@@ -149,6 +149,7 @@ private:
 	std::atomic<bool> mbIsActive = true;
 	bool mbSidePanelCollapsed = false;
 	bool mbAskingAboutChanges = false;
+	bool mbAppliedState = false;
 
 	EditorPanelState mState;
 };

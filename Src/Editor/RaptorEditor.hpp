@@ -104,6 +104,8 @@ public:
 	 */
 	void Update(float32 delta_time);
 
+	void UpdateCompiledMapViewLock();
+
 	/////////////////////////////////////
 	// Tools
 	/////////////////////////////////////
@@ -143,14 +145,18 @@ public:
 	FX_FORCE_INLINE eEditorView GetView() const { return mView; }
 	FX_FORCE_INLINE bool IsTopViewActive() const { return mView != eEditorView::Perspective; }
 
+	bool IsCompiledMapOpen() const;
+
 	FX_FORCE_INLINE void NoteTopViewCommand() { ++mTopViewCommandSerial; }
 
 	void TopViewSelect(const DynArray<ObjectID>& object_ids, eTopViewSelectMode mode);
 	void TopViewMove(const Vec3f offset);
 	void TopViewRotate(const Vec3f axis, float32 angle, const Vec3f pivot, const Vec3f offset);
-	void TopViewMoveFace(const Vec3f world_normal, float32 distance);
+	void TopViewMoveFace(const Vec3f world_normal, float32 distance, const DynArray<ObjectID>& object_ids);
 	void TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewVertexHandle>& handles, const Vec3f offset);
 	void TopViewCreate(eViewPlane plane, Vec3f min, Vec3f max, bool drop_to_ground);
+	void TopViewCreateRoom(eViewPlane plane, Vec3f min, Vec3f max, bool drop_to_ground, const RoomSettings& settings);
+	void TopViewHollowSelection(const RoomSettings& settings);
 	void TopViewCreateArch(eViewPlane plane, DynArray<Vec3f> points, bool drop_to_ground);
 	void TopViewCreateDecal(eViewPlane plane, Vec3f min, Vec3f max, bool drop_to_ground);
 	void TopViewCreatePatch(eViewPlane plane, ePatchPrimitive primitive, Vec3f min, Vec3f max, bool drop_to_ground,
@@ -159,9 +165,9 @@ public:
 							 const DynArray<TopViewVertexHandle>& handles);
 	void TopViewClip(const Vec3f point_a, const Vec3f point_b, const Vec3f view_axis);
 	void TopViewSubtract(bool keep_cutters);
-	void TopViewEditTextures(ObjectID face_object, const Vec3f face_normal, const TextureCommand& command);
-	void TopViewSetFaceMaterial(ObjectID face_object, const Vec3f face_normal, MaterialID material);
-	void TopViewSetPickedFace(ObjectID face_object, const Vec3f face_normal);
+	void TopViewEditTextures(const DynArray<TopViewFaceRef>& faces, const TextureCommand& command);
+	void TopViewSetFaceMaterial(const DynArray<TopViewFaceRef>& faces, MaterialID material);
+	void TopViewSetPickedFaces(const DynArray<TopViewFaceRef>& faces);
 	void TopViewSelectLight(uint32 light_id);
 	void TopViewMoveLight(const Vec3f offset);
 	void TopViewAimLight(const Vec3f direction);
@@ -190,8 +196,6 @@ public:
 	bool ClipObject(Object* object, const Vec3f point_a, const Vec3f point_b, const Vec3f direction);
 
 	uint32 SubtractSelection(bool keep_cutters);
-
-	uint32 HollowSelection();
 
 	/// Vis mode selects everything but data brushes, Data mode only the data brushes the filter lets through
 	bool IsObjectSelectable(const Object* object) const;
@@ -268,6 +272,8 @@ public:
 
 	bool CanRenameObject(const Object* object) const;
 	bool RenameObject(Object* object, const String& name);
+	/// Names the selection, numbering the names after the first so they stay unique
+	void RenameSelection(const String& name);
 
 	/////////////////////////////////////
 	// Subviews
@@ -377,7 +383,7 @@ private:
 
 	void DrawModelSelection();
 	void DrawSelectionOverlay();
-	void DrawPickedFace();
+	void DrawPickedFaces();
 	void DrawSubviews();
 
 	bool SelectSubview(uint32 instance, bool append_selection);
@@ -404,6 +410,12 @@ private:
 	eDataFilter mDataFilter = eDataFilter::All;
 
 	eEditorView mView = eEditorView::Perspective;
+	bool mbHasCreateReference = false;
+	Vec3f mCreateReferenceMin = Vec3f::sZero;
+	Vec3f mCreateReferenceMax = Vec3f::sZero;
+
+	eEditorView mViewBeforeCompiledMap = eEditorView::Perspective;
+	bool mbViewLockedByCompiledMap = false;
 	uint32 mTopViewCommandSerial = 0;
 
 	String mNotice;
@@ -429,10 +441,14 @@ private:
 	EditorSelection mSelection;
 	EditHistory mHistory { mSelection };
 
-	ObjectID mPickedFaceObject = ObjectID::scNull;
-	Vec3f mPickedFaceNormal = Vec3f::sZero;
-	Ref<PrimitiveMesh> mPickedFaceMesh;
-	SizedArray<Vec3f> mPickedFaceVertices;
+	struct PickedFaceOverlay
+	{
+		TopViewFaceRef Face;
+		Ref<PrimitiveMesh> pMesh;
+		SizedArray<Vec3f> Vertices;
+	};
+
+	DynArray<PickedFaceOverlay> mPickedFaces;
 
 	uint64 mSavedRevision = 0;
 	bool mbUntrackedChanges = false;

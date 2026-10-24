@@ -49,6 +49,8 @@ constexpr ToolButtonInfo scToolButtons[] = {
 	{ "Vertex", "Drag the corners of the selected brushes (V)", "Textures/editor_new/vertex.png" },
 	{ "Create", "Drag to create a brush (B)", "Textures/editor_new/brush.png" },
 	{ "Arch", "Drag a box to fill it with an arch made of brushes (A)", "Textures/editor_new/arch.png" },
+	{ "Room", "Drag a box to build a room or tunnel out of floor, wall and ceiling brushes (O)",
+	  "Textures/editor_new/room.png" },
 	{ "Curve", "Drag to create a curve patch, drag the control points of the selected patches (N)",
 	  "Textures/editor_new/bend.png" },
 	{ "Decal", "Drag a box to project a decal onto the surfaces behind it (D)", "Textures/editor_new/decal.png" },
@@ -462,22 +464,12 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 
 		mpToolGroup->Add(mpSnapButton, wxSizerFlags().CenterVertical().Border(wxLEFT, scSeparatorBorder));
 
-		mpHollowButton = new wxButton(parent, wxID_ANY, "Hollow", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
-		mpHollowButton->SetToolTip("Turn the selected brushes into rooms, with walls as thick as the grid step");
-		mpHollowButton->Enable(false);
-		mpHollowButton->Bind(wxEVT_BUTTON,
-							 [this](wxCommandEvent&)
-							 {
-								 thread::PostToGame(
-									 []
-									 {
-										 gEditor->HollowSelection();
-										 gEditor->NoteTopViewCommand();
-									 });
-								 mpCanvas->SetFocus();
-							 });
+		mpNameButton = new wxButton(parent, wxID_ANY, "Name...", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+		mpNameButton->SetToolTip("Name the selected brushes, numbering them when there are several (F2)");
+		mpNameButton->Enable(false);
+		mpNameButton->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { mpCanvas->PromptRename(); });
 
-		mpToolGroup->Add(mpHollowButton, wxSizerFlags().CenterVertical().Border(wxLEFT, scItemBorder));
+		mpToolGroup->Add(mpNameButton, wxSizerFlags().CenterVertical().Border(wxLEFT, scItemBorder));
 	}
 
 	for (uint32 i = 0; i < scViewPlaneCount; i++) {
@@ -501,6 +493,9 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 				mpCanvas->SetCreateVolume(plane, mBase[i], mSize[i]);
 			});
 
+		mpBaseFields[i] = base_field;
+		mpSizeFields[i] = size_field;
+
 		mpVolumeRows[i] = new wxBoxSizer(wxHORIZONTAL);
 		mpVolumeRows[i]->Add(new wxStaticLine(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL),
 							 wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT, scSeparatorBorder));
@@ -513,7 +508,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 												   "fit on. %s is used over empty space",
 												   scViewPlaneAxes[i].pBaseLabel));
 
-		ground_button->SetValue(true);
+		ground_button->SetValue(false);
 		ground_button->Bind(wxEVT_TOGGLEBUTTON,
 							[this, ground_button](wxCommandEvent&)
 							{
@@ -606,6 +601,69 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 				mpArchArcField->SetValue(settings.ArcDegrees);
 				mpArchStartField->SetValue(settings.StartDegrees);
 			});
+	}
+
+	{
+		wxChoice* shape_choice = new wxChoice(parent, wxID_ANY);
+		shape_choice->Append("Room");
+		shape_choice->Append("Tunnel");
+		shape_choice->SetSelection(static_cast<int>(mRoom.Shape));
+		shape_choice->SetToolTip("Rooms are closed on every side, tunnels are open at both ends of their longer side");
+		shape_choice->Bind(wxEVT_CHOICE,
+						   [this, shape_choice](wxCommandEvent&)
+						   {
+							   const int32 selection = shape_choice->GetSelection();
+
+							   if (selection != wxNOT_FOUND) {
+								   mRoom.Shape = static_cast<eRoomShape>(selection);
+								   mpCanvas->SetRoomSettings(mRoom);
+							   }
+
+							   mpCanvas->SetFocus();
+						   });
+
+		FloatField* wall_field = new FloatField(parent, "Wall", Vec2f(0.01f, 100000.0f));
+		wall_field->SetValue(mRoom.WallThickness);
+		wall_field->SetOnChange(
+			[this](const float32 value)
+			{
+				mRoom.WallThickness = value;
+				mpCanvas->SetRoomSettings(mRoom);
+			});
+
+		OutlineToggleButton* ceiling_button = new OutlineToggleButton(parent, wxBitmap(), "Ceiling");
+		ceiling_button->SetToolTip("Give rooms and tunnels a ceiling, turn it off for courtyards and trenches");
+		ceiling_button->SetValue(mRoom.bCeiling);
+		ceiling_button->Bind(wxEVT_TOGGLEBUTTON,
+							 [this, ceiling_button](wxCommandEvent&)
+							 {
+								 mRoom.bCeiling = ceiling_button->GetValue();
+								 mpCanvas->SetRoomSettings(mRoom);
+								 mpCanvas->SetFocus();
+							 });
+
+		mpHollowButton = new wxButton(parent, wxID_ANY, "Hollow Selection", wxDefaultPosition, wxDefaultSize,
+									  wxBU_EXACTFIT);
+		mpHollowButton->SetToolTip("Turn the selected boxes into rooms or tunnels with these settings, keeping their "
+								   "outside");
+		mpHollowButton->Enable(false);
+		mpHollowButton->Bind(wxEVT_BUTTON,
+							 [this](wxCommandEvent&)
+							 {
+								 mpCanvas->HollowSelection();
+								 mpCanvas->SetFocus();
+							 });
+
+		mpRoomRow = new wxBoxSizer(wxHORIZONTAL);
+		mpRoomRow->Add(new wxStaticLine(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL),
+					   wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT, scSeparatorBorder));
+		mpRoomRow->Add(shape_choice, wxSizerFlags().CenterVertical().Border(wxLEFT, 4));
+		mpRoomRow->Add(wall_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+		mpRoomRow->Add(ceiling_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+		mpRoomRow->Add(mpHollowButton, wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
+		mpToolRow->Add(mpRoomRow, wxSizerFlags().Expand().Border(wxTOP | wxBOTTOM, scItemBorder));
+
+		mpCanvas->SetRoomSettings(mRoom);
 	}
 
 	{
@@ -990,6 +1048,17 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 								  mpCanvas->SetFocus();
 							  });
 
+		OutlineToggleButton* names_button = new OutlineToggleButton(parent, wxBitmap(), "Names");
+		names_button->SetToolTip("Show the names of the brushes in the 2D views");
+		names_button->SetValue(false);
+		names_button->Bind(wxEVT_TOGGLEBUTTON,
+						   [this, names_button](wxCommandEvent&)
+						   {
+							   mpCanvas->SetShowNames(names_button->GetValue());
+							   mpCanvas->SetFocus();
+						   });
+
+		mpViewGroup->Add(names_button, wxSizerFlags().CenterVertical().Border(wxALL, scItemBorder));
 		mpViewGroup->Add(fit_button, wxSizerFlags().CenterVertical().Border(wxALL, scItemBorder));
 		mpViewGroup->Add(hide_button, wxSizerFlags().CenterVertical().Border(wxALL, scItemBorder));
 		mpViewGroup->Add(mpShowAllButton, wxSizerFlags().CenterVertical().Border(wxALL, scItemBorder));
@@ -997,6 +1066,16 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 
 	mpCanvas->SetOnToolChanged([this](eEditorTool tool) { ShowTool(tool); });
 	mpCanvas->SetOnPlaneChanged([this](eViewPlane plane) { ShowPlane(plane); });
+	mpCanvas->SetOnCreateVolumeChanged(
+		[this](eViewPlane plane, float32 base, float32 size)
+		{
+			const uint32 index = static_cast<uint32>(plane);
+
+			mBase[index] = base;
+			mSize[index] = size;
+			mpBaseFields[index]->SetValue(base);
+			mpSizeFields[index]->SetValue(size);
+		});
 
 	ShowTool(mpCanvas->GetTool());
 	ShowPlane(mpCanvas->GetPlane());
@@ -1028,6 +1107,7 @@ void EditorToolbar::UpdateVisibility()
 	}
 
 	mpToolRow->Show(mpArchRow, mbShows2D && mTool == eEditorTool::Arch, true);
+	mpToolRow->Show(mpRoomRow, mbShows2D && mTool == eEditorTool::Room, true);
 	mpToolRow->Show(mpCurveRow, mbShows2D && mTool == eEditorTool::Curve, true);
 	mpToolRow->Show(mpFaceRow, mbShows2D && mTool == eEditorTool::Face, true);
 
@@ -1064,6 +1144,12 @@ void EditorToolbar::ShowMode(eEditorMode mode, eDataFilter filter, uint32 availa
 
 void EditorToolbar::ShowSimulating(bool simulating) { mpSimulateButton->SetValue(simulating); }
 
+void EditorToolbar::Set2DViewsEnabled(bool enabled)
+{
+	mpTopButton->Enable(enabled);
+	mpSplitButton->Enable(enabled);
+}
+
 void EditorToolbar::ShowTool(eEditorTool tool)
 {
 	mTool = tool;
@@ -1098,6 +1184,7 @@ void EditorToolbar::ApplyState(const TopViewState& state)
 	if (has_selection != mbShownHasSelection) {
 		mbShownHasSelection = has_selection;
 		mpSnapButton->Enable(has_selection);
+		mpNameButton->Enable(has_selection);
 		mpHollowButton->Enable(has_selection);
 	}
 

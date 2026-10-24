@@ -154,6 +154,7 @@ public:
 
 	static constexpr float32 scWeaponFarPlane = 0.01f;
 	static constexpr float32 scWeaponNearPlane = 20.0f;
+	static constexpr float32 scWeaponDepthScale = 0.01f;
 
 public:
 	PerspectiveCamera() { Update(); }

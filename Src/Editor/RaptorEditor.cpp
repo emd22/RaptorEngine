@@ -80,10 +80,10 @@ static constexpr float32 scPlaceDistance = 4.0f;
 static constexpr float32 scCreateRange = 20.0f;
 
 /// Size of a snap step for each snap level. Mirrors tool_get_snap_multiplier() in `tool_common.strata`.
-static constexpr float32 scSnapSteps[] = { 0.05f, 0.10f, 0.25f, 0.50f };
+static constexpr float32 scSnapSteps[] = { 0.0625f, 0.125f, 0.25f, 0.5f, 1.0f };
 static constexpr int32 scSnapLevelCount = static_cast<int32>(std::size(scSnapSteps));
 
-static constexpr float32 scAngleSnapSteps[] = { 5.0f, 15.0f, 45.0f, 90.0f };
+static constexpr float32 scAngleSnapSteps[] = { 5.0f, 15.0f, 45.0f, 90.0f, 90.0f };
 static_assert(std::size(scAngleSnapSteps) == std::size(scSnapSteps));
 
 static const Vec3f scDefaultDataBrushHalfExtent(2.0f, 1.5f, 2.0f);
@@ -95,7 +95,7 @@ static constexpr uint32 ToolBit(eEditorTool tool) { return 1u << static_cast<uin
 static constexpr uint32 scBrushEditTools = ToolBit(eEditorTool::Face) | ToolBit(eEditorTool::Vertex);
 
 static constexpr uint32 scVisTools = ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Rotate) |
-									 ToolBit(eEditorTool::Create) | ToolBit(eEditorTool::Arch) |
+									 ToolBit(eEditorTool::Create) | ToolBit(eEditorTool::Arch) | ToolBit(eEditorTool::Room) |
 									 ToolBit(eEditorTool::Curve) | ToolBit(eEditorTool::Decal) |
 									 ToolBit(eEditorTool::Clip);
 
@@ -263,7 +263,7 @@ void RaptorEditor::EndGameLoop()
 {
 	thread::RunOnUIAndWait([this] { LockdownGUI(); });
 
-	TopViewSetPickedFace(ObjectID::scNull, Vec3f::sZero);
+	TopViewSetPickedFaces({});
 
 	mGamePhase = eGamePhase::Stopped;
 }
@@ -336,6 +336,7 @@ EditorPanelState RaptorEditor::BuildPanelState()
 
 	state.BlockoutPath = gWorld->PrototypePath;
 	state.bUnsavedChanges = HasUnsavedChanges();
+	state.bIsCompiledMap = IsCompiledMapOpen();
 
 	if (gWorld->pPrototype != nullptr) {
 		state.ActiveSubview = gWorld->pPrototype->GetSubviewName(gWorld->pPrototype->GetActiveSubview());
@@ -527,6 +528,8 @@ void RaptorEditor::InvokeReloadHandler(eReloadTarget target)
 
 void RaptorEditor::Update(float32 delta_time)
 {
+	UpdateCompiledMapViewLock();
+
 	if (gWorld->pPrototype != nullptr) {
 		gWorld->pPrototype->SyncSubviewInstances();
 
@@ -557,7 +560,7 @@ void RaptorEditor::Update(float32 delta_time)
 	}
 
 	DrawSelectionOverlay();
-	DrawPickedFace();
+	DrawPickedFaces();
 	DrawModelSelection();
 	DrawSubviews();
 }
@@ -1396,6 +1399,63 @@ bool RaptorEditor::RenameObject(Object* object, const String& name)
 	return true;
 }
 
+void RaptorEditor::RenameSelection(const String& name)
+{
+	if (IsSimulationMode()) {
+		return;
+	}
+
+	const String base_name = ConfigFile::MakeValidName(name);
+
+	if (base_name.IsEmpty()) {
+		Warn("Objects need a name");
+		return;
+	}
+
+	struct Rename
+	{
+		Object* pObject = nullptr;
+		String Before;
+		String After;
+	};
+
+	DynArray<Rename> renames;
+	uint32 suffix = 0;
+
+	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
+		Object* object = mSelection.GetObject(i);
+
+		if (!CanRenameObject(object)) {
+			continue;
+		}
+
+		String candidate;
+		bool is_taken = true;
+
+		while (is_taken) {
+			candidate = base_name;
+
+			if (suffix > 0) {
+				candidate = String::Fmt("{}_{}", base_name, suffix);
+			}
+
+			suffix++;
+
+			const Object* existing = gObjectManager->FindObject(HashStr32(candidate.CStr()));
+			is_taken = (existing != nullptr && existing != object);
+		}
+
+		if (!(candidate == object->Name.Get())) {
+			renames.Insert(Rename { object, object->Name.Get(), candidate });
+		}
+	}
+
+	for (const Rename& rename : renames) {
+		EmplaceEditOperation<RenameEditOperation>(rename.pObject, rename.Before, rename.After,
+												  static_cast<int32>(renames.Size));
+	}
+}
+
 void RaptorEditor::DeleteSelection()
 {
 	// Each delete takes its object out of the selection, so work from a copy
@@ -1622,94 +1682,6 @@ uint32 RaptorEditor::SubtractSelection(bool keep_cutters)
 	}
 
 	return cut_count;
-}
-
-uint32 RaptorEditor::HollowSelection()
-{
-	Blockout* blockout = gWorld->pPrototype;
-
-	if (blockout == nullptr || IsSimulationMode()) {
-		return 0;
-	}
-
-	struct Hollow
-	{
-		Object* pObject = nullptr;
-		Brush::PlaneList Before;
-		std::vector<Brush::PlaneList> Pieces;
-		std::vector<Vec3f> Positions;
-	};
-
-	const float32 thickness = GetSnapStep();
-
-	std::vector<Hollow> hollows;
-	uint32 operation_count = 0;
-	uint32 too_thin_count = 0;
-
-	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
-		Object* object = mSelection.GetObject(i);
-		const Brush* brush = blockout->GetBrush(object);
-
-		if (brush == nullptr || !CanEditObject(object) || object->HasTags(eObjectTag::LockTransform) ||
-			!CanBeSubtractedFrom(object)) {
-			continue;
-		}
-
-		Hollow hollow;
-		hollow.pObject = object;
-		hollow.Before = brush->Planes;
-
-		if (!blockout->GetHollowPieces(object, thickness, hollow.Pieces, hollow.Positions)) {
-			Warn("'{}' is too thin to hollow out with {} thick walls", object->Name.Get(), thickness);
-			too_thin_count++;
-			continue;
-		}
-
-		operation_count += static_cast<uint32>(hollow.Pieces.size());
-		hollows.push_back(std::move(hollow));
-	}
-
-	if (hollows.empty()) {
-		if (too_thin_count == 0) {
-			Warn("Select the brushes to hollow out first");
-		}
-
-		return 0;
-	}
-
-	if (operation_count > scMaxSubtractOperations) {
-		Warn("Hollowing the selection would make too many brushes at once");
-		return 0;
-	}
-
-	const int32 group_size = static_cast<int32>(operation_count);
-
-	std::vector<Object*> walls;
-
-	for (const Hollow& hollow : hollows) {
-		EmplaceEditOperation<BrushEditOperation>(hollow.pObject, hollow.Before, hollow.Pieces[0], group_size);
-		walls.push_back(hollow.pObject);
-
-		for (uint32 piece = 1; piece < hollow.Pieces.size(); piece++) {
-			ObjectSnapshot snapshot = ObjectSnapshot::Capture(*hollow.pObject,
-															  hollow.pObject->GetMaterialID());
-			snapshot.ObjectName = Name();
-			snapshot.Position = hollow.Positions[piece];
-
-			Object* created = EmplaceEditOperation<CreateBrushOperation>(hollow.Pieces[piece], snapshot, group_size)
-								  .GetCreated();
-
-			if (created != nullptr) {
-				walls.push_back(created);
-			}
-		}
-	}
-
-	for (Object* wall : walls) {
-		SelectObject(wall, true);
-	}
-
-	return static_cast<uint32>(hollows.size());
 }
 
 /////////////////////////////////////

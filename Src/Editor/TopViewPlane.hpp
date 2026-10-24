@@ -52,6 +52,17 @@ struct TopViewVertexHandle
 	Vec2f Position = Vec2f::scZero;
 };
 
+struct TopViewFaceRef
+{
+	ObjectID ObjectId = ObjectID::scNull;
+	Vec3f Normal = Vec3f::sZero;
+
+	bool operator==(const TopViewFaceRef& other) const
+	{
+		return ObjectId == other.ObjectId && Normal == other.Normal;
+	}
+};
+
 inline constexpr const char* scAxisNames = "XYZ";
 
 inline constexpr uint32 scArchPointsPerSegment = 8;
@@ -133,6 +144,72 @@ struct TextureCommand
 	eTextureCommand Type = eTextureCommand::Shift;
 	Vec2f Amount = Vec2f::scZero;
 };
+
+enum class eRoomShape : uint8
+{
+	Room,
+	Tunnel,
+
+	Count,
+};
+
+struct RoomSettings
+{
+	eRoomShape Shape = eRoomShape::Room;
+	float32 WallThickness = 0.25f;
+	bool bCeiling = true;
+};
+
+inline constexpr uint32 scMaxRoomPieces = 6;
+
+struct RoomPiece
+{
+	Vec3f Min = Vec3f::sZero;
+	Vec3f Max = Vec3f::sZero;
+};
+
+inline uint32 BuildRoomPieces(const Vec3f min, const Vec3f max, const RoomSettings& settings,
+							  RoomPiece (&out_pieces)[scMaxRoomPieces])
+{
+	const float32 wall = settings.WallThickness;
+	const Vec3f extent = max - min;
+
+	const bool is_tunnel = (settings.Shape == eRoomShape::Tunnel);
+	const bool open_x = is_tunnel && extent.X >= extent.Z;
+	const bool open_z = is_tunnel && !open_x;
+
+	const float32 vertical_walls = settings.bCeiling ? 2.0f : 1.0f;
+
+	if (!(wall > 0.0f) || extent.Y <= wall * vertical_walls || (!open_x && extent.X <= wall * 2.0f) ||
+		(!open_z && extent.Z <= wall * 2.0f)) {
+		return 0;
+	}
+
+	const Vec3f inner_min = min + Vec3f(open_x ? 0.0f : wall, wall, open_z ? 0.0f : wall);
+	const Vec3f inner_max = max - Vec3f(open_x ? 0.0f : wall, settings.bCeiling ? wall : 0.0f, open_z ? 0.0f : wall);
+
+	uint32 count = 0;
+
+	out_pieces[count++] = RoomPiece { min, Vec3f(max.X, inner_min.Y, max.Z) };
+
+	if (settings.bCeiling) {
+		out_pieces[count++] = RoomPiece { Vec3f(min.X, inner_max.Y, min.Z), max };
+	}
+
+	if (!open_x) {
+		out_pieces[count++] = RoomPiece { Vec3f(min.X, inner_min.Y, min.Z), Vec3f(inner_min.X, inner_max.Y, max.Z) };
+		out_pieces[count++] = RoomPiece { Vec3f(inner_max.X, inner_min.Y, min.Z), Vec3f(max.X, inner_max.Y, max.Z) };
+	}
+
+	if (!open_z) {
+		out_pieces[count++] = RoomPiece { Vec3f(inner_min.X, inner_min.Y, min.Z),
+										  Vec3f(inner_max.X, inner_max.Y, inner_min.Z) };
+		out_pieces[count++] = RoomPiece { Vec3f(inner_min.X, inner_min.Y, inner_max.Z),
+										  Vec3f(inner_max.X, inner_max.Y, max.Z) };
+	}
+
+	return count;
+}
 
 inline const ViewPlaneAxes& GetViewPlaneAxes(eViewPlane plane) { return scViewPlaneAxes[static_cast<uint32>(plane)]; }
 

@@ -19,6 +19,7 @@
 #ifdef FX_IS_EDITOR
 #include <Editor/RaptorEditor.hpp>
 #endif
+#include <Core/Serialize2.hpp>
 #include <Math/MathConsts.hpp>
 #include <Math/MathUtil.hpp>
 #include <Renderer/Globals.hpp>
@@ -60,6 +61,16 @@ static void RunGame()
 
 int main(int argc, char** argv)
 {
+	// 	{
+	// 		TestStruct ts {};
+	// 		SerializerIO sio = Serializable<TestStruct>::Save(ts);
+	// 		sio.PrintDebug();
+	// 	}
+	//
+	//
+	// 	return 0;
+
+
 #ifdef FX_IS_EDITOR
 	gEditor = new editor::RaptorEditor;
 

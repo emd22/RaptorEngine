@@ -70,10 +70,15 @@ public:
 	void CommitArch();
 	void DiscardArch();
 	void SetCurveSettings(const CurveSettings& settings);
+	void SetRoomSettings(const RoomSettings& settings);
+	void HollowSelection();
+
+	void SetShowNames(bool show);
+	void PromptRename();
 	void RunPatchCommand(ePatchCommand type);
 	void RunTextureCommand(const TextureCommand& command);
 
-	bool GetPickedFace(ObjectID& out_object, Vec3f& out_normal) const;
+	DynArray<TopViewFaceRef> GetPickedFaces() const;
 
 	void FitAll();
 	void FitSelection();
@@ -83,6 +88,10 @@ public:
 	void SetOnStatus(std::function<void(const wxString&)> handler) { mpOnStatus = std::move(handler); }
 	void SetOnArchChanged(std::function<void(const ArchSettings&)> handler) { mpOnArchChanged = std::move(handler); }
 	void SetOnCurveChanged(std::function<void(const CurveSettings&)> handler) { mpOnCurveChanged = std::move(handler); }
+	void SetOnCreateVolumeChanged(std::function<void(eViewPlane, float32, float32)> handler)
+	{
+		mpOnCreateVolumeChanged = std::move(handler);
+	}
 	void SetOnFaceTextureChanged(std::function<void(const TopViewFace&)> handler)
 	{
 		mpOnFaceTextureChanged = std::move(handler);
@@ -227,6 +236,7 @@ private:
 	void DrawBrushes(wxGraphicsContext& gc, const wxSize& size);
 	void DrawOverlays(wxGraphicsContext& gc, const wxSize& size);
 	void DrawMarkers(wxGraphicsContext& gc);
+	void DrawNames(wxGraphicsContext& gc, const wxSize& size);
 	void DrawPlayer(wxGraphicsContext& gc);
 
 	wxSize GetViewSize() const;
@@ -259,6 +269,7 @@ private:
 	void FinishMarquee();
 	void FinishMove();
 	void FinishCreate();
+	void GetCreateVolume(const DRect& rect, double depth, Vec3f& out_min, Vec3f& out_max) const;
 	void FinishArch();
 	void FinishArchEdit();
 	void FinishRotate();
@@ -283,6 +294,7 @@ private:
 	void SyncCurveFromSelection();
 	void SyncTextureFromPickedFace();
 	void SyncPickedFaceToGame();
+	void SyncCreateVolumeFromReference();
 	void SyncWeightFromHandles();
 
 	void UpdatePreview();
@@ -295,12 +307,19 @@ private:
 	void FitBounds(const ViewBounds& bounds);
 	void TryInitialFit();
 
+	double GetGridStep(double min_step) const;
 	double Snap(double value) const;
 	Vec2d Snap(const Vec2d uv) const;
 	double SnapAngle(double radians) const;
 
 	DynArray<int32> PickAt(const Vec2d uv) const;
 	int PickFaceAt(const Vec2d uv, int& out_face) const;
+	const TopViewFrontFace* PickFrontFaceAt(const Vec2d uv, ObjectID& out_brush) const;
+	bool IsFacePicked(ObjectID object_id, const Vec3f& normal) const;
+	void PickFace(ObjectID object_id, const Vec3f& normal, bool additive);
+	void UnpickFace(ObjectID object_id, const Vec3f& normal);
+	void ClearPickedFaces();
+	DynArray<ObjectID> GetFaceDragTargets() const;
 	void UpdateHover();
 	bool PickVertexAt(const Vec2d uv, TopViewVertexHandle& out_handle) const;
 	bool IsVertexSelected(ObjectID object_id, const Vec2d uv) const;
@@ -388,12 +407,14 @@ private:
 	bool mbHoverFace = false;
 	TopViewFace mHoverFace;
 
-	bool mbHasPickedFace = false;
-	ObjectID mPickedFaceBrushId = ObjectID::scNull;
-	Vec2f mPickedFaceNormal = Vec2f::scZero;
+	DynArray<TopViewFaceRef> mPickedFaces;
+	DynArray<TopViewFaceRef> mSentPickedFaces;
+	bool mbFaceToggleOnRelease = false;
+	bool mbFaceReplaceOnRelease = false;
 
-	ObjectID mSentPickedFaceId = ObjectID::scNull;
-	Vec3f mSentPickedFaceNormal = Vec3f::sZero;
+	bool mbHoverFrontFace = false;
+	TopViewFaceRef mHoverFrontFace;
+	DynArray<Vec2f> mHoverFrontPolygon;
 
 	DynArray<TopViewVertexHandle> mSelectedVertices;
 	TopViewVertexHandle mGrabbedVertex;
@@ -419,7 +440,11 @@ private:
 
 	float32 mCreateBase[scViewPlaneCount] = {};
 	float32 mCreateSize[scViewPlaneCount] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
-	bool mbDropToGround = true;
+	bool mbDropToGround = false;
+
+	bool mbHasAppliedCreateReference = false;
+	Vec3f mAppliedCreateReferenceMin = Vec3f::sZero;
+	Vec3f mAppliedCreateReferenceMax = Vec3f::sZero;
 
 	ArchSettings mArch;
 	bool mbArchPending = false;
@@ -433,6 +458,9 @@ private:
 	double mArchAngleTravel = 0.0;
 
 	CurveSettings mCurve;
+	RoomSettings mRoom;
+
+	bool mbShowNames = false;
 
 	std::function<void(eEditorTool)> mpOnToolChanged;
 	std::function<void(eViewPlane)> mpOnPlaneChanged;
@@ -443,6 +471,7 @@ private:
 	std::chrono::steady_clock::time_point mNoticeTime;
 	std::function<void(const ArchSettings&)> mpOnArchChanged;
 	std::function<void(const CurveSettings&)> mpOnCurveChanged;
+	std::function<void(eViewPlane, float32, float32)> mpOnCreateVolumeChanged;
 	std::function<void(const TopViewFace&)> mpOnFaceTextureChanged;
 };
 

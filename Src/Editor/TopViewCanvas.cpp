@@ -11,6 +11,7 @@
 #include <wx/dcgraph.h>
 #include <wx/dcmemory.h>
 #include <wx/graphics.h>
+#include <wx/textdlg.h>
 #include <wx/time.h>
 #include <wx/utils.h>
 
@@ -87,11 +88,12 @@ constexpr double scClipHandleRadius = 3.5;
 
 constexpr const char* scToolHints[] = {
 	"Drag to move, Shift adds, " FX_TOP_VIEW_FREE_KEY " ignores snap, Z frames selection",
-	"Drag an edge to move its face, click an edge to pick that face for texturing, " FX_TOP_VIEW_FREE_KEY
-	" ignores snap",
+	"Click an edge or inside a brush to pick a face, Shift picks more, drag an edge to move its face, "
+	FX_TOP_VIEW_FREE_KEY " ignores snap",
 	"Drag corners, Shift adds, " FX_TOP_VIEW_FREE_KEY " ignores snap",
 	"Drag to create a brush, " FX_TOP_VIEW_FREE_KEY " ignores snap",
 	"Drag a box to lay out an arch, then shape it with the handles, " FX_TOP_VIEW_FREE_KEY " ignores snap",
+	"Drag the outside of a room or tunnel, its depth comes from the fields, " FX_TOP_VIEW_FREE_KEY " ignores snap",
 	"Drag to create a patch, drag the control points of the selected patches, Shift adds, [ ] "
 	"subdivisions, " FX_TOP_VIEW_FREE_KEY " ignores snap",
 	"Drag a box to project a decal onto the surface behind it, " FX_TOP_VIEW_FREE_KEY " ignores snap",
@@ -102,12 +104,15 @@ constexpr const char* scToolHints[] = {
 
 static_assert(std::size(scToolHints) == static_cast<size_t>(eEditorTool::Count));
 
-constexpr const char* scPickedFaceHint = "Alt+Left/Right Shift UVs, Alt+[ ] scale, Alt+, . rotate";
+constexpr const char* scPickedFaceHint = "Shift-click picks more faces, Alt+Left/Right Shift UVs, Alt+[ ] scale, "
+										 "Alt+, . rotate";
 
 constexpr const char* scArchPendingHint = "Drag the handles to reshape, [ ] sides, arrows nudge, Enter or double-click "
 										  "builds, Esc cancels, " FX_TOP_VIEW_FREE_KEY " ignores snap";
 
-constexpr double scMetricSteps[] = { 0.1, 0.5, 1.0, 5.0, 10.0, 50.0, 100.0, 500.0, 1000.0, 5000.0, 10000.0 };
+constexpr double scWholeGridSteps[] = { 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0 };
+constexpr double scFinestGridStep = 0.0625;
+constexpr double scMajorGridRatio = 4.0;
 
 constexpr int scDimMarkerAlpha = 110;
 
@@ -292,6 +297,61 @@ const TopViewFace* FindMatchingFace(const TopViewProjection& projection, const V
 	}
 
 	return best;
+}
+
+const TopViewFace* FindSideFace(const TopViewProjection& projection, const Vec3f& world_normal)
+{
+	const TopViewFace* best = nullptr;
+	double best_dot = scFaceMatchDot;
+
+	for (const TopViewFace& face : projection.Faces) {
+		const double dot = face.WorldNormal.Dot(world_normal);
+
+		if (dot > best_dot) {
+			best_dot = dot;
+			best = &face;
+		}
+	}
+
+	return best;
+}
+
+const TopViewFrontFace* FindFrontFace(const TopViewProjection& projection, const Vec3f& world_normal)
+{
+	const TopViewFrontFace* best = nullptr;
+	double best_dot = scFaceMatchDot;
+
+	for (const TopViewFrontFace& front : projection.FrontFaces) {
+		const double dot = front.Face.WorldNormal.Dot(world_normal);
+
+		if (dot > best_dot) {
+			best_dot = dot;
+			best = &front;
+		}
+	}
+
+	return best;
+}
+
+bool IsInsidePolygon(const DynArray<Vec2f>& polygon, const Vec2d point)
+{
+	if (polygon.Size < 3) {
+		return false;
+	}
+
+	bool has_positive = false;
+	bool has_negative = false;
+
+	for (uint32 i = 0; i < polygon.Size; i++) {
+		const Vec2d a = ToVec2d(polygon[i]);
+		const Vec2d b = ToVec2d(polygon[(i + 1) % polygon.Size]);
+		const double cross = (b - a).Cross(point - a);
+
+		has_positive = has_positive || cross > 0.0;
+		has_negative = has_negative || cross < 0.0;
+	}
+
+	return !(has_positive && has_negative);
 }
 
 DynArray<Vec2f> BuildShiftedPolygon(const TopViewProjection& projection, const TopViewFace& face, double shift)
@@ -670,18 +730,30 @@ void TopViewCanvas::ApplyState(const TopViewState& state)
 		mSelectedVertices = std::move(kept);
 	}
 
-	if (mbHasPickedFace) {
-		const TopViewBrush* brush = FindBrush(mPickedFaceBrushId);
+	if (!mbPreviewHeld && mPickedFaces.IsNotEmpty()) {
+		DynArray<TopViewFaceRef> kept;
 
-		if (brush == nullptr || !brush->bSelected ||
-			FindMatchingFace(Projection(*brush), ToVec2d(mPickedFaceNormal)) == nullptr) {
-			mbHasPickedFace = false;
+		for (const TopViewFaceRef& face : mPickedFaces) {
+			const TopViewBrush* brush = FindBrush(face.ObjectId);
+
+			if (brush == nullptr) {
+				continue;
+			}
+
+			const TopViewProjection& projection = Projection(*brush);
+
+			if (FindSideFace(projection, face.Normal) != nullptr || FindFrontFace(projection, face.Normal) != nullptr) {
+				kept.Insert(face);
+			}
 		}
+
+		mPickedFaces = std::move(kept);
 	}
 
 	SyncCurveFromSelection();
 	SyncTextureFromPickedFace();
 	SyncPickedFaceToGame();
+	SyncCreateVolumeFromReference();
 
 	TryInitialFit();
 	UpdateHover();
@@ -760,7 +832,7 @@ void TopViewCanvas::ApplyTool(eEditorTool tool)
 	}
 
 	if (tool != eEditorTool::Face) {
-		mbHasPickedFace = false;
+		mPickedFaces.Clear();
 	}
 
 	if (mpOnToolChanged) {
@@ -805,7 +877,8 @@ void TopViewCanvas::SetPlane(eViewPlane plane)
 		mbPreviewHeld = false;
 		ClearPreview();
 		mbHoverFace = false;
-		mbHasPickedFace = false;
+		mbHoverFrontFace = false;
+		mPickedFaces.Clear();
 		mbHoverVertex = false;
 		mSelectedVertices.Clear();
 		mbArchPending = false;
@@ -867,6 +940,55 @@ void TopViewCanvas::SetCurveSettings(const CurveSettings& settings)
 	mCurve.Weight = std::max(mCurve.Weight, Patch::scMinWeight);
 }
 
+void TopViewCanvas::SetRoomSettings(const RoomSettings& settings)
+{
+	mRoom = settings;
+
+	if (mPreview.Kind == eDrag::Create) {
+		Refresh();
+	}
+}
+
+void TopViewCanvas::HollowSelection()
+{
+	SendCommand([settings = mRoom] { gEditor->TopViewHollowSelection(settings); });
+}
+
+void TopViewCanvas::SetShowNames(bool show)
+{
+	mbShowNames = show;
+	Refresh();
+}
+
+void TopViewCanvas::PromptRename()
+{
+	const uint32 selected_count = GetSelectedCount();
+
+	if (selected_count == 0 || mDrag != eDrag::None) {
+		return;
+	}
+
+	wxString message = "Name for the selected brush";
+
+	if (selected_count > 1) {
+		message = wxString::Format("Name for the %u selected brushes. The names after the first are numbered "
+								   "(name_1, name_2, ...)",
+								   selected_count);
+	}
+
+	wxTextEntryDialog dialog(this, message, "Name Brushes", wxString::FromUTF8(mState.SelectionName.CStr()));
+
+	if (dialog.ShowModal() != wxID_OK) {
+		SetFocus();
+		return;
+	}
+
+	const String name(dialog.GetValue().Trim().Trim(false).ToStdString());
+
+	SendCommand([name] { gEditor->RenameSelection(name); });
+	SetFocus();
+}
+
 void TopViewCanvas::NotifyCurveChanged()
 {
 	if (mpOnCurveChanged) {
@@ -905,30 +1027,101 @@ void TopViewCanvas::RunPatchCommand(ePatchCommand type)
 
 void TopViewCanvas::RunTextureCommand(const TextureCommand& command)
 {
-	ObjectID face_object = ObjectID::scNull;
-	Vec3f face_normal = Vec3f::sZero;
-
-	if (mbHasPickedFace) {
-		face_object = mPickedFaceBrushId;
-		face_normal = ToWorldVector(ToVec2d(mPickedFaceNormal), 0.0);
-	}
-
-	SendCommand([face_object, face_normal, command]
-				{ gEditor->TopViewEditTextures(face_object, face_normal, command); });
+	SendCommand([faces = GetPickedFaces(), command] { gEditor->TopViewEditTextures(faces, command); });
 
 	Refresh();
 }
 
-bool TopViewCanvas::GetPickedFace(ObjectID& out_object, Vec3f& out_normal) const
+DynArray<TopViewFaceRef> TopViewCanvas::GetPickedFaces() const
 {
-	if (mTool != eEditorTool::Face || !mbHasPickedFace) {
-		return false;
+	if (mTool != eEditorTool::Face) {
+		return {};
 	}
 
-	out_object = mPickedFaceBrushId;
-	out_normal = ToWorldVector(ToVec2d(mPickedFaceNormal), 0.0);
+	return mPickedFaces.Clone();
+}
 
-	return true;
+bool TopViewCanvas::IsFacePicked(ObjectID object_id, const Vec3f& normal) const
+{
+	for (const TopViewFaceRef& face : mPickedFaces) {
+		if (face.ObjectId == object_id && face.Normal.Dot(normal) > scFaceMatchDot) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void TopViewCanvas::PickFace(ObjectID object_id, const Vec3f& normal, bool additive)
+{
+	if (additive && IsFacePicked(object_id, normal)) {
+		UnpickFace(object_id, normal);
+		return;
+	}
+
+	if (!additive) {
+		mPickedFaces.Clear();
+
+		if (GetSelectedCount() > 0) {
+			SelectBrushes({}, eTopViewSelectMode::Replace);
+		}
+	}
+
+	mPickedFaces.Insert(TopViewFaceRef { object_id, normal });
+
+	SyncTextureFromPickedFace();
+	SyncPickedFaceToGame();
+	UpdateStatus();
+	Refresh();
+}
+
+void TopViewCanvas::UnpickFace(ObjectID object_id, const Vec3f& normal)
+{
+	DynArray<TopViewFaceRef> kept;
+
+	for (const TopViewFaceRef& face : mPickedFaces) {
+		if (face.ObjectId != object_id || face.Normal.Dot(normal) <= scFaceMatchDot) {
+			kept.Insert(face);
+		}
+	}
+
+	mPickedFaces = std::move(kept);
+
+	SyncTextureFromPickedFace();
+	SyncPickedFaceToGame();
+	UpdateStatus();
+	Refresh();
+}
+
+void TopViewCanvas::ClearPickedFaces()
+{
+	if (mPickedFaces.IsEmpty()) {
+		return;
+	}
+
+	mPickedFaces.Clear();
+
+	SyncPickedFaceToGame();
+	UpdateStatus();
+	Refresh();
+}
+
+DynArray<ObjectID> TopViewCanvas::GetFaceDragTargets() const
+{
+	DynArray<ObjectID> targets;
+	targets.Insert(mGrabbedBrushId);
+
+	for (const TopViewFaceRef& face : mPickedFaces) {
+		if (face.Normal.Dot(mGrabbedFace.WorldNormal) <= scFaceMatchDot) {
+			continue;
+		}
+
+		if (std::find(targets.begin(), targets.end(), face.ObjectId) == targets.end()) {
+			targets.Insert(face.ObjectId);
+		}
+	}
+
+	return targets;
 }
 
 void TopViewCanvas::SyncWeightFromHandles()
@@ -1001,38 +1194,69 @@ void TopViewCanvas::SyncCurveFromSelection()
 
 void TopViewCanvas::SyncTextureFromPickedFace()
 {
-	if (!mbHasPickedFace || !mpOnFaceTextureChanged) {
+	if (mPickedFaces.IsEmpty() || !mpOnFaceTextureChanged) {
 		return;
 	}
 
-	const TopViewBrush* brush = FindBrush(mPickedFaceBrushId);
+	const TopViewFaceRef& picked = mPickedFaces[mPickedFaces.Size - 1];
+	const TopViewBrush* brush = FindBrush(picked.ObjectId);
 
 	if (brush == nullptr) {
 		return;
 	}
 
-	const TopViewFace* face = FindMatchingFace(Projection(*brush), ToVec2d(mPickedFaceNormal));
+	const TopViewProjection& projection = Projection(*brush);
 
-	if (face != nullptr) {
+	if (const TopViewFace* face = FindSideFace(projection, picked.Normal); face != nullptr) {
 		mpOnFaceTextureChanged(*face);
+	}
+	else if (const TopViewFrontFace* front = FindFrontFace(projection, picked.Normal); front != nullptr) {
+		mpOnFaceTextureChanged(front->Face);
+	}
+}
+
+void TopViewCanvas::SyncCreateVolumeFromReference()
+{
+	if (!mState.bHasCreateReference) {
+		return;
+	}
+
+	if (mbHasAppliedCreateReference && mState.CreateReferenceMin == mAppliedCreateReferenceMin &&
+		mState.CreateReferenceMax == mAppliedCreateReferenceMax) {
+		return;
+	}
+
+	mbHasAppliedCreateReference = true;
+	mAppliedCreateReferenceMin = mState.CreateReferenceMin;
+	mAppliedCreateReferenceMax = mState.CreateReferenceMax;
+
+	for (uint32 i = 0; i < scViewPlaneCount; i++) {
+		const eViewPlane plane = static_cast<eViewPlane>(i);
+		const uint32 axis = GetViewPlaneAxes(plane).W;
+
+		const float32 base = GetAxis(mState.CreateReferenceMin, axis);
+		const float32 size = std::max<float32>(GetAxis(mState.CreateReferenceMax, axis) - base, scMinCreateDepth);
+
+		mCreateBase[i] = base;
+		mCreateSize[i] = size;
+
+		if (mpOnCreateVolumeChanged) {
+			mpOnCreateVolumeChanged(plane, base, size);
+		}
 	}
 }
 
 void TopViewCanvas::SyncPickedFaceToGame()
 {
-	ObjectID face_object = ObjectID::scNull;
-	Vec3f face_normal = Vec3f::sZero;
+	DynArray<TopViewFaceRef> faces = GetPickedFaces();
 
-	GetPickedFace(face_object, face_normal);
-
-	if (face_object == mSentPickedFaceId && face_normal == mSentPickedFaceNormal) {
+	if (faces == mSentPickedFaces) {
 		return;
 	}
 
-	mSentPickedFaceId = face_object;
-	mSentPickedFaceNormal = face_normal;
+	mSentPickedFaces = faces.Clone();
 
-	thread::PostToGame([face_object, face_normal] { gEditor->TopViewSetPickedFace(face_object, face_normal); });
+	thread::PostToGame([faces = std::move(faces)] { gEditor->TopViewSetPickedFaces(faces); });
 }
 
 bool TopViewCanvas::UsesHandles() const { return mTool == eEditorTool::Vertex || mTool == eEditorTool::Curve; }
@@ -1209,6 +1433,31 @@ void TopViewCanvas::PanByPixels(const Vec2d delta)
 	Refresh();
 }
 
+double TopViewCanvas::GetGridStep(double min_step) const
+{
+	double step = scFinestGridStep;
+
+	if (mState.bSnapEnabled && mState.SnapStep > 0.0f) {
+		step = mState.SnapStep;
+	}
+
+	while (step < 1.0 && step < min_step) {
+		step *= 2.0;
+	}
+
+	if (step < 1.0) {
+		return step;
+	}
+
+	for (const double whole_step : scWholeGridSteps) {
+		if (whole_step >= step && whole_step >= min_step) {
+			return whole_step;
+		}
+	}
+
+	return scWholeGridSteps[std::size(scWholeGridSteps) - 1];
+}
+
 double TopViewCanvas::Snap(double value) const
 {
 	if (mbSnapBypass || !mState.bSnapEnabled || mState.SnapStep <= 0.0f) {
@@ -1285,6 +1534,11 @@ void TopViewCanvas::Paint(wxGraphicsContext& gc, const wxSize& size)
 
 	DrawGrid(gc, size);
 	DrawBrushes(gc, size);
+
+	if (mbShowNames) {
+		DrawNames(gc, size);
+	}
+
 	DrawMarkers(gc);
 	DrawOverlays(gc, size);
 	DrawPlayer(gc);
@@ -1330,14 +1584,8 @@ void TopViewCanvas::DrawGrid(wxGraphicsContext& gc, const wxSize& size)
 		}
 	}
 
-	size_t minor_index = 0;
-
-	while (minor_index + 2 < std::size(scMetricSteps) && scMetricSteps[minor_index] * mScale < scMinorGridPixels) {
-		minor_index++;
-	}
-
-	const double minor = scMetricSteps[minor_index];
-	const double major = scMetricSteps[minor_index + 1];
+	const double minor = GetGridStep(scMinorGridPixels / mScale);
+	const double major = GetGridStep(minor * (scMajorGridRatio - 0.5));
 
 	draw_lines(minor, ToWxColour(theme.Grid.Minor), 1);
 	draw_lines(major, ToWxColour(theme.Grid.Major), 1);
@@ -1660,21 +1908,62 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 		}
 	}
 
-	if (mTool == eEditorTool::Face && mbHasPickedFace && mPreview.Kind == eDrag::None) {
-		const TopViewBrush* brush = FindBrush(mPickedFaceBrushId);
-		const TopViewFace* face = nullptr;
+	const auto add_polygon = [this](wxGraphicsPath& path, const DynArray<Vec2f>& polygon)
+	{
+		for (uint32 i = 0; i < polygon.Size; i++) {
+			const Vec2d screen = ToScreenCoords(ToVec2d(polygon[i]));
 
-		if (brush != nullptr) {
-			face = FindMatchingFace(Projection(*brush), ToVec2d(mPickedFaceNormal));
+			if (i == 0) {
+				path.MoveToPoint(screen.X, screen.Y);
+			}
+			else {
+				path.AddLineToPoint(screen.X, screen.Y);
+			}
 		}
 
-		if (face != nullptr) {
-			const Vec2d a = ToScreenCoords(ToVec2d(face->A));
-			const Vec2d b = ToScreenCoords(ToVec2d(face->B));
+		path.CloseSubpath();
+	};
 
-			gc.SetPen(wxPen(ToWxColour(theme.Tool.Face), 5));
-			gc.StrokeLine(a.X, a.Y, b.X, b.Y);
+	if (mTool == eEditorTool::Face && mPickedFaces.IsNotEmpty() && mPreview.Kind == eDrag::None) {
+		wxGraphicsPath front_fill = gc.CreatePath();
+		wxGraphicsPath side_lines = gc.CreatePath();
+
+		for (const TopViewFaceRef& picked : mPickedFaces) {
+			const TopViewBrush* brush = FindBrush(picked.ObjectId);
+
+			if (brush == nullptr) {
+				continue;
+			}
+
+			const TopViewProjection& projection = Projection(*brush);
+
+			if (const TopViewFace* face = FindSideFace(projection, picked.Normal); face != nullptr) {
+				const Vec2d a = ToScreenCoords(ToVec2d(face->A));
+				const Vec2d b = ToScreenCoords(ToVec2d(face->B));
+
+				side_lines.MoveToPoint(a.X, a.Y);
+				side_lines.AddLineToPoint(b.X, b.Y);
+			}
+			else if (const TopViewFrontFace* front = FindFrontFace(projection, picked.Normal); front != nullptr) {
+				add_polygon(front_fill, front->Polygon);
+			}
 		}
+
+		gc.SetPen(wxPen(ToWxColour(theme.Tool.Face), 2));
+		gc.SetBrush(wxBrush(WithAlpha(ToWxColour(theme.Tool.Face), 90)));
+		gc.DrawPath(front_fill, wxWINDING_RULE);
+
+		gc.SetPen(wxPen(ToWxColour(theme.Tool.Face), 5));
+		gc.StrokePath(side_lines);
+	}
+
+	if (mbHoverFrontFace && mPreview.Kind == eDrag::None) {
+		wxGraphicsPath hover_fill = gc.CreatePath();
+		add_polygon(hover_fill, mHoverFrontPolygon);
+
+		gc.SetPen(wxPen(WithAlpha(ToWxColour(theme.Tool.Face), 160), 1));
+		gc.SetBrush(wxBrush(WithAlpha(ToWxColour(theme.Tool.Face), 40)));
+		gc.DrawPath(hover_fill, wxWINDING_RULE);
 	}
 
 	if (mbHoverFace && mPreview.Kind == eDrag::None) {
@@ -1778,6 +2067,28 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 		gc.SetPen(wxPen(ToWxColour(theme.Tool.Create), 2));
 		gc.DrawRectangle(screen.Min.X, screen.Min.Y, screen_extent.X, screen_extent.Y);
 
+		if (mTool == eEditorTool::Room) {
+			Vec3f min;
+			Vec3f max;
+			GetCreateVolume(mPreview.RectUV,
+							std::max<double>(mCreateSize[static_cast<uint32>(mPlane)], scMinCreateDepth), min, max);
+
+			RoomPiece pieces[scMaxRoomPieces];
+			const uint32 piece_count = BuildRoomPieces(min, max, mRoom, pieces);
+
+			gc.SetBrush(*wxTRANSPARENT_BRUSH);
+			gc.SetPen(wxPen(ToWxColour(theme.Tool.Create), 1, wxPENSTYLE_SHORT_DASH));
+
+			for (uint32 i = 0; i < piece_count; i++) {
+				const Vec2d a = ProjectPoint(pieces[i].Min);
+				const Vec2d b = ProjectPoint(pieces[i].Max);
+				const DRect piece = to_screen_rect(DRect(Vec2d::Min(a, b), Vec2d::Max(a, b)));
+				const Vec2d piece_extent = piece.GetExtent();
+
+				gc.DrawRectangle(piece.Min.X, piece.Min.Y, piece_extent.X, piece_extent.Y);
+			}
+		}
+
 		gc.SetFont(font, ToWxColour(theme.Tool.Create));
 		gc.DrawText(wxString::Format("%.2f x %.2f", extent.X, extent.Y), screen.Min.X + 4.0, screen.Max.Y + 4.0);
 		return;
@@ -1848,6 +2159,58 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 
 			gc.DrawText(label, x, y);
 		}
+	}
+}
+
+void TopViewCanvas::DrawNames(wxGraphicsContext& gc, const wxSize& size)
+{
+	const EditorTheme& theme = GetEditorTheme();
+
+	const wxColour selected_colour = ToWxColour(theme.Tool.Selected);
+	const wxColour label_colour = ToWxColour(theme.Grid.Label);
+	const wxFont font = wxFont(wxFontInfo(9));
+
+	for (const TopViewBrush& brush : mState.Brushes) {
+		const TopViewProjection& projection = Projection(brush);
+
+		if (brush.Name.IsEmpty() || projection.Hull.IsEmpty()) {
+			continue;
+		}
+
+		Vec2d min_uv = Vec2d(DBL_MAX);
+		Vec2d max_uv = Vec2d(-DBL_MAX);
+
+		for (const Vec2f& point : projection.Hull) {
+			min_uv = Vec2d::Min(min_uv, ToVec2d(point));
+			max_uv = Vec2d::Max(max_uv, ToVec2d(point));
+		}
+
+		const Vec2d top_left = ToScreenCoords(Vec2d(min_uv.X, max_uv.Y));
+		const Vec2d bottom_right = ToScreenCoords(Vec2d(max_uv.X, min_uv.Y));
+		const Vec2d center = (top_left + bottom_right) * 0.5;
+
+		if (bottom_right.X < 0.0 || top_left.X > size.x || bottom_right.Y < 0.0 || top_left.Y > size.y) {
+			continue;
+		}
+
+		const wxString label = wxString::FromUTF8(brush.Name.CStr());
+
+		wxColour colour = label_colour;
+
+		if (brush.bSelected) {
+			colour = selected_colour;
+		}
+		else if (!brush.bSelectable) {
+			colour = WithAlpha(label_colour, scDimMarkerAlpha);
+		}
+
+		gc.SetFont(font, colour);
+
+		double label_width = 0.0;
+		double label_height = 0.0;
+		gc.GetTextExtent(label, &label_width, &label_height);
+
+		gc.DrawText(label, center.X - label_width * 0.5, center.Y - label_height * 0.5);
 	}
 }
 
@@ -2088,6 +2451,26 @@ int TopViewCanvas::PickFaceAt(const Vec2d uv, int& out_face) const
 	return best_brush;
 }
 
+const TopViewFrontFace* TopViewCanvas::PickFrontFaceAt(const Vec2d uv, ObjectID& out_brush) const
+{
+	for (const int32 index : PickAt(uv)) {
+		const TopViewBrush& brush = mState.Brushes[index];
+
+		if (brush.Kind == eTopViewBrushKind::Patch) {
+			continue;
+		}
+
+		for (const TopViewFrontFace& front : Projection(brush).FrontFaces) {
+			if (IsInsidePolygon(front.Polygon, uv)) {
+				out_brush = brush.ObjectId;
+				return &front;
+			}
+		}
+	}
+
+	return nullptr;
+}
+
 bool TopViewCanvas::IsVertexSelected(ObjectID object_id, const Vec2d uv) const
 {
 	for (const TopViewVertexHandle& handle : mSelectedVertices) {
@@ -2176,11 +2559,14 @@ void TopViewCanvas::UpdateHover()
 {
 	const bool had_face = mbHoverFace;
 	const TopViewFace previous_face = mHoverFace;
+	const bool had_front_face = mbHoverFrontFace;
+	const TopViewFaceRef previous_front_face = mHoverFrontFace;
 	const bool had_vertex = mbHoverVertex;
 	const TopViewVertexHandle previous_vertex = mHoverVertex;
 	const eArchHandle previous_arch = mArchHover;
 
 	mbHoverFace = false;
+	mbHoverFrontFace = false;
 	mbHoverVertex = false;
 	mArchHover = eArchHandle::None;
 
@@ -2192,6 +2578,18 @@ void TopViewCanvas::UpdateHover()
 			if (brush_index >= 0) {
 				mbHoverFace = true;
 				mHoverFace = Projection(mState.Brushes[brush_index]).Faces[face_index];
+			}
+			else {
+				ObjectID front_brush = ObjectID::scNull;
+
+				if (const TopViewFrontFace* front = PickFrontFaceAt(mHover, front_brush); front != nullptr) {
+					mbHoverFrontFace = true;
+					mHoverFrontFace = TopViewFaceRef { front_brush, front->Face.WorldNormal };
+
+					if (!had_front_face || !(previous_front_face == mHoverFrontFace)) {
+						mHoverFrontPolygon = front->Polygon.Clone();
+					}
+				}
 			}
 		}
 		else if (UsesHandles()) {
@@ -2206,8 +2604,11 @@ void TopViewCanvas::UpdateHover()
 								(mbHoverVertex && (mHoverVertex.ObjectId != previous_vertex.ObjectId ||
 												   !(mHoverVertex.Position == previous_vertex.Position)));
 
+	const bool front_face_changed = (mbHoverFrontFace != had_front_face) ||
+									(mbHoverFrontFace && !(mHoverFrontFace == previous_front_face));
+
 	if (mbHoverFace != had_face || (mbHoverFace && !(mHoverFace == previous_face)) || vertex_changed ||
-		mArchHover != previous_arch) {
+		front_face_changed || mArchHover != previous_arch) {
 		UpdateCursor();
 		Refresh();
 	}
@@ -2666,6 +3067,7 @@ void TopViewCanvas::BeginTool(const wxMouseEvent& event)
 		break;
 	case eEditorTool::Create:
 	case eEditorTool::Decal:
+	case eEditorTool::Room:
 		BeginCreate();
 		break;
 	case eEditorTool::Arch:
@@ -2780,6 +3182,10 @@ void TopViewCanvas::BeginSelect()
 	int32 pressed = hits[0];
 
 	for (const int32 index : hits) {
+		if (mbAdditive) {
+			break;
+		}
+
 		if (mState.Brushes[index].bSelected) {
 			pressed = index;
 			break;
@@ -2811,36 +3217,39 @@ void TopViewCanvas::BeginFace()
 	const int brush_index = PickFaceAt(mPress, face_index);
 
 	mbHasPressedBrush = false;
+	mbFaceToggleOnRelease = false;
+	mbFaceReplaceOnRelease = false;
 
 	if (brush_index < 0) {
-		mbHasPickedFace = false;
+		ObjectID front_brush = ObjectID::scNull;
 
-		const DynArray<int32> hits = PickAt(mPress);
-
-		if (hits.IsEmpty()) {
-			mDrag = eDrag::Marquee;
+		if (const TopViewFrontFace* front = PickFrontFaceAt(mPress, front_brush); front != nullptr) {
+			PickFace(front_brush, front->Face.WorldNormal, mbAdditive);
 			return;
 		}
 
-		const TopViewBrush& clicked = mState.Brushes[hits[0]];
-
-		if (!clicked.bSelected || GetSelectedCount() > 1) {
-			SelectBrush(clicked.ObjectId, mbAdditive ? eTopViewSelectMode::Add : eTopViewSelectMode::Replace);
-		}
-
+		mDrag = eDrag::Marquee;
 		return;
 	}
 
 	const TopViewBrush& brush = mState.Brushes[brush_index];
+	const TopViewFace& face = Projection(brush).Faces[face_index];
 
-	if (!brush.bSelected) {
-		SelectBrush(brush.ObjectId, mbAdditive ? eTopViewSelectMode::Add : eTopViewSelectMode::Replace);
+	if (!IsFacePicked(brush.ObjectId, face.WorldNormal)) {
+		PickFace(brush.ObjectId, face.WorldNormal, mbAdditive);
+	}
+	else if (mbAdditive) {
+		mbFaceToggleOnRelease = true;
+	}
+	else {
+		mbFaceReplaceOnRelease = true;
 	}
 
 	mGrabbedBrushId = brush.ObjectId;
-	mGrabbedFace = Projection(brush).Faces[face_index];
+	mGrabbedFace = face;
 	mFaceBaseOffset = mGrabbedFace.Normal.X * mGrabbedFace.A.X + mGrabbedFace.Normal.Y * mGrabbedFace.A.Y;
 	mbHoverFace = false;
+	mbHoverFrontFace = false;
 	mDrag = eDrag::Face;
 }
 
@@ -2889,8 +3298,11 @@ void TopViewCanvas::BeginVertex()
 
 	const TopViewBrush& clicked = mState.Brushes[hits[0]];
 
-	if (!clicked.bSelected || GetSelectedCount() > 1) {
-		SelectBrush(clicked.ObjectId, mbAdditive ? eTopViewSelectMode::Add : eTopViewSelectMode::Replace);
+	if (mbAdditive) {
+		SelectBrush(clicked.ObjectId, eTopViewSelectMode::Toggle);
+	}
+	else if (!clicked.bSelected || GetSelectedCount() > 1) {
+		SelectBrush(clicked.ObjectId, eTopViewSelectMode::Replace);
 	}
 }
 
@@ -2951,8 +3363,11 @@ void TopViewCanvas::BeginCurve()
 
 		mSelectedVertices.Clear();
 
-		if (!clicked.bSelected || GetSelectedCount() > 1) {
-			SelectBrush(clicked.ObjectId, mbAdditive ? eTopViewSelectMode::Add : eTopViewSelectMode::Replace);
+		if (mbAdditive) {
+			SelectBrush(clicked.ObjectId, eTopViewSelectMode::Toggle);
+		}
+		else if (!clicked.bSelected || GetSelectedCount() > 1) {
+			SelectBrush(clicked.ObjectId, eTopViewSelectMode::Replace);
 		}
 
 		return;
@@ -3076,8 +3491,10 @@ void TopViewCanvas::UpdatePreview()
 		mPreview.Shift = shift;
 		mPreview.NormalUV = normal;
 
+		const DynArray<ObjectID> targets = GetFaceDragTargets();
+
 		for (const TopViewBrush& brush : mState.Brushes) {
-			if (!brush.bSelected) {
+			if (std::find(targets.begin(), targets.end(), brush.ObjectId) == targets.end()) {
 				continue;
 			}
 
@@ -3437,6 +3854,50 @@ void TopViewCanvas::FinishMarquee()
 		return;
 	}
 
+	if (mTool == eEditorTool::Face) {
+		if (!mbAdditive) {
+			ClearPickedFaces();
+		}
+
+		if (!mbDragMoved) {
+			return;
+		}
+
+		const DRect rect(Vec2d::Min(mPress, mCurrent), Vec2d::Max(mPress, mCurrent));
+
+		for (const TopViewBrush& brush : mState.Brushes) {
+			const TopViewProjection& projection = Projection(brush);
+
+			if (!brush.bSelectable || brush.Kind == eTopViewBrushKind::Patch || projection.Hull.IsEmpty()) {
+				continue;
+			}
+
+			bool contained = true;
+
+			for (const Vec2f& point : projection.Hull) {
+				contained = contained && rect.Contains(ToVec2d(point));
+			}
+
+			if (!contained) {
+				continue;
+			}
+
+			for (const TopViewFrontFace& front : projection.FrontFaces) {
+				if (!IsFacePicked(brush.ObjectId, front.Face.WorldNormal)) {
+					mPickedFaces.Insert(TopViewFaceRef { brush.ObjectId, front.Face.WorldNormal });
+				}
+			}
+		}
+
+		if (mPickedFaces.IsNotEmpty() && GetSelectedCount() > 0) {
+			SelectBrushes({}, eTopViewSelectMode::Replace);
+		}
+
+		SyncTextureFromPickedFace();
+		SyncPickedFaceToGame();
+		return;
+	}
+
 	if (!mbDragMoved) {
 		if (!mbAdditive && GetSelectedCount() > 0) {
 			SelectBrushes({}, eTopViewSelectMode::Replace);
@@ -3478,8 +3939,10 @@ void TopViewCanvas::FinishMarquee()
 
 void TopViewCanvas::FinishMove()
 {
-	if (mbDragMoved) {
-		if (mPreview.Kind != eDrag::Move || mPreview.OffsetUV == Vec2d::scZero) {
+	const bool has_offset = (mPreview.Kind == eDrag::Move && !(mPreview.OffsetUV == Vec2d::scZero));
+
+	if (mbDragMoved && (has_offset || !mbAdditive)) {
+		if (!has_offset) {
 			return;
 		}
 
@@ -3527,10 +3990,12 @@ void TopViewCanvas::FinishMove()
 void TopViewCanvas::FinishFace()
 {
 	if (!mbDragMoved) {
-		mbHasPickedFace = true;
-		mPickedFaceBrushId = mGrabbedBrushId;
-		mPickedFaceNormal = mGrabbedFace.Normal;
-		SyncTextureFromPickedFace();
+		if (mbFaceToggleOnRelease) {
+			UnpickFace(mGrabbedBrushId, mGrabbedFace.WorldNormal);
+		}
+		else if (mbFaceReplaceOnRelease) {
+			PickFace(mGrabbedBrushId, mGrabbedFace.WorldNormal, false);
+		}
 	}
 
 	if (mPreview.Kind != eDrag::Face || std::fabs(mPreview.Shift) < 1e-6) {
@@ -3542,7 +4007,8 @@ void TopViewCanvas::FinishFace()
 	const float32 distance = static_cast<float32>(mPreview.Shift);
 
 	HoldPreview();
-	SendCommand([normal, distance] { gEditor->TopViewMoveFace(normal, distance); });
+	SendCommand([normal, distance, targets = GetFaceDragTargets()]
+				{ gEditor->TopViewMoveFace(normal, distance, targets); });
 }
 
 void TopViewCanvas::FinishCreate()
@@ -3558,22 +4024,22 @@ void TopViewCanvas::FinishCreate()
 		return;
 	}
 
-	const uint32 plane_index = static_cast<uint32>(mPlane);
-	const double base = mCreateBase[plane_index];
 	const bool is_decal = (mTool == eEditorTool::Decal);
-	const double depth = is_decal ? 0.0 : std::max<double>(mCreateSize[plane_index], scMinCreateDepth);
+	const double depth = is_decal ? 0.0 : std::max<double>(mCreateSize[static_cast<uint32>(mPlane)], scMinCreateDepth);
 
-	const Vec3f first = ToWorldVector(mPreview.RectUV.Min, base);
-	const Vec3f second = ToWorldVector(mPreview.RectUV.Max, base + depth);
-
-	const Vec3f min(std::min<float32>(first.X, second.X), std::min<float32>(first.Y, second.Y),
-					std::min<float32>(first.Z, second.Z));
-	const Vec3f max(std::max<float32>(first.X, second.X), std::max<float32>(first.Y, second.Y),
-					std::max<float32>(first.Z, second.Z));
+	Vec3f min;
+	Vec3f max;
+	GetCreateVolume(mPreview.RectUV, depth, min, max);
 
 	HoldPreview();
 	const bool drop_to_ground = mbDropToGround;
 	const eViewPlane plane = mPlane;
+
+	if (mTool == eEditorTool::Room) {
+		SendCommand([plane, min, max, drop_to_ground, settings = mRoom]
+					{ gEditor->TopViewCreateRoom(plane, min, max, drop_to_ground, settings); });
+		return;
+	}
 
 	if (is_decal) {
 		SendCommand([plane, min, max, drop_to_ground]
@@ -3597,6 +4063,17 @@ void TopViewCanvas::FinishCreate()
 	}
 
 	SendCommand([plane, min, max, drop_to_ground] { gEditor->TopViewCreate(plane, min, max, drop_to_ground); });
+}
+
+void TopViewCanvas::GetCreateVolume(const DRect& rect, double depth, Vec3f& out_min, Vec3f& out_max) const
+{
+	const double base = mCreateBase[static_cast<uint32>(mPlane)];
+
+	const Vec3f first = ToWorldVector(rect.Min, base);
+	const Vec3f second = ToWorldVector(rect.Max, base + depth);
+
+	out_min = Vec3f::Min(first, second);
+	out_max = Vec3f::Max(first, second);
 }
 
 TopViewCanvas::ArchEllipse TopViewCanvas::FitArch(const DRect& rect) const
@@ -4348,7 +4825,8 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 		return;
 	}
 
-	if (event.AltDown() && !command && mTool == eEditorTool::Face && mbHasPickedFace && mDrag == eDrag::None) {
+	if (event.AltDown() && !command && mTool == eEditorTool::Face && mPickedFaces.IsNotEmpty() &&
+		mDrag == eDrag::None) {
 		TextureCommand texture_command;
 		bool is_texture_key = true;
 
@@ -4515,6 +4993,9 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 	case 'A':
 		SetToolFromKey(eEditorTool::Arch);
 		break;
+	case 'O':
+		SetToolFromKey(eEditorTool::Room);
+		break;
 	case 'N':
 		SetToolFromKey(eEditorTool::Curve);
 		break;
@@ -4554,6 +5035,9 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 		break;
 	case 'U':
 		SendCommand([] { gEditor->TopViewToggleSnap(); });
+		break;
+	case WXK_F2:
+		PromptRename();
 		break;
 	case 'E':
 		if (mTool == eEditorTool::Curve && mDrag == eDrag::None) {
@@ -4629,8 +5113,8 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 			ClearPreview();
 			CancelDrag();
 		}
-		else if (mbHasPickedFace) {
-			mbHasPickedFace = false;
+		else if (mPickedFaces.IsNotEmpty()) {
+			mPickedFaces.Clear();
 			UpdateStatus();
 			Refresh();
 		}
@@ -4739,6 +5223,7 @@ void TopViewCanvas::UpdateCursor()
 		}
 		break;
 	case eEditorTool::Create:
+	case eEditorTool::Room:
 	case eEditorTool::Decal:
 	case eEditorTool::Clip:
 		SetCursor(wxCursor(wxCURSOR_CROSS));
@@ -4781,12 +5266,12 @@ void TopViewCanvas::UpdateStatus()
 		hint = scArchPendingHint;
 	}
 
-	if (mTool == eEditorTool::Face && mbHasPickedFace) {
+	if (mTool == eEditorTool::Face && mPickedFaces.IsNotEmpty()) {
 		hint = scPickedFaceHint;
 	}
 
 	text += wxString::Format(
-		"%d brushes, %u selected   |   Snap %s %.2f   |   Zoom %.0f%%   |   %s", static_cast<int>(mState.Brushes.Size),
+		"%d brushes, %u selected   |   Snap %s %g   |   Zoom %.0f%%   |   %s", static_cast<int>(mState.Brushes.Size),
 		GetSelectedCount(), mState.bSnapEnabled ? "on" : "off", mState.SnapStep, mScale / scDefaultScale * 100.0, hint);
 
 	mpOnStatus(text);

@@ -350,38 +350,6 @@ bool Blockout::GetSubtractPieces(Object* target, Object* cutter, std::vector<Bru
 	return true;
 }
 
-bool Blockout::GetHollowPieces(Object* object, float32 thickness, std::vector<Brush::PlaneList>& out_pieces,
-							   std::vector<Vec3f>& out_positions)
-{
-	const Brush* brush = GetBrush(object);
-
-	if (brush == nullptr || !(thickness > 0.0f)) {
-		return false;
-	}
-
-	Brush::PlaneList inner = brush->Planes;
-
-	for (BrushPlane& plane : inner) {
-		plane.Distance -= thickness;
-	}
-
-	if (!Brush::FromPlanes(inner).IsValid() || !brush->Subtract(inner, object->GetPosition(), out_pieces) ||
-		out_pieces.empty()) {
-		return false;
-	}
-
-	out_positions.clear();
-
-	for (const Brush::PlaneList& piece : out_pieces) {
-		const Brush shape = Brush::FromPlanes(piece);
-
-		out_positions.push_back(object->GetPosition() +
-								GetOffsetToKeepInPlace(object, brush->GetCenter(), shape.GetCenter()));
-	}
-
-	return true;
-}
-
 Brush Blockout::MakeWorldBox(const Vec3f min, const Vec3f max, Vec3f& out_position) const
 {
 	out_position = (min + max) * 0.5f;

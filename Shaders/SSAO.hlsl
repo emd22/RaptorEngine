@@ -72,9 +72,12 @@ struct SSAOPushConsts
 #define GTAO_HILBERT_WIDTH 64
 #define PI 3.14159265
 #define HALF_PI 1.57079633
+#define VIEWMODEL_DEPTH_SCALE 0.01
 
 float3 ReconstructViewPos(float2 uv, float depth)
 {
+	depth = select(depth < VIEWMODEL_DEPTH_SCALE, depth / VIEWMODEL_DEPTH_SCALE, depth);
+
 	float4 ndc = float4(uv * 2.0 - 1.0, depth, 1.0);
 
 	float4 view_space = mul(ndc, Consts.InvProjection);

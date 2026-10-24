@@ -191,9 +191,9 @@ DataPackEntry* DataPack::GetEntryFast(Hash64 id) const
 {
 	// TODO: replace with ordered map query
 
-	for (DataPackEntry& entry : Entries) {
+	for (const DataPackEntry& entry : Entries) {
 		if (entry.Id == id) {
-			return &entry;
+			return const_cast<DataPackEntry*>(&entry);
 		}
 	}
 

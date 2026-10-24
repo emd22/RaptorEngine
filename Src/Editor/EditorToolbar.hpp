@@ -32,6 +32,7 @@ public:
 	void ShowView(eEditorView view);
 	void ShowMode(eEditorMode mode, eDataFilter filter, uint32 available_tools);
 	void ShowSimulating(bool simulating);
+	void Set2DViewsEnabled(bool enabled);
 
 	void ApplyState(const TopViewState& state);
 
@@ -65,14 +66,18 @@ private:
 	OutlineToggleButton* mpSubtractButton = nullptr;
 	wxButton* mpShowAllButton = nullptr;
 	wxButton* mpSnapButton = nullptr;
-	wxButton* mpHollowButton = nullptr;
+	wxButton* mpNameButton = nullptr;
 
 	wxBoxSizer* mpPlaneGroup = nullptr;
 	wxBoxSizer* mpToolGroup = nullptr;
 	wxBoxSizer* mpViewGroup = nullptr;
 	wxBoxSizer* mpVolumeRows[scViewPlaneCount] = {};
+	FloatField* mpBaseFields[scViewPlaneCount] = {};
+	FloatField* mpSizeFields[scViewPlaneCount] = {};
 	OutlineToggleButton* mpGroundButtons[scViewPlaneCount] = {};
 	wxBoxSizer* mpArchRow = nullptr;
+	wxBoxSizer* mpRoomRow = nullptr;
+	wxButton* mpHollowButton = nullptr;
 	FloatField* mpArchSidesField = nullptr;
 	FloatField* mpArchWallField = nullptr;
 	FloatField* mpArchArcField = nullptr;
@@ -103,6 +108,7 @@ private:
 	float32 mSize[scViewPlaneCount] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
 
 	ArchSettings mArch;
+	RoomSettings mRoom;
 	CurveSettings mCurve;
 };
 

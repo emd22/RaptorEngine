@@ -1,30 +1,34 @@
 #pragma once
 
-#include <Core/Assert.hpp>
 #include <Core/Allocator.hpp>
+#include <Core/Assert.hpp>
 #include <Core/Types.hpp>
 #include <Engine.hpp>
 
+#include <cstddef>
+#include <functional>
+#include <iterator>
+#include <type_traits>
+#include <utility>
+
 namespace fx {
 
-#define FX_PAGED_ARRAY_ALLOC(type_, size_) StdAllocator::Alloc<type_>(size_)
-
-#define FX_PAGED_ARRAY_FREE(type_, ptr_) StdAllocator::Free<type_>(ptr_)
-
-
-// The size that a paged array is initialized to if any modifying functions are called before `.Init()`.
+// The size that a paged array is initialized to if any modifying functions are called before `.Create()`.
 #define FX_PAGED_ARRAY_AUTO_INIT_SIZE 32
 
 /**
- * @brief A dynamic array of objects, with objects preallocated with a user-defined size.
+ * @brief A dynamic array of objects stored in fixed-size pages. Elements never move once inserted, so pointers and
+ * references to them stay valid until the element is removed or the array is cleared.
  *
- * To use this class with a different allocator, include `PagedArrayImpl.hpp` with `FX_PAGED_ARRAY_ALLOC` and
- * `FX_PAGED_ARRAY_FREE` to the custom allocator functions.
+ * Pages from `pFirstPage` up to `pCurrentPage` are full, `pCurrentPage` holds at least one element unless the array
+ * is empty, and `pCurrentPage->pNext` is either null or a single empty spare page kept to avoid reallocating when
+ * insertions and removals alternate across a page boundary.
  *
  * @tparam TElementType The type of the object that will be stored.
- *
+ * @tparam TAllocator The allocator pages are allocated from.
  */
-template <typename TElementType>
+template <typename TElementType, typename TAllocator = StdAllocator>
+	requires C_IsAllocator<TAllocator>
 class PagedArray
 {
 public:
@@ -32,43 +36,37 @@ public:
 	{
 		TElementType* pData = nullptr;
 
-		/** The number of elements in use in `Data` */
+		/** The number of elements in use in `pData` */
 		uint32 Size = 0;
 
 		Page* pNext = nullptr;
 		Page* pPrev = nullptr;
-
-	public:
-		void Destroy()
-		{
-			if (!pData) {
-				return;
-			}
-
-			// Call the destructor for each item in the page
-			if constexpr (std::is_destructible_v<TElementType>) {
-				for (uint32 i = 0; i < Size; i++) {
-					pData[i].~TElementType();
-				}
-			}
-
-			// Since we have already called the destructors on each object, we don't want to call the
-			// destructor on the ptr of the object. Free the page without calling the destructor
-			FX_PAGED_ARRAY_FREE(void, (reinterpret_cast<void*>(pData)));
-			pData = nullptr;
-		}
 	};
 
-public:
-	struct Iterator
+	template <bool TIsConst>
+	struct IteratorBase
 	{
-		Iterator(Page* current_page, uint32 index) : mCurrentPage(current_page), mCurrentIndex(index) {}
+		using iterator_category = std::bidirectional_iterator_tag;
+		using value_type = TElementType;
+		using difference_type = std::ptrdiff_t;
+		using pointer = std::conditional_t<TIsConst, const TElementType*, TElementType*>;
+		using reference = std::conditional_t<TIsConst, const TElementType&, TElementType&>;
+		using PagePtr = std::conditional_t<TIsConst, const Page*, Page*>;
 
-		Iterator& operator++()
+		IteratorBase() = default;
+		IteratorBase(PagePtr current_page, uint32 index) : mCurrentPage(current_page), mCurrentIndex(index) {}
+
+		operator IteratorBase<true>() const
+			requires(!TIsConst)
+		{
+			return IteratorBase<true>(mCurrentPage, mCurrentIndex);
+		}
+
+		IteratorBase& operator++()
 		{
 			++mCurrentIndex;
 
-			if (mCurrentIndex >= mCurrentPage->Size && mCurrentPage->pNext) {
+			if (mCurrentIndex >= mCurrentPage->Size && mCurrentPage->pNext && mCurrentPage->pNext->Size > 0) {
 				mCurrentPage = mCurrentPage->pNext;
 				mCurrentIndex = 0;
 			}
@@ -76,15 +74,15 @@ public:
 			return *this;
 		}
 
-		Iterator operator++(int)
+		IteratorBase operator++(int)
 		{
-			Iterator iterator = *this;
+			IteratorBase iterator = *this;
 			++*this;
 
 			return iterator;
 		}
 
-		Iterator& operator--()
+		IteratorBase& operator--()
 		{
 			if (mCurrentIndex == 0) {
 				mCurrentPage = mCurrentPage->pPrev;
@@ -96,77 +94,78 @@ public:
 			return *this;
 		}
 
-		TElementType& operator*() { return mCurrentPage->pData[mCurrentIndex]; }
-		const TElementType& operator*() const { return mCurrentPage->pData[mCurrentIndex]; }
-
-		bool operator!=(const Iterator& other)
+		IteratorBase operator--(int)
 		{
-			return mCurrentPage && (mCurrentPage != other.mCurrentPage || mCurrentIndex != other.mCurrentIndex);
+			IteratorBase iterator = *this;
+			--*this;
+
+			return iterator;
 		}
 
-		Page* mCurrentPage = nullptr;
+		reference operator*() const { return mCurrentPage->pData[mCurrentIndex]; }
+		pointer operator->() const { return &mCurrentPage->pData[mCurrentIndex]; }
+
+		bool operator==(const IteratorBase& other) const
+		{
+			return mCurrentPage == other.mCurrentPage && mCurrentIndex == other.mCurrentIndex;
+		}
+
+		bool operator!=(const IteratorBase& other) const { return !(*this == other); }
+
+		PagePtr mCurrentPage = nullptr;
 		uint32 mCurrentIndex = 0;
 	};
 
-	PagedArray() = default;
+	using Iterator = IteratorBase<false>;
+	using ConstIterator = IteratorBase<true>;
 
-	PagedArray(const PagedArray& other) { (*this) = other; }
+public:
+	PagedArray() = default;
 
 	/**
 	 * @brief Creates a new paged array with a page capacity of `page_node_capacity`.
 	 */
-	PagedArray(uint32 page_node_capacity) { Create(page_node_capacity); }
+	explicit PagedArray(uint32 page_node_capacity) { Create(page_node_capacity); }
 
-	PagedArray(PagedArray&& other) { (*this) = std::move(other); }
+	PagedArray(const PagedArray& other)
+	{
+		CopyFrom(other);
+	}
+
+	PagedArray(PagedArray&& other) noexcept { TakeFrom(other); }
 
 	PagedArray& operator=(const PagedArray& other)
 	{
-		pFirstPage = other.pFirstPage;
-		pCurrentPage = other.pCurrentPage;
-
-		PageNodeCapacity = other.PageNodeCapacity;
-		CurrentPageIndex = other.CurrentPageIndex;
-
-		TrackedSize = other.TrackedSize;
+		if (this != &other) {
+			Destroy();
+			CopyFrom(other);
+		}
 
 		return *this;
 	}
 
-	PagedArray& operator=(PagedArray&& other)
+	PagedArray& operator=(PagedArray&& other) noexcept
 	{
-		pFirstPage = other.pFirstPage;
-		pCurrentPage = other.pCurrentPage;
-
-		PageNodeCapacity = other.PageNodeCapacity;
-		CurrentPageIndex = other.CurrentPageIndex;
-
-		TrackedSize = other.TrackedSize;
-		bDoNotDestroy = other.bDoNotDestroy;
-
-		other.pFirstPage = nullptr;
-		other.pCurrentPage = nullptr;
-
-		other.PageNodeCapacity = 0;
-		other.CurrentPageIndex = 0;
-
-		other.TrackedSize = 0;
-		other.bDoNotDestroy = false;
+		if (this != &other) {
+			Destroy();
+			TakeFrom(other);
+		}
 
 		return *this;
 	}
 
-	Iterator begin() const { return Iterator(pFirstPage, 0); }
+	Iterator begin() { return Iterator(pFirstPage, 0); }
+	Iterator end() { return Iterator(pCurrentPage, pCurrentPage ? pCurrentPage->Size : 0); }
 
-	Iterator end() const { return Iterator(pCurrentPage, pCurrentPage ? pCurrentPage->Size : 0); }
+	ConstIterator begin() const { return ConstIterator(pFirstPage, 0); }
+	ConstIterator end() const { return ConstIterator(pCurrentPage, pCurrentPage ? pCurrentPage->Size : 0); }
 
 	size_t GetCalculatedSize() const
 	{
 		size_t size = 0;
-		Page* page = pFirstPage;
 
-		while (page != nullptr) {
+		for (const Page* page = pFirstPage; page != nullptr; page = page->pNext) {
 			size += page->Size;
-			page = page->pNext;
 		}
 
 		Assert(size == TrackedSize);
@@ -174,174 +173,97 @@ public:
 		return size;
 	}
 
-	inline size_t Size() const
-	{
-		// return GetCalculatedSize();
-		return TrackedSize;
-	}
+	inline size_t Size() const { return TrackedSize; }
 
-	void Create(uint32 page_node_capacity = 32)
+	void Create(uint32 page_node_capacity = FX_PAGED_ARRAY_AUTO_INIT_SIZE)
 	{
-		// We are already allocated, free the previous pages
-		// TODO: replace this with some reallocs!
-		if (pFirstPage || pCurrentPage) {
-			Destroy();
-		}
+		AssertMsg(page_node_capacity > 0, "PagedArray page capacity must be greater than zero");
+
+		Destroy();
 
 		PageNodeCapacity = page_node_capacity;
 
-		pFirstPage = AllocateNewPage(nullptr, nullptr);
+		pFirstPage = AllocatePage(nullptr);
 		pCurrentPage = pFirstPage;
+		CurrentPageIndex = 0;
 	}
 
 	bool IsInited() const { return (pFirstPage != nullptr && pCurrentPage != nullptr); }
 
-	TElementType* Insert()
+	template <typename... TArgs>
+	TElementType& Emplace(TArgs&&... args)
 	{
-		InitializedIfNeeded();
+		static_assert(std::is_constructible_v<TElementType, TArgs...>,
+					  "PagedArray element cannot be constructed from these arguments");
 
-		// Create a new item and initialize it
+		InitializeIfNeeded();
+
+		if (pCurrentPage->Size >= PageNodeCapacity) {
+			AdvancePage();
+		}
+
 		TElementType* element = &pCurrentPage->pData[pCurrentPage->Size];
-
-		if constexpr (std::is_constructible_v<TElementType>) {
-			::new (element) TElementType;
-		}
-
-		// Move to the next index
-		++pCurrentPage->Size;
-
-		++TrackedSize;
-
-		// There are no free slots left in the page, allocate a new page
-		if (pCurrentPage->Size >= PageNodeCapacity) {
-			Page* new_page = AllocateNewPage(pCurrentPage, nullptr);
-
-			pCurrentPage->pNext = new_page;
-			pCurrentPage = new_page;
-		}
-
-		return element;
-	}
-
-	TElementType& Insert(const TElementType& element)
-	{
-		InitializedIfNeeded();
-
-		TElementType* new_element = &pCurrentPage->pData[pCurrentPage->Size];
-
-		if constexpr (std::is_copy_constructible_v<TElementType>) {
-			::new (new_element) TElementType(element);
-		}
-		else {
-			memcpy(new_element, &element, sizeof(TElementType));
-		}
+		::new (element) TElementType(std::forward<TArgs>(args)...);
 
 		++pCurrentPage->Size;
-
 		++TrackedSize;
 
-		// There are no free slots left in the page, allocate a new page
-		if (pCurrentPage->Size >= PageNodeCapacity) {
-			Page* new_page = AllocateNewPage(pCurrentPage, nullptr);
-
-			pCurrentPage->pNext = new_page;
-			pCurrentPage = new_page;
-		}
-
-		return *new_element;
+		return *element;
 	}
 
-	TElementType& Insert(TElementType&& element)
+	TElementType* Insert() { return &Emplace(); }
+
+	TElementType& Insert(const TElementType& element) { return Emplace(element); }
+
+	TElementType& Insert(TElementType&& element) { return Emplace(std::move(element)); }
+
+	Page* FindPageForElement(const TElementType* value) const
 	{
-		InitializedIfNeeded();
+		const std::less<const TElementType*> less;
 
-		TElementType* new_element = &pCurrentPage->pData[pCurrentPage->Size];
-
-		if constexpr (std::is_move_constructible_v<TElementType>) {
-			::new (new_element) TElementType(std::move(element));
-		}
-		else {
-			memcpy(new_element, &element, sizeof(TElementType));
-		}
-
-		++pCurrentPage->Size;
-
-		++TrackedSize;
-
-		// There are no free slots left in the page, allocate a new page
-		if (pCurrentPage->Size >= PageNodeCapacity) {
-			Page* new_page = AllocateNewPage(pCurrentPage, nullptr);
-
-			pCurrentPage->pNext = new_page;
-			pCurrentPage = new_page;
-		}
-
-		return *new_element;
-	}
-
-	Page* FindPageForElement(TElementType* value)
-	{
-		Page* current_page = pCurrentPage;
-
-		while (current_page != nullptr) {
-			const void* data_start_ptr = reinterpret_cast<char*>(current_page->pData);
-			const void* data_end_ptr = reinterpret_cast<const void*>(reinterpret_cast<const uint8*>(data_start_ptr) +
-																	 (sizeof(TElementType) * PageNodeCapacity));
-
-			const char* value_u8 = reinterpret_cast<char*>(value);
-
-			// If the value is within the bounds of this pages' pointers, then we know it is in this page.
-			if (value_u8 >= data_start_ptr && value_u8 <= data_end_ptr) {
-				return current_page;
+		for (Page* page = pFirstPage; page != nullptr; page = page->pNext) {
+			if (!less(value, page->pData) && less(value, page->pData + page->Size)) {
+				return page;
 			}
 		}
+
 		return nullptr;
 	}
 
 	TElementType& GetLast()
 	{
-		if (pCurrentPage->Size == 0 && pCurrentPage->pPrev) {
-			return pCurrentPage->pPrev->pData[pCurrentPage->pPrev->Size - 1];
-		}
+		AssertMsg(!IsEmpty(), "GetLast called on an empty PagedArray");
+
+		return pCurrentPage->pData[pCurrentPage->Size - 1];
+	}
+
+	const TElementType& GetLast() const
+	{
+		AssertMsg(!IsEmpty(), "GetLast called on an empty PagedArray");
 
 		return pCurrentPage->pData[pCurrentPage->Size - 1];
 	}
 
 	void RemoveLast()
 	{
-		// If there are no pages remaining, return null
-		if (pCurrentPage == nullptr) {
-			return;
-		}
-
-		SizeCheck(pCurrentPage->Size);
-
-		// If there are no items left in the page and there is another page before this one, switch
-		// to that page.
-		if (pCurrentPage->Size == 0 && pCurrentPage->pPrev) {
-			Page* page_to_remove = pCurrentPage;
-
-			pCurrentPage = page_to_remove->pPrev;
-			pCurrentPage->pNext = nullptr;
-
-			page_to_remove->Destroy();
-
-			FX_PAGED_ARRAY_FREE(Page, page_to_remove);
-
-			--CurrentPageIndex;
-		}
-
-		if (pCurrentPage->Size == 0) {
+		if (IsEmpty()) {
 			return;
 		}
 
 		--pCurrentPage->Size;
-
-		if constexpr (std::is_destructible_v<TElementType>) {
-			pCurrentPage->pData[pCurrentPage->Size].~TElementType();
-		}
+		pCurrentPage->pData[pCurrentPage->Size].~TElementType();
 
 		--TrackedSize;
+
+		if (pCurrentPage->Size == 0 && pCurrentPage->pPrev) {
+			if (pCurrentPage->pNext) {
+				FreePage(pCurrentPage->pNext);
+				pCurrentPage->pNext = nullptr;
+			}
+
+			pCurrentPage = pCurrentPage->pPrev;
+			--CurrentPageIndex;
+		}
 	}
 
 	void Clear()
@@ -350,71 +272,59 @@ public:
 			return;
 		}
 
-		Destroy();
-		Create(PageNodeCapacity);
+		DestroyElements();
+		FreePagesAfter(pFirstPage);
+
+		pCurrentPage = pFirstPage;
+		CurrentPageIndex = 0;
 	}
 
-	inline bool IsEmpty() const
+	inline bool IsEmpty() const { return TrackedSize == 0; }
+
+	TElementType& operator[](size_t index) { return Get(index); }
+	const TElementType& operator[](size_t index) const { return Get(index); }
+
+	TElementType& Get(size_t index) { return const_cast<TElementType&>(std::as_const(*this).Get(index)); }
+
+	const TElementType& Get(size_t index) const
 	{
-		if (pFirstPage == nullptr || pCurrentPage == nullptr) {
-			return true;
+		AssertMsg(index < TrackedSize, "PagedArray access out of range");
+
+		const size_t page_index = index / PageNodeCapacity;
+		const uint32 item_index = static_cast<uint32>(index % PageNodeCapacity);
+
+		const Page* page = nullptr;
+
+		if (page_index * 2 >= CurrentPageIndex) {
+			page = pCurrentPage;
+
+			for (size_t i = CurrentPageIndex; i > page_index; i--) {
+				page = page->pPrev;
+			}
 		}
+		else {
+			page = pFirstPage;
 
-		if (pCurrentPage == pFirstPage && pCurrentPage->Size == 0) {
-			return true;
+			for (size_t i = 0; i < page_index; i++) {
+				page = page->pNext;
+			}
 		}
-
-		return false;
-	}
-
-
-	TElementType& operator[](size_t index) const { return Get(index); }
-
-	TElementType& Get(size_t index) const
-	{
-		const uint32 dest_page_index = (index / PageNodeCapacity);
-		uint32 start_index = 0;
-
-		Page* page = pFirstPage;
-
-		while (start_index != dest_page_index) {
-			page = page->pNext;
-			++start_index;
-		}
-
-		const uint32 item_index = index - (dest_page_index * PageNodeCapacity);
 
 		return page->pData[item_index];
 	}
 
-
 	void Destroy()
 	{
-		TrackedSize = 0;
-		pCurrentPage = nullptr;
-
-		if (pFirstPage == nullptr || bDoNotDestroy) {
-			return;
+		if (pFirstPage != nullptr) {
+			DestroyElements();
+			FreePagesAfter(pFirstPage);
+			FreePage(pFirstPage);
 		}
 
-		Page* current_page = pFirstPage;
-
-		while (current_page != nullptr) {
-			Page* next_page = current_page->pNext;
-
-			if (current_page != nullptr) {
-				current_page->Destroy();
-			}
-
-			// FX_PAGED_ARRAY_FREE(Page, current_page);
-
-			current_page = next_page;
-		}
-
-		TrackedSize = 0;
-
-		pCurrentPage = nullptr;
 		pFirstPage = nullptr;
+		pCurrentPage = nullptr;
+		CurrentPageIndex = 0;
+		TrackedSize = 0;
 	}
 
 	void PrintDebugInfo() const
@@ -427,60 +337,108 @@ public:
 		if (pCurrentPage) {
 			LogInfo(LC_MEMORY, "CurrentPageSize={}", pCurrentPage->Size);
 		}
+		LogInfo(LC_MEMORY, "CurrentPageIndex={}", CurrentPageIndex);
 		LogInfo(LC_MEMORY, "TrackedSize={}", TrackedSize);
-		LogInfo(LC_MEMORY, "bDoNotDestroy={}", bDoNotDestroy);
 		LogInfo(LC_MEMORY, "");
 	}
 
-	~PagedArray()
-	{
-		if (pFirstPage == nullptr) {
-			return;
-		}
-
-		Destroy();
-	}
+	~PagedArray() { Destroy(); }
 
 private:
-	Page* AllocateNewPage(Page* prev, Page* next)
+	Page* AllocatePage(Page* prev)
 	{
-		// Allocate and initialize the page object
-		Page* page = FX_PAGED_ARRAY_ALLOC(Page, sizeof(Page));
-		if (page == nullptr) {
+		static_assert(alignof(TElementType) <= __STDCPP_DEFAULT_NEW_ALIGNMENT__,
+					  "PagedArray does not support over-aligned element types");
+
+		constexpr size_t header_size = (sizeof(Page) + alignof(TElementType) - 1) / alignof(TElementType) *
+									   alignof(TElementType);
+
+		void* memory = TAllocator::AllocRaw(header_size + sizeof(TElementType) * PageNodeCapacity);
+
+		if (memory == nullptr) {
 			Panic("PagedArray", "Memory error allocating page");
-			return nullptr;
 		}
 
-		page->Size = 0;
-		page->pNext = next;
+		Page* page = ::new (memory) Page;
+		page->pData = reinterpret_cast<TElementType*>(static_cast<uint8*>(memory) + header_size);
 		page->pPrev = prev;
-
-		// Allocate the buffer of nodes in the page
-		void* allocated_nodes = FX_PAGED_ARRAY_ALLOC(void, (sizeof(TElementType) * PageNodeCapacity));
-
-		if (allocated_nodes == nullptr) {
-			Panic("PagedArray", "Memory error allocating page data");
-			return nullptr;
-		}
-
-		page->pData = static_cast<TElementType*>(allocated_nodes);
-
-		++CurrentPageIndex;
 
 		return page;
 	}
 
-	FX_FORCE_INLINE void SizeCheck(uint32 size) const
+	static void FreePage(Page* page) { TAllocator::FreeRaw(page); }
+
+	void FreePagesAfter(Page* page)
 	{
-		if (size > PageNodeCapacity) {
-			Panic("PagedArray", "The current size of a page is greater than the allocated page node capacity!");
+		Page* next_page = page->pNext;
+		page->pNext = nullptr;
+
+		while (next_page != nullptr) {
+			Page* following_page = next_page->pNext;
+			FreePage(next_page);
+			next_page = following_page;
 		}
 	}
 
+	void DestroyElements()
+	{
+		for (Page* page = pFirstPage; page != nullptr; page = page->pNext) {
+			if constexpr (!std::is_trivially_destructible_v<TElementType>) {
+				for (uint32 i = 0; i < page->Size; i++) {
+					page->pData[i].~TElementType();
+				}
+			}
+
+			page->Size = 0;
+		}
+
+		TrackedSize = 0;
+	}
+
+	void AdvancePage()
+	{
+		if (pCurrentPage->pNext == nullptr) {
+			pCurrentPage->pNext = AllocatePage(pCurrentPage);
+		}
+
+		pCurrentPage = pCurrentPage->pNext;
+		++CurrentPageIndex;
+	}
+
+	void CopyFrom(const PagedArray& other)
+	{
+		static_assert(std::is_copy_constructible_v<TElementType>, "PagedArray element type is not copyable");
+
+		if (!other.IsInited()) {
+			PageNodeCapacity = other.PageNodeCapacity;
+			return;
+		}
+
+		Create(other.PageNodeCapacity);
+
+		for (const TElementType& element : other) {
+			Emplace(element);
+		}
+	}
+
+	void TakeFrom(PagedArray& other)
+	{
+		PageNodeCapacity = other.PageNodeCapacity;
+		pFirstPage = other.pFirstPage;
+		pCurrentPage = other.pCurrentPage;
+		CurrentPageIndex = other.CurrentPageIndex;
+		TrackedSize = other.TrackedSize;
+
+		other.pFirstPage = nullptr;
+		other.pCurrentPage = nullptr;
+		other.CurrentPageIndex = 0;
+		other.TrackedSize = 0;
+	}
+
 	/**
-	 * @brief Checks if the paged array is initialized. If not, this function automatically initialized it.
+	 * @brief Checks if the paged array is initialized. If not, this function automatically initializes it.
 	 */
-	FX_FORCE_INLINE void InitializedIfNeeded()
+	FX_FORCE_INLINE void InitializeIfNeeded()
 	{
 		if (IsInited()) {
 			return;
@@ -490,7 +448,11 @@ private:
 		LogWarning("PagedArray was not previously initialized, auto initializing!");
 #endif
 
-		Create(FX_PAGED_ARRAY_AUTO_INIT_SIZE);
+		if (PageNodeCapacity == 0) {
+			PageNodeCapacity = FX_PAGED_ARRAY_AUTO_INIT_SIZE;
+		}
+
+		Create(PageNodeCapacity);
 	}
 
 public:
@@ -499,11 +461,9 @@ public:
 
 	Page* pFirstPage = nullptr;
 	Page* pCurrentPage = nullptr;
-	int32 CurrentPageIndex = 0;
 
-	/// If true, this array will not be automatically freed.
-	bool bDoNotDestroy = false;
-
+	/// The index of `pCurrentPage` in the page list.
+	uint32 CurrentPageIndex = 0;
 
 	/// The number of inserted objects
 	uint32 TrackedSize = 0;

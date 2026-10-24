@@ -145,12 +145,39 @@ struct TopViewFace
 	Vec2f A = Vec2f::scZero;
 	Vec2f B = Vec2f::scZero;
 	Vec2f Normal = Vec2f::scZero;
+	Vec3f WorldNormal = Vec3f::sZero;
 
 	Vec2f TextureOffset = Vec2f::scZero;
 	float32 TextureScale = 2.0f;
 	float32 TextureRotation = 0.0f;
 
 	bool operator==(const TopViewFace& other) const = default;
+};
+
+struct TopViewFrontFace
+{
+	TopViewFace Face;
+	DynArray<Vec2f> Polygon;
+
+	TopViewFrontFace() = default;
+	TopViewFrontFace(TopViewFrontFace&& other) = default;
+	TopViewFrontFace(const TopViewFrontFace& other) { (*this) = other; }
+
+	TopViewFrontFace& operator=(TopViewFrontFace&& other) = default;
+
+	TopViewFrontFace& operator=(const TopViewFrontFace& other)
+	{
+		if (this == &other) {
+			return *this;
+		}
+
+		Face = other.Face;
+		Polygon = other.Polygon.Clone();
+
+		return *this;
+	}
+
+	bool operator==(const TopViewFrontFace& other) const = default;
 };
 
 struct TopViewProjection
@@ -161,6 +188,7 @@ struct TopViewProjection
 	DynArray<Vec2f> Hull;
 	DynArray<TopViewEdge> Edges;
 	DynArray<TopViewFace> Faces;
+	DynArray<TopViewFrontFace> FrontFaces;
 	DynArray<Vec2f> ControlPoints;
 	DynArray<float32> ControlWeights;
 	DynArray<PatchColor> ControlColors;
@@ -183,6 +211,7 @@ struct TopViewProjection
 		Hull = other.Hull.Clone();
 		Edges = other.Edges.Clone();
 		Faces = other.Faces.Clone();
+		FrontFaces = other.FrontFaces.Clone();
 		ControlPoints = other.ControlPoints.Clone();
 		ControlWeights = other.ControlWeights.Clone();
 		ControlColors = other.ControlColors.Clone();
@@ -197,6 +226,8 @@ struct TopViewBrush
 {
 	ObjectID ObjectId = ObjectID::scNull;
 	eTopViewBrushKind Kind = eTopViewBrushKind::Geometry;
+
+	String Name;
 
 	bool bSelected = false;
 	bool bSelectable = true;
@@ -262,6 +293,12 @@ struct TopViewState
 	/// How many brushes are hidden from the 2D views
 	uint32 HiddenCount = 0;
 
+	String SelectionName;
+
+	bool bHasCreateReference = false;
+	Vec3f CreateReferenceMin = Vec3f::sZero;
+	Vec3f CreateReferenceMax = Vec3f::sZero;
+
 	String Notice;
 	uint32 NoticeSerial = 0;
 
@@ -298,6 +335,12 @@ struct TopViewState
 		CommandSerial = other.CommandSerial;
 		HiddenCount = other.HiddenCount;
 
+		SelectionName = other.SelectionName;
+
+		bHasCreateReference = other.bHasCreateReference;
+		CreateReferenceMin = other.CreateReferenceMin;
+		CreateReferenceMax = other.CreateReferenceMax;
+
 		Notice = other.Notice;
 		NoticeSerial = other.NoticeSerial;
 
@@ -326,6 +369,7 @@ struct EditorPanelState
 	String SubviewNames;
 
 	bool bUnsavedChanges = false;
+	bool bIsCompiledMap = false;
 
 	bool operator==(const EditorPanelState& other) const = default;
 };

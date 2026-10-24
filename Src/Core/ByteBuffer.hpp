@@ -1,10 +1,13 @@
 #pragma once
 
+#include <Core/Allocator.hpp>
 #include <Core/Assert.hpp>
 #include <Core/SizedArray.hpp>
-#include <Core/Slice.hpp>
 #include <Core/Types.hpp>
+#include <cstdint>
 #include <cstring>
+#include <type_traits>
+#include <utility>
 
 namespace fx {
 
@@ -12,131 +15,167 @@ namespace fx {
 class ByteBuffer
 {
 public:
-    static ByteBuffer FromData(uint8* data, uint32 size)
-    {
-        ByteBuffer bb;
-        bb.pData = data;
-        bb.Capacity = size;
-        bb.Offset = 0;
-        bb.bIsExternalPtr = true;
-        return bb;
-    }
+	/**
+	 * @brief Acts as a view into a data buffer, with the functionality of a normal ByteBuffer. Does not copy the data.
+	 * Use `InsertRaw` if you want to copy into a new byte buffer.
+	 */
+	static ByteBuffer FromData(const void* data, size_t size)
+	{
+		Assert(size <= UINT32_MAX);
+
+		ByteBuffer bb;
+		bb.pData = const_cast<void*>(data);
+		bb.Size = static_cast<uint32>(size);
+		bb.Capacity = static_cast<uint32>(size);
+		bb.bIsExternalPtr = true;
+		bb.bIsReadOnly = true;
+		return bb;
+	}
 
 public:
-    ByteBuffer() = default;
+	ByteBuffer() = default;
 
-    ByteBuffer(uint32 size) { Create(size); }
-    ByteBuffer(ByteBuffer&& other);
+	explicit ByteBuffer(uint32 size) { Create(size); }
+	ByteBuffer(ByteBuffer&& other) noexcept;
 
-    ByteBuffer& operator=(ByteBuffer&& other) noexcept;
+	ByteBuffer& operator=(ByteBuffer&& other) noexcept;
 
-    template <typename T>
-    ByteBuffer(SizedArray<T>&& other)
-    {
-        (*this) = std::move(other);
-    }
+	template <typename T>
+	ByteBuffer(SizedArray<T>&& other)
+	{
+		(*this) = std::move(other);
+	}
 
-    ByteBuffer(const ByteBuffer& other) = delete;
+	ByteBuffer(const ByteBuffer& other) = delete;
 
-    template <typename T>
-    ByteBuffer& operator=(SizedArray<T>&& other) noexcept
-    {
-        pData = other.pData;
-        Offset = other.Offset;
-        Capacity = other.Capacity;
+	template <typename T>
+	ByteBuffer& operator=(SizedArray<T>&& other) noexcept
+	{
+		static_assert(std::is_trivially_copyable_v<T>);
 
-        other.pData = nullptr;
-        other.Offset = 0;
-        other.Capacity = 0;
+		const size_t size_in_bytes = other.GetSizeInBytes();
+		const size_t capacity_in_bytes = other.GetCapacityInBytes();
+		Assert(capacity_in_bytes <= UINT32_MAX);
 
-        return *this;
-    }
+		Free();
 
-    ByteBuffer& operator=(const ByteBuffer& other) = delete;
+		pData = other.pData;
+		Size = static_cast<uint32>(size_in_bytes);
+		Capacity = static_cast<uint32>(capacity_in_bytes);
+		bIsExternalPtr = other.bDoNotDestroy;
 
-    void Create(uint32 size);
+		other.pData = nullptr;
+		other.Size = 0;
+		other.Capacity = 0;
+		other.bDoNotDestroy = false;
 
-    template <typename T>
-    void InitAsCopyOf(const SizedArray<T>& data)
-    {
-        Assert(pData == nullptr);
+		return *this;
+	}
 
-        Create(sizeof(T), data.Capacity);
-        memcpy(pData, data.pData, data.GetSizeInBytes());
-        Offset = data.Offset;
-    }
+	ByteBuffer& operator=(const ByteBuffer& other) = delete;
 
-    template <typename T>
-    void Insert(const T& object)
-    {
-        memcpy(reinterpret_cast<uint8*>(pData) + Offset, &object, sizeof(T));
-        Offset += sizeof(T);
-    }
+	void Create(uint32 size);
 
-    void InsertRaw(const void* value, uint32 value_size);
+	template <typename T, typename TAllocator>
+	void InitAsCopyOf(const SizedArray<T, TAllocator>& data)
+	{
+		static_assert(std::is_trivially_copyable_v<T>);
+		Assert(data.GetCapacityInBytes() <= UINT32_MAX);
 
-    FX_FORCE_INLINE bool IsEmpty() const { return pData == nullptr || Offset == 0; }
-    FX_FORCE_INLINE bool IsNotEmpty() const { return !IsEmpty(); }
+		Create(static_cast<uint32>(data.GetCapacityInBytes()));
 
-    FX_FORCE_INLINE uint32 GetSize() const { return Offset; }
-    FX_FORCE_INLINE uint32 GetRemainingSize() const { return Capacity - Offset; }
+		const uint32 size_in_bytes = static_cast<uint32>(data.GetSizeInBytes());
+		if (size_in_bytes > 0) {
+			memcpy(pData, data.pData, size_in_bytes);
+		}
 
-    FX_FORCE_INLINE void Rewind() { Offset = 0; }
+		Size = size_in_bytes;
+	}
 
+	template <typename T>
+	void Insert(const T& object)
+	{
+		static_assert(std::is_trivially_copyable_v<T>);
+		InsertRaw(&object, sizeof(T));
+	}
 
-    template <typename T>
-    const T& Get(uint32 index) const
-    {
-        Assert(index < Capacity);
-        return *reinterpret_cast<const T*>(reinterpret_cast<uint8*>(pData) + index);
-    }
+	void InsertRaw(const void* value, uint32 value_size);
 
-    /**
-     * @brief Returns the value at the current `Offset` of the byte buffer and increments the offset by the size of T.
-     */
-    template <typename T>
-    const T& Get()
-    {
-        const T& value = Get<T>(Offset);
-        Offset += sizeof(T);
-        return value;
-    }
+	FX_FORCE_INLINE bool IsEmpty() const { return pData == nullptr || Size == 0; }
+	FX_FORCE_INLINE bool IsNotEmpty() const { return !IsEmpty(); }
 
-    template <typename T>
-    T* GetPtr()
-    {
-        return GetPtr<T>(Offset);
-    }
+	FX_FORCE_INLINE uint32 GetSize() const { return Size; }
+	FX_FORCE_INLINE uint32 GetRemainingSize() const { return Size - ReadOffset; }
+	FX_FORCE_INLINE uint32 GetRemainingCapacity() const { return Capacity - Size; }
 
-    template <typename T>
-    T& Get(uint32 index)
-    {
-        Assert(index < Capacity);
-        return *reinterpret_cast<T*>(reinterpret_cast<uint8*>(pData) + index);
-    }
+	FX_FORCE_INLINE void Rewind() { ReadOffset = 0; }
+
+	FX_FORCE_INLINE void Clear()
+	{
+		Size = 0;
+		ReadOffset = 0;
+	}
 
 
-    void* GetRaw(uint32 index);
-    const void* GetRaw(uint32 index) const;
+	template <typename T>
+	T Get(uint32 index) const
+	{
+		static_assert(std::is_trivially_copyable_v<T>);
+		Assert(index <= Size && sizeof(T) <= Size - index);
 
-    template <typename T>
-    T* GetPtr(uint32 index)
-    {
-        Assert(index < Capacity);
-        return reinterpret_cast<T*>(reinterpret_cast<uint8*>(pData) + index);
-    }
+		T value {};
+		memcpy(&value, static_cast<const uint8*>(pData) + index, sizeof(T));
+		return value;
+	}
 
-    void Free();
+	/**
+	 * @brief Returns the value at the current read offset of the byte buffer and advances the read offset by the size
+	 * of T.
+	 */
+	template <typename T>
+	T Get()
+	{
+		T value = Get<T>(ReadOffset);
+		ReadOffset += sizeof(T);
+		return value;
+	}
 
-    ~ByteBuffer() { Free(); }
+	template <typename T>
+	T* GetPtr()
+	{
+		return GetPtr<T>(ReadOffset);
+	}
+
+	template <typename T>
+	T* GetPtr(uint32 index)
+	{
+		Assert(index <= Size);
+		return reinterpret_cast<T*>(static_cast<uint8*>(pData) + index);
+	}
+
+	template <typename T>
+	const T* GetPtr(uint32 index) const
+	{
+		Assert(index <= Size);
+		return reinterpret_cast<const T*>(static_cast<const uint8*>(pData) + index);
+	}
+
+	void* GetRaw(uint32 index);
+	const void* GetRaw(uint32 index) const;
+
+	void Free();
+
+	~ByteBuffer() { Free(); }
 
 public:
-    void* pData = nullptr;
+	void* pData = nullptr;
 
-    bool bIsExternalPtr = false;
+	uint32 Size = 0;
+	uint32 Capacity = 0;
+	uint32 ReadOffset = 0;
 
-    uint32 Offset = 0;
-    uint32 Capacity = 0;
+	bool bIsExternalPtr = false;
+	bool bIsReadOnly = false;
 };
 
 } // namespace fx
