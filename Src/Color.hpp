@@ -1,7 +1,7 @@
 #pragma once
 
+#include <Core/Serialize2.hpp>
 #include <Core/Types.hpp>
-
 #include <cmath>
 
 namespace fx {
@@ -104,3 +104,6 @@ enum class eColorComponent
 FxEnumFlags(eColorComponent);
 
 } // namespace fx
+
+
+RS_ARRAY_TYPE_PARTIAL(fx::Color, fx::uint8, 4, 3, 255)

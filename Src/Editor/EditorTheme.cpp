@@ -15,28 +15,6 @@ static constexpr const char* scMainConfigPath = "Config/Main.conf";
 static constexpr const char* scThemeConfigKey = "editor_theme";
 static constexpr const char* scDefaultThemeID = "Dark";
 
-static bool ReadColor(const ConfigEntry& entry, Color& out_color)
-{
-	const PagedArray<ConfigPrimitive>& values = entry.GetArrayData();
-
-	if (!entry.bIsArray || (values.Size() != 3 && values.Size() != 4)) {
-		return false;
-	}
-
-	const auto component = [&values](uint32 index)
-	{ return static_cast<uint8>(std::clamp(values[index].Get<int32>(), 0, 255)); };
-
-	uint8 alpha = 255;
-
-	if (values.Size() == 4) {
-		alpha = component(3);
-	}
-
-	out_color = Color::FromRGBA(component(0), component(1), component(2), alpha);
-
-	return true;
-}
-
 bool EditorTheme::Load(const String& path)
 {
 	ConfigFile config;
@@ -47,9 +25,7 @@ bool EditorTheme::Load(const String& path)
 		return false;
 	}
 
-	if (const ConfigEntry* name = config.GetEntry(HashStr32("name"))) {
-		Name = String(name->GetValue<const char*>());
-	}
+	Serializable<EditorTheme>::LoadFromConfig(config, *this);
 
 	if (const ConfigEntry* appearance = config.GetEntry(HashStr32("appearance"))) {
 		String value;
@@ -72,51 +48,6 @@ bool EditorTheme::Load(const String& path)
 					   path.CStr());
 		}
 	}
-
-	ForEachColor(
-		[&](const char* group_name, const char* key, Color& color)
-		{
-			const ConfigEntry* group = config.GetEntry(HashStr32(group_name));
-
-			if (group == nullptr) {
-				return;
-			}
-
-			const ConfigEntry* entry = group->GetMember(HashStr32(key));
-
-			if (entry == nullptr) {
-				return;
-			}
-
-			if (!ReadColor(*entry, color)) {
-				LogWarning(LC_CORE, "Editor theme '{}': {}.{} should be [r, g, b] or [r, g, b, a]", path.CStr(),
-						   group_name, key);
-			}
-		});
-
-	ForEachInt(
-		[&](const char* group_name, const char* key, int32& value)
-		{
-			const ConfigEntry* group = config.GetEntry(HashStr32(group_name));
-
-			if (group == nullptr) {
-				return;
-			}
-
-			const ConfigEntry* entry = group->GetMember(HashStr32(key));
-
-			if (entry == nullptr) {
-				return;
-			}
-
-			if (entry->bIsArray || (entry->Type != ConfigPrimitive::ePrimitiveType::Int &&
-									entry->Type != ConfigPrimitive::ePrimitiveType::Float)) {
-				LogWarning(LC_CORE, "Editor theme '{}': {}.{} should be a number", path.CStr(), group_name, key);
-				return;
-			}
-
-			value = entry->GetValue<int32>();
-		});
 
 	return true;
 }

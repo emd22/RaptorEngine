@@ -3,6 +3,7 @@
 #include "SIMDHelper.hpp"
 
 #include <Core/Defines.hpp>
+#include <Core/Serialize2.hpp>
 #include <Core/Types.hpp>
 #include <format>
 
@@ -249,6 +250,8 @@ struct std::formatter<fx::Vec3f>
 		return std::format_to(ctx.out(), "({:.06f}, {:.06f}, {:.06f})", obj.X, obj.Y, obj.Z);
 	}
 };
+
+RS_ARRAY_TYPE(fx::Vec3f, fx::float32, 3)
 
 
 #ifdef FX_USE_AVX

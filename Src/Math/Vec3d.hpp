@@ -87,6 +87,8 @@ public:
 
 } // namespace fx
 
+RS_ARRAY_TYPE(fx::Vec3d, double, 3)
+
 
 #ifdef FX_USE_AVX
 #include "Impl/Vector/Vec3d_AVX.inl"

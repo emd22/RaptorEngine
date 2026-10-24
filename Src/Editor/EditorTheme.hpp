@@ -5,10 +5,10 @@
 #include <wx/colour.h>
 
 #include <Color.hpp>
+#include <Core/DynArray.hpp>
+#include <Core/Serialize2.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
-// #include <vector>
-#include <Core/DynArray.hpp>
 
 namespace fx::editor {
 
@@ -115,12 +115,7 @@ struct EditorTheme
 
 	bool Load(const String& path);
 
-	template <typename TFunc>
-	void ForEachColor(TFunc&& func);
-
-	template <typename TFunc>
-	void ForEachInt(TFunc&& func);
-
+public:
 	String ID;
 	String Name;
 	eAppearance Appearance = eAppearance::Dark;
@@ -134,82 +129,6 @@ struct EditorTheme
 	MarkerColors Marker;
 	ViewportColors Viewport;
 };
-
-template <typename TFunc>
-void EditorTheme::ForEachColor(TFunc&& func)
-{
-	func("frame", "background", Frame.Background);
-	func("frame", "sash", Frame.Sash);
-	func("frame", "sash_grip", Frame.SashGrip);
-	func("frame", "status_text", Frame.StatusText);
-	func("frame", "text", Frame.Text);
-
-	func("button", "selected", Button.Selected);
-	func("button", "text", Button.Text);
-	func("button", "disabled_text", Button.DisabledText);
-
-	func("material_picker", "background", MaterialPicker.Background);
-	func("material_picker", "text", MaterialPicker.Text);
-	func("material_picker", "highlight", MaterialPicker.Highlight);
-	func("material_picker", "highlight_text", MaterialPicker.HighlightText);
-	func("material_picker", "placeholder", MaterialPicker.Placeholder);
-
-	func("grid", "background", Grid.Background);
-	func("grid", "snap", Grid.Snap);
-	func("grid", "minor", Grid.Minor);
-	func("grid", "major", Grid.Major);
-	func("grid", "label", Grid.Label);
-	func("grid", "view_label", Grid.ViewLabel);
-	func("grid", "axis_x", Grid.AxisX);
-	func("grid", "axis_y", Grid.AxisY);
-	func("grid", "axis_z", Grid.AxisZ);
-
-	func("brush", "geometry", Brush.Geometry);
-	func("brush", "probe_volume", Brush.ProbeVolume);
-	func("brush", "reflection", Brush.Reflection);
-	func("brush", "volume", Brush.Volume);
-	func("brush", "nvbrush", Brush.NvBrush);
-	func("brush", "dbound", Brush.DBound);
-	func("brush", "portal", Brush.Portal);
-	func("brush", "decal", Brush.Decal);
-	func("brush", "patch", Brush.Patch);
-
-	func("tool", "selected", Tool.Selected);
-	func("tool", "selected_fill", Tool.SelectedFill);
-	func("tool", "create", Tool.Create);
-	func("tool", "create_fill", Tool.CreateFill);
-	func("tool", "marquee", Tool.Marquee);
-	func("tool", "marquee_fill", Tool.MarqueeFill);
-	func("tool", "rotate", Tool.Rotate);
-	func("tool", "face", Tool.Face);
-	func("tool", "vertex", Tool.Vertex);
-	func("tool", "handle", Tool.Handle);
-	func("tool", "handle_outline", Tool.HandleOutline);
-	func("tool", "clip", Tool.Clip);
-	func("tool", "clip_front_fill", Tool.ClipFrontFill);
-	func("tool", "clip_back_fill", Tool.ClipBackFill);
-
-	func("marker", "player", Marker.Player);
-	func("marker", "light", Marker.Light);
-	func("marker", "light_selected", Marker.LightSelected);
-	func("marker", "spawn", Marker.Spawn);
-	func("marker", "spawn_idle", Marker.SpawnIdle);
-	func("marker", "selected_outline", Marker.SelectedOutline);
-
-	func("viewport", "grab", Viewport.Grab);
-	func("viewport", "model_selected", Viewport.ModelSelected);
-	func("viewport", "edited_bounds", Viewport.EditedBounds);
-	func("viewport", "selection", Viewport.Selection);
-	func("viewport", "selected_face", Viewport.SelectedFace);
-}
-
-template <typename TFunc>
-void EditorTheme::ForEachInt(TFunc&& func)
-{
-	func("button", "lightness", Button.Lightness);
-	func("button", "hover_lightness", Button.HoverLightness);
-	func("button", "pressed_lightness", Button.PressedLightness);
-}
 
 class EditorThemeLibrary
 {
@@ -239,5 +158,104 @@ void StoreThemeChoice(const String& id);
 inline wxColour ToWxColour(const Color& color) { return wxColour(color.R, color.G, color.B, color.A); }
 
 } // namespace fx::editor
+
+/////////////////////////////////////
+// Serialization
+/////////////////////////////////////
+
+RS_OBJECT_BEGIN(fx::editor::EditorTheme::FrameColors)
+RS_FIELD_NAMED(Background, "background")
+RS_FIELD_NAMED(Sash, "sash")
+RS_FIELD_NAMED(SashGrip, "sash_grip")
+RS_FIELD_NAMED(StatusText, "status_text")
+RS_FIELD_NAMED(Text, "text")
+RS_OBJECT_END()
+
+RS_OBJECT_BEGIN(fx::editor::EditorTheme::ButtonColors)
+RS_FIELD_NAMED(Selected, "selected")
+RS_FIELD_NAMED(Text, "text")
+RS_FIELD_NAMED(DisabledText, "disabled_text")
+RS_FIELD_NAMED(Lightness, "lightness")
+RS_FIELD_NAMED(HoverLightness, "hover_lightness")
+RS_FIELD_NAMED(PressedLightness, "pressed_lightness")
+RS_OBJECT_END()
+
+RS_OBJECT_BEGIN(fx::editor::EditorTheme::MaterialPickerColors)
+RS_FIELD_NAMED(Background, "background")
+RS_FIELD_NAMED(Text, "text")
+RS_FIELD_NAMED(Highlight, "highlight")
+RS_FIELD_NAMED(HighlightText, "highlight_text")
+RS_FIELD_NAMED(Placeholder, "placeholder")
+RS_OBJECT_END()
+
+RS_OBJECT_BEGIN(fx::editor::EditorTheme::GridColors)
+RS_FIELD_NAMED(Background, "background")
+RS_FIELD_NAMED(Snap, "snap")
+RS_FIELD_NAMED(Minor, "minor")
+RS_FIELD_NAMED(Major, "major")
+RS_FIELD_NAMED(Label, "label")
+RS_FIELD_NAMED(ViewLabel, "view_label")
+RS_FIELD_NAMED(AxisX, "axis_x")
+RS_FIELD_NAMED(AxisY, "axis_y")
+RS_FIELD_NAMED(AxisZ, "axis_z")
+RS_OBJECT_END()
+
+RS_OBJECT_BEGIN(fx::editor::EditorTheme::BrushColors)
+RS_FIELD_NAMED(Geometry, "geometry")
+RS_FIELD_NAMED(ProbeVolume, "probe_volume")
+RS_FIELD_NAMED(Reflection, "reflection")
+RS_FIELD_NAMED(Volume, "volume")
+RS_FIELD_NAMED(NvBrush, "nvbrush")
+RS_FIELD_NAMED(DBound, "dbound")
+RS_FIELD_NAMED(Portal, "portal")
+RS_FIELD_NAMED(Decal, "decal")
+RS_FIELD_NAMED(Patch, "patch")
+RS_OBJECT_END()
+
+RS_OBJECT_BEGIN(fx::editor::EditorTheme::ToolColors)
+RS_FIELD_NAMED(Selected, "selected")
+RS_FIELD_NAMED(SelectedFill, "selected_fill")
+RS_FIELD_NAMED(Create, "create")
+RS_FIELD_NAMED(CreateFill, "create_fill")
+RS_FIELD_NAMED(Marquee, "marquee")
+RS_FIELD_NAMED(MarqueeFill, "marquee_fill")
+RS_FIELD_NAMED(Rotate, "rotate")
+RS_FIELD_NAMED(Face, "face")
+RS_FIELD_NAMED(Vertex, "vertex")
+RS_FIELD_NAMED(Handle, "handle")
+RS_FIELD_NAMED(HandleOutline, "handle_outline")
+RS_FIELD_NAMED(Clip, "clip")
+RS_FIELD_NAMED(ClipFrontFill, "clip_front_fill")
+RS_FIELD_NAMED(ClipBackFill, "clip_back_fill")
+RS_OBJECT_END()
+
+RS_OBJECT_BEGIN(fx::editor::EditorTheme::MarkerColors)
+RS_FIELD_NAMED(Player, "player")
+RS_FIELD_NAMED(Light, "light")
+RS_FIELD_NAMED(LightSelected, "light_selected")
+RS_FIELD_NAMED(Spawn, "spawn")
+RS_FIELD_NAMED(SpawnIdle, "spawn_idle")
+RS_FIELD_NAMED(SelectedOutline, "selected_outline")
+RS_OBJECT_END()
+
+RS_OBJECT_BEGIN(fx::editor::EditorTheme::ViewportColors)
+RS_FIELD_NAMED(Grab, "grab")
+RS_FIELD_NAMED(ModelSelected, "model_selected")
+RS_FIELD_NAMED(EditedBounds, "edited_bounds")
+RS_FIELD_NAMED(Selection, "selection")
+RS_FIELD_NAMED(SelectedFace, "selected_face")
+RS_OBJECT_END()
+
+RS_OBJECT_BEGIN(fx::editor::EditorTheme)
+RS_FIELD_NAMED(Name, "name")
+RS_FIELD_NAMED(Frame, "frame")
+RS_FIELD_NAMED(Button, "button")
+RS_FIELD_NAMED(MaterialPicker, "material_picker")
+RS_FIELD_NAMED(Grid, "grid")
+RS_FIELD_NAMED(Brush, "brush")
+RS_FIELD_NAMED(Tool, "tool")
+RS_FIELD_NAMED(Marker, "marker")
+RS_FIELD_NAMED(Viewport, "viewport")
+RS_OBJECT_END()
 
 #endif

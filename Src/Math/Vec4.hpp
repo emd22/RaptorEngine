@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Core/Serialize2.hpp>
 #include <Core/Types.hpp>
 #include <format>
 
@@ -253,6 +254,10 @@ public:
 };
 
 } // namespace fx
+
+
+RS_ARRAY_TYPE(fx::Vec4f, fx::float32, 4)
+RS_ARRAY_TYPE(fx::Vec4u, fx::uint32, 4)
 
 
 template <>

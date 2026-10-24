@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Core/Defines.hpp>
+#include <Core/Serialize2.hpp>
 #include <Math/Vec3.hpp>
 #include <Math/Vec4.hpp>
 
@@ -117,6 +118,8 @@ public:
 
 } // namespace fx
 
+
+RS_ARRAY_TYPE(fx::Quat, fx::float32, 4)
 
 template <>
 struct std::formatter<fx::Quat>
