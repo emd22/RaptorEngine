@@ -20,6 +20,21 @@ void ImageLayoutTransition(Image* image, VkImageLayout new_layout, CommandBuffer
 						   uint32 num_levels);
 
 /**
+ * @brief Moves an image to the general layout for compute shader writes, discarding what it held.
+ */
+void ImageBeginComputeWrite(const CommandBuffer& cmd, Image* image);
+
+/**
+ * @brief Makes compute shader writes to an image visible to compute and fragment shader reads.
+ */
+void ImageComputeWriteToRead(const CommandBuffer& cmd, Image* image);
+
+/**
+ * @brief Makes every earlier write in the command buffer visible to compute shader reads.
+ */
+void ComputeReadAfterAll(const CommandBuffer& cmd);
+
+/**
  * @brief Makes storage buffer writes from a compute shader visible to the fragment shader.
  */
 void BufferComputeToFragment(const CommandBuffer& cmd, RawGpuBuffer* buffer);

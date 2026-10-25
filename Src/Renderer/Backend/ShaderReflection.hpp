@@ -11,6 +11,7 @@ enum eShaderReflectionType : uint16
 	StructuredBuffer,
 	CBuffer,
 	Texture,
+	StorageImage,
 };
 
 namespace ShaderReflectionUtil {
@@ -23,6 +24,8 @@ FX_FORCE_INLINE VkDescriptorType TypeToVkDescriptorType(eShaderReflectionType re
 		return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 	case eShaderReflectionType::Texture:
 		return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	case eShaderReflectionType::StorageImage:
+		return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	default:;
 	}
 
@@ -51,6 +54,8 @@ FX_FORCE_INLINE const char* GetName(eShaderReflectionType refl_type)
 		return "CBuffer";
 	case eShaderReflectionType::Texture:
 		return "Texture";
+	case eShaderReflectionType::StorageImage:
+		return "StorageImage";
 	default:;
 	}
 

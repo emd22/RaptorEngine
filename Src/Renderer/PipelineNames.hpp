@@ -34,6 +34,9 @@ enum class ePipelineName : uint16
 	FogTemporal,
 	FogDenoise,
 	FogApply,
+	FogFroxelInject,
+	FogFroxelIntegrate,
+	FogFroxelApply,
 
 	NumPipelines
 };

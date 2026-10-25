@@ -91,6 +91,7 @@ enum class eImageType
 	Flat,
 	Cubemap,
 	CubemapArray,
+	Volume,
 };
 
 struct ImageInfo
@@ -117,6 +118,7 @@ struct ImageInfo
 
 public:
 	Vec2u Size = Vec2u::scZero;
+	uint32 Depth = 1;
 
 	eImageType ImageType = eImageType::Flat;
 	eImageFormat Format = eImageFormat::RGBA8_UNorm;
@@ -419,11 +421,13 @@ public:
 
 	void Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format, VkImageTiling tiling,
 				VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags = eImageCreateFlags::None,
-				uint32 cube_count = 1);
+				uint32 cube_count = 1, uint32 depth = 1);
 
 	void Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format,
 				VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags = eImageCreateFlags::None,
 				uint32 cube_count = 1);
+
+	void CreateVolume(const Vec2u& size, uint32 depth, eImageFormat format, VkImageUsageFlags usage);
 
 	void CreateFromData(renderer::CommandBuffer& cmd, const ImageInfo& info, eImageCreateFlags flags);
 

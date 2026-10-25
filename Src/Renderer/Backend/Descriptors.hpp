@@ -53,6 +53,7 @@ enum class eDescriptorEntryType
 	None,
 	Image,
 	Buffer,
+	StorageImage,
 };
 
 namespace DescriptorEntryUtil {
@@ -72,11 +73,17 @@ struct DescriptorEntry
 	 */
 	static DescriptorEntry AsImage(uint32 bind_index, eShaderType shader_stages, Image* image, Sampler* sampler);
 
+	/**
+	 * @brief Builds a descriptor entry for an image that shaders write to, which is kept in the general layout
+	 */
+	static DescriptorEntry AsStorageImage(uint32 bind_index, eShaderType shader_stages, Image* image);
+
 	VkDescriptorType GetDescriptorType() const;
 	FX_FORCE_INLINE eDescriptorEntryType GetType() const { return Type; }
 
 	FX_FORCE_INLINE bool IsImage() const { return (Type == eDescriptorEntryType::Image); }
 	FX_FORCE_INLINE bool IsBuffer() const { return (Type == eDescriptorEntryType::Buffer); }
+	FX_FORCE_INLINE bool IsStorageImage() const { return (Type == eDescriptorEntryType::StorageImage); }
 	FX_FORCE_INLINE bool IsInvalid() const { return (Type == eDescriptorEntryType::None); }
 
 public:
@@ -132,6 +139,7 @@ public:
 
 	void AddBuffer(uint32 bind_index, RawGpuBuffer* buffer, uint64 offset, uint64 range);
 	void AddImage(uint32 bind_index, Image* image, Sampler* sampler);
+	void AddStorageImage(uint32 bind_index, Image* image);
 	void AddImageFromTarget(uint32 bind_index, Target* target, Sampler* sampler);
 
 	void Build();

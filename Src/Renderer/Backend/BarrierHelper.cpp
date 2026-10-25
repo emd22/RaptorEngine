@@ -251,6 +251,103 @@ void ImageLayoutTransition(Image* image, VkImageLayout new_layout, CommandBuffer
 }
 
 
+void ImageBeginComputeWrite(const CommandBuffer& cmd, Image* image)
+{
+	Assert(image != nullptr);
+
+	VkImageMemoryBarrier2 barrier {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+		.pNext = nullptr,
+
+		.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+		.srcAccessMask = VK_ACCESS_2_NONE,
+
+		.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+		.dstAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
+
+		.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+		.newLayout = VK_IMAGE_LAYOUT_GENERAL,
+
+		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+
+		.image = image->InternalImage,
+
+		.subresourceRange = SubresourceRange(image),
+	};
+
+	VkDependencyInfo dep_info {
+		.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+		.pNext = nullptr,
+		.imageMemoryBarrierCount = 1,
+		.pImageMemoryBarriers = &barrier,
+	};
+
+	vkCmdPipelineBarrier2(cmd.Cmd, &dep_info);
+
+	image->ImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+}
+
+void ImageComputeWriteToRead(const CommandBuffer& cmd, Image* image)
+{
+	Assert(image != nullptr);
+
+	VkImageMemoryBarrier2 barrier {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+		.pNext = nullptr,
+
+		.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+		.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
+
+		.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+		.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+
+		.oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+		.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+
+		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+
+		.image = image->InternalImage,
+
+		.subresourceRange = SubresourceRange(image),
+	};
+
+	VkDependencyInfo dep_info {
+		.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+		.pNext = nullptr,
+		.imageMemoryBarrierCount = 1,
+		.pImageMemoryBarriers = &barrier,
+	};
+
+	vkCmdPipelineBarrier2(cmd.Cmd, &dep_info);
+
+	image->ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+}
+
+void ComputeReadAfterAll(const CommandBuffer& cmd)
+{
+	VkMemoryBarrier2 barrier {
+		.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+		.pNext = nullptr,
+
+		.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+		.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
+
+		.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+		.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_UNIFORM_READ_BIT,
+	};
+
+	VkDependencyInfo dep_info {
+		.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+		.pNext = nullptr,
+		.memoryBarrierCount = 1,
+		.pMemoryBarriers = &barrier,
+	};
+
+	vkCmdPipelineBarrier2(cmd.Cmd, &dep_info);
+}
+
 void BufferComputeToFragment(const CommandBuffer& cmd, RawGpuBuffer* buffer)
 {
 	Assert(buffer != nullptr);

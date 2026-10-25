@@ -378,6 +378,16 @@ void PSOBuild::AddImageFromTarget(uint32 bind_index, uint32 set_index, eShaderTy
 	mDescriptorEntries[set_index].Insert(DescriptorEntry::AsImage(bind_index, shader_stages, &target->Image, sampler));
 }
 
+void PSOBuild::AddStorageImage(uint32 bind_index, uint32 set_index, eShaderType shader_stages, Image* image)
+{
+	AssertMsg(HasFlag(mFlags, ePSOBuildFlags::ReuseDescriptors) == false,
+			  "Cannot build descriptors when already inheriting them from another pipeline");
+
+	AssertMsg(image != nullptr, "Image must be valid");
+
+	mDescriptorEntries[set_index].Insert(DescriptorEntry::AsStorageImage(bind_index, shader_stages, image));
+}
+
 void PSOBuild::AddFrameData(uint32 set_index)
 {
 	AssertMsg(HasFlag(mFlags, ePSOBuildFlags::ReuseDescriptors) == false,
@@ -399,6 +409,8 @@ static eDescriptorEntryType SRTToDET(eShaderReflectionType srt)
 		return eDescriptorEntryType::Buffer;
 	case eShaderReflectionType::Texture:
 		return eDescriptorEntryType::Image;
+	case eShaderReflectionType::StorageImage:
+		return eDescriptorEntryType::StorageImage;
 	default:;
 	}
 

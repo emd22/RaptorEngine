@@ -38,6 +38,10 @@ const ImageTypeProperties ImageTypeGetProperties(eImageType image_type, uint32 c
 		props.ViewType = VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
 		props.LayerCount = 6 * std::max(cube_count, 1U);
 	}
+	else if (image_type == eImageType::Volume) {
+		props.ViewType = VK_IMAGE_VIEW_TYPE_3D;
+		props.LayerCount = 1;
+	}
 	else {
 		LogError("Unknown image type!");
 	}
@@ -105,7 +109,7 @@ Image& Image::operator=(const Image& other)
 
 void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format,
 				   VkImageTiling tiling, VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags,
-				   uint32 cube_count)
+				   uint32 cube_count, uint32 depth)
 {
 	using namespace renderer;
 
@@ -128,6 +132,8 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 
 	Aspect = aspect;
 	Info = ImageInfo { size, format, 0, mips_count, Slice<const uint8>(nullptr, 0) };
+	Info.ImageType = image_type;
+	Info.Depth = std::max(depth, 1U);
 
 	if (!mpRefCnt) {
 		mpRefCnt = StdAllocator::Alloc<RefCount>(sizeof(RefCount));
@@ -156,13 +162,19 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 	}
 
 	// Create the vulkan image
+	VkImageType vk_image_type = VK_IMAGE_TYPE_2D;
+
+	if (image_type == eImageType::Volume) {
+		vk_image_type = VK_IMAGE_TYPE_3D;
+	}
+
 	VkImageCreateInfo image_info {
 		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
 		.flags = image_create_flags,
 
-		.imageType = VK_IMAGE_TYPE_2D,
+		.imageType = vk_image_type,
 		.format = ImageFormatUtil::ToUnderlying(format),
-		.extent = { .width = size.Width(), .height = size.Height(), .depth = 1 },
+		.extent = { .width = size.Width(), .height = size.Height(), .depth = Info.Depth },
 
 		.mipLevels = mips_count,
 		.arrayLayers = image_type_props.LayerCount,
@@ -260,6 +272,12 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 				   VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags, uint32 cube_count)
 {
 	Create(image_type, size, mips_count, format, VK_IMAGE_TILING_OPTIMAL, usage, aspect, flags, cube_count);
+}
+
+void Image::CreateVolume(const Vec2u& size, uint32 depth, eImageFormat format, VkImageUsageFlags usage)
+{
+	Create(eImageType::Volume, size, 1, format, VK_IMAGE_TILING_OPTIMAL, usage, eImageAspectFlag::Color,
+		   eImageCreateFlags::IsTarget, 1, depth);
 }
 
 

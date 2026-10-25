@@ -973,7 +973,11 @@ eFogMode GraphicsBackend::GetFogMode() const
 
 	const int64 mode = gCVars->Get("r_fog", scDefaultFogMode);
 
-	if (mode >= static_cast<int64>(eFogMode::Volumetric)) {
+	if (mode >= static_cast<int64>(eFogMode::Froxel)) {
+		return eFogMode::Froxel;
+	}
+
+	if (mode == static_cast<int64>(eFogMode::Volumetric)) {
 		return eFogMode::Volumetric;
 	}
 
@@ -1046,6 +1050,9 @@ void GraphicsBackend::RenderFog(Camera& camera)
 	consts.CameraOffsetAndHaze[2] = eye.Z - origin.Z;
 	consts.CameraOffsetAndHaze[3] = std::max(fog.Haze, 0.0f);
 
+	consts.ScreenSize[0] = static_cast<float32>(Swapchain.Extent.X);
+	consts.ScreenSize[1] = static_cast<float32>(Swapchain.Extent.Y);
+
 	consts.Anisotropy = std::clamp(fog.Anisotropy, -scMaxFogAnisotropy, scMaxFogAnisotropy);
 	consts.AmbientScale = std::max(fog.AmbientScale, 0.0f);
 
@@ -1080,6 +1087,11 @@ void GraphicsBackend::RenderFog(Camera& camera)
 	}
 	else {
 		memcpy(consts.FarSunMatrix, Mat4f::scIdentity.RawData, sizeof(consts.FarSunMatrix));
+	}
+
+	if (mode == eFogMode::Froxel) {
+		RenderFroxelFog(cmd, FrameAlloc.Push(consts));
+		return;
 	}
 
 	ePipelineName march_pipeline = ePipelineName::FogFast;
@@ -1161,6 +1173,47 @@ void GraphicsBackend::RenderFog(Camera& camera)
 
 	gPipelineCache->SetFrameData(resolve_consts_offset);
 	gPipelineCache->Bind(ePipelineName::FogApply, cmd);
+
+	vkCmdDraw(cmd.Get(), 3, 1, 0, 0);
+
+	pRenderer->FogApplyPass.End();
+}
+
+void GraphicsBackend::RenderFroxelFog(CommandBuffer& cmd, uint32 consts_offset)
+{
+	static constexpr uint32 scGroupSize = 8;
+
+	const uint32 group_columns = (scFroxelGridX + scGroupSize - 1) / scGroupSize;
+	const uint32 group_rows = (scFroxelGridY + scGroupSize - 1) / scGroupSize;
+
+	BarrierHelper::ComputeReadAfterAll(cmd);
+	BarrierHelper::ImageBeginComputeWrite(cmd, &pRenderer->FroxelLighting);
+	BarrierHelper::ImageBeginComputeWrite(cmd, &pRenderer->FroxelIntegrated);
+
+	gPipelineCache->AddBufferOffset(0, LightBuffer.GetBaseOffset());
+	gPipelineCache->AddBufferOffset(0, GetLightGridFrameOffset());
+	gPipelineCache->AddBufferOffset(0, GetLightIndexListFrameOffset());
+	gPipelineCache->AddBufferOffset(0, 0);
+	gPipelineCache->AddBufferOffset(0, 0);
+	gPipelineCache->AddBufferOffset(0, 0);
+	gPipelineCache->SetFrameData(consts_offset);
+	gPipelineCache->Bind(ePipelineName::FogFroxelInject, cmd);
+
+	vkCmdDispatch(cmd.Get(), group_columns, group_rows, scFroxelGridZ + 1);
+
+	BarrierHelper::ImageComputeWriteToRead(cmd, &pRenderer->FroxelLighting);
+
+	gPipelineCache->SetFrameData(consts_offset);
+	gPipelineCache->Bind(ePipelineName::FogFroxelIntegrate, cmd);
+
+	vkCmdDispatch(cmd.Get(), group_columns, group_rows, 1);
+
+	BarrierHelper::ImageComputeWriteToRead(cmd, &pRenderer->FroxelIntegrated);
+
+	pRenderer->FogApplyPass.Begin(cmd);
+
+	gPipelineCache->SetFrameData(consts_offset);
+	gPipelineCache->Bind(ePipelineName::FogFroxelApply, cmd);
 
 	vkCmdDraw(cmd.Get(), 3, 1, 0, 0);
 

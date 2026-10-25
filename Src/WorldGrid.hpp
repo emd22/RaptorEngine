@@ -166,7 +166,10 @@ private:
 
 public:
 	Vec2u mGridSize;
-	Vec2f mTileSize = Vec2f(10.0f, 10.0f);
+
+	/// The size of a single tile in metres. Note that since there is an object cap on world tiles, make sure these are
+	/// small enough even though compiled maps have significantly less objects.
+	Vec2f mTileSize = Vec2f(100.0f);
 	Vec3f mPositionOffset = Vec3f::sZero;
 
 	TileIndex ViewTileIndex = TileIndexNull;

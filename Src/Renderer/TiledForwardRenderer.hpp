@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Backend/BlendAttachment.hpp"
 #include "Backend/Descriptors.hpp"
 #include "Backend/Pipeline.hpp"
 #include "Backend/Shader.hpp"
@@ -65,8 +66,12 @@ struct alignas(16) FogConsts
 	uint32 Flags;
 	float32 JitterOffset;
 	uint32 NoiseShift;
-	float32 Pad[2];
+	float32 ScreenSize[2];
 };
+
+static constexpr uint32 scFroxelGridX = 160;
+static constexpr uint32 scFroxelGridY = 90;
+static constexpr uint32 scFroxelGridZ = 64;
 
 struct alignas(16) FogTemporalConsts
 {
@@ -157,6 +162,7 @@ private:
 	void CreateSSAOBlurPass();
 	void CreateParticlePass();
 	void CreateFogPasses();
+	void CreateFroxelFogPSO(const BlendAttachment& apply_blend);
 
 	// Lighting
 	// void CreateLightVolumePipeline();
@@ -209,6 +215,10 @@ public:
 	RenderStage FogTemporalPass;
 	RenderStage FogDenoisePass;
 	RenderStage FogApplyPass;
+	/// Froxel fog: lighting per froxel, with one extra slice for the light past the grid
+	Image FroxelLighting;
+	/// Froxel fog: in-scatter accumulated from the eye to the far edge of each slice
+	Image FroxelIntegrated;
 	/// Composition pass, combine results from all passes
 	RenderStage CompPass;
 

@@ -1073,6 +1073,90 @@ void TiledForwardRenderer::CreateFogPSO()
 	gPSOBuild->AddFrameData(1);
 
 	gPSOBuild->EndPipeline();
+
+	CreateFroxelFogPSO(blend);
+}
+
+void TiledForwardRenderer::CreateFroxelFogPSO(const BlendAttachment& apply_blend)
+{
+	const VkImageUsageFlags volume_usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+	FroxelLighting.CreateVolume(Vec2u(scFroxelGridX, scFroxelGridY), scFroxelGridZ + 1, eImageFormat::RGBA16_Float,
+								volume_usage);
+	FroxelIntegrated.CreateVolume(Vec2u(scFroxelGridX, scFroxelGridY), scFroxelGridZ, eImageFormat::RGBA16_Float,
+								  volume_usage);
+
+	Sampler* point_sampler = gSamplerCache->Request(SamplerProps {
+		eSamplerFilter::Nearest,
+		eSamplerFilter::Nearest,
+		eSamplerFilter::Nearest,
+		eSamplerAddressMode::ClampToEdge,
+	});
+
+	Sampler* volume_sampler = gSamplerCache->Request(SamplerProps {
+		eSamplerFilter::Linear,
+		eSamplerFilter::Linear,
+		eSamplerFilter::Nearest,
+		eSamplerAddressMode::ClampToEdge,
+	});
+
+	Target* depth_target = Prepass.GetTarget(eImageFormat::D32_Float);
+	Target* shadow_target = gShadowAtlas->GetTarget();
+
+	gPSOBuild->BeginPipeline(ePipelineName::FogFroxelInject);
+	gPSOBuild->SetShader(eShaderName::FogInject, {});
+
+	gPSOBuild->AddBuffer(1, 0, eShaderType::Compute, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+						 gGraphics->LightBuffer.PageSize);
+	gPSOBuild->AddBuffer(2, 0, eShaderType::Compute, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
+	gPSOBuild->AddBuffer(3, 0, eShaderType::Compute, &gGraphics->LightIndexListBuffer, 0,
+						 gGraphics->LightIndexListPageSize);
+	gPSOBuild->AddImageFromTarget(4, 0, eShaderType::Compute, shadow_target,
+								  gSamplerCache->Request({
+									  eSamplerFilter::Linear,
+									  eSamplerFilter::Linear,
+									  eSamplerFilter::Linear,
+									  eSamplerAddressMode::ClampToBorder,
+									  eSamplerBorderColor::FloatWhite,
+									  eSamplerCompareOp::Greater,
+								  }));
+	gPSOBuild->AddBuffer(5, 0, eShaderType::Compute, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
+	gPSOBuild->AddBuffer(6, 0, eShaderType::Compute, &gGraphics->ProbeVolumeBuffer, 0,
+						 gGraphics->ProbeVolumePageSize);
+	gPSOBuild->AddBuffer(7, 0, eShaderType::Compute, &gGraphics->ProbeGridBuffer, 0, gGraphics->ProbeGridPageSize);
+	gPSOBuild->AddStorageImage(8, 0, eShaderType::Compute, &FroxelLighting);
+
+	gPSOBuild->AddFrameData(1);
+
+	gPSOBuild->EndPipeline();
+
+	gPSOBuild->BeginPipeline(ePipelineName::FogFroxelIntegrate);
+	gPSOBuild->SetShader(eShaderName::FogIntegrate, {});
+
+	gPSOBuild->AddImage(0, 0, eShaderType::Compute, &FroxelLighting, point_sampler);
+	gPSOBuild->AddStorageImage(1, 0, eShaderType::Compute, &FroxelIntegrated);
+
+	gPSOBuild->AddFrameData(1);
+
+	gPSOBuild->EndPipeline();
+
+	gPSOBuild->BeginPipeline(ePipelineName::FogFroxelApply);
+
+	gPSOBuild->UseRenderStage(FogApplyPass);
+	gPSOBuild->SetShader(eShaderName::FogFroxelApply, {});
+	gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
+	gPSOBuild->SetCullMode(eCullMode::None);
+	gPSOBuild->SetDepthTest(false);
+	gPSOBuild->SetDepthWrite(false);
+	gPSOBuild->SetTargetBlend(FogApplyPass.GetTargetIndex(eImageFormat::RGBA16_Float), apply_blend);
+
+	gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, depth_target, point_sampler);
+	gPSOBuild->AddImage(1, 0, eShaderType::Pixel, &FroxelIntegrated, volume_sampler);
+	gPSOBuild->AddImage(2, 0, eShaderType::Pixel, &FroxelLighting, volume_sampler);
+
+	gPSOBuild->AddFrameData(1);
+
+	gPSOBuild->EndPipeline();
 }
 
 uint32 TiledForwardRenderer::GetViewConstants(const Camera& camera, eObjectLayer layer)

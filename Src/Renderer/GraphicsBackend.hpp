@@ -41,6 +41,7 @@ enum class eFogMode : int64
 	Off = 0,
 	Fast = 1,
 	Volumetric = 2,
+	Froxel = 3,
 };
 
 class TiledForwardRenderer;
@@ -89,6 +90,7 @@ public:
 	void RenderEarlyFrameEffects(Camera& camera);
 
 	void RenderFog(Camera& camera);
+	void RenderFroxelFog(CommandBuffer& cmd, uint32 consts_offset);
 
 	eFogMode GetFogMode() const;
 

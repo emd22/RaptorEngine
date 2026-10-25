@@ -414,7 +414,7 @@ EditorPanelState RaptorEditor::BuildPanelState()
 	}
 
 	world.Fog = gWorld->Fog;
-	world.FogQuality = std::clamp<int64>(gCVars->Get("r_fog", int64 { 2 }), 0, 2);
+	world.FogQuality = std::clamp<int64>(gCVars->Get("r_fog", int64 { 2 }), 0, 3);
 
 	const uint32 probe_count = gProbeManager->GetReflectionProbeCount();
 

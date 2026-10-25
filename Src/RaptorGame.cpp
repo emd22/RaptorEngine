@@ -152,7 +152,9 @@ void RaptorGame::InitEngine()
 
 	gPhysics->Create();
 	gAssetManager->Start(3);
-	gWorldGrid->Create(Vec2u(20, 20));
+
+	// Make the world grid approx 1.5km x 1.5km. This should be increased as the map sizes grow.
+	gWorldGrid->Create(Vec2u(15));
 
 	sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
 
@@ -1043,11 +1045,11 @@ void RaptorGame::RenderText()
 	if (gpu.IsEnabled() && (mpShowGpuCVar == nullptr || mpShowGpuCVar->IntValue != 0)) {
 		gTextRenderer->DrawText(String::Fmt("GPU={:.2f}ms", gpu.GetTotalMs()).CStr(), 1.0f, scWhite);
 		gTextRenderer->DrawText(
-			String::Fmt("shadow {:.2f} pre {:.2f} lightcull {:.2f} ao {:.2f} fwd {:.2f} part {:.2f} fog {:.2f} comp {:.2f}",
-						gpu.GetMs(eGpuMarker::Shadows), gpu.GetMs(eGpuMarker::Prepass),
-						gpu.GetMs(eGpuMarker::LightCulling), gpu.GetMs(eGpuMarker::SSAO),
-						gpu.GetMs(eGpuMarker::Forward), gpu.GetMs(eGpuMarker::Particles),
-						gpu.GetMs(eGpuMarker::Fog), gpu.GetMs(eGpuMarker::Composition))
+			String::Fmt(
+				"shadow {:.2f} pre {:.2f} lightcull {:.2f} ao {:.2f} fwd {:.2f} part {:.2f} fog {:.2f} comp {:.2f}",
+				gpu.GetMs(eGpuMarker::Shadows), gpu.GetMs(eGpuMarker::Prepass), gpu.GetMs(eGpuMarker::LightCulling),
+				gpu.GetMs(eGpuMarker::SSAO), gpu.GetMs(eGpuMarker::Forward), gpu.GetMs(eGpuMarker::Particles),
+				gpu.GetMs(eGpuMarker::Fog), gpu.GetMs(eGpuMarker::Composition))
 				.CStr(),
 			1.0f, scWhite);
 

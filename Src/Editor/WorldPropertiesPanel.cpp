@@ -233,6 +233,7 @@ void WorldPropertiesPanel::BuildFogSection(wxSizer* sizer)
 	mpFogQualityChoice->Append("Off");
 	mpFogQualityChoice->Append("Fast");
 	mpFogQualityChoice->Append("Volumetric");
+	mpFogQualityChoice->Append("Froxel");
 	section->AddRow("Quality", mpFogQualityChoice);
 
 	mpFogQualityChoice->Bind(wxEVT_CHOICE,

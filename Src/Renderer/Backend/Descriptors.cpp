@@ -24,6 +24,7 @@ const char* GetTypeName(eDescriptorEntryType type)
 		FX_ENUM_CASE_NAME(None);
 		FX_ENUM_CASE_NAME(Image);
 		FX_ENUM_CASE_NAME(Buffer);
+		FX_ENUM_CASE_NAME(StorageImage);
 	default:;
 	}
 
@@ -63,6 +64,18 @@ DescriptorEntry DescriptorEntry::AsImage(uint32 bind_index, eShaderType shader_s
 	return entry;
 }
 
+DescriptorEntry DescriptorEntry::AsStorageImage(uint32 bind_index, eShaderType shader_stages, Image* image)
+{
+	DescriptorEntry entry {
+		.Type = eDescriptorEntryType::StorageImage,
+		.Binding = bind_index,
+		.ShaderStages = shader_stages,
+		.pImage = image,
+	};
+
+	return entry;
+}
+
 VkDescriptorType DescriptorEntry::GetDescriptorType() const
 {
 	if (IsBuffer()) {
@@ -72,6 +85,9 @@ VkDescriptorType DescriptorEntry::GetDescriptorType() const
 	}
 	else if (IsImage()) {
 		return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	}
+	else if (IsStorageImage()) {
+		return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	}
 
 	Panic("DescriptorEntry", "Unknown descriptor entry type");
@@ -265,6 +281,19 @@ void DescriptorSet::AddImage(uint32 bind_index, Image* image, Sampler* sampler)
 	mbIsBuilt = false;
 }
 
+void DescriptorSet::AddStorageImage(uint32 bind_index, Image* image)
+{
+	if (!mDescriptorEntries.IsInited()) {
+		mDescriptorEntries.InitCapacity(scMaxDescriptorEntries);
+	}
+
+	AssertMsg(image != nullptr, "Input image cannot be null!");
+
+	mDescriptorEntries.Insert(DescriptorEntry::AsStorageImage(bind_index, eShaderType::None, image));
+
+	mbIsBuilt = false;
+}
+
 void DescriptorSet::Build()
 {
 	if (mDescriptorEntries.IsEmpty()) {
@@ -293,6 +322,25 @@ void DescriptorSet::Build()
 				.dstArrayElement = 0,
 				.descriptorCount = 1,
 				.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+				.pImageInfo = image_infos.Insert(image_info),
+			};
+
+			write_infos.Insert(image_write);
+		}
+		else if (entry.IsStorageImage()) {
+			VkDescriptorImageInfo image_info {
+				.sampler = nullptr,
+				.imageView = entry.pImage->View,
+				.imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+			};
+
+			const VkWriteDescriptorSet image_write {
+				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.dstSet = mInternalSet,
+				.dstBinding = entry.Binding,
+				.dstArrayElement = 0,
+				.descriptorCount = 1,
+				.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
 				.pImageInfo = image_infos.Insert(image_info),
 			};
 
