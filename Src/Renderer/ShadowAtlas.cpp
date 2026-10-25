@@ -26,18 +26,18 @@ FX_SET_MODULE_NAME("ShadowAtlas")
 
 /**
  * The general layout of the atlas is like this;
- * Directional on the left with the largest chunk of resolution, and the 16 spotlight slots on the right (each about
- * 512x512).
+ * Directional on the left with the largest chunk of resolution, and the spotlight slots on the right (each about
+ * 512x512). The bottom right 1024x1024 is the coarse far sun cascade used by the fog.
  *
  *     +-------------------+----+----+----+----+
  *     |                   |  0 |  1 |  2 |  3 |
  *     |                   +----+----+----+----+
  *     |                   |  4 |  5 |  6 |  7 |
- *     |       Sun         +----+----+----+----+
- *     |                   |  8 |  9 | 10 | 11 |
- *     |                   +----+----+----+----+
- *     |                   | 12 | 13 | 14 | 15 |
- *     +-------------------+----+----+----+----+
+ *     |       Sun         +----+----+---------+
+ *     |                   |  8 |  9 |         |
+ *     |                   +----+----+   Far   |
+ *     |                   | 12 | 13 |         |
+ *     +-------------------+----+----+---------+
  *
  */
 
@@ -46,11 +46,11 @@ FX_SET_MODULE_NAME("ShadowAtlas")
 /// render area.
 static constexpr VkImageLayout scAtlasLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-static VkRect2D RegionToRect(const ShadowAtlasRegion& region)
+static VkRect2D RegionToRect(const URect& region)
 {
 	return VkRect2D {
-		.offset = { .x = static_cast<int32>(region.Offset.X), .y = static_cast<int32>(region.Offset.Y) },
-		.extent = { .width = region.Size.X, .height = region.Size.Y },
+		.offset = { .x = static_cast<int32>(region.Min.X), .y = static_cast<int32>(region.Min.Y) },
+		.extent = { .width = region.Max.X, .height = region.Max.Y },
 	};
 }
 
@@ -100,7 +100,8 @@ bool ShadowAtlas::MakeShadowDesc(ePipelineFeatures features, PipelineDesc& out_d
 	const bool is_skinned = (features == ePipelineFeatures::Skinned);
 
 	out_desc.Features = features;
-	out_desc.DebugName = is_masked ? "ShadowDirectionalMasked" : (is_skinned ? "ShadowDirectionalSkinned" : "ShadowDirectional");
+	out_desc.DebugName = is_masked ? "ShadowDirectionalMasked"
+								   : (is_skinned ? "ShadowDirectionalSkinned" : "ShadowDirectional");
 
 	out_desc.Shader = eShaderName::Shadows;
 
@@ -120,17 +121,17 @@ bool ShadowAtlas::MakeShadowDesc(ePipelineFeatures features, PipelineDesc& out_d
 	out_desc.PushConstantStages = eShaderType::Vertex;
 	out_desc.PushConstantSize = sizeof(ShadowPushConstants);
 
-	out_desc.DeclareDescriptors = [is_masked, is_skinned](PSOBuild& pso)
+	out_desc.DeclareDescriptors = [](PSOBuild& pso)
 	{
 		// Set 0 (Global / Per Frame)
 		pso.AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0, gObjectManager->GetPageSize());
 		pso.AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
 					  gMaterialManager->MaterialPropertiesBuffer.Size);
 
-		if (is_masked || is_skinned) {
-			// Set 1 (Object local), the material's own descriptors. Only the albedo is read.
-			Material::DeclareDescriptors(pso);
-		}
+		// Set 1 (Object local), the material's own descriptors. Only the albedo is read.
+		Material::DeclareDescriptors(pso);
+
+		pso.AddFrameData(2);
 	};
 
 	return true;
@@ -151,7 +152,7 @@ void ShadowAtlas::BindPipeline(PipelineHandle pipeline)
 
 Target* ShadowAtlas::GetTarget() { return RenderStage.GetTarget(eImageFormat::D32_Float); }
 
-void ShadowAtlas::BeginRegion(const ShadowAtlasRegion& region)
+void ShadowAtlas::BeginRegion(const URect& region)
 {
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
@@ -173,7 +174,7 @@ void ShadowAtlas::BeginRegion(const ShadowAtlasRegion& region)
 	VkRect2D render_area = rect;
 
 	if (mbNeedsClear) {
-		render_area = RegionToRect(ShadowAtlasRegion { .Offset = Vec2u::scZero, .Size = Vec2u(scWidth, scHeight) });
+		render_area = RegionToRect(URect::FromRelative(Vec2u::scZero, Vec2u(scWidth, scHeight)));
 		mbNeedsClear = false;
 	}
 
@@ -184,38 +185,47 @@ void ShadowAtlas::BeginRegion(const ShadowAtlasRegion& region)
 	BindPipeline(gPipelineCache->GetOrCreateVariant(ePipelinePass::Shadow, ePipelineFeatures::None));
 }
 
-void ShadowAtlas::EndRegion()
+void ShadowAtlas::EndRegion() { RenderStage.End(); }
+
+URect ShadowAtlas::GetDirectionalRegion() const { return URect::FromRelative(Vec2u::scZero, Vec2u(scDirectionalSize)); }
+
+URect ShadowAtlas::GetFarDirectionalRegion() const
 {
-	RenderStage.End();
+	return URect::FromRelative(Vec2u(scWidth, scHeight) - Vec2u(scFarDirectionalSize), Vec2u(scFarDirectionalSize));
 }
 
-ShadowAtlasRegion ShadowAtlas::GetDirectionalRegion() const
-{
-	return ShadowAtlasRegion { .Offset = Vec2u::scZero, .Size = Vec2u(scDirectionalSize, scDirectionalSize) };
-}
-
-ShadowAtlasRegion ShadowAtlas::GetSpotTileRegion(ShadowTileIndex tile) const
+URect ShadowAtlas::GetSpotTileRegion(ShadowTileIndex tile) const
 {
 	Assert(tile < scMaxSpotTiles);
 
 	const uint32 column = tile % scSpotTilesPerRow;
 	const uint32 row = tile / scSpotTilesPerRow;
 
-	return ShadowAtlasRegion {
-		.Offset = Vec2u(scDirectionalSize + (column * scSpotTileSize), row * scSpotTileSize),
-		.Size = Vec2u(scSpotTileSize, scSpotTileSize),
-	};
+
+	const Vec2u region_position = Vec2u(scDirectionalSize + (column * scSpotTileSize), row * scSpotTileSize);
+
+	return URect::FromRelative(region_position, Vec2u(scSpotTileSize, scSpotTileSize));
 }
 
-void ShadowAtlas::GetRegionUVTransform(const ShadowAtlasRegion& region, float32 out_transform[4]) const
+void ShadowAtlas::GetRegionUVTransform(const URect& region, float32 out_transform[4]) const
 {
-	constexpr float32 cWidth = static_cast<float32>(scWidth);
-	constexpr float32 cHeight = static_cast<float32>(scHeight);
+	static constexpr Vec2f scAtlasSize = Vec2f(static_cast<float32>(scWidth), static_cast<float32>(scHeight));
+	static_assert(scAtlasSize.X > 0.0f && scAtlasSize.Y > 0.0f);
 
-	out_transform[0] = static_cast<float32>(region.Size.X) / cWidth;
-	out_transform[1] = static_cast<float32>(region.Size.Y) / cHeight;
-	out_transform[2] = static_cast<float32>(region.Offset.X) / cWidth;
-	out_transform[3] = static_cast<float32>(region.Offset.Y) / cHeight;
+	const FRect f_region = FRect(region);
+
+	const Vec2f xform_xy = f_region.Max / scAtlasSize;
+	const Vec2f xform_zw = f_region.Min / scAtlasSize;
+
+	out_transform[0] = xform_xy.X;
+	out_transform[1] = xform_xy.Y;
+	out_transform[2] = xform_zw.X;
+	out_transform[3] = xform_zw.Y;
+
+	// out_transform[0] = static_cast<float32>(region.Size.X) / cWidth;
+	// out_transform[1] = static_cast<float32>(region.Size.Y) / cHeight;
+	// out_transform[2] = static_cast<float32>(region.Offset.X) / cWidth;
+	// out_transform[3] = static_cast<float32>(region.Offset.Y) / cHeight;
 }
 
 ShadowTileIndex ShadowAtlas::AllocateSpotTile()
@@ -223,7 +233,7 @@ ShadowTileIndex ShadowAtlas::AllocateSpotTile()
 	for (ShadowTileIndex tile = 0; tile < scMaxSpotTiles; tile++) {
 		const uint32 bit = (1U << tile);
 
-		if ((mSpotTilesInUse & bit) == 0) {
+		if (((mSpotTilesInUse | scFarTileMask) & bit) == 0) {
 			mSpotTilesInUse |= bit;
 			return tile;
 		}

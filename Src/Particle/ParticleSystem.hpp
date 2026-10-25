@@ -120,7 +120,7 @@ struct alignas(16) ParticleGpuData
 
 static_assert(sizeof(ParticleGpuData) == 48);
 
-struct alignas(16) ParticlePushConstants
+struct alignas(16) ParticleConstants
 {
 	float32 ViewProjection[16];
 	float32 CameraRight[4];
@@ -130,7 +130,6 @@ struct alignas(16) ParticlePushConstants
 	float32 DepthParams[4];
 };
 
-static_assert(sizeof(ParticlePushConstants) <= 128);
 
 } // namespace renderer
 

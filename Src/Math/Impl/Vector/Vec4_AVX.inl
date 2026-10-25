@@ -36,6 +36,26 @@ Vec4f Vec4f::operator*(const Vec4f other) const { return Vec4f(_mm_mul_ps(mIntri
 
 Vec4f Vec4f::operator/(const Vec4f other) const { return Vec4f(_mm_div_ps(mIntrin, other.mIntrin)); }
 
+FX_FORCE_INLINE bool Vec4f::operator>(const Vec4f other) const
+{
+	return _mm_movemask_ps(_mm_cmpgt_ps(mIntrin, other.mIntrin)) == 0b1111;
+}
+
+FX_FORCE_INLINE bool Vec4f::operator<(const Vec4f other) const
+{
+	return _mm_movemask_ps(_mm_cmplt_ps(mIntrin, other.mIntrin)) == 0b1111;
+}
+
+FX_FORCE_INLINE bool Vec4f::operator>=(const Vec4f other) const
+{
+	return _mm_movemask_ps(_mm_cmpge_ps(mIntrin, other.mIntrin)) == 0b1111;
+}
+
+FX_FORCE_INLINE bool Vec4f::operator<=(const Vec4f other) const
+{
+	return _mm_movemask_ps(_mm_cmple_ps(mIntrin, other.mIntrin)) == 0b1111;
+}
+
 ///////////////////////////////
 // Vec + Scalar Operators
 ///////////////////////////////

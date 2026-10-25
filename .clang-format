@@ -49,7 +49,7 @@ SpacesInParentheses: false
 
 # Alignment
 AlignAfterOpenBracket: Align
-AlignConsecutiveAssignments: false
+AlignConsecutiveAssignments: None
 AlignConsecutiveDeclarations: false
 AlignConsecutiveMacros: true
 AlignEscapedNewlines: Right
@@ -107,8 +107,8 @@ PenaltyReturnTypeOnItsOwnLine: 60
 
 # Macro handling
 IndentPPDirectives: None
-MacroBlockBegin: ""
-MacroBlockEnd: ""
+MacroBlockBegin: "^(RS_OBJECT_BEGIN)$"
+MacroBlockEnd: "^(RS_OBJECT_END)$"
 
 ---
 Language: ObjC

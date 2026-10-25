@@ -109,6 +109,11 @@ public:
 	FX_FORCE_INLINE Vec4f operator*(float32 scalar) const;
 	FX_FORCE_INLINE Vec4f operator/(float32 scalar) const;
 
+	FX_FORCE_INLINE bool operator>(const Vec4f other) const;
+	FX_FORCE_INLINE bool operator<(const Vec4f other) const;
+	FX_FORCE_INLINE bool operator>=(const Vec4f other) const;
+	FX_FORCE_INLINE bool operator<=(const Vec4f other) const;
+
 	Vec4f operator-() const;
 
 	Vec4f& operator+=(const Vec4f other);

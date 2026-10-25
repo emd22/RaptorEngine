@@ -139,6 +139,30 @@ FX_FORCE_INLINE bool Vec3f::operator==(const Vec3f other) const
 	return vminvq_u32(equal_mask) == UINT32_MAX;
 }
 
+FX_FORCE_INLINE bool Vec3f::operator>(const Vec3f other) const
+{
+	const uint32x4_t mask = vsetq_lane_u32(UINT32_MAX, vcgtq_f32(mIntrin, other.mIntrin), 3);
+	return vminvq_u32(mask) == UINT32_MAX;
+}
+
+FX_FORCE_INLINE bool Vec3f::operator<(const Vec3f other) const
+{
+	const uint32x4_t mask = vsetq_lane_u32(UINT32_MAX, vcltq_f32(mIntrin, other.mIntrin), 3);
+	return vminvq_u32(mask) == UINT32_MAX;
+}
+
+FX_FORCE_INLINE bool Vec3f::operator>=(const Vec3f other) const
+{
+	const uint32x4_t mask = vsetq_lane_u32(UINT32_MAX, vcgeq_f32(mIntrin, other.mIntrin), 3);
+	return vminvq_u32(mask) == UINT32_MAX;
+}
+
+FX_FORCE_INLINE bool Vec3f::operator<=(const Vec3f other) const
+{
+	const uint32x4_t mask = vsetq_lane_u32(UINT32_MAX, vcleq_f32(mIntrin, other.mIntrin), 3);
+	return vminvq_u32(mask) == UINT32_MAX;
+}
+
 FX_FORCE_INLINE Vec3f Vec3f::operator+(const Vec3f other) const { return Vec3f(vaddq_f32(mIntrin, other.mIntrin)); }
 
 FX_FORCE_INLINE Vec3f Vec3f::operator-(const Vec3f other) const { return Vec3f(vsubq_f32(mIntrin, other.mIntrin)); }

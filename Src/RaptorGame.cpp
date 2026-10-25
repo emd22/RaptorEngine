@@ -255,6 +255,11 @@ void RaptorGame::CreateGame()
 	gCVars->Set("r_gtao_final_value_power", gCVars->Get("r_gtao_final_value_power", 2.2f));
 	gCVars->Set("r_gtao_denoise_blur_beta", gCVars->Get("r_gtao_denoise_blur_beta", 1.2f));
 
+	gCVars->Set("r_fog", gCVars->Get("r_fog", int64(2)));
+	gCVars->Set("r_fog_steps", gCVars->Get("r_fog_steps", int64(64)));
+	gCVars->Set("r_fog_distance", gCVars->Get("r_fog_distance", 100.0f));
+	gCVars->Set("r_fog_temporal", gCVars->Get("r_fog_temporal", int64(1)));
+
 	mCrosshairTicket = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm, scCrosshairPath,
 												eImageCreateFlags::None);
 
@@ -289,7 +294,7 @@ void RaptorGame::CreateGame()
 	gEditor->SetReloadHandler(editor::eReloadTarget::Clean, [this] { CleanWorld(); });
 
 	// Start out editing
-	gEditor->SetView(editor::eEditorView::Split);
+	gEditor->SetView(editor::eEditorView::Viewport);
 #endif
 
 	// Start the frame timer now, otherwise the first Tick() measures from counter zero (time since boot) and steps
@@ -308,7 +313,7 @@ void RaptorGame::CreateGame()
 			frame_time_limit = scUnfocusedFrameTime;
 		}
 #ifdef FX_IS_EDITOR
-		else if (gEditor->GetView() == editor::eEditorView::Top) {
+		else if (gEditor->GetView() == editor::eEditorView::Architect) {
 			frame_time_limit = scTopViewFrameTime;
 		}
 #endif
@@ -1038,11 +1043,11 @@ void RaptorGame::RenderText()
 	if (gpu.IsEnabled() && (mpShowGpuCVar == nullptr || mpShowGpuCVar->IntValue != 0)) {
 		gTextRenderer->DrawText(String::Fmt("GPU={:.2f}ms", gpu.GetTotalMs()).CStr(), 1.0f, scWhite);
 		gTextRenderer->DrawText(
-			String::Fmt("shadow {:.2f} pre {:.2f} lightcull {:.2f} ao {:.2f} fwd {:.2f} part {:.2f} comp {:.2f}",
+			String::Fmt("shadow {:.2f} pre {:.2f} lightcull {:.2f} ao {:.2f} fwd {:.2f} part {:.2f} fog {:.2f} comp {:.2f}",
 						gpu.GetMs(eGpuMarker::Shadows), gpu.GetMs(eGpuMarker::Prepass),
 						gpu.GetMs(eGpuMarker::LightCulling), gpu.GetMs(eGpuMarker::SSAO),
 						gpu.GetMs(eGpuMarker::Forward), gpu.GetMs(eGpuMarker::Particles),
-						gpu.GetMs(eGpuMarker::Composition))
+						gpu.GetMs(eGpuMarker::Fog), gpu.GetMs(eGpuMarker::Composition))
 				.CStr(),
 			1.0f, scWhite);
 
@@ -1189,6 +1194,7 @@ void RaptorGame::Tick()
 		if (sun->bEnabled) {
 			gShadowRenderer->PlaceCamera(gShadowRenderer->ShadowCamera, gWorld->Player.Position,
 										 sun->GetPosition().Normalize());
+			gShadowRenderer->PlaceFarCamera(gWorld->Player.Position, sun->GetPosition().Normalize());
 		}
 	}
 

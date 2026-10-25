@@ -21,10 +21,8 @@ public:
 	StackArray(const std::initializer_list<T>& list)
 	{
 		const size_t list_size = list.size();
-		if (list_size > Capacity) {
-			Panic("StackArray", "Stack array cannot be resized! {} > {}", list_size, Capacity);
-			return;
-		}
+
+		AssertMsg(Size < Capacity, "StackArray cannot be resized");
 
 		for (const T& obj : list) {
 			Insert(obj);
@@ -44,32 +42,37 @@ public:
 
 	T* Insert(const T& value)
 	{
-		if (Size >= Capacity) {
-			Panic("StackArray", "Insert out of range");
-		}
+		AssertMsg(Size < Capacity, "StackArray insert out of range");
+
 		pData[Size++] = value;
 		return &pData[Size - 1];
 	}
 
 	T* Insert()
 	{
+		AssertMsg(Size < Capacity, "StackArray insert out of range");
+
 		++Size;
 		return &pData[Size - 1];
 	}
 
 	const T& operator[](size_t index) const
 	{
+#ifdef FX_DEBUG_ARRAY_BOUNDS_CHECK
 		if (index >= Capacity) {
 			Panic("StackArray", "Access out of range");
 		}
+#endif
 		return pData[index];
 	}
 
 	T& operator[](size_t index)
 	{
+#ifdef FX_DEBUG_ARRAY_BOUNDS_CHECK
 		if (index >= Capacity) {
 			Panic("StackArray", "Access out of range");
 		}
+#endif
 		return pData[index];
 	}
 

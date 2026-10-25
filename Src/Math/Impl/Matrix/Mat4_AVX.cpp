@@ -131,10 +131,10 @@ Mat4f Mat4f::operator*(const Mat4f& other) const
 
 	for (int i = 0; i < 4; i++) {
 		const __m128 a = Rows[i].mIntrin;
-		__m128 r = _mm_mul_ps(SSE::Permute4<SSE::Shuffle_AX>(a), other.Rows[0].mIntrin);
-		r = _mm_fmadd_ps(SSE::Permute4<SSE::Shuffle_AY>(a), other.Rows[1].mIntrin, r);
-		r = _mm_fmadd_ps(SSE::Permute4<SSE::Shuffle_AZ>(a), other.Rows[2].mIntrin, r);
-		r = _mm_fmadd_ps(SSE::Permute4<SSE::Shuffle_AW>(a), other.Rows[3].mIntrin, r);
+		__m128 r = _mm_mul_ps(simd::Permute4<simd::Shuffle_AX>(a), other.Rows[0].mIntrin);
+		r = _mm_fmadd_ps(simd::Permute4<simd::Shuffle_AY>(a), other.Rows[1].mIntrin, r);
+		r = _mm_fmadd_ps(simd::Permute4<simd::Shuffle_AZ>(a), other.Rows[2].mIntrin, r);
+		r = _mm_fmadd_ps(simd::Permute4<simd::Shuffle_AW>(a), other.Rows[3].mIntrin, r);
 		result.Rows[i].mIntrin = r;
 	}
 
@@ -144,10 +144,10 @@ Mat4f Mat4f::operator*(const Mat4f& other) const
 Vec4f Mat4f::operator*(const Vec4f vec) const
 {
 	__m128 v = vec.mIntrin;
-	__m128 v0 = SSE::Permute4<SSE::Shuffle_AX>(v);
-	__m128 v1 = SSE::Permute4<SSE::Shuffle_AY>(v);
-	__m128 v2 = SSE::Permute4<SSE::Shuffle_AZ>(v);
-	__m128 v3 = SSE::Permute4<SSE::Shuffle_AW>(v);
+	__m128 v0 = simd::Permute4<simd::Shuffle_AX>(v);
+	__m128 v1 = simd::Permute4<simd::Shuffle_AY>(v);
+	__m128 v2 = simd::Permute4<simd::Shuffle_AZ>(v);
+	__m128 v3 = simd::Permute4<simd::Shuffle_AW>(v);
 
 	__m128 result = _mm_mul_ps(Rows[0].mIntrin, v0);
 	result = _mm_fmadd_ps(Rows[1].mIntrin, v1, result);

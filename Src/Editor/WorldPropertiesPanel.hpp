@@ -30,6 +30,10 @@ private:
 	void BuildSunSection(wxSizer* sizer);
 	void ApplySunState(const WorldPanelState& state);
 
+	void BuildFogSection(wxSizer* sizer);
+	void ApplyFogState(const WorldPanelState& state);
+	void PostFogSettings();
+
 	void BuildReflectionSection(wxSizer* sizer);
 	void ApplyReflectionState(const WorldPanelState& state);
 
@@ -53,6 +57,17 @@ private:
 	wxStaticText* mpSunStatus = nullptr;
 	bool mbShowingSun = true;
 	bool mbShowingSunStale = true;
+
+	wxCheckBox* mpFogEnabledCheck = nullptr;
+	wxChoice* mpFogQualityChoice = nullptr;
+	wxColourPickerCtrl* mpFogColorPicker = nullptr;
+	FloatField* mpFogDensityField = nullptr;
+	FloatField* mpFogHeightField = nullptr;
+	FloatField* mpFogFalloffField = nullptr;
+	FloatField* mpFogHazeField = nullptr;
+	FloatField* mpFogAnisotropyField = nullptr;
+	FloatField* mpFogAmbientField = nullptr;
+	int64 mShownFogQuality = -1;
 
 	wxStaticText* mpReflectionStatus = nullptr;
 	wxCheckBox* mpReflectionEnabledCheck = nullptr;

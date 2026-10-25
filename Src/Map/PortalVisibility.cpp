@@ -1,5 +1,6 @@
 #include "PortalVisibility.hpp"
 
+#include <Math/SIMDHelper.hpp>
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
@@ -18,6 +19,7 @@ void AddToRect(const Vec4f& clip, ScreenRect& rect)
 
 	rect.MinX = std::min(rect.MinX, x);
 	rect.MinY = std::min(rect.MinY, y);
+
 	rect.MaxX = std::max(rect.MaxX, x);
 	rect.MaxY = std::max(rect.MaxY, y);
 }
@@ -170,15 +172,7 @@ void PortalVisibility::Flow(uint32 area, const ScreenRect& rect, uint32 depth)
 
 Vec4f PortalVisibility::ToClip(const Vec3f& point) const
 {
-	const Vec4f& row_x = mViewProjection.Rows[0];
-	const Vec4f& row_y = mViewProjection.Rows[1];
-	const Vec4f& row_z = mViewProjection.Rows[2];
-	const Vec4f& row_w = mViewProjection.Rows[3];
-
-	return Vec4f(point.X * row_x.X + point.Y * row_y.X + point.Z * row_z.X + row_w.X,
-				 point.X * row_x.Y + point.Y * row_y.Y + point.Z * row_z.Y + row_w.Y,
-				 point.X * row_x.Z + point.Y * row_y.Z + point.Z * row_z.Z + row_w.Z,
-				 point.X * row_x.W + point.Y * row_y.W + point.Z * row_z.W + row_w.W);
+	return mViewProjection * Vec4f(point.X, point.Y, point.Z, 1.0f);
 }
 
 bool PortalVisibility::GetPortalRect(const MapPortal& portal, uint32 from_area, const ScreenRect& parent_rect,
@@ -196,14 +190,9 @@ bool PortalVisibility::GetPortalRect(const MapPortal& portal, uint32 from_area, 
 		const float32 distance = plane.Normal.Dot(mCameraPosition) - plane.Distance;
 
 		if (std::abs(distance) <= scNearMargin) {
-			const Vec3f margin(scNearMargin);
+			const BBox padded_bounds = portal.Bounds.AddMargin(Vec3f(scNearMargin));
 
-			const bool is_inside = mCameraPosition.X >= portal.Bounds.Min.X - margin.X &&
-								   mCameraPosition.Y >= portal.Bounds.Min.Y - margin.Y &&
-								   mCameraPosition.Z >= portal.Bounds.Min.Z - margin.Z &&
-								   mCameraPosition.X <= portal.Bounds.Max.X + margin.X &&
-								   mCameraPosition.Y <= portal.Bounds.Max.Y + margin.Y &&
-								   mCameraPosition.Z <= portal.Bounds.Max.Z + margin.Z;
+			const bool is_inside = mCameraPosition >= padded_bounds.Min && mCameraPosition <= padded_bounds.Max;
 
 			if (is_inside) {
 				out_rect = parent_rect;
@@ -245,6 +234,8 @@ bool PortalVisibility::GetPortalRect(const MapPortal& portal, uint32 from_area, 
 
 			if ((current_distance >= 0.0f) != (next_distance >= 0.0f)) {
 				const float32 t = current_distance / (current_distance - next_distance);
+
+				// const Vec3f current_xzw =
 
 				mClippedPoints.Insert(Vec4f(current.X + (next.X - current.X) * t, current.Y + (next.Y - current.Y) * t,
 											current.Z + (next.Z - current.Z) * t,

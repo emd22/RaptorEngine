@@ -68,6 +68,9 @@ float4 F_UnpackUIntToFloat4(uint x);
 #define F_CBuffer(name_, binding_, set_) \
     [[vk::binding(binding_, set_)]] cbuffer name_
 
+#define F_FrameData(type_, name_, set_) \
+    [[vk::binding(0, set_)]] ConstantBuffer<type_> name_
+
 
 #define BoneMtx float4x4
 

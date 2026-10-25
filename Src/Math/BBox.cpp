@@ -28,6 +28,8 @@ BBox& BBox::operator+=(const BBox& other)
 	return *this;
 }
 
+BBox BBox::AddMargin(const Vec3f margin) const { return BBox { Min - margin, Max + margin }; }
+
 
 void BBox::Add(const BBox& other)
 {

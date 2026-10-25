@@ -76,6 +76,8 @@ public:
 	void AddImageFromTarget(uint32 bind_index, uint32 set_index, eShaderType shader_stages, Target* target,
 							Sampler* sampler);
 
+	void AddFrameData(uint32 set_index);
+
 	/////////////////////////////////////
 	// Modifiers
 	/////////////////////////////////////

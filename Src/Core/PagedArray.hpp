@@ -4,7 +4,6 @@
 #include <Core/Assert.hpp>
 #include <Core/Types.hpp>
 #include <Engine.hpp>
-
 #include <cstddef>
 #include <functional>
 #include <iterator>
@@ -127,10 +126,7 @@ public:
 	 */
 	explicit PagedArray(uint32 page_node_capacity) { Create(page_node_capacity); }
 
-	PagedArray(const PagedArray& other)
-	{
-		CopyFrom(other);
-	}
+	PagedArray(const PagedArray& other) { CopyFrom(other); }
 
 	PagedArray(PagedArray&& other) noexcept { TakeFrom(other); }
 
@@ -288,12 +284,21 @@ public:
 
 	const TElementType& Get(size_t index) const
 	{
+#ifdef FX_DEBUG_ARRAY_BOUNDS_CHECK
 		AssertMsg(index < TrackedSize, "PagedArray access out of range");
+#endif
 
 		const size_t page_index = index / PageNodeCapacity;
 		const uint32 item_index = static_cast<uint32>(index % PageNodeCapacity);
 
 		const Page* page = nullptr;
+
+		// The idea behind this is that if we are past the halfway point in the paged array (e.g. you request an item in
+		// page X out of Y pages) then we want to move backwards in the page list to find the item. The performance is
+		// negligible for most instances of a PagedArray(and the branch may cost more) but for significant amounts of
+		// pages this could be a speedup.
+		//
+		// Note: CurrentPageIndex is the index of the page that the last inserted item is in.
 
 		if (page_index * 2 >= CurrentPageIndex) {
 			page = pCurrentPage;

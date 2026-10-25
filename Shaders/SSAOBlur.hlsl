@@ -52,13 +52,13 @@ PERMEND();
 /// R holds the visibility divided by GTAO_OCCLUSION_TERM_SCALE, G the packed edges from SSAO.hlsl
 F_Texture2D(tSSAO, 0, 0);
 
-struct BlurPushConsts
+struct BlurConsts
 {
 	float2 TexelSize;
 	float BlurBeta;
 };
 
-[[vk::push_constant]] BlurPushConsts Consts;
+F_FrameData(BlurConsts, Consts, 1);
 
 #define GTAO_OCCLUSION_TERM_SCALE 1.5
 

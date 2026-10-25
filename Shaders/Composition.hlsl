@@ -56,12 +56,12 @@ struct FSOutput
 };
 
 
-struct PSPushConsts
+struct PSConsts
 {
 	uint2 vFrameExtent;
 };
 
-[[vk::push_constant]] PSPushConsts PSConst;
+F_FrameData(PSConsts, PSConst, 1);
 
 F_Texture2D(tLighting, 2, 0);
 

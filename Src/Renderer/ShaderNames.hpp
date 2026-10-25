@@ -21,6 +21,10 @@ enum class eShaderName : uint32
 	SSAO,
 	SSAOBlur,
 	Particle,
+	Fog,
+	FogTemporal,
+	FogDenoise,
+	FogApply,
 
 	NumShaders,
 };
@@ -46,6 +50,10 @@ constexpr const char* GetName(const eShaderName id)
 		FX_ENUM_CASE_NAME(SSAO);
 		FX_ENUM_CASE_NAME(SSAOBlur);
 		FX_ENUM_CASE_NAME(Particle);
+		FX_ENUM_CASE_NAME(Fog);
+		FX_ENUM_CASE_NAME(FogTemporal);
+		FX_ENUM_CASE_NAME(FogDenoise);
+		FX_ENUM_CASE_NAME(FogApply);
 	default:
 		return "Unknown";
 	}

@@ -10,37 +10,12 @@
 
 #include <Core/Types.hpp>
 
+#include "SIMDHelper.hpp"
+
 namespace fx::Neon {
-
-enum eShuffleComponent
-{
-	/* A Vector */
-	Shuffle_AX = 0,
-	Shuffle_AY = 1,
-	Shuffle_AZ = 2,
-	Shuffle_AW = 3,
-
-	/* B Vector */
-	Shuffle_BX = 4,
-	Shuffle_BY = 5,
-	Shuffle_BZ = 6,
-	Shuffle_BW = 7,
-};
-
 
 constexpr uint32 scSignMask32 = 0x80000000;
 static_assert(scSignMask32 == std::bit_cast<uint32>(-0.0f));
-
-template <eShuffleComponent TA, eShuffleComponent TB, eShuffleComponent TC, eShuffleComponent TD>
-concept C_SinglePermute = (TA <= Shuffle_AW) && (TB <= Shuffle_AW) && (TC <= Shuffle_AW) && (TD <= Shuffle_AW);
-
-
-template <eShuffleComponent TA, eShuffleComponent TB, eShuffleComponent TC, eShuffleComponent TD>
-concept C_SinglePermuteForB = (TA >= Shuffle_BX) && (TB >= Shuffle_BX) && (TC >= Shuffle_BX) && (TD >= Shuffle_BX);
-
-
-template <eShuffleComponent TA, eShuffleComponent TB, eShuffleComponent TC, eShuffleComponent TD>
-concept C_AllComponentsSame = (TA == TB) && (TB == TC) && (TC == TD);
 
 FX_FORCE_INLINE float32 LengthSquared(float32x4_t vec)
 {
@@ -89,247 +64,16 @@ FX_FORCE_INLINE float32x4_t Negate(float32x4_t a)
 
 FX_FORCE_INLINE float32x4_t Floor(float32x4_t vec) { return vrndmq_f32(vec); }
 
-////////////////////////////////
-// Permute/Reorder Functions
-////////////////////////////////
-
-/**
- * @brief Returns a single vector rearranged to the template parameter values.
- */
-template <eShuffleComponent TComp1, eShuffleComponent TComp2, eShuffleComponent TComp3, eShuffleComponent TComp4>
-FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a)
-	requires C_SinglePermute<TComp1, TComp2, TComp3, TComp4>
-{
-	// Unspecialized shuffle, reorder the lanes directly
-
-	float32x4_t result;
-	result = vmovq_n_f32(vgetq_lane_f32(a, TComp1 & 0x03));
-	result = vsetq_lane_f32(vgetq_lane_f32(a, TComp2 & 0x03), result, 1);
-	result = vsetq_lane_f32(vgetq_lane_f32(a, TComp3 & 0x03), result, 2);
-	result = vsetq_lane_f32(vgetq_lane_f32(a, TComp4 & 0x03), result, 3);
-
-	return result;
-}
-
-// Specializations
-
-
-template <>
-FX_FORCE_INLINE float32x4_t Permute4<Shuffle_AW, Shuffle_AZ, Shuffle_AY, Shuffle_AX>(float32x4_t a)
-{
-	return vcombine_f32(vrev64_f32(vget_high_f32(a)), vrev64_f32(vget_low_f32(a)));
-}
-
-template <>
-FX_FORCE_INLINE float32x4_t Permute4<Shuffle_AX, Shuffle_AY, Shuffle_AZ, Shuffle_AW>(float32x4_t a)
-{
-	return a;
-}
-
-template <>
-FX_FORCE_INLINE float32x4_t Permute4<Shuffle_AX, Shuffle_AY, Shuffle_AZ, Shuffle_AZ>(float32x4_t a)
-{
-	return vcombine_f32(vget_low_f32(a), vdup_lane_f32(vget_high_f32(a), 0));
-}
-
-template <>
-FX_FORCE_INLINE float32x4_t Permute4<Shuffle_AX, Shuffle_AY, Shuffle_AW, Shuffle_AW>(float32x4_t a)
-{
-	return vcombine_f32(vget_low_f32(a), vdup_lane_f32(vget_high_f32(a), 1));
-}
-
-
-template <>
-FX_FORCE_INLINE float32x4_t Permute4<Shuffle_AY, Shuffle_AX, Shuffle_AW, Shuffle_AZ>(float32x4_t a)
-{
-	return vcombine_f32(vrev64_f32(vget_low_f32(a)), vrev64_f32(vget_high_f32(a)));
-}
-
-template <>
-FX_FORCE_INLINE float32x4_t Permute4<Shuffle_AZ, Shuffle_AZ, Shuffle_AY, Shuffle_AX>(float32x4_t a)
-{
-	return vcombine_f32(vdup_lane_f32(vget_high_f32(a), 0), vrev64_f32(vget_low_f32(a)));
-}
-
-template <>
-FX_FORCE_INLINE float32x4_t Permute4<Shuffle_AZ, Shuffle_AW, Shuffle_AX, Shuffle_AY>(float32x4_t a)
-{
-	return vcombine_f32(vget_high_f32(a), vget_low_f32(a));
-}
-
-template <>
-FX_FORCE_INLINE float32x4_t Permute4<Shuffle_AY, Shuffle_AZ, Shuffle_AX, Shuffle_AX>(float32x4_t a)
-{
-	static uint8x16_t table = { 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b,
-								0x00, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x03 };
-	return vreinterpretq_f32_u8(vqtbl1q_u8(vreinterpretq_u8_f32(a), table));
-}
-
-/**
- * @brief Returns the vector A rearranged to the components {Y, Z, X, W}.
- */
-template <>
-FX_FORCE_INLINE float32x4_t Permute4<Shuffle_AY, Shuffle_AZ, Shuffle_AX, Shuffle_AW>(float32x4_t a)
-{
-	// Extend vector (XYZW -> YZWX)
-	a = vextq_f32(a, a, 1);
-
-	// Get the low components (YZ)
-	const float32x2_t a_lo = vget_low_f32(a);
-
-	// Reverse high componets of YZWX (WX -> XW)
-	const float32x2_t a_hi = vrev64_f32(vget_high_f32(a));
-
-	// Return result YZXW
-	return vcombine_f32(a_lo, a_hi);
-}
-
-template <eShuffleComponent TComp1, eShuffleComponent TComp2, eShuffleComponent TComp3, eShuffleComponent TComp4>
-	requires C_SinglePermute<TComp1, TComp2, TComp3, TComp4> && C_AllComponentsSame<TComp1, TComp2, TComp3, TComp4>
-FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a)
-{
-	return vdupq_laneq_f32(a, TComp1);
-}
-
-/**
- * @brief Returns a vector containing elements across both vectors A and B, in the order of the template parameters.
- *
- * For example, given a vector A = {1, 2, 3, 4} and another vector B = {5, 6, 7, 8},
- * ```
- * // Returns {1, 6, 3, 8}
- * Permute4<Shuffle_AX, Shuffle_BY, Shuffle_AZ, Shuffle_BW>(A, B);
- * ```
- *
- */
-template <eShuffleComponent TComp1, eShuffleComponent TComp2, eShuffleComponent TComp3, eShuffleComponent TComp4>
-FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a, float32x4_t b)
-{
-	// Unspecialized shuffle, reorder the lanes directly
-
-	float32x4_t result;
-	result = vmovq_n_f32(vgetq_lane_f32(TComp1 >= Shuffle_BX ? b : a, TComp1 & 0x03));
-	result = vsetq_lane_f32(vgetq_lane_f32(TComp2 >= Shuffle_BX ? b : a, TComp2 & 0x03), result, 1);
-	result = vsetq_lane_f32(vgetq_lane_f32(TComp3 >= Shuffle_BX ? b : a, TComp3 & 0x03), result, 2);
-	result = vsetq_lane_f32(vgetq_lane_f32(TComp4 >= Shuffle_BX ? b : a, TComp4 & 0x03), result, 3);
-
-	return result;
-}
-
-/**
- * @brief Returns the single permutation of the two vectors A and B, using the components passed in via template
- * parameters.
- */
-template <eShuffleComponent TComp1, eShuffleComponent TComp2, eShuffleComponent TComp3, eShuffleComponent TComp4>
-FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a, float32x4_t b)
-	requires C_SinglePermute<TComp1, TComp2, TComp3, TComp4>
-{
-	return Permute4<TComp1, TComp2, TComp3, TComp4>(a);
-}
-
-/**
- * @brief Returns the vector B shuffled to the order passed in from the template arguments.
- */
-template <eShuffleComponent TComp1, eShuffleComponent TComp2, eShuffleComponent TComp3, eShuffleComponent TComp4>
-FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a, float32x4_t b)
-	requires C_SinglePermuteForB<TComp1, TComp2, TComp3, TComp4>
-{
-	// Adjust indices for single permutations
-	return Permute4<
-		static_cast<eShuffleComponent>(TComp1 - Shuffle_BX), static_cast<eShuffleComponent>(TComp2 - Shuffle_BX),
-		static_cast<eShuffleComponent>(TComp3 - Shuffle_BX), static_cast<eShuffleComponent>(TComp4 - Shuffle_BX)>(b);
-}
-
-////////////////////////////////
-// Double Permute Functions
-////////////////////////////////
-
-namespace detail {
-
-/**
- * @brief Returns the float64x2_t that holds the component `TComp`, from either vector A or B.
- */
-template <eShuffleComponent TComp>
-FX_FORCE_INLINE float64x2_t GetDoubleHalf(const float64x2x2_t& a, const float64x2x2_t& b)
-{
-	if constexpr (TComp >= Shuffle_BX) {
-		return b.val[(TComp >> 1) & 0x01];
-	}
-	return a.val[TComp >> 1];
-}
-
-/**
- * @brief Returns {a[TLaneA], b[TLaneB]}. Every combination maps to a single instruction.
- */
-template <uint32 TLaneA, uint32 TLaneB>
-FX_FORCE_INLINE float64x2_t Permute2d(float64x2_t a, float64x2_t b)
-{
-	if constexpr (TLaneA == 0 && TLaneB == 0) {
-		return vzip1q_f64(a, b);
-	}
-	else if constexpr (TLaneA == 1 && TLaneB == 1) {
-		return vzip2q_f64(a, b);
-	}
-	else if constexpr (TLaneA == 1 && TLaneB == 0) {
-		return vextq_f64(a, b, 1);
-	}
-	else {
-		// {a.x, b.y}, this is a no-op if a and b are the same register
-		return vcopyq_laneq_f64(a, 1, b, 1);
-	}
-}
-
-} // namespace detail
-
-/**
- * @brief Returns a vector containing elements across both double vectors A and B, in the order of the template
- * parameters. Same as the float32x4_t version of Permute4.
- */
-template <eShuffleComponent TComp1, eShuffleComponent TComp2, eShuffleComponent TComp3, eShuffleComponent TComp4>
-FX_FORCE_INLINE float64x2x2_t Permute4d(float64x2x2_t a, float64x2x2_t b)
-{
-	float64x2x2_t result;
-
-	result.val[0] = detail::Permute2d<TComp1 & 0x01, TComp2 & 0x01>(detail::GetDoubleHalf<TComp1>(a, b),
-																	detail::GetDoubleHalf<TComp2>(a, b));
-	result.val[1] = detail::Permute2d<TComp3 & 0x01, TComp4 & 0x01>(detail::GetDoubleHalf<TComp3>(a, b),
-																	detail::GetDoubleHalf<TComp4>(a, b));
-
-	return result;
-}
-
-/**
- * @brief Returns a single double vector rearranged to the template parameter values.
- */
-template <eShuffleComponent TComp1, eShuffleComponent TComp2, eShuffleComponent TComp3, eShuffleComponent TComp4>
-FX_FORCE_INLINE float64x2x2_t Permute4d(float64x2x2_t a)
-{
-	static_assert(C_SinglePermute<TComp1, TComp2, TComp3, TComp4>);
-
-	return Permute4d<TComp1, TComp2, TComp3, TComp4>(a, a);
-}
-
-/**
- * @brief Returns a double vector with the component `TComp` splatted across all lanes.
- */
-template <eShuffleComponent TComp>
-FX_FORCE_INLINE float64x2x2_t Permute4d(float64x2x2_t a)
-{
-	static_assert(TComp < Shuffle_BX);
-
-	const float64x2_t splat = vdupq_laneq_f64(a.val[TComp >> 1], TComp & 0x01);
-	return float64x2x2_t { { splat, splat } };
-}
-
 FX_FORCE_INLINE float32 Dot(float32x4_t a, float32x4_t b) { return vaddvq_f32(vmulq_f32(a, b)); }
 
 FX_FORCE_INLINE float32x4_t Cross(float32x4_t a, float32x4_t b)
 {
-	float32x4_t a_yzxw = Neon::Permute4<Shuffle_AY, Shuffle_AZ, Shuffle_AX, Shuffle_AW>(a);
-	float32x4_t b_yzxw = Neon::Permute4<Shuffle_AY, Shuffle_AZ, Shuffle_AX, Shuffle_AW>(b);
+	float32x4_t a_yzxw = simd::Permute4<simd::Shuffle_AY, simd::Shuffle_AZ, simd::Shuffle_AX, simd::Shuffle_AW>(a);
+	float32x4_t b_yzxw = simd::Permute4<simd::Shuffle_AY, simd::Shuffle_AZ, simd::Shuffle_AX, simd::Shuffle_AW>(b);
 
 	const float32x4_t result_yzxw = vsubq_f32(vmulq_f32(a, b_yzxw), vmulq_f32(a_yzxw, b));
 
-	return Neon::Permute4<Shuffle_AY, Shuffle_AZ, Shuffle_AX, Shuffle_AW>(result_yzxw);
+	return simd::Permute4<simd::Shuffle_AY, simd::Shuffle_AZ, simd::Shuffle_AX, simd::Shuffle_AW>(result_yzxw);
 }
 
 

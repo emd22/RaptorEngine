@@ -27,11 +27,11 @@
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/RenderStage.hpp>
 #include <Renderer/TiledForwardRenderer.hpp>
+#include <World.hpp>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstring>
-#include <World.hpp>
 
 namespace fx {
 
@@ -393,14 +393,12 @@ bool ParticleSystem::LoadEffect(const char* path, const String& name, ParticleEf
 	return true;
 }
 
-ParticleEffectID ParticleSystem::Play(const char* name, const Vec3f position, const Vec3f direction,
-									  eObjectLayer layer)
+ParticleEffectID ParticleSystem::Play(const char* name, const Vec3f position, const Vec3f direction, eObjectLayer layer)
 {
 	return Play(HashStr32(name), position, direction, layer);
 }
 
-ParticleEffectID ParticleSystem::Play(Hash32 name_hash, const Vec3f position, const Vec3f direction,
-									  eObjectLayer layer)
+ParticleEffectID ParticleSystem::Play(Hash32 name_hash, const Vec3f position, const Vec3f direction, eObjectLayer layer)
 {
 	uint32 def_index = UINT32_MAX;
 
@@ -919,8 +917,8 @@ void ParticleSystem::WriteInstances(uint32 base_offset, const Vec3f eye)
 {
 	using namespace renderer;
 
-	ParticleGpuData* instances = reinterpret_cast<ParticleGpuData*>(
-		static_cast<uint8*>(mInstanceBuffer.pMappedBuffer) + base_offset);
+	ParticleGpuData* instances = reinterpret_cast<ParticleGpuData*>(static_cast<uint8*>(mInstanceBuffer.pMappedBuffer) +
+																	base_offset);
 
 	for (uint32 i = 0; i < mSortEntries.Size; i++) {
 		const Particle& particle = mParticles[mSortEntries[i].Index];
@@ -1033,44 +1031,52 @@ void ParticleSystem::Render(renderer::CommandBuffer& cmd, const Camera& camera, 
 
 	WriteInstances(base_offset, eye);
 
+	const float32* projection = camera.ProjectionMatrix.RawData;
+	const bool is_soft = mpSoftCVar == nullptr || mpSoftCVar->IntValue != 0;
+
+	ParticleConstants world_consts {};
+
+	StoreFloat3(right, world_consts.CameraRight);
+	StoreFloat3(up, world_consts.CameraUp);
+	StoreFloat3(eye, world_consts.EyePosition);
+
+	world_consts.DepthParams[0] = projection[10];
+	world_consts.DepthParams[1] = projection[14];
+
+	ParticleConstants player_consts = world_consts;
+
+	memcpy(world_consts.ViewProjection, world_view_projection.RawData, sizeof(world_consts.ViewProjection));
+	world_consts.InstanceBase = 0;
+	world_consts.DepthParams[2] = 1.0f;
+	world_consts.DepthParams[3] = 0.0f;
+
+	if (is_soft) {
+		world_consts.DepthParams[3] = 1.0f;
+	}
+
+	memcpy(player_consts.ViewProjection, player_view_projection.RawData, sizeof(player_consts.ViewProjection));
+	player_consts.InstanceBase = world_count;
+	player_consts.DepthParams[2] = 2.0f;
+	player_consts.DepthParams[3] = 0.0f;
+
+	const uint32 world_offset = gGraphics->FrameAlloc.Push(world_consts);
+	const uint32 player_offset = gGraphics->FrameAlloc.Push(player_consts);
+
 	stage.Begin(cmd);
 
 	gPipelineCache->AddBufferOffset(0, base_offset);
+	gPipelineCache->SetFrameData(world_offset);
 	gPipelineCache->Bind(ePipelineName::Particles, cmd);
 
 	mpDescriptorSet->Bind(0, cmd, pipeline, Slice<const uint32>(&base_offset, 1));
 
-	const float32* projection = camera.ProjectionMatrix.RawData;
-	const bool is_soft = mpSoftCVar == nullptr || mpSoftCVar->IntValue != 0;
-
-	ParticlePushConstants push_constants {};
-	StoreFloat3(right, push_constants.CameraRight);
-	StoreFloat3(up, push_constants.CameraUp);
-	StoreFloat3(eye, push_constants.EyePosition);
-	push_constants.DepthParams[0] = projection[10];
-	push_constants.DepthParams[1] = projection[14];
-
 	if (world_count > 0) {
-		memcpy(push_constants.ViewProjection, world_view_projection.RawData, sizeof(push_constants.ViewProjection));
-		push_constants.InstanceBase = 0;
-		push_constants.DepthParams[2] = 1.0f;
-		push_constants.DepthParams[3] = 0.0f;
-
-		if (is_soft) {
-			push_constants.DepthParams[3] = 1.0f;
-		}
-
-		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex | eShaderType::Pixel, push_constants);
+		gGraphics->FrameAlloc.Bind(cmd, pipeline, world_offset);
 		vkCmdDraw(cmd.Get(), 6, world_count, 0, 0);
 	}
 
 	if (player_count > 0) {
-		memcpy(push_constants.ViewProjection, player_view_projection.RawData, sizeof(push_constants.ViewProjection));
-		push_constants.InstanceBase = world_count;
-		push_constants.DepthParams[2] = 2.0f;
-		push_constants.DepthParams[3] = 0.0f;
-
-		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex | eShaderType::Pixel, push_constants);
+		gGraphics->FrameAlloc.Bind(cmd, pipeline, player_offset);
 		vkCmdDraw(cmd.Get(), 6, player_count, 0, 0);
 	}
 

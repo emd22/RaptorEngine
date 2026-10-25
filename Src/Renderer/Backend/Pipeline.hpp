@@ -87,35 +87,35 @@ class CommandBuffer;
 class GpuDevice;
 
 
-struct alignas(16) DrawPushConstants
+struct alignas(16) ViewConstants
 {
-	float32 CameraMatrix[16];
-	uint32 ObjectId = 0;
-	uint32 MaterialIndex = 0;
-	uint32 TileColumns = 0;
-
-	eDrawFlags Flags = eDrawFlags::None;
-	static_assert(sizeof(Flags) == 4);
-
+	float32 ViewProjection[16];
+	float32 EyePosition[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 	uint32 TargetSize[2] = { 0U, 0U };
-
-	/// Index of the draw's first matrix in `GraphicsBackend::BoneBuffer` (skinned pipelines only).
-	uint32 BoneBase = 0;
+	uint32 TileColumns = 0;
 
 	/// Rows the light grid was dispatched with. Paired with `TileColumns` so the shading pass can clamp a pixel's
 	/// tile to the grid that was actually culled
 	uint32 TileRows = 0;
 
-	float32 EyePosition[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+	eDrawFlags Flags = eDrawFlags::None;
+	static_assert(sizeof(Flags) == 4);
 
 	/// Scale applied to the lit result before it is written to the HDR target, see GraphicsBackend::PreExposure
 	float32 PreExposure = 1.0f;
+};
+
+struct DrawPushConstants
+{
+	uint32 ObjectId = 0;
+	uint32 MaterialIndex = 0;
+
+	/// Index of the draw's first matrix in `GraphicsBackend::BoneBuffer` (skinned pipelines only).
+	uint32 BoneBase = 0;
 
 	uint32 SkinnedDecalStart = 0;
 	uint32 SkinnedDecalCount = 0;
 };
-
-static_assert(sizeof(DrawPushConstants) <= 128, "DrawPushConstants exceeds the minimum guaranteed push constant size");
 
 struct alignas(16) DebugLayerPushConstants
 {
@@ -141,7 +141,7 @@ struct alignas(16) LightVertPushConstants
 	uint32 LightId = 0;
 };
 
-struct alignas(16) LightCullPushConstants
+struct alignas(16) LightCullConstants
 {
 	float32 CameraMatrix[16];
 	float32 ScreenSize[2];
@@ -308,6 +308,10 @@ public:
 
 	FX_FORCE_INLINE bool HasLayout() const { return Layout.IsValid(); }
 
+	FX_FORCE_INLINE bool HasFrameData() const { return FrameDataSet != scNoFrameData; }
+
+	static uint32 GetBindSerial();
+
 	FX_FORCE_INLINE bool IsCompute() const { return bIsCompute; }
 
 	/// False until the pipeline has been built, and if it could not be
@@ -333,6 +337,10 @@ public:
 	VkPipeline InternalPipeline = nullptr;
 
 	SizedArray<DescriptorRef> DescriptorIDs;
+
+	static constexpr uint32 scNoFrameData = UINT32_MAX;
+
+	uint32 FrameDataSet = scNoFrameData;
 
 	ePipelineName Name;
 

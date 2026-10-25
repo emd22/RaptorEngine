@@ -21,6 +21,7 @@
 #include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Particle/ParticleSystem.hpp>
+#include <Renderer/LightProbe.hpp>
 #include <Texture/TextureManager.hpp>
 #include <algorithm>
 
@@ -53,6 +54,7 @@ void TiledForwardRenderer::Create(const Vec2u& extent)
 	CreateCompositionPSO();
 	CreateBitmapTextPSO();
 	CreateParticlePSO();
+	CreateFogPSO();
 	CreateLightCullingPSO();
 	CreateDebugLayerPSO();
 	CreateDebugSolidPSO();
@@ -186,8 +188,8 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 	ds_entries.Insert(DescriptorEntry::AsBuffer(7, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
 												gGraphics->ProbeVolumePageSize));
 
-	ds_entries.Insert(
-		DescriptorEntry::AsBuffer(13, eShaderType::Pixel, &gGraphics->ProbeGridBuffer, 0, gGraphics->ProbeGridPageSize));
+	ds_entries.Insert(DescriptorEntry::AsBuffer(13, eShaderType::Pixel, &gGraphics->ProbeGridBuffer, 0,
+												gGraphics->ProbeGridPageSize));
 
 
 	ds_entries.Insert(DescriptorEntry::AsImage(8, eShaderType::Pixel, gGraphics->pProbeMomentsAtlas,
@@ -201,12 +203,11 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 	ds_entries.Insert(DescriptorEntry::AsBuffer(14, eShaderType::Pixel, &gGraphics->ReflectionProbeBuffer, 0,
 												gGraphics->ReflectionProbePageSize));
 
-	ds_entries.Insert(
-		DescriptorEntry::AsImage(15, eShaderType::Pixel, gGraphics->pReflectionProbes,
-								 gSamplerCache->Request({
-									 .AddressMode = eSamplerAddressMode::ClampToEdge,
-									 .MaxLOD = static_cast<float32>(Limits::ReflectionProbeMips - 1),
-								 })));
+	ds_entries.Insert(DescriptorEntry::AsImage(15, eShaderType::Pixel, gGraphics->pReflectionProbes,
+											   gSamplerCache->Request({
+												   .AddressMode = eSamplerAddressMode::ClampToEdge,
+												   .MaxLOD = static_cast<float32>(Limits::ReflectionProbeMips - 1),
+											   })));
 
 	ds_entries.Insert(DescriptorEntry::AsImage(16, eShaderType::Pixel, gGraphics->pDfgLut,
 											   gSamplerCache->Request({
@@ -297,8 +298,6 @@ void TiledForwardRenderer::CreateSSAOPSO()
 		gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
 		gPSOBuild->SetCullMode(eCullMode::None);
 
-		gPSOBuild->SetPushConstants(eShaderType::Pixel, sizeof(SSAOPushConsts));
-
 		// Set 0 (Global / Per Frame)
 		gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, Prepass.GetTarget(eImageFormat::D32_Float),
 									  gSamplerCache->Request(SamplerProps {
@@ -311,6 +310,8 @@ void TiledForwardRenderer::CreateSSAOPSO()
 		gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, Prepass.GetTarget(eImageFormat::RGBA16_Float),
 									  gSamplerCache->Request({}));
 
+		gPSOBuild->AddFrameData(1);
+
 		gPSOBuild->EndPipeline();
 	}
 }
@@ -319,16 +320,15 @@ void TiledForwardRenderer::CreateSSAOBlurPSO()
 {
 	CreateSSAOBlurPass();
 
-	auto BuildPipeline = [this](ePipelineName name, RenderStage& stage, RenderStage& source,
-								const SizedArray<ShaderMacro>& macros) {
+	auto BuildPipeline =
+		[this](ePipelineName name, RenderStage& stage, RenderStage& source, const SizedArray<ShaderMacro>& macros)
+	{
 		gPSOBuild->BeginPipeline(name);
 
 		gPSOBuild->UseRenderStage(stage);
 		gPSOBuild->SetShader(eShaderName::SSAOBlur, macros);
 		gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
 		gPSOBuild->SetCullMode(eCullMode::None);
-
-		gPSOBuild->SetPushConstants(eShaderType::Pixel, sizeof(SSAOBlurPushConsts));
 
 		// tSSAO (visibility + packed edges)
 		gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, source.GetTarget(eImageFormat::RG16_UNorm),
@@ -337,6 +337,8 @@ void TiledForwardRenderer::CreateSSAOBlurPSO()
 										  eSamplerFilter::Nearest,
 										  eSamplerFilter::Nearest,
 									  }));
+
+		gPSOBuild->AddFrameData(1);
 
 		gPSOBuild->EndPipeline();
 	};
@@ -388,14 +390,14 @@ void TiledForwardRenderer::CreateDebugOverlayPSO()
 	gPSOBuild->SetDepthTest(false);
 	gPSOBuild->SetDepthWrite(false);
 
-	gPSOBuild->SetTargetBlend(static_cast<uint32>(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float)),
-							  BlendAttachment {
-								  .Enabled = true,
-								  .BlendOp = { .Ops = { .Alpha = VK_BLEND_OP_ADD, .Color = VK_BLEND_OP_ADD } },
-								  .AlphaBlend { .Ops { .Src = VK_BLEND_FACTOR_ZERO, .Dst = VK_BLEND_FACTOR_ONE } },
-								  .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA,
-													   .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
-							  });
+	gPSOBuild->SetTargetBlend(
+		static_cast<uint32>(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float)),
+		BlendAttachment {
+			.Enabled = true,
+			.BlendOp = { .Ops = { .Alpha = VK_BLEND_OP_ADD, .Color = VK_BLEND_OP_ADD } },
+			.AlphaBlend { .Ops { .Src = VK_BLEND_FACTOR_ZERO, .Dst = VK_BLEND_FACTOR_ONE } },
+			.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
+		});
 
 	gPSOBuild->EndPipeline();
 }
@@ -583,6 +585,7 @@ bool TiledForwardRenderer::MakeForwardDesc(ePipelinePass pass, ePipelineFeatures
 	{
 		AddGlobalDescriptors();
 		Material::DeclareDescriptors(pso);
+		pso.AddFrameData(2);
 	};
 
 	return true;
@@ -617,6 +620,7 @@ bool TiledForwardRenderer::MakePrepassDesc(ePipelineFeatures features, PipelineD
 					  gMaterialManager->MaterialPropertiesBuffer.Size);
 
 		Material::DeclareDescriptors(pso);
+		pso.AddFrameData(2);
 	};
 
 	return true;
@@ -698,7 +702,6 @@ void TiledForwardRenderer::SetDecalAtlases(Image* atlas, Image* normal_atlas)
 void TiledForwardRenderer::CreateLightCullingPSO()
 {
 	gPSOBuild->BeginPipeline(ePipelineName::LightCulling);
-	gPSOBuild->SetPushConstants(eShaderType::Compute, sizeof(LightCullPushConstants));
 	gPSOBuild->SetShader(eShaderName::LightCulling, {});
 
 	// bLightGrid
@@ -713,6 +716,8 @@ void TiledForwardRenderer::CreateLightCullingPSO()
 	gPSOBuild->AddBuffer(5, 0, eShaderType::Compute, &gGraphics->DecalBuffer, 0, gGraphics->DecalPageSize);
 	// bDecalMasks
 	gPSOBuild->AddBuffer(6, 0, eShaderType::Compute, &gGraphics->DecalMaskBuffer, 0, gGraphics->DecalMaskPageSize);
+
+	gPSOBuild->AddFrameData(1);
 
 	gPSOBuild->EndPipeline();
 }
@@ -739,24 +744,24 @@ void TiledForwardRenderer::DoLightCullingPass(Camera& camera, const Vec2u* pExte
 
 	const Mat4f& cam_matrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 
-	LightCullPushConstants push_constants {};
-	memcpy(push_constants.CameraMatrix, cam_matrix.RawData, sizeof(Mat4f));
-	push_constants.ScreenSize[0] = static_cast<float32>(extent.X);
-	push_constants.ScreenSize[1] = static_cast<float32>(extent.Y);
+	LightCullConstants consts {};
+	memcpy(consts.CameraMatrix, cam_matrix.RawData, sizeof(Mat4f));
+	consts.ScreenSize[0] = static_cast<float32>(extent.X);
+	consts.ScreenSize[1] = static_cast<float32>(extent.Y);
 
-	push_constants.LightCount = gGraphics->LightBuffer.SlotIndex;
-	push_constants.TileColumns = tile_columns;
+	consts.LightCount = gGraphics->LightBuffer.SlotIndex;
+	consts.TileColumns = tile_columns;
 
 	if (pLightOverride != nullptr) {
-		push_constants.LightCount = pLightOverride->LightCount;
-		push_constants.ReplacedLight = pLightOverride->ReplacedLight;
-		push_constants.ReplacementSlot = pLightOverride->ReplacementSlot;
+		consts.LightCount = pLightOverride->LightCount;
+		consts.ReplacedLight = pLightOverride->ReplacedLight;
+		consts.ReplacementSlot = pLightOverride->ReplacementSlot;
 	}
 
 	// Decals were uploaded for the player's view, and they are left out of probe captures (the only views with
 	// overrides) anyway
 	const bool is_main_view = (pExtentOverride == nullptr && pLightOverride == nullptr);
-	push_constants.DecalCount = is_main_view ? gDecalManager->GetVisibleCount() : 0;
+	consts.DecalCount = is_main_view ? gDecalManager->GetVisibleCount() : 0;
 
 	// Probe captures cull into the same pages that the main view, and the face before, were just shaded from
 	if (!is_main_view) {
@@ -771,10 +776,8 @@ void TiledForwardRenderer::DoLightCullingPass(Camera& camera, const Vec2u* pExte
 	gPipelineCache->AddBufferOffset(0, gGraphics->LightBuffer.GetBaseOffset());
 	gPipelineCache->AddBufferOffset(0, gGraphics->GetDecalFrameOffset());
 	gPipelineCache->AddBufferOffset(0, gGraphics->GetDecalMaskFrameOffset());
+	gPipelineCache->SetFrameData(gGraphics->FrameAlloc.Push(consts));
 	gPipelineCache->Bind(ePipelineName::LightCulling, cmd);
-
-	gGraphics->SubmitPushConstants(cmd, gPipelineCache->Request(ePipelineName::LightCulling), eShaderType::Compute,
-								   push_constants);
 
 	vkCmdDispatch(cmd.Get(), tile_columns, tile_rows, 1);
 
@@ -811,11 +814,10 @@ void TiledForwardRenderer::CreateCompositionPSO()
 		gPSOBuild->SetDepthTest(false);
 		gPSOBuild->SetDepthWrite(false);
 
-		gPSOBuild->SetPushConstants(eShaderType::Pixel, sizeof(CompositionPushConsts));
-
 		// tLighting
 		gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::RGBA16_Float),
 									  gSamplerCache->Request(SamplerProps {}));
+		gPSOBuild->AddFrameData(1);
 		gPSOBuild->EndPipeline();
 	};
 
@@ -875,7 +877,6 @@ void TiledForwardRenderer::CreateParticlePSO()
 	CreateParticlePass();
 
 	gPSOBuild->BeginPipeline(ePipelineName::Particles);
-	gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(ParticlePushConstants));
 
 	gPSOBuild->UseRenderStage(ParticlePass);
 	gPSOBuild->SetShader(eShaderName::Particle, {});
@@ -910,7 +911,252 @@ void TiledForwardRenderer::CreateParticlePSO()
 									  eSamplerFilter::Nearest,
 								  }));
 
+	gPSOBuild->AddFrameData(1);
+
 	gPSOBuild->EndPipeline();
+}
+
+void TiledForwardRenderer::CreateFogPasses()
+{
+	FogPass.Create("Fog", gGraphics->Swapchain.Extent, eSizeDivisor::HalfRes);
+	FogPass.AddTarget(eImageFormat::RGBA16_Float, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+					  eImageAspectFlag::Color);
+	FogPass.BuildRenderStage();
+
+	FogTemporalPass.Create("FogTemporal", gGraphics->Swapchain.Extent, eSizeDivisor::HalfRes);
+	FogTemporalPass.AddTarget(eImageFormat::RGBA16_Float,
+							  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+							  eImageAspectFlag::Color);
+	FogTemporalPass.BuildRenderStage();
+
+	FogDenoisePass.Create("FogDenoise", gGraphics->Swapchain.Extent, eSizeDivisor::HalfRes);
+	FogDenoisePass.AddTarget(eImageFormat::RGBA16_Float,
+							 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
+	FogDenoisePass.AddTarget(eImageFormat::RGBA16_Float,
+							 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
+	FogDenoisePass.AddTarget(eImageFormat::R32_SFloat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+							 eImageAspectFlag::Color);
+	FogDenoisePass.BuildRenderStage();
+
+	FogApplyPass.Create("FogApply", gGraphics->Swapchain.Extent, eSizeDivisor::FullRes);
+
+	Target* lit_target = ForwardPass.GetTarget(eImageFormat::RGBA16_Float);
+	AssertMsg(lit_target != nullptr, "The forward pass must be created before the fog passes");
+
+	Target lit(eImageFormat::RGBA16_Float, gGraphics->Swapchain.Extent, true,
+			   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
+	lit.UseImageFromTarget(lit_target);
+	lit.LoadOp = eLoadOp::Load;
+	lit.InitialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	FogApplyPass.AddTarget(lit);
+
+	FogApplyPass.BuildRenderStage();
+}
+
+void TiledForwardRenderer::CreateFogPSO()
+{
+	CreateFogPasses();
+
+	Sampler* point_sampler = gSamplerCache->Request(SamplerProps {
+		eSamplerFilter::Nearest,
+		eSamplerFilter::Nearest,
+		eSamplerFilter::Nearest,
+	});
+
+	Target* depth_target = Prepass.GetTarget(eImageFormat::D32_Float);
+	Target* shadow_target = gShadowAtlas->GetTarget();
+	Assert(shadow_target != nullptr);
+
+	const auto BuildMarchPipeline = [&](ePipelineName name, const SizedArray<ShaderMacro>& macros)
+	{
+		gPSOBuild->BeginPipeline(name);
+
+		gPSOBuild->UseRenderStage(FogPass);
+		gPSOBuild->SetShader(eShaderName::Fog, macros);
+		gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
+		gPSOBuild->SetCullMode(eCullMode::None);
+		gPSOBuild->SetDepthTest(false);
+		gPSOBuild->SetDepthWrite(false);
+
+		gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, depth_target, point_sampler);
+		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+							 gGraphics->LightBuffer.PageSize);
+		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
+		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
+							 gGraphics->LightIndexListPageSize);
+		gPSOBuild->AddImageFromTarget(4, 0, eShaderType::Pixel, shadow_target,
+									  gSamplerCache->Request({
+										  eSamplerFilter::Linear,
+										  eSamplerFilter::Linear,
+										  eSamplerFilter::Linear,
+										  eSamplerAddressMode::ClampToBorder,
+										  eSamplerBorderColor::FloatWhite,
+										  eSamplerCompareOp::Greater,
+									  }));
+		gPSOBuild->AddBuffer(5, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
+		gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
+							 gGraphics->ProbeVolumePageSize);
+		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeGridBuffer, 0, gGraphics->ProbeGridPageSize);
+
+		gPSOBuild->AddFrameData(1);
+
+		gPSOBuild->EndPipeline();
+	};
+
+	BuildMarchPipeline(ePipelineName::FogFast, {});
+	BuildMarchPipeline(ePipelineName::FogVolumetric, { ShaderMacro { .pcName = "FOG_VOLUMETRIC", .pcValue = "1" } });
+
+	gPSOBuild->BeginPipeline(ePipelineName::FogTemporal);
+
+	gPSOBuild->UseRenderStage(FogTemporalPass);
+	gPSOBuild->SetShader(eShaderName::FogTemporal, {});
+	gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
+	gPSOBuild->SetCullMode(eCullMode::None);
+	gPSOBuild->SetDepthTest(false);
+	gPSOBuild->SetDepthWrite(false);
+
+	gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, FogPass.GetTarget(eImageFormat::RGBA16_Float),
+								  point_sampler);
+	gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, FogDenoisePass.GetTarget(eImageFormat::RGBA16_Float, 1),
+								  point_sampler);
+	gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Pixel, depth_target, point_sampler);
+	gPSOBuild->AddImageFromTarget(3, 0, eShaderType::Pixel, FogDenoisePass.GetTarget(eImageFormat::R32_SFloat),
+								  point_sampler);
+
+	gPSOBuild->AddFrameData(1);
+
+	gPSOBuild->EndPipeline();
+
+	gPSOBuild->BeginPipeline(ePipelineName::FogDenoise);
+
+	gPSOBuild->UseRenderStage(FogDenoisePass);
+	gPSOBuild->SetShader(eShaderName::FogDenoise, {});
+	gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
+	gPSOBuild->SetCullMode(eCullMode::None);
+	gPSOBuild->SetDepthTest(false);
+	gPSOBuild->SetDepthWrite(false);
+
+	gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, FogTemporalPass.GetTarget(eImageFormat::RGBA16_Float),
+								  point_sampler);
+	gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, depth_target, point_sampler);
+
+	gPSOBuild->AddFrameData(1);
+
+	gPSOBuild->EndPipeline();
+
+	gPSOBuild->BeginPipeline(ePipelineName::FogApply);
+
+	gPSOBuild->UseRenderStage(FogApplyPass);
+	gPSOBuild->SetShader(eShaderName::FogApply, {});
+	gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
+	gPSOBuild->SetCullMode(eCullMode::None);
+	gPSOBuild->SetDepthTest(false);
+	gPSOBuild->SetDepthWrite(false);
+
+	BlendAttachment blend = BlendAttachment {
+		.Enabled = true,
+		.BlendOp = {
+			.Ops = {
+				.Alpha = VK_BLEND_OP_ADD,
+				.Color = VK_BLEND_OP_ADD,
+			},
+		},
+		.AlphaBlend { .Ops { .Src = VK_BLEND_FACTOR_ZERO, .Dst = VK_BLEND_FACTOR_ONE } },
+		.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_ONE, .Dst = VK_BLEND_FACTOR_SRC_ALPHA } },
+	};
+	gPSOBuild->SetTargetBlend(FogApplyPass.GetTargetIndex(eImageFormat::RGBA16_Float), blend);
+
+	gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, FogDenoisePass.GetTarget(eImageFormat::RGBA16_Float),
+								  point_sampler);
+	gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, depth_target, point_sampler);
+
+	gPSOBuild->AddFrameData(1);
+
+	gPSOBuild->EndPipeline();
+}
+
+uint32 TiledForwardRenderer::GetViewConstants(const Camera& camera, eObjectLayer layer)
+{
+	ViewConstants consts;
+	memset(&consts, 0, sizeof(ViewConstants));
+
+	consts.TargetSize[0] = gGraphics->Swapchain.Extent.X;
+	consts.TargetSize[1] = gGraphics->Swapchain.Extent.Y;
+	consts.TileColumns = mLightTileColumns;
+	consts.TileRows = mLightTileRows;
+
+	// Only the probe capture faces themselves get the capture flag. Keying it off
+	// IsCapturePending() would also strip probe GI and SSAO from the main view for
+	// every frame of a grid bake.
+	if (gProbeManager != nullptr && gProbeManager->IsCapturingFaces()) {
+		consts.Flags |= eDrawFlags::ProbeCapture;
+
+		if (gProbeManager->IsCapturingBounce()) {
+			consts.Flags |= eDrawFlags::ProbeBounce;
+		}
+
+		if (gProbeManager->IsCapturingReflection()) {
+			consts.Flags |= eDrawFlags::ReflectionCapture;
+		}
+	}
+
+	const bool is_probe_capture = HasFlag(consts.Flags, eDrawFlags::ProbeCapture);
+
+	consts.PreExposure = gGraphics->PreExposure;
+
+	if (is_probe_capture) {
+		consts.PreExposure = 1.0f;
+	}
+
+	if (gGraphics->bBakedSunActive && !is_probe_capture) {
+		consts.Flags |= eDrawFlags::BakedSun;
+	}
+
+	if (gGraphics->bBakedIndirectActive && !is_probe_capture) {
+		consts.Flags |= eDrawFlags::BakedIndirect;
+	}
+
+	if (gGraphics->bOnlyRenderProbes) {
+		consts.Flags |= eDrawFlags::DebugIrradiance;
+	}
+
+	if (gGraphics->bRenderProbeVisibility) {
+		consts.Flags |= eDrawFlags::DebugProbeVisibility;
+	}
+
+	if (gGraphics->bDisableReflectionProbes) {
+		consts.Flags |= eDrawFlags::NoReflectionProbes;
+	}
+
+	if (!is_probe_capture && gGraphics->ReflectionDebugView == 1) {
+		consts.Flags |= eDrawFlags::DebugReflection;
+	}
+
+	if (!is_probe_capture && gGraphics->ReflectionDebugView == 2) {
+		consts.Flags |= eDrawFlags::DebugReflectionCoverage;
+	}
+
+	// Decals are placed in the world, and the view model only lines up with the world from the camera's position
+	if (layer != eObjectLayer::WorldLayer) {
+		consts.Flags |= eDrawFlags::NoDecals;
+	}
+
+	memcpy(consts.ViewProjection, camera.GetCameraMatrix(layer).RawData, sizeof(Mat4f));
+	memcpy(consts.EyePosition, camera.Position.mData, sizeof(float32) * 3);
+	consts.EyePosition[3] = 1.0f;
+
+	CachedViewConstants& cached = mCachedViews[static_cast<uint32>(layer)];
+	const uint32 generation = gGraphics->FrameAlloc.GetGeneration();
+
+	if (cached.Generation == generation && memcmp(&cached.Consts, &consts, sizeof(ViewConstants)) == 0) {
+		return cached.Offset;
+	}
+
+	cached.Consts = consts;
+	cached.Offset = gGraphics->FrameAlloc.Push(consts);
+	cached.Generation = generation;
+
+	return cached.Offset;
 }
 
 void TiledForwardRenderer::RenderComposition(Camera& camera)
@@ -920,15 +1166,14 @@ void TiledForwardRenderer::RenderComposition(Camera& camera)
 	const ePipelineName pipeline_name = (gGraphics->Tonemapper == 1) ? ePipelineName::CompositionAgx
 																	 : ePipelineName::Composition;
 
-	gPipelineCache->Bind(pipeline_name, cmd);
-
 	Vec2u& extent = gGraphics->Swapchain.Extent;
 
-	CompositionPushConsts consts {
+	CompositionConsts consts {
 		.FrameExtent = { extent.X, extent.Y },
 	};
 
-	gGraphics->SubmitPushConstants(cmd, gPipelineCache->Request(pipeline_name), eShaderType::Pixel, consts);
+	gPipelineCache->SetFrameData(gGraphics->FrameAlloc.Push(consts));
+	gPipelineCache->Bind(pipeline_name, cmd);
 
 	// Use single triangle instead of two triangles as it removes the overlapping quads the gpu
 	// renders between triangles. Source: https://wallisc.github.io/rendering/2021/04/18/Fullscreen-Pass.html

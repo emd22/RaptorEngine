@@ -16,7 +16,7 @@ F_StructBuffer(bDecals, Decal, 5, 0);
 
 F_RWStructBuffer(bDecalMasks, uint, 6, 0);
 
-struct CSPushConsts
+struct CSConsts
 {
 	float4x4 mViewProjection;
 	float2 vScreenSize;
@@ -30,7 +30,7 @@ struct CSPushConsts
 	uint uiDecalCount;
 };
 
-[[vk::push_constant]] CSPushConsts CSConst;
+F_FrameData(CSConsts, CSConst, 1);
 
 #define NUM_THREADS (LIGHT_TILE_SIZE * LIGHT_TILE_SIZE)
 #define LIGHT_MASK_WORDS ((LIGHT_COUNT + 31) / 32)

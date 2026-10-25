@@ -131,6 +131,8 @@ public:
 
 	FX_FORCE_INLINE Vec3f GetBob() const { return Vec3f(mHeadBobX, mHeadBobY, 0.0f); }
 
+	FX_FORCE_INLINE Vec3f GetEyePosition() const { return Position + mCameraOffset; }
+
 	/**
 	 * @brief How fast the player actually moved horizontally last update, relative to the ground it stands on.
 	 */

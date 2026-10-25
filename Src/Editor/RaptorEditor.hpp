@@ -143,7 +143,7 @@ public:
 	void SetView(eEditorView view);
 
 	FX_FORCE_INLINE eEditorView GetView() const { return mView; }
-	FX_FORCE_INLINE bool IsTopViewActive() const { return mView != eEditorView::Perspective; }
+	FX_FORCE_INLINE bool IsTopViewActive() const { return mView != eEditorView::Viewport; }
 
 	bool IsCompiledMapOpen() const;
 
@@ -258,6 +258,8 @@ public:
 	void SetSunAngles(float32 azimuth_degrees, float32 elevation_degrees);
 	void SetSunAzimuth(float32 azimuth_degrees);
 	void SetSunElevation(float32 elevation_degrees);
+
+	void SetFog(const renderer::FogSettings& fog);
 
 	/// Creates a data brush of the kind the filter is set to, filling a world space box
 	Object* CreateDataBrush(const Brush::PlaneList& planes, const Vec3f position);
@@ -409,12 +411,12 @@ private:
 	eEditorMode mMode = eEditorMode::Vis;
 	eDataFilter mDataFilter = eDataFilter::All;
 
-	eEditorView mView = eEditorView::Perspective;
+	eEditorView mView = eEditorView::Viewport;
 	bool mbHasCreateReference = false;
 	Vec3f mCreateReferenceMin = Vec3f::sZero;
 	Vec3f mCreateReferenceMax = Vec3f::sZero;
 
-	eEditorView mViewBeforeCompiledMap = eEditorView::Perspective;
+	eEditorView mViewBeforeCompiledMap = eEditorView::Viewport;
 	bool mbViewLockedByCompiledMap = false;
 	uint32 mTopViewCommandSerial = 0;
 

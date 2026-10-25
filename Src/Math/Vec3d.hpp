@@ -58,6 +58,11 @@ public:
 
 	FX_FORCE_INLINE Vec3d operator/(const Vec3d& other) const;
 
+	FX_FORCE_INLINE bool operator>(const Vec3d& other) const;
+	FX_FORCE_INLINE bool operator<(const Vec3d& other) const;
+	FX_FORCE_INLINE bool operator>=(const Vec3d& other) const;
+	FX_FORCE_INLINE bool operator<=(const Vec3d& other) const;
+
 	FX_FORCE_INLINE Vec3f ToVec3f() const;
 
 	FX_FORCE_INLINE double Dot(const Vec3d& other) const;

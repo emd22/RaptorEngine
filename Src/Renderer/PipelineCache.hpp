@@ -123,6 +123,7 @@ public:
 
 	void RegisterPassTemplate(const ePipelinePass pass, PassTemplate pass_template);
 	void AddBufferOffset(uint32 set_index, uint32 offset);
+	void SetFrameData(uint32 offset) { mFrameDataOffset = offset; }
 
 private:
 	void Reset();
@@ -158,6 +159,7 @@ private:
 private:
 	SizedArray<Pipeline> mCache;
 	SizedArray<SizedArray<uint32>> mOffsets;
+	uint32 mFrameDataOffset = UINT32_MAX;
 
 	/// The pipelines made from descriptions, after the ones in mCache. Filled in order, and each is stored once it is
 	/// set up so a reader that finds it sees all of it.

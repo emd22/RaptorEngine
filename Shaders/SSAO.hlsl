@@ -48,7 +48,7 @@ struct FSOutput
 F_Texture2D(tDepth, 0, 0);
 F_Texture2D(tNormal, 1, 0);
 
-struct SSAOPushConsts
+struct SSAOConsts
 {
 	float4x4 InvProjection;
 	float4x4 Projection;
@@ -61,7 +61,7 @@ struct SSAOPushConsts
 	float FinalValuePower;
 };
 
-[[vk::push_constant]] SSAOPushConsts Consts;
+F_FrameData(SSAOConsts, Consts, 1);
 
 // Follows Intel's XeGTAO (Jimenez et al., "Practical Real-Time Strategies for Accurate Indirect Occlusion") at its
 // High preset. The depth MIP chain is left out, every tap reads the full resolution depth target.

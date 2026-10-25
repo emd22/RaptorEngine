@@ -490,10 +490,10 @@ wxMenu* EditorFrame::CreateViewMenu()
 
 	{
 		Bind(
-			wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetView(eEditorView::Perspective); }); },
+			wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetView(eEditorView::Viewport); }); },
 			mpPerspectiveMenuItem->GetId());
 		Bind(
-			wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetView(eEditorView::Top); }); },
+			wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetView(eEditorView::Architect); }); },
 			mpTopMenuItem->GetId());
 		Bind(
 			wxEVT_MENU, [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetView(eEditorView::Split); }); },
@@ -888,7 +888,7 @@ void EditorFrame::SetSidePanelCollapsed(bool collapsed)
 
 void EditorFrame::FocusActiveView()
 {
-	const bool use_2d = (mView == eEditorView::Top) || (mView == eEditorView::Split && mbSplitFocusOn2D);
+	const bool use_2d = (mView == eEditorView::Architect) || (mView == eEditorView::Split && mbSplitFocusOn2D);
 
 	if (use_2d && mpTopViewPanel != nullptr) {
 		mpTopViewPanel->GetCanvas()->SetFocus();
@@ -905,7 +905,7 @@ void EditorFrame::ShowView(const eEditorView view)
 	mpToolbar->ShowView(view);
 
 	switch (view) {
-	case eEditorView::Top:
+	case eEditorView::Architect:
 		mpTopMenuItem->Check(true);
 		break;
 	case eEditorView::Split:
@@ -939,8 +939,8 @@ void EditorFrame::ApplySplitLayout(const eEditorView view)
 								   0.1f, 0.9f);
 
 		if (view != eEditorView::Split || mpSplitter->GetSplitMode() != wanted_mode) {
-			wxWindow* removed = (view == eEditorView::Top) ? static_cast<wxWindow*>(mpViewport)
-														   : static_cast<wxWindow*>(mpTopViewPanel);
+			wxWindow* removed = (view == eEditorView::Architect) ? static_cast<wxWindow*>(mpViewport)
+																 : static_cast<wxWindow*>(mpTopViewPanel);
 
 			mpSplitter->Unsplit(removed);
 		}
@@ -964,8 +964,8 @@ void EditorFrame::ApplySplitLayout(const eEditorView view)
 		return;
 	}
 
-	wxWindow* wanted = (view == eEditorView::Top) ? static_cast<wxWindow*>(mpTopViewPanel)
-												  : static_cast<wxWindow*>(mpViewport);
+	wxWindow* wanted = (view == eEditorView::Architect) ? static_cast<wxWindow*>(mpTopViewPanel)
+														: static_cast<wxWindow*>(mpViewport);
 	wxWindow* current = mpSplitter->GetWindow1();
 
 	if (current != wanted) {

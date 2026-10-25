@@ -120,6 +120,7 @@ WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, w
 	}
 
 	BuildSunSection(sizer);
+	BuildFogSection(sizer);
 	BuildReflectionSection(sizer);
 
 	SetSizer(sizer);
@@ -215,6 +216,105 @@ void WorldPropertiesPanel::ApplySunState(const WorldPanelState& state)
 
 	if (!mpSunElevationField->HasFocus()) {
 		mpSunElevationField->SetValue(state.SunElevationDegrees);
+	}
+}
+
+void WorldPropertiesPanel::BuildFogSection(wxSizer* sizer)
+{
+	PropertySection* section = new PropertySection(this, "Fog");
+	wxWindow* body = section->GetBody();
+	sizer->Add(section, wxSizerFlags().Expand());
+
+	mpFogEnabledCheck = new wxCheckBox(body, wxID_ANY, "Enabled");
+	section->AddWide(mpFogEnabledCheck);
+	mpFogEnabledCheck->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) { PostFogSettings(); });
+
+	mpFogQualityChoice = new wxChoice(body, wxID_ANY);
+	mpFogQualityChoice->Append("Off");
+	mpFogQualityChoice->Append("Fast");
+	mpFogQualityChoice->Append("Volumetric");
+	section->AddRow("Quality", mpFogQualityChoice);
+
+	mpFogQualityChoice->Bind(wxEVT_CHOICE,
+							 [this](wxCommandEvent&)
+							 {
+								 const int32 selection = mpFogQualityChoice->GetSelection();
+								 if (selection < 0) {
+									 return;
+								 }
+
+								 mShownFogQuality = selection;
+								 thread::PostToGame([selection] { gCVars->Set("r_fog", selection); });
+							 });
+
+	wxBoxSizer* color_row = new wxBoxSizer(wxHORIZONTAL);
+	mpFogColorPicker = new wxColourPickerCtrl(body, wxID_ANY, *wxWHITE);
+	color_row->Add(mpFogColorPicker, wxSizerFlags().CenterVertical());
+	section->AddRow("Colour", color_row);
+	mpFogColorPicker->Bind(wxEVT_COLOURPICKER_CHANGED, [this](wxColourPickerEvent&) { PostFogSettings(); });
+
+	const auto add_field = [&](const char* label, const Vec2f& limits)
+	{
+		FloatField* field = new FloatField(body, label, limits);
+		field->SetOnChange([this](const float) { PostFogSettings(); });
+		section->AddRow(*field);
+		return field;
+	};
+
+	mpFogDensityField = add_field("Density", Vec2f(0.0f, 10.0f));
+	mpFogHeightField = add_field("Height", Vec2f(-10000.0f, 10000.0f));
+	mpFogFalloffField = add_field("Falloff", Vec2f(0.0f, 10.0f));
+	mpFogHazeField = add_field("Haze", Vec2f(0.0f, 10.0f));
+	mpFogAnisotropyField = add_field("Anisotropy", Vec2f(-0.95f, 0.95f));
+	mpFogAmbientField = add_field("Ambient", Vec2f(0.0f, 100.0f));
+}
+
+void WorldPropertiesPanel::PostFogSettings()
+{
+	const wxColour colour = mpFogColorPicker->GetColour();
+
+	renderer::FogSettings fog;
+	fog.bEnabled = mpFogEnabledCheck->GetValue();
+	fog.Albedo = Color::FromRGBA(colour.Red(), colour.Green(), colour.Blue(), 255);
+	fog.Density = mpFogDensityField->GetValue();
+	fog.Height = mpFogHeightField->GetValue();
+	fog.Falloff = mpFogFalloffField->GetValue();
+	fog.Haze = mpFogHazeField->GetValue();
+	fog.Anisotropy = mpFogAnisotropyField->GetValue();
+	fog.AmbientScale = mpFogAmbientField->GetValue();
+
+	thread::PostToGame([fog] { gEditor->SetFog(fog); });
+}
+
+void WorldPropertiesPanel::ApplyFogState(const WorldPanelState& state)
+{
+	const renderer::FogSettings& fog = state.Fog;
+
+	if (mpFogEnabledCheck->GetValue() != fog.bEnabled) {
+		mpFogEnabledCheck->SetValue(fog.bEnabled);
+	}
+
+	if (state.FogQuality != mShownFogQuality) {
+		mShownFogQuality = state.FogQuality;
+		mpFogQualityChoice->SetSelection(static_cast<int32>(state.FogQuality));
+	}
+
+	const wxColour colour(fog.Albedo.R, fog.Albedo.G, fog.Albedo.B);
+
+	if (mpFogColorPicker->GetColour() != colour) {
+		mpFogColorPicker->SetColour(colour);
+	}
+
+	const std::pair<FloatField*, float32> fields[] = {
+		{ mpFogDensityField, fog.Density },		  { mpFogHeightField, fog.Height },
+		{ mpFogFalloffField, fog.Falloff },		  { mpFogHazeField, fog.Haze },
+		{ mpFogAnisotropyField, fog.Anisotropy }, { mpFogAmbientField, fog.AmbientScale },
+	};
+
+	for (const auto& [field, value] : fields) {
+		if (!field->HasFocus()) {
+			field->SetValue(value);
+		}
 	}
 }
 
@@ -356,6 +456,7 @@ void WorldPropertiesPanel::ApplyState(const WorldPanelState& state)
 	}
 
 	ApplySunState(state);
+	ApplyFogState(state);
 	ApplyReflectionState(state);
 
 	if (!mpApertureField->HasFocus()) {

@@ -63,15 +63,24 @@ PERMIF(USE_VERTEX_COLOR);
 PERMEND();
 };
 
-struct VSPushConsts
+struct ViewConsts
 {
     float4x4 mViewProjection;
-	uint uiObjectIndex;
-    uint uiMaterialIndex;
-    uint uiTileColumns;
-    uint Flags;
+    float4 vEyePosition;
     uint2 vTargetSize;
+    uint uiTileColumns;
+    uint uiTileRows;
+    uint Flags;
+    float fPreExposure;
+};
+
+struct DrawConsts
+{
+    uint uiObjectIndex;
+    uint uiMaterialIndex;
     uint uiBoneBase;
+    uint uiSkinnedDecalStart;
+    uint uiSkinnedDecalCount;
 };
 
 PERMIF(USE_SKINNING);
@@ -80,18 +89,20 @@ PERMEND();
 
 F_StructBuffer(bObjectBuffer, Object, 0, 0);
 
-[[vk::push_constant]] VSPushConsts VSConst;
+F_FrameData(ViewConsts, ViewConst, 2);
+
+[[vk::push_constant]] DrawConsts DrawConst;
 
 VSOutput main(VSInput input)
 {
     VSOutput output;
 
-    float4x4 world_matrix = bObjectBuffer[VSConst.uiObjectIndex + input.uiInstanceId].mWorld;
+    float4x4 world_matrix = bObjectBuffer[DrawConst.uiObjectIndex + input.uiInstanceId].mWorld;
 
-    float4x4 MVP = mul(world_matrix, VSConst.mViewProjection);
+    float4x4 MVP = mul(world_matrix, ViewConst.mViewProjection);
 
 PERMIF(USE_SKINNING);
-    const uint bone_base = VSConst.uiBoneBase;
+    const uint bone_base = DrawConst.uiBoneBase;
 
     float4x4 skin_xform = input.vJointWeights.x * bBones[bone_base + input.vJointIndices.x]
         + input.vJointWeights.y * bBones[bone_base + input.vJointIndices.y]
@@ -140,7 +151,7 @@ PERMEND();
     float4 position_ws = mul(position_ms, world_matrix);
 	output.vPositionWS = position_ws.xyz;
 
-	output.uiMaterialIndex = VSConst.uiMaterialIndex;
+	output.uiMaterialIndex = DrawConst.uiMaterialIndex;
 
 	return output;
 }
@@ -246,25 +257,29 @@ F_Texture2D(tLightmapIrradiance, 18, 0)
 
 #define LIGHTMAP_DIRECTIONALITY 1.5
 
-struct FSPushConsts
+struct ViewConsts
 {
-	float4x4 mViewProjection;
-	uint uiObjectIndex;
-	uint uiMaterialIndex;
-	uint uiTileColumns;
-	uint Flags;
-	uint2 vTargetSize;
-	uint uiBoneBase;
-	/// Rows the light grid was dispatched with, paired with uiTileColumns
-	uint uiTileRows;
-	/// Camera position in world space
-	float4 vEyePosition;
-	float fPreExposure;
-	uint uiSkinnedDecalStart;
-	uint uiSkinnedDecalCount;
+    float4x4 mViewProjection;
+    float4 vEyePosition;
+    uint2 vTargetSize;
+    uint uiTileColumns;
+    uint uiTileRows;
+    uint Flags;
+    float fPreExposure;
 };
 
-[[vk::push_constant]] FSPushConsts FSConst;
+struct DrawConsts
+{
+    uint uiObjectIndex;
+    uint uiMaterialIndex;
+    uint uiBoneBase;
+    uint uiSkinnedDecalStart;
+    uint uiSkinnedDecalCount;
+};
+
+F_FrameData(ViewConsts, ViewConst, 2);
+
+[[vk::push_constant]] DrawConsts DrawConst;
 
 #define SHADOW_BIAS -0.000005f
 
@@ -569,7 +584,7 @@ PERMELSE();
 PERMEND();
 
 PERMIF(PROBE_CAPTURE);
-	albedo = select(HAS_FLAG(FSConst.Flags, DRAW_FLAG_REFLECTION_CAPTURE), albedo,
+	albedo = select(HAS_FLAG(ViewConst.Flags, DRAW_FLAG_REFLECTION_CAPTURE), albedo,
 					min(albedo, PROBE_CAPTURE_MAX_ALBEDO));
 PERMEND();
 
@@ -577,17 +592,17 @@ PERMEND();
 
 	uint2 tile_xy = uint2(input.vPosition.xy / LIGHT_TILE_SIZE);
 
-	const uint2 tile_limit = max(uint2(FSConst.uiTileColumns, FSConst.uiTileRows), uint2(1, 1)) - uint2(1, 1);
+	const uint2 tile_limit = max(uint2(ViewConst.uiTileColumns, ViewConst.uiTileRows), uint2(1, 1)) - uint2(1, 1);
 	tile_xy = min(tile_xy, tile_limit);
 
-	uint tile_index = tile_xy.x + (tile_xy.y * FSConst.uiTileColumns);
+	uint tile_index = tile_xy.x + (tile_xy.y * ViewConst.uiTileColumns);
 
 	TileLightData tile_data = bLightGrid[tile_index];
 
 PERMNOT(USE_SKINNING);
 PERMNOT(PROBE_CAPTURE);
 	// Decals stay where they are in the world, so skinned meshes would slide through them
-	tile_data.DecalWordEnd = select(HAS_FLAG(FSConst.Flags, DRAW_FLAG_NO_DECALS), tile_data.DecalWordStart,
+	tile_data.DecalWordEnd = select(HAS_FLAG(ViewConst.Flags, DRAW_FLAG_NO_DECALS), tile_data.DecalWordStart,
 									tile_data.DecalWordEnd);
 
 	// ApplyDecals() leaves the shading normal normalized, so N_final stays unit length through this
@@ -598,7 +613,7 @@ PERMEND();
 
 PERMIF(USE_SKINNING);
 PERMNOT(PROBE_CAPTURE);
-	ApplySkinnedDecals(surface, N_final, FSConst.uiSkinnedDecalStart, FSConst.uiSkinnedDecalCount,
+	ApplySkinnedDecals(surface, N_final, DrawConst.uiSkinnedDecalStart, DrawConst.uiSkinnedDecalCount,
 					   input.vPositionRest, normalize(input.vNormalRest) * facing, position_ddx, position_ddy);
 PERMEND();
 PERMEND();
@@ -613,7 +628,7 @@ PERMEND();
 	float3 accumulated_specular = float3(0.0, 0.0, 0.0);
 
 	const float3 N = N_final;
-	const float3 V = normalize(FSConst.vEyePosition.xyz - input.vPositionWS);
+	const float3 V = normalize(ViewConst.vEyePosition.xyz - input.vPositionWS);
 	const float NdotV = abs(dot(N, V)) + 1e-5f;
 
 	const float2 dfg = SampleDfg(F_TextureName(tDfgLut), tDfgLut, NdotV, roughness);
@@ -622,7 +637,7 @@ PERMEND();
 	/// The unperturbed surface normal (already flipped for backfaces), for rejecting light the surface faces away from
 	const float3 geometric_normal = normalize(input.vNormalWS);
 
-	const float2 ssao_coords = float2(input.vPosition.xy / (float2(FSConst.vTargetSize)));
+	const float2 ssao_coords = float2(input.vPosition.xy / (float2(ViewConst.vTargetSize)));
 
 PERMIF(PROBE_CAPTURE);
 	// Probe capture bakes have no matching SSAO data.
@@ -647,7 +662,7 @@ PERMEND();
 	const float3 R = GetSpecularDominantDir(N, reflect(-V, N), specular_alpha);
 
 PERMIF(PROBE_CAPTURE);
-	const bool use_probes = HAS_FLAG(FSConst.Flags, DRAW_FLAG_PROBE_BOUNCE);
+	const bool use_probes = HAS_FLAG(ViewConst.Flags, DRAW_FLAG_PROBE_BOUNCE);
 PERMELSE();
 	const bool use_probes = true;
 PERMEND();
@@ -698,7 +713,7 @@ PERMIF(USE_LIGHTMAP);
 	const float3 baked_irradiance = lightmap_irradiance *
 									(max(1.0 + dot(indirect_direction, N), 0.0) / indirect_balance);
 
-	const bool use_baked_indirect = HAS_FLAG(FSConst.Flags, DRAW_FLAG_BAKED_INDIRECT);
+	const bool use_baked_indirect = HAS_FLAG(ViewConst.Flags, DRAW_FLAG_BAKED_INDIRECT);
 
 	probe_irradiance = select(use_baked_indirect, baked_irradiance, probe_irradiance);
 	has_probes = or(has_probes, use_baked_indirect);
@@ -712,7 +727,7 @@ PERMIF(USE_LIGHTMAP);
 PERMELSE();
 	const float baked_sun_sample = probe_sun_visibility;
 PERMEND();
-	const float baked_sun_visibility = select(HAS_FLAG(FSConst.Flags, DRAW_FLAG_BAKED_SUN), baked_sun_sample, 1.0);
+	const float baked_sun_visibility = select(HAS_FLAG(ViewConst.Flags, DRAW_FLAG_BAKED_SUN), baked_sun_sample, 1.0);
 PERMEND();
 
 	for (uint tile_light = 0; tile_light < tile_data.Count; tile_light++) {
@@ -772,7 +787,7 @@ PERMEND();
 
 	if (has_probes) {
 PERMNOT(PROBE_CAPTURE);
-		const uint reflection_probe_count = select(HAS_FLAG(FSConst.Flags, DRAW_FLAG_NO_REFLECTION_PROBES), 0u,
+		const uint reflection_probe_count = select(HAS_FLAG(ViewConst.Flags, DRAW_FLAG_NO_REFLECTION_PROBES), 0u,
 												   GetReflectionProbeCount(bReflectionProbes));
 
 		probe_radiance = SampleReflectionProbes(input.vPositionWS, R, roughness, probe_radiance,
@@ -800,7 +815,7 @@ PERMEND();
 	const float3 specular_light = accumulated_specular + ambient_specular;
 
 PERMIF(PROBE_CAPTURE);
-	output.vAlbedo = float4(((diffuse_light + specular_light) * FSConst.fPreExposure) + emissive, 1.0f);
+	output.vAlbedo = float4(((diffuse_light + specular_light) * ViewConst.fPreExposure) + emissive, 1.0f);
 PERMELSE();
 PERMIF(BLEND_PASS);
 	const bool is_glass = HAS_FLAG(material.Flags, MF_GLASS);
@@ -811,33 +826,33 @@ PERMIF(BLEND_PASS);
 	const float out_alpha = select(is_glass, glass_alpha, base_alpha);
 	const float3 out_light = select(is_glass, glass_light, diffuse_light + specular_light);
 
-	output.vAlbedo = float4((out_light * FSConst.fPreExposure) + emissive, out_alpha);
+	output.vAlbedo = float4((out_light * ViewConst.fPreExposure) + emissive, out_alpha);
 PERMELSE();
-	output.vAlbedo = float4(((diffuse_light + specular_light) * FSConst.fPreExposure) + emissive, base_alpha);
+	output.vAlbedo = float4(((diffuse_light + specular_light) * ViewConst.fPreExposure) + emissive, base_alpha);
 PERMEND();
 PERMEND();
 
 PERMIF(DEBUG_VIEWS);
-	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_DEBUG_PROBE_IRRADIANCE)) {
-		output.vAlbedo = float4(probe_irradiance * FSConst.fPreExposure, 1.0f);
+	if (HAS_FLAG(ViewConst.Flags, DRAW_FLAG_DEBUG_PROBE_IRRADIANCE)) {
+		output.vAlbedo = float4(probe_irradiance * ViewConst.fPreExposure, 1.0f);
 	}
 
-	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_DEBUG_REFLECTION)) {
+	if (HAS_FLAG(ViewConst.Flags, DRAW_FLAG_DEBUG_REFLECTION)) {
 		const float3 mirror =
 			SampleReflectionProbes(input.vPositionWS, reflect(-V, geometric_normal), 0.0, float3(0.0, 0.0, 0.0),
 								   GetReflectionProbeCount(bReflectionProbes), bReflectionProbes,
 								   F_TextureName(tReflectionProbes), tReflectionProbes);
 
-		output.vAlbedo = float4(mirror * FSConst.fPreExposure, 1.0f);
+		output.vAlbedo = float4(mirror * ViewConst.fPreExposure, 1.0f);
 	}
 
-	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_DEBUG_REFLECTION_COVERAGE)) {
+	if (HAS_FLAG(ViewConst.Flags, DRAW_FLAG_DEBUG_REFLECTION_COVERAGE)) {
 		const float shade = 0.4 + (0.6 * saturate(dot(geometric_normal, V)));
 
 		output.vAlbedo = float4(ReflectionProbeCoverage(input.vPositionWS, bReflectionProbes) * shade, 1.0f);
 	}
 
-	if (HAS_FLAG(FSConst.Flags, DRAW_FLAG_DEBUG_PROBE_VISIBILITY)) {
+	if (HAS_FLAG(ViewConst.Flags, DRAW_FLAG_DEBUG_PROBE_VISIBILITY)) {
 		output.vAlbedo = float4(probe_visibility, probe_visibility, probe_visibility, 1.0f);
 	}
 PERMEND();

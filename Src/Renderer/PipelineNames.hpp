@@ -29,6 +29,12 @@ enum class ePipelineName : uint16
 	SSAODenoise,
 	SSAOBlur,
 
+	FogFast,
+	FogVolumetric,
+	FogTemporal,
+	FogDenoise,
+	FogApply,
+
 	NumPipelines
 };
 

@@ -143,7 +143,7 @@ private:
 
 	wxPanel* mpRootPanel = nullptr;
 
-	eEditorView mView = eEditorView::Perspective;
+	eEditorView mView = eEditorView::Viewport;
 
 	std::atomic<bool> mbCloseRequested = false;
 	std::atomic<bool> mbIsActive = true;

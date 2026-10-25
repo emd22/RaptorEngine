@@ -1033,10 +1033,10 @@ void RaptorEditor::UpdateCompiledMapViewLock()
 {
 	const bool is_compiled = IsCompiledMapOpen();
 
-	if (is_compiled && mView != eEditorView::Perspective) {
+	if (is_compiled && mView != eEditorView::Viewport) {
 		mViewBeforeCompiledMap = mView;
 		mbViewLockedByCompiledMap = true;
-		SetView(eEditorView::Perspective);
+		SetView(eEditorView::Viewport);
 	}
 	else if (!is_compiled && mbViewLockedByCompiledMap) {
 		mbViewLockedByCompiledMap = false;
@@ -1046,21 +1046,21 @@ void RaptorEditor::UpdateCompiledMapViewLock()
 
 void RaptorEditor::SetView(eEditorView view)
 {
-	if (view != eEditorView::Perspective && IsCompiledMapOpen()) {
+	if (view != eEditorView::Viewport && IsCompiledMapOpen()) {
 		LogWarning(LC_CORE, "The 2D views edit the prototype, open the .prx to use them");
 		mViewBeforeCompiledMap = view;
 		mbViewLockedByCompiledMap = true;
-		view = eEditorView::Perspective;
+		view = eEditorView::Viewport;
 	}
 
 	if (view != mView) {
 		mView = view;
 
-		if (view != eEditorView::Perspective && ControlManager::IsMouseLocked()) {
+		if (view != eEditorView::Viewport && ControlManager::IsMouseLocked()) {
 			ControlManager::ReleaseMouse();
 		}
 
-		if (view == eEditorView::Top) {
+		if (view == eEditorView::Architect) {
 			SetSimulating(false);
 		}
 
@@ -2017,7 +2017,8 @@ void RaptorEditor::TopViewCreateRoom(eViewPlane plane, Vec3f min, Vec3f max, boo
 	const uint32 piece_count = BuildRoomPieces(min, max, settings, pieces);
 
 	if (piece_count == 0) {
-		Warn("The room is too small for {} thick walls, make it bigger or check the depth field", settings.WallThickness);
+		Warn("The room is too small for {} thick walls, make it bigger or check the depth field",
+			 settings.WallThickness);
 		return;
 	}
 

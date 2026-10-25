@@ -326,13 +326,13 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 		mpPerspectiveButton->SetButtonSize(wxSize(scLetterButtonSize, scLetterButtonSize));
 		mpPerspectiveButton->SetToolTip("Fly around the level in 3D (Ctrl+1)");
 		mpPerspectiveButton->Bind(wxEVT_TOGGLEBUTTON, [](wxCommandEvent&)
-								  { thread::PostToGame([] { gEditor->SetView(eEditorView::Perspective); }); });
+								  { thread::PostToGame([] { gEditor->SetView(eEditorView::Viewport); }); });
 
 		mpTopButton = new OutlineToggleButton(parent, wxBitmap(), "2D");
 		mpTopButton->SetButtonSize(wxSize(scLetterButtonSize, scLetterButtonSize));
 		mpTopButton->SetToolTip("Top, front and side wireframe views for laying out brushes (Ctrl+2)");
-		mpTopButton->Bind(wxEVT_TOGGLEBUTTON,
-						  [](wxCommandEvent&) { thread::PostToGame([] { gEditor->SetView(eEditorView::Top); }); });
+		mpTopButton->Bind(wxEVT_TOGGLEBUTTON, [](wxCommandEvent&)
+						  { thread::PostToGame([] { gEditor->SetView(eEditorView::Architect); }); });
 
 		mpSplitButton = new OutlineToggleButton(parent, wxBitmap(), "Split");
 		mpSplitButton->SetToolTip("The 3D view and the 2D views together, with a draggable divider (Ctrl+3)");
@@ -1079,7 +1079,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 
 	ShowTool(mpCanvas->GetTool());
 	ShowPlane(mpCanvas->GetPlane());
-	ShowView(eEditorView::Perspective);
+	ShowView(eEditorView::Viewport);
 }
 
 wxSizer* EditorToolbar::GetSizer() { return mpSizer; }
@@ -1116,11 +1116,11 @@ void EditorToolbar::UpdateVisibility()
 
 void EditorToolbar::ShowView(eEditorView view)
 {
-	mpPerspectiveButton->SetValue(view == eEditorView::Perspective);
-	mpTopButton->SetValue(view == eEditorView::Top);
+	mpPerspectiveButton->SetValue(view == eEditorView::Viewport);
+	mpTopButton->SetValue(view == eEditorView::Architect);
 	mpSplitButton->SetValue(view == eEditorView::Split);
 
-	mbShows2D = (view != eEditorView::Perspective);
+	mbShows2D = (view != eEditorView::Viewport);
 
 	UpdateVisibility();
 }

@@ -41,17 +41,24 @@ PERMEND();
     uint uiMaterialIndex : ATTR0;
 };
 
-struct VSPushConsts
+struct ViewConsts
 {
     float4x4 mViewProjection;
-	uint uiObjectIndex;
-    uint uiMaterialIndex;
-    uint uiTileColumns;
-    // Unused by this pass, but declared to keep field offsets aligned with the full DrawPushConstants layout so
-    // uiBoneBase below lands on the right bytes.
-    uint uiFlags;
+    float4 vEyePosition;
     uint2 vTargetSize;
+    uint uiTileColumns;
+    uint uiTileRows;
+    uint Flags;
+    float fPreExposure;
+};
+
+struct DrawConsts
+{
+    uint uiObjectIndex;
+    uint uiMaterialIndex;
     uint uiBoneBase;
+    uint uiSkinnedDecalStart;
+    uint uiSkinnedDecalCount;
 };
 
 PERMIF(USE_SKINNING);
@@ -60,18 +67,20 @@ PERMEND();
 
 F_StructBuffer(bObjectBuffer, Object, 0, 0);
 
-[[vk::push_constant]] VSPushConsts VSConst;
+F_FrameData(ViewConsts, ViewConst, 2);
+
+[[vk::push_constant]] DrawConsts DrawConst;
 
 VSOutput main(VSInput input)
 {
     VSOutput output;
 
-    float4x4 world_matrix = bObjectBuffer[VSConst.uiObjectIndex + input.uiInstanceId].mWorld;
+    float4x4 world_matrix = bObjectBuffer[DrawConst.uiObjectIndex + input.uiInstanceId].mWorld;
 
-    float4x4 MVP = mul(world_matrix, VSConst.mViewProjection);
+    float4x4 MVP = mul(world_matrix, ViewConst.mViewProjection);
 
 PERMIF(USE_SKINNING);
-    const uint bone_base = VSConst.uiBoneBase;
+    const uint bone_base = DrawConst.uiBoneBase;
 
     float4x4 skin_xform = input.vJointWeights.x * bBones[bone_base + input.vJointIndices.x]
         + input.vJointWeights.y * bBones[bone_base + input.vJointIndices.y]
@@ -105,7 +114,7 @@ PERMEND();
     float4 position_ws = mul(position_ms, world_matrix);
 	output.vPositionWS = position_ws.xyz;
 
-	output.uiMaterialIndex = VSConst.uiMaterialIndex;
+	output.uiMaterialIndex = DrawConst.uiMaterialIndex;
 
     return output;
 }
@@ -152,16 +161,6 @@ PERMIF(USE_NORMAL_MAPS);
 F_Texture2D(tNormalMap, 1, 1)
 F_Texture2D(tORM, 2, 1)
 PERMEND();
-
-struct FSPushConsts
-{
-	float4x4 mViewProjection;
-	uint uiObjectIndex;
-	uint uiMaterialIndex;
-	uint uiTileColumns;
-};
-
-[[vk::push_constant]] FSPushConsts FSConst;
 
 FSOutput main(FSInput input)
 {

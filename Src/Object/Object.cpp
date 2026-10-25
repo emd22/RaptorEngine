@@ -535,73 +535,20 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 
 	FrameData* frame = gGraphics->GetFrame();
 
-	DrawPushConstants push_constants { .TargetSize = { gGraphics->Swapchain.Extent.X, gGraphics->Swapchain.Extent.Y } };
-	push_constants.ObjectId = GetDrawIndex();
+	gGraphics->FrameAlloc.Bind(frame->CmdBuffer, *pipeline,
+							   gGraphics->pRenderer->GetViewConstants(camera, mObjectLayer));
 
+	DrawPushConstants push_constants {};
+	push_constants.ObjectId = GetDrawIndex();
 	push_constants.MaterialIndex = mMaterialID.GetID();
-	push_constants.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
-	push_constants.TileRows = gGraphics->pRenderer->GetLightTileRows();
 	push_constants.BoneBase = BoneBufferBase;
 
-
-	// Only the probe capture faces themselves get the capture flag. Keying it off
-	// IsCapturePending() would also strip probe GI and SSAO from the main view for
-	// every frame of a grid bake.
-	if (gProbeManager != nullptr && gProbeManager->IsCapturingFaces()) {
-		push_constants.Flags |= eDrawFlags::ProbeCapture;
-
-		if (gProbeManager->IsCapturingBounce()) {
-			push_constants.Flags |= eDrawFlags::ProbeBounce;
-		}
-
-		if (gProbeManager->IsCapturingReflection()) {
-			push_constants.Flags |= eDrawFlags::ReflectionCapture;
-		}
-	}
-
-	const bool is_probe_capture = HasFlag(push_constants.Flags, eDrawFlags::ProbeCapture);
-	push_constants.PreExposure = is_probe_capture ? 1.0f : gGraphics->PreExposure;
-
-	if (gGraphics->bBakedSunActive && !is_probe_capture) {
-		push_constants.Flags |= eDrawFlags::BakedSun;
-	}
-
-	if (gGraphics->bBakedIndirectActive && !is_probe_capture) {
-		push_constants.Flags |= eDrawFlags::BakedIndirect;
-	}
+	const bool is_probe_capture = gProbeManager != nullptr && gProbeManager->IsCapturingFaces();
 
 	if (pSkeleton.IsValid() && !is_probe_capture) {
 		gDecalManager->GetSkinnedDecalRange(&(*pSkeleton), push_constants.SkinnedDecalStart,
 											push_constants.SkinnedDecalCount);
 	}
-
-	if (gGraphics->bOnlyRenderProbes) {
-		push_constants.Flags |= eDrawFlags::DebugIrradiance;
-	}
-
-	if (gGraphics->bRenderProbeVisibility) {
-		push_constants.Flags |= eDrawFlags::DebugProbeVisibility;
-	}
-
-	if (gGraphics->bDisableReflectionProbes) {
-		push_constants.Flags |= eDrawFlags::NoReflectionProbes;
-	}
-
-	if (!is_probe_capture && gGraphics->ReflectionDebugView == 1) {
-		push_constants.Flags |= eDrawFlags::DebugReflection;
-	}
-
-	if (!is_probe_capture && gGraphics->ReflectionDebugView == 2) {
-		push_constants.Flags |= eDrawFlags::DebugReflectionCoverage;
-	}
-
-	// Decals are placed in the world, and the view model only lines up with the world from the camera's position
-	if (mObjectLayer != eObjectLayer::WorldLayer) {
-		push_constants.Flags |= eDrawFlags::NoDecals;
-	}
-
-	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
-	memcpy(push_constants.EyePosition, camera.Position.mData, sizeof(float32) * 3);
 
 	gGraphics->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex | eShaderType::Pixel,
 								   push_constants);

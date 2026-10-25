@@ -37,6 +37,7 @@ enum eStringId
 	F_StructBuffer,
 	F_RWStructBuffer,
 	F_CBuffer,
+	F_FrameData,
 
 	// Test definitions
 	F_PARAMTEST,
@@ -64,6 +65,7 @@ static constexpr const char* scStrings[] = {
 	"F_StructBuffer",
 	"F_RWStructBuffer",
 	"F_CBuffer",
+	"F_FrameData",
 
 	// Test definitions
 	"F_PARAMTEST",
@@ -343,6 +345,15 @@ static void ParseCBufferDefinition(const std::vector<Slice<char>>& params, State
 	result.GetReflection().emplace_back(eShaderReflectionType::CBuffer, set, binding);
 }
 
+static void ParseFrameDataDefinition(const std::vector<Slice<char>>& params, State& state, Result& result)
+{
+	REQUIRE_PARAMS(params, 3);
+
+	const int32 set = ParamGetInt(params[2]);
+
+	result.GetReflection().emplace_back(eShaderReflectionType::CBuffer, set, 0);
+}
+
 static const PPFuncEntry PPFunctions[] = {
 	PPFuncEntry(FStr(F_PROGRAM), true, false, ParseProgramDefinition),
 	PPFuncEntry(FStr(F_REFLECT), true, false, ParseReflectionDefinition),
@@ -358,6 +369,7 @@ static const PPFuncEntry PPFunctions[] = {
 	PPFuncEntry(FStr(F_StructBuffer), true, true, ParseStructBufferDefinition),
 	PPFuncEntry(FStr(F_RWStructBuffer), true, true, ParseStructBufferDefinition),
 	PPFuncEntry(FStr(F_CBuffer), true, true, ParseCBufferDefinition),
+	PPFuncEntry(FStr(F_FrameData), true, true, ParseFrameDataDefinition),
 
 };
 

@@ -1,10 +1,12 @@
 #pragma once
 
+#include <Math/Rect.hpp>
 #include <Math/Vec2.hpp>
 #include <Renderer/PipelineDesc.hpp>
 #include <Renderer/PipelineKey.hpp>
 #include <Renderer/PipelineNames.hpp>
 #include <Renderer/RenderStage.hpp>
+#include <bit>
 
 namespace fx::renderer {
 
@@ -12,20 +14,18 @@ using ShadowTileIndex = uint32;
 
 static constexpr ShadowTileIndex ShadowTileIndexNull = UINT32_MAX;
 
-struct alignas(16) ShadowPushConstants
+struct alignas(16) ShadowViewConstants
 {
-	float32 CameraMatrix[16];
+	float32 ViewProjection[16];
+};
+
+struct ShadowPushConstants
+{
 	uint32 ObjectIndex = 0;
 	uint32 BoneBase = 0;
 	uint32 MaterialIndex = 0;
 };
 
-/// A rectangle of the shadow atlas, in texels
-struct ShadowAtlasRegion
-{
-	Vec2u Offset = Vec2u::scZero;
-	Vec2u Size = Vec2u::scZero;
-};
 
 class ShadowAtlas
 {
@@ -37,12 +37,34 @@ public:
 	static constexpr uint32 scSpotTileSize = 512;
 
 	static constexpr uint32 scSpotTilesPerRow = (scWidth - scDirectionalSize) / scSpotTileSize;
-	static constexpr uint32 scMaxSpotTiles = scSpotTilesPerRow * (scHeight / scSpotTileSize);
+	static constexpr uint32 scSpotTileRows = scHeight / scSpotTileSize;
+	static constexpr uint32 scMaxSpotTiles = scSpotTilesPerRow * scSpotTileRows;
+
+	static constexpr uint32 scFarDirectionalSize = 1024;
+	static constexpr uint32 scFarTilesPerSide = scFarDirectionalSize / scSpotTileSize;
+
+	static constexpr uint32 scFarTileMask = []
+	{
+		uint32 mask = 0;
+
+		for (uint32 row = scSpotTileRows - scFarTilesPerSide; row < scSpotTileRows; row++) {
+			for (uint32 column = scSpotTilesPerRow - scFarTilesPerSide; column < scSpotTilesPerRow; column++) {
+				mask |= (1U << ((row * scSpotTilesPerRow) + column));
+			}
+		}
+
+		return mask;
+	}();
+	static constexpr uint32 scUsableSpotTiles = scMaxSpotTiles - std::popcount(scFarTileMask);
 
 	static_assert(scDirectionalSize <= scHeight, "The directional region must fit in the atlas");
 
 	static_assert(scWidth == 4096 && scHeight == 2048, "Update SHADOW_ATLAS_WIDTH/HEIGHT in Shaders/Helper.hlsl");
-	static_assert(scMaxSpotTiles <= 32, "Spot tiles are tracked with a 32 bit mask");
+	static_assert(scMaxSpotTiles <= 32,
+				  "Not enough bits for spot tiles. There shouldn't be 32 shadow casting spotlights on screen at once!");
+	static_assert(scFarDirectionalSize % scSpotTileSize == 0, "The far region must cover whole spot tiles");
+	static_assert(scFarTilesPerSide <= scSpotTilesPerRow && scFarTilesPerSide <= scSpotTileRows,
+				  "The far region must fit in the spot tile area");
 
 public:
 	ShadowAtlas();
@@ -51,7 +73,7 @@ public:
 	 * @brief Starts a shadow pass that clears `region`, binds the shadow pipeline and points the viewport and scissor
 	 * at the region. The first pass after the atlas was invalidated clears the whole atlas instead.
 	 */
-	void BeginRegion(const ShadowAtlasRegion& region);
+	void BeginRegion(const URect& region);
 	void EndRegion();
 
 	/**
@@ -61,13 +83,14 @@ public:
 
 	bool MakeShadowDesc(ePipelineFeatures features, PipelineDesc& out_desc);
 
-	ShadowAtlasRegion GetDirectionalRegion() const;
-	ShadowAtlasRegion GetSpotTileRegion(ShadowTileIndex tile) const;
+	URect GetDirectionalRegion() const;
+	URect GetFarDirectionalRegion() const;
+	URect GetSpotTileRegion(ShadowTileIndex tile) const;
 
 	/**
 	 * @brief Writes the scale (xy) and offset (zw) that take a UV inside of `region` to a UV in the whole atlas.
 	 */
-	void GetRegionUVTransform(const ShadowAtlasRegion& region, float32 out_transform[4]) const;
+	void GetRegionUVTransform(const URect& region, float32 out_transform[4]) const;
 
 	/// Returns ShadowTileIndexNull if every tile is in use.
 	ShadowTileIndex AllocateSpotTile();

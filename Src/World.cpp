@@ -45,10 +45,7 @@ void World::Create()
 	pCVarBakedIndirect = gCVars->Set<int64>("r_baked_indirect", 1);
 }
 
-static bool IsTransparentMaterial(Material* mat)
-{
-	return (mat != nullptr && mat->IsTransparent());
-}
+static bool IsTransparentMaterial(Material* mat) { return (mat != nullptr && mat->IsTransparent()); }
 
 static bool CastsShadows(const Object& object)
 {
@@ -440,9 +437,13 @@ void World::ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Cam
 
 	ShadowPipelineSelector selector;
 
-	// Push constants definition
+	ShadowViewConstants view_consts;
+	memcpy(view_consts.ViewProjection, shadow_camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData,
+		   sizeof(float32) * 16);
+
+	const uint32 view_offset = gGraphics->FrameAlloc.Push(view_consts);
+
 	ShadowPushConstants consts;
-	memcpy(consts.CameraMatrix, shadow_camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(float32) * 16);
 
 	// The sun shadows rendered for a probe capture only come from casters the probes can see, so objects left out of
 	// the capture don't shadow it either
@@ -459,7 +460,8 @@ void World::ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Cam
 		}
 
 		Object* object = gObjectManager->GetObject(object_id);
-		if (object == nullptr || (is_probe_capture && (!object->IsProbeVisible() || object->HasTransparentMaterial()))) {
+		if (object == nullptr ||
+			(is_probe_capture && (!object->IsProbeVisible() || object->HasTransparentMaterial()))) {
 			continue;
 		}
 
@@ -474,11 +476,14 @@ void World::ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Cam
 		object->Update();
 		object->UpdateIfOutOfDate();
 
+		Pipeline& shadow_pipeline = selector.Select(object, cmd);
+		gGraphics->FrameAlloc.Bind(cmd, shadow_pipeline, view_offset);
+
 		// Push the direct index for the object id
 		consts.ObjectIndex = object->GetDrawIndex();
 		consts.BoneBase = object->BoneBufferBase;
 		consts.MaterialIndex = object->GetMaterialID().GetID();
-		gGraphics->SubmitPushConstants(cmd, selector.Select(object, cmd), eShaderType::Vertex, consts);
+		gGraphics->SubmitPushConstants(cmd, shadow_pipeline, eShaderType::Vertex, consts);
 		object->RenderPrimitive(cmd);
 	}
 }
@@ -516,7 +521,7 @@ void World::UpdateSpotShadows()
 				static bool sbWarned = false;
 				if (!sbWarned) {
 					LogWarning(LC_RENDER, "Shadow atlas is out of spot light tiles ({}), '{}' will not cast shadows",
-							   ShadowAtlas::scMaxSpotTiles, light->Name.Get());
+							   ShadowAtlas::scUsableSpotTiles, light->Name.Get());
 					sbWarned = true;
 				}
 
@@ -556,7 +561,7 @@ void World::UpdateSpotShadows()
 }
 
 
-void World::BeginShadowAtlasRegion(const ShadowAtlasRegion& region)
+void World::BeginShadowAtlasRegion(const URect& region)
 {
 	gShadowAtlas->BeginRegion(region);
 
@@ -586,7 +591,10 @@ void World::BakeSpotShadows()
 
 		ShadowPipelineSelector selector;
 
-		memcpy(consts.CameraMatrix, shadow.Matrix.RawData, sizeof(float32) * 16);
+		ShadowViewConstants view_consts;
+		memcpy(view_consts.ViewProjection, shadow.Matrix.RawData, sizeof(float32) * 16);
+
+		const uint32 view_offset = gGraphics->FrameAlloc.Push(view_consts);
 
 		const uint32 end_caster = bake.FirstCaster + bake.NumCasters;
 
@@ -601,10 +609,13 @@ void World::BakeSpotShadows()
 			// Casters out of view skip the forward pass, which is what normally uploads their matrix for this frame
 			gObjectManager->Submit(caster_id, caster->GetWorldMatrix());
 
+			Pipeline& shadow_pipeline = selector.Select(caster, cmd);
+			gGraphics->FrameAlloc.Bind(cmd, shadow_pipeline, view_offset);
+
 			consts.ObjectIndex = caster->GetDrawIndex();
 			consts.BoneBase = caster->BoneBufferBase;
 			consts.MaterialIndex = caster->GetMaterialID().GetID();
-			gGraphics->SubmitPushConstants(cmd, selector.Select(caster, cmd), eShaderType::Vertex, consts);
+			gGraphics->SubmitPushConstants(cmd, shadow_pipeline, eShaderType::Vertex, consts);
 			caster->RenderPrimitive(cmd);
 		}
 
@@ -756,20 +767,17 @@ void World::ExecutePrepassRenderList(renderer::PipelineHandle forward_pipeline)
 
 		object->Update();
 
-		DrawPushConstants consts { .TargetSize = { gGraphics->Swapchain.Extent.X, gGraphics->Swapchain.Extent.Y } };
-		consts.ObjectId = object->GetDrawIndex();
-		consts.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
-		consts.TileRows = gGraphics->pRenderer->GetLightTileRows();
-		consts.BoneBase = object->BoneBufferBase;
-
-		const Mat4f& cam_matrix = camera.GetCameraMatrix(object->GetObjectLayer());
-		memcpy(consts.CameraMatrix, cam_matrix.RawData, sizeof(Mat4f));
-
 		const MaterialID material_id = object->GetMaterialID();
 
 		CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
+		gGraphics->FrameAlloc.Bind(cmd, pipeline,
+								   gGraphics->pRenderer->GetViewConstants(camera, object->GetObjectLayer()));
+
+		DrawPushConstants consts {};
+		consts.ObjectId = object->GetDrawIndex();
 		consts.MaterialIndex = material_id.GetID();
+		consts.BoneBase = object->BoneBufferBase;
 		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex | eShaderType::Pixel, consts);
 
 		if (!gMaterialManager->BindWithPipeline(cmd, pipeline, material_id)) {
@@ -1168,6 +1176,14 @@ void World::Render(Camera* shadow_camera)
 			ExecuteShadowRenderList(GetShadowListPipeline(), gShadowRenderer->ShadowCamera, gGraphics->bBakedSunActive);
 		}
 
+		gShadowAtlas->EndRegion();
+	}
+
+	gGraphics->bFarSunShadowActive = render_sun_shadows && (gGraphics->GetFogMode() != eFogMode::Off);
+
+	if (gGraphics->bFarSunShadowActive) {
+		BeginShadowAtlasRegion(gShadowAtlas->GetFarDirectionalRegion());
+		ExecuteShadowRenderList(GetShadowListPipeline(), gShadowRenderer->FarShadowCamera, false);
 		gShadowAtlas->EndRegion();
 	}
 

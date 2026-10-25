@@ -2900,6 +2900,50 @@ void Blockout::LoadLegacyModels()
 	LoadModels(info.HasErrors() ? nullptr : info.GetEntry(HashStr32("objects")), scene_path + "/Models");
 }
 
+void Blockout::LoadFog(ConfigFile& info)
+{
+	renderer::FogSettings fog;
+
+	ConfigEntry* fog_entry = info.GetEntry(HashStr32("fog"));
+
+	if (fog_entry != nullptr) {
+		fog.bEnabled = (fog_entry->GetMemberValue<int64>(HashStr32("enabled"), 1) != 0);
+		fog.Density = fog_entry->GetMemberValue<float32>(HashStr32("density"), fog.Density);
+		fog.Height = fog_entry->GetMemberValue<float32>(HashStr32("height"), fog.Height);
+		fog.Falloff = fog_entry->GetMemberValue<float32>(HashStr32("falloff"), fog.Falloff);
+		fog.Haze = fog_entry->GetMemberValue<float32>(HashStr32("haze"), fog.Haze);
+		fog.Anisotropy = fog_entry->GetMemberValue<float32>(HashStr32("anisotropy"), fog.Anisotropy);
+		fog.AmbientScale = fog_entry->GetMemberValue<float32>(HashStr32("ambient"), fog.AmbientScale);
+
+		const Color color = fog_entry->GetMemberValue(HashStr32("color"), fog.Albedo);
+		fog.Albedo = Color::FromRGBA(color.R, color.G, color.B, 255);
+	}
+
+	gWorld->Fog = fog;
+}
+
+void Blockout::SaveFog(ConfigFile& info)
+{
+	const renderer::FogSettings& fog = gWorld->Fog;
+
+	if (fog == renderer::FogSettings {}) {
+		return;
+	}
+
+	ConfigEntry fog_entry = ConfigEntry::Struct("fog");
+
+	fog_entry.AddMember(ConfigEntry::Literal("enabled", static_cast<int64>(fog.bEnabled ? 1 : 0)));
+	fog_entry.AddMember(ConfigEntry::Literal("density", fog.Density));
+	fog_entry.AddMember(ConfigEntry::Literal("height", fog.Height));
+	fog_entry.AddMember(ConfigEntry::Literal("falloff", fog.Falloff));
+	fog_entry.AddMember(ConfigEntry::Literal("haze", fog.Haze));
+	WriteColorEntry(fog_entry, "color", fog.Albedo);
+	fog_entry.AddMember(ConfigEntry::Literal("anisotropy", fog.Anisotropy));
+	fog_entry.AddMember(ConfigEntry::Literal("ambient", fog.AmbientScale));
+
+	info.AddEntry(std::move(fog_entry));
+}
+
 void Blockout::SaveModels(ConfigFile& info)
 {
 	RemovePendingModels();
@@ -4662,6 +4706,8 @@ void Blockout::ResetToTemplate()
 	// Invalidate all shadows since we have replaced the lights
 	renderer::gShadowAtlas->Invalidate();
 
+	gWorld->Fog = renderer::FogSettings {};
+
 	gWorld->Player.TeleportTo(Vec3f(0.0, 2.0, 0.0));
 
 #ifdef FX_IS_EDITOR
@@ -4708,6 +4754,7 @@ ePrototypeLoadStatus Blockout::Load(const String& opened_path)
 	LoadLights(info);
 	LoadCamera(info);
 	LoadPlayerSpawn(info);
+	LoadFog(info);
 
 	// Remove the current blockout from the world
 	RemoveBlockoutFromWorld(pWorld);
@@ -4794,8 +4841,7 @@ static void StoreLastBlockoutPath(const String& path, const char* config_path)
 void Blockout::Save(const String& save_path)
 {
 	if (mbIsCompiledMap) {
-		LogError(LC_ASSET, "The prototype can't be saved while its compiled map is loaded, the compiled brushes "
-						   "would be lost. Open the prototype (.prx) to edit and save it.");
+		LogError(LC_ASSET, "Cannot save to compiled map. Open the prototype file to modify the map.");
 		return;
 	}
 
@@ -4820,6 +4866,7 @@ void Blockout::Save(const String& save_path)
 	SaveLights(info);
 	SaveCamera(info);
 	SavePlayerSpawn(info);
+	SaveFog(info);
 	SaveModels(info);
 
 	CommitEnteredSubviews();

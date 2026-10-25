@@ -99,6 +99,11 @@ public:
 	FX_FORCE_INLINE bool operator==(const Vec3f other) const;
 	bool operator==(const JPH::Vec3& other) const;
 
+	FX_FORCE_INLINE bool operator>(const Vec3f other) const;
+	FX_FORCE_INLINE bool operator<(const Vec3f other) const;
+	FX_FORCE_INLINE bool operator>=(const Vec3f other) const;
+	FX_FORCE_INLINE bool operator<=(const Vec3f other) const;
+
 	FX_FORCE_INLINE bool IsZero() const;
 	FX_FORCE_INLINE bool IsNearZero(const float32 tolerance = 0.00001) const;
 	FX_FORCE_INLINE bool IsCloseTo(const Vec3f other, const float32 tolerance = 0.00001) const;

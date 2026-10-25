@@ -50,11 +50,31 @@ FX_FORCE_INLINE Vec3d Vec3d::operator/(const Vec3d& other) const
 	return Vec3d(_mm256_div_pd(mIntrin, other.mIntrin));
 }
 
+FX_FORCE_INLINE bool Vec3d::operator>(const Vec3d& other) const
+{
+	return (_mm256_movemask_pd(_mm256_cmp_pd(mIntrin, other.mIntrin, _CMP_GT_OQ)) & 0b0111) == 0b0111;
+}
+
+FX_FORCE_INLINE bool Vec3d::operator<(const Vec3d& other) const
+{
+	return (_mm256_movemask_pd(_mm256_cmp_pd(mIntrin, other.mIntrin, _CMP_LT_OQ)) & 0b0111) == 0b0111;
+}
+
+FX_FORCE_INLINE bool Vec3d::operator>=(const Vec3d& other) const
+{
+	return (_mm256_movemask_pd(_mm256_cmp_pd(mIntrin, other.mIntrin, _CMP_GE_OQ)) & 0b0111) == 0b0111;
+}
+
+FX_FORCE_INLINE bool Vec3d::operator<=(const Vec3d& other) const
+{
+	return (_mm256_movemask_pd(_mm256_cmp_pd(mIntrin, other.mIntrin, _CMP_LE_OQ)) & 0b0111) == 0b0111;
+}
+
 FX_FORCE_INLINE double Vec3d::Dot(const Vec3d& other) const { return simd::Dot(mIntrin, other.mIntrin); }
 
 FX_FORCE_INLINE Vec3d Vec3d::Cross(const Vec3d& other) const
 {
-	using namespace SSE;
+	using namespace simd;
 
 	const DOUBLE4 a_yzxw = Permute4d<Shuffle_AY, Shuffle_AZ, Shuffle_AX, Shuffle_AW>(mIntrin);
 	const DOUBLE4 b_yzxw = Permute4d<Shuffle_AY, Shuffle_AZ, Shuffle_AX, Shuffle_AW>(other.mIntrin);

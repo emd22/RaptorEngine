@@ -39,8 +39,11 @@ enum class eEditorMode : uint32
 
 enum class eEditorView : uint32
 {
-	Perspective,
-	Top,
+	/// 3D view
+	Viewport,
+	/// Architect view
+	Architect,
+	// Split between 3D and Architect view
 	Split,
 
 	Count,

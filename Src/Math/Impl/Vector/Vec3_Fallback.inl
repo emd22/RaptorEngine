@@ -30,6 +30,26 @@ FX_FORCE_INLINE bool Vec3f::operator==(const Vec3f other) const
 	return dx && dy && dz;
 }
 
+FX_FORCE_INLINE bool Vec3f::operator>(const Vec3f other) const
+{
+	return (X > other.X) && (Y > other.Y) && (Z > other.Z);
+}
+
+FX_FORCE_INLINE bool Vec3f::operator<(const Vec3f other) const
+{
+	return (X < other.X) && (Y < other.Y) && (Z < other.Z);
+}
+
+FX_FORCE_INLINE bool Vec3f::operator>=(const Vec3f other) const
+{
+	return (X >= other.X) && (Y >= other.Y) && (Z >= other.Z);
+}
+
+FX_FORCE_INLINE bool Vec3f::operator<=(const Vec3f other) const
+{
+	return (X <= other.X) && (Y <= other.Y) && (Z <= other.Z);
+}
+
 FX_FORCE_INLINE Vec3f::Set(float32 x, float32 y, float32 z)
 {
 	X = x;

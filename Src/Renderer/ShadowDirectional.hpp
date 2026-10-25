@@ -16,6 +16,9 @@ public:
 	/// How far back along the sun direction the shadow camera sits from what it is centered on
 	static constexpr float32 scCameraDistance = 25.0f;
 
+	static constexpr float32 scFarCameraDistance = 150.0f;
+	static constexpr float32 scFarBounds = 200.0f;
+
 public:
 	ShadowDirectional();
 
@@ -24,6 +27,8 @@ public:
 	 * be normalized.
 	 */
 	void PlaceCamera(OrthoCamera& camera, const Vec3f target, const Vec3f sun_direction) const;
+
+	void PlaceFarCamera(const Vec3f target, const Vec3f sun_direction);
 
 	/**
 	 * @brief Checks that `position` is inside of `camera`'s shadow map and away from its edges, so that its
@@ -36,8 +41,13 @@ public:
 
 	~ShadowDirectional() = default;
 
+private:
+	static void PlaceOrthoCamera(OrthoCamera& camera, const Vec3f target, const Vec3f sun_direction,
+								 float32 distance, float32 resolution);
+
 public:
 	OrthoCamera ShadowCamera;
+	OrthoCamera FarShadowCamera;
 
 	/// Size of the directional region of the shadow atlas
 	Vec2u ShadowMapSize = Vec2u::scZero;

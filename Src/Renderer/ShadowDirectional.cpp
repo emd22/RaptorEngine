@@ -5,14 +5,32 @@ namespace fx::renderer {
 ShadowDirectional::ShadowDirectional() : ShadowMapSize(ShadowAtlas::scDirectionalSize, ShadowAtlas::scDirectionalSize)
 {
 	ShadowCamera.Update();
+
+	FarShadowCamera.SetBounds(scFarBounds, scFarBounds);
+	FarShadowCamera.SetNearPlane(0.1f);
+	FarShadowCamera.SetFarPlane(400.0f);
+	FarShadowCamera.UpdateProjectionMatrix();
+	FarShadowCamera.UpdateCameraMatrix();
 }
 
 void ShadowDirectional::PlaceCamera(OrthoCamera& camera, const Vec3f target, const Vec3f sun_direction) const
 {
-	camera.Position = target + (sun_direction * scCameraDistance);
+	PlaceOrthoCamera(camera, target, sun_direction, scCameraDistance, static_cast<float32>(ShadowMapSize.X));
+}
+
+void ShadowDirectional::PlaceFarCamera(const Vec3f target, const Vec3f sun_direction)
+{
+	PlaceOrthoCamera(FarShadowCamera, target, sun_direction, scFarCameraDistance,
+					 static_cast<float32>(ShadowAtlas::scFarDirectionalSize));
+}
+
+void ShadowDirectional::PlaceOrthoCamera(OrthoCamera& camera, const Vec3f target, const Vec3f sun_direction,
+										 float32 distance, float32 resolution)
+{
+	camera.Position = target + (sun_direction * distance);
 
 	Vec3f snapped_target = target;
-	camera.ResolveViewToTexels(camera.Position, snapped_target, Vec3f::sUp, static_cast<float32>(ShadowMapSize.X));
+	camera.ResolveViewToTexels(camera.Position, snapped_target, Vec3f::sUp, resolution);
 
 	camera.ViewMatrix.LookAt(camera.Position, snapped_target, Vec3f::sUp);
 	camera.UpdateCameraMatrix();

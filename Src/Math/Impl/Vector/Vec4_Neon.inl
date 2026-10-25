@@ -82,6 +82,26 @@ Vec4f Vec4f::operator*(const Vec4f other) const { return Vec4f(vmulq_f32(mIntrin
 
 Vec4f Vec4f::operator/(const Vec4f other) const { return Vec4f(vdivq_f32(mIntrin, other.mIntrin)); }
 
+FX_FORCE_INLINE bool Vec4f::operator>(const Vec4f other) const
+{
+	return vminvq_u32(vcgtq_f32(mIntrin, other.mIntrin)) == UINT32_MAX;
+}
+
+FX_FORCE_INLINE bool Vec4f::operator<(const Vec4f other) const
+{
+	return vminvq_u32(vcltq_f32(mIntrin, other.mIntrin)) == UINT32_MAX;
+}
+
+FX_FORCE_INLINE bool Vec4f::operator>=(const Vec4f other) const
+{
+	return vminvq_u32(vcgeq_f32(mIntrin, other.mIntrin)) == UINT32_MAX;
+}
+
+FX_FORCE_INLINE bool Vec4f::operator<=(const Vec4f other) const
+{
+	return vminvq_u32(vcleq_f32(mIntrin, other.mIntrin)) == UINT32_MAX;
+}
+
 
 ///////////////////////////////
 // Vec + Scalar Operators

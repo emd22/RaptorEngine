@@ -95,9 +95,9 @@ static constexpr uint32 ToolBit(eEditorTool tool) { return 1u << static_cast<uin
 static constexpr uint32 scBrushEditTools = ToolBit(eEditorTool::Face) | ToolBit(eEditorTool::Vertex);
 
 static constexpr uint32 scVisTools = ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Rotate) |
-									 ToolBit(eEditorTool::Create) | ToolBit(eEditorTool::Arch) | ToolBit(eEditorTool::Room) |
-									 ToolBit(eEditorTool::Curve) | ToolBit(eEditorTool::Decal) |
-									 ToolBit(eEditorTool::Clip);
+									 ToolBit(eEditorTool::Create) | ToolBit(eEditorTool::Arch) |
+									 ToolBit(eEditorTool::Room) | ToolBit(eEditorTool::Curve) |
+									 ToolBit(eEditorTool::Decal) | ToolBit(eEditorTool::Clip);
 
 static constexpr uint32 scDataTools[static_cast<uint32>(eDataFilter::Count)] = {
 	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Light),
@@ -413,6 +413,9 @@ EditorPanelState RaptorEditor::BuildPanelState()
 							  !gWorld->pPrototype->IsBakedSunCurrent(position);
 	}
 
+	world.Fog = gWorld->Fog;
+	world.FogQuality = std::clamp<int64>(gCVars->Get("r_fog", int64 { 2 }), 0, 2);
+
 	const uint32 probe_count = gProbeManager->GetReflectionProbeCount();
 
 	if (gProbeManager->IsBakingReflections()) {
@@ -684,8 +687,8 @@ void RaptorEditor::SetSimulating(bool simulating)
 			ClearSelection();
 			mLightEditor.Deselect();
 
-			if (mView == eEditorView::Top) {
-				SetView(eEditorView::Perspective);
+			if (mView == eEditorView::Architect) {
+				SetView(eEditorView::Viewport);
 			}
 		}
 		else {
@@ -1086,8 +1089,8 @@ void RaptorEditor::DeleteObject(Object* object, int32 group_size)
 	const Brush::PlaneList planes = (brush != nullptr) ? brush->Planes
 													   : Brush::FromBox(object->Bounds.Min, object->Bounds.Max).Planes;
 
-	EmplaceEditOperation<DeleteOperation>(
-		object, planes, ObjectSnapshot::Capture(*object, object->GetMaterialID()), group_size);
+	EmplaceEditOperation<DeleteOperation>(object, planes, ObjectSnapshot::Capture(*object, object->GetMaterialID()),
+										  group_size);
 }
 
 static bool IsCreatableDataKind(eDataFilter filter)
@@ -1189,6 +1192,16 @@ void RaptorEditor::SetSunAngles(float32 azimuth_degrees, float32 elevation_degre
 	const Vec3f direction(elevation_cos * azimuth_sin, elevation_sin, elevation_cos * azimuth_cos);
 
 	sun->SetPosition(direction * length);
+	MarkModified();
+}
+
+void RaptorEditor::SetFog(const renderer::FogSettings& fog)
+{
+	if (gWorld->Fog == fog) {
+		return;
+	}
+
+	gWorld->Fog = fog;
 	MarkModified();
 }
 
@@ -1630,8 +1643,8 @@ static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter
 	if (!keep_cutter) {
 		const Brush* cutter_brush = gWorld->pPrototype->GetBrush(cutter);
 
-		ops.push_back(std::make_unique<DeleteOperation>(
-			cutter, cutter_brush->Planes, ObjectSnapshot::Capture(*cutter, cutter->GetMaterialID())));
+		ops.push_back(std::make_unique<DeleteOperation>(cutter, cutter_brush->Planes,
+														ObjectSnapshot::Capture(*cutter, cutter->GetMaterialID())));
 		op_object_ids.push_back(cutter->ID);
 	}
 
@@ -1722,7 +1735,7 @@ bool RaptorEditor::CreateSubviewFromSelection(const String& name)
 	}
 
 	if (blockout->IsCompiledMap()) {
-		Warn("Open the prototype (.prx) to make subviews, a compiled map can't be edited");
+		Warn("Open the prototype to make subviews, a compiled map cannot be edited");
 		return false;
 	}
 

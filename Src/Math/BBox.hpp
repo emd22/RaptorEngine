@@ -25,6 +25,8 @@ public:
 		return *this;
 	}
 
+	BBox AddMargin(const Vec3f margin) const;
+
 	BBox operator+(const BBox& other) const;
 	BBox& operator+=(const BBox& other);
 

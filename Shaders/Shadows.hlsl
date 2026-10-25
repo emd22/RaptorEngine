@@ -34,16 +34,21 @@ PERMEND();
 };
 
 
-struct VSPushConsts
+struct ShadowViewConsts
 {
-    float4x4 mCameraMatrix;
+    float4x4 mViewProjection;
+};
+
+struct DrawConsts
+{
     uint uiObjectIndex;
     uint uiBoneBase;
     uint uiMaterialIndex;
 };
 
+F_FrameData(ShadowViewConsts, ViewConst, 2);
 
-[[vk::push_constant]] VSPushConsts VSConst;
+[[vk::push_constant]] DrawConsts DrawConst;
 
 F_StructBuffer(bObjectBuffer, Object, 0, 0);
 
@@ -54,11 +59,11 @@ PERMEND();
 VSOutput main(VSInput input)
 {
     VSOutput output;
-    float4x4 model_matrix = bObjectBuffer[VSConst.uiObjectIndex + input.uiInstanceId].mWorld;
-    float4x4 MVP = mul(model_matrix, VSConst.mCameraMatrix);
+    float4x4 model_matrix = bObjectBuffer[DrawConst.uiObjectIndex + input.uiInstanceId].mWorld;
+    float4x4 MVP = mul(model_matrix, ViewConst.mViewProjection);
 
 PERMIF(USE_SKINNING);
-    const uint bone_base = VSConst.uiBoneBase;
+    const uint bone_base = DrawConst.uiBoneBase;
 
     float4x4 skin_xform = input.vJointWeights.x * bBones[bone_base + input.vJointIndices.x]
         + input.vJointWeights.y * bBones[bone_base + input.vJointIndices.y]
@@ -74,7 +79,7 @@ PERMEND();
 
 PERMIF(ALPHA_MASK);
     output.vUV = input.vUV;
-    output.uiMaterialIndex = VSConst.uiMaterialIndex;
+    output.uiMaterialIndex = DrawConst.uiMaterialIndex;
 PERMEND();
 
 	return output;

@@ -31,7 +31,7 @@ struct VSOutput
 	float2 vDepthSoftness : TEXCOORD1;
 };
 
-struct PushConsts
+struct ParticleConsts
 {
 	float4x4 mViewProjection;
 	float4 vCameraRight;
@@ -43,7 +43,7 @@ struct PushConsts
 
 F_StructBuffer(bParticles, ParticleData, 0, 0);
 
-[[vk::push_constant]] PushConsts Const;
+F_FrameData(ParticleConsts, Const, 1);
 
 static const float2 scCorners[6] = {
 	float2(-1.0, -1.0), float2(1.0, -1.0), float2(1.0, 1.0),
@@ -125,7 +125,7 @@ struct FSOutput
 	float4 vColor : SV_TARGET0;
 };
 
-struct PushConsts
+struct ParticleConsts
 {
 	float4x4 mViewProjection;
 	float4 vCameraRight;
@@ -135,7 +135,7 @@ struct PushConsts
 	float4 vDepthParams;
 };
 
-[[vk::push_constant]] PushConsts Const;
+F_FrameData(ParticleConsts, Const, 1);
 
 F_Texture2D(tAtlas, 1, 0)
 F_Texture2D(tDepth, 2, 0)

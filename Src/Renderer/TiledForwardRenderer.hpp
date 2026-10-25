@@ -1,11 +1,14 @@
 #pragma once
 
 #include "Backend/Descriptors.hpp"
+#include "Backend/Pipeline.hpp"
 #include "Backend/Shader.hpp"
 #include "PipelineDesc.hpp"
 #include "PipelineNames.hpp"
 #include "RenderStage.hpp"
 #include "Vertex.hpp"
+
+#include <Object/ObjectLayer.hpp>
 
 namespace fx {
 class Camera;
@@ -18,12 +21,12 @@ struct FrameData;
 class CommandBuffer;
 
 
-struct alignas(16) CompositionPushConsts
+struct alignas(16) CompositionConsts
 {
 	uint32 FrameExtent[2];
 };
 
-struct alignas(16) SSAOPushConsts
+struct alignas(16) SSAOConsts
 {
 	float32 InvProjection[16];
 	float32 Projection[16];
@@ -36,10 +39,56 @@ struct alignas(16) SSAOPushConsts
 	float32 FinalValuePower;
 };
 
-struct alignas(16) SSAOBlurPushConsts
+struct alignas(16) SSAOBlurConsts
 {
 	float32 TexelSize[2];
 	float32 BlurBeta;
+};
+
+struct alignas(16) FogConsts
+{
+	float32 FarSunMatrix[16];
+	float32 FarSunAtlasRect[4];
+	float32 Rays[4][4];
+	float32 OriginAndDensity[4];
+	float32 CameraOffsetAndHaze[4];
+	float32 AlbedoAndFalloff[4];
+	float32 DepthA;
+	float32 DepthB;
+	float32 MarchDistance;
+	float32 PreExposure;
+	float32 Anisotropy;
+	float32 AmbientScale;
+	uint32 TileColumns;
+	uint32 TileRows;
+	uint32 StepCount;
+	uint32 Flags;
+	float32 JitterOffset;
+	uint32 NoiseShift;
+	float32 Pad[2];
+};
+
+struct alignas(16) FogTemporalConsts
+{
+	float32 PrevCameraMatrix[16];
+	float32 Rays[4][4];
+	float32 EyeAndBlend[4];
+	float32 DepthParams[2];
+	uint32 HistoryValid;
+	uint32 Pad;
+};
+
+struct alignas(16) FogResolveConsts
+{
+	float32 DepthParams[2];
+};
+
+enum class eFogFlags : uint32
+{
+	None = 0,
+	ProbeSunVisibility = 0x01,
+	FarSunShadow = 0x02,
+	NearSunDynamicOnly = 0x04,
 };
 
 
@@ -95,6 +144,7 @@ private:
 	void CreateDepthNormalPSO();
 	void CreateSSAOPSO();
 	void CreateSSAOBlurPSO();
+	void CreateFogPSO();
 	void CreateDebugLayerPSO();
 	void CreateDebugSolidPSO();
 	void CreateDebugOverlayPSO();
@@ -106,6 +156,7 @@ private:
 	void CreateSSAOPass();
 	void CreateSSAOBlurPass();
 	void CreateParticlePass();
+	void CreateFogPasses();
 
 	// Lighting
 	// void CreateLightVolumePipeline();
@@ -141,6 +192,8 @@ public:
 	FX_FORCE_INLINE uint32 GetLightTileColumns() const { return mLightTileColumns; }
 	FX_FORCE_INLINE uint32 GetLightTileRows() const { return mLightTileRows; }
 
+	uint32 GetViewConstants(const Camera& camera, eObjectLayer layer);
+
 	/// Depth + Normal prepass
 	RenderStage Prepass;
 	/// Main Forward+ lit pass
@@ -152,6 +205,10 @@ public:
 	/// SSAO blur pass
 	RenderStage SSAODenoisePass;
 	RenderStage SSAOBlurPass;
+	RenderStage FogPass;
+	RenderStage FogTemporalPass;
+	RenderStage FogDenoisePass;
+	RenderStage FogApplyPass;
 	/// Composition pass, combine results from all passes
 	RenderStage CompPass;
 
@@ -170,6 +227,15 @@ private:
 	/// Decal atlases that the persistent descriptor set was built with
 	Image* mpDecalAtlas = nullptr;
 	Image* mpDecalNormalAtlas = nullptr;
+
+	struct CachedViewConstants
+	{
+		ViewConstants Consts;
+		uint32 Offset = 0;
+		uint32 Generation = UINT32_MAX;
+	};
+
+	CachedViewConstants mCachedViews[2];
 };
 
 } // namespace fx::renderer

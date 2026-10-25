@@ -142,6 +142,26 @@ FX_FORCE_INLINE bool Vec3f::operator==(const Vec3f other) const
 	return static_cast<bool>(_mm_test_all_ones(cmp_v));
 }
 
+FX_FORCE_INLINE bool Vec3f::operator>(const Vec3f other) const
+{
+	return (_mm_movemask_ps(_mm_cmpgt_ps(mIntrin, other.mIntrin)) & 0b0111) == 0b0111;
+}
+
+FX_FORCE_INLINE bool Vec3f::operator<(const Vec3f other) const
+{
+	return (_mm_movemask_ps(_mm_cmplt_ps(mIntrin, other.mIntrin)) & 0b0111) == 0b0111;
+}
+
+FX_FORCE_INLINE bool Vec3f::operator>=(const Vec3f other) const
+{
+	return (_mm_movemask_ps(_mm_cmpge_ps(mIntrin, other.mIntrin)) & 0b0111) == 0b0111;
+}
+
+FX_FORCE_INLINE bool Vec3f::operator<=(const Vec3f other) const
+{
+	return (_mm_movemask_ps(_mm_cmple_ps(mIntrin, other.mIntrin)) & 0b0111) == 0b0111;
+}
+
 FX_FORCE_INLINE Vec3f Vec3f::operator+(const Vec3f other) const
 {
 	__m128 result = _mm_add_ps(mIntrin, other.mIntrin);

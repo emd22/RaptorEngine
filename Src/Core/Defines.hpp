@@ -32,6 +32,10 @@
 
 // #define FX_NO_DEBUG_ASSERTS
 
+/// Include checks for out of bound inserts or accesses for the core array containers.
+/// Incurs a performance penalty to Release builds and affects inlining/branch prediction.
+// #define FX_DEBUG_ARRAY_BOUNDS_CHECK 1
+
 
 ////////////////////////////////
 // Platform/Compiler macros

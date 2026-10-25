@@ -12,6 +12,7 @@
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
 #include <Object/ObjectFlags.hpp>
+#include <Renderer/FogSettings.hpp>
 
 namespace fx::editor {
 
@@ -95,6 +96,9 @@ struct WorldPanelState
 	float32 SunIntensity = 0.0f;
 	float32 SunAzimuthDegrees = 0.0f;
 	float32 SunElevationDegrees = 0.0f;
+
+	renderer::FogSettings Fog;
+	int64 FogQuality = 0;
 
 	bool operator==(const WorldPanelState& other) const = default;
 };

@@ -17,6 +17,7 @@ FX_SET_MODULE_NAME("Pipeline")
 namespace fx::renderer {
 
 static VkPipeline spBoundPipeline = nullptr;
+static uint32 sBindSerial = 0;
 
 
 /////////////////////////////////////
@@ -322,6 +323,7 @@ void Pipeline::Bind(const CommandBuffer& cmd) const
 	}
 
 	vkCmdBindPipeline(cmd.Get(), GetBindPoint(), InternalPipeline);
+	++sBindSerial;
 
 	if (!bIsCompute) {
 		vkCmdSetCullMode(cmd.Get(), DefaultCullMode);
@@ -329,6 +331,8 @@ void Pipeline::Bind(const CommandBuffer& cmd) const
 
 	spBoundPipeline = this->InternalPipeline;
 }
+
+uint32 Pipeline::GetBindSerial() { return sBindSerial; }
 
 void Pipeline::SetDoubleSided(const CommandBuffer& cmd, bool double_sided) const
 {

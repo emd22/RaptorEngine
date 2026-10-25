@@ -74,12 +74,40 @@ FX_FORCE_INLINE Vec3d Vec3d::operator/(const Vec3d& other) const
 	return Vec3d(result);
 }
 
+FX_FORCE_INLINE bool Vec3d::operator>(const Vec3d& other) const
+{
+	const uint64x2_t xy = vcgtq_f64(mIntrin.val[0], other.mIntrin.val[0]);
+	const uint64x2_t zw = vsetq_lane_u64(UINT64_MAX, vcgtq_f64(mIntrin.val[1], other.mIntrin.val[1]), 1);
+	return vminv_u32(vmovn_u64(vandq_u64(xy, zw))) == UINT32_MAX;
+}
+
+FX_FORCE_INLINE bool Vec3d::operator<(const Vec3d& other) const
+{
+	const uint64x2_t xy = vcltq_f64(mIntrin.val[0], other.mIntrin.val[0]);
+	const uint64x2_t zw = vsetq_lane_u64(UINT64_MAX, vcltq_f64(mIntrin.val[1], other.mIntrin.val[1]), 1);
+	return vminv_u32(vmovn_u64(vandq_u64(xy, zw))) == UINT32_MAX;
+}
+
+FX_FORCE_INLINE bool Vec3d::operator>=(const Vec3d& other) const
+{
+	const uint64x2_t xy = vcgeq_f64(mIntrin.val[0], other.mIntrin.val[0]);
+	const uint64x2_t zw = vsetq_lane_u64(UINT64_MAX, vcgeq_f64(mIntrin.val[1], other.mIntrin.val[1]), 1);
+	return vminv_u32(vmovn_u64(vandq_u64(xy, zw))) == UINT32_MAX;
+}
+
+FX_FORCE_INLINE bool Vec3d::operator<=(const Vec3d& other) const
+{
+	const uint64x2_t xy = vcleq_f64(mIntrin.val[0], other.mIntrin.val[0]);
+	const uint64x2_t zw = vsetq_lane_u64(UINT64_MAX, vcleq_f64(mIntrin.val[1], other.mIntrin.val[1]), 1);
+	return vminv_u32(vmovn_u64(vandq_u64(xy, zw))) == UINT32_MAX;
+}
+
 
 FX_FORCE_INLINE double Vec3d::Dot(const Vec3d& other) const { return simd::Dot(mIntrin, other.mIntrin); }
 
 FX_FORCE_INLINE Vec3d Vec3d::Cross(const Vec3d& other) const
 {
-	using namespace Neon;
+	using namespace simd;
 
 	const DOUBLE4 a_yzxw = Permute4d<Shuffle_AY, Shuffle_AZ, Shuffle_AX, Shuffle_AW>(mIntrin);
 	const DOUBLE4 b_yzxw = Permute4d<Shuffle_AY, Shuffle_AZ, Shuffle_AX, Shuffle_AW>(other.mIntrin);

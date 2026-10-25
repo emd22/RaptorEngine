@@ -6,6 +6,7 @@
 #include <Core/Types.hpp>
 #include <Renderer/Backend/DescriptorCache.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 #include <algorithm>
 
 namespace fx::renderer {
@@ -282,6 +283,12 @@ void PipelineCache::Bind(const PipelineHandle handle, const CommandBuffer& cmd)
 		Pipeline::DescriptorRef& desc_ref = pl.DescriptorIDs[i];
 		Assert(desc_ref.pSet != nullptr);
 
+		if (desc_ref.SetIndex == pl.FrameDataSet) {
+			AssertMsg(mFrameDataOffset != UINT32_MAX, "Pipeline needs frame data, call SetFrameData() before Bind()");
+			gGraphics->FrameAlloc.Bind(cmd, pl, mFrameDataOffset);
+			continue;
+		}
+
 		desc_ref.pSet->Bind(desc_ref.SetIndex, cmd, pl, Slice<uint32>(mOffsets[desc_ref.SetIndex]));
 	}
 
@@ -437,6 +444,7 @@ void PipelineCache::Reset()
 	}
 
 	mOffsets.Size = 0;
+	mFrameDataOffset = UINT32_MAX;
 }
 
 

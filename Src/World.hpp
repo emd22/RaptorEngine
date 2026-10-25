@@ -9,6 +9,7 @@
 #include <Object/Object.hpp>
 #include <Player.hpp>
 #include <Renderer/Camera.hpp>
+#include <Renderer/FogSettings.hpp>
 #include <Renderer/Light.hpp>
 #include <Renderer/LightList.hpp>
 #include <Renderer/RenderList.hpp>
@@ -135,7 +136,7 @@ private:
 	void BakeSpotShadows();
 
 	/// Starts a shadow pass over one region of the shadow atlas and binds the shadow pipeline's descriptors.
-	void BeginShadowAtlasRegion(const renderer::ShadowAtlasRegion& region);
+	void BeginShadowAtlasRegion(const URect& region);
 
 	/**
 	 * @brief Appends the shadow casters (and their attached nodes) from every tile that a sphere touches. Skinned
@@ -206,6 +207,8 @@ public:
 	} PlayerSpawn;
 
 	void RespawnPlayer() { Player.SpawnAt(PlayerSpawn.Position, PlayerSpawn.Direction); }
+
+	renderer::FogSettings Fog;
 
 	Blockout* pPrototype = nullptr;
 	String PrototypePath;

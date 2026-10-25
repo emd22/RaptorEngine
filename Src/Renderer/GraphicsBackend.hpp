@@ -6,6 +6,7 @@
 #include "Backend/Swapchain.hpp"
 #include "Backend/Synchro.hpp"
 #include "DeletionObject.hpp"
+#include "FrameAllocator.hpp"
 #include "GpuProfiler.hpp"
 #include "TiledForwardRenderer.hpp"
 #include "UniformBuffer.hpp"
@@ -33,6 +34,13 @@ enum class eFrameResult
 	Success,
 	GraphicsOutOfDate,
 	RenderError,
+};
+
+enum class eFogMode : int64
+{
+	Off = 0,
+	Fast = 1,
+	Volumetric = 2,
 };
 
 class TiledForwardRenderer;
@@ -79,6 +87,10 @@ public:
 	void BeginGeometry();
 
 	void RenderEarlyFrameEffects(Camera& camera);
+
+	void RenderFog(Camera& camera);
+
+	eFogMode GetFogMode() const;
 
 	void DoComposition(Camera& render_cam);
 
@@ -233,6 +245,8 @@ public:
 	/// large skeletons quickly go past the 64KB range a uniform buffer is limited to.
 	Uniforms BoneBuffer;
 
+	FrameAllocator FrameAlloc;
+
 	///////////////////////////////////
 	// Forward+ Tiled Lighting
 	///////////////////////////////////
@@ -303,6 +317,7 @@ public:
 	Image* pLightmapIrradiance = nullptr;
 	bool bBakedSunActive = false;
 	bool bBakedIndirectActive = false;
+	bool bFarSunShadowActive = false;
 
 	/// Times the stages of the GPU frame
 	GpuProfiler Profiler;
@@ -348,6 +363,9 @@ private:
 protected:
 	uint32 mFrameNumber = 0;
 	std::atomic_uint32_t mInternalFrameCounter = 0;
+
+	Mat4f mFogPrevCameraMatrix = Mat4f::scIdentity;
+	uint32 mFogHistoryFrame = UINT32_MAX;
 
 	// TSQueue<DeletionObject> mDeletionQueue;
 };

@@ -470,6 +470,8 @@ private:
 	void SaveCamera(ConfigFile& info);
 	void LoadPlayerSpawn(ConfigFile& info);
 	void SavePlayerSpawn(ConfigFile& info);
+	void LoadFog(ConfigFile& info);
+	void SaveFog(ConfigFile& info);
 	void AddOrUpdateLightFromEntry(const ConfigEntry& light_entry);
 
 	/**

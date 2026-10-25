@@ -5,6 +5,7 @@
 #include "Backend/Util.hpp"
 #include "Backend/VertexDescription.hpp"
 #include "Globals.hpp"
+#include "GraphicsBackend.hpp"
 #include "PipelineCache.hpp"
 #include "RenderStage.hpp"
 #include "ShaderCache.hpp"
@@ -32,6 +33,7 @@ void PSOBuild::BeginPipeline(Pipeline& pipeline, const ePipelineName name, const
 	mPipelineName = name;
 	mDebugName = debug_name;
 	mpPipeline = &pipeline;
+	mpPipeline->FrameDataSet = Pipeline::scNoFrameData;
 
 	if (!mpPipeline->DescriptorIDs.IsInited()) {
 		mpPipeline->DescriptorIDs.InitCapacity(8);
@@ -345,6 +347,7 @@ void PSOBuild::ReuseDS(ePipelineName other_pso)
 	// Copy the descriptor ref's from the other pso
 	SetFlag(mFlags, ePSOBuildFlags::ReuseDescriptors);
 	mpPipeline->DescriptorIDs.CloneFrom(gPipelineCache->Request(other_pso).DescriptorIDs);
+	mpPipeline->FrameDataSet = gPipelineCache->Request(other_pso).FrameDataSet;
 }
 
 void PSOBuild::AddBuffer(uint32 bind_index, uint32 set_index, eShaderType shader_stages, RawGpuBuffer* buffer,
@@ -373,6 +376,15 @@ void PSOBuild::AddImageFromTarget(uint32 bind_index, uint32 set_index, eShaderTy
 	AssertMsg(target != nullptr, "Target must be valid");
 
 	mDescriptorEntries[set_index].Insert(DescriptorEntry::AsImage(bind_index, shader_stages, &target->Image, sampler));
+}
+
+void PSOBuild::AddFrameData(uint32 set_index)
+{
+	AssertMsg(HasFlag(mFlags, ePSOBuildFlags::ReuseDescriptors) == false,
+			  "Cannot build descriptors when already inheriting them from another pipeline");
+
+	mDescriptorEntries[set_index].Insert(gGraphics->FrameAlloc.GetDescriptorEntry());
+	mpPipeline->FrameDataSet = set_index;
 }
 
 /**

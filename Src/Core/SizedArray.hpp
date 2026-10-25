@@ -8,7 +8,6 @@
 #include <stdio.h>
 
 #include <Core/Allocator.hpp>
-#include <Core/Allocator.hpp>
 #include <Engine.hpp>
 #include <cstdlib>
 #include <initializer_list>
@@ -63,9 +62,11 @@ public:
 	{
 		SizedArray<TElementType> clone;
 		clone.InitCapacity(other.Capacity);
+
 		for (uint32 i = 0; i < other.Size; i++) {
 			clone.Insert(other[i]);
 		}
+
 		return std::move(clone);
 	}
 
@@ -74,9 +75,6 @@ public:
 
 	SizedArray(size_t element_count) : Capacity(element_count)
 	{
-#ifdef FX_SIZED_ARRAY_DEBUG
-		LogDebug("Allocating SizedArray of capacity {:d} (type: {:s})", Capacity, typeid(TElementType).name());
-#endif
 		InternalAllocateArray(element_count);
 		Size = 0;
 	}
@@ -108,10 +106,6 @@ public:
 		}
 
 		TAllocator::FreeRaw(static_cast<void*>(pData));
-
-#ifdef FX_SIZED_ARRAY_DEBUG
-		LogDebug("Freeing SizedArray of size {:d} (type: {:s})", Size, typeid(TElementType).name());
-#endif
 
 		pData = nullptr;
 		Capacity = 0;
@@ -146,7 +140,9 @@ public:
 
 	const TElementType& operator[](size_t index) const
 	{
+#ifdef FX_DEBUG_ARRAY_BOUNDS_CHECK
 		AssertMsg(index < Capacity, "Access out of range");
+#endif
 		return pData[index];
 	}
 
@@ -159,6 +155,7 @@ public:
 	SizedArray<TElementType>& operator=(std::initializer_list<TElementType>& list)
 	{
 		const size_t list_size = list.size();
+
 		if (list_size > Capacity) {
 			Free();
 			InitCapacity(list.size());
@@ -256,7 +253,9 @@ public:
 
 	TElementType& Insert(const TElementType& object)
 	{
+#ifdef FX_DEBUG_ARRAY_BOUNDS_CHECK
 		AssertMsg(Size < Capacity, "Insert will exceed capacity!");
+#endif
 
 		TElementType* element = &pData[Size++];
 		new (element) TElementType(object);
@@ -266,17 +265,20 @@ public:
 
 	void Insert(TElementType&& object)
 	{
+#ifdef FX_DEBUG_ARRAY_BOUNDS_CHECK
 		AssertMsg(Size < Capacity, "Insert will exceed capacity!");
+#endif
 
 		TElementType* element = &pData[Size++];
-
 		new (element) TElementType(std::move(object));
 	}
 
 	/** Inserts a new empty element into the array and returns a pointer to the element */
 	TElementType* Insert()
 	{
+#ifdef FX_DEBUG_ARRAY_BOUNDS_CHECK
 		AssertMsg(Size < Capacity, "Insert will exceed capacity!");
+#endif
 
 		TElementType* element = &pData[Size++];
 
@@ -288,7 +290,9 @@ public:
 	template <typename... Args>
 	TElementType& Emplace(Args&&... args)
 	{
+#ifdef FX_DEBUG_ARRAY_BOUNDS_CHECK
 		AssertMsg(Size < Capacity, "Insert will exceed capacity!");
+#endif
 
 		TElementType* element = &pData[Size++];
 		new (element) TElementType(std::forward<Args>(args)...);
@@ -298,7 +302,10 @@ public:
 
 	void RemoveLast()
 	{
+#ifdef FX_DEBUG_ARRAY_BOUNDS_CHECK
 		AssertMsg(Size > 0, "No elements remaining!");
+#endif
+
 		--Size;
 		TElementType* element = &pData[Size];
 

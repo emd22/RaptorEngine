@@ -136,6 +136,7 @@ void GraphicsBackend::Init(Vec2u window_size)
 
 	LightBuffer.Create(scLightUniformSize, Limits::MaxActiveLights);
 	BoneBuffer.Create(sizeof(Mat4f), Limits::MaxBoneMatrices, eGpuBufferType::StorageWithOffset);
+	FrameAlloc.Create();
 
 	// Forward+ tiled light list buffers. These are double buffered per frame in flight, each tile's
 	LightGridPageSize = Limits::MaxScreenTiles * sizeof(uint32) * 4;
@@ -336,6 +337,10 @@ void GraphicsBackend::RebuildRenderStages()
 	rd->Prepass.Rebuild(size);
 	rd->ForwardPass.Rebuild(size);
 	rd->ParticlePass.Rebuild(size);
+	rd->FogPass.Rebuild(size);
+	rd->FogTemporalPass.Rebuild(size);
+	rd->FogDenoisePass.Rebuild(size);
+	rd->FogApplyPass.Rebuild(size);
 	rd->SSAOPass.Rebuild(size);
 	rd->SSAODenoisePass.Rebuild(size);
 	rd->SSAOBlurPass.Rebuild(size);
@@ -666,6 +671,7 @@ eFrameResult GraphicsBackend::BeginFrame()
 
 	LightBuffer.Rewind();
 	BoneBuffer.Rewind();
+	FrameAlloc.Rewind();
 
 	frame->InFlight.WaitFor();
 	frame->InFlight.Reset();
@@ -892,15 +898,13 @@ void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 
 	pRenderer->SSAOPass.Begin(frame->CmdBuffer);
 
-	gPipelineCache->Bind(ePipelineName::SSAO, frame->CmdBuffer);
-
 	Target* target = pRenderer->SSAOPass.GetTarget(eImageFormat::RG16_UNorm);
 	Assert(target != nullptr);
 
 	const float32 target_width = static_cast<float32>(target->Image.Info.Size.X);
 	const float32 target_height = static_cast<float32>(target->Image.Info.Size.Y);
 
-	SSAOPushConsts consts = {
+	SSAOConsts consts = {
 		.RenderSize = { target_width, target_height },
 	};
 
@@ -917,23 +921,24 @@ void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 		gCVars->Get("r_gtao_thin_occluder_compensation", scDefaultGTAOThinOccluderCompensation);
 	consts.FinalValuePower = gCVars->Get("r_gtao_final_value_power", scDefaultGTAOFinalValuePower);
 
-	SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::SSAO), eShaderType::Pixel, consts);
+	gPipelineCache->SetFrameData(FrameAlloc.Push(consts));
+	gPipelineCache->Bind(ePipelineName::SSAO, frame->CmdBuffer);
 
 	vkCmdDraw(frame->CmdBuffer.Get(), 3, 1, 0, 0);
 
 	pRenderer->SSAOPass.End();
 
-	SSAOBlurPushConsts blur_consts = {
+	const SSAOBlurConsts blur_consts = {
 		.TexelSize = { 1.0f / target_width, 1.0f / target_height },
 		.BlurBeta = gCVars->Get("r_gtao_denoise_blur_beta", scDefaultGTAODenoiseBlurBeta),
 	};
 
+	const uint32 blur_consts_offset = FrameAlloc.Push(blur_consts);
+
 	pRenderer->SSAODenoisePass.Begin(frame->CmdBuffer);
 
+	gPipelineCache->SetFrameData(blur_consts_offset);
 	gPipelineCache->Bind(ePipelineName::SSAODenoise, frame->CmdBuffer);
-
-	SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::SSAODenoise), eShaderType::Pixel,
-						blur_consts);
 
 	vkCmdDraw(frame->CmdBuffer.Get(), 3, 1, 0, 0);
 
@@ -941,14 +946,225 @@ void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 
 	pRenderer->SSAOBlurPass.Begin(frame->CmdBuffer);
 
+	gPipelineCache->SetFrameData(blur_consts_offset);
 	gPipelineCache->Bind(ePipelineName::SSAOBlur, frame->CmdBuffer);
-
-	SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::SSAOBlur), eShaderType::Pixel,
-						blur_consts);
 
 	vkCmdDraw(frame->CmdBuffer.Get(), 3, 1, 0, 0);
 
 	pRenderer->SSAOBlurPass.End();
+}
+
+static constexpr int64 scDefaultFogMode = static_cast<int64>(eFogMode::Volumetric);
+static constexpr int64 scDefaultFogSteps = 64;
+static constexpr int64 scMaxFogSteps = 256;
+static constexpr float32 scDefaultFogDistance = 100.0f;
+static constexpr float32 scMaxFogAnisotropy = 0.95f;
+static constexpr float32 scMinFogFalloff = 1e-4f;
+static constexpr float32 scFogHistoryBlend = 0.1f;
+static constexpr float64 scFogJitterSequenceStep = 0.6180339887498949;
+
+eFogMode GraphicsBackend::GetFogMode() const
+{
+	const FogSettings& fog = gWorld->Fog;
+
+	if (!fog.bEnabled || (fog.Density <= 0.0f && fog.Haze <= 0.0f)) {
+		return eFogMode::Off;
+	}
+
+	const int64 mode = gCVars->Get("r_fog", scDefaultFogMode);
+
+	if (mode >= static_cast<int64>(eFogMode::Volumetric)) {
+		return eFogMode::Volumetric;
+	}
+
+	if (mode == static_cast<int64>(eFogMode::Fast)) {
+		return eFogMode::Fast;
+	}
+
+	return eFogMode::Off;
+}
+
+void GraphicsBackend::RenderFog(Camera& camera)
+{
+	const eFogMode mode = GetFogMode();
+
+	if (mode == eFogMode::Off) {
+		return;
+	}
+
+	CommandBuffer& cmd = GetFrame()->CmdBuffer;
+
+	const FogSettings& fog = gWorld->Fog;
+
+	const float32* projection = camera.ProjectionMatrix.RawData;
+	const float32* inv_view = camera.InvViewMatrix.RawData;
+
+	const float32 depth_a = static_cast<float32>(1.0 - static_cast<float64>(projection[10]));
+	const float32 depth_b = -projection[14];
+
+	FogConsts consts {};
+
+	static constexpr float32 scCornerNdcX[] = { -1.0f, 1.0f, -1.0f, 1.0f };
+	static constexpr float32 scCornerNdcY[] = { -1.0f, -1.0f, 1.0f, 1.0f };
+
+	for (uint32 corner = 0; corner < 4; corner++) {
+		const float32 view_x = scCornerNdcX[corner] / projection[0];
+		const float32 view_y = scCornerNdcY[corner] / projection[5];
+
+		for (uint32 axis = 0; axis < 3; axis++) {
+			consts.Rays[corner][axis] = (view_x * inv_view[axis]) + (view_y * inv_view[4 + axis]) + inv_view[8 + axis];
+		}
+	}
+
+	consts.DepthA = depth_a;
+	consts.DepthB = depth_b;
+	consts.MarchDistance = std::max(gCVars->Get("r_fog_distance", scDefaultFogDistance), 0.1f);
+	consts.PreExposure = PreExposure;
+
+	const Vec3f eye(inv_view[12], inv_view[13], inv_view[14]);
+	Vec3f origin = eye;
+
+	const Player& player = gWorld->Player;
+
+	if (player.pCamera.IsValid() && &(*player.pCamera) == &camera) {
+		origin = player.GetEyePosition();
+	}
+
+	const float32 falloff = std::max(fog.Falloff, scMinFogFalloff);
+	const float32 origin_exponent = std::clamp(-falloff * (origin.Y - fog.Height), -80.0f, 80.0f);
+
+	consts.OriginAndDensity[0] = origin.X;
+	consts.OriginAndDensity[1] = origin.Y;
+	consts.OriginAndDensity[2] = origin.Z;
+	consts.OriginAndDensity[3] = std::max(fog.Density, 0.0f) * std::exp(origin_exponent);
+
+	fog.Albedo.GetLinearRGB(consts.AlbedoAndFalloff);
+	consts.AlbedoAndFalloff[3] = falloff;
+
+	consts.CameraOffsetAndHaze[0] = eye.X - origin.X;
+	consts.CameraOffsetAndHaze[1] = eye.Y - origin.Y;
+	consts.CameraOffsetAndHaze[2] = eye.Z - origin.Z;
+	consts.CameraOffsetAndHaze[3] = std::max(fog.Haze, 0.0f);
+
+	consts.Anisotropy = std::clamp(fog.Anisotropy, -scMaxFogAnisotropy, scMaxFogAnisotropy);
+	consts.AmbientScale = std::max(fog.AmbientScale, 0.0f);
+
+	consts.TileColumns = pRenderer->GetLightTileColumns();
+	consts.TileRows = pRenderer->GetLightTileRows();
+	consts.StepCount = static_cast<uint32>(
+		std::clamp(gCVars->Get("r_fog_steps", scDefaultFogSteps), int64(1), scMaxFogSteps));
+
+	const uint32 frame_counter = mInternalFrameCounter.load();
+	const bool temporal = gCVars->Get("r_fog_temporal", int64(1)) != 0;
+
+	consts.JitterOffset = 0.5f;
+	consts.NoiseShift = 0;
+
+	if (temporal) {
+		const float64 sequence = static_cast<float64>(frame_counter) * scFogJitterSequenceStep;
+		consts.JitterOffset = static_cast<float32>(sequence - std::floor(sequence));
+		consts.NoiseShift = frame_counter & 15U;
+	}
+
+	if (bBakedSunActive) {
+		consts.Flags |= static_cast<uint32>(eFogFlags::ProbeSunVisibility);
+		consts.Flags |= static_cast<uint32>(eFogFlags::NearSunDynamicOnly);
+	}
+
+	if (bFarSunShadowActive) {
+		consts.Flags |= static_cast<uint32>(eFogFlags::FarSunShadow);
+
+		memcpy(consts.FarSunMatrix, gShadowRenderer->FarShadowCamera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData,
+			   sizeof(consts.FarSunMatrix));
+		gShadowAtlas->GetRegionUVTransform(gShadowAtlas->GetFarDirectionalRegion(), consts.FarSunAtlasRect);
+	}
+	else {
+		memcpy(consts.FarSunMatrix, Mat4f::scIdentity.RawData, sizeof(consts.FarSunMatrix));
+	}
+
+	ePipelineName march_pipeline = ePipelineName::FogFast;
+
+	if (mode == eFogMode::Volumetric) {
+		march_pipeline = ePipelineName::FogVolumetric;
+	}
+
+	pRenderer->FogPass.Begin(cmd);
+
+	gPipelineCache->AddBufferOffset(0, LightBuffer.GetBaseOffset());
+	gPipelineCache->AddBufferOffset(0, GetLightGridFrameOffset());
+	gPipelineCache->AddBufferOffset(0, GetLightIndexListFrameOffset());
+	gPipelineCache->AddBufferOffset(0, 0);
+	gPipelineCache->AddBufferOffset(0, 0);
+	gPipelineCache->AddBufferOffset(0, 0);
+	gPipelineCache->SetFrameData(FrameAlloc.Push(consts));
+	gPipelineCache->Bind(march_pipeline, cmd);
+
+	vkCmdDraw(cmd.Get(), 3, 1, 0, 0);
+
+	pRenderer->FogPass.End();
+
+	bool history_valid = temporal && (mFogHistoryFrame + 1 == frame_counter);
+
+	Image* history_images[] = {
+		&pRenderer->FogDenoisePass.GetTarget(eImageFormat::RGBA16_Float, 1)->GetImage(),
+		&pRenderer->FogDenoisePass.GetTarget(eImageFormat::R32_SFloat)->GetImage(),
+	};
+
+	for (Image* history : history_images) {
+		if (history->ImageLayout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+			BarrierHelper::ImageLayoutTransition(history, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 0, 1);
+			history_valid = false;
+		}
+	}
+
+	FogTemporalConsts temporal_consts {};
+
+	memcpy(temporal_consts.PrevCameraMatrix, mFogPrevCameraMatrix.RawData, sizeof(temporal_consts.PrevCameraMatrix));
+	memcpy(temporal_consts.Rays, consts.Rays, sizeof(temporal_consts.Rays));
+
+	temporal_consts.EyeAndBlend[0] = eye.X;
+	temporal_consts.EyeAndBlend[1] = eye.Y;
+	temporal_consts.EyeAndBlend[2] = eye.Z;
+	temporal_consts.EyeAndBlend[3] = scFogHistoryBlend;
+	temporal_consts.DepthParams[0] = depth_a;
+	temporal_consts.DepthParams[1] = depth_b;
+	temporal_consts.HistoryValid = static_cast<uint32>(history_valid);
+
+	pRenderer->FogTemporalPass.Begin(cmd);
+
+	gPipelineCache->SetFrameData(FrameAlloc.Push(temporal_consts));
+	gPipelineCache->Bind(ePipelineName::FogTemporal, cmd);
+
+	vkCmdDraw(cmd.Get(), 3, 1, 0, 0);
+
+	pRenderer->FogTemporalPass.End();
+
+	mFogPrevCameraMatrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
+	mFogHistoryFrame = frame_counter;
+
+	const FogResolveConsts resolve_consts {
+		.DepthParams = { depth_a, depth_b },
+	};
+
+	const uint32 resolve_consts_offset = FrameAlloc.Push(resolve_consts);
+
+	pRenderer->FogDenoisePass.Begin(cmd);
+
+	gPipelineCache->SetFrameData(resolve_consts_offset);
+	gPipelineCache->Bind(ePipelineName::FogDenoise, cmd);
+
+	vkCmdDraw(cmd.Get(), 3, 1, 0, 0);
+
+	pRenderer->FogDenoisePass.End();
+
+	pRenderer->FogApplyPass.Begin(cmd);
+
+	gPipelineCache->SetFrameData(resolve_consts_offset);
+	gPipelineCache->Bind(ePipelineName::FogApply, cmd);
+
+	vkCmdDraw(cmd.Get(), 3, 1, 0, 0);
+
+	pRenderer->FogApplyPass.End();
 }
 
 void GraphicsBackend::DoComposition(Camera& render_cam)
@@ -961,6 +1177,9 @@ void GraphicsBackend::DoComposition(Camera& render_cam)
 
 	gParticleSystem->Render(frame->CmdBuffer, render_cam, pRenderer->ParticlePass);
 	MarkGpu(eGpuMarker::Particles);
+
+	RenderFog(render_cam);
+	MarkGpu(eGpuMarker::Fog);
 
 	// Probe capture bake faces render here: the main forward pass is done, so
 	// the capture can reuse its pipelines + light grid page before composition.
@@ -981,6 +1200,7 @@ void GraphicsBackend::DoComposition(Camera& render_cam)
 	// SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
 	// ProcessDeletionQueue(false, deletion_queue.Get());
 	// deletion_queue.Unlock();
+	FrameAlloc.Flush();
 	frame->CmdBuffer.End();
 
 	PresentFrame();
@@ -1042,6 +1262,7 @@ void GraphicsBackend::Destroy()
 
 	LightBuffer.Destroy();
 	BoneBuffer.Destroy();
+	FrameAlloc.Destroy();
 
 	LightGridBuffer.Destroy();
 	LightIndexListBuffer.Destroy();
