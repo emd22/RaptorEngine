@@ -953,6 +953,18 @@ void TiledForwardRenderer::CreateFogPasses()
 	FogApplyPass.BuildRenderStage();
 }
 
+Sampler* TiledForwardRenderer::GetFogShadowSampler()
+{
+	return gSamplerCache->Request(SamplerProps {
+		eSamplerFilter::Linear,
+		eSamplerFilter::Linear,
+		eSamplerFilter::Nearest,
+		eSamplerAddressMode::ClampToEdge,
+		eSamplerBorderColor::FloatWhite,
+		eSamplerCompareOp::LessOrEqual,
+	});
+}
+
 void TiledForwardRenderer::CreateFogPSO()
 {
 	CreateFogPasses();
@@ -966,6 +978,8 @@ void TiledForwardRenderer::CreateFogPSO()
 	Target* depth_target = Prepass.GetTarget(eImageFormat::D32_Float);
 	Target* shadow_target = gShadowAtlas->GetTarget();
 	Assert(shadow_target != nullptr);
+
+	Sampler* fog_shadow_sampler = GetFogShadowSampler();
 
 	const auto BuildMarchPipeline = [&](ePipelineName name, const SizedArray<ShaderMacro>& macros)
 	{
@@ -997,6 +1011,9 @@ void TiledForwardRenderer::CreateFogPSO()
 		gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
 							 gGraphics->ProbeVolumePageSize);
 		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeGridBuffer, 0, gGraphics->ProbeGridPageSize);
+		gPSOBuild->AddImage(9, 0, eShaderType::Pixel, gGraphics->pFogShadowAtlas, fog_shadow_sampler);
+		gPSOBuild->AddBuffer(10, 0, eShaderType::Pixel, &gGraphics->FogShadowPageBuffer, 0,
+							 gGraphics->FogShadowPageBufferSize);
 
 		gPSOBuild->AddFrameData(1);
 
@@ -1082,9 +1099,12 @@ void TiledForwardRenderer::CreateFroxelFogPSO(const BlendAttachment& apply_blend
 	const VkImageUsageFlags volume_usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
 	FroxelLighting.CreateVolume(Vec2u(scFroxelGridX, scFroxelGridY), scFroxelGridZ + 1, eImageFormat::RGBA16_Float,
-								volume_usage);
+								volume_usage | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
 	FroxelIntegrated.CreateVolume(Vec2u(scFroxelGridX, scFroxelGridY), scFroxelGridZ, eImageFormat::RGBA16_Float,
 								  volume_usage);
+	FroxelHistory.CreateVolume(Vec2u(scFroxelGridX, scFroxelGridY), scFroxelGridZ + 1, eImageFormat::RGBA16_Float,
+							   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+	FroxelSurface.CreateVolume(Vec2u(scFroxelGridX, scFroxelGridY), 1, eImageFormat::RGBA16_Float, volume_usage);
 
 	Sampler* point_sampler = gSamplerCache->Request(SamplerProps {
 		eSamplerFilter::Nearest,
@@ -1106,6 +1126,8 @@ void TiledForwardRenderer::CreateFroxelFogPSO(const BlendAttachment& apply_blend
 	gPSOBuild->BeginPipeline(ePipelineName::FogFroxelInject);
 	gPSOBuild->SetShader(eShaderName::FogInject, {});
 
+	gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Compute, depth_target, point_sampler);
+
 	gPSOBuild->AddBuffer(1, 0, eShaderType::Compute, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
 						 gGraphics->LightBuffer.PageSize);
 	gPSOBuild->AddBuffer(2, 0, eShaderType::Compute, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
@@ -1125,6 +1147,11 @@ void TiledForwardRenderer::CreateFroxelFogPSO(const BlendAttachment& apply_blend
 						 gGraphics->ProbeVolumePageSize);
 	gPSOBuild->AddBuffer(7, 0, eShaderType::Compute, &gGraphics->ProbeGridBuffer, 0, gGraphics->ProbeGridPageSize);
 	gPSOBuild->AddStorageImage(8, 0, eShaderType::Compute, &FroxelLighting);
+	gPSOBuild->AddImage(9, 0, eShaderType::Compute, gGraphics->pFogShadowAtlas, GetFogShadowSampler());
+	gPSOBuild->AddBuffer(10, 0, eShaderType::Compute, &gGraphics->FogShadowPageBuffer, 0,
+						 gGraphics->FogShadowPageBufferSize);
+	gPSOBuild->AddImage(11, 0, eShaderType::Compute, &FroxelHistory, volume_sampler);
+	gPSOBuild->AddStorageImage(12, 0, eShaderType::Compute, &FroxelSurface);
 
 	gPSOBuild->AddFrameData(1);
 
@@ -1153,6 +1180,7 @@ void TiledForwardRenderer::CreateFroxelFogPSO(const BlendAttachment& apply_blend
 	gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, depth_target, point_sampler);
 	gPSOBuild->AddImage(1, 0, eShaderType::Pixel, &FroxelIntegrated, volume_sampler);
 	gPSOBuild->AddImage(2, 0, eShaderType::Pixel, &FroxelLighting, volume_sampler);
+	gPSOBuild->AddImage(3, 0, eShaderType::Pixel, &FroxelSurface, volume_sampler);
 
 	gPSOBuild->AddFrameData(1);
 

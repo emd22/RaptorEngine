@@ -157,6 +157,17 @@ public:
 
 	bool HasDynamicOffsets() const { return mbHasDynamicOffsets; }
 
+	bool UsesImage(const Image* image) const
+	{
+		for (const DescriptorEntry& entry : mDescriptorEntries) {
+			if (entry.pImage == image) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 
 	~DescriptorSet() = default;
 

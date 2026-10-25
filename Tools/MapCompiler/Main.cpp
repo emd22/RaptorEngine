@@ -43,6 +43,8 @@ void PrintUsage()
 				"or high (default: medium)\n"
 				"  --probe-texel-rays <n>     Rays per probe visibility texel along each axis when baking probes, 0 to "
 				"leave the probes to the engine (default: 4)\n"
+				"  --no-fog-shadow  Do not bake the sun shadow pages that the fog is shadowed by\n"
+				"  --fog-shadow-texel <m>     Size of a fog shadow texel close up (default: 0.1)\n"
 				"  --obj <path>     Also write the compiled triangles as a Wavefront OBJ\n"
 				"  --verify [rays]  Trace random rays through the brushes and the compiled triangles and compare them\n"
 				"  --preset <name>  Start from a saved preset, the other options change it\n"
@@ -126,6 +128,12 @@ bool ParseArguments(int argc, char** argv, CompileOptions& out_arguments, Preset
 		}
 		else if (argument == "--no-indirect") {
 			out_arguments.Lightmap.bIndirect = false;
+		}
+		else if (argument == "--no-fog-shadow") {
+			out_arguments.Lightmap.FogShadow.bEnabled = false;
+		}
+		else if (argument == "--fog-shadow-texel" && has_value) {
+			out_arguments.Lightmap.FogShadow.TexelSize = std::atof(argv[++i]);
 		}
 		else if (argument == "--no-lightmap") {
 			out_arguments.Lightmap.bEnabled = false;

@@ -607,6 +607,8 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 		gProbeManager->ClearSunVisibility();
 	}
 
+	renderer::gGraphics->ClearFogShadow();
+
 	mbHasBakedSun = false;
 	mbHasBakedIndirect = false;
 	mbBakedWithSun = false;
@@ -742,6 +744,13 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 	mbHasBakedSun = has_lightmap && map.HasBakedSun();
 	mbHasBakedIndirect = has_lightmap && has_indirect;
 	mbBakedWithSun = lightmap.HasSun();
+
+	if (mbHasBakedSun && map.HasFogShadow()) {
+		renderer::gGraphics->UploadFogShadow(map.FogShadow);
+	}
+	else {
+		renderer::gGraphics->ClearFogShadow();
+	}
 
 	mCompiledDecalReceivers.reserve(map.Surfaces.Size);
 

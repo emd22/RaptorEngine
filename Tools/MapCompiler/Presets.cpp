@@ -45,6 +45,8 @@ ConfigEntry WritePreset(const CompilePreset& preset, uint32 index)
 	entry.AddMember(ConfigEntry::Literal("lightmap_samples", static_cast<int64>(lightmap.Samples)));
 	entry.AddMember(ConfigEntry::Literal("sun_radius", static_cast<float32>(lightmap.SunRadiusDegrees)));
 	entry.AddMember(ConfigEntry::Literal("probe_texel_rays", static_cast<int64>(lightmap.ProbeTexelRays)));
+	entry.AddMember(ConfigEntry::Literal("fog_shadow", ToInt(lightmap.FogShadow.bEnabled)));
+	entry.AddMember(ConfigEntry::Literal("fog_shadow_texel", static_cast<float32>(lightmap.FogShadow.TexelSize)));
 
 	entry.AddMember(ConfigEntry::Literal("indirect", ToInt(lightmap.bIndirect)));
 	entry.AddMember(ConfigEntry::Literal("indirect_rays", static_cast<int64>(lightmap.IndirectRays)));
@@ -104,6 +106,8 @@ CompilePreset ReadPreset(const ConfigEntry& entry)
 	lightmap.Samples = ReadUInt(entry, "lightmap_samples", lightmap.Samples);
 	lightmap.SunRadiusDegrees = ReadDouble(entry, "sun_radius", lightmap.SunRadiusDegrees);
 	lightmap.ProbeTexelRays = ReadUInt(entry, "probe_texel_rays", lightmap.ProbeTexelRays);
+	lightmap.FogShadow.bEnabled = ReadBool(entry, "fog_shadow", lightmap.FogShadow.bEnabled);
+	lightmap.FogShadow.TexelSize = ReadDouble(entry, "fog_shadow_texel", lightmap.FogShadow.TexelSize);
 
 	lightmap.bIndirect = ReadBool(entry, "indirect", lightmap.bIndirect);
 	lightmap.IndirectRays = ReadUInt(entry, "indirect_rays", lightmap.IndirectRays);

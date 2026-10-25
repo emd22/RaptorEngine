@@ -49,6 +49,7 @@ struct alignas(16) SSAOBlurConsts
 struct alignas(16) FogConsts
 {
 	float32 FarSunMatrix[16];
+	float32 PrevCameraMatrix[16];
 	float32 FarSunAtlasRect[4];
 	float32 Rays[4][4];
 	float32 OriginAndDensity[4];
@@ -67,6 +68,13 @@ struct alignas(16) FogConsts
 	float32 JitterOffset;
 	uint32 NoiseShift;
 	float32 ScreenSize[2];
+	float32 HistoryBlend;
+	float32 JitterAmount;
+	float32 BakedShadowRight[4];
+	float32 BakedShadowUp[4];
+	float32 BakedShadowForward[4];
+	float32 BakedShadowGrid[4];
+	float32 BakedShadowAtlas[4];
 };
 
 static constexpr uint32 scFroxelGridX = 160;
@@ -94,6 +102,7 @@ enum class eFogFlags : uint32
 	ProbeSunVisibility = 0x01,
 	FarSunShadow = 0x02,
 	NearSunDynamicOnly = 0x04,
+	BakedSunShadow = 0x08,
 };
 
 
@@ -163,6 +172,7 @@ private:
 	void CreateParticlePass();
 	void CreateFogPasses();
 	void CreateFroxelFogPSO(const BlendAttachment& apply_blend);
+	Sampler* GetFogShadowSampler();
 
 	// Lighting
 	// void CreateLightVolumePipeline();
@@ -219,6 +229,10 @@ public:
 	Image FroxelLighting;
 	/// Froxel fog: in-scatter accumulated from the eye to the far edge of each slice
 	Image FroxelIntegrated;
+	/// Froxel fog: last frame's FroxelLighting, reprojected into this frame's inject
+	Image FroxelHistory;
+	/// Froxel fog: per column nearest surface depth and the far end of the surface connected to it
+	Image FroxelSurface;
 	/// Composition pass, combine results from all passes
 	RenderStage CompPass;
 

@@ -514,6 +514,17 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 							baked.Density));
 		}
 
+		if (baked.bHasFogShadow) {
+			const FogShadowStats& fog = baked.FogShadow;
+			log(String::Fmt("  fog shadow   {} of {} {:.0f} m pages shadowed, {} texels at {:.2f} m, {} rays, {:.1f} MB",
+							fog.PageCount, fog.CellCount, options.Lightmap.FogShadow.PageSize, fog.TexelCount,
+							options.Lightmap.FogShadow.TexelSize, fog.RayCount,
+							static_cast<double>(fog.ByteCount) / (1024.0 * 1024.0)));
+		}
+		else if (source.bHasSun && options.Lightmap.FogShadow.bEnabled) {
+			log("  fog shadow   none, the sun is too low or nothing casts a shadow");
+		}
+
 		if (!source.bHasSun) {
 			log("  lightmap     no sun, the prototype has none or it is switched off");
 		}

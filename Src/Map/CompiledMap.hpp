@@ -98,6 +98,58 @@ struct CompiledMapLightmap
 	}
 };
 
+struct CompiledMapFogShadowLevel
+{
+	uint32 Width = 0;
+	uint32 Height = 0;
+
+	/// The light space depth of the first occluder seen from the sun, across the page's depth range. 0xFFFF where
+	/// nothing in the page is shadowed.
+	SizedArray<uint16> Depths;
+};
+
+/**
+ * @brief The sun's shadow over one square of the world, seen along the baked sun direction. Pages only exist where
+ * something casts a shadow, every other cell of the grid is fully lit.
+ */
+struct CompiledMapFogShadowPage
+{
+	int32 CellX = 0;
+	int32 CellZ = 0;
+
+	/// Lowest corner and size of the page in the light space plane
+	float32 LightMin[2] = {};
+	float32 LightSize[2] = {};
+
+	float32 DepthMin = 0.0f;
+	float32 DepthMax = 0.0f;
+
+	SizedArray<CompiledMapFogShadowLevel> Levels;
+};
+
+/**
+ * @brief Sun shadow pages for the fog, so it can be shadowed by the static world without a runtime shadow map
+ */
+struct CompiledMapFogShadow
+{
+	static constexpr uint32 scLevelCount = 3;
+	static constexpr uint32 scLevelStep = 4;
+
+	float32 Right[3] = { 1.0f, 0.0f, 0.0f };
+	float32 Up[3] = { 0.0f, 0.0f, 1.0f };
+	float32 Forward[3] = { 0.0f, -1.0f, 0.0f };
+
+	float32 PageSize = 0.0f;
+	float32 TexelSize = 0.0f;
+
+	int32 CellMin[2] = {};
+	uint32 CellCount[2] = {};
+
+	SizedArray<CompiledMapFogShadowPage> Pages;
+
+	bool IsEmpty() const { return CellCount[0] == 0 || CellCount[1] == 0; }
+};
+
 /**
  * @brief The corners of a convex collider, in world space
  */
@@ -147,7 +199,9 @@ class CompiledMap
 {
 public:
 	static constexpr uint32 scMagic = 0x504D5846;
-	static constexpr uint32 scVersion = 10;
+	static constexpr uint32 scVersion = 11;
+	/// Oldest version that still loads, the parts added since are left empty
+	static constexpr uint32 scMinVersion = 10;
 	static constexpr const char* scExtension = ".fxmap";
 	static constexpr const char* scPrototypeExtension = ".prx";
 
@@ -212,6 +266,10 @@ public:
 	{
 		return HasLightmap() && Lightmap.HasSun() && ProbeSunVisibility.Size == Probes.GetProbeCount();
 	}
+	CompiledMapFogShadow FogShadow;
+
+	bool HasFogShadow() const { return !FogShadow.IsEmpty(); }
+
 	bool HasBakedProbes() const
 	{
 		const uint64 probe_count = Probes.GetProbeCount();

@@ -12,7 +12,7 @@
 namespace fx::renderer {
 
 static constexpr uint32 scMaxDescriptorSets = 8;
-static constexpr uint32 scMaxBuffersPerDS = 6;
+static constexpr uint32 scMaxBuffersPerDS = 8;
 
 PipelineCache::PipelineCache()
 {

@@ -1179,7 +1179,10 @@ void World::Render(Camera* shadow_camera)
 		gShadowAtlas->EndRegion();
 	}
 
-	gGraphics->bFarSunShadowActive = render_sun_shadows && (gGraphics->GetFogMode() != eFogMode::Off);
+	const bool baked_fog_shadow = gGraphics->bBakedSunActive && gGraphics->bHasBakedFogShadow;
+
+	gGraphics->bFarSunShadowActive = render_sun_shadows && !baked_fog_shadow &&
+									 (gGraphics->GetFogMode() != eFogMode::Off);
 
 	if (gGraphics->bFarSunShadowActive) {
 		BeginShadowAtlasRegion(gShadowAtlas->GetFarDirectionalRegion());

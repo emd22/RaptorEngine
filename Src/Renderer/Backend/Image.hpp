@@ -84,6 +84,8 @@ enum class eImageFormat : uint16
 
 	BC7_UNorm,
 	BC7_SRGB,
+
+	D16_UNorm,
 };
 
 enum class eImageType
@@ -149,6 +151,7 @@ struct ImageFormatUtil
 	static constexpr bool IsDepth(eImageFormat format)
 	{
 		switch (format) {
+		case eImageFormat::D16_UNorm:
 		case eImageFormat::D16_UNorm_S8_UInt:
 		case eImageFormat::D32_Float:
 		case eImageFormat::D32_Float_S8_UInt:
@@ -246,6 +249,9 @@ struct ImageFormatUtil
 			return 12;
 
 			// Depth formats
+
+		case eImageFormat::D16_UNorm:
+			return 2;
 
 		case eImageFormat::D16_UNorm_S8_UInt:
 			return 3;
@@ -357,6 +363,8 @@ struct ImageFormatUtil
 
 			// Depth Formats
 
+		case eImageFormat::D16_UNorm:
+			return VK_FORMAT_D16_UNORM;
 		case eImageFormat::D16_UNorm_S8_UInt:
 			return VK_FORMAT_D16_UNORM_S8_UINT;
 		case eImageFormat::D32_Float:

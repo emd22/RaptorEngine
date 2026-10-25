@@ -118,6 +118,54 @@ float SampleSunCascade(float4x4 light_matrix, float4 atlas_rect, float3 position
 	return SampleShadowPcf(atlas_uv, atlas_rect, shadow_z + FOG_SHADOW_BIAS, rotation);
 }
 
+float SampleBakedSunShadow(float3 position_ws, float fallback, float2 rotation)
+{
+	const float3 right = Consts.vBakedShadowRight.xyz;
+	const float3 up = Consts.vBakedShadowUp.xyz;
+	const float3 forward = Consts.vBakedShadowForward.xyz;
+
+	const float page_size = Consts.vBakedShadowRight.w;
+	const float bias = Consts.vBakedShadowUp.w;
+	const float pcf_radius = Consts.vBakedShadowForward.w;
+
+	const float2 cell = floor(position_ws.xz / page_size) - Consts.vBakedShadowGrid.xy;
+	const bool in_grid = and(all(cell >= 0.0), all(cell < Consts.vBakedShadowGrid.zw));
+
+	const uint2 safe_cell = uint2(select(in_grid, cell, float2(0.0, 0.0)));
+	const FogShadowPage page = bFogShadowPages[safe_cell.x + (safe_cell.y * uint(Consts.vBakedShadowGrid.z))];
+
+	const float2 light = float2(dot(position_ws, right), dot(position_ws, up));
+	const float2 page_uv = (light - page.vLightRect.xy) * page.vLightRect.zw;
+	const float compare_depth = (dot(position_ws, forward) - page.vDepth.x - bias) * page.vDepth.y;
+
+	const float2 half_texel = 0.5 * Consts.vBakedShadowAtlas.xy;
+	const float2 region_min = page.vAtlasRect.zw + half_texel;
+	const float2 region_max = page.vAtlasRect.zw + page.vAtlasRect.xy - half_texel;
+
+	const float2 radius_uv = pcf_radius * page.vLightRect.zw;
+	const float2 axis_a = rotation * radius_uv;
+	const float2 axis_b = float2(-rotation.y, rotation.x) * radius_uv;
+
+	const float2 offsets[4] = { axis_a, -axis_a, axis_b, -axis_b };
+
+	float lit = 0.0;
+
+	[unroll]
+	for (uint tap = 0; tap < 4; tap++) {
+		const float2 atlas_uv = ((page_uv + offsets[tap]) * page.vAtlasRect.xy) + page.vAtlasRect.zw;
+		lit += F_SampleCmpLevelZero(tFogShadowAtlas, clamp(atlas_uv, region_min, region_max), compare_depth);
+	}
+
+	lit *= 0.25;
+
+	const bool has_page = page.vDepth.z > 0.5;
+	const bool outside_page = any(saturate(page_uv) != page_uv);
+
+	const float page_visibility = select(or(!has_page, outside_page), 1.0, lit);
+
+	return select(in_grid, page_visibility, fallback);
+}
+
 float SampleSunShadow(Light light, float3 position_ws, float fallback, float2 rotation)
 {
 	float near_coverage;
@@ -134,7 +182,10 @@ float SampleSunShadow(Light light, float3 position_ws, float fallback, float2 ro
 	near_coverage = select(has_near, near_coverage, 0.0);
 	far_coverage = select(has_far, far_coverage, 0.0);
 
-	const float far_visibility = lerp(fallback, far_lit, far_coverage);
+	const bool has_baked = HAS_FLAG(Consts.uiFlags, FOG_FLAG_BAKED_SUN_SHADOW);
+	const float baked_visibility = SampleBakedSunShadow(position_ws, fallback, rotation);
+
+	const float far_visibility = select(has_baked, baked_visibility, lerp(fallback, far_lit, far_coverage));
 
 	const bool near_dynamic_only = HAS_FLAG(Consts.uiFlags, FOG_FLAG_NEAR_SUN_DYNAMIC_ONLY);
 	const float blended = lerp(far_visibility, near_lit, near_coverage);

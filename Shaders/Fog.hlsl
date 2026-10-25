@@ -66,6 +66,9 @@ F_StructBuffer(bProbeBuffer, ProbeSHData, 5, 0);
 F_StructBuffer(bProbeVolume, ProbeVolume, 6, 0);
 F_StructBuffer(bProbeGrid, uint, 7, 0);
 
+F_ShadowTexture2D(tFogShadowAtlas, 9, 0);
+F_StructBuffer(bFogShadowPages, FogShadowPage, 10, 0);
+
 F_FrameData(FogConsts, Consts, 1);
 
 #include "FogMedium.hlsli"

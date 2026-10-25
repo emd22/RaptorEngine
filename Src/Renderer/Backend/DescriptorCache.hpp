@@ -60,6 +60,11 @@ public:
 
 	void RebuildAll();
 
+	/**
+	 * @brief Rewrites the descriptor sets that bind `image`, after it was recreated in place
+	 */
+	void RebuildUsingImage(const Image* image);
+
 	void Destroy();
 	~DescriptorCache() { Destroy(); }
 

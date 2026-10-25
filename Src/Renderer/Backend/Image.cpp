@@ -461,7 +461,7 @@ void Image::CopyFromBuffer(renderer::CommandBuffer& cmd, const renderer::RawGpuB
 		.bufferRowLength = 0,
 		.bufferImageHeight = 0,
 		.imageSubresource {
-			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.aspectMask = ImageFormatUtil::GetAspectMask(Info.Format),
 			.mipLevel = mip_level,
 			.baseArrayLayer = 0,
 			.layerCount = 1,

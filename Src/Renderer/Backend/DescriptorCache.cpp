@@ -256,6 +256,17 @@ void DescriptorCache::Destroy()
 	Cache.clear();
 }
 
+void DescriptorCache::RebuildUsingImage(const Image* image)
+{
+	DescriptorPool& pool = FindPool();
+
+	for (auto& [hash, descriptor_set] : Cache) {
+		if (descriptor_set.UsesImage(image)) {
+			descriptor_set.Rebuild(pool);
+		}
+	}
+}
+
 void DescriptorCache::RebuildAll()
 {
 	DescriptorPool& pool = FindPool();
