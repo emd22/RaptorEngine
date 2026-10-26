@@ -18,6 +18,7 @@
 #include <wx/toplevel.h>
 
 #include <Asset/ConfigFile.hpp>
+#include <Audio/AudioSystem.hpp>
 #include <Blockout.hpp>
 #include <CVar.hpp>
 #include <Controls.hpp>
@@ -100,7 +101,7 @@ static constexpr uint32 scVisTools = ToolBit(eEditorTool::Select) | scBrushEditT
 									 ToolBit(eEditorTool::Decal) | ToolBit(eEditorTool::Clip);
 
 static constexpr uint32 scDataTools[static_cast<uint32>(eDataFilter::Count)] = {
-	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Light),
+	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Light) | ToolBit(eEditorTool::Sound),
 	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Create),
 	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Create),
 	ToolBit(eEditorTool::Select),
@@ -109,6 +110,7 @@ static constexpr uint32 scDataTools[static_cast<uint32>(eDataFilter::Count)] = {
 	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Rotate) | ToolBit(eEditorTool::Create),
 	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Rotate) | ToolBit(eEditorTool::Create),
 	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Rotate) | ToolBit(eEditorTool::Create),
+	ToolBit(eEditorTool::Select) | ToolBit(eEditorTool::Sound),
 };
 
 static const char* const scCommandScriptPath = "./Scripts/editor/editor_cmd.strata";
@@ -448,6 +450,25 @@ EditorPanelState RaptorEditor::BuildPanelState()
 		panel.InnerAngleDegrees = MathUtil::RadiansToDegrees(light->GetInnerAngle());
 	}
 
+	if (mCurrentTool == eEditorTool::Sound) {
+		SoundPanelState& panel = state.Sound;
+
+		for (const SoundDef& def : gAudio->GetDefs()) {
+			panel.SoundNames += def.Name;
+			panel.SoundNames += "\n";
+		}
+
+		if (const SoundEmitter* emitter = mSoundEditor.GetSelected(); emitter != nullptr) {
+			panel.bHasSound = true;
+			panel.Name = emitter->Name;
+			panel.Sound = emitter->Sound;
+			panel.Position = emitter->Position;
+			panel.Volume = emitter->Volume;
+			panel.MinInterval = emitter->MinInterval;
+			panel.MaxInterval = emitter->MaxInterval;
+		}
+	}
+
 	if (IsTopViewActive()) {
 		state.TopView = BuildTopViewState();
 	}
@@ -558,6 +579,10 @@ void RaptorEditor::Update(float32 delta_time)
 		mLightEditor.DrawMarkers();
 	}
 
+	if (mCurrentTool == eEditorTool::Sound) {
+		mSoundEditor.DrawMarkers();
+	}
+
 	if (IsSpawnPointShown()) {
 		mSpawnEditor.DrawMarker(mbSpawnSelected);
 	}
@@ -636,13 +661,16 @@ void RaptorEditor::SetTool(eEditorTool tool)
 	}
 
 	if (tool != mCurrentTool) {
-		const bool was_light = (mCurrentTool == eEditorTool::Light);
-		const bool is_light = (tool == eEditorTool::Light);
+		const eEditorTool previous_tool = mCurrentTool;
 
 		mCurrentTool = tool;
 
-		if (was_light) {
+		if (previous_tool == eEditorTool::Light) {
 			mLightEditor.Deselect();
+		}
+
+		if (previous_tool == eEditorTool::Sound) {
+			mSoundEditor.Deselect();
 		}
 
 		if (tool != eEditorTool::Select) {
@@ -651,14 +679,20 @@ void RaptorEditor::SetTool(eEditorTool tool)
 
 		PruneSelection();
 
-		if (was_light != is_light && mpMainFrame != nullptr) {
+		const auto has_settings_panel = [](eEditorTool tool_to_check)
+		{ return tool_to_check == eEditorTool::Light || tool_to_check == eEditorTool::Sound; };
+
+		if ((has_settings_panel(previous_tool) || has_settings_panel(tool)) && mpMainFrame != nullptr) {
 			thread::PostToUI(
-				[this, is_light]
+				[this, tool]
 				{
 					ToolSettingsBasePanel* panel = nullptr;
 
-					if (is_light) {
+					if (tool == eEditorTool::Light) {
 						panel = new LightToolSettingsPanel();
+					}
+					else if (tool == eEditorTool::Sound) {
+						panel = new SoundToolSettingsPanel();
 					}
 
 					mpMainFrame->SetToolSettingsPanel(panel);
@@ -686,6 +720,7 @@ void RaptorEditor::SetSimulating(bool simulating)
 		if (simulating) {
 			ClearSelection();
 			mLightEditor.Deselect();
+			mSoundEditor.Deselect();
 
 			if (mView == eEditorView::Architect) {
 				SetView(eEditorView::Viewport);
@@ -842,7 +877,7 @@ bool RaptorEditor::IsObjectSelectable(const Object* object) const
 		return false;
 	}
 
-	if (mCurrentTool == eEditorTool::Light) {
+	if (mCurrentTool == eEditorTool::Light || mCurrentTool == eEditorTool::Sound) {
 		return false;
 	}
 

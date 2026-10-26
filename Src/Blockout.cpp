@@ -4,13 +4,13 @@
 #include <Asset/ConfigFile.hpp>
 #include <Asset/MeshGen.hpp>
 #include <BrushEntry.hpp>
-#include <LightEntry.hpp>
 #include <CVar.hpp>
 #include <Core/FilesystemIO.hpp>
 #include <Core/RefUtil.hpp>
 #include <Decal/MeshDecal.hpp>
 #include <Editor/RaptorEditor.hpp>
 #include <Engine.hpp>
+#include <LightEntry.hpp>
 #include <Map/CompiledMap.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
@@ -33,6 +33,14 @@
 RS_OBJECT_BEGIN(fx::World::PlayerSpawnPoint)
 	RS_FIELD_NAMED(Position, "pos")
 	RS_FIELD_NAMED(Direction, "dir")
+RS_OBJECT_END()
+
+RS_OBJECT_BEGIN(fx::SoundEmitter)
+	RS_FIELD_NAMED(Sound, "sound")
+	RS_FIELD_NAMED(Position, "pos")
+	RS_FIELD_NAMED(Volume, "volume")
+	RS_FIELD_NAMED(MinInterval, "interval_min")
+	RS_FIELD_NAMED(MaxInterval, "interval_max")
 RS_OBJECT_END()
 
 
@@ -501,6 +509,120 @@ bool Blockout::RaycastFace(Object* object, const Vec3f origin, const Vec3f direc
 	return true;
 }
 
+static int32 FindHitSide(const float32* planes, size_t side_count, const Vec3f point, const Vec3f normal)
+{
+	constexpr float32 scMinFacing = 0.5f;
+
+	int32 best_side = -1;
+	float32 best_distance = FLT_MAX;
+	int32 most_facing_side = -1;
+	float32 most_facing = -FLT_MAX;
+
+	for (size_t side = 0; side < side_count; side++) {
+		const Vec3f side_normal(planes[side * 4], planes[side * 4 + 1], planes[side * 4 + 2]);
+		const float32 facing = side_normal.Dot(normal);
+
+		if (facing > most_facing) {
+			most_facing = facing;
+			most_facing_side = static_cast<int32>(side);
+		}
+
+		if (facing < scMinFacing) {
+			continue;
+		}
+
+		const float32 distance = std::abs(side_normal.Dot(point) - planes[side * 4 + 3]);
+
+		if (distance < best_distance) {
+			best_distance = distance;
+			best_side = static_cast<int32>(side);
+		}
+	}
+
+	if (best_side < 0) {
+		return most_facing_side;
+	}
+
+	return best_side;
+}
+
+const String& Blockout::GetSurfaceAt(const physics::RayResult& hit)
+{
+	static const String scEmpty {};
+
+	if (!hit.bHit) {
+		return scEmpty;
+	}
+
+	const auto compiled = mCompiledSurfaceBodies.find(hit.Body.GetIndexAndSequenceNumber());
+
+	if (compiled != mCompiledSurfaceBodies.end()) {
+		const CompiledSurfaceBody& surfaces = compiled->second;
+
+		if (surfaces.bMesh) {
+			uint32 material = 0;
+
+			if (!gPhysics->pBackend->GetTriangleUserData(hit.Body, hit.SubShape, material)) {
+				return scEmpty;
+			}
+
+			return GetCompiledSurface(static_cast<int32>(material));
+		}
+
+		const int32 side = FindHitSide(surfaces.SidePlanes.pData, surfaces.SideMaterials.Size, hit.Point, hit.Normal);
+
+		if (side < 0) {
+			return scEmpty;
+		}
+
+		return GetCompiledSurface(surfaces.SideMaterials[static_cast<size_t>(side)]);
+	}
+
+	physics::Body* body = gPhysics->FindBody(hit.Body);
+
+	if (body == nullptr) {
+		return scEmpty;
+	}
+
+	Object* object = gObjectManager->GetObject(body->GetObjectID());
+
+	if (object == nullptr) {
+		return scEmpty;
+	}
+
+	const MaterialLibraryID object_material = mMaterials.FindID(object->GetMaterialID());
+	const Brush* brush = GetBrush(object);
+
+	if (brush == nullptr || brush->Planes.Size == 0) {
+		return mMaterials.GetSurface(object_material);
+	}
+
+	const Mat4f to_local = object->GetWorldMatrix().AffineInverse();
+	const Vec4f local_point = to_local * Vec4f(hit.Point.X, hit.Point.Y, hit.Point.Z, 1.0f);
+	const Vec4f local_normal = to_local * Vec4f(hit.Normal.X, hit.Normal.Y, hit.Normal.Z, 0.0f);
+
+	std::vector<float32> planes(brush->Planes.Size * 4);
+
+	for (uint32 i = 0; i < brush->Planes.Size; i++) {
+		const BrushPlane& plane = brush->Planes[i];
+
+		planes[i * 4] = plane.Normal.X;
+		planes[i * 4 + 1] = plane.Normal.Y;
+		planes[i * 4 + 2] = plane.Normal.Z;
+		planes[i * 4 + 3] = plane.Distance;
+	}
+
+	const int32 side = FindHitSide(planes.data(), brush->Planes.Size,
+								   Vec3f(local_point.X, local_point.Y, local_point.Z),
+								   Vec3f(local_normal.X, local_normal.Y, local_normal.Z).Normalize());
+
+	if (side < 0 || brush->Planes[static_cast<uint32>(side)].Material.IsEmpty()) {
+		return mMaterials.GetSurface(object_material);
+	}
+
+	return mMaterials.GetSurface(mMaterials.FindIDByName(brush->Planes[static_cast<uint32>(side)].Material.CStr()));
+}
+
 void Blockout::ReloadSingleObject(Object* object)
 {
 	if (object == nullptr || !object->HasTags(eObjectTag::Blockout)) {
@@ -588,6 +710,8 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 
 	mCompiledObjects.clear();
 	mCompiledBodies.clear();
+	mCompiledSurfaceBodies.clear();
+	mCompiledMaterialSurfaces.clear();
 	mCompiledProbeLayout.Clear();
 	mCompiledProbeIrradiance.Free();
 	mCompiledProbeMoments.Free();
@@ -759,22 +883,25 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 		renderer::gGraphics->ClearFogShadow();
 	}
 
+	mCompiledMaterialSurfaces.clear();
+	mCompiledMaterialSurfaces.reserve(map.Materials.Size);
+
+	for (size_t material_index = 0; material_index < map.Materials.Size; material_index++) {
+		const CompiledMapMaterial& material = map.Materials[material_index];
+
+		if (!material.Name.IsEmpty() && !mMaterials.FindIDByName(material.Name.CStr()).IsValid()) {
+			LogWarning(LC_ASSET, "The compiled map uses the unknown material '{}'", material.Name);
+		}
+
+		mCompiledMaterialSurfaces.push_back(
+			mMaterials.GetSurface(FindCompiledMaterial(map, static_cast<int32>(material_index))));
+	}
+
 	mCompiledDecalReceivers.reserve(map.Surfaces.Size);
 
 	for (size_t surface_index = 0; surface_index < map.Surfaces.Size; surface_index++) {
 		const CompiledMapSurface& surface = map.Surfaces[surface_index];
-		const CompiledMapMaterial& material = map.Materials[surface.MaterialIndex];
-
-		MaterialLibraryID library_id = GetCompiledFallbackMaterial(material.LibraryIndex);
-
-		if (!material.Name.IsEmpty()) {
-			library_id = mMaterials.FindIDByName(material.Name.CStr());
-
-			if (!library_id.IsValid()) {
-				LogWarning(LC_ASSET, "The compiled map uses the unknown material '{}'", material.Name);
-				library_id = GetCompiledFallbackMaterial(material.LibraryIndex);
-			}
-		}
+		const MaterialLibraryID library_id = FindCompiledMaterial(map, surface.MaterialIndex);
 
 		const MaterialID material_id = library_id.IsValid() ? GetMaterialForID(library_id) : GetDefaultMaterial();
 
@@ -902,6 +1029,10 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 		body->Teleport(Vec3f::sZero, Quat::scIdentity);
 
 		mCompiledBodies.push_back(body->GetID());
+
+		CompiledSurfaceBody& surfaces = mCompiledSurfaceBodies[body->GetBodyID().GetIndexAndSequenceNumber()];
+		surfaces.SidePlanes = SizedArray<float32>::Clone(hull.SidePlanes);
+		surfaces.SideMaterials = SizedArray<int32>::Clone(hull.SideMaterials);
 	}
 
 	for (size_t mesh_index = 0; mesh_index < map.CollisionMeshes.Size; mesh_index++) {
@@ -931,13 +1062,22 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 			positions.Insert(Vec3f(mesh.Points[i * 3], mesh.Points[i * 3 + 1], mesh.Points[i * 3 + 2]) - midpoint);
 		}
 
+		SizedArray<uint32> triangle_materials;
+		triangle_materials.InitSize(mesh.TriangleMaterials.Size);
+
+		for (size_t triangle = 0; triangle < mesh.TriangleMaterials.Size; triangle++) {
+			triangle_materials[triangle] = static_cast<uint32>(mesh.TriangleMaterials[triangle]);
+		}
+
 		physics::Body* body = gPhysics->NewBody(String::Fmt("WORLD_MESH_{}", mesh_index));
-		body->CreateTriangleMeshBody(positions, mesh.Indices, physics::BodyProps {});
+		body->CreateTriangleMeshBody(positions, mesh.Indices, physics::BodyProps {}, &triangle_materials);
 
 		body->SetMidpoint(midpoint);
 		body->Teleport(Vec3f::sZero, Quat::scIdentity);
 
 		mCompiledBodies.push_back(body->GetID());
+
+		mCompiledSurfaceBodies[body->GetBodyID().GetIndexAndSequenceNumber()].bMesh = true;
 	}
 
 	mCompiledProbeLayout.CopyFrom(map.Probes);
@@ -996,6 +1136,32 @@ MaterialLibraryID Blockout::GetCompiledFallbackMaterial(int32 library_index) con
 	}
 
 	return MaterialLibraryID::scNull;
+}
+
+MaterialLibraryID Blockout::FindCompiledMaterial(const CompiledMap& map, int32 material_index) const
+{
+	const CompiledMapMaterial& material = map.Materials[material_index];
+
+	if (!material.Name.IsEmpty()) {
+		const MaterialLibraryID library_id = mMaterials.FindIDByName(material.Name.CStr());
+
+		if (library_id.IsValid()) {
+			return library_id;
+		}
+	}
+
+	return GetCompiledFallbackMaterial(material.LibraryIndex);
+}
+
+const String& Blockout::GetCompiledSurface(int32 material_index) const
+{
+	static const String scEmpty {};
+
+	if (material_index < 0 || static_cast<size_t>(material_index) >= mCompiledMaterialSurfaces.size()) {
+		return scEmpty;
+	}
+
+	return mCompiledMaterialSurfaces[static_cast<size_t>(material_index)];
 }
 
 MaterialID Blockout::GetDefaultMaterial() const { return mMaterials.GetMaterial(mDefaultMaterialID); }
@@ -2634,6 +2800,40 @@ void Blockout::SaveCamera(ConfigFile& info)
 	camera.AddMember(ConfigEntry::Literal("exposure_ev", gCVars->Get("r_exposure_ev", 0.0f)));
 
 	info.AddEntry(std::move(camera));
+}
+
+void Blockout::LoadSoundEmitters(ConfigFile& info)
+{
+	gWorld->SoundEmitters.Clear();
+
+	const ConfigEntry* sounds = info.GetEntry(HashStr32("sounds"));
+
+	if (sounds == nullptr || !sounds->Members.IsInited()) {
+		return;
+	}
+
+	for (const ConfigEntry& entry : sounds->Members) {
+		SoundEmitter emitter;
+		Serializable<SoundEmitter>::LoadFromConfig(entry, emitter);
+
+		emitter.Name = entry.Name.Get();
+
+		gWorld->SoundEmitters.Add(emitter);
+	}
+}
+
+void Blockout::SaveSoundEmitters(ConfigFile& info)
+{
+	ConfigEntry sounds = ConfigEntry::Struct("sounds");
+
+	for (const SoundEmitter& emitter : gWorld->SoundEmitters.GetEmitters()) {
+		ConfigEntry entry = ConfigEntry::Struct(emitter.Name);
+		Serializable<SoundEmitter>::SaveToConfig(emitter, entry);
+
+		sounds.AddMember(std::move(entry));
+	}
+
+	info.AddEntry(std::move(sounds));
 }
 
 void Blockout::LoadPlayerSpawn(ConfigFile& info)
@@ -4658,6 +4858,7 @@ void Blockout::ResetToTemplate()
 	renderer::gShadowAtlas->Invalidate();
 
 	gWorld->Fog = renderer::FogSettings {};
+	gWorld->SoundEmitters.Clear();
 
 	gWorld->Player.TeleportTo(Vec3f(0.0, 2.0, 0.0));
 
@@ -4706,6 +4907,7 @@ ePrototypeLoadStatus Blockout::Load(const String& opened_path)
 	LoadCamera(info);
 	LoadPlayerSpawn(info);
 	LoadFog(info);
+	LoadSoundEmitters(info);
 
 	// Remove the current blockout from the world
 	RemoveBlockoutFromWorld(pWorld);
@@ -4818,6 +5020,7 @@ void Blockout::Save(const String& save_path)
 	SaveCamera(info);
 	SavePlayerSpawn(info);
 	SaveFog(info);
+	SaveSoundEmitters(info);
 	SaveModels(info);
 
 	CommitEnteredSubviews();

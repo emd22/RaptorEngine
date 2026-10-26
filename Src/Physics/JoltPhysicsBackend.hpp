@@ -139,6 +139,16 @@ struct RagdollImpact
 	uint32 RagdollSerial = 0;
 };
 
+struct SoundImpact
+{
+	Vec3f Point = Vec3f::sZero;
+	Vec3f Normal = Vec3f::sZero;
+	float32 Speed = 0.0f;
+	JPH::BodyID MovingBody {};
+	JPH::BodyID SurfaceBody {};
+	JPH::SubShapeID SurfaceSubShape {};
+};
+
 struct RagdollHit
 {
 	JPH::BodyID Body {};
@@ -157,6 +167,14 @@ public:
 
 	void SetMinImpactSpeed(float32 speed) { mMinImpactSpeed.store(speed); }
 	void SetMinHitSpeed(float32 speed) { mMinHitSpeed.store(speed); }
+	void SetMinSoundSpeed(float32 speed) { mMinSoundSpeed.store(speed); }
+
+	void DrainSoundImpacts(std::vector<SoundImpact>& out_impacts)
+	{
+		std::lock_guard<std::mutex> guard(mImpactsMutex);
+		out_impacts.insert(out_impacts.end(), mSoundImpacts.begin(), mSoundImpacts.end());
+		mSoundImpacts.clear();
+	}
 
 	void DrainHits(std::vector<RagdollHit>& out_hits)
 	{
@@ -186,6 +204,8 @@ public:
 	virtual void OnContactAdded(const JPH::Body& inBody1, const JPH::Body& inBody2,
 								const JPH::ContactManifold& inManifold, JPH::ContactSettings& ioSettings) override
 	{
+		QueueSoundImpact(inBody1, inBody2, inManifold);
+
 		const bool first_tagged = RagdollUserData::Matches(inBody1.GetUserData());
 		const bool second_tagged = RagdollUserData::Matches(inBody2.GetUserData());
 
@@ -275,12 +295,56 @@ public:
 	virtual void OnContactRemoved(const JPH::SubShapeIDPair& inSubShapePair) override {}
 
 private:
+	void QueueSoundImpact(const JPH::Body& inBody1, const JPH::Body& inBody2, const JPH::ContactManifold& inManifold)
+	{
+		if ((!inBody1.IsDynamic() && !inBody2.IsDynamic()) || inManifold.mRelativeContactPointsOn2.empty()) {
+			return;
+		}
+
+		const JPH::RVec3 point = inManifold.GetWorldSpaceContactPointOn2(0);
+		const JPH::Vec3 normal = inManifold.mWorldSpaceNormal;
+		const float32 speed = (inBody1.GetPointVelocity(point) - inBody2.GetPointVelocity(point)).Dot(normal);
+
+		if (speed < mMinSoundSpeed.load()) {
+			return;
+		}
+
+		const bool second_is_surface = !inBody2.IsDynamic() || inBody1.IsDynamic();
+
+		SoundImpact impact;
+		impact.Point = Vec3f(point.GetX(), point.GetY(), point.GetZ());
+		impact.Speed = speed;
+
+		if (second_is_surface) {
+			impact.Normal = Vec3f(-normal.GetX(), -normal.GetY(), -normal.GetZ());
+			impact.MovingBody = inBody1.GetID();
+			impact.SurfaceBody = inBody2.GetID();
+			impact.SurfaceSubShape = inManifold.mSubShapeID2;
+		}
+		else {
+			impact.Normal = Vec3f(normal.GetX(), normal.GetY(), normal.GetZ());
+			impact.MovingBody = inBody2.GetID();
+			impact.SurfaceBody = inBody1.GetID();
+			impact.SurfaceSubShape = inManifold.mSubShapeID1;
+		}
+
+		std::lock_guard<std::mutex> guard(mImpactsMutex);
+
+		if (mSoundImpacts.size() < scMaxQueuedImpacts) {
+			mSoundImpacts.push_back(impact);
+		}
+	}
+
+private:
 	std::atomic<float32> mMinImpactSpeed = 1.0e9f;
 	std::mutex mImpactsMutex;
 	std::vector<RagdollImpact> mImpacts;
 
 	std::atomic<float32> mMinHitSpeed = 1.5f;
 	std::vector<RagdollHit> mHits;
+
+	std::atomic<float32> mMinSoundSpeed = 1.0e9f;
+	std::vector<SoundImpact> mSoundImpacts;
 };
 
 // An example activation listener
@@ -299,6 +363,7 @@ struct RayResult
 	/// World space normal of the surface at `Point`, facing back towards the ray
 	Vec3f Normal = Vec3f::sZero;
 	JPH::BodyID Body {};
+	JPH::SubShapeID SubShape {};
 };
 
 
@@ -323,8 +388,16 @@ public:
 
 	FX_FORCE_INLINE JPH::BodyInterface& GetBodyInterface() { return PhysicsSystem.GetBodyInterface(); }
 
+	bool GetTriangleUserData(const JPH::BodyID body_id, const JPH::SubShapeID sub_shape, uint32& out_user_data) const;
+
 	FX_FORCE_INLINE void SetMinRagdollImpactSpeed(float32 speed) { mContactListener.SetMinImpactSpeed(speed); }
 	FX_FORCE_INLINE void SetMinRagdollHitSpeed(float32 speed) { mContactListener.SetMinHitSpeed(speed); }
+	FX_FORCE_INLINE void SetMinSoundImpactSpeed(float32 speed) { mContactListener.SetMinSoundSpeed(speed); }
+
+	FX_FORCE_INLINE void DrainSoundImpacts(std::vector<SoundImpact>& out_impacts)
+	{
+		mContactListener.DrainSoundImpacts(out_impacts);
+	}
 	FX_FORCE_INLINE void DrainRagdollHits(std::vector<RagdollHit>& out_hits) { mContactListener.DrainHits(out_hits); }
 	FX_FORCE_INLINE void DrainRagdollImpacts(std::vector<RagdollImpact>& out_impacts)
 	{

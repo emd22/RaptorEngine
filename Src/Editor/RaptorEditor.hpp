@@ -10,6 +10,7 @@
 #include "LightEditor.hpp"
 #include "Operation/BaseOperation.hpp"
 #include "Operation/History.hpp"
+#include "SoundEditor.hpp"
 #include "SpawnEditor.hpp"
 
 #include <wx/evtloop.h>
@@ -174,6 +175,9 @@ public:
 	void TopViewMoveLight(const Vec3f offset);
 	void TopViewAimLight(const Vec3f direction);
 	void TopViewCreateLight(const Vec3f position);
+	void TopViewSelectSound(uint32 sound_id);
+	void TopViewMoveSound(const Vec3f offset);
+	void TopViewCreateSound(const Vec3f position);
 	void TopViewSelectSpawn();
 	void TopViewMoveSpawn(const Vec3f offset);
 	void TopViewAimSpawn(const Vec3f direction);
@@ -244,6 +248,7 @@ public:
 	FX_FORCE_INLINE const EditorSelection& GetSelection() const { return mSelection; }
 
 	FX_FORCE_INLINE LightEditor& GetLightEditor() { return mLightEditor; }
+	FX_FORCE_INLINE SoundEditor& GetSoundEditor() { return mSoundEditor; }
 
 	/// Changes a brush's material, and makes it the one new brushes are made with
 	void SetObjectMaterial(Object* object, MaterialID material);
@@ -436,6 +441,8 @@ private:
 	EditorTheme mTheme {};
 
 	LightEditor mLightEditor;
+
+	SoundEditor mSoundEditor;
 
 	GrabEditor mGrabEditor;
 

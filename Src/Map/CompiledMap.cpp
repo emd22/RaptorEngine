@@ -212,6 +212,68 @@ void ReadFogShadow(Reader& reader, CompiledMapFogShadow& out_shadow)
 	}
 }
 
+void ReadCollisionMaterials(Reader& reader, SizedArray<CompiledMapHull>& hulls,
+							SizedArray<CompiledMapCollisionMesh>& meshes, size_t material_count)
+{
+	const auto is_valid_material = [material_count](int32 material)
+	{ return material >= -1 && material < static_cast<int64>(material_count); };
+
+	for (CompiledMapHull& hull : hulls) {
+		const uint32 side_count = reader.ReadCount();
+
+		if (reader.bFailed) {
+			return;
+		}
+
+		hull.SidePlanes.InitSize(static_cast<size_t>(side_count) * 4);
+		hull.SideMaterials.InitSize(side_count);
+
+		reader.Read(hull.SidePlanes.pData, hull.SidePlanes.Size);
+		reader.Read(hull.SideMaterials.pData, hull.SideMaterials.Size);
+
+		for (const int32 material : hull.SideMaterials) {
+			if (!is_valid_material(material)) {
+				reader.bFailed = true;
+				return;
+			}
+		}
+	}
+
+	for (CompiledMapCollisionMesh& mesh : meshes) {
+		const uint32 triangle_count = reader.ReadCount();
+
+		if (reader.bFailed || triangle_count != mesh.Indices.Size / 3) {
+			reader.bFailed = true;
+			return;
+		}
+
+		mesh.TriangleMaterials.InitSize(triangle_count);
+		reader.Read(mesh.TriangleMaterials.pData, mesh.TriangleMaterials.Size);
+
+		for (const int32 material : mesh.TriangleMaterials) {
+			if (!is_valid_material(material)) {
+				reader.bFailed = true;
+				return;
+			}
+		}
+	}
+}
+
+void WriteCollisionMaterials(Writer& writer, const SizedArray<CompiledMapHull>& hulls,
+							 const SizedArray<CompiledMapCollisionMesh>& meshes)
+{
+	for (const CompiledMapHull& hull : hulls) {
+		writer.WriteCount(hull.GetSideCount());
+		writer.Write(hull.SidePlanes.pData, hull.SidePlanes.Size);
+		writer.Write(hull.SideMaterials.pData, hull.SideMaterials.Size);
+	}
+
+	for (const CompiledMapCollisionMesh& mesh : meshes) {
+		writer.WriteCount(mesh.TriangleMaterials.Size);
+		writer.Write(mesh.TriangleMaterials.pData, mesh.TriangleMaterials.Size);
+	}
+}
+
 void WriteFogShadow(Writer& writer, const CompiledMapFogShadow& shadow)
 {
 	writer.Write(shadow.Right, 3);
@@ -599,6 +661,10 @@ bool CompiledMap::Load(const String& path)
 		ReadFogShadow(reader, FogShadow);
 	}
 
+	if (version >= 12 && !reader.bFailed) {
+		ReadCollisionMaterials(reader, Hulls, CollisionMeshes, Materials.Size);
+	}
+
 	for (const CompiledMapSurface& surface : Surfaces) {
 		if (surface.Area != scNoMapArea && (surface.Area < 0 || static_cast<size_t>(surface.Area) >= Areas.Size)) {
 			reader.bFailed = true;
@@ -754,6 +820,7 @@ bool CompiledMap::Save(const String& path) const
 	writer.Write(AreaRoot);
 
 	WriteFogShadow(writer, FogShadow);
+	WriteCollisionMaterials(writer, Hulls, CollisionMeshes);
 
 	return (writer.bFailed == false);
 }

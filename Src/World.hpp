@@ -4,6 +4,7 @@
 #include "WorldGrid.hpp"
 
 #include <Asset/AssetTicket.hpp>
+#include <Audio/SoundEmitters.hpp>
 #include <Map/PortalVisibility.hpp>
 #include <Math/Frustum.hpp>
 #include <Object/Object.hpp>
@@ -210,6 +211,8 @@ public:
 	void RespawnPlayer() { Player.SpawnAt(PlayerSpawn.Position, PlayerSpawn.Direction); }
 
 	renderer::FogSettings Fog;
+
+	SoundEmitterSet SoundEmitters;
 
 	Blockout* pPrototype = nullptr;
 	String PrototypePath;

@@ -954,6 +954,49 @@ void RaptorGame::UpdateRagdollDummies()
 	}
 }
 
+void RaptorGame::PlayImpactSounds()
+{
+	mImpactSoundClock += DeltaTime;
+
+	gPhysics->pBackend->SetMinSoundImpactSpeed(scImpactSoundMinSpeed);
+
+	mSoundImpacts.clear();
+	gPhysics->pBackend->DrainSoundImpacts(mSoundImpacts);
+
+	for (const physics::SoundImpact& impact : mSoundImpacts) {
+		const auto [entry, inserted] = mImpactSoundTimes.try_emplace(impact.MovingBody.GetIndexAndSequenceNumber(),
+																	 mImpactSoundClock);
+
+		if (!inserted) {
+			if (mImpactSoundClock - entry->second < scImpactSoundCooldown) {
+				continue;
+			}
+
+			entry->second = mImpactSoundClock;
+		}
+
+		physics::RayResult surface;
+		surface.bHit = true;
+		surface.Point = impact.Point;
+		surface.Normal = impact.Normal;
+		surface.Body = impact.SurfaceBody;
+		surface.SubShape = impact.SurfaceSubShape;
+
+		const float32 volume = std::clamp((impact.Speed - scImpactSoundMinSpeed) /
+											  (scImpactSoundFullSpeed - scImpactSoundMinSpeed),
+										  scImpactSoundMinVolume, 1.0f);
+
+		const SoundID sound = gAudio->PlayForSurface("impact", gWorld->pPrototype->GetSurfaceAt(surface),
+													 impact.Point);
+		gAudio->SetVolume(sound, volume);
+	}
+
+	if (mImpactSoundTimes.size() > scMaxImpactSoundBodies) {
+		std::erase_if(mImpactSoundTimes, [this](const auto& entry)
+					  { return mImpactSoundClock - entry.second >= scImpactSoundCooldown; });
+	}
+}
+
 void RaptorGame::UpdateWindowTitle()
 {
 	const bool is_compiled = (gWorld != nullptr && gWorld->pPrototype != nullptr &&
@@ -1194,6 +1237,7 @@ void RaptorGame::Tick()
 	const Ref<FPSCamera>& listener = gWorld->GetCurrentCamera();
 	gAudio->SetListener(listener->GetPosition(), listener->GetForwardVector(), listener->GetUpVector());
 	gAudio->Update(gGraphics->GetWindow()->IsFocused());
+	gWorld->SoundEmitters.Update(static_cast<float32>(DeltaTime), listener->GetPosition());
 
 	Ref<FPSCamera> camera = gWorld->Player.pCamera;
 
@@ -1216,6 +1260,7 @@ void RaptorGame::Tick()
 	}
 
 	gPhysics->pBackend->Update(static_cast<float32>(DeltaTime));
+	PlayImpactSounds();
 
 	FrameData* frame = gGraphics->GetFrame();
 

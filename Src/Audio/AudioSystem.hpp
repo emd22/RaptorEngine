@@ -104,6 +104,8 @@ public:
 	SoundID Play2D(const char* name);
 	SoundID Play2D(Hash32 name_hash);
 
+	SoundID PlayForSurface(const char* event, const String& surface, const Vec3f position);
+
 	void SetPosition(SoundID id, const Vec3f position);
 	void SetVolume(SoundID id, float32 volume);
 	void Stop(SoundID id);
@@ -122,6 +124,7 @@ public:
 	uint32 GetSampleRate() const;
 	uint32 GetChannelCount() const;
 	const SoundDef* FindDef(Hash32 name_hash) const;
+	const std::vector<SoundDef>& GetDefs() const { return mDefs; }
 
 private:
 	struct Backend;

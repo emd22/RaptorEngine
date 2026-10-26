@@ -1,6 +1,8 @@
 #include "WeaponSystem.hpp"
 
 #include <Asset/ConfigFile.hpp>
+#include <Audio/AudioSystem.hpp>
+#include <Blockout.hpp>
 #include <CVar.hpp>
 #include <Color.hpp>
 #include <Core/FilesystemIO.hpp>
@@ -94,6 +96,8 @@ const char* EventName(eEvent event)
 		return "lower";
 	case eEvent::ModeChanged:
 		return "mode changed";
+	case eEvent::Count:
+		break;
 	}
 
 	return "";
@@ -187,6 +191,25 @@ void WeaponSystem::LoadEffects(const ConfigEntry* effects, Weapon& weapon)
 	weapon.MuzzleJoint = StringMember(effects, "muzzle_joint", scDefaultMuzzleJoint);
 }
 
+void WeaponSystem::LoadSounds(const ConfigEntry* sounds, Weapon& weapon)
+{
+	static constexpr const char* scEventSoundKeys[] = {
+		"fire", "dry_fire", "reload_begin", "reload_end", "raise", "lower", "mode",
+	};
+
+	static_assert(std::size(scEventSoundKeys) == static_cast<size_t>(eEvent::Count));
+
+	for (uint32 i = 0; i < static_cast<uint32>(eEvent::Count); i++) {
+		weapon.EventSounds[i] = 0;
+
+		if (const ConfigEntry* sound = Child(sounds, scEventSoundKeys[i])) {
+			weapon.EventSounds[i] = HashStr32(sound->GetValue<const char*>());
+		}
+	}
+
+	weapon.BulletSound = StringMember(sounds, "bullet", "bullet");
+}
+
 bool WeaponSystem::LoadWeapon(const char* path, Weapon& weapon)
 {
 	ConfigFile config;
@@ -214,6 +237,7 @@ bool WeaponSystem::LoadWeapon(const char* path, Weapon& weapon)
 	const ConfigEntry* ammo = config.GetEntry(HashStr32("ammo"));
 	const ConfigEntry* switching = config.GetEntry(HashStr32("switch"));
 	const ConfigEntry* effects = config.GetEntry(HashStr32("effects"));
+	const ConfigEntry* sounds = config.GetEntry(HashStr32("sounds"));
 
 	weapon.ScriptPath = String(script_entry->GetValue<const char*>());
 	weapon.Name = name_entry != nullptr ? String(name_entry->GetValue<const char*>()) : String("Weapon");
@@ -226,6 +250,7 @@ bool WeaponSystem::LoadWeapon(const char* path, Weapon& weapon)
 	}
 
 	LoadEffects(effects, weapon);
+	LoadSounds(sounds, weapon);
 
 	weapon.IdleAnim = StringMember(animations, "idle", "BASE");
 	weapon.FireAnim = StringMember(animations, "fire", "Armature|Fire");
@@ -553,6 +578,10 @@ void WeaponSystem::HandleEvent(eEvent event)
 
 	const Weapon& weapon = mWeapons[mActive];
 
+	if (event >= eEvent::Fire && event < eEvent::Count && weapon.EventSounds[static_cast<uint32>(event)] != 0) {
+		gAudio->Play2D(weapon.EventSounds[static_cast<uint32>(event)]);
+	}
+
 	switch (event) {
 	case eEvent::Fire:
 		mpPlayer->DoFireAnimation(weapon.ViewKickback);
@@ -613,6 +642,8 @@ void WeaponSystem::ApplyHit(float32 damage, float32 force, bool decal)
 
 		hit_npc->Damage(damage, mLastHit.Body);
 
+		gAudio->PlayForSurface(mWeapons[mActive].BulletSound.CStr(), String("flesh"), mLastHit.Point);
+
 		if (force > 0.0f) {
 			hit_npc->AddImpulse(mLastHit.Body, mLastDirection * force, mLastHit.Point);
 		}
@@ -643,6 +674,8 @@ void WeaponSystem::ApplyHit(float32 damage, float32 force, bool decal)
 		for (uint32 i = 0; i < weapon.ImpactEffectCount; i++) {
 			gParticleSystem->Play(weapon.ImpactEffects[i], origin, direction);
 		}
+
+		gAudio->PlayForSurface(weapon.BulletSound.CStr(), gWorld->pPrototype->GetSurfaceAt(mLastHit), origin);
 	}
 
 	if (hit_npc == nullptr && motion == JPH::EMotionType::Dynamic && force > 0.0f) {

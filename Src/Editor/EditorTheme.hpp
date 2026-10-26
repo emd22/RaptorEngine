@@ -101,6 +101,8 @@ struct EditorTheme
 		Color LightSelected = Color::FromRGBA(255, 255, 90, 255);
 		Color Spawn = Color::FromRGBA(70, 220, 255, 255);
 		Color SpawnIdle = Color::FromRGBA(70, 130, 150, 255);
+		Color Sound = Color::FromRGBA(200, 110, 255, 255);
+		Color SoundSelected = Color::FromRGBA(235, 185, 255, 255);
 		Color SelectedOutline = Color::FromRGBA(255, 255, 255, 255);
 	};
 
@@ -235,6 +237,8 @@ RS_OBJECT_BEGIN(fx::editor::EditorTheme::MarkerColors)
 	RS_FIELD_NAMED(LightSelected, "light_selected")
 	RS_FIELD_NAMED(Spawn, "spawn")
 	RS_FIELD_NAMED(SpawnIdle, "spawn_idle")
+	RS_FIELD_NAMED(Sound, "sound")
+	RS_FIELD_NAMED(SoundSelected, "sound_selected")
 	RS_FIELD_NAMED(SelectedOutline, "selected_outline")
 RS_OBJECT_END()
 

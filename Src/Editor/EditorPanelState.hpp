@@ -103,6 +103,23 @@ struct WorldPanelState
 	bool operator==(const WorldPanelState& other) const = default;
 };
 
+struct SoundPanelState
+{
+	bool bHasSound = false;
+
+	String Name;
+	String Sound;
+	Vec3f Position = Vec3f::sZero;
+
+	float32 Volume = 1.0f;
+	float32 MinInterval = 0.0f;
+	float32 MaxInterval = 0.0f;
+
+	String SoundNames;
+
+	bool operator==(const SoundPanelState& other) const = default;
+};
+
 struct LightPanelState
 {
 	bool bHasLight = false;
@@ -254,12 +271,15 @@ enum class eTopViewMarkerKind : uint8
 {
 	Light,
 	Spawn,
+	Sound,
 };
 
 struct TopViewMarker
 {
 	eTopViewMarkerKind Kind = eTopViewMarkerKind::Light;
-	uint32 LightId = 0;
+	uint32 Id = 0;
+
+	float32 Radius = 0.0f;
 
 	Vec3f Position = Vec3f::sZero;
 	Vec3f AimOrigin = Vec3f::sZero;
@@ -357,6 +377,7 @@ struct EditorPanelState
 	MaterialLibraryState Materials;
 	WorldPanelState World;
 	LightPanelState Light;
+	SoundPanelState Sound;
 	TopViewState TopView;
 
 	String BlockoutPath;

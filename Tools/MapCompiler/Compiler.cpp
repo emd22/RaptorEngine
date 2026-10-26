@@ -67,7 +67,7 @@ bool HasFloorBelow(const PlaneSet& planes, const MapSource& source, const Vec3d&
 	return false;
 }
 
-void AddHulls(const MapSource& source, CompiledMap& map)
+void AddHulls(const PlaneSet& planes, const MapSource& source, CompiledMap& map)
 {
 	size_t hull_count = 0;
 
@@ -123,6 +123,36 @@ void AddHulls(const MapSource& source, CompiledMap& map)
 
 		CompiledMapHull hull;
 		hull.Points = ArrayUtil::DynToSizedArray(points);
+
+		hull.SidePlanes.InitSize(brush.Shape.Sides.Size * 4);
+		hull.SideMaterials.InitSize(brush.Shape.Sides.Size);
+
+		for (size_t side_index = 0; side_index < brush.Shape.Sides.Size; side_index++) {
+			const PolyhedronSide& side = brush.Shape.Sides[side_index];
+
+			int32 material = brush.MaterialIndex;
+			Vec3d normal = Vec3d(0.0);
+			double distance = 0.0;
+
+			if (side.PlaneIndex != PlaneSet::scNone) {
+				const Plane& plane = planes[side.PlaneIndex];
+				normal = plane.Normal;
+				distance = plane.Distance;
+
+				int32 face_material = SourceBrush::scDroppedFace;
+
+				if (brush.FindMap(side.PlaneIndex, face_material) != nullptr &&
+					face_material != SourceBrush::scDroppedFace) {
+					material = face_material;
+				}
+			}
+
+			hull.SidePlanes[side_index * 4] = static_cast<float32>(normal.X);
+			hull.SidePlanes[side_index * 4 + 1] = static_cast<float32>(normal.Y);
+			hull.SidePlanes[side_index * 4 + 2] = static_cast<float32>(normal.Z);
+			hull.SidePlanes[side_index * 4 + 3] = static_cast<float32>(distance);
+			hull.SideMaterials[side_index] = material;
+		}
 
 		map.Hulls.Emplace(std::move(hull));
 	}
@@ -349,7 +379,7 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 
 		areas.Write(planes, bsp, source, map);
 
-		AddHulls(source, map);
+		AddHulls(planes, source, map);
 		patches.WriteCollision(surface_options.ChunkSize, map);
 	}
 

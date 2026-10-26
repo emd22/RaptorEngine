@@ -1,6 +1,8 @@
 #include "Player.hpp"
 
 #include <Asset/AssetManager.hpp>
+#include <Audio/AudioSystem.hpp>
+#include <Blockout.hpp>
 #include <CVar.hpp>
 #include <Core/Random.hpp>
 #include <Core/RefUtil.hpp>
@@ -384,6 +386,11 @@ void Player::UpdateLanding(float32 delta_time)
 		if (dip > 0.0f) {
 			mLandingVelocity -= dip * SpringImpulsePerPeak(scLandingFrequency, scLandingDamping);
 		}
+
+		if (impact_speed >= scLandingSoundMinSpeed) {
+			PlayGroundSound("land", std::min(impact_speed / scLandingSoundFullSpeed, 1.0f));
+			mFootstepDistance = 0.0f;
+		}
 	}
 
 	mbWasOnGround = on_ground;
@@ -594,6 +601,46 @@ void Player::UpdateRecoil(float32 delta_time)
 }
 
 
+void Player::PlayGroundSound(const char* event, float32 volume)
+{
+	const JPH::CharacterVirtual& character = *Physics.pPlayerVirt;
+
+	physics::RayResult ground;
+	ground.bHit = true;
+	ground.Point.FromJoltVec3(character.GetGroundPosition());
+	ground.Normal.FromJoltVec3(character.GetGroundNormal());
+	ground.Body = character.GetGroundBodyID();
+	ground.SubShape = character.GetGroundSubShapeID();
+
+	const SoundID sound = gAudio->PlayForSurface(event, gWorld->pPrototype->GetSurfaceAt(ground), ground.Point);
+	gAudio->SetVolume(sound, volume);
+}
+
+void Player::UpdateFootsteps(float32 delta_time)
+{
+	const bool on_ground = Physics.pPlayerVirt->GetGroundState() == JPH::CharacterVirtual::EGroundState::OnGround;
+
+	if (!on_ground || mbIsFlymode || mHorizontalSpeed < scFootstepMinSpeed) {
+		return;
+	}
+
+	float32 stride = scFootstepWalkDistance;
+
+	if (bIsSprinting) {
+		stride = scFootstepSprintDistance;
+	}
+
+	mFootstepDistance += mHorizontalSpeed * delta_time;
+
+	if (mFootstepDistance < stride) {
+		return;
+	}
+
+	mFootstepDistance -= stride;
+
+	PlayGroundSound("footstep", std::clamp(mHorizontalSpeed / scSprintSpeed, scFootstepMinVolume, 1.0f));
+}
+
 void Player::UpdateMeasuredMotion(const Vec3f& previous_position, float32 delta_time)
 {
 	if (delta_time <= 1.0e-5f) {
@@ -644,6 +691,7 @@ void Player::Update(float64 delta_time)
 	UpdateRecoil(static_cast<float32>(delta_time));
 
 	UpdateLanding(static_cast<float32>(delta_time));
+	UpdateFootsteps(static_cast<float32>(physics_time));
 
 	pCamera->SetPosition(Position + mCameraOffset + Vec3f(0.0f, mLandingOffset, 0.0f));
 

@@ -57,6 +57,7 @@ constexpr ToolButtonInfo scToolButtons[] = {
 	{ "Rotate", "Rotate the selected brushes (R)", "Textures/editor_new/rotate.png" },
 	{ "Clip", "Drag a line across the selected brushes to split them in two (C)", "Textures/editor_new/cut.png" },
 	{ "Light", "Select, move, aim and add spot lights (I)", "Textures/editor_new/light.png" },
+	{ "Sound", "Select, move and add ambient sound emitters (K)", "Textures/editor_new/sound.png" },
 };
 
 static_assert(std::size(scToolButtons) == static_cast<size_t>(eEditorTool::Count));
@@ -271,6 +272,7 @@ bool ShowPatchTextureDialog(wxWindow* parent, PatchTextureSettings& settings)
 
 constexpr const char* scDataFilterNames[] = {
 	"All", "Probe Volumes", "Reflection Probes", "Spawn Points", "Volumes", "Lights", "nvbrush", "dbound", "portal",
+	"Sounds",
 };
 
 static_assert(std::size(scDataFilterNames) == static_cast<size_t>(eDataFilter::Count));

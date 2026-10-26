@@ -14,6 +14,7 @@
 #include "EditorThread.hpp"
 
 #include <Asset/MeshGen.hpp>
+#include <Audio/AudioSystem.hpp>
 #include <Blockout.hpp>
 #include <Controls.hpp>
 #include <Core/DynArray.hpp>
@@ -586,7 +587,7 @@ TopViewState RaptorEditor::BuildTopViewState()
 		TopViewMarker& marker = view.Markers.Emplace();
 
 		marker.Kind = eTopViewMarkerKind::Light;
-		marker.LightId = light.ID.ID;
+		marker.Id = light.ID.ID;
 		marker.Position = position;
 		marker.AimOrigin = position;
 		marker.Direction = light.GetDirection().Normalize();
@@ -594,6 +595,25 @@ TopViewState RaptorEditor::BuildTopViewState()
 		marker.BoundsMax = position;
 		marker.bSelected = (selected_light == &light);
 		marker.bSelectable = (mCurrentTool == eEditorTool::Light);
+	}
+
+	const SoundEmitter* selected_sound = mSoundEditor.GetSelected();
+
+	for (const SoundEmitter& emitter : gWorld->SoundEmitters.GetEmitters()) {
+		TopViewMarker& marker = view.Markers.Emplace();
+
+		marker.Kind = eTopViewMarkerKind::Sound;
+		marker.Id = emitter.Id;
+		marker.Position = emitter.Position;
+		marker.AimOrigin = emitter.Position;
+		marker.BoundsMin = emitter.Position;
+		marker.BoundsMax = emitter.Position;
+		marker.bSelected = (selected_sound == &emitter);
+		marker.bSelectable = (mCurrentTool == eEditorTool::Sound);
+
+		if (const SoundDef* def = gAudio->FindDef(HashStr32(emitter.Sound.CStr())); def != nullptr && def->bSpatial) {
+			marker.Radius = def->MaxDistance;
+		}
 	}
 
 	if (IsSpawnPointShown()) {
@@ -2979,6 +2999,37 @@ void RaptorEditor::TopViewCreateLight(const Vec3f position)
 	}
 }
 
+void RaptorEditor::TopViewSelectSound(uint32 sound_id)
+{
+	if (IsSimulationMode() || mCurrentTool != eEditorTool::Sound) {
+		return;
+	}
+
+	if (sound_id == 0) {
+		mSoundEditor.Deselect();
+	}
+	else {
+		mSoundEditor.Select(sound_id);
+	}
+
+	mbForcePanelSync = true;
+}
+
+void RaptorEditor::TopViewMoveSound(const Vec3f offset)
+{
+	if (!IsSimulationMode() && mCurrentTool == eEditorTool::Sound) {
+		mSoundEditor.MoveSelected(offset);
+	}
+}
+
+void RaptorEditor::TopViewCreateSound(const Vec3f position)
+{
+	if (!IsSimulationMode() && mCurrentTool == eEditorTool::Sound) {
+		mSoundEditor.Create(position);
+		mbForcePanelSync = true;
+	}
+}
+
 void RaptorEditor::TopViewSelectSpawn()
 {
 	if (!IsSimulationMode()) {
@@ -3027,6 +3078,10 @@ void RaptorEditor::TopViewDelete()
 		mLightEditor.DeleteSelected();
 		mbForcePanelSync = true;
 	}
+	else if (mCurrentTool == eEditorTool::Sound) {
+		mSoundEditor.DeleteSelected();
+		mbForcePanelSync = true;
+	}
 	else if (mbSpawnSelected) {
 		mSpawnEditor.ResetToDefault();
 	}
@@ -3043,6 +3098,10 @@ void RaptorEditor::TopViewDuplicate()
 
 	if (mCurrentTool == eEditorTool::Light) {
 		mLightEditor.DuplicateSelected();
+		mbForcePanelSync = true;
+	}
+	else if (mCurrentTool == eEditorTool::Sound) {
+		mSoundEditor.DuplicateSelected();
 		mbForcePanelSync = true;
 	}
 	else {

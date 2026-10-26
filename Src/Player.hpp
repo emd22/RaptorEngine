@@ -58,6 +58,13 @@ class Player
 	static constexpr float32 scLandingFrequency = 18.0f;
 	static constexpr float32 scLandingDamping = 0.35f;
 	static constexpr float32 scLandingViewModelCounter = 0.25f;
+
+	static constexpr float32 scFootstepWalkDistance = 1.9f;
+	static constexpr float32 scFootstepSprintDistance = 2.4f;
+	static constexpr float32 scFootstepMinSpeed = 0.5f;
+	static constexpr float32 scFootstepMinVolume = 0.4f;
+	static constexpr float32 scLandingSoundMinSpeed = 2.0f;
+	static constexpr float32 scLandingSoundFullSpeed = 9.0f;
 	static constexpr float32 scViewModelVelocityLag = 0.004f;
 	static constexpr float32 scViewModelVerticalLagSpeed = 12.0f;
 
@@ -156,6 +163,8 @@ private:
 	void UpdateRecoil(float32 delta_time);
 	void UpdateViewKick(float32 delta_time);
 	void UpdateLanding(float32 delta_time);
+	void UpdateFootsteps(float32 delta_time);
+	void PlayGroundSound(const char* event, float32 volume);
 	static float32 ViewKickImpulsePerPeak();
 	void UpdateViewModelSway(float32 delta_time);
 	void UpdateMeasuredMotion(const Vec3f& previous_position, float32 delta_time);
@@ -207,6 +216,8 @@ private:
 	float32 mLandingOffset = 0.0f;
 	float32 mLandingVelocity = 0.0f;
 	bool mbWasOnGround = false;
+
+	float32 mFootstepDistance = 0.0f;
 
 	PlayerController mWalkController;
 	NoClipController mNoClipController;

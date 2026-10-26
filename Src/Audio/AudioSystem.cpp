@@ -396,6 +396,31 @@ SoundID AudioSystem::Play(Hash32 name_hash, const Vec3f position) { return Start
 
 SoundID AudioSystem::Play2D(const char* name) { return Play2D(HashStr32(name)); }
 
+SoundID AudioSystem::PlayForSurface(const char* event, const String& surface, const Vec3f position)
+{
+	if (mpBackend == nullptr) {
+		return {};
+	}
+
+	const std::string base(event);
+
+	if (!surface.IsEmpty()) {
+		const Hash32 surface_sound = HashStr32((base + "_" + surface.CStr()).c_str());
+
+		if (FindDefIndex(surface_sound) != UINT32_MAX) {
+			return Play(surface_sound, position);
+		}
+	}
+
+	const Hash32 default_sound = HashStr32((base + "_default").c_str());
+
+	if (FindDefIndex(default_sound) != UINT32_MAX) {
+		return Play(default_sound, position);
+	}
+
+	return Play(HashStr32(event), position);
+}
+
 SoundID AudioSystem::Play2D(Hash32 name_hash) { return StartVoice(name_hash, Vec3f::sZero, false); }
 
 uint32 AudioSystem::AcquireVoice(uint32 def_index)
