@@ -1,4 +1,4 @@
-#include "Serialize2.hpp"
+#include "Serialize.hpp"
 
 #include <Asset/ConfigFile.hpp>
 #include <Core/Log.hpp>
@@ -407,7 +407,8 @@ bool SerializerIO::ReadConfigStringField(const char* name, const char*& out_data
 		return false;
 	}
 
-	if (member->bIsArray || member->Type != ConfigPrimitive::ePrimitiveType::String || member->mStringValue == nullptr) {
+	if (member->bIsArray || member->Type != ConfigPrimitive::ePrimitiveType::String ||
+		member->mStringValue == nullptr) {
 		LogWarning("Config member '{}' is not a string", name);
 		return false;
 	}

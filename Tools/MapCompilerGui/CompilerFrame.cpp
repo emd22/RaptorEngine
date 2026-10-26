@@ -193,8 +193,8 @@ CompilerFrame::CompilerFrame(const String& map_directory)
 		integer_sizer->Add(new wxStaticText(options_box, wxID_ANY, label),
 						   wxSizerFlags().CenterVertical().Border(wxRIGHT, scBorder));
 
-		wxSpinCtrl* spin = new wxSpinCtrl(options_box, wxID_ANY, "", wxDefaultPosition, wxSize(90, -1),
-										  wxSP_ARROW_KEYS, min, max, value);
+		wxSpinCtrl* spin = new wxSpinCtrl(options_box, wxID_ANY, "", wxDefaultPosition, wxSize(90, -1), wxSP_ARROW_KEYS,
+										  min, max, value);
 		spin->SetIncrement(step);
 		spin->SetToolTip(tooltip);
 		integer_sizer->Add(spin, wxSizerFlags().CenterVertical());
@@ -216,9 +216,10 @@ CompilerFrame::CompilerFrame(const String& map_directory)
 							 scSunRadiusStep,
 							 "Half the angle the sun covers in the sky. Wider makes softer shadow edges");
 
-	mpBakeIndirect = add_checkbox("Bake bounced light", default_lightmap.bIndirect,
-								  "Gather the light that bounces between surfaces into the lightmap. The engine uses it "
-								  "in place of the light probes' diffuse light on the compiled surfaces");
+	mpBakeIndirect = add_checkbox(
+		"Bake bounced light", default_lightmap.bIndirect,
+		"Gather the light that bounces between surfaces into the lightmap. The engine uses it "
+		"in place of the light probes' diffuse light on the compiled surfaces");
 	mpIndirectRays = add_integer("Bounce rays per texel", scMinIndirectRays, scMaxIndirectRays,
 								 static_cast<int>(default_lightmap.IndirectRays), scIndirectRayStep,
 								 "Rays each lightmap texel traces for every bounce. More is smoother and slower");
@@ -238,8 +239,8 @@ CompilerFrame::CompilerFrame(const String& map_directory)
 
 	const wxString denoise_levels[] = { "Off", "Low", "Medium", "High" };
 
-	mpIndirectDenoise = new wxChoice(options_box, wxID_ANY, wxDefaultPosition, wxDefaultSize,
-									 WXSIZEOF(denoise_levels), denoise_levels);
+	mpIndirectDenoise = new wxChoice(options_box, wxID_ANY, wxDefaultPosition, wxDefaultSize, WXSIZEOF(denoise_levels),
+									 denoise_levels);
 	mpIndirectDenoise->SetSelection(static_cast<int>(default_lightmap.IndirectDenoise));
 	mpIndirectDenoise->SetToolTip("How far the bounced light is smoothed across each surface to hide the noise of the "
 								  "rays. Edges, corners and real changes in brightness are kept. Higher reaches "
@@ -411,8 +412,10 @@ CompileOptions CompilerFrame::ReadOptions() const
 	options.bKeepOutside = mpKeepOutside->GetValue();
 
 	options.bPlaceProbes = mpPlaceProbes->GetValue();
-	options.Probes.LevelSpacing = static_cast<float32>(mpProbeLevelSpacing->GetValue());
-	options.Probes.BrushSpacing = static_cast<float32>(mpProbeBrushSpacing->GetValue());
+
+	options.ProbeSettings.LevelSpacing = static_cast<float32>(mpProbeLevelSpacing->GetValue());
+	options.ProbeSettings.BrushSpacing = static_cast<float32>(mpProbeBrushSpacing->GetValue());
+
 	options.Lightmap.bEnabled = mpBakeLightmap->GetValue();
 	options.Lightmap.Density = mpLightmapDensity->GetValue();
 	options.Lightmap.SunRadiusDegrees = mpSunRadius->GetValue();
@@ -421,6 +424,7 @@ CompileOptions CompilerFrame::ReadOptions() const
 	options.Lightmap.IndirectBounces = static_cast<uint32>(mpIndirectBounces->GetValue());
 	options.Lightmap.IndirectCacheMegabytes = static_cast<uint32>(mpIndirectCache->GetValue());
 	options.Lightmap.IndirectDenoise = static_cast<eDenoiseQuality>(mpIndirectDenoise->GetSelection());
+
 	options.VerifyRays = mpVerify->GetValue() ? static_cast<uint32>(mpVerifyRays->GetValue()) : 0;
 
 	return options;
@@ -436,8 +440,8 @@ void CompilerFrame::WriteOptions(const CompileOptions& options)
 	mpKeepOutside->SetValue(options.bKeepOutside);
 
 	mpPlaceProbes->SetValue(options.bPlaceProbes);
-	mpProbeLevelSpacing->SetValue(options.Probes.LevelSpacing);
-	mpProbeBrushSpacing->SetValue(options.Probes.BrushSpacing);
+	mpProbeLevelSpacing->SetValue(options.ProbeSettings.LevelSpacing);
+	mpProbeBrushSpacing->SetValue(options.ProbeSettings.BrushSpacing);
 	mpBakeLightmap->SetValue(options.Lightmap.bEnabled);
 	mpLightmapDensity->SetValue(options.Lightmap.Density);
 	mpSunRadius->SetValue(options.Lightmap.SunRadiusDegrees);
@@ -533,8 +537,8 @@ void CompilerFrame::SavePreset()
 	mPresets.Store(name, options);
 
 	if (!mPresets.Save()) {
-		wxMessageBox(wxString::Format("Could not write the presets to %s", PresetLibrary::scDefaultPath),
-					 "Save Preset", wxOK | wxICON_ERROR, this);
+		wxMessageBox(wxString::Format("Could not write the presets to %s", PresetLibrary::scDefaultPath), "Save Preset",
+					 wxOK | wxICON_ERROR, this);
 		return;
 	}
 

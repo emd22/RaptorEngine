@@ -275,7 +275,7 @@ static FLOAT4 N_object_ray_get_face(Object* obj)
 	if (obj->IsProbeVolume()) {
 		Vec3f face;
 
-		const float32 distance = obj->RaycastBounds(gWorld->Player.pCamera->Position,
+		const float32 distance = obj->RaycastBounds(gWorld->Player.pCamera->GetPosition(),
 													gWorld->Player.pCamera->GetForwardVector(), face);
 
 		return (distance >= 0.0f) ? face.mIntrin : simd::LoadFloat4(0.0f);
@@ -284,7 +284,7 @@ static FLOAT4 N_object_ray_get_face(Object* obj)
 	if (gWorld->pPrototype->GetBrush(obj) != nullptr) {
 		Vec3f face_normal;
 
-		if (!gWorld->pPrototype->RaycastFace(obj, gWorld->Player.pCamera->Position,
+		if (!gWorld->pPrototype->RaycastFace(obj, gWorld->Player.pCamera->GetPosition(),
 											 gWorld->Player.pCamera->GetForwardVector(), face_normal)) {
 			return simd::LoadFloat4(0.0f);
 		}
@@ -297,7 +297,7 @@ static FLOAT4 N_object_ray_get_face(Object* obj)
 		return simd::LoadFloat4(0.0f);
 	}
 
-	return gPhysics->pBackend->RaycastGetFaceOfBox(body->GetBody(), gWorld->Player.pCamera->Position,
+	return gPhysics->pBackend->RaycastGetFaceOfBox(body->GetBody(), gWorld->Player.pCamera->GetPosition(),
 												   gWorld->Player.pCamera->GetForwardVector() * 4.0f);
 }
 
@@ -334,7 +334,7 @@ static uint32 N_ctrl_mouse_state()
 }
 
 
-static FLOAT4 N_camera_position() { return gWorld->GetCurrentCamera()->Position.mIntrin; }
+static FLOAT4 N_camera_position() { return gWorld->GetCurrentCamera()->GetPosition().mIntrin; }
 static FLOAT4 N_player_get_position(void*) { return gWorld->Player.Position.mIntrin; }
 
 static void N_player_set_speed_multiplier(void*, float mult) { gWorld->Player.SpeedMultiplier = mult; }
@@ -342,8 +342,8 @@ static bool N_player_is_flymode(void*) { return gWorld->Player.IsFlyMode(); }
 
 static FLOAT4 N_player_ray_get_point(void*, float32 range)
 {
-	physics::RayResult rr = gPhysics->pBackend->Raycast(gWorld->Player.pCamera->Position,
-														gWorld->Player.pCamera->Direction * range);
+	physics::RayResult rr = gPhysics->pBackend->Raycast(gWorld->Player.pCamera->GetPosition(),
+														gWorld->Player.pCamera->GetForwardVector() * range);
 
 	if (!rr.bHit) {
 		return simd::LoadFloat4(0.0f);
@@ -354,8 +354,8 @@ static FLOAT4 N_player_ray_get_point(void*, float32 range)
 
 static FLOAT4 N_player_ray_get_normal(void*, float32 range)
 {
-	physics::RayResult rr = gPhysics->pBackend->Raycast(gWorld->Player.pCamera->Position,
-														gWorld->Player.pCamera->Direction * range);
+	physics::RayResult rr = gPhysics->pBackend->Raycast(gWorld->Player.pCamera->GetPosition(),
+														gWorld->Player.pCamera->GetForwardVector() * range);
 
 	if (!rr.bHit) {
 		return simd::LoadFloat4(0.0f);
@@ -367,7 +367,7 @@ static FLOAT4 N_player_ray_get_normal(void*, float32 range)
 /// Where the crosshair's ray meets the plane through `point` facing `normal`, or `point` if the ray never reaches it
 static FLOAT4 N_camera_ray_to_plane(FLOAT4 point, FLOAT4 normal)
 {
-	const Vec3f origin = gWorld->Player.pCamera->Position;
+	const Vec3f origin = gWorld->Player.pCamera->GetPosition();
 	const Vec3f direction = gWorld->Player.pCamera->GetForwardVector();
 	const Vec3f plane_normal(normal);
 
@@ -432,7 +432,7 @@ static FLOAT4 N_blockout_ray_hit_point(Object* object)
 	Vec3f point;
 
 	if (object == nullptr ||
-		!gWorld->pPrototype->RaycastFace(object, gWorld->Player.pCamera->Position,
+		!gWorld->pPrototype->RaycastFace(object, gWorld->Player.pCamera->GetPosition(),
 										 gWorld->Player.pCamera->GetForwardVector(), face_normal, &point)) {
 		return simd::LoadFloat4(0.0f);
 	}

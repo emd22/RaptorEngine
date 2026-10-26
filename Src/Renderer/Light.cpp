@@ -7,7 +7,7 @@
 
 #include "Light.hpp"
 
-#include "Camera.hpp"
+#include "Camera/PerspectiveCamera.hpp"
 #include "Engine.hpp"
 
 #include <Math/Frustum.hpp>
@@ -28,7 +28,7 @@ using VertexType = LightBase::VertexType;
 
 LightBase::LightBase(eLightFlags flags) : Flags(flags) {}
 
-void LightBase::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
+void LightBase::Render(const PerspectiveCamera2& camera, BaseCamera* shadow_camera)
 {
 	if (!bEnabled) {
 		return;
@@ -57,7 +57,7 @@ void LightBase::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
 	light_buffer.NextSlot();
 }
 
-void LightBase::FillGpuData(LightGpuData& data, const PerspectiveCamera& camera, Camera* shadow_camera) const
+void LightBase::FillGpuData(LightGpuData& data, const PerspectiveCamera2& camera, BaseCamera* shadow_camera) const
 {
 	// No shadow map by default (ShadowAtlasRect stays zero), shadowed lights fill these in their own FillGpuData
 	memcpy(data.LightCameraMatrix, Mat4f::scIdentity.RawData, sizeof(Mat4f));
@@ -131,7 +131,8 @@ LightPoint::LightPoint() { Type = eLightType::Point; }
 
 LightDirectional::LightDirectional() { Type = eLightType::Directional; }
 
-void LightDirectional::FillGpuData(LightGpuData& data, const PerspectiveCamera& camera, Camera* shadow_camera) const
+void LightDirectional::FillGpuData(LightGpuData& data, const PerspectiveCamera2& camera,
+								   BaseCamera* shadow_camera) const
 {
 	LightBase::FillGpuData(data, camera, shadow_camera);
 
@@ -141,7 +142,7 @@ void LightDirectional::FillGpuData(LightGpuData& data, const PerspectiveCamera& 
 	data.Position[1] = direction.Y;
 	data.Position[2] = direction.Z;
 
-	const Camera* light_camera = (shadow_camera != nullptr) ? shadow_camera : &camera;
+	const BaseCamera* light_camera = (shadow_camera != nullptr) ? shadow_camera : &camera;
 	memcpy(data.LightCameraMatrix, light_camera->GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
 
 	if (gShadowAtlas != nullptr) {
@@ -270,7 +271,7 @@ void LightSpot::ReleaseShadowTile()
 	Shadow = ShadowState {};
 }
 
-void LightSpot::FillGpuData(LightGpuData& data, const PerspectiveCamera& camera, Camera* shadow_camera) const
+void LightSpot::FillGpuData(LightGpuData& data, const PerspectiveCamera2& camera, BaseCamera* shadow_camera) const
 {
 	LightBase::FillGpuData(data, camera, shadow_camera);
 

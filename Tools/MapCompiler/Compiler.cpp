@@ -339,7 +339,8 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 		}
 
 		SurfaceOptions surface_options = options.Surface;
-		surface_options.bMakeLightmapCharts = options.Lightmap.bEnabled && (source.bHasSun || options.Lightmap.bIndirect);
+		surface_options.bMakeLightmapCharts = options.Lightmap.bEnabled &&
+											  (source.bHasSun || options.Lightmap.bIndirect);
 
 		patches.Build(source, bsp, sealed, surface_options.bCullHidden);
 
@@ -364,8 +365,8 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 		}
 
 		ProbePlacement::BuildLevelLayout(
-			map.Probes, boxes, Slice<BBox>(source.ProbeRegions.pData, source.ProbeRegions.Size), options.Probes);
-		map.ProbeSettings = options.Probes;
+			map.Probes, boxes, Slice<BBox>(source.ProbeRegions.pData, source.ProbeRegions.Size), options.ProbeSettings);
+		map.ProbeSettings = options.ProbeSettings;
 
 		result.ProbeCount = map.Probes.GetProbeCount();
 		result.ProbeVolumeCount = map.Probes.VolumeCount;
@@ -479,11 +480,11 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 				light_count++;
 			}
 
-			log(String::Fmt("  indirect     {} bounces, {} rays against {} triangles and {} nonvis triangles, {} lights, "
-							"{:.0f} lux on average",
-							options.Lightmap.IndirectBounces, baked.IndirectRayCount, baked.IndirectTriangleCount,
-							baked.IndirectBlockerCount, light_count,
-							baked.MeanIndirect));
+			log(String::Fmt(
+				"  indirect     {} bounces, {} rays against {} triangles and {} nonvis triangles, {} lights, "
+				"{:.0f} lux on average",
+				options.Lightmap.IndirectBounces, baked.IndirectRayCount, baked.IndirectTriangleCount,
+				baked.IndirectBlockerCount, light_count, baked.MeanIndirect));
 
 			if (baked.IndirectCachedTexelCount > 0) {
 				log(String::Fmt("  hit cache    {} of {} texels ({:.1f}%) reuse their first bounce hits, {:.0f} MB",
@@ -499,8 +500,9 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 			}
 
 			if (baked.MissingAlbedoCount > 0) {
-				log(String::Fmt("  warning      {} materials have no readable diffuse texture, they bounce light as grey",
-								baked.MissingAlbedoCount));
+				log(String::Fmt(
+					"  warning      {} materials have no readable diffuse texture, they bounce light as grey",
+					baked.MissingAlbedoCount));
 			}
 		}
 		else if (!options.Lightmap.bIndirect) {
@@ -512,6 +514,18 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 							"baked at {:.1f}",
 							options.Lightmap.MaxSize, options.Lightmap.MaxSize, options.Lightmap.Density,
 							baked.Density));
+		}
+
+		if (baked.bHasFogShadow) {
+			const FogShadowStats& fog = baked.FogShadow;
+			log(String::Fmt(
+				"  fog shadow   {} of {} {:.0f} m pages shadowed, {} texels at {:.2f} m, {} rays, {:.1f} MB",
+				fog.PageCount, fog.CellCount, options.Lightmap.FogShadow.PageSize, fog.TexelCount,
+				options.Lightmap.FogShadow.TexelSize, fog.RayCount,
+				static_cast<double>(fog.ByteCount) / (1024.0 * 1024.0)));
+		}
+		else if (source.bHasSun && options.Lightmap.FogShadow.bEnabled) {
+			log("  fog shadow   none, the sun is too low or nothing casts a shadow");
 		}
 
 		if (!source.bHasSun) {

@@ -1,20 +1,13 @@
 #include "NoClipController.hpp"
 
-#include <Math/MathUtil.hpp>
-#include <Renderer/Camera.hpp>
+#include <Renderer/Camera/PerspectiveCamera.hpp>
 
 namespace fx {
 
-Vec3f NoClipController::Update(float64 delta_time, const Vec3f input, const PerspectiveCamera& camera, bool sprinting)
+Vec3f NoClipController::Update(float64 delta_time, const Vec3f input, const PerspectiveCamera2& camera, bool sprinting)
 {
-	float32 s_anglex, c_anglex;
-	MathUtil::SinCos(camera.mAngleX, &s_anglex, &c_anglex);
-
-	float32 s_angley, c_angley;
-	MathUtil::SinCos(camera.mAngleY, &s_angley, &c_angley);
-
-	const Vec3f forward(s_anglex * c_angley, s_angley, c_anglex * c_angley);
-	const Vec3f right(c_anglex, 0.0f, -s_anglex);
+	const Vec3f forward = camera.GetForwardVector();
+	const Vec3f right = camera.GetFlatRightVector();
 
 	Accelerate(forward * input.Z + right * input.X + Vec3f::sUp * input.Y, delta_time, sprinting);
 

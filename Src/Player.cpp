@@ -16,10 +16,11 @@ using namespace renderer;
 
 void Player::Create()
 {
-	pCamera = MakeRef<PerspectiveCamera>();
+	pCamera = MakeRef<FPSCamera>();
 
 	pCamera->SetAspectRatio(gGraphics->Swapchain.GetAspectRatio());
-	pCamera->SetFov(scWalkingFov);
+	pCamera->SetFOV(MathUtil::DegreesToRadians(scWalkingFov));
+	pCamera->SetClip(scViewDistance, scNearClip);
 
 	Physics.Create();
 
@@ -103,7 +104,7 @@ void Player::OnViewModelLoaded(uint32 index, Object* object)
 
 		for (uint32 i = 0; i < skeleton.JointCount && i < skeleton.BoneNames.Size; i++) {
 			if (skeleton.BoneNames[i] == scViewModelViewJoint) {
-				slot.ViewOrigin = skeleton.InvBindTransforms[i].Inverse().GetTranslation();
+				slot.ViewOrigin = skeleton.InvBindTransforms[i].AffineInverse().GetTranslation();
 				slot.bHasViewJoint = true;
 				break;
 			}
@@ -147,8 +148,8 @@ void Player::ActivateViewModel(uint32 index)
 	ApplyViewModelIdleAnimation();
 
 	// Start in line with the camera so the view model doesn't swing in when it first appears
-	mPrevCameraYaw = pCamera->mAngleX;
-	mPrevCameraPitch = pCamera->mAngleY;
+	mPrevCameraYaw = mViewAngles.Yaw;
+	mPrevCameraPitch = mViewAngles.Pitch;
 	mViewModelSwayYaw = 0.0f;
 	mViewModelSwayPitch = 0.0f;
 }
@@ -174,8 +175,8 @@ static void CancelRecoilOffset(float32& offset, float32 input)
 
 void Player::RotateCamera(const Vec2f& xy)
 {
-	pCamera->Rotate(xy.X, xy.Y);
-	mCameraGoal = pCamera->GetRotation();
+	mViewAngles.Rotate(xy.X, xy.Y);
+	pCamera->SetRotation(mViewAngles.ToQuat());
 }
 
 void Player::RotateHead(const Vec2f& xy)
@@ -196,16 +197,18 @@ void Player::Jump()
 void Player::SpawnAt(const Vec3f position, const Vec3f direction)
 {
 	TeleportTo(position);
+	SetViewDirection(direction);
+}
 
-	const Vec3f unit = direction.Normalize();
-	const float32 yaw = std::atan2(unit.X, unit.Z);
-	const float32 pitch = std::asin(std::clamp(unit.Y, -1.0f, 1.0f));
+void Player::LookAt(const Vec3f target) { SetViewDirection(target - GetEyePosition()); }
 
-	pCamera->Rotate(std::remainder(yaw - pCamera->mAngleX, static_cast<float32>(FX_2PI)), pitch - pCamera->mAngleY);
+void Player::SetViewDirection(const Vec3f direction)
+{
+	mViewAngles.SetDirection(direction);
+	pCamera->SetRotation(mViewAngles.ToQuat());
 
-	mCameraGoal = pCamera->GetRotation();
-	mPrevCameraYaw = pCamera->mAngleX;
-	mPrevCameraPitch = pCamera->mAngleY;
+	mPrevCameraYaw = mViewAngles.Yaw;
+	mPrevCameraPitch = mViewAngles.Pitch;
 	mViewModelSwayYaw = 0.0f;
 	mViewModelSwayPitch = 0.0f;
 }
@@ -240,11 +243,11 @@ void Player::Move(float64 delta_time, const Vec3f offset)
 void Player::UpdateViewModelSway(float32 delta_time)
 {
 	// Yaw wraps at 2pi, so take the short way around to avoid a full-turn spike when it does.
-	const float32 yaw_delta = std::remainder(pCamera->mAngleX - mPrevCameraYaw, static_cast<float32>(FX_2PI));
-	const float32 pitch_delta = pCamera->mAngleY - mPrevCameraPitch;
+	const float32 yaw_delta = std::remainder(mViewAngles.Yaw - mPrevCameraYaw, static_cast<float32>(FX_2PI));
+	const float32 pitch_delta = mViewAngles.Pitch - mPrevCameraPitch;
 
-	mPrevCameraYaw = pCamera->mAngleX;
-	mPrevCameraPitch = pCamera->mAngleY;
+	mPrevCameraYaw = mViewAngles.Yaw;
+	mPrevCameraPitch = mViewAngles.Pitch;
 
 	// Ease back in line with the camera, then trail behind by a fraction of however far the camera turned this frame.
 	mViewModelSwayYaw = MathUtil::SmoothInterpolate(mViewModelSwayYaw, 0.0f, scViewModelSwayReturnSpeed, delta_time);
@@ -265,12 +268,11 @@ void Player::UpdateViewModel(double delta_time)
 
 	UpdateViewModelSway(static_cast<float32>(delta_time));
 
-	// Pitch/yaw map to euler angles the same way as PerspectiveCamera::GetRotation(). Roll goes in this local offset
-	// rather than the camera's euler angles, as FromEulerAngles applies Z last in world space.
+	// Roll goes in this local offset rather than the euler angles, as FromEulerAngles applies Z last in world space.
 	const Quat sway = Quat::FromEulerAngles(Vec3f(-mViewModelSwayPitch + mViewModelHolster * scHolsterPitch,
 												  mViewModelSwayYaw, mViewModelSwayYaw * scViewModelSwayRoll));
 
-	mViewModelRotation = Quat::FromEulerAngles(pCamera->GetRotation()) * sway;
+	mViewModelRotation = pCamera->GetRotation() * sway;
 
 	// Build the basis from the lagging rotation (rather than the camera's) so the view model pivots around the eye.
 	const Mat4f view_model_basis = Mat4f::AsRotation(mViewModelRotation);
@@ -322,12 +324,12 @@ void Player::UpdateViewModel(double delta_time)
 								  (Vec3f(basis.Rows[2]) * slot.ViewOrigin.Z);
 
 
-		mpViewModel->SetPosition(pCamera->Position - view_origin + view_offset);
+		mpViewModel->SetPosition(pCamera->GetPosition() - view_origin + view_offset);
 		mpViewModel->SetRotation(rotation);
 		return;
 	}
 
-	mpViewModel->SetPosition(pCamera->Position + view_offset);
+	mpViewModel->SetPosition(pCamera->GetPosition() + view_offset);
 	mpViewModel->SetRotation(mViewModelRotation * kick);
 }
 
@@ -579,11 +581,11 @@ void Player::UpdateRecoil(float32 delta_time)
 	}
 
 	if (delta_pitch != 0.0f || delta_yaw != 0.0f) {
-		const float32 pitch_before = pCamera->mAngleY;
+		const float32 pitch_before = mViewAngles.Pitch;
 
 		RotateCamera(Vec2f(delta_yaw, delta_pitch));
 
-		const float32 clamped_pitch = delta_pitch - (pCamera->mAngleY - pitch_before);
+		const float32 clamped_pitch = delta_pitch - (mViewAngles.Pitch - pitch_before);
 
 		if (std::abs(clamped_pitch) > scRecoilClampEpsilon) {
 			mRecoilOffsetPitch -= clamped_pitch;
@@ -613,7 +615,7 @@ void Player::UpdateFov(float32 delta_time, bool user_force_released)
 
 	const float32 target_fov = sprint_fov ? scSprintFov : scWalkingFov;
 	const float32 fov_speed = sprint_fov ? 8.0f : 13.0f;
-	const float32 current_fov = pCamera->GetFov();
+	const float32 current_fov = MathUtil::RadiansToDegrees(pCamera->GetFOV());
 
 	if (std::abs(current_fov - target_fov) <= 0.001f) {
 		return;
@@ -625,7 +627,7 @@ void Player::UpdateFov(float32 delta_time, bool user_force_released)
 		next_fov = target_fov;
 	}
 
-	pCamera->SetFov(next_fov);
+	pCamera->SetFOV(MathUtil::DegreesToRadians(next_fov));
 }
 
 void Player::Update(float64 delta_time)
@@ -643,7 +645,7 @@ void Player::Update(float64 delta_time)
 
 	UpdateLanding(static_cast<float32>(delta_time));
 
-	pCamera->MoveTo(Position + mCameraOffset + Vec3f(0.0f, mLandingOffset, 0.0f));
+	pCamera->SetPosition(Position + mCameraOffset + Vec3f(0.0f, mLandingOffset, 0.0f));
 
 	const bool user_force_released = GetController().GetVelocity().IsNearZero(0.1);
 
@@ -675,7 +677,7 @@ void Player::Update(float64 delta_time)
 	mHeadBobY = HeadBobStrength.Y * bob_sin;
 
 	Vec3f bob_vector = pCamera->GetUpVector() * mHeadBobY + pCamera->GetRightVector() * mHeadBobX;
-	pCamera->MoveBy(bob_vector);
+	pCamera->MoveWS(bob_vector);
 
 	UpdateFov(static_cast<float32>(delta_time), user_force_released);
 

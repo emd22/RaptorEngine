@@ -75,6 +75,7 @@ public:
 	void AddImage(uint32 bind_index, uint32 set_index, eShaderType shader_stages, Image* image, Sampler* sampler);
 	void AddImageFromTarget(uint32 bind_index, uint32 set_index, eShaderType shader_stages, Target* target,
 							Sampler* sampler);
+	void AddStorageImage(uint32 bind_index, uint32 set_index, eShaderType shader_stages, Image* image);
 
 	void AddFrameData(uint32 set_index);
 

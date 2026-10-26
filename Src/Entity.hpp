@@ -7,7 +7,6 @@
 #include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
-#include <Renderer/Camera.hpp>
 #include <Renderer/Constants.hpp>
 
 #define FX_VALIDATE_ENTITY_TYPE(TType_) static_assert(C_IsEntity<TType_>)

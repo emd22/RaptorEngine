@@ -25,6 +25,9 @@ enum class eShaderName : uint32
 	FogTemporal,
 	FogDenoise,
 	FogApply,
+	FogInject,
+	FogIntegrate,
+	FogFroxelApply,
 
 	NumShaders,
 };
@@ -54,6 +57,9 @@ constexpr const char* GetName(const eShaderName id)
 		FX_ENUM_CASE_NAME(FogTemporal);
 		FX_ENUM_CASE_NAME(FogDenoise);
 		FX_ENUM_CASE_NAME(FogApply);
+		FX_ENUM_CASE_NAME(FogInject);
+		FX_ENUM_CASE_NAME(FogIntegrate);
+		FX_ENUM_CASE_NAME(FogFroxelApply);
 	default:
 		return "Unknown";
 	}

@@ -17,7 +17,7 @@
 #include <Renderer/Backend/Image.hpp>
 #include <Renderer/Backend/Pipeline.hpp>
 #include <Renderer/Backend/Sampler/SamplerCache.hpp>
-#include <Renderer/Camera.hpp>
+#include <Renderer/Camera/PerspectiveCamera.hpp>
 #include <Renderer/Constants.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
@@ -787,7 +787,7 @@ void ParticleSystem::UpdateLighting(float32 delta_time)
 		has_sun = true;
 	}
 
-	const Camera* camera = nullptr;
+	const BaseCamera* camera = nullptr;
 
 	if (gWorld->GetCurrentCamera().IsValid()) {
 		camera = &(*gWorld->GetCurrentCamera());
@@ -809,8 +809,8 @@ void ParticleSystem::UpdateLighting(float32 delta_time)
 		if (use_probes) {
 			Vec3f to_camera = effect.Direction;
 
-			if (camera != nullptr && camera->Position.DistanceTo(sample_position) > 1e-3f) {
-				to_camera = (camera->Position - sample_position).Normalize();
+			if (camera != nullptr && camera->GetPosition().DistanceTo(sample_position) > 1e-3f) {
+				to_camera = (camera->GetPosition() - sample_position).Normalize();
 			}
 
 			gProbeManager->SampleIrradiance(sample_position, to_camera, ambient);
@@ -984,7 +984,7 @@ void ParticleSystem::WriteInstances(uint32 base_offset, const Vec3f eye)
 	}
 }
 
-void ParticleSystem::Render(renderer::CommandBuffer& cmd, const Camera& camera, renderer::RenderStage& stage)
+void ParticleSystem::Render(renderer::CommandBuffer& cmd, const BaseCamera& camera, renderer::RenderStage& stage)
 {
 	using namespace renderer;
 
@@ -1007,8 +1007,8 @@ void ParticleSystem::Render(renderer::CommandBuffer& cmd, const Camera& camera, 
 		return;
 	}
 
-	const Vec3f eye = camera.Position;
-	const Vec3f forward = camera.Direction.Normalize();
+	const Vec3f eye = camera.GetPosition();
+	const Vec3f forward = camera.GetForwardVector().Normalize();
 	const Vec3f right = Vec3f::sUp.Cross(forward).Normalize();
 	const Vec3f up = forward.Cross(right).Normalize();
 
@@ -1031,7 +1031,7 @@ void ParticleSystem::Render(renderer::CommandBuffer& cmd, const Camera& camera, 
 
 	WriteInstances(base_offset, eye);
 
-	const float32* projection = camera.ProjectionMatrix.RawData;
+	const float32* projection = camera.GetProjectionMatrix().RawData;
 	const bool is_soft = mpSoftCVar == nullptr || mpSoftCVar->IntValue != 0;
 
 	ParticleConstants world_consts {};

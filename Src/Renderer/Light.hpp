@@ -13,8 +13,9 @@
 #include <WorldGrid.hpp>
 
 namespace fx {
-class Camera;
+class BaseCamera;
 class Frustum;
+class PerspectiveCamera2;
 
 namespace renderer {
 class Pipeline;
@@ -57,7 +58,7 @@ public:
 	FX_FORCE_INLINE float32 GetRadius() const { return mRadius; }
 	FX_FORCE_INLINE bool IsCullable() const { return Type != eLightType::Directional; }
 
-	virtual void Render(const PerspectiveCamera& camera, Camera* shadow_camera);
+	virtual void Render(const PerspectiveCamera2& camera, BaseCamera* shadow_camera);
 
 	virtual ~LightBase() {}
 
@@ -65,8 +66,8 @@ protected:
 	/**
 	 * @brief Fills out this light's slot in the light buffer. Light types extend this with their own data.
 	 */
-	virtual void FillGpuData(renderer::LightGpuData& data, const PerspectiveCamera& camera,
-							 Camera* shadow_camera) const;
+	virtual void FillGpuData(renderer::LightGpuData& data, const PerspectiveCamera2& camera,
+							 BaseCamera* shadow_camera) const;
 
 public:
 	LightID ID = LightID::scNull;
@@ -110,8 +111,8 @@ public:
 	LightDirectional();
 
 protected:
-	void FillGpuData(renderer::LightGpuData& data, const PerspectiveCamera& camera,
-					 Camera* shadow_camera) const override;
+	void FillGpuData(renderer::LightGpuData& data, const PerspectiveCamera2& camera,
+					 BaseCamera* shadow_camera) const override;
 };
 
 /////////////////////////////////////
@@ -167,8 +168,8 @@ public:
 	~LightSpot() override;
 
 protected:
-	void FillGpuData(renderer::LightGpuData& data, const PerspectiveCamera& camera,
-					 Camera* shadow_camera) const override;
+	void FillGpuData(renderer::LightGpuData& data, const PerspectiveCamera2& camera,
+					 BaseCamera* shadow_camera) const override;
 
 public:
 	bool bCastShadows = true;

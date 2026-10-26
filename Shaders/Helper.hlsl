@@ -52,6 +52,13 @@ float4 F_UnpackUIntToFloat4(uint x);
     TextureCubeArray F_TextureName(_name) : register(t##binding_, space##set_); \
     SamplerState _name : register(s##binding_, space##set_);
 
+#define F_Texture3D(_name, binding_, set_) \
+    Texture3D F_TextureName(_name) : register(t##binding_, space##set_); \
+    SamplerState _name : register(s##binding_, space##set_);
+
+#define F_RWTexture3D(_name, type_, binding_, set_) \
+    [[vk::binding(binding_, set_)]] RWTexture3D<type_> _name
+
 #define F_DataTexture2D(_name, type_, binding_, set_) \
 	Texture2D<type_> F_TextureName(_name) : register(t##binding_, space##set_); \
 

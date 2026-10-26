@@ -414,7 +414,7 @@ EditorPanelState RaptorEditor::BuildPanelState()
 	}
 
 	world.Fog = gWorld->Fog;
-	world.FogQuality = std::clamp<int64>(gCVars->Get("r_fog", int64 { 2 }), 0, 2);
+	world.FogQuality = std::clamp<int64>(gCVars->Get("r_fog", int64 { 2 }), 0, 3);
 
 	const uint32 probe_count = gProbeManager->GetReflectionProbeCount();
 
@@ -1231,7 +1231,7 @@ Object* RaptorEditor::CreateReflectionProbeAtPlayer()
 		return nullptr;
 	}
 
-	const Vec3f center = SnapToGrid(gWorld->Player.pCamera->Position);
+	const Vec3f center = SnapToGrid(gWorld->Player.pCamera->GetPosition());
 
 	Vec3f position;
 	const Brush brush = gWorld->pPrototype->MakeWorldBox(center - scDefaultDataBrushHalfExtent,
@@ -1878,9 +1878,9 @@ bool RaptorEditor::PlaceSubview(const String& name)
 		return false;
 	}
 
-	const Ref<PerspectiveCamera>& camera = gWorld->Player.pCamera;
+	const Ref<FPSCamera>& camera = gWorld->Player.pCamera;
 
-	const physics::RayResult hit = gPhysics->pBackend->Raycast(camera->Position,
+	const physics::RayResult hit = gPhysics->pBackend->Raycast(camera->GetPosition(),
 															   camera->GetForwardVector() * scCreateRange);
 
 	BrushPlacement placement;
@@ -1889,7 +1889,7 @@ bool RaptorEditor::PlaceSubview(const String& name)
 		placement.Position = SnapToGrid(hit.Point);
 	}
 	else {
-		placement.Position = SnapToGrid(camera->Position + camera->GetForwardVector() * scPlaceDistance);
+		placement.Position = SnapToGrid(camera->GetPosition() + camera->GetForwardVector() * scPlaceDistance);
 	}
 
 	EmplaceEditOperation<SubviewPlaceOperation>(instance, placement);

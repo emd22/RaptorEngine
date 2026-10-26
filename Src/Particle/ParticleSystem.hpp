@@ -14,7 +14,7 @@
 
 namespace fx {
 
-class Camera;
+class BaseCamera;
 class Image;
 class CVarValue;
 
@@ -175,7 +175,7 @@ public:
 	void Clear();
 
 	void Update(float32 delta_time);
-	void Render(renderer::CommandBuffer& cmd, const Camera& camera, renderer::RenderStage& stage);
+	void Render(renderer::CommandBuffer& cmd, const BaseCamera& camera, renderer::RenderStage& stage);
 
 	renderer::RawGpuBuffer& GetInstanceBuffer() { return mInstanceBuffer; }
 

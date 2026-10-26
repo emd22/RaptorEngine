@@ -48,9 +48,11 @@ static constexpr VkImageLayout scAtlasLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_
 
 static VkRect2D RegionToRect(const URect& region)
 {
+	const Vec2u extent = region.GetExtent();
+
 	return VkRect2D {
 		.offset = { .x = static_cast<int32>(region.Min.X), .y = static_cast<int32>(region.Min.Y) },
-		.extent = { .width = region.Max.X, .height = region.Max.Y },
+		.extent = { .width = extent.X, .height = extent.Y },
 	};
 }
 
@@ -214,7 +216,7 @@ void ShadowAtlas::GetRegionUVTransform(const URect& region, float32 out_transfor
 
 	const FRect f_region = FRect(region);
 
-	const Vec2f xform_xy = f_region.Max / scAtlasSize;
+	const Vec2f xform_xy = f_region.GetExtent() / scAtlasSize;
 	const Vec2f xform_zw = f_region.Min / scAtlasSize;
 
 	out_transform[0] = xform_xy.X;

@@ -19,7 +19,7 @@
 #ifdef FX_IS_EDITOR
 #include <Editor/RaptorEditor.hpp>
 #endif
-#include <Core/Serialize2.hpp>
+#include <Core/Serialize.hpp>
 #include <Math/MathConsts.hpp>
 #include <Math/MathUtil.hpp>
 #include <Renderer/Globals.hpp>

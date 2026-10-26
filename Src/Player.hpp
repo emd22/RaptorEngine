@@ -8,7 +8,7 @@
 #include <Math/MathUtil.hpp>
 #include <Math/Vec2.hpp>
 #include <Physics/PhysicsPlayer.hpp>
-#include <Renderer/Camera.hpp>
+#include <Renderer/Camera/FPSCamera.hpp>
 #include <Weapon/WeaponSystem.hpp>
 
 namespace fx {
@@ -20,6 +20,8 @@ class Player
 	// TODO: Break these out into config vars
 	static constexpr float32 scSprintFov = 85.0f;
 	static constexpr float32 scWalkingFov = 80.0f;
+	static constexpr float32 scViewDistance = 1000.0f;
+	static constexpr float32 scNearClip = 0.01f;
 
 	/// Fraction of each frame's camera turn that the view model trails behind by. Higher values sway further.
 	static constexpr float32 scViewModelSwayAmount = 0.12f;
@@ -121,6 +123,10 @@ public:
 	 * @brief Puts the player at `position` (at its feet), looking along `direction`.
 	 */
 	void SpawnAt(const Vec3f position, const Vec3f direction);
+	void LookAt(const Vec3f target);
+	void SetViewDirection(const Vec3f direction);
+
+	const ViewAngles& GetViewAngles() const { return mViewAngles; }
 
 	void SetFlyMode(bool value);
 	bool IsFlyMode() const { return Physics.bDisableGravity; };
@@ -169,7 +175,7 @@ private:
 
 public:
 	physics::PhysicsPlayer Physics;
-	Ref<PerspectiveCamera> pCamera { nullptr };
+	Ref<FPSCamera> pCamera { nullptr };
 
 	Vec3f Position = Vec3f::sZero;
 
@@ -192,7 +198,7 @@ private:
 
 	Vec3f mCameraOffset = Vec3f::sZero;
 
-	Vec3f mCameraGoal = Vec3f::sZero;
+	ViewAngles mViewAngles;
 
 	float32 mHorizontalSpeed = 0.0f;
 

@@ -25,6 +25,8 @@ static VkDescriptorType ReflectionTypeToDescriptorType(eShaderReflectionType typ
 		return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 	case eShaderReflectionType::Texture:
 		return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	case eShaderReflectionType::StorageImage:
+		return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	default:;
 	}
 
@@ -126,6 +128,7 @@ DescriptorPool& DescriptorCache::FindPool()
 		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 512);
 		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 256);
 		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 256);
+		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 32);
 		pool->Create(GraphicsBackendFwd::GetDevice(), 256, true);
 		Pools.Insert(*pool);
 	}
@@ -166,9 +169,12 @@ DescriptorID DescriptorCache::GetID(const SizedArray<DescriptorEntry>& entries)
 			id_result = ID_HASH_HANDLE(reinterpret_cast<const void*>(&entry.Binding), sizeof(uint32));
 		}
 
-		if (entry.IsImage()) {
+		if (entry.IsImage() || entry.IsStorageImage()) {
 			Assert(entry.pImage != nullptr);
 			id_result = ID_HASH_HANDLE(reinterpret_cast<void*>(&entry.pImage->InternalImage), sizeof(uint64));
+
+			const uint32 type = static_cast<uint32>(entry.Type);
+			id_result = ID_HASH_HANDLE(&type, sizeof(type));
 		}
 		else if (entry.IsBuffer()) {
 			Assert(entry.pBuffer != nullptr);
@@ -224,6 +230,9 @@ std::pair<DescriptorID, DescriptorSet*> DescriptorCache::Request(const SizedArra
 		else if (entry.IsImage()) {
 			descriptor.AddImage(entry.Binding, entry.pImage, entry.pSampler);
 		}
+		else if (entry.IsStorageImage()) {
+			descriptor.AddStorageImage(entry.Binding, entry.pImage);
+		}
 	}
 
 	descriptor.Build();
@@ -245,6 +254,17 @@ void DescriptorCache::Destroy()
 {
 	Pools.Destroy();
 	Cache.clear();
+}
+
+void DescriptorCache::RebuildUsingImage(const Image* image)
+{
+	DescriptorPool& pool = FindPool();
+
+	for (auto& [hash, descriptor_set] : Cache) {
+		if (descriptor_set.UsesImage(image)) {
+			descriptor_set.Rebuild(pool);
+		}
+	}
 }
 
 void DescriptorCache::RebuildAll()

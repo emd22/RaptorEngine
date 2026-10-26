@@ -1,3 +1,11 @@
+/*
+ * File:        Serialize.hpp
+ * Author:      emd22
+ * Created:     24/10/2026
+ * Description: Routines to serialize structures and data to disk from C++
+ */
+
+
 #pragma once
 
 #include <Core/ByteBuffer.hpp>
@@ -75,6 +83,9 @@ concept C_IsSerializableField = C_IsTapeValue<T> || C_IsSerializableObject<T> ||
 
 template <typename T>
 struct SerializedArrayType;
+
+template <typename T>
+struct SerializedStringType;
 
 template <typename T>
 concept C_IsSerializedArrayType = requires {
@@ -379,6 +390,7 @@ private:
 		{                                                                                                              \
 			bool all_fields_found = true;
 
+/// Creates an array type (e.g. `vec = [1.0, 2.0, 3.0]`) for a struct
 #define RS_ARRAY_TYPE(type_, element_type_, count_)                                                                    \
 	template <>                                                                                                        \
 	struct fx::SerializedArrayType<type_>                                                                              \
@@ -387,7 +399,9 @@ private:
 		static constexpr uint32 scCount = count_;                                                                      \
 	};
 
-#define RS_ARRAY_TYPE_PARTIAL(type_, element_type_, count_, min_count_, fill_value_)                                 \
+
+/// Creates an array type, any missing components are set to `fill_value_`.
+#define RS_ARRAY_TYPE_PARTIAL(type_, element_type_, count_, min_count_, fill_value_)                                   \
 	template <>                                                                                                        \
 	struct fx::SerializedArrayType<type_>                                                                              \
 	{                                                                                                                  \
@@ -397,7 +411,11 @@ private:
 		static constexpr fx::float64 scFillValue = fill_value_;                                                        \
 	};
 
-#define RS_FIELD(field_name_)				all_fields_found &= io.Field(#field_name_, v.field_name_);
+
+/// Define a specific member of a struct. Takes the name from the name of the member.
+#define RS_FIELD(field_name_) all_fields_found &= io.Field(#field_name_, v.field_name_);
+
+/// Define a specific member of a struct with a custom name.
 #define RS_FIELD_NAMED(field_name_, label_) all_fields_found &= io.Field(label_, v.field_name_);
 
 #define RS_OBJECT_END()                                                                                                \

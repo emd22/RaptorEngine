@@ -152,6 +152,94 @@ private:
 	File* mpFile;
 };
 
+constexpr uint32 scMaxFogShadowLevelSize = 4096;
+constexpr uint32 scMaxFogShadowCells = 1 << 20;
+
+void ReadFogShadow(Reader& reader, CompiledMapFogShadow& out_shadow)
+{
+	reader.Read(out_shadow.Right, 3);
+	reader.Read(out_shadow.Up, 3);
+	reader.Read(out_shadow.Forward, 3);
+	out_shadow.PageSize = reader.Read<float32>();
+	out_shadow.TexelSize = reader.Read<float32>();
+	reader.Read(out_shadow.CellMin, 2);
+	reader.Read(out_shadow.CellCount, 2);
+
+	const uint64 cell_count = static_cast<uint64>(out_shadow.CellCount[0]) * out_shadow.CellCount[1];
+	const uint32 page_count = reader.ReadCount();
+
+	if (reader.bFailed || cell_count > scMaxFogShadowCells || page_count > cell_count) {
+		reader.bFailed = true;
+		return;
+	}
+
+	out_shadow.Pages.InitSize(page_count);
+
+	for (CompiledMapFogShadowPage& page : out_shadow.Pages) {
+		page.CellX = reader.Read<int32>();
+		page.CellZ = reader.Read<int32>();
+		reader.Read(page.LightMin, 2);
+		reader.Read(page.LightSize, 2);
+		page.DepthMin = reader.Read<float32>();
+		page.DepthMax = reader.Read<float32>();
+
+		const uint32 level_count = reader.ReadCount();
+
+		const int64 local_x = static_cast<int64>(page.CellX) - out_shadow.CellMin[0];
+		const int64 local_z = static_cast<int64>(page.CellZ) - out_shadow.CellMin[1];
+
+		if (reader.bFailed || level_count > CompiledMapFogShadow::scLevelCount || local_x < 0 || local_z < 0 ||
+			local_x >= out_shadow.CellCount[0] || local_z >= out_shadow.CellCount[1]) {
+			reader.bFailed = true;
+			return;
+		}
+
+		page.Levels.InitSize(level_count);
+
+		for (CompiledMapFogShadowLevel& level : page.Levels) {
+			level.Width = reader.Read<uint32>();
+			level.Height = reader.Read<uint32>();
+
+			if (reader.bFailed || level.Width == 0 || level.Height == 0 || level.Width > scMaxFogShadowLevelSize ||
+				level.Height > scMaxFogShadowLevelSize) {
+				reader.bFailed = true;
+				return;
+			}
+
+			level.Depths.InitSize(static_cast<size_t>(level.Width) * level.Height);
+			reader.Read(level.Depths.pData, level.Depths.Size);
+		}
+	}
+}
+
+void WriteFogShadow(Writer& writer, const CompiledMapFogShadow& shadow)
+{
+	writer.Write(shadow.Right, 3);
+	writer.Write(shadow.Up, 3);
+	writer.Write(shadow.Forward, 3);
+	writer.Write(shadow.PageSize);
+	writer.Write(shadow.TexelSize);
+	writer.Write(shadow.CellMin, 2);
+	writer.Write(shadow.CellCount, 2);
+	writer.WriteCount(shadow.Pages.Size);
+
+	for (const CompiledMapFogShadowPage& page : shadow.Pages) {
+		writer.Write(page.CellX);
+		writer.Write(page.CellZ);
+		writer.Write(page.LightMin, 2);
+		writer.Write(page.LightSize, 2);
+		writer.Write(page.DepthMin);
+		writer.Write(page.DepthMax);
+		writer.WriteCount(page.Levels.Size);
+
+		for (const CompiledMapFogShadowLevel& level : page.Levels) {
+			writer.Write(level.Width);
+			writer.Write(level.Height);
+			writer.Write(level.Depths.pData, level.Depths.Size);
+		}
+	}
+}
+
 } // namespace
 
 bool CompiledMap::Load(const String& path)
@@ -168,7 +256,7 @@ bool CompiledMap::Load(const String& path)
 	const uint32 magic = reader.Read<uint32>();
 	const uint32 version = reader.Read<uint32>();
 
-	if (reader.bFailed || magic != scMagic || version != scVersion) {
+	if (reader.bFailed || magic != scMagic || version < scMinVersion || version > scVersion) {
 		file_to_read.Close();
 		return false;
 	}
@@ -507,6 +595,10 @@ bool CompiledMap::Load(const String& path)
 		reader.bFailed = true;
 	}
 
+	if (version >= 11 && !reader.bFailed) {
+		ReadFogShadow(reader, FogShadow);
+	}
+
 	for (const CompiledMapSurface& surface : Surfaces) {
 		if (surface.Area != scNoMapArea && (surface.Area < 0 || static_cast<size_t>(surface.Area) >= Areas.Size)) {
 			reader.bFailed = true;
@@ -660,6 +752,8 @@ bool CompiledMap::Save(const String& path) const
 	writer.WriteCount(AreaNodes.Size);
 	writer.Write(AreaNodes.pData, AreaNodes.Size);
 	writer.Write(AreaRoot);
+
+	WriteFogShadow(writer, FogShadow);
 
 	return (writer.bFailed == false);
 }

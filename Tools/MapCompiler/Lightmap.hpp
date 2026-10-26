@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "FogShadow.hpp"
 #include "Surfaces.hpp"
 
 namespace fx::mapc {
@@ -38,6 +39,8 @@ struct LightmapOptions
 	eDenoiseQuality IndirectDenoise = eDenoiseQuality::Medium;
 
 	uint32 ProbeTexelRays = 4;
+
+	FogShadowOptions FogShadow;
 
 	String ImagePath;
 };
@@ -74,6 +77,9 @@ struct LightmapStats
 	uint32 BakedProbeCount = 0;
 	uint64 ProbeRayCount = 0;
 	double MeanProbeIrradiance = 0.0;
+
+	bool bHasFogShadow = false;
+	FogShadowStats FogShadow;
 };
 
 class LightmapBaker

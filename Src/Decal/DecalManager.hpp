@@ -13,7 +13,7 @@
 namespace fx {
 
 class Image;
-class PerspectiveCamera;
+class PerspectiveCamera2;
 class Skeleton;
 
 /**
@@ -91,7 +91,7 @@ public:
 
 	void Clear();
 
-	void Update(const PerspectiveCamera& camera);
+	void Update(const PerspectiveCamera2& camera);
 
 	FX_FORCE_INLINE uint32 GetVisibleCount() const { return mVisibleCount; }
 	FX_FORCE_INLINE uint32 GetCount() const { return mDecals.Size; }

@@ -528,7 +528,7 @@ void WeaponSystem::PlayMuzzleEffect(const Weapon& weapon)
 	}
 
 	gParticleSystem->Stop(mMuzzleEffect);
-	mMuzzleEffect = gParticleSystem->Play(weapon.MuzzleEffect, position, mpPlayer->pCamera->Direction,
+	mMuzzleEffect = gParticleSystem->Play(weapon.MuzzleEffect, position, mpPlayer->pCamera->GetForwardVector(),
 										  eObjectLayer::PlayerLayer);
 }
 
@@ -541,7 +541,7 @@ void WeaponSystem::UpdateEffects()
 	Vec3f position;
 
 	if (mpPlayer->GetViewModelJointPosition(mWeapons[mActive].MuzzleJoint.CStr(), position)) {
-		gParticleSystem->SetTransform(mMuzzleEffect, position, mpPlayer->pCamera->Direction);
+		gParticleSystem->SetTransform(mMuzzleEffect, position, mpPlayer->pCamera->GetForwardVector());
 	}
 }
 
@@ -575,7 +575,7 @@ float32 WeaponSystem::Trace(float32 yaw, float32 pitch, float32 range)
 {
 	mLastHit = physics::RayResult {};
 
-	Ref<PerspectiveCamera>& camera = mpPlayer->pCamera;
+	Ref<FPSCamera>& camera = mpPlayer->pCamera;
 
 	const Vec3f forward = camera->GetForwardVector();
 	const Vec3f right = camera->GetRightVector();
@@ -583,7 +583,7 @@ float32 WeaponSystem::Trace(float32 yaw, float32 pitch, float32 range)
 
 	mLastDirection = (forward + right * std::tan(yaw) + up * std::tan(pitch)).Normalize();
 
-	const physics::RayResult hit = gPhysics->pBackend->Raycast(camera->Position, mLastDirection * range);
+	const physics::RayResult hit = gPhysics->pBackend->Raycast(camera->GetPosition(), mLastDirection * range);
 
 	if (!hit.bHit) {
 		return -1.0f;
@@ -591,7 +591,7 @@ float32 WeaponSystem::Trace(float32 yaw, float32 pitch, float32 range)
 
 	mLastHit = hit;
 
-	return (hit.Point - camera->Position).Length();
+	return (hit.Point - camera->GetPosition()).Length();
 }
 
 void WeaponSystem::ApplyHit(float32 damage, float32 force, bool decal)

@@ -6,7 +6,7 @@
 #include <Object/ObjectLayer.hpp>
 #include <Renderer/Backend/Commands.hpp>
 #include <Renderer/Backend/Pipeline.hpp>
-#include <Renderer/Camera.hpp>
+#include <Renderer/Camera/BaseCamera.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/PipelineCache.hpp>
@@ -128,7 +128,7 @@ void DebugDraw::RenderOverlays(const CommandBuffer& cmd, const Mat4f& camera_mat
 	}
 }
 
-void DebugDraw::Render(const CommandBuffer& cmd, const Camera& camera)
+void DebugDraw::Render(const CommandBuffer& cmd, const BaseCamera& camera)
 {
 	const Mat4f& camera_matrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 
@@ -137,7 +137,6 @@ void DebugDraw::Render(const CommandBuffer& cmd, const Camera& camera)
 	}
 
 	if (mShapes.Size > 0) {
-
 		DebugLayerPushConstants push_constants {};
 
 		// A pipeline and mesh are bound once per shape kind instead of once per shape

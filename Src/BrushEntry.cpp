@@ -396,32 +396,24 @@ void WritePatchEntry(ConfigEntry& entry, const Patch& patch)
 // Subviews
 /////////////////////////////////////
 
-Quat ReadBrushRotation(const ConfigEntry& entry)
+BrushPlacement ReadBrushPlacement(const ConfigEntry& entry)
 {
-	Quat rotation = Quat::scIdentity;
+	BrushPlacement placement;
 
 	const ConfigEntry* euler_entry = entry.GetMember(HashStr32("rot"));
 
 	if (euler_entry != nullptr) {
-		rotation = Quat::FromEulerAngles(euler_entry->GetValue<Vec3f>());
+		placement.Rotation = Quat::FromEulerAngles(euler_entry->GetValue<Vec3f>());
 	}
 
-	const ConfigEntry* quat_entry = entry.GetMember(HashStr32("rotquat"));
-
-	if (quat_entry != nullptr) {
-		rotation = quat_entry->GetValue<Quat>();
-	}
-
-	return rotation;
-}
-
-BrushPlacement ReadBrushPlacement(const ConfigEntry& entry)
-{
-	BrushPlacement placement;
-	placement.Position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
-	placement.Rotation = ReadBrushRotation(entry);
+	Serializable<BrushPlacement>::LoadFromConfig(entry, placement);
 
 	return placement;
+}
+
+void WriteBrushPlacement(ConfigEntry& entry, const BrushPlacement& placement)
+{
+	Serializable<BrushPlacement>::SaveToConfig(placement, entry);
 }
 
 BrushPlacement PlaceInSubview(const BrushPlacement& local, const Vec3f brush_center, const BrushPlacement& instance)
@@ -518,14 +510,9 @@ ConfigEntry PlaceSubviewBrushEntry(ConfigEntry& brush_entry, const String& name,
 		center = brush.GetCenter();
 	}
 
-	BrushPlacement local;
-	local.Position = brush_entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
-	local.Rotation = ReadBrushRotation(brush_entry);
+	const BrushPlacement world = PlaceInSubview(ReadBrushPlacement(brush_entry), center, instance);
 
-	const BrushPlacement world = PlaceInSubview(local, center, instance);
-
-	placed.AddMember(ConfigEntry::Literal("pos", world.Position));
-	placed.AddMember(ConfigEntry::Literal("rotquat", world.Rotation));
+	WriteBrushPlacement(placed, world);
 
 	for (const ConfigEntry& member : brush_entry.Members) {
 		const Hash32 member_name = member.Name.GetHash();

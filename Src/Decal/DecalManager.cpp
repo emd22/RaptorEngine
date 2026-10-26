@@ -5,7 +5,7 @@
 #include <Engine.hpp>
 #include <Math/Frustum.hpp>
 #include <Math/MathUtil.hpp>
-#include <Renderer/Camera.hpp>
+#include <Renderer/Camera/PerspectiveCamera.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/Limits.hpp>
 #include <Renderer/TiledForwardRenderer.hpp>
@@ -254,7 +254,8 @@ void DecalManager::AddSkinnedDecal(const Skeleton* skeleton, const Mat4f& rest_t
 	uint32 first = 0;
 	uint32 count = 0;
 
-	const auto find_run = [&]() {
+	const auto find_run = [&]()
+	{
 		first = static_cast<uint32>(mSkinnedDecals.Size);
 		count = 0;
 
@@ -266,7 +267,8 @@ void DecalManager::AddSkinnedDecal(const Skeleton* skeleton, const Mat4f& rest_t
 		}
 	};
 
-	const auto erase_at = [this](uint32 index) {
+	const auto erase_at = [this](uint32 index)
+	{
 		for (uint32 i = index; i + 1 < mSkinnedDecals.Size; i++) {
 			mSkinnedDecals[i] = mSkinnedDecals[i + 1];
 		}
@@ -361,7 +363,7 @@ void DecalManager::Clear()
 	mSkinnedUploadedCount = 0;
 }
 
-void DecalManager::Update(const PerspectiveCamera& camera)
+void DecalManager::Update(const PerspectiveCamera2& camera)
 {
 	using namespace renderer;
 

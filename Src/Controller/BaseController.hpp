@@ -5,7 +5,7 @@
 
 namespace fx {
 
-class PerspectiveCamera;
+class PerspectiveCamera2;
 
 class BaseController
 {
@@ -17,7 +17,7 @@ public:
 public:
 	virtual ~BaseController() = default;
 
-	virtual Vec3f Update(double delta_time, const Vec3f input, const PerspectiveCamera& camera, bool sprinting) = 0;
+	virtual Vec3f Update(double delta_time, const Vec3f input, const PerspectiveCamera2& camera, bool sprinting) = 0;
 
 	virtual void Reset()
 	{

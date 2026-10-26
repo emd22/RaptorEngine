@@ -10,6 +10,10 @@ namespace fx {
 template <typename T>
 class Slice;
 
+/**
+ * @brief A string class used across the engine with a default stack allocation for small strings, and heap allocated
+ * for larger strings.
+ */
 class String
 {
 	static constexpr uint32 scStackAllocSize = 16;
@@ -21,7 +25,11 @@ public:
 public:
 	static String NoCopy(char* ptr, uint32 length);
 
+	/**
+	 * @brief Converts a number to a String.
+	 */
 	template <typename T>
+		requires std::is_floating_point_v<T> || std::is_integral_v<T>
 	static String From(T value)
 	{
 		// Using a temp buffer here is faster than trying to predict the length of the value before converting.
@@ -134,6 +142,15 @@ public:
 	bool operator==(const String& other) const;
 	bool operator==(const Slice<const char>& other) const;
 	bool operator==(const char* other) const;
+
+
+	String ToLower() const;
+	String ToUpper() const;
+
+	/**
+	 * @brief Compares strings without case sensitivity. Returns true if strings are equal.
+	 */
+	bool CompareNoCase(const String& other) const;
 
 	bool operator<(const String& other) const;
 

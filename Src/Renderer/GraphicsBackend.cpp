@@ -20,13 +20,13 @@
 #include <Core/RefUtil.hpp>
 #include <Core/Types.hpp>
 #include <Decal/DecalManager.hpp>
-#include <Particle/ParticleSystem.hpp>
+#include <Map/CompiledMap.hpp>
 #include <Material/MaterialManager.hpp>
+#include <Particle/ParticleSystem.hpp>
+#include <Renderer/Backend/BarrierHelper.hpp>
 #include <Renderer/Backend/DescriptorCache.hpp>
 #include <Renderer/Backend/ExtensionHandles.hpp>
-#include <Renderer/Camera.hpp>
 #include <Renderer/Globals.hpp>
-#include <Renderer/Backend/BarrierHelper.hpp>
 #include <Renderer/LightProbe.hpp>
 #include <Renderer/PSOBuild.hpp>
 #include <Renderer/PipelineCache.hpp>
@@ -52,6 +52,18 @@ using ExtensionList = GraphicsBackend::ExtensionList;
 
 static constexpr bool scEnableValidationLayers = false;
 static constexpr uint16 scHalfOne = 0x3C00;
+
+static constexpr uint16 scFogShadowUnshadowed = 0xFFFF;
+static constexpr uint32 scMaxFogShadowCells = 4096;
+static constexpr uint32 scFogShadowAtlasWidth = 4096;
+static constexpr uint32 scMaxFogShadowAtlasHeight = 8192;
+
+struct FogShadowPageGpu
+{
+	float32 LightRect[4];
+	float32 AtlasRect[4];
+	float32 Depth[4];
+};
 
 FX_SET_MODULE_NAME("RenderBackend")
 
@@ -201,6 +213,21 @@ void GraphicsBackend::Init(Vec2u window_size)
 		pLightmapIrradiance = CreateLightmapImage(
 			Vec2u(1, 1), eImageFormat::RGBA16_Float,
 			Slice<const uint8>(reinterpret_cast<const uint8*>(black_irradiance), sizeof(black_irradiance)));
+	}
+
+	{
+		const uint16 unshadowed = scFogShadowUnshadowed;
+
+		pFogShadowAtlas = CreateLightmapImage(
+			Vec2u(1, 1), eImageFormat::D16_UNorm,
+			Slice<const uint8>(reinterpret_cast<const uint8*>(&unshadowed), sizeof(unshadowed)));
+
+		FogShadowPageBufferSize = scMaxFogShadowCells * sizeof(FogShadowPageGpu);
+		FogShadowPageBuffer.Create(eGpuBufferType::StorageWithOffset, FogShadowPageBufferSize,
+								   VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
+
+		memset(FogShadowPageBuffer.pMappedBuffer, 0, FogShadowPageBufferSize);
+		FogShadowPageBuffer.FlushToGpu(0, FogShadowPageBufferSize);
 	}
 
 	ReflectionProbePageSize = Limits::MaxReflectionProbes * sizeof(ReflectionProbeData);
@@ -684,6 +711,146 @@ eFrameResult GraphicsBackend::BeginFrame()
 	return eFrameResult::Success;
 }
 
+bool GraphicsBackend::UploadFogShadow(const CompiledMapFogShadow& shadow)
+{
+	bHasBakedFogShadow = false;
+
+	const uint64 cell_count = static_cast<uint64>(shadow.CellCount[0]) * shadow.CellCount[1];
+
+	if (shadow.IsEmpty() || cell_count > scMaxFogShadowCells) {
+		if (cell_count > scMaxFogShadowCells) {
+			LogWarning(LC_RENDER, "The fog shadow covers {} pages, more than the {} that fit", cell_count,
+					   scMaxFogShadowCells);
+		}
+
+		return false;
+	}
+
+	SizedArray<uint32> order;
+	order.InitSize(shadow.Pages.Size);
+
+	uint32 widest = 1;
+	uint64 total_width = 0;
+
+	for (uint32 i = 0; i < shadow.Pages.Size; i++) {
+		order[i] = i;
+
+		const CompiledMapFogShadowLevel& detail = shadow.Pages[i].Levels[0];
+		widest = std::max(widest, detail.Width);
+		total_width += detail.Width;
+	}
+
+	std::sort(order.begin(), order.end(),
+			  [&](uint32 a, uint32 b) { return shadow.Pages[a].Levels[0].Height > shadow.Pages[b].Levels[0].Height; });
+
+	const uint32 atlas_width = std::max(widest,
+										static_cast<uint32>(std::min<uint64>(total_width, scFogShadowAtlasWidth)));
+
+	SizedArray<Vec2u> placements;
+	placements.InitSize(shadow.Pages.Size);
+
+	uint32 cursor_x = 0;
+	uint32 shelf_y = 0;
+	uint32 shelf_height = 0;
+
+	for (const uint32 page : order) {
+		const CompiledMapFogShadowLevel& detail = shadow.Pages[page].Levels[0];
+
+		if (cursor_x + detail.Width > atlas_width) {
+			cursor_x = 0;
+			shelf_y += shelf_height;
+			shelf_height = 0;
+		}
+
+		placements[page] = Vec2u(cursor_x, shelf_y);
+
+		cursor_x += detail.Width;
+		shelf_height = std::max(shelf_height, detail.Height);
+	}
+
+	const uint32 atlas_height = std::max(shelf_y + shelf_height, 1U);
+
+	if (atlas_height > scMaxFogShadowAtlasHeight) {
+		LogWarning(LC_RENDER, "The fog shadow pages need a {}x{} atlas, more than {} high", atlas_width, atlas_height,
+				   scMaxFogShadowAtlasHeight);
+		return false;
+	}
+
+	SizedArray<uint16> texels;
+	texels.InitSize(static_cast<size_t>(atlas_width) * atlas_height);
+	std::fill(texels.begin(), texels.end(), scFogShadowUnshadowed);
+
+	SizedArray<FogShadowPageGpu> cells;
+	cells.InitSize(cell_count);
+	memset(cells.pData, 0, cells.GetSizeInBytes());
+
+	for (uint32 i = 0; i < shadow.Pages.Size; i++) {
+		const CompiledMapFogShadowPage& page = shadow.Pages[i];
+		const CompiledMapFogShadowLevel& detail = page.Levels[0];
+		const Vec2u position = placements[i];
+
+		for (uint32 row = 0; row < detail.Height; row++) {
+			memcpy(texels.pData + static_cast<size_t>(position.Y + row) * atlas_width + position.X,
+				   detail.Depths.pData + static_cast<size_t>(row) * detail.Width, detail.Width * sizeof(uint16));
+		}
+
+		const uint64 cell = static_cast<uint64>(page.CellZ - shadow.CellMin[1]) * shadow.CellCount[0] +
+							static_cast<uint64>(page.CellX - shadow.CellMin[0]);
+
+		FogShadowPageGpu& gpu = cells[cell];
+		gpu.LightRect[0] = page.LightMin[0];
+		gpu.LightRect[1] = page.LightMin[1];
+		gpu.LightRect[2] = 1.0f / page.LightSize[0];
+		gpu.LightRect[3] = 1.0f / page.LightSize[1];
+		gpu.AtlasRect[0] = static_cast<float32>(detail.Width) / atlas_width;
+		gpu.AtlasRect[1] = static_cast<float32>(detail.Height) / atlas_height;
+		gpu.AtlasRect[2] = static_cast<float32>(position.X) / atlas_width;
+		gpu.AtlasRect[3] = static_cast<float32>(position.Y) / atlas_height;
+		gpu.Depth[0] = page.DepthMin;
+		gpu.Depth[1] = 1.0f / std::max(page.DepthMax - page.DepthMin, 1e-3f);
+		gpu.Depth[2] = 1.0f;
+	}
+
+	mDevice.WaitForIdle();
+
+	pFogShadowAtlas->ImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+	SubmitImmediateUploadCmd(
+		[&](CommandBuffer& cmd)
+		{
+			ImageInfo info(Vec2u(atlas_width, atlas_height), eImageFormat::D16_UNorm, 0, 1,
+						   Slice<const uint8>(reinterpret_cast<const uint8*>(texels.pData), texels.GetSizeInBytes()));
+
+			pFogShadowAtlas->CreateFromData(cmd, info, eImageCreateFlags::None);
+		});
+
+	gDescriptorCache->RebuildUsingImage(pFogShadowAtlas);
+
+	memcpy(FogShadowPageBuffer.pMappedBuffer, cells.pData, cells.GetSizeInBytes());
+	FogShadowPageBuffer.FlushToGpu(0, static_cast<uint32>(cells.GetSizeInBytes()));
+
+	for (uint32 axis = 0; axis < 3; axis++) {
+		FogShadow.Right[axis] = shadow.Right[axis];
+		FogShadow.Up[axis] = shadow.Up[axis];
+		FogShadow.Forward[axis] = shadow.Forward[axis];
+	}
+
+	FogShadow.PageSize = shadow.PageSize;
+	FogShadow.CellMin[0] = shadow.CellMin[0];
+	FogShadow.CellMin[1] = shadow.CellMin[1];
+	FogShadow.CellCount[0] = shadow.CellCount[0];
+	FogShadow.CellCount[1] = shadow.CellCount[1];
+	FogShadow.InvAtlasSize[0] = 1.0f / atlas_width;
+	FogShadow.InvAtlasSize[1] = 1.0f / atlas_height;
+
+	bHasBakedFogShadow = true;
+
+	LogInfo("Loaded fog shadow pages; {} of {} cells, {}x{} atlas", shadow.Pages.Size, cell_count, atlas_width,
+			atlas_height);
+
+	return true;
+}
+
 Image* GraphicsBackend::CreateLightmapImage(const Vec2u& size, eImageFormat format, const Slice<const uint8>& texels)
 {
 	Image* image = gTextureManager->NewTexture();
@@ -770,7 +937,7 @@ bool GraphicsBackend::UploadLightmap(const Vec2u& size, const uint8* sun_visibil
 	return true;
 }
 
-void GraphicsBackend::BeginLightCulling(Camera& render_cam) { pRenderer->DoLightCullingPass(render_cam); }
+void GraphicsBackend::BeginLightCulling(BaseCamera& render_cam) { pRenderer->DoLightCullingPass(render_cam); }
 
 void GraphicsBackend::BeginPrepass()
 {
@@ -892,7 +1059,7 @@ static constexpr float32 scDefaultGTAOThinOccluderCompensation = 0.0f;
 static constexpr float32 scDefaultGTAOFinalValuePower = 2.2f;
 static constexpr float32 scDefaultGTAODenoiseBlurBeta = 1.2f;
 
-void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
+void GraphicsBackend::RenderEarlyFrameEffects(PerspectiveCamera2& camera)
 {
 	FrameData* frame = GetFrame();
 
@@ -908,17 +1075,17 @@ void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 		.RenderSize = { target_width, target_height },
 	};
 
-	memcpy(consts.InvProjection, camera.InvProjectionMatrix.RawData, sizeof(float32) * 16);
-	memcpy(consts.Projection, camera.ProjectionMatrix.RawData, sizeof(float32) * 16);
-	memcpy(consts.View, camera.ViewMatrix.RawData, sizeof(float32) * 16);
+	memcpy(consts.InvProjection, camera.GetInvProjectionMatrix().RawData, sizeof(float32) * 16);
+	memcpy(consts.Projection, camera.GetProjectionMatrix().RawData, sizeof(float32) * 16);
+	memcpy(consts.View, camera.GetViewMatrix().RawData, sizeof(float32) * 16);
 
 	consts.EffectRadius = gCVars->Get("r_gtao_radius", scDefaultGTAORadius) *
 						  gCVars->Get("r_gtao_radius_multiplier", scDefaultGTAORadiusMultiplier);
 	consts.FalloffRange = gCVars->Get("r_gtao_falloff_range", scDefaultGTAOFalloffRange);
-	consts.SampleDistributionPower =
-		gCVars->Get("r_gtao_sample_distribution_power", scDefaultGTAOSampleDistributionPower);
-	consts.ThinOccluderCompensation =
-		gCVars->Get("r_gtao_thin_occluder_compensation", scDefaultGTAOThinOccluderCompensation);
+	consts.SampleDistributionPower = gCVars->Get("r_gtao_sample_distribution_power",
+												 scDefaultGTAOSampleDistributionPower);
+	consts.ThinOccluderCompensation = gCVars->Get("r_gtao_thin_occluder_compensation",
+												  scDefaultGTAOThinOccluderCompensation);
 	consts.FinalValuePower = gCVars->Get("r_gtao_final_value_power", scDefaultGTAOFinalValuePower);
 
 	gPipelineCache->SetFrameData(FrameAlloc.Push(consts));
@@ -961,7 +1128,10 @@ static constexpr float32 scDefaultFogDistance = 100.0f;
 static constexpr float32 scMaxFogAnisotropy = 0.95f;
 static constexpr float32 scMinFogFalloff = 1e-4f;
 static constexpr float32 scFogHistoryBlend = 0.1f;
+static constexpr float32 scFroxelHistoryBlend = 0.08f;
 static constexpr float64 scFogJitterSequenceStep = 0.6180339887498949;
+static constexpr float32 scBakedFogShadowBias = 0.02f;
+static constexpr float32 scBakedFogShadowPcfRadius = 0.05f;
 
 eFogMode GraphicsBackend::GetFogMode() const
 {
@@ -973,7 +1143,11 @@ eFogMode GraphicsBackend::GetFogMode() const
 
 	const int64 mode = gCVars->Get("r_fog", scDefaultFogMode);
 
-	if (mode >= static_cast<int64>(eFogMode::Volumetric)) {
+	if (mode >= static_cast<int64>(eFogMode::Froxel)) {
+		return eFogMode::Froxel;
+	}
+
+	if (mode == static_cast<int64>(eFogMode::Volumetric)) {
 		return eFogMode::Volumetric;
 	}
 
@@ -984,7 +1158,7 @@ eFogMode GraphicsBackend::GetFogMode() const
 	return eFogMode::Off;
 }
 
-void GraphicsBackend::RenderFog(Camera& camera)
+void GraphicsBackend::RenderFog(PerspectiveCamera2& camera)
 {
 	const eFogMode mode = GetFogMode();
 
@@ -996,8 +1170,8 @@ void GraphicsBackend::RenderFog(Camera& camera)
 
 	const FogSettings& fog = gWorld->Fog;
 
-	const float32* projection = camera.ProjectionMatrix.RawData;
-	const float32* inv_view = camera.InvViewMatrix.RawData;
+	const float32* projection = camera.GetProjectionMatrix().RawData;
+	const float32* inv_view = camera.GetInvViewMatrix().RawData;
 
 	const float32 depth_a = static_cast<float32>(1.0 - static_cast<float64>(projection[10]));
 	const float32 depth_b = -projection[14];
@@ -1046,6 +1220,9 @@ void GraphicsBackend::RenderFog(Camera& camera)
 	consts.CameraOffsetAndHaze[2] = eye.Z - origin.Z;
 	consts.CameraOffsetAndHaze[3] = std::max(fog.Haze, 0.0f);
 
+	consts.ScreenSize[0] = static_cast<float32>(Swapchain.Extent.X);
+	consts.ScreenSize[1] = static_cast<float32>(Swapchain.Extent.Y);
+
 	consts.Anisotropy = std::clamp(fog.Anisotropy, -scMaxFogAnisotropy, scMaxFogAnisotropy);
 	consts.AmbientScale = std::max(fog.AmbientScale, 0.0f);
 
@@ -1059,16 +1236,43 @@ void GraphicsBackend::RenderFog(Camera& camera)
 
 	consts.JitterOffset = 0.5f;
 	consts.NoiseShift = 0;
+	consts.JitterAmount = 0.0f;
+	consts.HistoryBlend = 0.0f;
 
 	if (temporal) {
 		const float64 sequence = static_cast<float64>(frame_counter) * scFogJitterSequenceStep;
 		consts.JitterOffset = static_cast<float32>(sequence - std::floor(sequence));
 		consts.NoiseShift = frame_counter & 15U;
+		consts.JitterAmount = 1.0f;
 	}
+
+	memcpy(consts.PrevCameraMatrix, mFogPrevCameraMatrix.RawData, sizeof(consts.PrevCameraMatrix));
 
 	if (bBakedSunActive) {
 		consts.Flags |= static_cast<uint32>(eFogFlags::ProbeSunVisibility);
 		consts.Flags |= static_cast<uint32>(eFogFlags::NearSunDynamicOnly);
+	}
+
+	if (bBakedSunActive && bHasBakedFogShadow) {
+		consts.Flags |= static_cast<uint32>(eFogFlags::BakedSunShadow);
+
+		for (uint32 axis = 0; axis < 3; axis++) {
+			consts.BakedShadowRight[axis] = FogShadow.Right[axis];
+			consts.BakedShadowUp[axis] = FogShadow.Up[axis];
+			consts.BakedShadowForward[axis] = FogShadow.Forward[axis];
+		}
+
+		consts.BakedShadowRight[3] = FogShadow.PageSize;
+		consts.BakedShadowUp[3] = scBakedFogShadowBias;
+		consts.BakedShadowForward[3] = scBakedFogShadowPcfRadius;
+
+		consts.BakedShadowGrid[0] = static_cast<float32>(FogShadow.CellMin[0]);
+		consts.BakedShadowGrid[1] = static_cast<float32>(FogShadow.CellMin[1]);
+		consts.BakedShadowGrid[2] = static_cast<float32>(FogShadow.CellCount[0]);
+		consts.BakedShadowGrid[3] = static_cast<float32>(FogShadow.CellCount[1]);
+
+		consts.BakedShadowAtlas[0] = FogShadow.InvAtlasSize[0];
+		consts.BakedShadowAtlas[1] = FogShadow.InvAtlasSize[1];
 	}
 
 	if (bFarSunShadowActive) {
@@ -1082,6 +1286,28 @@ void GraphicsBackend::RenderFog(Camera& camera)
 		memcpy(consts.FarSunMatrix, Mat4f::scIdentity.RawData, sizeof(consts.FarSunMatrix));
 	}
 
+	if (mode == eFogMode::Froxel) {
+		Image& history = pRenderer->FroxelHistory;
+
+		bool history_valid = temporal && (mFroxelHistoryFrame + 1 == frame_counter);
+
+		if (history.ImageLayout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+			BarrierHelper::ImageBeginComputeRead(cmd, &history);
+			history_valid = false;
+		}
+
+		if (history_valid) {
+			consts.HistoryBlend = scFroxelHistoryBlend;
+		}
+
+		RenderFroxelFog(cmd, FrameAlloc.Push(consts));
+
+		mFogPrevCameraMatrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
+		mFroxelHistoryFrame = frame_counter;
+
+		return;
+	}
+
 	ePipelineName march_pipeline = ePipelineName::FogFast;
 
 	if (mode == eFogMode::Volumetric) {
@@ -1093,6 +1319,7 @@ void GraphicsBackend::RenderFog(Camera& camera)
 	gPipelineCache->AddBufferOffset(0, LightBuffer.GetBaseOffset());
 	gPipelineCache->AddBufferOffset(0, GetLightGridFrameOffset());
 	gPipelineCache->AddBufferOffset(0, GetLightIndexListFrameOffset());
+	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->AddBufferOffset(0, 0);
@@ -1167,7 +1394,53 @@ void GraphicsBackend::RenderFog(Camera& camera)
 	pRenderer->FogApplyPass.End();
 }
 
-void GraphicsBackend::DoComposition(Camera& render_cam)
+void GraphicsBackend::RenderFroxelFog(CommandBuffer& cmd, uint32 consts_offset)
+{
+	static constexpr uint32 scGroupSize = 8;
+
+	const uint32 group_columns = (scFroxelGridX + scGroupSize - 1) / scGroupSize;
+	const uint32 group_rows = (scFroxelGridY + scGroupSize - 1) / scGroupSize;
+
+	BarrierHelper::ComputeReadAfterAll(cmd);
+	BarrierHelper::ImageBeginComputeWrite(cmd, &pRenderer->FroxelLighting);
+	BarrierHelper::ImageBeginComputeWrite(cmd, &pRenderer->FroxelIntegrated);
+	BarrierHelper::ImageBeginComputeWrite(cmd, &pRenderer->FroxelSurface);
+
+	gPipelineCache->AddBufferOffset(0, LightBuffer.GetBaseOffset());
+	gPipelineCache->AddBufferOffset(0, GetLightGridFrameOffset());
+	gPipelineCache->AddBufferOffset(0, GetLightIndexListFrameOffset());
+	gPipelineCache->AddBufferOffset(0, 0);
+	gPipelineCache->AddBufferOffset(0, 0);
+	gPipelineCache->AddBufferOffset(0, 0);
+	gPipelineCache->AddBufferOffset(0, 0);
+	gPipelineCache->SetFrameData(consts_offset);
+	gPipelineCache->Bind(ePipelineName::FogFroxelInject, cmd);
+
+	vkCmdDispatch(cmd.Get(), group_columns, group_rows, scFroxelGridZ + 1);
+
+	BarrierHelper::ImageComputeWriteToRead(cmd, &pRenderer->FroxelLighting);
+	BarrierHelper::ImageComputeWriteToRead(cmd, &pRenderer->FroxelSurface);
+
+	gPipelineCache->SetFrameData(consts_offset);
+	gPipelineCache->Bind(ePipelineName::FogFroxelIntegrate, cmd);
+
+	vkCmdDispatch(cmd.Get(), group_columns, group_rows, 1);
+
+	BarrierHelper::ImageComputeWriteToRead(cmd, &pRenderer->FroxelIntegrated);
+
+	pRenderer->FogApplyPass.Begin(cmd);
+
+	gPipelineCache->SetFrameData(consts_offset);
+	gPipelineCache->Bind(ePipelineName::FogFroxelApply, cmd);
+
+	vkCmdDraw(cmd.Get(), 3, 1, 0, 0);
+
+	pRenderer->FogApplyPass.End();
+
+	BarrierHelper::ImageCopyToComputeHistory(cmd, &pRenderer->FroxelLighting, &pRenderer->FroxelHistory);
+}
+
+void GraphicsBackend::DoComposition(PerspectiveCamera2& render_cam)
 {
 	FrameData* frame = GetFrame();
 
@@ -1272,6 +1545,7 @@ void GraphicsBackend::Destroy()
 	ProbeVolumeBuffer.Destroy();
 	ProbeGridBuffer.Destroy();
 	ReflectionProbeBuffer.Destroy();
+	FogShadowPageBuffer.Destroy();
 
 	gAssetManager->ShutdownDeletionQueue();
 

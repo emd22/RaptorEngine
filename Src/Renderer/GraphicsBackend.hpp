@@ -22,8 +22,10 @@
 #include <mutex>
 
 namespace fx {
-class Camera;
+class BaseCamera;
+class PerspectiveCamera2;
 class Image;
+struct CompiledMapFogShadow;
 } // namespace fx
 
 namespace fx::renderer {
@@ -41,9 +43,27 @@ enum class eFogMode : int64
 	Off = 0,
 	Fast = 1,
 	Volumetric = 2,
+	Froxel = 3,
 };
 
 class TiledForwardRenderer;
+
+/**
+ * @brief Where the fog shadow pages of the loaded compiled map are, see CompiledMapFogShadow
+ */
+struct BakedFogShadowParams
+{
+	float32 Right[3] = {};
+	float32 Up[3] = {};
+	float32 Forward[3] = {};
+
+	float32 PageSize = 0.0f;
+
+	int32 CellMin[2] = {};
+	uint32 CellCount[2] = {};
+
+	float32 InvAtlasSize[2] = {};
+};
 
 struct GpuUploadContext
 {
@@ -82,17 +102,18 @@ public:
 	void Destroy();
 
 	eFrameResult BeginFrame();
-	void BeginLightCulling(Camera& render_cam);
+	void BeginLightCulling(BaseCamera& render_cam);
 	void BeginPrepass();
 	void BeginGeometry();
 
-	void RenderEarlyFrameEffects(Camera& camera);
+	void RenderEarlyFrameEffects(PerspectiveCamera2& camera);
 
-	void RenderFog(Camera& camera);
+	void RenderFog(PerspectiveCamera2& camera);
+	void RenderFroxelFog(CommandBuffer& cmd, uint32 consts_offset);
 
 	eFogMode GetFogMode() const;
 
-	void DoComposition(Camera& render_cam);
+	void DoComposition(PerspectiveCamera2& render_cam);
 
 	void RebuildToResizedWindow();
 
@@ -315,6 +336,15 @@ public:
 
 	Image* pLightmap = nullptr;
 	Image* pLightmapIrradiance = nullptr;
+
+	/// Sun shadow pages that the fog samples on compiled maps with a baked sun, packed into one depth atlas
+	Image* pFogShadowAtlas = nullptr;
+	/// One entry per page grid cell, saying where its page is in the atlas and in light space
+	RawGpuBuffer FogShadowPageBuffer;
+	uint32 FogShadowPageBufferSize = 0;
+	BakedFogShadowParams FogShadow;
+	bool bHasBakedFogShadow = false;
+
 	bool bBakedSunActive = false;
 	bool bBakedIndirectActive = false;
 	bool bFarSunShadowActive = false;
@@ -345,6 +375,9 @@ public:
 						const uint8* directions);
 	Image* CreateLightmapImage(const Vec2u& size, eImageFormat format, const Slice<const uint8>& texels);
 
+	bool UploadFogShadow(const CompiledMapFogShadow& shadow);
+	void ClearFogShadow() { bHasBakedFogShadow = false; }
+
 	bool HasDebugView() const { return bOnlyRenderProbes || bRenderProbeVisibility || (ReflectionDebugView != 0); }
 
 private:
@@ -366,6 +399,7 @@ protected:
 
 	Mat4f mFogPrevCameraMatrix = Mat4f::scIdentity;
 	uint32 mFogHistoryFrame = UINT32_MAX;
+	uint32 mFroxelHistoryFrame = UINT32_MAX;
 
 	// TSQueue<DeletionObject> mDeletionQueue;
 };

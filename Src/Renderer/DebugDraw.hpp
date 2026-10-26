@@ -12,7 +12,7 @@
 
 namespace fx {
 
-class Camera;
+class BaseCamera;
 
 namespace renderer {
 
@@ -54,7 +54,7 @@ public:
 	void Overlay(const Ref<PrimitiveMesh>& mesh, const Mat4f& world_matrix, Color color);
 
 
-	void Render(const CommandBuffer& cmd, const Camera& camera);
+	void Render(const CommandBuffer& cmd, const BaseCamera& camera);
 
 	uint32 GetQueuedCount() const { return static_cast<uint32>(mShapes.Size + mOverlays.Size); }
 

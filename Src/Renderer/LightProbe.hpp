@@ -7,7 +7,7 @@
 #include <Math/Vec3.hpp>
 #include <Renderer/Backend/Commands.hpp>
 #include <Renderer/Backend/GpuBuffer.hpp>
-#include <Renderer/Camera.hpp>
+#include <Renderer/Camera/PerspectiveCamera.hpp>
 #include <Renderer/Limits.hpp>
 #include <Renderer/ProbePlacement.hpp>
 #include <Renderer/RenderStage.hpp>
@@ -48,7 +48,7 @@ public:
 	static constexpr uint32 scCaptureFaces = 6;
 	static constexpr uint32 scProbesPerFrame = 4;
 
-	using RenderFaceFunc = std::function<void(PerspectiveCamera& camera, renderer::RenderStage& stage)>;
+	using RenderFaceFunc = std::function<void(PerspectiveCamera2& camera, renderer::RenderStage& stage)>;
 
 public:
 	void Create();
@@ -150,6 +150,13 @@ private:
 	bool SaveReflectionProbes();
 	bool LoadReflectionProbes();
 
+	/**
+	 * @brief Create all cameras that probes are captured with
+	 */
+	void MakeCaptureCameras();
+
+	void MoveCaptureCameras(const Vec3f position);
+
 private:
 	ProbeLayout mLayout;
 	ProbeSHData mProbes[Limits::MaxIrradianceProbes] {};
@@ -167,7 +174,9 @@ private:
 
 	eBakeState mBakeState = eBakeState::Idle;
 	eBakePhase mBakePhase = eBakePhase::Irradiance;
+
 	bool mbCapturingFaces = false;
+
 	uint32 mCurrentProbe = 0;
 	uint32 mBatchStart = 0;
 	uint32 mCurrentBounce = 0;
@@ -185,6 +194,9 @@ private:
 	SizedArray<CaptureTexel> mCaptureTexels;
 	Mat4f mCaptureInvProjection = Mat4f::scIdentity;
 	Mat4f mCaptureFaceToClip[scCaptureFaces];
+
+
+	SizedArray<PerspectiveCamera2> mCaptureCameras;
 
 	renderer::RenderStage mReflectionStage;
 	renderer::RawGpuBuffer mReflectionStaging[scCaptureFaces];

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Core/Defines.hpp>
-#include <Core/Serialize2.hpp>
+#include <Core/Serialize.hpp>
 #include <Math/Vec3.hpp>
 #include <Math/Vec4.hpp>
 

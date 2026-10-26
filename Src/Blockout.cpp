@@ -4,6 +4,7 @@
 #include <Asset/ConfigFile.hpp>
 #include <Asset/MeshGen.hpp>
 #include <BrushEntry.hpp>
+#include <LightEntry.hpp>
 #include <CVar.hpp>
 #include <Core/FilesystemIO.hpp>
 #include <Core/RefUtil.hpp>
@@ -27,6 +28,12 @@
 #include <cctype>
 #include <cfloat>
 #include <filesystem>
+
+
+RS_OBJECT_BEGIN(fx::World::PlayerSpawnPoint)
+	RS_FIELD_NAMED(Position, "pos")
+	RS_FIELD_NAMED(Direction, "dir")
+RS_OBJECT_END()
 
 
 namespace fx {
@@ -265,7 +272,7 @@ bool Blockout::GetClipPieces(Object* object, const Vec3f point_a, const Vec3f po
 		return false;
 	}
 
-	const Mat4f to_local = object->GetWorldMatrix().Inverse();
+	const Mat4f to_local = object->GetWorldMatrix().AffineInverse();
 
 	const Vec4f local_a = to_local * Vec4f(point_a.X, point_a.Y, point_a.Z, 1.0f);
 	const Vec4f local_b = to_local * Vec4f(point_b.X, point_b.Y, point_b.Z, 1.0f);
@@ -307,7 +314,7 @@ bool Blockout::GetSubtractPieces(Object* target, Object* cutter, std::vector<Bru
 	}
 
 	const Mat4f to_world = cutter->GetWorldMatrix();
-	const Mat4f to_local = target->GetWorldMatrix().Inverse();
+	const Mat4f to_local = target->GetWorldMatrix().AffineInverse();
 
 	Brush::PlaneList cutter_planes;
 
@@ -472,7 +479,7 @@ bool Blockout::RaycastFace(Object* object, const Vec3f origin, const Vec3f direc
 	}
 
 	// Bring the ray into the brush's local space
-	const Mat4f to_local = object->GetWorldMatrix().Inverse();
+	const Mat4f to_local = object->GetWorldMatrix().AffineInverse();
 	const Vec4f local_origin = to_local * Vec4f(origin.X, origin.Y, origin.Z, 1.0f);
 	const Vec4f local_direction = to_local * Vec4f(direction.X, direction.Y, direction.Z, 0.0f);
 
@@ -606,6 +613,8 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	if (mbHasBakedSun) {
 		gProbeManager->ClearSunVisibility();
 	}
+
+	renderer::gGraphics->ClearFogShadow();
 
 	mbHasBakedSun = false;
 	mbHasBakedIndirect = false;
@@ -742,6 +751,13 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 	mbHasBakedSun = has_lightmap && map.HasBakedSun();
 	mbHasBakedIndirect = has_lightmap && has_indirect;
 	mbBakedWithSun = lightmap.HasSun();
+
+	if (mbHasBakedSun && map.HasFogShadow()) {
+		renderer::gGraphics->UploadFogShadow(map.FogShadow);
+	}
+	else {
+		renderer::gGraphics->ClearFogShadow();
+	}
 
 	mCompiledDecalReceivers.reserve(map.Surfaces.Size);
 
@@ -1324,7 +1340,7 @@ void Blockout::RefreshDecals(bool force)
 static bool RayEntersBrush(const Brush& brush, const Mat4f& world, const Vec3f origin, const Vec3f direction,
 						   float32& out_distance)
 {
-	const Mat4f to_local = world.Inverse();
+	const Mat4f to_local = world.AffineInverse();
 	const Vec3f local_origin = TransformPoint(to_local, origin);
 	const Vec3f local_direction = TransformDirection(to_local, direction);
 
@@ -1480,7 +1496,7 @@ void Blockout::RaycastDecalSurfaces(const Vec3f origin, const Vec3f direction, f
 				continue;
 			}
 
-			const Vec3f local = TransformPoint(receiver.World.Inverse(), above);
+			const Vec3f local = TransformPoint(receiver.World.AffineInverse(), above);
 
 			if (receiver.pBrush->ContainsPoint(local, -scDecalBuriedTolerance)) {
 				is_buried = true;
@@ -1838,7 +1854,7 @@ bool Blockout::RaycastPatch(Object* object, const Vec3f origin, const Vec3f dire
 		return false;
 	}
 
-	const Mat4f to_local = object->GetWorldMatrix().Inverse();
+	const Mat4f to_local = object->GetWorldMatrix().AffineInverse();
 	const Vec4f local_origin4 = to_local * Vec4f(origin.X, origin.Y, origin.Z, 1.0f);
 	const Vec4f local_direction4 = to_local * Vec4f(direction.X, direction.Y, direction.Z, 0.0f);
 
@@ -2029,7 +2045,7 @@ MaterialID Blockout::ReadBrushMaterial(ConfigEntry& entry)
 
 ObjectID Blockout::CreateBrush(ConfigEntry& entry)
 {
-	Vec3f position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
+	const BrushPlacement placement = ReadBrushPlacement(entry);
 
 	String blockout_id = String::Fmt("{}", entry.Name.Get());
 
@@ -2066,29 +2082,11 @@ ObjectID Blockout::CreateBrush(ConfigEntry& entry)
 	}
 
 	Object* object = gObjectManager->NewObject(blockout_id.Str(), material_id, object_tags);
-	object->MoveBy(position);
+	object->MoveBy(placement.Position);
 	object->SetShadowCaster(entry.GetMemberValue(HashStr32("shadows"), 1) != 0);
 	object->SetCullable(entry.GetMemberValue(HashStr32("nocull"), 0) == 0);
 
-	Quat rotation = Quat::scIdentity;
-
-	{
-		ConfigEntry* rot_entry = entry.GetMember(HashStr32("rot"));
-
-		if (rot_entry != nullptr) {
-			rotation = Quat::FromEulerAngles(rot_entry->GetValue<Vec3f>());
-		}
-	}
-
-	{
-		ConfigEntry* rotq_entry = entry.GetMember(HashStr32("rotquat"));
-
-		if (rotq_entry != nullptr) {
-			rotation = rotq_entry->GetValue<Quat>();
-		}
-	}
-
-	object->SetRotation(rotation);
+	object->SetRotation(placement.Rotation);
 
 	if (entry.GetMemberValue(HashStr32("probevolume"), 0) == 1) {
 		object->SetProbeVolume(true);
@@ -2334,7 +2332,7 @@ bool Blockout::ContainsPoint(Object* object, const Vec3f point)
 		return object->ContainsPoint(point);
 	}
 
-	const Vec4f local = object->GetWorldMatrix().Inverse() * Vec4f(point.X, point.Y, point.Z, 1.0f);
+	const Vec4f local = object->GetWorldMatrix().AffineInverse() * Vec4f(point.X, point.Y, point.Z, 1.0f);
 
 	return brush->ContainsPoint(Vec3f(local.X, local.Y, local.Z));
 }
@@ -2455,41 +2453,13 @@ Object* Blockout::RestoreObject(const Vec3f position, const Brush::PlaneList& pl
 	return object;
 }
 
-/// Values of the CLight constants in Config/Internal/Constants.conf
-enum class ePrxLightType : int64
-{
-	Point = 0,
-	Spot = 1,
-};
-
-static void WriteColorEntry(ConfigEntry& parent, const char* name, const Color& color)
-{
-	ConfigEntry color_array = ConfigEntry::Array(name, ConfigPrimitive::ePrimitiveType::Int);
-
-	color_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(color.R)));
-	color_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(color.G)));
-	color_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(color.B)));
-	color_array.AppendValue(ConfigPrimitive::FromValue(static_cast<int32>(color.A)));
-
-	parent.AddMember(std::move(color_array));
-}
-
-static void ReadLightColor(const ConfigEntry& entry, LightBase& light)
-{
-	const Color color = entry.GetMemberValue(HashStr32("color"), light.Color);
-
-	light.Color = Color::FromRGBA(color.R, color.G, color.B, 255);
-	light.Intensity = entry.GetMemberValue<float32>(HashStr32("intensity"), light.Intensity);
-}
-
 void Blockout::AddOrUpdateLightFromEntry(const ConfigEntry& light_entry)
 {
-	const int64 type_value = light_entry.GetMemberValue<int64>(HashStr32("type"),
-															   static_cast<int64>(ePrxLightType::Point));
+	const LightEntry data = ReadLightEntry(light_entry);
 
 	eLightType light_type;
 
-	switch (static_cast<ePrxLightType>(type_value)) {
+	switch (data.Type) {
 	case ePrxLightType::Point:
 		light_type = eLightType::Point;
 		break;
@@ -2497,7 +2467,7 @@ void Blockout::AddOrUpdateLightFromEntry(const ConfigEntry& light_entry)
 		light_type = eLightType::Spot;
 		break;
 	default:
-		LogError(LC_ASSET, "Light '{}' has unknown type {}", light_entry.Name.Get(), type_value);
+		LogError(LC_ASSET, "Light '{}' has unknown type {}", light_entry.Name.Get(), static_cast<int64>(data.Type));
 		return;
 	}
 
@@ -2518,29 +2488,25 @@ void Blockout::AddOrUpdateLightFromEntry(const ConfigEntry& light_entry)
 		}
 	}
 
-	light->SetPosition(light_entry.GetMemberValue(HashStr32("pos"), light->GetPosition()));
-	ReadLightColor(light_entry, *light);
-	light->SetRadius(light_entry.GetMemberValue<float32>(HashStr32("radius"), 5.0f));
+	light->SetPosition(data.Position);
+	light->Color = data.Color;
+	light->Intensity = data.Intensity;
+	light->SetRadius(data.Radius);
 
 	if (light_type == eLightType::Spot) {
 		Ref<LightSpot> spot(light);
 
-		ConfigEntry* direction = light_entry.GetMember(HashStr32("dir"));
-		if (direction != nullptr) {
-			spot->SetDirection(direction->GetValue<Vec3f>());
+		if (!data.Spot.Direction.IsZero()) {
+			spot->SetDirection(data.Spot.Direction);
 		}
 		else {
 			spot->SetRotation(light_entry.GetMemberValue(HashStr32("rot"), spot->mRotation));
 		}
 
-		// Cone half-angles, in degrees
-		const float32 inner_angle = light_entry.GetMemberValue<float32>(HashStr32("inner"), 20.0f);
-		const float32 outer_angle = light_entry.GetMemberValue<float32>(HashStr32("outer"), 30.0f);
+		spot->SetConeAngles(MathUtil::DegreesToRadians(data.Spot.InnerAngle),
+							MathUtil::DegreesToRadians(data.Spot.OuterAngle));
 
-		spot->SetConeAngles(MathUtil::DegreesToRadians(inner_angle), MathUtil::DegreesToRadians(outer_angle));
-
-		// Spot lights bake a shadow map into the shadow atlas unless `shadows = $False`
-		spot->bCastShadows = (light_entry.GetMemberValue<int64>(HashStr32("shadows"), 1) != 0);
+		spot->bCastShadows = data.Spot.bCastShadows;
 	}
 }
 
@@ -2556,15 +2522,21 @@ void Blockout::LoadLights(ConfigFile& info)
 
 	ConfigEntry* sun_entry = info.GetEntry(HashStr32("sun"));
 
-	const bool sun_enabled = (sun_entry != nullptr) && (sun_entry->GetMemberValue<int64>(HashStr32("enabled"), 1) != 0);
+	SunLightEntry sun_data;
+
+	if (sun_entry != nullptr) {
+		sun_data = ReadSunLightEntry(*sun_entry);
+	}
+
+	const bool sun_enabled = (sun_entry != nullptr) && sun_data.bEnabled;
 
 	sun->bEnabled = sun_enabled;
 	gCVars->Set("b_sun_enabled", sun_enabled);
 
 	if (sun_entry) {
-		sun->SetPosition(sun_entry->GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero));
-
-		ReadLightColor(*sun_entry, *sun);
+		sun->SetPosition(sun_data.Position);
+		sun->Color = sun_data.Color;
+		sun->Intensity = sun_data.Intensity;
 	}
 
 	// Load point and spot lights
@@ -2586,13 +2558,15 @@ void Blockout::SaveLights(ConfigFile& info)
 	Ref<LightDirectional> sun = gLightManager->GetDirectionalLight();
 
 	if (sun.IsValid()) {
+		const SunLightEntry sun_data {
+			.bEnabled = sun->bEnabled,
+			.Position = sun->GetPosition(),
+			.Color = sun->Color,
+			.Intensity = sun->Intensity,
+		};
+
 		ConfigEntry sun_entry = ConfigEntry::Struct("sun");
-
-		sun_entry.AddMember(ConfigEntry::Literal("enabled", static_cast<int64>(sun->bEnabled ? 1 : 0)));
-		sun_entry.AddMember(ConfigEntry::Literal("pos", sun->GetPosition()));
-
-		WriteColorEntry(sun_entry, "color", sun->Color);
-		sun_entry.AddMember(ConfigEntry::Literal("intensity", sun->Intensity));
+		WriteSunLightEntry(sun_entry, sun_data);
 
 		info.AddEntry(std::move(sun_entry));
 	}
@@ -2606,31 +2580,28 @@ void Blockout::SaveLights(ConfigFile& info)
 			continue;
 		}
 
-		ConfigEntry light_entry = ConfigEntry::Struct(light->Name.Get());
-
-		light_entry.AddMember(
-			ConfigEntry::DotReference("type", light->Type == eLightType::Spot ? "$clight.spot" : "$clight.point"));
-
-		light_entry.AddMember(ConfigEntry::Literal("pos", light->GetPosition()));
-		WriteColorEntry(light_entry, "color", light->Color);
-		light_entry.AddMember(ConfigEntry::Literal("intensity", light->Intensity));
-		light_entry.AddMember(ConfigEntry::Literal("radius", light->GetRadius()));
+		LightEntry data {
+			.Type = ePrxLightType::Point,
+			.Position = light->GetPosition(),
+			.Color = light->Color,
+			.Intensity = light->Intensity,
+			.Radius = light->GetRadius(),
+		};
 
 		if (light->Type == eLightType::Spot) {
 			Ref<LightSpot> spot(light);
 
-			const Vec3f direction = spot->GetDirection();
-
-			ConfigEntry direction_array = ConfigEntry::Array("dir", ConfigPrimitive::ePrimitiveType::Float);
-			direction_array.AppendValue(ConfigPrimitive::FromValue(direction.X));
-			direction_array.AppendValue(ConfigPrimitive::FromValue(direction.Y));
-			direction_array.AppendValue(ConfigPrimitive::FromValue(direction.Z));
-			light_entry.AddMember(std::move(direction_array));
-
-			light_entry.AddMember(ConfigEntry::Literal("inner", MathUtil::RadiansToDegrees(spot->GetInnerAngle())));
-			light_entry.AddMember(ConfigEntry::Literal("outer", MathUtil::RadiansToDegrees(spot->GetOuterAngle())));
-			light_entry.AddMember(ConfigEntry::Literal("shadows", static_cast<int64>(spot->bCastShadows ? 1 : 0)));
+			data.Type = ePrxLightType::Spot;
+			data.Spot = SpotLightEntry {
+				.Direction = spot->GetDirection(),
+				.InnerAngle = MathUtil::RadiansToDegrees(spot->GetInnerAngle()),
+				.OuterAngle = MathUtil::RadiansToDegrees(spot->GetOuterAngle()),
+				.bCastShadows = spot->bCastShadows,
+			};
 		}
+
+		ConfigEntry light_entry = ConfigEntry::Struct(light->Name.Get());
+		WriteLightEntry(light_entry, data);
 
 		lights_container.AddMember(std::move(light_entry));
 	}
@@ -2675,9 +2646,9 @@ void Blockout::LoadPlayerSpawn(ConfigFile& info)
 		return;
 	}
 
-	gWorld->PlayerSpawn.Position = spawn->GetMemberValue<Vec3f>(HashStr32("pos"),
-																World::PlayerSpawnPoint::DefaultPosition());
-	gWorld->PlayerSpawn.Direction = spawn->GetMemberValue<Vec3f>(HashStr32("dir"), Vec3f::sForward).Normalize();
+	Serializable<World::PlayerSpawnPoint>::LoadFromConfig(*spawn, gWorld->PlayerSpawn);
+
+	gWorld->PlayerSpawn.Direction = gWorld->PlayerSpawn.Direction.Normalize();
 	gWorld->PlayerSpawn.bCustom = true;
 }
 
@@ -2688,9 +2659,7 @@ void Blockout::SavePlayerSpawn(ConfigFile& info)
 	}
 
 	ConfigEntry spawn = ConfigEntry::Struct("player_spawn");
-
-	spawn.AddMember(ConfigEntry::Literal("pos", gWorld->PlayerSpawn.Position));
-	spawn.AddMember(ConfigEntry::Literal("dir", gWorld->PlayerSpawn.Direction));
+	Serializable<World::PlayerSpawnPoint>::SaveToConfig(gWorld->PlayerSpawn, spawn);
 
 	info.AddEntry(std::move(spawn));
 }
@@ -2904,19 +2873,13 @@ void Blockout::LoadFog(ConfigFile& info)
 {
 	renderer::FogSettings fog;
 
-	ConfigEntry* fog_entry = info.GetEntry(HashStr32("fog"));
+	const ConfigEntry* fog_entry = info.GetEntry(HashStr32("fog"));
 
 	if (fog_entry != nullptr) {
-		fog.bEnabled = (fog_entry->GetMemberValue<int64>(HashStr32("enabled"), 1) != 0);
-		fog.Density = fog_entry->GetMemberValue<float32>(HashStr32("density"), fog.Density);
-		fog.Height = fog_entry->GetMemberValue<float32>(HashStr32("height"), fog.Height);
-		fog.Falloff = fog_entry->GetMemberValue<float32>(HashStr32("falloff"), fog.Falloff);
-		fog.Haze = fog_entry->GetMemberValue<float32>(HashStr32("haze"), fog.Haze);
-		fog.Anisotropy = fog_entry->GetMemberValue<float32>(HashStr32("anisotropy"), fog.Anisotropy);
-		fog.AmbientScale = fog_entry->GetMemberValue<float32>(HashStr32("ambient"), fog.AmbientScale);
+		fog.bEnabled = true;
+		Serializable<renderer::FogSettings>::LoadFromConfig(*fog_entry, fog);
 
-		const Color color = fog_entry->GetMemberValue(HashStr32("color"), fog.Albedo);
-		fog.Albedo = Color::FromRGBA(color.R, color.G, color.B, 255);
+		fog.Albedo = Color::FromRGBA(fog.Albedo.R, fog.Albedo.G, fog.Albedo.B, 255);
 	}
 
 	gWorld->Fog = fog;
@@ -2931,15 +2894,7 @@ void Blockout::SaveFog(ConfigFile& info)
 	}
 
 	ConfigEntry fog_entry = ConfigEntry::Struct("fog");
-
-	fog_entry.AddMember(ConfigEntry::Literal("enabled", static_cast<int64>(fog.bEnabled ? 1 : 0)));
-	fog_entry.AddMember(ConfigEntry::Literal("density", fog.Density));
-	fog_entry.AddMember(ConfigEntry::Literal("height", fog.Height));
-	fog_entry.AddMember(ConfigEntry::Literal("falloff", fog.Falloff));
-	fog_entry.AddMember(ConfigEntry::Literal("haze", fog.Haze));
-	WriteColorEntry(fog_entry, "color", fog.Albedo);
-	fog_entry.AddMember(ConfigEntry::Literal("anisotropy", fog.Anisotropy));
-	fog_entry.AddMember(ConfigEntry::Literal("ambient", fog.AmbientScale));
+	Serializable<renderer::FogSettings>::SaveToConfig(fog, fog_entry);
 
 	info.AddEntry(std::move(fog_entry));
 }
@@ -3007,11 +2962,8 @@ ConfigEntry Blockout::MakeBrushEntry(Object* object, const String& name, const B
 {
 	ConfigEntry blockout_entry = ConfigEntry::Struct(name);
 	{
-		blockout_entry.AddMember(ConfigEntry::Literal("pos", placement.Position));
-
+		WriteBrushPlacement(blockout_entry, placement);
 		WriteBrushEntry(blockout_entry, object);
-
-		blockout_entry.AddMember(ConfigEntry::Literal("rotquat", placement.Rotation));
 
 		if (object->HasTags(eObjectTag::LockTransform)) {
 			blockout_entry.AddMember(ConfigEntry::Literal("lock", 1));
@@ -3078,8 +3030,7 @@ static ConfigEntry MakeSubviewInstanceEntry(const String& name, const String& su
 {
 	ConfigEntry entry = ConfigEntry::Struct(name);
 	entry.AddMember(ConfigEntry::Literal(scSubviewMemberName, subview_name.CStr()));
-	entry.AddMember(ConfigEntry::Literal("pos", placement.Position));
-	entry.AddMember(ConfigEntry::Literal("rotquat", placement.Rotation));
+	WriteBrushPlacement(entry, placement);
 
 	return entry;
 }

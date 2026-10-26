@@ -36,8 +36,8 @@ ConfigEntry WritePreset(const CompilePreset& preset, uint32 index)
 	entry.AddMember(ConfigEntry::Literal("keep_outside", ToInt(options.bKeepOutside)));
 
 	entry.AddMember(ConfigEntry::Literal("place_probes", ToInt(options.bPlaceProbes)));
-	entry.AddMember(ConfigEntry::Literal("probe_level_spacing", options.Probes.LevelSpacing));
-	entry.AddMember(ConfigEntry::Literal("probe_brush_spacing", options.Probes.BrushSpacing));
+	entry.AddMember(ConfigEntry::Literal("probe_level_spacing", options.ProbeSettings.LevelSpacing));
+	entry.AddMember(ConfigEntry::Literal("probe_brush_spacing", options.ProbeSettings.BrushSpacing));
 
 	entry.AddMember(ConfigEntry::Literal("lightmap", ToInt(lightmap.bEnabled)));
 	entry.AddMember(ConfigEntry::Literal("lightmap_density", static_cast<float32>(lightmap.Density)));
@@ -45,6 +45,8 @@ ConfigEntry WritePreset(const CompilePreset& preset, uint32 index)
 	entry.AddMember(ConfigEntry::Literal("lightmap_samples", static_cast<int64>(lightmap.Samples)));
 	entry.AddMember(ConfigEntry::Literal("sun_radius", static_cast<float32>(lightmap.SunRadiusDegrees)));
 	entry.AddMember(ConfigEntry::Literal("probe_texel_rays", static_cast<int64>(lightmap.ProbeTexelRays)));
+	entry.AddMember(ConfigEntry::Literal("fog_shadow", ToInt(lightmap.FogShadow.bEnabled)));
+	entry.AddMember(ConfigEntry::Literal("fog_shadow_texel", static_cast<float32>(lightmap.FogShadow.TexelSize)));
 
 	entry.AddMember(ConfigEntry::Literal("indirect", ToInt(lightmap.bIndirect)));
 	entry.AddMember(ConfigEntry::Literal("indirect_rays", static_cast<int64>(lightmap.IndirectRays)));
@@ -93,10 +95,10 @@ CompilePreset ReadPreset(const ConfigEntry& entry)
 	options.bKeepOutside = ReadBool(entry, "keep_outside", options.bKeepOutside);
 
 	options.bPlaceProbes = ReadBool(entry, "place_probes", options.bPlaceProbes);
-	options.Probes.LevelSpacing = static_cast<float32>(
-		ReadDouble(entry, "probe_level_spacing", options.Probes.LevelSpacing));
-	options.Probes.BrushSpacing = static_cast<float32>(
-		ReadDouble(entry, "probe_brush_spacing", options.Probes.BrushSpacing));
+	options.ProbeSettings.LevelSpacing = static_cast<float32>(
+		ReadDouble(entry, "probe_level_spacing", options.ProbeSettings.LevelSpacing));
+	options.ProbeSettings.BrushSpacing = static_cast<float32>(
+		ReadDouble(entry, "probe_brush_spacing", options.ProbeSettings.BrushSpacing));
 
 	lightmap.bEnabled = ReadBool(entry, "lightmap", lightmap.bEnabled);
 	lightmap.Density = ReadDouble(entry, "lightmap_density", lightmap.Density);
@@ -104,6 +106,8 @@ CompilePreset ReadPreset(const ConfigEntry& entry)
 	lightmap.Samples = ReadUInt(entry, "lightmap_samples", lightmap.Samples);
 	lightmap.SunRadiusDegrees = ReadDouble(entry, "sun_radius", lightmap.SunRadiusDegrees);
 	lightmap.ProbeTexelRays = ReadUInt(entry, "probe_texel_rays", lightmap.ProbeTexelRays);
+	lightmap.FogShadow.bEnabled = ReadBool(entry, "fog_shadow", lightmap.FogShadow.bEnabled);
+	lightmap.FogShadow.TexelSize = ReadDouble(entry, "fog_shadow_texel", lightmap.FogShadow.TexelSize);
 
 	lightmap.bIndirect = ReadBool(entry, "indirect", lightmap.bIndirect);
 	lightmap.IndirectRays = ReadUInt(entry, "indirect_rays", lightmap.IndirectRays);

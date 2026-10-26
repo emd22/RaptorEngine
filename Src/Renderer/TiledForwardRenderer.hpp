@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Backend/BlendAttachment.hpp"
 #include "Backend/Descriptors.hpp"
 #include "Backend/Pipeline.hpp"
 #include "Backend/Shader.hpp"
@@ -11,7 +12,7 @@
 #include <Object/ObjectLayer.hpp>
 
 namespace fx {
-class Camera;
+class BaseCamera;
 class Image;
 } // namespace fx
 
@@ -48,6 +49,7 @@ struct alignas(16) SSAOBlurConsts
 struct alignas(16) FogConsts
 {
 	float32 FarSunMatrix[16];
+	float32 PrevCameraMatrix[16];
 	float32 FarSunAtlasRect[4];
 	float32 Rays[4][4];
 	float32 OriginAndDensity[4];
@@ -65,8 +67,19 @@ struct alignas(16) FogConsts
 	uint32 Flags;
 	float32 JitterOffset;
 	uint32 NoiseShift;
-	float32 Pad[2];
+	float32 ScreenSize[2];
+	float32 HistoryBlend;
+	float32 JitterAmount;
+	float32 BakedShadowRight[4];
+	float32 BakedShadowUp[4];
+	float32 BakedShadowForward[4];
+	float32 BakedShadowGrid[4];
+	float32 BakedShadowAtlas[4];
 };
+
+static constexpr uint32 scFroxelGridX = 160;
+static constexpr uint32 scFroxelGridY = 90;
+static constexpr uint32 scFroxelGridZ = 64;
 
 struct alignas(16) FogTemporalConsts
 {
@@ -89,6 +102,7 @@ enum class eFogFlags : uint32
 	ProbeSunVisibility = 0x01,
 	FarSunShadow = 0x02,
 	NearSunDynamicOnly = 0x04,
+	BakedSunShadow = 0x08,
 };
 
 
@@ -115,7 +129,7 @@ class TiledForwardRenderer
 public:
 	void Create(const Vec2u& extent);
 
-	void RenderComposition(Camera& camera);
+	void RenderComposition(BaseCamera& camera);
 
 	/**
 	 * @brief Dispatches the Forward+ light culling pass. Must be called outside of a renderpass,
@@ -124,7 +138,7 @@ public:
 	 * (used by probe capture bakes, which render at a fixed small size).
 	 * @param pLightOverride Culls these lights instead of every light submitted this frame.
 	 */
-	void DoLightCullingPass(Camera& camera, const Vec2u* pExtentOverride = nullptr,
+	void DoLightCullingPass(BaseCamera& camera, const Vec2u* pExtentOverride = nullptr,
 							const LightCullOverride* pLightOverride = nullptr);
 
 	/**
@@ -157,6 +171,8 @@ private:
 	void CreateSSAOBlurPass();
 	void CreateParticlePass();
 	void CreateFogPasses();
+	void CreateFroxelFogPSO(const BlendAttachment& apply_blend);
+	Sampler* GetFogShadowSampler();
 
 	// Lighting
 	// void CreateLightVolumePipeline();
@@ -192,7 +208,7 @@ public:
 	FX_FORCE_INLINE uint32 GetLightTileColumns() const { return mLightTileColumns; }
 	FX_FORCE_INLINE uint32 GetLightTileRows() const { return mLightTileRows; }
 
-	uint32 GetViewConstants(const Camera& camera, eObjectLayer layer);
+	uint32 GetViewConstants(const BaseCamera& camera, eObjectLayer layer);
 
 	/// Depth + Normal prepass
 	RenderStage Prepass;
@@ -209,6 +225,14 @@ public:
 	RenderStage FogTemporalPass;
 	RenderStage FogDenoisePass;
 	RenderStage FogApplyPass;
+	/// Froxel fog: lighting per froxel, with one extra slice for the light past the grid
+	Image FroxelLighting;
+	/// Froxel fog: in-scatter accumulated from the eye to the far edge of each slice
+	Image FroxelIntegrated;
+	/// Froxel fog: last frame's FroxelLighting, reprojected into this frame's inject
+	Image FroxelHistory;
+	/// Froxel fog: per column nearest surface depth and the far end of the surface connected to it
+	Image FroxelSurface;
 	/// Composition pass, combine results from all passes
 	RenderStage CompPass;
 
