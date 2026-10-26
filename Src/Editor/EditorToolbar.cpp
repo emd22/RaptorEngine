@@ -300,6 +300,10 @@ OutlineToggleButton* MakeButton(wxWindow* parent, const ToolButtonInfo& info)
 
 } // namespace
 
+const char* GetToolName(eEditorTool tool) { return scToolButtons[static_cast<uint32>(tool)].pName; }
+
+const char* GetDataFilterName(eDataFilter filter) { return scDataFilterNames[static_cast<uint32>(filter)]; }
+
 
 EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent(parent), mpCanvas(canvas)
 {

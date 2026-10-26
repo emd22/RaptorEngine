@@ -28,6 +28,7 @@ enum eLogCategory
     LC_MEMORY,
     LC_ASSET,
     LC_SCRIPT,
+    LC_AUDIO,
 };
 
 

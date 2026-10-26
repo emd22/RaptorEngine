@@ -1,6 +1,7 @@
 #include "Engine.hpp"
 
 #include <Asset/AssetManager.hpp>
+#include <Audio/AudioSystem.hpp>
 #include <Asset/ShaderCompiler.hpp>
 #include <CVar.hpp>
 #include <Core/Thread/ThreadManager.hpp>
@@ -42,6 +43,7 @@ ScriptManager* gScriptManager = nullptr;
 CVarManager* gCVars = nullptr;
 NPCManager* gNPCManager = nullptr;
 ObjectScriptManager* gObjectScripts = nullptr;
+AudioSystem* gAudio = nullptr;
 
 #ifdef FX_IS_EDITOR
 editor::RaptorEditor* gEditor = nullptr;
@@ -73,11 +75,13 @@ void Init()
 	gCVars = new CVarManager;
 	gNPCManager = new NPCManager;
 	gObjectScripts = new ObjectScriptManager;
+	gAudio = new AudioSystem;
 }
 
 
 void Destroy()
 {
+	DESTROY_GLOBAL(gAudio);
 	DESTROY_GLOBAL(gNPCManager);
 	DESTROY_GLOBAL(gObjectScripts);
 	DESTROY_GLOBAL(gPhysics);

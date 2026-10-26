@@ -303,9 +303,6 @@ struct TopViewState
 	Vec3f CreateReferenceMin = Vec3f::sZero;
 	Vec3f CreateReferenceMax = Vec3f::sZero;
 
-	String Notice;
-	uint32 NoticeSerial = 0;
-
 	DynArray<TopViewBrush> Brushes;
 	DynArray<TopViewMarker> Markers;
 
@@ -344,9 +341,6 @@ struct TopViewState
 		bHasCreateReference = other.bHasCreateReference;
 		CreateReferenceMin = other.CreateReferenceMin;
 		CreateReferenceMax = other.CreateReferenceMax;
-
-		Notice = other.Notice;
-		NoticeSerial = other.NoticeSerial;
 
 		Brushes = other.Brushes.Clone();
 		Markers = other.Markers.Clone();

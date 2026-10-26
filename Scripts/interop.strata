@@ -236,6 +236,16 @@ extern void particle_stop(long effect);
 extern void particle_kill(long effect);
 extern bool particle_alive(long effect);
 
+/* Sounds */
+
+extern long sound_play(cstring name, float3 position);
+extern long sound_play_2d(cstring name);
+extern void sound_move(long sound, float3 position);
+extern void sound_set_volume(long sound, float volume);
+extern void sound_stop(long sound);
+extern void sound_kill(long sound);
+extern bool sound_alive(long sound);
+
 /* Portals */
 
 extern bool portal_set_open(cstring name, bool open);

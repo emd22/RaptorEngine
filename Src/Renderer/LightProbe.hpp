@@ -3,6 +3,7 @@
 #include <Core/DynArray.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/Slice.hpp>
+#include <Core/String.hpp>
 #include <Core/Types.hpp>
 #include <Math/Vec3.hpp>
 #include <Renderer/Backend/Commands.hpp>
@@ -93,6 +94,7 @@ public:
 	void RecordCaptureBatch(renderer::CommandBuffer& cmd, const RenderFaceFunc& render_face);
 	void ServiceCaptureBake();
 	void ServiceStaleCheck();
+	void RequestStaleCheck();
 
 	bool SaveProbes();
 	bool LoadProbes();
@@ -119,6 +121,8 @@ private:
 	};
 
 	void ApplyLayout();
+	void ReportStaleBake(const String& message);
+	void ClearStaleBakeReport();
 	bool BuildLayoutFromWorld(ProbeLayout& out_layout, uint32& out_brush_volumes) const;
 
 	uint32 SelectVolume(const Vec3f position) const;
@@ -165,7 +169,10 @@ private:
 
 	static constexpr uint32 scStaleCheckMaxWaitFrames = 600;
 	bool mbStaleCheckPending = false;
+	bool mbHasBakedLayout = false;
 	uint32 mStaleCheckWaitFrames = 0;
+	String mStaleMessage;
+	uint32 mStaleMessageId = 0;
 
 	DynArray<Vec3f> mSunSamplePositions;
 	DynArray<uint8> mSunSampleValues;

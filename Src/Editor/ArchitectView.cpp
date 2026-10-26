@@ -562,8 +562,6 @@ TopViewState RaptorEditor::BuildTopViewState()
 	view.SnapStep = GetSnapStep();
 	view.AngleSnapDegrees = GetAngleSnapStep();
 	view.CommandSerial = mTopViewCommandSerial;
-	view.Notice = mNotice;
-	view.NoticeSerial = mNoticeSerial;
 
 	const Ref<FPSCamera>& camera = gWorld->Player.pCamera;
 

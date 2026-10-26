@@ -1967,11 +1967,30 @@ void RaptorEditor::ForgetObjects()
 	SyncSelection();
 }
 
-void RaptorEditor::ShowNotice(const String& message)
+uint32 RaptorEditor::ShowStatusMessage(const String& text, std::chrono::milliseconds duration)
 {
-	mNotice = message;
-	mNoticeSerial++;
-	mbForcePanelSync = true;
+	const uint32 id = EditorFrame::NewStatusMessageId();
+
+	thread::PostToUI(
+		[this, id, text, duration]
+		{
+			if (mpMainFrame != nullptr) {
+				mpMainFrame->ShowStatusMessage(id, wxString::FromUTF8(text.CStr()), duration);
+			}
+		});
+
+	return id;
+}
+
+void RaptorEditor::ClearStatusMessage(uint32 id)
+{
+	thread::PostToUI(
+		[this, id]
+		{
+			if (mpMainFrame != nullptr) {
+				mpMainFrame->ClearStatusMessage(id);
+			}
+		});
 }
 
 bool RaptorEditor::HasUnsavedChanges() const { return mbUntrackedChanges || mHistory.GetRevision() != mSavedRevision; }

@@ -1,5 +1,6 @@
 #include "ScriptInterop.hpp"
 
+#include <Audio/AudioSystem.hpp>
 #include <Blockout.hpp>
 #include <CVar.hpp>
 #include <Controls.hpp>
@@ -603,6 +604,16 @@ static void N_particle_stop(int64 effect) { gParticleSystem->Stop(ParticleEffect
 static void N_particle_kill(int64 effect) { gParticleSystem->Kill(ParticleEffectID::Unpack(effect)); }
 static bool N_particle_alive(int64 effect) { return gParticleSystem->IsAlive(ParticleEffectID::Unpack(effect)); }
 
+static int64 N_sound_play(const char* name, FLOAT4 position) { return gAudio->Play(name, Vec3f(position)).Pack(); }
+static int64 N_sound_play_2d(const char* name) { return gAudio->Play2D(name).Pack(); }
+
+static void N_sound_move(int64 sound, FLOAT4 position) { gAudio->SetPosition(SoundID::Unpack(sound), Vec3f(position)); }
+
+static void N_sound_set_volume(int64 sound, float32 volume) { gAudio->SetVolume(SoundID::Unpack(sound), volume); }
+static void N_sound_stop(int64 sound) { gAudio->Stop(SoundID::Unpack(sound)); }
+static void N_sound_kill(int64 sound) { gAudio->Kill(SoundID::Unpack(sound)); }
+static bool N_sound_alive(int64 sound) { return gAudio->IsPlaying(SoundID::Unpack(sound)); }
+
 static bool N_portal_set_open(const char* name, bool open)
 {
 	AreaGraph& graph = gWorldGrid->GetAreaGraph();
@@ -760,6 +771,14 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("particle_stop", N_particle_stop),
 	PREDEF("particle_kill", N_particle_kill),
 	PREDEF("particle_alive", N_particle_alive),
+
+	PREDEF("sound_play", N_sound_play),
+	PREDEF("sound_play_2d", N_sound_play_2d),
+	PREDEF("sound_move", N_sound_move),
+	PREDEF("sound_set_volume", N_sound_set_volume),
+	PREDEF("sound_stop", N_sound_stop),
+	PREDEF("sound_kill", N_sound_kill),
+	PREDEF("sound_alive", N_sound_alive),
 
 	PREDEF("portal_set_open", N_portal_set_open),
 	PREDEF("portal_is_open", N_portal_is_open),

@@ -9,6 +9,7 @@
 #include <Asset/ConfigFile.hpp>
 // #include <Asset/Font/Font.hpp>
 #include <Asset/WorldFile.hpp>
+#include <Audio/AudioSystem.hpp>
 #include <CVar.hpp>
 #include <Controls.hpp>
 #include <Core/Assert.hpp>
@@ -152,6 +153,7 @@ void RaptorGame::InitEngine()
 
 	gPhysics->Create();
 	gAssetManager->Start(3);
+	gAudio->Create();
 
 	// Make the world grid approx 1.5km x 1.5km. This should be increased as the map sizes grow.
 	gWorldGrid->Create(Vec2u(15));
@@ -798,6 +800,7 @@ void RaptorGame::CleanWorld()
 	gNPCManager->ClearRagdolls();
 	gDecalManager->Clear();
 	gParticleSystem->Clear();
+	gAudio->StopAll();
 }
 
 void RaptorGame::AddDummyWound(RagdollDummy& dummy, const physics::RagdollHit& hit)
@@ -1090,6 +1093,10 @@ void RaptorGame::RenderText()
 								1.0f, scWhite);
 	}
 
+	if (gAudio->GetVoiceCount() > 0) {
+		gTextRenderer->DrawText(String::Fmt("sounds {}", gAudio->GetVoiceCount()).CStr(), 1.0f, scWhite);
+	}
+
 #ifdef FX_IS_EDITOR
 	gTextRenderer->DrawText(
 		String::Fmt("Q={}, QE={}", gEditor->GetSnapStep(), gEditor->GetToolState().ToolSnapEnabled).CStr(), 1.0,
@@ -1184,6 +1191,9 @@ void RaptorGame::Tick()
 
 	gWorld->Player.Update(DeltaTime);
 
+	const Ref<FPSCamera>& listener = gWorld->GetCurrentCamera();
+	gAudio->SetListener(listener->GetPosition(), listener->GetForwardVector(), listener->GetUpVector());
+	gAudio->Update(gGraphics->GetWindow()->IsFocused());
 
 	Ref<FPSCamera> camera = gWorld->Player.pCamera;
 
@@ -1275,6 +1285,7 @@ void RaptorGame::DestroyGame()
 	mRagdollDummies.clear();
 	gNPCManager->Clear();
 	gParticleSystem->Destroy();
+	gAudio->Destroy();
 
 	delete gShadowRenderer;
 	gShadowRenderer = nullptr;

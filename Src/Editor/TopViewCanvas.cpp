@@ -31,7 +31,6 @@ constexpr double scDefaultScale = 24.0;
 constexpr double scFitMargin = 1.25;
 
 constexpr double scPickTolerancePixels = 5.0;
-constexpr std::chrono::seconds scNoticeDuration(6);
 constexpr float32 scTextureRotateDegrees = 15.0f;
 constexpr double scDragThresholdPixels = 4.0;
 constexpr double scClickCycleRadiusPixels = 4.0;
@@ -694,12 +693,6 @@ void TopViewCanvas::ApplyState(const TopViewState& state)
 
 	mState = state;
 	mAvailableTools = state.AvailableTools;
-
-	if (state.NoticeSerial != mNoticeSerial) {
-		mNoticeSerial = state.NoticeSerial;
-		mNotice = wxString::FromUTF8(state.Notice.CStr());
-		mNoticeTime = std::chrono::steady_clock::now();
-	}
 
 	if (mbLocalSelection) {
 		ApplyLocalSelection();
@@ -5246,10 +5239,6 @@ void TopViewCanvas::UpdateStatus()
 	const ViewPlaneAxes& axes = Axes();
 
 	wxString text = wxString::Format("%s   |   ", axes.pName);
-
-	if (!mNotice.IsEmpty() && std::chrono::steady_clock::now() - mNoticeTime < scNoticeDuration) {
-		text += mNotice + "   |   ";
-	}
 
 	if (mState.bSimulating) {
 		text += "Simulating, editing is paused   |   ";

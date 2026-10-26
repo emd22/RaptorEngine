@@ -62,6 +62,8 @@ enum class eReloadTarget : uint32
 class RaptorEditor
 {
 public:
+	static constexpr std::chrono::seconds scWarningDuration { 6 };
+
 	RaptorEditor() = default;
 
 
@@ -343,10 +345,12 @@ public:
 		const String message = String::Fmt(fmt, args...);
 
 		LogWarning(LC_CORE, "{}", message.CStr());
-		ShowNotice(message);
+		ShowStatusMessage(message, scWarningDuration);
 	}
 
-	void ShowNotice(const String& message);
+	uint32 ShowStatusMessage(const String& text,
+							 std::chrono::milliseconds duration = std::chrono::milliseconds::zero());
+	void ClearStatusMessage(uint32 id);
 
 	/////////////////////////////////////
 	// Commands
@@ -419,9 +423,6 @@ private:
 	eEditorView mViewBeforeCompiledMap = eEditorView::Viewport;
 	bool mbViewLockedByCompiledMap = false;
 	uint32 mTopViewCommandSerial = 0;
-
-	String mNotice;
-	uint32 mNoticeSerial = 0;
 
 	eEditorTool mCurrentTool = eEditorTool::Select;
 	bool mbSimulating = false;

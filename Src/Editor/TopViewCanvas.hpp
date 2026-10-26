@@ -466,9 +466,6 @@ private:
 	std::function<void(eViewPlane)> mpOnPlaneChanged;
 	std::function<void(const wxString&)> mpOnStatus;
 
-	wxString mNotice;
-	uint32 mNoticeSerial = 0;
-	std::chrono::steady_clock::time_point mNoticeTime;
 	std::function<void(const ArchSettings&)> mpOnArchChanged;
 	std::function<void(const CurveSettings&)> mpOnCurveChanged;
 	std::function<void(eViewPlane, float32, float32)> mpOnCreateVolumeChanged;

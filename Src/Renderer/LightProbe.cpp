@@ -656,6 +656,8 @@ uint32 ProbeManager::RebuildVolumesFromWorld()
 	}
 
 	mbStaleCheckPending = false;
+	mbHasBakedLayout = false;
+	ClearStaleBakeReport();
 
 	Blockout* blockout = GetBlockout();
 	const bool from_compiled = (blockout != nullptr) && blockout->GetCompiledProbeLayout() != nullptr;
@@ -746,20 +748,44 @@ LayoutDifference CompareLayouts(const ProbeLayout& baked, const ProbeLayout& cur
 	return difference;
 }
 
-template <typename... TTypes>
-void WarnStaleBake(const char* fmt, TTypes&&... args)
+} // namespace
+
+void ProbeManager::ReportStaleBake(const String& message)
 {
+	if (message != mStaleMessage) {
+		LogWarning("{}", message.CStr());
+		mStaleMessage = message;
+	}
+
 #ifdef FX_IS_EDITOR
 	if (gEditor != nullptr) {
-		gEditor->Warn(fmt, std::forward<TTypes>(args)...);
-		return;
+		mStaleMessageId = gEditor->ShowStatusMessage(message);
+	}
+#endif
+}
+
+void ProbeManager::ClearStaleBakeReport()
+{
+	mStaleMessage.Clear();
+
+#ifdef FX_IS_EDITOR
+	if (gEditor != nullptr && mStaleMessageId != 0) {
+		gEditor->ClearStatusMessage(mStaleMessageId);
 	}
 #endif
 
-	LogWarning("{}", String::Fmt(fmt, std::forward<TTypes>(args)...).CStr());
+	mStaleMessageId = 0;
 }
 
-} // namespace
+void ProbeManager::RequestStaleCheck()
+{
+	if (!mbHasBakedLayout) {
+		return;
+	}
+
+	mbStaleCheckPending = true;
+	mStaleCheckWaitFrames = 0;
+}
 
 void ProbeManager::ServiceStaleCheck()
 {
@@ -778,27 +804,30 @@ void ProbeManager::ServiceStaleCheck()
 	uint32 num_brush_volumes = 0;
 
 	if (!BuildLayoutFromWorld(current, num_brush_volumes)) {
-		WarnStaleBake("The baked light probes don't match the map: it has no geometry to place probes around");
+		ReportStaleBake("The baked light probes don't match the map, it has no geometry to place probes around");
 		return;
 	}
 
 	const LayoutDifference difference = CompareLayouts(mLayout, current);
 
 	if (difference.IsEmpty()) {
-		LogInfo("The baked light probes match the map ({} probes)", GetProbeCount());
+		if (!mStaleMessage.IsEmpty()) {
+			LogInfo("The baked light probes match the map again ({} probes)", GetProbeCount());
+		}
+
+		ClearStaleBakeReport();
 		return;
 	}
 
 	if (difference.bVolumesChanged) {
-		WarnStaleBake("The baked light probes are out of date: the map now places {} probes in {} volume(s), the bake "
-					  "has {} in {}. Rebake and save the probes.",
-					  current.GetProbeCount(), current.VolumeCount, GetProbeCount(), mLayout.VolumeCount);
+		ReportStaleBake(String::Fmt("Light probes are out of date (the map places {}, the bake has {}), rebake and "
+									"save them",
+									current.GetProbeCount(), GetProbeCount()));
 		return;
 	}
 
-	WarnStaleBake("The baked light probes are out of date: {} of {} probes moved and {} grid points changed since the "
-				  "bake. Rebake and save the probes.",
-				  difference.MovedProbes, GetProbeCount(), difference.ChangedGridPoints);
+	ReportStaleBake(String::Fmt("Light probes are out of date ({} of {} moved), rebake and save them",
+								difference.MovedProbes, GetProbeCount()));
 }
 
 ///////////////////////////////////
@@ -874,6 +903,8 @@ void ProbeManager::BeginBake()
 	}
 
 	mbStaleCheckPending = false;
+	mbHasBakedLayout = false;
+	ClearStaleBakeReport();
 
 	mCurrentProbe = 0;
 	mCurrentBounce = 0;
@@ -1071,6 +1102,7 @@ void ProbeManager::ServiceCaptureBake()
 	}
 
 	mBakeState = eBakeState::Idle;
+	mbHasBakedLayout = true;
 	LogInfo("Probe bake complete ({} probes across {} volume(s), {} bounce(s))", GetProbeCount(), mLayout.VolumeCount,
 			mBounceCount);
 
@@ -1580,6 +1612,9 @@ bool ProbeManager::SaveProbes()
 
 bool ProbeManager::LoadProbes()
 {
+	mbHasBakedLayout = false;
+	ClearStaleBakeReport();
+
 	const bool loaded = LoadIrradianceProbes();
 
 	if (!loaded || !LoadReflectionProbes()) {
@@ -1774,6 +1809,7 @@ bool ProbeManager::LoadIrradianceProbes()
 	UploadToGpu(0, header.ProbeCount);
 
 	mbStaleCheckPending = true;
+	mbHasBakedLayout = true;
 	mStaleCheckWaitFrames = 0;
 
 	LogInfo("Loaded {} light probes across {} volume(s) from {}", header.ProbeCount, header.VolumeCount, path.CStr());

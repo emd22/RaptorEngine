@@ -4843,6 +4843,8 @@ void Blockout::Save(const String& save_path)
 
 	StoreLastBlockoutPath(path, "Config/Main.conf");
 
+	gProbeManager->RequestStaleCheck();
+
 #ifdef FX_IS_EDITOR
 	gEditor->MarkSaved();
 #endif
