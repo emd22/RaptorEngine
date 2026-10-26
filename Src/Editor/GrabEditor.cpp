@@ -58,9 +58,9 @@ void GrabEditor::Grab()
 {
 	Release();
 
-	PerspectiveCamera& camera = *gWorld->Player.pCamera;
+	PerspectiveCamera2& camera = *gWorld->Player.pCamera;
 
-	const physics::RayResult hit = gPhysics->pBackend->Raycast(camera.Position,
+	const physics::RayResult hit = gPhysics->pBackend->Raycast(camera.GetPosition(),
 															   camera.GetForwardVector() * scGrabRange);
 
 	if (!hit.bHit) {
@@ -77,7 +77,7 @@ void GrabEditor::Grab()
 
 	mBody = hit.Body;
 	mLocalPoint = Vec3f(to_local * JPH::Vec3(hit.Point.X, hit.Point.Y, hit.Point.Z));
-	mDistance = std::max((hit.Point - camera.Position).Length(), scMinHoldDistance);
+	mDistance = std::max((hit.Point - camera.GetPosition()).Length(), scMinHoldDistance);
 
 	mbHolding = true;
 }
@@ -105,9 +105,9 @@ void GrabEditor::Hold(float32 delta_time)
 		return;
 	}
 
-	PerspectiveCamera& camera = *gWorld->Player.pCamera;
+	PerspectiveCamera2& camera = *gWorld->Player.pCamera;
 
-	const Vec3f target = camera.Position + camera.GetForwardVector() * mDistance;
+	const Vec3f target = camera.GetPosition() + camera.GetForwardVector() * mDistance;
 	const Vec3f held_point = Vec3f(bodies.GetCenterOfMassTransform(mBody) *
 								   JPH::Vec3(mLocalPoint.X, mLocalPoint.Y, mLocalPoint.Z));
 

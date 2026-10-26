@@ -35,7 +35,7 @@ class CVarValue;
 // {
 // public:
 // 	EditorModeMoveCollider() = delete;
-// 	EditorModeMoveCollider(Ref<PerspectiveCamera> camera) { this->pCamera = camera; }
+// 	EditorModeMoveCollider(Ref<FPSCamera> camera) { this->pCamera = camera; }
 
 // 	void Update(const World& scene, const Vec3f movement_vector) override;
 // 	void OnLeave(const World& scene) override;
@@ -48,7 +48,7 @@ class CVarValue;
 // {
 // public:
 // 	EditorModeScaleCollider() = delete;
-// 	EditorModeScaleCollider(Ref<PerspectiveCamera> camera) { this->pCamera = camera; }
+// 	EditorModeScaleCollider(Ref<FPSCamera> camera) { this->pCamera = camera; }
 
 // 	void Update(const World& scene, const Vec3f movement_vector) override;
 // 	void OnLeave(const World& scene) override;
@@ -190,7 +190,8 @@ private:
 	CVarValue* mpNPCImpactSpeedCVar = nullptr;
 	CVarValue* mpNPCReactStrengthCVar = nullptr;
 
-	Ref<PerspectiveCamera> mpFlyCamera { nullptr };
+	Ref<FPSCamera> mpFlyCamera { nullptr };
+	ViewAngles mFlyCameraAngles;
 	NoClipController mFlyController;
 	bool mbFlyCameraDetached = false;
 

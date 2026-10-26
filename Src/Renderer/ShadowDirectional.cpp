@@ -6,14 +6,12 @@ ShadowDirectional::ShadowDirectional() : ShadowMapSize(ShadowAtlas::scDirectiona
 {
 	ShadowCamera.Update();
 
-	FarShadowCamera.SetBounds(scFarBounds, scFarBounds);
-	FarShadowCamera.SetNearPlane(0.1f);
-	FarShadowCamera.SetFarPlane(400.0f);
-	FarShadowCamera.UpdateProjectionMatrix();
-	FarShadowCamera.UpdateCameraMatrix();
+	FarShadowCamera.SetBounds(Vec2f(scFarBounds));
+	FarShadowCamera.SetClip(0.1f, 400.0f);
+	FarShadowCamera.Update();
 }
 
-void ShadowDirectional::PlaceCamera(OrthoCamera& camera, const Vec3f target, const Vec3f sun_direction) const
+void ShadowDirectional::PlaceCamera(OrthoCamera2& camera, const Vec3f target, const Vec3f sun_direction) const
 {
 	PlaceOrthoCamera(camera, target, sun_direction, scCameraDistance, static_cast<float32>(ShadowMapSize.X));
 }
@@ -24,20 +22,20 @@ void ShadowDirectional::PlaceFarCamera(const Vec3f target, const Vec3f sun_direc
 					 static_cast<float32>(ShadowAtlas::scFarDirectionalSize));
 }
 
-void ShadowDirectional::PlaceOrthoCamera(OrthoCamera& camera, const Vec3f target, const Vec3f sun_direction,
+void ShadowDirectional::PlaceOrthoCamera(OrthoCamera2& camera, const Vec3f target, const Vec3f sun_direction,
 										 float32 distance, float32 resolution)
 {
-	camera.Position = target + (sun_direction * distance);
+	Vec3f eye = target + (sun_direction * distance);
 
 	Vec3f snapped_target = target;
-	camera.ResolveViewToTexels(camera.Position, snapped_target, Vec3f::sUp, resolution);
+	camera.ResolveViewToTexels(eye, snapped_target, Vec3f::sUp, resolution);
 
-	camera.ViewMatrix.LookAt(camera.Position, snapped_target, Vec3f::sUp);
-	camera.UpdateCameraMatrix();
-	camera.mbRequireMatrixUpdate = false;
+	camera.SetPosition(eye);
+	camera.LookAt(snapped_target);
+	camera.Update();
 }
 
-bool ShadowDirectional::IsWellCovered(const OrthoCamera& camera, const Vec3f position, float32 edge_margin)
+bool ShadowDirectional::IsWellCovered(const OrthoCamera2& camera, const Vec3f position, float32 edge_margin)
 {
 	const float32* m = camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData;
 

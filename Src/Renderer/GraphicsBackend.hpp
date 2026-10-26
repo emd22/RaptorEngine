@@ -22,7 +22,8 @@
 #include <mutex>
 
 namespace fx {
-class Camera;
+class BaseCamera;
+class PerspectiveCamera2;
 class Image;
 struct CompiledMapFogShadow;
 } // namespace fx
@@ -101,18 +102,18 @@ public:
 	void Destroy();
 
 	eFrameResult BeginFrame();
-	void BeginLightCulling(Camera& render_cam);
+	void BeginLightCulling(BaseCamera& render_cam);
 	void BeginPrepass();
 	void BeginGeometry();
 
-	void RenderEarlyFrameEffects(Camera& camera);
+	void RenderEarlyFrameEffects(PerspectiveCamera2& camera);
 
-	void RenderFog(Camera& camera);
+	void RenderFog(PerspectiveCamera2& camera);
 	void RenderFroxelFog(CommandBuffer& cmd, uint32 consts_offset);
 
 	eFogMode GetFogMode() const;
 
-	void DoComposition(Camera& render_cam);
+	void DoComposition(PerspectiveCamera2& render_cam);
 
 	void RebuildToResizedWindow();
 

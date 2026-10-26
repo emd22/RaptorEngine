@@ -130,6 +130,9 @@ public:
 	Vec3f GetTranslation() const { return Vec3f(Rows[3]); }
 
 	Mat4f Inverse() const;
+	Mat4f AffineInverse() const;
+	Mat4f RigidInverse() const;
+	void TransposeTo(Mat4f& other) const;
 	Mat4f Transposed() const;
 	Mat4f TransposeMat3();
 

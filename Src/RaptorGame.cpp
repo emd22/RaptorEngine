@@ -278,12 +278,10 @@ void RaptorGame::CreateGame()
 	// Baked probes if the scene has them, procedural gradient otherwise.
 	gProbeManager->LoadProbes();
 
-	gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(Vec3f(0, 8, 5), Vec3f(0.0f, 8.0f, -2.0f), Vec3f(0, 1, 0));
-	gShadowRenderer->ShadowCamera.SetFarPlane(400.0f);
-	gShadowRenderer->ShadowCamera.SetNearPlane(0.1f);
-	gShadowRenderer->ShadowCamera.UpdateProjectionMatrix();
-	gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
-	gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
+	gShadowRenderer->ShadowCamera.SetPosition(Vec3f(0, 8, 5));
+	gShadowRenderer->ShadowCamera.LookAt(Vec3f(0.0f, 8.0f, -2.0f));
+	gShadowRenderer->ShadowCamera.SetClip(0.1f, 400.0f);
+	gShadowRenderer->ShadowCamera.Update();
 
 	CreateLights();
 
@@ -405,7 +403,7 @@ void RaptorGame::ToggleEditorMode()
 
 void RaptorGame::ToggleFlyCamera()
 {
-	Ref<PerspectiveCamera>& player_camera = gWorld->Player.pCamera;
+	Ref<FPSCamera>& player_camera = gWorld->Player.pCamera;
 
 	mbFlyCameraDetached = !mbFlyCameraDetached;
 
@@ -418,14 +416,15 @@ void RaptorGame::ToggleFlyCamera()
 	}
 
 	if (!mpFlyCamera.IsValid()) {
-		mpFlyCamera = MakeRef<PerspectiveCamera>();
+		mpFlyCamera = MakeRef<FPSCamera>();
 	}
 
-	mpFlyCamera->SetFovRad(player_camera->GetFovRad());
+	mpFlyCamera->SetFOV(player_camera->GetFOV());
 	mpFlyCamera->SetAspectRatio(gGraphics->GetWindow()->GetAspectRatio());
-	mpFlyCamera->SetPlanes(player_camera->mZNearClip, player_camera->mZFarClip);
-	mpFlyCamera->Rotate(player_camera->mAngleX - mpFlyCamera->mAngleX, player_camera->mAngleY - mpFlyCamera->mAngleY);
-	mpFlyCamera->MoveTo(player_camera->Position);
+	mpFlyCamera->SetClip(player_camera->GetNearClip(), player_camera->GetFarClip());
+	mFlyCameraAngles = gWorld->Player.GetViewAngles();
+	mpFlyCamera->SetRotation(mFlyCameraAngles.ToQuat());
+	mpFlyCamera->SetPosition(player_camera->GetPosition());
 	mpFlyCamera->Update();
 
 	mFlyController.Reset();
@@ -441,7 +440,7 @@ void RaptorGame::MoveFlyCamera()
 	const bool sprinting = ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT);
 	const Vec3f velocity = mFlyController.Update(DeltaTime, GetMovementVector(), *mpFlyCamera, sprinting);
 
-	mpFlyCamera->MoveBy(velocity * static_cast<float32>(DeltaTime));
+	mpFlyCamera->MoveWS(velocity * static_cast<float32>(DeltaTime));
 	mpFlyCamera->Update();
 }
 
@@ -536,7 +535,8 @@ void RaptorGame::ProcessControls()
 		mouse_delta.Y *= -scMouseRadiansPerPixel;
 
 		if (mbFlyCameraDetached) {
-			mpFlyCamera->Rotate(mouse_delta.X, mouse_delta.Y);
+			mFlyCameraAngles.Rotate(mouse_delta.X, mouse_delta.Y);
+			mpFlyCamera->SetRotation(mFlyCameraAngles.ToQuat());
 		}
 		else {
 			gWorld->Player.RotateHead(mouse_delta);
@@ -708,7 +708,7 @@ void RaptorGame::SpawnDebugNPC(Object* model)
 	forward.Y = 0.0f;
 	forward = forward.Normalize();
 
-	const physics::RayResult floor = gPhysics->pBackend->Raycast(gWorld->Player.pCamera->Position + forward * 2.5f,
+	const physics::RayResult floor = gPhysics->pBackend->Raycast(gWorld->Player.pCamera->GetPosition() + forward * 2.5f,
 																 Vec3f(0.0f, -10.0f, 0.0f));
 
 	NPCDesc desc;
@@ -1185,7 +1185,7 @@ void RaptorGame::Tick()
 	gWorld->Player.Update(DeltaTime);
 
 
-	Ref<PerspectiveCamera> camera = gWorld->Player.pCamera;
+	Ref<FPSCamera> camera = gWorld->Player.pCamera;
 
 	// Set from the scene file (see WorldFile::Load), or from the console
 	LightDirectional* sun = gLightManager->GetDirectionalLight();
@@ -1319,9 +1319,8 @@ RaptorGame::~RaptorGame()
 // 		phys->Teleport(phys->GetPosition() + (movement_vector * Vec3f(0.05)), phys->GetRotation());
 
 // 		Vec3f target = phys->GetPosition();
-// 		pCamera->MoveTo(target + Vec3f(0, 10, -10));
-// 		pCamera->Target = target;
-// 		pCamera->bLookatTarget = true;
+// 		pCamera->SetPosition(target + Vec3f(0, 10, -10));
+// 		pCamera->LookAt(target);
 
 // 		pCamera->Update();
 // 	}
@@ -1346,9 +1345,8 @@ RaptorGame::~RaptorGame()
 // 		}
 
 // 		Vec3f target = phys->GetPosition();
-// 		pCamera->MoveTo(target + Vec3f(0, 10, -10));
-// 		pCamera->Target = target;
-// 		pCamera->bLookatTarget = true;
+// 		pCamera->SetPosition(target + Vec3f(0, 10, -10));
+// 		pCamera->LookAt(target);
 
 // 		pCamera->Update();
 // 	}

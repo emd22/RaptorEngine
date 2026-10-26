@@ -367,8 +367,8 @@ void Object::UpdateInstanceCollider()
 	const Mat4f body_world = Mat4f::AsRotation(body->GetRotation()) * Mat4f::AsTranslation(body->GetPosition());
 	const Mat4f& source_world = source->GetWorldMatrix();
 
-	const Mat4f to_source = body_world * source_world.Inverse();
-	const Mat4f from_source = source_world * body_world.Inverse();
+	const Mat4f to_source = body_world * source_world.AffineInverse();
+	const Mat4f from_source = source_world * body_world.AffineInverse();
 
 	SizedArray<Mat4f> transforms;
 	transforms.InitCapacity(source->mInstances.Size);
@@ -411,7 +411,7 @@ Mat4f Object::GetNodeToSource(Object& source)
 		return Mat4f::scIdentity;
 	}
 
-	return GetWorldMatrix() * source.GetWorldMatrix().Inverse();
+	return GetWorldMatrix() * source.GetWorldMatrix().AffineInverse();
 }
 
 const BBox& Object::GetInstancedDrawBounds(Object& source)
@@ -523,7 +523,7 @@ uint32 Object::GetDrawCount()
 }
 
 
-void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
+void Object::RenderShallow(const BaseCamera& camera, renderer::Pipeline* pipeline)
 {
 	UpdateIfOutOfDate();
 
@@ -859,7 +859,7 @@ float32 Object::RaycastBounds(const Vec3f origin, const Vec3f direction, Vec3f& 
 	// Into the object's own space, so a rotated box is tested against the box it actually is rather than the
 	// looser one around it. An affine transform is linear in the ray parameter, so the distance that comes back
 	// is already in world metres.
-	const Mat4f inverse_model = GetWorldMatrix().Inverse();
+	const Mat4f inverse_model = GetWorldMatrix().AffineInverse();
 
 	const Vec4f local_origin = inverse_model * Vec4f(origin.X, origin.Y, origin.Z, 1.0f);
 	const Vec4f local_direction = inverse_model * Vec4f(direction.X, direction.Y, direction.Z, 0.0f);
@@ -872,7 +872,7 @@ float32 Object::RaycastBounds(const Vec3f origin, const Vec3f direction, Vec3f& 
 
 bool Object::ContainsPoint(const Vec3f point)
 {
-	const Vec4f local = GetWorldMatrix().Inverse() * Vec4f(point.X, point.Y, point.Z, 1.0f);
+	const Vec4f local = GetWorldMatrix().AffineInverse() * Vec4f(point.X, point.Y, point.Z, 1.0f);
 
 	return local.X >= Bounds.Min.X && local.X <= Bounds.Max.X && local.Y >= Bounds.Min.Y && local.Y <= Bounds.Max.Y &&
 		   local.Z >= Bounds.Min.Z && local.Z <= Bounds.Max.Z;

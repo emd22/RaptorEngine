@@ -93,7 +93,7 @@ static bool LiesOnPlane(const std::vector<Vec3f>& points, const Vec3f normal, fl
 }
 
 MeshDecalBuilder::MeshDecalBuilder(const Brush& volume, const Mat4f& volume_to_world)
-	: mVolume(volume), mWorldToLocal(volume_to_world.Inverse())
+	: mVolume(volume), mWorldToLocal(volume_to_world.AffineInverse())
 {
 	mLocalMin = volume.GetBoundsMin();
 	mLocalMax = volume.GetBoundsMax();

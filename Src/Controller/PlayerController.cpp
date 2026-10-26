@@ -1,17 +1,13 @@
 #include "PlayerController.hpp"
 
-#include <Math/MathUtil.hpp>
-#include <Renderer/Camera.hpp>
+#include <Renderer/Camera/PerspectiveCamera.hpp>
 
 namespace fx {
 
-Vec3f PlayerController::Update(double delta_time, const Vec3f input, const PerspectiveCamera& camera, bool sprinting)
+Vec3f PlayerController::Update(double delta_time, const Vec3f input, const PerspectiveCamera2& camera, bool sprinting)
 {
-	float32 s_anglex, c_anglex;
-	MathUtil::SinCos(camera.mAngleX, &s_anglex, &c_anglex);
-
-	const Vec3f forward(s_anglex, 0.0f, c_anglex);
-	const Vec3f right(c_anglex, 0.0f, -s_anglex);
+	const Vec3f forward = camera.GetFlatForwardVector();
+	const Vec3f right = camera.GetFlatRightVector();
 
 	Accelerate(forward * input.Z + right * input.X, delta_time, sprinting);
 

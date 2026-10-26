@@ -1,30 +1,41 @@
-#include <Renderer/Camera.hpp>
+#include "PerspectiveCamera.hpp"
+
+#include <Math/Vec4.hpp>
+
 
 namespace fx {
 
-void PerspectiveCamera::UpdateProjectionMatrix()
+
+bool PerspectiveCamera2::Update()
 {
-	ProjectionMatrix.LoadPerspectiveMatrix(mFovRad, mAspectRatio, mZNearClip, mZFarClip);
-	mWeaponProjectionMatrix.LoadPerspectiveMatrix(mWeaponFov, mAspectRatio, scWeaponNearPlane, scWeaponFarPlane);
-	mWeaponProjectionMatrix.Rows[2].Z *= scWeaponDepthScale;
-	mWeaponProjectionMatrix.Rows[3].Z *= scWeaponDepthScale;
+	// There is nothing to update, return
+	if (!mbTransformDirty && !mbRequireProjectionMatrixUpdate) {
+		return false;
+	}
 
-	mbRequireMatrixUpdate = false;
-}
+	// Update the projection matrix if we have new camera parameters
+	if (mbRequireProjectionMatrixUpdate) {
+		mProjectionMatrix.LoadPerspectiveMatrix(mFovY, mAspectRatio, mZNearClip, mZFarClip);
+		mbRequireProjectionMatrixUpdate = false;
+	}
 
-void PerspectiveCamera::UpdateCameraMatrix()
-{
-	mCameraMatrix = ViewMatrix * ProjectionMatrix;
-	mWeaponCameraMatrix = ViewMatrix * mWeaponProjectionMatrix;
+	// Update the view matrix if the transform has changed
+	if (mbTransformDirty) {
+		RebuildViewMatrix();
+	}
 
-	InvViewMatrix = ViewMatrix.Inverse();
-	InvProjectionMatrix = ProjectionMatrix.Inverse();
-}
 
-void PerspectiveCamera::OnWindowResize(const Vec2u& size)
-{
-	float32 aspect_ratio = static_cast<float32>(size.X) / static_cast<float32>(size.Y);
-	SetAspectRatio(aspect_ratio);
+	// Something was updated, so we need to recalc the camera matrix.
+
+	mCameraMatrix = mViewMatrix * mProjectionMatrix;
+
+	// Calculate the inverse matrices for view and projection
+	mInvViewMatrix = mViewMatrix.RigidInverse();
+	mInvProjectionMatrix = mProjectionMatrix.Inverse();
+
+	mbTransformDirty = false;
+
+	return true;
 }
 
 } // namespace fx

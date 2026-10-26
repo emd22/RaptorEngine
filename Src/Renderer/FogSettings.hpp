@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Color.hpp>
+#include <Core/Serialize.hpp>
 #include <Core/Types.hpp>
 
 namespace fx::renderer {
@@ -23,3 +24,14 @@ struct FogSettings
 };
 
 } // namespace fx::renderer
+
+RS_OBJECT_BEGIN(fx::renderer::FogSettings)
+	RS_FIELD_NAMED(bEnabled, "enabled")
+	RS_FIELD_NAMED(Density, "density")
+	RS_FIELD_NAMED(Height, "height")
+	RS_FIELD_NAMED(Falloff, "falloff")
+	RS_FIELD_NAMED(Haze, "haze")
+	RS_FIELD_NAMED(Albedo, "color")
+	RS_FIELD_NAMED(Anisotropy, "anisotropy")
+	RS_FIELD_NAMED(AmbientScale, "ambient")
+RS_OBJECT_END()

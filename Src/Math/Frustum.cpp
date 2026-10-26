@@ -3,7 +3,7 @@
 #include "NeonUtil.hpp"
 #include "SIMDHelper.hpp"
 
-#include <Renderer/Camera.hpp>
+#include <Renderer/Camera/PerspectiveCamera.hpp>
 #include <cfloat>
 #include <cmath>
 
@@ -19,9 +19,9 @@ static Vec4f ToPlane(const Vec4f vec)
 }
 
 
-void Frustum::Rebuild(const PerspectiveCamera& camera) { Rebuild(camera.GetCameraMatrix(eObjectLayer::WorldLayer)); }
+void Frustum::Rebuild(const PerspectiveCamera2& camera) { Rebuild(camera.GetCameraMatrix(eObjectLayer::WorldLayer)); }
 
-void Frustum::Rebuild(const Camera& camera, eObjectLayer layer) { Rebuild(camera.GetCameraMatrix(layer)); }
+void Frustum::Rebuild(const BaseCamera& camera, eObjectLayer layer) { Rebuild(camera.GetCameraMatrix(layer)); }
 
 void Frustum::Rebuild(const Mat4f& view_projection)
 {
@@ -142,7 +142,7 @@ bool Frustum::IntersectsOBB(const OBBox& obb, uint32 plane_mask) const
 }
 
 
-BBox Frustum::GetFrustumBoundingBox(const PerspectiveCamera& camera)
+BBox Frustum::GetFrustumBoundingBox(const PerspectiveCamera2& camera)
 {
 	Mat4f vp_matrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 	Mat4f vp_inverse = vp_matrix.Inverse();

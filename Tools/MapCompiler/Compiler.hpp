@@ -19,17 +19,19 @@ struct CompileOptions
 	static constexpr uint32 scDefaultVerifyRays = 20000;
 
 	String InputPath;
-	/// Next to the prototype when empty
+
+	/// Export is next to the prototype when empty
 	String OutputPath;
-	/// No OBJ is written when empty
+
+	/// The path to export an OBJ to. Does not export if this path is empty.
 	String ObjPath;
 
 	SurfaceOptions Surface;
 
 	bool bKeepOutside = false;
-
 	bool bPlaceProbes = true;
-	ProbePlacementSettings Probes;
+
+	ProbePlacementSettings ProbeSettings;
 
 	LightmapOptions Lightmap;
 

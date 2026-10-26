@@ -1,24 +1,39 @@
+#include "OrthoCamera.hpp"
+
 #include <Core/Assert.hpp>
-#include <Renderer/Camera.hpp>
 
 namespace fx {
 
-void OrthoCamera::UpdateProjectionMatrix()
-{
-	ProjectionMatrix.LoadOrthographicMatrix(mWidth, mHeight, mZNearClip, mZFarClip);
 
-	mbRequireMatrixUpdate = false;
+bool OrthoCamera2::Update()
+{
+	// There is nothing to update, return
+	if (!mbTransformDirty && !mbRequireProjectionMatrixUpdate) {
+		return false;
+	}
+
+	// Update the projection matrix if we have new camera parameters
+	if (mbRequireProjectionMatrixUpdate) {
+		mProjectionMatrix.LoadOrthographicMatrix(mSize.X, mSize.Y, mZNearClip, mZFarClip);
+		mbRequireProjectionMatrixUpdate = false;
+	}
+
+	// Update the view matrix if the transform has changed
+	if (mbTransformDirty) {
+		RebuildViewMatrix();
+	}
+
+
+	// Something was updated, so we need to recalc the camera matrix.
+
+	mCameraMatrix = mViewMatrix * mProjectionMatrix;
+
+
+	return true;
 }
 
-void OrthoCamera::UpdateCameraMatrix()
-{
-	mCameraMatrix = ViewMatrix * ProjectionMatrix;
 
-	InvViewMatrix = ViewMatrix.Inverse();
-	InvProjectionMatrix = ProjectionMatrix.Inverse();
-}
-
-void OrthoCamera::ResolveViewToTexels(Vec3f& eye, Vec3f& target, const Vec3f world_up, float32 texture_res)
+void OrthoCamera2::ResolveViewToTexels(Vec3f& eye, Vec3f& target, const Vec3f world_up, float32 texture_res) const
 {
 	Assert(texture_res > 0.0f);
 
@@ -26,7 +41,7 @@ void OrthoCamera::ResolveViewToTexels(Vec3f& eye, Vec3f& target, const Vec3f wor
 	const Vec3f right = world_up.Cross(forward).Normalize();
 	const Vec3f up = forward.Cross(right);
 
-	const float32 texel_size = mWidth / texture_res;
+	const float32 texel_size = mSize.X / texture_res;
 	const float32 texel_size_recip = 1.0f / texel_size;
 
 	const float32 view_x = eye.Dot(right);
@@ -42,7 +57,5 @@ void OrthoCamera::ResolveViewToTexels(Vec3f& eye, Vec3f& target, const Vec3f wor
 	eye += offset;
 	target += offset;
 }
-
-void OrthoCamera::OnWindowResize(const Vec2u& size) {}
 
 } // namespace fx

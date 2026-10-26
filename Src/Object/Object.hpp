@@ -53,7 +53,7 @@ public:
 	 */
 	void RenderPrimitive(const renderer::CommandBuffer& cmd);
 
-	void RenderShallow(const Camera& camera, renderer::Pipeline* alt_pipeline = nullptr);
+	void RenderShallow(const BaseCamera& camera, renderer::Pipeline* alt_pipeline = nullptr);
 
 	bool CheckIfReady(bool require_material);
 	void AttachObject(const ObjectID& object);

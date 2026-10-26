@@ -1036,7 +1036,7 @@ void AddBound(ProbePlacementBoxes& boxes, const BBox& local_bounds, const Mat4f&
 	bound.LocalBounds = local_bounds;
 	bound.WorldBounds = OBBox::FromLocalBounds(local_bounds, local_to_world).GetWorldAABB();
 	bound.LocalToWorld = local_to_world;
-	bound.WorldToLocal = local_to_world.Inverse();
+	bound.WorldToLocal = local_to_world.AffineInverse();
 	bound.Planes.InitAsCopyOf(planes);
 }
 
@@ -1105,7 +1105,7 @@ bool AddBox(ProbePlacementBoxes& boxes, const BBox& local_bounds, const Mat4f& l
 		box.LocalBounds = local_bounds;
 		box.WorldBounds = world_bounds;
 		box.LocalToWorld = local_to_world;
-		box.WorldToLocal = local_to_world.Inverse();
+		box.WorldToLocal = local_to_world.AffineInverse();
 		box.Planes.InitAsCopyOf(planes);
 
 		constexpr float32 cAxisEpsilon = 1e-5f;

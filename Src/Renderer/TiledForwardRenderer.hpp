@@ -12,7 +12,7 @@
 #include <Object/ObjectLayer.hpp>
 
 namespace fx {
-class Camera;
+class BaseCamera;
 class Image;
 } // namespace fx
 
@@ -129,7 +129,7 @@ class TiledForwardRenderer
 public:
 	void Create(const Vec2u& extent);
 
-	void RenderComposition(Camera& camera);
+	void RenderComposition(BaseCamera& camera);
 
 	/**
 	 * @brief Dispatches the Forward+ light culling pass. Must be called outside of a renderpass,
@@ -138,7 +138,7 @@ public:
 	 * (used by probe capture bakes, which render at a fixed small size).
 	 * @param pLightOverride Culls these lights instead of every light submitted this frame.
 	 */
-	void DoLightCullingPass(Camera& camera, const Vec2u* pExtentOverride = nullptr,
+	void DoLightCullingPass(BaseCamera& camera, const Vec2u* pExtentOverride = nullptr,
 							const LightCullOverride* pLightOverride = nullptr);
 
 	/**
@@ -208,7 +208,7 @@ public:
 	FX_FORCE_INLINE uint32 GetLightTileColumns() const { return mLightTileColumns; }
 	FX_FORCE_INLINE uint32 GetLightTileRows() const { return mLightTileRows; }
 
-	uint32 GetViewConstants(const Camera& camera, eObjectLayer layer);
+	uint32 GetViewConstants(const BaseCamera& camera, eObjectLayer layer);
 
 	/// Depth + Normal prepass
 	RenderStage Prepass;

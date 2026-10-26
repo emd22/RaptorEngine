@@ -20,17 +20,16 @@
 #include <Core/RefUtil.hpp>
 #include <Core/Types.hpp>
 #include <Decal/DecalManager.hpp>
-#include <Particle/ParticleSystem.hpp>
+#include <Map/CompiledMap.hpp>
 #include <Material/MaterialManager.hpp>
+#include <Particle/ParticleSystem.hpp>
+#include <Renderer/Backend/BarrierHelper.hpp>
 #include <Renderer/Backend/DescriptorCache.hpp>
 #include <Renderer/Backend/ExtensionHandles.hpp>
-#include <Renderer/Camera.hpp>
 #include <Renderer/Globals.hpp>
-#include <Renderer/Backend/BarrierHelper.hpp>
 #include <Renderer/LightProbe.hpp>
 #include <Renderer/PSOBuild.hpp>
 #include <Renderer/PipelineCache.hpp>
-#include <Map/CompiledMap.hpp>
 #include <Renderer/ShadowDirectional.hpp>
 #include <Texture/TextureManager.hpp>
 #include <World.hpp>
@@ -219,9 +218,9 @@ void GraphicsBackend::Init(Vec2u window_size)
 	{
 		const uint16 unshadowed = scFogShadowUnshadowed;
 
-		pFogShadowAtlas = CreateLightmapImage(Vec2u(1, 1), eImageFormat::D16_UNorm,
-											  Slice<const uint8>(reinterpret_cast<const uint8*>(&unshadowed),
-																 sizeof(unshadowed)));
+		pFogShadowAtlas = CreateLightmapImage(
+			Vec2u(1, 1), eImageFormat::D16_UNorm,
+			Slice<const uint8>(reinterpret_cast<const uint8*>(&unshadowed), sizeof(unshadowed)));
 
 		FogShadowPageBufferSize = scMaxFogShadowCells * sizeof(FogShadowPageGpu);
 		FogShadowPageBuffer.Create(eGpuBufferType::StorageWithOffset, FogShadowPageBufferSize,
@@ -741,11 +740,11 @@ bool GraphicsBackend::UploadFogShadow(const CompiledMapFogShadow& shadow)
 		total_width += detail.Width;
 	}
 
-	std::sort(order.begin(), order.end(), [&](uint32 a, uint32 b)
-			  { return shadow.Pages[a].Levels[0].Height > shadow.Pages[b].Levels[0].Height; });
+	std::sort(order.begin(), order.end(),
+			  [&](uint32 a, uint32 b) { return shadow.Pages[a].Levels[0].Height > shadow.Pages[b].Levels[0].Height; });
 
-	const uint32 atlas_width = std::max(widest, static_cast<uint32>(std::min<uint64>(total_width,
-																						scFogShadowAtlasWidth)));
+	const uint32 atlas_width = std::max(widest,
+										static_cast<uint32>(std::min<uint64>(total_width, scFogShadowAtlasWidth)));
 
 	SizedArray<Vec2u> placements;
 	placements.InitSize(shadow.Pages.Size);
@@ -938,7 +937,7 @@ bool GraphicsBackend::UploadLightmap(const Vec2u& size, const uint8* sun_visibil
 	return true;
 }
 
-void GraphicsBackend::BeginLightCulling(Camera& render_cam) { pRenderer->DoLightCullingPass(render_cam); }
+void GraphicsBackend::BeginLightCulling(BaseCamera& render_cam) { pRenderer->DoLightCullingPass(render_cam); }
 
 void GraphicsBackend::BeginPrepass()
 {
@@ -1060,7 +1059,7 @@ static constexpr float32 scDefaultGTAOThinOccluderCompensation = 0.0f;
 static constexpr float32 scDefaultGTAOFinalValuePower = 2.2f;
 static constexpr float32 scDefaultGTAODenoiseBlurBeta = 1.2f;
 
-void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
+void GraphicsBackend::RenderEarlyFrameEffects(PerspectiveCamera2& camera)
 {
 	FrameData* frame = GetFrame();
 
@@ -1076,17 +1075,17 @@ void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 		.RenderSize = { target_width, target_height },
 	};
 
-	memcpy(consts.InvProjection, camera.InvProjectionMatrix.RawData, sizeof(float32) * 16);
-	memcpy(consts.Projection, camera.ProjectionMatrix.RawData, sizeof(float32) * 16);
-	memcpy(consts.View, camera.ViewMatrix.RawData, sizeof(float32) * 16);
+	memcpy(consts.InvProjection, camera.GetInvProjectionMatrix().RawData, sizeof(float32) * 16);
+	memcpy(consts.Projection, camera.GetProjectionMatrix().RawData, sizeof(float32) * 16);
+	memcpy(consts.View, camera.GetViewMatrix().RawData, sizeof(float32) * 16);
 
 	consts.EffectRadius = gCVars->Get("r_gtao_radius", scDefaultGTAORadius) *
 						  gCVars->Get("r_gtao_radius_multiplier", scDefaultGTAORadiusMultiplier);
 	consts.FalloffRange = gCVars->Get("r_gtao_falloff_range", scDefaultGTAOFalloffRange);
-	consts.SampleDistributionPower =
-		gCVars->Get("r_gtao_sample_distribution_power", scDefaultGTAOSampleDistributionPower);
-	consts.ThinOccluderCompensation =
-		gCVars->Get("r_gtao_thin_occluder_compensation", scDefaultGTAOThinOccluderCompensation);
+	consts.SampleDistributionPower = gCVars->Get("r_gtao_sample_distribution_power",
+												 scDefaultGTAOSampleDistributionPower);
+	consts.ThinOccluderCompensation = gCVars->Get("r_gtao_thin_occluder_compensation",
+												  scDefaultGTAOThinOccluderCompensation);
 	consts.FinalValuePower = gCVars->Get("r_gtao_final_value_power", scDefaultGTAOFinalValuePower);
 
 	gPipelineCache->SetFrameData(FrameAlloc.Push(consts));
@@ -1159,7 +1158,7 @@ eFogMode GraphicsBackend::GetFogMode() const
 	return eFogMode::Off;
 }
 
-void GraphicsBackend::RenderFog(Camera& camera)
+void GraphicsBackend::RenderFog(PerspectiveCamera2& camera)
 {
 	const eFogMode mode = GetFogMode();
 
@@ -1171,8 +1170,8 @@ void GraphicsBackend::RenderFog(Camera& camera)
 
 	const FogSettings& fog = gWorld->Fog;
 
-	const float32* projection = camera.ProjectionMatrix.RawData;
-	const float32* inv_view = camera.InvViewMatrix.RawData;
+	const float32* projection = camera.GetProjectionMatrix().RawData;
+	const float32* inv_view = camera.GetInvViewMatrix().RawData;
 
 	const float32 depth_a = static_cast<float32>(1.0 - static_cast<float64>(projection[10]));
 	const float32 depth_b = -projection[14];
@@ -1441,7 +1440,7 @@ void GraphicsBackend::RenderFroxelFog(CommandBuffer& cmd, uint32 consts_offset)
 	BarrierHelper::ImageCopyToComputeHistory(cmd, &pRenderer->FroxelLighting, &pRenderer->FroxelHistory);
 }
 
-void GraphicsBackend::DoComposition(Camera& render_cam)
+void GraphicsBackend::DoComposition(PerspectiveCamera2& render_cam)
 {
 	FrameData* frame = GetFrame();
 

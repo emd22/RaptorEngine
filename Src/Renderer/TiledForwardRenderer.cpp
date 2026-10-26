@@ -5,7 +5,7 @@
 #include "Backend/DescriptorCache.hpp"
 #include "Backend/Sampler/SamplerCache.hpp"
 #include "Backend/Shader.hpp"
-#include "Camera.hpp"
+#include "Camera/BaseCamera.hpp"
 #include "Engine.hpp"
 #include "Globals.hpp"
 #include "GraphicsBackend.hpp"
@@ -722,7 +722,7 @@ void TiledForwardRenderer::CreateLightCullingPSO()
 	gPSOBuild->EndPipeline();
 }
 
-void TiledForwardRenderer::DoLightCullingPass(Camera& camera, const Vec2u* pExtentOverride,
+void TiledForwardRenderer::DoLightCullingPass(BaseCamera& camera, const Vec2u* pExtentOverride,
 											  const LightCullOverride* pLightOverride)
 {
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
@@ -1143,8 +1143,7 @@ void TiledForwardRenderer::CreateFroxelFogPSO(const BlendAttachment& apply_blend
 									  eSamplerCompareOp::Greater,
 								  }));
 	gPSOBuild->AddBuffer(5, 0, eShaderType::Compute, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
-	gPSOBuild->AddBuffer(6, 0, eShaderType::Compute, &gGraphics->ProbeVolumeBuffer, 0,
-						 gGraphics->ProbeVolumePageSize);
+	gPSOBuild->AddBuffer(6, 0, eShaderType::Compute, &gGraphics->ProbeVolumeBuffer, 0, gGraphics->ProbeVolumePageSize);
 	gPSOBuild->AddBuffer(7, 0, eShaderType::Compute, &gGraphics->ProbeGridBuffer, 0, gGraphics->ProbeGridPageSize);
 	gPSOBuild->AddStorageImage(8, 0, eShaderType::Compute, &FroxelLighting);
 	gPSOBuild->AddImage(9, 0, eShaderType::Compute, gGraphics->pFogShadowAtlas, GetFogShadowSampler());
@@ -1187,7 +1186,7 @@ void TiledForwardRenderer::CreateFroxelFogPSO(const BlendAttachment& apply_blend
 	gPSOBuild->EndPipeline();
 }
 
-uint32 TiledForwardRenderer::GetViewConstants(const Camera& camera, eObjectLayer layer)
+uint32 TiledForwardRenderer::GetViewConstants(const BaseCamera& camera, eObjectLayer layer)
 {
 	ViewConstants consts;
 	memset(&consts, 0, sizeof(ViewConstants));
@@ -1254,7 +1253,7 @@ uint32 TiledForwardRenderer::GetViewConstants(const Camera& camera, eObjectLayer
 	}
 
 	memcpy(consts.ViewProjection, camera.GetCameraMatrix(layer).RawData, sizeof(Mat4f));
-	memcpy(consts.EyePosition, camera.Position.mData, sizeof(float32) * 3);
+	memcpy(consts.EyePosition, camera.GetPosition().mData, sizeof(float32) * 3);
 	consts.EyePosition[3] = 1.0f;
 
 	CachedViewConstants& cached = mCachedViews[static_cast<uint32>(layer)];
@@ -1271,7 +1270,7 @@ uint32 TiledForwardRenderer::GetViewConstants(const Camera& camera, eObjectLayer
 	return cached.Offset;
 }
 
-void TiledForwardRenderer::RenderComposition(Camera& camera)
+void TiledForwardRenderer::RenderComposition(BaseCamera& camera)
 {
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 

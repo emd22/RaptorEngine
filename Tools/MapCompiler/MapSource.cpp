@@ -2,6 +2,7 @@
 
 #include <Asset/ConfigFile.hpp>
 #include <BrushEntry.hpp>
+#include <LightEntry.hpp>
 #include <Core/String.hpp>
 #include <Material/MaterialDefinition.hpp>
 #include <Material/SpecialMaterial.hpp>
@@ -31,9 +32,6 @@ constexpr const char* scMaterialRoot = "RaptorData/Data/materials";
 
 constexpr double scBrushExtent = 1e5;
 constexpr double scMinSunDistance = 1e-6;
-constexpr float32 scDefaultLightIntensity = 100000.0f;
-constexpr float32 scDefaultLightRadius = 5.0f;
-constexpr int64 scSpotLightType = 1;
 constexpr double scHalfTurnDegrees = 180.0;
 
 
@@ -109,11 +107,8 @@ void AddEntityPositions(const ConfigEntry* list, Array<Vec3d>& out_entities)
 	}
 }
 
-Vec3d ReadLightColor(const ConfigEntry& entry)
+Vec3d GetLightColor(const Color& color, const double intensity)
 {
-	const Color color = entry.GetMemberValue(HashStr32("color"), Color::FromRGBA(255, 255, 255, 255));
-	const double intensity = entry.GetMemberValue<float32>(HashStr32("intensity"), scDefaultLightIntensity);
-
 	float32 linear[3];
 	color.GetLinearRGB(linear);
 
@@ -133,26 +128,25 @@ void AddLights(const ConfigEntry* list, Array<SourceLight>& out_lights)
 			continue;
 		}
 
-		const double radius = entry.GetMemberValue<float32>(HashStr32("radius"), scDefaultLightRadius);
+		const LightEntry source = ReadLightEntry(entry);
+		const double radius = source.Radius;
 
 		SourceLight light;
-		light.Position = ToVec3d(position->GetValue<Vec3f>());
-		light.Color = ReadLightColor(entry);
+		light.Position = ToVec3d(source.Position);
+		light.Color = GetLightColor(source.Color, source.Intensity);
 		light.InvRadiusSq = 1.0 / std::max(radius * radius, 1e-8);
-		light.bSpot = entry.GetMemberValue<int64>(HashStr32("type"), 0) == scSpotLightType;
+		light.bSpot = (source.Type == ePrxLightType::Spot);
 
 		if (light.bSpot) {
-			const ConfigEntry* direction = entry.GetMember(HashStr32("dir"));
+			const Vec3d direction = ToVec3d(source.Spot.Direction);
 
-			if (direction != nullptr && ToVec3d(direction->GetValue<Vec3f>()).Length() > scMinSunDistance) {
-				light.Direction = ToVec3d(direction->GetValue<Vec3f>()).Normalized();
+			if (direction.Length() > scMinSunDistance) {
+				light.Direction = direction.Normalized();
 			}
 
 			const double max_angle = scHalfTurnDegrees * 0.5;
-			const double outer = std::clamp<double>(entry.GetMemberValue<float32>(HashStr32("outer"), 30.0f), 0.0,
-													max_angle);
-			const double inner = std::clamp<double>(entry.GetMemberValue<float32>(HashStr32("inner"), 20.0f), 0.0,
-													outer);
+			const double outer = std::clamp<double>(source.Spot.OuterAngle, 0.0, max_angle);
+			const double inner = std::clamp<double>(source.Spot.InnerAngle, 0.0, outer);
 
 			const double cos_inner = std::cos(inner * (M_PI / scHalfTurnDegrees));
 			const double cos_outer = std::cos(outer * (M_PI / scHalfTurnDegrees));
@@ -529,12 +523,13 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 
 	const ConfigEntry* sun_entry = info.GetEntry(HashStr32("sun"));
 
-	if (sun_entry != nullptr && sun_entry->GetMemberValue<int64>(HashStr32("enabled"), 1) != 0) {
-		const Vec3d sun_position = ToVec3d(sun_entry->GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero));
+	if (sun_entry != nullptr) {
+		const SunLightEntry sun = ReadSunLightEntry(*sun_entry);
+		const Vec3d sun_position = ToVec3d(sun.Position);
 
-		if (sun_position.Length() > scMinSunDistance) {
+		if (sun.bEnabled && sun_position.Length() > scMinSunDistance) {
 			SunDirection = sun_position.Normalized();
-			SunColor = ReadLightColor(*sun_entry);
+			SunColor = GetLightColor(sun.Color, sun.Intensity);
 			bHasSun = true;
 		}
 	}

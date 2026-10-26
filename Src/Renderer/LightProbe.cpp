@@ -28,10 +28,10 @@
 #include <Renderer/ReflectionFilter.hpp>
 #include <World.hpp>
 #include <algorithm>
-#include <limits>
 #include <bit>
 #include <cmath>
 #include <cstring>
+#include <limits>
 
 namespace fx {
 
@@ -65,7 +65,7 @@ constexpr float32 scCaptureSkyRadiance = 1500.0f / static_cast<float32>(M_PI);
 constexpr int64 scDefaultProbeBounces = 3;
 constexpr int64 scMaxProbeBounces = 8;
 
-PerspectiveCamera MakeCaptureCamera(const Vec3f position, uint32 face)
+PerspectiveCamera2 MakeCaptureCamera(const Vec3f position, uint32 face)
 {
 	static const Vec3f scFaceDirections[ProbeManager::scCaptureFaces] = {
 		Vec3f(1.0f, 0.0f, 0.0f),  Vec3f(-1.0f, 0.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
@@ -77,11 +77,11 @@ PerspectiveCamera MakeCaptureCamera(const Vec3f position, uint32 face)
 		Vec3f(0.0f, 0.0f, 1.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
 	};
 
-	PerspectiveCamera camera(90.0f, 1.0f, 200.0f, ProbePlacement::scCaptureNearPlane);
+	PerspectiveCamera2 camera(MathUtil::DegreesToRadians(90.0f), 1.0f, 200.0f, ProbePlacement::scCaptureNearPlane);
 
-	camera.Position = position;
-	camera.ViewMatrix.LookAt(position, position + scFaceDirections[face], scFaceUps[face]);
-	camera.UpdateCameraMatrix();
+	camera.SetPosition(position);
+	camera.LookAt(position + scFaceDirections[face], scFaceUps[face]);
+	camera.Update();
 
 	return camera;
 }
@@ -151,6 +151,7 @@ void SampleCaptureFace(const float32* face, uint32 size, float32 ndc_x, float32 
 		out[c] = top + (bottom - top) * fy;
 	}
 }
+
 
 ///////////////////////////////////
 // Placement
@@ -293,7 +294,7 @@ ReflectionProbeData MakeReflectionProbe(const ReflectionBox& box, const ProbePla
 	}
 
 	ReflectionProbeData probe {};
-	memcpy(probe.WorldToBox, box.BoxToWorld.Inverse().RawData, sizeof(probe.WorldToBox));
+	memcpy(probe.WorldToBox, box.BoxToWorld.AffineInverse().RawData, sizeof(probe.WorldToBox));
 
 	for (uint32 axis = 0; axis < 3; axis++) {
 		probe.PositionAndCount[axis] = position.mData[axis];
@@ -370,6 +371,38 @@ void UploadRange(renderer::RawGpuBuffer& buffer, const void* data, uint64 offset
 }
 
 } // namespace
+
+
+void ProbeManager::MakeCaptureCameras()
+{
+	// The cameras are already created, return em
+	if (mCaptureCameras.Size > 0) {
+		Assert(mCaptureCameras.Size == scCaptureFaces);
+		return;
+	}
+
+	mCaptureCameras.InitCapacity(scCaptureFaces);
+
+	static constexpr float32 scAspect = 1.0f;
+	static constexpr float32 scNearClip = ProbePlacement::scCaptureNearPlane;
+	static constexpr float32 scFarClip = 200.0f;
+	static constexpr float32 scCaptureFOV = 90.0f;
+
+	// Create all capture cameras
+	for (uint32 i = 0; i < scCaptureFaces; i++) {
+		PerspectiveCamera2& cam = mCaptureCameras.Emplace(MathUtil::DegreesToRadians(scCaptureFOV), scAspect, scFarClip,
+														  scNearClip);
+	}
+}
+
+void ProbeManager::MoveCaptureCameras(const Vec3f position)
+{
+	for (uint32 face_index = 0; face_index < scCaptureFaces; face_index++) {
+		PerspectiveCamera2& cam = mCaptureCameras[face_index];
+		cam.SetPosition(position);
+		cam.Update();
+	}
+}
 
 void ProbeManager::Create()
 {
@@ -610,8 +643,8 @@ bool ProbeManager::BuildLayoutFromWorld(ProbeLayout& out_layout, uint32& out_bru
 	settings.BrushSpacing = gCVars->Get("r_probe_spacing", ProbePlacementSettings::scDefaultBrushSpacing);
 	settings.LevelSpacing = gCVars->Get("r_probe_level_spacing", ProbePlacementSettings::scDefaultLevelSpacing);
 
-	out_brush_volumes = ProbePlacement::BuildLevelLayout(out_layout, boxes,
-														 Slice<BBox>(brush_regions.pData, brush_regions.Size), settings);
+	out_brush_volumes = ProbePlacement::BuildLevelLayout(
+		out_layout, boxes, Slice<BBox>(brush_regions.pData, brush_regions.Size), settings);
 	return true;
 }
 
@@ -912,10 +945,10 @@ void ProbeManager::BuildCaptureTexels()
 	CaptureTexel* texel = mCaptureTexels.pData;
 
 	for (uint32 face = 0; face < scCaptureFaces; face++) {
-		const PerspectiveCamera camera = MakeCaptureCamera(Vec3f::sZero, face);
-		const Mat4f inv_view_projection = camera.InvProjectionMatrix * camera.InvViewMatrix;
+		const PerspectiveCamera2 camera = MakeCaptureCamera(Vec3f::sZero, face);
+		const Mat4f inv_view_projection = camera.GetInvProjectionMatrix() * camera.GetInvViewMatrix();
 
-		mCaptureInvProjection = camera.InvProjectionMatrix;
+		mCaptureInvProjection = camera.GetInvProjectionMatrix();
 		mCaptureFaceToClip[face] = inv_view_projection.Inverse();
 
 		for (uint32 y = 0; y < scCaptureSize; y++) {
@@ -963,7 +996,7 @@ void ProbeManager::RecordCaptureBatch(renderer::CommandBuffer& cmd, const Render
 		const uint32 slot = mCurrentProbe - mBatchStart;
 
 		for (uint32 face = 0; face < scCaptureFaces; face++) {
-			PerspectiveCamera camera = MakeCaptureCamera(GetProbePosition(mCurrentProbe), face);
+			PerspectiveCamera2 camera = MakeCaptureCamera(GetProbePosition(mCurrentProbe), face);
 
 			render_face(camera, mCaptureStage);
 
@@ -1319,7 +1352,7 @@ void ProbeManager::BeginReflectionBake()
 	}
 
 	if (mReflectionProbeCount == 0) {
-		LogError("Reflection bake failed: no reflection probes have been placed");
+		LogWarning("No reflection probes in prototype, ignoring request to bake");
 		return;
 	}
 
@@ -1351,7 +1384,7 @@ void ProbeManager::RecordReflectionCapture(renderer::CommandBuffer& cmd, const R
 	mbCapturingFaces = true;
 
 	for (uint32 face = 0; face < scCaptureFaces; face++) {
-		PerspectiveCamera camera = MakeCaptureCamera(position, face);
+		PerspectiveCamera2 camera = MakeCaptureCamera(position, face);
 
 		render_face(camera, mReflectionStage);
 
@@ -1594,8 +1627,7 @@ bool ProbeManager::LoadCompiledProbes()
 {
 	const Blockout* blockout = GetBlockout();
 
-	if (blockout == nullptr || !blockout->HasCompiledProbes() ||
-		gCVars->Get("r_compiled_probes", int64 { 1 }) == 0) {
+	if (blockout == nullptr || !blockout->HasCompiledProbes() || gCVars->Get("r_compiled_probes", int64 { 1 }) == 0) {
 		return false;
 	}
 
@@ -1650,8 +1682,7 @@ bool ProbeManager::LoadCompiledProbes()
 
 	UploadToGpu(0, probe_count);
 
-	LogInfo("Loaded {} light probes across {} volume(s) baked into the compiled map", probe_count,
-			mLayout.VolumeCount);
+	LogInfo("Loaded {} light probes across {} volume(s) baked into the compiled map", probe_count, mLayout.VolumeCount);
 	return true;
 }
 

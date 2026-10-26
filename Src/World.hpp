@@ -8,7 +8,8 @@
 #include <Math/Frustum.hpp>
 #include <Object/Object.hpp>
 #include <Player.hpp>
-#include <Renderer/Camera.hpp>
+#include <Renderer/Camera/BaseCamera.hpp>
+#include <Renderer/Camera/OrthoCamera.hpp>
 #include <Renderer/FogSettings.hpp>
 #include <Renderer/Light.hpp>
 #include <Renderer/LightList.hpp>
@@ -60,13 +61,13 @@ public:
 
 	void AttachLoaded(Object* object);
 
-	void SelectCamera(const Ref<Camera>& camera) { mpCurrentCamera = camera; }
+	void SelectCamera(const Ref<FPSCamera>& camera) { mpCurrentCamera = camera; }
 
-	void SetCullCamera(const Ref<PerspectiveCamera>& camera) { mpCullCamera = camera; }
+	void SetCullCamera(const Ref<FPSCamera>& camera) { mpCullCamera = camera; }
 
 	bool HasDetachedCullCamera() const { return mpCullCamera.IsValid(); }
 
-	void Render(Camera* shadow_camera);
+	void Render(BaseCamera* shadow_camera);
 
 	/**
 	 * @brief Captures the next batch of probes for a light probe bake. Called from DoComposition after the main forward
@@ -78,7 +79,7 @@ public:
 
 	FX_FORCE_INLINE Player& GetPlayer() { return this->Player; }
 
-	Ref<PerspectiveCamera>& GetCurrentCamera() { return mpCurrentCamera; }
+	Ref<FPSCamera>& GetCurrentCamera() { return mpCurrentCamera; }
 
 	~World() { Destroy(); }
 
@@ -102,19 +103,19 @@ private:
 	void DebugDrawPortals();
 	void DebugDrawCullFrustum();
 
-	PerspectiveCamera& GetCullCamera();
+	PerspectiveCamera2& GetCullCamera();
 
-	void CullWorldTiles(const PerspectiveCamera& cam);
+	void CullWorldTiles(const PerspectiveCamera2& cam);
 
 	void ExecuteRenderList(renderer::PipelineHandle pipeline);
 	/// Draws the list of `pipeline` with `draw_pipeline`, which is a variant of it from another pass (or itself)
 	void ExecuteRenderList(renderer::PipelineHandle pipeline, renderer::PipelineHandle draw_pipeline,
-						   PerspectiveCamera& camera);
+						   PerspectiveCamera2& camera);
 
 	/// Draws the opaque geometry with every pipeline of the forward pass
-	void ExecuteForwardRenderLists(PerspectiveCamera& camera);
+	void ExecuteForwardRenderLists(PerspectiveCamera2& camera);
 	void ExecuteTransparentRenderLists();
-	void ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Camera& shadow_camera,
+	void ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const BaseCamera& shadow_camera,
 								 bool skip_lightmapped = false);
 
 	/**
@@ -122,7 +123,7 @@ private:
 	 * that reads it into a spare light buffer slot (the main view keeps the original slot and its shadow matrix).
 	 * @return False if the light buffer is full, in which case the shadow map is left alone.
 	 */
-	bool RenderCaptureSunShadows(LightDirectional& sun, const Vec3f center, OrthoCamera& out_shadow_camera,
+	bool RenderCaptureSunShadows(LightDirectional& sun, const Vec3f center, OrthoCamera2& out_shadow_camera,
 								 uint32& out_light_slot);
 
 	/**
@@ -229,8 +230,8 @@ public:
 	const PortalVisibility& GetPortalVisibility() const { return mPortalVisibility; }
 
 private:
-	Ref<PerspectiveCamera> mpCurrentCamera { nullptr };
-	Ref<PerspectiveCamera> mpCullCamera { nullptr };
+	Ref<FPSCamera> mpCurrentCamera { nullptr };
+	Ref<FPSCamera> mpCullCamera { nullptr };
 
 	physics::BodyID mSelectedPhysicsObjectId = physics::BodyID::scNull;
 

@@ -370,7 +370,7 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 
 	mpSkeleton = skeleton;
 	// mBodies = std::move(bodies);
-	mWorldInverse = object_world_matrix.Inverse();
+	mWorldInverse = object_world_matrix.AffineInverse();
 
 	mDrivenWorld.assign(joint_count, Mat4f::scIdentity);
 	mIsDriven.assign(joint_count, 0);
@@ -422,7 +422,7 @@ void Ragdoll::Drive(const Mat4f& object_world_matrix, float32 delta_time, bool t
 		return;
 	}
 
-	mWorldInverse = object_world_matrix.Inverse();
+	mWorldInverse = object_world_matrix.AffineInverse();
 
 	const Skeleton& skel = *mpSkeleton;
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
@@ -478,7 +478,7 @@ void Ragdoll::GoLimp(const Mat4f& object_world_matrix)
 		return;
 	}
 
-	mWorldInverse = object_world_matrix.Inverse();
+	mWorldInverse = object_world_matrix.AffineInverse();
 
 	SetAllBodyModes(eRagdollBodyMode::Limp);
 

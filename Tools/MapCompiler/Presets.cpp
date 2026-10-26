@@ -36,8 +36,8 @@ ConfigEntry WritePreset(const CompilePreset& preset, uint32 index)
 	entry.AddMember(ConfigEntry::Literal("keep_outside", ToInt(options.bKeepOutside)));
 
 	entry.AddMember(ConfigEntry::Literal("place_probes", ToInt(options.bPlaceProbes)));
-	entry.AddMember(ConfigEntry::Literal("probe_level_spacing", options.Probes.LevelSpacing));
-	entry.AddMember(ConfigEntry::Literal("probe_brush_spacing", options.Probes.BrushSpacing));
+	entry.AddMember(ConfigEntry::Literal("probe_level_spacing", options.ProbeSettings.LevelSpacing));
+	entry.AddMember(ConfigEntry::Literal("probe_brush_spacing", options.ProbeSettings.BrushSpacing));
 
 	entry.AddMember(ConfigEntry::Literal("lightmap", ToInt(lightmap.bEnabled)));
 	entry.AddMember(ConfigEntry::Literal("lightmap_density", static_cast<float32>(lightmap.Density)));
@@ -95,10 +95,10 @@ CompilePreset ReadPreset(const ConfigEntry& entry)
 	options.bKeepOutside = ReadBool(entry, "keep_outside", options.bKeepOutside);
 
 	options.bPlaceProbes = ReadBool(entry, "place_probes", options.bPlaceProbes);
-	options.Probes.LevelSpacing = static_cast<float32>(
-		ReadDouble(entry, "probe_level_spacing", options.Probes.LevelSpacing));
-	options.Probes.BrushSpacing = static_cast<float32>(
-		ReadDouble(entry, "probe_brush_spacing", options.Probes.BrushSpacing));
+	options.ProbeSettings.LevelSpacing = static_cast<float32>(
+		ReadDouble(entry, "probe_level_spacing", options.ProbeSettings.LevelSpacing));
+	options.ProbeSettings.BrushSpacing = static_cast<float32>(
+		ReadDouble(entry, "probe_brush_spacing", options.ProbeSettings.BrushSpacing));
 
 	lightmap.bEnabled = ReadBool(entry, "lightmap", lightmap.bEnabled);
 	lightmap.Density = ReadDouble(entry, "lightmap_density", lightmap.Density);

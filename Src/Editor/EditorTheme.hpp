@@ -6,7 +6,7 @@
 
 #include <Color.hpp>
 #include <Core/DynArray.hpp>
-#include <Core/Serialize2.hpp>
+#include <Core/Serialize.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
 

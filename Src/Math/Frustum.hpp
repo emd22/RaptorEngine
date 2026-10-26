@@ -16,8 +16,8 @@
 
 namespace fx {
 
-class PerspectiveCamera;
-class Camera;
+class PerspectiveCamera2;
+class BaseCamera;
 
 enum class eFrustumPlane
 {
@@ -41,8 +41,8 @@ class Frustum
 public:
 	Frustum() = default;
 
-	void Rebuild(const PerspectiveCamera& camera);
-	void Rebuild(const Camera& camera, eObjectLayer layer);
+	void Rebuild(const PerspectiveCamera2& camera);
+	void Rebuild(const BaseCamera& camera, eObjectLayer layer);
 
 	void Rebuild(const Mat4f& view_projection);
 
@@ -61,7 +61,7 @@ public:
 		return mClipPlanes[static_cast<uint32>(plane)];
 	}
 
-	BBox GetFrustumBoundingBox(const PerspectiveCamera& camera);
+	BBox GetFrustumBoundingBox(const PerspectiveCamera2& camera);
 
 private:
 	StackArray<Vec4f, 6> mClipPlanes;

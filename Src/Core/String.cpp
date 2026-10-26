@@ -1,5 +1,7 @@
 #include "String.hpp"
 
+#include <strings.h>
+
 #include <Core/Allocator.hpp>
 #include <Core/Assert.hpp>
 #include <Core/Log.hpp>
@@ -79,6 +81,66 @@ String String::SubStr(uint32 start, uint32 length) const
 	Assert(start <= Length && start + length <= Length);
 	return String(GetInternalPtr() + start, length);
 }
+
+bool String::CompareNoCase(const String& other) const
+{
+#if defined(FX_PLATFORM_MACOS) || defined(FX_PLATFORM_LINUX)
+	return (strncasecmp(GetInternalPtr(), other.GetInternalPtr(), Length) == 0);
+#elif FX_PLATFORM_WINDOWS
+	return (strnicmp(GetInternalPtr(), other.GetInternalPtr(), Length) == 0);
+#else
+	// Fallback
+	const char* s_a = GetInternalPtr();
+	const char* s_b = other.GetInternalPtr();
+
+	char ch_a, ch_b;
+
+	while ((ch_a = *s_a) != 0 && (ch_b = *s_b) != 0) {
+		if (tolower(static_cast<uint8>(ch_a)) - tolower(static_cast<uint8>(ch_b)) != 0) {
+			return false;
+		}
+
+		++s_a;
+		++s_b;
+	}
+
+	return true;
+#endif
+}
+
+
+String String::ToLower() const
+{
+	String result(Length + 1);
+
+	char* result_ptr = result.GetInternalPtr();
+	const char* ptr = GetInternalPtr();
+
+	for (uint32 i = 0; i < Length; i++) {
+		result_ptr[i] = tolower(ptr[i]);
+	}
+
+	result_ptr[Length] = '\0';
+
+	return result;
+}
+
+String String::ToUpper() const
+{
+	String result(Length + 1);
+
+	char* result_ptr = result.GetInternalPtr();
+	const char* ptr = GetInternalPtr();
+
+	for (uint32 i = 0; i < Length; i++) {
+		result_ptr[i] = toupper(ptr[i]);
+	}
+
+	result_ptr[Length] = '\0';
+
+	return result;
+}
+
 
 bool String::operator==(const String& other) const
 {

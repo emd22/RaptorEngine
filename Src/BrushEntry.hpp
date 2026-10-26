@@ -8,6 +8,7 @@
 #pragma once
 
 #include <Brush.hpp>
+#include <Core/Serialize.hpp>
 #include <Core/String.hpp>
 #include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
@@ -63,8 +64,8 @@ struct BrushPlacement
 	Quat Rotation = Quat::scIdentity;
 };
 
-Quat ReadBrushRotation(const ConfigEntry& entry);
 BrushPlacement ReadBrushPlacement(const ConfigEntry& entry);
+void WriteBrushPlacement(ConfigEntry& entry, const BrushPlacement& placement);
 
 /// Takes a brush from its subview's space to the world, for a subview placed at `instance`
 BrushPlacement PlaceInSubview(const BrushPlacement& local, const Vec3f brush_center, const BrushPlacement& instance);
@@ -123,3 +124,8 @@ void ForEachSubviewBrush(const ConfigFile& info, const String& prototype_path,
 						 const std::function<void(ConfigEntry&, const ConfigEntry&, uint32)>& callback);
 
 } // namespace fx
+
+RS_OBJECT_BEGIN(fx::BrushPlacement)
+	RS_FIELD_NAMED(Position, "pos")
+	RS_FIELD_NAMED(Rotation, "rotquat")
+RS_OBJECT_END()

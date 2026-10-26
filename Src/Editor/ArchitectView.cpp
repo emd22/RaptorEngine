@@ -565,13 +565,13 @@ TopViewState RaptorEditor::BuildTopViewState()
 	view.Notice = mNotice;
 	view.NoticeSerial = mNoticeSerial;
 
-	const Ref<PerspectiveCamera>& camera = gWorld->Player.pCamera;
+	const Ref<FPSCamera>& camera = gWorld->Player.pCamera;
 
 	if (camera.IsValid()) {
 		const Vec3f forward = camera->GetForwardVector();
 
 		view.bHasPlayer = true;
-		view.PlayerPosition = camera->Position;
+		view.PlayerPosition = camera->GetPosition();
 		view.PlayerDirection = forward;
 	}
 
@@ -1339,7 +1339,7 @@ void RaptorEditor::TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewV
 		}
 
 		const Mat4f world = object->GetWorldMatrix();
-		const Vec4f local_offset = world.Inverse() * Vec4f(offset.X, offset.Y, offset.Z, 0.0f);
+		const Vec4f local_offset = world.AffineInverse() * Vec4f(offset.X, offset.Y, offset.Z, 0.0f);
 		const Vec3f local_move(local_offset.X, local_offset.Y, local_offset.Z);
 
 		const Patch* patch = gWorld->pPrototype->GetPatch(object);
