@@ -363,7 +363,7 @@ void DecalManager::Clear()
 	mSkinnedUploadedCount = 0;
 }
 
-void DecalManager::Update(const PerspectiveCamera2& camera)
+void DecalManager::Update(const PerspectiveCamera& camera)
 {
 	using namespace renderer;
 

@@ -60,8 +60,12 @@ void JoltPhysicsBackend::Update(float32 delta_time)
 
 	StepAccumulator = std::min(StepAccumulator + delta_time, cTimeStep * scMaxSteps);
 
+	if (StepAccumulator >= cTimeStep * scStepThreshold) {
+		ClearBodyGroundContacts();
+	}
+
 	while (StepAccumulator >= cTimeStep * scStepThreshold) {
-		PhysicsSystem.Update(cTimeStep, 1, pTempAllocator.pPtr, pJobSystem.pPtr);
+		PhysicsSystem.Update(cTimeStep, scCollisionSteps, pTempAllocator.pPtr, pJobSystem.pPtr);
 		StepAccumulator -= cTimeStep;
 	}
 }

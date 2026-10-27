@@ -6,13 +6,12 @@
 
 namespace fx {
 
-class PerspectiveCamera2 : public BaseCamera
+class PerspectiveCamera : public BaseCamera
 {
 public:
-	PerspectiveCamera2() = default;
+	PerspectiveCamera() = default;
 
-	PerspectiveCamera2(float32 fov_y, float32 aspect, float32 z_near, float32 z_far)
-		: mFovY(fov_y), mAspectRatio(aspect)
+	PerspectiveCamera(float32 fov_y, float32 aspect, float32 z_near, float32 z_far) : mFovY(fov_y), mAspectRatio(aspect)
 	{
 		SetClip(z_near, z_far);
 	}
@@ -38,7 +37,7 @@ public:
 	FX_FORCE_INLINE const Mat4f& GetInvViewMatrix() const { return mInvViewMatrix; }
 	FX_FORCE_INLINE const Mat4f& GetInvProjectionMatrix() const { return mInvProjectionMatrix; }
 
-	~PerspectiveCamera2() override = default;
+	~PerspectiveCamera() override = default;
 
 protected:
 	// The inverse matrices for view and projection. This isn't on the BaseCamera class as we seldom need them for

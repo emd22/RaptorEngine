@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ThirdParty/Jolt/Jolt.h>
+#include <ThirdParty/Jolt/Physics/PhysicsStepListener.h>
 #include <ThirdParty/Jolt/Physics/Ragdoll/Ragdoll.h>
 
 #include <Asset/Animation.hpp>
@@ -11,7 +12,15 @@
 #include <Math/Vec3.hpp>
 #include <vector>
 
+#include "RagdollDef.hpp"
+
+namespace JPH {
+class PhysicsSystem;
+}
+
 namespace fx::physics {
+
+struct BodyGroundContact;
 
 enum class eRagdollBodyMode : uint8
 {
@@ -28,18 +37,18 @@ enum class eRagdollBodyPart : uint8
 	Leg,
 };
 
-class Ragdoll
+class Ragdoll : public JPH::PhysicsStepListener
 {
 public:
 	Ragdoll() = default;
 	Ragdoll(const Ragdoll&) = delete;
 	Ragdoll& operator=(const Ragdoll&) = delete;
 
-	bool Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_matrix);
+	bool Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_matrix, const RagdollDef& def);
 
 	void Activate(const Vec3f velocity);
 
-	void Drive(const Mat4f& object_world_matrix, float32 delta_time, bool teleport = false);
+	void Drive(const Mat4f& object_world_matrix, bool teleport = false);
 	void GoLimp(const Mat4f& object_world_matrix);
 
 	void SetBodyMode(uint32 body_index, eRagdollBodyMode mode);
@@ -53,6 +62,8 @@ public:
 	float32 GetWorstJointError() const;
 	bool GetBodyTrackingError(uint32 body_index, float32& out_distance, float32& out_angle) const;
 	Vec3f GetBodyPosition(uint32 body_index) const;
+	Vec3f GetCenterOfMass() const;
+	bool GetBodyGroundContact(uint32 body_index, BodyGroundContact& out_contact) const;
 	eRagdollBodyPart GetBodyPart(uint32 body_index) const;
 
 	FX_FORCE_INLINE uint32 GetBodyCount() const { return static_cast<uint32>(mBodies.Size); }
@@ -69,6 +80,8 @@ public:
 	void DebugDraw() const;
 
 	bool FindBoneForBody(JPH::BodyID body_id, uint32& out_bone_index) const;
+
+	void OnStep(const JPH::PhysicsStepListenerContext& inContext) override;
 
 	FX_FORCE_INLINE bool IsCreated() const { return mpRagdoll != nullptr; }
 	FX_FORCE_INLINE bool IsLimp() const { return mbLimp; }
@@ -91,23 +104,34 @@ private:
 		float32 Blend = 1.0f;
 		bool bSnap = false;
 		float32 Mass = 0.0f;
+		RagdollMuscle Muscle;
 		JPH::Vec3 ParentAnchor = JPH::Vec3::sZero();
 	};
 
+	struct BodyTarget
+	{
+		JPH::Vec3 Position = JPH::Vec3::sZero();
+		JPH::Quat Orientation = JPH::Quat::sIdentity();
+		eRagdollBodyMode Mode = eRagdollBodyMode::Limp;
+		float32 Strength = 1.0f;
+	};
+
 	void ApplyMotor(uint32 body_index);
+	float32 GetMotorTorqueFraction(uint32 body_index) const;
 	Mat4f GetBodyModelMatrix(uint32 body_index) const;
 
 	Ref<Skeleton> mpSkeleton { nullptr };
 	JPH::Ref<JPH::Ragdoll> mpRagdoll;
+	JPH::PhysicsSystem* mpPhysicsSystem = nullptr;
 	SizedArray<BodyInfo> mBodies;
 
+	std::vector<BodyTarget> mTargets;
 	std::vector<Mat4f> mDrivenWorld;
 	std::vector<uint8> mIsDriven;
-	std::vector<JPH::Quat> mTargetOrientations;
-	std::vector<JPH::Vec3> mTargetPositions;
 
 	Mat4f mWorldInverse = Mat4f::scIdentity;
 	uint32 mSerial = 0;
+	uint32 mSubstep = 0;
 	bool mbPoseSettled = false;
 	bool mbLimp = false;
 	bool mbHasMotors = false;

@@ -6,7 +6,7 @@
 namespace fx {
 
 
-bool PerspectiveCamera2::Update()
+bool PerspectiveCamera::Update()
 {
 	// There is nothing to update, return
 	if (!mbTransformDirty && !mbRequireProjectionMatrixUpdate) {

@@ -16,8 +16,6 @@ static const PipelineNameInfo scNameInfos[] = {
 	NAME_INFO("Composition"),
 	NAME_INFO("CompositionAgx"), NAME_INFO("SSAO"),			  NAME_INFO("SSAODenoise"),
 	NAME_INFO("SSAOBlur"),
-	NAME_INFO("FogFast"),		 NAME_INFO("FogVolumetric"),  NAME_INFO("FogTemporal"),
-	NAME_INFO("FogDenoise"),	 NAME_INFO("FogApply"),
 	NAME_INFO("FogFroxelInject"), NAME_INFO("FogFroxelIntegrate"), NAME_INFO("FogFroxelApply"),
 };
 

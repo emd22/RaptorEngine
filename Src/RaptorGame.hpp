@@ -11,7 +11,7 @@
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/Ragdoll.hpp>
 #include <Player.hpp>
-#include <Renderer/Exposure.hpp>
+#include <Renderer/Camera/BaseCamera.hpp>
 #include <Script/ScriptManager.hpp>
 #include <World.hpp>
 #include <atomic>

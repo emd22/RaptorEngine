@@ -918,26 +918,6 @@ void TiledForwardRenderer::CreateParticlePSO()
 
 void TiledForwardRenderer::CreateFogPasses()
 {
-	FogPass.Create("Fog", gGraphics->Swapchain.Extent, eSizeDivisor::HalfRes);
-	FogPass.AddTarget(eImageFormat::RGBA16_Float, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-					  eImageAspectFlag::Color);
-	FogPass.BuildRenderStage();
-
-	FogTemporalPass.Create("FogTemporal", gGraphics->Swapchain.Extent, eSizeDivisor::HalfRes);
-	FogTemporalPass.AddTarget(eImageFormat::RGBA16_Float,
-							  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-							  eImageAspectFlag::Color);
-	FogTemporalPass.BuildRenderStage();
-
-	FogDenoisePass.Create("FogDenoise", gGraphics->Swapchain.Extent, eSizeDivisor::HalfRes);
-	FogDenoisePass.AddTarget(eImageFormat::RGBA16_Float,
-							 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
-	FogDenoisePass.AddTarget(eImageFormat::RGBA16_Float,
-							 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
-	FogDenoisePass.AddTarget(eImageFormat::R32_SFloat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-							 eImageAspectFlag::Color);
-	FogDenoisePass.BuildRenderStage();
-
 	FogApplyPass.Create("FogApply", gGraphics->Swapchain.Extent, eSizeDivisor::FullRes);
 
 	Target* lit_target = ForwardPass.GetTarget(eImageFormat::RGBA16_Float);
@@ -969,133 +949,6 @@ void TiledForwardRenderer::CreateFogPSO()
 {
 	CreateFogPasses();
 
-	Sampler* point_sampler = gSamplerCache->Request(SamplerProps {
-		eSamplerFilter::Nearest,
-		eSamplerFilter::Nearest,
-		eSamplerFilter::Nearest,
-	});
-
-	Target* depth_target = Prepass.GetTarget(eImageFormat::D32_Float);
-	Target* shadow_target = gShadowAtlas->GetTarget();
-	Assert(shadow_target != nullptr);
-
-	Sampler* fog_shadow_sampler = GetFogShadowSampler();
-
-	const auto BuildMarchPipeline = [&](ePipelineName name, const SizedArray<ShaderMacro>& macros)
-	{
-		gPSOBuild->BeginPipeline(name);
-
-		gPSOBuild->UseRenderStage(FogPass);
-		gPSOBuild->SetShader(eShaderName::Fog, macros);
-		gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
-		gPSOBuild->SetCullMode(eCullMode::None);
-		gPSOBuild->SetDepthTest(false);
-		gPSOBuild->SetDepthWrite(false);
-
-		gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, depth_target, point_sampler);
-		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
-							 gGraphics->LightBuffer.PageSize);
-		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
-		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
-							 gGraphics->LightIndexListPageSize);
-		gPSOBuild->AddImageFromTarget(4, 0, eShaderType::Pixel, shadow_target,
-									  gSamplerCache->Request({
-										  eSamplerFilter::Linear,
-										  eSamplerFilter::Linear,
-										  eSamplerFilter::Linear,
-										  eSamplerAddressMode::ClampToBorder,
-										  eSamplerBorderColor::FloatWhite,
-										  eSamplerCompareOp::Greater,
-									  }));
-		gPSOBuild->AddBuffer(5, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
-		gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
-							 gGraphics->ProbeVolumePageSize);
-		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeGridBuffer, 0, gGraphics->ProbeGridPageSize);
-		gPSOBuild->AddImage(9, 0, eShaderType::Pixel, gGraphics->pFogShadowAtlas, fog_shadow_sampler);
-		gPSOBuild->AddBuffer(10, 0, eShaderType::Pixel, &gGraphics->FogShadowPageBuffer, 0,
-							 gGraphics->FogShadowPageBufferSize);
-
-		gPSOBuild->AddFrameData(1);
-
-		gPSOBuild->EndPipeline();
-	};
-
-	BuildMarchPipeline(ePipelineName::FogFast, {});
-	BuildMarchPipeline(ePipelineName::FogVolumetric, { ShaderMacro { .pcName = "FOG_VOLUMETRIC", .pcValue = "1" } });
-
-	gPSOBuild->BeginPipeline(ePipelineName::FogTemporal);
-
-	gPSOBuild->UseRenderStage(FogTemporalPass);
-	gPSOBuild->SetShader(eShaderName::FogTemporal, {});
-	gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
-	gPSOBuild->SetCullMode(eCullMode::None);
-	gPSOBuild->SetDepthTest(false);
-	gPSOBuild->SetDepthWrite(false);
-
-	gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, FogPass.GetTarget(eImageFormat::RGBA16_Float),
-								  point_sampler);
-	gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, FogDenoisePass.GetTarget(eImageFormat::RGBA16_Float, 1),
-								  point_sampler);
-	gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Pixel, depth_target, point_sampler);
-	gPSOBuild->AddImageFromTarget(3, 0, eShaderType::Pixel, FogDenoisePass.GetTarget(eImageFormat::R32_SFloat),
-								  point_sampler);
-
-	gPSOBuild->AddFrameData(1);
-
-	gPSOBuild->EndPipeline();
-
-	gPSOBuild->BeginPipeline(ePipelineName::FogDenoise);
-
-	gPSOBuild->UseRenderStage(FogDenoisePass);
-	gPSOBuild->SetShader(eShaderName::FogDenoise, {});
-	gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
-	gPSOBuild->SetCullMode(eCullMode::None);
-	gPSOBuild->SetDepthTest(false);
-	gPSOBuild->SetDepthWrite(false);
-
-	gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, FogTemporalPass.GetTarget(eImageFormat::RGBA16_Float),
-								  point_sampler);
-	gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, depth_target, point_sampler);
-
-	gPSOBuild->AddFrameData(1);
-
-	gPSOBuild->EndPipeline();
-
-	gPSOBuild->BeginPipeline(ePipelineName::FogApply);
-
-	gPSOBuild->UseRenderStage(FogApplyPass);
-	gPSOBuild->SetShader(eShaderName::FogApply, {});
-	gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
-	gPSOBuild->SetCullMode(eCullMode::None);
-	gPSOBuild->SetDepthTest(false);
-	gPSOBuild->SetDepthWrite(false);
-
-	BlendAttachment blend = BlendAttachment {
-		.Enabled = true,
-		.BlendOp = {
-			.Ops = {
-				.Alpha = VK_BLEND_OP_ADD,
-				.Color = VK_BLEND_OP_ADD,
-			},
-		},
-		.AlphaBlend { .Ops { .Src = VK_BLEND_FACTOR_ZERO, .Dst = VK_BLEND_FACTOR_ONE } },
-		.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_ONE, .Dst = VK_BLEND_FACTOR_SRC_ALPHA } },
-	};
-	gPSOBuild->SetTargetBlend(FogApplyPass.GetTargetIndex(eImageFormat::RGBA16_Float), blend);
-
-	gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, FogDenoisePass.GetTarget(eImageFormat::RGBA16_Float),
-								  point_sampler);
-	gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, depth_target, point_sampler);
-
-	gPSOBuild->AddFrameData(1);
-
-	gPSOBuild->EndPipeline();
-
-	CreateFroxelFogPSO(blend);
-}
-
-void TiledForwardRenderer::CreateFroxelFogPSO(const BlendAttachment& apply_blend)
-{
 	const VkImageUsageFlags volume_usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
 	FroxelLighting.CreateVolume(Vec2u(scFroxelGridX, scFroxelGridY), scFroxelGridZ + 1, eImageFormat::RGBA16_Float,
@@ -1174,6 +1027,19 @@ void TiledForwardRenderer::CreateFroxelFogPSO(const BlendAttachment& apply_blend
 	gPSOBuild->SetCullMode(eCullMode::None);
 	gPSOBuild->SetDepthTest(false);
 	gPSOBuild->SetDepthWrite(false);
+
+	const BlendAttachment apply_blend = BlendAttachment {
+		.Enabled = true,
+		.BlendOp = {
+			.Ops = {
+				.Alpha = VK_BLEND_OP_ADD,
+				.Color = VK_BLEND_OP_ADD,
+			},
+		},
+		.AlphaBlend { .Ops { .Src = VK_BLEND_FACTOR_ZERO, .Dst = VK_BLEND_FACTOR_ONE } },
+		.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_ONE, .Dst = VK_BLEND_FACTOR_SRC_ALPHA } },
+	};
+
 	gPSOBuild->SetTargetBlend(FogApplyPass.GetTargetIndex(eImageFormat::RGBA16_Float), apply_blend);
 
 	gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, depth_target, point_sampler);

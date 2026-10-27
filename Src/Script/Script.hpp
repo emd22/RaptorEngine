@@ -3,11 +3,26 @@
 #include "ScriptFunction.hpp"
 
 #include <Core/String.hpp>
+#include <Object/ObjectID.hpp>
 
 struct StrataJit;
 struct StrataCompiler;
 
 namespace fx::script {
+
+class Script;
+
+class CallingScriptScope
+{
+public:
+	explicit CallingScriptScope(Script* script);
+	~CallingScriptScope();
+
+	CallingScriptScope(const CallingScriptScope& other) = delete;
+	CallingScriptScope& operator=(const CallingScriptScope& other) = delete;
+};
+
+Script* GetCallingScript();
 
 class Script
 {
@@ -22,6 +37,10 @@ public:
 	Script& operator=(Script&& other);
 
 	void ReloadScript();
+
+	void SetOwner(ObjectID owner) { mOwner = owner; }
+	ObjectID GetOwner() const { return mOwner; }
+	const String& GetPath() const { return mPath; }
 
 	template <typename TSignature>
 	auto GetFunction(const char* fn_name) const -> ScriptFunctionType<TSignature>
@@ -44,6 +63,8 @@ public:
 		auto func_ptr = GetFunctionRaw<typename SC::Type>(name);
 
 		if (func_ptr != nullptr) {
+			CallingScriptScope calling_script(this);
+
 			if constexpr (std::is_void_v<ReturnType>) {
 				func_ptr(mpGlobalContext, args...);
 				return;
@@ -76,6 +97,8 @@ public:
 		-> ScriptFunction<TSignature>::ReturnType
 	{
 		using SF = ScriptFunction<TSignature>;
+
+		CallingScriptScope calling_script(this);
 
 		if constexpr (std::is_void_v<typename SF::ReturnType>) {
 			func_ptr(mpGlobalContext, args...);
@@ -111,6 +134,7 @@ private:
 	void* mpGlobalContext = nullptr;
 
 	String mPath;
+	ObjectID mOwner;
 };
 
 } // namespace fx::script

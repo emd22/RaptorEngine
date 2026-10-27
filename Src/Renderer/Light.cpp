@@ -28,7 +28,7 @@ using VertexType = LightBase::VertexType;
 
 LightBase::LightBase(eLightFlags flags) : Flags(flags) {}
 
-void LightBase::Render(const PerspectiveCamera2& camera, BaseCamera* shadow_camera)
+void LightBase::Render(const PerspectiveCamera& camera, BaseCamera* shadow_camera)
 {
 	if (!bEnabled) {
 		return;
@@ -57,7 +57,7 @@ void LightBase::Render(const PerspectiveCamera2& camera, BaseCamera* shadow_came
 	light_buffer.NextSlot();
 }
 
-void LightBase::FillGpuData(LightGpuData& data, const PerspectiveCamera2& camera, BaseCamera* shadow_camera) const
+void LightBase::FillGpuData(LightGpuData& data, const PerspectiveCamera& camera, BaseCamera* shadow_camera) const
 {
 	// No shadow map by default (ShadowAtlasRect stays zero), shadowed lights fill these in their own FillGpuData
 	memcpy(data.LightCameraMatrix, Mat4f::scIdentity.RawData, sizeof(Mat4f));
@@ -131,8 +131,7 @@ LightPoint::LightPoint() { Type = eLightType::Point; }
 
 LightDirectional::LightDirectional() { Type = eLightType::Directional; }
 
-void LightDirectional::FillGpuData(LightGpuData& data, const PerspectiveCamera2& camera,
-								   BaseCamera* shadow_camera) const
+void LightDirectional::FillGpuData(LightGpuData& data, const PerspectiveCamera& camera, BaseCamera* shadow_camera) const
 {
 	LightBase::FillGpuData(data, camera, shadow_camera);
 
@@ -271,7 +270,7 @@ void LightSpot::ReleaseShadowTile()
 	Shadow = ShadowState {};
 }
 
-void LightSpot::FillGpuData(LightGpuData& data, const PerspectiveCamera2& camera, BaseCamera* shadow_camera) const
+void LightSpot::FillGpuData(LightGpuData& data, const PerspectiveCamera& camera, BaseCamera* shadow_camera) const
 {
 	LightBase::FillGpuData(data, camera, shadow_camera);
 

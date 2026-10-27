@@ -4,7 +4,7 @@
 
 namespace fx {
 
-Vec3f NoClipController::Update(float64 delta_time, const Vec3f input, const PerspectiveCamera2& camera, bool sprinting)
+Vec3f NoClipController::Update(float64 delta_time, const Vec3f input, const PerspectiveCamera& camera, bool sprinting)
 {
 	const Vec3f forward = camera.GetForwardVector();
 	const Vec3f right = camera.GetFlatRightVector();

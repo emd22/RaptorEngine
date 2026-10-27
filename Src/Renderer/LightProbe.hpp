@@ -49,7 +49,7 @@ public:
 	static constexpr uint32 scCaptureFaces = 6;
 	static constexpr uint32 scProbesPerFrame = 4;
 
-	using RenderFaceFunc = std::function<void(PerspectiveCamera2& camera, renderer::RenderStage& stage)>;
+	using RenderFaceFunc = std::function<void(PerspectiveCamera& camera, renderer::RenderStage& stage)>;
 
 public:
 	void Create();
@@ -203,7 +203,7 @@ private:
 	Mat4f mCaptureFaceToClip[scCaptureFaces];
 
 
-	SizedArray<PerspectiveCamera2> mCaptureCameras;
+	SizedArray<PerspectiveCamera> mCaptureCameras;
 
 	renderer::RenderStage mReflectionStage;
 	renderer::RawGpuBuffer mReflectionStaging[scCaptureFaces];

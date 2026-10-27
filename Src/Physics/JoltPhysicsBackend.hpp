@@ -12,6 +12,7 @@
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
 #include <Math/Vec3.hpp>
+#include <algorithm>
 #include <atomic>
 #include <mutex>
 #include <vector>
@@ -159,11 +160,20 @@ struct RagdollHit
 	uint32 RagdollSerial = 0;
 };
 
+struct BodyGroundContact
+{
+	uint32 Count = 0;
+	Vec3f Point = Vec3f::sZero;
+	Vec3f Normal = Vec3f::sZero;
+	float32 Speed = 0.0f;
+};
+
 // An example contact listener
 class PhContactListener : public JPH::ContactListener
 {
 public:
 	static constexpr size_t scMaxQueuedImpacts = 64;
+	static constexpr size_t scMaxTrackedBodies = 512;
 
 	void SetMinImpactSpeed(float32 speed) { mMinImpactSpeed.store(speed); }
 	void SetMinHitSpeed(float32 speed) { mMinHitSpeed.store(speed); }
@@ -190,6 +200,35 @@ public:
 		mImpacts.clear();
 	}
 
+	void ClearBodyGroundContacts()
+	{
+		std::lock_guard<std::mutex> guard(mBodyContactMutex);
+		std::fill(mBodyContacts.begin(), mBodyContacts.end(), BodyContactAccum {});
+	}
+
+	void GetBodyGroundContact(JPH::BodyID body_id, BodyGroundContact& out_contact) const
+	{
+		out_contact = BodyGroundContact {};
+
+		const uint32 index = body_id.GetIndex();
+
+		if (index >= mBodyContacts.size()) {
+			return;
+		}
+
+		std::lock_guard<std::mutex> guard(mBodyContactMutex);
+		const BodyContactAccum& accum = mBodyContacts[index];
+
+		if (accum.Count == 0) {
+			return;
+		}
+
+		out_contact.Count = accum.Count;
+		out_contact.Point = Vec3f(accum.PointSum / static_cast<float32>(accum.Count));
+		out_contact.Normal = Vec3f(accum.NormalSum.Normalized());
+		out_contact.Speed = accum.Speed;
+	}
+
 	// See: ContactListener
 	virtual JPH::ValidateResult OnContactValidate(const JPH::Body& inBody1, const JPH::Body& inBody2,
 												  JPH::RVec3Arg inBaseOffset,
@@ -205,6 +244,7 @@ public:
 								const JPH::ContactManifold& inManifold, JPH::ContactSettings& ioSettings) override
 	{
 		QueueSoundImpact(inBody1, inBody2, inManifold);
+		RecordBodyGroundContact(inBody1, inBody2, inManifold);
 
 		const bool first_tagged = RagdollUserData::Matches(inBody1.GetUserData());
 		const bool second_tagged = RagdollUserData::Matches(inBody2.GetUserData());
@@ -290,11 +330,68 @@ public:
 	virtual void OnContactPersisted(const JPH::Body& inBody1, const JPH::Body& inBody2,
 									const JPH::ContactManifold& inManifold, JPH::ContactSettings& ioSettings) override
 	{
+		RecordBodyGroundContact(inBody1, inBody2, inManifold);
 	}
 
 	virtual void OnContactRemoved(const JPH::SubShapeIDPair& inSubShapePair) override {}
 
 private:
+	struct BodyContactAccum
+	{
+		uint32 Count = 0;
+		JPH::Vec3 PointSum = JPH::Vec3::sZero();
+		JPH::Vec3 NormalSum = JPH::Vec3::sZero();
+		float32 Speed = 0.0f;
+	};
+
+	void RecordBodyGroundContact(const JPH::Body& inBody1, const JPH::Body& inBody2,
+								 const JPH::ContactManifold& inManifold)
+	{
+		const bool first_is_body = inBody2.IsStatic() && RagdollUserData::Matches(inBody1.GetUserData());
+		const bool second_is_body = inBody1.IsStatic() && RagdollUserData::Matches(inBody2.GetUserData());
+
+		if (!first_is_body && !second_is_body) {
+			return;
+		}
+
+		const JPH::Body& body = first_is_body ? inBody1 : inBody2;
+		const uint32 index = body.GetID().GetIndex();
+
+		if (index >= mBodyContacts.size()) {
+			return;
+		}
+
+		const JPH::Vec3 normal = first_is_body ? -inManifold.mWorldSpaceNormal : inManifold.mWorldSpaceNormal;
+		const uint32 point_count = static_cast<uint32>(first_is_body ? inManifold.mRelativeContactPointsOn1.size()
+																	 : inManifold.mRelativeContactPointsOn2.size());
+
+		if (point_count == 0) {
+			return;
+		}
+
+		JPH::Vec3 point_sum = JPH::Vec3::sZero();
+
+		for (uint32 i = 0; i < point_count; i++) {
+			if (first_is_body) {
+				point_sum += JPH::Vec3(inManifold.GetWorldSpaceContactPointOn1(i));
+			}
+			else {
+				point_sum += JPH::Vec3(inManifold.GetWorldSpaceContactPointOn2(i));
+			}
+		}
+
+		const JPH::Vec3 point = point_sum / static_cast<float32>(point_count);
+		const float32 speed = -body.GetPointVelocity(JPH::RVec3(point)).Dot(normal);
+
+		std::lock_guard<std::mutex> guard(mBodyContactMutex);
+		BodyContactAccum& accum = mBodyContacts[index];
+
+		accum.Count += 1;
+		accum.PointSum += point;
+		accum.NormalSum += normal;
+		accum.Speed = std::max(accum.Speed, speed);
+	}
+
 	void QueueSoundImpact(const JPH::Body& inBody1, const JPH::Body& inBody2, const JPH::ContactManifold& inManifold)
 	{
 		if ((!inBody1.IsDynamic() && !inBody2.IsDynamic()) || inManifold.mRelativeContactPointsOn2.empty()) {
@@ -345,6 +442,9 @@ private:
 
 	std::atomic<float32> mMinSoundSpeed = 1.0e9f;
 	std::vector<SoundImpact> mSoundImpacts;
+
+	mutable std::mutex mBodyContactMutex;
+	std::vector<BodyContactAccum> mBodyContacts = std::vector<BodyContactAccum>(scMaxTrackedBodies);
 };
 
 // An example activation listener
@@ -371,6 +471,7 @@ class JoltPhysicsBackend
 {
 public:
 	static constexpr uint32 scMaxBodies = 512;
+	static constexpr int scCollisionSteps = 2;
 
 public:
 	JoltPhysicsBackend();
@@ -402,6 +503,14 @@ public:
 	FX_FORCE_INLINE void DrainRagdollImpacts(std::vector<RagdollImpact>& out_impacts)
 	{
 		mContactListener.DrainImpacts(out_impacts);
+	}
+
+	FX_FORCE_INLINE float32 GetCollisionStepTime() const { return cTimeStep / static_cast<float32>(scCollisionSteps); }
+
+	FX_FORCE_INLINE void ClearBodyGroundContacts() { mContactListener.ClearBodyGroundContacts(); }
+	FX_FORCE_INLINE void GetBodyGroundContact(JPH::BodyID body_id, BodyGroundContact& out_contact) const
+	{
+		mContactListener.GetBodyGroundContact(body_id, out_contact);
 	}
 
 	~JoltPhysicsBackend();

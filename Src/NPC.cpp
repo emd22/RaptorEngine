@@ -57,12 +57,14 @@ bool NPC::Create(const Object* model, const NPCDesc& desc)
 		SetIdleAnimation(desc.IdleAnimation);
 	}
 
-	if (!mRagdoll.Create(mpSkeleton, skinned->GetWorldMatrix())) {
+	const physics::RagdollDef* ragdoll_def = physics::GetHumanoidRagdollDef();
+
+	if (ragdoll_def == nullptr || !mRagdoll.Create(mpSkeleton, skinned->GetWorldMatrix(), *ragdoll_def)) {
 		LogWarning("NPC '{}': no ragdoll could be built for the skeleton, it will stay animated", desc.Name);
 	}
 
 	mRagdoll.SetAllBodyModes(physics::eRagdollBodyMode::Kinematic);
-	mRagdoll.Drive(skinned->GetWorldMatrix(), 0.0f, true);
+	mRagdoll.Drive(skinned->GetWorldMatrix(), true);
 
 	mSettleTimes.assign(mRagdoll.GetBodyCount(), 0.0f);
 
@@ -107,7 +109,7 @@ void NPC::Update(float32 delta_time, bool draw_debug)
 
 		UpdateReactions(delta_time);
 
-		mRagdoll.Drive(skinned->GetWorldMatrix(), delta_time, mbTeleported);
+		mRagdoll.Drive(skinned->GetWorldMatrix(), mbTeleported);
 		mRagdoll.WriteToSkeleton();
 
 		mbTeleported = false;

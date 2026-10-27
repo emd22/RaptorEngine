@@ -6,10 +6,10 @@
 
 namespace fx {
 
-class OrthoCamera2 final : public BaseCamera
+class OrthoCamera final : public BaseCamera
 {
 public:
-	OrthoCamera2() = default;
+	OrthoCamera() = default;
 
 	bool Update() override;
 
@@ -21,7 +21,7 @@ public:
 
 	void ResolveViewToTexels(Vec3f& eye, Vec3f& target, const Vec3f world_up, float32 texture_res) const;
 
-	~OrthoCamera2() override = default;
+	~OrthoCamera() override = default;
 
 public:
 	Vec2f mSize = Vec2f(45.0f);

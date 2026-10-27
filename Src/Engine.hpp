@@ -53,6 +53,9 @@ extern NPCManager* gNPCManager;
 class ObjectScriptManager;
 extern ObjectScriptManager* gObjectScripts;
 
+class TimerManager;
+extern TimerManager* gTimers;
+
 class AudioSystem;
 extern AudioSystem* gAudio;
 

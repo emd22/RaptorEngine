@@ -191,9 +191,15 @@ void Player::RotateHead(const Vec2f& xy)
 
 void Player::Jump()
 {
-	if (!mbIsFlymode) {
-		Physics.Jump();
+	if (mbIsFlymode) {
+		return;
 	}
+
+	if (Physics.bIsGrounded && Physics.CanJump()) {
+		PlayGroundSound("footsteps", std::clamp(mHorizontalSpeed / scSprintSpeed, scFootstepMinVolume, 1.0f));
+	}
+
+	Physics.Jump();
 }
 
 void Player::SpawnAt(const Vec3f position, const Vec3f direction)
@@ -388,7 +394,7 @@ void Player::UpdateLanding(float32 delta_time)
 		}
 
 		if (impact_speed >= scLandingSoundMinSpeed) {
-			PlayGroundSound("land", std::min(impact_speed / scLandingSoundFullSpeed, 1.0f));
+			PlayGroundSound("footsteps", std::min(impact_speed / scLandingSoundFullSpeed, 1.0f));
 			mFootstepDistance = 0.0f;
 		}
 	}

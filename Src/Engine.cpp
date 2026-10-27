@@ -16,6 +16,7 @@
 #include <Renderer/LightProbe.hpp>
 #include <Script/ObjectScripts.hpp>
 #include <Script/ScriptManager.hpp>
+#include <Script/TimerManager.hpp>
 #include <Texture/TextureManager.hpp>
 #include <World.hpp>
 #include <WorldGrid.hpp>
@@ -43,6 +44,7 @@ ScriptManager* gScriptManager = nullptr;
 CVarManager* gCVars = nullptr;
 NPCManager* gNPCManager = nullptr;
 ObjectScriptManager* gObjectScripts = nullptr;
+TimerManager* gTimers = nullptr;
 AudioSystem* gAudio = nullptr;
 
 #ifdef FX_IS_EDITOR
@@ -75,6 +77,7 @@ void Init()
 	gCVars = new CVarManager;
 	gNPCManager = new NPCManager;
 	gObjectScripts = new ObjectScriptManager;
+	gTimers = new TimerManager;
 	gAudio = new AudioSystem;
 }
 
@@ -84,6 +87,7 @@ void Destroy()
 	DESTROY_GLOBAL(gAudio);
 	DESTROY_GLOBAL(gNPCManager);
 	DESTROY_GLOBAL(gObjectScripts);
+	DESTROY_GLOBAL(gTimers);
 	DESTROY_GLOBAL(gPhysics);
 	DESTROY_GLOBAL(gShaderCompiler);
 	DESTROY_GLOBAL(gMaterialManager);

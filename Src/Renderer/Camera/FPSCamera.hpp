@@ -40,7 +40,7 @@ struct ViewAngles
 	float32 Pitch = 0.0f;
 };
 
-class FPSCamera final : public PerspectiveCamera2
+class FPSCamera final : public PerspectiveCamera
 {
 public:
 	FPSCamera() = default;

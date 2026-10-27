@@ -23,7 +23,7 @@
 
 namespace fx {
 class BaseCamera;
-class PerspectiveCamera2;
+class PerspectiveCamera;
 class Image;
 struct CompiledMapFogShadow;
 } // namespace fx
@@ -41,9 +41,7 @@ enum class eFrameResult
 enum class eFogMode : int64
 {
 	Off = 0,
-	Fast = 1,
-	Volumetric = 2,
-	Froxel = 3,
+	Froxel = 1,
 };
 
 class TiledForwardRenderer;
@@ -106,14 +104,14 @@ public:
 	void BeginPrepass();
 	void BeginGeometry();
 
-	void RenderEarlyFrameEffects(PerspectiveCamera2& camera);
+	void RenderEarlyFrameEffects(PerspectiveCamera& camera);
 
-	void RenderFog(PerspectiveCamera2& camera);
+	void RenderFog(PerspectiveCamera& camera);
 	void RenderFroxelFog(CommandBuffer& cmd, uint32 consts_offset);
 
 	eFogMode GetFogMode() const;
 
-	void DoComposition(PerspectiveCamera2& render_cam);
+	void DoComposition(PerspectiveCamera& render_cam);
 
 	void RebuildToResizedWindow();
 
@@ -398,7 +396,6 @@ protected:
 	std::atomic_uint32_t mInternalFrameCounter = 0;
 
 	Mat4f mFogPrevCameraMatrix = Mat4f::scIdentity;
-	uint32 mFogHistoryFrame = UINT32_MAX;
 	uint32 mFroxelHistoryFrame = UINT32_MAX;
 
 	// TSQueue<DeletionObject> mDeletionQueue;

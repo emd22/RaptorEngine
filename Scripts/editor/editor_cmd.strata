@@ -20,6 +20,12 @@ void CMD_snap2w()
 	editor_snap_selection_to_grid();
 }
 
+/* Logs every active script timer, with the script it came from and how long until it fires. */
+void CMD_timers()
+{
+	timer_list();
+}
+
 /////////////////////////////////////
 // Light probe volumes
 /////////////////////////////////////

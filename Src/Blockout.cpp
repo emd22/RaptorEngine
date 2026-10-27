@@ -24,6 +24,7 @@
 #include <Renderer/Limits.hpp>
 #include <Renderer/PipelineNames.hpp>
 #include <Script/ObjectScripts.hpp>
+#include <Script/TimerManager.hpp>
 #include <World.hpp>
 #include <algorithm>
 #include <cctype>
@@ -4953,6 +4954,7 @@ void Blockout::ResetToTemplate()
 #endif
 
 	RemoveBlockoutFromWorld(pWorld);
+	gTimers->CancelAll();
 
 	mPrototypePath = "";
 
@@ -5020,6 +5022,8 @@ ePrototypeLoadStatus Blockout::Load(const String& opened_path)
 				   "prototype to keep the new names",
 				   renamed_count, path);
 	}
+
+	gTimers->CancelAll();
 
 #ifdef FX_IS_EDITOR
 	// Everything is getting reloaded, so the editor can't hold on to any objects

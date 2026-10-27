@@ -164,6 +164,10 @@ void SoundEmitterSet::UpdateEmitter(const SoundEmitter& emitter, State& state, f
 	const bool in_reach = distance <= reach * scStartReachScale;
 	bool should_play = false;
 
+	if (distance > reach * scStopReachScale) {
+		state.bPlayedOnce = false;
+	}
+
 	if (def->bLoop) {
 		should_play = in_reach;
 	}
@@ -180,7 +184,6 @@ void SoundEmitterSet::UpdateEmitter(const SoundEmitter& emitter, State& state, f
 		}
 	}
 	else if (!state.bPlayedOnce && in_reach) {
-		state.bPlayedOnce = true;
 		should_play = true;
 	}
 
@@ -190,6 +193,7 @@ void SoundEmitterSet::UpdateEmitter(const SoundEmitter& emitter, State& state, f
 
 	state.Voice = gAudio->Play(sound, emitter.Position);
 	gAudio->SetVolume(state.Voice, emitter.Volume);
+	state.bPlayedOnce = gAudio->IsPlaying(state.Voice);
 }
 
 } // namespace fx

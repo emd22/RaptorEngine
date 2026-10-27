@@ -6,6 +6,7 @@
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Script/ScriptManager.hpp>
+#include <Script/TimerManager.hpp>
 #include <World.hpp>
 #include <algorithm>
 
@@ -167,6 +168,8 @@ bool ObjectScriptManager::Attach(Object* object, String path)
 	existing->pScript = script;
 	existing->bStarted = false;
 
+	script->SetOwner(object->ID);
+
 	BindFunctions(*existing);
 
 	return !script->HasErrors();
@@ -302,6 +305,8 @@ void ObjectScriptManager::Stop()
 		entry.bStarted = false;
 		entry.bHasLastPoint = false;
 		entry.bWasInside = false;
+
+		gTimers->CancelOwnedBy(entry.pScript);
 
 		Object* object = gObjectManager->GetObject(entry.ID);
 

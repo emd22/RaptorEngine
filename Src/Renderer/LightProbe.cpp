@@ -65,7 +65,7 @@ constexpr float32 scCaptureSkyRadiance = 1500.0f / static_cast<float32>(M_PI);
 constexpr int64 scDefaultProbeBounces = 3;
 constexpr int64 scMaxProbeBounces = 8;
 
-PerspectiveCamera2 MakeCaptureCamera(const Vec3f position, uint32 face)
+PerspectiveCamera MakeCaptureCamera(const Vec3f position, uint32 face)
 {
 	static const Vec3f scFaceDirections[ProbeManager::scCaptureFaces] = {
 		Vec3f(1.0f, 0.0f, 0.0f),  Vec3f(-1.0f, 0.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
@@ -77,7 +77,7 @@ PerspectiveCamera2 MakeCaptureCamera(const Vec3f position, uint32 face)
 		Vec3f(0.0f, 0.0f, 1.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
 	};
 
-	PerspectiveCamera2 camera(MathUtil::DegreesToRadians(90.0f), 1.0f, 200.0f, ProbePlacement::scCaptureNearPlane);
+	PerspectiveCamera camera(MathUtil::DegreesToRadians(90.0f), 1.0f, 200.0f, ProbePlacement::scCaptureNearPlane);
 
 	camera.SetPosition(position);
 	camera.LookAt(position + scFaceDirections[face], scFaceUps[face]);
@@ -390,15 +390,15 @@ void ProbeManager::MakeCaptureCameras()
 
 	// Create all capture cameras
 	for (uint32 i = 0; i < scCaptureFaces; i++) {
-		PerspectiveCamera2& cam = mCaptureCameras.Emplace(MathUtil::DegreesToRadians(scCaptureFOV), scAspect, scFarClip,
-														  scNearClip);
+		PerspectiveCamera& cam = mCaptureCameras.Emplace(MathUtil::DegreesToRadians(scCaptureFOV), scAspect, scFarClip,
+														 scNearClip);
 	}
 }
 
 void ProbeManager::MoveCaptureCameras(const Vec3f position)
 {
 	for (uint32 face_index = 0; face_index < scCaptureFaces; face_index++) {
-		PerspectiveCamera2& cam = mCaptureCameras[face_index];
+		PerspectiveCamera& cam = mCaptureCameras[face_index];
 		cam.SetPosition(position);
 		cam.Update();
 	}
@@ -976,7 +976,7 @@ void ProbeManager::BuildCaptureTexels()
 	CaptureTexel* texel = mCaptureTexels.pData;
 
 	for (uint32 face = 0; face < scCaptureFaces; face++) {
-		const PerspectiveCamera2 camera = MakeCaptureCamera(Vec3f::sZero, face);
+		const PerspectiveCamera camera = MakeCaptureCamera(Vec3f::sZero, face);
 		const Mat4f inv_view_projection = camera.GetInvProjectionMatrix() * camera.GetInvViewMatrix();
 
 		mCaptureInvProjection = camera.GetInvProjectionMatrix();
@@ -1027,7 +1027,7 @@ void ProbeManager::RecordCaptureBatch(renderer::CommandBuffer& cmd, const Render
 		const uint32 slot = mCurrentProbe - mBatchStart;
 
 		for (uint32 face = 0; face < scCaptureFaces; face++) {
-			PerspectiveCamera2 camera = MakeCaptureCamera(GetProbePosition(mCurrentProbe), face);
+			PerspectiveCamera camera = MakeCaptureCamera(GetProbePosition(mCurrentProbe), face);
 
 			render_face(camera, mCaptureStage);
 
@@ -1416,7 +1416,7 @@ void ProbeManager::RecordReflectionCapture(renderer::CommandBuffer& cmd, const R
 	mbCapturingFaces = true;
 
 	for (uint32 face = 0; face < scCaptureFaces; face++) {
-		PerspectiveCamera2 camera = MakeCaptureCamera(position, face);
+		PerspectiveCamera camera = MakeCaptureCamera(position, face);
 
 		render_face(camera, mReflectionStage);
 

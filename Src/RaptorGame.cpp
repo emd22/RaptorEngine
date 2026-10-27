@@ -28,7 +28,7 @@
 #include <Physics/PhysicsManager.hpp>
 #include <Physics/Ragdoll.hpp>
 #include <Renderer/Backend/Util.hpp>
-#include <Renderer/Exposure.hpp>
+#include <Renderer/Camera/BaseCamera.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/LightManager.hpp>
@@ -38,6 +38,7 @@
 #include <Renderer/TextRenderer.hpp>
 #include <Script/ObjectScripts.hpp>
 #include <Script/ScriptManager.hpp>
+#include <Script/TimerManager.hpp>
 #include <Texture/TextureManager.hpp>
 #include <algorithm>
 #include <cmath>
@@ -275,8 +276,7 @@ void RaptorGame::CreateGame()
 	gCVars->Set("r_gtao_final_value_power", gCVars->Get("r_gtao_final_value_power", 2.2f));
 	gCVars->Set("r_gtao_denoise_blur_beta", gCVars->Get("r_gtao_denoise_blur_beta", 1.2f));
 
-	gCVars->Set("r_fog", gCVars->Get("r_fog", int64(2)));
-	gCVars->Set("r_fog_steps", gCVars->Get("r_fog_steps", int64(64)));
+	gCVars->Set("r_fog", gCVars->Get("r_fog", int64(1)));
 	gCVars->Set("r_fog_distance", gCVars->Get("r_fog_distance", 100.0f));
 	gCVars->Set("r_fog_temporal", gCVars->Get("r_fog_temporal", int64(1)));
 
@@ -782,8 +782,9 @@ void RaptorGame::DropRagdollDummy(Object* model)
 	root->SetProbeVisible(false);
 
 	std::unique_ptr<physics::Ragdoll> ragdoll = std::make_unique<physics::Ragdoll>();
+	const physics::RagdollDef* ragdoll_def = physics::GetHumanoidRagdollDef();
 
-	if (!ragdoll->Create(skinned->pSkeleton, skinned->GetWorldMatrix())) {
+	if (ragdoll_def == nullptr || !ragdoll->Create(skinned->pSkeleton, skinned->GetWorldMatrix(), *ragdoll_def)) {
 		DestroyObjectTree(root->ID);
 		return;
 	}
@@ -888,6 +889,7 @@ void RaptorGame::UpdateObjectScripts()
 #endif
 
 	if (is_simulation_mode) {
+		gTimers->Update(DeltaTime);
 		gObjectScripts->Update(static_cast<float32>(DeltaTime), gWorld->Player.Position);
 	}
 	else {
@@ -1008,8 +1010,8 @@ void RaptorGame::PlayImpactSounds()
 	}
 
 	if (mImpactSoundTimes.size() > scMaxImpactSoundBodies) {
-		std::erase_if(mImpactSoundTimes, [this](const auto& entry)
-					  { return mImpactSoundClock - entry.second >= scImpactSoundCooldown; });
+		std::erase_if(mImpactSoundTimes,
+					  [this](const auto& entry) { return mImpactSoundClock - entry.second >= scImpactSoundCooldown; });
 	}
 }
 

@@ -29,8 +29,8 @@
 #include <Object/ObjectManager.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
+#include <Renderer/Camera/BaseCamera.hpp>
 #include <Renderer/DebugDraw.hpp>
-#include <Renderer/Exposure.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/Light.hpp>
@@ -416,7 +416,6 @@ EditorPanelState RaptorEditor::BuildPanelState()
 	}
 
 	world.Fog = gWorld->Fog;
-	world.FogQuality = std::clamp<int64>(gCVars->Get("r_fog", int64 { 2 }), 0, 3);
 
 	const uint32 probe_count = gProbeManager->GetReflectionProbeCount();
 

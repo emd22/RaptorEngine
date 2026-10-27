@@ -98,7 +98,6 @@ struct WorldPanelState
 	float32 SunElevationDegrees = 0.0f;
 
 	renderer::FogSettings Fog;
-	int64 FogQuality = 0;
 
 	bool operator==(const WorldPanelState& other) const = default;
 };

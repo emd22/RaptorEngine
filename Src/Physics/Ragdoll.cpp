@@ -26,60 +26,20 @@ namespace {
 
 constexpr float32 scDegreesToRadians = 0.0174532925f;
 
-constexpr float32 scMotorFrequency = 10.0f;
-constexpr float32 scMotorDamping = 1.0f;
-constexpr float32 scMotorMaxTorque = 150.0f;
 constexpr float32 scMotorMinFrequencyScale = 0.2f;
 
-constexpr float32 scTotalMass = 75.0f;
 constexpr float32 scSelfCollisionMargin = 0.02f;
 constexpr float32 scHingeSlackDegrees = 5.0f;
 constexpr float32 scHingeMinBend = 0.17f;
 
-enum class eJoint : uint8
-{
-	Cone,
-	HingeForward,
-	HingeBackward,
-};
-
-struct BoneDef
-{
-	const char* Bone;
-	const char* EndBone;
-	float32 ExtraLength;
-	float32 Radius;
-	float32 SwingDegrees;
-	float32 TwistDegrees;
-	bool Anchor;
-	float32 MassFraction;
-	eJoint Joint = eJoint::Cone;
-	float32 FlexDegrees = 0.0f;
-};
+constexpr float32 scSupportNormalMinUp = 0.7f;
+constexpr float32 scComCrossSize = 0.08f;
 
 struct ResolvedBone
 {
-	const BoneDef* pDef;
+	const RagdollBodyDef* pDef;
 	uint32 Bone;
 	uint32 EndBone;
-};
-
-constexpr BoneDef scHumanoid[] = {
-	{ "root", "spine04", 0.0f, 0.11f, 0.0f, 0.0f, true, 0.22f },
-	{ "spine03", "neck01", 0.0f, 0.13f, 25.0f, 20.0f, false, 0.28f },
-	{ "neck01", "head", 0.2f, 0.09f, 40.0f, 45.0f, false, 0.08f },
-
-	{ "upperarm01.L", "lowerarm01.L", 0.0f, 0.05f, 95.0f, 50.0f, false, 0.028f },
-	{ "lowerarm01.L", "wrist.L", 0.0f, 0.04f, 0.0f, 60.0f, false, 0.022f, eJoint::HingeForward, 140.0f },
-	{ "upperarm01.R", "lowerarm01.R", 0.0f, 0.05f, 95.0f, 50.0f, false, 0.028f },
-	{ "lowerarm01.R", "wrist.R", 0.0f, 0.04f, 0.0f, 60.0f, false, 0.022f, eJoint::HingeForward, 140.0f },
-
-	{ "upperleg01.L", "lowerleg01.L", 0.0f, 0.075f, 70.0f, 30.0f, true, 0.10f },
-	{ "lowerleg01.L", "foot.L", 0.0f, 0.055f, 0.0f, 10.0f, true, 0.046f, eJoint::HingeBackward, 135.0f },
-	{ "foot.L", "toe1-1.L", 0.0f, 0.04f, 30.0f, 10.0f, true, 0.014f },
-	{ "upperleg01.R", "lowerleg01.R", 0.0f, 0.075f, 70.0f, 30.0f, true, 0.10f },
-	{ "lowerleg01.R", "foot.R", 0.0f, 0.055f, 0.0f, 10.0f, true, 0.046f, eJoint::HingeBackward, 135.0f },
-	{ "foot.R", "toe1-1.R", 0.0f, 0.04f, 30.0f, 10.0f, true, 0.014f },
 };
 
 JPH::Vec3 RowAsVec3(const Mat4f& m, uint32 row)
@@ -139,9 +99,84 @@ uint32 FindBoneIndex(const Skeleton& skeleton, const char* name)
 	return BoneNull;
 }
 
+JPH::Vec3 GetUpDirection()
+{
+	const JPH::Vec3 gravity = gPhysics->pBackend->PhysicsSystem.GetGravity();
+	return (-gravity).NormalizedOr(JPH::Vec3::sAxisY());
+}
+
+Color GetTorqueColor(float32 fraction)
+{
+	const float32 t = std::clamp(fraction, 0.0f, 1.0f);
+
+	return Color::FromRGBA(static_cast<uint8>(70.0f + 185.0f * t), static_cast<uint8>(230.0f - 170.0f * t), 90, 255);
+}
+
+void ConvexHullOnPlane(const std::vector<JPH::Vec3>& points, const JPH::Vec3 up, std::vector<JPH::Vec3>& out_hull)
+{
+	out_hull.clear();
+
+	if (points.size() < 3) {
+		out_hull = points;
+		return;
+	}
+
+	struct PlanarPoint
+	{
+		JPH::Vec3 Point;
+		float32 X;
+		float32 Y;
+	};
+
+	const JPH::Vec3 axis_u = up.GetNormalizedPerpendicular();
+	const JPH::Vec3 axis_v = up.Cross(axis_u);
+
+	std::vector<PlanarPoint> sorted;
+	sorted.reserve(points.size());
+
+	for (const JPH::Vec3& point : points) {
+		sorted.push_back(PlanarPoint { point, point.Dot(axis_u), point.Dot(axis_v) });
+	}
+
+	std::sort(sorted.begin(), sorted.end(), [](const PlanarPoint& a, const PlanarPoint& b) {
+		return (a.X < b.X) || (a.X == b.X && a.Y < b.Y);
+	});
+
+	const auto cross = [](const PlanarPoint& origin, const PlanarPoint& a, const PlanarPoint& b) {
+		return (a.X - origin.X) * (b.Y - origin.Y) - (a.Y - origin.Y) * (b.X - origin.X);
+	};
+
+	std::vector<uint32> hull;
+	hull.reserve(sorted.size() * 2);
+
+	for (uint32 i = 0; i < sorted.size(); i++) {
+		while (hull.size() >= 2 && cross(sorted[hull[hull.size() - 2]], sorted[hull.back()], sorted[i]) <= 0.0f) {
+			hull.pop_back();
+		}
+		hull.push_back(i);
+	}
+
+	const size_t lower_size = hull.size() + 1;
+
+	for (size_t i = sorted.size() - 1; i > 0; i--) {
+		const uint32 index = static_cast<uint32>(i - 1);
+
+		while (hull.size() >= lower_size && cross(sorted[hull[hull.size() - 2]], sorted[hull.back()], sorted[index]) <= 0.0f) {
+			hull.pop_back();
+		}
+		hull.push_back(index);
+	}
+
+	hull.pop_back();
+
+	for (const uint32 index : hull) {
+		out_hull.push_back(sorted[index].Point);
+	}
+}
+
 } // namespace
 
-bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_matrix)
+bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_matrix, const RagdollDef& def)
 {
 	Destroy();
 
@@ -158,22 +193,22 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 	const uint32 joint_count = skel.JointCount;
 	const float32 scale = RowAsVec3(object_world_matrix, 0).Length();
 
-	// std::vector<ResolvedBone> parts;
 	std::vector<int> body_of_bone(joint_count, -1);
 
-	SizedArray<ResolvedBone> parts(std::size(scHumanoid));
+	SizedArray<ResolvedBone> parts(def.Bodies.size());
 
-	for (const BoneDef& def : scHumanoid) {
-		const uint32 bone_index = FindBoneIndex(skel, def.Bone);
-		const uint32 end_bone_index = FindBoneIndex(skel, def.EndBone);
+	for (const RagdollBodyDef& body_def : def.Bodies) {
+		const uint32 bone_index = FindBoneIndex(skel, body_def.Bone.CStr());
+		const uint32 end_bone_index = FindBoneIndex(skel, body_def.EndBone.CStr());
 
 		if (bone_index == BoneNull || end_bone_index == BoneNull) {
-			LogWarning(LC_PHYSICS, "Ragdoll: skeleton has no bone '{}' or '{}', skipping it", def.Bone, def.EndBone);
+			LogWarning(LC_PHYSICS, "Ragdoll: skeleton has no bone '{}' or '{}', skipping it", body_def.Bone.CStr(),
+					   body_def.EndBone.CStr());
 			continue;
 		}
 
 		body_of_bone[bone_index] = static_cast<int>(parts.Size);
-		parts.Insert(ResolvedBone { .pDef = &def, .Bone = bone_index, .EndBone = end_bone_index });
+		parts.Insert(ResolvedBone { .pDef = &body_def, .Bone = bone_index, .EndBone = end_bone_index });
 	}
 
 	if (parts.Size < 2) {
@@ -188,7 +223,7 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 	JPH::Vec3 forward_world = JPH::Vec3::sZero();
 
 	for (uint32 i = 0; i < parts.Size; i++) {
-		if (std::string_view(parts[i].pDef->Bone).starts_with("foot")) {
+		if (std::string_view(parts[i].pDef->Bone.CStr()).starts_with("foot")) {
 			forward_world += RowAsVec3(skel.WorldTransforms[parts[i].EndBone] * object_world_matrix, 3) -
 							 RowAsVec3(skel.WorldTransforms[parts[i].Bone] * object_world_matrix, 3);
 		}
@@ -196,7 +231,7 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 
 	forward_world = (forward_world - up_world * forward_world.Dot(up_world)).NormalizedOr(JPH::Vec3::sZero());
 
-	const float32 total_mass = scTotalMass * scale * scale * scale;
+	const float32 total_mass = def.TotalMass * scale * scale * scale;
 
 	JPH::Ref<JPH::Skeleton> jolt_skeleton = new JPH::Skeleton;
 	JPH::Ref<JPH::RagdollSettings> settings = new JPH::RagdollSettings;
@@ -210,7 +245,7 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 	mBodies.InitCapacity(parts.Size);
 
 	for (uint32 i = 0; i < parts.Size; i++) {
-		const BoneDef& def = *parts[i].pDef;
+		const RagdollBodyDef& body_def = *parts[i].pDef;
 		const uint32 bone = parts[i].Bone;
 		const uint32 end_bone = parts[i].EndBone;
 
@@ -225,11 +260,12 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 		}
 
 		if (parent_body < 0 && i != 0) {
-			LogWarning(LC_PHYSICS, "Ragdoll: bone '{}' has no ragdoll ancestor, not creating a ragdoll", def.Bone);
+			LogWarning(LC_PHYSICS, "Ragdoll: bone '{}' has no ragdoll ancestor, not creating a ragdoll",
+					   body_def.Bone.CStr());
 			return false;
 		}
 
-		jolt_skeleton->AddJoint(std::string_view(def.Bone), parent_body);
+		jolt_skeleton->AddJoint(std::string_view(body_def.Bone.CStr()), parent_body);
 
 		const Mat4f bone_world = skel.WorldTransforms[bone] * object_world_matrix;
 		const JPH::Mat44 rotation = RotationFromMatrix(bone_world);
@@ -241,13 +277,13 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 		const float32 span = delta.Length();
 
 		if (span < 1e-4f) {
-			LogWarning(LC_PHYSICS, "Ragdoll: bone '{}' has no length, not creating a ragdoll", def.Bone);
+			LogWarning(LC_PHYSICS, "Ragdoll: bone '{}' has no length, not creating a ragdoll", body_def.Bone.CStr());
 			return false;
 		}
 
 		const JPH::Vec3 axis_world = delta / span;
-		const float32 length = span + def.ExtraLength * scale;
-		const float32 radius = def.Radius * scale;
+		const float32 length = span + body_def.ExtraLength * scale;
+		const float32 radius = body_def.Radius * scale;
 		const float32 half_height = std::max(length * 0.5f - radius, 0.01f * scale);
 
 		const JPH::Vec3 axis_local = rotation.Multiply3x3Transposed(axis_world);
@@ -270,7 +306,7 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 		part.mLinearDamping = 0.05f;
 		part.mAngularDamping = 0.3f;
 		part.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
-		part.mMassPropertiesOverride.mMass = def.MassFraction * total_mass;
+		part.mMassPropertiesOverride.mMass = body_def.MassFraction * total_mass;
 
 		if (parent_body >= 0) {
 			JPH::SwingTwistConstraintSettings* joint = new JPH::SwingTwistConstraintSettings;
@@ -278,15 +314,15 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 			joint->mPosition1 = joint->mPosition2 = position;
 			joint->mTwistAxis1 = joint->mTwistAxis2 = axis_world;
 			joint->mPlaneAxis1 = joint->mPlaneAxis2 = axis_world.GetNormalizedPerpendicular();
-			joint->mNormalHalfConeAngle = joint->mPlaneHalfConeAngle = def.SwingDegrees * scDegreesToRadians;
-			joint->mTwistMinAngle = -def.TwistDegrees * scDegreesToRadians;
-			joint->mTwistMaxAngle = def.TwistDegrees * scDegreesToRadians;
+			joint->mNormalHalfConeAngle = joint->mPlaneHalfConeAngle = body_def.SwingDegrees * scDegreesToRadians;
+			joint->mTwistMinAngle = -body_def.TwistDegrees * scDegreesToRadians;
+			joint->mTwistMaxAngle = body_def.TwistDegrees * scDegreesToRadians;
 			joint->mMaxFrictionTorque = 0.5f;
-			joint->mSwingMotorSettings = JPH::MotorSettings(scMotorFrequency, scMotorDamping);
-			joint->mTwistMotorSettings = JPH::MotorSettings(scMotorFrequency, scMotorDamping);
+			joint->mSwingMotorSettings = JPH::MotorSettings(body_def.Muscle.Stiffness, body_def.Muscle.Damping);
+			joint->mTwistMotorSettings = JPH::MotorSettings(body_def.Muscle.Stiffness, body_def.Muscle.Damping);
 
-			if (def.Joint != eJoint::Cone) {
-				const float32 flex = def.FlexDegrees * scDegreesToRadians;
+			if (body_def.Joint != eRagdollJoint::Cone) {
+				const float32 flex = body_def.FlexDegrees * scDegreesToRadians;
 				const float32 slack = scHingeSlackDegrees * scDegreesToRadians;
 
 				const ResolvedBone& parent_part = parts[parent_body];
@@ -294,7 +330,7 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 											   RowAsVec3(skel.WorldTransforms[parent_part.Bone] * object_world_matrix, 3))
 												  .NormalizedOr(axis_world);
 
-				const JPH::Vec3 flex_direction = (def.Joint == eJoint::HingeForward) ? forward_world : -forward_world;
+				const JPH::Vec3 flex_direction = (body_def.Joint == eRagdollJoint::HingeForward) ? forward_world : -forward_world;
 				const JPH::Vec3 bend_axis = parent_axis.Cross(axis_world);
 
 				JPH::Vec3 hinge = axis_world.Cross(flex_direction);
@@ -330,8 +366,9 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 								  .Length = length,
 								  .Radius = radius,
 								  .ParentBody = parent_body,
-								  .bAnchor = def.Anchor,
-								  .Mass = def.MassFraction * total_mass });
+								  .bAnchor = body_def.bAnchor,
+								  .Mass = body_def.MassFraction * total_mass,
+								  .Muscle = body_def.Muscle });
 	}
 
 	if (!settings->Stabilize()) {
@@ -355,6 +392,9 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 	mSerial = serial;
 	mpRagdoll->AddToPhysicsSystem(JPH::EActivation::DontActivate);
 
+	mpPhysicsSystem = &system;
+	system.AddStepListener(this);
+
 	mbHasMotors = (mpRagdoll->GetConstraintCount() + 1 == mBodies.Size);
 
 	for (BodyInfo& info : mBodies) {
@@ -365,11 +405,10 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 			info.ParentAnchor = parent.mRotation.Conjugated() * JPH::Vec3(part.mPosition - parent.mPosition);
 		}
 	}
-	mTargetOrientations.assign(mBodies.Size, JPH::Quat::sIdentity());
-	mTargetPositions.assign(mBodies.Size, JPH::Vec3::sZero());
+
+	mTargets.assign(mBodies.Size, BodyTarget {});
 
 	mpSkeleton = skeleton;
-	// mBodies = std::move(bodies);
 	mWorldInverse = object_world_matrix.AffineInverse();
 
 	mDrivenWorld.assign(joint_count, Mat4f::scIdentity);
@@ -395,7 +434,8 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 		}
 	}
 
-	LogInfo(LC_PHYSICS, "Ragdoll: {} bodies, rest pose skinning error {:.5f}", mBodies.Size, worst_error);
+	LogInfo(LC_PHYSICS, "Ragdoll: {} bodies, {:.3f} kg, rest pose skinning error {:.5f}", mBodies.Size, total_mass,
+			worst_error);
 
 	return true;
 }
@@ -416,7 +456,7 @@ void Ragdoll::Activate(const Vec3f velocity)
 	}
 }
 
-void Ragdoll::Drive(const Mat4f& object_world_matrix, float32 delta_time, bool teleport)
+void Ragdoll::Drive(const Mat4f& object_world_matrix, bool teleport)
 {
 	if (mpRagdoll == nullptr || !mpSkeleton.IsValid() || mbLimp) {
 		return;
@@ -427,17 +467,13 @@ void Ragdoll::Drive(const Mat4f& object_world_matrix, float32 delta_time, bool t
 	const Skeleton& skel = *mpSkeleton;
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
 
-	const float32 move_time = std::max(delta_time, gPhysics->pBackend->cTimeStep);
-
 	for (uint32 i = 0; i < mBodies.Size; i++) {
 		BodyInfo& info = mBodies[i];
+		BodyTarget& target = mTargets[i];
 
 		const Mat4f bone_world = skel.WorldTransforms[info.BoneIndex] * object_world_matrix;
-		const JPH::Quat orientation = RotationFromMatrix(bone_world).GetQuaternion().Normalized();
-		const JPH::Vec3 position = RowAsVec3(bone_world, 3);
-
-		mTargetOrientations[i] = orientation;
-		mTargetPositions[i] = position;
+		target.Orientation = RotationFromMatrix(bone_world).GetQuaternion().Normalized();
+		target.Position = RowAsVec3(bone_world, 3);
 
 		if (info.Mode == eRagdollBodyMode::Limp) {
 			continue;
@@ -447,27 +483,18 @@ void Ragdoll::Drive(const Mat4f& object_world_matrix, float32 delta_time, bool t
 
 		if (info.Mode == eRagdollBodyMode::Kinematic) {
 			if (teleport || info.bSnap) {
-				body_interface.SetPositionAndRotation(body_id, position, orientation, JPH::EActivation::DontActivate);
+				body_interface.SetPositionAndRotation(body_id, target.Position, target.Orientation,
+													  JPH::EActivation::DontActivate);
 				body_interface.SetLinearAndAngularVelocity(body_id, JPH::Vec3::sZero(), JPH::Vec3::sZero());
 				info.bSnap = false;
-			}
-			else {
-				body_interface.MoveKinematic(body_id, position, orientation, move_time);
 			}
 
 			continue;
 		}
 
 		if (teleport) {
-			body_interface.SetPositionAndRotation(body_id, position, orientation, JPH::EActivation::Activate);
+			body_interface.SetPositionAndRotation(body_id, target.Position, target.Orientation, JPH::EActivation::Activate);
 			body_interface.SetLinearAndAngularVelocity(body_id, JPH::Vec3::sZero(), JPH::Vec3::sZero());
-		}
-
-		if (mbHasMotors && info.ParentBody >= 0) {
-			JPH::SwingTwistConstraint* joint = static_cast<JPH::SwingTwistConstraint*>(
-				mpRagdoll->GetConstraint(static_cast<int>(i) - 1));
-
-			joint->SetTargetOrientationBS(mTargetOrientations[info.ParentBody].Conjugated() * orientation);
 		}
 	}
 }
@@ -496,6 +523,43 @@ void Ragdoll::GoLimp(const Mat4f& object_world_matrix)
 	}
 }
 
+void Ragdoll::OnStep(const JPH::PhysicsStepListenerContext& inContext)
+{
+	if (mpRagdoll == nullptr) {
+		return;
+	}
+
+	JPH::BodyInterface& body_interface = inContext.mPhysicsSystem->GetBodyInterfaceNoLock();
+
+	if (inContext.mIsFirstStep) {
+		mSubstep = 0;
+	}
+
+	const uint32 steps_left = std::max(static_cast<uint32>(JoltPhysicsBackend::scCollisionSteps) - mSubstep, 1u);
+	const float32 fraction = inContext.mIsLastStep ? 1.0f : 1.0f / static_cast<float32>(steps_left);
+
+	mSubstep++;
+
+	for (uint32 i = 0; i < mBodies.Size; i++) {
+		const BodyTarget& target = mTargets[i];
+
+		if (target.Mode == eRagdollBodyMode::Kinematic) {
+			const JPH::BodyID body_id = mpRagdoll->GetBodyID(static_cast<int>(i));
+
+			JPH::RVec3 position;
+			JPH::Quat orientation;
+			body_interface.GetPositionAndRotation(body_id, position, orientation);
+
+			const JPH::Vec3 step_position = JPH::Vec3(position) + (target.Position - JPH::Vec3(position)) * fraction;
+			const JPH::Quat step_orientation = orientation.SLERP(target.Orientation, fraction).Normalized();
+
+			body_interface.MoveKinematic(body_id, step_position, step_orientation, inContext.mDeltaTime);
+		}
+
+		ApplyMotor(i);
+	}
+}
+
 void Ragdoll::ApplyMotor(uint32 body_index)
 {
 	const BodyInfo& info = mBodies[body_index];
@@ -504,15 +568,17 @@ void Ragdoll::ApplyMotor(uint32 body_index)
 		return;
 	}
 
+	const BodyTarget& target = mTargets[body_index];
+
 	JPH::SwingTwistConstraint* joint = static_cast<JPH::SwingTwistConstraint*>(
 		mpRagdoll->GetConstraint(static_cast<int>(body_index) - 1));
 
-	const JPH::EMotorState state = (info.Mode == eRagdollBodyMode::Powered) ? JPH::EMotorState::Position
-																			: JPH::EMotorState::Off;
+	const bool bPowered = (target.Mode == eRagdollBodyMode::Powered);
+	const JPH::EMotorState state = bPowered ? JPH::EMotorState::Position : JPH::EMotorState::Off;
 
-	const float32 frequency = scMotorFrequency *
-							  (scMotorMinFrequencyScale + (1.0f - scMotorMinFrequencyScale) * info.Strength);
-	const float32 torque = scMotorMaxTorque * info.Strength;
+	const float32 frequency = info.Muscle.Stiffness *
+							  (scMotorMinFrequencyScale + (1.0f - scMotorMinFrequencyScale) * target.Strength);
+	const float32 torque = info.Muscle.MaxTorque * target.Strength;
 
 	joint->GetSwingMotorSettings().mSpringSettings.mFrequency = frequency;
 	joint->GetSwingMotorSettings().SetTorqueLimit(torque);
@@ -521,6 +587,32 @@ void Ragdoll::ApplyMotor(uint32 body_index)
 
 	joint->SetSwingMotorState(state);
 	joint->SetTwistMotorState(state);
+
+	if (bPowered) {
+		joint->SetTargetOrientationBS(mTargets[info.ParentBody].Orientation.Conjugated() * target.Orientation);
+	}
+}
+
+float32 Ragdoll::GetMotorTorqueFraction(uint32 body_index) const
+{
+	const BodyInfo& info = mBodies[body_index];
+
+	if (!mbHasMotors || info.ParentBody < 0) {
+		return 0.0f;
+	}
+
+	const float32 limit = info.Muscle.MaxTorque * mTargets[body_index].Strength;
+
+	if (limit <= 0.0f) {
+		return 0.0f;
+	}
+
+	const JPH::SwingTwistConstraint* joint = static_cast<const JPH::SwingTwistConstraint*>(
+		mpRagdoll->GetConstraint(static_cast<int>(body_index) - 1));
+
+	const JPH::Vec3 torque = joint->GetTotalLambdaMotor() / gPhysics->pBackend->GetCollisionStepTime();
+
+	return torque.Length() / limit;
 }
 
 void Ragdoll::SetBodyMode(uint32 body_index, eRagdollBodyMode mode)
@@ -531,6 +623,7 @@ void Ragdoll::SetBodyMode(uint32 body_index, eRagdollBodyMode mode)
 
 	BodyInfo& info = mBodies[body_index];
 	info.Mode = mode;
+	mTargets[body_index].Mode = mode;
 
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
 	const JPH::BodyID body_id = mpRagdoll->GetBodyID(static_cast<int>(body_index));
@@ -545,7 +638,6 @@ void Ragdoll::SetBodyMode(uint32 body_index, eRagdollBodyMode mode)
 		body_interface.ActivateBody(body_id);
 	}
 
-	ApplyMotor(body_index);
 	mbPoseSettled = false;
 }
 
@@ -563,7 +655,7 @@ void Ragdoll::SetBodyStrength(uint32 body_index, float32 strength)
 	}
 
 	mBodies[body_index].Strength = std::clamp(strength, 0.0f, 1.0f);
-	ApplyMotor(body_index);
+	mTargets[body_index].Strength = mBodies[body_index].Strength;
 }
 
 void Ragdoll::SetBodyBlend(uint32 body_index, float32 blend)
@@ -597,7 +689,7 @@ float32 Ragdoll::GetBodyMass(uint32 body_index) const
 
 bool Ragdoll::GetBodyTrackingError(uint32 body_index, float32& out_distance, float32& out_angle) const
 {
-	if (mpRagdoll == nullptr || body_index >= mBodies.Size || body_index >= mTargetPositions.size()) {
+	if (mpRagdoll == nullptr || body_index >= mBodies.Size) {
 		return false;
 	}
 
@@ -605,9 +697,10 @@ bool Ragdoll::GetBodyTrackingError(uint32 body_index, float32& out_distance, flo
 	JPH::Quat orientation;
 	gPhysics->pBackend->GetBodyInterface().GetPositionAndRotation(GetBodyID(body_index), position, orientation);
 
-	const float32 alignment = std::min(std::abs(orientation.Dot(mTargetOrientations[body_index])), 1.0f);
+	const BodyTarget& target = mTargets[body_index];
+	const float32 alignment = std::min(std::abs(orientation.Dot(target.Orientation)), 1.0f);
 
-	out_distance = (JPH::Vec3(position) - mTargetPositions[body_index]).Length();
+	out_distance = (JPH::Vec3(position) - target.Position).Length();
 	out_angle = 2.0f * std::acos(alignment);
 
 	return true;
@@ -647,6 +740,36 @@ Vec3f Ragdoll::GetBodyPosition(uint32 body_index) const
 	return Vec3f(position.GetX(), position.GetY(), position.GetZ());
 }
 
+Vec3f Ragdoll::GetCenterOfMass() const
+{
+	JPH::Vec3 weighted_sum = JPH::Vec3::sZero();
+	float32 total_mass = 0.0f;
+
+	for (uint32 i = 0; i < mBodies.Size; i++) {
+		const Vec3f position = GetBodyPosition(i);
+		weighted_sum += JPH::Vec3(position.X, position.Y, position.Z) * mBodies[i].Mass;
+		total_mass += mBodies[i].Mass;
+	}
+
+	if (total_mass <= 0.0f) {
+		return Vec3f::sZero;
+	}
+
+	return Vec3f(weighted_sum / total_mass);
+}
+
+bool Ragdoll::GetBodyGroundContact(uint32 body_index, BodyGroundContact& out_contact) const
+{
+	if (mpRagdoll == nullptr || body_index >= mBodies.Size) {
+		out_contact = BodyGroundContact {};
+		return false;
+	}
+
+	gPhysics->pBackend->GetBodyGroundContact(GetBodyID(body_index), out_contact);
+
+	return out_contact.Count > 0;
+}
+
 Mat4f Ragdoll::GetBodyModelMatrix(uint32 body_index) const
 {
 	JPH::RVec3 position;
@@ -680,6 +803,11 @@ void Ragdoll::AddImpulse(JPH::BodyID body_id, const Vec3f impulse, const Vec3f p
 
 void Ragdoll::Destroy()
 {
+	if (mpPhysicsSystem != nullptr) {
+		mpPhysicsSystem->RemoveStepListener(this);
+		mpPhysicsSystem = nullptr;
+	}
+
 	if (mpRagdoll != nullptr) {
 		mpRagdoll->RemoveFromPhysicsSystem();
 		mpRagdoll = nullptr;
@@ -691,10 +819,9 @@ void Ragdoll::Destroy()
 
 	mpSkeleton = nullptr;
 	mBodies.Clear();
+	mTargets.clear();
 	mDrivenWorld.clear();
 	mIsDriven.clear();
-	mTargetOrientations.clear();
-	mTargetPositions.clear();
 	mbPoseSettled = false;
 	mbLimp = false;
 	mbHasMotors = false;
@@ -789,7 +916,7 @@ eRagdollBodyPart Ragdoll::GetBodyPart(uint32 body_index) const
 		return eRagdollBodyPart::Head;
 	}
 
-	if (name.starts_with("upperarm") || name.starts_with("lowerarm")) {
+	if (name.starts_with("upperarm") || name.starts_with("lowerarm") || name.starts_with("wrist")) {
 		return eRagdollBodyPart::Arm;
 	}
 
@@ -814,12 +941,15 @@ void Ragdoll::DebugDraw() const
 	};
 	static const Color scLinkColor = Color::FromRGBA(255, 220, 60, 255);
 	static const Color scVelocityColor = Color::FromRGBA(255, 70, 220, 255);
+	static const Color scComColor = Color::FromRGBA(255, 255, 255, 255);
+	static const Color scSupportColor = Color::FromRGBA(90, 220, 255, 255);
 
 	constexpr float32 scKinematicDim = 0.45f;
 	constexpr float32 scMinVelocityDraw = 0.5f;
 	constexpr float32 scVelocityScale = 0.15f;
 
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
+	const JPH::Vec3 up = GetUpDirection();
 
 	std::vector<Vec3f> centers(mBodies.Size, Vec3f::sZero);
 
@@ -851,8 +981,7 @@ void Ragdoll::DebugDraw() const
 		Color color = scPartColors[static_cast<uint32>(GetBodyPart(i))];
 
 		if (info.Mode == eRagdollBodyMode::Kinematic) {
-			color = Color::FromRGBA(static_cast<uint8>(color.R * scKinematicDim),
-									static_cast<uint8>(color.G * scKinematicDim),
+			color = Color::FromRGBA(static_cast<uint8>(color.R * scKinematicDim), static_cast<uint8>(color.G * scKinematicDim),
 									static_cast<uint8>(color.B * scKinematicDim), 255);
 		}
 
@@ -868,9 +997,70 @@ void Ragdoll::DebugDraw() const
 	for (uint32 i = 0; i < mBodies.Size; i++) {
 		const int32 parent = mBodies[i].ParentBody;
 
-		if (parent >= 0) {
-			renderer::gDebugDraw->Line(centers[i], centers[parent], scLinkColor);
+		if (parent < 0) {
+			continue;
 		}
+
+		Color link_color = scLinkColor;
+
+		if (mBodies[i].Mode == eRagdollBodyMode::Powered) {
+			link_color = GetTorqueColor(GetMotorTorqueFraction(i));
+		}
+
+		renderer::gDebugDraw->Line(centers[i], centers[parent], link_color);
+	}
+
+	std::vector<JPH::Vec3> support_points;
+	float32 support_height_sum = 0.0f;
+
+	for (uint32 i = 0; i < mBodies.Size; i++) {
+		BodyGroundContact contact;
+
+		if (!GetBodyGroundContact(i, contact)) {
+			continue;
+		}
+
+		const JPH::Vec3 normal(contact.Normal.X, contact.Normal.Y, contact.Normal.Z);
+
+		if (normal.Dot(up) < scSupportNormalMinUp) {
+			continue;
+		}
+
+		const JPH::Vec3 point(contact.Point.X, contact.Point.Y, contact.Point.Z);
+
+		support_points.push_back(point);
+		support_height_sum += point.Dot(up);
+	}
+
+	const Vec3f center_of_mass = GetCenterOfMass();
+
+	renderer::gDebugDraw->Line(center_of_mass - Vec3f::sRight * scComCrossSize,
+							   center_of_mass + Vec3f::sRight * scComCrossSize, scComColor);
+	renderer::gDebugDraw->Line(center_of_mass - Vec3f::sUp * scComCrossSize, center_of_mass + Vec3f::sUp * scComCrossSize,
+							   scComColor);
+
+	if (support_points.empty()) {
+		return;
+	}
+
+	const float32 support_height = support_height_sum / static_cast<float32>(support_points.size());
+	const JPH::Vec3 com(center_of_mass.X, center_of_mass.Y, center_of_mass.Z);
+	const JPH::Vec3 com_on_support = com - up * (com.Dot(up) - support_height);
+
+	renderer::gDebugDraw->Line(center_of_mass, Vec3f(com_on_support), scComColor);
+
+	std::vector<JPH::Vec3> hull;
+	ConvexHullOnPlane(support_points, up, hull);
+
+	if (hull.size() < 2) {
+		return;
+	}
+
+	for (size_t i = 0; i < hull.size(); i++) {
+		const JPH::Vec3& from = hull[i];
+		const JPH::Vec3& to = hull[(i + 1) % hull.size()];
+
+		renderer::gDebugDraw->Line(Vec3f(from), Vec3f(to), scSupportColor);
 	}
 }
 

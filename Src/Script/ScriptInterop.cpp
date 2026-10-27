@@ -18,6 +18,7 @@
 #include <Physics/PhysicsManager.hpp>
 #include <Renderer/LightProbe.hpp>
 #include <Script/ObjectScripts.hpp>
+#include <Script/TimerManager.hpp>
 #include <Weapon/WeaponSystem.hpp>
 #include <World.hpp>
 #include <WorldGrid.hpp>
@@ -614,6 +615,31 @@ static void N_sound_stop(int64 sound) { gAudio->Stop(SoundID::Unpack(sound)); }
 static void N_sound_kill(int64 sound) { gAudio->Kill(SoundID::Unpack(sound)); }
 static bool N_sound_alive(int64 sound) { return gAudio->IsPlaying(SoundID::Unpack(sound)); }
 
+static int64 N_timer_after(float32 seconds, const char* fn)
+{
+	return gTimers->StartScript(GetCallingScript(), seconds, 1, fn).Pack();
+}
+
+static int64 N_timer_every(float32 seconds, const char* fn)
+{
+	return gTimers->StartScript(GetCallingScript(), seconds, -1, fn).Pack();
+}
+
+static int64 N_timer_repeat(float32 seconds, int32 count, const char* fn)
+{
+	return gTimers->StartScript(GetCallingScript(), seconds, count, fn).Pack();
+}
+
+static void N_timer_cancel(int64 timer) { gTimers->Cancel(TimerID::Unpack(timer)); }
+static void N_timer_cancel_all() { gTimers->CancelOwnedBy(GetCallingScript()); }
+static bool N_timer_active(int64 timer) { return gTimers->IsActive(TimerID::Unpack(timer)); }
+static float32 N_timer_remaining(int64 timer)
+{
+	return static_cast<float32>(gTimers->GetRemaining(TimerID::Unpack(timer)));
+}
+static float32 N_timer_clock() { return static_cast<float32>(gTimers->GetTime()); }
+static void N_timer_list() { gTimers->Dump(); }
+
 static bool N_portal_set_open(const char* name, bool open)
 {
 	AreaGraph& graph = gWorldGrid->GetAreaGraph();
@@ -779,6 +805,16 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("sound_stop", N_sound_stop),
 	PREDEF("sound_kill", N_sound_kill),
 	PREDEF("sound_alive", N_sound_alive),
+
+	PREDEF("timer_after", N_timer_after),
+	PREDEF("timer_every", N_timer_every),
+	PREDEF("timer_repeat", N_timer_repeat),
+	PREDEF("timer_cancel", N_timer_cancel),
+	PREDEF("timer_cancel_all", N_timer_cancel_all),
+	PREDEF("timer_active", N_timer_active),
+	PREDEF("timer_remaining", N_timer_remaining),
+	PREDEF("timer_clock", N_timer_clock),
+	PREDEF("timer_list", N_timer_list),
 
 	PREDEF("portal_set_open", N_portal_set_open),
 	PREDEF("portal_is_open", N_portal_is_open),

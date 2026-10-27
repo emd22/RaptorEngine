@@ -364,9 +364,6 @@ void GraphicsBackend::RebuildRenderStages()
 	rd->Prepass.Rebuild(size);
 	rd->ForwardPass.Rebuild(size);
 	rd->ParticlePass.Rebuild(size);
-	rd->FogPass.Rebuild(size);
-	rd->FogTemporalPass.Rebuild(size);
-	rd->FogDenoisePass.Rebuild(size);
 	rd->FogApplyPass.Rebuild(size);
 	rd->SSAOPass.Rebuild(size);
 	rd->SSAODenoisePass.Rebuild(size);
@@ -1059,7 +1056,7 @@ static constexpr float32 scDefaultGTAOThinOccluderCompensation = 0.0f;
 static constexpr float32 scDefaultGTAOFinalValuePower = 2.2f;
 static constexpr float32 scDefaultGTAODenoiseBlurBeta = 1.2f;
 
-void GraphicsBackend::RenderEarlyFrameEffects(PerspectiveCamera2& camera)
+void GraphicsBackend::RenderEarlyFrameEffects(PerspectiveCamera& camera)
 {
 	FrameData* frame = GetFrame();
 
@@ -1121,13 +1118,9 @@ void GraphicsBackend::RenderEarlyFrameEffects(PerspectiveCamera2& camera)
 	pRenderer->SSAOBlurPass.End();
 }
 
-static constexpr int64 scDefaultFogMode = static_cast<int64>(eFogMode::Volumetric);
-static constexpr int64 scDefaultFogSteps = 64;
-static constexpr int64 scMaxFogSteps = 256;
 static constexpr float32 scDefaultFogDistance = 100.0f;
 static constexpr float32 scMaxFogAnisotropy = 0.95f;
 static constexpr float32 scMinFogFalloff = 1e-4f;
-static constexpr float32 scFogHistoryBlend = 0.1f;
 static constexpr float32 scFroxelHistoryBlend = 0.08f;
 static constexpr float64 scFogJitterSequenceStep = 0.6180339887498949;
 static constexpr float32 scBakedFogShadowBias = 0.02f;
@@ -1141,24 +1134,14 @@ eFogMode GraphicsBackend::GetFogMode() const
 		return eFogMode::Off;
 	}
 
-	const int64 mode = gCVars->Get("r_fog", scDefaultFogMode);
-
-	if (mode >= static_cast<int64>(eFogMode::Froxel)) {
-		return eFogMode::Froxel;
+	if (gCVars->Get("r_fog", int64(1)) == 0) {
+		return eFogMode::Off;
 	}
 
-	if (mode == static_cast<int64>(eFogMode::Volumetric)) {
-		return eFogMode::Volumetric;
-	}
-
-	if (mode == static_cast<int64>(eFogMode::Fast)) {
-		return eFogMode::Fast;
-	}
-
-	return eFogMode::Off;
+	return eFogMode::Froxel;
 }
 
-void GraphicsBackend::RenderFog(PerspectiveCamera2& camera)
+void GraphicsBackend::RenderFog(PerspectiveCamera& camera)
 {
 	const eFogMode mode = GetFogMode();
 
@@ -1228,8 +1211,6 @@ void GraphicsBackend::RenderFog(PerspectiveCamera2& camera)
 
 	consts.TileColumns = pRenderer->GetLightTileColumns();
 	consts.TileRows = pRenderer->GetLightTileRows();
-	consts.StepCount = static_cast<uint32>(
-		std::clamp(gCVars->Get("r_fog_steps", scDefaultFogSteps), int64(1), scMaxFogSteps));
 
 	const uint32 frame_counter = mInternalFrameCounter.load();
 	const bool temporal = gCVars->Get("r_fog_temporal", int64(1)) != 0;
@@ -1286,112 +1267,23 @@ void GraphicsBackend::RenderFog(PerspectiveCamera2& camera)
 		memcpy(consts.FarSunMatrix, Mat4f::scIdentity.RawData, sizeof(consts.FarSunMatrix));
 	}
 
-	if (mode == eFogMode::Froxel) {
-		Image& history = pRenderer->FroxelHistory;
+	Image& history = pRenderer->FroxelHistory;
 
-		bool history_valid = temporal && (mFroxelHistoryFrame + 1 == frame_counter);
+	bool history_valid = temporal && (mFroxelHistoryFrame + 1 == frame_counter);
 
-		if (history.ImageLayout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-			BarrierHelper::ImageBeginComputeRead(cmd, &history);
-			history_valid = false;
-		}
-
-		if (history_valid) {
-			consts.HistoryBlend = scFroxelHistoryBlend;
-		}
-
-		RenderFroxelFog(cmd, FrameAlloc.Push(consts));
-
-		mFogPrevCameraMatrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
-		mFroxelHistoryFrame = frame_counter;
-
-		return;
+	if (history.ImageLayout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+		BarrierHelper::ImageBeginComputeRead(cmd, &history);
+		history_valid = false;
 	}
 
-	ePipelineName march_pipeline = ePipelineName::FogFast;
-
-	if (mode == eFogMode::Volumetric) {
-		march_pipeline = ePipelineName::FogVolumetric;
+	if (history_valid) {
+		consts.HistoryBlend = scFroxelHistoryBlend;
 	}
 
-	pRenderer->FogPass.Begin(cmd);
-
-	gPipelineCache->AddBufferOffset(0, LightBuffer.GetBaseOffset());
-	gPipelineCache->AddBufferOffset(0, GetLightGridFrameOffset());
-	gPipelineCache->AddBufferOffset(0, GetLightIndexListFrameOffset());
-	gPipelineCache->AddBufferOffset(0, 0);
-	gPipelineCache->AddBufferOffset(0, 0);
-	gPipelineCache->AddBufferOffset(0, 0);
-	gPipelineCache->AddBufferOffset(0, 0);
-	gPipelineCache->SetFrameData(FrameAlloc.Push(consts));
-	gPipelineCache->Bind(march_pipeline, cmd);
-
-	vkCmdDraw(cmd.Get(), 3, 1, 0, 0);
-
-	pRenderer->FogPass.End();
-
-	bool history_valid = temporal && (mFogHistoryFrame + 1 == frame_counter);
-
-	Image* history_images[] = {
-		&pRenderer->FogDenoisePass.GetTarget(eImageFormat::RGBA16_Float, 1)->GetImage(),
-		&pRenderer->FogDenoisePass.GetTarget(eImageFormat::R32_SFloat)->GetImage(),
-	};
-
-	for (Image* history : history_images) {
-		if (history->ImageLayout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-			BarrierHelper::ImageLayoutTransition(history, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 0, 1);
-			history_valid = false;
-		}
-	}
-
-	FogTemporalConsts temporal_consts {};
-
-	memcpy(temporal_consts.PrevCameraMatrix, mFogPrevCameraMatrix.RawData, sizeof(temporal_consts.PrevCameraMatrix));
-	memcpy(temporal_consts.Rays, consts.Rays, sizeof(temporal_consts.Rays));
-
-	temporal_consts.EyeAndBlend[0] = eye.X;
-	temporal_consts.EyeAndBlend[1] = eye.Y;
-	temporal_consts.EyeAndBlend[2] = eye.Z;
-	temporal_consts.EyeAndBlend[3] = scFogHistoryBlend;
-	temporal_consts.DepthParams[0] = depth_a;
-	temporal_consts.DepthParams[1] = depth_b;
-	temporal_consts.HistoryValid = static_cast<uint32>(history_valid);
-
-	pRenderer->FogTemporalPass.Begin(cmd);
-
-	gPipelineCache->SetFrameData(FrameAlloc.Push(temporal_consts));
-	gPipelineCache->Bind(ePipelineName::FogTemporal, cmd);
-
-	vkCmdDraw(cmd.Get(), 3, 1, 0, 0);
-
-	pRenderer->FogTemporalPass.End();
+	RenderFroxelFog(cmd, FrameAlloc.Push(consts));
 
 	mFogPrevCameraMatrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
-	mFogHistoryFrame = frame_counter;
-
-	const FogResolveConsts resolve_consts {
-		.DepthParams = { depth_a, depth_b },
-	};
-
-	const uint32 resolve_consts_offset = FrameAlloc.Push(resolve_consts);
-
-	pRenderer->FogDenoisePass.Begin(cmd);
-
-	gPipelineCache->SetFrameData(resolve_consts_offset);
-	gPipelineCache->Bind(ePipelineName::FogDenoise, cmd);
-
-	vkCmdDraw(cmd.Get(), 3, 1, 0, 0);
-
-	pRenderer->FogDenoisePass.End();
-
-	pRenderer->FogApplyPass.Begin(cmd);
-
-	gPipelineCache->SetFrameData(resolve_consts_offset);
-	gPipelineCache->Bind(ePipelineName::FogApply, cmd);
-
-	vkCmdDraw(cmd.Get(), 3, 1, 0, 0);
-
-	pRenderer->FogApplyPass.End();
+	mFroxelHistoryFrame = frame_counter;
 }
 
 void GraphicsBackend::RenderFroxelFog(CommandBuffer& cmd, uint32 consts_offset)
@@ -1440,7 +1332,7 @@ void GraphicsBackend::RenderFroxelFog(CommandBuffer& cmd, uint32 consts_offset)
 	BarrierHelper::ImageCopyToComputeHistory(cmd, &pRenderer->FroxelLighting, &pRenderer->FroxelHistory);
 }
 
-void GraphicsBackend::DoComposition(PerspectiveCamera2& render_cam)
+void GraphicsBackend::DoComposition(PerspectiveCamera& render_cam)
 {
 	FrameData* frame = GetFrame();
 
