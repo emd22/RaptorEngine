@@ -5,6 +5,7 @@
 #include <Map/AreaSet.hpp>
 #include <Math/BBox.hpp>
 #include <Math/Vec3.hpp>
+#include <vector>
 
 namespace fx {
 
@@ -74,6 +75,8 @@ public:
 	int32 FindArea(const Vec3f& point) const;
 	AreaSet FindAreas(const BBox& bounds) const;
 	AreaSet FindLightAreas(const Vec3f& origin, const BBox& bounds) const;
+
+	void CollectConnectedAreas(uint32 area, std::vector<uint8>& out_connected) const;
 
 private:
 	void CollectAreas(int32 child, const Vec3f& center, const Vec3f& extent, AreaSet& out_set) const;

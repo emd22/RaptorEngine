@@ -206,7 +206,7 @@ class CompiledMap
 {
 public:
 	static constexpr uint32 scMagic = 0x504D5846;
-	static constexpr uint32 scVersion = 12;
+	static constexpr uint32 scVersion = 13;
 	/// Oldest version that still loads, the parts added since are left empty
 	static constexpr uint32 scMinVersion = 10;
 	static constexpr const char* scExtension = ".fxmap";
@@ -251,6 +251,8 @@ public:
 	SizedArray<CompiledMapShadowSurface> ShadowSurfaces;
 	SizedArray<CompiledMapHull> Hulls;
 	SizedArray<CompiledMapCollisionMesh> CollisionMeshes;
+
+	SizedArray<uint8> AcousticProbes;
 
 	/// Where the light probes go, worked out from the brushes. Empty if the map was compiled without probes.
 	ProbeLayout Probes;

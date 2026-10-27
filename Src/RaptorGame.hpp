@@ -181,6 +181,11 @@ private:
 	static constexpr float64 scImpactSoundCooldown = 0.12;
 	static constexpr size_t scMaxImpactSoundBodies = 512;
 
+	static constexpr float32 scClosedPortalGain = 0.2f;
+
+	std::vector<uint8> mListenerConnectedAreas;
+	int32 mListenerArea = -1;
+
 	std::vector<physics::SoundImpact> mSoundImpacts;
 	std::unordered_map<uint32, float64> mImpactSoundTimes;
 	float64 mImpactSoundClock = 0.0;

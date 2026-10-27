@@ -565,6 +565,7 @@ void RaptorEditor::Update(float32 delta_time)
 
 			gWorld->pPrototype->RefreshDecals();
 			gWorld->pPrototype->RefreshCappedPatches();
+			gWorld->pPrototype->RequestAcousticRebuild();
 		}
 	}
 

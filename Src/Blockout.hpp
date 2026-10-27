@@ -8,6 +8,7 @@
 #pragma once
 
 #include <Asset/ConfigFile.hpp>
+#include <Audio/SpatialAudio.hpp>
 #include <Brush.hpp>
 #include <BrushEntry.hpp>
 #include <Core/FreeArray.hpp>
@@ -207,6 +208,11 @@ public:
 	 * @brief Rebuilds the mesh of every decal whose volume or receiving brushes changed since it was last built
 	 */
 	void RefreshDecals(bool force = false);
+
+	void RequestAcousticRebuild();
+	void UpdateAcoustics(float32 delta_time);
+	void RebuildAcoustics();
+	AcousticSurface GetAcousticSurface(const MaterialLibraryID id) const;
 
 	void RaycastDecalSurfaces(const Vec3f origin, const Vec3f direction, float32 max_distance,
 							  std::vector<float32>& out_distances);
@@ -578,6 +584,11 @@ private:
 	std::vector<physics::BodyID> mCompiledBodies;
 	std::unordered_map<uint32, CompiledSurfaceBody> mCompiledSurfaceBodies;
 	std::vector<String> mCompiledMaterialSurfaces;
+	AcousticGeometry mCompiledAcoustics;
+	std::vector<uint8> mCompiledAcousticProbes;
+
+	static constexpr float32 scAcousticRebuildDelay = 0.5f;
+	float32 mAcousticRebuildTimer = -1.0f;
 	bool mbIsCompiledMap = false;
 	ProbeLayout mCompiledProbeLayout;
 	SizedArray<float32> mCompiledProbeIrradiance;

@@ -1,9 +1,11 @@
 #pragma once
 
+#include <Audio/SpatialAudio.hpp>
 #include <Core/Hash.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
 #include <Math/Vec3.hpp>
+#include <functional>
 #include <vector>
 
 namespace fx {
@@ -49,11 +51,18 @@ struct SoundRange
 	float32 Max = 1.0f;
 };
 
+struct SoundClip
+{
+	float32 Start = 0.0f;
+	float32 End = 0.0f;
+};
+
 struct SoundDef
 {
 	String Name;
 	Hash32 NameHash = 0;
 	std::vector<String> Files;
+	std::vector<SoundClip> Clips;
 
 	eSoundBus Bus = eSoundBus::Sfx;
 	SoundRange Volume { 1.0f, 1.0f };
@@ -77,6 +86,7 @@ struct SoundDef
 struct AudioCreateInfo
 {
 	bool bNoDevice = false;
+	bool bSteamAudio = true;
 	uint32 SampleRate = 0;
 	uint32 Channels = 0;
 };
@@ -86,6 +96,7 @@ class AudioSystem
 public:
 	static constexpr uint32 scMaxVoices = 128;
 	static constexpr const char* scSoundDirectory = "RaptorData/Data/Sounds";
+	static constexpr float32 scSurfaceSoundOffset = 0.1f;
 
 public:
 	AudioSystem() = default;
@@ -119,6 +130,14 @@ public:
 
 	uint64 ReadFrames(float32* out_frames, uint64 frame_count);
 
+	using PathGainFunction = std::function<float32(const Vec3f source, const Vec3f listener)>;
+
+	void SetPathGainFunction(PathGainFunction function) { mPathGain = std::move(function); }
+	void SetAcousticScene(const AcousticGeometry& geometry);
+	void SetBakedAcoustics(const std::vector<uint8>& data);
+
+	const SpatialAudio& GetSpatial() const { return mSpatial; }
+
 	bool IsActive() const { return mpBackend != nullptr; }
 	uint32 GetVoiceCount() const { return mActiveVoiceCount; }
 	uint32 GetSampleRate() const;
@@ -135,6 +154,8 @@ private:
 		uint32 Generation = 0;
 		uint64 StartOrder = 0;
 		float32 Volume = 1.0f;
+		Vec3f Position = Vec3f::sZero;
+		SpatialVoice* pSpatial = nullptr;
 		bool bActive = false;
 		bool bStopping = false;
 	};
@@ -151,6 +172,8 @@ private:
 	void ReleaseVoice(uint32 slot);
 
 	void ApplyVolumes(bool window_focused);
+	void UpdateSpatialVoice(uint32 slot);
+	float32 GetDistanceGain(const SoundDef& def, float32 distance) const;
 
 private:
 	Backend* mpBackend = nullptr;
@@ -164,6 +187,16 @@ private:
 	CVarValue* mpVolumeCVar = nullptr;
 	CVarValue* mpBusVolumeCVars[static_cast<uint32>(eSoundBus::Count)] {};
 	CVarValue* mpMuteUnfocusedCVar = nullptr;
+	CVarValue* mpSpatialCVar = nullptr;
+	CVarValue* mpHrtfCVar = nullptr;
+	CVarValue* mpReverbCVar = nullptr;
+	CVarValue* mpReverbVolumeCVar = nullptr;
+	CVarValue* mpReverbRaysCVar = nullptr;
+	CVarValue* mpReverbBouncesCVar = nullptr;
+
+	SpatialAudio mSpatial;
+	Vec3f mListenerPosition = Vec3f::sZero;
+	PathGainFunction mPathGain;
 
 	bool mbWarnedAboutVoiceOverflow = false;
 };

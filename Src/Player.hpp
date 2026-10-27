@@ -60,7 +60,7 @@ class Player
 	static constexpr float32 scLandingViewModelCounter = 0.25f;
 
 	static constexpr float32 scFootstepWalkDistance = 1.9f;
-	static constexpr float32 scFootstepSprintDistance = 2.4f;
+	static constexpr float32 scFootstepSprintDistance = 2.0f;
 	static constexpr float32 scFootstepMinSpeed = 0.5f;
 	static constexpr float32 scFootstepMinVolume = 0.4f;
 	static constexpr float32 scLandingSoundMinSpeed = 2.0f;

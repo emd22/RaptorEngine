@@ -95,6 +95,7 @@ if(WIN32)
             "${CMAKE_SOURCE_DIR}/Lib/win32/turbojpeg.dll"
             "${CMAKE_SOURCE_DIR}/Lib/win32/ktx.dll"
             "${CMAKE_SOURCE_DIR}/Lib/win32/zstd.dll"
+            "${CMAKE_SOURCE_DIR}/Lib/win32/phonon.dll"
             "$<TARGET_FILE_DIR:raptor>"
     )
 
@@ -210,7 +211,7 @@ target_link_libraries(raptor PRIVATE mimalloc-static)
 target_include_directories(raptor SYSTEM PRIVATE "Submodules/mimalloc/include")
 
 
-target_link_libraries(raptor PRIVATE turbojpeg SDL3 freetype ktx)
+target_link_libraries(raptor PRIVATE turbojpeg SDL3 freetype ktx phonon)
 
 
 # Map compiler (Tools/MapCompiler): turns the brushes of a prototype file into batched world geometry.
@@ -229,6 +230,7 @@ add_library(mapc_core STATIC
     "Src/Patch.cpp"
     "Src/Asset/ConfigFile.cpp"
     "Src/Material/MaterialDefinition.cpp"
+    "Src/Audio/Acoustics.cpp"
     "Src/Core/Allocator.cpp"
     "Src/Core/ByteBuffer.cpp"
     "Src/Core/File.cpp"
@@ -256,7 +258,7 @@ add_library(mapc_core STATIC
 
 target_include_directories(mapc_core PUBLIC "Src" "Tools/MapCompiler")
 target_include_directories(mapc_core SYSTEM PUBLIC "Src/ThirdParty" "Lib/Include" "Submodules/mimalloc/include")
-target_link_libraries(mapc_core PUBLIC mimalloc-static ktx)
+target_link_libraries(mapc_core PUBLIC mimalloc-static ktx phonon)
 
 if(WIN32)
     target_link_directories(mapc_core PUBLIC "${CMAKE_SOURCE_DIR}/Lib/Win32")
@@ -289,6 +291,12 @@ endif()
 
 add_executable(mapc "Tools/MapCompiler/Main.cpp")
 target_link_libraries(mapc PRIVATE mapc_core)
+
+if(WIN32)
+    add_custom_command(TARGET mapc POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/Lib/win32/phonon.dll" "$<TARGET_FILE_DIR:mapc>"
+    )
+endif()
 
 # The frontend is only built when wxWidgets is around, the command line tool never needs it
 if(NOT FX_EDITOR)

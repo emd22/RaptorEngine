@@ -3,6 +3,7 @@
 #include <Asset/AssetManager.hpp>
 #include <Asset/ConfigFile.hpp>
 #include <Asset/MeshGen.hpp>
+#include <Audio/AudioSystem.hpp>
 #include <BrushEntry.hpp>
 #include <CVar.hpp>
 #include <Core/FilesystemIO.hpp>
@@ -623,6 +624,104 @@ const String& Blockout::GetSurfaceAt(const physics::RayResult& hit)
 	return mMaterials.GetSurface(mMaterials.FindIDByName(brush->Planes[static_cast<uint32>(side)].Material.CStr()));
 }
 
+void Blockout::RequestAcousticRebuild() { mAcousticRebuildTimer = scAcousticRebuildDelay; }
+
+void Blockout::UpdateAcoustics(float32 delta_time)
+{
+	if (mAcousticRebuildTimer < 0.0f) {
+		return;
+	}
+
+	mAcousticRebuildTimer -= delta_time;
+
+	if (mAcousticRebuildTimer <= 0.0f) {
+		RebuildAcoustics();
+	}
+}
+
+AcousticSurface Blockout::GetAcousticSurface(const MaterialLibraryID id) const
+{
+	return AcousticSurface { .Name = mMaterials.GetSurface(id), .Density = mMaterials.GetDensity(id) };
+}
+
+void Blockout::RebuildAcoustics()
+{
+	mAcousticRebuildTimer = -1.0f;
+
+	AcousticGeometry geometry = mCompiledAcoustics;
+
+	for (const ObjectID object_id : BlockoutObjects) {
+		Object* object = gObjectManager->GetObject(object_id);
+
+		if (object == nullptr || object == pPreviewObject || object->IsHidden() || object->IsDataBrush() ||
+			object->IsDecal() || object->GetSpecialMaterial() != eSpecialMaterial::None) {
+			continue;
+		}
+
+		const Mat4f world = object->GetWorldMatrix();
+		const auto to_world = [&world](const Vec3f point)
+		{
+			const Vec4f transformed = world * Vec4f(point.X, point.Y, point.Z, 1.0f);
+			return Vec3f(transformed.X, transformed.Y, transformed.Z);
+		};
+
+		const uint32 object_surface =
+			geometry.FindOrAddSurface(GetAcousticSurface(mMaterials.FindID(object->GetMaterialID())));
+
+		if (const Brush* brush = GetBrush(object)) {
+			for (const Brush::Face& face : brush->Faces) {
+				if (face.Vertices.Size < 3) {
+					continue;
+				}
+
+				const BrushPlane& plane = brush->Planes[face.PlaneIndex];
+				uint32 surface = object_surface;
+
+				if (!plane.Material.IsEmpty()) {
+					surface =
+						geometry.FindOrAddSurface(GetAcousticSurface(mMaterials.FindIDByName(plane.Material.CStr())));
+				}
+
+				const Vec4f normal4 = world * Vec4f(plane.Normal.X, plane.Normal.Y, plane.Normal.Z, 0.0f);
+				const Vec3f normal(normal4.X, normal4.Y, normal4.Z);
+
+				const Vec3f first = to_world(face.Vertices[0]);
+
+				for (uint32 i = 1; i + 1 < face.Vertices.Size; i++) {
+					Vec3f b = to_world(face.Vertices[i]);
+					Vec3f c = to_world(face.Vertices[i + 1]);
+
+					if ((b - first).Cross(c - first).Dot(normal) < 0.0f) {
+						std::swap(b, c);
+					}
+
+					geometry.AddTriangle(first, b, c, surface);
+				}
+			}
+
+			continue;
+		}
+
+		if (const Patch* patch = GetPatch(object)) {
+			SizedArray<Vec3f> positions;
+			SizedArray<Vec3f> normals;
+			SizedArray<Vec3f> tangents;
+			SizedArray<float32> handedness;
+			SizedArray<Vec2f> texcoords;
+			SizedArray<uint32> indices;
+
+			patch->GenerateMesh(positions, normals, tangents, handedness, texcoords, indices);
+
+			for (size_t i = 0; i + 2 < indices.Size; i += 3) {
+				geometry.AddTriangle(to_world(positions[indices[i]]), to_world(positions[indices[i + 1]]),
+									 to_world(positions[indices[i + 2]]), object_surface);
+			}
+		}
+	}
+
+	gAudio->SetAcousticScene(geometry);
+}
+
 void Blockout::ReloadSingleObject(Object* object)
 {
 	if (object == nullptr || !object->HasTags(eObjectTag::Blockout)) {
@@ -712,6 +811,8 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	mCompiledBodies.clear();
 	mCompiledSurfaceBodies.clear();
 	mCompiledMaterialSurfaces.clear();
+	mCompiledAcoustics = AcousticGeometry {};
+	mCompiledAcousticProbes.clear();
 	mCompiledProbeLayout.Clear();
 	mCompiledProbeIrradiance.Free();
 	mCompiledProbeMoments.Free();
@@ -895,6 +996,28 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 
 		mCompiledMaterialSurfaces.push_back(
 			mMaterials.GetSurface(FindCompiledMaterial(map, static_cast<int32>(material_index))));
+	}
+
+	mCompiledAcoustics = AcousticGeometry {};
+	mCompiledAcousticProbes.assign(map.AcousticProbes.begin(), map.AcousticProbes.end());
+
+	for (size_t material_index = 0; material_index < map.Materials.Size; material_index++) {
+		mCompiledAcoustics.Surfaces.push_back(
+			GetAcousticSurface(FindCompiledMaterial(map, static_cast<int32>(material_index))));
+	}
+
+	for (const CompiledMapSurface& surface : map.Surfaces) {
+		for (size_t i = 0; i + 2 < surface.Indices.Size; i += 3) {
+			const CompiledMapVertex& a = surface.Vertices[surface.Indices[i]];
+			Vec3f b = surface.Vertices[surface.Indices[i + 1]].Position;
+			Vec3f c = surface.Vertices[surface.Indices[i + 2]].Position;
+
+			if ((b - a.Position).Cross(c - a.Position).Dot(a.Normal) < 0.0f) {
+				std::swap(b, c);
+			}
+
+			mCompiledAcoustics.AddTriangle(a.Position, b, c, surface.MaterialIndex);
+		}
 	}
 
 	mCompiledDecalReceivers.reserve(map.Surfaces.Size);
@@ -4860,6 +4983,9 @@ void Blockout::ResetToTemplate()
 	gWorld->Fog = renderer::FogSettings {};
 	gWorld->SoundEmitters.Clear();
 
+	RebuildAcoustics();
+	gAudio->SetBakedAcoustics({});
+
 	gWorld->Player.TeleportTo(Vec3f(0.0, 2.0, 0.0));
 
 #ifdef FX_IS_EDITOR
@@ -4957,6 +5083,8 @@ ePrototypeLoadStatus Blockout::Load(const String& opened_path)
 	}
 
 	RefreshDecals(true);
+	RebuildAcoustics();
+	gAudio->SetBakedAcoustics(mCompiledAcousticProbes);
 
 	renderer::gShadowAtlas->Invalidate();
 

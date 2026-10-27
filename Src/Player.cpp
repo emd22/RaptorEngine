@@ -612,7 +612,8 @@ void Player::PlayGroundSound(const char* event, float32 volume)
 	ground.Body = character.GetGroundBodyID();
 	ground.SubShape = character.GetGroundSubShapeID();
 
-	const SoundID sound = gAudio->PlayForSurface(event, gWorld->pPrototype->GetSurfaceAt(ground), ground.Point);
+	const Vec3f position = ground.Point + (ground.Normal * AudioSystem::scSurfaceSoundOffset);
+	const SoundID sound = gAudio->PlayForSurface(event, gWorld->pPrototype->GetSurfaceAt(ground), position);
 	gAudio->SetVolume(sound, volume);
 }
 
@@ -638,7 +639,7 @@ void Player::UpdateFootsteps(float32 delta_time)
 
 	mFootstepDistance -= stride;
 
-	PlayGroundSound("footstep", std::clamp(mHorizontalSpeed / scSprintSpeed, scFootstepMinVolume, 1.0f));
+	PlayGroundSound("footsteps", std::clamp(mHorizontalSpeed / scSprintSpeed, scFootstepMinVolume, 1.0f));
 }
 
 void Player::UpdateMeasuredMotion(const Vec3f& previous_position, float32 delta_time)

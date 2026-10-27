@@ -642,7 +642,8 @@ void WeaponSystem::ApplyHit(float32 damage, float32 force, bool decal)
 
 		hit_npc->Damage(damage, mLastHit.Body);
 
-		gAudio->PlayForSurface(mWeapons[mActive].BulletSound.CStr(), String("flesh"), mLastHit.Point);
+		gAudio->PlayForSurface(mWeapons[mActive].BulletSound.CStr(), String("flesh"),
+							   mLastHit.Point + (mLastHit.Normal * AudioSystem::scSurfaceSoundOffset));
 
 		if (force > 0.0f) {
 			hit_npc->AddImpulse(mLastHit.Body, mLastDirection * force, mLastHit.Point);
@@ -675,7 +676,8 @@ void WeaponSystem::ApplyHit(float32 damage, float32 force, bool decal)
 			gParticleSystem->Play(weapon.ImpactEffects[i], origin, direction);
 		}
 
-		gAudio->PlayForSurface(weapon.BulletSound.CStr(), gWorld->pPrototype->GetSurfaceAt(mLastHit), origin);
+		gAudio->PlayForSurface(weapon.BulletSound.CStr(), gWorld->pPrototype->GetSurfaceAt(mLastHit),
+							   mLastHit.Point + (normal * AudioSystem::scSurfaceSoundOffset));
 	}
 
 	if (hit_npc == nullptr && motion == JPH::EMotionType::Dynamic && force > 0.0f) {

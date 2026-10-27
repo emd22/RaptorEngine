@@ -83,6 +83,18 @@ static MaterialDefinition ReadDefinition(const std::filesystem::path& file_path,
 		definition.Surface = String(entry->GetMemberValue<const char*>(HashStr32("surface"), ""));
 	}
 
+	if (entry->GetMember(HashStr32("density")) != nullptr) {
+		const float32 density = entry->GetMemberValue<float32>(HashStr32("density"), 0.0f);
+
+		if (density > 0.0f) {
+			definition.Density = density;
+		}
+		else {
+			LogWarning(LC_ASSET, "The material '{}' has a density of {}, it must be above zero", definition.Name,
+					   density);
+		}
+	}
+
 	if (entry->GetMember(HashStr32("metallic")) != nullptr) {
 		definition.Metallic = entry->GetMemberValue<float32>(HashStr32("metallic"), 0.0f);
 	}

@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "AcousticBake.hpp"
 #include "Lightmap.hpp"
 #include "Surfaces.hpp"
 
@@ -34,6 +35,7 @@ struct CompileOptions
 	ProbePlacementSettings ProbeSettings;
 
 	LightmapOptions Lightmap;
+	AcousticOptions Acoustics;
 
 	uint32 VerifyRays = 0;
 };
@@ -58,6 +60,8 @@ struct CompileResult
 
 	bool bHasLightmap = false;
 	LightmapStats Lightmap;
+
+	AcousticStats Acoustics;
 
 	String OutputPath;
 	String LeakPath;

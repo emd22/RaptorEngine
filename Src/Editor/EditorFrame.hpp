@@ -28,6 +28,7 @@ class ObjectListWindow;
 class CVarListWindow;
 class MaterialPickerPanel;
 class AtlasPackerWindow;
+class ClipEditorWindow;
 
 class EditorToolbar;
 class EditorViewport;
@@ -73,6 +74,7 @@ public:
 	void ShowCVarListWindow();
 	void ShowMaterialPicker();
 	void ShowAtlasPackerWindow();
+	void ShowClipEditorWindow();
 
 	void NewPrototype();
 
@@ -128,6 +130,7 @@ private:
 	MaterialPickerPanel* mpMaterialPickerPanel = nullptr;
 	wxMenuItem* mpMaterialPickerMenuItem = nullptr;
 	AtlasPackerWindow* mpAtlasPackerWindow = nullptr;
+	ClipEditorWindow* mpClipEditorWindow = nullptr;
 
 	/// Tool specific settings
 	ToolSettingsBasePanel* mpToolSettingsPanel = nullptr;

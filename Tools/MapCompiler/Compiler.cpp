@@ -614,6 +614,23 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 		}
 	}
 
+	if (!options.Acoustics.bEnabled) {
+		log("  acoustics    off");
+	}
+	else if (BakeAcoustics(options.Acoustics, map, result.Acoustics, log)) {
+		const AcousticStats& acoustics = result.Acoustics;
+
+		log(String::Fmt("  acoustics    {} probes {:.1f} m apart from ({:.1f}, {:.1f}, {:.1f}) to ({:.1f}, {:.1f}, {:.1f}), "
+						"baked in {:.1f} s (reverb) + {:.1f} s (pathing), {:.1f} KB",
+						acoustics.ProbeCount, options.Acoustics.ProbeSpacing, acoustics.ProbeMin.X, acoustics.ProbeMin.Y,
+						acoustics.ProbeMin.Z, acoustics.ProbeMax.X, acoustics.ProbeMax.Y, acoustics.ProbeMax.Z,
+						acoustics.ReflectionSeconds, acoustics.PathingSeconds,
+						static_cast<double>(acoustics.DataSize) / 1024.0));
+	}
+	else if (!result.Acoustics.Error.IsEmpty()) {
+		log(String::Fmt("  warning      no acoustics, {}", result.Acoustics.Error));
+	}
+
 	if (!map.Save(result.OutputPath)) {
 		log(String::Fmt("Failed to write '{}'", result.OutputPath));
 		return result;

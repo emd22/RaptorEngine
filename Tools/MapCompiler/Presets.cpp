@@ -54,6 +54,13 @@ ConfigEntry WritePreset(const CompilePreset& preset, uint32 index)
 	entry.AddMember(ConfigEntry::Literal("indirect_cache", static_cast<int64>(lightmap.IndirectCacheMegabytes)));
 	entry.AddMember(ConfigEntry::Literal("indirect_denoise", GetDenoiseQualityName(lightmap.IndirectDenoise)));
 
+	entry.AddMember(ConfigEntry::Literal("acoustics", ToInt(options.Acoustics.bEnabled)));
+	entry.AddMember(ConfigEntry::Literal("acoustic_pathing", ToInt(options.Acoustics.bPathing)));
+	entry.AddMember(ConfigEntry::Literal("acoustic_probe_spacing", static_cast<float32>(options.Acoustics.ProbeSpacing)));
+	entry.AddMember(ConfigEntry::Literal("acoustic_probe_height", static_cast<float32>(options.Acoustics.ProbeHeight)));
+	entry.AddMember(ConfigEntry::Literal("reverb_rays", static_cast<int64>(options.Acoustics.ReverbRays)));
+	entry.AddMember(ConfigEntry::Literal("reverb_bounces", static_cast<int64>(options.Acoustics.ReverbBounces)));
+
 	entry.AddMember(ConfigEntry::Literal("verify_rays", static_cast<int64>(options.VerifyRays)));
 
 	return entry;
@@ -120,6 +127,13 @@ CompilePreset ReadPreset(const ConfigEntry& entry)
 	if (!ParseDenoiseQuality(denoise, lightmap.IndirectDenoise)) {
 		LogWarning(LC_CORE, "Preset '{}' has an unknown denoise level '{}'", preset.Name, denoise);
 	}
+
+	options.Acoustics.bEnabled = ReadBool(entry, "acoustics", options.Acoustics.bEnabled);
+	options.Acoustics.bPathing = ReadBool(entry, "acoustic_pathing", options.Acoustics.bPathing);
+	options.Acoustics.ProbeSpacing = ReadDouble(entry, "acoustic_probe_spacing", options.Acoustics.ProbeSpacing);
+	options.Acoustics.ProbeHeight = ReadDouble(entry, "acoustic_probe_height", options.Acoustics.ProbeHeight);
+	options.Acoustics.ReverbRays = ReadUInt(entry, "reverb_rays", options.Acoustics.ReverbRays);
+	options.Acoustics.ReverbBounces = ReadUInt(entry, "reverb_bounces", options.Acoustics.ReverbBounces);
 
 	options.VerifyRays = ReadUInt(entry, "verify_rays", options.VerifyRays);
 

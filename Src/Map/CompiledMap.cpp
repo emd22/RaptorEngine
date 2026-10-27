@@ -665,6 +665,11 @@ bool CompiledMap::Load(const String& path)
 		ReadCollisionMaterials(reader, Hulls, CollisionMeshes, Materials.Size);
 	}
 
+	if (version >= 13 && !reader.bFailed) {
+		AcousticProbes.InitSize(reader.ReadCount());
+		reader.Read(AcousticProbes.pData, AcousticProbes.Size);
+	}
+
 	for (const CompiledMapSurface& surface : Surfaces) {
 		if (surface.Area != scNoMapArea && (surface.Area < 0 || static_cast<size_t>(surface.Area) >= Areas.Size)) {
 			reader.bFailed = true;
@@ -821,6 +826,9 @@ bool CompiledMap::Save(const String& path) const
 
 	WriteFogShadow(writer, FogShadow);
 	WriteCollisionMaterials(writer, Hulls, CollisionMeshes);
+
+	writer.WriteCount(AcousticProbes.Size);
+	writer.Write(AcousticProbes.pData, AcousticProbes.Size);
 
 	return (writer.bFailed == false);
 }

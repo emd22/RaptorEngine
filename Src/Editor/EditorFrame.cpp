@@ -1,6 +1,7 @@
 #include "EditorFrame.hpp"
 
 #include "AtlasPackerWindow.hpp"
+#include "ClipEditorWindow.hpp"
 #include "CVarListWindow.hpp"
 #include "EditorTheme.hpp"
 #include "EditorThread.hpp"
@@ -540,6 +541,8 @@ wxMenu* EditorFrame::CreateToolsMenu()
 	mpMaterialPickerMenuItem->Check(true);
 	wxMenuItem* atlas_packer_item = tools_menu->Append(wxID_ANY, "Open Atlas Packer",
 													   "Pack images into a tile atlas and export its config");
+	wxMenuItem* clip_editor_item = tools_menu->Append(wxID_ANY, "Clip Editor",
+													  "Split one sound file into random clips for a sound def");
 
 	{
 		Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowObjectListWindow(); }, object_list_item->GetId());
@@ -548,6 +551,7 @@ wxMenu* EditorFrame::CreateToolsMenu()
 			wxEVT_MENU, [this](wxCommandEvent& event) { SetMaterialPickerShown(event.IsChecked()); },
 			mpMaterialPickerMenuItem->GetId());
 		Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowAtlasPackerWindow(); }, atlas_packer_item->GetId());
+		Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowClipEditorWindow(); }, clip_editor_item->GetId());
 	}
 
 	return tools_menu;
@@ -1211,6 +1215,16 @@ void EditorFrame::ShowAtlasPackerWindow()
 
 	mpAtlasPackerWindow->Show();
 	mpAtlasPackerWindow->Raise();
+}
+
+void EditorFrame::ShowClipEditorWindow()
+{
+	if (mpClipEditorWindow == nullptr) {
+		mpClipEditorWindow = new ClipEditorWindow(this);
+	}
+
+	mpClipEditorWindow->Show();
+	mpClipEditorWindow->Raise();
 }
 
 void EditorFrame::OnClose(wxCloseEvent& event)

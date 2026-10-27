@@ -154,6 +154,22 @@ void RaptorGame::InitEngine()
 	gPhysics->Create();
 	gAssetManager->Start(3);
 	gAudio->Create();
+	gAudio->SetPathGainFunction(
+		[this](const Vec3f source, const Vec3f listener)
+		{
+			if (mListenerArea < 0) {
+				return 1.0f;
+			}
+
+			const int32 source_area = gWorldGrid->GetAreaGraph().FindArea(source);
+
+			if (source_area < 0 || static_cast<size_t>(source_area) >= mListenerConnectedAreas.size() ||
+				mListenerConnectedAreas[static_cast<size_t>(source_area)] != 0) {
+				return 1.0f;
+			}
+
+			return scClosedPortalGain;
+		});
 
 	// Make the world grid approx 1.5km x 1.5km. This should be increased as the map sizes grow.
 	gWorldGrid->Create(Vec2u(15));
@@ -986,8 +1002,8 @@ void RaptorGame::PlayImpactSounds()
 											  (scImpactSoundFullSpeed - scImpactSoundMinSpeed),
 										  scImpactSoundMinVolume, 1.0f);
 
-		const SoundID sound = gAudio->PlayForSurface("impact", gWorld->pPrototype->GetSurfaceAt(surface),
-													 impact.Point);
+		const Vec3f position = impact.Point + (impact.Normal * AudioSystem::scSurfaceSoundOffset);
+		const SoundID sound = gAudio->PlayForSurface("impact", gWorld->pPrototype->GetSurfaceAt(surface), position);
 		gAudio->SetVolume(sound, volume);
 	}
 
@@ -1137,7 +1153,18 @@ void RaptorGame::RenderText()
 	}
 
 	if (gAudio->GetVoiceCount() > 0) {
-		gTextRenderer->DrawText(String::Fmt("sounds {}", gAudio->GetVoiceCount()).CStr(), 1.0f, scWhite);
+		const SpatialAudio& spatial = gAudio->GetSpatial();
+
+		float32 reverb_times[3];
+		spatial.GetReverbTimes(reverb_times);
+
+		gTextRenderer->DrawText(String::Fmt("sounds {} acoustic tris {} sim {:.3f}ms reverb {:.2f}/{:.2f}/{:.2f}s "
+											"({:.1f}ms)",
+											gAudio->GetVoiceCount(), spatial.GetSceneTriangleCount(),
+											spatial.GetSimulationMs(), reverb_times[0], reverb_times[1],
+											reverb_times[2], spatial.GetReflectionMs())
+									.CStr(),
+								1.0f, scWhite);
 	}
 
 #ifdef FX_IS_EDITOR
@@ -1235,6 +1262,19 @@ void RaptorGame::Tick()
 	gWorld->Player.Update(DeltaTime);
 
 	const Ref<FPSCamera>& listener = gWorld->GetCurrentCamera();
+	const AreaGraph& area_graph = gWorldGrid->GetAreaGraph();
+
+	mListenerArea = -1;
+
+	if (!area_graph.IsEmpty()) {
+		mListenerArea = area_graph.FindArea(listener->GetPosition());
+	}
+
+	if (mListenerArea >= 0) {
+		area_graph.CollectConnectedAreas(static_cast<uint32>(mListenerArea), mListenerConnectedAreas);
+	}
+
+	gWorld->pPrototype->UpdateAcoustics(static_cast<float32>(DeltaTime));
 	gAudio->SetListener(listener->GetPosition(), listener->GetForwardVector(), listener->GetUpVector());
 	gAudio->Update(gGraphics->GetWindow()->IsFocused());
 	gWorld->SoundEmitters.Update(static_cast<float32>(DeltaTime), listener->GetPosition());

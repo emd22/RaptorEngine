@@ -7,6 +7,7 @@
 #include <Core/Random.hpp>
 #include <Engine.hpp>
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <miniaudio.h>
 #include <string>
@@ -31,6 +32,22 @@ constexpr const char* scBusVolumeCVarNames[scBusCount] = {
 float32 RandomUnit() { return static_cast<float32>(FastRand32() >> 8) * (1.0f / 16777216.0f); }
 
 float32 RandomInRange(const SoundRange& range) { return range.Min + (range.Max - range.Min) * RandomUnit(); }
+
+ma_result ApplyClip(ma_sound* sound, const SoundClip& clip)
+{
+	ma_uint32 sample_rate = 0;
+
+	ma_result result = ma_sound_get_data_format(sound, nullptr, nullptr, &sample_rate, nullptr, 0);
+
+	if (result != MA_SUCCESS) {
+		return result;
+	}
+
+	const ma_uint64 begin = static_cast<ma_uint64>(static_cast<float64>(clip.Start) * sample_rate);
+	const ma_uint64 end = static_cast<ma_uint64>(static_cast<float64>(clip.End) * sample_rate);
+
+	return ma_data_source_set_range_in_pcm_frames(ma_sound_get_data_source(sound), begin, end);
+}
 
 template <typename T>
 T Value(ConfigFile& config, const char* name, T fallback)
@@ -119,9 +136,9 @@ ma_attenuation_model ToAttenuationModel(eSoundAttenuation attenuation)
 	return ma_attenuation_model_inverse;
 }
 
-Vec3f ToAudioSpace(const Vec3f value) { return Vec3f(value.X, value.Y, -value.Z); }
-
 } // namespace
+
+using Acoustics::ToAudioSpace;
 
 struct AudioSystem::Backend
 {
@@ -144,6 +161,7 @@ bool AudioSystem::Create(const AudioCreateInfo& info)
 
 	ma_engine_config config = ma_engine_config_init();
 	config.listenerCount = 1;
+	config.periodSizeInFrames = SpatialAudio::scFrameSize;
 	config.sampleRate = info.SampleRate;
 	config.channels = info.Channels;
 
@@ -176,6 +194,12 @@ bool AudioSystem::Create(const AudioCreateInfo& info)
 
 	mpVolumeCVar = gCVars->Set("s_volume", 1.0f);
 	mpMuteUnfocusedCVar = gCVars->Set("s_mute_unfocused", 1);
+	mpSpatialCVar = gCVars->Set("s_spatial", 1);
+	mpHrtfCVar = gCVars->Set("s_hrtf", 1);
+	mpReverbCVar = gCVars->Set("s_reverb", 1);
+	mpReverbVolumeCVar = gCVars->Set("s_reverb_volume", 0.3f);
+	mpReverbRaysCVar = gCVars->Set("s_reverb_rays", SpatialAudio::scDefaultReverbRays);
+	mpReverbBouncesCVar = gCVars->Set("s_reverb_bounces", SpatialAudio::scDefaultReverbBounces);
 
 	for (uint32 i = 0; i < scBusCount; i++) {
 		mpBusVolumeCVars[i] = gCVars->Set(scBusVolumeCVarNames[i], 1.0f);
@@ -192,6 +216,11 @@ bool AudioSystem::Create(const AudioCreateInfo& info)
 				GetChannelCount());
 	}
 
+	if (info.bSteamAudio) {
+		mSpatial.Create(&mpBackend->Engine, scMaxVoices,
+						reinterpret_cast<ma_node_base*>(&mpBackend->Buses[static_cast<uint32>(eSoundBus::Sfx)]));
+	}
+
 	LoadSounds();
 
 	return true;
@@ -205,6 +234,8 @@ void AudioSystem::Destroy()
 
 	StopAll();
 	UnloadDefs();
+
+	mSpatial.Destroy();
 
 	for (uint32 i = 0; i < scBusCount; i++) {
 		ma_sound_group_uninit(&mpBackend->Buses[i]);
@@ -325,6 +356,30 @@ bool AudioSystem::LoadDef(const char* path, const String& name, SoundDef& out_de
 	if (out_def.Files.empty()) {
 		LogError(LC_AUDIO, "Sound '{}' needs at least one file in 'file' or 'files'", path);
 		return false;
+	}
+
+	const ConfigEntry* clips = config.GetEntry(HashStr32("clips"));
+
+	if (clips != nullptr && clips->Members.IsInited()) {
+		for (const ConfigEntry& clip : clips->Members) {
+			if (!clip.bIsArray || !clip.ArrayData.IsInited() || clip.ArrayData.Size() != 2) {
+				LogError(LC_AUDIO, "Sound '{}' has a clip that is not [start, end]", path);
+				continue;
+			}
+
+			const float32 start = clip.ArrayData[0].Get<float32>();
+			const float32 end = clip.ArrayData[1].Get<float32>();
+
+			if (start < 0.0f || end <= start) {
+				LogError(LC_AUDIO, "Sound '{}' has an empty or negative clip [{}, {}]", path, start, end);
+				continue;
+			}
+
+			out_def.Clips.push_back(SoundClip { .Start = start, .End = end });
+		}
+	}
+	else if (clips != nullptr) {
+		LogError(LC_AUDIO, "Sound '{}' needs 'clips' written as [[start, end], ...]", path);
 	}
 
 	out_def.Bus = BusFromName(Value<const char*>(config, "bus", "sfx"));
@@ -491,18 +546,26 @@ SoundID AudioSystem::StartVoice(Hash32 name_hash, const Vec3f position, bool spa
 	}
 
 	const SoundDef& def = mDefs[def_index];
-	const uint32 file_count = static_cast<uint32>(def.Files.size());
+	const uint32 clip_count = std::max(static_cast<uint32>(def.Clips.size()), 1u);
+	const uint32 variant_count = static_cast<uint32>(def.Files.size()) * clip_count;
 
-	uint32 variant = FastRand32() % file_count;
+	uint32 variant = FastRand32() % variant_count;
 
-	if (file_count > 1 && variant == mpBackend->LastVariants[def_index]) {
-		variant = (variant + 1) % file_count;
+	if (variant_count > 1 && variant == mpBackend->LastVariants[def_index]) {
+		variant = (variant + 1) % variant_count;
+	}
+
+	const uint32 file_index = variant / clip_count;
+	const SoundClip* clip = nullptr;
+
+	if (!def.Clips.empty()) {
+		clip = &def.Clips[variant % clip_count];
 	}
 
 	ma_sound* prototype = nullptr;
 
 	if (!def.bStream) {
-		prototype = mpBackend->Prototypes[def_index][variant];
+		prototype = mpBackend->Prototypes[def_index][file_index];
 
 		ma_result load_result = MA_ERROR;
 
@@ -512,10 +575,14 @@ SoundID AudioSystem::StartVoice(Hash32 name_hash, const Vec3f position, bool spa
 
 		if (load_result != MA_SUCCESS && load_result != MA_BUSY) {
 			if (!mpBackend->WarnedAboutFailedLoads[def_index]) {
-				LogError(LC_AUDIO, "Sound '{}' could not load '{}'", def.Name, def.Files[variant]);
+				LogError(LC_AUDIO, "Sound '{}' could not load '{}'", def.Name, def.Files[file_index]);
 				mpBackend->WarnedAboutFailedLoads[def_index] = true;
 			}
 
+			return {};
+		}
+
+		if (clip != nullptr && ma_sound_get_data_format(prototype, nullptr, nullptr, nullptr, nullptr, 0) != MA_SUCCESS) {
 			return {};
 		}
 	}
@@ -543,20 +610,55 @@ SoundID AudioSystem::StartVoice(Hash32 name_hash, const Vec3f position, bool spa
 
 	ma_sound* sound = &mpBackend->Voices[slot];
 	ma_sound_group* bus = &mpBackend->Buses[static_cast<uint32>(def.Bus)];
+	ma_sound_group* attachment = bus;
+
+	SpatialVoice* spatial_voice = nullptr;
+
+	if ((flags & MA_SOUND_FLAG_NO_SPATIALIZATION) == 0 && mSpatial.IsActive() && mpSpatialCVar->IntValue != 0) {
+		spatial_voice = mSpatial.CreateVoice(reinterpret_cast<ma_node_base*>(bus));
+	}
+
+	if (spatial_voice != nullptr) {
+		flags |= MA_SOUND_FLAG_NO_SPATIALIZATION | MA_SOUND_FLAG_NO_DEFAULT_ATTACHMENT;
+		attachment = nullptr;
+	}
 
 	ma_result result = MA_SUCCESS;
 
 	if (def.bStream) {
-		result = ma_sound_init_from_file(&mpBackend->Engine, def.Files[variant].CStr(),
-										 flags | MA_SOUND_FLAG_STREAM | MA_SOUND_FLAG_ASYNC, bus, nullptr, sound);
+		ma_uint32 stream_flags = flags | MA_SOUND_FLAG_STREAM;
+
+		if (clip == nullptr) {
+			stream_flags |= MA_SOUND_FLAG_ASYNC;
+		}
+
+		result = ma_sound_init_from_file(&mpBackend->Engine, def.Files[file_index].CStr(), stream_flags, attachment,
+										 nullptr, sound);
 	}
 	else {
-		result = ma_sound_init_copy(&mpBackend->Engine, prototype, flags, bus, sound);
+		result = ma_sound_init_copy(&mpBackend->Engine, prototype, flags, attachment, sound);
 	}
 
 	if (result != MA_SUCCESS) {
 		LogError(LC_AUDIO, "Could not start sound '{}' ({})", def.Name, ma_result_description(result));
+		mSpatial.DestroyVoice(spatial_voice);
 		return {};
+	}
+
+	if (clip != nullptr) {
+		result = ApplyClip(sound, *clip);
+
+		if (result != MA_SUCCESS) {
+			LogError(LC_AUDIO, "Could not set clip [{}, {}] on sound '{}' ({})", clip->Start, clip->End, def.Name,
+					 ma_result_description(result));
+			ma_sound_uninit(sound);
+			mSpatial.DestroyVoice(spatial_voice);
+			return {};
+		}
+	}
+
+	if (spatial_voice != nullptr) {
+		ma_node_attach_output_bus(sound, 0, mSpatial.GetVoiceInput(spatial_voice), 0);
 	}
 
 	mpBackend->LastVariants[def_index] = variant;
@@ -565,10 +667,16 @@ SoundID AudioSystem::StartVoice(Hash32 name_hash, const Vec3f position, bool spa
 	voice.DefIndex = def_index;
 	voice.StartOrder = mNextStartOrder++;
 	voice.Volume = RandomInRange(def.Volume);
+	voice.Position = position;
+	voice.pSpatial = spatial_voice;
 	voice.bActive = true;
 	voice.bStopping = false;
 
 	++mActiveVoiceCount;
+
+	if (spatial_voice != nullptr) {
+		UpdateSpatialVoice(slot);
+	}
 
 	ma_sound_set_volume(sound, voice.Volume);
 	ma_sound_set_pitch(sound, RandomInRange(def.Pitch));
@@ -624,6 +732,9 @@ void AudioSystem::ReleaseVoice(uint32 slot)
 
 	ma_sound_uninit(&mpBackend->Voices[slot]);
 
+	mSpatial.DestroyVoice(voice.pSpatial);
+	voice.pSpatial = nullptr;
+
 	voice.bActive = false;
 	voice.bStopping = false;
 	++voice.Generation;
@@ -633,7 +744,16 @@ void AudioSystem::ReleaseVoice(uint32 slot)
 
 void AudioSystem::SetPosition(SoundID id, const Vec3f position)
 {
-	if (GetVoice(id) == nullptr) {
+	Voice* voice = GetVoice(id);
+
+	if (voice == nullptr) {
+		return;
+	}
+
+	voice->Position = position;
+
+	if (voice->pSpatial != nullptr) {
+		UpdateSpatialVoice(id.Slot);
 		return;
 	}
 
@@ -700,9 +820,13 @@ void AudioSystem::SetListener(const Vec3f position, const Vec3f forward, const V
 		return;
 	}
 
+	mListenerPosition = position;
+
 	const Vec3f audio_position = ToAudioSpace(position);
 	const Vec3f audio_forward = ToAudioSpace(forward);
 	const Vec3f audio_up = ToAudioSpace(up);
+
+	mSpatial.SetListener(audio_position, audio_forward, audio_up);
 
 	ma_engine_listener_set_position(&mpBackend->Engine, 0, audio_position.X, audio_position.Y, audio_position.Z);
 	ma_engine_listener_set_direction(&mpBackend->Engine, 0, audio_forward.X, audio_forward.Y, audio_forward.Z);
@@ -743,8 +867,73 @@ void AudioSystem::Update(bool window_focused)
 
 		if (ma_sound_at_end(sound) || (voice.bStopping && !ma_sound_is_playing(sound))) {
 			ReleaseVoice(i);
+			continue;
+		}
+
+		if (voice.pSpatial != nullptr) {
+			UpdateSpatialVoice(i);
 		}
 	}
+
+	mSpatial.SetReverb(mpReverbCVar->IntValue != 0, mpReverbVolumeCVar->FloatValue, mpHrtfCVar->IntValue != 0);
+	mSpatial.SetReverbQuality(static_cast<int32>(mpReverbRaysCVar->IntValue),
+							  static_cast<int32>(mpReverbBouncesCVar->IntValue));
+	mSpatial.Simulate();
+}
+
+float32 AudioSystem::GetDistanceGain(const SoundDef& def, float32 distance) const
+{
+	const float32 clamped = std::clamp(distance, def.MinDistance, def.MaxDistance);
+
+	switch (def.Attenuation) {
+	case eSoundAttenuation::None:
+		return 1.0f;
+	case eSoundAttenuation::Linear:
+		if (def.MaxDistance <= def.MinDistance) {
+			return 1.0f;
+		}
+
+		return std::clamp(1.0f - def.Rolloff * (clamped - def.MinDistance) / (def.MaxDistance - def.MinDistance), 0.0f,
+						  1.0f);
+	case eSoundAttenuation::Exponential:
+		return std::pow(clamped / def.MinDistance, -def.Rolloff);
+	case eSoundAttenuation::Inverse:
+		break;
+	}
+
+	return def.MinDistance / (def.MinDistance + def.Rolloff * (clamped - def.MinDistance));
+}
+
+void AudioSystem::UpdateSpatialVoice(uint32 slot)
+{
+	const Voice& voice = mVoices[slot];
+	const SoundDef& def = mDefs[voice.DefIndex];
+
+	float32 gain = GetDistanceGain(def, (voice.Position - mListenerPosition).Length());
+
+	if (mPathGain) {
+		gain *= mPathGain(voice.Position, mListenerPosition);
+	}
+
+	mSpatial.SetVoiceSource(voice.pSpatial, ToAudioSpace(voice.Position), gain, mpHrtfCVar->IntValue != 0);
+}
+
+void AudioSystem::SetAcousticScene(const AcousticGeometry& geometry)
+{
+	if (!mSpatial.IsActive()) {
+		return;
+	}
+
+	mSpatial.SetScene(Acoustics::ToAudioSpace(geometry));
+}
+
+void AudioSystem::SetBakedAcoustics(const std::vector<uint8>& data)
+{
+	if (!mSpatial.IsActive()) {
+		return;
+	}
+
+	mSpatial.SetBakedProbes(data);
 }
 
 uint64 AudioSystem::ReadFrames(float32* out_frames, uint64 frame_count)
