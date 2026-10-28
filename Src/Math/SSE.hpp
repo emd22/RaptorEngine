@@ -5,6 +5,7 @@
 // If we are on another platform and wish to emulate AVX, use the SIMDE wrapper headers
 #ifdef FX_USE_SIMDE
 #include <simde/avx2.h>
+#include <simde/f16c.h>
 #include <simde/fma.h>
 #include <simde/sse4.2.h>
 #else

@@ -18,6 +18,7 @@
 #include <Editor/RaptorEditor.hpp>
 #endif
 #include <Engine.hpp>
+#include <Math/Float16.hpp>
 #include <Map/CompiledMap.hpp>
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
@@ -91,23 +92,16 @@ float32 TexelToNdc(uint32 index, uint32 size)
 	return ((static_cast<float32>(index) + 0.5f) / static_cast<float32>(size)) * 2.0f - 1.0f;
 }
 
-/// Subnormals and NaNs decode as zero
-float32 HalfToFloat(uint16 half)
+float32 HalfToRadiance(uint16 half)
 {
-	const uint32 exponent = (half >> 10) & 0x1F;
-	const uint32 mantissa = half & 0x3FF;
+	const Float16 value = Float16::FromBits(half);
 
-	if (exponent == 0 || (exponent == 31 && mantissa != 0)) {
+	if (value.IsNaN()) {
 		return 0.0f;
 	}
 
-	uint32 bits = static_cast<uint32>(half & 0x8000) << 16;
-	bits |= (exponent == 31) ? 0x7F800000 : (((exponent + 112) << 23) | (mantissa << 13));
-
-	return std::bit_cast<float32>(bits);
+	return std::clamp(value.ToFloat(), 0.0f, scRadianceClamp);
 }
-
-float32 HalfToRadiance(uint16 half) { return std::clamp(HalfToFloat(half), 0.0f, scRadianceClamp); }
 
 /// `stored_depth` is reverse-Z, and 0 where nothing was drawn
 float32 CaptureDepthToDistance(const Mat4f& inv_projection, float32 stored_depth, float32 ndc_x, float32 ndc_y)

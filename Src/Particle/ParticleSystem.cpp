@@ -7,6 +7,7 @@
 #include <Core/Log.hpp>
 #include <Core/Random.hpp>
 #include <Engine.hpp>
+#include <Math/Float16.hpp>
 #include <Math/Frustum.hpp>
 #include <Math/MathConsts.hpp>
 #include <Math/Vec2.hpp>
@@ -58,15 +59,7 @@ float32 RandomInRange(const ParticleRange& range) { return range.Min + (range.Ma
 
 uint32 PackHalf2(float32 low, float32 high)
 {
-	const _Float16 half_low = static_cast<_Float16>(std::clamp(low, -scMaxHalf, scMaxHalf));
-	const _Float16 half_high = static_cast<_Float16>(std::clamp(high, -scMaxHalf, scMaxHalf));
-
-	uint16 low_bits;
-	uint16 high_bits;
-	memcpy(&low_bits, &half_low, sizeof(low_bits));
-	memcpy(&high_bits, &half_high, sizeof(high_bits));
-
-	return static_cast<uint32>(low_bits) | (static_cast<uint32>(high_bits) << 16);
+	return PackFloat16x2(std::clamp(low, -scMaxHalf, scMaxHalf), std::clamp(high, -scMaxHalf, scMaxHalf));
 }
 
 uint32 PackUnorm2(float32 low, float32 high)

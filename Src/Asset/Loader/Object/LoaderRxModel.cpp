@@ -9,6 +9,7 @@
 #include <Core/Ref.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
+#include <Math/Float16.hpp>
 #include <Object/Object.hpp>
 #include <Renderer/Backend/GraphicsBackendFwd.hpp>
 #include <Renderer/Globals.hpp>
@@ -67,39 +68,6 @@ struct BuiltSubmesh
 	Ref<PrimitiveMesh> pMesh { nullptr };
 };
 
-float32 HalfToFloat(uint16 half)
-{
-	const uint32 sign = static_cast<uint32>(half & 0x8000u) << 16;
-	const uint32 exponent = (half >> 10) & 0x1Fu;
-	uint32 mantissa = half & 0x3FFu;
-
-	uint32 bits = sign;
-
-	if (exponent == 0) {
-		if (mantissa != 0) {
-			uint32 shift = 0;
-
-			do {
-				++shift;
-				mantissa <<= 1;
-			} while ((mantissa & 0x400u) == 0);
-
-			bits = sign | ((113u - shift) << 23) | ((mantissa & 0x3FFu) << 13);
-		}
-	}
-	else if (exponent == 31) {
-		bits = sign | 0x7F800000u | (mantissa << 13);
-	}
-	else {
-		bits = sign | ((exponent + 112u) << 23) | (mantissa << 13);
-	}
-
-	float32 value;
-	memcpy(&value, &bits, sizeof(value));
-
-	return value;
-}
-
 void ReadFloats(const AttributeView& view, uint32 vertex, float32* out)
 {
 	const uint8* src = view.pData + static_cast<size_t>(vertex) * view.Stride;
@@ -117,7 +85,7 @@ void ReadFloats(const AttributeView& view, uint32 vertex, float32* out)
 		for (uint32 i = 0; i < components; i++) {
 			uint16 half;
 			memcpy(&half, src + i * 2, sizeof(half));
-			out[i] = HalfToFloat(half);
+			out[i] = Float16::FromBits(half).ToFloat();
 		}
 		break;
 	case rx::VF_UNorm8x4:

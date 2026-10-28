@@ -1,5 +1,6 @@
 #include "ReflectionFilter.hpp"
 
+#include <Math/Float16.hpp>
 #include <Math/MathConsts.hpp>
 #include <Math/MathUtil.hpp>
 #include <algorithm>
@@ -12,7 +13,6 @@ namespace fx::ReflectionFilter {
 namespace {
 
 constexpr uint32 scSampleCount = 128;
-constexpr float32 scMaxHalf = 65504.0f;
 
 struct CubeLevel
 {
@@ -174,6 +174,15 @@ std::vector<LobeSample> BuildLobeSamples(float32 roughness, uint32 source_size)
 	return samples;
 }
 
+uint16 FloatToHalf(float32 value)
+{
+	if (!(value > 0.0f)) {
+		return 0;
+	}
+
+	return Float16(std::min(value, Float16::scMaxValue.ToFloat())).GetBits();
+}
+
 void WriteTexel(uint16*& out, const float32 rgb[3])
 {
 	*out++ = FloatToHalf(rgb[0]);
@@ -254,30 +263,6 @@ float32 MipToRoughness(uint32 mip, uint32 mip_count)
 	}
 
 	return static_cast<float32>(mip) / static_cast<float32>(mip_count - 1);
-}
-
-uint16 FloatToHalf(float32 value)
-{
-	if (!(value > 0.0f)) {
-		return 0;
-	}
-
-	const uint32 bits = std::bit_cast<uint32>(std::min(value, scMaxHalf));
-	const int32 exponent = static_cast<int32>((bits >> 23) & 0xFF) - 127 + 15;
-	const uint32 mantissa = bits & 0x7FFFFF;
-
-	if (exponent <= 0) {
-		if (exponent < -10) {
-			return 0;
-		}
-
-		const uint32 shift = static_cast<uint32>(14 - exponent);
-		const uint32 full = mantissa | 0x800000;
-
-		return static_cast<uint16>((full >> shift) + ((full >> (shift - 1)) & 1));
-	}
-
-	return static_cast<uint16>(((static_cast<uint32>(exponent) << 10) | (mantissa >> 13)) + ((mantissa >> 12) & 1));
 }
 
 void Prefilter(const float32* const faces[scFaces], uint32 size, uint32 mip_count, uint16* out_texels)
