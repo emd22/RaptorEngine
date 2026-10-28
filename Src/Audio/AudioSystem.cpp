@@ -1,5 +1,7 @@
 #include "AudioSystem.hpp"
 
+#include <miniaudio.h>
+
 #include <Asset/ConfigFile.hpp>
 #include <CVar.hpp>
 #include <Core/FilesystemIO.hpp>
@@ -9,7 +11,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <miniaudio.h>
 #include <string>
 
 namespace fx {
@@ -197,7 +198,7 @@ bool AudioSystem::Create(const AudioCreateInfo& info)
 	mpSpatialCVar = gCVars->Set("s_spatial", 1);
 	mpHrtfCVar = gCVars->Set("s_hrtf", 1);
 	mpReverbCVar = gCVars->Set("s_reverb", 1);
-	mpReverbVolumeCVar = gCVars->Set("s_reverb_volume", 0.3f);
+	mpReverbVolumeCVar = gCVars->Set("s_reverb_volume", 0.8f);
 	mpReverbRaysCVar = gCVars->Set("s_reverb_rays", SpatialAudio::scDefaultReverbRays);
 	mpReverbBouncesCVar = gCVars->Set("s_reverb_bounces", SpatialAudio::scDefaultReverbBounces);
 
@@ -295,8 +296,8 @@ void AudioSystem::LoadSounds()
 		for (const String& path : def.Files) {
 			ma_sound* prototype = new ma_sound;
 
-			const ma_result result = ma_sound_init_from_file(&mpBackend->Engine, path.CStr(), scPrototypeFlags,
-															 nullptr, nullptr, prototype);
+			const ma_result result = ma_sound_init_from_file(&mpBackend->Engine, path.CStr(), scPrototypeFlags, nullptr,
+															 nullptr, prototype);
 
 			if (result != MA_SUCCESS) {
 				LogError(LC_AUDIO, "Could not load sound file '{}' ({})", path, ma_result_description(result));
@@ -398,6 +399,8 @@ bool AudioSystem::LoadDef(const char* path, const String& name, SoundDef& out_de
 	out_def.FadeIn = std::max(Value<float32>(config, "fade_in", 0.0f), 0.0f);
 	out_def.FadeOut = std::max(Value<float32>(config, "fade_out", 0.0f), 0.0f);
 
+	out_def.Reverb = std::max(Value<float32>(config, "reverb", 0.0f), 0.0f);
+
 	out_def.MaxInstances = static_cast<uint32>(std::max(Value<int32>(config, "max_instances", 0), 0));
 
 	return true;
@@ -448,6 +451,11 @@ const SoundDef* AudioSystem::FindDef(Hash32 name_hash) const
 SoundID AudioSystem::Play(const char* name, const Vec3f position) { return Play(HashStr32(name), position); }
 
 SoundID AudioSystem::Play(Hash32 name_hash, const Vec3f position) { return StartVoice(name_hash, position, true); }
+
+SoundID AudioSystem::PlayDelayed(Hash32 name_hash, const Vec3f position, float32 delay)
+{
+	return StartVoice(name_hash, position, true, delay);
+}
 
 SoundID AudioSystem::Play2D(const char* name) { return Play2D(HashStr32(name)); }
 
@@ -533,7 +541,7 @@ uint32 AudioSystem::AcquireVoice(uint32 def_index)
 	return oldest_slot;
 }
 
-SoundID AudioSystem::StartVoice(Hash32 name_hash, const Vec3f position, bool spatial)
+SoundID AudioSystem::StartVoice(Hash32 name_hash, const Vec3f position, bool spatial, float32 delay)
 {
 	if (mpBackend == nullptr) {
 		return {};
@@ -582,7 +590,8 @@ SoundID AudioSystem::StartVoice(Hash32 name_hash, const Vec3f position, bool spa
 			return {};
 		}
 
-		if (clip != nullptr && ma_sound_get_data_format(prototype, nullptr, nullptr, nullptr, nullptr, 0) != MA_SUCCESS) {
+		if (clip != nullptr &&
+			ma_sound_get_data_format(prototype, nullptr, nullptr, nullptr, nullptr, 0) != MA_SUCCESS) {
 			return {};
 		}
 	}
@@ -623,6 +632,18 @@ SoundID AudioSystem::StartVoice(Hash32 name_hash, const Vec3f position, bool spa
 		attachment = nullptr;
 	}
 
+	ReverbSend* reverb_send = nullptr;
+
+	if (spatial_voice == nullptr && (flags & MA_SOUND_FLAG_NO_SPATIALIZATION) != 0 && def.Reverb > 0.0f &&
+		mSpatial.IsActive()) {
+		reverb_send = mSpatial.CreateReverbSend(reinterpret_cast<ma_node_base*>(bus), def.Reverb);
+	}
+
+	if (reverb_send != nullptr) {
+		flags |= MA_SOUND_FLAG_NO_DEFAULT_ATTACHMENT;
+		attachment = nullptr;
+	}
+
 	ma_result result = MA_SUCCESS;
 
 	if (def.bStream) {
@@ -642,6 +663,7 @@ SoundID AudioSystem::StartVoice(Hash32 name_hash, const Vec3f position, bool spa
 	if (result != MA_SUCCESS) {
 		LogError(LC_AUDIO, "Could not start sound '{}' ({})", def.Name, ma_result_description(result));
 		mSpatial.DestroyVoice(spatial_voice);
+		mSpatial.DestroyReverbSend(reverb_send);
 		return {};
 	}
 
@@ -653,12 +675,17 @@ SoundID AudioSystem::StartVoice(Hash32 name_hash, const Vec3f position, bool spa
 					 ma_result_description(result));
 			ma_sound_uninit(sound);
 			mSpatial.DestroyVoice(spatial_voice);
+			mSpatial.DestroyReverbSend(reverb_send);
 			return {};
 		}
 	}
 
 	if (spatial_voice != nullptr) {
 		ma_node_attach_output_bus(sound, 0, mSpatial.GetVoiceInput(spatial_voice), 0);
+	}
+
+	if (reverb_send != nullptr) {
+		ma_node_attach_output_bus(sound, 0, mSpatial.GetReverbSendInput(reverb_send), 0);
 	}
 
 	mpBackend->LastVariants[def_index] = variant;
@@ -669,6 +696,7 @@ SoundID AudioSystem::StartVoice(Hash32 name_hash, const Vec3f position, bool spa
 	voice.Volume = RandomInRange(def.Volume);
 	voice.Position = position;
 	voice.pSpatial = spatial_voice;
+	voice.pReverbSend = reverb_send;
 	voice.bActive = true;
 	voice.bStopping = false;
 
@@ -695,6 +723,13 @@ SoundID AudioSystem::StartVoice(Hash32 name_hash, const Vec3f position, bool spa
 
 	if (def.FadeIn > 0.0f) {
 		ma_sound_set_fade_in_milliseconds(sound, 0.0f, 1.0f, static_cast<ma_uint64>(def.FadeIn * 1000.0f));
+	}
+
+	if (delay > 0.0f) {
+		const ma_uint64 delay_frames =
+			static_cast<ma_uint64>(delay * static_cast<float32>(ma_engine_get_sample_rate(&mpBackend->Engine)));
+
+		ma_sound_set_start_time_in_pcm_frames(sound, ma_engine_get_time_in_pcm_frames(&mpBackend->Engine) + delay_frames);
 	}
 
 	ma_sound_start(sound);
@@ -734,6 +769,9 @@ void AudioSystem::ReleaseVoice(uint32 slot)
 
 	mSpatial.DestroyVoice(voice.pSpatial);
 	voice.pSpatial = nullptr;
+
+	mSpatial.DestroyReverbSend(voice.pReverbSend);
+	voice.pReverbSend = nullptr;
 
 	voice.bActive = false;
 	voice.bStopping = false;

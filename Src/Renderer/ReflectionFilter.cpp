@@ -1,6 +1,7 @@
 #include "ReflectionFilter.hpp"
 
 #include <Math/MathConsts.hpp>
+#include <Math/MathUtil.hpp>
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -11,7 +12,6 @@ namespace fx::ReflectionFilter {
 namespace {
 
 constexpr uint32 scSampleCount = 128;
-// constexpr float32 scPi = 3.14159265359f;
 constexpr float32 scMaxHalf = 65504.0f;
 
 struct CubeLevel
@@ -126,16 +126,6 @@ std::vector<CubeLevel> BuildSourceLevels(const float32* const faces[scFaces], ui
 	return levels;
 }
 
-float32 RadicalInverse(uint32 bits)
-{
-	bits = (bits << 16) | (bits >> 16);
-	bits = ((bits & 0x55555555u) << 1) | ((bits & 0xAAAAAAAAu) >> 1);
-	bits = ((bits & 0x33333333u) << 2) | ((bits & 0xCCCCCCCCu) >> 2);
-	bits = ((bits & 0x0F0F0F0Fu) << 4) | ((bits & 0xF0F0F0F0u) >> 4);
-	bits = ((bits & 0x00FF00FFu) << 8) | ((bits & 0xFF00FF00u) >> 8);
-
-	return static_cast<float32>(bits) * 2.3283064365386963e-10f;
-}
 
 std::vector<LobeSample> BuildLobeSamples(float32 roughness, uint32 source_size)
 {
@@ -149,7 +139,7 @@ std::vector<LobeSample> BuildLobeSamples(float32 roughness, uint32 source_size)
 
 	for (uint32 i = 0; i < scSampleCount; i++) {
 		const float32 xi_x = (static_cast<float32>(i) + 0.5f) / static_cast<float32>(scSampleCount);
-		const float32 xi_y = RadicalInverse(i);
+		const float32 xi_y = MathUtil::RadicalInverse<float32>(i);
 
 		const float32 phi = 2.0f * FX_PI * xi_x;
 		const float32 cos_theta = std::sqrt((1.0f - xi_y) / (1.0f + (alpha_sq - 1.0f) * xi_y));

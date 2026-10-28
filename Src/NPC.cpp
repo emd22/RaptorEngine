@@ -24,7 +24,7 @@ bool NPC::Create(const Object* model, const NPCDesc& desc)
 
 	Object* root = model->CloneWithOwnSkeleton(std::string(desc.Name.CStr()));
 
-	std::vector<Object*> parts;
+	DynArray<Object*> parts;
 	CollectObjectTree(root, parts);
 
 	const auto skinned_part = std::find_if(parts.begin(), parts.end(),
@@ -64,9 +64,18 @@ bool NPC::Create(const Object* model, const NPCDesc& desc)
 	}
 
 	mRagdoll.SetAllBodyModes(physics::eRagdollBodyMode::Kinematic);
-	mRagdoll.Drive(skinned->GetWorldMatrix(), true);
+	mRagdoll.SetRootAssist(RootAssist);
+	mRagdoll.Drive(skinned->GetWorldMatrix(), 0.0f, true);
+	mAssistFade = 1.0f;
+	mPoweredTime = 0.0f;
+	mPhysicsBlend = 1.0f;
 
-	mSettleTimes.assign(mRagdoll.GetBodyCount(), 0.0f);
+	mBodyStrengths.Free();
+	mBodyStrengths.InitCapacity(mRagdoll.GetBodyCount());
+
+	for (uint32 i = 0; i < mRagdoll.GetBodyCount(); i++) {
+		mBodyStrengths.Insert(1.0f);
+	}
 
 	gWorld->AttachLoaded(root);
 
@@ -105,11 +114,19 @@ void NPC::Update(float32 delta_time, bool draw_debug)
 		mRagdoll.WriteToSkeleton();
 	}
 	else if (Object* skinned = GetSkinnedObject()) {
-		mpSkeleton->AdvancePose(delta_time);
+		float32 pose_time = delta_time;
 
+		if (mRagdoll.IsBalancing()) {
+			pose_time = 0.0f;
+		}
+
+		mpSkeleton->AdvancePose(pose_time);
+
+		UpdateBalance(delta_time);
 		UpdateReactions(delta_time);
+		UpdatePhysicsBlend(delta_time);
 
-		mRagdoll.Drive(skinned->GetWorldMatrix(), mbTeleported);
+		mRagdoll.Drive(skinned->GetWorldMatrix(), delta_time, mbTeleported);
 		mRagdoll.WriteToSkeleton();
 
 		mbTeleported = false;
@@ -205,7 +222,7 @@ void NPC::EnterRagdoll()
 		return;
 	}
 
-	std::vector<Object*> parts;
+	DynArray<Object*> parts;
 	CollectObjectTree(root, parts);
 
 	for (Object* part : parts) {
@@ -214,38 +231,171 @@ void NPC::EnterRagdoll()
 
 	mRagdoll.GoLimp(skinned->GetWorldMatrix());
 	mState = eState::Ragdoll;
+}
 
-	mSettleTimes.assign(mSettleTimes.size(), 0.0f);
+void NPC::UpdateBalance(float32 delta_time)
+{
+	constexpr float32 scMinBalanceTime = 0.75f;
+	constexpr float32 scAssistFadeTime = 0.5f;
+
+	if (mState != eState::Animated) {
+		return;
+	}
+
+	if (!bBalance) {
+		mRagdoll.SetBalancing(false);
+		mAssistFade = 1.0f;
+		return;
+	}
+
+	if (!mRagdoll.IsBalancing()) {
+		mAssistFade = std::min(mAssistFade + delta_time / scAssistFadeTime, 1.0f);
+		return;
+	}
+
+	const physics::BalanceStatus& status = mRagdoll.GetBalanceStatus();
+
+	mBalanceTime += delta_time;
+
+	if (status.State == physics::eBalanceState::Fallen) {
+		mRagdoll.SetBalancing(false);
+		mState = eState::Fallen;
+		return;
+	}
+
+	if (mBalanceTime > scMinBalanceTime && status.bCalm) {
+		ReturnToAnimation();
+	}
+}
+
+void NPC::ActivateBalance()
+{
+	if (!bBalance || mState != eState::Animated || !mRagdoll.IsCreated()) {
+		return;
+	}
+
+	mRagdoll.SetBalancing(true);
+
+	if (!mRagdoll.IsBalancing()) {
+		return;
+	}
+
+	mBalanceTime = 0.0f;
+	mAssistFade = 0.0f;
+}
+
+void NPC::ReturnToAnimation()
+{
+	Object* root = gObjectManager->GetObject(mRootID);
+
+	if (root != nullptr) {
+		const Vec3f offset = mRagdoll.GetBodyOrigin(0) - mRagdoll.GetBodyTargetOrigin(0);
+
+		root->SetPosition(root->GetPosition() + Vec3f(offset.X, 0.0f, offset.Z));
+	}
+
+	mRagdoll.RebaseTargets();
+	mRagdoll.SetBalancing(false);
+	mAssistFade = 0.0f;
+}
+
+bool NPC::IsPowered() const
+{
+	if (!mRagdoll.IsCreated() || mRagdoll.GetBodyCount() == 0) {
+		return false;
+	}
+
+	return mRagdoll.GetBodyMode(0) == physics::eRagdollBodyMode::Powered;
+}
+
+void NPC::SetPowered(bool powered)
+{
+	if (!mRagdoll.IsCreated() || IsPowered() == powered) {
+		return;
+	}
+
+	if (powered) {
+		mRagdoll.SetAllBodyModes(physics::eRagdollBodyMode::Powered);
+	}
+	else {
+		mRagdoll.SetAllBodyModes(physics::eRagdollBodyMode::Kinematic);
+	}
+
+	mPhysicsBlend = 1.0f;
+
+	for (uint32 i = 0; i < mRagdoll.GetBodyCount(); i++) {
+		mRagdoll.SetBodyBlend(i, mPhysicsBlend);
+	}
+}
+
+void NPC::UpdatePhysicsBlend(float32 delta_time)
+{
+	constexpr float32 scMinPoweredTime = 1.0f;
+	constexpr float32 scBlendOutTime = 0.25f;
+
+	if (mState != eState::Animated || !IsPowered()) {
+		return;
+	}
+
+	mPoweredTime += delta_time;
+
+	bool is_settled = !mRagdoll.IsBalancing() && mPoweredTime >= scMinPoweredTime && mAssistFade >= 1.0f;
+
+	for (const float32 body_strength : mBodyStrengths) {
+		if (body_strength < 1.0f) {
+			is_settled = false;
+		}
+	}
+
+	const float32 blend_step = delta_time / scBlendOutTime;
+
+	if (is_settled) {
+		mPhysicsBlend = std::max(mPhysicsBlend - blend_step, 0.0f);
+	}
+	else {
+		mPhysicsBlend = std::min(mPhysicsBlend + blend_step, 1.0f);
+	}
+
+	if (mPhysicsBlend <= 0.0f) {
+		SetPowered(false);
+		return;
+	}
+
+	for (uint32 i = 0; i < mRagdoll.GetBodyCount(); i++) {
+		mRagdoll.SetBodyBlend(i, mPhysicsBlend);
+	}
 }
 
 void NPC::UpdateReactions(float32 delta_time)
 {
-	constexpr float32 scSettleDistance = 0.0075f;
-	constexpr float32 scSettleAngle = 0.035f;
-	constexpr float32 scSettleTime = 0.15f;
+	const float32 recover_rate = (ReactRecoverTime > 0.0f) ? delta_time / ReactRecoverTime : 1.0f;
 
-	for (uint32 i = 0; i < mSettleTimes.size(); i++) {
-		if (mRagdoll.GetBodyMode(i) != physics::eRagdollBodyMode::Powered) {
-			continue;
-		}
-
-		float32 distance = 0.0f;
-		float32 angle = 0.0f;
-
-		if (!mRagdoll.GetBodyTrackingError(i, distance, angle) || distance > scSettleDistance || angle > scSettleAngle) {
-			mSettleTimes[i] = 0.0f;
-			continue;
-		}
-
-		mSettleTimes[i] += delta_time;
-
-		if (mSettleTimes[i] >= scSettleTime) {
-			mSettleTimes[i] = 0.0f;
-
-			mRagdoll.SetBodyMode(i, physics::eRagdollBodyMode::Kinematic);
-			mRagdoll.SetBodyStrength(i, 1.0f);
-		}
+	for (float32& body_strength : mBodyStrengths) {
+		body_strength = std::min(body_strength + recover_rate, 1.0f);
 	}
+
+	ApplyStrengths();
+}
+
+void NPC::ApplyStrengths()
+{
+	if (mBodyStrengths.IsEmpty()) {
+		return;
+	}
+
+	float32 strength = Strength;
+	float32 root_assist = RootAssist;
+
+	if (mState == eState::Fallen) {
+		strength = FallStrength;
+		root_assist = 0.0f;
+	}
+
+	for (uint32 i = 0; i < mBodyStrengths.Size; i++) {
+		mRagdoll.SetBodyStrength(i, strength * mBodyStrengths[i]);
+	}
+
+	mRagdoll.SetRootAssist(root_assist * mBodyStrengths[0] * mAssistFade);
 }
 
 void NPC::AddImpulse(JPH::BodyID body_id, const Vec3f impulse, const Vec3f point)
@@ -266,82 +416,55 @@ void NPC::React(JPH::BodyID body_id, const Vec3f impulse, const Vec3f point)
 {
 	constexpr float32 scMinSpeed = 1.0f;
 	constexpr float32 scMaxSpeed = 4.0f;
-	constexpr float32 scAnchorScale = 0.5f;
 
 	if (!IsCreated() || mState == eState::Ragdoll || !mRagdoll.IsCreated()) {
 		return;
 	}
 
-	const int32 hit_body = mRagdoll.FindBodyIndex(body_id);
+	const int32 body = mRagdoll.FindBodyIndex(body_id);
 	const uint32 body_count = mRagdoll.GetBodyCount();
 
-	if (hit_body < 0) {
+	if (body < 0) {
 		return;
 	}
 
-	int32 body = hit_body;
-	Vec3f at = point;
-	float32 scale = 1.0f;
+	SetPowered(true);
+	mPoweredTime = 0.0f;
 
-	if (mRagdoll.IsAnchor(hit_body)) {
-		body = -1;
+	if (!mRagdoll.IsAnchor(body)) {
+		const auto child_count = [&](int32 parent)
+		{
+			uint32 count = 0;
+
+			for (uint32 i = 0; i < body_count; i++) {
+				count += (mRagdoll.GetParentBody(i) == parent) ? 1 : 0;
+			}
+
+			return count;
+		};
+
+		int32 top = body;
+
+		for (int32 parent = mRagdoll.GetParentBody(top);
+			 parent >= 0 && !mRagdoll.IsAnchor(parent) && child_count(parent) == 1;
+			 parent = mRagdoll.GetParentBody(top)) {
+			top = parent;
+		}
 
 		for (uint32 i = 0; i < body_count; i++) {
-			const int32 parent = mRagdoll.GetParentBody(i);
-
-			if (!mRagdoll.IsAnchor(i) && parent >= 0 && mRagdoll.IsAnchor(parent)) {
-				body = static_cast<int32>(i);
-				break;
+			for (int32 walk = static_cast<int32>(i); walk >= 0; walk = mRagdoll.GetParentBody(walk)) {
+				if (walk == top) {
+					mBodyStrengths[i] = std::min(mBodyStrengths[i], ReactStrength);
+					break;
+				}
 			}
 		}
-
-		if (body < 0) {
-			return;
-		}
-
-		at = mRagdoll.GetBodyPosition(body);
-		scale = scAnchorScale;
+	}
+	else {
+		mBodyStrengths[body] = std::min(mBodyStrengths[body], ReactStrength);
 	}
 
-	const auto child_count = [&](int32 parent)
-	{
-		uint32 count = 0;
-
-		for (uint32 i = 0; i < body_count; i++) {
-			count += (mRagdoll.GetParentBody(i) == parent) ? 1 : 0;
-		}
-
-		return count;
-	};
-
-	int32 top = body;
-
-	for (int32 parent = mRagdoll.GetParentBody(top);
-		 parent >= 0 && !mRagdoll.IsAnchor(parent) && child_count(parent) == 1;
-		 parent = mRagdoll.GetParentBody(top)) {
-		top = parent;
-	}
-
-	for (uint32 i = 0; i < body_count; i++) {
-		bool in_chain = false;
-
-		for (int32 walk = static_cast<int32>(i); walk >= 0; walk = mRagdoll.GetParentBody(walk)) {
-			if (walk == top) {
-				in_chain = true;
-				break;
-			}
-		}
-
-		if (!in_chain) {
-			continue;
-		}
-
-		mRagdoll.SetBodyMode(i, physics::eRagdollBodyMode::Powered);
-		mRagdoll.SetBodyStrength(i, ReactStrength);
-		mRagdoll.SetBodyBlend(i, 1.0f);
-
-		mSettleTimes[i] = 0.0f;
-	}
+	ApplyStrengths();
 
 	const float32 length = impulse.Length();
 	const float32 mass = mRagdoll.GetBodyMass(body);
@@ -350,9 +473,12 @@ void NPC::React(JPH::BodyID body_id, const Vec3f impulse, const Vec3f point)
 		return;
 	}
 
-	const float32 speed = std::clamp(length * scale / mass, scMinSpeed, scMaxSpeed);
+	ActivateBalance();
+	ApplyStrengths();
 
-	mRagdoll.AddImpulse(mRagdoll.GetBodyID(body), impulse * (speed * mass / length), at);
+	const float32 speed = std::clamp(length / mass, scMinSpeed, scMaxSpeed);
+
+	mRagdoll.AddImpulse(body_id, impulse * (speed * mass / length), point);
 }
 
 float32 GetHitWoundSize(const physics::RagdollHit& hit)
@@ -463,34 +589,37 @@ NPC* NPCManager::Spawn(const Object* model, const NPCDesc& desc)
 		return nullptr;
 	}
 
-	mNPCs.push_back(std::move(npc));
-	return mNPCs.back().get();
+	NPC* spawned = npc.get();
+	mNPCs.Insert(std::move(npc));
+
+	return spawned;
 }
 
 void NPCManager::Destroy(NPC* npc)
 {
-	const auto found = std::find_if(mNPCs.begin(), mNPCs.end(),
-									[npc](const std::unique_ptr<NPC>& entry) { return entry.get() == npc; });
-
-	if (found != mNPCs.end()) {
-		mNPCs.erase(found);
+	for (uint32 i = 0; i < mNPCs.Size; i++) {
+		if (mNPCs[i].get() == npc) {
+			mNPCs.RemoveAt(i);
+			return;
+		}
 	}
 }
 
-void NPCManager::Clear() { mNPCs.clear(); }
+void NPCManager::Clear() { mNPCs.Clear(); }
 
 void NPCManager::ClearRagdolls()
 {
-	mNPCs.erase(std::remove_if(mNPCs.begin(), mNPCs.end(),
-							   [](const std::unique_ptr<NPC>& npc) { return npc->IsRagdoll(); }),
-				mNPCs.end());
+	for (uint32 i = mNPCs.Size; i > 0; i--) {
+		if (mNPCs[i - 1]->IsRagdoll()) {
+			mNPCs.RemoveAt(i - 1);
+		}
+	}
 }
 
 void NPCManager::Update(float32 delta_time, bool draw_debug)
 {
 	gPhysics->pBackend->SetMinRagdollHitSpeed(MinImpactSpeed);
 
-	mHits.clear();
 	gPhysics->pBackend->DrainRagdollHits(mHits);
 
 	for (const physics::RagdollHit& hit : mHits) {
@@ -501,6 +630,9 @@ void NPCManager::Update(float32 delta_time, bool draw_debug)
 
 	for (std::unique_ptr<NPC>& npc : mNPCs) {
 		npc->ReactStrength = ReactStrength;
+		npc->Strength = Strength;
+		npc->RootAssist = RootAssist;
+		npc->bBalance = bBalance;
 		npc->Update(delta_time, draw_debug);
 	}
 }

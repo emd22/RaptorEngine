@@ -15,7 +15,6 @@
 #include <algorithm>
 #include <atomic>
 #include <mutex>
-#include <vector>
 
 namespace JPH {
 class JobSystemThreadPool;
@@ -175,36 +174,47 @@ public:
 	static constexpr size_t scMaxQueuedImpacts = 64;
 	static constexpr size_t scMaxTrackedBodies = 512;
 
+	PhContactListener()
+	{
+		mBodyContacts.InitSize(scMaxTrackedBodies);
+		mImpacts.InitCapacity(scMaxQueuedImpacts);
+		mHits.InitCapacity(scMaxQueuedImpacts);
+		mSoundImpacts.InitCapacity(scMaxQueuedImpacts);
+	}
+
 	void SetMinImpactSpeed(float32 speed) { mMinImpactSpeed.store(speed); }
 	void SetMinHitSpeed(float32 speed) { mMinHitSpeed.store(speed); }
 	void SetMinSoundSpeed(float32 speed) { mMinSoundSpeed.store(speed); }
 
-	void DrainSoundImpacts(std::vector<SoundImpact>& out_impacts)
+	void DrainSoundImpacts(SizedArray<SoundImpact>& out_impacts)
 	{
 		std::lock_guard<std::mutex> guard(mImpactsMutex);
-		out_impacts.insert(out_impacts.end(), mSoundImpacts.begin(), mSoundImpacts.end());
-		mSoundImpacts.clear();
+		DrainQueue(mSoundImpacts, out_impacts);
 	}
 
-	void DrainHits(std::vector<RagdollHit>& out_hits)
+	void DrainHits(SizedArray<RagdollHit>& out_hits)
 	{
 		std::lock_guard<std::mutex> guard(mImpactsMutex);
-		out_hits.insert(out_hits.end(), mHits.begin(), mHits.end());
-		mHits.clear();
+		DrainQueue(mHits, out_hits);
 	}
 
-	void DrainImpacts(std::vector<RagdollImpact>& out_impacts)
+	void DrainImpacts(SizedArray<RagdollImpact>& out_impacts)
 	{
 		std::lock_guard<std::mutex> guard(mImpactsMutex);
-		out_impacts.insert(out_impacts.end(), mImpacts.begin(), mImpacts.end());
-		mImpacts.clear();
+		DrainQueue(mImpacts, out_impacts);
 	}
 
 	void ClearBodyGroundContacts()
 	{
 		std::lock_guard<std::mutex> guard(mBodyContactMutex);
-		std::fill(mBodyContacts.begin(), mBodyContacts.end(), BodyContactAccum {});
+		for (BodyContactAccum& accum : mBodyContacts) {
+			accum = BodyContactAccum {};
+		}
+
+		mGroundContactGeneration.fetch_add(1);
 	}
+
+	uint32 GetGroundContactGeneration() const { return mGroundContactGeneration.load(); }
 
 	void GetBodyGroundContact(JPH::BodyID body_id, BodyGroundContact& out_contact) const
 	{
@@ -212,7 +222,7 @@ public:
 
 		const uint32 index = body_id.GetIndex();
 
-		if (index >= mBodyContacts.size()) {
+		if (index >= mBodyContacts.Size) {
 			return;
 		}
 
@@ -292,8 +302,8 @@ public:
 
 			std::lock_guard<std::mutex> guard(mImpactsMutex);
 
-			if (mHits.size() < scMaxQueuedImpacts) {
-				mHits.push_back(hit);
+			if (mHits.Size < scMaxQueuedImpacts) {
+				mHits.Insert(hit);
 			}
 
 			return;
@@ -322,8 +332,8 @@ public:
 
 		std::lock_guard<std::mutex> guard(mImpactsMutex);
 
-		if (mImpacts.size() < scMaxQueuedImpacts) {
-			mImpacts.push_back(impact);
+		if (mImpacts.Size < scMaxQueuedImpacts) {
+			mImpacts.Insert(impact);
 		}
 	}
 
@@ -336,6 +346,22 @@ public:
 	virtual void OnContactRemoved(const JPH::SubShapeIDPair& inSubShapePair) override {}
 
 private:
+	template <typename T>
+	static void DrainQueue(SizedArray<T>& queue, SizedArray<T>& out_items)
+	{
+		if (!out_items.IsInited()) {
+			out_items.InitCapacity(scMaxQueuedImpacts);
+		}
+
+		out_items.Clear();
+
+		for (const T& item : queue) {
+			out_items.Insert(item);
+		}
+
+		queue.Clear();
+	}
+
 	struct BodyContactAccum
 	{
 		uint32 Count = 0;
@@ -357,7 +383,7 @@ private:
 		const JPH::Body& body = first_is_body ? inBody1 : inBody2;
 		const uint32 index = body.GetID().GetIndex();
 
-		if (index >= mBodyContacts.size()) {
+		if (index >= mBodyContacts.Size) {
 			return;
 		}
 
@@ -427,24 +453,25 @@ private:
 
 		std::lock_guard<std::mutex> guard(mImpactsMutex);
 
-		if (mSoundImpacts.size() < scMaxQueuedImpacts) {
-			mSoundImpacts.push_back(impact);
+		if (mSoundImpacts.Size < scMaxQueuedImpacts) {
+			mSoundImpacts.Insert(impact);
 		}
 	}
 
 private:
 	std::atomic<float32> mMinImpactSpeed = 1.0e9f;
 	std::mutex mImpactsMutex;
-	std::vector<RagdollImpact> mImpacts;
+	SizedArray<RagdollImpact> mImpacts;
 
 	std::atomic<float32> mMinHitSpeed = 1.5f;
-	std::vector<RagdollHit> mHits;
+	SizedArray<RagdollHit> mHits;
 
 	std::atomic<float32> mMinSoundSpeed = 1.0e9f;
-	std::vector<SoundImpact> mSoundImpacts;
+	SizedArray<SoundImpact> mSoundImpacts;
 
 	mutable std::mutex mBodyContactMutex;
-	std::vector<BodyContactAccum> mBodyContacts = std::vector<BodyContactAccum>(scMaxTrackedBodies);
+	std::atomic<uint32> mGroundContactGeneration = 0;
+	SizedArray<BodyContactAccum> mBodyContacts;
 };
 
 // An example activation listener
@@ -495,12 +522,12 @@ public:
 	FX_FORCE_INLINE void SetMinRagdollHitSpeed(float32 speed) { mContactListener.SetMinHitSpeed(speed); }
 	FX_FORCE_INLINE void SetMinSoundImpactSpeed(float32 speed) { mContactListener.SetMinSoundSpeed(speed); }
 
-	FX_FORCE_INLINE void DrainSoundImpacts(std::vector<SoundImpact>& out_impacts)
+	FX_FORCE_INLINE void DrainSoundImpacts(SizedArray<SoundImpact>& out_impacts)
 	{
 		mContactListener.DrainSoundImpacts(out_impacts);
 	}
-	FX_FORCE_INLINE void DrainRagdollHits(std::vector<RagdollHit>& out_hits) { mContactListener.DrainHits(out_hits); }
-	FX_FORCE_INLINE void DrainRagdollImpacts(std::vector<RagdollImpact>& out_impacts)
+	FX_FORCE_INLINE void DrainRagdollHits(SizedArray<RagdollHit>& out_hits) { mContactListener.DrainHits(out_hits); }
+	FX_FORCE_INLINE void DrainRagdollImpacts(SizedArray<RagdollImpact>& out_impacts)
 	{
 		mContactListener.DrainImpacts(out_impacts);
 	}
@@ -508,6 +535,10 @@ public:
 	FX_FORCE_INLINE float32 GetCollisionStepTime() const { return cTimeStep / static_cast<float32>(scCollisionSteps); }
 
 	FX_FORCE_INLINE void ClearBodyGroundContacts() { mContactListener.ClearBodyGroundContacts(); }
+	FX_FORCE_INLINE uint32 GetGroundContactGeneration() const
+	{
+		return mContactListener.GetGroundContactGeneration();
+	}
 	FX_FORCE_INLINE void GetBodyGroundContact(JPH::BodyID body_id, BodyGroundContact& out_contact) const
 	{
 		mContactListener.GetBodyGroundContact(body_id, out_contact);

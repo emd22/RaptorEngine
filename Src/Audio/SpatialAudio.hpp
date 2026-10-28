@@ -12,6 +12,7 @@ struct ma_node_base;
 namespace fx {
 
 struct SpatialVoice;
+struct ReverbSend;
 
 class SpatialAudio
 {
@@ -56,6 +57,10 @@ public:
 	SpatialVoice* CreateVoice(ma_node_base* output);
 	void DestroyVoice(SpatialVoice* voice);
 	ma_node_base* GetVoiceInput(SpatialVoice* voice) const;
+
+	ReverbSend* CreateReverbSend(ma_node_base* output, float32 send);
+	void DestroyReverbSend(ReverbSend* send);
+	ma_node_base* GetReverbSendInput(ReverbSend* send) const;
 
 	void SetVoiceSource(SpatialVoice* voice, const Vec3f position, float32 distance_gain, bool binaural);
 

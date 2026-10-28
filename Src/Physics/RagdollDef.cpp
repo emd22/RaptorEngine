@@ -11,7 +11,7 @@ namespace fx::physics {
 
 namespace {
 
-constexpr const char* scHumanoidPath = "RaptorData/Data/Demo/Models/ragdoll/humanoid.ragdoll";
+constexpr const char* scHumanoidPath = "RaptorData/Data/Demo/Models/ragdoll2/humanoid.ragdoll";
 constexpr float32 scDefaultTotalMass = 75.0f;
 constexpr float32 scMassToleranceKg = 2.0f;
 
@@ -33,6 +33,27 @@ eRagdollJoint ParseJoint(const char* name, bool& out_ok)
 	return eRagdollJoint::Cone;
 }
 
+eRagdollBodyPart ParseBodyPart(const char* name, bool& out_ok)
+{
+	out_ok = true;
+
+	if (std::strcmp(name, "torso") == 0) {
+		return eRagdollBodyPart::Torso;
+	}
+	if (std::strcmp(name, "head") == 0) {
+		return eRagdollBodyPart::Head;
+	}
+	if (std::strcmp(name, "arm") == 0) {
+		return eRagdollBodyPart::Arm;
+	}
+	if (std::strcmp(name, "leg") == 0) {
+		return eRagdollBodyPart::Leg;
+	}
+
+	out_ok = false;
+	return eRagdollBodyPart::Torso;
+}
+
 bool ReadBody(const ConfigEntry& entry, uint32 index, RagdollBodyDef& out_body)
 {
 	const char* bone = entry.GetMemberValue<const char*>(HashStr32("bone"), nullptr);
@@ -52,6 +73,15 @@ bool ReadBody(const ConfigEntry& entry, uint32 index, RagdollBodyDef& out_body)
 		return false;
 	}
 
+	const char* part_name = entry.GetMemberValue<const char*>(HashStr32("part"), "torso");
+	bool part_ok = false;
+	const eRagdollBodyPart part = ParseBodyPart(part_name, part_ok);
+
+	if (!part_ok) {
+		LogError(LC_PHYSICS, "Ragdoll body {} ('{}') has unknown part '{}'", index, bone, part_name);
+		return false;
+	}
+
 	out_body.Bone = bone;
 	out_body.EndBone = end_bone;
 	out_body.ExtraLength = entry.GetMemberValue<float32>(HashStr32("extra_length"), 0.0f);
@@ -61,7 +91,12 @@ bool ReadBody(const ConfigEntry& entry, uint32 index, RagdollBodyDef& out_body)
 	out_body.FlexDegrees = entry.GetMemberValue<float32>(HashStr32("flex"), 0.0f);
 	out_body.MassFraction = entry.GetMemberValue<float32>(HashStr32("mass_fraction"), 0.0f);
 	out_body.Joint = joint;
+	out_body.Part = part;
 	out_body.bAnchor = entry.GetMemberValue<int32>(HashStr32("anchor"), 0) != 0;
+	out_body.bFoot = entry.GetMemberValue<int32>(HashStr32("foot"), 0) != 0;
+	out_body.FootWidth = entry.GetMemberValue<float32>(HashStr32("width"), 0.0f);
+	out_body.HeelLength = entry.GetMemberValue<float32>(HashStr32("heel"), 0.0f);
+	out_body.Friction = entry.GetMemberValue<float32>(HashStr32("friction"), out_body.Friction);
 	out_body.Muscle.Stiffness = entry.GetMemberValue<float32>(HashStr32("stiffness"), out_body.Muscle.Stiffness);
 	out_body.Muscle.Damping = entry.GetMemberValue<float32>(HashStr32("damping"), out_body.Muscle.Damping);
 	out_body.Muscle.MaxTorque = entry.GetMemberValue<float32>(HashStr32("max_torque"), out_body.Muscle.MaxTorque);
@@ -91,20 +126,22 @@ bool LoadRagdollDef(const char* path, RagdollDef& out_def)
 	RagdollDef def;
 	def.TotalMass = config.GetEntryValue<float32>(HashStr32("total_mass"), scDefaultTotalMass);
 
+	def.Bodies.InitCapacity(bodies->Members.Size());
+
 	float32 fraction_sum = 0.0f;
 
 	for (const ConfigEntry& entry : bodies->Members) {
 		RagdollBodyDef body;
 
-		if (!ReadBody(entry, static_cast<uint32>(def.Bodies.size()), body)) {
+		if (!ReadBody(entry, static_cast<uint32>(def.Bodies.Size), body)) {
 			return false;
 		}
 
 		fraction_sum += body.MassFraction;
-		def.Bodies.push_back(body);
+		def.Bodies.Insert(body);
 	}
 
-	if (def.Bodies.empty()) {
+	if (def.Bodies.IsEmpty()) {
 		LogError(LC_PHYSICS, "Ragdoll config '{}' has no bodies", path);
 		return false;
 	}
@@ -117,7 +154,7 @@ bool LoadRagdollDef(const char* path, RagdollDef& out_def)
 		return false;
 	}
 
-	LogInfo(LC_PHYSICS, "Ragdoll config '{}': {} bodies, mass table {:.3f} kg", path, def.Bodies.size(), table_mass);
+	LogInfo(LC_PHYSICS, "Ragdoll config '{}': {} bodies, mass table {:.3f} kg", path, def.Bodies.Size, table_mass);
 
 	out_def = std::move(def);
 	return true;

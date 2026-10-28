@@ -186,12 +186,12 @@ private:
 	std::vector<uint8> mListenerConnectedAreas;
 	int32 mListenerArea = -1;
 
-	std::vector<physics::SoundImpact> mSoundImpacts;
+	SizedArray<physics::SoundImpact> mSoundImpacts;
 	std::unordered_map<uint32, float64> mImpactSoundTimes;
 	float64 mImpactSoundClock = 0.0;
 
 	std::vector<RagdollDummy> mRagdollDummies;
-	std::vector<physics::RagdollImpact> mRagdollImpacts;
+	SizedArray<physics::RagdollImpact> mRagdollImpacts;
 	AssetTicket mRagdollTemplateTicket { nullptr };
 	std::atomic<Object*> mpRagdollTemplate = nullptr;
 	bool mbRagdollTemplateRequested = false;
@@ -206,6 +206,9 @@ private:
 	CVarValue* mpNPCImpactDamageCVar = nullptr;
 	CVarValue* mpNPCImpactSpeedCVar = nullptr;
 	CVarValue* mpNPCReactStrengthCVar = nullptr;
+	CVarValue* mpNPCStrengthCVar = nullptr;
+	CVarValue* mpNPCRootAssistCVar = nullptr;
+	CVarValue* mpNPCBalanceCVar = nullptr;
 
 	Ref<FPSCamera> mpFlyCamera { nullptr };
 	ViewAngles mFlyCameraAngles;

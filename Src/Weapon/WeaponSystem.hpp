@@ -162,6 +162,7 @@ struct Weapon
 	String MuzzleJoint;
 
 	Hash32 EventSounds[static_cast<uint32>(eEvent::Count)] {};
+	Hash32 ReflectionSound = 0;
 	String BulletSound;
 
 	ScriptDef Def;
@@ -210,6 +211,7 @@ private:
 	void LoadEffects(const ConfigEntry* effects, Weapon& weapon);
 	void LoadSounds(const ConfigEntry* sounds, Weapon& weapon);
 	void PlayMuzzleEffect(const Weapon& weapon);
+	void PlayReflections(const Weapon& weapon);
 	void UpdateSwitching();
 	void UpdateHolsterAmount();
 

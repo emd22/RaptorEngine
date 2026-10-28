@@ -267,6 +267,9 @@ void RaptorGame::CreateGame()
 	mpNPCImpactDamageCVar = gCVars->Set("b_npc_impact_damage", gCVars->Get("b_npc_impact_damage", 0.25f));
 	mpNPCImpactSpeedCVar = gCVars->Set("b_npc_impact_speed", gCVars->Get("b_npc_impact_speed", 1.5f));
 	mpNPCReactStrengthCVar = gCVars->Set("b_npc_react_strength", gCVars->Get("b_npc_react_strength", 0.25f));
+	mpNPCStrengthCVar = gCVars->Set("b_npc_strength", gCVars->Get("b_npc_strength", 1.0f));
+	mpNPCRootAssistCVar = gCVars->Set("b_npc_root_assist", gCVars->Get("b_npc_root_assist", 1.0f));
+	mpNPCBalanceCVar = gCVars->Set("b_npc_balance", gCVars->Get("b_npc_balance", 1.0f));
 
 	gCVars->Set("r_gtao_radius", gCVars->Get("r_gtao_radius", 0.5f));
 	gCVars->Set("r_gtao_radius_multiplier", gCVars->Get("r_gtao_radius_multiplier", 1.457f));
@@ -699,7 +702,7 @@ void RaptorGame::RequestRagdollTemplate()
 	mbRagdollTemplateRequested = true;
 
 	mRagdollTemplateTicket = gAssetManager->LoadObject("ragdoll_template",
-													   "RaptorData/Data/Demo/Models/ragdoll/ragdoll.glb");
+													   "RaptorData/Data/Demo/Models/ragdoll2/ragdoll2.rxmodel");
 
 	mRagdollTemplateTicket.OnLoaded(
 		[this](void* item_ptr)
@@ -733,6 +736,7 @@ void RaptorGame::SpawnDebugNPC(Object* model)
 	desc.Name = String::Fmt("npc_{}", mNPCSpawnCount);
 	desc.Position = floor.bHit ? floor.Point : (gWorld->Player.Position + forward * 2.5f);
 	desc.Yaw = std::atan2(-forward.X, -forward.Z);
+	desc.IdleAnimation = "walk";
 
 	++mNPCSpawnCount;
 
@@ -747,7 +751,7 @@ void RaptorGame::DropRagdollDummy(Object* model)
 
 	Object* root = model->CloneWithOwnSkeleton(String::Fmt("ragdoll_dummy_{}", mRagdollSpawnCount).Str());
 
-	std::vector<Object*> parts;
+	DynArray<Object*> parts;
 	CollectObjectTree(root, parts);
 
 	const auto skinned_part = std::find_if(parts.begin(), parts.end(),
@@ -922,6 +926,15 @@ void RaptorGame::UpdateRagdollDummies()
 		gNPCManager->ReactStrength = mpNPCReactStrengthCVar->FloatValue;
 	}
 
+	if (mpNPCStrengthCVar != nullptr && mpNPCRootAssistCVar != nullptr) {
+		gNPCManager->Strength = mpNPCStrengthCVar->FloatValue;
+		gNPCManager->RootAssist = mpNPCRootAssistCVar->FloatValue;
+	}
+
+	if (mpNPCBalanceCVar != nullptr) {
+		gNPCManager->bBalance = mpNPCBalanceCVar->FloatValue != 0.0f;
+	}
+
 	gNPCManager->Update(static_cast<float32>(DeltaTime), draw_debug);
 
 	if (mRagdollDummies.empty() && gNPCManager->GetCount() == 0) {
@@ -933,7 +946,6 @@ void RaptorGame::UpdateRagdollDummies()
 
 	gPhysics->pBackend->SetMinRagdollImpactSpeed(min_blood_speed);
 
-	mRagdollImpacts.clear();
 	gPhysics->pBackend->DrainRagdollImpacts(mRagdollImpacts);
 
 	for (RagdollDummy& dummy : mRagdollDummies) {
@@ -978,7 +990,6 @@ void RaptorGame::PlayImpactSounds()
 
 	gPhysics->pBackend->SetMinSoundImpactSpeed(scImpactSoundMinSpeed);
 
-	mSoundImpacts.clear();
 	gPhysics->pBackend->DrainSoundImpacts(mSoundImpacts);
 
 	for (const physics::SoundImpact& impact : mSoundImpacts) {

@@ -4,6 +4,7 @@
 #include "Occluders.hpp"
 
 #include <Math/MathConsts.hpp>
+#include <Math/MathUtil.hpp>
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -30,23 +31,12 @@ constexpr uint8 scFullyLit = 255;
 constexpr double scThinInset = 0.05;
 constexpr uint32 scBuriedRays = 16;
 
-double GetRadicalInverse(uint32 index)
-{
-	uint32 bits = index;
-	bits = (bits << 16) | (bits >> 16);
-	bits = ((bits & 0x55555555U) << 1) | ((bits & 0xAAAAAAAAU) >> 1);
-	bits = ((bits & 0x33333333U) << 2) | ((bits & 0xCCCCCCCCU) >> 2);
-	bits = ((bits & 0x0F0F0F0FU) << 4) | ((bits & 0xF0F0F0F0U) >> 4);
-	bits = ((bits & 0x00FF00FFU) << 8) | ((bits & 0xFF00FF00U) >> 8);
-
-	return static_cast<double>(bits) * (1.0 / 4294967296.0);
-}
 
 Vec3d GetHemisphereDirection(uint32 index, uint32 count)
 {
 	const double u = (static_cast<double>(index) + 0.5) / count;
 	const double radius = std::sqrt(u);
-	const double angle = GetRadicalInverse(index) * FX_2PI;
+	const double angle = MathUtil::RadicalInverse<double>(index) * FX_2PI;
 
 	return Vec3d(std::cos(angle) * radius, std::sin(angle) * radius, std::sqrt(1.0 - u));
 }
@@ -67,7 +57,7 @@ public:
 	Vec3d Sample(uint32 index, uint32 count) const
 	{
 		const double u = (static_cast<double>(index) + 0.5) / count;
-		const double v = GetRadicalInverse(index);
+		const double v = MathUtil::RadicalInverse<double>(index);
 
 		const double radius = std::sqrt(u) * Spread;
 		const double angle = v * FX_2PI;
@@ -98,6 +88,7 @@ public:
 		// Padding is for all sides of the chart. Multiply by 2 for this.
 		// e.g. Padding on left and right, padding on top and bottom
 		const Vec2u padding_size = Vec2u(scChartPadding * 2u);
+
 		return (GetSize() + padding_size);
 	}
 

@@ -712,7 +712,7 @@ static void DoDirectUpload(AssetQueueItem& item, AssetItemData& asset_data)
 
 static void FinishObjectLoading(Object* root)
 {
-	std::vector<Object*> parts;
+	DynArray<Object*> parts;
 	CollectObjectTree(root, parts);
 
 	for (Object* part : parts) {

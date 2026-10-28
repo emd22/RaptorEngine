@@ -129,6 +129,12 @@
 	}
 
 
+// For compilers that do not support __has_builtin (e.g. MSVC) we can just force false.
+#ifndef __has_builtin
+#define __has_builtin(x) 0
+#endif
+
+
 #define FX_DEFINE_ENUM_AS_FLAGS(EnumType_)                                                                             \
 	FX_ENUM_DEFINE_BITWISE_OR(EnumType_)                                                                               \
 	FX_ENUM_DEFINE_BITWISE_AND(EnumType_)                                                                              \

@@ -80,6 +80,8 @@ struct SoundDef
 	float32 FadeIn = 0.0f;
 	float32 FadeOut = 0.0f;
 
+	float32 Reverb = 0.0f;
+
 	uint32 MaxInstances = 0;
 };
 
@@ -112,6 +114,7 @@ public:
 
 	SoundID Play(const char* name, const Vec3f position);
 	SoundID Play(Hash32 name_hash, const Vec3f position);
+	SoundID PlayDelayed(Hash32 name_hash, const Vec3f position, float32 delay);
 	SoundID Play2D(const char* name);
 	SoundID Play2D(Hash32 name_hash);
 
@@ -156,12 +159,13 @@ private:
 		float32 Volume = 1.0f;
 		Vec3f Position = Vec3f::sZero;
 		SpatialVoice* pSpatial = nullptr;
+		ReverbSend* pReverbSend = nullptr;
 		bool bActive = false;
 		bool bStopping = false;
 	};
 
 private:
-	SoundID StartVoice(Hash32 name_hash, const Vec3f position, bool spatial);
+	SoundID StartVoice(Hash32 name_hash, const Vec3f position, bool spatial, float32 delay = 0.0f);
 	bool LoadDef(const char* path, const String& name, SoundDef& out_def);
 	void UnloadDefs();
 

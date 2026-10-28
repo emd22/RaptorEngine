@@ -104,6 +104,7 @@ AcousticGeometry ToAudioSpace(const AcousticGeometry& geometry);
 
 uint32 GetMaterialPreset(const String& surface);
 const char* GetMaterialPresetName(uint32 preset);
+float32 GetReflectivity(const String& surface);
 
 bool Bake(const AcousticGeometry& geometry, const AcousticBakeSettings& settings, AcousticBakeResult& out_result,
 		  const AcousticProgressFunction& progress = {});

@@ -148,6 +148,13 @@ struct ReverbParams
 	bool bEnabled = true;
 };
 
+struct ReverbSend
+{
+	ma_node_base Node;
+	float32 Send = 0.0f;
+	bool bNodeInitialized = false;
+};
+
 struct ReverbNode
 {
 	ma_node_base Node;
@@ -367,6 +374,35 @@ void ProcessVoiceNode(ma_node* node, const float** frames_in, ma_uint32* frame_c
 
 ma_node_vtable scVoiceNodeVtable = {
 	ProcessVoiceNode, nullptr, 1, 2, 0,
+};
+
+void ProcessReverbSendNode(ma_node* node, const float** frames_in, ma_uint32* frame_count_in, float** frames_out,
+						   ma_uint32* frame_count_out)
+{
+	const ReverbSend& reverb_send = *static_cast<ReverbSend*>(node);
+
+	const float* input = frames_in[0];
+	const ma_uint32 frame_count = std::min(frame_count_in[0], *frame_count_out);
+	const float32 send = reverb_send.Send;
+
+	float* stereo_out = frames_out[0];
+	float* send_out = frames_out[1];
+
+	for (ma_uint32 i = 0; i < frame_count; i++) {
+		const float left = input[i * scChannelsIn];
+		const float right = input[i * scChannelsIn + 1];
+
+		stereo_out[i * scChannelsOut] = left;
+		stereo_out[i * scChannelsOut + 1] = right;
+		send_out[i] = 0.5f * (left + right) * send;
+	}
+
+	*frame_count_in = frame_count;
+	*frame_count_out = frame_count;
+}
+
+ma_node_vtable scReverbSendNodeVtable = {
+	ProcessReverbSendNode, nullptr, 1, 2, 0,
 };
 
 void RenderReverbFrame(ReverbNode& reverb)
@@ -1164,6 +1200,60 @@ void SpatialAudio::DestroyVoice(SpatialVoice* voice)
 	std::erase(mpState->Voices, voice);
 
 	delete voice;
+}
+
+ReverbSend* SpatialAudio::CreateReverbSend(ma_node_base* output, float32 send)
+{
+	if (mpState == nullptr) {
+		return nullptr;
+	}
+
+	ReverbSend* reverb_send = new ReverbSend;
+	reverb_send->Send = send;
+
+	const ma_uint32 channels_in = scChannelsIn;
+	const ma_uint32 channels_out[2] = { scChannelsOut, scSendChannels };
+
+	ma_node_config node_config = ma_node_config_init();
+	node_config.vtable = &scReverbSendNodeVtable;
+	node_config.pInputChannels = &channels_in;
+	node_config.pOutputChannels = channels_out;
+
+	if (ma_node_init(ma_engine_get_node_graph(mpState->pEngine), &node_config, nullptr, &reverb_send->Node) !=
+		MA_SUCCESS) {
+		LogError(LC_AUDIO, "Could not create a reverb send");
+		delete reverb_send;
+		return nullptr;
+	}
+
+	reverb_send->bNodeInitialized = true;
+
+	ma_node_attach_output_bus(&reverb_send->Node, 0, output, 0);
+	ma_node_attach_output_bus(&reverb_send->Node, 1, &mpState->pReverb->Node, 0);
+
+	return reverb_send;
+}
+
+void SpatialAudio::DestroyReverbSend(ReverbSend* send)
+{
+	if (send == nullptr) {
+		return;
+	}
+
+	if (send->bNodeInitialized) {
+		ma_node_uninit(&send->Node, nullptr);
+	}
+
+	delete send;
+}
+
+ma_node_base* SpatialAudio::GetReverbSendInput(ReverbSend* send) const
+{
+	if (send == nullptr) {
+		return nullptr;
+	}
+
+	return &send->Node;
 }
 
 ma_node_base* SpatialAudio::GetVoiceInput(SpatialVoice* voice) const

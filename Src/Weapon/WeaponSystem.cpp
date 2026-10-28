@@ -1,6 +1,7 @@
 #include "WeaponSystem.hpp"
 
 #include <Asset/ConfigFile.hpp>
+#include <Audio/Acoustics.hpp>
 #include <Audio/AudioSystem.hpp>
 #include <Blockout.hpp>
 #include <CVar.hpp>
@@ -36,6 +37,17 @@ static constexpr const char* scWeaponDirectory = "RaptorData/Data/Weapons";
 static constexpr const char* scDefaultImpactEffects[] = { "impact_dust" };
 static constexpr const char* scDefaultMuzzleJoint = "tag_flash";
 static constexpr float32 scWoundSize = 0.22f;
+
+static constexpr uint32 scReflectionRingRays = 8;
+static constexpr uint32 scReflectionUpRays = 4;
+static constexpr uint32 scReflectionRays = scReflectionRingRays + scReflectionUpRays;
+static constexpr uint32 scMaxReflections = 4;
+static constexpr float32 scReflectionUpAngle = MathUtil::DegToRad(40.0f);
+static constexpr float32 scReflectionRange = 80.0f;
+static constexpr float32 scReflectionMinDistance = 2.5f;
+static constexpr float32 scReflectionMergeCos = 0.85f;
+static constexpr float32 scReflectionMergeDistance = 0.2f;
+static constexpr float32 scSpeedOfSound = 343.0f;
 
 namespace {
 
@@ -207,6 +219,12 @@ void WeaponSystem::LoadSounds(const ConfigEntry* sounds, Weapon& weapon)
 		}
 	}
 
+	weapon.ReflectionSound = 0;
+
+	if (const ConfigEntry* reflection = Child(sounds, "reflection")) {
+		weapon.ReflectionSound = HashStr32(reflection->GetValue<const char*>());
+	}
+
 	weapon.BulletSound = StringMember(sounds, "bullet", "bullet");
 }
 
@@ -338,6 +356,7 @@ void WeaponSystem::Create(Player* player)
 	mbSwitching = false;
 
 	gCVars->Set("b_weapon_debug", false);
+	gCVars->Set("s_reflections", true);
 
 	const String directory = FilesystemIO::ResolvePath(scWeaponDirectory);
 
@@ -570,6 +589,97 @@ void WeaponSystem::UpdateEffects()
 	}
 }
 
+void WeaponSystem::PlayReflections(const Weapon& weapon)
+{
+	if (weapon.ReflectionSound == 0 || !gCVars->Get("s_reflections", true)) {
+		return;
+	}
+
+	struct Reflection
+	{
+		Vec3f Position;
+		Vec3f Direction;
+		float32 Distance;
+		float32 Weight;
+	};
+
+	Reflection candidates[scReflectionRays];
+	uint32 candidate_count = 0;
+
+	const Vec3f origin = mpPlayer->pCamera->GetPosition();
+	const float32 base_angle = static_cast<float32>(FastRand32() % 3600) * MathUtil::DegToRad(0.1f);
+
+	for (uint32 i = 0; i < scReflectionRays; i++) {
+		float32 elevation = 0.0f;
+		float32 angle = base_angle + (static_cast<float32>(i) * 2.0f * static_cast<float32>(M_PI)) / scReflectionRingRays;
+
+		if (i >= scReflectionRingRays) {
+			const uint32 up_index = i - scReflectionRingRays;
+
+			elevation = scReflectionUpAngle;
+			angle = base_angle + (static_cast<float32>(up_index) + 0.5f) * 2.0f * static_cast<float32>(M_PI) /
+									 scReflectionUpRays;
+		}
+
+		const Vec3f direction(std::cos(angle) * std::cos(elevation), std::sin(elevation),
+							  std::sin(angle) * std::cos(elevation));
+
+		const physics::RayResult hit = gPhysics->pBackend->Raycast(origin, direction * scReflectionRange);
+
+		if (!hit.bHit) {
+			continue;
+		}
+
+		const float32 distance = (hit.Point - origin).Length();
+
+		if (distance < scReflectionMinDistance) {
+			continue;
+		}
+
+		const float32 facing = std::abs(direction.Dot(hit.Normal));
+		const float32 reflectivity = Acoustics::GetReflectivity(gWorld->pPrototype->GetSurfaceAt(hit));
+
+		candidates[candidate_count++] = Reflection {
+			.Position = hit.Point + (hit.Normal * AudioSystem::scSurfaceSoundOffset),
+			.Direction = direction,
+			.Distance = distance,
+			.Weight = facing * reflectivity,
+		};
+	}
+
+	std::sort(candidates, candidates + candidate_count,
+			  [](const Reflection& a, const Reflection& b) { return a.Weight > b.Weight; });
+
+	const Reflection* chosen[scMaxReflections];
+	uint32 chosen_count = 0;
+
+	for (uint32 i = 0; i < candidate_count && chosen_count < scMaxReflections; i++) {
+		const Reflection& candidate = candidates[i];
+		bool merged = false;
+
+		for (uint32 j = 0; j < chosen_count; j++) {
+			const float32 distance_difference = std::abs(candidate.Distance - chosen[j]->Distance);
+
+			if (candidate.Direction.Dot(chosen[j]->Direction) > scReflectionMergeCos &&
+				distance_difference < scReflectionMergeDistance * chosen[j]->Distance) {
+				merged = true;
+				break;
+			}
+		}
+
+		if (merged) {
+			continue;
+		}
+
+		chosen[chosen_count++] = &candidate;
+
+		const float32 delay = (2.0f * candidate.Distance) / scSpeedOfSound;
+		const SoundID sound = gAudio->PlayDelayed(weapon.ReflectionSound, candidate.Position, delay);
+
+		gAudio->SetVolume(sound, candidate.Weight);
+	}
+}
+
 void WeaponSystem::HandleEvent(eEvent event)
 {
 	if (mpPlayer == nullptr || mWeaponCount == 0) {
@@ -586,6 +696,7 @@ void WeaponSystem::HandleEvent(eEvent event)
 	case eEvent::Fire:
 		mpPlayer->DoFireAnimation(weapon.ViewKickback);
 		PlayMuzzleEffect(weapon);
+		PlayReflections(weapon);
 		break;
 	case eEvent::ReloadBegin:
 		mpPlayer->DoReloadAnimation();

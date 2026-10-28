@@ -154,6 +154,13 @@ const char* GetMaterialPresetName(uint32 preset)
 	return scMaterialPresets[preset].Name;
 }
 
+float32 GetReflectivity(const String& surface)
+{
+	const IPLMaterial& material = scMaterialPresets[GetMaterialPreset(surface)].Material;
+
+	return 1.0f - (material.absorption[0] + material.absorption[1] + material.absorption[2]) / 3.0f;
+}
+
 IPLMaterial GetMaterial(const AcousticSurface& surface)
 {
 	const MaterialPreset& preset = scMaterialPresets[GetMaterialPreset(surface.Name)];
