@@ -131,12 +131,18 @@ FX_FORCE_INLINE bool Matches(uint64 user_data) { return (user_data & scTagMask) 
 FX_FORCE_INLINE uint32 GetSerial(uint64 user_data) { return static_cast<uint32>(user_data & 0xFFFFFFFFull); }
 } // namespace RagdollUserData
 
-struct RagdollImpact
+struct RagdollContact
 {
+	JPH::BodyID Body {};
 	Vec3f Point = Vec3f::sZero;
 	Vec3f Normal = Vec3f::sZero;
 	float32 Speed = 0.0f;
+	float32 OtherSpeed = 0.0f;
+	float32 OtherMass = 0.0f;
+	bool bOtherStatic = false;
 	uint32 RagdollSerial = 0;
+
+	FX_FORCE_INLINE bool IsStruck(float32 min_speed) const { return Speed >= min_speed && OtherSpeed >= min_speed; }
 };
 
 struct SoundImpact
@@ -147,16 +153,6 @@ struct SoundImpact
 	JPH::BodyID MovingBody {};
 	JPH::BodyID SurfaceBody {};
 	JPH::SubShapeID SurfaceSubShape {};
-};
-
-struct RagdollHit
-{
-	JPH::BodyID Body {};
-	Vec3f Point = Vec3f::sZero;
-	Vec3f Direction = Vec3f::sZero;
-	float32 Speed = 0.0f;
-	float32 Mass = 0.0f;
-	uint32 RagdollSerial = 0;
 };
 
 struct BodyGroundContact
@@ -177,13 +173,11 @@ public:
 	PhContactListener()
 	{
 		mBodyContacts.InitSize(scMaxTrackedBodies);
-		mImpacts.InitCapacity(scMaxQueuedImpacts);
-		mHits.InitCapacity(scMaxQueuedImpacts);
+		mRagdollContacts.InitCapacity(scMaxQueuedImpacts);
 		mSoundImpacts.InitCapacity(scMaxQueuedImpacts);
 	}
 
-	void SetMinImpactSpeed(float32 speed) { mMinImpactSpeed.store(speed); }
-	void SetMinHitSpeed(float32 speed) { mMinHitSpeed.store(speed); }
+	void SetMinRagdollContactSpeed(float32 speed) { mMinRagdollContactSpeed.store(speed); }
 	void SetMinSoundSpeed(float32 speed) { mMinSoundSpeed.store(speed); }
 
 	void DrainSoundImpacts(SizedArray<SoundImpact>& out_impacts)
@@ -192,16 +186,10 @@ public:
 		DrainQueue(mSoundImpacts, out_impacts);
 	}
 
-	void DrainHits(SizedArray<RagdollHit>& out_hits)
+	void DrainRagdollContacts(SizedArray<RagdollContact>& out_contacts)
 	{
 		std::lock_guard<std::mutex> guard(mImpactsMutex);
-		DrainQueue(mHits, out_hits);
-	}
-
-	void DrainImpacts(SizedArray<RagdollImpact>& out_impacts)
-	{
-		std::lock_guard<std::mutex> guard(mImpactsMutex);
-		DrainQueue(mImpacts, out_impacts);
+		DrainQueue(mRagdollContacts, out_contacts);
 	}
 
 	void ClearBodyGroundContacts()
@@ -274,66 +262,40 @@ public:
 		}
 
 		const JPH::Body& ragdoll_body = first_is_ragdoll ? inBody1 : inBody2;
-		const JPH::Body& surface_body = first_is_ragdoll ? inBody2 : inBody1;
+		const JPH::Body& other_body = first_is_ragdoll ? inBody2 : inBody1;
 
-		if (surface_body.IsDynamic()) {
-			const JPH::Vec3 direction = first_is_ragdoll ? -inManifold.mWorldSpaceNormal
-														 : inManifold.mWorldSpaceNormal;
-			const JPH::RVec3 hit_point = first_is_ragdoll ? inManifold.GetWorldSpaceContactPointOn1(0)
-														  : inManifold.GetWorldSpaceContactPointOn2(0);
+		const JPH::Vec3 normal = first_is_ragdoll ? -inManifold.mWorldSpaceNormal : inManifold.mWorldSpaceNormal;
+		const JPH::RVec3 point = first_is_ragdoll ? inManifold.GetWorldSpaceContactPointOn1(0)
+												  : inManifold.GetWorldSpaceContactPointOn2(0);
 
-			const JPH::Vec3 object_velocity = surface_body.GetPointVelocity(hit_point);
-			const float32 closing = (object_velocity - ragdoll_body.GetPointVelocity(hit_point)).Dot(direction);
-			const float32 min_speed = mMinHitSpeed.load();
+		const JPH::Vec3 other_velocity = other_body.GetPointVelocity(point);
+		const float32 closing = (other_velocity - ragdoll_body.GetPointVelocity(point)).Dot(normal);
 
-			if (closing < min_speed || object_velocity.Dot(direction) < min_speed) {
-				return;
+		if (closing < mMinRagdollContactSpeed.load()) {
+			return;
+		}
+
+		RagdollContact contact;
+		contact.Body = ragdoll_body.GetID();
+		contact.Point = Vec3f(point.GetX(), point.GetY(), point.GetZ());
+		contact.Normal = Vec3f(normal.GetX(), normal.GetY(), normal.GetZ());
+		contact.Speed = closing;
+		contact.OtherSpeed = other_velocity.Dot(normal);
+		contact.bOtherStatic = other_body.IsStatic();
+		contact.RagdollSerial = RagdollUserData::GetSerial(ragdoll_body.GetUserData());
+
+		if (other_body.IsDynamic()) {
+			const float32 inverse_mass = other_body.GetMotionProperties()->GetInverseMass();
+
+			if (inverse_mass > 0.0f) {
+				contact.OtherMass = 1.0f / inverse_mass;
 			}
-
-			const float32 inverse_mass = surface_body.GetMotionProperties()->GetInverseMass();
-
-			RagdollHit hit;
-			hit.Body = ragdoll_body.GetID();
-			hit.Point = Vec3f(hit_point.GetX(), hit_point.GetY(), hit_point.GetZ());
-			hit.Direction = Vec3f(direction.GetX(), direction.GetY(), direction.GetZ());
-			hit.Speed = closing;
-			hit.Mass = (inverse_mass > 0.0f) ? (1.0f / inverse_mass) : 0.0f;
-			hit.RagdollSerial = RagdollUserData::GetSerial(ragdoll_body.GetUserData());
-
-			std::lock_guard<std::mutex> guard(mImpactsMutex);
-
-			if (mHits.Size < scMaxQueuedImpacts) {
-				mHits.Insert(hit);
-			}
-
-			return;
 		}
-
-		if (!surface_body.IsStatic()) {
-			return;
-		}
-
-		const JPH::Vec3 surface_normal = first_is_ragdoll ? -inManifold.mWorldSpaceNormal
-														  : inManifold.mWorldSpaceNormal;
-		const JPH::RVec3 point = first_is_ragdoll ? inManifold.GetWorldSpaceContactPointOn2(0)
-												  : inManifold.GetWorldSpaceContactPointOn1(0);
-
-		const float32 speed = -ragdoll_body.GetPointVelocity(point).Dot(surface_normal);
-
-		if (speed < mMinImpactSpeed.load()) {
-			return;
-		}
-
-		RagdollImpact impact;
-		impact.Point = Vec3f(point.GetX(), point.GetY(), point.GetZ());
-		impact.Normal = Vec3f(surface_normal.GetX(), surface_normal.GetY(), surface_normal.GetZ());
-		impact.Speed = speed;
-		impact.RagdollSerial = RagdollUserData::GetSerial(ragdoll_body.GetUserData());
 
 		std::lock_guard<std::mutex> guard(mImpactsMutex);
 
-		if (mImpacts.Size < scMaxQueuedImpacts) {
-			mImpacts.Insert(impact);
+		if (mRagdollContacts.Size < scMaxQueuedImpacts) {
+			mRagdollContacts.Insert(contact);
 		}
 	}
 
@@ -459,12 +421,10 @@ private:
 	}
 
 private:
-	std::atomic<float32> mMinImpactSpeed = 1.0e9f;
 	std::mutex mImpactsMutex;
-	SizedArray<RagdollImpact> mImpacts;
 
-	std::atomic<float32> mMinHitSpeed = 1.5f;
-	SizedArray<RagdollHit> mHits;
+	std::atomic<float32> mMinRagdollContactSpeed = 1.5f;
+	SizedArray<RagdollContact> mRagdollContacts;
 
 	std::atomic<float32> mMinSoundSpeed = 1.0e9f;
 	SizedArray<SoundImpact> mSoundImpacts;
@@ -518,18 +478,16 @@ public:
 
 	bool GetTriangleUserData(const JPH::BodyID body_id, const JPH::SubShapeID sub_shape, uint32& out_user_data) const;
 
-	FX_FORCE_INLINE void SetMinRagdollImpactSpeed(float32 speed) { mContactListener.SetMinImpactSpeed(speed); }
-	FX_FORCE_INLINE void SetMinRagdollHitSpeed(float32 speed) { mContactListener.SetMinHitSpeed(speed); }
+	FX_FORCE_INLINE void SetMinRagdollContactSpeed(float32 speed) { mContactListener.SetMinRagdollContactSpeed(speed); }
 	FX_FORCE_INLINE void SetMinSoundImpactSpeed(float32 speed) { mContactListener.SetMinSoundSpeed(speed); }
 
 	FX_FORCE_INLINE void DrainSoundImpacts(SizedArray<SoundImpact>& out_impacts)
 	{
 		mContactListener.DrainSoundImpacts(out_impacts);
 	}
-	FX_FORCE_INLINE void DrainRagdollHits(SizedArray<RagdollHit>& out_hits) { mContactListener.DrainHits(out_hits); }
-	FX_FORCE_INLINE void DrainRagdollImpacts(SizedArray<RagdollImpact>& out_impacts)
+	FX_FORCE_INLINE void DrainRagdollContacts(SizedArray<RagdollContact>& out_contacts)
 	{
-		mContactListener.DrainImpacts(out_impacts);
+		mContactListener.DrainRagdollContacts(out_contacts);
 	}
 
 	FX_FORCE_INLINE float32 GetCollisionStepTime() const { return cTimeStep / static_cast<float32>(scCollisionSteps); }

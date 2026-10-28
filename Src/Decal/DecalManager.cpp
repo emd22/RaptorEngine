@@ -205,27 +205,27 @@ void DecalManager::AddBulletHole(const Vec3f hit_point, const Vec3f hit_normal)
 
 void DecalManager::AddBloodSplat(const Vec3f hit_point, const Vec3f hit_normal, float32 size)
 {
-	const float32 width = size * (0.8f + (0.4f * RandomUnit()));
-	const float32 height = width * (0.85f + (0.3f * RandomUnit()));
-
-	const float32 shade = 0.65f + (0.35f * RandomUnit());
-	const uint32 shade_byte = static_cast<uint32>(shade * 255.0f);
-
-	const DecalDesc desc {
-		.Position = hit_point,
-		.Direction = -hit_normal,
-		.Width = width,
-		.Height = height,
-		.Depth = scBloodDepth,
-		.Roll = RandomUnit() * 2.0f * static_cast<float32>(M_PI),
-		.AtlasRect = { mBloodRegion.ScaleU, mBloodRegion.ScaleV, mBloodRegion.OffsetU, mBloodRegion.OffsetV },
-		.Color = shade_byte | (shade_byte << 8) | (shade_byte << 16) | 0xFF000000u,
-		.Roughness = 0.2f,
-		.RoughnessWeight = 0.85f,
-		.NormalStrength = 0.0f,
-	};
-
-	AddDecal(desc);
+	// 	const float32 width = size * (0.8f + (0.4f * RandomUnit()));
+	// 	const float32 height = width * (0.85f + (0.3f * RandomUnit()));
+	//
+	// 	const float32 shade = 0.65f + (0.35f * RandomUnit());
+	// 	const uint32 shade_byte = static_cast<uint32>(shade * 255.0f);
+	//
+	// 	const DecalDesc desc {
+	// 		.Position = hit_point,
+	// 		.Direction = -hit_normal,
+	// 		.Width = width,
+	// 		.Height = height,
+	// 		.Depth = scBloodDepth,
+	// 		.Roll = RandomUnit() * 2.0f * static_cast<float32>(M_PI),
+	// 		.AtlasRect = { mBloodRegion.ScaleU, mBloodRegion.ScaleV, mBloodRegion.OffsetU, mBloodRegion.OffsetV },
+	// 		.Color = shade_byte | (shade_byte << 8) | (shade_byte << 16) | 0xFF000000u,
+	// 		.Roughness = 0.2f,
+	// 		.RoughnessWeight = 0.85f,
+	// 		.NormalStrength = 0.0f,
+	// 	};
+	//
+	// 	AddDecal(desc);
 }
 
 void DecalManager::AddSkinnedDecal(const Skeleton* skeleton, const Mat4f& rest_to_world, const DecalDesc& desc)

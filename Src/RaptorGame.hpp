@@ -102,8 +102,8 @@ private:
 	void DropRagdollDummy(Object* model);
 	void DestroyRagdollDummy(size_t index);
 	void CleanWorld();
-	void AddDummyWound(RagdollDummy& dummy, const physics::RagdollHit& hit);
-	void SpawnRagdollBlood(float32& cooldown, const physics::RagdollImpact& impact, float32 min_speed);
+	void AddDummyWound(RagdollDummy& dummy, const physics::RagdollContact& contact);
+	void SpawnRagdollBlood(float32& cooldown, const physics::RagdollContact& contact, float32 min_speed);
 
 	void RequestRagdollTemplate();
 	void SpawnDebugNPC(Object* model);
@@ -191,7 +191,6 @@ private:
 	float64 mImpactSoundClock = 0.0;
 
 	std::vector<RagdollDummy> mRagdollDummies;
-	SizedArray<physics::RagdollImpact> mRagdollImpacts;
 	AssetTicket mRagdollTemplateTicket { nullptr };
 	std::atomic<Object*> mpRagdollTemplate = nullptr;
 	bool mbRagdollTemplateRequested = false;
@@ -205,6 +204,7 @@ private:
 	CVarValue* mpRagdollBloodSpeedCVar = nullptr;
 	CVarValue* mpNPCImpactDamageCVar = nullptr;
 	CVarValue* mpNPCImpactSpeedCVar = nullptr;
+	CVarValue* mpNPCImpactSafeSpeedCVar = nullptr;
 	CVarValue* mpNPCReactStrengthCVar = nullptr;
 	CVarValue* mpNPCStrengthCVar = nullptr;
 	CVarValue* mpNPCRootAssistCVar = nullptr;

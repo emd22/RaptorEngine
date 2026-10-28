@@ -52,6 +52,7 @@ bool NPC::Create(const Object* model, const NPCDesc& desc)
 	mHealth = desc.MaxHealth;
 	mState = eState::Animated;
 	mbTeleported = true;
+	mPendingImpactDamage = 0.0f;
 
 	if (!desc.IdleAnimation.IsEmpty()) {
 		SetIdleAnimation(desc.IdleAnimation);
@@ -72,9 +73,11 @@ bool NPC::Create(const Object* model, const NPCDesc& desc)
 
 	mBodyStrengths.Free();
 	mBodyStrengths.InitCapacity(mRagdoll.GetBodyCount());
+	mMass = 0.0f;
 
 	for (uint32 i = 0; i < mRagdoll.GetBodyCount(); i++) {
 		mBodyStrengths.Insert(1.0f);
+		mMass += mRagdoll.GetBodyMass(i);
 	}
 
 	gWorld->AttachLoaded(root);
@@ -110,7 +113,12 @@ void NPC::Update(float32 delta_time, bool draw_debug)
 
 	BloodCooldown = std::max(BloodCooldown - delta_time, 0.0f);
 
-	if (mState == eState::Ragdoll) {
+	if (mPendingImpactDamage > 0.0f) {
+		Damage(mPendingImpactDamage);
+		mPendingImpactDamage = 0.0f;
+	}
+
+	if (mState != eState::Animated) {
 		mRagdoll.WriteToSkeleton();
 	}
 	else if (Object* skinned = GetSkinnedObject()) {
@@ -156,10 +164,9 @@ void NPC::DrawDebugHealth() const
 
 	renderer::gDebugDraw->Line(left_end, left_end + right * scBarWidth, Color::FromRGBA(60, 60, 60, 255));
 
-	const Color fill = (mState == eState::Ragdoll)
-						   ? Color::FromRGBA(150, 150, 150, 255)
-						   : Color::FromRGBA(static_cast<uint8>(255.0f * (1.0f - fraction)),
-											 static_cast<uint8>(255.0f * fraction), 40, 255);
+	const Color fill = (mState == eState::Ragdoll) ? Color::FromRGBA(150, 150, 150, 255)
+												   : Color::FromRGBA(static_cast<uint8>(255.0f * (1.0f - fraction)),
+																	 static_cast<uint8>(255.0f * fraction), 40, 255);
 
 	renderer::gDebugDraw->Line(left_end, left_end + right * (scBarWidth * fraction), fill);
 }
@@ -184,29 +191,33 @@ NPC::eBodyPart NPC::GetBodyPart(JPH::BodyID body_id) const
 	return (body_index < 0) ? eBodyPart::Torso : mRagdoll.GetBodyPart(static_cast<uint32>(body_index));
 }
 
+float32 NPC::GetDamageScale(JPH::BodyID body_id) const
+{
+	switch (GetBodyPart(body_id)) {
+	case eBodyPart::Head:
+		return HeadDamageScale;
+	case eBodyPart::Arm:
+	case eBodyPart::Leg:
+		return LimbDamageScale;
+	case eBodyPart::Torso:
+		return TorsoDamageScale;
+	}
+
+	return TorsoDamageScale;
+}
+
 void NPC::Damage(float32 amount, JPH::BodyID body_id)
 {
 	if (!IsCreated() || mState == eState::Ragdoll) {
 		return;
 	}
 
-	switch (GetBodyPart(body_id)) {
-	case eBodyPart::Head:
-		if (amount >= HeadKillDamage) {
-			Damage(mHealth);
-			return;
-		}
-
-		Damage(amount * HeadDamageScale);
-		return;
-	case eBodyPart::Arm:
-	case eBodyPart::Leg:
-		Damage(amount * LimbDamageScale);
-		return;
-	case eBodyPart::Torso:
-		Damage(amount * TorsoDamageScale);
+	if (GetBodyPart(body_id) == eBodyPart::Head && amount >= HeadKillDamage) {
+		Damage(mHealth);
 		return;
 	}
+
+	Damage(amount * GetDamageScale(body_id));
 }
 
 void NPC::EnterRagdoll()
@@ -222,15 +233,49 @@ void NPC::EnterRagdoll()
 		return;
 	}
 
+	SetCullable(false);
+
+	mRagdoll.GoLimp(skinned->GetWorldMatrix());
+	mState = eState::Ragdoll;
+}
+
+void NPC::EnterFallen()
+{
+	if (mState != eState::Animated || !mRagdoll.IsCreated()) {
+		return;
+	}
+
+	mRagdoll.SetBalancing(false);
+	mRagdoll.SetRootAssist(0.0f);
+	mRagdoll.SetAllBodyModes(physics::eRagdollBodyMode::Limp);
+
+	for (uint32 i = 0; i < mRagdoll.GetBodyCount(); i++) {
+		mRagdoll.SetBodyBlend(i, 1.0f);
+	}
+
+	if (mpSkeleton.IsValid()) {
+		mpSkeleton->SetExternalPose(true);
+	}
+
+	SetCullable(false);
+
+	mState = eState::Fallen;
+}
+
+void NPC::SetCullable(bool cullable)
+{
+	Object* root = gObjectManager->GetObject(mRootID);
+
+	if (root == nullptr) {
+		return;
+	}
+
 	DynArray<Object*> parts;
 	CollectObjectTree(root, parts);
 
 	for (Object* part : parts) {
-		part->SetCullable(false);
+		part->SetCullable(cullable);
 	}
-
-	mRagdoll.GoLimp(skinned->GetWorldMatrix());
-	mState = eState::Ragdoll;
 }
 
 void NPC::UpdateBalance(float32 delta_time)
@@ -258,8 +303,7 @@ void NPC::UpdateBalance(float32 delta_time)
 	mBalanceTime += delta_time;
 
 	if (status.State == physics::eBalanceState::Fallen) {
-		mRagdoll.SetBalancing(false);
-		mState = eState::Fallen;
+		EnterFallen();
 		return;
 	}
 
@@ -383,19 +427,11 @@ void NPC::ApplyStrengths()
 		return;
 	}
 
-	float32 strength = Strength;
-	float32 root_assist = RootAssist;
-
-	if (mState == eState::Fallen) {
-		strength = FallStrength;
-		root_assist = 0.0f;
-	}
-
 	for (uint32 i = 0; i < mBodyStrengths.Size; i++) {
-		mRagdoll.SetBodyStrength(i, strength * mBodyStrengths[i]);
+		mRagdoll.SetBodyStrength(i, Strength * mBodyStrengths[i]);
 	}
 
-	mRagdoll.SetRootAssist(root_assist * mBodyStrengths[0] * mAssistFade);
+	mRagdoll.SetRootAssist(RootAssist * mBodyStrengths[0] * mAssistFade);
 }
 
 void NPC::AddImpulse(JPH::BodyID body_id, const Vec3f impulse, const Vec3f point)
@@ -404,7 +440,7 @@ void NPC::AddImpulse(JPH::BodyID body_id, const Vec3f impulse, const Vec3f point
 		return;
 	}
 
-	if (mState == eState::Ragdoll) {
+	if (mState != eState::Animated) {
 		mRagdoll.AddImpulse(body_id, impulse, point);
 		return;
 	}
@@ -417,7 +453,7 @@ void NPC::React(JPH::BodyID body_id, const Vec3f impulse, const Vec3f point)
 	constexpr float32 scMinSpeed = 1.0f;
 	constexpr float32 scMaxSpeed = 4.0f;
 
-	if (!IsCreated() || mState == eState::Ragdoll || !mRagdoll.IsCreated()) {
+	if (!IsCreated() || mState != eState::Animated || !mRagdoll.IsCreated()) {
 		return;
 	}
 
@@ -481,18 +517,35 @@ void NPC::React(JPH::BodyID body_id, const Vec3f impulse, const Vec3f point)
 	mRagdoll.AddImpulse(body_id, impulse * (speed * mass / length), point);
 }
 
-float32 GetHitWoundSize(const physics::RagdollHit& hit)
+float32 GetContactWoundSize(const physics::RagdollContact& contact)
 {
 	constexpr float32 scMinSize = 0.15f;
 	constexpr float32 scMaxSize = 0.4f;
 	constexpr float32 scMaxMomentum = 150.0f;
 
-	const float32 strength = std::clamp(hit.Mass * hit.Speed / scMaxMomentum, 0.0f, 1.0f);
+	const float32 strength = std::clamp(contact.OtherMass * contact.Speed / scMaxMomentum, 0.0f, 1.0f);
 
 	return scMinSize + (scMaxSize - scMinSize) * strength;
 }
 
-void NPC::OnObjectHit(const physics::RagdollHit& hit, float32 damage_scale)
+float32 NPC::GetContactDamage(const physics::RagdollContact& contact) const
+{
+	const float32 excess = contact.Speed - SafeImpactSpeed;
+
+	if (excess <= 0.0f) {
+		return 0.0f;
+	}
+
+	float32 mass = mMass;
+
+	if (contact.OtherMass > 0.0f) {
+		mass = (mMass * contact.OtherMass) / (mMass + contact.OtherMass);
+	}
+
+	return ImpactDamageScale * mass * excess * GetDamageScale(contact.Body);
+}
+
+void NPC::OnContact(const physics::RagdollContact& contact)
 {
 	constexpr float32 scMaxKnockMass = 80.0f;
 	constexpr float32 scWoundCooldown = 0.25f;
@@ -501,8 +554,10 @@ void NPC::OnObjectHit(const physics::RagdollHit& hit, float32 damage_scale)
 		return;
 	}
 
-	if (BloodCooldown <= 0.0f) {
-		AddWound(hit.Body, hit.Point, hit.Direction, GetHitWoundSize(hit));
+	const bool is_struck = contact.IsStruck(MinImpactSpeed);
+
+	if (is_struck && BloodCooldown <= 0.0f) {
+		AddWound(contact.Body, contact.Point, contact.Normal, GetContactWoundSize(contact));
 		BloodCooldown = scWoundCooldown;
 	}
 
@@ -510,11 +565,19 @@ void NPC::OnObjectHit(const physics::RagdollHit& hit, float32 damage_scale)
 		return;
 	}
 
-	const float32 momentum = std::min(hit.Mass, scMaxKnockMass) * hit.Speed;
+	mPendingImpactDamage = std::max(mPendingImpactDamage, GetContactDamage(contact));
 
-	Damage(momentum * damage_scale, hit.Body);
+	if (!is_struck) {
+		return;
+	}
 
-	AddImpulse(hit.Body, hit.Direction * momentum, hit.Point);
+	float32 knock_mass = scMaxKnockMass;
+
+	if (contact.OtherMass > 0.0f) {
+		knock_mass = std::min(contact.OtherMass, scMaxKnockMass);
+	}
+
+	AddImpulse(contact.Body, contact.Normal * (knock_mass * contact.Speed), contact.Point);
 }
 
 void NPC::AddWound(JPH::BodyID body_id, const Vec3f point, const Vec3f direction, float32 size)
@@ -536,7 +599,7 @@ void NPC::SetPosition(const Vec3f position)
 {
 	Object* root = gObjectManager->GetObject(mRootID);
 
-	if (root == nullptr || mState == eState::Ragdoll) {
+	if (root == nullptr || mState != eState::Animated) {
 		return;
 	}
 
@@ -548,7 +611,7 @@ void NPC::SetYaw(float32 yaw)
 {
 	Object* root = gObjectManager->GetObject(mRootID);
 
-	if (root == nullptr || mState == eState::Ragdoll) {
+	if (root == nullptr || mState != eState::Animated) {
 		return;
 	}
 
@@ -618,21 +681,25 @@ void NPCManager::ClearRagdolls()
 
 void NPCManager::Update(float32 delta_time, bool draw_debug)
 {
-	gPhysics->pBackend->SetMinRagdollHitSpeed(MinImpactSpeed);
-
-	gPhysics->pBackend->DrainRagdollHits(mHits);
-
-	for (const physics::RagdollHit& hit : mHits) {
-		if (NPC* npc = FindByRagdollSerial(hit.RagdollSerial)) {
-			npc->OnObjectHit(hit, ImpactDamageScale);
-		}
-	}
+	gPhysics->pBackend->DrainRagdollContacts(mContacts);
 
 	for (std::unique_ptr<NPC>& npc : mNPCs) {
 		npc->ReactStrength = ReactStrength;
 		npc->Strength = Strength;
 		npc->RootAssist = RootAssist;
 		npc->bBalance = bBalance;
+		npc->ImpactDamageScale = ImpactDamageScale;
+		npc->MinImpactSpeed = MinImpactSpeed;
+		npc->SafeImpactSpeed = SafeImpactSpeed;
+	}
+
+	for (const physics::RagdollContact& contact : mContacts) {
+		if (NPC* npc = FindByRagdollSerial(contact.RagdollSerial)) {
+			npc->OnContact(contact);
+		}
+	}
+
+	for (std::unique_ptr<NPC>& npc : mNPCs) {
 		npc->Update(delta_time, draw_debug);
 	}
 }

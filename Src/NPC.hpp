@@ -51,9 +51,11 @@ public:
 	void Damage(float32 amount);
 	void Damage(float32 amount, JPH::BodyID body_id);
 	eBodyPart GetBodyPart(JPH::BodyID body_id) const;
+	float32 GetDamageScale(JPH::BodyID body_id) const;
 	void EnterRagdoll();
 
-	void OnObjectHit(const physics::RagdollHit& hit, float32 damage_scale);
+	void OnContact(const physics::RagdollContact& contact);
+	float32 GetContactDamage(const physics::RagdollContact& contact) const;
 
 	void AddImpulse(JPH::BodyID body_id, const Vec3f impulse, const Vec3f point);
 	void React(JPH::BodyID body_id, const Vec3f impulse, const Vec3f point);
@@ -94,7 +96,9 @@ public:
 	float32 Strength = 1.0f;
 	float32 RootAssist = 1.0f;
 	bool bBalance = true;
-	float32 FallStrength = 0.3f;
+	float32 ImpactDamageScale = 0.25f;
+	float32 MinImpactSpeed = 1.5f;
+	float32 SafeImpactSpeed = 6.0f;
 
 private:
 	Object* GetSkinnedObject() const;
@@ -102,6 +106,8 @@ private:
 	void ApplyStrengths();
 	void UpdateBalance(float32 delta_time);
 	void ReturnToAnimation();
+	void EnterFallen();
+	void SetCullable(bool cullable);
 	bool IsPowered() const;
 	void SetPowered(bool powered);
 	void UpdatePhysicsBlend(float32 delta_time);
@@ -114,17 +120,19 @@ private:
 	physics::Ragdoll mRagdoll;
 
 	float32 mHealth = 100.0f;
+	float32 mMass = 0.0f;
 	eState mState = eState::Animated;
 	bool mbTeleported = true;
 	float32 mBalanceTime = 0.0f;
 	float32 mAssistFade = 1.0f;
 	float32 mPoweredTime = 0.0f;
 	float32 mPhysicsBlend = 1.0f;
+	float32 mPendingImpactDamage = 0.0f;
 
 	SizedArray<float32> mBodyStrengths;
 };
 
-float32 GetHitWoundSize(const physics::RagdollHit& hit);
+float32 GetContactWoundSize(const physics::RagdollContact& contact);
 
 class NPCManager
 {
@@ -140,18 +148,19 @@ public:
 
 	float32 ImpactDamageScale = 0.25f;
 	float32 MinImpactSpeed = 1.5f;
+	float32 SafeImpactSpeed = 6.0f;
 	float32 ReactStrength = 0.25f;
 	float32 Strength = 1.0f;
 	float32 RootAssist = 1.0f;
 	bool bBalance = true;
 
-	FX_FORCE_INLINE const SizedArray<physics::RagdollHit>& GetHits() const { return mHits; }
+	FX_FORCE_INLINE const SizedArray<physics::RagdollContact>& GetContacts() const { return mContacts; }
 	FX_FORCE_INLINE uint32 GetCount() const { return mNPCs.Size; }
 	FX_FORCE_INLINE NPC* Get(size_t index) { return mNPCs[index].get(); }
 
 private:
 	DynArray<std::unique_ptr<NPC>, GrowthFunctions::Double> mNPCs;
-	SizedArray<physics::RagdollHit> mHits;
+	SizedArray<physics::RagdollContact> mContacts;
 };
 
 } // namespace fx
