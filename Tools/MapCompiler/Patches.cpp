@@ -411,6 +411,7 @@ void PatchBuilder::WriteCollision(double chunk_size, CompiledMap& out_map)
 	{
 		Array<float32> Points;
 		Array<uint32> Indices;
+		Array<int32> TriangleMaterials;
 		std::map<std::pair<uint32, int32>, uint32> Lookup;
 	};
 
@@ -460,6 +461,8 @@ void PatchBuilder::WriteCollision(double chunk_size, CompiledMap& out_map)
 				mesh.Indices.Emplace(found->second);
 			}
 
+			mesh.TriangleMaterials.Emplace(surface.MaterialIndex);
+
 			Stats.CollisionTriangles++;
 		}
 	}
@@ -470,6 +473,7 @@ void PatchBuilder::WriteCollision(double chunk_size, CompiledMap& out_map)
 		CompiledMapCollisionMesh& out_mesh = out_map.CollisionMeshes.Emplace();
 		out_mesh.Points = ArrayUtil::DynToSizedArray(mesh.Points);
 		out_mesh.Indices = ArrayUtil::DynToSizedArray(mesh.Indices);
+		out_mesh.TriangleMaterials = ArrayUtil::DynToSizedArray(mesh.TriangleMaterials);
 	}
 
 	Stats.CollisionMeshes = static_cast<uint32>(out_map.CollisionMeshes.Size);

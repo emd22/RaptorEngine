@@ -5,7 +5,6 @@
  * Description: Routines to serialize structures and data to disk from C++
  */
 
-
 #pragma once
 
 #include <Core/ByteBuffer.hpp>

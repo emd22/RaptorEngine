@@ -582,6 +582,7 @@ private:
 
 	bool ParseEntry(ConfigEntry* parent, ConfigEntry& out_entry);
 	bool ParseStruct(ConfigEntry& entry);
+	bool ParseArray(ConfigEntry& entry);
 	bool ParseValue(ConfigPrimitive& value);
 	bool ParseTerm(ConfigPrimitive& value);
 	bool ParseExpression(ConfigPrimitive& value);

@@ -852,42 +852,7 @@ bool ConfigFile::ParseEntry(ConfigEntry* parent, ConfigEntry& entry)
 
 	// Parse array
 	else if (GetToken()->Type == eTokenType::LBracket) {
-		EatToken(eTokenType::LBracket);
-
-		entry.bIsArray = true;
-
-		Token* value_token = GetToken();
-		entry.Type = GetValueTokenType(*value_token);
-
-		while (!IsAtEnd() && GetToken()->Type != eTokenType::RBracket) {
-			if (GetToken()->Type == eTokenType::LBrace) {
-				ConfigEntry element;
-				element.Name = std::to_string(entry.Members.IsInited() ? entry.Members.Size() : 0);
-
-				if (!ParseStruct(element)) {
-					return false;
-				}
-
-				entry.AddMember(std::move(element));
-			}
-			else {
-				ConfigPrimitive value;
-				if (!ParseExpression(value)) {
-					return false;
-				}
-				entry.AppendValue(std::move(value));
-			}
-
-			if (GetToken()->Type == eTokenType::RBracket) {
-				break;
-			}
-
-			if (!EatToken(eTokenType::Comma)) {
-				return false;
-			}
-		}
-
-		return EatToken(eTokenType::RBracket);
+		return ParseArray(entry);
 	}
 
 	// Parse a reference to another entry, which can be an object or an array and can be defined later in the file
@@ -954,6 +919,73 @@ bool ConfigFile::ParseStruct(ConfigEntry& entry)
 
 	// Missing closing brace (truncated file). Keep what was parsed.
 	return EatToken(eTokenType::RBrace);
+}
+
+bool ConfigFile::ParseArray(ConfigEntry& entry)
+{
+	if (mDepth >= cMaxDepth) {
+		LogError(LC_CORE, "Config({}): nesting too deep", mTokenIndex);
+		mbHasErrors = true;
+		return false;
+	}
+
+	EatToken(eTokenType::LBracket);
+
+	entry.bIsArray = true;
+
+	Token* value_token = GetToken();
+	entry.Type = GetValueTokenType(*value_token);
+
+	++mDepth;
+
+	bool success = true;
+
+	while (!IsAtEnd() && GetToken()->Type != eTokenType::RBracket) {
+		const eTokenType element_type = GetToken()->Type;
+
+		if (element_type == eTokenType::LBrace || element_type == eTokenType::LBracket) {
+			ConfigEntry element;
+			element.Name = std::to_string(entry.Members.IsInited() ? entry.Members.Size() : 0);
+
+			if (element_type == eTokenType::LBrace) {
+				success = ParseStruct(element);
+			}
+			else {
+				success = ParseArray(element);
+			}
+
+			if (!success) {
+				break;
+			}
+
+			entry.AddMember(std::move(element));
+		}
+		else {
+			ConfigPrimitive value;
+			if (!ParseExpression(value)) {
+				success = false;
+				break;
+			}
+			entry.AppendValue(std::move(value));
+		}
+
+		if (GetToken()->Type == eTokenType::RBracket) {
+			break;
+		}
+
+		if (!EatToken(eTokenType::Comma)) {
+			success = false;
+			break;
+		}
+	}
+
+	--mDepth;
+
+	if (!success) {
+		return false;
+	}
+
+	return EatToken(eTokenType::RBracket);
 }
 
 void ConfigFile::Parse(PagedArray<Token>& tokens)

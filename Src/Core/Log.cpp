@@ -31,6 +31,7 @@ void LogCategoryText(eLogCategory category)
         "[MEMORY] ",  /* Memory */
         "[ASSET] ",   /* Asset */
         "[SCRIPT] ",  /* Script */
+        "[AUDIO] ",   /* Audio */
     };
 
     static const char* scCatColors[] = {
@@ -41,6 +42,7 @@ void LogCategoryText(eLogCategory category)
         FX_LOG_COLOR_FG(212), /* Memory */
         FX_LOG_COLOR_FG(192), /* Asset */
         FX_LOG_COLOR_FG(84),  /* Script */
+        FX_LOG_COLOR_FG(81),  /* Audio */
     };
 
     const int cat_index = static_cast<int>(category);

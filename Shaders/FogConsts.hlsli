@@ -15,7 +15,7 @@ struct FogConsts
 	float fAmbientScale;
 	uint uiTileColumns;
 	uint uiTileRows;
-	uint uiStepCount;
+	uint uiPad0;
 	uint uiFlags;
 	float fJitterOffset;
 	uint uiNoiseShift;
@@ -42,8 +42,6 @@ struct FogShadowPage
 #define FOG_FLAG_BAKED_SUN_SHADOW 0x08
 
 #define FOG_CASCADE_FADE 0.1
-
-#define FOG_FAST_SEGMENTS 8
 
 #define FOG_SHADOW_BIAS -0.000005f
 

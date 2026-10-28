@@ -18,6 +18,7 @@
 #include <wx/toplevel.h>
 
 #include <Asset/ConfigFile.hpp>
+#include <Audio/AudioSystem.hpp>
 #include <Blockout.hpp>
 #include <CVar.hpp>
 #include <Controls.hpp>
@@ -28,8 +29,8 @@
 #include <Object/ObjectManager.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
+#include <Renderer/Camera/BaseCamera.hpp>
 #include <Renderer/DebugDraw.hpp>
-#include <Renderer/Exposure.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/Light.hpp>
@@ -100,7 +101,7 @@ static constexpr uint32 scVisTools = ToolBit(eEditorTool::Select) | scBrushEditT
 									 ToolBit(eEditorTool::Decal) | ToolBit(eEditorTool::Clip);
 
 static constexpr uint32 scDataTools[static_cast<uint32>(eDataFilter::Count)] = {
-	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Light),
+	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Light) | ToolBit(eEditorTool::Sound),
 	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Create),
 	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Create),
 	ToolBit(eEditorTool::Select),
@@ -109,6 +110,7 @@ static constexpr uint32 scDataTools[static_cast<uint32>(eDataFilter::Count)] = {
 	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Rotate) | ToolBit(eEditorTool::Create),
 	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Rotate) | ToolBit(eEditorTool::Create),
 	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Rotate) | ToolBit(eEditorTool::Create),
+	ToolBit(eEditorTool::Select) | ToolBit(eEditorTool::Sound),
 };
 
 static const char* const scCommandScriptPath = "./Scripts/editor/editor_cmd.strata";
@@ -414,7 +416,6 @@ EditorPanelState RaptorEditor::BuildPanelState()
 	}
 
 	world.Fog = gWorld->Fog;
-	world.FogQuality = std::clamp<int64>(gCVars->Get("r_fog", int64 { 2 }), 0, 3);
 
 	const uint32 probe_count = gProbeManager->GetReflectionProbeCount();
 
@@ -446,6 +447,25 @@ EditorPanelState RaptorEditor::BuildPanelState()
 		panel.Lumens = light->GetLumens();
 		panel.OuterAngleDegrees = MathUtil::RadiansToDegrees(light->GetOuterAngle());
 		panel.InnerAngleDegrees = MathUtil::RadiansToDegrees(light->GetInnerAngle());
+	}
+
+	if (mCurrentTool == eEditorTool::Sound) {
+		SoundPanelState& panel = state.Sound;
+
+		for (const SoundDef& def : gAudio->GetDefs()) {
+			panel.SoundNames += def.Name;
+			panel.SoundNames += "\n";
+		}
+
+		if (const SoundEmitter* emitter = mSoundEditor.GetSelected(); emitter != nullptr) {
+			panel.bHasSound = true;
+			panel.Name = emitter->Name;
+			panel.Sound = emitter->Sound;
+			panel.Position = emitter->Position;
+			panel.Volume = emitter->Volume;
+			panel.MinInterval = emitter->MinInterval;
+			panel.MaxInterval = emitter->MaxInterval;
+		}
 	}
 
 	if (IsTopViewActive()) {
@@ -544,6 +564,7 @@ void RaptorEditor::Update(float32 delta_time)
 
 			gWorld->pPrototype->RefreshDecals();
 			gWorld->pPrototype->RefreshCappedPatches();
+			gWorld->pPrototype->RequestAcousticRebuild();
 		}
 	}
 
@@ -556,6 +577,10 @@ void RaptorEditor::Update(float32 delta_time)
 
 	if (mCurrentTool == eEditorTool::Light) {
 		mLightEditor.DrawMarkers();
+	}
+
+	if (mCurrentTool == eEditorTool::Sound) {
+		mSoundEditor.DrawMarkers();
 	}
 
 	if (IsSpawnPointShown()) {
@@ -636,13 +661,16 @@ void RaptorEditor::SetTool(eEditorTool tool)
 	}
 
 	if (tool != mCurrentTool) {
-		const bool was_light = (mCurrentTool == eEditorTool::Light);
-		const bool is_light = (tool == eEditorTool::Light);
+		const eEditorTool previous_tool = mCurrentTool;
 
 		mCurrentTool = tool;
 
-		if (was_light) {
+		if (previous_tool == eEditorTool::Light) {
 			mLightEditor.Deselect();
+		}
+
+		if (previous_tool == eEditorTool::Sound) {
+			mSoundEditor.Deselect();
 		}
 
 		if (tool != eEditorTool::Select) {
@@ -651,14 +679,20 @@ void RaptorEditor::SetTool(eEditorTool tool)
 
 		PruneSelection();
 
-		if (was_light != is_light && mpMainFrame != nullptr) {
+		const auto has_settings_panel = [](eEditorTool tool_to_check)
+		{ return tool_to_check == eEditorTool::Light || tool_to_check == eEditorTool::Sound; };
+
+		if ((has_settings_panel(previous_tool) || has_settings_panel(tool)) && mpMainFrame != nullptr) {
 			thread::PostToUI(
-				[this, is_light]
+				[this, tool]
 				{
 					ToolSettingsBasePanel* panel = nullptr;
 
-					if (is_light) {
+					if (tool == eEditorTool::Light) {
 						panel = new LightToolSettingsPanel();
+					}
+					else if (tool == eEditorTool::Sound) {
+						panel = new SoundToolSettingsPanel();
 					}
 
 					mpMainFrame->SetToolSettingsPanel(panel);
@@ -686,6 +720,7 @@ void RaptorEditor::SetSimulating(bool simulating)
 		if (simulating) {
 			ClearSelection();
 			mLightEditor.Deselect();
+			mSoundEditor.Deselect();
 
 			if (mView == eEditorView::Architect) {
 				SetView(eEditorView::Viewport);
@@ -842,7 +877,7 @@ bool RaptorEditor::IsObjectSelectable(const Object* object) const
 		return false;
 	}
 
-	if (mCurrentTool == eEditorTool::Light) {
+	if (mCurrentTool == eEditorTool::Light || mCurrentTool == eEditorTool::Sound) {
 		return false;
 	}
 
@@ -1967,11 +2002,30 @@ void RaptorEditor::ForgetObjects()
 	SyncSelection();
 }
 
-void RaptorEditor::ShowNotice(const String& message)
+uint32 RaptorEditor::ShowStatusMessage(const String& text, std::chrono::milliseconds duration)
 {
-	mNotice = message;
-	mNoticeSerial++;
-	mbForcePanelSync = true;
+	const uint32 id = EditorFrame::NewStatusMessageId();
+
+	thread::PostToUI(
+		[this, id, text, duration]
+		{
+			if (mpMainFrame != nullptr) {
+				mpMainFrame->ShowStatusMessage(id, wxString::FromUTF8(text.CStr()), duration);
+			}
+		});
+
+	return id;
+}
+
+void RaptorEditor::ClearStatusMessage(uint32 id)
+{
+	thread::PostToUI(
+		[this, id]
+		{
+			if (mpMainFrame != nullptr) {
+				mpMainFrame->ClearStatusMessage(id);
+			}
+		});
 }
 
 bool RaptorEditor::HasUnsavedChanges() const { return mbUntrackedChanges || mHistory.GetRevision() != mSavedRevision; }

@@ -10,6 +10,7 @@
 #include "LightEditor.hpp"
 #include "Operation/BaseOperation.hpp"
 #include "Operation/History.hpp"
+#include "SoundEditor.hpp"
 #include "SpawnEditor.hpp"
 
 #include <wx/evtloop.h>
@@ -62,6 +63,8 @@ enum class eReloadTarget : uint32
 class RaptorEditor
 {
 public:
+	static constexpr std::chrono::seconds scWarningDuration { 6 };
+
 	RaptorEditor() = default;
 
 
@@ -172,6 +175,9 @@ public:
 	void TopViewMoveLight(const Vec3f offset);
 	void TopViewAimLight(const Vec3f direction);
 	void TopViewCreateLight(const Vec3f position);
+	void TopViewSelectSound(uint32 sound_id);
+	void TopViewMoveSound(const Vec3f offset);
+	void TopViewCreateSound(const Vec3f position);
 	void TopViewSelectSpawn();
 	void TopViewMoveSpawn(const Vec3f offset);
 	void TopViewAimSpawn(const Vec3f direction);
@@ -242,6 +248,7 @@ public:
 	FX_FORCE_INLINE const EditorSelection& GetSelection() const { return mSelection; }
 
 	FX_FORCE_INLINE LightEditor& GetLightEditor() { return mLightEditor; }
+	FX_FORCE_INLINE SoundEditor& GetSoundEditor() { return mSoundEditor; }
 
 	/// Changes a brush's material, and makes it the one new brushes are made with
 	void SetObjectMaterial(Object* object, MaterialID material);
@@ -343,10 +350,12 @@ public:
 		const String message = String::Fmt(fmt, args...);
 
 		LogWarning(LC_CORE, "{}", message.CStr());
-		ShowNotice(message);
+		ShowStatusMessage(message, scWarningDuration);
 	}
 
-	void ShowNotice(const String& message);
+	uint32 ShowStatusMessage(const String& text,
+							 std::chrono::milliseconds duration = std::chrono::milliseconds::zero());
+	void ClearStatusMessage(uint32 id);
 
 	/////////////////////////////////////
 	// Commands
@@ -420,9 +429,6 @@ private:
 	bool mbViewLockedByCompiledMap = false;
 	uint32 mTopViewCommandSerial = 0;
 
-	String mNotice;
-	uint32 mNoticeSerial = 0;
-
 	eEditorTool mCurrentTool = eEditorTool::Select;
 	bool mbSimulating = false;
 
@@ -435,6 +441,8 @@ private:
 	EditorTheme mTheme {};
 
 	LightEditor mLightEditor;
+
+	SoundEditor mSoundEditor;
 
 	GrabEditor mGrabEditor;
 

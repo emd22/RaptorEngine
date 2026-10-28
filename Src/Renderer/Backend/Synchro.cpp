@@ -29,7 +29,7 @@ void Fence::WaitFor(uint64 timeout) const
 	const VkResult status = vkWaitForFences(gGraphics->GetDevice()->Device, 1, &InternalFence, true, timeout);
 
 	if (status != VK_SUCCESS) {
-		PanicVulkan("Fence", "Could not create fence", status);
+		PanicVulkan("Fence", "Could not wait for fence", status);
 	}
 }
 

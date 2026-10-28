@@ -25,7 +25,7 @@ class TextRenderer
 {
 public:
 	/// Max glyphs on screen at once
-	static constexpr uint32 scMaxGlyphs = 300;
+	static constexpr uint32 scMaxGlyphs = 400;
 
 	static constexpr uint32 scGlyphWidth = 6;
 	static constexpr uint32 scGlyphHeight = 12;

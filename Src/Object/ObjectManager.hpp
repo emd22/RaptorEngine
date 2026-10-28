@@ -4,10 +4,10 @@
 #include "ObjectID.hpp"
 
 #include <Core/Bitset.hpp>
+#include <Core/DynArray.hpp>
 #include <Core/FreeArray.hpp>
 #include <Renderer/Backend/Descriptors.hpp>
 #include <Renderer/Backend/GpuBuffer.hpp>
-#include <vector>
 
 namespace fx {
 
@@ -136,6 +136,6 @@ private:
 };
 
 void DestroyObjectTree(ObjectID root_id);
-void CollectObjectTree(Object* root, std::vector<Object*>& out_parts);
+void CollectObjectTree(Object* root, DynArray<Object*>& out_parts);
 
 } // namespace fx

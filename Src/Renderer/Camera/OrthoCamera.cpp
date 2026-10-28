@@ -5,7 +5,7 @@
 namespace fx {
 
 
-bool OrthoCamera2::Update()
+bool OrthoCamera::Update()
 {
 	// There is nothing to update, return
 	if (!mbTransformDirty && !mbRequireProjectionMatrixUpdate) {
@@ -33,7 +33,7 @@ bool OrthoCamera2::Update()
 }
 
 
-void OrthoCamera2::ResolveViewToTexels(Vec3f& eye, Vec3f& target, const Vec3f world_up, float32 texture_res) const
+void OrthoCamera::ResolveViewToTexels(Vec3f& eye, Vec3f& target, const Vec3f world_up, float32 texture_res) const
 {
 	Assert(texture_res > 0.0f);
 

@@ -161,6 +161,26 @@ const String& MaterialLibrary::GetName(const MaterialLibraryID id) const
 	return mEntries[static_cast<size_t>(id.ID)].EntryName.Get();
 }
 
+const String& MaterialLibrary::GetSurface(const MaterialLibraryID id) const
+{
+	static const String scEmpty {};
+
+	if (!id.IsValid() || static_cast<size_t>(id.ID) >= mEntries.Size()) {
+		return scEmpty;
+	}
+
+	return mEntries[static_cast<size_t>(id.ID)].Definition.Surface;
+}
+
+std::optional<float32> MaterialLibrary::GetDensity(const MaterialLibraryID id) const
+{
+	if (!id.IsValid() || static_cast<size_t>(id.ID) >= mEntries.Size()) {
+		return std::nullopt;
+	}
+
+	return mEntries[static_cast<size_t>(id.ID)].Definition.Density;
+}
+
 const String& MaterialLibrary::GetDiffusePath(const MaterialLibraryID id) const
 {
 	static const String scEmpty {};

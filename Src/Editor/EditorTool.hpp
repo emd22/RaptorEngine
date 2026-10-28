@@ -25,6 +25,7 @@ enum class eEditorTool : uint32
 	Rotate,
 	Clip,
 	Light,
+	Sound,
 
 	Count,
 };
@@ -67,6 +68,7 @@ enum class eDataFilter : uint32
 	NvBrushes,
 	DBounds,
 	Portals,
+	Sounds,
 
 	Count,
 };

@@ -6,6 +6,7 @@
 
 #include <Asset/Loader/Image/LoaderStb.hpp>
 #include <Core/Random.hpp>
+#include <Math/MathUtil.hpp>
 #include <Math/SIMDHelper.hpp>
 #include <Texture/TextureManager.hpp>
 #include <algorithm>
@@ -18,16 +19,6 @@ namespace {
 constexpr uint32 scDfgSampleCount = 1024;
 constexpr float64 scDfgMinNdotV = 1e-3;
 
-float64 RadicalInverse(uint32 bits)
-{
-	bits = (bits << 16u) | (bits >> 16u);
-	bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
-	bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
-	bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
-	bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
-
-	return static_cast<float64>(bits) * 2.3283064365386963e-10;
-}
 
 float64 SmithGGXCorrelated(float64 n_dot_l, float64 n_dot_v, float64 alpha)
 {
@@ -52,7 +43,7 @@ void IntegrateDfg(float64 n_dot_v, float64 roughness, float64& out_scale, float6
 
 	for (uint32 i = 0; i < scDfgSampleCount; i++) {
 		const float64 u1 = (static_cast<float64>(i) + 0.5) / scDfgSampleCount;
-		const float64 u2 = RadicalInverse(i);
+		const float64 u2 = MathUtil::RadicalInverse<float32>(i);
 
 		const float64 phi = 2.0 * M_PI * u1;
 		const float64 cos_theta = std::sqrt((1.0 - u2) / (1.0 + ((alpha_sq - 1.0) * u2)));
@@ -148,9 +139,9 @@ Image* DfgLut(uint32 size)
 	renderer::gGraphics->SubmitImmediateUploadCmd(
 		[&](renderer::CommandBuffer& cmd)
 		{
-			ImageInfo info(Vec2u(size, size), eImageFormat::RG16_UNorm, 0, 1,
-						   Slice<const uint8>(reinterpret_cast<const uint8*>(pixel_data.pData),
-											  pixel_data.GetSizeInBytes()));
+			ImageInfo info(
+				Vec2u(size, size), eImageFormat::RG16_UNorm, 0, 1,
+				Slice<const uint8>(reinterpret_cast<const uint8*>(pixel_data.pData), pixel_data.GetSizeInBytes()));
 
 			image->CreateFromData(cmd, info, eImageCreateFlags::None);
 		});

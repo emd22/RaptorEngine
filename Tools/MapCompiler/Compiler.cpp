@@ -67,7 +67,7 @@ bool HasFloorBelow(const PlaneSet& planes, const MapSource& source, const Vec3d&
 	return false;
 }
 
-void AddHulls(const MapSource& source, CompiledMap& map)
+void AddHulls(const PlaneSet& planes, const MapSource& source, CompiledMap& map)
 {
 	size_t hull_count = 0;
 
@@ -123,6 +123,36 @@ void AddHulls(const MapSource& source, CompiledMap& map)
 
 		CompiledMapHull hull;
 		hull.Points = ArrayUtil::DynToSizedArray(points);
+
+		hull.SidePlanes.InitSize(brush.Shape.Sides.Size * 4);
+		hull.SideMaterials.InitSize(brush.Shape.Sides.Size);
+
+		for (size_t side_index = 0; side_index < brush.Shape.Sides.Size; side_index++) {
+			const PolyhedronSide& side = brush.Shape.Sides[side_index];
+
+			int32 material = brush.MaterialIndex;
+			Vec3d normal = Vec3d(0.0);
+			double distance = 0.0;
+
+			if (side.PlaneIndex != PlaneSet::scNone) {
+				const Plane& plane = planes[side.PlaneIndex];
+				normal = plane.Normal;
+				distance = plane.Distance;
+
+				int32 face_material = SourceBrush::scDroppedFace;
+
+				if (brush.FindMap(side.PlaneIndex, face_material) != nullptr &&
+					face_material != SourceBrush::scDroppedFace) {
+					material = face_material;
+				}
+			}
+
+			hull.SidePlanes[side_index * 4] = static_cast<float32>(normal.X);
+			hull.SidePlanes[side_index * 4 + 1] = static_cast<float32>(normal.Y);
+			hull.SidePlanes[side_index * 4 + 2] = static_cast<float32>(normal.Z);
+			hull.SidePlanes[side_index * 4 + 3] = static_cast<float32>(distance);
+			hull.SideMaterials[side_index] = material;
+		}
 
 		map.Hulls.Emplace(std::move(hull));
 	}
@@ -349,7 +379,7 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 
 		areas.Write(planes, bsp, source, map);
 
-		AddHulls(source, map);
+		AddHulls(planes, source, map);
 		patches.WriteCollision(surface_options.ChunkSize, map);
 	}
 
@@ -582,6 +612,23 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 			log("  verify       FAILED, the lightmap does not match the sun");
 			result.bVerifyFailed = true;
 		}
+	}
+
+	if (!options.Acoustics.bEnabled) {
+		log("  acoustics    off");
+	}
+	else if (BakeAcoustics(options.Acoustics, map, result.Acoustics, log)) {
+		const AcousticStats& acoustics = result.Acoustics;
+
+		log(String::Fmt("  acoustics    {} probes {:.1f} m apart from ({:.1f}, {:.1f}, {:.1f}) to ({:.1f}, {:.1f}, {:.1f}), "
+						"baked in {:.1f} s (reverb) + {:.1f} s (pathing), {:.1f} KB",
+						acoustics.ProbeCount, options.Acoustics.ProbeSpacing, acoustics.ProbeMin.X, acoustics.ProbeMin.Y,
+						acoustics.ProbeMin.Z, acoustics.ProbeMax.X, acoustics.ProbeMax.Y, acoustics.ProbeMax.Z,
+						acoustics.ReflectionSeconds, acoustics.PathingSeconds,
+						static_cast<double>(acoustics.DataSize) / 1024.0));
+	}
+	else if (!result.Acoustics.Error.IsEmpty()) {
+		log(String::Fmt("  warning      no acoustics, {}", result.Acoustics.Error));
 	}
 
 	if (!map.Save(result.OutputPath)) {

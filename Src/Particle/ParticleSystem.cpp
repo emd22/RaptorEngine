@@ -7,7 +7,9 @@
 #include <Core/Log.hpp>
 #include <Core/Random.hpp>
 #include <Engine.hpp>
+#include <Math/Float16.hpp>
 #include <Math/Frustum.hpp>
+#include <Math/MathConsts.hpp>
 #include <Math/Vec2.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
@@ -39,11 +41,8 @@ FX_SET_MODULE_NAME("ParticleSystem")
 
 namespace {
 
-constexpr float32 scPi = 3.14159265359f;
-constexpr float32 scTwoPi = 6.28318530718f;
-constexpr float32 scDegToRad = 0.01745329252f;
 constexpr float32 scMaxHalf = 65000.0f;
-constexpr float32 scSunScatter = 0.5f / scPi;
+constexpr float32 scSunScatter = 0.5f / FX_PI;
 constexpr float32 scCollisionOffset = 0.005f;
 constexpr float32 scLightingSampleOffset = 0.25f;
 
@@ -60,15 +59,7 @@ float32 RandomInRange(const ParticleRange& range) { return range.Min + (range.Ma
 
 uint32 PackHalf2(float32 low, float32 high)
 {
-	const _Float16 half_low = static_cast<_Float16>(std::clamp(low, -scMaxHalf, scMaxHalf));
-	const _Float16 half_high = static_cast<_Float16>(std::clamp(high, -scMaxHalf, scMaxHalf));
-
-	uint16 low_bits;
-	uint16 high_bits;
-	memcpy(&low_bits, &half_low, sizeof(low_bits));
-	memcpy(&high_bits, &half_high, sizeof(high_bits));
-
-	return static_cast<uint32>(low_bits) | (static_cast<uint32>(high_bits) << 16);
+	return PackFloat16x2(std::clamp(low, -scMaxHalf, scMaxHalf), std::clamp(high, -scMaxHalf, scMaxHalf));
 }
 
 uint32 PackUnorm2(float32 low, float32 high)
@@ -79,7 +70,7 @@ uint32 PackUnorm2(float32 low, float32 high)
 	return low_bits | (high_bits << 16);
 }
 
-float32 WrapAngle(float32 angle) { return angle - scTwoPi * std::floor((angle + scPi) / scTwoPi); }
+float32 WrapAngle(float32 angle) { return angle - FX_2PI * std::floor((angle + FX_PI) / FX_2PI); }
 
 void StoreFloat3(const Vec3f value, float32* out)
 {
@@ -104,7 +95,7 @@ Vec3f RandomDirectionInCone(const Vec3f forward, const Vec3f tangent, const Vec3
 {
 	const float32 cos_theta = 1.0f + (spread_cos - 1.0f) * RandomUnit();
 	const float32 sin_theta = std::sqrt(std::max(0.0f, 1.0f - cos_theta * cos_theta));
-	const float32 phi = scTwoPi * RandomUnit();
+	const float32 phi = FX_2PI * RandomUnit();
 
 	return (tangent * (std::cos(phi) * sin_theta)) + (bitangent * (std::sin(phi) * sin_theta)) + (forward * cos_theta);
 }
@@ -314,7 +305,7 @@ bool ParticleSystem::LoadEffect(const char* path, const String& name, ParticleEf
 		emitter.Radius = Member<float32>(entry, "radius", 0.0f);
 
 		const float32 spread = std::clamp(Member<float32>(entry, "spread", 180.0f), 0.0f, 180.0f);
-		emitter.SpreadCos = std::cos(spread * scDegToRad);
+		emitter.SpreadCos = std::cos(MathUtil::DegToRad(spread));
 
 		emitter.Burst = static_cast<uint32>(std::max(Member<int32>(entry, "burst", 0), 0));
 		emitter.Rate = std::max(Member<float32>(entry, "rate", 0.0f), 0.0f);
@@ -325,8 +316,8 @@ bool ParticleSystem::LoadEffect(const char* path, const String& name, ParticleEf
 		emitter.Speed = RangeMember(entry, "speed", emitter.Speed);
 		emitter.Size = RangeMember(entry, "size", emitter.Size);
 		emitter.SizeEndScale = Member<float32>(entry, "size_end", 1.0f);
-		emitter.Rotation = RangeMember(entry, "rotation", emitter.Rotation, scDegToRad);
-		emitter.Spin = RangeMember(entry, "spin", emitter.Spin, scDegToRad);
+		emitter.Rotation = RangeMember(entry, "rotation", emitter.Rotation, MathUtil::DegToRad(1.0f));
+		emitter.Spin = RangeMember(entry, "spin", emitter.Spin, MathUtil::DegToRad(1.0f));
 
 		emitter.GravityScale = Member<float32>(entry, "gravity", 0.0f);
 		emitter.Drag = std::max(Member<float32>(entry, "drag", 0.0f), 0.0f);
@@ -587,7 +578,7 @@ void ParticleSystem::SpawnParticles(uint32 effect_slot, uint32 emitter_index, ui
 			offset = direction * (emitter.Radius * std::cbrt(RandomUnit()));
 		}
 		else if (emitter.Shape == eParticleShape::Disc) {
-			const float32 angle = scTwoPi * RandomUnit();
+			const float32 angle = FX_2PI * RandomUnit();
 			const float32 distance = emitter.Radius * std::sqrt(RandomUnit());
 			offset = (tangent * (std::cos(angle) * distance)) + (bitangent * (std::sin(angle) * distance));
 		}
@@ -708,6 +699,7 @@ void ParticleSystem::UpdateParticles(float32 delta_time)
 
 		particle.Velocity += gravity * emitter.GravityScale;
 		particle.Velocity = particle.Velocity * (1.0f / (1.0f + emitter.Drag * delta_time));
+
 		particle.Position += particle.Velocity * delta_time;
 		particle.Rotation = WrapAngle(particle.Rotation + particle.Spin * delta_time);
 

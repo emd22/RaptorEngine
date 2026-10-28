@@ -98,9 +98,25 @@ struct WorldPanelState
 	float32 SunElevationDegrees = 0.0f;
 
 	renderer::FogSettings Fog;
-	int64 FogQuality = 0;
 
 	bool operator==(const WorldPanelState& other) const = default;
+};
+
+struct SoundPanelState
+{
+	bool bHasSound = false;
+
+	String Name;
+	String Sound;
+	Vec3f Position = Vec3f::sZero;
+
+	float32 Volume = 1.0f;
+	float32 MinInterval = 0.0f;
+	float32 MaxInterval = 0.0f;
+
+	String SoundNames;
+
+	bool operator==(const SoundPanelState& other) const = default;
 };
 
 struct LightPanelState
@@ -254,12 +270,15 @@ enum class eTopViewMarkerKind : uint8
 {
 	Light,
 	Spawn,
+	Sound,
 };
 
 struct TopViewMarker
 {
 	eTopViewMarkerKind Kind = eTopViewMarkerKind::Light;
-	uint32 LightId = 0;
+	uint32 Id = 0;
+
+	float32 Radius = 0.0f;
 
 	Vec3f Position = Vec3f::sZero;
 	Vec3f AimOrigin = Vec3f::sZero;
@@ -303,9 +322,6 @@ struct TopViewState
 	Vec3f CreateReferenceMin = Vec3f::sZero;
 	Vec3f CreateReferenceMax = Vec3f::sZero;
 
-	String Notice;
-	uint32 NoticeSerial = 0;
-
 	DynArray<TopViewBrush> Brushes;
 	DynArray<TopViewMarker> Markers;
 
@@ -345,9 +361,6 @@ struct TopViewState
 		CreateReferenceMin = other.CreateReferenceMin;
 		CreateReferenceMax = other.CreateReferenceMax;
 
-		Notice = other.Notice;
-		NoticeSerial = other.NoticeSerial;
-
 		Brushes = other.Brushes.Clone();
 		Markers = other.Markers.Clone();
 
@@ -363,6 +376,7 @@ struct EditorPanelState
 	MaterialLibraryState Materials;
 	WorldPanelState World;
 	LightPanelState Light;
+	SoundPanelState Sound;
 	TopViewState TopView;
 
 	String BlockoutPath;

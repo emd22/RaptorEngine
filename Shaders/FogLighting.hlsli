@@ -43,23 +43,6 @@ float ProbeSunVisibility(float4 probe_sample)
 	return select(use_probe_sun, saturate(probe_sample.a), 1.0);
 }
 
-float3 DirectionalInscatter(TileLightData tile, float3 direction, float g)
-{
-	float3 sum = float3(0.0, 0.0, 0.0);
-
-	for (uint tile_light = 0; tile_light < tile.Count; tile_light++) {
-		const Light light = Lights[bLightIndexList[tile.StartIndex + tile_light]];
-
-		const bool is_directional = light.uiLightType == FX_LIGHT_TYPE_DIRECTIONAL;
-		const float phase = PhaseHenyeyGreenstein(dot(light.vLightPosition, direction), g);
-		const float weight = select(is_directional, light.fIntensity * phase, 0.0);
-
-		sum += light.vLightColor * weight;
-	}
-
-	return sum;
-}
-
 float SampleShadowPcf(float2 atlas_uv, float4 atlas_rect, float compare_z, float2 rotation)
 {
 	const float2 texel = 1.0 / float2(SHADOW_ATLAS_WIDTH, SHADOW_ATLAS_HEIGHT);

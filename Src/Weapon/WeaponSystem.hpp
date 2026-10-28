@@ -60,6 +60,8 @@ enum class eEvent : int32
 	Raise,
 	Lower,
 	ModeChanged,
+
+	Count,
 };
 
 struct ScriptDef
@@ -159,6 +161,10 @@ struct Weapon
 	Hash32 MuzzleEffect = 0;
 	String MuzzleJoint;
 
+	Hash32 EventSounds[static_cast<uint32>(eEvent::Count)] {};
+	Hash32 ReflectionSound = 0;
+	String BulletSound;
+
 	ScriptDef Def;
 	ScriptState State;
 
@@ -203,7 +209,9 @@ private:
 	void ApplyAnimations(const Weapon& weapon);
 	void SpawnBloodSplatter(bool is_static);
 	void LoadEffects(const ConfigEntry* effects, Weapon& weapon);
+	void LoadSounds(const ConfigEntry* sounds, Weapon& weapon);
 	void PlayMuzzleEffect(const Weapon& weapon);
+	void PlayReflections(const Weapon& weapon);
 	void UpdateSwitching();
 	void UpdateHolsterAmount();
 

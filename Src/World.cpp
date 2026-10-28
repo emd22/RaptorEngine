@@ -191,11 +191,11 @@ void World::AddLoadedObject(Object* object)
 
 void World::ExecuteRenderList(renderer::PipelineHandle pipeline_handle)
 {
-	PerspectiveCamera2& camera = *mpCurrentCamera;
+	PerspectiveCamera& camera = *mpCurrentCamera;
 	ExecuteRenderList(pipeline_handle, pipeline_handle, camera);
 }
 
-void World::ExecuteForwardRenderLists(PerspectiveCamera2& camera)
+void World::ExecuteForwardRenderLists(PerspectiveCamera& camera)
 {
 	// The forward pipelines depth test against the prepass, which probe captures don't have
 	const bool is_probe_capture = gProbeManager->IsCapturingFaces();
@@ -219,7 +219,7 @@ void World::ExecuteForwardRenderLists(PerspectiveCamera2& camera)
 }
 
 void World::ExecuteRenderList(renderer::PipelineHandle pipeline_handle, renderer::PipelineHandle draw_pipeline_handle,
-							  PerspectiveCamera2& camera)
+							  PerspectiveCamera& camera)
 {
 	RenderListSection& section = mRenderList.GetSection(pipeline_handle);
 
@@ -273,7 +273,7 @@ void World::ExecuteRenderList(renderer::PipelineHandle pipeline_handle, renderer
 
 void World::ExecuteTransparentRenderLists()
 {
-	PerspectiveCamera2& camera = *mpCurrentCamera;
+	PerspectiveCamera& camera = *mpCurrentCamera;
 	const Vec3f camera_position = camera.GetPosition();
 	;
 
@@ -739,7 +739,7 @@ void World::ExecutePrepassRenderList(renderer::PipelineHandle forward_pipeline)
 		return;
 	}
 
-	PerspectiveCamera2& camera = *mpCurrentCamera;
+	PerspectiveCamera& camera = *mpCurrentCamera;
 
 	const RenderListSection& section = mRenderList.GetSection(forward_pipeline);
 
@@ -1012,7 +1012,7 @@ void World::AddUnculledLightsToLightList()
 	}
 }
 
-void World::CullWorldTiles(const PerspectiveCamera2& cam)
+void World::CullWorldTiles(const PerspectiveCamera& cam)
 {
 	gObjectManager->FlushInstanceUpdates();
 
@@ -1114,8 +1114,8 @@ void World::CullWorldTiles(const PerspectiveCamera2& cam)
 
 void World::Render(BaseCamera* shadow_camera)
 {
-	PerspectiveCamera2& camera = *mpCurrentCamera;
-	PerspectiveCamera2& cull_camera = GetCullCamera();
+	PerspectiveCamera& camera = *mpCurrentCamera;
+	PerspectiveCamera& cull_camera = GetCullCamera();
 
 	CullWorldTiles(cull_camera);
 
@@ -1258,11 +1258,11 @@ void World::Render(BaseCamera* shadow_camera)
 /// be captured with it. Past that the shadow map is re-rendered around the probe.
 static constexpr float32 scProbeShadowEdgeMargin = 0.5f;
 
-bool World::RenderCaptureSunShadows(LightDirectional& sun, const Vec3f center, OrthoCamera2& out_shadow_camera,
+bool World::RenderCaptureSunShadows(LightDirectional& sun, const Vec3f center, OrthoCamera& out_shadow_camera,
 									uint32& out_light_slot)
 {
 	// Same projection as the player's shadow camera, only the placement changes
-	OrthoCamera2 shadow_camera = gShadowRenderer->ShadowCamera;
+	OrthoCamera shadow_camera = gShadowRenderer->ShadowCamera;
 	gShadowRenderer->PlaceCamera(shadow_camera, center, sun.GetPosition().Normalize());
 
 	const uint32 light_slot = gGraphics->LightBuffer.SlotIndex;
@@ -1317,7 +1317,7 @@ void World::RenderProbeCapture()
 	Ref<LightDirectional> sun = gLightManager->GetDirectionalLight();
 	const bool sun_has_shadows = sun.IsValid() && sun->bEnabled && (mSunLightSlot != UINT32_MAX);
 
-	OrthoCamera2 capture_shadow_camera;
+	OrthoCamera capture_shadow_camera;
 	bool has_capture_shadows = false;
 
 	// Only the lights from the main view get culled, not the copies of the sun appended after them
@@ -1325,11 +1325,11 @@ void World::RenderProbeCapture()
 
 	gProbeManager->RecordCaptureBatch(
 		cmd,
-		[&](PerspectiveCamera2& camera, RenderStage& stage)
+		[&](PerspectiveCamera& camera, RenderStage& stage)
 		{
 			const bool needs_sun_shadows = !has_capture_shadows ||
-										   !ShadowDirectional::IsWellCovered(capture_shadow_camera, camera.GetPosition(),
-																			 scProbeShadowEdgeMargin);
+										   !ShadowDirectional::IsWellCovered(
+											   capture_shadow_camera, camera.GetPosition(), scProbeShadowEdgeMargin);
 
 			uint32 sun_slot;
 
@@ -1613,7 +1613,7 @@ static Vec3f UnprojectScreenPoint(const Mat4f& inverse_view_projection, float32 
 	return eye + direction * (distance / std::max(direction.Dot(forward), 0.1f));
 }
 
-PerspectiveCamera2& World::GetCullCamera()
+PerspectiveCamera& World::GetCullCamera()
 {
 	if (mpCullCamera.IsValid()) {
 		return *mpCullCamera;
@@ -1630,7 +1630,7 @@ void World::DebugDrawCullFrustum()
 
 	const Color frustum_color = Color::FromRGBA(255, 60, 200, 255);
 
-	const PerspectiveCamera2& camera = *mpCullCamera;
+	const PerspectiveCamera& camera = *mpCullCamera;
 	const Mat4f inverse_view_projection = camera.GetCameraMatrix(eObjectLayer::WorldLayer).Inverse();
 
 	const float32 distances[] = { 0.25f, 5.0f, 25.0f };
@@ -1643,8 +1643,8 @@ void World::DebugDrawCullFrustum()
 
 		for (uint32 corner = 0; corner < 4; corner++) {
 			corners[corner] = UnprojectScreenPoint(inverse_view_projection, ndc_corners[corner].X,
-												   ndc_corners[corner].Y, camera.GetPosition(), camera.GetForwardVector(),
-												   distances[ring]);
+												   ndc_corners[corner].Y, camera.GetPosition(),
+												   camera.GetForwardVector(), distances[ring]);
 		}
 
 		for (uint32 corner = 0; corner < 4; corner++) {

@@ -97,7 +97,7 @@ void Body::CreateMeshBody(const PrimitiveMesh& mesh, physics::eMotionType motion
 }
 
 void Body::CreateTriangleMeshBody(const SizedArray<Vec3f>& positions, const SizedArray<uint32>& indices,
-								  const BodyProps& object_properties)
+								  const BodyProps& object_properties, const SizedArray<uint32>* triangle_user_data)
 {
 	mMotionType = physics::eMotionType::Static;
 	PrimitiveType = ePrimitiveType::None;
@@ -125,11 +125,21 @@ void Body::CreateTriangleMeshBody(const SizedArray<Vec3f>& positions, const Size
 	JPH::IndexedTriangleList triangles;
 	triangles.reserve(indices.Size / 3);
 
+	const bool has_user_data = (triangle_user_data != nullptr && triangle_user_data->Size * 3 >= indices.Size);
+
 	for (size_t index = 0; index + 2 < indices.Size; index += 3) {
-		triangles.push_back(JPH::IndexedTriangle(indices[index], indices[index + 2], indices[index + 1]));
+		uint32 user_data = 0;
+
+		if (has_user_data) {
+			user_data = (*triangle_user_data)[index / 3];
+		}
+
+		triangles.push_back(
+			JPH::IndexedTriangle(indices[index], indices[index + 2], indices[index + 1], 0, user_data));
 	}
 
 	JPH::MeshShapeSettings mesh_settings(std::move(vertices), std::move(triangles));
+	mesh_settings.mPerTriangleUserData = has_user_data;
 	JPH::ShapeSettings::ShapeResult mesh_shape_result = mesh_settings.Create();
 
 	if (mesh_shape_result.HasError()) {

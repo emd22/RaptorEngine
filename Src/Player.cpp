@@ -1,6 +1,8 @@
 #include "Player.hpp"
 
 #include <Asset/AssetManager.hpp>
+#include <Audio/AudioSystem.hpp>
+#include <Blockout.hpp>
 #include <CVar.hpp>
 #include <Core/Random.hpp>
 #include <Core/RefUtil.hpp>
@@ -189,9 +191,15 @@ void Player::RotateHead(const Vec2f& xy)
 
 void Player::Jump()
 {
-	if (!mbIsFlymode) {
-		Physics.Jump();
+	if (mbIsFlymode) {
+		return;
 	}
+
+	if (Physics.bIsGrounded && Physics.CanJump()) {
+		PlayGroundSound("footsteps", std::clamp(mHorizontalSpeed / scSprintSpeed, scFootstepMinVolume, 1.0f));
+	}
+
+	Physics.Jump();
 }
 
 void Player::SpawnAt(const Vec3f position, const Vec3f direction)
@@ -383,6 +391,11 @@ void Player::UpdateLanding(float32 delta_time)
 
 		if (dip > 0.0f) {
 			mLandingVelocity -= dip * SpringImpulsePerPeak(scLandingFrequency, scLandingDamping);
+		}
+
+		if (impact_speed >= scLandingSoundMinSpeed) {
+			PlayGroundSound("footsteps", std::min(impact_speed / scLandingSoundFullSpeed, 1.0f));
+			mFootstepDistance = 0.0f;
 		}
 	}
 
@@ -594,6 +607,47 @@ void Player::UpdateRecoil(float32 delta_time)
 }
 
 
+void Player::PlayGroundSound(const char* event, float32 volume)
+{
+	const JPH::CharacterVirtual& character = *Physics.pPlayerVirt;
+
+	physics::RayResult ground;
+	ground.bHit = true;
+	ground.Point.FromJoltVec3(character.GetGroundPosition());
+	ground.Normal.FromJoltVec3(character.GetGroundNormal());
+	ground.Body = character.GetGroundBodyID();
+	ground.SubShape = character.GetGroundSubShapeID();
+
+	const Vec3f position = ground.Point + (ground.Normal * AudioSystem::scSurfaceSoundOffset);
+	const SoundID sound = gAudio->PlayForSurface(event, gWorld->pPrototype->GetSurfaceAt(ground), position);
+	gAudio->SetVolume(sound, volume);
+}
+
+void Player::UpdateFootsteps(float32 delta_time)
+{
+	const bool on_ground = Physics.pPlayerVirt->GetGroundState() == JPH::CharacterVirtual::EGroundState::OnGround;
+
+	if (!on_ground || mbIsFlymode || mHorizontalSpeed < scFootstepMinSpeed) {
+		return;
+	}
+
+	float32 stride = scFootstepWalkDistance;
+
+	if (bIsSprinting) {
+		stride = scFootstepSprintDistance;
+	}
+
+	mFootstepDistance += mHorizontalSpeed * delta_time;
+
+	if (mFootstepDistance < stride) {
+		return;
+	}
+
+	mFootstepDistance -= stride;
+
+	PlayGroundSound("footsteps", std::clamp(mHorizontalSpeed / scSprintSpeed, scFootstepMinVolume, 1.0f));
+}
+
 void Player::UpdateMeasuredMotion(const Vec3f& previous_position, float32 delta_time)
 {
 	if (delta_time <= 1.0e-5f) {
@@ -644,6 +698,7 @@ void Player::Update(float64 delta_time)
 	UpdateRecoil(static_cast<float32>(delta_time));
 
 	UpdateLanding(static_cast<float32>(delta_time));
+	UpdateFootsteps(static_cast<float32>(physics_time));
 
 	pCamera->SetPosition(Position + mCameraOffset + Vec3f(0.0f, mLandingOffset, 0.0f));
 

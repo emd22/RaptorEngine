@@ -4,6 +4,7 @@
 #include "WorldGrid.hpp"
 
 #include <Asset/AssetTicket.hpp>
+#include <Audio/SoundEmitters.hpp>
 #include <Map/PortalVisibility.hpp>
 #include <Math/Frustum.hpp>
 #include <Object/Object.hpp>
@@ -103,17 +104,17 @@ private:
 	void DebugDrawPortals();
 	void DebugDrawCullFrustum();
 
-	PerspectiveCamera2& GetCullCamera();
+	PerspectiveCamera& GetCullCamera();
 
-	void CullWorldTiles(const PerspectiveCamera2& cam);
+	void CullWorldTiles(const PerspectiveCamera& cam);
 
 	void ExecuteRenderList(renderer::PipelineHandle pipeline);
 	/// Draws the list of `pipeline` with `draw_pipeline`, which is a variant of it from another pass (or itself)
 	void ExecuteRenderList(renderer::PipelineHandle pipeline, renderer::PipelineHandle draw_pipeline,
-						   PerspectiveCamera2& camera);
+						   PerspectiveCamera& camera);
 
 	/// Draws the opaque geometry with every pipeline of the forward pass
-	void ExecuteForwardRenderLists(PerspectiveCamera2& camera);
+	void ExecuteForwardRenderLists(PerspectiveCamera& camera);
 	void ExecuteTransparentRenderLists();
 	void ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const BaseCamera& shadow_camera,
 								 bool skip_lightmapped = false);
@@ -123,7 +124,7 @@ private:
 	 * that reads it into a spare light buffer slot (the main view keeps the original slot and its shadow matrix).
 	 * @return False if the light buffer is full, in which case the shadow map is left alone.
 	 */
-	bool RenderCaptureSunShadows(LightDirectional& sun, const Vec3f center, OrthoCamera2& out_shadow_camera,
+	bool RenderCaptureSunShadows(LightDirectional& sun, const Vec3f center, OrthoCamera& out_shadow_camera,
 								 uint32& out_light_slot);
 
 	/**
@@ -210,6 +211,8 @@ public:
 	void RespawnPlayer() { Player.SpawnAt(PlayerSpawn.Position, PlayerSpawn.Direction); }
 
 	renderer::FogSettings Fog;
+
+	SoundEmitterSet SoundEmitters;
 
 	Blockout* pPrototype = nullptr;
 	String PrototypePath;

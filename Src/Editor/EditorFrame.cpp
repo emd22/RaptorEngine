@@ -1,6 +1,7 @@
 #include "EditorFrame.hpp"
 
 #include "AtlasPackerWindow.hpp"
+#include "ClipEditorWindow.hpp"
 #include "CVarListWindow.hpp"
 #include "EditorTheme.hpp"
 #include "EditorThread.hpp"
@@ -29,6 +30,7 @@
 #include <wx/sizer.h>
 #include <wx/splitter.h>
 #include <wx/stattext.h>
+#include <wx/statusbr.h>
 #include <wx/textdlg.h>
 
 #include <Blockout.hpp>
@@ -49,6 +51,16 @@ static constexpr int32 scSidePanelWidth = 300;
 static constexpr int32 scMinimumSidePanelWidth = 220;
 static constexpr size_t scToolSettingsSlotIndex = 3;
 static constexpr int32 scMinimumPaneSize = 160;
+
+enum eStatusField : int
+{
+	StatusField_Message,
+	StatusField_Selection,
+	StatusField_Mode,
+	StatusField_Map,
+
+	StatusField_Count,
+};
 
 static constexpr const char* scDefaultBlockoutPath = "RaptorData/Data/blockouts/btemp.prx";
 
@@ -529,6 +541,8 @@ wxMenu* EditorFrame::CreateToolsMenu()
 	mpMaterialPickerMenuItem->Check(true);
 	wxMenuItem* atlas_packer_item = tools_menu->Append(wxID_ANY, "Open Atlas Packer",
 													   "Pack images into a tile atlas and export its config");
+	wxMenuItem* clip_editor_item = tools_menu->Append(wxID_ANY, "Clip Editor",
+													  "Split one sound file into random clips for a sound def");
 
 	{
 		Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowObjectListWindow(); }, object_list_item->GetId());
@@ -537,6 +551,7 @@ wxMenu* EditorFrame::CreateToolsMenu()
 			wxEVT_MENU, [this](wxCommandEvent& event) { SetMaterialPickerShown(event.IsChecked()); },
 			mpMaterialPickerMenuItem->GetId());
 		Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowAtlasPackerWindow(); }, atlas_packer_item->GetId());
+		Bind(wxEVT_MENU, [this](wxCommandEvent&) { ShowClipEditorWindow(); }, clip_editor_item->GetId());
 	}
 
 	return tools_menu;
@@ -591,6 +606,16 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	menu_bar->Append(CreateSubviewMenu(), "&Subview");
 
 	SetMenuBar(menu_bar);
+
+	{
+		CreateStatusBar(StatusField_Count);
+
+		const int widths[StatusField_Count] = { -1, FromDIP(260), FromDIP(220), FromDIP(260) };
+		SetStatusWidths(StatusField_Count, widths);
+
+		mStatusMessageTimer.SetOwner(this);
+		Bind(wxEVT_TIMER, [this](wxTimerEvent&) { ClearStatusMessage(mStatusMessageId); }, mStatusMessageTimer.GetId());
+	}
 
 
 	wxPanel* root = new wxPanel(this, wxID_ANY);
@@ -703,6 +728,7 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	SetMinSize(wxDefaultSize);
 
 	ApplyTheme();
+	UpdateStatusBar();
 
 	Bind(wxEVT_CLOSE_WINDOW, &EditorFrame::OnClose, this);
 	Bind(wxEVT_ACTIVATE, &EditorFrame::OnActivate, this);
@@ -754,6 +780,11 @@ void EditorFrame::ApplyTheme()
 	mpSideSplitter->SetBackgroundColour(background);
 	mpSplitter->SetBackgroundColour(background);
 	mpTopViewPanel->ApplyTheme();
+
+	if (wxStatusBar* status_bar = GetStatusBar(); status_bar != nullptr) {
+		status_bar->SetBackgroundColour(background);
+		status_bar->SetForegroundColour(ToWxColour(theme.Frame.StatusText));
+	}
 
 	ApplyThemeToTree(this, ToWxColour(theme.Frame.Text));
 
@@ -999,11 +1030,20 @@ void EditorFrame::SetToolSettingsPanel(ToolSettingsBasePanel* new_panel)
 	mpComponentSizer->FitInside(mpSideScroller);
 }
 
-void EditorFrame::ShowSelectedTool(const eEditorTool tool) { mpTopViewPanel->GetCanvas()->ShowTool(tool); }
+void EditorFrame::ShowSelectedTool(const eEditorTool tool)
+{
+	mTool = tool;
+	mpTopViewPanel->GetCanvas()->ShowTool(tool);
+
+	UpdateStatusBar();
+}
 
 void EditorFrame::ShowSimulating(bool simulating)
 {
+	mbSimulating = simulating;
 	mpToolbar->ShowSimulating(simulating);
+
+	UpdateStatusBar();
 
 	FocusActiveView();
 }
@@ -1032,12 +1072,87 @@ void EditorFrame::ApplyState(const EditorPanelState& state)
 		mpTopViewPanel->ApplyState(mState.TopView);
 		mpToolbar->ApplyState(mState.TopView);
 	}
+
+	UpdateStatusBar();
+}
+
+uint32 EditorFrame::NewStatusMessageId()
+{
+	static std::atomic<uint32> sNextId = 1;
+
+	return sNextId.fetch_add(1, std::memory_order_relaxed);
+}
+
+uint32 EditorFrame::ShowStatusMessage(const wxString& text, std::chrono::milliseconds duration)
+{
+	const uint32 id = NewStatusMessageId();
+
+	ShowStatusMessage(id, text, duration);
+
+	return id;
+}
+
+void EditorFrame::ShowStatusMessage(uint32 id, const wxString& text, std::chrono::milliseconds duration)
+{
+	mStatusMessage = text;
+	mStatusMessageId = id;
+
+	if (duration > std::chrono::milliseconds::zero()) {
+		mStatusMessageTimer.StartOnce(static_cast<int>(duration.count()));
+	}
+	else {
+		mStatusMessageTimer.Stop();
+	}
+
+	UpdateStatusBar();
+}
+
+void EditorFrame::ClearStatusMessage(uint32 id)
+{
+	if (id == 0 || id != mStatusMessageId) {
+		return;
+	}
+
+	mStatusMessage.clear();
+	mStatusMessageId = 0;
+	mStatusMessageTimer.Stop();
+
+	UpdateStatusBar();
+}
+
+static void SetStatusField(wxStatusBar* status_bar, int field, const wxString& text)
+{
+	if (status_bar->GetStatusText(field) != text) {
+		status_bar->SetStatusText(text, field);
+	}
+}
+
+void EditorFrame::UpdateStatusBar()
+{
+	wxStatusBar* status_bar = GetStatusBar();
+
+	if (status_bar == nullptr) {
+		return;
+	}
+
+	wxString message = mStatusMessage;
+
+	if (message.IsEmpty() && mbSimulating) {
+		message = "Simulating, editing is paused";
+	}
+
+	SetStatusField(status_bar, StatusField_Message, message);
 }
 
 void EditorFrame::ShowMode(const eEditorMode mode, const eDataFilter filter, const uint32 available_tools)
 {
+	mMode = mode;
+	mDataFilter = filter;
+
 	mpToolbar->ShowMode(mode, filter, available_tools);
 	mpTopViewPanel->GetCanvas()->SetAvailableTools(available_tools);
+
+	UpdateStatusBar();
 
 	FocusActiveView();
 }
@@ -1100,6 +1215,16 @@ void EditorFrame::ShowAtlasPackerWindow()
 
 	mpAtlasPackerWindow->Show();
 	mpAtlasPackerWindow->Raise();
+}
+
+void EditorFrame::ShowClipEditorWindow()
+{
+	if (mpClipEditorWindow == nullptr) {
+		mpClipEditorWindow = new ClipEditorWindow(this);
+	}
+
+	mpClipEditorWindow->Show();
+	mpClipEditorWindow->Raise();
 }
 
 void EditorFrame::OnClose(wxCloseEvent& event)

@@ -261,6 +261,9 @@ private:
 	void BeginRotate();
 	void BeginClip();
 	void BeginLight(bool double_click);
+	void BeginSound(bool double_click);
+	Vec3f GetNewMarkerPosition() const;
+	void SendMarkerMove(eTopViewMarkerKind kind, const Vec3f offset);
 	void BeginTool(const wxMouseEvent& event);
 	bool BeginMarker();
 
@@ -431,12 +434,12 @@ private:
 	DynArray<ObjectID> mLocalSelection;
 
 	eTopViewMarkerKind mGrabbedMarkerKind = eTopViewMarkerKind::Light;
-	uint32 mGrabbedMarkerLightId = 0;
+	uint32 mGrabbedMarkerId = 0;
 
 	bool mbLocalMarkerSelection = false;
 	bool mbLocalMarkerSelected = false;
 	eTopViewMarkerKind mLocalMarkerKind = eTopViewMarkerKind::Light;
-	uint32 mLocalMarkerLightId = 0;
+	uint32 mLocalMarkerId = 0;
 
 	float32 mCreateBase[scViewPlaneCount] = {};
 	float32 mCreateSize[scViewPlaneCount] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
@@ -466,9 +469,6 @@ private:
 	std::function<void(eViewPlane)> mpOnPlaneChanged;
 	std::function<void(const wxString&)> mpOnStatus;
 
-	wxString mNotice;
-	uint32 mNoticeSerial = 0;
-	std::chrono::steady_clock::time_point mNoticeTime;
 	std::function<void(const ArchSettings&)> mpOnArchChanged;
 	std::function<void(const CurveSettings&)> mpOnCurveChanged;
 	std::function<void(eViewPlane, float32, float32)> mpOnCreateVolumeChanged;

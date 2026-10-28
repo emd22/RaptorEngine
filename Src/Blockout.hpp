@@ -8,6 +8,7 @@
 #pragma once
 
 #include <Asset/ConfigFile.hpp>
+#include <Audio/SpatialAudio.hpp>
 #include <Brush.hpp>
 #include <BrushEntry.hpp>
 #include <Core/FreeArray.hpp>
@@ -27,6 +28,7 @@
 #include <Physics/BodyID.hpp>
 #include <Renderer/ProbePlacement.hpp>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace fx {
@@ -37,7 +39,8 @@ class PrimitiveMesh;
 
 namespace physics {
 enum class eMotionType;
-}
+struct RayResult;
+} // namespace physics
 
 /**
  * @brief A change to the texture on one face of a brush
@@ -148,6 +151,8 @@ public:
 	bool RaycastFace(Object* object, const Vec3f origin, const Vec3f direction, Vec3f& out_face_normal,
 					 Vec3f* out_point = nullptr);
 
+	const String& GetSurfaceAt(const physics::RayResult& hit);
+
 	void ReloadSingleObject(Object* object);
 
 	void RebuildObject(Object* object);
@@ -203,6 +208,11 @@ public:
 	 * @brief Rebuilds the mesh of every decal whose volume or receiving brushes changed since it was last built
 	 */
 	void RefreshDecals(bool force = false);
+
+	void RequestAcousticRebuild();
+	void UpdateAcoustics(float32 delta_time);
+	void RebuildAcoustics();
+	AcousticSurface GetAcousticSurface(const MaterialLibraryID id) const;
 
 	void RaycastDecalSurfaces(const Vec3f origin, const Vec3f direction, float32 max_distance,
 							  std::vector<float32>& out_distances);
@@ -472,6 +482,8 @@ private:
 	void SavePlayerSpawn(ConfigFile& info);
 	void LoadFog(ConfigFile& info);
 	void SaveFog(ConfigFile& info);
+	void LoadSoundEmitters(ConfigFile& info);
+	void SaveSoundEmitters(ConfigFile& info);
 	void AddOrUpdateLightFromEntry(const ConfigEntry& light_entry);
 
 	/**
@@ -544,7 +556,17 @@ public:
 	Object* pPreviewObject = nullptr;
 
 private:
+	struct CompiledSurfaceBody
+	{
+		SizedArray<float32> SidePlanes;
+		SizedArray<int32> SideMaterials;
+		bool bMesh = false;
+	};
+
+private:
 	MaterialLibraryID GetCompiledFallbackMaterial(int32 library_index) const;
+	MaterialLibraryID FindCompiledMaterial(const CompiledMap& map, int32 material_index) const;
+	const String& GetCompiledSurface(int32 material_index) const;
 
 private:
 	MaterialLibrary mMaterials;
@@ -560,6 +582,13 @@ private:
 
 	std::vector<ObjectID> mCompiledObjects;
 	std::vector<physics::BodyID> mCompiledBodies;
+	std::unordered_map<uint32, CompiledSurfaceBody> mCompiledSurfaceBodies;
+	std::vector<String> mCompiledMaterialSurfaces;
+	AcousticGeometry mCompiledAcoustics;
+	std::vector<uint8> mCompiledAcousticProbes;
+
+	static constexpr float32 scAcousticRebuildDelay = 0.5f;
+	float32 mAcousticRebuildTimer = -1.0f;
 	bool mbIsCompiledMap = false;
 	ProbeLayout mCompiledProbeLayout;
 	SizedArray<float32> mCompiledProbeIrradiance;

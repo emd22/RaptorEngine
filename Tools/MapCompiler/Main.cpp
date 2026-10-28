@@ -46,6 +46,12 @@ void PrintUsage()
 		"leave the probes to the engine (default: 4)\n"
 		"  --no-fog-shadow  Do not bake the sun shadow pages that the fog is shadowed by\n"
 		"  --fog-shadow-texel <m>     Size of a fog shadow texel close up (default: 0.1)\n"
+		"  --no-acoustics   Do not bake the reverb and pathing probes for Steam Audio\n"
+		"  --no-pathing     Bake the reverb probes but not the paths sound takes around corners\n"
+		"  --acoustic-probe-spacing <m>  Spacing of the acoustic probes along the floor (default: 3)\n"
+		"  --acoustic-probe-height <m>   Height of the acoustic probes above the floor (default: 1.5)\n"
+		"  --reverb-rays <n>          Rays traced from each acoustic probe (default: 16384)\n"
+		"  --reverb-bounces <n>       How many times each reverb ray reflects (default: 64)\n"
 		"  --obj <path>     Also write the compiled triangles as a Wavefront OBJ\n"
 		"  --verify [rays]  Trace random rays through the brushes and the compiled triangles and compare them\n"
 		"  --preset <name>  Start from a saved preset, the other options change it\n"
@@ -138,6 +144,24 @@ bool ParseArguments(int argc, char** argv, CompileOptions& out_arguments, Preset
 		}
 		else if (argument == "--no-lightmap") {
 			out_arguments.Lightmap.bEnabled = false;
+		}
+		else if (argument == "--no-acoustics") {
+			out_arguments.Acoustics.bEnabled = false;
+		}
+		else if (argument == "--no-pathing") {
+			out_arguments.Acoustics.bPathing = false;
+		}
+		else if (argument == "--acoustic-probe-spacing" && has_value) {
+			out_arguments.Acoustics.ProbeSpacing = std::atof(argv[++i]);
+		}
+		else if (argument == "--acoustic-probe-height" && has_value) {
+			out_arguments.Acoustics.ProbeHeight = std::atof(argv[++i]);
+		}
+		else if (argument == "--reverb-rays" && has_value) {
+			out_arguments.Acoustics.ReverbRays = static_cast<uint32>(std::atoi(argv[++i]));
+		}
+		else if (argument == "--reverb-bounces" && has_value) {
+			out_arguments.Acoustics.ReverbBounces = static_cast<uint32>(std::atoi(argv[++i]));
 		}
 		else if (argument == "--no-probes") {
 			out_arguments.bPlaceProbes = false;

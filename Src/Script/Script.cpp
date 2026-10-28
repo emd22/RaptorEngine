@@ -5,9 +5,27 @@
 #include <strata/strata.h>
 
 #include <Core/Log.hpp>
+#include <Engine.hpp>
 #include <Script/ScriptManager.hpp>
+#include <Script/TimerManager.hpp>
+#include <vector>
 
 namespace fx::script {
+
+static thread_local std::vector<Script*> sCallingScripts;
+
+CallingScriptScope::CallingScriptScope(Script* script) { sCallingScripts.push_back(script); }
+
+CallingScriptScope::~CallingScriptScope() { sCallingScripts.pop_back(); }
+
+Script* GetCallingScript()
+{
+	if (sCallingScripts.empty()) {
+		return nullptr;
+	}
+
+	return sCallingScripts.back();
+}
 
 Script::Script(const String& path) : mPath(path) { ReloadScript(); }
 
@@ -22,6 +40,10 @@ Script::Script(Script&& other)
 
 void Script::ReloadScript()
 {
+	if (gTimers != nullptr) {
+		gTimers->CancelOwnedBy(this);
+	}
+
 	if (mpErrors != nullptr) {
 		strataFree(const_cast<char*>(mpErrors));
 		mpErrors = nullptr;
@@ -133,6 +155,10 @@ void Script::DestroyGlobalData()
 
 Script::~Script()
 {
+	if (gTimers != nullptr) {
+		gTimers->CancelOwnedBy(this);
+	}
+
 	if (mpGlobalContext != nullptr) {
 		DestroyGlobalData();
 	}

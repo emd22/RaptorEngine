@@ -86,6 +86,19 @@ public:
 		return &pData[Size - 1];
 	}
 
+	void RemoveAt(uint32 index)
+	{
+		if (index >= Size) {
+			return;
+		}
+
+		for (uint32 i = index; i + 1 < Size; i++) {
+			pData[i] = std::move(pData[i + 1]);
+		}
+
+		RemoveLast();
+	}
+
 	void RemoveLast()
 	{
 		if (Size == 0) {

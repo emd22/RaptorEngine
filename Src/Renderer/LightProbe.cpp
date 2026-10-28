@@ -18,6 +18,7 @@
 #include <Editor/RaptorEditor.hpp>
 #endif
 #include <Engine.hpp>
+#include <Math/Float16.hpp>
 #include <Map/CompiledMap.hpp>
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
@@ -65,7 +66,7 @@ constexpr float32 scCaptureSkyRadiance = 1500.0f / static_cast<float32>(M_PI);
 constexpr int64 scDefaultProbeBounces = 3;
 constexpr int64 scMaxProbeBounces = 8;
 
-PerspectiveCamera2 MakeCaptureCamera(const Vec3f position, uint32 face)
+PerspectiveCamera MakeCaptureCamera(const Vec3f position, uint32 face)
 {
 	static const Vec3f scFaceDirections[ProbeManager::scCaptureFaces] = {
 		Vec3f(1.0f, 0.0f, 0.0f),  Vec3f(-1.0f, 0.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
@@ -77,7 +78,7 @@ PerspectiveCamera2 MakeCaptureCamera(const Vec3f position, uint32 face)
 		Vec3f(0.0f, 0.0f, 1.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
 	};
 
-	PerspectiveCamera2 camera(MathUtil::DegreesToRadians(90.0f), 1.0f, 200.0f, ProbePlacement::scCaptureNearPlane);
+	PerspectiveCamera camera(MathUtil::DegreesToRadians(90.0f), 1.0f, 200.0f, ProbePlacement::scCaptureNearPlane);
 
 	camera.SetPosition(position);
 	camera.LookAt(position + scFaceDirections[face], scFaceUps[face]);
@@ -91,23 +92,16 @@ float32 TexelToNdc(uint32 index, uint32 size)
 	return ((static_cast<float32>(index) + 0.5f) / static_cast<float32>(size)) * 2.0f - 1.0f;
 }
 
-/// Subnormals and NaNs decode as zero
-float32 HalfToFloat(uint16 half)
+float32 HalfToRadiance(uint16 half)
 {
-	const uint32 exponent = (half >> 10) & 0x1F;
-	const uint32 mantissa = half & 0x3FF;
+	const Float16 value = Float16::FromBits(half);
 
-	if (exponent == 0 || (exponent == 31 && mantissa != 0)) {
+	if (value.IsNaN()) {
 		return 0.0f;
 	}
 
-	uint32 bits = static_cast<uint32>(half & 0x8000) << 16;
-	bits |= (exponent == 31) ? 0x7F800000 : (((exponent + 112) << 23) | (mantissa << 13));
-
-	return std::bit_cast<float32>(bits);
+	return std::clamp(value.ToFloat(), 0.0f, scRadianceClamp);
 }
-
-float32 HalfToRadiance(uint16 half) { return std::clamp(HalfToFloat(half), 0.0f, scRadianceClamp); }
 
 /// `stored_depth` is reverse-Z, and 0 where nothing was drawn
 float32 CaptureDepthToDistance(const Mat4f& inv_projection, float32 stored_depth, float32 ndc_x, float32 ndc_y)
@@ -390,15 +384,15 @@ void ProbeManager::MakeCaptureCameras()
 
 	// Create all capture cameras
 	for (uint32 i = 0; i < scCaptureFaces; i++) {
-		PerspectiveCamera2& cam = mCaptureCameras.Emplace(MathUtil::DegreesToRadians(scCaptureFOV), scAspect, scFarClip,
-														  scNearClip);
+		PerspectiveCamera& cam = mCaptureCameras.Emplace(MathUtil::DegreesToRadians(scCaptureFOV), scAspect, scFarClip,
+														 scNearClip);
 	}
 }
 
 void ProbeManager::MoveCaptureCameras(const Vec3f position)
 {
 	for (uint32 face_index = 0; face_index < scCaptureFaces; face_index++) {
-		PerspectiveCamera2& cam = mCaptureCameras[face_index];
+		PerspectiveCamera& cam = mCaptureCameras[face_index];
 		cam.SetPosition(position);
 		cam.Update();
 	}
@@ -656,6 +650,8 @@ uint32 ProbeManager::RebuildVolumesFromWorld()
 	}
 
 	mbStaleCheckPending = false;
+	mbHasBakedLayout = false;
+	ClearStaleBakeReport();
 
 	Blockout* blockout = GetBlockout();
 	const bool from_compiled = (blockout != nullptr) && blockout->GetCompiledProbeLayout() != nullptr;
@@ -746,20 +742,44 @@ LayoutDifference CompareLayouts(const ProbeLayout& baked, const ProbeLayout& cur
 	return difference;
 }
 
-template <typename... TTypes>
-void WarnStaleBake(const char* fmt, TTypes&&... args)
+} // namespace
+
+void ProbeManager::ReportStaleBake(const String& message)
 {
+	if (message != mStaleMessage) {
+		LogWarning("{}", message.CStr());
+		mStaleMessage = message;
+	}
+
 #ifdef FX_IS_EDITOR
 	if (gEditor != nullptr) {
-		gEditor->Warn(fmt, std::forward<TTypes>(args)...);
-		return;
+		mStaleMessageId = gEditor->ShowStatusMessage(message);
+	}
+#endif
+}
+
+void ProbeManager::ClearStaleBakeReport()
+{
+	mStaleMessage.Clear();
+
+#ifdef FX_IS_EDITOR
+	if (gEditor != nullptr && mStaleMessageId != 0) {
+		gEditor->ClearStatusMessage(mStaleMessageId);
 	}
 #endif
 
-	LogWarning("{}", String::Fmt(fmt, std::forward<TTypes>(args)...).CStr());
+	mStaleMessageId = 0;
 }
 
-} // namespace
+void ProbeManager::RequestStaleCheck()
+{
+	if (!mbHasBakedLayout) {
+		return;
+	}
+
+	mbStaleCheckPending = true;
+	mStaleCheckWaitFrames = 0;
+}
 
 void ProbeManager::ServiceStaleCheck()
 {
@@ -778,27 +798,30 @@ void ProbeManager::ServiceStaleCheck()
 	uint32 num_brush_volumes = 0;
 
 	if (!BuildLayoutFromWorld(current, num_brush_volumes)) {
-		WarnStaleBake("The baked light probes don't match the map: it has no geometry to place probes around");
+		ReportStaleBake("The baked light probes don't match the map, it has no geometry to place probes around");
 		return;
 	}
 
 	const LayoutDifference difference = CompareLayouts(mLayout, current);
 
 	if (difference.IsEmpty()) {
-		LogInfo("The baked light probes match the map ({} probes)", GetProbeCount());
+		if (!mStaleMessage.IsEmpty()) {
+			LogInfo("The baked light probes match the map again ({} probes)", GetProbeCount());
+		}
+
+		ClearStaleBakeReport();
 		return;
 	}
 
 	if (difference.bVolumesChanged) {
-		WarnStaleBake("The baked light probes are out of date: the map now places {} probes in {} volume(s), the bake "
-					  "has {} in {}. Rebake and save the probes.",
-					  current.GetProbeCount(), current.VolumeCount, GetProbeCount(), mLayout.VolumeCount);
+		ReportStaleBake(String::Fmt("Light probes are out of date (the map places {}, the bake has {}), rebake and "
+									"save them",
+									current.GetProbeCount(), GetProbeCount()));
 		return;
 	}
 
-	WarnStaleBake("The baked light probes are out of date: {} of {} probes moved and {} grid points changed since the "
-				  "bake. Rebake and save the probes.",
-				  difference.MovedProbes, GetProbeCount(), difference.ChangedGridPoints);
+	ReportStaleBake(String::Fmt("Light probes are out of date ({} of {} moved), rebake and save them",
+								difference.MovedProbes, GetProbeCount()));
 }
 
 ///////////////////////////////////
@@ -874,6 +897,8 @@ void ProbeManager::BeginBake()
 	}
 
 	mbStaleCheckPending = false;
+	mbHasBakedLayout = false;
+	ClearStaleBakeReport();
 
 	mCurrentProbe = 0;
 	mCurrentBounce = 0;
@@ -945,7 +970,7 @@ void ProbeManager::BuildCaptureTexels()
 	CaptureTexel* texel = mCaptureTexels.pData;
 
 	for (uint32 face = 0; face < scCaptureFaces; face++) {
-		const PerspectiveCamera2 camera = MakeCaptureCamera(Vec3f::sZero, face);
+		const PerspectiveCamera camera = MakeCaptureCamera(Vec3f::sZero, face);
 		const Mat4f inv_view_projection = camera.GetInvProjectionMatrix() * camera.GetInvViewMatrix();
 
 		mCaptureInvProjection = camera.GetInvProjectionMatrix();
@@ -996,7 +1021,7 @@ void ProbeManager::RecordCaptureBatch(renderer::CommandBuffer& cmd, const Render
 		const uint32 slot = mCurrentProbe - mBatchStart;
 
 		for (uint32 face = 0; face < scCaptureFaces; face++) {
-			PerspectiveCamera2 camera = MakeCaptureCamera(GetProbePosition(mCurrentProbe), face);
+			PerspectiveCamera camera = MakeCaptureCamera(GetProbePosition(mCurrentProbe), face);
 
 			render_face(camera, mCaptureStage);
 
@@ -1071,6 +1096,7 @@ void ProbeManager::ServiceCaptureBake()
 	}
 
 	mBakeState = eBakeState::Idle;
+	mbHasBakedLayout = true;
 	LogInfo("Probe bake complete ({} probes across {} volume(s), {} bounce(s))", GetProbeCount(), mLayout.VolumeCount,
 			mBounceCount);
 
@@ -1384,7 +1410,7 @@ void ProbeManager::RecordReflectionCapture(renderer::CommandBuffer& cmd, const R
 	mbCapturingFaces = true;
 
 	for (uint32 face = 0; face < scCaptureFaces; face++) {
-		PerspectiveCamera2 camera = MakeCaptureCamera(position, face);
+		PerspectiveCamera camera = MakeCaptureCamera(position, face);
 
 		render_face(camera, mReflectionStage);
 
@@ -1580,6 +1606,9 @@ bool ProbeManager::SaveProbes()
 
 bool ProbeManager::LoadProbes()
 {
+	mbHasBakedLayout = false;
+	ClearStaleBakeReport();
+
 	const bool loaded = LoadIrradianceProbes();
 
 	if (!loaded || !LoadReflectionProbes()) {
@@ -1774,6 +1803,7 @@ bool ProbeManager::LoadIrradianceProbes()
 	UploadToGpu(0, header.ProbeCount);
 
 	mbStaleCheckPending = true;
+	mbHasBakedLayout = true;
 	mStaleCheckWaitFrames = 0;
 
 	LogInfo("Loaded {} light probes across {} volume(s) from {}", header.ProbeCount, header.VolumeCount, path.CStr());

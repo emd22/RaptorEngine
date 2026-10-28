@@ -236,6 +236,38 @@ extern void particle_stop(long effect);
 extern void particle_kill(long effect);
 extern bool particle_alive(long effect);
 
+/* Sounds */
+
+extern long sound_play(cstring name, float3 position);
+extern long sound_play_2d(cstring name);
+extern void sound_move(long sound, float3 position);
+extern void sound_set_volume(long sound, float volume);
+extern void sound_stop(long sound);
+extern void sound_kill(long sound);
+extern bool sound_alive(long sound);
+
+/* Timers. Callbacks are looked up by name and have the signature `void fn(OBJECT self, long timer)`, where `self` is
+ * null for scripts that are not attached to an object. A timer belongs to the script that started it, and stops when
+ * that script is reloaded, detached or the object stops simulating. Timers only run while the game is simulating. */
+
+/* Calls `fn` once, after `seconds`. */
+extern long timer_after(float seconds, cstring fn);
+/* Calls `fn` every `seconds` until it is cancelled. */
+extern long timer_every(float seconds, cstring fn);
+/* Calls `fn` `count` times, `seconds` apart. */
+extern long timer_repeat(float seconds, int count, cstring fn);
+/* Cancelling a timer that has already finished does nothing. */
+extern void timer_cancel(long timer);
+/* Cancels every timer started by the calling script. */
+extern void timer_cancel_all();
+extern bool timer_active(long timer);
+/* Seconds until the timer fires next, or 0 if it is no longer active. */
+extern float timer_remaining(long timer);
+/* The game clock that timers are measured against, in seconds of simulation. */
+extern float timer_clock();
+/* Logs every active timer. */
+extern void timer_list();
+
 /* Portals */
 
 extern bool portal_set_open(cstring name, bool open);

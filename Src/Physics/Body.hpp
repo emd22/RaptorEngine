@@ -71,7 +71,8 @@ public:
 							  const BodyProps& object_properties);
 
 	void CreateTriangleMeshBody(const SizedArray<Vec3f>& positions, const SizedArray<uint32>& indices,
-								const BodyProps& object_properties);
+								const BodyProps& object_properties,
+								const SizedArray<uint32>* triangle_user_data = nullptr);
 
 	void CreateCompoundHullBody(const SizedArray<SizedArray<Vec3f>>& hulls, physics::eMotionType motion_type,
 								const BodyProps& object_properties);

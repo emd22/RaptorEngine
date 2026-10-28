@@ -31,7 +31,6 @@ constexpr double scDefaultScale = 24.0;
 constexpr double scFitMargin = 1.25;
 
 constexpr double scPickTolerancePixels = 5.0;
-constexpr std::chrono::seconds scNoticeDuration(6);
 constexpr float32 scTextureRotateDegrees = 15.0f;
 constexpr double scDragThresholdPixels = 4.0;
 constexpr double scClickCycleRadiusPixels = 4.0;
@@ -100,6 +99,7 @@ constexpr const char* scToolHints[] = {
 	"Drag around the pivot, " FX_TOP_VIEW_FREE_KEY " ignores snap",
 	"Drag a line across the selected brushes to split them, Esc deselects, " FX_TOP_VIEW_FREE_KEY " ignores snap",
 	"Click a light to select it, drag to move, drag its handle to aim, double-click to add one",
+	"Click a sound to select it, drag to move, double-click to add one",
 };
 
 static_assert(std::size(scToolHints) == static_cast<size_t>(eEditorTool::Count));
@@ -695,12 +695,6 @@ void TopViewCanvas::ApplyState(const TopViewState& state)
 	mState = state;
 	mAvailableTools = state.AvailableTools;
 
-	if (state.NoticeSerial != mNoticeSerial) {
-		mNoticeSerial = state.NoticeSerial;
-		mNotice = wxString::FromUTF8(state.Notice.CStr());
-		mNoticeTime = std::chrono::steady_clock::now();
-	}
-
 	if (mbLocalSelection) {
 		ApplyLocalSelection();
 	}
@@ -780,7 +774,7 @@ void TopViewCanvas::ApplyLocalMarkerSelection()
 {
 	for (TopViewMarker& marker : mState.Markers) {
 		const bool same_kind = (marker.Kind == mLocalMarkerKind);
-		const bool same_light = (marker.Kind == eTopViewMarkerKind::Spawn) || (marker.LightId == mLocalMarkerLightId);
+		const bool same_light = (marker.Kind == eTopViewMarkerKind::Spawn) || (marker.Id == mLocalMarkerId);
 
 		marker.bSelected = mbLocalMarkerSelected && same_kind && same_light;
 	}
@@ -2245,6 +2239,37 @@ void TopViewCanvas::DrawMarkers(wxGraphicsContext& gc)
 			direction_uv = mPreview.AimUV;
 		}
 
+		if (marker.Kind == eTopViewMarkerKind::Sound) {
+			wxColour sound_colour = ToWxColour(theme.Marker.Sound);
+			wxColour sound_outline = ToWxColour(theme.Tool.Handle);
+
+			if (marker.bSelected) {
+				sound_colour = ToWxColour(theme.Marker.SoundSelected);
+				sound_outline = ToWxColour(theme.Marker.SelectedOutline);
+			}
+
+			if (!marker.bSelectable) {
+				sound_colour = WithAlpha(sound_colour, scDimMarkerAlpha);
+			}
+
+			const Vec2d centre = ToScreenCoords(ProjectPoint(marker.Position) + offset);
+
+			gc.SetBrush(wxBrush(sound_colour));
+			gc.SetPen(wxPen(sound_outline, 1));
+			gc.DrawEllipse(centre.X - scMarkerHalfSize, centre.Y - scMarkerHalfSize, scMarkerHalfSize * 2.0,
+						   scMarkerHalfSize * 2.0);
+
+			if (marker.bSelected && marker.Radius > 0.0f) {
+				const double radius = static_cast<double>(marker.Radius) * mScale;
+
+				gc.SetBrush(*wxTRANSPARENT_BRUSH);
+				gc.SetPen(wxPen(sound_colour, 1, wxPENSTYLE_SHORT_DASH));
+				gc.DrawEllipse(centre.X - radius, centre.Y - radius, radius * 2.0, radius * 2.0);
+			}
+
+			continue;
+		}
+
 		wxColour colour = ToWxColour(theme.Marker.Light);
 		wxColour outline = ToWxColour(theme.Tool.Handle);
 		int fill_alpha = 24;
@@ -2773,7 +2798,7 @@ int32 TopViewCanvas::PickMarkerAt(const Vec2d uv, bool& out_tip) const
 	for (uint32 i = 0; i < mState.Markers.Size; i++) {
 		const TopViewMarker& marker = mState.Markers[i];
 
-		if (marker.bSelected && marker.bSelectable &&
+		if (marker.bSelected && marker.bSelectable && marker.Kind != eTopViewMarkerKind::Sound &&
 			(GetMarkerTip(marker, ProjectPoint(marker.Direction)) - uv).Length() <= tolerance) {
 			out_tip = true;
 			return static_cast<int32>(i);
@@ -2817,7 +2842,7 @@ int32 TopViewCanvas::FindMarker(eTopViewMarkerKind kind, uint32 light_id) const
 	for (uint32 i = 0; i < mState.Markers.Size; i++) {
 		const TopViewMarker& marker = mState.Markers[i];
 
-		if (marker.Kind == kind && (kind == eTopViewMarkerKind::Spawn || marker.LightId == light_id)) {
+		if (marker.Kind == kind && (kind == eTopViewMarkerKind::Spawn || marker.Id == light_id)) {
 			return static_cast<int32>(i);
 		}
 	}
@@ -2839,7 +2864,7 @@ int32 TopViewCanvas::FindSelectedMarker() const
 void TopViewCanvas::SelectMarker(int32 index)
 {
 	const eTopViewMarkerKind kind = mState.Markers[index].Kind;
-	const uint32 light_id = mState.Markers[index].LightId;
+	const uint32 light_id = mState.Markers[index].Id;
 
 	for (uint32 i = 0; i < mState.Markers.Size; i++) {
 		mState.Markers[i].bSelected = (static_cast<int32>(i) == index);
@@ -2848,7 +2873,7 @@ void TopViewCanvas::SelectMarker(int32 index)
 	mbLocalMarkerSelection = true;
 	mbLocalMarkerSelected = true;
 	mLocalMarkerKind = kind;
-	mLocalMarkerLightId = light_id;
+	mLocalMarkerId = light_id;
 
 	if (kind == eTopViewMarkerKind::Spawn) {
 		for (TopViewBrush& brush : mState.Brushes) {
@@ -2859,6 +2884,9 @@ void TopViewCanvas::SelectMarker(int32 index)
 		mbLocalSelection = true;
 
 		SendCommand([] { gEditor->TopViewSelectSpawn(); });
+	}
+	else if (kind == eTopViewMarkerKind::Sound) {
+		SendCommand([light_id] { gEditor->TopViewSelectSound(light_id); });
 	}
 	else {
 		SendCommand([light_id] { gEditor->TopViewSelectLight(light_id); });
@@ -2881,6 +2909,8 @@ void TopViewCanvas::DeselectMarkers()
 		return;
 	}
 
+	const eTopViewMarkerKind kind = mState.Markers[selected].Kind;
+
 	for (TopViewMarker& marker : mState.Markers) {
 		marker.bSelected = false;
 	}
@@ -2888,7 +2918,12 @@ void TopViewCanvas::DeselectMarkers()
 	mbLocalMarkerSelection = true;
 	mbLocalMarkerSelected = false;
 
-	SendCommand([] { gEditor->TopViewSelectLight(LightID::scNull.ID); });
+	if (kind == eTopViewMarkerKind::Sound) {
+		SendCommand([] { gEditor->TopViewSelectSound(0); });
+	}
+	else {
+		SendCommand([] { gEditor->TopViewSelectLight(LightID::scNull.ID); });
+	}
 
 	Refresh();
 }
@@ -3085,6 +3120,9 @@ void TopViewCanvas::BeginTool(const wxMouseEvent& event)
 	case eEditorTool::Light:
 		BeginLight(event.ButtonDClick());
 		break;
+	case eEditorTool::Sound:
+		BeginSound(event.ButtonDClick());
+		break;
 	default:
 		BeginSelect();
 		break;
@@ -3103,7 +3141,7 @@ bool TopViewCanvas::BeginMarker()
 	const TopViewMarker& marker = mState.Markers[index];
 
 	mGrabbedMarkerKind = marker.Kind;
-	mGrabbedMarkerLightId = marker.LightId;
+	mGrabbedMarkerId = marker.Id;
 
 	if (tip && marker.bSelected) {
 		mDrag = eDrag::MarkerAim;
@@ -3130,6 +3168,29 @@ void TopViewCanvas::BeginLight(bool double_click)
 		return;
 	}
 
+	const Vec3f position = GetNewMarkerPosition();
+
+	SendCommand([position] { gEditor->TopViewCreateLight(position); });
+}
+
+void TopViewCanvas::BeginSound(bool double_click)
+{
+	if (BeginMarker()) {
+		return;
+	}
+
+	if (!double_click) {
+		DeselectMarkers();
+		return;
+	}
+
+	const Vec3f position = GetNewMarkerPosition();
+
+	SendCommand([position] { gEditor->TopViewCreateSound(position); });
+}
+
+Vec3f TopViewCanvas::GetNewMarkerPosition() const
+{
 	double depth = 0.0;
 	const int32 selected = FindSelectedMarker();
 
@@ -3140,9 +3201,22 @@ void TopViewCanvas::BeginLight(bool double_click)
 		depth = DepthOf(mState.PlayerPosition);
 	}
 
-	const Vec3f position = ToWorldVector(Snap(mPress), depth);
+	return ToWorldVector(Snap(mPress), depth);
+}
 
-	SendCommand([position] { gEditor->TopViewCreateLight(position); });
+void TopViewCanvas::SendMarkerMove(eTopViewMarkerKind kind, const Vec3f offset)
+{
+	switch (kind) {
+	case eTopViewMarkerKind::Spawn:
+		SendCommand([offset] { gEditor->TopViewMoveSpawn(offset); });
+		break;
+	case eTopViewMarkerKind::Sound:
+		SendCommand([offset] { gEditor->TopViewMoveSound(offset); });
+		break;
+	case eTopViewMarkerKind::Light:
+		SendCommand([offset] { gEditor->TopViewMoveLight(offset); });
+		break;
+	}
 }
 
 void TopViewCanvas::BeginClip()
@@ -3627,7 +3701,7 @@ void TopViewCanvas::UpdatePreview()
 		break;
 	}
 	case eDrag::MarkerMove: {
-		const int32 index = FindMarker(mGrabbedMarkerKind, mGrabbedMarkerLightId);
+		const int32 index = FindMarker(mGrabbedMarkerKind, mGrabbedMarkerId);
 
 		if (index < 0) {
 			break;
@@ -3640,7 +3714,7 @@ void TopViewCanvas::UpdatePreview()
 		break;
 	}
 	case eDrag::MarkerAim: {
-		const int32 index = FindMarker(mGrabbedMarkerKind, mGrabbedMarkerLightId);
+		const int32 index = FindMarker(mGrabbedMarkerKind, mGrabbedMarkerId);
 
 		if (index < 0) {
 			break;
@@ -4640,12 +4714,7 @@ void TopViewCanvas::FinishMarkerMove()
 
 	HoldPreview();
 
-	if (mGrabbedMarkerKind == eTopViewMarkerKind::Spawn) {
-		SendCommand([offset] { gEditor->TopViewMoveSpawn(offset); });
-	}
-	else {
-		SendCommand([offset] { gEditor->TopViewMoveLight(offset); });
-	}
+	SendMarkerMove(mGrabbedMarkerKind, offset);
 }
 
 void TopViewCanvas::FinishMarkerAim()
@@ -4718,14 +4787,7 @@ void TopViewCanvas::OnZoomGesture(wxZoomGestureEvent& event)
 
 void TopViewCanvas::NudgeMarker(const TopViewMarker& marker, const Vec2d delta)
 {
-	const Vec3f offset = ToWorldVector(delta, 0.0);
-
-	if (marker.Kind == eTopViewMarkerKind::Spawn) {
-		SendCommand([offset] { gEditor->TopViewMoveSpawn(offset); });
-	}
-	else {
-		SendCommand([offset] { gEditor->TopViewMoveLight(offset); });
-	}
+	SendMarkerMove(marker.Kind, ToWorldVector(delta, 0.0));
 }
 
 void TopViewCanvas::NudgeSelection(const Vec2d delta, bool snap)
@@ -5011,6 +5073,9 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 	case 'I':
 		SetToolFromKey(eEditorTool::Light);
 		break;
+	case 'K':
+		SetToolFromKey(eEditorTool::Sound);
+		break;
 	case 'S':
 		if (mDrag == eDrag::None) {
 			Subtract(shift);
@@ -5246,10 +5311,6 @@ void TopViewCanvas::UpdateStatus()
 	const ViewPlaneAxes& axes = Axes();
 
 	wxString text = wxString::Format("%s   |   ", axes.pName);
-
-	if (!mNotice.IsEmpty() && std::chrono::steady_clock::now() - mNoticeTime < scNoticeDuration) {
-		text += mNotice + "   |   ";
-	}
 
 	if (mState.bSimulating) {
 		text += "Simulating, editing is paused   |   ";

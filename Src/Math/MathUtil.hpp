@@ -2,10 +2,6 @@
 
 #include <Core/Defines.hpp>
 #include <Core/Types.hpp>
-
-#define DegToRad(deg) ((deg) * (M_PI / 180.0f))
-#define RadToDeg(rad) ((rad) * (180.0f / M_PI))
-
 #include <bit>
 #include <cmath>
 
@@ -14,6 +10,46 @@ namespace fx::MathUtil {
 
 constexpr float32 DegreesToRadians(float32 degrees) { return ((degrees) * static_cast<float32>(M_PI / 180.0)); }
 constexpr float32 RadiansToDegrees(float32 radians) { return ((radians) * static_cast<float32>(180.0 / M_PI)); }
+
+constexpr float32 DegToRad(float32 degrees) { return ((degrees) * static_cast<float32>(M_PI / 180.0)); }
+constexpr float32 RadToDeg(float32 radians) { return ((radians) * static_cast<float32>(180.0 / M_PI)); }
+
+/**
+ * @brief Reverses all bits in a 32-bit integer
+ */
+constexpr uint32 BitReverse32(uint32 bits)
+{
+	// Evil MSVC does not support __has_builtin
+
+#if __has_builtin(__builtin_bitreverse32)
+	// Use the intrinsic if we have it (supported in Clang and GCC)
+	return __builtin_bitreverse32(bits);
+#else
+	bits = (bits << 16u) | (bits >> 16u);
+	bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
+	bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
+	bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
+	return ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
+#endif
+}
+
+
+template <typename T>
+	requires std::is_floating_point_v<T>
+constexpr T RadicalInverse(const uint32 bits);
+
+template <>
+constexpr double RadicalInverse<double>(const uint32 bits)
+{
+	return static_cast<double>(BitReverse32(bits)) * (1.0 / 4294967296.0);
+}
+
+template <>
+constexpr float32 RadicalInverse<float32>(const uint32 bits)
+{
+	return static_cast<float32>(BitReverse32(bits)) * 2.3283064365386963e-10f;
+}
+
 
 void SinCos(float32 rad, float32* out_sine, float32* out_cosine);
 

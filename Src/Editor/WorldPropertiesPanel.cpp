@@ -16,7 +16,7 @@
 
 #include <CVar.hpp>
 #include <Engine.hpp>
-#include <Renderer/Exposure.hpp>
+#include <Renderer/Camera/BaseCamera.hpp>
 #include <Renderer/LightProbe.hpp>
 #include <World.hpp>
 #include <algorithm>
@@ -229,25 +229,6 @@ void WorldPropertiesPanel::BuildFogSection(wxSizer* sizer)
 	section->AddWide(mpFogEnabledCheck);
 	mpFogEnabledCheck->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) { PostFogSettings(); });
 
-	mpFogQualityChoice = new wxChoice(body, wxID_ANY);
-	mpFogQualityChoice->Append("Off");
-	mpFogQualityChoice->Append("Fast");
-	mpFogQualityChoice->Append("Volumetric");
-	mpFogQualityChoice->Append("Froxel");
-	section->AddRow("Quality", mpFogQualityChoice);
-
-	mpFogQualityChoice->Bind(wxEVT_CHOICE,
-							 [this](wxCommandEvent&)
-							 {
-								 const int32 selection = mpFogQualityChoice->GetSelection();
-								 if (selection < 0) {
-									 return;
-								 }
-
-								 mShownFogQuality = selection;
-								 thread::PostToGame([selection] { gCVars->Set("r_fog", selection); });
-							 });
-
 	wxBoxSizer* color_row = new wxBoxSizer(wxHORIZONTAL);
 	mpFogColorPicker = new wxColourPickerCtrl(body, wxID_ANY, *wxWHITE);
 	color_row->Add(mpFogColorPicker, wxSizerFlags().CenterVertical());
@@ -293,11 +274,6 @@ void WorldPropertiesPanel::ApplyFogState(const WorldPanelState& state)
 
 	if (mpFogEnabledCheck->GetValue() != fog.bEnabled) {
 		mpFogEnabledCheck->SetValue(fog.bEnabled);
-	}
-
-	if (state.FogQuality != mShownFogQuality) {
-		mShownFogQuality = state.FogQuality;
-		mpFogQualityChoice->SetSelection(static_cast<int32>(state.FogQuality));
 	}
 
 	const wxColour colour(fog.Albedo.R, fog.Albedo.G, fog.Albedo.B);

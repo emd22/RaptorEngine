@@ -45,6 +45,8 @@ public:
 
 	const String& GetName(const MaterialLibraryID id) const;
 	const String& GetDiffusePath(const MaterialLibraryID id) const;
+	const String& GetSurface(const MaterialLibraryID id) const;
+	std::optional<float32> GetDensity(const MaterialLibraryID id) const;
 
 	MaterialID GetMaterial(const MaterialLibraryID id) const;
 	MaterialID GetSpecialMaterial(const eSpecialMaterial special) const;

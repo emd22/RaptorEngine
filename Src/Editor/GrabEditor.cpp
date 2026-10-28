@@ -58,7 +58,7 @@ void GrabEditor::Grab()
 {
 	Release();
 
-	PerspectiveCamera2& camera = *gWorld->Player.pCamera;
+	PerspectiveCamera& camera = *gWorld->Player.pCamera;
 
 	const physics::RayResult hit = gPhysics->pBackend->Raycast(camera.GetPosition(),
 															   camera.GetForwardVector() * scGrabRange);
@@ -105,7 +105,7 @@ void GrabEditor::Hold(float32 delta_time)
 		return;
 	}
 
-	PerspectiveCamera2& camera = *gWorld->Player.pCamera;
+	PerspectiveCamera& camera = *gWorld->Player.pCamera;
 
 	const Vec3f target = camera.GetPosition() + camera.GetForwardVector() * mDistance;
 	const Vec3f held_point = Vec3f(bodies.GetCenterOfMassTransform(mBody) *

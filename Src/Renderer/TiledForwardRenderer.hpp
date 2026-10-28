@@ -63,7 +63,7 @@ struct alignas(16) FogConsts
 	float32 AmbientScale;
 	uint32 TileColumns;
 	uint32 TileRows;
-	uint32 StepCount;
+	uint32 Pad0;
 	uint32 Flags;
 	float32 JitterOffset;
 	uint32 NoiseShift;
@@ -80,21 +80,6 @@ struct alignas(16) FogConsts
 static constexpr uint32 scFroxelGridX = 160;
 static constexpr uint32 scFroxelGridY = 90;
 static constexpr uint32 scFroxelGridZ = 64;
-
-struct alignas(16) FogTemporalConsts
-{
-	float32 PrevCameraMatrix[16];
-	float32 Rays[4][4];
-	float32 EyeAndBlend[4];
-	float32 DepthParams[2];
-	uint32 HistoryValid;
-	uint32 Pad;
-};
-
-struct alignas(16) FogResolveConsts
-{
-	float32 DepthParams[2];
-};
 
 enum class eFogFlags : uint32
 {
@@ -171,7 +156,6 @@ private:
 	void CreateSSAOBlurPass();
 	void CreateParticlePass();
 	void CreateFogPasses();
-	void CreateFroxelFogPSO(const BlendAttachment& apply_blend);
 	Sampler* GetFogShadowSampler();
 
 	// Lighting
@@ -221,9 +205,7 @@ public:
 	/// SSAO blur pass
 	RenderStage SSAODenoisePass;
 	RenderStage SSAOBlurPass;
-	RenderStage FogPass;
-	RenderStage FogTemporalPass;
-	RenderStage FogDenoisePass;
+	/// Blends the integrated froxel fog over the lit target
 	RenderStage FogApplyPass;
 	/// Froxel fog: lighting per froxel, with one extra slice for the light past the grid
 	Image FroxelLighting;

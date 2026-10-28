@@ -285,9 +285,9 @@ void DestroyObjectTree(ObjectID root_id)
 		return;
 	}
 
-	std::vector<ObjectID> children;
+	DynArray<ObjectID> children;
 	for (const ObjectID& child_id : root->AttachedNodes) {
-		children.push_back(child_id);
+		children.Insert(child_id);
 	}
 
 	root->AttachedNodes.Clear();
@@ -300,9 +300,9 @@ void DestroyObjectTree(ObjectID root_id)
 	gObjectManager->DestroyObject(root_id);
 }
 
-void CollectObjectTree(Object* root, std::vector<Object*>& out_parts)
+void CollectObjectTree(Object* root, DynArray<Object*>& out_parts)
 {
-	out_parts.push_back(root);
+	out_parts.Insert(root);
 
 	for (ObjectID child_id : root->AttachedNodes) {
 		Object* child = gObjectManager->GetObject(child_id);

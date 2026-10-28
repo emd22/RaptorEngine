@@ -59,7 +59,6 @@ private:
 	bool mbShowingSunStale = true;
 
 	wxCheckBox* mpFogEnabledCheck = nullptr;
-	wxChoice* mpFogQualityChoice = nullptr;
 	wxColourPickerCtrl* mpFogColorPicker = nullptr;
 	FloatField* mpFogDensityField = nullptr;
 	FloatField* mpFogHeightField = nullptr;
@@ -67,7 +66,6 @@ private:
 	FloatField* mpFogHazeField = nullptr;
 	FloatField* mpFogAnisotropyField = nullptr;
 	FloatField* mpFogAmbientField = nullptr;
-	int64 mShownFogQuality = -1;
 
 	wxStaticText* mpReflectionStatus = nullptr;
 	wxCheckBox* mpReflectionEnabledCheck = nullptr;

@@ -1,6 +1,8 @@
 #include "ReflectionFilter.hpp"
 
+#include <Math/Float16.hpp>
 #include <Math/MathConsts.hpp>
+#include <Math/MathUtil.hpp>
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -11,8 +13,6 @@ namespace fx::ReflectionFilter {
 namespace {
 
 constexpr uint32 scSampleCount = 128;
-// constexpr float32 scPi = 3.14159265359f;
-constexpr float32 scMaxHalf = 65504.0f;
 
 struct CubeLevel
 {
@@ -126,16 +126,6 @@ std::vector<CubeLevel> BuildSourceLevels(const float32* const faces[scFaces], ui
 	return levels;
 }
 
-float32 RadicalInverse(uint32 bits)
-{
-	bits = (bits << 16) | (bits >> 16);
-	bits = ((bits & 0x55555555u) << 1) | ((bits & 0xAAAAAAAAu) >> 1);
-	bits = ((bits & 0x33333333u) << 2) | ((bits & 0xCCCCCCCCu) >> 2);
-	bits = ((bits & 0x0F0F0F0Fu) << 4) | ((bits & 0xF0F0F0F0u) >> 4);
-	bits = ((bits & 0x00FF00FFu) << 8) | ((bits & 0xFF00FF00u) >> 8);
-
-	return static_cast<float32>(bits) * 2.3283064365386963e-10f;
-}
 
 std::vector<LobeSample> BuildLobeSamples(float32 roughness, uint32 source_size)
 {
@@ -149,7 +139,7 @@ std::vector<LobeSample> BuildLobeSamples(float32 roughness, uint32 source_size)
 
 	for (uint32 i = 0; i < scSampleCount; i++) {
 		const float32 xi_x = (static_cast<float32>(i) + 0.5f) / static_cast<float32>(scSampleCount);
-		const float32 xi_y = RadicalInverse(i);
+		const float32 xi_y = MathUtil::RadicalInverse<float32>(i);
 
 		const float32 phi = 2.0f * FX_PI * xi_x;
 		const float32 cos_theta = std::sqrt((1.0f - xi_y) / (1.0f + (alpha_sq - 1.0f) * xi_y));
@@ -182,6 +172,15 @@ std::vector<LobeSample> BuildLobeSamples(float32 roughness, uint32 source_size)
 	}
 
 	return samples;
+}
+
+uint16 FloatToHalf(float32 value)
+{
+	if (!(value > 0.0f)) {
+		return 0;
+	}
+
+	return Float16(std::min(value, Float16::scMaxValue.ToFloat())).GetBits();
 }
 
 void WriteTexel(uint16*& out, const float32 rgb[3])
@@ -264,30 +263,6 @@ float32 MipToRoughness(uint32 mip, uint32 mip_count)
 	}
 
 	return static_cast<float32>(mip) / static_cast<float32>(mip_count - 1);
-}
-
-uint16 FloatToHalf(float32 value)
-{
-	if (!(value > 0.0f)) {
-		return 0;
-	}
-
-	const uint32 bits = std::bit_cast<uint32>(std::min(value, scMaxHalf));
-	const int32 exponent = static_cast<int32>((bits >> 23) & 0xFF) - 127 + 15;
-	const uint32 mantissa = bits & 0x7FFFFF;
-
-	if (exponent <= 0) {
-		if (exponent < -10) {
-			return 0;
-		}
-
-		const uint32 shift = static_cast<uint32>(14 - exponent);
-		const uint32 full = mantissa | 0x800000;
-
-		return static_cast<uint16>((full >> shift) + ((full >> (shift - 1)) & 1));
-	}
-
-	return static_cast<uint16>(((static_cast<uint32>(exponent) << 10) | (mantissa >> 13)) + ((mantissa >> 12) & 1));
 }
 
 void Prefilter(const float32* const faces[scFaces], uint32 size, uint32 mip_count, uint16* out_texels)

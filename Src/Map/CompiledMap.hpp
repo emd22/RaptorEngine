@@ -157,6 +157,11 @@ struct CompiledMapHull
 {
 	SizedArray<float32> Points;
 
+	SizedArray<float32> SidePlanes;
+	SizedArray<int32> SideMaterials;
+
+	uint32 GetSideCount() const { return static_cast<uint32>(SideMaterials.Size); }
+
 	uint32 GetPointCount() const { return static_cast<uint32>(Points.Size / 3); }
 };
 
@@ -164,6 +169,8 @@ struct CompiledMapCollisionMesh
 {
 	SizedArray<float32> Points;
 	SizedArray<uint32> Indices;
+
+	SizedArray<int32> TriangleMaterials;
 
 	uint32 GetPointCount() const { return static_cast<uint32>(Points.Size / 3); }
 };
@@ -199,7 +206,7 @@ class CompiledMap
 {
 public:
 	static constexpr uint32 scMagic = 0x504D5846;
-	static constexpr uint32 scVersion = 11;
+	static constexpr uint32 scVersion = 13;
 	/// Oldest version that still loads, the parts added since are left empty
 	static constexpr uint32 scMinVersion = 10;
 	static constexpr const char* scExtension = ".fxmap";
@@ -244,6 +251,8 @@ public:
 	SizedArray<CompiledMapShadowSurface> ShadowSurfaces;
 	SizedArray<CompiledMapHull> Hulls;
 	SizedArray<CompiledMapCollisionMesh> CollisionMeshes;
+
+	SizedArray<uint8> AcousticProbes;
 
 	/// Where the light probes go, worked out from the brushes. Empty if the map was compiled without probes.
 	ProbeLayout Probes;

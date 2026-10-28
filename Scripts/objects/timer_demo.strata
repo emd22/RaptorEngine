@@ -1,0 +1,28 @@
+/*
+ * File:        timer_demo.strata
+ * Description: Example object script for timers. Attach it to an object and start the game. Every 2 seconds
+ *              on_heartbeat prints the game clock, and 5 seconds in on_once cancels the heartbeat. Stopping the
+ *              game or reloading scripts also cancels the timers, and object_start sets them up again.
+ */
+
+import ../interop;
+import ../common;
+
+long heartbeat_timer = 0;
+
+void object_start(OBJECT self)
+{
+	heartbeat_timer = timer_every(2.0f, "on_heartbeat");
+	timer_after(5.0f, "on_once");
+}
+
+void on_heartbeat(OBJECT self, long timer)
+{
+	print_float3(float3(timer_clock(), 0.0f, 0.0f));
+}
+
+void on_once(OBJECT self, long timer)
+{
+	printf("timer demo: cancelling the heartbeat\n");
+	timer_cancel(heartbeat_timer);
+}

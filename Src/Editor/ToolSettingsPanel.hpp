@@ -14,6 +14,8 @@ class wxColourPickerEvent;
 class wxBoxSizer;
 class wxSpinCtrl;
 class wxSpinCtrlDouble;
+class wxChoice;
+class wxCommandEvent;
 
 namespace fx::editor {
 
@@ -53,6 +55,30 @@ private:
 	FloatField* mpInnerAngleField = nullptr;
 
 	bool mbShowingAnything = false;
+};
+
+
+class SoundToolSettingsPanel : public ToolSettingsBasePanel
+{
+public:
+	void Construct(wxBoxSizer* tool_panel) override;
+	void ApplyState(const EditorPanelState& state) override;
+
+private:
+	void OnSoundChoice(wxCommandEvent& event);
+	void SetControlsEnabled(bool enabled);
+
+private:
+	wxStaticText* mpNameLabel = nullptr;
+	wxChoice* mpSoundChoice = nullptr;
+
+	Vector3Field* mpPositionField = nullptr;
+	FloatField* mpVolumeField = nullptr;
+	FloatField* mpMinIntervalField = nullptr;
+	FloatField* mpMaxIntervalField = nullptr;
+
+	String mSoundNames;
+	bool mbShowingAnything = true;
 };
 
 } // namespace fx::editor

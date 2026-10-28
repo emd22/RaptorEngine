@@ -11,11 +11,12 @@
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/Ragdoll.hpp>
 #include <Player.hpp>
-#include <Renderer/Exposure.hpp>
+#include <Renderer/Camera/BaseCamera.hpp>
 #include <Script/ScriptManager.hpp>
 #include <World.hpp>
 #include <atomic>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 class ShadowDirectional;
@@ -97,11 +98,12 @@ private:
 	void RequestRagdollDrop();
 	void UpdateObjectScripts();
 	void UpdateRagdollDummies();
+	void PlayImpactSounds();
 	void DropRagdollDummy(Object* model);
 	void DestroyRagdollDummy(size_t index);
 	void CleanWorld();
-	void AddDummyWound(RagdollDummy& dummy, const physics::RagdollHit& hit);
-	void SpawnRagdollBlood(float32& cooldown, const physics::RagdollImpact& impact, float32 min_speed);
+	void AddDummyWound(RagdollDummy& dummy, const physics::RagdollContact& contact);
+	void SpawnRagdollBlood(float32& cooldown, const physics::RagdollContact& contact, float32 min_speed);
 
 	void RequestRagdollTemplate();
 	void SpawnDebugNPC(Object* model);
@@ -173,8 +175,22 @@ private:
 	static constexpr size_t scMaxRagdollDummies = 8;
 	static constexpr float32 scDefaultRagdollBloodSpeed = 3.5f;
 
+	static constexpr float32 scImpactSoundMinSpeed = 1.5f;
+	static constexpr float32 scImpactSoundFullSpeed = 8.0f;
+	static constexpr float32 scImpactSoundMinVolume = 0.15f;
+	static constexpr float64 scImpactSoundCooldown = 0.12;
+	static constexpr size_t scMaxImpactSoundBodies = 512;
+
+	static constexpr float32 scClosedPortalGain = 0.2f;
+
+	std::vector<uint8> mListenerConnectedAreas;
+	int32 mListenerArea = -1;
+
+	SizedArray<physics::SoundImpact> mSoundImpacts;
+	std::unordered_map<uint32, float64> mImpactSoundTimes;
+	float64 mImpactSoundClock = 0.0;
+
 	std::vector<RagdollDummy> mRagdollDummies;
-	std::vector<physics::RagdollImpact> mRagdollImpacts;
 	AssetTicket mRagdollTemplateTicket { nullptr };
 	std::atomic<Object*> mpRagdollTemplate = nullptr;
 	bool mbRagdollTemplateRequested = false;
@@ -188,7 +204,11 @@ private:
 	CVarValue* mpRagdollBloodSpeedCVar = nullptr;
 	CVarValue* mpNPCImpactDamageCVar = nullptr;
 	CVarValue* mpNPCImpactSpeedCVar = nullptr;
+	CVarValue* mpNPCImpactSafeSpeedCVar = nullptr;
 	CVarValue* mpNPCReactStrengthCVar = nullptr;
+	CVarValue* mpNPCStrengthCVar = nullptr;
+	CVarValue* mpNPCRootAssistCVar = nullptr;
+	CVarValue* mpNPCBalanceCVar = nullptr;
 
 	Ref<FPSCamera> mpFlyCamera { nullptr };
 	ViewAngles mFlyCameraAngles;

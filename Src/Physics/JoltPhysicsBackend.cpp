@@ -19,6 +19,7 @@
 #include <ThirdParty/Jolt/Physics/Body/BodyCreationSettings.h>
 #include <ThirdParty/Jolt/Physics/Body/BodyLock.h>
 #include <ThirdParty/Jolt/Physics/Collision/Shape/BoxShape.h>
+#include <ThirdParty/Jolt/Physics/Collision/Shape/MeshShape.h>
 #include <ThirdParty/Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <ThirdParty/Jolt/Physics/PhysicsSettings.h>
 #include <ThirdParty/Jolt/Physics/PhysicsSystem.h>
@@ -59,8 +60,12 @@ void JoltPhysicsBackend::Update(float32 delta_time)
 
 	StepAccumulator = std::min(StepAccumulator + delta_time, cTimeStep * scMaxSteps);
 
+	if (StepAccumulator >= cTimeStep * scStepThreshold) {
+		ClearBodyGroundContacts();
+	}
+
 	while (StepAccumulator >= cTimeStep * scStepThreshold) {
-		PhysicsSystem.Update(cTimeStep, 1, pTempAllocator.pPtr, pJobSystem.pPtr);
+		PhysicsSystem.Update(cTimeStep, scCollisionSteps, pTempAllocator.pPtr, pJobSystem.pPtr);
 		StepAccumulator -= cTimeStep;
 	}
 }
@@ -172,7 +177,7 @@ RayResult JoltPhysicsBackend::Raycast(const Vec3f origin, const Vec3f direction,
 	if (PhysicsSystem.GetNarrowPhaseQuery().CastRay(rc, result, {}, {}, ignore_filter)) {
 		JPH::Vec3 hit_point = rc.GetPointOnRay(result.mFraction);
 
-		RayResult hit { .bHit = true, .Body = result.mBodyID };
+		RayResult hit { .bHit = true, .Body = result.mBodyID, .SubShape = result.mSubShapeID2 };
 		hit.Point.FromJoltVec3(hit_point);
 
 		JPH::BodyLockRead lock(PhysicsSystem.GetBodyLockInterface(), result.mBodyID);
@@ -192,6 +197,27 @@ RayResult JoltPhysicsBackend::Raycast(const Vec3f origin, const Vec3f direction,
 	}
 
 	return RayResult { false, Vec3f::sZero };
+}
+
+bool JoltPhysicsBackend::GetTriangleUserData(const JPH::BodyID body_id, const JPH::SubShapeID sub_shape,
+											 uint32& out_user_data) const
+{
+	JPH::BodyLockRead lock(PhysicsSystem.GetBodyLockInterface(), body_id);
+
+	if (!lock.Succeeded()) {
+		return false;
+	}
+
+	JPH::SubShapeID remainder;
+	const JPH::Shape* leaf = lock.GetBody().GetShape()->GetLeafShape(sub_shape, remainder);
+
+	if (leaf == nullptr || leaf->GetSubType() != JPH::EShapeSubType::Mesh) {
+		return false;
+	}
+
+	out_user_data = static_cast<const JPH::MeshShape*>(leaf)->GetTriangleUserData(remainder);
+
+	return true;
 }
 
 FLOAT4 JoltPhysicsBackend::RaycastGetFaceOfBox(JPH::Body* body, const Vec3f origin, const Vec3f direction) const

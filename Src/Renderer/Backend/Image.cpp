@@ -9,6 +9,7 @@
 #include <Core/Allocator.hpp>
 #include <Core/StackArray.hpp>
 #include <Engine.hpp>
+#include <Math/Float16.hpp>
 #include <Renderer/Backend/Fwd/Fwd_GetFrame.hpp>
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
@@ -653,32 +654,6 @@ void Image::DecRef()
 }
 
 
-static float32 HalfToFloat(uint16 value)
-{
-	const int32 exponent = (value >> 10) & 0x1F;
-	const uint32 mantissa = value & 0x3FF;
-
-	float32 magnitude = 0.0f;
-	if (exponent == 0) {
-		magnitude = std::ldexp(static_cast<float32>(mantissa), -24);
-	}
-	else if (exponent == 31) {
-		if (mantissa == 0) {
-			magnitude = std::numeric_limits<float32>::infinity();
-		}
-		else {
-			magnitude = std::numeric_limits<float32>::quiet_NaN();
-		}
-	}
-	else {
-		magnitude = std::ldexp(static_cast<float32>(mantissa | 0x400), exponent - 25);
-	}
-
-	if ((value & 0x8000) != 0) {
-		return -magnitude;
-	}
-	return magnitude;
-}
 
 static uint8 UnitToByte(float32 value)
 {
@@ -724,10 +699,10 @@ static bool ConvertToRgba8(eImageFormat format, const uint8* src, uint32 pixel_c
 		case eImageFormat::RGBA16_Float: {
 			uint16 texel[4];
 			memcpy(texel, src + i * 8, sizeof(texel));
-			out[0] = LinearToSrgbByte(HalfToFloat(texel[0]));
-			out[1] = LinearToSrgbByte(HalfToFloat(texel[1]));
-			out[2] = LinearToSrgbByte(HalfToFloat(texel[2]));
-			out[3] = UnitToByte(HalfToFloat(texel[3]));
+			out[0] = LinearToSrgbByte(Float16::FromBits(texel[0]).ToFloat());
+			out[1] = LinearToSrgbByte(Float16::FromBits(texel[1]).ToFloat());
+			out[2] = LinearToSrgbByte(Float16::FromBits(texel[2]).ToFloat());
+			out[3] = UnitToByte(Float16::FromBits(texel[3]).ToFloat());
 			break;
 		}
 

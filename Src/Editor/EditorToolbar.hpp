@@ -22,6 +22,9 @@ namespace fx::editor {
 class FloatField;
 class OutlineToggleButton;
 
+const char* GetToolName(eEditorTool tool);
+const char* GetDataFilterName(eDataFilter filter);
+
 class EditorToolbar
 {
 public:

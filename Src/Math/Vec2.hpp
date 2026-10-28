@@ -140,8 +140,12 @@ public:
 	Type Width() const { return GetX(); }
 	Type Height() const { return GetY(); }
 
-	FX_FORCE_INLINE Type Dot(const Vec2Base& other) const { return X * other.X + Y * other.Y; }
-	FX_FORCE_INLINE Type Cross(const Vec2Base& other) const { return X * other.Y - Y * other.X; }
+	FX_FORCE_INLINE Type Dot(const Vec2Base other) const { return X * other.X + Y * other.Y; }
+	FX_FORCE_INLINE Type Cross(const Vec2Base other) const { return X * other.Y - Y * other.X; }
+	FX_FORCE_INLINE Type CrossOffset(const Vec2Base other, const Vec2Base origin) const
+	{
+		return ((*this) - origin).Cross(other - origin);
+	}
 
 	FX_FORCE_INLINE Type LengthSquared() const { return Dot(*this); }
 
@@ -155,6 +159,12 @@ public:
 		requires std::is_same_v<Type, double>
 	{
 		return std::hypot(X, Y);
+	}
+
+	FX_FORCE_INLINE float32 Distance(const Vec2Base other) const
+		requires std::is_floating_point_v<Type>
+	{
+		return ((*this) - other).Length();
 	}
 
 	static FX_FORCE_INLINE Vec2Base Min(Vec2Base a, Vec2Base b)

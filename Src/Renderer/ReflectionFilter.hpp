@@ -15,8 +15,6 @@ uint64 GetTexelCount(uint32 size, uint32 mip_count);
 
 float32 MipToRoughness(uint32 mip, uint32 mip_count);
 
-uint16 FloatToHalf(float32 value);
-
 void Prefilter(const float32* const faces[scFaces], uint32 size, uint32 mip_count, uint16* out_texels);
 
 } // namespace fx::ReflectionFilter

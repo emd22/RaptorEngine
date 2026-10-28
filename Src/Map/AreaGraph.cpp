@@ -156,6 +156,38 @@ int32 AreaGraph::FindArea(const Vec3f& point) const
 	return CompiledMap::GetLeafArea(child);
 }
 
+void AreaGraph::CollectConnectedAreas(uint32 area, std::vector<uint8>& out_connected) const
+{
+	out_connected.assign(mAreas.Size, 0);
+
+	if (area >= mAreas.Size) {
+		return;
+	}
+
+	std::vector<uint32> pending { area };
+	out_connected[area] = 1;
+
+	while (!pending.empty()) {
+		const uint32 current = pending.back();
+		pending.pop_back();
+
+		for (const uint32 portal_index : mAreas[current].Portals) {
+			const MapPortal& portal = mPortals[portal_index];
+
+			if (!portal.bOpen) {
+				continue;
+			}
+
+			const uint32 other = portal.GetOtherArea(current);
+
+			if (other < mAreas.Size && out_connected[other] == 0) {
+				out_connected[other] = 1;
+				pending.push_back(other);
+			}
+		}
+	}
+}
+
 void AreaGraph::CollectAreas(int32 child, const Vec3f& center, const Vec3f& extent, AreaSet& out_set) const
 {
 	while (child >= 0 && !out_set.bEverywhere) {

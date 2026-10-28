@@ -6,7 +6,7 @@
 #include <Math/BBox.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/MathUtil.hpp>
-#include <Renderer/Exposure.hpp>
+#include <Renderer/Camera/BaseCamera.hpp>
 #include <Renderer/LightID.hpp>
 #include <Renderer/PipelineNames.hpp>
 #include <Renderer/ShadowAtlas.hpp>
@@ -15,7 +15,7 @@
 namespace fx {
 class BaseCamera;
 class Frustum;
-class PerspectiveCamera2;
+class PerspectiveCamera;
 
 namespace renderer {
 class Pipeline;
@@ -58,7 +58,7 @@ public:
 	FX_FORCE_INLINE float32 GetRadius() const { return mRadius; }
 	FX_FORCE_INLINE bool IsCullable() const { return Type != eLightType::Directional; }
 
-	virtual void Render(const PerspectiveCamera2& camera, BaseCamera* shadow_camera);
+	virtual void Render(const PerspectiveCamera& camera, BaseCamera* shadow_camera);
 
 	virtual ~LightBase() {}
 
@@ -66,7 +66,7 @@ protected:
 	/**
 	 * @brief Fills out this light's slot in the light buffer. Light types extend this with their own data.
 	 */
-	virtual void FillGpuData(renderer::LightGpuData& data, const PerspectiveCamera2& camera,
+	virtual void FillGpuData(renderer::LightGpuData& data, const PerspectiveCamera& camera,
 							 BaseCamera* shadow_camera) const;
 
 public:
@@ -111,7 +111,7 @@ public:
 	LightDirectional();
 
 protected:
-	void FillGpuData(renderer::LightGpuData& data, const PerspectiveCamera2& camera,
+	void FillGpuData(renderer::LightGpuData& data, const PerspectiveCamera& camera,
 					 BaseCamera* shadow_camera) const override;
 };
 
@@ -168,7 +168,7 @@ public:
 	~LightSpot() override;
 
 protected:
-	void FillGpuData(renderer::LightGpuData& data, const PerspectiveCamera2& camera,
+	void FillGpuData(renderer::LightGpuData& data, const PerspectiveCamera& camera,
 					 BaseCamera* shadow_camera) const override;
 
 public:

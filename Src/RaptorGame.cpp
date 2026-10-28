@@ -9,6 +9,7 @@
 #include <Asset/ConfigFile.hpp>
 // #include <Asset/Font/Font.hpp>
 #include <Asset/WorldFile.hpp>
+#include <Audio/AudioSystem.hpp>
 #include <CVar.hpp>
 #include <Controls.hpp>
 #include <Core/Assert.hpp>
@@ -27,7 +28,7 @@
 #include <Physics/PhysicsManager.hpp>
 #include <Physics/Ragdoll.hpp>
 #include <Renderer/Backend/Util.hpp>
-#include <Renderer/Exposure.hpp>
+#include <Renderer/Camera/BaseCamera.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/LightManager.hpp>
@@ -37,6 +38,7 @@
 #include <Renderer/TextRenderer.hpp>
 #include <Script/ObjectScripts.hpp>
 #include <Script/ScriptManager.hpp>
+#include <Script/TimerManager.hpp>
 #include <Texture/TextureManager.hpp>
 #include <algorithm>
 #include <cmath>
@@ -152,6 +154,23 @@ void RaptorGame::InitEngine()
 
 	gPhysics->Create();
 	gAssetManager->Start(3);
+	gAudio->Create();
+	gAudio->SetPathGainFunction(
+		[this](const Vec3f source, const Vec3f listener)
+		{
+			if (mListenerArea < 0) {
+				return 1.0f;
+			}
+
+			const int32 source_area = gWorldGrid->GetAreaGraph().FindArea(source);
+
+			if (source_area < 0 || static_cast<size_t>(source_area) >= mListenerConnectedAreas.size() ||
+				mListenerConnectedAreas[static_cast<size_t>(source_area)] != 0) {
+				return 1.0f;
+			}
+
+			return scClosedPortalGain;
+		});
 
 	// Make the world grid approx 1.5km x 1.5km. This should be increased as the map sizes grow.
 	gWorldGrid->Create(Vec2u(15));
@@ -247,7 +266,11 @@ void RaptorGame::CreateGame()
 
 	mpNPCImpactDamageCVar = gCVars->Set("b_npc_impact_damage", gCVars->Get("b_npc_impact_damage", 0.25f));
 	mpNPCImpactSpeedCVar = gCVars->Set("b_npc_impact_speed", gCVars->Get("b_npc_impact_speed", 1.5f));
+	mpNPCImpactSafeSpeedCVar = gCVars->Set("b_npc_impact_safe_speed", gCVars->Get("b_npc_impact_safe_speed", 6.0f));
 	mpNPCReactStrengthCVar = gCVars->Set("b_npc_react_strength", gCVars->Get("b_npc_react_strength", 0.25f));
+	mpNPCStrengthCVar = gCVars->Set("b_npc_strength", gCVars->Get("b_npc_strength", 1.0f));
+	mpNPCRootAssistCVar = gCVars->Set("b_npc_root_assist", gCVars->Get("b_npc_root_assist", 1.0f));
+	mpNPCBalanceCVar = gCVars->Set("b_npc_balance", gCVars->Get("b_npc_balance", 1.0f));
 
 	gCVars->Set("r_gtao_radius", gCVars->Get("r_gtao_radius", 0.5f));
 	gCVars->Set("r_gtao_radius_multiplier", gCVars->Get("r_gtao_radius_multiplier", 1.457f));
@@ -257,8 +280,7 @@ void RaptorGame::CreateGame()
 	gCVars->Set("r_gtao_final_value_power", gCVars->Get("r_gtao_final_value_power", 2.2f));
 	gCVars->Set("r_gtao_denoise_blur_beta", gCVars->Get("r_gtao_denoise_blur_beta", 1.2f));
 
-	gCVars->Set("r_fog", gCVars->Get("r_fog", int64(2)));
-	gCVars->Set("r_fog_steps", gCVars->Get("r_fog_steps", int64(64)));
+	gCVars->Set("r_fog", gCVars->Get("r_fog", int64(1)));
 	gCVars->Set("r_fog_distance", gCVars->Get("r_fog_distance", 100.0f));
 	gCVars->Set("r_fog_temporal", gCVars->Get("r_fog_temporal", int64(1)));
 
@@ -681,7 +703,7 @@ void RaptorGame::RequestRagdollTemplate()
 	mbRagdollTemplateRequested = true;
 
 	mRagdollTemplateTicket = gAssetManager->LoadObject("ragdoll_template",
-													   "RaptorData/Data/Demo/Models/ragdoll/ragdoll.glb");
+													   "RaptorData/Data/Demo/Models/ragdoll2/ragdoll2.rxmodel");
 
 	mRagdollTemplateTicket.OnLoaded(
 		[this](void* item_ptr)
@@ -715,6 +737,7 @@ void RaptorGame::SpawnDebugNPC(Object* model)
 	desc.Name = String::Fmt("npc_{}", mNPCSpawnCount);
 	desc.Position = floor.bHit ? floor.Point : (gWorld->Player.Position + forward * 2.5f);
 	desc.Yaw = std::atan2(-forward.X, -forward.Z);
+	desc.IdleAnimation = "walk";
 
 	++mNPCSpawnCount;
 
@@ -729,7 +752,7 @@ void RaptorGame::DropRagdollDummy(Object* model)
 
 	Object* root = model->CloneWithOwnSkeleton(String::Fmt("ragdoll_dummy_{}", mRagdollSpawnCount).Str());
 
-	std::vector<Object*> parts;
+	DynArray<Object*> parts;
 	CollectObjectTree(root, parts);
 
 	const auto skinned_part = std::find_if(parts.begin(), parts.end(),
@@ -764,8 +787,9 @@ void RaptorGame::DropRagdollDummy(Object* model)
 	root->SetProbeVisible(false);
 
 	std::unique_ptr<physics::Ragdoll> ragdoll = std::make_unique<physics::Ragdoll>();
+	const physics::RagdollDef* ragdoll_def = physics::GetHumanoidRagdollDef();
 
-	if (!ragdoll->Create(skinned->pSkeleton, skinned->GetWorldMatrix())) {
+	if (ragdoll_def == nullptr || !ragdoll->Create(skinned->pSkeleton, skinned->GetWorldMatrix(), *ragdoll_def)) {
 		DestroyObjectTree(root->ID);
 		return;
 	}
@@ -798,9 +822,10 @@ void RaptorGame::CleanWorld()
 	gNPCManager->ClearRagdolls();
 	gDecalManager->Clear();
 	gParticleSystem->Clear();
+	gAudio->StopAll();
 }
 
-void RaptorGame::AddDummyWound(RagdollDummy& dummy, const physics::RagdollHit& hit)
+void RaptorGame::AddDummyWound(RagdollDummy& dummy, const physics::RagdollContact& contact)
 {
 	constexpr float32 scWoundCooldown = 0.25f;
 
@@ -811,22 +836,23 @@ void RaptorGame::AddDummyWound(RagdollDummy& dummy, const physics::RagdollHit& h
 	Object* skinned = gObjectManager->GetObject(dummy.SkinnedID);
 	uint32 bone_index = 0;
 
-	if (skinned == nullptr || !skinned->pSkeleton.IsValid() || !dummy.pRagdoll->FindBoneForBody(hit.Body, bone_index) ||
+	if (skinned == nullptr || !skinned->pSkeleton.IsValid() ||
+		!dummy.pRagdoll->FindBoneForBody(contact.Body, bone_index) ||
 		bone_index >= skinned->pSkeleton->SkinningMatrices.Size) {
 		return;
 	}
 
 	const Mat4f rest_to_world = skinned->pSkeleton->SkinningMatrices[bone_index] * skinned->GetWorldMatrix();
 
-	gDecalManager->AddSkinnedBloodSplat(&(*skinned->pSkeleton), rest_to_world, hit.Point, hit.Direction,
-										GetHitWoundSize(hit));
+	gDecalManager->AddSkinnedBloodSplat(&(*skinned->pSkeleton), rest_to_world, contact.Point, contact.Normal,
+										GetContactWoundSize(contact));
 
 	dummy.BloodCooldown = scWoundCooldown;
 }
 
 static float32 RandomUnit() { return static_cast<float32>(FastRand32() >> 8) * (1.0f / 16777216.0f); }
 
-void RaptorGame::SpawnRagdollBlood(float32& cooldown, const physics::RagdollImpact& impact, float32 min_speed)
+void RaptorGame::SpawnRagdollBlood(float32& cooldown, const physics::RagdollContact& contact, float32 min_speed)
 {
 	constexpr float32 scCooldown = 0.25f;
 	constexpr float32 scMinSize = 0.4f;
@@ -839,14 +865,14 @@ void RaptorGame::SpawnRagdollBlood(float32& cooldown, const physics::RagdollImpa
 
 	cooldown = scCooldown;
 
-	const float32 strength = std::clamp((impact.Speed - min_speed) / scSpeedRange, 0.0f, 1.0f);
+	const float32 strength = std::clamp((contact.Speed - min_speed) / scSpeedRange, 0.0f, 1.0f);
 	const float32 size = scMinSize + (scMaxSize - scMinSize) * strength;
 
-	gDecalManager->AddBloodSplat(impact.Point, impact.Normal, size);
+	gDecalManager->AddBloodSplat(contact.Point, contact.Normal, size);
 
-	const Vec3f reference = (std::abs(impact.Normal.Y) < 0.9f) ? Vec3f::sUp : Vec3f::sRight;
-	const Vec3f tangent = reference.Cross(impact.Normal).Normalize();
-	const Vec3f bitangent = impact.Normal.Cross(tangent);
+	const Vec3f reference = (std::abs(contact.Normal.Y) < 0.9f) ? Vec3f::sUp : Vec3f::sRight;
+	const Vec3f tangent = reference.Cross(contact.Normal).Normalize();
+	const Vec3f bitangent = contact.Normal.Cross(tangent);
 
 	const uint32 satellites = 2 + static_cast<uint32>(strength * 2.0f);
 
@@ -856,7 +882,7 @@ void RaptorGame::SpawnRagdollBlood(float32& cooldown, const physics::RagdollImpa
 
 		const Vec3f offset = (tangent * std::cos(angle) + bitangent * std::sin(angle)) * distance;
 
-		gDecalManager->AddBloodSplat(impact.Point + offset, impact.Normal, size * (0.25f + 0.25f * RandomUnit()));
+		gDecalManager->AddBloodSplat(contact.Point + offset, contact.Normal, size * (0.25f + 0.25f * RandomUnit()));
 	}
 }
 
@@ -869,6 +895,7 @@ void RaptorGame::UpdateObjectScripts()
 #endif
 
 	if (is_simulation_mode) {
+		gTimers->Update(DeltaTime);
 		gObjectScripts->Update(static_cast<float32>(DeltaTime), gWorld->Player.Position);
 	}
 	else {
@@ -897,9 +924,28 @@ void RaptorGame::UpdateRagdollDummies()
 		gNPCManager->MinImpactSpeed = mpNPCImpactSpeedCVar->FloatValue;
 	}
 
+	if (mpNPCImpactSafeSpeedCVar != nullptr) {
+		gNPCManager->SafeImpactSpeed = mpNPCImpactSafeSpeedCVar->FloatValue;
+	}
+
 	if (mpNPCReactStrengthCVar != nullptr) {
 		gNPCManager->ReactStrength = mpNPCReactStrengthCVar->FloatValue;
 	}
+
+	if (mpNPCStrengthCVar != nullptr && mpNPCRootAssistCVar != nullptr) {
+		gNPCManager->Strength = mpNPCStrengthCVar->FloatValue;
+		gNPCManager->RootAssist = mpNPCRootAssistCVar->FloatValue;
+	}
+
+	if (mpNPCBalanceCVar != nullptr) {
+		gNPCManager->bBalance = mpNPCBalanceCVar->FloatValue != 0.0f;
+	}
+
+	const float32 min_blood_speed = (mpRagdollBloodSpeedCVar != nullptr) ? mpRagdollBloodSpeedCVar->FloatValue
+																		 : scDefaultRagdollBloodSpeed;
+
+	gPhysics->pBackend->SetMinRagdollContactSpeed(
+		std::min({ min_blood_speed, gNPCManager->MinImpactSpeed, gNPCManager->SafeImpactSpeed }));
 
 	gNPCManager->Update(static_cast<float32>(DeltaTime), draw_debug);
 
@@ -907,38 +953,35 @@ void RaptorGame::UpdateRagdollDummies()
 		return;
 	}
 
-	const float32 min_blood_speed = (mpRagdollBloodSpeedCVar != nullptr) ? mpRagdollBloodSpeedCVar->FloatValue
-																		 : scDefaultRagdollBloodSpeed;
-
-	gPhysics->pBackend->SetMinRagdollImpactSpeed(min_blood_speed);
-
-	mRagdollImpacts.clear();
-	gPhysics->pBackend->DrainRagdollImpacts(mRagdollImpacts);
-
 	for (RagdollDummy& dummy : mRagdollDummies) {
 		dummy.BloodCooldown = std::max(dummy.BloodCooldown - static_cast<float32>(DeltaTime), 0.0f);
 	}
 
-	for (const physics::RagdollHit& hit : gNPCManager->GetHits()) {
-		for (RagdollDummy& dummy : mRagdollDummies) {
-			if (dummy.pRagdoll->GetSerial() == hit.RagdollSerial) {
-				AddDummyWound(dummy, hit);
-				break;
-			}
-		}
-	}
+	for (const physics::RagdollContact& contact : gNPCManager->GetContacts()) {
+		const bool is_struck = contact.IsStruck(gNPCManager->MinImpactSpeed);
+		const bool is_splatter = !is_struck && contact.bOtherStatic && contact.Speed >= min_blood_speed;
 
-	for (const physics::RagdollImpact& impact : mRagdollImpacts) {
-		if (NPC* npc = gNPCManager->FindByRagdollSerial(impact.RagdollSerial)) {
-			SpawnRagdollBlood(npc->BloodCooldown, impact, min_blood_speed);
+		if (NPC* npc = gNPCManager->FindByRagdollSerial(contact.RagdollSerial)) {
+			if (is_splatter) {
+				SpawnRagdollBlood(npc->BloodCooldown, contact, min_blood_speed);
+			}
+
 			continue;
 		}
 
 		for (RagdollDummy& dummy : mRagdollDummies) {
-			if (dummy.pRagdoll->GetSerial() == impact.RagdollSerial) {
-				SpawnRagdollBlood(dummy.BloodCooldown, impact, min_blood_speed);
-				break;
+			if (dummy.pRagdoll->GetSerial() != contact.RagdollSerial) {
+				continue;
 			}
+
+			if (is_struck) {
+				AddDummyWound(dummy, contact);
+			}
+			else if (is_splatter) {
+				SpawnRagdollBlood(dummy.BloodCooldown, contact, min_blood_speed);
+			}
+
+			break;
 		}
 	}
 
@@ -948,6 +991,48 @@ void RaptorGame::UpdateRagdollDummies()
 		if (draw_debug) {
 			dummy.pRagdoll->DebugDraw();
 		}
+	}
+}
+
+void RaptorGame::PlayImpactSounds()
+{
+	mImpactSoundClock += DeltaTime;
+
+	gPhysics->pBackend->SetMinSoundImpactSpeed(scImpactSoundMinSpeed);
+
+	gPhysics->pBackend->DrainSoundImpacts(mSoundImpacts);
+
+	for (const physics::SoundImpact& impact : mSoundImpacts) {
+		const auto [entry, inserted] = mImpactSoundTimes.try_emplace(impact.MovingBody.GetIndexAndSequenceNumber(),
+																	 mImpactSoundClock);
+
+		if (!inserted) {
+			if (mImpactSoundClock - entry->second < scImpactSoundCooldown) {
+				continue;
+			}
+
+			entry->second = mImpactSoundClock;
+		}
+
+		physics::RayResult surface;
+		surface.bHit = true;
+		surface.Point = impact.Point;
+		surface.Normal = impact.Normal;
+		surface.Body = impact.SurfaceBody;
+		surface.SubShape = impact.SurfaceSubShape;
+
+		const float32 volume = std::clamp((impact.Speed - scImpactSoundMinSpeed) /
+											  (scImpactSoundFullSpeed - scImpactSoundMinSpeed),
+										  scImpactSoundMinVolume, 1.0f);
+
+		const Vec3f position = impact.Point + (impact.Normal * AudioSystem::scSurfaceSoundOffset);
+		const SoundID sound = gAudio->PlayForSurface("impact", gWorld->pPrototype->GetSurfaceAt(surface), position);
+		gAudio->SetVolume(sound, volume);
+	}
+
+	if (mImpactSoundTimes.size() > scMaxImpactSoundBodies) {
+		std::erase_if(mImpactSoundTimes,
+					  [this](const auto& entry) { return mImpactSoundClock - entry.second >= scImpactSoundCooldown; });
 	}
 }
 
@@ -1090,6 +1175,21 @@ void RaptorGame::RenderText()
 								1.0f, scWhite);
 	}
 
+	if (gAudio->GetVoiceCount() > 0) {
+		const SpatialAudio& spatial = gAudio->GetSpatial();
+
+		float32 reverb_times[3];
+		spatial.GetReverbTimes(reverb_times);
+
+		gTextRenderer->DrawText(String::Fmt("sounds {} acoustic tris {} sim {:.3f}ms reverb {:.2f}/{:.2f}/{:.2f}s "
+											"({:.1f}ms)",
+											gAudio->GetVoiceCount(), spatial.GetSceneTriangleCount(),
+											spatial.GetSimulationMs(), reverb_times[0], reverb_times[1],
+											reverb_times[2], spatial.GetReflectionMs())
+									.CStr(),
+								1.0f, scWhite);
+	}
+
 #ifdef FX_IS_EDITOR
 	gTextRenderer->DrawText(
 		String::Fmt("Q={}, QE={}", gEditor->GetSnapStep(), gEditor->GetToolState().ToolSnapEnabled).CStr(), 1.0,
@@ -1184,6 +1284,23 @@ void RaptorGame::Tick()
 
 	gWorld->Player.Update(DeltaTime);
 
+	const Ref<FPSCamera>& listener = gWorld->GetCurrentCamera();
+	const AreaGraph& area_graph = gWorldGrid->GetAreaGraph();
+
+	mListenerArea = -1;
+
+	if (!area_graph.IsEmpty()) {
+		mListenerArea = area_graph.FindArea(listener->GetPosition());
+	}
+
+	if (mListenerArea >= 0) {
+		area_graph.CollectConnectedAreas(static_cast<uint32>(mListenerArea), mListenerConnectedAreas);
+	}
+
+	gWorld->pPrototype->UpdateAcoustics(static_cast<float32>(DeltaTime));
+	gAudio->SetListener(listener->GetPosition(), listener->GetForwardVector(), listener->GetUpVector());
+	gAudio->Update(gGraphics->GetWindow()->IsFocused());
+	gWorld->SoundEmitters.Update(static_cast<float32>(DeltaTime), listener->GetPosition());
 
 	Ref<FPSCamera> camera = gWorld->Player.pCamera;
 
@@ -1206,6 +1323,7 @@ void RaptorGame::Tick()
 	}
 
 	gPhysics->pBackend->Update(static_cast<float32>(DeltaTime));
+	PlayImpactSounds();
 
 	FrameData* frame = gGraphics->GetFrame();
 
@@ -1275,6 +1393,7 @@ void RaptorGame::DestroyGame()
 	mRagdollDummies.clear();
 	gNPCManager->Clear();
 	gParticleSystem->Destroy();
+	gAudio->Destroy();
 
 	delete gShadowRenderer;
 	gShadowRenderer = nullptr;

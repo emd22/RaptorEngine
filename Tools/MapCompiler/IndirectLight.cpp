@@ -5,6 +5,7 @@
 #include <Color.hpp>
 #include <Core/FilesystemIO.hpp>
 #include <Material/MaterialDefinition.hpp>
+#include <Math/Float16.hpp>
 #include <Math/MathConsts.hpp>
 #include <Renderer/ProbeEncoding.hpp>
 #include <algorithm>
@@ -62,49 +63,6 @@ constexpr uint32 scFormatRGBA8Unorm = 37;
 constexpr uint32 scFormatRGBA8Srgb = 43;
 
 float32 GetLuminance(const Vec3f& color) { return color.X * 0.2126f + color.Y * 0.7152f + color.Z * 0.0722f; }
-
-uint16 FloatToHalf(float32 value)
-{
-	uint32 bits = 0;
-	std::memcpy(&bits, &value, sizeof(bits));
-
-	const uint32 sign = (bits >> 16) & 0x8000U;
-	const int32 exponent = static_cast<int32>((bits >> 23) & 0xFFU) - 127 + 15;
-	uint32 mantissa = bits & 0x7FFFFFU;
-
-	if (exponent <= 0) {
-		if (exponent < -10) {
-			return static_cast<uint16>(sign);
-		}
-
-		mantissa |= 0x800000U;
-
-		const uint32 shift = static_cast<uint32>(14 - exponent);
-		const uint32 remainder = mantissa & ((1U << shift) - 1U);
-		const uint32 halfway = 1U << (shift - 1U);
-
-		uint32 half = mantissa >> shift;
-
-		if (remainder > halfway || (remainder == halfway && (half & 1U) != 0)) {
-			half++;
-		}
-
-		return static_cast<uint16>(sign | half);
-	}
-
-	if (exponent >= 31) {
-		return static_cast<uint16>(sign | 0x7C00U);
-	}
-
-	uint32 half = sign | (static_cast<uint32>(exponent) << 10) | (mantissa >> 13);
-	const uint32 remainder = mantissa & 0x1FFFU;
-
-	if (remainder > 0x1000U || (remainder == 0x1000U && (half & 1U) != 0)) {
-		half++;
-	}
-
-	return static_cast<uint16>(half);
-}
 
 uint8 EncodeDirection(float32 value)
 {
@@ -1841,7 +1799,7 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 		for (uint32 channel = 0; channel < 3; channel++) {
 			float32 value = std::max(result[texel].mData[channel], 0.0f);
 
-			lightmap.Irradiance[texel * 3 + channel] = FloatToHalf(std::fmin(value, scMaxIrradiance));
+			lightmap.Irradiance[texel * 3 + channel] = Float16(std::fmin(value, scMaxIrradiance)).GetBits();
 			lightmap.Directions[texel * 3 + channel] = EncodeDirection(directions[texel].mData[channel]);
 		}
 
