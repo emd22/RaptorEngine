@@ -3,6 +3,7 @@
 #include <Core/Log.hpp>
 #include <Decal/DecalManager.hpp>
 #include <Engine.hpp>
+#include <Math/MathUtil.hpp>
 #include <Math/Quat.hpp>
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
@@ -196,7 +197,7 @@ void NPC::DrawDebugHealth() const
 	const Vec3f right = gWorld->Player.pCamera->GetRightVector();
 	const Vec3f left_end = root->GetPosition() + Vec3f(0.0f, scBarHeight, 0.0f) - right * (scBarWidth * 0.5f);
 
-	const float32 fraction = std::clamp(mHealth / MaxHealth, 0.0f, 1.0f);
+	const float32 fraction = MathUtil::Clamp(mHealth / MaxHealth, 0.0f, 1.0f);
 
 	renderer::gDebugDraw->Line(left_end, left_end + right * scBarWidth, Color::FromRGBA(60, 60, 60, 255));
 
@@ -232,7 +233,11 @@ NPC::eBodyPart NPC::GetBodyPart(JPH::BodyID body_id) const
 {
 	const int32 body_index = mRagdoll.FindBodyIndex(body_id);
 
-	return (body_index < 0) ? eBodyPart::Torso : mRagdoll.GetBodyPart(static_cast<uint32>(body_index));
+	if (body_index < 0) {
+		return eBodyPart::Torso;
+	}
+
+	return mRagdoll.GetBodyPart(static_cast<uint32>(body_index));
 }
 
 float32 NPC::GetDamageScale(JPH::BodyID body_id) const
@@ -584,7 +589,7 @@ void NPC::OnHit(const NPCHit& hit)
 		return;
 	}
 
-	const float32 speed = std::clamp(length / mass, scMinSpeed, scMaxSpeed);
+	const float32 speed = MathUtil::Clamp(length / mass, scMinSpeed, scMaxSpeed);
 
 	mRagdoll.AddImpulse(hit.Body, hit.Impulse * (speed * mass / length), hit.Point);
 }
@@ -638,7 +643,7 @@ float32 GetContactWoundSize(const physics::RagdollContact& contact)
 	constexpr float32 scMaxSize = 0.4f;
 	constexpr float32 scMaxMomentum = 150.0f;
 
-	const float32 strength = std::clamp(contact.OtherMass * contact.Speed / scMaxMomentum, 0.0f, 1.0f);
+	const float32 strength = MathUtil::Clamp(contact.OtherMass * contact.Speed / scMaxMomentum, 0.0f, 1.0f);
 
 	return scMinSize + (scMaxSize - scMinSize) * strength;
 }

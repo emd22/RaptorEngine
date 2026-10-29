@@ -7,23 +7,18 @@ namespace fx::physics::RagdollMath {
 
 namespace {
 
-float32 Cross2(const Vec2f origin, const Vec2f a, const Vec2f b) { return a.CrossOffset(b, origin); }
-
-float32 Distance2(const Vec2f a, const Vec2f b) { return std::hypot(a.X - b.X, a.Y - b.Y); }
-
 Vec2f ClosestOnSegment(const Vec2f a, const Vec2f b, const Vec2f p)
 {
-	const float32 dx = b.X - a.X;
-	const float32 dy = b.Y - a.Y;
-	const float32 length_sq = dx * dx + dy * dy;
+	const Vec2f edge = b - a;
+	const float32 length_sq = edge.LengthSquared();
 
 	if (length_sq < 1e-10f) {
 		return a;
 	}
 
-	const float32 t = std::clamp(((p.X - a.X) * dx + (p.Y - a.Y) * dy) / length_sq, 0.0f, 1.0f);
+	const float32 t = MathUtil::Clamp((p - a).Dot(edge) / length_sq, 0.0f, 1.0f);
 
-	return Vec2f { a.X + dx * t, a.Y + dy * t };
+	return a + edge * t;
 }
 
 } // namespace
@@ -140,7 +135,7 @@ uint32 BuildHull(Vec2f* points, uint32 count, Vec2f* out_hull)
 	// the hull below `min_size`, then appends it.
 	auto push = [&](const Vec2f& point, uint32 min_size)
 	{
-		while (size >= min_size && Cross2(out_hull[size - 2], out_hull[size - 1], point) <= 0.0f) {
+		while (size >= min_size && out_hull[size - 1].CrossOffset(point, out_hull[size - 2]) <= 0.0f) {
 			size--;
 		}
 		out_hull[size++] = point;
@@ -171,25 +166,30 @@ Vec2f ClosestOnHull(const Vec2f* hull, uint32 count, const Vec2f p, float32& out
 	}
 
 	if (count == 1) {
-		out_signed_distance = Distance2(p, hull[0]);
+		out_signed_distance = p.Distance(hull[0]);
 		return hull[0];
 	}
 
 	bool inside = (count >= 3);
 	Vec2f closest = hull[0];
 	float32 closest_distance = std::numeric_limits<float32>::max();
-	const uint32 edge_count = (count == 2) ? 1 : count;
+	uint32 edge_count = count;
+
+	// A two point hull is a single segment, so don't walk it back to the start
+	if (count == 2) {
+		edge_count = 1;
+	}
 
 	for (uint32 i = 0; i < edge_count; i++) {
 		const Vec2f a = hull[i];
 		const Vec2f b = hull[(i + 1) % count];
 
-		if (Cross2(a, b, p) < 0.0f) {
+		if (b.CrossOffset(p, a) < 0.0f) {
 			inside = false;
 		}
 
 		const Vec2f on_edge = ClosestOnSegment(a, b, p);
-		const float32 distance = Distance2(p, on_edge);
+		const float32 distance = p.Distance(on_edge);
 
 		if (distance < closest_distance) {
 			closest_distance = distance;
@@ -211,28 +211,27 @@ Vec2f GetHullCentroid(const Vec2f* hull, uint32 count)
 	Vec2f average = Vec2f::scZero;
 
 	for (uint32 i = 0; i < count; i++) {
-		average.X += hull[i].X / static_cast<float32>(count);
-		average.Y += hull[i].Y / static_cast<float32>(count);
+		average += hull[i] / static_cast<float32>(count);
 	}
 
+	// Area-weighted centroid of the triangle fan around the vertex average, which is unbiased by vertex density
 	float32 area = 0.0f;
 	Vec2f weighted = Vec2f::scZero;
 
 	for (uint32 i = 0; i < count; i++) {
-		const Vec2f a { hull[i].X - average.X, hull[i].Y - average.Y };
-		const Vec2f b { hull[(i + 1) % count].X - average.X, hull[(i + 1) % count].Y - average.Y };
-		const float32 cross = a.X * b.Y - a.Y * b.X;
+		const Vec2f a = hull[i] - average;
+		const Vec2f b = hull[(i + 1) % count] - average;
+		const float32 cross = a.Cross(b);
 
 		area += cross;
-		weighted.X += (a.X + b.X) * cross;
-		weighted.Y += (a.Y + b.Y) * cross;
+		weighted += (a + b) * cross;
 	}
 
 	if (std::abs(area) < 1e-8f) {
 		return average;
 	}
 
-	return Vec2f { average.X + weighted.X / (3.0f * area), average.Y + weighted.Y / (3.0f * area) };
+	return average + weighted / (3.0f * area);
 }
 
 } // namespace fx::physics::RagdollMath

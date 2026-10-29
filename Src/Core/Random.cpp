@@ -14,6 +14,9 @@ uint32 FastRand32()
 }
 
 
+float32 FastRandUnit() { return static_cast<float32>(FastRand32() >> 8) * (1.0f / 16777216.0f); }
+
+
 uint64 FastRand64()
 {
 	static uint64 sHash = 88172645463325252ULL;

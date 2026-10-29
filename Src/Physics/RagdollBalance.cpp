@@ -170,8 +170,8 @@ bool RagdollBalance::InitRestPose(const Ragdoll& ragdoll)
 		const JPH::Vec3 rest_normal = leg_direction.Cross(mRestForward);
 		const JPH::Vec3 rest_hinge = shin.RestOrientation * shin.HingeLocal;
 
-		leg.HingeSign = (rest_hinge.Dot(rest_normal) >= 0.0f) ? 1.0f : -1.0f;
-		leg.SideSign = ((thigh.RestPosition - pelvis.RestPosition).Dot(side) >= 0.0f) ? 1.0f : -1.0f;
+		leg.HingeSign = MathUtil::GetSign(rest_hinge.Dot(rest_normal));
+		leg.SideSign = MathUtil::GetSign((thigh.RestPosition - pelvis.RestPosition).Dot(side));
 
 		for (const JPH::Vec3& corner : leg.SoleCorners) {
 			rest_ground = std::min(rest_ground, (foot.RestPosition + foot.RestOrientation * corner).Dot(mUp));
@@ -226,7 +226,10 @@ void RagdollBalance::Reset()
 	mSupportCount = 0;
 	mbHasGround = false;
 	mStatus = BalanceStatus {};
-	mStatus.State = mbValid ? eBalanceState::Standing : eBalanceState::Off;
+
+	if (mbValid) {
+		mStatus.State = eBalanceState::Standing;
+	}
 }
 
 void RagdollBalance::Clear(Ragdoll& ragdoll)
@@ -319,7 +322,7 @@ void RagdollBalance::GatherState(Ragdoll& ragdoll, JPH::BodyInterface& body_inte
 	const JPH::Quat chest = body_interface.GetRotation(ragdoll.GetBodyID(mChestBody));
 	const JPH::Vec3 chest_up = (chest * ragdoll.mBodies[mChestBody].RestOrientation.Conjugated()) * mUp;
 
-	mTrunkTilt = std::acos(std::clamp(chest_up.Dot(mUp), -1.0f, 1.0f));
+	mTrunkTilt = std::acos(MathUtil::Clamp(chest_up.Dot(mUp), -1.0f, 1.0f));
 }
 
 void RagdollBalance::GatherFeet(Ragdoll& ragdoll, JPH::BodyInterface& body_interface, float32 delta_time,
@@ -442,13 +445,12 @@ void RagdollBalance::BuildSupport()
 	Vec2f shrunk[scMaxPoints + 1];
 
 	for (uint32 i = 0; i < mSupportCount; i++) {
-		shrunk[i] = Vec2f { center.X + (hull[i].X - center.X) * scSupportShrink,
-							center.Y + (hull[i].Y - center.Y) * scSupportShrink };
+		shrunk[i] = center + (hull[i] - center) * scSupportShrink;
 	}
 
 	float32 unused_distance = 0.0f;
 	const Vec2f held = ClosestOnHull(shrunk, mSupportCount, ToPlane(mCenterOfMass), unused_distance);
-	const Vec2f target { held.X + (center.X - held.X) * scCentering, held.Y + (center.Y - held.Y) * scCentering };
+	const Vec2f target = held + (center - held) * scCentering;
 
 	mSupportTarget = FromPlane(target);
 }
@@ -521,7 +523,7 @@ void RagdollBalance::UpdateStepping(float32 delta_time)
 	const JPH::Quat landing_foot = GetHeadingRotation(mForward) * leg.RestFoot;
 	const JPH::Vec3 landing_ankle = mSwing.Landing - landing_foot * leg.SoleCenter;
 
-	const float32 travel = SmoothStep(phase / scSwingTravelFraction);
+	const float32 travel = MathUtil::SmoothStep(phase / scSwingTravelFraction);
 	const JPH::Vec3 start = Horizontal(mSwing.StartAnkle);
 	const JPH::Vec3 end = Horizontal(landing_ankle);
 
@@ -573,7 +575,11 @@ void RagdollBalance::UpdateClosingStep(float32 delta_time)
 			const float32 distance_a = Horizontal(mCenterOfMass - mLegs[0].FootCenter).Length();
 			const float32 distance_b = Horizontal(mCenterOfMass - mLegs[1].FootCenter).Length();
 
-			mShiftLeg = (distance_a > distance_b) ? 0 : 1;
+			mShiftLeg = 1;
+
+			if (distance_a > distance_b) {
+				mShiftLeg = 0;
+			}
 			mShiftTime = 0.0f;
 		}
 
@@ -745,8 +751,7 @@ JPH::Vec3 RagdollBalance::PlanLanding(uint32 swing_leg, uint32 stance_leg, float
 	const Vec2f pressure = ClosestOnHull(stance_hull, stance_count, capture, unused_distance);
 
 	const float32 growth = std::exp(mOmega * std::max(time_left, 0.0f));
-	const Vec2f predicted { pressure.X + (capture.X - pressure.X) * growth,
-							pressure.Y + (capture.Y - pressure.Y) * growth };
+	const Vec2f predicted = pressure + (capture - pressure) * growth;
 
 	JPH::Vec3 direction = mAxisU * (predicted.X - pressure.X) + mAxisV * (predicted.Y - pressure.Y);
 	direction = direction.NormalizedOr(Horizontal(mVelocity).NormalizedOr(mForward));

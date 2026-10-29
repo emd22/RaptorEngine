@@ -53,9 +53,9 @@ int32 BehaviourContext::FindArm(uint32 body) const
 
 void BehaviourOutput::Init(uint32 body_count)
 {
-	InitFilled(Pose, body_count, JPH::Quat::sIdentity());
-	InitFilled(Mask, body_count, 0.0f);
-	InitFilled(Strength, body_count, 1.0f);
+	Pose.InitSize(body_count, JPH::Quat::sIdentity());
+	Mask.InitSize(body_count, 0.0f);
+	Strength.InitSize(body_count, 1.0f);
 	Reset();
 }
 
@@ -216,7 +216,13 @@ void RagdollBehaviour::CopySettings(const RagdollBehaviour& other)
 
 void RagdollBehaviour::LogSettings() const
 {
-	String line = String::Fmt("{} ({}, weight {:.2f})", mpName, mbActive ? "active" : "idle", mWeight);
+	const char* activity = "idle";
+
+	if (mbActive) {
+		activity = "active";
+	}
+
+	String line = String::Fmt("{} ({}, weight {:.2f})", mpName, activity, mWeight);
 
 	for (uint32 i = 0; i < mSettingCount; i++) {
 		line += String::Fmt(" {}={:.3g}", mSettings[i].Name, *mSettings[i].pValue);

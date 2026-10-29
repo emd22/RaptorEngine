@@ -40,7 +40,11 @@ void Ragdoll::OnStep(const JPH::PhysicsStepListenerContext& inContext)
 	}
 
 	const uint32 steps_left = std::max(static_cast<uint32>(JoltPhysicsBackend::scCollisionSteps) - mSubstep, 1u);
-	const float32 fraction = inContext.mIsLastStep ? 1.0f : 1.0f / static_cast<float32>(steps_left);
+	float32 fraction = 1.0f;
+
+	if (!inContext.mIsLastStep) {
+		fraction = 1.0f / static_cast<float32>(steps_left);
+	}
 
 	mSubstep++;
 
@@ -107,11 +111,20 @@ void Ragdoll::UpdateSubtrees(JPH::BodyInterface& body_interface)
 		state.Origin = JPH::Vec3(body_interface.GetPosition(body_id));
 		state.Center = JPH::Vec3(body_interface.GetCenterOfMassPosition(body_id));
 
-		const float32 mass = (info.Mode != eRagdollBodyMode::Kinematic) ? info.Mass : 0.0f;
+		float32 mass = 0.0f;
+		float32 inertia = 0.0f;
+
+		if (info.Mode != eRagdollBodyMode::Kinematic) {
+			mass = info.Mass;
+		}
+
+		if (mass > 0.0f) {
+			inertia = info.Inertia;
+		}
 
 		state.SubtreeMass = mass;
 		state.SubtreeMoment = state.Center * mass;
-		state.SubtreeSecondMoment = mass * state.Center.LengthSq() + ((mass > 0.0f) ? info.Inertia : 0.0f);
+		state.SubtreeSecondMoment = mass * state.Center.LengthSq() + inertia;
 	}
 
 	for (uint32 i = mBodies.Size - 1; i > 0; i--) {
@@ -224,7 +237,7 @@ void Ragdoll::ApplyGravityCompensation(JPH::BodyInterface& body_interface, const
 			continue;
 		}
 
-		const float32 scale = std::clamp(info.Strength / scGravityCompFullStrength, 0.0f, 1.0f) *
+		const float32 scale = MathUtil::Clamp(info.Strength / scGravityCompFullStrength, 0.0f, 1.0f) *
 							  mLayers[i].GravityScale;
 
 		if (scale <= 0.0f || state.SubtreeMass <= 0.0f) {

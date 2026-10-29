@@ -376,6 +376,22 @@ public:
 		}
 	}
 
+	/**
+	 *   Initializes an array to contain `element_count` copies of `value`.
+	 */
+	void InitSize(size_t element_count, const TElementType& value)
+	{
+		if (Capacity == 0) {
+			InitCapacity(element_count);
+		}
+
+		Size = Capacity;
+
+		for (uint64 i = 0; i < Size; i++) {
+			new (&pData[i]) TElementType(value);
+		}
+	}
+
 	size_t GetSizeInBytes() const { return Size * sizeof(TElementType); }
 
 	size_t GetCapacityInBytes() const { return Capacity * sizeof(TElementType); }

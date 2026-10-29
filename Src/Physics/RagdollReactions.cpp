@@ -26,20 +26,7 @@ constexpr float32 scHeadHandDrop = 0.05f;
 constexpr float32 scFallTimeout = 4.0f;
 constexpr float32 scGroundedStopTime = 0.1f;
 
-FX_FORCE_INLINE float32 RandomUnit() { return static_cast<float32>(FastRand32() >> 8) * (1.0f / 16777216.0f); }
-
 Vec3f GetHorizontal(const BehaviourContext& ctx, const Vec3f v) { return v - ctx.Up * v.Dot(ctx.Up); }
-
-Vec3f SafeNormalize(const Vec3f v, const Vec3f fallback)
-{
-	const float32 length = v.Length();
-
-	if (length < 1e-5f) {
-		return fallback;
-	}
-
-	return v / length;
-}
 
 float32 Envelope(float32 time, float32 attack, float32 total)
 {
@@ -51,7 +38,7 @@ float32 Envelope(float32 time, float32 attack, float32 total)
 		return time / attack;
 	}
 
-	return 1.0f - SmoothStep((time - attack) / std::max(total - attack, 1e-4f));
+	return 1.0f - MathUtil::SmoothStep((time - attack) / std::max(total - attack, 1e-4f));
 }
 
 Vec3f GetChestUp(const BehaviourContext& ctx) { return ctx.Forward.Cross(ctx.Right); }
@@ -90,7 +77,7 @@ FallenBehaviour::FallenBehaviour() : RagdollBehaviour("fallen", 0.0f)
 
 void FallenBehaviour::Init(const RagdollRig& rig, uint32 body_count)
 {
-	InitFilled(mFollow, body_count, JPH::Quat::sIdentity());
+	mFollow.InitSize(body_count, JPH::Quat::sIdentity());
 }
 
 void FallenBehaviour::CaptureFollowPose(const BehaviourContext& ctx, float32 blend)
@@ -217,7 +204,7 @@ void StaggerBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& 
 	}
 
 	const float32 speed = GetHorizontal(ctx, ctx.Velocity).Length();
-	const float32 spread = MathUtil::DegToRad(ArmSpread) * std::clamp(speed / SpreadSpeed, 0.0f, 1.0f);
+	const float32 spread = MathUtil::DegToRad(ArmSpread) * MathUtil::Clamp(speed / SpreadSpeed, 0.0f, 1.0f);
 
 	for (const BeRagdollArm& arm : ctx.pRig->Arms) {
 		out.AddWorldRotation(ctx, arm.Upper, ctx.Forward, arm.SideSign * spread);
@@ -245,7 +232,7 @@ ShotReactionBehaviour::ShotReactionBehaviour() : RagdollBehaviour("shot", 30.0f)
 
 void ShotReactionBehaviour::Init(const RagdollRig& rig, uint32 body_count)
 {
-	InitFilled(mLoosen, body_count, 1.0f);
+	mLoosen.InitSize(body_count, 1.0f);
 	mWound = Wound {};
 	mFlinchTime = -1.0f;
 }
@@ -270,7 +257,11 @@ void ShotReactionBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEv
 	LoosenAround(ctx, body);
 
 	mFlinchTime = 0.0f;
-	mFlinchSide = ((event.Point - chest).Dot(ctx.Right) >= 0.0f) ? 1.0f : -1.0f;
+	mFlinchSide = 1.0f;
+
+	if ((event.Point - chest).Dot(ctx.Right) < 0.0f) {
+		mFlinchSide = -1.0f;
+	}
 
 	StartGrab(ctx, event);
 }
@@ -279,7 +270,7 @@ void ShotReactionBehaviour::LoosenAround(const BehaviourContext& ctx, uint32 bod
 {
 	const Ragdoll& ragdoll = *ctx.pRagdoll;
 	const uint32 body_count = ctx.GetBodyCount();
-	const float32 loosen = std::clamp(Loosen, 0.0f, 1.0f);
+	const float32 loosen = MathUtil::Clamp(Loosen, 0.0f, 1.0f);
 
 	if (ragdoll.IsAnchor(body)) {
 		mLoosen[body] = std::min(mLoosen[body], loosen);
@@ -352,7 +343,7 @@ void ShotReactionBehaviour::StartGrab(const BehaviourContext& ctx, const Ragdoll
 		return;
 	}
 
-	const Vec3f outward = SafeNormalize(event.Point - ctx.Bodies[body].Center, -event.Direction);
+	const Vec3f outward = (event.Point - ctx.Bodies[body].Center).SafeNormalize(-event.Direction);
 
 	mWound.Body = body;
 	mWound.LocalPoint = ctx.ToBodyLocal(body, event.Point);
@@ -427,14 +418,14 @@ void ShotReactionBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOut
 	}
 
 	const float32 grab_time = mWound.Time - GrabDelay;
-	const float32 ramp_in = std::clamp(grab_time / scGrabRamp, 0.0f, 1.0f);
-	const float32 ramp_out = 1.0f - std::clamp((grab_time - (GrabTime - scGrabRamp)) / scGrabRamp, 0.0f, 1.0f);
+	const float32 ramp_in = MathUtil::Clamp(grab_time / scGrabRamp, 0.0f, 1.0f);
+	const float32 ramp_out = 1.0f - MathUtil::Clamp((grab_time - (GrabTime - scGrabRamp)) / scGrabRamp, 0.0f, 1.0f);
 
 	const Vec3f wound = ctx.FromBodyLocal(mWound.Body, mWound.LocalPoint);
 	const Vec3f normal = ctx.ToBodyDirection(mWound.Body, mWound.LocalNormal);
 
 	out.Hands[mWound.Arm] = BehaviourGoal { .Target = wound + normal * HandOffset,
-											.Weight = SmoothStep(ramp_in) * ramp_out };
+											.Weight = MathUtil::SmoothStep(ramp_in) * ramp_out };
 }
 
 /////////////////////////////////////
@@ -520,7 +511,7 @@ void BraceBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& ou
 		return;
 	}
 
-	const Vec3f side = SafeNormalize(ctx.Right - mNormal * ctx.Right.Dot(mNormal), ctx.Right);
+	const Vec3f side = (ctx.Right - mNormal * ctx.Right.Dot(mNormal)).SafeNormalize(ctx.Right);
 
 	for (uint32 i = 0; i < RagdollRig::scLimbCount; i++) {
 		const BeRagdollArm& arm = ctx.pRig->Arms[i];
@@ -863,7 +854,7 @@ void DyingBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent& ev
 		mDuration = HeadTime;
 	}
 	else {
-		mDuration = MinTime + (std::max(MaxTime, MinTime) - MinTime) * RandomUnit();
+		mDuration = MinTime + (std::max(MaxTime, MinTime) - MinTime) * FastRandUnit();
 	}
 
 	mDuration = std::max(mDuration, 1e-3f);
@@ -890,7 +881,7 @@ float32 DyingBehaviour::GetStrengthScale() const
 		return 1.0f;
 	}
 
-	return 1.0f - SmoothStep(mTime / mDuration);
+	return 1.0f - MathUtil::SmoothStep(mTime / mDuration);
 }
 
 void DyingBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& out) const

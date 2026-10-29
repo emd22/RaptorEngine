@@ -7,6 +7,7 @@
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
 #include <Math/Mat4.hpp>
+#include <Math/MathUtil.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
 #include <algorithm>
@@ -25,29 +26,9 @@ constexpr float32 scSoleCornerSigns[scSoleCorners][2] = {
 
 FX_FORCE_INLINE JPH::Vec3 RowAsVec3(const Mat4f& m, uint32 row) { return JPH::Vec3(m.Rows[row].mIntrin); }
 
-// FX_FORCE_INLINE Vec3f ToVec3f(const JPH::Vec3 v) { return Vec3f(v.GetX(), v.GetY(), v.GetZ()); }
-
 FX_FORCE_INLINE JPH::Vec3 GetUpFromGravity(const JPH::Vec3 gravity)
 {
 	return (-gravity).NormalizedOr(JPH::Vec3::sAxisY());
-}
-
-FX_FORCE_INLINE float32 SmoothStep(float32 t)
-{
-	const float32 x = std::clamp(t, 0.0f, 1.0f);
-	return x * x * (3.0f - 2.0f * x);
-}
-
-template <typename T>
-void InitFilled(SizedArray<T>& array, size_t size, const T& value)
-{
-	// array.Free();
-	array.InitSize(size);
-	std::fill(array.begin(), array.end(), value);
-
-	// for (size_t i = 0; i < size; i++) {
-	// 	array.Insert(value);
-	// }
 }
 
 JPH::Mat44 RotationFromMatrix(const Mat4f& m);

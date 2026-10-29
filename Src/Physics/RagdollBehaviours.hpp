@@ -39,7 +39,11 @@ public:
 	FX_FORCE_INLINE bool IsValid() const { return mRig.bValid; }
 	FX_FORCE_INLINE float32 GetStrength(uint32 body) const
 	{
-		return (body < mMixStrength.Size) ? mMixStrength[body] : 1.0f;
+		if (body >= mMixStrength.Size) {
+			return 1.0f;
+		}
+
+		return mMixStrength[body];
 	}
 	FX_FORCE_INLINE eBehaviourBalance GetBalance() const { return mMixBalance; }
 	FX_FORCE_INLINE bool IsDying() const { return mDying.IsActive(); }

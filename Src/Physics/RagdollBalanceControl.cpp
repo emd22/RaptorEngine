@@ -225,7 +225,7 @@ void RagdollBalance::ApplyTorsoControl(Ragdoll& ragdoll, JPH::BodyInterface& bod
 	for (uint32 i = 0; i < stance_count; i++) {
 		const RagdollLeg& leg = mLegs[stance_legs[i]];
 		const JPH::Quat thigh = body_interface.GetRotation(ragdoll.GetBodyID(leg.Thigh));
-		const float32 lift = std::clamp((leg.SoleHeight - mGroundHeight - scLiftStart) / scLiftRange, 0.0f, 1.0f);
+		const float32 lift = MathUtil::Clamp((leg.SoleHeight - mGroundHeight - scLiftStart) / scLiftRange, 0.0f, 1.0f);
 		const JPH::Quat hip_thigh = thigh.SLERP(leg.DesiredThigh, lift).Normalized();
 
 		Ragdoll::MotorOverride& hip_motor = ragdoll.mMotorOverrides[leg.Thigh];

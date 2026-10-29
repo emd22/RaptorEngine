@@ -156,17 +156,17 @@ void Ragdoll::SetBodyStrength(uint32 body_index, float32 strength)
 		return;
 	}
 
-	mBodies[body_index].Strength = std::clamp(strength, 0.0f, 1.0f);
+	mBodies[body_index].Strength = MathUtil::Clamp(strength, 0.0f, 1.0f);
 }
 
 void Ragdoll::SetBodyBlend(uint32 body_index, float32 blend)
 {
 	if (body_index < mBodies.Size) {
-		mBodies[body_index].Blend = std::clamp(blend, 0.0f, 1.0f);
+		mBodies[body_index].Blend = MathUtil::Clamp(blend, 0.0f, 1.0f);
 	}
 }
 
-void Ragdoll::SetRootAssist(float32 assist) { mRootAssist = std::clamp(assist, 0.0f, 1.0f); }
+void Ragdoll::SetRootAssist(float32 assist) { mRootAssist = MathUtil::Clamp(assist, 0.0f, 1.0f); }
 
 void Ragdoll::SetBalancing(bool balancing)
 {
@@ -245,7 +245,11 @@ JPH::BodyID Ragdoll::GetBodyID(uint32 body_index) const { return mpRagdoll->GetB
 
 float32 Ragdoll::GetBodyMass(uint32 body_index) const
 {
-	return (body_index < mBodies.Size) ? mBodies[body_index].Mass : 0.0f;
+	if (body_index >= mBodies.Size) {
+		return 0.0f;
+	}
+
+	return mBodies[body_index].Mass;
 }
 
 eRagdollBodyPart Ragdoll::GetBodyPart(uint32 body_index) const
@@ -401,7 +405,7 @@ void Ragdoll::WriteToSkeleton()
 		const BodyInfo& info = mBodies[i];
 		const bool is_driven = (info.Mode != eRagdollBodyMode::Kinematic) && (info.Blend > 0.0f);
 
-		mIsDriven[info.BoneIndex] = is_driven ? 1 : 0;
+		mIsDriven[info.BoneIndex] = static_cast<uint8>(is_driven);
 
 		if (!is_driven) {
 			continue;

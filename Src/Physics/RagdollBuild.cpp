@@ -93,7 +93,7 @@ uint32 FindBoneIndex(const Skeleton& skeleton, const char* name)
 void ResolveBones(const Skeleton& skel, const RagdollDef& def, SizedArray<ResolvedBone>& out_parts,
 				  SizedArray<int32>& out_body_of_bone)
 {
-	InitFilled(out_body_of_bone, skel.JointCount, -1);
+	out_body_of_bone.InitSize(skel.JointCount, -1);
 	out_parts.InitCapacity(def.Bodies.Size);
 
 	for (const RagdollBodyDef& body_def : def.Bodies) {
@@ -196,7 +196,11 @@ bool ApplyHingeLimits(JPH::SwingTwistConstraintSettings& joint, const BuildFrame
 
 	const JPH::Vec3 parent_axis = frame.GetBoneSpan(parent_part).NormalizedOr(axis_world);
 
-	const JPH::Vec3 flex_direction = (body_def.Joint == eRagdollJoint::HingeForward) ? frame.Forward : -frame.Forward;
+	JPH::Vec3 flex_direction = -frame.Forward;
+
+	if (body_def.Joint == eRagdollJoint::HingeForward) {
+		flex_direction = frame.Forward;
+	}
 	const JPH::Vec3 bend_axis = parent_axis.Cross(axis_world);
 
 	JPH::Vec3 hinge = axis_world.Cross(flex_direction);
@@ -324,8 +328,13 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 	Skeleton& skel = *skeleton;
 
 	const AnimationPlayback* playback = skel.GetActivePlayback();
-	skel.EvaluatePose((playback != nullptr) ? playback->pAnimation : nullptr,
-					  (playback != nullptr) ? playback->Time : 0.0f);
+
+	if (playback != nullptr) {
+		skel.EvaluatePose(playback->pAnimation, playback->Time);
+	}
+	else {
+		skel.EvaluatePose(nullptr, 0.0f);
+	}
 
 	SizedArray<ResolvedBone> parts;
 	SizedArray<int32> body_of_bone;
@@ -531,15 +540,15 @@ void Ragdoll::CreateRootAssist(const JPH::Vec3 root_position)
 
 void Ragdoll::InitBodyArrays(uint32 joint_count)
 {
-	InitFilled(mTargets, mBodies.Size, BodyTarget {});
-	InitFilled(mStates, mBodies.Size, BodyState {});
-	InitFilled(mMotorOverrides, mBodies.Size, MotorOverride {});
-	InitFilled(mLayers, mBodies.Size, BodyLayer {});
+	mTargets.InitSize(mBodies.Size, BodyTarget {});
+	mStates.InitSize(mBodies.Size, BodyState {});
+	mMotorOverrides.InitSize(mBodies.Size, MotorOverride {});
+	mLayers.InitSize(mBodies.Size, BodyLayer {});
 
 	mbHasTargets = false;
 
-	InitFilled(mDrivenWorld, joint_count, Mat4f::scIdentity);
-	InitFilled(mIsDriven, joint_count, static_cast<uint8>(0));
+	mDrivenWorld.InitSize(joint_count, Mat4f::scIdentity);
+	mIsDriven.InitSize(joint_count, static_cast<uint8>(0));
 
 	for (const BodyInfo& body : mBodies) {
 		mIsDriven[body.BoneIndex] = 1;

@@ -23,6 +23,11 @@ uint32 FastRand32();
  */
 uint64 FastRand64();
 
+/**
+ * @brief Generates a random float in [0, 1) from FastRand32().
+ */
+float32 FastRandUnit();
+
 
 /////////////////////////////////////
 // SIMD Functions

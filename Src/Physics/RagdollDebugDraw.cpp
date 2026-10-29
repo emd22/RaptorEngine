@@ -42,7 +42,7 @@ const Color scSwingColor = Color::FromRGBA(255, 70, 220, 255);
 
 Color GetTorqueColor(float32 fraction)
 {
-	const float32 t = std::clamp(fraction, 0.0f, 1.0f);
+	const float32 t = MathUtil::Clamp(fraction, 0.0f, 1.0f);
 
 	return Color::FromRGBA(static_cast<uint8>(70.0f + 185.0f * t), static_cast<uint8>(230.0f - 170.0f * t), 90, 255);
 }
@@ -69,7 +69,7 @@ void Ragdoll::DebugDraw() const
 	}
 
 	SizedArray<Vec3f> centers;
-	InitFilled(centers, mBodies.Size, Vec3f::sZero);
+	centers.InitSize(mBodies.Size, Vec3f::sZero);
 
 	DrawDebugBodies(centers);
 	DrawDebugLinks(centers);

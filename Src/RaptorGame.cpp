@@ -847,8 +847,6 @@ void RaptorGame::AddDummyWound(RagdollDummy& dummy, const physics::RagdollContac
 	dummy.BloodCooldown = scWoundCooldown;
 }
 
-static float32 RandomUnit() { return static_cast<float32>(FastRand32() >> 8) * (1.0f / 16777216.0f); }
-
 void RaptorGame::SpawnRagdollBlood(float32& cooldown, const physics::RagdollContact& contact, float32 min_speed)
 {
 	constexpr float32 scCooldown = 0.25f;
@@ -874,12 +872,12 @@ void RaptorGame::SpawnRagdollBlood(float32& cooldown, const physics::RagdollCont
 	const uint32 satellites = 2 + static_cast<uint32>(strength * 2.0f);
 
 	for (uint32 i = 0; i < satellites; i++) {
-		const float32 angle = RandomUnit() * 2.0f * static_cast<float32>(M_PI);
-		const float32 distance = size * (0.4f + 0.6f * RandomUnit());
+		const float32 angle = FastRandUnit() * 2.0f * static_cast<float32>(M_PI);
+		const float32 distance = size * (0.4f + 0.6f * FastRandUnit());
 
 		const Vec3f offset = (tangent * std::cos(angle) + bitangent * std::sin(angle)) * distance;
 
-		gDecalManager->AddBloodSplat(contact.Point + offset, contact.Normal, size * (0.25f + 0.25f * RandomUnit()));
+		gDecalManager->AddBloodSplat(contact.Point + offset, contact.Normal, size * (0.25f + 0.25f * FastRandUnit()));
 	}
 }
 

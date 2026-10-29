@@ -7,6 +7,7 @@
 
 #include <Core/Log.hpp>
 #include <Engine.hpp>
+#include <Math/MathUtil.hpp>
 #include <Math/TwoBoneIK.hpp>
 #include <Renderer/DebugDraw.hpp>
 #include <Renderer/Globals.hpp>
@@ -76,14 +77,14 @@ bool RagdollBehaviours::Init(Ragdoll& ragdoll)
 	mContext.pRagdoll = &ragdoll;
 	mContext.pRig = &mRig;
 	mContext.pBalance = &ragdoll.GetBalanceStatus();
-	InitFilled(mContext.Bodies, body_count, BehaviourBody {});
+	mContext.Bodies.InitSize(body_count, BehaviourBody {});
 
 	mOutput.Init(body_count);
 
-	InitFilled(mMixPose, body_count, JPH::Quat::sIdentity());
-	InitFilled(mMixOffset, body_count, JPH::Quat::sIdentity());
-	InitFilled(mMixWeight, body_count, 0.0f);
-	InitFilled(mMixStrength, body_count, 1.0f);
+	mMixPose.InitSize(body_count, JPH::Quat::sIdentity());
+	mMixOffset.InitSize(body_count, JPH::Quat::sIdentity());
+	mMixWeight.InitSize(body_count, 0.0f);
+	mMixStrength.InitSize(body_count, 1.0f);
 
 	for (RagdollBehaviour* behaviour : mBehaviours) {
 		behaviour->Init(mRig, body_count);
@@ -122,7 +123,7 @@ bool RagdollBehaviours::BuildRig(const Ragdoll& ragdoll)
 			mRig.Neck = i;
 		}
 
-		const float32 side_sign = ((body.RestPosition - pelvis).Dot(side) >= 0.0f) ? 1.0f : -1.0f;
+		const float32 side_sign = MathUtil::GetSign((body.RestPosition - pelvis).Dot(side));
 
 		if (body.Part == eRagdollBodyPart::Arm && parent_part != eRagdollBodyPart::Arm &&
 			arm_count < RagdollRig::scLimbCount) {
@@ -380,7 +381,7 @@ void RagdollBehaviours::PredictImpact()
 			ctx.bImpactPredicted = true;
 			ctx.ImpactPoint = hit.Point;
 			ctx.ImpactNormal = hit.Normal.SafeNormalize(ctx.Up);
-			ctx.ImpactTime = time - scImpactStep * (1.0f - std::clamp(fraction, 0.0f, 1.0f));
+			ctx.ImpactTime = time - scImpactStep * (1.0f - MathUtil::Clamp(fraction, 0.0f, 1.0f));
 
 			return;
 		}
@@ -721,7 +722,7 @@ void RagdollBehaviours::DebugDraw() const
 		}
 
 		const Vec3f shoulder = mContext.Bodies[mRig.Arms[arm].Upper].Origin;
-		const uint8 green = static_cast<uint8>(80.0f + 175.0f * std::clamp(goal.Weight, 0.0f, 1.0f));
+		const uint8 green = static_cast<uint8>(80.0f + 175.0f * MathUtil::Clamp(goal.Weight, 0.0f, 1.0f));
 
 		renderer::gDebugDraw->Line(shoulder, goal.Target, Color::FromRGBA(40, green, 40, 255));
 		DrawCross(goal.Target, Color::FromRGBA(40, green, 40, 255));
