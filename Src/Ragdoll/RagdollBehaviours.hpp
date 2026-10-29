@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Ragdoll.hpp"
 #include "RagdollReactions.hpp"
 
 namespace fx::physics {
@@ -36,7 +37,7 @@ public:
 
 	void DebugDraw() const;
 
-	FX_FORCE_INLINE bool IsValid() const { return mRig.bValid; }
+	FX_FORCE_INLINE bool IsValid() const { return mpRig != nullptr && mpRig->bValid; }
 	FX_FORCE_INLINE float32 GetStrength(uint32 body) const
 	{
 		if (body >= mMixStrength.Size) {
@@ -55,9 +56,9 @@ public:
 	FX_FORCE_INLINE const RagdollBehaviour* GetBehaviour(uint32 index) const { return mBehaviours[index]; }
 
 private:
-	static int32 FindChildBody(const Ragdoll& ragdoll, uint32 parent, eRagdollBodyPart part);
+	bool CanRun(const Ragdoll& ragdoll) const;
+	int32 FindIndex(const char* name) const;
 
-	bool BuildRig(const Ragdoll& ragdoll);
 	void Sense(Ragdoll& ragdoll, float32 delta_time);
 	void SenseChestFrame(const Ragdoll& ragdoll);
 	void PredictImpact();
@@ -65,6 +66,8 @@ private:
 	void Dispatch(const RagdollEvent& event);
 	void SortByPriority();
 
+	void Resolve(Ragdoll& ragdoll);
+	void ClearMix();
 	void Mix();
 	void FoldOutput(const BehaviourOutput& output, float32 weight);
 	void FoldOverride(uint32 body, const JPH::Quat& pose, float32 weight);
@@ -84,13 +87,13 @@ private:
 	RagdollBehaviour* mBehaviours[scBehaviourCount];
 	RagdollBehaviour* mOrder[scBehaviourCount];
 
-	RagdollRig mRig;
+	const RagdollRig* mpRig = nullptr;
 	BehaviourContext mContext;
+	SizedArray<Ragdoll::BodyState> mSamples;
 	BehaviourOutput mOutput;
 
-	SizedArray<JPH::Quat> mMixPose;
-	SizedArray<JPH::Quat> mMixOffset;
-	SizedArray<float32> mMixWeight;
+	/// The mixed pose layers, copied into the ragdoll by Apply (GravityScale comes from mMixGravity)
+	SizedArray<Ragdoll::BodyLayer> mMixLayers;
 	SizedArray<float32> mMixStrength;
 	eBehaviourBalance mMixBalance = eBehaviourBalance::Unset;
 	float32 mMixGravity = 1.0f;

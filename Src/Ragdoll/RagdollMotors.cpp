@@ -1,5 +1,3 @@
-#include "JoltPhysicsBackend.hpp"
-#include "PhysicsManager.hpp"
 #include "Ragdoll.hpp"
 #include "RagdollMath.hpp"
 
@@ -8,6 +6,8 @@
 
 #include <Engine.hpp>
 #include <Math/MathConsts.hpp>
+#include <Physics/JoltPhysicsBackend.hpp>
+#include <Physics/PhysicsManager.hpp>
 #include <algorithm>
 
 namespace fx::physics {
@@ -24,6 +24,16 @@ constexpr float32 scRootAssistFrequency = 6.0f;
 constexpr float32 scRootAssistDamping = 1.0f;
 constexpr float32 scRootAssistMaxForce = 1500.0f;
 constexpr float32 scRootAssistMaxTorque = 600.0f;
+
+/// Spring with natural frequency `omega` and damping ratio `damping` for a `mass` (or moment of inertia), times `scale`
+JPH::SpringSettings MakeSpring(float32 mass, float32 omega, float32 damping, float32 scale = 1.0f)
+{
+	return JPH::SpringSettings(JPH::ESpringMode::StiffnessAndDamping, scale * mass * omega * omega,
+							   scale * 2.0f * damping * omega * mass);
+}
+
+/// How far ahead to aim a damped spring along the target's velocity so it tracks without lag (2 zeta / omega)
+float32 GetLeadTime(float32 damping, float32 omega) { return 2.0f * damping / omega; }
 
 } // namespace
 
@@ -52,6 +62,8 @@ void Ragdoll::OnStep(const JPH::PhysicsStepListenerContext& inContext)
 
 	const JPH::Vec3 gravity = inContext.mPhysicsSystem->GetGravity();
 
+	// Ground contacts are cleared before each frame's update and filled during collision steps, so on the first step
+	// after a clear they are empty and the balance controller keeps its previous contact state
 	const uint32 contact_generation = gPhysics->pBackend->GetGroundContactGeneration();
 	const bool contacts_fresh = (contact_generation == mContactGeneration);
 	mContactGeneration = contact_generation;
@@ -88,7 +100,7 @@ void Ragdoll::MoveKinematicBodies(JPH::BodyInterface& body_interface, float32 fr
 		}
 
 		const BodyTarget& target = mTargets[i];
-		const JPH::BodyID body_id = mpRagdoll->GetBodyID(static_cast<int>(i));
+		const JPH::BodyID body_id = GetBodyID(i);
 
 		JPH::RVec3 position;
 		JPH::Quat orientation;
@@ -105,11 +117,9 @@ void Ragdoll::UpdateSubtrees(JPH::BodyInterface& body_interface)
 {
 	for (uint32 i = 0; i < mBodies.Size; i++) {
 		const BodyInfo& info = mBodies[i];
-		const JPH::BodyID body_id = mpRagdoll->GetBodyID(static_cast<int>(i));
 		BodyState& state = mStates[i];
 
-		state.Origin = JPH::Vec3(body_interface.GetPosition(body_id));
-		state.Center = JPH::Vec3(body_interface.GetCenterOfMassPosition(body_id));
+		SampleBody(body_interface, i, state);
 
 		float32 mass = 0.0f;
 		float32 inertia = 0.0f;
@@ -156,6 +166,36 @@ float32 Ragdoll::GetSupportedInertia(uint32 body_index, const JPH::Vec3 pivot) c
 	return std::max(inertia, scMinSubtreeInertia);
 }
 
+JPH::SwingTwistConstraint* Ragdoll::GetJoint(uint32 body_index) const
+{
+	// Jolt orders constraints by child part, and the root part has none
+	return static_cast<JPH::SwingTwistConstraint*>(mpRagdoll->GetConstraint(static_cast<int>(body_index) - 1));
+}
+
+Ragdoll::MotorOverride& Ragdoll::SetMotorTarget(uint32 body_index, const JPH::Quat& parent_world,
+												const JPH::Quat& child_world, float32 frequency_scale, bool supported)
+{
+	MotorOverride& motor_override = mMotorOverrides[body_index];
+
+	motor_override.Mode = eMotorOverride::Target;
+	motor_override.Target = RelativeRotation(parent_world, child_world);
+	motor_override.FrequencyScale = frequency_scale;
+	motor_override.bSupported = supported;
+
+	return motor_override;
+}
+
+void Ragdoll::GetHingeChainRotations(uint32 upper, uint32 lower, const JPH::Vec3 upper_direction,
+									 const JPH::Vec3 lower_direction, const JPH::Vec3 hinge, JPH::Quat& out_upper,
+									 JPH::Quat& out_lower) const
+{
+	const BodyInfo& upper_body = mBodies[upper];
+	const BodyInfo& lower_body = mBodies[lower];
+
+	out_upper = FrameRotation(upper_body.LocalAxis, lower_body.ParentHingeLocal, upper_direction, hinge);
+	out_lower = FrameRotation(lower_body.LocalAxis, lower_body.HingeLocal, lower_direction, hinge);
+}
+
 void Ragdoll::ApplyMotor(uint32 body_index)
 {
 	const BodyInfo& info = mBodies[body_index];
@@ -165,9 +205,7 @@ void Ragdoll::ApplyMotor(uint32 body_index)
 	}
 
 	const BodyTarget& target = mTargets[body_index];
-
-	JPH::SwingTwistConstraint* joint = static_cast<JPH::SwingTwistConstraint*>(
-		mpRagdoll->GetConstraint(static_cast<int>(body_index) - 1));
+	JPH::SwingTwistConstraint* joint = GetJoint(body_index);
 
 	const MotorOverride& motor_override = mMotorOverrides[body_index];
 	const bool is_powered = !mbLimp && (info.Mode == eRagdollBodyMode::Powered) &&
@@ -192,8 +230,7 @@ void Ragdoll::ApplyMotor(uint32 body_index)
 		inertia = GetSubtreeInertia(body_index, mStates[body_index].Origin);
 	}
 
-	const JPH::SpringSettings spring(JPH::ESpringMode::StiffnessAndDamping, inertia * omega * omega,
-									 2.0f * info.Muscle.Damping * omega * inertia);
+	const JPH::SpringSettings spring = MakeSpring(inertia, omega, info.Muscle.Damping);
 	const float32 torque = info.Muscle.MaxTorque * info.Strength;
 
 	JPH::MotorSettings& swing = joint->GetSwingMotorSettings();
@@ -213,7 +250,7 @@ void Ragdoll::ApplyMotor(uint32 body_index)
 		const BodyTarget& parent_target = mTargets[info.ParentBody];
 		const JPH::Quat parent_inverse = parent_target.Orientation.Conjugated();
 		const JPH::Vec3 relative_velocity = parent_inverse * (target.AngularVelocity - parent_target.AngularVelocity);
-		const float32 lead = 2.0f * info.Muscle.Damping / omega;
+		const float32 lead = GetLeadTime(info.Muscle.Damping, omega);
 
 		joint_target = IntegrateRotation(parent_inverse * target.Orientation, relative_velocity, lead);
 	}
@@ -244,14 +281,14 @@ void Ragdoll::ApplyGravityCompensation(JPH::BodyInterface& body_interface, const
 			continue;
 		}
 
-		const JPH::BodyID body_id = mpRagdoll->GetBodyID(static_cast<int>(i));
+		const JPH::BodyID body_id = GetBodyID(i);
 		const JPH::Vec3 gravity_torque = (state.SubtreeMoment - state.Origin * state.SubtreeMass).Cross(gravity) *
 										 scale;
 
 		body_interface.AddTorque(body_id, -gravity_torque);
 
 		if (mBodies[info.ParentBody].Mode != eRagdollBodyMode::Kinematic) {
-			body_interface.AddTorque(mpRagdoll->GetBodyID(info.ParentBody), gravity_torque);
+			body_interface.AddTorque(GetBodyID(info.ParentBody), gravity_torque);
 		}
 	}
 }
@@ -277,14 +314,10 @@ void Ragdoll::ApplyRootAssist(JPH::BodyInterface& body_interface, const JPH::Vec
 	const float32 inertia = GetSubtreeInertia(0, root.Center);
 
 	const float32 omega = FX_2PI * scRootAssistFrequency;
-	const float32 lead = 2.0f * scRootAssistDamping / omega;
+	const float32 lead = GetLeadTime(scRootAssistDamping, omega);
 
-	const JPH::SpringSettings linear_spring(JPH::ESpringMode::StiffnessAndDamping,
-											mRootAssist * total_mass * omega * omega,
-											mRootAssist * 2.0f * scRootAssistDamping * omega * total_mass);
-	const JPH::SpringSettings angular_spring(JPH::ESpringMode::StiffnessAndDamping,
-											 mRootAssist * inertia * omega * omega,
-											 mRootAssist * 2.0f * scRootAssistDamping * omega * inertia);
+	const JPH::SpringSettings linear_spring = MakeSpring(total_mass, omega, scRootAssistDamping, mRootAssist);
+	const JPH::SpringSettings angular_spring = MakeSpring(inertia, omega, scRootAssistDamping, mRootAssist);
 
 	for (uint32 axis = 0; axis < JPH::SixDOFConstraint::EAxis::Num; axis++) {
 		const JPH::SixDOFConstraint::EAxis jolt_axis = static_cast<JPH::SixDOFConstraint::EAxis>(axis);
@@ -305,7 +338,7 @@ void Ragdoll::ApplyRootAssist(JPH::BodyInterface& body_interface, const JPH::Vec
 	mpRootAssist->SetTargetPositionCS(target.Position + target.LinearVelocity * lead - mRootAnchor);
 	mpRootAssist->SetTargetOrientationBS(IntegrateRotation(target.Orientation, target.AngularVelocity, lead));
 
-	const JPH::BodyID root_id = mpRagdoll->GetBodyID(0);
+	const JPH::BodyID root_id = GetBodyID(0);
 
 	body_interface.AddForce(root_id, -gravity * (total_mass * mRootAssist));
 	body_interface.AddTorque(root_id, -(center_of_mass - root.Center).Cross(gravity * (total_mass * mRootAssist)));
@@ -332,8 +365,7 @@ float32 Ragdoll::GetMotorTorqueFraction(uint32 body_index) const
 		return 0.0f;
 	}
 
-	const JPH::SwingTwistConstraint* joint = static_cast<const JPH::SwingTwistConstraint*>(
-		mpRagdoll->GetConstraint(static_cast<int>(body_index) - 1));
+	const JPH::SwingTwistConstraint* joint = GetJoint(body_index);
 
 	const JPH::Vec3 torque = joint->GetTotalLambdaMotor() / gPhysics->pBackend->GetCollisionStepTime();
 

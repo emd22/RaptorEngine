@@ -26,8 +26,6 @@ constexpr float32 scHeadHandDrop = 0.05f;
 constexpr float32 scFallTimeout = 4.0f;
 constexpr float32 scGroundedStopTime = 0.1f;
 
-Vec3f GetHorizontal(const BehaviourContext& ctx, const Vec3f v) { return v - ctx.Up * v.Dot(ctx.Up); }
-
 float32 Envelope(float32 time, float32 attack, float32 total)
 {
 	if (time < 0.0f || time >= total) {
@@ -41,22 +39,10 @@ float32 Envelope(float32 time, float32 attack, float32 total)
 	return 1.0f - MathUtil::SmoothStep((time - attack) / std::max(total - attack, 1e-4f));
 }
 
-Vec3f GetChestUp(const BehaviourContext& ctx) { return ctx.Forward.Cross(ctx.Right); }
-
 bool IsInFront(const BehaviourContext& ctx, const Vec3f point)
 {
 	const Vec3f chest = ctx.Bodies[ctx.pRig->Chest].Center;
-	return GetHorizontal(ctx, point - chest).Dot(GetHorizontal(ctx, ctx.Forward)) > scBehindMargin;
-}
-
-void ScaleArmStrengths(const RagdollRig& rig, BehaviourOutput& out, float32 scale)
-{
-	for (const BeRagdollArm& arm : rig.Arms) {
-		out.ScaleStrength(arm.Clavicle, scale);
-		out.ScaleStrength(arm.Upper, scale);
-		out.ScaleStrength(arm.Lower, scale);
-		out.ScaleStrength(arm.Hand, scale);
-	}
+	return ctx.Horizontal(point - chest).Dot(ctx.Horizontal(ctx.Forward)) > scBehindMargin;
 }
 
 } // namespace
@@ -89,7 +75,7 @@ void FallenBehaviour::CaptureFollowPose(const BehaviourContext& ctx, float32 ble
 			continue;
 		}
 
-		const JPH::Quat actual = (ctx.Bodies[parent].Orientation.Conjugated() * ctx.Bodies[i].Orientation).Normalized();
+		const JPH::Quat actual = RelativeRotation(ctx.Bodies[parent].Orientation, ctx.Bodies[i].Orientation);
 
 		if (blend >= 1.0f) {
 			mFollow[i] = actual;
@@ -203,10 +189,10 @@ void StaggerBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& 
 		return;
 	}
 
-	const float32 speed = GetHorizontal(ctx, ctx.Velocity).Length();
+	const float32 speed = ctx.Horizontal(ctx.Velocity).Length();
 	const float32 spread = MathUtil::DegToRad(ArmSpread) * MathUtil::Clamp(speed / SpreadSpeed, 0.0f, 1.0f);
 
-	for (const BeRagdollArm& arm : ctx.pRig->Arms) {
+	for (const RagdollRigArm& arm : ctx.pRig->Arms) {
 		out.AddWorldRotation(ctx, arm.Upper, ctx.Forward, arm.SideSign * spread);
 	}
 }
@@ -243,9 +229,7 @@ void ShotReactionBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEv
 		return;
 	}
 
-	if (!IsActive()) {
-		Start(ctx);
-	}
+	StartIfIdle(ctx);
 
 	if (!IsActive()) {
 		return;
@@ -325,7 +309,7 @@ void ShotReactionBehaviour::StartGrab(const BehaviourContext& ctx, const Ragdoll
 			continue;
 		}
 
-		const BeRagdollArm& arm = ctx.pRig->Arms[i];
+		const RagdollRigArm& arm = ctx.pRig->Arms[i];
 		const float32 distance = (event.Point - ctx.Bodies[arm.Upper].Origin).Length();
 		const float32 reach = GrabReach * (arm.UpperLength + arm.LowerLength);
 
@@ -447,22 +431,18 @@ BraceBehaviour::BraceBehaviour() : RagdollBehaviour("brace", 50.0f)
 void BraceBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent& event)
 {
 	if (event.Type == eRagdollEvent::LostSupport && ctx.bAlive) {
-		if (!IsActive()) {
-			Start(ctx);
-		}
-
+		StartIfIdle(ctx);
 		return;
 	}
 
 	if ((event.Type == eRagdollEvent::Impact || event.Type == eRagdollEvent::OnGround) && IsActive()) {
-		mbLanded = true;
+		mLanding.bLanded = true;
 	}
 }
 
 void BraceBehaviour::OnStart(const BehaviourContext& ctx)
 {
-	mbLanded = false;
-	mLandedTime = 0.0f;
+	mLanding.Reset();
 	mbHasTarget = false;
 }
 
@@ -477,14 +457,12 @@ void BraceBehaviour::Update(const BehaviourContext& ctx)
 		return;
 	}
 
-	for (const BeRagdollArm& arm : ctx.pRig->Arms) {
-		mbLanded = mbLanded || ctx.Bodies[arm.Hand].bGround;
+	for (const RagdollRigArm& arm : ctx.pRig->Arms) {
+		mLanding.bLanded = mLanding.bLanded || ctx.Bodies[arm.Hand].bGround;
 	}
 
-	if (mbLanded) {
-		mLandedTime += ctx.DeltaTime;
-
-		if (mLandedTime >= Hold) {
+	if (mLanding.bLanded) {
+		if (mLanding.Advance(ctx.DeltaTime, Hold)) {
 			Stop();
 		}
 
@@ -514,7 +492,7 @@ void BraceBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& ou
 	const Vec3f side = (ctx.Right - mNormal * ctx.Right.Dot(mNormal)).SafeNormalize(ctx.Right);
 
 	for (uint32 i = 0; i < RagdollRig::scLimbCount; i++) {
-		const BeRagdollArm& arm = ctx.pRig->Arms[i];
+		const RagdollRigArm& arm = ctx.pRig->Arms[i];
 		const Vec3f shoulder = ctx.Bodies[arm.Upper].Origin;
 
 		Vec3f target = mPoint + side * (arm.SideSign * Spread) + mNormal * scBraceHandLift;
@@ -523,7 +501,7 @@ void BraceBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& ou
 		out.Hands[i] = BehaviourGoal { .Target = target, .Weight = 1.0f };
 	}
 
-	ScaleArmStrengths(*ctx.pRig, out, Strength);
+	out.ScaleArmStrengths(*ctx.pRig, Strength);
 }
 
 /////////////////////////////////////
@@ -546,7 +524,10 @@ ProtectHeadBehaviour::ProtectHeadBehaviour() : RagdollBehaviour("protect_head", 
 void ProtectHeadBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent& event)
 {
 	if (event.Type == eRagdollEvent::Impact || event.Type == eRagdollEvent::OnGround) {
-		mbLanded = IsActive();
+		if (IsActive()) {
+			mLanding.bLanded = true;
+		}
+
 		return;
 	}
 
@@ -570,15 +551,18 @@ void ProtectHeadBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEve
 	}
 
 	Start(ctx);
-
 	mDuration = duration;
-	mbLanded = false;
-	mLandedTime = 0.0f;
+}
+
+void ProtectHeadBehaviour::OnStart(const BehaviourContext& ctx)
+{
+	mDuration = -1.0f;
+	mLanding.Reset();
 }
 
 bool ProtectHeadBehaviour::IsFallingBackward(const BehaviourContext& ctx) const
 {
-	const bool is_backward = ctx.Velocity.Dot(GetHorizontal(ctx, ctx.Forward)) < -MinBackward;
+	const bool is_backward = ctx.Velocity.Dot(ctx.Horizontal(ctx.Forward)) < -MinBackward;
 	const bool lands_behind = ctx.bImpactPredicted && !IsInFront(ctx, ctx.ImpactPoint);
 
 	return is_backward || lands_behind;
@@ -591,9 +575,6 @@ void ProtectHeadBehaviour::Update(const BehaviourContext& ctx)
 
 		if (is_falling && IsFallingBackward(ctx)) {
 			Start(ctx);
-			mDuration = -1.0f;
-			mbLanded = false;
-			mLandedTime = 0.0f;
 		}
 
 		return;
@@ -604,12 +585,8 @@ void ProtectHeadBehaviour::Update(const BehaviourContext& ctx)
 		return;
 	}
 
-	if (mbLanded) {
-		mLandedTime += ctx.DeltaTime;
-
-		if (mLandedTime >= Hold) {
-			Stop();
-		}
+	if (mLanding.bLanded && mLanding.Advance(ctx.DeltaTime, Hold)) {
+		Stop();
 	}
 }
 
@@ -617,10 +594,10 @@ void ProtectHeadBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutp
 {
 	const RagdollRig& rig = *ctx.pRig;
 	const Vec3f head = ctx.Bodies[rig.Neck].Center;
-	const Vec3f chest_up = GetChestUp(ctx);
+	const Vec3f chest_up = ctx.GetChestUp();
 
 	for (uint32 i = 0; i < RagdollRig::scLimbCount; i++) {
-		const BeRagdollArm& arm = rig.Arms[i];
+		const RagdollRigArm& arm = rig.Arms[i];
 		const Vec3f target = head + ctx.Right * (arm.SideSign * scHeadHandSide) + ctx.Forward * scHeadHandForward -
 							 chest_up * scHeadHandDrop;
 
@@ -635,7 +612,7 @@ void ProtectHeadBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutp
 		out.AddWorldRotation(ctx, rig.Spine[i], ctx.Right, tuck * 0.3f);
 	}
 
-	ScaleArmStrengths(rig, out, Strength);
+	out.ScaleArmStrengths(rig, Strength);
 }
 
 /////////////////////////////////////
@@ -668,10 +645,7 @@ bool HighFallBehaviour::IsHighFall(const BehaviourContext& ctx) const
 void HighFallBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent& event)
 {
 	if (event.Type == eRagdollEvent::LostSupport && ctx.bFreePose && IsHighFall(ctx)) {
-		if (!IsActive()) {
-			Start(ctx);
-		}
-
+		StartIfIdle(ctx);
 		return;
 	}
 
@@ -680,12 +654,13 @@ void HighFallBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent&
 	}
 }
 
+void HighFallBehaviour::OnStart(const BehaviourContext& ctx) { mGroundedTime = 0.0f; }
+
 void HighFallBehaviour::Update(const BehaviourContext& ctx)
 {
 	if (!IsActive()) {
 		if (ctx.bFreePose && ctx.AirTime >= MinAirTime && IsHighFall(ctx)) {
 			Start(ctx);
-			mGroundedTime = 0.0f;
 		}
 
 		return;
@@ -715,7 +690,7 @@ void HighFallBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput&
 	const float32 arm_swing = MathUtil::DegToRad(ArmSwing);
 	const float32 leg_swing = MathUtil::DegToRad(LegSwing);
 
-	for (const BeRagdollArm& arm : rig.Arms) {
+	for (const RagdollRigArm& arm : rig.Arms) {
 		float32 offset = 0.0f;
 
 		if (arm.SideSign <= 0.0f) {
@@ -728,7 +703,7 @@ void HighFallBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput&
 							 -MathUtil::DegToRad(20.0f + 15.0f * std::sin(phase * 1.3f + offset)));
 	}
 
-	for (const BeRagdollLeg& leg : rig.Legs) {
+	for (const RagdollRigLeg& leg : rig.Legs) {
 		float32 offset = FX_PI_2;
 
 		if (leg.SideSign <= 0.0f) {
@@ -801,14 +776,14 @@ void WritheBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& o
 
 	AddMovementNoise(rig.Neck, 0.8f);
 
-	for (const BeRagdollArm& arm : rig.Arms) {
+	for (const RagdollRigArm& arm : rig.Arms) {
 		AddMovementNoise(arm.Clavicle, 0.3f);
 		AddMovementNoise(arm.Upper, 1.2f);
 		AddMovementNoise(arm.Lower, 0.8f);
 		AddMovementNoise(arm.Hand, 0.4f);
 	}
 
-	for (const BeRagdollLeg& leg : rig.Legs) {
+	for (const RagdollRigLeg& leg : rig.Legs) {
 		AddMovementNoise(leg.Thigh, 1.0f);
 		AddMovementNoise(leg.Shin, 0.9f);
 		AddMovementNoise(leg.Foot, 0.3f);

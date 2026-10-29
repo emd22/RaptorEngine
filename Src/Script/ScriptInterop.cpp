@@ -706,7 +706,7 @@ static int32 N_npc_last_hit() { return static_cast<int32>(gWorld->Player.Weapons
 static bool N_npc_is_alive(int32 npc)
 {
 	const NPC* found = FindNPC(npc);
-	return found != nullptr && !found->IsDying() && !found->IsRagdoll();
+	return found != nullptr && found->IsAlive();
 }
 
 static bool N_npc_behaviour_trigger(int32 npc, const char* behaviour)

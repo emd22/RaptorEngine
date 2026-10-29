@@ -26,7 +26,7 @@
 #include <Particle/ParticleSystem.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
-#include <Physics/Ragdoll.hpp>
+#include <Ragdoll/Ragdoll.hpp>
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Camera/BaseCamera.hpp>
 #include <Renderer/Globals.hpp>
@@ -743,25 +743,9 @@ void RaptorGame::SpawnDebugNPC(Object* model)
 
 void RaptorGame::DropRagdollDummy(Object* model)
 {
-	if (mRagdollDummies.size() >= scMaxRagdollDummies) {
-		DestroyRagdollDummy(0);
+	if (gNPCManager->GetDummyCount() >= scMaxRagdollDummies) {
+		gNPCManager->DestroyDummy(0);
 	}
-
-	Object* root = model->CloneWithOwnSkeleton(String::Fmt("ragdoll_dummy_{}", mRagdollSpawnCount).Str());
-
-	DynArray<Object*> parts;
-	CollectObjectTree(root, parts);
-
-	const auto skinned_part = std::find_if(parts.begin(), parts.end(),
-										   [](const Object* part) { return part->pSkeleton.IsValid(); });
-
-	if (skinned_part == parts.end()) {
-		LogWarning("The ragdoll model has no skeleton");
-		DestroyObjectTree(root->ID);
-		return;
-	}
-
-	Object* skinned = *skinned_part;
 
 	Vec3f forward = gWorld->Player.pCamera->GetForwardVector();
 	forward.Y = 0.0f;
@@ -771,114 +755,22 @@ void RaptorGame::DropRagdollDummy(Object* model)
 
 	const float32 lateral = (static_cast<float32>(mRagdollSpawnCount % 3) - 1.0f) * 0.9f;
 	const float32 height = 1.0f + 0.3f * static_cast<float32>(mRagdollSpawnCount % 2);
+	const String name = String::Fmt("ragdoll_dummy_{}", mRagdollSpawnCount);
 
 	++mRagdollSpawnCount;
 
-	root->SetPosition(gWorld->Player.Position + forward * 1.5f + right * lateral + Vec3f(0.0f, height, 0.0f));
+	const Vec3f position = gWorld->Player.Position + forward * 1.5f + right * lateral + Vec3f(0.0f, height, 0.0f);
 
-	for (Object* part : parts) {
-		part->SetCullable(false);
-	}
-
-	root->SetShadowCaster(true);
-	root->SetProbeVisible(false);
-
-	std::unique_ptr<physics::Ragdoll> ragdoll = std::make_unique<physics::Ragdoll>();
-	const physics::RagdollDef* ragdoll_def = physics::GetHumanoidRagdollDef();
-
-	if (ragdoll_def == nullptr || !ragdoll->Create(skinned->pSkeleton, skinned->GetWorldMatrix(), *ragdoll_def)) {
-		DestroyObjectTree(root->ID);
-		return;
-	}
-
-	gWorld->AttachLoaded(root);
-
-	ragdoll->Activate(forward * 2.0f);
-
-	mRagdollDummies.push_back(
-		RagdollDummy { .RootID = root->ID, .pRagdoll = std::move(ragdoll), .SkinnedID = skinned->ID });
-}
-
-void RaptorGame::DestroyRagdollDummy(size_t index)
-{
-	RagdollDummy& dummy = mRagdollDummies[index];
-
-	dummy.pRagdoll->Destroy();
-
-	DestroyObjectTree(dummy.RootID);
-
-	mRagdollDummies.erase(mRagdollDummies.begin() + static_cast<std::ptrdiff_t>(index));
+	gNPCManager->SpawnDummy(model, name, position, forward * 2.0f);
 }
 
 void RaptorGame::CleanWorld()
 {
-	while (!mRagdollDummies.empty()) {
-		DestroyRagdollDummy(mRagdollDummies.size() - 1);
-	}
-
+	gNPCManager->ClearDummies();
 	gNPCManager->ClearRagdolls();
 	gDecalManager->Clear();
 	gParticleSystem->Clear();
 	gAudio->StopAll();
-}
-
-void RaptorGame::AddDummyWound(RagdollDummy& dummy, const physics::RagdollContact& contact)
-{
-	constexpr float32 scWoundCooldown = 0.25f;
-
-	if (dummy.BloodCooldown > 0.0f) {
-		return;
-	}
-
-	Object* skinned = gObjectManager->GetObject(dummy.SkinnedID);
-	uint32 bone_index = 0;
-
-	if (skinned == nullptr || !skinned->pSkeleton.IsValid() ||
-		!dummy.pRagdoll->FindBoneForBody(contact.Body, bone_index) ||
-		bone_index >= skinned->pSkeleton->SkinningMatrices.Size) {
-		return;
-	}
-
-	const Mat4f rest_to_world = skinned->pSkeleton->SkinningMatrices[bone_index] * skinned->GetWorldMatrix();
-
-	gDecalManager->AddSkinnedBloodSplat(&(*skinned->pSkeleton), rest_to_world, contact.Point, contact.Normal,
-										GetContactWoundSize(contact));
-
-	dummy.BloodCooldown = scWoundCooldown;
-}
-
-void RaptorGame::SpawnRagdollBlood(float32& cooldown, const physics::RagdollContact& contact, float32 min_speed)
-{
-	constexpr float32 scCooldown = 0.25f;
-	constexpr float32 scMinSize = 0.4f;
-	constexpr float32 scMaxSize = 1.0f;
-	constexpr float32 scSpeedRange = 8.0f;
-
-	if (cooldown > 0.0f) {
-		return;
-	}
-
-	cooldown = scCooldown;
-
-	const float32 strength = std::clamp((contact.Speed - min_speed) / scSpeedRange, 0.0f, 1.0f);
-	const float32 size = scMinSize + (scMaxSize - scMinSize) * strength;
-
-	gDecalManager->AddBloodSplat(contact.Point, contact.Normal, size);
-
-	const Vec3f reference = (std::abs(contact.Normal.Y) < 0.9f) ? Vec3f::sUp : Vec3f::sRight;
-	const Vec3f tangent = reference.Cross(contact.Normal).Normalize();
-	const Vec3f bitangent = contact.Normal.Cross(tangent);
-
-	const uint32 satellites = 2 + static_cast<uint32>(strength * 2.0f);
-
-	for (uint32 i = 0; i < satellites; i++) {
-		const float32 angle = FastRandUnit() * 2.0f * static_cast<float32>(M_PI);
-		const float32 distance = size * (0.4f + 0.6f * FastRandUnit());
-
-		const Vec3f offset = (tangent * std::cos(angle) + bitangent * std::sin(angle)) * distance;
-
-		gDecalManager->AddBloodSplat(contact.Point + offset, contact.Normal, size * (0.25f + 0.25f * FastRandUnit()));
-	}
 }
 
 void RaptorGame::UpdateObjectScripts()
@@ -898,6 +790,29 @@ void RaptorGame::UpdateObjectScripts()
 	}
 }
 
+float32 RaptorGame::GetCVarFloat(const CVarValue* cvar, float32 fallback)
+{
+	if (cvar == nullptr) {
+		return fallback;
+	}
+
+	return cvar->FloatValue;
+}
+
+void RaptorGame::ReadNPCTuning(NPCTuning& tuning) const
+{
+	tuning.ImpactDamageScale = GetCVarFloat(mpNPCImpactDamageCVar, tuning.ImpactDamageScale);
+	tuning.MinImpactSpeed = GetCVarFloat(mpNPCImpactSpeedCVar, tuning.MinImpactSpeed);
+	tuning.SafeImpactSpeed = GetCVarFloat(mpNPCImpactSafeSpeedCVar, tuning.SafeImpactSpeed);
+	tuning.Strength = GetCVarFloat(mpNPCStrengthCVar, tuning.Strength);
+	tuning.RootAssist = GetCVarFloat(mpNPCRootAssistCVar, tuning.RootAssist);
+	tuning.BloodSpeed = GetCVarFloat(mpRagdollBloodSpeedCVar, scDefaultRagdollBloodSpeed);
+
+	if (mpNPCBalanceCVar != nullptr) {
+		tuning.bBalance = mpNPCBalanceCVar->FloatValue != 0.0f;
+	}
+}
+
 void RaptorGame::UpdateRagdollDummies()
 {
 	Object* model = mpRagdollTemplate.load();
@@ -912,77 +827,11 @@ void RaptorGame::UpdateRagdollDummies()
 		SpawnDebugNPC(model);
 	}
 
+	ReadNPCTuning(gNPCManager->Tuning);
+
 	const bool draw_debug = (gWorld->DebugBoundsMask & World::scDebugBoundsRagdolls) != 0;
 
-	if (mpNPCImpactDamageCVar != nullptr && mpNPCImpactSpeedCVar != nullptr) {
-		gNPCManager->ImpactDamageScale = mpNPCImpactDamageCVar->FloatValue;
-		gNPCManager->MinImpactSpeed = mpNPCImpactSpeedCVar->FloatValue;
-	}
-
-	if (mpNPCImpactSafeSpeedCVar != nullptr) {
-		gNPCManager->SafeImpactSpeed = mpNPCImpactSafeSpeedCVar->FloatValue;
-	}
-
-	if (mpNPCStrengthCVar != nullptr && mpNPCRootAssistCVar != nullptr) {
-		gNPCManager->Strength = mpNPCStrengthCVar->FloatValue;
-		gNPCManager->RootAssist = mpNPCRootAssistCVar->FloatValue;
-	}
-
-	if (mpNPCBalanceCVar != nullptr) {
-		gNPCManager->bBalance = mpNPCBalanceCVar->FloatValue != 0.0f;
-	}
-
-	const float32 min_blood_speed = (mpRagdollBloodSpeedCVar != nullptr) ? mpRagdollBloodSpeedCVar->FloatValue
-																		 : scDefaultRagdollBloodSpeed;
-
-	gPhysics->pBackend->SetMinRagdollContactSpeed(
-		std::min({ min_blood_speed, gNPCManager->MinImpactSpeed, gNPCManager->SafeImpactSpeed }));
-
 	gNPCManager->Update(static_cast<float32>(DeltaTime), draw_debug);
-
-	if (mRagdollDummies.empty() && gNPCManager->GetCount() == 0) {
-		return;
-	}
-
-	for (RagdollDummy& dummy : mRagdollDummies) {
-		dummy.BloodCooldown = std::max(dummy.BloodCooldown - static_cast<float32>(DeltaTime), 0.0f);
-	}
-
-	for (const physics::RagdollContact& contact : gNPCManager->GetContacts()) {
-		const bool is_struck = contact.IsStruck(gNPCManager->MinImpactSpeed);
-		const bool is_splatter = !is_struck && contact.bOtherStatic && contact.Speed >= min_blood_speed;
-
-		if (NPC* npc = gNPCManager->FindByRagdollSerial(contact.RagdollSerial)) {
-			if (is_splatter) {
-				SpawnRagdollBlood(npc->BloodCooldown, contact, min_blood_speed);
-			}
-
-			continue;
-		}
-
-		for (RagdollDummy& dummy : mRagdollDummies) {
-			if (dummy.pRagdoll->GetSerial() != contact.RagdollSerial) {
-				continue;
-			}
-
-			if (is_struck) {
-				AddDummyWound(dummy, contact);
-			}
-			else if (is_splatter) {
-				SpawnRagdollBlood(dummy.BloodCooldown, contact, min_blood_speed);
-			}
-
-			break;
-		}
-	}
-
-	for (RagdollDummy& dummy : mRagdollDummies) {
-		dummy.pRagdoll->WriteToSkeleton();
-
-		if (draw_debug) {
-			dummy.pRagdoll->DebugDraw();
-		}
-	}
 }
 
 void RaptorGame::PlayImpactSounds()
@@ -1377,11 +1226,7 @@ void RaptorGame::DestroyGame()
 {
 	gGraphics->GetDevice()->WaitForIdle();
 
-	for (RagdollDummy& dummy : mRagdollDummies) {
-		dummy.pRagdoll->Destroy();
-	}
-
-	mRagdollDummies.clear();
+	gNPCManager->ClearDummies();
 	gNPCManager->Clear();
 	gParticleSystem->Destroy();
 	gAudio->Destroy();

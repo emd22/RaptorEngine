@@ -4,6 +4,22 @@
 
 namespace fx::physics {
 
+/// Time since a falling body touched down, for behaviours that hold briefly after landing
+struct LandingHold
+{
+	bool bLanded = false;
+	float32 Time = 0.0f;
+
+	FX_FORCE_INLINE void Reset() { *this = LandingHold {}; }
+
+	/// @returns true once `hold` seconds have passed since landing
+	FX_FORCE_INLINE bool Advance(float32 delta_time, float32 hold)
+	{
+		Time += delta_time;
+		return Time >= hold;
+	}
+};
+
 class FallenBehaviour : public RagdollBehaviour
 {
 public:
@@ -99,8 +115,7 @@ public:
 	float32 MinSpeed = 0.8f;
 
 private:
-	bool mbLanded = false;
-	float32 mLandedTime = 0.0f;
+	LandingHold mLanding;
 	bool mbHasTarget = false;
 	Vec3f mPoint = Vec3f::sZero;
 	Vec3f mNormal = Vec3f::sUp;
@@ -112,6 +127,7 @@ public:
 	ProtectHeadBehaviour();
 
 	void OnEvent(const BehaviourContext& ctx, const RagdollEvent& event) override;
+	void OnStart(const BehaviourContext& ctx) override;
 	void Update(const BehaviourContext& ctx) override;
 	void Contribute(const BehaviourContext& ctx, BehaviourOutput& out) const override;
 
@@ -127,8 +143,7 @@ private:
 	bool IsFallingBackward(const BehaviourContext& ctx) const;
 
 	float32 mDuration = -1.0f;
-	bool mbLanded = false;
-	float32 mLandedTime = 0.0f;
+	LandingHold mLanding;
 };
 
 class HighFallBehaviour : public RagdollBehaviour
@@ -137,6 +152,7 @@ public:
 	HighFallBehaviour();
 
 	void OnEvent(const BehaviourContext& ctx, const RagdollEvent& event) override;
+	void OnStart(const BehaviourContext& ctx) override;
 	void Update(const BehaviourContext& ctx) override;
 	void Contribute(const BehaviourContext& ctx, BehaviourOutput& out) const override;
 	bool NeedsFreePose() const override { return true; }

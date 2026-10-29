@@ -1,5 +1,8 @@
 #include "RagdollMath.hpp"
 
+#include <Engine.hpp>
+#include <Physics/JoltPhysicsBackend.hpp>
+#include <Physics/PhysicsManager.hpp>
 #include <cmath>
 #include <limits>
 
@@ -22,6 +25,20 @@ Vec2f ClosestOnSegment(const Vec2f a, const Vec2f b, const Vec2f p)
 }
 
 } // namespace
+
+GravityFrame GravityFrame::FromGravity(const JPH::Vec3 gravity)
+{
+	GravityFrame frame;
+
+	frame.Up = GetUpFromGravity(gravity);
+	frame.AxisU = frame.Up.GetNormalizedPerpendicular();
+	frame.AxisV = frame.Up.Cross(frame.AxisU);
+	frame.Gravity = gravity.Length();
+
+	return frame;
+}
+
+GravityFrame GravityFrame::FromPhysics() { return FromGravity(gPhysics->pBackend->PhysicsSystem.GetGravity()); }
 
 JPH::Mat44 RotationFromMatrix(const Mat4f& m)
 {

@@ -9,8 +9,8 @@
 #include <Controller/NoClipController.hpp>
 #include <Object/Object.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
-#include <Physics/Ragdoll.hpp>
 #include <Player.hpp>
+#include <Ragdoll/Ragdoll.hpp>
 #include <Renderer/Camera/BaseCamera.hpp>
 #include <Script/ScriptManager.hpp>
 #include <World.hpp>
@@ -25,6 +25,7 @@ namespace fx {
 
 class Image;
 class CVarValue;
+struct NPCTuning;
 
 
 /////////////////////////////////////
@@ -93,17 +94,14 @@ private:
 	void RenderText();
 	void RenderCrosshair();
 
-	struct RagdollDummy;
-
 	void RequestRagdollDrop();
 	void UpdateObjectScripts();
 	void UpdateRagdollDummies();
 	void PlayImpactSounds();
 	void DropRagdollDummy(Object* model);
-	void DestroyRagdollDummy(size_t index);
 	void CleanWorld();
-	void AddDummyWound(RagdollDummy& dummy, const physics::RagdollContact& contact);
-	void SpawnRagdollBlood(float32& cooldown, const physics::RagdollContact& contact, float32 min_speed);
+	void ReadNPCTuning(NPCTuning& tuning) const;
+	static float32 GetCVarFloat(const CVarValue* cvar, float32 fallback);
 
 	void RequestRagdollTemplate();
 	void SpawnDebugNPC(Object* model);
@@ -164,14 +162,6 @@ private:
 
 	Console mCommandConsole;
 
-	struct RagdollDummy
-	{
-		ObjectID RootID = ObjectID::scNull;
-		std::unique_ptr<physics::Ragdoll> pRagdoll;
-		float32 BloodCooldown = 0.0f;
-		ObjectID SkinnedID = ObjectID::scNull;
-	};
-
 	static constexpr size_t scMaxRagdollDummies = 8;
 	static constexpr float32 scDefaultRagdollBloodSpeed = 3.5f;
 
@@ -190,7 +180,6 @@ private:
 	std::unordered_map<uint32, float64> mImpactSoundTimes;
 	float64 mImpactSoundClock = 0.0;
 
-	std::vector<RagdollDummy> mRagdollDummies;
 	AssetTicket mRagdollTemplateTicket { nullptr };
 	std::atomic<Object*> mpRagdollTemplate = nullptr;
 	bool mbRagdollTemplateRequested = false;

@@ -1,5 +1,3 @@
-#include "JoltPhysicsBackend.hpp"
-#include "PhysicsManager.hpp"
 #include "Ragdoll.hpp"
 #include "RagdollMath.hpp"
 
@@ -15,6 +13,8 @@
 #include <Engine.hpp>
 #include <Math/MathConsts.hpp>
 #include <Math/MathUtil.hpp>
+#include <Physics/JoltPhysicsBackend.hpp>
+#include <Physics/PhysicsManager.hpp>
 #include <algorithm>
 #include <cmath>
 #include <string_view>
@@ -346,12 +346,13 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 	}
 
 	const float32 scale = RowAsVec3(object_world_matrix, 0).Length();
+	const GravityFrame gravity_frame = GravityFrame::FromPhysics();
 
 	BuildFrame frame { .Skel = skel,
 					   .ObjectWorld = object_world_matrix,
 					   .Scale = scale,
 					   .TotalMass = def.TotalMass * scale * scale * scale,
-					   .Up = GetUpFromGravity(gPhysics->pBackend->PhysicsSystem.GetGravity()) };
+					   .Up = gravity_frame.Up };
 	frame.Forward = GetRestForward(frame, parts);
 
 	JPH::Ref<JPH::Skeleton> jolt_skeleton = new JPH::Skeleton;
@@ -408,7 +409,6 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 		const Mat4f& bone_model = skel.WorldTransforms[bone];
 
 		mBodies.Insert(BodyInfo {
-
 			.BoneScale = JPH::Vec3(RowAsVec3(bone_model, 0).Length(), RowAsVec3(bone_model, 1).Length(),
 								   RowAsVec3(bone_model, 2).Length()),
 			.ParentAnchor = parent_anchor,
@@ -416,14 +416,11 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 			.LocalCenter = body.Shape.CenterLocal,
 			.BoxHalfExtent = body.Shape.BoxHalfExtent,
 			.BoxRotation = body.Shape.BoxRotation,
-			/* */
 			.HingeLocal = body.Orientation.Conjugated() * body.Hinge,
 			.ParentHingeLocal = parent_hinge_local,
 			.RestPosition = body.Position,
 			.RestOrientation = body.Orientation,
-			/* */
 			.ParentBody = parent_body,
-			/* */
 			.Part = body_def.Part,
 			.Muscle = body_def.Muscle,
 			.Length = body.Length,
@@ -437,6 +434,12 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 		});
 	}
 
+	for (const BodyInfo& body : mBodies) {
+		mTotalMass += body.Mass;
+	}
+
+	// Stabilize evens out masses along each chain so the solver converges, which changes the total mass. The def's
+	// mass table is put back afterwards with the inertia scaled to match.
 	if (!settings->Stabilize()) {
 		LogWarning(LC_PHYSICS, "Ragdoll: failed to stabilize the constraints");
 	}
@@ -454,6 +457,7 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 	mbHasMotors = (mpRagdoll->GetConstraintCount() + 1 == mBodies.Size);
 
 	InitBodyArrays(skel.JointCount);
+	BuildRig(gravity_frame);
 
 	if (!mBalance.Init(*this)) {
 		LogInfo(LC_PHYSICS, "Ragdoll: no two-legged support found, balance is unavailable");
@@ -511,6 +515,8 @@ bool Ragdoll::AddToPhysicsSystem(JPH::RagdollSettings& settings)
 	return true;
 }
 
+/// A world-space SixDOF from the world to the pelvis with every axis free. ApplyRootAssist drives its motors towards
+/// the animated root, which holds the body up softly without pinning it.
 void Ragdoll::CreateRootAssist(const JPH::Vec3 root_position)
 {
 	JPH::SixDOFConstraintSettings root_settings;
@@ -552,6 +558,187 @@ void Ragdoll::InitBodyArrays(uint32 joint_count)
 
 	for (const BodyInfo& body : mBodies) {
 		mIsDriven[body.BoneIndex] = 1;
+	}
+}
+
+int32 Ragdoll::FindChildBody(uint32 parent, eRagdollBodyPart part) const
+{
+	for (uint32 i = parent + 1; i < mBodies.Size; i++) {
+		if (mBodies[i].ParentBody == static_cast<int32>(parent) && mBodies[i].Part == part) {
+			return static_cast<int32>(i);
+		}
+	}
+
+	return -1;
+}
+
+bool Ragdoll::FindLimbChain(uint32 root, uint32& out_middle, uint32& out_end) const
+{
+	const eRagdollBodyPart part = mBodies[root].Part;
+	const int32 middle = FindChildBody(root, part);
+
+	if (middle < 0) {
+		return false;
+	}
+
+	const int32 end = FindChildBody(static_cast<uint32>(middle), part);
+
+	if (end < 0) {
+		return false;
+	}
+
+	out_middle = static_cast<uint32>(middle);
+	out_end = static_cast<uint32>(end);
+
+	return true;
+}
+
+void Ragdoll::BuildRig(const GravityFrame& frame)
+{
+	mRig = RagdollRig {};
+
+	if (mBodies.Size < 2) {
+		return;
+	}
+
+	uint32 arm_count = 0;
+	uint32 leg_count = 0;
+
+	FindRigLimbs(arm_count, leg_count);
+
+	const bool has_feet = (leg_count == RagdollRig::scLimbCount) && InitRigFeet(frame);
+	const bool has_chest = (mRig.Neck != 0) && (mBodies[mRig.Neck].ParentBody >= 0);
+
+	if (has_chest) {
+		mRig.Chest = static_cast<uint32>(mBodies[mRig.Neck].ParentBody);
+
+		for (int32 walk = static_cast<int32>(mRig.Chest); walk > 0 && mRig.SpineCount < RagdollRig::scMaxSpine;
+			 walk = mBodies[walk].ParentBody) {
+			mRig.Spine[mRig.SpineCount++] = static_cast<uint32>(walk);
+		}
+	}
+
+	InitRigSides(frame, arm_count, leg_count);
+
+	const bool has_limbs = (arm_count == RagdollRig::scLimbCount) && (leg_count == RagdollRig::scLimbCount);
+	const bool legs_sided = (mRig.Legs[0].SideSign != mRig.Legs[1].SideSign);
+	const bool arms_sided = (mRig.Arms[0].SideSign != mRig.Arms[1].SideSign);
+
+	mRig.bCanBalance = has_feet && has_chest && legs_sided;
+	mRig.bValid = has_limbs && has_chest && (mRig.Chest != 0) && legs_sided && arms_sided;
+
+	if (!mRig.bValid) {
+		LogWarning(LC_PHYSICS, "Ragdoll: expected two arms, two legs and a head on a spine ({} arms, {} legs)",
+				   arm_count, leg_count);
+	}
+}
+
+void Ragdoll::FindRigLimbs(uint32& out_arm_count, uint32& out_leg_count)
+{
+	for (uint32 i = 1; i < mBodies.Size; i++) {
+		const BodyInfo& body = mBodies[i];
+
+		if (body.Part == eRagdollBodyPart::Head && mRig.Neck == 0) {
+			mRig.Neck = i;
+		}
+
+		const bool is_limb = (body.Part == eRagdollBodyPart::Arm) || (body.Part == eRagdollBodyPart::Leg);
+
+		// A limb starts at the first body of its part below a body of another part
+		if (!is_limb || mBodies[body.ParentBody].Part == body.Part) {
+			continue;
+		}
+
+		uint32 middle = 0;
+		uint32 end = 0;
+
+		if (!FindLimbChain(i, middle, end)) {
+			continue;
+		}
+
+		if (body.Part == eRagdollBodyPart::Arm && out_arm_count < RagdollRig::scLimbCount) {
+			RagdollRigArm& arm = mRig.Arms[out_arm_count++];
+
+			arm.Clavicle = static_cast<uint32>(body.ParentBody);
+			arm.Upper = i;
+			arm.Lower = middle;
+			arm.Hand = end;
+			arm.UpperLength = (mBodies[middle].RestPosition - body.RestPosition).Length();
+			arm.LowerLength = (mBodies[end].RestPosition - mBodies[middle].RestPosition).Length();
+		}
+		else if (body.Part == eRagdollBodyPart::Leg && out_leg_count < RagdollRig::scLimbCount) {
+			RagdollRigLeg& leg = mRig.Legs[out_leg_count++];
+
+			leg.Thigh = i;
+			leg.Shin = middle;
+			leg.Foot = end;
+		}
+	}
+}
+
+bool Ragdoll::InitRigFeet(const GravityFrame& frame)
+{
+	JPH::Vec3 forward = JPH::Vec3::sZero();
+
+	for (RagdollRigLeg& leg : mRig.Legs) {
+		const BodyInfo& thigh = mBodies[leg.Thigh];
+		const BodyInfo& shin = mBodies[leg.Shin];
+		const BodyInfo& foot = mBodies[leg.Foot];
+
+		if (!foot.bFoot || !foot.bBox || !shin.bHinge || thigh.ParentBody != 0) {
+			return false;
+		}
+
+		leg.Upper = (shin.RestPosition - thigh.RestPosition).Length();
+		leg.Lower = (foot.RestPosition - shin.RestPosition).Length();
+		leg.HipOffset = thigh.ParentAnchor;
+		leg.RestFoot = foot.RestOrientation;
+
+		const JPH::Vec3 half = foot.BoxHalfExtent;
+
+		for (uint32 corner = 0; corner < scSoleCorners; corner++) {
+			leg.SoleCorners[corner] = foot.LocalCenter +
+									  foot.BoxRotation * JPH::Vec3(scSoleCornerSigns[corner][0] * half.GetX(),
+																   -half.GetY(),
+																   scSoleCornerSigns[corner][1] * half.GetZ());
+		}
+
+		leg.SoleCenter = foot.LocalCenter + foot.BoxRotation * JPH::Vec3(0.0f, -half.GetY(), 0.0f);
+
+		mRig.FootHalfWidth = half.GetX();
+		mRig.FootHalfLength = half.GetZ();
+
+		forward += foot.RestOrientation * foot.BoxRotation * JPH::Vec3::sAxisZ();
+	}
+
+	mRig.RestForward = frame.Horizontal(forward).NormalizedOr(JPH::Vec3::sAxisZ());
+
+	return true;
+}
+
+void Ragdoll::InitRigSides(const GravityFrame& frame, uint32 arm_count, uint32 leg_count)
+{
+	const JPH::Vec3 side = frame.Up.Cross(mRig.RestForward);
+	const JPH::Vec3 pelvis = mBodies[0].RestPosition;
+
+	for (uint32 i = 0; i < arm_count; i++) {
+		RagdollRigArm& arm = mRig.Arms[i];
+		arm.SideSign = MathUtil::GetSign((mBodies[arm.Upper].RestPosition - pelvis).Dot(side));
+	}
+
+	for (uint32 i = 0; i < leg_count; i++) {
+		RagdollRigLeg& leg = mRig.Legs[i];
+
+		const BodyInfo& thigh = mBodies[leg.Thigh];
+		const BodyInfo& shin = mBodies[leg.Shin];
+		const BodyInfo& foot = mBodies[leg.Foot];
+
+		const JPH::Vec3 leg_direction = (foot.RestPosition - thigh.RestPosition).Normalized();
+		const JPH::Vec3 rest_normal = leg_direction.Cross(mRig.RestForward);
+		const JPH::Vec3 rest_hinge = shin.RestOrientation * shin.HingeLocal;
+
+		leg.SideSign = MathUtil::GetSign((thigh.RestPosition - pelvis).Dot(side));
+		leg.HingeSign = MathUtil::GetSign(rest_hinge.Dot(rest_normal));
 	}
 }
 

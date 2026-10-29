@@ -2,6 +2,7 @@
 
 #include "RagdollBalance.hpp"
 #include "RagdollDef.hpp"
+#include "RagdollRig.hpp"
 
 #include <ThirdParty/Jolt/Jolt.h>
 #include <ThirdParty/Jolt/Physics/Constraints/SixDOFConstraint.h>
@@ -19,6 +20,7 @@
 namespace JPH {
 class BodyInterface;
 class PhysicsSystem;
+class SwingTwistConstraint;
 } // namespace JPH
 
 namespace fx::physics {
@@ -35,8 +37,8 @@ enum class eRagdollBodyMode : uint8
 class Ragdoll : public JPH::PhysicsStepListener
 {
 private:
+	/// The balance controller is part of the motor system and writes targets and motor overrides directly
 	friend class RagdollBalance;
-	friend class RagdollBehaviours;
 
 	enum class eMotorOverride : uint8
 	{
@@ -47,6 +49,7 @@ private:
 
 	struct BodyInfo
 	{
+		/// Row lengths of the bone's model matrix (0.01 on centimetre rigs), stripped for Jolt and put back when posing
 		JPH::Vec3 BoneScale = JPH::Vec3::sReplicate(1.0f);
 		JPH::Vec3 ParentAnchor = JPH::Vec3::sZero();
 		JPH::Vec3 LocalAxis = JPH::Vec3::sAxisY();
@@ -91,15 +94,6 @@ private:
 		JPH::Vec3 AngularVelocity = JPH::Vec3::sZero();
 	};
 
-	struct BodyState
-	{
-		JPH::Vec3 Origin = JPH::Vec3::sZero();
-		JPH::Vec3 Center = JPH::Vec3::sZero();
-		float32 SubtreeMass = 0.0f;
-		JPH::Vec3 SubtreeMoment = JPH::Vec3::sZero();
-		float32 SubtreeSecondMoment = 0.0f;
-	};
-
 	struct MotorOverride
 	{
 		eMotorOverride Mode = eMotorOverride::None;
@@ -110,6 +104,20 @@ private:
 		bool bNoGravityComp = false;
 	};
 
+public:
+	/// One read of a body from Jolt; the subtree fields are only filled by UpdateSubtrees
+	struct BodyState
+	{
+		JPH::Vec3 Origin = JPH::Vec3::sZero();
+		JPH::Vec3 Center = JPH::Vec3::sZero();
+		JPH::Vec3 Velocity = JPH::Vec3::sZero();
+		JPH::Quat Orientation = JPH::Quat::sIdentity();
+		float32 SubtreeMass = 0.0f;
+		JPH::Vec3 SubtreeMoment = JPH::Vec3::sZero();
+		float32 SubtreeSecondMoment = 0.0f;
+	};
+
+	/// Pose a behaviour layer blends over the animated target, applied relative to the parent body
 	struct BodyLayer
 	{
 		JPH::Quat Pose = JPH::Quat::sIdentity();
@@ -134,31 +142,50 @@ public:
 	void SetAllBodyModes(eRagdollBodyMode mode);
 	void SetBodyStrength(uint32 body_index, float32 strength);
 	void SetBodyBlend(uint32 body_index, float32 blend);
+	void SetAllBodyBlends(float32 blend);
 	void SetRootAssist(float32 assist);
 	void SetBalancing(bool balancing);
 	void RebaseTargets();
 	void ClearBodyLayers();
+	void SetBodyLayers(const SizedArray<BodyLayer>& layers, float32 gravity_scale);
 
 	int32 FindBodyIndex(JPH::BodyID body_id) const;
-	JPH::BodyID GetBodyID(uint32 body_index) const;
+	FX_FORCE_INLINE JPH::BodyID GetBodyID(uint32 body_index) const
+	{
+		return mpRagdoll->GetBodyID(static_cast<int>(body_index));
+	}
 	float32 GetBodyMass(uint32 body_index) const;
 	float32 GetWorstJointError() const;
 	bool GetBodyTrackingError(uint32 body_index, float32& out_distance, float32& out_angle) const;
 	Vec3f GetBodyPosition(uint32 body_index) const;
 	Vec3f GetBodyOrigin(uint32 body_index) const;
 	Vec3f GetBodyTargetOrigin(uint32 body_index) const;
-	Vec3f GetCenterOfMass() const;
 	bool GetBodyGroundContact(uint32 body_index, BodyGroundContact& out_contact) const;
+	bool IsBodyOnGround(uint32 body_index, const JPH::Vec3 up, float32 min_up) const;
+	static bool IsSupportNormal(const BodyGroundContact& contact, const JPH::Vec3 up, float32 min_up);
 	eRagdollBodyPart GetBodyPart(uint32 body_index) const;
 
+	void SampleBody(JPH::BodyInterface& body_interface, uint32 body_index, BodyState& out_state) const;
+	bool GetMassAverage(const SizedArray<BodyState>& states, JPH::Vec3& out_center, JPH::Vec3& out_velocity) const;
+	void GetHingeChainRotations(uint32 upper, uint32 lower, const JPH::Vec3 upper_direction,
+								const JPH::Vec3 lower_direction, const JPH::Vec3 hinge, JPH::Quat& out_upper,
+								JPH::Quat& out_lower) const;
+
 	FX_FORCE_INLINE uint32 GetBodyCount() const { return static_cast<uint32>(mBodies.Size); }
+	FX_FORCE_INLINE float32 GetTotalMass() const { return mTotalMass; }
 	FX_FORCE_INLINE int32 GetParentBody(uint32 body_index) const { return mBodies[body_index].ParentBody; }
 	FX_FORCE_INLINE bool IsAnchor(uint32 body_index) const { return mBodies[body_index].bAnchor; }
+	FX_FORCE_INLINE bool IsFoot(uint32 body_index) const { return mBodies[body_index].bFoot; }
+	FX_FORCE_INLINE const JPH::Quat& GetRestOrientation(uint32 body_index) const
+	{
+		return mBodies[body_index].RestOrientation;
+	}
 	FX_FORCE_INLINE eRagdollBodyMode GetBodyMode(uint32 body_index) const { return mBodies[body_index].Mode; }
 	FX_FORCE_INLINE float32 GetBodyStrength(uint32 body_index) const { return mBodies[body_index].Strength; }
 	FX_FORCE_INLINE float32 GetRootAssist() const { return mRootAssist; }
 	FX_FORCE_INLINE bool IsBalancing() const { return mbBalancing; }
 	FX_FORCE_INLINE const BalanceStatus& GetBalanceStatus() const { return mBalance.GetStatus(); }
+	FX_FORCE_INLINE const RagdollRig& GetRig() const { return mRig; }
 
 	void AddImpulse(JPH::BodyID body_id, const Vec3f impulse, const Vec3f point);
 	void WriteToSkeleton();
@@ -170,6 +197,7 @@ public:
 	void OnStep(const JPH::PhysicsStepListenerContext& inContext) override;
 
 	FX_FORCE_INLINE bool IsCreated() const { return mpRagdoll != nullptr; }
+	FX_FORCE_INLINE bool IsAwake() const { return mpRagdoll->IsActive(); }
 	FX_FORCE_INLINE bool IsLimp() const { return mbLimp; }
 	FX_FORCE_INLINE uint32 GetSerial() const { return mSerial; }
 
@@ -184,11 +212,21 @@ private:
 	void InitBodyArrays(uint32 joint_count);
 	float32 WriteInitialPose();
 
+	void BuildRig(const RagdollMath::GravityFrame& frame);
+	void FindRigLimbs(uint32& out_arm_count, uint32& out_leg_count);
+	bool InitRigFeet(const RagdollMath::GravityFrame& frame);
+	void InitRigSides(const RagdollMath::GravityFrame& frame, uint32 arm_count, uint32 leg_count);
+	int32 FindChildBody(uint32 parent, eRagdollBodyPart part) const;
+	bool FindLimbChain(uint32 root, uint32& out_middle, uint32& out_end) const;
+
 	void MoveKinematicBodies(JPH::BodyInterface& body_interface, float32 fraction, float32 delta_time);
 	void UpdateSubtrees(JPH::BodyInterface& body_interface);
 	float32 GetRawSubtreeInertia(uint32 body_index, const JPH::Vec3 pivot) const;
 	float32 GetSubtreeInertia(uint32 body_index, const JPH::Vec3 pivot) const;
 	float32 GetSupportedInertia(uint32 body_index, const JPH::Vec3 pivot) const;
+	JPH::SwingTwistConstraint* GetJoint(uint32 body_index) const;
+	MotorOverride& SetMotorTarget(uint32 body_index, const JPH::Quat& parent_world, const JPH::Quat& child_world,
+								  float32 frequency_scale = 1.0f, bool supported = false);
 	void ApplyMotor(uint32 body_index);
 	void ApplyGravityCompensation(JPH::BodyInterface& body_interface, const JPH::Vec3 gravity);
 	void ApplyRootAssist(JPH::BodyInterface& body_interface, const JPH::Vec3 gravity);
@@ -198,9 +236,9 @@ private:
 	void SnapBodyToTarget(JPH::BodyInterface& body_interface, uint32 body_index, JPH::EActivation activation);
 	Mat4f GetBodyModelMatrix(uint32 body_index) const;
 
-	void DrawDebugBodies(SizedArray<Vec3f>& centers) const;
+	void DrawDebugBodies(const SizedArray<BodyState>& samples, SizedArray<Vec3f>& out_centers) const;
 	void DrawDebugLinks(const SizedArray<Vec3f>& centers) const;
-	void DrawDebugSupport() const;
+	void DrawDebugSupport(const SizedArray<BodyState>& samples) const;
 
 private:
 	Ref<Skeleton> mpSkeleton { nullptr };
@@ -213,6 +251,7 @@ private:
 	SizedArray<BodyState> mStates;
 	SizedArray<MotorOverride> mMotorOverrides;
 	SizedArray<BodyLayer> mLayers;
+	float32 mTotalMass = 0.0f;
 	bool mbHasTargets = false;
 	bool mbHasMotors = false;
 	bool mbLimp = false;
@@ -221,6 +260,7 @@ private:
 	JPH::Vec3 mRootAnchor = JPH::Vec3::sZero();
 	float32 mRootAssist = 0.0f;
 
+	RagdollRig mRig;
 	RagdollBalance mBalance;
 	bool mbBalancing = false;
 	uint32 mContactGeneration = 0;

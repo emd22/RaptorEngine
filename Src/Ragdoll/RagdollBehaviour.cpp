@@ -36,7 +36,7 @@ Vec3f BehaviourContext::ToLocalDirection(uint32 body, const Vec3f direction) con
 
 bool BehaviourContext::IsArmBody(uint32 arm, uint32 body) const
 {
-	const BeRagdollArm& chain = pRig->Arms[arm];
+	const RagdollRigArm& chain = pRig->Arms[arm];
 	return body == chain.Upper || body == chain.Lower || body == chain.Hand;
 }
 
@@ -53,9 +53,9 @@ int32 BehaviourContext::FindArm(uint32 body) const
 
 void BehaviourOutput::Init(uint32 body_count)
 {
-	Pose.InitSize(body_count, JPH::Quat::sIdentity());
-	Mask.InitSize(body_count, 0.0f);
-	Strength.InitSize(body_count, 1.0f);
+	Pose.InitSize(body_count);
+	Mask.InitSize(body_count);
+	Strength.InitSize(body_count);
 	Reset();
 }
 
@@ -104,6 +104,16 @@ void BehaviourOutput::ScaleAllStrengths(float32 scale)
 	}
 }
 
+void BehaviourOutput::ScaleArmStrengths(const RagdollRig& rig, float32 scale)
+{
+	for (const RagdollRigArm& arm : rig.Arms) {
+		ScaleStrength(arm.Clavicle, scale);
+		ScaleStrength(arm.Upper, scale);
+		ScaleStrength(arm.Lower, scale);
+		ScaleStrength(arm.Hand, scale);
+	}
+}
+
 RagdollBehaviour::RagdollBehaviour(const char* name, float32 priority) : Priority(priority), mpName(name)
 {
 	AddSetting("enabled", &Enabled);
@@ -136,6 +146,13 @@ void RagdollBehaviour::Start(const BehaviourContext& ctx)
 	}
 
 	OnStart(ctx);
+}
+
+void RagdollBehaviour::StartIfIdle(const BehaviourContext& ctx)
+{
+	if (!mbActive) {
+		Start(ctx);
+	}
 }
 
 void RagdollBehaviour::Stop()
@@ -176,33 +193,45 @@ void RagdollBehaviour::Advance(float32 delta_time)
 	}
 }
 
-bool RagdollBehaviour::SetSetting(const char* name, float32 value)
+const BehaviourSetting* RagdollBehaviour::FindSetting(const char* name) const
 {
 	for (uint32 i = 0; i < mSettingCount; i++) {
 		if (std::strcmp(mSettings[i].Name, name) == 0) {
-			*mSettings[i].pValue = value;
-
-			if (!IsEnabled()) {
-				Reset();
-			}
-
-			return true;
+			return &mSettings[i];
 		}
 	}
 
-	return false;
+	return nullptr;
+}
+
+bool RagdollBehaviour::SetSetting(const char* name, float32 value)
+{
+	const BehaviourSetting* setting = FindSetting(name);
+
+	if (setting == nullptr) {
+		return false;
+	}
+
+	*setting->pValue = value;
+
+	if (!IsEnabled()) {
+		Reset();
+	}
+
+	return true;
 }
 
 bool RagdollBehaviour::GetSetting(const char* name, float32& out_value) const
 {
-	for (uint32 i = 0; i < mSettingCount; i++) {
-		if (std::strcmp(mSettings[i].Name, name) == 0) {
-			out_value = *mSettings[i].pValue;
-			return true;
-		}
+	const BehaviourSetting* setting = FindSetting(name);
+
+	if (setting == nullptr) {
+		return false;
 	}
 
-	return false;
+	out_value = *setting->pValue;
+
+	return true;
 }
 
 void RagdollBehaviour::CopySettings(const RagdollBehaviour& other)

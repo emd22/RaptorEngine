@@ -1,12 +1,12 @@
 #include "Ragdoll.hpp"
 
-#include "JoltPhysicsBackend.hpp"
-#include "PhysicsManager.hpp"
 #include "RagdollMath.hpp"
 
 #include <ThirdParty/Jolt/Jolt.h>
 
 #include <Engine.hpp>
+#include <Physics/JoltPhysicsBackend.hpp>
+#include <Physics/PhysicsManager.hpp>
 #include <algorithm>
 #include <cmath>
 
@@ -78,7 +78,7 @@ void Ragdoll::Drive(const Mat4f& object_world_matrix, float32 delta_time, bool t
 void Ragdoll::SnapBodyToTarget(JPH::BodyInterface& body_interface, uint32 body_index, JPH::EActivation activation)
 {
 	const BodyTarget& target = mTargets[body_index];
-	const JPH::BodyID body_id = mpRagdoll->GetBodyID(static_cast<int>(body_index));
+	const JPH::BodyID body_id = GetBodyID(body_index);
 
 	body_interface.SetPositionAndRotation(body_id, target.Position, target.Orientation, activation);
 	body_interface.SetLinearAndAngularVelocity(body_id, JPH::Vec3::sZero(), JPH::Vec3::sZero());
@@ -93,10 +93,7 @@ void Ragdoll::GoLimp(const Mat4f& object_world_matrix)
 	mWorldInverse = object_world_matrix.AffineInverse();
 
 	SetAllBodyModes(eRagdollBodyMode::Limp);
-
-	for (BodyInfo& info : mBodies) {
-		info.Blend = 1.0f;
-	}
+	SetAllBodyBlends(1.0f);
 
 	mpRagdoll->Activate();
 
@@ -119,7 +116,7 @@ void Ragdoll::SetBodyMode(uint32 body_index, eRagdollBodyMode mode)
 	info.Mode = mode;
 
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
-	const JPH::BodyID body_id = mpRagdoll->GetBodyID(static_cast<int>(body_index));
+	const JPH::BodyID body_id = GetBodyID(body_index);
 
 	if (mode == eRagdollBodyMode::Kinematic) {
 		body_interface.SetMotionType(body_id, JPH::EMotionType::Kinematic, JPH::EActivation::DontActivate);
@@ -130,6 +127,7 @@ void Ragdoll::SetBodyMode(uint32 body_index, eRagdollBodyMode mode)
 		body_interface.SetGravityFactor(body_id, 1.0f);
 		body_interface.ActivateBody(body_id);
 
+		// Keep the animation's velocity (taken at the centre of mass) so the body does not stop dead
 		if (previous_mode == eRagdollBodyMode::Kinematic) {
 			const BodyTarget& target = mTargets[body_index];
 			const JPH::Vec3 offset = JPH::Vec3(body_interface.GetCenterOfMassPosition(body_id) -
@@ -166,6 +164,13 @@ void Ragdoll::SetBodyBlend(uint32 body_index, float32 blend)
 	}
 }
 
+void Ragdoll::SetAllBodyBlends(float32 blend)
+{
+	for (uint32 i = 0; i < mBodies.Size; i++) {
+		SetBodyBlend(i, blend);
+	}
+}
+
 void Ragdoll::SetRootAssist(float32 assist) { mRootAssist = MathUtil::Clamp(assist, 0.0f, 1.0f); }
 
 void Ragdoll::SetBalancing(bool balancing)
@@ -197,6 +202,14 @@ void Ragdoll::ClearBodyLayers()
 	}
 }
 
+void Ragdoll::SetBodyLayers(const SizedArray<BodyLayer>& layers, float32 gravity_scale)
+{
+	for (uint32 i = 0; i < mLayers.Size && i < layers.Size; i++) {
+		mLayers[i] = layers[i];
+		mLayers[i].GravityScale = gravity_scale;
+	}
+}
+
 void Ragdoll::AddImpulse(JPH::BodyID body_id, const Vec3f impulse, const Vec3f point)
 {
 	const int32 body_index = FindBodyIndex(body_id);
@@ -221,7 +234,7 @@ int32 Ragdoll::FindBodyIndex(JPH::BodyID body_id) const
 	}
 
 	for (uint32 i = 0; i < mBodies.Size; i++) {
-		if (mpRagdoll->GetBodyID(static_cast<int>(i)) == body_id) {
+		if (GetBodyID(i) == body_id) {
 			return static_cast<int32>(i);
 		}
 	}
@@ -240,8 +253,6 @@ bool Ragdoll::FindBoneForBody(JPH::BodyID body_id, uint32& out_bone_index) const
 	out_bone_index = mBodies[body_index].BoneIndex;
 	return true;
 }
-
-JPH::BodyID Ragdoll::GetBodyID(uint32 body_index) const { return mpRagdoll->GetBodyID(static_cast<int>(body_index)); }
 
 float32 Ragdoll::GetBodyMass(uint32 body_index) const
 {
@@ -329,22 +340,36 @@ Vec3f Ragdoll::GetBodyPosition(uint32 body_index) const
 	return Vec3f(position.GetX(), position.GetY(), position.GetZ());
 }
 
-Vec3f Ragdoll::GetCenterOfMass() const
+void Ragdoll::SampleBody(JPH::BodyInterface& body_interface, uint32 body_index, BodyState& out_state) const
 {
-	JPH::Vec3 weighted_sum = JPH::Vec3::sZero();
-	float32 total_mass = 0.0f;
+	const JPH::BodyID body_id = GetBodyID(body_index);
+
+	JPH::RVec3 position;
+	body_interface.GetPositionAndRotation(body_id, position, out_state.Orientation);
+
+	out_state.Origin = JPH::Vec3(position);
+	out_state.Center = JPH::Vec3(body_interface.GetCenterOfMassPosition(body_id));
+	out_state.Velocity = body_interface.GetLinearVelocity(body_id);
+}
+
+bool Ragdoll::GetMassAverage(const SizedArray<BodyState>& states, JPH::Vec3& out_center, JPH::Vec3& out_velocity) const
+{
+	if (mTotalMass <= 0.0f) {
+		return false;
+	}
+
+	JPH::Vec3 moment = JPH::Vec3::sZero();
+	JPH::Vec3 momentum = JPH::Vec3::sZero();
 
 	for (uint32 i = 0; i < mBodies.Size; i++) {
-		const Vec3f position = GetBodyPosition(i);
-		weighted_sum += JPH::Vec3(position.X, position.Y, position.Z) * mBodies[i].Mass;
-		total_mass += mBodies[i].Mass;
+		moment += states[i].Center * mBodies[i].Mass;
+		momentum += states[i].Velocity * mBodies[i].Mass;
 	}
 
-	if (total_mass <= 0.0f) {
-		return Vec3f::sZero;
-	}
+	out_center = moment / mTotalMass;
+	out_velocity = momentum / mTotalMass;
 
-	return Vec3f(weighted_sum / total_mass);
+	return true;
 }
 
 bool Ragdoll::GetBodyGroundContact(uint32 body_index, BodyGroundContact& out_contact) const
@@ -357,6 +382,18 @@ bool Ragdoll::GetBodyGroundContact(uint32 body_index, BodyGroundContact& out_con
 	gPhysics->pBackend->GetBodyGroundContact(GetBodyID(body_index), out_contact);
 
 	return out_contact.Count > 0;
+}
+
+bool Ragdoll::IsSupportNormal(const BodyGroundContact& contact, const JPH::Vec3 up, float32 min_up)
+{
+	return Vec3f::ToJolt(contact.Normal).Dot(up) >= min_up;
+}
+
+bool Ragdoll::IsBodyOnGround(uint32 body_index, const JPH::Vec3 up, float32 min_up) const
+{
+	BodyGroundContact contact;
+
+	return GetBodyGroundContact(body_index, contact) && IsSupportNormal(contact, up, min_up);
 }
 
 Mat4f Ragdoll::GetBodyModelMatrix(uint32 body_index) const
@@ -464,9 +501,11 @@ void Ragdoll::Destroy()
 	mStates.Free();
 	mMotorOverrides.Free();
 	mLayers.Free();
+	mTotalMass = 0.0f;
 	mbHasTargets = false;
 	mbHasMotors = false;
 	mbLimp = false;
+	mRig = RagdollRig {};
 	mBalance = RagdollBalance {};
 	mbBalancing = false;
 	mDrivenWorld.Free();

@@ -2,6 +2,7 @@
 
 #include "RagdollBalance.hpp"
 #include "RagdollDef.hpp"
+#include "RagdollRig.hpp"
 
 #include <ThirdParty/Jolt/Jolt.h>
 #include <ThirdParty/Jolt/Math/Quat.h>
@@ -38,42 +39,6 @@ enum class eBehaviourBalance : uint8
 	Unset,
 	Off,
 	On,
-};
-
-struct BeRagdollArm
-{
-	uint32 Clavicle = 0;
-	uint32 Upper = 0;
-	uint32 Lower = 0;
-	uint32 Hand = 0;
-	float32 UpperLength = 0.0f;
-	float32 LowerLength = 0.0f;
-	float32 SideSign = 1.0f;
-};
-
-struct BeRagdollLeg
-{
-	uint32 Thigh = 0;
-	uint32 Shin = 0;
-	uint32 Foot = 0;
-	float32 SideSign = 1.0f;
-};
-
-struct RagdollRig
-{
-	static constexpr uint32 scLimbCount = 2;
-	static constexpr uint32 scMaxSpine = 4;
-
-	BeRagdollArm Arms[scLimbCount];
-	BeRagdollLeg Legs[scLimbCount];
-
-	uint32 Spine[scMaxSpine];
-	uint32 SpineCount = 0;
-	uint32 Chest = 0;
-	uint32 Neck = 0;
-
-	JPH::Vec3 RestForward = JPH::Vec3::sAxisZ();
-	bool bValid = false;
 };
 
 struct BehaviourBody
@@ -121,6 +86,8 @@ struct BehaviourContext
 	bool bAlive = true;
 
 	FX_FORCE_INLINE uint32 GetBodyCount() const { return static_cast<uint32>(Bodies.Size); }
+	FX_FORCE_INLINE Vec3f Horizontal(const Vec3f v) const { return v - Up * v.Dot(Up); }
+	FX_FORCE_INLINE Vec3f GetChestUp() const { return Forward.Cross(Right); }
 
 	Vec3f ToBodyLocal(uint32 body, const Vec3f point) const;
 	Vec3f FromBodyLocal(uint32 body, const Vec3f local) const;
@@ -144,6 +111,8 @@ struct BehaviourOutput
 	BehaviourGoal Hands[RagdollRig::scLimbCount];
 	eBehaviourBalance Balance = eBehaviourBalance::Unset;
 	float32 GravityScale = 1.0f;
+
+	/// Additive poses rotate on top of the tracked target, override poses replace it
 	bool bAdditive = true;
 
 	void Init(uint32 body_count);
@@ -153,6 +122,7 @@ struct BehaviourOutput
 						  float32 mask = 1.0f);
 	void ScaleStrength(uint32 body, float32 scale);
 	void ScaleAllStrengths(float32 scale);
+	void ScaleArmStrengths(const RagdollRig& rig, float32 scale);
 };
 
 struct BehaviourSetting
@@ -198,17 +168,25 @@ public:
 	FX_FORCE_INLINE float32 GetTime() const { return mTime; }
 
 public:
+	// Settings are exposed by name to scripts; angles are in degrees and times in seconds
+
 	float32 Enabled = 1.0f;
+
+	/// Behaviours mix in ascending priority, so a higher priority overrides a lower one where they overlap
 	float32 Priority = 0.0f;
+
 	float32 FadeIn = 0.1f;
 	float32 FadeOut = 0.3f;
 
 protected:
 	void AddSetting(const char* name, float32* value);
+	void StartIfIdle(const BehaviourContext& ctx);
 
 	float32 mTime = 0.0f;
 
 private:
+	const BehaviourSetting* FindSetting(const char* name) const;
+
 	const char* mpName = nullptr;
 	BehaviourSetting mSettings[scMaxSettings];
 	uint32 mSettingCount = 0;
