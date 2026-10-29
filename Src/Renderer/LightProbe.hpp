@@ -151,6 +151,8 @@ private:
 	bool SaveIrradianceProbes();
 	bool LoadIrradianceProbes();
 	bool LoadCompiledProbes();
+	bool LoadProbeFile(const ProbeLayout* required_layout);
+	bool IsProbeFileNewerThanCompiledMap() const;
 	bool SaveReflectionProbes();
 	bool LoadReflectionProbes();
 

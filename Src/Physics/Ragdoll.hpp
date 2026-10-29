@@ -36,6 +36,7 @@ class Ragdoll : public JPH::PhysicsStepListener
 {
 private:
 	friend class RagdollBalance;
+	friend class RagdollBehaviours;
 
 	enum class eMotorOverride : uint8
 	{
@@ -46,36 +47,39 @@ private:
 
 	struct BodyInfo
 	{
-		uint32 BoneIndex = 0;
 		JPH::Vec3 BoneScale = JPH::Vec3::sReplicate(1.0f);
-		int32 ParentBody = -1;
 		JPH::Vec3 ParentAnchor = JPH::Vec3::sZero();
-		eRagdollBodyPart Part = eRagdollBodyPart::Torso;
-		bool bAnchor = false;
-		bool bFoot = false;
-
 		JPH::Vec3 LocalAxis = JPH::Vec3::sAxisY();
 		JPH::Vec3 LocalCenter = JPH::Vec3::sZero();
-		float32 Length = 0.0f;
-		float32 Radius = 0.0f;
-		bool bBox = false;
 		JPH::Vec3 BoxHalfExtent = JPH::Vec3::sZero();
 		JPH::Quat BoxRotation = JPH::Quat::sIdentity();
 
-		float32 Mass = 0.0f;
-		float32 Inertia = 0.0f;
-		RagdollMuscle Muscle;
-
-		bool bHinge = false;
 		JPH::Vec3 HingeLocal = JPH::Vec3::sZero();
 		JPH::Vec3 ParentHingeLocal = JPH::Vec3::sZero();
-
 		JPH::Vec3 RestPosition = JPH::Vec3::sZero();
 		JPH::Quat RestOrientation = JPH::Quat::sIdentity();
 
+		int32 ParentBody = -1;
+
+		eRagdollBodyPart Part = eRagdollBodyPart::Torso;
 		eRagdollBodyMode Mode = eRagdollBodyMode::Limp;
+
+		RagdollMuscle Muscle;
+
+		float32 Length = 0.0f;
+		float32 Radius = 0.0f;
+		bool bBox = false;
+
+		float32 Mass = 0.0f;
+		float32 Inertia = 0.0f;
+
 		float32 Strength = 1.0f;
 		float32 Blend = 1.0f;
+		uint32 BoneIndex = 0;
+
+		bool bHinge = false;
+		bool bAnchor = false;
+		bool bFoot = false;
 		bool bSnap = false;
 	};
 
@@ -106,6 +110,14 @@ private:
 		bool bNoGravityComp = false;
 	};
 
+	struct BodyLayer
+	{
+		JPH::Quat Pose = JPH::Quat::sIdentity();
+		JPH::Quat Offset = JPH::Quat::sIdentity();
+		float32 Weight = 0.0f;
+		float32 GravityScale = 1.0f;
+	};
+
 public:
 	Ragdoll() = default;
 	Ragdoll(const Ragdoll&) = delete;
@@ -125,6 +137,7 @@ public:
 	void SetRootAssist(float32 assist);
 	void SetBalancing(bool balancing);
 	void RebaseTargets();
+	void ClearBodyLayers();
 
 	int32 FindBodyIndex(JPH::BodyID body_id) const;
 	JPH::BodyID GetBodyID(uint32 body_index) const;
@@ -199,6 +212,7 @@ private:
 	SizedArray<BodyTarget> mTargets;
 	SizedArray<BodyState> mStates;
 	SizedArray<MotorOverride> mMotorOverrides;
+	SizedArray<BodyLayer> mLayers;
 	bool mbHasTargets = false;
 	bool mbHasMotors = false;
 	bool mbLimp = false;

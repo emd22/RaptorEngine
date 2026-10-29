@@ -194,17 +194,24 @@ void Ragdoll::ApplyMotor(uint32 body_index)
 	joint->SetSwingMotorState(JPH::EMotorState::Position);
 	joint->SetTwistMotorState(JPH::EMotorState::Position);
 
-	if (motor_override.Mode == eMotorOverride::Target) {
-		joint->SetTargetOrientationBS(motor_override.Target);
-		return;
+	JPH::Quat joint_target = motor_override.Target;
+
+	if (motor_override.Mode != eMotorOverride::Target) {
+		const BodyTarget& parent_target = mTargets[info.ParentBody];
+		const JPH::Quat parent_inverse = parent_target.Orientation.Conjugated();
+		const JPH::Vec3 relative_velocity = parent_inverse * (target.AngularVelocity - parent_target.AngularVelocity);
+		const float32 lead = 2.0f * info.Muscle.Damping / omega;
+
+		joint_target = IntegrateRotation(parent_inverse * target.Orientation, relative_velocity, lead);
 	}
 
-	const BodyTarget& parent_target = mTargets[info.ParentBody];
-	const JPH::Quat parent_inverse = parent_target.Orientation.Conjugated();
-	const JPH::Vec3 relative_velocity = parent_inverse * (target.AngularVelocity - parent_target.AngularVelocity);
-	const float32 lead = 2.0f * info.Muscle.Damping / omega;
+	const BodyLayer& layer = mLayers[body_index];
 
-	joint->SetTargetOrientationBS(IntegrateRotation(parent_inverse * target.Orientation, relative_velocity, lead));
+	if (layer.Weight > 0.0f) {
+		joint_target = joint_target.SLERP(layer.Pose, layer.Weight);
+	}
+
+	joint->SetTargetOrientationBS((joint_target * layer.Offset).Normalized());
 }
 
 void Ragdoll::ApplyGravityCompensation(JPH::BodyInterface& body_interface, const JPH::Vec3 gravity)
@@ -217,7 +224,8 @@ void Ragdoll::ApplyGravityCompensation(JPH::BodyInterface& body_interface, const
 			continue;
 		}
 
-		const float32 scale = std::clamp(info.Strength / scGravityCompFullStrength, 0.0f, 1.0f);
+		const float32 scale = std::clamp(info.Strength / scGravityCompFullStrength, 0.0f, 1.0f) *
+							  mLayers[i].GravityScale;
 
 		if (scale <= 0.0f || state.SubtreeMass <= 0.0f) {
 			continue;

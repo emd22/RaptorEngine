@@ -199,6 +199,40 @@ RayResult JoltPhysicsBackend::Raycast(const Vec3f origin, const Vec3f direction,
 	return RayResult { false, Vec3f::sZero };
 }
 
+RayResult JoltPhysicsBackend::RaycastStatic(const Vec3f origin, const Vec3f direction) const
+{
+	JPH::RRayCast rc;
+
+	origin.ToJoltVec3(rc.mOrigin);
+	direction.ToJoltVec3(rc.mDirection);
+
+	JPH::RayCastResult result;
+	JPH::SpecifiedObjectLayerFilter static_filter(PhLayer::Static);
+
+	if (!PhysicsSystem.GetNarrowPhaseQuery().CastRay(rc, result, {}, static_filter)) {
+		return RayResult { false, Vec3f::sZero };
+	}
+
+	const JPH::Vec3 hit_point = rc.GetPointOnRay(result.mFraction);
+
+	RayResult hit { .bHit = true, .Body = result.mBodyID, .SubShape = result.mSubShapeID2 };
+	hit.Point.FromJoltVec3(hit_point);
+
+	JPH::BodyLockRead lock(PhysicsSystem.GetBodyLockInterface(), result.mBodyID);
+
+	if (lock.Succeeded()) {
+		JPH::Vec3 normal = lock.GetBody().GetWorldSpaceSurfaceNormal(result.mSubShapeID2, hit_point);
+
+		if (normal.Dot(rc.mDirection) > 0.0f) {
+			normal = -normal;
+		}
+
+		hit.Normal.FromJoltVec3(normal);
+	}
+
+	return hit;
+}
+
 bool JoltPhysicsBackend::GetTriangleUserData(const JPH::BodyID body_id, const JPH::SubShapeID sub_shape,
 											 uint32& out_user_data) const
 {

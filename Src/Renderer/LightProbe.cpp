@@ -13,6 +13,7 @@
 #include <Blockout.hpp>
 #include <CVar.hpp>
 #include <Core/File.hpp>
+#include <Core/FilesystemIO.hpp>
 #include <Core/Path.hpp>
 #ifdef FX_IS_EDITOR
 #include <Editor/RaptorEditor.hpp>
@@ -1715,12 +1716,44 @@ bool ProbeManager::LoadCompiledProbes()
 	return true;
 }
 
+bool ProbeManager::IsProbeFileNewerThanCompiledMap() const
+{
+	if (gWorld == nullptr || gWorld->PrototypePath.GetLength() == 0) {
+		return false;
+	}
+
+	const String probe_path = FilesystemIO::ResolvePath(GetProbeFilePath(".fxprobe"));
+	const String compiled_path = FilesystemIO::ResolvePath(
+		CompiledMap::GetPathForPrototype(CompiledMap::GetPrototypePath(gWorld->PrototypePath)));
+
+	if (!FilesystemIO::FileExists(probe_path) || !FilesystemIO::FileExists(compiled_path)) {
+		return false;
+	}
+
+	return FilesystemIO::FileGetLastModified(probe_path.CStr()) >
+		   FilesystemIO::FileGetLastModified(compiled_path.CStr());
+}
+
 bool ProbeManager::LoadIrradianceProbes()
 {
+	const Blockout* blockout = GetBlockout();
+	const bool has_compiled_probes = blockout != nullptr && blockout->HasCompiledProbes() &&
+									 gCVars->Get("r_compiled_probes", int64 { 1 }) != 0;
+
+	if (has_compiled_probes && IsProbeFileNewerThanCompiledMap() &&
+		LoadProbeFile(blockout->GetCompiledProbeLayout())) {
+		return true;
+	}
+
 	if (LoadCompiledProbes()) {
 		return true;
 	}
 
+	return LoadProbeFile(nullptr);
+}
+
+bool ProbeManager::LoadProbeFile(const ProbeLayout* required_layout)
+{
 	const String path = GetProbeFilePath(".fxprobe");
 
 	File file(path, File::eModType::Read, File::eDataType::Binary);
@@ -1794,6 +1827,13 @@ bool ProbeManager::LoadIrradianceProbes()
 	for (uint32 probe = 0; probe < header.ProbeCount; probe++) {
 		const float32* position = mProbeInfos[probe].ProbePosition;
 		layout.Positions.Emplace(Vec3f(position[0], position[1], position[2]));
+	}
+
+	if (required_layout != nullptr && !CompareLayouts(layout, *required_layout).IsEmpty()) {
+		LogInfo("Probe file {} was baked for a different probe layout than the compiled map, using the compiled "
+				"probes",
+				path.CStr());
+		return false;
 	}
 
 	mLayout = std::move(layout);

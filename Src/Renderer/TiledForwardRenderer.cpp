@@ -527,8 +527,7 @@ bool TiledForwardRenderer::MakeForwardDesc(ePipelinePass pass, ePipelineFeatures
 	}
 
 	std::string suffix;
-	out_desc.Features = GetGeometryShaderVariant(features, out_desc.Macros, out_desc.VertexType, suffix,
-												 is_opaque || is_blended, true);
+	out_desc.Features = GetGeometryShaderVariant(features, out_desc.Macros, out_desc.VertexType, suffix, true, true);
 
 	// Transparent geometry also discards what is nearly invisible
 	if (is_blended) {
@@ -1089,7 +1088,7 @@ uint32 TiledForwardRenderer::GetViewConstants(const BaseCamera& camera, eObjectL
 		consts.Flags |= eDrawFlags::BakedSun;
 	}
 
-	if (gGraphics->bBakedIndirectActive && !is_probe_capture) {
+	if (gGraphics->bBakedIndirectActive) {
 		consts.Flags |= eDrawFlags::BakedIndirect;
 	}
 

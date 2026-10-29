@@ -99,6 +99,7 @@ public:
 
 	FX_FORCE_INLINE bool IsValid() const { return mbValid; }
 	FX_FORCE_INLINE const BalanceStatus& GetStatus() const { return mStatus; }
+	FX_FORCE_INLINE JPH::Vec3 GetRestForward() const { return mRestForward; }
 
 private:
 	bool InitLegs(const Ragdoll& ragdoll);

@@ -26,6 +26,12 @@ void CMD_timers()
 	timer_list();
 }
 
+/* Logs the default NPC behaviour settings that new NPCs start with. */
+void CMD_npcbehaviours()
+{
+	npc_behaviour_list(0);
+}
+
 /////////////////////////////////////
 // Light probe volumes
 /////////////////////////////////////

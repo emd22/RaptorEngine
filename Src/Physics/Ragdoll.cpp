@@ -190,6 +190,13 @@ void Ragdoll::SetBalancing(bool balancing)
 
 void Ragdoll::RebaseTargets() { mbHasTargets = false; }
 
+void Ragdoll::ClearBodyLayers()
+{
+	for (BodyLayer& layer : mLayers) {
+		layer = BodyLayer {};
+	}
+}
+
 void Ragdoll::AddImpulse(JPH::BodyID body_id, const Vec3f impulse, const Vec3f point)
 {
 	const int32 body_index = FindBodyIndex(body_id);
@@ -452,6 +459,7 @@ void Ragdoll::Destroy()
 	mTargets.Free();
 	mStates.Free();
 	mMotorOverrides.Free();
+	mLayers.Free();
 	mbHasTargets = false;
 	mbHasMotors = false;
 	mbLimp = false;

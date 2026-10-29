@@ -211,7 +211,7 @@ public:
 	uint32 Length = 0;
 
 private:
-	char mpStackStr[scStackAllocSize];
+	char mpStackStr[scStackAllocSize] = {};
 	char* mpHeapStr = nullptr;
 };
 

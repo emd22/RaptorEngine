@@ -470,6 +470,7 @@ public:
 	void OptimizeBroadPhase();
 
 	RayResult Raycast(const Vec3f origin, const Vec3f direction, JPH::BodyID ignore_body = JPH::BodyID()) const;
+	RayResult RaycastStatic(const Vec3f origin, const Vec3f direction) const;
 	SizedArray<JPH::BodyID> RaycastObjects(const Vec3f origin, const Vec3f direction) const;
 
 	FLOAT4 RaycastGetFaceOfBox(JPH::Body* body, const Vec3f origin, const Vec3f direction) const;

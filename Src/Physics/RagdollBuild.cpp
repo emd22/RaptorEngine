@@ -525,6 +525,7 @@ void Ragdoll::InitBodyArrays(uint32 joint_count)
 	InitFilled(mTargets, mBodies.Size, BodyTarget {});
 	InitFilled(mStates, mBodies.Size, BodyState {});
 	InitFilled(mMotorOverrides, mBodies.Size, MotorOverride {});
+	InitFilled(mLayers, mBodies.Size, BodyLayer {});
 	mbHasTargets = false;
 
 	InitFilled(mDrivenWorld, joint_count, Mat4f::scIdentity);

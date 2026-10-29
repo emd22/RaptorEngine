@@ -205,7 +205,6 @@ private:
 	CVarValue* mpNPCImpactDamageCVar = nullptr;
 	CVarValue* mpNPCImpactSpeedCVar = nullptr;
 	CVarValue* mpNPCImpactSafeSpeedCVar = nullptr;
-	CVarValue* mpNPCReactStrengthCVar = nullptr;
 	CVarValue* mpNPCStrengthCVar = nullptr;
 	CVarValue* mpNPCRootAssistCVar = nullptr;
 	CVarValue* mpNPCBalanceCVar = nullptr;

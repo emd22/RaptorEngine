@@ -273,6 +273,25 @@ extern void timer_list();
 extern bool portal_set_open(cstring name, bool open);
 extern bool portal_is_open(cstring name);
 
+/* NPC behaviours. An NPC is named by its handle, which is 0 for none. Behaviours are "fallen", "stagger", "shot",
+ * "brace", "protect_head", "high_fall", "writhe" and "dying"; every behaviour has the settings "enabled", "priority",
+ * "fade_in" and "fade_out" plus its own (npc_behaviour_list prints them). */
+
+extern int npc_find(cstring name);
+/* The NPC hit by the last weapon_hit_apply, or 0 if it missed. */
+extern int npc_last_hit();
+extern bool npc_is_alive(int npc);
+
+/* Starts a behaviour. "dying" kills the NPC; "fallen", "writhe" and "high_fall" knock it down first. */
+extern bool npc_behaviour_trigger(int npc, cstring behaviour);
+extern bool npc_behaviour_stop(int npc, cstring behaviour);
+extern bool npc_behaviour_active(int npc, cstring behaviour);
+
+/* With npc 0 this changes the default for every NPC, including ones spawned later. */
+extern bool npc_behaviour_set(int npc, cstring behaviour, cstring setting, float value);
+extern float npc_behaviour_get(int npc, cstring behaviour, cstring setting);
+extern void npc_behaviour_list(int npc);
+
 /* CVars */
 
 extern void cvar_set_int(cstring name, long value);

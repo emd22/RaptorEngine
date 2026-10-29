@@ -267,7 +267,6 @@ void RaptorGame::CreateGame()
 	mpNPCImpactDamageCVar = gCVars->Set("b_npc_impact_damage", gCVars->Get("b_npc_impact_damage", 0.25f));
 	mpNPCImpactSpeedCVar = gCVars->Set("b_npc_impact_speed", gCVars->Get("b_npc_impact_speed", 1.5f));
 	mpNPCImpactSafeSpeedCVar = gCVars->Set("b_npc_impact_safe_speed", gCVars->Get("b_npc_impact_safe_speed", 6.0f));
-	mpNPCReactStrengthCVar = gCVars->Set("b_npc_react_strength", gCVars->Get("b_npc_react_strength", 0.25f));
 	mpNPCStrengthCVar = gCVars->Set("b_npc_strength", gCVars->Get("b_npc_strength", 1.0f));
 	mpNPCRootAssistCVar = gCVars->Set("b_npc_root_assist", gCVars->Get("b_npc_root_assist", 1.0f));
 	mpNPCBalanceCVar = gCVars->Set("b_npc_balance", gCVars->Get("b_npc_balance", 1.0f));
@@ -926,10 +925,6 @@ void RaptorGame::UpdateRagdollDummies()
 
 	if (mpNPCImpactSafeSpeedCVar != nullptr) {
 		gNPCManager->SafeImpactSpeed = mpNPCImpactSafeSpeedCVar->FloatValue;
-	}
-
-	if (mpNPCReactStrengthCVar != nullptr) {
-		gNPCManager->ReactStrength = mpNPCReactStrengthCVar->FloatValue;
 	}
 
 	if (mpNPCStrengthCVar != nullptr && mpNPCRootAssistCVar != nullptr) {

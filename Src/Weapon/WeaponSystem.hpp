@@ -201,6 +201,8 @@ public:
 	void HandleEvent(eEvent event);
 	float32 Trace(float32 yaw, float32 pitch, float32 range);
 	void ApplyHit(float32 damage, float32 force, bool decal);
+
+	FX_FORCE_INLINE uint32 GetLastHitNPC() const { return mLastHitNPC; }
 	void Kick(float32 pitch, float32 yaw);
 
 private:
@@ -231,6 +233,7 @@ private:
 
 	physics::RayResult mLastHit;
 	Vec3f mLastDirection = Vec3f::sZero;
+	uint32 mLastHitNPC = 0;
 
 	ParticleEffectID mMuzzleEffect {};
 };

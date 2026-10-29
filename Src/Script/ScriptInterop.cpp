@@ -11,6 +11,7 @@
 #include <Editor/RaptorEditor.hpp>
 #include <Engine.hpp>
 #include <Math/SIMDHelper.hpp>
+#include <NPC.hpp>
 #include <Object/ObjectID.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Particle/ParticleSystem.hpp>
@@ -680,6 +681,84 @@ static void N_weapon_kick(float32 pitch, float32 yaw) { gWorld->Player.Weapons.K
 
 static void N_weapon_event(int32 event) { gWorld->Player.Weapons.HandleEvent(static_cast<weapon::eEvent>(event)); }
 
+static NPC* FindNPC(int32 npc)
+{
+	if (npc <= 0) {
+		return nullptr;
+	}
+
+	return gNPCManager->FindByRagdollSerial(static_cast<uint32>(npc));
+}
+
+static int32 N_npc_find(const char* name)
+{
+	NPC* npc = gNPCManager->FindByName(name);
+
+	if (npc == nullptr || !npc->GetRagdoll().IsCreated()) {
+		return 0;
+	}
+
+	return static_cast<int32>(npc->GetRagdollSerial());
+}
+
+static int32 N_npc_last_hit() { return static_cast<int32>(gWorld->Player.Weapons.GetLastHitNPC()); }
+
+static bool N_npc_is_alive(int32 npc)
+{
+	const NPC* found = FindNPC(npc);
+	return found != nullptr && !found->IsDying() && !found->IsRagdoll();
+}
+
+static bool N_npc_behaviour_trigger(int32 npc, const char* behaviour)
+{
+	NPC* found = FindNPC(npc);
+	return found != nullptr && found->TriggerBehaviour(behaviour);
+}
+
+static bool N_npc_behaviour_stop(int32 npc, const char* behaviour)
+{
+	NPC* found = FindNPC(npc);
+	return found != nullptr && found->StopBehaviour(behaviour);
+}
+
+static bool N_npc_behaviour_active(int32 npc, const char* behaviour)
+{
+	NPC* found = FindNPC(npc);
+	return found != nullptr && behaviour != nullptr && found->GetBehaviours().IsRunning(behaviour);
+}
+
+static bool N_npc_behaviour_set(int32 npc, const char* behaviour, const char* setting, float32 value)
+{
+	if (npc < 0) {
+		return false;
+	}
+
+	return gNPCManager->SetBehaviourSetting(static_cast<uint32>(npc), behaviour, setting, value);
+}
+
+static float32 N_npc_behaviour_get(int32 npc, const char* behaviour, const char* setting)
+{
+	float32 value = 0.0f;
+
+	if (npc < 0 || !gNPCManager->GetBehaviourSetting(static_cast<uint32>(npc), behaviour, setting, value)) {
+		return 0.0f;
+	}
+
+	return value;
+}
+
+static void N_npc_behaviour_list(int32 npc)
+{
+	if (npc == 0) {
+		gNPCManager->GetDefaultBehaviours().LogState();
+		return;
+	}
+
+	if (NPC* found = FindNPC(npc)) {
+		found->GetBehaviours().LogState();
+	}
+}
+
 static void N_script_error(const char* str) { LogError(LC_SCRIPT, "{}", str); }
 
 static void N_tool_state_send(const editor::EditorToolState* state)
@@ -823,6 +902,16 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("weapon_hit_apply", N_weapon_hit_apply),
 	PREDEF("weapon_kick", N_weapon_kick),
 	PREDEF("weapon_event", N_weapon_event),
+
+	PREDEF("npc_find", N_npc_find),
+	PREDEF("npc_last_hit", N_npc_last_hit),
+	PREDEF("npc_is_alive", N_npc_is_alive),
+	PREDEF("npc_behaviour_trigger", N_npc_behaviour_trigger),
+	PREDEF("npc_behaviour_stop", N_npc_behaviour_stop),
+	PREDEF("npc_behaviour_active", N_npc_behaviour_active),
+	PREDEF("npc_behaviour_set", N_npc_behaviour_set),
+	PREDEF("npc_behaviour_get", N_npc_behaviour_get),
+	PREDEF("npc_behaviour_list", N_npc_behaviour_list),
 
 	PREDEF("script_error", N_script_error),
 
