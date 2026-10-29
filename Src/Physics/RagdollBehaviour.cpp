@@ -15,28 +15,28 @@ using namespace RagdollMath;
 Vec3f BehaviourContext::ToBodyLocal(uint32 body, const Vec3f point) const
 {
 	const BehaviourBody& state = Bodies[body];
-	return ToVec3f(state.Orientation.Conjugated() * ToJolt(point - state.Origin));
+	return Vec3f::FromJolt(state.Orientation.Conjugated() * Vec3f::ToJolt(point - state.Origin));
 }
 
 Vec3f BehaviourContext::FromBodyLocal(uint32 body, const Vec3f local) const
 {
 	const BehaviourBody& state = Bodies[body];
-	return state.Origin + ToVec3f(state.Orientation * ToJolt(local));
+	return state.Origin + Vec3f::FromJolt(state.Orientation * Vec3f::ToJolt(local));
 }
 
 Vec3f BehaviourContext::ToBodyDirection(uint32 body, const Vec3f local_direction) const
 {
-	return ToVec3f(Bodies[body].Orientation * ToJolt(local_direction));
+	return Vec3f::FromJolt(Bodies[body].Orientation * Vec3f::ToJolt(local_direction));
 }
 
 Vec3f BehaviourContext::ToLocalDirection(uint32 body, const Vec3f direction) const
 {
-	return ToVec3f(Bodies[body].Orientation.Conjugated() * ToJolt(direction));
+	return Vec3f::FromJolt(Bodies[body].Orientation.Conjugated() * Vec3f::ToJolt(direction));
 }
 
 bool BehaviourContext::IsArmBody(uint32 arm, uint32 body) const
 {
-	const RagdollArm& chain = pRig->Arms[arm];
+	const BeRagdollArm& chain = pRig->Arms[arm];
 	return body == chain.Upper || body == chain.Lower || body == chain.Hand;
 }
 
@@ -83,7 +83,7 @@ void BehaviourOutput::AddWorldRotation(const BehaviourContext& ctx, uint32 body,
 		return;
 	}
 
-	const JPH::Vec3 local_axis = (ctx.Bodies[body].Orientation.Conjugated() * ToJolt(world_axis))
+	const JPH::Vec3 local_axis = (ctx.Bodies[body].Orientation.Conjugated() * Vec3f::ToJolt(world_axis))
 									 .NormalizedOr(JPH::Vec3::sAxisX());
 
 	Pose[body] = (Pose[body] * JPH::Quat::sRotation(local_axis, angle)).Normalized();
@@ -225,7 +225,7 @@ void RagdollBehaviour::LogSettings() const
 	LogInfo(LC_PHYSICS, "{}", line);
 }
 
-float32 BehaviourNoise(float32 time, float32 seed)
+float32 GetBehaviourNoise(float32 time, float32 seed)
 {
 	const float32 phase = seed * 12.9898f;
 

@@ -1,8 +1,8 @@
 #pragma once
 
+#include <Core/SizedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
-#include <Core/SizedArray.hpp>
 
 namespace fx::physics {
 
@@ -32,6 +32,7 @@ struct RagdollBodyDef
 {
 	String Bone;
 	String EndBone;
+
 	float32 ExtraLength = 0.0f;
 	float32 Radius = 0.05f;
 	float32 SwingDegrees = 0.0f;
@@ -41,10 +42,13 @@ struct RagdollBodyDef
 	float32 FootWidth = 0.0f;
 	float32 HeelLength = 0.0f;
 	float32 Friction = 0.8f;
+
 	eRagdollJoint Joint = eRagdollJoint::Cone;
 	eRagdollBodyPart Part = eRagdollBodyPart::Torso;
+
 	bool bAnchor = false;
 	bool bFoot = false;
+
 	RagdollMuscle Muscle;
 };
 

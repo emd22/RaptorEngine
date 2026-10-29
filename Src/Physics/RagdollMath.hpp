@@ -9,7 +9,6 @@
 #include <Math/Mat4.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
-
 #include <algorithm>
 
 namespace fx::physics::RagdollMath {
@@ -24,14 +23,9 @@ constexpr float32 scSoleCornerSigns[scSoleCorners][2] = {
 	{ -1.0f, 1.0f },
 };
 
-FX_FORCE_INLINE JPH::Vec3 RowAsVec3(const Mat4f& m, uint32 row)
-{
-	return JPH::Vec3(m.RawData[row * 4], m.RawData[row * 4 + 1], m.RawData[row * 4 + 2]);
-}
+FX_FORCE_INLINE JPH::Vec3 RowAsVec3(const Mat4f& m, uint32 row) { return JPH::Vec3(m.Rows[row].mIntrin); }
 
-FX_FORCE_INLINE Vec3f ToVec3f(const JPH::Vec3 v) { return Vec3f(v.GetX(), v.GetY(), v.GetZ()); }
-
-FX_FORCE_INLINE JPH::Vec3 ToJolt(const Vec3f v) { return JPH::Vec3(v.X, v.Y, v.Z); }
+// FX_FORCE_INLINE Vec3f ToVec3f(const JPH::Vec3 v) { return Vec3f(v.GetX(), v.GetY(), v.GetZ()); }
 
 FX_FORCE_INLINE JPH::Vec3 GetUpFromGravity(const JPH::Vec3 gravity)
 {
@@ -47,12 +41,13 @@ FX_FORCE_INLINE float32 SmoothStep(float32 t)
 template <typename T>
 void InitFilled(SizedArray<T>& array, size_t size, const T& value)
 {
-	array.Free();
-	array.InitCapacity(size);
+	// array.Free();
+	array.InitSize(size);
+	std::fill(array.begin(), array.end(), value);
 
-	for (size_t i = 0; i < size; i++) {
-		array.Insert(value);
-	}
+	// for (size_t i = 0; i < size; i++) {
+	// 	array.Insert(value);
+	// }
 }
 
 JPH::Mat44 RotationFromMatrix(const Mat4f& m);

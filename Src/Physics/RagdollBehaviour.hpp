@@ -40,7 +40,7 @@ enum class eBehaviourBalance : uint8
 	On,
 };
 
-struct RagdollArm
+struct BeRagdollArm
 {
 	uint32 Clavicle = 0;
 	uint32 Upper = 0;
@@ -51,7 +51,7 @@ struct RagdollArm
 	float32 SideSign = 1.0f;
 };
 
-struct RagdollLeg
+struct BeRagdollLeg
 {
 	uint32 Thigh = 0;
 	uint32 Shin = 0;
@@ -64,12 +64,14 @@ struct RagdollRig
 	static constexpr uint32 scLimbCount = 2;
 	static constexpr uint32 scMaxSpine = 4;
 
-	RagdollArm Arms[scLimbCount];
-	RagdollLeg Legs[scLimbCount];
+	BeRagdollArm Arms[scLimbCount];
+	BeRagdollLeg Legs[scLimbCount];
+
 	uint32 Spine[scMaxSpine];
 	uint32 SpineCount = 0;
 	uint32 Chest = 0;
 	uint32 Neck = 0;
+
 	JPH::Vec3 RestForward = JPH::Vec3::sAxisZ();
 	bool bValid = false;
 };
@@ -214,6 +216,6 @@ private:
 	bool mbActive = false;
 };
 
-float32 BehaviourNoise(float32 time, float32 seed);
+float32 GetBehaviourNoise(float32 time, float32 seed);
 
 } // namespace fx::physics

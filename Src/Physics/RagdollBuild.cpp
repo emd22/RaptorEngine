@@ -41,8 +41,10 @@ struct BuildFrame
 {
 	const Skeleton& Skel;
 	const Mat4f& ObjectWorld;
+
 	float32 Scale = 1.0f;
 	float32 TotalMass = 0.0f;
+
 	JPH::Vec3 Up = JPH::Vec3::sAxisY();
 	JPH::Vec3 Forward = JPH::Vec3::sZero();
 
@@ -162,6 +164,7 @@ BodyShape BuildFootBox(const BuildFrame& frame, const RagdollBodyDef& body_def, 
 	const float32 bottom = std::min(top, end_position.Dot(frame.Up)) - radius;
 	const float32 heel = -body_def.HeelLength * frame.Scale;
 	const float32 toe = (end_position - position).Dot(foot_forward) + radius + body_def.ExtraLength * frame.Scale;
+
 	const float32 box_half_height = std::max((top - bottom) * 0.5f, radius * 0.5f);
 
 	BodyShape shape;
@@ -170,6 +173,7 @@ BodyShape BuildFootBox(const BuildFrame& frame, const RagdollBodyDef& body_def, 
 
 	const JPH::Vec3 center_world = position + foot_forward * ((heel + toe) * 0.5f) +
 								   frame.Up * (bottom + box_half_height - top);
+
 	const JPH::Mat44 box_world(JPH::Vec4(foot_side, 0.0f), JPH::Vec4(frame.Up, 0.0f), JPH::Vec4(foot_forward, 0.0f),
 							   JPH::Vec4(0.0f, 0.0f, 0.0f, 1.0f));
 
@@ -184,9 +188,8 @@ BodyShape BuildFootBox(const BuildFrame& frame, const RagdollBodyDef& body_def, 
 	return shape;
 }
 
-bool ApplyHingeLimits(JPH::SwingTwistConstraintSettings& joint, const BuildFrame& frame,
-					  const RagdollBodyDef& body_def, const ResolvedBone& parent_part, const JPH::Vec3 axis_world,
-					  JPH::Vec3& out_hinge)
+bool ApplyHingeLimits(JPH::SwingTwistConstraintSettings& joint, const BuildFrame& frame, const RagdollBodyDef& body_def,
+					  const ResolvedBone& parent_part, const JPH::Vec3 axis_world, JPH::Vec3& out_hinge)
 {
 	const float32 flex = MathUtil::DegToRad(body_def.FlexDegrees);
 	const float32 slack = MathUtil::DegToRad(scHingeSlackDegrees);
@@ -227,6 +230,7 @@ JPH::SwingTwistConstraintSettings* BuildJoint(const BuildFrame& frame, const Rag
 											  const JPH::Vec3 axis_world, BuiltBody& out_body)
 {
 	JPH::SwingTwistConstraintSettings* joint = new JPH::SwingTwistConstraintSettings;
+
 	joint->mSpace = JPH::EConstraintSpace::WorldSpace;
 	joint->mPosition1 = joint->mPosition2 = position;
 	joint->mTwistAxis1 = joint->mTwistAxis2 = axis_world;
@@ -394,29 +398,34 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 
 		const Mat4f& bone_model = skel.WorldTransforms[bone];
 
-		mBodies.Insert(BodyInfo { .BoneIndex = bone,
-								  .BoneScale = JPH::Vec3(RowAsVec3(bone_model, 0).Length(),
-														 RowAsVec3(bone_model, 1).Length(),
-														 RowAsVec3(bone_model, 2).Length()),
-								  .ParentBody = parent_body,
-								  .ParentAnchor = parent_anchor,
-								  .Part = body_def.Part,
-								  .bAnchor = body_def.bAnchor,
-								  .bFoot = body_def.bFoot,
-								  .LocalAxis = body.AxisLocal,
-								  .LocalCenter = body.Shape.CenterLocal,
-								  .Length = body.Length,
-								  .Radius = body.Radius,
-								  .bBox = body.Shape.bBox,
-								  .BoxHalfExtent = body.Shape.BoxHalfExtent,
-								  .BoxRotation = body.Shape.BoxRotation,
-								  .Mass = body_def.MassFraction * frame.TotalMass,
-								  .Muscle = body_def.Muscle,
-								  .bHinge = body.bHinge,
-								  .HingeLocal = body.Orientation.Conjugated() * body.Hinge,
-								  .ParentHingeLocal = parent_hinge_local,
-								  .RestPosition = body.Position,
-								  .RestOrientation = body.Orientation });
+		mBodies.Insert(BodyInfo {
+
+			.BoneScale = JPH::Vec3(RowAsVec3(bone_model, 0).Length(), RowAsVec3(bone_model, 1).Length(),
+								   RowAsVec3(bone_model, 2).Length()),
+			.ParentAnchor = parent_anchor,
+			.LocalAxis = body.AxisLocal,
+			.LocalCenter = body.Shape.CenterLocal,
+			.BoxHalfExtent = body.Shape.BoxHalfExtent,
+			.BoxRotation = body.Shape.BoxRotation,
+			/* */
+			.HingeLocal = body.Orientation.Conjugated() * body.Hinge,
+			.ParentHingeLocal = parent_hinge_local,
+			.RestPosition = body.Position,
+			.RestOrientation = body.Orientation,
+			/* */
+			.ParentBody = parent_body,
+			/* */
+			.Part = body_def.Part,
+			.Muscle = body_def.Muscle,
+			.Length = body.Length,
+			.Radius = body.Radius,
+			.bBox = body.Shape.bBox,
+			.Mass = body_def.MassFraction * frame.TotalMass,
+			.BoneIndex = bone,
+			.bHinge = body.bHinge,
+			.bAnchor = body_def.bAnchor,
+			.bFoot = body_def.bFoot,
+		});
 	}
 
 	if (!settings->Stabilize()) {
@@ -446,8 +455,8 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 
 	const float32 skinning_error = WriteInitialPose();
 
-	LogInfo(LC_PHYSICS, "Ragdoll: {} bodies, {:.3f} kg, rest pose skinning error {:.5f}", mBodies.Size,
-			frame.TotalMass, skinning_error);
+	LogInfo(LC_PHYSICS, "Ragdoll: {} bodies, {:.3f} kg, rest pose skinning error {:.5f}", mBodies.Size, frame.TotalMass,
+			skinning_error);
 
 	return true;
 }
@@ -526,6 +535,7 @@ void Ragdoll::InitBodyArrays(uint32 joint_count)
 	InitFilled(mStates, mBodies.Size, BodyState {});
 	InitFilled(mMotorOverrides, mBodies.Size, MotorOverride {});
 	InitFilled(mLayers, mBodies.Size, BodyLayer {});
+
 	mbHasTargets = false;
 
 	InitFilled(mDrivenWorld, joint_count, Mat4f::scIdentity);

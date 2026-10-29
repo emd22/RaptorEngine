@@ -111,6 +111,20 @@ FX_FORCE_INLINE Vec3f Vec3f::Normalize() const
 	return Vec3f(vdivq_f32(mIntrin, len_v));
 }
 
+FX_FORCE_INLINE Vec3f Vec3f::SafeNormalize(const Vec3f fallback) const
+{
+	static constexpr float32 scEpsilon = 1e-5f;
+
+	const float32 len = Length();
+
+	if (len < scEpsilon) {
+		return fallback;
+	}
+
+	return Vec3f(vdivq_f32(mIntrin, vdupq_n_f32(len)));
+}
+
+
 FX_FORCE_INLINE float32 Vec3f::Length() const
 {
 	float32x4_t v = mIntrin;

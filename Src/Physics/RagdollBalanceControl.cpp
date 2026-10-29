@@ -1,6 +1,5 @@
-#include "RagdollBalance.hpp"
-
 #include "Ragdoll.hpp"
+#include "RagdollBalance.hpp"
 
 #include <Math/TwoBoneIK.hpp>
 #include <algorithm>
@@ -30,7 +29,7 @@ constexpr float32 scGravityFullStrength = 0.25f;
 
 } // namespace
 
-bool RagdollBalance::IsLoaded(const Leg& leg) const { return leg.bStance && leg.ContactAge < scContactHoldTime; }
+bool RagdollBalance::IsLoaded(const RagdollLeg& leg) const { return leg.bStance && leg.ContactAge < scContactHoldTime; }
 
 void RagdollBalance::DriveStanceLegs(Ragdoll& ragdoll)
 {
@@ -53,7 +52,7 @@ void RagdollBalance::DriveStanceLegs(Ragdoll& ragdoll)
 
 	float32 pelvis_height = std::numeric_limits<float32>::max();
 
-	for (const Leg& leg : mLegs) {
+	for (const RagdollLeg& leg : mLegs) {
 		if (!leg.bStance) {
 			continue;
 		}
@@ -61,7 +60,12 @@ void RagdollBalance::DriveStanceLegs(Ragdoll& ragdoll)
 		const JPH::Vec3 hip_offset = pelvis_target * leg.HipOffset;
 		const float32 reach = scStanceHeightFraction * (leg.Upper + leg.Lower);
 		const float32 spread = Horizontal(pelvis_horizontal + hip_offset - leg.AnklePosition).Length();
-		const float32 hip_height = std::sqrt(std::max(reach * reach - spread * spread, reach * reach * scMinHipHeight));
+
+		const float32 reach2 = reach * reach;
+		const float32 spread2 = spread * spread;
+
+
+		const float32 hip_height = std::sqrt(std::max(reach2 - spread2, reach2 * scMinHipHeight));
 
 		pelvis_height = std::min(pelvis_height, leg.AnklePosition.Dot(mUp) + hip_height - hip_offset.Dot(mUp));
 	}
@@ -72,7 +76,7 @@ void RagdollBalance::DriveStanceLegs(Ragdoll& ragdoll)
 
 	const JPH::Vec3 pelvis = pelvis_horizontal + mUp * pelvis_height;
 
-	for (Leg& leg : mLegs) {
+	for (RagdollLeg& leg : mLegs) {
 		if (!leg.bStance) {
 			continue;
 		}
@@ -118,12 +122,12 @@ void RagdollBalance::DriveStanceLegs(Ragdoll& ragdoll)
 
 void RagdollBalance::DriveSwingLeg(Ragdoll& ragdoll)
 {
-	const Leg& leg = mLegs[mSwing.Leg];
+	const RagdollLeg& leg = mLegs[mSwing.Leg];
 
 	DriveFreeLeg(ragdoll, leg, mSwing.AnkleTarget, GetHeadingRotation(mForward) * leg.RestFoot);
 }
 
-void RagdollBalance::DriveFreeLeg(Ragdoll& ragdoll, const Leg& leg, const JPH::Vec3 ankle, const JPH::Quat& foot)
+void RagdollBalance::DriveFreeLeg(Ragdoll& ragdoll, const RagdollLeg& leg, const JPH::Vec3 ankle, const JPH::Quat& foot)
 {
 	JPH::Quat thigh;
 	JPH::Quat shin;
@@ -142,13 +146,14 @@ void RagdollBalance::DriveFreeLeg(Ragdoll& ragdoll, const Leg& leg, const JPH::V
 	ankle_motor.Target = (shin.Conjugated() * foot).Normalized();
 }
 
-void RagdollBalance::SolveLeg(Ragdoll& ragdoll, const Leg& leg, const JPH::Vec3 hip, const JPH::Vec3 ankle,
+void RagdollBalance::SolveLeg(Ragdoll& ragdoll, const RagdollLeg& leg, const JPH::Vec3 hip, const JPH::Vec3 ankle,
 							  JPH::Quat& out_thigh, JPH::Quat& out_shin) const
 {
-	const TwoBoneIKResult ik = SolveTwoBoneIK(ToVec3f(hip), ToVec3f(ankle), leg.Upper, leg.Lower, ToVec3f(mForward));
+	const TwoBoneIKResult ik = SolveTwoBoneIK(Vec3f::FromJolt(hip), Vec3f::FromJolt(ankle), leg.Upper, leg.Lower,
+											  Vec3f::FromJolt(mForward));
 
-	const JPH::Vec3 knee = ToJolt(ik.Mid);
-	const JPH::Vec3 end = ToJolt(ik.End);
+	const JPH::Vec3 knee = Vec3f::ToJolt(ik.Mid);
+	const JPH::Vec3 end = Vec3f::ToJolt(ik.End);
 
 	const JPH::Vec3 thigh_direction = (knee - hip).NormalizedOr(-mUp);
 	const JPH::Vec3 shin_direction = (end - knee).NormalizedOr(-mUp);
@@ -165,10 +170,10 @@ void RagdollBalance::SolveLeg(Ragdoll& ragdoll, const Leg& leg, const JPH::Vec3 
 
 void RagdollBalance::ApplyTorsoControl(Ragdoll& ragdoll, JPH::BodyInterface& body_interface, const JPH::Vec3 gravity)
 {
-	uint32 stance_legs[scLegCount];
+	uint32 stance_legs[2];
 	uint32 stance_count = 0;
 
-	for (uint32 i = 0; i < scLegCount; i++) {
+	for (uint32 i = 0; i < 2; i++) {
 		if (IsLoaded(mLegs[i])) {
 			stance_legs[stance_count++] = i;
 		}
@@ -204,7 +209,7 @@ void RagdollBalance::ApplyTorsoControl(Ragdoll& ragdoll, JPH::BodyInterface& bod
 
 	inertia = std::max(inertia, 1e-2f);
 
-	float32 weights[scLegCount] = { 1.0f, 0.0f };
+	float32 weights[2] = { 1.0f, 0.0f };
 
 	if (stance_count == 2) {
 		const float32 distance_a = Horizontal(mCenterOfMass - mLegs[stance_legs[0]].FootCenter).Length();
@@ -218,19 +223,21 @@ void RagdollBalance::ApplyTorsoControl(Ragdoll& ragdoll, JPH::BodyInterface& bod
 	const float32 frequency_scale = scTorsoFrequency / ragdoll.mBodies[mLegs[0].Thigh].Muscle.Stiffness;
 
 	for (uint32 i = 0; i < stance_count; i++) {
-		const Leg& leg = mLegs[stance_legs[i]];
+		const RagdollLeg& leg = mLegs[stance_legs[i]];
 		const JPH::Quat thigh = body_interface.GetRotation(ragdoll.GetBodyID(leg.Thigh));
 		const float32 lift = std::clamp((leg.SoleHeight - mGroundHeight - scLiftStart) / scLiftRange, 0.0f, 1.0f);
 		const JPH::Quat hip_thigh = thigh.SLERP(leg.DesiredThigh, lift).Normalized();
 
 		Ragdoll::MotorOverride& hip_motor = ragdoll.mMotorOverrides[leg.Thigh];
+
 		hip_motor.Mode = Ragdoll::eMotorOverride::Target;
 		hip_motor.Target = (pelvis_target.Conjugated() * hip_thigh).Normalized();
 		hip_motor.FrequencyScale = frequency_scale;
 		hip_motor.Inertia = std::max(inertia * weights[i], 1e-2f);
 	}
 
-	const JPH::Vec3 upper_center = upper_moment / upper_mass;
+	const JPH::Vec3 upper_center = (upper_moment / upper_mass);
+
 	JPH::Vec3 torque = -(upper_center - pivot).Cross(gravity * upper_mass) * scGravityFeedForward *
 					   std::min(ragdoll.mBodies[0].Strength / scGravityFullStrength, 1.0f);
 

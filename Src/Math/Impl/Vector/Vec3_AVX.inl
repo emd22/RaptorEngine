@@ -117,10 +117,23 @@ FX_FORCE_INLINE Vec3f Vec3f::Normalize() const
 		return *this;
 	}
 
-	// Calculate length and splat to register
 	const __m128 len_v = _mm_set1_ps(length);
 
 	return Vec3f(_mm_div_ps(mIntrin, len_v));
+}
+
+
+FX_FORCE_INLINE Vec3f Vec3f::SafeNormalize(const Vec3f v, const Vec3f fallback) const
+{
+	static constexpr float32 scEpsilon = 1e-5f;
+
+	const float32 len = Length();
+
+	if (len < scEpsilon) {
+		return fallback;
+	}
+
+	return Vec3f(_mm_div_ps(mIntrin, _mm_set1_ps(len)));
 }
 
 FX_FORCE_INLINE float32 Vec3f::Length() const

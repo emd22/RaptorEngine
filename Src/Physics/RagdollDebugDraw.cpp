@@ -56,8 +56,8 @@ Color Dim(const Color color, float32 factor)
 void DrawGroundCross(const JPH::Vec3 point, const JPH::Vec3 axis_a, const JPH::Vec3 axis_b, float32 size,
 					 const Color color)
 {
-	renderer::gDebugDraw->Line(ToVec3f(point - axis_a * size), ToVec3f(point + axis_a * size), color);
-	renderer::gDebugDraw->Line(ToVec3f(point - axis_b * size), ToVec3f(point + axis_b * size), color);
+	renderer::gDebugDraw->Line(Vec3f::FromJolt(point - axis_a * size), Vec3f::FromJolt(point + axis_a * size), color);
+	renderer::gDebugDraw->Line(Vec3f::FromJolt(point - axis_b * size), Vec3f::FromJolt(point + axis_b * size), color);
 }
 
 } // namespace
@@ -115,7 +115,7 @@ void Ragdoll::DrawDebugBodies(SizedArray<Vec3f>& centers) const
 						Vec4f(z.GetX(), z.GetY(), z.GetZ(), 0.0f),
 						Vec4f(center.GetX(), center.GetY(), center.GetZ(), 1.0f));
 
-		centers[i] = ToVec3f(center);
+		centers[i] = Vec3f::FromJolt(center);
 
 		Color color = scPartColors[static_cast<uint32>(info.Part)];
 
@@ -175,11 +175,11 @@ void Ragdoll::DrawDebugSupport() const
 	for (uint32 i = 0; i < mBodies.Size; i++) {
 		BodyGroundContact contact;
 
-		if (!GetBodyGroundContact(i, contact) || ToJolt(contact.Normal).Dot(up) < scSupportNormalMinUp) {
+		if (!GetBodyGroundContact(i, contact) || Vec3f::ToJolt(contact.Normal).Dot(up) < scSupportNormalMinUp) {
 			continue;
 		}
 
-		const JPH::Vec3 point = ToJolt(contact.Point);
+		const JPH::Vec3 point = Vec3f::ToJolt(contact.Point);
 
 		support_points.Insert(Vec2f { point.Dot(axis_u), point.Dot(axis_v) });
 		support_height_sum += point.Dot(up);
@@ -190,10 +190,10 @@ void Ragdoll::DrawDebugSupport() const
 	}
 
 	const float32 support_height = support_height_sum / static_cast<float32>(support_points.Size);
-	const JPH::Vec3 com = ToJolt(center_of_mass);
+	const JPH::Vec3 com = Vec3f::ToJolt(center_of_mass);
 	const JPH::Vec3 com_on_support = com - up * (com.Dot(up) - support_height);
 
-	renderer::gDebugDraw->Line(center_of_mass, ToVec3f(com_on_support), scComColor);
+	renderer::gDebugDraw->Line(center_of_mass, Vec3f::FromJolt(com_on_support), scComColor);
 	DrawGroundCross(com_on_support, axis_u, axis_v, scComGroundCrossSize, scComColor);
 
 	SizedArray<Vec2f> hull;
@@ -206,7 +206,7 @@ void Ragdoll::DrawDebugSupport() const
 	}
 
 	const auto to_world = [&](const Vec2f point)
-	{ return ToVec3f(axis_u * point.X + axis_v * point.Y + up * support_height); };
+	{ return Vec3f::FromJolt(axis_u * point.X + axis_v * point.Y + up * support_height); };
 
 	for (uint32 i = 0; i < hull_count; i++) {
 		renderer::gDebugDraw->Line(to_world(hull[i]), to_world(hull[(i + 1) % hull_count]), scSupportColor);
@@ -229,11 +229,12 @@ void RagdollBalance::DebugDraw() const
 
 	DrawGroundCross(mCapturePoint, mForward, side, scMarkerSize, capture_color);
 	DrawGroundCross(mSupportCenter, mForward, side, scMarkerSize, scSupportCenterColor);
-	renderer::gDebugDraw->Line(ToVec3f(ToGround(mCenterOfMass)), ToVec3f(mCapturePoint), capture_color);
+	renderer::gDebugDraw->Line(Vec3f::FromJolt(ToGround(mCenterOfMass)), Vec3f::FromJolt(mCapturePoint), capture_color);
 
 	if (mStatus.State == eBalanceState::Stepping) {
 		DrawGroundCross(mSwing.Landing, mForward, side, scMarkerSize, scSwingColor);
-		renderer::gDebugDraw->Line(ToVec3f(mLegs[mSwing.Leg].AnklePosition), ToVec3f(mSwing.AnkleTarget), scSwingColor);
+		renderer::gDebugDraw->Line(Vec3f::FromJolt(mLegs[mSwing.Leg].AnklePosition),
+								   Vec3f::FromJolt(mSwing.AnkleTarget), scSwingColor);
 	}
 }
 

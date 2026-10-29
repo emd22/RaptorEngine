@@ -34,17 +34,6 @@ constexpr float32 scElbowOut = 0.6f;
 
 constexpr float32 scDebugCross = 0.05f;
 
-Vec3f SafeNormalize(const Vec3f v, const Vec3f fallback)
-{
-	const float32 length = v.Length();
-
-	if (length < 1e-5f) {
-		return fallback;
-	}
-
-	return v / length;
-}
-
 void DrawCross(const Vec3f point, Color color)
 {
 	renderer::gDebugDraw->Line(point - Vec3f(scDebugCross, 0.0f, 0.0f), point + Vec3f(scDebugCross, 0.0f, 0.0f), color);
@@ -149,7 +138,7 @@ bool RagdollBehaviours::BuildRig(const Ragdoll& ragdoll)
 				continue;
 			}
 
-			mRig.Arms[arm_count++] = RagdollArm {
+			mRig.Arms[arm_count++] = BeRagdollArm {
 				.Clavicle = static_cast<uint32>(body.ParentBody),
 				.Upper = i,
 				.Lower = static_cast<uint32>(lower),
@@ -174,7 +163,7 @@ bool RagdollBehaviours::BuildRig(const Ragdoll& ragdoll)
 				continue;
 			}
 
-			mRig.Legs[leg_count++] = RagdollLeg {
+			mRig.Legs[leg_count++] = BeRagdollLeg {
 				.Thigh = i, .Shin = static_cast<uint32>(shin), .Foot = static_cast<uint32>(foot), .SideSign = side_sign
 			};
 		}
@@ -254,7 +243,7 @@ void RagdollBehaviours::Sense(Ragdoll& ragdoll, float32 delta_time)
 {
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
 	const JPH::Vec3 gravity = gPhysics->pBackend->PhysicsSystem.GetGravity();
-	const Vec3f up = ToVec3f(GetUpFromGravity(gravity));
+	const Vec3f up = Vec3f::FromJolt(GetUpFromGravity(gravity));
 
 	BehaviourContext& ctx = mContext;
 
@@ -285,10 +274,10 @@ void RagdollBehaviours::Sense(Ragdoll& ragdoll, float32 delta_time)
 		JPH::Quat orientation;
 		body_interface.GetPositionAndRotation(body_id, position, orientation);
 
-		body.Origin = ToVec3f(JPH::Vec3(position));
+		body.Origin = Vec3f::FromJolt(JPH::Vec3(position));
 		body.Orientation = orientation;
-		body.Center = ToVec3f(JPH::Vec3(body_interface.GetCenterOfMassPosition(body_id)));
-		body.Velocity = ToVec3f(body_interface.GetLinearVelocity(body_id));
+		body.Center = Vec3f::FromJolt(JPH::Vec3(body_interface.GetCenterOfMassPosition(body_id)));
+		body.Velocity = Vec3f::FromJolt(body_interface.GetLinearVelocity(body_id));
 
 		BodyGroundContact contact;
 		body.bContact = is_powered && ragdoll.GetBodyGroundContact(i, contact);
@@ -356,10 +345,10 @@ void RagdollBehaviours::SenseChestFrame(const Ragdoll& ragdoll)
 
 	const JPH::Quat delta = ctx.Bodies[mRig.Chest].Orientation *
 							ragdoll.mBodies[mRig.Chest].RestOrientation.Conjugated();
-	const JPH::Vec3 up = ToJolt(ctx.Up);
+	const JPH::Vec3 up = Vec3f::ToJolt(ctx.Up);
 
-	ctx.Forward = ToVec3f((delta * mRig.RestForward).Normalized());
-	ctx.Right = ToVec3f((delta * up.Cross(mRig.RestForward)).NormalizedOr(JPH::Vec3::sAxisX()));
+	ctx.Forward = Vec3f::FromJolt((delta * mRig.RestForward).Normalized());
+	ctx.Right = Vec3f::FromJolt((delta * up.Cross(mRig.RestForward)).NormalizedOr(JPH::Vec3::sAxisX()));
 }
 
 void RagdollBehaviours::PredictImpact()
@@ -373,7 +362,9 @@ void RagdollBehaviours::PredictImpact()
 
 	for (uint32 step = 1; step <= scImpactSteps; step++) {
 		const float32 time = scImpactStep * static_cast<float32>(step);
+
 		const Vec3f next = chest.Center + chest.Velocity * time + gravity * (0.5f * time * time);
+
 		const Vec3f segment = next - point;
 		const float32 segment_length = segment.Length();
 
@@ -388,8 +379,9 @@ void RagdollBehaviours::PredictImpact()
 
 			ctx.bImpactPredicted = true;
 			ctx.ImpactPoint = hit.Point;
-			ctx.ImpactNormal = SafeNormalize(hit.Normal, ctx.Up);
+			ctx.ImpactNormal = hit.Normal.SafeNormalize(ctx.Up);
 			ctx.ImpactTime = time - scImpactStep * (1.0f - std::clamp(fraction, 0.0f, 1.0f));
+
 			return;
 		}
 
@@ -413,7 +405,10 @@ void RagdollBehaviours::EmitSupportEvents(float32 delta_time)
 
 		if (mUnsupportedTime >= scLostSupportTime && !mbLostSupportSent) {
 			mbLostSupportSent = true;
-			Dispatch(RagdollEvent { .Type = eRagdollEvent::LostSupport, .Magnitude = -ctx.Velocity.Dot(ctx.Up) });
+			Dispatch(RagdollEvent {
+				.Type = eRagdollEvent::LostSupport,
+				.Magnitude = -ctx.Velocity.Dot(ctx.Up),
+			});
 		}
 	}
 
@@ -579,7 +574,7 @@ void RagdollBehaviours::FoldOverride(uint32 body, const JPH::Quat& pose, float32
 void RagdollBehaviours::SolveArm(uint32 arm, const BehaviourGoal& goal, float32 weight)
 {
 	const BehaviourContext& ctx = mContext;
-	const RagdollArm& chain = mRig.Arms[arm];
+	const BeRagdollArm& chain = mRig.Arms[arm];
 	const Ragdoll::BodyInfo& upper = ctx.pRagdoll->mBodies[chain.Upper];
 	const Ragdoll::BodyInfo& lower = ctx.pRagdoll->mBodies[chain.Lower];
 
@@ -589,8 +584,8 @@ void RagdollBehaviours::SolveArm(uint32 arm, const BehaviourGoal& goal, float32 
 
 	const TwoBoneIKResult ik = SolveTwoBoneIK(shoulder, goal.Target, chain.UpperLength, chain.LowerLength, hint);
 
-	const Vec3f upper_direction = SafeNormalize(ik.Mid - shoulder, -chest_up);
-	const Vec3f lower_direction = SafeNormalize(ik.End - ik.Mid, upper_direction);
+	const Vec3f upper_direction = (ik.Mid - shoulder).SafeNormalize(-chest_up);
+	const Vec3f lower_direction = (ik.End - ik.Mid).SafeNormalize(upper_direction);
 
 	Vec3f hinge = upper_direction.Cross(lower_direction);
 
@@ -598,12 +593,13 @@ void RagdollBehaviours::SolveArm(uint32 arm, const BehaviourGoal& goal, float32 
 		hinge = upper_direction.Cross(hint);
 	}
 
-	hinge = SafeNormalize(hinge, ctx.Right);
+	hinge = hinge.SafeNormalize(ctx.Right);
 
-	const JPH::Quat upper_world = FrameRotation(upper.LocalAxis, lower.ParentHingeLocal, ToJolt(upper_direction),
-												ToJolt(hinge));
-	const JPH::Quat lower_world = FrameRotation(lower.LocalAxis, lower.HingeLocal, ToJolt(lower_direction),
-												ToJolt(hinge));
+	const JPH::Quat upper_world = FrameRotation(upper.LocalAxis, lower.ParentHingeLocal, Vec3f::ToJolt(upper_direction),
+												Vec3f::ToJolt(hinge));
+	const JPH::Quat lower_world = FrameRotation(lower.LocalAxis, lower.HingeLocal, Vec3f::ToJolt(lower_direction),
+												Vec3f::ToJolt(hinge));
+
 	const JPH::Quat parent = ctx.Bodies[chain.Clavicle].Orientation;
 
 	FoldOverride(chain.Upper, (parent.Conjugated() * upper_world).Normalized(), weight);

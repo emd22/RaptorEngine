@@ -715,8 +715,6 @@ void RaptorGame::RequestRagdollTemplate()
 				mpRagdollTemplate.store(object);
 			}
 		});
-
-	LogInfo("Loading the ragdoll model, dummies drop once it has loaded");
 }
 
 void RaptorGame::SpawnDebugNPC(Object* model)

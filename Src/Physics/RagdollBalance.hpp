@@ -39,42 +39,43 @@ struct BalanceStatus
 	bool bCalm = false;
 };
 
+struct RagdollLeg
+{
+	static constexpr uint32 scSoleCorners = RagdollMath::scSoleCorners;
+
+	uint32 Thigh = 0;
+	uint32 Shin = 0;
+	uint32 Foot = 0;
+	float32 Upper = 0.0f;
+	float32 Lower = 0.0f;
+	float32 HingeSign = 1.0f;
+	float32 SideSign = 1.0f;
+	JPH::Vec3 HipOffset = JPH::Vec3::sZero();
+	JPH::Vec3 SoleCenter = JPH::Vec3::sZero();
+	JPH::Vec3 SoleCorners[scSoleCorners];
+	JPH::Quat RestFoot = JPH::Quat::sIdentity();
+
+	JPH::Vec3 AnklePosition = JPH::Vec3::sZero();
+	JPH::Quat FootOrientation = JPH::Quat::sIdentity();
+	JPH::Vec3 FootCenter = JPH::Vec3::sZero();
+	JPH::Vec3 ContactCorners[scSoleCorners];
+	uint32 ContactCornerCount = 0;
+	float32 SoleHeight = 0.0f;
+	float32 ContactAge = 0.0f;
+	bool bTouching = false;
+	bool bContact = false;
+
+	bool bStance = true;
+	JPH::Quat DesiredThigh = JPH::Quat::sIdentity();
+};
+
+
 class RagdollBalance
 {
 private:
-	static constexpr uint32 scLegCount = 2;
-	static constexpr uint32 scSoleCorners = RagdollMath::scSoleCorners;
-
 	static constexpr float32 scContactHoldTime = 0.08f;
 	static constexpr float32 scSwingPress = 0.03f;
 
-	struct Leg
-	{
-		uint32 Thigh = 0;
-		uint32 Shin = 0;
-		uint32 Foot = 0;
-		float32 Upper = 0.0f;
-		float32 Lower = 0.0f;
-		float32 HingeSign = 1.0f;
-		float32 SideSign = 1.0f;
-		JPH::Vec3 HipOffset = JPH::Vec3::sZero();
-		JPH::Vec3 SoleCenter = JPH::Vec3::sZero();
-		JPH::Vec3 SoleCorners[scSoleCorners];
-		JPH::Quat RestFoot = JPH::Quat::sIdentity();
-
-		JPH::Vec3 AnklePosition = JPH::Vec3::sZero();
-		JPH::Quat FootOrientation = JPH::Quat::sIdentity();
-		JPH::Vec3 FootCenter = JPH::Vec3::sZero();
-		JPH::Vec3 ContactCorners[scSoleCorners];
-		uint32 ContactCornerCount = 0;
-		float32 SoleHeight = 0.0f;
-		float32 ContactAge = 0.0f;
-		bool bTouching = false;
-		bool bContact = false;
-
-		bool bStance = true;
-		JPH::Quat DesiredThigh = JPH::Quat::sIdentity();
-	};
 
 	struct Swing
 	{
@@ -105,8 +106,8 @@ private:
 	bool InitLegs(const Ragdoll& ragdoll);
 	bool InitRestPose(const Ragdoll& ragdoll);
 
-	void GatherState(Ragdoll& ragdoll, JPH::BodyInterface& body_interface, float32 delta_time,
-					 const JPH::Vec3 gravity, bool contacts_fresh);
+	void GatherState(Ragdoll& ragdoll, JPH::BodyInterface& body_interface, float32 delta_time, const JPH::Vec3 gravity,
+					 bool contacts_fresh);
 	void GatherFeet(Ragdoll& ragdoll, JPH::BodyInterface& body_interface, float32 delta_time, bool contacts_fresh);
 	bool IsAnyBodyOnGround(Ragdoll& ragdoll) const;
 	void BuildSupport();
@@ -120,24 +121,27 @@ private:
 	bool BeginStep();
 	void StartSwing(uint32 swing_leg, const JPH::Vec3 landing, bool fixed);
 
-	float32 GetCaptureDistance(const Leg& leg) const;
+	float32 GetCaptureDistance(const RagdollLeg& leg) const;
 	float32 GetLandingCaptureError(uint32 stance_leg, const JPH::Vec3 landing) const;
 	JPH::Vec3 PlanLanding(uint32 swing_leg, uint32 stance_leg, float32 time_left) const;
 
 	void DriveStanceLegs(Ragdoll& ragdoll);
 	void DriveSwingLeg(Ragdoll& ragdoll);
-	void DriveFreeLeg(Ragdoll& ragdoll, const Leg& leg, const JPH::Vec3 ankle, const JPH::Quat& foot);
-	void SolveLeg(Ragdoll& ragdoll, const Leg& leg, const JPH::Vec3 hip, const JPH::Vec3 ankle, JPH::Quat& out_thigh,
-				  JPH::Quat& out_shin) const;
+	void DriveFreeLeg(Ragdoll& ragdoll, const RagdollLeg& leg, const JPH::Vec3 ankle, const JPH::Quat& foot);
+	void SolveLeg(Ragdoll& ragdoll, const RagdollLeg& leg, const JPH::Vec3 hip, const JPH::Vec3 ankle,
+				  JPH::Quat& out_thigh, JPH::Quat& out_shin) const;
 	void ApplyTorsoControl(Ragdoll& ragdoll, JPH::BodyInterface& body_interface, const JPH::Vec3 gravity);
-	bool IsLoaded(const Leg& leg) const;
+	bool IsLoaded(const RagdollLeg& leg) const;
 
 	JPH::Vec3 GetHeadingForward(const JPH::Quat& orientation, const JPH::Quat& rest) const;
 	JPH::Quat GetHeadingRotation(const JPH::Vec3 forward) const;
 	JPH::Vec3 ToGround(const JPH::Vec3 point) const;
 
 	FX_FORCE_INLINE JPH::Vec3 Horizontal(const JPH::Vec3 v) const { return v - mUp * v.Dot(mUp); }
-	FX_FORCE_INLINE Vec2f ToPlane(const JPH::Vec3 point) const { return Vec2f { point.Dot(mAxisU), point.Dot(mAxisV) }; }
+	FX_FORCE_INLINE Vec2f ToPlane(const JPH::Vec3 point) const
+	{
+		return Vec2f { point.Dot(mAxisU), point.Dot(mAxisV) };
+	}
 	FX_FORCE_INLINE JPH::Vec3 FromPlane(const Vec2f point) const
 	{
 		return mAxisU * point.X + mAxisV * point.Y + mUp * mGroundHeight;
@@ -145,12 +149,14 @@ private:
 
 private:
 	bool mbValid = false;
-	Leg mLegs[scLegCount];
+	RagdollLeg mLegs[2];
+
 	uint32 mNeckBody = 0;
 	uint32 mChestBody = 0;
 
 	JPH::Vec3 mRestForward = JPH::Vec3::sAxisZ();
 	JPH::Quat mRestPelvis = JPH::Quat::sIdentity();
+
 	float32 mRestComHeight = 1.0f;
 	float32 mRestWidth = 0.3f;
 	float32 mFootHalfWidth = 0.045f;
