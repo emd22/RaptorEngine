@@ -283,9 +283,9 @@ void RaptorGame::CreateGame()
 	mpNPCActiveDistanceCVar = gCVars->Set("b_npc_active_distance", gCVars->Get("b_npc_active_distance", 50.0f));
 	mpNPCBumpSpeedCVar = gCVars->Set("b_npc_bump_speed", gCVars->Get("b_npc_bump_speed", 1.0f));
 	mpNPCBumpImpulseCVar = gCVars->Set("b_npc_bump_impulse", gCVars->Get("b_npc_bump_impulse", 4.0f));
-	mpNPCHitShoveCVar = gCVars->Set("b_npc_hit_shove", gCVars->Get("b_npc_hit_shove", 10.0f));
+	mpNPCHitShoveCVar = gCVars->Set("b_npc_hit_shove", gCVars->Get("b_npc_hit_shove", 20.0f));
 	mpNPCMinShoveCVar = gCVars->Set("b_npc_min_shove", gCVars->Get("b_npc_min_shove", 0.3f));
-	mpNPCMaxShoveCVar = gCVars->Set("b_npc_max_shove", gCVars->Get("b_npc_max_shove", 0.5f));
+	mpNPCMaxShoveCVar = gCVars->Set("b_npc_max_shove", gCVars->Get("b_npc_max_shove", 1.2f));
 	mpNPCStaggerTimeCVar = gCVars->Set("b_npc_stagger_time", gCVars->Get("b_npc_stagger_time", 1.1f));
 	mpNPCStaggerSpeedCVar = gCVars->Set("b_npc_stagger_speed", gCVars->Get("b_npc_stagger_speed", 1.1f));
 	mpNPCStumbleTimeCVar = gCVars->Set("b_npc_stumble_time", gCVars->Get("b_npc_stumble_time", 0.3f));

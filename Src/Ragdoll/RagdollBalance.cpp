@@ -33,8 +33,10 @@ constexpr float32 scSwingMinTouchdown = 0.6f;
 constexpr float32 scTouchdownDistance = 0.05f;
 constexpr float32 scLandingMargin = 0.08f;
 constexpr float32 scLandingSideMargin = 0.03f;
-constexpr float32 scMinStepWidth = 0.12f;
-constexpr float32 scMaxStepWidth = 0.5f;
+/// Extra outward reach on every step, so the stance opens up while the body is off balance
+constexpr float32 scStanceWidenMargin = 0.1f;
+constexpr float32 scMinStepWidth = 0.22f;
+constexpr float32 scMaxStepWidth = 0.6f;
 constexpr float32 scMaxStepLength = 0.5f;
 constexpr float32 scStanceDistanceCost = 2.0f;
 constexpr float32 scCaptureErrorCost = 10.0f;
@@ -51,12 +53,12 @@ constexpr float32 scMaxLandingDip = 0.03f;
 constexpr float32 scLandingDipTime = 0.25f;
 constexpr float32 scStumbleStep = 0.35f;
 
-constexpr float32 scFallTilt = MathUtil::DegToRad(50.0f);
+constexpr float32 scFallTilt = MathUtil::DegToRad(25.0f);
 /// Where a fall starts to build up, before it reaches the thresholds above
-constexpr float32 scFallStartTilt = MathUtil::DegToRad(25.0f);
+constexpr float32 scFallStartTilt = MathUtil::DegToRad(12.5f);
 constexpr float32 scFallStartHeight = 0.85f;
 /// A trunk lean past this steps even while the capture point is still over the feet, at most once per scLeanStepTime
-constexpr float32 scLeanStepTilt = MathUtil::DegToRad(10.0f);
+constexpr float32 scLeanStepTilt = MathUtil::DegToRad(3.0f);
 constexpr float32 scLeanStepTime = 0.15f;
 constexpr float32 scFallHeightFraction = 0.6f;
 constexpr float32 scCalmSpeed = 0.08f;
@@ -415,9 +417,8 @@ bool RagdollBalance::DetectFall()
 	const float32 height = mCenterOfMass.Dot(mFrame.Up) - mGroundHeight;
 	const float32 tilt_progress = MathUtil::Clamp((mTrunkTilt - scFallStartTilt) / (scFallTilt - scFallStartTilt), 0.0f,
 												  1.0f);
-	const float32 height_progress = MathUtil::Clamp((scFallStartHeight - height / mRestComHeight) /
-													(scFallStartHeight - scFallHeightFraction),
-												0.0f, 1.0f);
+	const float32 height_progress = MathUtil::Clamp(
+		(scFallStartHeight - height / mRestComHeight) / (scFallStartHeight - scFallHeightFraction), 0.0f, 1.0f);
 
 	// Balance and the muscles fade over the approach, reaching the same point as the thresholds below
 	mStatus.FallProgress = std::max(tilt_progress, height_progress);
@@ -560,6 +561,20 @@ void RagdollBalance::UpdateStepping(float32 delta_time)
 		return;
 	}
 
+	// The foot never reached its landing. Replan from where it is, and count
+	// the attempt against the step budget so a step that is impossible falls rather than looping
+	if (!touched_down) {
+		mStatus.RecoverySteps++;
+
+		if (mStatus.RecoverySteps >= scMaxRecoverySteps) {
+			Fall(eFallReason::StepBudget);
+			return;
+		}
+
+		StartSwing(mSwing.Leg, PlanLanding(mSwing.Leg, 1 - mSwing.Leg, scSwingTime), false);
+		return;
+	}
+
 	leg.bStance = true;
 
 	mStatus.State = eBalanceState::Standing;
@@ -659,7 +674,9 @@ void RagdollBalance::BeginStumbleStep()
 	}
 
 	const BalanceLeg& stance = mLegs[1 - swing_leg];
-	StartSwing(static_cast<uint32>(swing_leg), ToGround(stance.FootCenter + back * scStumbleStep), true);
+	const JPH::Vec3 side = mFrame.Up.Cross(mForward) * mLegs[swing_leg].SideSign;
+	StartSwing(static_cast<uint32>(swing_leg),
+			   ToGround(stance.FootCenter + back * scStumbleStep + side * scStanceWidenMargin), true);
 	mbStumbleStepped = true;
 }
 
@@ -841,7 +858,7 @@ JPH::Vec3 RagdollBalance::PlanLanding(uint32 swing_leg, uint32 stance_leg, float
 
 	const JPH::Vec3 side = mFrame.Up.Cross(mForward) * swing.SideSign;
 	JPH::Vec3 landing = mFrame.AxisU * predicted.X + mFrame.AxisV * predicted.Y + direction * scLandingMargin +
-						side * scLandingSideMargin;
+						side * (scLandingSideMargin + scStanceWidenMargin);
 
 	const JPH::Vec3 stance_center = mFrame.Horizontal(stance.FootCenter);
 	const float32 lateral = (landing - stance_center).Dot(side);

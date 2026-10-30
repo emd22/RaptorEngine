@@ -57,7 +57,7 @@ public:
 	float32 ArmSpread = 65.0f;
 	float32 SpreadSpeed = 0.4f;
 	/// How far the spine leans along the shove over the stumble (degrees), easing out as balance takes over
-	float32 Lean = 18.0f;
+	float32 Lean = 8.0f;
 };
 
 /// Arms reach to catch a capture point that has left the support
@@ -104,10 +104,10 @@ public:
 	void Contribute(const BehaviourContext& ctx, BehaviourOutput& out) const override;
 
 public:
-	float32 Loosen = 0.25f;
-	float32 RecoverTime = 0.6f;
-	float32 Flinch = 15.0f;
-	float32 FlinchTime = 0.35f;
+	float32 Loosen = 0.1f;
+	float32 RecoverTime = 1.0f;
+	float32 Flinch = 12.0f;
+	float32 FlinchTime = 0.45f;
 	float32 GrabDelay = 0.3f;
 	float32 GrabTime = 2.5f;
 	float32 GrabReach = 1.15f;
@@ -250,8 +250,8 @@ public:
 	FX_FORCE_INLINE bool IsFinished() const { return mbFinished; }
 
 public:
-	float32 MinTime = 1.0f;
-	float32 MaxTime = 3.0f;
+	float32 MinTime = 0.6f;
+	float32 MaxTime = 1.6f;
 	float32 HeadTime = 0.25f;
 	float32 BalanceStrength = 0.5f;
 
