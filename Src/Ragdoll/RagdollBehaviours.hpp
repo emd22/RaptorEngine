@@ -8,7 +8,7 @@ namespace fx::physics {
 class RagdollBehaviours
 {
 public:
-	static constexpr uint32 scBehaviourCount = 8;
+	static constexpr uint32 scBehaviourCount = 9;
 
 public:
 	RagdollBehaviours();
@@ -77,6 +77,7 @@ private:
 private:
 	FallenBehaviour mFallen;
 	StaggerBehaviour mStagger;
+	ArmBalanceBehaviour mArmBalance;
 	ShotReactionBehaviour mShot;
 	BraceBehaviour mBrace;
 	ProtectHeadBehaviour mProtectHead;

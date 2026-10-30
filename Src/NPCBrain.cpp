@@ -192,7 +192,13 @@ void NPCBrain::Update(float32 delta_time, const NPCBrainInput& input, NPCBrainOu
 		break;
 
 	case eNPCBrainState::React:
-		TurnTowards(delta_time, DirectionToYaw(Flatten(mThreat - input.Position)), out);
+		// A hurt NPC turns away from the shot rather than facing it
+		if (mbHurt) {
+			TurnTowards(delta_time, DirectionToYaw(Flatten(input.Position - mThreat)), out);
+		}
+		else {
+			TurnTowards(delta_time, DirectionToYaw(Flatten(mThreat - input.Position)), out);
+		}
 
 		if (mTime < ReactTime) {
 			break;

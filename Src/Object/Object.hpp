@@ -266,6 +266,7 @@ private:
 	Object* CloneNode(const String& name, SkeletonCloneMap& skeletons) const;
 
 	void UpdateBoneAttachment();
+	void MarkPoseDirty();
 
 	Object* FindInstanceSource();
 	void QueueInstanceRefresh();

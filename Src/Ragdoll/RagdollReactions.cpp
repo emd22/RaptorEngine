@@ -141,7 +141,7 @@ void FallenBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& o
 StaggerBehaviour::StaggerBehaviour() : RagdollBehaviour("stagger", 20.0f)
 {
 	FadeIn = 0.1f;
-	FadeOut = 0.3f;
+	FadeOut = 0.15f;
 
 	AddSetting("min_impulse", &MinImpulse);
 	AddSetting("min_time", &MinTime);
@@ -198,6 +198,84 @@ void StaggerBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& 
 
 	for (const RagdollRigArm& arm : ctx.pRig->Arms) {
 		out.AddWorldRotation(ctx, arm.Upper, ctx.Forward, arm.SideSign * spread);
+	}
+}
+
+/////////////////////////////////////
+// Arms reach to keep balance
+/////////////////////////////////////
+
+ArmBalanceBehaviour::ArmBalanceBehaviour() : RagdollBehaviour("arm_balance", 25.0f)
+{
+	FadeIn = 0.2f;
+	FadeOut = 0.3f;
+
+	AddSetting("fore_reach", &ForeReach);
+	AddSetting("side_reach", &SideReach);
+	AddSetting("raise_reach", &RaiseReach);
+	AddSetting("error_scale", &ErrorScale);
+	AddSetting("dead_zone", &DeadZone);
+	AddSetting("smooth_time", &SmoothTime);
+	AddSetting("strength", &Strength);
+}
+
+void ArmBalanceBehaviour::Update(const BehaviourContext& ctx)
+{
+	const eBalanceState state = ctx.pBalance->State;
+	const bool is_recovering = ctx.bAlive && ctx.bBalancing &&
+							   (state == eBalanceState::Standing || state == eBalanceState::Stepping);
+
+	if (is_recovering && !IsActive()) {
+		Start(ctx);
+	}
+	else if (!is_recovering && IsActive()) {
+		Stop();
+	}
+
+	float32 target_fore = 0.0f;
+	float32 target_side = 0.0f;
+
+	if (is_recovering) {
+		const Vec3f error = ctx.Horizontal(Vec3f::FromJolt(ctx.pBalance->CaptureError));
+		const float32 length = error.Length();
+		Vec3f outside = Vec3f::sZero;
+
+		if (length > DeadZone) {
+			outside = error * ((length - DeadZone) / length);
+		}
+
+		target_fore = MathUtil::Clamp(outside.Dot(ctx.Forward) / ErrorScale, -1.0f, 1.0f);
+		target_side = MathUtil::Clamp(outside.Dot(ctx.Right) / ErrorScale, -1.0f, 1.0f);
+	}
+
+	float32 blend = 1.0f;
+
+	if (SmoothTime > 0.0f) {
+		blend = 1.0f - std::exp(-ctx.DeltaTime / SmoothTime);
+	}
+
+	mFore += (target_fore - mFore) * blend;
+	mSide += (target_side - mSide) * blend;
+}
+
+void ArmBalanceBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& out) const
+{
+	const RagdollRig& rig = *ctx.pRig;
+	const float32 weight = MathUtil::Clamp(std::max(std::abs(mFore), std::abs(mSide)), 0.0f, 1.0f) * Strength;
+
+	for (uint32 i = 0; i < RagdollRig::scLimbCount; i++) {
+		const RagdollRigArm& arm = rig.Arms[i];
+		const float32 side = arm.SideSign;
+
+		// A lean reaches out on the same side, and the far arm lifts
+		const float32 outward = SideReach * side * std::max(side * mSide, 0.0f);
+		const float32 raised = RaiseReach * std::max(-side * mSide, 0.0f);
+		const float32 forward = ForeReach * mFore;
+
+		const Vec3f shoulder = ctx.Bodies[arm.Upper].Origin;
+		const Vec3f target = shoulder + ctx.Forward * forward + ctx.Right * outward + ctx.Up * raised;
+
+		out.Hands[i] = BehaviourGoal { .Target = target, .Weight = weight };
 	}
 }
 

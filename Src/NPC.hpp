@@ -76,7 +76,7 @@ struct NPCTuning
 	/// Least a shove adds while the body is already moving its way, as a fraction of a full shove
 	float32 RepeatShoveFraction = 0.3f;
 	/// Fastest drift balance lets a shoved NPC stagger at, however many hits land (m/s)
-	float32 MaxStaggerSpeed = 0.8f;
+	float32 MaxStaggerSpeed = 1.1f;
 
 	/// Most NPCs with powered ragdolls at once; the rest stay kinematic. 0 is no limit
 	uint32 MaxActive = 4;

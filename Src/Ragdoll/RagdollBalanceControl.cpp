@@ -17,7 +17,7 @@ constexpr float32 scStancePress = 0.01f;
 constexpr float32 scLiftStart = 0.003f;
 constexpr float32 scLiftRange = 0.015f;
 
-constexpr float32 scStanceHeightFraction = 0.9f;
+constexpr float32 scStanceHeightFraction = 0.97f;
 constexpr float32 scMinHipHeight = 0.25f;
 constexpr float32 scStanceFrequencyScale = 0.15f;
 constexpr float32 scMaxComShift = 0.12f;
@@ -251,6 +251,11 @@ void RagdollBalance::ApplyTorsoControl(Ragdoll& ragdoll, JPH::BodyInterface& bod
 
 void RagdollBalance::ApplyCenterOfMassControl(Ragdoll& ragdoll, JPH::BodyInterface& body_interface)
 {
+	// The body keeps moving back through the stumble, so the hold and braking wait until it has recovered
+	if (mStumbleTime > 0.0f) {
+		return;
+	}
+
 	uint32 loaded[2];
 	uint32 loaded_count = 0;
 

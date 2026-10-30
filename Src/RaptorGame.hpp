@@ -213,6 +213,7 @@ private:
 	CVarValue* mpNPCMaxShoveCVar = nullptr;
 	CVarValue* mpNPCStaggerTimeCVar = nullptr;
 	CVarValue* mpNPCStaggerSpeedCVar = nullptr;
+	CVarValue* mpNPCStumbleTimeCVar = nullptr;
 	CVarValue* mpNPCRepeatShoveCVar = nullptr;
 	CVarValue* mpNPCWanderCVar = nullptr;
 	CVarValue* mpPlayerRagdollCollisionCVar = nullptr;

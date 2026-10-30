@@ -58,6 +58,29 @@ public:
 	float32 SpreadSpeed = 0.4f;
 };
 
+/// Arms reach to catch a capture point that has left the support
+class ArmBalanceBehaviour : public RagdollBehaviour
+{
+public:
+	ArmBalanceBehaviour();
+
+	void Update(const BehaviourContext& ctx) override;
+	void Contribute(const BehaviourContext& ctx, BehaviourOutput& out) const override;
+
+public:
+	float32 ForeReach = 0.12f;
+	float32 SideReach = 0.15f;
+	float32 RaiseReach = 0.1f;
+	float32 ErrorScale = 0.1f;
+	float32 DeadZone = 0.03f;
+	float32 SmoothTime = 0.2f;
+	float32 Strength = 0.4f;
+
+private:
+	float32 mFore = 0.0f;
+	float32 mSide = 0.0f;
+};
+
 class ShotReactionBehaviour : public RagdollBehaviour
 {
 public:

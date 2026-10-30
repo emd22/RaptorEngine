@@ -196,7 +196,26 @@ void Object::UpdateAnimation()
 
 	if (skel.PoseHash != mLastPoseHash) {
 		mLastPoseHash = skel.PoseHash;
-		gWorldGrid->MarkObjectDirty(this);
+		MarkPoseDirty();
+	}
+}
+
+void Object::MarkPoseDirty()
+{
+	// Attached nodes such as skinned parts never get a tile of their own, so the grid only hears about the root. Walk up
+	// to the nearest node that has a tile, or spot shadows would never see a ragdoll move.
+	Object* node = this;
+
+	while (node != nullptr && node->mTileIndex == TileIndexNull) {
+		if (node->ParentID.IsNull() || node->ParentID.IsInvalid()) {
+			return;
+		}
+
+		node = gObjectManager->GetObject(node->ParentID);
+	}
+
+	if (node != nullptr) {
+		gWorldGrid->MarkObjectDirty(node);
 	}
 }
 

@@ -837,7 +837,7 @@ void NPC::Deactivate()
 void NPC::UpdatePhysicsBlend(float32 delta_time)
 {
 	constexpr float32 scMinPoweredTime = 1.0f;
-	constexpr float32 scBlendOutTime = 0.5f;
+	constexpr float32 scBlendOutTime = 0.4f;
 
 	if (mState != eState::Animated || !IsPowered()) {
 		return;
@@ -846,7 +846,7 @@ void NPC::UpdatePhysicsBlend(float32 delta_time)
 	mPoweredTime += delta_time;
 
 	const bool is_settled = !mActor.Ragdoll.IsBalancing() && !mbDying && mPoweredTime >= scMinPoweredTime &&
-							mAssistFade >= 1.0f && mBehaviours.IsIdle();
+							mBehaviours.IsIdle();
 
 	const float32 blend_step = delta_time / scBlendOutTime;
 

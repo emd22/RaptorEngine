@@ -43,7 +43,10 @@ struct BalanceAssist
 	/// Once released, a braking-only force up to this fraction of body weight still slows the body while it steps
 	float32 RecoveryForceFraction = 0.5f;
 	/// How long a shove's stagger drift lasts (s): longer keeps a shoved body stumbling for more steps
-	float32 StaggerDecayTime = 0.75f;
+	float32 StaggerDecayTime = 1.1f;
+	/// How long each shove leaves the body unassisted (s): balance holds back its centre of mass and stepping, so the body
+	/// stumbles before it recovers
+	float32 StumbleTime = 0.3f;
 };
 
 struct BalanceStatus
@@ -54,6 +57,8 @@ struct BalanceStatus
 	uint32 RecoverySteps = 0;
 	bool bRecovering = false;
 	bool bCalm = false;
+	/// Horizontal distance from the support to the capture point (m), zero while the capture point is over the feet
+	JPH::Vec3 CaptureError = JPH::Vec3::sZero();
 };
 
 /// A rig leg plus what the balance controller senses and plans for it each substep
@@ -106,7 +111,14 @@ public:
 
 	/// Velocity the body is let drift at after a shove instead of being held still, so it staggers a few steps. It
 	/// decays on its own while balancing and is cleared when balance stops
-	FX_FORCE_INLINE void SetStaggerVelocity(const JPH::Vec3 velocity) { mStaggerVelocity = velocity; }
+	FX_FORCE_INLINE void SetStaggerVelocity(const JPH::Vec3 velocity)
+	{
+		mStaggerVelocity = velocity;
+
+		if (velocity.LengthSq() > 0.0f) {
+			mStumbleTime = mAssist.StumbleTime;
+		}
+	}
 	FX_FORCE_INLINE JPH::Vec3 GetStaggerVelocity() const { return mStaggerVelocity; }
 	FX_FORCE_INLINE const BalanceStatus& GetStatus() const { return mStatus; }
 
@@ -169,8 +181,10 @@ private:
 	JPH::Quat mPelvisOrientation = JPH::Quat::sIdentity();
 	JPH::Quat mPelvisTarget = JPH::Quat::sIdentity();
 	float32 mTrunkTilt = 0.0f;
+	JPH::Vec3 mLeanDirection = JPH::Vec3::sAxisZ();
 	JPH::Vec3 mCapturePoint = JPH::Vec3::sZero();
 	JPH::Vec3 mStaggerVelocity = JPH::Vec3::sZero();
+	float32 mStumbleTime = 0.0f;
 
 	uint32 mSupportCount = 0;
 	JPH::Vec3 mSupportCenter = JPH::Vec3::sZero();

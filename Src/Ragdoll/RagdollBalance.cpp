@@ -24,7 +24,7 @@ constexpr float32 scCentering = 0.2f;
 
 constexpr float32 scStepTrigger = 0.02f;
 constexpr float32 scMinDoubleSupport = 0.05f;
-constexpr float32 scSwingTime = 0.3f;
+constexpr float32 scSwingTime = 0.22f;
 constexpr float32 scSwingFreezeFraction = 0.75f;
 constexpr float32 scSwingTravelFraction = 0.85f;
 constexpr float32 scSwingLift = 0.12f;
@@ -47,13 +47,16 @@ constexpr float32 scSwapLift = 0.03f;
 constexpr float32 scMaxStaggerDrift = 0.15f;
 constexpr float32 scRecoveredTime = 0.25f;
 constexpr float32 scLandingDipPerSpeed = 0.1f;
-constexpr float32 scMaxLandingDip = 0.08f;
+constexpr float32 scMaxLandingDip = 0.03f;
 constexpr float32 scLandingDipTime = 0.25f;
 
 constexpr float32 scFallTilt = MathUtil::DegToRad(50.0f);
+/// A trunk lean past this steps even while the capture point is still over the feet, at most once per scLeanStepTime
+constexpr float32 scLeanStepTilt = MathUtil::DegToRad(10.0f);
+constexpr float32 scLeanStepTime = 0.15f;
 constexpr float32 scFallHeightFraction = 0.6f;
 constexpr float32 scCalmSpeed = 0.08f;
-constexpr float32 scCalmTime = 0.5f;
+constexpr float32 scCalmTime = 0.25f;
 
 constexpr float32 scSettleSpeed = 0.25f;
 constexpr float32 scSettleTime = 0.3f;
@@ -150,6 +153,7 @@ void RagdollBalance::Reset()
 	mLoadWaitTime = 0.0f;
 	mCapturedTime = 0.0f;
 	mLandingDip = 0.0f;
+	mStumbleTime = 0.0f;
 	mCalmTime = 0.0f;
 	mSettleTime = 0.0f;
 	mShiftTime = 0.0f;
@@ -168,6 +172,7 @@ void RagdollBalance::Clear(Ragdoll& ragdoll)
 {
 	ragdoll.ClearMotorOverrides();
 	mStaggerVelocity = JPH::Vec3::sZero();
+	mStumbleTime = 0.0f;
 
 	if (mStatus.State != eBalanceState::Fallen) {
 		mStatus.State = eBalanceState::Off;
@@ -195,6 +200,7 @@ void RagdollBalance::Step(Ragdoll& ragdoll, JPH::BodyInterface& body_interface, 
 	const float32 stagger_decay = std::max(mAssist.StaggerDecayTime, 1e-3f);
 	mStaggerVelocity = mFrame.Horizontal(mStaggerVelocity) * std::exp(-delta_time / stagger_decay);
 	mLandingDip *= std::exp(-delta_time / scLandingDipTime);
+	mStumbleTime = std::max(mStumbleTime - delta_time, 0.0f);
 
 	if (!DetectFall()) {
 		if (mStatus.State == eBalanceState::Standing) {
@@ -261,6 +267,12 @@ void RagdollBalance::GatherState(Ragdoll& ragdoll, float32 delta_time, const JPH
 	const JPH::Vec3 chest_up = (chest * ragdoll.mBodies[mpRig->Chest].RestOrientation.Conjugated()) * mFrame.Up;
 
 	mTrunkTilt = std::acos(MathUtil::Clamp(chest_up.Dot(mFrame.Up), -1.0f, 1.0f));
+
+	mLeanDirection = mForward;
+
+	if (mTrunkTilt > scLeanStepTilt) {
+		mLeanDirection = mFrame.Horizontal(chest_up).NormalizedOr(mForward);
+	}
 }
 
 void RagdollBalance::GatherFeet(Ragdoll& ragdoll, float32 delta_time, bool contacts_fresh)
@@ -361,6 +373,7 @@ void RagdollBalance::BuildSupport()
 		mSupportCenter = ToGround(foot_center_sum / static_cast<float32>(std::max(stance_count, 1u)));
 		mSupportTarget = mSupportCenter;
 		mCaptureOutside = 0.0f;
+		mStatus.CaptureError = JPH::Vec3::sZero();
 		return;
 	}
 
@@ -368,7 +381,8 @@ void RagdollBalance::BuildSupport()
 
 	mSupportCenter = mFrame.FromPlane(center, mGroundHeight);
 
-	ClosestOnHull(hull, mSupportCount, mFrame.ToPlane(mCapturePoint), mCaptureOutside);
+	const Vec2f closest = ClosestOnHull(hull, mSupportCount, mFrame.ToPlane(mCapturePoint), mCaptureOutside);
+	mStatus.CaptureError = mCapturePoint - mFrame.FromPlane(closest, mGroundHeight);
 
 	Vec2f shrunk[scMaxPoints + 1];
 
@@ -439,7 +453,10 @@ void RagdollBalance::UpdateStanding(float32 delta_time)
 		mStatus.RecoverySteps = 0;
 	}
 
-	if (mSupportCount > 0 && mCaptureOutside > scStepTrigger && mDoubleSupportTime > scMinDoubleSupport) {
+	const bool capture_outside = mCaptureOutside > scStepTrigger && mDoubleSupportTime > scMinDoubleSupport;
+	const bool leaning = mTrunkTilt > scLeanStepTilt && mDoubleSupportTime > scLeanStepTime;
+
+	if (mStumbleTime <= 0.0f && mSupportCount > 0 && (capture_outside || leaning)) {
 		mShiftLeg = -1;
 
 		if (!BeginStep()) {
@@ -756,7 +773,7 @@ JPH::Vec3 RagdollBalance::PlanLanding(uint32 swing_leg, uint32 stance_leg, float
 	const Vec2f predicted = pressure + (capture - pressure) * growth;
 
 	JPH::Vec3 direction = mFrame.AxisU * (predicted.X - pressure.X) + mFrame.AxisV * (predicted.Y - pressure.Y);
-	direction = direction.NormalizedOr(mFrame.Horizontal(mVelocity).NormalizedOr(mForward));
+	direction = direction.NormalizedOr(mFrame.Horizontal(mVelocity).NormalizedOr(mLeanDirection));
 
 	const JPH::Vec3 side = mFrame.Up.Cross(mForward) * swing.SideSign;
 	JPH::Vec3 landing = mFrame.AxisU * predicted.X + mFrame.AxisV * predicted.Y + direction * scLandingMargin +
