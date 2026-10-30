@@ -27,20 +27,28 @@ constexpr float32 scMinDoubleSupport = 0.05f;
 constexpr float32 scSwingTime = 0.3f;
 constexpr float32 scSwingFreezeFraction = 0.75f;
 constexpr float32 scSwingTravelFraction = 0.85f;
-constexpr float32 scSwingLift = 0.07f;
+constexpr float32 scSwingLift = 0.12f;
 constexpr float32 scSwingOvertime = 0.15f;
 constexpr float32 scSwingMinTouchdown = 0.6f;
 constexpr float32 scTouchdownDistance = 0.05f;
-constexpr float32 scLandingMargin = 0.05f;
+constexpr float32 scLandingMargin = 0.08f;
 constexpr float32 scLandingSideMargin = 0.03f;
 constexpr float32 scMinStepWidth = 0.12f;
 constexpr float32 scMaxStepWidth = 0.5f;
-constexpr float32 scMaxStepLength = 0.75f;
+constexpr float32 scMaxStepLength = 0.3f;
 constexpr float32 scStanceDistanceCost = 2.0f;
 constexpr float32 scCaptureErrorCost = 10.0f;
 constexpr float32 scCaptureMargin = 0.05f;
 constexpr float32 scFreeFootPreference = 0.5f;
 constexpr uint32 scMaxRecoverySteps = 6;
+constexpr float32 scMaxSwingWeight = 0.6f;
+constexpr float32 scMaxLoadWait = 0.2f;
+constexpr float32 scSwapLift = 0.03f;
+constexpr float32 scMaxStaggerDrift = 0.15f;
+constexpr float32 scRecoveredTime = 0.25f;
+constexpr float32 scLandingDipPerSpeed = 0.1f;
+constexpr float32 scMaxLandingDip = 0.08f;
+constexpr float32 scLandingDipTime = 0.25f;
 
 constexpr float32 scFallTilt = MathUtil::DegToRad(50.0f);
 constexpr float32 scFallHeightFraction = 0.6f;
@@ -139,6 +147,9 @@ void RagdollBalance::Reset()
 
 	mSwing = Swing {};
 	mDoubleSupportTime = 0.0f;
+	mLoadWaitTime = 0.0f;
+	mCapturedTime = 0.0f;
+	mLandingDip = 0.0f;
 	mCalmTime = 0.0f;
 	mSettleTime = 0.0f;
 	mShiftTime = 0.0f;
@@ -156,6 +167,7 @@ void RagdollBalance::Reset()
 void RagdollBalance::Clear(Ragdoll& ragdoll)
 {
 	ragdoll.ClearMotorOverrides();
+	mStaggerVelocity = JPH::Vec3::sZero();
 
 	if (mStatus.State != eBalanceState::Fallen) {
 		mStatus.State = eBalanceState::Off;
@@ -180,6 +192,10 @@ void RagdollBalance::Step(Ragdoll& ragdoll, JPH::BodyInterface& body_interface, 
 	GatherState(ragdoll, delta_time, gravity, contacts_fresh);
 	BuildSupport();
 
+	const float32 stagger_decay = std::max(mAssist.StaggerDecayTime, 1e-3f);
+	mStaggerVelocity = mFrame.Horizontal(mStaggerVelocity) * std::exp(-delta_time / stagger_decay);
+	mLandingDip *= std::exp(-delta_time / scLandingDipTime);
+
 	if (!DetectFall()) {
 		if (mStatus.State == eBalanceState::Standing) {
 			UpdateStanding(delta_time);
@@ -202,6 +218,7 @@ void RagdollBalance::Step(Ragdoll& ragdoll, JPH::BodyInterface& body_interface, 
 	}
 
 	ApplyTorsoControl(ragdoll, body_interface, gravity);
+	ApplyCenterOfMassControl(ragdoll, body_interface);
 }
 
 void RagdollBalance::GatherState(Ragdoll& ragdoll, float32 delta_time, const JPH::Vec3 gravity, bool contacts_fresh)
@@ -211,7 +228,15 @@ void RagdollBalance::GatherState(Ragdoll& ragdoll, float32 delta_time, const JPH
 	ragdoll.GetMassAverage(ragdoll.mStates, mCenterOfMass, mVelocity);
 
 	mPelvisOrientation = ragdoll.mStates[0].Orientation;
-	mForward = GetHeadingForward(ragdoll.mTargets[0].Orientation, mRestPelvis);
+
+	// Plan around the way the body actually faces and keep only the animated pelvis tilt: a stumble can turn the body
+	// well away from the held animation, and holding the animated heading spends the hips' torque fighting the turn
+	// while the planner's left and right no longer match the legs
+	const JPH::Quat& animated = ragdoll.mTargets[0].Orientation;
+	mForward = GetHeadingForward(mPelvisOrientation, mRestPelvis);
+	mPelvisTarget = (GetHeadingRotation(mForward) *
+					 GetHeadingRotation(GetHeadingForward(animated, mRestPelvis)).Conjugated() * animated)
+						.Normalized();
 
 	GatherFeet(ragdoll, delta_time, contacts_fresh);
 
@@ -221,7 +246,16 @@ void RagdollBalance::GatherState(Ragdoll& ragdoll, float32 delta_time, const JPH
 
 	const float32 height = std::max(mCenterOfMass.Dot(mFrame.Up) - mGroundHeight, scMinPendulumHeight);
 	mOmega = std::sqrt(mFrame.Gravity / height);
-	mCapturePoint = ToGround(mCenterOfMass + mFrame.Horizontal(mVelocity) / mOmega);
+	// A stagger adds the distance it still has to drift, so a shove the legs soaked up still gets stepped into. It is
+	// capped so the steps aim at a point they can reach rather than one the body is not actually heading for
+	JPH::Vec3 stagger_drift = mFrame.Horizontal(mStaggerVelocity) * mAssist.StaggerDecayTime;
+	const float32 drift_length = stagger_drift.Length();
+
+	if (drift_length > scMaxStaggerDrift) {
+		stagger_drift *= scMaxStaggerDrift / drift_length;
+	}
+
+	mCapturePoint = ToGround(mCenterOfMass + mFrame.Horizontal(mVelocity) / mOmega + stagger_drift);
 
 	const JPH::Quat chest = ragdoll.mStates[mpRig->Chest].Orientation;
 	const JPH::Vec3 chest_up = (chest * ragdoll.mBodies[mpRig->Chest].RestOrientation.Conjugated()) * mFrame.Up;
@@ -388,6 +422,18 @@ void RagdollBalance::UpdateStanding(float32 delta_time)
 		mCalmTime = 0.0f;
 	}
 
+	if (mCaptureOutside < 0.0f) {
+		mCapturedTime += delta_time;
+	}
+	else {
+		mCapturedTime = 0.0f;
+	}
+
+	// Once a step has caught the body, any shuffles after it start a fresh step budget
+	if (mCapturedTime > scRecoveredTime) {
+		mStatus.RecoverySteps = 0;
+	}
+
 	if (mCalmTime > scCalmTime) {
 		mStatus.bRecovering = false;
 		mStatus.RecoverySteps = 0;
@@ -395,9 +441,15 @@ void RagdollBalance::UpdateStanding(float32 delta_time)
 
 	if (mSupportCount > 0 && mCaptureOutside > scStepTrigger && mDoubleSupportTime > scMinDoubleSupport) {
 		mShiftLeg = -1;
-		BeginStep();
+
+		if (!BeginStep()) {
+			mLoadWaitTime += delta_time;
+		}
+
 		return;
 	}
+
+	mLoadWaitTime = 0.0f;
 
 	UpdateClosingStep(delta_time);
 }
@@ -407,6 +459,21 @@ void RagdollBalance::UpdateStepping(float32 delta_time)
 	BalanceLeg& leg = mLegs[mSwing.Leg];
 
 	mSwing.Time += delta_time;
+
+	const uint32 stance_leg = 1 - mSwing.Leg;
+	const BalanceLeg& stance = mLegs[stance_leg];
+
+	// The swing foot is still carrying the body and the stance foot is coming off the ground instead, so step with the
+	// free foot rather than pivot over the planted one
+	if (!mSwing.bLifted && !mSwing.bSwapped && leg.bTouching && !stance.bTouching &&
+		stance.SoleHeight - mGroundHeight > scSwapLift) {
+		const uint32 planted_leg = mSwing.Leg;
+
+		leg.bStance = true;
+		StartSwing(stance_leg, PlanLanding(stance_leg, planted_leg, scSwingTime), false);
+		mSwing.bSwapped = true;
+		return;
+	}
 
 	const float32 phase = mSwing.Time / scSwingTime;
 
@@ -450,6 +517,10 @@ void RagdollBalance::UpdateStepping(float32 delta_time)
 	mStatus.State = eBalanceState::Standing;
 	mStatus.Steps++;
 	mDoubleSupportTime = 0.0f;
+
+	// The knees give with the landing, more the faster the body was going, instead of catching it on straight legs
+	const float32 landing_speed = mFrame.Horizontal(mVelocity).Length();
+	mLandingDip = std::max(mLandingDip, std::min(landing_speed * scLandingDipPerSpeed, scMaxLandingDip));
 
 	if (!mSwing.bFixed) {
 		mStatus.RecoverySteps++;
@@ -529,6 +600,11 @@ bool RagdollBalance::BeginStep()
 			continue;
 		}
 
+		// A foot carrying most of the weight cannot lift, so give the body a moment to move off it first
+		if (GetWeightShare(swing) > scMaxSwingWeight && mLoadWaitTime < scMaxLoadWait) {
+			continue;
+		}
+
 		const JPH::Vec3 landing = PlanLanding(swing, stance, scSwingTime);
 		float32 cost = mFrame.Horizontal(landing - mLegs[swing].FootCenter).Length() +
 					   std::max(GetCaptureDistance(mLegs[stance]), 0.0f) * scStanceDistanceCost +
@@ -551,6 +627,7 @@ bool RagdollBalance::BeginStep()
 
 	StartSwing(static_cast<uint32>(best_leg), best_landing, false);
 	mStatus.bRecovering = true;
+	mLoadWaitTime = 0.0f;
 
 	return true;
 }
@@ -571,6 +648,36 @@ void RagdollBalance::StartSwing(uint32 swing_leg, const JPH::Vec3 landing, bool 
 	mCalmTime = 0.0f;
 	mSettleTime = 0.0f;
 	mShiftLeg = -1;
+}
+
+float32 RagdollBalance::GetWeightShare(uint32 leg_index) const
+{
+	const BalanceLeg& leg = mLegs[leg_index];
+	const BalanceLeg& other = mLegs[1 - leg_index];
+
+	const bool is_off = !leg.bTouching && leg.SoleHeight - mGroundHeight > scNearGround;
+	const bool other_off = !other.bTouching && other.SoleHeight - mGroundHeight > scNearGround;
+
+	if (is_off || other_off) {
+		if (is_off) {
+			return 0.0f;
+		}
+
+		return 1.0f;
+	}
+
+	// Where the centre of mass sits along the line between the feet: 1 is right over this foot
+	const JPH::Vec3 own = mFrame.Horizontal(leg.FootCenter);
+	const JPH::Vec3 span = own - mFrame.Horizontal(other.FootCenter);
+	const float32 length2 = span.LengthSq();
+
+	if (length2 < 1e-6f) {
+		return 0.5f;
+	}
+
+	const float32 from_other = (mFrame.Horizontal(mCenterOfMass) - mFrame.Horizontal(other.FootCenter)).Dot(span);
+
+	return MathUtil::Clamp(from_other / length2, 0.0f, 1.0f);
 }
 
 float32 RagdollBalance::GetCaptureDistance(const BalanceLeg& leg) const

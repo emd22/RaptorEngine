@@ -12,6 +12,7 @@
 #include <Material/MaterialManagerFwd.hpp>
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
+#include <Physics/PhysicsManager.hpp>
 #include <Renderer/Light.hpp>
 #include <Renderer/LightManager.hpp>
 #include <World.hpp>
@@ -481,6 +482,8 @@ static bool CheckIfDynamicShouldBeRemoved(Object* object)
 	if (object->mPosition.DistanceTo(gWorld->Player.Position) >= scMaxDistance) {
 		LogInfo("Removed dynamic object {}", object->Name.Get());
 
+		// Without this the body keeps simulating after its object is gone
+		gPhysics->DestroyBody(object->PhysicsID);
 		gWorld->Detach(object->ID);
 		gObjectManager->DestroyObject(object->ID);
 		return true;

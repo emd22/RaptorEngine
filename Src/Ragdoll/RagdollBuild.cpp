@@ -261,7 +261,7 @@ void ConfigurePart(JPH::RagdollSettings::Part& part, const BuiltBody& body, cons
 	part.mPosition = body.Position;
 	part.mRotation = body.Orientation;
 	part.mMotionType = JPH::EMotionType::Dynamic;
-	part.mObjectLayer = PhLayer::Dynamic;
+	part.mObjectLayer = Ragdoll::GetModeLayer(eRagdollBodyMode::Limp);
 	part.mFriction = body_def.Friction;
 	part.mRestitution = 0.0f;
 	part.mLinearDamping = 0.05f;
@@ -549,7 +549,10 @@ void Ragdoll::InitBodyArrays(uint32 joint_count)
 	mTargets.InitSize(mBodies.Size, BodyTarget {});
 	mStates.InitSize(mBodies.Size, BodyState {});
 	mMotorOverrides.InitSize(mBodies.Size, MotorOverride {});
+	mOverrideTargets.InitSize(mBodies.Size, JPH::Quat::sIdentity());
+	mHadOverride.InitSize(mBodies.Size, uint8(0));
 	mLayers.InitSize(mBodies.Size, BodyLayer {});
+	mPreviousPoses.InitSize(mBodies.Size, BodyPose {});
 
 	mbHasTargets = false;
 

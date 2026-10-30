@@ -32,6 +32,28 @@ void CMD_npcbehaviours()
 	npc_behaviour_list(0);
 }
 
+/* Logs how many NPCs have active physics, the physics time per frame and what each NPC is doing. */
+void CMD_npcstats()
+{
+	npc_stats();
+}
+
+/* Every NPC walks to where the player is standing. */
+void CMD_npccome()
+{
+	for (int i = 0; i < npc_count(); i++) {
+		npc_walk_to(npc_at(i), player.position);
+	}
+}
+
+/* Every NPC runs away from the player. */
+void CMD_npcflee()
+{
+	for (int i = 0; i < npc_count(); i++) {
+		npc_flee(npc_at(i), player.position);
+	}
+}
+
 /////////////////////////////////////
 // Light probe volumes
 /////////////////////////////////////

@@ -156,11 +156,12 @@ void RagdollEntity::TickCooldown(float32 delta_time) { BloodCooldown = std::max(
 // NPC
 /////////////////////////////////////
 
-bool NPC::Create(const Object* model, const NPCDesc& desc, const NPCTuning& tuning)
+bool NPC::Create(const Object* model, const NPCDesc& desc, NPCManager& manager)
 {
 	Destroy();
 
-	mpTuning = &tuning;
+	mpManager = &manager;
+	mpTuning = &manager.Tuning;
 
 	if (!mActor.Clone(model, desc.Name)) {
 		return false;
@@ -176,13 +177,27 @@ bool NPC::Create(const Object* model, const NPCDesc& desc, const NPCTuning& tuni
 	MaxHealth = desc.MaxHealth;
 	RagdollHealth = desc.RagdollHealth;
 	mHealth = desc.MaxHealth;
+	Importance = desc.Importance;
 	mState = eState::Animated;
 	mbDying = false;
 	mbTeleported = true;
 	mPendingImpactDamage = 0.0f;
+	mPushCooldown = 0.0f;
+	mLocomotionSpeed = 0.0f;
+	mYaw = desc.Yaw;
 
-	if (!desc.IdleAnimation.IsEmpty()) {
-		SetIdleAnimation(desc.IdleAnimation);
+	mpIdleAnimation = FindAnimation(desc.IdleAnimation);
+	mpWalkAnimation = FindAnimation(desc.WalkAnimation);
+	mpRunAnimation = FindAnimation(desc.RunAnimation);
+	mWalkAnimationSpeed = std::max(desc.WalkAnimationSpeed, 0.1f);
+	mRunAnimationSpeed = std::max(desc.RunAnimationSpeed, 0.1f);
+
+	if (mpWalkAnimation == nullptr) {
+		mpWalkAnimation = mpIdleAnimation;
+	}
+
+	if (mpIdleAnimation != nullptr) {
+		mActor.pSkeleton->SetRestAnimation(mpIdleAnimation);
 	}
 
 	physics::Ragdoll& ragdoll = mActor.Ragdoll;
@@ -204,14 +219,40 @@ bool NPC::Create(const Object* model, const NPCDesc& desc, const NPCTuning& tuni
 	mPoweredTime = 0.0f;
 	mPhysicsBlend = 1.0f;
 
+	uint32 serial = 0;
+
+	if (ragdoll.IsCreated()) {
+		serial = ragdoll.GetSerial();
+	}
+
+	mMover.Create(manager.GetCharacterConfig(), desc.Position, serial);
+	mBrain.Init(desc.Position, (serial + 1) * 2654435761u);
+	mBrain.WanderRadius = mpTuning->WanderRadius;
+
 	gWorld->AttachLoaded(root);
 
 	return true;
 }
 
+const Animation* NPC::FindAnimation(const String& name) const
+{
+	if (name.IsEmpty() || !mActor.pSkeleton.IsValid()) {
+		return nullptr;
+	}
+
+	const Animation* anim = mActor.pSkeleton->FindAnimation(name);
+
+	if (anim == nullptr) {
+		LogWarning(LC_ASSET, "NPC '{}': could not find animation '{}'", mName, name);
+	}
+
+	return anim;
+}
+
 void NPC::Destroy()
 {
 	mBehaviours.Reset();
+	mMover.Destroy();
 	mActor.Destroy();
 
 	mState = eState::Animated;
@@ -225,6 +266,8 @@ void NPC::Update(float32 delta_time, bool draw_debug)
 	}
 
 	mActor.TickCooldown(delta_time);
+	mPushCooldown = std::max(mPushCooldown - delta_time, 0.0f);
+	mBrain.WanderRadius = mpTuning->WanderRadius;
 
 	if (mPendingImpactDamage > 0.0f) {
 		Damage(mPendingImpactDamage);
@@ -242,6 +285,7 @@ void NPC::Update(float32 delta_time, bool draw_debug)
 		mActor.Ragdoll.DebugDraw();
 		mBehaviours.DebugDraw();
 		DrawDebugHealth();
+		DrawDebugBrain();
 	}
 }
 
@@ -251,6 +295,8 @@ void NPC::UpdateActive(float32 delta_time)
 	Object* skinned = mActor.GetSkinned();
 
 	if (mState == eState::Animated && skinned != nullptr) {
+		UpdateLocomotion(delta_time);
+
 		float32 pose_time = delta_time;
 
 		// Hold the animation still while physics leads, so the ragdoll is not chasing a moving target
@@ -278,6 +324,135 @@ void NPC::UpdateActive(float32 delta_time)
 	}
 
 	ragdoll.WriteToSkeleton();
+}
+
+void NPC::UpdateLocomotion(float32 delta_time)
+{
+	Object* root = mActor.GetRoot();
+
+	if (root == nullptr || delta_time <= 0.0f) {
+		return;
+	}
+
+	// The brain waits while physics leads, so a reaction starts once the NPC is back on its feet
+	if (!mMover.IsEnabled()) {
+		UpdateLocomotionAnimation(delta_time, 0.0f);
+		return;
+	}
+
+	const Vec3f previous_position = root->GetPosition();
+
+	NPCBrainOutput out;
+	mBrain.Update(delta_time, NPCBrainInput { .Position = previous_position, .Yaw = mYaw }, out);
+
+	mMover.Update(delta_time, out.Velocity);
+	mYaw = out.Yaw;
+
+	const Vec3f position = mMover.GetPosition();
+	const Vec3f moved = position - previous_position;
+
+	root->SetPosition(position);
+	root->SetRotation(Quat::FromAxisAngle(Vec3f::sUp, mYaw));
+
+	const float32 speed = Vec3f(moved.X, 0.0f, moved.Z).Length() / delta_time;
+
+	UpdateLocomotionAnimation(delta_time, speed);
+}
+
+void NPC::UpdateLocomotionAnimation(float32 delta_time, float32 speed)
+{
+	constexpr float32 scSpeedSmoothing = 8.0f;
+	constexpr float32 scIdleSpeed = 0.15f;
+	constexpr float32 scBlendTime = 0.25f;
+
+	Skeleton& skeleton = *mActor.pSkeleton;
+
+	mLocomotionSpeed += (speed - mLocomotionSpeed) * std::min(delta_time * scSpeedSmoothing, 1.0f);
+
+	const Animation* wanted = mpIdleAnimation;
+	float32 rate = 1.0f;
+
+	if (mLocomotionSpeed >= scIdleSpeed && mpWalkAnimation != nullptr) {
+		const bool is_running = mLocomotionSpeed > 0.5f * (mWalkAnimationSpeed + mRunAnimationSpeed);
+
+		if (is_running && mpRunAnimation != nullptr) {
+			wanted = mpRunAnimation;
+			rate = mLocomotionSpeed / mRunAnimationSpeed;
+		}
+		else {
+			wanted = mpWalkAnimation;
+			rate = mLocomotionSpeed / mWalkAnimationSpeed;
+		}
+	}
+
+	if (wanted == nullptr) {
+		return;
+	}
+
+	if (skeleton.RestPlayback.pAnimation != wanted) {
+		skeleton.SetRestAnimation(wanted, rate, scBlendTime);
+		return;
+	}
+
+	skeleton.RestPlayback.Speed = rate;
+}
+
+void NPC::EnableMover()
+{
+	Object* root = mActor.GetRoot();
+
+	if (root == nullptr || !mMover.IsCreated() || mState != eState::Animated || mbDying) {
+		return;
+	}
+
+	mMover.Teleport(root->GetPosition());
+	mMover.SetEnabled(true);
+}
+
+void NPC::PlaceRootUnderPelvis()
+{
+	constexpr float32 scGroundProbe = 2.0f;
+
+	physics::Ragdoll& ragdoll = mActor.Ragdoll;
+	Object* root = mActor.GetRoot();
+
+	if (root == nullptr || !ragdoll.IsCreated()) {
+		return;
+	}
+
+	const Vec3f pelvis = ragdoll.GetBodyOrigin(0);
+	const Vec3f root_position = root->GetPosition();
+	Vec3f target = ragdoll.GetBodyTargetOrigin(0);
+
+	// Balancing lets the body turn as it stumbles, so turn the root to match or the animation twists it back
+	const Vec3f facing = ragdoll.GetPelvisHeading(false);
+	const Vec3f animated_facing = ragdoll.GetPelvisHeading(true);
+
+	if (facing.Length() > 0.0f && animated_facing.Length() > 0.0f) {
+		const float32 turn = NPCBrain::WrapAngle(NPCBrain::DirectionToYaw(facing) -
+												 NPCBrain::DirectionToYaw(animated_facing));
+		const float32 cos_turn = std::cos(turn);
+		const float32 sin_turn = std::sin(turn);
+		const Vec3f arm = target - root_position;
+
+		target = root_position + Vec3f(arm.X * cos_turn + arm.Z * sin_turn, arm.Y, arm.Z * cos_turn - arm.X * sin_turn);
+
+		mYaw = NPCBrain::WrapAngle(mYaw + turn);
+		root->SetRotation(Quat::FromAxisAngle(Vec3f::sUp, mYaw));
+	}
+
+	const Vec3f offset = pelvis - target;
+
+	Vec3f position = root_position + Vec3f(offset.X, 0.0f, offset.Z);
+
+	const physics::RayResult ground = gPhysics->pBackend->RaycastStatic(Vec3f(position.X, pelvis.Y, position.Z),
+																		Vec3f(0.0f, -scGroundProbe, 0.0f));
+
+	if (ground.bHit) {
+		position.Y = ground.Point.Y;
+	}
+
+	root->SetPosition(position);
 }
 
 void NPC::UpdateBehaviours(float32 delta_time)
@@ -322,6 +497,32 @@ void NPC::DrawDebugHealth() const
 	}
 
 	renderer::gDebugDraw->Line(left_end, left_end + right * (scBarWidth * fraction), fill);
+}
+
+void NPC::DrawDebugBrain() const
+{
+	const Object* root = mActor.GetRoot();
+	const eNPCBrainState state = mBrain.GetState();
+
+	if (root == nullptr || mState != eState::Animated) {
+		return;
+	}
+
+	const Vec3f lift(0.0f, 0.05f, 0.0f);
+	const Vec3f position = root->GetPosition() + lift;
+
+	renderer::gDebugDraw->Line(position, position + NPCBrain::YawToDirection(mYaw) * 0.6f,
+							   Color::FromRGBA(80, 160, 255, 255));
+
+	if (state == eNPCBrainState::WalkTo || state == eNPCBrainState::Flee) {
+		Color color = Color::FromRGBA(240, 220, 60, 255);
+
+		if (state == eNPCBrainState::Flee) {
+			color = Color::FromRGBA(255, 70, 40, 255);
+		}
+
+		renderer::gDebugDraw->Line(position, mBrain.GetTarget() + lift, color);
+	}
 }
 
 void NPC::Damage(float32 amount) { ApplyDamage(amount, -1); }
@@ -394,7 +595,12 @@ void NPC::Kill(int32 body)
 		return;
 	}
 
-	WakePhysics();
+	// Over the active budget there is no dying behaviour, the NPC just drops
+	if (!WakePhysics()) {
+		EnterRagdoll();
+		return;
+	}
+
 	mActor.SetCullable(false);
 
 	mbDying = true;
@@ -430,6 +636,7 @@ void NPC::EnterRagdoll()
 	// The object origin stays put while the ragdoll moves, so culling would drop it
 	mActor.SetCullable(false);
 
+	mMover.SetEnabled(false);
 	ragdoll.GoLimp(skinned->GetWorldMatrix());
 	mState = eState::Ragdoll;
 }
@@ -444,6 +651,7 @@ void NPC::EnterFallen()
 
 	ragdoll.SetBalancing(false);
 	ragdoll.SetRootAssist(0.0f);
+	mMover.SetEnabled(false);
 
 	if (mBehaviours.IsValid()) {
 		ragdoll.SetAllBodyModes(physics::eRagdollBodyMode::Powered);
@@ -532,14 +740,9 @@ void NPC::ActivateBalance()
 void NPC::ReturnToAnimation()
 {
 	physics::Ragdoll& ragdoll = mActor.Ragdoll;
-	Object* root = mActor.GetRoot();
 
 	// Move the animated root to where balancing left the pelvis, so the animation picks up from there
-	if (root != nullptr) {
-		const Vec3f offset = ragdoll.GetBodyOrigin(0) - ragdoll.GetBodyTargetOrigin(0);
-
-		root->SetPosition(root->GetPosition() + Vec3f(offset.X, 0.0f, offset.Z));
-	}
+	PlaceRootUnderPelvis();
 
 	ragdoll.RebaseTargets();
 	ragdoll.SetBalancing(false);
@@ -574,18 +777,67 @@ void NPC::SetPowered(bool powered)
 
 	mPhysicsBlend = 1.0f;
 	ragdoll.SetAllBodyBlends(mPhysicsBlend);
+
+	if (powered) {
+		mMover.SetEnabled(false);
+	}
+	else {
+		EnableMover();
+	}
 }
 
-void NPC::WakePhysics()
+bool NPC::WakePhysics()
 {
+	if (!mActor.Ragdoll.IsCreated()) {
+		return false;
+	}
+
+	if (!IsPowered() && mpManager != nullptr && !mpManager->RequestActive(*this)) {
+		return false;
+	}
+
 	SetPowered(true);
 	mPoweredTime = 0.0f;
+
+	return true;
+}
+
+bool NPC::IsPhysicsActive() const
+{
+	if (!mActor.Ragdoll.IsCreated() || mState == eState::Ragdoll) {
+		return false;
+	}
+
+	return IsPowered() || mState == eState::Fallen || mbDying;
+}
+
+bool NPC::CanDeactivate() const { return mState == eState::Animated && !mbDying && IsPowered(); }
+
+void NPC::Deactivate()
+{
+	physics::Ragdoll& ragdoll = mActor.Ragdoll;
+
+	if (!CanDeactivate()) {
+		return;
+	}
+
+	if (ragdoll.IsBalancing()) {
+		ReturnToAnimation();
+	}
+
+	mBehaviours.Reset();
+	ragdoll.ClearBodyLayers();
+	ragdoll.RebaseTargets();
+
+	mAssistFade = 1.0f;
+	SetPowered(false);
+	ApplyStrengths();
 }
 
 void NPC::UpdatePhysicsBlend(float32 delta_time)
 {
 	constexpr float32 scMinPoweredTime = 1.0f;
-	constexpr float32 scBlendOutTime = 0.25f;
+	constexpr float32 scBlendOutTime = 0.5f;
 
 	if (mState != eState::Animated || !IsPowered()) {
 		return;
@@ -610,7 +862,8 @@ void NPC::UpdatePhysicsBlend(float32 delta_time)
 		return;
 	}
 
-	mActor.Ragdoll.SetAllBodyBlends(mPhysicsBlend);
+	// Eased so the hand-back to the animation starts and lands gently instead of sliding at a constant rate
+	mActor.Ragdoll.SetAllBodyBlends(MathUtil::SmoothStep(mPhysicsBlend));
 }
 
 void NPC::ApplyStrengths()
@@ -632,6 +885,7 @@ void NPC::ApplyStrengths()
 	}
 
 	ragdoll.SetRootAssist(assist);
+	ragdoll.SetBalanceAssist(mpTuning->BalanceAssist);
 }
 
 void NPC::ApplyBehaviourOutput()
@@ -644,9 +898,6 @@ void NPC::ApplyBehaviourOutput()
 
 void NPC::OnHit(const NPCHit& hit)
 {
-	constexpr float32 scMinSpeed = 1.0f;
-	constexpr float32 scMaxSpeed = 4.0f;
-
 	physics::Ragdoll& ragdoll = mActor.Ragdoll;
 
 	if (!IsCreated()) {
@@ -664,7 +915,14 @@ void NPC::OnHit(const NPCHit& hit)
 		return;
 	}
 
-	WakePhysics();
+	if (mState == eState::Animated && !mbDying && gWorld != nullptr) {
+		mBrain.React(gWorld->Player.Position, hit.Damage > 0.0f);
+	}
+
+	// Over the active budget the NPC takes the damage but stays animated
+	if (!WakePhysics()) {
+		return;
+	}
 
 	const float32 length = hit.Impulse.Length();
 	Vec3f direction = Vec3f::sZero;
@@ -681,9 +939,7 @@ void NPC::OnHit(const NPCHit& hit)
 															 .Damage = hit.Damage });
 	ApplyBehaviourOutput();
 
-	const float32 mass = ragdoll.GetBodyMass(body);
-
-	if (length <= 1e-5f || mass <= 0.0f) {
+	if (length <= 1e-5f) {
 		return;
 	}
 
@@ -692,10 +948,116 @@ void NPC::OnHit(const NPCHit& hit)
 		return;
 	}
 
-	// Standing NPCs take the hit as a velocity change of the struck body, whatever the size of the impulse
-	const float32 speed = MathUtil::Clamp(length / mass, scMinSpeed, scMaxSpeed);
+	// Shove first, so the speed it tops up to is not already counted from the struck limbs' push
+	Shove(hit.Impulse * mpTuning->HitShoveScale, mpTuning->MinShoveSpeed);
 
-	ragdoll.AddImpulse(hit.Body, hit.Impulse * (speed * mass / length), hit.Point);
+	PushHitChain(body, hit.Impulse, hit.Point);
+}
+
+void NPC::PushHitChain(int32 body, const Vec3f impulse, const Vec3f point)
+{
+	constexpr uint32 scChainLength = 3;
+	constexpr float32 scChainFalloff[scChainLength] = { 1.0f, 0.6f, 0.3f };
+	constexpr float32 scMaxSpeed = 2.0f;
+
+	physics::Ragdoll& ragdoll = mActor.Ragdoll;
+
+	int32 chain[scChainLength];
+	uint32 chain_length = 0;
+	float32 weighted_mass = 0.0f;
+
+	for (int32 i = body; i >= 0 && chain_length < scChainLength; i = ragdoll.GetParentBody(i)) {
+		chain[chain_length] = i;
+		weighted_mass += scChainFalloff[chain_length] * ragdoll.GetBodyMass(i);
+		chain_length++;
+	}
+
+	const float32 length = impulse.Length();
+
+	if (weighted_mass <= 0.0f || length <= 1e-5f) {
+		return;
+	}
+
+	// The struck body leads and its parents follow, so a light hand is not flicked away and snapped straight back by
+	// its own muscles. Only the struck body takes the hit off centre and spins.
+	const float32 speed = std::min(length / weighted_mass, scMaxSpeed);
+	const Vec3f velocity = impulse * (speed / length);
+
+	for (uint32 i = 0; i < chain_length; i++) {
+		const uint32 index = static_cast<uint32>(chain[i]);
+		const Vec3f chain_impulse = velocity * (scChainFalloff[i] * ragdoll.GetBodyMass(index));
+
+		if (i == 0) {
+			ragdoll.AddImpulse(ragdoll.GetBodyID(index), chain_impulse, point);
+		}
+		else {
+			ragdoll.AddImpulse(ragdoll.GetBodyID(index), chain_impulse, ragdoll.GetBodyPosition(index));
+		}
+	}
+}
+
+void NPC::Shove(const Vec3f impulse, float32 min_speed)
+{
+	physics::Ragdoll& ragdoll = mActor.Ragdoll;
+	const physics::RagdollRig& rig = ragdoll.GetRig();
+
+	const Vec3f horizontal(impulse.X, 0.0f, impulse.Z);
+	const float32 length = horizontal.Length();
+	const float32 total_mass = ragdoll.GetTotalMass();
+
+	if (!rig.bCanBalance || length <= 1e-5f || total_mass <= 0.0f) {
+		return;
+	}
+
+	float32 moved_mass = 0.0f;
+
+	for (uint32 i = 0; i < ragdoll.GetBodyCount(); i++) {
+		if (!ragdoll.IsFoot(i)) {
+			moved_mass += ragdoll.GetBodyMass(i);
+		}
+	}
+
+	if (moved_mass <= 0.0f) {
+		return;
+	}
+
+	const float32 speed = MathUtil::Clamp(length / total_mass, min_speed, mpTuning->MaxShoveSpeed);
+	const Vec3f direction = horizontal / length;
+
+	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
+	float32 momentum = 0.0f;
+
+	for (uint32 i = 0; i < ragdoll.GetBodyCount(); i++) {
+		if (!ragdoll.IsFoot(i)) {
+			const Vec3f body_velocity = Vec3f(body_interface.GetLinearVelocity(ragdoll.GetBodyID(i)));
+			momentum += ragdoll.GetBodyMass(i) * body_velocity.Dot(direction);
+		}
+	}
+
+	// A hit while the body is still moving from the last one only tops its speed back up, so a burst knocks harder
+	// than one shot without each hit adding a full shove
+	const float32 target_speed = speed * total_mass / moved_mass;
+	const float32 current_speed = std::max(momentum / moved_mass, 0.0f);
+	const float32 added_speed = std::max(target_speed - current_speed, target_speed * mpTuning->RepeatShoveFraction);
+
+	// Everything above the feet moves together, so the body tips over its planted feet without bending at the hips
+	const Vec3f velocity = direction * added_speed;
+
+	for (uint32 i = 0; i < ragdoll.GetBodyCount(); i++) {
+		if (!ragdoll.IsFoot(i)) {
+			ragdoll.AddImpulse(ragdoll.GetBodyID(i), velocity * ragdoll.GetBodyMass(i), ragdoll.GetBodyPosition(i));
+		}
+	}
+
+	// Balance lets the body keep drifting with the shove for a moment, so it steps with it rather than stopping dead
+	Vec3f stagger = ragdoll.GetStaggerVelocity() + horizontal * (speed / length);
+	const float32 stagger_speed = stagger.Length();
+
+	if (stagger_speed > mpTuning->MaxStaggerSpeed) {
+		stagger = stagger * (mpTuning->MaxStaggerSpeed / stagger_speed);
+	}
+
+	ragdoll.SetStaggerVelocity(stagger);
 }
 
 bool NPC::TriggerBehaviour(const char* name)
@@ -716,7 +1078,9 @@ bool NPC::TriggerBehaviour(const char* name)
 	}
 
 	if (mState == eState::Animated) {
-		WakePhysics();
+		if (!WakePhysics()) {
+			return false;
+		}
 
 		if (behaviour->NeedsFreePose()) {
 			EnterFallen();
@@ -801,6 +1165,41 @@ void NPC::OnContact(const physics::RagdollContact& contact)
 																	.Magnitude = contact.Speed });
 }
 
+void NPC::OnPush(const NPCPush& push)
+{
+	constexpr float32 scPushCooldown = 0.5f;
+
+	physics::Ragdoll& ragdoll = mActor.Ragdoll;
+
+	if (!CanTakeDamage() || mState != eState::Animated || mPushCooldown > 0.0f) {
+		return;
+	}
+
+	mPushCooldown = scPushCooldown;
+	mBrain.React(push.Source, false);
+
+	const float32 length = push.Impulse.Length();
+
+	if (length <= 1e-5f || !mBehaviours.IsValid() || !WakePhysics()) {
+		return;
+	}
+
+	// Pushed at the chest, like a shove, rather than wherever the two capsules touched
+	const uint32 chest = ragdoll.GetRig().Chest;
+	const Vec3f point = ragdoll.GetBodyPosition(chest);
+
+	mBehaviours.HandleEvent(ragdoll, physics::RagdollEvent { .Type = physics::eRagdollEvent::Push,
+															 .Body = static_cast<int32>(chest),
+															 .Point = point,
+															 .Direction = push.Impulse / length,
+															 .Magnitude = length });
+	ApplyBehaviourOutput();
+
+	ragdoll.AddImpulse(ragdoll.GetBodyID(chest), push.Impulse, point);
+
+	Shove(push.Impulse, 0.0f);
+}
+
 void NPC::AddWound(JPH::BodyID body_id, const Vec3f point, const Vec3f direction, float32 size)
 {
 	mActor.AddWound(body_id, point, direction, size);
@@ -815,6 +1214,8 @@ void NPC::SetPosition(const Vec3f position)
 	}
 
 	root->SetPosition(position);
+	mMover.Teleport(position);
+	mBrain.SetHome(position);
 	mbTeleported = true;
 }
 
@@ -826,6 +1227,7 @@ void NPC::SetYaw(float32 yaw)
 		return;
 	}
 
+	mYaw = yaw;
 	root->SetRotation(Quat::FromAxisAngle(Vec3f::sUp, yaw));
 	mbTeleported = true;
 }
@@ -845,6 +1247,11 @@ void NPC::SetIdleAnimation(const String& name, float32 speed, float32 blend_time
 		return;
 	}
 
+	if (mpWalkAnimation == mpIdleAnimation) {
+		mpWalkAnimation = anim;
+	}
+
+	mpIdleAnimation = anim;
 	skeleton->SetRestAnimation(anim, speed, blend_time);
 }
 
@@ -865,7 +1272,7 @@ NPC* NPCManager::Spawn(const Object* model, const NPCDesc& desc)
 {
 	std::unique_ptr<NPC> npc = std::make_unique<NPC>();
 
-	if (!npc->Create(model, desc, Tuning)) {
+	if (!npc->Create(model, desc, *this)) {
 		return nullptr;
 	}
 
@@ -994,8 +1401,236 @@ void NPCManager::SpawnWorldBlood(RagdollEntity& actor, const physics::RagdollCon
 	}
 }
 
+const physics::CharacterConfig& NPCManager::GetCharacterConfig()
+{
+	if (!mbCharacterConfigLoaded) {
+		mCharacterConfig = physics::CharacterConfig::LoadPlayer();
+		mbCharacterConfigLoaded = true;
+	}
+
+	return mCharacterConfig;
+}
+
+float32 NPCManager::GetActivePriority(const NPC& npc) const
+{
+	constexpr float32 scInViewScale = 2.0f;
+	constexpr float32 scInViewCos = 0.5f;
+
+	const Object* root = gObjectManager->GetObject(npc.GetRootID());
+
+	if (root == nullptr || gWorld == nullptr || !gWorld->Player.pCamera) {
+		return npc.Importance;
+	}
+
+	const Vec3f eye = gWorld->Player.pCamera->GetPosition();
+	const Vec3f offset = root->GetPosition() - eye;
+	const float32 distance = offset.Length();
+
+	float32 priority = npc.Importance / std::max(distance, 1.0f);
+
+	if (distance > 1e-3f && gWorld->Player.pCamera->GetForwardVector().Dot(offset / distance) > scInViewCos) {
+		priority *= scInViewScale;
+	}
+
+	return priority;
+}
+
+uint32 NPCManager::GetActiveCount() const
+{
+	uint32 count = 0;
+
+	for (const std::unique_ptr<NPC>& npc : mNPCs) {
+		if (npc->IsPhysicsActive()) {
+			count++;
+		}
+	}
+
+	return count;
+}
+
+NPC* NPCManager::FindLowestPriorityActive(const NPC* exclude, float32& out_priority)
+{
+	NPC* lowest = nullptr;
+	out_priority = 0.0f;
+
+	for (std::unique_ptr<NPC>& npc : mNPCs) {
+		if (npc.get() == exclude || !npc->CanDeactivate()) {
+			continue;
+		}
+
+		const float32 priority = GetActivePriority(*npc);
+
+		if (lowest == nullptr || priority < out_priority) {
+			lowest = npc.get();
+			out_priority = priority;
+		}
+	}
+
+	return lowest;
+}
+
+bool NPCManager::RequestActive(const NPC& npc)
+{
+	const Object* root = gObjectManager->GetObject(npc.GetRootID());
+
+	if (Tuning.ActiveDistance > 0.0f && root != nullptr && gWorld != nullptr && gWorld->Player.pCamera) {
+		const float32 distance = (root->GetPosition() - gWorld->Player.pCamera->GetPosition()).Length();
+
+		if (distance > Tuning.ActiveDistance) {
+			mDeniedRequests++;
+			return false;
+		}
+	}
+
+	if (Tuning.MaxActive == 0 || GetActiveCount() < Tuning.MaxActive) {
+		return true;
+	}
+
+	float32 lowest_priority = 0.0f;
+	NPC* lowest = FindLowestPriorityActive(&npc, lowest_priority);
+
+	if (lowest == nullptr || lowest_priority >= GetActivePriority(npc)) {
+		mDeniedRequests++;
+		return false;
+	}
+
+	lowest->Deactivate();
+	mEvictions++;
+
+	return true;
+}
+
+void NPCManager::EnforceBudget()
+{
+	if (Tuning.ActiveDistance > 0.0f && gWorld != nullptr && gWorld->Player.pCamera) {
+		const Vec3f eye = gWorld->Player.pCamera->GetPosition();
+
+		for (std::unique_ptr<NPC>& npc : mNPCs) {
+			const Object* root = gObjectManager->GetObject(npc->GetRootID());
+
+			if (root != nullptr && npc->CanDeactivate() &&
+				(root->GetPosition() - eye).Length() > Tuning.ActiveDistance) {
+				npc->Deactivate();
+				mEvictions++;
+			}
+		}
+	}
+
+	if (Tuning.MaxActive == 0) {
+		return;
+	}
+
+	// Lowering the budget sends the least important standing NPCs back to animation
+	for (uint32 active = GetActiveCount(); active > Tuning.MaxActive; active--) {
+		float32 priority = 0.0f;
+		NPC* lowest = FindLowestPriorityActive(nullptr, priority);
+
+		if (lowest == nullptr) {
+			break;
+		}
+
+		lowest->Deactivate();
+		mEvictions++;
+	}
+}
+
+void NPCManager::ProcessPlayerBumps()
+{
+	if (gWorld == nullptr) {
+		return;
+	}
+
+	const physics::PhysicsPlayer& player = gWorld->Player.Physics;
+
+	for (const physics::CharacterBump& bump : player.GetBumps()) {
+		if (!NPCCharacterUserData::Matches(bump.OtherUserData)) {
+			continue;
+		}
+
+		const float32 closing = bump.GetClosingSpeed();
+
+		if (closing < Tuning.BumpSpeed) {
+			continue;
+		}
+
+		NPC* npc = FindByRagdollSerial(NPCCharacterUserData::GetSerial(bump.OtherUserData));
+
+		if (npc == nullptr) {
+			continue;
+		}
+
+		Vec3f direction = Vec3f(bump.Normal.X, 0.0f, bump.Normal.Z);
+		const float32 length = direction.Length();
+
+		if (length < 1e-3f) {
+			continue;
+		}
+
+		direction = direction / length;
+
+		const float32 impulse = std::min(Tuning.BumpImpulse * closing, Tuning.MaxBumpImpulse);
+
+		npc->OnPush(NPCPush { .Point = bump.Point, .Impulse = direction * impulse, .Source = gWorld->Player.Position });
+	}
+}
+
+void NPCManager::UpdateStats(float32 delta_time)
+{
+	constexpr float32 scAverageTime = 1.0f;
+
+	const float32 blend = std::min(delta_time / scAverageTime, 1.0f);
+
+	mAveragePhysicsMs += (gPhysics->pBackend->GetLastUpdateMs() - mAveragePhysicsMs) * blend;
+	mAverageActive += (static_cast<float32>(GetActiveCount()) - mAverageActive) * blend;
+}
+
+void NPCManager::LogStats() const
+{
+	uint32 kinematic = 0;
+	uint32 limp = 0;
+	uint32 moving = 0;
+
+	for (const std::unique_ptr<NPC>& npc : mNPCs) {
+		if (npc->IsRagdoll()) {
+			limp++;
+		}
+		else if (!npc->IsPhysicsActive()) {
+			kinematic++;
+		}
+
+		if (npc->GetMover().IsEnabled() && !npc->GetMover().IsResting()) {
+			moving++;
+		}
+	}
+
+	LogInfo(LC_PHYSICS,
+			"NPCs: {} total, {} active (budget {}, {:.1f} avg), {} kinematic, {} limp, {} capsules moving, {} dummies",
+			mNPCs.Size, GetActiveCount(), Tuning.MaxActive, mAverageActive, kinematic, limp, moving, mDummies.Size);
+	LogInfo(LC_PHYSICS,
+			"NPCs: physics {:.2f} ms per frame (1 s average), {} requests denied, {} sent back to kinematic",
+			mAveragePhysicsMs, mDeniedRequests, mEvictions);
+
+	for (const std::unique_ptr<NPC>& npc : mNPCs) {
+		const char* physics = "kinematic";
+
+		if (npc->IsRagdoll()) {
+			physics = "limp";
+		}
+		else if (npc->IsPhysicsActive()) {
+			physics = "active";
+		}
+
+		LogInfo(LC_PHYSICS, "  {}: brain {}, {}, priority {:.3f}", npc->GetName(),
+				NPCBrain::GetStateName(npc->GetBrain().GetState()), physics, GetActivePriority(*npc));
+	}
+}
+
 void NPCManager::Update(float32 delta_time, bool draw_debug)
 {
+	EnforceBudget();
+	ProcessPlayerBumps();
+	UpdateStats(delta_time);
+
 	gPhysics->pBackend->SetMinRagdollContactSpeed(
 		std::min({ Tuning.BloodSpeed, Tuning.MinImpactSpeed, Tuning.SafeImpactSpeed }));
 

@@ -133,6 +133,8 @@ public:
 
 	bool Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_matrix, const RagdollDef& def);
 
+	static JPH::ObjectLayer GetModeLayer(eRagdollBodyMode mode);
+
 	void Activate(const Vec3f velocity);
 
 	void Drive(const Mat4f& object_world_matrix, float32 delta_time, bool teleport = false);
@@ -140,11 +142,22 @@ public:
 
 	void SetBodyMode(uint32 body_index, eRagdollBodyMode mode);
 	void SetAllBodyModes(eRagdollBodyMode mode);
+	void PlaceFeetOnGround();
 	void SetBodyStrength(uint32 body_index, float32 strength);
 	void SetBodyBlend(uint32 body_index, float32 blend);
 	void SetAllBodyBlends(float32 blend);
 	void SetRootAssist(float32 assist);
 	void SetBalancing(bool balancing);
+	FX_FORCE_INLINE void SetBalanceAssist(const BalanceAssist& assist) { mBalance.SetAssist(assist); }
+	FX_FORCE_INLINE void SetStaggerVelocity(const Vec3f velocity)
+	{
+		mBalance.SetStaggerVelocity(JPH::Vec3(velocity.X, velocity.Y, velocity.Z));
+	}
+	FX_FORCE_INLINE Vec3f GetStaggerVelocity() const
+	{
+		const JPH::Vec3 velocity = mBalance.GetStaggerVelocity();
+		return Vec3f(velocity.GetX(), velocity.GetY(), velocity.GetZ());
+	}
 	void RebaseTargets();
 	void ClearBodyLayers();
 	void SetBodyLayers(const SizedArray<BodyLayer>& layers, float32 gravity_scale);
@@ -160,6 +173,8 @@ public:
 	Vec3f GetBodyPosition(uint32 body_index) const;
 	Vec3f GetBodyOrigin(uint32 body_index) const;
 	Vec3f GetBodyTargetOrigin(uint32 body_index) const;
+	/// Horizontal direction the pelvis faces, as simulated or as last animated
+	Vec3f GetPelvisHeading(bool animated) const;
 	bool GetBodyGroundContact(uint32 body_index, BodyGroundContact& out_contact) const;
 	bool IsBodyOnGround(uint32 body_index, const JPH::Vec3 up, float32 min_up) const;
 	static bool IsSupportNormal(const BodyGroundContact& contact, const JPH::Vec3 up, float32 min_up);
@@ -206,6 +221,15 @@ public:
 	~Ragdoll() { Destroy(); }
 
 private:
+	/// A body's pose before the last physics update, so the drawn pose can sit between the last two steps
+	struct BodyPose
+	{
+		JPH::Vec3 Position = JPH::Vec3::sZero();
+		JPH::Quat Orientation = JPH::Quat::sIdentity();
+		bool bValid = false;
+	};
+
+private:
 	void RestoreTableMasses(JPH::RagdollSettings& settings);
 	bool AddToPhysicsSystem(JPH::RagdollSettings& settings);
 	void CreateRootAssist(const JPH::Vec3 root_position);
@@ -234,7 +258,8 @@ private:
 	float32 GetMotorTorqueFraction(uint32 body_index) const;
 
 	void SnapBodyToTarget(JPH::BodyInterface& body_interface, uint32 body_index, JPH::EActivation activation);
-	Mat4f GetBodyModelMatrix(uint32 body_index) const;
+	void StorePreviousPoses(JPH::BodyInterface& body_interface);
+	Mat4f GetBodyModelMatrix(uint32 body_index, float32 step_alpha) const;
 
 	void DrawDebugBodies(const SizedArray<BodyState>& samples, SizedArray<Vec3f>& out_centers) const;
 	void DrawDebugLinks(const SizedArray<Vec3f>& centers) const;
@@ -250,7 +275,12 @@ private:
 	SizedArray<BodyTarget> mTargets;
 	SizedArray<BodyState> mStates;
 	SizedArray<MotorOverride> mMotorOverrides;
+	/// Joint targets the balance controller last drove, faded out after it lets go so the legs do not snap
+	SizedArray<JPH::Quat> mOverrideTargets;
+	SizedArray<uint8> mHadOverride;
+	float32 mOverrideFade = 0.0f;
 	SizedArray<BodyLayer> mLayers;
+	SizedArray<BodyPose> mPreviousPoses;
 	float32 mTotalMass = 0.0f;
 	bool mbHasTargets = false;
 	bool mbHasMotors = false;

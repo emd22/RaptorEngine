@@ -85,6 +85,8 @@ public:
 
 	void Teleport(const Vec3f position, const Quat rotation);
 
+	void SetLinearVelocity(const Vec3f velocity);
+
 	FX_FORCE_INLINE Vec3f GetPosition() { return Vec3f(mpPhysicsBody->GetPosition()); }
 	FX_FORCE_INLINE Quat GetRotation() { return Quat(mpPhysicsBody->GetRotation()); }
 

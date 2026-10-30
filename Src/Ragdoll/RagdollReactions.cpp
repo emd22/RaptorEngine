@@ -16,6 +16,8 @@ using namespace RagdollMath;
 namespace {
 
 constexpr float32 scFlinchAttack = 0.002f;
+constexpr float32 scLookAttack = 0.1f;
+constexpr float32 scMinLookDistance = 0.2f;
 constexpr float32 scGrabRamp = 0.3f;
 constexpr float32 scBehindMargin = -0.1f;
 constexpr float32 scBraceHandLift = 0.06f;
@@ -149,7 +151,9 @@ StaggerBehaviour::StaggerBehaviour() : RagdollBehaviour("stagger", 20.0f)
 
 void StaggerBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent& event)
 {
-	if (event.Type != eRagdollEvent::Hit || ctx.bFreePose || !ctx.bAlive || event.Magnitude < MinImpulse) {
+	const bool is_shove = (event.Type == eRagdollEvent::Hit || event.Type == eRagdollEvent::Push);
+
+	if (!is_shove || ctx.bFreePose || !ctx.bAlive || event.Magnitude < MinImpulse) {
 		return;
 	}
 
@@ -214,6 +218,9 @@ ShotReactionBehaviour::ShotReactionBehaviour() : RagdollBehaviour("shot", 30.0f)
 	AddSetting("grab_time", &GrabTime);
 	AddSetting("grab_reach", &GrabReach);
 	AddSetting("hand_offset", &HandOffset);
+	AddSetting("look_time", &LookTime);
+	AddSetting("look_yaw", &LookYaw);
+	AddSetting("look_pitch", &LookPitch);
 }
 
 void ShotReactionBehaviour::Init(const RagdollRig& rig, uint32 body_count)
@@ -221,6 +228,9 @@ void ShotReactionBehaviour::Init(const RagdollRig& rig, uint32 body_count)
 	mLoosen.InitSize(body_count, 1.0f);
 	mWound = Wound {};
 	mFlinchTime = -1.0f;
+	mFlinchPitch = 0.0f;
+	mLookBody = -1;
+	mLookTime = 0.0f;
 }
 
 void ShotReactionBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent& event)
@@ -245,6 +255,16 @@ void ShotReactionBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEv
 
 	if ((event.Point - chest).Dot(ctx.Right) < 0.0f) {
 		mFlinchSide = -1.0f;
+	}
+
+	// The shot pushes the body away from the shooter: a shot from the front arches back, from behind bows forward
+	const Vec3f push = ctx.Horizontal(event.Direction).SafeNormalize(Vec3f::sZero);
+	mFlinchPitch = push.Dot(ctx.Horizontal(ctx.Forward));
+
+	if (ctx.pRagdoll->GetBodyPart(body) != eRagdollBodyPart::Head) {
+		mLookBody = static_cast<int32>(body);
+		mLookLocal = ctx.ToBodyLocal(body, event.Point);
+		mLookTime = 0.0f;
 	}
 
 	StartGrab(ctx, event);
@@ -373,7 +393,13 @@ void ShotReactionBehaviour::Update(const BehaviourContext& ctx)
 		}
 	}
 
-	if (!is_loose && mFlinchTime < 0.0f && mWound.Arm < 0) {
+	if (mLookBody >= 0) {
+		mLookTime += dt;
+	}
+
+	const bool is_looking = mLookBody >= 0 && mLookTime < LookTime;
+
+	if (!is_loose && mFlinchTime < 0.0f && mWound.Arm < 0 && !is_looking) {
 		Stop();
 	}
 }
@@ -389,13 +415,18 @@ void ShotReactionBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOut
 	const float32 flinch = MathUtil::DegToRad(Flinch) * Envelope(mFlinchTime, scFlinchAttack, FlinchTime);
 
 	if (flinch > 0.0f) {
+		// Positive about Right pitches the body forward, so this is negative for a shot from the front
+		const float32 pitch = flinch * mFlinchPitch;
+
 		for (uint32 i = 0; i < rig.SpineCount; i++) {
-			out.AddWorldRotation(ctx, rig.Spine[i], ctx.Right, flinch * 0.5f);
+			out.AddWorldRotation(ctx, rig.Spine[i], ctx.Right, pitch * 0.5f);
 			out.AddWorldRotation(ctx, rig.Spine[i], ctx.Forward, -mFlinchSide * flinch * 0.4f);
 		}
 
-		out.AddWorldRotation(ctx, rig.Neck, ctx.Right, flinch * 0.6f);
+		out.AddWorldRotation(ctx, rig.Neck, ctx.Right, pitch * 0.6f);
 	}
+
+	LookAtWound(ctx, out);
 
 	if (mWound.Arm < 0 || mWound.Time < GrabDelay) {
 		return;
@@ -410,6 +441,33 @@ void ShotReactionBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOut
 
 	out.Hands[mWound.Arm] = BehaviourGoal { .Target = wound + normal * HandOffset,
 											.Weight = MathUtil::SmoothStep(ramp_in) * ramp_out };
+}
+
+void ShotReactionBehaviour::LookAtWound(const BehaviourContext& ctx, BehaviourOutput& out) const
+{
+	if (mLookBody < 0) {
+		return;
+	}
+
+	const float32 weight = Envelope(mLookTime, scLookAttack, LookTime);
+	const RagdollRig& rig = *ctx.pRig;
+	const Vec3f head = ctx.Bodies[rig.Neck].Center;
+	const Vec3f to_wound = ctx.FromBodyLocal(static_cast<uint32>(mLookBody), mLookLocal) - head;
+
+	if (weight <= 0.0f || to_wound.Length() < scMinLookDistance) {
+		return;
+	}
+
+	const Vec3f flat = ctx.Horizontal(to_wound);
+	const float32 yaw = std::atan2(flat.Dot(ctx.Right), flat.Dot(ctx.Forward));
+	const float32 pitch = std::atan2(to_wound.Dot(ctx.Up), flat.Length());
+
+	const float32 max_yaw = MathUtil::DegToRad(LookYaw);
+	const float32 max_pitch = MathUtil::DegToRad(LookPitch);
+
+	// Positive yaw about Up turns the forward vector towards Right, and positive about Right pitches it down
+	out.AddWorldRotation(ctx, rig.Neck, ctx.Up, MathUtil::Clamp(yaw, -max_yaw, max_yaw) * weight);
+	out.AddWorldRotation(ctx, rig.Neck, ctx.Right, -MathUtil::Clamp(pitch, -max_pitch, max_pitch) * weight);
 }
 
 /////////////////////////////////////

@@ -747,6 +747,72 @@ static float32 N_npc_behaviour_get(int32 npc, const char* behaviour, const char*
 	return value;
 }
 
+static int32 N_npc_count() { return static_cast<int32>(gNPCManager->GetCount()); }
+
+static int32 N_npc_at(int32 index)
+{
+	if (index < 0 || static_cast<uint32>(index) >= gNPCManager->GetCount()) {
+		return 0;
+	}
+
+	NPC* npc = gNPCManager->Get(static_cast<size_t>(index));
+
+	if (!npc->GetRagdoll().IsCreated()) {
+		return 0;
+	}
+
+	return static_cast<int32>(npc->GetRagdollSerial());
+}
+
+static bool N_npc_walk_to(int32 npc, FLOAT4 target)
+{
+	NPC* found = FindNPC(npc);
+
+	if (found == nullptr || !found->IsAlive()) {
+		return false;
+	}
+
+	found->GetBrain().WalkTo(Vec3f(target));
+	return true;
+}
+
+static bool N_npc_flee(int32 npc, FLOAT4 from)
+{
+	NPC* found = FindNPC(npc);
+
+	if (found == nullptr || !found->IsAlive()) {
+		return false;
+	}
+
+	found->GetBrain().Flee(Vec3f(from));
+	return true;
+}
+
+static bool N_npc_idle(int32 npc)
+{
+	NPC* found = FindNPC(npc);
+
+	if (found == nullptr) {
+		return false;
+	}
+
+	found->GetBrain().Idle();
+	return true;
+}
+
+static int32 N_npc_brain_state(int32 npc)
+{
+	const NPC* found = FindNPC(npc);
+
+	if (found == nullptr) {
+		return 0;
+	}
+
+	return static_cast<int32>(found->GetBrain().GetState());
+}
+
+static void N_npc_stats() { gNPCManager->LogStats(); }
+
 static void N_npc_behaviour_list(int32 npc)
 {
 	if (npc == 0) {
@@ -912,6 +978,13 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("npc_behaviour_set", N_npc_behaviour_set),
 	PREDEF("npc_behaviour_get", N_npc_behaviour_get),
 	PREDEF("npc_behaviour_list", N_npc_behaviour_list),
+	PREDEF("npc_count", N_npc_count),
+	PREDEF("npc_at", N_npc_at),
+	PREDEF("npc_walk_to", N_npc_walk_to),
+	PREDEF("npc_flee", N_npc_flee),
+	PREDEF("npc_idle", N_npc_idle),
+	PREDEF("npc_brain_state", N_npc_brain_state),
+	PREDEF("npc_stats", N_npc_stats),
 
 	PREDEF("script_error", N_script_error),
 

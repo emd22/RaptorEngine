@@ -292,6 +292,19 @@ extern bool npc_behaviour_set(int npc, cstring behaviour, cstring setting, float
 extern float npc_behaviour_get(int npc, cstring behaviour, cstring setting);
 extern void npc_behaviour_list(int npc);
 
+/* NPC movement. Animated NPCs walk in a straight line (no path finding) and give up when blocked. States are 0 idle,
+ * 1 walking to a point, 2 reacting to a hit or push, 3 fleeing. */
+
+extern int npc_count();
+/* The handle of the NPC at `index` (0 to npc_count() - 1), or 0 past the end. */
+extern int npc_at(int index);
+extern bool npc_walk_to(int npc, float3 target);
+extern bool npc_flee(int npc, float3 from);
+extern bool npc_idle(int npc);
+extern int npc_brain_state(int npc);
+/* Logs the active physics budget, physics time and each NPC's brain state. */
+extern void npc_stats();
+
 /* CVars */
 
 extern void cvar_set_int(cstring name, long value);

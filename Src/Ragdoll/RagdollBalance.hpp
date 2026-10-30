@@ -30,6 +30,22 @@ enum class eFallReason : uint8
 	StepBudget,
 };
 
+/**
+ * @brief Limits of the centre of mass control: a horizontal force pair between the pelvis and the loaded feet that does
+ * the hip and ankle strategy's job, since the leg motors alone barely move the pelvis
+ */
+struct BalanceAssist
+{
+	/// Largest force as a fraction of body weight
+	float32 MaxForceFraction = 0.15f;
+	/// The force fades out as the capture point moves this far outside the support (m). 0 never releases
+	float32 ReleaseDistance = 0.1f;
+	/// Once released, a braking-only force up to this fraction of body weight still slows the body while it steps
+	float32 RecoveryForceFraction = 0.5f;
+	/// How long a shove's stagger drift lasts (s): longer keeps a shoved body stumbling for more steps
+	float32 StaggerDecayTime = 0.75f;
+};
+
 struct BalanceStatus
 {
 	eBalanceState State = eBalanceState::Off;
@@ -72,6 +88,7 @@ private:
 		JPH::Vec3 AnkleTarget = JPH::Vec3::sZero();
 		bool bLifted = false;
 		bool bFixed = false;
+		bool bSwapped = false;
 	};
 
 public:
@@ -85,6 +102,12 @@ public:
 	void DebugDraw() const;
 
 	FX_FORCE_INLINE bool IsValid() const { return mbValid; }
+	FX_FORCE_INLINE void SetAssist(const BalanceAssist& assist) { mAssist = assist; }
+
+	/// Velocity the body is let drift at after a shove instead of being held still, so it staggers a few steps. It
+	/// decays on its own while balancing and is cleared when balance stops
+	FX_FORCE_INLINE void SetStaggerVelocity(const JPH::Vec3 velocity) { mStaggerVelocity = velocity; }
+	FX_FORCE_INLINE JPH::Vec3 GetStaggerVelocity() const { return mStaggerVelocity; }
 	FX_FORCE_INLINE const BalanceStatus& GetStatus() const { return mStatus; }
 
 private:
@@ -104,6 +127,7 @@ private:
 	bool BeginStep();
 	void StartSwing(uint32 swing_leg, const JPH::Vec3 landing, bool fixed);
 
+	float32 GetWeightShare(uint32 leg_index) const;
 	float32 GetCaptureDistance(const BalanceLeg& leg) const;
 	float32 GetLandingCaptureError(uint32 stance_leg, const JPH::Vec3 landing) const;
 	JPH::Vec3 PlanLanding(uint32 swing_leg, uint32 stance_leg, float32 time_left) const;
@@ -114,6 +138,7 @@ private:
 	void SolveLeg(Ragdoll& ragdoll, const BalanceLeg& leg, const JPH::Vec3 hip, const JPH::Vec3 ankle,
 				  JPH::Quat& out_thigh, JPH::Quat& out_shin) const;
 	void ApplyTorsoControl(Ragdoll& ragdoll, JPH::BodyInterface& body_interface, const JPH::Vec3 gravity);
+	void ApplyCenterOfMassControl(Ragdoll& ragdoll, JPH::BodyInterface& body_interface);
 	bool IsLoaded(const BalanceLeg& leg) const;
 
 	JPH::Vec3 GetHeadingForward(const JPH::Quat& orientation, const JPH::Quat& rest) const;
@@ -122,6 +147,7 @@ private:
 
 private:
 	bool mbValid = false;
+	BalanceAssist mAssist;
 	BalanceLeg mLegs[RagdollRig::scLimbCount];
 
 	const RagdollRig* mpRig = nullptr;
@@ -141,8 +167,10 @@ private:
 	JPH::Vec3 mCenterOfMass = JPH::Vec3::sZero();
 	JPH::Vec3 mVelocity = JPH::Vec3::sZero();
 	JPH::Quat mPelvisOrientation = JPH::Quat::sIdentity();
+	JPH::Quat mPelvisTarget = JPH::Quat::sIdentity();
 	float32 mTrunkTilt = 0.0f;
 	JPH::Vec3 mCapturePoint = JPH::Vec3::sZero();
+	JPH::Vec3 mStaggerVelocity = JPH::Vec3::sZero();
 
 	uint32 mSupportCount = 0;
 	JPH::Vec3 mSupportCenter = JPH::Vec3::sZero();
@@ -151,6 +179,10 @@ private:
 
 	Swing mSwing;
 	float32 mDoubleSupportTime = 0.0f;
+	float32 mLoadWaitTime = 0.0f;
+	float32 mCapturedTime = 0.0f;
+	/// How far the stance legs bend below their usual height after a landing, easing back out
+	float32 mLandingDip = 0.0f;
 	float32 mCalmTime = 0.0f;
 	float32 mSettleTime = 0.0f;
 	float32 mShiftTime = 0.0f;

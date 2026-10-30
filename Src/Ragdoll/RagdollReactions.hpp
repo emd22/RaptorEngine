@@ -54,8 +54,8 @@ public:
 public:
 	float32 MinImpulse = 1.0f;
 	float32 MinTime = 0.75f;
-	float32 ArmSpread = 35.0f;
-	float32 SpreadSpeed = 0.6f;
+	float32 ArmSpread = 65.0f;
+	float32 SpreadSpeed = 0.4f;
 };
 
 class ShotReactionBehaviour : public RagdollBehaviour
@@ -77,10 +77,14 @@ public:
 	float32 GrabTime = 2.5f;
 	float32 GrabReach = 1.15f;
 	float32 HandOffset = 0.07f;
+	float32 LookTime = 1.5f;
+	float32 LookYaw = 80.0f;
+	float32 LookPitch = 35.0f;
 
 private:
 	void LoosenAround(const BehaviourContext& ctx, uint32 body);
 	void StartGrab(const BehaviourContext& ctx, const RagdollEvent& event);
+	void LookAtWound(const BehaviourContext& ctx, BehaviourOutput& out) const;
 
 	struct Wound
 	{
@@ -95,6 +99,10 @@ private:
 	Wound mWound;
 	float32 mFlinchTime = -1.0f;
 	float32 mFlinchSide = 0.0f;
+	float32 mFlinchPitch = 0.0f;
+	int32 mLookBody = -1;
+	Vec3f mLookLocal = Vec3f::sZero;
+	float32 mLookTime = 0.0f;
 };
 
 class BraceBehaviour : public RagdollBehaviour

@@ -22,6 +22,8 @@ enum class eRagdollEvent : uint8
 	LostSupport,
 	OnGround,
 	Died,
+	/// A shove without damage, such as the player walking into the NPC
+	Push,
 };
 
 struct RagdollEvent

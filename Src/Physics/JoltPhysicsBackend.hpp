@@ -3,6 +3,7 @@
 #include <ThirdParty/Jolt/Jolt.h>
 #include <ThirdParty/Jolt/Physics/Body/BodyActivationListener.h>
 #include <ThirdParty/Jolt/Physics/Body/BodyManager.h>
+#include <ThirdParty/Jolt/Physics/Character/CharacterVirtual.h>
 #include <ThirdParty/Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
 #include <ThirdParty/Jolt/Physics/Collision/ObjectLayer.h>
 #include <ThirdParty/Jolt/Physics/PhysicsSystem.h>
@@ -11,6 +12,7 @@
 #include <Core/MemberRef.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
+#include <Math/MathUtil.hpp>
 #include <Math/Vec3.hpp>
 #include <algorithm>
 #include <atomic>
@@ -30,7 +32,14 @@ using Type = JPH::ObjectLayer;
 static constexpr JPH::ObjectLayer Static = 0;
 static constexpr JPH::ObjectLayer Dynamic = 1;
 static constexpr JPH::ObjectLayer Deactivated = 2;
-static constexpr JPH::ObjectLayer NumLayers = 3;
+/// Ragdoll bodies sit on the layer of their body mode, so characters can pick which ones they collide with
+static constexpr JPH::ObjectLayer RagdollKinematic = 3;
+static constexpr JPH::ObjectLayer RagdollPowered = 4;
+static constexpr JPH::ObjectLayer RagdollLimp = 5;
+static constexpr JPH::ObjectLayer NumLayers = 6;
+
+FX_FORCE_INLINE bool IsRagdoll(JPH::ObjectLayer layer) { return layer >= RagdollKinematic && layer <= RagdollLimp; }
+FX_FORCE_INLINE bool IsMoving(JPH::ObjectLayer layer) { return layer == Dynamic || IsRagdoll(layer); }
 }; // namespace PhLayer
 
 namespace PhBroadPhaseLayer {
@@ -52,6 +61,10 @@ public:
 		// Create a mapping table from object to broad phase layer
 		mObjectToBroadPhase[PhLayer::Static] = PhBroadPhaseLayer::Static;
 		mObjectToBroadPhase[PhLayer::Dynamic] = PhBroadPhaseLayer::Dynamic;
+		mObjectToBroadPhase[PhLayer::Deactivated] = PhBroadPhaseLayer::Deactivated;
+		mObjectToBroadPhase[PhLayer::RagdollKinematic] = PhBroadPhaseLayer::Dynamic;
+		mObjectToBroadPhase[PhLayer::RagdollPowered] = PhBroadPhaseLayer::Dynamic;
+		mObjectToBroadPhase[PhLayer::RagdollLimp] = PhBroadPhaseLayer::Dynamic;
 	}
 
 	virtual uint32 GetNumBroadPhaseLayers() const override { return PhBroadPhaseLayer::NumLayers; }
@@ -70,6 +83,8 @@ public:
 			return "Static";
 		case (JPH::BroadPhaseLayer::Type)PhBroadPhaseLayer::Dynamic:
 			return "Dynamic";
+		case (JPH::BroadPhaseLayer::Type)PhBroadPhaseLayer::Deactivated:
+			return "Deactivated";
 		default:
 			JPH_ASSERT(false);
 			return "Invalid";
@@ -87,17 +102,16 @@ class BodyVsBPLayerFilter : public JPH::ObjectVsBroadPhaseLayerFilter
 public:
 	virtual bool ShouldCollide(JPH::ObjectLayer inLayer1, JPH::BroadPhaseLayer inLayer2) const override
 	{
-		switch (inLayer1) {
-		case PhLayer::Static:
+		if (inLayer1 == PhLayer::Static) {
 			return inLayer2 == PhBroadPhaseLayer::Dynamic;
-		case PhLayer::Dynamic:
-			return true;
-		case PhLayer::Deactivated:
-			return false;
-		default:
-			JPH_ASSERT(false);
-			return false;
 		}
+
+		if (PhLayer::IsMoving(inLayer1)) {
+			return true;
+		}
+
+		JPH_ASSERT(inLayer1 == PhLayer::Deactivated);
+		return false;
 	}
 };
 
@@ -108,18 +122,56 @@ class BodyLayerPairFilterImpl : public JPH::ObjectLayerPairFilter
 public:
 	virtual bool ShouldCollide(JPH::ObjectLayer inObject1, JPH::ObjectLayer inObject2) const override
 	{
-		switch (inObject1) {
-		case PhLayer::Static:
-			return inObject2 == PhLayer::Dynamic; // Non moving only collides with moving
-		case PhLayer::Dynamic:
-			return true; // Moving collides with everything
-		case PhLayer::Deactivated:
-			return false;
-		default:
-			JPH_ASSERT(false);
-			return false;
+		if (inObject1 == PhLayer::Static) {
+			return PhLayer::IsMoving(inObject2); // Non moving only collides with moving
 		}
+
+		if (PhLayer::IsMoving(inObject1)) {
+			return inObject2 != PhLayer::Deactivated;
+		}
+
+		JPH_ASSERT(inObject1 == PhLayer::Deactivated);
+		return false;
 	}
+};
+
+/// Which ragdoll bodies a character capsule collides with
+enum class eCharacterRagdollCollision : uint8
+{
+	None,
+	/// Powered bodies only: animated NPCs are blocked by their own capsule and limp bodies are walked through
+	Powered,
+	All,
+};
+
+/// Layer filter for character capsules: the world and props, plus the ragdoll layers `RagdollCollision` allows
+class CharacterLayerFilter final : public JPH::ObjectLayerFilter
+{
+public:
+	explicit CharacterLayerFilter(eCharacterRagdollCollision ragdoll_collision) : mRagdollCollision(ragdoll_collision)
+	{
+	}
+
+	virtual bool ShouldCollide(JPH::ObjectLayer inLayer) const override
+	{
+		if (inLayer == PhLayer::Static || inLayer == PhLayer::Dynamic) {
+			return true;
+		}
+
+		switch (mRagdollCollision) {
+		case eCharacterRagdollCollision::None:
+			return false;
+		case eCharacterRagdollCollision::Powered:
+			return inLayer == PhLayer::RagdollPowered;
+		case eCharacterRagdollCollision::All:
+			return PhLayer::IsRagdoll(inLayer);
+		}
+
+		return false;
+	}
+
+private:
+	eCharacterRagdollCollision mRagdollCollision;
 };
 
 
@@ -459,6 +511,8 @@ class JoltPhysicsBackend
 public:
 	static constexpr uint32 scMaxBodies = 512;
 	static constexpr int scCollisionSteps = 2;
+	/// A step runs once this fraction of a step has built up, so the accumulator ends a frame in [-(1 - t), t)
+	static constexpr float32 scStepThreshold = 0.75f;
 
 public:
 	JoltPhysicsBackend();
@@ -493,6 +547,17 @@ public:
 
 	FX_FORCE_INLINE float32 GetCollisionStepTime() const { return cTimeStep / static_cast<float32>(scCollisionSteps); }
 
+	/// How far the frame is from the state before the last update (0) to the state after it (1). Drawing bodies there
+	/// keeps them a constant 0.75 steps behind wall time instead of jumping by whole steps
+	FX_FORCE_INLINE float32 GetStepAlpha() const
+	{
+		return MathUtil::Clamp(StepAccumulator / cTimeStep + (1.0f - scStepThreshold), 0.0f, 1.0f);
+	}
+
+	/// Wall time of the physics steps run by the last Update, and how many there were
+	FX_FORCE_INLINE float32 GetLastUpdateMs() const { return mLastUpdateMs; }
+	FX_FORCE_INLINE uint32 GetLastStepCount() const { return mLastStepCount; }
+
 	FX_FORCE_INLINE void ClearBodyGroundContacts() { mContactListener.ClearBodyGroundContacts(); }
 	FX_FORCE_INLINE uint32 GetGroundContactGeneration() const
 	{
@@ -515,6 +580,9 @@ public:
 	MemberRef<JPH::TempAllocatorImpl> pTempAllocator;
 	MemberRef<JPH::JobSystemThreadPool> pJobSystem;
 
+	/// The player and NPC capsules, so characters block each other
+	JPH::CharacterVsCharacterCollisionSimple CharacterCollision;
+
 
 private:
 	PhBPLayerInterfaceImpl mBroadPhaseInterface;
@@ -526,6 +594,9 @@ private:
 
 
 	bool mbIsInited = false;
+
+	float32 mLastUpdateMs = 0.0f;
+	uint32 mLastStepCount = 0;
 };
 
 } // namespace physics

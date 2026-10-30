@@ -19,6 +19,7 @@ namespace {
 constexpr float32 scMotorMinFrequencyScale = 0.2f;
 constexpr float32 scMinSubtreeInertia = 1e-4f;
 constexpr float32 scGravityCompFullStrength = 0.25f;
+constexpr float32 scOverrideFadeTime = 0.4f;
 
 constexpr float32 scRootAssistFrequency = 6.0f;
 constexpr float32 scRootAssistDamping = 1.0f;
@@ -47,6 +48,7 @@ void Ragdoll::OnStep(const JPH::PhysicsStepListenerContext& inContext)
 
 	if (inContext.mIsFirstStep) {
 		mSubstep = 0;
+		StorePreviousPoses(body_interface);
 	}
 
 	const uint32 steps_left = std::max(static_cast<uint32>(JoltPhysicsBackend::scCollisionSteps) - mSubstep, 1u);
@@ -78,6 +80,10 @@ void Ragdoll::OnStep(const JPH::PhysicsStepListenerContext& inContext)
 
 	for (uint32 i = 0; i < mBodies.Size; i++) {
 		ApplyMotor(i);
+	}
+
+	if (!mbBalancing && mOverrideFade > 0.0f) {
+		mOverrideFade = std::max(mOverrideFade - inContext.mDeltaTime / scOverrideFadeTime, 0.0f);
 	}
 
 	if (mbLimp) {
@@ -253,6 +259,17 @@ void Ragdoll::ApplyMotor(uint32 body_index)
 		const float32 lead = GetLeadTime(info.Muscle.Damping, omega);
 
 		joint_target = IntegrateRotation(parent_inverse * target.Orientation, relative_velocity, lead);
+	}
+
+	if (motor_override.Mode == eMotorOverride::Target) {
+		mOverrideTargets[body_index] = joint_target;
+	}
+
+	if (mbBalancing) {
+		mHadOverride[body_index] = (motor_override.Mode == eMotorOverride::Target);
+	}
+	else if (mOverrideFade > 0.0f && mHadOverride[body_index]) {
+		joint_target = joint_target.SLERP(mOverrideTargets[body_index], mOverrideFade);
 	}
 
 	const BodyLayer& layer = mLayers[body_index];

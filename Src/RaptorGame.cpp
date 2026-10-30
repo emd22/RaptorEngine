@@ -7,6 +7,7 @@
 
 #include <Asset/AssetManager.hpp>
 #include <Asset/ConfigFile.hpp>
+#include <Asset/MeshGen.hpp>
 // #include <Asset/Font/Font.hpp>
 #include <Asset/WorldFile.hpp>
 #include <Audio/AudioSystem.hpp>
@@ -84,6 +85,11 @@ static constexpr const char* scCrosshairPath = "Textures/crosshair.png";
 
 /// Crosshair width and height in window pixels, set `$i_crosshair_size` in the console to change it (0 hides it)
 static constexpr int64 scCrosshairSize = 3;
+
+/// Edge length, launch speed and distance in front of the eye of the physics cube fired from the camera
+static constexpr float32 scFireCubeSize = 0.5f;
+static constexpr float32 scFireCubeSpeed = 25.0f;
+static constexpr float32 scFireCubeSpawnDistance = 1.5f;
 
 RaptorGame::RaptorGame()
 {
@@ -270,6 +276,22 @@ void RaptorGame::CreateGame()
 	mpNPCStrengthCVar = gCVars->Set("b_npc_strength", gCVars->Get("b_npc_strength", 1.0f));
 	mpNPCRootAssistCVar = gCVars->Set("b_npc_root_assist", gCVars->Get("b_npc_root_assist", 1.0f));
 	mpNPCBalanceCVar = gCVars->Set("b_npc_balance", gCVars->Get("b_npc_balance", 1.0f));
+	mpNPCBalanceAssistCVar = gCVars->Set("b_npc_balance_assist", gCVars->Get("b_npc_balance_assist", 0.15f));
+	mpNPCBalanceReleaseCVar = gCVars->Set("b_npc_balance_release", gCVars->Get("b_npc_balance_release", 0.1f));
+	mpNPCBalanceRecoveryCVar = gCVars->Set("b_npc_balance_recovery", gCVars->Get("b_npc_balance_recovery", 0.5f));
+	mpNPCMaxActiveCVar = gCVars->Set("b_npc_max_active", gCVars->Get("b_npc_max_active", int64(4)));
+	mpNPCActiveDistanceCVar = gCVars->Set("b_npc_active_distance", gCVars->Get("b_npc_active_distance", 50.0f));
+	mpNPCBumpSpeedCVar = gCVars->Set("b_npc_bump_speed", gCVars->Get("b_npc_bump_speed", 1.0f));
+	mpNPCBumpImpulseCVar = gCVars->Set("b_npc_bump_impulse", gCVars->Get("b_npc_bump_impulse", 4.0f));
+	mpNPCHitShoveCVar = gCVars->Set("b_npc_hit_shove", gCVars->Get("b_npc_hit_shove", 10.0f));
+	mpNPCMinShoveCVar = gCVars->Set("b_npc_min_shove", gCVars->Get("b_npc_min_shove", 0.3f));
+	mpNPCMaxShoveCVar = gCVars->Set("b_npc_max_shove", gCVars->Get("b_npc_max_shove", 1.5f));
+	mpNPCStaggerTimeCVar = gCVars->Set("b_npc_stagger_time", gCVars->Get("b_npc_stagger_time", 0.75f));
+	mpNPCStaggerSpeedCVar = gCVars->Set("b_npc_stagger_speed", gCVars->Get("b_npc_stagger_speed", 0.8f));
+	mpNPCRepeatShoveCVar = gCVars->Set("b_npc_repeat_shove", gCVars->Get("b_npc_repeat_shove", 0.3f));
+	mpNPCWanderCVar = gCVars->Set("b_npc_wander", gCVars->Get("b_npc_wander", 0.0f));
+	mpPlayerRagdollCollisionCVar = gCVars->Set("b_player_ragdoll_collision",
+											   gCVars->Get("b_player_ragdoll_collision", int64(1)));
 
 	gCVars->Set("r_gtao_radius", gCVars->Get("r_gtao_radius", 0.5f));
 	gCVars->Set("r_gtao_radius_multiplier", gCVars->Get("r_gtao_radius_multiplier", 1.457f));
@@ -506,6 +528,10 @@ void RaptorGame::ProcessControls()
 		RequestRagdollTemplate();
 	}
 
+	if (is_simulation_mode && ControlManager::IsKeyPressed(eKey::FX_KEY_M)) {
+		FireCube();
+	}
+
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_L)) {
 		gWorld->bRenderProbes = !gWorld->bRenderProbes;
 		LogInfo("Probe debug render {}", gWorld->bRenderProbes ? "enabled" : "disabled");
@@ -735,6 +761,7 @@ void RaptorGame::SpawnDebugNPC(Object* model)
 	desc.Position = floor.bHit ? floor.Point : (gWorld->Player.Position + forward * 2.5f);
 	desc.Yaw = std::atan2(-forward.X, -forward.Z);
 	desc.IdleAnimation = "walk";
+	desc.WalkAnimation = "walk";
 
 	++mNPCSpawnCount;
 
@@ -764,10 +791,76 @@ void RaptorGame::DropRagdollDummy(Object* model)
 	gNPCManager->SpawnDummy(model, name, position, forward * 2.0f);
 }
 
+void RaptorGame::FireCube()
+{
+	const Vec3f eye = gWorld->Player.pCamera->GetPosition();
+	const Vec3f forward = gWorld->Player.pCamera->GetForwardVector();
+	const float32 half_size = scFireCubeSize * 0.5f;
+
+	// Stop short of anything in the way, so the cube never starts inside a wall
+	const physics::RayResult hit = gPhysics->pBackend->Raycast(eye, forward * scFireCubeSpawnDistance);
+	const float32 spawn_distance = hit.bHit ? eye.DistanceTo(hit.Point) - half_size : scFireCubeSpawnDistance;
+
+	if (spawn_distance < half_size) {
+		return;
+	}
+
+	if (mFiredCubes.Size >= scMaxFiredCubes) {
+		DestroyFiredCube(mFiredCubes[0]);
+		mFiredCubes.RemoveAt(0);
+	}
+
+	const String name = String::Fmt("fired_cube_{}", mFiredCubeCount);
+	++mFiredCubeCount;
+
+	Object* object = gObjectManager->NewObject(name, gWorld->pPrototype->GetDefaultMaterial(), eObjectTag::None);
+
+	object->pMesh = MeshGen::MakeCube(CubeGenOptions::Uniform(half_size))->AsDefaultMesh();
+	object->Bounds.Min = Vec3f(-half_size);
+	object->Bounds.Max = Vec3f(half_size);
+	object->SetShadowCaster(true);
+	object->SetPosition(eye + forward * spawn_distance);
+
+	physics::Body* body = gPhysics->NewBody(name);
+	body->CreatePrimitiveBody(physics::ePrimitiveType::Box, Vec3f(scFireCubeSize), physics::eMotionType::Dynamic,
+							  physics::BodyProps {});
+	body->Teleport(object->GetPosition(), object->mRotation);
+	body->SetLinearVelocity(forward * scFireCubeSpeed);
+
+	object->AttachCollider(body);
+	gWorld->AttachLoaded(object);
+
+	mFiredCubes.Insert(object->Name.GetHash());
+}
+
+void RaptorGame::DestroyFiredCube(Hash32 name_hash)
+{
+	// The cube may already be gone, dynamic objects are removed once they are too far from the player
+	Object* object = gObjectManager->FindObject(name_hash);
+
+	if (object == nullptr) {
+		return;
+	}
+
+	gPhysics->DestroyBody(object->PhysicsID);
+	gWorld->Detach(object->ID);
+	gObjectManager->DestroyObject(object->ID);
+}
+
+void RaptorGame::ClearFiredCubes()
+{
+	for (const Hash32 name_hash : mFiredCubes) {
+		DestroyFiredCube(name_hash);
+	}
+
+	mFiredCubes.Clear();
+}
+
 void RaptorGame::CleanWorld()
 {
 	gNPCManager->ClearDummies();
 	gNPCManager->ClearRagdolls();
+	ClearFiredCubes();
 	gDecalManager->Clear();
 	gParticleSystem->Clear();
 	gAudio->StopAll();
@@ -811,6 +904,36 @@ void RaptorGame::ReadNPCTuning(NPCTuning& tuning) const
 	if (mpNPCBalanceCVar != nullptr) {
 		tuning.bBalance = mpNPCBalanceCVar->FloatValue != 0.0f;
 	}
+
+	if (mpNPCMaxActiveCVar != nullptr) {
+		tuning.MaxActive = static_cast<uint32>(std::max<int64>(mpNPCMaxActiveCVar->IntValue, 0));
+	}
+
+	tuning.BalanceAssist.MaxForceFraction = GetCVarFloat(mpNPCBalanceAssistCVar, tuning.BalanceAssist.MaxForceFraction);
+	tuning.BalanceAssist.ReleaseDistance = GetCVarFloat(mpNPCBalanceReleaseCVar, tuning.BalanceAssist.ReleaseDistance);
+	tuning.BalanceAssist.RecoveryForceFraction = GetCVarFloat(mpNPCBalanceRecoveryCVar,
+															  tuning.BalanceAssist.RecoveryForceFraction);
+	tuning.ActiveDistance = GetCVarFloat(mpNPCActiveDistanceCVar, tuning.ActiveDistance);
+	tuning.BumpSpeed = GetCVarFloat(mpNPCBumpSpeedCVar, tuning.BumpSpeed);
+	tuning.BumpImpulse = GetCVarFloat(mpNPCBumpImpulseCVar, tuning.BumpImpulse);
+	tuning.HitShoveScale = GetCVarFloat(mpNPCHitShoveCVar, tuning.HitShoveScale);
+	tuning.MinShoveSpeed = GetCVarFloat(mpNPCMinShoveCVar, tuning.MinShoveSpeed);
+	tuning.MaxShoveSpeed = GetCVarFloat(mpNPCMaxShoveCVar, tuning.MaxShoveSpeed);
+	tuning.BalanceAssist.StaggerDecayTime = GetCVarFloat(mpNPCStaggerTimeCVar, tuning.BalanceAssist.StaggerDecayTime);
+	tuning.MaxStaggerSpeed = GetCVarFloat(mpNPCStaggerSpeedCVar, tuning.MaxStaggerSpeed);
+	tuning.RepeatShoveFraction = GetCVarFloat(mpNPCRepeatShoveCVar, tuning.RepeatShoveFraction);
+	tuning.WanderRadius = GetCVarFloat(mpNPCWanderCVar, tuning.WanderRadius);
+}
+
+physics::eCharacterRagdollCollision RaptorGame::GetPlayerRagdollCollision() const
+{
+	if (mpPlayerRagdollCollisionCVar == nullptr) {
+		return physics::eCharacterRagdollCollision::Powered;
+	}
+
+	const int64 mode = std::clamp<int64>(mpPlayerRagdollCollisionCVar->IntValue, 0, 2);
+
+	return static_cast<physics::eCharacterRagdollCollision>(mode);
 }
 
 void RaptorGame::UpdateRagdollDummies()
@@ -1101,6 +1224,7 @@ void RaptorGame::Tick()
 		ProcessControls();
 	}
 
+
 	if (!bInCommandMode) {
 		if (mbFlyCameraDetached) {
 			gWorld->Player.Move(DeltaTime, Vec3f::sZero);
@@ -1122,6 +1246,7 @@ void RaptorGame::Tick()
 	gEditor->SyncPanels();
 #endif
 
+	gWorld->Player.Physics.RagdollCollision = GetPlayerRagdollCollision();
 	gWorld->Player.Update(DeltaTime);
 
 	const Ref<FPSCamera>& listener = gWorld->GetCurrentCamera();

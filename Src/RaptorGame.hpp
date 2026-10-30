@@ -101,10 +101,14 @@ private:
 	void DropRagdollDummy(Object* model);
 	void CleanWorld();
 	void ReadNPCTuning(NPCTuning& tuning) const;
+	physics::eCharacterRagdollCollision GetPlayerRagdollCollision() const;
 	static float32 GetCVarFloat(const CVarValue* cvar, float32 fallback);
 
 	void RequestRagdollTemplate();
 	void SpawnDebugNPC(Object* model);
+	void FireCube();
+	void DestroyFiredCube(Hash32 name_hash);
+	void ClearFiredCubes();
 
 public:
 	// TODO: Player attachment system
@@ -197,6 +201,27 @@ private:
 	CVarValue* mpNPCStrengthCVar = nullptr;
 	CVarValue* mpNPCRootAssistCVar = nullptr;
 	CVarValue* mpNPCBalanceCVar = nullptr;
+	CVarValue* mpNPCBalanceAssistCVar = nullptr;
+	CVarValue* mpNPCBalanceReleaseCVar = nullptr;
+	CVarValue* mpNPCBalanceRecoveryCVar = nullptr;
+	CVarValue* mpNPCMaxActiveCVar = nullptr;
+	CVarValue* mpNPCActiveDistanceCVar = nullptr;
+	CVarValue* mpNPCBumpSpeedCVar = nullptr;
+	CVarValue* mpNPCBumpImpulseCVar = nullptr;
+	CVarValue* mpNPCHitShoveCVar = nullptr;
+	CVarValue* mpNPCMinShoveCVar = nullptr;
+	CVarValue* mpNPCMaxShoveCVar = nullptr;
+	CVarValue* mpNPCStaggerTimeCVar = nullptr;
+	CVarValue* mpNPCStaggerSpeedCVar = nullptr;
+	CVarValue* mpNPCRepeatShoveCVar = nullptr;
+	CVarValue* mpNPCWanderCVar = nullptr;
+	CVarValue* mpPlayerRagdollCollisionCVar = nullptr;
+
+	static constexpr uint32 scMaxFiredCubes = 32;
+
+	/// Name hashes of the cubes fired from the camera, oldest first
+	DynArray<Hash32> mFiredCubes;
+	uint32 mFiredCubeCount = 0;
 
 	Ref<FPSCamera> mpFlyCamera { nullptr };
 	ViewAngles mFlyCameraAngles;

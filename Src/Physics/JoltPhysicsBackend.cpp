@@ -5,6 +5,7 @@
 #include <Core/Log.hpp>
 #include <Core/Types.hpp>
 #include <algorithm>
+#include <chrono>
 
 /* Additional Jolt includes */
 #include <Jolt/Physics/Body/BodyFilter.h>
@@ -52,9 +53,10 @@ using namespace JPH::literals;
 void JoltPhysicsBackend::Update(float32 delta_time)
 {
 	constexpr float32 scMaxSteps = 4.0f;
-	constexpr float32 scStepThreshold = 0.75f;
 
 	if (bPhysicsPaused) {
+		mLastStepCount = 0;
+		mLastUpdateMs = 0.0f;
 		return;
 	}
 
@@ -64,10 +66,17 @@ void JoltPhysicsBackend::Update(float32 delta_time)
 		ClearBodyGroundContacts();
 	}
 
+	const auto start = std::chrono::steady_clock::now();
+	uint32 steps = 0;
+
 	while (StepAccumulator >= cTimeStep * scStepThreshold) {
 		PhysicsSystem.Update(cTimeStep, scCollisionSteps, pTempAllocator.pPtr, pJobSystem.pPtr);
 		StepAccumulator -= cTimeStep;
+		steps++;
 	}
+
+	mLastStepCount = steps;
+	mLastUpdateMs = std::chrono::duration<float32, std::milli>(std::chrono::steady_clock::now() - start).count();
 }
 
 void JoltPhysicsBackend::OptimizeBroadPhase() { PhysicsSystem.OptimizeBroadPhase(); }
