@@ -45,7 +45,7 @@ void DrawCross(const Vec3f point, Color color)
 } // namespace
 
 RagdollBehaviours::RagdollBehaviours()
-	: mBehaviours { &mFallen, &mStagger, &mArmBalance, &mShot, &mBrace, &mProtectHead, &mHighFall, &mWrithe, &mDying }
+	: mBehaviours { &mFallen, &mStagger, &mArmBalance, &mImpactRelax, &mShot, &mBrace, &mProtectHead, &mHighFall, &mWrithe, &mDying }
 {
 	std::copy(mBehaviours, mBehaviours + scBehaviourCount, mOrder);
 }
@@ -164,6 +164,7 @@ void RagdollBehaviours::Sense(Ragdoll& ragdoll, float32 delta_time)
 		body.Orientation = sample.Orientation;
 		body.Center = Vec3f::FromJolt(sample.Center);
 		body.Velocity = Vec3f::FromJolt(sample.Velocity);
+		body.AngularVelocity = Vec3f::FromJolt(sample.AngularVelocity);
 
 		BodyGroundContact contact;
 		body.bContact = is_powered && ragdoll.GetBodyGroundContact(i, contact);
@@ -208,7 +209,7 @@ void RagdollBehaviours::Sense(Ragdoll& ragdoll, float32 delta_time)
 	ctx.DropHeight = 0.0f;
 	ctx.bImpactPredicted = false;
 
-	if (!is_powered || !ctx.bFreePose) {
+	if (!is_powered || !ctx.IsFalling()) {
 		return;
 	}
 

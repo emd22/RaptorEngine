@@ -14,6 +14,11 @@ using namespace RagdollMath;
 namespace {
 
 constexpr float32 scStancePress = 0.01f;
+constexpr float32 scStumblePushFraction = 0.2f;
+/// Torque per unit spin about vertical, as a fraction of body mass, so a spinning body settles in about a second
+constexpr float32 scYawDamping = 0.2f;
+/// Torque per unit spin on the chest, as a fraction of body mass, for every axis
+constexpr float32 scTrunkSpinDamping = 0.02f;
 constexpr float32 scLiftStart = 0.003f;
 constexpr float32 scLiftRange = 0.015f;
 
@@ -27,6 +32,8 @@ constexpr float32 scTorsoFrequency = 4.0f;
 constexpr float32 scTorsoMaxTorque = 300.0f;
 constexpr float32 scGravityFeedForward = 1.0f;
 constexpr float32 scGravityFullStrength = 0.25f;
+/// Torque (N m) per unit of chest lean, reacted through the stance hips, so the upper body is pushed back upright
+constexpr float32 scTrunkLeanGain = 600.0f;
 
 /// Centre of mass control frequency (Hz) and damping ratio; its force limits come from BalanceAssist
 constexpr float32 scComFrequency = 2.0f;
@@ -59,7 +66,12 @@ void RagdollBalance::DriveStanceLegs(Ragdoll& ragdoll)
 		center = mLegs[1 - mShiftLeg].FootCenter;
 	}
 
-	JPH::Vec3 shift = mFrame.Horizontal(center - mCapturePoint) * scComShiftGain;
+	JPH::Vec3 shift = JPH::Vec3::sZero();
+
+	// Through a stumble the pelvis goes with the push rather than being shifted back over the feet
+	if (mStumbleTime <= 0.0f) {
+		shift = mFrame.Horizontal(center - mCapturePoint) * scComShiftGain;
+	}
 	const float32 shift_length = shift.Length();
 
 	if (shift_length > scMaxComShift) {
@@ -236,11 +248,17 @@ void RagdollBalance::ApplyTorsoControl(Ragdoll& ragdoll, JPH::BodyInterface& bod
 	JPH::Vec3 torque = -(upper_center - pivot).Cross(gravity * upper_mass) * scGravityFeedForward *
 					   std::min(ragdoll.mBodies[0].Strength / scGravityFullStrength, 1.0f);
 
+	const JPH::Quat chest = ragdoll.mStates[mpRig->Chest].Orientation;
+	const JPH::Vec3 chest_up = (chest * ragdoll.mBodies[mpRig->Chest].RestOrientation.Conjugated()) * mFrame.Up;
+	torque += chest_up.Cross(mFrame.Up) * scTrunkLeanGain;
+
 	const float32 torque_length = torque.Length();
 
 	if (torque_length > scTorsoMaxTorque) {
 		torque *= scTorsoMaxTorque / torque_length;
 	}
+
+	torque *= 1.0f - mStatus.FallProgress;
 
 	body_interface.AddTorque(ragdoll.GetBodyID(0), torque);
 
@@ -251,8 +269,11 @@ void RagdollBalance::ApplyTorsoControl(Ragdoll& ragdoll, JPH::BodyInterface& bod
 
 void RagdollBalance::ApplyCenterOfMassControl(Ragdoll& ragdoll, JPH::BodyInterface& body_interface)
 {
-	// The body keeps moving back through the stumble, so the hold and braking wait until it has recovered
+	// Through the stumble the centre of mass is pushed back along the shove, and the hold and braking wait for recovery
 	if (mStumbleTime > 0.0f) {
+		const JPH::Vec3 back = mFrame.Horizontal(mStaggerVelocity).NormalizedOr(JPH::Vec3::sZero());
+		body_interface.AddForce(ragdoll.GetBodyID(0),
+								back * (scStumblePushFraction * ragdoll.GetTotalMass() * mFrame.Gravity));
 		return;
 	}
 
@@ -313,6 +334,8 @@ void RagdollBalance::ApplyCenterOfMassControl(Ragdoll& ragdoll, JPH::BodyInterfa
 	// Released, it only slows the body down, so each recovery step takes some speed out instead of none
 	force += ClampLength(braking, mAssist.RecoveryForceFraction * weight * strength_scale) * (1.0f - hold);
 
+	force *= 1.0f - mStatus.FallProgress;
+
 	if (force.LengthSq() <= 0.0f) {
 		return;
 	}
@@ -323,6 +346,20 @@ void RagdollBalance::ApplyCenterOfMassControl(Ragdoll& ragdoll, JPH::BodyInterfa
 	for (uint32 i = 0; i < loaded_count; i++) {
 		body_interface.AddForce(ragdoll.GetBodyID(mLegs[loaded[i]].Foot), -force / static_cast<float32>(loaded_count));
 	}
+}
+
+void RagdollBalance::ApplyTrunkSpinDamping(Ragdoll& ragdoll, JPH::BodyInterface& body_interface)
+{
+	const float32 mass = ragdoll.GetTotalMass();
+
+	// The pelvis is damped about vertical, so a spin there settles instead of carrying on
+	const JPH::Vec3 pelvis_spin = body_interface.GetAngularVelocity(ragdoll.GetBodyID(0));
+	body_interface.AddTorque(ragdoll.GetBodyID(0), mFrame.Up * (-scYawDamping * mass * pelvis_spin.Dot(mFrame.Up)));
+
+	// The chest is damped about every axis, so the upper body stops rocking after a shove
+	const JPH::BodyID chest_id = ragdoll.GetBodyID(mpRig->Chest);
+	const JPH::Vec3 chest_spin = body_interface.GetAngularVelocity(chest_id);
+	body_interface.AddTorque(chest_id, -chest_spin * (scTrunkSpinDamping * mass));
 }
 
 } // namespace fx::physics

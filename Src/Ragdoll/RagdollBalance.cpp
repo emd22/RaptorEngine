@@ -35,7 +35,7 @@ constexpr float32 scLandingMargin = 0.08f;
 constexpr float32 scLandingSideMargin = 0.03f;
 constexpr float32 scMinStepWidth = 0.12f;
 constexpr float32 scMaxStepWidth = 0.5f;
-constexpr float32 scMaxStepLength = 0.3f;
+constexpr float32 scMaxStepLength = 0.5f;
 constexpr float32 scStanceDistanceCost = 2.0f;
 constexpr float32 scCaptureErrorCost = 10.0f;
 constexpr float32 scCaptureMargin = 0.05f;
@@ -49,8 +49,12 @@ constexpr float32 scRecoveredTime = 0.25f;
 constexpr float32 scLandingDipPerSpeed = 0.1f;
 constexpr float32 scMaxLandingDip = 0.03f;
 constexpr float32 scLandingDipTime = 0.25f;
+constexpr float32 scStumbleStep = 0.35f;
 
 constexpr float32 scFallTilt = MathUtil::DegToRad(50.0f);
+/// Where a fall starts to build up, before it reaches the thresholds above
+constexpr float32 scFallStartTilt = MathUtil::DegToRad(25.0f);
+constexpr float32 scFallStartHeight = 0.85f;
 /// A trunk lean past this steps even while the capture point is still over the feet, at most once per scLeanStepTime
 constexpr float32 scLeanStepTilt = MathUtil::DegToRad(10.0f);
 constexpr float32 scLeanStepTime = 0.15f;
@@ -153,7 +157,6 @@ void RagdollBalance::Reset()
 	mLoadWaitTime = 0.0f;
 	mCapturedTime = 0.0f;
 	mLandingDip = 0.0f;
-	mStumbleTime = 0.0f;
 	mCalmTime = 0.0f;
 	mSettleTime = 0.0f;
 	mShiftTime = 0.0f;
@@ -173,6 +176,9 @@ void RagdollBalance::Clear(Ragdoll& ragdoll)
 	ragdoll.ClearMotorOverrides();
 	mStaggerVelocity = JPH::Vec3::sZero();
 	mStumbleTime = 0.0f;
+	mbStumbleStepped = false;
+	mStatus.Stumble = 0.0f;
+	mStatus.FallProgress = 0.0f;
 
 	if (mStatus.State != eBalanceState::Fallen) {
 		mStatus.State = eBalanceState::Off;
@@ -202,6 +208,12 @@ void RagdollBalance::Step(Ragdoll& ragdoll, JPH::BodyInterface& body_interface, 
 	mLandingDip *= std::exp(-delta_time / scLandingDipTime);
 	mStumbleTime = std::max(mStumbleTime - delta_time, 0.0f);
 
+	mStatus.Stumble = 0.0f;
+
+	if (mAssist.StumbleTime > 0.0f) {
+		mStatus.Stumble = mStumbleTime / mAssist.StumbleTime;
+	}
+
 	if (!DetectFall()) {
 		if (mStatus.State == eBalanceState::Standing) {
 			UpdateStanding(delta_time);
@@ -225,6 +237,7 @@ void RagdollBalance::Step(Ragdoll& ragdoll, JPH::BodyInterface& body_interface, 
 
 	ApplyTorsoControl(ragdoll, body_interface, gravity);
 	ApplyCenterOfMassControl(ragdoll, body_interface);
+	ApplyTrunkSpinDamping(ragdoll, body_interface);
 }
 
 void RagdollBalance::GatherState(Ragdoll& ragdoll, float32 delta_time, const JPH::Vec3 gravity, bool contacts_fresh)
@@ -399,6 +412,16 @@ void RagdollBalance::BuildSupport()
 
 bool RagdollBalance::DetectFall()
 {
+	const float32 height = mCenterOfMass.Dot(mFrame.Up) - mGroundHeight;
+	const float32 tilt_progress = MathUtil::Clamp((mTrunkTilt - scFallStartTilt) / (scFallTilt - scFallStartTilt), 0.0f,
+												  1.0f);
+	const float32 height_progress = MathUtil::Clamp((scFallStartHeight - height / mRestComHeight) /
+													(scFallStartHeight - scFallHeightFraction),
+												0.0f, 1.0f);
+
+	// Balance and the muscles fade over the approach, reaching the same point as the thresholds below
+	mStatus.FallProgress = std::max(tilt_progress, height_progress);
+
 	eFallReason reason = eFallReason::None;
 
 	if (mTrunkTilt > scFallTilt) {
@@ -453,10 +476,19 @@ void RagdollBalance::UpdateStanding(float32 delta_time)
 		mStatus.RecoverySteps = 0;
 	}
 
+	// Through a stumble the first step goes backwards with the shove, rather than waiting on the capture point
+	if (mStumbleTime > 0.0f) {
+		if (!mbStumbleStepped) {
+			BeginStumbleStep();
+		}
+
+		return;
+	}
+
 	const bool capture_outside = mCaptureOutside > scStepTrigger && mDoubleSupportTime > scMinDoubleSupport;
 	const bool leaning = mTrunkTilt > scLeanStepTilt && mDoubleSupportTime > scLeanStepTime;
 
-	if (mStumbleTime <= 0.0f && mSupportCount > 0 && (capture_outside || leaning)) {
+	if (mSupportCount > 0 && (capture_outside || leaning)) {
 		mShiftLeg = -1;
 
 		if (!BeginStep()) {
@@ -467,7 +499,6 @@ void RagdollBalance::UpdateStanding(float32 delta_time)
 	}
 
 	mLoadWaitTime = 0.0f;
-
 	UpdateClosingStep(delta_time);
 }
 
@@ -597,6 +628,39 @@ bool RagdollBalance::NeedsClosingStep() const
 
 	return (std::abs(std::abs(spread.Dot(side)) - mRestWidth) > scStanceWidthTolerance) ||
 		   (std::abs(spread.Dot(mForward)) > scStanceSplitTolerance);
+}
+
+void RagdollBalance::BeginStumbleStep()
+{
+	const JPH::Vec3 back = mFrame.Horizontal(mStaggerVelocity).NormalizedOr(JPH::Vec3::sZero());
+
+	if (back.LengthSq() <= 0.0f) {
+		return;
+	}
+
+	int32 swing_leg = -1;
+	float32 lightest = std::numeric_limits<float32>::max();
+
+	for (uint32 leg = 0; leg < 2; leg++) {
+		if (!mLegs[1 - leg].bContact) {
+			continue;
+		}
+
+		const float32 share = GetWeightShare(leg);
+
+		if (share < lightest) {
+			lightest = share;
+			swing_leg = static_cast<int32>(leg);
+		}
+	}
+
+	if (swing_leg < 0) {
+		return;
+	}
+
+	const BalanceLeg& stance = mLegs[1 - swing_leg];
+	StartSwing(static_cast<uint32>(swing_leg), ToGround(stance.FootCenter + back * scStumbleStep), true);
+	mbStumbleStepped = true;
 }
 
 bool RagdollBalance::BeginStep()

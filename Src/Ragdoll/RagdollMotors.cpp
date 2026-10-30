@@ -17,6 +17,8 @@ using namespace RagdollMath;
 namespace {
 
 constexpr float32 scMotorMinFrequencyScale = 0.2f;
+/// How far the muscles let go as a fall completes: at full fall progress strength drops to 1 minus this
+constexpr float32 scFallLimp = 0.65f;
 constexpr float32 scMinSubtreeInertia = 1e-4f;
 constexpr float32 scGravityCompFullStrength = 0.25f;
 constexpr float32 scOverrideFadeTime = 0.4f;
@@ -223,8 +225,12 @@ void Ragdoll::ApplyMotor(uint32 body_index)
 		return;
 	}
 
+	// Muscles let go as the body falls, so it folds over the approach rather than snapping limp at the threshold
+	const float32 fall = mbBalancing ? mBalance.GetStatus().FallProgress : 0.0f;
+	const float32 strength = info.Strength * (1.0f - scFallLimp * fall);
+
 	const float32 frequency = info.Muscle.Stiffness * motor_override.FrequencyScale *
-							  (scMotorMinFrequencyScale + (1.0f - scMotorMinFrequencyScale) * info.Strength);
+							  (scMotorMinFrequencyScale + (1.0f - scMotorMinFrequencyScale) * strength);
 	const float32 omega = FX_2PI * frequency;
 
 	float32 inertia = motor_override.Inertia;
@@ -237,7 +243,7 @@ void Ragdoll::ApplyMotor(uint32 body_index)
 	}
 
 	const JPH::SpringSettings spring = MakeSpring(inertia, omega, info.Muscle.Damping);
-	const float32 torque = info.Muscle.MaxTorque * info.Strength;
+	const float32 torque = info.Muscle.MaxTorque * strength;
 
 	JPH::MotorSettings& swing = joint->GetSwingMotorSettings();
 	JPH::MotorSettings& twist = joint->GetTwistMotorSettings();

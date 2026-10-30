@@ -41,6 +41,19 @@ float32 Envelope(float32 time, float32 attack, float32 total)
 	return 1.0f - MathUtil::SmoothStep((time - attack) / std::max(total - attack, 1e-4f));
 }
 
+float32 OutsideDeadZone(float32 value, float32 dead_zone)
+{
+	if (value > dead_zone) {
+		return value - dead_zone;
+	}
+
+	if (value < -dead_zone) {
+		return value + dead_zone;
+	}
+
+	return 0.0f;
+}
+
 bool IsInFront(const BehaviourContext& ctx, const Vec3f point)
 {
 	const Vec3f chest = ctx.Bodies[ctx.pRig->Chest].Center;
@@ -55,7 +68,8 @@ bool IsInFront(const BehaviourContext& ctx, const Vec3f point)
 
 FallenBehaviour::FallenBehaviour() : RagdollBehaviour("fallen", 0.0f)
 {
-	FadeIn = 0.4f;
+	// Starts at full effect, so the fall picks up where the graded fade left the muscles
+	FadeIn = 0.0f;
 	FadeOut = 0.4f;
 
 	AddSetting("strength", &Strength);
@@ -147,6 +161,7 @@ StaggerBehaviour::StaggerBehaviour() : RagdollBehaviour("stagger", 20.0f)
 	AddSetting("min_time", &MinTime);
 	AddSetting("arm_spread", &ArmSpread);
 	AddSetting("spread_speed", &SpreadSpeed);
+	AddSetting("lean", &Lean);
 }
 
 void StaggerBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent& event)
@@ -189,6 +204,18 @@ void StaggerBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& 
 {
 	out.Balance = eBehaviourBalance::On;
 
+	// The spine leans along the shove, so a shot from behind tips the body forward rather than back at the shooter
+	const Vec3f push = ctx.Horizontal(ctx.pRagdoll->GetStaggerVelocity());
+	const float32 lean = MathUtil::DegToRad(Lean) * ctx.pBalance->Stumble;
+
+	if (push.Length() > 0.0f && lean > 0.0f) {
+		const Vec3f axis = ctx.Up.Cross(push);
+
+		for (uint32 i = 0; i < ctx.pRig->SpineCount; i++) {
+			out.AddWorldRotation(ctx, ctx.pRig->Spine[i], axis, lean / static_cast<float32>(ctx.pRig->SpineCount));
+		}
+	}
+
 	if (SpreadSpeed <= 0.0f) {
 		return;
 	}
@@ -217,6 +244,11 @@ ArmBalanceBehaviour::ArmBalanceBehaviour() : RagdollBehaviour("arm_balance", 25.
 	AddSetting("dead_zone", &DeadZone);
 	AddSetting("smooth_time", &SmoothTime);
 	AddSetting("strength", &Strength);
+	AddSetting("yaw_reach", &YawReach);
+	AddSetting("yaw_scale", &YawScale);
+	AddSetting("yaw_dead_zone", &YawDeadZone);
+	AddSetting("tip_dead_zone", &TipDeadZone);
+	AddSetting("tip_scale", &TipScale);
 }
 
 void ArmBalanceBehaviour::Update(const BehaviourContext& ctx)
@@ -234,6 +266,7 @@ void ArmBalanceBehaviour::Update(const BehaviourContext& ctx)
 
 	float32 target_fore = 0.0f;
 	float32 target_side = 0.0f;
+	float32 target_yaw = 0.0f;
 
 	if (is_recovering) {
 		const Vec3f error = ctx.Horizontal(Vec3f::FromJolt(ctx.pBalance->CaptureError));
@@ -244,8 +277,13 @@ void ArmBalanceBehaviour::Update(const BehaviourContext& ctx)
 			outside = error * ((length - DeadZone) / length);
 		}
 
-		target_fore = MathUtil::Clamp(outside.Dot(ctx.Forward) / ErrorScale, -1.0f, 1.0f);
+		// Tipping forward (positive about the chest's right axis) reaches the arms forward, so they catch the fall
+		const Vec3f chest_spin = ctx.Bodies[ctx.pRig->Chest].AngularVelocity;
+		const float32 tip_outside = OutsideDeadZone(chest_spin.Dot(ctx.Right), TipDeadZone);
+
+		target_fore = MathUtil::Clamp(outside.Dot(ctx.Forward) / ErrorScale + tip_outside / TipScale, -1.0f, 1.0f);
 		target_side = MathUtil::Clamp(outside.Dot(ctx.Right) / ErrorScale, -1.0f, 1.0f);
+		target_yaw = MathUtil::Clamp(OutsideDeadZone(chest_spin.Dot(ctx.Up), YawDeadZone) / YawScale, -1.0f, 1.0f);
 	}
 
 	float32 blend = 1.0f;
@@ -256,21 +294,23 @@ void ArmBalanceBehaviour::Update(const BehaviourContext& ctx)
 
 	mFore += (target_fore - mFore) * blend;
 	mSide += (target_side - mSide) * blend;
+	mYaw += (target_yaw - mYaw) * blend;
 }
 
 void ArmBalanceBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& out) const
 {
 	const RagdollRig& rig = *ctx.pRig;
-	const float32 weight = MathUtil::Clamp(std::max(std::abs(mFore), std::abs(mSide)), 0.0f, 1.0f) * Strength;
+	const float32 weight = MathUtil::Clamp(std::max({ std::abs(mFore), std::abs(mSide), std::abs(mYaw) }), 0.0f, 1.0f) *
+						   Strength;
 
 	for (uint32 i = 0; i < RagdollRig::scLimbCount; i++) {
 		const RagdollRigArm& arm = rig.Arms[i];
 		const float32 side = arm.SideSign;
 
-		// A lean reaches out on the same side, and the far arm lifts
+		// A lean reaches out on the same side, the far arm lifts, and the arms swing against the chest's spin
 		const float32 outward = SideReach * side * std::max(side * mSide, 0.0f);
 		const float32 raised = RaiseReach * std::max(-side * mSide, 0.0f);
-		const float32 forward = ForeReach * mFore;
+		const float32 forward = ForeReach * mFore - YawReach * side * mYaw;
 
 		const Vec3f shoulder = ctx.Bodies[arm.Upper].Origin;
 		const Vec3f target = shoulder + ctx.Forward * forward + ctx.Right * outward + ctx.Up * raised;
@@ -299,6 +339,7 @@ ShotReactionBehaviour::ShotReactionBehaviour() : RagdollBehaviour("shot", 30.0f)
 	AddSetting("look_time", &LookTime);
 	AddSetting("look_yaw", &LookYaw);
 	AddSetting("look_pitch", &LookPitch);
+	AddSetting("grab_strength", &GrabStrength);
 }
 
 void ShotReactionBehaviour::Init(const RagdollRig& rig, uint32 body_count)
@@ -517,6 +558,15 @@ void ShotReactionBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOut
 	const Vec3f wound = ctx.FromBodyLocal(mWound.Body, mWound.LocalPoint);
 	const Vec3f normal = ctx.ToBodyDirection(mWound.Body, mWound.LocalNormal);
 
+	// The grabbing arm eases its strength down as the hand takes hold, so the grab steadies the body rather than pulling it over
+	const float32 grip = MathUtil::SmoothStep(ramp_in) * ramp_out;
+	const RagdollRigArm& grab_arm = rig.Arms[mWound.Arm];
+	const float32 ease = 1.0f - (1.0f - GrabStrength) * grip;
+
+	out.ScaleStrength(grab_arm.Upper, ease);
+	out.ScaleStrength(grab_arm.Lower, ease);
+	out.ScaleStrength(grab_arm.Hand, ease);
+
 	out.Hands[mWound.Arm] = BehaviourGoal { .Target = wound + normal * HandOffset,
 											.Weight = MathUtil::SmoothStep(ramp_in) * ramp_out };
 }
@@ -585,10 +635,20 @@ void BraceBehaviour::OnStart(const BehaviourContext& ctx)
 void BraceBehaviour::Update(const BehaviourContext& ctx)
 {
 	if (!IsActive()) {
+		if (ctx.bAlive && ctx.IsFalling()) {
+			Start(ctx);
+		}
+
 		return;
 	}
 
 	if (!ctx.bAlive || mTime > scFallTimeout) {
+		Stop();
+		return;
+	}
+
+	// The balance got the body back up before it committed to a fall, so the hands let go
+	if (!ctx.IsFalling() && !mLanding.bLanded) {
 		Stop();
 		return;
 	}
@@ -654,7 +714,6 @@ ProtectHeadBehaviour::ProtectHeadBehaviour() : RagdollBehaviour("protect_head", 
 	AddSetting("min_backward", &MinBackward);
 	AddSetting("horizon", &Horizon);
 	AddSetting("hold", &Hold);
-	AddSetting("hit_time", &HitTime);
 }
 
 void ProtectHeadBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent& event)
@@ -671,23 +730,13 @@ void ProtectHeadBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEve
 		return;
 	}
 
-	float32 duration = -1.0f;
-
-	if (event.Type == eRagdollEvent::LostSupport) {
-		if (!IsFallingBackward(ctx)) {
-			return;
-		}
-	}
-	else if (event.Type == eRagdollEvent::Hit && event.Body >= 0 &&
-			 ctx.pRagdoll->GetBodyPart(static_cast<uint32>(event.Body)) == eRagdollBodyPart::Head) {
-		duration = HitTime;
-	}
-	else {
+	// Only a backward fall calls for the tuck: a head hit would tuck the body forward into the direction of the fall
+	if (event.Type != eRagdollEvent::LostSupport || !IsFallingBackward(ctx)) {
 		return;
 	}
 
 	Start(ctx);
-	mDuration = duration;
+	mDuration = -1.0f;
 }
 
 void ProtectHeadBehaviour::OnStart(const BehaviourContext& ctx)
@@ -872,6 +921,7 @@ WritheBehaviour::WritheBehaviour() : RagdollBehaviour("writhe", 10.0f)
 	AddSetting("amplitude", &Amplitude);
 	AddSetting("frequency", &Frequency);
 	AddSetting("curl", &Curl);
+	AddSetting("death_time", &DeathTime);
 }
 
 void WritheBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent& event)
@@ -1006,6 +1056,70 @@ void DyingBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& ou
 	}
 	else {
 		out.Balance = eBehaviourBalance::Off;
+	}
+}
+
+/////////////////////////////////////
+// A body part hits the ground hard
+/////////////////////////////////////
+
+ImpactRelaxBehaviour::ImpactRelaxBehaviour() : RagdollBehaviour("impact_relax", 35.0f)
+{
+	FadeIn = 0.0f;
+	FadeOut = 0.1f;
+
+	AddSetting("relax", &Relax);
+	AddSetting("recover_time", &RecoverTime);
+}
+
+void ImpactRelaxBehaviour::Init(const RagdollRig& rig, uint32 body_count) { mRelax.InitSize(body_count, 1.0f); }
+
+void ImpactRelaxBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent& event)
+{
+	if (event.Type != eRagdollEvent::Impact || !ctx.bAlive || event.Body < 0 ||
+		static_cast<uint32>(event.Body) >= ctx.GetBodyCount()) {
+		return;
+	}
+
+	const uint32 body = static_cast<uint32>(event.Body);
+
+	// Feet keep their grip, so balance still has something to stand on
+	if (ctx.pRagdoll->IsFoot(body)) {
+		return;
+	}
+
+	StartIfIdle(ctx);
+	mRelax[body] = std::min(mRelax[body], MathUtil::Clamp(Relax, 0.0f, 1.0f));
+}
+
+void ImpactRelaxBehaviour::Update(const BehaviourContext& ctx)
+{
+	if (!IsActive()) {
+		return;
+	}
+
+	float32 recover = 1.0f;
+
+	if (RecoverTime > 0.0f) {
+		recover = ctx.DeltaTime / RecoverTime;
+	}
+
+	bool all_back = true;
+
+	for (float32& relax : mRelax) {
+		relax = std::min(relax + recover, 1.0f);
+		all_back = all_back && (relax >= 1.0f);
+	}
+
+	if (all_back) {
+		Stop();
+	}
+}
+
+void ImpactRelaxBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& out) const
+{
+	for (uint32 i = 0; i < mRelax.Size; i++) {
+		out.Strength[i] = mRelax[i];
 	}
 }
 

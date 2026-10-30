@@ -59,6 +59,10 @@ struct BalanceStatus
 	bool bCalm = false;
 	/// Horizontal distance from the support to the capture point (m), zero while the capture point is over the feet
 	JPH::Vec3 CaptureError = JPH::Vec3::sZero();
+	/// Fraction of the stumble left after a shove: 1 just after it, 0 once balance is back
+	float32 Stumble = 0.0f;
+	/// How far the body has got into a fall, 0 upright to 1 at the threshold where it counts as fallen
+	float32 FallProgress = 0.0f;
 };
 
 /// A rig leg plus what the balance controller senses and plans for it each substep
@@ -117,6 +121,7 @@ public:
 
 		if (velocity.LengthSq() > 0.0f) {
 			mStumbleTime = mAssist.StumbleTime;
+			mbStumbleStepped = false;
 		}
 	}
 	FX_FORCE_INLINE JPH::Vec3 GetStaggerVelocity() const { return mStaggerVelocity; }
@@ -129,6 +134,7 @@ private:
 	void GatherFeet(Ragdoll& ragdoll, float32 delta_time, bool contacts_fresh);
 	bool IsAnyBodyOnGround(Ragdoll& ragdoll) const;
 	void BuildSupport();
+	void BeginStumbleStep();
 
 	bool DetectFall();
 	void Fall(eFallReason reason);
@@ -151,6 +157,7 @@ private:
 				  JPH::Quat& out_thigh, JPH::Quat& out_shin) const;
 	void ApplyTorsoControl(Ragdoll& ragdoll, JPH::BodyInterface& body_interface, const JPH::Vec3 gravity);
 	void ApplyCenterOfMassControl(Ragdoll& ragdoll, JPH::BodyInterface& body_interface);
+	void ApplyTrunkSpinDamping(Ragdoll& ragdoll, JPH::BodyInterface& body_interface);
 	bool IsLoaded(const BalanceLeg& leg) const;
 
 	JPH::Vec3 GetHeadingForward(const JPH::Quat& orientation, const JPH::Quat& rest) const;
@@ -185,6 +192,7 @@ private:
 	JPH::Vec3 mCapturePoint = JPH::Vec3::sZero();
 	JPH::Vec3 mStaggerVelocity = JPH::Vec3::sZero();
 	float32 mStumbleTime = 0.0f;
+	bool mbStumbleStepped = false;
 
 	uint32 mSupportCount = 0;
 	JPH::Vec3 mSupportCenter = JPH::Vec3::sZero();

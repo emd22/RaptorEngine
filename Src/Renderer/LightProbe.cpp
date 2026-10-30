@@ -19,8 +19,8 @@
 #include <Editor/RaptorEditor.hpp>
 #endif
 #include <Engine.hpp>
-#include <Math/Float16.hpp>
 #include <Map/CompiledMap.hpp>
+#include <Math/Float16.hpp>
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Renderer/Backend/BarrierHelper.hpp>
@@ -815,7 +815,7 @@ void ProbeManager::ServiceStaleCheck()
 	}
 
 	if (difference.bVolumesChanged) {
-		ReportStaleBake(String::Fmt("Light probes are out of date (the map places {}, the bake has {}), rebake and "
+		ReportStaleBake(String::Fmt("Light probes are out of date (prototype {},  baked {}), rebake and "
 									"save them",
 									current.GetProbeCount(), GetProbeCount()));
 		return;
@@ -1740,8 +1740,7 @@ bool ProbeManager::LoadIrradianceProbes()
 	const bool has_compiled_probes = blockout != nullptr && blockout->HasCompiledProbes() &&
 									 gCVars->Get("r_compiled_probes", int64 { 1 }) != 0;
 
-	if (has_compiled_probes && IsProbeFileNewerThanCompiledMap() &&
-		LoadProbeFile(blockout->GetCompiledProbeLayout())) {
+	if (has_compiled_probes && IsProbeFileNewerThanCompiledMap() && LoadProbeFile(blockout->GetCompiledProbeLayout())) {
 		return true;
 	}
 

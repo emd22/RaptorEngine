@@ -111,6 +111,7 @@ public:
 		JPH::Vec3 Origin = JPH::Vec3::sZero();
 		JPH::Vec3 Center = JPH::Vec3::sZero();
 		JPH::Vec3 Velocity = JPH::Vec3::sZero();
+		JPH::Vec3 AngularVelocity = JPH::Vec3::sZero();
 		JPH::Quat Orientation = JPH::Quat::sIdentity();
 		float32 SubtreeMass = 0.0f;
 		JPH::Vec3 SubtreeMoment = JPH::Vec3::sZero();

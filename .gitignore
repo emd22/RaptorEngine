@@ -63,3 +63,5 @@ strata_struct_test.o
 cache/shaders
 
 __cmake_systeminformation
+
+Private

@@ -459,8 +459,20 @@ void NPC::UpdateBehaviours(float32 delta_time)
 {
 	mBehaviours.Update(mActor.Ragdoll, delta_time);
 
-	if (mState == eState::Animated && IsPowered() && mBehaviours.HadEvent(physics::eRagdollEvent::LostSupport)) {
+	// A balancing body can lose its feet for a moment during a stumble step; the balancer decides when that becomes a fall
+	const bool lost_support = mBehaviours.HadEvent(physics::eRagdollEvent::LostSupport) && !mActor.Ragdoll.IsBalancing();
+
+	if (mState == eState::Animated && IsPowered() && lost_support) {
 		EnterFallen();
+	}
+
+	// Writhing on the ground for long enough is fatal
+	const physics::RagdollBehaviour* writhe = mBehaviours.Find("writhe");
+	float32 death_time = 0.0f;
+
+	if (!mbDying && writhe != nullptr && writhe->IsActive() && writhe->GetSetting("death_time", death_time) &&
+		writhe->GetTime() >= death_time) {
+		Kill();
 	}
 
 	if (mbDying && (mBehaviours.IsDeathComplete() || !mBehaviours.IsDying())) {
@@ -915,10 +927,6 @@ void NPC::OnHit(const NPCHit& hit)
 		return;
 	}
 
-	if (mState == eState::Animated && !mbDying && gWorld != nullptr) {
-		mBrain.React(gWorld->Player.Position, hit.Damage > 0.0f);
-	}
-
 	// Over the active budget the NPC takes the damage but stays animated
 	if (!WakePhysics()) {
 		return;
@@ -1176,7 +1184,6 @@ void NPC::OnPush(const NPCPush& push)
 	}
 
 	mPushCooldown = scPushCooldown;
-	mBrain.React(push.Source, false);
 
 	const float32 length = push.Impulse.Length();
 

@@ -56,6 +56,8 @@ public:
 	float32 MinTime = 0.75f;
 	float32 ArmSpread = 65.0f;
 	float32 SpreadSpeed = 0.4f;
+	/// How far the spine leans along the shove over the stumble (degrees), easing out as balance takes over
+	float32 Lean = 18.0f;
 };
 
 /// Arms reach to catch a capture point that has left the support
@@ -75,10 +77,20 @@ public:
 	float32 DeadZone = 0.03f;
 	float32 SmoothTime = 0.2f;
 	float32 Strength = 0.4f;
+	/// How far the arms swing against the chest's spin (m), kept small so the arms only nudge the spin
+	float32 YawReach = 0.08f;
+	float32 YawScale = 3.0f;
+	/// Spin (rad/s) the arms ignore, so a slow turn doesn't move them
+	float32 YawDeadZone = 0.5f;
+	/// Tip rate (rad/s) the arms ignore, so a slow sway doesn't move them
+	float32 TipDeadZone = 0.8f;
+	/// Tip rate (rad/s) past the dead zone that reaches the hands a full ForeReach
+	float32 TipScale = 4.0f;
 
 private:
 	float32 mFore = 0.0f;
 	float32 mSide = 0.0f;
+	float32 mYaw = 0.0f;
 };
 
 class ShotReactionBehaviour : public RagdollBehaviour
@@ -96,9 +108,11 @@ public:
 	float32 RecoverTime = 0.6f;
 	float32 Flinch = 15.0f;
 	float32 FlinchTime = 0.35f;
-	float32 GrabDelay = 0.15f;
+	float32 GrabDelay = 0.3f;
 	float32 GrabTime = 2.5f;
 	float32 GrabReach = 1.15f;
+	/// Strength the grabbing arm eases down to as the hand takes hold, so the grab steadies the body
+	float32 GrabStrength = 0.5f;
 	float32 HandOffset = 0.07f;
 	float32 LookTime = 1.5f;
 	float32 LookYaw = 80.0f;
@@ -168,7 +182,6 @@ public:
 	float32 MinBackward = 0.3f;
 	float32 Horizon = 0.5f;
 	float32 Hold = 0.6f;
-	float32 HitTime = 0.8f;
 
 private:
 	bool IsFallingBackward(const BehaviourContext& ctx) const;
@@ -218,6 +231,8 @@ public:
 	float32 Amplitude = 25.0f;
 	float32 Frequency = 0.5f;
 	float32 Curl = 15.0f;
+	/// How long an NPC writhes on the ground before it dies (s)
+	float32 DeathTime = 10.0f;
 };
 
 class DyingBehaviour : public RagdollBehaviour
@@ -244,6 +259,27 @@ private:
 	float32 mDuration = 1.0f;
 	bool mbHeadShot = false;
 	bool mbFinished = false;
+};
+
+/// Briefly loosens a body part that hits the ground hard, so it absorbs the landing instead of bouncing
+class ImpactRelaxBehaviour : public RagdollBehaviour
+{
+public:
+	ImpactRelaxBehaviour();
+
+	void Init(const RagdollRig& rig, uint32 body_count) override;
+	void OnEvent(const BehaviourContext& ctx, const RagdollEvent& event) override;
+	void Update(const BehaviourContext& ctx) override;
+	void Contribute(const BehaviourContext& ctx, BehaviourOutput& out) const override;
+
+public:
+	/// Strength the impacted body drops to, 1 being full
+	float32 Relax = 0.5f;
+	/// How long the body takes to get back to full strength (s)
+	float32 RecoverTime = 0.2f;
+
+private:
+	SizedArray<float32> mRelax;
 };
 
 } // namespace fx::physics

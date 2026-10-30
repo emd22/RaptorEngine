@@ -475,6 +475,7 @@ void Ragdoll::SampleBody(JPH::BodyInterface& body_interface, uint32 body_index, 
 	out_state.Origin = JPH::Vec3(position);
 	out_state.Center = JPH::Vec3(body_interface.GetCenterOfMassPosition(body_id));
 	out_state.Velocity = body_interface.GetLinearVelocity(body_id);
+	out_state.AngularVelocity = body_interface.GetAngularVelocity(body_id);
 }
 
 bool Ragdoll::GetMassAverage(const SizedArray<BodyState>& states, JPH::Vec3& out_center, JPH::Vec3& out_velocity) const

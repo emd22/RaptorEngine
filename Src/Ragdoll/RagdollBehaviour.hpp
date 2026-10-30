@@ -48,6 +48,7 @@ struct BehaviourBody
 	Vec3f Origin = Vec3f::sZero;
 	Vec3f Center = Vec3f::sZero;
 	Vec3f Velocity = Vec3f::sZero;
+	Vec3f AngularVelocity = Vec3f::sZero;
 	JPH::Quat Orientation = JPH::Quat::sIdentity();
 	bool bContact = false;
 	bool bGround = false;
@@ -90,6 +91,11 @@ struct BehaviourContext
 	FX_FORCE_INLINE uint32 GetBodyCount() const { return static_cast<uint32>(Bodies.Size); }
 	FX_FORCE_INLINE Vec3f Horizontal(const Vec3f v) const { return v - Up * v.Dot(Up); }
 	FX_FORCE_INLINE Vec3f GetChestUp() const { return Forward.Cross(Right); }
+	/// Free-falling, or tipping over while balancing before the fall is committed, so impacts can be predicted
+	FX_FORCE_INLINE bool IsFalling() const
+	{
+		return bFreePose || (bBalancing && pBalance != nullptr && pBalance->FallProgress > 0.0f);
+	}
 
 	Vec3f ToBodyLocal(uint32 body, const Vec3f point) const;
 	Vec3f FromBodyLocal(uint32 body, const Vec3f local) const;
