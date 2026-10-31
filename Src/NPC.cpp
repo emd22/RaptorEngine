@@ -127,7 +127,7 @@ bool RagdollEntity::AddWound(JPH::BodyID body_id, const Vec3f point, const Vec3f
 	Object* skinned = GetSkinned();
 	uint32 bone_index = 0;
 
-	if (skinned == nullptr || !pSkeleton.IsValid() || !Ragdoll.FindBoneForBody(body_id, bone_index) ||
+	if (skinned == nullptr || !pSkeleton.IsValid() || !Ragdoll.FindBoneForSegment(body_id, bone_index) ||
 		bone_index >= pSkeleton->SkinningMatrices.Size) {
 		return false;
 	}
@@ -459,8 +459,10 @@ void NPC::UpdateBehaviours(float32 delta_time)
 {
 	mBehaviours.Update(mActor.Ragdoll, delta_time);
 
-	// A balancing body can lose its feet for a moment during a stumble step; the balancer decides when that becomes a fall
-	const bool lost_support = mBehaviours.HadEvent(physics::eRagdollEvent::LostSupport) && !mActor.Ragdoll.IsBalancing();
+	// A balancing body can lose its feet for a moment during a stumble step; the balancer decides when that becomes a
+	// fall
+	const bool lost_support = mBehaviours.HadEvent(physics::eRagdollEvent::LostSupport) &&
+							  !mActor.Ragdoll.IsBalancing();
 
 	if (mState == eState::Animated && IsPowered() && lost_support) {
 		EnterFallen();
@@ -554,7 +556,7 @@ void NPC::ApplyDamage(float32 amount, int32 body)
 
 NPC::eBodyPart NPC::GetBodyPart(JPH::BodyID body_id) const
 {
-	const int32 body_index = mActor.Ragdoll.FindBodyIndex(body_id);
+	const int32 body_index = mActor.Ragdoll.FindSegmentIndex(body_id);
 
 	if (body_index < 0) {
 		return eBodyPart::Torso;
@@ -584,7 +586,7 @@ void NPC::Damage(float32 amount, JPH::BodyID body_id)
 		return;
 	}
 
-	const int32 body = mActor.Ragdoll.FindBodyIndex(body_id);
+	const int32 body = mActor.Ragdoll.FindSegmentIndex(body_id);
 
 	if (GetBodyPart(body_id) == eBodyPart::Head && amount >= HeadKillDamage) {
 		ApplyDamage(mHealth, body);
@@ -765,7 +767,7 @@ bool NPC::IsPowered() const
 {
 	const physics::Ragdoll& ragdoll = mActor.Ragdoll;
 
-	if (!ragdoll.IsCreated() || ragdoll.GetBodyCount() == 0) {
+	if (!ragdoll.IsCreated() || ragdoll.GetSegmentCount() == 0) {
 		return false;
 	}
 
@@ -886,7 +888,7 @@ void NPC::ApplyStrengths()
 		return;
 	}
 
-	for (uint32 i = 0; i < ragdoll.GetBodyCount(); i++) {
+	for (uint32 i = 0; i < ragdoll.GetSegmentCount(); i++) {
 		ragdoll.SetBodyStrength(i, mpTuning->Strength * mBehaviours.GetStrength(i));
 	}
 
@@ -920,7 +922,7 @@ void NPC::OnHit(const NPCHit& hit)
 		Damage(hit.Damage, hit.Body);
 	}
 
-	const int32 body = ragdoll.FindBodyIndex(hit.Body);
+	const int32 body = ragdoll.FindSegmentIndex(hit.Body);
 
 	if (mState == eState::Ragdoll || body < 0) {
 		ragdoll.AddImpulse(hit.Body, hit.Impulse, hit.Point);
@@ -1019,7 +1021,7 @@ void NPC::Shove(const Vec3f impulse, float32 min_speed)
 
 	float32 moved_mass = 0.0f;
 
-	for (uint32 i = 0; i < ragdoll.GetBodyCount(); i++) {
+	for (uint32 i = 0; i < ragdoll.GetSegmentCount(); i++) {
 		if (!ragdoll.IsFoot(i)) {
 			moved_mass += ragdoll.GetBodyMass(i);
 		}
@@ -1035,7 +1037,7 @@ void NPC::Shove(const Vec3f impulse, float32 min_speed)
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
 	float32 momentum = 0.0f;
 
-	for (uint32 i = 0; i < ragdoll.GetBodyCount(); i++) {
+	for (uint32 i = 0; i < ragdoll.GetSegmentCount(); i++) {
 		if (!ragdoll.IsFoot(i)) {
 			const Vec3f body_velocity = Vec3f(body_interface.GetLinearVelocity(ragdoll.GetBodyID(i)));
 			momentum += ragdoll.GetBodyMass(i) * body_velocity.Dot(direction);
@@ -1051,7 +1053,7 @@ void NPC::Shove(const Vec3f impulse, float32 min_speed)
 	// Everything above the feet moves together, so the body tips over its planted feet without bending at the hips
 	const Vec3f velocity = direction * added_speed;
 
-	for (uint32 i = 0; i < ragdoll.GetBodyCount(); i++) {
+	for (uint32 i = 0; i < ragdoll.GetSegmentCount(); i++) {
 		if (!ragdoll.IsFoot(i)) {
 			ragdoll.AddImpulse(ragdoll.GetBodyID(i), velocity * ragdoll.GetBodyMass(i), ragdoll.GetBodyPosition(i));
 		}
@@ -1166,11 +1168,12 @@ void NPC::OnContact(const physics::RagdollContact& contact)
 		return;
 	}
 
-	mBehaviours.HandleEvent(mActor.Ragdoll, physics::RagdollEvent { .Type = physics::eRagdollEvent::Impact,
-																	.Body = mActor.Ragdoll.FindBodyIndex(contact.Body),
-																	.Point = contact.Point,
-																	.Direction = contact.Normal,
-																	.Magnitude = contact.Speed });
+	mBehaviours.HandleEvent(mActor.Ragdoll,
+							physics::RagdollEvent { .Type = physics::eRagdollEvent::Impact,
+													.Body = mActor.Ragdoll.FindSegmentIndex(contact.Body),
+													.Point = contact.Point,
+													.Direction = contact.Normal,
+													.Magnitude = contact.Speed });
 }
 
 void NPC::OnPush(const NPCPush& push)

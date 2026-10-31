@@ -45,7 +45,8 @@ void DrawCross(const Vec3f point, Color color)
 } // namespace
 
 RagdollBehaviours::RagdollBehaviours()
-	: mBehaviours { &mFallen, &mStagger, &mArmBalance, &mImpactRelax, &mShot, &mBrace, &mProtectHead, &mHighFall, &mWrithe, &mDying }
+	: mBehaviours { &mFallen, &mStagger,	 &mArmBalance, &mImpactRelax, &mShot,
+					&mBrace,  &mProtectHead, &mHighFall,   &mWrithe,	  &mDying }
 {
 	std::copy(mBehaviours, mBehaviours + scBehaviourCount, mOrder);
 }
@@ -62,13 +63,13 @@ bool RagdollBehaviours::Init(Ragdoll& ragdoll)
 
 	mpRig = &ragdoll.GetRig();
 
-	const uint32 body_count = ragdoll.GetBodyCount();
+	const uint32 body_count = ragdoll.GetSegmentCount();
 
 	mContext.pRagdoll = &ragdoll;
 	mContext.pRig = mpRig;
 	mContext.pBalance = &ragdoll.GetBalanceStatus();
 	mContext.Bodies.InitSize(body_count, BehaviourBody {});
-	mSamples.InitSize(body_count, Ragdoll::BodyState {});
+	mSamples.InitSize(body_count, RDSegmentState {});
 
 	mOutput.Init(body_count);
 
@@ -155,10 +156,10 @@ void RagdollBehaviours::Sense(Ragdoll& ragdoll, float32 delta_time)
 	bool body_on_ground = false;
 
 	for (uint32 i = 0; i < ctx.GetBodyCount(); i++) {
-		Ragdoll::BodyState& sample = mSamples[i];
+		RDSegmentState& sample = mSamples[i];
 		BehaviourBody& body = ctx.Bodies[i];
 
-		ragdoll.SampleBody(body_interface, i, sample);
+		ragdoll.SampleSegment(body_interface, i, sample);
 
 		body.Origin = Vec3f::FromJolt(sample.Origin);
 		body.Orientation = sample.Orientation;

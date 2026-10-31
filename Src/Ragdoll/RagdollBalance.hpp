@@ -44,8 +44,8 @@ struct BalanceAssist
 	float32 RecoveryForceFraction = 0.5f;
 	/// How long a shove's stagger drift lasts (s): longer keeps a shoved body stumbling for more steps
 	float32 StaggerDecayTime = 1.1f;
-	/// How long each shove leaves the body unassisted (s): balance holds back its centre of mass and stepping, so the body
-	/// stumbles before it recovers
+	/// How long each shove leaves the body unassisted (s): balance holds back its centre of mass and stepping, so the
+	/// body stumbles before it recovers
 	float32 StumbleTime = 0.3f;
 };
 
@@ -164,6 +164,16 @@ private:
 	JPH::Quat GetHeadingRotation(const JPH::Vec3 forward) const;
 	JPH::Vec3 ToGround(const JPH::Vec3 point) const;
 
+	/**
+	 * @brief Returns the opposite leg to the index that is passed in.
+	 */
+	const BalanceLeg& GetOppositeLeg(const uint32 leg_index) const
+	{
+		// If the current leg index is 0, then the index is 1. if the current index is 1, the index is 0.
+		const uint32 opposite_index = 1 - leg_index;
+		return mLegs[opposite_index];
+	}
+
 private:
 	bool mbValid = false;
 	BalanceAssist mAssist;
@@ -176,7 +186,7 @@ private:
 	float32 mRestComHeight = 1.0f;
 	float32 mRestWidth = 0.3f;
 
-	RagdollMath::GravityFrame mFrame;
+	RagdollMath::GravityFrame mGroundFrame;
 	JPH::Vec3 mForward = JPH::Vec3::sAxisZ();
 	float32 mOmega = 3.0f;
 	float32 mGroundHeight = 0.0f;

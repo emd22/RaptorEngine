@@ -70,17 +70,17 @@ void Ragdoll::DebugDraw() const
 
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
 
-	SizedArray<BodyState> samples;
-	samples.InitSize(mBodies.Size, BodyState {});
+	SizedArray<RDSegmentState> samples;
+	samples.InitSize(mSegments.Size, RDSegmentState {});
 
-	for (uint32 i = 0; i < mBodies.Size; i++) {
-		SampleBody(body_interface, i, samples[i]);
+	for (uint32 i = 0; i < mSegments.Size; i++) {
+		SampleSegment(body_interface, i, samples[i]);
 	}
 
 	SizedArray<Vec3f> centers;
-	centers.InitSize(mBodies.Size, Vec3f::sZero);
+	centers.InitSize(mSegments.Size, Vec3f::sZero);
 
-	DrawDebugBodies(samples, centers);
+	DrawDebugSegments(samples, centers);
 	DrawDebugLinks(centers);
 	DrawDebugSupport(samples);
 
@@ -89,11 +89,11 @@ void Ragdoll::DebugDraw() const
 	}
 }
 
-void Ragdoll::DrawDebugBodies(const SizedArray<BodyState>& samples, SizedArray<Vec3f>& out_centers) const
+void Ragdoll::DrawDebugSegments(const SizedArray<RDSegmentState>& samples, SizedArray<Vec3f>& out_centers) const
 {
-	for (uint32 i = 0; i < mBodies.Size; i++) {
-		const BodyInfo& info = mBodies[i];
-		const BodyState& sample = samples[i];
+	for (uint32 i = 0; i < mSegments.Size; i++) {
+		const RDSegmentInfo& info = mSegments[i];
+		const RDSegmentState& sample = samples[i];
 		const JPH::Quat orientation = sample.Orientation;
 
 		const JPH::Mat44 rotation = JPH::Mat44::sRotation(orientation);
@@ -107,7 +107,10 @@ void Ragdoll::DrawDebugBodies(const SizedArray<BodyState>& samples, SizedArray<V
 		JPH::Vec3 y = axis * (info.Length * 0.5f);
 		JPH::Vec3 z = front * info.Radius;
 
-		if (info.bBox) {
+
+		// Build up a simple AABB to render as a WireBox.
+
+		if (info.ColliderType == eRagdollShapeCollider::Box) {
 			const JPH::Mat44 box_rotation = JPH::Mat44::sRotation(orientation * info.BoxRotation);
 
 			x = box_rotation.GetAxisX() * info.BoxHalfExtent.GetX();
@@ -138,8 +141,8 @@ void Ragdoll::DrawDebugBodies(const SizedArray<BodyState>& samples, SizedArray<V
 
 void Ragdoll::DrawDebugLinks(const SizedArray<Vec3f>& centers) const
 {
-	for (uint32 i = 0; i < mBodies.Size; i++) {
-		const int32 parent = mBodies[i].ParentBody;
+	for (uint32 i = 0; i < mSegments.Size; i++) {
+		const int32 parent = mSegments[i].ParentBody;
 
 		if (parent < 0) {
 			continue;
@@ -147,7 +150,7 @@ void Ragdoll::DrawDebugLinks(const SizedArray<Vec3f>& centers) const
 
 		Color link_color = scLinkColor;
 
-		if (mBodies[i].Mode == eRagdollBodyMode::Powered) {
+		if (mSegments[i].Mode == eRagdollBodyMode::Powered) {
 			link_color = GetTorqueColor(GetMotorTorqueFraction(i));
 		}
 
@@ -155,7 +158,7 @@ void Ragdoll::DrawDebugLinks(const SizedArray<Vec3f>& centers) const
 	}
 }
 
-void Ragdoll::DrawDebugSupport(const SizedArray<BodyState>& samples) const
+void Ragdoll::DrawDebugSupport(const SizedArray<RDSegmentState>& samples) const
 {
 	const GravityFrame frame = GravityFrame::FromPhysics();
 	const JPH::Vec3 up = frame.Up;
@@ -178,10 +181,10 @@ void Ragdoll::DrawDebugSupport(const SizedArray<BodyState>& samples) const
 	renderer::gDebugDraw->WireBox(center_of_mass, Vec3f(scComBoxHalfExtent), Quat::scIdentity, scComColor);
 
 	SizedArray<Vec2f> support_points;
-	support_points.InitCapacity(mBodies.Size);
+	support_points.InitCapacity(mSegments.Size);
 	float32 support_height_sum = 0.0f;
 
-	for (uint32 i = 0; i < mBodies.Size; i++) {
+	for (uint32 i = 0; i < mSegments.Size; i++) {
 		BodyGroundContact contact;
 
 		if (!GetBodyGroundContact(i, contact) || !IsSupportNormal(contact, up, scSupportNormalMinUp)) {
@@ -226,7 +229,7 @@ void RagdollBalance::DebugDraw() const
 		return;
 	}
 
-	const JPH::Vec3 side = mFrame.Up.Cross(mForward);
+	const JPH::Vec3 side = mGroundFrame.Up.Cross(mForward);
 
 	Color capture_color = scCaptureColor;
 

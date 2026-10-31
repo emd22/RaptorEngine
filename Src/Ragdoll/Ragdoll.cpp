@@ -42,9 +42,9 @@ void Ragdoll::Drive(const Mat4f& object_world_matrix, float32 delta_time, bool t
 	const Skeleton& skel = *mpSkeleton;
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
 
-	for (uint32 i = 0; i < mBodies.Size; i++) {
-		BodyInfo& info = mBodies[i];
-		BodyTarget& target = mTargets[i];
+	for (uint32 i = 0; i < mSegments.Size; i++) {
+		RDSegmentInfo& info = mSegments[i];
+		RDSegmentTarget& target = mSegmentTargets[i];
 
 		const Mat4f bone_world = skel.WorldTransforms[info.BoneIndex] * object_world_matrix;
 		const JPH::Quat orientation = RotationFromMatrix(bone_world).GetQuaternion().Normalized();
@@ -64,21 +64,21 @@ void Ragdoll::Drive(const Mat4f& object_world_matrix, float32 delta_time, bool t
 
 		if (info.Mode == eRagdollBodyMode::Kinematic) {
 			if (teleport || info.bSnap) {
-				SnapBodyToTarget(body_interface, i, JPH::EActivation::DontActivate);
+				SnapSegmentToTarget(body_interface, i, JPH::EActivation::DontActivate);
 				info.bSnap = false;
 			}
 		}
 		else if (info.Mode == eRagdollBodyMode::Powered && teleport) {
-			SnapBodyToTarget(body_interface, i, JPH::EActivation::Activate);
+			SnapSegmentToTarget(body_interface, i, JPH::EActivation::Activate);
 		}
 	}
 
 	mbHasTargets = true;
 }
 
-void Ragdoll::SnapBodyToTarget(JPH::BodyInterface& body_interface, uint32 body_index, JPH::EActivation activation)
+void Ragdoll::SnapSegmentToTarget(JPH::BodyInterface& body_interface, uint32 body_index, JPH::EActivation activation)
 {
-	const BodyTarget& target = mTargets[body_index];
+	const RDSegmentTarget& target = mSegmentTargets[body_index];
 	const JPH::BodyID body_id = GetBodyID(body_index);
 
 	body_interface.SetPositionAndRotation(body_id, target.Position, target.Orientation, activation);
@@ -89,7 +89,7 @@ void Ragdoll::SnapBodyToTarget(JPH::BodyInterface& body_interface, uint32 body_i
 
 void Ragdoll::StorePreviousPoses(JPH::BodyInterface& body_interface)
 {
-	for (uint32 i = 0; i < mBodies.Size; i++) {
+	for (uint32 i = 0; i < mSegments.Size; i++) {
 		BodyPose& pose = mPreviousPoses[i];
 
 		JPH::RVec3 position;
@@ -137,11 +137,11 @@ JPH::ObjectLayer Ragdoll::GetModeLayer(eRagdollBodyMode mode)
 
 void Ragdoll::SetBodyMode(uint32 body_index, eRagdollBodyMode mode)
 {
-	if (mpRagdoll == nullptr || body_index >= mBodies.Size || mBodies[body_index].Mode == mode) {
+	if (mpRagdoll == nullptr || body_index >= mSegments.Size || mSegments[body_index].Mode == mode) {
 		return;
 	}
 
-	BodyInfo& info = mBodies[body_index];
+	RDSegmentInfo& info = mSegments[body_index];
 	const eRagdollBodyMode previous_mode = info.Mode;
 	info.Mode = mode;
 
@@ -161,7 +161,7 @@ void Ragdoll::SetBodyMode(uint32 body_index, eRagdollBodyMode mode)
 
 		// Keep the animation's velocity (taken at the centre of mass) so the body does not stop dead
 		if (previous_mode == eRagdollBodyMode::Kinematic) {
-			const BodyTarget& target = mTargets[body_index];
+			const RDSegmentTarget& target = mSegmentTargets[body_index];
 			const JPH::Vec3 offset = JPH::Vec3(body_interface.GetCenterOfMassPosition(body_id) -
 											   body_interface.GetPosition(body_id));
 
@@ -177,8 +177,8 @@ void Ragdoll::SetAllBodyModes(eRagdollBodyMode mode)
 {
 	bool was_kinematic = false;
 
-	for (uint32 i = 0; i < mBodies.Size; i++) {
-		if (mBodies[i].Mode == eRagdollBodyMode::Kinematic) {
+	for (uint32 i = 0; i < mSegments.Size; i++) {
+		if (mSegments[i].Mode == eRagdollBodyMode::Kinematic) {
 			was_kinematic = true;
 		}
 
@@ -232,7 +232,7 @@ void Ragdoll::PlaceFeetOnGround()
 		}
 
 		// Tip the sole flat about the ankle, then lift whatever is still under the floor
-		const JPH::Vec3 sole_up = orientation * (mBodies[leg.Foot].RestOrientation.Conjugated() * up);
+		const JPH::Vec3 sole_up = orientation * (mSegments[leg.Foot].RestOrientation.Conjugated() * up);
 		orientation = (JPH::Quat::sFromTo(sole_up, up) * orientation).Normalized();
 
 		const float32 depth = std::min(get_lowest(orientation), 0.0f);
@@ -255,23 +255,23 @@ void Ragdoll::PlaceFeetOnGround()
 
 void Ragdoll::SetBodyStrength(uint32 body_index, float32 strength)
 {
-	if (mpRagdoll == nullptr || body_index >= mBodies.Size) {
+	if (mpRagdoll == nullptr || body_index >= mSegments.Size) {
 		return;
 	}
 
-	mBodies[body_index].Strength = MathUtil::Clamp(strength, 0.0f, 1.0f);
+	mSegments[body_index].Strength = MathUtil::Clamp(strength, 0.0f, 1.0f);
 }
 
 void Ragdoll::SetBodyBlend(uint32 body_index, float32 blend)
 {
-	if (body_index < mBodies.Size) {
-		mBodies[body_index].Blend = MathUtil::Clamp(blend, 0.0f, 1.0f);
+	if (body_index < mSegments.Size) {
+		mSegments[body_index].Blend = MathUtil::Clamp(blend, 0.0f, 1.0f);
 	}
 }
 
 void Ragdoll::SetAllBodyBlends(float32 blend)
 {
-	for (uint32 i = 0; i < mBodies.Size; i++) {
+	for (uint32 i = 0; i < mSegments.Size; i++) {
 		SetBodyBlend(i, blend);
 	}
 }
@@ -319,9 +319,9 @@ void Ragdoll::SetBodyLayers(const SizedArray<BodyLayer>& layers, float32 gravity
 
 void Ragdoll::AddImpulse(JPH::BodyID body_id, const Vec3f impulse, const Vec3f point)
 {
-	const int32 body_index = FindBodyIndex(body_id);
+	const int32 body_index = FindSegmentIndex(body_id);
 
-	if (body_index < 0 || mBodies[body_index].Mode == eRagdollBodyMode::Kinematic) {
+	if (body_index < 0 || mSegments[body_index].Mode == eRagdollBodyMode::Kinematic) {
 		return;
 	}
 
@@ -334,13 +334,13 @@ void Ragdoll::AddImpulse(JPH::BodyID body_id, const Vec3f impulse, const Vec3f p
 	mbPoseSettled = false;
 }
 
-int32 Ragdoll::FindBodyIndex(JPH::BodyID body_id) const
+int32 Ragdoll::FindSegmentIndex(JPH::BodyID body_id) const
 {
 	if (mpRagdoll == nullptr) {
 		return -1;
 	}
 
-	for (uint32 i = 0; i < mBodies.Size; i++) {
+	for (uint32 i = 0; i < mSegments.Size; i++) {
 		if (GetBodyID(i) == body_id) {
 			return static_cast<int32>(i);
 		}
@@ -349,39 +349,39 @@ int32 Ragdoll::FindBodyIndex(JPH::BodyID body_id) const
 	return -1;
 }
 
-bool Ragdoll::FindBoneForBody(JPH::BodyID body_id, uint32& out_bone_index) const
+bool Ragdoll::FindBoneForSegment(JPH::BodyID body_id, uint32& out_bone_index) const
 {
-	const int32 body_index = FindBodyIndex(body_id);
+	const int32 body_index = FindSegmentIndex(body_id);
 
 	if (body_index < 0) {
 		return false;
 	}
 
-	out_bone_index = mBodies[body_index].BoneIndex;
+	out_bone_index = mSegments[body_index].BoneIndex;
 	return true;
 }
 
 float32 Ragdoll::GetBodyMass(uint32 body_index) const
 {
-	if (body_index >= mBodies.Size) {
+	if (body_index >= mSegments.Size) {
 		return 0.0f;
 	}
 
-	return mBodies[body_index].Mass;
+	return mSegments[body_index].Mass;
 }
 
 eRagdollBodyPart Ragdoll::GetBodyPart(uint32 body_index) const
 {
-	if (body_index >= mBodies.Size) {
+	if (body_index >= mSegments.Size) {
 		return eRagdollBodyPart::Torso;
 	}
 
-	return mBodies[body_index].Part;
+	return mSegments[body_index].Part;
 }
 
 bool Ragdoll::GetBodyTrackingError(uint32 body_index, float32& out_distance, float32& out_angle) const
 {
-	if (mpRagdoll == nullptr || body_index >= mBodies.Size) {
+	if (mpRagdoll == nullptr || body_index >= mSegments.Size) {
 		return false;
 	}
 
@@ -389,7 +389,7 @@ bool Ragdoll::GetBodyTrackingError(uint32 body_index, float32& out_distance, flo
 	JPH::Quat orientation;
 	gPhysics->pBackend->GetBodyInterface().GetPositionAndRotation(GetBodyID(body_index), position, orientation);
 
-	const BodyTarget& target = mTargets[body_index];
+	const RDSegmentTarget& target = mSegmentTargets[body_index];
 	const float32 alignment = std::min(std::abs(orientation.Dot(target.Orientation)), 1.0f);
 
 	out_distance = (JPH::Vec3(position) - target.Position).Length();
@@ -407,8 +407,8 @@ float32 Ragdoll::GetWorstJointError() const
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
 	float32 worst = 0.0f;
 
-	for (uint32 i = 0; i < mBodies.Size; i++) {
-		const BodyInfo& info = mBodies[i];
+	for (uint32 i = 0; i < mSegments.Size; i++) {
+		const RDSegmentInfo& info = mSegments[i];
 
 		if (info.ParentBody < 0) {
 			continue;
@@ -434,17 +434,17 @@ Vec3f Ragdoll::GetBodyOrigin(uint32 body_index) const
 
 Vec3f Ragdoll::GetPelvisHeading(bool animated) const
 {
-	if (mBodies.Size == 0) {
+	if (mSegments.Size == 0) {
 		return Vec3f::sZero;
 	}
 
 	JPH::Quat orientation = gPhysics->pBackend->GetBodyInterface().GetRotation(GetBodyID(0));
 
 	if (animated) {
-		orientation = mTargets[0].Orientation;
+		orientation = mSegmentTargets[0].Orientation;
 	}
 
-	JPH::Vec3 forward = (orientation * mBodies[0].RestOrientation.Conjugated()) * mRig.RestForward;
+	JPH::Vec3 forward = (orientation * mSegments[0].RestOrientation.Conjugated()) * mRig.RestForward;
 	forward.SetY(0.0f);
 
 	return Vec3f(forward.NormalizedOr(JPH::Vec3::sZero()));
@@ -452,11 +452,11 @@ Vec3f Ragdoll::GetPelvisHeading(bool animated) const
 
 Vec3f Ragdoll::GetBodyTargetOrigin(uint32 body_index) const
 {
-	if (body_index >= mTargets.Size) {
+	if (body_index >= mSegmentTargets.Size) {
 		return Vec3f::sZero;
 	}
 
-	return Vec3f(mTargets[body_index].Position);
+	return Vec3f(mSegmentTargets[body_index].Position);
 }
 
 Vec3f Ragdoll::GetBodyPosition(uint32 body_index) const
@@ -465,7 +465,7 @@ Vec3f Ragdoll::GetBodyPosition(uint32 body_index) const
 	return Vec3f(position.GetX(), position.GetY(), position.GetZ());
 }
 
-void Ragdoll::SampleBody(JPH::BodyInterface& body_interface, uint32 body_index, BodyState& out_state) const
+void Ragdoll::SampleSegment(JPH::BodyInterface& body_interface, uint32 body_index, RDSegmentState& out_state) const
 {
 	const JPH::BodyID body_id = GetBodyID(body_index);
 
@@ -478,7 +478,8 @@ void Ragdoll::SampleBody(JPH::BodyInterface& body_interface, uint32 body_index, 
 	out_state.AngularVelocity = body_interface.GetAngularVelocity(body_id);
 }
 
-bool Ragdoll::GetMassAverage(const SizedArray<BodyState>& states, JPH::Vec3& out_center, JPH::Vec3& out_velocity) const
+bool Ragdoll::GetMassAverage(const SizedArray<RDSegmentState>& states, JPH::Vec3& out_center,
+							 JPH::Vec3& out_velocity) const
 {
 	if (mTotalMass <= 0.0f) {
 		return false;
@@ -487,9 +488,9 @@ bool Ragdoll::GetMassAverage(const SizedArray<BodyState>& states, JPH::Vec3& out
 	JPH::Vec3 moment = JPH::Vec3::sZero();
 	JPH::Vec3 momentum = JPH::Vec3::sZero();
 
-	for (uint32 i = 0; i < mBodies.Size; i++) {
-		moment += states[i].Center * mBodies[i].Mass;
-		momentum += states[i].Velocity * mBodies[i].Mass;
+	for (uint32 i = 0; i < mSegments.Size; i++) {
+		moment += states[i].Center * mSegments[i].Mass;
+		momentum += states[i].Velocity * mSegments[i].Mass;
 	}
 
 	out_center = moment / mTotalMass;
@@ -500,7 +501,7 @@ bool Ragdoll::GetMassAverage(const SizedArray<BodyState>& states, JPH::Vec3& out
 
 bool Ragdoll::GetBodyGroundContact(uint32 body_index, BodyGroundContact& out_contact) const
 {
-	if (mpRagdoll == nullptr || body_index >= mBodies.Size) {
+	if (mpRagdoll == nullptr || body_index >= mSegments.Size) {
 		out_contact = BodyGroundContact {};
 		return false;
 	}
@@ -522,7 +523,7 @@ bool Ragdoll::IsBodyOnGround(uint32 body_index, const JPH::Vec3 up, float32 min_
 	return GetBodyGroundContact(body_index, contact) && IsSupportNormal(contact, up, min_up);
 }
 
-Mat4f Ragdoll::GetBodyModelMatrix(uint32 body_index, float32 step_alpha) const
+Mat4f Ragdoll::GetSegmentWorldMatrix(uint32 body_index, float32 step_alpha) const
 {
 	JPH::RVec3 current_position;
 	JPH::Quat orientation;
@@ -541,7 +542,7 @@ Mat4f Ragdoll::GetBodyModelMatrix(uint32 body_index, float32 step_alpha) const
 
 	Mat4f model = world * mWorldInverse;
 	NormalizeRotationRows(model);
-	ScaleRotationRows(model, mBodies[body_index].BoneScale);
+	ScaleRotationRows(model, mSegments[body_index].BoneScale);
 
 	return model;
 }
@@ -563,9 +564,9 @@ void Ragdoll::WriteToSkeleton()
 
 		mbPoseSettled = is_asleep;
 
-		for (uint32 i = 0; i < mBodies.Size; i++) {
-			mDrivenWorld[mBodies[i].BoneIndex] = GetBodyModelMatrix(i, step_alpha);
-			mIsDriven[mBodies[i].BoneIndex] = 1;
+		for (uint32 i = 0; i < mSegments.Size; i++) {
+			mDrivenWorld[mSegments[i].BoneIndex] = GetSegmentWorldMatrix(i, step_alpha);
+			mIsDriven[mSegments[i].BoneIndex] = 1;
 		}
 
 		mpSkeleton->PoseFromDrivenBones(mDrivenWorld.pData, mIsDriven.pData);
@@ -575,8 +576,8 @@ void Ragdoll::WriteToSkeleton()
 	const Skeleton& skel = *mpSkeleton;
 	bool any_driven = false;
 
-	for (uint32 i = 0; i < mBodies.Size; i++) {
-		const BodyInfo& info = mBodies[i];
+	for (uint32 i = 0; i < mSegments.Size; i++) {
+		const RDSegmentInfo& info = mSegments[i];
 		const bool is_driven = (info.Mode != eRagdollBodyMode::Kinematic) && (info.Blend > 0.0f);
 
 		mIsDriven[info.BoneIndex] = static_cast<uint8>(is_driven);
@@ -587,7 +588,7 @@ void Ragdoll::WriteToSkeleton()
 
 		any_driven = true;
 
-		Mat4f model = GetBodyModelMatrix(i, step_alpha);
+		Mat4f model = GetSegmentWorldMatrix(i, step_alpha);
 
 		if (info.Blend < 1.0f) {
 			const Mat4f& animated = skel.WorldTransforms[info.BoneIndex];
@@ -633,9 +634,9 @@ void Ragdoll::Destroy()
 	}
 
 	mpSkeleton = nullptr;
-	mBodies.Clear();
-	mTargets.Free();
-	mStates.Free();
+	mSegments.Clear();
+	mSegmentTargets.Free();
+	mSegmentStates.Free();
 	mMotorOverrides.Free();
 	mLayers.Free();
 	mPreviousPoses.Free();

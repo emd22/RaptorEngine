@@ -87,8 +87,8 @@ static constexpr const char* scCrosshairPath = "Textures/crosshair.png";
 static constexpr int64 scCrosshairSize = 3;
 
 /// Edge length, launch speed and distance in front of the eye of the physics cube fired from the camera
-static constexpr float32 scFireCubeSize = 0.5f;
-static constexpr float32 scFireCubeSpeed = 25.0f;
+static constexpr float32 scFireCubeSize = 0.25f;
+static constexpr float32 scFireCubeSpeed = 6.0f;
 static constexpr float32 scFireCubeSpawnDistance = 1.5f;
 
 RaptorGame::RaptorGame()
@@ -276,7 +276,7 @@ void RaptorGame::CreateGame()
 	mpNPCStrengthCVar = gCVars->Set("b_npc_strength", gCVars->Get("b_npc_strength", 1.0f));
 	mpNPCRootAssistCVar = gCVars->Set("b_npc_root_assist", gCVars->Get("b_npc_root_assist", 1.0f));
 	mpNPCBalanceCVar = gCVars->Set("b_npc_balance", gCVars->Get("b_npc_balance", 1.0f));
-	mpNPCBalanceAssistCVar = gCVars->Set("b_npc_balance_assist", gCVars->Get("b_npc_balance_assist", 0.15f));
+	mpNPCBalanceAssistCVar = gCVars->Set("b_npc_balance_assist", gCVars->Get("b_npc_balance_assist", 0.50f));
 	mpNPCBalanceReleaseCVar = gCVars->Set("b_npc_balance_release", gCVars->Get("b_npc_balance_release", 0.1f));
 	mpNPCBalanceRecoveryCVar = gCVars->Set("b_npc_balance_recovery", gCVars->Get("b_npc_balance_recovery", 0.5f));
 	mpNPCMaxActiveCVar = gCVars->Set("b_npc_max_active", gCVars->Get("b_npc_max_active", int64(4)));
@@ -289,7 +289,7 @@ void RaptorGame::CreateGame()
 	mpNPCStaggerTimeCVar = gCVars->Set("b_npc_stagger_time", gCVars->Get("b_npc_stagger_time", 1.1f));
 	mpNPCStaggerSpeedCVar = gCVars->Set("b_npc_stagger_speed", gCVars->Get("b_npc_stagger_speed", 1.1f));
 	mpNPCStumbleTimeCVar = gCVars->Set("b_npc_stumble_time", gCVars->Get("b_npc_stumble_time", 0.3f));
-	mpNPCRepeatShoveCVar = gCVars->Set("b_npc_repeat_shove", gCVars->Get("b_npc_repeat_shove", 0.3f));
+	mpNPCRepeatShoveCVar = gCVars->Set("b_npc_repeat_shove", gCVars->Get("b_npc_repeat_shove", 0.1f));
 	mpNPCWanderCVar = gCVars->Set("b_npc_wander", gCVars->Get("b_npc_wander", 0.0f));
 	mpPlayerRagdollCollisionCVar = gCVars->Set("b_player_ragdoll_collision",
 											   gCVars->Get("b_player_ragdoll_collision", int64(1)));

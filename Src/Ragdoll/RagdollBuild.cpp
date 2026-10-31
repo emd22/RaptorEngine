@@ -3,6 +3,10 @@
 
 #include <ThirdParty/Jolt/Jolt.h>
 #include <ThirdParty/Jolt/Physics/Body/BodyCreationSettings.h>
+#include <ThirdParty/Jolt/Physics/Collision/CollideShape.h>
+#include <ThirdParty/Jolt/Physics/Collision/CollisionCollectorImpl.h>
+#include <ThirdParty/Jolt/Physics/Collision/CollisionDispatch.h>
+#include <ThirdParty/Jolt/Physics/Collision/GroupFilterTable.h>
 #include <ThirdParty/Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <ThirdParty/Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <ThirdParty/Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
@@ -56,11 +60,16 @@ struct BuildFrame
 	}
 };
 
-struct BodyShape
+struct RDSegment
 {
 	JPH::ShapeRefC Shape;
 	JPH::Vec3 CenterLocal = JPH::Vec3::sZero();
 	bool bBox = false;
+
+	/// The type of collider used in the shape. For most shapes, this should be a capsule. For shapes that must remain
+	/// stable (such as feet), they should be a box.
+	eRagdollShapeCollider ColliderType = eRagdollShapeCollider::Capsule;
+
 	JPH::Vec3 BoxHalfExtent = JPH::Vec3::sZero();
 	JPH::Quat BoxRotation = JPH::Quat::sIdentity();
 };
@@ -72,7 +81,7 @@ struct BuiltBody
 	JPH::Vec3 AxisLocal = JPH::Vec3::sAxisY();
 	float32 Length = 0.0f;
 	float32 Radius = 0.0f;
-	BodyShape Shape;
+	RDSegment Shape;
 	bool bHinge = false;
 	JPH::Vec3 Hinge = JPH::Vec3::sZero();
 };
@@ -137,11 +146,11 @@ JPH::Vec3 GetRestForward(const BuildFrame& frame, const SizedArray<ResolvedBone>
 	return (forward - body_up * forward.Dot(body_up)).NormalizedOr(JPH::Vec3::sZero());
 }
 
-BodyShape BuildCapsule(const JPH::Vec3 axis_local, float32 length, float32 radius, float32 scale)
+RDSegment BuildCapsule(const JPH::Vec3 axis_local, float32 length, float32 radius, float32 scale)
 {
 	const float32 half_height = std::max(length * 0.5f - radius, 0.01f * scale);
 
-	BodyShape shape;
+	RDSegment shape;
 	shape.CenterLocal = axis_local * (length * 0.5f);
 
 	JPH::ShapeRefC capsule = JPH::CapsuleShapeSettings(half_height, radius).Create().Get();
@@ -153,7 +162,7 @@ BodyShape BuildCapsule(const JPH::Vec3 axis_local, float32 length, float32 radiu
 	return shape;
 }
 
-BodyShape BuildFootBox(const BuildFrame& frame, const RagdollBodyDef& body_def, const JPH::Mat44& rotation,
+RDSegment BuildFootBox(const BuildFrame& frame, const RagdollBodyDef& body_def, const JPH::Mat44& rotation,
 					   const JPH::Vec3 position, const JPH::Vec3 end_position, const JPH::Vec3 axis_world,
 					   float32 radius)
 {
@@ -167,7 +176,7 @@ BodyShape BuildFootBox(const BuildFrame& frame, const RagdollBodyDef& body_def, 
 
 	const float32 box_half_height = std::max((top - bottom) * 0.5f, radius * 0.5f);
 
-	BodyShape shape;
+	RDSegment shape;
 	shape.bBox = true;
 	shape.BoxHalfExtent = JPH::Vec3(body_def.FootWidth * frame.Scale * 0.5f, box_half_height, (toe - heel) * 0.5f);
 
@@ -364,7 +373,7 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 	JPH::Array<JPH::Mat44> joint_matrices;
 	joint_matrices.reserve(parts.Size);
 
-	mBodies.InitCapacity(parts.Size);
+	mSegments.InitCapacity(parts.Size);
 
 	for (uint32 i = 0; i < parts.Size; i++) {
 		const RagdollBodyDef& body_def = *parts[i].pDef;
@@ -408,7 +417,7 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 
 		const Mat4f& bone_model = skel.WorldTransforms[bone];
 
-		mBodies.Insert(BodyInfo {
+		mSegments.Insert(RDSegmentInfo {
 			.BoneScale = JPH::Vec3(RowAsVec3(bone_model, 0).Length(), RowAsVec3(bone_model, 1).Length(),
 								   RowAsVec3(bone_model, 2).Length()),
 			.ParentAnchor = parent_anchor,
@@ -425,7 +434,8 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 			.Muscle = body_def.Muscle,
 			.Length = body.Length,
 			.Radius = body.Radius,
-			.bBox = body.Shape.bBox,
+			.ColliderType = body.Shape.ColliderType,
+			// .bUsesBoxCollider = body.Shape.bBox,
 			.Mass = body_def.MassFraction * frame.TotalMass,
 			.BoneIndex = bone,
 			.bHinge = body.bHinge,
@@ -434,7 +444,7 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 		});
 	}
 
-	for (const BodyInfo& body : mBodies) {
+	for (const RDSegmentInfo& body : mSegments) {
 		mTotalMass += body.Mass;
 	}
 
@@ -446,7 +456,7 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 
 	RestoreTableMasses(*settings);
 
-	settings->DisableParentChildCollisions(joint_matrices.data(), scSelfCollisionMargin * scale);
+	DisableSelfCollisions(*settings, joint_matrices.data(), scSelfCollisionMargin * scale);
 
 	if (!AddToPhysicsSystem(*settings)) {
 		return false;
@@ -454,7 +464,7 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 
 	CreateRootAssist(JPH::Vec3(settings->mParts[0].mPosition));
 
-	mbHasMotors = (mpRagdoll->GetConstraintCount() + 1 == mBodies.Size);
+	mbHasMotors = (mpRagdoll->GetConstraintCount() + 1 == mSegments.Size);
 
 	InitBodyArrays(skel.JointCount);
 	BuildRig(gravity_frame);
@@ -468,17 +478,17 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 
 	const float32 skinning_error = WriteInitialPose();
 
-	LogInfo(LC_PHYSICS, "Ragdoll: {} bodies, {:.3f} kg, rest pose skinning error {:.5f}", mBodies.Size, frame.TotalMass,
-			skinning_error);
+	LogInfo(LC_PHYSICS, "Ragdoll: {} bodies, {:.3f} kg, rest pose skinning error {:.5f}", mSegments.Size,
+			frame.TotalMass, skinning_error);
 
 	return true;
 }
 
 void Ragdoll::RestoreTableMasses(JPH::RagdollSettings& settings)
 {
-	for (uint32 i = 0; i < mBodies.Size; i++) {
+	for (uint32 i = 0; i < mSegments.Size; i++) {
 		JPH::MassProperties& mass_properties = settings.mParts[i].mMassPropertiesOverride;
-		const float32 table_mass = mBodies[i].Mass;
+		const float32 table_mass = mSegments[i].Mass;
 
 		if (mass_properties.mMass > 0.0f) {
 			mass_properties.mInertia *= table_mass / mass_properties.mMass;
@@ -488,7 +498,76 @@ void Ragdoll::RestoreTableMasses(JPH::RagdollSettings& settings)
 		mass_properties.mMass = table_mass;
 
 		const JPH::Mat44& inertia = mass_properties.mInertia;
-		mBodies[i].Inertia = (inertia(0, 0) + inertia(1, 1) + inertia(2, 2)) / 3.0f;
+		mSegments[i].Inertia = (inertia(0, 0) + inertia(1, 1) + inertia(2, 2)) / 3.0f;
+	}
+}
+
+void Ragdoll::DisableSelfCollisions(JPH::RagdollSettings& settings, const JPH::Mat44* joint_matrices, float32 margin)
+{
+	const uint32 part_count = mSegments.Size;
+
+	// Jolt's DisableParentChildCollisions keeps its table in a local reference and points the parts at it, so the table
+	// is freed before the bodies are made. This table is kept on the ragdoll instead.
+	mpSelfCollisionFilter = new JPH::GroupFilterTable(part_count);
+
+	for (uint32 i = 0; i < part_count; i++) {
+		if (mSegments[i].ParentBody >= 0) {
+			mpSelfCollisionFilter->DisableCollision(i, static_cast<uint32>(mSegments[i].ParentBody));
+		}
+
+		for (uint32 j = i + 1; j < part_count; j++) {
+			if (mSegments[i].bFoot && mSegments[j].bFoot) {
+				mpSelfCollisionFilter->DisableCollision(i, j);
+			}
+		}
+	}
+
+	for (uint32 j1 = 0; j1 < part_count; j1++) {
+		const JPH::RagdollSettings::Part& part1 = settings.mParts[j1];
+		JPH::Vec3 scale1;
+		const JPH::Mat44 com1 = joint_matrices[j1].PreTranslated(part1.GetShape()->GetCenterOfMass()).Decompose(scale1);
+
+		for (uint32 j2 = j1 + 1; j2 < part_count; j2++) {
+			const JPH::RagdollSettings::Part& part2 = settings.mParts[j2];
+
+			if (!mpSelfCollisionFilter->IsCollisionEnabled(j1, j2) ||
+				(!part1.HasMassProperties() && !part2.HasMassProperties())) {
+				continue;
+			}
+
+			JPH::Vec3 scale2;
+			const JPH::Mat44 com2 =
+				joint_matrices[j2].PreTranslated(part2.GetShape()->GetCenterOfMass()).Decompose(scale2);
+
+			JPH::CollideShapeSettings collide_settings;
+			collide_settings.mActiveEdgeMode = JPH::EActiveEdgeMode::CollideWithAll;
+			collide_settings.mBackFaceMode = JPH::EBackFaceMode::CollideWithBackFaces;
+			collide_settings.mMaxSeparationDistance = margin;
+
+			JPH::AnyHitCollisionCollector<JPH::CollideShapeCollector> collector;
+
+			// Dispatch with the dynamic shape first, as Jolt needs it that way round for convex against mesh
+			if (part1.HasMassProperties()) {
+				JPH::CollisionDispatch::sCollideShapeVsShape(part1.GetShape(), part2.GetShape(), scale1, scale2, com1,
+															 com2, JPH::SubShapeIDCreator(), JPH::SubShapeIDCreator(),
+															 collide_settings, collector);
+			}
+			else {
+				JPH::CollisionDispatch::sCollideShapeVsShape(part2.GetShape(), part1.GetShape(), scale2, scale1, com2,
+															 com1, JPH::SubShapeIDCreator(), JPH::SubShapeIDCreator(),
+															 collide_settings, collector);
+			}
+
+			if (collector.HadHit()) {
+				mpSelfCollisionFilter->DisableCollision(j1, j2);
+			}
+		}
+	}
+
+	for (uint32 i = 0; i < part_count; i++) {
+		JPH::RagdollSettings::Part& part = settings.mParts[i];
+		part.mCollisionGroup.SetSubGroupID(i);
+		part.mCollisionGroup.SetGroupFilter(mpSelfCollisionFilter);
 	}
 }
 
@@ -546,28 +625,28 @@ void Ragdoll::CreateRootAssist(const JPH::Vec3 root_position)
 
 void Ragdoll::InitBodyArrays(uint32 joint_count)
 {
-	mTargets.InitSize(mBodies.Size, BodyTarget {});
-	mStates.InitSize(mBodies.Size, BodyState {});
-	mMotorOverrides.InitSize(mBodies.Size, MotorOverride {});
-	mOverrideTargets.InitSize(mBodies.Size, JPH::Quat::sIdentity());
-	mHadOverride.InitSize(mBodies.Size, uint8(0));
-	mLayers.InitSize(mBodies.Size, BodyLayer {});
-	mPreviousPoses.InitSize(mBodies.Size, BodyPose {});
+	mSegmentTargets.InitSize(mSegments.Size, RDSegmentTarget {});
+	mSegmentStates.InitSize(mSegments.Size, RDSegmentState {});
+	mMotorOverrides.InitSize(mSegments.Size, MotorOverride {});
+	mOverrideTargets.InitSize(mSegments.Size, JPH::Quat::sIdentity());
+	mHadOverride.InitSize(mSegments.Size, uint8(0));
+	mLayers.InitSize(mSegments.Size, BodyLayer {});
+	mPreviousPoses.InitSize(mSegments.Size, BodyPose {});
 
 	mbHasTargets = false;
 
 	mDrivenWorld.InitSize(joint_count, Mat4f::scIdentity);
 	mIsDriven.InitSize(joint_count, static_cast<uint8>(0));
 
-	for (const BodyInfo& body : mBodies) {
+	for (const RDSegmentInfo& body : mSegments) {
 		mIsDriven[body.BoneIndex] = 1;
 	}
 }
 
 int32 Ragdoll::FindChildBody(uint32 parent, eRagdollBodyPart part) const
 {
-	for (uint32 i = parent + 1; i < mBodies.Size; i++) {
-		if (mBodies[i].ParentBody == static_cast<int32>(parent) && mBodies[i].Part == part) {
+	for (uint32 i = parent + 1; i < mSegments.Size; i++) {
+		if (mSegments[i].ParentBody == static_cast<int32>(parent) && mSegments[i].Part == part) {
 			return static_cast<int32>(i);
 		}
 	}
@@ -577,7 +656,7 @@ int32 Ragdoll::FindChildBody(uint32 parent, eRagdollBodyPart part) const
 
 bool Ragdoll::FindLimbChain(uint32 root, uint32& out_middle, uint32& out_end) const
 {
-	const eRagdollBodyPart part = mBodies[root].Part;
+	const eRagdollBodyPart part = mSegments[root].Part;
 	const int32 middle = FindChildBody(root, part);
 
 	if (middle < 0) {
@@ -600,7 +679,7 @@ void Ragdoll::BuildRig(const GravityFrame& frame)
 {
 	mRig = RagdollRig {};
 
-	if (mBodies.Size < 2) {
+	if (mSegments.Size < 2) {
 		return;
 	}
 
@@ -610,13 +689,13 @@ void Ragdoll::BuildRig(const GravityFrame& frame)
 	FindRigLimbs(arm_count, leg_count);
 
 	const bool has_feet = (leg_count == RagdollRig::scLimbCount) && InitRigFeet(frame);
-	const bool has_chest = (mRig.Neck != 0) && (mBodies[mRig.Neck].ParentBody >= 0);
+	const bool has_chest = (mRig.Neck != 0) && (mSegments[mRig.Neck].ParentBody >= 0);
 
 	if (has_chest) {
-		mRig.Chest = static_cast<uint32>(mBodies[mRig.Neck].ParentBody);
+		mRig.Chest = static_cast<uint32>(mSegments[mRig.Neck].ParentBody);
 
 		for (int32 walk = static_cast<int32>(mRig.Chest); walk > 0 && mRig.SpineCount < RagdollRig::scMaxSpine;
-			 walk = mBodies[walk].ParentBody) {
+			 walk = mSegments[walk].ParentBody) {
 			mRig.Spine[mRig.SpineCount++] = static_cast<uint32>(walk);
 		}
 	}
@@ -638,8 +717,8 @@ void Ragdoll::BuildRig(const GravityFrame& frame)
 
 void Ragdoll::FindRigLimbs(uint32& out_arm_count, uint32& out_leg_count)
 {
-	for (uint32 i = 1; i < mBodies.Size; i++) {
-		const BodyInfo& body = mBodies[i];
+	for (uint32 i = 1; i < mSegments.Size; i++) {
+		const RDSegmentInfo& body = mSegments[i];
 
 		if (body.Part == eRagdollBodyPart::Head && mRig.Neck == 0) {
 			mRig.Neck = i;
@@ -648,7 +727,7 @@ void Ragdoll::FindRigLimbs(uint32& out_arm_count, uint32& out_leg_count)
 		const bool is_limb = (body.Part == eRagdollBodyPart::Arm) || (body.Part == eRagdollBodyPart::Leg);
 
 		// A limb starts at the first body of its part below a body of another part
-		if (!is_limb || mBodies[body.ParentBody].Part == body.Part) {
+		if (!is_limb || mSegments[body.ParentBody].Part == body.Part) {
 			continue;
 		}
 
@@ -666,8 +745,8 @@ void Ragdoll::FindRigLimbs(uint32& out_arm_count, uint32& out_leg_count)
 			arm.Upper = i;
 			arm.Lower = middle;
 			arm.Hand = end;
-			arm.UpperLength = (mBodies[middle].RestPosition - body.RestPosition).Length();
-			arm.LowerLength = (mBodies[end].RestPosition - mBodies[middle].RestPosition).Length();
+			arm.UpperLength = (mSegments[middle].RestPosition - body.RestPosition).Length();
+			arm.LowerLength = (mSegments[end].RestPosition - mSegments[middle].RestPosition).Length();
 		}
 		else if (body.Part == eRagdollBodyPart::Leg && out_leg_count < RagdollRig::scLimbCount) {
 			RagdollRigLeg& leg = mRig.Legs[out_leg_count++];
@@ -684,11 +763,11 @@ bool Ragdoll::InitRigFeet(const GravityFrame& frame)
 	JPH::Vec3 forward = JPH::Vec3::sZero();
 
 	for (RagdollRigLeg& leg : mRig.Legs) {
-		const BodyInfo& thigh = mBodies[leg.Thigh];
-		const BodyInfo& shin = mBodies[leg.Shin];
-		const BodyInfo& foot = mBodies[leg.Foot];
+		const RDSegmentInfo& thigh = mSegments[leg.Thigh];
+		const RDSegmentInfo& shin = mSegments[leg.Shin];
+		const RDSegmentInfo& foot = mSegments[leg.Foot];
 
-		if (!foot.bFoot || !foot.bBox || !shin.bHinge || thigh.ParentBody != 0) {
+		if (!foot.bFoot || !shin.bHinge || thigh.ParentBody != 0) {
 			return false;
 		}
 
@@ -722,19 +801,19 @@ bool Ragdoll::InitRigFeet(const GravityFrame& frame)
 void Ragdoll::InitRigSides(const GravityFrame& frame, uint32 arm_count, uint32 leg_count)
 {
 	const JPH::Vec3 side = frame.Up.Cross(mRig.RestForward);
-	const JPH::Vec3 pelvis = mBodies[0].RestPosition;
+	const JPH::Vec3 pelvis = mSegments[0].RestPosition;
 
 	for (uint32 i = 0; i < arm_count; i++) {
 		RagdollRigArm& arm = mRig.Arms[i];
-		arm.SideSign = MathUtil::GetSign((mBodies[arm.Upper].RestPosition - pelvis).Dot(side));
+		arm.SideSign = MathUtil::GetSign((mSegments[arm.Upper].RestPosition - pelvis).Dot(side));
 	}
 
 	for (uint32 i = 0; i < leg_count; i++) {
 		RagdollRigLeg& leg = mRig.Legs[i];
 
-		const BodyInfo& thigh = mBodies[leg.Thigh];
-		const BodyInfo& shin = mBodies[leg.Shin];
-		const BodyInfo& foot = mBodies[leg.Foot];
+		const RDSegmentInfo& thigh = mSegments[leg.Thigh];
+		const RDSegmentInfo& shin = mSegments[leg.Shin];
+		const RDSegmentInfo& foot = mSegments[leg.Foot];
 
 		const JPH::Vec3 leg_direction = (foot.RestPosition - thigh.RestPosition).Normalized();
 		const JPH::Vec3 rest_normal = leg_direction.Cross(mRig.RestForward);

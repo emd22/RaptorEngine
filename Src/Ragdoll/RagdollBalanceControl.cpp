@@ -70,7 +70,7 @@ void RagdollBalance::DriveStanceLegs(Ragdoll& ragdoll)
 
 	// Through a stumble the pelvis goes with the push rather than being shifted back over the feet
 	if (mStumbleTime <= 0.0f) {
-		shift = mFrame.Horizontal(center - mCapturePoint) * scComShiftGain;
+		shift = mGroundFrame.Horizontal(center - mCapturePoint) * scComShiftGain;
 	}
 	const float32 shift_length = shift.Length();
 
@@ -78,7 +78,7 @@ void RagdollBalance::DriveStanceLegs(Ragdoll& ragdoll)
 		shift *= scMaxComShift / shift_length;
 	}
 
-	const JPH::Vec3 pelvis_horizontal = mFrame.Horizontal(ragdoll.mStates[0].Origin) + shift;
+	const JPH::Vec3 pelvis_horizontal = mGroundFrame.Horizontal(ragdoll.mSegmentStates[0].Origin) + shift;
 
 	float32 pelvis_height = std::numeric_limits<float32>::max();
 
@@ -89,7 +89,7 @@ void RagdollBalance::DriveStanceLegs(Ragdoll& ragdoll)
 
 		const JPH::Vec3 hip_offset = pelvis_target * leg.HipOffset;
 		const float32 reach = scStanceHeightFraction * (leg.Upper + leg.Lower);
-		const float32 spread = mFrame.Horizontal(pelvis_horizontal + hip_offset - leg.AnklePosition).Length();
+		const float32 spread = mGroundFrame.Horizontal(pelvis_horizontal + hip_offset - leg.AnklePosition).Length();
 
 		const float32 reach2 = reach * reach;
 		const float32 spread2 = spread * spread;
@@ -97,14 +97,14 @@ void RagdollBalance::DriveStanceLegs(Ragdoll& ragdoll)
 		const float32 hip_height = std::sqrt(std::max(reach2 - spread2, reach2 * scMinHipHeight));
 
 		pelvis_height = std::min(pelvis_height,
-								 leg.AnklePosition.Dot(mFrame.Up) + hip_height - hip_offset.Dot(mFrame.Up));
+								 leg.AnklePosition.Dot(mGroundFrame.Up) + hip_height - hip_offset.Dot(mGroundFrame.Up));
 	}
 
 	if (pelvis_height == std::numeric_limits<float32>::max()) {
 		return;
 	}
 
-	const JPH::Vec3 pelvis = pelvis_horizontal + mFrame.Up * (pelvis_height - mLandingDip);
+	const JPH::Vec3 pelvis = pelvis_horizontal + mGroundFrame.Up * (pelvis_height - mLandingDip);
 
 	for (BalanceLeg& leg : mLegs) {
 		if (!leg.bStance) {
@@ -118,13 +118,13 @@ void RagdollBalance::DriveStanceLegs(Ragdoll& ragdoll)
 
 		if (!IsLoaded(leg)) {
 			const JPH::Vec3 ankle = leg.AnklePosition -
-									mFrame.Up * (std::max(leg.SoleHeight - mGroundHeight, 0.0f) + scSwingPress);
+									mGroundFrame.Up * (std::max(leg.SoleHeight - mGroundHeight, 0.0f) + scSwingPress);
 			DriveFreeLeg(ragdoll, leg, ankle, foot);
 			continue;
 		}
 
 		const JPH::Vec3 ankle = leg.AnklePosition -
-								mFrame.Up * (std::max(leg.SoleHeight - mGroundHeight, 0.0f) + scStancePress);
+								mGroundFrame.Up * (std::max(leg.SoleHeight - mGroundHeight, 0.0f) + scStancePress);
 
 		JPH::Quat thigh;
 		JPH::Quat shin;
@@ -153,7 +153,7 @@ void RagdollBalance::DriveFreeLeg(Ragdoll& ragdoll, const BalanceLeg& leg, const
 {
 	JPH::Quat thigh;
 	JPH::Quat shin;
-	SolveLeg(ragdoll, leg, ragdoll.mStates[leg.Thigh].Origin, ankle, thigh, shin);
+	SolveLeg(ragdoll, leg, ragdoll.mSegmentStates[leg.Thigh].Origin, ankle, thigh, shin);
 
 	ragdoll.SetMotorTarget(leg.Thigh, mPelvisOrientation, thigh);
 	ragdoll.SetMotorTarget(leg.Shin, thigh, shin);
@@ -169,11 +169,11 @@ void RagdollBalance::SolveLeg(Ragdoll& ragdoll, const BalanceLeg& leg, const JPH
 	const JPH::Vec3 knee = Vec3f::ToJolt(ik.Mid);
 	const JPH::Vec3 end = Vec3f::ToJolt(ik.End);
 
-	const JPH::Vec3 thigh_direction = (knee - hip).NormalizedOr(-mFrame.Up);
-	const JPH::Vec3 shin_direction = (end - knee).NormalizedOr(-mFrame.Up);
-	const JPH::Vec3 leg_direction = (end - hip).NormalizedOr(-mFrame.Up);
+	const JPH::Vec3 thigh_direction = (knee - hip).NormalizedOr(-mGroundFrame.Up);
+	const JPH::Vec3 shin_direction = (end - knee).NormalizedOr(-mGroundFrame.Up);
+	const JPH::Vec3 leg_direction = (end - hip).NormalizedOr(-mGroundFrame.Up);
 
-	const JPH::Vec3 hinge = leg_direction.Cross(mForward).NormalizedOr(mFrame.Up.Cross(mForward)) * leg.HingeSign;
+	const JPH::Vec3 hinge = leg_direction.Cross(mForward).NormalizedOr(mGroundFrame.Up.Cross(mForward)) * leg.HingeSign;
 
 	ragdoll.GetHingeChainRotations(leg.Thigh, leg.Shin, thigh_direction, shin_direction, hinge, out_thigh, out_shin);
 }
@@ -194,11 +194,11 @@ void RagdollBalance::ApplyTorsoControl(Ragdoll& ragdoll, JPH::BodyInterface& bod
 	}
 
 	JPH::Vec3 pivot = JPH::Vec3::sZero();
-	float32 upper_mass = ragdoll.mStates[0].SubtreeMass;
-	JPH::Vec3 upper_moment = ragdoll.mStates[0].SubtreeMoment;
+	float32 upper_mass = ragdoll.mSegmentStates[0].SubtreeMass;
+	JPH::Vec3 upper_moment = ragdoll.mSegmentStates[0].SubtreeMoment;
 
 	for (uint32 i = 0; i < stance_count; i++) {
-		const Ragdoll::BodyState& thigh = ragdoll.mStates[mLegs[stance_legs[i]].Thigh];
+		const RDSegmentState& thigh = ragdoll.mSegmentStates[mLegs[stance_legs[i]].Thigh];
 
 		pivot += thigh.Origin;
 		upper_mass -= thigh.SubtreeMass;
@@ -222,19 +222,19 @@ void RagdollBalance::ApplyTorsoControl(Ragdoll& ragdoll, JPH::BodyInterface& bod
 	float32 weights[2] = { 1.0f, 0.0f };
 
 	if (stance_count == 2) {
-		const float32 distance_a = mFrame.Horizontal(mCenterOfMass - mLegs[stance_legs[0]].FootCenter).Length();
-		const float32 distance_b = mFrame.Horizontal(mCenterOfMass - mLegs[stance_legs[1]].FootCenter).Length();
+		const float32 distance_a = mGroundFrame.Horizontal(mCenterOfMass - mLegs[stance_legs[0]].FootCenter).Length();
+		const float32 distance_b = mGroundFrame.Horizontal(mCenterOfMass - mLegs[stance_legs[1]].FootCenter).Length();
 
 		weights[0] = distance_b / std::max(distance_a + distance_b, 1e-4f);
 		weights[1] = 1.0f - weights[0];
 	}
 
 	const JPH::Quat pelvis_target = mPelvisTarget;
-	const float32 frequency_scale = scTorsoFrequency / ragdoll.mBodies[mLegs[0].Thigh].Muscle.Stiffness;
+	const float32 frequency_scale = scTorsoFrequency / ragdoll.mSegments[mLegs[0].Thigh].Muscle.Stiffness;
 
 	for (uint32 i = 0; i < stance_count; i++) {
 		const BalanceLeg& leg = mLegs[stance_legs[i]];
-		const JPH::Quat thigh = ragdoll.mStates[leg.Thigh].Orientation;
+		const JPH::Quat thigh = ragdoll.mSegmentStates[leg.Thigh].Orientation;
 		const float32 lift = MathUtil::Clamp((leg.SoleHeight - mGroundHeight - scLiftStart) / scLiftRange, 0.0f, 1.0f);
 		const JPH::Quat hip_thigh = thigh.SLERP(leg.DesiredThigh, lift).Normalized();
 
@@ -246,11 +246,11 @@ void RagdollBalance::ApplyTorsoControl(Ragdoll& ragdoll, JPH::BodyInterface& bod
 	const JPH::Vec3 upper_center = (upper_moment / upper_mass);
 
 	JPH::Vec3 torque = -(upper_center - pivot).Cross(gravity * upper_mass) * scGravityFeedForward *
-					   std::min(ragdoll.mBodies[0].Strength / scGravityFullStrength, 1.0f);
+					   std::min(ragdoll.mSegments[0].Strength / scGravityFullStrength, 1.0f);
 
-	const JPH::Quat chest = ragdoll.mStates[mpRig->Chest].Orientation;
-	const JPH::Vec3 chest_up = (chest * ragdoll.mBodies[mpRig->Chest].RestOrientation.Conjugated()) * mFrame.Up;
-	torque += chest_up.Cross(mFrame.Up) * scTrunkLeanGain;
+	const JPH::Quat chest = ragdoll.mSegmentStates[mpRig->Chest].Orientation;
+	const JPH::Vec3 chest_up = (chest * ragdoll.mSegments[mpRig->Chest].RestOrientation.Conjugated()) * mGroundFrame.Up;
+	torque += chest_up.Cross(mGroundFrame.Up) * scTrunkLeanGain;
 
 	const float32 torque_length = torque.Length();
 
@@ -271,9 +271,9 @@ void RagdollBalance::ApplyCenterOfMassControl(Ragdoll& ragdoll, JPH::BodyInterfa
 {
 	// Through the stumble the centre of mass is pushed back along the shove, and the hold and braking wait for recovery
 	if (mStumbleTime > 0.0f) {
-		const JPH::Vec3 back = mFrame.Horizontal(mStaggerVelocity).NormalizedOr(JPH::Vec3::sZero());
+		const JPH::Vec3 back = mGroundFrame.Horizontal(mStaggerVelocity).NormalizedOr(JPH::Vec3::sZero());
 		body_interface.AddForce(ragdoll.GetBodyID(0),
-								back * (scStumblePushFraction * ragdoll.GetTotalMass() * mFrame.Gravity));
+								back * (scStumblePushFraction * ragdoll.GetTotalMass() * mGroundFrame.Gravity));
 		return;
 	}
 
@@ -302,11 +302,12 @@ void RagdollBalance::ApplyCenterOfMassControl(Ragdoll& ragdoll, JPH::BodyInterfa
 	const float32 mass = ragdoll.GetTotalMass();
 	const float32 omega = 2.0f * FX_PI * scComFrequency;
 
-	const JPH::Vec3 velocity = mFrame.Horizontal(mVelocity);
+	const JPH::Vec3 velocity = mGroundFrame.Horizontal(mVelocity);
 	const float32 speed = velocity.Length();
 	const float32 damping_scale = -2.0f * scComDamping * omega * mass;
 
-	JPH::Vec3 force = mFrame.Horizontal(target - mCenterOfMass) * (omega * omega * mass) + velocity * damping_scale;
+	JPH::Vec3 force = mGroundFrame.Horizontal(target - mCenterOfMass) * (omega * omega * mass) +
+					  velocity * damping_scale;
 
 	// Brakes anything above the stagger speed and never pushes, so a shove carries the body but cannot be added to
 	JPH::Vec3 braking = JPH::Vec3::sZero();
@@ -316,8 +317,8 @@ void RagdollBalance::ApplyCenterOfMassControl(Ragdoll& ragdoll, JPH::BodyInterfa
 		braking = velocity * (excess_speed / speed * damping_scale);
 	}
 
-	const float32 strength_scale = std::min(ragdoll.mBodies[0].Strength / scGravityFullStrength, 1.0f);
-	const float32 weight = mass * mFrame.Gravity;
+	const float32 strength_scale = std::min(ragdoll.mSegments[0].Strength / scGravityFullStrength, 1.0f);
+	const float32 weight = mass * mGroundFrame.Gravity;
 
 	float32 hold = 1.0f;
 
@@ -354,7 +355,8 @@ void RagdollBalance::ApplyTrunkSpinDamping(Ragdoll& ragdoll, JPH::BodyInterface&
 
 	// The pelvis is damped about vertical, so a spin there settles instead of carrying on
 	const JPH::Vec3 pelvis_spin = body_interface.GetAngularVelocity(ragdoll.GetBodyID(0));
-	body_interface.AddTorque(ragdoll.GetBodyID(0), mFrame.Up * (-scYawDamping * mass * pelvis_spin.Dot(mFrame.Up)));
+	body_interface.AddTorque(ragdoll.GetBodyID(0),
+							 mGroundFrame.Up * (-scYawDamping * mass * pelvis_spin.Dot(mGroundFrame.Up)));
 
 	// The chest is damped about every axis, so the upper body stops rocking after a shove
 	const JPH::BodyID chest_id = ragdoll.GetBodyID(mpRig->Chest);

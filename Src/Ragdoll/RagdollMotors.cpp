@@ -80,7 +80,7 @@ void Ragdoll::OnStep(const JPH::PhysicsStepListenerContext& inContext)
 		}
 	}
 
-	for (uint32 i = 0; i < mBodies.Size; i++) {
+	for (uint32 i = 0; i < mSegments.Size; i++) {
 		ApplyMotor(i);
 	}
 
@@ -102,12 +102,12 @@ void Ragdoll::OnStep(const JPH::PhysicsStepListenerContext& inContext)
 
 void Ragdoll::MoveKinematicBodies(JPH::BodyInterface& body_interface, float32 fraction, float32 delta_time)
 {
-	for (uint32 i = 0; i < mBodies.Size; i++) {
-		if (mBodies[i].Mode != eRagdollBodyMode::Kinematic) {
+	for (uint32 i = 0; i < mSegments.Size; i++) {
+		if (mSegments[i].Mode != eRagdollBodyMode::Kinematic) {
 			continue;
 		}
 
-		const BodyTarget& target = mTargets[i];
+		const RDSegmentTarget& target = mSegmentTargets[i];
 		const JPH::BodyID body_id = GetBodyID(i);
 
 		JPH::RVec3 position;
@@ -123,11 +123,11 @@ void Ragdoll::MoveKinematicBodies(JPH::BodyInterface& body_interface, float32 fr
 
 void Ragdoll::UpdateSubtrees(JPH::BodyInterface& body_interface)
 {
-	for (uint32 i = 0; i < mBodies.Size; i++) {
-		const BodyInfo& info = mBodies[i];
-		BodyState& state = mStates[i];
+	for (uint32 i = 0; i < mSegments.Size; i++) {
+		const RDSegmentInfo& info = mSegments[i];
+		RDSegmentState& state = mSegmentStates[i];
 
-		SampleBody(body_interface, i, state);
+		SampleSegment(body_interface, i, state);
 
 		float32 mass = 0.0f;
 		float32 inertia = 0.0f;
@@ -145,9 +145,9 @@ void Ragdoll::UpdateSubtrees(JPH::BodyInterface& body_interface)
 		state.SubtreeSecondMoment = mass * state.Center.LengthSq() + inertia;
 	}
 
-	for (uint32 i = mBodies.Size - 1; i > 0; i--) {
-		const BodyState& child = mStates[i];
-		BodyState& parent = mStates[mBodies[i].ParentBody];
+	for (uint32 i = mSegments.Size - 1; i > 0; i--) {
+		const RDSegmentState& child = mSegmentStates[i];
+		RDSegmentState& parent = mSegmentStates[mSegments[i].ParentBody];
 
 		parent.SubtreeMass += child.SubtreeMass;
 		parent.SubtreeMoment += child.SubtreeMoment;
@@ -157,7 +157,7 @@ void Ragdoll::UpdateSubtrees(JPH::BodyInterface& body_interface)
 
 float32 Ragdoll::GetRawSubtreeInertia(uint32 body_index, const JPH::Vec3 pivot) const
 {
-	const BodyState& state = mStates[body_index];
+	const RDSegmentState& state = mSegmentStates[body_index];
 
 	return state.SubtreeSecondMoment - 2.0f * pivot.Dot(state.SubtreeMoment) + state.SubtreeMass * pivot.LengthSq();
 }
@@ -197,22 +197,35 @@ void Ragdoll::GetHingeChainRotations(uint32 upper, uint32 lower, const JPH::Vec3
 									 const JPH::Vec3 lower_direction, const JPH::Vec3 hinge, JPH::Quat& out_upper,
 									 JPH::Quat& out_lower) const
 {
-	const BodyInfo& upper_body = mBodies[upper];
-	const BodyInfo& lower_body = mBodies[lower];
+	const RDSegmentInfo& upper_body = mSegments[upper];
+	const RDSegmentInfo& lower_body = mSegments[lower];
 
 	out_upper = FrameRotation(upper_body.LocalAxis, lower_body.ParentHingeLocal, upper_direction, hinge);
 	out_lower = FrameRotation(lower_body.LocalAxis, lower_body.HingeLocal, lower_direction, hinge);
 }
 
+JPH::Quat Ragdoll::LevelFoot(uint32 body_index, const JPH::Quat& relative) const
+{
+	const RDSegmentInfo& info = mSegments[body_index];
+	const JPH::Quat parent = mSegmentStates[info.ParentBody].Orientation;
+	const JPH::Quat foot = (parent * relative).Normalized();
+
+	// The collider is the foot box, so its up axis has to face up for the sole to lie flat on the ground
+	const JPH::Vec3 box_up = (foot * info.BoxRotation) * JPH::Vec3::sAxisY();
+	const JPH::Quat level = JPH::Quat::sFromTo(box_up, GravityFrame::FromPhysics().Up);
+
+	return RelativeRotation(parent, (level * foot).Normalized());
+}
+
 void Ragdoll::ApplyMotor(uint32 body_index)
 {
-	const BodyInfo& info = mBodies[body_index];
+	const RDSegmentInfo& info = mSegments[body_index];
 
 	if (!mbHasMotors || info.ParentBody < 0) {
 		return;
 	}
 
-	const BodyTarget& target = mTargets[body_index];
+	const RDSegmentTarget& target = mSegmentTargets[body_index];
 	JPH::SwingTwistConstraint* joint = GetJoint(body_index);
 
 	const MotorOverride& motor_override = mMotorOverrides[body_index];
@@ -236,10 +249,10 @@ void Ragdoll::ApplyMotor(uint32 body_index)
 	float32 inertia = motor_override.Inertia;
 
 	if (inertia <= 0.0f && motor_override.bSupported) {
-		inertia = GetSupportedInertia(body_index, mStates[body_index].Origin);
+		inertia = GetSupportedInertia(body_index, mSegmentStates[body_index].Origin);
 	}
 	else if (inertia <= 0.0f) {
-		inertia = GetSubtreeInertia(body_index, mStates[body_index].Origin);
+		inertia = GetSubtreeInertia(body_index, mSegmentStates[body_index].Origin);
 	}
 
 	const JPH::SpringSettings spring = MakeSpring(inertia, omega, info.Muscle.Damping);
@@ -259,7 +272,7 @@ void Ragdoll::ApplyMotor(uint32 body_index)
 	JPH::Quat joint_target = motor_override.Target;
 
 	if (motor_override.Mode != eMotorOverride::Target) {
-		const BodyTarget& parent_target = mTargets[info.ParentBody];
+		const RDSegmentTarget& parent_target = mSegmentTargets[info.ParentBody];
 		const JPH::Quat parent_inverse = parent_target.Orientation.Conjugated();
 		const JPH::Vec3 relative_velocity = parent_inverse * (target.AngularVelocity - parent_target.AngularVelocity);
 		const float32 lead = GetLeadTime(info.Muscle.Damping, omega);
@@ -284,14 +297,20 @@ void Ragdoll::ApplyMotor(uint32 body_index)
 		joint_target = joint_target.SLERP(layer.Pose, layer.Weight);
 	}
 
-	joint->SetTargetOrientationBS((joint_target * layer.Offset).Normalized());
+	JPH::Quat relative_target = (joint_target * layer.Offset).Normalized();
+
+	if (info.bFoot) {
+		relative_target = LevelFoot(body_index, relative_target);
+	}
+
+	joint->SetTargetOrientationBS(relative_target);
 }
 
 void Ragdoll::ApplyGravityCompensation(JPH::BodyInterface& body_interface, const JPH::Vec3 gravity)
 {
-	for (uint32 i = 1; i < mBodies.Size; i++) {
-		const BodyInfo& info = mBodies[i];
-		const BodyState& state = mStates[i];
+	for (uint32 i = 1; i < mSegments.Size; i++) {
+		const RDSegmentInfo& info = mSegments[i];
+		const RDSegmentState& state = mSegmentStates[i];
 
 		if (info.Mode != eRagdollBodyMode::Powered || mMotorOverrides[i].bNoGravityComp) {
 			continue;
@@ -310,7 +329,7 @@ void Ragdoll::ApplyGravityCompensation(JPH::BodyInterface& body_interface, const
 
 		body_interface.AddTorque(body_id, -gravity_torque);
 
-		if (mBodies[info.ParentBody].Mode != eRagdollBodyMode::Kinematic) {
+		if (mSegments[info.ParentBody].Mode != eRagdollBodyMode::Kinematic) {
 			body_interface.AddTorque(GetBodyID(info.ParentBody), gravity_torque);
 		}
 	}
@@ -319,7 +338,7 @@ void Ragdoll::ApplyGravityCompensation(JPH::BodyInterface& body_interface, const
 void Ragdoll::ApplyRootAssist(JPH::BodyInterface& body_interface, const JPH::Vec3 gravity)
 {
 	const bool is_active = (mpRootAssist != nullptr) && (mRootAssist > 0.0f) && !mbBalancing &&
-						   (mBodies[0].Mode == eRagdollBodyMode::Powered);
+						   (mSegments[0].Mode == eRagdollBodyMode::Powered);
 
 	if (mpRootAssist != nullptr) {
 		mpRootAssist->SetEnabled(is_active);
@@ -329,8 +348,8 @@ void Ragdoll::ApplyRootAssist(JPH::BodyInterface& body_interface, const JPH::Vec
 		return;
 	}
 
-	const BodyTarget& target = mTargets[0];
-	const BodyState& root = mStates[0];
+	const RDSegmentTarget& target = mSegmentTargets[0];
+	const RDSegmentState& root = mSegmentStates[0];
 
 	const float32 total_mass = root.SubtreeMass;
 	const JPH::Vec3 center_of_mass = root.SubtreeMoment / total_mass;
@@ -376,7 +395,7 @@ void Ragdoll::ClearMotorOverrides()
 
 float32 Ragdoll::GetMotorTorqueFraction(uint32 body_index) const
 {
-	const BodyInfo& info = mBodies[body_index];
+	const RDSegmentInfo& info = mSegments[body_index];
 
 	if (!mbHasMotors || info.ParentBody < 0) {
 		return 0.0f;

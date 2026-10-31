@@ -91,7 +91,7 @@ private:
 
 	const RagdollRig* mpRig = nullptr;
 	BehaviourContext mContext;
-	SizedArray<Ragdoll::BodyState> mSamples;
+	SizedArray<RDSegmentState> mSamples;
 	BehaviourOutput mOutput;
 
 	/// The mixed pose layers, copied into the ragdoll by Apply (GravityScale comes from mMixGravity)

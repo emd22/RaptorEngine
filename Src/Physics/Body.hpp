@@ -19,7 +19,7 @@ struct BodyProps
 {
 public:
 	float32 ConvexRadius = 0.001f;
-	float32 Friction = 0.2f;
+	float32 Friction = 0.7f;
 	float32 Restitution = 0.1f;
 
 	/**
