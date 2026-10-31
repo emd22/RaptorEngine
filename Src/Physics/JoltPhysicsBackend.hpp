@@ -186,12 +186,17 @@ FX_FORCE_INLINE uint32 GetSerial(uint64 user_data) { return static_cast<uint32>(
 struct RagdollContact
 {
 	JPH::BodyID Body {};
+
 	Vec3f Point = Vec3f::sZero;
 	Vec3f Normal = Vec3f::sZero;
+
 	float32 Speed = 0.0f;
+
 	float32 OtherSpeed = 0.0f;
 	float32 OtherMass = 0.0f;
+
 	bool bOtherStatic = false;
+
 	uint32 RagdollSerial = 0;
 
 	FX_FORCE_INLINE bool IsStruck(float32 min_speed) const { return Speed >= min_speed && OtherSpeed >= min_speed; }
@@ -559,10 +564,7 @@ public:
 	FX_FORCE_INLINE uint32 GetLastStepCount() const { return mLastStepCount; }
 
 	FX_FORCE_INLINE void ClearBodyGroundContacts() { mContactListener.ClearBodyGroundContacts(); }
-	FX_FORCE_INLINE uint32 GetGroundContactGeneration() const
-	{
-		return mContactListener.GetGroundContactGeneration();
-	}
+	FX_FORCE_INLINE uint32 GetGroundContactGeneration() const { return mContactListener.GetGroundContactGeneration(); }
 	FX_FORCE_INLINE void GetBodyGroundContact(JPH::BodyID body_id, BodyGroundContact& out_contact) const
 	{
 		mContactListener.GetBodyGroundContact(body_id, out_contact);

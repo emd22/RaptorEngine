@@ -61,10 +61,10 @@ struct RDSegmentInfo
 
 	int32 ParentBody = -1;
 
-	eRagdollBodyPart Part = eRagdollBodyPart::Torso;
+	eRDBodyPart Part = eRDBodyPart::Torso;
 	eRagdollBodyMode Mode = eRagdollBodyMode::Limp;
 
-	RagdollMuscle Muscle;
+	RDMuscle Muscle;
 
 	float32 Length = 0.0f;
 	float32 Radius = 0.0f;
@@ -155,7 +155,7 @@ public:
 	Ragdoll(const Ragdoll&) = delete;
 	Ragdoll& operator=(const Ragdoll&) = delete;
 
-	bool Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_matrix, const RagdollDef& def);
+	bool Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_matrix, const RDDefinition& def);
 
 	static JPH::ObjectLayer GetModeLayer(eRagdollBodyMode mode);
 
@@ -205,7 +205,7 @@ public:
 	bool GetBodyGroundContact(uint32 body_index, BodyGroundContact& out_contact) const;
 	bool IsBodyOnGround(uint32 body_index, const JPH::Vec3 up, float32 min_up) const;
 	static bool IsSupportNormal(const BodyGroundContact& contact, const JPH::Vec3 up, float32 min_up);
-	eRagdollBodyPart GetBodyPart(uint32 body_index) const;
+	eRDBodyPart GetBodyPart(uint32 body_index) const;
 
 	void SampleSegment(JPH::BodyInterface& body_interface, uint32 body_index, RDSegmentState& out_state) const;
 	bool GetMassAverage(const SizedArray<RDSegmentState>& states, JPH::Vec3& out_center, JPH::Vec3& out_velocity) const;
@@ -265,7 +265,7 @@ private:
 	void FindRigLimbs(uint32& out_arm_count, uint32& out_leg_count);
 	bool InitRigFeet(const RagdollMath::GravityFrame& frame);
 	void InitRigSides(const RagdollMath::GravityFrame& frame, uint32 arm_count, uint32 leg_count);
-	int32 FindChildBody(uint32 parent, eRagdollBodyPart part) const;
+	int32 FindChildBody(uint32 parent, eRDBodyPart part) const;
 	bool FindLimbChain(uint32 root, uint32& out_middle, uint32& out_end) const;
 
 	void MoveKinematicBodies(JPH::BodyInterface& body_interface, float32 fraction, float32 delta_time);

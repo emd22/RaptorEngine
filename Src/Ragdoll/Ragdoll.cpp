@@ -370,10 +370,10 @@ float32 Ragdoll::GetBodyMass(uint32 body_index) const
 	return mSegments[body_index].Mass;
 }
 
-eRagdollBodyPart Ragdoll::GetBodyPart(uint32 body_index) const
+eRDBodyPart Ragdoll::GetBodyPart(uint32 body_index) const
 {
 	if (body_index >= mSegments.Size) {
-		return eRagdollBodyPart::Torso;
+		return eRDBodyPart::Torso;
 	}
 
 	return mSegments[body_index].Part;

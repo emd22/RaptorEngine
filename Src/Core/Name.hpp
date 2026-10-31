@@ -8,7 +8,7 @@ namespace fx {
 class Name
 {
 public:
-	Name() = default;
+	constexpr Name() = default;
 	Name(const char* name) : mName(name), mHash(HashStr32(name)) {}
 	Name(const std::string& name) : mName(name), mHash(HashStr32(name.c_str())) {}
 	Name(const String& name) : mName(name), mHash(HashStr32(name.CStr())) {}
@@ -46,7 +46,8 @@ public:
 		return *this;
 	}
 
-	bool operator==(Hash32 hash) const { return mHash == hash; }
+	FX_FORCE_INLINE bool operator==(Hash32 hash) const { return mHash == hash; }
+	FX_FORCE_INLINE bool operator==(const Name& other) const { return (mHash == other.mHash); }
 
 	void Clear()
 	{
@@ -54,9 +55,24 @@ public:
 		mHash = HashNull32;
 	}
 
+	bool IsEmpty() const { return (mName.IsEmpty()); }
+
+	~Name() = default;
+
 private:
-	String mName;
+	String mName {};
 	Hash32 mHash = HashNull32;
 };
 
 } // namespace fx
+
+template <>
+struct std::formatter<fx::Name>
+{
+	constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+	auto format(const fx::Name& name, std::format_context& ctx) const
+	{
+		return std::format_to(ctx.out(), "{}", name.Get().CStr());
+	}
+};

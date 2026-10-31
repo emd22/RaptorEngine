@@ -15,98 +15,115 @@ constexpr const char* scHumanoidPath = "RaptorData/Data/Demo/Models/ragdoll2/hum
 constexpr float32 scDefaultTotalMass = 75.0f;
 constexpr float32 scMassToleranceKg = 2.0f;
 
-eRagdollJoint ParseJoint(const char* name, bool& out_ok)
+eRDJoint ParseJoint(const char* name, bool& out_ok)
 {
 	out_ok = true;
 
 	if (std::strcmp(name, "cone") == 0) {
-		return eRagdollJoint::Cone;
+		return eRDJoint::Cone;
 	}
 	if (std::strcmp(name, "hinge_forward") == 0) {
-		return eRagdollJoint::HingeForward;
+		return eRDJoint::HingeForward;
 	}
 	if (std::strcmp(name, "hinge_backward") == 0) {
-		return eRagdollJoint::HingeBackward;
+		return eRDJoint::HingeBackward;
 	}
 
 	out_ok = false;
-	return eRagdollJoint::Cone;
+	return eRDJoint::Cone;
 }
 
-eRagdollBodyPart ParseBodyPart(const char* name, bool& out_ok)
+eRDBodyPart ParseBodyPart(const char* name, bool& out_ok)
 {
 	out_ok = true;
 
 	if (std::strcmp(name, "torso") == 0) {
-		return eRagdollBodyPart::Torso;
+		return eRDBodyPart::Torso;
 	}
 	if (std::strcmp(name, "head") == 0) {
-		return eRagdollBodyPart::Head;
+		return eRDBodyPart::Head;
 	}
 	if (std::strcmp(name, "arm") == 0) {
-		return eRagdollBodyPart::Arm;
+		return eRDBodyPart::Arm;
 	}
 	if (std::strcmp(name, "leg") == 0) {
-		return eRagdollBodyPart::Leg;
+		return eRDBodyPart::Leg;
 	}
 
 	out_ok = false;
-	return eRagdollBodyPart::Torso;
+	return eRDBodyPart::Torso;
 }
 
-bool ReadBody(const ConfigEntry& entry, uint32 index, RagdollBodyDef& out_body)
+std::unique_ptr<RDDefaultSegment> ReadSegment(const ConfigEntry& entry, uint32 index)
 {
 	const char* bone = entry.GetMemberValue<const char*>(HashStr32("bone"), nullptr);
 	const char* end_bone = entry.GetMemberValue<const char*>(HashStr32("end"), nullptr);
 
 	if (bone == nullptr || end_bone == nullptr) {
 		LogError(LC_PHYSICS, "Ragdoll body {} needs 'bone' and 'end'", index);
-		return false;
+		return nullptr;
 	}
 
 	const char* joint_name = entry.GetMemberValue<const char*>(HashStr32("joint"), "cone");
 	bool joint_ok = false;
-	const eRagdollJoint joint = ParseJoint(joint_name, joint_ok);
+	const eRDJoint joint = ParseJoint(joint_name, joint_ok);
 
 	if (!joint_ok) {
 		LogError(LC_PHYSICS, "Ragdoll body {} ('{}') has unknown joint '{}'", index, bone, joint_name);
-		return false;
+		return nullptr;
 	}
 
 	const char* part_name = entry.GetMemberValue<const char*>(HashStr32("part"), "torso");
 	bool part_ok = false;
-	const eRagdollBodyPart part = ParseBodyPart(part_name, part_ok);
+	const eRDBodyPart part = ParseBodyPart(part_name, part_ok);
 
 	if (!part_ok) {
 		LogError(LC_PHYSICS, "Ragdoll body {} ('{}') has unknown part '{}'", index, bone, part_name);
-		return false;
+		return nullptr;
 	}
 
-	out_body.Bone = bone;
-	out_body.EndBone = end_bone;
-	out_body.ExtraLength = entry.GetMemberValue<float32>(HashStr32("extra_length"), 0.0f);
-	out_body.Radius = entry.GetMemberValue<float32>(HashStr32("radius"), out_body.Radius);
-	out_body.SwingDegrees = entry.GetMemberValue<float32>(HashStr32("swing"), 0.0f);
-	out_body.TwistDegrees = entry.GetMemberValue<float32>(HashStr32("twist"), 0.0f);
-	out_body.FlexDegrees = entry.GetMemberValue<float32>(HashStr32("flex"), 0.0f);
-	out_body.MassFraction = entry.GetMemberValue<float32>(HashStr32("mass_fraction"), 0.0f);
-	out_body.Joint = joint;
-	out_body.Part = part;
-	out_body.bAnchor = entry.GetMemberValue<int32>(HashStr32("anchor"), 0) != 0;
-	out_body.bFoot = entry.GetMemberValue<int32>(HashStr32("foot"), 0) != 0;
-	out_body.FootWidth = entry.GetMemberValue<float32>(HashStr32("width"), 0.0f);
-	out_body.HeelLength = entry.GetMemberValue<float32>(HashStr32("heel"), 0.0f);
-	out_body.Friction = entry.GetMemberValue<float32>(HashStr32("friction"), out_body.Friction);
-	out_body.Muscle.Stiffness = entry.GetMemberValue<float32>(HashStr32("stiffness"), out_body.Muscle.Stiffness);
-	out_body.Muscle.Damping = entry.GetMemberValue<float32>(HashStr32("damping"), out_body.Muscle.Damping);
-	out_body.Muscle.MaxTorque = entry.GetMemberValue<float32>(HashStr32("max_torque"), out_body.Muscle.MaxTorque);
+	const bool bIsFoot = entry.GetMemberValue<int32>(HashStr32("foot"), 0) != 0;
 
-	return true;
+	std::unique_ptr<RDDefaultSegment> segment;
+
+	if (bIsFoot) {
+		std::unique_ptr<RDFootSegment> foot = std::make_unique<RDFootSegment>();
+		foot->FootWidth = entry.GetMemberValue<float32>(HashStr32("width"), 0.0f);
+		foot->HeelLength = entry.GetMemberValue<float32>(HashStr32("heel"), 0.0f);
+		segment = std::move(foot);
+	}
+	else {
+		segment = std::make_unique<RDDefaultSegment>();
+	}
+
+	RDDefaultSegment& out = *segment;
+
+	out.StartBone = bone;
+	out.EndBone = end_bone;
+	out.ExtraLength = entry.GetMemberValue<float32>(HashStr32("extra_length"), 0.0f);
+	out.Radius = entry.GetMemberValue<float32>(HashStr32("radius"), out.Radius);
+	out.SwingDegrees = entry.GetMemberValue<float32>(HashStr32("swing"), 0.0f);
+	out.TwistDegrees = entry.GetMemberValue<float32>(HashStr32("twist"), 0.0f);
+	out.FlexDegrees = entry.GetMemberValue<float32>(HashStr32("flex"), 0.0f);
+	out.MassFraction = entry.GetMemberValue<float32>(HashStr32("mass_fraction"), 0.0f);
+	out.Joint = joint;
+	out.bAnchor = entry.GetMemberValue<int32>(HashStr32("anchor"), 0) != 0;
+	out.Friction = entry.GetMemberValue<float32>(HashStr32("friction"), out.Friction);
+	out.Muscle.Stiffness = entry.GetMemberValue<float32>(HashStr32("stiffness"), out.Muscle.Stiffness);
+	out.Muscle.Damping = entry.GetMemberValue<float32>(HashStr32("damping"), out.Muscle.Damping);
+	out.Muscle.MaxTorque = entry.GetMemberValue<float32>(HashStr32("max_torque"), out.Muscle.MaxTorque);
+
+	// A foot is always the Foot body part, whatever its part key says, since the constructor sets it
+	if (!bIsFoot) {
+		out.BodyPart = part;
+	}
+
+	return segment;
 }
 
 } // namespace
 
-bool LoadRagdollDef(const char* path, RagdollDef& out_def)
+bool RDLoadDefinition(const char* path, RDDefinition& out_def)
 {
 	ConfigFile config;
 	config.Load(path);
@@ -123,25 +140,25 @@ bool LoadRagdollDef(const char* path, RagdollDef& out_def)
 		return false;
 	}
 
-	RagdollDef def;
+	RDDefinition def;
 	def.TotalMass = config.GetEntryValue<float32>(HashStr32("total_mass"), scDefaultTotalMass);
 
-	def.Bodies.InitCapacity(bodies->Members.Size());
+	def.BodySegments.InitCapacity(bodies->Members.Size());
 
 	float32 fraction_sum = 0.0f;
 
 	for (const ConfigEntry& entry : bodies->Members) {
-		RagdollBodyDef body;
+		std::unique_ptr<RDDefaultSegment> segment = ReadSegment(entry, static_cast<uint32>(def.BodySegments.Size));
 
-		if (!ReadBody(entry, static_cast<uint32>(def.Bodies.Size), body)) {
+		if (segment == nullptr) {
 			return false;
 		}
 
-		fraction_sum += body.MassFraction;
-		def.Bodies.Insert(body);
+		fraction_sum += segment->MassFraction;
+		def.BodySegments.Insert(std::move(segment));
 	}
 
-	if (def.Bodies.IsEmpty()) {
+	if (def.BodySegments.IsEmpty()) {
 		LogError(LC_PHYSICS, "Ragdoll config '{}' has no bodies", path);
 		return false;
 	}
@@ -154,16 +171,17 @@ bool LoadRagdollDef(const char* path, RagdollDef& out_def)
 		return false;
 	}
 
-	LogInfo(LC_PHYSICS, "Ragdoll config '{}': {} bodies, mass table {:.3f} kg", path, def.Bodies.Size, table_mass);
+	LogInfo(LC_PHYSICS, "Ragdoll config '{}': {} bodies, mass table {:.3f} kg", path, def.BodySegments.Size,
+			table_mass);
 
 	out_def = std::move(def);
 	return true;
 }
 
-const RagdollDef* GetHumanoidRagdollDef()
+const RDDefinition* RDGetHumanoidDefinition()
 {
-	static RagdollDef sDef;
-	static const bool sbLoaded = LoadRagdollDef(scHumanoidPath, sDef);
+	static RDDefinition sDef;
+	static const bool sbLoaded = RDLoadDefinition(scHumanoidPath, sDef);
 
 	if (!sbLoaded) {
 		return nullptr;

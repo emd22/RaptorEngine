@@ -298,7 +298,7 @@ public:
 	uint32 mLastPoseHash = 0;
 
 	Ref<Skeleton> pAttachSkeleton { nullptr };
-	BoneId AttachBone = BoneNull;
+	BoneId AttachBone = scBoneNull;
 	Mat4f AttachOffset = Mat4f::scIdentity;
 	uint32 mLastAttachPoseHash = 0;
 	bool mbAttachPosed = false;

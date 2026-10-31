@@ -1,64 +1,91 @@
 #pragma once
 
+#include <Core/Name.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
+#include <memory>
 
 namespace fx::physics {
 
-enum class eRagdollJoint : uint8
+enum class eRDJoint : uint8
 {
 	Cone,
 	HingeForward,
 	HingeBackward,
 };
 
-enum class eRagdollBodyPart : uint8
+enum class eRDBodyPart : uint8
 {
 	Torso,
 	Head,
 	Arm,
 	Leg,
+	Foot,
 };
 
-struct RagdollMuscle
+struct RDMuscle
 {
 	float32 Stiffness = 10.0f;
 	float32 Damping = 1.0f;
 	float32 MaxTorque = 150.0f;
 };
 
-struct RagdollBodyDef
-{
-	String Bone;
-	String EndBone;
 
-	float32 ExtraLength = 0.0f;
+/////////////////////////////////////
+// Segment Types
+/////////////////////////////////////
+
+
+struct RDDefaultSegment
+{
+	virtual ~RDDefaultSegment() = default;
+
+	Name StartBone;
+	Name EndBone;
+
 	float32 Radius = 0.05f;
 	float32 SwingDegrees = 0.0f;
 	float32 TwistDegrees = 0.0f;
 	float32 FlexDegrees = 0.0f;
+
 	float32 MassFraction = 0.0f;
-	float32 FootWidth = 0.0f;
-	float32 HeelLength = 0.0f;
 	float32 Friction = 0.8f;
 
-	eRagdollJoint Joint = eRagdollJoint::Cone;
-	eRagdollBodyPart Part = eRagdollBodyPart::Torso;
+	/// Additional length added to the body segment (fingers, toes, neck, etc.)
+	float32 ExtraLength = 0.0f;
+
+	eRDJoint Joint = eRDJoint::Cone;
+	eRDBodyPart BodyPart = eRDBodyPart::Torso;
 
 	bool bAnchor = false;
-	bool bFoot = false;
 
-	RagdollMuscle Muscle;
+	RDMuscle Muscle;
 };
 
-struct RagdollDef
+struct RDFootSegment : public RDDefaultSegment
+{
+public:
+	RDFootSegment() { this->BodyPart = eRDBodyPart::Foot; }
+
+public:
+	float32 FootWidth = 0.0f;
+	float32 HeelLength = 0.0f;
+};
+
+
+/////////////////////////////////////
+// Ragdoll Definitions
+/////////////////////////////////////
+
+
+struct RDDefinition
 {
 	float32 TotalMass = 75.0f;
-	SizedArray<RagdollBodyDef> Bodies;
+	SizedArray<std::unique_ptr<RDDefaultSegment>> BodySegments;
 };
 
-bool LoadRagdollDef(const char* path, RagdollDef& out_def);
-const RagdollDef* GetHumanoidRagdollDef();
+bool RDLoadDefinition(const char* path, RDDefinition& out_def);
+const RDDefinition* RDGetHumanoidDefinition();
 
 } // namespace fx::physics

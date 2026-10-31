@@ -116,7 +116,7 @@ public:
 	TSRef<Object> pArmsObject { nullptr };
 	TSRef<Object> pHelmetObject { nullptr };
 
-	BoneId RHandBone = BoneNull;
+	BoneId RHandBone = scBoneNull;
 
 	double DeltaTime = 1.0f / 60.0f;
 

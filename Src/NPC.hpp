@@ -55,7 +55,7 @@ struct NPCHit
 	float32 Damage = 0.0f;
 };
 
-/// Settings shared by every NPC and ragdoll dummy, driven by the b_npc_* and b_ragdoll_* cvars
+/// Settings shared by every NPC and limp ragdoll
 struct NPCTuning
 {
 	float32 Strength = 1.0f;
@@ -67,25 +67,22 @@ struct NPCTuning
 	float32 SafeImpactSpeed = 6.0f;
 	float32 BloodSpeed = 3.5f;
 
-	/// Hits on a standing NPC also shove everything above its feet, so the centre of mass moves and balance has to
-	/// step. The hit impulse times HitShoveScale gives the speed change, kept between MinShoveSpeed and MaxShoveSpeed
-	/// (m/s)
 	float32 HitShoveScale = 10.0f;
 	float32 MinShoveSpeed = 0.3f;
 	float32 MaxShoveSpeed = 1.5f;
-	/// Least a shove adds while the body is already moving its way, as a fraction of a full shove
+
 	float32 RepeatShoveFraction = 0.3f;
-	/// Fastest drift balance lets a shoved NPC stagger at, however many hits land (m/s)
 	float32 MaxStaggerSpeed = 1.1f;
 
-	/// Most NPCs with powered ragdolls at once; the rest stay kinematic. 0 is no limit
-	uint32 MaxActive = 4;
-	/// NPCs further than this from the camera never get powered ragdolls (m). 0 is no limit
+	/// The maximum amount of powered ragdolls at a time. No limit if the value is 0.
+	uint32 MaxActive = 10;
+	/// The distance an NPC has to be within to have a powered ragdoll. Ragdolls will not be disabled based on distance
+	/// if the value is 0.
 	float32 ActiveDistance = 50.0f;
 
-	/// The player walking into an animated NPC faster than this pushes it (m/s)
+	/// The speed you need to be at (m/s) to push an NPC.
 	float32 BumpSpeed = 1.0f;
-	/// Push impulse per m/s of closing speed (N s per m/s), capped at MaxBumpImpulse
+
 	float32 BumpImpulse = 4.0f;
 	float32 MaxBumpImpulse = 40.0f;
 
@@ -152,7 +149,7 @@ public:
 
 	void Update(float32 delta_time, bool draw_debug);
 
-	using eBodyPart = physics::eRagdollBodyPart;
+	using eBodyPart = physics::eRDBodyPart;
 
 	void Damage(float32 amount);
 	void Damage(float32 amount, JPH::BodyID body_id);

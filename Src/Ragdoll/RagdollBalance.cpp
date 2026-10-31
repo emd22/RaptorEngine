@@ -349,7 +349,9 @@ void RagdollBalance::GatherFeet(Ragdoll& ragdoll, float32 delta_time, bool conta
 bool RagdollBalance::IsAnyBodyOnGround(Ragdoll& ragdoll) const
 {
 	for (uint32 i = 0; i < ragdoll.mSegments.Size; i++) {
-		if (ragdoll.mSegments[i].Part == eRagdollBodyPart::Leg && i != mLegs[0].Thigh && i != mLegs[1].Thigh) {
+		const eRDBodyPart part = ragdoll.mSegments[i].Part;
+
+		if ((part == eRDBodyPart::Leg || part == eRDBodyPart::Foot) && i != mLegs[0].Thigh && i != mLegs[1].Thigh) {
 			continue;
 		}
 

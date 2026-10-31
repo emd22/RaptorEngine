@@ -75,7 +75,7 @@ bool RagdollEntity::Clone(const Object* model, const String& name)
 bool RagdollEntity::CreateRagdoll()
 {
 	Object* skinned = GetSkinned();
-	const physics::RagdollDef* ragdoll_def = physics::GetHumanoidRagdollDef();
+	const physics::RDDefinition* ragdoll_def = physics::RDGetHumanoidDefinition();
 
 	if (skinned == nullptr || ragdoll_def == nullptr) {
 		return false;
@@ -572,6 +572,7 @@ float32 NPC::GetDamageScale(JPH::BodyID body_id) const
 		return HeadDamageScale;
 	case eBodyPart::Arm:
 	case eBodyPart::Leg:
+	case eBodyPart::Foot:
 		return LimbDamageScale;
 	case eBodyPart::Torso:
 		return TorsoDamageScale;

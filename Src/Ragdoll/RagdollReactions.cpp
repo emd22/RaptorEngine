@@ -380,7 +380,7 @@ void ShotReactionBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEv
 	const Vec3f push = ctx.Horizontal(event.Direction).SafeNormalize(Vec3f::sZero);
 	mFlinchPitch = push.Dot(ctx.Horizontal(ctx.Forward));
 
-	if (ctx.pRagdoll->GetBodyPart(body) != eRagdollBodyPart::Head) {
+	if (ctx.pRagdoll->GetBodyPart(body) != eRDBodyPart::Head) {
 		mLookBody = static_cast<int32>(body);
 		mLookLocal = ctx.ToBodyLocal(body, event.Point);
 		mLookTime = 0.0f;
@@ -434,7 +434,7 @@ void ShotReactionBehaviour::StartGrab(const BehaviourContext& ctx, const Ragdoll
 {
 	const uint32 body = static_cast<uint32>(event.Body);
 
-	if (event.Damage <= 0.0f || ctx.pRagdoll->GetBodyPart(body) == eRagdollBodyPart::Head || GrabTime <= 0.0f) {
+	if (event.Damage <= 0.0f || ctx.pRagdoll->GetBodyPart(body) == eRDBodyPart::Head || GrabTime <= 0.0f) {
 		return;
 	}
 
@@ -558,7 +558,8 @@ void ShotReactionBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOut
 	const Vec3f wound = ctx.FromBodyLocal(mWound.Body, mWound.LocalPoint);
 	const Vec3f normal = ctx.ToBodyDirection(mWound.Body, mWound.LocalNormal);
 
-	// The grabbing arm eases its strength down as the hand takes hold, so the grab steadies the body rather than pulling it over
+	// The grabbing arm eases its strength down as the hand takes hold, so the grab steadies the body rather than
+	// pulling it over
 	const float32 grip = MathUtil::SmoothStep(ramp_in) * ramp_out;
 	const RagdollRigArm& grab_arm = rig.Arms[mWound.Arm];
 	const float32 ease = 1.0f - (1.0f - GrabStrength) * grip;
@@ -1008,8 +1009,7 @@ void DyingBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent& ev
 		return;
 	}
 
-	mbHeadShot = event.Body >= 0 &&
-				 ctx.pRagdoll->GetBodyPart(static_cast<uint32>(event.Body)) == eRagdollBodyPart::Head;
+	mbHeadShot = event.Body >= 0 && ctx.pRagdoll->GetBodyPart(static_cast<uint32>(event.Body)) == eRDBodyPart::Head;
 
 	if (mbHeadShot) {
 		mDuration = HeadTime;

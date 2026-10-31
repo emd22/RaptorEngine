@@ -29,6 +29,7 @@ const Color scPartColors[] = {
 	Color::FromRGBA(255, 60, 60, 255),
 	Color::FromRGBA(70, 170, 255, 255),
 	Color::FromRGBA(80, 230, 90, 255),
+	Color::FromRGBA(80, 230, 90, 255),
 };
 const Color scLinkColor = Color::FromRGBA(255, 220, 60, 255);
 const Color scVelocityColor = Color::FromRGBA(255, 70, 220, 255);

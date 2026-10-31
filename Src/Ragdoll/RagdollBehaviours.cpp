@@ -172,11 +172,10 @@ void RagdollBehaviours::Sense(Ragdoll& ragdoll, float32 delta_time)
 		body.bGround = body.bContact && Ragdoll::IsSupportNormal(contact, frame.Up, scGroundNormalUp);
 
 		any_contact = any_contact || body.bContact;
-		const eRagdollBodyPart part = ragdoll.GetBodyPart(i);
+		const eRDBodyPart part = ragdoll.GetBodyPart(i);
 
 		feet_supported = feet_supported || (ragdoll.IsFoot(i) && body.bGround);
-		body_on_ground = body_on_ground ||
-						 (body.bGround && (part == eRagdollBodyPart::Torso || part == eRagdollBodyPart::Head));
+		body_on_ground = body_on_ground || (body.bGround && (part == eRDBodyPart::Torso || part == eRDBodyPart::Head));
 	}
 
 	JPH::Vec3 center_of_mass;

@@ -86,6 +86,13 @@ struct Schema
 		}
 	}
 
+	void ReadName(const ConfigEntry& table, const String& table_path, const char* key, Name& out, bool required = false)
+	{
+		if (const ConfigEntry* entry = GetString(table, table_path, key, required)) {
+			out = entry->Get<const char*>();
+		}
+	}
+
 	void ReadFloat(const ConfigEntry& table, const String& table_path, const char* key, float32& out)
 	{
 		const ConfigEntry* entry = Get(table, table_path, key, false);
@@ -232,7 +239,7 @@ struct Schema
 
 	void ReadMaterial(const ConfigEntry& table, const String& table_path, RxMaterialDesc& out)
 	{
-		out.Name = table.Name.Get().CStr();
+		out.MaterialName = table.Name.Get().CStr();
 
 		ReadString(table, table_path, "shader", out.Shader, true);
 
@@ -327,13 +334,13 @@ struct Schema
 
 	void ReadClip(const ConfigEntry& table, const String& table_path, RxClipDesc& out)
 	{
-		out.Name = table.Name.Get().CStr();
+		out.ClipName = table.Name.Get().CStr();
 
 		ReadFileRef(table, table_path, out.File);
 		ReadBool(table, table_path, "loop", out.bLoop);
 		ReadFloat(table, table_path, "speed", out.Speed);
 		ReadBool(table, table_path, "root_motion", out.bRootMotion);
-		ReadString(table, table_path, "root_joint", out.RootJoint);
+		ReadName(table, table_path, "root_joint", out.RootJoint);
 
 		const ConfigEntry* events = Get(table, table_path, "events", false);
 
@@ -436,7 +443,7 @@ const String* RxMaterialDesc::FindTexture(const StringView slot) const
 const RxMaterialDesc* RxModelDesc::FindMaterial(const StringView name) const
 {
 	for (const RxMaterialDesc& material : Materials) {
-		if (material.Name == name) {
+		if (material.MaterialName == name) {
 			return &material;
 		}
 	}
@@ -490,9 +497,9 @@ bool LoadRxModelDesc(const String& path, RxModelDesc& out_desc)
 			filename_start = (dot - stem_start);
 		}
 
-		out_desc.Name = file_name.SubStr(stem_start, filename_start);
+		out_desc.ModelName = file_name.SubStr(stem_start, filename_start);
 
-		schema.ReadString(*model, "model", "name", out_desc.Name);
+		schema.ReadString(*model, "model", "name", out_desc.ModelName);
 
 		if (const ConfigEntry* mesh = schema.GetTable(*model, "model", "mesh", true)) {
 			schema.ReadFileRef(*mesh, "model.mesh", out_desc.Mesh);
@@ -536,9 +543,9 @@ bool LoadRxModelDesc(const String& path, RxModelDesc& out_desc)
 						[&](const ConfigEntry& table, const std::string& table_path)
 						{
 							RxSocketDesc& socket = out_desc.Sockets.Emplace();
-							socket.Name = table.Name.Get().CStr();
+							socket.SocketName = table.Name.Get().CStr();
 
-							schema.ReadString(table, table_path, "joint", socket.Joint);
+							schema.ReadName(table, table_path, "joint", socket.JointName);
 							schema.ReadTransform(table, table_path, socket.Transform);
 						});
 
