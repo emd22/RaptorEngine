@@ -656,6 +656,20 @@ void NPC::EnterRagdoll()
 	mState = eState::Ragdoll;
 }
 
+// Temporary balance logging, tagged [npc-debug]: the chest's world-space lean from its thigh, in degrees
+static float32 GetChestLeanDegrees(physics::Ragdoll& ragdoll)
+{
+	const auto& rig = ragdoll.GetRig();
+	const Vec3f spine = ragdoll.GetBodyPosition(rig.Chest) - ragdoll.GetBodyPosition(rig.Legs[0].Thigh);
+	const float32 length = spine.Length();
+
+	if (length <= 1e-5f) {
+		return 0.0f;
+	}
+
+	return MathUtil::RadToDeg(std::acos(MathUtil::Clamp(spine.Dot(Vec3f::sUp) / length, -1.0f, 1.0f)));
+}
+
 void NPC::EnterFallen()
 {
 	physics::Ragdoll& ragdoll = mActor.Ragdoll;
@@ -735,6 +749,8 @@ void NPC::UpdateBalance(float32 delta_time)
 	}
 
 	if (!wants_balance) {
+		LogInfo(LC_PHYSICS, "[npc-debug] {} hand-back, lean={:.1f} deg, fall_progress={:.2f}, powered_time={:.2f} s, assist_fade={:.2f}",
+				GetName(), GetChestLeanDegrees(ragdoll), ragdoll.GetBalanceStatus().FallProgress, mPoweredTime, mAssistFade);
 		ReturnToAnimation();
 	}
 }
@@ -748,6 +764,8 @@ void NPC::ActivateBalance()
 	mActor.Ragdoll.SetBalancing(true);
 
 	if (mActor.Ragdoll.IsBalancing()) {
+		LogInfo(LC_PHYSICS, "[npc-debug] {} balance on, lean={:.1f} deg, powered_time={:.2f} s, assist_fade={:.2f}", GetName(),
+				GetChestLeanDegrees(mActor.Ragdoll), mPoweredTime, mAssistFade);
 		mAssistFade = 0.0f;
 	}
 }
@@ -1194,6 +1212,11 @@ void NPC::OnPush(const NPCPush& push)
 	if (length <= 1e-5f || !mBehaviours.IsValid() || !WakePhysics()) {
 		return;
 	}
+
+	LogInfo(LC_PHYSICS,
+			"[npc-debug] {} push {:.2f} N s, lean={:.1f} deg, balancing={}, powered={}, fall_progress={:.2f}, assist_fade={:.2f}, powered_time={:.2f} s",
+			GetName(), length, GetChestLeanDegrees(ragdoll), ragdoll.IsBalancing(), IsPowered(),
+			ragdoll.GetBalanceStatus().FallProgress, mAssistFade, mPoweredTime);
 
 	// Pushed at the chest, like a shove, rather than wherever the two capsules touched
 	const uint32 chest = ragdoll.GetRig().Chest;

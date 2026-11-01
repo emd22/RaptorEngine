@@ -259,6 +259,11 @@ private:
 	bool AddToPhysicsSystem(JPH::RagdollSettings& settings);
 	void CreateRootAssist(const JPH::Vec3 root_position);
 	void InitBodyArrays(uint32 joint_count);
+
+	/**
+	 * @brief
+	 * @returns The worst error for skinning
+	 */
 	float32 WriteInitialPose();
 
 	void BuildRig(const RagdollMath::GravityFrame& frame);

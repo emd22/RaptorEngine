@@ -43,10 +43,12 @@ struct BalanceAssist
 	/// Once released, a braking-only force up to this fraction of body weight still slows the body while it steps
 	float32 RecoveryForceFraction = 0.5f;
 	/// How long a shove's stagger drift lasts (s): longer keeps a shoved body stumbling for more steps
-	float32 StaggerDecayTime = 1.1f;
-	/// How long each shove leaves the body unassisted (s): balance holds back its centre of mass and stepping, so the
-	/// body stumbles before it recovers
+	float32 StaggerDecayTime = 0.75f;
+	/// How long each shove leaves the body unassisted (s)
 	float32 StumbleTime = 0.3f;
+	/// How long after a shove the body keeps still before its first catch step (s). The stagger lean eases in over it
+	/// too
+	float32 ReactionTime = 0.15f;
 };
 
 struct BalanceStatus
@@ -59,8 +61,12 @@ struct BalanceStatus
 	bool bCalm = false;
 	/// Horizontal distance from the support to the capture point (m), zero while the capture point is over the feet
 	JPH::Vec3 CaptureError = JPH::Vec3::sZero();
-	/// Fraction of the stumble left after a shove: 1 just after it, 0 once balance is back
+	/// Fraction of the stumble left after a shove
 	float32 Stumble = 0.0f;
+
+	/// Fraction of the reaction delay that has passed since the shove
+	float32 Reaction = 0.0f;
+
 	/// How far the body has got into a fall, 0 upright to 1 at the threshold where it counts as fallen
 	float32 FallProgress = 0.0f;
 };
@@ -87,6 +93,8 @@ class RagdollBalance
 private:
 	static constexpr float32 scContactHoldTime = 0.08f;
 	static constexpr float32 scSwingPress = 0.03f;
+	/// Stagger speed (m/s) above which a new shove finds the body already reacting
+	static constexpr float32 scReactionRestartSpeed = 0.25f;
 
 	struct Swing
 	{
@@ -117,9 +125,17 @@ public:
 	/// decays on its own while balancing and is cleared when balance stops
 	FX_FORCE_INLINE void SetStaggerVelocity(const JPH::Vec3 velocity)
 	{
+		const bool is_drifting = mStaggerVelocity.LengthSq() > scReactionRestartSpeed * scReactionRestartSpeed;
+
 		mStaggerVelocity = velocity;
 
 		if (velocity.LengthSq() > 0.0f) {
+			// A hit on a body already stumbling extends the stumble without restarting the reaction, so rapid hits
+			// still get stepped into
+			if (mStumbleTime <= 0.0f && !is_drifting) {
+				mReactionElapsed = 0.0f;
+			}
+
 			mStumbleTime = mAssist.StumbleTime;
 			mbStumbleStepped = false;
 		}
@@ -149,6 +165,7 @@ private:
 	float32 GetCaptureDistance(const BalanceLeg& leg) const;
 	float32 GetLandingCaptureError(uint32 stance_leg, const JPH::Vec3 landing) const;
 	JPH::Vec3 PlanLanding(uint32 swing_leg, uint32 stance_leg, float32 time_left) const;
+	JPH::Vec3 FitLanding(uint32 swing_leg, uint32 stance_leg, JPH::Vec3 landing) const;
 
 	void DriveStanceLegs(Ragdoll& ragdoll);
 	void DriveSwingLeg(Ragdoll& ragdoll);
@@ -202,6 +219,8 @@ private:
 	JPH::Vec3 mCapturePoint = JPH::Vec3::sZero();
 	JPH::Vec3 mStaggerVelocity = JPH::Vec3::sZero();
 	float32 mStumbleTime = 0.0f;
+	/// Time since the first shove of the current stumble (s)
+	float32 mReactionElapsed = 0.0f;
 	bool mbStumbleStepped = false;
 
 	uint32 mSupportCount = 0;

@@ -1078,7 +1078,7 @@ void RaptorEditor::SetView(eEditorView view)
 			ControlManager::ReleaseMouse();
 		}
 
-		if (view == eEditorView::Architect) {
+		if (view != eEditorView::Viewport) {
 			SetSimulating(false);
 		}
 

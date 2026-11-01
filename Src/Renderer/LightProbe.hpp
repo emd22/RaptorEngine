@@ -5,6 +5,7 @@
 #include <Core/Slice.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
+#include <Math/Float16.hpp>
 #include <Math/Vec3.hpp>
 #include <Renderer/Backend/Commands.hpp>
 #include <Renderer/Backend/GpuBuffer.hpp>
@@ -135,7 +136,7 @@ private:
 							 eImageFormat format, renderer::RawGpuBuffer& staging);
 
 	bool ReadBackProbe(uint32 batch_slot, uint32 probe_index);
-	void ProjectCapture(const uint16* const colors[scCaptureFaces], const float32* const depths[scCaptureFaces],
+	void ProjectCapture(const Float16* const colors[scCaptureFaces], const float32* const depths[scCaptureFaces],
 						ProbeSHData& out_sh, ProbeInfo& out_info) const;
 
 	void UploadToGpu(uint32 first_probe, uint32 count);
@@ -194,7 +195,7 @@ private:
 	ReflectionProbeData mReflectionProbes[Limits::MaxReflectionProbes] {};
 	uint32 mReflectionProbeCount = 0;
 	bool mbReflectionsBaked = false;
-	SizedArray<uint16> mReflectionTexels;
+	SizedArray<Float16> mReflectionTexels;
 
 	bool mbCaptureResourcesCreated = false;
 	renderer::RenderStage mCaptureStage;

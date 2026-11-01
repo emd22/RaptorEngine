@@ -75,7 +75,8 @@ std::unique_ptr<RDDefaultSegment> ReadSegment(const ConfigEntry& entry, uint32 i
 
 	const char* part_name = entry.GetMemberValue<const char*>(HashStr32("part"), "torso");
 	bool part_ok = false;
-	const eRDBodyPart part = ParseBodyPart(part_name, part_ok);
+
+	const eRDBodyPart body_part_type = ParseBodyPart(part_name, part_ok);
 
 	if (!part_ok) {
 		LogError(LC_PHYSICS, "Ragdoll body {} ('{}') has unknown part '{}'", index, bone, part_name);
@@ -87,13 +88,12 @@ std::unique_ptr<RDDefaultSegment> ReadSegment(const ConfigEntry& entry, uint32 i
 	std::unique_ptr<RDDefaultSegment> segment;
 
 	if (bIsFoot) {
-		std::unique_ptr<RDFootSegment> foot = std::make_unique<RDFootSegment>();
-		foot->FootWidth = entry.GetMemberValue<float32>(HashStr32("width"), 0.0f);
-		foot->HeelLength = entry.GetMemberValue<float32>(HashStr32("heel"), 0.0f);
-		segment = std::move(foot);
+		const float32 foot_width = entry.GetMemberValue<float32>(HashStr32("width"), 0.2f);
+		const float32 heel_length = entry.GetMemberValue<float32>(HashStr32("heel"), 0.2f);
+		segment = std::make_unique<RDFootSegment>(foot_width, heel_length);
 	}
 	else {
-		segment = std::make_unique<RDDefaultSegment>();
+		segment = std::make_unique<RDDefaultSegment>(body_part_type);
 	}
 
 	RDDefaultSegment& out = *segment;
@@ -113,9 +113,9 @@ std::unique_ptr<RDDefaultSegment> ReadSegment(const ConfigEntry& entry, uint32 i
 	out.Muscle.Damping = entry.GetMemberValue<float32>(HashStr32("damping"), out.Muscle.Damping);
 	out.Muscle.MaxTorque = entry.GetMemberValue<float32>(HashStr32("max_torque"), out.Muscle.MaxTorque);
 
-	// A foot is always the Foot body part, whatever its part key says, since the constructor sets it
+	// The RDFootSegment constructor sets the body part
 	if (!bIsFoot) {
-		out.BodyPart = part;
+		out.BodyPart = body_part_type;
 	}
 
 	return segment;

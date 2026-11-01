@@ -179,12 +179,12 @@ EditorFrame* RaptorEditor::CreateMainFrame(const char* title, const Vec2u& viewp
 
 	MoveToTopOfDisplay(mpMainFrame);
 
+#ifdef FX_PLATFORM_MACOS
+	// Show it without activating the app, so launching the editor (for example from automated tests) doesn't steal focus
+	mpMainFrame->ShowWithoutActivating();
+#else
 	mpMainFrame->Show();
 	mpMainFrame->Raise();
-
-#ifdef FX_PLATFORM_MACOS
-	// Bring window to front
-	platform::ActivateApp();
 #endif
 
 	mpMainFrame->ShowMode(mMode, mDataFilter, GetAvailableToolMask());

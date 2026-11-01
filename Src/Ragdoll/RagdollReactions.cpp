@@ -162,6 +162,8 @@ StaggerBehaviour::StaggerBehaviour() : RagdollBehaviour("stagger", 20.0f)
 	AddSetting("arm_spread", &ArmSpread);
 	AddSetting("spread_speed", &SpreadSpeed);
 	AddSetting("lean", &Lean);
+	AddSetting("lean_speed", &LeanSpeed);
+	AddSetting("head_stabilise", &HeadStabilise);
 }
 
 void StaggerBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent& event)
@@ -206,14 +208,23 @@ void StaggerBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& 
 
 	// The spine leans along the shove, so a shot from behind tips the body forward rather than back at the shooter
 	const Vec3f push = ctx.Horizontal(ctx.pRagdoll->GetStaggerVelocity());
-	const float32 lean = MathUtil::DegToRad(Lean) * ctx.pBalance->Stumble;
+	const float32 push_speed = push.Length();
+	float32 lean = MathUtil::DegToRad(Lean) * ctx.pBalance->Reaction;
 
-	if (push.Length() > 0.0f && lean > 0.0f) {
+	// Fades with the stagger drift, so the body stays tipped for as long as the shove is carrying it
+	if (LeanSpeed > 0.0f) {
+		lean *= MathUtil::Clamp(push_speed / LeanSpeed, 0.0f, 1.0f);
+	}
+
+	if (push_speed > 0.0f && lean > 0.0f) {
 		const Vec3f axis = ctx.Up.Cross(push);
 
 		for (uint32 i = 0; i < ctx.pRig->SpineCount; i++) {
 			out.AddWorldRotation(ctx, ctx.pRig->Spine[i], axis, lean / static_cast<float32>(ctx.pRig->SpineCount));
 		}
+
+		// The head turns back against the lean in part, so it stays closer to level while the body tips
+		out.AddWorldRotation(ctx, ctx.pRig->Neck, axis, -lean * HeadStabilise);
 	}
 
 	if (SpreadSpeed <= 0.0f) {

@@ -72,7 +72,7 @@ struct NPCTuning
 	float32 MaxShoveSpeed = 1.5f;
 
 	float32 RepeatShoveFraction = 0.3f;
-	float32 MaxStaggerSpeed = 1.1f;
+	float32 MaxStaggerSpeed = 0.8f;
 
 	/// The maximum amount of powered ragdolls at a time. No limit if the value is 0.
 	uint32 MaxActive = 10;

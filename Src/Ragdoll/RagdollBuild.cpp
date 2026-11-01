@@ -494,10 +494,7 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 	mpSkeleton = skeleton;
 	mWorldInverse = object_world_matrix.AffineInverse();
 
-	const float32 skinning_error = WriteInitialPose();
-
-	LogInfo(LC_PHYSICS, "Ragdoll: {} bodies, {:.3f} kg, rest pose skinning error {:.5f}", mSegments.Size,
-			frame.TotalMass, skinning_error);
+	WriteInitialPose();
 
 	return true;
 }
@@ -658,6 +655,7 @@ void Ragdoll::InitBodyArrays(uint32 joint_count)
 		mIsDriven[body.BoneIndex] = 1;
 	}
 }
+
 
 float32 Ragdoll::WriteInitialPose()
 {

@@ -39,8 +39,13 @@ struct RDMuscle
 
 struct RDDefaultSegment
 {
+public:
+	RDDefaultSegment() = default;
+	RDDefaultSegment(eRDBodyPart body_part) : BodyPart(body_part) {}
+
 	virtual ~RDDefaultSegment() = default;
 
+public:
 	Name StartBone;
 	Name EndBone;
 
@@ -66,7 +71,10 @@ struct RDDefaultSegment
 struct RDFootSegment : public RDDefaultSegment
 {
 public:
-	RDFootSegment() { this->BodyPart = eRDBodyPart::Foot; }
+	RDFootSegment(float32 foot_width, float32 heel_length) : FootWidth(foot_width), HeelLength(heel_length)
+	{
+		this->BodyPart = eRDBodyPart::Foot;
+	}
 
 public:
 	float32 FootWidth = 0.0f;

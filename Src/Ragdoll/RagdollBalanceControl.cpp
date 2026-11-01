@@ -14,7 +14,6 @@ using namespace RagdollMath;
 namespace {
 
 constexpr float32 scStancePress = 0.01f;
-constexpr float32 scStumblePushFraction = 0.2f;
 /// Torque per unit spin about vertical, as a fraction of body mass, so a spinning body settles in about a second
 constexpr float32 scYawDamping = 0.2f;
 /// Torque per unit spin on the chest, as a fraction of body mass, for every axis
@@ -22,8 +21,9 @@ constexpr float32 scTrunkSpinDamping = 0.02f;
 constexpr float32 scLiftStart = 0.003f;
 constexpr float32 scLiftRange = 0.015f;
 
-constexpr float32 scStanceHeightFraction = 0.97f;
-constexpr float32 scMinHipHeight = 0.25f;
+constexpr float32 scStanceHeightFraction = 0.93f;
+/// Lowest the hip sits, as a fraction of leg reach, when the foot is out of reach of the hip
+constexpr float32 scMinHipFraction = 0.5f;
 constexpr float32 scStanceFrequencyScale = 0.15f;
 constexpr float32 scMaxComShift = 0.12f;
 constexpr float32 scComShiftGain = 3.0f;
@@ -40,6 +40,10 @@ constexpr float32 scComFrequency = 2.0f;
 constexpr float32 scComDamping = 1.0f;
 /// Stagger speed (m/s) at which holding the centre of mass over the feet has fully given way to following the stagger
 constexpr float32 scStaggerHoldSpeed = 0.25f;
+/// Horizontal speed (m/s) of a loaded sole where the centre of mass assist starts to fade, and where it has fully
+/// stopped
+constexpr float32 scSlipStart = 0.1f;
+constexpr float32 scSlipEnd = 0.3f;
 
 JPH::Vec3 ClampLength(const JPH::Vec3 v, float32 max_length)
 {
@@ -94,7 +98,7 @@ void RagdollBalance::DriveStanceLegs(Ragdoll& ragdoll)
 		const float32 reach2 = reach * reach;
 		const float32 spread2 = spread * spread;
 
-		const float32 hip_height = std::sqrt(std::max(reach2 - spread2, reach2 * scMinHipHeight));
+		const float32 hip_height = std::max(std::sqrt(std::max(reach2 - spread2, 0.0f)), reach * scMinHipFraction);
 
 		pelvis_height = std::min(pelvis_height,
 								 leg.AnklePosition.Dot(mGroundFrame.Up) + hip_height - hip_offset.Dot(mGroundFrame.Up));
@@ -269,14 +273,6 @@ void RagdollBalance::ApplyTorsoControl(Ragdoll& ragdoll, JPH::BodyInterface& bod
 
 void RagdollBalance::ApplyCenterOfMassControl(Ragdoll& ragdoll, JPH::BodyInterface& body_interface)
 {
-	// Through the stumble the centre of mass is pushed back along the shove, and the hold and braking wait for recovery
-	if (mStumbleTime > 0.0f) {
-		const JPH::Vec3 back = mGroundFrame.Horizontal(mStaggerVelocity).NormalizedOr(JPH::Vec3::sZero());
-		body_interface.AddForce(ragdoll.GetBodyID(0),
-								back * (scStumblePushFraction * ragdoll.GetTotalMass() * mGroundFrame.Gravity));
-		return;
-	}
-
 	uint32 loaded[2];
 	uint32 loaded_count = 0;
 
@@ -290,58 +286,75 @@ void RagdollBalance::ApplyCenterOfMassControl(Ragdoll& ragdoll, JPH::BodyInterfa
 		return;
 	}
 
-	JPH::Vec3 target = mSupportTarget;
-
-	if (loaded_count == 1) {
-		target = mLegs[loaded[0]].FootCenter;
-	}
-	else if (mShiftLeg >= 0) {
-		target = mLegs[1 - mShiftLeg].FootCenter;
-	}
-
 	const float32 mass = ragdoll.GetTotalMass();
-	const float32 omega = 2.0f * FX_PI * scComFrequency;
-
-	const JPH::Vec3 velocity = mGroundFrame.Horizontal(mVelocity);
-	const float32 speed = velocity.Length();
-	const float32 damping_scale = -2.0f * scComDamping * omega * mass;
-
-	JPH::Vec3 force = mGroundFrame.Horizontal(target - mCenterOfMass) * (omega * omega * mass) +
-					  velocity * damping_scale;
-
-	// Brakes anything above the stagger speed and never pushes, so a shove carries the body but cannot be added to
-	JPH::Vec3 braking = JPH::Vec3::sZero();
-	const float32 excess_speed = speed - mStaggerVelocity.Length();
-
-	if (excess_speed > 0.0f && speed > 1e-4f) {
-		braking = velocity * (excess_speed / speed * damping_scale);
-	}
-
 	const float32 strength_scale = std::min(ragdoll.mSegments[0].Strength / scGravityFullStrength, 1.0f);
 	const float32 weight = mass * mGroundFrame.Gravity;
 
-	float32 hold = 1.0f;
+	JPH::Vec3 force = JPH::Vec3::sZero();
 
-	// Only holds the body while the capture point is over the feet; past that it has to step, so hard hits still fell
-	// it
-	if (mAssist.ReleaseDistance > 0.0f) {
-		hold = MathUtil::Clamp(1.0f - mCaptureOutside / mAssist.ReleaseDistance, 0.0f, 1.0f);
+	// The hold and braking wait for recovery, so through the stumble the shove carries the body on its own
+	if (mStumbleTime <= 0.0f) {
+		JPH::Vec3 target = mSupportTarget;
+
+		if (loaded_count == 1) {
+			target = mLegs[loaded[0]].FootCenter;
+		}
+		else if (mShiftLeg >= 0) {
+			target = mLegs[1 - mShiftLeg].FootCenter;
+		}
+
+		const float32 omega = 2.0f * FX_PI * scComFrequency;
+
+		const JPH::Vec3 velocity = mGroundFrame.Horizontal(mVelocity);
+		const float32 speed = velocity.Length();
+		const float32 damping_scale = -2.0f * scComDamping * omega * mass;
+
+		force = mGroundFrame.Horizontal(target - mCenterOfMass) * (omega * omega * mass) + velocity * damping_scale;
+
+		JPH::Vec3 braking = JPH::Vec3::sZero();
+		const float32 excess_speed = speed - mStaggerVelocity.Length();
+
+		if (excess_speed > 0.0f && speed > 1e-4f) {
+			braking = velocity * (excess_speed / speed * damping_scale);
+		}
+
+		float32 hold = 1.0f;
+
+		// Only hold the body when the capture point is over where the feet are. If it is past the feet, the body needs
+		// to step
+		if (mAssist.ReleaseDistance > 0.0f) {
+			hold = MathUtil::Clamp(1.0f - mCaptureOutside / mAssist.ReleaseDistance, 0.0f, 1.0f);
+		}
+
+		hold *= 1.0f - std::min(mStaggerVelocity.Length() / scStaggerHoldSpeed, 1.0f);
+
+		force = ClampLength(force, mAssist.MaxForceFraction * weight * strength_scale * hold);
+
+		// Released, it only slows the body down, so each recovery step takes some speed out instead of none
+		force += ClampLength(braking, mAssist.RecoveryForceFraction * weight * strength_scale) * (1.0f - hold);
 	}
 
-	hold *= 1.0f - std::min(mStaggerVelocity.Length() / scStaggerHoldSpeed, 1.0f);
-
-	force = ClampLength(force, mAssist.MaxForceFraction * weight * strength_scale * hold);
-
-	// Released, it only slows the body down, so each recovery step takes some speed out instead of none
-	force += ClampLength(braking, mAssist.RecoveryForceFraction * weight * strength_scale) * (1.0f - hold);
-
 	force *= 1.0f - mStatus.FallProgress;
+
+	// The pair is internal, so the ground only carries it through the loaded soles' friction. Limit it to what that
+	// friction can transmit, and fade it out as a loaded sole starts to slide
+	float32 friction = std::numeric_limits<float32>::max();
+	float32 grip = 1.0f;
+
+	for (uint32 i = 0; i < loaded_count; i++) {
+		const JPH::BodyID foot_id = ragdoll.GetBodyID(mLegs[loaded[i]].Foot);
+		const float32 slip = mGroundFrame.Horizontal(body_interface.GetLinearVelocity(foot_id)).Length();
+
+		friction = std::min(friction, body_interface.GetFriction(foot_id));
+		grip = std::min(grip, 1.0f - MathUtil::Clamp((slip - scSlipStart) / (scSlipEnd - scSlipStart), 0.0f, 1.0f));
+	}
+
+	force = ClampLength(force, friction * weight * grip);
 
 	if (force.LengthSq() <= 0.0f) {
 		return;
 	}
 
-	// An internal pair, pelvis against the loaded feet, so the ground still has to supply it through friction
 	body_interface.AddForce(ragdoll.GetBodyID(0), force);
 
 	for (uint32 i = 0; i < loaded_count; i++) {

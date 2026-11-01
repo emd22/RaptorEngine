@@ -56,8 +56,12 @@ public:
 	float32 MinTime = 0.75f;
 	float32 ArmSpread = 65.0f;
 	float32 SpreadSpeed = 0.4f;
-	/// How far the spine leans along the shove over the stumble (degrees), easing out as balance takes over
+	/// How far the spine leans along the shove (degrees)
 	float32 Lean = 8.0f;
+	/// Stagger speed (m/s) that gives the full lean
+	float32 LeanSpeed = 0.5f;
+	/// Share of the spine lean the head turns back against. 0 make its tip with the body, 1 keeps it level
+	float32 HeadStabilise = 0.6f;
 };
 
 /// Arms reach to catch a capture point that has left the support
