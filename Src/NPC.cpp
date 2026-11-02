@@ -1,5 +1,6 @@
 #include "NPC.hpp"
 
+#include <Asset/AssetManager.hpp>
 #include <Core/Log.hpp>
 #include <Core/Random.hpp>
 #include <Decal/DecalManager.hpp>
@@ -9,6 +10,7 @@
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Physics/PhysicsManager.hpp>
+#include <Ragdoll/RagdollImpact.hpp>
 #include <Renderer/DebugDraw.hpp>
 #include <Renderer/Globals.hpp>
 #include <World.hpp>
@@ -20,6 +22,12 @@ namespace fx {
 namespace {
 
 constexpr float32 scWoundCooldown = 0.25f;
+/// How long the drawn pose takes to move from the animation to the bodies when an NPC wakes (s)
+constexpr float32 scWakeBlendTime = 0.1f;
+/// How far a shot leg lets the stance sink for a moment (m)
+constexpr float32 scLegShotBuckle = 0.1f;
+/// How fast the body starts to sink when that happens (m/s)
+constexpr float32 scLegShotDrop = 0.5f;
 
 float32 GetContactWoundSize(const physics::RagdollContact& contact)
 {
@@ -308,6 +316,7 @@ void NPC::UpdateActive(float32 delta_time)
 	}
 
 	UpdateBehaviours(delta_time);
+	UpdateGetUp();
 
 	if (mState == eState::Animated && skinned != nullptr) {
 		UpdateBalance(delta_time);
@@ -316,6 +325,11 @@ void NPC::UpdateActive(float32 delta_time)
 
 	if (mState != eState::Ragdoll) {
 		ApplyStrengths();
+	}
+
+	if (mWakeBlend < 1.0f) {
+		mWakeBlend = std::min(mWakeBlend + delta_time / scWakeBlendTime, 1.0f);
+		ragdoll.SetAllBodyBlends(MathUtil::SmoothStep(mWakeBlend));
 	}
 
 	if (mState == eState::Animated && skinned != nullptr) {
@@ -656,20 +670,6 @@ void NPC::EnterRagdoll()
 	mState = eState::Ragdoll;
 }
 
-// Temporary balance logging, tagged [npc-debug]: the chest's world-space lean from its thigh, in degrees
-static float32 GetChestLeanDegrees(physics::Ragdoll& ragdoll)
-{
-	const auto& rig = ragdoll.GetRig();
-	const Vec3f spine = ragdoll.GetBodyPosition(rig.Chest) - ragdoll.GetBodyPosition(rig.Legs[0].Thigh);
-	const float32 length = spine.Length();
-
-	if (length <= 1e-5f) {
-		return 0.0f;
-	}
-
-	return MathUtil::RadToDeg(std::acos(MathUtil::Clamp(spine.Dot(Vec3f::sUp) / length, -1.0f, 1.0f)));
-}
-
 void NPC::EnterFallen()
 {
 	physics::Ragdoll& ragdoll = mActor.Ragdoll;
@@ -689,7 +689,9 @@ void NPC::EnterFallen()
 		ragdoll.SetAllBodyModes(physics::eRagdollBodyMode::Limp);
 	}
 
-	ragdoll.SetAllBodyBlends(1.0f);
+	if (mWakeBlend >= 1.0f) {
+		ragdoll.SetAllBodyBlends(1.0f);
+	}
 
 	if (mActor.pSkeleton.IsValid()) {
 		mActor.pSkeleton->SetExternalPose(true);
@@ -703,9 +705,52 @@ void NPC::EnterFallen()
 
 	mBehaviours.SetFreePose(true);
 	mBehaviours.Trigger(ragdoll, "fallen");
+	mBehaviours.Trigger(ragdoll, "get_up");
 	mBehaviours.HandleEvent(ragdoll, physics::RagdollEvent { .Type = physics::eRagdollEvent::LostSupport,
 															 .Magnitude = -ctx.Velocity.Dot(ctx.Up) });
 	ApplyStrengths();
+}
+
+void NPC::UpdateGetUp()
+{
+	if (mState != eState::Fallen || mbDying) {
+		return;
+	}
+
+	const physics::RagdollBehaviour* get_up = mBehaviours.Find("get_up");
+
+	if (get_up == nullptr) {
+		return;
+	}
+
+	const physics::eGetUpStage stage = get_up->GetUpStage();
+
+	// Once lifting, the fallen pose has to give way to the get-up, so the fallen behaviour stops. A lift that failed
+	// goes back to it
+	mBehaviours.SetFreePose(stage == physics::eGetUpStage::Resting);
+
+	if (stage == physics::eGetUpStage::Standing) {
+		ExitFallen();
+	}
+}
+
+void NPC::ExitFallen()
+{
+	mState = eState::Animated;
+
+	if (mActor.pSkeleton.IsValid()) {
+		mActor.pSkeleton->SetExternalPose(false);
+	}
+
+	mActor.SetCullable(true);
+
+	// The animated root has been left where the NPC started falling, so move it under the lifted pelvis first
+	PlaceRootUnderPelvis();
+	mActor.Ragdoll.RebaseTargets();
+
+	mAssistFade = 0.0f;
+	mPoweredTime = 0.0f;
+	EnableMover();
 }
 
 void NPC::UpdateBalance(float32 delta_time)
@@ -739,7 +784,7 @@ void NPC::UpdateBalance(float32 delta_time)
 	if (ragdoll.GetBalanceStatus().State == physics::eBalanceState::Fallen) {
 		// Dying NPCs skip the fallen behaviours and keep tracking their held pose while their strength fades
 		if (mbDying) {
-			ReturnToAnimation();
+			ragdoll.SetBalancing(false);
 		}
 		else {
 			EnterFallen();
@@ -749,9 +794,12 @@ void NPC::UpdateBalance(float32 delta_time)
 	}
 
 	if (!wants_balance) {
-		LogInfo(LC_PHYSICS, "[npc-debug] {} hand-back, lean={:.1f} deg, fall_progress={:.2f}, powered_time={:.2f} s, assist_fade={:.2f}",
-				GetName(), GetChestLeanDegrees(ragdoll), ragdoll.GetBalanceStatus().FallProgress, mPoweredTime, mAssistFade);
-		ReturnToAnimation();
+		if (mbDying) {
+			ragdoll.SetBalancing(false);
+		}
+		else {
+			ReturnToAnimation();
+		}
 	}
 }
 
@@ -764,8 +812,6 @@ void NPC::ActivateBalance()
 	mActor.Ragdoll.SetBalancing(true);
 
 	if (mActor.Ragdoll.IsBalancing()) {
-		LogInfo(LC_PHYSICS, "[npc-debug] {} balance on, lean={:.1f} deg, powered_time={:.2f} s, assist_fade={:.2f}", GetName(),
-				GetChestLeanDegrees(mActor.Ragdoll), mPoweredTime, mAssistFade);
 		mAssistFade = 0.0f;
 	}
 }
@@ -779,7 +825,16 @@ void NPC::ReturnToAnimation()
 
 	ragdoll.RebaseTargets();
 	ragdoll.SetBalancing(false);
-	mAssistFade = 0.0f;
+
+	// The bodies go straight back to following the animation and only the drawn pose eases over. Tracking a walk with
+	// powered legs instead has them scrabbling at the floor the whole way
+	ragdoll.BeginPoseBlend();
+	mBehaviours.Reset();
+	ragdoll.ClearBodyLayers();
+
+	mAssistFade = 1.0f;
+	SetPowered(false);
+	ApplyStrengths();
 }
 
 bool NPC::IsPowered() const
@@ -812,6 +867,10 @@ void NPC::SetPowered(bool powered)
 	ragdoll.SetAllBodyBlends(mPhysicsBlend);
 
 	if (powered) {
+		// The bodies sit a physics step behind the animation, and a planted foot gets lifted out of the floor. Drawn at
+		// once, that's a pop the moment anything touches the NPC
+		mWakeBlend = 0.0f;
+		ragdoll.SetAllBodyBlends(0.0f);
 		mMover.SetEnabled(false);
 	}
 	else {
@@ -856,6 +915,7 @@ void NPC::Deactivate()
 
 	if (ragdoll.IsBalancing()) {
 		ReturnToAnimation();
+		return;
 	}
 
 	mBehaviours.Reset();
@@ -871,6 +931,20 @@ void NPC::UpdatePhysicsBlend(float32 delta_time)
 {
 	constexpr float32 scMinPoweredTime = 1.0f;
 	constexpr float32 scBlendOutTime = 0.4f;
+	constexpr float32 scPoseBlendTime = 0.5f;
+
+	physics::Ragdoll& pose_ragdoll = mActor.Ragdoll;
+
+	if (pose_ragdoll.GetPoseBlend() > 0.0f) {
+		mPoseBlendTime += delta_time;
+
+		const float32 progress = MathUtil::Clamp(mPoseBlendTime / scPoseBlendTime, 0.0f, 1.0f);
+
+		pose_ragdoll.SetPoseBlend(1.0f - MathUtil::SmoothStep(progress));
+	}
+	else {
+		mPoseBlendTime = 0.0f;
+	}
 
 	if (mState != eState::Animated || !IsPowered()) {
 		return;
@@ -896,7 +970,9 @@ void NPC::UpdatePhysicsBlend(float32 delta_time)
 	}
 
 	// Eased so the hand-back to the animation starts and lands gently instead of sliding at a constant rate
-	mActor.Ragdoll.SetAllBodyBlends(MathUtil::SmoothStep(mPhysicsBlend));
+	if (mWakeBlend >= 1.0f) {
+		mActor.Ragdoll.SetAllBodyBlends(MathUtil::SmoothStep(mPhysicsBlend));
+	}
 }
 
 void NPC::ApplyStrengths()
@@ -973,113 +1049,63 @@ void NPC::OnHit(const NPCHit& hit)
 	}
 
 	if (mState != eState::Animated) {
-		ragdoll.AddImpulse(hit.Body, hit.Impulse, hit.Point);
+		// The physics step has already delivered a collision to a dynamic body
+		if (!hit.bIsCollision) {
+			ragdoll.AddImpulse(hit.Body, hit.Impulse, hit.Point);
+		}
+
 		return;
 	}
 
-	// Shove first, so the speed it tops up to is not already counted from the struck limbs' push
-	Shove(hit.Impulse * mpTuning->HitShoveScale, mpTuning->MinShoveSpeed);
+	if (hit.bIsCollision && length / ragdoll.GetTotalMass() >= mpTuning->KnockdownSpeed) {
+		EnterFallen();
 
-	PushHitChain(body, hit.Impulse, hit.Point);
+		// Whatever the contact normal says, the floor is not going to let the body go down
+		Vec3f velocity = hit.Impulse / ragdoll.GetTotalMass();
+		velocity.Y = std::max(velocity.Y, 0.0f);
+
+		physics::LaunchRagdoll(ragdoll, velocity);
+		return;
+	}
+
+	physics::RagdollKnock knock;
+	knock.Point = hit.Point;
+
+	if (!hit.bIsWholeBody) {
+		knock.Body = body;
+	}
+
+	if (hit.bIsCollision) {
+		knock.Impulse = hit.Impulse;
+		knock.MaxSpeed = mpTuning->MaxCollisionKnockSpeed;
+	}
+	else {
+		knock.Impulse = hit.Impulse * mpTuning->HitShoveScale;
+		knock.MinSpeed = mpTuning->MinShoveSpeed;
+		knock.MaxSpeed = mpTuning->MaxShoveSpeed;
+		knock.RepeatFraction = mpTuning->RepeatShoveFraction;
+	}
+
+	AddStagger(physics::ApplyRagdollKnock(ragdoll, knock));
+
+	if (!hit.bIsWholeBody) {
+		physics::ApplyRagdollLocalHit(ragdoll, static_cast<uint32>(body), hit.Impulse, hit.Point);
+	}
+
+	// A shot to the leg moves little of the body, since that foot is pinned to the floor. It shows as the knee giving
+	// way
+	if (hit.Damage > 0.0f && ragdoll.GetBodyPart(static_cast<uint32>(body)) == eBodyPart::Leg) {
+		ragdoll.AddBalanceBuckle(scLegShotBuckle);
+		physics::LaunchRagdoll(ragdoll, Vec3f(0.0f, -scLegShotDrop, 0.0f));
+	}
 }
 
-void NPC::PushHitChain(int32 body, const Vec3f impulse, const Vec3f point)
-{
-	constexpr uint32 scChainLength = 3;
-	constexpr float32 scChainFalloff[scChainLength] = { 1.0f, 0.6f, 0.3f };
-	constexpr float32 scMaxSpeed = 2.0f;
-
-	physics::Ragdoll& ragdoll = mActor.Ragdoll;
-
-	int32 chain[scChainLength];
-	uint32 chain_length = 0;
-	float32 weighted_mass = 0.0f;
-
-	for (int32 i = body; i >= 0 && chain_length < scChainLength; i = ragdoll.GetParentBody(i)) {
-		chain[chain_length] = i;
-		weighted_mass += scChainFalloff[chain_length] * ragdoll.GetBodyMass(i);
-		chain_length++;
-	}
-
-	const float32 length = impulse.Length();
-
-	if (weighted_mass <= 0.0f || length <= 1e-5f) {
-		return;
-	}
-
-	// The struck body leads and its parents follow, so a light hand is not flicked away and snapped straight back by
-	// its own muscles. Only the struck body takes the hit off centre and spins.
-	const float32 speed = std::min(length / weighted_mass, scMaxSpeed);
-	const Vec3f velocity = impulse * (speed / length);
-
-	for (uint32 i = 0; i < chain_length; i++) {
-		const uint32 index = static_cast<uint32>(chain[i]);
-		const Vec3f chain_impulse = velocity * (scChainFalloff[i] * ragdoll.GetBodyMass(index));
-
-		if (i == 0) {
-			ragdoll.AddImpulse(ragdoll.GetBodyID(index), chain_impulse, point);
-		}
-		else {
-			ragdoll.AddImpulse(ragdoll.GetBodyID(index), chain_impulse, ragdoll.GetBodyPosition(index));
-		}
-	}
-}
-
-void NPC::Shove(const Vec3f impulse, float32 min_speed)
+void NPC::AddStagger(const Vec3f velocity)
 {
 	physics::Ragdoll& ragdoll = mActor.Ragdoll;
-	const physics::RagdollRig& rig = ragdoll.GetRig();
 
-	const Vec3f horizontal(impulse.X, 0.0f, impulse.Z);
-	const float32 length = horizontal.Length();
-	const float32 total_mass = ragdoll.GetTotalMass();
-
-	if (!rig.bCanBalance || length <= 1e-5f || total_mass <= 0.0f) {
-		return;
-	}
-
-	float32 moved_mass = 0.0f;
-
-	for (uint32 i = 0; i < ragdoll.GetSegmentCount(); i++) {
-		if (!ragdoll.IsFoot(i)) {
-			moved_mass += ragdoll.GetBodyMass(i);
-		}
-	}
-
-	if (moved_mass <= 0.0f) {
-		return;
-	}
-
-	const float32 speed = MathUtil::Clamp(length / total_mass, min_speed, mpTuning->MaxShoveSpeed);
-	const Vec3f direction = horizontal / length;
-
-	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
-	float32 momentum = 0.0f;
-
-	for (uint32 i = 0; i < ragdoll.GetSegmentCount(); i++) {
-		if (!ragdoll.IsFoot(i)) {
-			const Vec3f body_velocity = Vec3f(body_interface.GetLinearVelocity(ragdoll.GetBodyID(i)));
-			momentum += ragdoll.GetBodyMass(i) * body_velocity.Dot(direction);
-		}
-	}
-
-	// A hit while the body is still moving from the last one only tops its speed back up, so a burst knocks harder
-	// than one shot without each hit adding a full shove
-	const float32 target_speed = speed * total_mass / moved_mass;
-	const float32 current_speed = std::max(momentum / moved_mass, 0.0f);
-	const float32 added_speed = std::max(target_speed - current_speed, target_speed * mpTuning->RepeatShoveFraction);
-
-	// Everything above the feet moves together, so the body tips over its planted feet without bending at the hips
-	const Vec3f velocity = direction * added_speed;
-
-	for (uint32 i = 0; i < ragdoll.GetSegmentCount(); i++) {
-		if (!ragdoll.IsFoot(i)) {
-			ragdoll.AddImpulse(ragdoll.GetBodyID(i), velocity * ragdoll.GetBodyMass(i), ragdoll.GetBodyPosition(i));
-		}
-	}
-
-	// Balance lets the body keep drifting with the shove for a moment, so it steps with it rather than stopping dead
-	Vec3f stagger = ragdoll.GetStaggerVelocity() + horizontal * (speed / length);
+	// Balance lets the body keep drifting with the blow for a moment, so it steps with it rather than stopping dead
+	Vec3f stagger = ragdoll.GetStaggerVelocity() + Vec3f(velocity.X, 0.0f, velocity.Z);
 	const float32 stagger_speed = stagger.Length();
 
 	if (stagger_speed > mpTuning->MaxStaggerSpeed) {
@@ -1153,8 +1179,6 @@ float32 NPC::GetContactDamage(const physics::RagdollContact& contact) const
 
 void NPC::OnContact(const physics::RagdollContact& contact)
 {
-	constexpr float32 scMaxKnockMass = 80.0f;
-
 	if (!IsCreated()) {
 		return;
 	}
@@ -1172,14 +1196,41 @@ void NPC::OnContact(const physics::RagdollContact& contact)
 	mPendingImpactDamage = std::max(mPendingImpactDamage, GetContactDamage(contact));
 
 	if (is_struck) {
-		float32 knock_mass = scMaxKnockMass;
+		// Both bodies leave the collision at the same speed, so what is left of a heavy prop's speed carries the NPC
+		// with it and a light prop's barely moves it. Something immovable gives the NPC its whole speed.
+		const float32 own_mass = mActor.Ragdoll.GetTotalMass();
+		float32 shared_fraction = 1.0f;
 
 		if (contact.OtherMass > 0.0f) {
-			knock_mass = std::min(contact.OtherMass, scMaxKnockMass);
+			shared_fraction = contact.OtherMass / (own_mass + contact.OtherMass);
 		}
 
-		OnHit(NPCHit {
-			.Body = contact.Body, .Point = contact.Point, .Impulse = contact.Normal * (knock_mass * contact.Speed) });
+		// The way the prop is travelling, since the normal only says which side of a limb it brushed first
+		const float32 other_speed = contact.OtherVelocity.Length();
+		const Vec3f direction = contact.OtherVelocity / other_speed;
+
+		const float32 knock_speed = std::min(other_speed * shared_fraction * mpTuning->CollisionKnockScale,
+											 mpTuning->MaxCollisionKnockSpeed);
+
+		const bool was_powered = IsPowered();
+
+		if (!was_powered && knock_speed < mpTuning->MinCollisionKnockSpeed) {
+			return;
+		}
+
+		OnHit(NPCHit { .Body = contact.Body,
+					   .Point = contact.Point,
+					   .Impulse = direction * (own_mass * knock_speed),
+					   .bIsCollision = true });
+
+		// A kinematic ragdoll stopped the prop like a wall, so hand back the speed it should have kept
+		if (!was_powered && IsPowered() && contact.OtherMass > 0.0f) {
+			JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
+			const Vec3f kept = direction * knock_speed;
+
+			body_interface.SetLinearVelocity(contact.OtherBody, JPH::Vec3(kept.X, kept.Y, kept.Z));
+		}
+
 		return;
 	}
 
@@ -1213,11 +1264,6 @@ void NPC::OnPush(const NPCPush& push)
 		return;
 	}
 
-	LogInfo(LC_PHYSICS,
-			"[npc-debug] {} push {:.2f} N s, lean={:.1f} deg, balancing={}, powered={}, fall_progress={:.2f}, assist_fade={:.2f}, powered_time={:.2f} s",
-			GetName(), length, GetChestLeanDegrees(ragdoll), ragdoll.IsBalancing(), IsPowered(),
-			ragdoll.GetBalanceStatus().FallProgress, mAssistFade, mPoweredTime);
-
 	// Pushed at the chest, like a shove, rather than wherever the two capsules touched
 	const uint32 chest = ragdoll.GetRig().Chest;
 	const Vec3f point = ragdoll.GetBodyPosition(chest);
@@ -1229,9 +1275,15 @@ void NPC::OnPush(const NPCPush& push)
 															 .Magnitude = length });
 	ApplyBehaviourOutput();
 
-	ragdoll.AddImpulse(ragdoll.GetBodyID(chest), push.Impulse, point);
+	physics::RagdollKnock knock;
+	knock.Body = static_cast<int32>(chest);
+	knock.Point = point;
+	knock.Impulse = push.Impulse;
+	knock.MaxSpeed = mpTuning->MaxShoveSpeed;
+	knock.RepeatFraction = mpTuning->RepeatShoveFraction;
 
-	Shove(push.Impulse, 0.0f);
+	AddStagger(physics::ApplyRagdollKnock(ragdoll, knock));
+	physics::ApplyRagdollLocalHit(ragdoll, chest, push.Impulse, point);
 }
 
 void NPC::AddWound(JPH::BodyID body_id, const Vec3f point, const Vec3f direction, float32 size)
@@ -1301,6 +1353,30 @@ bool NPC::PlayAnimation(const String& name, eAnimationEnd on_end, float32 speed,
 /////////////////////////////////////
 // NPC manager
 /////////////////////////////////////
+
+void NPCManager::RequestModel()
+{
+	if (mbModelRequested) {
+		return;
+	}
+
+	mbModelRequested = true;
+
+	mModelTicket = gAssetManager->LoadObject("ragdoll_template",
+											 "RaptorData/Data/Demo/Models/ragdoll2/ragdoll2.rxmodel");
+
+	mModelTicket.OnLoaded(
+		[this](void* item_ptr)
+		{
+			Object* object = static_cast<Object*>(item_ptr);
+
+			if (object != nullptr) {
+				object->SetShadowCaster(true);
+
+				mpModel.store(object);
+			}
+		});
+}
 
 NPC* NPCManager::Spawn(const Object* model, const NPCDesc& desc)
 {

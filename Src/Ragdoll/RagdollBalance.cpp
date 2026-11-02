@@ -22,13 +22,26 @@ constexpr float32 scMinPendulumHeight = 0.3f;
 constexpr float32 scSupportShrink = 0.5f;
 constexpr float32 scCentering = 0.2f;
 
-constexpr float32 scStepTrigger = 0.02f;
-constexpr float32 scMinDoubleSupport = 0.05f;
-constexpr float32 scSwingTime = 0.22f;
+constexpr float32 scStepTrigger = 0.04f;
+constexpr float32 scMinDoubleSupport = 0.12f;
+/// How far past the support the capture point has to be to cut a foot's time on the ground short (m)
+constexpr float32 scUrgentCapture = 0.25f;
+/// Cosine of the tilt under which a sole counts as lying flat
+constexpr float32 scFlatSoleCos = 0.97f;
+/// Swing times the planner picks between (s). It takes the slowest that lands where the body needs the foot
+constexpr float32 scMinSwingTime = 0.2f;
+constexpr float32 scMaxSwingTime = 0.44f;
+constexpr float32 scSwingTimeStep = 0.04f;
+/// Peak speed of a swinging foot (m/s)
+constexpr float32 scMaxSwingSpeed = 6.0f;
+/// How far a swinging foot passes from the stance ankle (m)
+constexpr float32 scSwingClearance = 0.2f;
 constexpr float32 scSwingFreezeFraction = 0.75f;
 constexpr float32 scSwingTravelFraction = 0.85f;
 constexpr float32 scSwingLift = 0.12f;
 constexpr float32 scSwingOvertime = 0.15f;
+/// Swings in a row that can miss the ground before the foot is just put down where it is
+constexpr uint32 scMaxFailedSwings = 3;
 constexpr float32 scSwingMinTouchdown = 0.6f;
 constexpr float32 scTouchdownDistance = 0.05f;
 constexpr float32 scLandingMargin = 0.08f;
@@ -37,23 +50,32 @@ constexpr float32 scLandingSideMargin = 0.03f;
 constexpr float32 scStanceWidenMargin = 0.1f;
 constexpr float32 scMinStepWidth = 0.22f;
 constexpr float32 scMaxStepWidth = 0.6f;
-constexpr float32 scMaxStepLength = 0.5f;
+constexpr float32 scMaxStepLength = 0.65f;
 constexpr float32 scStanceDistanceCost = 2.0f;
 constexpr float32 scCaptureErrorCost = 10.0f;
 constexpr float32 scCaptureMargin = 0.05f;
 constexpr float32 scFreeFootPreference = 0.5f;
-constexpr uint32 scMaxRecoverySteps = 6;
 constexpr float32 scMaxSwingWeight = 0.6f;
 constexpr float32 scMaxLoadWait = 0.2f;
 constexpr float32 scSwapLift = 0.03f;
 constexpr float32 scMaxStaggerDrift = 0.15f;
-constexpr float32 scRecoveredTime = 0.25f;
+/// A probed surface this close to the ground the feet are on is that ground (m)
+constexpr float32 scSameSurface = 0.01f;
+/// How far below the centre of mass the ground probes reach (m)
+constexpr float32 scProbeLength = 3.0f;
+/// How far a landing has to be above or below where the foot left for the swing to go up first or come down last (m)
+constexpr float32 scStepHeight = 0.03f;
+/// Fraction of the swing by which a foot stepping up has reached its height, and from which one stepping down leaves it
+constexpr float32 scStepUpEnd = 0.45f;
+constexpr float32 scStepDownStart = 0.35f;
+/// How long the fall height takes to follow a step up (s), and the rise it ignores as contact noise (m)
+constexpr float32 scFallGroundRiseTime = 0.4f;
+constexpr float32 scFallGroundTolerance = 0.015f;
 constexpr float32 scLandingDipPerSpeed = 0.1f;
 constexpr float32 scMaxLandingDip = 0.03f;
 constexpr float32 scLandingDipTime = 0.25f;
-/// Catch step length per m/s of stagger drift, clamped to the minimum and to scMaxStepLength
-constexpr float32 scStumbleStepPerSpeed = 0.4f;
-constexpr float32 scMinStumbleStep = 0.15f;
+/// Stagger speed (m/s) a shove needs before the body takes a catch step whether it has to or not
+constexpr float32 scStumbleStepSpeed = 0.3f;
 /// Added to a leg's weight share when choosing the catch step's foot, for stepping with the foot that just landed
 constexpr float32 scStumbleRepeatCost = 0.75f;
 /// How far past the stance foot a crossover step can land (m), and how far in front or behind it to pass the other leg
@@ -62,15 +84,21 @@ constexpr float32 scCrossoverClearance = 0.2f;
 /// Lateral offset (m) under which a landing counts as being in line with the stance foot
 constexpr float32 scCrossoverLateral = 0.1f;
 
-constexpr float32 scFallTilt = MathUtil::DegToRad(25.0f);
+constexpr float32 scFallTilt = MathUtil::DegToRad(45.0f);
 /// Where a fall starts to build up, before it reaches the thresholds above
-constexpr float32 scFallStartTilt = MathUtil::DegToRad(12.5f);
+constexpr float32 scFallStartTilt = MathUtil::DegToRad(22.5f);
 constexpr float32 scFallStartHeight = 0.85f;
 /// A trunk lean past this steps even while the capture point is still over the feet, at most once per scLeanStepTime
-constexpr float32 scLeanStepTilt = MathUtil::DegToRad(3.0f);
+constexpr float32 scLeanStepTilt = MathUtil::DegToRad(10.0f);
 constexpr float32 scLeanStepTime = 0.15f;
 constexpr float32 scFallHeightFraction = 0.6f;
-constexpr float32 scCalmSpeed = 0.08f;
+constexpr float32 scFallProgressAttack = 0.06f;
+constexpr float32 scFallProgressRelease = 0.3f;
+/// How long the capture point has to stay out of reach of any run of steps before it counts as a fall (s)
+constexpr float32 scUnviableTime = 0.2f;
+/// Slack on that reach, which assumes every step lands at once and exactly where it's aimed
+constexpr float32 scViabilityMargin = 2.0f;
+constexpr float32 scCalmSpeed = 0.15f;
 constexpr float32 scCalmTime = 0.25f;
 
 constexpr float32 scSettleSpeed = 0.25f;
@@ -84,12 +112,12 @@ constexpr float32 scShiftTimeout = 1.0f;
 
 Vec2f GetStancePressure(const BalanceLeg& stance, const GravityFrame& frame, const Vec2f capture)
 {
-	Vec2f points[scSoleCorners];
-	Vec2f hull[scSoleCorners + 1];
+	Vec2f points[BodyGroundContact::scMaxPoints];
+	Vec2f hull[BodyGroundContact::scMaxPoints + 1];
 	uint32 count = 0;
 
-	for (uint32 corner = 0; corner < stance.ContactCornerCount; corner++) {
-		points[count++] = frame.ToPlane(stance.ContactCorners[corner]);
+	for (uint32 i = 0; i < stance.ContactCount; i++) {
+		points[count++] = frame.ToPlane(stance.ContactPoints[i]);
 	}
 
 	if (count == 0) {
@@ -176,19 +204,24 @@ bool RagdollBalance::InitRestPose(const Ragdoll& ragdoll)
 
 void RagdollBalance::Reset()
 {
+	// Leaves the stagger and stumble alone: the hit that wakes balance sets them before it gets here, and Clear() is what
+	// drops them
 	for (BalanceLeg& leg : mLegs) {
 		leg.bStance = true;
 		leg.bContact = false;
 		leg.bTouching = false;
 		leg.ContactAge = scContactHoldTime;
-		leg.ContactCornerCount = 0;
+		leg.ContactCount = 0;
 	}
 
 	mSwing = Swing {};
 	mDoubleSupportTime = 0.0f;
 	mLoadWaitTime = 0.0f;
-	mCapturedTime = 0.0f;
+	mFailedSwings = 0;
 	mLandingDip = 0.0f;
+	mLift = 0.0f;
+	mbHasSmoothedPelvisVelocity = false;
+	mUnviableTime = 0.0f;
 	mCalmTime = 0.0f;
 	mSettleTime = 0.0f;
 	mShiftTime = 0.0f;
@@ -196,6 +229,7 @@ void RagdollBalance::Reset()
 	mbBodyOnGround = false;
 	mSupportCount = 0;
 	mbHasGround = false;
+	mbHasGroundProbe = false;
 	mStatus = BalanceStatus {};
 
 	if (mbValid) {
@@ -208,6 +242,7 @@ void RagdollBalance::Clear(Ragdoll& ragdoll)
 	ragdoll.ClearMotorOverrides();
 	mStaggerVelocity = JPH::Vec3::sZero();
 	mStumbleTime = 0.0f;
+	mReactionElapsed = 0.0f;
 	mbStumbleStepped = false;
 	mStatus.Stumble = 0.0f;
 	mStatus.FallProgress = 0.0f;
@@ -231,6 +266,8 @@ void RagdollBalance::Step(Ragdoll& ragdoll, JPH::BodyInterface& body_interface, 
 			return;
 		}
 	}
+
+	mDeltaTime = delta_time;
 
 	GatherState(ragdoll, delta_time, gravity, contacts_fresh);
 	BuildSupport();
@@ -263,6 +300,20 @@ void RagdollBalance::Step(Ragdoll& ragdoll, JPH::BodyInterface& body_interface, 
 
 	mStatus.bCalm = (mStatus.State == eBalanceState::Standing) && (mCalmTime > scCalmTime) && (mShiftLeg < 0);
 
+	for (BalanceLeg& leg : mLegs) {
+		if (leg.bStance && !IsLoaded(leg)) {
+			mStatus.HangingTime += delta_time;
+		}
+
+		if (leg.bStance && contacts_fresh && leg.bTouching != leg.bWasTouching) {
+			mStatus.ContactFlips++;
+		}
+
+		if (contacts_fresh) {
+			leg.bWasTouching = leg.bTouching;
+		}
+	}
+
 	if (mStatus.State == eBalanceState::Fallen) {
 		return;
 	}
@@ -274,7 +325,8 @@ void RagdollBalance::Step(Ragdoll& ragdoll, JPH::BodyInterface& body_interface, 
 	}
 
 	ApplyTorsoControl(ragdoll, body_interface, gravity);
-	ApplyCenterOfMassControl(ragdoll, body_interface);
+	ApplyLegForces(ragdoll, body_interface);
+	DriveHead(ragdoll);
 	ApplyTrunkSpinDamping(ragdoll, body_interface);
 }
 
@@ -301,12 +353,17 @@ void RagdollBalance::GatherState(Ragdoll& ragdoll, float32 delta_time, const JPH
 		mbBodyOnGround = IsAnyBodyOnGround(ragdoll);
 	}
 
-	const float32 height = std::max(mCenterOfMass.Dot(mGroundFrame.Up) - mGroundHeight, scMinPendulumHeight);
+	const float32 height = std::max(mCenterOfMass.Dot(mGroundFrame.Up) - mFallGround, scMinPendulumHeight);
 	mOmega = std::sqrt(mGroundFrame.Gravity / height);
 
 	// A stagger adds the distance it still has to drift, so a shove the legs soaked up still gets stepped into. It is
 	// capped so the steps aim at a point they can reach rather than one the body is not actually heading for
 	JPH::Vec3 stagger_drift = mGroundFrame.Horizontal(mStaggerVelocity) * mAssist.StaggerDecayTime;
+
+	// A shove too small to need a catch step doesn't get to ask for one
+	if (mGroundFrame.Horizontal(mStaggerVelocity).Length() < scStumbleStepSpeed) {
+		stagger_drift = JPH::Vec3::sZero();
+	}
 	const float32 drift_length = stagger_drift.Length();
 
 	if (drift_length > scMaxStaggerDrift) {
@@ -330,6 +387,7 @@ void RagdollBalance::GatherState(Ragdoll& ragdoll, float32 delta_time, const JPH
 void RagdollBalance::GatherFeet(Ragdoll& ragdoll, float32 delta_time, bool contacts_fresh)
 {
 	float32 contact_ground = std::numeric_limits<float32>::max();
+	const BalanceLeg* ground_leg = nullptr;
 
 	for (BalanceLeg& leg : mLegs) {
 		const RDSegmentState& foot = ragdoll.mSegmentStates[leg.Foot];
@@ -342,40 +400,97 @@ void RagdollBalance::GatherFeet(Ragdoll& ragdoll, float32 delta_time, bool conta
 		leg.ContactAge += delta_time;
 
 		if (contacts_fresh) {
-			leg.bTouching = ragdoll.IsBodyOnGround(leg.Foot, mGroundFrame.Up, scSupportNormalMinUp);
+			BodyGroundContact contact;
+			leg.bTouching = ragdoll.GetBodyGroundContact(leg.Foot, contact) &&
+							Ragdoll::IsSupportNormal(contact, mGroundFrame.Up, scSupportNormalMinUp);
 
 			if (leg.bTouching) {
 				leg.ContactAge = 0.0f;
+				leg.ContactCount = contact.PointCount;
+				leg.ContactNormal = JPH::Vec3(Vec3f::ToJolt(contact.Normal));
+				leg.ContactFriction = contact.Friction;
+				leg.SurfaceHeight = std::numeric_limits<float32>::max();
+
+				for (uint32 i = 0; i < contact.PointCount; i++) {
+					leg.ContactPoints[i] = contact.Points[i];
+					leg.SurfaceHeight = std::min(leg.SurfaceHeight, contact.Points[i].Dot(mGroundFrame.Up));
+				}
 			}
 		}
+
+		leg.SoleUp = (orientation * leg.RestFoot.Conjugated()) * mGroundFrame.Up;
 
 		leg.SoleHeight = std::numeric_limits<float32>::max();
 
 		for (uint32 corner = 0; corner < scSoleCorners; corner++) {
-			leg.ContactCorners[corner] = leg.AnklePosition + orientation * leg.SoleCorners[corner];
-			leg.SoleHeight = std::min(leg.SoleHeight, leg.ContactCorners[corner].Dot(mGroundFrame.Up));
+			leg.SoleWorld[corner] = leg.AnklePosition + orientation * leg.SoleCorners[corner];
+			leg.SoleHeight = std::min(leg.SoleHeight, leg.SoleWorld[corner].Dot(mGroundFrame.Up));
 		}
 
-		if (leg.ContactAge < scContactHoldTime) {
-			contact_ground = std::min(contact_ground, leg.SoleHeight);
+		if (leg.ContactAge < scContactHoldTime && leg.SurfaceHeight < contact_ground) {
+			contact_ground = leg.SurfaceHeight;
+			ground_leg = &leg;
 		}
 	}
 
-	if (contact_ground < std::numeric_limits<float32>::max()) {
+	if (ground_leg != nullptr) {
+		const bool had_ground = mbHasGround;
+
 		mGroundHeight = contact_ground;
 		mbHasGround = true;
+
+		float32 probe = 0.0f;
+
+		if (ProbeSurface(ground_leg->FootCenter, probe)) {
+			mGroundProbe = probe;
+			mbHasGroundProbe = true;
+		}
+
+		if (!had_ground || mGroundHeight < mFallGround + scFallGroundTolerance) {
+			mFallGround = mGroundHeight;
+		}
+		else {
+			mFallGround += (mGroundHeight - mFallGround) * (1.0f - std::exp(-delta_time / scFallGroundRiseTime));
+		}
 	}
 	else if (!mbHasGround) {
 		mGroundHeight = std::min(mLegs[0].FootCenter.Dot(mGroundFrame.Up), mLegs[1].FootCenter.Dot(mGroundFrame.Up));
+		mFallGround = mGroundHeight;
 	}
 
 	for (BalanceLeg& leg : mLegs) {
-		leg.bContact = (leg.ContactAge < scContactHoldTime) ||
-					   (mbHasGround && leg.SoleHeight - mGroundHeight < scNearGround);
-		leg.ContactCornerCount = 0;
+		const bool recently_touched = (leg.ContactAge < scContactHoldTime);
+
+		// A foot off the ground is measured against the surface under it
+		if (!recently_touched) {
+			leg.SurfaceHeight = GetGroundAt(leg.FootCenter);
+		}
+
+		leg.bContact = recently_touched || (mbHasGround && leg.SoleHeight - leg.SurfaceHeight < scNearGround);
+
+		if (recently_touched) {
+			// A sole lying flat can take weight anywhere on it, whichever corners touched this step. The solver's
+			// contact points jump from corner to corner as it settles, and the support shouldn't jump with them
+			if (leg.SoleUp.Dot(mGroundFrame.Up) > scFlatSoleCos) {
+				leg.ContactCount = 0;
+
+				for (const JPH::Vec3& corner : leg.SoleWorld) {
+					leg.ContactPoints[leg.ContactCount++] = corner;
+				}
+			}
+
+			continue;
+		}
+
+		// Hovering just above the ground the foot is about to bear weight on the corners nearest it
+		leg.ContactCount = 0;
 
 		if (leg.bContact) {
-			leg.ContactCornerCount = scSoleCorners;
+			for (const JPH::Vec3& corner : leg.SoleWorld) {
+				if (corner.Dot(mGroundFrame.Up) - leg.SurfaceHeight < scNearGround) {
+					leg.ContactPoints[leg.ContactCount++] = corner;
+				}
+			}
 		}
 	}
 }
@@ -399,7 +514,7 @@ bool RagdollBalance::IsAnyBodyOnGround(Ragdoll& ragdoll) const
 
 void RagdollBalance::BuildSupport()
 {
-	constexpr uint32 scMaxPoints = 2 * scSoleCorners;
+	constexpr uint32 scMaxPoints = 2 * BodyGroundContact::scMaxPoints;
 
 	Vec2f points[scMaxPoints];
 	uint32 count = 0;
@@ -415,8 +530,8 @@ void RagdollBalance::BuildSupport()
 		foot_center_sum += leg.FootCenter;
 		stance_count++;
 
-		for (uint32 corner = 0; corner < leg.ContactCornerCount; corner++) {
-			points[count++] = mGroundFrame.ToPlane(leg.ContactCorners[corner]);
+		for (uint32 i = 0; i < leg.ContactCount; i++) {
+			points[count++] = mGroundFrame.ToPlane(leg.ContactPoints[i]);
 		}
 	}
 
@@ -453,7 +568,7 @@ void RagdollBalance::BuildSupport()
 
 bool RagdollBalance::DetectFall()
 {
-	const float32 height = mCenterOfMass.Dot(mGroundFrame.Up) - mGroundHeight;
+	const float32 height = mCenterOfMass.Dot(mGroundFrame.Up) - mFallGround;
 	const float32 tilt_progress = MathUtil::Clamp((mTrunkTilt - scFallStartTilt) / (scFallTilt - scFallStartTilt), 0.0f,
 												  1.0f);
 	// The height is only measured down to a ground that a sole is near. Airborne, mGroundHeight is the last surface
@@ -466,19 +581,40 @@ bool RagdollBalance::DetectFall()
 			(scFallStartHeight - height / mRestComHeight) / (scFallStartHeight - scFallHeightFraction), 0.0f, 1.0f);
 	}
 
-	// Balance and the muscles fade over the approach, reaching the same point as the thresholds below
-	mStatus.FallProgress = std::max(tilt_progress, height_progress);
+	// Balance and the muscles fade over the approach, reaching the same point as the thresholds below. Eased so a foot
+	// losing contact for a moment or a sway past the threshold doesn't reach the muscles as a jolt
+	const float32 fall_progress = std::max(tilt_progress, height_progress);
+	float32 fall_time = scFallProgressRelease;
+
+	if (fall_progress > mStatus.FallProgress) {
+		fall_time = scFallProgressAttack;
+	}
+
+	mStatus.FallProgress += (fall_progress - mStatus.FallProgress) * (1.0f - std::exp(-mDeltaTime / fall_time));
 
 	eFallReason reason = eFallReason::None;
 
 	if (mTrunkTilt > scFallTilt) {
 		reason = eFallReason::Tilt;
 	}
-	else if (grounded && mCenterOfMass.Dot(mGroundFrame.Up) - mGroundHeight < mRestComHeight * scFallHeightFraction) {
+	else if (grounded && height < mRestComHeight * scFallHeightFraction) {
 		reason = eFallReason::Height;
 	}
 	else if (mbBodyOnGround) {
 		reason = eFallReason::Contact;
+	}
+
+	if (reason == eFallReason::None) {
+		if (IsViable()) {
+			mUnviableTime = 0.0f;
+		}
+		else {
+			mUnviableTime += mDeltaTime;
+
+			if (mUnviableTime > scUnviableTime) {
+				reason = eFallReason::Unviable;
+			}
+		}
 	}
 
 	if (reason == eFallReason::None) {
@@ -491,15 +627,6 @@ bool RagdollBalance::DetectFall()
 
 void RagdollBalance::Fall(eFallReason reason)
 {
-	if (mStatus.State != eBalanceState::Fallen) {
-		LogInfo(LC_PHYSICS,
-				"[npc-debug] fall reason={} tilt={:.1f} deg height={:.3f} m recovery_steps={} steps={} stumble={:.2f} "
-				"reaction={:.2f}",
-				static_cast<int>(reason), MathUtil::RadToDeg(mTrunkTilt),
-				mCenterOfMass.Dot(mGroundFrame.Up) - mGroundHeight, mStatus.RecoverySteps, mStatus.Steps,
-				mStatus.Stumble, mStatus.Reaction);
-	}
-
 	mStatus.State = eBalanceState::Fallen;
 	mStatus.FallReason = reason;
 }
@@ -515,25 +642,8 @@ void RagdollBalance::UpdateStanding(float32 delta_time)
 		mCalmTime = 0.0f;
 	}
 
-	if (mCaptureOutside < 0.0f) {
-		mCapturedTime += delta_time;
-	}
-	else {
-		mCapturedTime = 0.0f;
-	}
-
-	// Once a step has caught the body, any shuffles after it start a fresh step budget
-	if (mCapturedTime > scRecoveredTime) {
-		mStatus.RecoverySteps = 0;
-	}
-
-	if (mCalmTime > scCalmTime) {
-		mStatus.bRecovering = false;
-		mStatus.RecoverySteps = 0;
-	}
-
 	// Through a stumble the first step goes backwards with the shove, rather than waiting on the capture point
-	if (mStumbleTime > 0.0f) {
+	if (mStumbleTime > 0.0f && mGroundFrame.Horizontal(mStaggerVelocity).Length() >= scStumbleStepSpeed) {
 		if (!mbStumbleStepped && mStatus.Reaction >= 1.0f && mDoubleSupportTime > scMinDoubleSupport) {
 			BeginStumbleStep();
 		}
@@ -541,7 +651,8 @@ void RagdollBalance::UpdateStanding(float32 delta_time)
 		return;
 	}
 
-	const bool capture_outside = mCaptureOutside > scStepTrigger && mDoubleSupportTime > scMinDoubleSupport;
+	const bool capture_outside = mCaptureOutside > scStepTrigger &&
+								 (mDoubleSupportTime > scMinDoubleSupport || mCaptureOutside > scUrgentCapture);
 	const bool leaning = mTrunkTilt > scLeanStepTilt && mDoubleSupportTime > scLeanStepTime;
 
 	if (mSupportCount > 0 && (capture_outside || leaning)) {
@@ -564,30 +675,31 @@ void RagdollBalance::UpdateStepping(float32 delta_time)
 
 	mSwing.Time += delta_time;
 
-
-	// Shitty, bad. FIXME
-	const uint32 stance_leg = (1 - mSwing.Leg);
-
-	// const uint32 stance_leg = GetOppositeLeg(mSwing.Leg);
-
+	const uint32 stance_leg = 1 - mSwing.Leg;
 	const BalanceLeg& stance = mLegs[stance_leg];
 
 	// The swing foot is still carrying the body and the stance foot is coming off the ground instead, so step with the
 	// free foot rather than pivot over the planted one
 	if (!mSwing.bLifted && !mSwing.bSwapped && leg.bTouching && !stance.bTouching &&
-		stance.SoleHeight - mGroundHeight > scSwapLift) {
+		stance.SoleHeight - stance.SurfaceHeight > scSwapLift) {
 		const uint32 planted_leg = mSwing.Leg;
 
 		leg.bStance = true;
-		StartSwing(stance_leg, PlanLanding(stance_leg, planted_leg, scSwingTime), false);
+		float32 swap_time = scMinSwingTime;
+		const JPH::Vec3 swap_landing = PlanStep(stance_leg, planted_leg, swap_time);
+
+		StartSwing(stance_leg, swap_landing, false, swap_time);
 		mSwing.bSwapped = true;
 		return;
 	}
 
-	const float32 phase = mSwing.Time / scSwingTime;
+	const float32 phase = mSwing.Time / mSwing.Duration;
 
 	if (!mSwing.bFixed && phase < scSwingFreezeFraction) {
-		mSwing.Landing = PlanLanding(mSwing.Leg, 1 - mSwing.Leg, scSwingTime - mSwing.Time);
+		const JPH::Vec3 landing = PlanLanding(mSwing.Leg, 1 - mSwing.Leg, mSwing.Duration - mSwing.Time);
+
+		mStatus.SwingLandingTravel += (landing - mSwing.Landing).Length();
+		mSwing.Landing = landing;
 	}
 
 	const JPH::Quat landing_foot = GetHeadingRotation(mForward) * leg.RestFoot;
@@ -597,8 +709,46 @@ void RagdollBalance::UpdateStepping(float32 delta_time)
 	const JPH::Vec3 start = mGroundFrame.Horizontal(mSwing.StartAnkle);
 	const JPH::Vec3 end = mGroundFrame.Horizontal(landing_ankle);
 
-	float32 height = mSwing.StartAnkle.Dot(mGroundFrame.Up) +
-					 (landing_ankle.Dot(mGroundFrame.Up) - mSwing.StartAnkle.Dot(mGroundFrame.Up)) * travel;
+	// Covers its share of the distance left, so a landing that moves bends the path instead of throwing the foot along it
+	const float32 travel_left = 1.0f - mSwing.Travel;
+
+	if (travel_left > 1e-4f) {
+		mSwing.PathPoint += (landing_ankle - mSwing.PathPoint) * ((travel - mSwing.Travel) / travel_left);
+	}
+	else {
+		mSwing.PathPoint = landing_ankle;
+	}
+
+	mSwing.Travel = travel;
+
+	const float32 rise = mSwing.Landing.Dot(mGroundFrame.Up) - mSwing.StartSurface;
+
+	if (std::abs(rise) > scStepHeight) {
+		const auto get_height_travel = [rise](float32 at_phase)
+		{
+			if (rise > 0.0f) {
+				return MathUtil::SmoothStep(at_phase / scStepUpEnd);
+			}
+
+			return MathUtil::SmoothStep((at_phase - scStepDownStart) / (scSwingTravelFraction - scStepDownStart));
+		};
+
+		const float32 height_before = get_height_travel((mSwing.Time - delta_time) / mSwing.Duration);
+		const float32 height_left = 1.0f - height_before;
+
+		if (height_left > 1e-4f) {
+			mSwing.PathHeight += (landing_ankle.Dot(mGroundFrame.Up) - mSwing.PathHeight) *
+								 ((get_height_travel(phase) - height_before) / height_left);
+		}
+		else {
+			mSwing.PathHeight = landing_ankle.Dot(mGroundFrame.Up);
+		}
+	}
+	else {
+		mSwing.PathHeight = mSwing.PathPoint.Dot(mGroundFrame.Up);
+	}
+
+	float32 height = mSwing.PathHeight;
 
 	if (phase < 1.0f) {
 		height += scSwingLift * std::sin(FX_PI * phase);
@@ -607,7 +757,11 @@ void RagdollBalance::UpdateStepping(float32 delta_time)
 		height -= scSwingPress;
 	}
 
-	mSwing.AnkleTarget = start + (end - start) * travel + mGroundFrame.Up * height;
+	const JPH::Vec3 ankle_target = mGroundFrame.Horizontal(mSwing.PathPoint) + mGroundFrame.Up * height +
+								   GetSwingDetour(start, end, travel);
+
+	mStatus.PeakSwingTargetStep = std::max(mStatus.PeakSwingTargetStep, (ankle_target - mSwing.AnkleTarget).Length());
+	mSwing.AnkleTarget = ankle_target;
 
 	if (!leg.bTouching) {
 		mSwing.bLifted = true;
@@ -617,25 +771,37 @@ void RagdollBalance::UpdateStepping(float32 delta_time)
 	const bool touched_down = leg.bTouching &&
 							  ((mSwing.bLifted && (phase > scSwingMinTouchdown || near_landing)) || phase >= 1.0f);
 
-	if (!touched_down && mSwing.Time <= scSwingTime + scSwingOvertime) {
+	if (phase >= 1.0f && !touched_down) {
+		mStatus.SwingOvertime += delta_time;
+	}
+
+	if (!touched_down && mSwing.Time <= mSwing.Duration + scSwingOvertime) {
 		return;
 	}
 
-	// The foot never reached its landing. Replan from where it is, and count
-	// the attempt against the step budget so a step that cannot be reached falls rather than looping
+	// The foot never reached its landing. Replan from where it is
 	if (!touched_down) {
-		mStatus.RecoverySteps++;
+		mStatus.SwingRetries++;
+		mFailedSwings++;
 
-		if (mStatus.RecoverySteps >= scMaxRecoverySteps) {
-			Fall(eFallReason::StepBudget);
+		// Short only of the floor, it carries on down as a standing leg and the hip comes down to meet it. Starting the
+		// swing over would lift the foot all the way back up
+		if (near_landing || mFailedSwings >= scMaxFailedSwings) {
+			leg.bStance = true;
+			mStatus.State = eBalanceState::Standing;
+			mDoubleSupportTime = 0.0f;
 			return;
 		}
 
-		StartSwing(mSwing.Leg, PlanLanding(mSwing.Leg, 1 - mSwing.Leg, scSwingTime), false);
+		float32 retry_time = scMinSwingTime;
+		const JPH::Vec3 retry_landing = PlanStep(mSwing.Leg, 1 - mSwing.Leg, retry_time);
+
+		StartSwing(mSwing.Leg, retry_landing, false, retry_time);
 		return;
 	}
 
 	leg.bStance = true;
+	mFailedSwings = 0;
 
 	mStatus.State = eBalanceState::Standing;
 	mStatus.Steps++;
@@ -644,10 +810,6 @@ void RagdollBalance::UpdateStepping(float32 delta_time)
 	// The knees give with the landing, more the faster the body was going, instead of catching it on straight legs
 	const float32 landing_speed = mGroundFrame.Horizontal(mVelocity).Length();
 	mLandingDip = std::max(mLandingDip, std::min(landing_speed * scLandingDipPerSpeed, scMaxLandingDip));
-
-	if (!mSwing.bFixed) {
-		mStatus.RecoverySteps++;
-	}
 }
 
 void RagdollBalance::UpdateClosingStep(float32 delta_time)
@@ -682,7 +844,7 @@ void RagdollBalance::UpdateClosingStep(float32 delta_time)
 
 	if (GetCaptureDistance(stance) < -scShiftInside && mGroundFrame.Horizontal(mVelocity).Length() < scShiftSpeed) {
 		const JPH::Vec3 side = mGroundFrame.Up.Cross(mForward) * mLegs[swing_leg].SideSign;
-		StartSwing(swing_leg, ToGround(stance.FootCenter + side * mRestWidth), true);
+		StartSwing(swing_leg, ToLanding(stance.FootCenter + side * mRestWidth), true, scMaxSwingTime);
 		return;
 	}
 
@@ -714,11 +876,6 @@ void RagdollBalance::BeginStumbleStep()
 		return;
 	}
 
-	// A harder shove takes a longer catch step
-	const float32 step = MathUtil::Clamp(drift.Length() * scStumbleStepPerSpeed, scMinStumbleStep, scMaxStepLength);
-
-	const JPH::Vec3 right = mGroundFrame.Up.Cross(mForward);
-
 	int32 swing_leg = -1;
 	float32 best_cost = std::numeric_limits<float32>::max();
 
@@ -745,22 +902,17 @@ void RagdollBalance::BeginStumbleStep()
 		return;
 	}
 
-	const uint32 stance_leg = 1 - static_cast<uint32>(swing_leg);
-	const JPH::Vec3 side = right * mLegs[swing_leg].SideSign;
-	const JPH::Vec3 landing = mLegs[stance_leg].FootCenter + back * step + side * scStanceWidenMargin;
+	float32 swing_time = scMinSwingTime;
+	const JPH::Vec3 landing = PlanStep(static_cast<uint32>(swing_leg), 1 - static_cast<uint32>(swing_leg), swing_time);
 
-	StartSwing(static_cast<uint32>(swing_leg), FitLanding(static_cast<uint32>(swing_leg), stance_leg, landing), true);
+	StartSwing(static_cast<uint32>(swing_leg), landing, false, swing_time);
 	mbStumbleStepped = true;
 }
 
 bool RagdollBalance::BeginStep()
 {
-	if (mStatus.RecoverySteps >= scMaxRecoverySteps) {
-		Fall(eFallReason::StepBudget);
-		return false;
-	}
-
 	int32 best_leg = -1;
+	float32 best_time = scMinSwingTime;
 	float32 best_cost = std::numeric_limits<float32>::max();
 	JPH::Vec3 best_landing = JPH::Vec3::sZero();
 
@@ -776,10 +928,11 @@ bool RagdollBalance::BeginStep()
 			continue;
 		}
 
-		const JPH::Vec3 landing = PlanLanding(swing, stance, scSwingTime);
+		float32 swing_time = scMinSwingTime;
+		const JPH::Vec3 landing = PlanStep(swing, stance, swing_time);
 		float32 cost = mGroundFrame.Horizontal(landing - mLegs[swing].FootCenter).Length() +
 					   std::max(GetCaptureDistance(mLegs[stance]), 0.0f) * scStanceDistanceCost +
-					   GetLandingCaptureError(stance, landing) * scCaptureErrorCost;
+					   GetLandingCaptureError(stance, landing, swing_time) * scCaptureErrorCost;
 
 		if (!mLegs[swing].bContact) {
 			cost *= scFreeFootPreference;
@@ -789,6 +942,7 @@ bool RagdollBalance::BeginStep()
 			best_cost = cost;
 			best_leg = static_cast<int32>(swing);
 			best_landing = landing;
+			best_time = swing_time;
 		}
 	}
 
@@ -796,14 +950,85 @@ bool RagdollBalance::BeginStep()
 		return false;
 	}
 
-	StartSwing(static_cast<uint32>(best_leg), best_landing, false);
-	mStatus.bRecovering = true;
+	StartSwing(static_cast<uint32>(best_leg), best_landing, false, best_time);
 	mLoadWaitTime = 0.0f;
 
 	return true;
 }
 
-void RagdollBalance::StartSwing(uint32 swing_leg, const JPH::Vec3 landing, bool fixed)
+JPH::Vec3 RagdollBalance::GetSwingDetour(const JPH::Vec3 start, const JPH::Vec3 end, float32 travel) const
+{
+	const JPH::Vec3 stance = mGroundFrame.Horizontal(mLegs[1 - mSwing.Leg].AnklePosition);
+	const JPH::Vec3 path = end - start;
+	const float32 length2 = path.LengthSq();
+
+	if (length2 < 1e-4f) {
+		return JPH::Vec3::sZero();
+	}
+
+	const float32 along = MathUtil::Clamp((stance - start).Dot(path) / length2, 0.0f, 1.0f);
+	const JPH::Vec3 closest = start + path * along;
+	const float32 distance = (closest - stance).Length();
+
+	if (distance >= scSwingClearance) {
+		return JPH::Vec3::sZero();
+	}
+
+	// Bend the path away from the stance leg on the side it already passes, or in front if it runs straight through
+	JPH::Vec3 away = closest - stance;
+
+	if (distance < 1e-3f) {
+		away = mGroundFrame.Up.Cross(path);
+
+		if (away.Dot(mForward) < 0.0f) {
+			away = -away;
+		}
+	}
+
+	return away.NormalizedOr(mForward) * ((scSwingClearance - distance) * std::sin(FX_PI * travel));
+}
+
+JPH::Vec3 RagdollBalance::PlanStep(uint32 swing_leg, uint32 stance_leg, float32& out_time) const
+{
+	const JPH::Vec3 swing_foot = mGroundFrame.Horizontal(mLegs[swing_leg].FootCenter);
+
+	// The slowest swing that still lands where the body will need the foot. The capture point runs away while the foot
+	// is in the air, so a longer swing needs a longer step
+	for (float32 time = scMaxSwingTime; time > scMinSwingTime; time -= scSwingTimeStep) {
+		const JPH::Vec3 unfitted = PredictCapture(stance_leg, time);
+		const float32 reach = mGroundFrame.Horizontal(unfitted - mLegs[stance_leg].FootCenter).Length();
+		const float32 travel = (mGroundFrame.Horizontal(unfitted) - swing_foot).Length();
+
+		// Halved since a smooth swing's peak speed is about twice its mean
+		if (reach <= scMaxStepLength && travel / time <= scMaxSwingSpeed * 0.5f) {
+			out_time = time;
+			return PlanLanding(swing_leg, stance_leg, time);
+		}
+	}
+
+	out_time = scMinSwingTime;
+	return PlanLanding(swing_leg, stance_leg, scMinSwingTime);
+}
+
+JPH::Vec3 RagdollBalance::PredictCapture(uint32 stance_leg, float32 time) const
+{
+	const Vec2f capture = mGroundFrame.ToPlane(mCapturePoint);
+	const Vec2f pressure = GetStancePressure(mLegs[stance_leg], mGroundFrame, capture);
+	const Vec2f predicted = pressure + (capture - pressure) * std::exp(mOmega * time);
+
+	return mGroundFrame.AxisU * predicted.X + mGroundFrame.AxisV * predicted.Y;
+}
+
+bool RagdollBalance::IsViable() const
+{
+	// How far the capture point can be from the feet and still be caught by a run of the longest, quickest steps
+	const float32 shrink = std::exp(-mOmega * scMinSwingTime);
+	const float32 reach = scMaxStepLength * shrink / (1.0f - shrink);
+
+	return mCaptureOutside <= reach * scViabilityMargin;
+}
+
+void RagdollBalance::StartSwing(uint32 swing_leg, const JPH::Vec3 landing, bool fixed, float32 duration)
 {
 	BalanceLeg& leg = mLegs[swing_leg];
 	leg.bStance = false;
@@ -813,7 +1038,11 @@ void RagdollBalance::StartSwing(uint32 swing_leg, const JPH::Vec3 landing, bool 
 	mSwing.StartAnkle = leg.AnklePosition;
 	mSwing.Landing = landing;
 	mSwing.AnkleTarget = leg.AnklePosition;
+	mSwing.PathPoint = leg.AnklePosition;
+	mSwing.PathHeight = leg.AnklePosition.Dot(mGroundFrame.Up);
+	mSwing.StartSurface = leg.SurfaceHeight;
 	mSwing.bFixed = fixed;
+	mSwing.Duration = duration;
 
 	mStatus.State = eBalanceState::Stepping;
 	mCalmTime = 0.0f;
@@ -826,8 +1055,8 @@ float32 RagdollBalance::GetWeightShare(uint32 leg_index) const
 	const BalanceLeg& leg = mLegs[leg_index];
 	const BalanceLeg& other = mLegs[1 - leg_index];
 
-	const bool is_off = !leg.bTouching && leg.SoleHeight - mGroundHeight > scNearGround;
-	const bool other_off = !other.bTouching && other.SoleHeight - mGroundHeight > scNearGround;
+	const bool is_off = !leg.bTouching && leg.SoleHeight - leg.SurfaceHeight > scNearGround;
+	const bool other_off = !other.bTouching && other.SoleHeight - other.SurfaceHeight > scNearGround;
 
 	if (is_off || other_off) {
 		if (is_off) {
@@ -857,8 +1086,9 @@ float32 RagdollBalance::GetCaptureDistance(const BalanceLeg& leg) const
 	Vec2f points[scSoleCorners];
 	Vec2f hull[scSoleCorners + 1];
 
+	// The whole sole, since this asks how far the capture point is from where this foot could bear weight
 	for (uint32 corner = 0; corner < scSoleCorners; corner++) {
-		points[corner] = mGroundFrame.ToPlane(leg.ContactCorners[corner]);
+		points[corner] = mGroundFrame.ToPlane(leg.SoleWorld[corner]);
 	}
 
 	const uint32 count = BuildHull(points, scSoleCorners, hull);
@@ -869,7 +1099,7 @@ float32 RagdollBalance::GetCaptureDistance(const BalanceLeg& leg) const
 	return distance;
 }
 
-float32 RagdollBalance::GetLandingCaptureError(uint32 stance_leg, const JPH::Vec3 landing) const
+float32 RagdollBalance::GetLandingCaptureError(uint32 stance_leg, const JPH::Vec3 landing, float32 swing_time) const
 {
 	const BalanceLeg& stance = mLegs[stance_leg];
 	const JPH::Vec3 side = mGroundFrame.Up.Cross(mForward);
@@ -879,7 +1109,7 @@ float32 RagdollBalance::GetLandingCaptureError(uint32 stance_leg, const JPH::Vec
 	uint32 count = 0;
 
 	for (uint32 corner = 0; corner < scSoleCorners; corner++) {
-		points[count++] = mGroundFrame.ToPlane(stance.ContactCorners[corner]);
+		points[count++] = mGroundFrame.ToPlane(stance.SoleWorld[corner]);
 	}
 
 	for (uint32 corner = 0; corner < scSoleCorners; corner++) {
@@ -890,7 +1120,7 @@ float32 RagdollBalance::GetLandingCaptureError(uint32 stance_leg, const JPH::Vec
 
 	count = BuildHull(points, count, hull);
 
-	const float32 growth = std::exp(mOmega * scSwingTime);
+	const float32 growth = std::exp(mOmega * swing_time);
 	const Vec2f capture = mGroundFrame.ToPlane(mCapturePoint);
 	const Vec2f pressure = GetStancePressure(stance, mGroundFrame, capture);
 	const Vec2f predicted = pressure + (capture - pressure) * growth;
@@ -925,8 +1155,11 @@ JPH::Vec3 RagdollBalance::PlanLanding(uint32 swing_leg, uint32 stance_leg, float
 	const JPH::Vec3 side = mGroundFrame.Up.Cross(mForward) * swing.SideSign;
 
 	// Aim at the predicted capture point
+	// Fades with the error it follows, whose direction spins round as the error passes through nothing
+	const float32 margin = std::min(pressure_point_error.Length(), scLandingMargin);
+
 	const JPH::Vec3 landing_point = mGroundFrame.AxisU * predicted.X + mGroundFrame.AxisV * predicted.Y +
-									direction * scLandingMargin + side * (scLandingSideMargin + scStanceWidenMargin);
+									direction * margin + side * (scLandingSideMargin + scStanceWidenMargin);
 
 	return FitLanding(swing_leg, stance_leg, landing_point);
 }
@@ -974,7 +1207,7 @@ JPH::Vec3 RagdollBalance::FitLanding(uint32 swing_leg, uint32 stance_leg, JPH::V
 		step *= scMaxStepLength / step_length;
 	}
 
-	return ToGround(stance_center + step);
+	return ToLanding(stance_center + step);
 }
 
 JPH::Vec3 RagdollBalance::GetHeadingForward(const JPH::Quat& orientation, const JPH::Quat& rest) const
@@ -995,6 +1228,50 @@ JPH::Quat RagdollBalance::GetHeadingRotation(const JPH::Vec3 forward) const
 JPH::Vec3 RagdollBalance::ToGround(const JPH::Vec3 point) const
 {
 	return mGroundFrame.Horizontal(point) + mGroundFrame.Up * mGroundHeight;
+}
+
+JPH::Vec3 RagdollBalance::ToLanding(const JPH::Vec3 point) const
+{
+	const JPH::Vec3 along_sole = mForward * mpRig->FootHalfLength;
+
+	const float32 height = std::max({ GetGroundAt(point), GetGroundAt(point + along_sole),
+									  GetGroundAt(point - along_sole) });
+
+	return mGroundFrame.Horizontal(point) + mGroundFrame.Up * height;
+}
+
+bool RagdollBalance::ProbeSurface(const JPH::Vec3 point, float32& out_height) const
+{
+	const JPH::Vec3 origin = mGroundFrame.Horizontal(point) + mGroundFrame.Up * mCenterOfMass.Dot(mGroundFrame.Up);
+	const RayResult hit = gPhysics->pBackend->RaycastStaticNoLock(Vec3f::FromJolt(origin),
+																  Vec3f::FromJolt(-mGroundFrame.Up * scProbeLength));
+
+	if (!hit.bHit || Vec3f::ToJolt(hit.Normal).Dot(mGroundFrame.Up) < scSupportNormalMinUp) {
+		return false;
+	}
+
+	out_height = Vec3f::ToJolt(hit.Point).Dot(mGroundFrame.Up);
+
+	return true;
+}
+
+float32 RagdollBalance::GetGroundAt(const JPH::Vec3 point) const
+{
+	float32 probe = 0.0f;
+
+	if (!mbHasGroundProbe || !ProbeSurface(point, probe)) {
+		return mGroundHeight;
+	}
+
+	// Measured from the probe under the planted foot rather than taken as is, since the feet stand a little way into
+	// what they stand on
+	const float32 difference = probe - mGroundProbe;
+
+	if (std::abs(difference) < scSameSurface) {
+		return mGroundHeight;
+	}
+
+	return mGroundHeight + difference;
 }
 
 } // namespace fx::physics

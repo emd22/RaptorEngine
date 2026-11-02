@@ -1,0 +1,492 @@
+/*
+ * File:        ragdoll_tests.strata
+ * Description: Ragdoll tests for RaptorData/Data/blockouts/ragdoll_tests.prx. Attached to the map's test_runner volume
+ *              and runs on a loop while the game is simulating. Press J to skip to the next round.
+ *
+ *              Falls are in front of the spawn point. Seven NPCs stand at the edges of ledges (shortest on the left), and
+ *              a floating orange block pushes each one off, so the push is a real physics contact.
+ *
+ *              Tosses are behind the spawn point. Seven NPCs stand in a row (slowest on the left) and a box flies at
+ *              each one, launched from further away the faster it is so that every flight takes the same time.
+ *
+ *              Results go to stdout. A test fails if nothing happened to the NPC, if it fell through the floor or if its
+ *              ragdoll blew up. How hurt the NPC got is printed but not judged.
+ */
+
+import ../interop;
+import ../common;
+import ../keyboard;
+
+const int BAY_COUNT = 7;
+const float BAY_SPACING = 5.0f;
+const float GRAVITY = 9.81f;
+
+/* Falls */
+const int FALL_ROUND_COUNT = 3;
+const float FALL_ROUND_TIME = 11.0f;
+const float PUSH_START_TIME = 1.0f;
+const float NPC_EDGE_DISTANCE = 0.6f;
+const float RAM_SIZE = 2.0f;
+const float RAM_MASS = 400.0f;
+const float RAM_SPEED = 2.5f;
+const float RAM_START_GAP = 0.7f;
+const float RAM_HOVER = 0.05f;
+
+/* Tosses */
+const int TOSS_ROUND_COUNT = 6;
+const float TOSS_ROUND_TIME = 8.0f;
+const float TOSS_LIMP_ROUND_TIME = 12.0f;
+const float TOSS_START_TIME = 1.5f;
+const float TOSS_LIMP_START_TIME = 6.0f;
+const float TOSS_ROW_Z = 40.0f;
+const float TOSS_FLIGHT_TIME = 0.5f;
+
+/* Checks */
+const float MIN_REACTION_DISTANCE = 0.02f;
+/* A light box barely shifts a pelvis lying on the floor, but a ragdoll at rest would not move at all */
+const float MIN_LIMP_REACTION_SPEED = 0.05f;
+const float FLOOR_TOLERANCE = 0.3f;
+const float EXPLODED_SPEED_MARGIN = 12.0f;
+/* A hit that only just nudges the whole body should not put it on the floor. Matches b_npc_min_collision_knock. */
+const float NPC_MASS = 75.0f;
+const float MAX_NUDGE_SPEED = 0.15f;
+/* Above this the pelvis should reach at least half of the speed the box's momentum gives the body */
+const float MIN_CHECKED_KNOCK_SPEED = 1.0f;
+
+float[] FALL_HEIGHTS = { 0.5f, 1.0f, 2.0f, 3.0f, 5.0f, 8.0f, 12.0f };
+float[] TOSS_SPEEDS = { 2.0f, 4.0f, 6.0f, 8.0f, 12.0f, 16.0f, 24.0f };
+
+/* Per round, in the order they run */
+float[] FALL_YAWS = { 0.0f, 3.1415927f, 1.5707963f };
+float[] TOSS_MASSES = { 2.0f, 10.0f, 40.0f, 10.0f, 10.0f, 10.0f };
+float[] TOSS_SIZES = { 0.15f, 0.25f, 0.45f, 0.25f, 0.25f, 0.25f };
+/* Height the box arrives at. 0 aims at the pelvis of a limp target. */
+float[] TOSS_HEIGHTS = { 1.3f, 1.3f, 1.3f, 1.65f, 0.6f, 0.0f };
+
+int[] npcs = { 0; 7 };
+long[] props = { 0l; 7 };
+float[] start_x = { 0.0f; 7 };
+float[] start_y = { 0.0f; 7 };
+float[] start_z = { 0.0f; 7 };
+float[] peak_speed = { 0.0f; 7 };
+int[] worst_state = { 0; 7 };
+
+int round_index = 0;
+float round_time = 0.0f;
+bool round_started = false;
+bool action_started = false;
+bool rams_stopped = false;
+int passed = 0;
+int failed = 0;
+
+long saved_max_active = 0l;
+float saved_active_distance = 0.0f;
+
+
+bool is_fall_round() { return round_index < FALL_ROUND_COUNT; }
+bool is_limp_round() { return !is_fall_round() && TOSS_HEIGHTS[round_index - FALL_ROUND_COUNT] <= 0.0f; }
+/* The two rows are seen from opposite sides, so mirror one to put the first bay on the viewer's left in both */
+float toss_x(int bay) { return ((float)bay - 3.0f) * BAY_SPACING; }
+float ledge_x(int bay) { return -toss_x(bay); }
+
+float round_length()
+{
+	if (is_fall_round()) {
+		return FALL_ROUND_TIME;
+	}
+
+	if (is_limp_round()) {
+		return TOSS_LIMP_ROUND_TIME;
+	}
+
+	return TOSS_ROUND_TIME;
+}
+
+cstring state_name(int state)
+{
+	if (state == (int)NPC_STATE.STANDING) {
+		return "standing";
+	}
+
+	if (state == (int)NPC_STATE.BALANCING) {
+		return "balancing";
+	}
+
+	if (state == (int)NPC_STATE.FALLEN) {
+		return "fallen";
+	}
+
+	if (state == (int)NPC_STATE.DYING) {
+		return "dying";
+	}
+
+	if (state == (int)NPC_STATE.RAGDOLL) {
+		return "dead";
+	}
+
+	return "gone";
+}
+
+cstring toss_target_name(int toss)
+{
+	if (TOSS_HEIGHTS[toss] >= 1.5f) {
+		return "head";
+	}
+
+	if (TOSS_HEIGHTS[toss] <= 0.8f) {
+		return "legs";
+	}
+
+	return "chest";
+}
+
+void print_round_title()
+{
+	printf("[ragdoll_test] Round %d of %d: ", round_index + 1, FALL_ROUND_COUNT + TOSS_ROUND_COUNT);
+
+	if (is_fall_round()) {
+		if (round_index == 0) {
+			printf("pushed off a ledge from behind\n");
+		}
+		else if (round_index == 1) {
+			printf("pushed off a ledge from the front\n");
+		}
+		else {
+			printf("pushed off a ledge from the side\n");
+		}
+
+		return;
+	}
+
+	const int toss = round_index - FALL_ROUND_COUNT;
+
+	printf("%.0f kg box tossed at ", TOSS_MASSES[toss]);
+
+	if (is_limp_round()) {
+		printf("a limp ragdoll\n");
+	}
+	else {
+		printf("an NPC's %s\n", toss_target_name(toss));
+	}
+}
+
+void destroy_round()
+{
+	for (int bay = 0; bay < BAY_COUNT; bay++) {
+		npc_destroy(npcs[bay]);
+		prop_destroy(props[bay]);
+
+		npcs[bay] = 0;
+		props[bay] = 0l;
+	}
+}
+
+void spawn_npc(int bay, float3 position, float yaw)
+{
+	npcs[bay] = npc_spawn(position, yaw);
+
+	const float3 pelvis = npc_position(npcs[bay]);
+
+	start_x[bay] = pelvis.x;
+	start_y[bay] = pelvis.y;
+	start_z[bay] = pelvis.z;
+
+	peak_speed[bay] = 0.0f;
+	worst_state[bay] = (int)NPC_STATE.STANDING;
+}
+
+void start_round()
+{
+	round_time = 0.0f;
+	round_started = true;
+	action_started = false;
+	rams_stopped = false;
+
+	print_round_title();
+
+	for (int bay = 0; bay < BAY_COUNT; bay++) {
+		if (is_fall_round()) {
+			spawn_npc(bay, float3(ledge_x(bay), FALL_HEIGHTS[bay], -NPC_EDGE_DISTANCE), FALL_YAWS[round_index]);
+		}
+		else {
+			/* Facing the boxes */
+			spawn_npc(bay, float3(toss_x(bay), 0.0f, TOSS_ROW_Z), 0.0f);
+
+			if (is_limp_round()) {
+				npc_behaviour_trigger(npcs[bay], "dying");
+			}
+		}
+	}
+}
+
+float3 ram_position_for(int bay)
+{
+	const float ram_front_z = -NPC_EDGE_DISTANCE - RAM_START_GAP;
+
+	return float3(ledge_x(bay), FALL_HEIGHTS[bay] + RAM_SIZE * 0.5f + RAM_HOVER, ram_front_z - RAM_SIZE * 0.5f);
+}
+
+void start_pushes()
+{
+	for (int bay = 0; bay < BAY_COUNT; bay++) {
+		props[bay] = prop_spawn_box("proto_orange", RAM_SIZE, RAM_MASS, 0.0f, ram_position_for(bay), float3(0.0f, 0.0f, RAM_SPEED));
+	}
+}
+
+/* Stops at the edge of the ledge, leaving the NPC to go over on its own momentum */
+void update_rams()
+{
+	const float stop_z = -RAM_SIZE * 0.5f;
+	const float travel_time = (stop_z - ram_position_for(0).z) / RAM_SPEED;
+
+	float speed = RAM_SPEED;
+
+	if (round_time - PUSH_START_TIME >= travel_time) {
+		speed = 0.0f;
+	}
+
+	for (int bay = 0; bay < BAY_COUNT; bay++) {
+		prop_drive(props[bay], float3(0.0f, 0.0f, speed));
+	}
+}
+
+void start_tosses()
+{
+	const int toss = round_index - FALL_ROUND_COUNT;
+
+	for (int bay = 0; bay < BAY_COUNT; bay++) {
+		const float3 pelvis = npc_position(npcs[bay]);
+
+		float height = TOSS_HEIGHTS[toss];
+
+		/* Raised by half the box so it does not start inside the floor */
+		if (height <= 0.0f) {
+			height = pelvis.y + TOSS_SIZES[toss] * 0.5f;
+		}
+
+		/* The start of the arc is the same height as its end, so the box still arrives at about the rated speed */
+		const float3 launch = float3(pelvis.x, height, pelvis.z + TOSS_SPEEDS[bay] * TOSS_FLIGHT_TIME);
+		const float3 velocity = float3(0.0f, GRAVITY * TOSS_FLIGHT_TIME * 0.5f, -TOSS_SPEEDS[bay]);
+
+		props[bay] = prop_spawn_box("proto_blue", TOSS_SIZES[toss], TOSS_MASSES[toss], 1.0f, launch, velocity);
+
+			start_x[bay] = pelvis.x;
+		start_y[bay] = pelvis.y;
+		start_z[bay] = pelvis.z;
+		peak_speed[bay] = 0.0f;
+	}
+}
+
+void track_npcs()
+{
+	for (int bay = 0; bay < BAY_COUNT; bay++) {
+		/* Speeds only count once the test has started, so spawning and settling cannot trip the check */
+		if (!action_started) {
+			continue;
+		}
+
+		const float3 velocity = npc_velocity(npcs[bay]);
+
+		peak_speed[bay] = fmax(peak_speed[bay], float_sqrt(dot(velocity, velocity)));
+
+		const int state = (int)npc_state(npcs[bay]);
+
+		if (state > worst_state[bay]) {
+			worst_state[bay] = state;
+		}
+	}
+}
+
+/* The speed both bodies share if the box and the NPC leave the collision together */
+float knock_speed(int bay)
+{
+	const float mass = TOSS_MASSES[round_index - FALL_ROUND_COUNT];
+
+	return TOSS_SPEEDS[bay] * mass / (mass + NPC_MASS);
+}
+
+float expected_speed(int bay)
+{
+	if (is_fall_round()) {
+		return float_sqrt(2.0f * GRAVITY * (FALL_HEIGHTS[bay] + 1.0f)) + RAM_SPEED;
+	}
+
+	return TOSS_SPEEDS[bay];
+}
+
+cstring pass_word(bool ok)
+{
+	if (ok) {
+		return "PASS";
+	}
+
+	return "FAIL";
+}
+
+void report_bay(int bay)
+{
+	const float3 position = npc_position(npcs[bay]);
+
+	const float dx = position.x - start_x[bay];
+	const float dz = position.z - start_z[bay];
+	const float moved = float_sqrt(dx * dx + dz * dz);
+
+	const int final_state = (int)npc_state(npcs[bay]);
+
+	cstring failure = "";
+	bool ok = true;
+
+	if (position.x != position.x || position.y != position.y || position.z != position.z) {
+		ok = false;
+		failure = "position is NaN";
+	}
+	else if (final_state == (int)NPC_STATE.GONE) {
+		ok = false;
+		failure = "NPC is gone";
+	}
+	else if (position.y < -FLOOR_TOLERANCE) {
+		ok = false;
+		failure = "fell through the floor";
+	}
+	else if (peak_speed[bay] > expected_speed(bay) + EXPLODED_SPEED_MARGIN) {
+		ok = false;
+		failure = "ragdoll blew up";
+	}
+	else if (!is_fall_round() && !is_limp_round() && knock_speed(bay) >= MAX_NUDGE_SPEED && moved < MIN_REACTION_DISTANCE && worst_state[bay] == (int)NPC_STATE.STANDING) {
+		ok = false;
+		failure = "did not react";
+	}
+	else if (!is_fall_round() && !is_limp_round() && knock_speed(bay) < MAX_NUDGE_SPEED && worst_state[bay] >= (int)NPC_STATE.FALLEN) {
+		ok = false;
+		failure = "fell from a nudge";
+	}
+	else if (!is_fall_round() && !is_limp_round() && knock_speed(bay) >= MIN_CHECKED_KNOCK_SPEED && peak_speed[bay] < knock_speed(bay) * 0.5f) {
+		ok = false;
+		failure = "knock is too weak for the momentum";
+	}
+	else if (is_fall_round() && position.z < 0.0f) {
+		ok = false;
+		failure = "still on the ledge";
+	}
+	else if (is_limp_round() && peak_speed[bay] < MIN_LIMP_REACTION_SPEED) {
+		ok = false;
+		failure = "did not react";
+	}
+
+	if (is_fall_round()) {
+		printf("[ragdoll_test]   %5.1f m  ", FALL_HEIGHTS[bay]);
+	}
+	else {
+		printf("[ragdoll_test]   %5.1f m/s (knock %.2f)", TOSS_SPEEDS[bay], knock_speed(bay));
+	}
+
+	printf(" %s: %s (worst %s), health %.0f, moved %.2f m, pelvis y %.2f, peak %.1f m/s",
+		   pass_word(ok), state_name(final_state), state_name(worst_state[bay]), npc_health(npcs[bay]), moved,
+		   position.y, peak_speed[bay]);
+
+	if (ok) {
+		passed++;
+		printf("\n");
+	}
+	else {
+		failed++;
+		printf(" (%s)\n", failure);
+	}
+}
+
+void next_round()
+{
+	round_started = false;
+	round_index++;
+
+	if (round_index >= FALL_ROUND_COUNT + TOSS_ROUND_COUNT) {
+		printf("[ragdoll_test] Done: %d passed, %d failed. Starting over.\n", passed, failed);
+
+		round_index = 0;
+		passed = 0;
+		failed = 0;
+	}
+}
+
+void end_round()
+{
+	for (int bay = 0; bay < BAY_COUNT; bay++) {
+		report_bay(bay);
+	}
+
+	destroy_round();
+	next_round();
+}
+
+void object_start(OBJECT self)
+{
+	saved_max_active = cvar_get_int("b_npc_max_active", 4l);
+	saved_active_distance = cvar_get_float("b_npc_active_distance", 50.0f);
+
+	/* Every NPC in a round needs physics at once, wherever the player is looking from */
+	cvar_set_int("b_npc_max_active", 0l);
+	cvar_set_float("b_npc_active_distance", 0.0f);
+
+	round_index = 0;
+	round_started = false;
+	passed = 0;
+	failed = 0;
+}
+
+void object_update(OBJECT self, float delta_time)
+{
+	if (!npc_model_ready()) {
+		return;
+	}
+
+	if (!round_started) {
+		start_round();
+		return;
+	}
+
+	if (KEY.K_J.is_pressed()) {
+		printf("[ragdoll_test] Skipped\n");
+		destroy_round();
+		next_round();
+		return;
+	}
+
+	round_time += delta_time;
+
+	if (is_fall_round()) {
+		if (!action_started && round_time >= PUSH_START_TIME) {
+			action_started = true;
+			start_pushes();
+		}
+
+		if (action_started) {
+			update_rams();
+		}
+	}
+	else {
+		float start_time = TOSS_START_TIME;
+
+		if (is_limp_round()) {
+			start_time = TOSS_LIMP_START_TIME;
+		}
+
+		if (!action_started && round_time >= start_time) {
+			action_started = true;
+			start_tosses();
+		}
+	}
+
+	track_npcs();
+
+	if (round_time >= round_length()) {
+		end_round();
+	}
+}
+
+void object_stop(OBJECT self)
+{
+	destroy_round();
+
+	cvar_set_int("b_npc_max_active", saved_max_active);
+	cvar_set_float("b_npc_active_distance", saved_active_distance);
+}

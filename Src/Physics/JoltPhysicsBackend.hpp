@@ -186,6 +186,7 @@ FX_FORCE_INLINE uint32 GetSerial(uint64 user_data) { return static_cast<uint32>(
 struct RagdollContact
 {
 	JPH::BodyID Body {};
+	JPH::BodyID OtherBody {};
 
 	Vec3f Point = Vec3f::sZero;
 	Vec3f Normal = Vec3f::sZero;
@@ -193,6 +194,7 @@ struct RagdollContact
 	float32 Speed = 0.0f;
 
 	float32 OtherSpeed = 0.0f;
+	Vec3f OtherVelocity = Vec3f::sZero;
 	float32 OtherMass = 0.0f;
 
 	bool bOtherStatic = false;
@@ -214,10 +216,20 @@ struct SoundImpact
 
 struct BodyGroundContact
 {
+	/// Enough for two four point manifolds, which is what a flat box sole gets across a frame's two collision steps
+	static constexpr uint32 scMaxPoints = 8;
+
 	uint32 Count = 0;
 	Vec3f Point = Vec3f::sZero;
 	Vec3f Normal = Vec3f::sZero;
 	float32 Speed = 0.0f;
+
+	/// Friction the solver uses between this body and the surface
+	float32 Friction = 0.0f;
+
+	/// Where the body touches, on the surface, newest last once there are more than fit
+	uint32 PointCount = 0;
+	JPH::Vec3 Points[scMaxPoints];
 };
 
 // An example contact listener
@@ -226,6 +238,8 @@ class PhContactListener : public JPH::ContactListener
 public:
 	static constexpr size_t scMaxQueuedImpacts = 64;
 	static constexpr size_t scMaxTrackedBodies = 512;
+	/// Furthest a contact point can be short of the surface and still count as touching it (m)
+	static constexpr float32 scMaxGroundContactGap = 0.005f;
 
 	PhContactListener()
 	{
@@ -282,6 +296,12 @@ public:
 		out_contact.Point = Vec3f(accum.PointSum / static_cast<float32>(accum.Count));
 		out_contact.Normal = Vec3f(accum.NormalSum.Normalized());
 		out_contact.Speed = accum.Speed;
+		out_contact.Friction = accum.Friction;
+		out_contact.PointCount = std::min(accum.PointTotal, BodyGroundContact::scMaxPoints);
+
+		for (uint32 i = 0; i < out_contact.PointCount; i++) {
+			out_contact.Points[i] = accum.Points[i];
+		}
 	}
 
 	// See: ContactListener
@@ -299,7 +319,7 @@ public:
 								const JPH::ContactManifold& inManifold, JPH::ContactSettings& ioSettings) override
 	{
 		QueueSoundImpact(inBody1, inBody2, inManifold);
-		RecordBodyGroundContact(inBody1, inBody2, inManifold);
+		RecordBodyGroundContact(inBody1, inBody2, inManifold, ioSettings);
 
 		const bool first_tagged = RagdollUserData::Matches(inBody1.GetUserData());
 		const bool second_tagged = RagdollUserData::Matches(inBody2.GetUserData());
@@ -334,10 +354,12 @@ public:
 
 		RagdollContact contact;
 		contact.Body = ragdoll_body.GetID();
+		contact.OtherBody = other_body.GetID();
 		contact.Point = Vec3f(point.GetX(), point.GetY(), point.GetZ());
 		contact.Normal = Vec3f(normal.GetX(), normal.GetY(), normal.GetZ());
 		contact.Speed = closing;
 		contact.OtherSpeed = other_velocity.Dot(normal);
+		contact.OtherVelocity = Vec3f(other_velocity.GetX(), other_velocity.GetY(), other_velocity.GetZ());
 		contact.bOtherStatic = other_body.IsStatic();
 		contact.RagdollSerial = RagdollUserData::GetSerial(ragdoll_body.GetUserData());
 
@@ -359,7 +381,7 @@ public:
 	virtual void OnContactPersisted(const JPH::Body& inBody1, const JPH::Body& inBody2,
 									const JPH::ContactManifold& inManifold, JPH::ContactSettings& ioSettings) override
 	{
-		RecordBodyGroundContact(inBody1, inBody2, inManifold);
+		RecordBodyGroundContact(inBody1, inBody2, inManifold, ioSettings);
 	}
 
 	virtual void OnContactRemoved(const JPH::SubShapeIDPair& inSubShapePair) override {}
@@ -387,10 +409,13 @@ private:
 		JPH::Vec3 PointSum = JPH::Vec3::sZero();
 		JPH::Vec3 NormalSum = JPH::Vec3::sZero();
 		float32 Speed = 0.0f;
+		float32 Friction = 0.0f;
+		uint32 PointTotal = 0;
+		JPH::Vec3 Points[BodyGroundContact::scMaxPoints];
 	};
 
 	void RecordBodyGroundContact(const JPH::Body& inBody1, const JPH::Body& inBody2,
-								 const JPH::ContactManifold& inManifold)
+								 const JPH::ContactManifold& inManifold, const JPH::ContactSettings& settings)
 	{
 		const bool first_is_body = inBody2.IsStatic() && RagdollUserData::Matches(inBody1.GetUserData());
 		const bool second_is_body = inBody1.IsStatic() && RagdollUserData::Matches(inBody2.GetUserData());
@@ -407,22 +432,44 @@ private:
 		}
 
 		const JPH::Vec3 normal = first_is_body ? -inManifold.mWorldSpaceNormal : inManifold.mWorldSpaceNormal;
-		const uint32 point_count = static_cast<uint32>(first_is_body ? inManifold.mRelativeContactPointsOn1.size()
-																	 : inManifold.mRelativeContactPointsOn2.size());
+		const uint32 manifold_points = static_cast<uint32>(first_is_body ? inManifold.mRelativeContactPointsOn1.size()
+																		 : inManifold.mRelativeContactPointsOn2.size());
+
+		JPH::Vec3 point_sum = JPH::Vec3::sZero();
+		JPH::Vec3 surface_points[BodyGroundContact::scMaxPoints];
+		uint32 point_count = 0;
+
+		for (uint32 i = 0; i < manifold_points; i++) {
+			const JPH::Vec3 on_1 = JPH::Vec3(inManifold.GetWorldSpaceContactPointOn1(i));
+			const JPH::Vec3 on_2 = JPH::Vec3(inManifold.GetWorldSpaceContactPointOn2(i));
+
+			// Jolt reports contacts before they touch, so it can stop a fast body in time. A point still short of the
+			// surface carries no weight and gives no grip
+			if ((on_1 - on_2).Dot(inManifold.mWorldSpaceNormal) < -scMaxGroundContactGap) {
+				continue;
+			}
+
+			if (first_is_body) {
+				point_sum += on_1;
+			}
+			else {
+				point_sum += on_2;
+			}
+
+			if (point_count < BodyGroundContact::scMaxPoints) {
+				if (first_is_body) {
+					surface_points[point_count] = on_2;
+				}
+				else {
+					surface_points[point_count] = on_1;
+				}
+
+				point_count++;
+			}
+		}
 
 		if (point_count == 0) {
 			return;
-		}
-
-		JPH::Vec3 point_sum = JPH::Vec3::sZero();
-
-		for (uint32 i = 0; i < point_count; i++) {
-			if (first_is_body) {
-				point_sum += JPH::Vec3(inManifold.GetWorldSpaceContactPointOn1(i));
-			}
-			else {
-				point_sum += JPH::Vec3(inManifold.GetWorldSpaceContactPointOn2(i));
-			}
 		}
 
 		const JPH::Vec3 point = point_sum / static_cast<float32>(point_count);
@@ -435,6 +482,12 @@ private:
 		accum.PointSum += point;
 		accum.NormalSum += normal;
 		accum.Speed = std::max(accum.Speed, speed);
+		accum.Friction = settings.mCombinedFriction;
+
+		for (uint32 i = 0; i < point_count; i++) {
+			accum.Points[accum.PointTotal % BodyGroundContact::scMaxPoints] = surface_points[i];
+			accum.PointTotal++;
+		}
 	}
 
 	void QueueSoundImpact(const JPH::Body& inBody1, const JPH::Body& inBody2, const JPH::ContactManifold& inManifold)
@@ -530,6 +583,8 @@ public:
 
 	RayResult Raycast(const Vec3f origin, const Vec3f direction, JPH::BodyID ignore_body = JPH::BodyID()) const;
 	RayResult RaycastStatic(const Vec3f origin, const Vec3f direction) const;
+	/// For use inside a physics step, where the locking queries aren't allowed
+	RayResult RaycastStaticNoLock(const Vec3f origin, const Vec3f direction) const;
 	SizedArray<JPH::BodyID> RaycastObjects(const Vec3f origin, const Vec3f direction) const;
 
 	FLOAT4 RaycastGetFaceOfBox(JPH::Body* body, const Vec3f origin, const Vec3f direction) const;

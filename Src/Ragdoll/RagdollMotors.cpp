@@ -9,6 +9,7 @@
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
 #include <algorithm>
+#include <cmath>
 
 namespace fx::physics {
 
@@ -22,6 +23,11 @@ constexpr float32 scFallLimp = 0.65f;
 constexpr float32 scMinSubtreeInertia = 1e-4f;
 constexpr float32 scGravityCompFullStrength = 0.25f;
 constexpr float32 scOverrideFadeTime = 0.4f;
+/// How quickly a joint's target eases towards what's asked for (rad/s), critically damped
+constexpr float32 scMotorTargetOmega = 40.0f;
+constexpr float32 scMotorPreciseOmega = 150.0f;
+/// How quickly a joint's stiffness and torque limit change (s)
+constexpr float32 scMotorGainTime = 0.03f;
 
 constexpr float32 scRootAssistFrequency = 6.0f;
 constexpr float32 scRootAssistDamping = 1.0f;
@@ -68,6 +74,8 @@ void Ragdoll::OnStep(const JPH::PhysicsStepListenerContext& inContext)
 
 	// Ground contacts are cleared before each frame's update and filled during collision steps, so on the first step
 	// after a clear they are empty and the balance controller keeps its previous contact state
+	static_assert(JoltPhysicsBackend::scCollisionSteps >= 2, "A single collision step never has fresh ground contacts");
+
 	const uint32 contact_generation = gPhysics->pBackend->GetGroundContactGeneration();
 	const bool contacts_fresh = (contact_generation == mContactGeneration);
 	mContactGeneration = contact_generation;
@@ -75,13 +83,19 @@ void Ragdoll::OnStep(const JPH::PhysicsStepListenerContext& inContext)
 	if (!mbLimp) {
 		UpdateSubtrees(body_interface);
 
+		for (FootPlant& plant : mFootPlants) {
+			plant.bWanted = false;
+		}
+
 		if (mbBalancing) {
 			mBalance.Step(*this, body_interface, inContext.mDeltaTime, gravity, contacts_fresh);
 		}
+
+		ApplyFootPlants();
 	}
 
 	for (uint32 i = 0; i < mSegments.Size; i++) {
-		ApplyMotor(i);
+		ApplyMotor(i, inContext.mDeltaTime);
 	}
 
 	if (!mbBalancing && mOverrideFade > 0.0f) {
@@ -217,7 +231,39 @@ JPH::Quat Ragdoll::LevelFoot(uint32 body_index, const JPH::Quat& relative) const
 	return RelativeRotation(parent, (level * foot).Normalized());
 }
 
-void Ragdoll::ApplyMotor(uint32 body_index)
+JPH::Quat Ragdoll::FilterMotorTarget(MotorFilter& filter, const JPH::Quat& target, float32 omega,
+									 float32 delta_time) const
+{
+	JPH::Quat aligned = target;
+
+	if (filter.Target.Dot(target) < 0.0f) {
+		aligned = -target;
+	}
+
+	// The exact step of a critically damped spring on the angle to the target, so it can't overshoot at any time step
+	const JPH::Vec3 offset = GetRotationVector(RelativeRotation(aligned, filter.Target));
+	const float32 decay = std::exp(-omega * delta_time);
+	const JPH::Vec3 drift = (filter.Velocity + offset * omega) * delta_time;
+
+	const JPH::Vec3 next_offset = (offset + drift) * decay;
+	filter.Velocity = (filter.Velocity - drift * omega) * decay;
+
+	filter.Target = (aligned * IntegrateRotation(JPH::Quat::sIdentity(), next_offset, 1.0f)).Normalized();
+
+	return filter.Target;
+}
+
+void Ragdoll::FilterMotorGains(MotorFilter& filter, const JPH::SpringSettings& spring, float32 torque,
+							   float32 delta_time) const
+{
+	const float32 blend = 1.0f - std::exp(-delta_time / scMotorGainTime);
+
+	filter.Stiffness += (spring.mStiffness - filter.Stiffness) * blend;
+	filter.Damping += (spring.mDamping - filter.Damping) * blend;
+	filter.Torque += (torque - filter.Torque) * blend;
+}
+
+void Ragdoll::ApplyMotor(uint32 body_index, float32 delta_time)
 {
 	const RDSegmentInfo& info = mSegments[body_index];
 
@@ -232,9 +278,12 @@ void Ragdoll::ApplyMotor(uint32 body_index)
 	const bool is_powered = !mbLimp && (info.Mode == eRagdollBodyMode::Powered) &&
 							(motor_override.Mode != eMotorOverride::Off);
 
+	MotorFilter& filter = mMotorFilters[body_index];
+
 	if (!is_powered) {
 		joint->SetSwingMotorState(JPH::EMotorState::Off);
 		joint->SetTwistMotorState(JPH::EMotorState::Off);
+		filter.bValid = false;
 		return;
 	}
 
@@ -256,15 +305,30 @@ void Ragdoll::ApplyMotor(uint32 body_index)
 	}
 
 	const JPH::SpringSettings spring = MakeSpring(inertia, omega, info.Muscle.Damping);
-	const float32 torque = info.Muscle.MaxTorque * strength;
+	const float32 torque = std::min(info.Muscle.MaxTorque * strength, motor_override.MaxTorque);
+
+	// A muscle that has just switched on picks up from wherever the joint already is
+	if (!filter.bValid) {
+		filter.Target = RelativeRotation(mSegmentStates[info.ParentBody].Orientation,
+										 mSegmentStates[body_index].Orientation);
+		filter.Velocity = JPH::Vec3::sZero();
+		filter.Stiffness = spring.mStiffness;
+		filter.Damping = spring.mDamping;
+		filter.Torque = torque;
+		filter.bValid = true;
+	}
+
+	FilterMotorGains(filter, spring, torque, delta_time);
+
+	const JPH::SpringSettings smooth_spring(JPH::ESpringMode::StiffnessAndDamping, filter.Stiffness, filter.Damping);
 
 	JPH::MotorSettings& swing = joint->GetSwingMotorSettings();
 	JPH::MotorSettings& twist = joint->GetTwistMotorSettings();
 
-	swing.mSpringSettings = spring;
-	swing.SetTorqueLimit(torque);
-	twist.mSpringSettings = spring;
-	twist.SetTorqueLimit(torque);
+	swing.mSpringSettings = smooth_spring;
+	swing.SetTorqueLimit(filter.Torque);
+	twist.mSpringSettings = smooth_spring;
+	twist.SetTorqueLimit(filter.Torque);
 
 	joint->SetSwingMotorState(JPH::EMotorState::Position);
 	joint->SetTwistMotorState(JPH::EMotorState::Position);
@@ -299,11 +363,19 @@ void Ragdoll::ApplyMotor(uint32 body_index)
 
 	JPH::Quat relative_target = (joint_target * layer.Offset).Normalized();
 
-	if (info.bFoot) {
+	// Only a body standing on its feet wants its soles flat. Falling or lying down, this would bend the ankles to keep
+	// the soles facing the floor whichever way the legs point
+	if (info.bFoot && mbBalancing && !motor_override.bKeepFootPitch) {
 		relative_target = LevelFoot(body_index, relative_target);
 	}
 
-	joint->SetTargetOrientationBS(relative_target);
+	float32 target_omega = scMotorTargetOmega;
+
+	if (motor_override.bPrecise) {
+		target_omega = scMotorPreciseOmega;
+	}
+
+	joint->SetTargetOrientationBS(FilterMotorTarget(filter, relative_target, target_omega, delta_time));
 }
 
 void Ragdoll::ApplyGravityCompensation(JPH::BodyInterface& body_interface, const JPH::Vec3 gravity)
@@ -386,11 +458,151 @@ void Ragdoll::ApplyRootAssist(JPH::BodyInterface& body_interface, const JPH::Vec
 	body_interface.AddTorque(root_id, -(center_of_mass - root.Center).Cross(gravity * (total_mass * mRootAssist)));
 }
 
+void Ragdoll::RequestFootPlant(uint32 leg_index, float32 normal_force, float32 friction, bool level)
+{
+	FootPlant& plant = mFootPlants[leg_index];
+
+	plant.bWanted = true;
+	plant.NormalForce = normal_force;
+	plant.Friction = friction;
+	plant.bLevel = level;
+}
+
+void Ragdoll::ApplyFootPlants()
+{
+	using EAxis = JPH::SixDOFConstraint::EAxis;
+
+	/// How firmly a plant holds its spot and its level, against the weight it carries (Hz)
+	constexpr float32 scPlantFrequency = 15.0f;
+	constexpr float32 scPlantTurnFrequency = 6.0f;
+	/// Furthest a foot can be pulled from its spot before it counts as having slipped there (m)
+	constexpr float32 scMaxPlantStretch = 0.02f;
+	/// Leverage a sole has on its own spin, compared with the sole's half length (m)
+	constexpr float32 scPlantSpinArm = 0.04f;
+
+	for (uint32 leg = 0; leg < RagdollRig::scLimbCount; leg++) {
+		FootPlant& plant = mFootPlants[leg];
+
+		if (plant.pConstraint == nullptr) {
+			continue;
+		}
+
+		if (!plant.bWanted) {
+			if (plant.bActive) {
+				plant.pConstraint->SetEnabled(false);
+				plant.bActive = false;
+			}
+
+			continue;
+		}
+
+		const uint32 foot_body = mRig.Legs[leg].Foot;
+		const RDSegmentInfo& foot = mSegments[foot_body];
+		const RDSegmentState& state = mSegmentStates[foot_body];
+
+		if (!plant.bActive) {
+			plant.Anchor = state.Origin;
+			plant.pConstraint->SetEnabled(true);
+			plant.bActive = true;
+		}
+
+		JPH::Vec3 stretch = state.Origin - plant.Anchor;
+		stretch.SetY(0.0f);
+
+		const float32 stretch_length = stretch.Length();
+
+		if (stretch_length > scMaxPlantStretch) {
+			plant.Anchor += stretch * (1.0f - scMaxPlantStretch / stretch_length);
+		}
+
+		const float32 grip = plant.Friction * plant.NormalForce;
+		const float32 load_mass = std::max(plant.NormalForce / GravityFrame::FromPhysics().Gravity, foot.Mass);
+		const float32 omega = FX_2PI * scPlantFrequency;
+		const JPH::SpringSettings spring = MakeSpring(load_mass, omega, 1.0f);
+
+		for (const EAxis axis : { EAxis::TranslationX, EAxis::TranslationZ }) {
+			JPH::MotorSettings& motor = plant.pConstraint->GetMotorSettings(axis);
+
+			motor.mSpringSettings = spring;
+			motor.SetForceLimit(grip);
+			plant.pConstraint->SetMotorState(axis, JPH::EMotorState::Position);
+		}
+
+		plant.pConstraint->SetTargetPositionCS(plant.Anchor - plant.ConstraintOrigin);
+
+		// The sole lying flat is a matter of where the weight sits on it, so its torque is limited as the centre of
+		// pressure is. A foot rolling off its toes is left to do so
+		const float32 turn_omega = FX_2PI * scPlantTurnFrequency;
+		const JPH::SpringSettings turn_spring = MakeSpring(std::max(foot.Inertia, 0.05f), turn_omega, 1.0f);
+		const JPH::Quat box = state.Orientation * foot.BoxRotation;
+		const JPH::Quat flat = (JPH::Quat::sFromTo(box * JPH::Vec3::sAxisY(), JPH::Vec3::sAxisY()) * state.Orientation)
+								   .Normalized();
+
+		for (const EAxis axis : { EAxis::RotationX, EAxis::RotationZ }) {
+			JPH::MotorSettings& motor = plant.pConstraint->GetMotorSettings(axis);
+
+			motor.mSpringSettings = turn_spring;
+			motor.SetTorqueLimit(plant.NormalForce * mRig.FootHalfLength);
+
+			if (plant.bLevel) {
+				plant.pConstraint->SetMotorState(axis, JPH::EMotorState::Position);
+			}
+			else {
+				plant.pConstraint->SetMotorState(axis, JPH::EMotorState::Off);
+			}
+		}
+
+		JPH::MotorSettings& spin_motor = plant.pConstraint->GetMotorSettings(EAxis::RotationY);
+
+		spin_motor.mSpringSettings = turn_spring;
+		spin_motor.SetTorqueLimit(grip * scPlantSpinArm);
+		plant.pConstraint->SetMotorState(EAxis::RotationY, JPH::EMotorState::Position);
+
+		plant.pConstraint->SetTargetOrientationBS(flat);
+	}
+}
+
 void Ragdoll::ClearMotorOverrides()
 {
 	for (MotorOverride& motor_override : mMotorOverrides) {
 		motor_override = MotorOverride {};
 	}
+}
+
+float32 Ragdoll::GetJointLimitExcess(uint32 body_index) const
+{
+	if (!mbHasMotors || body_index == 0 || body_index >= mSegments.Size) {
+		return 0.0f;
+	}
+
+	const JPH::SwingTwistConstraint* joint = GetJoint(body_index);
+
+	JPH::Quat swing;
+	JPH::Quat twist;
+	joint->GetRotationInConstraintSpace().GetSwingTwist(swing, twist);
+
+	float32 twist_angle = twist.GetRotationAngle(JPH::Vec3::sAxisX());
+
+	if (twist_angle > FX_PI) {
+		twist_angle -= FX_2PI;
+	}
+
+	float32 excess = std::max(
+		{ twist_angle - joint->GetTwistMaxAngle(), joint->GetTwistMinAngle() - twist_angle, 0.0f });
+
+	// Swing is an ellipse in the plane and normal half angles
+	const JPH::Vec3 swing_vector = GetRotationVector(swing);
+	const float32 swing_angle = swing_vector.Length();
+
+	if (swing_angle > 1e-4f) {
+		const float32 ratio_y = (swing_vector.GetY() / swing_angle) / std::max(joint->GetPlaneHalfConeAngle(), 1e-3f);
+		const float32 ratio_z = (swing_vector.GetZ() / swing_angle) / std::max(joint->GetNormalHalfConeAngle(), 1e-3f);
+		const float32 limit = 1.0f / std::sqrt(ratio_y * ratio_y + ratio_z * ratio_z);
+
+		excess = std::max(excess, swing_angle - limit);
+	}
+
+	return MathUtil::RadToDeg(excess);
 }
 
 float32 Ragdoll::GetMotorTorqueFraction(uint32 body_index) const

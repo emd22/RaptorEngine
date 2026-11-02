@@ -57,6 +57,7 @@ enum EDITORTOOL
 
 /* Returns 1.0 if `value` is positive, returns -1.0 if negative. */
 extern float float_sign(float value);
+extern float float_sqrt(float value);
 
 extern float4 float4_round(float4 value);
 extern float4 float4_floor(float4 value);
@@ -304,6 +305,40 @@ extern bool npc_idle(int npc);
 extern int npc_brain_state(int npc);
 /* Logs the active physics budget, physics time and each NPC's brain state. */
 extern void npc_stats();
+
+/* Spawning. The NPC model loads in the background: npc_spawn returns 0 until npc_model_ready returns true. A yaw of 0
+ * faces +Z, and a yaw of `a` faces (sin a, 0, cos a). */
+
+extern bool npc_model_ready();
+extern int npc_spawn(float3 position, float yaw);
+extern void npc_destroy(int npc);
+
+/* Where the pelvis is in world space, which keeps following the NPC after it has fallen. */
+extern float3 npc_position(int npc);
+extern float3 npc_velocity(int npc);
+extern float npc_health(int npc);
+
+/* Must match N_npc_state in Src/Script/ScriptInterop.cpp! */
+enum NPC_STATE
+{
+	GONE,
+	STANDING,
+	BALANCING,
+	FALLEN,
+	DYING,
+	RAGDOLL,
+}
+
+extern NPC_STATE npc_state(int npc);
+
+/* Physics props: dynamic boxes named by the value prop_spawn_box returns. A gravity_scale of 0 makes a prop float.
+ * Props are removed once they get 50 m from the player, after which these calls do nothing. */
+
+extern long prop_spawn_box(cstring material, float size, float mass, float gravity_scale, float3 position, float3 velocity);
+/* Holds a prop at a velocity without letting contacts turn it. Call it every frame for a scripted mover. */
+extern void prop_drive(long prop, float3 velocity);
+extern float3 prop_position(long prop);
+extern void prop_destroy(long prop);
 
 /* CVars */
 

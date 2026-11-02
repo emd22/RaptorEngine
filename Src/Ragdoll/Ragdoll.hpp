@@ -17,6 +17,7 @@
 #include <Core/Types.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/Vec3.hpp>
+#include <limits>
 
 namespace JPH {
 class BodyInterface;
@@ -126,8 +127,14 @@ private:
 		JPH::Quat Target = JPH::Quat::sIdentity();
 		float32 FrequencyScale = 1.0f;
 		float32 Inertia = 0.0f;
+		/// Most torque the muscle can use here, if less than the muscle's own limit
+		float32 MaxTorque = std::numeric_limits<float32>::max();
 		bool bSupported = false;
 		bool bNoGravityComp = false;
+		/// A foot's target is normally levelled to lie flat on the ground. This one keeps its pitch
+		bool bKeepFootPitch = false;
+		/// A leg placing a foot has to get there on time, so its target is eased far less
+		bool bPrecise = false;
 	};
 
 public:
@@ -142,6 +149,35 @@ public:
 
 
 private:
+	/// What a joint's motor last aimed at and how hard, eased towards what's asked for so that a change in behaviour,
+	/// a new hit or a foot landing doesn't reach the muscles as a step
+	struct MotorFilter
+	{
+		JPH::Quat Target = JPH::Quat::sIdentity();
+		JPH::Vec3 Velocity = JPH::Vec3::sZero();
+		float32 Stiffness = 0.0f;
+		float32 Damping = 0.0f;
+		float32 Torque = 0.0f;
+		bool bValid = false;
+	};
+
+	/**
+	 * @brief Holds a loaded foot where it stands, with no more force than friction and its load allow. An iterative
+	 * solver with a whole body resting on a 1 kg foot can't build up the normal force a contact's friction needs before
+	 * the foot has moved, so left to contacts alone a planted foot skates and rocks.
+	 */
+	struct FootPlant
+	{
+		JPH::Ref<JPH::SixDOFConstraint> pConstraint;
+		JPH::Vec3 ConstraintOrigin = JPH::Vec3::sZero();
+		JPH::Vec3 Anchor = JPH::Vec3::sZero();
+		float32 NormalForce = 0.0f;
+		float32 Friction = 0.0f;
+		bool bWanted = false;
+		bool bActive = false;
+		bool bLevel = true;
+	};
+
 	/// A body's pose before the last physics update, so the drawn pose can sit between the last two steps
 	struct BodyPose
 	{
@@ -183,7 +219,14 @@ public:
 		const JPH::Vec3 velocity = mBalance.GetStaggerVelocity();
 		return Vec3f(velocity.GetX(), velocity.GetY(), velocity.GetZ());
 	}
+	FX_FORCE_INLINE void AddBalanceBuckle(float32 depth) { mBalance.AddBuckle(depth); }
 	void RebaseTargets();
+	/// Remembers the bodies' poses, so the skeleton can ease from them to its animation once the bodies have gone back
+	/// to following it. Advance it with SetPoseBlend
+	void BeginPoseBlend();
+	/// 1 draws the remembered pose, 0 the animation
+	FX_FORCE_INLINE void SetPoseBlend(float32 blend) { mPoseBlend = blend; }
+	FX_FORCE_INLINE float32 GetPoseBlend() const { return mPoseBlend; }
 
 	void ClearBodyLayers();
 	void SetBodyLayers(const SizedArray<BodyLayer>& layers, float32 gravity_scale);
@@ -195,7 +238,13 @@ public:
 	}
 
 	float32 GetBodyMass(uint32 body_index) const;
+	/// A body's moment of inertia, averaged over its axes
+	FX_FORCE_INLINE float32 GetBodyInertia(uint32 body_index) const { return mSegments[body_index].Inertia; }
+	/// Height of a leg's sole above the floor beneath it (m), negative if it is under it. Large if there's no floor
+	float32 GetSoleClearance(uint32 leg_index) const;
 	float32 GetWorstJointError() const;
+	/// How far past its limits a joint sits (degrees), 0 while it is inside them
+	float32 GetJointLimitExcess(uint32 body_index) const;
 	bool GetBodyTrackingError(uint32 body_index, float32& out_distance, float32& out_angle) const;
 	Vec3f GetBodyPosition(uint32 body_index) const;
 	Vec3f GetBodyOrigin(uint32 body_index) const;
@@ -219,6 +268,7 @@ public:
 	FX_FORCE_INLINE uint32 GetSegmentCount() const { return static_cast<uint32>(mSegments.Size); }
 
 	FX_FORCE_INLINE float32 GetTotalMass() const { return mTotalMass; }
+	FX_FORCE_INLINE uint32 GetBodyBone(uint32 body_index) const { return mSegments[body_index].BoneIndex; }
 	FX_FORCE_INLINE int32 GetParentBody(uint32 body_index) const { return mSegments[body_index].ParentBody; }
 	FX_FORCE_INLINE bool IsAnchor(uint32 body_index) const { return mSegments[body_index].bAnchor; }
 	FX_FORCE_INLINE bool IsFoot(uint32 body_index) const { return mSegments[body_index].bFoot; }
@@ -258,6 +308,9 @@ private:
 	void DisableSelfCollisions(JPH::RagdollSettings& settings, const JPH::Mat44* joint_matrices, float32 margin);
 	bool AddToPhysicsSystem(JPH::RagdollSettings& settings);
 	void CreateRootAssist(const JPH::Vec3 root_position);
+	void CreateFootPlants();
+	void RequestFootPlant(uint32 leg_index, float32 normal_force, float32 friction, bool level);
+	void ApplyFootPlants();
 	void InitBodyArrays(uint32 joint_count);
 
 	/**
@@ -281,7 +334,10 @@ private:
 	JPH::SwingTwistConstraint* GetJoint(uint32 body_index) const;
 	MotorOverride& SetMotorTarget(uint32 body_index, const JPH::Quat& parent_world, const JPH::Quat& child_world,
 								  float32 frequency_scale = 1.0f, bool supported = false);
-	void ApplyMotor(uint32 body_index);
+	void ApplyMotor(uint32 body_index, float32 delta_time);
+	JPH::Quat FilterMotorTarget(MotorFilter& filter, const JPH::Quat& target, float32 omega, float32 delta_time) const;
+	void FilterMotorGains(MotorFilter& filter, const JPH::SpringSettings& spring, float32 torque,
+						  float32 delta_time) const;
 	JPH::Quat LevelFoot(uint32 body_index, const JPH::Quat& relative) const;
 	void ApplyGravityCompensation(JPH::BodyInterface& body_interface, const JPH::Vec3 gravity);
 	void ApplyRootAssist(JPH::BodyInterface& body_interface, const JPH::Vec3 gravity);
@@ -290,6 +346,8 @@ private:
 
 	void SnapSegmentToTarget(JPH::BodyInterface& body_interface, uint32 body_index, JPH::EActivation activation);
 	void StorePreviousPoses(JPH::BodyInterface& body_interface);
+	void MoveBodiesToPoseBlend();
+	void GetPoseBlendWorld(uint32 body_index, JPH::Vec3& out_position, JPH::Quat& out_orientation) const;
 
 	/**
 	 * @brief Returns the world matrix for a given body segment.
@@ -313,7 +371,7 @@ private:
 
 
 	SizedArray<MotorOverride> mMotorOverrides;
-
+	SizedArray<MotorFilter> mMotorFilters;
 
 	/// Joint targets the balance controller last drove, faded out after it lets go so the legs do not snap
 	SizedArray<JPH::Quat> mOverrideTargets;
@@ -321,11 +379,14 @@ private:
 	float32 mOverrideFade = 0.0f;
 	SizedArray<BodyLayer> mLayers;
 	SizedArray<BodyPose> mPreviousPoses;
+	SizedArray<BodyPose> mPoseBlendFrom;
+	float32 mPoseBlend = 0.0f;
 	float32 mTotalMass = 0.0f;
 	bool mbHasTargets = false;
 	bool mbHasMotors = false;
 	bool mbLimp = false;
 
+	FootPlant mFootPlants[RagdollRig::scLimbCount];
 	JPH::Ref<JPH::SixDOFConstraint> mpRootAssist;
 	JPH::Vec3 mRootAnchor = JPH::Vec3::sZero();
 	float32 mRootAssist = 0.0f;

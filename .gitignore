@@ -65,3 +65,4 @@ cache/shaders
 __cmake_systeminformation
 
 Private
+Tools/RagdollBench/baselines/

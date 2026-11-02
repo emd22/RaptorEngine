@@ -53,6 +53,13 @@ set(MI_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(MI_OVERRIDE OFF CACHE BOOL "" FORCE)
 add_subdirectory(Submodules/mimalloc EXCLUDE_FROM_ALL)
 
+set(LIBDEFLATE_BUILD_STATIC_LIB ON CACHE BOOL "" FORCE)
+set(LIBDEFLATE_BUILD_SHARED_LIB OFF CACHE BOOL "" FORCE)
+set(LIBDEFLATE_GZIP_SUPPORT OFF CACHE BOOL "" FORCE)
+set(LIBDEFLATE_BUILD_GZIP OFF CACHE BOOL "" FORCE)
+set(LIBDEFLATE_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+add_subdirectory(Submodules/libdeflate EXCLUDE_FROM_ALL)
+
 # Add shaders as a Visual Studio filter, borrowed from Hyperion Engine
 file(GLOB_RECURSE SHADER_FILES "${CMAKE_SOURCE_DIR}/Shaders/*")
 source_group("Shaders" FILES ${SHADER_FILES})
@@ -211,7 +218,7 @@ target_link_libraries(raptor PRIVATE mimalloc-static)
 target_include_directories(raptor SYSTEM PRIVATE "Submodules/mimalloc/include")
 
 
-target_link_libraries(raptor PRIVATE turbojpeg SDL3 freetype ktx phonon)
+target_link_libraries(raptor PRIVATE turbojpeg SDL3 freetype ktx phonon libdeflate_static)
 
 
 # Map compiler (Tools/MapCompiler): turns the brushes of a prototype file into batched world geometry.
@@ -258,7 +265,7 @@ add_library(mapc_core STATIC
 
 target_include_directories(mapc_core PUBLIC "Src" "Tools/MapCompiler")
 target_include_directories(mapc_core SYSTEM PUBLIC "Src/ThirdParty" "Lib/Include" "Submodules/mimalloc/include")
-target_link_libraries(mapc_core PUBLIC mimalloc-static ktx phonon)
+target_link_libraries(mapc_core PUBLIC mimalloc-static ktx phonon libdeflate_static)
 
 if(WIN32)
     target_link_directories(mapc_core PUBLIC "${CMAKE_SOURCE_DIR}/Lib/Win32")

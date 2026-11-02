@@ -19,6 +19,12 @@ namespace fx {
 uint32 FastRand32();
 
 /**
+ * @brief Restarts FastRand32() from a seed, for runs that must repeat exactly. A seed of zero is replaced, since
+ * Xorshift never leaves zero.
+ */
+void SeedFastRand(uint32 seed);
+
+/**
  * @brief Generates a 64-bit random number using Xorshift.
  */
 uint64 FastRand64();

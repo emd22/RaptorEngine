@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Asset/Animation.hpp>
+#include <Asset/AssetTicket.hpp>
 #include <Core/DynArray.hpp>
 #include <Core/Ref.hpp>
 #include <Core/SizedArray.hpp>
@@ -13,6 +14,7 @@
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Ragdoll/Ragdoll.hpp>
 #include <Ragdoll/RagdollBehaviours.hpp>
+#include <atomic>
 #include <memory>
 
 namespace fx {
@@ -53,6 +55,10 @@ struct NPCHit
 	Vec3f Point = Vec3f::sZero;
 	Vec3f Impulse = Vec3f::sZero;
 	float32 Damage = 0.0f;
+	/// The impulse is momentum from a collision, so it is used as is rather than as a force scaled by HitShoveScale
+	bool bIsCollision = false;
+	/// The whole body takes the shove evenly, with no extra push on the struck limb
+	bool bIsWholeBody = false;
 };
 
 /// Settings shared by every NPC and limp ragdoll
@@ -70,6 +76,14 @@ struct NPCTuning
 	float32 HitShoveScale = 10.0f;
 	float32 MinShoveSpeed = 0.3f;
 	float32 MaxShoveSpeed = 1.5f;
+
+	/// Scales the speed a collision gives the whole body, which is otherwise what conservation of momentum gives it
+	float32 CollisionKnockScale = 1.0f;
+	/// A collision that gives the whole body less than this speed (m/s) leaves a standing NPC on its animation
+	float32 MinCollisionKnockSpeed = 0.15f;
+	float32 MaxCollisionKnockSpeed = 10.0f;
+	/// A collision that gives the whole body this speed (m/s) takes the NPC straight off its feet
+	float32 KnockdownSpeed = 3.0f;
 
 	float32 RepeatShoveFraction = 0.3f;
 	float32 MaxStaggerSpeed = 0.8f;
@@ -219,12 +233,13 @@ private:
 	void UpdateBehaviours(float32 delta_time);
 	void ApplyStrengths();
 	void ApplyBehaviourOutput();
-	void PushHitChain(int32 body, const Vec3f impulse, const Vec3f point);
-	void Shove(const Vec3f impulse, float32 min_speed);
+	void AddStagger(const Vec3f velocity);
 	void UpdateBalance(float32 delta_time);
 	void ActivateBalance();
 	void ReturnToAnimation();
 	void EnterFallen();
+	void UpdateGetUp();
+	void ExitFallen();
 	void EnterRagdoll();
 	bool IsPowered() const;
 	void SetPowered(bool powered);
@@ -262,12 +277,19 @@ private:
 	float32 mAssistFade = 1.0f;
 	float32 mPoweredTime = 0.0f;
 	float32 mPhysicsBlend = 1.0f;
+	float32 mPoseBlendTime = 0.0f;
+	float32 mWakeBlend = 1.0f;
 	float32 mPendingImpactDamage = 0.0f;
 };
 
 class NPCManager
 {
 public:
+	/// Starts loading the shared humanoid model, if it has not been requested yet
+	void RequestModel();
+	/// The shared humanoid model, or null until it has loaded
+	FX_FORCE_INLINE Object* GetModel() const { return mpModel.load(); }
+
 	NPC* Spawn(const Object* model, const NPCDesc& desc);
 	void Destroy(NPC* npc);
 	void Clear();
@@ -315,6 +337,10 @@ private:
 	DynArray<std::unique_ptr<RagdollEntity>, GrowthFunctions::Double> mDummies;
 	SizedArray<physics::RagdollContact> mContacts;
 	physics::RagdollBehaviours mDefaultBehaviours;
+
+	AssetTicket mModelTicket { nullptr };
+	std::atomic<Object*> mpModel = nullptr;
+	bool mbModelRequested = false;
 
 	physics::CharacterConfig mCharacterConfig;
 	bool mbCharacterConfigLoaded = false;

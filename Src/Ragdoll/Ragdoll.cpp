@@ -5,6 +5,7 @@
 #include <ThirdParty/Jolt/Jolt.h>
 
 #include <Engine.hpp>
+#include <Math/TwoBoneIK.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
 #include <algorithm>
@@ -177,6 +178,11 @@ void Ragdoll::SetAllBodyModes(eRagdollBodyMode mode)
 {
 	bool was_kinematic = false;
 
+	// A hit landing while the skeleton is still easing back to its animation picks up from the pose on screen
+	if (mode != eRagdollBodyMode::Kinematic && mPoseBlend > 0.0f) {
+		MoveBodiesToPoseBlend();
+	}
+
 	for (uint32 i = 0; i < mSegments.Size; i++) {
 		if (mSegments[i].Mode == eRagdollBodyMode::Kinematic) {
 			was_kinematic = true;
@@ -194,6 +200,8 @@ void Ragdoll::PlaceFeetOnGround()
 {
 	constexpr float32 scProbeUp = 0.3f;
 	constexpr float32 scProbeDown = 1.0f;
+	/// How far above the ground a sole still counts as planted (m)
+	constexpr float32 scPlantedHeight = 0.02f;
 
 	if (mpRagdoll == nullptr || !mRig.bCanBalance) {
 		return;
@@ -202,12 +210,14 @@ void Ragdoll::PlaceFeetOnGround()
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
 	const JPH::Vec3 up = JPH::Vec3::sAxisY();
 
-	// Animated feet sink into the floor (rigid box soles tip their corners under it as the foot rolls, and clips are
-	// rarely grounded to the centimetre). Left there, the depenetration kicks the body the moment it turns dynamic.
 	for (const RagdollRigLeg& leg : mRig.Legs) {
-		const JPH::BodyID body_id = GetBodyID(leg.Foot);
-		const JPH::Vec3 ankle = JPH::Vec3(body_interface.GetPosition(body_id));
-		JPH::Quat orientation = body_interface.GetRotation(body_id);
+		const JPH::BodyID thigh_id = GetBodyID(leg.Thigh);
+		const JPH::BodyID shin_id = GetBodyID(leg.Shin);
+		const JPH::BodyID foot_id = GetBodyID(leg.Foot);
+
+		const JPH::Vec3 hip = JPH::Vec3(body_interface.GetPosition(thigh_id));
+		const JPH::Vec3 knee = JPH::Vec3(body_interface.GetPosition(shin_id));
+		const JPH::Vec3 ankle = JPH::Vec3(body_interface.GetPosition(foot_id));
 
 		const RayResult ground = gPhysics->pBackend->RaycastStatic(
 			Vec3f(ankle.GetX(), ankle.GetY() + scProbeUp, ankle.GetZ()), Vec3f(0.0f, -(scProbeUp + scProbeDown), 0.0f));
@@ -216,41 +226,114 @@ void Ragdoll::PlaceFeetOnGround()
 			continue;
 		}
 
-		const auto get_lowest = [&](const JPH::Quat& rotation)
+		const auto get_clearance = [&](const JPH::Vec3 position, const JPH::Quat& rotation)
 		{
 			float32 lowest = std::numeric_limits<float32>::max();
 
 			for (const JPH::Vec3& corner : leg.SoleCorners) {
-				lowest = std::min(lowest, (ankle + rotation * corner).Dot(up));
+				lowest = std::min(lowest, (position + rotation * corner).Dot(up));
 			}
 
 			return lowest - ground.Point.Y;
 		};
 
-		if (get_lowest(orientation) >= 0.0f) {
+		JPH::Quat foot_rotation = body_interface.GetRotation(foot_id);
+		const float32 clearance = get_clearance(ankle, foot_rotation);
+
+		// A foot in mid air keeps the velocity the animation gave it
+		if (clearance > scPlantedHeight) {
 			continue;
 		}
 
-		// Tip the sole flat about the ankle, then lift whatever is still under the floor
-		const JPH::Vec3 sole_up = orientation * (mSegments[leg.Foot].RestOrientation.Conjugated() * up);
-		orientation = (JPH::Quat::sFromTo(sole_up, up) * orientation).Normalized();
+		JPH::Vec3 new_knee = knee;
+		JPH::Vec3 new_ankle = ankle;
 
-		const float32 depth = std::min(get_lowest(orientation), 0.0f);
-		const JPH::Vec3 position = ankle - up * depth;
+		// Clips rarely ground a rigid sole to the centimetre, so a planted foot can start under the floor. Left there,
+		// the depenetration kicks the body the moment it turns dynamic. The whole leg moves to fit, since moving just
+		// the foot would tear the ankle apart and let the joint snap back
+		if (clearance < 0.0f) {
+			const JPH::Vec3 sole_up = foot_rotation * (mSegments[leg.Foot].RestOrientation.Conjugated() * up);
 
-		body_interface.SetPositionAndRotation(body_id, JPH::RVec3(position), orientation, JPH::EActivation::Activate);
+			foot_rotation = (JPH::Quat::sFromTo(sole_up, up) * foot_rotation).Normalized();
 
-		JPH::Vec3 velocity = body_interface.GetLinearVelocity(body_id);
+			const JPH::Vec3 lifted = ankle - up * std::min(get_clearance(ankle, foot_rotation), 0.0f);
+			const TwoBoneIKResult ik = SolveTwoBoneIK(Vec3f::FromJolt(hip), Vec3f::FromJolt(lifted), leg.Upper,
+													  leg.Lower, Vec3f::FromJolt(knee - hip));
 
-		if (velocity.Dot(up) < 0.0f) {
-			velocity -= up * velocity.Dot(up);
+			new_knee = Vec3f::ToJolt(ik.Mid);
+			new_ankle = Vec3f::ToJolt(ik.End);
+
+			const JPH::Quat thigh_turn = JPH::Quat::sFromTo((knee - hip).Normalized(), (new_knee - hip).Normalized());
+			const JPH::Quat shin_turn = JPH::Quat::sFromTo((ankle - knee).Normalized(),
+														   (new_ankle - new_knee).Normalized());
+
+			body_interface.SetRotation(thigh_id, (thigh_turn * body_interface.GetRotation(thigh_id)).Normalized(),
+									   JPH::EActivation::Activate);
+			body_interface.SetPositionAndRotation(shin_id, JPH::RVec3(new_knee),
+												  (shin_turn * body_interface.GetRotation(shin_id)).Normalized(),
+												  JPH::EActivation::Activate);
+			body_interface.SetPositionAndRotation(foot_id, JPH::RVec3(new_ankle), foot_rotation,
+												  JPH::EActivation::Activate);
+
+			mPreviousPoses[leg.Thigh].bValid = false;
+			mPreviousPoses[leg.Shin].bValid = false;
+			mPreviousPoses[leg.Foot].bValid = false;
 		}
 
-		body_interface.SetLinearAndAngularVelocity(body_id, velocity, JPH::Vec3::sZero());
-		mPreviousPoses[leg.Foot].bValid = false;
+		// A foot standing on the floor isn't moving, whatever speed an in-place clip has it sliding at. The leg above
+		// it pivots about that foot, from standing still at the ankle to the pelvis' own speed at the hip, so no joint
+		// starts out being pulled apart
+		const JPH::Vec3 hip_velocity = body_interface.GetPointVelocity(GetBodyID(0), JPH::RVec3(hip));
+		const float32 span = std::max((hip - new_ankle).Length(), 1e-3f);
+		const JPH::Vec3 knee_velocity = hip_velocity *
+										MathUtil::Clamp((new_knee - new_ankle).Length() / span, 0.0f, 1.0f);
+
+		const auto set_link_velocity = [&](const JPH::BodyID body, const JPH::Vec3 start,
+										   const JPH::Vec3 start_velocity, const JPH::Vec3 end,
+										   const JPH::Vec3 end_velocity)
+		{
+			const JPH::Vec3 link = end - start;
+			const JPH::Vec3 angular = link.Cross(end_velocity - start_velocity) / std::max(link.LengthSq(), 1e-4f);
+			const JPH::Vec3 center = JPH::Vec3(body_interface.GetCenterOfMassPosition(body));
+
+			body_interface.SetLinearAndAngularVelocity(body, start_velocity + angular.Cross(center - start), angular);
+		};
+
+		set_link_velocity(thigh_id, hip, hip_velocity, new_knee, knee_velocity);
+		set_link_velocity(shin_id, new_knee, knee_velocity, new_ankle, JPH::Vec3::sZero());
+		body_interface.SetLinearAndAngularVelocity(foot_id, JPH::Vec3::sZero(), JPH::Vec3::sZero());
 	}
 
 	mbPoseSettled = false;
+}
+
+float32 Ragdoll::GetSoleClearance(uint32 leg_index) const
+{
+	constexpr float32 scProbeUp = 0.3f;
+	constexpr float32 scProbeDown = 1.0f;
+
+	const RagdollRigLeg& leg = mRig.Legs[leg_index];
+	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
+
+	JPH::RVec3 position;
+	JPH::Quat rotation;
+	body_interface.GetPositionAndRotation(GetBodyID(leg.Foot), position, rotation);
+
+	const JPH::Vec3 ankle = JPH::Vec3(position);
+	const RayResult ground = gPhysics->pBackend->RaycastStatic(
+		Vec3f(ankle.GetX(), ankle.GetY() + scProbeUp, ankle.GetZ()), Vec3f(0.0f, -(scProbeUp + scProbeDown), 0.0f));
+
+	if (!ground.bHit) {
+		return std::numeric_limits<float32>::max();
+	}
+
+	float32 lowest = std::numeric_limits<float32>::max();
+
+	for (const JPH::Vec3& corner : leg.SoleCorners) {
+		lowest = std::min(lowest, (ankle + rotation * corner).GetY());
+	}
+
+	return lowest - ground.Point.Y;
 }
 
 void Ragdoll::SetBodyStrength(uint32 body_index, float32 strength)
@@ -301,6 +384,47 @@ void Ragdoll::SetBalancing(bool balancing)
 }
 
 void Ragdoll::RebaseTargets() { mbHasTargets = false; }
+
+void Ragdoll::BeginPoseBlend()
+{
+	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
+
+	for (uint32 i = 0; i < mSegments.Size; i++) {
+		JPH::RVec3 position;
+		body_interface.GetPositionAndRotation(GetBodyID(i), position, mPoseBlendFrom[i].Orientation);
+
+		mPoseBlendFrom[i].Position = JPH::Vec3(position);
+		mPoseBlendFrom[i].bValid = true;
+	}
+
+	mPoseBlend = 1.0f;
+}
+
+void Ragdoll::GetPoseBlendWorld(uint32 body_index, JPH::Vec3& out_position, JPH::Quat& out_orientation) const
+{
+	const BodyPose& from = mPoseBlendFrom[body_index];
+	const RDSegmentTarget& target = mSegmentTargets[body_index];
+
+	out_position = target.Position + (from.Position - target.Position) * mPoseBlend;
+	out_orientation = target.Orientation.SLERP(from.Orientation, mPoseBlend).Normalized();
+}
+
+void Ragdoll::MoveBodiesToPoseBlend()
+{
+	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
+
+	for (uint32 i = 0; i < mSegments.Size; i++) {
+		JPH::Vec3 position;
+		JPH::Quat orientation;
+		GetPoseBlendWorld(i, position, orientation);
+
+		body_interface.SetPositionAndRotation(GetBodyID(i), JPH::RVec3(position), orientation,
+											  JPH::EActivation::Activate);
+		mPreviousPoses[i].bValid = false;
+	}
+
+	mPoseBlend = 0.0f;
+}
 
 void Ragdoll::ClearBodyLayers()
 {
@@ -578,6 +702,22 @@ void Ragdoll::WriteToSkeleton()
 
 	for (uint32 i = 0; i < mSegments.Size; i++) {
 		const RDSegmentInfo& info = mSegments[i];
+
+		if (mPoseBlend > 0.0f && info.Mode == eRagdollBodyMode::Kinematic) {
+			JPH::Vec3 position;
+			JPH::Quat orientation;
+			GetPoseBlendWorld(i, position, orientation);
+
+			Mat4f model = MatrixFromRotationTranslation(JPH::Mat44::sRotation(orientation), position) * mWorldInverse;
+			NormalizeRotationRows(model);
+			ScaleRotationRows(model, info.BoneScale);
+
+			mIsDriven[info.BoneIndex] = 1;
+			mDrivenWorld[info.BoneIndex] = model;
+			any_driven = true;
+			continue;
+		}
+
 		const bool is_driven = (info.Mode != eRagdollBodyMode::Kinematic) && (info.Blend > 0.0f);
 
 		mIsDriven[info.BoneIndex] = static_cast<uint8>(is_driven);
@@ -619,6 +759,14 @@ void Ragdoll::Destroy()
 
 	mpRootAssist = nullptr;
 
+	for (FootPlant& plant : mFootPlants) {
+		if (mpPhysicsSystem != nullptr && plant.pConstraint != nullptr) {
+			mpPhysicsSystem->RemoveConstraint(plant.pConstraint);
+		}
+
+		plant = FootPlant {};
+	}
+
 	if (mpPhysicsSystem != nullptr) {
 		mpPhysicsSystem->RemoveStepListener(this);
 		mpPhysicsSystem = nullptr;
@@ -640,6 +788,8 @@ void Ragdoll::Destroy()
 	mMotorOverrides.Free();
 	mLayers.Free();
 	mPreviousPoses.Free();
+	mPoseBlendFrom.Free();
+	mPoseBlend = 0.0f;
 	mTotalMass = 0.0f;
 	mbHasTargets = false;
 	mbHasMotors = false;

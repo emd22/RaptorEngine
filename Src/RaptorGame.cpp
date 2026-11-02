@@ -53,6 +53,9 @@
 #endif
 
 
+#include <cstdlib>
+#include <cstring>
+
 #define FX_LIMIT_FRAMERATE_ON_FOCUS_LOST 1
 
 
@@ -91,14 +94,87 @@ static constexpr float32 scFireCubeSize = 0.25f;
 static constexpr float32 scFireCubeSpeed = 6.0f;
 static constexpr float32 scFireCubeSpawnDistance = 1.5f;
 
-RaptorGame::RaptorGame()
+
+RaptorGame::RaptorGame(int argc, char** argv)
 {
-	InitEngine();
+	eWindowFlags window_flags = eWindowFlags::None;
+
+	mBenchCVars.InitCapacity(static_cast<size_t>(argc));
+
+	// Super simple arg parsing for now. Will likely overhaul in the future for passing in particular maps and
+	// parameters.
+	for (uint32 arg_index = 1; arg_index < argc; arg_index++) {
+		const String arg = String(argv[arg_index]);
+
+		if (arg == "-raise") {
+			SetFlag(window_flags, eWindowFlags::RaiseWindow);
+			continue;
+		}
+
+		if (arg == "-ragdoll-bench" && arg_index + 1 < static_cast<uint32>(argc)) {
+			BenchOptions.bEnabled = true;
+			BenchOptions.Suite = argv[++arg_index];
+			SetFlag(window_flags, eWindowFlags::Hidden);
+			continue;
+		}
+
+		if (arg == "-bench-ragdoll" && arg_index + 1 < static_cast<uint32>(argc)) {
+			physics::RDSetHumanoidDefinitionPath(argv[++arg_index]);
+			continue;
+		}
+
+		if (arg == "-reaction-capture" && arg_index + 1 < static_cast<uint32>(argc)) {
+			CaptureOptions.bEnabled = true;
+			CaptureOptions.OutDir = argv[++arg_index];
+			continue;
+		}
+
+		if (arg == "-capture-dt" && arg_index + 1 < static_cast<uint32>(argc)) {
+			CaptureOptions.FixedDelta = static_cast<float32>(std::atof(argv[++arg_index]));
+			continue;
+		}
+
+		if (arg == "-capture-images" && arg_index + 3 < static_cast<uint32>(argc)) {
+			CaptureOptions.ImageStride = static_cast<uint32>(std::atoi(argv[++arg_index]));
+			CaptureOptions.ImageFrom = static_cast<float32>(std::atof(argv[++arg_index]));
+			CaptureOptions.ImageTo = static_cast<float32>(std::atof(argv[++arg_index]));
+			continue;
+		}
+
+		if (arg == "-bench-render") {
+			BenchOptions.bRender = true;
+			continue;
+		}
+
+		if (arg == "-bench-out" && arg_index + 1 < static_cast<uint32>(argc)) {
+			BenchOptions.OutPath = argv[++arg_index];
+			continue;
+		}
+
+		if (arg == "-bench-traces" && arg_index + 1 < static_cast<uint32>(argc)) {
+			BenchOptions.TraceDir = argv[++arg_index];
+			continue;
+		}
+
+		if (arg == "-bench-shard" && arg_index + 2 < static_cast<uint32>(argc)) {
+			BenchOptions.ShardIndex = static_cast<uint32>(std::atoi(argv[++arg_index]));
+			BenchOptions.ShardCount = static_cast<uint32>(std::atoi(argv[++arg_index]));
+			continue;
+		}
+
+		if (arg == "-bench-cvar" && arg_index + 1 < static_cast<uint32>(argc)) {
+			mBenchCVars.Insert(argv[++arg_index]);
+			continue;
+		}
+	}
+
+
+	InitEngine(window_flags);
 	CreateGame();
 }
 
 
-void RaptorGame::InitEngine()
+void RaptorGame::InitEngine(const eWindowFlags window_flags)
 {
 #ifdef FX_LOG_OUTPUT_TO_FILE
 	LogCreateFile("FoxtrotLog.log");
@@ -144,7 +220,7 @@ void RaptorGame::InitEngine()
 
 	mBaseWindowTitle = String(window_title);
 
-	Ref<Window> window = Window::New(window_title, Vec2u(window_width, window_height));
+	Ref<Window> window = MakeRef<Window>(window_title, Vec2u(window_width, window_height), window_flags);
 
 	ConfigEntry* bob_entry = Config.GetEntry(HashStr32("HeadBob"));
 
@@ -279,6 +355,12 @@ void RaptorGame::CreateGame()
 	mpNPCBalanceAssistCVar = gCVars->Set("b_npc_balance_assist", gCVars->Get("b_npc_balance_assist", 0.50f));
 	mpNPCBalanceReleaseCVar = gCVars->Set("b_npc_balance_release", gCVars->Get("b_npc_balance_release", 0.1f));
 	mpNPCBalanceRecoveryCVar = gCVars->Set("b_npc_balance_recovery", gCVars->Get("b_npc_balance_recovery", 0.5f));
+	mpNPCBalanceResidualCVar = gCVars->Set("b_npc_balance_residual", gCVars->Get("b_npc_balance_residual", 0.15f));
+	mpNPCBalanceLiftCVar = gCVars->Set("b_npc_balance_lift", gCVars->Get("b_npc_balance_lift", 0.0f));
+	mpNPCBalanceExternalResidualCVar = gCVars->Set("b_npc_balance_external_residual",
+												   gCVars->Get("b_npc_balance_external_residual", 0.0f));
+	mpNPCBalancePelvisDampingCVar = gCVars->Set("b_npc_balance_pelvis_damping",
+												gCVars->Get("b_npc_balance_pelvis_damping", 5.0f));
 	mpNPCMaxActiveCVar = gCVars->Set("b_npc_max_active", gCVars->Get("b_npc_max_active", int64(4)));
 	mpNPCActiveDistanceCVar = gCVars->Set("b_npc_active_distance", gCVars->Get("b_npc_active_distance", 50.0f));
 	mpNPCBumpSpeedCVar = gCVars->Set("b_npc_bump_speed", gCVars->Get("b_npc_bump_speed", 1.0f));
@@ -286,6 +368,12 @@ void RaptorGame::CreateGame()
 	mpNPCHitShoveCVar = gCVars->Set("b_npc_hit_shove", gCVars->Get("b_npc_hit_shove", 10.0f));
 	mpNPCMinShoveCVar = gCVars->Set("b_npc_min_shove", gCVars->Get("b_npc_min_shove", 0.3f));
 	mpNPCMaxShoveCVar = gCVars->Set("b_npc_max_shove", gCVars->Get("b_npc_max_shove", 1.2f));
+	mpNPCCollisionKnockCVar = gCVars->Set("b_npc_collision_knock", gCVars->Get("b_npc_collision_knock", 1.0f));
+	mpNPCMinCollisionKnockCVar = gCVars->Set("b_npc_min_collision_knock",
+											 gCVars->Get("b_npc_min_collision_knock", 0.15f));
+	mpNPCMaxCollisionKnockCVar = gCVars->Set("b_npc_max_collision_knock",
+											 gCVars->Get("b_npc_max_collision_knock", 10.0f));
+	mpNPCKnockdownSpeedCVar = gCVars->Set("b_npc_knockdown_speed", gCVars->Get("b_npc_knockdown_speed", 3.0f));
 	mpNPCStaggerTimeCVar = gCVars->Set("b_npc_stagger_time", gCVars->Get("b_npc_stagger_time", 0.75f));
 	mpNPCStaggerSpeedCVar = gCVars->Set("b_npc_stagger_speed", gCVars->Get("b_npc_stagger_speed", 0.8f));
 	mpNPCStumbleTimeCVar = gCVars->Set("b_npc_stumble_time", gCVars->Get("b_npc_stumble_time", 0.3f));
@@ -345,6 +433,20 @@ void RaptorGame::CreateGame()
 	// physics by that much in one go.
 	mLastTick = SDL_GetPerformanceCounter();
 
+	if (BenchOptions.bEnabled) {
+		RunRagdollBench();
+	}
+
+	if (CaptureOptions.bEnabled) {
+		if (!mCapture.Begin(CaptureOptions)) {
+			std::_Exit(1);
+		}
+
+#ifdef FX_IS_EDITOR
+		gEditor->SetSimulating(true);
+#endif
+	}
+
 	while (sbRunning) {
 		const uint64 frame_start = SDL_GetPerformanceCounter();
 
@@ -353,7 +455,7 @@ void RaptorGame::CreateGame()
 #ifdef FX_LIMIT_FRAMERATE_ON_FOCUS_LOST
 		double frame_time_limit = 0.0;
 
-		if (!gGraphics->GetWindow()->IsFocused()) {
+		if (!gGraphics->GetWindow()->IsFocused() && !CaptureOptions.bEnabled) {
 			frame_time_limit = scUnfocusedFrameTime;
 		}
 #ifdef FX_IS_EDITOR
@@ -526,7 +628,7 @@ void RaptorGame::ProcessControls()
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_F9)) {
 		++mNPCSpawnsPending;
-		RequestRagdollTemplate();
+		gNPCManager->RequestModel();
 	}
 
 	if (is_simulation_mode && ControlManager::IsKeyPressed(eKey::FX_KEY_M)) {
@@ -717,31 +819,7 @@ void RaptorGame::ProcessControls()
 void RaptorGame::RequestRagdollDrop()
 {
 	++mRagdollDropsPending;
-	RequestRagdollTemplate();
-}
-
-void RaptorGame::RequestRagdollTemplate()
-{
-	if (mbRagdollTemplateRequested) {
-		return;
-	}
-
-	mbRagdollTemplateRequested = true;
-
-	mRagdollTemplateTicket = gAssetManager->LoadObject("ragdoll_template",
-													   "RaptorData/Data/Demo/Models/ragdoll2/ragdoll2.rxmodel");
-
-	mRagdollTemplateTicket.OnLoaded(
-		[this](void* item_ptr)
-		{
-			Object* object = static_cast<Object*>(item_ptr);
-
-			if (object != nullptr) {
-				object->SetShadowCaster(true);
-
-				mpRagdollTemplate.store(object);
-			}
-		});
+	gNPCManager->RequestModel();
 }
 
 void RaptorGame::SpawnDebugNPC(Object* model)
@@ -914,17 +992,84 @@ void RaptorGame::ReadNPCTuning(NPCTuning& tuning) const
 	tuning.BalanceAssist.ReleaseDistance = GetCVarFloat(mpNPCBalanceReleaseCVar, tuning.BalanceAssist.ReleaseDistance);
 	tuning.BalanceAssist.RecoveryForceFraction = GetCVarFloat(mpNPCBalanceRecoveryCVar,
 															  tuning.BalanceAssist.RecoveryForceFraction);
+	tuning.BalanceAssist.ResidualFraction = GetCVarFloat(mpNPCBalanceResidualCVar,
+														 tuning.BalanceAssist.ResidualFraction);
+	tuning.BalanceAssist.LiftFraction = GetCVarFloat(mpNPCBalanceLiftCVar, tuning.BalanceAssist.LiftFraction);
+	tuning.BalanceAssist.ExternalResidual = GetCVarFloat(mpNPCBalanceExternalResidualCVar,
+														 tuning.BalanceAssist.ExternalResidual);
+	tuning.BalanceAssist.PelvisDamping = GetCVarFloat(mpNPCBalancePelvisDampingCVar, tuning.BalanceAssist.PelvisDamping);
 	tuning.ActiveDistance = GetCVarFloat(mpNPCActiveDistanceCVar, tuning.ActiveDistance);
 	tuning.BumpSpeed = GetCVarFloat(mpNPCBumpSpeedCVar, tuning.BumpSpeed);
 	tuning.BumpImpulse = GetCVarFloat(mpNPCBumpImpulseCVar, tuning.BumpImpulse);
 	tuning.HitShoveScale = GetCVarFloat(mpNPCHitShoveCVar, tuning.HitShoveScale);
 	tuning.MinShoveSpeed = GetCVarFloat(mpNPCMinShoveCVar, tuning.MinShoveSpeed);
 	tuning.MaxShoveSpeed = GetCVarFloat(mpNPCMaxShoveCVar, tuning.MaxShoveSpeed);
+	tuning.CollisionKnockScale = GetCVarFloat(mpNPCCollisionKnockCVar, tuning.CollisionKnockScale);
+	tuning.MinCollisionKnockSpeed = GetCVarFloat(mpNPCMinCollisionKnockCVar, tuning.MinCollisionKnockSpeed);
+	tuning.MaxCollisionKnockSpeed = GetCVarFloat(mpNPCMaxCollisionKnockCVar, tuning.MaxCollisionKnockSpeed);
+	tuning.KnockdownSpeed = GetCVarFloat(mpNPCKnockdownSpeedCVar, tuning.KnockdownSpeed);
 	tuning.BalanceAssist.StaggerDecayTime = GetCVarFloat(mpNPCStaggerTimeCVar, tuning.BalanceAssist.StaggerDecayTime);
 	tuning.BalanceAssist.StumbleTime = GetCVarFloat(mpNPCStumbleTimeCVar, tuning.BalanceAssist.StumbleTime);
 	tuning.MaxStaggerSpeed = GetCVarFloat(mpNPCStaggerSpeedCVar, tuning.MaxStaggerSpeed);
 	tuning.RepeatShoveFraction = GetCVarFloat(mpNPCRepeatShoveCVar, tuning.RepeatShoveFraction);
 	tuning.WanderRadius = GetCVarFloat(mpNPCWanderCVar, tuning.WanderRadius);
+
+	// Every trial gets powered physics wherever the player is, and no decals pile up over a run
+	if (BenchOptions.bEnabled) {
+		tuning.MaxActive = 0;
+		tuning.ActiveDistance = 0.0f;
+		tuning.BloodSpeed = 1e9f;
+	}
+}
+
+void RaptorGame::RunRagdollBench()
+{
+	for (const char* assignment : mBenchCVars) {
+		const char* equals = std::strchr(assignment, '=');
+
+		if (equals == nullptr) {
+			continue;
+		}
+
+		const String name(assignment, static_cast<uint32>(equals - assignment));
+		const float32 value = static_cast<float32>(std::atof(equals + 1));
+		const char* setting = std::strchr(name.CStr(), '.');
+
+		// `behaviour.setting=value` sets a behaviour's default, and anything else is a cvar
+		if (setting != nullptr) {
+			const String behaviour(name.CStr(), static_cast<uint32>(setting - name.CStr()));
+			gNPCManager->SetBehaviourSetting(0, behaviour.CStr(), setting + 1, value);
+		}
+		else {
+			gCVars->Set(name.CStr(), value);
+		}
+	}
+
+	RagdollBench bench;
+
+	if (!bench.Begin(BenchOptions)) {
+		std::fflush(nullptr);
+		std::_Exit(1);
+	}
+
+	if (BenchOptions.bRender) {
+		mpRenderedBench = &bench;
+	}
+
+	while (!bench.IsFinished()) {
+		if (BenchOptions.bRender) {
+			Tick();
+			continue;
+		}
+
+		gAssetManager->DispatchCallbacks();
+		ReadNPCTuning(gNPCManager->Tuning);
+		bench.Tick();
+	}
+
+	// The run wrote all of its output, and tearing down the engine adds nothing to it
+	std::fflush(nullptr);
+	std::_Exit(0);
 }
 
 physics::eCharacterRagdollCollision RaptorGame::GetPlayerRagdollCollision() const
@@ -940,7 +1085,7 @@ physics::eCharacterRagdollCollision RaptorGame::GetPlayerRagdollCollision() cons
 
 void RaptorGame::UpdateRagdollDummies()
 {
-	Object* model = mpRagdollTemplate.load();
+	Object* model = gNPCManager->GetModel();
 
 	while (mRagdollDropsPending > 0 && model != nullptr) {
 		--mRagdollDropsPending;
@@ -1188,6 +1333,15 @@ void RaptorGame::Tick()
 	const uint64 current_tick = SDL_GetPerformanceCounter();
 
 	DeltaTime = static_cast<double>(current_tick - mLastTick) / sClockFreq;
+
+	if (mpRenderedBench != nullptr) {
+		DeltaTime = RagdollBench::scDeltaTime;
+	}
+
+	if (CaptureOptions.bEnabled && CaptureOptions.FixedDelta > 0.0f) {
+		DeltaTime = CaptureOptions.FixedDelta;
+	}
+
 	gGraphics->DeltaTime = static_cast<float32>(DeltaTime);
 
 	mFpsWindowTime += DeltaTime;
@@ -1289,6 +1443,16 @@ void RaptorGame::Tick()
 		return;
 	}
 
+	bool bench_stepped = false;
+
+	if (mpRenderedBench != nullptr) {
+		bench_stepped = mpRenderedBench->PreStep();
+	}
+
+	if (CaptureOptions.bEnabled) {
+		mCapture.PreStep(static_cast<float32>(DeltaTime));
+	}
+
 	gPhysics->pBackend->Update(static_cast<float32>(DeltaTime));
 	PlayImpactSounds();
 
@@ -1314,6 +1478,10 @@ void RaptorGame::Tick()
 	UpdateObjectScripts();
 	UpdateRagdollDummies();
 
+	if (bench_stepped) {
+		mpRenderedBench->PostStep();
+	}
+
 	gParticleSystem->Update(static_cast<float32>(DeltaTime));
 
 	UpdateExposure();
@@ -1338,6 +1506,15 @@ void RaptorGame::Tick()
 
 	RenderCrosshair();
 	gWorld->Player.Weapons.RenderHud();
+
+	if (CaptureOptions.bEnabled) {
+		mCapture.PostFrame(static_cast<float32>(DeltaTime));
+
+		if (mCapture.IsFinished()) {
+			std::fflush(nullptr);
+			std::_Exit(0);
+		}
+	}
 
 	gGraphics->DoComposition(*gWorld->GetCurrentCamera());
 

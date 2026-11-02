@@ -105,6 +105,11 @@ std::unique_ptr<RDDefaultSegment> ReadSegment(const ConfigEntry& entry, uint32 i
 	out.SwingDegrees = entry.GetMemberValue<float32>(HashStr32("swing"), 0.0f);
 	out.TwistDegrees = entry.GetMemberValue<float32>(HashStr32("twist"), 0.0f);
 	out.FlexDegrees = entry.GetMemberValue<float32>(HashStr32("flex"), 0.0f);
+	out.SwingForward = entry.GetMemberValue<float32>(HashStr32("swing_forward"), 0.0f);
+	out.SwingBack = entry.GetMemberValue<float32>(HashStr32("swing_back"), 0.0f);
+	out.SwingOut = entry.GetMemberValue<float32>(HashStr32("swing_out"), 0.0f);
+	out.SwingIn = entry.GetMemberValue<float32>(HashStr32("swing_in"), 0.0f);
+	out.JointFriction = entry.GetMemberValue<float32>(HashStr32("joint_friction"), out.JointFriction);
 	out.MassFraction = entry.GetMemberValue<float32>(HashStr32("mass_fraction"), 0.0f);
 	out.Joint = joint;
 	out.bAnchor = entry.GetMemberValue<int32>(HashStr32("anchor"), 0) != 0;
@@ -112,6 +117,11 @@ std::unique_ptr<RDDefaultSegment> ReadSegment(const ConfigEntry& entry, uint32 i
 	out.Muscle.Stiffness = entry.GetMemberValue<float32>(HashStr32("stiffness"), out.Muscle.Stiffness);
 	out.Muscle.Damping = entry.GetMemberValue<float32>(HashStr32("damping"), out.Muscle.Damping);
 	out.Muscle.MaxTorque = entry.GetMemberValue<float32>(HashStr32("max_torque"), out.Muscle.MaxTorque);
+
+	if (out.Muscle.Stiffness <= 0.0f) {
+		LogError(LC_PHYSICS, "Ragdoll body {} ('{}') needs a stiffness above 0", index, bone);
+		return nullptr;
+	}
 
 	// The RDFootSegment constructor sets the body part
 	if (!bIsFoot) {
@@ -178,10 +188,14 @@ bool RDLoadDefinition(const char* path, RDDefinition& out_def)
 	return true;
 }
 
+static const char* sHumanoidPath = scHumanoidPath;
+
+void RDSetHumanoidDefinitionPath(const char* path) { sHumanoidPath = path; }
+
 const RDDefinition* RDGetHumanoidDefinition()
 {
 	static RDDefinition sDef;
-	static const bool sbLoaded = RDLoadDefinition(scHumanoidPath, sDef);
+	static const bool sbLoaded = RDLoadDefinition(sHumanoidPath, sDef);
 
 	if (!sbLoaded) {
 		return nullptr;

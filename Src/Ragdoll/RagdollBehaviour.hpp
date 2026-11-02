@@ -105,6 +105,16 @@ struct BehaviourContext
 	int32 FindArm(uint32 body) const;
 };
 
+/// Stages of a get-up: lying still, lifting the body off the floor, settling it upright, then standing on the balance
+/// controller
+enum class eGetUpStage : uint8
+{
+	Resting,
+	Lifting,
+	Settling,
+	Standing,
+};
+
 struct BehaviourGoal
 {
 	Vec3f Target = Vec3f::sZero;
@@ -142,7 +152,7 @@ struct BehaviourSetting
 class RagdollBehaviour
 {
 public:
-	static constexpr uint32 scMaxSettings = 16;
+	static constexpr uint32 scMaxSettings = 24;
 
 public:
 	RagdollBehaviour(const char* name, float32 priority);
@@ -157,6 +167,8 @@ public:
 	virtual void Init(const RagdollRig& rig, uint32 body_count) {}
 	virtual void OnStart(const BehaviourContext& ctx) {}
 	virtual bool NeedsFreePose() const { return false; }
+	/// Where a get-up has got to, so the NPC knows when to hand the body back to its animation
+	virtual eGetUpStage GetUpStage() const { return eGetUpStage::Resting; }
 
 	void Start(const BehaviourContext& ctx);
 	void Stop();

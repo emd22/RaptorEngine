@@ -31,8 +31,14 @@ namespace {
 
 constexpr float32 scSelfCollisionMargin = 0.02f;
 constexpr uint32 scSolverVelocitySteps = 20;
+/// Joints and limits are only pulled back into place by position steps, and Jolt's default of 2 lets a hard landing
+/// bend a limb well past its limits
+constexpr uint32 scSolverPositionSteps = 6;
 constexpr float32 scHingeSlackDegrees = 5.0f;
 constexpr float32 scHingeMinBend = 0.17f;
+/// Inertia added about every axis of a body, as a fraction of its largest, with a floor per kilogram (m^2)
+constexpr float32 scInertiaBoost = 0.4f;
+constexpr float32 scInertiaFloorPerMass = 0.002f;
 
 struct ResolvedBone
 {
@@ -51,6 +57,7 @@ struct BuildFrame
 
 	JPH::Vec3 Up = JPH::Vec3::sAxisY();
 	JPH::Vec3 Forward = JPH::Vec3::sZero();
+	JPH::Vec3 RootPosition = JPH::Vec3::sZero();
 
 	Mat4f GetBoneWorld(uint32 bone) const { return Skel.WorldTransforms[bone] * ObjectWorld; }
 	JPH::Vec3 GetBonePosition(uint32 bone) const { return RowAsVec3(GetBoneWorld(bone), 3); }
@@ -240,6 +247,57 @@ bool ApplyHingeLimits(JPH::SwingTwistConstraintSettings& joint, const BuildFrame
 	return false;
 }
 
+/**
+ * @brief Centres a cone joint's limits between each pair of directions, by tilting the parent's end of the joint away
+ * from the rest pose. The motors are given targets in body space, so this doesn't move what they aim for.
+ */
+void ApplyAnatomicalLimits(JPH::SwingTwistConstraintSettings& joint, const BuildFrame& frame,
+						   const RDDefaultSegment& body_def, const JPH::Vec3 position, const JPH::Vec3 axis_world)
+{
+	constexpr float32 scMinPerpendicular = 0.3f;
+
+	const auto get_perpendicular = [&](const JPH::Vec3 wanted, const JPH::Vec3 fallback)
+	{
+		const JPH::Vec3 perpendicular = wanted - axis_world * wanted.Dot(axis_world);
+
+		if (perpendicular.Length() >= scMinPerpendicular) {
+			return perpendicular.Normalized();
+		}
+
+		return (fallback - axis_world * fallback.Dot(axis_world)).NormalizedOr(axis_world.GetNormalizedPerpendicular());
+	};
+
+	const JPH::Vec3 forward = get_perpendicular(frame.Forward, frame.Up);
+
+	JPH::Vec3 outward = frame.Up.Cross(frame.Forward);
+
+	if ((position - frame.RootPosition).Dot(outward) < 0.0f) {
+		outward = -outward;
+	}
+
+	// Sideways from the forward direction, on whichever side is further out
+	JPH::Vec3 out = axis_world.Cross(forward).NormalizedOr(axis_world.GetNormalizedPerpendicular());
+
+	if (out.Dot(get_perpendicular(outward, frame.Up)) < 0.0f) {
+		out = -out;
+	}
+
+	const float32 tilt_forward = MathUtil::DegToRad(body_def.SwingForward - body_def.SwingBack) * 0.5f;
+	const float32 tilt_out = MathUtil::DegToRad(body_def.SwingOut - body_def.SwingIn) * 0.5f;
+
+	const JPH::Quat tilt = (JPH::Quat::sRotation(axis_world.Cross(out), tilt_out) *
+							JPH::Quat::sRotation(axis_world.Cross(forward), tilt_forward))
+							   .Normalized();
+
+	joint.mTwistAxis1 = tilt * axis_world;
+	joint.mPlaneAxis1 = tilt * out;
+	joint.mTwistAxis2 = axis_world;
+	joint.mPlaneAxis2 = out;
+	// Jolt's plane half angle limits swing towards the plane axis, and its normal half angle swing away across it
+	joint.mNormalHalfConeAngle = MathUtil::DegToRad(body_def.SwingForward + body_def.SwingBack) * 0.5f;
+	joint.mPlaneHalfConeAngle = MathUtil::DegToRad(body_def.SwingOut + body_def.SwingIn) * 0.5f;
+}
+
 JPH::Ref<JPH::SwingTwistConstraintSettings> BuildJoint(const BuildFrame& frame, const RDDefaultSegment& body_def,
 													   const ResolvedBone& parent_part, const JPH::Vec3 position,
 													   const JPH::Vec3 axis_world, BuiltBody& out_body)
@@ -253,13 +311,17 @@ JPH::Ref<JPH::SwingTwistConstraintSettings> BuildJoint(const BuildFrame& frame, 
 	joint->mNormalHalfConeAngle = joint->mPlaneHalfConeAngle = MathUtil::DegToRad(body_def.SwingDegrees);
 	joint->mTwistMinAngle = -MathUtil::DegToRad(body_def.TwistDegrees);
 	joint->mTwistMaxAngle = MathUtil::DegToRad(body_def.TwistDegrees);
-	joint->mMaxFrictionTorque = 0.5f;
+	joint->mMaxFrictionTorque = body_def.JointFriction;
 	joint->mNumVelocityStepsOverride = scSolverVelocitySteps;
+	joint->mNumPositionStepsOverride = scSolverPositionSteps;
 	joint->mSwingMotorSettings = JPH::MotorSettings(body_def.Muscle.Stiffness, body_def.Muscle.Damping);
 	joint->mTwistMotorSettings = JPH::MotorSettings(body_def.Muscle.Stiffness, body_def.Muscle.Damping);
 
 	if (body_def.Joint != eRDJoint::Cone) {
 		out_body.bHinge = ApplyHingeLimits(*joint, frame, body_def, parent_part, axis_world, out_body.Hinge);
+	}
+	else if (body_def.SwingForward + body_def.SwingBack + body_def.SwingOut + body_def.SwingIn > 0.0f) {
+		ApplyAnatomicalLimits(*joint, frame, body_def, position, axis_world);
 	}
 
 	return joint;
@@ -278,6 +340,7 @@ void ConfigurePart(JPH::RagdollSettings::Part& part, const BuiltBody& body, cons
 	part.mLinearDamping = 0.05f;
 	part.mAngularDamping = 0.3f;
 	part.mNumVelocityStepsOverride = scSolverVelocitySteps;
+	part.mNumPositionStepsOverride = scSolverPositionSteps;
 	part.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
 	part.mMassPropertiesOverride.mMass = body_def.MassFraction * total_mass;
 }
@@ -422,6 +485,7 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 					   .TotalMass = def.TotalMass * scale * scale * scale,
 					   .Up = gravity_frame.Up };
 	frame.Forward = GetRestForward(frame, parts);
+	frame.RootPosition = frame.GetBonePosition(parts[0].StartBone);
 
 	JPH::Ref<JPH::Skeleton> jolt_skeleton = new JPH::Skeleton;
 	JPH::Ref<JPH::RagdollSettings> settings = new JPH::RagdollSettings;
@@ -486,6 +550,7 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 
 	InitBodyArrays(skel.JointCount);
 	BuildRig(gravity_frame);
+	CreateFootPlants();
 
 	if (!mBalance.Init(*this)) {
 		LogInfo(LC_PHYSICS, "Ragdoll: no two-legged support found, balance is unavailable");
@@ -512,7 +577,17 @@ void Ragdoll::RestoreTableMasses(JPH::RagdollSettings& settings)
 
 		mass_properties.mMass = table_mass;
 
-		const JPH::Mat44& inertia = mass_properties.mInertia;
+		// A thin limb has next to no inertia about its own axis, and a light one next to none at all, so the muscles
+		// and the bodies around them shake it. A little more about every axis is the usual cure for that and doesn't
+		// show
+		JPH::Mat44& inertia = mass_properties.mInertia;
+		const float32 largest = std::max({ inertia(0, 0), inertia(1, 1), inertia(2, 2) });
+		const float32 extra = std::max(largest * scInertiaBoost, table_mass * scInertiaFloorPerMass);
+
+		for (uint32 axis = 0; axis < 3; axis++) {
+			inertia(axis, axis) += extra;
+		}
+
 		mSegments[i].Inertia = (inertia(0, 0) + inertia(1, 1) + inertia(2, 2)) / 3.0f;
 	}
 }
@@ -636,15 +711,54 @@ void Ragdoll::CreateRootAssist(const JPH::Vec3 root_position)
 	}
 }
 
+void Ragdoll::CreateFootPlants()
+{
+	if (!mRig.bCanBalance) {
+		return;
+	}
+
+	for (uint32 leg = 0; leg < RagdollRig::scLimbCount; leg++) {
+		const JPH::BodyID foot_id = GetBodyID(mRig.Legs[leg].Foot);
+
+		JPH::BodyLockWrite lock(mpPhysicsSystem->GetBodyLockInterface(), foot_id);
+
+		if (!lock.Succeeded()) {
+			continue;
+		}
+
+		const JPH::RVec3 position = lock.GetBody().GetPosition();
+
+		JPH::SixDOFConstraintSettings settings;
+		settings.mSpace = JPH::EConstraintSpace::WorldSpace;
+		settings.mNumVelocityStepsOverride = scSolverVelocitySteps;
+		settings.mPosition1 = settings.mPosition2 = position;
+
+		for (uint32 axis = 0; axis < JPH::SixDOFConstraint::EAxis::Num; axis++) {
+			settings.MakeFreeAxis(static_cast<JPH::SixDOFConstraint::EAxis>(axis));
+		}
+
+		FootPlant& plant = mFootPlants[leg];
+
+		plant.pConstraint = static_cast<JPH::SixDOFConstraint*>(
+			settings.Create(JPH::Body::sFixedToWorld, lock.GetBody()));
+		plant.pConstraint->SetEnabled(false);
+		plant.ConstraintOrigin = JPH::Vec3(position);
+
+		mpPhysicsSystem->AddConstraint(plant.pConstraint);
+	}
+}
+
 void Ragdoll::InitBodyArrays(uint32 joint_count)
 {
 	mSegmentTargets.InitSize(mSegments.Size, RDSegmentTarget {});
 	mSegmentStates.InitSize(mSegments.Size, RDSegmentState {});
 	mMotorOverrides.InitSize(mSegments.Size, MotorOverride {});
+	mMotorFilters.InitSize(mSegments.Size, MotorFilter {});
 	mOverrideTargets.InitSize(mSegments.Size, JPH::Quat::sIdentity());
 	mHadOverride.InitSize(mSegments.Size, uint8(0));
 	mLayers.InitSize(mSegments.Size, BodyLayer {});
 	mPreviousPoses.InitSize(mSegments.Size, BodyPose {});
+	mPoseBlendFrom.InitSize(mSegments.Size, BodyPose {});
 
 	mbHasTargets = false;
 

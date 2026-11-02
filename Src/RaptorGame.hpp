@@ -12,10 +12,12 @@
 #include <Player.hpp>
 #include <Ragdoll/Ragdoll.hpp>
 #include <Renderer/Camera/BaseCamera.hpp>
+#include <Renderer/Window.hpp>
 #include <Script/ScriptManager.hpp>
+#include <Test/RagdollBench.hpp>
+#include <Test/ReactionCapture.hpp>
 #include <World.hpp>
 #include <atomic>
-#include <memory>
 #include <unordered_map>
 #include <vector>
 
@@ -66,7 +68,7 @@ struct NPCTuning;
 class RaptorGame
 {
 public:
-	RaptorGame();
+	RaptorGame(int argc, char** argv);
 
 	void CreateGame();
 
@@ -74,7 +76,7 @@ public:
 	~RaptorGame();
 
 private:
-	void InitEngine();
+	void InitEngine(const eWindowFlags window_flags);
 	void CreateLights();
 
 	void Tick();
@@ -101,10 +103,10 @@ private:
 	void DropRagdollDummy(Object* model);
 	void CleanWorld();
 	void ReadNPCTuning(NPCTuning& tuning) const;
+	[[noreturn]] void RunRagdollBench();
 	physics::eCharacterRagdollCollision GetPlayerRagdollCollision() const;
 	static float32 GetCVarFloat(const CVarValue* cvar, float32 fallback);
 
-	void RequestRagdollTemplate();
 	void SpawnDebugNPC(Object* model);
 	void FireCube();
 	void DestroyFiredCube(Hash32 name_hash);
@@ -120,6 +122,9 @@ public:
 
 	double DeltaTime = 1.0f / 60.0f;
 
+	RagdollBenchOptions BenchOptions;
+	ReactionCaptureOptions CaptureOptions;
+
 	double Fps = 0.0;
 	double FrameTimeMs = 0.0;
 
@@ -130,6 +135,11 @@ public:
 
 private:
 	uint64 mLastTick = 0;
+
+	SizedArray<const char*> mBenchCVars;
+	/// Set while -bench-render runs the bench through Tick()
+	RagdollBench* mpRenderedBench = nullptr;
+	ReactionCapture mCapture;
 
 	double mFpsWindowTime = 0.0;
 	uint64 mFpsWindowStartFrame = 0;
@@ -184,9 +194,6 @@ private:
 	std::unordered_map<uint32, float64> mImpactSoundTimes;
 	float64 mImpactSoundClock = 0.0;
 
-	AssetTicket mRagdollTemplateTicket { nullptr };
-	std::atomic<Object*> mpRagdollTemplate = nullptr;
-	bool mbRagdollTemplateRequested = false;
 	uint32 mRagdollDropsPending = 0;
 	uint32 mRagdollSpawnCount = 0;
 
@@ -204,6 +211,10 @@ private:
 	CVarValue* mpNPCBalanceAssistCVar = nullptr;
 	CVarValue* mpNPCBalanceReleaseCVar = nullptr;
 	CVarValue* mpNPCBalanceRecoveryCVar = nullptr;
+	CVarValue* mpNPCBalanceResidualCVar = nullptr;
+	CVarValue* mpNPCBalanceLiftCVar = nullptr;
+	CVarValue* mpNPCBalanceExternalResidualCVar = nullptr;
+	CVarValue* mpNPCBalancePelvisDampingCVar = nullptr;
 	CVarValue* mpNPCMaxActiveCVar = nullptr;
 	CVarValue* mpNPCActiveDistanceCVar = nullptr;
 	CVarValue* mpNPCBumpSpeedCVar = nullptr;
@@ -211,6 +222,10 @@ private:
 	CVarValue* mpNPCHitShoveCVar = nullptr;
 	CVarValue* mpNPCMinShoveCVar = nullptr;
 	CVarValue* mpNPCMaxShoveCVar = nullptr;
+	CVarValue* mpNPCCollisionKnockCVar = nullptr;
+	CVarValue* mpNPCMinCollisionKnockCVar = nullptr;
+	CVarValue* mpNPCMaxCollisionKnockCVar = nullptr;
+	CVarValue* mpNPCKnockdownSpeedCVar = nullptr;
 	CVarValue* mpNPCStaggerTimeCVar = nullptr;
 	CVarValue* mpNPCStaggerSpeedCVar = nullptr;
 	CVarValue* mpNPCStumbleTimeCVar = nullptr;

@@ -54,6 +54,17 @@ public:
 	float32 TwistDegrees = 0.0f;
 	float32 FlexDegrees = 0.0f;
 
+	/// A cone joint's limits in each direction from the rest pose, used in place of SwingDegrees when any are set.
+	/// Forward is the way the body faces, or up for a segment lying along that. Out is away from the body's centre, or
+	/// up for a segment lying along that.
+	float32 SwingForward = 0.0f;
+	float32 SwingBack = 0.0f;
+	float32 SwingOut = 0.0f;
+	float32 SwingIn = 0.0f;
+
+	/// Torque (N m) that resists the joint while its muscle is off, which is what makes a limp body settle
+	float32 JointFriction = 0.5f;
+
 	float32 MassFraction = 0.0f;
 	float32 Friction = 0.8f;
 
@@ -95,5 +106,8 @@ struct RDDefinition
 
 bool RDLoadDefinition(const char* path, RDDefinition& out_def);
 const RDDefinition* RDGetHumanoidDefinition();
+
+/// Loads the humanoid definition from another file, if called before the first RDGetHumanoidDefinition()
+void RDSetHumanoidDefinitionPath(const char* path);
 
 } // namespace fx::physics

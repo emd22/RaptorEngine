@@ -170,7 +170,8 @@ static void MoveToTopOfDisplay(wxFrame* frame)
 	frame->SetPosition(wxPoint(frame->GetPosition().x, work_area.GetTop()));
 }
 
-EditorFrame* RaptorEditor::CreateMainFrame(const char* title, const Vec2u& viewport_size)
+EditorFrame* RaptorEditor::CreateMainFrame(const char* title, const Vec2u& viewport_size,
+										   const eRaptorEditorFlags flags)
 {
 	mpMainFrame = new EditorFrame(wxString::FromAscii(title),
 								  wxSize(static_cast<int>(viewport_size.X), static_cast<int>(viewport_size.Y)));
@@ -179,13 +180,18 @@ EditorFrame* RaptorEditor::CreateMainFrame(const char* title, const Vec2u& viewp
 
 	MoveToTopOfDisplay(mpMainFrame);
 
-#ifdef FX_PLATFORM_MACOS
-	// Show it without activating the app, so launching the editor (for example from automated tests) doesn't steal focus
-	mpMainFrame->ShowWithoutActivating();
-#else
-	mpMainFrame->Show();
-	mpMainFrame->Raise();
-#endif
+	if (HasFlag(flags, eRaptorEditorFlags::Hidden)) {
+		// Stays off screen
+	}
+	else if (HasFlag(flags, eRaptorEditorFlags::RaiseWindow)) {
+		mpMainFrame->Show();
+		mpMainFrame->Raise();
+	}
+	else {
+		// Show it without activating the app, so launching the editor (for example from automated tests) doesn't steal
+		// focus
+		mpMainFrame->ShowWithoutActivating();
+	}
 
 	mpMainFrame->ShowMode(mMode, mDataFilter, GetAvailableToolMask());
 	mpMainFrame->GetViewport()->SetFocus();

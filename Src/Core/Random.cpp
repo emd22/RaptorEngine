@@ -3,14 +3,24 @@
 namespace fx {
 
 
+static uint32 sRand32State = 2463534242U;
+
 uint32 FastRand32()
 {
-	static uint32 sHash = 2463534242U;
+	sRand32State ^= (sRand32State << 13);
+	sRand32State ^= (sRand32State >> 17);
 
-	sHash ^= (sHash << 13);
-	sHash ^= (sHash >> 17);
+	return (sRand32State ^= (sRand32State << 5));
+}
 
-	return (sHash ^= (sHash << 5));
+
+void SeedFastRand(uint32 seed)
+{
+	sRand32State = 2463534242U ^ (seed * 2654435761U);
+
+	if (sRand32State == 0) {
+		sRand32State = 2463534242U;
+	}
 }
 
 
