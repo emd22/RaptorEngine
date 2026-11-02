@@ -128,7 +128,7 @@ int32 AreaGraph::FindPortal(const char* name) const
 	}
 
 	for (size_t i = 0; i < mPortals.Size; i++) {
-		if (std::strcmp(mPortals[i].Name.CStr(), name) == 0) {
+		if (mPortals[i].Name == name) {
 			return static_cast<int32>(i);
 		}
 	}
@@ -240,8 +240,8 @@ AreaSet AreaGraph::FindAreas(const BBox& bounds) const
 
 static bool BoundsOverlap(const BBox& a, const BBox& b)
 {
-	return a.Min.X <= b.Max.X && a.Max.X >= b.Min.X && a.Min.Y <= b.Max.Y && a.Max.Y >= b.Min.Y &&
-		   a.Min.Z <= b.Max.Z && a.Max.Z >= b.Min.Z;
+	return a.Min.X <= b.Max.X && a.Max.X >= b.Min.X && a.Min.Y <= b.Max.Y && a.Max.Y >= b.Min.Y && a.Min.Z <= b.Max.Z &&
+		   a.Max.Z >= b.Min.Z;
 }
 
 void AreaGraph::AddLightSeedArea(const Vec3f& point, AreaSet& out_set) const

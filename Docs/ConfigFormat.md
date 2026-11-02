@@ -1,18 +1,14 @@
-# Project format (.prx)
+# Overview
 
-PRX is a custom configuration language designed for this engine.
-A scene is outlined by a PRX script located at the root of the scenes' directory.
-This file specifies:
+This configuration format is the backbone for the data driven portions of the engine. It is used to store key-value pairs and allow for modifying data at runtime.
 
-- The name of the scene and associated metadata
-- All objects that are defined in the scene.
+It is used anywhere from particle definitions, to being the underlying format for prototype files, to being the glue for the `.rxmodel` format.
 
 ## Entries
 
 A file is defined as a collection of entries. Each assignment expression is considered an entry.
 
-Entries use strict typing, and enforce that they can only be read as the type which they are defined.
-They can be objects, arrays, or literal values. As well, predefined constants can be added in the configuration file interpreter.
+Entries use strict typing, and enforce that they can only be read as the type which they are defined. Float to int conversions will throw a warning, but will be ultimately implicitly converted to preserve functionality.
 
 Entries can either contain the value of a primitive (int, float, string, etc.), an object, or an array.
 
@@ -58,7 +54,7 @@ Objects allow an entry to store a number of other named members inside of it.
 SomeObject = { X = 10 }
 ```
 
-Members are separated by whitespace. A semicolon can also be used, which helps when several members share a line.
+Members are separated by whitespace. A semicolon can also be used, which helps visually separatation when several members share a line.
 
 ```
 SomeObject = { X = 10; Y = 20 }
@@ -105,12 +101,12 @@ References used inside an array or an expression (`$A | $B`) are resolved as the
 
 ## Including other files
 
-PRX scripts also give the ability to include other PRX scripts directly by substitution.
+Config files also have the ability to include other config files directly by substitution (C style).
 
-To include a file, use the `#include` directive. with a path to the script to include. This halts the tokenizer to read this included file, and appends the tokens to the current buffer. Note that since this tokenizes the data before adding it to the token buffer, **other file formats should not be included in the script this way**.
+To include a file, use the `#include` directive. with a path to the script to include. This and appends the tokens to the current buffer. Note that since config files are tokenized before parsing and therefore the included file needs to be tokenized on include, **other non-config files should not be included**.
 
 ```
-#include "[SOME_FILE_PATH].prx"
+#include "[SOME_FILE_PATH].conf"
 ```
 
 ## Counting syntax
@@ -129,6 +125,5 @@ parent = {
 	$ = {	 // becomes 1 = {
 		...
 	}
-
 }
 ```

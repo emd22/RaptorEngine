@@ -33,7 +33,19 @@
 #include <mutex>
 #include <vector>
 
+
 namespace fx {
+
+enum class eRaptorEditorFlags
+{
+	None = (0),
+	/// Focuses on the window on open, raising it above other windows.
+	RaiseWindow = (1 << 0),
+	/// Never puts the window on screen, for runs that do not draw anything.
+	Hidden = (1 << 1),
+};
+
+FxEnumFlags(eRaptorEditorFlags);
 
 class Object;
 class String;
@@ -69,24 +81,17 @@ public:
 
 
 	bool InitGUI(int argc, char** argv);
+	void InitTools();
+
+	EditorFrame* CreateMainFrame(const char* title, const Vec2u& viewport_size, const eRaptorEditorFlags flags);
+
+	void BeginGameLoop();
+	void EndGameLoop();
 
 	void RunUILoop();
 
-	void Destroy();
-
-
-	void InitTools();
-
-	EditorFrame* CreateMainFrame(const char* title, const Vec2u& viewport_size);
-
-	void BeginGameLoop();
-
-	void EndGameLoop();
-
 	void ProcessGUIOperations();
-
 	void SyncPanels();
-
 	void NotifyGameFinished();
 
 	void ServiceViewportResize();
@@ -363,6 +368,8 @@ public:
 
 	/// Runs `CMD_<name>` from the editor command script. Returns false if there is no such command.
 	bool RunCommand(const String& name);
+
+	void Destroy();
 
 	~RaptorEditor() = default;
 

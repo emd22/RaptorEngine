@@ -2,6 +2,7 @@
 
 #include <Core/File.hpp>
 #include <algorithm>
+#include <libdeflate.h>
 #include <cstdio>
 #include <cstring>
 
@@ -15,6 +16,10 @@ constexpr uint32 scMaxStringLength = 4096;
 constexpr uint32 scMaxElementCount = 1 << 28;
 constexpr uint32 scMaxLightmapSize = 8192;
 
+/// Lightmaps, probe moments, fog shadow pages and acoustic probes are zlib streams from this version on
+constexpr uint32 scFirstDeflatedVersion = 14;
+constexpr int scDeflateLevel = 9;
+
 bool IsNameBefore(const String& a, const String& b) { return std::strcmp(a.CStr(), b.CStr()) < 0; }
 
 struct Reader
@@ -22,6 +27,7 @@ struct Reader
 public:
 	Reader() = delete;
 	Reader(File* file_to_read) : mpFile(file_to_read) {}
+	~Reader() { libdeflate_free_decompressor(mpDecompressor); }
 
 	template <typename TType>
 	void Read(TType* values, size_t count)
@@ -63,6 +69,53 @@ public:
 		return count;
 	}
 
+	template <typename TType>
+	void ReadSection(TType* values, size_t count)
+	{
+		if (!bSectionsDeflated) {
+			Read(values, count);
+			return;
+		}
+
+		const uint32 deflated_size = ReadCount();
+
+		if (bFailed) {
+			return;
+		}
+
+		if (count == 0 || deflated_size == 0) {
+			bFailed = (count != 0 || deflated_size != 0);
+			return;
+		}
+
+		SizedArray<uint8> deflated;
+		deflated.InitSize(deflated_size);
+		Read(deflated.pData, deflated.Size);
+
+		if (bFailed) {
+			return;
+		}
+
+		if (mpDecompressor == nullptr) {
+			mpDecompressor = libdeflate_alloc_decompressor();
+		}
+
+		if (mpDecompressor == nullptr) {
+			bFailed = true;
+			return;
+		}
+
+		const size_t byte_count = count * sizeof(TType);
+		size_t inflated_size = 0;
+
+		const libdeflate_result result = libdeflate_zlib_decompress(mpDecompressor, deflated.pData, deflated.Size, values,
+																	byte_count, &inflated_size);
+
+		if (result != LIBDEFLATE_SUCCESS || inflated_size != byte_count) {
+			bFailed = true;
+		}
+	}
+
 	String ReadString()
 	{
 		Assert(mpFile != nullptr);
@@ -86,9 +139,11 @@ public:
 
 public:
 	bool bFailed = false;
+	bool bSectionsDeflated = false;
 
 private:
 	File* mpFile = nullptr;
+	libdeflate_decompressor* mpDecompressor = nullptr;
 };
 
 struct Writer
@@ -96,6 +151,7 @@ struct Writer
 public:
 	Writer() = delete;
 	Writer(File* file_to_write) : mpFile(file_to_write) {}
+	~Writer() { libdeflate_free_compressor(mpCompressor); }
 
 	template <typename TType>
 	void Write(const TType* values, size_t count)
@@ -144,12 +200,50 @@ public:
 		Write(value.CStr(), value.GetLength());
 	}
 
+	template <typename TType>
+	void WriteSection(const TType* values, size_t count)
+	{
+		if (bFailed) {
+			return;
+		}
+
+		if (count == 0) {
+			WriteCount(0);
+			return;
+		}
+
+		if (mpCompressor == nullptr) {
+			mpCompressor = libdeflate_alloc_compressor(scDeflateLevel);
+		}
+
+		if (mpCompressor == nullptr) {
+			bFailed = true;
+			return;
+		}
+
+		const size_t byte_count = count * sizeof(TType);
+
+		SizedArray<uint8> deflated;
+		deflated.InitSize(libdeflate_zlib_compress_bound(mpCompressor, byte_count));
+
+		const size_t deflated_size = libdeflate_zlib_compress(mpCompressor, values, byte_count, deflated.pData,
+															  deflated.Size);
+
+		if (deflated_size == 0) {
+			bFailed = true;
+			return;
+		}
+
+		WriteCount(deflated_size);
+		Write(deflated.pData, deflated_size);
+	}
 
 public:
 	bool bFailed = false;
 
 private:
 	File* mpFile;
+	libdeflate_compressor* mpCompressor = nullptr;
 };
 
 constexpr uint32 scMaxFogShadowLevelSize = 4096;
@@ -207,7 +301,7 @@ void ReadFogShadow(Reader& reader, CompiledMapFogShadow& out_shadow)
 			}
 
 			level.Depths.InitSize(static_cast<size_t>(level.Width) * level.Height);
-			reader.Read(level.Depths.pData, level.Depths.Size);
+			reader.ReadSection(level.Depths.pData, level.Depths.Size);
 		}
 	}
 }
@@ -297,7 +391,7 @@ void WriteFogShadow(Writer& writer, const CompiledMapFogShadow& shadow)
 		for (const CompiledMapFogShadowLevel& level : page.Levels) {
 			writer.Write(level.Width);
 			writer.Write(level.Height);
-			writer.Write(level.Depths.pData, level.Depths.Size);
+			writer.WriteSection(level.Depths.pData, level.Depths.Size);
 		}
 	}
 }
@@ -322,6 +416,8 @@ bool CompiledMap::Load(const String& path)
 		file_to_read.Close();
 		return false;
 	}
+
+	reader.bSectionsDeflated = (version >= scFirstDeflatedVersion);
 
 	SourceHash = reader.Read<uint64>();
 	bSealed = (reader.Read<uint32>() & scFlagSealed) != 0;
@@ -535,7 +631,7 @@ bool CompiledMap::Load(const String& path)
 	}
 	else {
 		Lightmap.SunVisibility.InitSize(lightmap_texel_count);
-		reader.Read(Lightmap.SunVisibility.pData, lightmap_texel_count);
+		reader.ReadSection(Lightmap.SunVisibility.pData, lightmap_texel_count);
 	}
 
 	Lightmap.Flags = reader.Read<uint32>();
@@ -549,8 +645,8 @@ bool CompiledMap::Load(const String& path)
 	else {
 		Lightmap.Irradiance.InitSize(irradiance_count);
 		Lightmap.Directions.InitSize(direction_count);
-		reader.Read(Lightmap.Irradiance.pData, irradiance_count);
-		reader.Read(Lightmap.Directions.pData, direction_count);
+		reader.ReadSection(Lightmap.Irradiance.pData, irradiance_count);
+		reader.ReadSection(Lightmap.Directions.pData, direction_count);
 	}
 
 	const uint32 probe_visibility_count = reader.ReadCount();
@@ -575,7 +671,7 @@ bool CompiledMap::Load(const String& path)
 		ProbeIrradiance.InitSize(probe_irradiance_count);
 		ProbeMoments.InitSize(probe_moment_count);
 		reader.Read(ProbeIrradiance.pData, probe_irradiance_count);
-		reader.Read(ProbeMoments.pData, probe_moment_count);
+		reader.ReadSection(ProbeMoments.pData, probe_moment_count);
 	}
 
 	Areas.InitSize(reader.ReadCount());
@@ -667,7 +763,7 @@ bool CompiledMap::Load(const String& path)
 
 	if (version >= 13 && !reader.bFailed) {
 		AcousticProbes.InitSize(reader.ReadCount());
-		reader.Read(AcousticProbes.pData, AcousticProbes.Size);
+		reader.ReadSection(AcousticProbes.pData, AcousticProbes.Size);
 	}
 
 	for (const CompiledMapSurface& surface : Surfaces) {
@@ -784,12 +880,12 @@ bool CompiledMap::Save(const String& path) const
 	writer.Write(Lightmap.Width);
 	writer.Write(Lightmap.Height);
 	writer.Write(Lightmap.SunDirection, 3);
-	writer.Write(Lightmap.SunVisibility.pData, Lightmap.SunVisibility.Size);
+	writer.WriteSection(Lightmap.SunVisibility.pData, Lightmap.SunVisibility.Size);
 	writer.Write(Lightmap.Flags);
 	writer.WriteCount(Lightmap.Irradiance.Size);
 	writer.WriteCount(Lightmap.Directions.Size);
-	writer.Write(Lightmap.Irradiance.pData, Lightmap.Irradiance.Size);
-	writer.Write(Lightmap.Directions.pData, Lightmap.Directions.Size);
+	writer.WriteSection(Lightmap.Irradiance.pData, Lightmap.Irradiance.Size);
+	writer.WriteSection(Lightmap.Directions.pData, Lightmap.Directions.Size);
 
 	writer.WriteCount(ProbeSunVisibility.Size);
 	writer.Write(ProbeSunVisibility.pData, ProbeSunVisibility.Size);
@@ -797,7 +893,7 @@ bool CompiledMap::Save(const String& path) const
 	writer.WriteCount(ProbeIrradiance.Size);
 	writer.WriteCount(ProbeMoments.Size);
 	writer.Write(ProbeIrradiance.pData, ProbeIrradiance.Size);
-	writer.Write(ProbeMoments.pData, ProbeMoments.Size);
+	writer.WriteSection(ProbeMoments.pData, ProbeMoments.Size);
 
 	writer.WriteCount(Areas.Size);
 
@@ -828,7 +924,7 @@ bool CompiledMap::Save(const String& path) const
 	WriteCollisionMaterials(writer, Hulls, CollisionMeshes);
 
 	writer.WriteCount(AcousticProbes.Size);
-	writer.Write(AcousticProbes.pData, AcousticProbes.Size);
+	writer.WriteSection(AcousticProbes.pData, AcousticProbes.Size);
 
 	return (writer.bFailed == false);
 }

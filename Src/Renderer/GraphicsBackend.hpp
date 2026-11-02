@@ -20,6 +20,7 @@
 #include <Core/TSQueue.hpp>
 #include <Math/Vec2.hpp>
 #include <mutex>
+#include <string>
 
 namespace fx {
 class BaseCamera;
@@ -207,11 +208,25 @@ public:
 	// }
 
 	uint32 GetElapsedFrameCount() const { return mInternalFrameCounter.load(); }
+	/// For runs that simulate without drawing: per-frame work such as animation is gated on this count changing
+	void CountFrameWithoutDrawing() { mInternalFrameCounter.fetch_add(1); }
+
+	/// Writes the next finished frame to `path` as it reaches the screen: width and height as uint32, then BGRA8 pixels
+	void RequestFrameCapture(const char* path);
 	uint32 GetFrameNumber() const { return mFrameNumber; }
 
 	FX_FORCE_INLINE bool DidResize() const { return bDidFrameResize; }
 
 private:
+	void RecordFrameCapture(CommandBuffer& cmd);
+	void WriteFrameCapture();
+
+	std::string mFrameCapturePath;
+	RawGpuBuffer mFrameCaptureBuffer;
+	uint64 mFrameCaptureBytes = 0;
+	uint32 mFrameCaptureWidth = 0;
+	uint32 mFrameCaptureHeight = 0;
+
 	void InitVulkan();
 	void CreateSurfaceFromWindow();
 

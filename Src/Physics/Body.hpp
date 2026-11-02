@@ -19,7 +19,7 @@ struct BodyProps
 {
 public:
 	float32 ConvexRadius = 0.001f;
-	float32 Friction = 0.2f;
+	float32 Friction = 0.7f;
 	float32 Restitution = 0.1f;
 
 	/**
@@ -84,6 +84,8 @@ public:
 	void SetMidpoint(const Vec3f midpoint);
 
 	void Teleport(const Vec3f position, const Quat rotation);
+
+	void SetLinearVelocity(const Vec3f velocity);
 
 	FX_FORCE_INLINE Vec3f GetPosition() { return Vec3f(mpPhysicsBody->GetPosition()); }
 	FX_FORCE_INLINE Quat GetRotation() { return Quat(mpPhysicsBody->GetRotation()); }

@@ -417,6 +417,18 @@ void Body::Teleport(const Vec3f position, const Quat rotation)
 		GetBodyID(), jolt_position, jolt_rotation, JPH::EActivation::Activate);
 }
 
+void Body::SetLinearVelocity(const Vec3f velocity)
+{
+	if (!mbHasPhysicsBody) {
+		return;
+	}
+
+	JPH::RVec3 jolt_velocity;
+	velocity.ToJoltVec3(jolt_velocity);
+
+	gPhysics->pBackend->GetBodyInterface().SetLinearVelocity(GetBodyID(), jolt_velocity);
+}
+
 } // namespace physics
 
 } // namespace fx

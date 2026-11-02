@@ -1,15 +1,14 @@
 #pragma once
 
 #include <Core/DynArray.hpp>
+#include <Core/Name.hpp>
 #include <Core/PagedArray.hpp>
 #include <Core/Slice.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
 #include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
-#include <string>
 #include <utility>
-#include <vector>
 
 namespace fx {
 
@@ -48,7 +47,7 @@ struct RxMaterialDesc
 	const RxMaterialParam* FindParam(const StringView name) const;
 	const String* FindTexture(const StringView slot) const;
 
-	String Name;
+	String MaterialName;
 	String Shader;
 	DynArray<std::pair<String, String>> Textures;
 	DynArray<RxMaterialParam> Params;
@@ -59,16 +58,16 @@ struct RxMaterialDesc
 
 struct RxSocketDesc
 {
-	String Name;
-	String Joint;
+	String SocketName;
+	Name JointName;
 	RxTransform Transform;
 };
 
 struct RxClipDesc
 {
-	String Name;
+	String ClipName;
 	RxFileRef File;
-	String RootJoint;
+	Name RootJoint;
 	float32 Speed = 1.0f;
 	bool bLoop = false;
 	bool bRootMotion = false;
@@ -78,7 +77,7 @@ struct RxModelDesc
 {
 	const RxMaterialDesc* FindMaterial(const StringView name) const;
 
-	String Name;
+	String ModelName;
 	RxFileRef Mesh;
 	RxFileRef Skeleton;
 	bool bHasSkeleton = false;

@@ -7,6 +7,7 @@
 
 #include <Asset/AssetManager.hpp>
 #include <Asset/ConfigFile.hpp>
+#include <Asset/MeshGen.hpp>
 // #include <Asset/Font/Font.hpp>
 #include <Asset/WorldFile.hpp>
 #include <Audio/AudioSystem.hpp>
@@ -26,7 +27,7 @@
 #include <Particle/ParticleSystem.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
-#include <Physics/Ragdoll.hpp>
+#include <Ragdoll/Ragdoll.hpp>
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Camera/BaseCamera.hpp>
 #include <Renderer/Globals.hpp>
@@ -51,6 +52,9 @@
 #include <Editor/RaptorEditor.hpp>
 #endif
 
+
+#include <cstdlib>
+#include <cstring>
 
 #define FX_LIMIT_FRAMERATE_ON_FOCUS_LOST 1
 
@@ -85,14 +89,92 @@ static constexpr const char* scCrosshairPath = "Textures/crosshair.png";
 /// Crosshair width and height in window pixels, set `$i_crosshair_size` in the console to change it (0 hides it)
 static constexpr int64 scCrosshairSize = 3;
 
-RaptorGame::RaptorGame()
+/// Edge length, launch speed and distance in front of the eye of the physics cube fired from the camera
+static constexpr float32 scFireCubeSize = 0.25f;
+static constexpr float32 scFireCubeSpeed = 6.0f;
+static constexpr float32 scFireCubeSpawnDistance = 1.5f;
+
+
+RaptorGame::RaptorGame(int argc, char** argv)
 {
-	InitEngine();
+	eWindowFlags window_flags = eWindowFlags::None;
+
+	mBenchCVars.InitCapacity(static_cast<size_t>(argc));
+
+	// Super simple arg parsing for now. Will likely overhaul in the future for passing in particular maps and
+	// parameters.
+	for (uint32 arg_index = 1; arg_index < argc; arg_index++) {
+		const String arg = String(argv[arg_index]);
+
+		if (arg == "-raise") {
+			SetFlag(window_flags, eWindowFlags::RaiseWindow);
+			continue;
+		}
+
+		if (arg == "-ragdoll-bench" && arg_index + 1 < static_cast<uint32>(argc)) {
+			BenchOptions.bEnabled = true;
+			BenchOptions.Suite = argv[++arg_index];
+			SetFlag(window_flags, eWindowFlags::Hidden);
+			continue;
+		}
+
+		if (arg == "-bench-ragdoll" && arg_index + 1 < static_cast<uint32>(argc)) {
+			physics::RDSetHumanoidDefinitionPath(argv[++arg_index]);
+			continue;
+		}
+
+		if (arg == "-reaction-capture" && arg_index + 1 < static_cast<uint32>(argc)) {
+			CaptureOptions.bEnabled = true;
+			CaptureOptions.OutDir = argv[++arg_index];
+			continue;
+		}
+
+		if (arg == "-capture-dt" && arg_index + 1 < static_cast<uint32>(argc)) {
+			CaptureOptions.FixedDelta = static_cast<float32>(std::atof(argv[++arg_index]));
+			continue;
+		}
+
+		if (arg == "-capture-images" && arg_index + 3 < static_cast<uint32>(argc)) {
+			CaptureOptions.ImageStride = static_cast<uint32>(std::atoi(argv[++arg_index]));
+			CaptureOptions.ImageFrom = static_cast<float32>(std::atof(argv[++arg_index]));
+			CaptureOptions.ImageTo = static_cast<float32>(std::atof(argv[++arg_index]));
+			continue;
+		}
+
+		if (arg == "-bench-render") {
+			BenchOptions.bRender = true;
+			continue;
+		}
+
+		if (arg == "-bench-out" && arg_index + 1 < static_cast<uint32>(argc)) {
+			BenchOptions.OutPath = argv[++arg_index];
+			continue;
+		}
+
+		if (arg == "-bench-traces" && arg_index + 1 < static_cast<uint32>(argc)) {
+			BenchOptions.TraceDir = argv[++arg_index];
+			continue;
+		}
+
+		if (arg == "-bench-shard" && arg_index + 2 < static_cast<uint32>(argc)) {
+			BenchOptions.ShardIndex = static_cast<uint32>(std::atoi(argv[++arg_index]));
+			BenchOptions.ShardCount = static_cast<uint32>(std::atoi(argv[++arg_index]));
+			continue;
+		}
+
+		if (arg == "-bench-cvar" && arg_index + 1 < static_cast<uint32>(argc)) {
+			mBenchCVars.Insert(argv[++arg_index]);
+			continue;
+		}
+	}
+
+
+	InitEngine(window_flags);
 	CreateGame();
 }
 
 
-void RaptorGame::InitEngine()
+void RaptorGame::InitEngine(const eWindowFlags window_flags)
 {
 #ifdef FX_LOG_OUTPUT_TO_FILE
 	LogCreateFile("FoxtrotLog.log");
@@ -138,7 +220,7 @@ void RaptorGame::InitEngine()
 
 	mBaseWindowTitle = String(window_title);
 
-	Ref<Window> window = Window::New(window_title, Vec2u(window_width, window_height));
+	Ref<Window> window = MakeRef<Window>(window_title, Vec2u(window_width, window_height), window_flags);
 
 	ConfigEntry* bob_entry = Config.GetEntry(HashStr32("HeadBob"));
 
@@ -267,10 +349,38 @@ void RaptorGame::CreateGame()
 	mpNPCImpactDamageCVar = gCVars->Set("b_npc_impact_damage", gCVars->Get("b_npc_impact_damage", 0.25f));
 	mpNPCImpactSpeedCVar = gCVars->Set("b_npc_impact_speed", gCVars->Get("b_npc_impact_speed", 1.5f));
 	mpNPCImpactSafeSpeedCVar = gCVars->Set("b_npc_impact_safe_speed", gCVars->Get("b_npc_impact_safe_speed", 6.0f));
-	mpNPCReactStrengthCVar = gCVars->Set("b_npc_react_strength", gCVars->Get("b_npc_react_strength", 0.25f));
 	mpNPCStrengthCVar = gCVars->Set("b_npc_strength", gCVars->Get("b_npc_strength", 1.0f));
 	mpNPCRootAssistCVar = gCVars->Set("b_npc_root_assist", gCVars->Get("b_npc_root_assist", 1.0f));
 	mpNPCBalanceCVar = gCVars->Set("b_npc_balance", gCVars->Get("b_npc_balance", 1.0f));
+	mpNPCBalanceAssistCVar = gCVars->Set("b_npc_balance_assist", gCVars->Get("b_npc_balance_assist", 0.50f));
+	mpNPCBalanceReleaseCVar = gCVars->Set("b_npc_balance_release", gCVars->Get("b_npc_balance_release", 0.1f));
+	mpNPCBalanceRecoveryCVar = gCVars->Set("b_npc_balance_recovery", gCVars->Get("b_npc_balance_recovery", 0.5f));
+	mpNPCBalanceResidualCVar = gCVars->Set("b_npc_balance_residual", gCVars->Get("b_npc_balance_residual", 0.15f));
+	mpNPCBalanceLiftCVar = gCVars->Set("b_npc_balance_lift", gCVars->Get("b_npc_balance_lift", 0.0f));
+	mpNPCBalanceExternalResidualCVar = gCVars->Set("b_npc_balance_external_residual",
+												   gCVars->Get("b_npc_balance_external_residual", 0.0f));
+	mpNPCBalancePelvisDampingCVar = gCVars->Set("b_npc_balance_pelvis_damping",
+												gCVars->Get("b_npc_balance_pelvis_damping", 5.0f));
+	mpNPCMaxActiveCVar = gCVars->Set("b_npc_max_active", gCVars->Get("b_npc_max_active", int64(4)));
+	mpNPCActiveDistanceCVar = gCVars->Set("b_npc_active_distance", gCVars->Get("b_npc_active_distance", 50.0f));
+	mpNPCBumpSpeedCVar = gCVars->Set("b_npc_bump_speed", gCVars->Get("b_npc_bump_speed", 1.0f));
+	mpNPCBumpImpulseCVar = gCVars->Set("b_npc_bump_impulse", gCVars->Get("b_npc_bump_impulse", 4.0f));
+	mpNPCHitShoveCVar = gCVars->Set("b_npc_hit_shove", gCVars->Get("b_npc_hit_shove", 10.0f));
+	mpNPCMinShoveCVar = gCVars->Set("b_npc_min_shove", gCVars->Get("b_npc_min_shove", 0.3f));
+	mpNPCMaxShoveCVar = gCVars->Set("b_npc_max_shove", gCVars->Get("b_npc_max_shove", 1.2f));
+	mpNPCCollisionKnockCVar = gCVars->Set("b_npc_collision_knock", gCVars->Get("b_npc_collision_knock", 1.0f));
+	mpNPCMinCollisionKnockCVar = gCVars->Set("b_npc_min_collision_knock",
+											 gCVars->Get("b_npc_min_collision_knock", 0.15f));
+	mpNPCMaxCollisionKnockCVar = gCVars->Set("b_npc_max_collision_knock",
+											 gCVars->Get("b_npc_max_collision_knock", 10.0f));
+	mpNPCKnockdownSpeedCVar = gCVars->Set("b_npc_knockdown_speed", gCVars->Get("b_npc_knockdown_speed", 3.0f));
+	mpNPCStaggerTimeCVar = gCVars->Set("b_npc_stagger_time", gCVars->Get("b_npc_stagger_time", 0.75f));
+	mpNPCStaggerSpeedCVar = gCVars->Set("b_npc_stagger_speed", gCVars->Get("b_npc_stagger_speed", 0.8f));
+	mpNPCStumbleTimeCVar = gCVars->Set("b_npc_stumble_time", gCVars->Get("b_npc_stumble_time", 0.3f));
+	mpNPCRepeatShoveCVar = gCVars->Set("b_npc_repeat_shove", gCVars->Get("b_npc_repeat_shove", 0.1f));
+	mpNPCWanderCVar = gCVars->Set("b_npc_wander", gCVars->Get("b_npc_wander", 0.0f));
+	mpPlayerRagdollCollisionCVar = gCVars->Set("b_player_ragdoll_collision",
+											   gCVars->Get("b_player_ragdoll_collision", int64(1)));
 
 	gCVars->Set("r_gtao_radius", gCVars->Get("r_gtao_radius", 0.5f));
 	gCVars->Set("r_gtao_radius_multiplier", gCVars->Get("r_gtao_radius_multiplier", 1.457f));
@@ -323,6 +433,20 @@ void RaptorGame::CreateGame()
 	// physics by that much in one go.
 	mLastTick = SDL_GetPerformanceCounter();
 
+	if (BenchOptions.bEnabled) {
+		RunRagdollBench();
+	}
+
+	if (CaptureOptions.bEnabled) {
+		if (!mCapture.Begin(CaptureOptions)) {
+			std::_Exit(1);
+		}
+
+#ifdef FX_IS_EDITOR
+		gEditor->SetSimulating(true);
+#endif
+	}
+
 	while (sbRunning) {
 		const uint64 frame_start = SDL_GetPerformanceCounter();
 
@@ -331,7 +455,7 @@ void RaptorGame::CreateGame()
 #ifdef FX_LIMIT_FRAMERATE_ON_FOCUS_LOST
 		double frame_time_limit = 0.0;
 
-		if (!gGraphics->GetWindow()->IsFocused()) {
+		if (!gGraphics->GetWindow()->IsFocused() && !CaptureOptions.bEnabled) {
 			frame_time_limit = scUnfocusedFrameTime;
 		}
 #ifdef FX_IS_EDITOR
@@ -504,7 +628,11 @@ void RaptorGame::ProcessControls()
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_F9)) {
 		++mNPCSpawnsPending;
-		RequestRagdollTemplate();
+		gNPCManager->RequestModel();
+	}
+
+	if (is_simulation_mode && ControlManager::IsKeyPressed(eKey::FX_KEY_M)) {
+		FireCube();
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_L)) {
@@ -691,33 +819,7 @@ void RaptorGame::ProcessControls()
 void RaptorGame::RequestRagdollDrop()
 {
 	++mRagdollDropsPending;
-	RequestRagdollTemplate();
-}
-
-void RaptorGame::RequestRagdollTemplate()
-{
-	if (mbRagdollTemplateRequested) {
-		return;
-	}
-
-	mbRagdollTemplateRequested = true;
-
-	mRagdollTemplateTicket = gAssetManager->LoadObject("ragdoll_template",
-													   "RaptorData/Data/Demo/Models/ragdoll2/ragdoll2.rxmodel");
-
-	mRagdollTemplateTicket.OnLoaded(
-		[this](void* item_ptr)
-		{
-			Object* object = static_cast<Object*>(item_ptr);
-
-			if (object != nullptr) {
-				object->SetShadowCaster(true);
-
-				mpRagdollTemplate.store(object);
-			}
-		});
-
-	LogInfo("Loading the ragdoll model, dummies drop once it has loaded");
+	gNPCManager->RequestModel();
 }
 
 void RaptorGame::SpawnDebugNPC(Object* model)
@@ -738,6 +840,7 @@ void RaptorGame::SpawnDebugNPC(Object* model)
 	desc.Position = floor.bHit ? floor.Point : (gWorld->Player.Position + forward * 2.5f);
 	desc.Yaw = std::atan2(-forward.X, -forward.Z);
 	desc.IdleAnimation = "walk";
+	desc.WalkAnimation = "walk";
 
 	++mNPCSpawnCount;
 
@@ -746,25 +849,9 @@ void RaptorGame::SpawnDebugNPC(Object* model)
 
 void RaptorGame::DropRagdollDummy(Object* model)
 {
-	if (mRagdollDummies.size() >= scMaxRagdollDummies) {
-		DestroyRagdollDummy(0);
+	if (gNPCManager->GetDummyCount() >= scMaxRagdollDummies) {
+		gNPCManager->DestroyDummy(0);
 	}
-
-	Object* root = model->CloneWithOwnSkeleton(String::Fmt("ragdoll_dummy_{}", mRagdollSpawnCount).Str());
-
-	DynArray<Object*> parts;
-	CollectObjectTree(root, parts);
-
-	const auto skinned_part = std::find_if(parts.begin(), parts.end(),
-										   [](const Object* part) { return part->pSkeleton.IsValid(); });
-
-	if (skinned_part == parts.end()) {
-		LogWarning("The ragdoll model has no skeleton");
-		DestroyObjectTree(root->ID);
-		return;
-	}
-
-	Object* skinned = *skinned_part;
 
 	Vec3f forward = gWorld->Player.pCamera->GetForwardVector();
 	forward.Y = 0.0f;
@@ -774,116 +861,88 @@ void RaptorGame::DropRagdollDummy(Object* model)
 
 	const float32 lateral = (static_cast<float32>(mRagdollSpawnCount % 3) - 1.0f) * 0.9f;
 	const float32 height = 1.0f + 0.3f * static_cast<float32>(mRagdollSpawnCount % 2);
+	const String name = String::Fmt("ragdoll_dummy_{}", mRagdollSpawnCount);
 
 	++mRagdollSpawnCount;
 
-	root->SetPosition(gWorld->Player.Position + forward * 1.5f + right * lateral + Vec3f(0.0f, height, 0.0f));
+	const Vec3f position = gWorld->Player.Position + forward * 1.5f + right * lateral + Vec3f(0.0f, height, 0.0f);
 
-	for (Object* part : parts) {
-		part->SetCullable(false);
-	}
+	gNPCManager->SpawnDummy(model, name, position, forward * 2.0f);
+}
 
-	root->SetShadowCaster(true);
-	root->SetProbeVisible(false);
+void RaptorGame::FireCube()
+{
+	const Vec3f eye = gWorld->Player.pCamera->GetPosition();
+	const Vec3f forward = gWorld->Player.pCamera->GetForwardVector();
+	const float32 half_size = scFireCubeSize * 0.5f;
 
-	std::unique_ptr<physics::Ragdoll> ragdoll = std::make_unique<physics::Ragdoll>();
-	const physics::RagdollDef* ragdoll_def = physics::GetHumanoidRagdollDef();
+	// Stop short of anything in the way, so the cube never starts inside a wall
+	const physics::RayResult hit = gPhysics->pBackend->Raycast(eye, forward * scFireCubeSpawnDistance);
+	const float32 spawn_distance = hit.bHit ? eye.DistanceTo(hit.Point) - half_size : scFireCubeSpawnDistance;
 
-	if (ragdoll_def == nullptr || !ragdoll->Create(skinned->pSkeleton, skinned->GetWorldMatrix(), *ragdoll_def)) {
-		DestroyObjectTree(root->ID);
+	if (spawn_distance < half_size) {
 		return;
 	}
 
-	gWorld->AttachLoaded(root);
+	if (mFiredCubes.Size >= scMaxFiredCubes) {
+		DestroyFiredCube(mFiredCubes[0]);
+		mFiredCubes.RemoveAt(0);
+	}
 
-	ragdoll->Activate(forward * 2.0f);
+	const String name = String::Fmt("fired_cube_{}", mFiredCubeCount);
+	++mFiredCubeCount;
 
-	mRagdollDummies.push_back(
-		RagdollDummy { .RootID = root->ID, .pRagdoll = std::move(ragdoll), .SkinnedID = skinned->ID });
+	Object* object = gObjectManager->NewObject(name, gWorld->pPrototype->GetDefaultMaterial(), eObjectTag::None);
+
+	object->pMesh = MeshGen::MakeCube(CubeGenOptions::Uniform(half_size))->AsDefaultMesh();
+	object->Bounds.Min = Vec3f(-half_size);
+	object->Bounds.Max = Vec3f(half_size);
+	object->SetShadowCaster(true);
+	object->SetPosition(eye + forward * spawn_distance);
+
+	physics::Body* body = gPhysics->NewBody(name);
+	body->CreatePrimitiveBody(physics::ePrimitiveType::Box, Vec3f(scFireCubeSize), physics::eMotionType::Dynamic,
+							  physics::BodyProps {});
+	body->Teleport(object->GetPosition(), object->mRotation);
+	body->SetLinearVelocity(forward * scFireCubeSpeed);
+
+	object->AttachCollider(body);
+	gWorld->AttachLoaded(object);
+
+	mFiredCubes.Insert(object->Name.GetHash());
 }
 
-void RaptorGame::DestroyRagdollDummy(size_t index)
+void RaptorGame::DestroyFiredCube(Hash32 name_hash)
 {
-	RagdollDummy& dummy = mRagdollDummies[index];
+	// The cube may already be gone, dynamic objects are removed once they are too far from the player
+	Object* object = gObjectManager->FindObject(name_hash);
 
-	dummy.pRagdoll->Destroy();
+	if (object == nullptr) {
+		return;
+	}
 
-	DestroyObjectTree(dummy.RootID);
+	gPhysics->DestroyBody(object->PhysicsID);
+	gWorld->Detach(object->ID);
+	gObjectManager->DestroyObject(object->ID);
+}
 
-	mRagdollDummies.erase(mRagdollDummies.begin() + static_cast<std::ptrdiff_t>(index));
+void RaptorGame::ClearFiredCubes()
+{
+	for (const Hash32 name_hash : mFiredCubes) {
+		DestroyFiredCube(name_hash);
+	}
+
+	mFiredCubes.Clear();
 }
 
 void RaptorGame::CleanWorld()
 {
-	while (!mRagdollDummies.empty()) {
-		DestroyRagdollDummy(mRagdollDummies.size() - 1);
-	}
-
+	gNPCManager->ClearDummies();
 	gNPCManager->ClearRagdolls();
+	ClearFiredCubes();
 	gDecalManager->Clear();
 	gParticleSystem->Clear();
 	gAudio->StopAll();
-}
-
-void RaptorGame::AddDummyWound(RagdollDummy& dummy, const physics::RagdollContact& contact)
-{
-	constexpr float32 scWoundCooldown = 0.25f;
-
-	if (dummy.BloodCooldown > 0.0f) {
-		return;
-	}
-
-	Object* skinned = gObjectManager->GetObject(dummy.SkinnedID);
-	uint32 bone_index = 0;
-
-	if (skinned == nullptr || !skinned->pSkeleton.IsValid() ||
-		!dummy.pRagdoll->FindBoneForBody(contact.Body, bone_index) ||
-		bone_index >= skinned->pSkeleton->SkinningMatrices.Size) {
-		return;
-	}
-
-	const Mat4f rest_to_world = skinned->pSkeleton->SkinningMatrices[bone_index] * skinned->GetWorldMatrix();
-
-	gDecalManager->AddSkinnedBloodSplat(&(*skinned->pSkeleton), rest_to_world, contact.Point, contact.Normal,
-										GetContactWoundSize(contact));
-
-	dummy.BloodCooldown = scWoundCooldown;
-}
-
-static float32 RandomUnit() { return static_cast<float32>(FastRand32() >> 8) * (1.0f / 16777216.0f); }
-
-void RaptorGame::SpawnRagdollBlood(float32& cooldown, const physics::RagdollContact& contact, float32 min_speed)
-{
-	constexpr float32 scCooldown = 0.25f;
-	constexpr float32 scMinSize = 0.4f;
-	constexpr float32 scMaxSize = 1.0f;
-	constexpr float32 scSpeedRange = 8.0f;
-
-	if (cooldown > 0.0f) {
-		return;
-	}
-
-	cooldown = scCooldown;
-
-	const float32 strength = std::clamp((contact.Speed - min_speed) / scSpeedRange, 0.0f, 1.0f);
-	const float32 size = scMinSize + (scMaxSize - scMinSize) * strength;
-
-	gDecalManager->AddBloodSplat(contact.Point, contact.Normal, size);
-
-	const Vec3f reference = (std::abs(contact.Normal.Y) < 0.9f) ? Vec3f::sUp : Vec3f::sRight;
-	const Vec3f tangent = reference.Cross(contact.Normal).Normalize();
-	const Vec3f bitangent = contact.Normal.Cross(tangent);
-
-	const uint32 satellites = 2 + static_cast<uint32>(strength * 2.0f);
-
-	for (uint32 i = 0; i < satellites; i++) {
-		const float32 angle = RandomUnit() * 2.0f * static_cast<float32>(M_PI);
-		const float32 distance = size * (0.4f + 0.6f * RandomUnit());
-
-		const Vec3f offset = (tangent * std::cos(angle) + bitangent * std::sin(angle)) * distance;
-
-		gDecalManager->AddBloodSplat(contact.Point + offset, contact.Normal, size * (0.25f + 0.25f * RandomUnit()));
-	}
 }
 
 void RaptorGame::UpdateObjectScripts()
@@ -903,9 +962,130 @@ void RaptorGame::UpdateObjectScripts()
 	}
 }
 
+float32 RaptorGame::GetCVarFloat(const CVarValue* cvar, float32 fallback)
+{
+	if (cvar == nullptr) {
+		return fallback;
+	}
+
+	return cvar->FloatValue;
+}
+
+void RaptorGame::ReadNPCTuning(NPCTuning& tuning) const
+{
+	tuning.ImpactDamageScale = GetCVarFloat(mpNPCImpactDamageCVar, tuning.ImpactDamageScale);
+	tuning.MinImpactSpeed = GetCVarFloat(mpNPCImpactSpeedCVar, tuning.MinImpactSpeed);
+	tuning.SafeImpactSpeed = GetCVarFloat(mpNPCImpactSafeSpeedCVar, tuning.SafeImpactSpeed);
+	tuning.Strength = GetCVarFloat(mpNPCStrengthCVar, tuning.Strength);
+	tuning.RootAssist = GetCVarFloat(mpNPCRootAssistCVar, tuning.RootAssist);
+	tuning.BloodSpeed = GetCVarFloat(mpRagdollBloodSpeedCVar, scDefaultRagdollBloodSpeed);
+
+	if (mpNPCBalanceCVar != nullptr) {
+		tuning.bBalance = mpNPCBalanceCVar->FloatValue != 0.0f;
+	}
+
+	if (mpNPCMaxActiveCVar != nullptr) {
+		tuning.MaxActive = static_cast<uint32>(std::max<int64>(mpNPCMaxActiveCVar->IntValue, 0));
+	}
+
+	tuning.BalanceAssist.MaxForceFraction = GetCVarFloat(mpNPCBalanceAssistCVar, tuning.BalanceAssist.MaxForceFraction);
+	tuning.BalanceAssist.ReleaseDistance = GetCVarFloat(mpNPCBalanceReleaseCVar, tuning.BalanceAssist.ReleaseDistance);
+	tuning.BalanceAssist.RecoveryForceFraction = GetCVarFloat(mpNPCBalanceRecoveryCVar,
+															  tuning.BalanceAssist.RecoveryForceFraction);
+	tuning.BalanceAssist.ResidualFraction = GetCVarFloat(mpNPCBalanceResidualCVar,
+														 tuning.BalanceAssist.ResidualFraction);
+	tuning.BalanceAssist.LiftFraction = GetCVarFloat(mpNPCBalanceLiftCVar, tuning.BalanceAssist.LiftFraction);
+	tuning.BalanceAssist.ExternalResidual = GetCVarFloat(mpNPCBalanceExternalResidualCVar,
+														 tuning.BalanceAssist.ExternalResidual);
+	tuning.BalanceAssist.PelvisDamping = GetCVarFloat(mpNPCBalancePelvisDampingCVar, tuning.BalanceAssist.PelvisDamping);
+	tuning.ActiveDistance = GetCVarFloat(mpNPCActiveDistanceCVar, tuning.ActiveDistance);
+	tuning.BumpSpeed = GetCVarFloat(mpNPCBumpSpeedCVar, tuning.BumpSpeed);
+	tuning.BumpImpulse = GetCVarFloat(mpNPCBumpImpulseCVar, tuning.BumpImpulse);
+	tuning.HitShoveScale = GetCVarFloat(mpNPCHitShoveCVar, tuning.HitShoveScale);
+	tuning.MinShoveSpeed = GetCVarFloat(mpNPCMinShoveCVar, tuning.MinShoveSpeed);
+	tuning.MaxShoveSpeed = GetCVarFloat(mpNPCMaxShoveCVar, tuning.MaxShoveSpeed);
+	tuning.CollisionKnockScale = GetCVarFloat(mpNPCCollisionKnockCVar, tuning.CollisionKnockScale);
+	tuning.MinCollisionKnockSpeed = GetCVarFloat(mpNPCMinCollisionKnockCVar, tuning.MinCollisionKnockSpeed);
+	tuning.MaxCollisionKnockSpeed = GetCVarFloat(mpNPCMaxCollisionKnockCVar, tuning.MaxCollisionKnockSpeed);
+	tuning.KnockdownSpeed = GetCVarFloat(mpNPCKnockdownSpeedCVar, tuning.KnockdownSpeed);
+	tuning.BalanceAssist.StaggerDecayTime = GetCVarFloat(mpNPCStaggerTimeCVar, tuning.BalanceAssist.StaggerDecayTime);
+	tuning.BalanceAssist.StumbleTime = GetCVarFloat(mpNPCStumbleTimeCVar, tuning.BalanceAssist.StumbleTime);
+	tuning.MaxStaggerSpeed = GetCVarFloat(mpNPCStaggerSpeedCVar, tuning.MaxStaggerSpeed);
+	tuning.RepeatShoveFraction = GetCVarFloat(mpNPCRepeatShoveCVar, tuning.RepeatShoveFraction);
+	tuning.WanderRadius = GetCVarFloat(mpNPCWanderCVar, tuning.WanderRadius);
+
+	// Every trial gets powered physics wherever the player is, and no decals pile up over a run
+	if (BenchOptions.bEnabled) {
+		tuning.MaxActive = 0;
+		tuning.ActiveDistance = 0.0f;
+		tuning.BloodSpeed = 1e9f;
+	}
+}
+
+void RaptorGame::RunRagdollBench()
+{
+	for (const char* assignment : mBenchCVars) {
+		const char* equals = std::strchr(assignment, '=');
+
+		if (equals == nullptr) {
+			continue;
+		}
+
+		const String name(assignment, static_cast<uint32>(equals - assignment));
+		const float32 value = static_cast<float32>(std::atof(equals + 1));
+		const char* setting = std::strchr(name.CStr(), '.');
+
+		// `behaviour.setting=value` sets a behaviour's default, and anything else is a cvar
+		if (setting != nullptr) {
+			const String behaviour(name.CStr(), static_cast<uint32>(setting - name.CStr()));
+			gNPCManager->SetBehaviourSetting(0, behaviour.CStr(), setting + 1, value);
+		}
+		else {
+			gCVars->Set(name.CStr(), value);
+		}
+	}
+
+	RagdollBench bench;
+
+	if (!bench.Begin(BenchOptions)) {
+		std::fflush(nullptr);
+		std::_Exit(1);
+	}
+
+	if (BenchOptions.bRender) {
+		mpRenderedBench = &bench;
+	}
+
+	while (!bench.IsFinished()) {
+		if (BenchOptions.bRender) {
+			Tick();
+			continue;
+		}
+
+		gAssetManager->DispatchCallbacks();
+		ReadNPCTuning(gNPCManager->Tuning);
+		bench.Tick();
+	}
+
+	// The run wrote all of its output, and tearing down the engine adds nothing to it
+	std::fflush(nullptr);
+	std::_Exit(0);
+}
+
+physics::eCharacterRagdollCollision RaptorGame::GetPlayerRagdollCollision() const
+{
+	if (mpPlayerRagdollCollisionCVar == nullptr) {
+		return physics::eCharacterRagdollCollision::Powered;
+	}
+
+	const int64 mode = std::clamp<int64>(mpPlayerRagdollCollisionCVar->IntValue, 0, 2);
+
+	return static_cast<physics::eCharacterRagdollCollision>(mode);
+}
+
 void RaptorGame::UpdateRagdollDummies()
 {
-	Object* model = mpRagdollTemplate.load();
+	Object* model = gNPCManager->GetModel();
 
 	while (mRagdollDropsPending > 0 && model != nullptr) {
 		--mRagdollDropsPending;
@@ -917,81 +1097,11 @@ void RaptorGame::UpdateRagdollDummies()
 		SpawnDebugNPC(model);
 	}
 
+	ReadNPCTuning(gNPCManager->Tuning);
+
 	const bool draw_debug = (gWorld->DebugBoundsMask & World::scDebugBoundsRagdolls) != 0;
 
-	if (mpNPCImpactDamageCVar != nullptr && mpNPCImpactSpeedCVar != nullptr) {
-		gNPCManager->ImpactDamageScale = mpNPCImpactDamageCVar->FloatValue;
-		gNPCManager->MinImpactSpeed = mpNPCImpactSpeedCVar->FloatValue;
-	}
-
-	if (mpNPCImpactSafeSpeedCVar != nullptr) {
-		gNPCManager->SafeImpactSpeed = mpNPCImpactSafeSpeedCVar->FloatValue;
-	}
-
-	if (mpNPCReactStrengthCVar != nullptr) {
-		gNPCManager->ReactStrength = mpNPCReactStrengthCVar->FloatValue;
-	}
-
-	if (mpNPCStrengthCVar != nullptr && mpNPCRootAssistCVar != nullptr) {
-		gNPCManager->Strength = mpNPCStrengthCVar->FloatValue;
-		gNPCManager->RootAssist = mpNPCRootAssistCVar->FloatValue;
-	}
-
-	if (mpNPCBalanceCVar != nullptr) {
-		gNPCManager->bBalance = mpNPCBalanceCVar->FloatValue != 0.0f;
-	}
-
-	const float32 min_blood_speed = (mpRagdollBloodSpeedCVar != nullptr) ? mpRagdollBloodSpeedCVar->FloatValue
-																		 : scDefaultRagdollBloodSpeed;
-
-	gPhysics->pBackend->SetMinRagdollContactSpeed(
-		std::min({ min_blood_speed, gNPCManager->MinImpactSpeed, gNPCManager->SafeImpactSpeed }));
-
 	gNPCManager->Update(static_cast<float32>(DeltaTime), draw_debug);
-
-	if (mRagdollDummies.empty() && gNPCManager->GetCount() == 0) {
-		return;
-	}
-
-	for (RagdollDummy& dummy : mRagdollDummies) {
-		dummy.BloodCooldown = std::max(dummy.BloodCooldown - static_cast<float32>(DeltaTime), 0.0f);
-	}
-
-	for (const physics::RagdollContact& contact : gNPCManager->GetContacts()) {
-		const bool is_struck = contact.IsStruck(gNPCManager->MinImpactSpeed);
-		const bool is_splatter = !is_struck && contact.bOtherStatic && contact.Speed >= min_blood_speed;
-
-		if (NPC* npc = gNPCManager->FindByRagdollSerial(contact.RagdollSerial)) {
-			if (is_splatter) {
-				SpawnRagdollBlood(npc->BloodCooldown, contact, min_blood_speed);
-			}
-
-			continue;
-		}
-
-		for (RagdollDummy& dummy : mRagdollDummies) {
-			if (dummy.pRagdoll->GetSerial() != contact.RagdollSerial) {
-				continue;
-			}
-
-			if (is_struck) {
-				AddDummyWound(dummy, contact);
-			}
-			else if (is_splatter) {
-				SpawnRagdollBlood(dummy.BloodCooldown, contact, min_blood_speed);
-			}
-
-			break;
-		}
-	}
-
-	for (RagdollDummy& dummy : mRagdollDummies) {
-		dummy.pRagdoll->WriteToSkeleton();
-
-		if (draw_debug) {
-			dummy.pRagdoll->DebugDraw();
-		}
-	}
 }
 
 void RaptorGame::PlayImpactSounds()
@@ -1223,6 +1333,15 @@ void RaptorGame::Tick()
 	const uint64 current_tick = SDL_GetPerformanceCounter();
 
 	DeltaTime = static_cast<double>(current_tick - mLastTick) / sClockFreq;
+
+	if (mpRenderedBench != nullptr) {
+		DeltaTime = RagdollBench::scDeltaTime;
+	}
+
+	if (CaptureOptions.bEnabled && CaptureOptions.FixedDelta > 0.0f) {
+		DeltaTime = CaptureOptions.FixedDelta;
+	}
+
 	gGraphics->DeltaTime = static_cast<float32>(DeltaTime);
 
 	mFpsWindowTime += DeltaTime;
@@ -1261,6 +1380,7 @@ void RaptorGame::Tick()
 		ProcessControls();
 	}
 
+
 	if (!bInCommandMode) {
 		if (mbFlyCameraDetached) {
 			gWorld->Player.Move(DeltaTime, Vec3f::sZero);
@@ -1282,6 +1402,7 @@ void RaptorGame::Tick()
 	gEditor->SyncPanels();
 #endif
 
+	gWorld->Player.Physics.RagdollCollision = GetPlayerRagdollCollision();
 	gWorld->Player.Update(DeltaTime);
 
 	const Ref<FPSCamera>& listener = gWorld->GetCurrentCamera();
@@ -1322,6 +1443,16 @@ void RaptorGame::Tick()
 		return;
 	}
 
+	bool bench_stepped = false;
+
+	if (mpRenderedBench != nullptr) {
+		bench_stepped = mpRenderedBench->PreStep();
+	}
+
+	if (CaptureOptions.bEnabled) {
+		mCapture.PreStep(static_cast<float32>(DeltaTime));
+	}
+
 	gPhysics->pBackend->Update(static_cast<float32>(DeltaTime));
 	PlayImpactSounds();
 
@@ -1346,6 +1477,10 @@ void RaptorGame::Tick()
 
 	UpdateObjectScripts();
 	UpdateRagdollDummies();
+
+	if (bench_stepped) {
+		mpRenderedBench->PostStep();
+	}
 
 	gParticleSystem->Update(static_cast<float32>(DeltaTime));
 
@@ -1372,6 +1507,15 @@ void RaptorGame::Tick()
 	RenderCrosshair();
 	gWorld->Player.Weapons.RenderHud();
 
+	if (CaptureOptions.bEnabled) {
+		mCapture.PostFrame(static_cast<float32>(DeltaTime));
+
+		if (mCapture.IsFinished()) {
+			std::fflush(nullptr);
+			std::_Exit(0);
+		}
+	}
+
 	gGraphics->DoComposition(*gWorld->GetCurrentCamera());
 
 	// Progressive probe bakes (single captures finish in one call, grid bakes
@@ -1386,11 +1530,7 @@ void RaptorGame::DestroyGame()
 {
 	gGraphics->GetDevice()->WaitForIdle();
 
-	for (RagdollDummy& dummy : mRagdollDummies) {
-		dummy.pRagdoll->Destroy();
-	}
-
-	mRagdollDummies.clear();
+	gNPCManager->ClearDummies();
 	gNPCManager->Clear();
 	gParticleSystem->Destroy();
 	gAudio->Destroy();

@@ -2,6 +2,9 @@
 
 #include "SIMDHelper.hpp"
 
+#include <ThirdParty/Jolt/Jolt.h>
+#include <ThirdParty/Jolt/Math/Real.h>
+
 #include <Core/Defines.hpp>
 #include <Core/Serialize.hpp>
 #include <Core/Types.hpp>
@@ -69,14 +72,18 @@ public:
 	void ToJoltVec3(JPH::RVec3& jolt_vec) const;
 	void FromJoltVec3(const JPH::RVec3& jolt_vec);
 
-	static FX_FORCE_INLINE Vec3f FromDifference(const float32* a, const float32* b)
-	{
-		const float32 vx = (a[0] - b[0]);
-		const float32 vy = (a[1] - b[1]);
-		const float32 vz = (a[2] - b[2]);
 
-		return Vec3f(vx, vy, vz);
-	}
+	/**
+	 * @brief Converts a Jolt Vec3 to a Vec3f.
+	 */
+	static Vec3f FromJolt(const JPH::RVec3 jvec) { return Vec3f(jvec.mValue); }
+
+	/**
+	 * @brief Converts a Vec3f to Jolt's Vec3f container.
+	 */
+	static JPH::RVec3 ToJolt(const Vec3f vec) { return JPH::Vec3(vec.mIntrin); }
+
+	static FX_FORCE_INLINE Vec3f FromDifference(const float32* a, const float32* b) { return (Vec3f(a) - Vec3f(b)); }
 
 	FX_FORCE_INLINE void CopyTo(float32* output)
 	{
@@ -120,6 +127,8 @@ public:
 	 * @returns The modified vector.
 	 */
 	FX_FORCE_INLINE Vec3f& NormalizeIP();
+
+	FX_FORCE_INLINE Vec3f SafeNormalize(const Vec3f fallback) const;
 
 	FX_FORCE_INLINE float32 Length() const;
 	FX_FORCE_INLINE Vec3f Cross(const Vec3f other) const;

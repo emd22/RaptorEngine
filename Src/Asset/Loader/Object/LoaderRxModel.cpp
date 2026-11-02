@@ -6,6 +6,7 @@
 #include <Asset/Animation.hpp>
 #include <Asset/AssetBase.hpp>
 #include <Asset/AssetManager.hpp>
+#include <Core/Name.hpp>
 #include <Core/Ref.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
@@ -446,19 +447,36 @@ bool LoaderRxModel::CheckFileHash(const RxBinaryFile& file, const RxFileRef& fil
 	return false;
 }
 
-int32 LoaderRxModel::FindJoint(const char* name) const
+// int32 LoaderRxModel::FindJoint(const char* name) const
+// {
+// 	if (!mpSkeleton) {
+// 		return -1;
+// 	}
+//
+// 	for (uint32 i = 0; i < mpSkeleton->JointCount; i++) {
+// 		if (strcmp(mpSkeleton->BoneNames[i].CStr(), name) == 0) {
+// 			return static_cast<int32>(i);
+// 		}
+// 	}
+//
+// 	return -1;
+// }
+
+int32 LoaderRxModel::FindJoint(const Name& name) const
 {
-	if (!mpSkeleton) {
-		return -1;
+	if (mpSkeleton == nullptr) {
+		return scInvalidJointIndex;
 	}
 
-	for (uint32 i = 0; i < mpSkeleton->JointCount; i++) {
-		if (strcmp(mpSkeleton->BoneNames[i].CStr(), name) == 0) {
-			return static_cast<int32>(i);
+	for (uint32 joint_index = 0; joint_index < mpSkeleton->JointCount; joint_index++) {
+		if (mpSkeleton->BoneNames[joint_index] == name) {
+			// Return the joint index
+			return static_cast<int32>(joint_index);
 		}
 	}
 
-	return -1;
+	// Canmot find the joint, return invalid index
+	return scInvalidJointIndex;
 }
 
 bool LoaderRxModel::ReadSkeleton(const RxFileRef& file_ref, Ref<Skeleton>& out_skeleton, uint64& out_signature) const
@@ -518,7 +536,7 @@ bool LoaderRxModel::ReadSkeleton(const RxFileRef& file_ref, Ref<Skeleton>& out_s
 		const char* name = file.GetString(joint.Name);
 
 		skel.BoneNames[i] = (name[0] != '\0') ? String(name) : String::Fmt("joint_{}", i);
-		skel.ParentIndices[i] = (joint.Parent < 0) ? BoneNull : static_cast<uint32>(joint.Parent);
+		skel.ParentIndices[i] = (joint.Parent < 0) ? scBoneNull : static_cast<uint32>(joint.Parent);
 
 		BoneTransform rest {};
 		rest.Translation = Vec3f(bind_pose[i].Translation[0], bind_pose[i].Translation[1], bind_pose[i].Translation[2]);
@@ -593,7 +611,7 @@ bool LoaderRxModel::ValidateTextures() const
 		for (const auto& [slot, path] : material.Textures) {
 			if (!IsFileKtx2(ResolvePath(path))) {
 				LogError(LC_ASSET, "{}: texture '{}' of material '{}' is missing or is not a KTX 2.0 file ('{}')",
-						 mModelPath, slot, material.Name, ResolvePath(path));
+						 mModelPath, slot, material.MaterialName, ResolvePath(path));
 				is_valid = false;
 			}
 		}
@@ -616,8 +634,8 @@ bool LoaderRxModel::LoadMaterialTexture(const RxMaterialDesc& desc, const char* 
 	loader::LoaderKtx ktx {};
 
 	if (!IsFileKtx2(path) || !ktx.Open(path.CStr()) || !ktx.IsOpen()) {
-		LogError(LC_ASSET, "Could not load KTX2 texture '{}' ({} of material '{}' in '{}')", path, slot, desc.Name,
-				 mModelPath);
+		LogError(LC_ASSET, "Could not load KTX2 texture '{}' ({} of material '{}' in '{}')", path, slot,
+				 desc.MaterialName, mModelPath);
 		return false;
 	}
 
@@ -957,17 +975,17 @@ bool LoaderRxModel::BuildObjects(const RxBinaryFile& mesh_file)
 	}
 
 	for (const RxSocketDesc& socket : mDesc.Sockets) {
-		if (!socket.Joint.IsEmpty() && FindJoint(socket.Joint.CStr()) < 0) {
+		if (!socket.JointName.IsEmpty() && FindJoint(socket.JointName) < 0) {
 			LogError(LC_ASSET, "{}: socket '{}' is attached to joint '{}', which is not in the skeleton", mModelPath,
-					 socket.Name, socket.Joint);
+					 socket.SocketName, socket.JointName);
 			return false;
 		}
 	}
 
 	for (const RxClipDesc& clip : mDesc.Clips) {
-		if (!clip.RootJoint.IsEmpty() && FindJoint(clip.RootJoint.CStr()) < 0) {
+		if (!clip.RootJoint.IsEmpty() && FindJoint(clip.RootJoint) < 0) {
 			LogError(LC_ASSET, "{}: animation '{}' has root_joint '{}', which is not in the skeleton", mModelPath,
-					 clip.Name, clip.RootJoint);
+					 clip.ClipName, clip.RootJoint);
 			return false;
 		}
 	}
@@ -1098,7 +1116,7 @@ bool LoaderRxModel::LoadClip(Animation& out_anim, const RxClipDesc& clip)
 
 	if ((header->Flags & rx::scAnimAdditive) != 0) {
 		LogWarning(LC_ASSET, "'{}' is an additive clip, which is not supported, skipping animation '{}'",
-				   file.GetPath(), clip.Name);
+				   file.GetPath(), clip.ClipName);
 		return false;
 	}
 
@@ -1114,7 +1132,7 @@ bool LoaderRxModel::LoadClip(Animation& out_anim, const RxClipDesc& clip)
 	const uint32 joint_count = mpSkeleton->JointCount;
 	const bool bind_by_index = (header->SkeletonSignature == mSkeletonSignature);
 
-	out_anim.Name = String(clip.Name);
+	out_anim.Name = String(clip.ClipName);
 	out_anim.Duration = (header->FrameCount > 1) ? static_cast<float32>(header->FrameCount - 1) / header->SampleRate
 												 : 0.0f;
 	out_anim.BoneTracks.InitSize(joint_count);
@@ -1204,8 +1222,8 @@ bool LoaderRxModel::LoadClip(Animation& out_anim, const RxClipDesc& clip)
 	}
 
 	if (dropped_tracks > 0) {
-		LogWarning(LC_ASSET, "Animation '{}' in '{}' has {} tracks for joints that are not in the skeleton", clip.Name,
-				   mModelPath, dropped_tracks);
+		LogWarning(LC_ASSET, "Animation '{}' in '{}' has {} tracks for joints that are not in the skeleton",
+				   clip.ClipName, mModelPath, dropped_tracks);
 	}
 
 	LogInfo(LC_ASSET, "Loaded animation '{}': {:.3f}s, {} joints", out_anim.Name, out_anim.Duration, joint_count);

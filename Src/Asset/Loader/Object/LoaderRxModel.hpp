@@ -18,8 +18,12 @@ namespace loader {
 
 class RxBinaryFile;
 
+
 class LoaderRxModel final : public ObjectLoaderBase
 {
+public:
+	static constexpr int32 scInvalidJointIndex = -1;
+
 public:
 	LoaderRxModel() = default;
 
@@ -60,7 +64,8 @@ private:
 							 bool* out_has_alpha = nullptr);
 	MaterialID MakeMaterial(const String& name, bool is_skinned);
 
-	int32 FindJoint(const char* name) const;
+	// int32 FindJoint(const char* name) const;
+	int32 FindJoint(const Name& name) const;
 
 	void AttachChild(Object* parent, ObjectID child_id);
 	void UploadObjectTree(Object* object);

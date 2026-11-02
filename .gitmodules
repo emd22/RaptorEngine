@@ -7,3 +7,6 @@
 [submodule "Submodules/mimalloc"]
 	path = Submodules/mimalloc
 	url = https://github.com/microsoft/mimalloc
+[submodule "Submodules/libdeflate"]
+	path = Submodules/libdeflate
+	url = https://github.com/ebiggers/libdeflate

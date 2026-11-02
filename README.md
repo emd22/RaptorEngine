@@ -1,7 +1,5 @@
 <img src="Screenshots/raptor-logo2.png" width="200px">
 
-Raptor is a 3D game engine being developed for an experimental game. It features a full brush and patch system (with map compilation!) to build out levels quickly and optimize geometry.
-
 ## Screenshots
 
 |            Integrated Level Builder             |    Global Illumination and Baked Shadows    |
@@ -12,21 +10,23 @@ Raptor is a 3D game engine being developed for an experimental game. It features
 
 - Tiled forward renderer (Forward+) with Vulkan
 - Full level editor with game view and 2D architect view
-    - supports brushes and mesh patches
-- Map compilation with baked shadows and polygon/face discard
-- Baked irradiance and reflection probes
+    - supports brushes and mesh patches, triangulated at map compile time.
+- Custom active ragdoll system with procedural reactions
+- Map compiler tool with GUI frontend.
+    - Optimizes and combines brushes and patches into map chunks. Removes occluded faces and combines touching objects together.
+    - Baked irradiance through lightmaps and irradiance probes
 - Fast math library using SIMD
-    - Supports Arm NEON and AVX processors
+    - Supports Arm NEON and AVX feature sets. Note that for x64, the engine requires AVX or higher.
 - Scripting with [Strata](https://github.com/StrataLanguage/stratac), compiled JIT
 - Custom core library and containers
 - Multithreaded and extensible asset manager that works seamlessly in the background
-- Jolt Physics integration
 
 ## Docs
 
 | Name          | Document                                |
 | ------------- | --------------------------------------- |
 | Config format | [ConfigFormat.md](Docs/ConfigFormat.md) |
+| Maps          | [Maps.md](Docs/Maps.md)                 |
 
 ## Building
 
@@ -52,3 +52,18 @@ ninja
 
 - Windows (x86_64)
 - macOS (aarch64)
+
+## Third Party
+
+I would like to thank the contributors and maintainers for these excellent libraries!
+
+| Name                 | License           | Link                                                            | Usage                                                                              |
+| -------------------- | ----------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Jolt Physics         | MIT               | [repo link](https://github.com/jrouwe/joltphysics)              | Realtime physics                                                                   |
+| miniaudio            | Public Domain     | [repo link](https://github.com/mackron/miniaudio)               | Audio system IO and file loading                                                   |
+| steam-audio          | Apache 2.0        | [repo link](https://github.com/ValveSoftware/steam-audio)       | Spatial audio                                                                      |
+| libktx               | Apache 2.0        | [repo link](https://github.com/khronosgroup/ktx-software)       | Load KTX2 files as required by the asset pipeline. (TODO: add asset pipeline docs) |
+| cgltf                | MIT               | [repo link](https://github.com/jkuhlmann/cgltf)                 | GLTF model loader                                                                  |
+| libdeflate           | MIT               | [repo link](https://github.com/ebiggers/libdeflate)             | Compiled map and lightmap data compression                                         |
+| dxc                  | LLVM              | [repo link](https://github.com/microsoft/directxshadercompiler) | Shader compiler                                                                    |
+| wxWidgets (optional) | wxWidgets License | [repo link](https://github.com/wxWidgets/wxWidgets)             | Used in tools and the editor UI                                                    |

@@ -736,6 +736,8 @@ float32 WeaponSystem::Trace(float32 yaw, float32 pitch, float32 range)
 
 void WeaponSystem::ApplyHit(float32 damage, float32 force, bool decal)
 {
+	mLastHitNPC = 0;
+
 	if (!mLastHit.bHit) {
 		return;
 	}
@@ -751,14 +753,15 @@ void WeaponSystem::ApplyHit(float32 damage, float32 force, bool decal)
 			hit_npc->AddWound(mLastHit.Body, mLastHit.Point, mLastDirection, scWoundSize);
 		}
 
-		hit_npc->Damage(damage, mLastHit.Body);
+		mLastHitNPC = hit_npc->GetRagdollSerial();
+
+		hit_npc->OnHit(NPCHit { .Body = mLastHit.Body,
+								.Point = mLastHit.Point,
+								.Impulse = mLastDirection * std::max(force, 0.0f),
+								.Damage = damage });
 
 		gAudio->PlayForSurface(mWeapons[mActive].BulletSound.CStr(), String("flesh"),
 							   mLastHit.Point + (mLastHit.Normal * AudioSystem::scSurfaceSoundOffset));
-
-		if (force > 0.0f) {
-			hit_npc->AddImpulse(mLastHit.Body, mLastDirection * force, mLastHit.Point);
-		}
 	}
 
 	const JPH::EMotionType motion = bodies.GetMotionType(mLastHit.Body);

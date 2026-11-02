@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Core/Types.hpp>
+#include <Math/Float16.hpp>
 #include <Math/Vec3.hpp>
 
 namespace fx::ReflectionFilter {
@@ -15,6 +16,6 @@ uint64 GetTexelCount(uint32 size, uint32 mip_count);
 
 float32 MipToRoughness(uint32 mip, uint32 mip_count);
 
-void Prefilter(const float32* const faces[scFaces], uint32 size, uint32 mip_count, uint16* out_texels);
+void Prefilter(const float32* const faces[scFaces], uint32 size, uint32 mip_count, Float16* out_texels);
 
 } // namespace fx::ReflectionFilter

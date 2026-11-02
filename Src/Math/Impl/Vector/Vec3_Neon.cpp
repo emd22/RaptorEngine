@@ -2,8 +2,7 @@
 
 #ifdef FX_USE_NEON
 
-#include <ThirdParty/Jolt/Jolt.h>
-#include <ThirdParty/Jolt/Math/Real.h>
+
 #include <arm_neon.h>
 
 #include <Core/Log.hpp>

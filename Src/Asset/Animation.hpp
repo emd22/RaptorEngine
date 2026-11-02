@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Core/Name.hpp>
 #include <Core/Ref.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/StackArray.hpp>
@@ -12,7 +13,7 @@
 namespace fx {
 
 using BoneId = uint32;
-static constexpr BoneId BoneNull = UINT32_MAX;
+static constexpr BoneId scBoneNull = UINT32_MAX;
 
 enum class eAnimationInterpolation : uint8
 {
@@ -85,6 +86,9 @@ struct BoneDelta
 
 void BlendPoses(const BoneTransform* a, const BoneTransform* b, float32 weight, BoneTransform* out, uint32 count);
 
+// TODO: Move Skeleton into its own file.
+
+
 struct Skeleton
 {
 public:
@@ -150,31 +154,25 @@ public:
 public:
 	SizedArray<Mat4f> InvBindTransforms;
 
-	/// The local transform each joint sits at when an animation does not drive it.
-	///
-	/// GLTF animations only contain channels for the joints (and the components of those joints) that
-	/// actually move, so anything not present in an animation has to fall back to the joint node's own
-	/// transform. Falling back to identity instead collapses every bone onto its parent's origin.
 	SizedArray<BoneTransform> RestPose;
 
 	SizedArray<Mat4f> RootTransforms;
 	SizedArray<uint32> ParentIndices;
 	SizedArray<uint32> EvaluationOrder;
-	SizedArray<String> BoneNames;
+
+	SizedArray<Name> BoneNames;
+
 	uint32 JointCount = 0;
 
 	SizedArray<Mat4f> LocalTransforms;
 	SizedArray<Mat4f> WorldTransforms;
 	SizedArray<Mat4f> SkinningMatrices;
 
-	/// Animations and playback state live on the skeleton rather than the object, as a single GLTF skin is commonly
-	/// shared by several meshes (each loaded as its own object). Those objects share this skeleton through `Ref`, so
-	/// the pose is evaluated and uploaded once per frame and every mesh draws with the same bone-buffer slot.
 	SizedArray<Animation> Animations;
 
 	/// Plays while the animation stack is empty. Holds the rest pose if it has no animation.
 	AnimationPlayback RestPlayback { .OnEnd = eAnimationEnd::Loop };
-	/// Animations pushed over the rest animation. Only the top one advances.
+
 	StackArray<AnimationPlayback, scMaxAnimationStack> AnimationStack;
 
 	uint32 BoneBufferBase = scNoBones;

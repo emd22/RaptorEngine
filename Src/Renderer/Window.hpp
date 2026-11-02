@@ -9,6 +9,18 @@ struct SDL_Window;
 
 namespace fx {
 
+enum class eWindowFlags
+{
+	None = (0),
+	/// Raises the window above all current windows, focusing it.
+	RaiseWindow = (1 << 0),
+	/// Never puts the window on screen, for runs that do not draw anything.
+	Hidden = (1 << 1),
+};
+
+FxEnumFlags(eWindowFlags);
+
+
 #ifdef FX_IS_EDITOR
 namespace editor {
 class EditorViewport;
@@ -24,14 +36,11 @@ class EditorViewport;
 class Window
 {
 public:
-	static Ref<Window> New(const char* title, const Vec2u& size) { return Ref<Window>::New(title, size); }
-
-public:
 	Window() = default;
 	Window(const Window& other) = delete;
-	Window(const char* title, const Vec2u& size) { Create(title, size); }
+	Window(const char* title, const Vec2u& size, const eWindowFlags flags) { Create(title, size, flags); }
 
-	void Create(const char* title, const Vec2u& size);
+	void Create(const char* title, const Vec2u& size, const eWindowFlags flags);
 
 	void HandleResize();
 
@@ -49,7 +58,9 @@ public:
 
 	void SetRelativeMouseMode(bool enabled);
 
-	/// True if the window currently has OS input focus (not minimized/backgrounded/alt-tabbed away from)
+	/**
+	 * @brief True if the window currently has OS input focus (not minimized/backgrounded/alt-tabbed away from)
+	 */
 	bool IsFocused() const;
 
 	float32 GetAspectRatio() const { return static_cast<float32>(mSize.X) / static_cast<float32>(mSize.Y); }

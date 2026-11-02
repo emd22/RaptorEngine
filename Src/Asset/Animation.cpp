@@ -235,7 +235,7 @@ void Skeleton::ComposePose(const BoneTransform* pose)
 		const uint32 i = has_order ? EvaluationOrder.pData[k] : k;
 		const uint32 parent = ParentIndices.pData[i];
 
-		if (parent == BoneNull) {
+		if (parent == scBoneNull) {
 			// A root joint's parent chain lives outside the skin, so its transform has to come from the
 			// node hierarchy instead of from another joint.
 			WorldTransforms[i] = has_root_transforms ? (LocalTransforms[i] * RootTransforms[i]) : LocalTransforms[i];
@@ -352,7 +352,8 @@ void Skeleton::StartInertialization(const AnimationPlayback* playback, float32 d
 
 		const BoneTransform source_previous {
 			.Translation = source[i].Translation - source_velocity.Translation * delta_time,
-			.Rotation = (QuatFromScaledAngleAxis(source_velocity.Rotation * -delta_time) * source[i].Rotation).Normalize(),
+			.Rotation = (QuatFromScaledAngleAxis(source_velocity.Rotation * -delta_time) * source[i].Rotation)
+							.Normalize(),
 			.Scale = source[i].Scale - source_velocity.Scale * delta_time,
 		};
 
@@ -469,7 +470,7 @@ void Skeleton::PoseFromDrivenBones(const Mat4f* driven_world, const uint8* is_dr
 		if (is_driven[i]) {
 			WorldTransforms[i] = driven_world[i];
 		}
-		else if (parent == BoneNull) {
+		else if (parent == scBoneNull) {
 			WorldTransforms[i] = has_root_transforms ? (LocalTransforms[i] * RootTransforms[i]) : LocalTransforms[i];
 		}
 		else {
@@ -735,7 +736,7 @@ void Skeleton::BuildEvaluationOrder()
 			state[current] = 1;
 			chain.push_back(current);
 
-			current = (ParentIndices.Size == joint_count) ? ParentIndices.pData[current] : BoneNull;
+			current = (ParentIndices.Size == joint_count) ? ParentIndices.pData[current] : scBoneNull;
 		}
 
 		for (auto it = chain.rbegin(); it != chain.rend(); ++it) {

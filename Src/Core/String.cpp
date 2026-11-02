@@ -318,6 +318,7 @@ String& String::operator=(String&& other)
 		// Set the other string to null to avoid freeing
 		other.mpHeapStr = nullptr;
 		other.Length = 0;
+		other.mpStackStr[0] = '\0';
 	}
 	else {
 		Length = other.Length;
@@ -327,6 +328,7 @@ String& String::operator=(String&& other)
 		mpStackStr[Length] = '\0';
 
 		other.Length = 0;
+		other.mpStackStr[0] = '\0';
 	}
 
 
@@ -483,6 +485,7 @@ void String::Clear()
 
 	mpHeapStr = nullptr;
 	Length = 0;
+	mpStackStr[0] = '\0';
 }
 
 String& String::ShortenTo(uint32 new_length)

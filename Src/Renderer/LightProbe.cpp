@@ -13,13 +13,14 @@
 #include <Blockout.hpp>
 #include <CVar.hpp>
 #include <Core/File.hpp>
+#include <Core/FilesystemIO.hpp>
 #include <Core/Path.hpp>
 #ifdef FX_IS_EDITOR
 #include <Editor/RaptorEditor.hpp>
 #endif
 #include <Engine.hpp>
-#include <Math/Float16.hpp>
 #include <Map/CompiledMap.hpp>
+#include <Math/Float16.hpp>
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Renderer/Backend/BarrierHelper.hpp>
@@ -66,36 +67,13 @@ constexpr float32 scCaptureSkyRadiance = 1500.0f / static_cast<float32>(M_PI);
 constexpr int64 scDefaultProbeBounces = 3;
 constexpr int64 scMaxProbeBounces = 8;
 
-PerspectiveCamera MakeCaptureCamera(const Vec3f position, uint32 face)
-{
-	static const Vec3f scFaceDirections[ProbeManager::scCaptureFaces] = {
-		Vec3f(1.0f, 0.0f, 0.0f),  Vec3f(-1.0f, 0.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
-		Vec3f(0.0f, -1.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f),	Vec3f(0.0f, 0.0f, -1.0f),
-	};
-
-	static const Vec3f scFaceUps[ProbeManager::scCaptureFaces] = {
-		Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f),
-		Vec3f(0.0f, 0.0f, 1.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
-	};
-
-	PerspectiveCamera camera(MathUtil::DegreesToRadians(90.0f), 1.0f, 200.0f, ProbePlacement::scCaptureNearPlane);
-
-	camera.SetPosition(position);
-	camera.LookAt(position + scFaceDirections[face], scFaceUps[face]);
-	camera.Update();
-
-	return camera;
-}
-
 float32 TexelToNdc(uint32 index, uint32 size)
 {
 	return ((static_cast<float32>(index) + 0.5f) / static_cast<float32>(size)) * 2.0f - 1.0f;
 }
 
-float32 HalfToRadiance(uint16 half)
+float32 HalfToRadiance(Float16 value)
 {
-	const Float16 value = Float16::FromBits(half);
-
 	if (value.IsNaN()) {
 		return 0.0f;
 	}
@@ -375,24 +353,37 @@ void ProbeManager::MakeCaptureCameras()
 		return;
 	}
 
-	mCaptureCameras.InitCapacity(scCaptureFaces);
+	static const Vec3f scFaceDirections[scCaptureFaces] = {
+		Vec3f(1.0f, 0.0f, 0.0f),  Vec3f(-1.0f, 0.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
+		Vec3f(0.0f, -1.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f),	Vec3f(0.0f, 0.0f, -1.0f),
+	};
+
+	static const Vec3f scFaceUps[scCaptureFaces] = {
+		Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f),
+		Vec3f(0.0f, 0.0f, 1.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
+	};
 
 	static constexpr float32 scAspect = 1.0f;
 	static constexpr float32 scNearClip = ProbePlacement::scCaptureNearPlane;
 	static constexpr float32 scFarClip = 200.0f;
 	static constexpr float32 scCaptureFOV = 90.0f;
 
-	// Create all capture cameras
-	for (uint32 i = 0; i < scCaptureFaces; i++) {
+	mCaptureCameras.InitCapacity(scCaptureFaces);
+
+	for (uint32 face = 0; face < scCaptureFaces; face++) {
 		PerspectiveCamera& cam = mCaptureCameras.Emplace(MathUtil::DegreesToRadians(scCaptureFOV), scAspect, scFarClip,
 														 scNearClip);
+
+		// A face's orientation only depends on its direction, so it is set once here. We only move the cameras from
+		// this point forward, keeping the orientation.
+		cam.LookAt(scFaceDirections[face], scFaceUps[face]);
+		cam.Update();
 	}
 }
 
 void ProbeManager::MoveCaptureCameras(const Vec3f position)
 {
-	for (uint32 face_index = 0; face_index < scCaptureFaces; face_index++) {
-		PerspectiveCamera& cam = mCaptureCameras[face_index];
+	for (PerspectiveCamera& cam : mCaptureCameras) {
 		cam.SetPosition(position);
 		cam.Update();
 	}
@@ -814,7 +805,7 @@ void ProbeManager::ServiceStaleCheck()
 	}
 
 	if (difference.bVolumesChanged) {
-		ReportStaleBake(String::Fmt("Light probes are out of date (the map places {}, the bake has {}), rebake and "
+		ReportStaleBake(String::Fmt("Light probes are out of date (prototype {},  baked {}), rebake and "
 									"save them",
 									current.GetProbeCount(), GetProbeCount()));
 		return;
@@ -892,7 +883,7 @@ void ProbeManager::BeginBake()
 	}
 
 	if (GetProbeCount() == 0) {
-		LogError("Probe bake failed: no probes have been placed");
+		LogError("Probe bake failed as no probes have been placed.");
 		return;
 	}
 
@@ -942,7 +933,7 @@ void ProbeManager::CreateCaptureResources()
 
 	for (uint32 slot = 0; slot < scProbesPerFrame; slot++) {
 		for (uint32 face = 0; face < scCaptureFaces; face++) {
-			create_staging(mColorStaging[slot][face], cPixels * sizeof(uint16) * 4);
+			create_staging(mColorStaging[slot][face], cPixels * sizeof(Float16) * 4);
 			create_staging(mDepthStaging[slot][face], cPixels * sizeof(float32));
 		}
 	}
@@ -954,9 +945,10 @@ void ProbeManager::CreateCaptureResources()
 	mReflectionStage.ClearValues[0].color = sky_clear;
 
 	for (renderer::RawGpuBuffer& staging : mReflectionStaging) {
-		create_staging(staging, cReflectionPixels * sizeof(uint16) * 4);
+		create_staging(staging, cReflectionPixels * sizeof(Float16) * 4);
 	}
 
+	MakeCaptureCameras();
 	BuildCaptureTexels();
 
 	mbCaptureResourcesCreated = true;
@@ -969,8 +961,10 @@ void ProbeManager::BuildCaptureTexels()
 	mCaptureTexels.InitSize(scCaptureFaces * scCaptureSize * scCaptureSize);
 	CaptureTexel* texel = mCaptureTexels.pData;
 
+	MoveCaptureCameras(Vec3f::sZero);
+
 	for (uint32 face = 0; face < scCaptureFaces; face++) {
-		const PerspectiveCamera camera = MakeCaptureCamera(Vec3f::sZero, face);
+		const PerspectiveCamera& camera = mCaptureCameras[face];
 		const Mat4f inv_view_projection = camera.GetInvProjectionMatrix() * camera.GetInvViewMatrix();
 
 		mCaptureInvProjection = camera.GetInvProjectionMatrix();
@@ -1020,10 +1014,10 @@ void ProbeManager::RecordCaptureBatch(renderer::CommandBuffer& cmd, const Render
 	for (; mCurrentProbe < batch_end; mCurrentProbe++) {
 		const uint32 slot = mCurrentProbe - mBatchStart;
 
-		for (uint32 face = 0; face < scCaptureFaces; face++) {
-			PerspectiveCamera camera = MakeCaptureCamera(GetProbePosition(mCurrentProbe), face);
+		MoveCaptureCameras(GetProbePosition(mCurrentProbe));
 
-			render_face(camera, mCaptureStage);
+		for (uint32 face = 0; face < scCaptureFaces; face++) {
+			render_face(mCaptureCameras[face], mCaptureStage);
 
 			CopyTargetToStaging(cmd, mCaptureStage, scCaptureSize, eImageFormat::RGBA16_Float,
 								mColorStaging[slot][face]);
@@ -1107,7 +1101,7 @@ void ProbeManager::ServiceCaptureBake()
 
 bool ProbeManager::ReadBackProbe(uint32 batch_slot, uint32 probe_index)
 {
-	const uint16* colors[scCaptureFaces];
+	const Float16* colors[scCaptureFaces];
 	const float32* depths[scCaptureFaces];
 
 	bool mapped = true;
@@ -1121,7 +1115,7 @@ bool ProbeManager::ReadBackProbe(uint32 batch_slot, uint32 probe_index)
 		depth.Map();
 		depth.InvalidateFromGpu();
 
-		colors[face] = static_cast<const uint16*>(color.pMappedBuffer);
+		colors[face] = static_cast<const Float16*>(color.pMappedBuffer);
 		depths[face] = static_cast<const float32*>(depth.pMappedBuffer);
 
 		mapped &= (colors[face] != nullptr && depths[face] != nullptr);
@@ -1139,7 +1133,7 @@ bool ProbeManager::ReadBackProbe(uint32 batch_slot, uint32 probe_index)
 	return mapped;
 }
 
-void ProbeManager::ProjectCapture(const uint16* const colors[scCaptureFaces],
+void ProbeManager::ProjectCapture(const Float16* const colors[scCaptureFaces],
 								  const float32* const depths[scCaptureFaces], ProbeSHData& out_sh,
 								  ProbeInfo& out_info) const
 {
@@ -1158,7 +1152,7 @@ void ProbeManager::ProjectCapture(const uint16* const colors[scCaptureFaces],
 		for (uint32 y = 0; y < scCaptureSize; y++) {
 			for (uint32 x = 0; x < scCaptureSize; x++, texel++) {
 				const uint32 pixel = y * scCaptureSize + x;
-				const uint16* rgba = colors[face] + pixel * 4;
+				const Float16* rgba = colors[face] + pixel * 4;
 
 				for (uint32 c = 0; c < 3; c++) {
 					const float32 radiance = HalfToRadiance(rgba[c]);
@@ -1365,8 +1359,6 @@ uint32 ProbeManager::RebuildReflectionProbesFromWorld()
 
 	UploadReflectionProbes(0);
 
-	LogInfo("Reflection probes rebuilt: {} from editor brushes, {} in total", num_brush_probes, mReflectionProbeCount);
-
 	return mReflectionProbeCount;
 }
 
@@ -1409,10 +1401,10 @@ void ProbeManager::RecordReflectionCapture(renderer::CommandBuffer& cmd, const R
 
 	mbCapturingFaces = true;
 
-	for (uint32 face = 0; face < scCaptureFaces; face++) {
-		PerspectiveCamera camera = MakeCaptureCamera(position, face);
+	MoveCaptureCameras(position);
 
-		render_face(camera, mReflectionStage);
+	for (uint32 face = 0; face < scCaptureFaces; face++) {
+		render_face(mCaptureCameras[face], mReflectionStage);
 
 		CopyTargetToStaging(cmd, mReflectionStage, Limits::ReflectionProbeSize, eImageFormat::RGBA16_Float,
 							mReflectionStaging[face]);
@@ -1428,7 +1420,7 @@ void ProbeManager::ServiceReflectionBake()
 	const uint32 probe = mBatchStart;
 
 	if (!ReadBackReflectionProbe(probe)) {
-		LogError("Reflection probe bake failed: could not read back probe {}", probe);
+		LogError("Reflection probe bake failed, could not read probe {}", probe);
 		mBakePhase = eBakePhase::Irradiance;
 		mBakeState = eBakeState::Idle;
 		return;
@@ -1465,7 +1457,7 @@ bool ProbeManager::ReadBackReflectionProbe(uint32 probe_index)
 		staging.Map();
 		staging.InvalidateFromGpu();
 
-		const uint16* rgba = static_cast<const uint16*>(staging.pMappedBuffer);
+		const Float16* rgba = static_cast<const Float16*>(staging.pMappedBuffer);
 
 		if (rgba == nullptr) {
 			mapped = false;
@@ -1542,13 +1534,12 @@ void ProbeManager::UploadReflectionCubemap(uint32 probe_index)
 {
 	using namespace renderer;
 
-	GraphicsBackend* graphics = gGraphics;
-	Image* image = graphics->pReflectionProbes;
+	Image* image = gGraphics->pReflectionProbes;
 	Assert(image != nullptr);
 
-	graphics->GetDevice()->WaitForIdle();
+	gGraphics->GetDevice()->WaitForIdle();
 
-	const uint64 bytes = scReflectionHalfsPerProbe * sizeof(uint16);
+	const uint64 bytes = scReflectionHalfsPerProbe * sizeof(Float16);
 
 	RawGpuBuffer staging;
 	staging.Create(eGpuBufferType::Transfer, bytes, VMA_MEMORY_USAGE_CPU_TO_GPU, eGpuBufferFlags::TransferReceiver);
@@ -1558,7 +1549,7 @@ void ProbeManager::UploadReflectionCubemap(uint32 probe_index)
 	uint64 offset = 0;
 
 	for (uint32 mip = 0; mip < Limits::ReflectionProbeMips; mip++) {
-		const uint32 mip_size = Limits::ReflectionProbeSize >> mip;
+		const uint32 mip_size = (Limits::ReflectionProbeSize >> mip);
 
 		regions[mip] = VkBufferImageCopy {
 			.bufferOffset = offset,
@@ -1571,10 +1562,10 @@ void ProbeManager::UploadReflectionCubemap(uint32 probe_index)
 			.imageExtent { .width = mip_size, .height = mip_size, .depth = 1 },
 		};
 
-		offset += static_cast<uint64>(mip_size) * mip_size * Limits::ReflectionProbeFaces * 4 * sizeof(uint16);
+		offset += static_cast<uint64>(mip_size) * mip_size * Limits::ReflectionProbeFaces * 4 * sizeof(Float16);
 	}
 
-	graphics->SubmitImmediateUploadCmd(
+	gGraphics->SubmitImmediateUploadCmd(
 		[&](CommandBuffer& cmd)
 		{
 			BarrierHelper::ImageLayoutTransition(image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 0,
@@ -1632,7 +1623,7 @@ bool ProbeManager::SaveIrradianceProbes()
 	File file(path, File::eModType::Write, File::eDataType::Binary);
 
 	if (!file.IsFileOpen()) {
-		LogError("Could not open {} to save the probes", path.CStr());
+		LogError("Could not open probe file '{}' for writing", path.CStr());
 		return false;
 	}
 
@@ -1715,18 +1706,49 @@ bool ProbeManager::LoadCompiledProbes()
 	return true;
 }
 
+bool ProbeManager::IsProbeFileNewerThanCompiledMap() const
+{
+	if (gWorld == nullptr || gWorld->PrototypePath.GetLength() == 0) {
+		return false;
+	}
+
+	const String probe_path = FilesystemIO::ResolvePath(GetProbeFilePath(".fxprobe"));
+	const String compiled_path = FilesystemIO::ResolvePath(
+		CompiledMap::GetPathForPrototype(CompiledMap::GetPrototypePath(gWorld->PrototypePath)));
+
+	if (!FilesystemIO::FileExists(probe_path) || !FilesystemIO::FileExists(compiled_path)) {
+		return false;
+	}
+
+	return FilesystemIO::FileGetLastModified(probe_path.CStr()) >
+		   FilesystemIO::FileGetLastModified(compiled_path.CStr());
+}
+
 bool ProbeManager::LoadIrradianceProbes()
 {
+	const Blockout* blockout = GetBlockout();
+	const bool has_compiled_probes = blockout != nullptr && blockout->HasCompiledProbes() &&
+									 gCVars->Get("r_compiled_probes", int64 { 1 }) != 0;
+
+	if (has_compiled_probes && IsProbeFileNewerThanCompiledMap() && LoadProbeFile(blockout->GetCompiledProbeLayout())) {
+		return true;
+	}
+
 	if (LoadCompiledProbes()) {
 		return true;
 	}
 
+	return LoadProbeFile(nullptr);
+}
+
+bool ProbeManager::LoadProbeFile(const ProbeLayout* required_layout)
+{
 	const String path = GetProbeFilePath(".fxprobe");
 
 	File file(path, File::eModType::Read, File::eDataType::Binary);
 
 	if (!file.IsFileOpen()) {
-		LogInfo("No probe file at {}, using procedural probes", path.CStr());
+		LogInfo("Probe file not found at '{}'", path.CStr());
 		return false;
 	}
 
@@ -1734,21 +1756,22 @@ bool ProbeManager::LoadIrradianceProbes()
 	ProbeFileHeader header;
 
 	if (!ReadExact(file, &header, sizeof(header)) || memcmp(&header.Layout, &expected, sizeof(expected)) != 0) {
-		LogWarning("Probe file {} is out of date or not a probe file, rebake the probes", path.CStr());
+		LogWarning("Probe file {} has invalid layout or missing header", path.CStr());
 		return false;
 	}
 
 	if (header.VolumeCount > Limits::MaxProbeVolumes || header.ProbeCount > Limits::MaxIrradianceProbes ||
 		header.GridPointCount > Limits::MaxProbeGridPoints) {
-		LogError("Probe file {} holds {} volumes, {} probes and {} grid points, past the limits of {}, {} and {}",
+		LogError("Probe file '{}' holds {} volumes, {} probes and {} grid points. This is over the limits that the "
+				 "engine has been compiled with ({}, {} and {} respectively)",
 				 path.CStr(), header.VolumeCount, header.ProbeCount, header.GridPointCount, Limits::MaxProbeVolumes,
 				 Limits::MaxIrradianceProbes, Limits::MaxProbeGridPoints);
 		return false;
 	}
 
 	if (file.GetFileSize() != GetProbeFileSize(header.ProbeCount, header.GridPointCount)) {
-		LogError("Probe file {} is {} bytes, not the {} its {} probes need", path.CStr(), file.GetFileSize(),
-				 GetProbeFileSize(header.ProbeCount, header.GridPointCount), header.ProbeCount);
+		LogError("Probe file '{}' is {} bytes, but expected a size of {}. The file may be corrupt.", path.CStr(),
+				 file.GetFileSize(), GetProbeFileSize(header.ProbeCount, header.GridPointCount));
 		return false;
 	}
 
@@ -1760,7 +1783,7 @@ bool ProbeManager::LoadIrradianceProbes()
 	if (!ReadExact(file, layout.Volumes, sizeof(layout.Volumes)) ||
 		!ReadExact(file, layout.Ranges, sizeof(layout.Ranges)) ||
 		!ReadExact(file, grid, header.GridPointCount * sizeof(uint16))) {
-		LogError("Could not read the probe volumes from {}", path.CStr());
+		LogError("Could not read probe volumes from '{}'", path.CStr());
 		return false;
 	}
 
@@ -1772,28 +1795,34 @@ bool ProbeManager::LoadIrradianceProbes()
 		const uint64 last_probe = static_cast<uint64>(range.FirstProbe) + range.ProbeCount;
 
 		if (last_point > header.GridPointCount || last_probe > header.ProbeCount) {
-			LogError("Probe file {} has a volume that runs past the probes it holds, rebake the probes", path.CStr());
+			LogError("Probe file '{}' requires a rebake", path.CStr());
 			return false;
 		}
 	}
 
 	for (const uint16 probe : layout.Grid) {
 		if (probe < Limits::ProbeGridSolid && probe >= header.ProbeCount) {
-			LogError("Probe file {} points at probe {} of {}, rebake the probes", path.CStr(), probe,
-					 header.ProbeCount);
+			LogError("Probe file {} requires a rebake", path.CStr());
 			return false;
 		}
 	}
 
 	if (!ReadExact(file, mProbes, header.ProbeCount * sizeof(ProbeSHData)) ||
 		!ReadExact(file, mProbeInfos, header.ProbeCount * sizeof(ProbeInfo))) {
-		LogError("Could not read the probes from {}", path.CStr());
+		LogError("Could not read probe file '{}'", path.CStr());
 		return false;
 	}
 
 	for (uint32 probe = 0; probe < header.ProbeCount; probe++) {
 		const float32* position = mProbeInfos[probe].ProbePosition;
 		layout.Positions.Emplace(Vec3f(position[0], position[1], position[2]));
+	}
+
+	if (required_layout != nullptr && !CompareLayouts(layout, *required_layout).IsEmpty()) {
+		LogInfo("Probe file {} was baked for a different probe layout than the compiled map, using the compiled "
+				"probes",
+				path.CStr());
+		return false;
 	}
 
 	mLayout = std::move(layout);
@@ -1806,14 +1835,15 @@ bool ProbeManager::LoadIrradianceProbes()
 	mbHasBakedLayout = true;
 	mStaleCheckWaitFrames = 0;
 
-	LogInfo("Loaded {} light probes across {} volume(s) from {}", header.ProbeCount, header.VolumeCount, path.CStr());
+	LogInfo("Loaded {} probes from {} volumes from probe file '{}'", header.ProbeCount, header.VolumeCount,
+			path.CStr());
 	return true;
 }
 
 bool ProbeManager::SaveReflectionProbes()
 {
 	if (mReflectionProbeCount > 0 && !mbReflectionsBaked) {
-		LogWarning("The reflection probes are not baked, so they were not saved");
+		LogWarning("There are reflection probes in the prototype, but none were baked");
 		return false;
 	}
 
@@ -1826,7 +1856,7 @@ bool ProbeManager::SaveReflectionProbes()
 	File file(path, File::eModType::Write, File::eDataType::Binary);
 
 	if (!file.IsFileOpen()) {
-		LogError("Could not open {} to save the reflection probes", path.CStr());
+		LogError("Could not open reflection probes file '{}' for writing", path.CStr());
 		return false;
 	}
 
@@ -1835,9 +1865,9 @@ bool ProbeManager::SaveReflectionProbes()
 
 	file.WriteRaw(&header, sizeof(header));
 	file.WriteRaw(mReflectionProbes, mReflectionProbeCount * sizeof(ReflectionProbeData));
-	file.WriteRaw(mReflectionTexels.pData, mReflectionProbeCount * scReflectionHalfsPerProbe * sizeof(uint16));
+	file.WriteRaw(mReflectionTexels.pData, mReflectionProbeCount * scReflectionHalfsPerProbe * sizeof(Float16));
 
-	LogInfo("Saved {} reflection probes to {}", mReflectionProbeCount, path.CStr());
+	LogInfo("Saved {} reflection probes to '{}'", mReflectionProbeCount, path.CStr());
 	return true;
 }
 
@@ -1848,7 +1878,7 @@ bool ProbeManager::LoadReflectionProbes()
 	File file(path, File::eModType::Read, File::eDataType::Binary);
 
 	if (!file.IsFileOpen()) {
-		LogInfo("No reflection probe file at {}", path.CStr());
+		LogInfo("Could not find reflection probe file at '{}'", path.CStr());
 		return false;
 	}
 
@@ -1863,7 +1893,7 @@ bool ProbeManager::LoadReflectionProbes()
 		return false;
 	}
 
-	const uint64 texel_bytes = header.ProbeCount * scReflectionHalfsPerProbe * sizeof(uint16);
+	const uint64 texel_bytes = header.ProbeCount * scReflectionHalfsPerProbe * sizeof(Float16);
 	const uint64 expected_size = sizeof(header) + header.ProbeCount * sizeof(ReflectionProbeData) + texel_bytes;
 
 	if (file.GetFileSize() != expected_size) {
@@ -1874,7 +1904,7 @@ bool ProbeManager::LoadReflectionProbes()
 
 	ReflectionProbeData probes[Limits::MaxReflectionProbes] {};
 
-	SizedArray<uint16> texels;
+	SizedArray<Float16> texels;
 	texels.InitSize(header.ProbeCount * scReflectionHalfsPerProbe);
 
 	if (!ReadExact(file, probes, header.ProbeCount * sizeof(ReflectionProbeData)) ||

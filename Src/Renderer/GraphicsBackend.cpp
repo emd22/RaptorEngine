@@ -1362,6 +1362,13 @@ void GraphicsBackend::DoComposition(PerspectiveCamera& render_cam)
 
 	pRenderer->CompPass.End();
 	MarkGpu(eGpuMarker::Composition);
+
+	const bool capture_frame = !mFrameCapturePath.empty();
+
+	if (capture_frame) {
+		RecordFrameCapture(frame->CmdBuffer);
+	}
+
 	// SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
 	// ProcessDeletionQueue(false, deletion_queue.Get());
 	// deletion_queue.Unlock();
@@ -1370,9 +1377,89 @@ void GraphicsBackend::DoComposition(PerspectiveCamera& render_cam)
 
 	PresentFrame();
 
+	if (capture_frame) {
+		WriteFrameCapture();
+	}
+
 	mInternalFrameCounter++;
 
 	mFrameNumber = (mInternalFrameCounter % FramesInFlight);
+}
+
+void GraphicsBackend::RequestFrameCapture(const char* path) { mFrameCapturePath = path; }
+
+void GraphicsBackend::RecordFrameCapture(CommandBuffer& cmd)
+{
+	Image& image = Swapchain.OutputImages[GetImageIndex()];
+	const Vec2u size = Swapchain.Extent;
+	const uint32 width = size.X;
+	const uint32 height = size.Y;
+	const uint64 byte_count = static_cast<uint64>(width) * height * 4;
+
+	if (mFrameCaptureBytes != byte_count) {
+		if (mFrameCaptureBytes > 0) {
+			mFrameCaptureBuffer.Destroy();
+		}
+
+		mFrameCaptureBuffer.Create(eGpuBufferType::Transfer, byte_count, VMA_MEMORY_USAGE_GPU_TO_CPU,
+								   eGpuBufferFlags::TransferReceiver);
+		mFrameCaptureBytes = byte_count;
+	}
+
+	const auto transition = [&](VkImageLayout from, VkImageLayout to, VkAccessFlags from_access, VkAccessFlags to_access)
+	{
+		const VkImageMemoryBarrier barrier {
+			.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			.srcAccessMask = from_access,
+			.dstAccessMask = to_access,
+			.oldLayout = from,
+			.newLayout = to,
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.image = image.InternalImage,
+			.subresourceRange { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = 1, .layerCount = 1 },
+		};
+
+		vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0,
+							 nullptr, 1, &barrier);
+	};
+
+	transition(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+			   VK_ACCESS_TRANSFER_READ_BIT);
+
+	const VkBufferImageCopy copy {
+		.imageSubresource { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1 },
+		.imageExtent { .width = width, .height = height, .depth = 1 },
+	};
+
+	vkCmdCopyImageToBuffer(cmd, image.InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, mFrameCaptureBuffer.Buffer, 1,
+						   &copy);
+
+	transition(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_ACCESS_TRANSFER_READ_BIT, 0);
+
+	mFrameCaptureWidth = width;
+	mFrameCaptureHeight = height;
+}
+
+void GraphicsBackend::WriteFrameCapture()
+{
+	GetDevice()->WaitForIdle();
+
+	std::FILE* file = std::fopen(mFrameCapturePath.c_str(), "wb");
+
+	if (file != nullptr) {
+		const uint32 header[2] = { mFrameCaptureWidth, mFrameCaptureHeight };
+		const uint64 byte_count = static_cast<uint64>(mFrameCaptureWidth) * mFrameCaptureHeight * 4;
+
+		std::fwrite(header, sizeof(uint32), 2, file);
+		mFrameCaptureBuffer.Map();
+		mFrameCaptureBuffer.InvalidateFromGpu();
+		std::fwrite(mFrameCaptureBuffer.pMappedBuffer, 1, byte_count, file);
+		mFrameCaptureBuffer.UnMap();
+		std::fclose(file);
+	}
+
+	mFrameCapturePath.clear();
 }
 
 void GraphicsBackend::RebuildToResizedWindow()

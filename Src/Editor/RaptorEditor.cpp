@@ -11,6 +11,7 @@
 #include "WorldPropertiesPanel.hpp"
 
 #include <wx/app.h>
+#include <wx/display.h>
 #include <wx/evtloop.h>
 #include <wx/image.h>
 #include <wx/init.h>
@@ -154,20 +155,43 @@ bool RaptorEditor::InitGUI(int argc, char** argv)
 
 void RaptorEditor::InitTools() { mpCommandScript = gScriptManager->LoadScript(scCommandScriptPath); }
 
-EditorFrame* RaptorEditor::CreateMainFrame(const char* title, const Vec2u& viewport_size)
+/// Moves the frame so its top edge is at the top of the display's work area, just below the menu bar. Left at
+/// wxDefaultPosition the frame opens lower than this
+static void MoveToTopOfDisplay(wxFrame* frame)
+{
+	unsigned display_index = 0;
+
+	const int found_index = wxDisplay::GetFromWindow(frame);
+	if (found_index != wxNOT_FOUND) {
+		display_index = static_cast<unsigned>(found_index);
+	}
+
+	const wxRect work_area = wxDisplay(display_index).GetClientArea();
+	frame->SetPosition(wxPoint(frame->GetPosition().x, work_area.GetTop()));
+}
+
+EditorFrame* RaptorEditor::CreateMainFrame(const char* title, const Vec2u& viewport_size,
+										   const eRaptorEditorFlags flags)
 {
 	mpMainFrame = new EditorFrame(wxString::FromAscii(title),
 								  wxSize(static_cast<int>(viewport_size.X), static_cast<int>(viewport_size.Y)));
 
 	mpMainFrame->SetInteractive(false);
 
-	mpMainFrame->Show();
-	mpMainFrame->Raise();
+	MoveToTopOfDisplay(mpMainFrame);
 
-#ifdef FX_PLATFORM_MACOS
-	// Bring window to front
-	platform::ActivateApp();
-#endif
+	if (HasFlag(flags, eRaptorEditorFlags::Hidden)) {
+		// Stays off screen
+	}
+	else if (HasFlag(flags, eRaptorEditorFlags::RaiseWindow)) {
+		mpMainFrame->Show();
+		mpMainFrame->Raise();
+	}
+	else {
+		// Show it without activating the app, so launching the editor (for example from automated tests) doesn't steal
+		// focus
+		mpMainFrame->ShowWithoutActivating();
+	}
 
 	mpMainFrame->ShowMode(mMode, mDataFilter, GetAvailableToolMask());
 	mpMainFrame->GetViewport()->SetFocus();

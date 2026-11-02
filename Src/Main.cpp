@@ -35,7 +35,7 @@ static constexpr size_t scGameThreadStackSize = 16 * 1024 * 1024;
 #endif
 
 
-static void RunGame()
+static void RunGame(int argc, char** argv)
 {
 	gScriptManager = new ScriptManager;
 
@@ -46,7 +46,7 @@ static void RunGame()
 	fx::renderer::Globals::Init();
 
 	{
-		fx::RaptorGame game {};
+		fx::RaptorGame game { argc, argv };
 	}
 
 	fx::Globals::Destroy();
@@ -61,16 +61,6 @@ static void RunGame()
 
 int main(int argc, char** argv)
 {
-	// 	{
-	// 		TestStruct ts {};
-	// 		SerializerIO sio = Serializable<TestStruct>::Save(ts);
-	// 		sio.PrintDebug();
-	// 	}
-	//
-	//
-	// 	return 0;
-
-
 #ifdef FX_IS_EDITOR
 	gEditor = new editor::RaptorEditor;
 
@@ -83,14 +73,14 @@ int main(int argc, char** argv)
 	game_thread.StackSize = scGameThreadStackSize;
 
 	game_thread.Create(
-		[]
+		[argc, argv]
 		{
 			struct FinishNotifier
 			{
 				~FinishNotifier() { gEditor->NotifyGameFinished(); }
 			} notifier;
 
-			RunGame();
+			RunGame(argc, argv);
 		});
 
 	gEditor->RunUILoop();

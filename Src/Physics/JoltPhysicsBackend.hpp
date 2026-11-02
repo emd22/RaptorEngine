@@ -3,6 +3,7 @@
 #include <ThirdParty/Jolt/Jolt.h>
 #include <ThirdParty/Jolt/Physics/Body/BodyActivationListener.h>
 #include <ThirdParty/Jolt/Physics/Body/BodyManager.h>
+#include <ThirdParty/Jolt/Physics/Character/CharacterVirtual.h>
 #include <ThirdParty/Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
 #include <ThirdParty/Jolt/Physics/Collision/ObjectLayer.h>
 #include <ThirdParty/Jolt/Physics/PhysicsSystem.h>
@@ -11,6 +12,7 @@
 #include <Core/MemberRef.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
+#include <Math/MathUtil.hpp>
 #include <Math/Vec3.hpp>
 #include <algorithm>
 #include <atomic>
@@ -30,7 +32,14 @@ using Type = JPH::ObjectLayer;
 static constexpr JPH::ObjectLayer Static = 0;
 static constexpr JPH::ObjectLayer Dynamic = 1;
 static constexpr JPH::ObjectLayer Deactivated = 2;
-static constexpr JPH::ObjectLayer NumLayers = 3;
+/// Ragdoll bodies sit on the layer of their body mode, so characters can pick which ones they collide with
+static constexpr JPH::ObjectLayer RagdollKinematic = 3;
+static constexpr JPH::ObjectLayer RagdollPowered = 4;
+static constexpr JPH::ObjectLayer RagdollLimp = 5;
+static constexpr JPH::ObjectLayer NumLayers = 6;
+
+FX_FORCE_INLINE bool IsRagdoll(JPH::ObjectLayer layer) { return layer >= RagdollKinematic && layer <= RagdollLimp; }
+FX_FORCE_INLINE bool IsMoving(JPH::ObjectLayer layer) { return layer == Dynamic || IsRagdoll(layer); }
 }; // namespace PhLayer
 
 namespace PhBroadPhaseLayer {
@@ -52,6 +61,10 @@ public:
 		// Create a mapping table from object to broad phase layer
 		mObjectToBroadPhase[PhLayer::Static] = PhBroadPhaseLayer::Static;
 		mObjectToBroadPhase[PhLayer::Dynamic] = PhBroadPhaseLayer::Dynamic;
+		mObjectToBroadPhase[PhLayer::Deactivated] = PhBroadPhaseLayer::Deactivated;
+		mObjectToBroadPhase[PhLayer::RagdollKinematic] = PhBroadPhaseLayer::Dynamic;
+		mObjectToBroadPhase[PhLayer::RagdollPowered] = PhBroadPhaseLayer::Dynamic;
+		mObjectToBroadPhase[PhLayer::RagdollLimp] = PhBroadPhaseLayer::Dynamic;
 	}
 
 	virtual uint32 GetNumBroadPhaseLayers() const override { return PhBroadPhaseLayer::NumLayers; }
@@ -70,6 +83,8 @@ public:
 			return "Static";
 		case (JPH::BroadPhaseLayer::Type)PhBroadPhaseLayer::Dynamic:
 			return "Dynamic";
+		case (JPH::BroadPhaseLayer::Type)PhBroadPhaseLayer::Deactivated:
+			return "Deactivated";
 		default:
 			JPH_ASSERT(false);
 			return "Invalid";
@@ -87,17 +102,16 @@ class BodyVsBPLayerFilter : public JPH::ObjectVsBroadPhaseLayerFilter
 public:
 	virtual bool ShouldCollide(JPH::ObjectLayer inLayer1, JPH::BroadPhaseLayer inLayer2) const override
 	{
-		switch (inLayer1) {
-		case PhLayer::Static:
+		if (inLayer1 == PhLayer::Static) {
 			return inLayer2 == PhBroadPhaseLayer::Dynamic;
-		case PhLayer::Dynamic:
-			return true;
-		case PhLayer::Deactivated:
-			return false;
-		default:
-			JPH_ASSERT(false);
-			return false;
 		}
+
+		if (PhLayer::IsMoving(inLayer1)) {
+			return true;
+		}
+
+		JPH_ASSERT(inLayer1 == PhLayer::Deactivated);
+		return false;
 	}
 };
 
@@ -108,18 +122,56 @@ class BodyLayerPairFilterImpl : public JPH::ObjectLayerPairFilter
 public:
 	virtual bool ShouldCollide(JPH::ObjectLayer inObject1, JPH::ObjectLayer inObject2) const override
 	{
-		switch (inObject1) {
-		case PhLayer::Static:
-			return inObject2 == PhLayer::Dynamic; // Non moving only collides with moving
-		case PhLayer::Dynamic:
-			return true; // Moving collides with everything
-		case PhLayer::Deactivated:
-			return false;
-		default:
-			JPH_ASSERT(false);
-			return false;
+		if (inObject1 == PhLayer::Static) {
+			return PhLayer::IsMoving(inObject2); // Non moving only collides with moving
 		}
+
+		if (PhLayer::IsMoving(inObject1)) {
+			return inObject2 != PhLayer::Deactivated;
+		}
+
+		JPH_ASSERT(inObject1 == PhLayer::Deactivated);
+		return false;
 	}
+};
+
+/// Which ragdoll bodies a character capsule collides with
+enum class eCharacterRagdollCollision : uint8
+{
+	None,
+	/// Powered bodies only: animated NPCs are blocked by their own capsule and limp bodies are walked through
+	Powered,
+	All,
+};
+
+/// Layer filter for character capsules: the world and props, plus the ragdoll layers `RagdollCollision` allows
+class CharacterLayerFilter final : public JPH::ObjectLayerFilter
+{
+public:
+	explicit CharacterLayerFilter(eCharacterRagdollCollision ragdoll_collision) : mRagdollCollision(ragdoll_collision)
+	{
+	}
+
+	virtual bool ShouldCollide(JPH::ObjectLayer inLayer) const override
+	{
+		if (inLayer == PhLayer::Static || inLayer == PhLayer::Dynamic) {
+			return true;
+		}
+
+		switch (mRagdollCollision) {
+		case eCharacterRagdollCollision::None:
+			return false;
+		case eCharacterRagdollCollision::Powered:
+			return inLayer == PhLayer::RagdollPowered;
+		case eCharacterRagdollCollision::All:
+			return PhLayer::IsRagdoll(inLayer);
+		}
+
+		return false;
+	}
+
+private:
+	eCharacterRagdollCollision mRagdollCollision;
 };
 
 
@@ -134,12 +186,19 @@ FX_FORCE_INLINE uint32 GetSerial(uint64 user_data) { return static_cast<uint32>(
 struct RagdollContact
 {
 	JPH::BodyID Body {};
+	JPH::BodyID OtherBody {};
+
 	Vec3f Point = Vec3f::sZero;
 	Vec3f Normal = Vec3f::sZero;
+
 	float32 Speed = 0.0f;
+
 	float32 OtherSpeed = 0.0f;
+	Vec3f OtherVelocity = Vec3f::sZero;
 	float32 OtherMass = 0.0f;
+
 	bool bOtherStatic = false;
+
 	uint32 RagdollSerial = 0;
 
 	FX_FORCE_INLINE bool IsStruck(float32 min_speed) const { return Speed >= min_speed && OtherSpeed >= min_speed; }
@@ -157,10 +216,20 @@ struct SoundImpact
 
 struct BodyGroundContact
 {
+	/// Enough for two four point manifolds, which is what a flat box sole gets across a frame's two collision steps
+	static constexpr uint32 scMaxPoints = 8;
+
 	uint32 Count = 0;
 	Vec3f Point = Vec3f::sZero;
 	Vec3f Normal = Vec3f::sZero;
 	float32 Speed = 0.0f;
+
+	/// Friction the solver uses between this body and the surface
+	float32 Friction = 0.0f;
+
+	/// Where the body touches, on the surface, newest last once there are more than fit
+	uint32 PointCount = 0;
+	JPH::Vec3 Points[scMaxPoints];
 };
 
 // An example contact listener
@@ -169,6 +238,8 @@ class PhContactListener : public JPH::ContactListener
 public:
 	static constexpr size_t scMaxQueuedImpacts = 64;
 	static constexpr size_t scMaxTrackedBodies = 512;
+	/// Furthest a contact point can be short of the surface and still count as touching it (m)
+	static constexpr float32 scMaxGroundContactGap = 0.005f;
 
 	PhContactListener()
 	{
@@ -225,6 +296,12 @@ public:
 		out_contact.Point = Vec3f(accum.PointSum / static_cast<float32>(accum.Count));
 		out_contact.Normal = Vec3f(accum.NormalSum.Normalized());
 		out_contact.Speed = accum.Speed;
+		out_contact.Friction = accum.Friction;
+		out_contact.PointCount = std::min(accum.PointTotal, BodyGroundContact::scMaxPoints);
+
+		for (uint32 i = 0; i < out_contact.PointCount; i++) {
+			out_contact.Points[i] = accum.Points[i];
+		}
 	}
 
 	// See: ContactListener
@@ -242,7 +319,7 @@ public:
 								const JPH::ContactManifold& inManifold, JPH::ContactSettings& ioSettings) override
 	{
 		QueueSoundImpact(inBody1, inBody2, inManifold);
-		RecordBodyGroundContact(inBody1, inBody2, inManifold);
+		RecordBodyGroundContact(inBody1, inBody2, inManifold, ioSettings);
 
 		const bool first_tagged = RagdollUserData::Matches(inBody1.GetUserData());
 		const bool second_tagged = RagdollUserData::Matches(inBody2.GetUserData());
@@ -277,10 +354,12 @@ public:
 
 		RagdollContact contact;
 		contact.Body = ragdoll_body.GetID();
+		contact.OtherBody = other_body.GetID();
 		contact.Point = Vec3f(point.GetX(), point.GetY(), point.GetZ());
 		contact.Normal = Vec3f(normal.GetX(), normal.GetY(), normal.GetZ());
 		contact.Speed = closing;
 		contact.OtherSpeed = other_velocity.Dot(normal);
+		contact.OtherVelocity = Vec3f(other_velocity.GetX(), other_velocity.GetY(), other_velocity.GetZ());
 		contact.bOtherStatic = other_body.IsStatic();
 		contact.RagdollSerial = RagdollUserData::GetSerial(ragdoll_body.GetUserData());
 
@@ -302,7 +381,7 @@ public:
 	virtual void OnContactPersisted(const JPH::Body& inBody1, const JPH::Body& inBody2,
 									const JPH::ContactManifold& inManifold, JPH::ContactSettings& ioSettings) override
 	{
-		RecordBodyGroundContact(inBody1, inBody2, inManifold);
+		RecordBodyGroundContact(inBody1, inBody2, inManifold, ioSettings);
 	}
 
 	virtual void OnContactRemoved(const JPH::SubShapeIDPair& inSubShapePair) override {}
@@ -330,10 +409,13 @@ private:
 		JPH::Vec3 PointSum = JPH::Vec3::sZero();
 		JPH::Vec3 NormalSum = JPH::Vec3::sZero();
 		float32 Speed = 0.0f;
+		float32 Friction = 0.0f;
+		uint32 PointTotal = 0;
+		JPH::Vec3 Points[BodyGroundContact::scMaxPoints];
 	};
 
 	void RecordBodyGroundContact(const JPH::Body& inBody1, const JPH::Body& inBody2,
-								 const JPH::ContactManifold& inManifold)
+								 const JPH::ContactManifold& inManifold, const JPH::ContactSettings& settings)
 	{
 		const bool first_is_body = inBody2.IsStatic() && RagdollUserData::Matches(inBody1.GetUserData());
 		const bool second_is_body = inBody1.IsStatic() && RagdollUserData::Matches(inBody2.GetUserData());
@@ -350,22 +432,44 @@ private:
 		}
 
 		const JPH::Vec3 normal = first_is_body ? -inManifold.mWorldSpaceNormal : inManifold.mWorldSpaceNormal;
-		const uint32 point_count = static_cast<uint32>(first_is_body ? inManifold.mRelativeContactPointsOn1.size()
-																	 : inManifold.mRelativeContactPointsOn2.size());
+		const uint32 manifold_points = static_cast<uint32>(first_is_body ? inManifold.mRelativeContactPointsOn1.size()
+																		 : inManifold.mRelativeContactPointsOn2.size());
+
+		JPH::Vec3 point_sum = JPH::Vec3::sZero();
+		JPH::Vec3 surface_points[BodyGroundContact::scMaxPoints];
+		uint32 point_count = 0;
+
+		for (uint32 i = 0; i < manifold_points; i++) {
+			const JPH::Vec3 on_1 = JPH::Vec3(inManifold.GetWorldSpaceContactPointOn1(i));
+			const JPH::Vec3 on_2 = JPH::Vec3(inManifold.GetWorldSpaceContactPointOn2(i));
+
+			// Jolt reports contacts before they touch, so it can stop a fast body in time. A point still short of the
+			// surface carries no weight and gives no grip
+			if ((on_1 - on_2).Dot(inManifold.mWorldSpaceNormal) < -scMaxGroundContactGap) {
+				continue;
+			}
+
+			if (first_is_body) {
+				point_sum += on_1;
+			}
+			else {
+				point_sum += on_2;
+			}
+
+			if (point_count < BodyGroundContact::scMaxPoints) {
+				if (first_is_body) {
+					surface_points[point_count] = on_2;
+				}
+				else {
+					surface_points[point_count] = on_1;
+				}
+
+				point_count++;
+			}
+		}
 
 		if (point_count == 0) {
 			return;
-		}
-
-		JPH::Vec3 point_sum = JPH::Vec3::sZero();
-
-		for (uint32 i = 0; i < point_count; i++) {
-			if (first_is_body) {
-				point_sum += JPH::Vec3(inManifold.GetWorldSpaceContactPointOn1(i));
-			}
-			else {
-				point_sum += JPH::Vec3(inManifold.GetWorldSpaceContactPointOn2(i));
-			}
 		}
 
 		const JPH::Vec3 point = point_sum / static_cast<float32>(point_count);
@@ -378,6 +482,12 @@ private:
 		accum.PointSum += point;
 		accum.NormalSum += normal;
 		accum.Speed = std::max(accum.Speed, speed);
+		accum.Friction = settings.mCombinedFriction;
+
+		for (uint32 i = 0; i < point_count; i++) {
+			accum.Points[accum.PointTotal % BodyGroundContact::scMaxPoints] = surface_points[i];
+			accum.PointTotal++;
+		}
 	}
 
 	void QueueSoundImpact(const JPH::Body& inBody1, const JPH::Body& inBody2, const JPH::ContactManifold& inManifold)
@@ -459,6 +569,8 @@ class JoltPhysicsBackend
 public:
 	static constexpr uint32 scMaxBodies = 512;
 	static constexpr int scCollisionSteps = 2;
+	/// A step runs once this fraction of a step has built up, so the accumulator ends a frame in [-(1 - t), t)
+	static constexpr float32 scStepThreshold = 0.75f;
 
 public:
 	JoltPhysicsBackend();
@@ -470,6 +582,9 @@ public:
 	void OptimizeBroadPhase();
 
 	RayResult Raycast(const Vec3f origin, const Vec3f direction, JPH::BodyID ignore_body = JPH::BodyID()) const;
+	RayResult RaycastStatic(const Vec3f origin, const Vec3f direction) const;
+	/// For use inside a physics step, where the locking queries aren't allowed
+	RayResult RaycastStaticNoLock(const Vec3f origin, const Vec3f direction) const;
 	SizedArray<JPH::BodyID> RaycastObjects(const Vec3f origin, const Vec3f direction) const;
 
 	FLOAT4 RaycastGetFaceOfBox(JPH::Body* body, const Vec3f origin, const Vec3f direction) const;
@@ -492,11 +607,19 @@ public:
 
 	FX_FORCE_INLINE float32 GetCollisionStepTime() const { return cTimeStep / static_cast<float32>(scCollisionSteps); }
 
-	FX_FORCE_INLINE void ClearBodyGroundContacts() { mContactListener.ClearBodyGroundContacts(); }
-	FX_FORCE_INLINE uint32 GetGroundContactGeneration() const
+	/// How far the frame is from the state before the last update (0) to the state after it (1). Drawing bodies there
+	/// keeps them a constant 0.75 steps behind wall time instead of jumping by whole steps
+	FX_FORCE_INLINE float32 GetStepAlpha() const
 	{
-		return mContactListener.GetGroundContactGeneration();
+		return MathUtil::Clamp(StepAccumulator / cTimeStep + (1.0f - scStepThreshold), 0.0f, 1.0f);
 	}
+
+	/// Wall time of the physics steps run by the last Update, and how many there were
+	FX_FORCE_INLINE float32 GetLastUpdateMs() const { return mLastUpdateMs; }
+	FX_FORCE_INLINE uint32 GetLastStepCount() const { return mLastStepCount; }
+
+	FX_FORCE_INLINE void ClearBodyGroundContacts() { mContactListener.ClearBodyGroundContacts(); }
+	FX_FORCE_INLINE uint32 GetGroundContactGeneration() const { return mContactListener.GetGroundContactGeneration(); }
 	FX_FORCE_INLINE void GetBodyGroundContact(JPH::BodyID body_id, BodyGroundContact& out_contact) const
 	{
 		mContactListener.GetBodyGroundContact(body_id, out_contact);
@@ -514,6 +637,9 @@ public:
 	MemberRef<JPH::TempAllocatorImpl> pTempAllocator;
 	MemberRef<JPH::JobSystemThreadPool> pJobSystem;
 
+	/// The player and NPC capsules, so characters block each other
+	JPH::CharacterVsCharacterCollisionSimple CharacterCollision;
+
 
 private:
 	PhBPLayerInterfaceImpl mBroadPhaseInterface;
@@ -525,6 +651,9 @@ private:
 
 
 	bool mbIsInited = false;
+
+	float32 mLastUpdateMs = 0.0f;
+	uint32 mLastStepCount = 0;
 };
 
 } // namespace physics

@@ -1,5 +1,6 @@
 #include "ScriptInterop.hpp"
 
+#include <Asset/MeshGen.hpp>
 #include <Audio/AudioSystem.hpp>
 #include <Blockout.hpp>
 #include <CVar.hpp>
@@ -11,6 +12,7 @@
 #include <Editor/RaptorEditor.hpp>
 #include <Engine.hpp>
 #include <Math/SIMDHelper.hpp>
+#include <NPC.hpp>
 #include <Object/ObjectID.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Particle/ParticleSystem.hpp>
@@ -403,6 +405,7 @@ static bool N_is_key_down(uint32 key) { return ControlManager::IsKeyDown(static_
 static bool N_is_key_pressed(uint32 key) { return ControlManager::IsKeyPressed(static_cast<eKey>(key)); }
 
 static float N_float_sign(float value) { return MathUtil::GetSign(value); }
+static float N_float_sqrt(float value) { return std::sqrt(value); }
 
 static void N_blockout_reload_object(Object* object) { gWorld->pPrototype->RebuildObject(object); }
 
@@ -680,6 +683,360 @@ static void N_weapon_kick(float32 pitch, float32 yaw) { gWorld->Player.Weapons.K
 
 static void N_weapon_event(int32 event) { gWorld->Player.Weapons.HandleEvent(static_cast<weapon::eEvent>(event)); }
 
+static NPC* FindNPC(int32 npc)
+{
+	if (npc <= 0) {
+		return nullptr;
+	}
+
+	return gNPCManager->FindByRagdollSerial(static_cast<uint32>(npc));
+}
+
+static int32 N_npc_find(const char* name)
+{
+	NPC* npc = gNPCManager->FindByName(name);
+
+	if (npc == nullptr || !npc->GetRagdoll().IsCreated()) {
+		return 0;
+	}
+
+	return static_cast<int32>(npc->GetRagdollSerial());
+}
+
+static int32 N_npc_last_hit() { return static_cast<int32>(gWorld->Player.Weapons.GetLastHitNPC()); }
+
+static bool N_npc_is_alive(int32 npc)
+{
+	const NPC* found = FindNPC(npc);
+	return found != nullptr && found->IsAlive();
+}
+
+static bool N_npc_behaviour_trigger(int32 npc, const char* behaviour)
+{
+	NPC* found = FindNPC(npc);
+	return found != nullptr && found->TriggerBehaviour(behaviour);
+}
+
+static bool N_npc_behaviour_stop(int32 npc, const char* behaviour)
+{
+	NPC* found = FindNPC(npc);
+	return found != nullptr && found->StopBehaviour(behaviour);
+}
+
+static bool N_npc_behaviour_active(int32 npc, const char* behaviour)
+{
+	NPC* found = FindNPC(npc);
+	return found != nullptr && behaviour != nullptr && found->GetBehaviours().IsRunning(behaviour);
+}
+
+static bool N_npc_behaviour_set(int32 npc, const char* behaviour, const char* setting, float32 value)
+{
+	if (npc < 0) {
+		return false;
+	}
+
+	return gNPCManager->SetBehaviourSetting(static_cast<uint32>(npc), behaviour, setting, value);
+}
+
+static float32 N_npc_behaviour_get(int32 npc, const char* behaviour, const char* setting)
+{
+	float32 value = 0.0f;
+
+	if (npc < 0 || !gNPCManager->GetBehaviourSetting(static_cast<uint32>(npc), behaviour, setting, value)) {
+		return 0.0f;
+	}
+
+	return value;
+}
+
+static int32 N_npc_count() { return static_cast<int32>(gNPCManager->GetCount()); }
+
+static int32 N_npc_at(int32 index)
+{
+	if (index < 0 || static_cast<uint32>(index) >= gNPCManager->GetCount()) {
+		return 0;
+	}
+
+	NPC* npc = gNPCManager->Get(static_cast<size_t>(index));
+
+	if (!npc->GetRagdoll().IsCreated()) {
+		return 0;
+	}
+
+	return static_cast<int32>(npc->GetRagdollSerial());
+}
+
+static bool N_npc_walk_to(int32 npc, FLOAT4 target)
+{
+	NPC* found = FindNPC(npc);
+
+	if (found == nullptr || !found->IsAlive()) {
+		return false;
+	}
+
+	found->GetBrain().WalkTo(Vec3f(target));
+	return true;
+}
+
+static bool N_npc_flee(int32 npc, FLOAT4 from)
+{
+	NPC* found = FindNPC(npc);
+
+	if (found == nullptr || !found->IsAlive()) {
+		return false;
+	}
+
+	found->GetBrain().Flee(Vec3f(from));
+	return true;
+}
+
+static bool N_npc_idle(int32 npc)
+{
+	NPC* found = FindNPC(npc);
+
+	if (found == nullptr) {
+		return false;
+	}
+
+	found->GetBrain().Idle();
+	return true;
+}
+
+static int32 N_npc_brain_state(int32 npc)
+{
+	const NPC* found = FindNPC(npc);
+
+	if (found == nullptr) {
+		return 0;
+	}
+
+	return static_cast<int32>(found->GetBrain().GetState());
+}
+
+static void N_npc_stats() { gNPCManager->LogStats(); }
+
+static bool N_npc_model_ready()
+{
+	gNPCManager->RequestModel();
+	return gNPCManager->GetModel() != nullptr;
+}
+
+static int32 N_npc_spawn(FLOAT4 position, float32 yaw)
+{
+	static uint32 sSpawnCount = 0;
+
+	const Object* model = gNPCManager->GetModel();
+
+	if (model == nullptr) {
+		return 0;
+	}
+
+	NPCDesc desc;
+	desc.Name = String::Fmt("script_npc_{}", sSpawnCount);
+	desc.Position = Vec3f(position);
+	desc.Yaw = yaw;
+	desc.IdleAnimation = "walk";
+	desc.WalkAnimation = "walk";
+
+	++sSpawnCount;
+
+	NPC* npc = gNPCManager->Spawn(model, desc);
+
+	if (npc == nullptr || !npc->GetRagdoll().IsCreated()) {
+		return 0;
+	}
+
+	return static_cast<int32>(npc->GetRagdollSerial());
+}
+
+static void N_npc_destroy(int32 npc)
+{
+	if (NPC* found = FindNPC(npc)) {
+		gNPCManager->Destroy(found);
+	}
+}
+
+/// The NPC's pelvis in world space, which unlike the root object follows the ragdoll
+static FLOAT4 N_npc_position(int32 npc)
+{
+	NPC* found = FindNPC(npc);
+
+	if (found == nullptr) {
+		return simd::LoadFloat4(0.0f);
+	}
+
+	return found->GetRagdoll().GetBodyOrigin(0).mIntrin;
+}
+
+static FLOAT4 N_npc_velocity(int32 npc)
+{
+	NPC* found = FindNPC(npc);
+
+	if (found == nullptr) {
+		return simd::LoadFloat4(0.0f);
+	}
+
+	const JPH::Vec3 velocity = gPhysics->pBackend->GetBodyInterface().GetLinearVelocity(
+		found->GetRagdoll().GetBodyID(0));
+
+	return Vec3f(velocity.GetX(), velocity.GetY(), velocity.GetZ()).mIntrin;
+}
+
+static float32 N_npc_health(int32 npc)
+{
+	const NPC* found = FindNPC(npc);
+
+	if (found == nullptr) {
+		return 0.0f;
+	}
+
+	return found->GetHealth();
+}
+
+/// Must match NPC_STATE in Scripts/interop.strata
+static int32 N_npc_state(int32 npc)
+{
+	NPC* found = FindNPC(npc);
+
+	if (found == nullptr) {
+		return 0;
+	}
+
+	if (found->IsRagdoll()) {
+		return 5;
+	}
+
+	if (found->IsDying()) {
+		return 4;
+	}
+
+	if (found->IsFallen()) {
+		return 3;
+	}
+
+	if (found->GetRagdoll().IsBalancing()) {
+		return 2;
+	}
+
+	return 1;
+}
+
+/////////////////////////////////////
+// Physics props
+/////////////////////////////////////
+
+static int64 N_prop_spawn_box(const char* material, float32 size, float32 mass, float32 gravity_scale, FLOAT4 position,
+							  FLOAT4 velocity)
+{
+	static uint32 sSpawnCount = 0;
+
+	if (material == nullptr || size <= 0.0f || mass <= 0.0f || gWorld->pPrototype == nullptr) {
+		return 0;
+	}
+
+	const String name = String::Fmt("script_prop_{}", sSpawnCount);
+	const float32 half_size = size * 0.5f;
+
+	++sSpawnCount;
+
+	Object* object = gObjectManager->NewObject(name, gWorld->pPrototype->GetFaceMaterial(material), eObjectTag::None);
+
+	object->pMesh = MeshGen::MakeCube(CubeGenOptions::Uniform(half_size))->AsDefaultMesh();
+	object->Bounds.Min = Vec3f(-half_size);
+	object->Bounds.Max = Vec3f(half_size);
+	object->SetShadowCaster(true);
+	object->SetPosition(Vec3f(position));
+
+	physics::BodyProps props;
+	props.Density = mass / (size * size * size);
+
+	physics::Body* body = gPhysics->NewBody(name);
+	body->CreatePrimitiveBody(physics::ePrimitiveType::Box, Vec3f(size), physics::eMotionType::Dynamic, props);
+	body->Teleport(object->GetPosition(), object->mRotation);
+	body->SetLinearVelocity(Vec3f(velocity));
+
+	gPhysics->pBackend->GetBodyInterface().SetGravityFactor(body->GetBodyID(), gravity_scale);
+
+	object->AttachCollider(body);
+	gWorld->AttachLoaded(object);
+
+	return static_cast<int64>(object->Name.GetHash());
+}
+
+static Object* FindProp(int64 prop)
+{
+	if (prop == 0) {
+		return nullptr;
+	}
+
+	return gObjectManager->FindObject(static_cast<Hash32>(prop));
+}
+
+static physics::Body* FindPropBody(int64 prop)
+{
+	Object* object = FindProp(prop);
+
+	if (object == nullptr) {
+		return nullptr;
+	}
+
+	return gPhysics->GetBody(object->PhysicsID);
+}
+
+/// Holds a prop at a velocity without letting contacts turn it. Call it every frame for a scripted mover.
+static void N_prop_drive(int64 prop, FLOAT4 velocity)
+{
+	physics::Body* body = FindPropBody(prop);
+
+	if (body == nullptr) {
+		return;
+	}
+
+	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
+	const JPH::BodyID body_id = body->GetBodyID();
+
+	body_interface.SetRotation(body_id, JPH::Quat::sIdentity(), JPH::EActivation::Activate);
+	body->SetLinearVelocity(Vec3f(velocity));
+	body_interface.SetAngularVelocity(body_id, JPH::Vec3::sZero());
+}
+
+/// Read from the physics body, since an object's own position only updates while it is being drawn
+static FLOAT4 N_prop_position(int64 prop)
+{
+	physics::Body* body = FindPropBody(prop);
+
+	if (body == nullptr) {
+		return simd::LoadFloat4(0.0f);
+	}
+
+	return body->GetPosition().mIntrin;
+}
+
+static void N_prop_destroy(int64 prop)
+{
+	Object* object = FindProp(prop);
+
+	if (object == nullptr) {
+		return;
+	}
+
+	gPhysics->DestroyBody(object->PhysicsID);
+	gWorld->Detach(object->ID);
+	gObjectManager->DestroyObject(object->ID);
+}
+
+static void N_npc_behaviour_list(int32 npc)
+{
+	if (npc == 0) {
+		gNPCManager->GetDefaultBehaviours().LogState();
+		return;
+	}
+
+	if (NPC* found = FindNPC(npc)) {
+		found->GetBehaviours().LogState();
+	}
+}
+
 static void N_script_error(const char* str) { LogError(LC_SCRIPT, "{}", str); }
 
 static void N_tool_state_send(const editor::EditorToolState* state)
@@ -762,6 +1119,7 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("float4_floor", N_float4_floor),
 	PREDEF("float3_abs", N_float3_abs),
 	PREDEF("float_sign", N_float_sign),
+	PREDEF("float_sqrt", N_float_sqrt),
 	PREDEF("print_float4", N_print_float4),
 
 	/* Controls */
@@ -823,6 +1181,35 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("weapon_hit_apply", N_weapon_hit_apply),
 	PREDEF("weapon_kick", N_weapon_kick),
 	PREDEF("weapon_event", N_weapon_event),
+
+	PREDEF("npc_find", N_npc_find),
+	PREDEF("npc_last_hit", N_npc_last_hit),
+	PREDEF("npc_is_alive", N_npc_is_alive),
+	PREDEF("npc_behaviour_trigger", N_npc_behaviour_trigger),
+	PREDEF("npc_behaviour_stop", N_npc_behaviour_stop),
+	PREDEF("npc_behaviour_active", N_npc_behaviour_active),
+	PREDEF("npc_behaviour_set", N_npc_behaviour_set),
+	PREDEF("npc_behaviour_get", N_npc_behaviour_get),
+	PREDEF("npc_behaviour_list", N_npc_behaviour_list),
+	PREDEF("npc_count", N_npc_count),
+	PREDEF("npc_at", N_npc_at),
+	PREDEF("npc_walk_to", N_npc_walk_to),
+	PREDEF("npc_flee", N_npc_flee),
+	PREDEF("npc_idle", N_npc_idle),
+	PREDEF("npc_brain_state", N_npc_brain_state),
+	PREDEF("npc_stats", N_npc_stats),
+	PREDEF("npc_model_ready", N_npc_model_ready),
+	PREDEF("npc_spawn", N_npc_spawn),
+	PREDEF("npc_destroy", N_npc_destroy),
+	PREDEF("npc_position", N_npc_position),
+	PREDEF("npc_velocity", N_npc_velocity),
+	PREDEF("npc_health", N_npc_health),
+	PREDEF("npc_state", N_npc_state),
+
+	PREDEF("prop_spawn_box", N_prop_spawn_box),
+	PREDEF("prop_drive", N_prop_drive),
+	PREDEF("prop_position", N_prop_position),
+	PREDEF("prop_destroy", N_prop_destroy),
 
 	PREDEF("script_error", N_script_error),
 

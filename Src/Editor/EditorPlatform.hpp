@@ -27,7 +27,6 @@ Vec2f ConsumeRelativeMouseDelta();
  * launch. This is to make that consistent
  */
 void ActivateApp();
-
 /**
  * @brief Starts listening for raw mouse movement on a background queue. Mice can take a moment to show up, so this is
  * called at startup rather than when relative mode is first entered

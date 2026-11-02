@@ -8,6 +8,7 @@
 #include <Asset/Animation.hpp>
 #include <Asset/AssetBase.hpp>
 #include <Asset/AssetManager.hpp>
+#include <Core/Name.hpp>
 #include <Core/Ref.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
@@ -1083,7 +1084,7 @@ void LoaderGltf::UploadObjectTree(Object* object)
 
 std::vector<int32> LoaderGltf::BuildJointLookup(cgltf_skin* skin) const
 {
-	std::vector<int32> lookup(mpGltfData->nodes_count, BoneNull);
+	std::vector<int32> lookup(mpGltfData->nodes_count, scBoneNull);
 
 	for (cgltf_size i = 0; i < skin->joints_count; i++) {
 		lookup[skin->joints[i] - mpGltfData->nodes] = static_cast<int32>(i);
@@ -1225,12 +1226,23 @@ void LoaderGltf::LoadSkeleton(Skeleton& skel, cgltf_skin* skin, const std::vecto
 	for (uint32 i = 0; i < joint_count; i++) {
 		const cgltf_node* joint = skin->joints[i];
 
-		skel.BoneNames[i] = joint->name ? String(joint->name) : String::Fmt("joint_{}", i);
+		// Choose a name for the joint/bone
+		String bone_name {};
+		if (joint->name != nullptr) {
+			bone_name = String(joint->name);
+		}
+		else {
+			bone_name = String::Fmt("joint_{}", i);
+		}
+
+		skel.BoneNames[i] = Name(bone_name);
+
+
 		skel.ParentIndices[i] = joint->parent ? static_cast<uint32>(joint_lookup[joint->parent - mpGltfData->nodes])
-											  : BoneNull;
+											  : scBoneNull;
 		skel.RestPose[i] = MakeRestPoseForJoint(joint);
 
-		const bool is_root_joint = (skel.ParentIndices[i] == BoneNull);
+		const bool is_root_joint = (skel.ParentIndices[i] == scBoneNull);
 
 		skel.RootTransforms[i] = Mat4f::scIdentity;
 
@@ -1634,7 +1646,7 @@ void LoaderGltf::ProcessData(AssetTicket& ticket)
 		if (attach_skin != nullptr) {
 			Ref<Skeleton>& skeleton = get_skeleton(attach_skin);
 
-			BoneId bone = BoneNull;
+			BoneId bone = scBoneNull;
 
 			for (cgltf_size joint_index = 0; joint_index < attach_skin->joints_count; joint_index++) {
 				if (attach_skin->joints[joint_index] == attach_joint) {

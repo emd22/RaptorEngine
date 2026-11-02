@@ -27,16 +27,25 @@
 
 namespace fx {
 
-void Window::Create(const char* title, const Vec2u& size)
+void Window::Create(const char* title, const Vec2u& size, const eWindowFlags flags)
 {
-	if (size.X > 8000 || size.Y > 8000) {
-		Panic("Window", "Window size is too large! (Size: {})", size);
+	// Limit the window size to 8000x8000.
+	const Vec2u clamped_size = Vec2u::Min(size, Vec2u(8000));
+	mSize = clamped_size;
+
+	eRaptorEditorFlags editor_flags = (eRaptorEditorFlags::None);
+
+	if (HasFlag(flags, eWindowFlags::RaiseWindow)) {
+		SetFlag(editor_flags, eRaptorEditorFlags::RaiseWindow);
 	}
 
-	mSize = size;
+	if (HasFlag(flags, eWindowFlags::Hidden)) {
+		SetFlag(editor_flags, eRaptorEditorFlags::Hidden);
+	}
 
 	editor::EditorFrame* frame = nullptr;
-	editor::thread::RunOnUIAndWait([&frame, title, &size] { frame = gEditor->CreateMainFrame(title, size); });
+	editor::thread::RunOnUIAndWait([&frame, title, &size, editor_flags]
+								   { frame = gEditor->CreateMainFrame(title, size, editor_flags); });
 
 	mpViewport = frame->GetViewport();
 

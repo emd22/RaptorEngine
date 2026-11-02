@@ -174,16 +174,16 @@ std::vector<LobeSample> BuildLobeSamples(float32 roughness, uint32 source_size)
 	return samples;
 }
 
-uint16 FloatToHalf(float32 value)
+Float16 FloatToHalf(float32 value)
 {
 	if (!(value > 0.0f)) {
-		return 0;
+		return Float16::scZero;
 	}
 
-	return Float16(std::min(value, Float16::scMaxValue.ToFloat())).GetBits();
+	return Float16(std::min(value, Float16::scMaxValue.ToFloat()));
 }
 
-void WriteTexel(uint16*& out, const float32 rgb[3])
+void WriteTexel(Float16*& out, const float32 rgb[3])
 {
 	*out++ = FloatToHalf(rgb[0]);
 	*out++ = FloatToHalf(rgb[1]);
@@ -265,11 +265,11 @@ float32 MipToRoughness(uint32 mip, uint32 mip_count)
 	return static_cast<float32>(mip) / static_cast<float32>(mip_count - 1);
 }
 
-void Prefilter(const float32* const faces[scFaces], uint32 size, uint32 mip_count, uint16* out_texels)
+void Prefilter(const float32* const faces[scFaces], uint32 size, uint32 mip_count, Float16* out_texels)
 {
 	const std::vector<CubeLevel> levels = BuildSourceLevels(faces, size);
 
-	uint16* out = out_texels;
+	Float16* out = out_texels;
 
 	for (uint32 face = 0; face < scFaces; face++) {
 		const float32* texel = levels[0].Faces[face].data();

@@ -4,8 +4,8 @@
 
 #import <Cocoa/Cocoa.h>
 #import <GameController/GameController.h>
-#import <os/lock.h>
 #import <QuartzCore/CAMetalLayer.h>
+#import <os/lock.h>
 
 namespace fx::editor::platform {
 
@@ -58,8 +58,8 @@ void InitRawMouse()
 
 	if (@available(macOS 11.0, *)) {
 		sRawMouseQueue = dispatch_queue_create(
-			"raptor.rawmouse", dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL,
-																		   QOS_CLASS_USER_INTERACTIVE, 0));
+			"raptor.rawmouse",
+			dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INTERACTIVE, 0));
 
 		for (GCMouse* mouse in [GCMouse mice]) {
 			AttachRawMouse(mouse);
@@ -161,8 +161,8 @@ Vec2f ConsumeRelativeMouseDelta()
 
 	return delta;
 }
-
 void ActivateApp() { [NSApp activateIgnoringOtherApps:YES]; }
+
 
 void DisableWindowTabbing() { [NSWindow setAllowsAutomaticWindowTabbing:NO]; }
 
