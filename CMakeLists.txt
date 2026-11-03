@@ -85,7 +85,7 @@ if(WIN32)
     endif()
 
     target_link_libraries(raptor PRIVATE vulkan-1 dxcompiler jpeg)
-    target_compile_definitions(raptor PRIVATE _USE_MATH_DEFINES)
+    target_compile_definitions(raptor PRIVATE _USE_MATH_DEFINES FX_USE_DXC)
 
     # When FX_BASE_DIR is left as the default "." it resolves against the working directory, and
     # assets (Shaders/, Data/, Config/) live at the repo root, not next to the generated .vcxproj.
@@ -125,7 +125,7 @@ elseif(APPLE)
     target_link_directories(raptor PRIVATE "${VK_SDK}/lib")
     set_target_properties(raptor PROPERTIES BUILD_RPATH "${VK_SDK}/lib")
 
-    target_link_libraries(raptor PRIVATE vulkan.1 dxcompiler)
+    target_link_libraries(raptor PRIVATE vulkan.1 zdxc)
     target_compile_definitions(raptor PRIVATE VK_ENABLE_BETA_EXTENSIONS=1)
 
 	target_compile_options(raptor PRIVATE  -fcolor-diagnostics)

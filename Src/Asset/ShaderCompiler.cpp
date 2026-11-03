@@ -8,7 +8,7 @@
 
 #include "ShaderPreproc.hpp"
 
-// DXC
+#ifdef FX_USE_DXC
 #ifndef FX_PLATFORM_WINDOWS
 #include <dxc/WinAdapter.h>
 #else
@@ -17,16 +17,20 @@
 #define NOMINMAX
 #endif
 #include <atlbase.h>
-#include <windows.h>
 #include <objbase.h>
+#include <windows.h>
 #pragma push_macro("GetObject")
 #undef GetObject
 #undef LoadImage
 #endif
 
-#include "ShaderPreproc.hpp"
-
 #include <dxc/dxcapi.h>
+
+#else
+
+#include <zdxc/zdxc.h>
+
+#endif
 
 #include <Asset/DataPack.hpp>
 #include <Core/BasicDb.hpp>
@@ -85,8 +89,14 @@ bool ShaderCompiler::CompileIfOutOfDate(const char* path, DataPack& pack, const 
 	return out_of_date;
 }
 
+#ifdef FX_USE_DXC
 #define SHADER_VERSION L"6_7"
+#else
+#define SHADER_VERSION "6_7"
+#endif
 
+
+#ifdef FX_USE_DXC
 static const wchar_t* ShaderTypeToDxName(eShaderType type)
 {
 	switch (type) {
@@ -101,15 +111,36 @@ static const wchar_t* ShaderTypeToDxName(eShaderType type)
 	return L"";
 }
 
+#else
+
+static const char* ShaderTypeToDxName(eShaderType type)
+{
+	switch (type) {
+	case eShaderType::Vertex:
+		return "vs_" SHADER_VERSION;
+	case eShaderType::Pixel:
+		return "ps_" SHADER_VERSION;
+	case eShaderType::Compute:
+		return "cs_" SHADER_VERSION;
+	default:;
+	}
+	return "";
+}
+
+#endif
+
+
 struct CompileState
 {
 	const char* pcPath;
 	DataPack& Pack;
 	const SizedArray<ShaderMacro>& pcMacros;
 	ShaderPreproc::Result& Preproc;
+#ifdef FX_USE_DXC
 	CComPtr<IDxcUtils> pUtils;
 	CComPtr<IDxcCompiler3> pCompiler;
 	CComPtr<IDxcIncludeHandler> pIncludeHandler;
+#endif
 };
 
 
@@ -187,7 +218,7 @@ static ByteBuffer BuildReflectionHeader(const CompileState& state, eShaderType s
 	return bb;
 }
 
-
+#ifdef FX_USE_DXC
 static CompileResult CompileProgram(const CompileState& state, eShaderType shader_type)
 {
 	constexpr uint32 cCodePage = DXC_CP_UTF8;
@@ -282,6 +313,108 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
 	return CompileResult::Success;
 }
 
+#else
+
+template <typename T>
+static Slice<T> ZdxcGetOutput(const zdxc_result* result, zdxc_output output)
+{
+	size_t size = 0;
+	const void* output_ptr = zdxc_result_output(result, output, &size);
+	return MakeSlice<T>(static_cast<T*>(output_ptr), size);
+}
+
+
+static CompileResult CompileProgram(const CompileState& state, eShaderType shader_type)
+{
+	const char* compile_args[] = {
+		state.pcPath,
+		// Entrypoint
+		"-E",
+		"main",
+
+		// Target profile
+		"-T",
+		ShaderTypeToDxName(shader_type),
+
+		"-O3",
+
+		// Makes min16float a real half precision type (it stays full precision without this), see the probe blending in
+		// ProbeCommon.hlsli. Needs shaderFloat16 on the device.
+		"-enable-16bit-types",
+
+		// Output format
+		"-spirv",
+	};
+
+	const ShaderPreproc::DataBuffer& shader_raw_data = state.Preproc.GetBuffer(shader_type);
+
+	zdxc_compile_info compile_info {
+		.size = sizeof(compile_info),
+		.args = compile_args,
+		.arg_count = std::size(compile_args),
+		.source = shader_raw_data.pData,
+		.source_size = shader_raw_data.Size,
+		.source_name = state.pcPath,
+		.read_file = nullptr,
+		.user = nullptr,
+	};
+
+	zdxc_result* result = zdxc_compile(&compile_info);
+	if (!result) {
+		LogError(LC_SHADER, "Failed to compile shader '{}': zdxc ran out of memory", state.pcPath);
+		return CompileResult::Failed;
+	}
+
+	const StringView diagnostics = ZdxcGetOutput<const char>(result, ZDXC_OUTPUT_DIAGNOSTICS);
+
+	if (zdxc_result_status(result) != ZDXC_STATUS_OK) {
+		LogError(LC_SHADER, "Failed to compile shader '{}'!", state.pcPath);
+		if (diagnostics.Size > 0) {
+			LogError(LC_SHADER, "Err: {}", diagnostics);
+		}
+
+		zdxc_result_free(result);
+		return CompileResult::Failed;
+	}
+
+	if (diagnostics.Size > 0) {
+		LogWarning(LC_SHADER, "Shader '{}' ({}) compiled with warnings:\n{}", state.pcPath,
+				   ShaderUtil::TypeToName(shader_type), diagnostics);
+	}
+
+	const Slice<const uint8> spirv_bin = ZdxcGetOutput<const uint8>(result, ZDXC_OUTPUT_OBJECT);
+
+	const ShaderId shader_id = renderer::Shader::GenerateShaderId(shader_type, state.pcMacros);
+
+	// Build the final buffer and write to the data pack
+	{
+#ifndef FX_SHADER_NO_REFLECTION
+		ByteBuffer reflection_header = BuildReflectionHeader(state, shader_type);
+#else
+		ByteBuffer reflection_header;
+#endif
+		ByteBuffer final_buffer(reflection_header.GetSize() + spirv_bin.Size);
+
+		// Write the reflection header
+		final_buffer.InsertRaw(reflection_header.pData, reflection_header.GetSize());
+		// Write the SPIRV data
+		final_buffer.InsertRaw(spirv_bin.pData, spirv_bin.Size);
+
+		// Add the final buffer to the data pack
+		state.Pack.AddEntry(shader_id,
+							MakeSlice<uint8>(reinterpret_cast<uint8*>(final_buffer.pData), final_buffer.GetSize()));
+	}
+
+	zdxc_result_free(result);
+
+	return CompileResult::Success;
+}
+
+
+#endif
+
+
+#ifdef FX_USE_DXC
 #define SOURCE_EXISTS(_shader_type) (preproc.GetBuffer(_shader_type).Size > 0)
 #define COMPILE_DEFAULT(_shader_type)                                                                                  \
 	CompileProgram(CompileState(path, pack, macros, preproc, utils, compiler, include_handler), _shader_type)
@@ -315,6 +448,34 @@ ShaderCompiler::eResult ShaderCompiler::Compile(const char* path, DataPack& pack
 
 	return CompileResult::Success;
 }
+
+#else
+#define SOURCE_EXISTS(_shader_type)	  (preproc.GetBuffer(_shader_type).Size > 0)
+#define COMPILE_DEFAULT(_shader_type) CompileProgram(CompileState(path, pack, macros, preproc), _shader_type)
+
+#define TRY_COMPILE_PROGRAM(_shader_type)                                                                              \
+	if (SOURCE_EXISTS(_shader_type) && (COMPILE_DEFAULT(_shader_type) != CompileResult::Success)) {                    \
+		return CompileResult::Failed;                                                                                  \
+	}
+
+
+ShaderCompiler::eResult ShaderCompiler::Compile(const char* path, DataPack& pack, const SizedArray<ShaderMacro>& macros,
+												bool do_db_flush)
+{
+	File file(path, File::eModType::Read, File::eDataType::Binary);
+	SizedArray<char> file_data = file.Read2<char>();
+
+	ShaderPreproc::Result preproc = ShaderPreproc::Process(file_data, macros);
+
+	TRY_COMPILE_PROGRAM(eShaderType::Vertex);
+	TRY_COMPILE_PROGRAM(eShaderType::Pixel);
+	TRY_COMPILE_PROGRAM(eShaderType::Compute);
+
+	return CompileResult::Success;
+}
+
+
+#endif
 
 void ShaderCompiler::Destroy() { sShaderCompileDb.Close(); }
 
