@@ -247,6 +247,10 @@ extern void sound_stop(long sound);
 extern void sound_kill(long sound);
 extern bool sound_alive(long sound);
 
+/* Mix snapshots from Sounds/Mix/mix.conf. They are counted, so every start needs a matching stop. */
+extern void sound_snapshot_start(cstring name);
+extern void sound_snapshot_stop(cstring name);
+
 /* Timers. Callbacks are looked up by name and have the signature `void fn(OBJECT self, long timer)`, where `self` is
  * null for scripts that are not attached to an object. A timer belongs to the script that started it, and stops when
  * that script is reloaded, detached or the object stops simulating. Timers only run while the game is simulating. */

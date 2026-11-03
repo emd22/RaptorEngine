@@ -979,7 +979,7 @@ bool RaptorEditor::SelectObject(Object* object, bool append_selection)
 	const bool selected = mSelection.Add(object);
 
 	if (!selected) {
-		Warn("Cannot select '{}', the selection is full", object->Name.Get());
+		LogWarning("Cannot select '{}' as the selection list is full", object->Name.Get());
 	}
 
 	SyncSelection();
@@ -1006,7 +1006,7 @@ bool RaptorEditor::SelectSubview(uint32 instance, bool append_selection)
 	const bool selected = mSelection.Add(root);
 
 	if (!selected) {
-		Warn("Cannot select '{}', the selection is full", root->Name.Get());
+		LogWarning("Cannot select '{}' as the selection list is full", root->Name.Get());
 	}
 
 	SyncSelection();
@@ -1449,7 +1449,6 @@ bool RaptorEditor::RenameObject(Object* object, const String& name)
 	}
 
 	if (name.IsEmpty()) {
-		Warn("Objects need a name");
 		return false;
 	}
 
@@ -1462,7 +1461,7 @@ bool RaptorEditor::RenameObject(Object* object, const String& name)
 	const Object* existing = gObjectManager->FindObject(HashStr32(valid_name.CStr()));
 
 	if (existing != nullptr && existing != object) {
-		Warn("There is already an object named '{}'", valid_name);
+		LogWarning("There is already an object named '{}'", valid_name);
 		return false;
 	}
 
@@ -1480,7 +1479,6 @@ void RaptorEditor::RenameSelection(const String& name)
 	const String base_name = ConfigFile::MakeValidName(name);
 
 	if (base_name.IsEmpty()) {
-		Warn("Objects need a name");
 		return;
 	}
 
@@ -1708,7 +1706,7 @@ static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter
 	}
 
 	if (ops.size() > scMaxSubtractOperations) {
-		gEditor->Warn("Subtracting '{}' would change too many blockouts at once", cutter->Name.Get());
+		LogWarning("Subtracting '{}' would change too many brushes at once", cutter->Name.Get());
 		return 0;
 	}
 
@@ -1794,7 +1792,6 @@ bool RaptorEditor::CreateSubviewFromSelection(const String& name)
 	}
 
 	if (blockout->IsCompiledMap()) {
-		Warn("Open the prototype to make subviews, a compiled map cannot be edited");
 		return false;
 	}
 
@@ -1810,14 +1807,14 @@ bool RaptorEditor::CreateSubviewFromSelection(const String& name)
 		}
 
 		if (!blockout->HasBrush(object) && !blockout->HasPatch(object)) {
-			Warn("Only brushes, patches and subviews can be part of a subview, '{}' is none of them",
-				 object->Name.Get());
+			LogWarning("Only brushes, patches and subviews can be part of a subview, '{}' is not implemented.",
+					   object->Name.Get());
 			return false;
 		}
 
 		if (!CanEditObject(object)) {
-			Warn("'{}' is already part of the subview '{}'", object->Name.Get(),
-				 blockout->GetSubviewName(object->SubviewInstance));
+			LogWarning("'{}' is already part of the subview '{}'", object->Name.Get(),
+					   blockout->GetSubviewName(object->SubviewInstance));
 			return false;
 		}
 
@@ -1825,7 +1822,6 @@ bool RaptorEditor::CreateSubviewFromSelection(const String& name)
 	}
 
 	if (count == 0) {
-		Warn("Select the brushes to make a subview from first");
 		return false;
 	}
 
@@ -1881,7 +1877,6 @@ bool RaptorEditor::EnterSubview()
 	}
 
 	if (!IsSubviewSelected()) {
-		Warn("Select a placed subview to enter it");
 		return false;
 	}
 
@@ -1893,7 +1888,7 @@ bool RaptorEditor::EnterSubview()
 	ForgetObjects();
 
 	if (!blockout->EnterSubview(instance)) {
-		Warn("Could not enter the subview '{}'", blockout->GetSubviewName(instance));
+		LogError("Could not enter the subview '{}'", blockout->GetSubviewName(instance));
 		return false;
 	}
 
@@ -1933,7 +1928,7 @@ bool RaptorEditor::PlaceSubview(const String& name)
 	const uint32 instance = blockout->NewSubviewInstance(name);
 
 	if (instance == Blockout::scNoSubview) {
-		Warn("The subview '{}' could not be placed", name);
+		LogError("The subview '{}' could not be placed", name);
 		return false;
 	}
 
@@ -2026,31 +2021,6 @@ void RaptorEditor::ForgetObjects()
 	SyncSelection();
 }
 
-uint32 RaptorEditor::ShowStatusMessage(const String& text, std::chrono::milliseconds duration)
-{
-	const uint32 id = EditorFrame::NewStatusMessageId();
-
-	thread::PostToUI(
-		[this, id, text, duration]
-		{
-			if (mpMainFrame != nullptr) {
-				mpMainFrame->ShowStatusMessage(id, wxString::FromUTF8(text.CStr()), duration);
-			}
-		});
-
-	return id;
-}
-
-void RaptorEditor::ClearStatusMessage(uint32 id)
-{
-	thread::PostToUI(
-		[this, id]
-		{
-			if (mpMainFrame != nullptr) {
-				mpMainFrame->ClearStatusMessage(id);
-			}
-		});
-}
 
 bool RaptorEditor::HasUnsavedChanges() const { return mbUntrackedChanges || mHistory.GetRevision() != mSavedRevision; }
 

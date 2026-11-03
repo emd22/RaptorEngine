@@ -52,7 +52,7 @@ struct CharacterBump
 class PhysicsPlayer
 {
 public:
-	static constexpr float32 scEyeHeight = 1.72f;
+	static constexpr float32 scEyeHeight = 1.64f;
 	static constexpr float32 scStandingHeight = 1.84f;
 
 	static constexpr float32 scGravityScale = 1.5f;

@@ -238,7 +238,6 @@ private:
 	void ActivateBalance();
 	void ReturnToAnimation();
 	void EnterFallen();
-	void UpdateGetUp();
 	void ExitFallen();
 	void EnterRagdoll();
 	bool IsPowered() const;

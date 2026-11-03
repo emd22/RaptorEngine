@@ -316,7 +316,6 @@ void NPC::UpdateActive(float32 delta_time)
 	}
 
 	UpdateBehaviours(delta_time);
-	UpdateGetUp();
 
 	if (mState == eState::Animated && skinned != nullptr) {
 		UpdateBalance(delta_time);
@@ -705,33 +704,9 @@ void NPC::EnterFallen()
 
 	mBehaviours.SetFreePose(true);
 	mBehaviours.Trigger(ragdoll, "fallen");
-	mBehaviours.Trigger(ragdoll, "get_up");
 	mBehaviours.HandleEvent(ragdoll, physics::RagdollEvent { .Type = physics::eRagdollEvent::LostSupport,
 															 .Magnitude = -ctx.Velocity.Dot(ctx.Up) });
 	ApplyStrengths();
-}
-
-void NPC::UpdateGetUp()
-{
-	if (mState != eState::Fallen || mbDying) {
-		return;
-	}
-
-	const physics::RagdollBehaviour* get_up = mBehaviours.Find("get_up");
-
-	if (get_up == nullptr) {
-		return;
-	}
-
-	const physics::eGetUpStage stage = get_up->GetUpStage();
-
-	// Once lifting, the fallen pose has to give way to the get-up, so the fallen behaviour stops. A lift that failed
-	// goes back to it
-	mBehaviours.SetFreePose(stage == physics::eGetUpStage::Resting);
-
-	if (stage == physics::eGetUpStage::Standing) {
-		ExitFallen();
-	}
 }
 
 void NPC::ExitFallen()
@@ -744,7 +719,7 @@ void NPC::ExitFallen()
 
 	mActor.SetCullable(true);
 
-	// The animated root has been left where the NPC started falling, so move it under the lifted pelvis first
+	// The animated root has been left where the NPC started falling, so move it under the pelvis first
 	PlaceRootUnderPelvis();
 	mActor.Ragdoll.RebaseTargets();
 

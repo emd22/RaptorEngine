@@ -46,7 +46,7 @@ void DrawCross(const Vec3f point, Color color)
 
 RagdollBehaviours::RagdollBehaviours()
 	: mBehaviours { &mFallen,	   &mStagger,  &mArmBalance, &mImpactRelax, &mShot, &mBrace,
-					&mProtectHead, &mHighFall, &mWrithe,	 &mDying,		&mGetUp }
+					&mProtectHead, &mHighFall, &mWrithe,	 &mDying }
 {
 	std::copy(mBehaviours, mBehaviours + scBehaviourCount, mOrder);
 }

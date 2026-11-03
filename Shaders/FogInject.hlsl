@@ -45,7 +45,7 @@ F_FrameData(FogConsts, Consts, 1);
 #define FROXEL_HISTORY_DEPTH_TOLERANCE 0.25
 #define FROXEL_HISTORY_RELATIVE_DEPTH_TOLERANCE 0.1
 
-void LoadColumnDepths(uint2 column, out float depths[FROXEL_DEPTH_TAP_COUNT])
+int2 ColumnTapPixel(uint2 column, uint tap)
 {
 	uint depth_width;
 	uint depth_height;
@@ -54,11 +54,17 @@ void LoadColumnDepths(uint2 column, out float depths[FROXEL_DEPTH_TAP_COUNT])
 	const int2 depth_limit = int2(depth_width, depth_height) - int2(1, 1);
 	const float2 cell_size = float2(depth_width, depth_height) / float2(FROXEL_GRID_X, FROXEL_GRID_Y);
 
+	const uint2 tap_xy = uint2(tap % FROXEL_DEPTH_TAPS, tap / FROXEL_DEPTH_TAPS);
+	const float2 fraction = (float2(tap_xy) + 0.5) / float(FROXEL_DEPTH_TAPS);
+
+	return min(int2((float2(column) + fraction) * cell_size), depth_limit);
+}
+
+void LoadColumnDepths(uint2 column, out float depths[FROXEL_DEPTH_TAP_COUNT])
+{
 	[unroll]
 	for (uint tap = 0; tap < FROXEL_DEPTH_TAP_COUNT; tap++) {
-		const uint2 tap_xy = uint2(tap % FROXEL_DEPTH_TAPS, tap / FROXEL_DEPTH_TAPS);
-		const float2 fraction = (float2(tap_xy) + 0.5) / float(FROXEL_DEPTH_TAPS);
-		const int2 pixel = min(int2((float2(column) + fraction) * cell_size), depth_limit);
+		const int2 pixel = ColumnTapPixel(column, tap);
 
 		const float raw_depth = F_SampleLoad(tDepth, int3(pixel, 0)).r;
 		const bool is_viewmodel = raw_depth >= VIEWMODEL_MIN_RAW_DEPTH;
@@ -67,13 +73,17 @@ void LoadColumnDepths(uint2 column, out float depths[FROXEL_DEPTH_TAP_COUNT])
 	}
 }
 
-float NearestColumnDepth(float depths[FROXEL_DEPTH_TAP_COUNT])
+float NearestColumnDepth(float depths[FROXEL_DEPTH_TAP_COUNT], out uint nearest_tap)
 {
-	float nearest = FROXEL_NO_SURFACE;
+	float nearest = depths[0];
+	nearest_tap = 0;
 
 	[unroll]
-	for (uint tap = 0; tap < FROXEL_DEPTH_TAP_COUNT; tap++) {
-		nearest = min(nearest, depths[tap]);
+	for (uint tap = 1; tap < FROXEL_DEPTH_TAP_COUNT; tap++) {
+		const bool is_nearer = depths[tap] < nearest;
+
+		nearest = select(is_nearer, depths[tap], nearest);
+		nearest_tap = select(is_nearer, tap, nearest_tap);
 	}
 
 	return nearest;
@@ -132,7 +142,8 @@ void main(uint3 froxel : SV_DispatchThreadID)
 	float column_depths[FROXEL_DEPTH_TAP_COUNT];
 	LoadColumnDepths(froxel.xy, column_depths);
 
-	const float surface_depth = NearestColumnDepth(column_depths);
+	uint nearest_tap;
+	const float surface_depth = NearestColumnDepth(column_depths, nearest_tap);
 	const float clamp_depth = max(surface_depth - FROXEL_SURFACE_MARGIN, 0.0);
 
 	[branch]
@@ -150,7 +161,9 @@ void main(uint3 froxel : SV_DispatchThreadID)
 
 	const uint tile_columns = Consts.uiTileColumns;
 	const uint2 tile_limit = max(uint2(tile_columns, Consts.uiTileRows), uint2(1, 1)) - uint2(1, 1);
-	const uint2 tile_xy = min(uint2(saturate(uv) * Consts.vScreenSize) / LIGHT_TILE_SIZE, tile_limit);
+	// Light tiles end at their farthest surface. The tile under the nearest tap reaches at least as deep as every
+	// froxel in the column is clamped to, a tile picked from the jittered UV may not near silhouettes.
+	const uint2 tile_xy = min(uint2(ColumnTapPixel(froxel.xy, nearest_tap)) / LIGHT_TILE_SIZE, tile_limit);
 
 	const TileLightData tile = bLightGrid[tile_xy.x + (tile_xy.y * tile_columns)];
 

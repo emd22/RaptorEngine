@@ -349,18 +349,6 @@ public:
 	void MarkSaved();
 	void MarkModified();
 
-	template <typename... TTypes>
-	void Warn(const char* fmt, TTypes&&... args)
-	{
-		const String message = String::Fmt(fmt, args...);
-
-		LogWarning(LC_CORE, "{}", message.CStr());
-		ShowStatusMessage(message, scWarningDuration);
-	}
-
-	uint32 ShowStatusMessage(const String& text,
-							 std::chrono::milliseconds duration = std::chrono::milliseconds::zero());
-	void ClearStatusMessage(uint32 id);
 
 	/////////////////////////////////////
 	// Commands

@@ -327,6 +327,9 @@ void RaptorGame::CreateGame()
 	mpDecalsCVar = gCVars->Set("r_decals", 1);
 	mpDebugBoundsCVar = gCVars->Set("r_debug_bounds", 0);
 
+	// `$s_debug 1` shows the audio voices and mix, 2 also marks the voices in the world
+	mAudioDebug.Create();
+
 	mpExposureCVar = gCVars->Set("r_exposure_ev", gCVars->Get("r_exposure_ev", 0.0f));
 	mpApertureCVar = gCVars->Set("r_aperture", gCVars->Get("r_aperture", 16.0f));
 	mpShutterCVar = gCVars->Set("r_shutter", gCVars->Get("r_shutter", 0.01f));
@@ -1285,7 +1288,10 @@ void RaptorGame::RenderText()
 								1.0f, scWhite);
 	}
 
-	if (gAudio->GetVoiceCount() > 0) {
+	if (mAudioDebug.IsEnabled()) {
+		mAudioDebug.DrawText(*gWorld->GetCurrentCamera());
+	}
+	else if (gAudio->GetVoiceCount() > 0) {
 		const SpatialAudio& spatial = gAudio->GetSpatial();
 
 		float32 reverb_times[3];
@@ -1420,7 +1426,8 @@ void RaptorGame::Tick()
 
 	gWorld->pPrototype->UpdateAcoustics(static_cast<float32>(DeltaTime));
 	gAudio->SetListener(listener->GetPosition(), listener->GetForwardVector(), listener->GetUpVector());
-	gAudio->Update(gGraphics->GetWindow()->IsFocused());
+	gAudio->Update(static_cast<float32>(DeltaTime), gGraphics->GetWindow()->IsFocused());
+	mAudioDebug.DrawWorld();
 	gWorld->SoundEmitters.Update(static_cast<float32>(DeltaTime), listener->GetPosition());
 
 	Ref<FPSCamera> camera = gWorld->Player.pCamera;

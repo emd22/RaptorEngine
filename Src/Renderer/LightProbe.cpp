@@ -741,23 +741,11 @@ void ProbeManager::ReportStaleBake(const String& message)
 		LogWarning("{}", message.CStr());
 		mStaleMessage = message;
 	}
-
-#ifdef FX_IS_EDITOR
-	if (gEditor != nullptr) {
-		mStaleMessageId = gEditor->ShowStatusMessage(message);
-	}
-#endif
 }
 
 void ProbeManager::ClearStaleBakeReport()
 {
 	mStaleMessage.Clear();
-
-#ifdef FX_IS_EDITOR
-	if (gEditor != nullptr && mStaleMessageId != 0) {
-		gEditor->ClearStatusMessage(mStaleMessageId);
-	}
-#endif
 
 	mStaleMessageId = 0;
 }

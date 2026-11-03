@@ -14,13 +14,28 @@ namespace fx {
 struct SpatialVoice;
 struct ReverbSend;
 
+struct SpatialVoiceDebug
+{
+	float32 Occlusion = 1.0f;
+	float32 Transmission[3] = { 1.0f, 1.0f, 1.0f };
+	float32 AirAbsorption[3] = { 1.0f, 1.0f, 1.0f };
+	float32 PathGain = 0.0f;
+	float32 LevelDb = -120.0f;
+	bool bSimulated = false;
+	bool bHasPath = false;
+	bool bStarted = false;
+};
+
 class SpatialAudio
 {
 public:
 	static constexpr uint32 scFrameSize = 512;
 	static constexpr float32 scOcclusionRadius = 0.4f;
 	static constexpr int32 scOcclusionSamples = 8;
-	static constexpr int32 scTransmissionRays = 3;
+	static constexpr int32 scTransmissionRays = 8;
+	static constexpr float32 scOcclusionOpenSeconds = 0.05f;
+	static constexpr float32 scOcclusionCloseSeconds = 0.12f;
+	static constexpr float32 scMaxSimulateStepSeconds = 0.1f;
 
 	static constexpr int32 scMaxReverbRays = 8192;
 	static constexpr int32 scDefaultReverbRays = 2048;
@@ -32,8 +47,8 @@ public:
 	static constexpr uint32 scReverbChannels = (scReverbOrder + 1) * (scReverbOrder + 1);
 	static constexpr float32 scReverbIntervalSeconds = 0.1f;
 	static constexpr float32 scOccludedReverbSend = 0.35f;
-	static constexpr float32 scOccludedGainFloorLow = 0.25f;
-	static constexpr float32 scOccludedGainFloorHigh = 0.04f;
+	static constexpr float32 scOccludedGainFloorLow = 0.01f;
+	static constexpr float32 scOccludedGainFloorHigh = 0.001f;
 
 	static constexpr int32 scPathingOrder = Acoustics::scProbeOrder;
 	static constexpr uint32 scPathingCoefficients = (scPathingOrder + 1) * (scPathingOrder + 1);
@@ -63,6 +78,9 @@ public:
 	ma_node_base* GetReverbSendInput(ReverbSend* send) const;
 
 	void SetVoiceSource(SpatialVoice* voice, const Vec3f position, float32 distance_gain, bool binaural);
+	bool IsVoiceReady(const SpatialVoice* voice) const;
+	void SetVoiceStarted(SpatialVoice* voice);
+	bool GetVoiceDebug(const SpatialVoice* voice, SpatialVoiceDebug& out) const;
 
 	void SetListener(const Vec3f position, const Vec3f forward, const Vec3f up);
 	void SetReverb(bool enabled, float32 volume, bool binaural);

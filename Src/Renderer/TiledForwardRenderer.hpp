@@ -165,6 +165,7 @@ private:
 
 	// Light culling
 	void CreateLightCullingPSO();
+	void BuildLightCullingPipeline(ePipelineName name, bool depth_bounds);
 
 	/// Registers the decal buffers and atlases (set 0) on the forward pipeline currently being built
 	void AddDecalDescriptors();

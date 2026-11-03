@@ -99,6 +99,12 @@ public:
 
 	FX_FORCE_INLINE void SetDepthCompareOp(VkCompareOp op) { mProperties.DepthCompareOp = op; }
 
+	FX_FORCE_INLINE void SetDepthBias(float32 constant, float32 slope)
+	{
+		mProperties.DepthBiasConstant = constant;
+		mProperties.DepthBiasSlope = slope;
+	}
+
 	FX_FORCE_INLINE Ref<ShaderProgram> GetShaderProgram(eShaderType shader_type)
 	{
 		return mShaderPrograms[static_cast<uint32>(shader_type) - 1];

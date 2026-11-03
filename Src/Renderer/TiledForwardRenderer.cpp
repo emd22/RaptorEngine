@@ -700,8 +700,29 @@ void TiledForwardRenderer::SetDecalAtlases(Image* atlas, Image* normal_atlas)
 
 void TiledForwardRenderer::CreateLightCullingPSO()
 {
-	gPSOBuild->BeginPipeline(ePipelineName::LightCulling);
-	gPSOBuild->SetShader(eShaderName::LightCulling, {});
+	BuildLightCullingPipeline(ePipelineName::LightCulling, true);
+	BuildLightCullingPipeline(ePipelineName::LightCullingCapture, false);
+}
+
+void TiledForwardRenderer::BuildLightCullingPipeline(ePipelineName name, bool depth_bounds)
+{
+	gPSOBuild->BeginPipeline(name);
+
+	if (depth_bounds) {
+		gPSOBuild->SetShader(eShaderName::LightCulling, { ShaderMacro { .pcName = "USE_DEPTH_BOUNDS", .pcValue = "1" } });
+
+		// tDepth
+		gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Compute, Prepass.GetTarget(eImageFormat::D32_Float),
+									  gSamplerCache->Request(SamplerProps {
+										  eSamplerFilter::Nearest,
+										  eSamplerFilter::Nearest,
+										  eSamplerFilter::Nearest,
+										  eSamplerAddressMode::ClampToEdge,
+									  }));
+	}
+	else {
+		gPSOBuild->SetShader(eShaderName::LightCulling, {});
+	}
 
 	// bLightGrid
 	gPSOBuild->AddBuffer(0, 0, eShaderType::Compute, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
@@ -762,11 +783,21 @@ void TiledForwardRenderer::DoLightCullingPass(BaseCamera& camera, const Vec2u* p
 	const bool is_main_view = (pExtentOverride == nullptr && pLightOverride == nullptr);
 	consts.DecalCount = is_main_view ? gDecalManager->GetVisibleCount() : 0;
 
-	// Probe captures cull into the same pages that the main view, and the face before, were just shaded from
+	// Same conversion as the fog, stored depth is 1 - ndc
+	const float32* projection = camera.GetProjectionMatrix().RawData;
+	consts.DepthA = static_cast<float32>(1.0 - static_cast<float64>(projection[10]));
+	consts.DepthB = -projection[14];
+
+	// Probe captures cull into the same pages that the main view, and the face before, were just shaded from. They
+	// have no prepass, so only the main view's tiles are bounded by depth.
 	if (!is_main_view) {
 		BarrierHelper::BufferFragmentToCompute(cmd, &gGraphics->LightGridBuffer);
 		BarrierHelper::BufferFragmentToCompute(cmd, &gGraphics->LightIndexListBuffer);
 		BarrierHelper::BufferFragmentToCompute(cmd, &gGraphics->DecalMaskBuffer);
+	}
+	else {
+		// The prepass's render pass only syncs its depth with fragment shader reads
+		BarrierHelper::ComputeReadAfterAll(cmd);
 	}
 
 	// In binding order
@@ -776,7 +807,13 @@ void TiledForwardRenderer::DoLightCullingPass(BaseCamera& camera, const Vec2u* p
 	gPipelineCache->AddBufferOffset(0, gGraphics->GetDecalFrameOffset());
 	gPipelineCache->AddBufferOffset(0, gGraphics->GetDecalMaskFrameOffset());
 	gPipelineCache->SetFrameData(gGraphics->FrameAlloc.Push(consts));
-	gPipelineCache->Bind(ePipelineName::LightCulling, cmd);
+	ePipelineName pipeline = ePipelineName::LightCullingCapture;
+
+	if (is_main_view) {
+		pipeline = ePipelineName::LightCulling;
+	}
+
+	gPipelineCache->Bind(pipeline, cmd);
 
 	vkCmdDispatch(cmd.Get(), tile_columns, tile_rows, 1);
 

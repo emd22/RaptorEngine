@@ -158,7 +158,7 @@ void TextRenderer::DrawText(const char* text, float32 scale, uint32 color)
 	const float32 glyph_width = static_cast<float32>(scGlyphWidth) * scale;
 	const float32 glyph_height = static_cast<float32>(scGlyphHeight) * scale;
 
-	StackArray<InstanceData, scMaxGlyphs> instances;
+	StackArray<InstanceData, scMaxGlyphsPerDraw> instances;
 	const float32 atlas_w = static_cast<float32>(mpAtlas->Info.Size.X);
 	const float32 atlas_h = static_cast<float32>(mpAtlas->Info.Size.Y);
 
@@ -170,7 +170,7 @@ void TextRenderer::DrawText(const char* text, float32 scale, uint32 color)
 	Vec2f cursor = mCursorPosition - half_window_size + scMargin;
 
 	for (const char* c = text; *c != '\0'; ++c) {
-		if (instances.Size >= scMaxGlyphs) {
+		if (instances.Size >= scMaxGlyphsPerDraw) {
 			break;
 		}
 

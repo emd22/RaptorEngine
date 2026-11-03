@@ -1434,8 +1434,8 @@ void RaptorEditor::TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewV
 
 		if (!moved.IsValid() || extent.X < scMinBrushExtent || extent.Y < scMinBrushExtent ||
 			extent.Z < scMinBrushExtent) {
-			Warn("Cannot move those vertices of '{}', the brush would collapse or have too many faces",
-				 object->Name.Get());
+			LogWarning("Cannot move those vertices of '{}' as the brush would collapse or have too many faces",
+					   object->Name.Get());
 			continue;
 		}
 
@@ -1443,7 +1443,7 @@ void RaptorEditor::TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewV
 											[&](const Vec3f point) { return !IsOnBrushEdge(moved, point); });
 
 		if (is_concave) {
-			Warn("Cannot move those vertices of '{}', the brush would no longer be convex", object->Name.Get());
+			LogWarning("Cannot move those vertices of '{}' as the brush would no longer be convex", object->Name.Get());
 			continue;
 		}
 
@@ -1879,7 +1879,7 @@ void RaptorEditor::TopViewPatchCommand(eViewPlane plane, const PatchCommand& com
 
 		if (patch->bIsDetailMesh && (is_weight_command || command.Type == ePatchCommand::SetClosure)) {
 			if (is_weight_command || command.Closure != ePatchClosure::None) {
-				Warn("Detail mesh patch '{}' has no weights, caps or thickness", object->Name.Get());
+				LogWarning("Detail mesh patch '{}' has no weights, caps or thickness", object->Name.Get());
 			}
 
 			continue;
@@ -1894,23 +1894,23 @@ void RaptorEditor::TopViewPatchCommand(eViewPlane plane, const PatchCommand& com
 			}
 
 			if (!ApplyTurnCommand(changed, object->GetWorldMatrix(), plane, object->ID, handles)) {
-				Warn("Select all four corners of the detail mesh cells to turn on patch '{}'", object->Name.Get());
+				LogWarning("Select all four corners of the detail mesh cells to turn on patch '{}'",
+						   object->Name.Get());
 				continue;
 			}
 		}
 		else if (is_weight_command) {
 			if (!ApplyWeightCommand(changed, command, object->GetWorldMatrix(), plane, object->ID, handles)) {
-				Warn("Select control points of patch '{}' to set their weight", object->Name.Get());
+				LogWarning("Select control points of patch '{}' to set their weight", object->Name.Get());
 				continue;
 			}
 		}
 		else if (!ApplyPatchCommand(changed, command, object->GetWorldMatrix(), has_control, column, row)) {
 			if (command.Type == ePatchCommand::MapTexture) {
-				Warn("The texture scale and repeats can't be 0");
+				LogWarning("The texture scale and repeats can't be 0");
 				break;
 			}
 
-			Warn("Patch '{}' can't be changed that way, it is at its smallest or largest size", object->Name.Get());
 			continue;
 		}
 
@@ -1922,7 +1922,7 @@ void RaptorEditor::TopViewPatchCommand(eViewPlane plane, const PatchCommand& com
 			Patch pieces[Patch::scMaxClosurePieces];
 
 			if (changed.BuildClosure(pieces) == 0) {
-				Warn("Patch '{}' has no curved open edge to cap", object->Name.Get());
+				LogWarning("Patch '{}' has no curved open edge to cap", object->Name.Get());
 			}
 		}
 
@@ -1930,7 +1930,7 @@ void RaptorEditor::TopViewPatchCommand(eViewPlane plane, const PatchCommand& com
 	}
 
 	if (patch_count == 0 && command.Type == ePatchCommand::MapTexture) {
-		Warn("Select the patches to change the texture of first");
+		LogWarning("Select the patches to change the texture");
 	}
 
 	for (PatchEdit& edit : edits) {
@@ -2005,10 +2005,6 @@ void RaptorEditor::TopViewCreate(eViewPlane plane, Vec3f min, Vec3f max, bool dr
 	Object* created = CreateWorldBox(min, max);
 
 	if (created == nullptr) {
-		if (IsDataMode()) {
-			Warn("Pick Probe Volumes, Reflection Probes or Volumes in the Data filter to create one");
-		}
-
 		return;
 	}
 
@@ -2035,8 +2031,7 @@ void RaptorEditor::TopViewCreateRoom(eViewPlane plane, Vec3f min, Vec3f max, boo
 	const uint32 piece_count = BuildRoomPieces(min, max, settings, pieces);
 
 	if (piece_count == 0) {
-		Warn("The room is too small for {} thick walls, make it bigger or check the depth field",
-			 settings.WallThickness);
+		LogWarning("The room is too small for {} thick walls", settings.WallThickness);
 		return;
 	}
 
@@ -2113,23 +2108,23 @@ void RaptorEditor::TopViewHollowSelection(const RoomSettings& settings)
 	}
 
 	if (skipped_count > 0) {
-		Warn("Skipped {} brushes, only boxes that aren't rotated can be hollowed into rooms", skipped_count);
+		LogWarning("Skipped {} brushes, only boxes that aren't rotated can be hollowed into rooms", skipped_count);
 	}
 
 	if (too_small_count > 0) {
-		Warn("Skipped {} brushes that are too small for {} thick walls", too_small_count, settings.WallThickness);
+		LogWarning("Skipped {} brushes that are too small for {} thick walls", too_small_count, settings.WallThickness);
 	}
 
 	if (hollows.IsEmpty()) {
 		if (skipped_count == 0 && too_small_count == 0) {
-			Warn("Select the boxes to hollow out first");
+			LogWarning("Select the boxes to hollow");
 		}
 
 		return;
 	}
 
 	if (operation_count > scMaxRoomOperations) {
-		Warn("Hollowing the selection would make too many brushes at once");
+		LogWarning("Hollowing the selection would make too many brushes");
 		return;
 	}
 
@@ -2232,7 +2227,7 @@ void RaptorEditor::TopViewCreateDecal(eViewPlane plane, Vec3f min, Vec3f max, bo
 			max += shift;
 		}
 		else {
-			Warn("There is no surface under the decal to project onto, it was left at the base");
+			LogWarning("There is no surface under the decal to project onto");
 		}
 	}
 
@@ -2337,7 +2332,7 @@ void RaptorEditor::TopViewCreateArch(eViewPlane plane, DynArray<Vec3f> points, b
 	}
 
 	if (pieces.Size < segment_count) {
-		Warn("Skipped {} arch segments that were too thin to make into brushes", segment_count - pieces.Size);
+		LogWarning("Skipped {} arch segments that were too thin to make into brushes", segment_count - pieces.Size);
 	}
 
 	if (pieces.IsEmpty()) {
@@ -2451,7 +2446,7 @@ void RaptorEditor::FitDBoundsToLevel()
 	}
 
 	if (!has_geometry) {
-		Warn("There is no level geometry to fit the map bounds to");
+		LogWarning("There is no level geometry to fit the map bounds to");
 		return;
 	}
 
@@ -2542,7 +2537,7 @@ void RaptorEditor::TopViewClip(const Vec3f point_a, const Vec3f point_b, const V
 	}
 
 	if (clips.IsEmpty()) {
-		Warn("The clip line does not cross any of the selected brushes");
+		LogWarning("The clip line does not cross any of the selected brushes");
 		return;
 	}
 
@@ -2576,12 +2571,12 @@ void RaptorEditor::TopViewSubtract(bool keep_cutters)
 	}
 
 	if (mSelection.IsEmpty()) {
-		Warn("Select the brushes to subtract first");
+		LogWarning("Select the brushes to subtract first");
 		return;
 	}
 
 	if (SubtractSelection(keep_cutters) == 0) {
-		Warn("The selected brushes do not overlap any other brushes");
+		LogWarning("The selected brushes do not overlap any other brushes");
 	}
 }
 
@@ -2716,7 +2711,7 @@ void RaptorEditor::TopViewEditTextures(const DynArray<TopViewFaceRef>& faces, co
 		brush_count++;
 
 		if (command.Type == eTextureCommand::WorldAlign && !object->mRotation.IsCloseTo(Quat::scIdentity)) {
-			Warn("'{}' is rotated, so its textures can't be lined up with the world grid", object->Name.Get());
+			LogWarning("Textures can't be lined up with the world grid as '{}' is rotated", object->Name.Get());
 			continue;
 		}
 
@@ -2729,7 +2724,7 @@ void RaptorEditor::TopViewEditTextures(const DynArray<TopViewFaceRef>& faces, co
 				const int32 plane_index = FindWorldFacePlane(changed, *object, normal);
 
 				if (plane_index == Brush::scNoPlane) {
-					Warn("A picked face of '{}' is no longer there, pick it again", object->Name.Get());
+					LogWarning("A picked face of '{}' is no longer in the prototype", object->Name.Get());
 					continue;
 				}
 
@@ -2763,12 +2758,7 @@ void RaptorEditor::TopViewEditTextures(const DynArray<TopViewFaceRef>& faces, co
 	}
 
 	if (brush_count == 0) {
-		Warn("Pick a face with the Face tool, or select brushes, to change their textures");
 		return;
-	}
-
-	if (limited_count > 0) {
-		Warn("Some textures are already at their smallest or largest scale");
 	}
 
 	for (const Edit& edit : edits) {
@@ -2881,7 +2871,7 @@ void RaptorEditor::TopViewSetFaceMaterial(const DynArray<TopViewFaceRef>& faces,
 	}
 
 	if (IsBrushMarkerMaterial(material.GetSpecial())) {
-		Warn("'{}' can only be given to a whole brush", GetSpecialMaterialName(material.GetSpecial()));
+		LogWarning("'{}' can only be given to a whole brush", GetSpecialMaterialName(material.GetSpecial()));
 		return;
 	}
 
@@ -2906,7 +2896,7 @@ void RaptorEditor::TopViewSetFaceMaterial(const DynArray<TopViewFaceRef>& faces,
 
 		if (brush == nullptr || object->IsDecal() || !CanEditObject(object) ||
 			IsBrushMarkerMaterial(object->GetSpecialMaterial())) {
-			Warn("Only the faces of brushes can have a material of their own");
+			LogWarning("Only the faces of brushes can have a material of their own");
 			continue;
 		}
 
@@ -2928,7 +2918,7 @@ void RaptorEditor::TopViewSetFaceMaterial(const DynArray<TopViewFaceRef>& faces,
 		const int32 plane_index = FindWorldFacePlane(edit->Changed, *object, face_ref.Normal);
 
 		if (plane_index == Brush::scNoPlane) {
-			Warn("A picked face of '{}' is no longer there, pick it again", object->Name.Get());
+			LogWarning("A picked face of '{}' is no longer in the prototype", object->Name.Get());
 			continue;
 		}
 

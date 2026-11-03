@@ -1,6 +1,7 @@
 #include "SpatialAudio.hpp"
 
 #include <Audio/AcousticScene.hpp>
+#include <Audio/AudioMeter.hpp>
 #include <Core/Log.hpp>
 #include <algorithm>
 #include <atomic>
@@ -114,6 +115,8 @@ struct SpatialVoice
 	Vec3f Position = Vec3f::sZero;
 	float32 DistanceGain = 1.0f;
 	bool bBinaural = true;
+	bool bSimulated = false;
+	bool bPathRequested = false;
 
 	IPLfloat32 AirAbsorption[IPL_NUM_BANDS] = { 1.0f, 1.0f, 1.0f };
 	IPLfloat32 Occlusion = 1.0f;
@@ -122,10 +125,18 @@ struct SpatialVoice
 	bool bHasPath = false;
 	IPLfloat32 PathEq[IPL_NUM_BANDS] = { 0.0f, 0.0f, 0.0f };
 	IPLfloat32 PathSh[SpatialAudio::scPathingCoefficients] {};
+	float32 PathGain = 0.0f;
+
+	float32 SampleRate = 48000.0f;
+	AudioMeter Meter;
 
 	SpinLock ParamsLock;
 	SpatialVoiceParams PendingParams;
 	SpatialVoiceParams ActiveParams;
+	std::atomic<bool> bStarted = false;
+	bool bHasActiveParams = false;
+	float32 RenderedReverbSend = 0.0f;
+	float32 RenderedPathGain = 0.0f;
 
 	float32 MonoIn[SpatialAudio::scFrameSize] {};
 	float32 MonoDirect[SpatialAudio::scFrameSize] {};
@@ -207,6 +218,7 @@ struct SpatialAudio::State
 	bool bStopWorker = false;
 
 	bool bSceneChanged = false;
+	bool bPathRequestsChanged = false;
 	IPLScene PendingScene = nullptr;
 	uint32 PendingSceneTriangles = 0;
 
@@ -228,6 +240,9 @@ struct SpatialAudio::State
 	bool bWorkerPathing = false;
 	std::unordered_map<uint64, IPLSource> PathSources;
 
+	Clock::time_point LastSimulate;
+	bool bHasLastSimulate = false;
+
 	std::atomic<float32> ReflectionMs = 0.0f;
 	std::atomic<float32> ReverbTimes[IPL_NUM_BANDS] = { 0.0f, 0.0f, 0.0f };
 	std::atomic<uint32> PathedVoices = 0;
@@ -235,12 +250,28 @@ struct SpatialAudio::State
 
 namespace {
 
-void RenderVoicePath(SpatialVoice& voice)
+float32 SmoothOcclusion(float32 current, float32 target, float32 delta_time)
+{
+	float32 seconds = SpatialAudio::scOcclusionCloseSeconds;
+
+	if (target > current) {
+		seconds = SpatialAudio::scOcclusionOpenSeconds;
+	}
+
+	return target + (current - target) * std::exp(-delta_time / seconds);
+}
+
+void RenderVoicePath(SpatialVoice& voice, float32 gain_begin, float32 gain_end)
 {
 	const SpatialVoiceParams& params = voice.ActiveParams;
+	const float32 gain_step = (gain_end - gain_begin) / static_cast<float32>(SpatialAudio::scFrameSize);
+
+	if (gain_begin <= scMinPathGain) {
+		iplPathEffectReset(voice.PathEffect);
+	}
 
 	for (uint32 i = 0; i < SpatialAudio::scFrameSize; i++) {
-		voice.PathIn[i] = voice.MonoIn[i] * params.PathGain;
+		voice.PathIn[i] = voice.MonoIn[i] * (gain_begin + gain_step * static_cast<float32>(i));
 	}
 
 	float32* path_in = voice.PathIn;
@@ -275,10 +306,29 @@ void RenderVoicePath(SpatialVoice& voice)
 
 void RenderVoiceFrame(SpatialVoice& voice)
 {
-	if (voice.ParamsLock.TryLock()) {
+	// The first frame must not render with the defaults, so it waits for the lock
+	if (!voice.bHasActiveParams) {
+		voice.ParamsLock.Lock();
+		voice.ActiveParams = voice.PendingParams;
+		voice.ParamsLock.Unlock();
+
+		voice.RenderedReverbSend = voice.ActiveParams.ReverbSend;
+		voice.RenderedPathGain = voice.ActiveParams.PathGain;
+		voice.bHasActiveParams = true;
+	}
+	else if (voice.ParamsLock.TryLock()) {
 		voice.ActiveParams = voice.PendingParams;
 		voice.ParamsLock.Unlock();
 	}
+
+	const float32 send_begin = voice.RenderedReverbSend;
+	const float32 send_step = (voice.ActiveParams.ReverbSend - send_begin) /
+							  static_cast<float32>(SpatialAudio::scFrameSize);
+	const float32 path_begin = voice.RenderedPathGain;
+	const float32 path_end = voice.ActiveParams.PathGain;
+
+	voice.RenderedReverbSend = voice.ActiveParams.ReverbSend;
+	voice.RenderedPathGain = path_end;
 
 	float32* mono_in = voice.MonoIn;
 	float32* mono_direct = voice.MonoDirect;
@@ -293,7 +343,7 @@ void RenderVoiceFrame(SpatialVoice& voice)
 	if (voice.ActiveParams.bBinaural) {
 		IPLBinauralEffectParams binaural {};
 		binaural.direction = voice.ActiveParams.Direction;
-		binaural.interpolation = IPL_HRTFINTERPOLATION_NEAREST;
+		binaural.interpolation = IPL_HRTFINTERPOLATION_BILINEAR;
 		binaural.spatialBlend = 1.0f;
 		binaural.hrtf = voice.Hrtf;
 
@@ -306,8 +356,8 @@ void RenderVoiceFrame(SpatialVoice& voice)
 		iplPanningEffectApply(voice.PanningEffect, &panning, &direct_buffer, &out_buffer);
 	}
 
-	if (voice.ActiveParams.PathGain > scMinPathGain) {
-		RenderVoicePath(voice);
+	if (path_begin > scMinPathGain || path_end > scMinPathGain) {
+		RenderVoicePath(voice, path_begin, path_end);
 	}
 
 	if (voice.OutCount + SpatialAudio::scFrameSize > scOutFifoFrames) {
@@ -315,12 +365,11 @@ void RenderVoiceFrame(SpatialVoice& voice)
 	}
 
 	float32* out = voice.OutFifo + static_cast<size_t>(voice.OutCount) * scVoiceFifoStride;
-	const float32 send = voice.ActiveParams.ReverbSend;
 
 	for (uint32 i = 0; i < SpatialAudio::scFrameSize; i++) {
 		out[i * scVoiceFifoStride] = voice.StereoLeft[i];
 		out[i * scVoiceFifoStride + 1] = voice.StereoRight[i];
-		out[i * scVoiceFifoStride + 2] = voice.MonoIn[i] * send;
+		out[i * scVoiceFifoStride + 2] = voice.MonoIn[i] * (send_begin + send_step * static_cast<float32>(i));
 	}
 
 	voice.OutCount += SpatialAudio::scFrameSize;
@@ -330,6 +379,13 @@ void ProcessVoiceNode(ma_node* node, const float** frames_in, ma_uint32* frame_c
 					  ma_uint32* frame_count_out)
 {
 	SpatialVoice& voice = *static_cast<SpatialVoice*>(node);
+
+	// miniaudio feeds silence before the sound starts; rendering it would latch the unsimulated params
+	if (!voice.bStarted.load(std::memory_order_acquire)) {
+		std::memset(frames_out[0], 0, static_cast<size_t>(*frame_count_out) * scChannelsOut * sizeof(float));
+		std::memset(frames_out[1], 0, static_cast<size_t>(*frame_count_out) * sizeof(float));
+		return;
+	}
 
 	const float* input = frames_in[0];
 	const ma_uint32 input_frames = frame_count_in[0];
@@ -370,6 +426,8 @@ void ProcessVoiceNode(ma_node* node, const float** frames_in, ma_uint32* frame_c
 	}
 
 	PopFifo(voice.OutFifo, voice.OutCount, scVoiceFifoStride, available);
+
+	voice.Meter.Process(stereo_out, output_frames, scChannelsOut, voice.SampleRate);
 }
 
 ma_node_vtable scVoiceNodeVtable = {
@@ -555,6 +613,7 @@ void PublishVoiceParams(SpatialVoice& voice, const SpatialAudio::State& state)
 		std::memcpy(params.PathSh, voice.PathSh, sizeof(params.PathSh));
 	}
 
+	voice.PathGain = params.PathGain;
 	params.bBinaural = voice.bBinaural;
 
 	voice.ParamsLock.Lock();
@@ -778,17 +837,27 @@ void SimulatePathing(SpatialAudio::State& state, const IPLCoordinateSpace3& list
 
 void RunAcousticWorker(SpatialAudio::State& state)
 {
-	const auto interval = std::chrono::duration<float32>(SpatialAudio::scReverbIntervalSeconds);
+	const auto interval = std::chrono::duration_cast<Clock::duration>(
+		std::chrono::duration<float32>(SpatialAudio::scReverbIntervalSeconds));
+
+	Clock::time_point next_reverb = Clock::now();
 
 	std::unique_lock lock(state.WorkerMutex);
 
 	while (!state.bStopWorker) {
-		state.WorkerSignal.wait_for(lock, interval, [&state]
-									{ return state.bStopWorker || state.bSceneChanged || state.bProbesChanged; });
+		// New voices wake the worker right away so their pathing is ready before they start
+		state.WorkerSignal.wait_until(lock, next_reverb,
+									  [&state]
+									  {
+										  return state.bStopWorker || state.bSceneChanged || state.bProbesChanged ||
+												 state.bPathRequestsChanged;
+									  });
 
 		if (state.bStopWorker) {
 			break;
 		}
+
+		state.bPathRequestsChanged = false;
 
 		IPLScene new_scene = nullptr;
 		uint32 new_scene_triangles = 0;
@@ -829,13 +898,16 @@ void RunAcousticWorker(SpatialAudio::State& state)
 			ApplyWorkerProbes(state, new_probes, new_pathing);
 		}
 
-		IPLfloat32 reverb_times[IPL_NUM_BANDS] = { 0.0f, 0.0f, 0.0f };
+		if (scene_changed || probes_changed || start >= next_reverb) {
+			IPLfloat32 reverb_times[IPL_NUM_BANDS] = { 0.0f, 0.0f, 0.0f };
 
-		if (enabled && (state.WorkerSceneTriangles > 0 || state.WorkerProbes != nullptr)) {
-			SimulateReverb(state, listener, rays, bounces, reverb_times);
+			if (enabled && (state.WorkerSceneTriangles > 0 || state.WorkerProbes != nullptr)) {
+				SimulateReverb(state, listener, rays, bounces, reverb_times);
+			}
+
+			PublishReverbTimes(state, reverb_times);
+			next_reverb = Clock::now() + interval;
 		}
-
-		PublishReverbTimes(state, reverb_times);
 
 		std::vector<PathResult> results;
 
@@ -1108,6 +1180,7 @@ SpatialVoice* SpatialAudio::CreateVoice(ma_node_base* output)
 	voice->Id = mNextVoiceId++;
 	voice->Context = mpState->Context;
 	voice->Hrtf = mpState->Hrtf;
+	voice->SampleRate = static_cast<float32>(ma_engine_get_sample_rate(mpState->pEngine));
 
 	IPLDirectEffectSettings direct_settings { 1 };
 	IPLBinauralEffectSettings binaural_settings { mpState->Hrtf };
@@ -1276,6 +1349,50 @@ void SpatialAudio::SetVoiceSource(SpatialVoice* voice, const Vec3f position, flo
 	voice->bBinaural = binaural;
 
 	PublishVoiceParams(*voice, *mpState);
+}
+
+bool SpatialAudio::IsVoiceReady(const SpatialVoice* voice) const
+{
+	if (mpState == nullptr || voice == nullptr) {
+		return true;
+	}
+
+	if (!voice->bSimulated) {
+		return false;
+	}
+
+	return !mbBakedPathing || !HasScene() || voice->bHasPath;
+}
+
+bool SpatialAudio::GetVoiceDebug(const SpatialVoice* voice, SpatialVoiceDebug& out) const
+{
+	if (mpState == nullptr || voice == nullptr) {
+		return false;
+	}
+
+	out.Occlusion = voice->Occlusion;
+
+	for (uint32 band = 0; band < IPL_NUM_BANDS; band++) {
+		out.Transmission[band] = voice->Transmission[band];
+		out.AirAbsorption[band] = voice->AirAbsorption[band];
+	}
+
+	out.PathGain = voice->PathGain;
+	out.LevelDb = voice->Meter.GetPeakDb();
+	out.bSimulated = voice->bSimulated;
+	out.bHasPath = voice->bHasPath;
+	out.bStarted = voice->bStarted.load(std::memory_order_relaxed);
+
+	return true;
+}
+
+void SpatialAudio::SetVoiceStarted(SpatialVoice* voice)
+{
+	if (voice == nullptr) {
+		return;
+	}
+
+	voice->bStarted.store(true, std::memory_order_release);
 }
 
 void SpatialAudio::SetListener(const Vec3f position, const Vec3f forward, const Vec3f up)
@@ -1484,6 +1601,7 @@ bool SpatialAudio::SetBakedProbes(const std::vector<uint8>& data)
 
 	for (SpatialVoice* voice : mpState->Voices) {
 		voice->bHasPath = false;
+		voice->bPathRequested = false;
 	}
 
 	return probes != nullptr || data.empty();
@@ -1496,13 +1614,35 @@ void SpatialAudio::Simulate()
 		return;
 	}
 
+	const Clock::time_point now = Clock::now();
+	float32 delta_time = 0.0f;
+
+	if (mpState->bHasLastSimulate) {
+		delta_time = std::min(std::chrono::duration<float32>(now - mpState->LastSimulate).count(),
+							  scMaxSimulateStepSeconds);
+	}
+
+	mpState->LastSimulate = now;
+	mpState->bHasLastSimulate = true;
+
+	bool new_path_requests = false;
+
 	if (mbBakedPathing) {
 		std::lock_guard guard(mpState->WorkerMutex);
 
 		mpState->PathRequests.clear();
 
-		for (const SpatialVoice* voice : mpState->Voices) {
+		for (SpatialVoice* voice : mpState->Voices) {
 			mpState->PathRequests.push_back(PathRequest { voice->Id, voice->Position });
+
+			if (!voice->bPathRequested) {
+				voice->bPathRequested = true;
+				new_path_requests = true;
+			}
+		}
+
+		if (new_path_requests) {
+			mpState->bPathRequestsChanged = true;
 		}
 
 		for (SpatialVoice* voice : mpState->Voices) {
@@ -1523,6 +1663,10 @@ void SpatialAudio::Simulate()
 			std::memcpy(voice.PathEq, result.Eq, sizeof(voice.PathEq));
 			std::memcpy(voice.PathSh, result.Sh, sizeof(voice.PathSh));
 		}
+	}
+
+	if (new_path_requests) {
+		mpState->WorkerSignal.notify_all();
 	}
 
 	if (mpState->Voices.empty()) {
@@ -1569,18 +1713,32 @@ void SpatialAudio::Simulate()
 		IPLSimulationOutputs outputs {};
 		iplSourceGetOutputs(voice->Source, IPL_SIMULATIONFLAGS_DIRECT, &outputs);
 
-		voice->Occlusion = 1.0f;
+		float32 occlusion = 1.0f;
+		IPLfloat32 transmission[IPL_NUM_BANDS] = { 1.0f, 1.0f, 1.0f };
 
 		for (uint32 band = 0; band < IPL_NUM_BANDS; band++) {
 			voice->AirAbsorption[band] = outputs.direct.airAbsorption[band];
-			voice->Transmission[band] = 1.0f;
 		}
 
 		if (HasScene()) {
-			voice->Occlusion = outputs.direct.occlusion;
+			occlusion = outputs.direct.occlusion;
 
 			for (uint32 band = 0; band < IPL_NUM_BANDS; band++) {
-				voice->Transmission[band] = outputs.direct.transmission[band];
+				transmission[band] = outputs.direct.transmission[band];
+			}
+		}
+
+		// A new voice takes the result as is; afterwards one-frame ray flicker is smoothed out
+		if (!voice->bSimulated) {
+			voice->Occlusion = occlusion;
+			std::memcpy(voice->Transmission, transmission, sizeof(voice->Transmission));
+			voice->bSimulated = true;
+		}
+		else {
+			voice->Occlusion = SmoothOcclusion(voice->Occlusion, occlusion, delta_time);
+
+			for (uint32 band = 0; band < IPL_NUM_BANDS; band++) {
+				voice->Transmission[band] = SmoothOcclusion(voice->Transmission[band], transmission[band], delta_time);
 			}
 		}
 

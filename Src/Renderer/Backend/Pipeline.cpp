@@ -204,7 +204,10 @@ void Pipeline::Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shade
 		.polygonMode = properties.PolygonMode,
 		.cullMode = properties.CullMode,
 		.frontFace = properties.WindingOrder,
-		.depthBiasEnable = VK_FALSE,
+		.depthBiasEnable = (properties.DepthBiasConstant != 0.0f || properties.DepthBiasSlope != 0.0f),
+		.depthBiasConstantFactor = properties.DepthBiasConstant,
+		.depthBiasClamp = 0.0f,
+		.depthBiasSlopeFactor = properties.DepthBiasSlope,
 		.lineWidth = 1.0f,
 	};
 

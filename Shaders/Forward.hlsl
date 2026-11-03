@@ -281,7 +281,7 @@ F_FrameData(ViewConsts, ViewConst, 2);
 
 [[vk::push_constant]] DrawConsts DrawConst;
 
-#define SHADOW_BIAS -0.000005f
+#define SHADOW_BIAS 0.0f
 
 #define SHADOW_NORMAL_OFFSET_TEXELS 1.0
 

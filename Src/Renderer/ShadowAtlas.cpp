@@ -46,6 +46,11 @@ FX_SET_MODULE_NAME("ShadowAtlas")
 /// render area.
 static constexpr VkImageLayout scAtlasLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
+/// Depth bias for shadow casters. With both sides drawn, lit surfaces are in their own shadow map, so this keeps them
+/// from shadowing themselves. The slope term does the work, a D32 float constant unit is only a few ULPs.
+static constexpr float32 scDepthBiasConstant = -16.0f;
+static constexpr float32 scDepthBiasSlope = -2.0f;
+
 static VkRect2D RegionToRect(const URect& region)
 {
 	const Vec2u extent = region.GetExtent();
@@ -117,8 +122,14 @@ bool ShadowAtlas::MakeShadowDesc(ePipelineFeatures features, PipelineDesc& out_d
 	out_desc.pStage = &RenderStage;
 	out_desc.VertexType = is_skinned ? eVertexType::Skinned : eVertexType::Default;
 	out_desc.DepthCompareOp = VK_COMPARE_OP_GREATER;
-	out_desc.CullMode = eCullMode::Back;
-	out_desc.FaceOrder = eFaceOrder::Reverse;
+
+	// Both sides are drawn, so the nearest surface to the light is what casts. Drawing back faces only leaked light where
+	// a caster meets its receiver (wall bases), as the far face of the caster ends exactly on the receiver.
+	out_desc.CullMode = eCullMode::None;
+
+	// Reverse Z, so a negative bias pushes casters away from the light
+	out_desc.DepthBiasConstant = scDepthBiasConstant;
+	out_desc.DepthBiasSlope = scDepthBiasSlope;
 
 	out_desc.PushConstantStages = eShaderType::Vertex;
 	out_desc.PushConstantSize = sizeof(ShadowPushConstants);

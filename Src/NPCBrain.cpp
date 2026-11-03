@@ -1,13 +1,12 @@
 #include "NPCBrain.hpp"
 
+#include <Math/MathConsts.hpp>
 #include <Math/MathUtil.hpp>
 #include <cmath>
 
 namespace fx {
 
 namespace {
-
-constexpr float32 scTwoPi = 2.0f * static_cast<float32>(M_PI);
 
 Vec3f Flatten(const Vec3f v) { return Vec3f(v.X, 0.0f, v.Z); }
 
@@ -19,10 +18,10 @@ float32 NPCBrain::DirectionToYaw(const Vec3f direction) { return std::atan2(dire
 
 float32 NPCBrain::WrapAngle(float32 angle)
 {
-	angle = std::fmod(angle + static_cast<float32>(M_PI), scTwoPi);
+	angle = std::fmod(angle + static_cast<float32>(M_PI), FX_2PI);
 
 	if (angle < 0.0f) {
-		angle += scTwoPi;
+		angle += FX_2PI;
 	}
 
 	return angle - static_cast<float32>(M_PI);
@@ -155,7 +154,7 @@ void NPCBrain::PickFleeTarget(const Vec3f position, float32 turn)
 	Vec3f away = Flatten(position - mThreat);
 
 	if (away.Length() < 1e-3f) {
-		away = YawToDirection(RandomUnit() * scTwoPi);
+		away = YawToDirection(RandomUnit() * FX_2PI);
 	}
 
 	const float32 yaw = DirectionToYaw(away) + turn;
@@ -178,7 +177,7 @@ void NPCBrain::Update(float32 delta_time, const NPCBrainInput& input, NPCBrainOu
 	switch (mState) {
 	case eNPCBrainState::Idle:
 		if (WanderRadius > 0.0f && mTime >= WanderPause) {
-			const float32 angle = RandomUnit() * scTwoPi;
+			const float32 angle = RandomUnit() * FX_2PI;
 			const float32 radius = WanderRadius * std::sqrt(RandomUnit());
 
 			WalkTo(mHome + YawToDirection(angle) * radius);

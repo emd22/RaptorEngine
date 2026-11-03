@@ -152,6 +152,9 @@ struct alignas(16) LightCullConstants
 	uint32 ReplacementSlot = 0;
 	/// Number of decals in GraphicsBackend::DecalBuffer for this frame
 	uint32 DecalCount = 0;
+	/// Turn stored depth back into view depth, for the depth bounded tiles of the main view
+	float32 DepthA = 0.0f;
+	float32 DepthB = 0.0f;
 };
 
 /// A single light slot in GraphicsBackend::LightBuffer. Mirrors `Light` in Shaders/LightingCommon.hlsli.
@@ -228,6 +231,10 @@ struct PipelineProperties
 	bool bRenderLines : 1 = false;
 
 	VkCompareOp DepthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
+
+	/// Added to each fragment's depth, see VkPipelineRasterizationStateCreateInfo. Both zero leaves depth bias off.
+	float32 DepthBiasConstant = 0.0f;
+	float32 DepthBiasSlope = 0.0f;
 };
 
 struct PushConstants

@@ -524,6 +524,9 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 		Vec3d normal_sum = Vec3d(0.0);
 		uint32 position_count = 0;
 
+		Vec3d nearest_position = Vec3d(0.0);
+		double nearest_distance = scNoHit;
+
 		for (uint32 sample = 0; sample < sample_count; sample++) {
 			const uint32 sample_x = sample % samples;
 			const uint32 sample_y = sample / samples;
@@ -561,6 +564,17 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 			position_sum = position_sum + origin;
 			normal_sum = normal_sum + normal;
 			position_count++;
+
+			if (!is_planar) {
+				const double offset_x = (sample_x + 0.5) * sample_step - 0.5;
+				const double offset_y = (sample_y + 0.5) * sample_step - 0.5;
+				const double distance = offset_x * offset_x + offset_y * offset_y;
+
+				if (distance < nearest_distance) {
+					nearest_distance = distance;
+					nearest_position = origin;
+				}
+			}
 
 			if (layout.bFacesSun) {
 				lit += count_lit(origin, normal, sample);
@@ -602,6 +616,7 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 				position_sum = origin;
 				normal_sum = normal;
 				position_count = 1;
+				nearest_position = origin;
 
 				for (uint32 sample = 0; sample < sample_count && layout.bFacesSun; sample++) {
 					lit += count_lit(origin, normal, sample);
@@ -617,7 +632,14 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 		context.pTexels[texel] = static_cast<uint8>((lit * 255 + covered / 2) / covered);
 
 		if (context.pPositions != nullptr) {
-			context.pPositions[texel] = (position_sum * (1.0 / position_count)).ToVec3f();
+			// Averaging points across a curved chart's triangles can sink behind the surface
+			if (is_planar) {
+				context.pPositions[texel] = (position_sum * (1.0 / position_count)).ToVec3f();
+			}
+			else {
+				context.pPositions[texel] = nearest_position.ToVec3f();
+			}
+
 			context.pNormals[texel] = normal_sum.Normalized().ToVec3f();
 		}
 	}

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "MathConsts.hpp"
+
 #include <Core/Defines.hpp>
 #include <Core/Types.hpp>
 #include <bit>
@@ -13,6 +15,17 @@ constexpr float32 RadiansToDegrees(float32 radians) { return ((radians) * static
 
 constexpr float32 DegToRad(float32 degrees) { return ((degrees) * static_cast<float32>(M_PI / 180.0)); }
 constexpr float32 RadToDeg(float32 radians) { return ((radians) * static_cast<float32>(180.0 / M_PI)); }
+
+/**
+ * @brief Converts the value of a uint32 to radians
+ */
+constexpr double ToAngle(uint32 value)
+{
+	// Since the value can be anywhere from 0 to (2^32)-1, we can divide by (2^32) to bring the value into the range of
+	// 0 to 1.
+	constexpr double scDivisor = static_cast<double>(0xFFFFFFFFLLU + 1LLU);
+	return static_cast<double>(value) * (FX_2PI / scDivisor);
+}
 
 /**
  * @brief Reverses all bits in a 32-bit integer

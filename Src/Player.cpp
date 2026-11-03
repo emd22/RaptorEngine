@@ -618,8 +618,7 @@ void Player::PlayGroundSound(const char* event, float32 volume)
 	ground.Body = character.GetGroundBodyID();
 	ground.SubShape = character.GetGroundSubShapeID();
 
-	const Vec3f position = ground.Point + (ground.Normal * AudioSystem::scSurfaceSoundOffset);
-	const SoundID sound = gAudio->PlayForSurface(event, gWorld->pPrototype->GetSurfaceAt(ground), position);
+	const SoundID sound = gAudio->PlayForSurface2D(event, gWorld->pPrototype->GetSurfaceAt(ground));
 	gAudio->SetVolume(sound, volume);
 }
 

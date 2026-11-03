@@ -617,6 +617,8 @@ static void N_sound_set_volume(int64 sound, float32 volume) { gAudio->SetVolume(
 static void N_sound_stop(int64 sound) { gAudio->Stop(SoundID::Unpack(sound)); }
 static void N_sound_kill(int64 sound) { gAudio->Kill(SoundID::Unpack(sound)); }
 static bool N_sound_alive(int64 sound) { return gAudio->IsPlaying(SoundID::Unpack(sound)); }
+static void N_sound_snapshot_start(const char* name) { gAudio->StartSnapshot(name); }
+static void N_sound_snapshot_stop(const char* name) { gAudio->StopSnapshot(name); }
 
 static int64 N_timer_after(float32 seconds, const char* fn)
 {
@@ -1163,6 +1165,8 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("sound_stop", N_sound_stop),
 	PREDEF("sound_kill", N_sound_kill),
 	PREDEF("sound_alive", N_sound_alive),
+	PREDEF("sound_snapshot_start", N_sound_snapshot_start),
+	PREDEF("sound_snapshot_stop", N_sound_snapshot_stop),
 
 	PREDEF("timer_after", N_timer_after),
 	PREDEF("timer_every", N_timer_every),

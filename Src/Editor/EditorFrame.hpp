@@ -89,13 +89,6 @@ public:
 	void SelectTheme(uint32 index);
 	void ReloadTheme();
 
-	static uint32 NewStatusMessageId();
-
-	uint32 ShowStatusMessage(const wxString& text,
-							 std::chrono::milliseconds duration = std::chrono::milliseconds::zero());
-	void ShowStatusMessage(uint32 id, const wxString& text, std::chrono::milliseconds duration);
-	void ClearStatusMessage(uint32 id);
-
 private:
 	void OnClose(wxCloseEvent& event);
 	void OnActivate(wxActivateEvent& event);
@@ -105,7 +98,6 @@ private:
 	void FocusActiveView();
 	void ApplyTheme();
 	void ApplySplitLayout(const eEditorView view);
-	void UpdateStatusBar();
 
 	void RunAfterUnsavedCheck(const wxString& question, std::function<void()> game_task);
 
@@ -161,10 +153,6 @@ private:
 	eEditorMode mMode = eEditorMode::Vis;
 	eDataFilter mDataFilter = eDataFilter::All;
 	bool mbSimulating = false;
-
-	wxTimer mStatusMessageTimer;
-	wxString mStatusMessage;
-	uint32 mStatusMessageId = 0;
 
 	std::atomic<bool> mbCloseRequested = false;
 	std::atomic<bool> mbIsActive = true;

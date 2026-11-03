@@ -10,6 +10,8 @@
 #include "RenderStage.hpp"
 #include "ShaderCache.hpp"
 
+#include <bit>
+
 #include <algorithm>
 
 #define FX_DEBUG_SET_DESCRIPTOR_NAMES 1
@@ -77,6 +79,7 @@ void PSOBuild::Build(const PipelineHandle handle, const PipelineDesc& desc)
 	SetDepthTest(desc.bDepthTest);
 	SetDepthWrite(desc.bDepthWrite);
 	SetDepthCompareOp(desc.DepthCompareOp);
+	SetDepthBias(desc.DepthBiasConstant, desc.DepthBiasSlope);
 
 	for (const BlendAttachment& blend : desc.Blends) {
 		SetTargetBlend(blend.TargetIndex, blend);
@@ -488,6 +491,8 @@ PipelineKey PSOBuild::MakeKey()
 	key.WindingOrder = mProperties.WindingOrder;
 	key.PolygonMode = mProperties.PolygonMode;
 	key.DepthCompareOp = mProperties.DepthCompareOp;
+	key.DepthBiasConstantBits = std::bit_cast<uint32>(mProperties.DepthBiasConstant);
+	key.DepthBiasSlopeBits = std::bit_cast<uint32>(mProperties.DepthBiasSlope);
 
 	key.bDepthTest = !mProperties.bDisableDepthTest;
 	key.bDepthWrite = !mProperties.bDisableDepthWrite;
