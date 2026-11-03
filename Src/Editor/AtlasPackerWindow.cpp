@@ -24,12 +24,6 @@ enum eColumn : int32
 	Column_Position,
 };
 
-static constexpr int32 scDefaultTileSize = 64;
-static constexpr int32 scDefaultColumns = 16;
-static constexpr int32 scMaxTileSize = 4096;
-static constexpr int32 scMaxColumns = 1024;
-static constexpr int32 scMaxAtlasDimension = 16384;
-
 class AtlasPreviewPanel : public wxPanel
 {
 public:
@@ -45,17 +39,19 @@ public:
 		mpLayout = layout;
 		mSelectedGroup = selected_group;
 
-		if (pixels.pData == nullptr || layout->GetWidth() <= 0 || layout->GetHeight() <= 0) {
+		const Vec2i pixel_size = layout->GetPixelSize();
+
+		if (pixels.pData == nullptr || pixel_size.X <= 0 || pixel_size.Y <= 0) {
 			mBitmap = wxBitmap();
 		}
 		else {
-			wxImage image(layout->GetWidth(), layout->GetHeight(), false);
+			wxImage image(pixel_size.X, pixel_size.Y, false);
 			image.InitAlpha();
 
 			uint8* rgb = image.GetData();
 			uint8* alpha = image.GetAlpha();
 
-			const size_t count = static_cast<size_t>(layout->GetWidth()) * layout->GetHeight();
+			const size_t count = static_cast<size_t>(pixel_size.X) * pixel_size.Y;
 
 			for (size_t i = 0; i < count; i++) {
 				rgb[i * 3 + 0] = pixels[i * 4 + 0];
@@ -89,8 +85,8 @@ private:
 
 		const AtlasLayout& layout = *mpLayout;
 		const wxSize client = GetClientSize();
-		const double atlas_width = layout.GetWidth();
-		const double atlas_height = layout.GetHeight();
+		const double atlas_width = layout.GetPixelSize().X;
+		const double atlas_height = layout.GetPixelSize().Y;
 		const double scale = std::min((client.x - 8) / atlas_width, (client.y - 8) / atlas_height);
 
 		if (scale <= 0.0) {
@@ -106,7 +102,13 @@ private:
 		for (int y = 0; y < draw_height; y += checker) {
 			for (int x = 0; x < draw_width; x += checker) {
 				const bool light = (((x / checker) + (y / checker)) & 1) == 0;
-				dc.SetBrush(wxBrush(light ? wxColour(90, 90, 90) : wxColour(70, 70, 70)));
+
+				wxColour checker_colour(70, 70, 70);
+				if (light) {
+					checker_colour = wxColour(90, 90, 90);
+				}
+
+				dc.SetBrush(wxBrush(checker_colour));
 				dc.SetPen(*wxTRANSPARENT_PEN);
 				dc.DrawRectangle(origin_x + x, origin_y + y, std::min(checker, draw_width - x),
 								 std::min(checker, draw_height - y));
@@ -120,11 +122,11 @@ private:
 		const double tile = layout.TileSize * scale;
 
 		dc.SetPen(wxPen(wxColour(255, 255, 255, 60), 1));
-		for (int32 col = 0; col <= layout.Columns; col++) {
+		for (int32 col = 0; col <= layout.TileCount.X; col++) {
 			const int x = origin_x + static_cast<int>(col * tile);
 			dc.DrawLine(x, origin_y, x, origin_y + draw_height);
 		}
-		for (int32 row = 0; row <= layout.Rows; row++) {
+		for (int32 row = 0; row <= layout.TileCount.Y; row++) {
 			const int y = origin_y + static_cast<int>(row * tile);
 			dc.DrawLine(origin_x, y, origin_x + draw_width, y);
 		}
@@ -136,12 +138,19 @@ private:
 			const AtlasGroup& group = layout.Groups[i];
 			const bool selected = static_cast<int32>(i) == mSelectedGroup;
 
-			dc.SetPen(wxPen(selected ? wxColour(255, 200, 40) : wxColour(60, 200, 255), selected ? 3 : 2));
+			wxColour pen_colour(60, 200, 255);
+			int pen_width = 2;
+			if (selected) {
+				pen_colour = wxColour(255, 200, 40);
+				pen_width = 3;
+			}
 
-			const int x = origin_x + static_cast<int>(group.TileX * tile);
-			const int y = origin_y + static_cast<int>(group.TileY * tile);
-			const int w = static_cast<int>(group.TilesWide * tile);
-			const int h = static_cast<int>(group.TilesHigh * tile);
+			dc.SetPen(wxPen(pen_colour, pen_width));
+
+			const int x = origin_x + static_cast<int>(group.TilePos.X * tile);
+			const int y = origin_y + static_cast<int>(group.TilePos.Y * tile);
+			const int w = static_cast<int>(group.TileCount.X * tile);
+			const int h = static_cast<int>(group.TileCount.Y * tile);
 
 			dc.DrawRectangle(x, y, w, h);
 			dc.SetClippingRegion(x, y, w, h);
@@ -159,15 +168,21 @@ private:
 AtlasPackerWindow::AtlasPackerWindow(wxWindow* parent)
 	: wxFrame(parent, wxID_ANY, "Atlas Packer", wxDefaultPosition, wxSize(980, 620))
 {
+	constexpr int32 scDefaultTileSize = 64;
+	constexpr int32 scDefaultColumns = 16;
+	constexpr int32 scMaxTileSize = 4096;
+	constexpr int32 scMaxColumns = 1024;
+
 	wxPanel* root = new wxPanel(this, wxID_ANY);
 	wxBoxSizer* sizer = new wxBoxSizer(wxHORIZONTAL);
 
 	wxBoxSizer* left = new wxBoxSizer(wxVERTICAL);
 
 	wxBoxSizer* settings = new wxBoxSizer(wxHORIZONTAL);
-	settings->Add(new wxStaticText(root, wxID_ANY, "Tile size (px)"), wxSizerFlags().CenterVertical().Border(wxRIGHT, 6));
-	mpTileSize = new wxSpinCtrl(root, wxID_ANY, "", wxDefaultPosition, wxSize(80, -1), wxSP_ARROW_KEYS, 1, scMaxTileSize,
-								scDefaultTileSize);
+	settings->Add(new wxStaticText(root, wxID_ANY, "Tile size (px)"),
+				  wxSizerFlags().CenterVertical().Border(wxRIGHT, 6));
+	mpTileSize = new wxSpinCtrl(root, wxID_ANY, "", wxDefaultPosition, wxSize(80, -1), wxSP_ARROW_KEYS, 1,
+								scMaxTileSize, scDefaultTileSize);
 	settings->Add(mpTileSize, wxSizerFlags().CenterVertical().Border(wxRIGHT, 14));
 	settings->Add(new wxStaticText(root, wxID_ANY, "Atlas width (tiles)"),
 				  wxSizerFlags().CenterVertical().Border(wxRIGHT, 6));
@@ -280,7 +295,8 @@ void AtlasPackerWindow::AddImages()
 	Repack();
 
 	if (!failed.IsEmpty()) {
-		wxMessageBox(wxString::FromUTF8((String("Could not load:") + failed).CStr()), "Atlas Packer", wxOK | wxICON_WARNING, this);
+		wxMessageBox(wxString::FromUTF8((String("Could not load:") + failed).CStr()), "Atlas Packer",
+					 wxOK | wxICON_WARNING, this);
 	}
 }
 
@@ -292,11 +308,7 @@ void AtlasPackerWindow::RemoveSelected()
 		return;
 	}
 
-	for (uint32 i = row; i + 1 < mImages.Size; i++) {
-		mImages[i] = std::move(mImages[i + 1]);
-	}
-
-	mImages.RemoveLast();
+	mImages.RemoveAt(static_cast<uint32>(row));
 	Repack();
 }
 
@@ -317,6 +329,8 @@ void AtlasPackerWindow::MoveSelected(int32 direction)
 
 void AtlasPackerWindow::Repack()
 {
+	constexpr int32 scMaxAtlasDimension = 16384;
+
 	const int32 selected = GetSelectedRow();
 
 	mLayout = PackAtlas(mImages, mpTileSize->GetValue(), mpColumns->GetValue());
@@ -327,7 +341,8 @@ void AtlasPackerWindow::Repack()
 
 	RebuildRows();
 
-	const bool too_large = mLayout.GetWidth() > scMaxAtlasDimension || mLayout.GetHeight() > scMaxAtlasDimension;
+	const Vec2i pixel_size = mLayout.GetPixelSize();
+	const bool too_large = pixel_size.X > scMaxAtlasDimension || pixel_size.Y > scMaxAtlasDimension;
 
 	if (too_large) {
 		mpPreview->SetAtlas(&mLayout, SizedArray<uint8>(), -1);
@@ -347,12 +362,12 @@ void AtlasPackerWindow::Repack()
 	mpExportButton->Enable(has_images && !too_large);
 
 	if (too_large) {
-		mpStatus->SetLabel(wxString::Format("Atlas would be %d x %d px, over the %d px limit", mLayout.GetWidth(),
-											mLayout.GetHeight(), scMaxAtlasDimension));
+		mpStatus->SetLabel(wxString::Format("Atlas would be %d x %d px, over the %d px limit", pixel_size.X,
+											pixel_size.Y, scMaxAtlasDimension));
 	}
 	else {
-		mpStatus->SetLabel(wxString::Format("%u groups, %d x %d tiles, %d x %d px", mImages.Size, mLayout.Columns,
-											mLayout.Rows, mLayout.GetWidth(), mLayout.GetHeight()));
+		mpStatus->SetLabel(wxString::Format("%u groups, %d x %d tiles, %d x %d px", mImages.Size, mLayout.TileCount.X,
+											mLayout.TileCount.Y, pixel_size.X, pixel_size.Y));
 	}
 }
 
@@ -365,9 +380,9 @@ void AtlasPackerWindow::RebuildRows()
 		const AtlasGroup& group = mLayout.Groups[i];
 
 		const long row = mpList->InsertItem(static_cast<long>(i), wxString::FromUTF8(group.Name.CStr()));
-		mpList->SetItem(row, Column_Source, wxString::Format("%d x %d", group.SourceWidth, group.SourceHeight));
-		mpList->SetItem(row, Column_Tiles, wxString::Format("%d x %d", group.TilesWide, group.TilesHigh));
-		mpList->SetItem(row, Column_Position, wxString::Format("%d, %d", group.TileX, group.TileY));
+		mpList->SetItem(row, Column_Source, wxString::Format("%d x %d", group.SourceSize.X, group.SourceSize.Y));
+		mpList->SetItem(row, Column_Tiles, wxString::Format("%d x %d", group.TileCount.X, group.TileCount.Y));
+		mpList->SetItem(row, Column_Position, wxString::Format("%d, %d", group.TilePos.X, group.TilePos.Y));
 	}
 
 	mpList->Thaw();

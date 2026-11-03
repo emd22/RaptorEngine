@@ -18,12 +18,13 @@
 #include <Core/FilesystemIO.hpp>
 #include <Core/Log.hpp>
 #include <Core/Random.hpp>
+#include <Core/SizedArray.hpp>
 #include <Engine.hpp>
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
-#include <sstream>
+#include <string>
 
 namespace fx::editor {
 
@@ -37,16 +38,8 @@ enum eClipColumn : int32
 	ClipColumn_Length,
 };
 
-static constexpr int32 scRulerHeight = 20;
-static constexpr int32 scEdgeGrabPixels = 5;
-static constexpr int32 scMinCreatePixels = 3;
 static constexpr float64 scMinClipLength = 0.001;
 static constexpr float64 scMinViewLength = 0.01;
-static constexpr float64 scDetectWindow = 0.002;
-static constexpr float64 scDetectMinLength = 0.01;
-static constexpr float64 scDetectPreRoll = 0.005;
-static constexpr float64 scDetectTail = 0.015;
-static constexpr const char* scAudioWildcard = "Audio files (*.wav;*.mp3;*.flac)|*.wav;*.mp3;*.flac";
 
 float64 ClipAudio::GetDuration() const
 {
@@ -116,7 +109,7 @@ struct ClipPreviewPlayer
 			return false;
 		}
 
-		if (ma_audio_buffer_ref_init(ma_format_f32, audio.Channels, audio.Samples.data(), audio.FrameCount, &Buffer) !=
+		if (ma_audio_buffer_ref_init(ma_format_f32, audio.Channels, audio.Samples.pData, audio.FrameCount, &Buffer) !=
 			MA_SUCCESS) {
 			return false;
 		}
@@ -254,13 +247,15 @@ private:
 
 	eDrag HitTest(int x, int32& out_index) const
 	{
-		const std::vector<ClipRegion>& clips = mpOwner->GetClips();
+		constexpr int32 scEdgeGrabPixels = 5;
+
+		const ClipList& clips = mpOwner->GetClips();
 		const int32 selected = mpOwner->GetSelected();
 
 		out_index = -1;
 
 		for (int32 pass = 0; pass < 2; pass++) {
-			for (int32 i = 0; i < static_cast<int32>(clips.size()); i++) {
+			for (int32 i = 0; i < static_cast<int32>(clips.Size); i++) {
 				if ((pass == 0) != (i == selected)) {
 					continue;
 				}
@@ -277,7 +272,7 @@ private:
 			}
 		}
 
-		for (int32 i = static_cast<int32>(clips.size()) - 1; i >= 0; i--) {
+		for (int32 i = static_cast<int32>(clips.Size) - 1; i >= 0; i--) {
 			if (x >= TimeToX(clips[i].Start) && x <= TimeToX(clips[i].End)) {
 				out_index = i;
 				return eDrag::Move;
@@ -295,15 +290,15 @@ private:
 			return;
 		}
 
-		std::vector<ClipRegion>& clips = mpOwner->GetClips();
+		ClipList& clips = mpOwner->GetClips();
 		const float64 time = ClampTime(XToTime(event.GetX()));
 
 		int32 index = -1;
 		mDrag = HitTest(event.GetX(), index);
 
 		if (mDrag == eDrag::Create) {
-			clips.push_back(ClipRegion { .Start = time, .End = time });
-			index = static_cast<int32>(clips.size()) - 1;
+			clips.Insert(ClipRegion { .Start = time, .End = time });
+			index = static_cast<int32>(clips.Size) - 1;
 			mDragAnchor = time;
 		}
 		else if (mDrag == eDrag::Move) {
@@ -331,9 +326,9 @@ private:
 			return;
 		}
 
-		std::vector<ClipRegion>& clips = mpOwner->GetClips();
+		ClipList& clips = mpOwner->GetClips();
 
-		if (mDragIndex < 0 || mDragIndex >= static_cast<int32>(clips.size())) {
+		if (mDragIndex < 0 || mDragIndex >= static_cast<int32>(clips.Size)) {
 			return;
 		}
 
@@ -377,23 +372,25 @@ private:
 
 	void OnLeftUp(wxMouseEvent&)
 	{
+		constexpr int32 scMinCreatePixels = 3;
+
 		if (mDrag == eDrag::None || mDrag == eDrag::Pan) {
 			return;
 		}
 
-		std::vector<ClipRegion>& clips = mpOwner->GetClips();
+		ClipList& clips = mpOwner->GetClips();
 		const eDrag drag = mDrag;
 
 		EndDrag();
 
-		if (mDragIndex < 0 || mDragIndex >= static_cast<int32>(clips.size())) {
+		if (mDragIndex < 0 || mDragIndex >= static_cast<int32>(clips.Size)) {
 			return;
 		}
 
 		ClipRegion& clip = clips[mDragIndex];
 
 		if (drag == eDrag::Create && TimeToX(clip.End) - TimeToX(clip.Start) < scMinCreatePixels) {
-			clips.erase(clips.begin() + mDragIndex);
+			clips.RemoveAt(static_cast<uint32>(mDragIndex));
 			mpOwner->SetSelected(-1);
 			Refresh();
 			return;
@@ -529,6 +526,8 @@ private:
 
 	void OnPaint(wxPaintEvent&)
 	{
+		constexpr int32 scRulerHeight = 20;
+
 		wxAutoBufferedPaintDC dc(this);
 		dc.SetBackground(wxBrush(wxColour(30, 30, 32)));
 		dc.Clear();
@@ -553,10 +552,10 @@ private:
 		dc.SetBrush(wxBrush(wxColour(44, 44, 48)));
 		dc.DrawRectangle(0, 0, client.x, scRulerHeight);
 
-		const std::vector<ClipRegion>& clips = mpOwner->GetClips();
+		const ClipList& clips = mpOwner->GetClips();
 		const int32 selected = mpOwner->GetSelected();
 
-		for (int32 i = 0; i < static_cast<int32>(clips.size()); i++) {
+		for (int32 i = 0; i < static_cast<int32>(clips.Size); i++) {
 			const int x0 = TimeToX(clips[i].Start);
 			const int x1 = std::max(TimeToX(clips[i].End), x0 + 1);
 
@@ -600,7 +599,7 @@ private:
 
 			for (uint64 frame = begin; frame < end; frame++) {
 				for (uint32 channel = 0; channel < channels; channel++) {
-					const float32 value = audio.Samples[frame * channels + channel];
+					const float32 value = audio.Samples[static_cast<uint32>(frame * channels + channel)];
 					low = std::min(low, value);
 					high = std::max(high, value);
 				}
@@ -623,7 +622,7 @@ private:
 			dc.DrawText(wxString::Format("%.*fs", decimals, tick), x + 3, 2);
 		}
 
-		for (int32 i = 0; i < static_cast<int32>(clips.size()); i++) {
+		for (int32 i = 0; i < static_cast<int32>(clips.Size); i++) {
 			const int x0 = TimeToX(clips[i].Start);
 
 			if (x0 < -40 || x0 > client.x) {
@@ -768,7 +767,7 @@ ClipEditorWindow::ClipEditorWindow(wxWindow* parent)
 
 	auto on_range_edit = [this](wxSpinDoubleEvent&)
 	{
-		if (mbUpdatingControls || mSelected < 0 || mSelected >= static_cast<int32>(mClips.size())) {
+		if (mbUpdatingControls || mSelected < 0 || mSelected >= static_cast<int32>(mClips.Size)) {
 			return;
 		}
 
@@ -820,7 +819,7 @@ ClipEditorWindow::~ClipEditorWindow()
 
 void ClipEditorWindow::SetSelected(int32 index)
 {
-	if (index < 0 || index >= static_cast<int32>(mClips.size())) {
+	if (index < 0 || index >= static_cast<int32>(mClips.Size)) {
 		index = -1;
 	}
 
@@ -868,7 +867,7 @@ void ClipEditorWindow::OnClipsCommitted()
 void ClipEditorWindow::SortClips()
 {
 	ClipRegion selected_clip;
-	const bool has_selection = mSelected >= 0 && mSelected < static_cast<int32>(mClips.size());
+	const bool has_selection = mSelected >= 0 && mSelected < static_cast<int32>(mClips.Size);
 
 	if (has_selection) {
 		selected_clip = mClips[mSelected];
@@ -881,7 +880,7 @@ void ClipEditorWindow::SortClips()
 		return;
 	}
 
-	for (int32 i = 0; i < static_cast<int32>(mClips.size()); i++) {
+	for (int32 i = 0; i < static_cast<int32>(mClips.Size); i++) {
 		if (mClips[i].Start == selected_clip.Start && mClips[i].End == selected_clip.End) {
 			mSelected = i;
 			return;
@@ -896,7 +895,7 @@ void ClipEditorWindow::RebuildList()
 	mpList->Freeze();
 	mpList->DeleteAllItems();
 
-	for (int32 i = 0; i < static_cast<int32>(mClips.size()); i++) {
+	for (int32 i = 0; i < static_cast<int32>(mClips.Size); i++) {
 		mpList->InsertItem(i, wxString::Format("%d", i + 1));
 		UpdateListRow(i);
 	}
@@ -908,7 +907,7 @@ void ClipEditorWindow::RebuildList()
 
 void ClipEditorWindow::UpdateListRow(int32 index)
 {
-	if (index < 0 || index >= static_cast<int32>(mClips.size()) || index >= mpList->GetItemCount()) {
+	if (index < 0 || index >= static_cast<int32>(mClips.Size) || index >= mpList->GetItemCount()) {
 		return;
 	}
 
@@ -922,7 +921,7 @@ void ClipEditorWindow::UpdateListRow(int32 index)
 void ClipEditorWindow::UpdateSelectionControls()
 {
 	const bool loaded = mAudio.IsLoaded();
-	const bool has_selection = mSelected >= 0 && mSelected < static_cast<int32>(mClips.size());
+	const bool has_selection = mSelected >= 0 && mSelected < static_cast<int32>(mClips.Size);
 	const float64 duration = std::max(mAudio.GetDuration(), scMinClipLength);
 
 	mbUpdatingControls = true;
@@ -941,22 +940,22 @@ void ClipEditorWindow::UpdateSelectionControls()
 	mpEnd->Enable(has_selection);
 	mpDeleteButton->Enable(has_selection);
 	mpPlayButton->Enable(loaded);
-	mpRandomButton->Enable(!mClips.empty());
+	mpRandomButton->Enable(mClips.IsNotEmpty());
 	mpDetectButton->Enable(loaded);
-	mpSaveButton->Enable(loaded && !mClips.empty());
-	mpSaveAsButton->Enable(loaded && !mClips.empty());
+	mpSaveButton->Enable(loaded && mClips.IsNotEmpty());
+	mpSaveAsButton->Enable(loaded && mClips.IsNotEmpty());
 }
 
 void ClipEditorWindow::UpdateTitle()
 {
 	wxString title = "Clip Editor";
 
-	if (!mAudioPath.empty()) {
-		title += " - " + wxString::FromUTF8(fs::path(mAudioPath).filename().string());
+	if (!mAudioPath.IsEmpty()) {
+		title += " - " + wxString::FromUTF8(fs::path(mAudioPath.CStr()).filename().string());
 	}
 
-	if (!mConfPath.empty()) {
-		title += " (" + wxString::FromUTF8(fs::path(mConfPath).filename().string()) + ")";
+	if (!mConfPath.IsEmpty()) {
+		title += " (" + wxString::FromUTF8(fs::path(mConfPath.CStr()).filename().string()) + ")";
 	}
 
 	if (mbDirty) {
@@ -981,15 +980,16 @@ bool ClipEditorWindow::ConfirmDiscard()
 	return wxMessageBox("Discard the unsaved clips?", "Clip Editor", wxYES_NO | wxICON_QUESTION, this) == wxYES;
 }
 
-bool ClipEditorWindow::LoadAudio(const std::string& path)
+bool ClipEditorWindow::LoadAudio(const String& path)
 {
 	StopPlayback();
 
 	ma_decoder_config config = ma_decoder_config_init(ma_format_f32, 0, 0);
 	ma_decoder decoder;
 
-	if (ma_decoder_init_file(path.c_str(), &config, &decoder) != MA_SUCCESS) {
-		wxMessageBox(wxString::FromUTF8("Could not decode '" + path + "'."), "Clip Editor", wxOK | wxICON_ERROR, this);
+	if (ma_decoder_init_file(path.CStr(), &config, &decoder) != MA_SUCCESS) {
+		wxMessageBox(wxString::FromUTF8(String::Fmt("Could not decode '{}'.", path).CStr()), "Clip Editor",
+					 wxOK | wxICON_ERROR, this);
 		return false;
 	}
 
@@ -998,13 +998,17 @@ bool ClipEditorWindow::LoadAudio(const std::string& path)
 	audio.SampleRate = decoder.outputSampleRate;
 
 	constexpr ma_uint64 scChunkFrames = 16384;
-	std::vector<float32> chunk(scChunkFrames * audio.Channels);
+	SizedArray<float32> chunk;
+	chunk.InitSize(scChunkFrames * audio.Channels);
 
 	while (true) {
 		ma_uint64 frames_read = 0;
-		const ma_result result = ma_decoder_read_pcm_frames(&decoder, chunk.data(), scChunkFrames, &frames_read);
+		const ma_result result = ma_decoder_read_pcm_frames(&decoder, chunk.begin(), scChunkFrames, &frames_read);
 
-		audio.Samples.insert(audio.Samples.end(), chunk.begin(), chunk.begin() + frames_read * audio.Channels);
+		for (uint64 i = 0; i < frames_read * audio.Channels; i++) {
+			audio.Samples.Insert(chunk[i]);
+		}
+
 		audio.FrameCount += frames_read;
 
 		if (result != MA_SUCCESS || frames_read < scChunkFrames) {
@@ -1015,18 +1019,20 @@ bool ClipEditorWindow::LoadAudio(const std::string& path)
 	ma_decoder_uninit(&decoder);
 
 	if (!audio.IsLoaded()) {
-		wxMessageBox(wxString::FromUTF8("'" + path + "' has no audio."), "Clip Editor", wxOK | wxICON_ERROR, this);
+		wxMessageBox(wxString::FromUTF8(String::Fmt("'{}' has no audio.", path).CStr()), "Clip Editor",
+					 wxOK | wxICON_ERROR, this);
 		return false;
 	}
 
 	mAudio = std::move(audio);
 	mAudioPath = path;
-	mClips.clear();
+	mClips.Clear();
 	mSelected = -1;
 	mLastRandom = -1;
 
-	mpFileLabel->SetLabel(wxString::FromUTF8(path) + wxString::Format("  (%.3f s, %u Hz, %u ch)", mAudio.GetDuration(),
-																	  mAudio.SampleRate, mAudio.Channels));
+	mpFileLabel->SetLabel(wxString::FromUTF8(path.CStr()) + wxString::Format("  (%.3f s, %u Hz, %u ch)",
+																			 mAudio.GetDuration(), mAudio.SampleRate,
+																			 mAudio.Channels));
 	mpWaveform->FitView();
 	RebuildList();
 	UpdateSelectionControls();
@@ -1040,6 +1046,8 @@ void ClipEditorWindow::OpenSound()
 		return;
 	}
 
+	constexpr const char* scAudioWildcard = "Audio files (*.wav;*.mp3;*.flac)|*.wav;*.mp3;*.flac";
+
 	wxFileDialog dialog(this, "Open sound", wxString::FromUTF8(GetSoundDirectory().string()), "", scAudioWildcard,
 						wxFD_OPEN | wxFD_FILE_MUST_EXIST);
 
@@ -1047,8 +1055,8 @@ void ClipEditorWindow::OpenSound()
 		return;
 	}
 
-	if (LoadAudio(std::string(dialog.GetPath().utf8_string()))) {
-		mConfPath.clear();
+	if (LoadAudio(String(dialog.GetPath().utf8_string().data()))) {
+		mConfPath = String();
 		mbConfHasMultipleFiles = false;
 		SetDirty(false);
 		mpStatus->SetLabel("Drag on the waveform to add clips, or use Auto Detect");
@@ -1068,41 +1076,42 @@ void ClipEditorWindow::OpenConf()
 		return;
 	}
 
-	LoadConf(std::string(dialog.GetPath().utf8_string()));
+	LoadConf(String(dialog.GetPath().utf8_string().data()));
 }
 
-bool ClipEditorWindow::LoadConf(const std::string& path)
+bool ClipEditorWindow::LoadConf(const String& path)
 {
 	ConfigFile config;
-	config.Load(path);
+	config.Load(path.Str());
 
 	if (config.HasErrors()) {
-		wxMessageBox(wxString::FromUTF8("Could not parse '" + path + "'."), "Clip Editor", wxOK | wxICON_ERROR, this);
+		wxMessageBox(wxString::FromUTF8(String::Fmt("Could not parse '{}'.", path).CStr()), "Clip Editor",
+					 wxOK | wxICON_ERROR, this);
 		return false;
 	}
 
-	std::vector<std::string> files;
+	DynArray<String, GrowthFunctions::Double> files;
 
 	const ConfigEntry* files_entry = config.GetEntry(HashStr32("files"));
 
 	if (files_entry != nullptr && files_entry->bIsArray && files_entry->ArrayData.IsInited()) {
 		for (uint32 i = 0; i < files_entry->ArrayData.Size(); i++) {
-			files.push_back(files_entry->ArrayData[i].Get<const char*>());
+			files.Insert(String(files_entry->ArrayData[i].Get<const char*>()));
 		}
 	}
 
 	const ConfigEntry* file_entry = config.GetEntry(HashStr32("file"));
 
 	if (file_entry != nullptr && !file_entry->bIsArray) {
-		files.push_back(file_entry->GetValue<const char*>());
+		files.Insert(String(file_entry->GetValue<const char*>()));
 	}
 
-	if (files.empty()) {
+	if (files.IsEmpty()) {
 		wxMessageBox("This sound definition has no 'file' or 'files'.", "Clip Editor", wxOK | wxICON_ERROR, this);
 		return false;
 	}
 
-	const std::string audio_path = (GetSoundDirectory() / files[0]).string();
+	const String audio_path = (GetSoundDirectory() / files[0].CStr()).string();
 
 	if (!LoadAudio(audio_path)) {
 		return false;
@@ -1120,13 +1129,13 @@ bool ClipEditorWindow::LoadConf(const std::string& path)
 			const float64 end = clip.ArrayData[1].Get<float32>();
 
 			if (start >= 0.0 && end > start) {
-				mClips.push_back(ClipRegion { .Start = start, .End = end });
+				mClips.Insert(ClipRegion { .Start = start, .End = end });
 			}
 		}
 	}
 
 	mConfPath = path;
-	mbConfHasMultipleFiles = files.size() > 1;
+	mbConfHasMultipleFiles = files.Size > 1;
 
 	SortClips();
 	RebuildList();
@@ -1135,11 +1144,11 @@ bool ClipEditorWindow::LoadConf(const std::string& path)
 
 	if (mbConfHasMultipleFiles) {
 		mpStatus->SetLabel(wxString::Format(
-			"This def lists %zu files; showing the first. Clips apply to every file and saving keeps the list.",
-			files.size()));
+			"This def lists %u files; showing the first. Clips apply to every file and saving keeps the list.",
+			files.Size));
 	}
 	else {
-		mpStatus->SetLabel(wxString::Format("Loaded %zu clips", mClips.size()));
+		mpStatus->SetLabel(wxString::Format("Loaded %u clips", mClips.Size));
 	}
 
 	return true;
@@ -1147,19 +1156,25 @@ bool ClipEditorWindow::LoadConf(const std::string& path)
 
 void ClipEditorWindow::AutoDetect()
 {
+	constexpr float64 scDetectWindow = 0.002;
+	constexpr float64 scDetectMinLength = 0.01;
+	constexpr float64 scDetectPreRoll = 0.005;
+	constexpr float64 scDetectTail = 0.015;
+
 	if (!mAudio.IsLoaded()) {
 		return;
 	}
 
-	if (!mClips.empty() && wxMessageBox("Replace the current clips with detected ones?", "Clip Editor",
-										wxYES_NO | wxICON_QUESTION, this) != wxYES) {
+	if (mClips.IsNotEmpty() && wxMessageBox("Replace the current clips with detected ones?", "Clip Editor",
+											wxYES_NO | wxICON_QUESTION, this) != wxYES) {
 		return;
 	}
 
 	const uint64 window = std::max<uint64>(static_cast<uint64>(scDetectWindow * mAudio.SampleRate), 1);
 	const uint64 window_count = (mAudio.FrameCount + window - 1) / window;
 
-	std::vector<float32> envelope(window_count, 0.0f);
+	SizedArray<float32> envelope;
+	envelope.InitSize(window_count, 0.0f);
 	float32 peak = 0.0f;
 
 	for (uint64 w = 0; w < window_count; w++) {
@@ -1167,7 +1182,8 @@ void ClipEditorWindow::AutoDetect()
 
 		for (uint64 frame = w * window; frame < end; frame++) {
 			for (uint32 channel = 0; channel < mAudio.Channels; channel++) {
-				envelope[w] = std::max(envelope[w], std::fabs(mAudio.Samples[frame * mAudio.Channels + channel]));
+				envelope[w] = std::max(
+					envelope[w], std::fabs(mAudio.Samples[static_cast<uint32>(frame * mAudio.Channels + channel)]));
 			}
 		}
 
@@ -1183,7 +1199,7 @@ void ClipEditorWindow::AutoDetect()
 	const float64 window_seconds = static_cast<float64>(window) / mAudio.SampleRate;
 	const float64 min_gap = mpMinGap->GetValue() / 1000.0;
 
-	std::vector<ClipRegion> detected;
+	ClipList detected;
 	bool active = false;
 	float64 start = 0.0;
 
@@ -1198,20 +1214,24 @@ void ClipEditorWindow::AutoDetect()
 			const float64 end = w * window_seconds;
 			active = false;
 
-			if (!detected.empty() && start - detected.back().End < min_gap) {
-				detected.back().End = end;
+			if (!detected.IsEmpty() && start - detected[detected.Size - 1].End < min_gap) {
+				detected[detected.Size - 1].End = end;
 			}
 			else {
-				detected.push_back(ClipRegion { .Start = start, .End = end });
+				detected.Insert(ClipRegion { .Start = start, .End = end });
 			}
 		}
 	}
 
-	std::erase_if(detected, [](const ClipRegion& clip) { return clip.End - clip.Start < scDetectMinLength; });
+	for (uint32 i = detected.Size; i-- > 0;) {
+		if (detected[i].End - detected[i].Start < scDetectMinLength) {
+			detected.RemoveAt(i);
+		}
+	}
 
 	const float64 duration = mAudio.GetDuration();
 
-	for (size_t i = 0; i < detected.size(); i++) {
+	for (uint32 i = 0; i < detected.Size; i++) {
 		float64 earliest = 0.0;
 		float64 latest = duration;
 
@@ -1219,7 +1239,7 @@ void ClipEditorWindow::AutoDetect()
 			earliest = detected[i - 1].End;
 		}
 
-		if (i + 1 < detected.size()) {
+		if (i + 1 < detected.Size) {
 			latest = detected[i + 1].Start - scDetectPreRoll;
 		}
 
@@ -1237,7 +1257,7 @@ void ClipEditorWindow::AutoDetect()
 	SetSelected(-1);
 	SetDirty(true);
 
-	mpStatus->SetLabel(wxString::Format("Detected %zu clips", mClips.size()));
+	mpStatus->SetLabel(wxString::Format("Detected %u clips", mClips.Size));
 }
 
 void ClipEditorWindow::PlayRange(float64 start, float64 end)
@@ -1260,7 +1280,7 @@ void ClipEditorWindow::PlaySelected()
 		return;
 	}
 
-	if (mSelected >= 0 && mSelected < static_cast<int32>(mClips.size())) {
+	if (mSelected >= 0 && mSelected < static_cast<int32>(mClips.Size)) {
 		PlayRange(mClips[mSelected].Start, mClips[mSelected].End);
 	}
 	else {
@@ -1270,7 +1290,7 @@ void ClipEditorWindow::PlaySelected()
 
 void ClipEditorWindow::PlayRandom()
 {
-	const uint32 count = static_cast<uint32>(mClips.size());
+	const uint32 count = mClips.Size;
 
 	if (count == 0) {
 		return;
@@ -1300,34 +1320,34 @@ void ClipEditorWindow::StopPlayback()
 
 void ClipEditorWindow::DeleteSelected()
 {
-	if (mSelected < 0 || mSelected >= static_cast<int32>(mClips.size())) {
+	if (mSelected < 0 || mSelected >= static_cast<int32>(mClips.Size)) {
 		return;
 	}
 
-	mClips.erase(mClips.begin() + mSelected);
+	mClips.RemoveAt(static_cast<uint32>(mSelected));
 
-	const int32 next = std::min(mSelected, static_cast<int32>(mClips.size()) - 1);
+	const int32 next = std::min(mSelected, static_cast<int32>(mClips.Size) - 1);
 
 	RebuildList();
 	SetSelected(next);
 	SetDirty(true);
 }
 
-bool ClipEditorWindow::ResolveSoundFileKey(std::string& out_key)
+bool ClipEditorWindow::ResolveSoundFileKey(String& out_key)
 {
 	const fs::path sound_directory = GetSoundDirectory();
 
 	std::error_code error;
-	fs::path audio = fs::weakly_canonical(fs::absolute(mAudioPath), error);
+	fs::path audio = fs::weakly_canonical(fs::absolute(mAudioPath.CStr()), error);
 
 	if (error) {
-		audio = fs::path(mAudioPath);
+		audio = fs::path(mAudioPath.CStr());
 	}
 
 	const fs::path relative = audio.lexically_relative(sound_directory);
 
 	if (!relative.empty() && *relative.begin() != "..") {
-		out_key = relative.generic_string();
+		out_key = String(relative.generic_string());
 		return true;
 	}
 
@@ -1354,8 +1374,8 @@ bool ClipEditorWindow::ResolveSoundFileKey(std::string& out_key)
 		return false;
 	}
 
-	mAudioPath = target.string();
-	out_key = target.filename().generic_string();
+	mAudioPath = String(target.string());
+	out_key = String(target.filename().generic_string());
 
 	return true;
 }
@@ -1396,64 +1416,73 @@ static void CountBrackets(const std::string& line, int32& depth)
 	}
 }
 
+static bool IsBlankLine(const String& line)
+{
+	const char* text = line.CStr();
+
+	for (uint32 i = 0; i < line.GetLength(); i++) {
+		if (text[i] != ' ' && text[i] != '\t' && text[i] != '\r') {
+			return false;
+		}
+	}
+
+	return true;
+}
+
 void ClipEditorWindow::Save(bool choose_path)
 {
-	if (!mAudio.IsLoaded() || mClips.empty()) {
+	if (!mAudio.IsLoaded() || mClips.IsEmpty()) {
 		return;
 	}
 
-	std::string file_key;
+	String file_key;
 
 	if (!mbConfHasMultipleFiles && !ResolveSoundFileKey(file_key)) {
 		return;
 	}
 
-	std::string conf_path = mConfPath;
+	String conf_path = mConfPath;
 	const fs::path sound_directory = GetSoundDirectory();
 
-	if (choose_path || conf_path.empty()) {
+	if (choose_path || conf_path.IsEmpty()) {
 		wxFileDialog dialog(this, "Save sound definition", wxString::FromUTF8(sound_directory.string()),
-							wxString::FromUTF8(fs::path(mAudioPath).stem().string() + ".conf"),
+							wxString::FromUTF8(fs::path(mAudioPath.CStr()).stem().string() + ".conf"),
 							"Sound definitions (*.conf)|*.conf", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
 
 		if (dialog.ShowModal() != wxID_OK) {
 			return;
 		}
 
-		conf_path = std::string(dialog.GetPath().utf8_string());
+		conf_path = String(dialog.GetPath().utf8_string().data());
 
-		if (fs::path(conf_path).extension() != ".conf") {
+		if (fs::path(conf_path.CStr()).extension() != ".conf") {
 			conf_path += ".conf";
 		}
 	}
 
-	std::ostringstream clips_text;
-	clips_text << "clips = [\n";
-
-	char buffer[64];
+	String clips_text = "clips = [\n";
 
 	for (const ClipRegion& clip : mClips) {
-		std::snprintf(buffer, sizeof(buffer), "\t[%.3f, %.3f],\n", clip.Start, clip.End);
-		clips_text << buffer;
+		clips_text += String::Fmt("\t[{:.3f}, {:.3f}],\n", clip.Start, clip.End);
 	}
 
-	clips_text << "]";
+	clips_text += "]";
 
-	std::string file_line;
+	String file_line;
 
 	if (!mbConfHasMultipleFiles) {
-		file_line = "file = \"" + file_key + "\"";
+		file_line = String::Fmt("file = \"{}\"", file_key);
 	}
 
-	std::vector<std::string> lines;
+	DynArray<String, GrowthFunctions::Double> lines;
 	bool placed_file = mbConfHasMultipleFiles;
 	bool placed_clips = false;
 
 	{
-		std::ifstream existing(conf_path);
+		std::ifstream existing(conf_path.CStr());
 
 		if (!existing.is_open()) {
-			lines.push_back("bus = \"sfx\"");
+			lines.Insert(String("bus = \"sfx\""));
 		}
 
 		std::string line;
@@ -1470,51 +1499,53 @@ void ClipEditorWindow::Save(bool choose_path)
 			const bool is_clips = name == "clips";
 
 			if (!is_file && !is_clips) {
-				lines.push_back(line);
+				lines.Insert(String(line));
 				continue;
 			}
 
 			CountBrackets(line, skip_depth);
 
 			if (is_file && !placed_file) {
-				lines.push_back(file_line);
+				lines.Insert(file_line);
 				placed_file = true;
 			}
 			else if (is_clips && !placed_clips) {
-				lines.push_back(clips_text.str());
+				lines.Insert(clips_text);
 				placed_clips = true;
 			}
 		}
 	}
 
-	while (!lines.empty() && lines.back().find_first_not_of(" \t\r") == std::string::npos) {
-		lines.pop_back();
+	while (lines.IsNotEmpty() && IsBlankLine(lines[lines.Size - 1])) {
+		lines.RemoveLast();
 	}
 
 	if (!placed_file) {
-		lines.insert(lines.begin(), file_line);
+		lines.Insert(file_line);
+		std::rotate(lines.begin(), lines.end() - 1, lines.end());
 	}
 
 	if (!placed_clips) {
-		lines.push_back(clips_text.str());
+		lines.Insert(clips_text);
 	}
 
-	std::ostringstream text;
+	String text;
 
-	for (const std::string& line : lines) {
-		text << line << "\n";
+	for (const String& line : lines) {
+		text += line;
+		text += "\n";
 	}
 
 	{
-		std::ofstream out(conf_path, std::ios::trunc);
+		std::ofstream out(conf_path.CStr(), std::ios::trunc);
 
 		if (!out.is_open()) {
-			wxMessageBox(wxString::FromUTF8("Could not write '" + conf_path + "'."), "Clip Editor", wxOK | wxICON_ERROR,
-						 this);
+			wxMessageBox(wxString::FromUTF8(String::Fmt("Could not write '{}'.", conf_path).CStr()), "Clip Editor",
+						 wxOK | wxICON_ERROR, this);
 			return;
 		}
 
-		out << text.str();
+		out.write(text.CStr(), text.GetLength());
 	}
 
 	mConfPath = conf_path;
@@ -1528,18 +1559,20 @@ void ClipEditorWindow::Save(bool choose_path)
 			}
 		});
 
-	LogInfo(LC_AUDIO, "Clip editor saved {} clips to '{}'", mClips.size(), conf_path);
+	LogInfo(LC_AUDIO, "Clip editor saved {} clips to '{}'", mClips.Size, conf_path);
 
 	std::error_code error;
-	const fs::path saved_directory = fs::weakly_canonical(fs::absolute(conf_path).parent_path(), error);
+	const fs::path saved_directory = fs::weakly_canonical(fs::absolute(conf_path.CStr()).parent_path(), error);
 
 	if (!error && saved_directory != sound_directory) {
-		mpStatus->SetLabel(wxString::FromUTF8("Saved, but only defs directly in " + sound_directory.string() +
-											  " are loaded by the game"));
+		mpStatus->SetLabel(wxString::FromUTF8(
+			String::Fmt("Saved, but only defs directly in {} are loaded by the game", sound_directory.string())
+				.CStr()));
 	}
 	else {
-		mpStatus->SetLabel(wxString::FromUTF8("Saved " + fs::path(conf_path).filename().string() + " (" +
-											  std::to_string(mClips.size()) + " clips) and reloaded sounds"));
+		mpStatus->SetLabel(wxString::FromUTF8(String::Fmt("Saved {} ({} clips) and reloaded sounds",
+														  fs::path(conf_path.CStr()).filename().string(), mClips.Size)
+												  .CStr()));
 	}
 }
 

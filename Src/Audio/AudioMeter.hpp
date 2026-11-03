@@ -11,7 +11,6 @@ namespace fx {
 /// Both readings fall off over `scReleaseSeconds`, so a reader polling once per frame does not miss short peaks.
 struct AudioMeter
 {
-	static constexpr float32 scReleaseSeconds = 0.3f;
 	static constexpr float32 scSilenceDb = -120.0f;
 
 	std::atomic<float32> Peak = 0.0f;
@@ -22,6 +21,8 @@ struct AudioMeter
 
 	void Process(const float* frames, uint32 frame_count, uint32 channels, float32 sample_rate)
 	{
+		constexpr float32 scReleaseSeconds = 0.3f;
+
 		if (frame_count == 0 || channels == 0) {
 			return;
 		}

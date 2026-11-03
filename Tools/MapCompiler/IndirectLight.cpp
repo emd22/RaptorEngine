@@ -21,48 +21,20 @@ namespace fx::mapc {
 
 namespace {
 
-constexpr const char* scMaterialRoot = "RaptorData/Data/materials";
-
-constexpr float32 scSkyRadiance = 1500.0f / FX_PI;
 constexpr float32 scMaxAlbedo = 0.9f;
-constexpr float32 scDefaultAlbedo = 0.5f;
-constexpr float32 scMaxIrradiance = 65000.0f;
-constexpr float32 scUniformDirectionality = 2.0f / 3.0f;
-constexpr float32 scHitEpsilon = 1e-5f;
-constexpr float32 scShadowEpsilon = 1e-3f;
-constexpr float32 scParallelEpsilon = 1e-12f;
-constexpr float32 scMinDirection = 1e-9f;
 constexpr float32 scNoHit = std::numeric_limits<float32>::infinity();
 
-constexpr uint32 scLeafSize = 4;
-constexpr uint32 scMaxStackDepth = 128;
 constexpr uint32 scBinCount = 16;
-constexpr int32 scEmptyChild = std::numeric_limits<int32>::min();
-constexpr uint32 scTexelsPerClaim = 64;
-constexpr uint32 scAlbedoMipSize = 128;
 
 constexpr int32 scFilterRadius = 2;
 constexpr int32 scFilterWidth = scFilterRadius * 2 + 1;
-constexpr uint32 scFilterTapCount = scFilterWidth * scFilterWidth;
 constexpr float32 scFilterKernel[scFilterWidth] = { 1.0f / 16.0f, 1.0f / 4.0f, 3.0f / 8.0f, 1.0f / 4.0f, 1.0f / 16.0f };
 constexpr float32 scVarianceKernel[3] = { 0.25f, 0.5f, 0.25f };
-constexpr float32 scFilterNormalPower = 8.0f;
-constexpr float32 scFilterPlaneTolerance = 0.25f;
-constexpr float32 scFilterLuminanceSigma = 2.0f;
-constexpr float32 scFilterLuminanceEpsilon = 1e-3f;
-constexpr float32 scFilterRidge = 0.02f;
-constexpr float32 scFilterMinDeterminant = 1e-4f;
-constexpr float32 scFilterMinSigma = 1e-6f;
-constexpr uint32 scNoRect = std::numeric_limits<uint32>::max();
 constexpr uint32 scNoShading = std::numeric_limits<uint32>::max();
 constexpr uint32 scSkyHit = std::numeric_limits<uint32>::max();
 constexpr uint32 scDarkHit = scSkyHit - 1;
-constexpr uint64 scBytesPerMegabyte = 1024 * 1024;
 
-constexpr uint32 scFormatRGBA8Unorm = 37;
-constexpr uint32 scFormatRGBA8Srgb = 43;
-
-float32 GetLuminance(const Vec3f& color) { return color.X * 0.2126f + color.Y * 0.7152f + color.Z * 0.0722f; }
+float32 GetLuminance(const Vec3f& color) { return color.Dot(Vec3f(0.2126f, 0.7152f, 0.0722f)); }
 
 uint8 EncodeDirection(float32 value)
 {
@@ -98,6 +70,10 @@ struct AlbedoTexture
 
 bool ReadAlbedoTexture(const String& path, AlbedoTexture& out_texture)
 {
+	constexpr uint32 scAlbedoMipSize = 128;
+	constexpr uint32 scFormatRGBA8Unorm = 37;
+	constexpr uint32 scFormatRGBA8Srgb = 43;
+
 	ktxTexture* texture = nullptr;
 
 	if (ktxTexture_CreateFromNamedFile(FilesystemIO::ResolvePath(path).CStr(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT,
@@ -193,7 +169,9 @@ bool ReadAlbedoTexture(const String& path, AlbedoTexture& out_texture)
 
 SizedArray<AlbedoTexture> LoadAlbedos(const SizedArray<CompiledMapMaterial>& materials, uint32& out_missing)
 {
-	const std::vector<MaterialDefinition> definitions = LoadMaterialDefinitions(scMaterialRoot);
+	constexpr float32 scDefaultAlbedo = 0.5f;
+
+	const MaterialDefinitionArray definitions = LoadMaterialDefinitions(scMaterialRoot);
 
 	SizedArray<AlbedoTexture> albedos;
 	albedos.InitSize(materials.Size);
@@ -253,8 +231,8 @@ Vec3f CapAlbedo(const Vec3f& albedo) { return Vec3f::Min(albedo, Vec3f(scMaxAlbe
 
 struct TriangleShading
 {
-	float32 U[3] = {};
-	float32 V[3] = {};
+	Vec3f U = Vec3f(0.0f);
+	Vec3f V = Vec3f(0.0f);
 	Vec2f Texcoord[3];
 	Vec3f Tint[3];
 	uint32 Material = 0;
@@ -280,6 +258,8 @@ struct alignas(16) SceneNode
 
 	SceneNode()
 	{
+		constexpr int32 scEmptyChild = std::numeric_limits<int32>::min();
+
 		for (uint32 lane = 0; lane < 4; lane++) {
 			for (uint32 axis = 0; axis < 3; axis++) {
 				Bounds[axis * 2][lane] = scNoHit;
@@ -311,6 +291,8 @@ struct SceneRay
 
 	SceneRay(const Vec3f& origin, const Vec3f& direction)
 	{
+		constexpr float32 scMinDirection = 1e-9f;
+
 		for (uint32 axis = 0; axis < 3; axis++) {
 			float32 component = direction.mData[axis];
 
@@ -486,6 +468,9 @@ private:
 
 	static bool HitsPacket(const ScenePacket& packet, const SceneRay& ray, SceneHit& hit)
 	{
+		constexpr float32 scHitEpsilon = 1e-5f;
+		constexpr float32 scParallelEpsilon = 1e-12f;
+
 		FLOAT4 edge_ab[3];
 		FLOAT4 edge_ac[3];
 		FLOAT4 offset[3];
@@ -553,6 +538,8 @@ private:
 	template <bool TAnyHit>
 	bool Traverse(const SceneRay& ray, SceneHit& hit) const
 	{
+		constexpr uint32 scMaxStackDepth = 128;
+
 		if (mTriangles.Size == 0) {
 			return false;
 		}
@@ -705,6 +692,8 @@ private:
 
 	static int32 BuildBinary(Array<BuildReference>& references, Array<BuildNode>& nodes, uint32 first, uint32 count)
 	{
+		constexpr uint32 scLeafSize = 4;
+
 		const int32 node_index = static_cast<int32>(nodes.Size);
 		nodes.Emplace();
 
@@ -981,6 +970,8 @@ void RunParallel(uint32 count, uint32 claim_size, const TFunction& function)
 template <typename TFunction>
 void RunParallel(uint32 count, const TFunction& function)
 {
+	constexpr uint32 scTexelsPerClaim = 64;
+
 	RunParallel(count, scTexelsPerClaim, function);
 }
 
@@ -1147,10 +1138,11 @@ class Denoiser
 public:
 	Denoiser(const IndirectInput& input, const Array<uint32>& texels) : mInput(input)
 	{
+		constexpr uint32 scNoRect = std::numeric_limits<uint32>::max();
+
 		const uint64 texel_count = static_cast<uint64>(input.Width) * input.Height;
 
-		mTexelRects.InitSize(texel_count);
-		std::fill(mTexelRects.begin(), mTexelRects.end(), scNoRect);
+		mTexelRects.InitSize(texel_count, scNoRect);
 
 		for (uint32 rect_index = 0; rect_index < input.LightmapRects.Size; rect_index++) {
 			const URect& rect = input.LightmapRects[rect_index];
@@ -1247,6 +1239,15 @@ private:
 
 	void FilterTexel(uint32 index, int32 step, const Vec3f* values, const Vec3f* directions, const float32* variance)
 	{
+		constexpr uint32 scFilterTapCount = scFilterWidth * scFilterWidth;
+		constexpr float32 scFilterNormalPower = 8.0f;
+		constexpr float32 scFilterPlaneTolerance = 0.25f;
+		constexpr float32 scFilterLuminanceSigma = 2.0f;
+		constexpr float32 scFilterLuminanceEpsilon = 1e-3f;
+		constexpr float32 scFilterRidge = 0.02f;
+		constexpr float32 scFilterMinDeterminant = 1e-4f;
+		constexpr float32 scFilterMinSigma = 1e-6f;
+
 		const uint32 texel = mTexels[index];
 
 		const Vec3f position = mInput.pPositions[texel];
@@ -1318,12 +1319,10 @@ private:
 		const float32 cofactor_2 = b * e - c * d;
 		const float32 determinant = a * cofactor_0 + b * cofactor_1 + c * cofactor_2;
 
-		float32 fit[3] = { 1.0f / std::fmax(a, 1e-6f), 0.0f, 0.0f };
+		Vec3f fit(1.0f / std::fmax(a, 1e-6f), 0.0f, 0.0f);
 
 		if (determinant > scFilterMinDeterminant * a * d * f) {
-			fit[0] = cofactor_0 / determinant;
-			fit[1] = cofactor_1 / determinant;
-			fit[2] = cofactor_2 / determinant;
+			fit = Vec3f(cofactor_0, cofactor_1, cofactor_2) / determinant;
 		}
 
 		Vec3f value_sum(0.0f);
@@ -1337,7 +1336,7 @@ private:
 
 			const float32 x = static_cast<float32>(static_cast<int32>(tap % scFilterWidth) - scFilterRadius);
 			const float32 y = static_cast<float32>(static_cast<int32>(tap / scFilterWidth) - scFilterRadius);
-			const float32 weight = weights[tap] * (fit[0] + fit[1] * x + fit[2] * y);
+			const float32 weight = weights[tap] * fit.Dot(Vec3f(1.0f, x, y));
 			const uint64 near = taps[tap];
 
 			value_sum += values[near] * weight;
@@ -1412,6 +1411,8 @@ public:
 
 	Vec3f GetDirect(uint64 texel) const
 	{
+		constexpr float32 scShadowEpsilon = 1e-3f;
+
 		const Vec3f position = mInput.pPositions[texel];
 		const Vec3f normal = mInput.pNormals[texel];
 
@@ -1488,8 +1489,9 @@ public:
 		const TriangleShading& shading = mShadings[triangle.Shading];
 		const float32 w = 1.0f - hit.U - hit.V;
 
-		const float32 x = shading.U[0] * w + shading.U[1] * hit.U + shading.U[2] * hit.V;
-		const float32 y = shading.V[0] * w + shading.V[1] * hit.U + shading.V[2] * hit.V;
+		const Vec3f barycentric(w, hit.U, hit.V);
+		const float32 x = shading.U.Dot(barycentric);
+		const float32 y = shading.V.Dot(barycentric);
 
 		const uint32 texel_x = static_cast<uint32>(
 			std::clamp(static_cast<int64>(std::floor(x)), static_cast<int64>(0), static_cast<int64>(mInput.Width) - 1));
@@ -1507,6 +1509,8 @@ public:
 
 	static Vec3f GetRadiance(const GatherHit& hit, const Vec3f* direct, const Vec3f* indirect)
 	{
+		constexpr float32 scSkyRadiance = 1500.0f / FX_PI;
+
 		if (hit.Texel == scSkyHit) {
 			return Vec3f(scSkyRadiance);
 		}
@@ -1521,6 +1525,8 @@ public:
 	void Gather(uint64 texel, const DirectionSet& directions, const Vec3f* direct, const Vec3f* indirect,
 				CachedHit* cache, bool replay, Vec3f& out_irradiance, Vec3f& out_direction, float32& out_variance) const
 	{
+		constexpr float32 scUniformDirectionality = 2.0f / 3.0f;
+
 		const Vec3f origin = mInput.pPositions[texel];
 		const Vec3f normal = mInput.pNormals[texel];
 
@@ -1581,7 +1587,7 @@ public:
 		constexpr uint32 cTexelCount = ProbeEncoding::scMomentTexelCount;
 		constexpr float32 cMaxDistance = Limits::ProbeDepthMaxDistance;
 
-		float32 sh[Limits::ProbeSHCoeffCount][3] = {};
+		Vec3f sh[Limits::ProbeSHCoeffCount] = {};
 
 		double weights[cTexelCount] = {};
 		double sums[cTexelCount] = {};
@@ -1592,9 +1598,7 @@ public:
 			const Vec3f radiance = GetRadiance(hit, direct, indirect);
 
 			for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
-				for (uint32 c = 0; c < 3; c++) {
-					sh[k][c] += radiance.mData[c] * ray.WeightedBasis[k];
-				}
+				sh[k] += radiance * ray.WeightedBasis[k];
 			}
 
 			const double distance = std::fmin(hit.Distance, cMaxDistance);
@@ -1605,9 +1609,11 @@ public:
 		}
 
 		for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
-			for (uint32 c = 0; c < 3; c++) {
-				out_irradiance[k * 3 + c] = sh[k][c] * ProbeEncoding::scCosineLobe[k];
-			}
+			const Vec3f coefficient = sh[k] * ProbeEncoding::scCosineLobe[k];
+
+			out_irradiance[k * 3 + 0] = coefficient.X;
+			out_irradiance[k * 3 + 1] = coefficient.Y;
+			out_irradiance[k * 3 + 2] = coefficient.Z;
 		}
 
 		for (uint32 texel = 0; texel < cTexelCount; texel++) {
@@ -1638,6 +1644,9 @@ private:
 bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, const IndirectInput& input,
 					   const LightmapOptions& options, CompiledMap& out_map, LightmapStats& out_stats)
 {
+	constexpr float32 scMaxIrradiance = 65000.0f;
+	constexpr uint64 scBytesPerMegabyte = 1024 * 1024;
+
 	if (!options.bIndirect || options.IndirectBounces == 0 || options.IndirectRays == 0) {
 		return false;
 	}
@@ -1669,8 +1678,9 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 				for (uint32 corner = 0; corner < 3; corner++) {
 					const uint32 vertex = corners[corner];
 
-					shading.U[corner] = surface.LightmapTexcoords[vertex * 2] * static_cast<float32>(input.Width);
-					shading.V[corner] = surface.LightmapTexcoords[vertex * 2 + 1] * static_cast<float32>(input.Height);
+					shading.U.mData[corner] = surface.LightmapTexcoords[vertex * 2] * static_cast<float32>(input.Width);
+					shading.V.mData[corner] = surface.LightmapTexcoords[vertex * 2 + 1] *
+											  static_cast<float32>(input.Height);
 
 					shading.Texcoord[corner] = surface.Vertices[vertex].Texcoord;
 					shading.Tint[corner] = Vec3f(1.0f);
@@ -1714,17 +1724,11 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 	SizedArray<Vec3f> directions;
 	SizedArray<float32> variance;
 
-	direct.InitSize(texel_count);
-	indirect.InitSize(texel_count);
-	gathered.InitSize(texel_count);
-	directions.InitSize(texel_count);
-	variance.InitSize(texel_count);
-
-	std::fill(direct.begin(), direct.end(), Vec3f(0.0f));
-	std::fill(indirect.begin(), indirect.end(), Vec3f(0.0f));
-	std::fill(gathered.begin(), gathered.end(), Vec3f(0.0f));
-	std::fill(directions.begin(), directions.end(), Vec3f(0.0f));
-	std::fill(variance.begin(), variance.end(), 0.0f);
+	direct.InitSize(texel_count, Vec3f(0.0f));
+	indirect.InitSize(texel_count, Vec3f(0.0f));
+	gathered.InitSize(texel_count, Vec3f(0.0f));
+	directions.InitSize(texel_count, Vec3f(0.0f));
+	variance.InitSize(texel_count, 0.0f);
 
 	const IndirectBake bake(source, input, scene, shadings, albedos);
 

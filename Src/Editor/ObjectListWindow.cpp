@@ -99,7 +99,7 @@ void ObjectListWindow::RefreshList()
 
 			SizedArray<Object*> objects = gObjectManager->CollectObjects();
 
-			DynArray<Row> rows;
+			RowArray rows;
 
 			for (uint32 i = 0; i < objects.Size; i++) {
 				Object* object = objects[i];
@@ -122,7 +122,7 @@ void ObjectListWindow::RefreshList()
 		});
 }
 
-void ObjectListWindow::ShowRows(const DynArray<Row>& rows)
+void ObjectListWindow::ShowRows(const RowArray& rows)
 {
 	mpList->Freeze();
 	mpList->DeleteAllItems();

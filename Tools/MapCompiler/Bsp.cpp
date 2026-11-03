@@ -6,10 +6,6 @@ namespace fx::mapc {
 
 namespace {
 
-constexpr double scBoundsMargin = 8.0;
-constexpr int32 scSplitPenalty = 8;
-constexpr int32 scAxialBonus = 4;
-
 struct BuildTask
 {
 	int32 NodeIndex = 0;
@@ -74,6 +70,9 @@ void SplitFragments(const PlaneSet& planes, Array<Polyhedron>& fragments, int32 
 
 int32 Bsp::ChooseSplitPlane(const Array<Polyhedron>& fragments, const Array<Polyhedron>& portal_fragments) const
 {
+	constexpr int32 scSplitPenalty = 8;
+	constexpr int32 scAxialBonus = 4;
+
 	const PlaneSet& planes = *mpPlanes;
 
 	const auto for_each_fragment = [&](const auto& func)
@@ -123,14 +122,15 @@ int32 Bsp::ChooseSplitPlane(const Array<Polyhedron>& fragments, const Array<Poly
 		int64 back_count = 0;
 		int64 split_count = 0;
 
+		const Vec3d abs_normal(std::abs(plane.Normal.X), std::abs(plane.Normal.Y), std::abs(plane.Normal.Z));
+
 		for_each_fragment(
 			[&](const Polyhedron& fragment)
 			{
 				const Vec3d center = (fragment.Min + fragment.Max) * 0.5;
 				const Vec3d half = (fragment.Max - fragment.Min) * 0.5;
 
-				const double radius = std::abs(plane.Normal.X) * half.X + std::abs(plane.Normal.Y) * half.Y +
-									  std::abs(plane.Normal.Z) * half.Z;
+				const double radius = abs_normal.Dot(half);
 				const double distance = plane.DistanceTo(center);
 
 				if (distance - radius >= -scOnEpsilon) {
@@ -162,6 +162,8 @@ int32 Bsp::ChooseSplitPlane(const Array<Polyhedron>& fragments, const Array<Poly
 void Bsp::Build(PlaneSet& planes, Array<Polyhedron> brushes, Array<Polyhedron> portal_brushes, const Vec3d& min,
 				const Vec3d& max)
 {
+	constexpr double scBoundsMargin = 8.0;
+
 	mpPlanes = &planes;
 
 	Nodes.Clear();
@@ -246,7 +248,10 @@ void Bsp::Build(PlaneSet& planes, Array<Polyhedron> brushes, Array<Polyhedron> p
 		if (is_leaf) {
 			Node& node = Nodes[static_cast<size_t>(task.NodeIndex)];
 			node.bSolid = is_solid;
-			node.PortalBrush = is_solid ? -1 : task.PortalBrush;
+			node.PortalBrush = task.PortalBrush;
+			if (is_solid) {
+				node.PortalBrush = -1;
+			}
 			node.Cell = std::move(task.Cell);
 
 			if (is_solid) {
@@ -289,7 +294,12 @@ int32 Bsp::FindLeaf(const Vec3d& point) const
 
 	while (!Nodes[static_cast<size_t>(index)].IsLeaf()) {
 		const Node& node = Nodes[static_cast<size_t>(index)];
-		index = ((*mpPlanes)[node.PlaneIndex].DistanceTo(point) >= 0.0) ? node.Front : node.Back;
+		if ((*mpPlanes)[node.PlaneIndex].DistanceTo(point) >= 0.0) {
+			index = node.Front;
+		}
+		else {
+			index = node.Back;
+		}
 	}
 
 	return index;
@@ -331,7 +341,11 @@ void Bsp::FilterWinding(const Winding& winding, int32 plane_index, Array<LeafFra
 		const eSide side = SplitWinding(item.Points, plane, front, back);
 
 		if (side == eSide::On) {
-			const int32 child = (plane.Normal.Dot(normal) > 0.0) ? node.Front : node.Back;
+			int32 child = node.Back;
+			if (plane.Normal.Dot(normal) > 0.0) {
+				child = node.Front;
+			}
+
 			stack.Emplace(LeafFragment { child, std::move(item.Points) });
 			continue;
 		}

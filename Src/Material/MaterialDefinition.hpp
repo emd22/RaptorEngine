@@ -1,12 +1,10 @@
 #pragma once
 
+#include <Core/DynArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
 #include <Math/Vec3.hpp>
-
 #include <optional>
-#include <string>
-#include <vector>
 
 namespace fx {
 
@@ -35,6 +33,11 @@ struct MaterialDefinition
 	bool IsTransparent() const { return bGlass || Alpha < 0.999f; }
 };
 
-std::vector<MaterialDefinition> LoadMaterialDefinitions(const std::string& root);
+using MaterialDefinitionArray = DynArray<MaterialDefinition, GrowthFunctions::Double>;
+
+/// Where the per-folder .mat files live, relative to the base directory
+inline constexpr const char* scMaterialRoot = "RaptorData/Data/materials";
+
+MaterialDefinitionArray LoadMaterialDefinitions(const String& root);
 
 } // namespace fx

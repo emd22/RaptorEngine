@@ -16,9 +16,6 @@ namespace fx::ProbeEncoding {
 
 constexpr float32 scSHNorm0 = 0.282095f;
 constexpr float32 scSHNorm1 = 0.488603f;
-constexpr float32 scSHNorm2 = 1.092548f;
-constexpr float32 scSHNorm20 = 0.315392f;
-constexpr float32 scSHNorm22 = 0.546274f;
 
 /// A_l / pi per band, so evaluating the SH gives irradiance / pi
 constexpr float32 scCosineLobe[Limits::ProbeSHCoeffCount] = {
@@ -30,6 +27,10 @@ constexpr uint32 scMomentTexelCount = Limits::ProbeDepthFaces * Limits::ProbeDep
 /// Order must match EvalProbeIrradiance() in Shaders/ProbeCommon.hlsli
 inline void EvalSHBasis(const Vec3f d, float32 out[Limits::ProbeSHCoeffCount])
 {
+	constexpr float32 scSHNorm2 = 1.092548f;
+	constexpr float32 scSHNorm20 = 0.315392f;
+	constexpr float32 scSHNorm22 = 0.546274f;
+
 	out[0] = scSHNorm0;
 	out[1] = scSHNorm1 * d.Y;
 	out[2] = scSHNorm1 * d.Z;
@@ -50,18 +51,39 @@ inline uint32 DirectionToMomentTexel(const Vec3f d)
 	float32 v;
 
 	if (a.X >= a.Y && a.X >= a.Z) {
-		face = (d.X > 0.0f) ? 0 : 1;
-		u = ((d.X > 0.0f) ? -d.Z : d.Z) / a.X;
+		if (d.X > 0.0f) {
+			face = 0;
+			u = -d.Z / a.X;
+		}
+		else {
+			face = 1;
+			u = d.Z / a.X;
+		}
+
 		v = -d.Y / a.X;
 	}
 	else if (a.Y >= a.Z) {
-		face = (d.Y > 0.0f) ? 2 : 3;
+		if (d.Y > 0.0f) {
+			face = 2;
+			v = d.Z / a.Y;
+		}
+		else {
+			face = 3;
+			v = -d.Z / a.Y;
+		}
+
 		u = d.X / a.Y;
-		v = ((d.Y > 0.0f) ? d.Z : -d.Z) / a.Y;
 	}
 	else {
-		face = (d.Z > 0.0f) ? 4 : 5;
-		u = ((d.Z > 0.0f) ? d.X : -d.X) / a.Z;
+		if (d.Z > 0.0f) {
+			face = 4;
+			u = d.X / a.Z;
+		}
+		else {
+			face = 5;
+			u = -d.X / a.Z;
+		}
+
 		v = -d.Y / a.Z;
 	}
 

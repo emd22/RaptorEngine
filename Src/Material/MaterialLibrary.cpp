@@ -30,12 +30,12 @@ static bool AttachTexture(Material* material, Material::eResourceType type, cons
 	return true;
 }
 
-bool MaterialLibrary::Load(const std::string& root)
+bool MaterialLibrary::Load(const String& root)
 {
 	mEntries.Clear();
 	mEntries.Create(64);
 
-	std::vector<MaterialDefinition> definitions = LoadMaterialDefinitions(root);
+	MaterialDefinitionArray definitions = LoadMaterialDefinitions(root);
 
 	for (MaterialDefinition& definition : definitions) {
 		const Name entry_name(definition.Name.CStr());

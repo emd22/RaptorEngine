@@ -17,7 +17,7 @@ namespace editor {
 // Subviews
 /////////////////////////////////////
 
-static void DestroySubviewBrushes(EditorSelection& selection, std::vector<SubviewBrushRef>& brushes)
+static void DestroySubviewBrushes(EditorSelection& selection, SubviewBrushArray& brushes)
 {
 	for (const SubviewBrushRef& brush : brushes) {
 		Object* live = gObjectManager->GetObject(brush.ID);
@@ -31,10 +31,10 @@ static void DestroySubviewBrushes(EditorSelection& selection, std::vector<Subvie
 		gWorld->pPrototype->DestroyObject(live);
 	}
 
-	brushes.clear();
+	brushes.Clear();
 }
 
-static void RemoveSubviewInstances(EditorSelection& selection, std::vector<uint32>& instances)
+static void RemoveSubviewInstances(EditorSelection& selection, SubviewInstanceArray& instances)
 {
 	Blockout* blockout = gWorld->pPrototype;
 
@@ -44,26 +44,37 @@ static void RemoveSubviewInstances(EditorSelection& selection, std::vector<uint3
 		blockout->RemoveSubviewInstance(instance);
 	}
 
-	instances.clear();
+	instances.Clear();
 }
 
-static void DissolveSubview(EditorSelection& selection, uint32 instance, std::vector<SubviewBrushRef>& out_brushes,
-							std::vector<uint32>& out_instances)
+static void RemoveSubviewPlacement(EditorSelection& selection, uint32 instance, BrushPlacement& out_placement)
+{
+	Blockout* blockout = gWorld->pPrototype;
+
+	blockout->GetSubviewPlacement(instance, out_placement);
+
+	selection.Remove(blockout->GetSubviewObject(instance));
+
+	blockout->RemoveSubviewInstance(instance);
+}
+
+static void DissolveSubview(EditorSelection& selection, uint32 instance, SubviewBrushArray& out_brushes,
+							SubviewInstanceArray& out_instances)
 {
 	Blockout* blockout = gWorld->pPrototype;
 
 	selection.Remove(blockout->GetSubviewObject(instance));
 
-	std::vector<ObjectID> created;
+	DynArray<ObjectID, GrowthFunctions::Double> created;
 	blockout->DissolveSubviewInstance(instance, created, out_instances);
 
-	out_brushes.clear();
+	out_brushes.Clear();
 
 	for (const ObjectID id : created) {
 		Object* brush = gObjectManager->GetObject(id);
 
 		if (brush != nullptr) {
-			out_brushes.push_back(SubviewBrushRef { brush, id });
+			out_brushes.Insert(SubviewBrushRef { brush, id });
 		}
 	}
 }
@@ -80,13 +91,7 @@ void SubviewPlaceOperation::Execute(EditorSelection& selection)
 
 void SubviewPlaceOperation::Undo(EditorSelection& selection)
 {
-	Blockout* blockout = gWorld->pPrototype;
-
-	blockout->GetSubviewPlacement(mInstance, mPlacement);
-
-	selection.Remove(blockout->GetSubviewObject(mInstance));
-
-	blockout->RemoveSubviewInstance(mInstance);
+	RemoveSubviewPlacement(selection, mInstance, mPlacement);
 }
 
 SubviewRemoveOperation::SubviewRemoveOperation(uint32 instance, int32 group_size)
@@ -96,13 +101,7 @@ SubviewRemoveOperation::SubviewRemoveOperation(uint32 instance, int32 group_size
 
 void SubviewRemoveOperation::Execute(EditorSelection& selection)
 {
-	Blockout* blockout = gWorld->pPrototype;
-
-	blockout->GetSubviewPlacement(mInstance, mPlacement);
-
-	selection.Remove(blockout->GetSubviewObject(mInstance));
-
-	blockout->RemoveSubviewInstance(mInstance);
+	RemoveSubviewPlacement(selection, mInstance, mPlacement);
 }
 
 void SubviewRemoveOperation::Undo(EditorSelection& selection)
@@ -116,10 +115,10 @@ SubviewCreateOperation::SubviewCreateOperation(uint32 instance, Object* const* o
 {
 	for (uint32 i = 0; i < count; i++) {
 		if (gWorld->pPrototype->IsSubviewObject(objects[i])) {
-			mInstances.push_back(objects[i]->SubviewInstance);
+			mInstances.Insert(objects[i]->SubviewInstance);
 		}
 		else {
-			mBrushes.push_back(SubviewBrushRef { objects[i], objects[i]->ID });
+			mBrushes.Insert(SubviewBrushRef { objects[i], objects[i]->ID });
 		}
 	}
 }

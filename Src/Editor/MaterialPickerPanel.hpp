@@ -58,7 +58,7 @@ private:
 
 	MaterialLibraryState mShownLibrary;
 
-	DynArray<MaterialLibraryID> mShownSlots;
+	DynArray<MaterialLibraryID, GrowthFunctions::Double> mShownSlots;
 
 	/// Thumbnails are loaded one per idle event, in library order
 	HashMap<MaterialLibraryID, wxBitmap> mBitmaps;

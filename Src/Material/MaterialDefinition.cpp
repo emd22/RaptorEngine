@@ -11,11 +11,14 @@
 
 namespace fx {
 
-static String ReadTexturePath(const ConfigEntry* entry, const char* key, const std::string& directory,
-							  const std::filesystem::path& resolved_directory, const std::string& stem,
-							  const char* suffix)
+static String ReadTexturePath(const ConfigEntry* entry, const char* key, const String& directory,
+							  const std::filesystem::path& resolved_directory, const String& stem, const char* suffix)
 {
-	const ConfigEntry* member = (entry != nullptr) ? entry->GetMember(HashStr32(key)) : nullptr;
+	const ConfigEntry* member = nullptr;
+
+	if (entry != nullptr) {
+		member = entry->GetMember(HashStr32(key));
+	}
 
 	if (member != nullptr) {
 		if (member->Type != ConfigEntry::ePrimitiveType::String) {
@@ -28,17 +31,17 @@ static String ReadTexturePath(const ConfigEntry* entry, const char* key, const s
 			return String();
 		}
 
-		return String(directory + "/" + relative_path);
+		return directory + "/" + relative_path;
 	}
 
-	const std::string conventional_name = stem + "_" + suffix + ".ktx2";
+	const String conventional_name = stem + "_" + suffix + ".ktx2";
 	std::error_code error;
 
-	if (!std::filesystem::exists(resolved_directory / conventional_name, error)) {
+	if (!std::filesystem::exists(resolved_directory / conventional_name.CStr(), error)) {
 		return String();
 	}
 
-	return String(directory + "/" + conventional_name);
+	return directory + "/" + conventional_name;
 }
 
 static String GetDefinitionName(const String& stem)
@@ -52,20 +55,20 @@ static String GetDefinitionName(const String& stem)
 	return stem;
 }
 
-static MaterialDefinition ReadDefinition(const std::filesystem::path& file_path, const std::string& directory,
-										 const std::string& source_path)
+static MaterialDefinition ReadDefinition(const std::filesystem::path& file_path, const String& directory,
+										 const String& source_path)
 {
-	const std::string stem = file_path.stem().string();
+	const String stem(file_path.stem().string());
 	const std::filesystem::path resolved_directory = file_path.parent_path();
 
 	ConfigFile file {};
-	file.Load(source_path);
+	file.Load(source_path.CStr());
 
 	const ConfigEntry* entry = file.GetEntry(HashStr32("material"));
 
 	MaterialDefinition definition {};
-	definition.Name = String(GetDefinitionName(stem));
-	definition.SourcePath = String(source_path);
+	definition.Name = GetDefinitionName(stem);
+	definition.SourcePath = source_path;
 
 	definition.DiffusePath = ReadTexturePath(entry, "diffuse", directory, resolved_directory, stem, "diffuse");
 	definition.NormalPath = ReadTexturePath(entry, "normal", directory, resolved_directory, stem, "normal");
@@ -110,11 +113,11 @@ static MaterialDefinition ReadDefinition(const std::filesystem::path& file_path,
 	return definition;
 }
 
-std::vector<MaterialDefinition> LoadMaterialDefinitions(const std::string& root)
+MaterialDefinitionArray LoadMaterialDefinitions(const String& root)
 {
-	std::vector<MaterialDefinition> definitions;
+	MaterialDefinitionArray definitions;
 
-	const std::filesystem::path resolved_root = FilesystemIO::ResolvePath(String(root)).Str();
+	const std::filesystem::path resolved_root = FilesystemIO::ResolvePath(root).Str();
 	std::error_code error;
 
 	if (!std::filesystem::is_directory(resolved_root, error)) {
@@ -122,12 +125,12 @@ std::vector<MaterialDefinition> LoadMaterialDefinitions(const std::string& root)
 		return definitions;
 	}
 
-	std::vector<std::filesystem::path> files;
+	DynArray<std::filesystem::path, GrowthFunctions::Double> files;
 
 	for (std::filesystem::recursive_directory_iterator it(resolved_root, error), end; !error && it != end;
 		 it.increment(error)) {
 		if (it->is_regular_file(error) && it->path().extension() == MaterialDefinition::scExtension) {
-			files.push_back(it->path());
+			files.Insert(it->path());
 		}
 	}
 
@@ -135,17 +138,16 @@ std::vector<MaterialDefinition> LoadMaterialDefinitions(const std::string& root)
 			  { return a.stem().string() < b.stem().string(); });
 
 	for (const std::filesystem::path& file_path : files) {
-		const std::string relative_directory =
-			file_path.parent_path().lexically_relative(resolved_root).generic_string();
+		const String relative_directory(file_path.parent_path().lexically_relative(resolved_root).generic_string());
 
-		std::string directory = root;
+		String directory = root;
 
-		if (!relative_directory.empty() && relative_directory != ".") {
-			directory += "/" + relative_directory;
+		if (!relative_directory.IsEmpty() && relative_directory != ".") {
+			directory += String("/") + relative_directory;
 		}
 
-		const std::string source_path = directory + "/" + file_path.filename().string();
-		const String name = GetDefinitionName(file_path.stem().string());
+		const String source_path = directory + "/" + file_path.filename().string().c_str();
+		const String name = GetDefinitionName(String(file_path.stem().string()));
 
 		const bool is_duplicate = std::any_of(definitions.begin(), definitions.end(),
 											  [&name](const MaterialDefinition& other)
@@ -156,7 +158,7 @@ std::vector<MaterialDefinition> LoadMaterialDefinitions(const std::string& root)
 			continue;
 		}
 
-		definitions.push_back(ReadDefinition(file_path, directory, source_path));
+		definitions.Insert(ReadDefinition(file_path, directory, source_path));
 	}
 
 	return definitions;

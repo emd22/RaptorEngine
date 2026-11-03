@@ -6,29 +6,29 @@ namespace fx::mapc {
 
 namespace {
 
-constexpr double scNormalEpsilon = 1e-6;
-constexpr double scDistanceEpsilon = 1e-4;
-constexpr double scSnapEpsilon = 1e-7;
-constexpr double scDistanceSnapGrid = 1024.0;
-constexpr double scDistanceSnapEpsilon = 2e-6;
-constexpr double scBucketsPerUnit = 64.0;
-constexpr uint32 scBaseWindingCapacity = 8;
-
 void SnapPlane(Vec3d& normal, double& distance)
 {
+	constexpr double scSnapEpsilon = 1e-7;
+	constexpr double scDistanceSnapGrid = 1024.0;
+	constexpr double scDistanceSnapEpsilon = 2e-6;
+
 	for (int32 axis = 0; axis < 3; axis++) {
 		if (std::abs(normal.mData[axis]) < scSnapEpsilon) {
 			normal.mData[axis] = 0.0;
 		}
 		else if (std::abs(std::abs(normal.mData[axis]) - 1.0) < scSnapEpsilon) {
-			const double direction = (normal.mData[axis] < 0.0) ? -1.0 : 1.0;
+			double direction = 1.0;
+			if (normal.mData[axis] < 0.0) {
+				direction = -1.0;
+			}
+
 			normal = Vec3d(0.0);
 			normal.mData[axis] = direction;
 			break;
 		}
 	}
 
-	normal = normal * (1.0 / normal.Length());
+	normal = normal.Normalized();
 
 	const double snapped = std::round(distance * scDistanceSnapGrid) / scDistanceSnapGrid;
 
@@ -39,6 +39,9 @@ void SnapPlane(Vec3d& normal, double& distance)
 
 bool IsSamePlane(const Plane& plane, const Vec3d& normal, double distance)
 {
+	constexpr double scNormalEpsilon = 1e-6;
+	constexpr double scDistanceEpsilon = 1e-4;
+
 	return std::abs(plane.Distance - distance) < scDistanceEpsilon &&
 		   std::abs(plane.Normal.X - normal.X) < scNormalEpsilon &&
 		   std::abs(plane.Normal.Y - normal.Y) < scNormalEpsilon &&
@@ -61,13 +64,19 @@ void SnapPointToAxialPlane(Vec3d& point, const Plane& plane)
 
 int32 PlaneSet::FindOrAdd(Vec3d normal, double distance)
 {
+	constexpr double scBucketsPerUnit = 64.0;
+
 	SnapPlane(normal, distance);
 
 	double sign = 1.0;
 
 	for (int32 axis = 0; axis < 3; axis++) {
 		if (normal.mData[axis] != 0.0) {
-			sign = (normal.mData[axis] < 0.0) ? -1.0 : 1.0;
+			sign = 1.0;
+			if (normal.mData[axis] < 0.0) {
+				sign = -1.0;
+			}
+
 			break;
 		}
 	}
@@ -75,7 +84,11 @@ int32 PlaneSet::FindOrAdd(Vec3d normal, double distance)
 	const Vec3d positive_normal = normal * sign;
 	const double positive_distance = distance * sign;
 
-	const int32 flipped = (sign < 0.0) ? 1 : 0;
+	int32 flipped = 0;
+	if (sign < 0.0) {
+		flipped = 1;
+	}
+
 	const int64 bucket = static_cast<int64>(std::floor(positive_distance * scBucketsPerUnit));
 
 	for (int64 offset = -1; offset <= 1; offset++) {
@@ -99,6 +112,8 @@ int32 PlaneSet::FindOrAdd(Vec3d normal, double distance)
 
 Winding MakeBaseWinding(const Plane& plane, double extent)
 {
+	constexpr uint32 scBaseWindingCapacity = 8;
+
 	int32 major_axis = 0;
 
 	for (int32 axis = 1; axis < 3; axis++) {
@@ -107,7 +122,10 @@ Winding MakeBaseWinding(const Plane& plane, double extent)
 		}
 	}
 
-	Vec3d up = (major_axis == 1) ? Vec3d(1.0, 0.0, 0.0) : Vec3d(0.0, 1.0, 0.0);
+	Vec3d up = Vec3d(0.0, 1.0, 0.0);
+	if (major_axis == 1) {
+		up = Vec3d(1.0, 0.0, 0.0);
+	}
 
 	up = up - plane.Normal * up.Dot(plane.Normal);
 	up = up * (extent / up.Length());
@@ -195,13 +213,15 @@ eSide SplitWinding(const Winding& winding, const Plane& plane, Winding& out_fron
 
 		const Vec3d& next_point = winding[next];
 
-		const bool forward = (sides[i] > 0);
-		const Vec3d& from = forward ? point : next_point;
-		const Vec3d& to = forward ? next_point : point;
-		const double from_distance = forward ? distances[i] : distances[next];
-		const double to_distance = forward ? distances[next] : distances[i];
+		Vec3d middle = point;
 
-		Vec3d middle = from + (to - from) * (from_distance / (from_distance - to_distance));
+		if (sides[i] > 0) {
+			middle = point + (next_point - point) * (distances[i] / (distances[i] - distances[next]));
+		}
+		else {
+			middle = next_point + (point - next_point) * (distances[next] / (distances[next] - distances[i]));
+		}
+
 		SnapPointToAxialPlane(middle, plane);
 
 		out_front.Emplace(middle);
@@ -231,6 +251,8 @@ eSide SplitWinding(const Winding& winding, const Plane& plane, Winding& out_fron
 
 void RemoveDuplicatePoints(Winding& winding)
 {
+	constexpr double scPointEpsilon = 1e-5;
+
 	Winding result;
 
 	for (const Vec3d& point : winding) {
@@ -250,6 +272,9 @@ void RemoveDuplicatePoints(Winding& winding)
 
 bool IsWindingTiny(const Winding& winding)
 {
+	constexpr double scMinEdgeLength = 1e-4;
+	constexpr double scMinArea = 1e-8;
+
 	if (winding.Size < 3) {
 		return true;
 	}
@@ -283,7 +308,11 @@ Vec3d GetWindingNormal(const Winding& winding)
 	const Vec3d area = GetAreaVector(winding);
 	const double length = area.Length();
 
-	return (length > 0.0) ? area * (1.0 / length) : Vec3d(0.0);
+	if (length > 0.0) {
+		return area * (1.0 / length);
+	}
+
+	return Vec3d(0.0);
 }
 
 Vec3d GetWindingCenter(const Winding& winding)
@@ -294,7 +323,11 @@ Vec3d GetWindingCenter(const Winding& winding)
 		sum = sum + point;
 	}
 
-	return winding.Size == 0 ? sum : sum * (1.0 / static_cast<double>(winding.Size));
+	if (winding.Size == 0) {
+		return sum;
+	}
+
+	return sum * (1.0 / static_cast<double>(winding.Size));
 }
 
 Winding ReverseWinding(const Winding& winding)
@@ -451,7 +484,10 @@ eSide SplitPolyhedron(const PlaneSet& planes, const Polyhedron& polyhedron, int3
 		return eSide::Front;
 	}
 
-	const eSide larger_side = (max_front >= max_back) ? eSide::Front : eSide::Back;
+	eSide larger_side = eSide::Back;
+	if (max_front >= max_back) {
+		larger_side = eSide::Front;
+	}
 
 	Winding cap = MakeBaseWinding(plane, (polyhedron.Max - polyhedron.Min).Length() * 2.0 + std::abs(plane.Distance) +
 											 polyhedron.Max.Length() + polyhedron.Min.Length() + 16.0);

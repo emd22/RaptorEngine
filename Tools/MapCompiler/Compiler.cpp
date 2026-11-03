@@ -26,9 +26,6 @@ namespace fx::mapc {
 
 namespace {
 
-constexpr float32 scHullPointEpsilon = 1e-5f;
-constexpr uint32 scMaxWrongLightmapPoints = 200;
-
 bool HasFloorBelow(const PlaneSet& planes, const MapSource& source, const Vec3d& point)
 {
 	for (const SourceBrush& brush : source.Brushes) {
@@ -69,10 +66,14 @@ bool HasFloorBelow(const PlaneSet& planes, const MapSource& source, const Vec3d&
 
 void AddHulls(const PlaneSet& planes, const MapSource& source, CompiledMap& map)
 {
+	constexpr float32 scHullPointEpsilon = 1e-5f;
+
 	size_t hull_count = 0;
 
 	for (const SourceBrush& brush : source.Brushes) {
-		hull_count += brush.bCollides ? 1 : 0;
+		if (brush.bCollides) {
+			hull_count++;
+		}
 	}
 
 	map.BrushNames.InitCapacity(source.Brushes.Size + source.Patches.Size);
@@ -174,8 +175,11 @@ bool WriteObj(const String& path, const CompiledMap& map)
 		const CompiledMapSurface& surface = map.Surfaces[i];
 		const CompiledMapMaterial& material = map.Materials[surface.MaterialIndex];
 
-		const String material_name = material.Name.IsEmpty() ? String::Fmt("library_{}", material.LibraryIndex)
-															 : material.Name;
+		String material_name = material.Name;
+
+		if (material.Name.IsEmpty()) {
+			material_name = String::Fmt("library_{}", material.LibraryIndex);
+		}
 
 		// std::fprintf(file, "o surface_%zu\nusemtl %s\n", i, material_name.CStr());
 		file.Write(String::Fmt("o surface_{}\nusemtl {}\n", i, material_name));
@@ -239,7 +243,14 @@ double GetSeconds(std::chrono::steady_clock::time_point since)
 	return std::chrono::duration<double>(std::chrono::steady_clock::now() - since).count();
 }
 
-double GetPercentRemoved(double before, double after) { return (before > 0.0) ? (1.0 - after / before) * 100.0 : 0.0; }
+double GetPercentRemoved(double before, double after)
+{
+	if (before > 0.0) {
+		return (1.0 - after / before) * 100.0;
+	}
+
+	return 0.0;
+}
 
 } // namespace
 
@@ -270,8 +281,12 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 		return result;
 	}
 
-	result.OutputPath = options.OutputPath.IsEmpty() ? CompiledMap::GetPathForPrototype(String(input_path.string()))
-													 : options.OutputPath;
+	if (options.OutputPath.IsEmpty()) {
+		result.OutputPath = CompiledMap::GetPathForPrototype(String(input_path.string()));
+	}
+	else {
+		result.OutputPath = options.OutputPath;
+	}
 
 	const std::filesystem::path base_path = std::filesystem::absolute(FilesystemIO::GetBasePath(), error);
 	const String engine_path = std::filesystem::relative(input_path, base_path, error).generic_string();
@@ -413,7 +428,12 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 
 	if (flood.bSealed) {
 		result.Seal = eSealState::Sealed;
-		log(String::Fmt("  seal         sealed{}", options.bKeepOutside ? ", faces towards the void kept" : ""));
+		const char* kept_note = "";
+		if (options.bKeepOutside) {
+			kept_note = ", faces towards the void kept";
+		}
+
+		log(String::Fmt("  seal         sealed{}", kept_note));
 	}
 	else if (flood.EntitiesUsed == 0) {
 		log("  seal         unknown, there are no entities (spawn, lights, models) in open space to fill from. Faces "
@@ -608,6 +628,8 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 						"behind patches, {} wrong",
 						verify.PointCount, verify.LitCount, verify.EdgeCount, verify.HiddenCount, verify.WrongCount));
 
+		constexpr uint32 scMaxWrongLightmapPoints = 200;
+
 		if (verify.WrongCount * scMaxWrongLightmapPoints > verify.PointCount) {
 			log("  verify       FAILED, the lightmap does not match the sun");
 			result.bVerifyFailed = true;
@@ -620,12 +642,12 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 	else if (BakeAcoustics(options.Acoustics, map, result.Acoustics, log)) {
 		const AcousticStats& acoustics = result.Acoustics;
 
-		log(String::Fmt("  acoustics    {} probes {:.1f} m apart from ({:.1f}, {:.1f}, {:.1f}) to ({:.1f}, {:.1f}, {:.1f}), "
-						"baked in {:.1f} s (reverb) + {:.1f} s (pathing), {:.1f} KB",
-						acoustics.ProbeCount, options.Acoustics.ProbeSpacing, acoustics.ProbeMin.X, acoustics.ProbeMin.Y,
-						acoustics.ProbeMin.Z, acoustics.ProbeMax.X, acoustics.ProbeMax.Y, acoustics.ProbeMax.Z,
-						acoustics.ReflectionSeconds, acoustics.PathingSeconds,
-						static_cast<double>(acoustics.DataSize) / 1024.0));
+		log(String::Fmt(
+			"  acoustics    {} probes {:.1f} m apart from ({:.1f}, {:.1f}, {:.1f}) to ({:.1f}, {:.1f}, {:.1f}), "
+			"baked in {:.1f} s (reverb) + {:.1f} s (pathing), {:.1f} KB",
+			acoustics.ProbeCount, options.Acoustics.ProbeSpacing, acoustics.ProbeMin.X, acoustics.ProbeMin.Y,
+			acoustics.ProbeMin.Z, acoustics.ProbeMax.X, acoustics.ProbeMax.Y, acoustics.ProbeMax.Z,
+			acoustics.ReflectionSeconds, acoustics.PathingSeconds, static_cast<double>(acoustics.DataSize) / 1024.0));
 	}
 	else if (!result.Acoustics.Error.IsEmpty()) {
 		log(String::Fmt("  warning      no acoustics, {}", result.Acoustics.Error));

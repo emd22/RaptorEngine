@@ -95,7 +95,6 @@ public:
 	static constexpr float32 scDefaultTextureScale = 2.0f;
 
 	static constexpr float32 scMinWeight = 1e-3f;
-	static constexpr float32 scQuarterArcWeight = 0.70710678f;
 
 	static constexpr uint32 scEdgeCount = 4;
 	static constexpr uint32 scMaxThickenPieces = scEdgeCount + 1;

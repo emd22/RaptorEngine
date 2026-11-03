@@ -17,4 +17,3 @@
 #include <Patch.hpp>
 #include <Renderer/LightID.hpp>
 #include <memory>
-#include <vector>

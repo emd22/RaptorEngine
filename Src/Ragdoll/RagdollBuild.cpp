@@ -29,16 +29,10 @@ using namespace RagdollMath;
 
 namespace {
 
-constexpr float32 scSelfCollisionMargin = 0.02f;
 constexpr uint32 scSolverVelocitySteps = 20;
 /// Joints and limits are only pulled back into place by position steps, and Jolt's default of 2 lets a hard landing
 /// bend a limb well past its limits
 constexpr uint32 scSolverPositionSteps = 6;
-constexpr float32 scHingeSlackDegrees = 5.0f;
-constexpr float32 scHingeMinBend = 0.17f;
-/// Inertia added about every axis of a body, as a fraction of its largest, with a floor per kilogram (m^2)
-constexpr float32 scInertiaBoost = 0.4f;
-constexpr float32 scInertiaFloorPerMass = 0.002f;
 
 struct ResolvedBone
 {
@@ -115,8 +109,10 @@ void ResolveBones(const Skeleton& skel, const RDDefinition& def, SizedArray<Reso
 		const uint32 end_bone_index = FindBoneIndex(skel, segment_def->EndBone);
 
 		if (start_bone_index == scBoneNull || end_bone_index == scBoneNull) {
-			const String missing_bone_name = (start_bone_index == scBoneNull) ? segment_def->StartBone.Get()
-																			  : segment_def->EndBone.Get();
+			String missing_bone_name = segment_def->EndBone.Get();
+			if (start_bone_index == scBoneNull) {
+				missing_bone_name = segment_def->StartBone.Get();
+			}
 
 			LogError(LC_PHYSICS, "Skeleton is missing bone '{}', skipping segment", missing_bone_name);
 			continue;
@@ -209,6 +205,9 @@ bool ApplyHingeLimits(JPH::SwingTwistConstraintSettings& joint, const BuildFrame
 					  const RDDefaultSegment& body_def, const ResolvedBone& parent_part, const JPH::Vec3 axis_world,
 					  JPH::Vec3& out_hinge)
 {
+	constexpr float32 scHingeSlackDegrees = 5.0f;
+	constexpr float32 scHingeMinBend = 0.17f;
+
 	const float32 flex = MathUtil::DegToRad(body_def.FlexDegrees);
 	const float32 slack = MathUtil::DegToRad(scHingeSlackDegrees);
 
@@ -453,10 +452,23 @@ RDSegmentInfo MakeSegmentInfo(const BuildFrame& frame, const ResolvedBone& part,
 	};
 }
 
+void MakeFreeSixDOF(JPH::SixDOFConstraintSettings& settings, const JPH::Vec3 position)
+{
+	settings.mSpace = JPH::EConstraintSpace::WorldSpace;
+	settings.mNumVelocityStepsOverride = scSolverVelocitySteps;
+	settings.mPosition1 = settings.mPosition2 = position;
+
+	for (uint32 axis = 0; axis < JPH::SixDOFConstraint::EAxis::Num; axis++) {
+		settings.MakeFreeAxis(static_cast<JPH::SixDOFConstraint::EAxis>(axis));
+	}
+}
+
 } // namespace
 
 bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_matrix, const RDDefinition& def)
 {
+	constexpr float32 scSelfCollisionMargin = 0.02f;
+
 	Destroy();
 
 	if (!skeleton.IsValid() || skeleton->JointCount == 0 || gPhysics == nullptr || gPhysics->pBackend == nullptr) {
@@ -493,8 +505,8 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 	settings->mSkeleton = jolt_skeleton;
 	settings->mParts.resize(parts.Size);
 
-	JPH::Array<JPH::Mat44> joint_matrices;
-	joint_matrices.reserve(parts.Size);
+	SizedArray<JPH::Mat44> joint_matrices;
+	joint_matrices.InitCapacity(parts.Size);
 
 	mSegments.InitCapacity(parts.Size);
 
@@ -521,7 +533,7 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 			return false;
 		}
 
-		joint_matrices.push_back(JPH::Mat44::sRotationTranslation(body.Orientation, body.Position));
+		joint_matrices.Insert(JPH::Mat44::sRotationTranslation(body.Orientation, body.Position));
 
 		mSegments.Insert(MakeSegmentInfo(frame, parts[i], body, *settings, parent_body));
 	}
@@ -538,7 +550,7 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 
 	RestoreTableMasses(*settings);
 
-	DisableSelfCollisions(*settings, joint_matrices.data(), scSelfCollisionMargin * scale);
+	DisableSelfCollisions(*settings, joint_matrices.pData, scSelfCollisionMargin * scale);
 
 	if (!AddToPhysicsSystem(*settings)) {
 		return false;
@@ -566,6 +578,10 @@ bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_ma
 
 void Ragdoll::RestoreTableMasses(JPH::RagdollSettings& settings)
 {
+	// Inertia added about every axis of a body, as a fraction of its largest, with a floor per kilogram (m^2)
+	constexpr float32 scInertiaBoost = 0.4f;
+	constexpr float32 scInertiaFloorPerMass = 0.002f;
+
 	for (uint32 i = 0; i < mSegments.Size; i++) {
 		JPH::MassProperties& mass_properties = settings.mParts[i].mMassPropertiesOverride;
 		const float32 table_mass = mSegments[i].Mass;
@@ -687,13 +703,7 @@ bool Ragdoll::AddToPhysicsSystem(JPH::RagdollSettings& settings)
 void Ragdoll::CreateRootAssist(const JPH::Vec3 root_position)
 {
 	JPH::SixDOFConstraintSettings root_settings;
-	root_settings.mSpace = JPH::EConstraintSpace::WorldSpace;
-	root_settings.mNumVelocityStepsOverride = scSolverVelocitySteps;
-	root_settings.mPosition1 = root_settings.mPosition2 = root_position;
-
-	for (uint32 axis = 0; axis < JPH::SixDOFConstraint::EAxis::Num; axis++) {
-		root_settings.MakeFreeAxis(static_cast<JPH::SixDOFConstraint::EAxis>(axis));
-	}
+	MakeFreeSixDOF(root_settings, root_position);
 
 	{
 		JPH::BodyLockWrite lock(mpPhysicsSystem->GetBodyLockInterface(), mpRagdoll->GetBodyID(0));
@@ -729,13 +739,7 @@ void Ragdoll::CreateFootPlants()
 		const JPH::RVec3 position = lock.GetBody().GetPosition();
 
 		JPH::SixDOFConstraintSettings settings;
-		settings.mSpace = JPH::EConstraintSpace::WorldSpace;
-		settings.mNumVelocityStepsOverride = scSolverVelocitySteps;
-		settings.mPosition1 = settings.mPosition2 = position;
-
-		for (uint32 axis = 0; axis < JPH::SixDOFConstraint::EAxis::Num; axis++) {
-			settings.MakeFreeAxis(static_cast<JPH::SixDOFConstraint::EAxis>(axis));
-		}
+		MakeFreeSixDOF(settings, position);
 
 		FootPlant& plant = mFootPlants[leg];
 
@@ -777,11 +781,7 @@ float32 Ragdoll::WriteInitialPose()
 	const uint32 joint_count = skel.JointCount;
 
 	SizedArray<Mat4f> expected;
-	expected.InitSize(joint_count);
-
-	for (uint32 i = 0; i < joint_count; i++) {
-		expected[i] = skel.SkinningMatrices[i];
-	}
+	expected.InitAsCopyOf(skel.SkinningMatrices.pData, joint_count);
 
 	WriteToSkeleton();
 

@@ -1,11 +1,12 @@
 #pragma once
 
+#include <Core/DynArray.hpp>
+#include <Core/SizedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
 #include <Math/Vec3.hpp>
 #include <functional>
 #include <optional>
-#include <vector>
 
 namespace fx {
 
@@ -19,40 +20,51 @@ struct AcousticSurface
 
 struct AcousticGeometry
 {
-	std::vector<Vec3f> Vertices;
-	std::vector<uint32> Indices;
-	std::vector<uint32> TriangleSurfaces;
-	std::vector<AcousticSurface> Surfaces;
+	DynArray<Vec3f, GrowthFunctions::Double> Vertices;
+	DynArray<uint32, GrowthFunctions::Double> Indices;
+	DynArray<uint32, GrowthFunctions::Double> TriangleSurfaces;
+	DynArray<AcousticSurface, GrowthFunctions::Double> Surfaces;
+
+	AcousticGeometry Clone() const
+	{
+		AcousticGeometry copy;
+		copy.Vertices = Vertices.Clone();
+		copy.Indices = Indices.Clone();
+		copy.TriangleSurfaces = TriangleSurfaces.Clone();
+		copy.Surfaces = Surfaces.Clone();
+
+		return copy;
+	}
 
 	void AddTriangle(const Vec3f a, const Vec3f b, const Vec3f c, uint32 surface)
 	{
-		const uint32 base = static_cast<uint32>(Vertices.size());
+		const uint32 base = Vertices.Size;
 
-		Vertices.push_back(a);
-		Vertices.push_back(b);
-		Vertices.push_back(c);
+		Vertices.Insert(a);
+		Vertices.Insert(b);
+		Vertices.Insert(c);
 
-		Indices.push_back(base);
-		Indices.push_back(base + 1);
-		Indices.push_back(base + 2);
+		Indices.Insert(base);
+		Indices.Insert(base + 1);
+		Indices.Insert(base + 2);
 
-		TriangleSurfaces.push_back(surface);
+		TriangleSurfaces.Insert(surface);
 	}
 
 	uint32 FindOrAddSurface(const AcousticSurface& surface)
 	{
-		for (uint32 i = 0; i < Surfaces.size(); i++) {
+		for (uint32 i = 0; i < Surfaces.Size; i++) {
 			if (Surfaces[i] == surface) {
 				return i;
 			}
 		}
 
-		Surfaces.push_back(surface);
+		Surfaces.Insert(surface);
 
-		return static_cast<uint32>(Surfaces.size() - 1);
+		return Surfaces.Size - 1;
 	}
 
-	uint32 GetTriangleCount() const { return static_cast<uint32>(TriangleSurfaces.size()); }
+	uint32 GetTriangleCount() const { return TriangleSurfaces.Size; }
 };
 
 struct AcousticBakeSettings
@@ -79,7 +91,7 @@ struct AcousticBakeSettings
 
 struct AcousticBakeResult
 {
-	std::vector<uint8> Data;
+	SizedArray<uint8> Data;
 
 	uint32 ProbeCount = 0;
 	Vec3f ProbeMin = Vec3f::sZero;
@@ -109,7 +121,7 @@ float32 GetReflectivity(const String& surface);
 bool Bake(const AcousticGeometry& geometry, const AcousticBakeSettings& settings, AcousticBakeResult& out_result,
 		  const AcousticProgressFunction& progress = {});
 
-bool UnwrapProbeData(const std::vector<uint8>& data, const uint8*& out_payload, size_t& out_size, String& out_error);
+bool UnwrapProbeData(const SizedArray<uint8>& data, const uint8*& out_payload, size_t& out_size, String& out_error);
 
 } // namespace Acoustics
 

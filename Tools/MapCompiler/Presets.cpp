@@ -7,8 +7,6 @@ namespace fx::mapc {
 
 namespace {
 
-constexpr int64 scPresetFileVersion = 1;
-
 constexpr const char* scDenoiseNames[] = { "off", "low", "medium", "high" };
 
 int64 ToInt(bool value)
@@ -56,7 +54,8 @@ ConfigEntry WritePreset(const CompilePreset& preset, uint32 index)
 
 	entry.AddMember(ConfigEntry::Literal("acoustics", ToInt(options.Acoustics.bEnabled)));
 	entry.AddMember(ConfigEntry::Literal("acoustic_pathing", ToInt(options.Acoustics.bPathing)));
-	entry.AddMember(ConfigEntry::Literal("acoustic_probe_spacing", static_cast<float32>(options.Acoustics.ProbeSpacing)));
+	entry.AddMember(
+		ConfigEntry::Literal("acoustic_probe_spacing", static_cast<float32>(options.Acoustics.ProbeSpacing)));
 	entry.AddMember(ConfigEntry::Literal("acoustic_probe_height", static_cast<float32>(options.Acoustics.ProbeHeight)));
 	entry.AddMember(ConfigEntry::Literal("reverb_rays", static_cast<int64>(options.Acoustics.ReverbRays)));
 	entry.AddMember(ConfigEntry::Literal("reverb_bounces", static_cast<int64>(options.Acoustics.ReverbBounces)));
@@ -178,6 +177,8 @@ bool PresetLibrary::Load(const String& path)
 
 bool PresetLibrary::Save(const String& path) const
 {
+	constexpr int64 scPresetFileVersion = 1;
+
 	ConfigFile config;
 	config.AddEntry(ConfigEntry::Literal("version", scPresetFileVersion));
 

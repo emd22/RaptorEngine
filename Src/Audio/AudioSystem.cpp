@@ -23,7 +23,6 @@ FX_SET_MODULE_NAME("AudioSystem")
 namespace {
 
 constexpr uint32 scRootBusCount = static_cast<uint32>(eSoundBus::Count);
-constexpr uint32 scNoDeviceSampleRate = 48000;
 
 constexpr const char* scRootBusNames[scRootBusCount] = {
 	"sfx",
@@ -39,12 +38,8 @@ constexpr const char* scBusVolumeCVarNames[scRootBusCount] = {
 	"s_volume_voice",
 };
 
-constexpr float32 scLimiterThreshold = 0.891f;
-constexpr float32 scLimiterReleaseSeconds = 0.1f;
 constexpr uint32 scLimiterLookahead = 64;
 constexpr uint32 scMaxNodeChannels = 8;
-
-constexpr float32 scLowpassBypass = 18000.0f;
 
 // Stereo-linked peak limiter on the master mix. The gain is computed from the incoming samples and applied to
 // samples delayed by the lookahead, so it is already down when a peak comes out.
@@ -86,6 +81,8 @@ struct BusNode
 void ProcessBusNode(ma_node* node, const float** frames_in, ma_uint32* frame_count_in, float** frames_out,
 					ma_uint32* frame_count_out)
 {
+	constexpr float32 scLowpassBypass = 18000.0f;
+
 	BusNode& bus = *static_cast<BusNode*>(node);
 
 	const ma_uint32 frame_count = std::min(frame_count_in[0], *frame_count_out);
@@ -141,6 +138,8 @@ ma_node_vtable scBusNodeVtable = {
 void ProcessLimiterNode(ma_node* node, const float** frames_in, ma_uint32* frame_count_in, float** frames_out,
 						ma_uint32* frame_count_out)
 {
+	constexpr float32 scLimiterThreshold = 0.891f;
+
 	MasterLimiter& limiter = *static_cast<MasterLimiter*>(node);
 
 	const ma_uint32 frame_count = std::min(frame_count_in[0], *frame_count_out);
@@ -205,9 +204,7 @@ ma_node_vtable scLimiterNodeVtable = {
 	ProcessLimiterNode, nullptr, 1, 1, MA_NODE_FLAG_CONTINUOUS_PROCESSING,
 };
 
-float32 RandomUnit() { return static_cast<float32>(FastRand32() >> 8) * (1.0f / 16777216.0f); }
-
-float32 RandomInRange(const SoundRange& range) { return range.Min + (range.Max - range.Min) * RandomUnit(); }
+float32 RandomInRange(const SoundRange& range) { return range.Min + (range.Max - range.Min) * FastRandUnit(); }
 
 ma_result ApplyClip(ma_sound* sound, const SoundClip& clip)
 {
@@ -308,13 +305,17 @@ struct AudioSystem::Backend
 	BusNode BusNodes[scMaxBuses];
 	ma_sound Voices[scMaxVoices];
 
-	std::vector<std::vector<ma_sound*>> Prototypes;
-	std::vector<uint32> LastVariants;
-	std::vector<bool> WarnedAboutFailedLoads;
+	SizedArray<SizedArray<ma_sound*>> Prototypes;
+	SizedArray<uint32> LastVariants;
+	SizedArray<bool> WarnedAboutFailedLoads;
 };
 
 bool AudioSystem::Create(const AudioCreateInfo& info)
 {
+	constexpr uint32 scOutputChannels = 2;
+	constexpr uint32 scNoDeviceSampleRate = 48000;
+	constexpr float32 scLimiterReleaseSeconds = 0.1f;
+
 	if (mpBackend != nullptr) {
 		return true;
 	}
@@ -447,7 +448,7 @@ void AudioSystem::Destroy()
 	delete mpBackend;
 	mpBackend = nullptr;
 
-	mDefs.clear();
+	mDefs.Clear();
 }
 
 void AudioSystem::LoadSounds()
@@ -458,7 +459,7 @@ void AudioSystem::LoadSounds()
 
 	StopAll();
 	UnloadDefs();
-	mDefs.clear();
+	mDefs.Clear();
 
 	// Sound defs name their bus, so the mix comes first
 	LoadMix();
@@ -477,24 +478,26 @@ void AudioSystem::LoadSounds()
 
 		SoundDef def;
 
-		if (LoadDef((std::string(scSoundDirectory) + "/" + file).c_str(), String(name.c_str()), def)) {
-			mDefs.push_back(std::move(def));
+		if (LoadDef(String::Fmt("{}/{}", scSoundDirectory, file.c_str()).CStr(), String(name.c_str()), def)) {
+			mDefs.Insert(std::move(def));
 		}
 	}
 
-	mpBackend->Prototypes.resize(mDefs.size());
-	mpBackend->LastVariants.assign(mDefs.size(), UINT32_MAX);
-	mpBackend->WarnedAboutFailedLoads.assign(mDefs.size(), false);
+	mpBackend->Prototypes.InitSize(mDefs.Size);
+	mpBackend->LastVariants.InitSize(mDefs.Size, UINT32_MAX);
+	mpBackend->WarnedAboutFailedLoads.InitSize(mDefs.Size, false);
 
 	constexpr ma_uint32 scPrototypeFlags = MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC |
 										   MA_SOUND_FLAG_NO_DEFAULT_ATTACHMENT;
 
-	for (uint32 i = 0; i < mDefs.size(); i++) {
+	for (uint32 i = 0; i < mDefs.Size; i++) {
 		const SoundDef& def = mDefs[i];
 
 		if (def.bStream) {
 			continue;
 		}
+
+		mpBackend->Prototypes[i].InitCapacity(def.Files.Size);
 
 		for (const String& path : def.Files) {
 			ma_sound* prototype = new ma_sound;
@@ -509,11 +512,11 @@ void AudioSystem::LoadSounds()
 				prototype = nullptr;
 			}
 
-			mpBackend->Prototypes[i].push_back(prototype);
+			mpBackend->Prototypes[i].Insert(prototype);
 		}
 	}
 
-	LogInfo(LC_AUDIO, "Loaded {} sounds", mDefs.size());
+	LogInfo(LC_AUDIO, "Loaded {} sounds", mDefs.Size);
 }
 
 bool AudioSystem::LoadDef(const char* path, const String& name, SoundDef& out_def)
@@ -529,24 +532,24 @@ bool AudioSystem::LoadDef(const char* path, const String& name, SoundDef& out_de
 	out_def.Name = name;
 	out_def.NameHash = HashStr32(name.CStr());
 
-	std::vector<const char*> file_names;
+	DynArray<const char*, GrowthFunctions::Double> file_names;
 
 	const ConfigEntry* files = config.GetEntry(HashStr32("files"));
 
 	if (files != nullptr && files->bIsArray && files->ArrayData.IsInited()) {
 		for (uint32 i = 0; i < files->ArrayData.Size(); i++) {
-			file_names.push_back(files->ArrayData[i].Get<const char*>());
+			file_names.Insert(files->ArrayData[i].Get<const char*>());
 		}
 	}
 
 	const ConfigEntry* file = config.GetEntry(HashStr32("file"));
 
 	if (file != nullptr && !file->bIsArray) {
-		file_names.push_back(file->GetValue<const char*>());
+		file_names.Insert(file->GetValue<const char*>());
 	}
 
 	for (const char* file_name : file_names) {
-		const String relative_path = String((std::string(scSoundDirectory) + "/" + file_name).c_str());
+		const String relative_path = String::Fmt("{}/{}", scSoundDirectory, file_name);
 		const String resolved_path = FilesystemIO::ResolvePath(relative_path);
 
 		if (!FilesystemIO::FileExists(resolved_path)) {
@@ -554,10 +557,10 @@ bool AudioSystem::LoadDef(const char* path, const String& name, SoundDef& out_de
 			continue;
 		}
 
-		out_def.Files.push_back(resolved_path);
+		out_def.Files.Insert(resolved_path);
 	}
 
-	if (out_def.Files.empty()) {
+	if (out_def.Files.IsEmpty()) {
 		LogError(LC_AUDIO, "Sound '{}' needs at least one file in 'file' or 'files'", path);
 		return false;
 	}
@@ -579,7 +582,7 @@ bool AudioSystem::LoadDef(const char* path, const String& name, SoundDef& out_de
 				continue;
 			}
 
-			out_def.Clips.push_back(SoundClip { .Start = start, .End = end });
+			out_def.Clips.Insert(SoundClip { .Start = start, .End = end });
 		}
 	}
 	else if (clips != nullptr) {
@@ -622,7 +625,7 @@ void AudioSystem::UnloadDefs()
 		return;
 	}
 
-	for (std::vector<ma_sound*>& prototypes : mpBackend->Prototypes) {
+	for (SizedArray<ma_sound*>& prototypes : mpBackend->Prototypes) {
 		for (ma_sound* prototype : prototypes) {
 			if (prototype != nullptr) {
 				ma_sound_uninit(prototype);
@@ -631,9 +634,9 @@ void AudioSystem::UnloadDefs()
 		}
 	}
 
-	mpBackend->Prototypes.clear();
-	mpBackend->LastVariants.clear();
-	mpBackend->WarnedAboutFailedLoads.clear();
+	mpBackend->Prototypes.Free();
+	mpBackend->LastVariants.Free();
+	mpBackend->WarnedAboutFailedLoads.Free();
 }
 
 bool AudioSystem::CreateBusNodes(uint32 index)
@@ -997,7 +1000,7 @@ bool AudioSystem::IsSnapshotActive(const char* name) const
 
 uint32 AudioSystem::FindDefIndex(Hash32 name_hash) const
 {
-	for (uint32 i = 0; i < mDefs.size(); i++) {
+	for (uint32 i = 0; i < mDefs.Size; i++) {
 		if (mDefs[i].NameHash == name_hash) {
 			return i;
 		}
@@ -1030,17 +1033,15 @@ SoundID AudioSystem::Play2D(const char* name) { return Play2D(HashStr32(name)); 
 
 Hash32 AudioSystem::FindSurfaceSound(const char* event, const String& surface) const
 {
-	const std::string base(event);
-
 	if (!surface.IsEmpty()) {
-		const Hash32 surface_sound = HashStr32((base + "_" + surface.CStr()).c_str());
+		const Hash32 surface_sound = HashStr32(String::Fmt("{}_{}", event, surface.CStr()).CStr());
 
 		if (FindDefIndex(surface_sound) != UINT32_MAX) {
 			return surface_sound;
 		}
 	}
 
-	const Hash32 default_sound = HashStr32((base + "_default").c_str());
+	const Hash32 default_sound = HashStr32(String::Fmt("{}_default", event).CStr());
 
 	if (FindDefIndex(default_sound) != UINT32_MAX) {
 		return default_sound;
@@ -1153,8 +1154,8 @@ SoundID AudioSystem::StartVoice(Hash32 name_hash, const Vec3f position, bool spa
 	}
 
 	const SoundDef& def = mDefs[def_index];
-	const uint32 clip_count = std::max(static_cast<uint32>(def.Clips.size()), 1u);
-	const uint32 variant_count = static_cast<uint32>(def.Files.size()) * clip_count;
+	const uint32 clip_count = std::max<uint32>(def.Clips.Size, 1);
+	const uint32 variant_count = def.Files.Size * clip_count;
 
 	uint32 variant = FastRand32() % variant_count;
 
@@ -1165,7 +1166,7 @@ SoundID AudioSystem::StartVoice(Hash32 name_hash, const Vec3f position, bool spa
 	const uint32 file_index = variant / clip_count;
 	const SoundClip* clip = nullptr;
 
-	if (!def.Clips.empty()) {
+	if (def.Clips.IsNotEmpty()) {
 		clip = &def.Clips[variant % clip_count];
 	}
 
@@ -1410,6 +1411,8 @@ void AudioSystem::FadeOutVoice(uint32 slot, float32 seconds)
 
 void AudioSystem::StartReadyVoices()
 {
+	constexpr float32 scMaxStartDelaySeconds = 0.05f;
+
 	const ma_uint64 now = ma_engine_get_time_in_pcm_frames(&mpBackend->Engine);
 	const ma_uint64 max_wait = static_cast<ma_uint64>(scMaxStartDelaySeconds * static_cast<float32>(GetSampleRate()));
 
@@ -1618,6 +1621,8 @@ void AudioSystem::UpdateMix(float32 delta_time, bool window_focused)
 
 void AudioSystem::Update(float32 delta_time, bool window_focused)
 {
+	constexpr float32 scMaxUpdateStepSeconds = 0.1f;
+
 	if (mpBackend == nullptr) {
 		return;
 	}
@@ -1714,7 +1719,7 @@ void AudioSystem::SetAcousticScene(const AcousticGeometry& geometry)
 	mSpatial.SetScene(Acoustics::ToAudioSpace(geometry));
 }
 
-void AudioSystem::SetBakedAcoustics(const std::vector<uint8>& data)
+void AudioSystem::SetBakedAcoustics(const SizedArray<uint8>& data)
 {
 	if (!mSpatial.IsActive()) {
 		return;

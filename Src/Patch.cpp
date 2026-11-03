@@ -11,8 +11,9 @@ namespace {
 constexpr double scDegenerateCross = 1e-12;
 constexpr double scDegenerateTexture = 1e-12;
 constexpr double scDegenerateLength = 1e-12;
-constexpr double scNudges[] = { 1e-4, 1e-3, 1e-2, 5e-2 };
-constexpr uint32 scArcLengthSamples = 16;
+
+/// Weight of the two outer control points of a quarter circle, as a rational Bezier curve
+constexpr float32 scArc = 0.70710678f;
 
 struct SurfaceSample
 {
@@ -24,15 +25,6 @@ struct SurfaceSample
 	Vec2d TexcoordDerivU = Vec2d(0.0, 0.0);
 	Vec2d TexcoordDerivV = Vec2d(0.0, 0.0);
 };
-
-Vec3d ToDouble(const Vec3f value) { return Vec3d(value.X, value.Y, value.Z); }
-
-Vec2d ToDouble(const Vec2f value) { return Vec2d(value.X, value.Y); }
-
-Vec3f ToFloat(const Vec3d& value)
-{
-	return Vec3f(static_cast<float32>(value.X), static_cast<float32>(value.Y), static_cast<float32>(value.Z));
-}
 
 PatchColor MixColors(const PatchColor& a, float32 weight_a, const PatchColor& b, float32 weight_b)
 {
@@ -100,26 +92,22 @@ float32 GetAxis(const Vec3f value, uint32 axis)
 
 struct SectionPoint
 {
-	float32 A = 0.0f;
-	float32 B = 0.0f;
+	Vec2f Position = Vec2f(0.0f, 0.0f);
 	float32 Weight = 1.0f;
 };
 
-constexpr float32 scArc = Patch::scQuarterArcWeight;
-
 constexpr SectionPoint scRing[] = {
-	{ 1.0f, 0.5f },		   { 1.0f, 1.0f, scArc }, { 0.5f, 1.0f },		 { 0.0f, 1.0f, scArc }, { 0.0f, 0.5f },
-	{ 0.0f, 0.0f, scArc }, { 0.5f, 0.0f },		  { 1.0f, 0.0f, scArc }, { 1.0f, 0.5f },
+	{ Vec2f(1.0f, 0.5f) },		  { Vec2f(1.0f, 1.0f), scArc }, { Vec2f(0.5f, 1.0f) },
+	{ Vec2f(0.0f, 1.0f), scArc }, { Vec2f(0.0f, 0.5f) },		{ Vec2f(0.0f, 0.0f), scArc },
+	{ Vec2f(0.5f, 0.0f) },		  { Vec2f(1.0f, 0.0f), scArc }, { Vec2f(1.0f, 0.5f) },
 };
 
 Vec3f GetBoxPoint(const Vec3f min, const Vec3f max, uint32 axis, float32 along, float32 a, float32 b)
 {
 	axis = axis % 3;
 
-	const auto lerp = [&](uint32 index, float32 t)
-	{ return GetAxis(min, index) + (GetAxis(max, index) - GetAxis(min, index)) * t; };
-
-	return MakeAxisPoint(axis, lerp(axis, along), lerp((axis + 1) % 3, a), lerp((axis + 2) % 3, b));
+	const Vec3f origin(min.X, min.Y, min.Z);
+	return origin + (max - min) * MakeAxisPoint(axis, along, a, b);
 }
 
 Patch MakeExtrusion(const Vec3f min, const Vec3f max, uint32 axis, const Slice<const SectionPoint> section,
@@ -152,8 +140,8 @@ Patch MakeExtrusion(const Vec3f min, const Vec3f max, uint32 axis, const Slice<c
 		}
 
 		for (uint32 column = 0; column < section.Size; column++) {
-			const float32 a = min_a + (max_a - min_a) * section[column].A;
-			const float32 b = min_b + (max_b - min_b) * section[column].B;
+			const float32 a = min_a + (max_a - min_a) * section[column].Position.X;
+			const float32 b = min_b + (max_b - min_b) * section[column].Position.Y;
 
 			PatchPoint& point = patch.GetPoint(column, row);
 
@@ -178,9 +166,11 @@ void OrientAwayFrom(Patch& patch, const Vec3d& inside)
 
 double GetCurveLength(const PatchPoint& a, const PatchPoint& b, const PatchPoint& c)
 {
-	const Vec3d position_a = ToDouble(a.Position);
-	const Vec3d position_b = ToDouble(b.Position);
-	const Vec3d position_c = ToDouble(c.Position);
+	constexpr uint32 scArcLengthSamples = 16;
+
+	const Vec3d position_a(a.Position);
+	const Vec3d position_b(b.Position);
+	const Vec3d position_c(c.Position);
 
 	double length = 0.0;
 	Vec3d previous = position_a;
@@ -286,11 +276,7 @@ Patch Patch::FromDetailMesh(uint32 width, uint32 height)
 	patch.SubdivisionsU = 1;
 	patch.SubdivisionsV = 1;
 	patch.Points.InitSize(width * height);
-	patch.TurnedCells.InitCapacity((width - 1) * (height - 1));
-
-	for (uint32 cell = 0; cell < (width - 1) * (height - 1); cell++) {
-		patch.TurnedCells.Insert(static_cast<uint8>(0));
-	}
+	patch.TurnedCells.InitSize((width - 1) * (height - 1), static_cast<uint8>(0));
 
 	return patch;
 }
@@ -316,8 +302,7 @@ Patch Patch::MakeFlat(const Vec3f min, const Vec3f max, uint32 axis)
 		}
 	}
 
-	OrientAwayFrom(patch,
-				   ToDouble(GetBoxPoint(min, max, axis, 0.0f, 0.5f, 0.5f) - MakeAxisPoint(axis, 1.0f, 0.0f, 0.0f)));
+	OrientAwayFrom(patch, Vec3d(GetBoxPoint(min, max, axis, 0.0f, 0.5f, 0.5f) - MakeAxisPoint(axis, 1.0f, 0.0f, 0.0f)));
 	patch.NaturalTexture();
 
 	return patch;
@@ -327,8 +312,8 @@ Patch Patch::MakeCylinder(const Vec3f min, const Vec3f max, uint32 axis)
 {
 	Patch patch = MakeExtrusion(min, max, axis, MakeSlice(scRing), false);
 
-	const Vec3d center = ToDouble(GetBoxPoint(min, max, axis, 0.5f, 0.5f, 0.5f));
-	const Vec3d direction = ToDouble(MakeAxisPoint(axis % 3, 1.0f, 0.0f, 0.0f));
+	const Vec3d center = Vec3d(GetBoxPoint(min, max, axis, 0.5f, 0.5f, 0.5f));
+	const Vec3d direction = Vec3d(MakeAxisPoint(axis % 3, 1.0f, 0.0f, 0.0f));
 	const Vec3d sample = patch.Evaluate(0.5, 0.5).Position;
 
 	OrientAwayFrom(patch, center + direction * direction.Dot(sample - center));
@@ -341,7 +326,7 @@ Patch Patch::MakeCone(const Vec3f min, const Vec3f max, uint32 axis)
 {
 	Patch patch = MakeExtrusion(min, max, axis, MakeSlice(scRing), true);
 
-	OrientAwayFrom(patch, ToDouble(GetBoxPoint(min, max, axis, 0.0f, 0.5f, 0.5f)));
+	OrientAwayFrom(patch, Vec3d(GetBoxPoint(min, max, axis, 0.0f, 0.5f, 0.5f)));
 	patch.NaturalTexture();
 
 	return patch;
@@ -349,11 +334,11 @@ Patch Patch::MakeCone(const Vec3f min, const Vec3f max, uint32 axis)
 
 Patch Patch::MakeBevel(const Vec3f min, const Vec3f max, uint32 axis)
 {
-	static constexpr SectionPoint scSection[] = { { 0.0f, 1.0f }, { 1.0f, 1.0f }, { 1.0f, 0.0f } };
+	static constexpr SectionPoint scSection[] = { { Vec2f(0.0f, 1.0f) }, { Vec2f(1.0f, 1.0f) }, { Vec2f(1.0f, 0.0f) } };
 
 	Patch patch = MakeExtrusion(min, max, axis, MakeSlice(scSection), false);
 
-	OrientAwayFrom(patch, ToDouble(GetBoxPoint(min, max, axis, 0.5f, 0.0f, 0.0f)));
+	OrientAwayFrom(patch, Vec3d(GetBoxPoint(min, max, axis, 0.5f, 0.0f, 0.0f)));
 	patch.NaturalTexture();
 
 	return patch;
@@ -362,12 +347,13 @@ Patch Patch::MakeBevel(const Vec3f min, const Vec3f max, uint32 axis)
 Patch Patch::MakeEndcap(const Vec3f min, const Vec3f max, uint32 axis)
 {
 	static constexpr SectionPoint scSection[] = {
-		{ 0.0f, 0.0f }, { 0.0f, 1.0f, scArc }, { 0.5f, 1.0f }, { 1.0f, 1.0f, scArc }, { 1.0f, 0.0f },
+		{ Vec2f(0.0f, 0.0f) },		  { Vec2f(0.0f, 1.0f), scArc }, { Vec2f(0.5f, 1.0f) },
+		{ Vec2f(1.0f, 1.0f), scArc }, { Vec2f(1.0f, 0.0f) },
 	};
 
 	Patch patch = MakeExtrusion(min, max, axis, MakeSlice(scSection), false);
 
-	OrientAwayFrom(patch, ToDouble(GetBoxPoint(min, max, axis, 0.5f, 0.5f, 0.0f)));
+	OrientAwayFrom(patch, Vec3d(GetBoxPoint(min, max, axis, 0.5f, 0.5f, 0.0f)));
 	patch.NaturalTexture();
 
 	return patch;
@@ -398,8 +384,7 @@ Patch Patch::MakeDetailMesh(const Vec3f min, const Vec3f max, uint32 axis, uint3
 		}
 	}
 
-	OrientAwayFrom(patch,
-				   ToDouble(GetBoxPoint(min, max, axis, 0.0f, 0.5f, 0.5f) - MakeAxisPoint(axis, 1.0f, 0.0f, 0.0f)));
+	OrientAwayFrom(patch, Vec3d(GetBoxPoint(min, max, axis, 0.0f, 0.5f, 0.5f) - MakeAxisPoint(axis, 1.0f, 0.0f, 0.0f)));
 	std::fill(patch.TurnedCells.begin(), patch.TurnedCells.end(), static_cast<uint8>(0));
 	patch.WorldTexture();
 
@@ -533,8 +518,8 @@ SurfaceSample SampleSubPatch(const Patch& patch, uint32 sub_column, uint32 sub_r
 	for (uint32 row = 0; row < 3; row++) {
 		for (uint32 column = 0; column < 3; column++) {
 			const PatchPoint& point = patch.GetPoint(sub_column * 2 + column, sub_row * 2 + row);
-			const Vec3d position = ToDouble(point.Position);
-			const Vec2d texcoord = ToDouble(point.Texcoord);
+			const Vec3d position = Vec3d(point.Position);
+			const Vec2d texcoord = Vec2d(point.Texcoord);
 			const double point_weight = static_cast<double>(point.Weight);
 
 			const double weight = basis_u[column] * basis_v[row] * point_weight;
@@ -649,6 +634,8 @@ uint32 FindSubPatchSpans(double value, uint32 count, SubPatchSpan out_spans[2])
 bool GetFrame(const Patch& patch, const SubPatchSpan& column, const SubPatchSpan& row, Vec3d& out_normal,
 			  Vec3d& out_tangent, double& out_handedness)
 {
+	static constexpr double scNudges[] = { 1e-4, 1e-3, 1e-2, 5e-2 };
+
 	SurfaceSample sample = SampleSubPatch(patch, column.Index, row.Index, column.Local, row.Local);
 	Vec3d normal = sample.DerivU.Cross(sample.DerivV);
 
@@ -704,8 +691,8 @@ void MeasureNaturalDistances(const Patch& patch, bool along_columns, SizedArray<
 			double length = 0.0;
 
 			for (uint32 line = 0; line < lines; line++) {
-				length += (ToDouble(GetLinePoint(patch, along_columns, index + 1, line).Position) -
-						   ToDouble(GetLinePoint(patch, along_columns, index, line).Position))
+				length += (Vec3d(GetLinePoint(patch, along_columns, index + 1, line).Position) -
+						   Vec3d(GetLinePoint(patch, along_columns, index, line).Position))
 							  .Length();
 			}
 
@@ -771,10 +758,10 @@ bool SolveTriangleFrame(const PatchPoint& a, const PatchPoint& b, const PatchPoi
 						Vec3d& out_tangent, double& out_handedness)
 {
 	SurfaceSample sample;
-	sample.DerivU = ToDouble(b.Position) - ToDouble(a.Position);
-	sample.DerivV = ToDouble(c.Position) - ToDouble(a.Position);
-	sample.TexcoordDerivU = ToDouble(b.Texcoord) - ToDouble(a.Texcoord);
-	sample.TexcoordDerivV = ToDouble(c.Texcoord) - ToDouble(a.Texcoord);
+	sample.DerivU = Vec3d(b.Position) - Vec3d(a.Position);
+	sample.DerivV = Vec3d(c.Position) - Vec3d(a.Position);
+	sample.TexcoordDerivU = Vec2d(b.Texcoord) - Vec2d(a.Texcoord);
+	sample.TexcoordDerivV = Vec2d(c.Texcoord) - Vec2d(a.Texcoord);
 
 	const Vec3d normal = sample.DerivU.Cross(sample.DerivV);
 	const double length = normal.Length();
@@ -837,8 +824,8 @@ PatchVertex EvaluateDetailMesh(const Patch& patch, double u, double v)
 	for (uint32 corner = 0; corner < 3; corner++) {
 		const PatchPoint& point = patch.Points[corners[corner]];
 
-		vertex.Position = vertex.Position + ToDouble(point.Position) * weights[corner];
-		vertex.Texcoord += ToDouble(point.Texcoord) * weights[corner];
+		vertex.Position = vertex.Position + Vec3d(point.Position) * weights[corner];
+		vertex.Texcoord += Vec2d(point.Texcoord) * weights[corner];
 		AddColor(color, point.Color, weights[corner]);
 	}
 
@@ -925,8 +912,8 @@ void BuildDetailMeshGrid(const Patch& patch, SizedArray<PatchVertex>& out_grid, 
 			const PatchPoint& point = patch.GetPoint(column, row);
 
 			PatchVertex vertex;
-			vertex.Position = ToDouble(point.Position);
-			vertex.Texcoord = ToDouble(point.Texcoord);
+			vertex.Position = Vec3d(point.Position);
+			vertex.Texcoord = Vec2d(point.Texcoord);
 			vertex.Color = point.Color;
 			vertex.Parameter = Vec2d(static_cast<double>(column), static_cast<double>(row));
 
@@ -934,11 +921,8 @@ void BuildDetailMeshGrid(const Patch& patch, SizedArray<PatchVertex>& out_grid, 
 		}
 	}
 
-	SizedArray<Vec3d> bitangents(patch.Points.Size);
-
-	for (size_t i = 0; i < patch.Points.Size; i++) {
-		bitangents.Insert(Vec3d(0.0));
-	}
+	SizedArray<Vec3d> bitangents;
+	bitangents.InitSize(patch.Points.Size, Vec3d(0.0));
 
 	out_triangles.InitCapacity((patch.Width - 1) * (patch.Height - 1) * 6);
 
@@ -1024,10 +1008,10 @@ Vec3d GetFacingNormal(const Patch& patch)
 	for (uint32 row = 0; row + 1 < patch.Height; row++) {
 		for (uint32 column = 0; column + 1 < patch.Width; column++) {
 			const CellCorners cell = GetCellCorners(patch, column, row);
-			const Vec3d diagonal_a = ToDouble(patch.Points[cell.Index11].Position) -
-									 ToDouble(patch.Points[cell.Index00].Position);
-			const Vec3d diagonal_b = ToDouble(patch.Points[cell.Index01].Position) -
-									 ToDouble(patch.Points[cell.Index10].Position);
+			const Vec3d diagonal_a = Vec3d(patch.Points[cell.Index11].Position) -
+									 Vec3d(patch.Points[cell.Index00].Position);
+			const Vec3d diagonal_b = Vec3d(patch.Points[cell.Index01].Position) -
+									 Vec3d(patch.Points[cell.Index10].Position);
 
 			sum = sum + diagonal_a.Cross(diagonal_b);
 		}
@@ -1246,11 +1230,11 @@ void Patch::GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normal
 		const uint32 base = static_cast<uint32>(positions.Size);
 
 		for (const PatchVertex& vertex : mesh.Vertices) {
-			positions.Insert(ToFloat(vertex.Position));
-			normals.Insert(ToFloat(vertex.Normal));
-			tangents.Insert(ToFloat(vertex.Tangent));
+			positions.Insert(vertex.Position.ToVec3f());
+			normals.Insert(vertex.Normal.ToVec3f());
+			tangents.Insert(vertex.Tangent.ToVec3f());
 			tangent_handedness.Insert(static_cast<float32>(vertex.Handedness));
-			texcoords.Insert(Vec2f(static_cast<float32>(vertex.Texcoord.X), static_cast<float32>(vertex.Texcoord.Y)));
+			texcoords.Insert(Vec2f::From(vertex.Texcoord));
 
 			if (packed_colors != nullptr) {
 				packed_colors->Insert(vertex.Color.Pack());
@@ -1354,8 +1338,8 @@ bool Patch::ResampleDetailMesh(uint32 cells_u, uint32 cells_v)
 												static_cast<double>(row) * scale_v);
 			PatchPoint& point = resampled.GetPoint(column, row);
 
-			point.Position = ToFloat(vertex.Position);
-			point.Texcoord = Vec2f(static_cast<float32>(vertex.Texcoord.X), static_cast<float32>(vertex.Texcoord.Y));
+			point.Position = vertex.Position.ToVec3f();
+			point.Texcoord = Vec2f::From(vertex.Texcoord);
 			point.Color = vertex.Color;
 		}
 	}
@@ -1556,9 +1540,7 @@ void Patch::FitTexture(float32 repeats_u, float32 repeats_v)
 namespace {
 
 constexpr float32 scEdgeMatchDistance = 1e-4f;
-constexpr float32 scCornerCapMinBulge = 1e-3f;
 constexpr double scEdgeInset = 1e-2;
-constexpr double scMinOffsetCos = 0.1;
 
 uint32 GetEdgeSubdivisions(const Patch& patch, uint32 edge)
 {
@@ -1598,6 +1580,8 @@ void OrientOutward(Patch& patch, const Vec3d& outward)
 Patch MakeCornerCap(const PatchPoint& start, const PatchPoint& corner, const PatchPoint& end, const Vec3f fill,
 					uint32 subdivisions, const Vec3d& outward, const Mat4f& to_world)
 {
+	constexpr float32 scCornerCapMinBulge = 1e-3f;
+
 	const Vec3f chord = end.Position - start.Position;
 	const Vec3f to_corner = corner.Position - start.Position;
 	const float32 chord_length = chord.Length();
@@ -1681,8 +1665,7 @@ void Patch::WorldTexture(const Mat4f& to_world, float32 scale, uint32 axis)
 	}
 
 	const Vec3d facing_normal = GetFacingNormal(*this);
-	const Vec4f turned = to_world * Vec4f(static_cast<float32>(facing_normal.X), static_cast<float32>(facing_normal.Y),
-										  static_cast<float32>(facing_normal.Z), 0.0f);
+	const Vec4f turned = to_world * Vec4f(facing_normal.ToVec3f(), 0.0f);
 	const float32 normal[3] = { turned.X, turned.Y, turned.Z };
 
 	uint32 dominant = axis;
@@ -1719,7 +1702,7 @@ void Patch::WorldTexture(const Mat4f& to_world, float32 scale, uint32 axis)
 	}
 
 	for (PatchPoint& point : Points) {
-		const Vec4f moved = to_world * Vec4f(point.Position.X, point.Position.Y, point.Position.Z, 1.0f);
+		const Vec4f moved = to_world * Vec4f(point.Position, 1.0f);
 		const Vec3f world_position(moved.X, moved.Y, moved.Z);
 
 		point.Texcoord = Vec2f(world_position.Dot(u_axis) / scale, world_position.Dot(v_axis) / scale);
@@ -1836,6 +1819,8 @@ Vec3d Patch::GetEdgeOutward(uint32 edge) const
 
 Patch Patch::MakeOffset(float32 distance) const
 {
+	constexpr double scMinOffsetCos = 0.1;
+
 	Patch offset = Clone();
 
 	if (!IsValid()) {
@@ -1871,7 +1856,7 @@ Patch Patch::MakeOffset(float32 distance) const
 				shift = average * (static_cast<double>(distance) / length_squared);
 			}
 
-			offset.GetPoint(column, row).Position = GetPoint(column, row).Position - ToFloat(shift);
+			offset.GetPoint(column, row).Position = GetPoint(column, row).Position - shift.ToVec3f();
 		}
 	}
 
@@ -2020,7 +2005,7 @@ uint32 Patch::Cap(Patch out_caps[scMaxCapPieces], const Mat4f& to_world) const
 
 			Vec3f fill = corner.Position;
 
-			if (normal.Dot(ToDouble(corner.Position - middle)) > 0.0) {
+			if (normal.Dot(Vec3d(corner.Position - middle)) > 0.0) {
 				fill = start.Position + end.Position - corner.Position;
 			}
 

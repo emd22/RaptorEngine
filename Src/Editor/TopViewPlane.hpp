@@ -57,10 +57,7 @@ struct TopViewFaceRef
 	ObjectID ObjectId = ObjectID::scNull;
 	Vec3f Normal = Vec3f::sZero;
 
-	bool operator==(const TopViewFaceRef& other) const
-	{
-		return ObjectId == other.ObjectId && Normal == other.Normal;
-	}
+	bool operator==(const TopViewFaceRef& other) const { return ObjectId == other.ObjectId && Normal == other.Normal; }
 };
 
 inline constexpr const char* scAxisNames = "XYZ";
@@ -178,15 +175,33 @@ inline uint32 BuildRoomPieces(const Vec3f min, const Vec3f max, const RoomSettin
 	const bool open_x = is_tunnel && extent.X >= extent.Z;
 	const bool open_z = is_tunnel && !open_x;
 
-	const float32 vertical_walls = settings.bCeiling ? 2.0f : 1.0f;
+	float32 vertical_walls = 1.0f;
+	if (settings.bCeiling) {
+		vertical_walls = 2.0f;
+	}
 
 	if (!(wall > 0.0f) || extent.Y <= wall * vertical_walls || (!open_x && extent.X <= wall * 2.0f) ||
 		(!open_z && extent.Z <= wall * 2.0f)) {
 		return 0;
 	}
 
-	const Vec3f inner_min = min + Vec3f(open_x ? 0.0f : wall, wall, open_z ? 0.0f : wall);
-	const Vec3f inner_max = max - Vec3f(open_x ? 0.0f : wall, settings.bCeiling ? wall : 0.0f, open_z ? 0.0f : wall);
+	float32 wall_inset_x = wall;
+	if (open_x) {
+		wall_inset_x = 0.0f;
+	}
+
+	float32 wall_inset_z = wall;
+	if (open_z) {
+		wall_inset_z = 0.0f;
+	}
+
+	float32 ceiling_inset = 0.0f;
+	if (settings.bCeiling) {
+		ceiling_inset = wall;
+	}
+
+	const Vec3f inner_min = min + Vec3f(wall_inset_x, wall, wall_inset_z);
+	const Vec3f inner_max = max - Vec3f(wall_inset_x, ceiling_inset, wall_inset_z);
 
 	uint32 count = 0;
 
@@ -224,6 +239,19 @@ inline float32 GetAxis(const Vec3f& vector, uint32 axis)
 	}
 
 	return vector.Z;
+}
+
+inline void SetAxis(Vec3f& vector, uint32 axis, float32 value)
+{
+	if (axis == 0) {
+		vector.X = value;
+	}
+	else if (axis == 1) {
+		vector.Y = value;
+	}
+	else {
+		vector.Z = value;
+	}
 }
 
 } // namespace fx::editor

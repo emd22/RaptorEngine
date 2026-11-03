@@ -27,12 +27,16 @@ struct CompiledMapVertex
 	/// The fourth value is the handedness
 	Vec4f Tangent;
 	Vec2f Texcoord;
+	/// Named so it is copied and written as zeros instead of whatever the allocation held
+	float32 Padding[2] = {};
 
 	// float32 Position[3];
 	// float32 Normal[3];
 	// float32 Tangent[4];
 	// float32 Texcoord[2];
 };
+
+static_assert(sizeof(CompiledMapVertex) == 64, "CompiledMapVertex is written to .fxmap files as is");
 
 struct CompiledMapMaterial
 {

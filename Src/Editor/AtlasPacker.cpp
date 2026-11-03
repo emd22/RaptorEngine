@@ -26,7 +26,7 @@ static uint32 FindLastSeparator(const String& path)
 	return std::max(slash, backslash);
 }
 
-static bool IsGroupNameUsed(const DynArray<AtlasGroup>& groups, const String& name)
+static bool IsGroupNameUsed(const AtlasGroupArray& groups, const String& name)
 {
 	for (const AtlasGroup& group : groups) {
 		if (group.Name == name) {
@@ -66,7 +66,12 @@ String ReplacePathExtension(const String& path, const char* extension)
 
 	const bool has_extension = dot != String::scNotFound && (separator == String::scNotFound || dot > separator + 1);
 
-	return (has_extension ? path.SubStr(0, dot) : path) + extension;
+	String base = path;
+	if (has_extension) {
+		base = path.SubStr(0, dot);
+	}
+
+	return base + extension;
 }
 
 bool LoadAtlasImage(const String& path, AtlasImage& out_image)
@@ -87,10 +92,14 @@ bool LoadAtlasImage(const String& path, AtlasImage& out_image)
 	const String file_name = GetPathFileName(path);
 	const uint32 dot = file_name.FindLast('.');
 
+	String base_name = file_name;
+	if (dot != String::scNotFound && dot != 0) {
+		base_name = file_name.SubStr(0, dot);
+	}
+
 	out_image.Path = path;
-	out_image.Name = MakeGroupName(dot == String::scNotFound || dot == 0 ? file_name : file_name.SubStr(0, dot));
-	out_image.Width = width;
-	out_image.Height = height;
+	out_image.Name = MakeGroupName(base_name);
+	out_image.Size = Vec2i(width, height);
 	out_image.Pixels = SizedArray<uint8>::CreateCopyOf(data, static_cast<size_t>(width) * height * 4);
 
 	stbi_image_free(data);
@@ -100,7 +109,11 @@ bool LoadAtlasImage(const String& path, AtlasImage& out_image)
 String MakeGroupName(const String& raw)
 {
 	const bool needs_prefix = raw.IsEmpty() || std::isdigit(static_cast<unsigned char>(raw.CStr()[0])) != 0;
-	const uint32 offset = needs_prefix ? 1 : 0;
+
+	uint32 offset = 0;
+	if (needs_prefix) {
+		offset = 1;
+	}
 
 	SizedArray<char> name(raw.GetLength() + offset + 1);
 	name.MarkFull();
@@ -111,7 +124,13 @@ String MakeGroupName(const String& raw)
 
 	for (uint32 i = 0; i < raw.GetLength(); i++) {
 		const char ch = raw.CStr()[i];
-		name[i + offset] = IsGroupNameChar(ch) ? ch : '_';
+
+		char name_char = '_';
+		if (IsGroupNameChar(ch)) {
+			name_char = ch;
+		}
+
+		name[i + offset] = name_char;
 	}
 
 	return String(name.pData, raw.GetLength() + offset);
@@ -126,30 +145,29 @@ int32 GetTilesForSize(int32 pixels, int32 tile_size)
 	return std::max(1, (pixels + tile_size - 1) / tile_size);
 }
 
-AtlasLayout PackAtlas(const DynArray<AtlasImage>& images, int32 tile_size, int32 columns)
+AtlasLayout PackAtlas(const AtlasImageArray& images, int32 tile_size, int32 columns)
 {
 	AtlasLayout layout;
 	layout.TileSize = std::max(1, tile_size);
-	layout.Columns = std::max(1, columns);
+	layout.TileCount.X = std::max(1, columns);
 	layout.Groups.SetPageSize(16);
 
 	int32 max_rows = 1;
 
 	for (const AtlasImage& image : images) {
-		layout.Columns = std::max(layout.Columns, GetTilesForSize(image.Width, layout.TileSize));
-		max_rows += GetTilesForSize(image.Height, layout.TileSize);
+		layout.TileCount.X = std::max(layout.TileCount.X, GetTilesForSize(image.Size.X, layout.TileSize));
+		max_rows += GetTilesForSize(image.Size.Y, layout.TileSize);
 	}
 
-	const size_t grid_size = static_cast<size_t>(layout.Columns) * max_rows;
-	SizedArray<uint8> occupied(grid_size);
-	occupied.MarkFull();
-	std::memset(occupied.pData, 0, grid_size);
+	const size_t grid_size = static_cast<size_t>(layout.TileCount.X) * max_rows;
+	SizedArray<uint8> occupied;
+	occupied.InitSize(grid_size, 0);
 
 	auto is_free = [&](int32 x, int32 y, int32 w, int32 h)
 	{
 		for (int32 row = y; row < y + h; row++) {
 			for (int32 col = x; col < x + w; col++) {
-				if (occupied[static_cast<size_t>(row) * layout.Columns + col] != 0) {
+				if (occupied[static_cast<size_t>(row) * layout.TileCount.X + col] != 0) {
 					return false;
 				}
 			}
@@ -160,10 +178,9 @@ AtlasLayout PackAtlas(const DynArray<AtlasImage>& images, int32 tile_size, int32
 
 	for (const AtlasImage& image : images) {
 		AtlasGroup group;
-		group.TilesWide = GetTilesForSize(image.Width, layout.TileSize);
-		group.TilesHigh = GetTilesForSize(image.Height, layout.TileSize);
-		group.SourceWidth = image.Width;
-		group.SourceHeight = image.Height;
+		group.TileCount.X = GetTilesForSize(image.Size.X, layout.TileSize);
+		group.TileCount.Y = GetTilesForSize(image.Size.Y, layout.TileSize);
+		group.SourceSize = image.Size;
 
 		const String name = MakeGroupName(image.Name);
 		group.Name = name;
@@ -181,10 +198,9 @@ AtlasLayout PackAtlas(const DynArray<AtlasImage>& images, int32 tile_size, int32
 				break;
 			}
 
-			for (int32 x = 0; x + group.TilesWide <= layout.Columns; x++) {
-				if (is_free(x, y, group.TilesWide, group.TilesHigh)) {
-					group.TileX = x;
-					group.TileY = y;
+			for (int32 x = 0; x + group.TileCount.X <= layout.TileCount.X; x++) {
+				if (is_free(x, y, group.TileCount.X, group.TileCount.Y)) {
+					group.TilePos = Vec2i(x, y);
 					placed = true;
 					break;
 				}
@@ -193,42 +209,42 @@ AtlasLayout PackAtlas(const DynArray<AtlasImage>& images, int32 tile_size, int32
 			++y;
 		}
 
-		for (int32 row = group.TileY; row < group.TileY + group.TilesHigh; row++) {
-			for (int32 col = group.TileX; col < group.TileX + group.TilesWide; col++) {
-				occupied[static_cast<size_t>(row) * layout.Columns + col] = 1;
+		for (int32 row = group.TilePos.Y; row < group.TilePos.Y + group.TileCount.Y; row++) {
+			for (int32 col = group.TilePos.X; col < group.TilePos.X + group.TileCount.X; col++) {
+				occupied[static_cast<size_t>(row) * layout.TileCount.X + col] = 1;
 			}
 		}
 
-		layout.Rows = std::max(layout.Rows, group.TileY + group.TilesHigh);
+		layout.TileCount.Y = std::max(layout.TileCount.Y, group.TilePos.Y + group.TileCount.Y);
 		layout.Groups.Emplace(std::move(group));
 	}
 
-	layout.Rows = std::max(layout.Rows, 1);
+	layout.TileCount.Y = std::max(layout.TileCount.Y, 1);
 
 	return layout;
 }
 
-SizedArray<uint8> ComposeAtlas(const DynArray<AtlasImage>& images, const AtlasLayout& layout)
+SizedArray<uint8> ComposeAtlas(const AtlasImageArray& images, const AtlasLayout& layout)
 {
-	const size_t atlas_width = static_cast<size_t>(layout.GetWidth());
-	const size_t atlas_bytes = atlas_width * layout.GetHeight() * 4;
+	const Vec2i pixel_size = layout.GetPixelSize();
+	const size_t atlas_width = static_cast<size_t>(pixel_size.X);
+	const size_t atlas_bytes = atlas_width * pixel_size.Y * 4;
 
-	SizedArray<uint8> atlas(atlas_bytes);
-	atlas.MarkFull();
-	std::memset(atlas.pData, 0, atlas_bytes);
+	SizedArray<uint8> atlas;
+	atlas.InitSize(atlas_bytes, 0);
 
 	for (uint32 i = 0; i < images.Size && i < layout.Groups.Size; i++) {
 		const AtlasImage& image = images[i];
 		const AtlasGroup& group = layout.Groups[i];
 
-		const size_t dest_x = static_cast<size_t>(group.TileX) * layout.TileSize;
-		const size_t dest_y = static_cast<size_t>(group.TileY) * layout.TileSize;
+		const size_t dest_x = static_cast<size_t>(group.TilePos.X) * layout.TileSize;
+		const size_t dest_y = static_cast<size_t>(group.TilePos.Y) * layout.TileSize;
 
-		for (int32 row = 0; row < image.Height; row++) {
-			const uint8* source = image.Pixels.pData + static_cast<size_t>(row) * image.Width * 4;
+		for (int32 row = 0; row < image.Size.Y; row++) {
+			const uint8* source = image.Pixels.pData + static_cast<size_t>(row) * image.Size.X * 4;
 			uint8* dest = atlas.pData + ((dest_y + row) * atlas_width + dest_x) * 4;
 
-			std::memcpy(dest, source, static_cast<size_t>(image.Width) * 4);
+			std::memcpy(dest, source, static_cast<size_t>(image.Size.X) * 4);
 		}
 	}
 

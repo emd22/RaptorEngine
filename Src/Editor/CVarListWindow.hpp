@@ -28,8 +28,10 @@ public:
 		String Value;
 	};
 
+	using RowArray = DynArray<Row, GrowthFunctions::Double>;
+
 private:
-	void ShowRows(DynArray<Row> rows);
+	void ShowRows(RowArray rows);
 	void RebuildRows(const String& previously_selected);
 	void UpdateValues();
 	void ShowSelected();
@@ -51,7 +53,7 @@ private:
 
 	wxTimer mRefreshTimer;
 
-	DynArray<Row> mShown;
+	RowArray mShown;
 };
 
 } // namespace fx::editor

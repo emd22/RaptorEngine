@@ -20,33 +20,23 @@ using namespace RagdollMath;
 
 namespace {
 
-constexpr float32 scGroundNormalUp = 0.5f;
-constexpr float32 scLostSupportTime = 0.15f;
-constexpr float32 scOnGroundTime = 0.25f;
-constexpr float32 scOnGroundMaxSpeed = 1.5f;
-constexpr float32 scOnGroundRearmTime = 0.5f;
-constexpr float32 scDropRayLength = 50.0f;
-constexpr uint32 scImpactSteps = 16;
-constexpr float32 scImpactStep = 0.05f;
-
-constexpr float32 scElbowDown = 1.0f;
-constexpr float32 scElbowBack = 0.3f;
-constexpr float32 scElbowOut = 0.6f;
-
-constexpr float32 scDebugCross = 0.05f;
-
 void DrawCross(const Vec3f point, Color color)
 {
-	renderer::gDebugDraw->Line(point - Vec3f(scDebugCross, 0.0f, 0.0f), point + Vec3f(scDebugCross, 0.0f, 0.0f), color);
-	renderer::gDebugDraw->Line(point - Vec3f(0.0f, scDebugCross, 0.0f), point + Vec3f(0.0f, scDebugCross, 0.0f), color);
-	renderer::gDebugDraw->Line(point - Vec3f(0.0f, 0.0f, scDebugCross), point + Vec3f(0.0f, 0.0f, scDebugCross), color);
+	constexpr float32 scDebugCross = 0.05f;
+
+	const Vec3f axes[3] = { Vec3f(scDebugCross, 0.0f, 0.0f), Vec3f(0.0f, scDebugCross, 0.0f),
+							Vec3f(0.0f, 0.0f, scDebugCross) };
+
+	for (const Vec3f axis : axes) {
+		renderer::gDebugDraw->Line(point - axis, point + axis, color);
+	}
 }
 
 } // namespace
 
 RagdollBehaviours::RagdollBehaviours()
-	: mBehaviours { &mFallen,	   &mStagger,  &mArmBalance, &mImpactRelax, &mShot, &mBrace,
-					&mProtectHead, &mHighFall, &mWrithe,	 &mDying }
+	: mBehaviours { &mFallen, &mStagger,	 &mArmBalance, &mImpactRelax, &mShot,
+					&mBrace,  &mProtectHead, &mHighFall,   &mWrithe,	  &mDying }
 {
 	std::copy(mBehaviours, mBehaviours + scBehaviourCount, mOrder);
 }
@@ -135,6 +125,9 @@ void RagdollBehaviours::SetAlive(bool alive) { mContext.bAlive = alive; }
 
 void RagdollBehaviours::Sense(Ragdoll& ragdoll, float32 delta_time)
 {
+	constexpr float32 scGroundNormalUp = 0.5f;
+	constexpr float32 scDropRayLength = 50.0f;
+
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
 	const GravityFrame frame = GravityFrame::FromPhysics();
 	const Vec3f up = Vec3f::FromJolt(frame.Up);
@@ -241,6 +234,9 @@ void RagdollBehaviours::SenseChestFrame(const Ragdoll& ragdoll)
 
 void RagdollBehaviours::PredictImpact()
 {
+	constexpr uint32 scImpactSteps = 16;
+	constexpr float32 scImpactStep = 0.05f;
+
 	BehaviourContext& ctx = mContext;
 
 	const BehaviourBody& chest = ctx.Bodies[mpRig->Chest];
@@ -279,6 +275,11 @@ void RagdollBehaviours::PredictImpact()
 
 void RagdollBehaviours::EmitSupportEvents(float32 delta_time)
 {
+	constexpr float32 scLostSupportTime = 0.15f;
+	constexpr float32 scOnGroundTime = 0.25f;
+	constexpr float32 scOnGroundMaxSpeed = 1.5f;
+	constexpr float32 scOnGroundRearmTime = 0.5f;
+
 	const BehaviourContext& ctx = mContext;
 
 	if (ctx.bFeetSupported || ctx.bBodyOnGround || !ctx.bAirborne) {
@@ -461,6 +462,10 @@ void RagdollBehaviours::FoldOverride(uint32 body, const JPH::Quat& pose, float32
 
 void RagdollBehaviours::SolveArm(uint32 arm, const BehaviourGoal& goal, float32 weight)
 {
+	constexpr float32 scElbowDown = 1.0f;
+	constexpr float32 scElbowBack = 0.3f;
+	constexpr float32 scElbowOut = 0.6f;
+
 	const BehaviourContext& ctx = mContext;
 	const RagdollRigArm& chain = mpRig->Arms[arm];
 

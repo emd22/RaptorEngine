@@ -45,8 +45,6 @@ template <typename T>
 class FieldBase : public FieldBaseImpl
 {
 public:
-	static constexpr int32 scFieldWidth = 56;
-	static constexpr int32 scVectorFieldWidth = 40;
 	static constexpr uint32 scFloatPrecision = 3;
 
 	using TRefType = TGetConstRef<T>;
@@ -165,9 +163,6 @@ void RelayoutToScroller(wxWindow* window);
 
 class PropertySection : public wxPanel
 {
-public:
-	static constexpr int32 scMinLabelWidth = 96;
-
 public:
 	PropertySection(wxWindow* parent, const wxString& title, bool expanded = true);
 

@@ -18,17 +18,6 @@
 
 namespace fx::editor {
 
-static constexpr float32 scMarkerHalfExtent = 0.12f;
-static constexpr float32 scDirectionLength = 1.5f;
-static constexpr float32 scDirectionTipHalfExtent = 0.05f;
-
-static constexpr float32 scEditTolerance = 0.0005f;
-
-static constexpr float32 scNewLightRadius = 8.0f;
-static const float32 scNewLightInnerAngle = MathUtil::DegreesToRadians(30.0f);
-static const float32 scNewLightOuterAngle = MathUtil::DegreesToRadians(40.0f);
-
-
 Vec3f SnapDirection(const Vec3f direction)
 {
 	const float32 step_degrees = gEditor->GetAngleSnapStep();
@@ -107,7 +96,7 @@ void LightEditor::AimSelected(const Vec3f direction)
 	gEditor->EmplaceEditOperation<LightTransformOperation>(light, position, position, before, after);
 }
 
-LightSpot* LightEditor::Create(const Vec3f position)
+static Name MakeUniqueLightName()
 {
 	uint32 index = gLightManager->GetCache().Size;
 	Name name;
@@ -115,6 +104,17 @@ LightSpot* LightEditor::Create(const Vec3f position)
 	do {
 		name = String::Fmt("Light_{}", index++).Str();
 	} while (gLightManager->FindLight(name.GetHash()) != nullptr);
+
+	return name;
+}
+
+LightSpot* LightEditor::Create(const Vec3f position)
+{
+	constexpr float32 scNewLightRadius = 8.0f;
+	const float32 scNewLightInnerAngle = MathUtil::DegreesToRadians(30.0f);
+	const float32 scNewLightOuterAngle = MathUtil::DegreesToRadians(40.0f);
+
+	const Name name = MakeUniqueLightName();
 
 	LightSnapshot snapshot;
 
@@ -157,12 +157,7 @@ void LightEditor::DuplicateSelected()
 		return;
 	}
 
-	uint32 index = gLightManager->GetCache().Size;
-	Name name;
-
-	do {
-		name = String::Fmt("Light_{}", index++).Str();
-	} while (gLightManager->FindLight(name.GetHash()) != nullptr);
+	const Name name = MakeUniqueLightName();
 
 	LightSnapshot snapshot = LightSnapshot::Capture(*light);
 	snapshot.LightName = name;
@@ -177,6 +172,7 @@ void LightEditor::DuplicateSelected()
 void LightEditor::DrawMarkers()
 {
 	const EditorTheme::MarkerColors& colors = gEditor->GetTheme().Marker;
+	constexpr float32 scMarkerHalfExtent = 0.12f;
 
 	for (const Ref<LightBase>& base : gLightManager->GetCache()) {
 		if (!base.IsValid() || base->Type != eLightType::Spot) {
@@ -185,7 +181,11 @@ void LightEditor::DrawMarkers()
 
 		LightSpot& light = static_cast<LightSpot&>(*base);
 
-		const Color color = (light.ID == mSelectedID) ? colors.LightSelected : colors.Light;
+		Color color = colors.Light;
+		if (light.ID == mSelectedID) {
+			color = colors.LightSelected;
+		}
+
 		const Vec3f position = light.GetPosition();
 		const Vec3f tip = position + (light.GetDirection().Normalize() * scDirectionLength);
 

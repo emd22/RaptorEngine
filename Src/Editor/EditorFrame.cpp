@@ -47,11 +47,6 @@
 
 namespace fx::editor {
 
-static constexpr int32 scSidePanelWidth = 300;
-static constexpr int32 scMinimumSidePanelWidth = 220;
-static constexpr size_t scToolSettingsSlotIndex = 3;
-static constexpr int32 scMinimumPaneSize = 160;
-
 enum eStatusField : int
 {
 	StatusField_Message,
@@ -61,8 +56,6 @@ enum eStatusField : int
 
 	StatusField_Count,
 };
-
-static constexpr const char* scDefaultBlockoutPath = "RaptorData/Data/blockouts/btemp.prx";
 
 class EditorSplitter : public wxSplitterWindow
 {
@@ -116,6 +109,8 @@ static String ToBlockoutPath(const std::filesystem::path& chosen)
 
 static std::filesystem::path GetBlockoutDialogStart(const String& blockout_path)
 {
+	constexpr const char* scDefaultBlockoutPath = "RaptorData/Data/blockouts/btemp.prx";
+
 	if (blockout_path.IsEmpty()) {
 		return std::filesystem::absolute(scDefaultBlockoutPath);
 	}
@@ -486,7 +481,7 @@ wxMenu* EditorFrame::CreateViewMenu()
 
 	{
 		wxMenu* theme_menu = new wxMenu;
-		const DynArray<EditorTheme>& themes = GetThemeLibrary().GetThemes();
+		const EditorThemeArray& themes = GetThemeLibrary().GetThemes();
 
 		for (uint32 index = 0; index < themes.Size; index++) {
 			wxMenuItem* theme_item = theme_menu->AppendRadioItem(
@@ -594,6 +589,10 @@ wxMenu* EditorFrame::CreateSubviewMenu()
 
 EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : wxFrame(nullptr, wxID_ANY, title)
 {
+	constexpr int32 scSidePanelWidth = 300;
+	constexpr int32 scMinimumSidePanelWidth = 220;
+	constexpr int32 scMinimumPaneSize = 160;
+
 	GetThemeLibrary().Load();
 
 	wxMenuBar* menu_bar = new wxMenuBar;
@@ -945,12 +944,23 @@ void EditorFrame::ShowView(const eEditorView view)
 
 void EditorFrame::ApplySplitLayout(const eEditorView view)
 {
-	const wxSplitMode wanted_mode = mbStackedSplit ? wxSPLIT_HORIZONTAL : wxSPLIT_VERTICAL;
+	wxSplitMode wanted_mode = wxSPLIT_VERTICAL;
+
+	if (mbStackedSplit) {
+		wanted_mode = wxSPLIT_HORIZONTAL;
+	}
 
 	const auto extent = [this](wxSplitMode mode)
 	{
 		const wxSize size = mpSplitter->GetClientSize();
-		return std::max((mode == wxSPLIT_HORIZONTAL) ? size.y : size.x, 1);
+
+		int extent_px = size.x;
+
+		if (mode == wxSPLIT_HORIZONTAL) {
+			extent_px = size.y;
+		}
+
+		return std::max(extent_px, 1);
 	};
 
 	if (mpSplitter->IsSplit()) {
@@ -959,8 +969,11 @@ void EditorFrame::ApplySplitLayout(const eEditorView view)
 								   0.1f, 0.9f);
 
 		if (view != eEditorView::Split || mpSplitter->GetSplitMode() != wanted_mode) {
-			wxWindow* removed = (view == eEditorView::Architect) ? static_cast<wxWindow*>(mpViewport)
-																 : static_cast<wxWindow*>(mpTopViewPanel);
+			wxWindow* removed = static_cast<wxWindow*>(mpTopViewPanel);
+
+			if (view == eEditorView::Architect) {
+				removed = static_cast<wxWindow*>(mpViewport);
+			}
 
 			mpSplitter->Unsplit(removed);
 		}
@@ -984,8 +997,12 @@ void EditorFrame::ApplySplitLayout(const eEditorView view)
 		return;
 	}
 
-	wxWindow* wanted = (view == eEditorView::Architect) ? static_cast<wxWindow*>(mpTopViewPanel)
-														: static_cast<wxWindow*>(mpViewport);
+	wxWindow* wanted = static_cast<wxWindow*>(mpViewport);
+
+	if (view == eEditorView::Architect) {
+		wanted = static_cast<wxWindow*>(mpTopViewPanel);
+	}
+
 	wxWindow* current = mpSplitter->GetWindow1();
 
 	if (current != wanted) {
@@ -998,6 +1015,8 @@ void EditorFrame::ApplySplitLayout(const eEditorView view)
 
 void EditorFrame::SetToolSettingsPanel(ToolSettingsBasePanel* new_panel)
 {
+	constexpr size_t scToolSettingsSlotIndex = 3;
+
 	if (mpToolSettingsPanel != nullptr) {
 		mpComponentSizer->Detach(mpToolSettingsPanel);
 		mpToolSettingsPanel->Destroy();

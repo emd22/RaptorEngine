@@ -32,13 +32,7 @@ const char* ReadBrushMaterialName(const ConfigEntry& entry);
  */
 Brush ReadBrushEntry(ConfigEntry& entry);
 
-constexpr const char* scFaceMaterialsName = "facemats";
-
-constexpr const char* scBrushMaterialName = "-";
-
 void WriteFaceMaterials(ConfigEntry& entry, const Brush& brush);
-
-constexpr const char* scPatchName = "patch";
 
 bool IsPatchEntry(const ConfigEntry& entry);
 Patch ReadPatchEntry(ConfigEntry& entry);

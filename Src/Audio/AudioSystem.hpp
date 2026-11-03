@@ -1,12 +1,13 @@
 #pragma once
 
 #include <Audio/SpatialAudio.hpp>
+#include <Core/DynArray.hpp>
 #include <Core/Hash.hpp>
+#include <Core/SizedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
 #include <Math/Vec3.hpp>
 #include <functional>
-#include <vector>
 
 namespace fx {
 
@@ -64,8 +65,8 @@ struct SoundDef
 {
 	String Name;
 	Hash32 NameHash = 0;
-	std::vector<String> Files;
-	std::vector<SoundClip> Clips;
+	DynArray<String, GrowthFunctions::Double> Files;
+	DynArray<SoundClip, GrowthFunctions::Double> Clips;
 
 	uint32 Bus = static_cast<uint32>(eSoundBus::Sfx);
 	SoundRange Volume { 1.0f, 1.0f };
@@ -172,15 +173,12 @@ public:
 	static constexpr const char* scSoundDirectory = "RaptorData/Data/Sounds";
 	static constexpr float32 scSurfaceSoundOffset = 0.1f;
 	static constexpr float32 scDeclickSeconds = 0.005f;
-	static constexpr float32 scMaxStartDelaySeconds = 0.05f;
-	static constexpr uint32 scOutputChannels = 2;
 
 	static constexpr const char* scMixPath = "RaptorData/Data/Sounds/Mix/mix.conf";
 	static constexpr uint32 scMaxBuses = 32;
 	static constexpr uint32 scMaxDucks = 32;
 	static constexpr uint32 scMaxSnapshots = 32;
 	static constexpr float32 scLowpassOpen = 20000.0f;
-	static constexpr float32 scMaxUpdateStepSeconds = 0.1f;
 
 public:
 	AudioSystem() = default;
@@ -243,7 +241,7 @@ public:
 
 	void SetPathGainFunction(PathGainFunction function) { mPathGain = std::move(function); }
 	void SetAcousticScene(const AcousticGeometry& geometry);
-	void SetBakedAcoustics(const std::vector<uint8>& data);
+	void SetBakedAcoustics(const SizedArray<uint8>& data);
 
 	const SpatialAudio& GetSpatial() const { return mSpatial; }
 
@@ -252,7 +250,7 @@ public:
 	uint32 GetSampleRate() const;
 	uint32 GetChannelCount() const;
 	const SoundDef* FindDef(Hash32 name_hash) const;
-	const std::vector<SoundDef>& GetDefs() const { return mDefs; }
+	const DynArray<SoundDef, GrowthFunctions::Double>& GetDefs() const { return mDefs; }
 
 private:
 	struct Backend;
@@ -317,7 +315,7 @@ private:
 private:
 	Backend* mpBackend = nullptr;
 
-	std::vector<SoundDef> mDefs;
+	DynArray<SoundDef, GrowthFunctions::Double> mDefs;
 
 	Voice mVoices[scMaxVoices];
 	uint32 mActiveVoiceCount = 0;

@@ -74,9 +74,6 @@ private:
 	wxChoice* mpReflectionDebugChoice = nullptr;
 	wxString mShownReflectionStatus;
 	int64 mShownReflectionDebug = -1;
-
-	Vec3f mShownPosition = Vec3f::sZero;
-	bool mbShowingAnything = true;
 };
 
 } // namespace fx::editor

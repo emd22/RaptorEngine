@@ -9,9 +9,6 @@ namespace fx::mapc {
 
 namespace {
 
-constexpr double scHullEpsilon = 1e-9;
-constexpr double scHullPointEpsilon = 1e-7;
-
 struct AreaSets
 {
 	Array<int32> Parents;
@@ -65,13 +62,11 @@ Vec3d GetCellPoint(const Polyhedron& cell)
 	return sum * (1.0 / count);
 }
 
-double Cross2(const Vec2d& origin, const Vec2d& a, const Vec2d& b)
-{
-	return (a.X - origin.X) * (b.Y - origin.Y) - (a.Y - origin.Y) * (b.X - origin.X);
-}
-
 Winding MergeConvex(const Array<Winding>& pieces, const Plane& plane)
 {
+	constexpr double scHullEpsilon = 1e-9;
+	constexpr double scHullPointEpsilon = 1e-7;
+
 	const Vec3d normal = plane.Normal;
 
 	Vec3d axis = Vec3d(0.0);
@@ -138,7 +133,7 @@ Winding MergeConvex(const Array<Winding>& pieces, const Plane& plane)
 			const Vec2d& point = unique[point_index];
 
 			while (chain.Size >= start + 2 &&
-				   Cross2(chain[chain.Size - 2], chain[chain.Size - 1], point) <= scHullEpsilon) {
+				   chain[chain.Size - 1].CrossOffset(point, chain[chain.Size - 2]) <= scHullEpsilon) {
 				chain.RemoveLast();
 			}
 
@@ -422,7 +417,12 @@ int32 AreaBuilder::WriteNode(const PlaneSet& planes, const Bsp& bsp, int32 node_
 	const Node& node = bsp.Nodes[static_cast<size_t>(node_index)];
 
 	if (node.IsLeaf()) {
-		return CompiledMap::MakeLeafChild(node.bSolid ? scNoMapArea : node.Area);
+		int32 leaf_area = node.Area;
+		if (node.bSolid) {
+			leaf_area = scNoMapArea;
+		}
+
+		return CompiledMap::MakeLeafChild(leaf_area);
 	}
 
 	const int32 front = WriteNode(planes, bsp, node.Front, out_nodes);

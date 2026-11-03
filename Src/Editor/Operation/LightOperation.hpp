@@ -2,8 +2,6 @@
 
 #include "BaseOperation.hpp"
 
-#include <vector>
-
 
 namespace fx {
 

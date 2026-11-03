@@ -11,15 +11,15 @@ namespace {
 
 float32 RandomInterval(const SoundEmitter& emitter)
 {
-	const float32 unit = static_cast<float32>(FastRand32() >> 8) * (1.0f / 16777216.0f);
-	return emitter.MinInterval + (std::max(emitter.MaxInterval, emitter.MinInterval) - emitter.MinInterval) * unit;
+	return emitter.MinInterval +
+		   (std::max(emitter.MaxInterval, emitter.MinInterval) - emitter.MinInterval) * FastRandUnit();
 }
 
 } // namespace
 
 SoundEmitter& SoundEmitterSet::Add(const SoundEmitter& emitter)
 {
-	SoundEmitter& added = mEmitters.emplace_back(emitter);
+	SoundEmitter& added = mEmitters.Emplace(emitter);
 
 	if (added.Id == 0) {
 		added.Id = NewId();
@@ -31,22 +31,22 @@ SoundEmitter& SoundEmitterSet::Add(const SoundEmitter& emitter)
 		added.Name = NewName();
 	}
 
-	mStates.emplace_back();
+	mStates.Emplace();
 
 	return added;
 }
 
 bool SoundEmitterSet::Remove(uint32 id)
 {
-	for (size_t i = 0; i < mEmitters.size(); i++) {
+	for (uint32 i = 0; i < mEmitters.Size; i++) {
 		if (mEmitters[i].Id != id) {
 			continue;
 		}
 
 		Stop(mStates[i]);
 
-		mEmitters.erase(mEmitters.begin() + static_cast<std::ptrdiff_t>(i));
-		mStates.erase(mStates.begin() + static_cast<std::ptrdiff_t>(i));
+		mEmitters.RemoveAt(i);
+		mStates.RemoveAt(i);
 
 		return true;
 	}
@@ -71,8 +71,8 @@ void SoundEmitterSet::Clear()
 {
 	StopAll();
 
-	mEmitters.clear();
-	mStates.clear();
+	mEmitters.Clear();
+	mStates.Clear();
 	mNextId = 1;
 }
 
@@ -91,7 +91,7 @@ const SoundEmitter* SoundEmitterSet::Find(uint32 id) const { return const_cast<S
 
 String SoundEmitterSet::NewName() const
 {
-	uint32 index = static_cast<uint32>(mEmitters.size());
+	uint32 index = mEmitters.Size;
 
 	while (true) {
 		const String name = String::Fmt("Sound_{}", index++);
@@ -121,14 +121,16 @@ void SoundEmitterSet::StopAll()
 
 void SoundEmitterSet::Update(float32 delta_time, const Vec3f listener)
 {
-	for (size_t i = 0; i < mEmitters.size(); i++) {
+	for (uint32 i = 0; i < mEmitters.Size; i++) {
 		UpdateEmitter(mEmitters[i], mStates[i], delta_time, listener);
 	}
 }
 
-void SoundEmitterSet::UpdateEmitter(const SoundEmitter& emitter, State& state, float32 delta_time,
-									const Vec3f listener)
+void SoundEmitterSet::UpdateEmitter(const SoundEmitter& emitter, State& state, float32 delta_time, const Vec3f listener)
 {
+	constexpr float32 scStartReachScale = 1.1f;
+	constexpr float32 scStopReachScale = 1.25f;
+
 	const Hash32 sound = HashStr32(emitter.Sound.CStr());
 
 	if (state.PlayingSound != sound) {

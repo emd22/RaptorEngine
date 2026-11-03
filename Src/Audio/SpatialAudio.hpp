@@ -1,10 +1,10 @@
 #pragma once
 
 #include <Audio/Acoustics.hpp>
+#include <Core/SizedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
 #include <Math/Vec3.hpp>
-#include <vector>
 
 struct ma_engine;
 struct ma_node_base;
@@ -30,32 +30,17 @@ class SpatialAudio
 {
 public:
 	static constexpr uint32 scFrameSize = 512;
-	static constexpr float32 scOcclusionRadius = 0.4f;
 	static constexpr int32 scOcclusionSamples = 8;
-	static constexpr int32 scTransmissionRays = 8;
-	static constexpr float32 scOcclusionOpenSeconds = 0.05f;
-	static constexpr float32 scOcclusionCloseSeconds = 0.12f;
-	static constexpr float32 scMaxSimulateStepSeconds = 0.1f;
 
 	static constexpr int32 scMaxReverbRays = 8192;
 	static constexpr int32 scDefaultReverbRays = 2048;
 	static constexpr int32 scDefaultReverbBounces = 64;
-	static constexpr int32 scMaxReverbBounces = 256;
-	static constexpr int32 scReverbDiffuseSamples = 32;
 	static constexpr float32 scReverbDuration = 2.0f;
 	static constexpr int32 scReverbOrder = 1;
 	static constexpr uint32 scReverbChannels = (scReverbOrder + 1) * (scReverbOrder + 1);
-	static constexpr float32 scReverbIntervalSeconds = 0.1f;
-	static constexpr float32 scOccludedReverbSend = 0.35f;
-	static constexpr float32 scOccludedGainFloorLow = 0.01f;
-	static constexpr float32 scOccludedGainFloorHigh = 0.001f;
 
 	static constexpr int32 scPathingOrder = Acoustics::scProbeOrder;
 	static constexpr uint32 scPathingCoefficients = (scPathingOrder + 1) * (scPathingOrder + 1);
-	static constexpr int32 scPathingVisSamples = 4;
-	static constexpr float32 scPathingVisRadius = 0.5f;
-	static constexpr float32 scPathingVisThreshold = 0.1f;
-	static constexpr float32 scPathingVisRange = 50.0f;
 
 public:
 	SpatialAudio() = default;
@@ -88,7 +73,7 @@ public:
 	void SetScene(const AcousticGeometry& geometry);
 	void ClearScene();
 
-	bool SetBakedProbes(const std::vector<uint8>& data);
+	bool SetBakedProbes(const SizedArray<uint8>& data);
 	bool HasBakedProbes() const { return mBakedProbeCount > 0; }
 	bool HasBakedPathing() const { return mbBakedPathing; }
 	uint32 GetBakedProbeCount() const { return mBakedProbeCount; }

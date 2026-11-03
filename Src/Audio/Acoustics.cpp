@@ -42,9 +42,9 @@ struct MaterialAlias
 };
 
 constexpr MaterialAlias scMaterialAliases[] = {
-	{ "tile", "ceramic" },	  { "tiles", "ceramic" }, { "stone", "rock" },	{ "siding", "wood" },
-	{ "shingle", "wood" },	  { "dirt", "gravel" },	  { "grass", "gravel" }, { "sand", "gravel" },
-	{ "fabric", "carpet" },	  { "cloth", "carpet" },  { "flesh", "carpet" },
+	{ "tile", "ceramic" },	{ "tiles", "ceramic" }, { "stone", "rock" },   { "siding", "wood" },
+	{ "shingle", "wood" },	{ "dirt", "gravel" },	{ "grass", "gravel" }, { "sand", "gravel" },
+	{ "fabric", "carpet" }, { "cloth", "carpet" },	{ "flesh", "carpet" },
 };
 
 using Clock = std::chrono::steady_clock;
@@ -95,12 +95,15 @@ IPLMatrix4x4 MakeBoxTransform(const Vec3f min, const Vec3f max)
 {
 	IPLMatrix4x4 transform {};
 
-	transform.elements[0][0] = max.X - min.X;
-	transform.elements[1][1] = max.Y - min.Y;
-	transform.elements[2][2] = max.Z - min.Z;
-	transform.elements[0][3] = (min.X + max.X) * 0.5f;
-	transform.elements[1][3] = (min.Y + max.Y) * 0.5f;
-	transform.elements[2][3] = (min.Z + max.Z) * 0.5f;
+	const Vec3f extent = max - min;
+	const Vec3f centre = (min + max) * 0.5f;
+
+	transform.elements[0][0] = extent.X;
+	transform.elements[1][1] = extent.Y;
+	transform.elements[2][2] = extent.Z;
+	transform.elements[0][3] = centre.X;
+	transform.elements[1][3] = centre.Y;
+	transform.elements[2][3] = centre.Z;
 	transform.elements[3][3] = 1.0f;
 
 	return transform;
@@ -112,13 +115,13 @@ Vec3f ToAudioSpace(const Vec3f value) { return Vec3f(value.X, value.Y, -value.Z)
 
 AcousticGeometry ToAudioSpace(const AcousticGeometry& geometry)
 {
-	AcousticGeometry audio_geometry = geometry;
+	AcousticGeometry audio_geometry = geometry.Clone();
 
 	for (Vec3f& vertex : audio_geometry.Vertices) {
 		vertex = ToAudioSpace(vertex);
 	}
 
-	for (size_t i = 0; i + 2 < audio_geometry.Indices.size(); i += 3) {
+	for (uint32 i = 0; i + 2 < audio_geometry.Indices.Size; i += 3) {
 		std::swap(audio_geometry.Indices[i + 1], audio_geometry.Indices[i + 2]);
 	}
 
@@ -181,18 +184,18 @@ IPLMaterial GetMaterial(const AcousticSurface& surface)
 	return material;
 }
 
-bool UnwrapProbeData(const std::vector<uint8>& data, const uint8*& out_payload, size_t& out_size, String& out_error)
+bool UnwrapProbeData(const SizedArray<uint8>& data, const uint8*& out_payload, size_t& out_size, String& out_error)
 {
 	ProbeDataHeader header;
 
-	if (data.size() < sizeof(header)) {
+	if (data.Size < sizeof(header)) {
 		out_error = "the data is too short";
 		return false;
 	}
 
-	std::memcpy(&header, data.data(), sizeof(header));
+	std::memcpy(&header, data.pData, sizeof(header));
 
-	if (header.Magic != scProbeDataMagic || header.PayloadSize != data.size() - sizeof(header)) {
+	if (header.Magic != scProbeDataMagic || header.PayloadSize != data.Size - sizeof(header)) {
 		out_error = "the data is not baked acoustic probes";
 		return false;
 	}
@@ -203,7 +206,7 @@ bool UnwrapProbeData(const std::vector<uint8>& data, const uint8*& out_payload, 
 		return false;
 	}
 
-	const uint8* payload = data.data() + sizeof(header);
+	const uint8* payload = data.pData + sizeof(header);
 	const size_t payload_size = static_cast<size_t>(header.PayloadSize);
 
 	if (HashPayload(payload, payload_size) != header.PayloadHash) {
@@ -229,6 +232,15 @@ void IPLCALL OnSteamAudioLog(IPLLogLevel level, const char* message)
 	}
 }
 
+bool CreateContext(IPLContext& out_context)
+{
+	IPLContextSettings context_settings {};
+	context_settings.version = STEAMAUDIO_VERSION;
+	context_settings.logCallback = OnSteamAudioLog;
+
+	return iplContextCreate(&context_settings, &out_context) == IPL_STATUS_SUCCESS;
+}
+
 bool CreateScene(IPLContext context, const AcousticGeometry& audio_geometry, IPLScene& out_scene,
 				 IPLStaticMesh& out_mesh)
 {
@@ -246,15 +258,18 @@ bool CreateScene(IPLContext context, const AcousticGeometry& audio_geometry, IPL
 	const uint32 triangle_count = audio_geometry.GetTriangleCount();
 
 	if (triangle_count > 0) {
-		std::vector<IPLVector3> vertices;
-		vertices.reserve(audio_geometry.Vertices.size());
+		SizedArray<IPLVector3> vertices;
+		vertices.InitCapacity(audio_geometry.Vertices.Size);
 
 		for (const Vec3f vertex : audio_geometry.Vertices) {
-			vertices.push_back(ToIPL(vertex));
+			vertices.Insert(ToIPL(vertex));
 		}
 
-		std::vector<IPLTriangle> triangles(triangle_count);
-		std::vector<IPLint32> material_indices(triangle_count);
+		SizedArray<IPLTriangle> triangles;
+		triangles.InitSize(triangle_count);
+
+		SizedArray<IPLint32> material_indices;
+		material_indices.InitSize(triangle_count);
 
 		for (uint32 i = 0; i < triangle_count; i++) {
 			for (uint32 corner = 0; corner < 3; corner++) {
@@ -264,24 +279,25 @@ bool CreateScene(IPLContext context, const AcousticGeometry& audio_geometry, IPL
 			material_indices[i] = static_cast<IPLint32>(audio_geometry.TriangleSurfaces[i]);
 		}
 
-		std::vector<IPLMaterial> materials;
+		SizedArray<IPLMaterial> materials;
+		materials.InitCapacity(std::max<size_t>(audio_geometry.Surfaces.Size, 1));
 
 		for (const AcousticSurface& surface : audio_geometry.Surfaces) {
-			materials.push_back(GetMaterial(surface));
+			materials.Insert(GetMaterial(surface));
 		}
 
-		if (materials.empty()) {
-			materials.push_back(scMaterialPresets[0].Material);
+		if (materials.IsEmpty()) {
+			materials.Insert(scMaterialPresets[0].Material);
 		}
 
 		IPLStaticMeshSettings mesh_settings {};
-		mesh_settings.numVertices = static_cast<IPLint32>(vertices.size());
+		mesh_settings.numVertices = static_cast<IPLint32>(vertices.Size);
 		mesh_settings.numTriangles = static_cast<IPLint32>(triangle_count);
-		mesh_settings.numMaterials = static_cast<IPLint32>(materials.size());
-		mesh_settings.vertices = vertices.data();
-		mesh_settings.triangles = triangles.data();
-		mesh_settings.materialIndices = material_indices.data();
-		mesh_settings.materials = materials.data();
+		mesh_settings.numMaterials = static_cast<IPLint32>(materials.Size);
+		mesh_settings.vertices = vertices.pData;
+		mesh_settings.triangles = triangles.pData;
+		mesh_settings.materialIndices = material_indices.pData;
+		mesh_settings.materials = materials.pData;
 
 		if (iplStaticMeshCreate(out_scene, &mesh_settings, &out_mesh) != IPL_STATUS_SUCCESS) {
 			LogError(LC_AUDIO, "Could not create the acoustic mesh ({} triangles)", triangle_count);
@@ -313,13 +329,9 @@ bool Bake(const AcousticGeometry& geometry, const AcousticBakeSettings& settings
 		threads = std::max(static_cast<int32>(std::thread::hardware_concurrency()), 1);
 	}
 
-	IPLContextSettings context_settings {};
-	context_settings.version = STEAMAUDIO_VERSION;
-	context_settings.logCallback = OnSteamAudioLog;
-
 	IPLContext context = nullptr;
 
-	if (iplContextCreate(&context_settings, &context) != IPL_STATUS_SUCCESS) {
+	if (!CreateContext(context)) {
 		out_result.Error = "Steam Audio could not start";
 		return false;
 	}
@@ -460,9 +472,9 @@ bool Bake(const AcousticGeometry& geometry, const AcousticBakeSettings& settings
 	header.PayloadSize = size;
 	header.PayloadHash = HashPayload(data, size);
 
-	out_result.Data.resize(sizeof(header) + size);
-	std::memcpy(out_result.Data.data(), &header, sizeof(header));
-	std::memcpy(out_result.Data.data() + sizeof(header), data, size);
+	out_result.Data.InitSize(sizeof(header) + size);
+	std::memcpy(out_result.Data.pData, &header, sizeof(header));
+	std::memcpy(out_result.Data.pData + sizeof(header), data, size);
 
 	release();
 

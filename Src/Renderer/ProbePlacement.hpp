@@ -18,13 +18,11 @@
 #include <Math/Vec3.hpp>
 #include <Renderer/Limits.hpp>
 #include <functional>
-
-namespace fx {
-class Patch;
-}
 #include <limits>
 
 namespace fx {
+
+class Patch;
 
 /// Mirrors ProbeVolume in Shaders/ProbeCommon.hlsli
 struct ProbeVolumeData
@@ -139,7 +137,13 @@ struct ProbeLayout
 			Grid.Emplace(Limits::ProbeGridEmpty);
 		}
 
-		return (count > 0) ? &Grid[first] : nullptr;
+		uint16* first_point = nullptr;
+
+		if (count > 0) {
+			first_point = &Grid[first];
+		}
+
+		return first_point;
 	}
 
 	void Truncate(uint32 grid_point_count, uint32 probe_count)

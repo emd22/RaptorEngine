@@ -8,6 +8,8 @@ namespace editor {
 
 EditHistory::EditHistory(EditorSelection& selection) : mSelection(selection)
 {
+	constexpr uint32 scMaxOperations = 256;
+
 	mOperations.InitCapacity(scMaxOperations);
 }
 
@@ -99,7 +101,11 @@ uint64 EditHistory::GetRevision() const
 {
 	const std::unique_ptr<EditOperation>* last = mOperations.Last();
 
-	return (last != nullptr) ? (*last)->Revision : mBaseRevision;
+	if (last != nullptr) {
+		return (*last)->Revision;
+	}
+
+	return mBaseRevision;
 }
 
 

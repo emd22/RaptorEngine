@@ -1,10 +1,10 @@
 #pragma once
 
 #include <Audio/AudioSystem.hpp>
+#include <Core/DynArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
 #include <Math/Vec3.hpp>
-#include <vector>
 
 namespace fx {
 
@@ -24,10 +24,6 @@ struct SoundEmitter
 class SoundEmitterSet
 {
 public:
-	static constexpr float32 scStartReachScale = 1.1f;
-	static constexpr float32 scStopReachScale = 1.25f;
-
-public:
 	SoundEmitter& Add(const SoundEmitter& emitter);
 	bool Remove(uint32 id);
 	bool Replace(const SoundEmitter& emitter);
@@ -39,7 +35,7 @@ public:
 	uint32 NewId() { return mNextId++; }
 	String NewName() const;
 
-	const std::vector<SoundEmitter>& GetEmitters() const { return mEmitters; }
+	const DynArray<SoundEmitter, GrowthFunctions::Double>& GetEmitters() const { return mEmitters; }
 
 	void Update(float32 delta_time, const Vec3f listener);
 	void StopAll();
@@ -58,8 +54,8 @@ private:
 	void UpdateEmitter(const SoundEmitter& emitter, State& state, float32 delta_time, const Vec3f listener);
 
 private:
-	std::vector<SoundEmitter> mEmitters;
-	std::vector<State> mStates;
+	DynArray<SoundEmitter, GrowthFunctions::Double> mEmitters;
+	DynArray<State, GrowthFunctions::Double> mStates;
 	uint32 mNextId = 1;
 };
 

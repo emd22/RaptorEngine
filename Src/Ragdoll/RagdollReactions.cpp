@@ -16,29 +16,9 @@ using namespace RagdollMath;
 namespace {
 
 constexpr float32 scFlinchAttack = 0.05f;
-/// How far off the spine a hit has to land to give the torso its full turn (m)
-constexpr float32 scTwistLever = 0.15f;
-/// Strength a hit body in the legs or pelvis drops to at the least, since the whole figure is standing on them
-constexpr float32 scAnchorLoosen = 0.6f;
 constexpr float32 scLookAttack = 0.1f;
-constexpr float32 scMinLookDistance = 0.2f;
-constexpr float32 scLookYawLever = 0.15f;
 constexpr float32 scGrabRamp = 0.3f;
-constexpr float32 scGutAttack = 0.08f;
-constexpr float32 scSnapAttack = 0.03f;
-constexpr float32 scLimbAttack = 0.05f;
-constexpr float32 scBehindMargin = -0.1f;
-constexpr float32 scBraceHandLift = 0.06f;
-constexpr float32 scBraceElbowBend = 0.1f;
-constexpr float32 scHeadHandSide = 0.11f;
-constexpr float32 scHeadHandForward = 0.05f;
-constexpr float32 scHeadHandDrop = 0.05f;
 constexpr float32 scFallTimeout = 4.0f;
-constexpr float32 scGroundedStopTime = 0.1f;
-constexpr float32 scWritheResumeTime = 0.5f;
-
-constexpr float32 scTimerFinished = -1.0f;
-
 
 float32 Envelope(float32 time, float32 attack, float32 total)
 {
@@ -55,6 +35,8 @@ float32 Envelope(float32 time, float32 attack, float32 total)
 
 float32 AdvanceTimer(float32 time, float32 delta_time, float32 total)
 {
+	constexpr float32 scTimerFinished = -1.0f;
+
 	if (time < 0.0f) {
 		return scTimerFinished;
 	}
@@ -96,8 +78,22 @@ float32 OutsideDeadZone(float32 value, float32 dead_zone)
 
 bool IsInFront(const BehaviourContext& ctx, const Vec3f point)
 {
+	constexpr float32 scBehindMargin = -0.1f;
+
 	const Vec3f chest = ctx.Bodies[ctx.pRig->Chest].Center;
 	return ctx.Horizontal(point - chest).Dot(ctx.Horizontal(ctx.Forward)) > scBehindMargin;
+}
+
+bool IsLandingEvent(const RagdollEvent& event)
+{
+	return event.Type == eRagdollEvent::Impact || event.Type == eRagdollEvent::OnGround;
+}
+
+void ScaleArmLimbs(BehaviourOutput& out, const RagdollRigArm& arm, float32 scale)
+{
+	out.ScaleStrength(arm.Upper, scale);
+	out.ScaleStrength(arm.Lower, scale);
+	out.ScaleStrength(arm.Hand, scale);
 }
 
 } // namespace
@@ -417,6 +413,9 @@ void ShotReactionBehaviour::Init(const RagdollRig& rig, uint32 body_count)
 
 void ShotReactionBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent& event)
 {
+	// How far off the spine a hit has to land to give the torso its full turn (m)
+	constexpr float32 scTwistLever = 0.15f;
+
 	if (event.Type != eRagdollEvent::Hit || event.Body < 0 || static_cast<uint32>(event.Body) >= ctx.GetBodyCount()) {
 		return;
 	}
@@ -506,6 +505,9 @@ void ShotReactionBehaviour::StartVariant(const BehaviourContext& ctx, const Ragd
 
 void ShotReactionBehaviour::LoosenAround(const BehaviourContext& ctx, uint32 body)
 {
+	// Strength a hit body in the legs or pelvis drops to at the least, since the whole figure is standing on them
+	constexpr float32 scAnchorLoosen = 0.6f;
+
 	const Ragdoll& ragdoll = *ctx.pRagdoll;
 	const uint32 body_count = ctx.GetBodyCount();
 	const float32 loosen = MathUtil::Clamp(Loosen, 0.0f, 1.0f);
@@ -652,6 +654,10 @@ void ShotReactionBehaviour::Update(const BehaviourContext& ctx)
 
 void ShotReactionBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& out) const
 {
+	constexpr float32 scGutAttack = 0.08f;
+	constexpr float32 scSnapAttack = 0.03f;
+	constexpr float32 scLimbAttack = 0.05f;
+
 	const RagdollRig& rig = *ctx.pRig;
 
 	// Stands on its own feet until it's finished with the wound, rather than walking off holding it
@@ -706,10 +712,7 @@ void ShotReactionBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOut
 	const float32 limb_scale = 1.0f - (1.0f - MathUtil::Clamp(LimbStrength, 0.0f, 1.0f)) * injury;
 
 	if (mInjury.Arm >= 0) {
-		const RagdollRigArm& arm = rig.Arms[mInjury.Arm];
-		out.ScaleStrength(arm.Upper, limb_scale);
-		out.ScaleStrength(arm.Lower, limb_scale);
-		out.ScaleStrength(arm.Hand, limb_scale);
+		ScaleArmLimbs(out, rig.Arms[mInjury.Arm], limb_scale);
 	}
 
 	if (mInjury.Leg >= 0) {
@@ -738,9 +741,7 @@ void ShotReactionBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOut
 	const RagdollRigArm& grab_arm = rig.Arms[mWound.Arm];
 	const float32 ease = 1.0f - (1.0f - GrabStrength) * grip;
 
-	out.ScaleStrength(grab_arm.Upper, ease);
-	out.ScaleStrength(grab_arm.Lower, ease);
-	out.ScaleStrength(grab_arm.Hand, ease);
+	ScaleArmLimbs(out, grab_arm, ease);
 
 	out.Hands[mWound.Arm] = BehaviourGoal { .Target = wound + normal * HandOffset,
 											.Weight = MathUtil::SmoothStep(ramp_in) * ramp_out };
@@ -748,6 +749,9 @@ void ShotReactionBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOut
 
 void ShotReactionBehaviour::LookAtWound(const BehaviourContext& ctx, BehaviourOutput& out) const
 {
+	constexpr float32 scMinLookDistance = 0.2f;
+	constexpr float32 scLookYawLever = 0.15f;
+
 	if (mLookBody < 0) {
 		return;
 	}
@@ -803,7 +807,7 @@ void BraceBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent& ev
 		return;
 	}
 
-	if ((event.Type == eRagdollEvent::Impact || event.Type == eRagdollEvent::OnGround) && IsActive()) {
+	if (IsLandingEvent(event) && IsActive()) {
 		mLanding.bLanded = true;
 	}
 }
@@ -863,6 +867,9 @@ void BraceBehaviour::Update(const BehaviourContext& ctx)
 
 void BraceBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& out) const
 {
+	constexpr float32 scBraceHandLift = 0.06f;
+	constexpr float32 scBraceElbowBend = 0.1f;
+
 	if (!mbHasTarget) {
 		return;
 	}
@@ -900,7 +907,7 @@ ProtectHeadBehaviour::ProtectHeadBehaviour() : RagdollBehaviour("protect_head", 
 
 void ProtectHeadBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent& event)
 {
-	if (event.Type == eRagdollEvent::Impact || event.Type == eRagdollEvent::OnGround) {
+	if (IsLandingEvent(event)) {
 		if (IsActive()) {
 			mLanding.bLanded = true;
 		}
@@ -958,6 +965,10 @@ void ProtectHeadBehaviour::Update(const BehaviourContext& ctx)
 
 void ProtectHeadBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& out) const
 {
+	constexpr float32 scHeadHandSide = 0.11f;
+	constexpr float32 scHeadHandForward = 0.05f;
+	constexpr float32 scHeadHandDrop = 0.05f;
+
 	const RagdollRig& rig = *ctx.pRig;
 	const Vec3f head = ctx.Bodies[rig.Neck].Center;
 	const Vec3f chest_up = ctx.GetChestUp();
@@ -1015,7 +1026,7 @@ void HighFallBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent&
 		return;
 	}
 
-	if ((event.Type == eRagdollEvent::Impact || event.Type == eRagdollEvent::OnGround) && IsActive()) {
+	if (IsLandingEvent(event) && IsActive()) {
 		Stop();
 	}
 }
@@ -1024,6 +1035,8 @@ void HighFallBehaviour::OnStart(const BehaviourContext& ctx) { mGroundedTime = 0
 
 void HighFallBehaviour::Update(const BehaviourContext& ctx)
 {
+	constexpr float32 scGroundedStopTime = 0.1f;
+
 	if (!IsActive()) {
 		if (ctx.bFreePose && ctx.AirTime >= MinAirTime && IsHighFall(ctx)) {
 			Start(ctx);
@@ -1114,6 +1127,8 @@ void WritheBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent& e
 
 void WritheBehaviour::Update(const BehaviourContext& ctx)
 {
+	constexpr float32 scWritheResumeTime = 0.5f;
+
 	if (IsActive() && !ctx.bFreePose) {
 		Stop();
 		return;

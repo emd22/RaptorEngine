@@ -39,7 +39,7 @@ public:
 	};
 
 public:
-	bool Load(const std::string& root);
+	bool Load(const String& root);
 
 	FX_FORCE_INLINE uint32 GetCount() const { return static_cast<uint32>(mEntries.Size()); }
 

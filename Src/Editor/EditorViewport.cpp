@@ -13,6 +13,11 @@ namespace fx::editor {
 
 static eKey OffsetKey(eKey base, int32 offset) { return static_cast<eKey>(static_cast<int32>(base) + offset); }
 
+static Vec2f ToMouseMotion(const wxPoint delta)
+{
+	return Vec2f(static_cast<float32>(delta.x), static_cast<float32>(delta.y));
+}
+
 /**
  * @brief Converts a wxWidgets key code to its corresponding Key ID.
  */
@@ -265,7 +270,7 @@ void EditorViewport::OnMouseMove(wxMouseEvent& event)
 	// Relative mode reads the movement in PollRelativeMouse() instead, since the cursor is held in place
 	if (!mbRelativeMouse && mLastMousePos != wxDefaultPosition) {
 		const wxPoint delta = position - mLastMousePos;
-		ControlManager::PostMouseMotion(Vec2f(static_cast<float32>(delta.x), static_cast<float32>(delta.y)));
+		ControlManager::PostMouseMotion(ToMouseMotion(delta));
 	}
 
 	mLastMousePos = position;
@@ -348,7 +353,7 @@ void EditorViewport::PollRelativeMouse()
 	const wxPoint delta = ScreenToClient(wxGetMousePosition()) - center;
 
 	if (delta.x != 0 || delta.y != 0) {
-		ControlManager::PostMouseMotion(Vec2f(static_cast<float32>(delta.x), static_cast<float32>(delta.y)));
+		ControlManager::PostMouseMotion(ToMouseMotion(delta));
 		WarpPointer(center.x, center.y);
 	}
 #endif

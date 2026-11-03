@@ -58,7 +58,14 @@ public:
 
 	uint32 GetProbeCount() const { return mLayout.GetProbeCount(); }
 	Vec3f GetProbePosition(uint32 index) const { return mLayout.Positions[index]; }
-	uint32 GetCurrentProbeIndex() const { return (mBakePhase == eBakePhase::Irradiance) ? mCurrentProbe : UINT32_MAX; }
+	uint32 GetCurrentProbeIndex() const
+	{
+		if (mBakePhase == eBakePhase::Irradiance) {
+			return mCurrentProbe;
+		}
+
+		return UINT32_MAX;
+	}
 
 	uint32 GetVolumeCount() const { return mLayout.VolumeCount; }
 
@@ -88,7 +95,12 @@ public:
 
 	Vec2u GetCaptureExtent() const
 	{
-		const uint32 size = (mBakePhase == eBakePhase::Reflection) ? Limits::ReflectionProbeSize : scCaptureSize;
+		uint32 size = scCaptureSize;
+
+		if (mBakePhase == eBakePhase::Reflection) {
+			size = Limits::ReflectionProbeSize;
+		}
+
 		return Vec2u(size, size);
 	}
 
@@ -170,7 +182,6 @@ private:
 	ProbeInfo mProbeInfos[Limits::MaxIrradianceProbes] {};
 	bool mbGridDirty = true;
 
-	static constexpr uint32 scStaleCheckMaxWaitFrames = 600;
 	bool mbStaleCheckPending = false;
 	bool mbHasBakedLayout = false;
 	uint32 mStaleCheckWaitFrames = 0;

@@ -33,7 +33,6 @@ namespace {
 
 constexpr int scItemBorder = 2;
 constexpr int scSeparatorBorder = 6;
-constexpr int scLetterButtonSize = 32;
 
 struct ToolButtonInfo
 {
@@ -61,16 +60,6 @@ constexpr ToolButtonInfo scToolButtons[] = {
 };
 
 static_assert(std::size(scToolButtons) == static_cast<size_t>(eEditorTool::Count));
-
-constexpr ToolButtonInfo scSimulateButton = {
-	"Simulate", "Play the level in the 3D view. Nothing can be edited while simulating (X in the 3D view)",
-	"Textures/editor_new/simulate.png"
-};
-
-constexpr ToolButtonInfo scSubtractButton = {
-	"Subtract", "Cut the selected brushes out of the brushes they overlap (S). Hold Shift to keep the cutters",
-	"Textures/editor_new/subtract.png"
-};
 
 constexpr const char* scPlaneNames[scViewPlaneCount] = {
 	"Top", "Forward", "Back", "Left", "Right",
@@ -116,10 +105,6 @@ const TextureButtonInfo scTextureAlignButtons[] = {
 	  false },
 };
 
-constexpr Vec2f scTextureOffsetLimits = Vec2f(-100000.0f, 100000.0f);
-constexpr Vec2f scTextureScaleLimits = Vec2f(1.0f / 64.0f, 1024.0f);
-constexpr Vec2f scTextureRotationLimits = Vec2f(-360.0f, 360.0f);
-
 struct PatchMappingInfo
 {
 	const char* pName;
@@ -138,12 +123,12 @@ constexpr const char* scPatchAxisNames[] = { "Auto", "X", "Y", "Z" };
 
 static_assert(std::size(scPatchAxisNames) == static_cast<size_t>(ePatchTextureAxis::Count));
 
-constexpr int scDialogBorder = 10;
-constexpr int scDescriptionIndent = 22;
-constexpr int scDescriptionWrapWidth = 320;
-
 bool ShowPatchTextureDialog(wxWindow* parent, PatchTextureSettings& settings)
 {
+	constexpr int scDialogBorder = 10;
+	constexpr int scDescriptionIndent = 22;
+	constexpr int scDescriptionWrapWidth = 320;
+
 	wxDialog dialog(parent, wxID_ANY, "Patch Texture");
 
 	wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
@@ -271,8 +256,8 @@ bool ShowPatchTextureDialog(wxWindow* parent, PatchTextureSettings& settings)
 }
 
 constexpr const char* scDataFilterNames[] = {
-	"All", "Probe Volumes", "Reflection Probes", "Spawn Points", "Volumes", "Lights", "nvbrush", "dbound", "portal",
-	"Sounds",
+	"All",	  "Probe Volumes", "Reflection Probes", "Spawn Points", "Volumes", "Lights", "nvbrush", "dbound",
+	"portal", "Sounds",
 };
 
 static_assert(std::size(scDataFilterNames) == static_cast<size_t>(eDataFilter::Count));
@@ -300,6 +285,28 @@ OutlineToggleButton* MakeButton(wxWindow* parent, const ToolButtonInfo& info)
 	return button;
 }
 
+void AddSeparator(wxSizer* row, wxWindow* parent)
+{
+	row->Add(new wxStaticLine(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL),
+			 wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT, scSeparatorBorder));
+}
+
+unsigned char ToColourByte(const float32 value)
+{
+	return static_cast<unsigned char>(std::lround(std::clamp(value, 0.0f, 1.0f) * 255.0f));
+}
+
+template <typename TAction>
+void PostTopViewCommand(TAction action)
+{
+	thread::PostToGame(
+		[action]
+		{
+			action();
+			gEditor->NoteTopViewCommand();
+		});
+}
+
 } // namespace
 
 const char* GetToolName(eEditorTool tool) { return scToolButtons[static_cast<uint32>(tool)].pName; }
@@ -309,6 +316,11 @@ const char* GetDataFilterName(eDataFilter filter) { return scDataFilterNames[sta
 
 EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent(parent), mpCanvas(canvas)
 {
+	constexpr int scLetterButtonSize = 32;
+	constexpr Vec2f scTextureOffsetLimits = Vec2f(-100000.0f, 100000.0f);
+	constexpr Vec2f scTextureScaleLimits = Vec2f(1.0f / 64.0f, 1024.0f);
+	constexpr Vec2f scTextureRotationLimits = Vec2f(-360.0f, 360.0f);
+
 	mpSizer = new wxBoxSizer(wxVERTICAL);
 	mpViewRow = new wxWrapSizer(wxHORIZONTAL);
 	mpToolRow = new wxWrapSizer(wxHORIZONTAL);
@@ -317,6 +329,11 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 
 	{
 		wxBoxSizer* group = AddGroup(mpViewRow, false);
+
+		constexpr ToolButtonInfo scSimulateButton = {
+			"Simulate", "Play the level in the 3D view. Nothing can be edited while simulating (X in the 3D view)",
+			"Textures/editor_new/simulate.png"
+		};
 
 		mpSimulateButton = MakeButton(parent, scSimulateButton);
 		mpSimulateButton->Bind(wxEVT_TOGGLEBUTTON, [](wxCommandEvent&)
@@ -441,6 +458,11 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 			mpToolGroup->Add(button, wxSizerFlags().CenterVertical().Border(wxALL, scItemBorder));
 		}
 
+		constexpr ToolButtonInfo scSubtractButton = {
+			"Subtract", "Cut the selected brushes out of the brushes they overlap (S). Hold Shift to keep the cutters",
+			"Textures/editor_new/subtract.png"
+		};
+
 		mpSubtractButton = MakeButton(parent, scSubtractButton);
 		mpSubtractButton->Bind(wxEVT_TOGGLEBUTTON,
 							   [this](wxCommandEvent&)
@@ -459,12 +481,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 		mpSnapButton->Bind(wxEVT_BUTTON,
 						   [this](wxCommandEvent&)
 						   {
-							   thread::PostToGame(
-								   []
-								   {
-									   gEditor->SnapSelectionToGrid();
-									   gEditor->NoteTopViewCommand();
-								   });
+							   PostTopViewCommand([] { gEditor->SnapSelectionToGrid(); });
 							   mpCanvas->SetFocus();
 						   });
 
@@ -503,8 +520,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 		mpSizeFields[i] = size_field;
 
 		mpVolumeRows[i] = new wxBoxSizer(wxHORIZONTAL);
-		mpVolumeRows[i]->Add(new wxStaticLine(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL),
-							 wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT, scSeparatorBorder));
+		AddSeparator(mpVolumeRows[i], parent);
 		mpVolumeRows[i]->Add(base_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 4));
 		mpVolumeRows[i]->Add(size_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
 
@@ -572,8 +588,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 			});
 
 		mpArchRow = new wxBoxSizer(wxHORIZONTAL);
-		mpArchRow->Add(new wxStaticLine(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL),
-					   wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT, scSeparatorBorder));
+		AddSeparator(mpArchRow, parent);
 		mpArchRow->Add(sides_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 4));
 		mpArchRow->Add(wall_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
 		mpArchRow->Add(arc_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
@@ -661,8 +676,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 							 });
 
 		mpRoomRow = new wxBoxSizer(wxHORIZONTAL);
-		mpRoomRow->Add(new wxStaticLine(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL),
-					   wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT, scSeparatorBorder));
+		AddSeparator(mpRoomRow, parent);
 		mpRoomRow->Add(shape_choice, wxSizerFlags().CenterVertical().Border(wxLEFT, 4));
 		mpRoomRow->Add(wall_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
 		mpRoomRow->Add(ceiling_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
@@ -730,8 +744,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 							});
 
 		mpCurveRow = new wxBoxSizer(wxHORIZONTAL);
-		mpCurveRow->Add(new wxStaticLine(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL),
-						wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT, scSeparatorBorder));
+		AddSeparator(mpCurveRow, parent);
 		mpCurveRow->Add(primitive_choice, wxSizerFlags().CenterVertical().Border(wxLEFT, 4));
 		mpCurveRow->Add(subdivisions_u_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
 		mpCurveRow->Add(subdivisions_v_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
@@ -812,11 +825,9 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 		mpCurveRow->Add(weight_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
 		mpCurveRow->Add(round_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 6));
 
-		const auto to_byte = [](float32 value)
-		{ return static_cast<unsigned char>(std::lround(std::clamp(value, 0.0f, 1.0f) * 255.0f)); };
-
 		wxColourPickerCtrl* color_picker = new wxColourPickerCtrl(
-			parent, wxID_ANY, wxColour(to_byte(mCurve.Color.R), to_byte(mCurve.Color.G), to_byte(mCurve.Color.B)));
+			parent, wxID_ANY,
+			wxColour(ToColourByte(mCurve.Color.R), ToColourByte(mCurve.Color.G), ToColourByte(mCurve.Color.B)));
 		color_picker->SetToolTip("Tint the selected control points (or every point of the selected patches). The "
 								 "colour blends across the surface between points");
 		color_picker->Bind(wxEVT_COLOURPICKER_CHANGED,
@@ -888,8 +899,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 		mpToolRow->Add(mpCurveRow, wxSizerFlags().Expand().Border(wxTOP | wxBOTTOM, scItemBorder));
 
 		mpFaceRow = new wxBoxSizer(wxHORIZONTAL);
-		mpFaceRow->Add(new wxStaticLine(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL),
-					   wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT, scSeparatorBorder));
+		AddSeparator(mpFaceRow, parent);
 
 		wxStaticText* texture_label = new wxStaticText(parent, wxID_ANY, "Texture");
 		texture_label->SetToolTip("Changes the face picked with the Face tool, or every face of the selected brushes "
@@ -1000,10 +1010,8 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 				mCurve.Color = settings.Color;
 				mpCurveWeightField->SetValue(settings.Weight);
 				mpCurveAlphaField->SetValue(settings.Color.A);
-				mpCurveColorPicker->SetColour(wxColour(
-					static_cast<unsigned char>(std::lround(std::clamp(settings.Color.R, 0.0f, 1.0f) * 255.0f)),
-					static_cast<unsigned char>(std::lround(std::clamp(settings.Color.G, 0.0f, 1.0f) * 255.0f)),
-					static_cast<unsigned char>(std::lround(std::clamp(settings.Color.B, 0.0f, 1.0f) * 255.0f))));
+				mpCurveColorPicker->SetColour(wxColour(ToColourByte(settings.Color.R), ToColourByte(settings.Color.G),
+													   ToColourByte(settings.Color.B)));
 				mpCurveSubdivisionsUField->SetValue(static_cast<float32>(settings.SubdivisionsU));
 				mpCurveSubdivisionsVField->SetValue(static_cast<float32>(settings.SubdivisionsV));
 				mpCurveSmoothButton->SetValue(settings.bSmooth);
@@ -1030,12 +1038,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 		hide_button->Bind(wxEVT_BUTTON,
 						  [this](wxCommandEvent&)
 						  {
-							  thread::PostToGame(
-								  []
-								  {
-									  gEditor->TopViewHideSelection();
-									  gEditor->NoteTopViewCommand();
-								  });
+							  PostTopViewCommand([] { gEditor->TopViewHideSelection(); });
 							  mpCanvas->SetFocus();
 						  });
 
@@ -1045,12 +1048,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 		mpShowAllButton->Bind(wxEVT_BUTTON,
 							  [this](wxCommandEvent&)
 							  {
-								  thread::PostToGame(
-									  []
-									  {
-										  gEditor->TopViewShowAll();
-										  gEditor->NoteTopViewCommand();
-									  });
+								  PostTopViewCommand([] { gEditor->TopViewShowAll(); });
 								  mpCanvas->SetFocus();
 							  });
 
@@ -1095,8 +1093,7 @@ wxBoxSizer* EditorToolbar::AddGroup(wxWrapSizer* row, bool separated)
 	wxBoxSizer* group = new wxBoxSizer(wxHORIZONTAL);
 
 	if (separated) {
-		group->Add(new wxStaticLine(mpParent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL),
-				   wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT, scSeparatorBorder));
+		AddSeparator(group, mpParent);
 	}
 
 	row->Add(group, wxSizerFlags().Expand().Border(wxTOP | wxBOTTOM, scItemBorder));

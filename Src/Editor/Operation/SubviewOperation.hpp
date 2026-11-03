@@ -3,7 +3,7 @@
 #include "BaseOperation.hpp"
 
 #include <BrushEntry.hpp>
-#include <vector>
+#include <Core/DynArray.hpp>
 
 
 namespace fx {
@@ -21,6 +21,9 @@ struct SubviewBrushRef
 	Object* pObject = nullptr;
 	ObjectID ID = ObjectID::scNull;
 };
+
+using SubviewBrushArray = DynArray<SubviewBrushRef, GrowthFunctions::Double>;
+using SubviewInstanceArray = DynArray<uint32, GrowthFunctions::Double>;
 
 /**
  * @brief Places an existing subview into the current prototype.
@@ -74,8 +77,8 @@ public:
 private:
 	uint32 mInstance;
 	BrushPlacement mPlacement;
-	std::vector<SubviewBrushRef> mBrushes;
-	std::vector<uint32> mInstances;
+	SubviewBrushArray mBrushes;
+	SubviewInstanceArray mInstances;
 };
 
 /**
@@ -95,8 +98,8 @@ public:
 private:
 	uint32 mInstance;
 	BrushPlacement mPlacement;
-	std::vector<SubviewBrushRef> mBrushes;
-	std::vector<uint32> mInstances;
+	SubviewBrushArray mBrushes;
+	SubviewInstanceArray mInstances;
 };
 
 

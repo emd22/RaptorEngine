@@ -22,12 +22,6 @@ using renderer::gTextRenderer;
 
 namespace {
 
-constexpr uint32 scMeterWidth = 16;
-constexpr float32 scMeterFloorDb = -60.0f;
-constexpr float32 scMarkerHalfExtent = 0.15f;
-constexpr float32 scLabelHeight = 0.3f;
-constexpr float32 scMinClipW = 1e-3f;
-
 const uint32 scWhite = Color::FromRGBA(255, 255, 255, 255).AsUInt();
 const uint32 scHeader = Color::FromRGBA(255, 220, 120, 255).AsUInt();
 const uint32 scBusColor = Color::FromRGBA(130, 200, 255, 255).AsUInt();
@@ -48,6 +42,9 @@ String FormatDb(float32 db)
 
 String FormatMeter(float32 rms_db, float32 peak_db)
 {
+	constexpr uint32 scMeterWidth = 16;
+	constexpr float32 scMeterFloorDb = -60.0f;
+
 	char bar[scMeterWidth + 3];
 	bar[0] = '[';
 	bar[scMeterWidth + 1] = ']';
@@ -91,6 +88,8 @@ float32 GetVoiceLevelDb(const AudioVoiceDebug& voice)
 
 uint32 GetVoiceColor(const AudioVoiceDebug& voice)
 {
+	constexpr float32 scQuietDb = -50.0f;
+
 	if (voice.bPending) {
 		return scPendingColor;
 	}
@@ -99,7 +98,7 @@ uint32 GetVoiceColor(const AudioVoiceDebug& voice)
 		return scStoppingColor;
 	}
 
-	if (GetVoiceLevelDb(voice) < AudioDebugView::scQuietDb) {
+	if (GetVoiceLevelDb(voice) < scQuietDb) {
 		return scQuietColor;
 	}
 
@@ -225,10 +224,12 @@ void DrawMixState()
 
 void DrawVoices(AudioVoiceDebug* voices, uint32 voice_count)
 {
+	constexpr uint32 scMaxListedVoices = 12;
+
 	gTextRenderer->DrawText("VOICE              BUS          DIST  DGAIN   OCC  TRANS L/M/H     PATH   LEVEL", 1.0f,
 							scHeader);
 
-	const uint32 listed = std::min(voice_count, AudioDebugView::scMaxListedVoices);
+	const uint32 listed = std::min(voice_count, scMaxListedVoices);
 
 	for (uint32 i = 0; i < listed; i++) {
 		const AudioVoiceDebug& voice = voices[i];
@@ -290,12 +291,16 @@ void DrawVoices(AudioVoiceDebug* voices, uint32 voice_count)
 
 void DrawWorldLabels(const BaseCamera& camera, const AudioVoiceDebug* voices, uint32 voice_count)
 {
+	constexpr uint32 scMaxWorldLabels = 16;
+	constexpr float32 scLabelHeight = 0.3f;
+	constexpr float32 scMinClipW = 1e-3f;
+
 	const Mat4f& view_projection = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 	const Vec2u window_size = gGraphics->GetWindow()->GetSize();
 
 	uint32 labels = 0;
 
-	for (uint32 i = 0; i < voice_count && labels < AudioDebugView::scMaxWorldLabels; i++) {
+	for (uint32 i = 0; i < voice_count && labels < scMaxWorldLabels; i++) {
 		const AudioVoiceDebug& voice = voices[i];
 
 		if (!voice.bSpatial) {
@@ -303,21 +308,20 @@ void DrawWorldLabels(const BaseCamera& camera, const AudioVoiceDebug* voices, ui
 		}
 
 		const Vec3f anchor = voice.Position + Vec3f(0.0f, scLabelHeight, 0.0f);
-		const Vec4f clip = view_projection * Vec4f(anchor.X, anchor.Y, anchor.Z, 1.0f);
+		const Vec4f clip = view_projection * Vec4f(anchor, 1.0f);
 
 		if (clip.W < scMinClipW) {
 			continue;
 		}
 
-		const float32 x = clip.X / clip.W;
-		const float32 y = clip.Y / clip.W;
+		const Vec2f ndc = Vec2f(clip.X, clip.Y) / clip.W;
 
-		if (x < -1.0f || x > 1.0f || y < -1.0f || y > 1.0f) {
+		if (ndc.X < -1.0f || ndc.X > 1.0f || ndc.Y < -1.0f || ndc.Y > 1.0f) {
 			continue;
 		}
 
-		const Vec2f pixel((x * 0.5f + 0.5f) * static_cast<float32>(window_size.X),
-						  (y * 0.5f + 0.5f) * static_cast<float32>(window_size.Y));
+		const Vec2f window_extent(static_cast<float32>(window_size.X), static_cast<float32>(window_size.Y));
+		const Vec2f pixel = (ndc * 0.5f + 0.5f) * window_extent;
 
 		String label = String::Fmt("{} {}", voice.Name, FormatDb(GetVoiceLevelDb(voice)));
 
@@ -351,6 +355,8 @@ bool AudioDebugView::IsEnabled() const
 
 void AudioDebugView::DrawWorld()
 {
+	constexpr float32 scMarkerHalfExtent = 0.15f;
+
 	if (!IsEnabled() || mpDebugCVar->IntValue < 2) {
 		return;
 	}
@@ -373,8 +379,8 @@ void AudioDebugView::DrawWorld()
 		if (voice.bSteam && !voice.bPending) {
 			const float32 occlusion = std::clamp(voice.Spatial.Occlusion, 0.0f, 1.0f);
 
-			color = Color::FromRGBA(static_cast<uint8>(255.0f * (1.0f - occlusion)), static_cast<uint8>(255.0f * occlusion),
-									60, 255);
+			color = Color::FromRGBA(static_cast<uint8>(255.0f * (1.0f - occlusion)),
+									static_cast<uint8>(255.0f * occlusion), 60, 255);
 		}
 
 		gDebugDraw->WireBox(voice.Position, half_extent, Quat::scIdentity, color);

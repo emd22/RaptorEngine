@@ -22,8 +22,6 @@ enum eColumn : int32
 	Column_Value,
 };
 
-static constexpr int scRefreshIntervalMs = 500;
-
 CVarListWindow::CVarListWindow(wxWindow* parent)
 	: wxFrame(parent, wxID_ANY, "CVar List", wxDefaultPosition, wxSize(520, 480)), mRefreshTimer(this)
 {
@@ -111,7 +109,7 @@ void CVarListWindow::RefreshList()
 				return;
 			}
 
-			DynArray<Row> rows;
+			RowArray rows;
 
 			for (CVarValue* cvar : gCVars->CollectCVars()) {
 				const String& name = cvar->GetName();
@@ -131,7 +129,7 @@ void CVarListWindow::RefreshList()
 		});
 }
 
-void CVarListWindow::ShowRows(DynArray<Row> rows)
+void CVarListWindow::ShowRows(RowArray rows)
 {
 	bool same_rows = rows.Size == mShown.Size;
 
@@ -258,6 +256,8 @@ void CVarListWindow::ApplyValue()
 
 void CVarListWindow::OnShow(wxShowEvent& event)
 {
+	constexpr int scRefreshIntervalMs = 500;
+
 	if (event.IsShown()) {
 		RefreshList();
 		mRefreshTimer.Start(scRefreshIntervalMs);

@@ -10,9 +10,6 @@ namespace {
 using namespace fx;
 using namespace fx::mapc;
 
-constexpr int scExitUsage = 2;
-constexpr int scExitVerifyFailed = 3;
-
 void PrintUsage()
 {
 	std::printf(
@@ -226,6 +223,9 @@ void PrintPresets(const PresetLibrary& presets)
 
 int main(int argc, char** argv)
 {
+	constexpr int scExitUsage = 2;
+	constexpr int scExitVerifyFailed = 3;
+
 	CompileOptions options;
 	PresetArguments preset_arguments;
 
@@ -279,5 +279,9 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	return result.bVerifyFailed ? scExitVerifyFailed : 0;
+	if (result.bVerifyFailed) {
+		return scExitVerifyFailed;
+	}
+
+	return 0;
 }

@@ -12,11 +12,6 @@ class CVarValue;
 class AudioDebugView
 {
 public:
-	static constexpr uint32 scMaxListedVoices = 12;
-	static constexpr uint32 scMaxWorldLabels = 16;
-	static constexpr float32 scQuietDb = -50.0f;
-
-public:
 	void Create();
 
 	bool IsEnabled() const;

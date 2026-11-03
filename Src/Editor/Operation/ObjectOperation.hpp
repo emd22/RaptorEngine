@@ -135,7 +135,7 @@ private:
 	eObjectTag mTagsBefore = eObjectTag::None;
 	Vec3f mPositionBefore = Vec3f::sZero;
 	Quat mRotationBefore = Quat::scIdentity;
-	DynArray<NodeFlags> mNodesBefore;
+	DynArray<NodeFlags, GrowthFunctions::Double> mNodesBefore;
 };
 
 class ScriptEditOperation final : public ObjectEditOperation

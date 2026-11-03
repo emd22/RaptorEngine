@@ -45,7 +45,7 @@ private:
 	wxStaticText* mpStatus = nullptr;
 	AtlasPreviewPanel* mpPreview = nullptr;
 
-	DynArray<AtlasImage> mImages;
+	AtlasImageArray mImages;
 	AtlasLayout mLayout;
 
 	String mLastDirectory;

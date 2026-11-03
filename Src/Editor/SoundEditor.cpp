@@ -13,8 +13,6 @@
 
 namespace fx::editor {
 
-static constexpr float32 scEditTolerance = 0.0005f;
-
 SoundEmitter* SoundEditor::GetSelected()
 {
 	if (mSelectedId == 0) {
@@ -109,6 +107,7 @@ void SoundEditor::DuplicateSelected()
 void SoundEditor::DrawMarkers()
 {
 	const EditorTheme::MarkerColors& colors = gEditor->GetTheme().Marker;
+	constexpr float32 scMarkerHalfExtent = 0.15f;
 
 	for (const SoundEmitter& emitter : gWorld->SoundEmitters.GetEmitters()) {
 		Color color = colors.Sound;

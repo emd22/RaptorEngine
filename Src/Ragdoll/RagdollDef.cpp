@@ -11,10 +11,6 @@ namespace fx::physics {
 
 namespace {
 
-constexpr const char* scHumanoidPath = "RaptorData/Data/Demo/Models/ragdoll2/humanoid.ragdoll";
-constexpr float32 scDefaultTotalMass = 75.0f;
-constexpr float32 scMassToleranceKg = 2.0f;
-
 eRDJoint ParseJoint(const char* name, bool& out_ok)
 {
 	out_ok = true;
@@ -135,6 +131,8 @@ std::unique_ptr<RDDefaultSegment> ReadSegment(const ConfigEntry& entry, uint32 i
 
 bool RDLoadDefinition(const char* path, RDDefinition& out_def)
 {
+	constexpr float32 scMassToleranceKg = 2.0f;
+
 	ConfigFile config;
 	config.Load(path);
 
@@ -151,7 +149,7 @@ bool RDLoadDefinition(const char* path, RDDefinition& out_def)
 	}
 
 	RDDefinition def;
-	def.TotalMass = config.GetEntryValue<float32>(HashStr32("total_mass"), scDefaultTotalMass);
+	def.TotalMass = config.GetEntryValue<float32>(HashStr32("total_mass"), def.TotalMass);
 
 	def.BodySegments.InitCapacity(bodies->Members.Size());
 
@@ -188,7 +186,7 @@ bool RDLoadDefinition(const char* path, RDDefinition& out_def)
 	return true;
 }
 
-static const char* sHumanoidPath = scHumanoidPath;
+static const char* sHumanoidPath = "RaptorData/Data/Demo/Models/ragdoll2/humanoid.ragdoll";
 
 void RDSetHumanoidDefinitionPath(const char* path) { sHumanoidPath = path; }
 

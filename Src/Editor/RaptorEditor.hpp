@@ -75,8 +75,6 @@ enum class eReloadTarget : uint32
 class RaptorEditor
 {
 public:
-	static constexpr std::chrono::seconds scWarningDuration { 6 };
-
 	RaptorEditor() = default;
 
 
@@ -393,6 +391,7 @@ private:
 	void DrawSubviews();
 
 	bool SelectSubview(uint32 instance, bool append_selection);
+	bool AddToSelection(Object* object, bool append_selection);
 
 	/// Copies the selection over to the command script
 	void SyncSelection();
@@ -453,7 +452,7 @@ private:
 		SizedArray<Vec3f> Vertices;
 	};
 
-	DynArray<PickedFaceOverlay> mPickedFaces;
+	DynArray<PickedFaceOverlay, GrowthFunctions::Double> mPickedFaces;
 
 	uint64 mSavedRevision = 0;
 	bool mbUntrackedChanges = false;

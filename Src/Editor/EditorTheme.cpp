@@ -73,12 +73,12 @@ void EditorThemeLibrary::Load()
 
 	const std::filesystem::path directory(FilesystemIO::ResolvePath(scThemeDirectory).CStr());
 
-	std::vector<std::filesystem::path> files;
+	DynArray<std::filesystem::path, GrowthFunctions::Double> files;
 	std::error_code error;
 
 	for (const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator(directory, error)) {
 		if (entry.is_regular_file() && entry.path().extension() == ".conf") {
-			files.push_back(entry.path());
+			files.Insert(entry.path());
 		}
 	}
 
@@ -89,9 +89,9 @@ void EditorThemeLibrary::Load()
 		theme.ID = String(file.stem().string());
 		theme.Name = theme.ID;
 
-		const std::string relative_path = std::string(scThemeDirectory) + "/" + file.filename().string();
+		const String relative_path = String(scThemeDirectory) + "/" + String(file.filename().string());
 
-		if (theme.Load(String(relative_path))) {
+		if (theme.Load(relative_path)) {
 			mThemes.Insert(std::move(theme));
 		}
 	}
@@ -137,7 +137,7 @@ bool EditorThemeLibrary::ReloadActive()
 	theme.ID = active.ID;
 	theme.Name = theme.ID;
 
-	const String path(std::string(scThemeDirectory) + "/" + active.ID.CStr() + ".conf");
+	const String path = String(scThemeDirectory) + "/" + active.ID + ".conf";
 
 	if (!theme.Load(path)) {
 		return false;

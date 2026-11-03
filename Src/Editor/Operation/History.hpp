@@ -14,8 +14,6 @@ namespace editor {
  */
 class EditHistory
 {
-	static constexpr uint32 scMaxOperations = 256;
-
 public:
 	explicit EditHistory(EditorSelection& selection);
 

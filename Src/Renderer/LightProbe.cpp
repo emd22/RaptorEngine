@@ -45,14 +45,15 @@ namespace {
 // Spherical harmonics
 ///////////////////////////////////
 
-ProbeSHData MakeSkyGradientProbe(const float32 sky[3], const float32 ground[3])
+ProbeSHData MakeSkyGradientProbe(Vec3f sky, Vec3f ground)
 {
 	ProbeSHData probe {};
 
-	for (uint32 c = 0; c < 3; c++) {
-		probe.SH[0][c] = (sky[c] + ground[c]) * 0.5f / scSHNorm0;
-		probe.SH[1][c] = (sky[c] - ground[c]) * 0.5f / scSHNorm1;
-	}
+	Vec3f sh0 = (sky + ground) * 0.5f / scSHNorm0;
+	Vec3f sh1 = (sky - ground) * 0.5f / scSHNorm1;
+
+	sh0.CopyTo(probe.SH[0]);
+	sh1.CopyTo(probe.SH[1]);
 
 	return probe;
 }
@@ -61,12 +62,6 @@ ProbeSHData MakeSkyGradientProbe(const float32 sky[3], const float32 ground[3])
 // Capture
 ///////////////////////////////////
 
-constexpr float32 scRadianceClamp = 65000.0f;
-constexpr float32 scCaptureSkyRadiance = 1500.0f / static_cast<float32>(M_PI);
-
-constexpr int64 scDefaultProbeBounces = 3;
-constexpr int64 scMaxProbeBounces = 8;
-
 float32 TexelToNdc(uint32 index, uint32 size)
 {
 	return ((static_cast<float32>(index) + 0.5f) / static_cast<float32>(size)) * 2.0f - 1.0f;
@@ -74,6 +69,8 @@ float32 TexelToNdc(uint32 index, uint32 size)
 
 float32 HalfToRadiance(Float16 value)
 {
+	constexpr float32 scRadianceClamp = 65000.0f;
+
 	if (value.IsNaN()) {
 		return 0.0f;
 	}
@@ -93,7 +90,11 @@ float32 CaptureDepthToDistance(const Mat4f& inv_projection, float32 stored_depth
 	const Vec4f view = inv_projection * Vec4f(ndc_x, ndc_y, 1.0f - stored_depth, 1.0f);
 	const float32 distance = Vec3f(view.X, view.Y, view.Z).Length() / fabsf(view.W);
 
-	return (distance < cFar) ? distance : cFar;
+	if (distance < cFar) {
+		return distance;
+	}
+
+	return cFar;
 }
 
 void SampleCaptureFace(const float32* face, uint32 size, float32 ndc_x, float32 ndc_y, float32 out[3])
@@ -116,12 +117,10 @@ void SampleCaptureFace(const float32* face, uint32 size, float32 ndc_x, float32 
 	const float32* t01 = face + (y1 * size + x0) * 3;
 	const float32* t11 = face + (y1 * size + x1) * 3;
 
-	for (uint32 c = 0; c < 3; c++) {
-		const float32 top = t00[c] + (t10[c] - t00[c]) * fx;
-		const float32 bottom = t01[c] + (t11[c] - t01[c]) * fx;
+	const Vec3f top = Vec3f::Lerp(Vec3f(t00), Vec3f(t10), fx);
+	const Vec3f bottom = Vec3f::Lerp(Vec3f(t01), Vec3f(t11), fx);
 
-		out[c] = top + (bottom - top) * fy;
-	}
+	Vec3f::Lerp(top, bottom, fy).CopyTo(out);
 }
 
 
@@ -129,7 +128,23 @@ void SampleCaptureFace(const float32* face, uint32 size, float32 ndc_x, float32 
 // Placement
 ///////////////////////////////////
 
-Blockout* GetBlockout() { return (gWorld != nullptr) ? gWorld->pPrototype : nullptr; }
+Blockout* GetBlockout()
+{
+	if (gWorld != nullptr) {
+		return gWorld->pPrototype;
+	}
+
+	return nullptr;
+}
+
+void CopyHullPlanes(SizedArray<ProbePlacementBoxes::Plane>& planes, const Brush& hull)
+{
+	planes.InitCapacity(hull.Planes.Size);
+
+	for (uint32 i = 0; i < planes.Capacity; i++) {
+		planes.Insert({ hull.Planes[i].Normal, hull.Planes[i].Distance });
+	}
+}
 
 ProbePlacementBoxes GatherPlacementBoxes()
 {
@@ -152,7 +167,11 @@ ProbePlacementBoxes GatherPlacementBoxes()
 		}
 
 		if (object.IsPatch()) {
-			const Patch* patch = (blockout != nullptr) ? blockout->GetPatch(&object) : nullptr;
+			const Patch* patch = nullptr;
+
+			if (blockout != nullptr) {
+				patch = blockout->GetPatch(&object);
+			}
 
 			if (patch != nullptr) {
 				ProbePlacement::AddPatchSurfaces(boxes, *patch, object.GetWorldMatrix());
@@ -165,13 +184,19 @@ ProbePlacementBoxes GatherPlacementBoxes()
 			continue;
 		}
 
-		const Brush* brush = (blockout != nullptr) ? blockout->GetBrush(&object) : nullptr;
+		const Brush* brush = nullptr;
+
+		if (blockout != nullptr) {
+			brush = blockout->GetBrush(&object);
+		}
+
 		const bool is_hull = brush != nullptr && brush->IsValid() && !brush->IsBox();
 
-		planes.InitCapacity(is_hull ? brush->Planes.Size : 0);
-
-		for (uint32 i = 0; i < planes.Capacity; i++) {
-			planes.Insert({ brush->Planes[i].Normal, brush->Planes[i].Distance });
+		if (is_hull) {
+			CopyHullPlanes(planes, *brush);
+		}
+		else {
+			planes.InitCapacity(0);
 		}
 
 		if (is_bound) {
@@ -183,7 +208,7 @@ ProbePlacementBoxes GatherPlacementBoxes()
 	}
 
 	if (blockout != nullptr) {
-		std::vector<Blockout::SubviewSolid> solids;
+		DynArray<Blockout::SubviewSolid, GrowthFunctions::Double> solids;
 		blockout->GetSubviewSolids(solids);
 
 		for (const Blockout::SubviewSolid& solid : solids) {
@@ -193,10 +218,11 @@ ProbePlacementBoxes GatherPlacementBoxes()
 
 			const Brush& brush = *solid.pBrush;
 
-			planes.InitCapacity(brush.IsBox() ? 0 : brush.Planes.Size);
-
-			for (uint32 i = 0; i < planes.Capacity; i++) {
-				planes.Insert({ brush.Planes[i].Normal, brush.Planes[i].Distance });
+			if (brush.IsBox()) {
+				planes.InitCapacity(0);
+			}
+			else {
+				CopyHullPlanes(planes, brush);
 			}
 
 			ProbePlacement::AddBox(boxes, BBox(brush.GetBoundsMin(), brush.GetBoundsMax()), solid.World, planes);
@@ -211,9 +237,15 @@ ProbePlacementBoxes GatherPlacementBoxes()
 	return boxes;
 }
 
+void SetProbeInfoPosition(ProbeInfo& info, Vec3f position)
+{
+	position.CopyTo(info.ProbePosition);
+	info.ProbePosition[3] = 1.0f;
+}
+
 void ResetDepthMoments(ProbeInfo& info)
 {
-	for (uint32 texel = 0; texel < Limits::ProbeDepthFaces * Limits::ProbeDepthTexelsPerFace; texel++) {
+	for (uint32 texel = 0; texel < scMomentTexelCount; texel++) {
 		info.DepthMoments[texel * 2 + 0] = Limits::ProbeDepthMaxDistance;
 		info.DepthMoments[texel * 2 + 1] = Limits::ProbeDepthMaxDistance * Limits::ProbeDepthMaxDistance;
 	}
@@ -224,11 +256,8 @@ void ResetDepthMoments(ProbeInfo& info)
 ///////////////////////////////////
 
 constexpr float32 scReflectionBlendDistance = 1.0f;
-constexpr float32 scReflectionMinHalfExtent = 0.05f;
-constexpr float32 scReflectionRelocation = 0.9f;
 
-constexpr uint64 scReflectionTexelsPerProbe = 6ull * (128 * 128 + 64 * 64 + 32 * 32 + 16 * 16 + 8 * 8 + 4 * 4);
-constexpr uint64 scReflectionHalfsPerProbe = scReflectionTexelsPerProbe * 4;
+constexpr uint64 scReflectionHalfsPerProbe = 6ull * (128 * 128 + 64 * 64 + 32 * 32 + 16 * 16 + 8 * 8 + 4 * 4) * 4;
 
 static_assert(Limits::ReflectionProbeSize == 128 && Limits::ReflectionProbeMips == 6);
 
@@ -241,6 +270,8 @@ struct ReflectionBox
 
 ReflectionBox MakeReflectionBox(const Vec3f local_min, const Vec3f local_max, const Mat4f& local_to_world)
 {
+	constexpr float32 scReflectionMinHalfExtent = 0.05f;
+
 	const Vec3f half_extent = Vec3f::Max((local_max - local_min) * 0.5f, Vec3f(scReflectionMinHalfExtent));
 	const Vec3f center = (local_max + local_min) * 0.5f;
 
@@ -254,6 +285,8 @@ ReflectionBox MakeReflectionBox(const Vec3f local_min, const Vec3f local_max, co
 
 ReflectionProbeData MakeReflectionProbe(const ReflectionBox& box, const ProbePlacementBoxes& boxes, uint32 index)
 {
+	constexpr float32 scReflectionRelocation = 0.9f;
+
 	const Vec4f center_h = box.BoxToWorld * Vec4f(0.0f, 0.0f, 0.0f, 1.0f);
 	const Vec3f center(center_h.X, center_h.Y, center_h.Z);
 
@@ -268,10 +301,8 @@ ReflectionProbeData MakeReflectionProbe(const ReflectionBox& box, const ProbePla
 	ReflectionProbeData probe {};
 	memcpy(probe.WorldToBox, box.BoxToWorld.AffineInverse().RawData, sizeof(probe.WorldToBox));
 
-	for (uint32 axis = 0; axis < 3; axis++) {
-		probe.PositionAndCount[axis] = position.mData[axis];
-		probe.Fade[axis] = box.HalfExtent.mData[axis] / scReflectionBlendDistance;
-	}
+	position.CopyTo(probe.PositionAndCount);
+	(box.HalfExtent / scReflectionBlendDistance).CopyTo(probe.Fade);
 
 	return probe;
 }
@@ -363,16 +394,14 @@ void ProbeManager::MakeCaptureCameras()
 		Vec3f(0.0f, 0.0f, 1.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
 	};
 
-	static constexpr float32 scAspect = 1.0f;
-	static constexpr float32 scNearClip = ProbePlacement::scCaptureNearPlane;
-	static constexpr float32 scFarClip = 200.0f;
-	static constexpr float32 scCaptureFOV = 90.0f;
+	constexpr float32 scFarClip = 200.0f;
+	constexpr float32 scCaptureFOV = 90.0f;
 
 	mCaptureCameras.InitCapacity(scCaptureFaces);
 
 	for (uint32 face = 0; face < scCaptureFaces; face++) {
-		PerspectiveCamera& cam = mCaptureCameras.Emplace(MathUtil::DegreesToRadians(scCaptureFOV), scAspect, scFarClip,
-														 scNearClip);
+		PerspectiveCamera& cam = mCaptureCameras.Emplace(MathUtil::DegreesToRadians(scCaptureFOV), 1.0f, scFarClip,
+														 ProbePlacement::scCaptureNearPlane);
 
 		// A face's orientation only depends on its direction, so it is set once here. We only move the cameras from
 		// this point forward, keeping the orientation.
@@ -391,8 +420,8 @@ void ProbeManager::MoveCaptureCameras(const Vec3f position)
 
 void ProbeManager::Create()
 {
-	constexpr float32 cSky[3] = { 0.055f, 0.062f, 0.075f };
-	constexpr float32 cGround[3] = { 0.025f, 0.022f, 0.020f };
+	const Vec3f cSky(0.055f, 0.062f, 0.075f);
+	const Vec3f cGround(0.025f, 0.022f, 0.020f);
 
 	std::fill(std::begin(mProbes), std::end(mProbes), MakeSkyGradientProbe(cSky, cGround));
 
@@ -413,18 +442,13 @@ uint32 ProbeManager::SelectVolume(const Vec3f position) const
 	float32 best_distance_sq = std::numeric_limits<float32>::max();
 	float32 best_cell_volume = std::numeric_limits<float32>::max();
 
-	const float32 point[3] = { position.X, position.Y, position.Z };
-
 	for (uint32 i = 0; i < mLayout.VolumeCount; i++) {
 		const ProbeVolumeData& volume = mLayout.Volumes[i];
 
-		float32 distance_sq = 0.0f;
-
-		for (uint32 axis = 0; axis < 3; axis++) {
-			const float32 outside = std::max(
-				std::max(volume.MinAndCount[axis] - point[axis], point[axis] - volume.MaxAndCellVolume[axis]), 0.0f);
-			distance_sq += outside * outside;
-		}
+		const Vec3f volume_min(volume.MinAndCount);
+		const Vec3f volume_max(volume.MaxAndCellVolume);
+		const Vec3f outside = Vec3f::Max(Vec3f::Max(volume_min - position, position - volume_max), Vec3f(0.0f));
+		const float32 distance_sq = outside.Dot(outside);
 
 		const float32 cell_volume = volume.MaxAndCellVolume[3];
 
@@ -446,8 +470,6 @@ bool ProbeManager::SampleVolume(const Vec3f position, uint32 volume_index, const
 {
 	const ProbeVolumeData& volume = mLayout.Volumes[volume_index];
 
-	const float32 point[3] = { position.X, position.Y, position.Z };
-
 	uint32 dims[3];
 	uint32 base[3];
 	float32 fraction[3];
@@ -455,14 +477,14 @@ bool ProbeManager::SampleVolume(const Vec3f position, uint32 volume_index, const
 	for (uint32 axis = 0; axis < 3; axis++) {
 		dims[axis] = std::max(volume.DimsAndFirst[axis], 2U);
 
-		const float32 local = std::clamp((point[axis] - volume.MinAndCount[axis]) * volume.InvCellSize[axis], 0.0f,
-										 static_cast<float32>(dims[axis] - 1));
+		const float32 local = std::clamp((position.mData[axis] - volume.MinAndCount[axis]) * volume.InvCellSize[axis],
+										 0.0f, static_cast<float32>(dims[axis] - 1));
 
 		base[axis] = std::min(static_cast<uint32>(local), dims[axis] - 2);
 		fraction[axis] = std::clamp(local - static_cast<float32>(base[axis]), 0.0f, 1.0f);
 	}
 
-	float32 irradiance[3] = { 0.0f, 0.0f, 0.0f };
+	Vec3f irradiance(0.0f);
 	float32 total_weight = 0.0f;
 
 	for (uint32 corner = 0; corner < 8; corner++) {
@@ -495,9 +517,7 @@ bool ProbeManager::SampleVolume(const Vec3f position, uint32 volume_index, const
 		const ProbeSHData& probe = mProbes[probe_index];
 
 		for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
-			for (uint32 c = 0; c < 3; c++) {
-				irradiance[c] += probe.SH[k][c] * basis[k] * weight;
-			}
+			irradiance += Vec3f(probe.SH[k]) * basis[k] * weight;
 		}
 
 		total_weight += weight;
@@ -509,8 +529,7 @@ bool ProbeManager::SampleVolume(const Vec3f position, uint32 volume_index, const
 
 	const float32 scale = 1.0f / total_weight;
 
-	out_irradiance = Vec3f(std::max(irradiance[0] * scale, 0.0f), std::max(irradiance[1] * scale, 0.0f),
-						   std::max(irradiance[2] * scale, 0.0f));
+	out_irradiance = Vec3f::Max(irradiance * scale, Vec3f(0.0f));
 
 	return true;
 }
@@ -583,10 +602,7 @@ void ProbeManager::ApplyLayout()
 		const Vec3f position = mLayout.Positions[probe];
 		ProbeInfo& info = mProbeInfos[probe];
 
-		info.ProbePosition[0] = position.X;
-		info.ProbePosition[1] = position.Y;
-		info.ProbePosition[2] = position.Z;
-		info.ProbePosition[3] = 1.0f;
+		SetProbeInfoPosition(info, position);
 
 		ResetDepthMoments(info);
 	}
@@ -602,7 +618,11 @@ bool ProbeManager::BuildLayoutFromWorld(ProbeLayout& out_layout, uint32& out_bru
 	out_brush_volumes = 0;
 
 	Blockout* blockout = GetBlockout();
-	const ProbeLayout* compiled_layout = (blockout != nullptr) ? blockout->GetCompiledProbeLayout() : nullptr;
+	const ProbeLayout* compiled_layout = nullptr;
+
+	if (blockout != nullptr) {
+		compiled_layout = blockout->GetCompiledProbeLayout();
+	}
 
 	if (compiled_layout != nullptr) {
 		out_layout.CopyFrom(*compiled_layout);
@@ -660,9 +680,15 @@ uint32 ProbeManager::RebuildVolumesFromWorld()
 
 	RebuildReflectionProbesFromWorld();
 
+	const char* source = "rebuilt";
+
+	if (from_compiled) {
+		source = "taken from the compiled map";
+	}
+
 	LogInfo("Probe volumes {}: {} volumes ({} from editor brushes), {} of {} probes and {} of {} grid points used",
-			from_compiled ? "taken from the compiled map" : "rebuilt", mLayout.VolumeCount, num_brush_volumes,
-			GetProbeCount(), Limits::MaxIrradianceProbes, mLayout.GetGridPointCount(), Limits::MaxProbeGridPoints);
+			source, mLayout.VolumeCount, num_brush_volumes, GetProbeCount(), Limits::MaxIrradianceProbes,
+			mLayout.GetGridPointCount(), Limits::MaxProbeGridPoints);
 
 	return num_brush_volumes;
 }
@@ -673,17 +699,23 @@ uint32 ProbeManager::RebuildVolumesFromWorld()
 
 namespace {
 
-constexpr float32 scStaleVolumeTolerance = 1e-3f;
-constexpr float32 scStaleProbeTolerance = 0.01f;
-
 bool VolumesMatch(const ProbeVolumeData& a, const ProbeVolumeData& b)
 {
+	constexpr float32 scStaleVolumeTolerance = 1e-3f;
+
 	for (uint32 axis = 0; axis < 3; axis++) {
-		if (a.DimsAndFirst[axis] != b.DimsAndFirst[axis] ||
-			std::abs(a.MinAndCount[axis] - b.MinAndCount[axis]) > scStaleVolumeTolerance ||
-			std::abs(a.MaxAndCellVolume[axis] - b.MaxAndCellVolume[axis]) > scStaleVolumeTolerance) {
+		if (a.DimsAndFirst[axis] != b.DimsAndFirst[axis]) {
 			return false;
 		}
+	}
+
+	const Vec3f min_difference = (Vec3f(a.MinAndCount) - Vec3f(b.MinAndCount)).Abs();
+	const Vec3f max_difference = (Vec3f(a.MaxAndCellVolume) - Vec3f(b.MaxAndCellVolume)).Abs();
+	const Vec3f difference = Vec3f::Max(min_difference, max_difference);
+
+	if (difference.X > scStaleVolumeTolerance || difference.Y > scStaleVolumeTolerance ||
+		difference.Z > scStaleVolumeTolerance) {
+		return false;
 	}
 
 	return a.DimsAndFirst[3] == b.DimsAndFirst[3];
@@ -700,6 +732,8 @@ struct LayoutDifference
 
 LayoutDifference CompareLayouts(const ProbeLayout& baked, const ProbeLayout& current)
 {
+	constexpr float32 scStaleProbeTolerance = 0.01f;
+
 	LayoutDifference difference;
 
 	if (baked.VolumeCount != current.VolumeCount || baked.GetGridPointCount() != current.GetGridPointCount() ||
@@ -722,10 +756,9 @@ LayoutDifference CompareLayouts(const ProbeLayout& baked, const ProbeLayout& cur
 	}
 
 	for (uint32 probe = 0; probe < baked.GetProbeCount(); probe++) {
-		const Vec3f offset = baked.Positions[probe] - current.Positions[probe];
+		const Vec3f offset = (baked.Positions[probe] - current.Positions[probe]).Abs();
 
-		if (std::abs(offset.X) > scStaleProbeTolerance || std::abs(offset.Y) > scStaleProbeTolerance ||
-			std::abs(offset.Z) > scStaleProbeTolerance) {
+		if (offset.X > scStaleProbeTolerance || offset.Y > scStaleProbeTolerance || offset.Z > scStaleProbeTolerance) {
 			difference.MovedProbes++;
 		}
 	}
@@ -762,6 +795,8 @@ void ProbeManager::RequestStaleCheck()
 
 void ProbeManager::ServiceStaleCheck()
 {
+	constexpr uint32 scStaleCheckMaxWaitFrames = 600;
+
 	if (!mbStaleCheckPending || IsBaking()) {
 		return;
 	}
@@ -865,6 +900,9 @@ void ProbeManager::ResolveSunVisibility()
 
 void ProbeManager::BeginBake()
 {
+	constexpr int64 scDefaultProbeBounces = 3;
+	constexpr int64 scMaxProbeBounces = 8;
+
 	if (IsBaking()) {
 		LogWarning("A probe bake is already in progress");
 		return;
@@ -903,6 +941,8 @@ void ProbeManager::CreateCaptureResources()
 	constexpr uint32 cReflectionSize = Limits::ReflectionProbeSize;
 	constexpr uint64 cPixels = static_cast<uint64>(scCaptureSize) * scCaptureSize;
 	constexpr uint64 cReflectionPixels = static_cast<uint64>(cReflectionSize) * cReflectionSize;
+
+	constexpr float32 scCaptureSkyRadiance = 1500.0f / static_cast<float32>(M_PI);
 
 	const VkClearColorValue sky_clear = { { scCaptureSkyRadiance, scCaptureSkyRadiance, scCaptureSkyRadiance, 1.0f } };
 
@@ -1025,8 +1065,11 @@ void ProbeManager::CopyTargetToStaging(renderer::CommandBuffer& cmd, renderer::R
 
 	Image& image = target->Image;
 
-	const VkImageAspectFlags aspect = (format == eImageFormat::D32_Float) ? VK_IMAGE_ASPECT_DEPTH_BIT
-																		  : VK_IMAGE_ASPECT_COLOR_BIT;
+	VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+
+	if (format == eImageFormat::D32_Float) {
+		aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+	}
 
 	renderer::BarrierHelper::ImageLayoutTransition(&image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, cmd, 0, 1);
 
@@ -1125,14 +1168,13 @@ void ProbeManager::ProjectCapture(const Float16* const colors[scCaptureFaces],
 								  const float32* const depths[scCaptureFaces], ProbeSHData& out_sh,
 								  ProbeInfo& out_info) const
 {
-	constexpr uint32 cNumMomentTexels = Limits::ProbeDepthFaces * Limits::ProbeDepthTexelsPerFace;
 	constexpr float32 cFar = Limits::ProbeDepthMaxDistance;
 
-	float32 sh[Limits::ProbeSHCoeffCount][3] = {};
+	Vec3f sh[Limits::ProbeSHCoeffCount] = {};
 
-	float32 moment_weight[cNumMomentTexels] = {};
-	float32 moment_sum[cNumMomentTexels] = {};
-	float32 moment_sum_sq[cNumMomentTexels] = {};
+	float32 moment_weight[scMomentTexelCount] = {};
+	float32 moment_sum[scMomentTexelCount] = {};
+	float32 moment_sum_sq[scMomentTexelCount] = {};
 
 	const CaptureTexel* texel = mCaptureTexels.pData;
 
@@ -1142,12 +1184,10 @@ void ProbeManager::ProjectCapture(const Float16* const colors[scCaptureFaces],
 				const uint32 pixel = y * scCaptureSize + x;
 				const Float16* rgba = colors[face] + pixel * 4;
 
-				for (uint32 c = 0; c < 3; c++) {
-					const float32 radiance = HalfToRadiance(rgba[c]);
+				const Vec3f radiance(HalfToRadiance(rgba[0]), HalfToRadiance(rgba[1]), HalfToRadiance(rgba[2]));
 
-					for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
-						sh[k][c] += radiance * texel->WeightedBasis[k];
-					}
+				for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
+					sh[k] += radiance * texel->WeightedBasis[k];
 				}
 
 				const float32 distance = CaptureDepthToDistance(mCaptureInvProjection, depths[face][pixel],
@@ -1162,14 +1202,12 @@ void ProbeManager::ProjectCapture(const Float16* const colors[scCaptureFaces],
 	}
 
 	for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
-		for (uint32 c = 0; c < 3; c++) {
-			out_sh.SH[k][c] = sh[k][c] * scCosineLobe[k];
-		}
+		(sh[k] * scCosineLobe[k]).CopyTo(out_sh.SH[k]);
 
 		out_sh.SH[k][3] = 0.0f;
 	}
 
-	for (uint32 t = 0; t < cNumMomentTexels; t++) {
+	for (uint32 t = 0; t < scMomentTexelCount; t++) {
 		float32 mean = cFar;
 		float32 mean_sq = cFar * cFar;
 
@@ -1297,8 +1335,7 @@ void ProbeManager::UploadMomentsAtlas(uint32 first_probe, uint32 count)
 
 Vec3f ProbeManager::GetReflectionProbePosition(uint32 index) const
 {
-	const float32* position = mReflectionProbes[index].PositionAndCount;
-	return Vec3f(position[0], position[1], position[2]);
+	return Vec3f(mReflectionProbes[index].PositionAndCount);
 }
 
 uint32 ProbeManager::RebuildReflectionProbesFromWorld()
@@ -1322,7 +1359,12 @@ uint32 ProbeManager::RebuildReflectionProbesFromWorld()
 			  [](const ReflectionBox& a, const ReflectionBox& b) { return a.Volume < b.Volume; });
 
 	const bool has_level_probe = !boxes.IsEmpty() && gCVars->Get("r_reflection_level_probe", int64(0)) != 0;
-	const uint32 max_brush_probes = Limits::MaxReflectionProbes - (has_level_probe ? 1 : 0);
+	uint32 max_brush_probes = Limits::MaxReflectionProbes;
+
+	if (has_level_probe) {
+		max_brush_probes -= 1;
+	}
+
 	const uint32 num_brush_probes = std::min(reflection_boxes.Size, max_brush_probes);
 
 	if (reflection_boxes.Size > max_brush_probes) {
@@ -1668,10 +1710,7 @@ bool ProbeManager::LoadCompiledProbes()
 		ProbeInfo& info = mProbeInfos[probe];
 		const Vec3f position = mLayout.Positions[probe];
 
-		info.ProbePosition[0] = position.X;
-		info.ProbePosition[1] = position.Y;
-		info.ProbePosition[2] = position.Z;
-		info.ProbePosition[3] = 1.0f;
+		SetProbeInfoPosition(info, position);
 
 		const uint16* probe_moments = moments + static_cast<uint64>(probe) * CompiledMap::scProbeMomentValues;
 
@@ -1802,8 +1841,7 @@ bool ProbeManager::LoadProbeFile(const ProbeLayout* required_layout)
 	}
 
 	for (uint32 probe = 0; probe < header.ProbeCount; probe++) {
-		const float32* position = mProbeInfos[probe].ProbePosition;
-		layout.Positions.Emplace(Vec3f(position[0], position[1], position[2]));
+		layout.Positions.Emplace(Vec3f(mProbeInfos[probe].ProbePosition));
 	}
 
 	if (required_layout != nullptr && !CompareLayouts(layout, *required_layout).IsEmpty()) {

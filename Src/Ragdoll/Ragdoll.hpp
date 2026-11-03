@@ -212,7 +212,7 @@ public:
 	FX_FORCE_INLINE void SetBalanceAssist(const BalanceAssist& assist) { mBalance.SetAssist(assist); }
 	FX_FORCE_INLINE void SetStaggerVelocity(const Vec3f velocity)
 	{
-		mBalance.SetStaggerVelocity(JPH::Vec3(velocity.X, velocity.Y, velocity.Z));
+		mBalance.SetStaggerVelocity(Vec3f::ToJolt(velocity));
 	}
 	FX_FORCE_INLINE Vec3f GetStaggerVelocity() const
 	{

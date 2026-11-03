@@ -11,6 +11,7 @@
 #include <Audio/SpatialAudio.hpp>
 #include <Brush.hpp>
 #include <BrushEntry.hpp>
+#include <Core/DynArray.hpp>
 #include <Core/FreeArray.hpp>
 #include <Core/HashMap.hpp>
 #include <Core/Name.hpp>
@@ -111,8 +112,8 @@ public:
 	bool GetClipPieces(Object* object, const Vec3f point_a, const Vec3f point_b, const Vec3f face_normal,
 					   Brush::PlaneList& out_kept, Brush::PlaneList& out_split, Vec3f& out_split_position);
 
-	bool GetSubtractPieces(Object* target, Object* cutter, std::vector<Brush::PlaneList>& out_pieces,
-						   std::vector<Vec3f>& out_positions);
+	bool GetSubtractPieces(Object* target, Object* cutter, Brush::PieceList& out_pieces,
+						   SizedArray<Vec3f>& out_positions);
 
 	void RefreshCappedPatches();
 
@@ -215,7 +216,7 @@ public:
 	AcousticSurface GetAcousticSurface(const MaterialLibraryID id) const;
 
 	void RaycastDecalSurfaces(const Vec3f origin, const Vec3f direction, float32 max_distance,
-							  std::vector<float32>& out_distances);
+							  DynArray<float32, GrowthFunctions::Double>& out_distances);
 
 	const MaterialLibrary& GetMaterialLibrary() const { return mMaterials; }
 
@@ -317,8 +318,8 @@ public:
 	Object* GetSubviewObject(uint32 instance) const;
 	uint32 GetSubviewBrushCount(uint32 instance) const;
 
-	void GetSubviewMembers(uint32 instance, std::vector<Object*>& out_members) const;
-	void GetSubviewSolids(std::vector<SubviewSolid>& out_solids);
+	void GetSubviewMembers(uint32 instance, DynArray<Object*, GrowthFunctions::Double>& out_members) const;
+	void GetSubviewSolids(DynArray<SubviewSolid, GrowthFunctions::Double>& out_solids);
 
 	bool GetSubviewPlacement(uint32 instance, BrushPlacement& out_placement);
 
@@ -341,8 +342,8 @@ public:
 	Object* PlaceSubviewInstance(uint32 instance, const BrushPlacement& placement);
 	void RemoveSubviewInstance(uint32 instance);
 
-	uint32 DissolveSubviewInstance(uint32 instance, std::vector<ObjectID>& out_brushes,
-								   std::vector<uint32>& out_instances);
+	uint32 DissolveSubviewInstance(uint32 instance, DynArray<ObjectID, GrowthFunctions::Double>& out_brushes,
+								   DynArray<uint32, GrowthFunctions::Double>& out_instances);
 
 	void SyncSubviewInstances();
 
@@ -534,9 +535,9 @@ private:
 	};
 
 	bool IsDecalReceiver(Object* object);
-	void GatherDecalReceivers(const BBox& bounds, std::vector<DecalReceiver>& out_receivers);
+	void GatherDecalReceivers(const BBox& bounds, DynArray<DecalReceiver, GrowthFunctions::Double>& out_receivers);
 	uint64 HashDecal(Object* decal, const Brush& volume, const BBox& bounds,
-					 const std::vector<DecalReceiver>& receivers) const;
+					 const DynArray<DecalReceiver, GrowthFunctions::Double>& receivers) const;
 	void RebuildDecalMesh(Object* decal, const Brush& volume);
 
 	void CreateCompiledShadows(const CompiledMap& map);
@@ -585,7 +586,7 @@ private:
 	std::unordered_map<uint32, CompiledSurfaceBody> mCompiledSurfaceBodies;
 	std::vector<String> mCompiledMaterialSurfaces;
 	AcousticGeometry mCompiledAcoustics;
-	std::vector<uint8> mCompiledAcousticProbes;
+	SizedArray<uint8> mCompiledAcousticProbes;
 
 	static constexpr float32 scAcousticRebuildDelay = 0.5f;
 	float32 mAcousticRebuildTimer = -1.0f;
