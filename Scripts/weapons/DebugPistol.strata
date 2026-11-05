@@ -1,0 +1,6 @@
+import ./WeaponImpl;
+
+void weapon_update(ref RWeapon weapon, ref RWeaponDef def, ref RWeaponInput inp, float delta_time)
+{
+	weapon.GenericUpdate(def, inp, delta_time);
+}

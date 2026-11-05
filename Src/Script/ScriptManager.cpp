@@ -2,11 +2,20 @@
 
 #include <strata/strata.h>
 
+#include <Core/FilesystemIO.hpp>
+
 namespace fx {
 
 ScriptManager::ScriptManager()
 {
 	mpCompiler = strataCompilerCreate();
+	if (mpCompiler == nullptr) {
+		LogError("Error initializing Strata compiler.");
+		return;
+	}
+
+	strataAddImportDir(mpCompiler, FX_BASE_DIR "/Submodules/strata/");
+
 	mScripts.Init(scMaxScripts);
 }
 

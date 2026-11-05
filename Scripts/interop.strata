@@ -3,6 +3,7 @@
  */
 
 
+@export
 extern int printf(string fmt, ...);
 
 /* Must match eScriptOpType in Src/Script/ScriptInterop.cpp! Only MOVE, SCALE and ROTATE are pushed with editor_push_op_vec */
@@ -48,6 +49,7 @@ enum EDITORTOOL
 	ROTATE,
 	CLIP,
 	LIGHT,
+	SOUND,
 }
 
 
@@ -55,8 +57,6 @@ enum EDITORTOOL
 	Math Util
  */
 
-/* Returns 1.0 if `value` is positive, returns -1.0 if negative. */
-extern float float_sign(float value);
 extern float float_sqrt(float value);
 
 extern float4 float4_round(float4 value);
@@ -91,6 +91,10 @@ const uint OBJ_TAG_LOCK = (1 << 1);
 /* Set through probe_volume_mark, not set_tags: marking also takes the brush out of the world. */
 const uint OBJ_TAG_PROBEVOLUME = (1 << 2);
 const uint OBJ_TAG_REFLECTIONPROBE = (1 << 3);
+const uint OBJ_TAG_SPAWN = (1 << 4);
+const uint OBJ_TAG_TRIGGER = (1 << 5);
+const uint OBJ_TAG_DECAL = (1 << 8);
+const uint OBJ_TAG_PATCH = (1 << 9);
 
 impl OBJECT
 {
@@ -282,45 +286,46 @@ extern bool portal_is_open(cstring name);
  * "brace", "protect_head", "high_fall", "writhe" and "dying"; every behaviour has the settings "enabled", "priority",
  * "fade_in" and "fade_out" plus its own (npc_behaviour_list prints them). */
 
-extern int npc_find(cstring name);
+@export extern int npc_find(cstring name);
 /* The NPC hit by the last weapon_hit_apply, or 0 if it missed. */
-extern int npc_last_hit();
-extern bool npc_is_alive(int npc);
+@export extern int npc_last_hit();
+@export extern bool npc_is_alive(int npc);
 
 /* Starts a behaviour. "dying" kills the NPC; "fallen", "writhe" and "high_fall" knock it down first. */
-extern bool npc_behaviour_trigger(int npc, cstring behaviour);
-extern bool npc_behaviour_stop(int npc, cstring behaviour);
-extern bool npc_behaviour_active(int npc, cstring behaviour);
+
+@export extern bool npc_behaviour_trigger(int npc, cstring behaviour);
+@export extern bool npc_behaviour_stop(int npc, cstring behaviour);
+@export extern bool npc_behaviour_active(int npc, cstring behaviour);
 
 /* With npc 0 this changes the default for every NPC, including ones spawned later. */
-extern bool npc_behaviour_set(int npc, cstring behaviour, cstring setting, float value);
-extern float npc_behaviour_get(int npc, cstring behaviour, cstring setting);
-extern void npc_behaviour_list(int npc);
+@export extern bool npc_behaviour_set(int npc, cstring behaviour, cstring setting, float value);
+@export extern float npc_behaviour_get(int npc, cstring behaviour, cstring setting);
+@export extern void npc_behaviour_list(int npc);
 
 /* NPC movement. Animated NPCs walk in a straight line (no path finding) and give up when blocked. States are 0 idle,
  * 1 walking to a point, 2 reacting to a hit or push, 3 fleeing. */
 
-extern int npc_count();
+@export extern int npc_count();
 /* The handle of the NPC at `index` (0 to npc_count() - 1), or 0 past the end. */
-extern int npc_at(int index);
-extern bool npc_walk_to(int npc, float3 target);
-extern bool npc_flee(int npc, float3 from);
-extern bool npc_idle(int npc);
-extern int npc_brain_state(int npc);
+@export extern int npc_at(int index);
+@export extern bool npc_walk_to(int npc, float3 target);
+@export extern bool npc_flee(int npc, float3 from);
+@export extern bool npc_idle(int npc);
+@export extern int npc_brain_state(int npc);
 /* Logs the active physics budget, physics time and each NPC's brain state. */
-extern void npc_stats();
+@export extern void npc_stats();
 
 /* Spawning. The NPC model loads in the background: npc_spawn returns 0 until npc_model_ready returns true. A yaw of 0
  * faces +Z, and a yaw of `a` faces (sin a, 0, cos a). */
 
-extern bool npc_model_ready();
-extern int npc_spawn(float3 position, float yaw);
-extern void npc_destroy(int npc);
+@export extern bool npc_model_ready();
+@export extern int npc_spawn(float3 position, float yaw);
+@export extern void npc_destroy(int npc);
 
 /* Where the pelvis is in world space, which keeps following the NPC after it has fallen. */
-extern float3 npc_position(int npc);
-extern float3 npc_velocity(int npc);
-extern float npc_health(int npc);
+@export extern float3 npc_position(int npc);
+@export extern float3 npc_velocity(int npc);
+@export extern float npc_health(int npc);
 
 /* Must match N_npc_state in Src/Script/ScriptInterop.cpp! */
 enum NPC_STATE
@@ -333,30 +338,30 @@ enum NPC_STATE
 	RAGDOLL,
 }
 
-extern NPC_STATE npc_state(int npc);
+@export extern NPC_STATE npc_state(int npc);
 
 /* Physics props: dynamic boxes named by the value prop_spawn_box returns. A gravity_scale of 0 makes a prop float.
  * Props are removed once they get 50 m from the player, after which these calls do nothing. */
 
-extern long prop_spawn_box(cstring material, float size, float mass, float gravity_scale, float3 position, float3 velocity);
+@export extern long prop_spawn_box(cstring material, float size, float mass, float gravity_scale, float3 position, float3 velocity);
 /* Holds a prop at a velocity without letting contacts turn it. Call it every frame for a scripted mover. */
-extern void prop_drive(long prop, float3 velocity);
-extern float3 prop_position(long prop);
-extern void prop_destroy(long prop);
+@export extern void prop_drive(long prop, float3 velocity);
+@export extern float3 prop_position(long prop);
+@export extern void prop_destroy(long prop);
 
 /* CVars */
 
-extern void cvar_set_int(cstring name, long value);
-extern void cvar_set_float(cstring name, float value);
-extern void cvar_set_string(cstring name, string value);
+@export extern void cvar_set_int(cstring name, long value);
+@export extern void cvar_set_float(cstring name, float value);
+@export extern void cvar_set_string(cstring name, string value);
 
 void cvar_set_bool(cstring name, bool value)
 {
 	cvar_set_int(name, (long)value);
 }
 
-extern float cvar_get_float(cstring name, float fallback);
-extern long cvar_get_int(cstring name, long fallback);
+@export extern float cvar_get_float(cstring name, float fallback);
+@export extern long cvar_get_int(cstring name, long fallback);
 
 bool cvar_get_bool(cstring name, bool fallback)
 {
@@ -365,4 +370,3 @@ bool cvar_get_bool(cstring name, bool fallback)
 
 
 extern void script_error(cstring str);
-

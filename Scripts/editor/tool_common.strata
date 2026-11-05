@@ -8,8 +8,10 @@
  */
 
 import ../interop;
-import ../common;
 import ../keyboard;
+
+import std/math;
+import ../math;
 
 
 /* Configuration to be passed back and forth between the GUI editor and the strata scripts.
@@ -26,12 +28,6 @@ struct TOOLSTATE
 	   Used mainly with scale/face tool. */
 	OBJECT transform_marker_object;
 }
-
-enum OBJECTTAG
-{
-	BLOCKOUT = (1 << 0),
-}
-
 
 /* Must match scMaxSelectedObjects in Src/Editor/EditorTool.hpp! */
 const int LIMIT_SELECTION_OBJECTS = 128;
@@ -69,10 +65,7 @@ SELECTION sel;
 /* Receive the current state from the GUI editor. */
 void tool_state_receive(ref TOOLSTATE tc)
 {
-	state.selected_tool = tc.selected_tool;
-	state.tool_snap_level = tc.tool_snap_level;
-	state.tool_snap_enabled = tc.tool_snap_enabled;
-	state.transform_marker_object = tc.transform_marker_object;
+	state = tc;
 }
 
 /* Receive the current selection from the GUI editor. Called whenever the selection changes, and at the start of
@@ -117,7 +110,7 @@ void hide_transform_marker_object()
 float tool_get_snap_multiplier()
 {
 	float[5] snap_values = { 0.0625f, 0.125f, 0.25f, 0.5f, 1.0f };
-	uint index = fclamp(state.tool_snap_level, 0, 4);
+	int index = clamp<int>(state.tool_snap_level, 0, 4);
 	return snap_values[index];
 }
 
@@ -140,7 +133,7 @@ float3 editor_transform_snap(float3 vec)
 
 bool editor_vec_equal(float3 a, float3 b)
 {
-	return nearzero(a - b);
+	return NearZero(a - b);
 }
 
 

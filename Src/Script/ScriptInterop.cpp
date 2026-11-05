@@ -24,7 +24,9 @@
 #include <Weapon/WeaponSystem.hpp>
 #include <World.hpp>
 #include <WorldGrid.hpp>
+#include <cmath>
 #include <vector>
+
 
 namespace fx::script {
 
@@ -324,20 +326,6 @@ static void N_object__select_object_internal(Object* obj, bool is_selected, bool
 }
 
 
-static uint32 N_ctrl_mouse_state()
-{
-	uint32 result = 0;
-	if (ControlManager::IsKeyDown(eKey::FX_MOUSE_LEFT)) {
-		result |= (1 << 0);
-	}
-	if (ControlManager::IsKeyDown(eKey::FX_MOUSE_RIGHT)) {
-		result |= (1 << 1);
-	}
-
-	return result;
-}
-
-
 static FLOAT4 N_camera_position() { return gWorld->GetCurrentCamera()->GetPosition().mIntrin; }
 static FLOAT4 N_player_get_position(void*) { return gWorld->Player.Position.mIntrin; }
 
@@ -400,9 +388,9 @@ static FLOAT4 N_float3_abs(FLOAT4 value)
 }
 
 
-static bool N_is_key_up(uint32 key) { return ControlManager::IsKeyUp(static_cast<eKey>(key)); }
-static bool N_is_key_down(uint32 key) { return ControlManager::IsKeyDown(static_cast<eKey>(key)); }
-static bool N_is_key_pressed(uint32 key) { return ControlManager::IsKeyPressed(static_cast<eKey>(key)); }
+static bool N_RKey_IsUp(uint32 key) { return ControlManager::IsKeyUp(static_cast<eKey>(key)); }
+static bool N_RKey_IsDown(uint32 key) { return ControlManager::IsKeyDown(static_cast<eKey>(key)); }
+static bool N_RKey_IsPressed(uint32 key) { return ControlManager::IsKeyPressed(static_cast<eKey>(key)); }
 
 static float N_float_sign(float value) { return MathUtil::GetSign(value); }
 static float N_float_sqrt(float value) { return std::sqrt(value); }
@@ -588,6 +576,8 @@ static void N_cvar_set_string(const char* name, const char* value) { gCVars->Set
 static int64 N_cvar_get_int(const char* name, int64 fallback) { return gCVars->Get(name, fallback); }
 static float32 N_cvar_get_float(const char* name, float32 fallback) { return gCVars->Get(name, fallback); }
 
+static uint32 N_fastrand32() { return FastRand32(); }
+
 static float32 N_random_range(float32 lo, float32 hi)
 {
 	const float32 unit = static_cast<float32>(FastRand32() >> 8) * (1.0f / 16777216.0f);
@@ -671,19 +661,22 @@ static bool N_portal_is_open(const char* name)
 	return graph.GetPortal(static_cast<uint32>(portal)).bOpen;
 }
 
-static float32 N_weapon_trace(float32 yaw, float32 pitch, float32 range)
+static float32 N_RWeapon_WeaponTrace(float32 yaw, float32 pitch, float32 range)
 {
 	return gWorld->Player.Weapons.Trace(yaw, pitch, range);
 }
 
-static void N_weapon_hit_apply(float32 damage, float32 force, bool decal)
+static void N_RWeapon_ApplyHit(float32 damage, float32 force, bool decal)
 {
 	gWorld->Player.Weapons.ApplyHit(damage, force, decal);
 }
 
-static void N_weapon_kick(float32 pitch, float32 yaw) { gWorld->Player.Weapons.Kick(pitch, yaw); }
+static void N_RWeapon_DoWeaponKick(float32 pitch, float32 yaw) { gWorld->Player.Weapons.Kick(pitch, yaw); }
 
-static void N_weapon_event(int32 event) { gWorld->Player.Weapons.HandleEvent(static_cast<weapon::eEvent>(event)); }
+static void N_RWeapon_HandleEvent(int32 event)
+{
+	gWorld->Player.Weapons.HandleEvent(static_cast<weapon::eEvent>(event));
+}
 
 static NPC* FindNPC(int32 npc)
 {
@@ -1063,9 +1056,7 @@ static void N_tool_state_send(const editor::EditorToolState* state)
 
 static const PredefExtern scAvailableExterns[] = {
 	PREDEF("printf", printf),
-
-	/* Controls */
-	PREDEF("ctrl_mouse_state", N_ctrl_mouse_state),
+	PREDEF("sqrtf", sqrtf),
 
 	/* Object functions  */
 	PREDEF("object_get", N_object_get),
@@ -1125,9 +1116,9 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("print_float4", N_print_float4),
 
 	/* Controls */
-	PREDEF("KEY_is_up", N_is_key_up),
-	PREDEF("KEY_is_down", N_is_key_down),
-	PREDEF("KEY_is_pressed", N_is_key_pressed),
+	PREDEF("RKey_IsUp", N_RKey_IsUp),
+	PREDEF("RKey_IsDown", N_RKey_IsDown),
+	PREDEF("RKey_IsPressed", N_RKey_IsPressed),
 
 	/* Light probes */
 	PREDEF("probe_volume_mark", N_probe_volume_mark),
@@ -1150,6 +1141,7 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("cvar_get_int", N_cvar_get_int),
 	PREDEF("cvar_get_float", N_cvar_get_float),
 
+	PREDEF("fastrand32", N_fastrand32),
 	PREDEF("random_range", N_random_range),
 
 	PREDEF("particle_play", N_particle_play),
@@ -1181,10 +1173,10 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("portal_set_open", N_portal_set_open),
 	PREDEF("portal_is_open", N_portal_is_open),
 
-	PREDEF("weapon_trace", N_weapon_trace),
-	PREDEF("weapon_hit_apply", N_weapon_hit_apply),
-	PREDEF("weapon_kick", N_weapon_kick),
-	PREDEF("weapon_event", N_weapon_event),
+	PREDEF("RWeapon_WeaponTrace", N_RWeapon_WeaponTrace),
+	PREDEF("RWeapon_ApplyHit", N_RWeapon_ApplyHit),
+	PREDEF("RWeapon_DoWeaponKick", N_RWeapon_DoWeaponKick),
+	PREDEF("RWeapon_HandleEvent", N_RWeapon_HandleEvent),
 
 	PREDEF("npc_find", N_npc_find),
 	PREDEF("npc_last_hit", N_npc_last_hit),

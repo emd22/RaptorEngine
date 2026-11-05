@@ -1,0 +1,59 @@
+/* Strata math routines for Raptor */
+
+import std/mathconsts;
+
+@export
+extern float sqrtf(float x);
+
+/* Private */
+extern float3 float3_abs(float3 value);
+extern float4 float4_floor(float4 value);
+
+/* Returns a random value between 0 and UINT32_MAX. */
+extern uint fastrand32();
+
+float3 abs(float3 value)
+{
+	return float3_abs(value);
+}
+
+float3 floor(float3 value)
+{
+	return (float4_floor(float4(value, 0.0f))).xyz;
+}
+
+float4 floor(float4 value)
+{
+	return float4_floor(value);
+}
+
+bool is_approx(float value, float expect, float tolerance)
+{
+	return (value <= (expect - tolerance) && value >= (expect + tolerance));
+}
+
+
+/* Returns true if `value` is near 0.0f in all lanes. */
+bool NearZero(float3 value)
+{
+	const float epsilon = 0.00001f;
+	const float3 xa = abs(value);
+
+	return (xa.x <= epsilon && xa.y <= epsilon && xa.z <= epsilon);
+}
+
+float Deg2Rad(float deg)
+{
+	return deg * F_PI_OVER_180;
+}
+
+float Rad2Deg(float rad)
+{
+	return rad * F_180_OVER_PI;
+}
+
+float RandRange(float lo, float hi)
+{
+	const float unit = ((float)(fastrand32() >> 8)) * (1.0f / 16777216.0f);
+	return (lo + (hi - lo) * unit);
+}
