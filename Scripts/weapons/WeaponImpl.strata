@@ -141,7 +141,7 @@ impl RWeapon
 		}
 	}
 
-	void WeaponInit(ref RWeapon self, ref RWeaponDef def)
+	void WeaponInit(ref RWeapon self, const ref RWeaponDef def)
 	{
 		self.Phase = RWeaponPhase.READY;
 		self.FireMode = def.DefaultMode;
@@ -157,7 +157,7 @@ impl RWeapon
 		self.FireBuffer = 0.0f;
 	}
 
-	void Equip(ref RWeapon self, ref RWeaponDef def)
+	void Equip(ref RWeapon self, const ref RWeaponDef def)
 	{
 		self.BurstRemaining = 0;
 		self.FireBuffer = 0.0f;
@@ -166,7 +166,7 @@ impl RWeapon
 		RWeapon.HandleEvent(RWeaponEvent.RAISE);
 	}
 
-	void Holster(ref RWeapon self, ref RWeaponDef def)
+	void Holster(ref RWeapon self, const ref RWeaponDef def)
 	{
 		self.BurstRemaining = 0;
 		self.FireBuffer = 0.0f;

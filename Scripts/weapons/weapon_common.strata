@@ -86,6 +86,7 @@ struct RWeaponFalloffDef
 }
 
 
+@component
 struct RWeaponDef
 {
 	float Damage;
@@ -121,6 +122,7 @@ struct RWeaponDef
 	float LowerTime;
 }
 
+@component
 struct RWeapon
 {
 	RWeaponPhase Phase;
@@ -139,6 +141,7 @@ struct RWeapon
 	float FireBuffer;
 }
 
+@component
 struct RWeaponInput
 {
 	RInputFlags Flags;
@@ -187,14 +190,19 @@ impl RWeaponMode
 		return ((((uint)mode_flags) & ((uint)mode)) != 0);
 	}
 
+	/* Modes are bit flags, so this steps through bit indices (SEMI -> AUTO -> BURST -> SEMI) */
 	RWeaponMode Next(RWeaponMode mode_flags, RWeaponMode current)
 	{
-		for (int i = 1; i <= RWeaponMode.COUNT; i++) {
-			RWeaponMode candidate = (RWeaponMode)((int)current + i);
+		int current_bit = 0;
 
-			if (candidate >= RWeaponMode.COUNT) {
-				candidate = (RWeaponMode)((int)candidate - (int)RWeaponMode.COUNT);
+		for (int bit = 0; bit < (int)RWeaponMode.COUNT; bit++) {
+			if ((int)current == (1 << bit)) {
+				current_bit = bit;
 			}
+		}
+
+		for (int i = 1; i <= (int)RWeaponMode.COUNT; i++) {
+			RWeaponMode candidate = (RWeaponMode)(1 << ((current_bit + i) % (int)RWeaponMode.COUNT));
 
 			if (RWeaponMode.IsAllowed(mode_flags, candidate)) {
 				return candidate;

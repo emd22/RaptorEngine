@@ -2,6 +2,7 @@
 
 #include "ScriptFunction.hpp"
 
+#include <Core/Slice.hpp>
 #include <Core/String.hpp>
 #include <Object/ObjectID.hpp>
 
@@ -115,6 +116,9 @@ public:
 
 	FX_FORCE_INLINE bool HasErrors() const { return (mpErrors != nullptr); };
 	FX_FORCE_INLINE const char* GetErrors() const { return mpErrors; }
+
+	/** The module's type metadata (read with strata/strata_types.h); empty when it declares no @component structs. */
+	Slice<const uint8> GetTypeMetadata() const;
 
 	~Script();
 
