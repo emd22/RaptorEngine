@@ -9,6 +9,7 @@
 #include "ShadowAtlas.hpp"
 
 #include <Asset/AssetManager.hpp>
+#include <Core/BitUtil.hpp>
 #include <Engine.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
@@ -26,25 +27,25 @@ FX_SET_MODULE_NAME("ShadowAtlas")
 
 /**
  * The general layout of the atlas is like this;
- * Directional on the left with the largest chunk of resolution, and the spotlight slots on the right (each about
- * 512x512). The bottom right 1024x1024 is the coarse far sun cascade used by the fog.
+ * Directional on the left with the largest chunk of resolution (dynamic sun shadows), and the spotlight slots on the
+ * right (each about 512x512). The `Far` chunk is the coarse sun cascade used for volumetric fog.
+ *
+ * The spotlight tiles 10, 11, 14 and 15 are now designated as D0, D1, D2 and D3. These are dynamic spotlights that are
+ * exempt from volumetric fog (for now) and have other special properties and are reserved for moving or updating
+ * lights.
  *
  *     +-------------------+----+----+----+----+
  *     |                   |  0 |  1 |  2 |  3 |
  *     |                   +----+----+----+----+
  *     |                   |  4 |  5 |  6 |  7 |
- *     |       Sun         +----+----+---------+
- *     |                   |  8 |  9 |         |
- *     |                   +----+----+   Far   |
- *     |                   | 12 | 13 |         |
- *     +-------------------+----+----+---------+
+ *     |       Sun         +----+----+----+----+
+ *     |                   |         | D0 | D1 |
+ *     |                   |   Far   +----+----+
+ *     |                   |         | D2 | D3 |
+ *     +-------------------+----+----+----+----+
  *
  */
 
-/// The atlas is sampled by the forward pass between shadow passes, and each region's render pass starts and ends in
-/// this layout. It can't start from VK_IMAGE_LAYOUT_UNDEFINED, as that would throw away everything outside of the
-/// render area.
-static constexpr VkImageLayout scAtlasLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 /// Depth bias for shadow casters. With both sides drawn, lit surfaces are in their own shadow map, so this keeps them
 /// from shadowing themselves. The slope term does the work, a D32 float constant unit is only a few ULPs.
@@ -63,20 +64,17 @@ static VkRect2D RegionToRect(const URect& region)
 
 ShadowAtlas::ShadowAtlas()
 {
-	const Vec2u size(scWidth, scHeight);
+	RenderStage.Create("ShadowAtlas", scAtlasSize, eSizeDivisor::FullRes);
 
-	RenderStage.Create("ShadowAtlas", size, eSizeDivisor::FullRes);
-
-	Target atlas_target(eImageFormat::D32_Float, size, false,
+	Target atlas_target(eImageFormat::D32_Float, scAtlasSize, false,
 						VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
 						eImageAspectFlag::Depth);
 
 	// Every region is rendered in its own pass with the region as the render area, so the clear only touches that
-	// region and the baked spot light tiles survive between frames. MoltenVK chuff going on here that I gotta figure
-	// out
+	// region and the baked spot light tiles survive between frames.
 	atlas_target.LoadOp = eLoadOp::Clear;
-	atlas_target.InitialLayout = scAtlasLayout;
-	atlas_target.FinalLayout = scAtlasLayout;
+	atlas_target.InitialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	atlas_target.FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	atlas_target.StencilLoadOp = eLoadOp::DontCare;
 	atlas_target.StencilStoreOp = eStoreOp::DontCare;
@@ -88,7 +86,7 @@ ShadowAtlas::ShadowAtlas()
 										 [this](ePipelineFeatures features, PipelineDesc& out_desc)
 										 { return MakeShadowDesc(features, out_desc); });
 
-	// Opaque casters first, then alpha masked ones
+	// Create the shadow caster variants up front: opaque, alpha masked and skinned
 	gPipelineCache->GetOrCreateVariant(ePipelinePass::Shadow, ePipelineFeatures::None);
 	gPipelineCache->GetOrCreateVariant(ePipelinePass::Shadow, ePipelineFeatures::AlphaMask);
 	gPipelineCache->GetOrCreateVariant(ePipelinePass::Shadow, ePipelineFeatures::Skinned);
@@ -123,8 +121,8 @@ bool ShadowAtlas::MakeShadowDesc(ePipelineFeatures features, PipelineDesc& out_d
 	out_desc.VertexType = is_skinned ? eVertexType::Skinned : eVertexType::Default;
 	out_desc.DepthCompareOp = VK_COMPARE_OP_GREATER;
 
-	// Both sides are drawn, so the nearest surface to the light is what casts. Drawing back faces only leaked light where
-	// a caster meets its receiver (wall bases), as the far face of the caster ends exactly on the receiver.
+	// Both sides are drawn, so the nearest surface to the light is what casts. Drawing back faces only leaked light
+	// where a caster meets its receiver (wall bases), as the far face of the caster ends exactly on the receiver.
 	out_desc.CullMode = eCullMode::None;
 
 	// Reverse Z, so a negative bias pushes casters away from the light
@@ -172,9 +170,9 @@ void ShadowAtlas::BeginRegion(const URect& region)
 	Target* target = GetTarget();
 	Assert(target != nullptr);
 
-	// The image only reaches the sampled layout after its first pass
-	if (target->Image.ImageLayout != scAtlasLayout) {
-		BarrierHelper::ImageLayoutTransition(&target->Image, scAtlasLayout, cmd, 0, 1);
+	// The image starts out undefined, so move it into the sampled layout before the first pass
+	if (target->Image.ImageLayout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+		BarrierHelper::ImageLayoutTransition(&target->Image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 0, 1);
 	}
 
 	const VkRect2D rect = RegionToRect(region);
@@ -187,7 +185,7 @@ void ShadowAtlas::BeginRegion(const URect& region)
 	VkRect2D render_area = rect;
 
 	if (mbNeedsClear) {
-		render_area = RegionToRect(URect::FromRelative(Vec2u::scZero, Vec2u(scWidth, scHeight)));
+		render_area = RegionToRect(URect::FromRelative(Vec2u::scZero, scAtlasSize));
 		mbNeedsClear = false;
 	}
 
@@ -200,68 +198,123 @@ void ShadowAtlas::BeginRegion(const URect& region)
 
 void ShadowAtlas::EndRegion() { RenderStage.End(); }
 
-URect ShadowAtlas::GetDirectionalRegion() const { return URect::FromRelative(Vec2u::scZero, Vec2u(scDirectionalSize)); }
+URect ShadowAtlas::GetDirectionalRegion() const
+{
+	// The "whole hog" left half of the atlas
+	return URect::FromRelative(Vec2u::scZero, Vec2u(scDirectionalSize));
+}
 
 URect ShadowAtlas::GetFarDirectionalRegion() const
 {
-	return URect::FromRelative(Vec2u(scWidth, scHeight) - Vec2u(scFarDirectionalSize), Vec2u(scFarDirectionalSize));
+	// The bottom of the spot grid, directly right of the sun. Uses 4 spotlight tiles worth of space
+	Vec2u start_point = Vec2u(scDirectionalSize, scAtlasSize.Y - scFarDirectionalSize);
+	return URect::FromRelative(start_point, Vec2u(scFarDirectionalSize));
 }
 
-URect ShadowAtlas::GetSpotTileRegion(ShadowTileIndex tile) const
+URect ShadowAtlas::GetDynamicSpotTileRegion() const
 {
-	Assert(tile < scMaxSpotTiles);
+	// Directly to the right of the far cascade, the same size as it
+	return GetFarDirectionalRegion().OffsetBy(Vec2u(scFarDirectionalSize, 0U));
+}
 
-	const uint32 column = tile % scSpotTilesPerRow;
-	const uint32 row = tile / scSpotTilesPerRow;
+URect ShadowAtlas::GetStaticSpotTileRegion() const
+{
+	// The top right of the atlas, with the bottom half left for the far cascade and dynamic tiles
+	const Vec2u start_point = Vec2u(scDirectionalSize, 0U);
+	const Vec2u size = Vec2u(scDirectionalSize, scDirectionalSize / 2U);
 
+	return URect::FromRelative(start_point, size);
+}
+
+URect ShadowAtlas::GetSpotTileRegion(ShadowTileIndex tile_index) const
+{
+	constexpr uint32 scSpotMask =
+		static_cast<uint32>(eShadowAtlasMask::StaticSpot) | static_cast<uint32>(eShadowAtlasMask::DynamicSpot);
+
+	if (tile_index >= 32U || (TileBit(tile_index) & scSpotMask) == 0U) {
+		LogError("Spot tile region is invalid!");
+		return URect::FromRelative(Vec2u::scZero, Vec2u::scZero);
+	}
+
+	const uint32 column = tile_index % scSpotGridColumns;
+	const uint32 row = tile_index / scSpotGridColumns;
 
 	const Vec2u region_position = Vec2u(scDirectionalSize + (column * scSpotTileSize), row * scSpotTileSize);
 
 	return URect::FromRelative(region_position, Vec2u(scSpotTileSize, scSpotTileSize));
 }
 
+ShadowTileIndex ShadowAtlas::FindFreeTile(const eShadowAtlasMask mask) const
+{
+	// Bits outside the mask are forced to 1, so the first zero can only be a free tile inside it
+	const uint32 unavailable = mSpotTilesInUse | ~static_cast<uint32>(mask);
+	const uint32 bit_index = Bit::FindFirstZero32(unavailable);
+
+	if (bit_index == Bit::scBitNotFound) {
+		return ShadowTileIndexNull;
+	}
+
+	return bit_index;
+}
+
+
 void ShadowAtlas::GetRegionUVTransform(const URect& region, float32 out_transform[4]) const
 {
-	static constexpr Vec2f scAtlasSize = Vec2f(static_cast<float32>(scWidth), static_cast<float32>(scHeight));
-	static_assert(scAtlasSize.X > 0.0f && scAtlasSize.Y > 0.0f);
+	static_assert(scAtlasSize.X > 0U && scAtlasSize.Y > 0U);
+
+	static constexpr Vec2f scAtlasSizeFloat = Vec2f::From<uint32>(scAtlasSize);
 
 	const FRect f_region = FRect(region);
 
-	const Vec2f xform_xy = f_region.GetExtent() / scAtlasSize;
-	const Vec2f xform_zw = f_region.Min / scAtlasSize;
+	const Vec2f xform_xy = f_region.GetExtent() / scAtlasSizeFloat;
+	const Vec2f xform_zw = f_region.Min / scAtlasSizeFloat;
 
 	out_transform[0] = xform_xy.X;
 	out_transform[1] = xform_xy.Y;
 	out_transform[2] = xform_zw.X;
 	out_transform[3] = xform_zw.Y;
-
-	// out_transform[0] = static_cast<float32>(region.Size.X) / cWidth;
-	// out_transform[1] = static_cast<float32>(region.Size.Y) / cHeight;
-	// out_transform[2] = static_cast<float32>(region.Offset.X) / cWidth;
-	// out_transform[3] = static_cast<float32>(region.Offset.Y) / cHeight;
 }
 
-ShadowTileIndex ShadowAtlas::AllocateSpotTile()
-{
-	for (ShadowTileIndex tile = 0; tile < scMaxSpotTiles; tile++) {
-		const uint32 bit = (1U << tile);
 
-		if (((mSpotTilesInUse | scFarTileMask) & bit) == 0) {
-			mSpotTilesInUse |= bit;
-			return tile;
-		}
+ShadowTileIndex ShadowAtlas::AllocateDynamicSpotTile()
+{
+	ShadowTileIndex tile_index = FindFreeTile(eShadowAtlasMask::DynamicSpot);
+
+	// We found a tile, set it as in use
+	if (tile_index != ShadowTileIndexNull) {
+		mSpotTilesInUse |= TileBit(tile_index);
+		return tile_index;
 	}
+
 
 	return ShadowTileIndexNull;
 }
 
-void ShadowAtlas::FreeSpotTile(ShadowTileIndex tile)
+
+ShadowTileIndex ShadowAtlas::AllocateStaticSpotTile()
 {
-	if (tile >= scMaxSpotTiles) {
+	ShadowTileIndex tile_index = FindFreeTile(eShadowAtlasMask::StaticSpot);
+
+	// We found a tile, set it as in use
+	if (tile_index != ShadowTileIndexNull) {
+		mSpotTilesInUse |= TileBit(tile_index);
+		return tile_index;
+	}
+
+
+	return ShadowTileIndexNull;
+}
+
+void ShadowAtlas::FreeSpotTile(ShadowTileIndex tile_index)
+{
+	constexpr uint32 scSpotMask =
+		static_cast<uint32>(eShadowAtlasMask::StaticSpot) | static_cast<uint32>(eShadowAtlasMask::DynamicSpot);
+
+	if (tile_index >= 32U || (TileBit(tile_index) & scSpotMask) == 0U) {
 		return;
 	}
 
-	mSpotTilesInUse &= ~(1U << tile);
+	mSpotTilesInUse &= ~TileBit(tile_index);
 }
 
 void ShadowAtlas::Invalidate()

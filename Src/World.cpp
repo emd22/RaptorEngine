@@ -31,7 +31,7 @@ void World::Create()
 {
 	SortedEntryBuffer.SetPageSize(128);
 
-	mSpotShadowBakes.SetPageSize(ShadowAtlas::scMaxSpotTiles);
+	mSpotShadowBakes.SetPageSize(ShadowAtlas::scTotalStaticSpotTiles);
 	mSpotShadowCasters.SetPageSize(256);
 
 	mVisibleTiles.InitCapacity(600);
@@ -515,13 +515,13 @@ void World::UpdateSpotShadows()
 		}
 
 		if (shadow.AtlasTile == ShadowTileIndexNull) {
-			shadow.AtlasTile = gShadowAtlas->AllocateSpotTile();
+			shadow.AtlasTile = gShadowAtlas->AllocateStaticSpotTile();
 
 			if (shadow.AtlasTile == ShadowTileIndexNull) {
 				static bool sbWarned = false;
 				if (!sbWarned) {
 					LogWarning(LC_RENDER, "Shadow atlas is out of spot light tiles ({}), '{}' will not cast shadows",
-							   ShadowAtlas::scUsableSpotTiles, light->Name.Get());
+							   ShadowAtlas::scTotalStaticSpotTiles, light->Name.Get());
 					sbWarned = true;
 				}
 
@@ -1132,22 +1132,31 @@ void World::Render(BaseCamera* shadow_camera)
 
 	mSunLightSlot = UINT32_MAX;
 
-	for (const LightID light_id : mLightList.GetLights()) {
-		LightBase* light = gLightManager->GetLight(light_id);
+	// Map lights first, then persistent ones, which probe captures leave out by culling only the first slots
+	for (uint32 pass = 0; pass < 2; pass++) {
+		const bool wants_persistent = (pass == 1);
 
-		if (light == nullptr) {
-			continue;
+		if (wants_persistent) {
+			mMapLightSlotCount = gGraphics->LightBuffer.SlotIndex;
 		}
 
-		const uint32 slot = gGraphics->LightBuffer.SlotIndex;
+		for (const LightID light_id : mLightList.GetLights()) {
+			LightBase* light = gLightManager->GetLight(light_id);
 
-		light->Render(camera, shadow_camera);
+			if (light == nullptr || light->IsPersistent() != wants_persistent) {
+				continue;
+			}
 
-		// Probe captures swap this slot out for a copy of the sun with its own shadow map, see RenderProbeCapture()
-		const bool was_written = (gGraphics->LightBuffer.SlotIndex != slot);
+			const uint32 slot = gGraphics->LightBuffer.SlotIndex;
 
-		if (light->Type == eLightType::Directional && was_written && mSunLightSlot == UINT32_MAX) {
-			mSunLightSlot = slot;
+			light->Render(camera, shadow_camera);
+
+			// Probe captures swap this slot out for a copy of the sun with its own shadow map, see RenderProbeCapture()
+			const bool was_written = (gGraphics->LightBuffer.SlotIndex != slot);
+
+			if (light->Type == eLightType::Directional && was_written && mSunLightSlot == UINT32_MAX) {
+				mSunLightSlot = slot;
+			}
 		}
 	}
 
@@ -1192,6 +1201,11 @@ void World::Render(BaseCamera* shadow_camera)
 
 	BakeSpotShadows();
 	gGraphics->MarkGpu(eGpuMarker::Shadows);
+
+	// Persistent lights are the ones that were not baked, so they are the ones that bounce at runtime
+	gGraphics->Transport.Render(gGraphics->GetFrame()->CmdBuffer, mMapLightSlotCount,
+								gGraphics->LightBuffer.SlotIndex - mMapLightSlotCount, !gProbeManager->IsBaking());
+	gGraphics->MarkGpu(eGpuMarker::LightTransport);
 
 	gGraphics->BeginPrepass();
 
@@ -1320,8 +1334,9 @@ void World::RenderProbeCapture()
 	OrthoCamera capture_shadow_camera;
 	bool has_capture_shadows = false;
 
-	// Only the lights from the main view get culled, not the copies of the sun appended after them
-	LightCullOverride light_override { .LightCount = gGraphics->LightBuffer.SlotIndex };
+	// Only the map lights from the main view get culled, not persistent lights (the flashlight) or the copies of the
+	// sun appended after them
+	LightCullOverride light_override { .LightCount = mMapLightSlotCount };
 
 	gProbeManager->RecordCaptureBatch(
 		cmd,

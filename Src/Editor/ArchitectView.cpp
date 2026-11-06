@@ -585,7 +585,7 @@ TopViewState RaptorEditor::BuildTopViewState()
 	const LightSpot* selected_light = mLightEditor.GetSelected();
 
 	for (const Ref<LightBase>& base : gLightManager->GetCache()) {
-		if (!base.IsValid() || base->Type != eLightType::Spot) {
+		if (!base.IsValid() || base->Type != eLightType::Spot || base->IsPersistent()) {
 			continue;
 		}
 

@@ -37,6 +37,9 @@ enum class ePipelineName : uint16
 	FogFroxelInject,
 	FogFroxelIntegrate,
 	FogFroxelApply,
+	LightTransportInject,
+	LightTransportBounce,
+	LightTransportApply,
 
 	NumPipelines
 };

@@ -44,7 +44,7 @@ LightSpot* LightEditor::GetSelected()
 
 	LightBase* light = gLightManager->GetLight(mSelectedID);
 
-	if (light == nullptr || light->Type != eLightType::Spot) {
+	if (light == nullptr || light->Type != eLightType::Spot || light->IsPersistent()) {
 		mSelectedID = LightID::scNull;
 		return nullptr;
 	}
@@ -175,7 +175,7 @@ void LightEditor::DrawMarkers()
 	constexpr float32 scMarkerHalfExtent = 0.12f;
 
 	for (const Ref<LightBase>& base : gLightManager->GetCache()) {
-		if (!base.IsValid() || base->Type != eLightType::Spot) {
+		if (!base.IsValid() || base->Type != eLightType::Spot || base->IsPersistent()) {
 			continue;
 		}
 

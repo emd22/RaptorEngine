@@ -549,6 +549,67 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 								baked.BakedProbeCount, baked.ProbeRayCount, baked.MeanProbeIrradiance));
 			}
 
+			if (baked.TransportClusterCount > 0) {
+				log(String::Fmt("  transport    {} clusters, {} samples, {} links ({:.1f} MB), built in {:.1f} s",
+								baked.TransportClusterCount, baked.TransportSampleCount, baked.TransportLinkCount,
+								static_cast<double>(baked.TransportLinkCount * sizeof(CompiledMapTransportLink)) /
+									(1024.0 * 1024.0),
+								baked.TransportSeconds));
+			}
+
+			if (baked.Transport.bMeasured) {
+				const TransportStats& transport = baked.Transport;
+				const double ray_count = std::max<double>(static_cast<double>(transport.RayCount), 1.0);
+				constexpr double scBytesPerLink = 8.0;
+				constexpr double scBytesPerMegabyte = 1024.0 * 1024.0;
+
+				log(String::Fmt("  transport    {} rays per texel, {:.1f}% sky, {:.1f}% black, {:.1f}% off-chart, "
+								"measured in {:.1f} s",
+								transport.RaysPerTexel, 100.0 * static_cast<double>(transport.SkyRayCount) / ray_count,
+								100.0 * static_cast<double>(transport.DarkRayCount) / ray_count,
+								100.0 * static_cast<double>(transport.UnmappedRayCount) / ray_count, transport.Seconds));
+
+				for (uint32 level = 0; level < TransportStats::scLevelCount; level++) {
+					const uint32 block = 1U << level;
+
+					log(String::Fmt("  transport    cluster {}x{} ({:.2f} m): {} clusters", block, block,
+									static_cast<double>(block) / baked.Density, transport.ClusterCounts[level]));
+				}
+
+				const auto log_links = [&](const String& receiver, uint32 source_level, const TransportLinkStats& links)
+				{
+					if (links.ReceiverCount == 0) {
+						return;
+					}
+
+					const double receivers = static_cast<double>(links.ReceiverCount);
+					const double mean95 = static_cast<double>(links.Link95Sum) / receivers;
+					const uint32 block = 1U << source_level;
+
+					log(String::Fmt("  transport    {} <- {}x{}: {} receivers, links unique {:.1f}, 90% {:.1f}, 95% {:.1f}, "
+									"99% {:.1f}, max 95% {}, {:.1f} MB at 95%",
+									receiver, block, block, links.ReceiverCount,
+									static_cast<double>(links.UniqueLinkSum) / receivers,
+									static_cast<double>(links.Link90Sum) / receivers, mean95,
+									static_cast<double>(links.Link99Sum) / receivers, links.MaxLink95,
+									receivers * mean95 * scBytesPerLink / scBytesPerMegabyte));
+				};
+
+				for (uint32 receiver_level = 0; receiver_level < TransportStats::scLevelCount; receiver_level++) {
+					const uint32 block = 1U << receiver_level;
+
+					for (uint32 source_level = 0; source_level < TransportStats::scLevelCount; source_level++) {
+						log_links(String::Fmt("{}x{}", block, block), source_level,
+								  transport.Texels[receiver_level][source_level]);
+					}
+				}
+
+				for (uint32 source_level = 0; source_level < TransportStats::scLevelCount; source_level++) {
+					log_links(String::Fmt("probe ({} rays)", transport.ProbeRaysPerProbe), source_level,
+							  transport.Probes[source_level]);
+				}
+			}
+
 			if (baked.MissingAlbedoCount > 0) {
 				log(String::Fmt(
 					"  warning      {} materials have no readable diffuse texture, they bounce light as grey",

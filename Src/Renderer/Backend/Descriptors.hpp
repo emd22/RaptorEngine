@@ -168,6 +168,17 @@ public:
 		return false;
 	}
 
+	bool UsesBuffer(const RawGpuBuffer* buffer) const
+	{
+		for (const DescriptorEntry& entry : mDescriptorEntries) {
+			if (entry.IsBuffer() && entry.pBuffer == buffer) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 
 	~DescriptorSet() = default;
 

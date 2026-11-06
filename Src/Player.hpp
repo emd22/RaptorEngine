@@ -9,9 +9,13 @@
 #include <Math/Vec2.hpp>
 #include <Physics/PhysicsPlayer.hpp>
 #include <Renderer/Camera/FPSCamera.hpp>
+#include <Renderer/LightID.hpp>
 #include <Weapon/WeaponSystem.hpp>
 
+
 namespace fx {
+
+class LightSpot;
 
 class Object;
 
@@ -200,6 +204,8 @@ public:
 	float32 mBobCounterY = 0.0f;
 
 	weapon::WeaponSystem Weapons;
+
+	LightSpot* pFlashlight = nullptr;
 
 private:
 	float32 mHeadBobX = 0.0f;

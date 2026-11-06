@@ -840,6 +840,7 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	}
 
 	renderer::gGraphics->ClearFogShadow();
+	renderer::gGraphics->Transport.Clear();
 
 	mbHasBakedSun = false;
 	mbHasBakedIndirect = false;
@@ -971,6 +972,13 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 			LogWarning(LC_ASSET, "The compiled map's {}x{} lightmap is larger than {}x{}, its lighting stays dynamic",
 					   lightmap.Width, lightmap.Height, Limits::LightmapSize, Limits::LightmapSize);
 		}
+	}
+
+	if (has_lightmap) {
+		renderer::gGraphics->Transport.Upload(map.Transport, lightmap);
+	}
+	else {
+		renderer::gGraphics->Transport.Clear();
 	}
 
 	mbHasBakedSun = has_lightmap && map.HasBakedSun();
@@ -2865,6 +2873,10 @@ void Blockout::SaveLights(ConfigFile& info)
 	ConfigEntry lights_container = ConfigEntry::Struct("lights");
 
 	for (const Ref<LightBase>& light : gLightManager->GetCache()) {
+		if (light->IsPersistent()) {
+			continue;
+		}
+
 		if (light->Type != eLightType::Point && light->Type != eLightType::Spot) {
 			continue;
 		}

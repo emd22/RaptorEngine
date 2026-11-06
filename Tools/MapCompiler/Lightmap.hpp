@@ -40,9 +40,43 @@ struct LightmapOptions
 
 	uint32 ProbeTexelRays = 4;
 
+	bool bTransportStats = false;
+	bool bLightTransport = true;
+
 	FogShadowOptions FogShadow;
 
 	String ImagePath;
+};
+
+/// Clusters are square blocks of 1, 2, 4 or 8 texels on a side, aligned to their chart
+struct TransportLinkStats
+{
+	uint64 ReceiverCount = 0;
+	uint64 UniqueLinkSum = 0;
+	uint64 Link90Sum = 0;
+	uint64 Link95Sum = 0;
+	uint64 Link99Sum = 0;
+	uint32 MaxLink95 = 0;
+};
+
+struct TransportStats
+{
+	static constexpr uint32 scLevelCount = 4;
+
+	bool bMeasured = false;
+	uint32 RaysPerTexel = 0;
+	uint64 RayCount = 0;
+	uint64 SkyRayCount = 0;
+	uint64 DarkRayCount = 0;
+	uint64 UnmappedRayCount = 0;
+	uint64 ClusterCounts[scLevelCount] = {};
+	double Seconds = 0.0;
+
+	/// [receiver level][source level]
+	TransportLinkStats Texels[scLevelCount][scLevelCount];
+
+	uint32 ProbeRaysPerProbe = 0;
+	TransportLinkStats Probes[scLevelCount];
 };
 
 struct LightmapStats
@@ -77,6 +111,13 @@ struct LightmapStats
 	uint32 BakedProbeCount = 0;
 	uint64 ProbeRayCount = 0;
 	double MeanProbeIrradiance = 0.0;
+
+	TransportStats Transport;
+
+	uint32 TransportClusterCount = 0;
+	uint32 TransportSampleCount = 0;
+	uint64 TransportLinkCount = 0;
+	double TransportSeconds = 0.0;
 
 	bool bHasFogShadow = false;
 	FogShadowStats FogShadow;

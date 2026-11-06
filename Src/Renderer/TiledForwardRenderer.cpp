@@ -55,6 +55,7 @@ void TiledForwardRenderer::Create(const Vec2u& extent)
 	CreateBitmapTextPSO();
 	CreateParticlePSO();
 	CreateFogPSO();
+	gGraphics->Transport.CreatePipelines();
 	CreateLightCullingPSO();
 	CreateDebugLayerPSO();
 	CreateDebugSolidPSO();
@@ -222,7 +223,7 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 												   eSamplerAddressMode::ClampToEdge,
 											   })));
 
-	ds_entries.Insert(DescriptorEntry::AsImage(18, eShaderType::Pixel, gGraphics->pLightmapIrradiance,
+	ds_entries.Insert(DescriptorEntry::AsImage(18, eShaderType::Pixel, gGraphics->GetShadingIrradiance(),
 											   gSamplerCache->Request({
 												   eSamplerFilter::Linear,
 												   eSamplerFilter::Linear,

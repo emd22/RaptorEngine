@@ -84,7 +84,7 @@ float4 F_UnpackUIntToFloat4(uint x);
 
 #define LIGHT_COUNT 64
 
-/// Shadow atlas dimensions. Mirrors ShadowAtlas::scWidth / scHeight in Src/Renderer/ShadowAtlas.hpp, which are
+/// Shadow atlas dimensions. Mirrors ShadowAtlas::scAtlasSize in Src/Renderer/ShadowAtlas.hpp, which is
 /// compile time constants that ShadowAtlas::GetRegionUVTransform() already bakes into the atlas rects, so the
 /// shader does not have to query the texture per pixel per light.
 #define SHADOW_ATLAS_WIDTH 4096

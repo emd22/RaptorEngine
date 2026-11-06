@@ -10,6 +10,7 @@
 #include <Object/ObjectManager.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
+#include <Renderer/LightManager.hpp>
 #include <World.hpp>
 
 namespace fx {
@@ -35,6 +36,11 @@ void Player::Create()
 	mNoClipController.SprintSpeed = scSprintSpeed * 2.0f;
 
 	Weapons.Create(this);
+
+	pFlashlight = gLightManager->NewLight<LightSpot>("Flashlight");
+	pFlashlight->Flags |= LF_Persistent;
+	pFlashlight->SetRadius(15.0f);
+
 
 	if (mActiveViewModel < 0) {
 		SetViewModel(scDefaultViewModel);
@@ -701,6 +707,7 @@ void Player::Update(float64 delta_time)
 
 	pCamera->SetPosition(Position + mCameraOffset + Vec3f(0.0f, mLandingOffset, 0.0f));
 
+
 	const bool user_force_released = GetController().GetVelocity().IsNearZero(0.1);
 
 	// const bool should_reset_center = ((user_force_released || Physics.bIsGrounded) &&
@@ -736,6 +743,9 @@ void Player::Update(float64 delta_time)
 	UpdateFov(static_cast<float32>(delta_time), user_force_released);
 
 	pCamera->Update();
+
+	pFlashlight->SetPosition(pCamera->GetPosition() + (pCamera->GetForwardVector() * 0.5f) - Vec3f(0.0f, 0.2f, 0.0f));
+	pFlashlight->SetRotation(pCamera->GetRotation());
 
 	Weapons.Update(static_cast<float32>(delta_time));
 

@@ -52,6 +52,10 @@ void LightManager::Clear()
 	std::lock_guard<std::mutex> guard(mInUse);
 
 	for (LightBase* light : mLightList) {
+		if (light->IsPersistent()) {
+			continue;
+		}
+
 		DestroyLight(light);
 	}
 }

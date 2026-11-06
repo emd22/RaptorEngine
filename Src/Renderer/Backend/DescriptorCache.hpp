@@ -65,6 +65,11 @@ public:
 	 */
 	void RebuildUsingImage(const Image* image);
 
+	/**
+	 * @brief Rebuilds the sets that use any of `buffers` or `images`, after they were recreated in place
+	 */
+	void RebuildUsing(Slice<const RawGpuBuffer* const> buffers, Slice<Image* const> images);
+
 	void Destroy();
 	~DescriptorCache() { Destroy(); }
 

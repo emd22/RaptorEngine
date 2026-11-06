@@ -8,6 +8,7 @@
 #include "DeletionObject.hpp"
 #include "FrameAllocator.hpp"
 #include "GpuProfiler.hpp"
+#include "LightTransport.hpp"
 #include "TiledForwardRenderer.hpp"
 #include "UniformBuffer.hpp"
 #include "Window.hpp"
@@ -349,6 +350,21 @@ public:
 
 	Image* pLightmap = nullptr;
 	Image* pLightmapIrradiance = nullptr;
+
+	/// Bounces the lights that were not baked through the compiled map's cluster links, on top of the lightmap
+	LightTransport Transport;
+
+	/// The irradiance the forward pass shades lightmapped surfaces with: relit while the transport is active
+	Image* GetShadingIrradiance() const
+	{
+		Image* relit = Transport.GetRelitIrradiance();
+
+		if (relit != nullptr) {
+			return relit;
+		}
+
+		return pLightmapIrradiance;
+	}
 
 	/// Sun shadow pages that the fog samples on compiled maps with a baked sun, packed into one depth atlas
 	Image* pFogShadowAtlas = nullptr;

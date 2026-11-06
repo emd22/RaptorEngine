@@ -41,6 +41,10 @@ void PrintUsage()
 		"or high (default: medium)\n"
 		"  --probe-texel-rays <n>     Rays per probe visibility texel along each axis when baking probes, 0 to "
 		"leave the probes to the engine (default: 4)\n"
+		"  --no-light-transport       Do not store the links between lightmap clusters that let unbaked lights "
+		"bounce at runtime\n"
+		"  --transport-stats          Measure how many source clusters each lightmap texel and probe would need "
+		"links to if the bounced light were relit at runtime\n"
 		"  --no-fog-shadow  Do not bake the sun shadow pages that the fog is shadowed by\n"
 		"  --fog-shadow-texel <m>     Size of a fog shadow texel close up (default: 0.1)\n"
 		"  --no-acoustics   Do not bake the reverb and pathing probes for Steam Audio\n"
@@ -129,6 +133,12 @@ bool ParseArguments(int argc, char** argv, CompileOptions& out_arguments, Preset
 		}
 		else if (argument == "--list-presets") {
 			out_presets.bList = true;
+		}
+		else if (argument == "--no-light-transport") {
+			out_arguments.Lightmap.bLightTransport = false;
+		}
+		else if (argument == "--transport-stats") {
+			out_arguments.Lightmap.bTransportStats = true;
 		}
 		else if (argument == "--no-indirect") {
 			out_arguments.Lightmap.bIndirect = false;

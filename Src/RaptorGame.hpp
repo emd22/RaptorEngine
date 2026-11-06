@@ -145,6 +145,7 @@ private:
 	double mFpsWindowTime = 0.0;
 	uint64 mFpsWindowStartFrame = 0;
 
+
 	CVarValue* mpShowFpsCVar = nullptr;
 
 	AudioDebugView mAudioDebug;

@@ -25,6 +25,9 @@ struct LightGpuData;
 enum eLightFlags : uint16
 {
 	LF_None = 0x0000,
+
+	/// Owned by game code rather than the map: survives LightManager::Clear(), and is not saved or edited
+	LF_Persistent = 0x0001,
 };
 
 enum class eLightType
@@ -57,6 +60,7 @@ public:
 
 	FX_FORCE_INLINE float32 GetRadius() const { return mRadius; }
 	FX_FORCE_INLINE bool IsCullable() const { return Type != eLightType::Directional; }
+	FX_FORCE_INLINE bool IsPersistent() const { return (Flags & LF_Persistent) != 0; }
 
 	virtual void Render(const PerspectiveCamera& camera, BaseCamera* shadow_camera);
 

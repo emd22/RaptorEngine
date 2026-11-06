@@ -213,6 +213,8 @@ void GraphicsBackend::Init(Vec2u window_size)
 		pLightmapIrradiance = CreateLightmapImage(
 			Vec2u(1, 1), eImageFormat::RGBA16_Float,
 			Slice<const uint8>(reinterpret_cast<const uint8*>(black_irradiance), sizeof(black_irradiance)));
+
+		Transport.Create();
 	}
 
 	{
@@ -1521,6 +1523,7 @@ void GraphicsBackend::Destroy()
 	DecalBuffer.Destroy();
 	DecalMaskBuffer.Destroy();
 	ProbeBuffer.Destroy();
+	Transport.Destroy();
 	ProbeVolumeBuffer.Destroy();
 	ProbeGridBuffer.Destroy();
 	ReflectionProbeBuffer.Destroy();
