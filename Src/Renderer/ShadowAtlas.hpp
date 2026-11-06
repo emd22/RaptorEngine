@@ -33,13 +33,9 @@ enum class eShadowAtlasMask : uint32
 {
 	None = 0x00000000,
 
-	// 8 tiles
-	StaticSpot = 0x000000FF,
+	// 12 tiles
+	StaticSpot = 0x0000CCFF,
 
-	// 4 tiles
-	DynamicSpot = TileBit(10) | TileBit(11) | TileBit(14) | TileBit(15),
-
-	// 4 tiles
 	FarCascade = TileBit(8) | TileBit(9) | TileBit(12) | TileBit(13),
 };
 
@@ -80,33 +76,29 @@ public:
 
 	static constexpr uint32 scFarTilesPerSide = scFarDirectionalSize / scSpotTileSize;
 
-	static constexpr uint32 scTotalStaticSpotTiles = (scStaticSpotTiles.X * scStaticSpotTiles.Y);
-	static constexpr uint32 scTotalDynamicSpotTiles = (scDynamicSpotTiles.X * scDynamicSpotTiles.Y);
+	static constexpr uint32 scTotalStaticSpotTiles = (scStaticSpotTiles.X * scStaticSpotTiles.Y) +
+													 (scDynamicSpotTiles.X * scDynamicSpotTiles.Y);
+	// static constexpr uint32 scTotalDynamicSpotTiles = (scDynamicSpotTiles.X * scDynamicSpotTiles.Y);
 
 	static_assert(scDirectionalSize <= scAtlasSize.Y, "The directional region must fit into the atlas");
 
 	static_assert(scAtlasSize.X == 4096 && scAtlasSize.Y == 2048,
 				  "You changed the shadow atlas dimensions, update SHADOW_ATLAS_WIDTH/HEIGHT in Shaders/Helper.hlsl!");
 
-	static_assert((static_cast<uint32>(eShadowAtlasMask::StaticSpot) &
-				   static_cast<uint32>(eShadowAtlasMask::DynamicSpot)) == 0U,
-				  "Static and dynamic spot tiles overlap");
+
 	static_assert((static_cast<uint32>(eShadowAtlasMask::StaticSpot) &
 				   static_cast<uint32>(eShadowAtlasMask::FarCascade)) == 0U,
 				  "Static spot tiles and the far cascade overlap");
-	static_assert((static_cast<uint32>(eShadowAtlasMask::DynamicSpot) &
-				   static_cast<uint32>(eShadowAtlasMask::FarCascade)) == 0U,
-				  "Dynamic spot tiles and the far cascade overlap");
 
 	static_assert(std::popcount(static_cast<uint32>(eShadowAtlasMask::StaticSpot)) == scTotalStaticSpotTiles,
 				  "The static spot mask does not match the static spot tile region");
-	static_assert(std::popcount(static_cast<uint32>(eShadowAtlasMask::DynamicSpot)) == scTotalDynamicSpotTiles,
-				  "The dynamic spot mask does not match the dynamic spot tile region");
+	// static_assert(std::popcount(static_cast<uint32>(eShadowAtlasMask::DynamicSpot)) == scTotalDynamicSpotTiles,
+	// 			  "The dynamic spot mask does not match the dynamic spot tile region");
 	static_assert(std::popcount(static_cast<uint32>(eShadowAtlasMask::FarCascade)) ==
 					  scFarTilesPerSide * scFarTilesPerSide,
 				  "The far cascade mask does not match the far cascade region");
 
-	static_assert(scTotalStaticSpotTiles + scTotalDynamicSpotTiles <= 32,
+	static_assert(scTotalStaticSpotTiles <= 32,
 				  "Not enough bits for spot tiles. There shouldn't be 32 shadow casting spotlights on screen at once!");
 
 public:
@@ -146,7 +138,7 @@ public:
 	/**
 	 * @brief Finds and allocates a new dynamic spotlight tile. Returns ShadowTileIndexNull if none are found.
 	 */
-	ShadowTileIndex AllocateDynamicSpotTile();
+	// ShadowTileIndex AllocateDynamicSpotTile();
 
 	/**
 	 * @brief Returns the lowest free tile inside `mask` without allocating it, or ShadowTileIndexNull if there is none.

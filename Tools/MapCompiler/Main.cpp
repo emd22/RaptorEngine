@@ -43,6 +43,8 @@ void PrintUsage()
 		"leave the probes to the engine (default: 4)\n"
 		"  --no-light-transport       Do not store the links between lightmap clusters that let unbaked lights "
 		"bounce at runtime\n"
+		"  --transport-min-link <f>   Drop links carrying less than this fraction of a cluster's rays, 0 to keep all "
+		"that coverage needs (default: 0.005, 0 keeps every link coverage needs)\n"
 		"  --transport-stats          Measure how many source clusters each lightmap texel and probe would need "
 		"links to if the bounced light were relit at runtime\n"
 		"  --no-fog-shadow  Do not bake the sun shadow pages that the fog is shadowed by\n"
@@ -136,6 +138,9 @@ bool ParseArguments(int argc, char** argv, CompileOptions& out_arguments, Preset
 		}
 		else if (argument == "--no-light-transport") {
 			out_arguments.Lightmap.bLightTransport = false;
+		}
+		else if (argument == "--transport-min-link" && has_value) {
+			out_arguments.Lightmap.TransportMinLinkFraction = std::atof(argv[++i]);
 		}
 		else if (argument == "--transport-stats") {
 			out_arguments.Lightmap.bTransportStats = true;

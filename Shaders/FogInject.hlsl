@@ -183,6 +183,9 @@ void main(uint3 froxel : SV_DispatchThreadID)
 
 	for (uint tile_light = 0; tile_light < shadowed_count; tile_light++) {
 		const Light light = Lights[bLightIndexList[tile.StartIndex + tile_light]];
+		if ((light.Flags & FX_LIGHT_FLAG_DYNAMIC) != 0) {
+			continue;
+		}
 
 		light_sum += LightInscatter(light, position_ws, direction, g, sun_fallback, pcf_rotation);
 	}
@@ -191,6 +194,9 @@ void main(uint3 froxel : SV_DispatchThreadID)
 
 	for (uint tail_light = 0; tail_light < tail_count; tail_light++) {
 		const Light light = Lights[bLightIndexList[tile.StartIndex + tail_light]];
+		if ((light.Flags & FX_LIGHT_FLAG_DYNAMIC) != 0) {
+			continue;
+		}
 
 		const bool is_directional = light.uiLightType == FX_LIGHT_TYPE_DIRECTIONAL;
 		const float phase = PhaseHenyeyGreenstein(dot(light.vLightPosition, direction), g);

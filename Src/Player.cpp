@@ -38,8 +38,9 @@ void Player::Create()
 	Weapons.Create(this);
 
 	pFlashlight = gLightManager->NewLight<LightSpot>("Flashlight");
-	pFlashlight->Flags |= LF_Persistent;
+	pFlashlight->Flags |= (LF_Persistent | LF_Dynamic);
 	pFlashlight->SetRadius(15.0f);
+	pFlashlight->SetConeAngles(MathUtil::DegToRad(5.0f), MathUtil::DegToRad(40.0f));
 
 
 	if (mActiveViewModel < 0) {

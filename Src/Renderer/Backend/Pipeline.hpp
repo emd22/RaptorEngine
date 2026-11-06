@@ -184,10 +184,12 @@ struct alignas(16) LightGpuData
 	/// Where the light's shadow map is in the shadow atlas: xy scales and zw offsets a shadow map UV into an atlas UV.
 	/// All zero when the light has no shadow map.
 	float32 ShadowAtlasRect[4];
+
+	uint32 Flags;
 };
 
 
-static_assert(sizeof(LightGpuData) == 144, "LightGpuData must match the Light struct in LightingCommon.hlsli");
+static_assert(sizeof(LightGpuData) == 160, "LightGpuData must match the Light struct in LightingCommon.hlsli");
 static_assert(sizeof(LightGpuData) * 64 <= 16384, "The light buffer must fit the guaranteed uniform buffer range");
 
 /// A single decal in GraphicsBackend::DecalBuffer. Mirrors `Decal` in Shaders/DecalCommon.hlsli.

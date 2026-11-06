@@ -4,6 +4,8 @@
 #define FX_LIGHT_TYPE_POINT 2
 #define FX_LIGHT_TYPE_SPOT 3
 
+#define FX_LIGHT_FLAG_DYNAMIC (1 << 1)
+
 /// Mirrors `LightGpuData` on the CPU
 struct Light
 {
@@ -35,6 +37,10 @@ struct Light
 	// 144
 	/// XY is the scale, ZW is the offset into the atlas
 	float4 vShadowAtlasRect;
+
+	uint Flags;
+
+	// 160
 };
 
 ///////////////////////////////////

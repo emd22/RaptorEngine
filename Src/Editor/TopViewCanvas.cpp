@@ -52,24 +52,6 @@ constexpr double scMinClipLength = 1e-3;
 #define FX_TOP_VIEW_FREE_KEY "Ctrl"
 #endif
 
-constexpr const char* scToolHints[] = {
-	"Drag to move, Shift adds, " FX_TOP_VIEW_FREE_KEY " ignores snap, Z frames selection",
-	"Click an edge or inside a brush to pick a face, Shift picks more, drag an edge to move its "
-	"face, " FX_TOP_VIEW_FREE_KEY " ignores snap",
-	"Drag corners, Shift adds, " FX_TOP_VIEW_FREE_KEY " ignores snap",
-	"Drag to create a brush, " FX_TOP_VIEW_FREE_KEY " ignores snap",
-	"Drag a box to lay out an arch, then shape it with the handles, " FX_TOP_VIEW_FREE_KEY " ignores snap",
-	"Drag the outside of a room or tunnel, its depth comes from the fields, " FX_TOP_VIEW_FREE_KEY " ignores snap",
-	"Drag to create a patch, drag the control points of the selected patches, Shift adds, [ ] "
-	"subdivisions, " FX_TOP_VIEW_FREE_KEY " ignores snap",
-	"Drag a box to project a decal onto the surface behind it, " FX_TOP_VIEW_FREE_KEY " ignores snap",
-	"Drag around the pivot, " FX_TOP_VIEW_FREE_KEY " ignores snap",
-	"Drag a line across the selected brushes to split them, Esc deselects, " FX_TOP_VIEW_FREE_KEY " ignores snap",
-	"Click a light to select it, drag to move, drag its handle to aim, double-click to add one",
-	"Click a sound to select it, drag to move, double-click to add one",
-};
-
-static_assert(std::size(scToolHints) == static_cast<size_t>(eEditorTool::Count));
 
 constexpr int scDimMarkerAlpha = 110;
 
@@ -5450,11 +5432,6 @@ void TopViewCanvas::UpdateCursor()
 void TopViewCanvas::UpdateStatus()
 {
 	constexpr double scDefaultScale = 24.0;
-	constexpr const char* scPickedFaceHint = "Shift-click picks more faces, Alt+Left/Right Shift UVs, Alt+[ ] scale, "
-											 "Alt+, . rotate";
-	constexpr const char* scArchPendingHint =
-		"Drag the handles to reshape, [ ] sides, arrows nudge, Enter or double-click "
-		"builds, Esc cancels, " FX_TOP_VIEW_FREE_KEY " ignores snap";
 
 	if (!mpOnStatus) {
 		return;
@@ -5462,35 +5439,24 @@ void TopViewCanvas::UpdateStatus()
 
 	const ViewPlaneAxes& axes = Axes();
 
-	wxString text = wxString::Format("%s   |   ", axes.pName);
+	wxString text = wxString::Format("%s | ", axes.pName);
 
 	if (mState.bSimulating) {
-		text += "Simulating, editing is paused   |   ";
+		text += "Simulating, editing is paused | ";
 	}
 
 	if (mbHovering) {
-		text += wxString::Format("%c %.2f   %c %.2f   |   ", scAxisNames[axes.U], mHover.X * axes.USign,
+		text += wxString::Format("%c %.2f   %c %.2f | ", scAxisNames[axes.U], mHover.X * axes.USign,
 								 scAxisNames[axes.V], mHover.Y);
 	}
 
-	const char* hint = scToolHints[static_cast<uint32>(mTool)];
-
-	if (mTool == eEditorTool::Arch && HasPendingArch()) {
-		hint = scArchPendingHint;
-	}
-
-	if (mTool == eEditorTool::Face && mPickedFaces.IsNotEmpty()) {
-		hint = scPickedFaceHint;
-	}
-
-	const char* snap_label = "off";
+	const char* snap_label = "no snap";
 	if (mState.bSnapEnabled) {
-		snap_label = "on";
+		snap_label = "snap";
 	}
 
-	text += wxString::Format("%d brushes, %u selected   |   Snap %s %g   |   Zoom %.0f%%   |   %s",
-							 static_cast<int>(mState.Brushes.Size), GetSelectedCount(), snap_label, mState.SnapStep,
-							 mScale / scDefaultScale * 100.0, hint);
+	text += wxString::Format("%d brushes, %u selected | %s (%g) | Zoom %.0f%%", static_cast<int>(mState.Brushes.Size),
+							 GetSelectedCount(), snap_label, mState.SnapStep, mScale / scDefaultScale * 100.0);
 
 	mpOnStatus(text);
 }

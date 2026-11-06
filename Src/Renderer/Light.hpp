@@ -26,8 +26,12 @@ enum eLightFlags : uint16
 {
 	LF_None = 0x0000,
 
-	/// Owned by game code rather than the map: survives LightManager::Clear(), and is not saved or edited
-	LF_Persistent = 0x0001,
+	/// The light is omitted from bakes and is not cleared when changing levels. This is used for lights like player
+	/// flashlights.
+	LF_Persistent = (1 << 0),
+
+	/// A light that will be moving and invalidated frequently. Does not contribute to volumetric lighting.
+	LF_Dynamic = (1 << 1),
 };
 
 enum class eLightType
@@ -151,6 +155,8 @@ public:
 
 	FX_FORCE_INLINE float32 GetInnerAngle() const { return mInnerAngle; }
 	FX_FORCE_INLINE float32 GetOuterAngle() const { return mOuterAngle; }
+
+	FX_FORCE_INLINE bool CanContributeToFog() const { return (!HasFlag(Flags, LF_Dynamic) && bCastShadows); }
 
 	void SetDirection(const Vec3f direction);
 

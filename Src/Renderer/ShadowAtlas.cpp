@@ -30,18 +30,15 @@ FX_SET_MODULE_NAME("ShadowAtlas")
  * Directional on the left with the largest chunk of resolution (dynamic sun shadows), and the spotlight slots on the
  * right (each about 512x512). The `Far` chunk is the coarse sun cascade used for volumetric fog.
  *
- * The spotlight tiles 10, 11, 14 and 15 are now designated as D0, D1, D2 and D3. These are dynamic spotlights that are
- * exempt from volumetric fog (for now) and have other special properties and are reserved for moving or updating
- * lights.
  *
  *     +-------------------+----+----+----+----+
  *     |                   |  0 |  1 |  2 |  3 |
  *     |                   +----+----+----+----+
  *     |                   |  4 |  5 |  6 |  7 |
  *     |       Sun         +----+----+----+----+
- *     |                   |         | D0 | D1 |
+ *     |                   |         | 10 | 11 |
  *     |                   |   Far   +----+----+
- *     |                   |         | D2 | D3 |
+ *     |                   |         | 14 | 15 |
  *     +-------------------+----+----+----+----+
  *
  */
@@ -228,8 +225,8 @@ URect ShadowAtlas::GetStaticSpotTileRegion() const
 
 URect ShadowAtlas::GetSpotTileRegion(ShadowTileIndex tile_index) const
 {
-	constexpr uint32 scSpotMask =
-		static_cast<uint32>(eShadowAtlasMask::StaticSpot) | static_cast<uint32>(eShadowAtlasMask::DynamicSpot);
+	constexpr uint32 scSpotMask = static_cast<uint32>(eShadowAtlasMask::StaticSpot);
+	// | static_cast<uint32>(eShadowAtlasMask::DynamicSpot);
 
 	if (tile_index >= 32U || (TileBit(tile_index) & scSpotMask) == 0U) {
 		LogError("Spot tile region is invalid!");
@@ -276,19 +273,19 @@ void ShadowAtlas::GetRegionUVTransform(const URect& region, float32 out_transfor
 }
 
 
-ShadowTileIndex ShadowAtlas::AllocateDynamicSpotTile()
-{
-	ShadowTileIndex tile_index = FindFreeTile(eShadowAtlasMask::DynamicSpot);
-
-	// We found a tile, set it as in use
-	if (tile_index != ShadowTileIndexNull) {
-		mSpotTilesInUse |= TileBit(tile_index);
-		return tile_index;
-	}
-
-
-	return ShadowTileIndexNull;
-}
+// ShadowTileIndex ShadowAtlas::AllocateDynamicSpotTile()
+// {
+// 	ShadowTileIndex tile_index = FindFreeTile(eShadowAtlasMask::DynamicSpot);
+//
+// 	// We found a tile, set it as in use
+// 	if (tile_index != ShadowTileIndexNull) {
+// 		mSpotTilesInUse |= TileBit(tile_index);
+// 		return tile_index;
+// 	}
+//
+//
+// 	return ShadowTileIndexNull;
+// }
 
 
 ShadowTileIndex ShadowAtlas::AllocateStaticSpotTile()
@@ -307,8 +304,8 @@ ShadowTileIndex ShadowAtlas::AllocateStaticSpotTile()
 
 void ShadowAtlas::FreeSpotTile(ShadowTileIndex tile_index)
 {
-	constexpr uint32 scSpotMask =
-		static_cast<uint32>(eShadowAtlasMask::StaticSpot) | static_cast<uint32>(eShadowAtlasMask::DynamicSpot);
+	constexpr uint32 scSpotMask = static_cast<uint32>(eShadowAtlasMask::StaticSpot);
+	// | static_cast<uint32>(eShadowAtlasMask::DynamicSpot);
 
 	if (tile_index >= 32U || (TileBit(tile_index) & scSpotMask) == 0U) {
 		return;

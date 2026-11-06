@@ -42,6 +42,8 @@ struct LightmapOptions
 
 	bool bTransportStats = false;
 	bool bLightTransport = true;
+	/// Links that carry less than this fraction of a cluster's gather rays are dropped, even before coverage is met
+	double TransportMinLinkFraction = 0.0005;
 
 	FogShadowOptions FogShadow;
 

@@ -2064,7 +2064,8 @@ struct TransportRun
  * cluster to the clusters its gather rays hit
  */
 void BuildTransport(const IndirectBake& bake, const IndirectInput& input, const Array<uint32>& texels,
-					const DirectionSet& directions, CompiledMapTransport& out_transport, LightmapStats& out_stats)
+					const DirectionSet& directions, float32 min_link_fraction, CompiledMapTransport& out_transport,
+					LightmapStats& out_stats)
 {
 	constexpr uint32 cSize = scTransportClusterSize;
 	constexpr uint32 cQuadrant = cSize / scTransportSamplesPerSide;
@@ -2272,11 +2273,16 @@ void BuildTransport(const IndirectBake& bake, const IndirectInput& input, const 
 							  [](const TransportRun& a, const TransportRun& b) { return a.Count > b.Count; });
 
 					const float32 needed = scTransportCoverage * static_cast<float32>(surface_hits.Size);
+					const float32 min_hits = min_link_fraction * static_cast<float32>(total_rays);
 
 					uint32 kept = 0;
 					uint32 kept_hits = 0;
 
-					while (kept < runs.Size && static_cast<float32>(kept_hits) < needed) {
+					// Runs are sorted by count, so the links that fall under the floor are always the last ones. The
+					// strongest link is always kept so the rescale below has something to divide by.
+					while (kept < runs.Size &&
+						   (kept == 0 || (static_cast<float32>(kept_hits) < needed &&
+										  static_cast<float32>(runs[kept].Count) >= min_hits))) {
 						kept_hits += runs[kept].Count;
 						kept++;
 					}
@@ -2554,7 +2560,8 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 	out_map.Transport = CompiledMapTransport {};
 
 	if (options.bLightTransport) {
-		BuildTransport(bake, input, texels, direction_set, out_map.Transport, out_stats);
+		BuildTransport(bake, input, texels, direction_set, static_cast<float32>(options.TransportMinLinkFraction),
+					   out_map.Transport, out_stats);
 	}
 
 	out_stats.bHasIndirect = true;

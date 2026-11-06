@@ -682,6 +682,13 @@ void RaptorGame::ProcessControls()
 		LogInfo("Reflection probe debug view: {}", scViewNames[mpReflectionDebugCVar->IntValue]);
 	}
 
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_F)) {
+		LightSpot* flashlight = gWorld->GetPlayer().pFlashlight;
+		if (flashlight) {
+			flashlight->bEnabled = !flashlight->bEnabled;
+		}
+	}
+
 	if (ControlManager::IsMouseLocked()) {
 		Vec2f mouse_delta = ControlManager::GetMouseDelta();
 		mouse_delta.X *= scMouseRadiansPerPixel;
@@ -1000,7 +1007,8 @@ void RaptorGame::ReadNPCTuning(NPCTuning& tuning) const
 	tuning.BalanceAssist.LiftFraction = GetCVarFloat(mpNPCBalanceLiftCVar, tuning.BalanceAssist.LiftFraction);
 	tuning.BalanceAssist.ExternalResidual = GetCVarFloat(mpNPCBalanceExternalResidualCVar,
 														 tuning.BalanceAssist.ExternalResidual);
-	tuning.BalanceAssist.PelvisDamping = GetCVarFloat(mpNPCBalancePelvisDampingCVar, tuning.BalanceAssist.PelvisDamping);
+	tuning.BalanceAssist.PelvisDamping = GetCVarFloat(mpNPCBalancePelvisDampingCVar,
+													  tuning.BalanceAssist.PelvisDamping);
 	tuning.ActiveDistance = GetCVarFloat(mpNPCActiveDistanceCVar, tuning.ActiveDistance);
 	tuning.BumpSpeed = GetCVarFloat(mpNPCBumpSpeedCVar, tuning.BumpSpeed);
 	tuning.BumpImpulse = GetCVarFloat(mpNPCBumpImpulseCVar, tuning.BumpImpulse);
@@ -1246,9 +1254,9 @@ void RaptorGame::RenderText()
 			String::Fmt(
 				"shadow {:.2f} gi {:.2f} pre {:.2f} lightcull {:.2f} ao {:.2f} fwd {:.2f} part {:.2f} fog {:.2f} comp "
 				"{:.2f}",
-				gpu.GetMs(eGpuMarker::Shadows), gpu.GetMs(eGpuMarker::LightTransport), gpu.GetMs(eGpuMarker::Prepass), gpu.GetMs(eGpuMarker::LightCulling),
-				gpu.GetMs(eGpuMarker::SSAO), gpu.GetMs(eGpuMarker::Forward), gpu.GetMs(eGpuMarker::Particles),
-				gpu.GetMs(eGpuMarker::Fog), gpu.GetMs(eGpuMarker::Composition))
+				gpu.GetMs(eGpuMarker::Shadows), gpu.GetMs(eGpuMarker::LightTransport), gpu.GetMs(eGpuMarker::Prepass),
+				gpu.GetMs(eGpuMarker::LightCulling), gpu.GetMs(eGpuMarker::SSAO), gpu.GetMs(eGpuMarker::Forward),
+				gpu.GetMs(eGpuMarker::Particles), gpu.GetMs(eGpuMarker::Fog), gpu.GetMs(eGpuMarker::Composition))
 				.CStr(),
 			1.0f, scWhite);
 
