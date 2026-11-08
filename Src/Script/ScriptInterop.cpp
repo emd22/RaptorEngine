@@ -1141,6 +1141,15 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("cvar_get_int", N_cvar_get_int),
 	PREDEF("cvar_get_float", N_cvar_get_float),
 
+	/* New implementation */
+	PREDEF("CVarInterop_SetInt", N_cvar_set_int),
+	PREDEF("CVarInterop_SetFloat", N_cvar_set_float),
+	PREDEF("CVarInterop_SetString", N_cvar_set_string),
+
+	PREDEF("CVarInterop_GetInt", N_cvar_get_int),
+	PREDEF("CVarInterop_GetFloat", N_cvar_get_float),
+
+
 	PREDEF("fastrand32", N_fastrand32),
 	PREDEF("random_range", N_random_range),
 

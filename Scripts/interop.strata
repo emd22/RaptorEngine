@@ -86,6 +86,7 @@ void print_float3(float3 value)
 struct OBJECTID = uint;
 handle OBJECT;
 
+
 const uint OBJ_TAG_BLOCKOUT = (1 << 0);
 const uint OBJ_TAG_LOCK = (1 << 1);
 /* Set through probe_volume_mark, not set_tags: marking also takes the brush out of the world. */

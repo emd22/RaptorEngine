@@ -1,41 +1,32 @@
-import ../camera_util.strata;
-import ../common.strata;
+import ../Camera;
+import ../CVar;
 
+import ../interop;
 
-CAMERASTATE saved_state;
-bool did_enter = false;
+RCameraInfo gSavedCameraInfo;
 
-void brighten_camera()
+bool bDidEnter = false;
+
+void BrightenCamera()
 {
-	cvar_set_float("r_shutter", 1.0 / 40.0f);
-}
-
-void do_exposure_volume(OBJECT trigger, bool is_enter)
-{
-	float3 dir;
-	if (is_enter) {
-		dir = trigger.enter_direction;
-	}
-	else {
-		dir = trigger.exit_direction;
-	}
+	SetCVar<float>("r_shutter", 1.0 / 40.0f);
 }
 
 void object_trigger_enter(OBJECT trigger)
 {
 	float3 dir = trigger.enter_direction;
 
-	if (did_enter) {
-		camera_state_load(saved_state);
+	if (bDidEnter) {
+		gSavedCameraInfo.Fetch();
 		printf("EXIT\n");
 	}
 	else {
-		camera_state_save(saved_state);
-		brighten_camera();
+		gSavedCameraInfo.Apply();
+		BrightenCamera();
 		printf("ENTER\n");
 	}
 
-	did_enter = !did_enter;
+	bDidEnter = !bDidEnter;
 }
 
 

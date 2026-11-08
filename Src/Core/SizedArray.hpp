@@ -9,8 +9,12 @@
 
 #include <Core/Allocator.hpp>
 #include <Engine.hpp>
+#include <algorithm>
 #include <cstdlib>
 #include <initializer_list>
+#include <memory>
+#include <type_traits>
+#include <utility>
 
 #ifdef FX_SIZED_ARRAY_DEBUG
 #include "Log.hpp"
@@ -38,36 +42,30 @@ public:
 
 
 public:
-	static SizedArray<TElementType> CreateCopyOf(const TElementType* ptr, SizeType size)
+	static SizedArray CreateCopyOf(const TElementType* ptr, SizeType size)
 	{
-		SizedArray<TElementType> arr(size);
-		arr.MarkFull();
+		SizedArray arr;
+		arr.InitAsCopyOf(ptr, size);
 
-		memcpy(arr.pData, ptr, arr.GetSizeInBytes());
-
-		return std::move(arr);
+		return arr;
 	}
 
-	static SizedArray<TElementType> CreateAsSize(SizeType size)
+	static SizedArray CreateAsSize(SizeType size)
 	{
-		SizedArray<TElementType> arr;
+		SizedArray arr;
 		arr.InitSize(size);
 
-		return std::move(arr);
+		return arr;
 	}
 
-	static SizedArray<TElementType> CreateEmpty() { return SizedArray<TElementType>(nullptr, 0); }
+	static SizedArray CreateEmpty() { return SizedArray(nullptr, 0); }
 
-	static SizedArray<TElementType> Clone(const SizedArray<TElementType>& other)
+	static SizedArray Clone(const SizedArray& other)
 	{
-		SizedArray<TElementType> clone;
-		clone.InitCapacity(other.Capacity);
+		SizedArray clone;
+		clone.CloneFrom(other);
 
-		for (uint32 i = 0; i < other.Size; i++) {
-			clone.Insert(other[i]);
-		}
-
-		return std::move(clone);
+		return clone;
 	}
 
 public:
@@ -92,7 +90,7 @@ public:
 		}
 	};
 
-	SizedArray(SizedArray<TElementType>&& other) { (*this) = std::move(other); }
+	SizedArray(SizedArray&& other) noexcept { TakeFrom(other); }
 
 	SizedArray() = default;
 
@@ -114,7 +112,16 @@ public:
 
 	void Free()
 	{
-		if (pData == nullptr || bDoNotDestroy) {
+		if (bDoNotDestroy) {
+			// A non-owning view only forgets the memory it points at.
+			pData = nullptr;
+			Size = 0;
+			Capacity = 0;
+			bDoNotDestroy = false;
+			return;
+		}
+
+		if (pData == nullptr) {
 			return;
 		}
 
@@ -152,7 +159,7 @@ public:
 		return pData[index];
 	}
 
-	SizedArray<TElementType>& operator=(std::initializer_list<TElementType>& list)
+	SizedArray& operator=(std::initializer_list<TElementType> list)
 	{
 		const size_t list_size = list.size();
 
@@ -170,71 +177,36 @@ public:
 		return *this;
 	}
 
-	SizedArray<TElementType>& operator=(SizedArray<TElementType>&& other)
+	SizedArray& operator=(SizedArray&& other) noexcept
 	{
-		if (pData) {
+		if (this != &other) {
 			Free();
+			TakeFrom(other);
 		}
-
-
-		pData = other.pData;
-		other.pData = nullptr;
-
-		Size = other.Size;
-		Capacity = other.Capacity;
-
-		other.Size = 0;
-		other.Capacity = 0;
-
-		bDoNotDestroy = other.bDoNotDestroy;
-		other.bDoNotDestroy = false;
 
 		return *this;
 	}
 
-	template <typename T>
+	/** Copies `other`'s elements into a fresh allocation with the same capacity. */
+	template <typename T, typename TOtherAllocator>
 		requires C_IsSameOrConst<T, TElementType>
-	void InitAsCopyOf(const SizedArray<T>& other)
+	void InitAsCopyOf(const SizedArray<T, TOtherAllocator>& other)
 	{
-		InitCapacity(other.Capacity);
-		Size = other.Size;
-
-		if constexpr (std::is_copy_constructible_v<TElementType>) {
-			for (SizeType i = 0; i < Size; i++) {
-				new (pData + i) TElementType(other.pData[i]);
-			}
-		}
-		else {
-			std::memcpy(reinterpret_cast<void*>(pData), reinterpret_cast<const void*>(other.pData),
-						other.GetSizeInBytes());
-		}
+		InitAsCopyOf(other.pData, other.Size, other.Capacity);
 	}
 
-	template <typename T>
-		requires std::is_same_v<typename std::remove_const<T>::type, TElementType>
-	void InitAsCopyOf(const SizedArray<T>& other, SizeType copy_capacity)
+	/** Copies `other`'s elements into a fresh allocation of at least `copy_capacity` elements. */
+	template <typename T, typename TOtherAllocator>
+		requires C_IsSameOrConst<T, TElementType>
+	void InitAsCopyOf(const SizedArray<T, TOtherAllocator>& other, SizeType copy_capacity)
 	{
-		InitCapacity(max(other.Capacity, copy_capacity));
-		Size = other.Size;
-
-		// FIXME: Replace with std::copy
-		memcpy(pData, other.pData, other.GetSizeInBytes());
+		InitAsCopyOf(other.pData, other.Size, std::max(other.Capacity, copy_capacity));
 	}
 
-	void InitAsCopyOf(const TElementType* ptr, SizeType size)
-	{
-		InitSize(size);
-		memcpy(pData, ptr, GetSizeInBytes());
-	}
+	/** Copies `size` elements from `ptr` into a fresh allocation of exactly `size` elements. */
+	void InitAsCopyOf(const TElementType* ptr, SizeType size) { InitAsCopyOf(ptr, size, size); }
 
-	void CloneFrom(const SizedArray<TElementType>& other)
-	{
-		InitCapacity(other.Capacity);
-		Size = other.Size;
-
-		// FIXME: Replace with std::copy
-		memcpy(pData, other.pData, other.GetSizeInBytes());
-	}
+	void CloneFrom(const SizedArray& other) { InitAsCopyOf(other); }
 
 	void Clear()
 	{
@@ -316,9 +288,7 @@ public:
 
 	void InitCapacity(size_t element_count)
 	{
-		if (pData != nullptr) {
-			Free();
-		}
+		Free();
 
 		InternalAllocateArray(element_count);
 
@@ -365,6 +335,8 @@ public:
 	 */
 	void InitSize(size_t element_count)
 	{
+		Clear();
+
 		if (Capacity == 0) {
 			InitCapacity(element_count);
 		}
@@ -381,6 +353,8 @@ public:
 	 */
 	void InitSize(size_t element_count, const TElementType& value)
 	{
+		Clear();
+
 		if (Capacity == 0) {
 			InitCapacity(element_count);
 		}
@@ -417,6 +391,31 @@ public:
 
 
 protected:
+	void InitAsCopyOf(const TElementType* ptr, SizeType size, SizeType capacity)
+	{
+		static_assert(std::is_copy_constructible_v<TElementType>, "SizedArray element type is not copyable");
+		AssertMsg(size <= capacity, "Copy size exceeds capacity");
+		AssertMsg(ptr != nullptr || size == 0, "Copying from a null pointer");
+
+		if (ptr != nullptr && pData != nullptr && !bDoNotDestroy) {
+			AssertMsg(ptr + size <= pData || pData + Capacity <= ptr, "Copying a SizedArray into itself");
+		}
+
+		InitCapacity(capacity);
+
+		// Lowers to memmove for trivially copyable types, copy-constructs each element otherwise.
+		std::uninitialized_copy_n(ptr, size, pData);
+		Size = size;
+	}
+
+	void TakeFrom(SizedArray& other)
+	{
+		pData = std::exchange(other.pData, nullptr);
+		Size = std::exchange(other.Size, 0);
+		Capacity = std::exchange(other.Capacity, 0);
+		bDoNotDestroy = std::exchange(other.bDoNotDestroy, false);
+	}
+
 	void InternalAllocateArray(size_t element_count)
 	{
 #ifdef FX_SIZED_ARRAY_DEBUG

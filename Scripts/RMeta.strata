@@ -1,0 +1,32 @@
+/* Raptor meta functions */
+
+
+/* Returns true if the type is unsigned (e.g. uint or ulong) */
+@meta
+bool IsUnsigned(type T)
+{
+	return (@is_same(T, uint) || @is_same(T, ulong) || @is_same(T, byte));
+}
+
+@meta
+bool IsInteger(type T)
+{
+	if (@is_same(T, int) || @is_same(T, long) || @is_same(T, sbyte)) {
+		return true;
+	}
+
+	return @IsUnsigned(T);
+}
+
+/* Returns true if the type is a float or double. */
+@meta
+bool IsFloat(type T)
+{
+	return (@is_same(T, float) || @is_same(T, double));
+}
+
+@meta
+bool IsString(type T)
+{
+	return (@is_same(T, string) || @is_same(T, cstring));
+}

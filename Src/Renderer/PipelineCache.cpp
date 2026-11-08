@@ -38,14 +38,10 @@ PipelineCache::PipelineCache()
 		}
 	}
 
-	mOffsets.InitCapacity(scMaxDescriptorSets);
+	mOffsets.InitSize(scMaxDescriptorSets);
 
-	for (uint32 i = 0; i < mOffsets.Capacity; i++) {
-		mOffsets[i].pData = nullptr;
-		mOffsets[i].Size = 0;
-		mOffsets[i].Capacity = 0;
-		mOffsets[i].bDoNotDestroy = false;
-		mOffsets[i].InitCapacity(scMaxBuffersPerDS);
+	for (SizedArray<uint32>& offsets : mOffsets) {
+		offsets.InitCapacity(scMaxBuffersPerDS);
 	}
 }
 
@@ -439,11 +435,10 @@ void PipelineCache::AddBufferOffset(uint32 set_index, uint32 offset) { mOffsets[
 
 void PipelineCache::Reset()
 {
-	for (uint32 i = 0; i < mOffsets.Capacity; i++) {
-		mOffsets[i].Size = 0;
+	for (SizedArray<uint32>& offsets : mOffsets) {
+		offsets.Clear();
 	}
 
-	mOffsets.Size = 0;
 	mFrameDataOffset = UINT32_MAX;
 }
 
