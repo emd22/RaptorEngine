@@ -731,7 +731,8 @@ bool WriteImage(const String& path, const CompiledMapLightmap& lightmap)
 } // namespace
 
 bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const SurfaceBuilder& surfaces,
-						 const PatchBuilder* patches, const LightmapOptions& options, CompiledMap& out_map)
+						 const PatchBuilder* patches, const ModelBuilder* models, const LightmapOptions& options,
+						 CompiledMap& out_map)
 {
 	constexpr uint32 scRowsPerClaim = 8;
 	constexpr uint32 scDirectionShuffle = 7919;
@@ -756,7 +757,7 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 	}
 
 	OccluderSet occluders;
-	occluders.Build(planes, source, patches);
+	occluders.Build(planes, source, patches, models);
 
 	const SunSampler sun(source.SunDirection, options.SunRadiusDegrees);
 
@@ -943,7 +944,7 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 		// input.pRects = rects.pData;
 		// input.RectCount = rects.Size;
 
-		BakeIndirectLight(source, surfaces, input, options, out_map, Stats);
+		BakeIndirectLight(source, surfaces, models, input, options, out_map, Stats);
 	}
 
 	uint32 probe_count = 0;
@@ -987,6 +988,7 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 	Stats.ChartCount = charts.Size;
 	Stats.OccluderCount = occluders.GetCount();
 	Stats.OccluderTriangleCount = occluders.GetTriangleCount();
+	Stats.OccluderModelTriangleCount = occluders.GetModelTriangleCount();
 	Stats.Density = density;
 	Stats.TexelCount = valid_count;
 	Stats.RayCount = context.RayCount.load() + static_cast<uint64>(probe_count) * probe_rays;

@@ -106,6 +106,14 @@ const char* ReadInstanceSubviewName(const ConfigEntry& instance);
 void AppendPlacedSubviewBrushes(ConfigEntry& out_brushes, ConfigEntry& subview_brushes, const String& instance_name,
 								const BrushPlacement& instance);
 
+/**
+ * @brief Whether the map compiler bakes a model of the `objects` entry into the lighting (as an occluder that light
+ * bounces off). Only models that never move and cast shadows count: no script, spawn or player layer, not unlit,
+ * `shadows = 1`, no `nobake`, and no collider brush that is dynamic.
+ */
+bool IsBakedModelEntry(const ConfigEntry& model, const ConfigEntry* brushes);
+
+/// The prototype file mixed with its subview files and the mesh files of every baked model
 uint64 HashPrototype(const String& prototype_path, const ConfigFile& info);
 
 uint32 CountSubviewBrushes(const ConfigFile& info, const String& prototype_path);

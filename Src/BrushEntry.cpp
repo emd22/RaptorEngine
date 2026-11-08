@@ -2,9 +2,11 @@
 
 #include <Asset/ConfigFile.hpp>
 #include <Core/DynArray.hpp>
+#include <Core/FilesystemIO.hpp>
 #include <Core/HashMap.hpp>
 #include <Map/CompiledMap.hpp>
 #include <Material/SpecialMaterial.hpp>
+#include <Object/ObjectLayer.hpp>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -763,6 +765,60 @@ static void HashSubviewFiles(const ConfigFile& info, const String& prototype_pat
 	}
 }
 
+bool IsBakedModelEntry(const ConfigEntry& model, const ConfigEntry* brushes)
+{
+	const ConfigEntry* mesh = model.GetMember(HashStr32("mesh"));
+
+	if (mesh == nullptr || mesh->Type != ConfigEntry::ePrimitiveType::String) {
+		return false;
+	}
+
+	if (model.GetMemberValue(HashStr32("shadows"), 0) == 0 || model.GetMemberValue(HashStr32("unlit"), 0) != 0 ||
+		model.GetMemberValue(HashStr32("spawn"), 0) != 0 || model.GetMemberValue(HashStr32("nobake"), 0) != 0 ||
+		model.GetMember(HashStr32("script")) != nullptr) {
+		return false;
+	}
+
+	if (model.GetMemberValue(HashStr32("layer"), 0) == static_cast<int64>(eObjectLayer::PlayerLayer)) {
+		return false;
+	}
+
+	const ConfigEntry* collider = model.GetMember(HashStr32("collider"));
+
+	if (collider != nullptr && collider->Type == ConfigEntry::ePrimitiveType::String && brushes != nullptr) {
+		const ConfigEntry* collider_brush = brushes->GetMember(HashStr32(collider->Get<const char*>()));
+
+		if (collider_brush != nullptr && collider_brush->GetMemberValue(HashStr32("dynamic"), 0) != 0) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+static void HashModelFiles(const ConfigFile& info, uint64& hash)
+{
+	constexpr uint64 scHashPrime = 1099511628211ull;
+
+	const ConfigEntry* models = info.GetEntry(HashStr32("objects"));
+
+	if (models == nullptr || !models->Members.IsInited()) {
+		return;
+	}
+
+	const ConfigEntry* brushes = info.GetEntry(HashStr32("all"));
+
+	for (const ConfigEntry& model : models->Members) {
+		if (!IsBakedModelEntry(model, brushes)) {
+			continue;
+		}
+
+		const char* mesh_path = model.GetMember(HashStr32("mesh"))->Get<const char*>();
+
+		hash = (hash ^ CompiledMap::HashFile(FilesystemIO::ResolvePath(mesh_path))) * scHashPrime;
+	}
+}
+
 uint64 HashPrototype(const String& prototype_path, const ConfigFile& info)
 {
 	uint64 hash = CompiledMap::HashFile(prototype_path);
@@ -770,6 +826,8 @@ uint64 HashPrototype(const String& prototype_path, const ConfigFile& info)
 	if (hash == 0) {
 		return 0;
 	}
+
+	HashModelFiles(info, hash);
 
 	const ConfigEntry* instances = info.GetEntry(HashStr32(scSubviewInstancesEntryName));
 

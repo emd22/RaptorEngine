@@ -365,6 +365,8 @@ private:
 		ObjectID ID = ObjectID::scNull;
 		String MeshPath;
 		String ColliderName;
+		/// Kept out of the map compiler's bake (`nobake`), see IsBakedModelEntry
+		bool bNoBake = false;
 	};
 
 	struct SubviewMember

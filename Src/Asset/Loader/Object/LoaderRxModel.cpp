@@ -1,6 +1,7 @@
 #include "LoaderRxModel.hpp"
 
 #include "../Image/LoaderKtx.hpp"
+#include "ModelGeometry.hpp"
 #include "RxModelFormat.hpp"
 
 #include <Asset/Animation.hpp>
@@ -31,34 +32,12 @@ namespace loader {
 namespace {
 
 constexpr uint32 scInfluencesPerVertex = 4;
-constexpr uint32 scMaxWeightSets = 2;
+using rx::scMaxWeightSets;
 
 constexpr uint8 scKtx2Magic[12] = { 0xAB, 'K', 'T', 'X', ' ', '2', '0', 0xBB, '\r', '\n', 0x1A, '\n' };
 
-struct AttributeView
+struct MeshSource : rx::MeshViews
 {
-	bool IsValid() const { return pData != nullptr; }
-
-	const uint8* pData = nullptr;
-	uint32 Stride = 0;
-	uint8 Format = 0;
-};
-
-struct MeshSource
-{
-	const rx::MeshHeader* pHeader = nullptr;
-	const rx::Submesh* pSubmeshes = nullptr;
-
-	const uint8* pIndices = nullptr;
-	uint32 IndexSize = 0;
-
-	AttributeView Position;
-	AttributeView Normal;
-	AttributeView Tangent;
-	AttributeView TexCoord;
-	AttributeView Joints[scMaxWeightSets];
-	AttributeView Weights[scMaxWeightSets];
-
 	uint32 JointCount = 0;
 	uint32 JointOffset = 0;
 };
@@ -69,69 +48,7 @@ struct BuiltSubmesh
 	Ref<PrimitiveMesh> pMesh { nullptr };
 };
 
-void ReadFloats(const AttributeView& view, uint32 vertex, float32* out)
-{
-	const uint8* src = view.pData + static_cast<size_t>(vertex) * view.Stride;
-	const uint32 components = rx::GetFormatComponents(view.Format);
-
-	switch (view.Format) {
-	case rx::VF_F32x1:
-	case rx::VF_F32x2:
-	case rx::VF_F32x3:
-	case rx::VF_F32x4:
-		memcpy(out, src, components * sizeof(float32));
-		break;
-	case rx::VF_F16x2:
-	case rx::VF_F16x4:
-		for (uint32 i = 0; i < components; i++) {
-			uint16 half;
-			memcpy(&half, src + i * 2, sizeof(half));
-			out[i] = Float16::FromBits(half).ToFloat();
-		}
-		break;
-	case rx::VF_UNorm8x4:
-		for (uint32 i = 0; i < components; i++) {
-			out[i] = static_cast<float32>(src[i]) / 255.0f;
-		}
-		break;
-	case rx::VF_SNorm8x4:
-		for (uint32 i = 0; i < components; i++) {
-			out[i] = std::max(static_cast<float32>(static_cast<int8>(src[i])) / 127.0f, -1.0f);
-		}
-		break;
-	case rx::VF_UInt8x4:
-		for (uint32 i = 0; i < components; i++) {
-			out[i] = static_cast<float32>(src[i]);
-		}
-		break;
-	case rx::VF_UNorm16x2:
-	case rx::VF_UNorm16x4:
-		for (uint32 i = 0; i < components; i++) {
-			uint16 value;
-			memcpy(&value, src + i * 2, sizeof(value));
-			out[i] = static_cast<float32>(value) / 65535.0f;
-		}
-		break;
-	case rx::VF_SNorm16x4:
-		for (uint32 i = 0; i < components; i++) {
-			int16 value;
-			memcpy(&value, src + i * 2, sizeof(value));
-			out[i] = std::max(static_cast<float32>(value) / 32767.0f, -1.0f);
-		}
-		break;
-	case rx::VF_UInt16x4:
-		for (uint32 i = 0; i < components; i++) {
-			uint16 value;
-			memcpy(&value, src + i * 2, sizeof(value));
-			out[i] = static_cast<float32>(value);
-		}
-		break;
-	default:
-		break;
-	}
-}
-
-void ReadJoints(const AttributeView& view, uint32 vertex, uint32* out)
+void ReadJoints(const rx::AttributeView& view, uint32 vertex, uint32* out)
 {
 	const uint8* src = view.pData + static_cast<size_t>(vertex) * view.Stride;
 
@@ -144,45 +61,6 @@ void ReadJoints(const AttributeView& view, uint32 vertex, uint32* out)
 			memcpy(&value, src + i * 2, sizeof(value));
 			out[i] = value;
 		}
-	}
-}
-
-bool IsFormatAllowed(uint8 semantic, uint8 format)
-{
-	switch (semantic) {
-	case rx::VS_Position:
-		return format == rx::VF_F32x3;
-	case rx::VS_Normal:
-		return format == rx::VF_F32x3 || format == rx::VF_SNorm16x4 || format == rx::VF_SNorm8x4;
-	case rx::VS_Tangent:
-		return format == rx::VF_F32x4 || format == rx::VF_SNorm16x4 || format == rx::VF_SNorm8x4;
-	case rx::VS_TexCoord:
-		return format == rx::VF_F32x2 || format == rx::VF_F16x2 || format == rx::VF_UNorm16x2;
-	case rx::VS_Color:
-		return format == rx::VF_UNorm8x4 || format == rx::VF_F16x4 || format == rx::VF_F32x4;
-	case rx::VS_Joints:
-		return format == rx::VF_UInt8x4 || format == rx::VF_UInt16x4;
-	case rx::VS_Weights:
-		return format == rx::VF_UNorm8x4 || format == rx::VF_UNorm16x4 || format == rx::VF_F32x4;
-	default:
-		return rx::GetFormatSize(format) != 0;
-	}
-}
-
-void ReadAttribute(const AttributeView& view, uint32 base_vertex, uint32 vertex_count, uint32 components,
-				   SizedArray<float32>& out)
-{
-	if (!view.IsValid()) {
-		return;
-	}
-
-	out.InitSize(static_cast<size_t>(vertex_count) * components);
-
-	for (uint32 i = 0; i < vertex_count; i++) {
-		float32 values[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-		ReadFloats(view, base_vertex + i, values);
-
-		memcpy(&out[static_cast<size_t>(i) * components], values, components * sizeof(float32));
 	}
 }
 
@@ -211,7 +89,7 @@ void ReadInfluences(const MeshSource& source, uint32 base_vertex, uint32 vertex_
 			float32 weights[scInfluencesPerVertex];
 
 			ReadJoints(source.Joints[set], base_vertex + vertex, joints);
-			ReadFloats(source.Weights[set], base_vertex + vertex, weights);
+			rx::ReadFloats(source.Weights[set], base_vertex + vertex, weights);
 
 			for (uint32 k = 0; k < scInfluencesPerVertex; k++) {
 				if (!(weights[k] > 0.0f) || joints[k] >= source.JointCount) {
@@ -248,115 +126,15 @@ void ReadInfluences(const MeshSource& source, uint32 base_vertex, uint32 vertex_
 	}
 }
 
-void TransformGeometry(SizedArray<float32>& positions, SizedArray<float32>& normals, SizedArray<float32>& tangents,
-					   SizedArray<uint32>& indices, const Mat4f& matrix)
-{
-	const float32* m = matrix.RawData;
-
-	const float32 a00 = m[0], a01 = m[1], a02 = m[2];
-	const float32 a10 = m[4], a11 = m[5], a12 = m[6];
-	const float32 a20 = m[8], a21 = m[9], a22 = m[10];
-
-	const float32 c00 = a11 * a22 - a12 * a21;
-	const float32 c01 = a12 * a20 - a10 * a22;
-	const float32 c02 = a10 * a21 - a11 * a20;
-	const float32 c10 = a02 * a21 - a01 * a22;
-	const float32 c11 = a00 * a22 - a02 * a20;
-	const float32 c12 = a01 * a20 - a00 * a21;
-	const float32 c20 = a01 * a12 - a02 * a11;
-	const float32 c21 = a02 * a10 - a00 * a12;
-	const float32 c22 = a00 * a11 - a01 * a10;
-
-	const float32 determinant = a00 * c00 + a01 * c01 + a02 * c02;
-	const float32 sign = (determinant < 0.0f) ? -1.0f : 1.0f;
-
-	for (size_t i = 0; i + 2 < positions.Size; i += 3) {
-		float32* p = &positions[i];
-
-		const float32 x = p[0];
-		const float32 y = p[1];
-		const float32 z = p[2];
-
-		p[0] = x * a00 + y * a10 + z * a20 + m[12];
-		p[1] = x * a01 + y * a11 + z * a21 + m[13];
-		p[2] = x * a02 + y * a12 + z * a22 + m[14];
-	}
-
-	for (size_t i = 0; i + 2 < normals.Size; i += 3) {
-		float32* n = &normals[i];
-
-		float32 nx = (n[0] * c00 + n[1] * c10 + n[2] * c20) * sign;
-		float32 ny = (n[0] * c01 + n[1] * c11 + n[2] * c21) * sign;
-		float32 nz = (n[0] * c02 + n[1] * c12 + n[2] * c22) * sign;
-
-		const float32 length = std::sqrt(nx * nx + ny * ny + nz * nz);
-
-		if (length > 1e-20f) {
-			nx /= length;
-			ny /= length;
-			nz /= length;
-		}
-
-		n[0] = nx;
-		n[1] = ny;
-		n[2] = nz;
-	}
-
-	for (size_t i = 0; i + 3 < tangents.Size; i += 4) {
-		float32* t = &tangents[i];
-
-		float32 tx = t[0] * a00 + t[1] * a10 + t[2] * a20;
-		float32 ty = t[0] * a01 + t[1] * a11 + t[2] * a21;
-		float32 tz = t[0] * a02 + t[1] * a12 + t[2] * a22;
-
-		const float32 length = std::sqrt(tx * tx + ty * ty + tz * tz);
-
-		if (length > 1e-20f) {
-			tx /= length;
-			ty /= length;
-			tz /= length;
-		}
-
-		t[0] = tx;
-		t[1] = ty;
-		t[2] = tz;
-		t[3] *= sign;
-	}
-
-	if (determinant < 0.0f) {
-		for (size_t i = 0; i + 2 < indices.Size; i += 3) {
-			std::swap(indices[i + 1], indices[i + 2]);
-		}
-	}
-}
-
 bool BuildSubmeshMesh(PrimitiveMesh& mesh, const MeshSource& source, const rx::Submesh& submesh, bool has_normal_map,
 					  const Mat4f* bake_transform)
 {
 	const uint32 vertex_count = submesh.VertexCount;
 
 	SizedArray<uint32> indices;
-	indices.InitSize(submesh.IndexCount);
 
-	for (uint32 i = 0; i < submesh.IndexCount; i++) {
-		const uint8* src = source.pIndices + static_cast<size_t>(submesh.FirstIndex + i) * source.IndexSize;
-
-		uint32 index = 0;
-
-		if (source.IndexSize == 2) {
-			uint16 value;
-			memcpy(&value, src, sizeof(value));
-			index = value;
-		}
-		else {
-			memcpy(&index, src, sizeof(index));
-		}
-
-		if (index >= vertex_count) {
-			return false;
-		}
-
-		indices[i] = index;
+	if (!rx::ReadSubmeshIndices(source, submesh, indices)) {
+		return false;
 	}
 
 	SizedArray<float32> positions;
@@ -366,10 +144,10 @@ bool BuildSubmeshMesh(PrimitiveMesh& mesh, const MeshSource& source, const rx::S
 	SizedArray<float32> weights;
 	SizedArray<uint32> bone_ids;
 
-	ReadAttribute(source.Position, submesh.BaseVertex, vertex_count, 3, positions);
-	ReadAttribute(source.Normal, submesh.BaseVertex, vertex_count, 3, normals);
-	ReadAttribute(source.TexCoord, submesh.BaseVertex, vertex_count, 2, uvs);
-	ReadAttribute(source.Tangent, submesh.BaseVertex, vertex_count, 4, tangents);
+	rx::ReadAttribute(source.Position, submesh.BaseVertex, vertex_count, 3, positions);
+	rx::ReadAttribute(source.Normal, submesh.BaseVertex, vertex_count, 3, normals);
+	rx::ReadAttribute(source.TexCoord, submesh.BaseVertex, vertex_count, 2, uvs);
+	rx::ReadAttribute(source.Tangent, submesh.BaseVertex, vertex_count, 4, tangents);
 
 	if ((submesh.Flags & rx::scSubmeshSkinned) != 0) {
 		ReadInfluences(source, submesh.BaseVertex, vertex_count, bone_ids, weights);
@@ -398,7 +176,7 @@ bool BuildSubmeshMesh(PrimitiveMesh& mesh, const MeshSource& source, const rx::S
 	}
 
 	if (bake_transform != nullptr) {
-		TransformGeometry(positions, normals, tangents, indices, *bake_transform);
+		TransformModelGeometry(positions, normals, tangents, indices, bake_transform->RawData);
 	}
 
 	mesh.VertexList.CreateFrom(positions, normals, uvs, tangents, weights, bone_ids, eVertexCreateFlags::DefaultLayout);
@@ -784,109 +562,19 @@ bool LoaderRxModel::BuildObjects(const RxBinaryFile& mesh_file)
 
 	MeshSource source;
 
-	uint32 attribute_count = 0;
-	uint32 submesh_count = 0;
+	String error;
 
-	source.pHeader = mesh_file.GetSingle<rx::MeshHeader>("MHDR");
-
-	const rx::VertexAttribute* attributes = mesh_file.GetChunk<rx::VertexAttribute>("VATR", attribute_count);
-	source.pSubmeshes = mesh_file.GetChunk<rx::Submesh>("SUBM", submesh_count);
-
-	const rx::ChunkEntry* index_chunk = mesh_file.FindChunk("IDXB");
-
-	if (source.pHeader == nullptr || attributes == nullptr || source.pSubmeshes == nullptr) {
+	if (!rx::ReadMeshViews(mesh_file, source, error)) {
+		LogError(LC_ASSET, "{}", error);
 		return false;
+	}
+
+	if (source.bHasColors && ShouldWarn("vertex_colors")) {
+		LogWarning(LC_ASSET, "'{}' has vertex colors, which are not supported and are ignored", mesh_path);
 	}
 
 	const rx::MeshHeader& header = *source.pHeader;
-
-	if (index_chunk == nullptr || (header.IndexSize != 2 && header.IndexSize != 4) ||
-		index_chunk->Stride != header.IndexSize || index_chunk->Count != header.IndexCount) {
-		LogError(LC_ASSET, "'{}' has a missing or malformed index buffer", mesh_path);
-		return false;
-	}
-
-	source.pIndices = mesh_file.GetChunkData(*index_chunk);
-	source.IndexSize = header.IndexSize;
-
-	if (attribute_count != header.AttributeCount || submesh_count != header.SubmeshCount ||
-		header.StreamCount > rx::scMaxStreams || header.VertexCount == 0) {
-		LogError(LC_ASSET, "'{}' has chunks that do not match its mesh header", mesh_path);
-		return false;
-	}
-
-	const rx::ChunkEntry* streams[rx::scMaxStreams] = {};
-
-	for (uint32 i = 0; i < header.StreamCount; i++) {
-		const std::string id = std::format("VB{:02}", i);
-
-		streams[i] = mesh_file.FindChunk(id.c_str());
-
-		if (streams[i] == nullptr || streams[i]->Count != header.VertexCount) {
-			LogError(LC_ASSET, "'{}' has a missing or malformed vertex stream '{}'", mesh_path, id);
-			return false;
-		}
-	}
-
-	uint32 position_count = 0;
-
-	for (uint32 i = 0; i < attribute_count; i++) {
-		const rx::VertexAttribute& attribute = attributes[i];
-		const uint32 format_size = rx::GetFormatSize(attribute.Format);
-
-		if (attribute.Stream >= header.StreamCount || format_size == 0 ||
-			attribute.Offset + format_size > streams[attribute.Stream]->Stride ||
-			!IsFormatAllowed(attribute.Semantic, attribute.Format)) {
-			LogError(LC_ASSET, "'{}' vertex attribute {} (semantic {}, format {}) is malformed", mesh_path, i,
-					 attribute.Semantic, attribute.Format);
-			return false;
-		}
-
-		AttributeView view;
-		view.pData = mesh_file.GetChunkData(*streams[attribute.Stream]) + attribute.Offset;
-		view.Stride = streams[attribute.Stream]->Stride;
-		view.Format = attribute.Format;
-
-		switch (attribute.Semantic) {
-		case rx::VS_Position:
-			source.Position = view;
-			position_count++;
-			break;
-		case rx::VS_Normal:
-			source.Normal = view;
-			break;
-		case rx::VS_Tangent:
-			source.Tangent = view;
-			break;
-		case rx::VS_TexCoord:
-			if (attribute.SemanticIndex == 0) {
-				source.TexCoord = view;
-			}
-			break;
-		case rx::VS_Joints:
-			if (attribute.SemanticIndex < scMaxWeightSets) {
-				source.Joints[attribute.SemanticIndex] = view;
-			}
-			break;
-		case rx::VS_Weights:
-			if (attribute.SemanticIndex < scMaxWeightSets) {
-				source.Weights[attribute.SemanticIndex] = view;
-			}
-			break;
-		case rx::VS_Color:
-			if (ShouldWarn("vertex_colors")) {
-				LogWarning(LC_ASSET, "'{}' has vertex colors, which are not supported and are ignored", mesh_path);
-			}
-			break;
-		default:
-			break;
-		}
-	}
-
-	if (position_count != 1) {
-		LogError(LC_ASSET, "'{}' must have exactly one POSITION attribute, found {}", mesh_path, position_count);
-		return false;
-	}
+	const uint32 submesh_count = source.SubmeshCount;
 
 	bool needs_skeleton = false;
 

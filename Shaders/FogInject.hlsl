@@ -146,6 +146,8 @@ void main(uint3 froxel : SV_DispatchThreadID)
 	const float surface_depth = NearestColumnDepth(column_depths, nearest_tap);
 	const float clamp_depth = max(surface_depth - FROXEL_SURFACE_MARGIN, 0.0);
 
+	const bool skip_clamp = (Consts.uiFlags & FOG_FLAG_DEBUG_NO_CLAMP) != 0;
+
 	[branch]
 	if (froxel.z == 0) {
 		const float surface_limit = ConnectedSurfaceLimit(column_depths, surface_depth);
@@ -153,7 +155,7 @@ void main(uint3 froxel : SV_DispatchThreadID)
 		tFroxelSurface[uint3(froxel.xy, 0)] = float4(surface_depth, surface_limit, 0.0, 0.0);
 	}
 
-	const float sample_depth = select(is_tail, slice_depth, min(slice_depth, clamp_depth));
+	const float sample_depth = select(or(is_tail, skip_clamp), slice_depth, min(slice_depth, clamp_depth));
 	const float3 position_ws = FogEyePosition() + (ray_unit_depth * sample_depth);
 
 	const float history_depth = min(FroxelSliceToDepth(float(froxel.z) + 0.5), clamp_depth);
@@ -209,7 +211,9 @@ void main(uint3 froxel : SV_DispatchThreadID)
 	const float prev_depth = prev_clip.w;
 	const float2 prev_uv = ((prev_clip.xy / max(prev_depth, 1e-6)) * 0.5) + 0.5;
 
-	const float3 history_uvw = float3(prev_uv, FroxelDepthToSlice(prev_depth) / float(FROXEL_GRID_Z + 1));
+	// Stops at the last slice's centre so the fetch never blends in the tail slice
+	const float history_slice = min(FroxelDepthToSlice(prev_depth), float(FROXEL_GRID_Z) - 0.5);
+	const float3 history_uvw = float3(prev_uv, history_slice / float(FROXEL_GRID_Z + 1));
 	const float4 history = F_SampleLevel(tFroxelHistory, history_uvw, 0);
 
 	const float history_tolerance =

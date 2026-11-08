@@ -3112,6 +3112,8 @@ void Blockout::ApplyModelProperties(Object& object, Model& model, const ConfigEn
 
 	const ConfigEntry* collider = entry.GetMember(HashStr32("collider"));
 	model.ColliderName = (collider != nullptr) ? collider->Get<const char*>() : "";
+
+	model.bNoBake = entry.GetMemberValue(HashStr32("nobake"), 0) != 0;
 }
 
 void Blockout::LinkModelColliders()
@@ -3283,6 +3285,10 @@ void Blockout::SaveModels(ConfigFile& info)
 
 		if (!model.ColliderName.IsEmpty()) {
 			model_entry.AddMember(ConfigEntry::Literal("collider", model.ColliderName.CStr()));
+		}
+
+		if (model.bNoBake) {
+			model_entry.AddMember(ConfigEntry::Literal("nobake", 1));
 		}
 
 		models_container.AddMember(std::move(model_entry));

@@ -177,6 +177,37 @@ const TextureMap* SourceBrush::FindMap(int32 plane_index, int32& out_material) c
 	return nullptr;
 }
 
+void MapSource::AddModels(const ConfigEntry* models_entry, const ConfigEntry* brushes)
+{
+	if (models_entry == nullptr || !models_entry->Members.IsInited()) {
+		Models.InitCapacity(0);
+		return;
+	}
+
+	Models.InitCapacity(models_entry->Members.Size());
+
+	for (const ConfigEntry& entry : models_entry->Members) {
+		const ConfigEntry* mesh = entry.GetMember(HashStr32("mesh"));
+
+		if (mesh == nullptr || mesh->Type != ConfigEntry::ePrimitiveType::String) {
+			continue;
+		}
+
+		const Vec3f position = entry.GetMemberValue(HashStr32("pos"), Vec3f(0.0f));
+		Quat rotation = entry.GetMemberValue(HashStr32("rot"), Quat::scIdentity);
+		rotation = entry.GetMemberValue(HashStr32("rotquat"), rotation);
+		const float32 scale = entry.GetMemberValue(HashStr32("scale"), 1.0f);
+
+		SourceModel& model = Models.Emplace();
+		model.Name = entry.Name.Get();
+		model.MeshPath = mesh->Get<const char*>();
+		model.Transform = Mat4f::AsScale(Vec3f(scale)) * Mat4f::AsRotation(rotation) * Mat4f::AsTranslation(position);
+		model.bBaked = IsBakedModelEntry(entry, brushes);
+		model.bProbeBox = entry.GetMemberValue(HashStr32("unlit"), 0) == 0 &&
+						  entry.GetMemberValue(HashStr32("noprobe"), 0) == 0;
+	}
+}
+
 int32 MapSource::FindOrAddMaterial(const String& name, int32 library_index, const CachedMaterials& mc)
 {
 	for (size_t i = 0; i < Materials.Size; i++) {
@@ -551,9 +582,7 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 	AddEntityPositions(info.GetEntry(HashStr32("lights")), Entities);
 	AddEntityPositions(models_entry, Entities);
 
-	if (models_entry != nullptr) {
-		ModelCount = static_cast<uint32>(models_entry->Members.Size());
-	}
+	AddModels(models_entry, blocks_entry);
 
 	return true;
 }

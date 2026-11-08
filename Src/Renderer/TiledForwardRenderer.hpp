@@ -88,7 +88,15 @@ enum class eFogFlags : uint32
 	FarSunShadow = 0x02,
 	NearSunDynamicOnly = 0x04,
 	BakedSunShadow = 0x08,
+
+	// r_fog_debug bits, shifted up by scFogDebugFlagShift
+	DebugNoClamp = 0x10,
+	DebugAcceptAll = 0x20,
+	DebugSlopeAcceptance = 0x40,
 };
+
+static constexpr uint32 scFogDebugFlagShift = 4;
+static constexpr uint32 scFogDebugFlagMask = 0x7;
 
 
 /**

@@ -2,6 +2,7 @@
 
 #include "../Image/LoaderKtx.hpp"
 #include "../Image/LoaderStb.hpp"
+#include "ModelGeometry.hpp"
 
 #include <ThirdParty/cgltf.h>
 
@@ -32,7 +33,6 @@ namespace loader {
 
 namespace {
 
-constexpr uint32 scMaxUvSets = 4;
 constexpr uint32 scInfluencesPerVertex = 4;
 
 struct MeshAttributes
@@ -44,38 +44,6 @@ struct MeshAttributes
 	SizedArray<float32> Weights;
 	SizedArray<uint32> BoneIds;
 };
-
-struct UvChoice
-{
-	uint32 Set = 0;
-	bool bHasTransform = false;
-	cgltf_texture_transform Transform {};
-	bool bMismatch = false;
-};
-
-bool UnpackFloats(const cgltf_accessor* accessor, cgltf_type expected_type, SizedArray<float32>& out)
-{
-	if (accessor == nullptr || accessor->type != expected_type) {
-		return false;
-	}
-
-	const cgltf_size float_count = cgltf_accessor_unpack_floats(accessor, nullptr, 0);
-
-	if (float_count == 0) {
-		return false;
-	}
-
-	SizedArray<float32> unpacked;
-	unpacked.InitSize(float_count);
-
-	if (cgltf_accessor_unpack_floats(accessor, unpacked.pData, float_count) != float_count) {
-		return false;
-	}
-
-	out = std::move(unpacked);
-
-	return true;
-}
 
 bool UnpackJoints(const cgltf_accessor* accessor, SizedArray<uint32>& out)
 {
@@ -97,91 +65,6 @@ bool UnpackJoints(const cgltf_accessor* accessor, SizedArray<uint32>& out)
 	out = std::move(unpacked);
 
 	return true;
-}
-
-bool IsPrimitiveSupported(const cgltf_primitive* primitive)
-{
-	return primitive->type == cgltf_primitive_type_triangles ||
-		   primitive->type == cgltf_primitive_type_triangle_strip ||
-		   primitive->type == cgltf_primitive_type_triangle_fan;
-}
-
-bool BuildTriangleIndices(const cgltf_primitive* primitive, uint32 vertex_count, SizedArray<uint32>& out_indices)
-{
-	SizedArray<uint32> source;
-
-	if (primitive->indices != nullptr) {
-		const cgltf_size count = primitive->indices->count;
-
-		if (count == 0) {
-			return false;
-		}
-
-		source.InitSize(count);
-
-		if (cgltf_accessor_unpack_indices(primitive->indices, source.pData, sizeof(uint32), count) != count) {
-			return false;
-		}
-	}
-	else {
-		source.InitSize(vertex_count);
-
-		for (uint32 i = 0; i < vertex_count; i++) {
-			source[i] = i;
-		}
-	}
-
-	for (uint32 i = 0; i < source.Size; i++) {
-		if (source[i] >= vertex_count) {
-			return false;
-		}
-	}
-
-	if (primitive->type == cgltf_primitive_type_triangles) {
-		const uint32 usable = static_cast<uint32>((source.Size / 3) * 3);
-
-		if (usable == 0) {
-			return false;
-		}
-
-		out_indices.InitSize(usable);
-		memcpy(out_indices.pData, source.pData, usable * sizeof(uint32));
-
-		return true;
-	}
-
-	if (source.Size < 3) {
-		return false;
-	}
-
-	out_indices.InitCapacity((source.Size - 2) * 3);
-
-	for (uint32 i = 0; i + 2 < source.Size; i++) {
-		uint32 a = source[i];
-		uint32 b = source[i + 1];
-		uint32 c = source[i + 2];
-
-		if (primitive->type == cgltf_primitive_type_triangle_strip) {
-			if ((i % 2) == 1) {
-				std::swap(a, b);
-			}
-		}
-		else {
-			a = source[0];
-			b = source[i + 1];
-			c = source[i + 2];
-		}
-
-		if (a == b || b == c || a == c) {
-			continue;
-		}
-
-		out_indices.Insert(a);
-		out_indices.Insert(b);
-		out_indices.Insert(c);
-	}
-
-	return out_indices.Size > 0;
 }
 
 void MergeInfluences(const SizedArray<uint32> (&joints)[2], const SizedArray<float32> (&weights)[2], uint32 set_count,
@@ -247,205 +130,6 @@ void MergeInfluences(const SizedArray<uint32> (&joints)[2], const SizedArray<flo
 			}
 		}
 	}
-}
-
-bool IsIdentityMatrix(const float* m)
-{
-	for (uint32 i = 0; i < 16; i++) {
-		const float expected = (i % 5 == 0) ? 1.0f : 0.0f;
-
-		if (std::abs(m[i] - expected) > 1e-6f) {
-			return false;
-		}
-	}
-
-	return true;
-}
-
-void TransformGeometry(MeshAttributes& attributes, SizedArray<uint32>& indices, const float* m)
-{
-	const float a00 = m[0];
-	const float a10 = m[1];
-	const float a20 = m[2];
-	const float a01 = m[4];
-	const float a11 = m[5];
-	const float a21 = m[6];
-	const float a02 = m[8];
-	const float a12 = m[9];
-	const float a22 = m[10];
-
-	const float c00 = a11 * a22 - a12 * a21;
-	const float c01 = a12 * a20 - a10 * a22;
-	const float c02 = a10 * a21 - a11 * a20;
-	const float c10 = a02 * a21 - a01 * a22;
-	const float c11 = a00 * a22 - a02 * a20;
-	const float c12 = a01 * a20 - a00 * a21;
-	const float c20 = a01 * a12 - a02 * a11;
-	const float c21 = a02 * a10 - a00 * a12;
-	const float c22 = a00 * a11 - a01 * a10;
-
-	const float determinant = a00 * c00 + a01 * c01 + a02 * c02;
-	const float sign = (determinant < 0.0f) ? -1.0f : 1.0f;
-
-	for (size_t i = 0; i + 2 < attributes.Positions.Size; i += 3) {
-		float* p = &attributes.Positions[i];
-
-		const float x = p[0];
-		const float y = p[1];
-		const float z = p[2];
-
-		p[0] = a00 * x + a01 * y + a02 * z + m[12];
-		p[1] = a10 * x + a11 * y + a12 * z + m[13];
-		p[2] = a20 * x + a21 * y + a22 * z + m[14];
-	}
-
-	for (size_t i = 0; i + 2 < attributes.Normals.Size; i += 3) {
-		float* n = &attributes.Normals[i];
-
-		const float x = n[0];
-		const float y = n[1];
-		const float z = n[2];
-
-		float nx = (c00 * x + c01 * y + c02 * z) * sign;
-		float ny = (c10 * x + c11 * y + c12 * z) * sign;
-		float nz = (c20 * x + c21 * y + c22 * z) * sign;
-
-		const float length = std::sqrt(nx * nx + ny * ny + nz * nz);
-
-		if (length > 1e-20f) {
-			nx /= length;
-			ny /= length;
-			nz /= length;
-		}
-
-		n[0] = nx;
-		n[1] = ny;
-		n[2] = nz;
-	}
-
-	for (size_t i = 0; i + 3 < attributes.Tangents.Size; i += 4) {
-		float* t = &attributes.Tangents[i];
-
-		const float x = t[0];
-		const float y = t[1];
-		const float z = t[2];
-
-		float tx = a00 * x + a01 * y + a02 * z;
-		float ty = a10 * x + a11 * y + a12 * z;
-		float tz = a20 * x + a21 * y + a22 * z;
-
-		const float length = std::sqrt(tx * tx + ty * ty + tz * tz);
-
-		if (length > 1e-20f) {
-			tx /= length;
-			ty /= length;
-			tz /= length;
-		}
-
-		t[0] = tx;
-		t[1] = ty;
-		t[2] = tz;
-		t[3] *= sign;
-	}
-
-	if (determinant < 0.0f) {
-		for (size_t i = 0; i + 2 < indices.Size; i += 3) {
-			std::swap(indices[i + 1], indices[i + 2]);
-		}
-	}
-}
-
-void ApplyUvTransform(SizedArray<float32>& uvs, const cgltf_texture_transform& transform)
-{
-	const float cosine = std::cos(transform.rotation);
-	const float sine = std::sin(transform.rotation);
-
-	for (size_t i = 0; i + 1 < uvs.Size; i += 2) {
-		const float u = uvs[i] * transform.scale[0];
-		const float v = uvs[i + 1] * transform.scale[1];
-
-		uvs[i] = cosine * u - sine * v + transform.offset[0];
-		uvs[i + 1] = sine * u + cosine * v + transform.offset[1];
-	}
-}
-
-int32 GetViewUvSet(const cgltf_texture_view& view)
-{
-	if (view.has_transform && view.transform.has_texcoord) {
-		return view.transform.texcoord;
-	}
-
-	return view.texcoord;
-}
-
-bool IsSameTransform(const cgltf_texture_view& a, const cgltf_texture_view& b)
-{
-	if (a.has_transform != b.has_transform) {
-		return false;
-	}
-
-	if (!a.has_transform) {
-		return true;
-	}
-
-	const cgltf_texture_transform& ta = a.transform;
-	const cgltf_texture_transform& tb = b.transform;
-
-	return std::abs(ta.offset[0] - tb.offset[0]) < 1e-6f && std::abs(ta.offset[1] - tb.offset[1]) < 1e-6f &&
-		   std::abs(ta.rotation - tb.rotation) < 1e-6f && std::abs(ta.scale[0] - tb.scale[0]) < 1e-6f &&
-		   std::abs(ta.scale[1] - tb.scale[1]) < 1e-6f;
-}
-
-UvChoice ChooseUvSet(const cgltf_material* material)
-{
-	UvChoice choice;
-
-	if (material == nullptr) {
-		return choice;
-	}
-
-	std::vector<const cgltf_texture_view*> views;
-
-	auto add_view = [&](const cgltf_texture_view& view)
-	{
-		if (view.texture != nullptr) {
-			views.push_back(&view);
-		}
-	};
-
-	if (material->has_pbr_specular_glossiness) {
-		add_view(material->pbr_specular_glossiness.diffuse_texture);
-		add_view(material->pbr_specular_glossiness.specular_glossiness_texture);
-	}
-	else if (material->has_pbr_metallic_roughness) {
-		add_view(material->pbr_metallic_roughness.base_color_texture);
-		add_view(material->pbr_metallic_roughness.metallic_roughness_texture);
-	}
-
-	add_view(material->normal_texture);
-	add_view(material->occlusion_texture);
-	add_view(material->emissive_texture);
-
-	if (views.empty()) {
-		return choice;
-	}
-
-	const cgltf_texture_view& primary = *views[0];
-
-	choice.Set = static_cast<uint32>(std::max(GetViewUvSet(primary), 0));
-
-	if (primary.has_transform) {
-		choice.bHasTransform = true;
-		choice.Transform = primary.transform;
-	}
-
-	for (const cgltf_texture_view* view : views) {
-		if (GetViewUvSet(*view) != GetViewUvSet(primary) || !IsSameTransform(*view, primary)) {
-			choice.bMismatch = true;
-		}
-	}
-
-	return choice;
 }
 
 } // namespace
@@ -816,7 +500,7 @@ bool LoaderGltf::BuildPrimitiveMesh(PrimitiveMesh& mesh, cgltf_primitive* primit
 	const cgltf_accessor* position_accessor = nullptr;
 	const cgltf_accessor* normal_accessor = nullptr;
 	const cgltf_accessor* tangent_accessor = nullptr;
-	const cgltf_accessor* uv_accessors[scMaxUvSets] = {};
+	const cgltf_accessor* uv_accessors[gltf::scMaxUvSets] = {};
 	const cgltf_accessor* joint_accessors[2] = {};
 	const cgltf_accessor* weight_accessors[2] = {};
 
@@ -841,7 +525,7 @@ bool LoaderGltf::BuildPrimitiveMesh(PrimitiveMesh& mesh, cgltf_primitive* primit
 			}
 			break;
 		case cgltf_attribute_type_texcoord:
-			if (index >= 0 && index < static_cast<cgltf_int>(scMaxUvSets)) {
+			if (index >= 0 && index < static_cast<cgltf_int>(gltf::scMaxUvSets)) {
 				uv_accessors[index] = attribute.data;
 			}
 			break;
@@ -872,7 +556,7 @@ bool LoaderGltf::BuildPrimitiveMesh(PrimitiveMesh& mesh, cgltf_primitive* primit
 
 	MeshAttributes attributes;
 
-	if (!UnpackFloats(position_accessor, cgltf_type_vec3, attributes.Positions)) {
+	if (!gltf::UnpackFloats(position_accessor, cgltf_type_vec3, attributes.Positions)) {
 		LogError(LC_ASSET, "A primitive in '{}' has no readable positions", mModelPath);
 		return false;
 	}
@@ -881,22 +565,22 @@ bool LoaderGltf::BuildPrimitiveMesh(PrimitiveMesh& mesh, cgltf_primitive* primit
 
 	SizedArray<uint32> indices;
 
-	if (!BuildTriangleIndices(primitive, vertex_count, indices)) {
+	if (!gltf::BuildTriangleIndices(primitive, vertex_count, indices)) {
 		LogError(LC_ASSET, "A primitive in '{}' has no valid triangles", mModelPath);
 		return false;
 	}
 
-	if (UnpackFloats(normal_accessor, cgltf_type_vec3, attributes.Normals) &&
+	if (gltf::UnpackFloats(normal_accessor, cgltf_type_vec3, attributes.Normals) &&
 		attributes.Normals.Size != static_cast<size_t>(vertex_count) * 3) {
 		attributes.Normals.Free();
 	}
 
-	if (UnpackFloats(tangent_accessor, cgltf_type_vec4, attributes.Tangents) &&
+	if (gltf::UnpackFloats(tangent_accessor, cgltf_type_vec4, attributes.Tangents) &&
 		attributes.Tangents.Size != static_cast<size_t>(vertex_count) * 4) {
 		attributes.Tangents.Free();
 	}
 
-	const UvChoice uv_choice = ChooseUvSet(primitive->material);
+	const gltf::UvChoice uv_choice = gltf::ChooseUvSet(primitive->material);
 
 	if (uv_choice.bMismatch &&
 		ShouldWarn(std::string("uv_mismatch:") + std::to_string(reinterpret_cast<uintptr_t>(primitive->material)))) {
@@ -906,10 +590,10 @@ bool LoaderGltf::BuildPrimitiveMesh(PrimitiveMesh& mesh, cgltf_primitive* primit
 				   primitive->material->name ? primitive->material->name : "<unnamed>", mModelPath);
 	}
 
-	uint32 uv_set = (uv_choice.Set < scMaxUvSets) ? uv_choice.Set : 0;
+	uint32 uv_set = (uv_choice.Set < gltf::scMaxUvSets) ? uv_choice.Set : 0;
 
 	if (uv_accessors[uv_set] == nullptr) {
-		for (uint32 set = 0; set < scMaxUvSets; set++) {
+		for (uint32 set = 0; set < gltf::scMaxUvSets; set++) {
 			if (uv_accessors[set] != nullptr) {
 				uv_set = set;
 				break;
@@ -917,7 +601,7 @@ bool LoaderGltf::BuildPrimitiveMesh(PrimitiveMesh& mesh, cgltf_primitive* primit
 		}
 	}
 
-	if (UnpackFloats(uv_accessors[uv_set], cgltf_type_vec2, attributes.Uvs) &&
+	if (gltf::UnpackFloats(uv_accessors[uv_set], cgltf_type_vec2, attributes.Uvs) &&
 		attributes.Uvs.Size != static_cast<size_t>(vertex_count) * 2) {
 		attributes.Uvs.Free();
 	}
@@ -929,12 +613,12 @@ bool LoaderGltf::BuildPrimitiveMesh(PrimitiveMesh& mesh, cgltf_primitive* primit
 		const size_t expected = static_cast<size_t>(vertex_count) * scInfluencesPerVertex;
 
 		bool has_first_set = UnpackJoints(joint_accessors[0], joints[0]) &&
-							 UnpackFloats(weight_accessors[0], cgltf_type_vec4, weights[0]) &&
+							 gltf::UnpackFloats(weight_accessors[0], cgltf_type_vec4, weights[0]) &&
 							 joints[0].Size == expected && weights[0].Size == expected;
 
 		const bool has_second_set = has_first_set && joint_accessors[1] != nullptr && weight_accessors[1] != nullptr &&
 									UnpackJoints(joint_accessors[1], joints[1]) &&
-									UnpackFloats(weight_accessors[1], cgltf_type_vec4, weights[1]) &&
+									gltf::UnpackFloats(weight_accessors[1], cgltf_type_vec4, weights[1]) &&
 									joints[1].Size == expected && weights[1].Size == expected;
 
 		if (has_first_set) {
@@ -944,11 +628,11 @@ bool LoaderGltf::BuildPrimitiveMesh(PrimitiveMesh& mesh, cgltf_primitive* primit
 	}
 
 	if (context.bBakeTransform) {
-		TransformGeometry(attributes, indices, context.WorldMatrix);
+		TransformModelGeometry(attributes.Positions, attributes.Normals, attributes.Tangents, indices, context.WorldMatrix);
 	}
 
 	if (uv_choice.bHasTransform && !attributes.Uvs.IsEmpty()) {
-		ApplyUvTransform(attributes.Uvs, uv_choice.Transform);
+		gltf::ApplyUvTransform(attributes.Uvs, uv_choice.Transform);
 	}
 
 	if (attributes.Normals.IsEmpty()) {
@@ -994,7 +678,7 @@ bool LoaderGltf::BuildObjectsFromPrimitives(Object* container_object, cgltf_mesh
 	for (cgltf_size i = 0; i < gltf_mesh->primitives_count; i++) {
 		cgltf_primitive* gltf_primitive = &gltf_mesh->primitives[i];
 
-		if (IsPrimitiveSupported(gltf_primitive)) {
+		if (gltf::IsPrimitiveSupported(gltf_primitive)) {
 			primitives.push_back(gltf_primitive);
 		}
 		else if (ShouldWarn("primitive_topology")) {

@@ -2,6 +2,7 @@
 #include "Presets.hpp"
 
 #include <cctype>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 
@@ -41,6 +42,9 @@ void PrintUsage()
 		"or high (default: medium)\n"
 		"  --probe-texel-rays <n>     Rays per probe visibility texel along each axis when baking probes, 0 to "
 		"leave the probes to the engine (default: 4)\n"
+		"  --no-models      Leave models out of the bake, so they cast no baked shadows and bounce no light\n"
+		"  --model-cell <m>           Size of the cells that hold the bounced light of model surfaces "
+		"(default: 0.25)\n"
 		"  --no-light-transport       Do not store the links between lightmap clusters that let unbaked lights "
 		"bounce at runtime\n"
 		"  --transport-min-link <f>   Drop links carrying less than this fraction of a cluster's rays, 0 to keep all "
@@ -112,6 +116,12 @@ bool ParseArguments(int argc, char** argv, CompileOptions& out_arguments, Preset
 		}
 		else if (argument == "--indirect-bounces" && has_value) {
 			out_arguments.Lightmap.IndirectBounces = static_cast<uint32>(std::atoi(argv[++i]));
+		}
+		else if (argument == "--no-models") {
+			out_arguments.bModels = false;
+		}
+		else if (argument == "--model-cell" && has_value) {
+			out_arguments.Lightmap.ModelCellSize = std::fmax(std::atof(argv[++i]), 0.01);
 		}
 		else if (argument == "--indirect-cache" && has_value) {
 			out_arguments.Lightmap.IndirectCacheMegabytes = static_cast<uint32>(std::atoi(argv[++i]));

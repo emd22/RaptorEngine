@@ -3,6 +3,7 @@
 #include "Areas.hpp"
 #include "Bsp.hpp"
 #include "MapSource.hpp"
+#include "Models.hpp"
 #include "Verify.hpp"
 
 #include <Asset/ConfigFile.hpp>
@@ -316,6 +317,42 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 		log(String::Fmt("  nonvis       {} faces dropped", source.NonVisFaceCount));
 	}
 
+	ModelBuilder models;
+
+	if (options.bModels) {
+		models.Build(source);
+	}
+
+	if (source.Models.Size > 0) {
+		const ModelStats& model_stats = models.Stats;
+
+		if (!options.bModels) {
+			log(String::Fmt("  models       {} left out of the bake (--no-models)", source.Models.Size));
+		}
+		else {
+			log(String::Fmt("  models       {} of {} baked ({} triangles), {} probe boxes, {} left to the engine "
+							"(unlit, no shadows, scripted or moving)",
+							model_stats.BakedCount, source.Models.Size, model_stats.Triangles, model_stats.ProbeBoxes,
+							source.Models.Size - model_stats.BakedCount));
+		}
+
+		for (const String& message : models.Errors) {
+			log(String::Fmt("  warning      {}", message));
+		}
+
+		if (model_stats.SkippedMeshCount > 0) {
+			log(String::Fmt("  warning      {} skinned or joint-attached model meshes are not baked, they only have a "
+							"pose once animated",
+							model_stats.SkippedMeshCount));
+		}
+
+		if (model_stats.BlendMeshCount > 0) {
+			log(String::Fmt("  models       {} blended (see-through) model meshes neither cast baked shadows nor "
+							"bounce light",
+							model_stats.BlendMeshCount));
+		}
+	}
+
 
 	CompiledMap map;
 	map.SourceHash = HashPrototypeFile(String(input_path.string()));
@@ -419,7 +456,7 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 
 	LightmapBaker lightmap;
 
-	result.bHasLightmap = lightmap.Bake(planes, source, surfaces, &patches, options.Lightmap, map);
+	result.bHasLightmap = lightmap.Bake(planes, source, surfaces, &patches, &models, options.Lightmap, map);
 	result.Lightmap = lightmap.Stats;
 
 	const String leak_path = ReplaceExtension(result.OutputPath, ".leak");
@@ -504,11 +541,6 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 							source.ProbeBoxes.Boxes.Size, source.ProbeBoxes.ObjectCount));
 		}
 
-		if (source.ModelCount > 0) {
-			log(String::Fmt(
-				"  warning      {} models are not known to the compiler, so probes are not kept out of them",
-				source.ModelCount));
-		}
 	}
 
 	if (result.bHasLightmap) {
@@ -519,8 +551,14 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 						baked.Width, baked.Height, baked.ChartCount, baked.Density, baked.LitFraction * 100.0,
 						baked.TexelCount, baked.RayCount, baked.OccluderCount));
 
-		if (baked.OccluderTriangleCount > 0) {
-			log(String::Fmt("  lightmap     {} patch triangles also cast shadows", baked.OccluderTriangleCount));
+		const uint32 patch_occluders = baked.OccluderTriangleCount - baked.OccluderModelTriangleCount;
+
+		if (patch_occluders > 0) {
+			log(String::Fmt("  lightmap     {} patch triangles also cast shadows", patch_occluders));
+		}
+
+		if (baked.OccluderModelTriangleCount > 0) {
+			log(String::Fmt("  lightmap     {} model triangles also cast shadows", baked.OccluderModelTriangleCount));
 		}
 
 		if (baked.bHasIndirect) {
@@ -535,6 +573,12 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 				"{:.0f} lux on average",
 				options.Lightmap.IndirectBounces, baked.IndirectRayCount, baked.IndirectTriangleCount,
 				baked.IndirectBlockerCount, light_count, baked.MeanIndirect));
+
+			if (baked.IndirectModelTriangleCount > 0) {
+				log(String::Fmt("  indirect     {} model triangles bounce light through {} cells of {:.2f} m",
+								baked.IndirectModelTriangleCount, baked.IndirectModelCellCount,
+								options.Lightmap.ModelCellSize));
+			}
 
 			if (baked.IndirectCachedTexelCount > 0) {
 				log(String::Fmt("  hit cache    {} of {} texels ({:.1f}%) reuse their first bounce hits, {:.0f} MB",
@@ -650,11 +694,6 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 				"shadowed by the world");
 		}
 
-		if (source.ModelCount > 0) {
-			log(String::Fmt("  warning      {} models are not known to the compiler, so they cast no baked shadows or "
-							"bounced light",
-							source.ModelCount));
-		}
 	}
 	else if (!options.Lightmap.bEnabled) {
 		log("  lightmap     off");
@@ -681,9 +720,27 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 	}
 
 	if (options.VerifyRays > 0 && result.bHasLightmap && source.bHasSun) {
-		const LightmapVerifyResult verify = VerifyLightmap(planes, source, map, patches.ReferencePoints,
-														   patches.ReferenceFacings, lightmap.Stats.Density,
-														   options.VerifyRays);
+		// Model triangles shadow the lightmap too, so the reference traces them like patch triangles
+		Array<Vec3d> occluder_points = CopyArray(patches.ReferencePoints);
+		Array<Vec3d> occluder_facings = CopyArray(patches.ReferenceFacings);
+
+		for (const ModelSurface& surface : models.Surfaces) {
+			for (size_t index = 0; index + 2 < surface.Indices.Size; index += 3) {
+				Vec3d facing = Vec3d(0.0);
+
+				for (uint32 corner = 0; corner < 3; corner++) {
+					const ModelVertex& vertex = surface.Vertices[static_cast<size_t>(surface.Indices[index + corner])];
+
+					occluder_points.Emplace(vertex.Position);
+					facing = facing + vertex.Normal;
+				}
+
+				occluder_facings.Emplace(facing);
+			}
+		}
+
+		const LightmapVerifyResult verify = VerifyLightmap(planes, source, map, occluder_points, occluder_facings,
+														   lightmap.Stats.Density, options.VerifyRays);
 
 		log(String::Fmt("  verify       {} lightmap points, {} lit, {} skipped beside a shadow edge, {} hidden "
 						"behind patches, {} wrong",

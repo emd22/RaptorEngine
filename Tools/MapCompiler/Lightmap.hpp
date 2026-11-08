@@ -12,6 +12,8 @@
 
 namespace fx::mapc {
 
+class ModelBuilder;
+
 enum class eDenoiseQuality : uint32
 {
 	Off,
@@ -39,6 +41,9 @@ struct LightmapOptions
 	eDenoiseQuality IndirectDenoise = eDenoiseQuality::Medium;
 
 	uint32 ProbeTexelRays = 4;
+
+	/// Size of the cells that hold the bounced light of model surfaces, which have no lightmap texels
+	double ModelCellSize = 0.25;
 
 	bool bTransportStats = false;
 	bool bLightTransport = true;
@@ -88,6 +93,7 @@ struct LightmapStats
 	uint32 ChartCount = 0;
 	uint32 OccluderCount = 0;
 	uint32 OccluderTriangleCount = 0;
+	uint32 OccluderModelTriangleCount = 0;
 
 	double Density = 0.0;
 
@@ -102,6 +108,8 @@ struct LightmapStats
 	bool bHasIndirect = false;
 	uint32 IndirectTriangleCount = 0;
 	uint32 IndirectBlockerCount = 0;
+	uint32 IndirectModelTriangleCount = 0;
+	uint32 IndirectModelCellCount = 0;
 	uint32 IndirectLightCount = 0;
 	uint32 MissingAlbedoCount = 0;
 	uint64 IndirectRayCount = 0;
@@ -129,7 +137,8 @@ class LightmapBaker
 {
 public:
 	bool Bake(const PlaneSet& planes, const MapSource& source, const SurfaceBuilder& surfaces,
-			  const PatchBuilder* patches, const LightmapOptions& options, CompiledMap& out_map);
+			  const PatchBuilder* patches, const ModelBuilder* models, const LightmapOptions& options,
+			  CompiledMap& out_map);
 
 public:
 	LightmapStats Stats;

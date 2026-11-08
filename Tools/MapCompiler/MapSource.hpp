@@ -10,6 +10,7 @@
 #include "Geometry.hpp"
 
 #include <Map/CompiledMap.hpp>
+#include <Math/Mat4.hpp>
 #include <Patch.hpp>
 #include <Renderer/ProbePlacement.hpp>
 
@@ -72,6 +73,20 @@ struct SourcePatch
 	Patch Shape;
 };
 
+struct SourceModel
+{
+	String Name;
+	String MeshPath;
+
+	/// Model space to world space, as Entity::RecalculateModelMatrix builds it
+	Mat4f Transform = Mat4f::scIdentity;
+
+	/// Casts baked shadows and takes part in the bounce (see IsBakedModelEntry)
+	bool bBaked = false;
+	/// Keeps light probes out of its bounds, as the engine's GatherPlacementBoxes does
+	bool bProbeBox = false;
+};
+
 struct SourceLight
 {
 	Vec3d Position = Vec3d::scZero;
@@ -92,6 +107,7 @@ public:
 
 	void AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& name, const CachedMaterials& mc);
 	void AddPatch(ConfigEntry& entry, const String& name, const CachedMaterials& mc);
+	void AddModels(const ConfigEntry* models_entry, const ConfigEntry* brushes);
 
 public:
 	/// These three hold strings, so they are sized once from the number of brushes in the prototype and never grow
@@ -116,7 +132,8 @@ public:
 	ProbePlacementBoxes ProbeBoxes;
 	/// World bounds of the probe volume brushes
 	Array<BBox> ProbeRegions;
-	uint32 ModelCount = 0;
+	/// Holds strings, so it is sized once from the prototype's `objects` entry
+	SizedArray<SourceModel> Models;
 
 	Vec3d Min = Vec3d::scZero;
 	Vec3d Max = Vec3d::scZero;

@@ -61,6 +61,8 @@ F_FrameData(FogConsts, Consts, 1);
 #define FROXEL_UPSAMPLE_TOLERANCE 0.25
 #define FROXEL_UPSAMPLE_RELATIVE_TOLERANCE 0.05
 #define FROXEL_UPSAMPLE_REJECTED_WEIGHT 1e-4
+// Accepted weight below which the ring fallback fades in with r_fog_debug 4
+#define FROXEL_RING_FADE_WEIGHT 0.25
 
 struct FroxelUpsample
 {
@@ -70,15 +72,20 @@ struct FroxelUpsample
 	float AcceptedWeight;
 };
 
+/// Full acceptance up to the column's connected limit plus `tolerance`, then a ramp down to zero over `ramp_width`.
 void AddFroxelColumn(inout FroxelUpsample upsample, int2 column, float base_weight, float view_depth,
-					 float integrated_w)
+					 float integrated_w, float slope_ramp)
 {
 	const int2 column_limit = int2(FROXEL_GRID_X, FROXEL_GRID_Y) - int2(1, 1);
 	column = clamp(column, int2(0, 0), column_limit);
 
 	const float surface_limit = F_SampleLoad(tFroxelSurface, int4(column, 0, 0)).g;
 	const float tolerance = FROXEL_UPSAMPLE_TOLERANCE + (FROXEL_UPSAMPLE_RELATIVE_TOLERANCE * surface_limit);
-	const float acceptance = saturate((surface_limit + (2.0 * tolerance) - view_depth) / tolerance);
+	const float ramp_width = max(tolerance, slope_ramp);
+
+	const bool accept_all = (Consts.uiFlags & FOG_FLAG_DEBUG_ACCEPT_ALL) != 0;
+	const float acceptance =
+		select(accept_all, 1.0, saturate((surface_limit + tolerance + ramp_width - view_depth) / ramp_width));
 
 	const float weight = base_weight * max(acceptance, FROXEL_UPSAMPLE_REJECTED_WEIGHT);
 
@@ -102,6 +109,23 @@ FSOutput main(FSInput input)
 	const float view_depth = LinearViewDepth(F_SampleLoad(tDepth, int3(pixel, 0)).r);
 
 	const float2 uv = (float2(pixel) + 0.5) / float2(depth_width, depth_height);
+
+	// How far depth moves across one froxel column at this pixel, from the smaller one-sided difference on each
+	// axis so a pixel beside a silhouette measures its own surface. Grazing surfaces get a ramp about a column wide
+	// on screen, surfaces facing the camera and silhouettes keep the tight one.
+	const int2 pixel_limit = int2(depth_width, depth_height) - int2(1, 1);
+	const float depth_left = LinearViewDepth(F_SampleLoad(tDepth, int3(max(pixel - int2(1, 0), 0), 0)).r);
+	const float depth_right = LinearViewDepth(F_SampleLoad(tDepth, int3(min(pixel + int2(1, 0), pixel_limit), 0)).r);
+	const float depth_up = LinearViewDepth(F_SampleLoad(tDepth, int3(max(pixel - int2(0, 1), 0), 0)).r);
+	const float depth_down = LinearViewDepth(F_SampleLoad(tDepth, int3(min(pixel + int2(0, 1), pixel_limit), 0)).r);
+
+	const float2 depth_slope = float2(min(abs(depth_right - view_depth), abs(view_depth - depth_left)),
+									  min(abs(depth_down - view_depth), abs(view_depth - depth_up)));
+
+	const float2 column_pixels = float2(depth_width, depth_height) / float2(FROXEL_GRID_X, FROXEL_GRID_Y);
+
+	const bool use_slope_ramp = (Consts.uiFlags & FOG_FLAG_DEBUG_SLOPE_ACCEPTANCE) != 0;
+	const float slope_ramp = select(use_slope_ramp, length(depth_slope) * max(column_pixels.x, column_pixels.y), 0.0);
 	const float3 ray_unit_depth = FogScreenRay(uv);
 	const float ray_length = length(ray_unit_depth);
 
@@ -122,18 +146,23 @@ FSOutput main(FSInput input)
 		const int2 offset = int2(inner & 1, inner >> 1);
 		const float2 bilinear = select(offset == int2(1, 1), column_fraction, 1.0 - column_fraction);
 
-		AddFroxelColumn(upsample, int2(base_column) + offset, bilinear.x * bilinear.y, view_depth, integrated_w);
+		AddFroxelColumn(upsample, int2(base_column) + offset, bilinear.x * bilinear.y, view_depth, integrated_w,
+						slope_ramp);
 	}
 
+	// The ring fades in as the inner columns' accepted weight drops instead of switching on at zero
+	const float ring_fade = saturate(1.0 - (upsample.AcceptedWeight / FROXEL_RING_FADE_WEIGHT));
+	const float ring_weight = select(use_slope_ramp, ring_fade, select(upsample.AcceptedWeight <= 0.0, 1.0, 0.0));
+
 	[branch]
-	if (upsample.AcceptedWeight <= 0.0) {
+	if (ring_weight > 0.0) {
 		[unroll]
 		for (uint outer = 0; outer < 16; outer++) {
 			const int2 offset = int2(outer & 3, outer >> 2) - int2(1, 1);
 			const bool is_inner = all(and(offset >= int2(0, 0), offset <= int2(1, 1)));
 
-			AddFroxelColumn(upsample, int2(base_column) + offset, select(is_inner, 0.0, 1.0), view_depth,
-							integrated_w);
+			AddFroxelColumn(upsample, int2(base_column) + offset, select(is_inner, 0.0, ring_weight), view_depth,
+							integrated_w, slope_ramp);
 		}
 	}
 

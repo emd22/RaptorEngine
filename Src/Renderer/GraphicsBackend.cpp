@@ -1231,6 +1231,9 @@ void GraphicsBackend::RenderFog(PerspectiveCamera& camera)
 
 	memcpy(consts.PrevCameraMatrix, mFogPrevCameraMatrix.RawData, sizeof(consts.PrevCameraMatrix));
 
+	const uint32 debug_bits = static_cast<uint32>(gCVars->Get("r_fog_debug", int64(0))) & scFogDebugFlagMask;
+	consts.Flags |= debug_bits << scFogDebugFlagShift;
+
 	if (bBakedSunActive) {
 		consts.Flags |= static_cast<uint32>(eFogFlags::ProbeSunVisibility);
 		consts.Flags |= static_cast<uint32>(eFogFlags::NearSunDynamicOnly);

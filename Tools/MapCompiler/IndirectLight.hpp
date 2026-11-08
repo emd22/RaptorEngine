@@ -28,7 +28,12 @@ struct IndirectInput
 	SizedArray<URect> LightmapRects;
 };
 
-bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, const IndirectInput& input,
-					   const LightmapOptions& options, CompiledMap& out_map, LightmapStats& out_stats);
+/**
+ * @brief Bakes bounce light into the lightmap and the light probes. Model triangles (`models`, optional) have no
+ * lightmap texels, so their radiance lives in a bake-only cache of world space cells that is gathered like texels.
+ */
+bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, const ModelBuilder* models,
+					   const IndirectInput& input, const LightmapOptions& options, CompiledMap& out_map,
+					   LightmapStats& out_stats);
 
 } // namespace fx::mapc

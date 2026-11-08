@@ -1,4 +1,5 @@
 #include "IndirectLight.hpp"
+#include "Models.hpp"
 
 #include <ktx.h>
 
@@ -18,6 +19,7 @@
 #include <limits>
 #include <mutex>
 #include <thread>
+#include <unordered_map>
 
 namespace fx::mapc {
 
@@ -70,18 +72,12 @@ struct AlbedoTexture
 	}
 };
 
-bool ReadAlbedoTexture(const String& path, AlbedoTexture& out_texture)
+/// Box filters the base colour of `texture` down to at most 128 px and destroys `texture`
+bool ReadAlbedoKtx(ktxTexture* texture, AlbedoTexture& out_texture)
 {
 	constexpr uint32 scAlbedoMipSize = 128;
 	constexpr uint32 scFormatRGBA8Unorm = 37;
 	constexpr uint32 scFormatRGBA8Srgb = 43;
-
-	ktxTexture* texture = nullptr;
-
-	if (ktxTexture_CreateFromNamedFile(FilesystemIO::ResolvePath(path).CStr(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT,
-									   &texture) != KTX_SUCCESS) {
-		return false;
-	}
 
 	uint32 format = 0;
 
@@ -169,14 +165,37 @@ bool ReadAlbedoTexture(const String& path, AlbedoTexture& out_texture)
 	return true;
 }
 
-SizedArray<AlbedoTexture> LoadAlbedos(const SizedArray<CompiledMapMaterial>& materials, uint32& out_missing)
+bool ReadAlbedoTexture(const String& path, AlbedoTexture& out_texture)
 {
-	constexpr float32 scDefaultAlbedo = 0.5f;
+	ktxTexture* texture = nullptr;
 
+	if (ktxTexture_CreateFromNamedFile(FilesystemIO::ResolvePath(path).CStr(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT,
+									   &texture) != KTX_SUCCESS) {
+		return false;
+	}
+
+	return ReadAlbedoKtx(texture, out_texture);
+}
+
+bool ReadAlbedoTexture(const SizedArray<uint8>& data, AlbedoTexture& out_texture)
+{
+	ktxTexture* texture = nullptr;
+
+	if (ktxTexture_CreateFromMemory(data.pData, data.Size, KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &texture) !=
+		KTX_SUCCESS) {
+		return false;
+	}
+
+	return ReadAlbedoKtx(texture, out_texture);
+}
+
+constexpr float32 scDefaultAlbedo = 0.5f;
+
+/// Fills the first `materials.Size` entries of `albedos`
+void LoadAlbedos(const SizedArray<CompiledMapMaterial>& materials, SizedArray<AlbedoTexture>& albedos,
+				 uint32& out_missing)
+{
 	const MaterialDefinitionArray definitions = LoadMaterialDefinitions(scMaterialRoot);
-
-	SizedArray<AlbedoTexture> albedos;
-	albedos.InitSize(materials.Size);
 
 	for (size_t i = 0; i < materials.Size; i++) {
 		const CompiledMapMaterial& material = materials[i];
@@ -218,8 +237,45 @@ SizedArray<AlbedoTexture> LoadAlbedos(const SizedArray<CompiledMapMaterial>& mat
 			texel = texel * tint;
 		}
 	}
+}
 
-	return albedos;
+/// Fills the model materials of `albedos`, from index `first` on
+void LoadModelAlbedos(const ModelBuilder& models, SizedArray<AlbedoTexture>& albedos, uint32 first,
+					  uint32& out_missing)
+{
+	for (uint32 i = 0; i < models.GetMaterialCount(); i++) {
+		const loader::StaticModelMaterial& material = models.GetMaterial(i);
+		AlbedoTexture& albedo = albedos[first + i];
+
+		albedo.InitConstant(Vec3f(1.0f));
+
+		bool has_texture = false;
+
+		if (!material.DiffuseData.IsEmpty()) {
+			has_texture = ReadAlbedoTexture(material.DiffuseData, albedo);
+		}
+		else if (!material.DiffusePath.IsEmpty()) {
+			has_texture = ReadAlbedoTexture(material.DiffusePath, albedo);
+		}
+		else {
+			has_texture = true;
+		}
+
+		if (!has_texture) {
+			albedo.InitConstant(Vec3f(scDefaultAlbedo));
+			out_missing++;
+		}
+
+		Vec3f tint = material.BaseColor;
+
+		if (!material.bHasMetallicTexture) {
+			tint = tint * (1.0f - std::clamp(material.Metallic, 0.0f, 1.0f));
+		}
+
+		for (Vec3f& texel : albedo.Texels) {
+			texel = texel * tint;
+		}
+	}
 }
 
 Vec3f UnpackColor(uint32 packed)
@@ -238,6 +294,8 @@ struct TriangleShading
 	Vec2f Texcoord[3];
 	Vec3f Tint[3];
 	uint32 Material = 0;
+	/// Model triangles have no texels, their hits read the model cache instead
+	bool bModel = false;
 };
 
 struct SceneTriangle
@@ -1402,30 +1460,283 @@ bool WriteImage(const String& path, uint32 width, uint32 height, const Vec3f* ir
 	return written == pixels.Size && closed;
 }
 
+constexpr uint32 scNoCell = std::numeric_limits<uint32>::max();
+
+/**
+ * @brief Bake-only radiance cache for model triangles, which have no lightmap texels. World space is cut into cubic
+ * cells, split again by which of the six axis directions a triangle faces, so the two sides of a thin wall stay apart.
+ * Each cell is gathered like a texel from the sample point nearest the middle of the model surface inside it.
+ */
+class ModelCache
+{
+public:
+	void Build(const ModelBuilder& models, float32 cell_size)
+	{
+		constexpr float32 scSurfaceOffset = 1e-3f;
+
+		mInvCellSize = 1.0f / cell_size;
+
+		const float32 spacing = cell_size * 0.5f;
+
+		struct Accumulator
+		{
+			Vec3f Sum = Vec3f(0.0f);
+			uint32 Count = 0;
+
+			float32 BestDistance = scNoHit;
+			Vec3f BestPoint = Vec3f(0.0f);
+			Vec3f BestNormal = Vec3f(0.0f);
+			Vec3f BestFacing = Vec3f(0.0f);
+		};
+
+		Array<Accumulator> accumulators;
+
+		ForEachSample(models, spacing,
+					  [&](const Vec3f& point, const Vec3f&, const Vec3f& facing)
+					  {
+						  const uint64 key = GetKey(point, facing);
+						  const auto found = mCells.find(key);
+
+						  uint32 cell = 0;
+
+						  if (found == mCells.end()) {
+							  cell = accumulators.Size;
+							  mCells.emplace(key, cell);
+							  accumulators.Emplace();
+						  }
+						  else {
+							  cell = found->second;
+						  }
+
+						  accumulators[cell].Sum += point;
+						  accumulators[cell].Count++;
+					  });
+
+		ForEachSample(models, spacing,
+					  [&](const Vec3f& point, const Vec3f& normal, const Vec3f& facing)
+					  {
+						  Accumulator& accumulator = accumulators[mCells.find(GetKey(point, facing))->second];
+
+						  const Vec3f offset = point - accumulator.Sum * (1.0f / static_cast<float32>(accumulator.Count));
+						  const float32 distance = offset.Dot(offset);
+
+						  if (distance < accumulator.BestDistance) {
+							  accumulator.BestDistance = distance;
+							  accumulator.BestPoint = point;
+							  accumulator.BestNormal = normal;
+							  accumulator.BestFacing = facing;
+						  }
+					  });
+
+		Positions.InitSize(accumulators.Size);
+		Normals.InitSize(accumulators.Size);
+
+		for (uint32 cell = 0; cell < accumulators.Size; cell++) {
+			const Accumulator& accumulator = accumulators[cell];
+
+			Positions[cell] = accumulator.BestPoint + accumulator.BestFacing * scSurfaceOffset;
+			Normals[cell] = accumulator.BestNormal;
+		}
+	}
+
+	uint32 GetCount() const { return static_cast<uint32>(Positions.Size); }
+
+	/// The cell of a hit on a model triangle, or the nearest neighbouring cell facing the same way
+	uint32 Find(const Vec3f& point, const Vec3f& facing) const
+	{
+		const int32 x = GetCoordinate(point.X);
+		const int32 y = GetCoordinate(point.Y);
+		const int32 z = GetCoordinate(point.Z);
+		const uint32 direction = GetDirection(facing);
+
+		const auto found = mCells.find(MakeKey(x, y, z, direction));
+
+		if (found != mCells.end()) {
+			return found->second;
+		}
+
+		for (int32 dz = -1; dz <= 1; dz++) {
+			for (int32 dy = -1; dy <= 1; dy++) {
+				for (int32 dx = -1; dx <= 1; dx++) {
+					const auto neighbour = mCells.find(MakeKey(x + dx, y + dy, z + dz, direction));
+
+					if (neighbour != mCells.end()) {
+						return neighbour->second;
+					}
+				}
+			}
+		}
+
+		return scNoCell;
+	}
+
+public:
+	SizedArray<Vec3f> Positions;
+	SizedArray<Vec3f> Normals;
+
+private:
+	static constexpr int32 scCoordinateBias = 1 << 19;
+	static constexpr uint64 scCoordinateMask = (1ull << 20) - 1;
+
+	template <typename TFunction>
+	static void ForEachSample(const ModelBuilder& models, float32 spacing, const TFunction& function)
+	{
+		constexpr uint32 scMaxSteps = 1024;
+
+		for (const ModelSurface& surface : models.Surfaces) {
+			for (size_t index = 0; index + 2 < surface.Indices.Size; index += 3) {
+				const ModelVertex* corners[3];
+
+				for (uint32 corner = 0; corner < 3; corner++) {
+					corners[corner] = &surface.Vertices[static_cast<size_t>(surface.Indices[index + corner])];
+				}
+
+				const Vec3f a = corners[0]->Position.ToVec3f();
+				const Vec3f b = corners[1]->Position.ToVec3f();
+				const Vec3f c = corners[2]->Position.ToVec3f();
+
+				const Vec3f na = corners[0]->Normal.ToVec3f();
+				const Vec3f nb = corners[1]->Normal.ToVec3f();
+				const Vec3f nc = corners[2]->Normal.ToVec3f();
+
+				Vec3f facing = na + nb + nc;
+				const float32 facing_length = facing.Length();
+
+				if (!(facing_length > 1e-6f)) {
+					continue;
+				}
+
+				facing = facing * (1.0f / facing_length);
+
+				const float32 longest = std::fmax((b - a).Length(), std::fmax((c - b).Length(), (a - c).Length()));
+				const uint32 steps = std::clamp(static_cast<uint32>(std::ceil(longest / spacing)), 1u, scMaxSteps);
+				const float32 inv_steps = 1.0f / static_cast<float32>(steps);
+
+				const auto emit = [&](float32 u, float32 v)
+				{
+					const float32 w = 1.0f - u - v;
+
+					Vec3f normal = na * w + nb * u + nc * v;
+					const float32 normal_length = normal.Length();
+
+					if (normal_length > 1e-6f) {
+						normal = normal * (1.0f / normal_length);
+					}
+					else {
+						normal = facing;
+					}
+
+					function(a * w + b * u + c * v, normal, facing);
+				};
+
+				emit(1.0f / 3.0f, 1.0f / 3.0f);
+
+				for (uint32 i = 0; i <= steps; i++) {
+					for (uint32 j = 0; i + j <= steps; j++) {
+						emit(static_cast<float32>(i) * inv_steps, static_cast<float32>(j) * inv_steps);
+					}
+				}
+			}
+		}
+	}
+
+	int32 GetCoordinate(float32 value) const { return static_cast<int32>(std::floor(value * mInvCellSize)); }
+
+	static uint32 GetDirection(const Vec3f& facing)
+	{
+		uint32 axis = 0;
+
+		for (uint32 i = 1; i < 3; i++) {
+			if (std::abs(facing.mData[i]) > std::abs(facing.mData[axis])) {
+				axis = i;
+			}
+		}
+
+		return axis * 2 + ((facing.mData[axis] < 0.0f) ? 1u : 0u);
+	}
+
+	static uint64 MakeKey(int32 x, int32 y, int32 z, uint32 direction)
+	{
+		const uint64 ux = static_cast<uint64>(x + scCoordinateBias) & scCoordinateMask;
+		const uint64 uy = static_cast<uint64>(y + scCoordinateBias) & scCoordinateMask;
+		const uint64 uz = static_cast<uint64>(z + scCoordinateBias) & scCoordinateMask;
+
+		return ux | (uy << 20) | (uz << 40) | (static_cast<uint64>(direction) << 60);
+	}
+
+	uint64 GetKey(const Vec3f& point, const Vec3f& facing) const
+	{
+		return MakeKey(GetCoordinate(point.X), GetCoordinate(point.Y), GetCoordinate(point.Z), GetDirection(facing));
+	}
+
+private:
+	float32 mInvCellSize = 1.0f;
+	std::unordered_map<uint64, uint32> mCells;
+};
+
 class IndirectBake
 {
 public:
 	IndirectBake(const MapSource& source, const IndirectInput& input, const Scene& scene,
-				 const Array<TriangleShading>& shadings, const SizedArray<AlbedoTexture>& albedos)
-		: mSource(source), mInput(input), mScene(scene), mShadings(shadings), mAlbedos(albedos)
+				 const Array<TriangleShading>& shadings, const SizedArray<AlbedoTexture>& albedos,
+				 const ModelCache& cache)
+		: mSource(source), mInput(input), mScene(scene), mShadings(shadings), mAlbedos(albedos), mCache(cache),
+		  mTexelCount(static_cast<uint64>(input.Width) * input.Height)
 	{
+	}
+
+	/// Sample indices past the lightmap's texels are model cache cells
+	bool IsCell(uint64 sample) const { return sample >= mTexelCount; }
+
+	Vec3f GetPosition(uint64 sample) const
+	{
+		if (IsCell(sample)) {
+			return mCache.Positions[sample - mTexelCount];
+		}
+
+		return mInput.pPositions[sample];
+	}
+
+	Vec3f GetNormal(uint64 sample) const
+	{
+		if (IsCell(sample)) {
+			return mCache.Normals[sample - mTexelCount];
+		}
+
+		return mInput.pNormals[sample];
+	}
+
+	/// Cells have no baked sun visibility, so they trace the middle of the sun disc
+	float32 GetSunVisibility(uint64 sample, const Vec3f& position, const Vec3f& sun_direction) const
+	{
+		if (!IsCell(sample)) {
+			return static_cast<float32>(mInput.pSunVisibility[sample]) / 255.0f;
+		}
+
+		if (mScene.IsOccluded(SceneRay(position, sun_direction), scNoHit)) {
+			return 0.0f;
+		}
+
+		return 1.0f;
 	}
 
 	Vec3f GetDirect(uint64 texel) const
 	{
 		constexpr float32 scShadowEpsilon = 1e-3f;
 
-		const Vec3f position = mInput.pPositions[texel];
-		const Vec3f normal = mInput.pNormals[texel];
+		const Vec3f position = GetPosition(texel);
+		const Vec3f normal = GetNormal(texel);
 
 		Vec3f irradiance(0.0f);
 
 		if (mSource.bHasSun) {
 			const Vec3f sun_direction = mSource.SunDirection.ToVec3f();
 			const float32 sun_cosine = std::fmax(normal.Dot(sun_direction), 0.0f);
-			const float32 visibility = static_cast<float32>(mInput.pSunVisibility[texel]) / 255.0f;
 
-			irradiance += mSource.SunColor.ToVec3f() * (sun_cosine * visibility);
+			if (sun_cosine > 0.0f) {
+				const float32 visibility = GetSunVisibility(texel, position, sun_direction);
+				irradiance += mSource.SunColor.ToVec3f() * (sun_cosine * visibility);
+			}
 		}
 
 		for (const SourceLight& light : mSource.Lights) {
@@ -1491,6 +1802,19 @@ public:
 		const TriangleShading& shading = mShadings[triangle.Shading];
 		const float32 w = 1.0f - hit.U - hit.V;
 
+		const Vec2f texcoord = shading.Texcoord[0] * w + shading.Texcoord[1] * hit.U + shading.Texcoord[2] * hit.V;
+
+		if (shading.bModel) {
+			const uint32 cell = mCache.Find(origin + direction * hit.Distance, triangle.Facing);
+
+			if (cell != scNoCell) {
+				cached.Texel = static_cast<uint32>(mTexelCount + cell);
+				cached.Albedo = CapAlbedo(mAlbedos[shading.Material].Sample(texcoord.X, texcoord.Y));
+			}
+
+			return cached;
+		}
+
 		const Vec3f barycentric(w, hit.U, hit.V);
 		const float32 x = shading.U.Dot(barycentric);
 		const float32 y = shading.V.Dot(barycentric);
@@ -1499,7 +1823,6 @@ public:
 			std::clamp(static_cast<int64>(std::floor(x)), static_cast<int64>(0), static_cast<int64>(mInput.Width) - 1));
 		const uint32 texel_y = static_cast<uint32>(std::clamp(static_cast<int64>(std::floor(y)), static_cast<int64>(0),
 															  static_cast<int64>(mInput.Height) - 1));
-		const Vec2f texcoord = shading.Texcoord[0] * w + shading.Texcoord[1] * hit.U + shading.Texcoord[2] * hit.V;
 		const Vec3f tint = shading.Tint[0] * w + shading.Tint[1] * hit.U + shading.Tint[2] * hit.V;
 		const Vec3f albedo = CapAlbedo(mAlbedos[shading.Material].Sample(texcoord.X, texcoord.Y) * tint);
 
@@ -1529,8 +1852,8 @@ public:
 	{
 		constexpr float32 scUniformDirectionality = 2.0f / 3.0f;
 
-		const Vec3f origin = mInput.pPositions[texel];
-		const Vec3f normal = mInput.pNormals[texel];
+		const Vec3f origin = GetPosition(texel);
+		const Vec3f normal = GetNormal(texel);
 
 		Vec3f tangent;
 		Vec3f bitangent;
@@ -1588,8 +1911,8 @@ public:
 	void TraceGatherHits(uint64 texel, const DirectionSet& directions, uint32* out_hits,
 						 Vec3f* out_albedos = nullptr) const
 	{
-		const Vec3f origin = mInput.pPositions[texel];
-		const Vec3f normal = mInput.pNormals[texel];
+		const Vec3f origin = GetPosition(texel);
+		const Vec3f normal = GetNormal(texel);
 
 		Vec3f tangent;
 		Vec3f bitangent;
@@ -1604,7 +1927,12 @@ public:
 
 			const GatherHit hit = TraceHit(origin, direction);
 
+			// Light transport only links lightmap clusters, so a ray that ends on a model is lost to it
 			out_hits[ray] = hit.Texel;
+
+			if (hit.Texel < scDarkHit && IsCell(hit.Texel)) {
+				out_hits[ray] = scDarkHit;
+			}
 
 			if (out_albedos != nullptr) {
 				out_albedos[ray] = hit.Albedo;
@@ -1668,6 +1996,8 @@ private:
 	const Scene& mScene;
 	const Array<TriangleShading>& mShadings;
 	const SizedArray<AlbedoTexture>& mAlbedos;
+	const ModelCache& mCache;
+	uint64 mTexelCount = 0;
 };
 
 constexpr uint32 scTransportLevels = TransportStats::scLevelCount;
@@ -2342,8 +2672,9 @@ void BuildTransport(const IndirectBake& bake, const IndirectInput& input, const 
 
 } // namespace
 
-bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, const IndirectInput& input,
-					   const LightmapOptions& options, CompiledMap& out_map, LightmapStats& out_stats)
+bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, const ModelBuilder* models,
+					   const IndirectInput& input, const LightmapOptions& options, CompiledMap& out_map,
+					   LightmapStats& out_stats)
 {
 	constexpr float32 scMaxIrradiance = 65000.0f;
 	constexpr uint64 scBytesPerMegabyte = 1024 * 1024;
@@ -2352,7 +2683,17 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 		return false;
 	}
 
-	const SizedArray<AlbedoTexture> albedos = LoadAlbedos(out_map.Materials, out_stats.MissingAlbedoCount);
+	const uint32 model_material_count = (models != nullptr) ? models->GetMaterialCount() : 0;
+	const uint32 first_model_material = static_cast<uint32>(out_map.Materials.Size);
+
+	SizedArray<AlbedoTexture> albedos;
+	albedos.InitSize(out_map.Materials.Size + model_material_count);
+
+	LoadAlbedos(out_map.Materials, albedos, out_stats.MissingAlbedoCount);
+
+	if (models != nullptr) {
+		LoadModelAlbedos(*models, albedos, first_model_material, out_stats.MissingAlbedoCount);
+	}
 
 	Scene scene;
 	Array<TriangleShading> shadings;
@@ -2402,6 +2743,40 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 
 	const uint32 surface_triangle_count = scene.GetTriangleCount();
 
+	ModelCache model_cache;
+
+	if (models != nullptr && !models->Surfaces.IsEmpty()) {
+		for (const ModelSurface& surface : models->Surfaces) {
+			for (size_t index = 0; index + 2 < surface.Indices.Size; index += 3) {
+				const ModelVertex* corners[3];
+
+				for (uint32 corner = 0; corner < 3; corner++) {
+					corners[corner] = &surface.Vertices[static_cast<size_t>(surface.Indices[index + corner])];
+				}
+
+				const uint32 shading_index = shadings.Size;
+
+				TriangleShading& shading = shadings.Emplace();
+				shading.Material = first_model_material + surface.MaterialIndex;
+				shading.bModel = true;
+
+				for (uint32 corner = 0; corner < 3; corner++) {
+					shading.Texcoord[corner] = corners[corner]->Texcoord;
+					shading.Tint[corner] = Vec3f(1.0f);
+				}
+
+				const Vec3f facing = (corners[0]->Normal + corners[1]->Normal + corners[2]->Normal).ToVec3f();
+
+				scene.AddTriangle(corners[0]->Position.ToVec3f(), corners[1]->Position.ToVec3f(),
+								  corners[2]->Position.ToVec3f(), facing, shading_index);
+			}
+		}
+
+		model_cache.Build(*models, static_cast<float32>(options.ModelCellSize));
+	}
+
+	const uint32 model_triangle_count = scene.GetTriangleCount() - surface_triangle_count;
+
 	for (uint32 index = 0; index + 2 < surfaces.BlockerPoints.Size; index += 3) {
 		scene.AddTriangle(surfaces.BlockerPoints[index].ToVec3f(), surfaces.BlockerPoints[index + 1].ToVec3f(),
 						  surfaces.BlockerPoints[index + 2].ToVec3f(), Vec3f(0.0f), scNoShading);
@@ -2410,6 +2785,9 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 	scene.Build();
 
 	const uint64 texel_count = static_cast<uint64>(input.Width) * input.Height;
+
+	// Model cache cells follow the texels in every per-sample array
+	const uint64 sample_count = texel_count + model_cache.GetCount();
 
 	Array<uint32> texels;
 
@@ -2425,15 +2803,17 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 	SizedArray<Vec3f> directions;
 	SizedArray<float32> variance;
 
-	direct.InitSize(texel_count, Vec3f(0.0f));
-	indirect.InitSize(texel_count, Vec3f(0.0f));
-	gathered.InitSize(texel_count, Vec3f(0.0f));
-	directions.InitSize(texel_count, Vec3f(0.0f));
-	variance.InitSize(texel_count, 0.0f);
+	direct.InitSize(sample_count, Vec3f(0.0f));
+	indirect.InitSize(sample_count, Vec3f(0.0f));
+	gathered.InitSize(sample_count, Vec3f(0.0f));
+	directions.InitSize(sample_count, Vec3f(0.0f));
+	variance.InitSize(sample_count, 0.0f);
 
-	const IndirectBake bake(source, input, scene, shadings, albedos);
+	const IndirectBake bake(source, input, scene, shadings, albedos, model_cache);
 
 	RunParallel(texels.Size, [&](uint32 i) { direct[texels[i]] = bake.GetDirect(texels[i]); });
+	RunParallel(model_cache.GetCount(),
+				[&](uint32 cell) { direct[texel_count + cell] = bake.GetDirect(texel_count + cell); });
 
 	Array<uint8> filled;
 	Array<Vec3f> scratch_values;
@@ -2477,6 +2857,15 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 
 						bake.Gather(texel, direction_set, direct.pData, previous, hits, bounce > 0 && hits != nullptr,
 									current[texel], directions[texel], variance[texel]);
+					});
+
+		RunParallel(model_cache.GetCount(),
+					[&](uint32 cell)
+					{
+						const uint64 sample = texel_count + cell;
+
+						bake.Gather(sample, direction_set, direct.pData, previous, nullptr, false, current[sample],
+									directions[sample], variance[sample]);
 					});
 
 		Vec3f* filtered_directions = nullptr;
@@ -2566,11 +2955,14 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 
 	out_stats.bHasIndirect = true;
 	out_stats.IndirectTriangleCount = surface_triangle_count;
-	out_stats.IndirectBlockerCount = scene.GetTriangleCount() - surface_triangle_count;
+	out_stats.IndirectBlockerCount = scene.GetTriangleCount() - surface_triangle_count - model_triangle_count;
+	out_stats.IndirectModelTriangleCount = model_triangle_count;
+	out_stats.IndirectModelCellCount = model_cache.GetCount();
 	out_stats.IndirectLightCount = source.Lights.Size;
 	out_stats.IndirectRayCount = static_cast<uint64>(texels.Size) * options.IndirectRays +
 								 static_cast<uint64>(texels.Size - cached_texel_count) * options.IndirectRays *
-									 (options.IndirectBounces - 1);
+									 (options.IndirectBounces - 1) +
+								 static_cast<uint64>(model_cache.GetCount()) * options.IndirectRays * options.IndirectBounces;
 	out_stats.IndirectCachedTexelCount = cached_texel_count;
 	out_stats.IndirectTexelCount = texels.Size;
 	out_stats.IndirectCacheMegabytes = static_cast<double>(cached_texel_count * cache_bytes_per_texel) /

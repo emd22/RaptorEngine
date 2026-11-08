@@ -396,6 +396,7 @@ void RaptorGame::CreateGame()
 	gCVars->Set("r_fog", gCVars->Get("r_fog", int64(1)));
 	gCVars->Set("r_fog_distance", gCVars->Get("r_fog_distance", 100.0f));
 	gCVars->Set("r_fog_temporal", gCVars->Get("r_fog_temporal", int64(1)));
+	gCVars->Set("r_fog_debug", gCVars->Get("r_fog_debug", int64(0)));
 
 	mCrosshairTicket = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm, scCrosshairPath,
 												eImageCreateFlags::None);
