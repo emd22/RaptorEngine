@@ -30,7 +30,7 @@
 
 namespace fx::script {
 
-static Object* N_object_get(uint32 id)
+static Object* N_RObjectGet(uint32 id)
 {
 	ObjectID obj_id(id);
 	if (obj_id.IsInvalid()) {
@@ -40,7 +40,7 @@ static Object* N_object_get(uint32 id)
 	return gObjectManager->GetObject(obj_id);
 }
 
-static Object* N_object_find(const char* name)
+static Object* N_RObjectFind(const char* name)
 {
 	if (name == nullptr) {
 		return nullptr;
@@ -142,7 +142,7 @@ static void N_editor_push_op_delete(Object* obj, int32 group_size)
 }
 
 
-static void N_object_move_to(Object* obj, FLOAT4 position)
+static void N_RObject_MoveTo(Object* obj, FLOAT4 position)
 {
 	if (obj == nullptr) {
 		return;
@@ -152,7 +152,7 @@ static void N_object_move_to(Object* obj, FLOAT4 position)
 	obj->SetPosition(Vec3f(position));
 }
 
-static void N_object_move_by(Object* obj, FLOAT4 by)
+static void N_RObject_MoveBy(Object* obj, FLOAT4 by)
 {
 	if (obj == nullptr) {
 		return;
@@ -162,7 +162,7 @@ static void N_object_move_by(Object* obj, FLOAT4 by)
 }
 
 
-static FLOAT4 N_object_get_position(Object* obj)
+static FLOAT4 N_RObject_GetPosition(Object* obj)
 {
 	if (obj == nullptr) {
 		return simd::LoadFloat4(0.0f);
@@ -171,7 +171,7 @@ static FLOAT4 N_object_get_position(Object* obj)
 	return obj->GetPosition().mIntrin;
 }
 
-static void N_object_rotate_to(Object* obj, FLOAT4 euler_radians)
+static void N_RObject_RotateToEuler(Object* obj, FLOAT4 euler_radians)
 {
 	if (obj == nullptr) {
 		return;
@@ -180,7 +180,7 @@ static void N_object_rotate_to(Object* obj, FLOAT4 euler_radians)
 	obj->SetRotation(Quat::FromEulerAngles(Vec3f(euler_radians)));
 }
 
-static FLOAT4 N_object_get_rotation(Object* obj)
+static FLOAT4 N_RObject_GetRotationEuler(Object* obj)
 {
 	if (obj == nullptr) {
 		return simd::LoadFloat4(0.0f);
@@ -191,7 +191,7 @@ static FLOAT4 N_object_get_rotation(Object* obj)
 
 static void N_print_float4(FLOAT4 v) { LogInfo(LC_SCRIPT, "{}", Vec4f(v)); }
 
-static uint32 N_object_get_tags(Object* obj)
+static uint32 N_RObject_GetTags(Object* obj)
 {
 	if (obj == nullptr) {
 		return 0;
@@ -200,7 +200,7 @@ static uint32 N_object_get_tags(Object* obj)
 	return static_cast<uint32>(obj->Tags);
 }
 
-static void N_object_set_tags(Object* obj, uint32 tags)
+static void N_RObject_SetTags(Object* obj, uint32 tags)
 {
 	if (obj == nullptr) {
 		return;
@@ -1059,8 +1059,8 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("sqrtf", sqrtf),
 
 	/* Object functions  */
-	PREDEF("object_get", N_object_get),
-	PREDEF("object_find", N_object_find),
+	PREDEF("RObjectGet", N_RObjectGet),
+	PREDEF("RObjectFind", N_RObjectFind),
 
 	PREDEF("editor_push_op_vec", N_editor_push_op_vec3),
 	PREDEF("editor_push_op_delete", N_editor_push_op_delete),
@@ -1068,20 +1068,13 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("editor_op_dupe_object", N_editor_op_dupe_object),
 	PREDEF("editor_snap_selection_to_grid", N_editor_snap_selection_to_grid),
 
-	PREDEF("OBJECT_move_to", N_object_move_to),
-	PREDEF("OBJECT_move_by", N_object_move_by),
-	PREDEF("OBJECT_get_position", N_object_get_position),
-	PREDEF("OBJECT_rotate_to", N_object_rotate_to),
-	PREDEF("OBJECT_get_rotation", N_object_get_rotation),
-	PREDEF("OBJECT_get_tags", N_object_get_tags),
-	PREDEF("OBJECT_set_tags", N_object_set_tags),
-	PREDEF("OBJECT_ray_get_face", N_object_ray_get_face),
-	PREDEF("OBJECT_get_enter_direction", N_object_get_enter_direction),
-	PREDEF("OBJECT_get_exit_direction", N_object_get_exit_direction),
-	PREDEF("OBJECT_local_to_world", N_object_local_to_world),
-	PREDEF("OBJECT_local_dir_to_world", N_object_local_dir_to_world),
-	PREDEF("OBJECT_direction_scale", N_object_direction_scale),
-	PREDEF("OBJECT__select_object_internal", N_object__select_object_internal),
+	PREDEF("RObject_MoveTo", N_RObject_MoveTo),
+	PREDEF("RObject_MoveBy", N_RObject_MoveBy),
+	PREDEF("RObject_GetPosition", N_RObject_GetPosition),
+	PREDEF("RObject_RotateToEuler", N_RObject_RotateToEuler),
+	PREDEF("RObject_GetRotationEuler", N_RObject_GetRotationEuler),
+	PREDEF("RObject_GetTags", N_RObject_GetTags),
+	PREDEF("RObject_SetTags", N_RObject_SetTags),
 
 	PREDEF("blockout_reload_object", N_blockout_reload_object),
 	PREDEF("blockout_object_scale", N_blockout_object_scale),

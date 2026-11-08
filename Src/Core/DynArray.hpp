@@ -4,6 +4,10 @@
 #include <Core/Types.hpp>
 #include <algorithm>
 #include <cstdlib>
+#include <memory>
+#include <new>
+#include <type_traits>
+#include <utility>
 
 namespace fx {
 
@@ -26,7 +30,7 @@ class DynArray
 public:
 	DynArray() = default;
 
-	DynArray(DynArray&& other) { (*this) = std::move(other); }
+	DynArray(DynArray&& other) noexcept { (*this) = std::move(other); }
 
 	TElementType& operator[](uint32 index) noexcept { return pData[index]; }
 	const TElementType& operator[](uint32 index) const noexcept { return pData[index]; }
@@ -38,6 +42,7 @@ public:
 	DynArray Clone() const
 	{
 		DynArray result;
+		result.PageSize = PageSize;
 		result.EnsureCapacity(Size);
 
 		for (uint32 i = 0; i < Size; i++) {
@@ -49,7 +54,7 @@ public:
 
 	TElementType* Get(uint32 index)
 	{
-		if (index > Size) {
+		if (index >= Size) {
 			return nullptr;
 		}
 
@@ -59,22 +64,24 @@ public:
 
 	const TElementType* Get(uint32 index) const
 	{
-		if (index > Size) {
+		if (index >= Size) {
 			return nullptr;
 		}
 
 		return &pData[index];
 	}
 
-	template <typename... Args>
-	TElementType& Emplace(Args&&... args)
+	template <typename... TArgs>
+	TElementType& Emplace(TArgs&&... args)
 	{
-		EnsureCapacity(Size + 1);
+		if (Size < Capacity) {
+			TElementType* element = ::new (static_cast<void*>(pData + Size)) TElementType(std::forward<TArgs>(args)...);
+			++Size;
 
-		TElementType* element = &pData[Size++];
-		new (element) TElementType(std::forward<Args>(args)...);
+			return *element;
+		}
 
-		return *element;
+		return EmplaceGrow(std::forward<TArgs>(args)...);
 	}
 
 	TElementType* GetLast()
@@ -111,26 +118,14 @@ public:
 		--Size;
 	}
 
-	void Insert(const TElementType& object)
+	TElementType& Insert(const TElementType& object)
 	{
-		EnsureCapacity(Size + 1);
+		static_assert(std::is_copy_constructible_v<TElementType>, "DynArray element type is not copyable");
 
-		TElementType* dst = &pData[Size++];
-		if constexpr (std::is_copy_constructible_v<TElementType>) {
-			new (dst) TElementType(object);
-		}
-		else {
-			memcpy(dst, &object, sizeof(TElementType));
-		}
+		return Emplace(object);
 	}
 
-	void Insert(TElementType&& object)
-	{
-		EnsureCapacity(Size + 1);
-
-		TElementType* dst = &pData[Size++];
-		new (dst) TElementType(std::move(object));
-	}
+	TElementType& Insert(TElementType&& object) { return Emplace(std::move(object)); }
 
 	FX_FORCE_INLINE bool IsEmpty() const { return Size == 0; }
 	FX_FORCE_INLINE bool IsNotEmpty() const { return !IsEmpty(); }
@@ -194,7 +189,7 @@ public:
 
 		// Release what we are holding before taking over the other array's buffer
 		Clear();
-		std::free(reinterpret_cast<void*>(pData));
+		std::free(static_cast<void*>(pData));
 
 		Size = other.Size;
 		Capacity = other.Capacity;
@@ -230,47 +225,115 @@ public:
 
 	~DynArray()
 	{
-		// Destroy all objects
-
-		if constexpr (std::is_destructible_v<TElementType>) {
-			for (uint32 i = 0; i < Size; i++) {
-				pData[i].~TElementType();
-			}
-		}
-
-
-		if (pData) {
-			std::free(reinterpret_cast<void*>(pData));
-		}
+		Clear();
+		std::free(static_cast<void*>(pData));
 	}
 
 private:
 	/**
-	 * @brief Ensure there is enough capacity in the array for `size` more elements to be stored
+	 * @brief Ensure the array can hold at least `size` elements without reallocating.
 	 */
-	FX_FORCE_INLINE void EnsureCapacity(const uint32 size)
+	void EnsureCapacity(const uint32 size)
 	{
-		const uint32 new_size = size;
-
-		// If we already have enough capacity, nothing more to do
-		if (Capacity >= new_size) {
+		if (Capacity >= size) {
 			return;
 		}
 
-		// If the data has not been allocated yet, allocate it with a minimum page size or the required size
+		Reallocate(GrowCapacity(size));
+	}
+
+	uint32 GrowCapacity(const uint32 required) const
+	{
+		if (Capacity == 0) {
+			return std::max(required, PageSize);
+		}
+
+		uint32 capacity = Capacity;
+
+		while (capacity < required) {
+			const uint32 next = TGrow(capacity, PageSize);
+			AssertMsg(next > capacity, "DynArray growth function did not grow (zero page size or overflow)");
+			capacity = next;
+		}
+
+		return capacity;
+	}
+
+	static TElementType* AllocateBuffer(const uint32 capacity)
+	{
+		void* memory = std::malloc(sizeof(TElementType) * static_cast<size_t>(capacity));
+
+		if (memory == nullptr) {
+			Panic("DynArray", "Out of memory allocating {} elements", capacity);
+		}
+
+		return static_cast<TElementType*>(memory);
+	}
+
+	/**
+	 * @brief Moves the elements into a buffer of `new_capacity`. Trivially copyable elements are realloc'd, anything
+	 * else is move-constructed into the new buffer and destroyed in the old one, so element addresses held by the
+	 * elements themselves stay valid.
+	 */
+	void Reallocate(const uint32 new_capacity)
+	{
+		if constexpr (std::is_trivially_copyable_v<TElementType>) {
+			void* memory = std::realloc(static_cast<void*>(pData), sizeof(TElementType) * static_cast<size_t>(new_capacity));
+
+			if (memory == nullptr) {
+				Panic("DynArray", "Out of memory allocating {} elements", new_capacity);
+			}
+
+			pData = static_cast<TElementType*>(memory);
+		}
+		else {
+			TElementType* new_data = AllocateBuffer(new_capacity);
+			RelocateInto(new_data);
+			pData = new_data;
+		}
+
+		Capacity = new_capacity;
+	}
+
+	void RelocateInto(TElementType* new_data)
+	{
 		if (pData == nullptr) {
-			Capacity = (new_size < PageSize) ? PageSize : new_size;
-			pData = reinterpret_cast<TElementType*>(std::malloc(sizeof(TElementType) * Capacity));
 			return;
 		}
 
-		// Keep growing the capacity until it can accommodate the requested new size
-		while (Capacity < new_size) {
-			Capacity = TGrow(Capacity, PageSize);
+		std::uninitialized_move_n(pData, Size, new_data);
+		std::destroy_n(pData, Size);
+		std::free(static_cast<void*>(pData));
+	}
+
+	/**
+	 * @brief Emplace into a full array. The new element is built before the old buffer is released, so arguments that
+	 * refer to elements of this array (`array.Insert(array[0])`) are still valid while it is constructed.
+	 */
+	template <typename... TArgs>
+	TElementType& EmplaceGrow(TArgs&&... args)
+	{
+		const uint32 new_capacity = GrowCapacity(Size + 1);
+		TElementType* element = nullptr;
+
+		if constexpr (std::is_trivially_copyable_v<TElementType>) {
+			TElementType value(std::forward<TArgs>(args)...);
+
+			Reallocate(new_capacity);
+			element = ::new (static_cast<void*>(pData + Size)) TElementType(value);
+		}
+		else {
+			TElementType* new_data = AllocateBuffer(new_capacity);
+			element = ::new (static_cast<void*>(new_data + Size)) TElementType(std::forward<TArgs>(args)...);
+
+			RelocateInto(new_data);
+			pData = new_data;
+			Capacity = new_capacity;
 		}
 
-		// Resize our buffer to the new capacity
-		pData = reinterpret_cast<TElementType*>(std::realloc(pData, sizeof(TElementType) * Capacity));
+		++Size;
+
+		return *element;
 	}
 
 public:

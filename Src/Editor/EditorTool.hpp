@@ -73,7 +73,7 @@ enum class eDataFilter : uint32
 	Count,
 };
 
-/// Mirrored by LIMIT_SELECTION_OBJECTS in `tool_common.strata`
+/// Mirrored by LIMIT_SELECTION_OBJECTS in `editor_cmd.strata`
 static constexpr uint32 scMaxSelectedObjects = 128;
 
 static constexpr float32 scEditTolerance = 0.0005f;
@@ -82,7 +82,7 @@ static constexpr float32 scDirectionLength = 1.5f;
 static constexpr float32 scDirectionTipHalfExtent = 0.05f;
 
 /**
- * @brief Configuration information to be sent to all editor scripts. Mirrored by TOOLSTATE in `tool_common.strata`.
+ * @brief Configuration information to be sent to all editor scripts. Mirrored by TOOLSTATE in `editor_cmd.strata`.
  */
 struct EditorToolState
 {
@@ -96,10 +96,10 @@ struct EditorToolState
 };
 
 static_assert(offsetof(EditorToolState, pTransformMarkerObject) == 16 && sizeof(EditorToolState) == 24,
-			  "EditorToolState must match TOOLSTATE in tool_common.strata");
+			  "EditorToolState must match TOOLSTATE in editor_cmd.strata");
 
 /**
- * @brief The selection as the editor command script sees it. Mirrored by SELECTION in `tool_common.strata`.
+ * @brief The selection as the editor command script sees it. Mirrored by SELECTION in `editor_cmd.strata`.
  */
 struct EditorToolSelection
 {
@@ -112,7 +112,7 @@ struct EditorToolSelection
 
 static_assert(offsetof(EditorToolSelection, SelectionSize) == scMaxSelectedObjects * 40 &&
 				  sizeof(EditorToolSelection) == scMaxSelectedObjects * 40 + 16,
-			  "EditorToolSelection must match SELECTION in tool_common.strata");
+			  "EditorToolSelection must match SELECTION in editor_cmd.strata");
 
 
 } // namespace editor

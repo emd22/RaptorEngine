@@ -1,0 +1,47 @@
+
+/* The raw Object handle from the engine. */
+handle RObject;
+
+struct RObjectID = uint;
+
+enum RObjectTags : uint
+{
+	Blockout = (1 << 0),
+	Lock = (1 << 1),
+	ProbeVolume = (1 << 2),
+	ReflectionProbe = (1 << 3),
+	Spawn = (1 << 4),
+	Trigger = (1 << 5),
+	Decal = (1 << 8),
+	Patch = (1 << 9),
+};
+
+
+/* Finds an object in a map given the name. */
+@export extern RObject RObjectFind(cstring name);
+@export extern RObject RObjectGet(RObjectID id);
+
+
+impl RObject
+{
+	extern void MoveTo(RObject obj, float3 position);
+	extern void MoveBy(RObject obj, float3 by);
+
+	extern float3 GetPosition(RObject obj);
+
+	/* Sets the rotation of the object with euler angles. */
+	extern void RotateToEuler(RObject obj, float3 euler);
+
+	/* Get the rotation of the object in euler angles. */
+	extern float3 GetRotationEuler(RObject obj);
+
+	extern RObjectTags GetTags(RObject obj);
+	extern void SetTags(RObject obj, RObjectTags tags);
+
+
+	property float3 position
+	{
+		get = RObject_GetPosition;
+		set = RObject_MoveTo;
+	}
+}

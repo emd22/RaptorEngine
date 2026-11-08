@@ -6,7 +6,63 @@
  *              name, so `snap2w` runs CMD_snap2w. The editor sends over its state and selection before each one.
  */
 
-import tool_common;
+import ../interop;
+import ../RObject;
+
+
+/////////////////////////////////////
+// Editor state and selection
+/////////////////////////////////////
+
+/* Must match EditorToolState in Src/Editor/EditorTool.hpp! */
+struct TOOLSTATE
+{
+	EDITORTOOL selected_tool;
+
+	int tool_snap_level;
+	bool tool_snap_enabled;
+
+	RObject transform_marker_object;
+}
+
+/* Must match scMaxSelectedObjects in Src/Editor/EditorTool.hpp! */
+const int LIMIT_SELECTION_OBJECTS = 128;
+
+/* Must match EditorToolSelection in Src/Editor/EditorTool.hpp! */
+struct SELECTION
+{
+	RObject[LIMIT_SELECTION_OBJECTS] selected_objects;
+	float3[LIMIT_SELECTION_OBJECTS] initial_object_positions;
+	float3[LIMIT_SELECTION_OBJECTS] initial_object_rotations;
+	int selected_objects_count;
+};
+
+/* KEEP: Ethan refactor note */
+TOOLSTATE state;
+SELECTION sel;
+
+/* Receive the current state from the GUI editor. Called before each command. */
+void tool_state_receive(ref TOOLSTATE tc)
+{
+	state = tc;
+}
+
+/* Receive the current selection from the GUI editor. Called before each command. */
+void tool_selection_receive(ref SELECTION selection)
+{
+	sel.selected_objects_count = selection.selected_objects_count;
+
+	for (int i = 0; i < selection.selected_objects_count; i++) {
+		sel.selected_objects[i] = selection.selected_objects[i];
+		sel.initial_object_positions[i] = selection.initial_object_positions[i];
+		sel.initial_object_rotations[i] = selection.initial_object_rotations[i];
+	}
+}
+
+bool editor_has_object_selection()
+{
+	return (sel.selected_objects_count > 0);
+}
 
 
 /////////////////////////////////////
@@ -188,7 +244,7 @@ void CMD_lock()
 	}
 
 	for (int i = 0; i < sel.selected_objects_count; i++) {
-		OBJECT obj = sel.selected_objects[i];
-		obj.set_tags(obj.get_tags() | OBJ_TAG_LOCK);
+		RObject obj = sel.selected_objects[i];
+		obj.SetTags((RObjectTags)((uint)obj.GetTags() | (uint)RObjectTags.Lock));
 	}
 }

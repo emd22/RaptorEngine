@@ -69,7 +69,7 @@ public:
 };
 
 
-/// Size of a snap step for each snap level. Mirrors tool_get_snap_multiplier() in `tool_common.strata`.
+/// Size of a snap step for each snap level.
 static constexpr float32 scSnapSteps[] = { 0.0625f, 0.125f, 0.25f, 0.5f, 1.0f };
 static constexpr int32 scSnapLevelCount = static_cast<int32>(std::size(scSnapSteps));
 

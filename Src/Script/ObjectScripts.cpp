@@ -27,11 +27,11 @@ const ObjectScriptManager::Entry* ObjectScriptManager::FindEntry(ObjectID id) co
 
 void ObjectScriptManager::BindFunctions(Entry& entry)
 {
-	entry.pFnStart = entry.pScript->GetFunction<void(Object*)>("object_start");
-	entry.pFnUpdate = entry.pScript->GetFunction<void(Object*, float32)>("object_update");
-	entry.pFnStop = entry.pScript->GetFunction<void(Object*)>("object_stop");
-	entry.pFnTriggerEnter = entry.pScript->GetFunction<void(Object*)>("object_trigger_enter");
-	entry.pFnTriggerExit = entry.pScript->GetFunction<void(Object*)>("object_trigger_exit");
+	entry.pFnStart = entry.pScript->GetFunction<void(Object*)>("ObjectBegin");
+	entry.pFnUpdate = entry.pScript->GetFunction<void(Object*, float32)>("ObjectTick");
+	entry.pFnStop = entry.pScript->GetFunction<void(Object*)>("ObjectStop");
+	entry.pFnTriggerEnter = entry.pScript->GetFunction<void(Object*)>("TriggerEnter");
+	entry.pFnTriggerExit = entry.pScript->GetFunction<void(Object*)>("TriggerExit");
 }
 
 Vec3f ObjectScriptManager::GetCrossingDirection(const Entry& entry, const Vec3f point)
