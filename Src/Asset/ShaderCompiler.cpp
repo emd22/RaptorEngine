@@ -246,6 +246,7 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
 
 		// Output format
 		L"-spirv",
+		L"-fspv-target-env=vulkan1.3",
 	};
 
 	CComPtr<IDxcBlobEncoding> source_blob;
@@ -344,6 +345,7 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
 
 		// Output format
 		"-spirv",
+		"-fspv-target-env=vulkan1.3",
 	};
 
 	const ShaderPreproc::DataBuffer& shader_raw_data = state.Preproc.GetBuffer(shader_type);

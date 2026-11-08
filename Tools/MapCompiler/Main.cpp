@@ -47,6 +47,8 @@ void PrintUsage()
 		"(default: 0.25)\n"
 		"  --no-light-transport       Do not store the links between lightmap clusters that let unbaked lights "
 		"bounce at runtime\n"
+		"  --no-bricks                Do not store the GI brick scene\n"
+		"  --brick-size <m>           Width of the finest GI bricks, every level after doubles (default: 0.25)\n"
 		"  --transport-min-link <f>   Drop links carrying less than this fraction of a cluster's rays, 0 to keep all "
 		"that coverage needs (default: 0.005, 0 keeps every link coverage needs)\n"
 		"  --transport-stats          Measure how many source clusters each lightmap texel and probe would need "
@@ -145,6 +147,12 @@ bool ParseArguments(int argc, char** argv, CompileOptions& out_arguments, Preset
 		}
 		else if (argument == "--list-presets") {
 			out_presets.bList = true;
+		}
+		else if (argument == "--no-bricks") {
+			out_arguments.Bricks.bEnabled = false;
+		}
+		else if (argument == "--brick-size" && has_value) {
+			out_arguments.Bricks.Level0BrickSize = std::atof(argv[++i]);
 		}
 		else if (argument == "--no-light-transport") {
 			out_arguments.Lightmap.bLightTransport = false;

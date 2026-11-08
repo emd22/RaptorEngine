@@ -40,6 +40,8 @@ enum class ePipelineName : uint16
 	LightTransportInject,
 	LightTransportBounce,
 	LightTransportApply,
+	BrickUpdate,
+	BrickDebug,
 
 	NumPipelines
 };

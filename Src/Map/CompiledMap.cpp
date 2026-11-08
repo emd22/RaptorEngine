@@ -441,6 +441,51 @@ void WriteTransport(Writer& writer, const CompiledMapTransport& transport)
 	WriteSectionArray(writer, transport.Links);
 }
 
+void ReadBricks(Reader& reader, CompiledMapBricks& out_bricks)
+{
+	out_bricks.MarginScale = reader.Read<float32>();
+
+	ReadSectionArray(reader, out_bricks.Levels);
+	ReadSectionArray(reader, out_bricks.Bricks);
+	ReadSectionArray(reader, out_bricks.Refs);
+	ReadSectionArray(reader, out_bricks.Triangles);
+
+	if (reader.bFailed || out_bricks.IsEmpty()) {
+		out_bricks = CompiledMapBricks {};
+		return;
+	}
+
+	bool valid = out_bricks.Levels.Size <= CompiledMapBricks::scMaxLevels && out_bricks.MarginScale > 0.0f;
+
+	for (const CompiledMapBrickLevel& level : out_bricks.Levels) {
+		valid = valid && level.BrickSize > 0.0f &&
+				static_cast<uint64>(level.FirstBrick) + level.BrickCount <= out_bricks.Bricks.Size;
+	}
+
+	for (const CompiledMapBrick& brick : out_bricks.Bricks) {
+		valid = valid && static_cast<uint64>(brick.FirstRef) + brick.RefCount <= out_bricks.Refs.Size;
+	}
+
+	for (const uint32 ref : out_bricks.Refs) {
+		valid = valid && ref < out_bricks.Triangles.Size;
+	}
+
+	// The GI can do without it, so the rest of the map still loads
+	if (!valid) {
+		out_bricks = CompiledMapBricks {};
+	}
+}
+
+void WriteBricks(Writer& writer, const CompiledMapBricks& bricks)
+{
+	writer.Write(bricks.MarginScale);
+
+	WriteSectionArray(writer, bricks.Levels);
+	WriteSectionArray(writer, bricks.Bricks);
+	WriteSectionArray(writer, bricks.Refs);
+	WriteSectionArray(writer, bricks.Triangles);
+}
+
 void WriteFogShadow(Writer& writer, const CompiledMapFogShadow& shadow)
 {
 	writer.Write(shadow.Right, 3);
@@ -843,6 +888,10 @@ bool CompiledMap::Load(const String& path)
 		ReadTransport(reader, Transport, Lightmap);
 	}
 
+	if (version >= 16 && !reader.bFailed) {
+		ReadBricks(reader, Bricks);
+	}
+
 	for (const CompiledMapSurface& surface : Surfaces) {
 		if (surface.Area != scNoMapArea && (surface.Area < 0 || static_cast<size_t>(surface.Area) >= Areas.Size)) {
 			reader.bFailed = true;
@@ -1004,6 +1053,7 @@ bool CompiledMap::Save(const String& path) const
 	writer.WriteSection(AcousticProbes.pData, AcousticProbes.Size);
 
 	WriteTransport(writer, Transport);
+	WriteBricks(writer, Bricks);
 
 	return (writer.bFailed == false);
 }

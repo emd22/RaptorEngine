@@ -1253,11 +1253,13 @@ void RaptorGame::RenderText()
 		gTextRenderer->DrawText(String::Fmt("GPU={:.2f}ms", gpu.GetTotalMs()).CStr(), 1.0f, scWhite);
 		gTextRenderer->DrawText(
 			String::Fmt(
-				"shadow {:.2f} gi {:.2f} pre {:.2f} lightcull {:.2f} ao {:.2f} fwd {:.2f} part {:.2f} fog {:.2f} comp "
-				"{:.2f}",
-				gpu.GetMs(eGpuMarker::Shadows), gpu.GetMs(eGpuMarker::LightTransport), gpu.GetMs(eGpuMarker::Prepass),
+				"shadow {:.2f} gi {:.2f} bricks {:.2f} pre {:.2f} lightcull {:.2f} ao {:.2f} fwd {:.2f} part {:.2f} fog "
+				"{:.2f} trace {:.2f} comp {:.2f}",
+				gpu.GetMs(eGpuMarker::Shadows), gpu.GetMs(eGpuMarker::LightTransport), gpu.GetMs(eGpuMarker::BrickScene),
+				gpu.GetMs(eGpuMarker::Prepass),
 				gpu.GetMs(eGpuMarker::LightCulling), gpu.GetMs(eGpuMarker::SSAO), gpu.GetMs(eGpuMarker::Forward),
-				gpu.GetMs(eGpuMarker::Particles), gpu.GetMs(eGpuMarker::Fog), gpu.GetMs(eGpuMarker::Composition))
+				gpu.GetMs(eGpuMarker::Particles), gpu.GetMs(eGpuMarker::Fog), gpu.GetMs(eGpuMarker::BrickDebug),
+				gpu.GetMs(eGpuMarker::Composition))
 				.CStr(),
 			1.0f, scWhite);
 

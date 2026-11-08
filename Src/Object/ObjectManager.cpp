@@ -147,7 +147,10 @@ void ObjectManager::Submit(const ObjectID& object_id, const Mat4f& model_matrix)
 	static_assert(offsetof(ObjectGpuEntry, ModelMatrix) == 0);
 
 	Assert(object_id.GetID() < scMaxObjects);
-	memcpy(GetBufferAtFrame(object_id.GetID()), model_matrix.RawData, sizeof(Mat4f));
+
+	ObjectGpuEntry* entry = GetBufferAtFrame(object_id.GetID());
+	memcpy(entry->ModelMatrix, model_matrix.RawData, sizeof(Mat4f));
+	memcpy(entry->PrevModelMatrix, model_matrix.RawData, sizeof(Mat4f));
 }
 
 

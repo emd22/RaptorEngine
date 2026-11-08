@@ -14,6 +14,8 @@ namespace fx {
 struct alignas(16) ObjectGpuEntry
 {
 	float ModelMatrix[16];
+	/// Where the object was last frame, for motion vectors. Equal to ModelMatrix when it did not move.
+	float PrevModelMatrix[16];
 };
 
 class Mat4f;

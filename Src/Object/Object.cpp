@@ -524,6 +524,7 @@ void Object::UpdateDrawSlots()
 	for (uint32 index = 0; index < count; index++) {
 		const Mat4f world = node_to_source * source->mInstances[index] * source_world;
 		memcpy(slots[index].ModelMatrix, world.RawData, sizeof(Mat4f));
+		memcpy(slots[index].PrevModelMatrix, world.RawData, sizeof(Mat4f));
 	}
 
 	mDrawCount = count;

@@ -49,6 +49,7 @@ void Entity::SetModelMatrix(const Mat4f& other)
 	// We do not want the next update to replace the new matrix
 	mbMatrixOutOfDate = false;
 
+	BeginMatrixChange();
 	mWorldMatrix = other;
 	mMatrixSubmittedFrames = 0;
 
@@ -82,18 +83,50 @@ void Entity::SubmitMatrixIfNeeded()
 	}
 
 	const uint8 frame_bit = static_cast<uint8>(1U << renderer::gGraphics->GetFrameNumber());
+	const bool is_moving = mbChangeIsMotion && (mMatrixChangedFrame == renderer::gGraphics->GetElapsedFrameCount());
 
-	if (mMatrixSubmittedFrames & frame_bit) {
+	if (!is_moving && (mMatrixSubmittedFrames & frame_bit)) {
 		return;
 	}
 
-	gObjectManager->Submit(ID.GetID(), mWorldMatrix);
+	ObjectGpuEntry entry;
+	memcpy(entry.ModelMatrix, mWorldMatrix.RawData, sizeof(Mat4f));
 
-	mMatrixSubmittedFrames |= frame_bit;
+	if (is_moving) {
+		memcpy(entry.PrevModelMatrix, mPrevWorldMatrix.RawData, sizeof(Mat4f));
+	}
+	else {
+		memcpy(entry.PrevModelMatrix, mWorldMatrix.RawData, sizeof(Mat4f));
+	}
+
+	gObjectManager->Submit(ID, entry);
+
+	// A page written with motion has to be written again once the object stops
+	if (!is_moving) {
+		mMatrixSubmittedFrames |= frame_bit;
+	}
+}
+
+void Entity::BeginMatrixChange()
+{
+	const uint32 frame = renderer::gGraphics->GetElapsedFrameCount();
+
+	if (mMatrixChangedFrame == frame) {
+		return;
+	}
+
+	mPrevWorldMatrix = mWorldMatrix;
+	mMatrixChangedFrame = frame;
+
+	// The first matrix an entity gets is not a movement
+	mbChangeIsMotion = mbHasWorldMatrix;
+	mbHasWorldMatrix = true;
 }
 
 void Entity::RecalculateModelMatrix()
 {
+	BeginMatrixChange();
+
 	if (TransformMode == eTransformMode::Default) {
 		mWorldMatrix = Mat4f::AsScale(Vec3f(mScale)) * Mat4f::AsRotation(mRotation) * Mat4f::AsTranslation(mPosition);
 	}

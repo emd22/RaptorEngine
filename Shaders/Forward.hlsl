@@ -99,8 +99,6 @@ VSOutput main(VSInput input)
 
     float4x4 world_matrix = bObjectBuffer[DrawConst.uiObjectIndex + input.uiInstanceId].mWorld;
 
-    float4x4 MVP = mul(world_matrix, ViewConst.mViewProjection);
-
 PERMIF(USE_SKINNING);
     const uint bone_base = DrawConst.uiBoneBase;
 
@@ -110,9 +108,13 @@ PERMIF(USE_SKINNING);
         + input.vJointWeights.w * bBones[bone_base + input.vJointIndices.w];
 
     // Posed vertex in model space
-    float4 position_ms = mul(float4(input.vPosition, 1.0), skin_xform);
+    const float4 position_ms = SkinPointExact(float4(input.vPosition, 1.0), bBones[bone_base + input.vJointIndices.x],
+                                              bBones[bone_base + input.vJointIndices.y],
+                                              bBones[bone_base + input.vJointIndices.z],
+                                              bBones[bone_base + input.vJointIndices.w], input.vJointWeights);
 
-    output.vPosition = mul(position_ms, MVP);
+    // Exact, so that this and the other depth pass agree to the bit for the forward pass's EQUAL depth test
+    output.vPosition = ProjectPointExact(position_ms, world_matrix, ViewConst.mViewProjection);
     output.vNormalWS = normalize(mul(mul(input.vNormal, (float3x3)skin_xform), (float3x3)world_matrix));
 
     output.vPositionRest = input.vPosition;
@@ -120,7 +122,8 @@ PERMIF(USE_SKINNING);
 PERMELSE();
     float4 position_ms = float4(input.vPosition, 1.0);
 
-    output.vPosition = mul(position_ms, MVP);
+    // Exact, so that this and the other depth pass agree to the bit for the forward pass's EQUAL depth test
+    output.vPosition = ProjectPointExact(position_ms, world_matrix, ViewConst.mViewProjection);
     output.vNormalWS = normalize(mul(input.vNormal, (float3x3)world_matrix));
 PERMEND();
 

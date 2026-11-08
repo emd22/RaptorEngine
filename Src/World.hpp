@@ -224,6 +224,11 @@ public:
 	CVarValue* pCVarPortalDebug = nullptr;
 	CVarValue* pCVarBakedShadows = nullptr;
 	CVarValue* pCVarBakedIndirect = nullptr;
+	CVarValue* pCVarBricks = nullptr;
+	CVarValue* pCVarBrickDebug = nullptr;
+	CVarValue* pCVarBrickBudget = nullptr;
+	CVarValue* pCVarBrickCone = nullptr;
+	CVarValue* pCVarBrickRayLength = nullptr;
 
 	uint32 FrustumTestedObjects = 0;
 	uint32 FrustumCulledObjects = 0;

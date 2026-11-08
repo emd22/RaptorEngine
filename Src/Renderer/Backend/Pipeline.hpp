@@ -5,6 +5,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include <cstddef>
+
 #include <Core/Ref.hpp>
 #include <Core/RefCountedBase.hpp>
 #include <Core/SizedArray.hpp>
@@ -103,7 +105,14 @@ struct alignas(16) ViewConstants
 
 	/// Scale applied to the lit result before it is written to the HDR target, see GraphicsBackend::PreExposure
 	float32 PreExposure = 1.0f;
+
+	uint32 Padding[2] = { 0U, 0U };
+
+	/// Last frame's ViewProjection for the same layer, for motion vectors. Equal to ViewProjection off the main view.
+	float32 PrevViewProjection[16];
 };
+
+static_assert(offsetof(ViewConstants, PrevViewProjection) == 112);
 
 struct DrawPushConstants
 {
