@@ -18,6 +18,8 @@ constexpr uint32 scMaxLightmapSize = 8192;
 
 /// Lightmaps, probe moments, fog shadow pages and acoustic probes are zlib streams from this version on
 constexpr uint32 scFirstDeflatedVersion = 14;
+/// Probe depth moments are octahedral maps from this version on, cube faces before it
+constexpr uint32 scFirstOctahedralProbeVersion = 16;
 constexpr int scDeflateLevel = 9;
 
 bool IsNameBefore(const String& a, const String& b) { return std::strcmp(a.CStr(), b.CStr()) < 0; }
@@ -735,9 +737,11 @@ bool CompiledMap::Load(const String& path)
 	const uint32 probe_irradiance_count = reader.ReadCount();
 	const uint32 probe_moment_count = reader.ReadCount();
 	const uint64 baked_probe_count = Probes.GetProbeCount();
+	const bool has_cube_moments = (version < scFirstOctahedralProbeVersion);
 
 	if ((probe_irradiance_count != 0 && probe_irradiance_count != baked_probe_count * scProbeSHFloats) ||
-		(probe_moment_count != 0 && probe_moment_count != baked_probe_count * scProbeMomentValues)) {
+		(probe_moment_count != 0 && !has_cube_moments &&
+		 probe_moment_count != baked_probe_count * scProbeMomentValues)) {
 		reader.bFailed = true;
 	}
 	else {
@@ -745,6 +749,14 @@ bool CompiledMap::Load(const String& path)
 		ProbeMoments.InitSize(probe_moment_count);
 		reader.Read(ProbeIrradiance.pData, probe_irradiance_count);
 		reader.ReadSection(ProbeMoments.pData, probe_moment_count);
+
+		// Moments from before the octahedral layout can't be sampled, so the map loads without its baked probes
+		if (has_cube_moments && probe_moment_count != 0 && !reader.bFailed) {
+			LogWarning("'{}' has probes baked as cube maps, recompile it to bake octahedral probes", path.CStr());
+
+			ProbeIrradiance.Free();
+			ProbeMoments.Free();
+		}
 	}
 
 	Areas.InitSize(reader.ReadCount());

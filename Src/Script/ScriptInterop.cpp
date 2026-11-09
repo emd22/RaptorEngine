@@ -18,6 +18,7 @@
 #include <Particle/ParticleSystem.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
+#include <Renderer/LightManager.hpp>
 #include <Renderer/LightProbe.hpp>
 #include <Script/ObjectScripts.hpp>
 #include <Script/TimerManager.hpp>
@@ -1045,6 +1046,36 @@ static void N_tool_state_send(const editor::EditorToolState* state)
 #endif
 }
 
+static LightSpot* N_RLightSpot_Create(const char* name, eLightFlags light_flags)
+{
+	LightSpot* light = gLightManager->NewLight<LightSpot>(name);
+	light->SetFlags(light_flags);
+	return light;
+}
+
+static void N_RLightSpot_SetRadius(LightSpot* light, float32 radius) { light->SetRadius(radius); }
+static float32 N_RLightSpot_GetRadius(LightSpot* light) { return light->GetRadius(); }
+
+static void N_RLightSpot_SetConeAngles(LightSpot* light, float32 inner_rad, float32 outer_rad)
+{
+	light->SetConeAngles(inner_rad, outer_rad);
+}
+
+static void N_RLightSpot_SetPosition(LightSpot* light, FLOAT4 position) { light->SetPosition(Vec3f(position)); }
+
+static void N_RLightSpot_SetRotationEuler(LightSpot* light, FLOAT4 rotation_euler)
+{
+	light->SetRotation(Quat::FromEulerAngles(Vec3f(rotation_euler)));
+}
+
+static float32 N_RLightSpot_GetInnerAngle(LightSpot* light) { return light->GetInnerAngle(); }
+static float32 N_RLightSpot_GetOuterAngle(LightSpot* light) { return light->GetOuterAngle(); }
+static eLightFlags N_RLightSpot_GetFlags(LightSpot* light) { return light->Flags; }
+static void N_RLightSpot_SetFlags(LightSpot* light, eLightFlags flags) { light->SetFlags(flags); }
+static void N_RLightSpot_SetDirection(LightSpot* light, FLOAT4 direction) { light->SetDirection(Vec3f(direction)); }
+
+static void N_RLightSpot_Destroy(LightSpot* light) { gLightManager->RemoveLight(light->ID); }
+
 
 /////////////////////////////////////
 // Predef gather
@@ -1057,6 +1088,8 @@ static void N_tool_state_send(const editor::EditorToolState* state)
 static const PredefExtern scAvailableExterns[] = {
 	PREDEF("printf", printf),
 	PREDEF("sqrtf", sqrtf),
+	PREDEF("sinf", sinf),
+	PREDEF("cosf", cosf),
 
 	/* Object functions  */
 	PREDEF("RObjectGet", N_RObjectGet),
@@ -1075,6 +1108,19 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("RObject_GetRotationEuler", N_RObject_GetRotationEuler),
 	PREDEF("RObject_GetTags", N_RObject_GetTags),
 	PREDEF("RObject_SetTags", N_RObject_SetTags),
+
+	PREDEF("RLightSpot_Create", N_RLightSpot_Create),
+	PREDEF("RLightSpot_GetFlags", N_RLightSpot_GetFlags),
+	PREDEF("RLightSpot_SetFlags", N_RLightSpot_SetFlags),
+	PREDEF("RLightSpot_SetRadius", N_RLightSpot_SetRadius),
+	PREDEF("RLightSpot_GetRadius", N_RLightSpot_GetRadius),
+	PREDEF("RLightSpot_SetConeAngles", N_RLightSpot_SetConeAngles),
+	PREDEF("RLightSpot_SetPosition", N_RLightSpot_SetPosition),
+	PREDEF("RLightSpot_SetRotationEuler", N_RLightSpot_SetRotationEuler),
+	PREDEF("RLightSpot_GetInnerAngle", N_RLightSpot_GetInnerAngle),
+	PREDEF("RLightSpot_GetOuterAngle", N_RLightSpot_GetOuterAngle),
+	PREDEF("RLightSpot_SetDirection", N_RLightSpot_SetDirection),
+	PREDEF("RLightSpot_Destroy", N_RLightSpot_Destroy),
 
 	PREDEF("blockout_reload_object", N_blockout_reload_object),
 	PREDEF("blockout_object_scale", N_blockout_object_scale),

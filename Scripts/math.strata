@@ -5,6 +5,13 @@ import std/mathconsts;
 @export
 extern float sqrtf(float x);
 
+@export
+extern float sinf(float x);
+
+@export
+extern float cosf(float x);
+
+
 /* Private */
 extern float3 float3_abs(float3 value);
 extern float4 float4_floor(float4 value);
@@ -31,6 +38,7 @@ bool is_approx(float value, float expect, float tolerance)
 {
 	return (value <= (expect - tolerance) && value >= (expect + tolerance));
 }
+
 
 
 /* Returns true if `value` is near 0.0f in all lanes. */

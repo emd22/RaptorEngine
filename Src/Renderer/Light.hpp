@@ -58,6 +58,9 @@ public:
 	void SetPosition(const Vec3f position) override;
 	void SetRotation(const Quat rotation) override;
 
+	FX_FORCE_INLINE void SetFlags(const eLightFlags flags) { Flags = flags; }
+	FX_FORCE_INLINE eLightFlags GetFlags() const { return Flags; }
+
 	virtual BBox GetBounds() const;
 
 	virtual bool IsOutsideFrustum(const Frustum& frustum) const;

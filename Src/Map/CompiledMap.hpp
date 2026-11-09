@@ -261,7 +261,7 @@ class CompiledMap
 {
 public:
 	static constexpr uint32 scMagic = 0x504D5846;
-	static constexpr uint32 scVersion = 15;
+	static constexpr uint32 scVersion = 16;
 	/// Oldest version that still loads, the parts added since are left empty
 	static constexpr uint32 scMinVersion = 10;
 	static constexpr const char* scExtension = ".fxmap";
@@ -321,7 +321,7 @@ public:
 	SizedArray<uint8> ProbeSunVisibility;
 
 	static constexpr uint32 scProbeSHFloats = Limits::ProbeSHCoeffCount * 3;
-	static constexpr uint32 scProbeMomentValues = Limits::ProbeDepthFaces * Limits::ProbeDepthTexelsPerFace * 2;
+	static constexpr uint32 scProbeMomentValues = Limits::ProbeDepthTexelCount * 2;
 
 	SizedArray<float32> ProbeIrradiance;
 	SizedArray<uint16> ProbeMoments;

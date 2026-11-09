@@ -1,0 +1,46 @@
+
+import ../RLight;
+import ../RObject;
+
+import ../math;
+
+import std/mathconsts;
+
+extern int printf(cstring fmt, ...);
+
+/* */
+
+const float gcSpinSpeed = ((90.0f * F_PI) / 180.0f);
+
+RLightSpot gLight;
+
+float gTime = 0.0f;
+
+
+void ObjectBegin(RObject obj)
+{
+	gLight = RLightSpot.Create("AlarmLight", ((uint)RLightFlags.Dynamic | (uint)RLightFlags.Persistent));
+	gLight.SetPosition(float3(0.0f));
+	gLight.SetRadius(30.0f);
+
+	printf("Creating light\n");
+}
+
+void ObjectTick(RObject obj, float delta_time)
+{
+	gTime += delta_time * 4.0f;
+	if (gTime > F_2PI) {
+		gTime = 0.0f;
+	}
+
+	const float3 direction = float3(cosf(gTime), 0.0f, sinf(gTime));
+
+	gLight.SetDirection(direction);
+}
+
+
+
+void ObjectStop(RObject obj)
+{
+	gLight.Destroy();
+}

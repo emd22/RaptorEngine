@@ -11,18 +11,19 @@
 
 #define PROBE_MAX_PROBES 4096
 
+/// Octahedral depth map resolution per probe
 #define PROBE_DEPTH_SIZE 16
-#define PROBE_DEPTH_FACES 6
-#define PROBE_DEPTH_TEXELS_PER_FACE (PROBE_DEPTH_SIZE * PROBE_DEPTH_SIZE)
 
 /// Distance stored by the bake where nothing was hit
 #define PROBE_DEPTH_MAX_DISTANCE 50.0
 
-/// Every probe's moments live in one RG16_UNorm atlas, each probe a horizontal strip of its six cube faces
-#define PROBE_ATLAS_COLUMNS 32
-#define PROBE_ATLAS_PROBE_WIDTH (PROBE_DEPTH_FACES * PROBE_DEPTH_SIZE)
-#define PROBE_ATLAS_WIDTH (PROBE_ATLAS_COLUMNS * PROBE_ATLAS_PROBE_WIDTH)
-#define PROBE_ATLAS_HEIGHT (((PROBE_MAX_PROBES + PROBE_ATLAS_COLUMNS - 1) / PROBE_ATLAS_COLUMNS) * PROBE_DEPTH_SIZE)
+/// Every probe's moments live in one RG16_UNorm atlas, each probe a square tile of its octahedral map with a one
+/// texel border of the wrapped edges
+#define PROBE_ATLAS_TILE_SIZE (PROBE_DEPTH_SIZE + 2)
+#define PROBE_ATLAS_COLUMNS 64
+#define PROBE_ATLAS_WIDTH (PROBE_ATLAS_COLUMNS * PROBE_ATLAS_TILE_SIZE)
+#define PROBE_ATLAS_ROWS ((PROBE_MAX_PROBES + PROBE_ATLAS_COLUMNS - 1) / PROBE_ATLAS_COLUMNS)
+#define PROBE_ATLAS_HEIGHT (PROBE_ATLAS_ROWS * PROBE_ATLAS_TILE_SIZE)
 
 // Tuning
 
@@ -154,32 +155,21 @@ float3 EvalProbeIrradiance(float3 normal, ProbeSHData probe)
 	return max(EvalProbeIrradianceRaw(normal, probe), float3(0.0, 0.0, 0.0));
 }
 
-/// Cubemap face and UV that direction `d` falls in. Must match DirectionToMomentTexel() in Src/Renderer/LightProbe.cpp.
-void ProbeDepthDirectionToFaceUV(float3 d, out uint face, out float2 uv01)
+/// Octahedral map UV in [0, 1] that direction `d` falls in, +Y at the centre.
+float2 ProbeDepthDirectionToOctUV(float3 d)
 {
-	const float3 a = abs(d);
+	// Get the absolute value and horizontal add all lanes
+	const float sum = dot(abs(d), 1.0);
+	const float3 n = d / sum;
 
-	const bool x_major = and(a.x >= a.y, a.x >= a.z);
-	const bool y_major = a.y >= a.z;
-	const bool3 positive = d > 0.0;
+	const float2 signs = select(n.xz >= 0.0, float2(1.0, 1.0), float2(-1.0, -1.0));
+	const float2 folded = (1.0 - abs(n.zx)) * signs;
 
-	const uint face_x = select(positive.x, 0u, 1u);
-	const uint face_y = select(positive.y, 2u, 3u);
-	const uint face_z = select(positive.z, 4u, 5u);
-
-	const float2 uv_x = float2(select(positive.x, -d.z, d.z), -d.y);
-	const float2 uv_y = float2(d.x, select(positive.y, d.z, -d.z));
-	const float2 uv_z = float2(select(positive.z, d.x, -d.x), -d.y);
-
-	const float major = select(x_major, a.x, select(y_major, a.y, a.z));
-	const float2 uv = select(x_major, uv_x, select(y_major, uv_y, uv_z)) / major;
-
-	face = select(x_major, face_x, select(y_major, face_y, face_z));
-	uv01 = uv * 0.5 + 0.5;
+	return select(n.y >= 0.0, n.xz, folded) * 0.5 + 0.5;
 }
 
-/// Half the angle covered by a depth texel, as a slope
-static const float PROBE_DEPTH_TEXEL_SLOPE = tan(radians(45.0 / PROBE_DEPTH_SIZE));
+/// Half the angle covered by an average depth texel (4 pi / SIZE^2 steradians), as a slope
+static const float PROBE_DEPTH_TEXEL_SLOPE = tan(1.7724539 / PROBE_DEPTH_SIZE);
 
 float ProbeMinVariance(float mean)
 {
@@ -199,12 +189,12 @@ float ProbeDepthChebyshev(float receiver_dist, float mean, float variance)
 	return select(biased_dist <= mean, 1.0, clamped_variance / (clamped_variance + d * d));
 }
 
-/// Where probe `index`'s strip for `face` starts in the atlas, in texels.
-float2 ProbeAtlasFaceOrigin(uint index, uint face)
+/// Where probe `index`'s tile starts in the atlas, in texels.
+float2 ProbeAtlasTileOrigin(uint index)
 {
 	const uint2 tile = uint2(index % PROBE_ATLAS_COLUMNS, index / PROBE_ATLAS_COLUMNS);
 
-	return float2((tile.x * PROBE_ATLAS_PROBE_WIDTH) + (face * PROBE_DEPTH_SIZE), tile.y * PROBE_DEPTH_SIZE);
+	return float2(tile * PROBE_ATLAS_TILE_SIZE);
 }
 
 struct ProbeMoments
@@ -213,14 +203,15 @@ struct ProbeMoments
 	float Variance;
 };
 
-ProbeMoments SampleProbeMoments(Texture2D moments_atlas, SamplerState moments_sampler, uint index, uint face,
-								float2 uv01)
+ProbeMoments SampleProbeMoments(Texture2D moments_atlas, SamplerState moments_sampler, uint index, float2 uv01)
 {
-	const float2 in_face = clamp(uv01 * float(PROBE_DEPTH_SIZE), 0.5, float(PROBE_DEPTH_SIZE) - 0.5) - 0.5;
-	const float2 base = floor(in_face);
-	const float2 f = in_face - base;
+	const float2 in_map = uv01 * float(PROBE_DEPTH_SIZE) - 0.5;
+	const float2 base = floor(in_map);
+	const float2 f = in_map - base;
 
-	const float2 corner = ProbeAtlasFaceOrigin(index, face) + base + 1.0;
+	// One texel past the border to the map, one more to the corner the four gathered texels share. At the map's
+	// edges the gather reaches into the border, which holds the texels across the octahedral seam.
+	const float2 corner = ProbeAtlasTileOrigin(index) + base + 2.0;
 	const float2 uv = corner / float2(PROBE_ATLAS_WIDTH, PROBE_ATLAS_HEIGHT);
 
 	const float4 means = moments_atlas.GatherRed(moments_sampler, uv) * PROBE_DEPTH_MAX_DISTANCE;
@@ -238,7 +229,7 @@ ProbeMoments SampleProbeMoments(Texture2D moments_atlas, SamplerState moments_sa
 	return moments;
 }
 
-/// Visibility of `pos_ws` as seen from probe `info_index` using its depth cubemap.
+/// Visibility of `pos_ws` as seen from probe `index` using its octahedral depth map.
 float SampleProbeVisibility(float3 pos_ws, float3 probe_pos, Texture2D moments_atlas, SamplerState moments_sampler,
 							uint index)
 {
@@ -248,11 +239,9 @@ float SampleProbeVisibility(float3 pos_ws, float3 probe_pos, Texture2D moments_a
 	const bool at_probe = raw_dist < 1e-4;
 	const float3 direction = select(at_probe, float3(0.0, 0.0, 1.0), to_receiver / max(raw_dist, 1e-4));
 
-	uint face;
-	float2 uv01;
-	ProbeDepthDirectionToFaceUV(direction, face, uv01);
+	const float2 uv01 = ProbeDepthDirectionToOctUV(direction);
 
-	const ProbeMoments moments = SampleProbeMoments(moments_atlas, moments_sampler, index, face, uv01);
+	const ProbeMoments moments = SampleProbeMoments(moments_atlas, moments_sampler, index, uv01);
 
 	// Nothing was hit in this direction.
 	const bool no_hit = moments.Mean >= PROBE_DEPTH_MAX_DISTANCE - 1e-3;

@@ -311,7 +311,7 @@ ReflectionProbeData MakeReflectionProbe(const ReflectionBox& box, const ProbePla
 // GPU and file IO
 ///////////////////////////////////
 
-constexpr uint32 scProbeFileVersion = 13;
+constexpr uint32 scProbeFileVersion = 14;
 constexpr uint32 scReflectionFileVersion = 1;
 
 struct ProbeFileLayout
@@ -1293,7 +1293,7 @@ void ProbeManager::UploadMomentsAtlas(uint32 first_probe, uint32 count)
 {
 	using namespace renderer;
 
-	constexpr uint32 cFaceSize = Limits::ProbeDepthSize;
+	constexpr uint32 cTileSize = Limits::ProbeAtlasTileSize;
 
 	GraphicsBackend* graphics = gGraphics;
 	Assert(graphics->pProbeMomentsAtlas != nullptr);
@@ -1302,7 +1302,9 @@ void ProbeManager::UploadMomentsAtlas(uint32 first_probe, uint32 count)
 	const uint32 last_row = (first_probe + count - 1) / Limits::ProbeAtlasColumns;
 
 	SizedArray<uint16> row;
-	row.InitSize(static_cast<uint64>(Limits::ProbeAtlasWidth) * cFaceSize * 2);
+	row.InitSize(static_cast<uint64>(Limits::ProbeAtlasWidth) * cTileSize * 2);
+
+	uint16 encoded[scMomentTexelCount * 2];
 
 	for (uint32 atlas_row = first_row; atlas_row <= last_row; atlas_row++) {
 		// Unused probes keep the max distance, which reads as unoccluded
@@ -1313,21 +1315,25 @@ void ProbeManager::UploadMomentsAtlas(uint32 first_probe, uint32 count)
 
 		for (uint32 probe = row_first_probe; probe < row_end_probe; probe++) {
 			const float32* moments = mProbeInfos[probe].DepthMoments;
-			const uint32 strip_x = (probe - row_first_probe) * Limits::ProbeAtlasProbeWidth;
 
-			for (uint32 face = 0; face < Limits::ProbeDepthFaces; face++) {
-				for (uint32 y = 0; y < cFaceSize; y++) {
-					for (uint32 x = 0; x < cFaceSize; x++) {
-						const uint32 src = (face * Limits::ProbeDepthTexelsPerFace + y * cFaceSize + x) * 2;
-						const uint32 dst = (y * Limits::ProbeAtlasWidth + strip_x + face * cFaceSize + x) * 2;
+			for (uint32 texel = 0; texel < scMomentTexelCount; texel++) {
+				// Stored as a standard deviation, mean_sq - mean^2 would cancel to nothing at 16 bits
+				const float32 mean = moments[texel * 2 + 0];
+				const float32 stddev = std::sqrt(std::max(moments[texel * 2 + 1] - (mean * mean), 0.0f));
 
-						// Stored as a standard deviation, mean_sq - mean^2 would cancel to nothing at 16 bits
-						const float32 mean = moments[src + 0];
-						const float32 stddev = std::sqrt(std::max(moments[src + 1] - (mean * mean), 0.0f));
+				encoded[texel * 2 + 0] = EncodeUNorm16(mean / Limits::ProbeDepthMaxDistance);
+				encoded[texel * 2 + 1] = EncodeUNorm16(stddev / Limits::ProbeDepthMaxDistance);
+			}
 
-						row[dst + 0] = EncodeUNorm16(mean / Limits::ProbeDepthMaxDistance);
-						row[dst + 1] = EncodeUNorm16(stddev / Limits::ProbeDepthMaxDistance);
-					}
+			const uint32 tile_x = (probe - row_first_probe) * cTileSize;
+
+			for (uint32 y = 0; y < cTileSize; y++) {
+				for (uint32 x = 0; x < cTileSize; x++) {
+					const uint32 src = TileTexelToMomentTexel(x, y) * 2;
+					const uint32 dst = (y * Limits::ProbeAtlasWidth + tile_x + x) * 2;
+
+					row[dst + 0] = encoded[src + 0];
+					row[dst + 1] = encoded[src + 1];
 				}
 			}
 		}
@@ -1337,8 +1343,8 @@ void ProbeManager::UploadMomentsAtlas(uint32 first_probe, uint32 count)
 					   eGpuBufferFlags::TransferReceiver);
 		staging.Upload(row.pData, row.GetSizeInBytes());
 
-		const Vec2u row_size(Limits::ProbeAtlasWidth, cFaceSize);
-		const Vec2u row_offset(0, atlas_row * cFaceSize);
+		const Vec2u row_size(Limits::ProbeAtlasWidth, cTileSize);
+		const Vec2u row_offset(0, atlas_row * cTileSize);
 
 		graphics->SubmitImmediateUploadCmd(
 			[&](CommandBuffer& cmd)

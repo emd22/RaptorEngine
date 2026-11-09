@@ -49,7 +49,6 @@ Vec3f Vec3f::Rotate(const Quat rotation) const
 	const Quat vec = Quat(_mm_blend_ps(mIntrin, zero_v, 0b1000));
 	const Quat result = rotation * vec * rotation.Conjugate();
 
-	// W is zero in exact arithmetic; clear any rounding residue so the Vec3f's W lane stays 0
 	return Vec3f(_mm_blend_ps(result.mIntrin, zero_v, 0b1000));
 }
 

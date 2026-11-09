@@ -40,7 +40,7 @@ void PrintUsage()
 		"them, 8 bytes per ray (default: 0, off)\n"
 		"  --indirect-denoise <level> How hard to smooth the noise out of the bounced light: off, low, medium "
 		"or high (default: medium)\n"
-		"  --probe-texel-rays <n>     Rays per probe visibility texel along each axis when baking probes, 0 to "
+		"  --probe-texel-rays <n>     Probe ray density, (16n)^2 rays per cube face when baking probes, 0 to "
 		"leave the probes to the engine (default: 4)\n"
 		"  --no-models      Leave models out of the bake, so they cast no baked shadows and bounce no light\n"
 		"  --model-cell <m>           Size of the cells that hold the bounced light of model surfaces "

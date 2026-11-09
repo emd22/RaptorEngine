@@ -1202,17 +1202,21 @@ Vec3f GetCubeDirection(uint32 face, float32 u, float32 v)
 	}
 }
 
+/// Probe rays are a cube grid of (scProbeRayGridBase * rays_per_texel)^2 per face, 4 gives the engine capture's 64
+constexpr uint32 scProbeRayGridBase = 16;
+constexpr uint32 scProbeRayFaces = 6;
+
 SizedArray<ProbeRay> BuildProbeRays(uint32 rays_per_texel)
 {
-	const uint32 size = Limits::ProbeDepthSize * rays_per_texel;
+	const uint32 size = scProbeRayGridBase * rays_per_texel;
 	const float32 step = 2.0f / static_cast<float32>(size);
 
 	SizedArray<ProbeRay> rays;
-	rays.InitSize(static_cast<uint64>(Limits::ProbeDepthFaces) * size * size);
+	rays.InitSize(static_cast<uint64>(scProbeRayFaces) * size * size);
 
 	ProbeRay* ray = rays.pData;
 
-	for (uint32 face = 0; face < Limits::ProbeDepthFaces; face++) {
+	for (uint32 face = 0; face < scProbeRayFaces; face++) {
 		for (uint32 y = 0; y < size; y++) {
 			for (uint32 x = 0; x < size; x++, ray++) {
 				const float32 x0 = -1.0f + static_cast<float32>(x) * step;

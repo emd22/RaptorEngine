@@ -8,9 +8,12 @@
 #pragma once
 
 #include <Core/Types.hpp>
+#include <Math/SIMDHelper.hpp>
+#include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
 #include <Renderer/Limits.hpp>
 #include <algorithm>
+#include <cmath>
 
 namespace fx::ProbeEncoding {
 
@@ -22,7 +25,7 @@ constexpr float32 scCosineLobe[Limits::ProbeSHCoeffCount] = {
 	1.0f, 2.0f / 3.0f, 2.0f / 3.0f, 2.0f / 3.0f, 0.25f, 0.25f, 0.25f, 0.25f, 0.25f,
 };
 
-constexpr uint32 scMomentTexelCount = Limits::ProbeDepthFaces * Limits::ProbeDepthTexelsPerFace;
+constexpr uint32 scMomentTexelCount = Limits::ProbeDepthTexelCount;
 
 /// Order must match EvalProbeIrradiance() in Shaders/ProbeCommon.hlsli
 inline void EvalSHBasis(const Vec3f d, float32 out[Limits::ProbeSHCoeffCount])
@@ -42,57 +45,70 @@ inline void EvalSHBasis(const Vec3f d, float32 out[Limits::ProbeSHCoeffCount])
 	out[8] = scSHNorm22 * (d.X * d.X - d.Y * d.Y);
 }
 
+/**
+ * @brief Octahedral map coordinates in [-1, 1] for direction `d`
+ */
+inline Vec2f DirectionToOctahedral(const Vec3f d)
+{
+	const float l1 = simd::HAdd(simd::Abs(d.mIntrin));
+
+	const float32 inv_l1 = 1.0f / (std::fabs(d.X) + std::fabs(d.Y) + std::fabs(d.Z));
+
+	Vec3f xyz = d * inv_l1;
+
+	if (d.Y >= 0.0f) {
+		return Vec2f(xyz.X, xyz.Z);
+	}
+
+	Vec2f sign = Vec2f(1.0f);
+
+	if (xyz.X < 0.0f) {
+		sign.X = -1.0f;
+	}
+
+	if (xyz.Z < 0.0f) {
+		sign.Y = -1.0f;
+	}
+
+	const Vec2f result = Vec2f(1.0f) - Vec2f(std::fabs(xyz.Z), std::fabs(xyz.X));
+
+	return (result * sign);
+
+	// out_u = (1.0f - std::fabs(z)) * sign_x;
+	// out_v = (1.0f - std::fabs(x)) * sign_z;
+}
+
 inline uint32 DirectionToMomentTexel(const Vec3f d)
 {
-	const Vec3f a = d.Abs();
-
-	uint32 face;
-	float32 u;
-	float32 v;
-
-	if (a.X >= a.Y && a.X >= a.Z) {
-		if (d.X > 0.0f) {
-			face = 0;
-			u = -d.Z / a.X;
-		}
-		else {
-			face = 1;
-			u = d.Z / a.X;
-		}
-
-		v = -d.Y / a.X;
-	}
-	else if (a.Y >= a.Z) {
-		if (d.Y > 0.0f) {
-			face = 2;
-			v = d.Z / a.Y;
-		}
-		else {
-			face = 3;
-			v = -d.Z / a.Y;
-		}
-
-		u = d.X / a.Y;
-	}
-	else {
-		if (d.Z > 0.0f) {
-			face = 4;
-			u = d.X / a.Z;
-		}
-		else {
-			face = 5;
-			u = -d.X / a.Z;
-		}
-
-		v = -d.Y / a.Z;
-	}
-
 	constexpr uint32 cSize = Limits::ProbeDepthSize;
+
+	Vec2f uv = DirectionToOctahedral(d);
 
 	const auto to_texel = [](float32 coord)
 	{ return std::min(static_cast<uint32>(std::max((coord * 0.5f + 0.5f) * cSize, 0.0f)), cSize - 1); };
 
-	return face * Limits::ProbeDepthTexelsPerFace + to_texel(v) * cSize + to_texel(u);
+	return to_texel(uv.Y) * cSize + to_texel(uv.X);
+}
+
+/// Moment texel that texel (x, y) of a probe's atlas tile holds
+inline uint32 TileTexelToMomentTexel(uint32 x, uint32 y)
+{
+	constexpr int32 cSize = static_cast<int32>(Limits::ProbeDepthSize);
+
+	int32 u = static_cast<int32>(x) - 1;
+	int32 v = static_cast<int32>(y) - 1;
+
+	if (u < 0 || u >= cSize) {
+		u = std::clamp(u, 0, cSize - 1);
+		v = cSize - 1 - v;
+	}
+
+	if (v < 0 || v >= cSize) {
+		v = std::clamp(v, 0, cSize - 1);
+		u = cSize - 1 - u;
+	}
+
+	return static_cast<uint32>(v * cSize + u);
 }
 
 inline uint16 EncodeUNorm16(float32 value)

@@ -50,7 +50,6 @@ Vec3f Vec3f::Rotate(const Quat rotation) const
 	const Quat vec = Quat(vsetq_lane_f32(0.0f, mIntrin, 3));
 	const Quat result = rotation * vec * rotation.Conjugate();
 
-	// W is zero in exact arithmetic; clear any rounding residue so the Vec3f's W lane stays 0
 	return Vec3f(vsetq_lane_f32(0.0f, result.mIntrin, 3));
 }
 
