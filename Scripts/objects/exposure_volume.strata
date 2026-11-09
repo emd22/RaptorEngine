@@ -1,4 +1,4 @@
-import ../Camera;
+import ../RCamera;
 import ../CVar;
 
 import ../interop;

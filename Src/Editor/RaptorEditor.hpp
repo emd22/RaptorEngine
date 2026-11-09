@@ -158,7 +158,7 @@ public:
 	void TopViewSelect(const DynArray<ObjectID>& object_ids, eTopViewSelectMode mode);
 	void TopViewMove(const Vec3f offset);
 	void TopViewRotate(const Vec3f axis, float32 angle, const Vec3f pivot, const Vec3f offset);
-	void TopViewMoveFace(const Vec3f world_normal, float32 distance, const DynArray<ObjectID>& object_ids);
+	void TopViewMoveFaces(const DynArray<TopViewFaceRef>& faces, float32 distance);
 	void TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewVertexHandle>& handles, const Vec3f offset);
 	void TopViewCreate(eViewPlane plane, Vec3f min, Vec3f max, bool drop_to_ground);
 	void TopViewCreateRoom(eViewPlane plane, Vec3f min, Vec3f max, bool drop_to_ground, const RoomSettings& settings);

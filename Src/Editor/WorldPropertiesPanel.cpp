@@ -45,6 +45,7 @@ constexpr const char* scReflectionDebugViews[] = {
 	"Off",
 	"Mirror Reflections",
 	"Probe Coverage",
+	"Normalization",
 };
 
 int32 BoolToInt(const bool value)

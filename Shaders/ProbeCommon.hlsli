@@ -2,7 +2,6 @@
 /// Light-probe sampling shared by the forward passes.
 ///
 
-
 #define PROBE_SH_COEFF_COUNT 9
 
 #define PROBE_MAX_VOLUMES 8
@@ -48,7 +47,6 @@ struct ProbeSHData
 	float4 SH[PROBE_SH_COEFF_COUNT];
 };
 
-
 float3 ProbeSHPosition(ProbeSHData probe) { return float3(probe.SH[0].w, probe.SH[1].w, probe.SH[2].w); }
 
 float ProbeSHSunVisibility(ProbeSHData probe) { return probe.SH[3].w; }
@@ -68,7 +66,6 @@ struct ProbeVolume
 	/// fields above, but SelectProbeVolume() runs per pixel over every volume, so they come precomputed.
 	float4 vMaxAndCellVolume;
 };
-
 
 
 uint GetProbeVolumeCount(StructuredBuffer<ProbeVolume> volumes)
@@ -191,7 +188,6 @@ float ProbeMinVariance(float mean)
 	return stddev * stddev;
 }
 
-
 float ProbeDepthChebyshev(float receiver_dist, float mean, float variance)
 {
 	const float biased_dist = max(receiver_dist - PROBE_CHEBYSHEV_BIAS, 0.0);
@@ -298,7 +294,6 @@ void ProbeVolumeCell(float3 pos_ws, ProbeVolume volume, out uint3 base, out floa
 	base = min(uint3(floor(local)), dims - 2);
 	cell_frac = saturate(local - float3(base));
 }
-
 
 uint ProbeGridLookup(StructuredBuffer<uint> grid, uint point_index)
 {
@@ -430,12 +425,32 @@ bool SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 geometric_n, fl
 
 #define REFLECTION_PROBE_MAX_LOD 5.0
 
+/// Most a reflection probe is brightened to match the light where it is used. Dimming is not limited.
+#define REFLECTION_NORMALIZE_MAX 1.5
+
 struct ReflectionProbe
 {
 	float4x4 mWorldToBox;
 	float4 vPositionAndCount;
 	float4 vFade;
+	/// Light probe irradiance luminance at the capture point along +X, +Y, +Z, w = 1 when there is any. See
+	/// ProbeManager::SampleCaptureIrradiance()
+	float4 vCaptureIrradiancePositive;
+	/// The same along -X, -Y, -Z
+	float4 vCaptureIrradianceNegative;
 };
+
+/// A cubemap holds the light around its capture point. Somewhere that gets less light than that point (a nook, under a
+/// ledge, the dark side of a doorway the box spans) would reflect it too brightly, so the cubemap is scaled by the
+/// irradiance at the pixel over the irradiance at the capture point, along the same normal.
+float ReflectionProbeNormalization(ReflectionProbe probe, float3 n, float local_luminance)
+{
+	const float3 side = select(n >= 0.0, probe.vCaptureIrradiancePositive.xyz, probe.vCaptureIrradianceNegative.xyz);
+	const float capture = dot(n * n, side);
+	const float ratio = min(local_luminance / max(capture, 1e-6), REFLECTION_NORMALIZE_MAX);
+
+	return select(probe.vCaptureIrradiancePositive.w > 0.5, ratio, 1.0);
+}
 
 uint GetReflectionProbeCount(StructuredBuffer<ReflectionProbe> probes)
 {
@@ -460,6 +475,29 @@ float ReflectionProbeWeight(float3 pos_bs, ReflectionProbe probe)
 	return saturate(min(edge.x, min(edge.y, edge.z)));
 }
 
+/// ReflectionProbeNormalization() blended over the probes the way SampleReflectionProbes() blends their cubemaps, 1 where
+/// no probe covers the position. Debug view only.
+float ReflectionProbeNormalizationBlend(float3 pos_ws, float3 n, float local_luminance,
+									   StructuredBuffer<ReflectionProbe> probes)
+{
+	const uint probe_count = (uint)probes[0].vPositionAndCount.w;
+
+	float normalization = 0.0;
+	float remaining = 1.0;
+
+	for (uint i = 0; i < probe_count; i++) {
+		const ReflectionProbe probe = probes[i];
+
+		const float3 pos_bs = mul(float4(pos_ws, 1.0), probe.mWorldToBox).xyz;
+		const float weight = ReflectionProbeWeight(pos_bs, probe);
+
+		normalization += ReflectionProbeNormalization(probe, n, local_luminance) * (weight * remaining);
+		remaining *= 1.0 - weight;
+	}
+
+	return normalization + remaining;
+}
+
 float3 ReflectionProbeCoverage(float3 pos_ws, StructuredBuffer<ReflectionProbe> probes)
 {
 	const uint probe_count = (uint)probes[0].vFade.w;
@@ -482,9 +520,11 @@ float3 ReflectionProbeCoverage(float3 pos_ws, StructuredBuffer<ReflectionProbe> 
 	return color + (float3(0.03, 0.03, 0.03) * remaining);
 }
 
+/// `n` and `local_luminance` are the normal and irradiance luminance the probes are normalized to. With
+/// `apply_normalization` off the cubemaps are used as captured.
 float3 SampleReflectionProbes(float3 pos_ws, float3 r, float roughness, float3 fallback, uint probe_count,
 							  StructuredBuffer<ReflectionProbe> probes, TextureCubeArray cubemaps,
-							  SamplerState cubemap_sampler)
+							  SamplerState cubemap_sampler, float3 n, float local_luminance, bool apply_normalization)
 {
 	const float lod = roughness * REFLECTION_PROBE_MAX_LOD;
 
@@ -504,7 +544,11 @@ float3 SampleReflectionProbes(float3 pos_ws, float3 r, float roughness, float3 f
 		const float3 dir_bs = mul(float4(r, 0.0), probe.mWorldToBox).xyz;
 		const float3 dir = ReflectionBoxProject(pos_ws, r, pos_bs, dir_bs, probe.vPositionAndCount.xyz);
 
-		radiance += cubemaps.SampleLevel(cubemap_sampler, float4(dir, float(i)), lod).rgb * (weight * remaining);
+		const float normalization =
+			select(apply_normalization, ReflectionProbeNormalization(probe, n, local_luminance), 1.0);
+
+		radiance += cubemaps.SampleLevel(cubemap_sampler, float4(dir, float(i)), lod).rgb *
+					(weight * remaining * normalization);
 		remaining *= 1.0 - weight;
 
 		if (remaining < 0.01) {

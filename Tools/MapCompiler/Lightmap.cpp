@@ -940,6 +940,7 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 		input.pSunVisibility = lightmap.SunVisibility.pData;
 		input.pPositions = positions.pData;
 		input.pNormals = normals.pData;
+		input.pPlanes = &planes;
 
 		// input.pRects = rects.pData;
 		// input.RectCount = rects.Size;

@@ -136,9 +136,6 @@ void GraphicsBackend::Init(Vec2u window_size)
 
 	TransferSync.Create(eSemaphoreType::Timeline);
 
-	// SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
-	// deletion_queue->InitCapacity(Limits::MaxDeletionQueueItems);
-
 	// Create final submission semaphores. Note that there is one submission semaphore
 	// per Swapchain image, not frame in flight.
 	mSubmitSemaphores.InitSize(Swapchain.OutputImages.Size);
@@ -150,7 +147,6 @@ void GraphicsBackend::Init(Vec2u window_size)
 	BoneBuffer.Create(sizeof(Mat4f), Limits::MaxBoneMatrices, eGpuBufferType::StorageWithOffset);
 	FrameAlloc.Create();
 
-	// Forward+ tiled light list buffers. These are double buffered per frame in flight, each tile's
 	LightGridPageSize = Limits::MaxScreenTiles * sizeof(uint32) * 4;
 	LightIndexListPageSize = Limits::MaxScreenTiles * Limits::MaxLightsPerTile * sizeof(uint32);
 
@@ -232,7 +228,7 @@ void GraphicsBackend::Init(Vec2u window_size)
 		FogShadowPageBuffer.FlushToGpu(0, FogShadowPageBufferSize);
 	}
 
-	ReflectionProbePageSize = Limits::MaxReflectionProbes * sizeof(ReflectionProbeData);
+	ReflectionProbePageSize = Limits::MaxReflectionProbes * sizeof(ReflectionProbeGpu);
 	ReflectionProbeBuffer.Create(eGpuBufferType::StorageWithOffset, ReflectionProbePageSize,
 								 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
 
@@ -365,6 +361,8 @@ void GraphicsBackend::RebuildRenderStages()
 	// The forward pass shares the prepass's depth image, so the prepass has to be rebuilt first
 	rd->Prepass.Rebuild(size);
 	rd->ForwardPass.Rebuild(size);
+	rd->SceneCopyPass.Rebuild(size);
+	rd->ForwardBlendPass.Rebuild(size);
 	rd->ParticlePass.Rebuild(size);
 	rd->FogApplyPass.Rebuild(size);
 	rd->SSAOPass.Rebuild(size);
@@ -949,9 +947,31 @@ void GraphicsBackend::BeginGeometry()
 	FrameData* frame = GetFrame();
 
 	pRenderer->ForwardPass.Begin(frame->CmdBuffer);
+	mpActiveForwardStage = &pRenderer->ForwardPass;
 	// gPipelineCache->Bind(ePipelineName::Geometry, frame->CmdBuffer);
 
 	// The tiled light list offsets are applied with the persistent set 0 in World::ExecuteRenderList()
+}
+
+void GraphicsBackend::CopySceneForWater()
+{
+	if (mpActiveForwardStage != &pRenderer->ForwardPass) {
+		return;
+	}
+
+	CommandBuffer& cmd = GetFrame()->CmdBuffer;
+	RenderStage& forward = pRenderer->ForwardPass;
+	RenderStage& copy = pRenderer->SceneCopyPass;
+
+	forward.End();
+
+	BarrierHelper::ImageCopyAttachmentForSampling(cmd, &forward.GetTarget(eImageFormat::RGBA16_Float)->Image,
+												  &copy.GetTarget(eImageFormat::RGBA16_Float)->Image);
+	BarrierHelper::ImageCopyAttachmentForSampling(cmd, &forward.GetTarget(eImageFormat::D32_Float)->Image,
+												  &copy.GetTarget(eImageFormat::D32_Float)->Image);
+
+	pRenderer->ForwardBlendPass.Begin(cmd);
+	mpActiveForwardStage = &pRenderer->ForwardBlendPass;
 }
 
 void GraphicsBackend::PresentFrame()
@@ -1342,7 +1362,14 @@ void GraphicsBackend::DoComposition(PerspectiveCamera& render_cam)
 	FrameData* frame = GetFrame();
 
 
-	pRenderer->ForwardPass.End();
+	RenderStage* forward_stage = mpActiveForwardStage;
+
+	if (forward_stage == nullptr) {
+		forward_stage = &pRenderer->ForwardPass;
+	}
+
+	forward_stage->End();
+	mpActiveForwardStage = nullptr;
 	MarkGpu(eGpuMarker::Forward);
 
 	gParticleSystem->Render(frame->CmdBuffer, render_cam, pRenderer->ParticlePass);
@@ -1411,7 +1438,8 @@ void GraphicsBackend::RecordFrameCapture(CommandBuffer& cmd)
 		mFrameCaptureBytes = byte_count;
 	}
 
-	const auto transition = [&](VkImageLayout from, VkImageLayout to, VkAccessFlags from_access, VkAccessFlags to_access)
+	const auto transition =
+		[&](VkImageLayout from, VkImageLayout to, VkAccessFlags from_access, VkAccessFlags to_access)
 	{
 		const VkImageMemoryBarrier barrier {
 			.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -1425,20 +1453,21 @@ void GraphicsBackend::RecordFrameCapture(CommandBuffer& cmd)
 			.subresourceRange { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = 1, .layerCount = 1 },
 		};
 
-		vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0,
-							 nullptr, 1, &barrier);
+		vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
+							 0, nullptr, 1, &barrier);
 	};
 
-	transition(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-			   VK_ACCESS_TRANSFER_READ_BIT);
+	transition(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT);
 
 	const VkBufferImageCopy copy {
-		.imageSubresource { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1 },
+		.imageSubresource {
+			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1 },
 		.imageExtent { .width = width, .height = height, .depth = 1 },
 	};
 
-	vkCmdCopyImageToBuffer(cmd, image.InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, mFrameCaptureBuffer.Buffer, 1,
-						   &copy);
+	vkCmdCopyImageToBuffer(cmd, image.InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, mFrameCaptureBuffer.Buffer,
+						   1, &copy);
 
 	transition(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_ACCESS_TRANSFER_READ_BIT, 0);
 

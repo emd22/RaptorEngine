@@ -255,7 +255,25 @@ F_Texture2D(tSSAO, 5, 0);
 F_Texture2D(tLightmap, 17, 0)
 F_Texture2D(tLightmapIrradiance, 18, 0)
 
+PERMIF(WATER);
+// The opaque scene behind the water, copied out before anything was blended, see GraphicsBackend::CopySceneForWater()
+F_Texture2D(tSceneColor, 19, 0)
+F_Texture2D(tSceneDepth, 20, 0)
+PERMEND();
+
 #define LIGHTMAP_DIRECTIONALITY 1.5
+
+/// How much faster water absorbs the colours that aren't its own, which shifts deeper water towards its colour
+#define WATER_ABSORPTION_SPREAD 3.0
+/// Caustic cells per metre on the floor under the water
+#define WATER_CAUSTIC_SCALE 0.9
+/// How fast the caustics move per texture repeat the normal map scrolls, in radians
+#define WATER_CAUSTIC_SPEED 25.0
+
+/// How far the view ray under water is bent where the shading normal leans away from the surface, per metre of depth
+#define WATER_REFRACTION 0.5
+/// Depth past which the bend stops growing, so a deep floor doesn't swim
+#define WATER_MAX_REFRACTION_DEPTH 2.0
 
 struct ViewConsts
 {
@@ -266,6 +284,8 @@ struct ViewConsts
     uint uiTileRows;
     uint Flags;
     float fPreExposure;
+    float2 vDepthParams;
+    float fTime;
 };
 
 struct DrawConsts
@@ -280,6 +300,47 @@ struct DrawConsts
 F_FrameData(ViewConsts, ViewConst, 2);
 
 [[vk::push_constant]] DrawConsts DrawConst;
+
+PERMIF(WATER);
+/// View depth of a stored depth value.
+float ViewDepthFromStored(float stored)
+{
+	// Depth is reverse-Z, invert it
+	const float denominator = (1.0 - stored) - ViewConst.vDepthParams.x;
+
+	return ViewConst.vDepthParams.y / select(abs(denominator) < 1e-12, -1e-12, denominator);
+}
+
+float2 WaterHash2(float2 cell)
+{
+	return frac(sin(float2(dot(cell, float2(127.1, 311.7)), dot(cell, float2(269.5, 183.3)))) * 43758.5453);
+}
+
+float WaterCausticLayer(float2 position, float phase)
+{
+	const float2 cell = floor(position);
+	const float2 f = frac(position);
+
+	float nearest = 8.0;
+	float second = 8.0;
+
+	[unroll]
+	for (int y = -1; y <= 1; y++) {
+		[unroll]
+		for (int x = -1; x <= 1; x++) {
+			const float2 offset = float2(float(x), float(y));
+			const float2 seed = WaterHash2(cell + offset);
+			const float2 site = offset + 0.5 + (0.4 * sin(phase + (6.2831853 * seed)));
+			const float site_distance = length(site - f);
+
+			second = min(second, max(nearest, site_distance));
+			nearest = min(nearest, site_distance);
+		}
+	}
+
+	return 1.0 - smoothstep(0.0, 0.2, second - nearest);
+}
+PERMEND();
 
 #define SHADOW_BIAS 0.0f
 
@@ -566,7 +627,21 @@ PERMNOT(UNLIT);
 
 PERMIF(USE_NORMAL_MAPS);
     float4 surface_sample = F_Sample(tORM, input.vUV);
-    float3 normal_ts = F_Sample(tNormalMap, input.vUV).rgb * 2.0 - 1.0;
+
+PERMIF(WATER);
+	// Water normal maps have two layers sliding over each other to simulate ripples
+
+    const float scroll = ViewConst.fTime * material.fNormalScrollSpeed;
+    const float3 ripple_a = F_Sample(tNormalMap, input.vUV + (float2(0.83, 0.32) * scroll)).rgb * 2.0 - 1.0;
+    const float3 ripple_b = F_Sample(tNormalMap, (input.vUV * 0.71) + (float2(-0.38, 0.91) * scroll)).rgb * 2.0 - 1.0;
+    float3 normal_ts = float3(ripple_a.xy + ripple_b.xy, ripple_a.z * ripple_b.z);
+
+PERMELSE();
+
+	float3 normal_ts = F_Sample(tNormalMap, input.vUV).rgb * 2.0 - 1.0;
+
+PERMEND();
+    normal_ts.xy *= material.fNormalStrength;
 
     const float3 vertex_normal = normalize(input.vNormalWS);
     const float3 tangent =
@@ -577,9 +652,8 @@ PERMIF(USE_NORMAL_MAPS);
 
     float3 N_final = normalize(mul(normal_ts, TBN));
 PERMELSE();
-	// No surface texture in this pipeline; the material factors alone describe the surface.
+	// No surface texture in this pipeline
 	float4 surface_sample = float4(1.0, 1.0, 1.0, 1.0);
-
     float3 N_final = normalize(input.vNormalWS);
 PERMEND();
 
@@ -601,11 +675,9 @@ PERMEND();
 
 PERMNOT(USE_SKINNING);
 PERMNOT(PROBE_CAPTURE);
-	// Decals stay where they are in the world, so skinned meshes would slide through them
 	tile_data.DecalWordEnd = select(HAS_FLAG(ViewConst.Flags, DRAW_FLAG_NO_DECALS), tile_data.DecalWordStart,
 									tile_data.DecalWordEnd);
 
-	// ApplyDecals() leaves the shading normal normalized, so N_final stays unit length through this
 	ApplyDecals(surface, N_final, tile_data, tile_index, input.vPositionWS, normalize(input.vNormalWS),
 				position_ddx, position_ddy);
 PERMEND();
@@ -636,6 +708,12 @@ PERMEND();
 
 	/// The unperturbed surface normal (already flipped for backfaces), for rejecting light the surface faces away from
 	const float3 geometric_normal = normalize(input.vNormalWS);
+
+PERMIF(WATER);
+	const float3 diffuse_normal = geometric_normal;
+PERMELSE();
+	const float3 diffuse_normal = N;
+PERMEND();
 
 	const float2 ssao_coords = float2(input.vPosition.xy / (float2(ViewConst.vTargetSize)));
 
@@ -675,8 +753,8 @@ PERMEND();
 
 			float probe_coverage;
 
-			SampleProbeVolumeIrradiance(input.vPositionWS, N, geometric_normal, R, bProbeVolume[volume_index],
-										bProbeBuffer, bProbeGrid, F_TextureName(tProbeMoments), tProbeMoments,
+			SampleProbeVolumeIrradiance(input.vPositionWS, diffuse_normal, geometric_normal, R,
+										bProbeVolume[volume_index], bProbeBuffer, bProbeGrid, F_TextureName(tProbeMoments), tProbeMoments,
 										probe_irradiance, probe_radiance, probe_visibility, probe_coverage,
 										probe_sun_visibility);
 
@@ -688,7 +766,7 @@ PERMEND();
 				float base_sun_visibility;
 
 				const bool base_sampled = SampleProbeVolumeIrradiance(
-					input.vPositionWS, N, geometric_normal, R, bProbeVolume[0], bProbeBuffer, bProbeGrid,
+					input.vPositionWS, diffuse_normal, geometric_normal, R, bProbeVolume[0], bProbeBuffer, bProbeGrid,
 					F_TextureName(tProbeMoments), tProbeMoments, base_irradiance, base_radiance, base_visibility,
 					base_coverage, base_sun_visibility);
 
@@ -711,7 +789,7 @@ PERMIF(USE_LIGHTMAP);
 	const float3 indirect_direction = (lightmap_sample.rgb * 2.0 - 1.0) * LIGHTMAP_DIRECTIONALITY;
 	const float indirect_balance = max(1.0 + dot(indirect_direction, geometric_normal), 1e-2);
 	const float3 baked_irradiance = lightmap_irradiance *
-									(max(1.0 + dot(indirect_direction, N), 0.0) / indirect_balance);
+									(max(1.0 + dot(indirect_direction, diffuse_normal), 0.0) / indirect_balance);
 
 	const bool use_baked_indirect = HAS_FLAG(ViewConst.Flags, DRAW_FLAG_BAKED_INDIRECT);
 
@@ -759,6 +837,7 @@ PERMEND();
 		float3 H = normalize(V + L);
 
 		float NdotL = DotC(N, L);
+		const float diffuse_NdotL = DotC(diffuse_normal, L);
 		float NdotH = DotC(N, H);
 		float LdotH = DotC(L, H);
 
@@ -771,14 +850,15 @@ PERMEND();
 		float Vis = V_SmithGGXCorrelated(NdotV, NdotL, light_alpha);
 		float3 Fr = D * F * Vis * FX_MATH_1_OVER_PI * energy_compensation;
 
-		float Fd = Fr_FrostbiteDisneyDiffuse(NdotV, NdotL, LdotH, roughness);
+		float Fd = Fr_FrostbiteDisneyDiffuse(NdotV, diffuse_NdotL, LdotH, roughness);
 
 		float3 diffuse_term = Fd * diffuse_reflectance * FX_MATH_1_OVER_PI;
 		float3 specular_term = Fr;
 
 		const float3 incoming_light = attenuation * light_color * NdotL * (visibility * horizon);
+		const float3 diffuse_incoming_light = attenuation * light_color * diffuse_NdotL * (visibility * horizon);
 
-		accumulated_light += incoming_light * diffuse_term;
+		accumulated_light += diffuse_incoming_light * diffuse_term;
 		accumulated_specular += incoming_light * specular_term;
 	}
 
@@ -790,9 +870,13 @@ PERMNOT(PROBE_CAPTURE);
 		const uint reflection_probe_count = select(HAS_FLAG(ViewConst.Flags, DRAW_FLAG_NO_REFLECTION_PROBES), 0u,
 												   GetReflectionProbeCount(bReflectionProbes));
 
+		const float local_luminance = dot(probe_irradiance, float3(0.2126, 0.7152, 0.0722));
+		const bool normalize_reflections = !HAS_FLAG(ViewConst.Flags, DRAW_FLAG_NO_REFLECTION_NORMALIZE);
+
 		probe_radiance = SampleReflectionProbes(input.vPositionWS, R, roughness, probe_radiance,
 												reflection_probe_count, bReflectionProbes,
-												F_TextureName(tReflectionProbes), tReflectionProbes);
+												F_TextureName(tReflectionProbes), tReflectionProbes, diffuse_normal,
+												local_luminance, normalize_reflections);
 PERMEND();
 
 		const float specular_horizon = saturate(1.0 + dot(R, geometric_normal));
@@ -818,6 +902,65 @@ PERMIF(PROBE_CAPTURE);
 	output.vAlbedo = float4(((diffuse_light + specular_light) * ViewConst.fPreExposure) + emissive, 1.0f);
 PERMELSE();
 PERMIF(BLEND_PASS);
+PERMIF(WATER);
+	// Water writes the scene behind instead of blending over it. The light that comes through is the opaque
+	// scene, absorbed over the length of view ray under the surface.
+
+	const float2 target_size = float2(ViewConst.vTargetSize);
+	const int2 last_pixel = int2(ViewConst.vTargetSize) - int2(1, 1);
+	const float2 pixel_uv = input.vPosition.xy / target_size;
+
+	const float surface_depth = ViewDepthFromStored(input.vPosition.z);
+	const float depth_to_ray = length(ViewConst.vEyePosition.xyz - input.vPositionWS) / max(surface_depth, 1e-4);
+
+	const float straight_depth = ViewDepthFromStored(F_SampleLoad(tSceneDepth, int3(input.vPosition.xy, 0)).r);
+	const float straight_thickness = max(straight_depth - surface_depth, 0.0) * depth_to_ray;
+
+	const float3 bend = (N - geometric_normal) * (min(straight_thickness, WATER_MAX_REFRACTION_DEPTH) * WATER_REFRACTION);
+	const float4 refracted_clip = mul(float4(input.vPositionWS + bend, 1.0), ViewConst.mViewProjection);
+	const float2 refracted_uv = saturate(((refracted_clip.xy / max(refracted_clip.w, 1e-4)) * 0.5) + 0.5);
+	const int2 refracted_pixel = min(int2(refracted_uv * target_size), last_pixel);
+	const float refracted_depth = ViewDepthFromStored(F_SampleLoad(tSceneDepth, int3(refracted_pixel, 0)).r);
+
+	// Bending onto something in front of the water would pull it under the surface, so that keeps the straight ray
+	const bool use_refracted = refracted_depth > surface_depth;
+	const float2 scene_uv = select(use_refracted, refracted_uv, pixel_uv);
+	const float scene_depth = select(use_refracted, refracted_depth, straight_depth);
+	const float thickness = max(scene_depth - surface_depth, 0.0) * depth_to_ray;
+
+	// Caustics
+	const float3 floor_position = input.vPositionWS - (V * thickness);
+	const float floor_depth = thickness * abs(dot(V, geometric_normal));
+	const float caustic_phase = ViewConst.fTime * material.fNormalScrollSpeed * WATER_CAUSTIC_SPEED;
+
+	const float3 straight_floor_position = input.vPositionWS - (V * straight_thickness);
+	const float3 floor_normal = abs(cross(ddy(straight_floor_position), ddx(straight_floor_position)));
+	const bool faces_up = floor_normal.y >= max(floor_normal.x, floor_normal.z);
+	const bool faces_x = floor_normal.x >= floor_normal.z;
+	const float2 caustic_plane = select(faces_up, floor_position.xz, select(faces_x, floor_position.zy, floor_position.xy));
+	const float2 caustic_position = caustic_plane * WATER_CAUSTIC_SCALE;
+
+	const float caustic_a = WaterCausticLayer(caustic_position, caustic_phase);
+	const float caustic_b = WaterCausticLayer((caustic_position * 1.37) + float2(3.1, 7.7), -caustic_phase * 1.3);
+	const float caustic = pow((caustic_a + caustic_b) * 0.5, 2.0);
+	const float caustic_fade = saturate(floor_depth * 4.0) * exp(-floor_depth * 0.25);
+
+	const float3 scene = F_SampleLevel(tSceneColor, scene_uv, 0.0).rgb *
+						 (1.0 + (caustic * caustic_fade * material.fCausticStrength));
+
+	// Each colour absorbes water at a different rate
+	const float3 tint = albedo / max(max(albedo.r, max(albedo.g, albedo.b)), 1e-4);
+	const float base_absorption = -log(1.0 - min(base_alpha, 0.999));
+	const float3 absorption = base_absorption * (1.0 + (WATER_ABSORPTION_SPREAD * (1.0 - tint)));
+	const float3 transmittance = exp(-absorption * thickness);
+
+	const float water_fresnel = F_Schlick(float3(0.02, 0.02, 0.02), 1.0, NdotV).g;
+
+	const float3 body = lerp(scene, diffuse_light * ViewConst.fPreExposure, 1.0 - transmittance);
+	const float3 water = (body * (1.0 - water_fresnel)) + (specular_light * ViewConst.fPreExposure);
+
+	output.vAlbedo = float4(water + emissive, 1.0f);
+PERMELSE();
 	const bool is_glass = HAS_FLAG(material.Flags, MF_GLASS);
 	const float glass_fresnel = F_Schlick(surface.vF0, 1.0, NdotV).g;
 	const float glass_alpha = lerp(base_alpha, 1.0, glass_fresnel);
@@ -827,6 +970,7 @@ PERMIF(BLEND_PASS);
 	const float3 out_light = select(is_glass, glass_light, diffuse_light + specular_light);
 
 	output.vAlbedo = float4((out_light * ViewConst.fPreExposure) + emissive, out_alpha);
+PERMEND();
 PERMELSE();
 	output.vAlbedo = float4(((diffuse_light + specular_light) * ViewConst.fPreExposure) + emissive, base_alpha);
 PERMEND();
@@ -841,7 +985,7 @@ PERMIF(DEBUG_VIEWS);
 		const float3 mirror =
 			SampleReflectionProbes(input.vPositionWS, reflect(-V, geometric_normal), 0.0, float3(0.0, 0.0, 0.0),
 								   GetReflectionProbeCount(bReflectionProbes), bReflectionProbes,
-								   F_TextureName(tReflectionProbes), tReflectionProbes);
+								   F_TextureName(tReflectionProbes), tReflectionProbes, geometric_normal, 0.0, false);
 
 		output.vAlbedo = float4(mirror * ViewConst.fPreExposure, 1.0f);
 	}
@@ -850,6 +994,20 @@ PERMIF(DEBUG_VIEWS);
 		const float shade = 0.4 + (0.6 * saturate(dot(geometric_normal, V)));
 
 		output.vAlbedo = float4(ReflectionProbeCoverage(input.vPositionWS, bReflectionProbes) * shade, 1.0f);
+	}
+
+	if (HAS_FLAG(ViewConst.Flags, DRAW_FLAG_DEBUG_REFLECTION_NORMALIZE)) {
+		// Green where reflections are used as captured, towards blue as they are dimmed (full blue at 1/4), towards
+		// red as they are brightened (full red at the REFLECTION_NORMALIZE_MAX limit)
+		const float normalization =
+			ReflectionProbeNormalizationBlend(input.vPositionWS, diffuse_normal,
+											  dot(probe_irradiance, float3(0.2126, 0.7152, 0.0722)), bReflectionProbes);
+		const float stops = log2(max(normalization, 1e-3));
+		const float dimmed = saturate(-stops * 0.5);
+		const float brightened = saturate(stops / log2(REFLECTION_NORMALIZE_MAX));
+		const float shade = 0.4 + (0.6 * saturate(dot(geometric_normal, V)));
+
+		output.vAlbedo = float4(float3(brightened, 1.0 - max(dimmed, brightened), dimmed) * shade, 1.0f);
 	}
 
 	if (HAS_FLAG(ViewConst.Flags, DRAW_FLAG_DEBUG_PROBE_VISIBILITY)) {

@@ -160,6 +160,7 @@ private:
 	CVarValue* mpShowGpuCVar = nullptr;
 	CVarValue* mpProbesCVar = nullptr;
 	CVarValue* mpReflectionProbesCVar = nullptr;
+	CVarValue* mpReflectionNormalizeCVar = nullptr;
 	CVarValue* mpReflectionDebugCVar = nullptr;
 	CVarValue* mpDecalsCVar = nullptr;
 	CVarValue* mpDebugBoundsCVar = nullptr;

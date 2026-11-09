@@ -191,6 +191,7 @@ PERMEND();
 PERMNOT(UNLIT);
 PERMIF(USE_NORMAL_MAPS);
     float3 normal_ts = F_Sample(tNormalMap, input.vUV).rgb * 2.0 - 1.0;
+    normal_ts.xy *= material.fNormalStrength;
 
     // Re-orthonormalised the same way Forward.hlsl does it, so the prepass normals the SSAO pass reads match
     // what the lighting pass shades with. rsqrt guards a degenerate tangent instead of producing a NaN.

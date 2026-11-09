@@ -49,6 +49,8 @@ struct SourceBrush
 	bool bCastsShadow = true;
 
 	bool bPortal = false;
+	/// Filled with a water material, which absorbs the light that crosses it in the indirect bake
+	bool bWater = false;
 
 	Array<int32> PlaneIndices;
 	Array<TextureMap> Maps;
@@ -115,6 +117,7 @@ public:
 	SizedArray<SourcePatch> Patches;
 	SizedArray<CompiledMapMaterial> Materials;
 	Array<uint8> OpaqueMaterials;
+	Array<uint8> WaterMaterials;
 	SizedArray<String> Warnings;
 
 	Array<Vec3d> Entities;

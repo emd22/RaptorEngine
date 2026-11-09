@@ -9,6 +9,8 @@ class PerspectiveCamera;
 class NoClipController : public BaseController
 {
 public:
+	NoClipController();
+
 	Vec3f Update(double delta_time, const Vec3f input, const PerspectiveCamera& camera, bool sprinting) override;
 };
 

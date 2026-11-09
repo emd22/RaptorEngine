@@ -465,8 +465,10 @@ uint32 ProbeManager::SelectVolume(const Vec3f position) const
 	return best;
 }
 
+/// `out_coverage` is the share of the trilinear weight on placed probes against placed and empty grid points (solid
+/// ones don't count), as SampleProbeVolumeIrradiance() computes it in ProbeCommon.hlsli.
 bool ProbeManager::SampleVolume(const Vec3f position, uint32 volume_index, const float32* basis,
-								Vec3f& out_irradiance) const
+								Vec3f& out_irradiance, float32& out_coverage) const
 {
 	const ProbeVolumeData& volume = mLayout.Volumes[volume_index];
 
@@ -486,6 +488,7 @@ bool ProbeManager::SampleVolume(const Vec3f position, uint32 volume_index, const
 
 	Vec3f irradiance(0.0f);
 	float32 total_weight = 0.0f;
+	float32 open_weight = 0.0f;
 
 	for (uint32 corner = 0; corner < 8; corner++) {
 		const uint32 offset[3] = { corner & 1U, (corner >> 1) & 1U, (corner >> 2) & 1U };
@@ -510,6 +513,10 @@ bool ProbeManager::SampleVolume(const Vec3f position, uint32 volume_index, const
 
 		const uint16 probe_index = mLayout.Grid[grid_index];
 
+		if (probe_index == Limits::ProbeGridEmpty) {
+			open_weight += weight;
+		}
+
 		if (probe_index >= Limits::ProbeGridSolid || weight <= 0.0f) {
 			continue;
 		}
@@ -522,6 +529,8 @@ bool ProbeManager::SampleVolume(const Vec3f position, uint32 volume_index, const
 
 		total_weight += weight;
 	}
+
+	out_coverage = total_weight / std::max(total_weight + open_weight, 1e-6f);
 
 	if (total_weight <= 1e-6f) {
 		return false;
@@ -545,15 +554,28 @@ bool ProbeManager::SampleIrradiance(const Vec3f position, const Vec3f normal, Ve
 
 	const uint32 volume_index = SelectVolume(position);
 
-	if (SampleVolume(position, volume_index, basis, out_irradiance)) {
+	float32 coverage = 0.0f;
+	const bool sampled = SampleVolume(position, volume_index, basis, out_irradiance, coverage);
+
+	if (volume_index == 0 || coverage >= 0.999f) {
+		return sampled;
+	}
+
+	// Like the shader, a cell of a sparse volume that is partly empty is filled in from the base volume
+	Vec3f base_irradiance;
+	float32 base_coverage;
+
+	if (!SampleVolume(position, 0, basis, base_irradiance, base_coverage)) {
+		return sampled;
+	}
+
+	if (!sampled) {
+		out_irradiance = base_irradiance;
 		return true;
 	}
 
-	if (volume_index != 0) {
-		return SampleVolume(position, 0, basis, out_irradiance);
-	}
-
-	return false;
+	out_irradiance = out_irradiance + ((base_irradiance - out_irradiance) * (1.0f - coverage));
+	return true;
 }
 
 void ProbeManager::Destroy()
@@ -1543,18 +1565,59 @@ bool ProbeManager::ReadBackReflectionProbe(uint32 probe_index)
 	return true;
 }
 
+/// The shader scales each cubemap by the light probe irradiance where it is used over the irradiance here. Taking both
+/// from the light probes (not from the cubemap itself) makes the scale exactly 1 at the capture point, and it follows
+/// the light probes when they are rebaked without the reflections. Kept as an ambient cube (one value per axis
+/// direction, blended by the squared normal), which unlike a linear fit can't go negative where the light is one-sided.
+void ProbeManager::SampleCaptureIrradiance(const Vec3f position, ReflectionProbeGpu& probe) const
+{
+	static const Vec3f scAxes[3] = { Vec3f(1.0f, 0.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f) };
+
+	const auto luminance = [](const Vec3f color)
+	{ return (color.X * 0.2126f) + (color.Y * 0.7152f) + (color.Z * 0.0722f); };
+
+	std::fill(std::begin(probe.CaptureIrradiancePositive), std::end(probe.CaptureIrradiancePositive), 0.0f);
+	std::fill(std::begin(probe.CaptureIrradianceNegative), std::end(probe.CaptureIrradianceNegative), 0.0f);
+
+	float32 positive[3];
+	float32 negative[3];
+
+	for (uint32 axis = 0; axis < 3; axis++) {
+		Vec3f positive_irradiance;
+		Vec3f negative_irradiance;
+
+		if (!SampleIrradiance(position, scAxes[axis], positive_irradiance) ||
+			!SampleIrradiance(position, -scAxes[axis], negative_irradiance)) {
+			return;
+		}
+
+		positive[axis] = luminance(positive_irradiance);
+		negative[axis] = luminance(negative_irradiance);
+	}
+
+	std::copy(std::begin(positive), std::end(positive), probe.CaptureIrradiancePositive);
+	std::copy(std::begin(negative), std::end(negative), probe.CaptureIrradianceNegative);
+	probe.CaptureIrradiancePositive[3] = 1.0f;
+}
+
 void ProbeManager::UploadReflectionProbes(uint32 visible_count)
 {
 	renderer::GraphicsBackend* graphics = renderer::gGraphics;
 
 	graphics->GetDevice()->WaitForIdle();
 
-	ReflectionProbeData gpu_probes[Limits::MaxReflectionProbes];
-	memcpy(gpu_probes, mReflectionProbes, sizeof(gpu_probes));
+	ReflectionProbeGpu gpu_probes[Limits::MaxReflectionProbes] {};
 
-	for (ReflectionProbeData& probe : gpu_probes) {
-		probe.PositionAndCount[3] = static_cast<float32>(visible_count);
-		probe.Fade[3] = static_cast<float32>(mReflectionProbeCount);
+	for (uint32 i = 0; i < Limits::MaxReflectionProbes; i++) {
+		ReflectionProbeGpu& probe = gpu_probes[i];
+
+		probe.Probe = mReflectionProbes[i];
+		probe.Probe.PositionAndCount[3] = static_cast<float32>(visible_count);
+		probe.Probe.Fade[3] = static_cast<float32>(mReflectionProbeCount);
+
+		if (i < mReflectionProbeCount) {
+			SampleCaptureIrradiance(GetReflectionProbePosition(i), probe);
+		}
 	}
 
 	UploadRange(graphics->ReflectionProbeBuffer, gpu_probes, 0, sizeof(gpu_probes));

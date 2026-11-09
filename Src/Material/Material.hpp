@@ -40,6 +40,8 @@ enum class eMaterialFlags : uint32
 	/// Both faces are drawn (glTF doubleSided), with the back face lit with a flipped normal.
 	DoubleSided = (1 << 3),
 	Glass = (1 << 4),
+	/// A calm water surface: a clear blend like glass, but reflecting with water's fixed reflectance.
+	Water = (1 << 5),
 };
 
 FxEnumFlags(eMaterialFlags);
@@ -133,9 +135,20 @@ struct MaterialProperties
 	float32 EmissiveFactor[3] = { 0.0f, 0.0f, 0.0f };
 
 	float32 AlphaCutoff = 0.5f;
+
+	/// Scales the tangent space tilt of the normal map, 0 is flat
+	float32 NormalStrength = 1.0f;
+
+	/// Water only: how fast its normal map drifts, in texture repeats per second. 0 keeps it still
+	float32 NormalScrollSpeed = 0.0f;
+
+	float32 Padding = 0.0f;
+
+	/// Water only: how much the light patterns on the floor under it brighten the floor. 0 has none
+	float32 CausticStrength = 0.0f;
 };
 
-static_assert(sizeof(MaterialProperties) == 64,
+static_assert(sizeof(MaterialProperties) == 80,
 			  "MaterialProperties must match `Material` in Shaders/MaterialDef.hlsli");
 
 /**
@@ -197,7 +210,8 @@ public:
 	void SetSupportsSkinning(bool value) { bSupportsSkinning = value; }
 
 	FX_FORCE_INLINE bool IsGlass() const { return HasFlag(Properties.Flags, eMaterialFlags::Glass); }
-	FX_FORCE_INLINE bool IsTransparent() const { return Properties.Alpha < 0.999f || IsGlass(); }
+	FX_FORCE_INLINE bool IsWater() const { return HasFlag(Properties.Flags, eMaterialFlags::Water); }
+	FX_FORCE_INLINE bool IsTransparent() const { return Properties.Alpha < 0.999f || IsGlass() || IsWater(); }
 
 	FX_FORCE_INLINE MaterialID GetID() const { return ID; }
 
@@ -221,6 +235,10 @@ public:
 	void SetAlphaMask(bool value);
 	void SetDoubleSided(bool value);
 	void SetGlass(bool value);
+	void SetWater(bool value);
+	void SetNormalStrength(float32 strength);
+	void SetNormalScrollSpeed(float32 speed);
+	void SetCausticStrength(float32 strength);
 	void SetAlpha(float32 alpha);
 	void SetMetallicRoughness(float32 metallic, float32 roughness);
 

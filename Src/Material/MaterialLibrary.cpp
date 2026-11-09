@@ -113,8 +113,9 @@ MaterialID MaterialLibrary::CreateMaterial(Entry& entry) const
 	AttachTexture(material, Material::eResourceType::Normal, definition.NormalPath, name);
 	const bool has_orm = AttachTexture(material, Material::eResourceType::ORM, definition.OrmPath, name);
 
+	// With an ORM bound, metallic/roughness scale the texture's B/G channels
 	if (has_orm) {
-		material->SetMetallicRoughness(1.0f, 1.0f);
+		material->SetMetallicRoughness(definition.Metallic.value_or(1.0f), definition.Roughness.value_or(1.0f));
 	}
 
 	if (definition.Alpha < 1.0f) {
@@ -129,6 +130,10 @@ MaterialID MaterialLibrary::CreateMaterial(Entry& entry) const
 		material->SetGlass(true);
 	}
 
+	if (definition.bWater) {
+		material->SetWater(true);
+	}
+
 	if (!has_orm) {
 		const float32 metallic = definition.Metallic.value_or(material->Properties.MetallicFactor);
 		const float32 roughness = definition.Roughness.value_or(material->Properties.RoughnessFactor);
@@ -141,6 +146,18 @@ MaterialID MaterialLibrary::CreateMaterial(Entry& entry) const
 		const float32 base_color[3] = { color.X, color.Y, color.Z };
 
 		material->SetBaseColorFactor(base_color);
+	}
+
+	if (definition.NormalStrength.has_value()) {
+		material->SetNormalStrength(*definition.NormalStrength);
+	}
+
+	if (definition.NormalScrollSpeed.has_value()) {
+		material->SetNormalScrollSpeed(*definition.NormalScrollSpeed);
+	}
+
+	if (definition.CausticStrength.has_value()) {
+		material->SetCausticStrength(*definition.CausticStrength);
 	}
 
 	material->Finalize();

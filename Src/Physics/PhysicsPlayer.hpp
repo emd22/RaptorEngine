@@ -87,6 +87,10 @@ public:
 
 	void Update(float64 delta_time);
 
+	FX_FORCE_INLINE bool HasGravity() const { return (MathUtil::IsCloseTo(GravityMultiplier, 0.0f)); }
+	FX_FORCE_INLINE void SetGravityMultiplier(const float32 multiplier) { GravityMultiplier = multiplier; }
+	FX_FORCE_INLINE float32 GetGravityMultiplier() const { return GravityMultiplier; }
+
 private:
 	class ContactListener final : public JPH::CharacterContactListener
 	{
@@ -135,6 +139,8 @@ public:
 	float32 CoyoteTime = scDefaultCoyoteTime;
 	float32 mTimeSinceGrounded = 1.0e6f;
 
+	float32 GravityMultiplier = 1.0f;
+
 	// float32 HeadRecoveryYOffset = 0.0f;
 	float mTime = 0.01f;
 
@@ -142,6 +148,7 @@ public:
 	bool bCollisionEnabled : 1 = true;
 
 	bool bDisableGravity : 1 = false;
+
 
 	bool mbJumpPending : 1 = false;
 	bool mbJumpConsumed : 1 = false;

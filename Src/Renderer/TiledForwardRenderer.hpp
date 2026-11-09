@@ -194,37 +194,44 @@ private:
 
 	void GenerateRandomTexture(uint32 size);
 
-
 public:
-	DescriptorPool DescriptorPool;
-
 	FX_FORCE_INLINE uint32 GetLightTileColumns() const { return mLightTileColumns; }
 	FX_FORCE_INLINE uint32 GetLightTileRows() const { return mLightTileRows; }
 
 	uint32 GetViewConstants(const BaseCamera& camera, eObjectLayer layer);
 
+
+public:
+	DescriptorPool DescriptorPool;
+
+
 	/// Depth + Normal prepass
 	RenderStage Prepass;
+
 	/// Main Forward+ lit pass
 	RenderStage ForwardPass;
-	/// Particles over the lit target, sampling the prepass depth for soft edges
+
+	/* Water + Blending */
+	/// Copies of the opaque lit target and depth, pre any sort of blending passes
+	RenderStage SceneCopyPass;
+	/// Continues ForwardPass on the same targets once the scene has been copied
+	RenderStage ForwardBlendPass;
+
 	RenderStage ParticlePass;
-	/// SSAO pass
+
+	/* SSAO */
 	RenderStage SSAOPass;
-	/// SSAO blur pass
 	RenderStage SSAODenoisePass;
 	RenderStage SSAOBlurPass;
-	/// Blends the integrated froxel fog over the lit target
+
+	/* Volumetric Lighting */
 	RenderStage FogApplyPass;
-	/// Froxel fog: lighting per froxel, with one extra slice for the light past the grid
 	Image FroxelLighting;
-	/// Froxel fog: in-scatter accumulated from the eye to the far edge of each slice
 	Image FroxelIntegrated;
-	/// Froxel fog: last frame's FroxelLighting, reprojected into this frame's inject
 	Image FroxelHistory;
-	/// Froxel fog: per column nearest surface depth and the far end of the surface connected to it
 	Image FroxelSurface;
-	/// Composition pass, combine results from all passes
+
+	/* Composition, combines results from previous passes */
 	RenderStage CompPass;
 
 

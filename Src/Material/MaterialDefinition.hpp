@@ -22,6 +22,7 @@ struct MaterialDefinition
 	float32 Alpha = 1.0f;
 	bool bUnlit = false;
 	bool bGlass = false;
+	bool bWater = false;
 
 	String Surface;
 	std::optional<float32> Density;
@@ -29,8 +30,11 @@ struct MaterialDefinition
 	std::optional<float32> Metallic;
 	std::optional<float32> Roughness;
 	std::optional<Vec3f> BaseColor;
+	std::optional<float32> NormalStrength;
+	std::optional<float32> NormalScrollSpeed;
+	std::optional<float32> CausticStrength;
 
-	bool IsTransparent() const { return bGlass || Alpha < 0.999f; }
+	bool IsTransparent() const { return bGlass || bWater || Alpha < 0.999f; }
 };
 
 using MaterialDefinitionArray = DynArray<MaterialDefinition, GrowthFunctions::Double>;

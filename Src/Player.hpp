@@ -3,6 +3,7 @@
 #include <Asset/Animation.hpp>
 #include <Controller/NoClipController.hpp>
 #include <Controller/PlayerController.hpp>
+#include <Controller/SwimController.hpp>
 #include <Core/Ref.hpp>
 #include <Core/String.hpp>
 #include <Math/MathUtil.hpp>
@@ -227,6 +228,7 @@ private:
 
 	PlayerController mWalkController;
 	NoClipController mNoClipController;
+	SwimController mSwimController;
 
 	enum eViewKickChannel : uint32
 	{
@@ -262,6 +264,7 @@ private:
 		String Path;
 		Object* pObject = nullptr;
 		Ref<Skeleton> pSkeleton { nullptr };
+
 		/// Position of the view joint in model space. The joint sits at the camera and looks down the model's -Z.
 		Vec3f ViewOrigin = Vec3f::sZero;
 		bool bHasViewJoint = false;
@@ -272,16 +275,16 @@ private:
 	int32 mActiveViewModel = -1;
 
 	Object* mpViewModel = nullptr;
+
 	/// Shared by every mesh in the view model. Null if the view model has no skeleton.
 	Ref<Skeleton> mpViewModelSkeleton { nullptr };
 
-	/**
-	 * @brief The view model's rotation: the camera's rotation with the sway applied in the camera's local space.
-	 */
 	Quat mViewModelRotation = Quat::scIdentity;
+
 	/// How far (radians) the view model currently trails the camera's yaw and pitch.
 	float32 mViewModelSwayYaw = 0.0f;
 	float32 mViewModelSwayPitch = 0.0f;
+
 	/// Camera angles from the previous view model update, used to find how far the camera turned.
 	float32 mPrevCameraYaw = 0.0f;
 	float32 mPrevCameraPitch = 0.0f;

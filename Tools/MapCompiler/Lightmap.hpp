@@ -110,6 +110,7 @@ struct LightmapStats
 	uint32 IndirectBlockerCount = 0;
 	uint32 IndirectModelTriangleCount = 0;
 	uint32 IndirectModelCellCount = 0;
+	uint32 IndirectWaterVolumeCount = 0;
 	uint32 IndirectLightCount = 0;
 	uint32 MissingAlbedoCount = 0;
 	uint64 IndirectRayCount = 0;

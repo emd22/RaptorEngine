@@ -35,6 +35,9 @@ void Player::Create()
 	mNoClipController.Speed = scWalkSpeed * 1.75f;
 	mNoClipController.SprintSpeed = scSprintSpeed * 2.0f;
 
+	mSwimController.Speed = scWalkSpeed * 0.5f;
+	mSwimController.SprintSpeed = scSprintSpeed * 0.5f;
+
 	Weapons.Create(this);
 
 	pFlashlight = gLightManager->NewLight<LightSpot>("Flashlight");
@@ -167,6 +170,9 @@ void Player::ResetMotion()
 {
 	mWalkController.Reset();
 	mNoClipController.Reset();
+	mSwimController.Reset();
+
+
 	mHorizontalSpeed = 0.0f;
 
 	mLandingOffset = 0.0f;
@@ -245,6 +251,7 @@ void Player::Move(float64 delta_time, const Vec3f offset)
 {
 	BaseController& controller = GetController();
 	controller.SpeedMultiplier = SpeedMultiplier;
+	Physics.SetGravityMultiplier(controller.GetGravityMultiplier());
 
 	const Vec3f velocity = controller.Update(delta_time, offset, *pCamera, bIsSprinting);
 

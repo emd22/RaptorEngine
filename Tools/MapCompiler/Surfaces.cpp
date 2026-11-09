@@ -28,6 +28,7 @@ struct Face
 	int32 PlaneIndex = PlaneSet::scNone;
 	int32 MaterialIndex = 0;
 	int32 MapIndex = 0;
+	uint32 BrushIndex = 0;
 	bool bCastsShadow = true;
 
 	Winding Original;
@@ -937,7 +938,18 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 	Array<Face> faces;
 	Array<LeafFragment> fragments;
 
-	for (const SourceBrush& brush : source.Brushes) {
+	const auto is_water_face = [&source](int32 material_index)
+	{
+		return material_index != SourceBrush::scDroppedFace &&
+			   source.WaterMaterials[static_cast<size_t>(material_index)] != 0;
+	};
+
+	Array<uint32> water_face_counts;
+
+	for (uint32 brush_index = 0; brush_index < source.Brushes.Size; brush_index++) {
+		const SourceBrush& brush = source.Brushes[brush_index];
+		water_face_counts.Emplace(0u);
+
 		if (!brush.bVisible) {
 			continue;
 		}
@@ -950,10 +962,15 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 				continue;
 			}
 
+			if (is_water_face(material_index)) {
+				water_face_counts[brush_index]++;
+			}
+
 			Face face;
 			face.PlaneIndex = side.PlaneIndex;
 			face.MaterialIndex = material_index;
 			face.MapIndex = FindOrAddMap(*map);
+			face.BrushIndex = brush_index;
 			face.bCastsShadow = brush.bCastsShadow;
 			face.Original = CopyWinding(side.Points);
 			face.Min = Vec3d(1e30, 1e30, 1e30);
@@ -1018,6 +1035,22 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 		}
 	}
 
+	Array<Face> ordered;
+
+	for (Face& face : faces) {
+		if (!is_water_face(face.MaterialIndex)) {
+			ordered.Emplace(std::move(face));
+		}
+	}
+
+	for (Face& face : faces) {
+		if (is_water_face(face.MaterialIndex)) {
+			ordered.Emplace(std::move(face));
+		}
+	}
+
+	faces = std::move(ordered);
+
 	HashMap<int32, Array<size_t>> faces_on_plane;
 
 	for (size_t i = 0; i < faces.Size; i++) {
@@ -1067,6 +1100,26 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 		}
 
 		earlier_faces.Emplace(i);
+	}
+
+	Array<uint32> visible_water_faces;
+
+	for (uint32 brush_index = 0; brush_index < source.Brushes.Size; brush_index++) {
+		visible_water_faces.Emplace(0u);
+	}
+
+	for (const Face& face : faces) {
+		if (is_water_face(face.MaterialIndex) && face.Visible.Size > 0) {
+			visible_water_faces[face.BrushIndex]++;
+		}
+	}
+
+	for (uint32 brush_index = 0; brush_index < source.Brushes.Size; brush_index++) {
+		if (water_face_counts[brush_index] > 0 && visible_water_faces[brush_index] == 0) {
+			Warnings.Emplace(String::Fmt("water brush '{}' is buried in solid brushes and is not drawn, carve a basin "
+										 "for it or raise it above the floor",
+										 source.Brushes[brush_index].Name));
+		}
 	}
 
 	for (Face& face : faces) {
@@ -1539,9 +1592,6 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 		surface.MaterialIndex = batch.MaterialIndex;
 		surface.Area = batch.Area;
 
-		// surface.Vertices = CopyToSizedArray(batch.Vertices);
-		// surface.Indices = CopyToSizedArray(batch.Indices);
-
 		surface.Vertices = ArrayUtil::DynToSizedArray(batch.Vertices);
 		surface.Indices = ArrayUtil::DynToSizedArray(batch.Indices);
 
@@ -1549,21 +1599,11 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 			surface.Colors = ArrayUtil::DynToSizedArray(batch.Colors);
 		}
 
-		// for (int32 axis = 0; axis < 3; axis++) {
-		// 	surface.BoundsMin[axis] = surface.Vertices[0].Position[axis];
-		// 	surface.BoundsMax[axis] = surface.Vertices[0].Position[axis];
-		// }
-
 		surface.Bounds = BBox(surface.Vertices[0].Position, surface.Vertices[0].Position);
 
 		for (const CompiledMapVertex& vertex : surface.Vertices) {
 			surface.Bounds = BBox(Vec3f::Min(surface.Bounds.Min, vertex.Position),
 								  Vec3f::Max(surface.Bounds.Max, vertex.Position));
-
-			// for (int32 axis = 0; axis < 3; axis++) {
-			// 	surface.BoundsMin[axis] = std::min(surface.BoundsMin[axis], vertex.Position[axis]);
-			// 	surface.BoundsMax[axis] = std::max(surface.BoundsMax[axis], vertex.Position[axis]);
-			// }
 		}
 
 		Stats.NumTriangles += static_cast<uint32>(surface.Indices.Size / 3);

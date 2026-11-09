@@ -1,4 +1,5 @@
 #include "IndirectLight.hpp"
+
 #include "Models.hpp"
 
 #include <ktx.h>
@@ -38,6 +39,11 @@ constexpr uint32 scNoShading = std::numeric_limits<uint32>::max();
 constexpr uint32 scSkyHit = std::numeric_limits<uint32>::max();
 constexpr uint32 scDarkHit = scSkyHit - 1;
 
+constexpr uint32 scWaterSkyHit = scSkyHit - 2;
+
+/// Matches WATER_ABSORPTION_SPREAD in Forward.hlsl
+constexpr float32 scWaterAbsorptionSpread = 3.0f;
+
 float32 GetLuminance(const Vec3f& color) { return color.Dot(Vec3f(0.2126f, 0.7152f, 0.0722f)); }
 
 uint8 EncodeDirection(float32 value)
@@ -72,7 +78,6 @@ struct AlbedoTexture
 	}
 };
 
-/// Box filters the base colour of `texture` down to at most 128 px and destroys `texture`
 bool ReadAlbedoKtx(ktxTexture* texture, AlbedoTexture& out_texture)
 {
 	constexpr uint32 scAlbedoMipSize = 128;
@@ -193,7 +198,7 @@ constexpr float32 scDefaultAlbedo = 0.5f;
 
 /// Fills the first `materials.Size` entries of `albedos`
 void LoadAlbedos(const SizedArray<CompiledMapMaterial>& materials, SizedArray<AlbedoTexture>& albedos,
-				 uint32& out_missing)
+				 SizedArray<float32>& out_alphas, uint32& out_missing)
 {
 	const MaterialDefinitionArray definitions = LoadMaterialDefinitions(scMaterialRoot);
 
@@ -202,6 +207,7 @@ void LoadAlbedos(const SizedArray<CompiledMapMaterial>& materials, SizedArray<Al
 		AlbedoTexture& albedo = albedos[i];
 
 		albedo.InitConstant(Vec3f(scDefaultAlbedo));
+		out_alphas[i] = 1.0f;
 
 		const auto found = std::find_if(definitions.begin(), definitions.end(),
 										[&material](const MaterialDefinition& definition)
@@ -214,6 +220,8 @@ void LoadAlbedos(const SizedArray<CompiledMapMaterial>& materials, SizedArray<Al
 
 			continue;
 		}
+
+		out_alphas[i] = found->Alpha;
 
 		if (found->DiffusePath.IsEmpty()) {
 			albedo.InitConstant(Vec3f(1.0f));
@@ -240,8 +248,7 @@ void LoadAlbedos(const SizedArray<CompiledMapMaterial>& materials, SizedArray<Al
 }
 
 /// Fills the model materials of `albedos`, from index `first` on
-void LoadModelAlbedos(const ModelBuilder& models, SizedArray<AlbedoTexture>& albedos, uint32 first,
-					  uint32& out_missing)
+void LoadModelAlbedos(const ModelBuilder& models, SizedArray<AlbedoTexture>& albedos, uint32 first, uint32& out_missing)
 {
 	for (uint32 i = 0; i < models.GetMaterialCount(); i++) {
 		const loader::StaticModelMaterial& material = models.GetMaterial(i);
@@ -894,6 +901,138 @@ private:
 	int32 mRoot = 0;
 };
 
+struct WaterPath
+{
+	Vec3f Transmittance = Vec3f(1.0f);
+	/// Albedo of the water the path crossed, which scatters the light it absorbs
+	Vec3f Color = Vec3f(0.0f);
+
+	bool bCrossed = false;
+};
+
+/// The water brushes, as convex volumes that absorb light like the WATER shader permutation does
+class WaterVolumes
+{
+public:
+	void Add(const PlaneSet& planes, const Array<int32>& plane_indices, const AlbedoTexture& albedo, float32 alpha)
+	{
+		Volume& volume = mVolumes.Emplace();
+
+		for (const int32 plane_index : plane_indices) {
+			const Plane& plane = planes[plane_index];
+			volume.Planes.Emplace(VolumePlane { plane.Normal.ToVec3f(), static_cast<float32>(plane.Distance) });
+		}
+
+		Vec3f color(0.0f);
+
+		for (const Vec3f& texel : albedo.Texels) {
+			color += texel;
+		}
+
+		color = color * (1.0f / static_cast<float32>(std::max<size_t>(albedo.Texels.Size, 1)));
+
+		// `alpha` is how much of the water's own colour one metre absorbs, the other colours go faster
+		const Vec3f tint = color * (1.0f / std::fmax(std::fmax(color.X, std::fmax(color.Y, color.Z)), 1e-4f));
+		const float32 base_absorption = -std::log(1.0f - std::clamp(alpha, 0.0f, 0.999f));
+
+		volume.Absorption = (Vec3f(1.0f) + (Vec3f(1.0f) - tint) * scWaterAbsorptionSpread) * base_absorption;
+		volume.Color = CapAlbedo(color);
+	}
+
+	bool IsEmpty() const { return mVolumes.Size == 0; }
+
+	uint32 GetCount() const { return mVolumes.Size; }
+
+	WaterPath Trace(const Vec3f& origin, const Vec3f& direction, float32 max_distance) const
+	{
+		WaterPath path;
+
+		Vec3f depth(0.0f);
+		Vec3f color_sum(0.0f);
+		float32 length_sum = 0.0f;
+
+		for (const Volume& volume : mVolumes) {
+			const float32 length = GetLength(volume, origin, direction, max_distance);
+
+			if (length <= 0.0f) {
+				continue;
+			}
+
+			depth += volume.Absorption * length;
+			color_sum += volume.Color * length;
+			length_sum += length;
+		}
+
+		if (length_sum <= 0.0f) {
+			return path;
+		}
+
+		path.bCrossed = true;
+		path.Transmittance = Vec3f(std::exp(-depth.X), std::exp(-depth.Y), std::exp(-depth.Z));
+		path.Color = color_sum * (1.0f / length_sum);
+
+		return path;
+	}
+
+private:
+	struct VolumePlane
+	{
+		Vec3f Normal = Vec3f(0.0f);
+		float32 Distance = 0.0f;
+	};
+
+	struct Volume
+	{
+		Array<VolumePlane> Planes;
+
+		/// Per metre, per channel
+		Vec3f Absorption = Vec3f(0.0f);
+		Vec3f Color = Vec3f(0.0f);
+	};
+
+	/// Length of origin + direction * [0, max_distance] inside the volume
+	static float32 GetLength(const Volume& volume, const Vec3f& origin, const Vec3f& direction, float32 max_distance)
+	{
+		// Rays to the sky end where they leave the water, this only keeps an open volume finite
+		constexpr float32 scMaxLength = 1e5f;
+		constexpr float32 scParallel = 1e-9f;
+
+		float32 enter = 0.0f;
+		float32 exit = std::fmin(max_distance, scMaxLength);
+
+		for (const VolumePlane& plane : volume.Planes) {
+			const float32 distance = plane.Normal.Dot(origin) - plane.Distance;
+			const float32 speed = plane.Normal.Dot(direction);
+
+			if (std::abs(speed) < scParallel) {
+				if (distance > 0.0f) {
+					return 0.0f;
+				}
+
+				continue;
+			}
+
+			const float32 time = -distance / speed;
+
+			if (speed < 0.0f) {
+				enter = std::fmax(enter, time);
+			}
+			else {
+				exit = std::fmin(exit, time);
+			}
+
+			if (enter >= exit) {
+				return 0.0f;
+			}
+		}
+
+		return exit - enter;
+	}
+
+private:
+	Array<Volume> mVolumes;
+};
+
 struct GatherHit
 {
 	Vec3f Albedo = Vec3f(0.0f);
@@ -1463,9 +1602,7 @@ bool WriteImage(const String& path, uint32 width, uint32 height, const Vec3f* ir
 constexpr uint32 scNoCell = std::numeric_limits<uint32>::max();
 
 /**
- * @brief Bake-only radiance cache for model triangles, which have no lightmap texels. World space is cut into cubic
- * cells, split again by which of the six axis directions a triangle faces, so the two sides of a thin wall stay apart.
- * Each cell is gathered like a texel from the sample point nearest the middle of the model surface inside it.
+ * @brief Bake-only radiance cache for model triangles
  */
 class ModelCache
 {
@@ -1517,7 +1654,8 @@ public:
 					  {
 						  Accumulator& accumulator = accumulators[mCells.find(GetKey(point, facing))->second];
 
-						  const Vec3f offset = point - accumulator.Sum * (1.0f / static_cast<float32>(accumulator.Count));
+						  const Vec3f offset = point -
+											   accumulator.Sum * (1.0f / static_cast<float32>(accumulator.Count));
 						  const float32 distance = offset.Dot(offset);
 
 						  if (distance < accumulator.BestDistance) {
@@ -1679,9 +1817,9 @@ class IndirectBake
 public:
 	IndirectBake(const MapSource& source, const IndirectInput& input, const Scene& scene,
 				 const Array<TriangleShading>& shadings, const SizedArray<AlbedoTexture>& albedos,
-				 const ModelCache& cache)
+				 const ModelCache& cache, const WaterVolumes& water)
 		: mSource(source), mInput(input), mScene(scene), mShadings(shadings), mAlbedos(albedos), mCache(cache),
-		  mTexelCount(static_cast<uint64>(input.Width) * input.Height)
+		  mWater(water), mTexelCount(static_cast<uint64>(input.Width) * input.Height)
 	{
 	}
 
@@ -1706,7 +1844,9 @@ public:
 		return mInput.pNormals[sample];
 	}
 
-	/// Cells have no baked sun visibility, so they trace the middle of the sun disc
+	/**
+	 * @brief Cells have no baked sun visibility so we need to trace the middle of the sun disc
+	 */
 	float32 GetSunVisibility(uint64 sample, const Vec3f& position, const Vec3f& sun_direction) const
 	{
 		if (!IsCell(sample)) {
@@ -1735,7 +1875,13 @@ public:
 
 			if (sun_cosine > 0.0f) {
 				const float32 visibility = GetSunVisibility(texel, position, sun_direction);
-				irradiance += mSource.SunColor.ToVec3f() * (sun_cosine * visibility);
+				Vec3f sun = mSource.SunColor.ToVec3f() * (sun_cosine * visibility);
+
+				if (visibility > 0.0f && !mWater.IsEmpty()) {
+					sun = sun * mWater.Trace(position, sun_direction, scNoHit).Transmittance;
+				}
+
+				irradiance += sun;
 			}
 		}
 
@@ -1774,7 +1920,13 @@ public:
 				continue;
 			}
 
-			irradiance += light.Color.ToVec3f() * (attenuation * cosine);
+			Vec3f light_irradiance = light.Color.ToVec3f() * (attenuation * cosine);
+
+			if (!mWater.IsEmpty()) {
+				light_irradiance = light_irradiance * mWater.Trace(position, direction, distance).Transmittance;
+			}
+
+			irradiance += light_irradiance;
 		}
 
 		return irradiance * FX_1_OVER_PI;
@@ -1832,12 +1984,44 @@ public:
 		return cached;
 	}
 
+
+	GatherHit TraceWaterHit(const Vec3f& origin, const Vec3f& direction) const
+	{
+		GatherHit hit = TraceHit(origin, direction);
+
+		if (mWater.IsEmpty() || hit.Texel == scDarkHit) {
+			return hit;
+		}
+
+		const WaterPath path = mWater.Trace(origin, direction, hit.Distance);
+
+		if (!path.bCrossed) {
+			return hit;
+		}
+
+		const Vec3f scattered = (Vec3f(1.0f) - path.Transmittance) * path.Color;
+
+		if (hit.Texel == scSkyHit) {
+			hit.Texel = scWaterSkyHit;
+			hit.Albedo = (path.Transmittance + scattered) * scMaxAlbedo;
+		}
+		else {
+			hit.Albedo = hit.Albedo * path.Transmittance + scattered;
+		}
+
+		return hit;
+	}
+
 	static Vec3f GetRadiance(const GatherHit& hit, const Vec3f* direct, const Vec3f* indirect)
 	{
 		constexpr float32 scSkyRadiance = 1500.0f / FX_PI;
 
 		if (hit.Texel == scSkyHit) {
 			return Vec3f(scSkyRadiance);
+		}
+
+		if (hit.Texel == scWaterSkyHit) {
+			return hit.Albedo * (scSkyRadiance / scMaxAlbedo);
 		}
 
 		if (hit.Texel == scDarkHit) {
@@ -1878,7 +2062,7 @@ public:
 				hit.Albedo = DecodeCachedAlbedo(cache[ray].Albedo);
 			}
 			else {
-				hit = TraceHit(origin, direction);
+				hit = TraceWaterHit(origin, direction);
 
 				if (cache != nullptr) {
 					cache[ray] = CachedHit { hit.Texel, EncodeCachedAlbedo(hit.Albedo) };
@@ -1953,7 +2137,7 @@ public:
 		double sums_sq[cTexelCount] = {};
 
 		for (const ProbeRay& ray : rays) {
-			const GatherHit hit = TraceHit(position, ray.Direction);
+			const GatherHit hit = TraceWaterHit(position, ray.Direction);
 			const Vec3f radiance = GetRadiance(hit, direct, indirect);
 
 			for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
@@ -1997,13 +2181,13 @@ private:
 	const Array<TriangleShading>& mShadings;
 	const SizedArray<AlbedoTexture>& mAlbedos;
 	const ModelCache& mCache;
+	const WaterVolumes& mWater;
 	uint64 mTexelCount = 0;
 };
 
 constexpr uint32 scTransportLevels = TransportStats::scLevelCount;
 constexpr uint32 scNoCluster = std::numeric_limits<uint32>::max();
 
-/// Square blocks of texels per chart at each level. Level 0 is the texel itself.
 class TransportClusters
 {
 public:
@@ -2215,99 +2399,98 @@ void MeasureTransport(const IndirectBake& bake, const IndirectInput& input, cons
 	std::atomic<uint64> dark_rays { 0 };
 	std::atomic<uint64> unmapped_rays { 0 };
 
-	RunParallel(
-		job_count, 4,
-		[&](uint32 job)
-		{
-			const uint32 first = job_offsets[job];
-			const uint32 count = job_offsets[job + 1] - first;
+	RunParallel(job_count, 4,
+				[&](uint32 job)
+				{
+					const uint32 first = job_offsets[job];
+					const uint32 count = job_offsets[job + 1] - first;
 
-			if (count == 0) {
-				return;
-			}
-
-			const uint32* job_texel = job_texels.pData + first;
-
-			SizedArray<uint32> hits;
-			hits.InitSize(static_cast<uint64>(count) * ray_count);
-
-			uint64 sky = 0;
-			uint64 dark = 0;
-			uint64 unmapped = 0;
-
-			for (uint32 i = 0; i < count; i++) {
-				uint32* texel_hits = hits.pData + static_cast<uint64>(i) * ray_count;
-
-				bake.TraceGatherHits(job_texel[i], directions, texel_hits);
-
-				for (uint32 ray = 0; ray < ray_count; ray++) {
-					const uint32 hit = texel_hits[ray];
-
-					if (hit == scSkyHit) {
-						sky++;
-					}
-					else if (hit == scDarkHit) {
-						dark++;
-					}
-					else if (clusters.Get(1, hit) == scNoCluster) {
-						unmapped++;
-					}
-				}
-			}
-
-			total_rays.fetch_add(static_cast<uint64>(count) * ray_count, std::memory_order_relaxed);
-			sky_rays.fetch_add(sky, std::memory_order_relaxed);
-			dark_rays.fetch_add(dark, std::memory_order_relaxed);
-			unmapped_rays.fetch_add(unmapped, std::memory_order_relaxed);
-
-			Array<uint32> keys;
-			Array<uint32> runs;
-
-			for (uint32 receiver_level = 0; receiver_level < scTransportLevels; receiver_level++) {
-				bool grouped[scMaxJobTexels] = {};
-				uint32 members[scMaxJobTexels];
-
-				for (uint32 i = 0; i < count; i++) {
-					if (grouped[i]) {
-						continue;
+					if (count == 0) {
+						return;
 					}
 
-					const uint32 receiver = clusters.Get(receiver_level, job_texel[i]);
-					uint32 member_count = 0;
+					const uint32* job_texel = job_texels.pData + first;
 
-					for (uint32 j = i; j < count; j++) {
-						if (!grouped[j] && clusters.Get(receiver_level, job_texel[j]) == receiver) {
-							grouped[j] = true;
-							members[member_count++] = j;
-						}
-					}
+					SizedArray<uint32> hits;
+					hits.InitSize(static_cast<uint64>(count) * ray_count);
 
-					for (uint32 source_level = 0; source_level < scTransportLevels; source_level++) {
-						keys.Clear();
+					uint64 sky = 0;
+					uint64 dark = 0;
+					uint64 unmapped = 0;
 
-						for (uint32 m = 0; m < member_count; m++) {
-							const uint32* texel_hits = hits.pData + static_cast<uint64>(members[m]) * ray_count;
+					for (uint32 i = 0; i < count; i++) {
+						uint32* texel_hits = hits.pData + static_cast<uint64>(i) * ray_count;
 
-							for (uint32 ray = 0; ray < ray_count; ray++) {
-								const uint32 hit = texel_hits[ray];
+						bake.TraceGatherHits(job_texel[i], directions, texel_hits);
 
-								if (hit == scSkyHit || hit == scDarkHit) {
-									continue;
-								}
+						for (uint32 ray = 0; ray < ray_count; ray++) {
+							const uint32 hit = texel_hits[ray];
 
-								const uint32 source = clusters.Get(source_level, hit);
-
-								if (source != scNoCluster) {
-									keys.Emplace(source);
-								}
+							if (hit == scSkyHit) {
+								sky++;
+							}
+							else if (hit == scDarkHit) {
+								dark++;
+							}
+							else if (clusters.Get(1, hit) == scNoCluster) {
+								unmapped++;
 							}
 						}
-
-						CountLinks(keys, runs, texel_links[receiver_level][source_level]);
 					}
-				}
-			}
-		});
+
+					total_rays.fetch_add(static_cast<uint64>(count) * ray_count, std::memory_order_relaxed);
+					sky_rays.fetch_add(sky, std::memory_order_relaxed);
+					dark_rays.fetch_add(dark, std::memory_order_relaxed);
+					unmapped_rays.fetch_add(unmapped, std::memory_order_relaxed);
+
+					Array<uint32> keys;
+					Array<uint32> runs;
+
+					for (uint32 receiver_level = 0; receiver_level < scTransportLevels; receiver_level++) {
+						bool grouped[scMaxJobTexels] = {};
+						uint32 members[scMaxJobTexels];
+
+						for (uint32 i = 0; i < count; i++) {
+							if (grouped[i]) {
+								continue;
+							}
+
+							const uint32 receiver = clusters.Get(receiver_level, job_texel[i]);
+							uint32 member_count = 0;
+
+							for (uint32 j = i; j < count; j++) {
+								if (!grouped[j] && clusters.Get(receiver_level, job_texel[j]) == receiver) {
+									grouped[j] = true;
+									members[member_count++] = j;
+								}
+							}
+
+							for (uint32 source_level = 0; source_level < scTransportLevels; source_level++) {
+								keys.Clear();
+
+								for (uint32 m = 0; m < member_count; m++) {
+									const uint32* texel_hits = hits.pData + static_cast<uint64>(members[m]) * ray_count;
+
+									for (uint32 ray = 0; ray < ray_count; ray++) {
+										const uint32 hit = texel_hits[ray];
+
+										if (hit == scSkyHit || hit == scDarkHit) {
+											continue;
+										}
+
+										const uint32 source = clusters.Get(source_level, hit);
+
+										if (source != scNoCluster) {
+											keys.Emplace(source);
+										}
+									}
+								}
+
+								CountLinks(keys, runs, texel_links[receiver_level][source_level]);
+							}
+						}
+					}
+				});
 
 	LinkAccumulator probe_links[scTransportLevels];
 	const uint32 probe_count = map.Probes.GetProbeCount();
@@ -2610,9 +2793,8 @@ void BuildTransport(const IndirectBake& bake, const IndirectInput& input, const 
 
 					// Runs are sorted by count, so the links that fall under the floor are always the last ones. The
 					// strongest link is always kept so the rescale below has something to divide by.
-					while (kept < runs.Size &&
-						   (kept == 0 || (static_cast<float32>(kept_hits) < needed &&
-										  static_cast<float32>(runs[kept].Count) >= min_hits))) {
+					while (kept < runs.Size && (kept == 0 || (static_cast<float32>(kept_hits) < needed &&
+															  static_cast<float32>(runs[kept].Count) >= min_hits))) {
 						kept_hits += runs[kept].Count;
 						kept++;
 					}
@@ -2628,8 +2810,8 @@ void BuildTransport(const IndirectBake& bake, const IndirectInput& input, const 
 					cluster.LinkCount = kept;
 
 					for (uint32 i = 0; i < kept; i++) {
-						links.Emplace(CompiledMapTransportLink {
-							runs[i].Source, static_cast<float32>(runs[i].Count) * scale });
+						links.Emplace(
+							CompiledMapTransportLink { runs[i].Source, static_cast<float32>(runs[i].Count) * scale });
 					}
 
 					for (const TransportRun& run : runs) {
@@ -2689,7 +2871,21 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 	SizedArray<AlbedoTexture> albedos;
 	albedos.InitSize(out_map.Materials.Size + model_material_count);
 
-	LoadAlbedos(out_map.Materials, albedos, out_stats.MissingAlbedoCount);
+	SizedArray<float32> alphas;
+	alphas.InitSize(out_map.Materials.Size, 1.0f);
+
+	LoadAlbedos(out_map.Materials, albedos, alphas, out_stats.MissingAlbedoCount);
+
+	WaterVolumes water;
+
+	if (input.pPlanes != nullptr) {
+		for (const SourceBrush& brush : source.Brushes) {
+			if (brush.bWater && brush.MaterialIndex >= 0 && static_cast<size_t>(brush.MaterialIndex) < alphas.Size) {
+				water.Add(*input.pPlanes, brush.PlaneIndices, albedos[static_cast<size_t>(brush.MaterialIndex)],
+						  alphas[static_cast<size_t>(brush.MaterialIndex)]);
+			}
+		}
+	}
 
 	if (models != nullptr) {
 		LoadModelAlbedos(*models, albedos, first_model_material, out_stats.MissingAlbedoCount);
@@ -2809,7 +3005,7 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 	directions.InitSize(sample_count, Vec3f(0.0f));
 	variance.InitSize(sample_count, 0.0f);
 
-	const IndirectBake bake(source, input, scene, shadings, albedos, model_cache);
+	const IndirectBake bake(source, input, scene, shadings, albedos, model_cache, water);
 
 	RunParallel(texels.Size, [&](uint32 i) { direct[texels[i]] = bake.GetDirect(texels[i]); });
 	RunParallel(model_cache.GetCount(),
@@ -2958,11 +3154,13 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 	out_stats.IndirectBlockerCount = scene.GetTriangleCount() - surface_triangle_count - model_triangle_count;
 	out_stats.IndirectModelTriangleCount = model_triangle_count;
 	out_stats.IndirectModelCellCount = model_cache.GetCount();
+	out_stats.IndirectWaterVolumeCount = water.GetCount();
 	out_stats.IndirectLightCount = source.Lights.Size;
 	out_stats.IndirectRayCount = static_cast<uint64>(texels.Size) * options.IndirectRays +
 								 static_cast<uint64>(texels.Size - cached_texel_count) * options.IndirectRays *
 									 (options.IndirectBounces - 1) +
-								 static_cast<uint64>(model_cache.GetCount()) * options.IndirectRays * options.IndirectBounces;
+								 static_cast<uint64>(model_cache.GetCount()) * options.IndirectRays *
+									 options.IndirectBounces;
 	out_stats.IndirectCachedTexelCount = cached_texel_count;
 	out_stats.IndirectTexelCount = texels.Size;
 	out_stats.IndirectCacheMegabytes = static_cast<double>(cached_texel_count * cache_bytes_per_texel) /

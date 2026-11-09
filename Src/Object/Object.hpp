@@ -110,6 +110,7 @@ public:
 	FX_FORCE_INLINE const MaterialID& GetMaterialID() const { return mMaterialID; };
 	FX_FORCE_INLINE eSpecialMaterial GetSpecialMaterial() const { return mMaterialID.GetSpecial(); }
 	bool HasTransparentMaterial() const;
+	bool HasWaterMaterial() const;
 
 	void SetMaterial(const MaterialID& id);
 
@@ -164,6 +165,9 @@ public:
 	void SetDecal(bool value);
 
 	void ApplyVolumeState();
+
+	/// Takes the collider out of the physics world for things that are walked through (volumes, water)
+	void ApplyColliderState();
 
 	/// True if this object marks out a probe volume rather than being level geometry
 	FX_FORCE_INLINE bool IsProbeVolume() const { return HasTags(eObjectTag::ProbeVolume); }

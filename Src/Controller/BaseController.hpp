@@ -32,6 +32,9 @@ public:
 
 	float32 GetMaxSpeed(bool sprinting) const;
 
+	FX_FORCE_INLINE float32 GetGravityMultiplier() const { return GravityMultiplier; }
+	FX_FORCE_INLINE void SetGravityMultiplier(const float32 multiplier) { GravityMultiplier = multiplier; }
+
 protected:
 	/**
 	 * @brief Applies direction to the velocity.
@@ -43,6 +46,8 @@ public:
 	float32 SprintSpeed = scDefaultSprintSpeed;
 	float32 SpeedMultiplier = 1.0f;
 	float32 MovementLerpSpeed = scDefaultMovementLerpSpeed;
+
+	float32 GravityMultiplier = 1.0f;
 
 protected:
 	Vec3f mVelocity = Vec3f::sZero;

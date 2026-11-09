@@ -25,6 +25,9 @@ struct IndirectInput
 	const Vec3f* pPositions = nullptr;
 	const Vec3f* pNormals = nullptr;
 
+	/// The brush planes of the map, for the water volumes
+	const PlaneSet* pPlanes = nullptr;
+
 	SizedArray<URect> LightmapRects;
 };
 

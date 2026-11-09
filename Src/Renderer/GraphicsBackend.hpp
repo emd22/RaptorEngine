@@ -106,6 +106,12 @@ public:
 	void BeginPrepass();
 	void BeginGeometry();
 
+	/**
+	 * @brief Ends the opaque part of the forward pass, copies the lit target and depth for water to sample, and
+	 * continues in ForwardBlendPass. Called once per frame at most, before the blended draws.
+	 */
+	void CopySceneForWater();
+
 	void RenderEarlyFrameEffects(PerspectiveCamera& camera);
 
 	void RenderFog(PerspectiveCamera& camera);
@@ -387,10 +393,14 @@ public:
 	/// Turn off the probe lighting or the decals in every draw, to see what they cost in the GPU timings
 	bool bDisableProbes = false;
 	bool bDisableReflectionProbes = false;
+	bool bDisableReflectionNormalize = false;
 	uint32 ReflectionDebugView = 0;
 	bool bDisableDecals = false;
 
 	float32 PreExposure = 1.0f;
+
+	/// Seconds the game has run for, advanced by every tick's delta. Drives shader animation such as water ripples
+	float64 ShaderTime = 0.0;
 
 	uint32 Tonemapper = 1;
 
@@ -428,6 +438,9 @@ protected:
 
 	Mat4f mFogPrevCameraMatrix = Mat4f::scIdentity;
 	uint32 mFroxelHistoryFrame = UINT32_MAX;
+
+	/// The stage the geometry is being drawn into, ForwardPass or ForwardBlendPass after CopySceneForWater()
+	RenderStage* mpActiveForwardStage = nullptr;
 
 	// TSQueue<DeletionObject> mDeletionQueue;
 };

@@ -55,7 +55,7 @@ static bool CastsShadows(const Object& object)
 
 	const Material* material = MaterialManagerFwd::GetMaterial(object.GetMaterialID());
 
-	return (material == nullptr || !material->IsGlass());
+	return (material == nullptr || !(material->IsGlass() || material->IsWater()));
 }
 
 /**
@@ -312,6 +312,16 @@ void World::ExecuteTransparentRenderLists()
 	std::sort(SortedEntryBuffer.pData, SortedEntryBuffer.pData + SortedEntryBuffer.Size,
 			  [](const TransparentObjectCarrier& a, const TransparentObjectCarrier& b)
 			  { return a.Distance > b.Distance; });
+
+	// Water reads the opaque scene behind it, which has to be copied out before anything is blended over it
+	for (const TransparentObjectCarrier& transparent_object : SortedEntryBuffer) {
+		const Object* object = gObjectManager->GetObject(transparent_object.ID);
+
+		if (object != nullptr && object->HasWaterMaterial()) {
+			gGraphics->CopySceneForWater();
+			break;
+		}
+	}
 
 	const bool is_debug_view = gGraphics->HasDebugView();
 

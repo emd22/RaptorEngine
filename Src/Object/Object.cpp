@@ -53,11 +53,15 @@ void Object::SetMaterial(const MaterialID& id)
 	}
 
 	const eSpecialMaterial previous_special = GetSpecialMaterial();
+	const bool was_water = HasWaterMaterial();
 
 	mMaterialID = id;
 
 	if (IsBrushMarkerMaterial(previous_special) || IsBrushMarkerMaterial(GetSpecialMaterial())) {
 		ApplyVolumeState();
+	}
+	else if (was_water != HasWaterMaterial()) {
+		ApplyColliderState();
 	}
 
 	// if (bIsAddedToWorld && !ID.IsInvalid() && pMesh.IsValid()) {
@@ -617,6 +621,13 @@ bool Object::HasTransparentMaterial() const
 	return (material != nullptr && material->IsTransparent());
 }
 
+bool Object::HasWaterMaterial() const
+{
+	const Material* material = gMaterialManager->GetMaterial(mMaterialID);
+
+	return (material != nullptr && material->IsWater());
+}
+
 bool Object::CanBeFrustumCulled() const
 {
 	if (!IsCullable() || !pMesh.IsValid() || mObjectLayer != eObjectLayer::WorldLayer) {
@@ -850,17 +861,26 @@ void Object::ApplyVolumeState()
 	SetProbeVisible(!is_volume);
 	SetShadowCaster(!is_volume);
 
+	ApplyColliderState();
+}
+
+void Object::ApplyColliderState()
+{
 	// Deactivating a body is not enough, a static one still collides, so take it out of the world entirely
 	physics::Body* body = gPhysics->GetBody(PhysicsID);
 
-	if (body != nullptr && body->mbHasPhysicsBody) {
-		// An invisible collider is the one marker that still has to be solid
-		if (is_volume && GetSpecialMaterial() != eSpecialMaterial::NvBrush) {
-			body->RemoveFromWorld();
-		}
-		else {
-			body->AddToWorld();
-		}
+	if (body == nullptr || !body->mbHasPhysicsBody) {
+		return;
+	}
+
+	// An invisible collider is the one marker that still has to be solid
+	const bool is_passable_volume = IsVolume() && GetSpecialMaterial() != eSpecialMaterial::NvBrush;
+
+	if (is_passable_volume || HasWaterMaterial()) {
+		body->RemoveFromWorld();
+	}
+	else {
+		body->AddToWorld();
 	}
 }
 

@@ -1284,7 +1284,7 @@ static int32 FindWorldFacePlane(const Brush& brush, const Object& object, const 
 	return plane_index;
 }
 
-void RaptorEditor::TopViewMoveFace(const Vec3f world_normal, float32 distance, const DynArray<ObjectID>& object_ids)
+void RaptorEditor::TopViewMoveFaces(const DynArray<TopViewFaceRef>& faces, float32 distance)
 {
 	if (IsSimulationMode() || !IsToolAvailable(eEditorTool::Face) || std::fabs(distance) < scMinMoveDistance) {
 		return;
@@ -1293,37 +1293,40 @@ void RaptorEditor::TopViewMoveFace(const Vec3f world_normal, float32 distance, c
 	struct FaceMove
 	{
 		Object* pObject = nullptr;
+		int32 PlaneIndex = Brush::scNoPlane;
 		Vec3f LocalNormal;
 	};
 
 	DoublingArray<FaceMove> moves;
 
-	for (const ObjectID object_id : object_ids) {
-		Object* object = FindTopViewObject(object_id);
+	for (const TopViewFaceRef& face : faces) {
+		Object* object = FindTopViewObject(face.ObjectId);
 
 		if (object == nullptr || object->HasTags(eObjectTag::LockTransform) || !CanEditObject(object)) {
+			continue;
+		}
+
+		const Brush* brush = gWorld->pPrototype->GetBrush(object);
+
+		if (brush == nullptr) {
+			continue;
+		}
+
+		const int32 plane_index = FindWorldFacePlane(*brush, *object, face.Normal);
+
+		if (plane_index == Brush::scNoPlane) {
 			continue;
 		}
 
 		bool is_listed = false;
 
 		for (const FaceMove& move : moves) {
-			is_listed = is_listed || (move.pObject == object);
+			is_listed = is_listed || (move.pObject == object && move.PlaneIndex == plane_index);
 		}
 
-		const Brush* brush = gWorld->pPrototype->GetBrush(object);
-
-		if (is_listed || brush == nullptr) {
-			continue;
+		if (!is_listed) {
+			moves.Insert(FaceMove { object, plane_index, brush->Planes[plane_index].Normal });
 		}
-
-		const int32 plane_index = FindWorldFacePlane(*brush, *object, world_normal);
-
-		if (plane_index == Brush::scNoPlane) {
-			continue;
-		}
-
-		moves.Insert(FaceMove { object, brush->Planes[plane_index].Normal });
 	}
 
 	for (const FaceMove& move : moves) {

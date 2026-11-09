@@ -1,0 +1,6 @@
+handle RPlayer;
+
+impl RPlayer
+{
+	extern float3 GetPosition(RPlayer player);
+}

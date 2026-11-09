@@ -343,6 +343,8 @@ void RaptorGame::CreateGame()
 	gCVars->Set("r_probe_bounces", 3);
 	gCVars->Set("r_compiled_probes", 1);
 	mpReflectionProbesCVar = gCVars->Set("r_reflection_probes", 1);
+	// 0 = reflection probes are not scaled to the light probe irradiance where they are used, for A/B
+	mpReflectionNormalizeCVar = gCVars->Set("r_reflection_normalize", 1);
 	gCVars->Set("r_reflection_level_probe", 0);
 	mpReflectionDebugCVar = gCVars->Set("r_reflection_debug", 0);
 
@@ -677,10 +679,10 @@ void RaptorGame::ProcessControls()
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_4) && mpReflectionDebugCVar != nullptr) {
-		static const char* const scViewNames[] = { "off", "mirror reflections", "probe coverage" };
+		static const char* const scViewNames[] = { "off", "mirror reflections", "probe coverage", "normalization" };
 
-		mpReflectionDebugCVar->IntValue = (std::clamp<int64>(mpReflectionDebugCVar->IntValue, 0, 2) + 1) % 3;
-		LogInfo("Reflection probe debug view: {}", scViewNames[mpReflectionDebugCVar->IntValue]);
+		mpReflectionDebugCVar->IntValue = (std::clamp<int64>(mpReflectionDebugCVar->IntValue, 0, 3) + 1) % 4;
+		LogInfo("Reflection probe debug view {}", scViewNames[mpReflectionDebugCVar->IntValue]);
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_F)) {
@@ -1359,6 +1361,7 @@ void RaptorGame::Tick()
 	}
 
 	gGraphics->DeltaTime = static_cast<float32>(DeltaTime);
+	gGraphics->ShaderTime += DeltaTime;
 
 	mFpsWindowTime += DeltaTime;
 
@@ -1481,8 +1484,10 @@ void RaptorGame::Tick()
 	gGraphics->bDisableProbes = (mpProbesCVar != nullptr) && (mpProbesCVar->IntValue == 0);
 	gGraphics->bDisableReflectionProbes = (mpReflectionProbesCVar != nullptr) &&
 										  (mpReflectionProbesCVar->IntValue == 0);
+	gGraphics->bDisableReflectionNormalize = (mpReflectionNormalizeCVar != nullptr) &&
+											 (mpReflectionNormalizeCVar->IntValue == 0);
 	gGraphics->ReflectionDebugView = (mpReflectionDebugCVar != nullptr)
-										 ? static_cast<uint32>(std::clamp<int64>(mpReflectionDebugCVar->IntValue, 0, 2))
+										 ? static_cast<uint32>(std::clamp<int64>(mpReflectionDebugCVar->IntValue, 0, 3))
 										 : 0;
 	gGraphics->Tonemapper = (mpTonemapperCVar != nullptr)
 								? static_cast<uint32>(std::clamp<int64>(mpTonemapperCVar->IntValue, 0, 1))

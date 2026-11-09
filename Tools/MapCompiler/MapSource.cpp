@@ -19,6 +19,7 @@ struct CachedMaterials
 {
 	HashMap<String, bool> ModelColliders;
 	HashMap<String, bool> TransparentMaterials;
+	HashMap<String, bool> WaterMaterials;
 };
 
 
@@ -157,8 +158,16 @@ void AddLights(const ConfigEntry* list, Array<SourceLight>& out_lights)
 void ReadMaterialFlags(CachedMaterials& out_materials)
 {
 	for (const MaterialDefinition& definition : LoadMaterialDefinitions(scMaterialRoot)) {
-		if (definition.IsTransparent() && FindSpecialMaterial(definition.Name.CStr()) == eSpecialMaterial::None) {
+		if (FindSpecialMaterial(definition.Name.CStr()) != eSpecialMaterial::None) {
+			continue;
+		}
+
+		if (definition.IsTransparent()) {
 			out_materials.TransparentMaterials.Insert(definition.Name, true);
+		}
+
+		if (definition.bWater) {
+			out_materials.WaterMaterials.Insert(definition.Name, true);
 		}
 	}
 }
@@ -218,6 +227,7 @@ int32 MapSource::FindOrAddMaterial(const String& name, int32 library_index, cons
 
 	Materials.Emplace(CompiledMapMaterial { name, library_index });
 	OpaqueMaterials.Emplace(static_cast<uint8>(!mc.TransparentMaterials.Contains(name)));
+	WaterMaterials.Emplace(static_cast<uint8>(mc.WaterMaterials.Contains(name)));
 
 	return static_cast<int32>(Materials.Size - 1);
 }
@@ -400,6 +410,12 @@ void MapSource::AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& nam
 			source.bSolid = false;
 			source.bCastsShadow = false;
 			TransparentBrushCount++;
+		}
+
+		// Water can be walked into, unlike glass
+		if (mc.WaterMaterials.Contains(material_name)) {
+			source.bCollides = false;
+			source.bWater = true;
 		}
 		break;
 	}

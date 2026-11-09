@@ -216,23 +216,6 @@ double ThicknessAlong(const TopViewProjection& projection, const Vec2d normal)
 	return high - low;
 }
 
-const TopViewFace* FindMatchingFace(const TopViewProjection& projection, const Vec2d normal)
-{
-	const TopViewFace* best = nullptr;
-	double best_dot = scFaceMatchDot;
-
-	for (const TopViewFace& face : projection.Faces) {
-		const double dot = ToVec2d(face.Normal).Dot(normal);
-
-		if (dot > best_dot) {
-			best_dot = dot;
-			best = &face;
-		}
-	}
-
-	return best;
-}
-
 const TopViewFace* FindSideFace(const TopViewProjection& projection, const Vec3f& world_normal)
 {
 	const TopViewFace* best = nullptr;
@@ -288,7 +271,13 @@ bool IsInsidePolygon(const DynArray<Vec2f>& polygon, const Vec2d point)
 	return !(has_positive && has_negative);
 }
 
-DynArray<Vec2f> BuildShiftedPolygon(const TopViewProjection& projection, const TopViewFace& face, double shift)
+struct ShiftedFace
+{
+	const TopViewFace* pFace = nullptr;
+	double Shift = 0.0;
+};
+
+DynArray<Vec2f> BuildShiftedPolygon(const TopViewProjection& projection, const DynArray<ShiftedFace>& faces)
 {
 	struct HalfPlane
 	{
@@ -307,9 +296,6 @@ DynArray<Vec2f> BuildShiftedPolygon(const TopViewProjection& projection, const T
 		return result;
 	}
 
-	const Vec2d face_normal = ToVec2d(face.Normal);
-	const double face_offset = face_normal.Dot(ToVec2d(face.A));
-
 	DynArray<HalfPlane> planes;
 	Vec2d center(0.0, 0.0);
 
@@ -327,14 +313,28 @@ DynArray<Vec2f> BuildShiftedPolygon(const TopViewProjection& projection, const T
 		const Vec2d normal(along.Y / length, -along.X / length);
 		const double offset = normal.Dot(from);
 
-		if (normal.Dot(face_normal) > scFaceMatchDot && std::fabs(offset - face_offset) < scFaceSameLineTolerance) {
-			continue;
+		bool is_shifted = false;
+
+		for (const ShiftedFace& shifted : faces) {
+			const Vec2d face_normal = ToVec2d(shifted.pFace->Normal);
+			const double face_offset = face_normal.Dot(ToVec2d(shifted.pFace->A));
+
+			if (normal.Dot(face_normal) > scFaceMatchDot && std::fabs(offset - face_offset) < scFaceSameLineTolerance) {
+				is_shifted = true;
+			}
 		}
 
-		planes.Insert(HalfPlane { normal, offset });
+		if (!is_shifted) {
+			planes.Insert(HalfPlane { normal, offset });
+		}
 	}
 
-	planes.Insert(HalfPlane { face_normal, face_offset + shift });
+	for (const ShiftedFace& shifted : faces) {
+		const Vec2d face_normal = ToVec2d(shifted.pFace->Normal);
+		const double face_offset = face_normal.Dot(ToVec2d(shifted.pFace->A));
+
+		planes.Insert(HalfPlane { face_normal, face_offset + shifted.Shift });
+	}
 
 	DynArray<Vec2d> polygon;
 	polygon.Insert(Vec2d(center.X - scClipExtent, center.Y - scClipExtent));
@@ -1037,18 +1037,29 @@ void TopViewCanvas::ClearPickedFaces()
 	Refresh();
 }
 
-DynArray<ObjectID> TopViewCanvas::GetFaceDragTargets() const
+DynArray<TopViewFaceRef> TopViewCanvas::GetFaceDragTargets() const
 {
-	DynArray<ObjectID> targets;
-	targets.Insert(mGrabbedBrushId);
+	DynArray<TopViewFaceRef> targets;
+	targets.Insert(TopViewFaceRef { mGrabbedBrushId, mGrabbedFace.WorldNormal });
 
 	for (const TopViewFaceRef& face : mPickedFaces) {
-		if (face.Normal.Dot(mGrabbedFace.WorldNormal) <= scFaceMatchDot) {
+		const TopViewBrush* brush = FindBrush(face.ObjectId);
+
+		// Front faces point along the view axis, so a 2D drag cannot move them
+		if (brush == nullptr || FindSideFace(Projection(*brush), face.Normal) == nullptr) {
 			continue;
 		}
 
-		if (std::find(targets.begin(), targets.end(), face.ObjectId) == targets.end()) {
-			targets.Insert(face.ObjectId);
+		bool is_listed = false;
+
+		for (const TopViewFaceRef& target : targets) {
+			if (target.ObjectId == face.ObjectId && target.Normal.Dot(face.Normal) > scFaceMatchDot) {
+				is_listed = true;
+			}
+		}
+
+		if (!is_listed) {
+			targets.Insert(face);
 		}
 	}
 
@@ -3594,23 +3605,32 @@ void TopViewCanvas::UpdatePreview()
 		mPreview.Shift = shift;
 		mPreview.NormalUV = normal;
 
-		const DynArray<ObjectID> targets = GetFaceDragTargets();
+		const DynArray<TopViewFaceRef> targets = GetFaceDragTargets();
 
 		for (const TopViewBrush& brush : mState.Brushes) {
-			if (std::find(targets.begin(), targets.end(), brush.ObjectId) == targets.end()) {
-				continue;
-			}
-
 			const TopViewProjection& projection = Projection(brush);
-			const TopViewFace* face = FindMatchingFace(projection, normal);
+			DynArray<ShiftedFace> faces;
 
-			if (face == nullptr) {
+			for (const TopViewFaceRef& target : targets) {
+				if (target.ObjectId != brush.ObjectId) {
+					continue;
+				}
+
+				const TopViewFace* face = FindSideFace(projection, target.Normal);
+
+				if (face == nullptr) {
+					continue;
+				}
+
+				const double thickness = ThicknessAlong(projection, ToVec2d(face->Normal));
+				faces.Insert(ShiftedFace { face, std::max(shift, std::min(0.0, min_thickness - thickness)) });
+			}
+
+			if (faces.IsEmpty()) {
 				continue;
 			}
 
-			const double brush_shift = std::max(shift,
-												std::min(0.0, min_thickness - ThicknessAlong(projection, normal)));
-			DynArray<Vec2f> polygon = BuildShiftedPolygon(projection, *face, brush_shift);
+			DynArray<Vec2f> polygon = BuildShiftedPolygon(projection, faces);
 
 			if (polygon.Size >= 3) {
 				mPreview.Outlines.Insert(OutlinePreview { brush.ObjectId, std::move(polygon) });
@@ -4110,12 +4130,10 @@ void TopViewCanvas::FinishFace()
 		return;
 	}
 
-	const Vec3f normal = ToWorldVector(mPreview.NormalUV, 0.0);
 	const float32 distance = static_cast<float32>(mPreview.Shift);
 
 	HoldPreview();
-	SendCommand([normal, distance, targets = GetFaceDragTargets()]
-				{ gEditor->TopViewMoveFace(normal, distance, targets); });
+	SendCommand([distance, targets = GetFaceDragTargets()] { gEditor->TopViewMoveFaces(targets, distance); });
 }
 
 void TopViewCanvas::FinishCreate()

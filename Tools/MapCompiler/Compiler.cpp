@@ -503,6 +503,11 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 
 	log(String::Fmt("  faces        {}, {} removed, {} clipped, {} overlaps cut", stats.NumSrcFaces, stats.FacesRemoved,
 					stats.FacesClipped, stats.OverlapsRemoved));
+
+	for (const String& warning : surfaces.Warnings) {
+		log(String::Fmt("  warning      {}", warning));
+	}
+
 	log(String::Fmt("  polygons     {} pieces merged into {}, {} T-junctions fixed", stats.NumPolygonsBeforeMerge,
 					stats.NumPolygons, stats.TJunctionsFixed));
 
@@ -540,7 +545,6 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 			log(String::Fmt("  warning      probes are only kept out of the first {} of {} brushes",
 							source.ProbeBoxes.Boxes.Size, source.ProbeBoxes.ObjectCount));
 		}
-
 	}
 
 	if (result.bHasLightmap) {
@@ -580,6 +584,11 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 								options.Lightmap.ModelCellSize));
 			}
 
+			if (baked.IndirectWaterVolumeCount > 0) {
+				log(String::Fmt("  indirect     {} water volumes absorb the rays that cross them",
+								baked.IndirectWaterVolumeCount));
+			}
+
 			if (baked.IndirectCachedTexelCount > 0) {
 				log(String::Fmt("  hit cache    {} of {} texels ({:.1f}%) reuse their first bounce hits, {:.0f} MB",
 								baked.IndirectCachedTexelCount, baked.IndirectTexelCount,
@@ -611,7 +620,8 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 								"measured in {:.1f} s",
 								transport.RaysPerTexel, 100.0 * static_cast<double>(transport.SkyRayCount) / ray_count,
 								100.0 * static_cast<double>(transport.DarkRayCount) / ray_count,
-								100.0 * static_cast<double>(transport.UnmappedRayCount) / ray_count, transport.Seconds));
+								100.0 * static_cast<double>(transport.UnmappedRayCount) / ray_count,
+								transport.Seconds));
 
 				for (uint32 level = 0; level < TransportStats::scLevelCount; level++) {
 					const uint32 block = 1U << level;
@@ -630,13 +640,14 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 					const double mean95 = static_cast<double>(links.Link95Sum) / receivers;
 					const uint32 block = 1U << source_level;
 
-					log(String::Fmt("  transport    {} <- {}x{}: {} receivers, links unique {:.1f}, 90% {:.1f}, 95% {:.1f}, "
-									"99% {:.1f}, max 95% {}, {:.1f} MB at 95%",
-									receiver, block, block, links.ReceiverCount,
-									static_cast<double>(links.UniqueLinkSum) / receivers,
-									static_cast<double>(links.Link90Sum) / receivers, mean95,
-									static_cast<double>(links.Link99Sum) / receivers, links.MaxLink95,
-									receivers * mean95 * scBytesPerLink / scBytesPerMegabyte));
+					log(String::Fmt(
+						"  transport    {} <- {}x{}: {} receivers, links unique {:.1f}, 90% {:.1f}, 95% {:.1f}, "
+						"99% {:.1f}, max 95% {}, {:.1f} MB at 95%",
+						receiver, block, block, links.ReceiverCount,
+						static_cast<double>(links.UniqueLinkSum) / receivers,
+						static_cast<double>(links.Link90Sum) / receivers, mean95,
+						static_cast<double>(links.Link99Sum) / receivers, links.MaxLink95,
+						receivers * mean95 * scBytesPerLink / scBytesPerMegabyte));
 				};
 
 				for (uint32 receiver_level = 0; receiver_level < TransportStats::scLevelCount; receiver_level++) {
@@ -693,7 +704,6 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 			log("  warning      there are no light probes, so models and other objects without a lightmap are not "
 				"shadowed by the world");
 		}
-
 	}
 	else if (!options.Lightmap.bEnabled) {
 		log("  lightmap     off");

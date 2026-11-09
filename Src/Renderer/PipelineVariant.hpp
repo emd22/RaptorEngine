@@ -21,6 +21,8 @@ enum class ePipelineFeatures : uint32
 	Lightmap = (1 << 4),
 	/// The object has a per-vertex colour stream that tints its albedo and scales its opacity
 	VertexColor = (1 << 5),
+	/// Water samples the opaque scene behind it for depth absorption and refraction (blend passes only)
+	Water = (1 << 6),
 };
 
 FxEnumFlags(ePipelineFeatures);
@@ -53,6 +55,6 @@ enum class ePipelinePass : uint8
 constexpr uint32 scNumPipelinePasses = static_cast<uint32>(ePipelinePass::Count);
 
 /// Every combination of the ePipelineFeatures bits
-constexpr uint32 scNumFeatureCombinations = 1U << 6;
+constexpr uint32 scNumFeatureCombinations = 1U << 7;
 
 } // namespace fx::renderer

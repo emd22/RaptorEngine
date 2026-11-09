@@ -322,7 +322,7 @@ private:
 	void PickFace(ObjectID object_id, const Vec3f& normal, bool additive);
 	void UnpickFace(ObjectID object_id, const Vec3f& normal);
 	void ClearPickedFaces();
-	DynArray<ObjectID> GetFaceDragTargets() const;
+	DynArray<TopViewFaceRef> GetFaceDragTargets() const;
 	void UpdateHover();
 	bool PickVertexAt(const Vec2d uv, TopViewVertexHandle& out_handle) const;
 	bool IsVertexSelected(ObjectID object_id, const Vec2d uv) const;

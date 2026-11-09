@@ -2007,6 +2007,9 @@ void Blockout::RebuildBrush(Object* object, Brush&& brush, physics::eMotionType 
 	if (IsBrushMarkerMaterial(object->GetSpecialMaterial())) {
 		object->ApplyVolumeState();
 	}
+	else if (object->HasWaterMaterial()) {
+		object->ApplyColliderState();
+	}
 
 	mBrushes.Insert(object->ID.GetID(), std::move(brush));
 }
@@ -3888,6 +3891,12 @@ void Blockout::BuildSubview(Subview& subview)
 				for (const uint32 index : mesh.Indices) {
 					builder->Indices.push_back(first_vertex + index);
 				}
+			}
+
+			const Material* member_material = gMaterialManager->GetMaterial(member.Material);
+
+			if (member_material != nullptr && member_material->IsWater()) {
+				continue;
 			}
 
 			SizedArray<Vec3f>& hull = hulls.emplace_back();

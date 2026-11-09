@@ -407,7 +407,7 @@ EditorPanelState RaptorEditor::BuildPanelState()
 	world.DebugMask = gCVars->Get("r_debug_bounds", int64 { 0 });
 	world.bReflectionsEnabled = gCVars->Get("r_reflection_probes", int64 { 1 }) != 0;
 	world.bReflectionFallback = gCVars->Get("r_reflection_level_probe", int64 { 0 }) != 0;
-	world.ReflectionDebugView = std::clamp<int64>(gCVars->Get("r_reflection_debug", int64 { 0 }), 0, 2);
+	world.ReflectionDebugView = std::clamp<int64>(gCVars->Get("r_reflection_debug", int64 { 0 }), 0, 3);
 
 	if (LightDirectional* sun = gLightManager->GetDirectionalLight(); sun != nullptr) {
 		const Vec3f position = sun->GetPosition();
