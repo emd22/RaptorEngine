@@ -97,6 +97,9 @@ public:
 protected:
 	void RecalculateModelMatrix();
 
+	/// Keeps the matrix from before the first change of a frame, which is where the object was drawn last frame
+	void BeginMatrixChange();
+
 	void SetPreTransform(const Mat4f& transform)
 	{
 		mPreTransform = transform;
@@ -131,6 +134,11 @@ protected:
 	Mat4f mWorldMatrix = Mat4f::scIdentity;
 	Mat4f mPreTransform = Mat4f::scIdentity;
 
+
+	Mat4f mPrevWorldMatrix = Mat4f::scIdentity;
+	uint32 mMatrixChangedFrame = UINT32_MAX;
+	bool mbHasWorldMatrix = false;
+	bool mbChangeIsMotion = false;
 
 	uint8 mMatrixSubmittedFrames = 0;
 	static_assert(renderer::FramesInFlight <= 8);

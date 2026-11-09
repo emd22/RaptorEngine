@@ -9,6 +9,7 @@
 #include "RenderStage.hpp"
 #include "Vertex.hpp"
 
+#include <Math/Mat4.hpp>
 #include <Object/ObjectLayer.hpp>
 
 namespace fx {
@@ -200,6 +201,8 @@ public:
 
 	uint32 GetViewConstants(const BaseCamera& camera, eObjectLayer layer);
 
+	/// Remembers last frame's matrices of the main view, which the view constants pass on for motion vectors
+	void BeginViewMotion(const BaseCamera& camera);
 
 public:
 	DescriptorPool DescriptorPool;
@@ -258,6 +261,10 @@ private:
 	};
 
 	CachedViewConstants mCachedViews[2];
+
+	const BaseCamera* mpMotionCamera = nullptr;
+	Mat4f mMotionViewProjection[2] = { Mat4f::scIdentity, Mat4f::scIdentity };
+	Mat4f mMotionPrevViewProjection[2] = { Mat4f::scIdentity, Mat4f::scIdentity };
 };
 
 } // namespace fx::renderer

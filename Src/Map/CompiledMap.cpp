@@ -20,6 +20,12 @@ constexpr uint32 scMaxLightmapSize = 8192;
 constexpr uint32 scFirstDeflatedVersion = 14;
 /// Probe depth moments are octahedral maps from this version on, cube faces before it
 constexpr uint32 scFirstOctahedralProbeVersion = 16;
+/// Every file from this version on has the GI bricks and octahedral moments. v16 was used for both on separate
+/// branches: one wrote cube moments and bricks, the other octahedral moments and no bricks. Load() tells them apart
+/// by the size of the moments and by whether anything follows the transport.
+constexpr uint32 scFirstBricksVersion = 17;
+/// Values per probe in the cube face moments from before the octahedral layout (6 faces of 16x16, mean + variance)
+constexpr uint32 scCubeProbeMomentValues = 6 * 16 * 16 * 2;
 constexpr int scDeflateLevel = 9;
 
 bool IsNameBefore(const String& a, const String& b) { return std::strcmp(a.CStr(), b.CStr()) < 0; }
@@ -443,6 +449,51 @@ void WriteTransport(Writer& writer, const CompiledMapTransport& transport)
 	WriteSectionArray(writer, transport.Links);
 }
 
+void ReadBricks(Reader& reader, CompiledMapBricks& out_bricks)
+{
+	out_bricks.MarginScale = reader.Read<float32>();
+
+	ReadSectionArray(reader, out_bricks.Levels);
+	ReadSectionArray(reader, out_bricks.Bricks);
+	ReadSectionArray(reader, out_bricks.Refs);
+	ReadSectionArray(reader, out_bricks.Triangles);
+
+	if (reader.bFailed || out_bricks.IsEmpty()) {
+		out_bricks = CompiledMapBricks {};
+		return;
+	}
+
+	bool valid = out_bricks.Levels.Size <= CompiledMapBricks::scMaxLevels && out_bricks.MarginScale > 0.0f;
+
+	for (const CompiledMapBrickLevel& level : out_bricks.Levels) {
+		valid = valid && level.BrickSize > 0.0f &&
+				static_cast<uint64>(level.FirstBrick) + level.BrickCount <= out_bricks.Bricks.Size;
+	}
+
+	for (const CompiledMapBrick& brick : out_bricks.Bricks) {
+		valid = valid && static_cast<uint64>(brick.FirstRef) + brick.RefCount <= out_bricks.Refs.Size;
+	}
+
+	for (const uint32 ref : out_bricks.Refs) {
+		valid = valid && ref < out_bricks.Triangles.Size;
+	}
+
+	// The GI can do without it, so the rest of the map still loads
+	if (!valid) {
+		out_bricks = CompiledMapBricks {};
+	}
+}
+
+void WriteBricks(Writer& writer, const CompiledMapBricks& bricks)
+{
+	writer.Write(bricks.MarginScale);
+
+	WriteSectionArray(writer, bricks.Levels);
+	WriteSectionArray(writer, bricks.Bricks);
+	WriteSectionArray(writer, bricks.Refs);
+	WriteSectionArray(writer, bricks.Triangles);
+}
+
 void WriteFogShadow(Writer& writer, const CompiledMapFogShadow& shadow)
 {
 	writer.Write(shadow.Right, 3);
@@ -737,7 +788,9 @@ bool CompiledMap::Load(const String& path)
 	const uint32 probe_irradiance_count = reader.ReadCount();
 	const uint32 probe_moment_count = reader.ReadCount();
 	const uint64 baked_probe_count = Probes.GetProbeCount();
-	const bool has_cube_moments = (version < scFirstOctahedralProbeVersion);
+	const bool is_branch_v16_cube = (version == scFirstOctahedralProbeVersion && probe_moment_count != 0 &&
+									 probe_moment_count == baked_probe_count * scCubeProbeMomentValues);
+	const bool has_cube_moments = (version < scFirstOctahedralProbeVersion) || is_branch_v16_cube;
 
 	if ((probe_irradiance_count != 0 && probe_irradiance_count != baked_probe_count * scProbeSHFloats) ||
 		(probe_moment_count != 0 && !has_cube_moments &&
@@ -853,6 +906,13 @@ bool CompiledMap::Load(const String& path)
 
 	if (version >= 15 && !reader.bFailed) {
 		ReadTransport(reader, Transport, Lightmap);
+	}
+
+	const bool has_bricks = (version >= scFirstBricksVersion) ||
+							(version == scFirstOctahedralProbeVersion && file_to_read.GetPosition() < file_to_read.GetFileSize());
+
+	if (has_bricks && !reader.bFailed) {
+		ReadBricks(reader, Bricks);
 	}
 
 	for (const CompiledMapSurface& surface : Surfaces) {
@@ -1016,6 +1076,7 @@ bool CompiledMap::Save(const String& path) const
 	writer.WriteSection(AcousticProbes.pData, AcousticProbes.Size);
 
 	WriteTransport(writer, Transport);
+	WriteBricks(writer, Bricks);
 
 	return (writer.bFailed == false);
 }

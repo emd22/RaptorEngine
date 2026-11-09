@@ -43,6 +43,11 @@ void World::Create()
 	pCVarPortalDebug = gCVars->Set<int64>("r_portal_debug", 0);
 	pCVarBakedShadows = gCVars->Set<int64>("r_baked_shadows", 1);
 	pCVarBakedIndirect = gCVars->Set<int64>("r_baked_indirect", 1);
+	pCVarBricks = gCVars->Set<int64>("r_bricks", 1);
+	pCVarBrickDebug = gCVars->Set<int64>("r_brick_debug", 0);
+	pCVarBrickBudget = gCVars->Set<int64>("r_brick_budget", 16384);
+	pCVarBrickCone = gCVars->Set<float32>("r_brick_cone", 0.05f);
+	pCVarBrickRayLength = gCVars->Set<float32>("r_brick_ray_length", 50.0f);
 }
 
 static bool IsTransparentMaterial(Material* mat) { return (mat != nullptr && mat->IsTransparent()); }
@@ -1217,6 +1222,24 @@ void World::Render(BaseCamera* shadow_camera)
 								gGraphics->LightBuffer.SlotIndex - mMapLightSlotCount, !gProbeManager->IsBaking());
 	gGraphics->MarkGpu(eGpuMarker::LightTransport);
 
+	const bool bricks_enabled = (pCVarBricks->IntValue != 0);
+
+	if (bricks_enabled) {
+		gGraphics->Bricks.Update(gGraphics->GetFrame()->CmdBuffer, camera.GetPosition(),
+								 static_cast<uint32>(std::max<int64>(pCVarBrickBudget->IntValue, 0)));
+		gGraphics->MarkGpu(eGpuMarker::BrickScene);
+	}
+
+	const int64 brick_view = pCVarBrickDebug->IntValue;
+	gGraphics->BrickDebugCone = pCVarBrickCone->FloatValue;
+	gGraphics->BrickDebugRayLength = pCVarBrickRayLength->FloatValue;
+	gGraphics->BrickDebugView = BrickScene::eDebugView::None;
+
+	if (bricks_enabled && brick_view > 0 && brick_view < static_cast<int64>(BrickScene::eDebugView::Count)) {
+		gGraphics->BrickDebugView = static_cast<BrickScene::eDebugView>(brick_view);
+	}
+
+	gGraphics->pRenderer->BeginViewMotion(camera);
 	gGraphics->BeginPrepass();
 
 	gPipelineCache->ForEachPassPipeline(ePipelinePass::Forward,

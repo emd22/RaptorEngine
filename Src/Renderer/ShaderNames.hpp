@@ -27,6 +27,8 @@ enum class eShaderName : uint32
 	LightTransportInject,
 	LightTransportBounce,
 	LightTransportApply,
+	BrickUpdate,
+	BrickDebug,
 
 	NumShaders,
 };
@@ -58,6 +60,8 @@ constexpr const char* GetName(const eShaderName id)
 		FX_ENUM_CASE_NAME(LightTransportInject);
 		FX_ENUM_CASE_NAME(LightTransportBounce);
 		FX_ENUM_CASE_NAME(LightTransportApply);
+		FX_ENUM_CASE_NAME(BrickUpdate);
+		FX_ENUM_CASE_NAME(BrickDebug);
 	default:
 		return "Unknown";
 	}

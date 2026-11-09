@@ -56,6 +56,10 @@ void TiledForwardRenderer::Create(const Vec2u& extent)
 	CreateParticlePSO();
 	CreateFogPSO();
 	gGraphics->Transport.CreatePipelines();
+	gGraphics->Bricks.CreatePipelines(Prepass.GetTarget(eImageFormat::D32_Float),
+									  Prepass.GetTarget(eImageFormat::RGBA16_Float),
+									  Prepass.GetTarget(eImageFormat::RG16_Float),
+									  ForwardPass.GetTarget(eImageFormat::RGBA16_Float));
 	CreateLightCullingPSO();
 	CreateDebugLayerPSO();
 	CreateDebugSolidPSO();
@@ -72,10 +76,11 @@ void TiledForwardRenderer::CreateForwardPass()
 	// Forward pass
 	ForwardPass.Create("Forward", gGraphics->Swapchain.Extent, eSizeDivisor::FullRes);
 
-	// Lit target. Copied into SceneCopyPass when water needs the opaque scene behind it
+	// Lit target. Copied into SceneCopyPass when water needs the opaque scene behind it, and storage for the brick
+	// debug views, which write over it.
 	ForwardPass.AddTarget(eImageFormat::RGBA16_Float,
 						  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-							  VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+							  VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
 						  eImageAspectFlag::Color);
 
 	// Depth target. This shares the prepass's depth image and loads it rather than clearing, so the forward pass only
@@ -161,8 +166,12 @@ void TiledForwardRenderer::CreateDepthNormalPass()
 						  VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
 					  eImageAspectFlag::Depth);
 
-	// World-space normals target (index 1)
+	// World-space normals in xyz, roughness in w (index 1)
 	Prepass.AddTarget(eImageFormat::RGBA16_Float, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+					  eImageAspectFlag::Color);
+
+	// Motion vectors as a UV offset to last frame (index 2)
+	Prepass.AddTarget(eImageFormat::RG16_Float, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 					  eImageAspectFlag::Color);
 
 	Prepass.BuildRenderStage();
@@ -1233,6 +1242,14 @@ uint32 TiledForwardRenderer::GetViewConstants(const BaseCamera& camera, eObjectL
 	}
 
 	memcpy(consts.ViewProjection, camera.GetCameraMatrix(layer).RawData, sizeof(Mat4f));
+
+	if (&camera == mpMotionCamera && !is_probe_capture) {
+		memcpy(consts.PrevViewProjection, mMotionPrevViewProjection[static_cast<uint32>(layer)].RawData, sizeof(Mat4f));
+	}
+	else {
+		memcpy(consts.PrevViewProjection, consts.ViewProjection, sizeof(Mat4f));
+	}
+
 	memcpy(consts.EyePosition, camera.GetPosition().mData, sizeof(float32) * 3);
 	consts.EyePosition[3] = 1.0f;
 
@@ -1254,6 +1271,26 @@ uint32 TiledForwardRenderer::GetViewConstants(const BaseCamera& camera, eObjectL
 	cached.Generation = generation;
 
 	return cached.Offset;
+}
+
+void TiledForwardRenderer::BeginViewMotion(const BaseCamera& camera)
+{
+	const bool is_same_camera = (&camera == mpMotionCamera);
+
+	for (uint32 layer = 0; layer < 2; layer++) {
+		const Mat4f& view_projection = camera.GetCameraMatrix(static_cast<eObjectLayer>(layer));
+
+		if (is_same_camera) {
+			mMotionPrevViewProjection[layer] = mMotionViewProjection[layer];
+		}
+		else {
+			mMotionPrevViewProjection[layer] = view_projection;
+		}
+
+		mMotionViewProjection[layer] = view_projection;
+	}
+
+	mpMotionCamera = &camera;
 }
 
 void TiledForwardRenderer::RenderComposition(BaseCamera& camera)

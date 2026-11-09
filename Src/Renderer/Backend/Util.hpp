@@ -50,6 +50,8 @@ public:
 
 
 		switch (format) {
+		case VK_FORMAT_R16G16_SFLOAT:
+			return 4;
 		case VK_FORMAT_D16_UNORM:
 			return 2;
 		case VK_FORMAT_D16_UNORM_S8_UINT:

@@ -30,7 +30,27 @@
 struct Object
 {
 	float4x4 mWorld;
+	float4x4 mPrevWorld;
 };
+
+/// `v * m` as an explicit chain of fused multiply-adds, which leaves the shader compiler nothing to fuse its own way, so
+/// any shader that transforms a point with it gets the same bits whatever else it computes. The prepass and the forward
+/// pass rely on it, since the forward pass only shades where its depth is EQUAL to the prepass's. (`precise` would do
+/// the same, but ZDXC drops it.)
+float4 MulPointExact(float4 v, float4x4 m) { return mad(v.x, m[0], mad(v.y, m[1], mad(v.z, m[2], v.w * m[3]))); }
+
+float4 ProjectPointExact(float4 position_ms, float4x4 world, float4x4 view_projection)
+{
+	return MulPointExact(MulPointExact(position_ms, world), view_projection);
+}
+
+/// A skinned position from four weighted bone matrices, exact in the same way as MulPointExact
+float4 SkinPointExact(float4 position, float4x4 bone0, float4x4 bone1, float4x4 bone2, float4x4 bone3, float4 weights)
+{
+	return mad(weights.x, MulPointExact(position, bone0),
+			   mad(weights.y, MulPointExact(position, bone1),
+				   mad(weights.z, MulPointExact(position, bone2), weights.w * MulPointExact(position, bone3))));
+}
 
 /// Generates UnpackUnorm4x8
 [[vk::ext_instruction(64, "GLSL.std.450")]]

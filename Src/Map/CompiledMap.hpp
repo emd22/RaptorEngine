@@ -208,6 +208,51 @@ struct CompiledMapTransport
 /**
  * @brief The corners of a convex collider, in world space
  */
+/// One clip level of the brick scene, whose bricks are `BrickSize` metres wide
+struct CompiledMapBrickLevel
+{
+	float32 BrickSize = 0.0f;
+	uint32 FirstBrick = 0;
+	uint32 BrickCount = 0;
+	uint32 Padding = 0;
+};
+
+/// A brick that some geometry passes within the margin of. `Coord` times the level's brick size is its minimum corner.
+struct CompiledMapBrick
+{
+	int32 Coord[3] = {};
+	uint32 FirstRef = 0;
+	uint32 RefCount = 0;
+	uint32 Padding = 0;
+};
+
+/// Laid out to match BrickTriangle in Shaders/BrickCommon.hlsli
+struct CompiledMapBrickTriangle
+{
+	float32 Corners[3][4] = {};
+};
+
+/**
+ * @brief The geometry the GI traces against: for every clip level, the bricks that geometry touches and the triangles
+ * that their distances are computed from. The distances themselves are computed on the GPU.
+ */
+struct CompiledMapBricks
+{
+	static constexpr uint32 scTexelsPerBrick = 8;
+	static constexpr uint32 scMaxLevels = 8;
+
+	/// Distances are kept up to this many brick widths, and a brick lists every triangle within that of it
+	float32 MarginScale = 0.5f;
+
+	SizedArray<CompiledMapBrickLevel> Levels;
+	/// Each level's bricks are sorted by X, then Y, then Z
+	SizedArray<CompiledMapBrick> Bricks;
+	SizedArray<uint32> Refs;
+	SizedArray<CompiledMapBrickTriangle> Triangles;
+
+	bool IsEmpty() const { return Levels.Size == 0 || Bricks.Size == 0 || Triangles.Size == 0; }
+};
+
 struct CompiledMapHull
 {
 	SizedArray<float32> Points;
@@ -261,7 +306,7 @@ class CompiledMap
 {
 public:
 	static constexpr uint32 scMagic = 0x504D5846;
-	static constexpr uint32 scVersion = 16;
+	static constexpr uint32 scVersion = 17;
 	/// Oldest version that still loads, the parts added since are left empty
 	static constexpr uint32 scMinVersion = 10;
 	static constexpr const char* scExtension = ".fxmap";
@@ -317,6 +362,7 @@ public:
 
 	CompiledMapLightmap Lightmap;
 	CompiledMapTransport Transport;
+	CompiledMapBricks Bricks;
 
 	SizedArray<uint8> ProbeSunVisibility;
 

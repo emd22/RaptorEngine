@@ -39,6 +39,9 @@ PERMEND();
     float3 vPositionWS   : POSITION;
 
     uint uiMaterialIndex : ATTR0;
+
+    float4 vClipPosition : ATTR1;
+    float4 vPrevClipPosition : ATTR2;
 };
 
 struct ViewConsts
@@ -50,6 +53,10 @@ struct ViewConsts
     uint uiTileRows;
     uint Flags;
     float fPreExposure;
+    float2 vDepthParams;
+    float fTime;
+    uint3 vPadding;
+    float4x4 mPrevViewProjection;
 };
 
 struct DrawConsts
@@ -76,8 +83,7 @@ VSOutput main(VSInput input)
     VSOutput output;
 
     float4x4 world_matrix = bObjectBuffer[DrawConst.uiObjectIndex + input.uiInstanceId].mWorld;
-
-    float4x4 MVP = mul(world_matrix, ViewConst.mViewProjection);
+    float4x4 prev_world_matrix = bObjectBuffer[DrawConst.uiObjectIndex + input.uiInstanceId].mPrevWorld;
 
 PERMIF(USE_SKINNING);
     const uint bone_base = DrawConst.uiBoneBase;
@@ -88,14 +94,19 @@ PERMIF(USE_SKINNING);
         + input.vJointWeights.w * bBones[bone_base + input.vJointIndices.w];
 
     // Posed vertex in model space
-    float4 position_ms = mul(float4(input.vPosition, 1.0), skin_xform);
+    const float4 position_ms = SkinPointExact(float4(input.vPosition, 1.0), bBones[bone_base + input.vJointIndices.x],
+                                              bBones[bone_base + input.vJointIndices.y],
+                                              bBones[bone_base + input.vJointIndices.z],
+                                              bBones[bone_base + input.vJointIndices.w], input.vJointWeights);
 
-    output.vPosition = mul(position_ms, MVP);
+    // Exact, so that this and the other depth pass agree to the bit for the forward pass's EQUAL depth test
+    output.vPosition = ProjectPointExact(position_ms, world_matrix, ViewConst.mViewProjection);
     output.vNormalWS = normalize(mul(mul(input.vNormal, (float3x3)skin_xform), (float3x3)world_matrix));
 PERMELSE();
     float4 position_ms = float4(input.vPosition, 1.0);
 
-    output.vPosition = mul(position_ms, MVP);
+    // Exact, so that this and the other depth pass agree to the bit for the forward pass's EQUAL depth test
+    output.vPosition = ProjectPointExact(position_ms, world_matrix, ViewConst.mViewProjection);
     output.vNormalWS = normalize(mul(input.vNormal, (float3x3)world_matrix));
 PERMEND();
 
@@ -116,6 +127,10 @@ PERMEND();
 
 	output.uiMaterialIndex = DrawConst.uiMaterialIndex;
 
+    // Skinned meshes have no previous pose, so only the object and camera motion is known
+    output.vClipPosition = output.vPosition;
+    output.vPrevClipPosition = mul(mul(position_ms, prev_world_matrix), ViewConst.mPrevViewProjection);
+
     return output;
 }
 
@@ -127,7 +142,10 @@ F_PROGRAM(FPT_PIXEL)
 
 struct FSOutput
 {
-    float4 vNormal : SV_TARGET0; /* Prepass normals, world-space */
+    /// World space normal in xyz, perceptual roughness in w
+    float4 vNormal : SV_TARGET0;
+    /// UV offset from this pixel to where the surface was last frame
+    float2 vMotion : SV_TARGET1;
 };
 
 struct FSInput
@@ -145,6 +163,9 @@ PERMEND();
 	float3 vPositionWS : POSITION;
 
 	uint uiMaterialIndex : ATTR0;
+
+    float4 vClipPosition : ATTR1;
+    float4 vPrevClipPosition : ATTR2;
 
 	/// False when a double sided material is seen from behind
 	bool bIsFrontFace : SV_IsFrontFace;
@@ -167,6 +188,10 @@ FSOutput main(FSInput input)
     FSOutput output;
 
     output.vNormal = float4(0.0, 0.0, 0.0, 0.0);
+
+    const float2 uv = (input.vClipPosition.xy / input.vClipPosition.w) * 0.5 + 0.5;
+    const float2 prev_uv = (input.vPrevClipPosition.xy / input.vPrevClipPosition.w) * 0.5 + 0.5;
+    output.vMotion = prev_uv - uv;
 
     // Double sided materials are lit from whichever side is seen
     const float facing = select(input.bIsFrontFace, 1.0, -1.0);
@@ -202,9 +227,12 @@ PERMIF(USE_NORMAL_MAPS);
 
     float3x3 TBN = float3x3(tangent, bitangent, vertex_normal);
 
-    output.vNormal = float4(normalize(mul(normal_ts, TBN)), 0.0);
+    // Same as GetSurfaceParams() in Forward.hlsl, before decals
+    const float roughness = saturate(F_Sample(tORM, input.vUV).g * material.fRoughnessFactor);
+
+    output.vNormal = float4(normalize(mul(normal_ts, TBN)), roughness);
 PERMELSE()
-    output.vNormal = float4(input.vNormalWS, 0.0);
+    output.vNormal = float4(input.vNormalWS, saturate(material.fRoughnessFactor));
 PERMEND();
 PERMEND();
 

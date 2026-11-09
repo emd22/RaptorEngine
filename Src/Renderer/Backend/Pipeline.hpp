@@ -5,6 +5,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include <cstddef>
+
 #include <Core/Ref.hpp>
 #include <Core/RefCountedBase.hpp>
 #include <Core/SizedArray.hpp>
@@ -112,7 +114,15 @@ struct alignas(16) ViewConstants
 
 	/// See GraphicsBackend::ShaderTime
 	float32 Time = 0.0f;
+
+	uint32 Padding[3] = { 0U, 0U, 0U };
+
+	/// Last frame's ViewProjection for the same layer, for motion vectors. Equal to ViewProjection off the main view.
+	float32 PrevViewProjection[16];
 };
+
+static_assert(offsetof(ViewConstants, DepthParams) == 104);
+static_assert(offsetof(ViewConstants, PrevViewProjection) == 128);
 
 struct DrawPushConstants
 {
