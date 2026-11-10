@@ -1,5 +1,6 @@
 #include "SDFPages.hpp"
 
+#include "IndirectLight.hpp"
 #include "Models.hpp"
 #include "Surfaces.hpp"
 
@@ -8,6 +9,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstring>
 
 namespace fx::mapc {
 
@@ -90,7 +92,19 @@ int32 KeyCoord(uint64 key, uint32 shift)
 // 	return std::abs(distance) <= radius;
 // }
 
-void AddTriangle(Array<DTriangle>& triangles, const DVec3 a, const DVec3 b, const DVec3 c)
+/// Albedo of the triangles that no material is known for, the same default the bake uses
+constexpr float32 scDefaultAlbedo = 0.5f;
+
+uint32 PackAlbedo(const FVec3& albedo)
+{
+	const auto channel = [](float32 value)
+	{ return static_cast<uint32>(std::lround(std::clamp(value, 0.0f, 1.0f) * 255.0f)); };
+
+	return channel(albedo.X) | (channel(albedo.Y) << 8) | (channel(albedo.Z) << 16);
+}
+
+void AddTriangle(Array<DTriangle>& triangles, Array<uint32>& albedos, uint32 albedo, const DVec3 a, const DVec3 b,
+				 const DVec3 c)
 {
 	const DVec3 normal = (b - a).Cross(c - a);
 
@@ -101,18 +115,36 @@ void AddTriangle(Array<DTriangle>& triangles, const DVec3 a, const DVec3 b, cons
 	}
 
 	triangles.Insert(DTriangle { a, b, c });
+	albedos.Insert(albedo);
 }
 
 void GatherTriangles(const MapSource& source, const SurfaceBuilder& surfaces, const ModelBuilder* models,
-					 const CompiledMap& map, Array<DTriangle>& out_triangles)
+					 const CompiledMap& map, Array<DTriangle>& out_triangles, Array<uint32>& out_albedos)
 {
+	SizedArray<FVec3> map_albedos;
+	SizedArray<FVec3> model_albedos;
+	uint32 missing = 0;
+
+	LoadMeanAlbedos(map, models, map_albedos, model_albedos, missing);
+
+	const auto get_albedo = [](const SizedArray<FVec3>& albedos, uint32 index)
+	{
+		if (index < albedos.Size) {
+			return PackAlbedo(albedos[index]);
+		}
+
+		return PackAlbedo(FVec3(scDefaultAlbedo));
+	};
+
 	for (const CompiledMapSurface& surface : map.Surfaces) {
 		if (source.OpaqueMaterials[surface.MaterialIndex] == 0) {
 			continue;
 		}
 
+		const uint32 albedo = get_albedo(map_albedos, static_cast<uint32>(surface.MaterialIndex));
+
 		for (size_t index = 0; index + 2 < surface.Indices.Size; index += 3) {
-			AddTriangle(out_triangles, DVec3(surface.Vertices[surface.Indices[index]].Position),
+			AddTriangle(out_triangles, out_albedos, albedo, DVec3(surface.Vertices[surface.Indices[index]].Position),
 						DVec3(surface.Vertices[surface.Indices[index + 1]].Position),
 						DVec3(surface.Vertices[surface.Indices[index + 2]].Position));
 		}
@@ -120,16 +152,20 @@ void GatherTriangles(const MapSource& source, const SurfaceBuilder& surfaces, co
 
 	if (models != nullptr) {
 		for (const ModelSurface& surface : models->Surfaces) {
+			const uint32 albedo = get_albedo(model_albedos, surface.MaterialIndex);
+
 			for (size_t index = 0; index + 2 < surface.Indices.Size; index += 3) {
-				AddTriangle(out_triangles, (surface.Vertices[static_cast<size_t>(surface.Indices[index])].Position),
+				AddTriangle(out_triangles, out_albedos, albedo, (surface.Vertices[static_cast<size_t>(surface.Indices[index])].Position),
 							(surface.Vertices[static_cast<size_t>(surface.Indices[index + 1])].Position),
 							(surface.Vertices[static_cast<size_t>(surface.Indices[index + 2])].Position));
 			}
 		}
 	}
 
+	const uint32 blocker_albedo = PackAlbedo(FVec3(scDefaultAlbedo));
+
 	for (size_t index = 0; index + 2 < surfaces.BlockerPoints.Size; index += 3) {
-		AddTriangle(out_triangles, (surfaces.BlockerPoints[index]), (surfaces.BlockerPoints[index + 1]),
+		AddTriangle(out_triangles, out_albedos, blocker_albedo, (surfaces.BlockerPoints[index]), (surfaces.BlockerPoints[index + 1]),
 					(surfaces.BlockerPoints[index + 2]));
 	}
 }
@@ -216,7 +252,8 @@ void BuildSDFPages(const MapSource& source, const SurfaceBuilder& surfaces, cons
 	const auto start_time = std::chrono::steady_clock::now();
 
 	Array<DTriangle> triangles;
-	GatherTriangles(source, surfaces, models, out_map, triangles);
+	Array<uint32> albedos;
+	GatherTriangles(source, surfaces, models, out_map, triangles, albedos);
 
 	if (triangles.Size == 0) {
 		return;
@@ -252,7 +289,8 @@ void BuildSDFPages(const MapSource& source, const SurfaceBuilder& surfaces, cons
 	pages.Refs.InitCapacity(ref_count);
 	pages.Triangles.InitCapacity(triangles.Size);
 
-	for (const DTriangle& triangle : triangles) {
+	for (size_t triangle_index = 0; triangle_index < triangles.Size; triangle_index++) {
+		const DTriangle& triangle = triangles[triangle_index];
 		CompiledMapSDFPageTriangle& packed = pages.Triangles.Emplace();
 
 		for (uint32 corner = 0; corner < 3; corner++) {
@@ -261,6 +299,8 @@ void BuildSDFPages(const MapSource& source, const SurfaceBuilder& surfaces, cons
 			packed.Corners[corner][2] = static_cast<float32>(triangle.Points[corner].Z);
 			packed.Corners[corner][3] = 0.0f;
 		}
+
+		memcpy(&packed.Corners[0][3], &albedos[triangle_index], sizeof(uint32));
 	}
 
 	for (uint32 level = 0; level < level_count; level++) {
@@ -286,6 +326,10 @@ void BuildSDFPages(const MapSource& source, const SurfaceBuilder& surfaces, cons
 		}
 
 		packed_level.SDFPageCount = static_cast<uint32>(pages.SDFPages.Size) - packed_level.FirstSDFPage;
+
+		for (uint32 page = packed_level.FirstSDFPage; page < pages.SDFPages.Size; page++) {
+			out_stats.MaxRefsPerPage = std::max(out_stats.MaxRefsPerPage, pages.SDFPages[page].RefCount);
+		}
 		out_stats.SDFPageCounts[level] = packed_level.SDFPageCount;
 	}
 

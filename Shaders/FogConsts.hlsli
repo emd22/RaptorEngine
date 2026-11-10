@@ -1,3 +1,6 @@
+#ifndef FOG_CONSTS_HLSLI
+#define FOG_CONSTS_HLSLI
+
 struct FogConsts
 {
 	float4x4 mFarSunMatrix;
@@ -29,11 +32,25 @@ struct FogConsts
 	float4 vBakedShadowAtlas;
 };
 
+
 struct FogShadowPage
 {
 	float4 vLightRect;
 	float4 vAtlasRect;
 	float4 vDepth;
+};
+
+/// Mirrors the BakedShadow* members of FogConsts
+struct BakedSunShadowParams
+{
+	/// XYZ are the light space axes. W: page size, depth bias, PCF radius.
+	float4 vRight;
+	float4 vUp;
+	float4 vForward;
+	/// First cell XY, cell counts ZW
+	float4 vGrid;
+	/// Reciprocal atlas size in XY
+	float4 vAtlas;
 };
 
 #define FOG_FLAG_PROBE_SUN_VISIBILITY 0x01
@@ -55,3 +72,5 @@ struct FogShadowPage
 #define FROXEL_GRID_X 160
 #define FROXEL_GRID_Y 90
 #define FROXEL_GRID_Z 64
+
+#endif

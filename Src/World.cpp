@@ -48,6 +48,11 @@ void World::Create()
 	pCVarSDFPageBudget = gCVars->Set<int64>("r_sdf_page_budget", 16384);
 	pCVarSDFPageCone = gCVars->Set<float32>("r_sdf_page_cone", 0.05f);
 	pCVarSDFPageRayLength = gCVars->Set<float32>("r_sdf_page_ray_length", 50.0f);
+	pCVarSDFPageProbeStride = gCVars->Set<int64>("r_sdf_page_probe_stride", 1);
+	pCVarGIClipmap = gCVars->Set<int64>("r_gi_clipmap", 0);
+	pCVarGIClipmapDebug = gCVars->Set<int64>("r_gi_clipmap_debug", 0);
+	pCVarGIProbeBudget = gCVars->Set<int64>("r_gi_probe_budget", 3072);
+	pCVarGIHysteresis = gCVars->Set<float32>("r_gi_hysteresis", 0.97f);
 }
 
 static bool IsTransparentMaterial(Material* mat) { return (mat != nullptr && mat->IsTransparent()); }
@@ -1143,6 +1148,7 @@ void World::Render(BaseCamera* shadow_camera)
 	}
 
 	gGraphics->LightBuffer.Rewind();
+	gGraphics->ShadeLights.Clear();
 
 	// Spot lights need their shadow atlas tile and shadow matrix before they are uploaded
 	UpdateSpotShadows();
@@ -1173,6 +1179,15 @@ void World::Render(BaseCamera* shadow_camera)
 
 			if (light->Type == eLightType::Directional && was_written && mSunLightSlot == UINT32_MAX) {
 				mSunLightSlot = slot;
+			}
+
+			if (was_written && gGraphics->ShadeLights.Size < gGraphics->ShadeLights.Capacity) {
+				gGraphics->ShadeLights.Insert(ShadeLightCandidate {
+					.Slot = slot,
+					.bDirectional = (light->Type == eLightType::Directional),
+					.Position = light->GetPosition(),
+					.Radius = light->GetRadius(),
+				});
 			}
 		}
 	}
@@ -1232,9 +1247,27 @@ void World::Render(BaseCamera* shadow_camera)
 		gGraphics->MarkGpu(eGpuMarker::SDFPageScene);
 	}
 
+	gGraphics->GIClipmapDebugView = ProbeClipmap::eDebugView::None;
+
+	if (sdf_pages_enabled && pCVarGIClipmap->IntValue != 0) {
+		ProbeClipmap::Settings settings;
+		settings.Budget = static_cast<uint32>(std::max<int64>(pCVarGIProbeBudget->IntValue, 0));
+		settings.Hysteresis = std::clamp(pCVarGIHysteresis->FloatValue, 0.0f, 0.999f);
+
+		gGraphics->GIClipmap.Update(gGraphics->GetFrame()->CmdBuffer, camera.GetPosition(), settings);
+		gGraphics->MarkGpu(eGpuMarker::GIClipmap);
+
+		const int64 clipmap_view = pCVarGIClipmapDebug->IntValue;
+
+		if (clipmap_view > 0 && clipmap_view < static_cast<int64>(ProbeClipmap::eDebugView::Count)) {
+			gGraphics->GIClipmapDebugView = static_cast<ProbeClipmap::eDebugView>(clipmap_view);
+		}
+	}
+
 	const int64 sdf_page_view = pCVarSDFPageDebug->IntValue;
 	gGraphics->SDFPageDebugCone = pCVarSDFPageCone->FloatValue;
 	gGraphics->SDFPageDebugRayLength = pCVarSDFPageRayLength->FloatValue;
+	gGraphics->SDFPageDebugProbeStride = static_cast<uint32>(std::max<int64>(pCVarSDFPageProbeStride->IntValue, 1));
 	gGraphics->SDFPageDebugView = SDFPageScene::eDebugView::None;
 
 	if (sdf_pages_enabled && sdf_page_view > 0 && sdf_page_view < static_cast<int64>(SDFPageScene::eDebugView::Count)) {

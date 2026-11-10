@@ -88,6 +88,8 @@ enum class eImageFormat : uint16
 	D16_UNorm,
 
 	RG16_Float,
+
+	R16_UInt,
 };
 
 enum class eImageType
@@ -274,6 +276,9 @@ struct ImageFormatUtil
 		case eImageFormat::R8_UNorm:
 			return 1;
 
+		case eImageFormat::R16_UInt:
+			return 2;
+
 		case eImageFormat::BC7_UNorm:
 		case eImageFormat::BC7_SRGB:
 			break;
@@ -388,6 +393,8 @@ struct ImageFormatUtil
 			return VK_FORMAT_R8_UINT;
 		case eImageFormat::R8_UNorm:
 			return VK_FORMAT_R8_UNORM;
+		case eImageFormat::R16_UInt:
+			return VK_FORMAT_R16_UINT;
 
 		case eImageFormat::BC7_UNorm:
 			return VK_FORMAT_BC7_UNORM_BLOCK;

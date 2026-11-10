@@ -32,6 +32,8 @@ struct SDFPageStats
 	uint32 LevelCount = 0;
 	uint32 SDFPageCounts[CompiledMapSDFPages::scMaxLevels] = {};
 	uint64 RefCount = 0;
+	/// Pages with more refs than fit the 8 bit nearest triangle index fall back to the default albedo past it
+	uint32 MaxRefsPerPage = 0;
 	uint64 ByteCount = 0;
 	double Seconds = 0.0;
 };

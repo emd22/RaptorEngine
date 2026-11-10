@@ -7,6 +7,7 @@
 #include "GraphicsBackend.hpp"
 #include "PSOBuild.hpp"
 #include "PipelineCache.hpp"
+#include "ShadowAtlas.hpp"
 #include "Target.hpp"
 
 #include <Core/Log.hpp>
@@ -24,6 +25,10 @@ constexpr uint64 scPlaceholderBytes = 64;
 constexpr uint32 scUpdateGroupColumns = 1024;
 constexpr uint32 scDebugGroupSize = 8;
 constexpr uint32 scStatCount = 8;
+/// Mirrors SDF_PAGE_NEAREST_BLOCK in Shaders/SDFPageCommon.hlsli
+constexpr uint32 scNearestBlock = 2;
+
+constexpr uint32 scShadeFlagBakedSun = 0x01;
 constexpr uint32 scLogInterval = 120;
 
 constexpr uint8 scDirtyIndirection = 1;
@@ -44,15 +49,23 @@ struct SDFPageDebugConsts
 	float32 EyePosition[4] = {};
 	/// Target width and height, view, frame
 	uint32 Info[4] = {};
-	/// Cone slope and length of the GI rays
+	/// Cone slope and length of the GI rays, pre-exposure
 	float32 Params[4] = {};
+	BakedSunShadowGpu BakedSun;
+	/// Light buffer slots shaded at each hit
+	uint32 LightIndices[4] = {};
+	/// Light count, flags, probe stride
+	uint32 Lights[4] = {};
+	/// Radiance of the rays that miss
+	float32 SkyRadiance[4] = {};
 };
 
 static_assert(sizeof(SDFPageLevelGpu) == 32);
 static_assert(sizeof(SDFPageSceneGpu) == 192);
 static_assert(sizeof(CompiledMapSDFPageTriangle) == 48);
 static_assert(sizeof(SDFPageUpdateConsts) == 32);
-static_assert(sizeof(SDFPageDebugConsts) == 192 + 64 + 16 + 16 + 16);
+static_assert(sizeof(BakedSunShadowGpu) == 80);
+static_assert(sizeof(SDFPageDebugConsts) == 192 + 64 + 16 + 16 + 16 + 80 + 16 + 16 + 16);
 
 /// Every buffer binding is dynamic, so each takes an offset in binding order
 void AddZeroOffsets(uint32 count)
@@ -149,6 +162,15 @@ void SDFPageScene::Create()
 	mpAtlas->CreateVolume(UVec2(scAtlasSDFPagesX * scTexelsPerSDFPage, scAtlasSDFPagesY * scTexelsPerSDFPage),
 						  scAtlasSDFPagesZ * scTexelsPerSDFPage, eImageFormat::R8_UNorm,
 						  VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+	mpNearest = gTextureManager->NewTexture();
+	mpNearest->CreateVolume(UVec2(scAtlasSDFPagesX * scTexelsPerSDFPage / scNearestBlock,
+								  scAtlasSDFPagesY * scTexelsPerSDFPage / scNearestBlock),
+							scAtlasSDFPagesZ * scTexelsPerSDFPage / scNearestBlock, eImageFormat::R16_UInt,
+							VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+
+	mAtlasFirstRef.Create(eGpuBufferType::Storage, static_cast<uint64>(scAtlasSDFPageCount) * sizeof(uint32),
+						  VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::None);
+
 	mbAtlasInitialized = false;
 
 	mFreeAtlas.InitCapacity(scAtlasSDFPageCount);
@@ -183,6 +205,8 @@ void SDFPageScene::CreatePipelines(Target* depth, Target* normals, Target* motio
 	gPSOBuild->AddBuffer(2, 0, eShaderType::Compute, &mTriangles, 0, VK_WHOLE_SIZE);
 	gPSOBuild->AddBuffer(3, 0, eShaderType::Compute, &mIndirection, 0, VK_WHOLE_SIZE);
 	gPSOBuild->AddStorageImage(4, 0, eShaderType::Compute, mpAtlas);
+	gPSOBuild->AddStorageImage(5, 0, eShaderType::Compute, mpNearest);
+	gPSOBuild->AddBuffer(6, 0, eShaderType::Compute, &mAtlasFirstRef, 0, VK_WHOLE_SIZE);
 	gPSOBuild->AddFrameData(1);
 	gPSOBuild->EndPipeline();
 
@@ -195,6 +219,32 @@ void SDFPageScene::CreatePipelines(Target* depth, Target* normals, Target* motio
 	gPSOBuild->AddImageFromTarget(4, 0, eShaderType::Compute, motion, point_sampler);
 	gPSOBuild->AddStorageImage(5, 0, eShaderType::Compute, &lit->GetImage());
 	gPSOBuild->AddBuffer(6, 0, eShaderType::Compute, &mStats, 0, scStatCount * sizeof(uint32));
+	gPSOBuild->AddBuffer(7, 0, eShaderType::Compute, &mTriangles, 0, VK_WHOLE_SIZE);
+	gPSOBuild->AddBuffer(8, 0, eShaderType::Compute, &mRefs, 0, VK_WHOLE_SIZE);
+	gPSOBuild->AddBuffer(9, 0, eShaderType::Compute, &mAtlasFirstRef, 0, VK_WHOLE_SIZE);
+	gPSOBuild->AddImage(10, 0, eShaderType::Compute, mpNearest, point_sampler);
+	gPSOBuild->AddBuffer(11, 0, eShaderType::Compute, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+						 gGraphics->LightBuffer.PageSize);
+	gPSOBuild->AddImageFromTarget(12, 0, eShaderType::Compute, gShadowAtlas->GetTarget(),
+								  gSamplerCache->Request({
+									  eSamplerFilter::Linear,
+									  eSamplerFilter::Linear,
+									  eSamplerFilter::Linear,
+									  eSamplerAddressMode::ClampToBorder,
+									  eSamplerBorderColor::FloatWhite,
+									  eSamplerCompareOp::Greater,
+								  }));
+	gPSOBuild->AddImage(13, 0, eShaderType::Compute, gGraphics->pFogShadowAtlas,
+						gSamplerCache->Request({
+							eSamplerFilter::Linear,
+							eSamplerFilter::Linear,
+							eSamplerFilter::Nearest,
+							eSamplerAddressMode::ClampToEdge,
+							eSamplerBorderColor::FloatWhite,
+							eSamplerCompareOp::LessOrEqual,
+						}));
+	gPSOBuild->AddBuffer(14, 0, eShaderType::Compute, &gGraphics->FogShadowPageBuffer, 0,
+						 gGraphics->FogShadowPageBufferSize);
 	gPSOBuild->AddFrameData(1);
 	gPSOBuild->EndPipeline();
 }
@@ -206,6 +256,7 @@ void SDFPageScene::Destroy()
 	mIndirection.Destroy();
 	mJobs.Destroy();
 	mStats.Destroy();
+	mAtlasFirstRef.Destroy();
 
 	mbActive = false;
 }
@@ -596,6 +647,7 @@ void SDFPageScene::Update(CommandBuffer& cmd, const FVec3& center, uint32 eval_b
 	const VkImageLayout atlas_from = mbAtlasInitialized ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 														: VK_IMAGE_LAYOUT_UNDEFINED;
 	AtlasTransition(cmd, mpAtlas, atlas_from, VK_IMAGE_LAYOUT_GENERAL);
+	AtlasTransition(cmd, mpNearest, atlas_from, VK_IMAGE_LAYOUT_GENERAL);
 	mbAtlasInitialized = true;
 
 	SDFPageUpdateConsts consts {
@@ -604,7 +656,7 @@ void SDFPageScene::Update(CommandBuffer& cmd, const FVec3& center, uint32 eval_b
 	};
 
 	gPipelineCache->AddBufferOffset(0, frame * scMaxJobsPerFrame * sizeof(Job));
-	AddZeroOffsets(3);
+	AddZeroOffsets(4);
 	gPipelineCache->SetFrameData(gGraphics->FrameAlloc.Push(consts));
 	gPipelineCache->Bind(ePipelineName::SDFPageUpdate, cmd);
 
@@ -614,11 +666,12 @@ void SDFPageScene::Update(CommandBuffer& cmd, const FVec3& center, uint32 eval_b
 	vkCmdDispatch(cmd.Get(), columns, rows, 1);
 
 	AtlasTransition(cmd, mpAtlas, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	AtlasTransition(cmd, mpNearest, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	ComputeBarrier(cmd);
 }
 
 void SDFPageScene::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDebugView view, float32 cone_slope,
-							   float32 ray_length)
+							   float32 ray_length, uint32 probe_stride)
 {
 	if (!mbActive || !mbAtlasInitialized || view == eDebugView::None) {
 		return;
@@ -681,6 +734,15 @@ void SDFPageScene::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDe
 	consts.Info[3] = gGraphics->GetElapsedFrameCount();
 	consts.Params[0] = cone_slope;
 	consts.Params[1] = ray_length;
+	consts.Params[2] = gGraphics->PreExposure;
+
+	gGraphics->SelectShadeLights(eye, ray_length, consts.LightIndices, consts.Lights[0]);
+	consts.Lights[2] = std::max(probe_stride, 1U);
+
+	if (gGraphics->IsBakedSunShadowActive()) {
+		consts.Lights[1] |= scShadeFlagBakedSun;
+		consts.BakedSun = gGraphics->GetBakedSunShadowGpu();
+	}
 
 	Image* lit = &gGraphics->pRenderer->ForwardPass.GetTarget(eImageFormat::RGBA16_Float)->GetImage();
 
@@ -689,6 +751,9 @@ void SDFPageScene::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDe
 
 	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->AddBufferOffset(0, frame * scStatCount * sizeof(uint32));
+	AddZeroOffsets(3);
+	gPipelineCache->AddBufferOffset(0, gGraphics->LightBuffer.GetBaseOffset());
+	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->SetFrameData(gGraphics->FrameAlloc.Push(consts));
 	gPipelineCache->Bind(ePipelineName::SDFPageDebug, cmd);
 

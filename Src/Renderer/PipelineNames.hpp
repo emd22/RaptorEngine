@@ -42,6 +42,9 @@ enum class ePipelineName : uint16
 	LightTransportApply,
 	SDFPageUpdate,
 	SDFPageDebug,
+	ProbeClipmapTrace,
+	ProbeClipmapBlend,
+	ProbeClipmapDebug,
 
 	NumPipelines
 };

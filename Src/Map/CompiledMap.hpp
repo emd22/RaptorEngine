@@ -226,7 +226,8 @@ struct CompiledMapSDFPage
 	uint32 Padding = 0;
 };
 
-/// Laid out to match SDFPageTriangle in Shaders/SDFPageCommon.hlsli
+/// Laid out to match SDFPageTriangle in Shaders/SDFPageCommon.hlsli. The first corner's W holds the triangle's
+/// linear albedo as RGB8 (red in the low byte), stored as the bits of a uint32.
 struct CompiledMapSDFPageTriangle
 {
 	float32 Corners[3][4] = {};

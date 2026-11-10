@@ -212,6 +212,8 @@ void GraphicsBackend::Init(UVec2 window_size)
 
 		Transport.Create();
 		SDFPages.Create();
+		GIClipmap.Create();
+		ShadeLights.InitCapacity(Limits::MaxActiveLights);
 	}
 
 	{
@@ -1164,6 +1166,82 @@ eFogMode GraphicsBackend::GetFogMode() const
 	return eFogMode::Froxel;
 }
 
+void GraphicsBackend::SelectShadeLights(const FVec3& center, float32 reach, uint32 out_slots[4], uint32& out_count) const
+{
+	constexpr uint32 scMax = SDFPageScene::scShadeMaxLights;
+
+	out_count = 0;
+
+	for (const ShadeLightCandidate& light : ShadeLights) {
+		if (light.bDirectional && out_count < scMax) {
+			out_slots[out_count++] = light.Slot;
+			break;
+		}
+	}
+
+	float32 distances[scMax] = {};
+	const uint32 first_local = out_count;
+
+	for (const ShadeLightCandidate& light : ShadeLights) {
+		if (light.bDirectional) {
+			continue;
+		}
+
+		const float32 distance = (light.Position - center).Length();
+
+		if (distance > light.Radius + reach) {
+			continue;
+		}
+
+		// Keep the nearest ones, sorted by distance
+		uint32 insert = out_count;
+
+		while (insert > first_local && distances[insert - 1] > distance) {
+			insert--;
+		}
+
+		if (insert >= scMax) {
+			continue;
+		}
+
+		const uint32 last = std::min(out_count, scMax - 1);
+
+		for (uint32 index = last; index > insert; index--) {
+			out_slots[index] = out_slots[index - 1];
+			distances[index] = distances[index - 1];
+		}
+
+		out_slots[insert] = light.Slot;
+		distances[insert] = distance;
+		out_count = std::min(out_count + 1, scMax);
+	}
+}
+
+BakedSunShadowGpu GraphicsBackend::GetBakedSunShadowGpu() const
+{
+	BakedSunShadowGpu baked;
+
+	for (uint32 axis = 0; axis < 3; axis++) {
+		baked.Right[axis] = FogShadow.Right[axis];
+		baked.Up[axis] = FogShadow.Up[axis];
+		baked.Forward[axis] = FogShadow.Forward[axis];
+	}
+
+	baked.Right[3] = FogShadow.PageSize;
+	baked.Up[3] = scBakedFogShadowBias;
+	baked.Forward[3] = scBakedFogShadowPcfRadius;
+
+	baked.Grid[0] = static_cast<float32>(FogShadow.CellMin[0]);
+	baked.Grid[1] = static_cast<float32>(FogShadow.CellMin[1]);
+	baked.Grid[2] = static_cast<float32>(FogShadow.CellCount[0]);
+	baked.Grid[3] = static_cast<float32>(FogShadow.CellCount[1]);
+
+	baked.Atlas[0] = FogShadow.InvAtlasSize[0];
+	baked.Atlas[1] = FogShadow.InvAtlasSize[1];
+
+	return baked;
+}
+
 void GraphicsBackend::RenderFog(PerspectiveCamera& camera)
 {
 	const eFogMode mode = GetFogMode();
@@ -1260,26 +1338,16 @@ void GraphicsBackend::RenderFog(PerspectiveCamera& camera)
 		consts.Flags |= static_cast<uint32>(eFogFlags::NearSunDynamicOnly);
 	}
 
-	if (bBakedSunActive && bHasBakedFogShadow) {
+	if (IsBakedSunShadowActive()) {
 		consts.Flags |= static_cast<uint32>(eFogFlags::BakedSunShadow);
 
-		for (uint32 axis = 0; axis < 3; axis++) {
-			consts.BakedShadowRight[axis] = FogShadow.Right[axis];
-			consts.BakedShadowUp[axis] = FogShadow.Up[axis];
-			consts.BakedShadowForward[axis] = FogShadow.Forward[axis];
-		}
+		const BakedSunShadowGpu baked = GetBakedSunShadowGpu();
 
-		consts.BakedShadowRight[3] = FogShadow.PageSize;
-		consts.BakedShadowUp[3] = scBakedFogShadowBias;
-		consts.BakedShadowForward[3] = scBakedFogShadowPcfRadius;
-
-		consts.BakedShadowGrid[0] = static_cast<float32>(FogShadow.CellMin[0]);
-		consts.BakedShadowGrid[1] = static_cast<float32>(FogShadow.CellMin[1]);
-		consts.BakedShadowGrid[2] = static_cast<float32>(FogShadow.CellCount[0]);
-		consts.BakedShadowGrid[3] = static_cast<float32>(FogShadow.CellCount[1]);
-
-		consts.BakedShadowAtlas[0] = FogShadow.InvAtlasSize[0];
-		consts.BakedShadowAtlas[1] = FogShadow.InvAtlasSize[1];
+		memcpy(consts.BakedShadowRight, baked.Right, sizeof(baked.Right));
+		memcpy(consts.BakedShadowUp, baked.Up, sizeof(baked.Up));
+		memcpy(consts.BakedShadowForward, baked.Forward, sizeof(baked.Forward));
+		memcpy(consts.BakedShadowGrid, baked.Grid, sizeof(baked.Grid));
+		memcpy(consts.BakedShadowAtlas, baked.Atlas, sizeof(baked.Atlas));
 	}
 
 	if (bFarSunShadowActive) {
@@ -1387,8 +1455,14 @@ void GraphicsBackend::DoComposition(PerspectiveCamera& render_cam)
 	}
 
 	if (SDFPageDebugView != SDFPageScene::eDebugView::None) {
-		SDFPages.RenderDebug(frame->CmdBuffer, render_cam, SDFPageDebugView, SDFPageDebugCone, SDFPageDebugRayLength);
+		SDFPages.RenderDebug(frame->CmdBuffer, render_cam, SDFPageDebugView, SDFPageDebugCone, SDFPageDebugRayLength,
+							 SDFPageDebugProbeStride);
 		MarkGpu(eGpuMarker::SDFPageDebug);
+	}
+
+	if (GIClipmapDebugView != ProbeClipmap::eDebugView::None) {
+		GIClipmap.RenderDebug(frame->CmdBuffer, render_cam, GIClipmapDebugView);
+		MarkGpu(eGpuMarker::GIClipmapDebug);
 	}
 
 	pRenderer->CompPass.Begin(frame->CmdBuffer);
@@ -1560,6 +1634,7 @@ void GraphicsBackend::Destroy()
 	DecalMaskBuffer.Destroy();
 	ProbeBuffer.Destroy();
 	Transport.Destroy();
+	GIClipmap.Destroy();
 	SDFPages.Destroy();
 	ProbeVolumeBuffer.Destroy();
 	ProbeGridBuffer.Destroy();

@@ -13,13 +13,25 @@
 #define SDF_PAGE_ATLAS_SHIFT_X 6
 #define SDF_PAGE_ATLAS_SHIFT_Y 5
 
+/// The nearest triangle is kept once per block of this many texels a side, as an index into the page's refs
+#define SDF_PAGE_NEAREST_BLOCK 2
+#define SDF_PAGE_NEAREST_SIZE (SDF_PAGE_TEXELS / SDF_PAGE_NEAREST_BLOCK)
+
 /// Mirrors CompiledMapSDFPageTriangle in Src/Map/CompiledMap.hpp
 struct SDFPageTriangle
 {
+	/// W is the linear albedo as RGB8, red in the low byte
 	float4 vA;
 	float4 vB;
 	float4 vC;
 };
+
+float3 SDFPageTriangleAlbedo(SDFPageTriangle page_triangle)
+{
+	const uint packed = asuint(page_triangle.vA.w);
+
+	return float3(packed & 0xFFu, (packed >> 8) & 0xFFu, (packed >> 16) & 0xFFu) * (1.0 / 255.0);
+}
 
 /// Mirrors SDFPageLevelGpu
 struct SDFPageLevel

@@ -27,6 +27,8 @@ enum class eGpuMarker : uint32
 	Fog,
 	ProbeCapture,
 	SDFPageDebug,
+	GIClipmap,
+	GIClipmapDebug,
 	Composition,
 
 	Count,

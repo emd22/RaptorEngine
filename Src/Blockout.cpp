@@ -842,6 +842,7 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	renderer::gGraphics->ClearFogShadow();
 	renderer::gGraphics->Transport.Clear();
 	renderer::gGraphics->SDFPages.Clear();
+	renderer::gGraphics->GIClipmap.Reset();
 
 	mbHasBakedSun = false;
 	mbHasBakedIndirect = false;
@@ -983,6 +984,7 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 	}
 
 	renderer::gGraphics->SDFPages.Upload(map.SDFPages);
+	renderer::gGraphics->GIClipmap.Reset();
 
 	mbHasBakedSun = has_lightmap && map.HasBakedSun();
 	mbHasBakedIndirect = has_lightmap && has_indirect;

@@ -732,10 +732,11 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 			counts += String::Fmt("{}", pages.SDFPageCounts[level]);
 		}
 
-		log(String::Fmt("  sdf pages    {} levels from {:.2f} m, {} triangles, {} pages, {} refs, {:.1f} MB, built in "
-						"{:.2f} s",
+		log(String::Fmt("  sdf pages    {} levels from {:.2f} m, {} triangles, {} pages, {} refs (at most {} in a "
+						"page), {:.1f} MB, built in {:.2f} s",
 						pages.LevelCount, options.SDFPages.Level0SDFPageSize, pages.TriangleCount, counts,
-						pages.RefCount, static_cast<double>(pages.ByteCount) / (1024.0 * 1024.0), pages.Seconds));
+						pages.RefCount, pages.MaxRefsPerPage, static_cast<double>(pages.ByteCount) / (1024.0 * 1024.0),
+						pages.Seconds));
 	}
 	else if (!options.SDFPages.bEnabled) {
 		log("  sdf pages    off");

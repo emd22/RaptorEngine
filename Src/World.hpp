@@ -224,6 +224,11 @@ public:
 	CVarValue* pCVarSDFPageBudget = nullptr;
 	CVarValue* pCVarSDFPageCone = nullptr;
 	CVarValue* pCVarSDFPageRayLength = nullptr;
+	CVarValue* pCVarSDFPageProbeStride = nullptr;
+	CVarValue* pCVarGIClipmap = nullptr;
+	CVarValue* pCVarGIClipmapDebug = nullptr;
+	CVarValue* pCVarGIProbeBudget = nullptr;
+	CVarValue* pCVarGIHysteresis = nullptr;
 
 	uint32 FrustumTestedObjects = 0;
 	uint32 FrustumCulledObjects = 0;

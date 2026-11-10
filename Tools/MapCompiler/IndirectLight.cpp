@@ -2858,6 +2858,45 @@ void BuildTransport(const IndirectBake& bake, const IndirectInput& input, const 
 
 } // namespace
 
+void LoadMeanAlbedos(const CompiledMap& map, const ModelBuilder* models, SizedArray<FVec3>& out_map_albedos,
+					 SizedArray<FVec3>& out_model_albedos, uint32& out_missing)
+{
+	const uint32 model_material_count = (models != nullptr) ? models->GetMaterialCount() : 0;
+
+	SizedArray<AlbedoTexture> albedos;
+	albedos.InitSize(map.Materials.Size + model_material_count);
+
+	SizedArray<float32> alphas;
+	alphas.InitSize(map.Materials.Size, 1.0f);
+
+	LoadAlbedos(map.Materials, albedos, alphas, out_missing);
+
+	if (models != nullptr) {
+		LoadModelAlbedos(*models, albedos, static_cast<uint32>(map.Materials.Size), out_missing);
+	}
+
+	out_map_albedos.InitSize(map.Materials.Size);
+	out_model_albedos.InitSize(model_material_count);
+
+	for (size_t index = 0; index < albedos.Size; index++) {
+		const AlbedoTexture& albedo = albedos[index];
+		FVec3 sum(0.0f);
+
+		for (const FVec3& texel : albedo.Texels) {
+			sum = sum + texel;
+		}
+
+		const FVec3 mean = CapAlbedo(sum * (1.0f / static_cast<float32>(std::max<size_t>(albedo.Texels.Size, 1))));
+
+		if (index < map.Materials.Size) {
+			out_map_albedos[index] = mean;
+		}
+		else {
+			out_model_albedos[index - map.Materials.Size] = mean;
+		}
+	}
+}
+
 bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, const ModelBuilder* models,
 					   const IndirectInput& input, const LightmapOptions& options, CompiledMap& out_map,
 					   LightmapStats& out_stats)

@@ -29,6 +29,9 @@ enum class eShaderName : uint32
 	LightTransportApply,
 	SDFPageUpdate,
 	SDFPageDebug,
+	ProbeClipmapTrace,
+	ProbeClipmapBlend,
+	ProbeClipmapDebug,
 
 	NumShaders,
 };
@@ -62,6 +65,9 @@ constexpr const char* GetName(const eShaderName id)
 		FX_ENUM_CASE_NAME(LightTransportApply);
 		FX_ENUM_CASE_NAME(SDFPageUpdate);
 		FX_ENUM_CASE_NAME(SDFPageDebug);
+		FX_ENUM_CASE_NAME(ProbeClipmapTrace);
+		FX_ENUM_CASE_NAME(ProbeClipmapBlend);
+		FX_ENUM_CASE_NAME(ProbeClipmapDebug);
 	default:
 		return "Unknown";
 	}

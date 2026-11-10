@@ -2,6 +2,8 @@ F_PROGRAM(FPT_COMPUTE)
 
 #include "./Helper.hlsl"
 #include "SDFPageCommon.hlsli"
+#include "LightingCommon.hlsli"
+#include "FogConsts.hlsli"
 
 struct SDFPageDebugConsts
 {
@@ -10,8 +12,15 @@ struct SDFPageDebugConsts
 	float4 vEyePosition;
 	/// Target width and height, view, frame
 	uint4 vInfo;
-	/// Cone slope and length of the GI rays
+	/// Cone slope and length of the GI rays, pre-exposure
 	float4 vParams;
+	BakedSunShadowParams BakedSun;
+	/// Light buffer slots shaded at each hit
+	uint4 vLightIndices;
+	/// Light count, flags (SHADE_FLAG_*), probe stride
+	uint4 vLights;
+	/// Radiance of the rays that miss
+	float4 vSkyRadiance;
 };
 
 F_StructBuffer(bSDFPageIndirection, uint, 0, 0);
@@ -24,10 +33,28 @@ F_Texture2D(tMotion, 4, 0);
 
 F_RWStructBuffer(bStats, uint, 6, 0);
 
+F_StructBuffer(bTriangles, SDFPageTriangle, 7, 0);
+F_StructBuffer(bRefs, uint, 8, 0);
+F_StructBuffer(bAtlasFirstRef, uint, 9, 0);
+Texture3D<uint> tNearestTexture : register(t10, space0);
+SamplerState tNearest : register(s10, space0);
+
+F_CBuffer(FSLightBuffer, 11, 0)
+{
+	Light Lights[LIGHT_COUNT];
+};
+
+F_ShadowTexture2D(tShadowAtlas, 12, 0);
+F_ShadowTexture2D(tFogShadowAtlas, 13, 0);
+F_StructBuffer(bFogShadowPages, FogShadowPage, 14, 0);
+
+#include "BakedSunShadow.hlsli"
+
 F_FrameData(SDFPageDebugConsts, Consts, 1);
 
 #define SDF_PAGE_SCENE Consts.Scene
 #include "SDFPageTrace.hlsli"
+#include "SDFPageShade.hlsli"
 
 /// Mirrors SDFPageScene::eDebugView
 #define VIEW_NORMALS 1
@@ -40,6 +67,8 @@ F_FrameData(SDFPageDebugConsts, Consts, 1);
 #define VIEW_GI_STEPS 8
 /// Every 8x8 thread group is one screen probe: its 64 rays leave the surface under the group's first pixel
 #define VIEW_PROBE_RAYS 9
+/// The probe rays of VIEW_PROBE_RAYS, with the light leaving each hit (albedo, sun, local lights) or the sky
+#define VIEW_PROBE_SHADE 10
 #define PROBE_SIZE 8
 
 #define STAT_MATCH 0
@@ -124,8 +153,9 @@ void RecordSteps(SDFPageHit hit)
 	AddStat(STAT_MAX_STEPS, select(hit.uiSteps >= SDF_PAGE_MAX_STEPS, 1u, 0u));
 }
 
-float3 ShadePixel(uint2 pixel, uint2 group_pixel, uint2 local)
+float3 ShadePixel(uint2 pixel, uint2 group, uint2 local)
 {
+	const uint2 group_pixel = group * PROBE_SIZE;
 	const uint view = Consts.vInfo.z;
 	const float2 uv = (float2(pixel) + 0.5) / float2(Consts.vInfo.xy);
 
@@ -149,10 +179,13 @@ float3 ShadePixel(uint2 pixel, uint2 group_pixel, uint2 local)
 	else if (view == VIEW_ROUGHNESS) {
 		colour = normal_sample.www;
 	}
-	else if (or(or(view == VIEW_GI_RAYS, view == VIEW_GI_STEPS), view == VIEW_PROBE_RAYS)) {
+	else if (or(or(view == VIEW_GI_RAYS, view == VIEW_GI_STEPS), or(view == VIEW_PROBE_RAYS, view == VIEW_PROBE_SHADE))) {
 		colour = float3(1.0, 1.0, 1.0);
 
-		const bool is_probe = view == VIEW_PROBE_RAYS;
+		const bool is_probe = or(view == VIEW_PROBE_RAYS, view == VIEW_PROBE_SHADE);
+		const uint group_columns = (Consts.vInfo.x + PROBE_SIZE - 1) / PROBE_SIZE;
+		// Every probe stride'th probe traces, so a run can trace a given number of rays
+		const bool is_skipped = and(is_probe, ((group.x + group.y * group_columns) % max(Consts.vLights.z, 1u)) != 0);
 		const uint2 origin_pixel = select(is_probe, min(group_pixel, Consts.vInfo.xy - 1), pixel);
 		const float2 origin_uv = (float2(origin_pixel) + 0.5) / float2(Consts.vInfo.xy);
 		const float origin_depth = F_SampleLoad(tDepth, int3(origin_pixel, 0)).r;
@@ -164,7 +197,7 @@ float3 ShadePixel(uint2 pixel, uint2 group_pixel, uint2 local)
 		const bool is_traceable = length(origin_surface - eye) < GI_MAX_DISTANCE;
 		const bool has_surface = and(origin_depth > 0.0, origin_depth < VIEWMODEL_STORED_DEPTH);
 
-		if (and(has_surface, is_traceable)) {
+		if (and(and(has_surface, is_traceable), !is_skipped)) {
 			const float3 normal = normalize(origin_normal.xyz);
 			const uint seed = Hash(pixel.x + pixel.y * 7919u + Consts.vInfo.w * 104729u);
 			const float2 jitter = float2(Hash(seed) & 0xFFFFu, Hash(seed ^ 0x9E3779B9u) & 0xFFFFu) / 65536.0;
@@ -180,6 +213,24 @@ float3 ShadePixel(uint2 pixel, uint2 group_pixel, uint2 local)
 			const float visibility = select(hit.bHit, saturate(hit.fDistance / GI_AO_DISTANCE), 1.0);
 
 			colour = visibility.xxx;
+
+			if (view == VIEW_PROBE_SHADE) {
+				float3 radiance = Consts.vSkyRadiance.rgb;
+
+				if (hit.bHit) {
+					const float3 position = origin + direction * hit.fDistance;
+					const SDFPageTriangle page_triangle = SDFPageNearestTriangle(hit, position);
+					const float3 face = normalize(cross(page_triangle.vB.xyz - page_triangle.vA.xyz, page_triangle.vC.xyz - page_triangle.vA.xyz));
+					const float3 hit_normal = select(dot(face, direction) > 0.0, -face, face);
+
+					const float angle = float(Hash(seed ^ 0x68E31DA4u) & 0xFFFFu) * (2.0 * PI / 65536.0);
+					radiance = SDFPageShadeHit(position, hit_normal, SDFPageTriangleAlbedo(page_triangle),
+											   float2(cos(angle), sin(angle)), Consts.BakedSun, Consts.vLightIndices,
+											   Consts.vLights.x, Consts.vLights.y);
+				}
+
+				colour = radiance * Consts.vParams.z;
+			}
 
 			if (view == VIEW_GI_STEPS) {
 				colour = select(hit.uiSteps >= SDF_PAGE_MAX_STEPS, float3(1.0, 0.0, 1.0), HeatColour(float(hit.uiSteps) / 96.0));
@@ -253,7 +304,7 @@ void main(uint3 thread : SV_DispatchThreadID, uint3 group : SV_GroupID, uint3 lo
 	}
 
 	if (all(pixel < Consts.vInfo.xy)) {
-		tOutput[pixel] = float4(ShadePixel(pixel, group.xy * PROBE_SIZE, local.xy), 1.0);
+		tOutput[pixel] = float4(ShadePixel(pixel, group.xy, local.xy), 1.0);
 	}
 
 	[unroll]

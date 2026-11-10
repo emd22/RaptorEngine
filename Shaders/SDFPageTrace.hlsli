@@ -18,6 +18,9 @@ struct SDFPageHit
 	float fDistance;
 	uint uiSteps;
 	uint uiLevel;
+	/// The page the ray stopped in, valid on a hit
+	uint uiAtlas;
+	int3 vCoord;
 	bool bHit;
 };
 
@@ -122,6 +125,8 @@ SDFPageHit SDFPageTrace(float3 origin, float3 direction, float max_distance, flo
 	hit.fDistance = max_distance;
 	hit.uiSteps = 0;
 	hit.uiLevel = 0;
+	hit.uiAtlas = SDF_PAGE_EMPTY;
+	hit.vCoord = int3(0, 0, 0);
 	hit.bHit = false;
 
 	const float3 safe_direction = select(abs(direction) < 1e-6, select(direction < 0.0, -1e-6, 1e-6), direction);
@@ -194,6 +199,8 @@ SDFPageHit SDFPageTrace(float3 origin, float3 direction, float max_distance, flo
 		if (and(!is_empty, distance < sdf_page_level.vParams.w * SDF_PAGE_HIT_TEXELS)) {
 			hit.fDistance = t;
 			hit.uiLevel = level;
+			hit.uiAtlas = atlas;
+			hit.vCoord = coord;
 			hit.bHit = true;
 			break;
 		}

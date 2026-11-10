@@ -86,6 +86,8 @@ public:
 		Levels,
 		GiSteps,
 		ProbeRays,
+		/// The probe rays, with the light leaving each hit
+		ProbeShade,
 		Count,
 	};
 
@@ -107,9 +109,22 @@ public:
 
 	/// Traces from the camera (or from the prepass surfaces) and overwrites the lit target with the result
 	void RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDebugView view, float32 cone_slope,
-					 float32 ray_length);
+					 float32 ray_length, uint32 probe_stride);
+
+	/// Mirrors SHADE_MAX_LIGHTS in Shaders/SDFPageShade.hlsli
+	static constexpr uint32 scShadeMaxLights = 4;
 
 	bool IsActive() const { return mbActive; }
+
+	/// True once some pages have distances to trace against
+	bool IsTraceable() const { return mbActive && mbAtlasInitialized; }
+
+	RawGpuBuffer* GetIndirectionBuffer() { return &mIndirection; }
+	RawGpuBuffer* GetTriangleBuffer() { return &mTriangles; }
+	RawGpuBuffer* GetRefBuffer() { return &mRefs; }
+	RawGpuBuffer* GetAtlasFirstRefBuffer() { return &mAtlasFirstRef; }
+	Image* GetAtlas() { return mpAtlas; }
+	Image* GetNearest() { return mpNearest; }
 
 	void GetSceneConsts(SDFPageSceneGpu& out_consts) const;
 
@@ -168,6 +183,10 @@ private:
 	RawGpuBuffer mStats;
 
 	Image* mpAtlas = nullptr;
+	/// Index into the page's refs of the triangle nearest each block of SDFPageNearestBlock texels a side
+	Image* mpNearest = nullptr;
+	/// First ref of the page in each atlas slot, to find its triangles from the nearest index
+	RawGpuBuffer mAtlasFirstRef;
 	bool mbAtlasInitialized = false;
 
 	SizedArray<uint32> mFreeAtlas;

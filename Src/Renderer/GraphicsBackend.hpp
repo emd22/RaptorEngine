@@ -9,6 +9,7 @@
 #include "FrameAllocator.hpp"
 #include "GpuProfiler.hpp"
 #include "LightTransport.hpp"
+#include "ProbeClipmap.hpp"
 #include "SDFPageScene.hpp"
 #include "TiledForwardRenderer.hpp"
 #include "UniformBuffer.hpp"
@@ -64,6 +65,28 @@ struct BakedFogShadowParams
 	uint32 CellCount[2] = {};
 
 	float32 InvAtlasSize[2] = {};
+};
+
+/// The baked sun shadow lookup as BakedSunShadowParams in Shaders/FogConsts.hlsli lays it out
+struct BakedSunShadowGpu
+{
+	/// XYZ are the light space axes. W: page size, depth bias, PCF radius.
+	float32 Right[4] = {};
+	float32 Up[4] = {};
+	float32 Forward[4] = {};
+	/// First cell XY, cell counts ZW
+	float32 Grid[4] = {};
+	/// Reciprocal atlas size in XY
+	float32 Atlas[4] = {};
+};
+
+/// A light written into the light buffer this frame, for picking the lights the GI shades its ray hits with
+struct ShadeLightCandidate
+{
+	uint32 Slot = 0;
+	bool bDirectional = false;
+	FVec3 Position = FVec3::sZero;
+	float32 Radius = 0.0f;
 };
 
 struct GpuUploadContext
@@ -168,6 +191,16 @@ public:
 
 	bool UploadFogShadow(const CompiledMapFogShadow& shadow);
 	void ClearFogShadow() { bHasBakedFogShadow = false; }
+
+	/// True when the baked sun visibility is current and the map has fog shadow pages to look it up in
+	bool IsBakedSunShadowActive() const { return bBakedSunActive && bHasBakedFogShadow; }
+	BakedSunShadowGpu GetBakedSunShadowGpu() const;
+
+	/**
+	 * @brief The light buffer slots the GI shades its hits with: the sun, then the nearest local lights that reach
+	 * within `reach` of `center`, up to SDFPageScene::scShadeMaxLights
+	 */
+	void SelectShadeLights(const FVec3& center, float32 reach, uint32 out_slots[4], uint32& out_count) const;
 
 	bool HasDebugView() const { return bOnlyRenderProbes || bRenderProbeVisibility || (ReflectionDebugView != 0); }
 
@@ -311,6 +344,14 @@ public:
 	SDFPageScene::eDebugView SDFPageDebugView = SDFPageScene::eDebugView::None;
 	float32 SDFPageDebugCone = 0.0f;
 	float32 SDFPageDebugRayLength = 50.0f;
+	/// Only every this many probes trace in the probe ray views
+	uint32 SDFPageDebugProbeStride = 1;
+
+	ProbeClipmap GIClipmap;
+	ProbeClipmap::eDebugView GIClipmapDebugView = ProbeClipmap::eDebugView::None;
+
+	/// Filled by the world as it writes the light buffer each frame
+	SizedArray<ShadeLightCandidate> ShadeLights;
 
 	Image* pFogShadowAtlas = nullptr;
 

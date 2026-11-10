@@ -59,6 +59,9 @@ void TiledForwardRenderer::Create(const UVec2& extent)
 	gGraphics->SDFPages.CreatePipelines(
 		Prepass.GetTarget(eImageFormat::D32_Float), Prepass.GetTarget(eImageFormat::RGBA16_Float),
 		Prepass.GetTarget(eImageFormat::RG16_Float), ForwardPass.GetTarget(eImageFormat::RGBA16_Float));
+	gGraphics->GIClipmap.CreatePipelines(Prepass.GetTarget(eImageFormat::D32_Float),
+										 Prepass.GetTarget(eImageFormat::RGBA16_Float),
+										 ForwardPass.GetTarget(eImageFormat::RGBA16_Float));
 	CreateLightCullingPSO();
 	CreateDebugLayerPSO();
 	CreateDebugSolidPSO();

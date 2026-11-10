@@ -33,6 +33,7 @@ F_Texture3D(tFroxelHistory, 11, 0);
 F_FrameData(FogConsts, Consts, 1);
 
 #include "FogMedium.hlsli"
+#include "BakedSunShadow.hlsli"
 #include "FogLighting.hlsli"
 
 #define FROXEL_SURFACE_MARGIN 0.1

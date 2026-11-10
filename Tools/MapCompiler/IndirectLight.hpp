@@ -35,6 +35,13 @@ struct IndirectInput
  * @brief Bakes bounce light into the lightmap and the light probes. Model triangles (`models`, optional) have no
  * lightmap texels, so their radiance lives in a bake-only cache of world space cells that is gathered like texels.
  */
+/**
+ * @brief The mean albedo of every map material and every model material, capped like the bake caps it. Missing
+ * textures fall back to the bake's default albedo and are counted in `out_missing`.
+ */
+void LoadMeanAlbedos(const CompiledMap& map, const ModelBuilder* models, SizedArray<FVec3>& out_map_albedos,
+					 SizedArray<FVec3>& out_model_albedos, uint32& out_missing);
+
 bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, const ModelBuilder* models,
 					   const IndirectInput& input, const LightmapOptions& options, CompiledMap& out_map,
 					   LightmapStats& out_stats);

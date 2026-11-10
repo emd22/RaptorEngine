@@ -27,6 +27,8 @@ F_StructBuffer(bTriangles, SDFPageTriangle, 2, 0);
 F_RWStructBuffer(bIndirection, uint, 3, 0);
 
 [[vk::image_format("r8")]] F_RWTexture3D(tAtlas, float, 4, 0);
+[[vk::image_format("r16ui")]] F_RWTexture3D(tNearest, uint, 5, 0);
+F_RWStructBuffer(bAtlasFirstRef, uint, 6, 0);
 
 F_FrameData(SDFPageUpdateConsts, Consts, 1);
 
@@ -36,7 +38,7 @@ F_FrameData(SDFPageUpdateConsts, Consts, 1);
 
 float Dot2(float3 v) { return dot(v, v); }
 
-/// Squared distance from `p` to the triangle abc
+/// Squared distance from `p` to the page_triangle abc
 float TriangleDistanceSq(float3 p, float3 a, float3 b, float3 c)
 {
 	const float3 ba = b - a;
@@ -85,6 +87,14 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 		float3 positions[TEXELS_PER_THREAD];
 		float best[TEXELS_PER_THREAD];
 
+		// Each thread also finds the nearest page_triangle to the centre of one block of texels
+		const uint3 block = uint3(thread % SDF_PAGE_NEAREST_SIZE, (thread / SDF_PAGE_NEAREST_SIZE) % SDF_PAGE_NEAREST_SIZE,
+								  thread / (SDF_PAGE_NEAREST_SIZE * SDF_PAGE_NEAREST_SIZE));
+		const float3 block_centre = origin + (float3(block * SDF_PAGE_NEAREST_BLOCK) + SDF_PAGE_NEAREST_BLOCK * 0.5) *
+												 texel_size;
+		float block_best = 1e30;
+		uint block_ref = 0;
+
 		[unroll]
 		for (uint index = 0; index < TEXELS_PER_THREAD; index++) {
 			positions[index] = origin + (float3(GetLocalTexel(thread, index)) + 0.5) * texel_size;
@@ -93,13 +103,18 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 
 		[loop]
 		for (uint ref = 0; ref < job.uiRefCount; ref++) {
-			const SDFPageTriangle triangle = bTriangles[bRefs[job.uiFirstRef + ref]];
+			const SDFPageTriangle page_triangle = bTriangles[bRefs[job.uiFirstRef + ref]];
 
 			[unroll]
 			for (uint index = 0; index < TEXELS_PER_THREAD; index++) {
-				best[index] = min(best[index], TriangleDistanceSq(positions[index], triangle.vA.xyz, triangle.vB.xyz,
-																  triangle.vC.xyz));
+				best[index] = min(best[index], TriangleDistanceSq(positions[index], page_triangle.vA.xyz, page_triangle.vB.xyz,
+																  page_triangle.vC.xyz));
 			}
+
+			const float block_distance = TriangleDistanceSq(block_centre, page_triangle.vA.xyz, page_triangle.vB.xyz,
+															page_triangle.vC.xyz);
+			block_ref = select(block_distance < block_best, ref, block_ref);
+			block_best = min(block_best, block_distance);
 		}
 
 		const float margin = texel_size * SDF_PAGE_TEXELS * Consts.vParams.x;
@@ -108,6 +123,12 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 		[unroll]
 		for (uint index = 0; index < TEXELS_PER_THREAD; index++) {
 			tAtlas[atlas_origin + GetLocalTexel(thread, index)] = saturate(sqrt(best[index]) / margin);
+		}
+
+		tNearest[atlas_origin / SDF_PAGE_NEAREST_BLOCK + block] = min(block_ref, 0xFFFFu);
+
+		if (thread == 0) {
+			bAtlasFirstRef[job.uiAtlas] = job.uiFirstRef;
 		}
 	}
 
