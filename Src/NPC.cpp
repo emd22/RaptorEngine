@@ -124,7 +124,7 @@ void RagdollEntity::SetCullable(bool cullable)
 	}
 }
 
-bool RagdollEntity::AddWound(JPH::BodyID body_id, const Vec3f point, const Vec3f direction, float32 size)
+bool RagdollEntity::AddWound(JPH::BodyID body_id, const FVec3 point, const FVec3 direction, float32 size)
 {
 	Object* skinned = GetSkinned();
 	uint32 bone_index = 0;
@@ -172,7 +172,7 @@ bool NPC::Create(const Object* model, const NPCDesc& desc, NPCManager& manager)
 	Object* root = mActor.GetRoot();
 
 	root->SetPosition(desc.Position);
-	root->SetRotation(Quat::FromAxisAngle(Vec3f::sUp, desc.Yaw));
+	root->SetRotation(Quat::FromAxisAngle(FVec3::sUp, desc.Yaw));
 
 	mName = desc.Name;
 
@@ -350,7 +350,7 @@ void NPC::UpdateLocomotion(float32 delta_time)
 		return;
 	}
 
-	const Vec3f previous_position = root->GetPosition();
+	const FVec3 previous_position = root->GetPosition();
 
 	NPCBrainOutput out;
 	mBrain.Update(delta_time, NPCBrainInput { .Position = previous_position, .Yaw = mYaw }, out);
@@ -358,13 +358,13 @@ void NPC::UpdateLocomotion(float32 delta_time)
 	mMover.Update(delta_time, out.Velocity);
 	mYaw = out.Yaw;
 
-	const Vec3f position = mMover.GetPosition();
-	const Vec3f moved = position - previous_position;
+	const FVec3 position = mMover.GetPosition();
+	const FVec3 moved = position - previous_position;
 
 	root->SetPosition(position);
-	root->SetRotation(Quat::FromAxisAngle(Vec3f::sUp, mYaw));
+	root->SetRotation(Quat::FromAxisAngle(FVec3::sUp, mYaw));
 
-	const float32 speed = Vec3f(moved.X, 0.0f, moved.Z).Length() / delta_time;
+	const float32 speed = FVec3(moved.X, 0.0f, moved.Z).Length() / delta_time;
 
 	UpdateLocomotionAnimation(delta_time, speed);
 }
@@ -430,33 +430,33 @@ void NPC::PlaceRootUnderPelvis()
 		return;
 	}
 
-	const Vec3f pelvis = ragdoll.GetBodyOrigin(0);
-	const Vec3f root_position = root->GetPosition();
-	Vec3f target = ragdoll.GetBodyTargetOrigin(0);
+	const FVec3 pelvis = ragdoll.GetBodyOrigin(0);
+	const FVec3 root_position = root->GetPosition();
+	FVec3 target = ragdoll.GetBodyTargetOrigin(0);
 
 	// Balancing lets the body turn as it stumbles, so turn the root to match or the animation twists it back
-	const Vec3f facing = ragdoll.GetPelvisHeading(false);
-	const Vec3f animated_facing = ragdoll.GetPelvisHeading(true);
+	const FVec3 facing = ragdoll.GetPelvisHeading(false);
+	const FVec3 animated_facing = ragdoll.GetPelvisHeading(true);
 
 	if (facing.Length() > 0.0f && animated_facing.Length() > 0.0f) {
 		const float32 turn = NPCBrain::WrapAngle(NPCBrain::DirectionToYaw(facing) -
 												 NPCBrain::DirectionToYaw(animated_facing));
 		const float32 cos_turn = std::cos(turn);
 		const float32 sin_turn = std::sin(turn);
-		const Vec3f arm = target - root_position;
+		const FVec3 arm = target - root_position;
 
-		target = root_position + Vec3f(arm.X * cos_turn + arm.Z * sin_turn, arm.Y, arm.Z * cos_turn - arm.X * sin_turn);
+		target = root_position + FVec3(arm.X * cos_turn + arm.Z * sin_turn, arm.Y, arm.Z * cos_turn - arm.X * sin_turn);
 
 		mYaw = NPCBrain::WrapAngle(mYaw + turn);
-		root->SetRotation(Quat::FromAxisAngle(Vec3f::sUp, mYaw));
+		root->SetRotation(Quat::FromAxisAngle(FVec3::sUp, mYaw));
 	}
 
-	const Vec3f offset = pelvis - target;
+	const FVec3 offset = pelvis - target;
 
-	Vec3f position = root_position + Vec3f(offset.X, 0.0f, offset.Z);
+	FVec3 position = root_position + FVec3(offset.X, 0.0f, offset.Z);
 
-	const physics::RayResult ground = gPhysics->pBackend->RaycastStatic(Vec3f(position.X, pelvis.Y, position.Z),
-																		Vec3f(0.0f, -scGroundProbe, 0.0f));
+	const physics::RayResult ground = gPhysics->pBackend->RaycastStatic(FVec3(position.X, pelvis.Y, position.Z),
+																		FVec3(0.0f, -scGroundProbe, 0.0f));
 
 	if (ground.bHit) {
 		position.Y = ground.Point.Y;
@@ -503,8 +503,8 @@ void NPC::DrawDebugHealth() const
 		return;
 	}
 
-	const Vec3f right = gWorld->Player.pCamera->GetRightVector();
-	const Vec3f left_end = root->GetPosition() + Vec3f(0.0f, scBarHeight, 0.0f) - right * (scBarWidth * 0.5f);
+	const FVec3 right = gWorld->Player.pCamera->GetRightVector();
+	const FVec3 left_end = root->GetPosition() + FVec3(0.0f, scBarHeight, 0.0f) - right * (scBarWidth * 0.5f);
 
 	const float32 fraction = MathUtil::Clamp(mHealth / MaxHealth, 0.0f, 1.0f);
 
@@ -532,8 +532,8 @@ void NPC::DrawDebugBrain() const
 		return;
 	}
 
-	const Vec3f lift(0.0f, 0.05f, 0.0f);
-	const Vec3f position = root->GetPosition() + lift;
+	const FVec3 lift(0.0f, 0.05f, 0.0f);
+	const FVec3 position = root->GetPosition() + lift;
 
 	renderer::gDebugDraw->Line(position, position + NPCBrain::YawToDirection(mYaw) * 0.6f,
 							   Color::FromRGBA(80, 160, 255, 255));
@@ -1007,7 +1007,7 @@ void NPC::OnHit(const NPCHit& hit)
 	}
 
 	const float32 length = hit.Impulse.Length();
-	Vec3f direction = Vec3f::sZero;
+	FVec3 direction = FVec3::sZero;
 
 	if (length > 1e-5f) {
 		direction = hit.Impulse / length;
@@ -1038,7 +1038,7 @@ void NPC::OnHit(const NPCHit& hit)
 		EnterFallen();
 
 		// Whatever the contact normal says, the floor is not going to let the body go down
-		Vec3f velocity = hit.Impulse / ragdoll.GetTotalMass();
+		FVec3 velocity = hit.Impulse / ragdoll.GetTotalMass();
 		velocity.Y = std::max(velocity.Y, 0.0f);
 
 		physics::LaunchRagdoll(ragdoll, velocity);
@@ -1073,16 +1073,16 @@ void NPC::OnHit(const NPCHit& hit)
 	// way
 	if (hit.Damage > 0.0f && ragdoll.GetBodyPart(static_cast<uint32>(body)) == eBodyPart::Leg) {
 		ragdoll.AddBalanceBuckle(scLegShotBuckle);
-		physics::LaunchRagdoll(ragdoll, Vec3f(0.0f, -scLegShotDrop, 0.0f));
+		physics::LaunchRagdoll(ragdoll, FVec3(0.0f, -scLegShotDrop, 0.0f));
 	}
 }
 
-void NPC::AddStagger(const Vec3f velocity)
+void NPC::AddStagger(const FVec3 velocity)
 {
 	physics::Ragdoll& ragdoll = mActor.Ragdoll;
 
 	// Balance lets the body keep drifting with the blow for a moment, so it steps with it rather than stopping dead
-	Vec3f stagger = ragdoll.GetStaggerVelocity() + Vec3f(velocity.X, 0.0f, velocity.Z);
+	FVec3 stagger = ragdoll.GetStaggerVelocity() + FVec3(velocity.X, 0.0f, velocity.Z);
 	const float32 stagger_speed = stagger.Length();
 
 	if (stagger_speed > mpTuning->MaxStaggerSpeed) {
@@ -1184,7 +1184,7 @@ void NPC::OnContact(const physics::RagdollContact& contact)
 
 		// The way the prop is travelling, since the normal only says which side of a limb it brushed first
 		const float32 other_speed = contact.OtherVelocity.Length();
-		const Vec3f direction = contact.OtherVelocity / other_speed;
+		const FVec3 direction = contact.OtherVelocity / other_speed;
 
 		const float32 knock_speed = std::min(other_speed * shared_fraction * mpTuning->CollisionKnockScale,
 											 mpTuning->MaxCollisionKnockSpeed);
@@ -1203,9 +1203,9 @@ void NPC::OnContact(const physics::RagdollContact& contact)
 		// A kinematic ragdoll stopped the prop like a wall, so hand back the speed it should have kept
 		if (!was_powered && IsPowered() && contact.OtherMass > 0.0f) {
 			JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
-			const Vec3f kept = direction * knock_speed;
+			const FVec3 kept = direction * knock_speed;
 
-			body_interface.SetLinearVelocity(contact.OtherBody, Vec3f::ToJolt(kept));
+			body_interface.SetLinearVelocity(contact.OtherBody, FVec3::ToJolt(kept));
 		}
 
 		return;
@@ -1243,7 +1243,7 @@ void NPC::OnPush(const NPCPush& push)
 
 	// Pushed at the chest, like a shove, rather than wherever the two capsules touched
 	const uint32 chest = ragdoll.GetRig().Chest;
-	const Vec3f point = ragdoll.GetBodyPosition(chest);
+	const FVec3 point = ragdoll.GetBodyPosition(chest);
 
 	mBehaviours.HandleEvent(ragdoll, physics::RagdollEvent { .Type = physics::eRagdollEvent::Push,
 															 .Body = static_cast<int32>(chest),
@@ -1263,12 +1263,12 @@ void NPC::OnPush(const NPCPush& push)
 	physics::ApplyRagdollLocalHit(ragdoll, chest, push.Impulse, point);
 }
 
-void NPC::AddWound(JPH::BodyID body_id, const Vec3f point, const Vec3f direction, float32 size)
+void NPC::AddWound(JPH::BodyID body_id, const FVec3 point, const FVec3 direction, float32 size)
 {
 	mActor.AddWound(body_id, point, direction, size);
 }
 
-void NPC::SetPosition(const Vec3f position)
+void NPC::SetPosition(const FVec3 position)
 {
 	Object* root = mActor.GetRoot();
 
@@ -1291,7 +1291,7 @@ void NPC::SetYaw(float32 yaw)
 	}
 
 	mYaw = yaw;
-	root->SetRotation(Quat::FromAxisAngle(Vec3f::sUp, yaw));
+	root->SetRotation(Quat::FromAxisAngle(FVec3::sUp, yaw));
 	mbTeleported = true;
 }
 
@@ -1392,7 +1392,7 @@ void NPCManager::ClearRagdolls()
 	}
 }
 
-bool NPCManager::SpawnDummy(const Object* model, const String& name, const Vec3f position, const Vec3f velocity)
+bool NPCManager::SpawnDummy(const Object* model, const String& name, const FVec3 position, const FVec3 velocity)
 {
 	std::unique_ptr<RagdollEntity> dummy = std::make_unique<RagdollEntity>();
 
@@ -1466,14 +1466,14 @@ void NPCManager::SpawnWorldBlood(RagdollEntity& actor, const physics::RagdollCon
 
 	gDecalManager->AddBloodSplat(contact.Point, contact.Normal, size);
 
-	Vec3f reference = Vec3f::sRight;
+	FVec3 reference = FVec3::sRight;
 
 	if (std::abs(contact.Normal.Y) < 0.9f) {
-		reference = Vec3f::sUp;
+		reference = FVec3::sUp;
 	}
 
-	const Vec3f tangent = reference.Cross(contact.Normal).Normalize();
-	const Vec3f bitangent = contact.Normal.Cross(tangent);
+	const FVec3 tangent = reference.Cross(contact.Normal).Normalize();
+	const FVec3 bitangent = contact.Normal.Cross(tangent);
 
 	// A few smaller splats scattered around the main one
 	const uint32 satellites = 2 + static_cast<uint32>(strength * 2.0f);
@@ -1482,7 +1482,7 @@ void NPCManager::SpawnWorldBlood(RagdollEntity& actor, const physics::RagdollCon
 		const float32 angle = FastRandUnit() * 2.0f * static_cast<float32>(M_PI);
 		const float32 distance = size * (0.4f + 0.6f * FastRandUnit());
 
-		const Vec3f offset = (tangent * std::cos(angle) + bitangent * std::sin(angle)) * distance;
+		const FVec3 offset = (tangent * std::cos(angle) + bitangent * std::sin(angle)) * distance;
 
 		gDecalManager->AddBloodSplat(contact.Point + offset, contact.Normal, size * (0.25f + 0.25f * FastRandUnit()));
 	}
@@ -1509,8 +1509,8 @@ float32 NPCManager::GetActivePriority(const NPC& npc) const
 		return npc.Importance;
 	}
 
-	const Vec3f eye = gWorld->Player.pCamera->GetPosition();
-	const Vec3f offset = root->GetPosition() - eye;
+	const FVec3 eye = gWorld->Player.pCamera->GetPosition();
+	const FVec3 offset = root->GetPosition() - eye;
 	const float32 distance = offset.Length();
 
 	float32 priority = npc.Importance / std::max(distance, 1.0f);
@@ -1590,7 +1590,7 @@ bool NPCManager::RequestActive(const NPC& npc)
 void NPCManager::EnforceBudget()
 {
 	if (Tuning.ActiveDistance > 0.0f && gWorld != nullptr && gWorld->Player.pCamera) {
-		const Vec3f eye = gWorld->Player.pCamera->GetPosition();
+		const FVec3 eye = gWorld->Player.pCamera->GetPosition();
 
 		for (std::unique_ptr<NPC>& npc : mNPCs) {
 			const Object* root = gObjectManager->GetObject(npc->GetRootID());
@@ -1646,7 +1646,7 @@ void NPCManager::ProcessPlayerBumps()
 			continue;
 		}
 
-		Vec3f direction = Vec3f(bump.Normal.X, 0.0f, bump.Normal.Z);
+		FVec3 direction = FVec3(bump.Normal.X, 0.0f, bump.Normal.Z);
 		const float32 length = direction.Length();
 
 		if (length < 1e-3f) {

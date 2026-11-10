@@ -108,7 +108,7 @@ void ObjectListWindow::RefreshList()
 					continue;
 				}
 
-				const Vec3f position = object->GetPosition();
+				const FVec3 position = object->GetPosition();
 
 				rows.Insert(Row {
 					.Name = object->Name.Get(),

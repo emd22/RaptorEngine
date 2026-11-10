@@ -47,10 +47,10 @@ public:
 
 	struct GeneratedMesh
 	{
-		SizedArray<Vec3f> Positions;
-		SizedArray<Vec3f> Normals;
+		SizedArray<FVec3> Positions;
+		SizedArray<FVec3> Normals;
 		/// Optional, only filled by generators that lay out UVs (cube, quad)
-		SizedArray<Vec3f> Tangents;
+		SizedArray<FVec3> Tangents;
 		/// One per vertex, -1 where the face's UVs are mirrored. Empty means +1 everywhere
 		SizedArray<float32> TangentHandedness;
 		SizedArray<Vec2f> Texcoords;

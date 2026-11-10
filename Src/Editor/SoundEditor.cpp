@@ -32,11 +32,11 @@ void SoundEditor::Select(uint32 id) { mSelectedId = id; }
 
 void SoundEditor::Deselect() { mSelectedId = 0; }
 
-void SoundEditor::MoveSelected(const Vec3f offset)
+void SoundEditor::MoveSelected(const FVec3 offset)
 {
 	const SoundEmitter* emitter = GetSelected();
 
-	if (emitter == nullptr || offset.IsCloseTo(Vec3f::sZero, scEditTolerance)) {
+	if (emitter == nullptr || offset.IsCloseTo(FVec3::sZero, scEditTolerance)) {
 		return;
 	}
 
@@ -59,7 +59,7 @@ void SoundEditor::EditSelected(const SoundEmitter& after)
 	gEditor->EmplaceEditOperation<SoundEmitterEditOperation>(*emitter, after);
 }
 
-SoundEmitter* SoundEditor::Create(const Vec3f position)
+SoundEmitter* SoundEditor::Create(const FVec3 position)
 {
 	SoundEmitter emitter;
 	emitter.Id = gWorld->SoundEmitters.NewId();
@@ -116,7 +116,7 @@ void SoundEditor::DrawMarkers()
 			color = colors.SoundSelected;
 		}
 
-		renderer::gDebugDraw->SolidBox(emitter.Position, Vec3f(scMarkerHalfExtent), Quat::scIdentity, color);
+		renderer::gDebugDraw->SolidBox(emitter.Position, FVec3(scMarkerHalfExtent), Quat::scIdentity, color);
 	}
 }
 

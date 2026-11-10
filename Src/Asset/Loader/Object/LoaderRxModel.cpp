@@ -317,10 +317,10 @@ bool LoaderRxModel::ReadSkeleton(const RxFileRef& file_ref, Ref<Skeleton>& out_s
 		skel.ParentIndices[i] = (joint.Parent < 0) ? scBoneNull : static_cast<uint32>(joint.Parent);
 
 		BoneTransform rest {};
-		rest.Translation = Vec3f(bind_pose[i].Translation[0], bind_pose[i].Translation[1], bind_pose[i].Translation[2]);
+		rest.Translation = FVec3(bind_pose[i].Translation[0], bind_pose[i].Translation[1], bind_pose[i].Translation[2]);
 		rest.Rotation = Quat(bind_pose[i].Rotation[0], bind_pose[i].Rotation[1], bind_pose[i].Rotation[2],
 							 bind_pose[i].Rotation[3]);
-		rest.Scale = Vec3f(bind_pose[i].Scale[0], bind_pose[i].Scale[1], bind_pose[i].Scale[2]);
+		rest.Scale = FVec3(bind_pose[i].Scale[0], bind_pose[i].Scale[1], bind_pose[i].Scale[2]);
 
 		skel.RestPose[i] = rest;
 
@@ -758,8 +758,8 @@ bool LoaderRxModel::BuildObjects(const RxBinaryFile& mesh_file)
 			AttachChild(output_object, current_object->ID);
 
 			if (has_root_bounds) {
-				root_bounds.Min = Vec3f::Min(root_bounds.Min, current_object->Bounds.Min);
-				root_bounds.Max = Vec3f::Max(root_bounds.Max, current_object->Bounds.Max);
+				root_bounds.Min = FVec3::Min(root_bounds.Min, current_object->Bounds.Min);
+				root_bounds.Max = FVec3::Max(root_bounds.Max, current_object->Bounds.Max);
 			}
 			else {
 				root_bounds = current_object->Bounds;
@@ -894,7 +894,7 @@ bool LoaderRxModel::LoadClip(Animation& out_anim, const RxClipDesc& clip)
 			}
 		}
 		else {
-			BoneTransformTrack<Vec3f>& vector_track = (track.Channel == rx::TC_Translation) ? bone_track.Translation
+			BoneTransformTrack<FVec3>& vector_track = (track.Channel == rx::TC_Translation) ? bone_track.Translation
 																							: bone_track.Scale;
 
 			vector_track.Times = std::move(times);
@@ -904,7 +904,7 @@ bool LoaderRxModel::LoadClip(Animation& out_anim, const RxClipDesc& clip)
 				float32 value[3];
 				memcpy(value, data + key * key_stride, sizeof(value));
 
-				vector_track.Values[key] = Vec3f(value[0], value[1], value[2]);
+				vector_track.Values[key] = FVec3(value[0], value[1], value[2]);
 			}
 		}
 	}

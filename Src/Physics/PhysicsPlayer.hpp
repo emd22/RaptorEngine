@@ -7,8 +7,8 @@
 
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Quat.hpp>
-#include <Math/Vec3.hpp>
 
 namespace fx {
 class ConfigFile;
@@ -38,11 +38,11 @@ JPH::Vec3 GetCharacterGravity();
 struct CharacterBump
 {
 	uint64 OtherUserData = 0;
-	Vec3f Point = Vec3f::sZero;
+	FVec3 Point = FVec3::sZero;
 	/// Points from the player into the other character
-	Vec3f Normal = Vec3f::sZero;
-	Vec3f Velocity = Vec3f::sZero;
-	Vec3f OtherVelocity = Vec3f::sZero;
+	FVec3 Normal = FVec3::sZero;
+	FVec3 Velocity = FVec3::sZero;
+	FVec3 OtherVelocity = FVec3::sZero;
 	bool bNew = false;
 
 	/// Speed the player moves into the other character along the contact normal
@@ -67,8 +67,8 @@ public:
 	PhysicsPlayer() {}
 
 	void Create();
-	void Teleport(const Vec3f position);
-	void ApplyMovement(const Vec3f direction);
+	void Teleport(const FVec3 position);
+	void ApplyMovement(const FVec3 direction);
 
 	bool CanJump() const { return !bDisableGravity && !mbJumpConsumed && mTimeSinceGrounded <= CoyoteTime; }
 
@@ -79,7 +79,7 @@ public:
 		}
 	}
 
-	SizedArray<JPH::BodyID> RaycastBodies(Vec3f direction) const;
+	SizedArray<JPH::BodyID> RaycastBodies(FVec3 direction) const;
 
 	FX_FORCE_INLINE const SizedArray<CharacterBump>& GetBumps() const { return mContactListener.Bumps; }
 

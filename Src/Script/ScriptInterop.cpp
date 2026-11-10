@@ -64,15 +64,15 @@ enum class eScriptOpType
 	Rotate,
 };
 
-static Vec3f N_editor_push_op_vec3(Object* obj, int op_type, FLOAT4 original, FLOAT4 updated, int32 group_size)
+static FVec3 N_editor_push_op_vec3(Object* obj, int op_type, FLOAT4 original, FLOAT4 updated, int32 group_size)
 {
 #ifdef FX_IS_EDITOR
 	if (obj == nullptr) {
-		return Vec3f::sZero;
+		return FVec3::sZero;
 	}
 
-	const Vec3f before(original);
-	const Vec3f after(updated);
+	const FVec3 before(original);
+	const FVec3 after(updated);
 
 	switch (static_cast<eScriptOpType>(op_type)) {
 	case eScriptOpType::Move:
@@ -86,12 +86,12 @@ static Vec3f N_editor_push_op_vec3(Object* obj, int op_type, FLOAT4 original, FL
 		break;
 	default:
 		LogWarning("Editor op type {} cannot be pushed with a vector", op_type);
-		return Vec3f::sZero;
+		return FVec3::sZero;
 	}
 
 	return after;
 #else
-	return Vec3f::sZero;
+	return FVec3::sZero;
 #endif
 }
 
@@ -99,7 +99,7 @@ static Object* N_editor_op_create_object(FLOAT4 position, int32 group_size)
 {
 #ifdef FX_IS_EDITOR
 	return gEditor
-		->EmplaceEditOperation<editor::CreateOperation>(Vec3f(position), group_size, gEditor->GetNewBrushMaterial())
+		->EmplaceEditOperation<editor::CreateOperation>(FVec3(position), group_size, gEditor->GetNewBrushMaterial())
 		.GetCreated();
 #else
 	return nullptr;
@@ -114,7 +114,7 @@ static Object* N_editor_op_dupe_object(Object* object_to_dupe, FLOAT4 position, 
 	}
 
 	return gEditor
-		->EmplaceEditOperation<editor::DupeOperation>(object_to_dupe, Vec3f(position), group_size,
+		->EmplaceEditOperation<editor::DupeOperation>(object_to_dupe, FVec3(position), group_size,
 													  gEditor->AllocateDupeSubview(object_to_dupe))
 		.GetDupe();
 #else
@@ -150,7 +150,7 @@ static void N_RObject_MoveTo(Object* obj, FLOAT4 position)
 	}
 
 
-	obj->SetPosition(Vec3f(position));
+	obj->SetPosition(FVec3(position));
 }
 
 static void N_RObject_MoveBy(Object* obj, FLOAT4 by)
@@ -159,7 +159,7 @@ static void N_RObject_MoveBy(Object* obj, FLOAT4 by)
 		return;
 	}
 
-	obj->MoveBy(Vec3f(by));
+	obj->MoveBy(FVec3(by));
 }
 
 
@@ -178,7 +178,7 @@ static void N_RObject_RotateToEuler(Object* obj, FLOAT4 euler_radians)
 		return;
 	}
 
-	obj->SetRotation(Quat::FromEulerAngles(Vec3f(euler_radians)));
+	obj->SetRotation(Quat::FromEulerAngles(FVec3(euler_radians)));
 }
 
 static FLOAT4 N_RObject_GetRotationEuler(Object* obj)
@@ -220,10 +220,10 @@ static float32 N_object_direction_scale(Object* obj, FLOAT4 direction)
 	// A brush's reach along a face normal is exactly where that face is, which its bounds only give for boxes
 	const Brush* brush = gWorld->pPrototype->GetBrush(obj);
 	if (brush != nullptr) {
-		return brush->GetSupport(Vec3f(direction).Normalize());
+		return brush->GetSupport(FVec3(direction).Normalize());
 	}
 
-	return obj->GetDirectionScale(Vec3f(direction));
+	return obj->GetDirectionScale(FVec3(direction));
 }
 
 static FLOAT4 N_object_get_enter_direction(Object* obj)
@@ -250,10 +250,10 @@ static FLOAT4 N_object_local_to_world(Object* obj, FLOAT4 point)
 		return point;
 	}
 
-	const Vec3f p(point);
+	const FVec3 p(point);
 	const Vec4f world = obj->GetWorldMatrix() * Vec4f(p.X, p.Y, p.Z, 1.0f);
 
-	return Vec3f(world.X, world.Y, world.Z).mIntrin;
+	return FVec3(world.X, world.Y, world.Z).mIntrin;
 }
 
 static FLOAT4 N_object_local_dir_to_world(Object* obj, FLOAT4 direction)
@@ -262,9 +262,9 @@ static FLOAT4 N_object_local_dir_to_world(Object* obj, FLOAT4 direction)
 		return direction;
 	}
 
-	const Vec3f d(direction);
+	const FVec3 d(direction);
 	const Vec4f world = obj->GetWorldMatrix() * Vec4f(d.X, d.Y, d.Z, 0.0f);
-	const Vec3f world_dir(world.X, world.Y, world.Z);
+	const FVec3 world_dir(world.X, world.Y, world.Z);
 
 	if (world_dir.IsCloseTo(simd::LoadFloat4(0.0f))) {
 		return simd::LoadFloat4(0.0f);
@@ -280,7 +280,7 @@ static FLOAT4 N_object_ray_get_face(Object* obj)
 	}
 
 	if (obj->IsProbeVolume()) {
-		Vec3f face;
+		FVec3 face;
 
 		const float32 distance = obj->RaycastBounds(gWorld->Player.pCamera->GetPosition(),
 													gWorld->Player.pCamera->GetForwardVector(), face);
@@ -289,7 +289,7 @@ static FLOAT4 N_object_ray_get_face(Object* obj)
 	}
 
 	if (gWorld->pPrototype->GetBrush(obj) != nullptr) {
-		Vec3f face_normal;
+		FVec3 face_normal;
 
 		if (!gWorld->pPrototype->RaycastFace(obj, gWorld->Player.pCamera->GetPosition(),
 											 gWorld->Player.pCamera->GetForwardVector(), face_normal)) {
@@ -360,16 +360,16 @@ static FLOAT4 N_player_ray_get_normal(void*, float32 range)
 /// Where the crosshair's ray meets the plane through `point` facing `normal`, or `point` if the ray never reaches it
 static FLOAT4 N_camera_ray_to_plane(FLOAT4 point, FLOAT4 normal)
 {
-	const Vec3f origin = gWorld->Player.pCamera->GetPosition();
-	const Vec3f direction = gWorld->Player.pCamera->GetForwardVector();
-	const Vec3f plane_normal(normal);
+	const FVec3 origin = gWorld->Player.pCamera->GetPosition();
+	const FVec3 direction = gWorld->Player.pCamera->GetForwardVector();
+	const FVec3 plane_normal(normal);
 
 	const float32 facing = plane_normal.Dot(direction);
 	if (std::abs(facing) < 1e-5f) {
 		return point;
 	}
 
-	const float32 distance = plane_normal.Dot(Vec3f(point) - origin) / facing;
+	const float32 distance = plane_normal.Dot(FVec3(point) - origin) / facing;
 	if (distance < 0.0f) {
 		return point;
 	}
@@ -400,7 +400,7 @@ static void N_blockout_reload_object(Object* object) { gWorld->pPrototype->Rebui
 
 static void N_blockout_object_scale(Object* object, FLOAT4 face_dir, FLOAT4 magnitude)
 {
-	gWorld->pPrototype->MoveFace(object, Vec3f(face_dir), Vec3f(magnitude).X);
+	gWorld->pPrototype->MoveFace(object, FVec3(face_dir), FVec3(magnitude).X);
 }
 
 /// The centre of the face facing along `face`, in the object's local space
@@ -411,7 +411,7 @@ static FLOAT4 N_blockout_face_center(Object* object, FLOAT4 face)
 		return simd::LoadFloat4(0.0f);
 	}
 
-	const int32 plane_index = brush->FindPlane(Vec3f(face));
+	const int32 plane_index = brush->FindPlane(FVec3(face));
 	if (plane_index == Brush::scNoPlane) {
 		return simd::LoadFloat4(0.0f);
 	}
@@ -422,8 +422,8 @@ static FLOAT4 N_blockout_face_center(Object* object, FLOAT4 face)
 /// Where the crosshair's ray hits a blockout, in world space
 static FLOAT4 N_blockout_ray_hit_point(Object* object)
 {
-	Vec3f face_normal;
-	Vec3f point;
+	FVec3 face_normal;
+	FVec3 point;
 
 	if (object == nullptr ||
 		!gWorld->pPrototype->RaycastFace(object, gWorld->Player.pCamera->GetPosition(),
@@ -436,8 +436,8 @@ static FLOAT4 N_blockout_ray_hit_point(Object* object)
 
 static void N_blockout_preview_box(FLOAT4 min, FLOAT4 max)
 {
-	Vec3f position;
-	const Brush brush = gWorld->pPrototype->MakeWorldBox(Vec3f(min), Vec3f(max), position);
+	FVec3 position;
+	const Brush brush = gWorld->pPrototype->MakeWorldBox(FVec3(min), FVec3(max), position);
 
 	gWorld->pPrototype->ShowPreview(position, Quat::scIdentity, brush);
 }
@@ -447,10 +447,10 @@ static void N_blockout_preview_clip(Object* object, FLOAT4 point_a, FLOAT4 point
 {
 	Brush::PlaneList kept;
 	Brush::PlaneList split;
-	Vec3f split_position;
+	FVec3 split_position;
 
-	if (object == nullptr || !gWorld->pPrototype->GetClipPieces(object, Vec3f(point_a), Vec3f(point_b),
-																Vec3f(face_normal), kept, split, split_position)) {
+	if (object == nullptr || !gWorld->pPrototype->GetClipPieces(object, FVec3(point_a), FVec3(point_b),
+																FVec3(face_normal), kept, split, split_position)) {
 		gWorld->pPrototype->HidePreview();
 		return;
 	}
@@ -463,7 +463,7 @@ static void N_blockout_hide_preview() { gWorld->pPrototype->HidePreview(); }
 static Object* N_blockout_create_box(FLOAT4 min, FLOAT4 max)
 {
 #ifdef FX_IS_EDITOR
-	return gEditor->CreateWorldBox(Vec3f(min), Vec3f(max));
+	return gEditor->CreateWorldBox(FVec3(min), FVec3(max));
 #else
 	return nullptr;
 #endif
@@ -473,7 +473,7 @@ static Object* N_blockout_create_box(FLOAT4 min, FLOAT4 max)
 static bool N_blockout_clip(Object* object, FLOAT4 point_a, FLOAT4 point_b, FLOAT4 face_normal)
 {
 #ifdef FX_IS_EDITOR
-	return gEditor->ClipObject(object, Vec3f(point_a), Vec3f(point_b), Vec3f(face_normal));
+	return gEditor->ClipObject(object, FVec3(point_a), FVec3(point_b), FVec3(face_normal));
 #else
 	return false;
 #endif
@@ -500,11 +500,11 @@ static void N_blockout_edit_face_texture(Object* object, FLOAT4 face, uint32 edi
 		return;
 	}
 
-	const Vec3f amount_vec(amount);
+	const FVec3 amount_vec(amount);
 
 	Brush::PlaneList planes_after;
 
-	if (!gWorld->pPrototype->GetFaceTextureEdit(object, Vec3f(face), static_cast<eFaceTextureEdit>(edit),
+	if (!gWorld->pPrototype->GetFaceTextureEdit(object, FVec3(face), static_cast<eFaceTextureEdit>(edit),
 												Vec2f(amount_vec.X, amount_vec.Y), planes_after)) {
 		return;
 	}
@@ -513,7 +513,7 @@ static void N_blockout_edit_face_texture(Object* object, FLOAT4 face, uint32 edi
 #endif
 }
 
-static Object* N_blockout_new_object(FLOAT4 position) { return gWorld->pPrototype->NewObject(Vec3f(position)); }
+static Object* N_blockout_new_object(FLOAT4 position) { return gWorld->pPrototype->NewObject(FVec3(position)); }
 static Object* N_blockout_dupe_object(Object* object) { return gWorld->pPrototype->DupeObject(object); }
 static void N_blockout_destroy_object(Object* object) { gWorld->pPrototype->DestroyObject(object); }
 
@@ -587,22 +587,22 @@ static float32 N_random_range(float32 lo, float32 hi)
 
 static int64 N_particle_play(const char* name, FLOAT4 position, FLOAT4 direction)
 {
-	return gParticleSystem->Play(name, Vec3f(position), Vec3f(direction)).Pack();
+	return gParticleSystem->Play(name, FVec3(position), FVec3(direction)).Pack();
 }
 
 static void N_particle_move(int64 effect, FLOAT4 position, FLOAT4 direction)
 {
-	gParticleSystem->SetTransform(ParticleEffectID::Unpack(effect), Vec3f(position), Vec3f(direction));
+	gParticleSystem->SetTransform(ParticleEffectID::Unpack(effect), FVec3(position), FVec3(direction));
 }
 
 static void N_particle_stop(int64 effect) { gParticleSystem->Stop(ParticleEffectID::Unpack(effect)); }
 static void N_particle_kill(int64 effect) { gParticleSystem->Kill(ParticleEffectID::Unpack(effect)); }
 static bool N_particle_alive(int64 effect) { return gParticleSystem->IsAlive(ParticleEffectID::Unpack(effect)); }
 
-static int64 N_sound_play(const char* name, FLOAT4 position) { return gAudio->Play(name, Vec3f(position)).Pack(); }
+static int64 N_sound_play(const char* name, FLOAT4 position) { return gAudio->Play(name, FVec3(position)).Pack(); }
 static int64 N_sound_play_2d(const char* name) { return gAudio->Play2D(name).Pack(); }
 
-static void N_sound_move(int64 sound, FLOAT4 position) { gAudio->SetPosition(SoundID::Unpack(sound), Vec3f(position)); }
+static void N_sound_move(int64 sound, FLOAT4 position) { gAudio->SetPosition(SoundID::Unpack(sound), FVec3(position)); }
 
 static void N_sound_set_volume(int64 sound, float32 volume) { gAudio->SetVolume(SoundID::Unpack(sound), volume); }
 static void N_sound_stop(int64 sound) { gAudio->Stop(SoundID::Unpack(sound)); }
@@ -770,7 +770,7 @@ static bool N_npc_walk_to(int32 npc, FLOAT4 target)
 		return false;
 	}
 
-	found->GetBrain().WalkTo(Vec3f(target));
+	found->GetBrain().WalkTo(FVec3(target));
 	return true;
 }
 
@@ -782,7 +782,7 @@ static bool N_npc_flee(int32 npc, FLOAT4 from)
 		return false;
 	}
 
-	found->GetBrain().Flee(Vec3f(from));
+	found->GetBrain().Flee(FVec3(from));
 	return true;
 }
 
@@ -829,7 +829,7 @@ static int32 N_npc_spawn(FLOAT4 position, float32 yaw)
 
 	NPCDesc desc;
 	desc.Name = String::Fmt("script_npc_{}", sSpawnCount);
-	desc.Position = Vec3f(position);
+	desc.Position = FVec3(position);
 	desc.Yaw = yaw;
 	desc.IdleAnimation = "walk";
 	desc.WalkAnimation = "walk";
@@ -875,7 +875,7 @@ static FLOAT4 N_npc_velocity(int32 npc)
 	const JPH::Vec3 velocity = gPhysics->pBackend->GetBodyInterface().GetLinearVelocity(
 		found->GetRagdoll().GetBodyID(0));
 
-	return Vec3f(velocity.GetX(), velocity.GetY(), velocity.GetZ()).mIntrin;
+	return FVec3(velocity.GetX(), velocity.GetY(), velocity.GetZ()).mIntrin;
 }
 
 static float32 N_npc_health(int32 npc)
@@ -938,18 +938,18 @@ static int64 N_prop_spawn_box(const char* material, float32 size, float32 mass, 
 	Object* object = gObjectManager->NewObject(name, gWorld->pPrototype->GetFaceMaterial(material), eObjectTag::None);
 
 	object->pMesh = MeshGen::MakeCube(CubeGenOptions::Uniform(half_size))->AsDefaultMesh();
-	object->Bounds.Min = Vec3f(-half_size);
-	object->Bounds.Max = Vec3f(half_size);
+	object->Bounds.Min = FVec3(-half_size);
+	object->Bounds.Max = FVec3(half_size);
 	object->SetShadowCaster(true);
-	object->SetPosition(Vec3f(position));
+	object->SetPosition(FVec3(position));
 
 	physics::BodyProps props;
 	props.Density = mass / (size * size * size);
 
 	physics::Body* body = gPhysics->NewBody(name);
-	body->CreatePrimitiveBody(physics::ePrimitiveType::Box, Vec3f(size), physics::eMotionType::Dynamic, props);
+	body->CreatePrimitiveBody(physics::ePrimitiveType::Box, FVec3(size), physics::eMotionType::Dynamic, props);
 	body->Teleport(object->GetPosition(), object->mRotation);
-	body->SetLinearVelocity(Vec3f(velocity));
+	body->SetLinearVelocity(FVec3(velocity));
 
 	gPhysics->pBackend->GetBodyInterface().SetGravityFactor(body->GetBodyID(), gravity_scale);
 
@@ -992,7 +992,7 @@ static void N_prop_drive(int64 prop, FLOAT4 velocity)
 	const JPH::BodyID body_id = body->GetBodyID();
 
 	body_interface.SetRotation(body_id, JPH::Quat::sIdentity(), JPH::EActivation::Activate);
-	body->SetLinearVelocity(Vec3f(velocity));
+	body->SetLinearVelocity(FVec3(velocity));
 	body_interface.SetAngularVelocity(body_id, JPH::Vec3::sZero());
 }
 
@@ -1061,18 +1061,18 @@ static void N_RLightSpot_SetConeAngles(LightSpot* light, float32 inner_rad, floa
 	light->SetConeAngles(inner_rad, outer_rad);
 }
 
-static void N_RLightSpot_SetPosition(LightSpot* light, FLOAT4 position) { light->SetPosition(Vec3f(position)); }
+static void N_RLightSpot_SetPosition(LightSpot* light, FLOAT4 position) { light->SetPosition(FVec3(position)); }
 
 static void N_RLightSpot_SetRotationEuler(LightSpot* light, FLOAT4 rotation_euler)
 {
-	light->SetRotation(Quat::FromEulerAngles(Vec3f(rotation_euler)));
+	light->SetRotation(Quat::FromEulerAngles(FVec3(rotation_euler)));
 }
 
 static float32 N_RLightSpot_GetInnerAngle(LightSpot* light) { return light->GetInnerAngle(); }
 static float32 N_RLightSpot_GetOuterAngle(LightSpot* light) { return light->GetOuterAngle(); }
 static eLightFlags N_RLightSpot_GetFlags(LightSpot* light) { return light->Flags; }
 static void N_RLightSpot_SetFlags(LightSpot* light, eLightFlags flags) { light->SetFlags(flags); }
-static void N_RLightSpot_SetDirection(LightSpot* light, FLOAT4 direction) { light->SetDirection(Vec3f(direction)); }
+static void N_RLightSpot_SetDirection(LightSpot* light, FLOAT4 direction) { light->SetDirection(FVec3(direction)); }
 
 static void N_RLightSpot_Destroy(LightSpot* light) { gLightManager->RemoveLight(light->ID); }
 

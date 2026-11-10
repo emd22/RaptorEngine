@@ -172,7 +172,7 @@ void JoltPhysicsBackend::Create()
 	mbIsInited = true;
 }
 
-RayResult JoltPhysicsBackend::Raycast(const Vec3f origin, const Vec3f direction, JPH::BodyID ignore_body) const
+RayResult JoltPhysicsBackend::Raycast(const FVec3 origin, const FVec3 direction, JPH::BodyID ignore_body) const
 {
 	JPH::RRayCast rc;
 
@@ -205,10 +205,10 @@ RayResult JoltPhysicsBackend::Raycast(const Vec3f origin, const Vec3f direction,
 		return hit;
 	}
 
-	return RayResult { false, Vec3f::sZero };
+	return RayResult { false, FVec3::sZero };
 }
 
-RayResult JoltPhysicsBackend::RaycastStatic(const Vec3f origin, const Vec3f direction) const
+RayResult JoltPhysicsBackend::RaycastStatic(const FVec3 origin, const FVec3 direction) const
 {
 	JPH::RRayCast rc;
 
@@ -219,7 +219,7 @@ RayResult JoltPhysicsBackend::RaycastStatic(const Vec3f origin, const Vec3f dire
 	JPH::SpecifiedObjectLayerFilter static_filter(PhLayer::Static);
 
 	if (!PhysicsSystem.GetNarrowPhaseQuery().CastRay(rc, result, {}, static_filter)) {
-		return RayResult { false, Vec3f::sZero };
+		return RayResult { false, FVec3::sZero };
 	}
 
 	const JPH::Vec3 hit_point = rc.GetPointOnRay(result.mFraction);
@@ -242,7 +242,7 @@ RayResult JoltPhysicsBackend::RaycastStatic(const Vec3f origin, const Vec3f dire
 	return hit;
 }
 
-RayResult JoltPhysicsBackend::RaycastStaticNoLock(const Vec3f origin, const Vec3f direction) const
+RayResult JoltPhysicsBackend::RaycastStaticNoLock(const FVec3 origin, const FVec3 direction) const
 {
 	JPH::RRayCast rc;
 
@@ -253,7 +253,7 @@ RayResult JoltPhysicsBackend::RaycastStaticNoLock(const Vec3f origin, const Vec3
 	JPH::SpecifiedObjectLayerFilter static_filter(PhLayer::Static);
 
 	if (!PhysicsSystem.GetNarrowPhaseQueryNoLock().CastRay(rc, result, {}, static_filter)) {
-		return RayResult { false, Vec3f::sZero };
+		return RayResult { false, FVec3::sZero };
 	}
 
 	const JPH::Vec3 hit_point = rc.GetPointOnRay(result.mFraction);
@@ -297,7 +297,7 @@ bool JoltPhysicsBackend::GetTriangleUserData(const JPH::BodyID body_id, const JP
 	return true;
 }
 
-FLOAT4 JoltPhysicsBackend::RaycastGetFaceOfBox(JPH::Body* body, const Vec3f origin, const Vec3f direction) const
+FLOAT4 JoltPhysicsBackend::RaycastGetFaceOfBox(JPH::Body* body, const FVec3 origin, const FVec3 direction) const
 {
 	JPH::RayCastResult hit;
 	JPH::RRayCast rc;
@@ -326,7 +326,7 @@ FLOAT4 JoltPhysicsBackend::RaycastGetFaceOfBox(JPH::Body* body, const Vec3f orig
 	return simd::LoadFloat4(0.0f);
 }
 
-SizedArray<JPH::BodyID> JoltPhysicsBackend::RaycastObjects(const Vec3f origin, const Vec3f direction) const
+SizedArray<JPH::BodyID> JoltPhysicsBackend::RaycastObjects(const FVec3 origin, const FVec3 direction) const
 {
 	JPH::RRayCast rc;
 	origin.ToJoltVec3(rc.mOrigin);

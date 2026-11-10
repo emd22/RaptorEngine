@@ -27,8 +27,8 @@ struct CachedMaterials;
 
 struct TextureMap
 {
-	Vec3d GradientU = Vec3d::scZero;
-	Vec3d GradientV = Vec3d::scZero;
+	DVec3 GradientU = DVec3::scZero;
+	DVec3 GradientV = DVec3::scZero;
 
 	double OffsetU = 0.0;
 	double OffsetV = 0.0;
@@ -91,9 +91,9 @@ struct SourceModel
 
 struct SourceLight
 {
-	Vec3d Position = Vec3d::scZero;
-	Vec3d Direction = Vec3d(0.0, -1.0, 0.0);
-	Vec3d Color = Vec3d::scZero;
+	DVec3 Position = DVec3::scZero;
+	DVec3 Direction = DVec3(0.0, -1.0, 0.0);
+	DVec3 Color = DVec3::scZero;
 
 	double InvRadiusSq = 0.0;
 
@@ -120,14 +120,14 @@ public:
 	Array<uint8> WaterMaterials;
 	SizedArray<String> Warnings;
 
-	Array<Vec3d> Entities;
+	Array<DVec3> Entities;
 
 	bool bHasPlayerSpawn = false;
-	Vec3d PlayerSpawn = Vec3d::scZero;
+	DVec3 PlayerSpawn = DVec3::scZero;
 
 	bool bHasSun = false;
-	Vec3d SunDirection = Vec3d::scUp;
-	Vec3d SunColor = Vec3d::scZero;
+	DVec3 SunDirection = DVec3::scUp;
+	DVec3 SunColor = DVec3::scZero;
 
 	Array<SourceLight> Lights;
 
@@ -138,8 +138,8 @@ public:
 	/// Holds strings, so it is sized once from the prototype's `objects` entry
 	SizedArray<SourceModel> Models;
 
-	Vec3d Min = Vec3d::scZero;
-	Vec3d Max = Vec3d::scZero;
+	DVec3 Min = DVec3::scZero;
+	DVec3 Max = DVec3::scZero;
 
 	uint32 EntityBrushCount = 0;
 	uint32 ClipBrushCount = 0;

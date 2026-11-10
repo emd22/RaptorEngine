@@ -307,7 +307,7 @@ void DrawWorldLabels(const BaseCamera& camera, const AudioVoiceDebug* voices, ui
 			continue;
 		}
 
-		const Vec3f anchor = voice.Position + Vec3f(0.0f, scLabelHeight, 0.0f);
+		const FVec3 anchor = voice.Position + FVec3(0.0f, scLabelHeight, 0.0f);
 		const Vec4f clip = view_projection * Vec4f(anchor, 1.0f);
 
 		if (clip.W < scMinClipW) {
@@ -364,7 +364,7 @@ void AudioDebugView::DrawWorld()
 	AudioVoiceDebug voices[AudioSystem::scMaxVoices];
 	const uint32 count = gAudio->GetVoiceDebug(voices, AudioSystem::scMaxVoices);
 
-	const Vec3f half_extent(scMarkerHalfExtent);
+	const FVec3 half_extent(scMarkerHalfExtent);
 
 	for (uint32 i = 0; i < count; i++) {
 		const AudioVoiceDebug& voice = voices[i];

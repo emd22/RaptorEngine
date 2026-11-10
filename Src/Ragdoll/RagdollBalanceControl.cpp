@@ -256,11 +256,11 @@ void RagdollBalance::DriveFreeLeg(Ragdoll& ragdoll, const BalanceLeg& leg, const
 void RagdollBalance::SolveLeg(Ragdoll& ragdoll, const BalanceLeg& leg, const JPH::Vec3 hip, const JPH::Vec3 ankle,
 							  JPH::Quat& out_thigh, JPH::Quat& out_shin) const
 {
-	const TwoBoneIKResult ik = SolveTwoBoneIK(Vec3f::FromJolt(hip), Vec3f::FromJolt(ankle), leg.Upper, leg.Lower,
-											  Vec3f::FromJolt(mForward));
+	const TwoBoneIKResult ik = SolveTwoBoneIK(FVec3::FromJolt(hip), FVec3::FromJolt(ankle), leg.Upper, leg.Lower,
+											  FVec3::FromJolt(mForward));
 
-	const JPH::Vec3 knee = Vec3f::ToJolt(ik.Mid);
-	const JPH::Vec3 end = Vec3f::ToJolt(ik.End);
+	const JPH::Vec3 knee = FVec3::ToJolt(ik.Mid);
+	const JPH::Vec3 end = FVec3::ToJolt(ik.End);
 
 	const JPH::Vec3 thigh_direction = (knee - hip).NormalizedOr(-mGroundFrame.Up);
 	const JPH::Vec3 shin_direction = (end - knee).NormalizedOr(-mGroundFrame.Up);

@@ -10,8 +10,8 @@
 #include <Core/SizedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Vec2.hpp>
-#include <Math/Vec3.hpp>
 #include <Math/Vec4.hpp>
 #include <Renderer/Limits.hpp>
 #include <Renderer/ProbePlacement.hpp>
@@ -22,8 +22,8 @@ constexpr int32 scNoMapArea = -1;
 
 struct CompiledMapVertex
 {
-	Vec3f Position;
-	Vec3f Normal;
+	FVec3 Position;
+	FVec3 Normal;
 	/// The fourth value is the handedness
 	Vec4f Tangent;
 	Vec2f Texcoord;
@@ -398,7 +398,7 @@ public:
 
 	bool HasAreas() const { return Areas.Size > 0; }
 
-	int32 FindArea(const Vec3f& point) const;
+	int32 FindArea(const FVec3& point) const;
 
 	static constexpr int32 MakeLeafChild(int32 area) { return -2 - area; }
 	static constexpr int32 GetLeafArea(int32 child) { return -2 - child; }

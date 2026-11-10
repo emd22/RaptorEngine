@@ -147,7 +147,7 @@ struct Weapon
 	String ScriptPath;
 
 	String ViewModel;
-	Vec3f ViewOffset = Vec3f::sZero;
+	FVec3 ViewOffset = FVec3::sZero;
 
 	String IdleAnim;
 	String FireAnim;
@@ -232,7 +232,7 @@ private:
 	bool mbEnabled = true;
 
 	physics::RayResult mLastHit;
-	Vec3f mLastDirection = Vec3f::sZero;
+	FVec3 mLastDirection = FVec3::sZero;
 	uint32 mLastHitNPC = 0;
 
 	ParticleEffectID mMuzzleEffect {};

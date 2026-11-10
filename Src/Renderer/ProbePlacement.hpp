@@ -14,8 +14,8 @@
 #include <Core/StackArray.hpp>
 #include <Core/Types.hpp>
 #include <Math/BBox.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Mat4.hpp>
-#include <Math/Vec3.hpp>
 #include <Renderer/Limits.hpp>
 #include <functional>
 #include <limits>
@@ -67,7 +67,7 @@ struct ProbePlacementBoxes
 {
 	struct Plane
 	{
-		Vec3f Normal;
+		FVec3 Normal;
 		float32 Distance;
 	};
 
@@ -92,14 +92,14 @@ struct ProbePlacementBoxes
 	/// World bounds of thin lit surfaces (patches). Probes are placed around them but not kept out of them.
 	DynArray<BBox, GrowthFunctions::Double> Surfaces;
 
-	Vec3f Min = Vec3f(std::numeric_limits<float32>::max());
-	Vec3f Max = Vec3f(-std::numeric_limits<float32>::max());
+	FVec3 Min = FVec3(std::numeric_limits<float32>::max());
+	FVec3 Max = FVec3(-std::numeric_limits<float32>::max());
 
 	/// Every object offered to AddBox(), including the ones past scMaxBoxes
 	uint32 ObjectCount = 0;
 
 	/// Optional. Returns false for points that no probe should be placed at.
-	std::function<bool(const Vec3f)> IsOpen;
+	std::function<bool(const FVec3)> IsOpen;
 
 	bool IsEmpty() const { return Min.X > Max.X; }
 };
@@ -121,7 +121,7 @@ struct ProbeLayout
 
 	/// One entry per grid point: a probe index, Limits::ProbeGridEmpty or Limits::ProbeGridSolid
 	DynArray<uint16, GrowthFunctions::Double> Grid;
-	DynArray<Vec3f, GrowthFunctions::Double> Positions;
+	DynArray<FVec3, GrowthFunctions::Double> Positions;
 
 	/// Grid points left without a probe by ProbePlacementBoxes::IsOpen
 	uint32 VoidPointCount = 0;
@@ -197,20 +197,20 @@ bool CheckGridSize(const ProbeGridSize& grid);
 void FinaliseVolumeBounds(ProbeVolumeData& volume);
 
 /// True if a probe that belongs at `grid_position` can sit at `position`
-bool IsPositionValid(const Vec3f grid_position, const Vec3f position, const ProbePlacementBoxes& boxes);
+bool IsPositionValid(const FVec3 grid_position, const FVec3 position, const ProbePlacementBoxes& boxes);
 
 /// Searches around `grid_position` for the valid position closest to `preferred`
-bool FindValidPosition(const Vec3f grid_position, const Vec3f preferred, const Vec3f max_relocation,
-					   const ProbePlacementBoxes& boxes, Vec3f& out_position);
+bool FindValidPosition(const FVec3 grid_position, const FVec3 preferred, const FVec3 max_relocation,
+					   const ProbePlacementBoxes& boxes, FVec3& out_position);
 
-bool AddVolume(ProbeLayout& layout, const Vec3f volume_min, const Vec3f volume_size, const ProbeGridSize& grid,
+bool AddVolume(ProbeLayout& layout, const FVec3 volume_min, const FVec3 volume_size, const ProbeGridSize& grid,
 			   const ProbePlacementBoxes& boxes, eProbeFill fill);
 
 /// Adds the coarse dense volume that covers the whole level
 bool AddLevelBaseVolume(ProbeLayout& layout, const ProbePlacementBoxes& boxes);
 
 /// Adds a volume with probes near surfaces only, coarsening `spacing` until it fits the probes that are left
-bool AddSurfaceVolumeForBudget(ProbeLayout& layout, const Vec3f region_min, const Vec3f region_max, float32 spacing,
+bool AddSurfaceVolumeForBudget(ProbeLayout& layout, const FVec3 region_min, const FVec3 region_max, float32 spacing,
 							   const ProbePlacementBoxes& boxes, bool cell_centred);
 
 /**

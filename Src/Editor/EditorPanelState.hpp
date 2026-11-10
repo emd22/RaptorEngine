@@ -9,8 +9,8 @@
 #include <Core/DynArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Vec2.hpp>
-#include <Math/Vec3.hpp>
 #include <Object/ObjectFlags.hpp>
 #include <Renderer/FogSettings.hpp>
 
@@ -34,7 +34,7 @@ struct ObjectPanelState
 	/// The subview being edited
 	String ActiveSubview;
 
-	Vec3f EnterDirection = Vec3f::sZero;
+	FVec3 EnterDirection = FVec3::sZero;
 
 	uint32 SelectedCount = 0;
 	eObjectTag Tags = eObjectTag::None;
@@ -108,7 +108,7 @@ struct SoundPanelState
 
 	String Name;
 	String Sound;
-	Vec3f Position = Vec3f::sZero;
+	FVec3 Position = FVec3::sZero;
 
 	float32 Volume = 1.0f;
 	float32 MinInterval = 0.0f;
@@ -126,7 +126,7 @@ struct LightPanelState
 	String Name;
 
 	struct Color Color = Color::sWhite;
-	Vec3f Position = Vec3f::sZero;
+	FVec3 Position = FVec3::sZero;
 
 	float32 Radius = 0.0f;
 	float32 Intensity = 0.0f;
@@ -165,7 +165,7 @@ struct TopViewFace
 	Vec2f A = Vec2f::scZero;
 	Vec2f B = Vec2f::scZero;
 	Vec2f Normal = Vec2f::scZero;
-	Vec3f WorldNormal = Vec3f::sZero;
+	FVec3 WorldNormal = FVec3::sZero;
 
 	Vec2f TextureOffset = Vec2f::scZero;
 	float32 TextureScale = 2.0f;
@@ -280,12 +280,12 @@ struct TopViewMarker
 
 	float32 Radius = 0.0f;
 
-	Vec3f Position = Vec3f::sZero;
-	Vec3f AimOrigin = Vec3f::sZero;
-	Vec3f Direction = Vec3f(0.0f, 0.0f, 1.0f);
+	FVec3 Position = FVec3::sZero;
+	FVec3 AimOrigin = FVec3::sZero;
+	FVec3 Direction = FVec3(0.0f, 0.0f, 1.0f);
 
-	Vec3f BoundsMin = Vec3f::sZero;
-	Vec3f BoundsMax = Vec3f::sZero;
+	FVec3 BoundsMin = FVec3::sZero;
+	FVec3 BoundsMax = FVec3::sZero;
 
 	bool bSelected = false;
 	bool bSelectable = false;
@@ -308,8 +308,8 @@ struct TopViewState
 	float32 AngleSnapDegrees = 15.0f;
 
 	bool bHasPlayer = false;
-	Vec3f PlayerPosition = Vec3f::sZero;
-	Vec3f PlayerDirection = Vec3f(0.0f, 0.0f, 1.0f);
+	FVec3 PlayerPosition = FVec3::sZero;
+	FVec3 PlayerDirection = FVec3(0.0f, 0.0f, 1.0f);
 
 	uint32 CommandSerial = 0;
 
@@ -319,8 +319,8 @@ struct TopViewState
 	String SelectionName;
 
 	bool bHasCreateReference = false;
-	Vec3f CreateReferenceMin = Vec3f::sZero;
-	Vec3f CreateReferenceMax = Vec3f::sZero;
+	FVec3 CreateReferenceMin = FVec3::sZero;
+	FVec3 CreateReferenceMax = FVec3::sZero;
 
 	DynArray<TopViewBrush> Brushes;
 	DynArray<TopViewMarker> Markers;

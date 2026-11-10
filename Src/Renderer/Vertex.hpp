@@ -1,8 +1,8 @@
 #pragma once
 
 #include <Core/Types.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Vec2.hpp>
-#include <Math/Vec3.hpp>
 #include <Math/Vec4.hpp>
 
 namespace fx::renderer {
@@ -112,11 +112,11 @@ FX_FORCE_INLINE uint32 GetSize(fx::renderer::eVertexType type)
  * @brief Returns the position values given a vertex struct.
  */
 template <eVertexType TVertexType>
-Vec3f GetPosition(const Vertex<TVertexType>& vertex)
+FVec3 GetPosition(const Vertex<TVertexType>& vertex)
 {
 	static_assert(offsetof(Vertex<eVertexType::Slim>, Position) == offsetof(Vertex<eVertexType::Default>, Position) &&
 				  offsetof(Vertex<eVertexType::Default>, Position) == offsetof(Vertex<eVertexType::Skinned>, Position));
 
-	return Vec3f(vertex.Position);
+	return FVec3(vertex.Position);
 }
 }; // namespace fx::renderer::VertexUtil

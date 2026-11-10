@@ -142,8 +142,8 @@ private:
 	struct Wound
 	{
 		uint32 Body = 0;
-		Vec3f LocalPoint = Vec3f::sZero;
-		Vec3f LocalNormal = Vec3f::sUp;
+		FVec3 LocalPoint = FVec3::sZero;
+		FVec3 LocalNormal = FVec3::sUp;
 		int32 Arm = -1;
 		float32 Time = 0.0f;
 	};
@@ -162,7 +162,7 @@ private:
 	float32 mFlinchPitch = 0.0f;
 	float32 mFlinchYaw = 0.0f;
 	int32 mLookBody = -1;
-	Vec3f mLookLocal = Vec3f::sZero;
+	FVec3 mLookLocal = FVec3::sZero;
 	float32 mLookTime = 0.0f;
 	float32 mGutTime = -1.0f;
 	float32 mSnapTime = -1.0f;
@@ -191,8 +191,8 @@ public:
 private:
 	LandingHold mLanding;
 	bool mbHasTarget = false;
-	Vec3f mPoint = Vec3f::sZero;
-	Vec3f mNormal = Vec3f::sUp;
+	FVec3 mPoint = FVec3::sZero;
+	FVec3 mNormal = FVec3::sUp;
 };
 
 class ProtectHeadBehaviour : public RagdollBehaviour

@@ -4,7 +4,7 @@
 
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 #include <Object/ObjectID.hpp>
 #include <vector>
 
@@ -30,9 +30,9 @@ public:
 		FnStop pFnStop = nullptr;
 		FnTrigger pFnTriggerEnter = nullptr;
 		FnTrigger pFnTriggerExit = nullptr;
-		Vec3f LastPoint = Vec3f::sZero;
-		Vec3f EnterDirection = Vec3f::sZero;
-		Vec3f ExitDirection = Vec3f::sZero;
+		FVec3 LastPoint = FVec3::sZero;
+		FVec3 EnterDirection = FVec3::sZero;
+		FVec3 ExitDirection = FVec3::sZero;
 		bool bHasLastPoint = false;
 		bool bStarted = false;
 		bool bWasInside = false;
@@ -42,7 +42,7 @@ public:
 	struct EnterGate
 	{
 		ObjectID ID;
-		Vec3f LocalDirection = Vec3f::sZero;
+		FVec3 LocalDirection = FVec3::sZero;
 	};
 
 public:
@@ -57,14 +57,14 @@ public:
 	bool HasErrors(ObjectID id) const;
 	const String& GetPath(ObjectID id) const;
 
-	Vec3f GetEnterDirection(ObjectID id) const;
-	Vec3f GetExitDirection(ObjectID id) const;
+	FVec3 GetEnterDirection(ObjectID id) const;
+	FVec3 GetExitDirection(ObjectID id) const;
 
-	void SetRequiredEnterDirection(ObjectID id, const Vec3f local_direction);
-	bool TryGetRequiredEnterDirection(ObjectID id, Vec3f& out_local_direction) const;
+	void SetRequiredEnterDirection(ObjectID id, const FVec3 local_direction);
+	bool TryGetRequiredEnterDirection(ObjectID id, FVec3& out_local_direction) const;
 	void ClearRequiredEnterDirection(ObjectID id);
 
-	void Update(float32 delta_time, const Vec3f trigger_point);
+	void Update(float32 delta_time, const FVec3 trigger_point);
 	void Stop();
 
 	void OnScriptsReloaded();
@@ -78,10 +78,10 @@ private:
 	const Entry* FindEntry(ObjectID id) const;
 
 	static void BindFunctions(Entry& entry);
-	void UpdateTrigger(Entry& entry, Object* object, const Vec3f point);
-	bool PassesEnterGate(const Entry& entry, Object* object, const Vec3f direction) const;
-	static Vec3f GetCrossingDirection(const Entry& entry, const Vec3f point);
-	static void LeaveTrigger(Entry& entry, Object* object, const Vec3f direction = Vec3f::sZero);
+	void UpdateTrigger(Entry& entry, Object* object, const FVec3 point);
+	bool PassesEnterGate(const Entry& entry, Object* object, const FVec3 direction) const;
+	static FVec3 GetCrossingDirection(const Entry& entry, const FVec3 point);
+	static void LeaveTrigger(Entry& entry, Object* object, const FVec3 direction = FVec3::sZero);
 	static void FreeEntry(Entry& entry);
 
 private:

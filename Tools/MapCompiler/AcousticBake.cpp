@@ -61,17 +61,17 @@ bool BakeAcoustics(const AcousticOptions& options, CompiledMap& map, AcousticSta
 		geometry.Surfaces.Insert(surface);
 	}
 
-	Vec3f bounds_min = map.Surfaces[0].Bounds.Min;
-	Vec3f bounds_max = map.Surfaces[0].Bounds.Max;
+	FVec3 bounds_min = map.Surfaces[0].Bounds.Min;
+	FVec3 bounds_max = map.Surfaces[0].Bounds.Max;
 
 	for (const CompiledMapSurface& surface : map.Surfaces) {
-		bounds_min = Vec3f::Min(bounds_min, surface.Bounds.Min);
-		bounds_max = Vec3f::Max(bounds_max, surface.Bounds.Max);
+		bounds_min = FVec3::Min(bounds_min, surface.Bounds.Min);
+		bounds_max = FVec3::Max(bounds_max, surface.Bounds.Max);
 
 		for (size_t i = 0; i + 2 < surface.Indices.Size; i += 3) {
 			const CompiledMapVertex& a = surface.Vertices[surface.Indices[i]];
-			Vec3f b = surface.Vertices[surface.Indices[i + 1]].Position;
-			Vec3f c = surface.Vertices[surface.Indices[i + 2]].Position;
+			FVec3 b = surface.Vertices[surface.Indices[i + 1]].Position;
+			FVec3 c = surface.Vertices[surface.Indices[i + 2]].Position;
 
 			if ((b - a.Position).Cross(c - a.Position).Dot(a.Normal) < 0.0f) {
 				std::swap(b, c);

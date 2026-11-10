@@ -33,9 +33,9 @@ constexpr float32 scMinPathGain = 1.0e-3f;
 
 using Clock = std::chrono::steady_clock;
 
-IPLCoordinateSpace3 MakeSpace(const Vec3f origin, const Vec3f ahead, const Vec3f up)
+IPLCoordinateSpace3 MakeSpace(const FVec3 origin, const FVec3 ahead, const FVec3 up)
 {
-	const Vec3f right = ahead.Cross(up).Normalize();
+	const FVec3 right = ahead.Cross(up).Normalize();
 
 	return IPLCoordinateSpace3 {
 		.right = ToIPL(right),
@@ -73,7 +73,7 @@ void PopFifo(float32* fifo, uint32& count, uint32 stride, uint32 frames)
 struct PathRequest
 {
 	uint64 VoiceId = 0;
-	Vec3f Position = Vec3f::sZero;
+	FVec3 Position = FVec3::sZero;
 };
 
 struct PathResult
@@ -89,7 +89,7 @@ struct SpatialVoiceParams
 {
 	IPLDirectEffectParams Direct {};
 	IPLVector3 Direction { 0.0f, 0.0f, -1.0f };
-	IPLCoordinateSpace3 Listener = MakeSpace(Vec3f::sZero, Vec3f(0.0f, 0.0f, -1.0f), Vec3f::sUp);
+	IPLCoordinateSpace3 Listener = MakeSpace(FVec3::sZero, FVec3(0.0f, 0.0f, -1.0f), FVec3::sUp);
 	float32 ReverbSend = 0.0f;
 	float32 PathGain = 0.0f;
 	IPLfloat32 PathEq[IPL_NUM_BANDS] = { 0.0f, 0.0f, 0.0f };
@@ -113,7 +113,7 @@ struct SpatialVoice
 
 	bool bNodeInitialized = false;
 
-	Vec3f Position = Vec3f::sZero;
+	FVec3 Position = FVec3::sZero;
 	float32 DistanceGain = 1.0f;
 	bool bBinaural = true;
 	bool bSimulated = false;
@@ -155,7 +155,7 @@ struct SpatialVoice
 struct ReverbParams
 {
 	IPLfloat32 ReverbTimes[IPL_NUM_BANDS] = { 0.0f, 0.0f, 0.0f };
-	IPLCoordinateSpace3 Orientation = MakeSpace(Vec3f::sZero, Vec3f(0.0f, 0.0f, -1.0f), Vec3f::sUp);
+	IPLCoordinateSpace3 Orientation = MakeSpace(FVec3::sZero, FVec3(0.0f, 0.0f, -1.0f), FVec3::sUp);
 	bool bBinaural = true;
 	bool bEnabled = true;
 };
@@ -204,9 +204,9 @@ struct SpatialAudio::State
 	DynArray<SpatialVoice*, GrowthFunctions::Double> Voices;
 	bool bCommitNeeded = true;
 
-	Vec3f ListenerPosition = Vec3f::sZero;
-	Vec3f ListenerForward = Vec3f(0.0f, 0.0f, -1.0f);
-	Vec3f ListenerUp = Vec3f::sUp;
+	FVec3 ListenerPosition = FVec3::sZero;
+	FVec3 ListenerForward = FVec3(0.0f, 0.0f, -1.0f);
+	FVec3 ListenerUp = FVec3::sUp;
 
 	ReverbNode* pReverb = nullptr;
 	IPLSimulator ReflectionSimulator = nullptr;
@@ -227,7 +227,7 @@ struct SpatialAudio::State
 	IPLProbeBatch PendingProbes = nullptr;
 	bool bPendingPathing = false;
 
-	IPLCoordinateSpace3 WorkerListener = MakeSpace(Vec3f::sZero, Vec3f(0.0f, 0.0f, -1.0f), Vec3f::sUp);
+	IPLCoordinateSpace3 WorkerListener = MakeSpace(FVec3::sZero, FVec3(0.0f, 0.0f, -1.0f), FVec3::sUp);
 	bool bReverbEnabled = true;
 	int32 ReverbRays = SpatialAudio::scDefaultReverbRays;
 	int32 ReverbBounces = SpatialAudio::scDefaultReverbBounces;
@@ -599,7 +599,7 @@ void PublishVoiceParams(SpatialVoice& voice, const SpatialAudio::State& state)
 		params.Direct.transmission[band] = std::max(occluded_gain, floors[band]);
 	}
 
-	const Vec3f to_source = voice.Position - state.ListenerPosition;
+	const FVec3 to_source = voice.Position - state.ListenerPosition;
 
 	if (to_source.Length() > scMinDirectionLength) {
 		params.Direction = iplCalculateRelativeDirection(state.Context, ToIPL(voice.Position),
@@ -818,7 +818,7 @@ void SimulatePathing(SpatialAudio::State& state, const IPLCoordinateSpace3& list
 
 		IPLSimulationInputs inputs {};
 		inputs.flags = IPL_SIMULATIONFLAGS_PATHING;
-		inputs.source = MakeSpace(request.Position, Vec3f(0.0f, 0.0f, -1.0f), Vec3f::sUp);
+		inputs.source = MakeSpace(request.Position, FVec3(0.0f, 0.0f, -1.0f), FVec3::sUp);
 		inputs.pathingProbes = state.WorkerProbes;
 		inputs.visRadius = scPathingVisRadius;
 		inputs.visThreshold = scPathingVisThreshold;
@@ -1358,7 +1358,7 @@ ma_node_base* SpatialAudio::GetVoiceInput(SpatialVoice* voice) const
 	return &voice->Node;
 }
 
-void SpatialAudio::SetVoiceSource(SpatialVoice* voice, const Vec3f position, float32 distance_gain, bool binaural)
+void SpatialAudio::SetVoiceSource(SpatialVoice* voice, const FVec3 position, float32 distance_gain, bool binaural)
 {
 	if (mpState == nullptr || voice == nullptr) {
 		return;
@@ -1415,7 +1415,7 @@ void SpatialAudio::SetVoiceStarted(SpatialVoice* voice)
 	voice->bStarted.store(true, std::memory_order_release);
 }
 
-void SpatialAudio::SetListener(const Vec3f position, const Vec3f forward, const Vec3f up)
+void SpatialAudio::SetListener(const FVec3 position, const FVec3 forward, const FVec3 up)
 {
 	if (mpState == nullptr) {
 		return;
@@ -1719,7 +1719,7 @@ void SpatialAudio::Simulate()
 		IPLSimulationInputs inputs {};
 		inputs.flags = IPL_SIMULATIONFLAGS_DIRECT;
 		inputs.directFlags = static_cast<IPLDirectSimulationFlags>(direct_flags);
-		inputs.source = MakeSpace(voice->Position, Vec3f(0.0f, 0.0f, -1.0f), Vec3f::sUp);
+		inputs.source = MakeSpace(voice->Position, FVec3(0.0f, 0.0f, -1.0f), FVec3::sUp);
 		inputs.distanceAttenuationModel.type = IPL_DISTANCEATTENUATIONTYPE_DEFAULT;
 		inputs.airAbsorptionModel.type = IPL_AIRABSORPTIONTYPE_DEFAULT;
 		inputs.occlusionType = IPL_OCCLUSIONTYPE_VOLUMETRIC;

@@ -8,9 +8,9 @@
 #pragma once
 
 #include <Core/Types.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/SIMDHelper.hpp>
 #include <Math/Vec2.hpp>
-#include <Math/Vec3.hpp>
 #include <Renderer/Limits.hpp>
 #include <algorithm>
 #include <cmath>
@@ -28,7 +28,7 @@ constexpr float32 scCosineLobe[Limits::ProbeSHCoeffCount] = {
 constexpr uint32 scMomentTexelCount = Limits::ProbeDepthTexelCount;
 
 /// Order must match EvalProbeIrradiance() in Shaders/ProbeCommon.hlsli
-inline void EvalSHBasis(const Vec3f d, float32 out[Limits::ProbeSHCoeffCount])
+inline void EvalSHBasis(const FVec3 d, float32 out[Limits::ProbeSHCoeffCount])
 {
 	constexpr float32 scSHNorm2 = 1.092548f;
 	constexpr float32 scSHNorm20 = 0.315392f;
@@ -48,13 +48,13 @@ inline void EvalSHBasis(const Vec3f d, float32 out[Limits::ProbeSHCoeffCount])
 /**
  * @brief Octahedral map coordinates in [-1, 1] for direction `d`
  */
-inline Vec2f DirectionToOctahedral(const Vec3f d)
+inline Vec2f DirectionToOctahedral(const FVec3 d)
 {
 	const float l1 = simd::HAdd(simd::Abs(d.mIntrin));
 
 	const float32 inv_l1 = 1.0f / (std::fabs(d.X) + std::fabs(d.Y) + std::fabs(d.Z));
 
-	Vec3f xyz = d * inv_l1;
+	FVec3 xyz = d * inv_l1;
 
 	if (d.Y >= 0.0f) {
 		return Vec2f(xyz.X, xyz.Z);
@@ -78,7 +78,7 @@ inline Vec2f DirectionToOctahedral(const Vec3f d)
 	// out_v = (1.0f - std::fabs(x)) * sign_z;
 }
 
-inline uint32 DirectionToMomentTexel(const Vec3f d)
+inline uint32 DirectionToMomentTexel(const FVec3 d)
 {
 	constexpr uint32 cSize = Limits::ProbeDepthSize;
 

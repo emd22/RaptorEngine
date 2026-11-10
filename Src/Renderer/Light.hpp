@@ -55,7 +55,7 @@ public:
 	LightBase(eLightFlags flags = LF_None);
 
 	void SetRadius(const float radius);
-	void SetPosition(const Vec3f position) override;
+	void SetPosition(const FVec3 position) override;
 	void SetRotation(const Quat rotation) override;
 
 	FX_FORCE_INLINE void SetFlags(const eLightFlags flags) { Flags = flags; }
@@ -161,9 +161,9 @@ public:
 
 	FX_FORCE_INLINE bool CanContributeToFog() const { return (!HasFlag(Flags, LF_Dynamic) && bCastShadows); }
 
-	void SetDirection(const Vec3f direction);
+	void SetDirection(const FVec3 direction);
 
-	Vec3f GetDirection() const;
+	FVec3 GetDirection() const;
 
 	float32 GetEffectiveSolidAngle() const;
 	float32 GetLumens() const;

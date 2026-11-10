@@ -27,7 +27,7 @@ namespace fx::mapc {
 
 namespace {
 
-bool HasFloorBelow(const PlaneSet& planes, const MapSource& source, const Vec3d& point)
+bool HasFloorBelow(const PlaneSet& planes, const MapSource& source, const DVec3& point)
 {
 	for (const SourceBrush& brush : source.Brushes) {
 		if (!brush.bCollides) {
@@ -103,7 +103,7 @@ void AddHulls(const PlaneSet& planes, const MapSource& source, CompiledMap& map)
 		points.Clear();
 
 		for (const PolyhedronSide& side : brush.Shape.Sides) {
-			for (const Vec3d& point : side.Points) {
+			for (const DVec3& point : side.Points) {
 				const float32 values[3] = { static_cast<float32>(point.X), static_cast<float32>(point.Y),
 											static_cast<float32>(point.Z) };
 
@@ -133,7 +133,7 @@ void AddHulls(const PlaneSet& planes, const MapSource& source, CompiledMap& map)
 			const PolyhedronSide& side = brush.Shape.Sides[side_index];
 
 			int32 material = brush.MaterialIndex;
-			Vec3d normal = Vec3d(0.0);
+			DVec3 normal = DVec3(0.0);
 			double distance = 0.0;
 
 			if (side.PlaneIndex != PlaneSet::scNone) {
@@ -396,7 +396,7 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 		}
 
 		if (source.bHasPlayerSpawn) {
-			const Vec3d& spawn = source.PlayerSpawn;
+			const DVec3& spawn = source.PlayerSpawn;
 
 			if (bsp.Nodes[static_cast<size_t>(bsp.FindLeaf(spawn))].bSolid) {
 				log(String::Fmt("  warning      the player spawn at ({:.2f}, {:.2f}, {:.2f}) is inside a solid brush",
@@ -439,9 +439,9 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 		ProbePlacementBoxes& boxes = source.ProbeBoxes;
 
 		if (sealed) {
-			boxes.IsOpen = [&bsp](const Vec3f point)
+			boxes.IsOpen = [&bsp](const FVec3 point)
 			{
-				const Node& leaf = bsp.Nodes[static_cast<size_t>(bsp.FindLeaf(Vec3d(point.X, point.Y, point.Z)))];
+				const Node& leaf = bsp.Nodes[static_cast<size_t>(bsp.FindLeaf(DVec3(point.X, point.Y, point.Z)))];
 				return leaf.bSolid || leaf.bReached;
 			};
 		}
@@ -487,15 +487,15 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 		std::FILE* leak_file = std::fopen(leak_path.CStr(), "w");
 
 		if (leak_file != nullptr) {
-			for (const Vec3d& point : flood.LeakPath) {
+			for (const DVec3& point : flood.LeakPath) {
 				std::fprintf(leak_file, "%.6f %.6f %.6f\n", point.X, point.Y, point.Z);
 			}
 
 			std::fclose(leak_file);
 		}
 
-		const Vec3d& from = flood.LeakPath[0];
-		const Vec3d& to = GetLast(flood.LeakPath);
+		const DVec3& from = flood.LeakPath[0];
+		const DVec3& to = GetLast(flood.LeakPath);
 
 		log(String::Fmt("  seal         LEAKED, faces towards the void are kept. The path from the entity at ({:.2f}, "
 						"{:.2f}, {:.2f}) to the void at ({:.2f}, {:.2f}, {:.2f}) is in {}",
@@ -756,12 +756,12 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 
 	if (options.VerifyRays > 0 && result.bHasLightmap && source.bHasSun) {
 		// Model triangles shadow the lightmap too, so the reference traces them like patch triangles
-		Array<Vec3d> occluder_points = CopyArray(patches.ReferencePoints);
-		Array<Vec3d> occluder_facings = CopyArray(patches.ReferenceFacings);
+		Array<DVec3> occluder_points = CopyArray(patches.ReferencePoints);
+		Array<DVec3> occluder_facings = CopyArray(patches.ReferenceFacings);
 
 		for (const ModelSurface& surface : models.Surfaces) {
 			for (size_t index = 0; index + 2 < surface.Indices.Size; index += 3) {
-				Vec3d facing = Vec3d(0.0);
+				DVec3 facing = DVec3(0.0);
 
 				for (uint32 corner = 0; corner < 3; corner++) {
 					const ModelVertex& vertex = surface.Vertices[static_cast<size_t>(surface.Indices[index + corner])];

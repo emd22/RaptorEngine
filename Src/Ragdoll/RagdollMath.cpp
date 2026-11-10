@@ -58,8 +58,8 @@ Mat4f MatrixFromRotationTranslation(const JPH::Mat44& rotation, const JPH::Vec3&
 	const JPH::Vec3 y = rotation.GetAxisY();
 	const JPH::Vec3 z = rotation.GetAxisZ();
 
-	return Mat4f(Vec4f(Vec3f::FromJolt(x), 0.0f), Vec4f(Vec3f::FromJolt(y), 0.0f), Vec4f(Vec3f::FromJolt(z), 0.0f),
-				 Vec4f(Vec3f::FromJolt(position), 1.0f));
+	return Mat4f(Vec4f(FVec3::FromJolt(x), 0.0f), Vec4f(FVec3::FromJolt(y), 0.0f), Vec4f(FVec3::FromJolt(z), 0.0f),
+				 Vec4f(FVec3::FromJolt(position), 1.0f));
 }
 
 void NormalizeRotationRows(Mat4f& m)

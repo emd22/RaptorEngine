@@ -50,19 +50,19 @@ bool MaterialLibrary::Load(const String& root)
 	return mEntries.Size() > 0;
 }
 
-static Vec3f GetSpecialMaterialColor(eSpecialMaterial special)
+static FVec3 GetSpecialMaterialColor(eSpecialMaterial special)
 {
 	switch (special) {
 	case eSpecialMaterial::NonVis:
-		return Vec3f(0.55f, 0.3f, 0.75f);
+		return FVec3(0.55f, 0.3f, 0.75f);
 	case eSpecialMaterial::NvBrush:
-		return Vec3f(1.0f, 0.6f, 0.15f);
+		return FVec3(1.0f, 0.6f, 0.15f);
 	case eSpecialMaterial::DBound:
-		return Vec3f(0.35f, 0.5f, 1.0f);
+		return FVec3(0.35f, 0.5f, 1.0f);
 	case eSpecialMaterial::Portal:
-		return Vec3f(1.0f, 0.9f, 0.2f);
+		return FVec3(1.0f, 0.9f, 0.2f);
 	default:
-		return Vec3f(1.0f, 1.0f, 1.0f);
+		return FVec3(1.0f, 1.0f, 1.0f);
 	}
 }
 
@@ -142,7 +142,7 @@ MaterialID MaterialLibrary::CreateMaterial(Entry& entry) const
 	}
 
 	if (definition.BaseColor.has_value()) {
-		const Vec3f color = *definition.BaseColor;
+		const FVec3 color = *definition.BaseColor;
 		const float32 base_color[3] = { color.X, color.Y, color.Z };
 
 		material->SetBaseColorFactor(base_color);

@@ -279,7 +279,7 @@ void World::ExecuteRenderList(renderer::PipelineHandle pipeline_handle, renderer
 void World::ExecuteTransparentRenderLists()
 {
 	PerspectiveCamera& camera = *mpCurrentCamera;
-	const Vec3f camera_position = camera.GetPosition();
+	const FVec3 camera_position = camera.GetPosition();
 	;
 
 	auto Gather = [&](PipelineHandle pipeline)
@@ -295,8 +295,8 @@ void World::ExecuteTransparentRenderLists()
 				continue;
 			}
 
-			Vec3f center = object->GetPosition() + object->Bounds.Min + object->Bounds.GetSize() * 0.5f;
-			Vec3f diff = center - camera_position;
+			FVec3 center = object->GetPosition() + object->Bounds.Min + object->Bounds.GetSize() * 0.5f;
+			FVec3 diff = center - camera_position;
 
 			float32 distance_sq = diff.Dot(diff);
 
@@ -639,7 +639,7 @@ void World::BakeSpotShadows()
 }
 
 
-void World::GatherSpotShadowCasters(const Vec3f center, float32 radius, DynArray<ObjectID>& out_casters)
+void World::GatherSpotShadowCasters(const FVec3 center, float32 radius, DynArray<ObjectID>& out_casters)
 {
 	const uint32 first_caster = out_casters.Size;
 
@@ -687,7 +687,7 @@ void World::GatherSpotShadowCasters(const Vec3f center, float32 radius, DynArray
 }
 
 
-static bool SkinnedCasterReachesSphere(Object& object, const Vec3f center, float32 radius)
+static bool SkinnedCasterReachesSphere(Object& object, const FVec3 center, float32 radius)
 {
 	constexpr float32 scMeshPadding = 0.3f;
 
@@ -703,9 +703,9 @@ static bool SkinnedCasterReachesSphere(Object& object, const Vec3f center, float
 
 	const Skeleton& skeleton = *object.pSkeleton;
 	const float32* m = object.GetWorldMatrix().RawData;
-	const Vec3f c = skeleton.PoseCenter;
+	const FVec3 c = skeleton.PoseCenter;
 
-	const Vec3f pose_center(c.X * m[0] + c.Y * m[4] + c.Z * m[8] + m[12], c.X * m[1] + c.Y * m[5] + c.Z * m[9] + m[13],
+	const FVec3 pose_center(c.X * m[0] + c.Y * m[4] + c.Z * m[8] + m[12], c.X * m[1] + c.Y * m[5] + c.Z * m[9] + m[13],
 							c.X * m[2] + c.Y * m[6] + c.Z * m[10] + m[14]);
 
 	const float32 reach = (skeleton.PoseRadius + scMeshPadding) * object.mScale + radius;
@@ -713,7 +713,7 @@ static bool SkinnedCasterReachesSphere(Object& object, const Vec3f center, float
 	return (pose_center - center).Length() <= reach;
 }
 
-void World::AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, const Vec3f center, float32 radius,
+void World::AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, const FVec3 center, float32 radius,
 										 DynArray<ObjectID>& out_casters)
 {
 	if (id.IsInvalid()) {
@@ -1087,9 +1087,9 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 	// Super broad phase for culling.
 
 	Vec2u min_tile = gWorldGrid->TileToTileXY(
-		gWorldGrid->WorldToTile(Vec3f(frustum_bounds.Min.X, 0.0f, frustum_bounds.Min.Z)));
+		gWorldGrid->WorldToTile(FVec3(frustum_bounds.Min.X, 0.0f, frustum_bounds.Min.Z)));
 	Vec2u max_tile = gWorldGrid->TileToTileXY(
-		gWorldGrid->WorldToTile(Vec3f(frustum_bounds.Max.X, 0.0f, frustum_bounds.Max.Z)));
+		gWorldGrid->WorldToTile(FVec3(frustum_bounds.Max.X, 0.0f, frustum_bounds.Max.Z)));
 
 	const uint32 num_tiles_x = gWorldGrid->mGridSize.X;
 	const uint32 num_tiles_y = gWorldGrid->mGridSize.Y;
@@ -1183,7 +1183,7 @@ void World::Render(BaseCamera* shadow_camera)
 	gGraphics->bBakedSunActive = render_sun_shadows && (pCVarBakedShadows->IntValue != 0) && pPrototype != nullptr &&
 								 pPrototype->IsBakedSunCurrent(sun->GetPosition());
 
-	Vec3f sun_position = Vec3f::sZero;
+	FVec3 sun_position = FVec3::sZero;
 
 	if (sun.IsValid()) {
 		sun_position = sun->GetPosition();
@@ -1226,7 +1226,7 @@ void World::Render(BaseCamera* shadow_camera)
 
 	if (sdf_pages_enabled) {
 		gGraphics->SDFPages.Update(gGraphics->GetFrame()->CmdBuffer, camera.GetPosition(),
-								 static_cast<uint32>(std::max<int64>(pCVarSDFPageBudget->IntValue, 0)));
+								   static_cast<uint32>(std::max<int64>(pCVarSDFPageBudget->IntValue, 0)));
 		gGraphics->MarkGpu(eGpuMarker::SDFPageScene);
 	}
 
@@ -1305,7 +1305,7 @@ void World::Render(BaseCamera* shadow_camera)
 /// be captured with it. Past that the shadow map is re-rendered around the probe.
 static constexpr float32 scProbeShadowEdgeMargin = 0.5f;
 
-bool World::RenderCaptureSunShadows(LightDirectional& sun, const Vec3f center, OrthoCamera& out_shadow_camera,
+bool World::RenderCaptureSunShadows(LightDirectional& sun, const FVec3 center, OrthoCamera& out_shadow_camera,
 									uint32& out_light_slot)
 {
 	// Same projection as the player's shadow camera, only the placement changes
@@ -1444,11 +1444,11 @@ void World::DebugDrawWorldGrid()
 	const Color debug_color = Color::FromRGBA(255, 255, 255, 255);
 	const Color player_debug_color = Color::FromRGBA(255, 0, 0, 255);
 
-	const Vec3f tile_size = Vec3f(gWorldGrid->mTileSize.X, 1.0f, gWorldGrid->mTileSize.Y);
+	const FVec3 tile_size = FVec3(gWorldGrid->mTileSize.X, 1.0f, gWorldGrid->mTileSize.Y);
 
 	for (uint32 y = 0; y < gWorldGrid->mGridSize.Y; y++) {
 		for (uint32 x = 0; x < gWorldGrid->mGridSize.X; x++) {
-			const Vec3f tile_offset = Vec3f(x, -1.5f, y) * tile_size;
+			const FVec3 tile_offset = FVec3(x, -1.5f, y) * tile_size;
 
 			Mat4f model_matrix = Mat4f::AsScale(tile_size) * Mat4f::AsRotation(Quat::scIdentity) *
 								 Mat4f::AsTranslation((tile_offset)-gWorldGrid->mPositionOffset + (tile_size * 0.5f));
@@ -1487,11 +1487,11 @@ void World::DebugDrawPhysicsBodies()
 		const JPH::AABox bounds = body->GetWorldSpaceBounds();
 		const Color color = (phys->GetMotionType() == physics::eMotionType::Static) ? static_color : dynamic_color;
 
-		gDebugDraw->WireBox(BBox(Vec3f(bounds.mMin), Vec3f(bounds.mMax)), color);
+		gDebugDraw->WireBox(BBox(FVec3(bounds.mMin), FVec3(bounds.mMax)), color);
 	}
 }
 
-Object* World::RaycastProbeVolumes(const Vec3f origin, const Vec3f direction, float32 max_distance,
+Object* World::RaycastProbeVolumes(const FVec3 origin, const FVec3 direction, float32 max_distance,
 								   float32& out_distance, const std::function<bool(const Object&)>& accept)
 {
 	Object* nearest = nullptr;
@@ -1502,7 +1502,7 @@ Object* World::RaycastProbeVolumes(const Vec3f origin, const Vec3f direction, fl
 			continue;
 		}
 
-		Vec3f face;
+		FVec3 face;
 		const float32 distance = object.RaycastBounds(origin, direction, face);
 
 		if (distance >= 0.0f && distance < nearest_distance) {
@@ -1530,8 +1530,8 @@ void World::DebugDrawSelectedDecals()
 			continue;
 		}
 
-		const Vec3f half_extent = (object->Bounds.Max - object->Bounds.Min) * 0.5f;
-		const Vec3f center = (object->Bounds.Max + object->Bounds.Min) * 0.5f;
+		const FVec3 half_extent = (object->Bounds.Max - object->Bounds.Min) * 0.5f;
+		const FVec3 center = (object->Bounds.Max + object->Bounds.Min) * 0.5f;
 
 		gDebugDraw->WireBox(Mat4f::AsScale(half_extent) * Mat4f::AsTranslation(center) * object->GetWorldMatrix(),
 							decal_color);
@@ -1570,8 +1570,8 @@ void World::DebugDrawProbeVolumes()
 			continue;
 		}
 
-		const Vec3f half_extent = (object.Bounds.Max - object.Bounds.Min) * 0.5f;
-		const Vec3f center = (object.Bounds.Max + object.Bounds.Min) * 0.5f;
+		const FVec3 half_extent = (object.Bounds.Max - object.Bounds.Min) * 0.5f;
+		const FVec3 center = (object.Bounds.Max + object.Bounds.Min) * 0.5f;
 
 		Mat4f world_matrix = Mat4f::AsScale(half_extent) * Mat4f::AsTranslation(center) * object.GetWorldMatrix();
 
@@ -1588,7 +1588,7 @@ void World::DebugDrawProbeVolumes()
 		gDebugDraw->WireBox(world_matrix, is_selected ? selected_color : color);
 	}
 
-	static const Vec3f scCapturePointHalfExtent(0.12f);
+	static const FVec3 scCapturePointHalfExtent(0.12f);
 
 	for (uint32 i = 0; i < gProbeManager->GetReflectionProbeCount(); i++) {
 		gDebugDraw->SolidBox(gProbeManager->GetReflectionProbePosition(i), scCapturePointHalfExtent, Quat::scIdentity,
@@ -1603,7 +1603,7 @@ void World::DebugDrawProbes()
 	}
 
 	// Tiny solid cubes (~0.15m). The base debug cube spans -1..+1, so scale by half-extent.
-	static const Vec3f scProbeHalfExtent(0.1f);
+	static const FVec3 scProbeHalfExtent(0.1f);
 
 	static const Color scVolumeColors[Limits::MaxProbeVolumes] = {
 		Color::FromRGBA(60, 220, 255, 100),	 Color::FromRGBA(255, 220, 60, 100),  Color::FromRGBA(140, 255, 90, 100),
@@ -1641,8 +1641,8 @@ void World::Destroy()
 	// mPhysicsObjects.Destroy();
 }
 
-static Vec3f UnprojectScreenPoint(const Mat4f& inverse_view_projection, float32 x, float32 y, const Vec3f& eye,
-								  const Vec3f& forward, float32 distance)
+static FVec3 UnprojectScreenPoint(const Mat4f& inverse_view_projection, float32 x, float32 y, const FVec3& eye,
+								  const FVec3& forward, float32 distance)
 {
 	const Vec4f& row_x = inverse_view_projection.Rows[0];
 	const Vec4f& row_y = inverse_view_projection.Rows[1];
@@ -1652,11 +1652,11 @@ static Vec3f UnprojectScreenPoint(const Mat4f& inverse_view_projection, float32 
 	constexpr float32 depth = 0.5f;
 
 	const float32 w = x * row_x.W + y * row_y.W + depth * row_z.W + row_w.W;
-	const Vec3f point((x * row_x.X + y * row_y.X + depth * row_z.X + row_w.X) / w,
+	const FVec3 point((x * row_x.X + y * row_y.X + depth * row_z.X + row_w.X) / w,
 					  (x * row_x.Y + y * row_y.Y + depth * row_z.Y + row_w.Y) / w,
 					  (x * row_x.Z + y * row_y.Z + depth * row_z.Z + row_w.Z) / w);
 
-	const Vec3f direction = (point - eye).Normalize();
+	const FVec3 direction = (point - eye).Normalize();
 
 	return eye + direction * (distance / std::max(direction.Dot(forward), 0.1f));
 }
@@ -1684,10 +1684,10 @@ void World::DebugDrawCullFrustum()
 	const float32 distances[] = { 0.25f, 5.0f, 25.0f };
 	const Vec2f ndc_corners[] = { { -1.0f, -1.0f }, { 1.0f, -1.0f }, { 1.0f, 1.0f }, { -1.0f, 1.0f } };
 
-	Vec3f previous_ring[4];
+	FVec3 previous_ring[4];
 
 	for (uint32 ring = 0; ring < std::size(distances); ring++) {
-		Vec3f corners[4];
+		FVec3 corners[4];
 
 		for (uint32 corner = 0; corner < 4; corner++) {
 			corners[corner] = UnprojectScreenPoint(inverse_view_projection, ndc_corners[corner].X,
@@ -1709,7 +1709,7 @@ void World::DebugDrawCullFrustum()
 		}
 	}
 
-	gDebugDraw->WireBox(BBox(camera.GetPosition() - Vec3f(0.1f), camera.GetPosition() + Vec3f(0.1f)), frustum_color);
+	gDebugDraw->WireBox(BBox(camera.GetPosition() - FVec3(0.1f), camera.GetPosition() + FVec3(0.1f)), frustum_color);
 }
 
 void World::DebugDrawPortals()
@@ -1758,11 +1758,11 @@ void World::DebugDrawPortals()
 
 		for (size_t polygon = 0; polygon < portal.PolygonSizes.Size; polygon++) {
 			const uint32 size = portal.PolygonSizes[polygon];
-			Vec3f center = Vec3f::sZero;
+			FVec3 center = FVec3::sZero;
 
 			for (uint32 point = 0; point < size; point++) {
-				const Vec3f& from = portal.Points[first_point + point];
-				const Vec3f& to = portal.Points[first_point + (point + 1) % size];
+				const FVec3& from = portal.Points[first_point + point];
+				const FVec3& to = portal.Points[first_point + (point + 1) % size];
 
 				gDebugDraw->Line(from, to, color);
 				center += from;
@@ -1792,8 +1792,8 @@ void World::DebugDrawPortals()
 		return;
 	}
 
-	Vec3f eye = GetCullCamera().GetPosition();
-	Vec3f forward = GetCullCamera().GetForwardVector();
+	FVec3 eye = GetCullCamera().GetPosition();
+	FVec3 forward = GetCullCamera().GetForwardVector();
 	float32 distance = 0.5f;
 
 	if (mbPortalLocked) {
@@ -1801,7 +1801,7 @@ void World::DebugDrawPortals()
 		forward = mLockedCameraDirection;
 		distance = 2.0f;
 
-		gDebugDraw->WireBox(BBox(eye - Vec3f(0.1f), eye + Vec3f(0.1f)), rect_color);
+		gDebugDraw->WireBox(BBox(eye - FVec3(0.1f), eye + FVec3(0.1f)), rect_color);
 	}
 
 	const Mat4f inverse_view_projection = mPortalVisibility.GetViewProjection().Inverse();
@@ -1813,7 +1813,7 @@ void World::DebugDrawPortals()
 
 		const ScreenRect& rect = mPortalVisibility.GetAreaRect(area);
 
-		const Vec3f corners[4] = {
+		const FVec3 corners[4] = {
 			UnprojectScreenPoint(inverse_view_projection, rect.MinX, rect.MinY, eye, forward, distance),
 			UnprojectScreenPoint(inverse_view_projection, rect.MaxX, rect.MinY, eye, forward, distance),
 			UnprojectScreenPoint(inverse_view_projection, rect.MaxX, rect.MaxY, eye, forward, distance),

@@ -24,7 +24,7 @@ namespace physics {
 
 const BodyID BodyID::scNull = BodyID(UINT32_MAX);
 
-void Body::CreatePrimitiveBody(ePrimitiveType primitive_type, const Vec3f dimensions, physics::eMotionType motion_type,
+void Body::CreatePrimitiveBody(ePrimitiveType primitive_type, const FVec3 dimensions, physics::eMotionType motion_type,
 							   const BodyProps& object_properties)
 {
 	mMotionType = motion_type;
@@ -37,7 +37,7 @@ void Body::CreatePrimitiveBody(ePrimitiveType primitive_type, const Vec3f dimens
 		LogWarning(LC_PHYSICS, "Creating primitive collider with invalid dimensions {} - clamping to minimum {}",
 				   dimensions, scMinDim);
 	}
-	Dimensions = Vec3f(std::max(dimensions.X, scMinDim), std::max(dimensions.Y, scMinDim),
+	Dimensions = FVec3(std::max(dimensions.X, scMinDim), std::max(dimensions.Y, scMinDim),
 					   std::max(dimensions.Z, scMinDim));
 
 	// Jolt uses half dimensions (i.e. radius vs diameter) so we need to give it half of our shizzle
@@ -96,7 +96,7 @@ void Body::CreateMeshBody(const PrimitiveMesh& mesh, physics::eMotionType motion
 	CreateJoltBody(mesh_shape_result.Get(), physics::Body::eFlags::None, motion_type, object_properties);
 }
 
-void Body::CreateTriangleMeshBody(const SizedArray<Vec3f>& positions, const SizedArray<uint32>& indices,
+void Body::CreateTriangleMeshBody(const SizedArray<FVec3>& positions, const SizedArray<uint32>& indices,
 								  const BodyProps& object_properties, const SizedArray<uint32>* triangle_user_data)
 {
 	mMotionType = physics::eMotionType::Static;
@@ -110,14 +110,14 @@ void Body::CreateTriangleMeshBody(const SizedArray<Vec3f>& positions, const Size
 	JPH::VertexList vertices;
 	vertices.reserve(positions.Size);
 
-	Vec3f min = positions[0];
-	Vec3f max = positions[0];
+	FVec3 min = positions[0];
+	FVec3 max = positions[0];
 
-	for (const Vec3f position : positions) {
+	for (const FVec3 position : positions) {
 		vertices.push_back(JPH::Float3(position.X, position.Y, position.Z));
 
-		min = Vec3f::Min(min, position);
-		max = Vec3f::Max(max, position);
+		min = FVec3::Min(min, position);
+		max = FVec3::Max(max, position);
 	}
 
 	Dimensions = max - min;
@@ -134,8 +134,7 @@ void Body::CreateTriangleMeshBody(const SizedArray<Vec3f>& positions, const Size
 			user_data = (*triangle_user_data)[index / 3];
 		}
 
-		triangles.push_back(
-			JPH::IndexedTriangle(indices[index], indices[index + 2], indices[index + 1], 0, user_data));
+		triangles.push_back(JPH::IndexedTriangle(indices[index], indices[index + 2], indices[index + 1], 0, user_data));
 	}
 
 	JPH::MeshShapeSettings mesh_settings(std::move(vertices), std::move(triangles));
@@ -151,7 +150,7 @@ void Body::CreateTriangleMeshBody(const SizedArray<Vec3f>& positions, const Size
 				   object_properties);
 }
 
-void Body::CreateConvexHullBody(const SizedArray<Vec3f>& points, physics::eMotionType motion_type,
+void Body::CreateConvexHullBody(const SizedArray<FVec3>& points, physics::eMotionType motion_type,
 								const BodyProps& object_properties)
 {
 	mMotionType = motion_type;
@@ -165,15 +164,15 @@ void Body::CreateConvexHullBody(const SizedArray<Vec3f>& points, physics::eMotio
 	JPH::Array<JPH::Vec3> jolt_points;
 	jolt_points.reserve(points.Size);
 
-	Vec3f min = points[0];
-	Vec3f max = points[0];
+	FVec3 min = points[0];
+	FVec3 max = points[0];
 
-	// TODO: Fix Vec3f::ToJoltVec3 to dupe the Z lane to W
-	for (const Vec3f point : points) {
+	// TODO: Fix FVec3::ToJoltVec3 to dupe the Z lane to W
+	for (const FVec3 point : points) {
 		jolt_points.push_back(JPH::Vec3(point.X, point.Y, point.Z));
 
-		min = Vec3f::Min(min, point);
-		max = Vec3f::Max(max, point);
+		min = FVec3::Min(min, point);
+		max = FVec3::Max(max, point);
 	}
 
 	Dimensions = max - min;
@@ -191,7 +190,7 @@ void Body::CreateConvexHullBody(const SizedArray<Vec3f>& points, physics::eMotio
 	UpdateJoltBody(hull_shape_result.Get(), physics::Body::eFlags::None, motion_type, object_properties);
 }
 
-void Body::CreateCompoundHullBody(const SizedArray<SizedArray<Vec3f>>& hulls, physics::eMotionType motion_type,
+void Body::CreateCompoundHullBody(const SizedArray<SizedArray<FVec3>>& hulls, physics::eMotionType motion_type,
 								  const BodyProps& object_properties)
 {
 	mMotionType = motion_type;
@@ -199,11 +198,11 @@ void Body::CreateCompoundHullBody(const SizedArray<SizedArray<Vec3f>>& hulls, ph
 
 	JPH::StaticCompoundShapeSettings compound_settings;
 
-	Vec3f min(FLT_MAX);
-	Vec3f max(-FLT_MAX);
+	FVec3 min(FLT_MAX);
+	FVec3 max(-FLT_MAX);
 	uint32 hull_count = 0;
 
-	for (const SizedArray<Vec3f>& points : hulls) {
+	for (const SizedArray<FVec3>& points : hulls) {
 		if (points.Size < 4) {
 			continue;
 		}
@@ -211,11 +210,11 @@ void Body::CreateCompoundHullBody(const SizedArray<SizedArray<Vec3f>>& hulls, ph
 		JPH::Array<JPH::Vec3> jolt_points;
 		jolt_points.reserve(points.Size);
 
-		for (const Vec3f point : points) {
+		for (const FVec3 point : points) {
 			jolt_points.push_back(JPH::Vec3(point.X, point.Y, point.Z));
 
-			min = Vec3f::Min(min, point);
-			max = Vec3f::Max(max, point);
+			min = FVec3::Min(min, point);
+			max = FVec3::Max(max, point);
 		}
 
 		JPH::Ref<JPH::ConvexHullShapeSettings> hull_settings = new JPH::ConvexHullShapeSettings(
@@ -259,7 +258,7 @@ void Body::UpdateJoltBody(JPH::ShapeRefC shape, physics::Body::eFlags flags, phy
 {
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->PhysicsSystem.GetBodyInterface();
 
-	Vec3f previous_position = Vec3f::sZero;
+	FVec3 previous_position = FVec3::sZero;
 	Quat previous_rotation = Quat::scIdentity;
 
 	if (mpPhysicsBody) {
@@ -379,7 +378,7 @@ void Body::DestroyPhysicsBody()
 }
 
 
-void Body::SetMidpoint(const Vec3f midpoint) { Midpoint = midpoint; }
+void Body::SetMidpoint(const FVec3 midpoint) { Midpoint = midpoint; }
 
 void Body::RemoveFromWorld()
 {
@@ -401,7 +400,7 @@ void Body::AddToWorld()
 	mbIsInWorld = true;
 }
 
-void Body::Teleport(const Vec3f position, const Quat rotation)
+void Body::Teleport(const FVec3 position, const Quat rotation)
 {
 	if (!mbHasPhysicsBody) {
 		return;
@@ -417,7 +416,7 @@ void Body::Teleport(const Vec3f position, const Quat rotation)
 		GetBodyID(), jolt_position, jolt_rotation, JPH::EActivation::Activate);
 }
 
-void Body::SetLinearVelocity(const Vec3f velocity)
+void Body::SetLinearVelocity(const FVec3 velocity)
 {
 	if (!mbHasPhysicsBody) {
 		return;

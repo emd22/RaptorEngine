@@ -12,8 +12,8 @@
 #include <Core/StackArray.hpp>
 #include <Core/String.hpp>
 #include <Math/BBox.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Vec2.hpp>
-#include <Math/Vec3.hpp>
 
 namespace fx {
 
@@ -33,7 +33,7 @@ struct BrushFaceTexture
 
 struct BrushPlane
 {
-	Vec3f Normal = Vec3f::sZero;
+	FVec3 Normal = FVec3::sZero;
 	float32 Distance = 0.0f;
 
 	BrushFaceTexture Texture;
@@ -61,54 +61,54 @@ public:
 	struct Face
 	{
 		uint32 PlaneIndex = 0;
-		SizedArray<Vec3f> Vertices;
+		SizedArray<FVec3> Vertices;
 	};
 
 public:
 	/**
 	 * @brief Creates a box with its textures anchored to its minimum corner, matching MeshGen::MakeCube with bAlignUVs
 	 */
-	static Brush FromBox(const Vec3f min, const Vec3f max);
+	static Brush FromBox(const FVec3 min, const FVec3 max);
 	static Brush FromPlanes(const PlaneList& planes);
 
-	static Brush FromVertices(const SizedArray<Vec3f>& points, const PlaneList& reference);
+	static Brush FromVertices(const SizedArray<FVec3>& points, const PlaneList& reference);
 
 	bool Rebuild();
 
 	bool IsValid() const { return Faces.IsNotEmpty(); }
 	bool IsBox() const;
 
-	Vec3f GetBoundsMin() const { return mBounds.Min; }
-	Vec3f GetBoundsMax() const { return mBounds.Max; }
-	Vec3f GetCenter() const { return (mBounds.Min + mBounds.Max) * 0.5f; }
+	FVec3 GetBoundsMin() const { return mBounds.Min; }
+	FVec3 GetBoundsMax() const { return mBounds.Max; }
+	FVec3 GetCenter() const { return (mBounds.Min + mBounds.Max) * 0.5f; }
 
 	/**
 	 * @brief Returns the unique corner points of the brush
 	 */
-	const SizedArray<Vec3f>& GetVertices() const { return mVertices; }
+	const SizedArray<FVec3>& GetVertices() const { return mVertices; }
 
-	bool ContainsPoint(const Vec3f point, float32 tolerance = 0.0f) const;
+	bool ContainsPoint(const FVec3 point, float32 tolerance = 0.0f) const;
 
 	/**
 	 * @brief Returns the index of the plane facing along `normal`, or scNoPlane
 	 */
-	int32 FindPlane(const Vec3f normal) const;
+	int32 FindPlane(const FVec3 normal) const;
 
 	/**
 	 * @brief Returns how far the brush reaches along `direction`. For a face normal this is the distance of its plane
 	 */
-	float32 GetSupport(const Vec3f direction) const;
+	float32 GetSupport(const FVec3 direction) const;
 
 	/**
 	 * @brief Returns the average of the corners of the face on a plane
 	 */
-	Vec3f GetFaceCenter(uint32 plane_index) const;
+	FVec3 GetFaceCenter(uint32 plane_index) const;
 
 	/**
 	 * @brief Finds where a ray starting outside the brush enters it
 	 * @param out_distance Distance to the hit in multiples of the length of `direction`
 	 */
-	bool Raycast(const Vec3f origin, const Vec3f direction, float32& out_distance, uint32& out_plane_index) const;
+	bool Raycast(const FVec3 origin, const FVec3 direction, float32& out_distance, uint32& out_plane_index) const;
 
 	/**
 	 * @brief Splits the brush in two along a plane. The new faces get the texture layout of the brush's local space.
@@ -118,10 +118,10 @@ public:
 	 * the world grid from it, like AlignTexturesToWorld(), instead of starting from the local origin.
 	 * @returns false if the plane misses the brush, or the brush has no room for another plane
 	 */
-	bool Split(const Vec3f normal, float32 distance, const Vec3f origin, PlaneList& out_back,
+	bool Split(const FVec3 normal, float32 distance, const FVec3 origin, PlaneList& out_back,
 			   PlaneList& out_front) const;
 
-	bool Subtract(const PlaneList& cutter, const Vec3f origin, PieceList& out_pieces) const;
+	bool Subtract(const PlaneList& cutter, const FVec3 origin, PieceList& out_pieces) const;
 
 	/**
 	 * @brief Resets a face's texture layout to the one FromBox() uses
@@ -131,8 +131,8 @@ public:
 	/**
 	 * @brief Lines every face's texture up with the world grid, for a brush on an unrotated object at `origin`.
 	 */
-	void AlignTexturesToWorld(const Vec3f origin);
-	void AlignFaceTextureToWorld(uint32 plane_index, const Vec3f origin);
+	void AlignTexturesToWorld(const FVec3 origin);
+	void AlignFaceTextureToWorld(uint32 plane_index, const FVec3 origin);
 
 	/**
 	 * @brief Returns true if every face has the default layout from ResetFaceTexture()
@@ -147,12 +147,12 @@ public:
 	 * @brief Returns how fast a plane's U and V change across the brush's local space. A point's texture coordinate is
 	 * its dot product with each gradient, plus the plane's texture offset.
 	 */
-	static void GetTextureGradients(const BrushPlane& plane, Vec3f& out_u_gradient, Vec3f& out_v_gradient);
+	static void GetTextureGradients(const BrushPlane& plane, FVec3& out_u_gradient, FVec3& out_v_gradient);
 
 	/**
 	 * @brief Generates a triangle mesh for rendering
 	 */
-	void GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normals, SizedArray<Vec3f>& tangents,
+	void GenerateMesh(SizedArray<FVec3>& positions, SizedArray<FVec3>& normals, SizedArray<FVec3>& tangents,
 					  SizedArray<float32>& tangent_handedness, SizedArray<Vec2f>& texcoords,
 					  SizedArray<uint32>& indices, const String* only_material = nullptr) const;
 
@@ -161,7 +161,7 @@ public:
 	SizedArray<Face> Faces;
 
 private:
-	SizedArray<Vec3f> mVertices;
+	SizedArray<FVec3> mVertices;
 
 	BBox mBounds;
 };

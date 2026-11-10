@@ -37,9 +37,9 @@ void DebugDraw::Draw(eDebugShape shape, const Mat4f& world_matrix, Color color)
 	mShapes.Insert(QueuedShape { .WorldMatrix = world_matrix, .Color = color.AsUInt(), .Shape = shape });
 }
 
-void DebugDraw::Line(const Vec3f from, const Vec3f to, Color color)
+void DebugDraw::Line(const FVec3 from, const FVec3 to, Color color)
 {
-	const Vec3f delta = to - from;
+	const FVec3 delta = to - from;
 
 	const Mat4f world_matrix(Vec4f(delta.X, delta.Y, delta.Z, 0.0f), Vec4f(0.0f, 0.0f, 0.0f, 0.0f),
 							 Vec4f(0.0f, 0.0f, 0.0f, 0.0f), Vec4f(from.X, from.Y, from.Z, 1.0f));
@@ -47,12 +47,12 @@ void DebugDraw::Line(const Vec3f from, const Vec3f to, Color color)
 	Draw(eDebugShape::Line, world_matrix, color);
 }
 
-static Mat4f MakeBoxMatrix(const Vec3f center, const Vec3f half_extent, const Quat rotation)
+static Mat4f MakeBoxMatrix(const FVec3 center, const FVec3 half_extent, const Quat rotation)
 {
 	return Mat4f::AsScale(half_extent) * Mat4f::AsRotation(rotation) * Mat4f::AsTranslation(center);
 }
 
-void DebugDraw::WireBox(const Vec3f center, const Vec3f half_extent, const Quat rotation, Color color)
+void DebugDraw::WireBox(const FVec3 center, const FVec3 half_extent, const Quat rotation, Color color)
 {
 	WireBox(MakeBoxMatrix(center, half_extent, rotation), color);
 }
@@ -62,7 +62,7 @@ void DebugDraw::WireBox(const BBox& box, Color color)
 	WireBox((box.Min + box.Max) * 0.5f, (box.Max - box.Min) * 0.5f, Quat::scIdentity, color);
 }
 
-void DebugDraw::SolidBox(const Vec3f center, const Vec3f half_extent, const Quat rotation, Color color)
+void DebugDraw::SolidBox(const FVec3 center, const FVec3 half_extent, const Quat rotation, Color color)
 {
 	SolidBox(MakeBoxMatrix(center, half_extent, rotation), color);
 }

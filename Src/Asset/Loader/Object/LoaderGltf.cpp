@@ -628,7 +628,8 @@ bool LoaderGltf::BuildPrimitiveMesh(PrimitiveMesh& mesh, cgltf_primitive* primit
 	}
 
 	if (context.bBakeTransform) {
-		TransformModelGeometry(attributes.Positions, attributes.Normals, attributes.Tangents, indices, context.WorldMatrix);
+		TransformModelGeometry(attributes.Positions, attributes.Normals, attributes.Tangents, indices,
+							   context.WorldMatrix);
 	}
 
 	if (uv_choice.bHasTransform && !attributes.Uvs.IsEmpty()) {
@@ -718,8 +719,8 @@ bool LoaderGltf::BuildObjectsFromPrimitives(Object* container_object, cgltf_mesh
 		MakeMaterialForPrimitive(current_object, gltf_primitive);
 
 		if (has_bounds) {
-			out_bounds.Min = Vec3f::Min(out_bounds.Min, current_object->Bounds.Min);
-			out_bounds.Max = Vec3f::Max(out_bounds.Max, current_object->Bounds.Max);
+			out_bounds.Min = FVec3::Min(out_bounds.Min, current_object->Bounds.Min);
+			out_bounds.Max = FVec3::Max(out_bounds.Max, current_object->Bounds.Max);
 		}
 		else {
 			out_bounds = current_object->Bounds;
@@ -792,15 +793,15 @@ static BoneTransform MakeRestPoseForJoint(const cgltf_node* joint)
 		// the engine's row-major/row-vector matrices, so no transpose is needed here.
 		const Mat4f m(joint->matrix);
 
-		Vec3f axis_x = Vec3f(m.Rows[0]);
-		Vec3f axis_y = Vec3f(m.Rows[1]);
-		Vec3f axis_z = Vec3f(m.Rows[2]);
+		FVec3 axis_x = FVec3(m.Rows[0]);
+		FVec3 axis_y = FVec3(m.Rows[1]);
+		FVec3 axis_z = FVec3(m.Rows[2]);
 
 		const float32 scale_x = axis_x.Length();
 		const float32 scale_y = axis_y.Length();
 		const float32 scale_z = axis_z.Length();
 
-		rest.Scale = Vec3f(scale_x, scale_y, scale_z);
+		rest.Scale = FVec3(scale_x, scale_y, scale_z);
 		rest.Translation = m.GetTranslation();
 
 		if (scale_x > 1e-8f && scale_y > 1e-8f && scale_z > 1e-8f) {
@@ -843,7 +844,7 @@ static BoneTransform MakeRestPoseForJoint(const cgltf_node* joint)
 	}
 	else {
 		if (joint->has_translation) {
-			rest.Translation = Vec3f(joint->translation[0], joint->translation[1], joint->translation[2]);
+			rest.Translation = FVec3(joint->translation[0], joint->translation[1], joint->translation[2]);
 		}
 
 		if (joint->has_rotation) {
@@ -851,12 +852,12 @@ static BoneTransform MakeRestPoseForJoint(const cgltf_node* joint)
 		}
 
 		if (joint->has_scale) {
-			rest.Scale = Vec3f(joint->scale[0], joint->scale[1], joint->scale[2]);
+			rest.Scale = FVec3(joint->scale[0], joint->scale[1], joint->scale[2]);
 		}
 	}
 
 	// Mirror across X to match the vertex buffers and the animation tracks.
-	rest.Translation = Vec3f::FlipSigns<-1, 1, 1, 1>(rest.Translation);
+	rest.Translation = FVec3::FlipSigns<-1, 1, 1, 1>(rest.Translation);
 	rest.Rotation = Quat(rest.Rotation.GetX(), -rest.Rotation.GetY(), -rest.Rotation.GetZ(), rest.Rotation.GetW());
 
 	return rest;
@@ -1046,14 +1047,14 @@ void LoaderGltf::LoadAnimation(Animation& out_anim, const cgltf_animation& anim,
 				float32 buffer[4];
 
 				read_element(key_index, value_offset, buffer);
-				joint_track.Translation.Values[key_index] = Vec3f(buffer);
+				joint_track.Translation.Values[key_index] = FVec3(buffer);
 
 				if (is_cubic) {
 					read_element(key_index, 0, buffer);
-					joint_track.Translation.InTangents[key_index] = Vec3f(buffer);
+					joint_track.Translation.InTangents[key_index] = FVec3(buffer);
 
 					read_element(key_index, 2, buffer);
-					joint_track.Translation.OutTangents[key_index] = Vec3f(buffer);
+					joint_track.Translation.OutTangents[key_index] = FVec3(buffer);
 				}
 			}
 		}
@@ -1096,14 +1097,14 @@ void LoaderGltf::LoadAnimation(Animation& out_anim, const cgltf_animation& anim,
 				float32 buffer[4];
 
 				read_element(key_index, value_offset, buffer);
-				joint_track.Scale.Values[key_index] = Vec3f(buffer);
+				joint_track.Scale.Values[key_index] = FVec3(buffer);
 
 				if (is_cubic) {
 					read_element(key_index, 0, buffer);
-					joint_track.Scale.InTangents[key_index] = Vec3f(buffer);
+					joint_track.Scale.InTangents[key_index] = FVec3(buffer);
 
 					read_element(key_index, 2, buffer);
-					joint_track.Scale.OutTangents[key_index] = Vec3f(buffer);
+					joint_track.Scale.OutTangents[key_index] = FVec3(buffer);
 				}
 			}
 		}
@@ -1352,8 +1353,8 @@ void LoaderGltf::ProcessData(AssetTicket& ticket)
 
 			if (has_node_bounds) {
 				if (has_root_bounds) {
-					root_bounds.Min = Vec3f::Min(root_bounds.Min, node_bounds.Min);
-					root_bounds.Max = Vec3f::Max(root_bounds.Max, node_bounds.Max);
+					root_bounds.Min = FVec3::Min(root_bounds.Min, node_bounds.Min);
+					root_bounds.Max = FVec3::Max(root_bounds.Max, node_bounds.Max);
 				}
 				else {
 					root_bounds = node_bounds;

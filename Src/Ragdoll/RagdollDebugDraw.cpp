@@ -46,8 +46,8 @@ Color Dim(const Color color, float32 factor)
 void DrawGroundCross(const JPH::Vec3 point, const JPH::Vec3 axis_a, const JPH::Vec3 axis_b, float32 size,
 					 const Color color)
 {
-	renderer::gDebugDraw->Line(Vec3f::FromJolt(point - axis_a * size), Vec3f::FromJolt(point + axis_a * size), color);
-	renderer::gDebugDraw->Line(Vec3f::FromJolt(point - axis_b * size), Vec3f::FromJolt(point + axis_b * size), color);
+	renderer::gDebugDraw->Line(FVec3::FromJolt(point - axis_a * size), FVec3::FromJolt(point + axis_a * size), color);
+	renderer::gDebugDraw->Line(FVec3::FromJolt(point - axis_b * size), FVec3::FromJolt(point + axis_b * size), color);
 }
 
 } // namespace
@@ -67,8 +67,8 @@ void Ragdoll::DebugDraw() const
 		SampleSegment(body_interface, i, samples[i]);
 	}
 
-	SizedArray<Vec3f> centers;
-	centers.InitSize(mSegments.Size, Vec3f::sZero);
+	SizedArray<FVec3> centers;
+	centers.InitSize(mSegments.Size, FVec3::sZero);
 
 	DrawDebugSegments(samples, centers);
 	DrawDebugLinks(centers);
@@ -79,7 +79,7 @@ void Ragdoll::DebugDraw() const
 	}
 }
 
-void Ragdoll::DrawDebugSegments(const SizedArray<RDSegmentState>& samples, SizedArray<Vec3f>& out_centers) const
+void Ragdoll::DrawDebugSegments(const SizedArray<RDSegmentState>& samples, SizedArray<FVec3>& out_centers) const
 {
 	constexpr float32 scKinematicDim = 0.45f;
 	constexpr float32 scMinVelocityDraw = 0.5f;
@@ -112,10 +112,10 @@ void Ragdoll::DrawDebugSegments(const SizedArray<RDSegmentState>& samples, Sized
 			z = box_rotation.GetAxisZ() * info.BoxHalfExtent.GetZ();
 		}
 
-		const Mat4f box(Vec4f(Vec3f::FromJolt(x), 0.0f), Vec4f(Vec3f::FromJolt(y), 0.0f),
-						Vec4f(Vec3f::FromJolt(z), 0.0f), Vec4f(Vec3f::FromJolt(center), 1.0f));
+		const Mat4f box(Vec4f(FVec3::FromJolt(x), 0.0f), Vec4f(FVec3::FromJolt(y), 0.0f),
+						Vec4f(FVec3::FromJolt(z), 0.0f), Vec4f(FVec3::FromJolt(center), 1.0f));
 
-		out_centers[i] = Vec3f::FromJolt(center);
+		out_centers[i] = FVec3::FromJolt(center);
 
 		Color color = scPartColors[static_cast<uint32>(info.Part)];
 
@@ -126,13 +126,13 @@ void Ragdoll::DrawDebugSegments(const SizedArray<RDSegmentState>& samples, Sized
 		renderer::gDebugDraw->WireBox(box, color);
 
 		if (sample.Velocity.Length() > scMinVelocityDraw) {
-			renderer::gDebugDraw->Line(out_centers[i], out_centers[i] + Vec3f(sample.Velocity) * scVelocityScale,
+			renderer::gDebugDraw->Line(out_centers[i], out_centers[i] + FVec3(sample.Velocity) * scVelocityScale,
 									   scVelocityColor);
 		}
 	}
 }
 
-void Ragdoll::DrawDebugLinks(const SizedArray<Vec3f>& centers) const
+void Ragdoll::DrawDebugLinks(const SizedArray<FVec3>& centers) const
 {
 	for (uint32 i = 0; i < mSegments.Size; i++) {
 		const int32 parent = mSegments[i].ParentBody;
@@ -167,15 +167,15 @@ void Ragdoll::DrawDebugSupport(const SizedArray<RDSegmentState>& samples) const
 		return;
 	}
 
-	const Vec3f center_of_mass = Vec3f::FromJolt(com);
+	const FVec3 center_of_mass = FVec3::FromJolt(com);
 
-	renderer::gDebugDraw->Line(center_of_mass - Vec3f::sRight * scComCrossSize,
-							   center_of_mass + Vec3f::sRight * scComCrossSize, scComColor);
-	renderer::gDebugDraw->Line(center_of_mass - Vec3f::sUp * scComCrossSize,
-							   center_of_mass + Vec3f::sUp * scComCrossSize, scComColor);
-	renderer::gDebugDraw->Line(center_of_mass - Vec3f::sForward * scComCrossSize,
-							   center_of_mass + Vec3f::sForward * scComCrossSize, scComColor);
-	renderer::gDebugDraw->WireBox(center_of_mass, Vec3f(scComBoxHalfExtent), Quat::scIdentity, scComColor);
+	renderer::gDebugDraw->Line(center_of_mass - FVec3::sRight * scComCrossSize,
+							   center_of_mass + FVec3::sRight * scComCrossSize, scComColor);
+	renderer::gDebugDraw->Line(center_of_mass - FVec3::sUp * scComCrossSize,
+							   center_of_mass + FVec3::sUp * scComCrossSize, scComColor);
+	renderer::gDebugDraw->Line(center_of_mass - FVec3::sForward * scComCrossSize,
+							   center_of_mass + FVec3::sForward * scComCrossSize, scComColor);
+	renderer::gDebugDraw->WireBox(center_of_mass, FVec3(scComBoxHalfExtent), Quat::scIdentity, scComColor);
 
 	SizedArray<Vec2f> support_points;
 	support_points.InitCapacity(mSegments.Size);
@@ -188,7 +188,7 @@ void Ragdoll::DrawDebugSupport(const SizedArray<RDSegmentState>& samples) const
 			continue;
 		}
 
-		const JPH::Vec3 point = Vec3f::ToJolt(contact.Point);
+		const JPH::Vec3 point = FVec3::ToJolt(contact.Point);
 
 		support_points.Insert(frame.ToPlane(point));
 		support_height_sum += point.Dot(up);
@@ -201,7 +201,7 @@ void Ragdoll::DrawDebugSupport(const SizedArray<RDSegmentState>& samples) const
 	const float32 support_height = support_height_sum / static_cast<float32>(support_points.Size);
 	const JPH::Vec3 com_on_support = com - up * (com.Dot(up) - support_height);
 
-	renderer::gDebugDraw->Line(center_of_mass, Vec3f::FromJolt(com_on_support), scComColor);
+	renderer::gDebugDraw->Line(center_of_mass, FVec3::FromJolt(com_on_support), scComColor);
 	DrawGroundCross(com_on_support, frame.AxisU, frame.AxisV, scComGroundCrossSize, scComColor);
 
 	SizedArray<Vec2f> hull;
@@ -213,7 +213,7 @@ void Ragdoll::DrawDebugSupport(const SizedArray<RDSegmentState>& samples) const
 		return;
 	}
 
-	const auto to_world = [&](const Vec2f point) { return Vec3f::FromJolt(frame.FromPlane(point, support_height)); };
+	const auto to_world = [&](const Vec2f point) { return FVec3::FromJolt(frame.FromPlane(point, support_height)); };
 
 	for (uint32 i = 0; i < hull_count; i++) {
 		renderer::gDebugDraw->Line(to_world(hull[i]), to_world(hull[(i + 1) % hull_count]), scSupportColor);
@@ -238,12 +238,12 @@ void RagdollBalance::DebugDraw() const
 
 	DrawGroundCross(mCapturePoint, mForward, side, scMarkerSize, capture_color);
 	DrawGroundCross(mSupportCenter, mForward, side, scMarkerSize, scSupportCenterColor);
-	renderer::gDebugDraw->Line(Vec3f::FromJolt(ToGround(mCenterOfMass)), Vec3f::FromJolt(mCapturePoint), capture_color);
+	renderer::gDebugDraw->Line(FVec3::FromJolt(ToGround(mCenterOfMass)), FVec3::FromJolt(mCapturePoint), capture_color);
 
 	if (mStatus.State == eBalanceState::Stepping) {
 		DrawGroundCross(mSwing.Landing, mForward, side, scMarkerSize, scSwingColor);
-		renderer::gDebugDraw->Line(Vec3f::FromJolt(mLegs[mSwing.Leg].AnklePosition),
-								   Vec3f::FromJolt(mSwing.AnkleTarget), scSwingColor);
+		renderer::gDebugDraw->Line(FVec3::FromJolt(mLegs[mSwing.Leg].AnklePosition),
+								   FVec3::FromJolt(mSwing.AnkleTarget), scSwingColor);
 	}
 }
 

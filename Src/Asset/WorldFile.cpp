@@ -104,7 +104,7 @@ void WorldFile::AddColliderFromEntry(const std::string& scene_path, const Config
 	physics::eMotionType motion_type = physics::eMotionType::Static;
 	physics::Body* phys = gPhysics->NewBody(collider_name);
 
-	Vec3f position = collider_entry.GetMemberValue(HashStr32("pos"), Vec3f::sZero);
+	FVec3 position = collider_entry.GetMemberValue(HashStr32("pos"), FVec3::sZero);
 	Quat rotation = collider_entry.GetMemberValue(HashStr32("rot"), Quat::scIdentity);
 
 	ConfigEntry* physics_type = collider_entry.GetMember(HashStr32("type"));
@@ -114,10 +114,10 @@ void WorldFile::AddColliderFromEntry(const std::string& scene_path, const Config
 
 	ConfigEntry* box = collider_entry.GetMember(HashStr32("box"));
 	if (box != nullptr) {
-		Vec3f size = box->GetMemberValue(HashStr32("size"), Vec3f::sOne);
+		FVec3 size = box->GetMemberValue(HashStr32("size"), FVec3::sOne);
 		if (size.X <= 0.0f || size.Y <= 0.0f || size.Z <= 0.0f) {
 			LogWarning(LC_PHYSICS, "Collider '{}' has invalid Size {} - falling back to 1,1,1", collider_name, size);
-			size = Vec3f::sOne;
+			size = FVec3::sOne;
 		}
 
 		phys->CreatePrimitiveBody(physics::ePrimitiveType::Box, size, motion_type, physics::BodyProps {});

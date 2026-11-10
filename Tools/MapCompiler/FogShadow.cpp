@@ -37,22 +37,22 @@ struct RowJob
 
 struct LightBasis
 {
-	Vec3d Right = Vec3d(0.0);
-	Vec3d Up = Vec3d(0.0);
-	Vec3d Forward = Vec3d(0.0);
+	DVec3 Right = DVec3(0.0);
+	DVec3 Up = DVec3(0.0);
+	DVec3 Forward = DVec3(0.0);
 
-	Vec3d ToWorld(double x, double y, double depth) const { return Right * x + Up * y + Forward * depth; }
+	DVec3 ToWorld(double x, double y, double depth) const { return Right * x + Up * y + Forward * depth; }
 };
 
-LightBasis MakeLightBasis(const Vec3d& sun_direction)
+LightBasis MakeLightBasis(const DVec3& sun_direction)
 {
 	LightBasis basis;
 	basis.Forward = (sun_direction * -1.0).Normalized();
 
-	Vec3d reference(0.0, 1.0, 0.0);
+	DVec3 reference(0.0, 1.0, 0.0);
 
 	if (std::abs(basis.Forward.Y) > 0.9) {
-		reference = Vec3d(0.0, 0.0, 1.0);
+		reference = DVec3(0.0, 0.0, 1.0);
 	}
 
 	basis.Right = reference.Cross(basis.Forward).Normalized();
@@ -90,7 +90,7 @@ PageFrame MakePageFrame(const LightBasis& basis, int32 cell_x, int32 cell_z, dou
 	frame.DepthMax = -scNoHit;
 
 	for (uint32 corner = 0; corner < 8; corner++) {
-		Vec3d point(x0, min_y, z0);
+		DVec3 point(x0, min_y, z0);
 
 		if ((corner & 1) != 0) {
 			point.X += page_size;
@@ -148,7 +148,7 @@ void TraceRow(const OccluderSet& occluders, const LightBasis& basis, double star
 			for (uint32 sample_x = 0; sample_x < samples; sample_x++) {
 				const double light_x = frame.LightMin.X + (column + (sample_x + 0.5) * inv_samples) * texel_x;
 
-				const Vec3d origin = basis.ToWorld(light_x, light_y, start_depth);
+				const DVec3 origin = basis.ToWorld(light_x, light_y, start_depth);
 				const double time = occluders.TraceClosest(origin, basis.Forward, max_time);
 
 				nearest = std::min(nearest, time);
@@ -196,7 +196,7 @@ CompiledMapFogShadowLevel ReduceLevel(const CompiledMapFogShadowLevel& source)
 
 } // namespace
 
-bool BakeFogShadow(const OccluderSet& occluders, const Vec3d& sun_direction, const FogShadowOptions& options,
+bool BakeFogShadow(const OccluderSet& occluders, const DVec3& sun_direction, const FogShadowOptions& options,
 				   CompiledMapFogShadow& out_shadow, FogShadowStats& out_stats)
 {
 	constexpr double scDepthMargin = 1.0;
@@ -207,8 +207,8 @@ bool BakeFogShadow(const OccluderSet& occluders, const Vec3d& sun_direction, con
 	out_shadow = CompiledMapFogShadow {};
 	out_stats = FogShadowStats {};
 
-	Vec3d bounds_min(0.0);
-	Vec3d bounds_max(0.0);
+	DVec3 bounds_min(0.0);
+	DVec3 bounds_max(0.0);
 
 	if (!options.bEnabled || options.PageSize <= 0.0 || options.TexelSize <= 0.0 ||
 		!occluders.GetBounds(bounds_min, bounds_max)) {
@@ -247,7 +247,7 @@ bool BakeFogShadow(const OccluderSet& occluders, const Vec3d& sun_direction, con
 	double start_depth = scNoHit;
 
 	for (uint32 corner = 0; corner < 8; corner++) {
-		Vec3d point = bounds_min;
+		DVec3 point = bounds_min;
 
 		if ((corner & 1) != 0) {
 			point.X = bounds_max.X;

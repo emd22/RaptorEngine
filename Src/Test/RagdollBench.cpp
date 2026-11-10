@@ -70,16 +70,16 @@ constexpr int32 scLateSpinFrame = 15;
 
 constexpr float32 scRadToDeg = 180.0f / FX_PI;
 
-float32 HorizontalLength(const Vec3f v) { return std::sqrt(v.X * v.X + v.Z * v.Z); }
+float32 HorizontalLength(const FVec3 v) { return std::sqrt(v.X * v.X + v.Z * v.Z); }
 
 float32 GetKneeBend(physics::Ragdoll& ragdoll, const physics::RagdollRigLeg& leg)
 {
-	const Vec3f hip = ragdoll.GetBodyOrigin(leg.Thigh);
-	const Vec3f knee = ragdoll.GetBodyOrigin(leg.Shin);
-	const Vec3f ankle = ragdoll.GetBodyOrigin(leg.Foot);
+	const FVec3 hip = ragdoll.GetBodyOrigin(leg.Thigh);
+	const FVec3 knee = ragdoll.GetBodyOrigin(leg.Shin);
+	const FVec3 ankle = ragdoll.GetBodyOrigin(leg.Foot);
 
-	const Vec3f upper = (knee - hip).SafeNormalize(Vec3f::sUp);
-	const Vec3f lower = (ankle - knee).SafeNormalize(Vec3f::sUp);
+	const FVec3 upper = (knee - hip).SafeNormalize(FVec3::sUp);
+	const FVec3 lower = (ankle - knee).SafeNormalize(FVec3::sUp);
 
 	return std::acos(MathUtil::Clamp(upper.Dot(lower), -1.0f, 1.0f)) * scRadToDeg;
 }
@@ -88,7 +88,7 @@ float32 GetKneeBend(physics::Ragdoll& ragdoll, const physics::RagdollRigLeg& leg
 float32 GetWeightShare(physics::Ragdoll& ragdoll, const physics::RagdollRigLeg& leg,
 					   const physics::RagdollRigLeg& other)
 {
-	Vec3f center = Vec3f::sZero;
+	FVec3 center = FVec3::sZero;
 
 	for (uint32 i = 0; i < ragdoll.GetSegmentCount(); i++) {
 		center += ragdoll.GetBodyPosition(i) * ragdoll.GetBodyMass(i);
@@ -96,23 +96,23 @@ float32 GetWeightShare(physics::Ragdoll& ragdoll, const physics::RagdollRigLeg& 
 
 	center = center / ragdoll.GetTotalMass();
 
-	const Vec3f own = ragdoll.GetBodyPosition(leg.Foot);
-	const Vec3f span = own - ragdoll.GetBodyPosition(other.Foot);
+	const FVec3 own = ragdoll.GetBodyPosition(leg.Foot);
+	const FVec3 span = own - ragdoll.GetBodyPosition(other.Foot);
 	const float32 length2 = span.X * span.X + span.Z * span.Z;
 
 	if (length2 < 1e-6f) {
 		return 0.5f;
 	}
 
-	const Vec3f from_other = center - ragdoll.GetBodyPosition(other.Foot);
+	const FVec3 from_other = center - ragdoll.GetBodyPosition(other.Foot);
 
 	return MathUtil::Clamp((from_other.X * span.X + from_other.Z * span.Z) / length2, 0.0f, 1.0f);
 }
 
-Vec3f GetDirection(float32 degrees)
+FVec3 GetDirection(float32 degrees)
 {
 	const float32 radians = degrees / scRadToDeg;
-	return Vec3f(std::sin(radians), 0.0f, std::cos(radians));
+	return FVec3(std::sin(radians), 0.0f, std::cos(radians));
 }
 
 uint64 HashBytes(uint64 hash, const void* data, size_t size)
@@ -270,11 +270,11 @@ void RagdollBench::AddReactionTrials()
 
 	// Damage as the debug pistol's on each part, without killing except where the case is about that
 	static constexpr HitCase scCases[] = {
-		{ "chest", "chest", 0.0f, 34.0f },		   { "chestR", "chest", 0.12f, 34.0f },
-		{ "chestL", "chest", -0.12f, 34.0f },	   { "pelvis", "pelvis", 0.0f, 34.0f },
-		{ "head", "head", 0.0f, 1.0f },			   { "headkill", "head", 0.0f, 34.0f },
-		{ "kill", "chest", 0.0f, 200.0f },		   { "uparm", "upperarm", 0.0f, 34.0f },
-		{ "forearm", "forearm", 0.0f, 34.0f },	   { "thigh", "thigh", 0.0f, 34.0f },
+		{ "chest", "chest", 0.0f, 34.0f },	   { "chestR", "chest", 0.12f, 34.0f },
+		{ "chestL", "chest", -0.12f, 34.0f },  { "pelvis", "pelvis", 0.0f, 34.0f },
+		{ "head", "head", 0.0f, 1.0f },		   { "headkill", "head", 0.0f, 34.0f },
+		{ "kill", "chest", 0.0f, 200.0f },	   { "uparm", "upperarm", 0.0f, 34.0f },
+		{ "forearm", "forearm", 0.0f, 34.0f }, { "thigh", "thigh", 0.0f, 34.0f },
 		{ "shin", "shin", 0.0f, 34.0f },
 	};
 
@@ -406,12 +406,12 @@ void RagdollBench::CreateFloor()
 	gPhysics->pBackend->GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::DontActivate);
 }
 
-void RagdollBench::AddTerrainBox(const Vec3f position, const Vec3f direction, float32 near_distance,
+void RagdollBench::AddTerrainBox(const FVec3 position, const FVec3 direction, float32 near_distance,
 								 float32 far_distance, float32 top)
 {
 	const float32 half_depth = (far_distance - near_distance) * 0.5f;
 	const float32 half_height = (top + scTerrainFooting) * 0.5f;
-	const Vec3f center = position + direction * (near_distance + half_depth);
+	const FVec3 center = position + direction * (near_distance + half_depth);
 
 	JPH::BodyCreationSettings settings(new JPH::BoxShape(JPH::Vec3(scTerrainHalfWidth, half_height, half_depth)),
 									   JPH::RVec3(center.X, scFloorHeight + top - half_height, center.Z),
@@ -419,16 +419,17 @@ void RagdollBench::AddTerrainBox(const Vec3f position, const Vec3f direction, fl
 									   JPH::EMotionType::Static, physics::PhLayer::Static);
 	settings.mFriction = scFloorFriction;
 
-	JPH::BodyID body = gPhysics->pBackend->GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::DontActivate);
+	JPH::BodyID body = gPhysics->pBackend->GetBodyInterface().CreateAndAddBody(settings,
+																			   JPH::EActivation::DontActivate);
 	mTerrainBodies.Insert(std::move(body));
 }
 
-void RagdollBench::AddTerrainRamp(const Vec3f position, const Vec3f direction, float32 near_distance,
+void RagdollBench::AddTerrainRamp(const FVec3 position, const FVec3 direction, float32 near_distance,
 								  float32 near_height, float32 length, float32 pitch)
 {
 	const JPH::Quat rotation = JPH::Quat::sRotation(JPH::Vec3::sAxisY(), std::atan2(direction.X, direction.Z)) *
 							   JPH::Quat::sRotation(JPH::Vec3::sAxisX(), pitch);
-	const JPH::Vec3 top_near = Vec3f::ToJolt(position + direction * near_distance + Vec3f(0.0f, near_height, 0.0f));
+	const JPH::Vec3 top_near = FVec3::ToJolt(position + direction * near_distance + FVec3(0.0f, near_height, 0.0f));
 	const JPH::Vec3 center = top_near + rotation * JPH::Vec3(0.0f, -scRampThickness * 0.5f, length * 0.5f);
 
 	const JPH::Vec3 half_extent(scTerrainHalfWidth, scRampThickness * 0.5f, length * 0.5f);
@@ -437,63 +438,64 @@ void RagdollBench::AddTerrainRamp(const Vec3f position, const Vec3f direction, f
 									   JPH::EMotionType::Static, physics::PhLayer::Static);
 	settings.mFriction = scFloorFriction;
 
-	JPH::BodyID body = gPhysics->pBackend->GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::DontActivate);
+	JPH::BodyID body = gPhysics->pBackend->GetBodyInterface().CreateAndAddBody(settings,
+																			   JPH::EActivation::DontActivate);
 	mTerrainBodies.Insert(std::move(body));
 }
 
-float32 RagdollBench::CreateTerrain(const Trial& trial, const Vec3f position)
+float32 RagdollBench::CreateTerrain(const Trial& trial, const FVec3 position)
 {
-	const Vec3f direction = GetDirection(trial.Direction);
+	const FVec3 direction = GetDirection(trial.Direction);
 	const float32 edge = scTerrainDistance;
 
 	switch (trial.Terrain) {
-		case eTerrain::Flat:
-			return 0.0f;
+	case eTerrain::Flat:
+		return 0.0f;
 
-		case eTerrain::Kerb:
-			AddTerrainBox(position, direction, edge, edge + scTerrainDepth, trial.TerrainHeight);
-			return 0.0f;
+	case eTerrain::Kerb:
+		AddTerrainBox(position, direction, edge, edge + scTerrainDepth, trial.TerrainHeight);
+		return 0.0f;
 
-		case eTerrain::Drop:
-			AddTerrainBox(position, direction, edge - scTerrainDepth, edge, trial.TerrainHeight);
-			return trial.TerrainHeight;
+	case eTerrain::Drop:
+		AddTerrainBox(position, direction, edge - scTerrainDepth, edge, trial.TerrainHeight);
+		return trial.TerrainHeight;
 
-		case eTerrain::StairsUp:
-			for (uint32 i = 0; i < scStairCount; i++) {
-				const float32 near_distance = edge + static_cast<float32>(i) * scStairTread;
+	case eTerrain::StairsUp:
+		for (uint32 i = 0; i < scStairCount; i++) {
+			const float32 near_distance = edge + static_cast<float32>(i) * scStairTread;
 
-				AddTerrainBox(position, direction, near_distance, edge + scTerrainDepth,
-							  static_cast<float32>(i + 1) * scStairRise);
-			}
-
-			return 0.0f;
-
-		case eTerrain::StairsDown: {
-			const float32 height = static_cast<float32>(scStairCount) * scStairRise;
-
-			AddTerrainBox(position, direction, edge - scTerrainDepth, edge, height);
-
-			for (uint32 i = 1; i < scStairCount; i++) {
-				const float32 near_distance = edge + static_cast<float32>(i - 1) * scStairTread;
-
-				AddTerrainBox(position, direction, near_distance, near_distance + scStairTread,
-							  height - static_cast<float32>(i) * scStairRise);
-			}
-
-			return height;
+			AddTerrainBox(position, direction, near_distance, edge + scTerrainDepth,
+						  static_cast<float32>(i + 1) * scStairRise);
 		}
 
-		case eTerrain::RampUp:
-			AddTerrainRamp(position, direction, edge, 0.0f, scRampUpLength, -trial.TerrainHeight / scRadToDeg);
-			return 0.0f;
+		return 0.0f;
 
-		case eTerrain::RampDown: {
-			const float32 pitch = trial.TerrainHeight / scRadToDeg;
+	case eTerrain::StairsDown: {
+		const float32 height = static_cast<float32>(scStairCount) * scStairRise;
 
-			AddTerrainBox(position, direction, edge - scTerrainDepth, edge, scRampDownHeight);
-			AddTerrainRamp(position, direction, edge, scRampDownHeight, scRampDownHeight / std::sin(pitch), pitch);
-			return scRampDownHeight;
+		AddTerrainBox(position, direction, edge - scTerrainDepth, edge, height);
+
+		for (uint32 i = 1; i < scStairCount; i++) {
+			const float32 near_distance = edge + static_cast<float32>(i - 1) * scStairTread;
+
+			AddTerrainBox(position, direction, near_distance, near_distance + scStairTread,
+						  height - static_cast<float32>(i) * scStairRise);
 		}
+
+		return height;
+	}
+
+	case eTerrain::RampUp:
+		AddTerrainRamp(position, direction, edge, 0.0f, scRampUpLength, -trial.TerrainHeight / scRadToDeg);
+		return 0.0f;
+
+	case eTerrain::RampDown: {
+		const float32 pitch = trial.TerrainHeight / scRadToDeg;
+
+		AddTerrainBox(position, direction, edge - scTerrainDepth, edge, scRampDownHeight);
+		AddTerrainRamp(position, direction, edge, scRampDownHeight, scRampDownHeight / std::sin(pitch), pitch);
+		return scRampDownHeight;
+	}
 	}
 
 	return 0.0f;
@@ -553,7 +555,7 @@ void RagdollBench::StartBatch(uint32 batch_index)
 
 		NPCDesc desc;
 		desc.Name = String(trial.Name);
-		desc.Position = Vec3f((static_cast<float32>(i % scGridWidth) - 1.5f) * scTrialSpacing, scFloorHeight,
+		desc.Position = FVec3((static_cast<float32>(i % scGridWidth) - 1.5f) * scTrialSpacing, scFloorHeight,
 							  (static_cast<float32>(i / scGridWidth) - 1.5f) * scTrialSpacing);
 		desc.Position.Y += CreateTerrain(trial, desc.Position);
 
@@ -593,20 +595,20 @@ void RagdollBench::FireShots(TrialRun& run)
 
 	physics::Ragdoll& ragdoll = run.pNPC->GetRagdoll();
 	const uint32 chest = ragdoll.GetRig().Chest;
-	const Vec3f direction = GetDirection(trial.Direction);
+	const FVec3 direction = GetDirection(trial.Direction);
 
 	NPCHit hit { .Body = ragdoll.GetBodyID(chest), .Point = ragdoll.GetBodyPosition(chest) };
 
 	if (trial.HitPart != nullptr) {
 		const uint32 body = static_cast<uint32>(FindHitBody(run));
-		const Vec3f right = Vec3f::sUp.Cross(direction);
+		const FVec3 right = FVec3::sUp.Cross(direction);
 
 		hit.Body = ragdoll.GetBodyID(body);
 		hit.Point = ragdoll.GetBodyPosition(body) - direction * 0.08f + right * trial.HitOffset;
 		hit.Damage = trial.Damage;
 
 		Quality& look = run.Look;
-		const Vec3f lever = hit.Point - ragdoll.GetBodyPosition(0);
+		const FVec3 lever = hit.Point - ragdoll.GetBodyPosition(0);
 
 		look.ExpectedYaw = lever.Z * direction.X - lever.X * direction.Z;
 		look.LeverHeight = hit.Point.Y - ragdoll.GetBodyOrigin(ragdoll.GetRig().Legs[0].Foot).Y;
@@ -677,7 +679,7 @@ void RagdollBench::SampleQuality(TrialRun& run, int32 since_hit)
 		look.BodyLimit.InitSize(segments, 0.0f);
 	}
 
-	Vec3f center = Vec3f::sZero;
+	FVec3 center = FVec3::sZero;
 
 	for (uint32 i = 0; i < segments; i++) {
 		center += ragdoll.GetBodyPosition(i) * ragdoll.GetBodyMass(i);
@@ -685,11 +687,11 @@ void RagdollBench::SampleQuality(TrialRun& run, int32 since_hit)
 
 	center = center / ragdoll.GetTotalMass();
 
-	const Vec3f direction = GetDirection(run.pTrial->Direction);
+	const FVec3 direction = GetDirection(run.pTrial->Direction);
 	const int32 hit_body = FindHitBody(run);
-	const Vec3f chest_lean = ragdoll.GetBodyPosition(rig.Chest) - ragdoll.GetBodyPosition(0);
+	const FVec3 chest_lean = ragdoll.GetBodyPosition(rig.Chest) - ragdoll.GetBodyPosition(0);
 
-	const Vec3f forward = run.pNPC->GetBehaviours().GetContext().Forward;
+	const FVec3 forward = run.pNPC->GetBehaviours().GetContext().Forward;
 	const float32 heading = std::atan2(forward.X, forward.Z);
 
 	if (since_hit == 0) {
@@ -731,8 +733,8 @@ void RagdollBench::SampleQuality(TrialRun& run, int32 since_hit)
 
 	// Back on its animation the pose is the clip's, whatever the clip does, so only physics-driven frames count
 	const bool is_physical = ragdoll.GetBodyMode(0) != physics::eRagdollBodyMode::Kinematic;
-	const bool in_shot = !is_physical || since_hit < scHitSettleFrames +
-														 static_cast<int32>(run.pTrial->ShotCount - 1) *
+	const bool in_shot = !is_physical ||
+						 since_hit < scHitSettleFrames + static_cast<int32>(run.pTrial->ShotCount - 1) *
 															 static_cast<int32>(run.pTrial->ShotInterval);
 	bool any_twitch = false;
 
@@ -781,10 +783,10 @@ void RagdollBench::SampleQuality(TrialRun& run, int32 since_hit)
 	}
 
 	// How much the pelvis jumps from one frame to the next, beyond what a steady speed would do
-	const Vec3f pelvis = ragdoll.GetBodyOrigin(0);
+	const FVec3 pelvis = ragdoll.GetBodyOrigin(0);
 
 	if (since_hit >= 2 && !in_shot) {
-		const Vec3f second = pelvis - look.PelvisHistory[0] * 2.0f + look.PelvisHistory[1];
+		const FVec3 second = pelvis - look.PelvisHistory[0] * 2.0f + look.PelvisHistory[1];
 		look.PeakRootJitter = std::max(look.PeakRootJitter, second.Length() * 1000.0f);
 	}
 
@@ -799,7 +801,7 @@ void RagdollBench::SampleQuality(TrialRun& run, int32 since_hit)
 		constexpr float32 scMinHeadSwing = 6.0f;
 
 		const physics::BehaviourContext& ctx = run.pNPC->GetBehaviours().GetContext();
-		const Vec3f head = (ragdoll.GetBodyPosition(rig.Neck) - ragdoll.GetBodyOrigin(rig.Neck)).SafeNormalize(ctx.Up);
+		const FVec3 head = (ragdoll.GetBodyPosition(rig.Neck) - ragdoll.GetBodyOrigin(rig.Neck)).SafeNormalize(ctx.Up);
 		const float32 bend[2] = { head.Dot(ctx.Right) * scRadToDeg, head.Dot(ctx.Forward) * scRadToDeg };
 		const uint32 stage = (run.FallFrame >= 0) ? 1 : 0;
 
@@ -865,7 +867,7 @@ void RagdollBench::SampleFeet(TrialRun& run)
 		const physics::RagdollRigLeg& leg = rig.Legs[i];
 		FootTrack& foot = run.Feet[i];
 
-		const Vec3f position = ragdoll.GetBodyPosition(leg.Foot);
+		const FVec3 position = ragdoll.GetBodyPosition(leg.Foot);
 		const bool touching = ragdoll.IsBodyOnGround(leg.Foot, up, scMinSupportUp);
 		const float32 knee = GetKneeBend(ragdoll, leg);
 
@@ -897,7 +899,7 @@ void RagdollBench::SampleFeet(TrialRun& run)
 				const bool loaded = GetWeightShare(ragdoll, leg, rig.Legs[1 - i]) >= scLoadedShare;
 
 				if (loaded && !foot.bLoaded) {
-					foot.LoadedSlip = Vec3f::sZero;
+					foot.LoadedSlip = FVec3::sZero;
 				}
 
 				foot.bLoaded = loaded;
@@ -907,11 +909,11 @@ void RagdollBench::SampleFeet(TrialRun& run)
 				if (loaded && ragdoll.GetBodyGroundContact(leg.Foot, contact)) {
 					JPH::BodyInterface& bodies = gPhysics->pBackend->GetBodyInterface();
 					const JPH::BodyID foot_id = ragdoll.GetBodyID(leg.Foot);
-					const JPH::Vec3 lever = Vec3f::ToJolt(contact.Point - position);
+					const JPH::Vec3 lever = FVec3::ToJolt(contact.Point - position);
 					const JPH::Vec3 contact_velocity = bodies.GetLinearVelocity(foot_id) +
 													   bodies.GetAngularVelocity(foot_id).Cross(lever);
 
-					foot.LoadedSlip += Vec3f::FromJolt(contact_velocity) * scDeltaTime;
+					foot.LoadedSlip += FVec3::FromJolt(contact_velocity) * scDeltaTime;
 					foot.LoadedSlide = std::max(foot.LoadedSlide, HorizontalLength(foot.LoadedSlip));
 				}
 			}
@@ -953,7 +955,7 @@ void RagdollBench::SampleFeet(TrialRun& run)
 			run.PeakLift = std::max(run.PeakLift, position.Y - foot.StanceHeight);
 			run.PeakSwingKnee = std::max(run.PeakSwingKnee, knee);
 
-			Vec3f air_velocity = (position - foot.LastPosition) / scDeltaTime;
+			FVec3 air_velocity = (position - foot.LastPosition) / scDeltaTime;
 			air_velocity.Y = 0.0f;
 
 			if (air_velocity.Length() > scMinReversalSpeed) {
@@ -982,7 +984,7 @@ void RagdollBench::Sample(TrialRun& run)
 	const physics::RagdollRig& rig = ragdoll.GetRig();
 	const uint32 segments = ragdoll.GetSegmentCount();
 
-	Vec3f center = Vec3f::sZero;
+	FVec3 center = FVec3::sZero;
 
 	if (run.pTrial->bTrace && run.Trace.Capacity == 0) {
 		run.Trace.InitCapacity(static_cast<size_t>(mEndFrame / scTraceStride + 1) * segments * scTraceValues);
@@ -991,8 +993,8 @@ void RagdollBench::Sample(TrialRun& run)
 	const bool trace_frame = run.pTrial->bTrace && (mFrame % scTraceStride == 0);
 
 	for (uint32 i = 0; i < segments; i++) {
-		const Vec3f position = ragdoll.GetBodyPosition(i);
-		const Vec3f origin = ragdoll.GetBodyOrigin(i);
+		const FVec3 position = ragdoll.GetBodyPosition(i);
+		const FVec3 origin = ragdoll.GetBodyOrigin(i);
 
 		center += position * ragdoll.GetBodyMass(i);
 
@@ -1013,7 +1015,7 @@ void RagdollBench::Sample(TrialRun& run)
 
 	center = center / ragdoll.GetTotalMass();
 
-	Vec3f velocity = Vec3f::sZero;
+	FVec3 velocity = FVec3::sZero;
 
 	if (mFrame > 0) {
 		velocity = (center - run.PreviousCenter) / scDeltaTime;
@@ -1041,7 +1043,7 @@ void RagdollBench::Sample(TrialRun& run)
 		run.PeakBodySpeed = std::max(run.PeakBodySpeed, bodies.GetLinearVelocity(ragdoll.GetBodyID(i)).Length());
 	}
 
-	const Vec3f direction = GetDirection(run.pTrial->Direction);
+	const FVec3 direction = GetDirection(run.pTrial->Direction);
 	const float32 knock = (ragdoll.GetBodyOrigin(0) - run.HitOrigin).Dot(direction);
 
 	if (since_hit == 30) {
@@ -1099,8 +1101,8 @@ void RagdollBench::Sample(TrialRun& run)
 
 	run.PeakSpeed = std::max(run.PeakSpeed, HorizontalLength(velocity));
 
-	const Vec3f chest_up = npc.GetBehaviours().GetContext().GetChestUp();
-	const float32 tilt = std::acos(MathUtil::Clamp(chest_up.Dot(Vec3f::sUp), -1.0f, 1.0f)) * scRadToDeg;
+	const FVec3 chest_up = npc.GetBehaviours().GetContext().GetChestUp();
+	const float32 tilt = std::acos(MathUtil::Clamp(chest_up.Dot(FVec3::sUp), -1.0f, 1.0f)) * scRadToDeg;
 
 	run.PeakTilt = std::max(run.PeakTilt, tilt);
 	run.AssistImpulse += ragdoll.GetBalanceStatus().AssistForce * scDeltaTime;
@@ -1215,7 +1217,10 @@ void RagdollBench::WriteTrial(const TrialRun& run)
 		"\"stances\":%u,\"slide\":%.4f,\"peak_slide\":%.4f,\"peak_loaded_slide\":%.4f,\"peak_body_speed\":%.2f,\"foot_"
 		"spin\":%.1f,\"jitter_head\":%.2f,\"jitter_trunk\":%.2f,\"jitter_arm\":%.2f,\"jitter_leg\":%.2f,"
 		"\"twitch_frames\":%u,\"limit_excess\":%.2f,\"limit_frames\":%u,\"joint_gap\":%.4f,\"root_jitter\":%.2f,"
-		"\"hang_time\":%.3f,\"contact_flips\":%u,\"swing_overtime\":%.3f,\"swing_retries\":%u,\"swing_target_step\":%.4f,\"landing_travel\":%.3f,\"foot_reversals\":%u,\"foot_air_time\":%.3f,\"pelvis_low\":%.3f,\"pelvis_rise\":%.3f,\"pelvis_bobs\":%u,\"head_swings\":%.2f,\"fall_head_swings\":%.2f,\"hit_move\":%.4f,\"com_025\":%.4f,\"com_05\":%.4f,\"com_10\":%.4f,\"chest_lean\":%.4f,\"yaw_response\":%."
+		"\"hang_time\":%.3f,\"contact_flips\":%u,\"swing_overtime\":%.3f,\"swing_retries\":%u,\"swing_target_step\":%."
+		"4f,\"landing_travel\":%.3f,\"foot_reversals\":%u,\"foot_air_time\":%.3f,\"pelvis_low\":%.3f,\"pelvis_rise\":%."
+		"3f,\"pelvis_bobs\":%u,\"head_swings\":%.2f,\"fall_head_swings\":%.2f,\"hit_move\":%.4f,\"com_025\":%.4f,\"com_"
+		"05\":%.4f,\"com_10\":%.4f,\"chest_lean\":%.4f,\"yaw_response\":%."
 		"2f,\"yaw_expected\":%.4f,\"lever\":%.3f,\"hash\":\"%"
 		"016llx\"}\n",
 		trial.Name, trial.Condition, static_cast<int>(trial.bStill), trial.Direction, trial.Phase,
@@ -1226,19 +1231,23 @@ void RagdollBench::WriteTrial(const TrialRun& run)
 		run.MinStepTime, run.MinStepGap, run.PeakLift, run.Stances, slide, run.PeakSlide, run.PeakLoadedSlide,
 		run.PeakBodySpeed, foot_spin, run.Look.JitterSum[0] / jitter_count, run.Look.JitterSum[1] / jitter_count,
 		run.Look.JitterSum[2] / jitter_count, run.Look.JitterSum[3] / jitter_count, run.Look.TwitchFrames,
-		run.Look.PeakLimitExcess, run.Look.LimitFrames, run.Look.PeakJointGap, run.Look.PeakRootJitter,
-		run.HangTime, run.ContactFlips, run.SwingOvertime, run.SwingRetries, run.PeakSwingTargetStep,
-		run.SwingLandingTravel, run.FootReversals, static_cast<float32>(run.FootAirFrames) * scDeltaTime, run.PelvisDrop, run.PelvisRise, run.PelvisBobs, head_swings[0], head_swings[1], run.Look.HitBodyMove, run.Look.CenterMove[0], run.Look.CenterMove[1], run.Look.CenterMove[2], run.Look.ChestLean,
-		run.Look.YawResponse, run.Look.ExpectedYaw, run.Look.LeverHeight, static_cast<unsigned long long>(run.Hash));
+		run.Look.PeakLimitExcess, run.Look.LimitFrames, run.Look.PeakJointGap, run.Look.PeakRootJitter, run.HangTime,
+		run.ContactFlips, run.SwingOvertime, run.SwingRetries, run.PeakSwingTargetStep, run.SwingLandingTravel,
+		run.FootReversals, static_cast<float32>(run.FootAirFrames) * scDeltaTime, run.PelvisDrop, run.PelvisRise,
+		run.PelvisBobs, head_swings[0], head_swings[1], run.Look.HitBodyMove, run.Look.CenterMove[0],
+		run.Look.CenterMove[1], run.Look.CenterMove[2], run.Look.ChestLean, run.Look.YawResponse, run.Look.ExpectedYaw,
+		run.Look.LeverHeight, static_cast<unsigned long long>(run.Hash));
 }
 
 void RagdollBench::WriteTrace(const TrialRun& run)
 {
 	if (run.pTrial->HitPart != nullptr && run.Look.BodyJitter.Size > 0) {
-		std::fprintf(mpOut, "{\"bodies\":\"%s\",\"gap_frame\":%d,\"jitter\":[", run.pTrial->Name, run.Look.WorstGapFrame);
+		std::fprintf(mpOut, "{\"bodies\":\"%s\",\"gap_frame\":%d,\"jitter\":[", run.pTrial->Name,
+					 run.Look.WorstGapFrame);
 
 		for (uint32 i = 0; i < run.Look.BodyJitter.Size; i++) {
-			std::fprintf(mpOut, "%s%.1f", (i == 0) ? "" : ",", run.Look.BodyJitter[i] / std::max(run.Look.JitterCount, 1u));
+			std::fprintf(mpOut, "%s%.1f", (i == 0) ? "" : ",",
+						 run.Look.BodyJitter[i] / std::max(run.Look.JitterCount, 1u));
 		}
 
 		std::fprintf(mpOut, "],\"limit\":[");

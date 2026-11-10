@@ -32,8 +32,8 @@ struct Face
 	bool bCastsShadow = true;
 
 	Winding Original;
-	Vec3d Min = Vec3d(0.0);
-	Vec3d Max = Vec3d(0.0);
+	DVec3 Min = DVec3(0.0);
+	DVec3 Max = DVec3(0.0);
 
 	Array<FacePiece> Visible;
 };
@@ -58,7 +58,7 @@ struct CellKeyHash
 	}
 };
 
-CellKey GetCell(const Vec3d& point, double cell_size)
+CellKey GetCell(const DVec3& point, double cell_size)
 {
 	return CellKey { static_cast<int64>(std::floor(point.X / cell_size)),
 					 static_cast<int64>(std::floor(point.Y / cell_size)),
@@ -68,7 +68,7 @@ CellKey GetCell(const Vec3d& point, double cell_size)
 class VertexWelder
 {
 public:
-	int32 Add(const Vec3d& point)
+	int32 Add(const DVec3& point)
 	{
 		constexpr double scWeldCellSize = 1e-3;
 
@@ -101,13 +101,13 @@ public:
 	}
 
 public:
-	Array<Vec3d> Points;
+	Array<DVec3> Points;
 
 private:
 	std::unordered_map<CellKey, Array<int32>, CellKeyHash> mCells;
 };
 
-bool SubtractConvex(const Winding& piece, const Winding& cutter, const Vec3d& normal, Array<Winding>& out_pieces)
+bool SubtractConvex(const Winding& piece, const Winding& cutter, const DVec3& normal, Array<Winding>& out_pieces)
 {
 	Array<Winding> outside;
 
@@ -116,10 +116,10 @@ bool SubtractConvex(const Winding& piece, const Winding& cutter, const Vec3d& no
 	Winding back;
 
 	for (size_t i = 0; i < cutter.Size && rest.Size != 0; i++) {
-		const Vec3d& from = cutter[i];
-		const Vec3d& to = cutter[(i + 1) % cutter.Size];
+		const DVec3& from = cutter[i];
+		const DVec3& to = cutter[(i + 1) % cutter.Size];
 
-		const Vec3d edge_normal = (to - from).Cross(normal);
+		const DVec3 edge_normal = (to - from).Cross(normal);
 		const double length = edge_normal.Length();
 
 		if (length <= 0.0) {
@@ -155,14 +155,14 @@ bool SubtractConvex(const Winding& piece, const Winding& cutter, const Vec3d& no
 
 struct TangentFrame
 {
-	Vec3d Tangent = Vec3d(0.0);
+	DVec3 Tangent = DVec3(0.0);
 	double Handedness = 1.0;
 };
 
-TangentFrame GetTangentFrame(const Vec3d& normal, const TextureMap& map)
+TangentFrame GetTangentFrame(const DVec3& normal, const TextureMap& map)
 {
-	const Vec3d u_gradient = map.GradientU - normal * normal.Dot(map.GradientU);
-	const Vec3d v_gradient = map.GradientV - normal * normal.Dot(map.GradientV);
+	const DVec3 u_gradient = map.GradientU - normal * normal.Dot(map.GradientU);
+	const DVec3 v_gradient = map.GradientV - normal * normal.Dot(map.GradientV);
 
 	const double uu = u_gradient.Dot(u_gradient);
 	const double uv = u_gradient.Dot(v_gradient);
@@ -174,20 +174,20 @@ TangentFrame GetTangentFrame(const Vec3d& normal, const TextureMap& map)
 	TangentFrame frame;
 
 	if (std::abs(determinant) < scMinTangentDeterminant) {
-		Vec3d fallback = Vec3d(1.0, 0.0, 0.0);
+		DVec3 fallback = DVec3(1.0, 0.0, 0.0);
 		if (std::abs(normal.Y) < 0.9) {
-			fallback = Vec3d(0.0, 1.0, 0.0);
+			fallback = DVec3(0.0, 1.0, 0.0);
 		}
 
-		const Vec3d tangent = fallback.Cross(normal);
+		const DVec3 tangent = fallback.Cross(normal);
 		frame.Tangent = tangent * (1.0 / tangent.Length());
 		return frame;
 	}
 
-	Vec3d tangent = (u_gradient * vv - v_gradient * uv) * (1.0 / determinant);
+	DVec3 tangent = (u_gradient * vv - v_gradient * uv) * (1.0 / determinant);
 	tangent = tangent * (1.0 / tangent.Length());
 
-	const Vec3d v_direction = (v_gradient * uu - u_gradient * uv) * (1.0 / determinant);
+	const DVec3 v_direction = (v_gradient * uu - u_gradient * uv) * (1.0 / determinant);
 
 	frame.Tangent = tangent;
 	frame.Handedness = 1.0;
@@ -198,9 +198,9 @@ TangentFrame GetTangentFrame(const Vec3d& normal, const TextureMap& map)
 	return frame;
 }
 
-bool IsOnSegment(const Vec3d& point, const Vec3d& from, const Vec3d& to, double& out_fraction)
+bool IsOnSegment(const DVec3& point, const DVec3& from, const DVec3& to, double& out_fraction)
 {
-	const Vec3d edge = to - from;
+	const DVec3 edge = to - from;
 	const double length_squared = edge.Dot(edge);
 
 	if (length_squared <= 0.0) {
@@ -213,7 +213,7 @@ bool IsOnSegment(const Vec3d& point, const Vec3d& from, const Vec3d& to, double&
 		return false;
 	}
 
-	const Vec3d closest = from + edge * out_fraction;
+	const DVec3 closest = from + edge * out_fraction;
 
 	return (point - closest).Length() < scOnEdgeEpsilon && (point - from).Length() > scWeldEpsilon &&
 		   (point - to).Length() > scWeldEpsilon;
@@ -250,10 +250,10 @@ void RemoveValue(Array<int32>& array, int32 value)
 
 struct PlaneBasis
 {
-	Vec3d U = Vec3d(0.0);
-	Vec3d V = Vec3d(0.0);
+	DVec3 U = DVec3(0.0);
+	DVec3 V = DVec3(0.0);
 
-	explicit PlaneBasis(const Vec3d& normal)
+	explicit PlaneBasis(const DVec3& normal)
 	{
 		int32 minor_axis = 0;
 
@@ -263,7 +263,7 @@ struct PlaneBasis
 			}
 		}
 
-		Vec3d reference = Vec3d(0.0);
+		DVec3 reference = DVec3(0.0);
 		reference.mData[minor_axis] = 1.0;
 
 		U = reference.Cross(normal);
@@ -271,13 +271,13 @@ struct PlaneBasis
 		V = normal.Cross(U);
 	}
 
-	Vec2d Project(const Vec3d& point) const { return Vec2d(point.Dot(U), point.Dot(V)); }
+	Vec2d Project(const DVec3& point) const { return Vec2d(point.Dot(U), point.Dot(V)); }
 };
 
 class GroupPoints
 {
 public:
-	GroupPoints(const Array<Vec3d>& points, const Vec3d& normal) : mPoints(points), mBasis(normal) {}
+	GroupPoints(const Array<DVec3>& points, const DVec3& normal) : mPoints(points), mBasis(normal) {}
 
 	/// Returned by value, since a reference into the cache would be invalidated when the cache grows
 	Vec2d operator[](int32 index)
@@ -292,7 +292,7 @@ public:
 	}
 
 private:
-	const Array<Vec3d>& mPoints;
+	const Array<DVec3>& mPoints;
 	PlaneBasis mBasis;
 	HashMap<int32, Vec2d> mProjected;
 };
@@ -643,7 +643,7 @@ double GetTriangleArea(const Array<int32>& indices, GroupPoints& points)
 class TJunctionFixer
 {
 public:
-	TJunctionFixer(const Array<Vec3d>& points, const Array<int32>& candidates)
+	TJunctionFixer(const Array<DVec3>& points, const Array<int32>& candidates)
 		: mPoints(points), mCandidates(candidates)
 	{
 		for (const int32 index : candidates) {
@@ -681,10 +681,10 @@ public:
 	{
 		constexpr int64 scMaxEdgeGridCells = 4096;
 
-		const Vec3d padding(scOnEdgeEpsilon, scOnEdgeEpsilon, scOnEdgeEpsilon);
+		const DVec3 padding(scOnEdgeEpsilon, scOnEdgeEpsilon, scOnEdgeEpsilon);
 
-		const Vec3d& from = mPoints[static_cast<size_t>(from_index)];
-		const Vec3d& to = mPoints[static_cast<size_t>(to_index)];
+		const DVec3& from = mPoints[static_cast<size_t>(from_index)];
+		const DVec3& to = mPoints[static_cast<size_t>(to_index)];
 
 		mInserts.Clear();
 
@@ -733,7 +733,7 @@ public:
 	}
 
 private:
-	const Array<Vec3d>& mPoints;
+	const Array<DVec3>& mPoints;
 	const Array<int32>& mCandidates;
 	std::unordered_map<CellKey, Array<int32>, CellKeyHash> mGrid;
 
@@ -758,7 +758,7 @@ PatchSurfaceVertex BlendPatchVertices(const PatchSurfaceVertex& a, const PatchSu
 		.A = a.Color.A + (b.Color.A - a.Color.A) * color_weight,
 	};
 
-	const Vec3d normal = a.Normal + (b.Normal - a.Normal) * weight;
+	const DVec3 normal = a.Normal + (b.Normal - a.Normal) * weight;
 	const double normal_length = normal.Length();
 
 	vertex.Normal = a.Normal;
@@ -767,8 +767,8 @@ PatchSurfaceVertex BlendPatchVertices(const PatchSurfaceVertex& a, const PatchSu
 		vertex.Normal = normal * (1.0 / normal_length);
 	}
 
-	const Vec3d tangent = a.Tangent + (b.Tangent - a.Tangent) * weight;
-	const Vec3d projected = tangent - vertex.Normal * vertex.Normal.Dot(tangent);
+	const DVec3 tangent = a.Tangent + (b.Tangent - a.Tangent) * weight;
+	const DVec3 projected = tangent - vertex.Normal * vertex.Normal.Dot(tangent);
 	const double tangent_length = projected.Length();
 
 	vertex.Tangent = a.Tangent;
@@ -780,7 +780,7 @@ PatchSurfaceVertex BlendPatchVertices(const PatchSurfaceVertex& a, const PatchSu
 	return vertex;
 }
 
-uint32 StitchPatch(PatchSurface& surface, const Array<int32>& weld, TJunctionFixer& fixer, const Array<Vec3d>& points)
+uint32 StitchPatch(PatchSurface& surface, const Array<int32>& weld, TJunctionFixer& fixer, const Array<DVec3>& points)
 {
 	uint32 inserted_count = 0;
 
@@ -884,10 +884,10 @@ struct SurfaceGroup
 	Array<Loop> Polygons;
 	Array<Loop> Loops;
 
-	Vec3d Center = Vec3d(0.0);
+	DVec3 Center = DVec3(0.0);
 };
 
-int32 FindPointArea(const Bsp& bsp, const Vec3d& point, const Vec3d& normal)
+int32 FindPointArea(const Bsp& bsp, const DVec3& point, const DVec3& normal)
 {
 	constexpr double scAreaProbeDistance = 1e-3;
 
@@ -909,7 +909,7 @@ int32 SurfaceBuilder::FindOrAddMap(const TextureMap& map)
 	constexpr double scGradientEpsilon = 1e-6;
 	constexpr double scOffsetEpsilon = 1e-5;
 
-	const auto is_near = [](const Vec3d& a, const Vec3d& b)
+	const auto is_near = [](const DVec3& a, const DVec3& b)
 	{
 		return std::abs(a.X - b.X) < scGradientEpsilon && std::abs(a.Y - b.Y) < scGradientEpsilon &&
 			   std::abs(a.Z - b.Z) < scGradientEpsilon;
@@ -973,10 +973,10 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 			face.BrushIndex = brush_index;
 			face.bCastsShadow = brush.bCastsShadow;
 			face.Original = CopyWinding(side.Points);
-			face.Min = Vec3d(1e30, 1e30, 1e30);
-			face.Max = Vec3d(-1e30, -1e30, -1e30);
+			face.Min = DVec3(1e30, 1e30, 1e30);
+			face.Max = DVec3(-1e30, -1e30, -1e30);
 
-			for (const Vec3d& point : side.Points) {
+			for (const DVec3& point : side.Points) {
 				face.Min = MinVec(face.Min, point);
 				face.Max = MaxVec(face.Max, point);
 			}
@@ -1057,7 +1057,7 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 		Face& face = faces[i];
 		Array<size_t>& earlier_faces = faces_on_plane[face.PlaneIndex];
 
-		const Vec3d normal = planes[face.PlaneIndex].Normal;
+		const DVec3 normal = planes[face.PlaneIndex].Normal;
 
 		for (const size_t earlier_index : earlier_faces) {
 			if (!options.bCullHidden) {
@@ -1071,7 +1071,7 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 				continue;
 			}
 
-			const Vec3d padding(scOnEpsilon, scOnEpsilon, scOnEpsilon);
+			const DVec3 padding(scOnEpsilon, scOnEpsilon, scOnEpsilon);
 			const bool overlaps = face.Min <= earlier.Max + padding && face.Max >= earlier.Min - padding;
 
 			if (!overlaps) {
@@ -1146,7 +1146,7 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 	for (const SurfacePolygon& polygon : mPolygons) {
 		Loop loop;
 
-		for (const Vec3d& point : polygon.Points) {
+		for (const DVec3& point : polygon.Points) {
 			const int32 index = welder.Add(point);
 
 			if (loop.Size == 0 || (GetLast(loop) != index && loop[0] != index)) {
@@ -1190,7 +1190,7 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 		}
 	}
 
-	const Array<Vec3d>& points = welder.Points;
+	const Array<DVec3>& points = welder.Points;
 
 	for (uint32 surface_index = 0; surface_index < patch_welds.Size; surface_index++) {
 		PatchSurface& surface = patches->Surfaces[surface_index];
@@ -1294,7 +1294,7 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 
 	struct ShadowBatch
 	{
-		Array<Vec3d> Points;
+		Array<DVec3> Points;
 		Array<uint32> Indices;
 
 		HashMap<int32, uint32> PointLookup;
@@ -1307,7 +1307,7 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 	Array<int32> polygon_indices;
 
 	for (auto& [key, group] : groups) {
-		const Vec3d normal = planes[group.PlaneIndex].Normal;
+		const DVec3 normal = planes[group.PlaneIndex].Normal;
 		const TextureMap& map = mMaps[static_cast<size_t>(group.MapIndex)];
 		const TangentFrame frame = GetTangentFrame(normal, map);
 
@@ -1360,7 +1360,7 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 				continue;
 			}
 
-			Vec3d center = Vec3d(0.0);
+			DVec3 center = DVec3(0.0);
 
 			for (const int32 index : triangle_indices) {
 				center = center + points[static_cast<size_t>(index)];
@@ -1434,7 +1434,7 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 				const int32 corners[3] = { triangle_indices[t], triangle_indices[t + 2], triangle_indices[t + 1] };
 
 				for (const int32 corner : corners) {
-					const Vec3d& point = points[static_cast<size_t>(corner)];
+					const DVec3& point = points[static_cast<size_t>(corner)];
 					const auto vertex_key = std::make_tuple(corner, group.PlaneIndex, group.MapIndex, chart_index);
 
 					auto found = batch.VertexLookup.find(vertex_key);
@@ -1442,9 +1442,9 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 					if (found == batch.VertexLookup.end()) {
 						CompiledMapVertex vertex {};
 
-						vertex.Position = point.ToVec3f();
-						vertex.Normal = normal.ToVec3f();
-						vertex.Tangent = Vec4f(frame.Tangent.ToVec3f(), frame.Handedness);
+						vertex.Position = point.ToFVec3();
+						vertex.Normal = normal.ToFVec3();
+						vertex.Tangent = Vec4f(frame.Tangent.ToFVec3(), frame.Handedness);
 
 						vertex.Texcoord = Vec2f(static_cast<float32>(map.GradientU.Dot(point) + map.OffsetU),
 												static_cast<float32>(map.GradientV.Dot(point) + map.OffsetV));
@@ -1459,7 +1459,7 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 					TrianglePoints.Emplace(point);
 				}
 
-				const Vec3d& a = points[static_cast<size_t>(corners[0])];
+				const DVec3& a = points[static_cast<size_t>(corners[0])];
 
 				Stats.Area += (points[static_cast<size_t>(corners[1])] - a)
 								  .Cross(points[static_cast<size_t>(corners[2])] - a)
@@ -1493,7 +1493,7 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 			}
 
 			for (size_t triangle = 0; triangle + 2 < surface.Indices.Size; triangle += 3) {
-				Vec3d center = Vec3d(0.0);
+				DVec3 center = DVec3(0.0);
 
 				for (uint32 corner = 0; corner < 3; corner++) {
 					center = center +
@@ -1525,14 +1525,14 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 					}
 				}
 
-				const Vec3d& a = surface.Vertices[static_cast<size_t>(surface.Indices[triangle])].Position;
-				const Vec3d& b = surface.Vertices[static_cast<size_t>(surface.Indices[triangle + 1])].Position;
-				const Vec3d& c = surface.Vertices[static_cast<size_t>(surface.Indices[triangle + 2])].Position;
+				const DVec3& a = surface.Vertices[static_cast<size_t>(surface.Indices[triangle])].Position;
+				const DVec3& b = surface.Vertices[static_cast<size_t>(surface.Indices[triangle + 1])].Position;
+				const DVec3& c = surface.Vertices[static_cast<size_t>(surface.Indices[triangle + 2])].Position;
 
-				const Vec3d triangle_normal = (b - a).Cross(c - a);
+				const DVec3 triangle_normal = (b - a).Cross(c - a);
 				const double normal_length = triangle_normal.Length();
 
-				Vec3d unit_normal = Vec3d(0.0);
+				DVec3 unit_normal = DVec3(0.0);
 
 				if (normal_length > 0.0) {
 					unit_normal = triangle_normal * (1.0 / normal_length);
@@ -1552,9 +1552,9 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 
 					if (found == batch.PatchVertexLookup.end()) {
 						CompiledMapVertex vertex {};
-						vertex.Position = source_vertex.Position.ToVec3f();
-						vertex.Normal = source_vertex.Normal.ToVec3f();
-						vertex.Tangent = Vec4f(source_vertex.Tangent.ToVec3f(),
+						vertex.Position = source_vertex.Position.ToFVec3();
+						vertex.Normal = source_vertex.Normal.ToFVec3();
+						vertex.Tangent = Vec4f(source_vertex.Tangent.ToFVec3(),
 											   static_cast<float32>(source_vertex.Handedness));
 						vertex.Texcoord = Vec2f(static_cast<float32>(source_vertex.Texcoord.X),
 												static_cast<float32>(source_vertex.Texcoord.Y));
@@ -1602,8 +1602,8 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 		surface.Bounds = BBox(surface.Vertices[0].Position, surface.Vertices[0].Position);
 
 		for (const CompiledMapVertex& vertex : surface.Vertices) {
-			surface.Bounds = BBox(Vec3f::Min(surface.Bounds.Min, vertex.Position),
-								  Vec3f::Max(surface.Bounds.Max, vertex.Position));
+			surface.Bounds = BBox(FVec3::Min(surface.Bounds.Min, vertex.Position),
+								  FVec3::Max(surface.Bounds.Max, vertex.Position));
 		}
 
 		Stats.NumTriangles += static_cast<uint32>(surface.Indices.Size / 3);
@@ -1627,17 +1627,17 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 		surface.Points.InitSize(shadow.Points.Size * 3);
 		surface.Indices = ArrayUtil::DynToSizedArray(shadow.Indices);
 
-		const Vec3f first = shadow.Points[0].ToVec3f();
+		const FVec3 first = shadow.Points[0].ToFVec3();
 		surface.Bounds = BBox(first, first);
 
 		for (size_t i = 0; i < shadow.Points.Size; i++) {
-			const Vec3f point = shadow.Points[i].ToVec3f();
+			const FVec3 point = shadow.Points[i].ToFVec3();
 
 			surface.Points[i * 3] = point.X;
 			surface.Points[i * 3 + 1] = point.Y;
 			surface.Points[i * 3 + 2] = point.Z;
 
-			surface.Bounds = BBox(Vec3f::Min(surface.Bounds.Min, point), Vec3f::Max(surface.Bounds.Max, point));
+			surface.Bounds = BBox(FVec3::Min(surface.Bounds.Min, point), FVec3::Max(surface.Bounds.Max, point));
 		}
 
 		Stats.NumShadowTriangles += static_cast<uint32>(surface.Indices.Size / 3);

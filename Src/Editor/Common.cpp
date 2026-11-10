@@ -10,7 +10,7 @@
 #include <wx/textctrl.h>
 #include <wx/valnum.h>
 
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 #include <algorithm>
 
 namespace fx::editor {
@@ -86,7 +86,7 @@ Vector3Field::TType Vector3Field::GetValue() const
 		mpFields[axis]->GetValue().ToDouble(&axis_values[axis]);
 	}
 
-	return Vec3f(static_cast<float32>(axis_values[0]), static_cast<float32>(axis_values[1]),
+	return FVec3(static_cast<float32>(axis_values[0]), static_cast<float32>(axis_values[1]),
 				 static_cast<float32>(axis_values[2]));
 }
 

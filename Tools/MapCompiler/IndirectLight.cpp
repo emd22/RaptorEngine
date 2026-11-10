@@ -44,7 +44,7 @@ constexpr uint32 scWaterSkyHit = scSkyHit - 2;
 /// Matches WATER_ABSORPTION_SPREAD in Forward.hlsl
 constexpr float32 scWaterAbsorptionSpread = 3.0f;
 
-float32 GetLuminance(const Vec3f& color) { return color.Dot(Vec3f(0.2126f, 0.7152f, 0.0722f)); }
+float32 GetLuminance(const FVec3& color) { return color.Dot(FVec3(0.2126f, 0.7152f, 0.0722f)); }
 
 uint8 EncodeDirection(float32 value)
 {
@@ -55,9 +55,9 @@ struct AlbedoTexture
 {
 	uint32 Width = 1;
 	uint32 Height = 1;
-	SizedArray<Vec3f> Texels;
+	SizedArray<FVec3> Texels;
 
-	void InitConstant(const Vec3f& color)
+	void InitConstant(const FVec3& color)
 	{
 		Width = 1;
 		Height = 1;
@@ -66,7 +66,7 @@ struct AlbedoTexture
 		Texels[0] = color;
 	}
 
-	Vec3f Sample(float32 u, float32 v) const
+	FVec3 Sample(float32 u, float32 v) const
 	{
 		const float32 x = (u - std::floor(u)) * static_cast<float32>(Width);
 		const float32 y = (v - std::floor(v)) * static_cast<float32>(Height);
@@ -150,12 +150,12 @@ bool ReadAlbedoKtx(ktxTexture* texture, AlbedoTexture& out_texture)
 			const uint32 last_x = std::min((out_x + 1) * factor, width);
 			const uint32 last_y = std::min((out_y + 1) * factor, height);
 
-			Vec3f sum(0.0f);
+			FVec3 sum(0.0f);
 
 			for (uint32 y = out_y * factor; y < last_y; y++) {
 				for (uint32 x = out_x * factor; x < last_x; x++) {
 					const uint8* texel = texels + static_cast<size_t>(y) * row_pitch + static_cast<size_t>(x) * 4;
-					sum += Vec3f(decode[texel[0]], decode[texel[1]], decode[texel[2]]);
+					sum += FVec3(decode[texel[0]], decode[texel[1]], decode[texel[2]]);
 				}
 			}
 
@@ -206,7 +206,7 @@ void LoadAlbedos(const SizedArray<CompiledMapMaterial>& materials, SizedArray<Al
 		const CompiledMapMaterial& material = materials[i];
 		AlbedoTexture& albedo = albedos[i];
 
-		albedo.InitConstant(Vec3f(scDefaultAlbedo));
+		albedo.InitConstant(FVec3(scDefaultAlbedo));
 		out_alphas[i] = 1.0f;
 
 		const auto found = std::find_if(definitions.begin(), definitions.end(),
@@ -224,14 +224,14 @@ void LoadAlbedos(const SizedArray<CompiledMapMaterial>& materials, SizedArray<Al
 		out_alphas[i] = found->Alpha;
 
 		if (found->DiffusePath.IsEmpty()) {
-			albedo.InitConstant(Vec3f(1.0f));
+			albedo.InitConstant(FVec3(1.0f));
 		}
 		else if (!ReadAlbedoTexture(found->DiffusePath, albedo)) {
-			albedo.InitConstant(Vec3f(scDefaultAlbedo));
+			albedo.InitConstant(FVec3(scDefaultAlbedo));
 			out_missing++;
 		}
 
-		Vec3f tint(1.0f);
+		FVec3 tint(1.0f);
 
 		if (found->BaseColor.has_value()) {
 			tint = tint * *found->BaseColor;
@@ -241,7 +241,7 @@ void LoadAlbedos(const SizedArray<CompiledMapMaterial>& materials, SizedArray<Al
 			tint = tint * (1.0f - std::clamp(*found->Metallic, 0.0f, 1.0f));
 		}
 
-		for (Vec3f& texel : albedo.Texels) {
+		for (FVec3& texel : albedo.Texels) {
 			texel = texel * tint;
 		}
 	}
@@ -254,7 +254,7 @@ void LoadModelAlbedos(const ModelBuilder& models, SizedArray<AlbedoTexture>& alb
 		const loader::StaticModelMaterial& material = models.GetMaterial(i);
 		AlbedoTexture& albedo = albedos[first + i];
 
-		albedo.InitConstant(Vec3f(1.0f));
+		albedo.InitConstant(FVec3(1.0f));
 
 		bool has_texture = false;
 
@@ -269,37 +269,37 @@ void LoadModelAlbedos(const ModelBuilder& models, SizedArray<AlbedoTexture>& alb
 		}
 
 		if (!has_texture) {
-			albedo.InitConstant(Vec3f(scDefaultAlbedo));
+			albedo.InitConstant(FVec3(scDefaultAlbedo));
 			out_missing++;
 		}
 
-		Vec3f tint = material.BaseColor;
+		FVec3 tint = material.BaseColor;
 
 		if (!material.bHasMetallicTexture) {
 			tint = tint * (1.0f - std::clamp(material.Metallic, 0.0f, 1.0f));
 		}
 
-		for (Vec3f& texel : albedo.Texels) {
+		for (FVec3& texel : albedo.Texels) {
 			texel = texel * tint;
 		}
 	}
 }
 
-Vec3f UnpackColor(uint32 packed)
+FVec3 UnpackColor(uint32 packed)
 {
-	return Vec3f(static_cast<float32>(packed & 0xFFU), static_cast<float32>((packed >> 8) & 0xFFU),
+	return FVec3(static_cast<float32>(packed & 0xFFU), static_cast<float32>((packed >> 8) & 0xFFU),
 				 static_cast<float32>((packed >> 16) & 0xFFU)) *
 		   (1.0f / 255.0f);
 }
 
-Vec3f CapAlbedo(const Vec3f& albedo) { return Vec3f::Min(albedo, Vec3f(scMaxAlbedo)); }
+FVec3 CapAlbedo(const FVec3& albedo) { return FVec3::Min(albedo, FVec3(scMaxAlbedo)); }
 
 struct TriangleShading
 {
-	Vec3f U = Vec3f(0.0f);
-	Vec3f V = Vec3f(0.0f);
+	FVec3 U = FVec3(0.0f);
+	FVec3 V = FVec3(0.0f);
 	Vec2f Texcoord[3];
-	Vec3f Tint[3];
+	FVec3 Tint[3];
 	uint32 Material = 0;
 	/// Model triangles have no texels, their hits read the model cache instead
 	bool bModel = false;
@@ -307,13 +307,13 @@ struct TriangleShading
 
 struct SceneTriangle
 {
-	Vec3f A = Vec3f(0.0f);
-	Vec3f EdgeAB = Vec3f(0.0f);
-	Vec3f EdgeAC = Vec3f(0.0f);
-	Vec3f Facing = Vec3f(0.0f);
+	FVec3 A = FVec3(0.0f);
+	FVec3 EdgeAB = FVec3(0.0f);
+	FVec3 EdgeAC = FVec3(0.0f);
+	FVec3 Facing = FVec3(0.0f);
 
-	Vec3f Min = Vec3f(0.0f);
-	Vec3f Max = Vec3f(0.0f);
+	FVec3 Min = FVec3(0.0f);
+	FVec3 Max = FVec3(0.0f);
 
 	uint32 Shading = scNoShading;
 };
@@ -356,7 +356,7 @@ struct SceneRay
 	uint32 Near[3] = {};
 	uint32 Far[3] = {};
 
-	SceneRay(const Vec3f& origin, const Vec3f& direction)
+	SceneRay(const FVec3& origin, const FVec3& direction)
 	{
 		constexpr float32 scMinDirection = 1e-9f;
 
@@ -402,9 +402,9 @@ FX_FORCE_INLINE void CrossLanes(const FLOAT4* a, const FLOAT4* b, FLOAT4* out)
 	out[2] = simd::Sub(simd::Mul(a[0], b[1]), simd::Mul(a[1], b[0]));
 }
 
-float32 GetSurfaceArea(const Vec3f& min, const Vec3f& max)
+float32 GetSurfaceArea(const FVec3& min, const FVec3& max)
 {
-	const Vec3f extent = max - min;
+	const FVec3 extent = max - min;
 
 	return 2.0f * (extent.X * extent.Y + extent.Y * extent.Z + extent.Z * extent.X);
 }
@@ -412,15 +412,15 @@ float32 GetSurfaceArea(const Vec3f& min, const Vec3f& max)
 class Scene
 {
 public:
-	void AddTriangle(const Vec3f& a, const Vec3f& b, const Vec3f& c, const Vec3f& facing, uint32 shading)
+	void AddTriangle(const FVec3& a, const FVec3& b, const FVec3& c, const FVec3& facing, uint32 shading)
 	{
 		SceneTriangle& triangle = mTriangles.Emplace();
 		triangle.A = a;
 		triangle.EdgeAB = b - a;
 		triangle.EdgeAC = c - a;
 		triangle.Facing = facing;
-		triangle.Min = Vec3f::Min(a, Vec3f::Min(b, c));
-		triangle.Max = Vec3f::Max(a, Vec3f::Max(b, c));
+		triangle.Min = FVec3::Min(a, FVec3::Min(b, c));
+		triangle.Max = FVec3::Max(a, FVec3::Max(b, c));
 		triangle.Shading = shading;
 	}
 
@@ -473,17 +473,17 @@ public:
 private:
 	struct BuildReference
 	{
-		Vec3f Min = Vec3f(0.0f);
-		Vec3f Max = Vec3f(0.0f);
-		Vec3f Center = Vec3f(0.0f);
+		FVec3 Min = FVec3(0.0f);
+		FVec3 Max = FVec3(0.0f);
+		FVec3 Center = FVec3(0.0f);
 
 		uint32 Triangle = 0;
 	};
 
 	struct BuildNode
 	{
-		Vec3f Min = Vec3f(0.0f);
-		Vec3f Max = Vec3f(0.0f);
+		FVec3 Min = FVec3(0.0f);
+		FVec3 Max = FVec3(0.0f);
 
 		int32 Left = -1;
 		int32 Right = -1;
@@ -494,8 +494,8 @@ private:
 
 	struct BuildBin
 	{
-		Vec3f Min = Vec3f(scNoHit);
-		Vec3f Max = Vec3f(-scNoHit);
+		FVec3 Min = FVec3(scNoHit);
+		FVec3 Max = FVec3(-scNoHit);
 
 		uint32 Count = 0;
 	};
@@ -682,8 +682,8 @@ private:
 		return found;
 	}
 
-	static bool FindSplit(const Array<BuildReference>& references, uint32 first, uint32 count, const Vec3f& center_min,
-						  const Vec3f& center_max, uint32& out_axis, uint32& out_bin)
+	static bool FindSplit(const Array<BuildReference>& references, uint32 first, uint32 count, const FVec3& center_min,
+						  const FVec3& center_max, uint32& out_axis, uint32& out_bin)
 	{
 		float32 best_cost = scNoHit;
 		bool found = false;
@@ -703,21 +703,21 @@ private:
 				const BuildReference& reference = references[i];
 				BuildBin& bin = bins[GetBin(reference, axis, center_min.mData[axis], scale)];
 
-				bin.Min = Vec3f::Min(bin.Min, reference.Min);
-				bin.Max = Vec3f::Max(bin.Max, reference.Max);
+				bin.Min = FVec3::Min(bin.Min, reference.Min);
+				bin.Max = FVec3::Max(bin.Max, reference.Max);
 				bin.Count++;
 			}
 
 			float32 right_areas[scBinCount];
 			uint32 right_counts[scBinCount];
 
-			Vec3f right_min(scNoHit);
-			Vec3f right_max(-scNoHit);
+			FVec3 right_min(scNoHit);
+			FVec3 right_max(-scNoHit);
 			uint32 right_count = 0;
 
 			for (uint32 bin = scBinCount - 1; bin > 0; bin--) {
-				right_min = Vec3f::Min(right_min, bins[bin].Min);
-				right_max = Vec3f::Max(right_max, bins[bin].Max);
+				right_min = FVec3::Min(right_min, bins[bin].Min);
+				right_max = FVec3::Max(right_max, bins[bin].Max);
 				right_count += bins[bin].Count;
 
 				right_areas[bin] = 0.0f;
@@ -729,13 +729,13 @@ private:
 				right_counts[bin] = right_count;
 			}
 
-			Vec3f left_min(scNoHit);
-			Vec3f left_max(-scNoHit);
+			FVec3 left_min(scNoHit);
+			FVec3 left_max(-scNoHit);
 			uint32 left_count = 0;
 
 			for (uint32 bin = 1; bin < scBinCount; bin++) {
-				left_min = Vec3f::Min(left_min, bins[bin - 1].Min);
-				left_max = Vec3f::Max(left_max, bins[bin - 1].Max);
+				left_min = FVec3::Min(left_min, bins[bin - 1].Min);
+				left_max = FVec3::Max(left_max, bins[bin - 1].Max);
 				left_count += bins[bin - 1].Count;
 
 				if (left_count == 0 || right_counts[bin] == 0) {
@@ -764,18 +764,18 @@ private:
 		const int32 node_index = static_cast<int32>(nodes.Size);
 		nodes.Emplace();
 
-		Vec3f min = references[first].Min;
-		Vec3f max = references[first].Max;
-		Vec3f center_min = references[first].Center;
-		Vec3f center_max = center_min;
+		FVec3 min = references[first].Min;
+		FVec3 max = references[first].Max;
+		FVec3 center_min = references[first].Center;
+		FVec3 center_max = center_min;
 
 		for (uint32 i = first + 1; i < first + count; i++) {
 			const BuildReference& reference = references[i];
 
-			min = Vec3f::Min(min, reference.Min);
-			max = Vec3f::Max(max, reference.Max);
-			center_min = Vec3f::Min(center_min, reference.Center);
-			center_max = Vec3f::Max(center_max, reference.Center);
+			min = FVec3::Min(min, reference.Min);
+			max = FVec3::Max(max, reference.Max);
+			center_min = FVec3::Min(center_min, reference.Center);
+			center_max = FVec3::Max(center_max, reference.Center);
 		}
 
 		int32 left = -1;
@@ -903,9 +903,9 @@ private:
 
 struct WaterPath
 {
-	Vec3f Transmittance = Vec3f(1.0f);
+	FVec3 Transmittance = FVec3(1.0f);
 	/// Albedo of the water the path crossed, which scatters the light it absorbs
-	Vec3f Color = Vec3f(0.0f);
+	FVec3 Color = FVec3(0.0f);
 
 	bool bCrossed = false;
 };
@@ -920,22 +920,22 @@ public:
 
 		for (const int32 plane_index : plane_indices) {
 			const Plane& plane = planes[plane_index];
-			volume.Planes.Emplace(VolumePlane { plane.Normal.ToVec3f(), static_cast<float32>(plane.Distance) });
+			volume.Planes.Emplace(VolumePlane { plane.Normal.ToFVec3(), static_cast<float32>(plane.Distance) });
 		}
 
-		Vec3f color(0.0f);
+		FVec3 color(0.0f);
 
-		for (const Vec3f& texel : albedo.Texels) {
+		for (const FVec3& texel : albedo.Texels) {
 			color += texel;
 		}
 
 		color = color * (1.0f / static_cast<float32>(std::max<size_t>(albedo.Texels.Size, 1)));
 
 		// `alpha` is how much of the water's own colour one metre absorbs, the other colours go faster
-		const Vec3f tint = color * (1.0f / std::fmax(std::fmax(color.X, std::fmax(color.Y, color.Z)), 1e-4f));
+		const FVec3 tint = color * (1.0f / std::fmax(std::fmax(color.X, std::fmax(color.Y, color.Z)), 1e-4f));
 		const float32 base_absorption = -std::log(1.0f - std::clamp(alpha, 0.0f, 0.999f));
 
-		volume.Absorption = (Vec3f(1.0f) + (Vec3f(1.0f) - tint) * scWaterAbsorptionSpread) * base_absorption;
+		volume.Absorption = (FVec3(1.0f) + (FVec3(1.0f) - tint) * scWaterAbsorptionSpread) * base_absorption;
 		volume.Color = CapAlbedo(color);
 	}
 
@@ -943,12 +943,12 @@ public:
 
 	uint32 GetCount() const { return mVolumes.Size; }
 
-	WaterPath Trace(const Vec3f& origin, const Vec3f& direction, float32 max_distance) const
+	WaterPath Trace(const FVec3& origin, const FVec3& direction, float32 max_distance) const
 	{
 		WaterPath path;
 
-		Vec3f depth(0.0f);
-		Vec3f color_sum(0.0f);
+		FVec3 depth(0.0f);
+		FVec3 color_sum(0.0f);
 		float32 length_sum = 0.0f;
 
 		for (const Volume& volume : mVolumes) {
@@ -968,7 +968,7 @@ public:
 		}
 
 		path.bCrossed = true;
-		path.Transmittance = Vec3f(std::exp(-depth.X), std::exp(-depth.Y), std::exp(-depth.Z));
+		path.Transmittance = FVec3(std::exp(-depth.X), std::exp(-depth.Y), std::exp(-depth.Z));
 		path.Color = color_sum * (1.0f / length_sum);
 
 		return path;
@@ -977,7 +977,7 @@ public:
 private:
 	struct VolumePlane
 	{
-		Vec3f Normal = Vec3f(0.0f);
+		FVec3 Normal = FVec3(0.0f);
 		float32 Distance = 0.0f;
 	};
 
@@ -986,12 +986,12 @@ private:
 		Array<VolumePlane> Planes;
 
 		/// Per metre, per channel
-		Vec3f Absorption = Vec3f(0.0f);
-		Vec3f Color = Vec3f(0.0f);
+		FVec3 Absorption = FVec3(0.0f);
+		FVec3 Color = FVec3(0.0f);
 	};
 
 	/// Length of origin + direction * [0, max_distance] inside the volume
-	static float32 GetLength(const Volume& volume, const Vec3f& origin, const Vec3f& direction, float32 max_distance)
+	static float32 GetLength(const Volume& volume, const FVec3& origin, const FVec3& direction, float32 max_distance)
 	{
 		// Rays to the sky end where they leave the water, this only keeps an open volume finite
 		constexpr float32 scMaxLength = 1e5f;
@@ -1035,7 +1035,7 @@ private:
 
 struct GatherHit
 {
-	Vec3f Albedo = Vec3f(0.0f);
+	FVec3 Albedo = FVec3(0.0f);
 	uint32 Texel = scSkyHit;
 	float32 Distance = scNoHit;
 };
@@ -1046,7 +1046,7 @@ struct CachedHit
 	uint32 Albedo;
 };
 
-uint32 EncodeCachedAlbedo(const Vec3f& albedo)
+uint32 EncodeCachedAlbedo(const FVec3& albedo)
 {
 	uint32 packed = 0;
 
@@ -1058,9 +1058,9 @@ uint32 EncodeCachedAlbedo(const Vec3f& albedo)
 	return packed;
 }
 
-Vec3f DecodeCachedAlbedo(uint32 packed)
+FVec3 DecodeCachedAlbedo(uint32 packed)
 {
-	Vec3f albedo(0.0f);
+	FVec3 albedo(0.0f);
 
 	for (uint32 channel = 0; channel < 3; channel++) {
 		const float32 value = static_cast<float32>((packed >> (channel * 8)) & 0xFFU) * (1.0f / 255.0f);
@@ -1104,7 +1104,7 @@ struct DirectionSet
 		}
 	}
 
-	static Vec3f GetLocal(const Vec2f& point, float32 offset_u, float32 offset_v)
+	static FVec3 GetLocal(const Vec2f& point, float32 offset_u, float32 offset_v)
 	{
 		const float32 u = point.X + offset_u - std::floor(point.X + offset_u);
 		const float32 v = point.Y + offset_v - std::floor(point.Y + offset_v);
@@ -1112,16 +1112,16 @@ struct DirectionSet
 		const float32 radius = std::sqrt(u);
 		const float32 angle = v * FX_2PI;
 
-		return Vec3f(std::cos(angle) * radius, std::sin(angle) * radius, std::sqrt(std::fmax(1.0f - u, 0.0f)));
+		return FVec3(std::cos(angle) * radius, std::sin(angle) * radius, std::sqrt(std::fmax(1.0f - u, 0.0f)));
 	}
 };
 
-void GetBasis(const Vec3f& normal, Vec3f& out_tangent, Vec3f& out_bitangent)
+void GetBasis(const FVec3& normal, FVec3& out_tangent, FVec3& out_bitangent)
 {
-	Vec3f reference(0.0f, 1.0f, 0.0f);
+	FVec3 reference(0.0f, 1.0f, 0.0f);
 
 	if (std::abs(normal.Y) >= 0.9f) {
-		reference = Vec3f(1.0f, 0.0f, 0.0f);
+		reference = FVec3(1.0f, 0.0f, 0.0f);
 	}
 
 	out_tangent = reference.Cross(normal).Normalize();
@@ -1176,7 +1176,7 @@ void RunParallel(uint32 count, const TFunction& function)
 
 struct ProbeRay
 {
-	Vec3f Direction = Vec3f(0.0f);
+	FVec3 Direction = FVec3(0.0f);
 	float32 WeightedBasis[Limits::ProbeSHCoeffCount] = {};
 	float32 SolidAngle = 0.0f;
 	uint32 MomentTexel = 0;
@@ -1184,21 +1184,21 @@ struct ProbeRay
 
 float32 GetCubeCornerArea(float32 x, float32 y) { return std::atan2(x * y, std::sqrt(x * x + y * y + 1.0f)); }
 
-Vec3f GetCubeDirection(uint32 face, float32 u, float32 v)
+FVec3 GetCubeDirection(uint32 face, float32 u, float32 v)
 {
 	switch (face) {
 	case 0:
-		return Vec3f(1.0f, -v, -u);
+		return FVec3(1.0f, -v, -u);
 	case 1:
-		return Vec3f(-1.0f, -v, u);
+		return FVec3(-1.0f, -v, u);
 	case 2:
-		return Vec3f(u, 1.0f, v);
+		return FVec3(u, 1.0f, v);
 	case 3:
-		return Vec3f(u, -1.0f, -v);
+		return FVec3(u, -1.0f, -v);
 	case 4:
-		return Vec3f(u, -v, 1.0f);
+		return FVec3(u, -v, 1.0f);
 	default:
-		return Vec3f(-u, -v, -1.0f);
+		return FVec3(-u, -v, -1.0f);
 	}
 }
 
@@ -1242,7 +1242,7 @@ SizedArray<ProbeRay> BuildProbeRays(uint32 rays_per_texel)
 }
 
 
-void BleedEdges(const IndirectInput& input, Vec3f* values, Array<uint8>& filled, Array<Vec3f>& scratch_values,
+void BleedEdges(const IndirectInput& input, FVec3* values, Array<uint8>& filled, Array<FVec3>& scratch_values,
 				Array<uint8>& scratch_filled)
 {
 	for (const URect& rect : input.LightmapRects) {
@@ -1265,7 +1265,7 @@ void BleedEdges(const IndirectInput& input, Vec3f* values, Array<uint8>& filled,
 		}
 
 		for (uint32 pass = 0; pass < rect_size.X + rect_size.Y; pass++) {
-			Fill(scratch_values, rect_size.X * rect_size.Y, Vec3f(0.0f));
+			Fill(scratch_values, rect_size.X * rect_size.Y, FVec3(0.0f));
 			Fill(scratch_filled, rect_size.X * rect_size.Y, static_cast<uint8>(0));
 
 			bool changed = false;
@@ -1276,7 +1276,7 @@ void BleedEdges(const IndirectInput& input, Vec3f* values, Array<uint8>& filled,
 						continue;
 					}
 
-					Vec3f sum(0.0f);
+					FVec3 sum(0.0f);
 					uint32 count = 0;
 
 					for (int32 offset_y = -1; offset_y <= 1; offset_y++) {
@@ -1369,7 +1369,7 @@ public:
 		mBlurredVariance.InitSize(texel_count);
 	}
 
-	void Filter(uint32 iterations, Vec3f* values, Vec3f* directions, float32* variance)
+	void Filter(uint32 iterations, FVec3* values, FVec3* directions, float32* variance)
 	{
 		for (uint32 iteration = 0; iteration < iterations; iteration++) {
 			BlurVariance(variance);
@@ -1440,7 +1440,7 @@ private:
 					});
 	}
 
-	void FilterTexel(uint32 index, int32 step, const Vec3f* values, const Vec3f* directions, const float32* variance)
+	void FilterTexel(uint32 index, int32 step, const FVec3* values, const FVec3* directions, const float32* variance)
 	{
 		constexpr uint32 scFilterTapCount = scFilterWidth * scFilterWidth;
 		constexpr float32 scFilterNormalPower = 8.0f;
@@ -1453,8 +1453,8 @@ private:
 
 		const uint32 texel = mTexels[index];
 
-		const Vec3f position = mInput.pPositions[texel];
-		const Vec3f normal = mInput.pNormals[texel];
+		const FVec3 position = mInput.pPositions[texel];
+		const FVec3 normal = mInput.pNormals[texel];
 		const float32 luminance = GetLuminance(values[texel]);
 		const float32 blurred_variance = mBlurredVariance[texel];
 		const float32 plane_tolerance = mInput.TexelSize * scFilterPlaneTolerance;
@@ -1522,14 +1522,14 @@ private:
 		const float32 cofactor_2 = b * e - c * d;
 		const float32 determinant = a * cofactor_0 + b * cofactor_1 + c * cofactor_2;
 
-		Vec3f fit(1.0f / std::fmax(a, 1e-6f), 0.0f, 0.0f);
+		FVec3 fit(1.0f / std::fmax(a, 1e-6f), 0.0f, 0.0f);
 
 		if (determinant > scFilterMinDeterminant * a * d * f) {
-			fit = Vec3f(cofactor_0, cofactor_1, cofactor_2) / determinant;
+			fit = FVec3(cofactor_0, cofactor_1, cofactor_2) / determinant;
 		}
 
-		Vec3f value_sum(0.0f);
-		Vec3f direction_sum(0.0f);
+		FVec3 value_sum(0.0f);
+		FVec3 direction_sum(0.0f);
 		float32 variance_sum = 0.0f;
 
 		for (uint32 tap = 0; tap < scFilterTapCount; tap++) {
@@ -1539,7 +1539,7 @@ private:
 
 			const float32 x = static_cast<float32>(static_cast<int32>(tap % scFilterWidth) - scFilterRadius);
 			const float32 y = static_cast<float32>(static_cast<int32>(tap / scFilterWidth) - scFilterRadius);
-			const float32 weight = weights[tap] * fit.Dot(Vec3f(1.0f, x, y));
+			const float32 weight = weights[tap] * fit.Dot(FVec3(1.0f, x, y));
 			const uint64 near = taps[tap];
 
 			value_sum += values[near] * weight;
@@ -1550,7 +1550,7 @@ private:
 			}
 		}
 
-		mValues[index] = Vec3f(std::fmax(value_sum.X, 0.0f), std::fmax(value_sum.Y, 0.0f),
+		mValues[index] = FVec3(std::fmax(value_sum.X, 0.0f), std::fmax(value_sum.Y, 0.0f),
 							   std::fmax(value_sum.Z, 0.0f));
 		mVariance[index] = variance_sum;
 		mDirections[index] = direction_sum;
@@ -1562,13 +1562,13 @@ private:
 	Array<uint32> mTexels;
 	SizedArray<uint32> mTexelRects;
 
-	SizedArray<Vec3f> mValues;
-	SizedArray<Vec3f> mDirections;
+	SizedArray<FVec3> mValues;
+	SizedArray<FVec3> mDirections;
 	SizedArray<float32> mVariance;
 	SizedArray<float32> mBlurredVariance;
 };
 
-bool WriteImage(const String& path, uint32 width, uint32 height, const Vec3f* irradiance, double mean_luminance)
+bool WriteImage(const String& path, uint32 width, uint32 height, const FVec3* irradiance, double mean_luminance)
 {
 	std::FILE* file = std::fopen(path.CStr(), "wb");
 
@@ -1621,19 +1621,19 @@ public:
 
 		struct Accumulator
 		{
-			Vec3f Sum = Vec3f(0.0f);
+			FVec3 Sum = FVec3(0.0f);
 			uint32 Count = 0;
 
 			float32 BestDistance = scNoHit;
-			Vec3f BestPoint = Vec3f(0.0f);
-			Vec3f BestNormal = Vec3f(0.0f);
-			Vec3f BestFacing = Vec3f(0.0f);
+			FVec3 BestPoint = FVec3(0.0f);
+			FVec3 BestNormal = FVec3(0.0f);
+			FVec3 BestFacing = FVec3(0.0f);
 		};
 
 		Array<Accumulator> accumulators;
 
 		ForEachSample(models, spacing,
-					  [&](const Vec3f& point, const Vec3f&, const Vec3f& facing)
+					  [&](const FVec3& point, const FVec3&, const FVec3& facing)
 					  {
 						  const uint64 key = GetKey(point, facing);
 						  const auto found = mCells.find(key);
@@ -1654,11 +1654,11 @@ public:
 					  });
 
 		ForEachSample(models, spacing,
-					  [&](const Vec3f& point, const Vec3f& normal, const Vec3f& facing)
+					  [&](const FVec3& point, const FVec3& normal, const FVec3& facing)
 					  {
 						  Accumulator& accumulator = accumulators[mCells.find(GetKey(point, facing))->second];
 
-						  const Vec3f offset = point -
+						  const FVec3 offset = point -
 											   accumulator.Sum * (1.0f / static_cast<float32>(accumulator.Count));
 						  const float32 distance = offset.Dot(offset);
 
@@ -1684,7 +1684,7 @@ public:
 	uint32 GetCount() const { return static_cast<uint32>(Positions.Size); }
 
 	/// The cell of a hit on a model triangle, or the nearest neighbouring cell facing the same way
-	uint32 Find(const Vec3f& point, const Vec3f& facing) const
+	uint32 Find(const FVec3& point, const FVec3& facing) const
 	{
 		const int32 x = GetCoordinate(point.X);
 		const int32 y = GetCoordinate(point.Y);
@@ -1713,8 +1713,8 @@ public:
 	}
 
 public:
-	SizedArray<Vec3f> Positions;
-	SizedArray<Vec3f> Normals;
+	SizedArray<FVec3> Positions;
+	SizedArray<FVec3> Normals;
 
 private:
 	static constexpr int32 scCoordinateBias = 1 << 19;
@@ -1733,15 +1733,15 @@ private:
 					corners[corner] = &surface.Vertices[static_cast<size_t>(surface.Indices[index + corner])];
 				}
 
-				const Vec3f a = corners[0]->Position.ToVec3f();
-				const Vec3f b = corners[1]->Position.ToVec3f();
-				const Vec3f c = corners[2]->Position.ToVec3f();
+				const FVec3 a = corners[0]->Position.ToFVec3();
+				const FVec3 b = corners[1]->Position.ToFVec3();
+				const FVec3 c = corners[2]->Position.ToFVec3();
 
-				const Vec3f na = corners[0]->Normal.ToVec3f();
-				const Vec3f nb = corners[1]->Normal.ToVec3f();
-				const Vec3f nc = corners[2]->Normal.ToVec3f();
+				const FVec3 na = corners[0]->Normal.ToFVec3();
+				const FVec3 nb = corners[1]->Normal.ToFVec3();
+				const FVec3 nc = corners[2]->Normal.ToFVec3();
 
-				Vec3f facing = na + nb + nc;
+				FVec3 facing = na + nb + nc;
 				const float32 facing_length = facing.Length();
 
 				if (!(facing_length > 1e-6f)) {
@@ -1758,7 +1758,7 @@ private:
 				{
 					const float32 w = 1.0f - u - v;
 
-					Vec3f normal = na * w + nb * u + nc * v;
+					FVec3 normal = na * w + nb * u + nc * v;
 					const float32 normal_length = normal.Length();
 
 					if (normal_length > 1e-6f) {
@@ -1784,7 +1784,7 @@ private:
 
 	int32 GetCoordinate(float32 value) const { return static_cast<int32>(std::floor(value * mInvCellSize)); }
 
-	static uint32 GetDirection(const Vec3f& facing)
+	static uint32 GetDirection(const FVec3& facing)
 	{
 		uint32 axis = 0;
 
@@ -1806,7 +1806,7 @@ private:
 		return ux | (uy << 20) | (uz << 40) | (static_cast<uint64>(direction) << 60);
 	}
 
-	uint64 GetKey(const Vec3f& point, const Vec3f& facing) const
+	uint64 GetKey(const FVec3& point, const FVec3& facing) const
 	{
 		return MakeKey(GetCoordinate(point.X), GetCoordinate(point.Y), GetCoordinate(point.Z), GetDirection(facing));
 	}
@@ -1830,7 +1830,7 @@ public:
 	/// Sample indices past the lightmap's texels are model cache cells
 	bool IsCell(uint64 sample) const { return sample >= mTexelCount; }
 
-	Vec3f GetPosition(uint64 sample) const
+	FVec3 GetPosition(uint64 sample) const
 	{
 		if (IsCell(sample)) {
 			return mCache.Positions[sample - mTexelCount];
@@ -1839,7 +1839,7 @@ public:
 		return mInput.pPositions[sample];
 	}
 
-	Vec3f GetNormal(uint64 sample) const
+	FVec3 GetNormal(uint64 sample) const
 	{
 		if (IsCell(sample)) {
 			return mCache.Normals[sample - mTexelCount];
@@ -1851,7 +1851,7 @@ public:
 	/**
 	 * @brief Cells have no baked sun visibility so we need to trace the middle of the sun disc
 	 */
-	float32 GetSunVisibility(uint64 sample, const Vec3f& position, const Vec3f& sun_direction) const
+	float32 GetSunVisibility(uint64 sample, const FVec3& position, const FVec3& sun_direction) const
 	{
 		if (!IsCell(sample)) {
 			return static_cast<float32>(mInput.pSunVisibility[sample]) / 255.0f;
@@ -1864,22 +1864,22 @@ public:
 		return 1.0f;
 	}
 
-	Vec3f GetDirect(uint64 texel) const
+	FVec3 GetDirect(uint64 texel) const
 	{
 		constexpr float32 scShadowEpsilon = 1e-3f;
 
-		const Vec3f position = GetPosition(texel);
-		const Vec3f normal = GetNormal(texel);
+		const FVec3 position = GetPosition(texel);
+		const FVec3 normal = GetNormal(texel);
 
-		Vec3f irradiance(0.0f);
+		FVec3 irradiance(0.0f);
 
 		if (mSource.bHasSun) {
-			const Vec3f sun_direction = mSource.SunDirection.ToVec3f();
+			const FVec3 sun_direction = mSource.SunDirection.ToFVec3();
 			const float32 sun_cosine = std::fmax(normal.Dot(sun_direction), 0.0f);
 
 			if (sun_cosine > 0.0f) {
 				const float32 visibility = GetSunVisibility(texel, position, sun_direction);
-				Vec3f sun = mSource.SunColor.ToVec3f() * (sun_cosine * visibility);
+				FVec3 sun = mSource.SunColor.ToFVec3() * (sun_cosine * visibility);
 
 				if (visibility > 0.0f && !mWater.IsEmpty()) {
 					sun = sun * mWater.Trace(position, sun_direction, scNoHit).Transmittance;
@@ -1890,7 +1890,7 @@ public:
 		}
 
 		for (const SourceLight& light : mSource.Lights) {
-			const Vec3f to_light = light.Position.ToVec3f() - position;
+			const FVec3 to_light = light.Position.ToFVec3() - position;
 			const float32 distance_sq = to_light.Dot(to_light);
 
 			const float32 factor = distance_sq * static_cast<float32>(light.InvRadiusSq);
@@ -1903,10 +1903,10 @@ public:
 			}
 
 			const float32 distance = std::sqrt(distance_sq);
-			const Vec3f direction = to_light * (1.0f / distance);
+			const FVec3 direction = to_light * (1.0f / distance);
 
 			if (light.bSpot) {
-				const float32 cone_cosine = -direction.Dot(light.Direction.ToVec3f());
+				const float32 cone_cosine = -direction.Dot(light.Direction.ToFVec3());
 				const float32 cone = std::clamp((cone_cosine - static_cast<float32>(light.SpotCosOuter)) *
 													static_cast<float32>(light.SpotAngleScale),
 												0.0f, 1.0f);
@@ -1924,7 +1924,7 @@ public:
 				continue;
 			}
 
-			Vec3f light_irradiance = light.Color.ToVec3f() * (attenuation * cosine);
+			FVec3 light_irradiance = light.Color.ToFVec3() * (attenuation * cosine);
 
 			if (!mWater.IsEmpty()) {
 				light_irradiance = light_irradiance * mWater.Trace(position, direction, distance).Transmittance;
@@ -1936,7 +1936,7 @@ public:
 		return irradiance * FX_1_OVER_PI;
 	}
 
-	GatherHit TraceHit(const Vec3f& origin, const Vec3f& direction) const
+	GatherHit TraceHit(const FVec3& origin, const FVec3& direction) const
 	{
 		GatherHit cached;
 
@@ -1971,7 +1971,7 @@ public:
 			return cached;
 		}
 
-		const Vec3f barycentric(w, hit.U, hit.V);
+		const FVec3 barycentric(w, hit.U, hit.V);
 		const float32 x = shading.U.Dot(barycentric);
 		const float32 y = shading.V.Dot(barycentric);
 
@@ -1979,8 +1979,8 @@ public:
 			std::clamp(static_cast<int64>(std::floor(x)), static_cast<int64>(0), static_cast<int64>(mInput.Width) - 1));
 		const uint32 texel_y = static_cast<uint32>(std::clamp(static_cast<int64>(std::floor(y)), static_cast<int64>(0),
 															  static_cast<int64>(mInput.Height) - 1));
-		const Vec3f tint = shading.Tint[0] * w + shading.Tint[1] * hit.U + shading.Tint[2] * hit.V;
-		const Vec3f albedo = CapAlbedo(mAlbedos[shading.Material].Sample(texcoord.X, texcoord.Y) * tint);
+		const FVec3 tint = shading.Tint[0] * w + shading.Tint[1] * hit.U + shading.Tint[2] * hit.V;
+		const FVec3 albedo = CapAlbedo(mAlbedos[shading.Material].Sample(texcoord.X, texcoord.Y) * tint);
 
 		cached.Texel = texel_y * mInput.Width + texel_x;
 		cached.Albedo = albedo;
@@ -1989,7 +1989,7 @@ public:
 	}
 
 
-	GatherHit TraceWaterHit(const Vec3f& origin, const Vec3f& direction) const
+	GatherHit TraceWaterHit(const FVec3& origin, const FVec3& direction) const
 	{
 		GatherHit hit = TraceHit(origin, direction);
 
@@ -2003,7 +2003,7 @@ public:
 			return hit;
 		}
 
-		const Vec3f scattered = (Vec3f(1.0f) - path.Transmittance) * path.Color;
+		const FVec3 scattered = (FVec3(1.0f) - path.Transmittance) * path.Color;
 
 		if (hit.Texel == scSkyHit) {
 			hit.Texel = scWaterSkyHit;
@@ -2016,12 +2016,12 @@ public:
 		return hit;
 	}
 
-	static Vec3f GetRadiance(const GatherHit& hit, const Vec3f* direct, const Vec3f* indirect)
+	static FVec3 GetRadiance(const GatherHit& hit, const FVec3* direct, const FVec3* indirect)
 	{
 		constexpr float32 scSkyRadiance = 1500.0f / FX_PI;
 
 		if (hit.Texel == scSkyHit) {
-			return Vec3f(scSkyRadiance);
+			return FVec3(scSkyRadiance);
 		}
 
 		if (hit.Texel == scWaterSkyHit) {
@@ -2029,35 +2029,35 @@ public:
 		}
 
 		if (hit.Texel == scDarkHit) {
-			return Vec3f(0.0f);
+			return FVec3(0.0f);
 		}
 
 		return hit.Albedo * (direct[hit.Texel] + indirect[hit.Texel]);
 	}
 
-	void Gather(uint64 texel, const DirectionSet& directions, const Vec3f* direct, const Vec3f* indirect,
-				CachedHit* cache, bool replay, Vec3f& out_irradiance, Vec3f& out_direction, float32& out_variance) const
+	void Gather(uint64 texel, const DirectionSet& directions, const FVec3* direct, const FVec3* indirect,
+				CachedHit* cache, bool replay, FVec3& out_irradiance, FVec3& out_direction, float32& out_variance) const
 	{
 		constexpr float32 scUniformDirectionality = 2.0f / 3.0f;
 
-		const Vec3f origin = GetPosition(texel);
-		const Vec3f normal = GetNormal(texel);
+		const FVec3 origin = GetPosition(texel);
+		const FVec3 normal = GetNormal(texel);
 
-		Vec3f tangent;
-		Vec3f bitangent;
+		FVec3 tangent;
+		FVec3 bitangent;
 		GetBasis(normal, tangent, bitangent);
 
 		const float32 offset_u = HashToUnit(static_cast<uint32>(texel) * 2);
 		const float32 offset_v = HashToUnit(static_cast<uint32>(texel) * 2 + 1);
 
-		Vec3f sum(0.0f);
-		Vec3f direction_sum(0.0f);
+		FVec3 sum(0.0f);
+		FVec3 direction_sum(0.0f);
 		float32 luminance_sum = 0.0f;
 		float32 luminance_sq_sum = 0.0f;
 
 		for (uint32 ray = 0; ray < directions.Points.Size; ray++) {
-			const Vec3f local = DirectionSet::GetLocal(directions.Points[ray], offset_u, offset_v);
-			const Vec3f direction = (tangent * local.X + bitangent * local.Y + normal * local.Z).Normalize();
+			const FVec3 local = DirectionSet::GetLocal(directions.Points[ray], offset_u, offset_v);
+			const FVec3 direction = (tangent * local.X + bitangent * local.Y + normal * local.Z).Normalize();
 
 			GatherHit hit;
 
@@ -2073,7 +2073,7 @@ public:
 				}
 			}
 
-			const Vec3f radiance = GetRadiance(hit, direct, indirect);
+			const FVec3 radiance = GetRadiance(hit, direct, indirect);
 			const float32 luminance = GetLuminance(radiance);
 
 			sum += radiance;
@@ -2097,21 +2097,21 @@ public:
 	/// Traces the same rays as Gather() and writes the texel each one hits (or scSkyHit / scDarkHit), and its albedo
 	/// when `out_albedos` is given
 	void TraceGatherHits(uint64 texel, const DirectionSet& directions, uint32* out_hits,
-						 Vec3f* out_albedos = nullptr) const
+						 FVec3* out_albedos = nullptr) const
 	{
-		const Vec3f origin = GetPosition(texel);
-		const Vec3f normal = GetNormal(texel);
+		const FVec3 origin = GetPosition(texel);
+		const FVec3 normal = GetNormal(texel);
 
-		Vec3f tangent;
-		Vec3f bitangent;
+		FVec3 tangent;
+		FVec3 bitangent;
 		GetBasis(normal, tangent, bitangent);
 
 		const float32 offset_u = HashToUnit(static_cast<uint32>(texel) * 2);
 		const float32 offset_v = HashToUnit(static_cast<uint32>(texel) * 2 + 1);
 
 		for (uint32 ray = 0; ray < directions.Points.Size; ray++) {
-			const Vec3f local = DirectionSet::GetLocal(directions.Points[ray], offset_u, offset_v);
-			const Vec3f direction = (tangent * local.X + bitangent * local.Y + normal * local.Z).Normalize();
+			const FVec3 local = DirectionSet::GetLocal(directions.Points[ray], offset_u, offset_v);
+			const FVec3 direction = (tangent * local.X + bitangent * local.Y + normal * local.Z).Normalize();
 
 			const GatherHit hit = TraceHit(origin, direction);
 
@@ -2128,13 +2128,13 @@ public:
 		}
 	}
 
-	void BakeProbe(const Vec3f& position, const SizedArray<ProbeRay>& rays, const Vec3f* direct, const Vec3f* indirect,
+	void BakeProbe(const FVec3& position, const SizedArray<ProbeRay>& rays, const FVec3* direct, const FVec3* indirect,
 				   float32* out_irradiance, uint16* out_moments) const
 	{
 		constexpr uint32 cTexelCount = ProbeEncoding::scMomentTexelCount;
 		constexpr float32 cMaxDistance = Limits::ProbeDepthMaxDistance;
 
-		Vec3f sh[Limits::ProbeSHCoeffCount] = {};
+		FVec3 sh[Limits::ProbeSHCoeffCount] = {};
 
 		double weights[cTexelCount] = {};
 		double sums[cTexelCount] = {};
@@ -2142,7 +2142,7 @@ public:
 
 		for (const ProbeRay& ray : rays) {
 			const GatherHit hit = TraceWaterHit(position, ray.Direction);
-			const Vec3f radiance = GetRadiance(hit, direct, indirect);
+			const FVec3 radiance = GetRadiance(hit, direct, indirect);
 
 			for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
 				sh[k] += radiance * ray.WeightedBasis[k];
@@ -2156,7 +2156,7 @@ public:
 		}
 
 		for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
-			const Vec3f coefficient = sh[k] * ProbeEncoding::scCosineLobe[k];
+			const FVec3 coefficient = sh[k] * ProbeEncoding::scCosineLobe[k];
 
 			out_irradiance[k * 3 + 0] = coefficient.X;
 			out_irradiance[k * 3 + 1] = coefficient.Y;
@@ -2507,7 +2507,7 @@ void MeasureTransport(const IndirectBake& bake, const IndirectInput& input, cons
 		RunParallel(probe_count, 1,
 					[&](uint32 probe)
 					{
-						const Vec3f position = map.Probes.Positions[probe];
+						const FVec3 position = map.Probes.Positions[probe];
 
 						SizedArray<uint32> hits;
 						hits.InitSize(probe_rays.Size);
@@ -2573,7 +2573,7 @@ struct TransportRun
 {
 	uint32 Source;
 	uint32 Count;
-	Vec3f AlbedoSum;
+	FVec3 AlbedoSum;
 };
 
 /**
@@ -2705,8 +2705,8 @@ void BuildTransport(const IndirectBake& bake, const IndirectInput& input, const 
 						continue;
 					}
 
-					const Vec3f position = input.pPositions[best_texel];
-					const Vec3f normal = input.pNormals[best_texel];
+					const FVec3 position = input.pPositions[best_texel];
+					const FVec3 normal = input.pNormals[best_texel];
 
 					CompiledMapTransportSample& sample = samples.Emplace();
 					sample.Position[0] = position.X;
@@ -2746,7 +2746,7 @@ void BuildTransport(const IndirectBake& bake, const IndirectInput& input, const 
 					SizedArray<uint32> hits;
 					hits.InitSize(total_rays);
 
-					SizedArray<Vec3f> albedos;
+					SizedArray<FVec3> albedos;
 					albedos.InitSize(total_rays);
 
 					for (uint32 i = 0; i < count; i++) {
@@ -2778,7 +2778,7 @@ void BuildTransport(const IndirectBake& bake, const IndirectInput& input, const 
 
 					for (const TransportHit& hit : surface_hits) {
 						if (runs.Size == 0 || GetLast(runs).Source != hit.Source) {
-							runs.Emplace(TransportRun { hit.Source, 0, Vec3f(0.0f) });
+							runs.Emplace(TransportRun { hit.Source, 0, FVec3(0.0f) });
 						}
 
 						TransportRun& run = GetLast(runs);
@@ -2925,7 +2925,7 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 											  static_cast<float32>(input.Height);
 
 					shading.Texcoord[corner] = surface.Vertices[vertex].Texcoord;
-					shading.Tint[corner] = Vec3f(1.0f);
+					shading.Tint[corner] = FVec3(1.0f);
 
 					if (surface.HasVertexColors()) {
 						shading.Tint[corner] = UnpackColor(surface.Colors[vertex]);
@@ -2933,7 +2933,7 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 				}
 			}
 
-			const Vec3f facing = surface.Vertices[corners[0]].Normal + surface.Vertices[corners[1]].Normal +
+			const FVec3 facing = surface.Vertices[corners[0]].Normal + surface.Vertices[corners[1]].Normal +
 								 surface.Vertices[corners[2]].Normal;
 
 			scene.AddTriangle(surface.Vertices[corners[0]].Position, surface.Vertices[corners[1]].Position,
@@ -2962,13 +2962,13 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 
 				for (uint32 corner = 0; corner < 3; corner++) {
 					shading.Texcoord[corner] = corners[corner]->Texcoord;
-					shading.Tint[corner] = Vec3f(1.0f);
+					shading.Tint[corner] = FVec3(1.0f);
 				}
 
-				const Vec3f facing = (corners[0]->Normal + corners[1]->Normal + corners[2]->Normal).ToVec3f();
+				const FVec3 facing = (corners[0]->Normal + corners[1]->Normal + corners[2]->Normal).ToFVec3();
 
-				scene.AddTriangle(corners[0]->Position.ToVec3f(), corners[1]->Position.ToVec3f(),
-								  corners[2]->Position.ToVec3f(), facing, shading_index);
+				scene.AddTriangle(corners[0]->Position.ToFVec3(), corners[1]->Position.ToFVec3(),
+								  corners[2]->Position.ToFVec3(), facing, shading_index);
 			}
 		}
 
@@ -2978,8 +2978,8 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 	const uint32 model_triangle_count = scene.GetTriangleCount() - surface_triangle_count;
 
 	for (uint32 index = 0; index + 2 < surfaces.BlockerPoints.Size; index += 3) {
-		scene.AddTriangle(surfaces.BlockerPoints[index].ToVec3f(), surfaces.BlockerPoints[index + 1].ToVec3f(),
-						  surfaces.BlockerPoints[index + 2].ToVec3f(), Vec3f(0.0f), scNoShading);
+		scene.AddTriangle(surfaces.BlockerPoints[index].ToFVec3(), surfaces.BlockerPoints[index + 1].ToFVec3(),
+						  surfaces.BlockerPoints[index + 2].ToFVec3(), FVec3(0.0f), scNoShading);
 	}
 
 	scene.Build();
@@ -2997,16 +2997,16 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 		}
 	}
 
-	SizedArray<Vec3f> direct;
-	SizedArray<Vec3f> indirect;
-	SizedArray<Vec3f> gathered;
-	SizedArray<Vec3f> directions;
+	SizedArray<FVec3> direct;
+	SizedArray<FVec3> indirect;
+	SizedArray<FVec3> gathered;
+	SizedArray<FVec3> directions;
 	SizedArray<float32> variance;
 
-	direct.InitSize(sample_count, Vec3f(0.0f));
-	indirect.InitSize(sample_count, Vec3f(0.0f));
-	gathered.InitSize(sample_count, Vec3f(0.0f));
-	directions.InitSize(sample_count, Vec3f(0.0f));
+	direct.InitSize(sample_count, FVec3(0.0f));
+	indirect.InitSize(sample_count, FVec3(0.0f));
+	gathered.InitSize(sample_count, FVec3(0.0f));
+	directions.InitSize(sample_count, FVec3(0.0f));
 	variance.InitSize(sample_count, 0.0f);
 
 	const IndirectBake bake(source, input, scene, shadings, albedos, model_cache, water);
@@ -3016,7 +3016,7 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 				[&](uint32 cell) { direct[texel_count + cell] = bake.GetDirect(texel_count + cell); });
 
 	Array<uint8> filled;
-	Array<Vec3f> scratch_values;
+	Array<FVec3> scratch_values;
 	Array<uint8> scratch_filled;
 
 	BleedEdges(input, direct.pData, filled, scratch_values, scratch_filled);
@@ -3040,8 +3040,8 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 	Denoiser denoiser(input, texels);
 	const uint32 denoise_iterations = GetDenoiseIterations(options.IndirectDenoise);
 
-	Vec3f* previous = indirect.pData;
-	Vec3f* current = gathered.pData;
+	FVec3* previous = indirect.pData;
+	FVec3* current = gathered.pData;
 
 	for (uint32 bounce = 0; bounce < options.IndirectBounces; bounce++) {
 		RunParallel(texels.Size,
@@ -3068,7 +3068,7 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 									directions[sample], variance[sample]);
 					});
 
-		Vec3f* filtered_directions = nullptr;
+		FVec3* filtered_directions = nullptr;
 
 		if (bounce + 1 == options.IndirectBounces) {
 			filtered_directions = directions.pData;
@@ -3079,7 +3079,7 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 		std::swap(previous, current);
 	}
 
-	const Vec3f* result = previous;
+	const FVec3* result = previous;
 
 	BleedEdges(input, directions.pData, filled, scratch_values, scratch_filled);
 
@@ -3134,7 +3134,7 @@ bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, 
 		for (uint32 probe = 0; probe < probe_count; probe++) {
 			const float32* sh = out_map.ProbeIrradiance.pData +
 								static_cast<uint64>(probe) * CompiledMap::scProbeSHFloats;
-			probe_luminance_sum += GetLuminance(Vec3f(sh[0], sh[1], sh[2]) * ProbeEncoding::scSHNorm0);
+			probe_luminance_sum += GetLuminance(FVec3(sh[0], sh[1], sh[2]) * ProbeEncoding::scSHNorm0);
 		}
 
 		out_stats.BakedProbeCount = probe_count;

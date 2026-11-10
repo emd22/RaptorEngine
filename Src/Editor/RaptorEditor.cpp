@@ -319,14 +319,14 @@ uint32 RaptorEditor::GetAvailableToolMask() const
 	return mask;
 }
 
-static Vec2f GetSunAngles(const Vec3f position)
+static Vec2f GetSunAngles(const FVec3 position)
 {
 	const float32 length = position.Length();
 	if (length < 1e-6f) {
 		return Vec2f::scZero;
 	}
 
-	const Vec3f direction = position / length;
+	const FVec3 direction = position / length;
 
 	return Vec2f(MathUtil::RadiansToDegrees(std::atan2(direction.X, direction.Z)),
 				 MathUtil::RadiansToDegrees(std::asin(std::clamp(direction.Y, -1.0f, 1.0f))));
@@ -387,7 +387,7 @@ EditorPanelState RaptorEditor::BuildPanelState()
 
 		panel.bIsTrigger = object->IsTrigger();
 
-		Vec3f enter_direction;
+		FVec3 enter_direction;
 
 		if (panel.bIsTrigger && gObjectScripts->TryGetRequiredEnterDirection(object->ID, enter_direction)) {
 			panel.bHasEnterDirection = true;
@@ -410,7 +410,7 @@ EditorPanelState RaptorEditor::BuildPanelState()
 	world.ReflectionDebugView = std::clamp<int64>(gCVars->Get("r_reflection_debug", int64 { 0 }), 0, 3);
 
 	if (LightDirectional* sun = gLightManager->GetDirectionalLight(); sun != nullptr) {
-		const Vec3f position = sun->GetPosition();
+		const FVec3 position = sun->GetPosition();
 		const Vec2f angles = GetSunAngles(position);
 
 		world.bHasSun = true;
@@ -607,8 +607,8 @@ void RaptorEditor::Update(float32 delta_time)
 static void DrawModelBounds(Object* object, const Color& color)
 {
 	if (object->pMesh.IsValid()) {
-		const Vec3f half_extent = (object->Bounds.Max - object->Bounds.Min) * 0.5f;
-		const Vec3f center = (object->Bounds.Max + object->Bounds.Min) * 0.5f;
+		const FVec3 half_extent = (object->Bounds.Max - object->Bounds.Min) * 0.5f;
+		const FVec3 center = (object->Bounds.Max + object->Bounds.Min) * 0.5f;
 
 		renderer::gDebugDraw->WireBox(
 			Mat4f::AsScale(half_extent) * Mat4f::AsTranslation(center) * object->GetWorldMatrix(), color);
@@ -833,7 +833,7 @@ float32 RaptorEditor::GetAngleSnapStep() const
 	return scAngleSnapSteps[std::clamp(mToolState.ToolSnapLevel, 0, scSnapLevelCount - 1)];
 }
 
-Vec3f RaptorEditor::SnapToGrid(const Vec3f position) const
+FVec3 RaptorEditor::SnapToGrid(const FVec3 position) const
 {
 	if (!mToolState.ToolSnapEnabled) {
 		return position;
@@ -842,11 +842,11 @@ Vec3f RaptorEditor::SnapToGrid(const Vec3f position) const
 	return RoundToGrid(position);
 }
 
-Vec3f RaptorEditor::RoundToGrid(const Vec3f position) const
+FVec3 RaptorEditor::RoundToGrid(const FVec3 position) const
 {
 	const float32 step = GetSnapStep();
 
-	return Vec3f(simd::Round((position / step).mIntrin)) * step;
+	return FVec3(simd::Round((position / step).mIntrin)) * step;
 }
 
 void RaptorEditor::SyncSelection()
@@ -1155,7 +1155,7 @@ static bool IsCreatableDataKind(eDataFilter filter)
 		   filter == eDataFilter::Portals;
 }
 
-Object* RaptorEditor::CreateDataBrush(const Brush::PlaneList& planes, const Vec3f position)
+Object* RaptorEditor::CreateDataBrush(const Brush::PlaneList& planes, const FVec3 position)
 {
 	if (gWorld->pPrototype == nullptr || !IsCreatableDataKind(mDataFilter)) {
 		return nullptr;
@@ -1250,7 +1250,7 @@ void RaptorEditor::SetSunAngles(float32 azimuth_degrees, float32 elevation_degre
 		length = 1.0f;
 	}
 
-	const Vec3f direction(elevation_cos * azimuth_sin, elevation_sin, elevation_cos * azimuth_cos);
+	const FVec3 direction(elevation_cos * azimuth_sin, elevation_sin, elevation_cos * azimuth_cos);
 
 	sun->SetPosition(direction * length);
 	MarkModified();
@@ -1288,15 +1288,15 @@ void RaptorEditor::SetSunElevation(float32 elevation_degrees)
 
 Object* RaptorEditor::CreateReflectionProbeAtPlayer()
 {
-	const Vec3f scDefaultDataBrushHalfExtent(2.0f, 1.5f, 2.0f);
+	const FVec3 scDefaultDataBrushHalfExtent(2.0f, 1.5f, 2.0f);
 
 	if (gWorld->pPrototype == nullptr) {
 		return nullptr;
 	}
 
-	const Vec3f center = SnapToGrid(gWorld->Player.pCamera->GetPosition());
+	const FVec3 center = SnapToGrid(gWorld->Player.pCamera->GetPosition());
 
-	Vec3f position;
+	FVec3 position;
 	const Brush brush = gWorld->pPrototype->MakeWorldBox(center - scDefaultDataBrushHalfExtent,
 														 center + scDefaultDataBrushHalfExtent, position);
 
@@ -1405,19 +1405,19 @@ uint32 RaptorEditor::SetSelectionScript(const String& path)
 	return count;
 }
 
-uint32 RaptorEditor::SetSelectionEnterDirection(const Vec3f local_direction)
+uint32 RaptorEditor::SetSelectionEnterDirection(const FVec3 local_direction)
 {
 	constexpr float32 scMinDirectionLength = 1e-4f;
 	constexpr float32 scSameDirectionDistance = 1e-5f;
 
-	Vec3f wanted = Vec3f::sZero;
+	FVec3 wanted = FVec3::sZero;
 
 	if (local_direction.Length() > scMinDirectionLength) {
 		wanted = local_direction.Normalize();
 	}
 
 	Object* targets[scMaxSelectedObjects];
-	Vec3f befores[scMaxSelectedObjects];
+	FVec3 befores[scMaxSelectedObjects];
 	uint32 count = 0;
 
 	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
@@ -1427,7 +1427,7 @@ uint32 RaptorEditor::SetSelectionEnterDirection(const Vec3f local_direction)
 			continue;
 		}
 
-		Vec3f current = Vec3f::sZero;
+		FVec3 current = FVec3::sZero;
 		gObjectScripts->TryGetRequiredEnterDirection(object->ID, current);
 
 		if ((current - wanted).Length() < scSameDirectionDistance) {
@@ -1604,7 +1604,7 @@ void RaptorEditor::DupeSelection()
 	SyncSelection();
 }
 
-bool RaptorEditor::ClipObject(Object* object, const Vec3f point_a, const Vec3f point_b, const Vec3f direction)
+bool RaptorEditor::ClipObject(Object* object, const FVec3 point_a, const FVec3 point_b, const FVec3 direction)
 {
 	Blockout* blockout = gWorld->pPrototype;
 
@@ -1672,7 +1672,7 @@ static uint32 SubtractCutter(Object* cutter, const DynArray<ObjectID, GrowthFunc
 		}
 
 		Brush::PieceList pieces;
-		SizedArray<Vec3f> positions;
+		SizedArray<FVec3> positions;
 
 		if (!gWorld->pPrototype->GetSubtractPieces(target, cutter, pieces, positions)) {
 			continue;
@@ -1844,7 +1844,7 @@ bool RaptorEditor::CreateSubviewFromSelection(const String& name)
 
 	BrushPlacement placement;
 	placement.Position = SnapToGrid(
-		Vec3f((bounds.Min.X + bounds.Max.X) * 0.5f, bounds.Min.Y, (bounds.Min.Z + bounds.Max.Z) * 0.5f));
+		FVec3((bounds.Min.X + bounds.Max.X) * 0.5f, bounds.Min.Y, (bounds.Min.Z + bounds.Max.Z) * 0.5f));
 
 	String wanted_name = name;
 

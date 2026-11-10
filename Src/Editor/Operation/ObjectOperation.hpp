@@ -36,20 +36,20 @@ protected:
 class MoveOperation final : public ObjectEditOperation
 {
 public:
-	MoveOperation(Object* object, const Vec3f& before, const Vec3f& after, int32 group_size = 1);
+	MoveOperation(Object* object, const FVec3& before, const FVec3& after, int32 group_size = 1);
 
 	void Execute(EditorSelection& selection) override;
 	void Undo(EditorSelection& selection) override;
 
 private:
-	Vec3f mBefore;
-	Vec3f mAfter;
+	FVec3 mBefore;
+	FVec3 mAfter;
 };
 
 class RotateOperation final : public ObjectEditOperation
 {
 public:
-	RotateOperation(Object* object, const Vec3f& euler_before, const Vec3f& euler_after, int32 group_size = 1);
+	RotateOperation(Object* object, const FVec3& euler_before, const FVec3& euler_after, int32 group_size = 1);
 	RotateOperation(Object* object, const Quat& before, const Quat& after, int32 group_size = 1);
 
 	void Execute(EditorSelection& selection) override;
@@ -63,13 +63,13 @@ private:
 class ScaleFaceOperation final : public ObjectEditOperation
 {
 public:
-	ScaleFaceOperation(Object* object, const Vec3f& face_normal, float32 distance, int32 group_size = 1);
+	ScaleFaceOperation(Object* object, const FVec3& face_normal, float32 distance, int32 group_size = 1);
 
 	void Execute(EditorSelection& selection) override;
 	void Undo(EditorSelection& selection) override;
 
 private:
-	Vec3f mFaceNormal;
+	FVec3 mFaceNormal;
 	float32 mDistance;
 	Brush::PlaneList mPlanesBefore;
 };
@@ -133,7 +133,7 @@ private:
 	bool mbEnabled;
 
 	eObjectTag mTagsBefore = eObjectTag::None;
-	Vec3f mPositionBefore = Vec3f::sZero;
+	FVec3 mPositionBefore = FVec3::sZero;
 	Quat mRotationBefore = Quat::scIdentity;
 	DynArray<NodeFlags, GrowthFunctions::Double> mNodesBefore;
 };
@@ -167,14 +167,14 @@ private:
 class TriggerDirectionEditOperation final : public ObjectEditOperation
 {
 public:
-	TriggerDirectionEditOperation(Object* object, const Vec3f& before, const Vec3f& after, int32 group_size = 1);
+	TriggerDirectionEditOperation(Object* object, const FVec3& before, const FVec3& after, int32 group_size = 1);
 
 	void Execute(EditorSelection& selection) override;
 	void Undo(EditorSelection& selection) override;
 
 private:
-	Vec3f mBefore;
-	Vec3f mAfter;
+	FVec3 mBefore;
+	FVec3 mAfter;
 };
 
 
@@ -185,12 +185,12 @@ private:
 class CreateOperation final : public ObjectCreationOperation
 {
 public:
-	explicit CreateOperation(const Vec3f& position, int32 group_size = 1, MaterialID material = MaterialID::scNull);
+	explicit CreateOperation(const FVec3& position, int32 group_size = 1, MaterialID material = MaterialID::scNull);
 
 	void Execute(EditorSelection& selection) override;
 
 private:
-	Vec3f mPosition;
+	FVec3 mPosition;
 	MaterialID mMaterial;
 };
 
@@ -216,7 +216,7 @@ class DupeOperation final : public ObjectEditOperation
 {
 public:
 	/// `dupe_subview` is the subview instance that the dupe becomes, when a placed subview is being copied
-	DupeOperation(Object* original, const Vec3f& position, int32 group_size = 1, uint32 dupe_subview = 0);
+	DupeOperation(Object* original, const FVec3& position, int32 group_size = 1, uint32 dupe_subview = 0);
 
 	void Execute(EditorSelection& selection) override;
 	void Undo(EditorSelection& selection) override;
@@ -227,7 +227,7 @@ public:
 	Object* GetDupe() const;
 
 private:
-	Vec3f mPosition;
+	FVec3 mPosition;
 	uint32 mDupeSubview = 0;
 	Object* mpDupe = nullptr;
 	ObjectID mDupeID = ObjectID::scNull;

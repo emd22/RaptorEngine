@@ -1020,11 +1020,11 @@ const SoundDef* AudioSystem::FindDef(Hash32 name_hash) const
 	return &mDefs[index];
 }
 
-SoundID AudioSystem::Play(const char* name, const Vec3f position) { return Play(HashStr32(name), position); }
+SoundID AudioSystem::Play(const char* name, const FVec3 position) { return Play(HashStr32(name), position); }
 
-SoundID AudioSystem::Play(Hash32 name_hash, const Vec3f position) { return StartVoice(name_hash, position, true); }
+SoundID AudioSystem::Play(Hash32 name_hash, const FVec3 position) { return StartVoice(name_hash, position, true); }
 
-SoundID AudioSystem::PlayDelayed(Hash32 name_hash, const Vec3f position, float32 delay)
+SoundID AudioSystem::PlayDelayed(Hash32 name_hash, const FVec3 position, float32 delay)
 {
 	return StartVoice(name_hash, position, true, delay);
 }
@@ -1050,7 +1050,7 @@ Hash32 AudioSystem::FindSurfaceSound(const char* event, const String& surface) c
 	return HashStr32(event);
 }
 
-SoundID AudioSystem::PlayForSurface(const char* event, const String& surface, const Vec3f position)
+SoundID AudioSystem::PlayForSurface(const char* event, const String& surface, const FVec3 position)
 {
 	if (mpBackend == nullptr) {
 		return {};
@@ -1068,7 +1068,7 @@ SoundID AudioSystem::PlayForSurface2D(const char* event, const String& surface)
 	return Play2D(FindSurfaceSound(event, surface));
 }
 
-SoundID AudioSystem::Play2D(Hash32 name_hash) { return StartVoice(name_hash, Vec3f::sZero, false); }
+SoundID AudioSystem::Play2D(Hash32 name_hash) { return StartVoice(name_hash, FVec3::sZero, false); }
 
 uint32 AudioSystem::AcquireVoice(uint32 def_index)
 {
@@ -1141,7 +1141,7 @@ uint32 AudioSystem::AcquireVoice(uint32 def_index)
 	return steal_slot;
 }
 
-SoundID AudioSystem::StartVoice(Hash32 name_hash, const Vec3f position, bool spatial, float32 delay)
+SoundID AudioSystem::StartVoice(Hash32 name_hash, const FVec3 position, bool spatial, float32 delay)
 {
 	if (mpBackend == nullptr) {
 		return {};
@@ -1316,7 +1316,7 @@ SoundID AudioSystem::StartVoice(Hash32 name_hash, const Vec3f position, bool spa
 	ma_sound_set_looping(sound, def.bLoop);
 
 	if ((flags & MA_SOUND_FLAG_NO_SPATIALIZATION) == 0) {
-		const Vec3f audio_position = ToAudioSpace(position);
+		const FVec3 audio_position = ToAudioSpace(position);
 
 		ma_sound_set_position(sound, audio_position.X, audio_position.Y, audio_position.Z);
 		ma_sound_set_attenuation_model(sound, ToAttenuationModel(def.Attenuation));
@@ -1433,7 +1433,7 @@ void AudioSystem::StartReadyVoices()
 	}
 }
 
-void AudioSystem::SetPosition(SoundID id, const Vec3f position)
+void AudioSystem::SetPosition(SoundID id, const FVec3 position)
 {
 	Voice* voice = GetVoice(id);
 
@@ -1448,7 +1448,7 @@ void AudioSystem::SetPosition(SoundID id, const Vec3f position)
 		return;
 	}
 
-	const Vec3f audio_position = ToAudioSpace(position);
+	const FVec3 audio_position = ToAudioSpace(position);
 
 	ma_sound_set_position(&mpBackend->Voices[id.Slot], audio_position.X, audio_position.Y, audio_position.Z);
 }
@@ -1501,7 +1501,7 @@ void AudioSystem::StopAll()
 	}
 }
 
-void AudioSystem::SetListener(const Vec3f position, const Vec3f forward, const Vec3f up)
+void AudioSystem::SetListener(const FVec3 position, const FVec3 forward, const FVec3 up)
 {
 	if (mpBackend == nullptr) {
 		return;
@@ -1509,9 +1509,9 @@ void AudioSystem::SetListener(const Vec3f position, const Vec3f forward, const V
 
 	mListenerPosition = position;
 
-	const Vec3f audio_position = ToAudioSpace(position);
-	const Vec3f audio_forward = ToAudioSpace(forward);
-	const Vec3f audio_up = ToAudioSpace(up);
+	const FVec3 audio_position = ToAudioSpace(position);
+	const FVec3 audio_forward = ToAudioSpace(forward);
+	const FVec3 audio_up = ToAudioSpace(up);
 
 	mSpatial.SetListener(audio_position, audio_forward, audio_up);
 

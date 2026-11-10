@@ -6,7 +6,7 @@ namespace fx::mapc {
 
 namespace {
 
-void SnapPlane(Vec3d& normal, double& distance)
+void SnapPlane(DVec3& normal, double& distance)
 {
 	constexpr double scSnapEpsilon = 1e-7;
 	constexpr double scDistanceSnapGrid = 1024.0;
@@ -22,7 +22,7 @@ void SnapPlane(Vec3d& normal, double& distance)
 				direction = -1.0;
 			}
 
-			normal = Vec3d(0.0);
+			normal = DVec3(0.0);
 			normal.mData[axis] = direction;
 			break;
 		}
@@ -37,7 +37,7 @@ void SnapPlane(Vec3d& normal, double& distance)
 	}
 }
 
-bool IsSamePlane(const Plane& plane, const Vec3d& normal, double distance)
+bool IsSamePlane(const Plane& plane, const DVec3& normal, double distance)
 {
 	constexpr double scNormalEpsilon = 1e-6;
 	constexpr double scDistanceEpsilon = 1e-4;
@@ -48,7 +48,7 @@ bool IsSamePlane(const Plane& plane, const Vec3d& normal, double distance)
 		   std::abs(plane.Normal.Z - normal.Z) < scNormalEpsilon;
 }
 
-void SnapPointToAxialPlane(Vec3d& point, const Plane& plane)
+void SnapPointToAxialPlane(DVec3& point, const Plane& plane)
 {
 	for (int32 axis = 0; axis < 3; axis++) {
 		if (plane.Normal.mData[axis] == 1.0) {
@@ -62,7 +62,7 @@ void SnapPointToAxialPlane(Vec3d& point, const Plane& plane)
 
 } // namespace
 
-int32 PlaneSet::FindOrAdd(Vec3d normal, double distance)
+int32 PlaneSet::FindOrAdd(DVec3 normal, double distance)
 {
 	constexpr double scBucketsPerUnit = 64.0;
 
@@ -81,7 +81,7 @@ int32 PlaneSet::FindOrAdd(Vec3d normal, double distance)
 		}
 	}
 
-	const Vec3d positive_normal = normal * sign;
+	const DVec3 positive_normal = normal * sign;
 	const double positive_distance = distance * sign;
 
 	int32 flipped = 0;
@@ -122,16 +122,16 @@ Winding MakeBaseWinding(const Plane& plane, double extent)
 		}
 	}
 
-	Vec3d up = Vec3d(0.0, 1.0, 0.0);
+	DVec3 up = DVec3(0.0, 1.0, 0.0);
 	if (major_axis == 1) {
-		up = Vec3d(1.0, 0.0, 0.0);
+		up = DVec3(1.0, 0.0, 0.0);
 	}
 
 	up = up - plane.Normal * up.Dot(plane.Normal);
 	up = up * (extent / up.Length());
 
-	const Vec3d right = up.Cross(plane.Normal);
-	const Vec3d origin = plane.Normal * plane.Distance;
+	const DVec3 right = up.Cross(plane.Normal);
+	const DVec3 origin = plane.Normal * plane.Distance;
 
 	Winding winding;
 	winding.SetPageSize(scBaseWindingCapacity);
@@ -192,7 +192,7 @@ eSide SplitWinding(const Winding& winding, const Plane& plane, Winding& out_fron
 
 	for (size_t i = 0; i < count; i++) {
 		const size_t next = (i + 1) % count;
-		const Vec3d& point = winding[i];
+		const DVec3& point = winding[i];
 
 		if (sides[i] == 0) {
 			out_front.Emplace(point);
@@ -211,9 +211,9 @@ eSide SplitWinding(const Winding& winding, const Plane& plane, Winding& out_fron
 			continue;
 		}
 
-		const Vec3d& next_point = winding[next];
+		const DVec3& next_point = winding[next];
 
-		Vec3d middle = point;
+		DVec3 middle = point;
 
 		if (sides[i] > 0) {
 			middle = point + (next_point - point) * (distances[i] / (distances[i] - distances[next]));
@@ -255,7 +255,7 @@ void RemoveDuplicatePoints(Winding& winding)
 
 	Winding result;
 
-	for (const Vec3d& point : winding) {
+	for (const DVec3& point : winding) {
 		if (result.Size != 0 && (point - GetLast(result)).Length() < scPointEpsilon) {
 			continue;
 		}
@@ -290,9 +290,9 @@ bool IsWindingTiny(const Winding& winding)
 	return long_edges < 3 || GetWindingArea(winding) < scMinArea;
 }
 
-static Vec3d GetAreaVector(const Winding& winding)
+static DVec3 GetAreaVector(const Winding& winding)
 {
-	Vec3d sum = Vec3d(0.0);
+	DVec3 sum = DVec3(0.0);
 
 	for (size_t i = 2; i < winding.Size; i++) {
 		sum = sum + (winding[i - 1] - winding[0]).Cross(winding[i] - winding[0]);
@@ -303,23 +303,23 @@ static Vec3d GetAreaVector(const Winding& winding)
 
 double GetWindingArea(const Winding& winding) { return GetAreaVector(winding).Length(); }
 
-Vec3d GetWindingNormal(const Winding& winding)
+DVec3 GetWindingNormal(const Winding& winding)
 {
-	const Vec3d area = GetAreaVector(winding);
+	const DVec3 area = GetAreaVector(winding);
 	const double length = area.Length();
 
 	if (length > 0.0) {
 		return area * (1.0 / length);
 	}
 
-	return Vec3d(0.0);
+	return DVec3(0.0);
 }
 
-Vec3d GetWindingCenter(const Winding& winding)
+DVec3 GetWindingCenter(const Winding& winding)
 {
-	Vec3d sum = Vec3d(0.0);
+	DVec3 sum = DVec3(0.0);
 
-	for (const Vec3d& point : winding) {
+	for (const DVec3& point : winding) {
 		sum = sum + point;
 	}
 
@@ -364,11 +364,11 @@ Polyhedron Polyhedron::Clone() const
 
 void Polyhedron::UpdateBounds()
 {
-	Min = Vec3d(1e30, 1e30, 1e30);
-	Max = Vec3d(-1e30, -1e30, -1e30);
+	Min = DVec3(1e30, 1e30, 1e30);
+	Max = DVec3(-1e30, -1e30, -1e30);
 
 	for (const PolyhedronSide& side : Sides) {
-		for (const Vec3d& point : side.Points) {
+		for (const DVec3& point : side.Points) {
 			Min = MinVec(Min, point);
 			Max = MaxVec(Max, point);
 		}
@@ -468,7 +468,7 @@ eSide SplitPolyhedron(const PlaneSet& planes, const Polyhedron& polyhedron, int3
 			continue;
 		}
 
-		for (const Vec3d& point : side.Points) {
+		for (const DVec3& point : side.Points) {
 			const double distance = plane.DistanceTo(point);
 
 			max_front = std::fmax(max_front, distance);

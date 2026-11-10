@@ -3,9 +3,9 @@
 #include <Core/Name.hpp>
 #include <Core/PagedArray.hpp>
 #include <Core/Ref.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/Quat.hpp>
-#include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
 #include <Renderer/Constants.hpp>
 
@@ -33,7 +33,7 @@ enum class eTransformMode
 class Entity
 {
 public:
-	virtual void SetPosition(const Vec3f position)
+	virtual void SetPosition(const FVec3 position)
 	{
 		mPosition = position;
 		MarkTransformOutOfDate();
@@ -47,7 +47,7 @@ public:
 
 	virtual void SetScale(const float scale);
 
-	virtual void MoveBy(const Vec3f offset) { SetPosition(mPosition + offset); }
+	virtual void MoveBy(const FVec3 offset) { SetPosition(mPosition + offset); }
 	void ScaleBy(const float scale);
 
 	virtual void OnAttached(World* scene) {}
@@ -65,7 +65,7 @@ public:
 	Mat4f& GetWorldMatrix();
 	// const Mat4f& GetNormalMatrix();
 
-	const Vec3f GetPosition() const { return mPosition; }
+	const FVec3 GetPosition() const { return mPosition; }
 
 	FX_FORCE_INLINE void MarkTransformOutOfDate()
 	{
@@ -74,7 +74,7 @@ public:
 		MarkMatrixOutOfDate();
 	}
 
-	FX_FORCE_INLINE void SetRotationOrigin(const Vec3f origin)
+	FX_FORCE_INLINE void SetRotationOrigin(const FVec3 origin)
 	{
 		RotationOrigin = origin;
 		TransformMode = eTransformMode::TransformFromOrigin;
@@ -118,11 +118,11 @@ public:
 
 	Name Name;
 
-	Vec3f mPosition = Vec3f::sZero;
+	FVec3 mPosition = FVec3::sZero;
 	Quat mRotation = Quat::scIdentity;
 	float32 mScale = 1.0f;
 
-	Vec3f RotationOrigin = Vec3f::sZero;
+	FVec3 RotationOrigin = FVec3::sZero;
 
 	eTransformMode TransformMode = eTransformMode::Default;
 

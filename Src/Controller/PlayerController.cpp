@@ -4,10 +4,10 @@
 
 namespace fx {
 
-Vec3f PlayerController::Update(double delta_time, const Vec3f input, const PerspectiveCamera& camera, bool sprinting)
+FVec3 PlayerController::Update(double delta_time, const FVec3 input, const PerspectiveCamera& camera, bool sprinting)
 {
-	const Vec3f forward = camera.GetFlatForwardVector();
-	const Vec3f right = camera.GetFlatRightVector();
+	const FVec3 forward = camera.GetFlatForwardVector();
+	const FVec3 right = camera.GetFlatRightVector();
 
 	Accelerate(forward * input.Z + right * input.X, delta_time, sprinting);
 

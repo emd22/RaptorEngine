@@ -79,7 +79,7 @@ void AreaGraph::Load(const CompiledMap& map)
 		portal.Points.InitSize(point_count);
 
 		for (uint32 point = 0; point < point_count; point++) {
-			portal.Points[point] = Vec3f(source.Points[point * 3], source.Points[point * 3 + 1],
+			portal.Points[point] = FVec3(source.Points[point * 3], source.Points[point * 3 + 1],
 										 source.Points[point * 3 + 2]);
 		}
 
@@ -91,12 +91,12 @@ void AreaGraph::Load(const CompiledMap& map)
 		for (size_t polygon = 0; polygon < portal.PolygonSizes.Size; polygon++) {
 			const uint32 size = portal.PolygonSizes[polygon];
 
-			Vec3f normal = Vec3f::sZero;
-			Vec3f center = Vec3f::sZero;
+			FVec3 normal = FVec3::sZero;
+			FVec3 center = FVec3::sZero;
 
 			for (uint32 point = 0; point < size; point++) {
-				const Vec3f& a = portal.Points[first_point + point];
-				const Vec3f& b = portal.Points[first_point + (point + 1) % size];
+				const FVec3& a = portal.Points[first_point + point];
+				const FVec3& b = portal.Points[first_point + (point + 1) % size];
 
 				normal.X += (a.Y - b.Y) * (a.Z + b.Z);
 				normal.Y += (a.Z - b.Z) * (a.X + b.X);
@@ -136,7 +136,7 @@ int32 AreaGraph::FindPortal(const char* name) const
 	return -1;
 }
 
-int32 AreaGraph::FindArea(const Vec3f& point) const
+int32 AreaGraph::FindArea(const FVec3& point) const
 {
 	int32 child = mRoot;
 
@@ -188,7 +188,7 @@ void AreaGraph::CollectConnectedAreas(uint32 area, std::vector<uint8>& out_conne
 	}
 }
 
-void AreaGraph::CollectAreas(int32 child, const Vec3f& center, const Vec3f& extent, AreaSet& out_set) const
+void AreaGraph::CollectAreas(int32 child, const FVec3& center, const FVec3& extent, AreaSet& out_set) const
 {
 	while (child >= 0 && !out_set.bEverywhere) {
 		const MapAreaNode& node = mNodes[static_cast<size_t>(child)];
@@ -225,8 +225,8 @@ AreaSet AreaGraph::FindAreas(const BBox& bounds) const
 		return AreaSet {};
 	}
 
-	const Vec3f center = (bounds.Min + bounds.Max) * 0.5f;
-	const Vec3f extent = (bounds.Max - bounds.Min) * 0.5f;
+	const FVec3 center = (bounds.Min + bounds.Max) * 0.5f;
+	const FVec3 extent = (bounds.Max - bounds.Min) * 0.5f;
 
 	AreaSet set = AreaSet::MakeEmpty();
 	CollectAreas(mRoot, center, extent, set);
@@ -244,7 +244,7 @@ static bool BoundsOverlap(const BBox& a, const BBox& b)
 		   a.Max.Z >= b.Min.Z;
 }
 
-void AreaGraph::AddLightSeedArea(const Vec3f& point, AreaSet& out_set) const
+void AreaGraph::AddLightSeedArea(const FVec3& point, AreaSet& out_set) const
 {
 	const int32 area = FindArea(point);
 
@@ -253,7 +253,7 @@ void AreaGraph::AddLightSeedArea(const Vec3f& point, AreaSet& out_set) const
 	}
 }
 
-AreaSet AreaGraph::FindLightAreas(const Vec3f& origin, const BBox& bounds) const
+AreaSet AreaGraph::FindLightAreas(const FVec3& origin, const BBox& bounds) const
 {
 	if (IsEmpty()) {
 		return AreaSet {};
@@ -270,9 +270,9 @@ AreaSet AreaGraph::FindLightAreas(const Vec3f& origin, const BBox& bounds) const
 			break;
 		}
 
-		const Vec3f steps[] = { Vec3f(offset, 0.0f, 0.0f), Vec3f(0.0f, offset, 0.0f), Vec3f(0.0f, 0.0f, offset) };
+		const FVec3 steps[] = { FVec3(offset, 0.0f, 0.0f), FVec3(0.0f, offset, 0.0f), FVec3(0.0f, 0.0f, offset) };
 
-		for (const Vec3f& step : steps) {
+		for (const FVec3& step : steps) {
 			AddLightSeedArea(origin + step, set);
 			AddLightSeedArea(origin - step, set);
 		}

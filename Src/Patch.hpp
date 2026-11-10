@@ -9,10 +9,10 @@
 #pragma once
 
 #include <Core/SizedArray.hpp>
+#include <Math/DVec3.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/Vec2.hpp>
-#include <Math/Vec3.hpp>
-#include <Math/Vec3d.hpp>
 
 namespace fx {
 
@@ -32,7 +32,7 @@ struct PatchColor
 
 struct PatchPoint
 {
-	Vec3f Position = Vec3f::sZero;
+	FVec3 Position = FVec3::sZero;
 	Vec2f Texcoord = Vec2f(0.0f, 0.0f);
 	float32 Weight = 1.0f;
 	PatchColor Color;
@@ -40,9 +40,9 @@ struct PatchPoint
 
 struct PatchVertex
 {
-	Vec3d Position = Vec3d(0.0);
-	Vec3d Normal = Vec3d(0.0);
-	Vec3d Tangent = Vec3d(0.0);
+	DVec3 Position = DVec3(0.0);
+	DVec3 Normal = DVec3(0.0);
+	DVec3 Tangent = DVec3(0.0);
 	double Handedness = 1.0;
 	Vec2d Texcoord = Vec2d(0.0, 0.0);
 	Vec2d Parameter = Vec2d(0.0, 0.0);
@@ -109,14 +109,14 @@ public:
 	static Patch FromGrid(uint32 width, uint32 height);
 	static Patch FromDetailMesh(uint32 width, uint32 height);
 
-	static Patch MakeFlat(const Vec3f min, const Vec3f max, uint32 axis);
-	static Patch MakeCylinder(const Vec3f min, const Vec3f max, uint32 axis);
-	static Patch MakeCone(const Vec3f min, const Vec3f max, uint32 axis);
-	static Patch MakeBevel(const Vec3f min, const Vec3f max, uint32 axis);
-	static Patch MakeEndcap(const Vec3f min, const Vec3f max, uint32 axis);
-	static Patch MakeDetailMesh(const Vec3f min, const Vec3f max, uint32 axis, uint32 cells_u = scDefaultSubdivisions,
+	static Patch MakeFlat(const FVec3 min, const FVec3 max, uint32 axis);
+	static Patch MakeCylinder(const FVec3 min, const FVec3 max, uint32 axis);
+	static Patch MakeCone(const FVec3 min, const FVec3 max, uint32 axis);
+	static Patch MakeBevel(const FVec3 min, const FVec3 max, uint32 axis);
+	static Patch MakeEndcap(const FVec3 min, const FVec3 max, uint32 axis);
+	static Patch MakeDetailMesh(const FVec3 min, const FVec3 max, uint32 axis, uint32 cells_u = scDefaultSubdivisions,
 								uint32 cells_v = scDefaultSubdivisions);
-	static Patch MakePrimitive(ePatchPrimitive primitive, const Vec3f min, const Vec3f max, uint32 axis);
+	static Patch MakePrimitive(ePatchPrimitive primitive, const FVec3 min, const FVec3 max, uint32 axis);
 
 	static bool IsValidSize(uint32 size) { return size >= scMinSize && size <= scMaxSize && (size & 1) == 1; }
 	static bool IsValidDetailMeshSize(uint32 size)
@@ -149,9 +149,9 @@ public:
 	PatchPoint& GetPoint(uint32 column, uint32 row) { return Points[row * Width + column]; }
 	const PatchPoint& GetPoint(uint32 column, uint32 row) const { return Points[row * Width + column]; }
 
-	Vec3f GetBoundsMin() const;
-	Vec3f GetBoundsMax() const;
-	Vec3f GetCenter() const { return (GetBoundsMin() + GetBoundsMax()) * 0.5f; }
+	FVec3 GetBoundsMin() const;
+	FVec3 GetBoundsMax() const;
+	FVec3 GetCenter() const { return (GetBoundsMin() + GetBoundsMax()) * 0.5f; }
 
 	bool IsCellTurned(uint32 column, uint32 row) const;
 	void TurnCell(uint32 column, uint32 row);
@@ -161,7 +161,7 @@ public:
 
 	void Tessellate(PatchMesh& out_mesh) const;
 
-	void GenerateMesh(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normals, SizedArray<Vec3f>& tangents,
+	void GenerateMesh(SizedArray<FVec3>& positions, SizedArray<FVec3>& normals, SizedArray<FVec3>& tangents,
 					  SizedArray<float32>& tangent_handedness, SizedArray<Vec2f>& texcoords,
 					  SizedArray<uint32>& indices, const Mat4f& to_world = Mat4f::scIdentity,
 					  SizedArray<uint32>* packed_colors = nullptr) const;
@@ -184,7 +184,7 @@ public:
 	void GetEdgePoints(uint32 edge, SizedArray<PatchPoint>& out_points) const;
 	bool IsEdgeClosed(uint32 edge) const;
 	bool IsEdgeRing(uint32 edge) const;
-	Vec3d GetEdgeOutward(uint32 edge) const;
+	DVec3 GetEdgeOutward(uint32 edge) const;
 
 	Patch MakeOffset(float32 distance) const;
 	Patch MakeCap(uint32 edge, const Mat4f& to_world = Mat4f::scIdentity) const;

@@ -15,9 +15,9 @@
 #include <Core/PagedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Quat.hpp>
 #include <Math/Vec2.hpp>
-#include <Math/Vec3.hpp>
 #include <Util/Tokenizer.hpp>
 #include <string>
 #include <vector>
@@ -331,7 +331,7 @@ public:
 		return entry;
 	}
 
-	static ConfigEntry Literal(const String& name, const Vec3f value)
+	static ConfigEntry Literal(const String& name, const FVec3 value)
 	{
 		ConfigEntry entry = ConfigEntry::Array(name, ConfigPrimitive::ePrimitiveType::Float);
 		entry.AppendValue(value);
@@ -377,7 +377,7 @@ public:
 
 	void AppendValue(ConfigPrimitive&& value);
 
-	void AppendValue(const Vec3f vec);
+	void AppendValue(const FVec3 vec);
 	void AppendValue(const Vec4f vec);
 	void AppendValue(const Quat quat);
 
@@ -405,13 +405,13 @@ public:
 	}
 
 	template <>
-	Vec3f GetValue<Vec3f>() const
+	FVec3 GetValue<FVec3>() const
 	{
 		if (!bIsArray || ArrayData.Size() < 3) {
 			LogWarning(LC_CORE, "Config entry '{}' is not an array of at least 3 values", Name.Get());
-			return Vec3f(0.0f, 0.0f, 0.0f);
+			return FVec3(0.0f, 0.0f, 0.0f);
 		}
-		return Vec3f(ArrayData[0].Get<float32>(), ArrayData[1].Get<float32>(), ArrayData[2].Get<float32>());
+		return FVec3(ArrayData[0].Get<float32>(), ArrayData[1].Get<float32>(), ArrayData[2].Get<float32>());
 	}
 
 	template <>

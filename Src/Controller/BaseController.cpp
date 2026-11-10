@@ -13,7 +13,7 @@ float32 BaseController::GetMaxSpeed(bool sprinting) const
 	return max_speed * SpeedMultiplier;
 }
 
-void BaseController::Accelerate(const Vec3f direction, double delta_time, bool sprinting)
+void BaseController::Accelerate(const FVec3 direction, double delta_time, bool sprinting)
 {
 	mGoal = direction;
 

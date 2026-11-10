@@ -5,9 +5,9 @@
 #include <Core/SizedArray.hpp>
 #include <Core/StackArray.hpp>
 #include <Core/String.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/Quat.hpp>
-#include <Math/Vec3.hpp>
 #include <Renderer/Limits.hpp>
 
 namespace fx {
@@ -36,9 +36,9 @@ struct BoneTransformTrack
 
 struct BoneTrack
 {
-	BoneTransformTrack<Vec3f> Translation;
+	BoneTransformTrack<FVec3> Translation;
 	BoneTransformTrack<Quat> Rotation;
-	BoneTransformTrack<Vec3f> Scale;
+	BoneTransformTrack<FVec3> Scale;
 };
 
 struct Animation
@@ -72,16 +72,16 @@ struct AnimationPlayback
 
 struct BoneTransform
 {
-	Vec3f Translation = Vec3f::sZero;
+	FVec3 Translation = FVec3::sZero;
 	Quat Rotation = Quat::scIdentity;
-	Vec3f Scale = Vec3f::sOne;
+	FVec3 Scale = FVec3::sOne;
 };
 
 struct BoneDelta
 {
-	Vec3f Translation = Vec3f::sZero;
-	Vec3f Rotation = Vec3f::sZero;
-	Vec3f Scale = Vec3f::sZero;
+	FVec3 Translation = FVec3::sZero;
+	FVec3 Rotation = FVec3::sZero;
+	FVec3 Scale = FVec3::sZero;
 };
 
 void BlendPoses(const BoneTransform* a, const BoneTransform* b, float32 weight, BoneTransform* out, uint32 count);
@@ -178,7 +178,7 @@ public:
 	uint32 BoneBufferBase = scNoBones;
 
 	uint32 PoseHash = 0;
-	Vec3f PoseCenter = Vec3f::sZero;
+	FVec3 PoseCenter = FVec3::sZero;
 	float32 PoseRadius = 0.0f;
 
 	Ref<Skeleton> pSource { nullptr };

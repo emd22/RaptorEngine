@@ -9,7 +9,7 @@ namespace fx::Acoustics {
 const IPLBakedDataIdentifier scReverbIdentifier = { IPL_BAKEDDATATYPE_REFLECTIONS, IPL_BAKEDDATAVARIATION_REVERB, {} };
 const IPLBakedDataIdentifier scPathingIdentifier = { IPL_BAKEDDATATYPE_PATHING, IPL_BAKEDDATAVARIATION_DYNAMIC, {} };
 
-IPLVector3 ToIPL(const Vec3f value);
+IPLVector3 ToIPL(const FVec3 value);
 
 IPLMaterial GetMaterial(const AcousticSurface& surface);
 

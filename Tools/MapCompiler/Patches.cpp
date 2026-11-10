@@ -38,7 +38,7 @@ struct SmoothKeyHash
 	}
 };
 
-SmoothKey MakeSmoothKey(uint32 group, const Vec3d& point)
+SmoothKey MakeSmoothKey(uint32 group, const DVec3& point)
 {
 	constexpr double scSmoothCellSize = 1e-3;
 
@@ -53,9 +53,9 @@ struct VertexRef
 	uint32 Vertex = 0;
 };
 
-Vec3d Orthogonalize(const Vec3d& tangent, const Vec3d& normal)
+DVec3 Orthogonalize(const DVec3& tangent, const DVec3& normal)
 {
-	const Vec3d projected = tangent - normal * normal.Dot(tangent);
+	const DVec3 projected = tangent - normal * normal.Dot(tangent);
 	const double length = projected.Length();
 
 	if (length <= scMinNormalLength) {
@@ -106,7 +106,7 @@ void BuildChartGrid(const Patch& patch, ChartGrid& out_grid)
 		return;
 	}
 
-	const auto at = [&](uint32 row, uint32 column) -> const Vec3d&
+	const auto at = [&](uint32 row, uint32 column) -> const DVec3&
 	{ return mesh.Vertices[static_cast<size_t>(row) * columns + column].Position; };
 
 	Array<double> row_lengths;
@@ -149,7 +149,7 @@ void BuildChartGrid(const Patch& patch, ChartGrid& out_grid)
 	}
 }
 
-bool IsBlocked(const Bsp& bsp, const Vec3d& point, bool sealed)
+bool IsBlocked(const Bsp& bsp, const DVec3& point, bool sealed)
 {
 	const Node& leaf = bsp.Nodes[static_cast<size_t>(bsp.FindLeaf(point))];
 
@@ -253,20 +253,20 @@ void PatchBuilder::SmoothNormals(const MapSource& source)
 		}
 	}
 
-	Array<Array<Vec3d>> smoothed;
+	Array<Array<DVec3>> smoothed;
 
 	for (uint32 surface_index = 0; surface_index < Surfaces.Size; surface_index++) {
 		const PatchSurface& surface = Surfaces[surface_index];
-		Array<Vec3d>& normals = smoothed.Emplace();
+		Array<DVec3>& normals = smoothed.Emplace();
 
 		for (const PatchSurfaceVertex& vertex : surface.Vertices) {
-			Vec3d normal = vertex.Normal;
+			DVec3 normal = vertex.Normal;
 			const uint32 group = groups[surface_index];
 
 			if (group != 0) {
 				const SmoothKey center = MakeSmoothKey(group, vertex.Position);
 
-				Vec3d sum = Vec3d(0.0);
+				DVec3 sum = DVec3(0.0);
 				uint32 count = 0;
 
 				for (int64 x = -1; x <= 1; x++) {
@@ -326,27 +326,27 @@ void PatchBuilder::Cull(const Bsp& bsp, bool sealed)
 		Array<int32> kept;
 
 		for (size_t index = 0; index + 2 < surface.Indices.Size; index += 3) {
-			const Vec3d& a = surface.Vertices[static_cast<size_t>(surface.Indices[index])].Position;
-			const Vec3d& b = surface.Vertices[static_cast<size_t>(surface.Indices[index + 1])].Position;
-			const Vec3d& c = surface.Vertices[static_cast<size_t>(surface.Indices[index + 2])].Position;
+			const DVec3& a = surface.Vertices[static_cast<size_t>(surface.Indices[index])].Position;
+			const DVec3& b = surface.Vertices[static_cast<size_t>(surface.Indices[index + 1])].Position;
+			const DVec3& c = surface.Vertices[static_cast<size_t>(surface.Indices[index + 2])].Position;
 
-			const Vec3d cross = (b - a).Cross(c - a);
+			const DVec3 cross = (b - a).Cross(c - a);
 			const double length = cross.Length();
 
 			bool is_hidden = length > scMinNormalLength;
 
 			if (is_hidden) {
-				const Vec3d normal = cross * (scCullOffset / length);
-				const Vec3d centroid = (a + b + c) * (1.0 / 3.0);
+				const DVec3 normal = cross * (scCullOffset / length);
+				const DVec3 centroid = (a + b + c) * (1.0 / 3.0);
 
-				const Vec3d samples[4] = {
+				const DVec3 samples[4] = {
 					centroid,
 					a + (centroid - a) * scCullInset,
 					b + (centroid - b) * scCullInset,
 					c + (centroid - c) * scCullInset,
 				};
 
-				for (const Vec3d& sample : samples) {
+				for (const DVec3& sample : samples) {
 					is_hidden = is_hidden && IsBlocked(bsp, sample + normal, sealed) &&
 								IsBlocked(bsp, sample - normal, sealed);
 				}
@@ -428,7 +428,7 @@ void PatchBuilder::WriteCollision(double chunk_size, CompiledMap& out_map)
 		}
 
 		for (size_t index = 0; index + 2 < surface.Indices.Size; index += 3) {
-			Vec3d centroid = Vec3d(0.0);
+			DVec3 centroid = DVec3(0.0);
 
 			for (uint32 corner = 0; corner < 3; corner++) {
 				centroid = centroid + surface.Vertices[static_cast<size_t>(surface.Indices[index + corner])].Position;
@@ -451,7 +451,7 @@ void PatchBuilder::WriteCollision(double chunk_size, CompiledMap& out_map)
 				auto found = mesh.Lookup.find({ surface_index, vertex_index });
 
 				if (found == mesh.Lookup.end()) {
-					const Vec3d& position = surface.Vertices[static_cast<size_t>(vertex_index)].Position;
+					const DVec3& position = surface.Vertices[static_cast<size_t>(vertex_index)].Position;
 
 					found = mesh.Lookup.emplace(std::make_pair(surface_index, vertex_index), mesh.Points.Size / 3)
 								.first;

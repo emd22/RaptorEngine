@@ -18,7 +18,7 @@
 
 namespace fx::editor {
 
-Vec3f SnapDirection(const Vec3f direction)
+FVec3 SnapDirection(const FVec3 direction)
 {
 	const float32 step_degrees = gEditor->GetAngleSnapStep();
 
@@ -26,14 +26,14 @@ Vec3f SnapDirection(const Vec3f direction)
 		return direction;
 	}
 
-	const Vec3f unit = direction.Normalize();
+	const FVec3 unit = direction.Normalize();
 	const float32 step = MathUtil::DegreesToRadians(step_degrees);
 
 	const float32 yaw = std::round(std::atan2(unit.X, unit.Z) / step) * step;
 	const float32 pitch = std::round(std::asin(std::clamp(unit.Y, -1.0f, 1.0f)) / step) * step;
 	const float32 horizontal = std::cos(pitch);
 
-	return Vec3f(std::sin(yaw) * horizontal, std::sin(pitch), std::cos(yaw) * horizontal);
+	return FVec3(std::sin(yaw) * horizontal, std::sin(pitch), std::cos(yaw) * horizontal);
 }
 
 LightSpot* LightEditor::GetSelected()
@@ -56,7 +56,7 @@ void LightEditor::Select(LightID id) { mSelectedID = id; }
 
 void LightEditor::Deselect() { mSelectedID = LightID::scNull; }
 
-void LightEditor::MoveSelected(const Vec3f offset)
+void LightEditor::MoveSelected(const FVec3 offset)
 {
 	LightSpot* light = GetSelected();
 
@@ -64,19 +64,19 @@ void LightEditor::MoveSelected(const Vec3f offset)
 		return;
 	}
 
-	const Vec3f before = light->GetPosition();
-	const Vec3f after = before + offset;
+	const FVec3 before = light->GetPosition();
+	const FVec3 after = before + offset;
 
 	if (after.IsCloseTo(before, scEditTolerance)) {
 		return;
 	}
 
-	const Vec3f direction = light->GetDirection().Normalize();
+	const FVec3 direction = light->GetDirection().Normalize();
 
 	gEditor->EmplaceEditOperation<LightTransformOperation>(light, before, after, direction, direction);
 }
 
-void LightEditor::AimSelected(const Vec3f direction)
+void LightEditor::AimSelected(const FVec3 direction)
 {
 	LightSpot* light = GetSelected();
 
@@ -84,14 +84,14 @@ void LightEditor::AimSelected(const Vec3f direction)
 		return;
 	}
 
-	const Vec3f before = light->GetDirection().Normalize();
-	const Vec3f after = SnapDirection(direction).Normalize();
+	const FVec3 before = light->GetDirection().Normalize();
+	const FVec3 after = SnapDirection(direction).Normalize();
 
 	if (after.IsCloseTo(before, scEditTolerance)) {
 		return;
 	}
 
-	const Vec3f position = light->GetPosition();
+	const FVec3 position = light->GetPosition();
 
 	gEditor->EmplaceEditOperation<LightTransformOperation>(light, position, position, before, after);
 }
@@ -108,7 +108,7 @@ static Name MakeUniqueLightName()
 	return name;
 }
 
-LightSpot* LightEditor::Create(const Vec3f position)
+LightSpot* LightEditor::Create(const FVec3 position)
 {
 	constexpr float32 scNewLightRadius = 8.0f;
 	const float32 scNewLightInnerAngle = MathUtil::DegreesToRadians(30.0f);
@@ -119,7 +119,7 @@ LightSpot* LightEditor::Create(const Vec3f position)
 	LightSnapshot snapshot;
 
 	snapshot.Position = position;
-	snapshot.Direction = SnapDirection(Vec3f(0.0f, -1.0f, 0.0f));
+	snapshot.Direction = SnapDirection(FVec3(0.0f, -1.0f, 0.0f));
 
 	snapshot.LightName = name;
 	snapshot.Radius = scNewLightRadius;
@@ -186,12 +186,12 @@ void LightEditor::DrawMarkers()
 			color = colors.LightSelected;
 		}
 
-		const Vec3f position = light.GetPosition();
-		const Vec3f tip = position + (light.GetDirection().Normalize() * scDirectionLength);
+		const FVec3 position = light.GetPosition();
+		const FVec3 tip = position + (light.GetDirection().Normalize() * scDirectionLength);
 
-		renderer::gDebugDraw->SolidBox(position, Vec3f(scMarkerHalfExtent), Quat::scIdentity, color);
+		renderer::gDebugDraw->SolidBox(position, FVec3(scMarkerHalfExtent), Quat::scIdentity, color);
 		renderer::gDebugDraw->Line(position, tip, color);
-		renderer::gDebugDraw->SolidBox(tip, Vec3f(scDirectionTipHalfExtent), Quat::scIdentity, color);
+		renderer::gDebugDraw->SolidBox(tip, FVec3(scDirectionTipHalfExtent), Quat::scIdentity, color);
 	}
 }
 

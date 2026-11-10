@@ -68,14 +68,14 @@ bool ReactionCapture::Begin(const ReactionCaptureOptions& options)
 
 void ReactionCapture::SpawnTarget()
 {
-	Vec3f forward = gWorld->Player.pCamera->GetForwardVector();
+	FVec3 forward = gWorld->Player.pCamera->GetForwardVector();
 	forward.Y = 0.0f;
 	forward = forward.Normalize();
 
 	mEye = gWorld->Player.pCamera->GetPosition();
 
 	const physics::RayResult floor = gPhysics->pBackend->RaycastStatic(mEye + forward * scCameraDistance,
-																	   Vec3f(0.0f, -10.0f, 0.0f));
+																	   FVec3(0.0f, -10.0f, 0.0f));
 	mTargetPosition = mEye + forward * scCameraDistance;
 
 	if (floor.bHit) {
@@ -92,7 +92,7 @@ void ReactionCapture::SpawnTarget()
 	mpTarget = gNPCManager->Spawn(gNPCManager->GetModel(), desc);
 }
 
-void ReactionCapture::PlaceCamera() { gWorld->Player.LookAt(mTargetPosition + Vec3f(0.0f, 1.0f, 0.0f)); }
+void ReactionCapture::PlaceCamera() { gWorld->Player.LookAt(mTargetPosition + FVec3(0.0f, 1.0f, 0.0f)); }
 
 void ReactionCapture::FireEvents()
 {
@@ -118,8 +118,8 @@ void ReactionCapture::FireEvents()
 			body = rig.Arms[0].Upper;
 		}
 
-		const Vec3f center = ragdoll.GetBodyPosition(body);
-		const Vec3f direction = (center - mEye).Normalize();
+		const FVec3 center = ragdoll.GetBodyPosition(body);
+		const FVec3 direction = (center - mEye).Normalize();
 
 		NPCHit hit { .Body = ragdoll.GetBodyID(body),
 					 .Point = center - direction * 0.08f,
@@ -170,7 +170,7 @@ void ReactionCapture::WriteFrame(float32 delta_time)
 	for (uint32 i = 0; i < ragdoll.GetSegmentCount(); i++) {
 		const Mat4f drawn_matrix = skeleton.WorldTransforms[ragdoll.GetBodyBone(i)] * world;
 		const Vec4f drawn = drawn_matrix.Rows[3];
-		const Vec3f origin = ragdoll.GetBodyOrigin(i);
+		const FVec3 origin = ragdoll.GetBodyOrigin(i);
 
 		std::fprintf(mpOut, "%u,%.5f,%.5f,%u,%.4f,%d,%d,%d,%.3f,%u,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f\n", mFrame, mTime,
 					 delta_time, steps, alpha, static_cast<int>(mpTarget->GetState()), static_cast<int>(is_powered),

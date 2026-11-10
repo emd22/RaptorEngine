@@ -23,7 +23,7 @@ FX_FORCE_INLINE bool Quat::IsCloseTo(const Quat other, const float32 tolerance) 
 	return IsCloseTo(other.mIntrin, tolerance);
 }
 
-FX_FORCE_INLINE Vec3f Quat::GetDirection() const
+FX_FORCE_INLINE FVec3 Quat::GetDirection() const
 {
 	// dir X = (2.0 * ((X * Z) + (Y * W)))
 	// dir Y = (2.0 * ((Y * Z) - (X * W)))
@@ -47,7 +47,7 @@ FX_FORCE_INLINE Vec3f Quat::GetDirection() const
 	const float32 scale[] = { 2.0f, 2.0f, -2.0f, 0.0f };
 	const float32 bias[] = { 0.0f, 0.0f, 1.0f, 0.0f };
 
-	return Vec3f(vfmaq_f32(vld1q_f32(bias), vcombine_f32(res_lo, res_hi), vld1q_f32(scale)));
+	return FVec3(vfmaq_f32(vld1q_f32(bias), vcombine_f32(res_lo, res_hi), vld1q_f32(scale)));
 }
 
 FX_FORCE_INLINE bool Quat::IsCloseTo(const float32x4_t& other, const float32 tolerance) const

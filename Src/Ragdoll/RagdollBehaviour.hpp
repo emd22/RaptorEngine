@@ -9,7 +9,7 @@
 
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 
 namespace fx::physics {
 
@@ -30,8 +30,8 @@ struct RagdollEvent
 {
 	eRagdollEvent Type = eRagdollEvent::Hit;
 	int32 Body = -1;
-	Vec3f Point = Vec3f::sZero;
-	Vec3f Direction = Vec3f::sZero;
+	FVec3 Point = FVec3::sZero;
+	FVec3 Direction = FVec3::sZero;
 	float32 Magnitude = 0.0f;
 	float32 Damage = 0.0f;
 };
@@ -45,10 +45,10 @@ enum class eBehaviourBalance : uint8
 
 struct BehaviourBody
 {
-	Vec3f Origin = Vec3f::sZero;
-	Vec3f Center = Vec3f::sZero;
-	Vec3f Velocity = Vec3f::sZero;
-	Vec3f AngularVelocity = Vec3f::sZero;
+	FVec3 Origin = FVec3::sZero;
+	FVec3 Center = FVec3::sZero;
+	FVec3 Velocity = FVec3::sZero;
+	FVec3 AngularVelocity = FVec3::sZero;
 	JPH::Quat Orientation = JPH::Quat::sIdentity();
 	bool bContact = false;
 	bool bGround = false;
@@ -65,11 +65,11 @@ struct BehaviourContext
 
 	SizedArray<BehaviourBody> Bodies;
 
-	Vec3f Up = Vec3f::sUp;
-	Vec3f CenterOfMass = Vec3f::sZero;
-	Vec3f Velocity = Vec3f::sZero;
-	Vec3f Forward = Vec3f::sForward;
-	Vec3f Right = Vec3f::sRight;
+	FVec3 Up = FVec3::sUp;
+	FVec3 CenterOfMass = FVec3::sZero;
+	FVec3 Velocity = FVec3::sZero;
+	FVec3 Forward = FVec3::sForward;
+	FVec3 Right = FVec3::sRight;
 	float32 Gravity = 9.81f;
 
 	bool bFeetSupported = false;
@@ -80,8 +80,8 @@ struct BehaviourContext
 	float32 DropHeight = 0.0f;
 
 	bool bImpactPredicted = false;
-	Vec3f ImpactPoint = Vec3f::sZero;
-	Vec3f ImpactNormal = Vec3f::sUp;
+	FVec3 ImpactPoint = FVec3::sZero;
+	FVec3 ImpactNormal = FVec3::sUp;
 	float32 ImpactTime = 0.0f;
 
 	bool bFreePose = false;
@@ -89,25 +89,25 @@ struct BehaviourContext
 	bool bAlive = true;
 
 	FX_FORCE_INLINE uint32 GetBodyCount() const { return static_cast<uint32>(Bodies.Size); }
-	FX_FORCE_INLINE Vec3f Horizontal(const Vec3f v) const { return v - Up * v.Dot(Up); }
-	FX_FORCE_INLINE Vec3f GetChestUp() const { return Forward.Cross(Right); }
+	FX_FORCE_INLINE FVec3 Horizontal(const FVec3 v) const { return v - Up * v.Dot(Up); }
+	FX_FORCE_INLINE FVec3 GetChestUp() const { return Forward.Cross(Right); }
 	/// Free-falling, or tipping over while balancing before the fall is committed, so impacts can be predicted
 	FX_FORCE_INLINE bool IsFalling() const
 	{
 		return bFreePose || (bBalancing && pBalance != nullptr && pBalance->FallProgress > 0.0f);
 	}
 
-	Vec3f ToBodyLocal(uint32 body, const Vec3f point) const;
-	Vec3f FromBodyLocal(uint32 body, const Vec3f local) const;
-	Vec3f ToBodyDirection(uint32 body, const Vec3f local_direction) const;
-	Vec3f ToLocalDirection(uint32 body, const Vec3f direction) const;
+	FVec3 ToBodyLocal(uint32 body, const FVec3 point) const;
+	FVec3 FromBodyLocal(uint32 body, const FVec3 local) const;
+	FVec3 ToBodyDirection(uint32 body, const FVec3 local_direction) const;
+	FVec3 ToLocalDirection(uint32 body, const FVec3 direction) const;
 	bool IsArmBody(uint32 arm, uint32 body) const;
 	int32 FindArm(uint32 body) const;
 };
 
 struct BehaviourGoal
 {
-	Vec3f Target = Vec3f::sZero;
+	FVec3 Target = FVec3::sZero;
 	float32 Weight = 0.0f;
 };
 
@@ -126,7 +126,7 @@ struct BehaviourOutput
 	void Init(uint32 body_count);
 	void Reset();
 
-	void AddWorldRotation(const BehaviourContext& ctx, uint32 body, const Vec3f world_axis, float32 angle,
+	void AddWorldRotation(const BehaviourContext& ctx, uint32 body, const FVec3 world_axis, float32 angle,
 						  float32 mask = 1.0f);
 	void ScaleStrength(uint32 body, float32 scale);
 	void ScaleAllStrengths(float32 scale);

@@ -94,7 +94,7 @@ private:
 	void DebugDrawSelectedDecals();
 
 public:
-	Object* RaycastProbeVolumes(const Vec3f origin, const Vec3f direction, float32 max_distance, float32& out_distance,
+	Object* RaycastProbeVolumes(const FVec3 origin, const FVec3 direction, float32 max_distance, float32& out_distance,
 								const std::function<bool(const Object&)>& accept = nullptr);
 
 private:
@@ -124,7 +124,7 @@ private:
 	 * that reads it into a spare light buffer slot (the main view keeps the original slot and its shadow matrix).
 	 * @return False if the light buffer is full, in which case the shadow map is left alone.
 	 */
-	bool RenderCaptureSunShadows(LightDirectional& sun, const Vec3f center, OrthoCamera& out_shadow_camera,
+	bool RenderCaptureSunShadows(LightDirectional& sun, const FVec3 center, OrthoCamera& out_shadow_camera,
 								 uint32& out_light_slot);
 
 	/**
@@ -144,8 +144,8 @@ private:
 	 * @brief Appends the shadow casters (and their attached nodes) from every tile that a sphere touches. Skinned
 	 * objects are skipped, the shadow pipeline cannot draw them.
 	 */
-	void GatherSpotShadowCasters(const Vec3f center, float32 radius, DynArray<ObjectID>& out_casters);
-	void AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, const Vec3f center, float32 radius,
+	void GatherSpotShadowCasters(const FVec3 center, float32 radius, DynArray<ObjectID>& out_casters);
+	void AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, const FVec3 center, float32 radius,
 									  DynArray<ObjectID>& out_casters);
 	/// Draws the objects of a forward pipeline's list into the prepass, with the prepass pipeline that goes with it
 	void ExecutePrepassRenderList(renderer::PipelineHandle forward_pipeline);
@@ -194,16 +194,16 @@ public:
 	/// Where the player starts a level, and which way it looks. `bCustom` is false until the level sets one.
 	struct PlayerSpawnPoint
 	{
-		static Vec3f DefaultPosition() { return Vec3f(0.0f, -0.2f, -2.0f); }
+		static FVec3 DefaultPosition() { return FVec3(0.0f, -0.2f, -2.0f); }
 
-		Vec3f Position = DefaultPosition();
-		Vec3f Direction = Vec3f::sForward;
+		FVec3 Position = DefaultPosition();
+		FVec3 Direction = FVec3::sForward;
 		bool bCustom = false;
 
 		void Reset()
 		{
 			Position = DefaultPosition();
-			Direction = Vec3f::sForward;
+			Direction = FVec3::sForward;
 			bCustom = false;
 		}
 	} PlayerSpawn;
@@ -262,8 +262,8 @@ private:
 
 	bool mbPortalLocked = false;
 	Mat4f mLockedViewProjection;
-	Vec3f mLockedCameraPosition = Vec3f::sZero;
-	Vec3f mLockedCameraDirection = Vec3f::sForward;
+	FVec3 mLockedCameraPosition = FVec3::sZero;
+	FVec3 mLockedCameraDirection = FVec3::sForward;
 
 	SizedArray<TileIndex> mVisibleTiles;
 	uint64 mCullSerial = 0;

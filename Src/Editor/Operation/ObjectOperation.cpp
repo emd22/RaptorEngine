@@ -263,7 +263,7 @@ static Object* RestoreBrush(const ObjectSnapshot& snapshot, const Brush::PlaneLi
 
 ObjectSnapshot ObjectSnapshot::Capture(const Object& object, MaterialID material)
 {
-	Vec3f enter_direction = Vec3f::sZero;
+	FVec3 enter_direction = FVec3::sZero;
 	gObjectScripts->TryGetRequiredEnterDirection(object.ID, enter_direction);
 
 	std::shared_ptr<const Patch> patch;
@@ -353,7 +353,7 @@ void ObjectCreationOperation::Redo(EditorSelection& selection)
 }
 
 
-MoveOperation::MoveOperation(Object* object, const Vec3f& before, const Vec3f& after, int32 group_size)
+MoveOperation::MoveOperation(Object* object, const FVec3& before, const FVec3& after, int32 group_size)
 	: ObjectEditOperation(object, group_size), mBefore(before), mAfter(after)
 {
 }
@@ -372,7 +372,7 @@ void MoveOperation::Undo(EditorSelection& selection)
 	}
 }
 
-RotateOperation::RotateOperation(Object* object, const Vec3f& euler_before, const Vec3f& euler_after, int32 group_size)
+RotateOperation::RotateOperation(Object* object, const FVec3& euler_before, const FVec3& euler_after, int32 group_size)
 	: RotateOperation(object, Quat::FromEulerAngles(euler_before), Quat::FromEulerAngles(euler_after), group_size)
 {
 }
@@ -396,7 +396,7 @@ void RotateOperation::Undo(EditorSelection& selection)
 	}
 }
 
-ScaleFaceOperation::ScaleFaceOperation(Object* object, const Vec3f& face_normal, float32 distance, int32 group_size)
+ScaleFaceOperation::ScaleFaceOperation(Object* object, const FVec3& face_normal, float32 distance, int32 group_size)
 	: ObjectEditOperation(object, group_size), mFaceNormal(face_normal), mDistance(distance)
 {
 }
@@ -584,7 +584,7 @@ void RenameEditOperation::Undo(EditorSelection& selection)
 	}
 }
 
-TriggerDirectionEditOperation::TriggerDirectionEditOperation(Object* object, const Vec3f& before, const Vec3f& after,
+TriggerDirectionEditOperation::TriggerDirectionEditOperation(Object* object, const FVec3& before, const FVec3& after,
 															 int32 group_size)
 	: ObjectEditOperation(object, group_size), mBefore(before), mAfter(after)
 {
@@ -608,7 +608,7 @@ void TriggerDirectionEditOperation::Undo(EditorSelection& selection)
 // Object creation and deletion
 /////////////////////////////////////
 
-CreateOperation::CreateOperation(const Vec3f& position, int32 group_size, MaterialID material)
+CreateOperation::CreateOperation(const FVec3& position, int32 group_size, MaterialID material)
 	: ObjectCreationOperation(group_size), mPosition(position), mMaterial(material)
 {
 }
@@ -626,7 +626,7 @@ CreateBrushOperation::CreateBrushOperation(const Brush::PlaneList& planes, const
 
 void CreateBrushOperation::Execute(EditorSelection& selection) { Retarget(RestoreBrush(mSnapshot, mPlanes)); }
 
-DupeOperation::DupeOperation(Object* original, const Vec3f& position, int32 group_size, uint32 dupe_subview)
+DupeOperation::DupeOperation(Object* original, const FVec3& position, int32 group_size, uint32 dupe_subview)
 	: ObjectEditOperation(original, group_size), mPosition(position), mDupeSubview(dupe_subview)
 {
 }

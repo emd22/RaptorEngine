@@ -108,8 +108,8 @@ Brush ReadBrushEntry(ConfigEntry& entry)
 		}
 
 		// Left, right, top, bottom, front, back extents
-		const Vec3f min = -Vec3f(scales[0].Get<float32>(), scales[3].Get<float32>(), scales[5].Get<float32>());
-		const Vec3f max = Vec3f(scales[1].Get<float32>(), scales[2].Get<float32>(), scales[4].Get<float32>());
+		const FVec3 min = -FVec3(scales[0].Get<float32>(), scales[3].Get<float32>(), scales[5].Get<float32>());
+		const FVec3 max = FVec3(scales[1].Get<float32>(), scales[2].Get<float32>(), scales[4].Get<float32>());
 
 		return Brush::FromBox(min, max);
 	}
@@ -134,7 +134,7 @@ Brush ReadBrushEntry(ConfigEntry& entry)
 
 	for (uint32 i = 0; i < plane_count; i++) {
 		planes.Insert(BrushPlane {
-			.Normal = Vec3f(values[i * 4].Get<float32>(), values[i * 4 + 1].Get<float32>(),
+			.Normal = FVec3(values[i * 4].Get<float32>(), values[i * 4 + 1].Get<float32>(),
 							values[i * 4 + 2].Get<float32>()),
 			.Distance = values[i * 4 + 3].Get<float32>(),
 		});
@@ -232,7 +232,7 @@ Patch ReadPatchEntry(ConfigEntry& entry)
 		const uint32 base = i * scValuesPerPatchPoint;
 		PatchPoint& point = patch.Points[i];
 
-		point.Position = Vec3f(values[base].Get<float32>(), values[base + 1].Get<float32>(),
+		point.Position = FVec3(values[base].Get<float32>(), values[base + 1].Get<float32>(),
 							   values[base + 2].Get<float32>());
 		point.Texcoord = Vec2f(values[base + 3].Get<float32>(), values[base + 4].Get<float32>());
 	}
@@ -411,7 +411,7 @@ BrushPlacement ReadBrushPlacement(const ConfigEntry& entry)
 	const ConfigEntry* euler_entry = entry.GetMember(HashStr32("rot"));
 
 	if (euler_entry != nullptr) {
-		placement.Rotation = Quat::FromEulerAngles(euler_entry->GetValue<Vec3f>());
+		placement.Rotation = Quat::FromEulerAngles(euler_entry->GetValue<FVec3>());
 	}
 
 	Serializable<BrushPlacement>::LoadFromConfig(entry, placement);
@@ -424,7 +424,7 @@ void WriteBrushPlacement(ConfigEntry& entry, const BrushPlacement& placement)
 	Serializable<BrushPlacement>::SaveToConfig(placement, entry);
 }
 
-BrushPlacement PlaceInSubview(const BrushPlacement& local, const Vec3f brush_center, const BrushPlacement& instance)
+BrushPlacement PlaceInSubview(const BrushPlacement& local, const FVec3 brush_center, const BrushPlacement& instance)
 {
 	BrushPlacement world;
 	world.Rotation = (instance.Rotation * local.Rotation).Normalize();
@@ -433,7 +433,7 @@ BrushPlacement PlaceInSubview(const BrushPlacement& local, const Vec3f brush_cen
 	return world;
 }
 
-BrushPlacement RemoveFromSubview(const BrushPlacement& world, const Vec3f brush_center, const BrushPlacement& instance)
+BrushPlacement RemoveFromSubview(const BrushPlacement& world, const FVec3 brush_center, const BrushPlacement& instance)
 {
 	const Quat inverse = instance.Rotation.Conjugate();
 
@@ -444,7 +444,7 @@ BrushPlacement RemoveFromSubview(const BrushPlacement& world, const Vec3f brush_
 	return local;
 }
 
-BrushPlacement FindSubviewPlacement(const BrushPlacement& world, const BrushPlacement& local, const Vec3f brush_center)
+BrushPlacement FindSubviewPlacement(const BrushPlacement& world, const BrushPlacement& local, const FVec3 brush_center)
 {
 	BrushPlacement instance;
 	instance.Rotation = (world.Rotation * local.Rotation.Conjugate()).Normalize();
@@ -498,7 +498,7 @@ ConfigEntry PlaceSubviewBrushEntry(ConfigEntry& brush_entry, const String& name,
 {
 	ConfigEntry placed(name);
 
-	Vec3f center = Vec3f::sZero;
+	FVec3 center = FVec3::sZero;
 
 	if (IsPatchEntry(brush_entry)) {
 		const Patch patch = ReadPatchEntry(brush_entry);

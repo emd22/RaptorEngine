@@ -2,7 +2,7 @@
 
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 #include <functional>
 
 namespace fx {
@@ -29,8 +29,8 @@ struct AcousticStats
 	bool bPathing = false;
 
 	uint32 ProbeCount = 0;
-	Vec3f ProbeMin = Vec3f::sZero;
-	Vec3f ProbeMax = Vec3f::sZero;
+	FVec3 ProbeMin = FVec3::sZero;
+	FVec3 ProbeMax = FVec3::sZero;
 
 	size_t DataSize = 0;
 

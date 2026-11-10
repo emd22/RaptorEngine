@@ -10,33 +10,33 @@
 #include "Containers.hpp"
 
 #include <Core/Types.hpp>
-#include <Math/Vec3d.hpp>
+#include <Math/DVec3.hpp>
 #include <cmath>
 #include <unordered_map>
 
 namespace fx::mapc {
 
-inline Vec3d MinVec(const Vec3d& a, const Vec3d& b)
+inline DVec3 MinVec(const DVec3& a, const DVec3& b)
 {
-	return Vec3d(std::fmin(a.X, b.X), std::fmin(a.Y, b.Y), std::fmin(a.Z, b.Z));
+	return DVec3(std::fmin(a.X, b.X), std::fmin(a.Y, b.Y), std::fmin(a.Z, b.Z));
 }
 
-inline Vec3d MaxVec(const Vec3d& a, const Vec3d& b)
+inline DVec3 MaxVec(const DVec3& a, const DVec3& b)
 {
-	return Vec3d(std::fmax(a.X, b.X), std::fmax(a.Y, b.Y), std::fmax(a.Z, b.Z));
+	return DVec3(std::fmax(a.X, b.X), std::fmax(a.Y, b.Y), std::fmax(a.Z, b.Z));
 }
 
 constexpr double scOnEpsilon = 1e-5;
 
 struct Plane
 {
-	Vec3d Normal = Vec3d(0.0);
+	DVec3 Normal = DVec3(0.0);
 	double Distance = 0.0;
 
-	double DistanceTo(const Vec3d& point) const { return Normal.Dot(point) - Distance; }
+	double DistanceTo(const DVec3& point) const { return Normal.Dot(point) - Distance; }
 };
 
-using Winding = Array<Vec3d>;
+using Winding = Array<DVec3>;
 
 enum class eSide
 {
@@ -52,7 +52,7 @@ public:
 	static constexpr int32 scNone = -1;
 
 public:
-	int32 FindOrAdd(Vec3d normal, double distance);
+	int32 FindOrAdd(DVec3 normal, double distance);
 
 	const Plane& operator[](int32 index) const { return mPlanes[static_cast<size_t>(index)]; }
 	int32 GetCount() const { return static_cast<int32>(mPlanes.Size); }
@@ -73,8 +73,8 @@ eSide SplitWinding(const Winding& winding, const Plane& plane, Winding& out_fron
 void RemoveDuplicatePoints(Winding& winding);
 bool IsWindingTiny(const Winding& winding);
 double GetWindingArea(const Winding& winding);
-Vec3d GetWindingCenter(const Winding& winding);
-Vec3d GetWindingNormal(const Winding& winding);
+DVec3 GetWindingCenter(const Winding& winding);
+DVec3 GetWindingNormal(const Winding& winding);
 Winding ReverseWinding(const Winding& winding);
 
 Winding CopyWinding(const Winding& winding);
@@ -95,8 +95,8 @@ struct Polyhedron
 	Array<PolyhedronSide> Sides;
 	int32 Source = -1;
 
-	Vec3d Min = Vec3d(0.0);
-	Vec3d Max = Vec3d(0.0);
+	DVec3 Min = DVec3(0.0);
+	DVec3 Max = DVec3(0.0);
 
 	Polyhedron Clone() const;
 

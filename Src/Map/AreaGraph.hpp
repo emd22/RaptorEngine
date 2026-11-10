@@ -4,7 +4,7 @@
 #include <Core/String.hpp>
 #include <Map/AreaSet.hpp>
 #include <Math/BBox.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 #include <vector>
 
 namespace fx {
@@ -13,7 +13,7 @@ class CompiledMap;
 
 struct MapPortalPlane
 {
-	Vec3f Normal = Vec3f::sZero;
+	FVec3 Normal = FVec3::sZero;
 	float32 Distance = 0.0f;
 };
 
@@ -26,7 +26,7 @@ struct MapPortal
 
 	BBox Bounds;
 
-	SizedArray<Vec3f> Points;
+	SizedArray<FVec3> Points;
 	SizedArray<uint32> PolygonSizes;
 	SizedArray<MapPortalPlane> PolygonPlanes;
 
@@ -72,15 +72,15 @@ public:
 	int32 FindPortal(const char* name) const;
 	void SetPortalOpen(uint32 index, bool open) { mPortals[index].bOpen = open; }
 
-	int32 FindArea(const Vec3f& point) const;
+	int32 FindArea(const FVec3& point) const;
 	AreaSet FindAreas(const BBox& bounds) const;
-	AreaSet FindLightAreas(const Vec3f& origin, const BBox& bounds) const;
+	AreaSet FindLightAreas(const FVec3& origin, const BBox& bounds) const;
 
 	void CollectConnectedAreas(uint32 area, std::vector<uint8>& out_connected) const;
 
 private:
-	void CollectAreas(int32 child, const Vec3f& center, const Vec3f& extent, AreaSet& out_set) const;
-	void AddLightSeedArea(const Vec3f& point, AreaSet& out_set) const;
+	void CollectAreas(int32 child, const FVec3& center, const FVec3& extent, AreaSet& out_set) const;
+	void AddLightSeedArea(const FVec3& point, AreaSet& out_set) const;
 
 private:
 	SizedArray<MapAreaNode> mNodes;

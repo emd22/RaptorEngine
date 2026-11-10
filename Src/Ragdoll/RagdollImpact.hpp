@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Core/Types.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 
 namespace fx::physics {
 
@@ -14,8 +14,8 @@ struct RagdollKnock
 {
 	/// The body struck, which decides how much of the blow reaches the rest of the figure. -1 hits the whole figure
 	int32 Body = -1;
-	Vec3f Point = Vec3f::sZero;
-	Vec3f Impulse = Vec3f::sZero;
+	FVec3 Point = FVec3::sZero;
+	FVec3 Impulse = FVec3::sZero;
 
 	/// Limits on the speed the blow gives the centre of mass (m/s). The minimum is scaled down for limbs
 	float32 MinSpeed = 0.0f;
@@ -36,16 +36,16 @@ struct RagdollKnock
  *
  * @returns The velocity the centre of mass gained
  */
-Vec3f ApplyRagdollKnock(Ragdoll& ragdoll, const RagdollKnock& knock);
+FVec3 ApplyRagdollKnock(Ragdoll& ragdoll, const RagdollKnock& knock);
 
 /**
  * @brief The struck limb's own reaction to a blow, on top of the figure's: it leads and its parents follow.
  */
-void ApplyRagdollLocalHit(Ragdoll& ragdoll, uint32 body, const Vec3f impulse, const Vec3f point);
+void ApplyRagdollLocalHit(Ragdoll& ragdoll, uint32 body, const FVec3 impulse, const FVec3 point);
 
 /**
  * @brief Gives every body the same velocity, for a blow big enough to take the figure off its feet outright.
  */
-void LaunchRagdoll(Ragdoll& ragdoll, const Vec3f velocity);
+void LaunchRagdoll(Ragdoll& ragdoll, const FVec3 velocity);
 
 } // namespace fx::physics

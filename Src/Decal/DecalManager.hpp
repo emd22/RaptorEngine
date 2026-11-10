@@ -4,8 +4,8 @@
 #include <Core/SizedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Mat4.hpp>
-#include <Math/Vec3.hpp>
 #include <Renderer/Backend/Pipeline.hpp>
 #include <Texture/AtlasConfig.hpp>
 #include <atomic>
@@ -21,8 +21,8 @@ class Skeleton;
  */
 struct DecalDesc
 {
-	Vec3f Position = Vec3f::sZero;
-	Vec3f Direction = Vec3f::sForward;
+	FVec3 Position = FVec3::sZero;
+	FVec3 Direction = FVec3::sForward;
 
 	/// Size of the projection in world units
 	float32 Width = 0.25f;
@@ -78,13 +78,13 @@ public:
 	void Create();
 
 	void AddDecal(const DecalDesc& desc);
-	void AddBulletHole(const Vec3f hit_point, const Vec3f hit_normal);
+	void AddBulletHole(const FVec3 hit_point, const FVec3 hit_normal);
 
-	void AddBloodSplat(const Vec3f hit_point, const Vec3f hit_normal, float32 size);
+	void AddBloodSplat(const FVec3 hit_point, const FVec3 hit_normal, float32 size);
 
 	void AddSkinnedDecal(const Skeleton* skeleton, const Mat4f& rest_to_world, const DecalDesc& desc);
-	void AddSkinnedBloodSplat(const Skeleton* skeleton, const Mat4f& rest_to_world, const Vec3f hit_point,
-							  const Vec3f direction, float32 size);
+	void AddSkinnedBloodSplat(const Skeleton* skeleton, const Mat4f& rest_to_world, const FVec3 hit_point,
+							  const FVec3 direction, float32 size);
 	void RemoveSkinnedDecals(const Skeleton* skeleton);
 
 	void GetSkinnedDecalRange(const Skeleton* skeleton, uint32& out_start, uint32& out_count) const;
@@ -114,7 +114,7 @@ private:
 private:
 	String LoadAtlasConfig();
 	DecalEntry BuildEntry(const DecalDesc& desc) const;
-	void ReplaceCoveredDecals(const DecalDesc& desc, const Vec3f forward);
+	void ReplaceCoveredDecals(const DecalDesc& desc, const FVec3 forward);
 
 private:
 	/// Ring buffer of decals

@@ -13,8 +13,8 @@
 
 namespace fx::loader {
 
-void TransformModelGeometry(SizedArray<float32>& positions, SizedArray<float32>& normals,
-							SizedArray<float32>& tangents, SizedArray<uint32>& indices, const float32* m)
+void TransformModelGeometry(SizedArray<float32>& positions, SizedArray<float32>& normals, SizedArray<float32>& tangents,
+							SizedArray<uint32>& indices, const float32* m)
 {
 	const float32 a00 = m[0];
 	const float32 a10 = m[1];
@@ -636,14 +636,14 @@ void MakeFlatNormals(SizedArray<float32>& positions, SizedArray<float32>& uvs, S
 	out_normals.InitSize(static_cast<size_t>(vertex_count) * 3);
 
 	for (uint32 vertex = 0; vertex + 2 < vertex_count; vertex += 3) {
-		const Vec3f a(positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2]);
-		const Vec3f b(positions[vertex * 3 + 3], positions[vertex * 3 + 4], positions[vertex * 3 + 5]);
-		const Vec3f c(positions[vertex * 3 + 6], positions[vertex * 3 + 7], positions[vertex * 3 + 8]);
+		const FVec3 a(positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2]);
+		const FVec3 b(positions[vertex * 3 + 3], positions[vertex * 3 + 4], positions[vertex * 3 + 5]);
+		const FVec3 c(positions[vertex * 3 + 6], positions[vertex * 3 + 7], positions[vertex * 3 + 8]);
 
-		Vec3f normal = (b - a).Cross(c - a);
+		FVec3 normal = (b - a).Cross(c - a);
 
 		if (normal.Length() < 1e-20f) {
-			normal = Vec3f(0.0f, 1.0f, 0.0f);
+			normal = FVec3(0.0f, 1.0f, 0.0f);
 		}
 		else {
 			normal.NormalizeIP();
@@ -675,13 +675,13 @@ void ReadGltfMaterial(const cgltf_material& source, const String& directory, Sta
 
 	if (source.has_pbr_specular_glossiness) {
 		const float32* factor = source.pbr_specular_glossiness.diffuse_factor;
-		out.BaseColor = Vec3f(factor[0], factor[1], factor[2]);
+		out.BaseColor = FVec3(factor[0], factor[1], factor[2]);
 		diffuse = &source.pbr_specular_glossiness.diffuse_texture;
 	}
 	else if (source.has_pbr_metallic_roughness) {
 		const cgltf_pbr_metallic_roughness& pbr = source.pbr_metallic_roughness;
 
-		out.BaseColor = Vec3f(pbr.base_color_factor[0], pbr.base_color_factor[1], pbr.base_color_factor[2]);
+		out.BaseColor = FVec3(pbr.base_color_factor[0], pbr.base_color_factor[1], pbr.base_color_factor[2]);
 		out.Metallic = pbr.metallic_factor;
 		out.bHasMetallicTexture = (pbr.metallic_roughness_texture.texture != nullptr);
 		diffuse = &pbr.base_color_texture;
@@ -729,8 +729,8 @@ bool HasJointAncestor(const cgltf_node* node, const SizedArray<uint8>& is_joint,
 	return false;
 }
 
-bool ReadGltfMesh(const cgltf_primitive& primitive, const float32* world_matrix, bool bake_transform,
-				  uint32 material, StaticModelMesh& out_mesh)
+bool ReadGltfMesh(const cgltf_primitive& primitive, const float32* world_matrix, bool bake_transform, uint32 material,
+				  StaticModelMesh& out_mesh)
 {
 	const cgltf_accessor* position_accessor = nullptr;
 	const cgltf_accessor* normal_accessor = nullptr;
@@ -943,7 +943,7 @@ bool ReadRxModel(const String& path, StaticModel& out_model, String& out_error)
 
 		if (const RxMaterialParam* base_color = source.FindParam("base_color")) {
 			if (base_color->Values.Size >= 3) {
-				material.BaseColor = Vec3f(base_color->Values[0], base_color->Values[1], base_color->Values[2]);
+				material.BaseColor = FVec3(base_color->Values[0], base_color->Values[1], base_color->Values[2]);
 			}
 		}
 

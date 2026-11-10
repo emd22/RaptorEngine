@@ -34,24 +34,24 @@ void ObjectScriptManager::BindFunctions(Entry& entry)
 	entry.pFnTriggerExit = entry.pScript->GetFunction<void(Object*)>("TriggerExit");
 }
 
-Vec3f ObjectScriptManager::GetCrossingDirection(const Entry& entry, const Vec3f point)
+FVec3 ObjectScriptManager::GetCrossingDirection(const Entry& entry, const FVec3 point)
 {
 	static constexpr float32 scMinCrossingDistance = 1e-4f;
 
 	if (!entry.bHasLastPoint) {
-		return Vec3f::sZero;
+		return FVec3::sZero;
 	}
 
-	const Vec3f movement = point - entry.LastPoint;
+	const FVec3 movement = point - entry.LastPoint;
 
 	if (movement.Length() < scMinCrossingDistance) {
-		return Vec3f::sZero;
+		return FVec3::sZero;
 	}
 
 	return movement.Normalize();
 }
 
-void ObjectScriptManager::LeaveTrigger(Entry& entry, Object* object, const Vec3f direction)
+void ObjectScriptManager::LeaveTrigger(Entry& entry, Object* object, const FVec3 direction)
 {
 	if (!entry.bTriggerInside) {
 		return;
@@ -65,9 +65,9 @@ void ObjectScriptManager::LeaveTrigger(Entry& entry, Object* object, const Vec3f
 	}
 }
 
-bool ObjectScriptManager::PassesEnterGate(const Entry& entry, Object* object, const Vec3f direction) const
+bool ObjectScriptManager::PassesEnterGate(const Entry& entry, Object* object, const FVec3 direction) const
 {
-	Vec3f local_direction;
+	FVec3 local_direction;
 
 	if (!TryGetRequiredEnterDirection(entry.ID, local_direction)) {
 		return true;
@@ -79,10 +79,10 @@ bool ObjectScriptManager::PassesEnterGate(const Entry& entry, Object* object, co
 
 	const Vec4f world = object->GetWorldMatrix() * Vec4f(local_direction.X, local_direction.Y, local_direction.Z, 0.0f);
 
-	return direction.Dot(Vec3f(world.X, world.Y, world.Z)) > 0.0f;
+	return direction.Dot(FVec3(world.X, world.Y, world.Z)) > 0.0f;
 }
 
-void ObjectScriptManager::UpdateTrigger(Entry& entry, Object* object, const Vec3f point)
+void ObjectScriptManager::UpdateTrigger(Entry& entry, Object* object, const FVec3 point)
 {
 	if (!object->IsTrigger() || gWorld->pPrototype == nullptr) {
 		entry.bWasInside = false;
@@ -98,7 +98,7 @@ void ObjectScriptManager::UpdateTrigger(Entry& entry, Object* object, const Vec3
 
 	entry.bWasInside = inside;
 
-	const Vec3f direction = GetCrossingDirection(entry, point);
+	const FVec3 direction = GetCrossingDirection(entry, point);
 
 	if (!inside) {
 		LeaveTrigger(entry, object, direction);
@@ -205,21 +205,21 @@ const String& ObjectScriptManager::GetPath(ObjectID id) const
 	return (entry != nullptr) ? entry->Path : scNoPath;
 }
 
-Vec3f ObjectScriptManager::GetEnterDirection(ObjectID id) const
+FVec3 ObjectScriptManager::GetEnterDirection(ObjectID id) const
 {
 	const Entry* entry = FindEntry(id);
 
-	return (entry != nullptr) ? entry->EnterDirection : Vec3f::sZero;
+	return (entry != nullptr) ? entry->EnterDirection : FVec3::sZero;
 }
 
-Vec3f ObjectScriptManager::GetExitDirection(ObjectID id) const
+FVec3 ObjectScriptManager::GetExitDirection(ObjectID id) const
 {
 	const Entry* entry = FindEntry(id);
 
-	return (entry != nullptr) ? entry->ExitDirection : Vec3f::sZero;
+	return (entry != nullptr) ? entry->ExitDirection : FVec3::sZero;
 }
 
-void ObjectScriptManager::SetRequiredEnterDirection(ObjectID id, const Vec3f local_direction)
+void ObjectScriptManager::SetRequiredEnterDirection(ObjectID id, const FVec3 local_direction)
 {
 	static constexpr float32 scMinDirectionLength = 1e-4f;
 
@@ -245,7 +245,7 @@ void ObjectScriptManager::SetRequiredEnterDirection(ObjectID id, const Vec3f loc
 	}
 }
 
-bool ObjectScriptManager::TryGetRequiredEnterDirection(ObjectID id, Vec3f& out_local_direction) const
+bool ObjectScriptManager::TryGetRequiredEnterDirection(ObjectID id, FVec3& out_local_direction) const
 {
 	for (const EnterGate& gate : mEnterGates) {
 		if (gate.ID.GetID() == id.GetID()) {
@@ -257,9 +257,9 @@ bool ObjectScriptManager::TryGetRequiredEnterDirection(ObjectID id, Vec3f& out_l
 	return false;
 }
 
-void ObjectScriptManager::ClearRequiredEnterDirection(ObjectID id) { SetRequiredEnterDirection(id, Vec3f::sZero); }
+void ObjectScriptManager::ClearRequiredEnterDirection(ObjectID id) { SetRequiredEnterDirection(id, FVec3::sZero); }
 
-void ObjectScriptManager::Update(float32 delta_time, const Vec3f trigger_point)
+void ObjectScriptManager::Update(float32 delta_time, const FVec3 trigger_point)
 {
 	for (size_t i = 0; i < mEntries.size(); ++i) {
 		Entry& entry = mEntries[i];

@@ -31,10 +31,10 @@ struct LightmapVerifyResult
 };
 
 VerifyResult VerifyTriangles(const PlaneSet& planes, const Bsp& bsp, const MapSource& source, bool sealed,
-							 const Array<Vec3d>& triangle_points, const Array<Vec3d>& patch_points, uint32 ray_count);
+							 const Array<DVec3>& triangle_points, const Array<DVec3>& patch_points, uint32 ray_count);
 
 LightmapVerifyResult VerifyLightmap(const PlaneSet& planes, const MapSource& source, const CompiledMap& map,
-									const Array<Vec3d>& patch_points, const Array<Vec3d>& patch_facings, double density,
+									const Array<DVec3>& patch_points, const Array<DVec3>& patch_facings, double density,
 									uint32 point_count);
 
 } // namespace fx::mapc

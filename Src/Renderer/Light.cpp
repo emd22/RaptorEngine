@@ -90,7 +90,7 @@ void LightBase::SetRadius(const float radius)
 	}
 }
 
-void LightBase::SetPosition(const Vec3f position)
+void LightBase::SetPosition(const FVec3 position)
 {
 	Entity::SetPosition(position);
 
@@ -110,7 +110,7 @@ void LightBase::SetRotation(const Quat rotation)
 
 BBox LightBase::GetBounds() const
 {
-	const Vec3f extent(mRadius);
+	const FVec3 extent(mRadius);
 	return BBox(mPosition - extent, mPosition + extent);
 }
 
@@ -137,7 +137,7 @@ void LightDirectional::FillGpuData(LightGpuData& data, const PerspectiveCamera& 
 	LightBase::FillGpuData(data, camera, shadow_camera);
 
 	// Position holds the direction towards the light for this type. The shading pass takes it pre-normalized.
-	const Vec3f direction = mPosition.Normalize();
+	const FVec3 direction = mPosition.Normalize();
 	data.Position[0] = direction.X;
 	data.Position[1] = direction.Y;
 	data.Position[2] = direction.Z;
@@ -178,7 +178,7 @@ void LightSpot::SetConeAngles(float32 inner_angle, float32 outer_angle)
 
 BBox LightSpot::GetBounds() const
 {
-	const Vec3f direction = GetDirection().Normalize();
+	const FVec3 direction = GetDirection().Normalize();
 	const float32 axis_components[3] = { direction.X, direction.Y, direction.Z };
 
 	float32 low[3];
@@ -195,7 +195,7 @@ BBox LightSpot::GetBounds() const
 		low[axis] = -mRadius * std::max(reach_negative, 0.0f);
 	}
 
-	return BBox(mPosition + Vec3f(low[0], low[1], low[2]), mPosition + Vec3f(high[0], high[1], high[2]));
+	return BBox(mPosition + FVec3(low[0], low[1], low[2]), mPosition + FVec3(high[0], high[1], high[2]));
 }
 
 bool LightSpot::IsOutsideFrustum(const Frustum& frustum) const { return !frustum.IntersectsAABB(GetBounds()); }
@@ -212,9 +212,9 @@ float32 LightSpot::GetLumens() const { return Intensity * GetEffectiveSolidAngle
 
 void LightSpot::SetLumens(float32 lumens) { Intensity = lumens / std::max(GetEffectiveSolidAngle(), 1e-4f); }
 
-void LightSpot::SetDirection(const Vec3f direction)
+void LightSpot::SetDirection(const FVec3 direction)
 {
-	const Vec3f dir = direction.Normalize();
+	const FVec3 dir = direction.Normalize();
 
 	// Shortest arc from forward (+Z) to `dir`: axis is (+Z x dir), w is 1 + (+Z . dir)
 	const float32 w = 1.0f + dir.Z;
@@ -228,7 +228,7 @@ void LightSpot::SetDirection(const Vec3f direction)
 	SetRotation(Quat(-dir.Y, dir.X, 0.0f, w).Normalize());
 }
 
-Vec3f LightSpot::GetDirection() const
+FVec3 LightSpot::GetDirection() const
 {
 	// const float32 x = mRotation.GetX();
 	// const float32 y = mRotation.GetY();
@@ -237,16 +237,16 @@ Vec3f LightSpot::GetDirection() const
 
 
 	// Forward (+Z) rotated by q, i.e. the third row of the rotation matrix
-	// return Vec3f(2.0f * (x * z + w * y), 2.0f * (y * z - w * x), 1.0f - 2.0f * (x * x + y * y));
+	// return FVec3(2.0f * (x * z + w * y), 2.0f * (y * z - w * x), 1.0f - 2.0f * (x * x + y * y));
 	return mRotation.GetDirection();
 }
 
 Mat4f LightSpot::CalculateShadowMatrix() const
 {
-	const Vec3f direction = GetDirection().Normalize();
+	const FVec3 direction = GetDirection().Normalize();
 
 	// The cone is round, so any up vector works as long as it isn't parallel to the cone
-	const Vec3f up = (std::fabs(direction.Y) > 0.99f) ? Vec3f(0.0f, 0.0f, 1.0f) : Vec3f::sUp;
+	const FVec3 up = (std::fabs(direction.Y) > 0.99f) ? FVec3(0.0f, 0.0f, 1.0f) : FVec3::sUp;
 
 	Mat4f view = Mat4f::scIdentity;
 	view.LookAt(mPosition, mPosition + direction, up);
@@ -275,7 +275,7 @@ void LightSpot::FillGpuData(LightGpuData& data, const PerspectiveCamera& camera,
 {
 	LightBase::FillGpuData(data, camera, shadow_camera);
 
-	const Vec3f direction = GetDirection().Normalize();
+	const FVec3 direction = GetDirection().Normalize();
 
 	data.SpotDirection[0] = direction.X;
 	data.SpotDirection[1] = direction.Y;

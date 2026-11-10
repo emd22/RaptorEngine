@@ -343,7 +343,7 @@ void RagdollBalance::GatherFeet(Ragdoll& ragdoll, float32 delta_time, bool conta
 			if (leg.bTouching) {
 				leg.ContactAge = 0.0f;
 				leg.ContactCount = contact.PointCount;
-				leg.ContactNormal = JPH::Vec3(Vec3f::ToJolt(contact.Normal));
+				leg.ContactNormal = JPH::Vec3(FVec3::ToJolt(contact.Normal));
 				leg.ContactFriction = contact.Friction;
 				leg.SurfaceHeight = std::numeric_limits<float32>::max();
 
@@ -1274,14 +1274,14 @@ bool RagdollBalance::ProbeSurface(const JPH::Vec3 point, float32& out_height) co
 	constexpr float32 scProbeLength = 3.0f;
 
 	const JPH::Vec3 origin = mGroundFrame.Horizontal(point) + mGroundFrame.Up * mCenterOfMass.Dot(mGroundFrame.Up);
-	const RayResult hit = gPhysics->pBackend->RaycastStaticNoLock(Vec3f::FromJolt(origin),
-																  Vec3f::FromJolt(-mGroundFrame.Up * scProbeLength));
+	const RayResult hit = gPhysics->pBackend->RaycastStaticNoLock(FVec3::FromJolt(origin),
+																  FVec3::FromJolt(-mGroundFrame.Up * scProbeLength));
 
-	if (!hit.bHit || Vec3f::ToJolt(hit.Normal).Dot(mGroundFrame.Up) < scSupportNormalMinUp) {
+	if (!hit.bHit || FVec3::ToJolt(hit.Normal).Dot(mGroundFrame.Up) < scSupportNormalMinUp) {
 		return false;
 	}
 
-	out_height = Vec3f::ToJolt(hit.Point).Dot(mGroundFrame.Up);
+	out_height = FVec3::ToJolt(hit.Point).Dot(mGroundFrame.Up);
 
 	return true;
 }

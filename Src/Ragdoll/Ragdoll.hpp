@@ -15,8 +15,8 @@
 #include <Core/Ref.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Mat4.hpp>
-#include <Math/Vec3.hpp>
 #include <limits>
 
 namespace JPH {
@@ -195,7 +195,7 @@ public:
 
 	static JPH::ObjectLayer GetModeLayer(eRagdollBodyMode mode);
 
-	void Activate(const Vec3f velocity);
+	void Activate(const FVec3 velocity);
 
 	void Drive(const Mat4f& object_world_matrix, float32 delta_time, bool teleport = false);
 	void GoLimp(const Mat4f& object_world_matrix);
@@ -210,14 +210,14 @@ public:
 	void SetBalancing(bool balancing);
 
 	FX_FORCE_INLINE void SetBalanceAssist(const BalanceAssist& assist) { mBalance.SetAssist(assist); }
-	FX_FORCE_INLINE void SetStaggerVelocity(const Vec3f velocity)
+	FX_FORCE_INLINE void SetStaggerVelocity(const FVec3 velocity)
 	{
-		mBalance.SetStaggerVelocity(Vec3f::ToJolt(velocity));
+		mBalance.SetStaggerVelocity(FVec3::ToJolt(velocity));
 	}
-	FX_FORCE_INLINE Vec3f GetStaggerVelocity() const
+	FX_FORCE_INLINE FVec3 GetStaggerVelocity() const
 	{
 		const JPH::Vec3 velocity = mBalance.GetStaggerVelocity();
-		return Vec3f(velocity.GetX(), velocity.GetY(), velocity.GetZ());
+		return FVec3(velocity.GetX(), velocity.GetY(), velocity.GetZ());
 	}
 	FX_FORCE_INLINE void AddBalanceBuckle(float32 depth) { mBalance.AddBuckle(depth); }
 	void RebaseTargets();
@@ -246,11 +246,11 @@ public:
 	/// How far past its limits a joint sits (degrees), 0 while it is inside them
 	float32 GetJointLimitExcess(uint32 body_index) const;
 	bool GetBodyTrackingError(uint32 body_index, float32& out_distance, float32& out_angle) const;
-	Vec3f GetBodyPosition(uint32 body_index) const;
-	Vec3f GetBodyOrigin(uint32 body_index) const;
-	Vec3f GetBodyTargetOrigin(uint32 body_index) const;
+	FVec3 GetBodyPosition(uint32 body_index) const;
+	FVec3 GetBodyOrigin(uint32 body_index) const;
+	FVec3 GetBodyTargetOrigin(uint32 body_index) const;
 	/// Horizontal direction the pelvis faces, as simulated or as last animated
-	Vec3f GetPelvisHeading(bool animated) const;
+	FVec3 GetPelvisHeading(bool animated) const;
 	bool GetBodyGroundContact(uint32 body_index, BodyGroundContact& out_contact) const;
 	bool IsBodyOnGround(uint32 body_index, const JPH::Vec3 up, float32 min_up) const;
 	static bool IsSupportNormal(const BodyGroundContact& contact, const JPH::Vec3 up, float32 min_up);
@@ -284,7 +284,7 @@ public:
 	FX_FORCE_INLINE const BalanceStatus& GetBalanceStatus() const { return mBalance.GetStatus(); }
 	FX_FORCE_INLINE const RagdollRig& GetRig() const { return mRig; }
 
-	void AddImpulse(JPH::BodyID body_id, const Vec3f impulse, const Vec3f point);
+	void AddImpulse(JPH::BodyID body_id, const FVec3 impulse, const FVec3 point);
 	void WriteToSkeleton();
 
 	void DebugDraw() const;
@@ -354,8 +354,8 @@ private:
 	 */
 	Mat4f GetSegmentWorldMatrix(uint32 body_index, float32 step_alpha) const;
 
-	void DrawDebugSegments(const SizedArray<RDSegmentState>& samples, SizedArray<Vec3f>& out_centers) const;
-	void DrawDebugLinks(const SizedArray<Vec3f>& centers) const;
+	void DrawDebugSegments(const SizedArray<RDSegmentState>& samples, SizedArray<FVec3>& out_centers) const;
+	void DrawDebugLinks(const SizedArray<FVec3>& centers) const;
 	void DrawDebugSupport(const SizedArray<RDSegmentState>& samples) const;
 
 private:

@@ -20,14 +20,14 @@ using namespace RagdollMath;
 
 namespace {
 
-void DrawCross(const Vec3f point, Color color)
+void DrawCross(const FVec3 point, Color color)
 {
 	constexpr float32 scDebugCross = 0.05f;
 
-	const Vec3f axes[3] = { Vec3f(scDebugCross, 0.0f, 0.0f), Vec3f(0.0f, scDebugCross, 0.0f),
-							Vec3f(0.0f, 0.0f, scDebugCross) };
+	const FVec3 axes[3] = { FVec3(scDebugCross, 0.0f, 0.0f), FVec3(0.0f, scDebugCross, 0.0f),
+							FVec3(0.0f, 0.0f, scDebugCross) };
 
-	for (const Vec3f axis : axes) {
+	for (const FVec3 axis : axes) {
 		renderer::gDebugDraw->Line(point - axis, point + axis, color);
 	}
 }
@@ -130,7 +130,7 @@ void RagdollBehaviours::Sense(Ragdoll& ragdoll, float32 delta_time)
 
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
 	const GravityFrame frame = GravityFrame::FromPhysics();
-	const Vec3f up = Vec3f::FromJolt(frame.Up);
+	const FVec3 up = FVec3::FromJolt(frame.Up);
 
 	BehaviourContext& ctx = mContext;
 
@@ -154,11 +154,11 @@ void RagdollBehaviours::Sense(Ragdoll& ragdoll, float32 delta_time)
 
 		ragdoll.SampleSegment(body_interface, i, sample);
 
-		body.Origin = Vec3f::FromJolt(sample.Origin);
+		body.Origin = FVec3::FromJolt(sample.Origin);
 		body.Orientation = sample.Orientation;
-		body.Center = Vec3f::FromJolt(sample.Center);
-		body.Velocity = Vec3f::FromJolt(sample.Velocity);
-		body.AngularVelocity = Vec3f::FromJolt(sample.AngularVelocity);
+		body.Center = FVec3::FromJolt(sample.Center);
+		body.Velocity = FVec3::FromJolt(sample.Velocity);
+		body.AngularVelocity = FVec3::FromJolt(sample.AngularVelocity);
 
 		BodyGroundContact contact;
 		body.bContact = is_powered && ragdoll.GetBodyGroundContact(i, contact);
@@ -175,8 +175,8 @@ void RagdollBehaviours::Sense(Ragdoll& ragdoll, float32 delta_time)
 	JPH::Vec3 velocity;
 
 	if (ragdoll.GetMassAverage(mSamples, center_of_mass, velocity)) {
-		ctx.CenterOfMass = Vec3f::FromJolt(center_of_mass);
-		ctx.Velocity = Vec3f::FromJolt(velocity);
+		ctx.CenterOfMass = FVec3::FromJolt(center_of_mass);
+		ctx.Velocity = FVec3::FromJolt(velocity);
 	}
 
 	ctx.bFeetSupported = feet_supported;
@@ -226,10 +226,10 @@ void RagdollBehaviours::SenseChestFrame(const Ragdoll& ragdoll)
 
 	const JPH::Quat delta = ctx.Bodies[mpRig->Chest].Orientation *
 							ragdoll.GetRestOrientation(mpRig->Chest).Conjugated();
-	const JPH::Vec3 up = Vec3f::ToJolt(ctx.Up);
+	const JPH::Vec3 up = FVec3::ToJolt(ctx.Up);
 
-	ctx.Forward = Vec3f::FromJolt((delta * mpRig->RestForward).Normalized());
-	ctx.Right = Vec3f::FromJolt((delta * up.Cross(mpRig->RestForward)).NormalizedOr(JPH::Vec3::sAxisX()));
+	ctx.Forward = FVec3::FromJolt((delta * mpRig->RestForward).Normalized());
+	ctx.Right = FVec3::FromJolt((delta * up.Cross(mpRig->RestForward)).NormalizedOr(JPH::Vec3::sAxisX()));
 }
 
 void RagdollBehaviours::PredictImpact()
@@ -240,16 +240,16 @@ void RagdollBehaviours::PredictImpact()
 	BehaviourContext& ctx = mContext;
 
 	const BehaviourBody& chest = ctx.Bodies[mpRig->Chest];
-	const Vec3f gravity = ctx.Up * -ctx.Gravity;
+	const FVec3 gravity = ctx.Up * -ctx.Gravity;
 
-	Vec3f point = chest.Center;
+	FVec3 point = chest.Center;
 
 	for (uint32 step = 1; step <= scImpactSteps; step++) {
 		const float32 time = scImpactStep * static_cast<float32>(step);
 
-		const Vec3f next = chest.Center + chest.Velocity * time + gravity * (0.5f * time * time);
+		const FVec3 next = chest.Center + chest.Velocity * time + gravity * (0.5f * time * time);
 
-		const Vec3f segment = next - point;
+		const FVec3 segment = next - point;
 		const float32 segment_length = segment.Length();
 
 		const RayResult hit = gPhysics->pBackend->RaycastStatic(point, segment);
@@ -469,16 +469,16 @@ void RagdollBehaviours::SolveArm(uint32 arm, const BehaviourGoal& goal, float32 
 	const BehaviourContext& ctx = mContext;
 	const RagdollRigArm& chain = mpRig->Arms[arm];
 
-	const Vec3f chest_up = ctx.GetChestUp();
-	const Vec3f shoulder = ctx.Bodies[chain.Upper].Origin;
-	const Vec3f hint = -chest_up * scElbowDown - ctx.Forward * scElbowBack + ctx.Right * (chain.SideSign * scElbowOut);
+	const FVec3 chest_up = ctx.GetChestUp();
+	const FVec3 shoulder = ctx.Bodies[chain.Upper].Origin;
+	const FVec3 hint = -chest_up * scElbowDown - ctx.Forward * scElbowBack + ctx.Right * (chain.SideSign * scElbowOut);
 
 	const TwoBoneIKResult ik = SolveTwoBoneIK(shoulder, goal.Target, chain.UpperLength, chain.LowerLength, hint);
 
-	const Vec3f upper_direction = (ik.Mid - shoulder).SafeNormalize(-chest_up);
-	const Vec3f lower_direction = (ik.End - ik.Mid).SafeNormalize(upper_direction);
+	const FVec3 upper_direction = (ik.Mid - shoulder).SafeNormalize(-chest_up);
+	const FVec3 lower_direction = (ik.End - ik.Mid).SafeNormalize(upper_direction);
 
-	Vec3f hinge = upper_direction.Cross(lower_direction);
+	FVec3 hinge = upper_direction.Cross(lower_direction);
 
 	if (hinge.Length() < 1e-3f) {
 		hinge = upper_direction.Cross(hint);
@@ -488,8 +488,8 @@ void RagdollBehaviours::SolveArm(uint32 arm, const BehaviourGoal& goal, float32 
 
 	JPH::Quat upper_world;
 	JPH::Quat lower_world;
-	ctx.pRagdoll->GetHingeChainRotations(chain.Upper, chain.Lower, Vec3f::ToJolt(upper_direction),
-										 Vec3f::ToJolt(lower_direction), Vec3f::ToJolt(hinge), upper_world,
+	ctx.pRagdoll->GetHingeChainRotations(chain.Upper, chain.Lower, FVec3::ToJolt(upper_direction),
+										 FVec3::ToJolt(lower_direction), FVec3::ToJolt(hinge), upper_world,
 										 lower_world);
 
 	FoldOverride(chain.Upper, RelativeRotation(ctx.Bodies[chain.Clavicle].Orientation, upper_world), weight);
@@ -609,7 +609,7 @@ void RagdollBehaviours::DebugDraw() const
 			continue;
 		}
 
-		const Vec3f shoulder = mContext.Bodies[mpRig->Arms[arm].Upper].Origin;
+		const FVec3 shoulder = mContext.Bodies[mpRig->Arms[arm].Upper].Origin;
 		const uint8 green = static_cast<uint8>(80.0f + 175.0f * MathUtil::Clamp(goal.Weight, 0.0f, 1.0f));
 
 		renderer::gDebugDraw->Line(shoulder, goal.Target, Color::FromRGBA(40, green, 40, 255));

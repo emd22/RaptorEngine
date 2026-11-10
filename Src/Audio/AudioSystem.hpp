@@ -6,7 +6,7 @@
 #include <Core/SizedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 #include <functional>
 
 namespace fx {
@@ -139,7 +139,7 @@ struct AudioVoiceDebug
 {
 	const char* Name = "";
 	const char* Bus = "";
-	Vec3f Position = Vec3f::sZero;
+	FVec3 Position = FVec3::sZero;
 	float32 Distance = 0.0f;
 	float32 DistanceGain = 1.0f;
 	float32 Volume = 1.0f;
@@ -192,16 +192,16 @@ public:
 
 	void LoadSounds();
 
-	SoundID Play(const char* name, const Vec3f position);
-	SoundID Play(Hash32 name_hash, const Vec3f position);
-	SoundID PlayDelayed(Hash32 name_hash, const Vec3f position, float32 delay);
+	SoundID Play(const char* name, const FVec3 position);
+	SoundID Play(Hash32 name_hash, const FVec3 position);
+	SoundID PlayDelayed(Hash32 name_hash, const FVec3 position, float32 delay);
 	SoundID Play2D(const char* name);
 	SoundID Play2D(Hash32 name_hash);
 
-	SoundID PlayForSurface(const char* event, const String& surface, const Vec3f position);
+	SoundID PlayForSurface(const char* event, const String& surface, const FVec3 position);
 	SoundID PlayForSurface2D(const char* event, const String& surface);
 
-	void SetPosition(SoundID id, const Vec3f position);
+	void SetPosition(SoundID id, const FVec3 position);
 	void SetVolume(SoundID id, float32 volume);
 	void Stop(SoundID id);
 	void Kill(SoundID id);
@@ -232,12 +232,12 @@ public:
 	uint32 GetStolenVoiceCount() const { return mStolenVoiceCount; }
 	uint32 GetDroppedVoiceCount() const { return mDroppedVoiceCount; }
 
-	void SetListener(const Vec3f position, const Vec3f forward, const Vec3f up);
+	void SetListener(const FVec3 position, const FVec3 forward, const FVec3 up);
 	void Update(float32 delta_time, bool window_focused);
 
 	uint64 ReadFrames(float32* out_frames, uint64 frame_count);
 
-	using PathGainFunction = std::function<float32(const Vec3f source, const Vec3f listener)>;
+	using PathGainFunction = std::function<float32(const FVec3 source, const FVec3 listener)>;
 
 	void SetPathGainFunction(PathGainFunction function) { mPathGain = std::move(function); }
 	void SetAcousticScene(const AcousticGeometry& geometry);
@@ -263,7 +263,7 @@ private:
 		uint64 RequestFrame = 0;
 		float32 Volume = 1.0f;
 		float32 UserVolume = 1.0f;
-		Vec3f Position = Vec3f::sZero;
+		FVec3 Position = FVec3::sZero;
 		SpatialVoice* pSpatial = nullptr;
 		ReverbSend* pReverbSend = nullptr;
 		bool bActive = false;
@@ -285,7 +285,7 @@ private:
 	};
 
 private:
-	SoundID StartVoice(Hash32 name_hash, const Vec3f position, bool spatial, float32 delay = 0.0f);
+	SoundID StartVoice(Hash32 name_hash, const FVec3 position, bool spatial, float32 delay = 0.0f);
 	bool LoadDef(const char* path, const String& name, SoundDef& out_def);
 	void UnloadDefs();
 
@@ -341,7 +341,7 @@ private:
 	CVarValue* mpReverbBouncesCVar = nullptr;
 
 	SpatialAudio mSpatial;
-	Vec3f mListenerPosition = Vec3f::sZero;
+	FVec3 mListenerPosition = FVec3::sZero;
 	PathGainFunction mPathGain;
 
 	bool mbWarnedAboutVoiceOverflow = false;

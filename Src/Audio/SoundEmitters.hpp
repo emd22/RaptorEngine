@@ -4,7 +4,7 @@
 #include <Core/DynArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 
 namespace fx {
 
@@ -13,7 +13,7 @@ struct SoundEmitter
 	uint32 Id = 0;
 	String Name;
 	String Sound;
-	Vec3f Position = Vec3f::sZero;
+	FVec3 Position = FVec3::sZero;
 	float32 Volume = 1.0f;
 	float32 MinInterval = 0.0f;
 	float32 MaxInterval = 0.0f;
@@ -37,7 +37,7 @@ public:
 
 	const DynArray<SoundEmitter, GrowthFunctions::Double>& GetEmitters() const { return mEmitters; }
 
-	void Update(float32 delta_time, const Vec3f listener);
+	void Update(float32 delta_time, const FVec3 listener);
 	void StopAll();
 
 private:
@@ -51,7 +51,7 @@ private:
 
 private:
 	void Stop(State& state);
-	void UpdateEmitter(const SoundEmitter& emitter, State& state, float32 delta_time, const Vec3f listener);
+	void UpdateEmitter(const SoundEmitter& emitter, State& state, float32 delta_time, const FVec3 listener);
 
 private:
 	DynArray<SoundEmitter, GrowthFunctions::Double> mEmitters;

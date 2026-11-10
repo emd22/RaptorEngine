@@ -4,8 +4,8 @@
 #include <Core/SizedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Mat4.hpp>
-#include <Math/Vec3.hpp>
 #include <Object/ObjectLayer.hpp>
 #include <Renderer/Backend/GpuBuffer.hpp>
 #include <Texture/AtlasConfig.hpp>
@@ -162,12 +162,12 @@ public:
 
 	void LoadEffects();
 
-	ParticleEffectID Play(const char* name, const Vec3f position, const Vec3f direction,
+	ParticleEffectID Play(const char* name, const FVec3 position, const FVec3 direction,
 						  eObjectLayer layer = eObjectLayer::WorldLayer);
-	ParticleEffectID Play(Hash32 name_hash, const Vec3f position, const Vec3f direction,
+	ParticleEffectID Play(Hash32 name_hash, const FVec3 position, const FVec3 direction,
 						  eObjectLayer layer = eObjectLayer::WorldLayer);
 
-	void SetTransform(ParticleEffectID id, const Vec3f position, const Vec3f direction);
+	void SetTransform(ParticleEffectID id, const FVec3 position, const FVec3 direction);
 	void Stop(ParticleEffectID id);
 	void Kill(ParticleEffectID id);
 	bool IsAlive(ParticleEffectID id) const;
@@ -188,8 +188,8 @@ public:
 private:
 	struct Particle
 	{
-		Vec3f Position;
-		Vec3f Velocity;
+		FVec3 Position;
+		FVec3 Velocity;
 		float32 Age;
 		float32 Lifetime;
 		float32 Size;
@@ -208,9 +208,9 @@ private:
 
 	struct EffectInstance
 	{
-		Vec3f Position = Vec3f::sZero;
-		Vec3f Direction = Vec3f::sUp;
-		Vec3f Lighting = Vec3f::sOne;
+		FVec3 Position = FVec3::sZero;
+		FVec3 Direction = FVec3::sUp;
+		FVec3 Lighting = FVec3::sOne;
 		uint32 DefIndex = 0;
 		uint32 Generation = 0;
 		uint32 LiveParticles = 0;
@@ -243,7 +243,7 @@ private:
 	const EffectInstance* GetInstance(ParticleEffectID id) const;
 
 	const ParticleEmitterDef& GetEmitter(const Particle& particle) const;
-	Vec3f GetWorldPosition(const Particle& particle) const;
+	FVec3 GetWorldPosition(const Particle& particle) const;
 
 	void SpawnParticles(uint32 effect_slot, uint32 emitter_index, uint32 count);
 	void UpdateEmitters(float32 delta_time);
@@ -251,10 +251,10 @@ private:
 	void UpdateLighting(float32 delta_time);
 	void RetireEffects();
 
-	bool CollideParticle(Particle& particle, const ParticleEmitterDef& emitter, const Vec3f previous_position);
+	bool CollideParticle(Particle& particle, const ParticleEmitterDef& emitter, const FVec3 previous_position);
 
-	uint32 GatherLayer(eObjectLayer layer, const Mat4f& view_projection, const Vec3f eye, const Vec3f forward);
-	void WriteInstances(uint32 first_instance, const Vec3f eye);
+	uint32 GatherLayer(eObjectLayer layer, const Mat4f& view_projection, const FVec3 eye, const FVec3 forward);
+	void WriteInstances(uint32 first_instance, const FVec3 eye);
 
 	void BuildDescriptorSet(Image* atlas);
 

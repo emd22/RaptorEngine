@@ -38,11 +38,11 @@ void Entity::SetScale(const float scale)
 
 // Go through SetRotation so overrides (e.g. Object syncing its physics body and attached objects) see the change.
 // Renormalize so that repeated small rotations do not accumulate scale into the model matrix.
-void Entity::RotateX(float32 rad) { SetRotation((mRotation * Quat::FromAxisAngle(Vec3f::sRight, rad)).Normalize()); }
+void Entity::RotateX(float32 rad) { SetRotation((mRotation * Quat::FromAxisAngle(FVec3::sRight, rad)).Normalize()); }
 
-void Entity::RotateY(float32 rad) { SetRotation((mRotation * Quat::FromAxisAngle(Vec3f::sUp, rad)).Normalize()); }
+void Entity::RotateY(float32 rad) { SetRotation((mRotation * Quat::FromAxisAngle(FVec3::sUp, rad)).Normalize()); }
 
-void Entity::RotateZ(float32 rad) { SetRotation((mRotation * Quat::FromAxisAngle(Vec3f::sForward, rad)).Normalize()); }
+void Entity::RotateZ(float32 rad) { SetRotation((mRotation * Quat::FromAxisAngle(FVec3::sForward, rad)).Normalize()); }
 
 void Entity::SetModelMatrix(const Mat4f& other)
 {
@@ -128,10 +128,10 @@ void Entity::RecalculateModelMatrix()
 	BeginMatrixChange();
 
 	if (TransformMode == eTransformMode::Default) {
-		mWorldMatrix = Mat4f::AsScale(Vec3f(mScale)) * Mat4f::AsRotation(mRotation) * Mat4f::AsTranslation(mPosition);
+		mWorldMatrix = Mat4f::AsScale(FVec3(mScale)) * Mat4f::AsRotation(mRotation) * Mat4f::AsTranslation(mPosition);
 	}
 	else if (TransformMode == eTransformMode::TransformFromOrigin) {
-		mWorldMatrix = Mat4f::AsScale(Vec3f(mScale)) * Mat4f::AsTranslation(RotationOrigin) *
+		mWorldMatrix = Mat4f::AsScale(FVec3(mScale)) * Mat4f::AsTranslation(RotationOrigin) *
 					   Mat4f::AsRotation(mRotation) * Mat4f::AsTranslation(-RotationOrigin) *
 					   Mat4f::AsTranslation(mPosition);
 	}

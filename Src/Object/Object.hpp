@@ -60,7 +60,7 @@ public:
 
 	void Update();
 
-	void SetPosition(const Vec3f position) override;
+	void SetPosition(const FVec3 position) override;
 	void SetRotation(const Quat rotation) override;
 	void SetScale(const float scale) override;
 
@@ -68,7 +68,7 @@ public:
 
 	void PrintDebug() const;
 
-	float32 GetDirectionScale(const Vec3f direction);
+	float32 GetDirectionScale(const FVec3 direction);
 
 	// XXX: TEMP
 	void UpdateAnimation();
@@ -79,10 +79,10 @@ public:
 	// Instancing
 	/////////////////////////////////////
 
-	uint32 AddInstance(const Vec3f position, const Quat rotation = Quat::scIdentity, float32 scale = 1.0f);
+	uint32 AddInstance(const FVec3 position, const Quat rotation = Quat::scIdentity, float32 scale = 1.0f);
 	uint32 AddInstance(const Mat4f& transform);
 
-	void SetInstance(uint32 index, const Vec3f position, const Quat rotation = Quat::scIdentity, float32 scale = 1.0f);
+	void SetInstance(uint32 index, const FVec3 position, const Quat rotation = Quat::scIdentity, float32 scale = 1.0f);
 	void SetInstance(uint32 index, const Mat4f& transform);
 
 	void RemoveInstance(uint32 index);
@@ -187,9 +187,9 @@ public:
 	FX_FORCE_INLINE bool IsReflectionProbe() const { return HasTags(eObjectTag::ReflectionProbe); }
 	FX_FORCE_INLINE bool IsDynamic() const { return HasFlag(Flags, eObjectFlags::PhysicsEnabled); }
 
-	float32 RaycastBounds(const Vec3f origin, const Vec3f direction, Vec3f& out_face);
+	float32 RaycastBounds(const FVec3 origin, const FVec3 direction, FVec3& out_face);
 
-	bool ContainsPoint(const Vec3f point);
+	bool ContainsPoint(const FVec3 point);
 
 
 	FX_FORCE_INLINE OBBox GetWorldOBB() { return OBBox::FromLocalBounds(Bounds, GetWorldMatrix()); }
@@ -310,7 +310,7 @@ public:
 	ObjectID ParentID = ObjectID::scNull;
 	PagedArray<ObjectID> AttachedNodes;
 
-	BBox Bounds { Vec3f::sZero, Vec3f::sZero };
+	BBox Bounds { FVec3::sZero, FVec3::sZero };
 
 	std::atomic_bool bIsAddedToWorld = false;
 	std::atomic_bool bIsLoading = false;

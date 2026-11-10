@@ -4,7 +4,7 @@
 #include <Core/SizedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 
 struct ma_engine;
 struct ma_node_base;
@@ -62,12 +62,12 @@ public:
 	void DestroyReverbSend(ReverbSend* send);
 	ma_node_base* GetReverbSendInput(ReverbSend* send) const;
 
-	void SetVoiceSource(SpatialVoice* voice, const Vec3f position, float32 distance_gain, bool binaural);
+	void SetVoiceSource(SpatialVoice* voice, const FVec3 position, float32 distance_gain, bool binaural);
 	bool IsVoiceReady(const SpatialVoice* voice) const;
 	void SetVoiceStarted(SpatialVoice* voice);
 	bool GetVoiceDebug(const SpatialVoice* voice, SpatialVoiceDebug& out) const;
 
-	void SetListener(const Vec3f position, const Vec3f forward, const Vec3f up);
+	void SetListener(const FVec3 position, const FVec3 forward, const FVec3 up);
 	void SetReverb(bool enabled, float32 volume, bool binaural);
 	void SetReverbQuality(int32 rays, int32 bounces);
 	void SetScene(const AcousticGeometry& geometry);

@@ -63,13 +63,13 @@ struct LightmapChart
 {
 	int32 PlaneIndex = PlaneSet::scNone;
 
-	Vec3d U = Vec3d::scZero;
-	Vec3d V = Vec3d::scZero;
+	DVec3 U = DVec3::scZero;
+	DVec3 V = DVec3::scZero;
 
 	Array<Vec2d> TrianglePoints;
 
-	Array<Vec3d> WorldPoints;
-	Array<Vec3d> Normals;
+	Array<DVec3> WorldPoints;
+	Array<DVec3> Normals;
 
 	bool IsPlanar() const { return WorldPoints.Size == 0; }
 };
@@ -91,9 +91,9 @@ public:
 	Array<String> Warnings;
 
 	/// Three corners per triangle of everything that was written, for verification
-	Array<Vec3d> TrianglePoints;
+	Array<DVec3> TrianglePoints;
 
-	Array<Vec3d> BlockerPoints;
+	Array<DVec3> BlockerPoints;
 
 	Array<LightmapChart> Charts;
 	Array<Array<LightmapVertex>> LightmapVertices;

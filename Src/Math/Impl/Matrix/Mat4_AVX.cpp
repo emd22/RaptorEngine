@@ -231,15 +231,15 @@ Mat4f Mat4f::TransposeMat3() { return Transposed(); }
 
 void Mat4f::CopyAsMat3To(float* dest) const { memcpy(dest, RawData, sizeof(float32) * 12); }
 
-void Mat4f::LookAt(const Vec3f eye, const Vec3f target, const Vec3f upvec)
+void Mat4f::LookAt(const FVec3 eye, const FVec3 target, const FVec3 upvec)
 {
-	Vec3f forward = (target - eye);
+	FVec3 forward = (target - eye);
 	forward.NormalizeIP();
 
-	Vec3f right = upvec.Cross(forward);
+	FVec3 right = upvec.Cross(forward);
 	right.NormalizeIP();
 
-	const Vec3f up = forward.Cross(right);
+	const FVec3 up = forward.Cross(right);
 
 	Rows[0].Set(right.X, up.X, forward.X, 0.0f);
 	Rows[1].Set(right.Y, up.Y, forward.Y, 0.0f);

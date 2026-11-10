@@ -14,7 +14,7 @@ constexpr double scNoHit = std::numeric_limits<double>::infinity();
 constexpr double scParallelEpsilon = 1e-14;
 constexpr uint32 scSeed = 0x52415054;
 
-bool IsNearBrush(const PlaneSet& planes, const SourceBrush& brush, const Vec3d& point)
+bool IsNearBrush(const PlaneSet& planes, const SourceBrush& brush, const DVec3& point)
 {
 	constexpr double scOriginClearance = 1e-2;
 
@@ -27,7 +27,7 @@ bool IsNearBrush(const PlaneSet& planes, const SourceBrush& brush, const Vec3d& 
 	return true;
 }
 
-double TraceBrush(const PlaneSet& planes, const SourceBrush& brush, const Vec3d& origin, const Vec3d& direction)
+double TraceBrush(const PlaneSet& planes, const SourceBrush& brush, const DVec3& origin, const DVec3& direction)
 {
 	double enter = -scNoHit;
 	double exit = scNoHit;
@@ -63,14 +63,14 @@ double TraceBrush(const PlaneSet& planes, const SourceBrush& brush, const Vec3d&
 	return scNoHit;
 }
 
-double TraceTriangle(const Vec3d& a, const Vec3d& b, const Vec3d& c, const Vec3d& origin, const Vec3d& direction)
+double TraceTriangle(const DVec3& a, const DVec3& b, const DVec3& c, const DVec3& origin, const DVec3& direction)
 {
 	constexpr double scBarycentricTolerance = 1e-9;
 
-	const Vec3d edge_ab = b - a;
-	const Vec3d edge_ac = c - a;
+	const DVec3 edge_ab = b - a;
+	const DVec3 edge_ac = c - a;
 
-	const Vec3d p = direction.Cross(edge_ac);
+	const DVec3 p = direction.Cross(edge_ac);
 	const double determinant = edge_ab.Dot(p);
 
 	if (std::abs(determinant) < scParallelEpsilon) {
@@ -78,7 +78,7 @@ double TraceTriangle(const Vec3d& a, const Vec3d& b, const Vec3d& c, const Vec3d
 	}
 
 	const double inverse = 1.0 / determinant;
-	const Vec3d offset = origin - a;
+	const DVec3 offset = origin - a;
 
 	const double u = offset.Dot(p) * inverse;
 
@@ -86,7 +86,7 @@ double TraceTriangle(const Vec3d& a, const Vec3d& b, const Vec3d& c, const Vec3d
 		return scNoHit;
 	}
 
-	const Vec3d q = offset.Cross(edge_ab);
+	const DVec3 q = offset.Cross(edge_ab);
 	const double v = direction.Dot(q) * inverse;
 
 	if (v < -scBarycentricTolerance || u + v > 1.0 + scBarycentricTolerance) {
@@ -102,7 +102,7 @@ double TraceTriangle(const Vec3d& a, const Vec3d& b, const Vec3d& c, const Vec3d
 	return scNoHit;
 }
 
-bool SeesSun(const PlaneSet& planes, const MapSource& source, const Array<Vec3d>& patch_points, const Vec3d& origin)
+bool SeesSun(const PlaneSet& planes, const MapSource& source, const Array<DVec3>& patch_points, const DVec3& origin)
 {
 	for (const SourceBrush& brush : source.Brushes) {
 		if (brush.bVisible && brush.bCastsShadow && TraceBrush(planes, brush, origin, source.SunDirection) != scNoHit) {
@@ -120,7 +120,7 @@ bool SeesSun(const PlaneSet& planes, const MapSource& source, const Array<Vec3d>
 	return true;
 }
 
-bool IsInsideVisibleBrush(const PlaneSet& planes, const MapSource& source, const Vec3d& point)
+bool IsInsideVisibleBrush(const PlaneSet& planes, const MapSource& source, const DVec3& point)
 {
 	for (const SourceBrush& brush : source.Brushes) {
 		if (!brush.bVisible) {
@@ -141,9 +141,9 @@ bool IsInsideVisibleBrush(const PlaneSet& planes, const MapSource& source, const
 	return false;
 }
 
-bool IsHiddenByPatches(const PlaneSet& planes, const MapSource& source, const Array<Vec3d>& patch_points,
-					   const Array<Vec3d>& patch_facings, const Vec3d& origin, const Vec3d& normal, const Vec3d& right,
-					   const Vec3d& up)
+bool IsHiddenByPatches(const PlaneSet& planes, const MapSource& source, const Array<DVec3>& patch_points,
+					   const Array<DVec3>& patch_facings, const DVec3& origin, const DVec3& normal, const DVec3& right,
+					   const DVec3& up)
 {
 	if (patch_facings.Size == 0) {
 		return false;
@@ -161,7 +161,7 @@ bool IsHiddenByPatches(const PlaneSet& planes, const MapSource& source, const Ar
 		const double angle = MathUtil::ToAngle(bits);
 		const double radius = std::sqrt(u);
 
-		const Vec3d direction = right * (std::cos(angle) * radius) + up * (std::sin(angle) * radius) +
+		const DVec3 direction = right * (std::cos(angle) * radius) + up * (std::sin(angle) * radius) +
 								normal * std::sqrt(1.0 - u);
 
 		double closest = scNoHit;
@@ -216,7 +216,7 @@ double SampleLightmap(const CompiledMapLightmap& lightmap, double u, double v)
 } // namespace
 
 LightmapVerifyResult VerifyLightmap(const PlaneSet& planes, const MapSource& source, const CompiledMap& map,
-									const Array<Vec3d>& patch_points, const Array<Vec3d>& patch_facings, double density,
+									const Array<DVec3>& patch_points, const Array<DVec3>& patch_facings, double density,
 									uint32 point_count)
 {
 	constexpr double scLightmapBias = 1e-3;
@@ -246,7 +246,7 @@ LightmapVerifyResult VerifyLightmap(const PlaneSet& planes, const MapSource& sou
 		const size_t triangle = std::min<size_t>(static_cast<size_t>(unit(random) * triangle_count),
 												 triangle_count - 1);
 
-		Vec3d weights(0.0);
+		DVec3 weights(0.0);
 		weights.X = unit(random);
 		weights.Y = unit(random);
 
@@ -257,7 +257,7 @@ LightmapVerifyResult VerifyLightmap(const PlaneSet& planes, const MapSource& sou
 
 		weights.Z = 1.0 - weights.X - weights.Y;
 
-		Vec3d position = Vec3d(0.0);
+		DVec3 position = DVec3(0.0);
 		double u = 0.0;
 		double v = 0.0;
 
@@ -265,39 +265,39 @@ LightmapVerifyResult VerifyLightmap(const PlaneSet& planes, const MapSource& sou
 			const uint32 index = surface.Indices[triangle * 3 + corner];
 			const CompiledMapVertex& vertex = surface.Vertices[index];
 
-			position = position + Vec3d(vertex.Position) * weights.mData[corner];
+			position = position + DVec3(vertex.Position) * weights.mData[corner];
 
 			u += surface.LightmapTexcoords[index * 2] * weights.mData[corner];
 			v += surface.LightmapTexcoords[index * 2 + 1] * weights.mData[corner];
 		}
 
-		Vec3d weighted_normal = Vec3d(0.0);
+		DVec3 weighted_normal = DVec3(0.0);
 
 		for (uint32 corner = 0; corner < 3; corner++) {
 			const CompiledMapVertex& vertex = surface.Vertices[surface.Indices[triangle * 3 + corner]];
-			weighted_normal = weighted_normal + Vec3d(vertex.Normal) * weights.mData[corner];
+			weighted_normal = weighted_normal + DVec3(vertex.Normal) * weights.mData[corner];
 		}
 
-		const Vec3d normal = weighted_normal.Normalized();
+		const DVec3 normal = weighted_normal.Normalized();
 
-		Vec3d reference = Vec3d(1.0, 0.0, 0.0);
+		DVec3 reference = DVec3(1.0, 0.0, 0.0);
 		if (std::abs(normal.Y) < 0.9) {
-			reference = Vec3d(0.0, 1.0, 0.0);
+			reference = DVec3(0.0, 1.0, 0.0);
 		}
 
 
-		const Vec3d right = reference.Cross(normal).Normalized();
-		const Vec3d up = normal.Cross(right);
+		const DVec3 right = reference.Cross(normal).Normalized();
+		const DVec3 up = normal.Cross(right);
 
-		const Vec3d origin = position + normal * scLightmapBias;
+		const DVec3 origin = position + normal * scLightmapBias;
 		const bool faces_sun = normal.Dot(source.SunDirection) > 0.0;
 
-		const Vec3d offsets[5] = { Vec3d(0.0), right * edge_distance, right * -edge_distance, up * edge_distance,
+		const DVec3 offsets[5] = { DVec3(0.0), right * edge_distance, right * -edge_distance, up * edge_distance,
 								   up * -edge_distance };
 
 		uint32 lit_count = 0;
 
-		for (const Vec3d& offset : offsets) {
+		for (const DVec3& offset : offsets) {
 			if (faces_sun && SeesSun(planes, source, patch_points, origin + offset)) {
 				lit_count++;
 			}
@@ -331,7 +331,7 @@ LightmapVerifyResult VerifyLightmap(const PlaneSet& planes, const MapSource& sou
 }
 
 VerifyResult VerifyTriangles(const PlaneSet& planes, const Bsp& bsp, const MapSource& source, bool sealed,
-							 const Array<Vec3d>& triangle_points, const Array<Vec3d>& patch_points, uint32 ray_count)
+							 const Array<DVec3>& triangle_points, const Array<DVec3>& patch_points, uint32 ray_count)
 {
 	constexpr uint32 scMaxOriginAttempts = 64;
 	constexpr double scHitTolerance = 1e-4;
@@ -342,14 +342,14 @@ VerifyResult VerifyTriangles(const PlaneSet& planes, const Bsp& bsp, const MapSo
 	std::uniform_real_distribution<double> unit(0.0, 1.0);
 	std::normal_distribution<double> normal(0.0, 1.0);
 
-	const Vec3d size = source.Max - source.Min;
+	const DVec3 size = source.Max - source.Min;
 
 	for (uint32 ray = 0; ray < ray_count; ray++) {
-		Vec3d origin = Vec3d(0.0);
+		DVec3 origin = DVec3(0.0);
 		bool found_origin = false;
 
 		for (uint32 attempt = 0; attempt < scMaxOriginAttempts && !found_origin; attempt++) {
-			origin = source.Min + Vec3d(size.X * unit(random), size.Y * unit(random), size.Z * unit(random));
+			origin = source.Min + DVec3(size.X * unit(random), size.Y * unit(random), size.Z * unit(random));
 
 			const Node& leaf = bsp.Nodes[static_cast<size_t>(bsp.FindLeaf(origin))];
 
@@ -368,7 +368,7 @@ VerifyResult VerifyTriangles(const PlaneSet& planes, const Bsp& bsp, const MapSo
 			continue;
 		}
 
-		Vec3d direction(normal(random), normal(random), normal(random));
+		DVec3 direction(normal(random), normal(random), normal(random));
 		const double length = direction.Length();
 
 		if (length < 1e-6) {

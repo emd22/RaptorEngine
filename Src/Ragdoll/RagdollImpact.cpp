@@ -92,7 +92,7 @@ JPH::Mat44 GetFigureInertia(const Ragdoll& ragdoll, const JPH::Vec3 pivot)
 	for (uint32 i = 0; i < ragdoll.GetSegmentCount(); i++) {
 		const float32 mass = ragdoll.GetBodyMass(i);
 		const float32 own = ragdoll.GetBodyInertia(i);
-		const JPH::Vec3 arm = Vec3f::ToJolt(ragdoll.GetBodyPosition(i)) - pivot;
+		const JPH::Vec3 arm = FVec3::ToJolt(ragdoll.GetBodyPosition(i)) - pivot;
 
 		const float32 x = arm.GetX();
 		const float32 y = arm.GetY();
@@ -112,7 +112,7 @@ JPH::Mat44 GetFigureInertia(const Ragdoll& ragdoll, const JPH::Vec3 pivot)
 
 } // namespace
 
-Vec3f ApplyRagdollKnock(Ragdoll& ragdoll, const RagdollKnock& knock)
+FVec3 ApplyRagdollKnock(Ragdoll& ragdoll, const RagdollKnock& knock)
 {
 	// Fastest a blow can turn the figure about vertical (rad/s). It has little inertia that way, and arms held in
 	// close would otherwise spin it like a top
@@ -125,7 +125,7 @@ Vec3f ApplyRagdollKnock(Ragdoll& ragdoll, const RagdollKnock& knock)
 	const JPH::Vec3 up = JPH::Vec3::sAxisY();
 
 	if (total_mass <= 0.0f || body_count == 0) {
-		return Vec3f::sZero;
+		return FVec3::sZero;
 	}
 
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
@@ -137,7 +137,7 @@ Vec3f ApplyRagdollKnock(Ragdoll& ragdoll, const RagdollKnock& knock)
 	for (uint32 i = 0; i < body_count; i++) {
 		const float32 mass = ragdoll.GetBodyMass(i);
 
-		center_of_mass += Vec3f::ToJolt(ragdoll.GetBodyPosition(i)) * mass;
+		center_of_mass += FVec3::ToJolt(ragdoll.GetBodyPosition(i)) * mass;
 		momentum += body_interface.GetLinearVelocity(ragdoll.GetBodyID(i)) * mass;
 	}
 
@@ -151,15 +151,15 @@ Vec3f ApplyRagdollKnock(Ragdoll& ragdoll, const RagdollKnock& knock)
 		for (uint32 leg = 0; leg < RagdollRig::scLimbCount; leg++) {
 			if (ragdoll.GetSoleClearance(leg) <= scPivotClearance) {
 				planted[leg] = true;
-				pivot += Vec3f::ToJolt(ragdoll.GetBodyOrigin(rig.Legs[leg].Foot));
+				pivot += FVec3::ToJolt(ragdoll.GetBodyOrigin(rig.Legs[leg].Foot));
 				planted_count++;
 			}
 		}
 	}
 
 	const float32 transfer = GetKnockTransfer(ragdoll, knock.Body);
-	JPH::Vec3 impulse = Vec3f::ToJolt(knock.Impulse) * transfer;
-	JPH::Vec3 point = Vec3f::ToJolt(knock.Point);
+	JPH::Vec3 impulse = FVec3::ToJolt(knock.Impulse) * transfer;
+	JPH::Vec3 point = FVec3::ToJolt(knock.Point);
 
 	if (knock.Body < 0) {
 		point = center_of_mass;
@@ -188,7 +188,7 @@ Vec3f ApplyRagdollKnock(Ragdoll& ragdoll, const RagdollKnock& knock)
 	const float32 raw_speed = flat_velocity.Length();
 
 	if (raw_speed <= 1e-5f) {
-		return Vec3f::sZero;
+		return FVec3::sZero;
 	}
 
 	const float32 wanted = MathUtil::Clamp(raw_speed, knock.MinSpeed * transfer, knock.MaxSpeed);
@@ -216,7 +216,7 @@ Vec3f ApplyRagdollKnock(Ragdoll& ragdoll, const RagdollKnock& knock)
 		}
 
 		const JPH::BodyID body_id = ragdoll.GetBodyID(i);
-		const JPH::Vec3 center = Vec3f::ToJolt(ragdoll.GetBodyPosition(i));
+		const JPH::Vec3 center = FVec3::ToJolt(ragdoll.GetBodyPosition(i));
 
 		body_interface.SetLinearAndAngularVelocity(
 			body_id, body_interface.GetLinearVelocity(body_id) + linear + angular.Cross(center - pivot),
@@ -224,10 +224,10 @@ Vec3f ApplyRagdollKnock(Ragdoll& ragdoll, const RagdollKnock& knock)
 		body_interface.ActivateBody(body_id);
 	}
 
-	return Vec3f::FromJolt(direction * added);
+	return FVec3::FromJolt(direction * added);
 }
 
-void ApplyRagdollLocalHit(Ragdoll& ragdoll, uint32 body, const Vec3f impulse, const Vec3f point)
+void ApplyRagdollLocalHit(Ragdoll& ragdoll, uint32 body, const FVec3 impulse, const FVec3 point)
 {
 	// Bullets carry little momentum for how hard they should look. This is how much harder the struck limb takes it
 	constexpr float32 scLocalScale = 2.5f;
@@ -251,11 +251,11 @@ void ApplyRagdollLocalHit(Ragdoll& ragdoll, uint32 body, const Vec3f impulse, co
 	}
 
 	const float32 speed = std::min(scLocalScale * length / weighted_mass, scMaxLocalSpeed);
-	const Vec3f velocity = impulse * (speed / length);
+	const FVec3 velocity = impulse * (speed / length);
 
 	for (uint32 i = 0; i < chain_length; i++) {
 		const uint32 index = static_cast<uint32>(chain[i]);
-		const Vec3f chain_impulse = velocity * (scLocalFalloff[i] * ragdoll.GetBodyMass(index));
+		const FVec3 chain_impulse = velocity * (scLocalFalloff[i] * ragdoll.GetBodyMass(index));
 
 		// Only the struck body takes it off centre and spins
 		if (i == 0) {
@@ -267,7 +267,7 @@ void ApplyRagdollLocalHit(Ragdoll& ragdoll, uint32 body, const Vec3f impulse, co
 	}
 }
 
-void LaunchRagdoll(Ragdoll& ragdoll, const Vec3f velocity)
+void LaunchRagdoll(Ragdoll& ragdoll, const FVec3 velocity)
 {
 	for (uint32 i = 0; i < ragdoll.GetSegmentCount(); i++) {
 		ragdoll.AddImpulse(ragdoll.GetBodyID(i), velocity * ragdoll.GetBodyMass(i), ragdoll.GetBodyPosition(i));

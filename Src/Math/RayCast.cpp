@@ -1,8 +1,8 @@
 #include "RayCast.hpp"
 
 #include "BBox.hpp"
+#include "FVec3.hpp"
 #include "MathUtil.hpp"
-#include "Vec3.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -19,13 +19,13 @@ constexpr float scParallelEpsilon = 1e-8f;
 
 float RayCast(const Ray& ray, const BBox& aabb)
 {
-	Vec3f face;
+	FVec3 face;
 	return RayCast(ray, aabb, face);
 }
 
-float RayCast(const Ray& ray, const BBox& aabb, Vec3f& out_face)
+float RayCast(const Ray& ray, const BBox& aabb, FVec3& out_face)
 {
-	out_face = Vec3f::sZero;
+	out_face = FVec3::sZero;
 
 	float t_enter = -std::numeric_limits<float>::infinity();
 	float t_exit = std::numeric_limits<float>::infinity();

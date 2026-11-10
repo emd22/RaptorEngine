@@ -14,7 +14,7 @@ namespace fx {
 
 static Vec4f ToPlane(const Vec4f vec)
 {
-	float32 length = Vec3f(vec.mIntrin).Length();
+	float32 length = FVec3(vec.mIntrin).Length();
 	return (Vec4f(vec) / length);
 }
 
@@ -61,11 +61,11 @@ bool Frustum::TileIntersectsAABB(const BBox& tile_aabb) const
 		const Vec4f plane = mClipPlanes[i];
 
 		// Positive vertex: the AABB corner furthest along the plane normal.
-		Vec3f p_vertex(plane.X >= 0.0f ? tile_aabb.Max.X : tile_aabb.Min.X,
+		FVec3 p_vertex(plane.X >= 0.0f ? tile_aabb.Max.X : tile_aabb.Min.X,
 					   plane.Y >= 0.0f ? tile_aabb.Max.Y : tile_aabb.Min.Y,
 					   plane.Z >= 0.0f ? tile_aabb.Max.Z : tile_aabb.Min.Z);
 
-		if (Vec3f(plane).Dot(p_vertex) + plane.W < 0.0f) {
+		if (FVec3(plane).Dot(p_vertex) + plane.W < 0.0f) {
 			return false;
 		}
 	}
@@ -73,7 +73,7 @@ bool Frustum::TileIntersectsAABB(const BBox& tile_aabb) const
 	return true;
 }
 
-bool Frustum::IntersectsSphere(const Vec3f center, float32 radius, uint32 plane_mask) const
+bool Frustum::IntersectsSphere(const FVec3 center, float32 radius, uint32 plane_mask) const
 {
 	// Rebuild() writes the planes by index, so `mClipPlanes.Size` stays at zero
 	for (uint32 i = 0; i <= static_cast<uint32>(eFrustumPlane::Far); i++) {
@@ -84,7 +84,7 @@ bool Frustum::IntersectsSphere(const Vec3f center, float32 radius, uint32 plane_
 		const Vec4f plane = mClipPlanes[i];
 
 		// The planes are normalized, so this is the signed distance to the plane
-		if (Vec3f(plane).Dot(center) + plane.W < -radius) {
+		if (FVec3(plane).Dot(center) + plane.W < -radius) {
 			return false;
 		}
 	}
@@ -94,8 +94,8 @@ bool Frustum::IntersectsSphere(const Vec3f center, float32 radius, uint32 plane_
 
 bool Frustum::IntersectsAABB(const BBox& aabb, uint32 plane_mask) const
 {
-	const Vec3f center = (aabb.Min + aabb.Max) * 0.5f;
-	const Vec3f half_extent = (aabb.Max - aabb.Min) * 0.5f;
+	const FVec3 center = (aabb.Min + aabb.Max) * 0.5f;
+	const FVec3 half_extent = (aabb.Max - aabb.Min) * 0.5f;
 
 	for (uint32 i = 0; i <= static_cast<uint32>(eFrustumPlane::Far); i++) {
 		if ((plane_mask & (1U << i)) == 0) {
@@ -103,7 +103,7 @@ bool Frustum::IntersectsAABB(const BBox& aabb, uint32 plane_mask) const
 		}
 
 		const Vec4f plane = mClipPlanes[i];
-		const Vec3f normal(plane);
+		const FVec3 normal(plane);
 
 		const float32 reach = half_extent.Dot(normal.Abs());
 
@@ -117,10 +117,10 @@ bool Frustum::IntersectsAABB(const BBox& aabb, uint32 plane_mask) const
 
 bool Frustum::IntersectsOBB(const OBBox& obb, uint32 plane_mask) const
 {
-	const Vec3f center = (obb.Corners[0] + obb.Corners[7]) * 0.5f;
-	const Vec3f half_x = (obb.Corners[1] - obb.Corners[0]) * 0.5f;
-	const Vec3f half_y = (obb.Corners[2] - obb.Corners[0]) * 0.5f;
-	const Vec3f half_z = (obb.Corners[4] - obb.Corners[0]) * 0.5f;
+	const FVec3 center = (obb.Corners[0] + obb.Corners[7]) * 0.5f;
+	const FVec3 half_x = (obb.Corners[1] - obb.Corners[0]) * 0.5f;
+	const FVec3 half_y = (obb.Corners[2] - obb.Corners[0]) * 0.5f;
+	const FVec3 half_z = (obb.Corners[4] - obb.Corners[0]) * 0.5f;
 
 	for (uint32 i = 0; i <= static_cast<uint32>(eFrustumPlane::Far); i++) {
 		if ((plane_mask & (1U << i)) == 0) {
@@ -128,7 +128,7 @@ bool Frustum::IntersectsOBB(const OBBox& obb, uint32 plane_mask) const
 		}
 
 		const Vec4f plane = mClipPlanes[i];
-		const Vec3f normal(plane);
+		const FVec3 normal(plane);
 
 		const float32 reach = std::abs(half_x.Dot(normal)) + std::abs(half_y.Dot(normal)) +
 							  std::abs(half_z.Dot(normal));
@@ -147,18 +147,18 @@ BBox Frustum::GetFrustumBoundingBox(const PerspectiveCamera& camera)
 	Mat4f vp_matrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 	Mat4f vp_inverse = vp_matrix.Inverse();
 
-	static const Vec3f ndc_corners[8] = { { -1, -1, 0 }, { 1, -1, 0 }, { 1, 1, 0 }, { -1, 1, 0 },
+	static const FVec3 ndc_corners[8] = { { -1, -1, 0 }, { 1, -1, 0 }, { 1, 1, 0 }, { -1, 1, 0 },
 										  { -1, -1, 1 }, { 1, -1, 1 }, { 1, 1, 1 }, { -1, 1, 1 } };
 
-	Vec3f min_point(FLT_MAX, FLT_MAX, FLT_MAX);
-	Vec3f max_point(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+	FVec3 min_point(FLT_MAX, FLT_MAX, FLT_MAX);
+	FVec3 max_point(-FLT_MAX, -FLT_MAX, -FLT_MAX);
 
-	for (const Vec3f corner : ndc_corners) {
+	for (const FVec3 corner : ndc_corners) {
 		Vec4f world = vp_inverse * Vec4f(corner.X, corner.Y, corner.Z, 1.0f);
 		world = (world / world.W);
 
-		min_point = Vec3f::Min(min_point, Vec3f(world.X, world.Y, world.Z));
-		max_point = Vec3f::Max(max_point, Vec3f(world.X, world.Y, world.Z));
+		min_point = FVec3::Min(min_point, FVec3(world.X, world.Y, world.Z));
+		max_point = FVec3::Max(max_point, FVec3(world.X, world.Y, world.Z));
 	}
 
 	return BBox(min_point, max_point);

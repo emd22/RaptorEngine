@@ -76,11 +76,11 @@ float32 OutsideDeadZone(float32 value, float32 dead_zone)
 	return 0.0f;
 }
 
-bool IsInFront(const BehaviourContext& ctx, const Vec3f point)
+bool IsInFront(const BehaviourContext& ctx, const FVec3 point)
 {
 	constexpr float32 scBehindMargin = -0.1f;
 
-	const Vec3f chest = ctx.Bodies[ctx.pRig->Chest].Center;
+	const FVec3 chest = ctx.Bodies[ctx.pRig->Chest].Center;
 	return ctx.Horizontal(point - chest).Dot(ctx.Horizontal(ctx.Forward)) > scBehindMargin;
 }
 
@@ -243,7 +243,7 @@ void StaggerBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& 
 	out.Balance = eBehaviourBalance::On;
 
 	// The spine leans along the shove, so a shot from behind tips the body forward rather than back at the shooter
-	const Vec3f push = ctx.Horizontal(ctx.pRagdoll->GetStaggerVelocity());
+	const FVec3 push = ctx.Horizontal(ctx.pRagdoll->GetStaggerVelocity());
 	const float32 push_speed = push.Length();
 	float32 lean = MathUtil::DegToRad(Lean) * ctx.pBalance->Reaction;
 
@@ -253,7 +253,7 @@ void StaggerBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& 
 	}
 
 	if (push_speed > 0.0f && lean > 0.0f) {
-		const Vec3f axis = ctx.Up.Cross(push);
+		const FVec3 axis = ctx.Up.Cross(push);
 
 		for (uint32 i = 0; i < ctx.pRig->SpineCount; i++) {
 			out.AddWorldRotation(ctx, ctx.pRig->Spine[i], axis, lean / static_cast<float32>(ctx.pRig->SpineCount));
@@ -316,16 +316,16 @@ void ArmBalanceBehaviour::Update(const BehaviourContext& ctx)
 	float32 target_yaw = 0.0f;
 
 	if (is_recovering) {
-		const Vec3f error = ctx.Horizontal(Vec3f::FromJolt(ctx.pBalance->CaptureError));
+		const FVec3 error = ctx.Horizontal(FVec3::FromJolt(ctx.pBalance->CaptureError));
 		const float32 length = error.Length();
-		Vec3f outside = Vec3f::sZero;
+		FVec3 outside = FVec3::sZero;
 
 		if (length > DeadZone) {
 			outside = error * ((length - DeadZone) / length);
 		}
 
 		// Tipping forward (positive about the chest's right axis) reaches the arms forward, so they catch the fall
-		const Vec3f chest_spin = ctx.Bodies[ctx.pRig->Chest].AngularVelocity;
+		const FVec3 chest_spin = ctx.Bodies[ctx.pRig->Chest].AngularVelocity;
 		const float32 tip_outside = OutsideDeadZone(chest_spin.Dot(ctx.Right), TipDeadZone);
 
 		target_fore = MathUtil::Clamp(outside.Dot(ctx.Forward) / ErrorScale + tip_outside / TipScale, -1.0f, 1.0f);
@@ -359,8 +359,8 @@ void ArmBalanceBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutpu
 		const float32 raised = RaiseReach * std::max(-side * mSide, 0.0f);
 		const float32 forward = ForeReach * mFore - YawReach * side * mYaw;
 
-		const Vec3f shoulder = ctx.Bodies[arm.Upper].Origin;
-		const Vec3f target = shoulder + ctx.Forward * forward + ctx.Right * outward + ctx.Up * raised;
+		const FVec3 shoulder = ctx.Bodies[arm.Upper].Origin;
+		const FVec3 target = shoulder + ctx.Forward * forward + ctx.Right * outward + ctx.Up * raised;
 
 		out.Hands[i] = BehaviourGoal { .Target = target, .Weight = weight };
 	}
@@ -427,7 +427,7 @@ void ShotReactionBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEv
 	}
 
 	const uint32 body = static_cast<uint32>(event.Body);
-	const Vec3f chest = ctx.Bodies[ctx.pRig->Chest].Center;
+	const FVec3 chest = ctx.Bodies[ctx.pRig->Chest].Center;
 
 	LoosenAround(ctx, body);
 
@@ -446,11 +446,11 @@ void ShotReactionBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEv
 	}
 
 	// The shot pushes the body away from the shooter: a shot from the front arches back, from behind bows forward
-	const Vec3f push = ctx.Horizontal(event.Direction).SafeNormalize(Vec3f::sZero);
+	const FVec3 push = ctx.Horizontal(event.Direction).SafeNormalize(FVec3::sZero);
 	mFlinchPitch = push.Dot(ctx.Horizontal(ctx.Forward));
 
 	// How far to one side of the spine it landed, in the sense it turns the torso
-	const Vec3f lever = ctx.Horizontal(event.Point - chest);
+	const FVec3 lever = ctx.Horizontal(event.Point - chest);
 	mFlinchYaw = 0.0f;
 
 	if (ctx.pRagdoll->GetBodyPart(body) != eRDBodyPart::Head && FindLeg(ctx, body) < 0) {
@@ -583,7 +583,7 @@ void ShotReactionBehaviour::StartGrab(const BehaviourContext& ctx, const Ragdoll
 		return;
 	}
 
-	const Vec3f outward = (event.Point - ctx.Bodies[body].Center).SafeNormalize(-event.Direction);
+	const FVec3 outward = (event.Point - ctx.Bodies[body].Center).SafeNormalize(-event.Direction);
 
 	mWound.Body = body;
 	mWound.LocalPoint = ctx.ToBodyLocal(body, event.Point);
@@ -732,8 +732,8 @@ void ShotReactionBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOut
 	const float32 ramp_in = MathUtil::Clamp(grab_time / scGrabRamp, 0.0f, 1.0f);
 	const float32 ramp_out = 1.0f - MathUtil::Clamp((grab_time - (GrabTime - scGrabRamp)) / scGrabRamp, 0.0f, 1.0f);
 
-	const Vec3f wound = ctx.FromBodyLocal(mWound.Body, mWound.LocalPoint);
-	const Vec3f normal = ctx.ToBodyDirection(mWound.Body, mWound.LocalNormal);
+	const FVec3 wound = ctx.FromBodyLocal(mWound.Body, mWound.LocalPoint);
+	const FVec3 normal = ctx.ToBodyDirection(mWound.Body, mWound.LocalNormal);
 
 	// The grabbing arm eases its strength down as the hand takes hold, so the grab steadies the body rather than
 	// pulling it over
@@ -759,7 +759,7 @@ void ShotReactionBehaviour::LookAtWound(const BehaviourContext& ctx, BehaviourOu
 	const RagdollRig& rig = *ctx.pRig;
 
 	// From the neck joint and in the chest's frame, so neither the head's own turn nor a fall moves where the wound is
-	const Vec3f to_wound = ctx.FromBodyLocal(static_cast<uint32>(mLookBody), mLookLocal) - ctx.Bodies[rig.Neck].Origin;
+	const FVec3 to_wound = ctx.FromBodyLocal(static_cast<uint32>(mLookBody), mLookLocal) - ctx.Bodies[rig.Neck].Origin;
 	const float32 closeness = MathUtil::Clamp(to_wound.Length() / scMinLookDistance, 0.0f, 1.0f);
 	const float32 weight = Envelope(mLookTime, scLookAttack, LookTime) * MathUtil::SmoothStep(closeness);
 
@@ -767,7 +767,7 @@ void ShotReactionBehaviour::LookAtWound(const BehaviourContext& ctx, BehaviourOu
 		return;
 	}
 
-	const Vec3f chest_up = ctx.GetChestUp();
+	const FVec3 chest_up = ctx.GetChestUp();
 	const float32 side = to_wound.Dot(ctx.Right);
 	const float32 ahead = to_wound.Dot(ctx.Forward);
 
@@ -874,13 +874,13 @@ void BraceBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& ou
 		return;
 	}
 
-	const Vec3f side = (ctx.Right - mNormal * ctx.Right.Dot(mNormal)).SafeNormalize(ctx.Right);
+	const FVec3 side = (ctx.Right - mNormal * ctx.Right.Dot(mNormal)).SafeNormalize(ctx.Right);
 
 	for (uint32 i = 0; i < RagdollRig::scLimbCount; i++) {
 		const RagdollRigArm& arm = ctx.pRig->Arms[i];
-		const Vec3f shoulder = ctx.Bodies[arm.Upper].Origin;
+		const FVec3 shoulder = ctx.Bodies[arm.Upper].Origin;
 
-		Vec3f target = mPoint + side * (arm.SideSign * Spread) + mNormal * scBraceHandLift;
+		FVec3 target = mPoint + side * (arm.SideSign * Spread) + mNormal * scBraceHandLift;
 		target = target + (shoulder - target) * scBraceElbowBend;
 
 		out.Hands[i] = BehaviourGoal { .Target = target, .Weight = 1.0f };
@@ -970,12 +970,12 @@ void ProtectHeadBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutp
 	constexpr float32 scHeadHandDrop = 0.05f;
 
 	const RagdollRig& rig = *ctx.pRig;
-	const Vec3f head = ctx.Bodies[rig.Neck].Center;
-	const Vec3f chest_up = ctx.GetChestUp();
+	const FVec3 head = ctx.Bodies[rig.Neck].Center;
+	const FVec3 chest_up = ctx.GetChestUp();
 
 	for (uint32 i = 0; i < RagdollRig::scLimbCount; i++) {
 		const RagdollRigArm& arm = rig.Arms[i];
-		const Vec3f target = head + ctx.Right * (arm.SideSign * scHeadHandSide) + ctx.Forward * scHeadHandForward -
+		const FVec3 target = head + ctx.Right * (arm.SideSign * scHeadHandSide) + ctx.Forward * scHeadHandForward -
 							 chest_up * scHeadHandDrop;
 
 		out.Hands[i] = BehaviourGoal { .Target = target, .Weight = 1.0f };

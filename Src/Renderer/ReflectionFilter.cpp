@@ -57,7 +57,7 @@ void SampleFace(const CubeLevel& level, uint32 face, float32 u, float32 v, float
 	}
 }
 
-void SampleCube(const std::vector<CubeLevel>& levels, const Vec3f direction, float32 lod, float32 out[3])
+void SampleCube(const std::vector<CubeLevel>& levels, const FVec3 direction, float32 lod, float32 out[3])
 {
 	uint32 face;
 	float32 u;
@@ -193,25 +193,25 @@ void WriteTexel(Float16*& out, const float32 rgb[3])
 
 } // namespace
 
-Vec3f FaceUVToDirection(uint32 face, float32 u, float32 v)
+FVec3 FaceUVToDirection(uint32 face, float32 u, float32 v)
 {
 	switch (face) {
 	case 0:
-		return Vec3f(1.0f, -v, -u);
+		return FVec3(1.0f, -v, -u);
 	case 1:
-		return Vec3f(-1.0f, -v, u);
+		return FVec3(-1.0f, -v, u);
 	case 2:
-		return Vec3f(u, 1.0f, v);
+		return FVec3(u, 1.0f, v);
 	case 3:
-		return Vec3f(u, -1.0f, -v);
+		return FVec3(u, -1.0f, -v);
 	case 4:
-		return Vec3f(u, -v, 1.0f);
+		return FVec3(u, -v, 1.0f);
 	default:
-		return Vec3f(-u, -v, -1.0f);
+		return FVec3(-u, -v, -1.0f);
 	}
 }
 
-void DirectionToFaceUV(const Vec3f direction, uint32& out_face, float32& out_u, float32& out_v)
+void DirectionToFaceUV(const FVec3 direction, uint32& out_face, float32& out_u, float32& out_v)
 {
 	const float32 x = direction.X;
 	const float32 y = direction.Y;
@@ -289,16 +289,16 @@ void Prefilter(const float32* const faces[scFaces], uint32 size, uint32 mip_coun
 					const float32 u = ((static_cast<float32>(x) + 0.5f) / static_cast<float32>(mip_size)) * 2.0f - 1.0f;
 					const float32 v = ((static_cast<float32>(y) + 0.5f) / static_cast<float32>(mip_size)) * 2.0f - 1.0f;
 
-					const Vec3f normal = FaceUVToDirection(face, u, v).Normalize();
-					const Vec3f up = (std::abs(normal.Z) < 0.999f) ? Vec3f(0.0f, 0.0f, 1.0f) : Vec3f(1.0f, 0.0f, 0.0f);
-					const Vec3f tangent = up.Cross(normal).Normalize();
-					const Vec3f bitangent = normal.Cross(tangent);
+					const FVec3 normal = FaceUVToDirection(face, u, v).Normalize();
+					const FVec3 up = (std::abs(normal.Z) < 0.999f) ? FVec3(0.0f, 0.0f, 1.0f) : FVec3(1.0f, 0.0f, 0.0f);
+					const FVec3 tangent = up.Cross(normal).Normalize();
+					const FVec3 bitangent = normal.Cross(tangent);
 
 					float32 sum[3] = {};
 					float32 weight = 0.0f;
 
 					for (const LobeSample& sample : samples) {
-						const Vec3f direction = tangent * sample.Direction[0] + bitangent * sample.Direction[1] +
+						const FVec3 direction = tangent * sample.Direction[0] + bitangent * sample.Direction[1] +
 												normal * sample.Direction[2];
 
 						float32 radiance[3];

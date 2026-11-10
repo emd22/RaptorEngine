@@ -49,14 +49,14 @@ void ModelBuilder::Build(MapSource& source)
 			}
 
 			if (source_model.bProbeBox && mesh.Positions.Size >= 3) {
-				const Vec3f first(mesh.Positions[0], mesh.Positions[1], mesh.Positions[2]);
+				const FVec3 first(mesh.Positions[0], mesh.Positions[1], mesh.Positions[2]);
 				BBox bounds(first, first);
 
 				for (size_t i = 3; i + 2 < mesh.Positions.Size; i += 3) {
-					const Vec3f point(mesh.Positions[i], mesh.Positions[i + 1], mesh.Positions[i + 2]);
+					const FVec3 point(mesh.Positions[i], mesh.Positions[i + 1], mesh.Positions[i + 2]);
 
-					bounds.Min = Vec3f::Min(bounds.Min, point);
-					bounds.Max = Vec3f::Max(bounds.Max, point);
+					bounds.Min = FVec3::Min(bounds.Min, point);
+					bounds.Max = FVec3::Max(bounds.Max, point);
 				}
 
 				if (ProbePlacement::AddBox(source.ProbeBoxes, bounds, source_model.Transform, no_planes)) {
@@ -82,9 +82,9 @@ void ModelBuilder::Build(MapSource& source)
 
 			for (uint32 vertex = 0; vertex < vertex_count; vertex++) {
 				ModelVertex& out = surface.Vertices.Emplace();
-				out.Position = Vec3d(mesh.Positions[vertex * 3], mesh.Positions[vertex * 3 + 1],
+				out.Position = DVec3(mesh.Positions[vertex * 3], mesh.Positions[vertex * 3 + 1],
 									 mesh.Positions[vertex * 3 + 2]);
-				out.Normal = Vec3d(mesh.Normals[vertex * 3], mesh.Normals[vertex * 3 + 1],
+				out.Normal = DVec3(mesh.Normals[vertex * 3], mesh.Normals[vertex * 3 + 1],
 								   mesh.Normals[vertex * 3 + 2]);
 
 				if (has_uvs) {

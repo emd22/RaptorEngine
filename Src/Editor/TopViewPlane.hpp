@@ -3,8 +3,8 @@
 #ifdef FX_IS_EDITOR
 
 #include <Core/Types.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Vec2.hpp>
-#include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
 #include <Patch.hpp>
 #include <algorithm>
@@ -55,7 +55,7 @@ struct TopViewVertexHandle
 struct TopViewFaceRef
 {
 	ObjectID ObjectId = ObjectID::scNull;
-	Vec3f Normal = Vec3f::sZero;
+	FVec3 Normal = FVec3::sZero;
 
 	bool operator==(const TopViewFaceRef& other) const { return ObjectId == other.ObjectId && Normal == other.Normal; }
 };
@@ -161,15 +161,15 @@ inline constexpr uint32 scMaxRoomPieces = 6;
 
 struct RoomPiece
 {
-	Vec3f Min = Vec3f::sZero;
-	Vec3f Max = Vec3f::sZero;
+	FVec3 Min = FVec3::sZero;
+	FVec3 Max = FVec3::sZero;
 };
 
-inline uint32 BuildRoomPieces(const Vec3f min, const Vec3f max, const RoomSettings& settings,
+inline uint32 BuildRoomPieces(const FVec3 min, const FVec3 max, const RoomSettings& settings,
 							  RoomPiece (&out_pieces)[scMaxRoomPieces])
 {
 	const float32 wall = settings.WallThickness;
-	const Vec3f extent = max - min;
+	const FVec3 extent = max - min;
 
 	const bool is_tunnel = (settings.Shape == eRoomShape::Tunnel);
 	const bool open_x = is_tunnel && extent.X >= extent.Z;
@@ -200,27 +200,27 @@ inline uint32 BuildRoomPieces(const Vec3f min, const Vec3f max, const RoomSettin
 		ceiling_inset = wall;
 	}
 
-	const Vec3f inner_min = min + Vec3f(wall_inset_x, wall, wall_inset_z);
-	const Vec3f inner_max = max - Vec3f(wall_inset_x, ceiling_inset, wall_inset_z);
+	const FVec3 inner_min = min + FVec3(wall_inset_x, wall, wall_inset_z);
+	const FVec3 inner_max = max - FVec3(wall_inset_x, ceiling_inset, wall_inset_z);
 
 	uint32 count = 0;
 
-	out_pieces[count++] = RoomPiece { min, Vec3f(max.X, inner_min.Y, max.Z) };
+	out_pieces[count++] = RoomPiece { min, FVec3(max.X, inner_min.Y, max.Z) };
 
 	if (settings.bCeiling) {
-		out_pieces[count++] = RoomPiece { Vec3f(min.X, inner_max.Y, min.Z), max };
+		out_pieces[count++] = RoomPiece { FVec3(min.X, inner_max.Y, min.Z), max };
 	}
 
 	if (!open_x) {
-		out_pieces[count++] = RoomPiece { Vec3f(min.X, inner_min.Y, min.Z), Vec3f(inner_min.X, inner_max.Y, max.Z) };
-		out_pieces[count++] = RoomPiece { Vec3f(inner_max.X, inner_min.Y, min.Z), Vec3f(max.X, inner_max.Y, max.Z) };
+		out_pieces[count++] = RoomPiece { FVec3(min.X, inner_min.Y, min.Z), FVec3(inner_min.X, inner_max.Y, max.Z) };
+		out_pieces[count++] = RoomPiece { FVec3(inner_max.X, inner_min.Y, min.Z), FVec3(max.X, inner_max.Y, max.Z) };
 	}
 
 	if (!open_z) {
-		out_pieces[count++] = RoomPiece { Vec3f(inner_min.X, inner_min.Y, min.Z),
-										  Vec3f(inner_max.X, inner_max.Y, inner_min.Z) };
-		out_pieces[count++] = RoomPiece { Vec3f(inner_min.X, inner_min.Y, inner_max.Z),
-										  Vec3f(inner_max.X, inner_max.Y, max.Z) };
+		out_pieces[count++] = RoomPiece { FVec3(inner_min.X, inner_min.Y, min.Z),
+										  FVec3(inner_max.X, inner_max.Y, inner_min.Z) };
+		out_pieces[count++] = RoomPiece { FVec3(inner_min.X, inner_min.Y, inner_max.Z),
+										  FVec3(inner_max.X, inner_max.Y, max.Z) };
 	}
 
 	return count;
@@ -228,7 +228,7 @@ inline uint32 BuildRoomPieces(const Vec3f min, const Vec3f max, const RoomSettin
 
 inline const ViewPlaneAxes& GetViewPlaneAxes(eViewPlane plane) { return scViewPlaneAxes[static_cast<uint32>(plane)]; }
 
-inline float32 GetAxis(const Vec3f& vector, uint32 axis)
+inline float32 GetAxis(const FVec3& vector, uint32 axis)
 {
 	if (axis == 0) {
 		return vector.X;
@@ -241,7 +241,7 @@ inline float32 GetAxis(const Vec3f& vector, uint32 axis)
 	return vector.Z;
 }
 
-inline void SetAxis(Vec3f& vector, uint32 axis, float32 value)
+inline void SetAxis(FVec3& vector, uint32 axis, float32 value)
 {
 	if (axis == 0) {
 		vector.X = value;

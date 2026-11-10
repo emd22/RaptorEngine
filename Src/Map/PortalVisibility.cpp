@@ -61,7 +61,7 @@ void PortalVisibility::Disable()
 	PortalsPassed = 0;
 }
 
-void PortalVisibility::Update(const AreaGraph& graph, const Mat4f& view_projection, const Vec3f& camera_position)
+void PortalVisibility::Update(const AreaGraph& graph, const Mat4f& view_projection, const FVec3& camera_position)
 {
 	Disable();
 
@@ -170,7 +170,7 @@ void PortalVisibility::Flow(uint32 area, const ScreenRect& rect, uint32 depth)
 	}
 }
 
-Vec4f PortalVisibility::ToClip(const Vec3f& point) const
+Vec4f PortalVisibility::ToClip(const FVec3& point) const
 {
 	return mViewProjection * Vec4f(point.X, point.Y, point.Z, 1.0f);
 }
@@ -190,7 +190,7 @@ bool PortalVisibility::GetPortalRect(const MapPortal& portal, uint32 from_area, 
 		const float32 distance = plane.Normal.Dot(mCameraPosition) - plane.Distance;
 
 		if (std::abs(distance) <= scNearMargin) {
-			const BBox padded_bounds = portal.Bounds.AddMargin(Vec3f(scNearMargin));
+			const BBox padded_bounds = portal.Bounds.AddMargin(FVec3(scNearMargin));
 
 			const bool is_inside = mCameraPosition >= padded_bounds.Min && mCameraPosition <= padded_bounds.Max;
 
@@ -235,7 +235,7 @@ bool PortalVisibility::GetPortalRect(const MapPortal& portal, uint32 from_area, 
 			if ((current_distance >= 0.0f) != (next_distance >= 0.0f)) {
 				const float32 t = current_distance / (current_distance - next_distance);
 
-				// const Vec3f current_xzw =
+				// const FVec3 current_xzw =
 
 				mClippedPoints.Insert(Vec4f(current.X + (next.X - current.X) * t, current.Y + (next.Y - current.Y) * t,
 											current.Z + (next.Z - current.Z) * t,
@@ -266,7 +266,7 @@ bool PortalVisibility::ProjectBounds(const BBox& bounds, ScreenRect& out_rect) c
 	out_rect = MakeEmptyRect();
 
 	for (uint32 corner = 0; corner < 8; corner++) {
-		Vec3f point = bounds.Min;
+		FVec3 point = bounds.Min;
 
 		if ((corner & 1) != 0) {
 			point.X = bounds.Max.X;

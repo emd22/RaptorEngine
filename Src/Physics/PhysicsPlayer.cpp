@@ -216,7 +216,7 @@ void PhysicsPlayer::Create()
 	character_collision.Add(pPlayerVirt);
 }
 
-void PhysicsPlayer::Teleport(const Vec3f position)
+void PhysicsPlayer::Teleport(const FVec3 position)
 {
 	JPH::RVec3 jolt_position;
 	position.ToJoltVec3(jolt_position);
@@ -245,7 +245,7 @@ void PhysicsPlayer::SetCollisionEnabled(bool value)
 	gPhysics->pBackend->GetBodyInterface().SetObjectLayer(inner_body_id, GetCollisionLayer());
 }
 
-void PhysicsPlayer::ApplyMovement(const Vec3f direction)
+void PhysicsPlayer::ApplyMovement(const FVec3 direction)
 {
 	Vec3 jolt_dir;
 	direction.ToJoltVec3(jolt_dir);
@@ -254,7 +254,7 @@ void PhysicsPlayer::ApplyMovement(const Vec3f direction)
 	// pPlayerVirt->SetLinearVelocity(jolt_dir);
 }
 
-SizedArray<JPH::BodyID> PhysicsPlayer::RaycastBodies(Vec3f direction) const
+SizedArray<JPH::BodyID> PhysicsPlayer::RaycastBodies(FVec3 direction) const
 {
 	JPH::RayCast rc;
 	rc.mOrigin = pPlayerVirt->GetPosition();

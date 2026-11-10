@@ -3,8 +3,8 @@
 #include "Models.hpp"
 #include "Surfaces.hpp"
 
+#include <Math/DVec3.hpp>
 #include <Math/Triangle.hpp>
-#include <Math/Vec3d.hpp>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -15,7 +15,7 @@ namespace {
 
 // struct Triangle
 // {
-// 	Vec3d Corners[3];
+// 	DVec3 Corners[3];
 // };
 
 /// A triangle referenced by a page, keyed by the page so sorting groups each page's triangles together
@@ -49,18 +49,18 @@ int32 KeyCoord(uint64 key, uint32 shift)
 }
 
 /// Separating axis test of a triangle against an axis aligned box (Akenine-Möller)
-// bool TriangleOverlapsBox(const Triangle& triangle, const Vec3d center, double half_size)
+// bool TriangleOverlapsBox(const Triangle& triangle, const DVec3 center, double half_size)
 // {
-// 	const Vec3d v0 = (triangle.Corners[0] - center);
-// 	const Vec3d v1 = (triangle.Corners[1] - center);
-// 	const Vec3d v2 = (triangle.Corners[2] - center);
+// 	const DVec3 v0 = (triangle.Corners[0] - center);
+// 	const DVec3 v1 = (triangle.Corners[1] - center);
+// 	const DVec3 v2 = (triangle.Corners[2] - center);
 //
-// 	const Vec3d edges[3] = { (v1 - v0), (v2 - v1), (v0 - v2) };
-// 	const Vec3d axes[3] = { Vec3d { 1.0, 0.0, 0.0 }, Vec3d { 0.0, 1.0, 0.0 }, Vec3d { 0.0, 0.0, 1.0 } };
+// 	const DVec3 edges[3] = { (v1 - v0), (v2 - v1), (v0 - v2) };
+// 	const DVec3 axes[3] = { DVec3 { 1.0, 0.0, 0.0 }, DVec3 { 0.0, 1.0, 0.0 }, DVec3 { 0.0, 0.0, 1.0 } };
 //
-// 	for (const Vec3d edge : edges) {
-// 		for (const Vec3d box_axis : axes) {
-// 			const Vec3d axis = box_axis.Cross(edge);
+// 	for (const DVec3 edge : edges) {
+// 		for (const DVec3 box_axis : axes) {
+// 			const DVec3 axis = box_axis.Cross(edge);
 //
 // 			const double p0 = v0.Dot(axis);
 // 			const double p1 = v1.Dot(axis);
@@ -83,16 +83,16 @@ int32 KeyCoord(uint64 key, uint32 shift)
 // 		}
 // 	}
 //
-// 	const Vec3d normal = edges[0].Cross(edges[1]);
+// 	const DVec3 normal = edges[0].Cross(edges[1]);
 // 	const double distance = normal.Dot(v0);
 // 	const double radius = half_size * (std::abs(normal.X) + std::abs(normal.Y) + std::abs(normal.Z));
 //
 // 	return std::abs(distance) <= radius;
 // }
 
-void AddTriangle(Array<DTriangle>& triangles, const Vec3d a, const Vec3d b, const Vec3d c)
+void AddTriangle(Array<DTriangle>& triangles, const DVec3 a, const DVec3 b, const DVec3 c)
 {
-	const Vec3d normal = (b - a).Cross(c - a);
+	const DVec3 normal = (b - a).Cross(c - a);
 
 	constexpr double scMinDoubleArea = 1e-12;
 
@@ -112,9 +112,9 @@ void GatherTriangles(const MapSource& source, const SurfaceBuilder& surfaces, co
 		}
 
 		for (size_t index = 0; index + 2 < surface.Indices.Size; index += 3) {
-			AddTriangle(out_triangles, Vec3d(surface.Vertices[surface.Indices[index]].Position),
-						Vec3d(surface.Vertices[surface.Indices[index + 1]].Position),
-						Vec3d(surface.Vertices[surface.Indices[index + 2]].Position));
+			AddTriangle(out_triangles, DVec3(surface.Vertices[surface.Indices[index]].Position),
+						DVec3(surface.Vertices[surface.Indices[index + 1]].Position),
+						DVec3(surface.Vertices[surface.Indices[index + 2]].Position));
 		}
 	}
 
@@ -183,10 +183,10 @@ void BuildLevel(const Array<DTriangle>& triangles, double sdf_page_size, double 
 		for (int64 x = low[0]; x <= high[0]; x++) {
 			for (int64 y = low[1]; y <= high[1]; y++) {
 				for (int64 z = low[2]; z <= high[2]; z++) {
-					const Vec3d xyz = Vec3d(static_cast<double>(x), static_cast<double>(y), static_cast<double>(z));
-					const Vec3d center = (xyz + Vec3d(0.5)) * Vec3d(sdf_page_size);
+					const DVec3 xyz = DVec3(static_cast<double>(x), static_cast<double>(y), static_cast<double>(z));
+					const DVec3 center = (xyz + DVec3(0.5)) * DVec3(sdf_page_size);
 
-					// const Vec3d center { (static_cast<double>(x) + 0.5) * sdf_page_size,
+					// const DVec3 center { (static_cast<double>(x) + 0.5) * sdf_page_size,
 					// 					 (static_cast<double>(y) + 0.5) * sdf_page_size,
 					// 					 (static_cast<double>(z) + 0.5) * sdf_page_size };
 
@@ -204,7 +204,7 @@ void BuildLevel(const Array<DTriangle>& triangles, double sdf_page_size, double 
 } // namespace
 
 void BuildSDFPages(const MapSource& source, const SurfaceBuilder& surfaces, const ModelBuilder* models,
-				 const SDFPageOptions& options, CompiledMap& out_map, SDFPageStats& out_stats)
+				   const SDFPageOptions& options, CompiledMap& out_map, SDFPageStats& out_stats)
 {
 	out_map.SDFPages = CompiledMapSDFPages {};
 	out_stats = SDFPageStats {};

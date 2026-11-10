@@ -315,15 +315,15 @@ uint32 SDFPageScene::GetPendingCount() const
 }
 
 void SDFPageScene::FindSDFPageRange(const Level& level, int32 min_x, int32 max_x, uint32& out_begin,
-								uint32& out_end) const
+									uint32& out_end) const
 {
 	const CompiledMapSDFPage* first = mSDFPages.pData + level.FirstSDFPage;
 	const CompiledMapSDFPage* last = first + level.SDFPageCount;
 
 	const CompiledMapSDFPage* begin = std::lower_bound(first, last, min_x, [](const CompiledMapSDFPage& page, int32 x)
-													 { return page.Coord[0] < x; });
+													   { return page.Coord[0] < x; });
 	const CompiledMapSDFPage* end = std::lower_bound(begin, last, max_x, [](const CompiledMapSDFPage& page, int32 x)
-												   { return page.Coord[0] < x; });
+													 { return page.Coord[0] < x; });
 
 	out_begin = static_cast<uint32>(begin - mSDFPages.pData);
 	out_end = static_cast<uint32>(end - mSDFPages.pData);
@@ -374,7 +374,7 @@ void SDFPageScene::ResetLevel(uint32 level_index)
 	mDirty.Size = kept;
 }
 
-bool SDFPageScene::PlaceLevel(uint32 level_index, const Vec3f& center)
+bool SDFPageScene::PlaceLevel(uint32 level_index, const FVec3& center)
 {
 	Level& level = mLevels[level_index];
 
@@ -483,7 +483,7 @@ void SDFPageScene::GetSceneConsts(SDFPageSceneGpu& out_consts) const
 	out_consts.InvAtlasSize[2] = 1.0f / static_cast<float32>(scAtlasSDFPagesZ * scTexelsPerSDFPage);
 }
 
-void SDFPageScene::Update(CommandBuffer& cmd, const Vec3f& center, uint32 eval_budget)
+void SDFPageScene::Update(CommandBuffer& cmd, const FVec3& center, uint32 eval_budget)
 {
 	if (!mbActive) {
 		return;
@@ -617,7 +617,8 @@ void SDFPageScene::Update(CommandBuffer& cmd, const Vec3f& center, uint32 eval_b
 	ComputeBarrier(cmd);
 }
 
-void SDFPageScene::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDebugView view, float32 cone_slope, float32 ray_length)
+void SDFPageScene::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDebugView view, float32 cone_slope,
+							   float32 ray_length)
 {
 	if (!mbActive || !mbAtlasInitialized || view == eDebugView::None) {
 		return;
@@ -652,8 +653,8 @@ void SDFPageScene::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDe
 				"{:.1f} steps, {} at the step limit, check {:.2f}% match {:.2f}% early {:.2f}% late ({} surface, {} "
 				"sky, {} skipped pixels)",
 				static_cast<uint32>(view), cone_slope, GetResidentCount(), GetPendingCount(),
-				gGraphics->Profiler.GetMs(eGpuMarker::SDFPageScene), gGraphics->Profiler.GetMs(eGpuMarker::SDFPageDebug),
-				ray_count, mean_steps, max_step_rays,
+				gGraphics->Profiler.GetMs(eGpuMarker::SDFPageScene),
+				gGraphics->Profiler.GetMs(eGpuMarker::SDFPageDebug), ray_count, mean_steps, max_step_rays,
 				100.0 * check.Match / surfaces, 100.0 * check.Early / surfaces, 100.0 * check.Late / surfaces,
 				check.Match + check.Early + check.Late, check.Sky, check.Skipped);
 	}
@@ -667,7 +668,7 @@ void SDFPageScene::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDe
 	const Mat4f inverse = camera.GetCameraMatrix(eObjectLayer::WorldLayer).Inverse();
 	memcpy(consts.InvViewProjection, inverse.RawData, sizeof(Mat4f));
 
-	const Vec3f eye = camera.GetPosition();
+	const FVec3 eye = camera.GetPosition();
 	consts.EyePosition[0] = eye.X;
 	consts.EyePosition[1] = eye.Y;
 	consts.EyePosition[2] = eye.Z;

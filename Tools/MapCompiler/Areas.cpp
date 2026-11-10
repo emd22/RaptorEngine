@@ -43,13 +43,13 @@ struct AreaSets
 
 bool IsOpenLeaf(const Node& node) { return node.IsLeaf() && !node.bSolid && node.bReached; }
 
-Vec3d GetCellPoint(const Polyhedron& cell)
+DVec3 GetCellPoint(const Polyhedron& cell)
 {
-	Vec3d sum = Vec3d(0.0);
+	DVec3 sum = DVec3(0.0);
 	double count = 0.0;
 
 	for (const PolyhedronSide& side : cell.Sides) {
-		for (const Vec3d& point : side.Points) {
+		for (const DVec3& point : side.Points) {
 			sum = sum + point;
 			count += 1.0;
 		}
@@ -67,9 +67,9 @@ Winding MergeConvex(const Array<Winding>& pieces, const Plane& plane)
 	constexpr double scHullEpsilon = 1e-9;
 	constexpr double scHullPointEpsilon = 1e-7;
 
-	const Vec3d normal = plane.Normal;
+	const DVec3 normal = plane.Normal;
 
-	Vec3d axis = Vec3d(0.0);
+	DVec3 axis = DVec3(0.0);
 	int32 smallest = 0;
 
 	for (int32 i = 1; i < 3; i++) {
@@ -80,13 +80,13 @@ Winding MergeConvex(const Array<Winding>& pieces, const Plane& plane)
 
 	axis.mData[smallest] = 1.0;
 
-	const Vec3d u = axis.Cross(normal).Normalized();
-	const Vec3d v = normal.Cross(u);
+	const DVec3 u = axis.Cross(normal).Normalized();
+	const DVec3 v = normal.Cross(u);
 
 	Array<Vec2d> points;
 
 	for (const Winding& piece : pieces) {
-		for (const Vec3d& point : piece) {
+		for (const DVec3& point : piece) {
 			points.Emplace(Vec2d(u.Dot(point), v.Dot(point)));
 		}
 	}
@@ -234,7 +234,7 @@ void AreaBuilder::Build(const PlaneSet& planes, Bsp& bsp, const MapSource& sourc
 		}
 
 		const Array<int32>& leaves = brush_leaves[brush_index];
-		const Vec3d center = (brush.Shape.Min + brush.Shape.Max) * 0.5;
+		const DVec3 center = (brush.Shape.Min + brush.Shape.Max) * 0.5;
 
 		if (leaves.Size == 0) {
 			Warnings.Emplace(String::Fmt("portal brush '{}' at ({:.2f}, {:.2f}, {:.2f}) is buried in solid brushes or "
@@ -359,7 +359,7 @@ void AreaBuilder::Build(const PlaneSet& planes, Bsp& bsp, const MapSource& sourc
 		portal.FrontArea = final_areas[static_cast<size_t>(portal.FrontArea)];
 
 		const SourceBrush& brush = source.Brushes[static_cast<size_t>(portal.Brush)];
-		const Vec3d center = (brush.Shape.Min + brush.Shape.Max) * 0.5;
+		const DVec3 center = (brush.Shape.Min + brush.Shape.Max) * 0.5;
 
 		if (portal.BackArea == portal.FrontArea) {
 			Warnings.Emplace(String::Fmt("portal brush '{}' at ({:.2f}, {:.2f}, {:.2f}) does not separate two areas, "
@@ -453,10 +453,10 @@ void AreaBuilder::Write(const PlaneSet& planes, const Bsp& bsp, const MapSource&
 		return;
 	}
 
-	Array<Vec3d> area_min;
-	Array<Vec3d> area_max;
-	Fill(area_min, Stats.AreaCount, Vec3d(DBL_MAX));
-	Fill(area_max, Stats.AreaCount, Vec3d(-DBL_MAX));
+	Array<DVec3> area_min;
+	Array<DVec3> area_max;
+	Fill(area_min, Stats.AreaCount, DVec3(DBL_MAX));
+	Fill(area_max, Stats.AreaCount, DVec3(-DBL_MAX));
 
 	for (const Node& node : bsp.Nodes) {
 		if (!node.IsLeaf() || node.bSolid || node.Area == scNoMapArea) {
@@ -472,7 +472,7 @@ void AreaBuilder::Write(const PlaneSet& planes, const Bsp& bsp, const MapSource&
 	out_map.Areas.InitSize(Stats.AreaCount);
 
 	for (size_t i = 0; i < Stats.AreaCount; i++) {
-		out_map.Areas[i].Bounds = BBox(area_min[i].ToVec3f(), area_max[i].ToVec3f());
+		out_map.Areas[i].Bounds = BBox(area_min[i].ToFVec3(), area_max[i].ToFVec3());
 	}
 
 	out_map.AreaPortals.InitSize(Portals.Size);
@@ -494,23 +494,23 @@ void AreaBuilder::Write(const PlaneSet& planes, const Bsp& bsp, const MapSource&
 		out_portal.Points.InitSize(point_count * 3);
 		out_portal.PolygonSizes.InitSize(portal.Polygons.Size);
 
-		Vec3f bounds_min = portal.Polygons[0][0].ToVec3f();
-		Vec3f bounds_max = bounds_min;
+		FVec3 bounds_min = portal.Polygons[0][0].ToFVec3();
+		FVec3 bounds_max = bounds_min;
 
 		size_t point_index = 0;
 
 		for (size_t polygon = 0; polygon < portal.Polygons.Size; polygon++) {
 			out_portal.PolygonSizes[polygon] = static_cast<uint32>(portal.Polygons[polygon].Size);
 
-			for (const Vec3d& point : portal.Polygons[polygon]) {
-				const Vec3f position = point.ToVec3f();
+			for (const DVec3& point : portal.Polygons[polygon]) {
+				const FVec3 position = point.ToFVec3();
 
 				out_portal.Points[point_index * 3] = position.X;
 				out_portal.Points[point_index * 3 + 1] = position.Y;
 				out_portal.Points[point_index * 3 + 2] = position.Z;
 
-				bounds_min = Vec3f::Min(bounds_min, position);
-				bounds_max = Vec3f::Max(bounds_max, position);
+				bounds_min = FVec3::Min(bounds_min, position);
+				bounds_max = FVec3::Max(bounds_max, position);
 
 				point_index++;
 			}

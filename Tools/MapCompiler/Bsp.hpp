@@ -50,7 +50,7 @@ struct FloodResult
 	bool bSealed = false;
 	uint32 EntitiesInSolid = 0;
 	uint32 EntitiesUsed = 0;
-	Array<Vec3d> LeakPath;
+	Array<DVec3> LeakPath;
 };
 
 class Bsp
@@ -59,15 +59,15 @@ public:
 	/**
 	 * @param brushes The solids to build the tree from. They are taken apart while it is built.
 	 */
-	void Build(PlaneSet& planes, Array<Polyhedron> brushes, Array<Polyhedron> portal_brushes, const Vec3d& min,
-			   const Vec3d& max);
+	void Build(PlaneSet& planes, Array<Polyhedron> brushes, Array<Polyhedron> portal_brushes, const DVec3& min,
+			   const DVec3& max);
 
-	int32 FindLeaf(const Vec3d& point) const;
+	int32 FindLeaf(const DVec3& point) const;
 
 	void FilterWinding(const Winding& winding, int32 plane_index, Array<LeafFragment>& out_fragments) const;
 
 	void BuildPortals();
-	FloodResult FloodFill(const Array<Vec3d>& entities);
+	FloodResult FloodFill(const Array<DVec3>& entities);
 
 public:
 	Array<Node> Nodes;

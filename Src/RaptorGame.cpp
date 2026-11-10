@@ -238,7 +238,7 @@ void RaptorGame::InitEngine(const eWindowFlags window_flags)
 	gAssetManager->Start(3);
 	gAudio->Create();
 	gAudio->SetPathGainFunction(
-		[this](const Vec3f source, const Vec3f listener)
+		[this](const FVec3 source, const FVec3 listener)
 		{
 			if (mListenerArea < 0) {
 				return 1.0f;
@@ -274,7 +274,7 @@ void RaptorGame::CreateLights()
 {
 	// Ref<LightPoint> pl = Ref<LightPoint>::New();
 	// pl->Color = Color::FromRGBA(50, 250, 100, 8);
-	// pl->MoveBy(Vec3f(0, 1, 0));
+	// pl->MoveBy(FVec3(0, 1, 0));
 	// pl->SetRadius(3.0);
 	// // pl->SetScale(15);
 
@@ -282,7 +282,7 @@ void RaptorGame::CreateLights()
 
 	// Ref<LightPoint> pl2 = Ref<LightPoint>::New();
 	// pl2->Color = Color::FromRGBA(200, 80, 100, 8);
-	// pl2->MoveBy(Vec3f(1, 0.5, 0));
+	// pl2->MoveBy(FVec3(1, 0.5, 0));
 	// pl2->SetRadius(3.0);
 
 	// mMainScene.Attach(pl2);
@@ -416,8 +416,8 @@ void RaptorGame::CreateGame()
 	// Baked probes if the scene has them, procedural gradient otherwise.
 	gProbeManager->LoadProbes();
 
-	gShadowRenderer->ShadowCamera.SetPosition(Vec3f(0, 8, 5));
-	gShadowRenderer->ShadowCamera.LookAt(Vec3f(0.0f, 8.0f, -2.0f));
+	gShadowRenderer->ShadowCamera.SetPosition(FVec3(0, 8, 5));
+	gShadowRenderer->ShadowCamera.LookAt(FVec3(0.0f, 8.0f, -2.0f));
 	gShadowRenderer->ShadowCamera.SetClip(0.1f, 400.0f);
 	gShadowRenderer->ShadowCamera.Update();
 
@@ -487,9 +487,9 @@ void RaptorGame::CreateGame()
 }
 
 
-static FX_FORCE_INLINE Vec3f GetMovementVector()
+static FX_FORCE_INLINE FVec3 GetMovementVector()
 {
-	Vec3f movement = Vec3f::sZero;
+	FVec3 movement = FVec3::sZero;
 
 	if (ControlManager::IsKeyDown(eKey::FX_KEY_W)) {
 		movement.Z += 1.0f;
@@ -513,9 +513,9 @@ static FX_FORCE_INLINE Vec3f GetMovementVector()
 	return movement;
 }
 
-static FX_FORCE_INLINE Vec3f GetEditorMovementVector()
+static FX_FORCE_INLINE FVec3 GetEditorMovementVector()
 {
-	Vec3f movement = Vec3f::sZero;
+	FVec3 movement = FVec3::sZero;
 
 	const float speed = 0.25f;
 
@@ -590,7 +590,7 @@ void RaptorGame::ToggleFlyCamera()
 void RaptorGame::MoveFlyCamera()
 {
 	const bool sprinting = ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT);
-	const Vec3f velocity = mFlyController.Update(DeltaTime, GetMovementVector(), *mpFlyCamera, sprinting);
+	const FVec3 velocity = mFlyController.Update(DeltaTime, GetMovementVector(), *mpFlyCamera, sprinting);
 
 	mpFlyCamera->MoveWS(velocity * static_cast<float32>(DeltaTime));
 	mpFlyCamera->Update();
@@ -841,12 +841,12 @@ void RaptorGame::SpawnDebugNPC(Object* model)
 		gNPCManager->Destroy(gNPCManager->Get(0));
 	}
 
-	Vec3f forward = gWorld->Player.pCamera->GetForwardVector();
+	FVec3 forward = gWorld->Player.pCamera->GetForwardVector();
 	forward.Y = 0.0f;
 	forward = forward.Normalize();
 
 	const physics::RayResult floor = gPhysics->pBackend->Raycast(gWorld->Player.pCamera->GetPosition() + forward * 2.5f,
-																 Vec3f(0.0f, -10.0f, 0.0f));
+																 FVec3(0.0f, -10.0f, 0.0f));
 
 	NPCDesc desc;
 	desc.Name = String::Fmt("npc_{}", mNPCSpawnCount);
@@ -866,11 +866,11 @@ void RaptorGame::DropRagdollDummy(Object* model)
 		gNPCManager->DestroyDummy(0);
 	}
 
-	Vec3f forward = gWorld->Player.pCamera->GetForwardVector();
+	FVec3 forward = gWorld->Player.pCamera->GetForwardVector();
 	forward.Y = 0.0f;
 	forward = forward.Normalize();
 
-	const Vec3f right = gWorld->Player.pCamera->GetRightVector();
+	const FVec3 right = gWorld->Player.pCamera->GetRightVector();
 
 	const float32 lateral = (static_cast<float32>(mRagdollSpawnCount % 3) - 1.0f) * 0.9f;
 	const float32 height = 1.0f + 0.3f * static_cast<float32>(mRagdollSpawnCount % 2);
@@ -878,15 +878,15 @@ void RaptorGame::DropRagdollDummy(Object* model)
 
 	++mRagdollSpawnCount;
 
-	const Vec3f position = gWorld->Player.Position + forward * 1.5f + right * lateral + Vec3f(0.0f, height, 0.0f);
+	const FVec3 position = gWorld->Player.Position + forward * 1.5f + right * lateral + FVec3(0.0f, height, 0.0f);
 
 	gNPCManager->SpawnDummy(model, name, position, forward * 2.0f);
 }
 
 void RaptorGame::FireCube()
 {
-	const Vec3f eye = gWorld->Player.pCamera->GetPosition();
-	const Vec3f forward = gWorld->Player.pCamera->GetForwardVector();
+	const FVec3 eye = gWorld->Player.pCamera->GetPosition();
+	const FVec3 forward = gWorld->Player.pCamera->GetForwardVector();
 	const float32 half_size = scFireCubeSize * 0.5f;
 
 	// Stop short of anything in the way, so the cube never starts inside a wall
@@ -908,13 +908,13 @@ void RaptorGame::FireCube()
 	Object* object = gObjectManager->NewObject(name, gWorld->pPrototype->GetDefaultMaterial(), eObjectTag::None);
 
 	object->pMesh = MeshGen::MakeCube(CubeGenOptions::Uniform(half_size))->AsDefaultMesh();
-	object->Bounds.Min = Vec3f(-half_size);
-	object->Bounds.Max = Vec3f(half_size);
+	object->Bounds.Min = FVec3(-half_size);
+	object->Bounds.Max = FVec3(half_size);
 	object->SetShadowCaster(true);
 	object->SetPosition(eye + forward * spawn_distance);
 
 	physics::Body* body = gPhysics->NewBody(name);
-	body->CreatePrimitiveBody(physics::ePrimitiveType::Box, Vec3f(scFireCubeSize), physics::eMotionType::Dynamic,
+	body->CreatePrimitiveBody(physics::ePrimitiveType::Box, FVec3(scFireCubeSize), physics::eMotionType::Dynamic,
 							  physics::BodyProps {});
 	body->Teleport(object->GetPosition(), object->mRotation);
 	body->SetLinearVelocity(forward * scFireCubeSpeed);
@@ -1149,7 +1149,7 @@ void RaptorGame::PlayImpactSounds()
 											  (scImpactSoundFullSpeed - scImpactSoundMinSpeed),
 										  scImpactSoundMinVolume, 1.0f);
 
-		const Vec3f position = impact.Point + (impact.Normal * AudioSystem::scSurfaceSoundOffset);
+		const FVec3 position = impact.Point + (impact.Normal * AudioSystem::scSurfaceSoundOffset);
 		const SoundID sound = gAudio->PlayForSurface("impact", gWorld->pPrototype->GetSurfaceAt(surface), position);
 		gAudio->SetVolume(sound, volume);
 	}
@@ -1257,8 +1257,8 @@ void RaptorGame::RenderText()
 			String::Fmt(
 				"shadow {:.2f} gi {:.2f} sdf {:.2f} pre {:.2f} lightcull {:.2f} ao {:.2f} fwd {:.2f} part {:.2f} fog "
 				"{:.2f} trace {:.2f} comp {:.2f}",
-				gpu.GetMs(eGpuMarker::Shadows), gpu.GetMs(eGpuMarker::LightTransport), gpu.GetMs(eGpuMarker::SDFPageScene),
-				gpu.GetMs(eGpuMarker::Prepass),
+				gpu.GetMs(eGpuMarker::Shadows), gpu.GetMs(eGpuMarker::LightTransport),
+				gpu.GetMs(eGpuMarker::SDFPageScene), gpu.GetMs(eGpuMarker::Prepass),
 				gpu.GetMs(eGpuMarker::LightCulling), gpu.GetMs(eGpuMarker::SSAO), gpu.GetMs(eGpuMarker::Forward),
 				gpu.GetMs(eGpuMarker::Particles), gpu.GetMs(eGpuMarker::Fog), gpu.GetMs(eGpuMarker::SDFPageDebug),
 				gpu.GetMs(eGpuMarker::Composition))
@@ -1404,7 +1404,7 @@ void RaptorGame::Tick()
 
 	if (!bInCommandMode) {
 		if (mbFlyCameraDetached) {
-			gWorld->Player.Move(DeltaTime, Vec3f::sZero);
+			gWorld->Player.Move(DeltaTime, FVec3::sZero);
 			MoveFlyCamera();
 		}
 		else {
@@ -1416,7 +1416,7 @@ void RaptorGame::Tick()
 #endif
 	}
 	else {
-		gWorld->Player.Move(DeltaTime, Vec3f::sZero);
+		gWorld->Player.Move(DeltaTime, FVec3::sZero);
 	}
 
 #ifdef FX_IS_EDITOR
@@ -1594,15 +1594,15 @@ RaptorGame::~RaptorGame()
 /////////////////////////////////////
 
 
-// void EditorModeMoveCollider::Update(const World& scene, const Vec3f movement_vector)
+// void EditorModeMoveCollider::Update(const World& scene, const FVec3 movement_vector)
 // {
 // 	physics::BodyID phys_id = scene.GetSelectedPhysicsObject();
 // 	if (phys_id != physics::BodyID::scNull) {
 // 		physics::Body* phys = scene.GetPhysicsObject(phys_id);
-// 		phys->Teleport(phys->GetPosition() + (movement_vector * Vec3f(0.05)), phys->GetRotation());
+// 		phys->Teleport(phys->GetPosition() + (movement_vector * FVec3(0.05)), phys->GetRotation());
 
-// 		Vec3f target = phys->GetPosition();
-// 		pCamera->SetPosition(target + Vec3f(0, 10, -10));
+// 		FVec3 target = phys->GetPosition();
+// 		pCamera->SetPosition(target + FVec3(0, 10, -10));
 // 		pCamera->LookAt(target);
 
 // 		pCamera->Update();
@@ -1611,12 +1611,12 @@ RaptorGame::~RaptorGame()
 
 // void EditorModeMoveCollider::OnLeave(const World& scene) {}
 
-// void EditorModeScaleCollider::Update(const World& scene, const Vec3f movement_vector)
+// void EditorModeScaleCollider::Update(const World& scene, const FVec3 movement_vector)
 // {
 // 	physics::BodyID phys_id = scene.GetSelectedPhysicsObject();
 // 	if (phys_id != physics::BodyID::scNull) {
 // 		physics::Body* phys = scene.GetPhysicsObject(phys_id);
-// 		phys->Dimensions = phys->Dimensions + (movement_vector * Vec3f(0.05));
+// 		phys->Dimensions = phys->Dimensions + (movement_vector * FVec3(0.05));
 // 		if (phys->Dimensions.X < 0.01f) {
 // 			phys->Dimensions.X = 0.01f;
 // 		}
@@ -1627,8 +1627,8 @@ RaptorGame::~RaptorGame()
 // 			phys->Dimensions.Z = 0.01f;
 // 		}
 
-// 		Vec3f target = phys->GetPosition();
-// 		pCamera->SetPosition(target + Vec3f(0, 10, -10));
+// 		FVec3 target = phys->GetPosition();
+// 		pCamera->SetPosition(target + FVec3(0, 10, -10));
 // 		pCamera->LookAt(target);
 
 // 		pCamera->Update();

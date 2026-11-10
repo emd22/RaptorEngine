@@ -216,7 +216,7 @@ double ThicknessAlong(const TopViewProjection& projection, const Vec2d normal)
 	return high - low;
 }
 
-const TopViewFace* FindSideFace(const TopViewProjection& projection, const Vec3f& world_normal)
+const TopViewFace* FindSideFace(const TopViewProjection& projection, const FVec3& world_normal)
 {
 	const TopViewFace* best = nullptr;
 	double best_dot = scFaceMatchDot;
@@ -233,7 +233,7 @@ const TopViewFace* FindSideFace(const TopViewProjection& projection, const Vec3f
 	return best;
 }
 
-const TopViewFrontFace* FindFrontFace(const TopViewProjection& projection, const Vec3f& world_normal)
+const TopViewFrontFace* FindFrontFace(const TopViewProjection& projection, const FVec3& world_normal)
 {
 	const TopViewFrontFace* best = nullptr;
 	double best_dot = scFaceMatchDot;
@@ -596,11 +596,11 @@ DynArray<Vec2d> TopViewCanvas::CollectVertexHandles(const TopViewBrush& brush) c
 	return CollectHandles(Projection(brush));
 }
 
-Vec3f TopViewCanvas::ToWorldVector(const Vec2d uv, double w) const
+FVec3 TopViewCanvas::ToWorldVector(const Vec2d uv, double w) const
 {
 	const ViewPlaneAxes& axes = Axes();
 
-	Vec3f result = Vec3f::sZero;
+	FVec3 result = FVec3::sZero;
 	SetAxis(result, axes.U, static_cast<float32>(uv.X * axes.USign));
 	SetAxis(result, axes.V, static_cast<float32>(uv.Y));
 	SetAxis(result, axes.W, static_cast<float32>(w));
@@ -608,14 +608,14 @@ Vec3f TopViewCanvas::ToWorldVector(const Vec2d uv, double w) const
 	return result;
 }
 
-Vec2d TopViewCanvas::ProjectPoint(const Vec3f& point) const
+Vec2d TopViewCanvas::ProjectPoint(const FVec3& point) const
 {
 	const ViewPlaneAxes& axes = Axes();
 
 	return Vec2d(GetAxis(point, axes.U) * axes.USign, GetAxis(point, axes.V));
 }
 
-double TopViewCanvas::DepthOf(const Vec3f& vector) const { return GetAxis(vector, Axes().W); }
+double TopViewCanvas::DepthOf(const FVec3& vector) const { return GetAxis(vector, Axes().W); }
 
 void TopViewCanvas::ApplyState(const TopViewState& state)
 {
@@ -972,7 +972,7 @@ DynArray<TopViewFaceRef> TopViewCanvas::GetPickedFaces() const
 	return mPickedFaces.Clone();
 }
 
-bool TopViewCanvas::IsFacePicked(ObjectID object_id, const Vec3f& normal) const
+bool TopViewCanvas::IsFacePicked(ObjectID object_id, const FVec3& normal) const
 {
 	for (const TopViewFaceRef& face : mPickedFaces) {
 		if (face.ObjectId == object_id && face.Normal.Dot(normal) > scFaceMatchDot) {
@@ -983,7 +983,7 @@ bool TopViewCanvas::IsFacePicked(ObjectID object_id, const Vec3f& normal) const
 	return false;
 }
 
-void TopViewCanvas::PickFace(ObjectID object_id, const Vec3f& normal, bool additive)
+void TopViewCanvas::PickFace(ObjectID object_id, const FVec3& normal, bool additive)
 {
 	if (additive && IsFacePicked(object_id, normal)) {
 		UnpickFace(object_id, normal);
@@ -1006,7 +1006,7 @@ void TopViewCanvas::PickFace(ObjectID object_id, const Vec3f& normal, bool addit
 	Refresh();
 }
 
-void TopViewCanvas::UnpickFace(ObjectID object_id, const Vec3f& normal)
+void TopViewCanvas::UnpickFace(ObjectID object_id, const FVec3& normal)
 {
 	DynArray<TopViewFaceRef> kept;
 
@@ -2074,8 +2074,8 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 		gc.DrawRectangle(screen.Min.X, screen.Min.Y, screen_extent.X, screen_extent.Y);
 
 		if (mTool == eEditorTool::Room) {
-			Vec3f min;
-			Vec3f max;
+			FVec3 min;
+			FVec3 max;
 			GetCreateVolume(mPreview.RectUV,
 							std::max<double>(mCreateSize[static_cast<uint32>(mPlane)], scMinCreateDepth), min, max);
 
@@ -3194,7 +3194,7 @@ void TopViewCanvas::BeginLight(bool double_click)
 		return;
 	}
 
-	const Vec3f position = GetNewMarkerPosition();
+	const FVec3 position = GetNewMarkerPosition();
 
 	SendCommand([position] { gEditor->TopViewCreateLight(position); });
 }
@@ -3210,12 +3210,12 @@ void TopViewCanvas::BeginSound(bool double_click)
 		return;
 	}
 
-	const Vec3f position = GetNewMarkerPosition();
+	const FVec3 position = GetNewMarkerPosition();
 
 	SendCommand([position] { gEditor->TopViewCreateSound(position); });
 }
 
-Vec3f TopViewCanvas::GetNewMarkerPosition() const
+FVec3 TopViewCanvas::GetNewMarkerPosition() const
 {
 	double depth = 0.0;
 	const int32 selected = FindSelectedMarker();
@@ -3230,7 +3230,7 @@ Vec3f TopViewCanvas::GetNewMarkerPosition() const
 	return ToWorldVector(Snap(mPress), depth);
 }
 
-void TopViewCanvas::SendMarkerMove(eTopViewMarkerKind kind, const Vec3f offset)
+void TopViewCanvas::SendMarkerMove(eTopViewMarkerKind kind, const FVec3 offset)
 {
 	switch (kind) {
 	case eTopViewMarkerKind::Spawn:
@@ -3935,7 +3935,7 @@ void TopViewCanvas::FinishVertex()
 	}
 
 	DynArray<TopViewVertexHandle> handles = mSelectedVertices.Clone();
-	const Vec3f offset = ToWorldVector(mPreview.OffsetUV, 0.0);
+	const FVec3 offset = ToWorldVector(mPreview.OffsetUV, 0.0);
 	const eViewPlane plane = mPlane;
 
 	for (TopViewVertexHandle& handle : mSelectedVertices) {
@@ -4073,7 +4073,7 @@ void TopViewCanvas::FinishMove()
 			return;
 		}
 
-		const Vec3f offset = ToWorldVector(mPreview.OffsetUV, 0.0);
+		const FVec3 offset = ToWorldVector(mPreview.OffsetUV, 0.0);
 
 		HoldPreview();
 		SendCommand([offset] { gEditor->TopViewMove(offset); });
@@ -4155,8 +4155,8 @@ void TopViewCanvas::FinishCreate()
 		depth = std::max<double>(mCreateSize[static_cast<uint32>(mPlane)], scMinCreateDepth);
 	}
 
-	Vec3f min;
-	Vec3f max;
+	FVec3 min;
+	FVec3 max;
 	GetCreateVolume(mPreview.RectUV, depth, min, max);
 
 	HoldPreview();
@@ -4193,15 +4193,15 @@ void TopViewCanvas::FinishCreate()
 	SendCommand([plane, min, max, drop_to_ground] { gEditor->TopViewCreate(plane, min, max, drop_to_ground); });
 }
 
-void TopViewCanvas::GetCreateVolume(const DRect& rect, double depth, Vec3f& out_min, Vec3f& out_max) const
+void TopViewCanvas::GetCreateVolume(const DRect& rect, double depth, FVec3& out_min, FVec3& out_max) const
 {
 	const double base = mCreateBase[static_cast<uint32>(mPlane)];
 
-	const Vec3f first = ToWorldVector(rect.Min, base);
-	const Vec3f second = ToWorldVector(rect.Max, base + depth);
+	const FVec3 first = ToWorldVector(rect.Min, base);
+	const FVec3 second = ToWorldVector(rect.Max, base + depth);
 
-	out_min = Vec3f::Min(first, second);
-	out_max = Vec3f::Max(first, second);
+	out_min = FVec3::Min(first, second);
+	out_max = FVec3::Max(first, second);
 }
 
 TopViewCanvas::ArchEllipse TopViewCanvas::FitArch(const DRect& rect) const
@@ -4525,7 +4525,7 @@ void TopViewCanvas::CommitArch()
 	const double base = mCreateBase[plane_index];
 	const double depth = std::max<double>(mCreateSize[plane_index], scMinCreateDepth);
 
-	DynArray<Vec3f> points;
+	DynArray<FVec3> points;
 
 	for (uint32 i = 0; i < corners.Size; i += scArchCornersPerSegment) {
 		for (uint32 j = 0; j < scArchCornersPerSegment; j++) {
@@ -4761,10 +4761,10 @@ void TopViewCanvas::FinishRotate()
 		return;
 	}
 
-	const Vec3f axis = ToWorldVector(Vec2d::scZero, 1.0);
+	const FVec3 axis = ToWorldVector(Vec2d::scZero, 1.0);
 	const float32 angle = static_cast<float32>(Axes().RotateSign * mPreview.Angle);
-	const Vec3f pivot = ToWorldVector(mPreview.PivotUV, 0.0);
-	const Vec3f offset = ToWorldVector(mPreview.OffsetUV, 0.0);
+	const FVec3 pivot = ToWorldVector(mPreview.PivotUV, 0.0);
+	const FVec3 offset = ToWorldVector(mPreview.OffsetUV, 0.0);
 
 	HoldPreview();
 	SendCommand([axis, angle, pivot, offset] { gEditor->TopViewRotate(axis, angle, pivot, offset); });
@@ -4777,9 +4777,9 @@ void TopViewCanvas::FinishClip()
 		return;
 	}
 
-	const Vec3f point_a = ToWorldVector(mPreview.ClipA, 0.0);
-	const Vec3f point_b = ToWorldVector(mPreview.ClipB, 0.0);
-	const Vec3f view_axis = ToWorldVector(Vec2d::scZero, 1.0);
+	const FVec3 point_a = ToWorldVector(mPreview.ClipA, 0.0);
+	const FVec3 point_b = ToWorldVector(mPreview.ClipB, 0.0);
+	const FVec3 view_axis = ToWorldVector(Vec2d::scZero, 1.0);
 
 	HoldPreview();
 	SendCommand([point_a, point_b, view_axis] { gEditor->TopViewClip(point_a, point_b, view_axis); });
@@ -4791,7 +4791,7 @@ void TopViewCanvas::FinishMarkerMove()
 		return;
 	}
 
-	const Vec3f offset = ToWorldVector(mPreview.OffsetUV, 0.0);
+	const FVec3 offset = ToWorldVector(mPreview.OffsetUV, 0.0);
 
 	HoldPreview();
 
@@ -4804,7 +4804,7 @@ void TopViewCanvas::FinishMarkerAim()
 		return;
 	}
 
-	const Vec3f direction = ToWorldVector(mPreview.AimUV, mPreview.AimDepth);
+	const FVec3 direction = ToWorldVector(mPreview.AimUV, mPreview.AimDepth);
 
 	HoldPreview();
 
@@ -4910,7 +4910,7 @@ void TopViewCanvas::NudgeSelection(const Vec2d delta, bool snap)
 		moved = SnapNudge(bounds.Rect.Min, delta);
 	}
 
-	const Vec3f offset = ToWorldVector(moved, 0.0);
+	const FVec3 offset = ToWorldVector(moved, 0.0);
 
 	SendCommand([offset] { gEditor->TopViewMove(offset); });
 }
@@ -5096,7 +5096,7 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 		}
 
 		DynArray<TopViewVertexHandle> handles = mSelectedVertices.Clone();
-		const Vec3f offset = ToWorldVector(Vec2d(0.0, 0.0), distance * Axes().DepthSign);
+		const FVec3 offset = ToWorldVector(Vec2d(0.0, 0.0), distance * Axes().DepthSign);
 		const eViewPlane plane = mPlane;
 
 		SendCommand([plane, handles = std::move(handles), offset]

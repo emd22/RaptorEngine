@@ -10,7 +10,7 @@
 #include <Color.hpp>
 #include <Core/Serialize.hpp>
 #include <Core/Types.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 
 namespace fx {
 
@@ -26,14 +26,14 @@ enum class ePrxLightType : int64
 struct SunLightEntry
 {
 	bool bEnabled = true;
-	Vec3f Position = Vec3f::sZero;
+	FVec3 Position = FVec3::sZero;
 	struct Color Color = Color::FromRGBA(255, 255, 255, 255);
 	float32 Intensity = 100000.0f;
 };
 
 struct SpotLightEntry
 {
-	Vec3f Direction = Vec3f::sZero;
+	FVec3 Direction = FVec3::sZero;
 	float32 InnerAngle = 20.0f;
 	float32 OuterAngle = 30.0f;
 	bool bCastShadows = true;
@@ -42,7 +42,7 @@ struct SpotLightEntry
 struct LightEntry
 {
 	ePrxLightType Type = ePrxLightType::Point;
-	Vec3f Position = Vec3f::sZero;
+	FVec3 Position = FVec3::sZero;
 	struct Color Color = Color::FromRGBA(255, 255, 255, 255);
 	float32 Intensity = 100000.0f;
 	float32 Radius = 5.0f;

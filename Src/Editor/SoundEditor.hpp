@@ -4,7 +4,7 @@
 
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 
 namespace fx {
 
@@ -23,10 +23,10 @@ public:
 	void Select(uint32 id);
 	void Deselect();
 
-	void MoveSelected(const Vec3f offset);
+	void MoveSelected(const FVec3 offset);
 	void EditSelected(const SoundEmitter& after);
 
-	SoundEmitter* Create(const Vec3f position);
+	SoundEmitter* Create(const FVec3 position);
 	void DeleteSelected();
 	void DuplicateSelected();
 

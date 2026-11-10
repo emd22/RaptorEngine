@@ -27,7 +27,7 @@ void Player::Create()
 
 	Physics.Create();
 
-	mCameraOffset = Vec3f(0, physics::PhysicsPlayer::scEyeHeight, 0);
+	mCameraOffset = FVec3(0, physics::PhysicsPlayer::scEyeHeight, 0);
 
 	mWalkController.Speed = scWalkSpeed;
 	mWalkController.SprintSpeed = scSprintSpeed;
@@ -215,15 +215,15 @@ void Player::Jump()
 	Physics.Jump();
 }
 
-void Player::SpawnAt(const Vec3f position, const Vec3f direction)
+void Player::SpawnAt(const FVec3 position, const FVec3 direction)
 {
 	TeleportTo(position);
 	SetViewDirection(direction);
 }
 
-void Player::LookAt(const Vec3f target) { SetViewDirection(target - GetEyePosition()); }
+void Player::LookAt(const FVec3 target) { SetViewDirection(target - GetEyePosition()); }
 
-void Player::SetViewDirection(const Vec3f direction)
+void Player::SetViewDirection(const FVec3 direction)
 {
 	mViewAngles.SetDirection(direction);
 	pCamera->SetRotation(mViewAngles.ToQuat());
@@ -236,7 +236,7 @@ void Player::SetViewDirection(const Vec3f direction)
 
 void Player::SetFlyMode(bool value)
 {
-	const Vec3f velocity = GetController().GetVelocity();
+	const FVec3 velocity = GetController().GetVelocity();
 
 	mbIsFlymode = value;
 	Physics.bDisableGravity = value;
@@ -247,13 +247,13 @@ void Player::SetFlyMode(bool value)
 	mLandingVelocity = 0.0f;
 }
 
-void Player::Move(float64 delta_time, const Vec3f offset)
+void Player::Move(float64 delta_time, const FVec3 offset)
 {
 	BaseController& controller = GetController();
 	controller.SpeedMultiplier = SpeedMultiplier;
 	Physics.SetGravityMultiplier(controller.GetGravityMultiplier());
 
-	const Vec3f velocity = controller.Update(delta_time, offset, *pCamera, bIsSprinting);
+	const FVec3 velocity = controller.Update(delta_time, offset, *pCamera, bIsSprinting);
 
 	if (!mbIsFlymode && controller.GetGoal().Length() <= 0.25) {
 		mBobCounterY = MathUtil::SmoothInterpolate(mBobCounterY, 0.0f, 10.0f, delta_time);
@@ -291,7 +291,7 @@ void Player::UpdateViewModel(double delta_time)
 	UpdateViewModelSway(static_cast<float32>(delta_time));
 
 	// Roll goes in this local offset rather than the euler angles, as FromEulerAngles applies Z last in world space.
-	const Quat sway = Quat::FromEulerAngles(Vec3f(-mViewModelSwayPitch + mViewModelHolster * scHolsterPitch,
+	const Quat sway = Quat::FromEulerAngles(FVec3(-mViewModelSwayPitch + mViewModelHolster * scHolsterPitch,
 												  mViewModelSwayYaw, mViewModelSwayYaw * scViewModelSwayRoll));
 
 	mViewModelRotation = pCamera->GetRotation() * sway;
@@ -299,9 +299,9 @@ void Player::UpdateViewModel(double delta_time)
 	// Build the basis from the lagging rotation (rather than the camera's) so the view model pivots around the eye.
 	const Mat4f view_model_basis = Mat4f::AsRotation(mViewModelRotation);
 
-	const Vec3f right = Vec3f(view_model_basis.Rows[0]);
-	const Vec3f up = Vec3f(view_model_basis.Rows[1]);
-	const Vec3f forward = Vec3f(view_model_basis.Rows[2]);
+	const FVec3 right = FVec3(view_model_basis.Rows[0]);
+	const FVec3 up = FVec3(view_model_basis.Rows[1]);
+	const FVec3 forward = FVec3(view_model_basis.Rows[2]);
 
 	float32 horizontal_scale = 0.34f;
 	float32 vertical_scale = 0.20f;
@@ -312,25 +312,25 @@ void Player::UpdateViewModel(double delta_time)
 	// }
 
 	// Negate the bob (l'eponge) to reduce motion and make the movement feel more cohesive.
-	const Vec3f bob = -GetBob();
+	const FVec3 bob = -GetBob();
 
-	Vec3f view_model_bob = (right * (bob.X * horizontal_scale)) + (up * (bob.Y * vertical_scale));
+	FVec3 view_model_bob = (right * (bob.X * horizontal_scale)) + (up * (bob.Y * vertical_scale));
 	const JPH::Vec3 character_velocity = Physics.pPlayerVirt->GetLinearVelocity();
 
 	mViewModelVerticalLag = MathUtil::SmoothInterpolate(mViewModelVerticalLag,
 														-character_velocity.GetY() * scViewModelVelocityLag,
 														scViewModelVerticalLagSpeed, delta_time);
 
-	view_model_bob += Vec3f(-character_velocity.GetX() * scViewModelVelocityLag,
+	view_model_bob += FVec3(-character_velocity.GetX() * scViewModelVelocityLag,
 							mViewModelVerticalLag - mLandingOffset * scLandingViewModelCounter,
 							-character_velocity.GetZ() * scViewModelVelocityLag);
 
 	// const float32 rotx = sin(gWorld->Player.mBobCounterY * 0.5f) * 0.05f;
 
 	const Quat kick = Quat::FromEulerAngles(
-		Vec3f(-mViewKickValue[ViewKickPitch], mViewKickValue[ViewKickYaw], mViewKickValue[ViewKickRoll]));
+		FVec3(-mViewKickValue[ViewKickPitch], mViewKickValue[ViewKickYaw], mViewKickValue[ViewKickRoll]));
 
-	const Vec3f view_offset = view_model_bob + (right * mViewModelOffset.X) + (up * mViewModelOffset.Y) +
+	const FVec3 view_offset = view_model_bob + (right * mViewModelOffset.X) + (up * mViewModelOffset.Y) +
 							  (forward * (mViewModelOffset.Z - mViewKickValue[ViewKickBack])) -
 							  (up * (mViewModelHolster * scHolsterDrop));
 
@@ -338,12 +338,12 @@ void Player::UpdateViewModel(double delta_time)
 
 	if (slot.bHasViewJoint) {
 		const Quat rotation = mViewModelRotation * kick *
-							  Quat::FromEulerAngles(Vec3f(0.0f, static_cast<float32>(FX_PI), 0.0f));
+							  Quat::FromEulerAngles(FVec3(0.0f, static_cast<float32>(FX_PI), 0.0f));
 		const Mat4f basis = Mat4f::AsRotation(rotation);
 
-		const Vec3f view_origin = (Vec3f(basis.Rows[0]) * slot.ViewOrigin.X) +
-								  (Vec3f(basis.Rows[1]) * slot.ViewOrigin.Y) +
-								  (Vec3f(basis.Rows[2]) * slot.ViewOrigin.Z);
+		const FVec3 view_origin = (FVec3(basis.Rows[0]) * slot.ViewOrigin.X) +
+								  (FVec3(basis.Rows[1]) * slot.ViewOrigin.Y) +
+								  (FVec3(basis.Rows[2]) * slot.ViewOrigin.Z);
 
 
 		mpViewModel->SetPosition(pCamera->GetPosition() - view_origin + view_offset);
@@ -497,7 +497,7 @@ void Player::DoReloadAnimation()
 	mpViewModelSkeleton->PushAnimation(reload);
 }
 
-bool Player::GetViewModelJointPosition(const char* joint_name, Vec3f& out_position)
+bool Player::GetViewModelJointPosition(const char* joint_name, FVec3& out_position)
 {
 	if (mpViewModel == nullptr || mActiveViewModel < 0) {
 		return false;
@@ -518,7 +518,7 @@ bool Player::GetViewModelJointPosition(const char* joint_name, Vec3f& out_positi
 		}
 
 		const Mat4f joint_world = skeleton.WorldTransforms[i] * mpViewModel->GetWorldMatrix();
-		out_position = Vec3f(joint_world.Rows[3]);
+		out_position = FVec3(joint_world.Rows[3]);
 		return true;
 	}
 
@@ -661,14 +661,14 @@ void Player::UpdateFootsteps(float32 delta_time)
 	PlayGroundSound("footsteps", std::clamp(mHorizontalSpeed / scSprintSpeed, scFootstepMinVolume, 1.0f));
 }
 
-void Player::UpdateMeasuredMotion(const Vec3f& previous_position, float32 delta_time)
+void Player::UpdateMeasuredMotion(const FVec3& previous_position, float32 delta_time)
 {
 	if (delta_time <= 1.0e-5f) {
 		return;
 	}
 
 	const JPH::Vec3 ground_velocity = Physics.pPlayerVirt->GetGroundVelocity();
-	const Vec3f moved = Position - previous_position;
+	const FVec3 moved = Position - previous_position;
 
 	const float32 velocity_x = moved.X / delta_time - ground_velocity.GetX();
 	const float32 velocity_z = moved.Z / delta_time - ground_velocity.GetZ();
@@ -701,7 +701,7 @@ void Player::Update(float64 delta_time)
 {
 	const float64 physics_time = std::min(delta_time, static_cast<float64>(physics::PhysicsPlayer::scMaxStepTime));
 
-	const Vec3f previous_position = Position;
+	const FVec3 previous_position = Position;
 
 	Physics.Update(physics_time);
 	SyncPhysicsToPlayer();
@@ -713,7 +713,7 @@ void Player::Update(float64 delta_time)
 	UpdateLanding(static_cast<float32>(delta_time));
 	UpdateFootsteps(static_cast<float32>(physics_time));
 
-	pCamera->SetPosition(Position + mCameraOffset + Vec3f(0.0f, mLandingOffset, 0.0f));
+	pCamera->SetPosition(Position + mCameraOffset + FVec3(0.0f, mLandingOffset, 0.0f));
 
 
 	const bool user_force_released = GetController().GetVelocity().IsNearZero(0.1);
@@ -745,14 +745,14 @@ void Player::Update(float64 delta_time)
 	mHeadBobX = HeadBobStrength.X * bob_cos;
 	mHeadBobY = HeadBobStrength.Y * bob_sin;
 
-	Vec3f bob_vector = pCamera->GetUpVector() * mHeadBobY + pCamera->GetRightVector() * mHeadBobX;
+	FVec3 bob_vector = pCamera->GetUpVector() * mHeadBobY + pCamera->GetRightVector() * mHeadBobX;
 	pCamera->MoveWS(bob_vector);
 
 	UpdateFov(static_cast<float32>(delta_time), user_force_released);
 
 	pCamera->Update();
 
-	pFlashlight->SetPosition(pCamera->GetPosition() + (pCamera->GetForwardVector() * 0.5f) - Vec3f(0.0f, 0.2f, 0.0f));
+	pFlashlight->SetPosition(pCamera->GetPosition() + (pCamera->GetForwardVector() * 0.5f) - FVec3(0.0f, 0.2f, 0.0f));
 	pFlashlight->SetRotation(pCamera->GetRotation());
 
 	Weapons.Update(static_cast<float32>(delta_time));

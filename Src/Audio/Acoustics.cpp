@@ -91,12 +91,12 @@ void IPLCALL OnBakeProgress(IPLfloat32 fraction, void* user_data)
 	}
 }
 
-IPLMatrix4x4 MakeBoxTransform(const Vec3f min, const Vec3f max)
+IPLMatrix4x4 MakeBoxTransform(const FVec3 min, const FVec3 max)
 {
 	IPLMatrix4x4 transform {};
 
-	const Vec3f extent = max - min;
-	const Vec3f centre = (min + max) * 0.5f;
+	const FVec3 extent = max - min;
+	const FVec3 centre = (min + max) * 0.5f;
 
 	transform.elements[0][0] = extent.X;
 	transform.elements[1][1] = extent.Y;
@@ -111,13 +111,13 @@ IPLMatrix4x4 MakeBoxTransform(const Vec3f min, const Vec3f max)
 
 } // namespace
 
-Vec3f ToAudioSpace(const Vec3f value) { return Vec3f(value.X, value.Y, -value.Z); }
+FVec3 ToAudioSpace(const FVec3 value) { return FVec3(value.X, value.Y, -value.Z); }
 
 AcousticGeometry ToAudioSpace(const AcousticGeometry& geometry)
 {
 	AcousticGeometry audio_geometry = geometry.Clone();
 
-	for (Vec3f& vertex : audio_geometry.Vertices) {
+	for (FVec3& vertex : audio_geometry.Vertices) {
 		vertex = ToAudioSpace(vertex);
 	}
 
@@ -220,7 +220,7 @@ bool UnwrapProbeData(const SizedArray<uint8>& data, const uint8*& out_payload, s
 	return true;
 }
 
-IPLVector3 ToIPL(const Vec3f value) { return IPLVector3 { value.X, value.Y, value.Z }; }
+IPLVector3 ToIPL(const FVec3 value) { return IPLVector3 { value.X, value.Y, value.Z }; }
 
 void IPLCALL OnSteamAudioLog(IPLLogLevel level, const char* message)
 {
@@ -261,7 +261,7 @@ bool CreateScene(IPLContext context, const AcousticGeometry& audio_geometry, IPL
 		SizedArray<IPLVector3> vertices;
 		vertices.InitCapacity(audio_geometry.Vertices.Size);
 
-		for (const Vec3f vertex : audio_geometry.Vertices) {
+		for (const FVec3 vertex : audio_geometry.Vertices) {
 			vertices.Insert(ToIPL(vertex));
 		}
 
@@ -373,14 +373,14 @@ bool Bake(const AcousticGeometry& geometry, const AcousticBakeSettings& settings
 		return false;
 	}
 
-	const Vec3f corner_a = ToAudioSpace(settings.BoundsMin);
-	const Vec3f corner_b = ToAudioSpace(settings.BoundsMax);
+	const FVec3 corner_a = ToAudioSpace(settings.BoundsMin);
+	const FVec3 corner_b = ToAudioSpace(settings.BoundsMax);
 
 	IPLProbeGenerationParams generation {};
 	generation.type = IPL_PROBEGENERATIONTYPE_UNIFORMFLOOR;
 	generation.spacing = settings.ProbeSpacing;
 	generation.height = settings.ProbeHeight;
-	generation.transform = MakeBoxTransform(Vec3f::Min(corner_a, corner_b), Vec3f::Max(corner_a, corner_b));
+	generation.transform = MakeBoxTransform(FVec3::Min(corner_a, corner_b), FVec3::Max(corner_a, corner_b));
 
 	iplProbeArrayCreate(context, &probe_array);
 	iplProbeArrayGenerateProbes(probe_array, scene, &generation);
@@ -397,15 +397,15 @@ bool Bake(const AcousticGeometry& geometry, const AcousticBakeSettings& settings
 
 	for (int32 i = 0; i < probe_count; i++) {
 		const IPLSphere probe = iplProbeArrayGetProbe(probe_array, i);
-		const Vec3f centre = ToAudioSpace(Vec3f(probe.center.x, probe.center.y, probe.center.z));
+		const FVec3 centre = ToAudioSpace(FVec3(probe.center.x, probe.center.y, probe.center.z));
 
 		if (i == 0) {
 			out_result.ProbeMin = centre;
 			out_result.ProbeMax = centre;
 		}
 
-		out_result.ProbeMin = Vec3f::Min(out_result.ProbeMin, centre);
-		out_result.ProbeMax = Vec3f::Max(out_result.ProbeMax, centre);
+		out_result.ProbeMin = FVec3::Min(out_result.ProbeMin, centre);
+		out_result.ProbeMax = FVec3::Max(out_result.ProbeMax, centre);
 	}
 
 	iplProbeBatchCreate(context, &probe_batch);

@@ -4,7 +4,7 @@
 #include <Core/SizedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 #include <functional>
 #include <optional>
 
@@ -20,7 +20,7 @@ struct AcousticSurface
 
 struct AcousticGeometry
 {
-	DynArray<Vec3f, GrowthFunctions::Double> Vertices;
+	DynArray<FVec3, GrowthFunctions::Double> Vertices;
 	DynArray<uint32, GrowthFunctions::Double> Indices;
 	DynArray<uint32, GrowthFunctions::Double> TriangleSurfaces;
 	DynArray<AcousticSurface, GrowthFunctions::Double> Surfaces;
@@ -36,7 +36,7 @@ struct AcousticGeometry
 		return copy;
 	}
 
-	void AddTriangle(const Vec3f a, const Vec3f b, const Vec3f c, uint32 surface)
+	void AddTriangle(const FVec3 a, const FVec3 b, const FVec3 c, uint32 surface)
 	{
 		const uint32 base = Vertices.Size;
 
@@ -69,8 +69,8 @@ struct AcousticGeometry
 
 struct AcousticBakeSettings
 {
-	Vec3f BoundsMin = Vec3f::sZero;
-	Vec3f BoundsMax = Vec3f::sZero;
+	FVec3 BoundsMin = FVec3::sZero;
+	FVec3 BoundsMax = FVec3::sZero;
 
 	float32 ProbeSpacing = 3.0f;
 	float32 ProbeHeight = 1.5f;
@@ -94,8 +94,8 @@ struct AcousticBakeResult
 	SizedArray<uint8> Data;
 
 	uint32 ProbeCount = 0;
-	Vec3f ProbeMin = Vec3f::sZero;
-	Vec3f ProbeMax = Vec3f::sZero;
+	FVec3 ProbeMin = FVec3::sZero;
+	FVec3 ProbeMax = FVec3::sZero;
 
 	bool bHasPathing = false;
 
@@ -111,7 +111,7 @@ namespace Acoustics {
 
 static constexpr int32 scProbeOrder = 1;
 
-Vec3f ToAudioSpace(const Vec3f value);
+FVec3 ToAudioSpace(const FVec3 value);
 AcousticGeometry ToAudioSpace(const AcousticGeometry& geometry);
 
 uint32 GetMaterialPreset(const String& surface);

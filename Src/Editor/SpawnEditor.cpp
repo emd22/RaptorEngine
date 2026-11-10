@@ -19,14 +19,14 @@ float32 SpawnEditor::GetBodyHeight() { return physics::PhysicsPlayer::scStanding
 
 float32 SpawnEditor::GetEyeHeight() { return physics::PhysicsPlayer::scEyeHeight; }
 
-void SpawnEditor::Move(const Vec3f offset)
+void SpawnEditor::Move(const FVec3 offset)
 {
 	const World::PlayerSpawnPoint& spawn = gWorld->PlayerSpawn;
 
 	Push(spawn.Position + offset, spawn.Direction.Normalize(), true);
 }
 
-void SpawnEditor::Aim(const Vec3f direction)
+void SpawnEditor::Aim(const FVec3 direction)
 {
 	if (direction.Length() < scEditTolerance) {
 		return;
@@ -42,10 +42,10 @@ void SpawnEditor::ResetToDefault()
 	Push(defaults.Position, defaults.Direction, false);
 }
 
-void SpawnEditor::Push(const Vec3f position, const Vec3f direction, bool custom)
+void SpawnEditor::Push(const FVec3 position, const FVec3 direction, bool custom)
 {
 	const World::PlayerSpawnPoint& spawn = gWorld->PlayerSpawn;
-	const Vec3f direction_before = spawn.Direction.Normalize();
+	const FVec3 direction_before = spawn.Direction.Normalize();
 
 	if (position.IsCloseTo(spawn.Position, scEditTolerance) && direction.IsCloseTo(direction_before, scEditTolerance) &&
 		custom == spawn.bCustom) {
@@ -66,15 +66,15 @@ void SpawnEditor::DrawMarker(bool selected)
 		color = gEditor->GetTheme().Marker.Spawn;
 	}
 
-	const Vec3f half_extent(scHalfWidth, GetBodyHeight() * 0.5f, scHalfWidth);
-	const Vec3f body_center = spawn.Position + Vec3f(0.0f, half_extent.Y, 0.0f);
+	const FVec3 half_extent(scHalfWidth, GetBodyHeight() * 0.5f, scHalfWidth);
+	const FVec3 body_center = spawn.Position + FVec3(0.0f, half_extent.Y, 0.0f);
 
-	const Vec3f eye = spawn.Position + Vec3f(0.0f, GetEyeHeight(), 0.0f);
-	const Vec3f tip = eye + (spawn.Direction.Normalize() * scDirectionLength);
+	const FVec3 eye = spawn.Position + FVec3(0.0f, GetEyeHeight(), 0.0f);
+	const FVec3 tip = eye + (spawn.Direction.Normalize() * scDirectionLength);
 
 	renderer::gDebugDraw->WireBox(body_center, half_extent, Quat::scIdentity, color);
 	renderer::gDebugDraw->Line(eye, tip, color);
-	renderer::gDebugDraw->SolidBox(tip, Vec3f(scDirectionTipHalfExtent), Quat::scIdentity, color);
+	renderer::gDebugDraw->SolidBox(tip, FVec3(scDirectionTipHalfExtent), Quat::scIdentity, color);
 }
 
 } // namespace fx::editor

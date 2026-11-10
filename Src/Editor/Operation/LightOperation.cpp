@@ -83,9 +83,9 @@ void LightEditOperation::Destroy()
 // Light operations
 /////////////////////////////////////
 
-LightTransformOperation::LightTransformOperation(LightSpot* light, const Vec3f& position_before,
-												 const Vec3f& position_after, const Vec3f& direction_before,
-												 const Vec3f& direction_after)
+LightTransformOperation::LightTransformOperation(LightSpot* light, const FVec3& position_before,
+												 const FVec3& position_after, const FVec3& direction_before,
+												 const FVec3& direction_after)
 	: LightEditOperation(light, 1), mPositionBefore(position_before), mPositionAfter(position_after),
 	  mDirectionBefore(direction_before), mDirectionAfter(direction_after)
 {

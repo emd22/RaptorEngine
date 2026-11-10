@@ -156,34 +156,34 @@ public:
 	FX_FORCE_INLINE void NoteTopViewCommand() { ++mTopViewCommandSerial; }
 
 	void TopViewSelect(const DynArray<ObjectID>& object_ids, eTopViewSelectMode mode);
-	void TopViewMove(const Vec3f offset);
-	void TopViewRotate(const Vec3f axis, float32 angle, const Vec3f pivot, const Vec3f offset);
+	void TopViewMove(const FVec3 offset);
+	void TopViewRotate(const FVec3 axis, float32 angle, const FVec3 pivot, const FVec3 offset);
 	void TopViewMoveFaces(const DynArray<TopViewFaceRef>& faces, float32 distance);
-	void TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewVertexHandle>& handles, const Vec3f offset);
-	void TopViewCreate(eViewPlane plane, Vec3f min, Vec3f max, bool drop_to_ground);
-	void TopViewCreateRoom(eViewPlane plane, Vec3f min, Vec3f max, bool drop_to_ground, const RoomSettings& settings);
+	void TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewVertexHandle>& handles, const FVec3 offset);
+	void TopViewCreate(eViewPlane plane, FVec3 min, FVec3 max, bool drop_to_ground);
+	void TopViewCreateRoom(eViewPlane plane, FVec3 min, FVec3 max, bool drop_to_ground, const RoomSettings& settings);
 	void TopViewHollowSelection(const RoomSettings& settings);
-	void TopViewCreateArch(eViewPlane plane, DynArray<Vec3f> points, bool drop_to_ground);
-	void TopViewCreateDecal(eViewPlane plane, Vec3f min, Vec3f max, bool drop_to_ground);
-	void TopViewCreatePatch(eViewPlane plane, ePatchPrimitive primitive, Vec3f min, Vec3f max, bool drop_to_ground,
+	void TopViewCreateArch(eViewPlane plane, DynArray<FVec3> points, bool drop_to_ground);
+	void TopViewCreateDecal(eViewPlane plane, FVec3 min, FVec3 max, bool drop_to_ground);
+	void TopViewCreatePatch(eViewPlane plane, ePatchPrimitive primitive, FVec3 min, FVec3 max, bool drop_to_ground,
 							const PatchCommand& settings);
 	void TopViewPatchCommand(eViewPlane plane, const PatchCommand& command,
 							 const DynArray<TopViewVertexHandle>& handles);
-	void TopViewClip(const Vec3f point_a, const Vec3f point_b, const Vec3f view_axis);
+	void TopViewClip(const FVec3 point_a, const FVec3 point_b, const FVec3 view_axis);
 	void TopViewSubtract(bool keep_cutters);
 	void TopViewEditTextures(const DynArray<TopViewFaceRef>& faces, const TextureCommand& command);
 	void TopViewSetFaceMaterial(const DynArray<TopViewFaceRef>& faces, MaterialID material);
 	void TopViewSetPickedFaces(const DynArray<TopViewFaceRef>& faces);
 	void TopViewSelectLight(uint32 light_id);
-	void TopViewMoveLight(const Vec3f offset);
-	void TopViewAimLight(const Vec3f direction);
-	void TopViewCreateLight(const Vec3f position);
+	void TopViewMoveLight(const FVec3 offset);
+	void TopViewAimLight(const FVec3 direction);
+	void TopViewCreateLight(const FVec3 position);
 	void TopViewSelectSound(uint32 sound_id);
-	void TopViewMoveSound(const Vec3f offset);
-	void TopViewCreateSound(const Vec3f position);
+	void TopViewMoveSound(const FVec3 offset);
+	void TopViewCreateSound(const FVec3 position);
 	void TopViewSelectSpawn();
-	void TopViewMoveSpawn(const Vec3f offset);
-	void TopViewAimSpawn(const Vec3f direction);
+	void TopViewMoveSpawn(const FVec3 offset);
+	void TopViewAimSpawn(const FVec3 direction);
 	void TopViewRespawn();
 	void TopViewToggleSubview();
 	void TopViewDelete();
@@ -196,13 +196,13 @@ public:
 
 	uint32 SnapSelectionToGrid();
 
-	Object* CreateWorldBox(const Vec3f min, const Vec3f max);
+	Object* CreateWorldBox(const FVec3 min, const FVec3 max);
 	Object* CreateWorldPatch(Patch&& world_patch, int32 group_size = 1, MaterialID material = MaterialID::scNull);
 	void FitDBoundsToLevel();
 
 	FX_FORCE_INLINE bool IsSpawnSelected() const { return mbSpawnSelected; }
 
-	bool ClipObject(Object* object, const Vec3f point_a, const Vec3f point_b, const Vec3f direction);
+	bool ClipObject(Object* object, const FVec3 point_a, const FVec3 point_b, const FVec3 direction);
 
 	uint32 SubtractSelection(bool keep_cutters);
 
@@ -220,9 +220,9 @@ public:
 	float32 GetSnapStep() const;
 
 	/// Rounds a position (or a distance) to the snap step, if snapping is on
-	Vec3f SnapToGrid(const Vec3f position) const;
+	FVec3 SnapToGrid(const FVec3 position) const;
 
-	Vec3f RoundToGrid(const Vec3f position) const;
+	FVec3 RoundToGrid(const FVec3 position) const;
 
 	float32 GetAngleSnapStep() const;
 
@@ -272,7 +272,7 @@ public:
 	void SetFog(const renderer::FogSettings& fog);
 
 	/// Creates a data brush of the kind the filter is set to, filling a world space box
-	Object* CreateDataBrush(const Brush::PlaneList& planes, const Vec3f position);
+	Object* CreateDataBrush(const Brush::PlaneList& planes, const FVec3 position);
 	uint32 SetSelectionReflectionProbe(bool enabled);
 
 	uint32 SetSelectionObjectState(eObjectTag tag, bool enabled);
@@ -280,7 +280,7 @@ public:
 
 	uint32 SetSelectionScript(const String& path);
 
-	uint32 SetSelectionEnterDirection(const Vec3f local_direction);
+	uint32 SetSelectionEnterDirection(const FVec3 local_direction);
 
 	bool CanRenameObject(const Object* object) const;
 	bool RenameObject(Object* object, const String& name);
@@ -416,8 +416,8 @@ private:
 
 	eEditorView mView = eEditorView::Viewport;
 	bool mbHasCreateReference = false;
-	Vec3f mCreateReferenceMin = Vec3f::sZero;
-	Vec3f mCreateReferenceMax = Vec3f::sZero;
+	FVec3 mCreateReferenceMin = FVec3::sZero;
+	FVec3 mCreateReferenceMax = FVec3::sZero;
 
 	eEditorView mViewBeforeCompiledMap = eEditorView::Viewport;
 	bool mbViewLockedByCompiledMap = false;
@@ -449,7 +449,7 @@ private:
 	{
 		TopViewFaceRef Face;
 		Ref<PrimitiveMesh> pMesh;
-		SizedArray<Vec3f> Vertices;
+		SizedArray<FVec3> Vertices;
 	};
 
 	DynArray<PickedFaceOverlay, GrowthFunctions::Double> mPickedFaces;

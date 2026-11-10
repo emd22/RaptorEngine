@@ -83,7 +83,7 @@ void WorldGrid::Create(const Vec2u grid_size)
 	Vec2u half_grid = grid_size / Vec2u(2U);
 
 	// Center the grid about zero.
-	mPositionOffset = ((Vec3f(half_grid.X, 0.0f, half_grid.Y) * Vec3f(mTileSize.X, 0.0f, mTileSize.Y)));
+	mPositionOffset = ((FVec3(half_grid.X, 0.0f, half_grid.Y) * FVec3(mTileSize.X, 0.0f, mTileSize.Y)));
 }
 
 void WorldGrid::GetObjectTileRect(Object* object, TileIndex* out_start, Vec2u* out_span) const
@@ -606,7 +606,7 @@ void WorldGrid::MarkObjectDirty(const Object* object)
 	}
 }
 
-bool WorldGrid::HasChangedSince(const Vec3f center, float32 radius, uint64 serial) const
+bool WorldGrid::HasChangedSince(const FVec3 center, float32 radius, uint64 serial) const
 {
 	if (GlobalTile.ChangeSerial > serial) {
 		return true;
@@ -629,9 +629,9 @@ bool WorldGrid::HasChangedSince(const Vec3f center, float32 radius, uint64 seria
 	return false;
 }
 
-void WorldGrid::GetSphereTileRange(const Vec3f center, float32 radius, Vec2u* out_min, Vec2u* out_max) const
+void WorldGrid::GetSphereTileRange(const FVec3 center, float32 radius, Vec2u* out_min, Vec2u* out_max) const
 {
-	const Vec3f extent(radius, radius, radius);
+	const FVec3 extent(radius, radius, radius);
 
 	*out_min = TileToTileXY(WorldToTile(center - extent));
 	*out_max = TileToTileXY(WorldToTile(center + extent));
@@ -701,14 +701,14 @@ Vec2u WorldGrid::TileToTileXY(TileIndex tile_index) const
 	return Vec2u(tile_x, tile_y);
 }
 
-Vec3f WorldGrid::GetTileWorldPosition(TileIndex tile_index) const
+FVec3 WorldGrid::GetTileWorldPosition(TileIndex tile_index) const
 {
 	return TileXYToWorldCenter(TileToTileXY(tile_index));
 }
 
-Vec3f WorldGrid::TileXYToWorldCenter(Vec2u tile_xy) const
+FVec3 WorldGrid::TileXYToWorldCenter(Vec2u tile_xy) const
 {
-	return Vec3f((static_cast<float32>(tile_xy.X) * mTileSize.X) - mPositionOffset.X + (mTileSize.X * 0.5f),
+	return FVec3((static_cast<float32>(tile_xy.X) * mTileSize.X) - mPositionOffset.X + (mTileSize.X * 0.5f),
 				 mPositionOffset.Y,
 				 (static_cast<float32>(tile_xy.Y) * mTileSize.Y) - mPositionOffset.Z + (mTileSize.Y * 0.5f));
 }
@@ -745,9 +745,9 @@ TileIndex WorldGrid::TileFromTileXY(const Vec2u& xy) const
 	return std::min(xy.Y, mGridSize.Y - 1) * mGridSize.X + std::min(xy.X, mGridSize.X - 1);
 }
 
-TileIndex WorldGrid::WorldToTile(const Vec3f position) const
+TileIndex WorldGrid::WorldToTile(const FVec3 position) const
 {
-	const Vec3f adjusted = position + mPositionOffset;
+	const FVec3 adjusted = position + mPositionOffset;
 	const int32 tile_x = static_cast<int>(std::floor(adjusted.X / mTileSize.X));
 	const int32 tile_z = static_cast<int>(std::floor(adjusted.Z / mTileSize.Y));
 

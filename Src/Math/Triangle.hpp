@@ -7,9 +7,9 @@
 
 #pragma once
 
+#include "DVec3.hpp"
+#include "FVec3.hpp"
 #include "SIMDHelper.hpp"
-#include "Vec3.hpp"
-#include "Vec3d.hpp"
 
 namespace fx {
 
@@ -49,8 +49,8 @@ public:
 		const TVectorType axes[3] = { TVectorType { 1.0, 0.0, 0.0 }, TVectorType { 0.0, 1.0, 0.0 },
 									  TVectorType { 0.0, 0.0, 1.0 } };
 
-		for (const Vec3d edge : edges) {
-			for (const Vec3d box_axis : axes) {
+		for (const DVec3 edge : edges) {
+			for (const DVec3 box_axis : axes) {
 				const DOUBLE4 axis = box_axis.Cross(edge).mIntrin;
 
 				const double p0 = tri.Points[0].Dot(axis);
@@ -108,7 +108,7 @@ public:
 	TVectorType Points[3] {};
 };
 
-using FTriangle = Triangle<Vec3f>;
-using DTriangle = Triangle<Vec3d>;
+using FTriangle = Triangle<FVec3>;
+using DTriangle = Triangle<DVec3>;
 
 } // namespace fx

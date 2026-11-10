@@ -42,7 +42,7 @@ struct NPCTuning;
 // 	EditorModeMoveCollider() = delete;
 // 	EditorModeMoveCollider(Ref<FPSCamera> camera) { this->pCamera = camera; }
 
-// 	void Update(const World& scene, const Vec3f movement_vector) override;
+// 	void Update(const World& scene, const FVec3 movement_vector) override;
 // 	void OnLeave(const World& scene) override;
 
 // 	~EditorModeMoveCollider() override {};
@@ -55,7 +55,7 @@ struct NPCTuning;
 // 	EditorModeScaleCollider() = delete;
 // 	EditorModeScaleCollider(Ref<FPSCamera> camera) { this->pCamera = camera; }
 
-// 	void Update(const World& scene, const Vec3f movement_vector) override;
+// 	void Update(const World& scene, const FVec3 movement_vector) override;
 // 	void OnLeave(const World& scene) override;
 
 // 	~EditorModeScaleCollider() override {};

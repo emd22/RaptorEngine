@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Core/Types.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 
 namespace fx {
 
@@ -17,18 +17,18 @@ public:
 public:
 	virtual ~BaseController() = default;
 
-	virtual Vec3f Update(double delta_time, const Vec3f input, const PerspectiveCamera& camera, bool sprinting) = 0;
+	virtual FVec3 Update(double delta_time, const FVec3 input, const PerspectiveCamera& camera, bool sprinting) = 0;
 
 	virtual void Reset()
 	{
-		mVelocity = Vec3f::sZero;
-		mGoal = Vec3f::sZero;
+		mVelocity = FVec3::sZero;
+		mGoal = FVec3::sZero;
 	}
 
-	void SetVelocity(const Vec3f velocity) { mVelocity = velocity; }
+	void SetVelocity(const FVec3 velocity) { mVelocity = velocity; }
 
-	const Vec3f GetVelocity() const { return mVelocity; }
-	const Vec3f GetGoal() const { return mGoal; }
+	const FVec3 GetVelocity() const { return mVelocity; }
+	const FVec3 GetGoal() const { return mGoal; }
 
 	float32 GetMaxSpeed(bool sprinting) const;
 
@@ -39,7 +39,7 @@ protected:
 	/**
 	 * @brief Applies direction to the velocity.
 	 */
-	void Accelerate(const Vec3f direction, double delta_time, bool sprinting);
+	void Accelerate(const FVec3 direction, double delta_time, bool sprinting);
 
 public:
 	float32 Speed = scDefaultSpeed;
@@ -50,8 +50,8 @@ public:
 	float32 GravityMultiplier = 1.0f;
 
 protected:
-	Vec3f mVelocity = Vec3f::sZero;
-	Vec3f mGoal = Vec3f::sZero;
+	FVec3 mVelocity = FVec3::sZero;
+	FVec3 mGoal = FVec3::sZero;
 };
 
 } // namespace fx

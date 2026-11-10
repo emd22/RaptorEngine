@@ -43,8 +43,8 @@ static eVertexType ChooseVertexType(bool has_default_data, bool has_skinning, eV
 	return type;
 }
 
-void VertexList::CreateFrom(const SizedArray<Vec3f>& positions, const SizedArray<Vec3f>& normals,
-							const SizedArray<Vec2f>& uvs, const SizedArray<Vec3f>& tangents,
+void VertexList::CreateFrom(const SizedArray<FVec3>& positions, const SizedArray<FVec3>& normals,
+							const SizedArray<Vec2f>& uvs, const SizedArray<FVec3>& tangents,
 							const SizedArray<Vec4f>& bone_weights, const SizedArray<Vec4u>& bone_ids,
 							eVertexCreateFlags create_flags, const SizedArray<float32>& tangent_handedness)
 {
@@ -82,9 +82,9 @@ void VertexList::CreateFrom(const SizedArray<Vec3f>& positions, const SizedArray
 		}
 
 		if (supports_default) {
-			WriteOrZeroVec<float32, Vec3f, 3>(vertex.Normal, normals, vertex_index, has_normals);
+			WriteOrZeroVec<float32, FVec3, 3>(vertex.Normal, normals, vertex_index, has_normals);
 			WriteOrZeroVec<float32, Vec2f, 2>(vertex.UV, uvs, vertex_index, has_uvs);
-			WriteOrZeroVec<float32, Vec3f, 3>(vertex.Tangent, tangents, vertex_index, has_tangents);
+			WriteOrZeroVec<float32, FVec3, 3>(vertex.Tangent, tangents, vertex_index, has_tangents);
 
 			vertex.Tangent[3] = has_handedness ? tangent_handedness[vertex_index] : 1.0f;
 
@@ -191,7 +191,7 @@ void VertexList::CreateSlimFrom(const SizedArray<float32>& positions, eVertexCre
 	}
 }
 
-void VertexList::CreateSlimFrom(const SizedArray<Vec3f>& positions, eVertexCreateFlags create_flags)
+void VertexList::CreateSlimFrom(const SizedArray<FVec3>& positions, eVertexCreateFlags create_flags)
 {
 	Assert(positions.Size > 0);
 

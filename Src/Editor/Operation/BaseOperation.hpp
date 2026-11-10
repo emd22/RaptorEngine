@@ -14,8 +14,8 @@
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
 #include <Material/MaterialID.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Quat.hpp>
-#include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
 #include <Patch.hpp>
 #include <Renderer/LightID.hpp>
@@ -80,7 +80,7 @@ private:
  */
 struct ObjectSnapshot
 {
-	Vec3f Position = Vec3f::sZero;
+	FVec3 Position = FVec3::sZero;
 	MaterialID Material = MaterialID::scNull;
 	Quat Rotation = Quat::scIdentity;
 	Name ObjectName;
@@ -97,7 +97,7 @@ struct ObjectSnapshot
 
 	String ScriptPath;
 
-	Vec3f EnterDirection = Vec3f::sZero;
+	FVec3 EnterDirection = FVec3::sZero;
 
 	/// So that undoing the delete of a placed subview brings its brushes back as that subview
 	uint32 SubviewInstance = 0;
@@ -119,8 +119,8 @@ struct ObjectSnapshot
 struct LightSnapshot
 {
 	Name LightName;
-	Vec3f Position = Vec3f::sZero;
-	Vec3f Direction = Vec3f::sForward;
+	FVec3 Position = FVec3::sZero;
+	FVec3 Direction = FVec3::sForward;
 	float32 Radius = 5.0f;
 
 	float32 InnerAngle = 0.0f;

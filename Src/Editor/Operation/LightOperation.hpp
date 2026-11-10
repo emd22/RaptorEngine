@@ -19,17 +19,17 @@ namespace editor {
 class LightTransformOperation final : public LightEditOperation
 {
 public:
-	LightTransformOperation(LightSpot* light, const Vec3f& position_before, const Vec3f& position_after,
-							const Vec3f& direction_before, const Vec3f& direction_after);
+	LightTransformOperation(LightSpot* light, const FVec3& position_before, const FVec3& position_after,
+							const FVec3& direction_before, const FVec3& direction_after);
 
 	void Execute(EditorSelection& selection) override;
 	void Undo(EditorSelection& selection) override;
 
 private:
-	Vec3f mPositionBefore;
-	Vec3f mPositionAfter;
-	Vec3f mDirectionBefore;
-	Vec3f mDirectionAfter;
+	FVec3 mPositionBefore;
+	FVec3 mPositionAfter;
+	FVec3 mDirectionBefore;
+	FVec3 mDirectionAfter;
 };
 
 /**

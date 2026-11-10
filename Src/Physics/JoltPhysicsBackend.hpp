@@ -12,8 +12,8 @@
 #include <Core/MemberRef.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/MathUtil.hpp>
-#include <Math/Vec3.hpp>
 #include <algorithm>
 #include <atomic>
 #include <mutex>
@@ -188,13 +188,13 @@ struct RagdollContact
 	JPH::BodyID Body {};
 	JPH::BodyID OtherBody {};
 
-	Vec3f Point = Vec3f::sZero;
-	Vec3f Normal = Vec3f::sZero;
+	FVec3 Point = FVec3::sZero;
+	FVec3 Normal = FVec3::sZero;
 
 	float32 Speed = 0.0f;
 
 	float32 OtherSpeed = 0.0f;
-	Vec3f OtherVelocity = Vec3f::sZero;
+	FVec3 OtherVelocity = FVec3::sZero;
 	float32 OtherMass = 0.0f;
 
 	bool bOtherStatic = false;
@@ -206,8 +206,8 @@ struct RagdollContact
 
 struct SoundImpact
 {
-	Vec3f Point = Vec3f::sZero;
-	Vec3f Normal = Vec3f::sZero;
+	FVec3 Point = FVec3::sZero;
+	FVec3 Normal = FVec3::sZero;
 	float32 Speed = 0.0f;
 	JPH::BodyID MovingBody {};
 	JPH::BodyID SurfaceBody {};
@@ -220,8 +220,8 @@ struct BodyGroundContact
 	static constexpr uint32 scMaxPoints = 8;
 
 	uint32 Count = 0;
-	Vec3f Point = Vec3f::sZero;
-	Vec3f Normal = Vec3f::sZero;
+	FVec3 Point = FVec3::sZero;
+	FVec3 Normal = FVec3::sZero;
 	float32 Speed = 0.0f;
 
 	/// Friction the solver uses between this body and the surface
@@ -293,8 +293,8 @@ public:
 		}
 
 		out_contact.Count = accum.Count;
-		out_contact.Point = Vec3f(accum.PointSum / static_cast<float32>(accum.Count));
-		out_contact.Normal = Vec3f(accum.NormalSum.Normalized());
+		out_contact.Point = FVec3(accum.PointSum / static_cast<float32>(accum.Count));
+		out_contact.Normal = FVec3(accum.NormalSum.Normalized());
 		out_contact.Speed = accum.Speed;
 		out_contact.Friction = accum.Friction;
 		out_contact.PointCount = std::min(accum.PointTotal, BodyGroundContact::scMaxPoints);
@@ -355,11 +355,11 @@ public:
 		RagdollContact contact;
 		contact.Body = ragdoll_body.GetID();
 		contact.OtherBody = other_body.GetID();
-		contact.Point = Vec3f(point.GetX(), point.GetY(), point.GetZ());
-		contact.Normal = Vec3f(normal.GetX(), normal.GetY(), normal.GetZ());
+		contact.Point = FVec3(point.GetX(), point.GetY(), point.GetZ());
+		contact.Normal = FVec3(normal.GetX(), normal.GetY(), normal.GetZ());
 		contact.Speed = closing;
 		contact.OtherSpeed = other_velocity.Dot(normal);
-		contact.OtherVelocity = Vec3f(other_velocity.GetX(), other_velocity.GetY(), other_velocity.GetZ());
+		contact.OtherVelocity = FVec3(other_velocity.GetX(), other_velocity.GetY(), other_velocity.GetZ());
 		contact.bOtherStatic = other_body.IsStatic();
 		contact.RagdollSerial = RagdollUserData::GetSerial(ragdoll_body.GetUserData());
 
@@ -507,17 +507,17 @@ private:
 		const bool second_is_surface = !inBody2.IsDynamic() || inBody1.IsDynamic();
 
 		SoundImpact impact;
-		impact.Point = Vec3f(point.GetX(), point.GetY(), point.GetZ());
+		impact.Point = FVec3(point.GetX(), point.GetY(), point.GetZ());
 		impact.Speed = speed;
 
 		if (second_is_surface) {
-			impact.Normal = Vec3f(-normal.GetX(), -normal.GetY(), -normal.GetZ());
+			impact.Normal = FVec3(-normal.GetX(), -normal.GetY(), -normal.GetZ());
 			impact.MovingBody = inBody1.GetID();
 			impact.SurfaceBody = inBody2.GetID();
 			impact.SurfaceSubShape = inManifold.mSubShapeID2;
 		}
 		else {
-			impact.Normal = Vec3f(normal.GetX(), normal.GetY(), normal.GetZ());
+			impact.Normal = FVec3(normal.GetX(), normal.GetY(), normal.GetZ());
 			impact.MovingBody = inBody2.GetID();
 			impact.SurfaceBody = inBody1.GetID();
 			impact.SurfaceSubShape = inManifold.mSubShapeID1;
@@ -556,9 +556,9 @@ public:
 struct RayResult
 {
 	bool bHit = false;
-	Vec3f Point = Vec3f::sZero;
+	FVec3 Point = FVec3::sZero;
 	/// World space normal of the surface at `Point`, facing back towards the ray
-	Vec3f Normal = Vec3f::sZero;
+	FVec3 Normal = FVec3::sZero;
 	JPH::BodyID Body {};
 	JPH::SubShapeID SubShape {};
 };
@@ -581,13 +581,13 @@ public:
 
 	void OptimizeBroadPhase();
 
-	RayResult Raycast(const Vec3f origin, const Vec3f direction, JPH::BodyID ignore_body = JPH::BodyID()) const;
-	RayResult RaycastStatic(const Vec3f origin, const Vec3f direction) const;
+	RayResult Raycast(const FVec3 origin, const FVec3 direction, JPH::BodyID ignore_body = JPH::BodyID()) const;
+	RayResult RaycastStatic(const FVec3 origin, const FVec3 direction) const;
 	/// For use inside a physics step, where the locking queries aren't allowed
-	RayResult RaycastStaticNoLock(const Vec3f origin, const Vec3f direction) const;
-	SizedArray<JPH::BodyID> RaycastObjects(const Vec3f origin, const Vec3f direction) const;
+	RayResult RaycastStaticNoLock(const FVec3 origin, const FVec3 direction) const;
+	SizedArray<JPH::BodyID> RaycastObjects(const FVec3 origin, const FVec3 direction) const;
 
-	FLOAT4 RaycastGetFaceOfBox(JPH::Body* body, const Vec3f origin, const Vec3f direction) const;
+	FLOAT4 RaycastGetFaceOfBox(JPH::Body* body, const FVec3 origin, const FVec3 direction) const;
 
 	FX_FORCE_INLINE JPH::BodyInterface& GetBodyInterface() { return PhysicsSystem.GetBodyInterface(); }
 

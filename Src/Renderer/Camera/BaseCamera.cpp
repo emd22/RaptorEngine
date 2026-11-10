@@ -8,9 +8,9 @@ void BaseCamera::RebuildViewMatrix()
 {
 	Mat4f basis = Mat4f::AsRotation(mRotation);
 
-	const Vec3f right { basis.Rows[0] };
-	const Vec3f up { basis.Rows[1] };
-	const Vec3f forward { basis.Rows[2] };
+	const FVec3 right { basis.Rows[0] };
+	const FVec3 up { basis.Rows[1] };
+	const FVec3 forward { basis.Rows[2] };
 
 	// Note, not identity row (0.0, 0.0, 0.0, 1.0) as we sub the 1.0 in at the end
 	basis.Rows[3] = Vec4f(0.0f);
@@ -25,7 +25,7 @@ void BaseCamera::RebuildViewMatrix()
 	mbTransformDirty = false;
 }
 
-static Quat QuatFromBasis(const Vec3f right, const Vec3f up, const Vec3f forward)
+static Quat QuatFromBasis(const FVec3 right, const FVec3 up, const FVec3 forward)
 {
 	const float32 trace = right.X + up.Y + forward.Z;
 
@@ -48,14 +48,14 @@ static Quat QuatFromBasis(const Vec3f right, const Vec3f up, const Vec3f forward
 	return Quat((right.Z + forward.X) / s, (up.Z + forward.Y) / s, 0.25f * s, (right.Y - up.X) / s);
 }
 
-void BaseCamera::LookAt(const Vec3f target, const Vec3f up)
+void BaseCamera::LookAt(const FVec3 target, const FVec3 up)
 {
-	const Vec3f forward = (target - mPosition).Normalize();
+	const FVec3 forward = (target - mPosition).Normalize();
 
-	Vec3f right = up.Cross(forward);
+	FVec3 right = up.Cross(forward);
 
 	if (right.Dot(right) < 1e-8f) {
-		right = Vec3f::sForward.Cross(forward);
+		right = FVec3::sForward.Cross(forward);
 	}
 
 	right.NormalizeIP();

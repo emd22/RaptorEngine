@@ -5,7 +5,7 @@
 
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 #include <cstdio>
 
 namespace fx {
@@ -101,9 +101,9 @@ private:
 		float32 PeakLimitExcess = 0.0f;
 		uint32 LimitFrames = 0;
 		float32 PeakJointGap = 0.0f;
-		Vec3f HitBodyStart = Vec3f::sZero;
-		Vec3f CenterStart = Vec3f::sZero;
-		Vec3f ChestLeanStart = Vec3f::sZero;
+		FVec3 HitBodyStart = FVec3::sZero;
+		FVec3 CenterStart = FVec3::sZero;
+		FVec3 ChestLeanStart = FVec3::sZero;
 		float32 YawStart = 0.0f;
 		float32 HitBodyMove = 0.0f;
 		float32 CenterMove[3] = {};
@@ -112,7 +112,7 @@ private:
 		float32 ExpectedYaw = 0.0f;
 		float32 LeverHeight = 0.0f;
 		float32 PeakRootJitter = 0.0f;
-		Vec3f PelvisHistory[2] = { Vec3f::sZero, Vec3f::sZero };
+		FVec3 PelvisHistory[2] = { FVec3::sZero, FVec3::sZero };
 		uint32 RestFrame = 0;
 		/// Times the head turned back on itself against the chest, sideways and forwards, up to a fall and after it
 		uint32 HeadSwings[2] = {};
@@ -127,17 +127,17 @@ private:
 		bool bStarted = false;
 		int32 AirFrames = 0;
 		int32 TakeoffFrame = 0;
-		Vec3f TakeoffPosition = Vec3f::sZero;
-		Vec3f LastPosition = Vec3f::sZero;
+		FVec3 TakeoffPosition = FVec3::sZero;
+		FVec3 LastPosition = FVec3::sZero;
 		float32 StanceHeight = 0.0f;
 		float32 Slide = 0.0f;
 		/// Furthest the contact point has slipped since this foot took at least a third of the body's weight. Slide
 		/// adds up the foot's own movement, so rocking and rolling count there. Here they don't, since a roll leaves
 		/// the contact point still
 		float32 LoadedSlide = 0.0f;
-		Vec3f LoadedSlip = Vec3f::sZero;
+		FVec3 LoadedSlip = FVec3::sZero;
 		bool bLoaded = false;
-		Vec3f AirVelocity = Vec3f::sZero;
+		FVec3 AirVelocity = FVec3::sZero;
 	};
 
 	struct TrialRun
@@ -148,9 +148,9 @@ private:
 		uint32 ShotsFired = 0;
 
 		uint64 Hash = 14695981039346656037ULL;
-		Vec3f PreviousCenter = Vec3f::sZero;
-		Vec3f PreHitVelocity = Vec3f::sZero;
-		Vec3f HitOrigin = Vec3f::sZero;
+		FVec3 PreviousCenter = FVec3::sZero;
+		FVec3 PreHitVelocity = FVec3::sZero;
+		FVec3 HitOrigin = FVec3::sZero;
 
 		int32 FallFrame = -1;
 		int32 ReturnFrame = -1;
@@ -229,11 +229,11 @@ private:
 
 	void CreateFloor();
 	/// Builds the trial's terrain around a position on the floor and returns how far above the floor the NPC starts
-	float32 CreateTerrain(const Trial& trial, const Vec3f position);
-	void AddTerrainBox(const Vec3f position, const Vec3f direction, float32 near_distance, float32 far_distance,
+	float32 CreateTerrain(const Trial& trial, const FVec3 position);
+	void AddTerrainBox(const FVec3 position, const FVec3 direction, float32 near_distance, float32 far_distance,
 					   float32 top);
 	/// A slope going away from the position, its top face passing through the near end at the given height
-	void AddTerrainRamp(const Vec3f position, const Vec3f direction, float32 near_distance, float32 near_height,
+	void AddTerrainRamp(const FVec3 position, const FVec3 direction, float32 near_distance, float32 near_height,
 						float32 length, float32 pitch);
 	void RemoveTerrain();
 	bool StartNextBatch();

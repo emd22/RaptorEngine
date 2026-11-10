@@ -22,8 +22,8 @@ struct IndirectInput
 
 	const uint8* pCovered = nullptr;
 	const uint8* pSunVisibility = nullptr;
-	const Vec3f* pPositions = nullptr;
-	const Vec3f* pNormals = nullptr;
+	const FVec3* pPositions = nullptr;
+	const FVec3* pNormals = nullptr;
 
 	/// The brush planes of the map, for the water volumes
 	const PlaneSet* pPlanes = nullptr;

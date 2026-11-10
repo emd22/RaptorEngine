@@ -16,9 +16,9 @@ namespace fx::mapc {
 
 struct PatchSurfaceVertex
 {
-	Vec3d Position = Vec3d(0.0);
-	Vec3d Normal = Vec3d(0.0);
-	Vec3d Tangent = Vec3d(0.0);
+	DVec3 Position = DVec3(0.0);
+	DVec3 Normal = DVec3(0.0);
+	DVec3 Tangent = DVec3(0.0);
 	double Handedness = 1.0;
 	Vec2d Texcoord = Vec2d(0.0, 0.0);
 	Vec2d Chart = Vec2d(0.0, 0.0);
@@ -66,8 +66,8 @@ public:
 public:
 	Array<PatchSurface> Surfaces;
 
-	Array<Vec3d> ReferencePoints;
-	Array<Vec3d> ReferenceFacings;
+	Array<DVec3> ReferencePoints;
+	Array<DVec3> ReferenceFacings;
 
 	PatchStats Stats;
 

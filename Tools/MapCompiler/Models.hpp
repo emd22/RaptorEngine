@@ -17,8 +17,8 @@ namespace fx::mapc {
 
 struct ModelVertex
 {
-	Vec3d Position = Vec3d(0.0);
-	Vec3d Normal = Vec3d(0.0);
+	DVec3 Position = DVec3(0.0);
+	DVec3 Normal = DVec3(0.0);
 	Vec2f Texcoord = Vec2f(0.0f, 0.0f);
 };
 

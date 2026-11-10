@@ -11,8 +11,8 @@ class SpawnTransformOperation final : public EditOperation
 public:
 	struct State
 	{
-		Vec3f Position = Vec3f::sZero;
-		Vec3f Direction = Vec3f::sForward;
+		FVec3 Position = FVec3::sZero;
+		FVec3 Direction = FVec3::sForward;
 		bool bCustom = false;
 	};
 

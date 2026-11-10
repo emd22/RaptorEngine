@@ -1,8 +1,8 @@
 #pragma once
 
+#include <Math/FVec3.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/Quat.hpp>
-#include <Math/Vec3.hpp>
 #include <Object/ObjectLayer.hpp>
 #include <algorithm>
 #include <cassert>
@@ -40,7 +40,7 @@ class BaseCamera
 {
 public:
 	BaseCamera() = default;
-	BaseCamera(const Vec3f position, const Quat rotation, float32 z_near, float32 z_far)
+	BaseCamera(const FVec3 position, const Quat rotation, float32 z_near, float32 z_far)
 		: mPosition(position), mRotation(rotation), mZNearClip(z_near), mZFarClip(z_far)
 	{
 		// Since Raptor uses reverse-Z, the far plane must be smaller than the near plane.
@@ -49,9 +49,9 @@ public:
 
 	virtual bool Update() = 0;
 
-	FX_FORCE_INLINE Vec3f GetForwardVector() const { return mRotation.GetDirection(); }
-	FX_FORCE_INLINE Vec3f GetRightVector() const { return Vec3f::sRight.Rotate(mRotation); }
-	FX_FORCE_INLINE Vec3f GetUpVector() const { return Vec3f::sUp.Rotate(mRotation); }
+	FX_FORCE_INLINE FVec3 GetForwardVector() const { return mRotation.GetDirection(); }
+	FX_FORCE_INLINE FVec3 GetRightVector() const { return FVec3::sRight.Rotate(mRotation); }
+	FX_FORCE_INLINE FVec3 GetUpVector() const { return FVec3::sUp.Rotate(mRotation); }
 
 	FX_FORCE_INLINE void SetClip(float32 z_near, float32 z_far)
 	{
@@ -64,23 +64,23 @@ public:
 	 * @brief Returns forward facing vector, disregarding influence from the Y axis. This is to prevent pitch from
 	 * slowing down player movement for example.
 	 */
-	FX_FORCE_INLINE Vec3f GetFlatForwardVector() const { return GetRightVector().Cross(Vec3f::sUp).Normalize(); }
+	FX_FORCE_INLINE FVec3 GetFlatForwardVector() const { return GetRightVector().Cross(FVec3::sUp).Normalize(); }
 
 	/**
 	 * @brief Returns right facing vector, disregarding influence from the Y axis.
 	 */
-	FX_FORCE_INLINE Vec3f GetFlatRightVector() const { return Vec3f::sUp.Cross(GetFlatForwardVector()); }
+	FX_FORCE_INLINE FVec3 GetFlatRightVector() const { return FVec3::sUp.Cross(GetFlatForwardVector()); }
 
 	/**
 	 * @brief Moves the camera in world space, disregarding any directionality.
 	 */
-	FX_FORCE_INLINE void MoveWS(const Vec3f offset)
+	FX_FORCE_INLINE void MoveWS(const FVec3 offset)
 	{
 		mPosition += offset;
 		mbTransformDirty = true;
 	}
 
-	FX_FORCE_INLINE void SetPosition(const Vec3f position)
+	FX_FORCE_INLINE void SetPosition(const FVec3 position)
 	{
 		mPosition = position;
 		mbTransformDirty = true;
@@ -93,10 +93,10 @@ public:
 		mbTransformDirty = true;
 	}
 
-	FX_FORCE_INLINE Vec3f GetPosition() const { return mPosition; }
+	FX_FORCE_INLINE FVec3 GetPosition() const { return mPosition; }
 	FX_FORCE_INLINE Quat GetRotation() const { return mRotation; }
 
-	void LookAt(const Vec3f target, const Vec3f up = Vec3f::sUp);
+	void LookAt(const FVec3 target, const FVec3 up = FVec3::sUp);
 
 	virtual const Mat4f& GetCameraMatrix(eObjectLayer layer) const { return mCameraMatrix; }
 
@@ -118,7 +118,7 @@ protected:
 	Mat4f mProjectionMatrix = Mat4f::scIdentity;
 	Mat4f mViewMatrix = Mat4f::scIdentity;
 
-	Vec3f mPosition = Vec3f::sZero;
+	FVec3 mPosition = FVec3::sZero;
 	Quat mRotation = Quat::scIdentity;
 
 

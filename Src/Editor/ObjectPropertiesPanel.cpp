@@ -26,14 +26,14 @@ namespace fx::editor {
 struct EnterDirectionChoice
 {
 	const char* pName;
-	Vec3f Direction;
+	FVec3 Direction;
 };
 
 static const EnterDirectionChoice scEnterDirections[] = {
-	{ "Any", Vec3f(0.0f, 0.0f, 0.0f) },		   { "+X (right)", Vec3f(1.0f, 0.0f, 0.0f) },
-	{ "-X (left)", Vec3f(-1.0f, 0.0f, 0.0f) }, { "+Y (up)", Vec3f(0.0f, 1.0f, 0.0f) },
-	{ "-Y (down)", Vec3f(0.0f, -1.0f, 0.0f) }, { "+Z (forward)", Vec3f(0.0f, 0.0f, 1.0f) },
-	{ "-Z (back)", Vec3f(0.0f, 0.0f, -1.0f) },
+	{ "Any", FVec3(0.0f, 0.0f, 0.0f) },		   { "+X (right)", FVec3(1.0f, 0.0f, 0.0f) },
+	{ "-X (left)", FVec3(-1.0f, 0.0f, 0.0f) }, { "+Y (up)", FVec3(0.0f, 1.0f, 0.0f) },
+	{ "-Y (down)", FVec3(0.0f, -1.0f, 0.0f) }, { "+Z (forward)", FVec3(0.0f, 0.0f, 1.0f) },
+	{ "-Z (back)", FVec3(0.0f, 0.0f, -1.0f) },
 };
 
 static constexpr int32 scNumEnterDirections = static_cast<int32>(std::size(scEnterDirections));
@@ -348,7 +348,7 @@ void ObjectPropertiesPanel::OnEnterDirectionChoice(wxCommandEvent& event)
 		return;
 	}
 
-	const Vec3f direction = scEnterDirections[selection].Direction;
+	const FVec3 direction = scEnterDirections[selection].Direction;
 
 	thread::PostToGame([direction] { gEditor->SetSelectionEnterDirection(direction); });
 }

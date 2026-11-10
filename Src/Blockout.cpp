@@ -90,12 +90,12 @@ static void WriteScriptEntry(ConfigEntry& entry, const Object* object)
 static void ReadTriggerEntry(Object* object, const ConfigEntry& entry)
 {
 	gObjectScripts->SetRequiredEnterDirection(object->ID,
-											  entry.GetMemberValue<Vec3f>(HashStr32("enter_dir"), Vec3f::sZero));
+											  entry.GetMemberValue<FVec3>(HashStr32("enter_dir"), FVec3::sZero));
 }
 
 static void WriteTriggerEntry(ConfigEntry& entry, const Object* object)
 {
-	Vec3f direction;
+	FVec3 direction;
 
 	if (gObjectScripts->TryGetRequiredEnterDirection(object->ID, direction)) {
 		entry.AddMember(ConfigEntry::Literal("enter_dir", direction));
@@ -167,7 +167,7 @@ void Blockout::Create(World* world)
 
 		pWorld->Attach(ticket);
 
-		pXFormObject->SetPosition(Vec3f(200.0f));
+		pXFormObject->SetPosition(FVec3(200.0f));
 	}
 
 	{
@@ -177,7 +177,7 @@ void Blockout::Create(World* world)
 		pPreviewObject->SetProbeVisible(false);
 
 		// Needs a mesh to be added to the world; ShowPreview() replaces it
-		Brush brush = Brush::FromBox(Vec3f(-0.25f), Vec3f(0.25f));
+		Brush brush = Brush::FromBox(FVec3(-0.25f), FVec3(0.25f));
 		Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
 		brush.GenerateMesh(mesh->Positions, mesh->Normals, mesh->Tangents, mesh->TangentHandedness, mesh->Texcoords,
 						   mesh->Indices);
@@ -205,7 +205,7 @@ static physics::eMotionType GetMotionType(const Object* object)
 	return (body != nullptr) ? body->GetMotionType() : physics::eMotionType::Static;
 }
 
-bool Blockout::MoveFace(Object* object, const Vec3f face_normal, float32 distance)
+bool Blockout::MoveFace(Object* object, const FVec3 face_normal, float32 distance)
 {
 	Brush* brush = GetBrush(object);
 	if (brush == nullptr) {
@@ -252,9 +252,9 @@ bool Blockout::SetBrushPlanes(Object* object, const Brush::PlaneList& planes)
 	return true;
 }
 
-static Vec3f GetOffsetToKeepInPlace(const Object* object, const Vec3f old_center, const Vec3f new_center)
+static FVec3 GetOffsetToKeepInPlace(const Object* object, const FVec3 old_center, const FVec3 new_center)
 {
-	const Vec3f center_delta = new_center - old_center;
+	const FVec3 center_delta = new_center - old_center;
 	return center_delta.Rotate(object->mRotation) - center_delta;
 }
 
@@ -263,7 +263,7 @@ void Blockout::ApplyBrushInPlace(Object* object, Brush&& brush)
 	const Brush* current = GetBrush(object);
 
 	if (current != nullptr) {
-		const Vec3f offset = GetOffsetToKeepInPlace(object, current->GetCenter(), brush.GetCenter());
+		const FVec3 offset = GetOffsetToKeepInPlace(object, current->GetCenter(), brush.GetCenter());
 
 		if (!offset.IsCloseTo(simd::LoadFloat4(0.0f))) {
 			object->SetPosition(object->GetPosition() + offset);
@@ -273,8 +273,8 @@ void Blockout::ApplyBrushInPlace(Object* object, Brush&& brush)
 	RebuildBrush(object, std::move(brush), GetMotionType(object));
 }
 
-bool Blockout::GetClipPieces(Object* object, const Vec3f point_a, const Vec3f point_b, const Vec3f face_normal,
-							 Brush::PlaneList& out_kept, Brush::PlaneList& out_split, Vec3f& out_split_position)
+bool Blockout::GetClipPieces(Object* object, const FVec3 point_a, const FVec3 point_b, const FVec3 face_normal,
+							 Brush::PlaneList& out_kept, Brush::PlaneList& out_split, FVec3& out_split_position)
 {
 	const Brush* brush = GetBrush(object);
 	if (brush == nullptr) {
@@ -287,17 +287,17 @@ bool Blockout::GetClipPieces(Object* object, const Vec3f point_a, const Vec3f po
 	const Vec4f local_b = to_local * Vec4f(point_b.X, point_b.Y, point_b.Z, 1.0f);
 	const Vec4f local_normal = to_local * Vec4f(face_normal.X, face_normal.Y, face_normal.Z, 0.0f);
 
-	const Vec3f a(local_a.X, local_a.Y, local_a.Z);
-	const Vec3f b(local_b.X, local_b.Y, local_b.Z);
+	const FVec3 a(local_a.X, local_a.Y, local_a.Z);
+	const FVec3 b(local_b.X, local_b.Y, local_b.Z);
 
 	// The cut runs along the line and straight down through the face it was drawn on
-	const Vec3f cut_normal = (b - a).Cross(Vec3f(local_normal.X, local_normal.Y, local_normal.Z));
+	const FVec3 cut_normal = (b - a).Cross(FVec3(local_normal.X, local_normal.Y, local_normal.Z));
 
 	if (cut_normal.IsCloseTo(simd::LoadFloat4(0.0f))) {
 		return false;
 	}
 
-	const Vec3f normal = cut_normal.Normalize();
+	const FVec3 normal = cut_normal.Normalize();
 
 	// The cut faces line up with the world grid, like the faces of a box made with MakeWorldBox()
 	if (!brush->Split(normal, normal.Dot(a), object->GetPosition(), out_kept, out_split)) {
@@ -313,7 +313,7 @@ bool Blockout::GetClipPieces(Object* object, const Vec3f point_a, const Vec3f po
 }
 
 bool Blockout::GetSubtractPieces(Object* target, Object* cutter, Brush::PieceList& out_pieces,
-								 SizedArray<Vec3f>& out_positions)
+								 SizedArray<FVec3>& out_positions)
 {
 	const Brush* brush = GetBrush(target);
 	const Brush* cutter_brush = GetBrush(cutter);
@@ -328,7 +328,7 @@ bool Blockout::GetSubtractPieces(Object* target, Object* cutter, Brush::PieceLis
 	Brush::PlaneList cutter_planes;
 
 	for (const BrushPlane& plane : cutter_brush->Planes) {
-		const Vec3f point = plane.Normal * plane.Distance;
+		const FVec3 point = plane.Normal * plane.Distance;
 
 		const Vec4f world_point = to_world * Vec4f(point.X, point.Y, point.Z, 1.0f);
 		const Vec4f world_normal = to_world * Vec4f(plane.Normal.X, plane.Normal.Y, plane.Normal.Z, 0.0f);
@@ -336,7 +336,7 @@ bool Blockout::GetSubtractPieces(Object* target, Object* cutter, Brush::PieceLis
 		const Vec4f local_point = to_local * world_point;
 		const Vec4f local_normal = to_local * world_normal;
 
-		const Vec3f normal(local_normal.X, local_normal.Y, local_normal.Z);
+		const FVec3 normal(local_normal.X, local_normal.Y, local_normal.Z);
 		const float32 length = normal.Length();
 
 		if (!(length > 0.0f)) {
@@ -345,7 +345,7 @@ bool Blockout::GetSubtractPieces(Object* target, Object* cutter, Brush::PieceLis
 
 		BrushPlane cut;
 		cut.Normal = normal * (1.0f / length);
-		cut.Distance = cut.Normal.Dot(Vec3f(local_point.X, local_point.Y, local_point.Z));
+		cut.Distance = cut.Normal.Dot(FVec3(local_point.X, local_point.Y, local_point.Z));
 
 		cutter_planes.Insert(cut);
 	}
@@ -366,11 +366,11 @@ bool Blockout::GetSubtractPieces(Object* target, Object* cutter, Brush::PieceLis
 	return true;
 }
 
-Brush Blockout::MakeWorldBox(const Vec3f min, const Vec3f max, Vec3f& out_position) const
+Brush Blockout::MakeWorldBox(const FVec3 min, const FVec3 max, FVec3& out_position) const
 {
 	out_position = (min + max) * 0.5f;
 
-	const Vec3f half_size = (max - min) * 0.5f;
+	const FVec3 half_size = (max - min) * 0.5f;
 
 	Brush brush = Brush::FromBox(-half_size, half_size);
 	brush.AlignTexturesToWorld(out_position);
@@ -378,7 +378,7 @@ Brush Blockout::MakeWorldBox(const Vec3f min, const Vec3f max, Vec3f& out_positi
 	return brush;
 }
 
-void Blockout::ShowPreview(const Vec3f position, const Quat rotation, const Brush& brush)
+void Blockout::ShowPreview(const FVec3 position, const Quat rotation, const Brush& brush)
 {
 	if (!brush.IsValid()) {
 		HidePreview();
@@ -413,10 +413,10 @@ void Blockout::ShowPreview(const Vec3f position, const Quat rotation, const Brus
 void Blockout::HidePreview()
 {
 	// Out of the way, the same place the transform marker hides
-	pPreviewObject->SetPosition(Vec3f(-200.0f));
+	pPreviewObject->SetPosition(FVec3(-200.0f));
 }
 
-bool Blockout::GetFaceTextureEdit(Object* object, const Vec3f face_normal, eFaceTextureEdit edit, const Vec2f& amount,
+bool Blockout::GetFaceTextureEdit(Object* object, const FVec3 face_normal, eFaceTextureEdit edit, const Vec2f& amount,
 								  Brush::PlaneList& out_planes)
 {
 	Brush* brush = GetBrush(object);
@@ -454,7 +454,7 @@ bool Blockout::GetFaceTextureEdit(Object* object, const Vec3f face_normal, eFace
 	return true;
 }
 
-Object* Blockout::RaycastBlockout(const Vec3f origin, const Vec3f direction, Vec3f& out_face_normal)
+Object* Blockout::RaycastBlockout(const FVec3 origin, const FVec3 direction, FVec3& out_face_normal)
 {
 	// Sorted nearest first
 	SizedArray<JPH::BodyID> hits = gPhysics->pBackend->RaycastObjects(origin, direction);
@@ -475,8 +475,8 @@ Object* Blockout::RaycastBlockout(const Vec3f origin, const Vec3f direction, Vec
 	return nullptr;
 }
 
-bool Blockout::RaycastFace(Object* object, const Vec3f origin, const Vec3f direction, Vec3f& out_face_normal,
-						   Vec3f* out_point)
+bool Blockout::RaycastFace(Object* object, const FVec3 origin, const FVec3 direction, FVec3& out_face_normal,
+						   FVec3* out_point)
 {
 	if (GetPatch(object) != nullptr) {
 		return RaycastPatch(object, origin, direction, out_face_normal, out_point);
@@ -495,8 +495,8 @@ bool Blockout::RaycastFace(Object* object, const Vec3f origin, const Vec3f direc
 	float32 distance;
 	uint32 plane_index;
 
-	if (!brush->Raycast(Vec3f(local_origin.X, local_origin.Y, local_origin.Z),
-						Vec3f(local_direction.X, local_direction.Y, local_direction.Z), distance, plane_index)) {
+	if (!brush->Raycast(FVec3(local_origin.X, local_origin.Y, local_origin.Z),
+						FVec3(local_direction.X, local_direction.Y, local_direction.Z), distance, plane_index)) {
 		return false;
 	}
 
@@ -510,7 +510,7 @@ bool Blockout::RaycastFace(Object* object, const Vec3f origin, const Vec3f direc
 	return true;
 }
 
-static int32 FindHitSide(const float32* planes, size_t side_count, const Vec3f point, const Vec3f normal)
+static int32 FindHitSide(const float32* planes, size_t side_count, const FVec3 point, const FVec3 normal)
 {
 	constexpr float32 scMinFacing = 0.5f;
 
@@ -520,7 +520,7 @@ static int32 FindHitSide(const float32* planes, size_t side_count, const Vec3f p
 	float32 most_facing = -FLT_MAX;
 
 	for (size_t side = 0; side < side_count; side++) {
-		const Vec3f side_normal(planes[side * 4], planes[side * 4 + 1], planes[side * 4 + 2]);
+		const FVec3 side_normal(planes[side * 4], planes[side * 4 + 1], planes[side * 4 + 2]);
 		const float32 facing = side_normal.Dot(normal);
 
 		if (facing > most_facing) {
@@ -614,8 +614,8 @@ const String& Blockout::GetSurfaceAt(const physics::RayResult& hit)
 	}
 
 	const int32 side = FindHitSide(planes.data(), brush->Planes.Size,
-								   Vec3f(local_point.X, local_point.Y, local_point.Z),
-								   Vec3f(local_normal.X, local_normal.Y, local_normal.Z).Normalize());
+								   FVec3(local_point.X, local_point.Y, local_point.Z),
+								   FVec3(local_normal.X, local_normal.Y, local_normal.Z).Normalize());
 
 	if (side < 0 || brush->Planes[static_cast<uint32>(side)].Material.IsEmpty()) {
 		return mMaterials.GetSurface(object_material);
@@ -659,10 +659,10 @@ void Blockout::RebuildAcoustics()
 		}
 
 		const Mat4f world = object->GetWorldMatrix();
-		const auto to_world = [&world](const Vec3f point)
+		const auto to_world = [&world](const FVec3 point)
 		{
 			const Vec4f transformed = world * Vec4f(point.X, point.Y, point.Z, 1.0f);
-			return Vec3f(transformed.X, transformed.Y, transformed.Z);
+			return FVec3(transformed.X, transformed.Y, transformed.Z);
 		};
 
 		const uint32 object_surface = geometry.FindOrAddSurface(
@@ -683,13 +683,13 @@ void Blockout::RebuildAcoustics()
 				}
 
 				const Vec4f normal4 = world * Vec4f(plane.Normal.X, plane.Normal.Y, plane.Normal.Z, 0.0f);
-				const Vec3f normal(normal4.X, normal4.Y, normal4.Z);
+				const FVec3 normal(normal4.X, normal4.Y, normal4.Z);
 
-				const Vec3f first = to_world(face.Vertices[0]);
+				const FVec3 first = to_world(face.Vertices[0]);
 
 				for (uint32 i = 1; i + 1 < face.Vertices.Size; i++) {
-					Vec3f b = to_world(face.Vertices[i]);
-					Vec3f c = to_world(face.Vertices[i + 1]);
+					FVec3 b = to_world(face.Vertices[i]);
+					FVec3 c = to_world(face.Vertices[i + 1]);
 
 					if ((b - first).Cross(c - first).Dot(normal) < 0.0f) {
 						std::swap(b, c);
@@ -703,9 +703,9 @@ void Blockout::RebuildAcoustics()
 		}
 
 		if (const Patch* patch = GetPatch(object)) {
-			SizedArray<Vec3f> positions;
-			SizedArray<Vec3f> normals;
-			SizedArray<Vec3f> tangents;
+			SizedArray<FVec3> positions;
+			SizedArray<FVec3> normals;
+			SizedArray<FVec3> tangents;
 			SizedArray<float32> handedness;
 			SizedArray<Vec2f> texcoords;
 			SizedArray<uint32> indices;
@@ -848,7 +848,7 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	mbBakedWithSun = false;
 }
 
-bool Blockout::IsBakedSunCurrent(const Vec3f sun_position) const
+bool Blockout::IsBakedSunCurrent(const FVec3 sun_position) const
 {
 	if (!mbHasBakedSun || sun_position.Length() < 1e-6f) {
 		return false;
@@ -857,7 +857,7 @@ bool Blockout::IsBakedSunCurrent(const Vec3f sun_position) const
 	return sun_position.Normalize().Dot(mBakedSunDirection) > scBakedSunMinCosine;
 }
 
-bool Blockout::IsBakedIndirectCurrent(bool sun_enabled, const Vec3f sun_position) const
+bool Blockout::IsBakedIndirectCurrent(bool sun_enabled, const FVec3 sun_position) const
 {
 	if (!mbHasBakedIndirect) {
 		return false;
@@ -921,9 +921,9 @@ void Blockout::CreateCompiledShadows(const CompiledMap& map)
 
 		for (uint32 point = 0; point < point_count; point++) {
 			mesh->Positions.Insert(
-				Vec3f(surface.Points[point * 3], surface.Points[point * 3 + 1], surface.Points[point * 3 + 2]));
-			mesh->Normals.Insert(Vec3f::sUp);
-			mesh->Tangents.Insert(Vec3f::sRight);
+				FVec3(surface.Points[point * 3], surface.Points[point * 3 + 1], surface.Points[point * 3 + 2]));
+			mesh->Normals.Insert(FVec3::sUp);
+			mesh->Tangents.Insert(FVec3::sRight);
 			mesh->TangentHandedness.Insert(1.0f);
 			mesh->Texcoords.Insert(Vec2f(0.0f, 0.0f));
 		}
@@ -1020,8 +1020,8 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 	for (const CompiledMapSurface& surface : map.Surfaces) {
 		for (size_t i = 0; i + 2 < surface.Indices.Size; i += 3) {
 			const CompiledMapVertex& a = surface.Vertices[surface.Indices[i]];
-			Vec3f b = surface.Vertices[surface.Indices[i + 1]].Position;
-			Vec3f c = surface.Vertices[surface.Indices[i + 2]].Position;
+			FVec3 b = surface.Vertices[surface.Indices[i + 1]].Position;
+			FVec3 c = surface.Vertices[surface.Indices[i + 2]].Position;
 
 			if ((b - a.Position).Cross(c - a.Position).Dot(a.Normal) < 0.0f) {
 				std::swap(b, c);
@@ -1058,7 +1058,7 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 		for (const CompiledMapVertex& vertex : surface.Vertices) {
 			mesh->Positions.Insert(vertex.Position);
 			mesh->Normals.Insert(vertex.Normal);
-			mesh->Tangents.Insert(Vec3f(vertex.Tangent));
+			mesh->Tangents.Insert(FVec3(vertex.Tangent));
 			mesh->TangentHandedness.Insert(vertex.Tangent.W);
 			mesh->Texcoords.Insert(vertex.Texcoord);
 		}
@@ -1133,23 +1133,23 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 			continue;
 		}
 
-		Vec3f min = Vec3f(hull.Points[0], hull.Points[1], hull.Points[2]);
-		Vec3f max = min;
+		FVec3 min = FVec3(hull.Points[0], hull.Points[1], hull.Points[2]);
+		FVec3 max = min;
 
 		for (uint32 i = 1; i < point_count; i++) {
-			const Vec3f point(hull.Points[i * 3], hull.Points[i * 3 + 1], hull.Points[i * 3 + 2]);
+			const FVec3 point(hull.Points[i * 3], hull.Points[i * 3 + 1], hull.Points[i * 3 + 2]);
 
-			min = Vec3f::Min(min, point);
-			max = Vec3f::Max(max, point);
+			min = FVec3::Min(min, point);
+			max = FVec3::Max(max, point);
 		}
 
-		const Vec3f midpoint = (min + max) * 0.5f;
+		const FVec3 midpoint = (min + max) * 0.5f;
 
-		SizedArray<Vec3f> hull_points;
+		SizedArray<FVec3> hull_points;
 		hull_points.InitCapacity(point_count);
 
 		for (uint32 i = 0; i < point_count; i++) {
-			hull_points.Insert(Vec3f(hull.Points[i * 3], hull.Points[i * 3 + 1], hull.Points[i * 3 + 2]) - midpoint);
+			hull_points.Insert(FVec3(hull.Points[i * 3], hull.Points[i * 3 + 1], hull.Points[i * 3 + 2]) - midpoint);
 		}
 
 		physics::Body* body = gPhysics->NewBody(String::Fmt("WORLD_HULL_{}", hull_index));
@@ -1160,7 +1160,7 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 								   });
 
 		body->SetMidpoint(midpoint);
-		body->Teleport(Vec3f::sZero, Quat::scIdentity);
+		body->Teleport(FVec3::sZero, Quat::scIdentity);
 
 		mCompiledBodies.push_back(body->GetID());
 
@@ -1177,23 +1177,23 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 			continue;
 		}
 
-		Vec3f min = Vec3f(mesh.Points[0], mesh.Points[1], mesh.Points[2]);
-		Vec3f max = min;
+		FVec3 min = FVec3(mesh.Points[0], mesh.Points[1], mesh.Points[2]);
+		FVec3 max = min;
 
 		for (uint32 i = 1; i < point_count; i++) {
-			const Vec3f point(mesh.Points[i * 3], mesh.Points[i * 3 + 1], mesh.Points[i * 3 + 2]);
+			const FVec3 point(mesh.Points[i * 3], mesh.Points[i * 3 + 1], mesh.Points[i * 3 + 2]);
 
-			min = Vec3f::Min(min, point);
-			max = Vec3f::Max(max, point);
+			min = FVec3::Min(min, point);
+			max = FVec3::Max(max, point);
 		}
 
-		const Vec3f midpoint = (min + max) * 0.5f;
+		const FVec3 midpoint = (min + max) * 0.5f;
 
-		SizedArray<Vec3f> positions;
+		SizedArray<FVec3> positions;
 		positions.InitCapacity(point_count);
 
 		for (uint32 i = 0; i < point_count; i++) {
-			positions.Insert(Vec3f(mesh.Points[i * 3], mesh.Points[i * 3 + 1], mesh.Points[i * 3 + 2]) - midpoint);
+			positions.Insert(FVec3(mesh.Points[i * 3], mesh.Points[i * 3 + 1], mesh.Points[i * 3 + 2]) - midpoint);
 		}
 
 		SizedArray<uint32> triangle_materials;
@@ -1207,7 +1207,7 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 		body->CreateTriangleMeshBody(positions, mesh.Indices, physics::BodyProps {}, &triangle_materials);
 
 		body->SetMidpoint(midpoint);
-		body->Teleport(Vec3f::sZero, Quat::scIdentity);
+		body->Teleport(FVec3::sZero, Quat::scIdentity);
 
 		mCompiledBodies.push_back(body->GetID());
 
@@ -1226,14 +1226,14 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 		mCompiledProbeMoments.Free();
 	}
 
-	mBakedSunDirection = Vec3f(lightmap.SunDirection[0], lightmap.SunDirection[1], lightmap.SunDirection[2]);
+	mBakedSunDirection = FVec3(lightmap.SunDirection[0], lightmap.SunDirection[1], lightmap.SunDirection[2]);
 
 	if (mbHasBakedIndirect) {
 		LogInfo("Loaded baked indirect light; {}x{} lightmap", lightmap.Width, lightmap.Height);
 	}
 
 	if (mbHasBakedSun) {
-		gProbeManager->SetSunVisibility(Slice<const Vec3f>(map.Probes.Positions.pData, map.Probes.Positions.Size),
+		gProbeManager->SetSunVisibility(Slice<const FVec3>(map.Probes.Positions.pData, map.Probes.Positions.Size),
 										Slice<const uint8>(map.ProbeSunVisibility.pData, map.ProbeSunVisibility.Size));
 
 		LogInfo("Loaded baked sun shadows; {}x{} lightmap, {} probes", lightmap.Width, lightmap.Height,
@@ -1329,7 +1329,7 @@ Patch* Blockout::GetPatch(const Object* object)
 	return mPatches.Find(object->ID.GetID());
 }
 
-bool Blockout::GetLocalCenter(const Object* object, Vec3f& out_center)
+bool Blockout::GetLocalCenter(const Object* object, FVec3& out_center)
 {
 	const Brush* brush = GetBrush(object);
 
@@ -1372,18 +1372,18 @@ static void HashPlanes(uint64& hash, const Brush& brush)
 	}
 }
 
-static Vec3f TransformPoint(const Mat4f& matrix, const Vec3f point)
+static FVec3 TransformPoint(const Mat4f& matrix, const FVec3 point)
 {
 	const Vec4f moved = matrix * Vec4f(point.X, point.Y, point.Z, 1.0f);
 
-	return Vec3f(moved.X, moved.Y, moved.Z);
+	return FVec3(moved.X, moved.Y, moved.Z);
 }
 
-static Vec3f TransformDirection(const Mat4f& matrix, const Vec3f direction)
+static FVec3 TransformDirection(const Mat4f& matrix, const FVec3 direction)
 {
 	const Vec4f turned = matrix * Vec4f(direction.X, direction.Y, direction.Z, 0.0f);
 
-	return Vec3f(turned.X, turned.Y, turned.Z);
+	return FVec3(turned.X, turned.Y, turned.Z);
 }
 
 static void HashPatch(uint64& hash, const Patch& patch)
@@ -1415,8 +1415,8 @@ static void HashPatch(uint64& hash, const Patch& patch)
 
 struct PatchWorldMesh
 {
-	SizedArray<Vec3f> Positions;
-	SizedArray<Vec3f> Normals;
+	SizedArray<FVec3> Positions;
+	SizedArray<FVec3> Normals;
 	SizedArray<uint32> Indices;
 };
 
@@ -1436,17 +1436,17 @@ static void AttachPatchMesh(Object* object, MeshGen::GeneratedMesh& mesh, const 
 
 static void MakePatchWorldMesh(const Patch& patch, const Mat4f& world, PatchWorldMesh& out_mesh)
 {
-	SizedArray<Vec3f> tangents;
+	SizedArray<FVec3> tangents;
 	SizedArray<float32> handedness;
 	SizedArray<Vec2f> texcoords;
 
 	patch.GenerateMesh(out_mesh.Positions, out_mesh.Normals, tangents, handedness, texcoords, out_mesh.Indices);
 
-	for (Vec3f& position : out_mesh.Positions) {
+	for (FVec3& position : out_mesh.Positions) {
 		position = TransformPoint(world, position);
 	}
 
-	for (Vec3f& normal : out_mesh.Normals) {
+	for (FVec3& normal : out_mesh.Normals) {
 		normal = TransformDirection(world, normal);
 	}
 }
@@ -1637,12 +1637,12 @@ void Blockout::RefreshDecals(bool force)
 	}
 }
 
-static bool RayEntersBrush(const Brush& brush, const Mat4f& world, const Vec3f origin, const Vec3f direction,
+static bool RayEntersBrush(const Brush& brush, const Mat4f& world, const FVec3 origin, const FVec3 direction,
 						   float32& out_distance)
 {
 	const Mat4f to_local = world.AffineInverse();
-	const Vec3f local_origin = TransformPoint(to_local, origin);
-	const Vec3f local_direction = TransformDirection(to_local, direction);
+	const FVec3 local_origin = TransformPoint(to_local, origin);
+	const FVec3 local_direction = TransformDirection(to_local, direction);
 
 	float32 enter = -FLT_MAX;
 	float32 exit = FLT_MAX;
@@ -1677,12 +1677,12 @@ static bool RayEntersBrush(const Brush& brush, const Mat4f& world, const Vec3f o
 	return true;
 }
 
-static bool RayHitsTriangle(const Vec3f origin, const Vec3f direction, const Vec3f a, const Vec3f b, const Vec3f c,
+static bool RayHitsTriangle(const FVec3 origin, const FVec3 direction, const FVec3 a, const FVec3 b, const FVec3 c,
 							float32& out_distance)
 {
-	const Vec3f edge_ab = b - a;
-	const Vec3f edge_ac = c - a;
-	const Vec3f p = direction.Cross(edge_ac);
+	const FVec3 edge_ab = b - a;
+	const FVec3 edge_ac = c - a;
+	const FVec3 p = direction.Cross(edge_ac);
 	const float32 determinant = edge_ab.Dot(p);
 
 	if (std::fabs(determinant) < 1e-12f) {
@@ -1690,14 +1690,14 @@ static bool RayHitsTriangle(const Vec3f origin, const Vec3f direction, const Vec
 	}
 
 	const float32 inverse = 1.0f / determinant;
-	const Vec3f to_origin = origin - a;
+	const FVec3 to_origin = origin - a;
 	const float32 u = to_origin.Dot(p) * inverse;
 
 	if (u < 0.0f || u > 1.0f) {
 		return false;
 	}
 
-	const Vec3f q = to_origin.Cross(edge_ab);
+	const FVec3 q = to_origin.Cross(edge_ab);
 	const float32 v = direction.Dot(q) * inverse;
 
 	if (v < 0.0f || u + v > 1.0f) {
@@ -1714,13 +1714,13 @@ static bool RayHitsTriangle(const Vec3f origin, const Vec3f direction, const Vec
 	return true;
 }
 
-void Blockout::RaycastDecalSurfaces(const Vec3f origin, const Vec3f direction, float32 max_distance,
+void Blockout::RaycastDecalSurfaces(const FVec3 origin, const FVec3 direction, float32 max_distance,
 									DynArray<float32, GrowthFunctions::Double>& out_distances)
 {
 	out_distances.Clear();
 
-	const Vec3f end = origin + direction * max_distance;
-	const BBox bounds(Vec3f::Min(origin, end), Vec3f::Max(origin, end));
+	const FVec3 end = origin + direction * max_distance;
+	const BBox bounds(FVec3::Min(origin, end), FVec3::Max(origin, end));
 
 	DynArray<DecalReceiver, GrowthFunctions::Double> receivers;
 	GatherDecalReceivers(bounds, receivers);
@@ -1747,7 +1747,7 @@ void Blockout::RaycastDecalSurfaces(const Vec3f origin, const Vec3f direction, f
 			const uint32 b = mesh.Indices[i + 1];
 			const uint32 c = mesh.Indices[i + 2];
 
-			const Vec3f normal = mesh.Normals[a] + mesh.Normals[b] + mesh.Normals[c];
+			const FVec3 normal = mesh.Normals[a] + mesh.Normals[b] + mesh.Normals[c];
 
 			if (normal.Dot(direction) >= 0.0f) {
 				continue;
@@ -1770,7 +1770,7 @@ void Blockout::RaycastDecalSurfaces(const Vec3f origin, const Vec3f direction, f
 			const uint32 b = receiver.Indices[i + 1];
 			const uint32 c = receiver.Indices[i + 2];
 
-			const Vec3f normal = receiver.Normals[a] + receiver.Normals[b] + receiver.Normals[c];
+			const FVec3 normal = receiver.Normals[a] + receiver.Normals[b] + receiver.Normals[c];
 
 			if (normal.Dot(direction) >= 0.0f) {
 				continue;
@@ -1787,7 +1787,7 @@ void Blockout::RaycastDecalSurfaces(const Vec3f origin, const Vec3f direction, f
 	}
 
 	for (const float32 distance : candidates) {
-		const Vec3f above = origin + direction * (distance - MeshDecalBuilder::scSurfaceOffset);
+		const FVec3 above = origin + direction * (distance - MeshDecalBuilder::scSurfaceOffset);
 
 		bool is_buried = false;
 
@@ -1796,7 +1796,7 @@ void Blockout::RaycastDecalSurfaces(const Vec3f origin, const Vec3f direction, f
 				continue;
 			}
 
-			const Vec3f local = TransformPoint(receiver.World.AffineInverse(), above);
+			const FVec3 local = TransformPoint(receiver.World.AffineInverse(), above);
 
 			if (receiver.pBrush->ContainsPoint(local, -scDecalBuriedTolerance)) {
 				is_buried = true;
@@ -1850,8 +1850,8 @@ static Ref<PrimitiveMesh> MakeFaceMesh(const Brush& brush, const String* materia
 
 	out_bounds = BBox(mesh.Positions[0], mesh.Positions[0]);
 
-	for (const Vec3f position : mesh.Positions) {
-		out_bounds = BBox(Vec3f::Min(out_bounds.Min, position), Vec3f::Max(out_bounds.Max, position));
+	for (const FVec3 position : mesh.Positions) {
+		out_bounds = BBox(FVec3::Min(out_bounds.Min, position), FVec3::Max(out_bounds.Max, position));
 	}
 
 	return mesh.AsDefaultMesh();
@@ -1969,7 +1969,7 @@ void Blockout::RebuildBrush(Object* object, Brush&& brush, physics::eMotionType 
 	object->Bounds.Max = brush.GetBoundsMax();
 
 	// Blockouts rotate about the centre of their bounds
-	const Vec3f midpoint = brush.GetCenter();
+	const FVec3 midpoint = brush.GetCenter();
 	object->SetRotationOrigin(-midpoint);
 
 	RebuildFaceMeshes(object, brush);
@@ -1978,11 +1978,11 @@ void Blockout::RebuildBrush(Object* object, Brush&& brush, physics::eMotionType 
 
 	gPhysics->DestroyBody(object->PhysicsID);
 
-	SizedArray<Vec3f> hull_points;
+	SizedArray<FVec3> hull_points;
 	hull_points.InitCapacity(brush.GetVertices().Size);
 
 	// The collider is centred on the midpoint so that it rotates the same way as the object
-	for (const Vec3f vertex : brush.GetVertices()) {
+	for (const FVec3 vertex : brush.GetVertices()) {
 		hull_points.Insert(vertex - midpoint);
 	}
 
@@ -2021,7 +2021,7 @@ void Blockout::RebuildPatch(Object* object, Patch&& patch)
 {
 	Assert(patch.IsValid());
 
-	const Vec3f center = patch.GetCenter();
+	const FVec3 center = patch.GetCenter();
 	object->SetRotationOrigin(-center);
 
 	const Mat4f world = object->GetWorldMatrix();
@@ -2041,19 +2041,19 @@ void Blockout::RebuildPatch(Object* object, Patch&& patch)
 		LogWarning(LC_ASSET, "Patch '{}' has no area, it is not drawn", object->Name.Get());
 
 		mesh->Positions = { center, center, center };
-		mesh->Normals = { Vec3f::sUp, Vec3f::sUp, Vec3f::sUp };
-		mesh->Tangents = { Vec3f(1.0f, 0.0f, 0.0f), Vec3f(1.0f, 0.0f, 0.0f), Vec3f(1.0f, 0.0f, 0.0f) };
+		mesh->Normals = { FVec3::sUp, FVec3::sUp, FVec3::sUp };
+		mesh->Tangents = { FVec3(1.0f, 0.0f, 0.0f), FVec3(1.0f, 0.0f, 0.0f), FVec3(1.0f, 0.0f, 0.0f) };
 		mesh->TangentHandedness = { 1.0f, 1.0f, 1.0f };
 		mesh->Texcoords = { Vec2f::scZero, Vec2f::scZero, Vec2f::scZero };
 		mesh->Indices = { 0, 1, 2 };
 	}
 
-	Vec3f min = mesh->Positions[0];
-	Vec3f max = mesh->Positions[0];
+	FVec3 min = mesh->Positions[0];
+	FVec3 max = mesh->Positions[0];
 
-	for (const Vec3f position : mesh->Positions) {
-		min = Vec3f::Min(min, position);
-		max = Vec3f::Max(max, position);
+	for (const FVec3 position : mesh->Positions) {
+		min = FVec3::Min(min, position);
+		max = FVec3::Max(max, position);
 	}
 
 	AttachPatchMesh(object, *mesh, colors);
@@ -2067,10 +2067,10 @@ void Blockout::RebuildPatch(Object* object, Patch&& patch)
 	gPhysics->DestroyBody(object->PhysicsID);
 	object->PhysicsID = physics::BodyID::scNull;
 
-	SizedArray<Vec3f> collider_points;
+	SizedArray<FVec3> collider_points;
 	collider_points.InitCapacity(mesh->Positions.Size);
 
-	for (const Vec3f position : mesh->Positions) {
+	for (const FVec3 position : mesh->Positions) {
 		collider_points.Insert(position - center);
 	}
 
@@ -2137,7 +2137,7 @@ bool Blockout::SetPatch(Object* object, Patch&& patch)
 		return false;
 	}
 
-	const Vec3f offset = GetOffsetToKeepInPlace(object, current->GetCenter(), patch.GetCenter());
+	const FVec3 offset = GetOffsetToKeepInPlace(object, current->GetCenter(), patch.GetCenter());
 
 	if (!offset.IsCloseTo(simd::LoadFloat4(0.0f))) {
 		object->SetPosition(object->GetPosition() + offset);
@@ -2148,8 +2148,8 @@ bool Blockout::SetPatch(Object* object, Patch&& patch)
 	return true;
 }
 
-bool Blockout::RaycastPatch(Object* object, const Vec3f origin, const Vec3f direction, Vec3f& out_face_normal,
-							Vec3f* out_point)
+bool Blockout::RaycastPatch(Object* object, const FVec3 origin, const FVec3 direction, FVec3& out_face_normal,
+							FVec3* out_point)
 {
 	const Patch* patch = GetPatch(object);
 
@@ -2161,30 +2161,30 @@ bool Blockout::RaycastPatch(Object* object, const Vec3f origin, const Vec3f dire
 	const Vec4f local_origin4 = to_local * Vec4f(origin.X, origin.Y, origin.Z, 1.0f);
 	const Vec4f local_direction4 = to_local * Vec4f(direction.X, direction.Y, direction.Z, 0.0f);
 
-	const Vec3d local_origin(local_origin4.X, local_origin4.Y, local_origin4.Z);
-	const Vec3d local_direction(local_direction4.X, local_direction4.Y, local_direction4.Z);
+	const DVec3 local_origin(local_origin4.X, local_origin4.Y, local_origin4.Z);
+	const DVec3 local_direction(local_direction4.X, local_direction4.Y, local_direction4.Z);
 
-	SizedArray<Vec3f> positions;
-	SizedArray<Vec3f> normals;
-	SizedArray<Vec3f> tangents;
+	SizedArray<FVec3> positions;
+	SizedArray<FVec3> normals;
+	SizedArray<FVec3> tangents;
 	SizedArray<float32> handedness;
 	SizedArray<Vec2f> texcoords;
 	SizedArray<uint32> indices;
 
 	patch->GenerateMesh(positions, normals, tangents, handedness, texcoords, indices);
 
-	const auto to_double = [](const Vec3f value) { return Vec3d(value.X, value.Y, value.Z); };
+	const auto to_double = [](const FVec3 value) { return DVec3(value.X, value.Y, value.Z); };
 
 	double nearest = DBL_MAX;
 
 	for (size_t index = 0; index + 2 < indices.Size; index += 3) {
-		const Vec3d a = to_double(positions[indices[index]]);
-		const Vec3d b = to_double(positions[indices[index + 1]]);
-		const Vec3d c = to_double(positions[indices[index + 2]]);
+		const DVec3 a = to_double(positions[indices[index]]);
+		const DVec3 b = to_double(positions[indices[index + 1]]);
+		const DVec3 c = to_double(positions[indices[index + 2]]);
 
-		const Vec3d edge_a = b - a;
-		const Vec3d edge_b = c - a;
-		const Vec3d p = local_direction.Cross(edge_b);
+		const DVec3 edge_a = b - a;
+		const DVec3 edge_b = c - a;
+		const DVec3 p = local_direction.Cross(edge_b);
 		const double determinant = edge_a.Dot(p);
 
 		if (std::fabs(determinant) < 1e-14) {
@@ -2192,14 +2192,14 @@ bool Blockout::RaycastPatch(Object* object, const Vec3f origin, const Vec3f dire
 		}
 
 		const double inverse = 1.0 / determinant;
-		const Vec3d to_origin = local_origin - a;
+		const DVec3 to_origin = local_origin - a;
 		const double u = to_origin.Dot(p) * inverse;
 
 		if (u < 0.0 || u > 1.0) {
 			continue;
 		}
 
-		const Vec3d q = to_origin.Cross(edge_a);
+		const DVec3 q = to_origin.Cross(edge_a);
 		const double v = local_direction.Dot(q) * inverse;
 
 		if (v < 0.0 || u + v > 1.0) {
@@ -2212,14 +2212,14 @@ bool Blockout::RaycastPatch(Object* object, const Vec3f origin, const Vec3f dire
 			continue;
 		}
 
-		Vec3d normal = edge_b.Cross(edge_a).Normalized();
+		DVec3 normal = edge_b.Cross(edge_a).Normalized();
 
 		if (normal.Dot(local_direction) > 0.0) {
 			normal = normal * -1.0;
 		}
 
 		nearest = distance;
-		out_face_normal = normal.ToVec3f();
+		out_face_normal = normal.ToFVec3();
 	}
 
 	if (nearest == DBL_MAX) {
@@ -2291,7 +2291,7 @@ void Blockout::WriteBrushEntry(ConfigEntry& entry, const Object* object)
 	WriteFaceMaterials(entry, *brush);
 }
 
-ObjectID Blockout::CreateBrush(const String& name, const Vec3f position, const Quat rotation,
+ObjectID Blockout::CreateBrush(const String& name, const FVec3 position, const Quat rotation,
 							   const MaterialID material_id, const BBox bounds)
 {
 	static constexpr eObjectTag scObjectTags = eObjectTag::Blockout;
@@ -2519,7 +2519,7 @@ std::string Blockout::MakeUniqueBrushName() const
 	return name.Str();
 }
 
-Object* Blockout::NewObject(const Vec3f position, MaterialID material)
+Object* Blockout::NewObject(const FVec3 position, MaterialID material)
 {
 	std::string blockout_name = MakeUniqueBrushName();
 	LogInfo("Creating new blockout object '{}'", blockout_name);
@@ -2533,7 +2533,7 @@ Object* Blockout::NewObject(const Vec3f position, MaterialID material)
 	object->SetShadowCaster(true);
 	object->SubviewInstance = mActiveSubview;
 
-	RebuildBrush(object, Brush::FromBox(Vec3f(-scale), Vec3f(scale)), physics::eMotionType::Static);
+	RebuildBrush(object, Brush::FromBox(FVec3(-scale), FVec3(scale)), physics::eMotionType::Static);
 
 	AssetTicket ticket(static_cast<void*>(object));
 	ticket.MarkAndSignalLoaded();
@@ -2600,7 +2600,7 @@ Object* Blockout::DupeObject(Object* object)
 
 	gObjectScripts->Attach(dupe, gObjectScripts->GetPath(object->ID));
 
-	Vec3f enter_direction;
+	FVec3 enter_direction;
 
 	if (gObjectScripts->TryGetRequiredEnterDirection(object->ID, enter_direction)) {
 		gObjectScripts->SetRequiredEnterDirection(dupe->ID, enter_direction);
@@ -2627,7 +2627,7 @@ Object* Blockout::DupeObject(Object* object)
 
 bool Blockout::HasBrush(const Object* object) { return GetBrush(object) != nullptr; }
 
-bool Blockout::ContainsPoint(Object* object, const Vec3f point)
+bool Blockout::ContainsPoint(Object* object, const FVec3 point)
 {
 	const Brush* brush = GetBrush(object);
 
@@ -2637,7 +2637,7 @@ bool Blockout::ContainsPoint(Object* object, const Vec3f point)
 
 	const Vec4f local = object->GetWorldMatrix().AffineInverse() * Vec4f(point.X, point.Y, point.Z, 1.0f);
 
-	return brush->ContainsPoint(Vec3f(local.X, local.Y, local.Z));
+	return brush->ContainsPoint(FVec3(local.X, local.Y, local.Z));
 }
 
 bool Blockout::SetDynamic(Object* object, bool dynamic)
@@ -2685,7 +2685,7 @@ static String MakeRestoredName(const Name& name, uint32 object_count)
 	return restored_name;
 }
 
-Object* Blockout::RestorePatch(const Vec3f position, const Patch& patch, MaterialID material, const Quat rotation,
+Object* Blockout::RestorePatch(const FVec3 position, const Patch& patch, MaterialID material, const Quat rotation,
 							   const Name& name)
 {
 	if (!patch.IsValid()) {
@@ -2717,7 +2717,7 @@ Object* Blockout::RestorePatch(const Vec3f position, const Patch& patch, Materia
 	return object;
 }
 
-Object* Blockout::RestoreObject(const Vec3f position, const Brush::PlaneList& planes, MaterialID material,
+Object* Blockout::RestoreObject(const FVec3 position, const Brush::PlaneList& planes, MaterialID material,
 								const Quat rotation, const Name& name, bool is_dynamic, bool is_decal)
 {
 	Brush brush = Brush::FromPlanes(planes);
@@ -3366,7 +3366,7 @@ ConfigEntry Blockout::MakeBrushEntry(Object* object, const String& name, const B
 // Subviews
 /////////////////////////////////////
 
-static Mat4f MakeBrushMatrix(const BrushPlacement& placement, const Vec3f center)
+static Mat4f MakeBrushMatrix(const BrushPlacement& placement, const FVec3 center)
 {
 	return Mat4f::AsTranslation(-center) * Mat4f::AsRotation(placement.Rotation) * Mat4f::AsTranslation(center) *
 		   Mat4f::AsTranslation(placement.Position);
@@ -3562,7 +3562,7 @@ uint32 Blockout::AddNestedSubviewInstance(const ConfigEntry& entry, const BrushP
 	}
 
 	const uint32 instance = AddSubviewInstance(subview_name, entry.Name.Get());
-	const BrushPlacement placement = PlaceInSubview(ReadBrushPlacement(entry), Vec3f::sZero, parent);
+	const BrushPlacement placement = PlaceInSubview(ReadBrushPlacement(entry), FVec3::sZero, parent);
 
 	if (FindSubview(subview_name) == nullptr) {
 		SubviewInstance* found = FindSubviewInstance(instance);
@@ -3770,15 +3770,15 @@ void Blockout::BuildSubview(Subview& subview)
 	{
 		MaterialID Material = MaterialID::scNull;
 
-		std::vector<Vec3f> Positions;
-		std::vector<Vec3f> Normals;
-		std::vector<Vec3f> Tangents;
+		std::vector<FVec3> Positions;
+		std::vector<FVec3> Normals;
+		std::vector<FVec3> Tangents;
 		std::vector<float32> TangentHandedness;
 		std::vector<Vec2f> Texcoords;
 		std::vector<uint32> Indices;
 
-		Vec3f Min = Vec3f(FLT_MAX);
-		Vec3f Max = Vec3f(-FLT_MAX);
+		FVec3 Min = FVec3(FLT_MAX);
+		FVec3 Max = FVec3(-FLT_MAX);
 	};
 
 	subview.Members.clear();
@@ -3805,10 +3805,10 @@ void Blockout::BuildSubview(Subview& subview)
 	}
 
 	std::vector<GroupBuilder> builders;
-	std::vector<SizedArray<Vec3f>> hulls;
+	std::vector<SizedArray<FVec3>> hulls;
 
-	Vec3f min(FLT_MAX);
-	Vec3f max(-FLT_MAX);
+	FVec3 min(FLT_MAX);
+	FVec3 max(-FLT_MAX);
 
 
 	if (subview.Flat.Members.IsInited()) {
@@ -3870,7 +3870,7 @@ void Blockout::BuildSubview(Subview& subview)
 				const uint32 first_vertex = static_cast<uint32>(builder->Positions.size());
 
 				for (size_t i = 0; i < mesh.Positions.Size; i++) {
-					const Vec3f position = TransformPoint(member.ToSubview, mesh.Positions[i]);
+					const FVec3 position = TransformPoint(member.ToSubview, mesh.Positions[i]);
 
 					builder->Positions.push_back(position);
 					builder->Normals.push_back(TransformDirection(member.ToSubview, mesh.Normals[i]));
@@ -3884,11 +3884,11 @@ void Blockout::BuildSubview(Subview& subview)
 						builder->TangentHandedness.push_back(1.0f);
 					}
 
-					builder->Min = Vec3f::Min(builder->Min, position);
-					builder->Max = Vec3f::Max(builder->Max, position);
+					builder->Min = FVec3::Min(builder->Min, position);
+					builder->Max = FVec3::Max(builder->Max, position);
 
-					min = Vec3f::Min(min, position);
-					max = Vec3f::Max(max, position);
+					min = FVec3::Min(min, position);
+					max = FVec3::Max(max, position);
 				}
 
 				for (const uint32 index : mesh.Indices) {
@@ -3902,10 +3902,10 @@ void Blockout::BuildSubview(Subview& subview)
 				continue;
 			}
 
-			SizedArray<Vec3f>& hull = hulls.emplace_back();
+			SizedArray<FVec3>& hull = hulls.emplace_back();
 			hull.InitCapacity(brush.GetVertices().Size);
 
-			for (const Vec3f vertex : brush.GetVertices()) {
+			for (const FVec3 vertex : brush.GetVertices()) {
 				hull.Insert(TransformPoint(member.ToSubview, vertex));
 			}
 		}
@@ -3927,17 +3927,17 @@ void Blockout::BuildSubview(Subview& subview)
 		group.Bounds = BBox(builder.Min, builder.Max);
 	}
 
-	SizedArray<SizedArray<Vec3f>> subview_hulls;
+	SizedArray<SizedArray<FVec3>> subview_hulls;
 	subview_hulls.InitCapacity(hulls.size());
 
-	for (SizedArray<Vec3f>& hull : hulls) {
+	for (SizedArray<FVec3>& hull : hulls) {
 		subview_hulls.Insert(std::move(hull));
 	}
 
 	subview.Hulls = std::move(subview_hulls);
 
 	if (builders.empty()) {
-		subview.Bounds = BBox(Vec3f::sZero, Vec3f::sZero);
+		subview.Bounds = BBox(FVec3::sZero, FVec3::sZero);
 	}
 	else {
 		subview.Bounds = BBox(min, max);
@@ -4096,8 +4096,8 @@ bool Blockout::GetSubviewBounds(uint32 instance, BBox& out_bounds)
 
 bool Blockout::GetBrushBounds(Object* const* objects, uint32 count, BBox& out_bounds)
 {
-	Vec3f min(FLT_MAX);
-	Vec3f max(-FLT_MAX);
+	FVec3 min(FLT_MAX);
+	FVec3 max(-FLT_MAX);
 	bool has_bounds = false;
 
 	for (uint32 i = 0; i < count; i++) {
@@ -4106,8 +4106,8 @@ bool Blockout::GetBrushBounds(Object* const* objects, uint32 count, BBox& out_bo
 		if (IsSubviewObject(member)) {
 			const BBox world_bounds = member->GetWorldOBB().GetWorldAABB();
 
-			min = Vec3f::Min(min, world_bounds.Min);
-			max = Vec3f::Max(max, world_bounds.Max);
+			min = FVec3::Min(min, world_bounds.Min);
+			max = FVec3::Max(max, world_bounds.Max);
 			has_bounds = true;
 			continue;
 		}
@@ -4125,17 +4125,17 @@ bool Blockout::GetBrushBounds(Object* const* objects, uint32 count, BBox& out_bo
 			const OBBox box = OBBox::FromLocalBounds(member->Bounds, world);
 			const BBox world_bounds = box.GetWorldAABB();
 
-			min = Vec3f::Min(min, world_bounds.Min);
-			max = Vec3f::Max(max, world_bounds.Max);
+			min = FVec3::Min(min, world_bounds.Min);
+			max = FVec3::Max(max, world_bounds.Max);
 			has_bounds = true;
 			continue;
 		}
 
-		for (const Vec3f vertex : brush->GetVertices()) {
+		for (const FVec3 vertex : brush->GetVertices()) {
 			const Vec4f point = world * Vec4f(vertex.X, vertex.Y, vertex.Z, 1.0f);
 
-			min = Vec3f(std::min(min.X, point.X), std::min(min.Y, point.Y), std::min(min.Z, point.Z));
-			max = Vec3f(std::max(max.X, point.X), std::max(max.Y, point.Y), std::max(max.Z, point.Z));
+			min = FVec3(std::min(min.X, point.X), std::min(min.Y, point.Y), std::min(min.Z, point.Z));
+			max = FVec3(std::max(max.X, point.X), std::max(max.Y, point.Y), std::max(max.Z, point.Z));
 			has_bounds = true;
 		}
 	}
@@ -4147,7 +4147,7 @@ bool Blockout::GetBrushBounds(Object* const* objects, uint32 count, BBox& out_bo
 	return has_bounds;
 }
 
-uint32 Blockout::CreateSubview(const String& name, Object* const* objects, uint32 count, const Vec3f origin)
+uint32 Blockout::CreateSubview(const String& name, Object* const* objects, uint32 count, const FVec3 origin)
 {
 	const String subview_name = MakeSubviewName(name);
 
@@ -4169,11 +4169,11 @@ uint32 Blockout::CreateSubview(const String& name, Object* const* objects, uint3
 			}
 
 			instances.AddMember(MakeSubviewInstanceEntry(child->Name, child->SubviewName,
-														 RemoveFromSubview(world, Vec3f::sZero, placement)));
+														 RemoveFromSubview(world, FVec3::sZero, placement)));
 			continue;
 		}
 
-		Vec3f center;
+		FVec3 center;
 
 		if (!GetLocalCenter(object, center)) {
 			LogError(LC_ASSET, "'{}' is not a brush, so it can't be part of a subview", object->Name.Get());
@@ -4459,7 +4459,7 @@ void Blockout::PlaceSubviewEntities(const SubviewInstance& instance)
 	GetSubviewMembers(instance.ID, members);
 
 	for (Object* member : members) {
-		Vec3f center;
+		FVec3 center;
 
 		if (!GetLocalCenter(member, center) || member->SubviewMember >= subview->Flat.Members.Size()) {
 			continue;
@@ -4597,7 +4597,7 @@ void Blockout::CommitSubview(uint32 instance, const BrushPlacement& placement)
 	uint32 member_index = 0;
 
 	for (Object* member : members) {
-		Vec3f center;
+		FVec3 center;
 
 		if (!GetLocalCenter(member, center)) {
 			continue;
@@ -4625,7 +4625,7 @@ void Blockout::CommitSubview(uint32 instance, const BrushPlacement& placement)
 		}
 
 		instances.AddMember(
-			MakeSubviewInstanceEntry(child.Name, child.SubviewName, RemoveFromSubview(world, Vec3f::sZero, placement)));
+			MakeSubviewInstanceEntry(child.Name, child.SubviewName, RemoveFromSubview(world, FVec3::sZero, placement)));
 	}
 
 	subview->Brushes = std::move(brushes);
@@ -4990,8 +4990,8 @@ void Blockout::ResetToTemplate()
 	MaterialLibraryID lib_base_material = gWorld->pPrototype->mMaterials.FindIDByName("white_tile");
 	MaterialID base_material = gWorld->pPrototype->mMaterials.GetMaterial(lib_base_material);
 
-	CreateBrush("base", Vec3f(0.0f, -2.0f, 0.0f), Quat::scIdentity, base_material,
-				BBox(Vec3f(-10.0f, -0.1f, -10.0f), Vec3f(10.0f, 0.0f, 10.0f)));
+	CreateBrush("base", FVec3(0.0f, -2.0f, 0.0f), Quat::scIdentity, base_material,
+				BBox(FVec3(-10.0f, -0.1f, -10.0f), FVec3(10.0f, 0.0f, 10.0f)));
 
 	gLightManager->Clear();
 
@@ -5003,7 +5003,7 @@ void Blockout::ResetToTemplate()
 	if (sun == nullptr) {
 		sun = gLightManager->NewLight<LightDirectional>("sun");
 		sun->bEnabled = true;
-		sun->SetPosition(Vec3f(1.0f, 5.0f, -1.0f));
+		sun->SetPosition(FVec3(1.0f, 5.0f, -1.0f));
 
 		gCVars->Set("b_sun_enabled", 1);
 	}
@@ -5017,7 +5017,7 @@ void Blockout::ResetToTemplate()
 	RebuildAcoustics();
 	gAudio->SetBakedAcoustics({});
 
-	gWorld->Player.TeleportTo(Vec3f(0.0, 2.0, 0.0));
+	gWorld->Player.TeleportTo(FVec3(0.0, 2.0, 0.0));
 
 #ifdef FX_IS_EDITOR
 	gEditor->MarkSaved();

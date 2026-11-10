@@ -58,7 +58,7 @@ public:
 	void SetID(physics::BodyID id) { ID = id; }
 	physics::BodyID GetID() const { return ID; }
 
-	void CreatePrimitiveBody(ePrimitiveType primitive_type, const Vec3f dimensions, physics::eMotionType motion_type,
+	void CreatePrimitiveBody(ePrimitiveType primitive_type, const FVec3 dimensions, physics::eMotionType motion_type,
 							 const BodyProps& object_properties);
 
 	void CreateMeshBody(const PrimitiveMesh& mesh, physics::eMotionType motion_type,
@@ -67,27 +67,27 @@ public:
 	/**
 	 * @brief Creates a collider from the convex hull of the points, which are relative to the body's position.
 	 */
-	void CreateConvexHullBody(const SizedArray<Vec3f>& points, physics::eMotionType motion_type,
+	void CreateConvexHullBody(const SizedArray<FVec3>& points, physics::eMotionType motion_type,
 							  const BodyProps& object_properties);
 
-	void CreateTriangleMeshBody(const SizedArray<Vec3f>& positions, const SizedArray<uint32>& indices,
+	void CreateTriangleMeshBody(const SizedArray<FVec3>& positions, const SizedArray<uint32>& indices,
 								const BodyProps& object_properties,
 								const SizedArray<uint32>* triangle_user_data = nullptr);
 
-	void CreateCompoundHullBody(const SizedArray<SizedArray<Vec3f>>& hulls, physics::eMotionType motion_type,
+	void CreateCompoundHullBody(const SizedArray<SizedArray<FVec3>>& hulls, physics::eMotionType motion_type,
 								const BodyProps& object_properties);
 
 	void DestroyPhysicsBody();
 
 	void SetInstanceTransforms(const Mat4f* transforms, uint32 count);
 
-	void SetMidpoint(const Vec3f midpoint);
+	void SetMidpoint(const FVec3 midpoint);
 
-	void Teleport(const Vec3f position, const Quat rotation);
+	void Teleport(const FVec3 position, const Quat rotation);
 
-	void SetLinearVelocity(const Vec3f velocity);
+	void SetLinearVelocity(const FVec3 velocity);
 
-	FX_FORCE_INLINE Vec3f GetPosition() { return Vec3f(mpPhysicsBody->GetPosition()); }
+	FX_FORCE_INLINE FVec3 GetPosition() { return FVec3(mpPhysicsBody->GetPosition()); }
 	FX_FORCE_INLINE Quat GetRotation() { return Quat(mpPhysicsBody->GetRotation()); }
 
 	FX_FORCE_INLINE JPH::Body* GetBody() { return mpPhysicsBody; };
@@ -123,10 +123,10 @@ public:
 
 	bool mbHasPhysicsBody = false;
 
-	Vec3f Dimensions = Vec3f::sOne;
+	FVec3 Dimensions = FVec3::sOne;
 
 	/// The midpoint of the physics body. The position is offset by this.
-	Vec3f Midpoint = Vec3f::sZero;
+	FVec3 Midpoint = FVec3::sZero;
 
 	ePrimitiveType PrimitiveType = ePrimitiveType::None;
 

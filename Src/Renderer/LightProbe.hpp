@@ -5,8 +5,8 @@
 #include <Core/Slice.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Float16.hpp>
-#include <Math/Vec3.hpp>
 #include <Renderer/Backend/Commands.hpp>
 #include <Renderer/Backend/GpuBuffer.hpp>
 #include <Renderer/Camera/PerspectiveCamera.hpp>
@@ -74,7 +74,7 @@ public:
 	void Destroy();
 
 	uint32 GetProbeCount() const { return mLayout.GetProbeCount(); }
-	Vec3f GetProbePosition(uint32 index) const { return mLayout.Positions[index]; }
+	FVec3 GetProbePosition(uint32 index) const { return mLayout.Positions[index]; }
 
 	uint32 GetCurrentProbeIndex() const
 	{
@@ -87,16 +87,16 @@ public:
 
 	uint32 GetVolumeCount() const { return mLayout.VolumeCount; }
 
-	bool SampleIrradiance(const Vec3f position, const Vec3f normal, Vec3f& out_irradiance) const;
+	bool SampleIrradiance(const FVec3 position, const FVec3 normal, FVec3& out_irradiance) const;
 	void GetVolumeProbeRange(uint32 volume, uint32& out_first_probe, uint32& out_count) const;
 
 	uint32 RebuildVolumesFromWorld();
 
-	void SetSunVisibility(Slice<const Vec3f> positions, Slice<const uint8> values);
+	void SetSunVisibility(Slice<const FVec3> positions, Slice<const uint8> values);
 	void ClearSunVisibility();
 
 	uint32 GetReflectionProbeCount() const { return mReflectionProbeCount; }
-	Vec3f GetReflectionProbePosition(uint32 index) const;
+	FVec3 GetReflectionProbePosition(uint32 index) const;
 	bool AreReflectionsBaked() const { return mbReflectionsBaked; }
 
 	uint32 RebuildReflectionProbesFromWorld();
@@ -156,8 +156,8 @@ private:
 	void ClearStaleBakeReport();
 	bool BuildLayoutFromWorld(ProbeLayout& out_layout, uint32& out_brush_volumes) const;
 
-	uint32 SelectVolume(const Vec3f position) const;
-	bool SampleVolume(const Vec3f position, uint32 volume_index, const float32* basis, Vec3f& out_irradiance,
+	uint32 SelectVolume(const FVec3 position) const;
+	bool SampleVolume(const FVec3 position, uint32 volume_index, const float32* basis, FVec3& out_irradiance,
 					  float32& out_coverage) const;
 	void ResolveSunVisibility();
 
@@ -178,7 +178,7 @@ private:
 	void ServiceReflectionBake();
 	bool ReadBackReflectionProbe(uint32 probe_index);
 	void UploadReflectionProbes(uint32 visible_count);
-	void SampleCaptureIrradiance(const Vec3f position, ReflectionProbeGpu& probe) const;
+	void SampleCaptureIrradiance(const FVec3 position, ReflectionProbeGpu& probe) const;
 	void UploadReflectionCubemap(uint32 probe_index);
 
 	bool SaveIrradianceProbes();
@@ -194,7 +194,7 @@ private:
 	 */
 	void MakeCaptureCameras();
 
-	void MoveCaptureCameras(const Vec3f position);
+	void MoveCaptureCameras(const FVec3 position);
 
 private:
 	ProbeLayout mLayout;
@@ -208,7 +208,7 @@ private:
 	String mStaleMessage;
 	uint32 mStaleMessageId = 0;
 
-	DynArray<Vec3f> mSunSamplePositions;
+	DynArray<FVec3> mSunSamplePositions;
 	DynArray<uint8> mSunSampleValues;
 	float32 mSunVisibility[Limits::MaxIrradianceProbes] {};
 	bool mbSunVisibilityDirty = true;

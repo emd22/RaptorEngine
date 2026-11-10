@@ -2,7 +2,7 @@
 
 #include <Core/Defines.hpp>
 #include <Core/Serialize.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Vec4.hpp>
 
 #ifdef FX_USE_NEON
@@ -28,15 +28,15 @@ public:
 	Quat(const float32* buffer);
 	Quat(const JPH::Quat& other);
 
-	static Quat FromAxisAngle(const Vec3f axis, float32 angle);
-	static Quat FromEulerAngles(const Vec3f angles);
+	static Quat FromAxisAngle(const FVec3 axis, float32 angle);
+	static Quat FromEulerAngles(const FVec3 angles);
 
-	Vec3f GetEulerAngles() const;
+	FVec3 GetEulerAngles() const;
 
 	/**
 	 * @brief Get Forward (+Z) rotated by this quaternion.
 	 */
-	FX_FORCE_INLINE Vec3f GetDirection() const;
+	FX_FORCE_INLINE FVec3 GetDirection() const;
 
 	Quat operator*(const Quat other) const;
 

@@ -265,7 +265,7 @@ bool WeaponSystem::LoadWeapon(const char* path, Weapon& weapon)
 	weapon.ViewModel = view_model != nullptr ? String(view_model->GetValue<const char*>()) : String("");
 
 	if (const ConfigEntry* view_offset = config.GetEntry(HashStr32("view_offset"))) {
-		weapon.ViewOffset = view_offset->GetValue<Vec3f>();
+		weapon.ViewOffset = view_offset->GetValue<FVec3>();
 	}
 
 	LoadEffects(effects, weapon);
@@ -640,7 +640,7 @@ void WeaponSystem::PlayMuzzleEffect(const Weapon& weapon)
 		return;
 	}
 
-	Vec3f position;
+	FVec3 position;
 
 	if (!mpPlayer->GetViewModelJointPosition(weapon.MuzzleJoint.CStr(), position)) {
 		return;
@@ -657,7 +657,7 @@ void WeaponSystem::UpdateEffects()
 		return;
 	}
 
-	Vec3f position;
+	FVec3 position;
 
 	if (mpPlayer->GetViewModelJointPosition(mWeapons[mActive].MuzzleJoint.CStr(), position)) {
 		gParticleSystem->SetTransform(mMuzzleEffect, position, mpPlayer->pCamera->GetForwardVector());
@@ -672,8 +672,8 @@ void WeaponSystem::PlayReflections(const Weapon& weapon)
 
 	struct Reflection
 	{
-		Vec3f Position;
-		Vec3f Direction;
+		FVec3 Position;
+		FVec3 Direction;
 		float32 Distance;
 		float32 Weight;
 	};
@@ -681,7 +681,7 @@ void WeaponSystem::PlayReflections(const Weapon& weapon)
 	Reflection candidates[scReflectionRays];
 	uint32 candidate_count = 0;
 
-	const Vec3f origin = mpPlayer->pCamera->GetPosition();
+	const FVec3 origin = mpPlayer->pCamera->GetPosition();
 	const float32 base_angle = static_cast<float32>(FastRand32() % 3600) * MathUtil::DegToRad(0.1f);
 
 	for (uint32 i = 0; i < scReflectionRays; i++) {
@@ -697,7 +697,7 @@ void WeaponSystem::PlayReflections(const Weapon& weapon)
 					(static_cast<float32>(up_index) + 0.5f) * 2.0f * static_cast<float32>(M_PI) / scReflectionUpRays;
 		}
 
-		const Vec3f direction(std::cos(angle) * std::cos(elevation), std::sin(elevation),
+		const FVec3 direction(std::cos(angle) * std::cos(elevation), std::sin(elevation),
 							  std::sin(angle) * std::cos(elevation));
 
 		const physics::RayResult hit = gPhysics->pBackend->Raycast(origin, direction * scReflectionRange);
@@ -793,9 +793,9 @@ float32 WeaponSystem::Trace(float32 yaw, float32 pitch, float32 range)
 
 	Ref<FPSCamera>& camera = mpPlayer->pCamera;
 
-	const Vec3f forward = camera->GetForwardVector();
-	const Vec3f right = camera->GetRightVector();
-	const Vec3f up = camera->GetUpVector();
+	const FVec3 forward = camera->GetForwardVector();
+	const FVec3 right = camera->GetRightVector();
+	const FVec3 up = camera->GetUpVector();
 
 	mLastDirection = (forward + right * std::tan(yaw) + up * std::tan(pitch)).Normalize();
 
@@ -857,10 +857,10 @@ void WeaponSystem::ApplyHit(float32 damage, float32 force, bool decal)
 	if (!bleeds) {
 		const Weapon& weapon = mWeapons[mActive];
 
-		const Vec3f normal = mLastHit.Normal;
-		const Vec3f reflected = mLastDirection - (normal * (2.0f * mLastDirection.Dot(normal)));
-		const Vec3f origin = mLastHit.Point + (normal * 0.01f);
-		const Vec3f direction = (normal + reflected).Normalize();
+		const FVec3 normal = mLastHit.Normal;
+		const FVec3 reflected = mLastDirection - (normal * (2.0f * mLastDirection.Dot(normal)));
+		const FVec3 origin = mLastHit.Point + (normal * 0.01f);
+		const FVec3 direction = (normal + reflected).Normalize();
 
 		for (uint32 i = 0; i < weapon.ImpactEffectCount; i++) {
 			gParticleSystem->Play(weapon.ImpactEffects[i], origin, direction);
@@ -888,14 +888,14 @@ void WeaponSystem::SpawnBloodSplatter(bool is_static)
 	constexpr float32 exit_range = 3.0f;
 	constexpr float32 floor_range = 2.0f;
 
-	const Vec3f point = mLastHit.Point;
+	const FVec3 point = mLastHit.Point;
 
 	if (is_static) {
 		gDecalManager->AddBloodSplat(point, mLastHit.Normal, 0.5f);
 	}
 
-	const Vec3f scatter(RandomUnit() - 0.5f, RandomUnit() - 0.5f, RandomUnit() - 0.5f);
-	const Vec3f exit_direction = (mLastDirection + (scatter * 0.2f)).Normalize();
+	const FVec3 scatter(RandomUnit() - 0.5f, RandomUnit() - 0.5f, RandomUnit() - 0.5f);
+	const FVec3 exit_direction = (mLastDirection + (scatter * 0.2f)).Normalize();
 
 	const physics::RayResult exit_hit = gPhysics->pBackend->Raycast(point, exit_direction * exit_range, mLastHit.Body);
 
@@ -904,8 +904,8 @@ void WeaponSystem::SpawnBloodSplatter(bool is_static)
 		gDecalManager->AddBloodSplat(exit_hit.Point, exit_hit.Normal, 0.9f * distance_fade);
 	}
 
-	const Vec3f floor_origin = point + (mLastHit.Normal * 0.05f);
-	const physics::RayResult floor_hit = gPhysics->pBackend->Raycast(floor_origin, -Vec3f::sUp * floor_range,
+	const FVec3 floor_origin = point + (mLastHit.Normal * 0.05f);
+	const physics::RayResult floor_hit = gPhysics->pBackend->Raycast(floor_origin, -FVec3::sUp * floor_range,
 																	 mLastHit.Body);
 
 	if (floor_hit.bHit) {

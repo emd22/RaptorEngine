@@ -119,14 +119,14 @@ void SoundEmitterSet::StopAll()
 	}
 }
 
-void SoundEmitterSet::Update(float32 delta_time, const Vec3f listener)
+void SoundEmitterSet::Update(float32 delta_time, const FVec3 listener)
 {
 	for (uint32 i = 0; i < mEmitters.Size; i++) {
 		UpdateEmitter(mEmitters[i], mStates[i], delta_time, listener);
 	}
 }
 
-void SoundEmitterSet::UpdateEmitter(const SoundEmitter& emitter, State& state, float32 delta_time, const Vec3f listener)
+void SoundEmitterSet::UpdateEmitter(const SoundEmitter& emitter, State& state, float32 delta_time, const FVec3 listener)
 {
 	constexpr float32 scStartReachScale = 1.1f;
 	constexpr float32 scStopReachScale = 1.25f;

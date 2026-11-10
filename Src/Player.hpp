@@ -100,9 +100,9 @@ public:
 	void ApplyViewModelIdleAnimation();
 	void SetViewModelHolster(float32 amount) { mViewModelHolster = amount; }
 	/// Moves the view model in view space: X is right, Y is up, Z is forward, in metres.
-	void SetViewModelOffset(const Vec3f offset) { mViewModelOffset = offset; }
+	void SetViewModelOffset(const FVec3 offset) { mViewModelOffset = offset; }
 
-	bool GetViewModelJointPosition(const char* joint_name, Vec3f& out_position);
+	bool GetViewModelJointPosition(const char* joint_name, FVec3& out_position);
 
 	void AddRecoil(float32 pitch, float32 yaw);
 	void SetRecoilRecovery(float32 rate_per_second) { mRecoilRecovery = rate_per_second; }
@@ -112,7 +112,7 @@ public:
 	/**
 	 * @brief Move the player and its physics by `offset`.
 	 */
-	void TeleportBy(const Vec3f offset)
+	void TeleportBy(const FVec3 offset)
 	{
 		SyncPhysicsToPlayer();
 
@@ -124,7 +124,7 @@ public:
 	/**
 	 * @brief Move the player and its physics to `position`, discarding any momentum.
 	 */
-	void TeleportTo(const Vec3f position)
+	void TeleportTo(const FVec3 position)
 	{
 		Position = position;
 		ResetMotion();
@@ -134,22 +134,22 @@ public:
 	/**
 	 * @brief Puts the player at `position` (at its feet), looking along `direction`.
 	 */
-	void SpawnAt(const Vec3f position, const Vec3f direction);
-	void LookAt(const Vec3f target);
-	void SetViewDirection(const Vec3f direction);
+	void SpawnAt(const FVec3 position, const FVec3 direction);
+	void LookAt(const FVec3 target);
+	void SetViewDirection(const FVec3 direction);
 
 	const ViewAngles& GetViewAngles() const { return mViewAngles; }
 
 	void SetFlyMode(bool value);
 	bool IsFlyMode() const { return Physics.bDisableGravity; };
 
-	void Move(float64 delta_time, const Vec3f offset);
+	void Move(float64 delta_time, const FVec3 offset);
 
 	void RotateHead(const Vec2f& xy);
 
-	FX_FORCE_INLINE Vec3f GetBob() const { return Vec3f(mHeadBobX, mHeadBobY, 0.0f); }
+	FX_FORCE_INLINE FVec3 GetBob() const { return FVec3(mHeadBobX, mHeadBobY, 0.0f); }
 
-	FX_FORCE_INLINE Vec3f GetEyePosition() const { return Position + mCameraOffset; }
+	FX_FORCE_INLINE FVec3 GetEyePosition() const { return Position + mCameraOffset; }
 
 	/**
 	 * @brief How fast the player actually moved horizontally last update, relative to the ground it stands on.
@@ -172,7 +172,7 @@ private:
 	void PlayGroundSound(const char* event, float32 volume);
 	static float32 ViewKickImpulsePerPeak();
 	void UpdateViewModelSway(float32 delta_time);
-	void UpdateMeasuredMotion(const Vec3f& previous_position, float32 delta_time);
+	void UpdateMeasuredMotion(const FVec3& previous_position, float32 delta_time);
 	void UpdateFov(float32 delta_time, bool user_force_released);
 	void ResetMotion();
 
@@ -191,9 +191,9 @@ public:
 	physics::PhysicsPlayer Physics;
 	Ref<FPSCamera> pCamera { nullptr };
 
-	Vec3f Position = Vec3f::sZero;
+	FVec3 Position = FVec3::sZero;
 
-	Vec3f mViewModelOffset = Vec3f::sZero;
+	FVec3 mViewModelOffset = FVec3::sZero;
 
 	bool bIsSprinting : 1 = false;
 
@@ -212,7 +212,7 @@ private:
 	float32 mHeadBobX = 0.0f;
 	float32 mHeadBobY = 0.0f;
 
-	Vec3f mCameraOffset = Vec3f::sZero;
+	FVec3 mCameraOffset = FVec3::sZero;
 
 	ViewAngles mViewAngles;
 
@@ -266,7 +266,7 @@ private:
 		Ref<Skeleton> pSkeleton { nullptr };
 
 		/// Position of the view joint in model space. The joint sits at the camera and looks down the model's -Z.
-		Vec3f ViewOrigin = Vec3f::sZero;
+		FVec3 ViewOrigin = FVec3::sZero;
 		bool bHasViewJoint = false;
 	};
 

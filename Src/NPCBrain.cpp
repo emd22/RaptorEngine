@@ -8,13 +8,13 @@ namespace fx {
 
 namespace {
 
-Vec3f Flatten(const Vec3f v) { return Vec3f(v.X, 0.0f, v.Z); }
+FVec3 Flatten(const FVec3 v) { return FVec3(v.X, 0.0f, v.Z); }
 
 } // namespace
 
-Vec3f NPCBrain::YawToDirection(float32 yaw) { return Vec3f(std::sin(yaw), 0.0f, std::cos(yaw)); }
+FVec3 NPCBrain::YawToDirection(float32 yaw) { return FVec3(std::sin(yaw), 0.0f, std::cos(yaw)); }
 
-float32 NPCBrain::DirectionToYaw(const Vec3f direction) { return std::atan2(direction.X, direction.Z); }
+float32 NPCBrain::DirectionToYaw(const FVec3 direction) { return std::atan2(direction.X, direction.Z); }
 
 float32 NPCBrain::WrapAngle(float32 angle)
 {
@@ -43,7 +43,7 @@ const char* NPCBrain::GetStateName(eNPCBrainState state)
 	return "unknown";
 }
 
-void NPCBrain::Init(const Vec3f home, uint32 seed)
+void NPCBrain::Init(const FVec3 home, uint32 seed)
 {
 	mHome = home;
 	mTarget = home;
@@ -70,21 +70,21 @@ void NPCBrain::Enter(eNPCBrainState state)
 
 void NPCBrain::Idle() { Enter(eNPCBrainState::Idle); }
 
-void NPCBrain::WalkTo(const Vec3f target)
+void NPCBrain::WalkTo(const FVec3 target)
 {
 	mTarget = target;
 	Enter(eNPCBrainState::WalkTo);
 }
 
-void NPCBrain::Flee(const Vec3f from)
+void NPCBrain::Flee(const FVec3 from)
 {
 	mThreat = from;
 	mFleeTurn = 1.0f;
-	mFleeDirection = Vec3f::sZero;
+	mFleeDirection = FVec3::sZero;
 	Enter(eNPCBrainState::Flee);
 }
 
-void NPCBrain::React(const Vec3f source, bool hurt)
+void NPCBrain::React(const FVec3 source, bool hurt)
 {
 	// A second hit while reacting restarts the reaction but keeps what to go back to
 	if (mState == eNPCBrainState::React) {
@@ -109,10 +109,10 @@ void NPCBrain::TurnTowards(float32 delta_time, float32 yaw, NPCBrainOutput& out)
 	out.Yaw = WrapAngle(out.Yaw + MathUtil::Clamp(error, -max_turn, max_turn));
 }
 
-bool NPCBrain::SteerTowards(float32 delta_time, const NPCBrainInput& input, const Vec3f target, float32 speed,
+bool NPCBrain::SteerTowards(float32 delta_time, const NPCBrainInput& input, const FVec3 target, float32 speed,
 							NPCBrainOutput& out)
 {
-	const Vec3f offset = Flatten(target - input.Position);
+	const FVec3 offset = Flatten(target - input.Position);
 	const float32 distance = offset.Length();
 
 	if (distance <= ArriveRadius) {
@@ -133,7 +133,7 @@ bool NPCBrain::SteerTowards(float32 delta_time, const NPCBrainInput& input, cons
 	return false;
 }
 
-bool NPCBrain::CheckStuck(float32 delta_time, const NPCBrainInput& input, const Vec3f target)
+bool NPCBrain::CheckStuck(float32 delta_time, const NPCBrainInput& input, const FVec3 target)
 {
 	const float32 distance = Flatten(target - input.Position).Length();
 
@@ -149,9 +149,9 @@ bool NPCBrain::CheckStuck(float32 delta_time, const NPCBrainInput& input, const 
 	return mProgressTime >= StuckTime;
 }
 
-void NPCBrain::PickFleeTarget(const Vec3f position, float32 turn)
+void NPCBrain::PickFleeTarget(const FVec3 position, float32 turn)
 {
-	Vec3f away = Flatten(position - mThreat);
+	FVec3 away = Flatten(position - mThreat);
 
 	if (away.Length() < 1e-3f) {
 		away = YawToDirection(RandomUnit() * FX_2PI);
@@ -169,7 +169,7 @@ void NPCBrain::Update(float32 delta_time, const NPCBrainInput& input, NPCBrainOu
 {
 	constexpr float32 scFleeReplanTurn = MathUtil::DegToRad(70.0f);
 
-	out.Velocity = Vec3f::sZero;
+	out.Velocity = FVec3::sZero;
 	out.Yaw = input.Yaw;
 
 	mTime += delta_time;

@@ -11,31 +11,31 @@ ShadowDirectional::ShadowDirectional() : ShadowMapSize(ShadowAtlas::scDirectiona
 	FarShadowCamera.Update();
 }
 
-void ShadowDirectional::PlaceCamera(OrthoCamera& camera, const Vec3f target, const Vec3f sun_direction) const
+void ShadowDirectional::PlaceCamera(OrthoCamera& camera, const FVec3 target, const FVec3 sun_direction) const
 {
 	PlaceOrthoCamera(camera, target, sun_direction, scCameraDistance, static_cast<float32>(ShadowMapSize.X));
 }
 
-void ShadowDirectional::PlaceFarCamera(const Vec3f target, const Vec3f sun_direction)
+void ShadowDirectional::PlaceFarCamera(const FVec3 target, const FVec3 sun_direction)
 {
 	PlaceOrthoCamera(FarShadowCamera, target, sun_direction, scFarCameraDistance,
 					 static_cast<float32>(ShadowAtlas::scFarDirectionalSize));
 }
 
-void ShadowDirectional::PlaceOrthoCamera(OrthoCamera& camera, const Vec3f target, const Vec3f sun_direction,
+void ShadowDirectional::PlaceOrthoCamera(OrthoCamera& camera, const FVec3 target, const FVec3 sun_direction,
 										 float32 distance, float32 resolution)
 {
-	Vec3f eye = target + (sun_direction * distance);
+	FVec3 eye = target + (sun_direction * distance);
 
-	Vec3f snapped_target = target;
-	camera.ResolveViewToTexels(eye, snapped_target, Vec3f::sUp, resolution);
+	FVec3 snapped_target = target;
+	camera.ResolveViewToTexels(eye, snapped_target, FVec3::sUp, resolution);
 
 	camera.SetPosition(eye);
 	camera.LookAt(snapped_target);
 	camera.Update();
 }
 
-bool ShadowDirectional::IsWellCovered(const OrthoCamera& camera, const Vec3f position, float32 edge_margin)
+bool ShadowDirectional::IsWellCovered(const OrthoCamera& camera, const FVec3 position, float32 edge_margin)
 {
 	const float32* m = camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData;
 

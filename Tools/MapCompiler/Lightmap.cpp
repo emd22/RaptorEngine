@@ -22,24 +22,24 @@ constexpr double scCoverageEpsilon = 1e-9;
 constexpr uint32 scBuriedRays = 16;
 
 
-Vec3d GetHemisphereDirection(uint32 index, uint32 count)
+DVec3 GetHemisphereDirection(uint32 index, uint32 count)
 {
 	const double u = (static_cast<double>(index) + 0.5) / count;
 	const double radius = std::sqrt(u);
 	const double angle = MathUtil::RadicalInverse<double>(index) * FX_2PI;
 
-	return Vec3d(std::cos(angle) * radius, std::sin(angle) * radius, std::sqrt(1.0 - u));
+	return DVec3(std::cos(angle) * radius, std::sin(angle) * radius, std::sqrt(1.0 - u));
 }
 
 struct SunSampler
 {
 public:
-	SunSampler(const Vec3d& direction, double radius_degrees) : Direction(direction)
+	SunSampler(const DVec3& direction, double radius_degrees) : Direction(direction)
 	{
-		Vec3d reference(1.0, 0.0, 0.0);
+		DVec3 reference(1.0, 0.0, 0.0);
 
 		if (std::abs(direction.Y) < 0.9) {
-			reference = Vec3d(0.0, 1.0, 0.0);
+			reference = DVec3(0.0, 1.0, 0.0);
 		}
 
 		Right = reference.Cross(direction).Normalized();
@@ -48,7 +48,7 @@ public:
 		Spread = std::tan(radius_degrees * (FX_2PI / 360.0));
 	}
 
-	Vec3d Sample(uint32 index, uint32 count) const
+	DVec3 Sample(uint32 index, uint32 count) const
 	{
 		const double u = (static_cast<double>(index) + 0.5) / count;
 		const double v = MathUtil::RadicalInverse<double>(index);
@@ -60,9 +60,9 @@ public:
 	}
 
 public:
-	Vec3d Direction = Vec3d(0.0, 1.0, 0.0);
-	Vec3d Right = Vec3d(1.0, 0.0, 0.0);
-	Vec3d Up = Vec3d(0.0, 0.0, 1.0);
+	DVec3 Direction = DVec3(0.0, 1.0, 0.0);
+	DVec3 Right = DVec3(1.0, 0.0, 0.0);
+	DVec3 Up = DVec3(0.0, 0.0, 1.0);
 
 	double Spread = 0.0;
 };
@@ -240,16 +240,16 @@ struct BakeContext
 	uint32 Samples = 1;
 	uint32 Width = 0;
 
-	const Vec3d* pDirections = nullptr;
+	const DVec3* pDirections = nullptr;
 	uint32 DirectionsPerSample = 1;
 
-	const Vec3d* pBuriedDirections = nullptr;
+	const DVec3* pBuriedDirections = nullptr;
 
 	uint8* pTexels = nullptr;
 	uint8* pValid = nullptr;
 
-	Vec3f* pPositions = nullptr;
-	Vec3f* pNormals = nullptr;
+	FVec3* pPositions = nullptr;
+	FVec3* pNormals = nullptr;
 
 	std::atomic<uint64> RayCount { 0 };
 };
@@ -327,8 +327,8 @@ bool FindPointInTexel(const Array<Vec2d>& corners, double center_x, double cente
 
 struct SurfacePoint
 {
-	Vec3d Position = Vec3d(0.0);
-	Vec3d Normal = Vec3d(0.0);
+	DVec3 Position = DVec3(0.0);
+	DVec3 Normal = DVec3(0.0);
 };
 
 SurfacePoint InterpolateChart(const LightmapChart& chart, const Vec2d texel_corners[3], uint32 first_corner, double x,
@@ -336,7 +336,7 @@ SurfacePoint InterpolateChart(const LightmapChart& chart, const Vec2d texel_corn
 {
 	const double total = texel_corners[1].CrossOffset(texel_corners[2], texel_corners[0]);
 
-	Vec3d weights(1.0 / 3.0);
+	DVec3 weights(1.0 / 3.0);
 
 	if (std::abs(total) > scCoverageEpsilon) {
 		weights.X = texel_corners[2].CrossOffset(Vec2d(x, y), texel_corners[1]) / total;
@@ -356,7 +356,7 @@ SurfacePoint InterpolateChart(const LightmapChart& chart, const Vec2d texel_corn
 	}
 
 	SurfacePoint point;
-	Vec3d normal = Vec3d(0.0);
+	DVec3 normal = DVec3(0.0);
 
 	for (uint32 corner = 0; corner < 3; corner++) {
 		point.Position = point.Position + chart.WorldPoints[first_corner + corner] * weights.mData[corner];
@@ -383,8 +383,8 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 	const ChartLayout& layout = context.Layouts[job.Chart];
 	const bool is_planar = chart.IsPlanar();
 
-	Vec3d plane_normal = Vec3d(0.0);
-	Vec3d plane_origin = Vec3d(0.0);
+	DVec3 plane_normal = DVec3(0.0);
+	DVec3 plane_origin = DVec3(0.0);
 
 	if (is_planar) {
 		const Plane& plane = context.Planes[chart.PlaneIndex];
@@ -489,16 +489,16 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 		return point;
 	};
 
-	const auto is_buried = [&](const Vec3d& origin, const Vec3d& normal)
+	const auto is_buried = [&](const DVec3& origin, const DVec3& normal)
 	{
 		ray_count += scBuriedRays;
 
 		return context.Occluders.IsBuried(origin, normal, context.pBuriedDirections, scBuriedRays);
 	};
 
-	const auto count_lit = [&](const Vec3d& origin, const Vec3d& normal, uint32 sample)
+	const auto count_lit = [&](const DVec3& origin, const DVec3& normal, uint32 sample)
 	{
-		const Vec3d* directions = context.pDirections + sample * direction_count;
+		const DVec3* directions = context.pDirections + sample * direction_count;
 
 		uint32 lit_count = 0;
 
@@ -522,11 +522,11 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 		uint32 lit = 0;
 		bool touches_polygon = false;
 
-		Vec3d position_sum = Vec3d(0.0);
-		Vec3d normal_sum = Vec3d(0.0);
+		DVec3 position_sum = DVec3(0.0);
+		DVec3 normal_sum = DVec3(0.0);
 		uint32 position_count = 0;
 
-		Vec3d nearest_position = Vec3d(0.0);
+		DVec3 nearest_position = DVec3(0.0);
 		double nearest_distance = scNoHit;
 
 		for (uint32 sample = 0; sample < sample_count; sample++) {
@@ -542,8 +542,8 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 			const double texel_x = column + (sample_x + 0.5) * sample_step;
 			const double texel_y = job.Row + (sample_y + 0.5) * sample_step;
 
-			Vec3d origin = Vec3d(0.0);
-			Vec3d normal = plane_normal;
+			DVec3 origin = DVec3(0.0);
+			DVec3 normal = plane_normal;
 
 			if (is_planar) {
 				origin = get_origin(texel_x, texel_y);
@@ -597,8 +597,8 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 				thin_point = thin_point + inward * step;
 			}
 
-			Vec3d origin = Vec3d(0.0);
-			Vec3d normal = plane_normal;
+			DVec3 origin = DVec3(0.0);
+			DVec3 normal = plane_normal;
 
 			if (is_planar) {
 				origin = get_origin(thin_point.X, thin_point.Y);
@@ -635,13 +635,13 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 		if (context.pPositions != nullptr) {
 			// Averaging points across a curved chart's triangles can sink behind the surface
 			if (is_planar) {
-				context.pPositions[texel] = (position_sum * (1.0 / position_count)).ToVec3f();
+				context.pPositions[texel] = (position_sum * (1.0 / position_count)).ToFVec3();
 			}
 			else {
-				context.pPositions[texel] = nearest_position.ToVec3f();
+				context.pPositions[texel] = nearest_position.ToFVec3();
 			}
 
-			context.pNormals[texel] = normal_sum.Normalized().ToVec3f();
+			context.pNormals[texel] = normal_sum.Normalized().ToFVec3();
 		}
 	}
 
@@ -768,7 +768,7 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 			layouts[i].bFacesSun = planes[charts[i].PlaneIndex].Normal.Dot(source.SunDirection) > 0.0;
 		}
 		else {
-			for (const Vec3d& normal : charts[i].Normals) {
+			for (const DVec3& normal : charts[i].Normals) {
 				layouts[i].bFacesSun = layouts[i].bFacesSun || normal.Dot(source.SunDirection) > 0.0;
 			}
 		}
@@ -806,8 +806,8 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 	context.pTexels = lightmap.SunVisibility.pData;
 	context.pValid = valid.pData;
 
-	SizedArray<Vec3f> positions;
-	SizedArray<Vec3f> normals;
+	SizedArray<FVec3> positions;
+	SizedArray<FVec3> normals;
 
 	if (options.bIndirect) {
 		positions.InitSize(texel_count);
@@ -819,7 +819,7 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 
 	const uint32 direction_total = context.Samples * context.Samples * context.Samples;
 
-	SizedArray<Vec3d> directions;
+	SizedArray<DVec3> directions;
 	directions.InitSize(direction_total);
 
 	for (uint32 i = 0; i < direction_total; i++) {
@@ -829,7 +829,7 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 	context.pDirections = directions.pData;
 	context.DirectionsPerSample = context.Samples;
 
-	SizedArray<Vec3d> buried_directions;
+	SizedArray<DVec3> buried_directions;
 	buried_directions.InitSize(scBuriedRays);
 
 	for (uint32 i = 0; i < scBuriedRays; i++) {
@@ -961,8 +961,8 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 	out_map.ProbeSunVisibility.InitSize(probe_count);
 
 	for (uint32 probe = 0; probe < probe_count; probe++) {
-		const Vec3f position = out_map.Probes.Positions[probe];
-		const Vec3d origin(position.X, position.Y, position.Z);
+		const FVec3 position = out_map.Probes.Positions[probe];
+		const DVec3 origin(position.X, position.Y, position.Z);
 
 		uint32 lit = 0;
 

@@ -1201,8 +1201,8 @@ void GraphicsBackend::RenderFog(PerspectiveCamera& camera)
 	consts.MarchDistance = std::max(gCVars->Get("r_fog_distance", scDefaultFogDistance), 0.1f);
 	consts.PreExposure = PreExposure;
 
-	const Vec3f eye(inv_view[12], inv_view[13], inv_view[14]);
-	Vec3f origin = eye;
+	const FVec3 eye(inv_view[12], inv_view[13], inv_view[14]);
+	FVec3 origin = eye;
 
 	const Player& player = gWorld->Player;
 

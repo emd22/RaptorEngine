@@ -10,8 +10,8 @@
 #include <Core/UndoStack.hpp>
 #include <Material/MaterialID.hpp>
 #include <Math/BBox.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Quat.hpp>
-#include <Math/Vec3.hpp>
 #include <Object/ObjectFlags.hpp>
 #include <Object/ObjectID.hpp>
 #include <Patch.hpp>

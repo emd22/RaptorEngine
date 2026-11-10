@@ -69,7 +69,7 @@ void GrabEditor::Grab()
 	const JPH::RMat44 to_local = bodies.GetCenterOfMassTransform(hit.Body).InversedRotationTranslation();
 
 	mBody = hit.Body;
-	mLocalPoint = Vec3f(to_local * JPH::Vec3(hit.Point.X, hit.Point.Y, hit.Point.Z));
+	mLocalPoint = FVec3(to_local * JPH::Vec3(hit.Point.X, hit.Point.Y, hit.Point.Z));
 	mDistance = std::max((hit.Point - camera.GetPosition()).Length(), scMinHoldDistance);
 
 	mbHolding = true;
@@ -82,7 +82,7 @@ void GrabEditor::Launch()
 	JPH::BodyInterface& bodies = gPhysics->pBackend->GetBodyInterface();
 
 	if (bodies.IsAdded(mBody) && bodies.GetMotionType(mBody) == JPH::EMotionType::Dynamic) {
-		const Vec3f launch = gWorld->Player.pCamera->GetForwardVector() * scLaunchSpeed;
+		const FVec3 launch = gWorld->Player.pCamera->GetForwardVector() * scLaunchSpeed;
 
 		bodies.ActivateBody(mBody);
 		bodies.SetLinearVelocity(mBody, JPH::Vec3(launch.X, launch.Y, launch.Z));
@@ -107,19 +107,19 @@ void GrabEditor::Hold(float32 delta_time)
 
 	PerspectiveCamera& camera = *gWorld->Player.pCamera;
 
-	const Vec3f target = camera.GetPosition() + camera.GetForwardVector() * mDistance;
-	const Vec3f held_point = Vec3f(bodies.GetCenterOfMassTransform(mBody) *
+	const FVec3 target = camera.GetPosition() + camera.GetForwardVector() * mDistance;
+	const FVec3 held_point = FVec3(bodies.GetCenterOfMassTransform(mBody) *
 								   JPH::Vec3(mLocalPoint.X, mLocalPoint.Y, mLocalPoint.Z));
 
-	Vec3f velocity = (target - held_point) * scStiffness;
+	FVec3 velocity = (target - held_point) * scStiffness;
 	const float32 speed = velocity.Length();
 
 	if (speed > scMaxSpeed) {
 		velocity = velocity * (scMaxSpeed / speed);
 	}
 
-	const Vec3f current = Vec3f(bodies.GetLinearVelocity(mBody));
-	Vec3f change = velocity - current;
+	const FVec3 current = FVec3(bodies.GetLinearVelocity(mBody));
+	FVec3 change = velocity - current;
 	const float32 max_change = scMaxAcceleration * delta_time;
 	const float32 change_length = change.Length();
 

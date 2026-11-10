@@ -4,7 +4,7 @@
 #include <ThirdParty/Jolt/Physics/Character/CharacterVirtual.h>
 
 #include <Core/Types.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 #include <Physics/PhysicsPlayer.hpp>
 
 namespace fx {
@@ -29,17 +29,17 @@ public:
 	NPCMover(const NPCMover&) = delete;
 	NPCMover& operator=(const NPCMover&) = delete;
 
-	bool Create(const physics::CharacterConfig& config, const Vec3f position, uint32 serial);
+	bool Create(const physics::CharacterConfig& config, const FVec3 position, uint32 serial);
 	void Destroy();
 
 	void SetEnabled(bool enabled);
-	void Teleport(const Vec3f position);
+	void Teleport(const FVec3 position);
 
 	/// Moves the capsule with `desired_velocity` along the ground, with gravity and stair stepping like the player
-	void Update(float32 delta_time, const Vec3f desired_velocity);
+	void Update(float32 delta_time, const FVec3 desired_velocity);
 
-	Vec3f GetPosition() const;
-	Vec3f GetVelocity() const;
+	FVec3 GetPosition() const;
+	FVec3 GetVelocity() const;
 	bool IsGrounded() const;
 
 	FX_FORCE_INLINE bool IsCreated() const { return mpCharacter != nullptr; }

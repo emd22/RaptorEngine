@@ -15,13 +15,13 @@ const CharacterLayerFilter scNPCLayerFilter(eCharacterRagdollCollision::None);
 
 } // namespace
 
-bool NPCMover::Create(const CharacterConfig& config, const Vec3f position, uint32 serial)
+bool NPCMover::Create(const CharacterConfig& config, const FVec3 position, uint32 serial)
 {
 	Destroy();
 
 	mConfig = config;
 
-	const JPH::RVec3 jolt_position = Vec3f::ToJolt(position);
+	const JPH::RVec3 jolt_position = FVec3::ToJolt(position);
 
 	JPH::Ref<JPH::CharacterVirtualSettings> settings = CreateCharacterSettings(config);
 
@@ -67,13 +67,13 @@ void NPCMover::SetEnabled(bool enabled)
 	}
 }
 
-void NPCMover::Teleport(const Vec3f position)
+void NPCMover::Teleport(const FVec3 position)
 {
 	if (mpCharacter == nullptr) {
 		return;
 	}
 
-	mpCharacter->SetPosition(Vec3f::ToJolt(position));
+	mpCharacter->SetPosition(FVec3::ToJolt(position));
 	mpCharacter->SetLinearVelocity(JPH::Vec3::sZero());
 	mRestTime = 0.0f;
 
@@ -88,7 +88,7 @@ void NPCMover::RefreshContacts()
 								 *gPhysics->pBackend->pTempAllocator);
 }
 
-void NPCMover::Update(float32 delta_time, const Vec3f desired_velocity)
+void NPCMover::Update(float32 delta_time, const FVec3 desired_velocity)
 {
 	constexpr float32 scMaxStepTime = 0.1f;
 	constexpr float32 scRestSpeed = 0.01f;
@@ -146,22 +146,22 @@ void NPCMover::Update(float32 delta_time, const Vec3f desired_velocity)
 								*gPhysics->pBackend->pTempAllocator);
 }
 
-Vec3f NPCMover::GetPosition() const
+FVec3 NPCMover::GetPosition() const
 {
 	if (mpCharacter == nullptr) {
-		return Vec3f::sZero;
+		return FVec3::sZero;
 	}
 
-	return Vec3f::FromJolt(mpCharacter->GetPosition());
+	return FVec3::FromJolt(mpCharacter->GetPosition());
 }
 
-Vec3f NPCMover::GetVelocity() const
+FVec3 NPCMover::GetVelocity() const
 {
 	if (mpCharacter == nullptr) {
-		return Vec3f::sZero;
+		return FVec3::sZero;
 	}
 
-	return Vec3f::FromJolt(mpCharacter->GetLinearVelocity());
+	return FVec3::FromJolt(mpCharacter->GetLinearVelocity());
 }
 
 bool NPCMover::IsGrounded() const

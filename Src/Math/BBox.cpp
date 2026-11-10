@@ -4,7 +4,7 @@
 namespace fx {
 
 
-BBox::BBox(Vec3f min, Vec3f max) : Min(min), Max(max) {}
+BBox::BBox(FVec3 min, FVec3 max) : Min(min), Max(max) {}
 
 BBox& BBox::operator+=(const BBox& other)
 {
@@ -22,19 +22,19 @@ BBox& BBox::operator+=(const BBox& other)
 	 */
 
 
-	Min = Vec3f::Min(other.Min, Min);
-	Max = Vec3f::Max(other.Max, Max);
+	Min = FVec3::Min(other.Min, Min);
+	Max = FVec3::Max(other.Max, Max);
 
 	return *this;
 }
 
-BBox BBox::AddMargin(const Vec3f margin) const { return BBox { Min - margin, Max + margin }; }
+BBox BBox::AddMargin(const FVec3 margin) const { return BBox { Min - margin, Max + margin }; }
 
 
 void BBox::Add(const BBox& other)
 {
-	Min = Vec3f::Min(other.Min, Min);
-	Max = Vec3f::Max(other.Max, Max);
+	Min = FVec3::Min(other.Min, Min);
+	Max = FVec3::Max(other.Max, Max);
 }
 
 
@@ -69,7 +69,7 @@ OBBox OBBox::FromLocalBounds(const BBox& local_bounds, const Mat4f transform)
 						  (corner & (1 << 2)) ? local_bounds.Max.Z : local_bounds.Min.Z, 1.0f);
 
 		const Vec4f world = transform * local;
-		obb.Corners[corner] = Vec3f(world.X, world.Y, world.Z);
+		obb.Corners[corner] = FVec3(world.X, world.Y, world.Z);
 	}
 
 	return obb;
@@ -77,12 +77,12 @@ OBBox OBBox::FromLocalBounds(const BBox& local_bounds, const Mat4f transform)
 
 BBox OBBox::GetWorldAABB() const
 {
-	Vec3f out_min { std::numeric_limits<float32>::max() };
-	Vec3f out_max { -std::numeric_limits<float32>::max() };
+	FVec3 out_min { std::numeric_limits<float32>::max() };
+	FVec3 out_max { -std::numeric_limits<float32>::max() };
 
-	for (const Vec3f corner : Corners) {
-		out_min = Vec3f::Min(out_min, corner);
-		out_max = Vec3f::Max(out_max, corner);
+	for (const FVec3 corner : Corners) {
+		out_min = FVec3::Min(out_min, corner);
+		out_max = FVec3::Max(out_max, corner);
 	}
 
 	return BBox(out_min, out_max);

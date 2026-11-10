@@ -22,9 +22,9 @@
 #include <Material/MaterialID.hpp>
 #include <Material/MaterialLibrary.hpp>
 #include <Math/BBox.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/Quat.hpp>
-#include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
 #include <Physics/BodyID.hpp>
 #include <Renderer/ProbePlacement.hpp>
@@ -95,7 +95,7 @@ public:
 	 * @brief Moves the face facing along `face_normal` out by `distance` (in by a negative distance), keeping the rest
 	 * of the brush where it is. The brush is kept at least scMinBlockoutThickness thick behind the face.
 	 */
-	bool MoveFace(Object* object, const Vec3f face_normal, float32 distance);
+	bool MoveFace(Object* object, const FVec3 face_normal, float32 distance);
 
 	/**
 	 * @brief Rebuilds a blockout from a set of planes, e.g. to undo an edit. Anything the planes have in common with
@@ -109,11 +109,11 @@ public:
 	 * @param out_kept The blockout's brush after the split
 	 * @param out_split The piece that splits off, for a new blockout at `out_split_position`
 	 */
-	bool GetClipPieces(Object* object, const Vec3f point_a, const Vec3f point_b, const Vec3f face_normal,
-					   Brush::PlaneList& out_kept, Brush::PlaneList& out_split, Vec3f& out_split_position);
+	bool GetClipPieces(Object* object, const FVec3 point_a, const FVec3 point_b, const FVec3 face_normal,
+					   Brush::PlaneList& out_kept, Brush::PlaneList& out_split, FVec3& out_split_position);
 
 	bool GetSubtractPieces(Object* target, Object* cutter, Brush::PieceList& out_pieces,
-						   SizedArray<Vec3f>& out_positions);
+						   SizedArray<FVec3>& out_positions);
 
 	void RefreshCappedPatches();
 
@@ -123,18 +123,18 @@ public:
 	 * with the world grid
 	 * @param out_position Where the blockout goes
 	 */
-	Brush MakeWorldBox(const Vec3f min, const Vec3f max, Vec3f& out_position) const;
+	Brush MakeWorldBox(const FVec3 min, const FVec3 max, FVec3& out_position) const;
 
 	/**
 	 * @brief Shows a see-through preview of a brush on an object with the given transform
 	 */
-	void ShowPreview(const Vec3f position, const Quat rotation, const Brush& brush);
+	void ShowPreview(const FVec3 position, const Quat rotation, const Brush& brush);
 	void HidePreview();
 
 	/**
 	 * @brief Returns the planes of the object's brush with the texture on one face changed, without applying them
 	 */
-	bool GetFaceTextureEdit(Object* object, const Vec3f face_normal, eFaceTextureEdit edit, const Vec2f& amount,
+	bool GetFaceTextureEdit(Object* object, const FVec3 face_normal, eFaceTextureEdit edit, const Vec2f& amount,
 							Brush::PlaneList& out_planes);
 
 	/**
@@ -142,15 +142,15 @@ public:
 	 * @param direction The direction of the ray, with the length of how far it reaches
 	 * @param out_face_normal The normal of the face that was hit, in the blockout's local space
 	 */
-	Object* RaycastBlockout(const Vec3f origin, const Vec3f direction, Vec3f& out_face_normal);
+	Object* RaycastBlockout(const FVec3 origin, const FVec3 direction, FVec3& out_face_normal);
 
 	/**
 	 * @brief Finds the face of a blockout that a world space ray hits
 	 * @param out_face_normal The normal of the face that was hit, in the object's local space
 	 * @param out_point Where the face was hit, in world space
 	 */
-	bool RaycastFace(Object* object, const Vec3f origin, const Vec3f direction, Vec3f& out_face_normal,
-					 Vec3f* out_point = nullptr);
+	bool RaycastFace(Object* object, const FVec3 origin, const FVec3 direction, FVec3& out_face_normal,
+					 FVec3* out_point = nullptr);
 
 	const String& GetSurfaceAt(const physics::RayResult& hit);
 
@@ -161,7 +161,7 @@ public:
 	/**
 	 * @brief Creates a new blockout objectC
 	 */
-	Object* NewObject(const Vec3f position, MaterialID material = MaterialID::scNull);
+	Object* NewObject(const FVec3 position, MaterialID material = MaterialID::scNull);
 
 	Object* DupeObject(Object* object);
 
@@ -172,10 +172,10 @@ public:
 	 * @brief Recreates a destroyed blockout object from a snapshot (undo of Delete).
 	 * Falls back to a unique name if the original name is taken.
 	 */
-	Object* RestoreObject(const Vec3f position, const Brush::PlaneList& planes, MaterialID material,
+	Object* RestoreObject(const FVec3 position, const Brush::PlaneList& planes, MaterialID material,
 						  const Quat rotation, const Name& name, bool is_dynamic = false, bool is_decal = false);
 
-	Object* RestorePatch(const Vec3f position, const Patch& patch, MaterialID material, const Quat rotation,
+	Object* RestorePatch(const FVec3 position, const Patch& patch, MaterialID material, const Quat rotation,
 						 const Name& name);
 
 	bool SetPatch(Object* object, Patch&& patch);
@@ -190,7 +190,7 @@ public:
 
 	bool HasBrush(const Object* object);
 
-	bool ContainsPoint(Object* object, const Vec3f point);
+	bool ContainsPoint(Object* object, const FVec3 point);
 
 	/**
 	 * @brief Clears the prototype of all brushes and objects, and creates the basis for a new prototype.
@@ -215,7 +215,7 @@ public:
 	void RebuildAcoustics();
 	AcousticSurface GetAcousticSurface(const MaterialLibraryID id) const;
 
-	void RaycastDecalSurfaces(const Vec3f origin, const Vec3f direction, float32 max_distance,
+	void RaycastDecalSurfaces(const FVec3 origin, const FVec3 direction, float32 max_distance,
 							  DynArray<float32, GrowthFunctions::Double>& out_distances);
 
 	const MaterialLibrary& GetMaterialLibrary() const { return mMaterials; }
@@ -254,9 +254,9 @@ public:
 	bool IsCompiledObject(const Object* object) const;
 
 	bool HasBakedSun() const { return mbHasBakedSun; }
-	bool IsBakedSunCurrent(const Vec3f sun_position) const;
+	bool IsBakedSunCurrent(const FVec3 sun_position) const;
 
-	bool IsBakedIndirectCurrent(bool sun_enabled, const Vec3f sun_position) const;
+	bool IsBakedIndirectCurrent(bool sun_enabled, const FVec3 sun_position) const;
 
 	/**
 	 * @brief The brush that a blockout object is built from, or nullptr if the object is not a blockout.
@@ -265,7 +265,7 @@ public:
 	Patch* GetPatch(const Object* object);
 	bool HasPatch(const Object* object) { return GetPatch(object) != nullptr; }
 
-	bool GetLocalCenter(const Object* object, Vec3f& out_center);
+	bool GetLocalCenter(const Object* object, FVec3& out_center);
 
 	/**
 	 * @brief True if the loaded blockout file has an `objects` entry. Files saved before models moved into the
@@ -334,7 +334,7 @@ public:
 	 * The brushes themselves are left as they are.
 	 * @param origin The point of the level that becomes the origin of the subview
 	 */
-	uint32 CreateSubview(const String& name, Object* const* objects, uint32 count, const Vec3f origin);
+	uint32 CreateSubview(const String& name, Object* const* objects, uint32 count, const FVec3 origin);
 
 	/// Makes an instance of a subview that is not placed yet. Returns scNoSubview if there is no such subview.
 	uint32 NewSubviewInstance(const String& subview_name);
@@ -381,7 +381,7 @@ private:
 	{
 		MaterialID Material = MaterialID::scNull;
 		Ref<PrimitiveMesh> pMesh { nullptr };
-		BBox Bounds { Vec3f::sZero, Vec3f::sZero };
+		BBox Bounds { FVec3::sZero, FVec3::sZero };
 	};
 
 	struct Subview
@@ -395,8 +395,8 @@ private:
 
 		std::vector<SubviewMember> Members;
 		std::vector<SubviewGroup> Groups;
-		SizedArray<SizedArray<Vec3f>> Hulls;
-		BBox Bounds { Vec3f::sZero, Vec3f::sZero };
+		SizedArray<SizedArray<FVec3>> Hulls;
+		BBox Bounds { FVec3::sZero, FVec3::sZero };
 
 		bool bHasFile = false;
 		bool bDirty = false;
@@ -460,7 +460,7 @@ private:
 	 * @brief Creates a new brush from values
 	 * @returns A null ObjectID on failure, the ObjectID of the brush otherwise
 	 */
-	ObjectID CreateBrush(const String& name, const Vec3f position, const Quat rotation, const MaterialID material_id,
+	ObjectID CreateBrush(const String& name, const FVec3 position, const Quat rotation, const MaterialID material_id,
 						 const BBox bounds);
 
 	/**
@@ -514,8 +514,8 @@ private:
 	void ApplyBrushInPlace(Object* object, Brush&& brush);
 
 	void RebuildPatch(Object* object, Patch&& patch);
-	bool RaycastPatch(Object* object, const Vec3f origin, const Vec3f direction, Vec3f& out_face_normal,
-					  Vec3f* out_point);
+	bool RaycastPatch(Object* object, const FVec3 origin, const FVec3 direction, FVec3& out_face_normal,
+					  FVec3* out_point);
 
 	void RemoveBlockoutFromWorld(World* world);
 	void RemoveSingleObjectFromWorld(Object* object);
@@ -531,8 +531,8 @@ private:
 	struct CompiledDecalReceiver
 	{
 		BBox Bounds;
-		SizedArray<Vec3f> Positions;
-		SizedArray<Vec3f> Normals;
+		SizedArray<FVec3> Positions;
+		SizedArray<FVec3> Normals;
 		SizedArray<uint32> Indices;
 	};
 
@@ -600,7 +600,7 @@ private:
 	bool mbHasBakedSun = false;
 	bool mbHasBakedIndirect = false;
 	bool mbBakedWithSun = false;
-	Vec3f mBakedSunDirection = Vec3f::sUp;
+	FVec3 mBakedSunDirection = FVec3::sUp;
 
 	Brush::PlaneList mPreviewPlanes;
 

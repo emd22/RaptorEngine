@@ -6,10 +6,10 @@
 
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/MathUtil.hpp>
 #include <Math/Vec2.hpp>
-#include <Math/Vec3.hpp>
 #include <algorithm>
 
 namespace fx::physics::RagdollMath {

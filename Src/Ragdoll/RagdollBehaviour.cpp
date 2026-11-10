@@ -12,26 +12,26 @@ namespace fx::physics {
 
 using namespace RagdollMath;
 
-Vec3f BehaviourContext::ToBodyLocal(uint32 body, const Vec3f point) const
+FVec3 BehaviourContext::ToBodyLocal(uint32 body, const FVec3 point) const
 {
 	const BehaviourBody& state = Bodies[body];
-	return Vec3f::FromJolt(state.Orientation.Conjugated() * Vec3f::ToJolt(point - state.Origin));
+	return FVec3::FromJolt(state.Orientation.Conjugated() * FVec3::ToJolt(point - state.Origin));
 }
 
-Vec3f BehaviourContext::FromBodyLocal(uint32 body, const Vec3f local) const
+FVec3 BehaviourContext::FromBodyLocal(uint32 body, const FVec3 local) const
 {
 	const BehaviourBody& state = Bodies[body];
-	return state.Origin + Vec3f::FromJolt(state.Orientation * Vec3f::ToJolt(local));
+	return state.Origin + FVec3::FromJolt(state.Orientation * FVec3::ToJolt(local));
 }
 
-Vec3f BehaviourContext::ToBodyDirection(uint32 body, const Vec3f local_direction) const
+FVec3 BehaviourContext::ToBodyDirection(uint32 body, const FVec3 local_direction) const
 {
-	return Vec3f::FromJolt(Bodies[body].Orientation * Vec3f::ToJolt(local_direction));
+	return FVec3::FromJolt(Bodies[body].Orientation * FVec3::ToJolt(local_direction));
 }
 
-Vec3f BehaviourContext::ToLocalDirection(uint32 body, const Vec3f direction) const
+FVec3 BehaviourContext::ToLocalDirection(uint32 body, const FVec3 direction) const
 {
-	return Vec3f::FromJolt(Bodies[body].Orientation.Conjugated() * Vec3f::ToJolt(direction));
+	return FVec3::FromJolt(Bodies[body].Orientation.Conjugated() * FVec3::ToJolt(direction));
 }
 
 bool BehaviourContext::IsArmBody(uint32 arm, uint32 body) const
@@ -76,14 +76,14 @@ void BehaviourOutput::Reset()
 	bAdditive = true;
 }
 
-void BehaviourOutput::AddWorldRotation(const BehaviourContext& ctx, uint32 body, const Vec3f world_axis, float32 angle,
+void BehaviourOutput::AddWorldRotation(const BehaviourContext& ctx, uint32 body, const FVec3 world_axis, float32 angle,
 									   float32 mask)
 {
 	if (body >= Pose.Size || angle == 0.0f) {
 		return;
 	}
 
-	const JPH::Vec3 local_axis = (ctx.Bodies[body].Orientation.Conjugated() * Vec3f::ToJolt(world_axis))
+	const JPH::Vec3 local_axis = (ctx.Bodies[body].Orientation.Conjugated() * FVec3::ToJolt(world_axis))
 									 .NormalizedOr(JPH::Vec3::sAxisX());
 
 	Pose[body] = (Pose[body] * JPH::Quat::sRotation(local_axis, angle)).Normalized();

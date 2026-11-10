@@ -1,16 +1,16 @@
 #pragma once
 
 #include <Core/Types.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Float16.hpp>
-#include <Math/Vec3.hpp>
 
 namespace fx::ReflectionFilter {
 
 static constexpr uint32 scFaces = 6;
 
-Vec3f FaceUVToDirection(uint32 face, float32 u, float32 v);
+FVec3 FaceUVToDirection(uint32 face, float32 u, float32 v);
 
-void DirectionToFaceUV(const Vec3f direction, uint32& out_face, float32& out_u, float32& out_v);
+void DirectionToFaceUV(const FVec3 direction, uint32& out_face, float32& out_u, float32& out_v);
 
 uint64 GetTexelCount(uint32 size, uint32 mip_count);
 

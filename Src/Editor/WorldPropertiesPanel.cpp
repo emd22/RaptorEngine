@@ -78,7 +78,7 @@ WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, w
 	mpPositionField = new Vector3Field(world_body, "Player", Vec2f(-100000.0f, 100000.0f));
 	world_section->AddRow(*mpPositionField);
 
-	mpPositionField->SetOnChange([](const Vec3f value)
+	mpPositionField->SetOnChange([](const FVec3 value)
 								 { thread::PostToGame([value] { gWorld->Player.TeleportTo(value); }); });
 
 	mpDebugLayerChoice = new wxChoice(world_body, wxID_ANY);

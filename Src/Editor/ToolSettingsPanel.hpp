@@ -6,7 +6,7 @@
 #include <wx/string.h>
 
 #include <Core/Types.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 
 class wxStaticText;
 class wxColourPickerCtrl;

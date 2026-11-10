@@ -196,7 +196,7 @@ struct Schema
 			float32 values[3];
 
 			if (ReadFloats(*position, table_path + ".pos", values, 3)) {
-				out.Position = Vec3f(values[0], values[1], values[2]);
+				out.Position = FVec3(values[0], values[1], values[2]);
 			}
 		}
 
@@ -219,13 +219,13 @@ struct Schema
 		if (const ConfigEntry* scale = Get(table, table_path, "scale", false)) {
 			if (IsNumber(*scale)) {
 				const float32 uniform = scale->Get<float32>();
-				out.Scale = Vec3f(uniform, uniform, uniform);
+				out.Scale = FVec3(uniform, uniform, uniform);
 			}
 			else {
 				float32 values[3];
 
 				if (ReadFloats(*scale, table_path + ".scale", values, 3)) {
-					out.Scale = Vec3f(values[0], values[1], values[2]);
+					out.Scale = FVec3(values[0], values[1], values[2]);
 				}
 			}
 		}

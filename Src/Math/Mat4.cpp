@@ -55,14 +55,14 @@ Mat4f Mat4f::Inverse() const
 
 Mat4f Mat4f::AffineInverse() const
 {
-	const Vec3f r0(Rows[0]);
-	const Vec3f r1(Rows[1]);
-	const Vec3f r2(Rows[2]);
-	const Vec3f t(Rows[3]);
+	const FVec3 r0(Rows[0]);
+	const FVec3 r1(Rows[1]);
+	const FVec3 r2(Rows[2]);
+	const FVec3 t(Rows[3]);
 
-	const Vec3f c0 = r1.Cross(r2);
-	const Vec3f c1 = r2.Cross(r0);
-	const Vec3f c2 = r0.Cross(r1);
+	const FVec3 c0 = r1.Cross(r2);
+	const FVec3 c1 = r2.Cross(r0);
+	const FVec3 c2 = r0.Cross(r1);
 
 	const float32 idet = 1.0f / r0.Dot(c0);
 
@@ -77,10 +77,10 @@ Mat4f Mat4f::AffineInverse() const
 
 Mat4f Mat4f::RigidInverse() const
 {
-	const Vec3f r0(Rows[0]);
-	const Vec3f r1(Rows[1]);
-	const Vec3f r2(Rows[2]);
-	const Vec3f t(Rows[3]);
+	const FVec3 r0(Rows[0]);
+	const FVec3 r1(Rows[1]);
+	const FVec3 r2(Rows[2]);
+	const FVec3 t(Rows[3]);
 
 	Mat4f result;
 	result.Rows[0].Set(r0.X, r1.X, r2.X, 0.0f);

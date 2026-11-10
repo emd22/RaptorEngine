@@ -26,15 +26,15 @@ struct ViewAngles
 		Pitch = MathUtil::Clamp(Pitch + pitch_delta, -scPitchLimit, scPitchLimit);
 	}
 
-	void SetDirection(const Vec3f direction)
+	void SetDirection(const FVec3 direction)
 	{
-		const Vec3f unit = direction.Normalize();
+		const FVec3 unit = direction.Normalize();
 
 		Yaw = std::atan2(unit.X, unit.Z);
 		Pitch = std::asin(MathUtil::Clamp(unit.Y, -1.0f, 1.0f));
 	}
 
-	Quat ToQuat() const { return Quat::FromEulerAngles(Vec3f(-Pitch, Yaw, 0.0f)); }
+	Quat ToQuat() const { return Quat::FromEulerAngles(FVec3(-Pitch, Yaw, 0.0f)); }
 
 	float32 Yaw = 0.0f;
 	float32 Pitch = 0.0f;

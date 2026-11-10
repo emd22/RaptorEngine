@@ -33,12 +33,12 @@ constexpr double scMinSunDistance = 1e-6;
 
 struct Transform
 {
-	Vec3d Rows[3] = { Vec3d(1.0, 0.0, 0.0), Vec3d(0.0, 1.0, 0.0), Vec3d(0.0, 0.0, 1.0) };
-	Vec3d Pivot = Vec3d(0.0);
-	Vec3d Position = Vec3d(0.0);
+	DVec3 Rows[3] = { DVec3(1.0, 0.0, 0.0), DVec3(0.0, 1.0, 0.0), DVec3(0.0, 0.0, 1.0) };
+	DVec3 Pivot = DVec3(0.0);
+	DVec3 Position = DVec3(0.0);
 
-	Vec3d Rotate(const Vec3d& vector) const { return Rows[0] * vector.X + Rows[1] * vector.Y + Rows[2] * vector.Z; }
-	Vec3d Apply(const Vec3d& point) const { return Rotate(point - Pivot) + Pivot + Position; }
+	DVec3 Rotate(const DVec3& vector) const { return Rows[0] * vector.X + Rows[1] * vector.Y + Rows[2] * vector.Z; }
+	DVec3 Apply(const DVec3& point) const { return Rotate(point - Pivot) + Pivot + Position; }
 };
 
 Quat ReadRotation(ConfigEntry& entry)
@@ -48,7 +48,7 @@ Quat ReadRotation(ConfigEntry& entry)
 	ConfigEntry* euler_entry = entry.GetMember(HashStr32("rot"));
 
 	if (euler_entry != nullptr) {
-		rotation = Quat::FromEulerAngles(euler_entry->GetValue<Vec3f>());
+		rotation = Quat::FromEulerAngles(euler_entry->GetValue<FVec3>());
 	}
 
 	ConfigEntry* quat_entry = entry.GetMember(HashStr32("rotquat"));
@@ -60,11 +60,11 @@ Quat ReadRotation(ConfigEntry& entry)
 	return rotation;
 }
 
-Transform MakeTransform(const Quat rotation, const Vec3f pivot, const Vec3f position)
+Transform MakeTransform(const Quat rotation, const FVec3 pivot, const FVec3 position)
 {
 	Transform transform;
-	transform.Pivot = Vec3d(pivot);
-	transform.Position = Vec3d(position);
+	transform.Pivot = DVec3(pivot);
+	transform.Position = DVec3(position);
 
 	const bool is_identity = (rotation.X == 0.0f && rotation.Y == 0.0f && rotation.Z == 0.0f);
 
@@ -72,7 +72,7 @@ Transform MakeTransform(const Quat rotation, const Vec3f pivot, const Vec3f posi
 		const Mat4f matrix = Mat4f::AsRotation(rotation);
 
 		for (int32 row = 0; row < 3; row++) {
-			const Vec3d axis(matrix.Rows[row].X, matrix.Rows[row].Y, matrix.Rows[row].Z);
+			const DVec3 axis(matrix.Rows[row].X, matrix.Rows[row].Y, matrix.Rows[row].Z);
 			transform.Rows[row] = axis.Normalized();
 		}
 	}
@@ -80,13 +80,13 @@ Transform MakeTransform(const Quat rotation, const Vec3f pivot, const Vec3f posi
 	return transform;
 }
 
-Mat4f MakeObjectMatrix(const Quat rotation, const Vec3f pivot, const Vec3f position)
+Mat4f MakeObjectMatrix(const Quat rotation, const FVec3 pivot, const FVec3 position)
 {
-	return Mat4f::AsScale(Vec3f(1.0f)) * Mat4f::AsTranslation(-pivot) * Mat4f::AsRotation(rotation) *
+	return Mat4f::AsScale(FVec3(1.0f)) * Mat4f::AsTranslation(-pivot) * Mat4f::AsRotation(rotation) *
 		   Mat4f::AsTranslation(pivot) * Mat4f::AsTranslation(position);
 }
 
-void AddEntityPositions(const ConfigEntry* list, Array<Vec3d>& out_entities)
+void AddEntityPositions(const ConfigEntry* list, Array<DVec3>& out_entities)
 {
 	if (list == nullptr) {
 		return;
@@ -96,17 +96,17 @@ void AddEntityPositions(const ConfigEntry* list, Array<Vec3d>& out_entities)
 		const ConfigEntry* position = entry.GetMember(HashStr32("pos"));
 
 		if (position != nullptr) {
-			out_entities.Emplace(Vec3d(position->GetValue<Vec3f>()));
+			out_entities.Emplace(DVec3(position->GetValue<FVec3>()));
 		}
 	}
 }
 
-Vec3d GetLightColor(const Color& color, const double intensity)
+DVec3 GetLightColor(const Color& color, const double intensity)
 {
 	float32 linear[3];
 	color.GetLinearRGB(linear);
 
-	return Vec3d(linear[0], linear[1], linear[2]) * intensity;
+	return DVec3(linear[0], linear[1], linear[2]) * intensity;
 }
 
 void AddLights(const ConfigEntry* list, Array<SourceLight>& out_lights)
@@ -126,13 +126,13 @@ void AddLights(const ConfigEntry* list, Array<SourceLight>& out_lights)
 		const double radius = source.Radius;
 
 		SourceLight light;
-		light.Position = Vec3d(source.Position);
+		light.Position = DVec3(source.Position);
 		light.Color = GetLightColor(source.Color, source.Intensity);
 		light.InvRadiusSq = 1.0 / std::max(radius * radius, 1e-8);
 		light.bSpot = (source.Type == ePrxLightType::Spot);
 
 		if (light.bSpot) {
-			const Vec3d direction = Vec3d(source.Spot.Direction);
+			const DVec3 direction = DVec3(source.Spot.Direction);
 
 			if (direction.Length() > scMinSunDistance) {
 				light.Direction = direction.Normalized();
@@ -202,7 +202,7 @@ void MapSource::AddModels(const ConfigEntry* models_entry, const ConfigEntry* br
 			continue;
 		}
 
-		const Vec3f position = entry.GetMemberValue(HashStr32("pos"), Vec3f(0.0f));
+		const FVec3 position = entry.GetMemberValue(HashStr32("pos"), FVec3(0.0f));
 		Quat rotation = entry.GetMemberValue(HashStr32("rot"), Quat::scIdentity);
 		rotation = entry.GetMemberValue(HashStr32("rotquat"), rotation);
 		const float32 scale = entry.GetMemberValue(HashStr32("scale"), 1.0f);
@@ -210,7 +210,7 @@ void MapSource::AddModels(const ConfigEntry* models_entry, const ConfigEntry* br
 		SourceModel& model = Models.Emplace();
 		model.Name = entry.Name.Get();
 		model.MeshPath = mesh->Get<const char*>();
-		model.Transform = Mat4f::AsScale(Vec3f(scale)) * Mat4f::AsRotation(rotation) * Mat4f::AsTranslation(position);
+		model.Transform = Mat4f::AsScale(FVec3(scale)) * Mat4f::AsRotation(rotation) * Mat4f::AsTranslation(position);
 		model.bBaked = IsBakedModelEntry(entry, brushes);
 		model.bProbeBox = entry.GetMemberValue(HashStr32("unlit"), 0) == 0 &&
 						  entry.GetMemberValue(HashStr32("noprobe"), 0) == 0;
@@ -248,13 +248,13 @@ void MapSource::AddPatch(ConfigEntry& entry, const String& name, const CachedMat
 		return;
 	}
 
-	const Vec3f position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
+	const FVec3 position = entry.GetMemberValue<FVec3>(HashStr32("pos"), FVec3::sZero);
 	const Transform transform = MakeTransform(ReadRotation(entry), patch.GetCenter(), position);
 
 	for (PatchPoint& point : patch.Points) {
-		const Vec3d world = transform.Apply(Vec3d(point.Position));
+		const DVec3 world = transform.Apply(DVec3(point.Position));
 
-		point.Position = world.ToVec3f();
+		point.Position = world.ToFVec3();
 
 		Min = MinVec(Min, world);
 		Max = MaxVec(Max, world);
@@ -300,8 +300,8 @@ void MapSource::AddPatch(ConfigEntry& entry, const String& name, const CachedMat
 			source.Shape = std::move(pieces[piece - 1]);
 
 			for (const PatchPoint& point : source.Shape.Points) {
-				Min = MinVec(Min, Vec3d(point.Position));
-				Max = MaxVec(Max, Vec3d(point.Position));
+				Min = MinVec(Min, DVec3(point.Position));
+				Max = MaxVec(Max, DVec3(point.Position));
 			}
 		}
 	}
@@ -319,7 +319,7 @@ void MapSource::AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& nam
 		return;
 	}
 
-	const Vec3f position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
+	const FVec3 position = entry.GetMemberValue<FVec3>(HashStr32("pos"), FVec3::sZero);
 	const Quat rotation = ReadRotation(entry);
 	const Transform transform = MakeTransform(rotation, brush.GetCenter(), position);
 
@@ -448,32 +448,32 @@ void MapSource::AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& nam
 		return FindOrAddMaterial(plane.Material, library_index, mc);
 	};
 
-	const Vec3d offset = transform.Pivot + transform.Position;
+	const DVec3 offset = transform.Pivot + transform.Position;
 
 	for (const BrushPlane& plane : brush.Planes) {
-		const Vec3d local_normal = Vec3d(plane.Normal);
-		const Vec3d rotated_normal = transform.Rotate(local_normal);
+		const DVec3 local_normal = DVec3(plane.Normal);
+		const DVec3 rotated_normal = transform.Rotate(local_normal);
 		const double length = rotated_normal.Length();
 
 		if (length <= 0.0) {
 			continue;
 		}
 
-		const Vec3d world_normal = rotated_normal * (1.0 / length);
+		const DVec3 world_normal = rotated_normal * (1.0 / length);
 		const double world_distance = (static_cast<double>(plane.Distance) - local_normal.Dot(transform.Pivot)) /
 										  length +
 									  world_normal.Dot(offset);
 
-		Vec3f u_gradient;
-		Vec3f v_gradient;
+		FVec3 u_gradient;
+		FVec3 v_gradient;
 		Brush::GetTextureGradients(plane, u_gradient, v_gradient);
 
 		TextureMap map;
-		map.GradientU = transform.Rotate(Vec3d(u_gradient));
-		map.GradientV = transform.Rotate(Vec3d(v_gradient));
-		map.OffsetU = static_cast<double>(plane.Texture.Offset.X) + Vec3d(u_gradient).Dot(transform.Pivot) -
+		map.GradientU = transform.Rotate(DVec3(u_gradient));
+		map.GradientV = transform.Rotate(DVec3(v_gradient));
+		map.OffsetU = static_cast<double>(plane.Texture.Offset.X) + DVec3(u_gradient).Dot(transform.Pivot) -
 					  map.GradientU.Dot(offset);
-		map.OffsetV = static_cast<double>(plane.Texture.Offset.Y) + Vec3d(v_gradient).Dot(transform.Pivot) -
+		map.OffsetV = static_cast<double>(plane.Texture.Offset.Y) + DVec3(v_gradient).Dot(transform.Pivot) -
 					  map.GradientV.Dot(offset);
 
 		source.PlaneIndices.Emplace(planes.FindOrAdd(world_normal, world_distance));
@@ -549,8 +549,8 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 									 renamed_count));
 	}
 
-	Min = Vec3d(DBL_MAX);
-	Max = Vec3d(-DBL_MAX);
+	Min = DVec3(DBL_MAX);
+	Max = DVec3(-DBL_MAX);
 
 	Patches.InitCapacity(entry_count);
 
@@ -575,7 +575,7 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 	const ConfigEntry* spawn_entry = info.GetEntry(HashStr32("player_spawn"));
 
 	if (spawn_entry != nullptr && spawn_entry->GetMember(HashStr32("pos")) != nullptr) {
-		PlayerSpawn = Vec3d(spawn_entry->GetMember(HashStr32("pos"))->GetValue<Vec3f>());
+		PlayerSpawn = DVec3(spawn_entry->GetMember(HashStr32("pos"))->GetValue<FVec3>());
 		bHasPlayerSpawn = true;
 
 		Entities.Emplace(PlayerSpawn);
@@ -585,7 +585,7 @@ bool MapSource::Load(const String& path, PlaneSet& planes)
 
 	if (sun_entry != nullptr) {
 		const SunLightEntry sun = ReadSunLightEntry(*sun_entry);
-		const Vec3d sun_position = Vec3d(sun.Position);
+		const DVec3 sun_position = DVec3(sun.Position);
 
 		if (sun.bEnabled && sun_position.Length() > scMinSunDistance) {
 			SunDirection = sun_position.Normalized();

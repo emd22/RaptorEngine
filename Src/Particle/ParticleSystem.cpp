@@ -72,26 +72,26 @@ uint32 PackUnorm2(float32 low, float32 high)
 
 float32 WrapAngle(float32 angle) { return angle - FX_2PI * std::floor((angle + FX_PI) / FX_2PI); }
 
-void StoreFloat3(const Vec3f value, float32* out)
+void StoreFloat3(const FVec3 value, float32* out)
 {
 	out[0] = value.X;
 	out[1] = value.Y;
 	out[2] = value.Z;
 }
 
-void MakeBasis(const Vec3f forward, Vec3f& out_tangent, Vec3f& out_bitangent)
+void MakeBasis(const FVec3 forward, FVec3& out_tangent, FVec3& out_bitangent)
 {
-	Vec3f reference = Vec3f::sUp;
+	FVec3 reference = FVec3::sUp;
 
 	if (std::abs(forward.Y) > 0.99f) {
-		reference = Vec3f::sRight;
+		reference = FVec3::sRight;
 	}
 
 	out_tangent = reference.Cross(forward).Normalize();
 	out_bitangent = forward.Cross(out_tangent);
 }
 
-Vec3f RandomDirectionInCone(const Vec3f forward, const Vec3f tangent, const Vec3f bitangent, float32 spread_cos)
+FVec3 RandomDirectionInCone(const FVec3 forward, const FVec3 tangent, const FVec3 bitangent, float32 spread_cos)
 {
 	const float32 cos_theta = 1.0f + (spread_cos - 1.0f) * RandomUnit();
 	const float32 sin_theta = std::sqrt(std::max(0.0f, 1.0f - cos_theta * cos_theta));
@@ -384,12 +384,12 @@ bool ParticleSystem::LoadEffect(const char* path, const String& name, ParticleEf
 	return true;
 }
 
-ParticleEffectID ParticleSystem::Play(const char* name, const Vec3f position, const Vec3f direction, eObjectLayer layer)
+ParticleEffectID ParticleSystem::Play(const char* name, const FVec3 position, const FVec3 direction, eObjectLayer layer)
 {
 	return Play(HashStr32(name), position, direction, layer);
 }
 
-ParticleEffectID ParticleSystem::Play(Hash32 name_hash, const Vec3f position, const Vec3f direction, eObjectLayer layer)
+ParticleEffectID ParticleSystem::Play(Hash32 name_hash, const FVec3 position, const FVec3 direction, eObjectLayer layer)
 {
 	uint32 def_index = UINT32_MAX;
 
@@ -472,7 +472,7 @@ const ParticleEmitterDef& ParticleSystem::GetEmitter(const Particle& particle) c
 	return mEffectDefs[mEffects[particle.EffectSlot].DefIndex].Emitters[particle.EmitterIndex];
 }
 
-Vec3f ParticleSystem::GetWorldPosition(const Particle& particle) const
+FVec3 ParticleSystem::GetWorldPosition(const Particle& particle) const
 {
 	if (GetEmitter(particle).bLocalSpace) {
 		return mEffects[particle.EffectSlot].Position + particle.Position;
@@ -481,7 +481,7 @@ Vec3f ParticleSystem::GetWorldPosition(const Particle& particle) const
 	return particle.Position;
 }
 
-void ParticleSystem::SetTransform(ParticleEffectID id, const Vec3f position, const Vec3f direction)
+void ParticleSystem::SetTransform(ParticleEffectID id, const FVec3 position, const FVec3 direction)
 {
 	EffectInstance* effect = GetInstance(id);
 
@@ -550,16 +550,16 @@ void ParticleSystem::SpawnParticles(uint32 effect_slot, uint32 emitter_index, ui
 	EffectInstance& effect = mEffects[effect_slot];
 	const ParticleEmitterDef& emitter = mEffectDefs[effect.DefIndex].Emitters[emitter_index];
 
-	Vec3f tangent;
-	Vec3f bitangent;
+	FVec3 tangent;
+	FVec3 bitangent;
 	MakeBasis(effect.Direction, tangent, bitangent);
 
 	const uint32 frame_count = emitter.FramesX * emitter.FramesY;
 
-	Vec3f origin = effect.Position;
+	FVec3 origin = effect.Position;
 
 	if (emitter.bLocalSpace) {
-		origin = Vec3f::sZero;
+		origin = FVec3::sZero;
 	}
 
 	for (uint32 i = 0; i < count; i++) {
@@ -571,10 +571,10 @@ void ParticleSystem::SpawnParticles(uint32 effect_slot, uint32 emitter_index, ui
 			return;
 		}
 
-		Vec3f offset = Vec3f::sZero;
+		FVec3 offset = FVec3::sZero;
 
 		if (emitter.Shape == eParticleShape::Sphere) {
-			const Vec3f direction = RandomDirectionInCone(effect.Direction, tangent, bitangent, -1.0f);
+			const FVec3 direction = RandomDirectionInCone(effect.Direction, tangent, bitangent, -1.0f);
 			offset = direction * (emitter.Radius * std::cbrt(RandomUnit()));
 		}
 		else if (emitter.Shape == eParticleShape::Disc) {
@@ -583,7 +583,7 @@ void ParticleSystem::SpawnParticles(uint32 effect_slot, uint32 emitter_index, ui
 			offset = (tangent * (std::cos(angle) * distance)) + (bitangent * (std::sin(angle) * distance));
 		}
 
-		const Vec3f direction = RandomDirectionInCone(effect.Direction, tangent, bitangent, emitter.SpreadCos);
+		const FVec3 direction = RandomDirectionInCone(effect.Direction, tangent, bitangent, emitter.SpreadCos);
 
 		uint8 start_frame = 0;
 
@@ -628,9 +628,9 @@ void ParticleSystem::Update(float32 delta_time)
 }
 
 bool ParticleSystem::CollideParticle(Particle& particle, const ParticleEmitterDef& emitter,
-									 const Vec3f previous_position)
+									 const FVec3 previous_position)
 {
-	const Vec3f travel = particle.Position - previous_position;
+	const FVec3 travel = particle.Position - previous_position;
 
 	if (travel.Dot(travel) < 1e-10f) {
 		return false;
@@ -644,12 +644,12 @@ bool ParticleSystem::CollideParticle(Particle& particle, const ParticleEmitterDe
 		return false;
 	}
 
-	const Vec3f normal = hit.Normal;
+	const FVec3 normal = hit.Normal;
 	const float32 normal_speed = particle.Velocity.Dot(normal);
 
 	if (normal_speed < 0.0f) {
-		const Vec3f normal_velocity = normal * normal_speed;
-		const Vec3f tangent_velocity = particle.Velocity - normal_velocity;
+		const FVec3 normal_velocity = normal * normal_speed;
+		const FVec3 tangent_velocity = particle.Velocity - normal_velocity;
 
 		particle.Velocity = (tangent_velocity * (1.0f - emitter.Friction)) - (normal_velocity * emitter.Bounce);
 	}
@@ -665,7 +665,7 @@ bool ParticleSystem::CollideParticle(Particle& particle, const ParticleEmitterDe
 
 void ParticleSystem::UpdateParticles(float32 delta_time)
 {
-	const Vec3f gravity = Vec3f(0.0f, -scGravity * delta_time, 0.0f);
+	const FVec3 gravity = FVec3(0.0f, -scGravity * delta_time, 0.0f);
 
 	const bool can_collide = (mpCollisionCVar == nullptr || mpCollisionCVar->IntValue != 0) && gPhysics != nullptr &&
 							 gPhysics->pBackend != nullptr;
@@ -695,7 +695,7 @@ void ParticleSystem::UpdateParticles(float32 delta_time)
 		}
 
 		const ParticleEmitterDef& emitter = GetEmitter(particle);
-		const Vec3f previous_position = particle.Position;
+		const FVec3 previous_position = particle.Position;
 
 		particle.Velocity += gravity * emitter.GravityScale;
 		particle.Velocity = particle.Velocity * (1.0f / (1.0f + emitter.Drag * delta_time));
@@ -764,8 +764,8 @@ void ParticleSystem::UpdateLighting(float32 delta_time)
 {
 	using namespace renderer;
 
-	Vec3f sun_direction = Vec3f::sUp;
-	Vec3f sun_irradiance = Vec3f::sZero;
+	FVec3 sun_direction = FVec3::sUp;
+	FVec3 sun_irradiance = FVec3::sZero;
 	bool has_sun = false;
 
 	LightDirectional* sun = gLightManager->GetDirectionalLight();
@@ -775,7 +775,7 @@ void ParticleSystem::UpdateLighting(float32 delta_time)
 		sun->Color.GetLinearRGB(sun_color);
 
 		sun_direction = sun->GetPosition().Normalize();
-		sun_irradiance = Vec3f(sun_color[0], sun_color[1], sun_color[2]) * sun->Intensity;
+		sun_irradiance = FVec3(sun_color[0], sun_color[1], sun_color[2]) * sun->Intensity;
 		has_sun = true;
 	}
 
@@ -794,12 +794,12 @@ void ParticleSystem::UpdateLighting(float32 delta_time)
 			continue;
 		}
 
-		const Vec3f sample_position = effect.Position + (effect.Direction * scLightingSampleOffset);
+		const FVec3 sample_position = effect.Position + (effect.Direction * scLightingSampleOffset);
 
-		Vec3f ambient = Vec3f::sZero;
+		FVec3 ambient = FVec3::sZero;
 
 		if (use_probes) {
-			Vec3f to_camera = effect.Direction;
+			FVec3 to_camera = effect.Direction;
 
 			if (camera != nullptr && camera->GetPosition().DistanceTo(sample_position) > 1e-3f) {
 				to_camera = (camera->GetPosition() - sample_position).Normalize();
@@ -830,7 +830,7 @@ void ParticleSystem::UpdateLighting(float32 delta_time)
 			effect.bHasSunVisibility = true;
 		}
 
-		const Vec3f sun_light = sun_irradiance * (effect.SunVisibility * scSunScatter);
+		const FVec3 sun_light = sun_irradiance * (effect.SunVisibility * scSunScatter);
 
 		effect.Lighting = (ambient + sun_light) * pre_exposure;
 	}
@@ -864,8 +864,8 @@ void ParticleSystem::RetireEffects()
 	}
 }
 
-uint32 ParticleSystem::GatherLayer(eObjectLayer layer, const Mat4f& view_projection, const Vec3f eye,
-								   const Vec3f forward)
+uint32 ParticleSystem::GatherLayer(eObjectLayer layer, const Mat4f& view_projection, const FVec3 eye,
+								   const FVec3 forward)
 {
 	Frustum frustum;
 	frustum.Rebuild(view_projection);
@@ -881,7 +881,7 @@ uint32 ParticleSystem::GatherLayer(eObjectLayer layer, const Mat4f& view_project
 		}
 
 		const ParticleEmitterDef& emitter = GetEmitter(particle);
-		const Vec3f position = GetWorldPosition(particle);
+		const FVec3 position = GetWorldPosition(particle);
 
 		const float32 radius = (particle.Size * std::max(emitter.SizeEndScale, 1.0f)) +
 							   (particle.Velocity.Length() * emitter.Stretch);
@@ -905,7 +905,7 @@ uint32 ParticleSystem::GatherLayer(eObjectLayer layer, const Mat4f& view_project
 	return count;
 }
 
-void ParticleSystem::WriteInstances(uint32 base_offset, const Vec3f eye)
+void ParticleSystem::WriteInstances(uint32 base_offset, const FVec3 eye)
 {
 	using namespace renderer;
 
@@ -925,7 +925,7 @@ void ParticleSystem::WriteInstances(uint32 base_offset, const Vec3f eye)
 			color[c] = emitter.ColorStart[c] + (emitter.ColorEnd[c] - emitter.ColorStart[c]) * t;
 		}
 
-		Vec3f light = Vec3f::sOne;
+		FVec3 light = FVec3::sOne;
 
 		if (emitter.bLit) {
 			light = effect.Lighting;
@@ -961,8 +961,8 @@ void ParticleSystem::WriteInstances(uint32 base_offset, const Vec3f eye)
 		const float32 frame_offset_v = emitter.Region.OffsetV +
 									   frame_scale_v * static_cast<float32>(frame / emitter.FramesX);
 
-		const Vec3f position = GetWorldPosition(particle);
-		const Vec3f stretch = particle.Velocity * emitter.Stretch;
+		const FVec3 position = GetWorldPosition(particle);
+		const FVec3 stretch = particle.Velocity * emitter.Stretch;
 
 		ParticleGpuData& instance = instances[i];
 		StoreFloat3(position, instance.Position);
@@ -999,10 +999,10 @@ void ParticleSystem::Render(renderer::CommandBuffer& cmd, const BaseCamera& came
 		return;
 	}
 
-	const Vec3f eye = camera.GetPosition();
-	const Vec3f forward = camera.GetForwardVector().Normalize();
-	const Vec3f right = Vec3f::sUp.Cross(forward).Normalize();
-	const Vec3f up = forward.Cross(right).Normalize();
+	const FVec3 eye = camera.GetPosition();
+	const FVec3 forward = camera.GetForwardVector().Normalize();
+	const FVec3 right = FVec3::sUp.Cross(forward).Normalize();
+	const FVec3 up = forward.Cross(right).Normalize();
 
 	const Mat4f& world_view_projection = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 	const Mat4f& player_view_projection = camera.GetCameraMatrix(eObjectLayer::PlayerLayer);

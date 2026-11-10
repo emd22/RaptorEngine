@@ -1,8 +1,8 @@
 #include "Animation.hpp"
 
 #include <Core/String.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Quat.hpp>
-#include <Math/Vec3.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <World.hpp>
@@ -17,10 +17,10 @@ template <typename T>
 static T Interpolate(const T a, const T b, float32 t);
 
 template <>
-Vec3f Interpolate(const Vec3f a, const Vec3f b, float32 t)
+FVec3 Interpolate(const FVec3 a, const FVec3 b, float32 t)
 {
 	// return b;
-	return Vec3f::Lerp(a, b, t);
+	return FVec3::Lerp(a, b, t);
 }
 
 template <>
@@ -34,7 +34,7 @@ template <typename T>
 static T Hermite(const T& p0, const T& out0, const T& p1, const T& in1, float32 t, float32 dt);
 
 template <>
-Vec3f Hermite(const Vec3f& p0, const Vec3f& out0, const Vec3f& p1, const Vec3f& in1, float32 t, float32 dt)
+FVec3 Hermite(const FVec3& p0, const FVec3& out0, const FVec3& p1, const FVec3& in1, float32 t, float32 dt)
 {
 	const float32 t2 = t * t;
 	const float32 t3 = t2 * t;
@@ -105,7 +105,7 @@ static T GetComponentAtTime(float32 time, const BoneTransformTrack<T>& track, co
 	return Interpolate(track.Values.pData[current], track.Values.pData[next], alpha);
 }
 
-static Vec3f QuatToScaledAngleAxis(const Quat q)
+static FVec3 QuatToScaledAngleAxis(const Quat q)
 {
 	float32 x = q.GetX();
 	float32 y = q.GetY();
@@ -122,14 +122,14 @@ static Vec3f QuatToScaledAngleAxis(const Quat q)
 	const float32 sin_half = std::sqrt(x * x + y * y + z * z);
 
 	if (sin_half < 1e-6f) {
-		return Vec3f(x, y, z) * 2.0f;
+		return FVec3(x, y, z) * 2.0f;
 	}
 
 	const float32 angle = 2.0f * std::atan2(sin_half, w);
-	return Vec3f(x, y, z) * (angle / sin_half);
+	return FVec3(x, y, z) * (angle / sin_half);
 }
 
-static Quat QuatFromScaledAngleAxis(const Vec3f v)
+static Quat QuatFromScaledAngleAxis(const FVec3 v)
 {
 	const float32 angle = v.Length();
 
@@ -143,11 +143,11 @@ static Quat QuatFromScaledAngleAxis(const Vec3f v)
 	return Quat(v.X * scale, v.Y * scale, v.Z * scale, std::cos(half));
 }
 
-static Vec3f AngularVelocityToLogRate(const Vec3f log_rotation, const Vec3f angular_velocity)
+static FVec3 AngularVelocityToLogRate(const FVec3 log_rotation, const FVec3 angular_velocity)
 {
 	const float32 angle = log_rotation.Length();
-	const Vec3f c1 = log_rotation.Cross(angular_velocity);
-	const Vec3f c2 = log_rotation.Cross(c1);
+	const FVec3 c1 = log_rotation.Cross(angular_velocity);
+	const FVec3 c2 = log_rotation.Cross(c1);
 
 	float32 k = 1.0f / 12.0f;
 
@@ -158,7 +158,7 @@ static Vec3f AngularVelocityToLogRate(const Vec3f log_rotation, const Vec3f angu
 	return angular_velocity - c1 * 0.5f + c2 * k;
 }
 
-static Vec3f RotationDelta(const Quat from, const Quat to) { return QuatToScaledAngleAxis(to * from.Conjugate()); }
+static FVec3 RotationDelta(const Quat from, const Quat to) { return QuatToScaledAngleAxis(to * from.Conjugate()); }
 
 static BoneDelta PoseDelta(const BoneTransform& from, const BoneTransform& to)
 {
@@ -169,9 +169,9 @@ static BoneDelta PoseDelta(const BoneTransform& from, const BoneTransform& to)
 	};
 }
 
-static void DecaySpring(Vec3f& x, Vec3f& v, float32 damping, float32 delta_time)
+static void DecaySpring(FVec3& x, FVec3& v, float32 damping, float32 delta_time)
 {
-	const Vec3f j1 = v + x * damping;
+	const FVec3 j1 = v + x * damping;
 	const float32 decay = std::exp(-damping * delta_time);
 
 	x = (x + j1 * delta_time) * decay;
@@ -185,9 +185,9 @@ void BlendPoses(const BoneTransform* a, const BoneTransform* b, float32 weight, 
 		rotation.NLerpIP(b[i].Rotation, weight);
 
 		out[i] = BoneTransform {
-			.Translation = Vec3f::Lerp(a[i].Translation, b[i].Translation, weight),
+			.Translation = FVec3::Lerp(a[i].Translation, b[i].Translation, weight),
 			.Rotation = rotation,
-			.Scale = Vec3f::Lerp(a[i].Scale, b[i].Scale, weight),
+			.Scale = FVec3::Lerp(a[i].Scale, b[i].Scale, weight),
 		};
 	}
 }
@@ -358,7 +358,7 @@ void Skeleton::StartInertialization(const AnimationPlayback* playback, float32 d
 		};
 
 		const BoneDelta offset = PoseDelta(source_previous, last[i]);
-		const Vec3f source_angular_velocity = source_velocity.Rotation.Rotate(QuatFromScaledAngleAxis(offset.Rotation));
+		const FVec3 source_angular_velocity = source_velocity.Rotation.Rotate(QuatFromScaledAngleAxis(offset.Rotation));
 
 		mOffsets.pData[i] = offset;
 		mOffsetVelocities.pData[i] = BoneDelta {
@@ -434,14 +434,14 @@ void Skeleton::UpdatePoseSummary()
 
 	PoseHash = hash;
 
-	Vec3f min = Vec3f(1.0e30f, 1.0e30f, 1.0e30f);
-	Vec3f max = Vec3f(-1.0e30f, -1.0e30f, -1.0e30f);
+	FVec3 min = FVec3(1.0e30f, 1.0e30f, 1.0e30f);
+	FVec3 max = FVec3(-1.0e30f, -1.0e30f, -1.0e30f);
 
 	for (uint32 i = 0; i < JointCount; i++) {
 		const float32* row = &WorldTransforms[i].RawData[12];
 
-		min = Vec3f(std::min(min.X, row[0]), std::min(min.Y, row[1]), std::min(min.Z, row[2]));
-		max = Vec3f(std::max(max.X, row[0]), std::max(max.Y, row[1]), std::max(max.Z, row[2]));
+		min = FVec3(std::min(min.X, row[0]), std::min(min.Y, row[1]), std::min(min.Z, row[2]));
+		max = FVec3(std::max(max.X, row[0]), std::max(max.Y, row[1]), std::max(max.Z, row[2]));
 	}
 
 	PoseCenter = (min + max) * 0.5f;

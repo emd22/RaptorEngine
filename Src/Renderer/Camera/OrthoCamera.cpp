@@ -33,13 +33,13 @@ bool OrthoCamera::Update()
 }
 
 
-void OrthoCamera::ResolveViewToTexels(Vec3f& eye, Vec3f& target, const Vec3f world_up, float32 texture_res) const
+void OrthoCamera::ResolveViewToTexels(FVec3& eye, FVec3& target, const FVec3 world_up, float32 texture_res) const
 {
 	Assert(texture_res > 0.0f);
 
-	const Vec3f forward = (target - eye).Normalize();
-	const Vec3f right = world_up.Cross(forward).Normalize();
-	const Vec3f up = forward.Cross(right);
+	const FVec3 forward = (target - eye).Normalize();
+	const FVec3 right = world_up.Cross(forward).Normalize();
+	const FVec3 up = forward.Cross(right);
 
 	const float32 texel_size = mSize.X / texture_res;
 	const float32 texel_size_recip = 1.0f / texel_size;
@@ -52,7 +52,7 @@ void OrthoCamera::ResolveViewToTexels(Vec3f& eye, Vec3f& target, const Vec3f wor
 
 	// Shift both eye and target by the same offset so the view direction is unchanged -- only the
 	// position within the texel grid moves.
-	const Vec3f offset = right * (snapped_x - view_x) + up * (snapped_y - view_y);
+	const FVec3 offset = right * (snapped_x - view_x) + up * (snapped_y - view_y);
 
 	eye += offset;
 	target += offset;

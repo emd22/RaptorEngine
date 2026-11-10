@@ -5,8 +5,8 @@
 #include <wx/sizer.h>
 
 #include <Core/Types.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Vec2.hpp>
-#include <Math/Vec3.hpp>
 #include <functional>
 
 
@@ -111,7 +111,7 @@ private:
 /////////////////////////////////////
 
 
-class Vector3Field final : public FieldBase<Vec3f>
+class Vector3Field final : public FieldBase<FVec3>
 {
 public:
 	Vector3Field(wxWindow* parent, const wxString& label, const Vec2f& limits);

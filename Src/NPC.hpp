@@ -7,7 +7,7 @@
 #include <Core/SizedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 #include <NPCBrain.hpp>
 #include <NPCMover.hpp>
 #include <Object/ObjectID.hpp>
@@ -25,7 +25,7 @@ class NPCManager;
 struct NPCDesc
 {
 	String Name;
-	Vec3f Position = Vec3f::sZero;
+	FVec3 Position = FVec3::sZero;
 	float32 Yaw = 0.0f;
 	float32 MaxHealth = 100.0f;
 	float32 RagdollHealth = 0.0f;
@@ -43,17 +43,17 @@ struct NPCDesc
 
 struct NPCPush
 {
-	Vec3f Point = Vec3f::sZero;
-	Vec3f Impulse = Vec3f::sZero;
+	FVec3 Point = FVec3::sZero;
+	FVec3 Impulse = FVec3::sZero;
 	/// Where the push came from, which the NPC turns to face
-	Vec3f Source = Vec3f::sZero;
+	FVec3 Source = FVec3::sZero;
 };
 
 struct NPCHit
 {
 	JPH::BodyID Body {};
-	Vec3f Point = Vec3f::sZero;
-	Vec3f Impulse = Vec3f::sZero;
+	FVec3 Point = FVec3::sZero;
+	FVec3 Impulse = FVec3::sZero;
 	float32 Damage = 0.0f;
 	/// The impulse is momentum from a collision, so it is used as is rather than as a force scaled by HitShoveScale
 	bool bIsCollision = false;
@@ -118,7 +118,7 @@ public:
 	void Destroy();
 
 	void SetCullable(bool cullable);
-	bool AddWound(JPH::BodyID body_id, const Vec3f point, const Vec3f direction, float32 size);
+	bool AddWound(JPH::BodyID body_id, const FVec3 point, const FVec3 direction, float32 size);
 	void AddContactWound(const physics::RagdollContact& contact);
 	void TickCooldown(float32 delta_time);
 
@@ -186,9 +186,9 @@ public:
 	bool TriggerBehaviour(const char* name);
 	bool StopBehaviour(const char* name);
 
-	void AddWound(JPH::BodyID body_id, const Vec3f point, const Vec3f direction, float32 size);
+	void AddWound(JPH::BodyID body_id, const FVec3 point, const FVec3 direction, float32 size);
 
-	void SetPosition(const Vec3f position);
+	void SetPosition(const FVec3 position);
 	void SetYaw(float32 yaw);
 
 	void SetIdleAnimation(const String& name, float32 speed = 1.0f, float32 blend_time = Skeleton::scDefaultBlendTime);
@@ -233,7 +233,7 @@ private:
 	void UpdateBehaviours(float32 delta_time);
 	void ApplyStrengths();
 	void ApplyBehaviourOutput();
-	void AddStagger(const Vec3f velocity);
+	void AddStagger(const FVec3 velocity);
 	void UpdateBalance(float32 delta_time);
 	void ActivateBalance();
 	void ReturnToAnimation();
@@ -294,7 +294,7 @@ public:
 	void Clear();
 	void ClearRagdolls();
 
-	bool SpawnDummy(const Object* model, const String& name, const Vec3f position, const Vec3f velocity);
+	bool SpawnDummy(const Object* model, const String& name, const FVec3 position, const FVec3 velocity);
 	void DestroyDummy(uint32 index);
 	void ClearDummies();
 

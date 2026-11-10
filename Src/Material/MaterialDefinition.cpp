@@ -108,7 +108,7 @@ static MaterialDefinition ReadDefinition(const std::filesystem::path& file_path,
 	}
 
 	if (entry->GetMember(HashStr32("color")) != nullptr) {
-		definition.BaseColor = entry->GetMemberValue<Vec3f>(HashStr32("color"), Vec3f(1.0f, 1.0f, 1.0f));
+		definition.BaseColor = entry->GetMemberValue<FVec3>(HashStr32("color"), FVec3(1.0f, 1.0f, 1.0f));
 	}
 
 	if (entry->GetMember(HashStr32("normal_strength")) != nullptr) {

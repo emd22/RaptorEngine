@@ -206,8 +206,8 @@ void Object::UpdateAnimation()
 
 void Object::MarkPoseDirty()
 {
-	// Attached nodes such as skinned parts never get a tile of their own, so the grid only hears about the root. Walk up
-	// to the nearest node that has a tile, or spot shadows would never see a ragdoll move.
+	// Attached nodes such as skinned parts never get a tile of their own, so the grid only hears about the root. Walk
+	// up to the nearest node that has a tile, or spot shadows would never see a ragdoll move.
 	Object* node = this;
 
 	while (node != nullptr && node->mTileIndex == TileIndexNull) {
@@ -295,12 +295,12 @@ Object* Object::CloneWithOwnSkeleton(const std::string& name) const
 	return CloneNode(name, skeletons);
 }
 
-static Mat4f MakeInstanceTransform(const Vec3f position, const Quat rotation, float32 scale)
+static Mat4f MakeInstanceTransform(const FVec3 position, const Quat rotation, float32 scale)
 {
-	return Mat4f::AsScale(Vec3f(scale)) * Mat4f::AsRotation(rotation) * Mat4f::AsTranslation(position);
+	return Mat4f::AsScale(FVec3(scale)) * Mat4f::AsRotation(rotation) * Mat4f::AsTranslation(position);
 }
 
-uint32 Object::AddInstance(const Vec3f position, const Quat rotation, float32 scale)
+uint32 Object::AddInstance(const FVec3 position, const Quat rotation, float32 scale)
 {
 	return AddInstance(MakeInstanceTransform(position, rotation, scale));
 }
@@ -313,7 +313,7 @@ uint32 Object::AddInstance(const Mat4f& transform)
 	return mInstances.Size - 1;
 }
 
-void Object::SetInstance(uint32 index, const Vec3f position, const Quat rotation, float32 scale)
+void Object::SetInstance(uint32 index, const FVec3 position, const Quat rotation, float32 scale)
 {
 	SetInstance(index, MakeInstanceTransform(position, rotation, scale));
 }
@@ -699,18 +699,18 @@ void Object::Update()
 	UpdateAnimation();
 }
 
-float32 Object::GetDirectionScale(const Vec3f direction)
+float32 Object::GetDirectionScale(const FVec3 direction)
 {
 	if (direction.IsCloseTo(simd::LoadFloat4(0.0f))) {
 		return 0.0f;
 	}
 
-	Vec3f dir = direction.Normalize();
+	FVec3 dir = direction.Normalize();
 
-	Vec3f pos_extent = Bounds.Max;
-	Vec3f neg_extent = -Bounds.Min;
+	FVec3 pos_extent = Bounds.Max;
+	FVec3 neg_extent = -Bounds.Min;
 
-	Vec3f extent((dir.X >= 0.0f) ? pos_extent.X : neg_extent.X, (dir.Y >= 0.0f) ? pos_extent.Y : neg_extent.Y,
+	FVec3 extent((dir.X >= 0.0f) ? pos_extent.X : neg_extent.X, (dir.Y >= 0.0f) ? pos_extent.Y : neg_extent.Y,
 				 (dir.Z >= 0.0f) ? pos_extent.Z : neg_extent.Z);
 
 	float32 distance = dir.Abs().Dot(extent);
@@ -734,7 +734,7 @@ void Object::AttachObject(const ObjectID& attach_id)
 
 void Object::SyncObjectWithPhysics(physics::Body* phys)
 {
-	const Vec3f physics_position = phys->GetPosition() - phys->Midpoint;
+	const FVec3 physics_position = phys->GetPosition() - phys->Midpoint;
 
 	if ((!mPosition.IsCloseTo(physics_position) || !mRotation.IsCloseTo(phys->GetRotation()))) {
 		mPosition = physics_position;
@@ -894,7 +894,7 @@ void Object::SetReflectionProbe(bool value)
 	}
 }
 
-float32 Object::RaycastBounds(const Vec3f origin, const Vec3f direction, Vec3f& out_face)
+float32 Object::RaycastBounds(const FVec3 origin, const FVec3 direction, FVec3& out_face)
 {
 	// Into the object's own space, so a rotated box is tested against the box it actually is rather than the
 	// looser one around it. An affine transform is linear in the ray parameter, so the distance that comes back
@@ -904,13 +904,13 @@ float32 Object::RaycastBounds(const Vec3f origin, const Vec3f direction, Vec3f& 
 	const Vec4f local_origin = inverse_model * Vec4f(origin.X, origin.Y, origin.Z, 1.0f);
 	const Vec4f local_direction = inverse_model * Vec4f(direction.X, direction.Y, direction.Z, 0.0f);
 
-	const Ray ray(Vec3f(local_origin.X, local_origin.Y, local_origin.Z),
-				  Vec3f(local_direction.X, local_direction.Y, local_direction.Z));
+	const Ray ray(FVec3(local_origin.X, local_origin.Y, local_origin.Z),
+				  FVec3(local_direction.X, local_direction.Y, local_direction.Z));
 
 	return RayCast(ray, Bounds, out_face);
 }
 
-bool Object::ContainsPoint(const Vec3f point)
+bool Object::ContainsPoint(const FVec3 point)
 {
 	const Vec4f local = GetWorldMatrix().AffineInverse() * Vec4f(point.X, point.Y, point.Z, 1.0f);
 
@@ -949,9 +949,9 @@ void Object::SetShadowCaster(const bool value)
 	}
 }
 
-void Object::SetPosition(const Vec3f position)
+void Object::SetPosition(const FVec3 position)
 {
-	const Vec3f delta = position - mPosition;
+	const FVec3 delta = position - mPosition;
 
 	Entity::SetPosition(position);
 	InvalidateDrawCopies();

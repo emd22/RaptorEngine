@@ -1,8 +1,9 @@
 #include "CompiledMap.hpp"
 
+#include <libdeflate.h>
+
 #include <Core/File.hpp>
 #include <algorithm>
-#include <libdeflate.h>
 #include <cstdio>
 #include <cstring>
 
@@ -21,8 +22,8 @@ constexpr uint32 scFirstDeflatedVersion = 14;
 /// Probe depth moments are octahedral maps from this version on, cube faces before it
 constexpr uint32 scFirstOctahedralProbeVersion = 16;
 /// Every file from this version on has the GI SDF pages and octahedral moments. v16 was used for both on separate
-/// branches: one wrote cube moments and SDF pages, the other octahedral moments and no SDF pages. Load() tells them apart
-/// by the size of the moments and by whether anything follows the transport.
+/// branches: one wrote cube moments and SDF pages, the other octahedral moments and no SDF pages. Load() tells them
+/// apart by the size of the moments and by whether anything follows the transport.
 constexpr uint32 scFirstSDFPagesVersion = 17;
 /// Values per probe in the cube face moments from before the octahedral layout (6 faces of 16x16, mean + variance)
 constexpr uint32 scCubeProbeMomentValues = 6 * 16 * 16 * 2;
@@ -116,8 +117,8 @@ public:
 		const size_t byte_count = count * sizeof(TType);
 		size_t inflated_size = 0;
 
-		const libdeflate_result result = libdeflate_zlib_decompress(mpDecompressor, deflated.pData, deflated.Size, values,
-																	byte_count, &inflated_size);
+		const libdeflate_result result = libdeflate_zlib_decompress(mpDecompressor, deflated.pData, deflated.Size,
+																	values, byte_count, &inflated_size);
 
 		if (result != LIBDEFLATE_SUCCESS || inflated_size != byte_count) {
 			bFailed = true;
@@ -184,8 +185,8 @@ public:
 	}
 
 	template <typename TType>
-		requires std::same_as<TType, Vec3f>
-	void Write(const Vec3f& value)
+		requires std::same_as<TType, FVec3>
+	void Write(const FVec3& value)
 	{
 		Assert(mpFile != nullptr);
 
@@ -567,8 +568,8 @@ bool CompiledMap::Load(const String& path)
 		surface.MaterialIndex = reader.Read<uint32>();
 		surface.Area = reader.Read<int32>();
 
-		const Vec3f bounds_min = reader.Read<Vec3f>();
-		const Vec3f bounds_max = reader.Read<Vec3f>();
+		const FVec3 bounds_min = reader.Read<FVec3>();
+		const FVec3 bounds_max = reader.Read<FVec3>();
 		//
 		// reader.Read(surface.BoundsMin, 3);
 		// reader.Read(surface.BoundsMax, 3);
@@ -623,8 +624,8 @@ bool CompiledMap::Load(const String& path)
 	ShadowSurfaces.InitSize(reader.ReadCount());
 
 	for (CompiledMapShadowSurface& surface : ShadowSurfaces) {
-		const Vec3f bounds_min = reader.Read<Vec3f>();
-		const Vec3f bounds_max = reader.Read<Vec3f>();
+		const FVec3 bounds_min = reader.Read<FVec3>();
+		const FVec3 bounds_max = reader.Read<FVec3>();
 
 		surface.Bounds = BBox(bounds_min, bounds_max);
 
@@ -724,7 +725,7 @@ bool CompiledMap::Load(const String& path)
 		reader.Read(positions.pData, positions.Size);
 
 		for (uint32 i = 0; i < probe_count; i++) {
-			Probes.Positions.Emplace(Vec3f(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]));
+			Probes.Positions.Emplace(FVec3(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]));
 		}
 	}
 
@@ -765,7 +766,8 @@ bool CompiledMap::Load(const String& path)
 	const uint32 irradiance_count = reader.ReadCount();
 	const uint32 direction_count = reader.ReadCount();
 
-	if ((irradiance_count != 0 && irradiance_count != lightmap_texel_count * 3) || direction_count != irradiance_count) {
+	if ((irradiance_count != 0 && irradiance_count != lightmap_texel_count * 3) ||
+		direction_count != irradiance_count) {
 		reader.bFailed = true;
 	}
 	else {
@@ -815,8 +817,8 @@ bool CompiledMap::Load(const String& path)
 	Areas.InitSize(reader.ReadCount());
 
 	for (CompiledMapArea& area : Areas) {
-		const Vec3f bounds_min = reader.Read<Vec3f>();
-		const Vec3f bounds_max = reader.Read<Vec3f>();
+		const FVec3 bounds_min = reader.Read<FVec3>();
+		const FVec3 bounds_max = reader.Read<FVec3>();
 
 		area.Bounds = BBox(bounds_min, bounds_max);
 	}
@@ -828,8 +830,8 @@ bool CompiledMap::Load(const String& path)
 		portal.BackArea = reader.Read<uint32>();
 		portal.FrontArea = reader.Read<uint32>();
 
-		const Vec3f bounds_min = reader.Read<Vec3f>();
-		const Vec3f bounds_max = reader.Read<Vec3f>();
+		const FVec3 bounds_min = reader.Read<FVec3>();
+		const FVec3 bounds_max = reader.Read<FVec3>();
 
 		portal.Bounds = BBox(bounds_min, bounds_max);
 
@@ -909,7 +911,8 @@ bool CompiledMap::Load(const String& path)
 	}
 
 	const bool has_sdf_pages = (version >= scFirstSDFPagesVersion) ||
-							(version == scFirstOctahedralProbeVersion && file_to_read.GetPosition() < file_to_read.GetFileSize());
+							   (version == scFirstOctahedralProbeVersion &&
+								file_to_read.GetPosition() < file_to_read.GetFileSize());
 
 	if (has_sdf_pages && !reader.bFailed) {
 		ReadSDFPages(reader, SDFPages);
@@ -1021,7 +1024,7 @@ bool CompiledMap::Save(const String& path) const
 	writer.WriteCount(Probes.Positions.Size);
 	writer.Write(Probes.Grid.pData, Probes.Grid.Size);
 
-	for (const Vec3f position : Probes.Positions) {
+	for (const FVec3 position : Probes.Positions) {
 		const float32 values[3] = { position.X, position.Y, position.Z };
 		writer.Write(values, 3);
 	}
@@ -1081,7 +1084,7 @@ bool CompiledMap::Save(const String& path) const
 	return (writer.bFailed == false);
 }
 
-int32 CompiledMap::FindArea(const Vec3f& point) const
+int32 CompiledMap::FindArea(const FVec3& point) const
 {
 	int32 child = AreaRoot;
 

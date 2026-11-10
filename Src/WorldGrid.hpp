@@ -5,8 +5,8 @@
 #include <Core/SizedArray.hpp>
 #include <Map/AreaGraph.hpp>
 #include <Math/BBox.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Vec2.hpp>
-#include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
 #include <Renderer/LightID.hpp>
 #include <unordered_set>
@@ -62,12 +62,12 @@ public:
 	 */
 	void AddObject(ObjectID id);
 
-	TileIndex WorldToTile(const Vec3f position) const;
+	TileIndex WorldToTile(const FVec3 position) const;
 
 	/**
 	 * @brief Gets the rectangle of tiles (inclusive) that a sphere reaches.
 	 */
-	void GetSphereTileRange(const Vec3f center, float32 radius, Vec2u* out_min, Vec2u* out_max) const;
+	void GetSphereTileRange(const FVec3 center, float32 radius, Vec2u* out_min, Vec2u* out_max) const;
 	TileIndex TileFromTileXY(const Vec2u& xy) const;
 
 	const SizedArray<ObjectID>& GetNearbyObjects();
@@ -91,7 +91,7 @@ public:
 	/**
 	 * @brief True if a shadow caster changed in any tile the sphere reaches (or in the global tile) after `serial`.
 	 */
-	bool HasChangedSince(const Vec3f center, float32 radius, uint64 serial) const;
+	bool HasChangedSince(const FVec3 center, float32 radius, uint64 serial) const;
 
 	/// Bumped every time a tile is marked as changed. Store this when baking, and pass it to `HasChangedSince`.
 	FX_FORCE_INLINE uint64 GetChangeSerial() const { return mChangeSerial; }
@@ -110,9 +110,9 @@ public:
 	void RemoveLight(LightBase* light);
 
 	Vec2u TileToTileXY(TileIndex tile_index) const;
-	Vec3f GetTileWorldPosition(TileIndex tile_index) const;
+	FVec3 GetTileWorldPosition(TileIndex tile_index) const;
 
-	Vec3f TileXYToWorldCenter(Vec2u tile_xy) const;
+	FVec3 TileXYToWorldCenter(Vec2u tile_xy) const;
 
 	Tile* GetTile(TileIndex index);
 	const Tile* GetTile(TileIndex index) const;
@@ -122,8 +122,8 @@ public:
 
 	FX_FORCE_INLINE BBox GetTileAABB(TileIndex ti) const
 	{
-		Vec3f tile_position = GetTileWorldPosition(ti);
-		Vec3f half(mTileSize.X * 0.5f, 1.0f, mTileSize.Y * 0.5f);
+		FVec3 tile_position = GetTileWorldPosition(ti);
+		FVec3 half(mTileSize.X * 0.5f, 1.0f, mTileSize.Y * 0.5f);
 		return BBox(tile_position - half, tile_position + half);
 	}
 
@@ -170,7 +170,7 @@ public:
 	/// The size of a single tile in metres. Note that since there is an object cap on world tiles, make sure these are
 	/// small enough even though compiled maps have significantly less objects.
 	Vec2f mTileSize = Vec2f(100.0f);
-	Vec3f mPositionOffset = Vec3f::sZero;
+	FVec3 mPositionOffset = FVec3::sZero;
 
 	TileIndex ViewTileIndex = TileIndexNull;
 

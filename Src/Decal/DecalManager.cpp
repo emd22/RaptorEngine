@@ -20,7 +20,7 @@ FX_SET_MODULE_NAME("DecalManager")
 /// Uniform random value in [0, 1)
 static float32 RandomUnit() { return static_cast<float32>(FastRand32() >> 8) * (1.0f / 16777216.0f); }
 
-static void StoreFloat3(const Vec3f value, float32* out)
+static void StoreFloat3(const FVec3 value, float32* out)
 {
 	out[0] = value.X;
 	out[1] = value.Y;
@@ -60,31 +60,31 @@ String DecalManager::LoadAtlasConfig()
 
 DecalManager::DecalEntry DecalManager::BuildEntry(const DecalDesc& desc) const
 {
-	const Vec3f forward = desc.Direction.Normalize();
+	const FVec3 forward = desc.Direction.Normalize();
 
 	// Anything that isn't parallel to the projection works as a reference for the decal's up axis
-	const Vec3f reference = (std::abs(forward.Y) < 0.99f) ? Vec3f::sUp : Vec3f::sForward;
+	const FVec3 reference = (std::abs(forward.Y) < 0.99f) ? FVec3::sUp : FVec3::sForward;
 
-	const Vec3f unrolled_right = reference.Cross(forward).Normalize();
-	const Vec3f unrolled_up = forward.Cross(unrolled_right);
+	const FVec3 unrolled_right = reference.Cross(forward).Normalize();
+	const FVec3 unrolled_up = forward.Cross(unrolled_right);
 
 	float32 roll_sin, roll_cos;
 	MathUtil::SinCos(desc.Roll, &roll_sin, &roll_cos);
 
-	const Vec3f right = (unrolled_right * roll_cos) + (unrolled_up * roll_sin);
-	const Vec3f up = (unrolled_up * roll_cos) - (unrolled_right * roll_sin);
+	const FVec3 right = (unrolled_right * roll_cos) + (unrolled_up * roll_sin);
+	const FVec3 up = (unrolled_up * roll_cos) - (unrolled_right * roll_sin);
 
 	DecalEntry entry {};
 	renderer::DecalGpuData& gpu_data = entry.GpuData;
 
-	const Vec3f scaled_axes[3] = {
+	const FVec3 scaled_axes[3] = {
 		right * (1.0f / desc.Width),
 		up * (1.0f / desc.Height),
 		forward * (1.0f / desc.Depth),
 	};
 
 	for (uint32 axis = 0; axis < 3; axis++) {
-		const Vec3f scaled_axis = scaled_axes[axis];
+		const FVec3 scaled_axis = scaled_axes[axis];
 
 		gpu_data.WorldToDecal[(0 * 4) + axis] = scaled_axis.X;
 		gpu_data.WorldToDecal[(1 * 4) + axis] = scaled_axis.Y;
@@ -124,7 +124,7 @@ void DecalManager::AddDecal(const DecalDesc& desc)
 {
 	const DecalEntry entry = BuildEntry(desc);
 
-	ReplaceCoveredDecals(desc, Vec3f(entry.GpuData.AxisZ));
+	ReplaceCoveredDecals(desc, FVec3(entry.GpuData.AxisZ));
 
 	if (mDecals.Size < mDecals.Capacity) {
 		mDecals.Insert(entry);
@@ -137,7 +137,7 @@ void DecalManager::AddDecal(const DecalDesc& desc)
 	mNextSlot = static_cast<uint32>((mNextSlot + 1) % mDecals.Capacity);
 }
 
-void DecalManager::ReplaceCoveredDecals(const DecalDesc& desc, const Vec3f forward)
+void DecalManager::ReplaceCoveredDecals(const DecalDesc& desc, const FVec3 forward)
 {
 	const float32 replace_distance = scReplaceDistanceFraction * std::min(desc.Width, desc.Height);
 	const float32 replace_distance_sq = replace_distance * replace_distance;
@@ -156,13 +156,13 @@ void DecalManager::ReplaceCoveredDecals(const DecalDesc& desc, const Vec3f forwa
 			continue;
 		}
 
-		const Vec3f offset = Vec3f(other_data.Center) - desc.Position;
+		const FVec3 offset = FVec3(other_data.Center) - desc.Position;
 
 		if (offset.Dot(offset) > replace_distance_sq) {
 			continue;
 		}
 
-		if (Vec3f(other_data.AxisZ).Dot(forward) < scReplaceMinFacing) {
+		if (FVec3(other_data.AxisZ).Dot(forward) < scReplaceMinFacing) {
 			continue;
 		}
 
@@ -170,7 +170,7 @@ void DecalManager::ReplaceCoveredDecals(const DecalDesc& desc, const Vec3f forwa
 	}
 }
 
-void DecalManager::AddBulletHole(const Vec3f hit_point, const Vec3f hit_normal)
+void DecalManager::AddBulletHole(const FVec3 hit_point, const FVec3 hit_normal)
 {
 	constexpr uint32 variant_count = scBulletHoleAtlasColumns * scBulletHoleAtlasRows;
 	const float32 cell_width = mBulletHoleRegion.ScaleU / static_cast<float32>(scBulletHoleAtlasColumns);
@@ -203,7 +203,7 @@ void DecalManager::AddBulletHole(const Vec3f hit_point, const Vec3f hit_normal)
 	AddDecal(desc);
 }
 
-void DecalManager::AddBloodSplat(const Vec3f hit_point, const Vec3f hit_normal, float32 size)
+void DecalManager::AddBloodSplat(const FVec3 hit_point, const FVec3 hit_normal, float32 size)
 {
 	// 	const float32 width = size * (0.8f + (0.4f * RandomUnit()));
 	// 	const float32 height = width * (0.85f + (0.3f * RandomUnit()));
@@ -243,7 +243,7 @@ void DecalManager::AddSkinnedDecal(const Skeleton* skeleton, const Mat4f& rest_t
 	float32* axes[3] = { gpu_data.AxisX, gpu_data.AxisY, gpu_data.AxisZ };
 
 	for (uint32 axis = 0; axis < 3; axis++) {
-		const Vec3f rest_axis(rest_to_decal.RawData[(0 * 4) + axis], rest_to_decal.RawData[(1 * 4) + axis],
+		const FVec3 rest_axis(rest_to_decal.RawData[(0 * 4) + axis], rest_to_decal.RawData[(1 * 4) + axis],
 							  rest_to_decal.RawData[(2 * 4) + axis]);
 
 		StoreFloat3(rest_axis.Normalize(), axes[axis]);
@@ -297,8 +297,8 @@ void DecalManager::AddSkinnedDecal(const Skeleton* skeleton, const Mat4f& rest_t
 	mSkinnedDecals[insert_at] = entry;
 }
 
-void DecalManager::AddSkinnedBloodSplat(const Skeleton* skeleton, const Mat4f& rest_to_world, const Vec3f hit_point,
-										const Vec3f direction, float32 size)
+void DecalManager::AddSkinnedBloodSplat(const Skeleton* skeleton, const Mat4f& rest_to_world, const FVec3 hit_point,
+										const FVec3 direction, float32 size)
 {
 	const float32 width = size * (0.8f + (0.4f * RandomUnit()));
 	const float32 height = width * (0.85f + (0.3f * RandomUnit()));
@@ -391,7 +391,7 @@ void DecalManager::Update(const PerspectiveCamera& camera)
 		const uint32 slot = (mNextSlot + i) % decal_count;
 		const DecalEntry& entry = mDecals[slot];
 
-		if (!entry.bReplaced && frustum.IntersectsSphere(Vec3f(entry.GpuData.Center), entry.BoundsRadius)) {
+		if (!entry.bReplaced && frustum.IntersectsSphere(FVec3(entry.GpuData.Center), entry.BoundsRadius)) {
 			mVisibleSlots.Insert(slot);
 		}
 	}

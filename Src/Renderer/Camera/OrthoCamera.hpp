@@ -19,7 +19,7 @@ public:
 		mbRequireProjectionMatrixUpdate = true;
 	}
 
-	void ResolveViewToTexels(Vec3f& eye, Vec3f& target, const Vec3f world_up, float32 texture_res) const;
+	void ResolveViewToTexels(FVec3& eye, FVec3& target, const FVec3 world_up, float32 texture_res) const;
 
 	~OrthoCamera() override = default;
 

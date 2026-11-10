@@ -23,7 +23,7 @@ constexpr uint32 scMaxStackDepth = 64;
 
 struct OccluderPlane
 {
-	Vec3d Normal = Vec3d(0.0);
+	DVec3 Normal = DVec3(0.0);
 	double Distance = 0.0;
 };
 
@@ -33,16 +33,16 @@ struct Occluder
 	uint32 PlaneCount = 0;
 
 	int32 FirstCorner = -1;
-	Vec3d Facing = Vec3d(0.0);
+	DVec3 Facing = DVec3(0.0);
 
-	Vec3d Min = Vec3d(0.0);
-	Vec3d Max = Vec3d(0.0);
+	DVec3 Min = DVec3(0.0);
+	DVec3 Max = DVec3(0.0);
 };
 
 struct BvhNode
 {
-	Vec3d Min = Vec3d(0.0);
-	Vec3d Max = Vec3d(0.0);
+	DVec3 Min = DVec3(0.0);
+	DVec3 Max = DVec3(0.0);
 
 	int32 Left = -1;
 	int32 Right = -1;
@@ -54,8 +54,7 @@ struct BvhNode
 class OccluderSet
 {
 public:
-	void Build(const PlaneSet& planes, const MapSource& source, const PatchBuilder* patches,
-			   const ModelBuilder* models)
+	void Build(const PlaneSet& planes, const MapSource& source, const PatchBuilder* patches, const ModelBuilder* models)
 	{
 		for (const SourceBrush& brush : source.Brushes) {
 			if (!brush.bVisible || !brush.bCastsShadow) {
@@ -89,7 +88,7 @@ public:
 					for (uint32 corner = 0; corner < 3; corner++) {
 						const PatchSurfaceVertex& vertex =
 							surface.Vertices[static_cast<size_t>(surface.Indices[index + corner])];
-						const Vec3d& point = vertex.Position;
+						const DVec3& point = vertex.Position;
 
 						mCorners.Emplace(point);
 						occluder.Facing = occluder.Facing + vertex.Normal;
@@ -116,8 +115,9 @@ public:
 					occluder.FirstCorner = static_cast<int32>(mCorners.Size);
 
 					for (uint32 corner = 0; corner < 3; corner++) {
-						const ModelVertex& vertex = surface.Vertices[static_cast<size_t>(surface.Indices[index + corner])];
-						const Vec3d& point = vertex.Position;
+						const ModelVertex& vertex = surface
+														.Vertices[static_cast<size_t>(surface.Indices[index + corner])];
+						const DVec3& point = vertex.Position;
 
 						mCorners.Emplace(point);
 						occluder.Facing = occluder.Facing + vertex.Normal;
@@ -147,7 +147,7 @@ public:
 	uint32 GetTriangleCount() const { return mTriangleCount; }
 	uint32 GetModelTriangleCount() const { return mModelTriangleCount; }
 
-	bool GetBounds(Vec3d& out_min, Vec3d& out_max) const
+	bool GetBounds(DVec3& out_min, DVec3& out_max) const
 	{
 		if (mNodes.Size == 0) {
 			return false;
@@ -159,7 +159,7 @@ public:
 		return true;
 	}
 
-	double TraceClosest(const Vec3d& origin, const Vec3d& direction, double max_time) const
+	double TraceClosest(const DVec3& origin, const DVec3& direction, double max_time) const
 	{
 		if (mNodes.Size == 0) {
 			return scNoHit;
@@ -204,7 +204,7 @@ public:
 		return closest;
 	}
 
-	bool IsOccluded(const Vec3d& origin, const Vec3d& direction) const
+	bool IsOccluded(const DVec3& origin, const DVec3& direction) const
 	{
 		if (mNodes.Size == 0) {
 			return false;
@@ -241,7 +241,7 @@ public:
 		return false;
 	}
 
-	bool IsInsideBrush(const Vec3d& point) const
+	bool IsInsideBrush(const DVec3& point) const
 	{
 		if (mNodes.Size == 0) {
 			return false;
@@ -281,7 +281,7 @@ public:
 		return false;
 	}
 
-	bool HitsBackFace(const Vec3d& origin, const Vec3d& direction) const
+	bool HitsBackFace(const DVec3& origin, const DVec3& direction) const
 	{
 		if (mNodes.Size == 0) {
 			return false;
@@ -328,7 +328,7 @@ public:
 		return is_back_face;
 	}
 
-	bool IsBuried(const Vec3d& point, const Vec3d& normal, const Vec3d* local_directions, uint32 direction_count) const
+	bool IsBuried(const DVec3& point, const DVec3& normal, const DVec3* local_directions, uint32 direction_count) const
 	{
 		if (IsInsideBrush(point)) {
 			return true;
@@ -338,19 +338,19 @@ public:
 			return false;
 		}
 
-		Vec3d reference = Vec3d(1.0, 0.0, 0.0);
+		DVec3 reference = DVec3(1.0, 0.0, 0.0);
 		if (std::abs(normal.Y) < 0.9) {
-			reference = Vec3d(0.0, 1.0, 0.0);
+			reference = DVec3(0.0, 1.0, 0.0);
 		}
 
-		const Vec3d tangent = reference.Cross(normal).Normalized();
-		const Vec3d bitangent = normal.Cross(tangent);
+		const DVec3 tangent = reference.Cross(normal).Normalized();
+		const DVec3 bitangent = normal.Cross(tangent);
 
 		uint32 back_faces = 0;
 
 		for (uint32 i = 0; i < direction_count; i++) {
-			const Vec3d& local = local_directions[i];
-			const Vec3d direction = tangent * local.X + bitangent * local.Y + normal * local.Z;
+			const DVec3& local = local_directions[i];
+			const DVec3 direction = tangent * local.X + bitangent * local.Y + normal * local.Z;
 
 			if (HitsBackFace(point, direction)) {
 				back_faces++;
@@ -361,7 +361,7 @@ public:
 	}
 
 private:
-	static bool ContainsPoint(const Vec3d& min, const Vec3d& max, const Vec3d& point)
+	static bool ContainsPoint(const DVec3& min, const DVec3& max, const DVec3& point)
 	{
 		for (int32 axis = 0; axis < 3; axis++) {
 			if (point.mData[axis] < min.mData[axis] || point.mData[axis] > max.mData[axis]) {
@@ -372,7 +372,7 @@ private:
 		return true;
 	}
 
-	bool IsInsideOccluder(const Occluder& occluder, const Vec3d& point) const
+	bool IsInsideOccluder(const Occluder& occluder, const DVec3& point) const
 	{
 		for (uint32 i = 0; i < occluder.PlaneCount; i++) {
 			const OccluderPlane& plane = mPlanes[occluder.FirstPlane + i];
@@ -385,7 +385,7 @@ private:
 		return true;
 	}
 
-	static bool HitsBox(const BvhNode& node, const Vec3d& origin, const Vec3d& direction, double max_time = scNoHit)
+	static bool HitsBox(const BvhNode& node, const DVec3& origin, const DVec3& direction, double max_time = scNoHit)
 	{
 		double enter = 0.0;
 		double exit = max_time;
@@ -412,15 +412,15 @@ private:
 		return enter <= exit;
 	}
 
-	bool HitsTriangle(const Occluder& occluder, const Vec3d& origin, const Vec3d& direction, double& out_time) const
+	bool HitsTriangle(const Occluder& occluder, const DVec3& origin, const DVec3& direction, double& out_time) const
 	{
 		constexpr double scTriangleMinDistance = 1e-6;
 
-		const Vec3d& a = mCorners[static_cast<uint32>(occluder.FirstCorner)];
-		const Vec3d edge_ab = mCorners[static_cast<uint32>(occluder.FirstCorner) + 1] - a;
-		const Vec3d edge_ac = mCorners[static_cast<uint32>(occluder.FirstCorner) + 2] - a;
+		const DVec3& a = mCorners[static_cast<uint32>(occluder.FirstCorner)];
+		const DVec3 edge_ab = mCorners[static_cast<uint32>(occluder.FirstCorner) + 1] - a;
+		const DVec3 edge_ac = mCorners[static_cast<uint32>(occluder.FirstCorner) + 2] - a;
 
-		const Vec3d p = direction.Cross(edge_ac);
+		const DVec3 p = direction.Cross(edge_ac);
 		const double determinant = edge_ab.Dot(p);
 
 		if (std::abs(determinant) < scParallelEpsilon) {
@@ -428,14 +428,14 @@ private:
 		}
 
 		const double inverse = 1.0 / determinant;
-		const Vec3d offset = origin - a;
+		const DVec3 offset = origin - a;
 		const double u = offset.Dot(p) * inverse;
 
 		if (u < 0.0 || u > 1.0) {
 			return false;
 		}
 
-		const Vec3d q = offset.Cross(edge_ab);
+		const DVec3 q = offset.Cross(edge_ab);
 		const double v = direction.Dot(q) * inverse;
 
 		if (v < 0.0 || u + v > 1.0) {
@@ -447,14 +447,14 @@ private:
 		return out_time > scTriangleMinDistance;
 	}
 
-	bool HitsOccluder(const Occluder& occluder, const Vec3d& origin, const Vec3d& direction) const
+	bool HitsOccluder(const Occluder& occluder, const DVec3& origin, const DVec3& direction) const
 	{
 		double time = scNoHit;
 
 		return IntersectOccluder(occluder, origin, direction, time);
 	}
 
-	bool IntersectOccluder(const Occluder& occluder, const Vec3d& origin, const Vec3d& direction,
+	bool IntersectOccluder(const Occluder& occluder, const DVec3& origin, const DVec3& direction,
 						   double& out_time) const
 	{
 		if (occluder.FirstCorner >= 0) {
@@ -504,15 +504,15 @@ private:
 		const int32 node_index = static_cast<int32>(mNodes.Size);
 		mNodes.Emplace();
 
-		Vec3d min = mOccluders[first].Min;
-		Vec3d max = mOccluders[first].Max;
+		DVec3 min = mOccluders[first].Min;
+		DVec3 max = mOccluders[first].Max;
 
-		Vec3d center_min = (min + max) * 0.5;
-		Vec3d center_max = center_min;
+		DVec3 center_min = (min + max) * 0.5;
+		DVec3 center_max = center_min;
 
 		for (uint32 i = 1; i < count; i++) {
 			const Occluder& occluder = mOccluders[first + i];
-			const Vec3d center = (occluder.Min + occluder.Max) * 0.5;
+			const DVec3 center = (occluder.Min + occluder.Max) * 0.5;
 
 			min = MinVec(min, occluder.Min);
 			max = MaxVec(max, occluder.Max);
@@ -524,7 +524,7 @@ private:
 		int32 right = -1;
 
 		if (count > scLeafSize) {
-			const Vec3d extent = center_max - center_min;
+			const DVec3 extent = center_max - center_min;
 
 			int32 axis = 0;
 
@@ -558,7 +558,7 @@ private:
 
 private:
 	Array<OccluderPlane> mPlanes;
-	Array<Vec3d> mCorners;
+	Array<DVec3> mCorners;
 	Array<Occluder> mOccluders;
 	Array<BvhNode> mNodes;
 	uint32 mTriangleCount = 0;

@@ -4,9 +4,9 @@
 #include <Brush.hpp>
 #include <Core/DynArray.hpp>
 #include <Math/BBox.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/Vec2.hpp>
-#include <Math/Vec3.hpp>
 #include <vector>
 
 namespace fx {
@@ -23,7 +23,7 @@ public:
 	void AddBrush(const Brush& brush, const Mat4f& brush_to_world);
 	void ClipBrushes();
 
-	void AddTriangles(const Vec3f* positions, const Vec3f* normals, const uint32* indices, uint32 index_count);
+	void AddTriangles(const FVec3* positions, const FVec3* normals, const uint32* indices, uint32 index_count);
 
 	bool IsEmpty() const { return mIndices.IsEmpty(); }
 
@@ -34,7 +34,7 @@ public:
 private:
 	struct LocalPlane
 	{
-		Vec3f Normal;
+		FVec3 Normal;
 		float32 Distance;
 	};
 
@@ -42,20 +42,20 @@ private:
 	{
 		const Brush* pBrush = nullptr;
 		Mat4f ToLocal;
-		Vec3f Min;
-		Vec3f Max;
+		FVec3 Min;
+		FVec3 Max;
 		std::vector<LocalPlane> Planes;
 	};
 
-	using Polygon = std::vector<Vec3f>;
+	using Polygon = std::vector<FVec3>;
 
 private:
-	uint32 ClipToVolume(const Vec3f* points, uint32 count, Vec3f* out_points) const;
-	void EmitPolygon(const Vec3f* points, uint32 count, const Vec3f normal);
-	bool OverlapsVolume(const Vec3f min, const Vec3f max) const;
+	uint32 ClipToVolume(const FVec3* points, uint32 count, FVec3* out_points) const;
+	void EmitPolygon(const FVec3* points, uint32 count, const FVec3 normal);
+	bool OverlapsVolume(const FVec3 min, const FVec3 max) const;
 
-	static void SubtractReceiver(std::vector<Polygon>& fragments, const BrushReceiver& occluder, bool occluder_wins_ties,
-								 const Vec3f normal);
+	static void SubtractReceiver(std::vector<Polygon>& fragments, const BrushReceiver& occluder,
+								 bool occluder_wins_ties, const FVec3 normal);
 
 private:
 	template <typename TElementType>
@@ -66,16 +66,16 @@ private:
 	const Brush& mVolume;
 	Mat4f mWorldToLocal;
 
-	Vec3f mLocalMin;
-	Vec3f mLocalMax;
+	FVec3 mLocalMin;
+	FVec3 mLocalMax;
 
-	Vec3f mUGradient;
-	Vec3f mVGradient;
+	FVec3 mUGradient;
+	FVec3 mVGradient;
 	float32 mMinFacing = 0.0f;
 
-	GrowingArray<Vec3f> mPositions;
-	GrowingArray<Vec3f> mNormals;
-	GrowingArray<Vec3f> mTangents;
+	GrowingArray<FVec3> mPositions;
+	GrowingArray<FVec3> mNormals;
+	GrowingArray<FVec3> mTangents;
 	GrowingArray<float32> mHandedness;
 	GrowingArray<Vec2f> mTexcoords;
 	GrowingArray<uint32> mIndices;

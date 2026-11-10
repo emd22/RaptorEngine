@@ -5,8 +5,8 @@
 #include <Core/FilesystemIO.hpp>
 #include <Core/Hash.hpp>
 #include <Core/PagedArray.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Quat.hpp>
-#include <Math/Vec3.hpp>
 #include <Math/Vec4.hpp>
 #include <Util/Tokenizer.hpp>
 #include <algorithm>
@@ -295,7 +295,7 @@ ConfigEntry* ConfigEntry::GetMember(const Hash32 name_hash) const
 }
 
 
-void ConfigEntry::AppendValue(const Vec3f vec)
+void ConfigEntry::AppendValue(const FVec3 vec)
 {
 	if (!ArrayData.IsInited()) {
 		ArrayData.Create(4);

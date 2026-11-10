@@ -15,7 +15,7 @@
 #include <Core/SizedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 
 namespace fx::loader {
 
@@ -100,7 +100,7 @@ struct StaticModelMaterial
 {
 	String Name;
 
-	Vec3f BaseColor = Vec3f(1.0f);
+	FVec3 BaseColor = FVec3(1.0f);
 	float32 Metallic = 0.0f;
 	bool bHasMetallicTexture = false;
 

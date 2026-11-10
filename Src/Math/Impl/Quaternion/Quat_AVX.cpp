@@ -24,7 +24,7 @@ Quat::Quat(float32 x, float32 y, float32 z, float32 w)
 
 Quat::Quat(const JPH::Quat& other) { mIntrin = other.mValue.mValue; }
 
-Quat Quat::FromAxisAngle(const Vec3f axis, float32 angle)
+Quat Quat::FromAxisAngle(const FVec3 axis, float32 angle)
 {
 	float32 sv, cv;
 	MathUtil::SinCos(angle * 0.5f, &sv, &cv);
@@ -41,7 +41,7 @@ bool Quat::IsCloseTo(const JPH::Quat& other, const float32 tolerance) const { re
 void Quat::FromJoltQuaternion(const JPH::Quat& quat) { mIntrin = quat.mValue.mValue; }
 void Quat::ToJoltQuaternion(JPH::Quat& quat) const { quat.mValue.mValue = mIntrin; }
 
-Quat Quat::FromEulerAngles(const Vec3f angles)
+Quat Quat::FromEulerAngles(const FVec3 angles)
 {
 	/*
 		Create the quaternion using
@@ -100,7 +100,7 @@ Quat Quat::operator*(const Quat other) const
 				lw * rw - lx * rx - ly * ry - lz * rz);
 }
 
-// Quat Quat::FromEulerAngles_NeonTest(Vec3f angles)
+// Quat Quat::FromEulerAngles_NeonTest(FVec3 angles)
 // {
 //     Quat quat;
 
@@ -196,7 +196,7 @@ Quat Quat::operator*(const Quat other) const
 // }
 
 
-Vec3f Quat::GetEulerAngles() const
+FVec3 Quat::GetEulerAngles() const
 {
 	const float32 y_sq = Y * Y;
 
@@ -213,7 +213,7 @@ Vec3f Quat::GetEulerAngles() const
 	float t3 = 2.0f * (W * Z + X * Y);
 	float t4 = 1.0f - 2.0f * (y_sq + Z * Z);
 
-	return Vec3f(atan2(t0, t1), asin(t2), atan2(t3, t4));
+	return FVec3(atan2(t0, t1), asin(t2), atan2(t3, t4));
 }
 
 } // namespace fx

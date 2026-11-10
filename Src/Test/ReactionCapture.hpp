@@ -2,7 +2,7 @@
 
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 #include <cstdio>
 
 namespace fx {
@@ -49,8 +49,8 @@ private:
 	ReactionCaptureOptions mOptions;
 	std::FILE* mpOut = nullptr;
 	NPC* mpTarget = nullptr;
-	Vec3f mTargetPosition = Vec3f::sZero;
-	Vec3f mEye = Vec3f::sZero;
+	FVec3 mTargetPosition = FVec3::sZero;
+	FVec3 mEye = FVec3::sZero;
 	float32 mTime = 0.0f;
 	uint32 mNextEvent = 0;
 	uint32 mFrame = 0;

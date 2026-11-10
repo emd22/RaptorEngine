@@ -13,7 +13,7 @@
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
 #include <Map/CompiledMap.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 
 namespace fx {
 class Image;
@@ -103,7 +103,7 @@ public:
 	 * @brief Moves the clip windows to `center` and records the pass that fills the pages that came into view
 	 * @param eval_budget The most pages to compute distances for this frame
 	 */
-	void Update(CommandBuffer& cmd, const Vec3f& center, uint32 eval_budget);
+	void Update(CommandBuffer& cmd, const FVec3& center, uint32 eval_budget);
 
 	/// Traces from the camera (or from the prepass surfaces) and overwrites the lit target with the result
 	void RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDebugView view, float32 cone_slope,
@@ -150,7 +150,7 @@ private:
 	void CreateBuffer(RawGpuBuffer& buffer, uint64 size, const void* data);
 
 	/// Moves a level's window, returning true if it moved too far to keep any of its pages
-	bool PlaceLevel(uint32 level_index, const Vec3f& center);
+	bool PlaceLevel(uint32 level_index, const FVec3& center);
 	void ResetLevel(uint32 level_index);
 	void MarkDirty(uint32 level_index, uint32 slot, uint8 value);
 	void FreeSlot(Level& level, uint32 slot);

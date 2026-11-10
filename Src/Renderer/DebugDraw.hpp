@@ -5,9 +5,9 @@
 #include <Core/Ref.hpp>
 #include <Core/Types.hpp>
 #include <Math/BBox.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/Quat.hpp>
-#include <Math/Vec3.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
 
 namespace fx {
@@ -41,14 +41,14 @@ public:
 
 	void Draw(eDebugShape shape, const Mat4f& world_matrix, Color color);
 
-	void Line(const Vec3f from, const Vec3f to, Color color);
+	void Line(const FVec3 from, const FVec3 to, Color color);
 
 	void WireBox(const Mat4f& world_matrix, Color color) { Draw(eDebugShape::WireBox, world_matrix, color); }
-	void WireBox(const Vec3f center, const Vec3f half_extent, const Quat rotation, Color color);
+	void WireBox(const FVec3 center, const FVec3 half_extent, const Quat rotation, Color color);
 	void WireBox(const BBox& box, Color color);
 
 	void SolidBox(const Mat4f& world_matrix, Color color) { Draw(eDebugShape::SolidBox, world_matrix, color); }
-	void SolidBox(const Vec3f center, const Vec3f half_extent, const Quat rotation, Color color);
+	void SolidBox(const FVec3 center, const FVec3 half_extent, const Quat rotation, Color color);
 	void SolidBox(const BBox& box, Color color);
 
 	void Overlay(const Ref<PrimitiveMesh>& mesh, const Mat4f& world_matrix, Color color);

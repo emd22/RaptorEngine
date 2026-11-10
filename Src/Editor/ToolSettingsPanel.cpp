@@ -51,7 +51,7 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 
 	{
 		mpPositionField = new Vector3Field(body, "Position", Vec2f(-100000.0f, 100000.0f));
-		mpPositionField->SetOnChange([](const Vec3f value)
+		mpPositionField->SetOnChange([](const FVec3 value)
 									 { EditSelectedLight([value](LightSpot& light) { light.SetPosition(value); }); });
 
 		section->AddRow(*mpPositionField);
@@ -206,7 +206,7 @@ void SoundToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 	section->AddRow("Sound", mpSoundChoice);
 
 	mpPositionField = new Vector3Field(body, "Position", Vec2f(-100000.0f, 100000.0f));
-	mpPositionField->SetOnChange([](const Vec3f value)
+	mpPositionField->SetOnChange([](const FVec3 value)
 								 { EditSelectedSound([value](SoundEmitter& emitter) { emitter.Position = value; }); });
 	section->AddRow(*mpPositionField);
 

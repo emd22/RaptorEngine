@@ -122,13 +122,13 @@ int32 Bsp::ChooseSplitPlane(const Array<Polyhedron>& fragments, const Array<Poly
 		int64 back_count = 0;
 		int64 split_count = 0;
 
-		const Vec3d abs_normal(std::abs(plane.Normal.X), std::abs(plane.Normal.Y), std::abs(plane.Normal.Z));
+		const DVec3 abs_normal(std::abs(plane.Normal.X), std::abs(plane.Normal.Y), std::abs(plane.Normal.Z));
 
 		for_each_fragment(
 			[&](const Polyhedron& fragment)
 			{
-				const Vec3d center = (fragment.Min + fragment.Max) * 0.5;
-				const Vec3d half = (fragment.Max - fragment.Min) * 0.5;
+				const DVec3 center = (fragment.Min + fragment.Max) * 0.5;
+				const DVec3 half = (fragment.Max - fragment.Min) * 0.5;
 
 				const double radius = abs_normal.Dot(half);
 				const double distance = plane.DistanceTo(center);
@@ -159,8 +159,8 @@ int32 Bsp::ChooseSplitPlane(const Array<Polyhedron>& fragments, const Array<Poly
 	return best_plane;
 }
 
-void Bsp::Build(PlaneSet& planes, Array<Polyhedron> brushes, Array<Polyhedron> portal_brushes, const Vec3d& min,
-				const Vec3d& max)
+void Bsp::Build(PlaneSet& planes, Array<Polyhedron> brushes, Array<Polyhedron> portal_brushes, const DVec3& min,
+				const DVec3& max)
 {
 	constexpr double scBoundsMargin = 8.0;
 
@@ -172,14 +172,14 @@ void Bsp::Build(PlaneSet& planes, Array<Polyhedron> brushes, Array<Polyhedron> p
 	PortalCount = 0;
 	MaxDepth = 0;
 
-	const Vec3d margin(scBoundsMargin, scBoundsMargin, scBoundsMargin);
-	const Vec3d outer_min = min - margin;
-	const Vec3d outer_max = max + margin;
+	const DVec3 margin(scBoundsMargin, scBoundsMargin, scBoundsMargin);
+	const DVec3 outer_min = min - margin;
+	const DVec3 outer_max = max + margin;
 
 	Array<int32> bounds_planes;
 
 	for (int32 axis = 0; axis < 3; axis++) {
-		Vec3d normal = Vec3d(0.0);
+		DVec3 normal = DVec3(0.0);
 		normal.mData[axis] = 1.0;
 
 		mBoundsPlanes[axis * 2] = planes.FindOrAdd(normal, outer_max.mData[axis]);
@@ -288,7 +288,7 @@ void Bsp::Build(PlaneSet& planes, Array<Polyhedron> brushes, Array<Polyhedron> p
 	}
 }
 
-int32 Bsp::FindLeaf(const Vec3d& point) const
+int32 Bsp::FindLeaf(const DVec3& point) const
 {
 	int32 index = 0;
 
@@ -308,7 +308,7 @@ int32 Bsp::FindLeaf(const Vec3d& point) const
 void Bsp::FilterWinding(const Winding& winding, int32 plane_index, Array<LeafFragment>& out_fragments) const
 {
 	const PlaneSet& planes = *mpPlanes;
-	const Vec3d normal = planes[plane_index].Normal;
+	const DVec3 normal = planes[plane_index].Normal;
 
 	Array<LeafFragment> stack;
 	stack.Emplace(LeafFragment { 0, CopyWinding(winding) });
@@ -407,14 +407,14 @@ void Bsp::BuildPortals()
 	}
 }
 
-FloodResult Bsp::FloodFill(const Array<Vec3d>& entities)
+FloodResult Bsp::FloodFill(const Array<DVec3>& entities)
 {
 	FloodResult result;
 
 	struct Visit
 	{
 		int32 Previous = Node::scNone;
-		Vec3d Through = Vec3d(0.0);
+		DVec3 Through = DVec3(0.0);
 		bool bVisited = false;
 	};
 
@@ -428,7 +428,7 @@ FloodResult Bsp::FloodFill(const Array<Vec3d>& entities)
 		node.bReached = false;
 	}
 
-	for (const Vec3d& entity : entities) {
+	for (const DVec3& entity : entities) {
 		const int32 leaf = FindLeaf(entity);
 
 		if (Nodes[static_cast<size_t>(leaf)].bSolid) {

@@ -6,7 +6,7 @@
 #include <ThirdParty/Jolt/Physics/Body/BodyID.h>
 
 #include <Core/Types.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 
 namespace fx::editor {
 
@@ -28,7 +28,7 @@ private:
 
 	JPH::BodyID mBody {};
 
-	Vec3f mLocalPoint = Vec3f::sZero;
+	FVec3 mLocalPoint = FVec3::sZero;
 	float32 mDistance = 0.0f;
 };
 

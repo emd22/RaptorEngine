@@ -1,7 +1,7 @@
 #pragma once
 
+#include "FVec3.hpp"
 #include "Mat4.hpp"
-#include "Vec3.hpp"
 
 namespace fx {
 
@@ -12,20 +12,20 @@ class BBox
 {
 public:
 	BBox() = default;
-	BBox(Vec3f min, Vec3f max);
+	BBox(FVec3 min, FVec3 max);
 
-	FX_FORCE_INLINE Vec3f GetSize() { return Max - Min; }
+	FX_FORCE_INLINE FVec3 GetSize() { return Max - Min; }
 
 	void Add(const BBox& other);
 
-	BBox& OffsetBy(const Vec3f offset)
+	BBox& OffsetBy(const FVec3 offset)
 	{
 		Min += offset;
 		Max += offset;
 		return *this;
 	}
 
-	BBox AddMargin(const Vec3f margin) const;
+	BBox AddMargin(const FVec3 margin) const;
 
 	BBox operator+(const BBox& other) const;
 	BBox& operator+=(const BBox& other);
@@ -33,8 +33,8 @@ public:
 	BBox& operator=(const BBox& other);
 
 public:
-	Vec3f Min = Vec3f::sZero;
-	Vec3f Max = Vec3f::sZero;
+	FVec3 Min = FVec3::sZero;
+	FVec3 Max = FVec3::sZero;
 };
 
 /**
@@ -50,7 +50,7 @@ public:
 	BBox GetWorldAABB() const;
 
 public:
-	Vec3f Corners[8];
+	FVec3 Corners[8];
 };
 
 } // namespace fx

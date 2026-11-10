@@ -45,12 +45,12 @@ namespace {
 // Spherical harmonics
 ///////////////////////////////////
 
-ProbeSHData MakeSkyGradientProbe(Vec3f sky, Vec3f ground)
+ProbeSHData MakeSkyGradientProbe(FVec3 sky, FVec3 ground)
 {
 	ProbeSHData probe {};
 
-	Vec3f sh0 = (sky + ground) * 0.5f / scSHNorm0;
-	Vec3f sh1 = (sky - ground) * 0.5f / scSHNorm1;
+	FVec3 sh0 = (sky + ground) * 0.5f / scSHNorm0;
+	FVec3 sh1 = (sky - ground) * 0.5f / scSHNorm1;
 
 	sh0.CopyTo(probe.SH[0]);
 	sh1.CopyTo(probe.SH[1]);
@@ -88,7 +88,7 @@ float32 CaptureDepthToDistance(const Mat4f& inv_projection, float32 stored_depth
 	}
 
 	const Vec4f view = inv_projection * Vec4f(ndc_x, ndc_y, 1.0f - stored_depth, 1.0f);
-	const float32 distance = Vec3f(view.X, view.Y, view.Z).Length() / fabsf(view.W);
+	const float32 distance = FVec3(view.X, view.Y, view.Z).Length() / fabsf(view.W);
 
 	if (distance < cFar) {
 		return distance;
@@ -117,10 +117,10 @@ void SampleCaptureFace(const float32* face, uint32 size, float32 ndc_x, float32 
 	const float32* t01 = face + (y1 * size + x0) * 3;
 	const float32* t11 = face + (y1 * size + x1) * 3;
 
-	const Vec3f top = Vec3f::Lerp(Vec3f(t00), Vec3f(t10), fx);
-	const Vec3f bottom = Vec3f::Lerp(Vec3f(t01), Vec3f(t11), fx);
+	const FVec3 top = FVec3::Lerp(FVec3(t00), FVec3(t10), fx);
+	const FVec3 bottom = FVec3::Lerp(FVec3(t01), FVec3(t11), fx);
 
-	Vec3f::Lerp(top, bottom, fy).CopyTo(out);
+	FVec3::Lerp(top, bottom, fy).CopyTo(out);
 }
 
 
@@ -237,7 +237,7 @@ ProbePlacementBoxes GatherPlacementBoxes()
 	return boxes;
 }
 
-void SetProbeInfoPosition(ProbeInfo& info, Vec3f position)
+void SetProbeInfoPosition(ProbeInfo& info, FVec3 position)
 {
 	position.CopyTo(info.ProbePosition);
 	info.ProbePosition[3] = 1.0f;
@@ -264,16 +264,16 @@ static_assert(Limits::ReflectionProbeSize == 128 && Limits::ReflectionProbeMips 
 struct ReflectionBox
 {
 	Mat4f BoxToWorld;
-	Vec3f HalfExtent;
+	FVec3 HalfExtent;
 	float32 Volume;
 };
 
-ReflectionBox MakeReflectionBox(const Vec3f local_min, const Vec3f local_max, const Mat4f& local_to_world)
+ReflectionBox MakeReflectionBox(const FVec3 local_min, const FVec3 local_max, const Mat4f& local_to_world)
 {
 	constexpr float32 scReflectionMinHalfExtent = 0.05f;
 
-	const Vec3f half_extent = Vec3f::Max((local_max - local_min) * 0.5f, Vec3f(scReflectionMinHalfExtent));
-	const Vec3f center = (local_max + local_min) * 0.5f;
+	const FVec3 half_extent = FVec3::Max((local_max - local_min) * 0.5f, FVec3(scReflectionMinHalfExtent));
+	const FVec3 center = (local_max + local_min) * 0.5f;
 
 	ReflectionBox box;
 	box.BoxToWorld = Mat4f::AsScale(half_extent) * Mat4f::AsTranslation(center) * local_to_world;
@@ -288,9 +288,9 @@ ReflectionProbeData MakeReflectionProbe(const ReflectionBox& box, const ProbePla
 	constexpr float32 scReflectionRelocation = 0.9f;
 
 	const Vec4f center_h = box.BoxToWorld * Vec4f(0.0f, 0.0f, 0.0f, 1.0f);
-	const Vec3f center(center_h.X, center_h.Y, center_h.Z);
+	const FVec3 center(center_h.X, center_h.Y, center_h.Z);
 
-	Vec3f position = center;
+	FVec3 position = center;
 
 	if (!ProbePlacement::IsPositionValid(center, center, boxes) &&
 		!ProbePlacement::FindValidPosition(center, center, box.HalfExtent * scReflectionRelocation, boxes, position)) {
@@ -384,14 +384,14 @@ void ProbeManager::MakeCaptureCameras()
 		return;
 	}
 
-	static const Vec3f scFaceDirections[scCaptureFaces] = {
-		Vec3f(1.0f, 0.0f, 0.0f),  Vec3f(-1.0f, 0.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
-		Vec3f(0.0f, -1.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f),	Vec3f(0.0f, 0.0f, -1.0f),
+	static const FVec3 scFaceDirections[scCaptureFaces] = {
+		FVec3(1.0f, 0.0f, 0.0f),  FVec3(-1.0f, 0.0f, 0.0f), FVec3(0.0f, 1.0f, 0.0f),
+		FVec3(0.0f, -1.0f, 0.0f), FVec3(0.0f, 0.0f, 1.0f),	FVec3(0.0f, 0.0f, -1.0f),
 	};
 
-	static const Vec3f scFaceUps[scCaptureFaces] = {
-		Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f),
-		Vec3f(0.0f, 0.0f, 1.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
+	static const FVec3 scFaceUps[scCaptureFaces] = {
+		FVec3(0.0f, 1.0f, 0.0f), FVec3(0.0f, 1.0f, 0.0f), FVec3(0.0f, 0.0f, 1.0f),
+		FVec3(0.0f, 0.0f, 1.0f), FVec3(0.0f, 1.0f, 0.0f), FVec3(0.0f, 1.0f, 0.0f),
 	};
 
 	constexpr float32 scFarClip = 200.0f;
@@ -410,7 +410,7 @@ void ProbeManager::MakeCaptureCameras()
 	}
 }
 
-void ProbeManager::MoveCaptureCameras(const Vec3f position)
+void ProbeManager::MoveCaptureCameras(const FVec3 position)
 {
 	for (PerspectiveCamera& cam : mCaptureCameras) {
 		cam.SetPosition(position);
@@ -420,8 +420,8 @@ void ProbeManager::MoveCaptureCameras(const Vec3f position)
 
 void ProbeManager::Create()
 {
-	const Vec3f cSky(0.055f, 0.062f, 0.075f);
-	const Vec3f cGround(0.025f, 0.022f, 0.020f);
+	const FVec3 cSky(0.055f, 0.062f, 0.075f);
+	const FVec3 cGround(0.025f, 0.022f, 0.020f);
 
 	std::fill(std::begin(mProbes), std::end(mProbes), MakeSkyGradientProbe(cSky, cGround));
 
@@ -429,14 +429,14 @@ void ProbeManager::Create()
 		ResetDepthMoments(info);
 	}
 
-	ProbePlacement::AddVolume(mLayout, Vec3f(-20.0f, -2.0f, -20.0f), Vec3f(150.0f, 15.0f, 150.0f),
+	ProbePlacement::AddVolume(mLayout, FVec3(-20.0f, -2.0f, -20.0f), FVec3(150.0f, 15.0f, 150.0f),
 							  ProbeGridSize { 4, 2, 4 }, ProbePlacementBoxes {}, eProbeFill::Dense);
 	ApplyLayout();
 
 	UploadReflectionProbes(0);
 }
 
-uint32 ProbeManager::SelectVolume(const Vec3f position) const
+uint32 ProbeManager::SelectVolume(const FVec3 position) const
 {
 	uint32 best = 0;
 	float32 best_distance_sq = std::numeric_limits<float32>::max();
@@ -445,9 +445,9 @@ uint32 ProbeManager::SelectVolume(const Vec3f position) const
 	for (uint32 i = 0; i < mLayout.VolumeCount; i++) {
 		const ProbeVolumeData& volume = mLayout.Volumes[i];
 
-		const Vec3f volume_min(volume.MinAndCount);
-		const Vec3f volume_max(volume.MaxAndCellVolume);
-		const Vec3f outside = Vec3f::Max(Vec3f::Max(volume_min - position, position - volume_max), Vec3f(0.0f));
+		const FVec3 volume_min(volume.MinAndCount);
+		const FVec3 volume_max(volume.MaxAndCellVolume);
+		const FVec3 outside = FVec3::Max(FVec3::Max(volume_min - position, position - volume_max), FVec3(0.0f));
 		const float32 distance_sq = outside.Dot(outside);
 
 		const float32 cell_volume = volume.MaxAndCellVolume[3];
@@ -467,8 +467,8 @@ uint32 ProbeManager::SelectVolume(const Vec3f position) const
 
 /// `out_coverage` is the share of the trilinear weight on placed probes against placed and empty grid points (solid
 /// ones don't count), as SampleProbeVolumeIrradiance() computes it in ProbeCommon.hlsli.
-bool ProbeManager::SampleVolume(const Vec3f position, uint32 volume_index, const float32* basis,
-								Vec3f& out_irradiance, float32& out_coverage) const
+bool ProbeManager::SampleVolume(const FVec3 position, uint32 volume_index, const float32* basis, FVec3& out_irradiance,
+								float32& out_coverage) const
 {
 	const ProbeVolumeData& volume = mLayout.Volumes[volume_index];
 
@@ -486,7 +486,7 @@ bool ProbeManager::SampleVolume(const Vec3f position, uint32 volume_index, const
 		fraction[axis] = std::clamp(local - static_cast<float32>(base[axis]), 0.0f, 1.0f);
 	}
 
-	Vec3f irradiance(0.0f);
+	FVec3 irradiance(0.0f);
 	float32 total_weight = 0.0f;
 	float32 open_weight = 0.0f;
 
@@ -524,7 +524,7 @@ bool ProbeManager::SampleVolume(const Vec3f position, uint32 volume_index, const
 		const ProbeSHData& probe = mProbes[probe_index];
 
 		for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
-			irradiance += Vec3f(probe.SH[k]) * basis[k] * weight;
+			irradiance += FVec3(probe.SH[k]) * basis[k] * weight;
 		}
 
 		total_weight += weight;
@@ -538,12 +538,12 @@ bool ProbeManager::SampleVolume(const Vec3f position, uint32 volume_index, const
 
 	const float32 scale = 1.0f / total_weight;
 
-	out_irradiance = Vec3f::Max(irradiance * scale, Vec3f(0.0f));
+	out_irradiance = FVec3::Max(irradiance * scale, FVec3(0.0f));
 
 	return true;
 }
 
-bool ProbeManager::SampleIrradiance(const Vec3f position, const Vec3f normal, Vec3f& out_irradiance) const
+bool ProbeManager::SampleIrradiance(const FVec3 position, const FVec3 normal, FVec3& out_irradiance) const
 {
 	if (mLayout.VolumeCount == 0 || GetProbeCount() == 0) {
 		return false;
@@ -562,7 +562,7 @@ bool ProbeManager::SampleIrradiance(const Vec3f position, const Vec3f normal, Ve
 	}
 
 	// Like the shader, a cell of a sparse volume that is partly empty is filled in from the base volume
-	Vec3f base_irradiance;
+	FVec3 base_irradiance;
 	float32 base_coverage;
 
 	if (!SampleVolume(position, 0, basis, base_irradiance, base_coverage)) {
@@ -621,7 +621,7 @@ void ProbeManager::ApplyLayout()
 	const uint32 probe_count = GetProbeCount();
 
 	for (uint32 probe = 0; probe < probe_count; probe++) {
-		const Vec3f position = mLayout.Positions[probe];
+		const FVec3 position = mLayout.Positions[probe];
 		ProbeInfo& info = mProbeInfos[probe];
 
 		SetProbeInfoPosition(info, position);
@@ -731,9 +731,9 @@ bool VolumesMatch(const ProbeVolumeData& a, const ProbeVolumeData& b)
 		}
 	}
 
-	const Vec3f min_difference = (Vec3f(a.MinAndCount) - Vec3f(b.MinAndCount)).Abs();
-	const Vec3f max_difference = (Vec3f(a.MaxAndCellVolume) - Vec3f(b.MaxAndCellVolume)).Abs();
-	const Vec3f difference = Vec3f::Max(min_difference, max_difference);
+	const FVec3 min_difference = (FVec3(a.MinAndCount) - FVec3(b.MinAndCount)).Abs();
+	const FVec3 max_difference = (FVec3(a.MaxAndCellVolume) - FVec3(b.MaxAndCellVolume)).Abs();
+	const FVec3 difference = FVec3::Max(min_difference, max_difference);
 
 	if (difference.X > scStaleVolumeTolerance || difference.Y > scStaleVolumeTolerance ||
 		difference.Z > scStaleVolumeTolerance) {
@@ -778,7 +778,7 @@ LayoutDifference CompareLayouts(const ProbeLayout& baked, const ProbeLayout& cur
 	}
 
 	for (uint32 probe = 0; probe < baked.GetProbeCount(); probe++) {
-		const Vec3f offset = (baked.Positions[probe] - current.Positions[probe]).Abs();
+		const FVec3 offset = (baked.Positions[probe] - current.Positions[probe]).Abs();
 
 		if (offset.X > scStaleProbeTolerance || offset.Y > scStaleProbeTolerance || offset.Z > scStaleProbeTolerance) {
 			difference.MovedProbes++;
@@ -864,7 +864,7 @@ void ProbeManager::ServiceStaleCheck()
 // Sun visibility
 ///////////////////////////////////
 
-void ProbeManager::SetSunVisibility(Slice<const Vec3f> positions, Slice<const uint8> values)
+void ProbeManager::SetSunVisibility(Slice<const FVec3> positions, Slice<const uint8> values)
 {
 	const uint32 count = static_cast<uint32>(std::min(positions.Size, values.Size));
 
@@ -896,7 +896,7 @@ void ProbeManager::ResolveSunVisibility()
 			continue;
 		}
 
-		const Vec3f position = mLayout.Positions[probe];
+		const FVec3 position = mLayout.Positions[probe];
 
 		uint32 nearest = std::min(probe, sample_count - 1);
 		float32 nearest_distance = position.DistanceTo(mSunSamplePositions[nearest]);
@@ -1011,7 +1011,7 @@ void ProbeManager::BuildCaptureTexels()
 	mCaptureTexels.InitSize(scCaptureFaces * scCaptureSize * scCaptureSize);
 	CaptureTexel* texel = mCaptureTexels.pData;
 
-	MoveCaptureCameras(Vec3f::sZero);
+	MoveCaptureCameras(FVec3::sZero);
 
 	for (uint32 face = 0; face < scCaptureFaces; face++) {
 		const PerspectiveCamera& camera = mCaptureCameras[face];
@@ -1026,7 +1026,7 @@ void ProbeManager::BuildCaptureTexels()
 				const float32 ndc_y = TexelToNdc(y, scCaptureSize);
 
 				const Vec4f point = inv_view_projection * Vec4f(ndc_x, ndc_y, 0.5f, 1.0f);
-				const Vec3f direction = Vec3f(point.X / point.W, point.Y / point.W, point.Z / point.W).Normalize();
+				const FVec3 direction = FVec3(point.X / point.W, point.Y / point.W, point.Z / point.W).Normalize();
 
 				const float32 dist_sq = 1.0f + ndc_x * ndc_x + ndc_y * ndc_y;
 				texel->SolidAngle = cTexelArea / (dist_sq * sqrtf(dist_sq));
@@ -1192,7 +1192,7 @@ void ProbeManager::ProjectCapture(const Float16* const colors[scCaptureFaces],
 {
 	constexpr float32 cFar = Limits::ProbeDepthMaxDistance;
 
-	Vec3f sh[Limits::ProbeSHCoeffCount] = {};
+	FVec3 sh[Limits::ProbeSHCoeffCount] = {};
 
 	float32 moment_weight[scMomentTexelCount] = {};
 	float32 moment_sum[scMomentTexelCount] = {};
@@ -1206,7 +1206,7 @@ void ProbeManager::ProjectCapture(const Float16* const colors[scCaptureFaces],
 				const uint32 pixel = y * scCaptureSize + x;
 				const Float16* rgba = colors[face] + pixel * 4;
 
-				const Vec3f radiance(HalfToRadiance(rgba[0]), HalfToRadiance(rgba[1]), HalfToRadiance(rgba[2]));
+				const FVec3 radiance(HalfToRadiance(rgba[0]), HalfToRadiance(rgba[1]), HalfToRadiance(rgba[2]));
 
 				for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
 					sh[k] += radiance * texel->WeightedBasis[k];
@@ -1361,9 +1361,9 @@ void ProbeManager::UploadMomentsAtlas(uint32 first_probe, uint32 count)
 // Reflection probes
 ///////////////////////////////////
 
-Vec3f ProbeManager::GetReflectionProbePosition(uint32 index) const
+FVec3 ProbeManager::GetReflectionProbePosition(uint32 index) const
 {
-	return Vec3f(mReflectionProbes[index].PositionAndCount);
+	return FVec3(mReflectionProbes[index].PositionAndCount);
 }
 
 uint32 ProbeManager::RebuildReflectionProbesFromWorld()
@@ -1455,7 +1455,7 @@ void ProbeManager::RecordReflectionCapture(renderer::CommandBuffer& cmd, const R
 {
 	mBatchStart = mCurrentProbe;
 
-	const Vec3f position = GetReflectionProbePosition(mCurrentProbe);
+	const FVec3 position = GetReflectionProbePosition(mCurrentProbe);
 
 	mbCapturingFaces = true;
 
@@ -1547,7 +1547,7 @@ bool ProbeManager::ReadBackReflectionProbe(uint32 probe_index)
 
 		for (uint32 y = 0; y < cSize; y++) {
 			for (uint32 x = 0; x < cSize; x++, out += 3) {
-				const Vec3f direction = ReflectionFilter::FaceUVToDirection(face, TexelToNdc(x, cSize),
+				const FVec3 direction = ReflectionFilter::FaceUVToDirection(face, TexelToNdc(x, cSize),
 																			TexelToNdc(y, cSize));
 
 				uint32 capture_face;
@@ -1575,11 +1575,11 @@ bool ProbeManager::ReadBackReflectionProbe(uint32 probe_index)
 /// from the light probes (not from the cubemap itself) makes the scale exactly 1 at the capture point, and it follows
 /// the light probes when they are rebaked without the reflections. Kept as an ambient cube (one value per axis
 /// direction, blended by the squared normal), which unlike a linear fit can't go negative where the light is one-sided.
-void ProbeManager::SampleCaptureIrradiance(const Vec3f position, ReflectionProbeGpu& probe) const
+void ProbeManager::SampleCaptureIrradiance(const FVec3 position, ReflectionProbeGpu& probe) const
 {
-	static const Vec3f scAxes[3] = { Vec3f(1.0f, 0.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f) };
+	static const FVec3 scAxes[3] = { FVec3(1.0f, 0.0f, 0.0f), FVec3(0.0f, 1.0f, 0.0f), FVec3(0.0f, 0.0f, 1.0f) };
 
-	const auto luminance = [](const Vec3f color)
+	const auto luminance = [](const FVec3 color)
 	{ return (color.X * 0.2126f) + (color.Y * 0.7152f) + (color.Z * 0.0722f); };
 
 	std::fill(std::begin(probe.CaptureIrradiancePositive), std::end(probe.CaptureIrradiancePositive), 0.0f);
@@ -1589,8 +1589,8 @@ void ProbeManager::SampleCaptureIrradiance(const Vec3f position, ReflectionProbe
 	float32 negative[3];
 
 	for (uint32 axis = 0; axis < 3; axis++) {
-		Vec3f positive_irradiance;
-		Vec3f negative_irradiance;
+		FVec3 positive_irradiance;
+		FVec3 negative_irradiance;
 
 		if (!SampleIrradiance(position, scAxes[axis], positive_irradiance) ||
 			!SampleIrradiance(position, -scAxes[axis], negative_irradiance)) {
@@ -1777,7 +1777,7 @@ bool ProbeManager::LoadCompiledProbes()
 		}
 
 		ProbeInfo& info = mProbeInfos[probe];
-		const Vec3f position = mLayout.Positions[probe];
+		const FVec3 position = mLayout.Positions[probe];
 
 		SetProbeInfoPosition(info, position);
 
@@ -1910,7 +1910,7 @@ bool ProbeManager::LoadProbeFile(const ProbeLayout* required_layout)
 	}
 
 	for (uint32 probe = 0; probe < header.ProbeCount; probe++) {
-		layout.Positions.Emplace(Vec3f(mProbeInfos[probe].ProbePosition));
+		layout.Positions.Emplace(FVec3(mProbeInfos[probe].ProbePosition));
 	}
 
 	if (required_layout != nullptr && !CompareLayouts(layout, *required_layout).IsEmpty()) {
@@ -2012,7 +2012,7 @@ bool ProbeManager::LoadReflectionProbes()
 		const float32* world_to_box = probes[probe].WorldToBox;
 
 		for (uint32 axis = 0; axis < 3; axis++) {
-			const float32 scale = Vec3f(world_to_box[axis], world_to_box[4 + axis], world_to_box[8 + axis]).Length();
+			const float32 scale = FVec3(world_to_box[axis], world_to_box[4 + axis], world_to_box[8 + axis]).Length();
 			probes[probe].Fade[axis] = 1.0f / (std::max(scale, 1e-6f) * scReflectionBlendDistance);
 		}
 	}

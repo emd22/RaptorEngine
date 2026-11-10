@@ -23,13 +23,13 @@ constexpr float32 scProbeDown = 1.0f;
 
 } // namespace
 
-void Ragdoll::Activate(const Vec3f velocity)
+void Ragdoll::Activate(const FVec3 velocity)
 {
 	if (mpRagdoll == nullptr) {
 		return;
 	}
 
-	mpRagdoll->SetLinearVelocity(Vec3f::ToJolt(velocity));
+	mpRagdoll->SetLinearVelocity(FVec3::ToJolt(velocity));
 	mpRagdoll->Activate();
 
 	mbLimp = true;
@@ -225,7 +225,7 @@ void Ragdoll::PlaceFeetOnGround()
 		const JPH::Vec3 ankle = JPH::Vec3(body_interface.GetPosition(foot_id));
 
 		const RayResult ground = gPhysics->pBackend->RaycastStatic(
-			Vec3f(ankle.GetX(), ankle.GetY() + scProbeUp, ankle.GetZ()), Vec3f(0.0f, -(scProbeUp + scProbeDown), 0.0f));
+			FVec3(ankle.GetX(), ankle.GetY() + scProbeUp, ankle.GetZ()), FVec3(0.0f, -(scProbeUp + scProbeDown), 0.0f));
 
 		if (!ground.bHit) {
 			continue;
@@ -262,11 +262,11 @@ void Ragdoll::PlaceFeetOnGround()
 			foot_rotation = (JPH::Quat::sFromTo(sole_up, up) * foot_rotation).Normalized();
 
 			const JPH::Vec3 lifted = ankle - up * std::min(get_clearance(ankle, foot_rotation), 0.0f);
-			const TwoBoneIKResult ik = SolveTwoBoneIK(Vec3f::FromJolt(hip), Vec3f::FromJolt(lifted), leg.Upper,
-													  leg.Lower, Vec3f::FromJolt(knee - hip));
+			const TwoBoneIKResult ik = SolveTwoBoneIK(FVec3::FromJolt(hip), FVec3::FromJolt(lifted), leg.Upper,
+													  leg.Lower, FVec3::FromJolt(knee - hip));
 
-			new_knee = Vec3f::ToJolt(ik.Mid);
-			new_ankle = Vec3f::ToJolt(ik.End);
+			new_knee = FVec3::ToJolt(ik.Mid);
+			new_ankle = FVec3::ToJolt(ik.End);
 
 			const JPH::Quat thigh_turn = JPH::Quat::sFromTo((knee - hip).Normalized(), (new_knee - hip).Normalized());
 			const JPH::Quat shin_turn = JPH::Quat::sFromTo((ankle - knee).Normalized(),
@@ -323,7 +323,7 @@ float32 Ragdoll::GetSoleClearance(uint32 leg_index) const
 
 	const JPH::Vec3 ankle = JPH::Vec3(position);
 	const RayResult ground = gPhysics->pBackend->RaycastStatic(
-		Vec3f(ankle.GetX(), ankle.GetY() + scProbeUp, ankle.GetZ()), Vec3f(0.0f, -(scProbeUp + scProbeDown), 0.0f));
+		FVec3(ankle.GetX(), ankle.GetY() + scProbeUp, ankle.GetZ()), FVec3(0.0f, -(scProbeUp + scProbeDown), 0.0f));
 
 	if (!ground.bHit) {
 		return std::numeric_limits<float32>::max();
@@ -443,7 +443,7 @@ void Ragdoll::SetBodyLayers(const SizedArray<BodyLayer>& layers, float32 gravity
 	}
 }
 
-void Ragdoll::AddImpulse(JPH::BodyID body_id, const Vec3f impulse, const Vec3f point)
+void Ragdoll::AddImpulse(JPH::BodyID body_id, const FVec3 impulse, const FVec3 point)
 {
 	const int32 body_index = FindSegmentIndex(body_id);
 
@@ -454,7 +454,7 @@ void Ragdoll::AddImpulse(JPH::BodyID body_id, const Vec3f impulse, const Vec3f p
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
 
 	body_interface.ActivateBody(body_id);
-	body_interface.AddImpulse(body_id, Vec3f::ToJolt(impulse), Vec3f::ToJolt(point));
+	body_interface.AddImpulse(body_id, FVec3::ToJolt(impulse), FVec3::ToJolt(point));
 
 	mbPoseSettled = false;
 }
@@ -551,16 +551,16 @@ float32 Ragdoll::GetWorstJointError() const
 	return worst;
 }
 
-Vec3f Ragdoll::GetBodyOrigin(uint32 body_index) const
+FVec3 Ragdoll::GetBodyOrigin(uint32 body_index) const
 {
 	const JPH::RVec3 position = gPhysics->pBackend->GetBodyInterface().GetPosition(GetBodyID(body_index));
-	return Vec3f(position.GetX(), position.GetY(), position.GetZ());
+	return FVec3(position.GetX(), position.GetY(), position.GetZ());
 }
 
-Vec3f Ragdoll::GetPelvisHeading(bool animated) const
+FVec3 Ragdoll::GetPelvisHeading(bool animated) const
 {
 	if (mSegments.Size == 0) {
-		return Vec3f::sZero;
+		return FVec3::sZero;
 	}
 
 	JPH::Quat orientation = gPhysics->pBackend->GetBodyInterface().GetRotation(GetBodyID(0));
@@ -572,22 +572,22 @@ Vec3f Ragdoll::GetPelvisHeading(bool animated) const
 	JPH::Vec3 forward = (orientation * mSegments[0].RestOrientation.Conjugated()) * mRig.RestForward;
 	forward.SetY(0.0f);
 
-	return Vec3f(forward.NormalizedOr(JPH::Vec3::sZero()));
+	return FVec3(forward.NormalizedOr(JPH::Vec3::sZero()));
 }
 
-Vec3f Ragdoll::GetBodyTargetOrigin(uint32 body_index) const
+FVec3 Ragdoll::GetBodyTargetOrigin(uint32 body_index) const
 {
 	if (body_index >= mSegmentTargets.Size) {
-		return Vec3f::sZero;
+		return FVec3::sZero;
 	}
 
-	return Vec3f(mSegmentTargets[body_index].Position);
+	return FVec3(mSegmentTargets[body_index].Position);
 }
 
-Vec3f Ragdoll::GetBodyPosition(uint32 body_index) const
+FVec3 Ragdoll::GetBodyPosition(uint32 body_index) const
 {
 	const JPH::RVec3 position = gPhysics->pBackend->GetBodyInterface().GetCenterOfMassPosition(GetBodyID(body_index));
-	return Vec3f(position.GetX(), position.GetY(), position.GetZ());
+	return FVec3(position.GetX(), position.GetY(), position.GetZ());
 }
 
 void Ragdoll::SampleSegment(JPH::BodyInterface& body_interface, uint32 body_index, RDSegmentState& out_state) const
@@ -638,7 +638,7 @@ bool Ragdoll::GetBodyGroundContact(uint32 body_index, BodyGroundContact& out_con
 
 bool Ragdoll::IsSupportNormal(const BodyGroundContact& contact, const JPH::Vec3 up, float32 min_up)
 {
-	return Vec3f::ToJolt(contact.Normal).Dot(up) >= min_up;
+	return FVec3::ToJolt(contact.Normal).Dot(up) >= min_up;
 }
 
 bool Ragdoll::IsBodyOnGround(uint32 body_index, const JPH::Vec3 up, float32 min_up) const

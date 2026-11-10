@@ -10,8 +10,8 @@
 #include <Brush.hpp>
 #include <Core/Serialize.hpp>
 #include <Core/String.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Quat.hpp>
-#include <Math/Vec3.hpp>
 #include <Patch.hpp>
 #include <functional>
 
@@ -54,7 +54,7 @@ constexpr const char* scSubviewMemberName = "subview";
  */
 struct BrushPlacement
 {
-	Vec3f Position = Vec3f::sZero;
+	FVec3 Position = FVec3::sZero;
 	Quat Rotation = Quat::scIdentity;
 };
 
@@ -62,13 +62,13 @@ BrushPlacement ReadBrushPlacement(const ConfigEntry& entry);
 void WriteBrushPlacement(ConfigEntry& entry, const BrushPlacement& placement);
 
 /// Takes a brush from its subview's space to the world, for a subview placed at `instance`
-BrushPlacement PlaceInSubview(const BrushPlacement& local, const Vec3f brush_center, const BrushPlacement& instance);
+BrushPlacement PlaceInSubview(const BrushPlacement& local, const FVec3 brush_center, const BrushPlacement& instance);
 
 /// Takes a brush from the world to the space of a subview placed at `instance`
-BrushPlacement RemoveFromSubview(const BrushPlacement& world, const Vec3f brush_center, const BrushPlacement& instance);
+BrushPlacement RemoveFromSubview(const BrushPlacement& world, const FVec3 brush_center, const BrushPlacement& instance);
 
 /// Works out where a subview is placed from one of its brushes
-BrushPlacement FindSubviewPlacement(const BrushPlacement& world, const BrushPlacement& local, const Vec3f brush_center);
+BrushPlacement FindSubviewPlacement(const BrushPlacement& world, const BrushPlacement& local, const FVec3 brush_center);
 
 String MakeSubviewBrushName(const String& instance_name, uint32 member_index);
 

@@ -8,7 +8,7 @@
 #pragma once
 
 #include <Map/CompiledMap.hpp>
-#include <Math/Vec3d.hpp>
+#include <Math/DVec3.hpp>
 
 namespace fx::mapc {
 
@@ -38,7 +38,7 @@ struct FogShadowStats
 	uint64 ByteCount = 0;
 };
 
-bool BakeFogShadow(const OccluderSet& occluders, const Vec3d& sun_direction, const FogShadowOptions& options,
+bool BakeFogShadow(const OccluderSet& occluders, const DVec3& sun_direction, const FogShadowOptions& options,
 				   CompiledMapFogShadow& out_shadow, FogShadowStats& out_stats);
 
 } // namespace fx::mapc

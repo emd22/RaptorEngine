@@ -12,9 +12,9 @@
 
 #include <Core/DynArray.hpp>
 #include <Core/Types.hpp>
+#include <Math/FVec3.hpp>
 #include <Math/Rect.hpp>
 #include <Math/Vec2.hpp>
-#include <Math/Vec3.hpp>
 #include <Patch.hpp>
 #include <chrono>
 #include <functional>
@@ -246,9 +246,9 @@ private:
 	const ViewPlaneAxes& Axes() const;
 	const TopViewProjection& Projection(const TopViewBrush& brush) const;
 	DynArray<Vec2d> CollectVertexHandles(const TopViewBrush& brush) const;
-	Vec3f ToWorldVector(const Vec2d uv, double w) const;
-	Vec2d ProjectPoint(const Vec3f& point) const;
-	double DepthOf(const Vec3f& vector) const;
+	FVec3 ToWorldVector(const Vec2d uv, double w) const;
+	Vec2d ProjectPoint(const FVec3& point) const;
+	double DepthOf(const FVec3& vector) const;
 
 	void BeginPan(const wxPoint& position);
 	void BeginSelect();
@@ -262,8 +262,8 @@ private:
 	void BeginClip();
 	void BeginLight(bool double_click);
 	void BeginSound(bool double_click);
-	Vec3f GetNewMarkerPosition() const;
-	void SendMarkerMove(eTopViewMarkerKind kind, const Vec3f offset);
+	FVec3 GetNewMarkerPosition() const;
+	void SendMarkerMove(eTopViewMarkerKind kind, const FVec3 offset);
 	void BeginTool(const wxMouseEvent& event);
 	bool BeginMarker();
 
@@ -272,7 +272,7 @@ private:
 	void FinishMarquee();
 	void FinishMove();
 	void FinishCreate();
-	void GetCreateVolume(const DRect& rect, double depth, Vec3f& out_min, Vec3f& out_max) const;
+	void GetCreateVolume(const DRect& rect, double depth, FVec3& out_min, FVec3& out_max) const;
 	void FinishArch();
 	void FinishArchEdit();
 	void FinishRotate();
@@ -318,9 +318,9 @@ private:
 	DynArray<int32> PickAt(const Vec2d uv) const;
 	int PickFaceAt(const Vec2d uv, int& out_face) const;
 	const TopViewFrontFace* PickFrontFaceAt(const Vec2d uv, ObjectID& out_brush) const;
-	bool IsFacePicked(ObjectID object_id, const Vec3f& normal) const;
-	void PickFace(ObjectID object_id, const Vec3f& normal, bool additive);
-	void UnpickFace(ObjectID object_id, const Vec3f& normal);
+	bool IsFacePicked(ObjectID object_id, const FVec3& normal) const;
+	void PickFace(ObjectID object_id, const FVec3& normal, bool additive);
+	void UnpickFace(ObjectID object_id, const FVec3& normal);
 	void ClearPickedFaces();
 	DynArray<TopViewFaceRef> GetFaceDragTargets() const;
 	void UpdateHover();
@@ -446,8 +446,8 @@ private:
 	bool mbDropToGround = false;
 
 	bool mbHasAppliedCreateReference = false;
-	Vec3f mAppliedCreateReferenceMin = Vec3f::sZero;
-	Vec3f mAppliedCreateReferenceMax = Vec3f::sZero;
+	FVec3 mAppliedCreateReferenceMin = FVec3::sZero;
+	FVec3 mAppliedCreateReferenceMax = FVec3::sZero;
 
 	ArchSettings mArch;
 	bool mbArchPending = false;

@@ -167,11 +167,11 @@ public:
 			VertexType& vertex_b = vertex_at(index_b);
 			VertexType& vertex_c = vertex_at(index_c);
 
-			const Vec3f position_a(vertex_a.Position);
-			const Vec3f position_b(vertex_b.Position);
-			const Vec3f position_c(vertex_c.Position);
+			const FVec3 position_a(vertex_a.Position);
+			const FVec3 position_b(vertex_b.Position);
+			const FVec3 position_c(vertex_c.Position);
 
-			const Vec3f normal = (position_c - position_a).Cross(position_b - position_a);
+			const FVec3 normal = (position_c - position_a).Cross(position_b - position_a);
 
 			for (VertexType* vertex : { &vertex_a, &vertex_b, &vertex_c }) {
 				vertex->Normal[0] += normal.X;
@@ -183,10 +183,10 @@ public:
 		for (uint32 index = 0; index < num_vertices; index++) {
 			VertexType& vertex = vertex_at(index);
 
-			Vec3f normal(vertex.Normal);
+			FVec3 normal(vertex.Normal);
 
 			if (normal.Length() < 1e-12f) {
-				normal = Vec3f(0.0f, 1.0f, 0.0f);
+				normal = FVec3(0.0f, 1.0f, 0.0f);
 			}
 			else {
 				normal.NormalizeIP();

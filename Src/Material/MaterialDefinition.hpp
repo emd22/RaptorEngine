@@ -3,7 +3,7 @@
 #include <Core/DynArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FVec3.hpp>
 #include <optional>
 
 namespace fx {
@@ -29,7 +29,7 @@ struct MaterialDefinition
 
 	std::optional<float32> Metallic;
 	std::optional<float32> Roughness;
-	std::optional<Vec3f> BaseColor;
+	std::optional<FVec3> BaseColor;
 	std::optional<float32> NormalStrength;
 	std::optional<float32> NormalScrollSpeed;
 	std::optional<float32> CausticStrength;
