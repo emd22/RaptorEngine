@@ -1,6 +1,7 @@
 #include "Surfaces.hpp"
 
 #include <Core/ArrayUtil.hpp>
+#include <Core/HashMap.hpp>
 #include <Math/Vec2.hpp>
 #include <algorithm>
 #include <map>
@@ -11,18 +12,10 @@ namespace fx::mapc {
 
 namespace {
 
-constexpr double scFullFaceTolerance = 1e-9;
-constexpr double scGradientEpsilon = 1e-6;
-constexpr double scOffsetEpsilon = 1e-5;
 constexpr double scCollinearEpsilon = 2e-6;
 constexpr double scWeldEpsilon = 2e-5;
-constexpr double scWeldCellSize = 1e-3;
 constexpr double scOnEdgeEpsilon = 1e-5;
 constexpr double scEdgeGridCellSize = 2.0;
-constexpr int64 scMaxEdgeGridCells = 4096;
-constexpr double scMinTangentDeterminant = 1e-20;
-constexpr double scAreaTolerance = 1e-6;
-constexpr double scAreaProbeDistance = 1e-3;
 
 struct FacePiece
 {
@@ -35,6 +28,7 @@ struct Face
 	int32 PlaneIndex = PlaneSet::scNone;
 	int32 MaterialIndex = 0;
 	int32 MapIndex = 0;
+	uint32 BrushIndex = 0;
 	bool bCastsShadow = true;
 
 	Winding Original;
@@ -76,6 +70,8 @@ class VertexWelder
 public:
 	int32 Add(const Vec3d& point)
 	{
+		constexpr double scWeldCellSize = 1e-3;
+
 		const CellKey center = GetCell(point, scWeldCellSize);
 
 		for (int64 x = -1; x <= 1; x++) {
@@ -173,10 +169,16 @@ TangentFrame GetTangentFrame(const Vec3d& normal, const TextureMap& map)
 	const double vv = v_gradient.Dot(v_gradient);
 	const double determinant = uu * vv - uv * uv;
 
+	constexpr double scMinTangentDeterminant = 1e-20;
+
 	TangentFrame frame;
 
 	if (std::abs(determinant) < scMinTangentDeterminant) {
-		const Vec3d fallback = (std::abs(normal.Y) < 0.9) ? Vec3d(0.0, 1.0, 0.0) : Vec3d(1.0, 0.0, 0.0);
+		Vec3d fallback = Vec3d(1.0, 0.0, 0.0);
+		if (std::abs(normal.Y) < 0.9) {
+			fallback = Vec3d(0.0, 1.0, 0.0);
+		}
+
 		const Vec3d tangent = fallback.Cross(normal);
 		frame.Tangent = tangent * (1.0 / tangent.Length());
 		return frame;
@@ -188,7 +190,10 @@ TangentFrame GetTangentFrame(const Vec3d& normal, const TextureMap& map)
 	const Vec3d v_direction = (v_gradient * uu - u_gradient * uv) * (1.0 / determinant);
 
 	frame.Tangent = tangent;
-	frame.Handedness = (normal.Cross(tangent).Dot(v_direction) > 0.0) ? -1.0 : 1.0;
+	frame.Handedness = 1.0;
+	if (normal.Cross(tangent).Dot(v_direction) > 0.0) {
+		frame.Handedness = -1.0;
+	}
 
 	return frame;
 }
@@ -274,35 +279,33 @@ class GroupPoints
 public:
 	GroupPoints(const Array<Vec3d>& points, const Vec3d& normal) : mPoints(points), mBasis(normal) {}
 
-	const Vec2d& operator[](int32 index)
+	/// Returned by value, since a reference into the cache would be invalidated when the cache grows
+	Vec2d operator[](int32 index)
 	{
-		auto found = mProjected.find(index);
+		const Vec2d* found = mProjected.Find(index);
 
-		if (found == mProjected.end()) {
-			found = mProjected.emplace(index, mBasis.Project(mPoints[static_cast<size_t>(index)])).first;
+		if (found == nullptr) {
+			return mProjected.Emplace(index, mBasis.Project(mPoints[static_cast<size_t>(index)]));
 		}
 
-		return found->second;
+		return *found;
 	}
 
 private:
 	const Array<Vec3d>& mPoints;
 	PlaneBasis mBasis;
-	std::unordered_map<int32, Vec2d> mProjected;
+	HashMap<int32, Vec2d> mProjected;
 };
-
-double Cross2(const Vec2d& origin, const Vec2d& a, const Vec2d& b)
-{
-	return (a.X - origin.X) * (b.Y - origin.Y) - (a.Y - origin.Y) * (b.X - origin.X);
-}
-
-double Distance2(const Vec2d& a, const Vec2d& b) { return std::hypot(b.X - a.X, b.Y - a.Y); }
 
 double GetSideDistance(const Vec2d& from, const Vec2d& to, const Vec2d& point)
 {
-	const double length = Distance2(from, to);
+	const double length = (to - from).Length();
 
-	return (length > 0.0) ? Cross2(from, to, point) / length : 0.0;
+	if (length > 0.0) {
+		return to.CrossOffset(point, from) / length;
+	}
+
+	return 0.0;
 }
 
 double GetLoopArea(const Loop& loop, GroupPoints& points)
@@ -326,7 +329,7 @@ bool BuildLoops(const Array<EdgeKey>& edges, GroupPoints& points, Array<Loop>& o
 
 	out_loops.Clear();
 
-	std::unordered_map<int32, Array<size_t>> outgoing;
+	HashMap<int32, Array<size_t>> outgoing;
 
 	for (size_t i = 0; i < edges.Size; i++) {
 		outgoing[edges[i].first].Emplace(i);
@@ -403,12 +406,12 @@ bool BuildLoops(const Array<EdgeKey>& edges, GroupPoints& points, Array<Loop>& o
 }
 
 bool FindBridge(const Loop& hole, const Array<Loop>& loops, size_t hole_index,
-				const std::map<int32, Array<int32>>& inner_edges, Array<int32>& out_path)
+				const HashMap<int32, Array<int32>>& inner_edges, Array<int32>& out_path)
 {
-	std::unordered_map<int32, int32> previous;
+	HashMap<int32, int32> previous;
 	Array<int32> queue;
 
-	std::unordered_map<int32, bool> is_target;
+	HashMap<int32, bool> is_target;
 
 	for (size_t i = 0; i < loops.Size; i++) {
 		if (i == hole_index) {
@@ -416,12 +419,13 @@ bool FindBridge(const Loop& hole, const Array<Loop>& loops, size_t hole_index,
 		}
 
 		for (const int32 vertex : loops[i]) {
-			is_target[vertex] = true;
+			is_target.Insert(vertex, true);
 		}
 	}
 
 	for (const int32 vertex : hole) {
-		if (previous.emplace(vertex, -1).second) {
+		if (!previous.Contains(vertex)) {
+			previous.Insert(vertex, -1);
 			queue.Emplace(vertex);
 		}
 	}
@@ -429,7 +433,7 @@ bool FindBridge(const Loop& hole, const Array<Loop>& loops, size_t hole_index,
 	for (size_t head = 0; head < queue.Size; head++) {
 		const int32 vertex = queue[head];
 
-		if (previous[vertex] != -1 && is_target.contains(vertex)) {
+		if (previous[vertex] != -1 && is_target.Contains(vertex)) {
 			out_path.Clear();
 
 			for (int32 at = vertex; at != -1; at = previous[at]) {
@@ -439,14 +443,15 @@ bool FindBridge(const Loop& hole, const Array<Loop>& loops, size_t hole_index,
 			return true;
 		}
 
-		const auto found = inner_edges.find(vertex);
+		const Array<int32>* found = inner_edges.Find(vertex);
 
-		if (found == inner_edges.end()) {
+		if (found == nullptr) {
 			continue;
 		}
 
-		for (const int32 next : found->second) {
-			if (previous.emplace(next, vertex).second) {
+		for (const int32 next : *found) {
+			if (!previous.Contains(next)) {
+				previous.Insert(next, vertex);
 				queue.Emplace(next);
 			}
 		}
@@ -484,7 +489,7 @@ void RemoveCollinearPoints(Loop& loop, GroupPoints& points)
 bool MergeRegion(const Array<Loop>& polygons, GroupPoints& points, Array<Loop>& out_loops)
 {
 	std::map<EdgeKey, int32> edge_counts;
-	std::map<int32, Array<int32>> inner_edges;
+	HashMap<int32, Array<int32>> inner_edges;
 
 	for (const Loop& polygon : polygons) {
 		for (size_t i = 0; i < polygon.Size; i++) {
@@ -596,7 +601,7 @@ bool TriangulateLoop(const Loop& loop, GroupPoints& points, Array<int32>& out_in
 						  GetSideDistance(next, previous, other) > -scInsideTolerance;
 			}
 
-			const double length = Distance2(previous, next);
+			const double length = (next - previous).Length();
 
 			if (!blocked && (best == count || length < best_length)) {
 				best = i;
@@ -615,7 +620,7 @@ bool TriangulateLoop(const Loop& loop, GroupPoints& points, Array<int32>& out_in
 		RemoveAt(remaining, static_cast<uint32>(best));
 	}
 
-	if (remaining.Size == 3 && Cross2(points[remaining[0]], points[remaining[1]], points[remaining[2]]) > 0.0) {
+	if (remaining.Size == 3 && points[remaining[1]].CrossOffset(points[remaining[2]], points[remaining[0]]) > 0.0) {
 		for (const int32 index : remaining) {
 			out_indices.Emplace(index);
 		}
@@ -629,7 +634,7 @@ double GetTriangleArea(const Array<int32>& indices, GroupPoints& points)
 	double area = 0.0;
 
 	for (size_t i = 0; i + 2 < indices.Size; i += 3) {
-		area += Cross2(points[indices[i]], points[indices[i + 1]], points[indices[i + 2]]) * 0.5;
+		area += points[indices[i + 1]].CrossOffset(points[indices[i + 2]], points[indices[i]]) * 0.5;
 	}
 
 	return area;
@@ -674,6 +679,8 @@ public:
 
 	const Array<std::pair<double, int32>>& FindInserts(int32 from_index, int32 to_index)
 	{
+		constexpr int64 scMaxEdgeGridCells = 4096;
+
 		const Vec3d padding(scOnEdgeEpsilon, scOnEdgeEpsilon, scOnEdgeEpsilon);
 
 		const Vec3d& from = mPoints[static_cast<size_t>(from_index)];
@@ -882,6 +889,8 @@ struct SurfaceGroup
 
 int32 FindPointArea(const Bsp& bsp, const Vec3d& point, const Vec3d& normal)
 {
+	constexpr double scAreaProbeDistance = 1e-3;
+
 	for (const double offset : { scAreaProbeDistance, -scAreaProbeDistance, 0.0 }) {
 		const Node& leaf = bsp.Nodes[static_cast<size_t>(bsp.FindLeaf(point + normal * offset))];
 
@@ -897,6 +906,9 @@ int32 FindPointArea(const Bsp& bsp, const Vec3d& point, const Vec3d& normal)
 
 int32 SurfaceBuilder::FindOrAddMap(const TextureMap& map)
 {
+	constexpr double scGradientEpsilon = 1e-6;
+	constexpr double scOffsetEpsilon = 1e-5;
+
 	const auto is_near = [](const Vec3d& a, const Vec3d& b)
 	{
 		return std::abs(a.X - b.X) < scGradientEpsilon && std::abs(a.Y - b.Y) < scGradientEpsilon &&
@@ -921,10 +933,23 @@ int32 SurfaceBuilder::FindOrAddMap(const TextureMap& map)
 void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const MapSource& source, bool sealed,
 							   const SurfaceOptions& options)
 {
+	constexpr double scFullFaceTolerance = 1e-9;
+
 	Array<Face> faces;
 	Array<LeafFragment> fragments;
 
-	for (const SourceBrush& brush : source.Brushes) {
+	const auto is_water_face = [&source](int32 material_index)
+	{
+		return material_index != SourceBrush::scDroppedFace &&
+			   source.WaterMaterials[static_cast<size_t>(material_index)] != 0;
+	};
+
+	Array<uint32> water_face_counts;
+
+	for (uint32 brush_index = 0; brush_index < source.Brushes.Size; brush_index++) {
+		const SourceBrush& brush = source.Brushes[brush_index];
+		water_face_counts.Emplace(0u);
+
 		if (!brush.bVisible) {
 			continue;
 		}
@@ -937,10 +962,15 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 				continue;
 			}
 
+			if (is_water_face(material_index)) {
+				water_face_counts[brush_index]++;
+			}
+
 			Face face;
 			face.PlaneIndex = side.PlaneIndex;
 			face.MaterialIndex = material_index;
 			face.MapIndex = FindOrAddMap(*map);
+			face.BrushIndex = brush_index;
 			face.bCastsShadow = brush.bCastsShadow;
 			face.Original = CopyWinding(side.Points);
 			face.Min = Vec3d(1e30, 1e30, 1e30);
@@ -1005,7 +1035,23 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 		}
 	}
 
-	std::unordered_map<int32, Array<size_t>> faces_on_plane;
+	Array<Face> ordered;
+
+	for (Face& face : faces) {
+		if (!is_water_face(face.MaterialIndex)) {
+			ordered.Emplace(std::move(face));
+		}
+	}
+
+	for (Face& face : faces) {
+		if (is_water_face(face.MaterialIndex)) {
+			ordered.Emplace(std::move(face));
+		}
+	}
+
+	faces = std::move(ordered);
+
+	HashMap<int32, Array<size_t>> faces_on_plane;
 
 	for (size_t i = 0; i < faces.Size; i++) {
 		Face& face = faces[i];
@@ -1025,12 +1071,8 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 				continue;
 			}
 
-			bool overlaps = true;
-
-			for (int32 axis = 0; axis < 3; axis++) {
-				overlaps = overlaps && face.Min.mData[axis] <= earlier.Max.mData[axis] + scOnEpsilon &&
-						   face.Max.mData[axis] >= earlier.Min.mData[axis] - scOnEpsilon;
-			}
+			const Vec3d padding(scOnEpsilon, scOnEpsilon, scOnEpsilon);
+			const bool overlaps = face.Min <= earlier.Max + padding && face.Max >= earlier.Min - padding;
 
 			if (!overlaps) {
 				continue;
@@ -1060,6 +1102,26 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 		earlier_faces.Emplace(i);
 	}
 
+	Array<uint32> visible_water_faces;
+
+	for (uint32 brush_index = 0; brush_index < source.Brushes.Size; brush_index++) {
+		visible_water_faces.Emplace(0u);
+	}
+
+	for (const Face& face : faces) {
+		if (is_water_face(face.MaterialIndex) && face.Visible.Size > 0) {
+			visible_water_faces[face.BrushIndex]++;
+		}
+	}
+
+	for (uint32 brush_index = 0; brush_index < source.Brushes.Size; brush_index++) {
+		if (water_face_counts[brush_index] > 0 && visible_water_faces[brush_index] == 0) {
+			Warnings.Emplace(String::Fmt("water brush '{}' is buried in solid brushes and is not drawn, carve a basin "
+										 "for it or raise it above the floor",
+										 source.Brushes[brush_index].Name));
+		}
+	}
+
 	for (Face& face : faces) {
 		for (FacePiece& piece : face.Visible) {
 			if (IsWindingTiny(piece.Points)) {
@@ -1075,6 +1137,8 @@ void SurfaceBuilder::CullFaces(const PlaneSet& planes, const Bsp& bsp, const Map
 void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const MapSource& source,
 								 const SurfaceOptions& options, PatchBuilder* patches, CompiledMap& out_map)
 {
+	constexpr double scAreaTolerance = 1e-6;
+
 	VertexWelder welder;
 
 	std::map<std::tuple<int32, int32, int32, int32, bool>, SurfaceGroup> groups;
@@ -1094,8 +1158,8 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 			continue;
 		}
 
-		SurfaceGroup& group = groups[{ polygon.PlaneIndex, polygon.MaterialIndex, polygon.MapIndex, polygon.Area,
-									   polygon.bCastsShadow }];
+		SurfaceGroup& group =
+			groups[{ polygon.PlaneIndex, polygon.MaterialIndex, polygon.MapIndex, polygon.Area, polygon.bCastsShadow }];
 		group.PlaneIndex = polygon.PlaneIndex;
 		group.bCastsShadow = polygon.bCastsShadow;
 		group.MaterialIndex = polygon.MaterialIndex;
@@ -1107,7 +1171,7 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 	Array<Array<int32>> patch_welds;
 
 	if (patches != nullptr) {
-		Array<std::pair<int32, int32>> boundary;
+		Array<PatchEdge> boundary;
 
 		for (PatchSurface& surface : patches->Surfaces) {
 			Array<int32>& weld = patch_welds.Emplace();
@@ -1233,7 +1297,7 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 		Array<Vec3d> Points;
 		Array<uint32> Indices;
 
-		std::map<int32, uint32> PointLookup;
+		HashMap<int32, uint32> PointLookup;
 		std::map<std::pair<uint32, int32>, uint32> PatchPointLookup;
 	};
 
@@ -1320,14 +1384,15 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 					const int32 corners[3] = { triangle_indices[t], triangle_indices[t + 2], triangle_indices[t + 1] };
 
 					for (const int32 corner : corners) {
-						auto found = shadow.PointLookup.find(corner);
+						const uint32* found = shadow.PointLookup.Find(corner);
 
-						if (found == shadow.PointLookup.end()) {
-							found = shadow.PointLookup.emplace(corner, static_cast<uint32>(shadow.Points.Size)).first;
+						if (found == nullptr) {
+							shadow.PointLookup.Insert(corner, static_cast<uint32>(shadow.Points.Size));
 							shadow.Points.Emplace(points[static_cast<size_t>(corner)]);
+							found = shadow.PointLookup.Find(corner);
 						}
 
-						shadow.Indices.Emplace(found->second);
+						shadow.Indices.Emplace(*found);
 					}
 				}
 			}
@@ -1527,9 +1592,6 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 		surface.MaterialIndex = batch.MaterialIndex;
 		surface.Area = batch.Area;
 
-		// surface.Vertices = CopyToSizedArray(batch.Vertices);
-		// surface.Indices = CopyToSizedArray(batch.Indices);
-
 		surface.Vertices = ArrayUtil::DynToSizedArray(batch.Vertices);
 		surface.Indices = ArrayUtil::DynToSizedArray(batch.Indices);
 
@@ -1537,21 +1599,11 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 			surface.Colors = ArrayUtil::DynToSizedArray(batch.Colors);
 		}
 
-		// for (int32 axis = 0; axis < 3; axis++) {
-		// 	surface.BoundsMin[axis] = surface.Vertices[0].Position[axis];
-		// 	surface.BoundsMax[axis] = surface.Vertices[0].Position[axis];
-		// }
-
 		surface.Bounds = BBox(surface.Vertices[0].Position, surface.Vertices[0].Position);
 
 		for (const CompiledMapVertex& vertex : surface.Vertices) {
 			surface.Bounds = BBox(Vec3f::Min(surface.Bounds.Min, vertex.Position),
 								  Vec3f::Max(surface.Bounds.Max, vertex.Position));
-
-			// for (int32 axis = 0; axis < 3; axis++) {
-			// 	surface.BoundsMin[axis] = std::min(surface.BoundsMin[axis], vertex.Position[axis]);
-			// 	surface.BoundsMax[axis] = std::max(surface.BoundsMax[axis], vertex.Position[axis]);
-			// }
 		}
 
 		Stats.NumTriangles += static_cast<uint32>(surface.Indices.Size / 3);

@@ -22,12 +22,6 @@ namespace fx {
 namespace {
 
 constexpr float32 scWoundCooldown = 0.25f;
-/// How long the drawn pose takes to move from the animation to the bodies when an NPC wakes (s)
-constexpr float32 scWakeBlendTime = 0.1f;
-/// How far a shot leg lets the stance sink for a moment (m)
-constexpr float32 scLegShotBuckle = 0.1f;
-/// How fast the body starts to sink when that happens (m/s)
-constexpr float32 scLegShotDrop = 0.5f;
 
 float32 GetContactWoundSize(const physics::RagdollContact& contact)
 {
@@ -299,6 +293,9 @@ void NPC::Update(float32 delta_time, bool draw_debug)
 
 void NPC::UpdateActive(float32 delta_time)
 {
+	// How long the drawn pose takes to move from the animation to the bodies when an NPC wakes (s)
+	constexpr float32 scWakeBlendTime = 0.1f;
+
 	physics::Ragdoll& ragdoll = mActor.Ragdoll;
 	Object* skinned = mActor.GetSkinned();
 
@@ -316,7 +313,6 @@ void NPC::UpdateActive(float32 delta_time)
 	}
 
 	UpdateBehaviours(delta_time);
-	UpdateGetUp();
 
 	if (mState == eState::Animated && skinned != nullptr) {
 		UpdateBalance(delta_time);
@@ -705,33 +701,9 @@ void NPC::EnterFallen()
 
 	mBehaviours.SetFreePose(true);
 	mBehaviours.Trigger(ragdoll, "fallen");
-	mBehaviours.Trigger(ragdoll, "get_up");
 	mBehaviours.HandleEvent(ragdoll, physics::RagdollEvent { .Type = physics::eRagdollEvent::LostSupport,
 															 .Magnitude = -ctx.Velocity.Dot(ctx.Up) });
 	ApplyStrengths();
-}
-
-void NPC::UpdateGetUp()
-{
-	if (mState != eState::Fallen || mbDying) {
-		return;
-	}
-
-	const physics::RagdollBehaviour* get_up = mBehaviours.Find("get_up");
-
-	if (get_up == nullptr) {
-		return;
-	}
-
-	const physics::eGetUpStage stage = get_up->GetUpStage();
-
-	// Once lifting, the fallen pose has to give way to the get-up, so the fallen behaviour stops. A lift that failed
-	// goes back to it
-	mBehaviours.SetFreePose(stage == physics::eGetUpStage::Resting);
-
-	if (stage == physics::eGetUpStage::Standing) {
-		ExitFallen();
-	}
 }
 
 void NPC::ExitFallen()
@@ -744,7 +716,7 @@ void NPC::ExitFallen()
 
 	mActor.SetCullable(true);
 
-	// The animated root has been left where the NPC started falling, so move it under the lifted pelvis first
+	// The animated root has been left where the NPC started falling, so move it under the pelvis first
 	PlaceRootUnderPelvis();
 	mActor.Ragdoll.RebaseTargets();
 
@@ -1007,6 +979,11 @@ void NPC::ApplyBehaviourOutput()
 
 void NPC::OnHit(const NPCHit& hit)
 {
+	// How far a shot leg lets the stance sink for a moment (m)
+	constexpr float32 scLegShotBuckle = 0.1f;
+	// How fast the body starts to sink when that happens (m/s)
+	constexpr float32 scLegShotDrop = 0.5f;
+
 	physics::Ragdoll& ragdoll = mActor.Ragdoll;
 
 	if (!IsCreated()) {
@@ -1228,7 +1205,7 @@ void NPC::OnContact(const physics::RagdollContact& contact)
 			JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
 			const Vec3f kept = direction * knock_speed;
 
-			body_interface.SetLinearVelocity(contact.OtherBody, JPH::Vec3(kept.X, kept.Y, kept.Z));
+			body_interface.SetLinearVelocity(contact.OtherBody, Vec3f::ToJolt(kept));
 		}
 
 		return;

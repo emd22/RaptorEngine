@@ -4,6 +4,8 @@
 
 namespace fx {
 
+NoClipController::NoClipController() { this->GravityMultiplier = 0.0f; }
+
 Vec3f NoClipController::Update(float64 delta_time, const Vec3f input, const PerspectiveCamera& camera, bool sprinting)
 {
 	const Vec3f forward = camera.GetForwardVector();

@@ -17,6 +17,7 @@ enum class eGpuMarker : uint32
 {
 	FrameStart,
 	Shadows,
+	LightTransport,
 	Prepass,
 	LightCulling,
 	SSAO,

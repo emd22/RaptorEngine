@@ -4,34 +4,43 @@
 #define FX_LIGHT_TYPE_POINT 2
 #define FX_LIGHT_TYPE_SPOT 3
 
+#define FX_LIGHT_FLAG_DYNAMIC (1 << 1)
+
 /// Mirrors `LightGpuData` on the CPU
 struct Light
 {
 	// 64
 	/// View projection matrix of the light's shadow map, for lights with a region in the shadow atlas
 	float4x4 LightCameraMatrix;
+
 	// 80
-	/// Direction towards the light for directional lights, already normalized. World position otherwise.
+	/// Direction towards the light for directional lights, already normalized
 	float3 vLightPosition;
 	float1 fLightRadius;
+
 	// 96
 	uint1 uiLightColor;
 	uint1 uiLightType;
 	float1 fIntensity;
 	/// 1 / (radius * radius), so the shading pass does not divide once per pixel per light
 	float1 fInvRadiusSq;
+
 	// 112
-	/// Spot lights only: world space direction the cone points along
 	float3 vSpotDirection;
-	/// Spot lights only: cosine of the outer cone half-angle
 	float1 fSpotCosOuter;
+
 	// 128
 	float3 vLightColor;
-	/// Spot lights only: 1 / (cos(inner) - cos(outer))
+
 	float1 fSpotAngleScale;
+
 	// 144
-	/// Shadow map UV to shadow atlas UV: xy is the scale, zw the offset. Zero when the light casts no shadows.
+	/// XY is the scale, ZW is the offset into the atlas
 	float4 vShadowAtlasRect;
+
+	uint Flags;
+
+	// 160
 };
 
 ///////////////////////////////////

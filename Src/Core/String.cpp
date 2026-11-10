@@ -111,7 +111,7 @@ bool String::CompareNoCase(const String& other) const
 
 String String::ToLower() const
 {
-	String result(Length + 1);
+	String result(Length);
 
 	char* result_ptr = result.GetInternalPtr();
 	const char* ptr = GetInternalPtr();
@@ -127,7 +127,7 @@ String String::ToLower() const
 
 String String::ToUpper() const
 {
-	String result(Length + 1);
+	String result(Length);
 
 	char* result_ptr = result.GetInternalPtr();
 	const char* ptr = GetInternalPtr();

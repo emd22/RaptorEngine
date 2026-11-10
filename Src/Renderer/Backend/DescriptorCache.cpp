@@ -267,6 +267,27 @@ void DescriptorCache::RebuildUsingImage(const Image* image)
 	}
 }
 
+void DescriptorCache::RebuildUsing(Slice<const RawGpuBuffer* const> buffers, Slice<Image* const> images)
+{
+	DescriptorPool& pool = FindPool();
+
+	for (auto& [hash, descriptor_set] : Cache) {
+		bool uses_any = false;
+
+		for (const RawGpuBuffer* buffer : buffers) {
+			uses_any = uses_any || descriptor_set.UsesBuffer(buffer);
+		}
+
+		for (const Image* image : images) {
+			uses_any = uses_any || descriptor_set.UsesImage(image);
+		}
+
+		if (uses_any) {
+			descriptor_set.Rebuild(pool);
+		}
+	}
+}
+
 void DescriptorCache::RebuildAll()
 {
 	DescriptorPool& pool = FindPool();

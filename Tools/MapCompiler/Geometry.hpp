@@ -27,9 +27,6 @@ inline Vec3d MaxVec(const Vec3d& a, const Vec3d& b)
 }
 
 constexpr double scOnEpsilon = 1e-5;
-constexpr double scPointEpsilon = 1e-5;
-constexpr double scMinEdgeLength = 1e-4;
-constexpr double scMinArea = 1e-8;
 
 struct Plane
 {

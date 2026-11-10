@@ -46,7 +46,11 @@ LightSpot* LightEditOperation::ResolveLight() const
 	}
 
 	LightBase* live = gLightManager->GetLight(mLightID);
-	return (live == mpLight) ? mpLight : nullptr;
+	if (live == mpLight) {
+		return mpLight;
+	}
+
+	return nullptr;
 }
 
 void LightEditOperation::Restore(const LightSnapshot& snapshot)

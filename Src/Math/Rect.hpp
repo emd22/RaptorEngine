@@ -44,6 +44,10 @@ public:
 	bool operator==(const Rect other) const { return (Min == other.Min && Max == other.Max); }
 	bool operator!=(const Rect other) const { return (Min != other.Min || Max != other.Max); }
 
+
+	constexpr Rect OffsetBy(const Vec2Type offset) { return Rect(Min + offset, Max + offset); }
+
+
 	constexpr Vec2Type GetCenter() const { return (Min + Max) / Vec2Type { static_cast<T>(2) }; }
 	constexpr Vec2Type GetExtent() const { return (Max - Min); }
 

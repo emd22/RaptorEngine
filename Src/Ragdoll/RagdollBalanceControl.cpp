@@ -13,64 +13,6 @@ using namespace RagdollMath;
 
 namespace {
 
-
-constexpr float32 scStancePress = 0.01f;
-constexpr float32 scSetDownPress = 0.01f;
-/// Torque per unit spin about vertical, as a fraction of body mass, so a spinning body settles in about a second
-constexpr float32 scYawDamping = 0.2f;
-/// Torque per unit spin on the chest, as a fraction of body mass, for every axis
-constexpr float32 scTrunkSpinDamping = 0.02f;
-constexpr float32 scLiftStart = 0.003f;
-constexpr float32 scLiftRange = 0.015f;
-
-/// How far a swinging foot leaves pointing down, and arrives pointing up, for the heel to reach the ground first
-constexpr float32 scSwingToeDown = MathUtil::DegToRad(15.0f);
-constexpr float32 scSwingHeelUp = MathUtil::DegToRad(8.0f);
-/// Fraction of the swing over which a foot levels out from leaving toes-down
-constexpr float32 scSwingToeDownEnd = 0.4f;
-/// Fraction of the swing where the toes start coming up for a heel landing
-constexpr float32 scSwingHeelStart = 0.6f;
-constexpr float32 scToeOffRoll = MathUtil::DegToRad(25.0f);
-/// How far the centre of mass has to be in front of a planted foot before its heel starts to rise, and over what
-/// further distance the roll completes (m)
-constexpr float32 scToeOffStart = 0.08f;
-constexpr float32 scToeOffRange = 0.2f;
-
-constexpr float32 scStanceHeightFraction = 0.93f;
-/// Lowest the hip sits, as a fraction of leg reach, when the foot is out of reach of the hip
-constexpr float32 scMinHipFraction = 0.5f;
-/// How far a swinging leg's reach is allowed to open for its landing, as a fraction of leg length
-constexpr float32 scSwingReachFraction = 0.96f;
-/// Lowest the stance leg lets the hip go for a swinging foot, as a fraction of that reach
-constexpr float32 scMinYieldFraction = 0.75f;
-/// Fraction of the swing over which the stance leg bends for it
-constexpr float32 scYieldLeadFraction = 0.6f;
-/// The stance knee and ankle muscles only hold posture and damp. The leg forces carry the load
-constexpr float32 scStanceFrequencyScale = 0.05f;
-/// Frequency (Hz) the leg forces hold the pelvis at its height
-constexpr float32 scHeightFrequency = 2.0f;
-constexpr float32 scMaxComShift = 0.12f;
-constexpr float32 scComShiftGain = 3.0f;
-
-constexpr float32 scTorsoFrequency = 4.0f;
-constexpr float32 scTorsoMaxTorque = 300.0f;
-constexpr float32 scGravityFullStrength = 0.25f;
-/// Torque (N m) per unit of chest lean, reacted through the stance hips, so the upper body is pushed back upright
-constexpr float32 scTrunkLeanGain = 600.0f;
-
-/// Centre of mass control frequency (Hz) and damping ratio; its force limits come from BalanceAssist
-constexpr float32 scComFrequency = 2.0f;
-constexpr float32 scComDamping = 1.0f;
-/// Stagger speed (m/s) at which holding the centre of mass over the feet has fully given way to following the stagger
-constexpr float32 scStaggerHoldSpeed = 0.25f;
-/// Most the legs push up or pull down to hold height, as a fraction of body weight. Legs can't pull on the ground, and
-/// doing so takes the weight off a foot and lets it skid
-constexpr float32 scMaxPushFraction = 0.6f;
-constexpr float32 scMaxPullFraction = 0.15f;
-constexpr uint32 scPressureIterations = 4;
-/// A body this far into a fall lets its feet go
-constexpr float32 scFootPlantMaxFall = 0.8f;
-
 JPH::Vec3 ClampLength(const JPH::Vec3 v, float32 max_length)
 {
 	const float32 length = v.Length();
@@ -82,12 +24,52 @@ JPH::Vec3 ClampLength(const JPH::Vec3 v, float32 max_length)
 	return v * (max_length / length);
 }
 
+float32 GetStrengthScale(float32 strength)
+{
+	constexpr float32 scGravityFullStrength = 0.25f;
+
+	return std::min(strength / scGravityFullStrength, 1.0f);
+}
+
+
+uint32 BuildContactHull(const GravityFrame& frame, const BalanceLeg& leg, Vec2f* out_hull)
+{
+	Vec2f points[BodyGroundContact::scMaxPoints];
+
+	for (uint32 i = 0; i < leg.ContactCount; i++) {
+		points[i] = frame.ToPlane(leg.ContactPoints[i]);
+	}
+
+	return BuildHull(points, leg.ContactCount, out_hull);
+}
+
 } // namespace
 
 bool RagdollBalance::IsLoaded(const BalanceLeg& leg) const { return leg.bStance && leg.ContactAge < scContactHoldTime; }
 
 void RagdollBalance::DriveStanceLegs(Ragdoll& ragdoll)
 {
+	constexpr float32 scStancePress = 0.01f;
+	constexpr float32 scSetDownPress = 0.01f;
+	constexpr float32 scToeOffRoll = MathUtil::DegToRad(25.0f);
+	// How far the centre of mass has to be in front of a planted foot before its heel starts to rise, and over what
+	// further distance the roll completes (m)
+	constexpr float32 scToeOffStart = 0.08f;
+	constexpr float32 scToeOffRange = 0.2f;
+	constexpr float32 scStanceHeightFraction = 0.93f;
+	// Lowest the hip sits, as a fraction of leg reach, when the foot is out of reach of the hip
+	constexpr float32 scMinHipFraction = 0.5f;
+	// How far a swinging leg's reach is allowed to open for its landing, as a fraction of leg length
+	constexpr float32 scSwingReachFraction = 0.96f;
+	// Lowest the stance leg lets the hip go for a swinging foot, as a fraction of that reach
+	constexpr float32 scMinYieldFraction = 0.75f;
+	// Fraction of the swing over which the stance leg bends for it
+	constexpr float32 scYieldLeadFraction = 0.6f;
+	// The stance knee and ankle muscles only hold posture and damp. The leg forces carry the load
+	constexpr float32 scStanceFrequencyScale = 0.05f;
+	constexpr float32 scMaxComShift = 0.12f;
+	constexpr float32 scComShiftGain = 3.0f;
+
 	const JPH::Quat pelvis_target = mPelvisTarget;
 
 	JPH::Vec3 center = mSupportTarget;
@@ -123,7 +105,6 @@ void RagdollBalance::DriveStanceLegs(Ragdoll& ragdoll)
 
 		const float32 reach2 = reach * reach;
 		const float32 spread2 = spread * spread;
-
 		const float32 hip_height = std::max(std::sqrt(std::max(reach2 - spread2, 0.0f)), reach * scMinHipFraction);
 
 		// Measured from where the ankle sits with its sole on the floor, so a foot in the air brings the hip down until
@@ -146,8 +127,7 @@ void RagdollBalance::DriveStanceLegs(Ragdoll& ragdoll)
 	if (mStatus.State == eBalanceState::Stepping) {
 		const BalanceLeg& swing = mLegs[mSwing.Leg];
 		const JPH::Vec3 hip_offset = pelvis_target * swing.HipOffset;
-		const JPH::Quat landing_foot = GetHeadingRotation(mForward) * swing.RestFoot;
-		const JPH::Vec3 landing_ankle = mSwing.Landing - landing_foot * swing.SoleCenter;
+		const JPH::Vec3 landing_ankle = GetLandingAnkle(swing, mSwing.Landing);
 
 		const float32 reach = scSwingReachFraction * (swing.Upper + swing.Lower);
 		const float32 spread = mGroundFrame.Horizontal(pelvis_horizontal + hip_offset - landing_ankle).Length();
@@ -223,6 +203,14 @@ JPH::Quat RagdollBalance::PitchFoot(const JPH::Quat& foot, float32 radians) cons
 
 void RagdollBalance::DriveSwingLeg(Ragdoll& ragdoll)
 {
+	// How far a swinging foot leaves pointing down, and arrives pointing up, for the heel to reach the ground first
+	constexpr float32 scSwingToeDown = MathUtil::DegToRad(15.0f);
+	constexpr float32 scSwingHeelUp = MathUtil::DegToRad(8.0f);
+	// Fraction of the swing over which a foot levels out from leaving toes-down
+	constexpr float32 scSwingToeDownEnd = 0.4f;
+	// Fraction of the swing where the toes start coming up for a heel landing
+	constexpr float32 scSwingHeelStart = 0.6f;
+
 	const BalanceLeg& leg = mLegs[mSwing.Leg];
 	const float32 phase = MathUtil::Clamp(mSwing.Time / mSwing.Duration, 0.0f, 1.0f);
 
@@ -285,6 +273,13 @@ void RagdollBalance::SolveLeg(Ragdoll& ragdoll, const BalanceLeg& leg, const JPH
 
 void RagdollBalance::ApplyTorsoControl(Ragdoll& ragdoll, JPH::BodyInterface& body_interface, const JPH::Vec3 gravity)
 {
+	constexpr float32 scLiftStart = 0.003f;
+	constexpr float32 scLiftRange = 0.015f;
+	constexpr float32 scTorsoFrequency = 4.0f;
+	constexpr float32 scTorsoMaxTorque = 300.0f;
+	// Torque (N m) per unit of chest lean, reacted through the stance hips, so the upper body is pushed back upright
+	constexpr float32 scTrunkLeanGain = 600.0f;
+
 	uint32 stance_legs[2];
 	uint32 stance_count = 0;
 
@@ -373,6 +368,13 @@ void RagdollBalance::ApplyTorsoControl(Ragdoll& ragdoll, JPH::BodyInterface& bod
 JPH::Vec3 RagdollBalance::GetCenterOfMassForce(uint32 loaded_count, const uint32* loaded, float32 mass,
 											   float32 strength_scale) const
 {
+	// Centre of mass control frequency (Hz) and damping ratio; its force limits come from BalanceAssist
+	constexpr float32 scComFrequency = 2.0f;
+	constexpr float32 scComDamping = 1.0f;
+	// Stagger speed (m/s) at which holding the centre of mass over the feet has fully given way to following the
+	// stagger
+	constexpr float32 scStaggerHoldSpeed = 0.25f;
+
 	const float32 weight = mass * mGroundFrame.Gravity;
 
 	// The hold and braking wait for recovery, so through the stumble the shove carries the body on its own
@@ -429,14 +431,8 @@ JPH::Vec3 RagdollBalance::LimitAnkleTorque(const BalanceLeg& leg, const JPH::Vec
 		return JPH::Vec3::sZero();
 	}
 
-	Vec2f points[BodyGroundContact::scMaxPoints];
 	Vec2f hull[BodyGroundContact::scMaxPoints + 1];
-
-	for (uint32 i = 0; i < leg.ContactCount; i++) {
-		points[i] = mGroundFrame.ToPlane(leg.ContactPoints[i]);
-	}
-
-	const uint32 count = BuildHull(points, leg.ContactCount, hull);
+	const uint32 count = BuildContactHull(mGroundFrame, leg, hull);
 
 	// The foot can only push back on the ankle by moving its centre of pressure, which stays under the sole
 	const JPH::Vec3 pressure = mGroundFrame.Up.Cross(torque) / normal_force;
@@ -451,7 +447,7 @@ JPH::Vec3 RagdollBalance::LimitAnkleTorque(const BalanceLeg& leg, const JPH::Vec
 	}
 
 	const Vec2f limited = closest - ankle;
-	const JPH::Vec3 limited_pressure = mGroundFrame.AxisU * limited.X + mGroundFrame.AxisV * limited.Y;
+	const JPH::Vec3 limited_pressure = mGroundFrame.FromPlane(limited, 0.0f);
 
 	return limited_pressure.Cross(mGroundFrame.Up) * normal_force;
 }
@@ -462,14 +458,8 @@ bool RagdollBalance::IsPressureInside(const BalanceLeg& leg, const JPH::Vec3 tor
 		return false;
 	}
 
-	Vec2f points[BodyGroundContact::scMaxPoints];
 	Vec2f hull[BodyGroundContact::scMaxPoints + 1];
-
-	for (uint32 i = 0; i < leg.ContactCount; i++) {
-		points[i] = mGroundFrame.ToPlane(leg.ContactPoints[i]);
-	}
-
-	const uint32 count = BuildHull(points, leg.ContactCount, hull);
+	const uint32 count = BuildContactHull(mGroundFrame, leg, hull);
 	const Vec2f wanted = mGroundFrame.ToPlane(leg.AnklePosition) +
 						 mGroundFrame.ToPlane(mGroundFrame.Up.Cross(torque) / normal_force);
 
@@ -497,7 +487,7 @@ void RagdollBalance::ApplyExternalSupport(Ragdoll& ragdoll, JPH::BodyInterface& 
 
 	const float32 mass = ragdoll.GetTotalMass();
 	const float32 weight = mass * mGroundFrame.Gravity;
-	const float32 strength_scale = std::min(ragdoll.mSegments[0].Strength / scGravityFullStrength, 1.0f);
+	const float32 strength_scale = GetStrengthScale(ragdoll.mSegments[0].Strength);
 	const RDSegmentState& root = ragdoll.mSegmentStates[0];
 	const JPH::BodyID root_id = ragdoll.GetBodyID(0);
 
@@ -554,6 +544,16 @@ void RagdollBalance::ApplyExternalSupport(Ragdoll& ragdoll, JPH::BodyInterface& 
 
 void RagdollBalance::ApplyLegForces(Ragdoll& ragdoll, JPH::BodyInterface& body_interface)
 {
+	// Frequency (Hz) the leg forces hold the pelvis at its height
+	constexpr float32 scHeightFrequency = 2.0f;
+	// Most the legs push up or pull down to hold height, as a fraction of body weight. Legs can't pull on the ground,
+	// and doing so takes the weight off a foot and lets it skid
+	constexpr float32 scMaxPushFraction = 0.6f;
+	constexpr float32 scMaxPullFraction = 0.15f;
+	constexpr uint32 scPressureIterations = 4;
+	// A body this far into a fall lets its feet go
+	constexpr float32 scFootPlantMaxFall = 0.8f;
+
 	uint32 loaded[2];
 	uint32 loaded_count = 0;
 
@@ -576,7 +576,7 @@ void RagdollBalance::ApplyLegForces(Ragdoll& ragdoll, JPH::BodyInterface& body_i
 	// What the lift carries is off the legs
 	const float32 gravity = mGroundFrame.Gravity * (1.0f - mLift);
 	const float32 weight = mass * mGroundFrame.Gravity;
-	const float32 strength_scale = std::min(ragdoll.mSegments[0].Strength / scGravityFullStrength, 1.0f);
+	const float32 strength_scale = GetStrengthScale(ragdoll.mSegments[0].Strength);
 	const JPH::Vec3 up = mGroundFrame.Up;
 
 	const JPH::Vec3 horizontal = GetCenterOfMassForce(loaded_count, loaded, mass, strength_scale);
@@ -705,6 +705,11 @@ void RagdollBalance::ApplyLegForces(Ragdoll& ragdoll, JPH::BodyInterface& body_i
 
 void RagdollBalance::ApplyTrunkSpinDamping(Ragdoll& ragdoll, JPH::BodyInterface& body_interface)
 {
+	// Torque per unit spin about vertical, as a fraction of body mass, so a spinning body settles in about a second
+	constexpr float32 scYawDamping = 0.2f;
+	// Torque per unit spin on the chest, as a fraction of body mass, for every axis
+	constexpr float32 scTrunkSpinDamping = 0.02f;
+
 	const float32 mass = ragdoll.GetTotalMass();
 
 	// The pelvis is damped about vertical, so a spin there settles instead of carrying on
@@ -714,7 +719,9 @@ void RagdollBalance::ApplyTrunkSpinDamping(Ragdoll& ragdoll, JPH::BodyInterface&
 	uint32 loaded_count = 0;
 
 	for (const BalanceLeg& leg : mLegs) {
-		loaded_count += IsLoaded(leg) ? 1 : 0;
+		if (IsLoaded(leg)) {
+			loaded_count++;
+		}
 	}
 
 	// The ground takes the reaction through the loaded feet, and with none down there is nothing to push against

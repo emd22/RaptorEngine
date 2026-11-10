@@ -48,18 +48,18 @@ public:
 	{
 	}
 
-	Vec2Base operator-() const { return Vec2Base(-X, -Y); }
+	constexpr Vec2Base operator-() const { return Vec2Base(-X, -Y); }
 
 
-	Vec2Base operator+(const Vec2Base& other) const { return Vec2Base(X + other.X, Y + other.Y); }
-	Vec2Base operator-(const Vec2Base& other) const { return Vec2Base(X - other.X, Y - other.Y); }
-	Vec2Base operator*(const Vec2Base& other) const { return Vec2Base(X * other.X, Y * other.Y); }
-	Vec2Base operator/(const Vec2Base& other) const { return Vec2Base(X / other.X, Y / other.Y); }
+	constexpr Vec2Base operator+(const Vec2Base& other) const { return Vec2Base(X + other.X, Y + other.Y); }
+	constexpr Vec2Base operator-(const Vec2Base& other) const { return Vec2Base(X - other.X, Y - other.Y); }
+	constexpr Vec2Base operator*(const Vec2Base& other) const { return Vec2Base(X * other.X, Y * other.Y); }
+	constexpr Vec2Base operator/(const Vec2Base& other) const { return Vec2Base(X / other.X, Y / other.Y); }
 
-	Vec2Base operator+(Type scalar) const { return Vec2Base(X + scalar, Y + scalar); }
-	Vec2Base operator-(Type scalar) const { return Vec2Base(X - scalar, Y - scalar); }
-	Vec2Base operator*(Type scalar) const { return Vec2Base(X * scalar, Y * scalar); }
-	Vec2Base operator/(Type scalar) const { return Vec2Base(X / scalar, Y / scalar); }
+	constexpr Vec2Base operator+(Type scalar) const { return Vec2Base(X + scalar, Y + scalar); }
+	constexpr Vec2Base operator-(Type scalar) const { return Vec2Base(X - scalar, Y - scalar); }
+	constexpr Vec2Base operator*(Type scalar) const { return Vec2Base(X * scalar, Y * scalar); }
+	constexpr Vec2Base operator/(Type scalar) const { return Vec2Base(X / scalar, Y / scalar); }
 
 	Vec2Base& operator+=(const Vec2Base& other)
 	{

@@ -1,23 +1,21 @@
 #include "AcousticBake.hpp"
 
 #include <Audio/Acoustics.hpp>
+#include <Core/HashMap.hpp>
 #include <Map/CompiledMap.hpp>
 #include <Material/MaterialDefinition.hpp>
 #include <algorithm>
-#include <unordered_map>
 
 namespace fx::mapc {
 
 namespace {
 
-constexpr const char* scMaterialRoot = "RaptorData/Data/materials";
-constexpr const char* scLockedMaterialName = "proto_white";
-constexpr const char* scEditableMaterialName = "proto_grey";
-constexpr int32 scEditableLibraryIndex = 1;
-constexpr int32 scProgressSteps = 4;
-
 String GetMaterialName(const CompiledMapMaterial& material)
 {
+	constexpr const char* scLockedMaterialName = "proto_white";
+	constexpr const char* scEditableMaterialName = "proto_grey";
+	constexpr int32 scEditableLibraryIndex = 1;
+
 	if (!material.Name.IsEmpty()) {
 		return material.Name;
 	}
@@ -34,6 +32,8 @@ String GetMaterialName(const CompiledMapMaterial& material)
 bool BakeAcoustics(const AcousticOptions& options, CompiledMap& map, AcousticStats& out_stats,
 				   const std::function<void(const String&)>& log)
 {
+	constexpr int32 scProgressSteps = 4;
+
 	out_stats = AcousticStats {};
 	map.AcousticProbes.Free();
 
@@ -41,23 +41,24 @@ bool BakeAcoustics(const AcousticOptions& options, CompiledMap& map, AcousticSta
 		return false;
 	}
 
-	std::unordered_map<std::string, AcousticSurface> surfaces;
+	HashMap<String, AcousticSurface> surfaces;
 
 	for (const MaterialDefinition& definition : LoadMaterialDefinitions(scMaterialRoot)) {
-		surfaces[definition.Name.CStr()] = AcousticSurface { .Name = definition.Surface, .Density = definition.Density };
+		surfaces.Insert(definition.Name, AcousticSurface { .Name = definition.Surface, .Density = definition.Density });
 	}
 
 	AcousticGeometry geometry;
 
 	for (size_t i = 0; i < map.Materials.Size; i++) {
-		const auto found = surfaces.find(GetMaterialName(map.Materials[i]).CStr());
+		const String material_name = GetMaterialName(map.Materials[i]);
+		const AcousticSurface* found = surfaces.Find(material_name);
 		AcousticSurface surface;
 
-		if (found != surfaces.end()) {
-			surface = found->second;
+		if (found != nullptr) {
+			surface = *found;
 		}
 
-		geometry.Surfaces.push_back(surface);
+		geometry.Surfaces.Insert(surface);
 	}
 
 	Vec3f bounds_min = map.Surfaces[0].Bounds.Min;
@@ -113,7 +114,7 @@ bool BakeAcoustics(const AcousticOptions& options, CompiledMap& map, AcousticSta
 		return false;
 	}
 
-	map.AcousticProbes.InitSize(result.Data.size());
+	map.AcousticProbes.InitSize(result.Data.Size);
 	std::copy(result.Data.begin(), result.Data.end(), map.AcousticProbes.pData);
 
 	out_stats.bBaked = true;
@@ -121,7 +122,7 @@ bool BakeAcoustics(const AcousticOptions& options, CompiledMap& map, AcousticSta
 	out_stats.ProbeCount = result.ProbeCount;
 	out_stats.ProbeMin = result.ProbeMin;
 	out_stats.ProbeMax = result.ProbeMax;
-	out_stats.DataSize = result.Data.size();
+	out_stats.DataSize = result.Data.Size;
 	out_stats.ReflectionSeconds = result.ReflectionSeconds;
 	out_stats.PathingSeconds = result.PathingSeconds;
 

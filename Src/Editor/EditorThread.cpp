@@ -21,8 +21,9 @@ static TSQueue<Task> sGameTasks(scMaxQueuedTasks);
 static std::mutex sWakeMutex;
 static std::function<void()> sWakeHandler;
 
+using TaskBatch = DynArray<Task, GrowthFunctions::Double>;
 
-static void TakeAll(TSQueue<Task>& queue, DynArray<Task>& out)
+static void TakeAll(TSQueue<Task>& queue, TaskBatch& out)
 {
 	auto locked = queue.GetQueue();
 
@@ -43,7 +44,7 @@ void SetUIWakeHandler(std::function<void()> handler)
 
 void RunUITasks()
 {
-	DynArray<Task> batch;
+	TaskBatch batch;
 	TakeAll(sUITasks, batch);
 
 	for (Task& task : batch) {
@@ -111,7 +112,7 @@ void PostToGame(Task task) { sGameTasks.GetQueue()->Push(std::move(task)); }
 
 uint32 RunGameTasks()
 {
-	DynArray<Task> batch;
+	TaskBatch batch;
 	TakeAll(sGameTasks, batch);
 
 	for (Task& task : batch) {

@@ -19,16 +19,6 @@
 
 namespace fx::editor {
 
-static constexpr float32 scGrabRange = 6.0f;
-static constexpr float32 scMinHoldDistance = 1.0f;
-
-static constexpr float32 scStiffness = 20.0f;
-static constexpr float32 scMaxSpeed = 20.0f;
-static constexpr float32 scMaxAcceleration = 60.0f;
-static constexpr float32 scAngularDamping = 8.0f;
-static constexpr float32 scLaunchSpeed = 25.0f;
-
-
 void GrabEditor::Update(float32 delta_time)
 {
 	const bool key_down = ControlManager::IsKeyDown(eKey::FX_KEY_Y);
@@ -56,6 +46,9 @@ void GrabEditor::Update(float32 delta_time)
 
 void GrabEditor::Grab()
 {
+	constexpr float32 scGrabRange = 6.0f;
+	constexpr float32 scMinHoldDistance = 1.0f;
+
 	Release();
 
 	PerspectiveCamera& camera = *gWorld->Player.pCamera;
@@ -84,6 +77,8 @@ void GrabEditor::Grab()
 
 void GrabEditor::Launch()
 {
+	constexpr float32 scLaunchSpeed = 25.0f;
+
 	JPH::BodyInterface& bodies = gPhysics->pBackend->GetBodyInterface();
 
 	if (bodies.IsAdded(mBody) && bodies.GetMotionType(mBody) == JPH::EMotionType::Dynamic) {
@@ -98,6 +93,11 @@ void GrabEditor::Launch()
 
 void GrabEditor::Hold(float32 delta_time)
 {
+	constexpr float32 scStiffness = 20.0f;
+	constexpr float32 scMaxSpeed = 20.0f;
+	constexpr float32 scMaxAcceleration = 60.0f;
+	constexpr float32 scAngularDamping = 8.0f;
+
 	JPH::BodyInterface& bodies = gPhysics->pBackend->GetBodyInterface();
 
 	if (!bodies.IsAdded(mBody) || bodies.GetMotionType(mBody) != JPH::EMotionType::Dynamic) {

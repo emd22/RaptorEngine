@@ -1,0 +1,287 @@
+import ./weapon_common;
+
+import std/math;
+import ../math;
+
+
+float sDiscX;
+float sDiscY;
+
+void SampleDisc()
+{
+	for (int i = 0; i < 8; i++) {
+		float x = RandRange(-1.0f, 1.0f);
+		float y = RandRange(-1.0f, 1.0f);
+
+		const float hypo = x * x + y * y;
+
+		if (hypo <= 1.0f) {
+			sDiscX = x;
+			sDiscY = y;
+			return;
+		}
+	}
+
+	sDiscX = 0.0f;
+	sDiscY = 0.0f;
+}
+
+
+
+/* Check to see if the timer has ran out. If it has, then set the phase to `finish_phase`. */
+void CheckPhaseComplete(ref RWeapon st, RWeaponPhase finish_phase)
+{
+	if (st.Timer <= 0.0f) {
+		st.Timer = 0.0f;
+		st.Phase = finish_phase;
+	}
+}
+
+
+impl RWeapon
+{
+	extern void HandleEvent(RWeaponEvent event);
+	extern void DoWeaponKick(float pitch, float yaw);
+	extern float WeaponTrace(float yaw, float pitch, float range);
+	extern void ApplyHit(float damage, float force, bool decal);
+
+	void BeginPhase(ref RWeapon self, RWeaponPhase phase, float duration)
+	{
+		self.Phase = phase;
+		self.Timer = duration;
+		self.TimerTotal = max<float>(duration, 0.0001f);
+	}
+
+	bool CanReload(ref RWeapon self, ref RWeaponDef def)
+	{
+		return (self.Phase == RWeaponPhase.READY && self.Magazine < def.MagSize && self.Reserve > 0);
+	}
+
+	void BeginReload(ref RWeapon self, ref RWeaponDef def)
+	{
+		float duration = def.ReloadTime;
+
+		if (self.Magazine == 0) {
+			duration = def.ReloadTimeFromEmpty;
+		}
+
+		self.BurstRemaining = 0;
+		self.FireBuffer = 0.0f;
+
+		self.BeginPhase(RWeaponPhase.RELOADING, duration);
+		RWeapon.HandleEvent(RWeaponEvent.RELOAD_BEGIN);
+	}
+
+	void FinishReload(ref RWeapon self, ref RWeaponDef def)
+	{
+		int needed = def.MagSize - self.Magazine;
+		int taken = min<int>(needed, self.Reserve);
+
+		self.Magazine = self.Magazine + taken;
+		self.Reserve = self.Reserve - taken;
+		self.Phase = RWeaponPhase.READY;
+		self.Timer = 0.0f;
+
+		RWeapon.HandleEvent(RWeaponEvent.RELOAD_END);
+	}
+
+	void ApplyRecoil(ref RWeapon self, ref RWeaponDef def)
+	{
+		const float ramp = min<float>(def.Recoil.Ramp * (float)self.RecoilShots, def.Recoil.RampMax);
+		const float scale = 1.0 + ramp;
+
+		const float recoil_pitch = RandRange(-def.Recoil.PitchVariance, def.Recoil.PitchVariance);
+
+		const float pitch = (def.Recoil.Pitch + recoil_pitch) * scale;
+		const float yaw = RandRange(-def.Recoil.Yaw, def.Recoil.Yaw) * scale;
+
+		RWeapon.DoWeaponKick(Deg2Rad(pitch), Deg2Rad(yaw));
+		self.RecoilShots++;
+	}
+
+	void FireShot(ref RWeapon self, ref RWeaponDef def, ref RWeaponInput inp)
+	{
+		float rpm = def.RPM;
+		if (self.FireMode == RWeaponMode.BURST) {
+			rpm = def.Burst.RPM;
+		}
+
+		float spread_rad = Deg2Rad(GetWeaponSpread(def, self, inp));
+
+		self.Magazine--;
+		self.SinceShot = 0.0f;
+		self.Cooldown = GetWeaponInterval(rpm);
+		self.FireBuffer = 0.0f;
+
+		RWeapon.HandleEvent(RWeaponEvent.FIRE);
+
+		for (int pellet = 0; pellet < def.NumPellets; pellet++) {
+			SampleDisc();
+
+			float distance = RWeapon.WeaponTrace(sDiscX * spread_rad, sDiscY * spread_rad, def.Range);
+
+			if (distance >= 0.0f) {
+				float damage = def.Damage * GetWeaponFalloff(def, distance);
+				RWeapon.ApplyHit(damage, def.HitForce, def.Decals != 0);
+			}
+		}
+
+		self.ApplyRecoil(def);
+		self.Bloom = min<float>(self.Bloom + def.Spread.PerShot, def.Spread.Max);
+	}
+
+	void BurstStep(ref RWeapon self, ref RWeaponDef def, ref RWeaponInput inp)
+	{
+		self.FireShot(def, inp);
+		self.BurstRemaining--;
+
+		if (self.BurstRemaining <= 0) {
+			self.BurstRemaining = 0;
+			self.Cooldown = max<float>(self.Cooldown, def.Burst.Cooldown);
+		}
+	}
+
+	void WeaponInit(ref RWeapon self, const ref RWeaponDef def)
+	{
+		self.Phase = RWeaponPhase.READY;
+		self.FireMode = def.DefaultMode;
+		self.Magazine = def.MagSize;
+		self.Reserve = min<int>(def.ReserveStart, def.ReserveMax);
+		self.BurstRemaining = 0;
+		self.RecoilShots = 0;
+		self.Timer = 0.0f;
+		self.TimerTotal = 1.0f;
+		self.Cooldown = 0.0f;
+		self.SinceShot = 10.0f;
+		self.Bloom = 0.0f;
+		self.FireBuffer = 0.0f;
+	}
+
+	void Equip(ref RWeapon self, const ref RWeaponDef def)
+	{
+		self.BurstRemaining = 0;
+		self.FireBuffer = 0.0f;
+
+		self.BeginPhase(RWeaponPhase.RAISING, def.RaiseTime);
+		RWeapon.HandleEvent(RWeaponEvent.RAISE);
+	}
+
+	void Holster(ref RWeapon self, const ref RWeaponDef def)
+	{
+		self.BurstRemaining = 0;
+		self.FireBuffer = 0.0f;
+
+		self.BeginPhase(RWeaponPhase.LOWERING, def.LowerTime);
+		RWeapon.HandleEvent(RWeaponEvent.LOWER);
+	}
+
+	void GenericUpdate(ref RWeapon self, ref RWeaponDef def, ref RWeaponInput inp, float delta_time)
+	{
+		self.Cooldown = max<float>(0.0f, self.Cooldown - delta_time);
+		self.SinceShot = self.SinceShot + delta_time;
+		self.FireBuffer = max<float>(0.0f, self.FireBuffer - delta_time);
+
+		if (self.SinceShot > 0.06f) {
+			self.Bloom = max<float>(0.0f, self.Bloom - def.Spread.Recovery * delta_time);
+		}
+
+		if (self.SinceShot > def.Recoil.ResetTime) {
+			self.RecoilShots = 0;
+		}
+
+		// Check if the raise has completed
+		if (self.Phase == RWeaponPhase.RAISING) {
+			self.Timer -= (delta_time);
+			CheckPhaseComplete(self, RWeaponPhase.READY);
+			return;
+		}
+
+		// Check if the lower has completed
+		if (self.Phase == RWeaponPhase.LOWERING) {
+			self.Timer -= (delta_time);
+			CheckPhaseComplete(self, RWeaponPhase.LOWERED);
+			return;
+		}
+
+		// There is no weapon, wait for raise
+		if (self.Phase == RWeaponPhase.LOWERED) {
+			return;
+		}
+
+
+		if (self.Phase == RWeaponPhase.RELOADING) {
+			self.Timer -= delta_time;
+
+			if (self.Timer <= 0.0f) {
+				self.FinishReload(def);
+			}
+
+			return;
+		}
+
+		if (((uint)inp.Flags & (uint)RInputFlags.SWITCH_MODE) != 0 && self.BurstRemaining == 0) {
+			RWeaponMode mode = RWeaponMode.Next(def.FireModes, self.FireMode);
+
+			if (mode != self.FireMode) {
+				self.FireMode = mode;
+				RWeapon.HandleEvent(RWeaponEvent.MODE_CHANGED);
+			}
+		}
+
+		if (((uint)inp.Flags & (uint)RInputFlags.RELOAD_PRESSED) != 0 && self.CanReload(def)) {
+			self.BeginReload(def);
+			return;
+		}
+
+		if (self.BurstRemaining > 0) {
+			if (self.Cooldown <= 0.0f) {
+				if (self.Magazine > 0) {
+					self.BurstStep(def, inp);
+				}
+				else {
+					self.BurstRemaining = 0;
+				}
+			}
+
+			return;
+		}
+
+		if (((uint)inp.Flags & (uint)RInputFlags.FIRE_PRESSED) != 0) {
+			self.FireBuffer = FIRE_BUFFER_TIME;
+		}
+
+		bool wants_fire = (self.FireBuffer > 0.0f);
+
+		if (self.FireMode == RWeaponMode.AUTO) {
+			wants_fire = (((uint)inp.Flags & (uint)RInputFlags.FIRE_HELD) != 0);
+		}
+
+		if (!wants_fire) {
+			return;
+		}
+
+		if (self.Magazine <= 0) {
+			if (((uint)inp.Flags & (uint)RInputFlags.FIRE_PRESSED) != 0) {
+				RWeapon.HandleEvent(RWeaponEvent.DRY_FIRE);
+			}
+			if (def.AutoReload != 0 && self.CanReload(def)) {
+				self.BeginReload(def);
+			}
+
+			self.FireBuffer = 0.0f;
+			return;
+		}
+
+		if (self.Cooldown > 0.0f) {
+			return;
+		}
+
+		if (self.FireMode == RWeaponMode.BURST) {
+			self.BurstRemaining = min<int>(def.Burst.BurstCount, self.Magazine);
+			self.BurstStep(def, inp);
+			return;
+		}
+
+		self.FireShot(def, inp);
+	}
+}

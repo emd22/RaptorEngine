@@ -8,6 +8,7 @@
 #include "DeletionObject.hpp"
 #include "FrameAllocator.hpp"
 #include "GpuProfiler.hpp"
+#include "LightTransport.hpp"
 #include "TiledForwardRenderer.hpp"
 #include "UniformBuffer.hpp"
 #include "Window.hpp"
@@ -104,6 +105,12 @@ public:
 	void BeginLightCulling(BaseCamera& render_cam);
 	void BeginPrepass();
 	void BeginGeometry();
+
+	/**
+	 * @brief Ends the opaque part of the forward pass, copies the lit target and depth for water to sample, and
+	 * continues in ForwardBlendPass. Called once per frame at most, before the blended draws.
+	 */
+	void CopySceneForWater();
 
 	void RenderEarlyFrameEffects(PerspectiveCamera& camera);
 
@@ -350,6 +357,21 @@ public:
 	Image* pLightmap = nullptr;
 	Image* pLightmapIrradiance = nullptr;
 
+	/// Bounces the lights that were not baked through the compiled map's cluster links, on top of the lightmap
+	LightTransport Transport;
+
+	/// The irradiance the forward pass shades lightmapped surfaces with: relit while the transport is active
+	Image* GetShadingIrradiance() const
+	{
+		Image* relit = Transport.GetRelitIrradiance();
+
+		if (relit != nullptr) {
+			return relit;
+		}
+
+		return pLightmapIrradiance;
+	}
+
 	/// Sun shadow pages that the fog samples on compiled maps with a baked sun, packed into one depth atlas
 	Image* pFogShadowAtlas = nullptr;
 	/// One entry per page grid cell, saying where its page is in the atlas and in light space
@@ -371,10 +393,14 @@ public:
 	/// Turn off the probe lighting or the decals in every draw, to see what they cost in the GPU timings
 	bool bDisableProbes = false;
 	bool bDisableReflectionProbes = false;
+	bool bDisableReflectionNormalize = false;
 	uint32 ReflectionDebugView = 0;
 	bool bDisableDecals = false;
 
 	float32 PreExposure = 1.0f;
+
+	/// Seconds the game has run for, advanced by every tick's delta. Drives shader animation such as water ripples
+	float64 ShaderTime = 0.0;
 
 	uint32 Tonemapper = 1;
 
@@ -412,6 +438,9 @@ protected:
 
 	Mat4f mFogPrevCameraMatrix = Mat4f::scIdentity;
 	uint32 mFroxelHistoryFrame = UINT32_MAX;
+
+	/// The stage the geometry is being drawn into, ForwardPass or ForwardBlendPass after CopySceneForWater()
+	RenderStage* mpActiveForwardStage = nullptr;
 
 	// TSQueue<DeletionObject> mDeletionQueue;
 };

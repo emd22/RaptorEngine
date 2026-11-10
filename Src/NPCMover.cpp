@@ -10,9 +10,6 @@ using namespace physics;
 
 namespace {
 
-constexpr float32 scMaxStepTime = 0.1f;
-constexpr float32 scRestSpeed = 0.01f;
-
 /// NPC capsules collide with the world and props, never with ragdoll bodies (their own included)
 const CharacterLayerFilter scNPCLayerFilter(eCharacterRagdollCollision::None);
 
@@ -24,8 +21,7 @@ bool NPCMover::Create(const CharacterConfig& config, const Vec3f position, uint3
 
 	mConfig = config;
 
-	JPH::RVec3 jolt_position;
-	position.ToJoltVec3(jolt_position);
+	const JPH::RVec3 jolt_position = Vec3f::ToJolt(position);
 
 	JPH::Ref<JPH::CharacterVirtualSettings> settings = CreateCharacterSettings(config);
 
@@ -77,10 +73,7 @@ void NPCMover::Teleport(const Vec3f position)
 		return;
 	}
 
-	JPH::RVec3 jolt_position;
-	position.ToJoltVec3(jolt_position);
-
-	mpCharacter->SetPosition(jolt_position);
+	mpCharacter->SetPosition(Vec3f::ToJolt(position));
 	mpCharacter->SetLinearVelocity(JPH::Vec3::sZero());
 	mRestTime = 0.0f;
 
@@ -97,6 +90,11 @@ void NPCMover::RefreshContacts()
 
 void NPCMover::Update(float32 delta_time, const Vec3f desired_velocity)
 {
+	constexpr float32 scMaxStepTime = 0.1f;
+	constexpr float32 scRestSpeed = 0.01f;
+	// A resting capsule still refreshes this often, so it notices the floor going away
+	constexpr float32 scRestRefreshTime = 0.5f;
+
 	if (mpCharacter == nullptr || !mbEnabled || delta_time <= 0.0f) {
 		return;
 	}
@@ -154,10 +152,7 @@ Vec3f NPCMover::GetPosition() const
 		return Vec3f::sZero;
 	}
 
-	Vec3f position;
-	position.FromJoltVec3(JPH::Vec3(mpCharacter->GetPosition()));
-
-	return position;
+	return Vec3f::FromJolt(mpCharacter->GetPosition());
 }
 
 Vec3f NPCMover::GetVelocity() const
@@ -166,10 +161,7 @@ Vec3f NPCMover::GetVelocity() const
 		return Vec3f::sZero;
 	}
 
-	Vec3f velocity;
-	velocity.FromJoltVec3(mpCharacter->GetLinearVelocity());
-
-	return velocity;
+	return Vec3f::FromJolt(mpCharacter->GetLinearVelocity());
 }
 
 bool NPCMover::IsGrounded() const

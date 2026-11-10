@@ -1,0 +1,15 @@
+
+struct NPCBehaviour
+{
+
+}
+
+struct NPCID = int;
+
+impl NPCBehaviour
+{
+	extern bool Trigger(NPCID npc, cstring behaviour);
+	extern bool Stop(NPCID npc, cstring behaviour);
+	extern bool Active(NPCID npc, cstring behaviour);
+
+}

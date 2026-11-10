@@ -419,9 +419,15 @@ void ImageCopyToComputeHistory(const CommandBuffer& cmd, Image* source, Image* h
 	vkCmdPipelineBarrier2(cmd.Cmd, &to_transfer_info);
 
 	const VkImageCopy region {
-		.srcSubresource = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1 },
+		.srcSubresource = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+							.mipLevel = 0,
+							.baseArrayLayer = 0,
+							.layerCount = 1 },
 		.srcOffset = { 0, 0, 0 },
-		.dstSubresource = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1 },
+		.dstSubresource = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+							.mipLevel = 0,
+							.baseArrayLayer = 0,
+							.layerCount = 1 },
 		.dstOffset = { 0, 0, 0 },
 		.extent = { source->Info.Size.X, source->Info.Size.Y, source->Info.Depth },
 	};
@@ -461,6 +467,141 @@ void ImageCopyToComputeHistory(const CommandBuffer& cmd, Image* source, Image* h
 
 	source->ImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 	history->ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+}
+
+void ImageCopyAttachmentForSampling(const CommandBuffer& cmd, Image* source, Image* copy)
+{
+	Assert(source != nullptr && copy != nullptr);
+
+	constexpr VkPipelineStageFlags2 cAttachmentStages = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT |
+														VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
+														VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+
+	constexpr VkAccessFlags2 cAttachmentAccess = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT |
+												 VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT |
+												 VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+												 VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+	const VkImageAspectFlags aspect = ImageFormatUtil::GetAspectMask(source->Info.Format);
+
+	VkImageMemoryBarrier2 to_transfer[] = {
+		{
+			.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+			.pNext = nullptr,
+
+			.srcStageMask = cAttachmentStages | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+			.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+
+			.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT,
+			.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT,
+
+			.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+
+			.image = source->InternalImage,
+
+			.subresourceRange = SubresourceRange(source),
+		},
+		{
+			.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+			.pNext = nullptr,
+
+			// Last frame's water may still be reading the copy
+			.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+			.srcAccessMask = VK_ACCESS_2_NONE,
+
+			.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT,
+			.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+
+			.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+			.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+
+			.image = copy->InternalImage,
+
+			.subresourceRange = SubresourceRange(copy),
+		},
+	};
+
+	VkDependencyInfo to_transfer_info {
+		.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+		.pNext = nullptr,
+		.imageMemoryBarrierCount = 2,
+		.pImageMemoryBarriers = to_transfer,
+	};
+
+	vkCmdPipelineBarrier2(cmd.Cmd, &to_transfer_info);
+
+	const VkImageCopy region {
+		.srcSubresource = { .aspectMask = aspect, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1 },
+		.srcOffset = { 0, 0, 0 },
+		.dstSubresource = { .aspectMask = aspect, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1 },
+		.dstOffset = { 0, 0, 0 },
+		.extent = { source->Info.Size.X, source->Info.Size.Y, 1 },
+	};
+
+	vkCmdCopyImage(cmd.Cmd, source->InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, copy->InternalImage,
+				   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+	VkImageMemoryBarrier2 to_read[] = {
+		{
+			.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+			.pNext = nullptr,
+
+			.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT,
+			.srcAccessMask = VK_ACCESS_2_NONE,
+
+			.dstStageMask = cAttachmentStages | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+			.dstAccessMask = cAttachmentAccess | VK_ACCESS_2_SHADER_READ_BIT,
+
+			.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+
+			.image = source->InternalImage,
+
+			.subresourceRange = SubresourceRange(source),
+		},
+		{
+			.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+			.pNext = nullptr,
+
+			.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT,
+			.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+
+			.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+			.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+
+			.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+
+			.image = copy->InternalImage,
+
+			.subresourceRange = SubresourceRange(copy),
+		},
+	};
+
+	VkDependencyInfo to_read_info {
+		.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+		.pNext = nullptr,
+		.imageMemoryBarrierCount = 2,
+		.pImageMemoryBarriers = to_read,
+	};
+
+	vkCmdPipelineBarrier2(cmd.Cmd, &to_read_info);
+
+	source->ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	copy->ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 }
 
 void ComputeReadAfterAll(const CommandBuffer& cmd)

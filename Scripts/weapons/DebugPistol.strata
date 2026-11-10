@@ -1,0 +1,23 @@
+import ./WeaponImpl;
+
+void WeaponInit(ref RWeapon weapon, const ref RWeaponDef def)
+{
+	weapon.WeaponInit(def);
+}
+
+
+void WeaponEquip(ref RWeapon weapon, const ref RWeaponDef def)
+{
+	weapon.Equip(def);
+}
+
+void WeaponHolster(ref RWeapon weapon, const ref RWeaponDef def)
+{
+	weapon.Holster(def);
+}
+
+
+void WeaponUpdate(ref RWeapon weapon, ref RWeaponDef def, ref RWeaponInput inp, float delta_time)
+{
+	weapon.GenericUpdate(def, inp, delta_time);
+}

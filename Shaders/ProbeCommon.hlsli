@@ -2,7 +2,6 @@
 /// Light-probe sampling shared by the forward passes.
 ///
 
-
 #define PROBE_SH_COEFF_COUNT 9
 
 #define PROBE_MAX_VOLUMES 8
@@ -12,18 +11,19 @@
 
 #define PROBE_MAX_PROBES 4096
 
+/// Octahedral depth map resolution per probe
 #define PROBE_DEPTH_SIZE 16
-#define PROBE_DEPTH_FACES 6
-#define PROBE_DEPTH_TEXELS_PER_FACE (PROBE_DEPTH_SIZE * PROBE_DEPTH_SIZE)
 
 /// Distance stored by the bake where nothing was hit
 #define PROBE_DEPTH_MAX_DISTANCE 50.0
 
-/// Every probe's moments live in one RG16_UNorm atlas, each probe a horizontal strip of its six cube faces
-#define PROBE_ATLAS_COLUMNS 32
-#define PROBE_ATLAS_PROBE_WIDTH (PROBE_DEPTH_FACES * PROBE_DEPTH_SIZE)
-#define PROBE_ATLAS_WIDTH (PROBE_ATLAS_COLUMNS * PROBE_ATLAS_PROBE_WIDTH)
-#define PROBE_ATLAS_HEIGHT (((PROBE_MAX_PROBES + PROBE_ATLAS_COLUMNS - 1) / PROBE_ATLAS_COLUMNS) * PROBE_DEPTH_SIZE)
+/// Every probe's moments live in one RG16_UNorm atlas, each probe a square tile of its octahedral map with a one
+/// texel border of the wrapped edges
+#define PROBE_ATLAS_TILE_SIZE (PROBE_DEPTH_SIZE + 2)
+#define PROBE_ATLAS_COLUMNS 64
+#define PROBE_ATLAS_WIDTH (PROBE_ATLAS_COLUMNS * PROBE_ATLAS_TILE_SIZE)
+#define PROBE_ATLAS_ROWS ((PROBE_MAX_PROBES + PROBE_ATLAS_COLUMNS - 1) / PROBE_ATLAS_COLUMNS)
+#define PROBE_ATLAS_HEIGHT (PROBE_ATLAS_ROWS * PROBE_ATLAS_TILE_SIZE)
 
 // Tuning
 
@@ -48,7 +48,6 @@ struct ProbeSHData
 	float4 SH[PROBE_SH_COEFF_COUNT];
 };
 
-
 float3 ProbeSHPosition(ProbeSHData probe) { return float3(probe.SH[0].w, probe.SH[1].w, probe.SH[2].w); }
 
 float ProbeSHSunVisibility(ProbeSHData probe) { return probe.SH[3].w; }
@@ -68,7 +67,6 @@ struct ProbeVolume
 	/// fields above, but SelectProbeVolume() runs per pixel over every volume, so they come precomputed.
 	float4 vMaxAndCellVolume;
 };
-
 
 
 uint GetProbeVolumeCount(StructuredBuffer<ProbeVolume> volumes)
@@ -157,32 +155,21 @@ float3 EvalProbeIrradiance(float3 normal, ProbeSHData probe)
 	return max(EvalProbeIrradianceRaw(normal, probe), float3(0.0, 0.0, 0.0));
 }
 
-/// Cubemap face and UV that direction `d` falls in. Must match DirectionToMomentTexel() in Src/Renderer/LightProbe.cpp.
-void ProbeDepthDirectionToFaceUV(float3 d, out uint face, out float2 uv01)
+/// Octahedral map UV in [0, 1] that direction `d` falls in, +Y at the centre.
+float2 ProbeDepthDirectionToOctUV(float3 d)
 {
-	const float3 a = abs(d);
+	// Get the absolute value and horizontal add all lanes
+	const float sum = dot(abs(d), 1.0);
+	const float3 n = d / sum;
 
-	const bool x_major = and(a.x >= a.y, a.x >= a.z);
-	const bool y_major = a.y >= a.z;
-	const bool3 positive = d > 0.0;
+	const float2 signs = select(n.xz >= 0.0, float2(1.0, 1.0), float2(-1.0, -1.0));
+	const float2 folded = (1.0 - abs(n.zx)) * signs;
 
-	const uint face_x = select(positive.x, 0u, 1u);
-	const uint face_y = select(positive.y, 2u, 3u);
-	const uint face_z = select(positive.z, 4u, 5u);
-
-	const float2 uv_x = float2(select(positive.x, -d.z, d.z), -d.y);
-	const float2 uv_y = float2(d.x, select(positive.y, d.z, -d.z));
-	const float2 uv_z = float2(select(positive.z, d.x, -d.x), -d.y);
-
-	const float major = select(x_major, a.x, select(y_major, a.y, a.z));
-	const float2 uv = select(x_major, uv_x, select(y_major, uv_y, uv_z)) / major;
-
-	face = select(x_major, face_x, select(y_major, face_y, face_z));
-	uv01 = uv * 0.5 + 0.5;
+	return select(n.y >= 0.0, n.xz, folded) * 0.5 + 0.5;
 }
 
-/// Half the angle covered by a depth texel, as a slope
-static const float PROBE_DEPTH_TEXEL_SLOPE = tan(radians(45.0 / PROBE_DEPTH_SIZE));
+/// Half the angle covered by an average depth texel (4 pi / SIZE^2 steradians), as a slope
+static const float PROBE_DEPTH_TEXEL_SLOPE = tan(1.7724539 / PROBE_DEPTH_SIZE);
 
 float ProbeMinVariance(float mean)
 {
@@ -190,7 +177,6 @@ float ProbeMinVariance(float mean)
 	const float stddev = max(mean * PROBE_DEPTH_TEXEL_SLOPE, PROBE_MIN_DEPTH_STDDEV);
 	return stddev * stddev;
 }
-
 
 float ProbeDepthChebyshev(float receiver_dist, float mean, float variance)
 {
@@ -203,12 +189,12 @@ float ProbeDepthChebyshev(float receiver_dist, float mean, float variance)
 	return select(biased_dist <= mean, 1.0, clamped_variance / (clamped_variance + d * d));
 }
 
-/// Where probe `index`'s strip for `face` starts in the atlas, in texels.
-float2 ProbeAtlasFaceOrigin(uint index, uint face)
+/// Where probe `index`'s tile starts in the atlas, in texels.
+float2 ProbeAtlasTileOrigin(uint index)
 {
 	const uint2 tile = uint2(index % PROBE_ATLAS_COLUMNS, index / PROBE_ATLAS_COLUMNS);
 
-	return float2((tile.x * PROBE_ATLAS_PROBE_WIDTH) + (face * PROBE_DEPTH_SIZE), tile.y * PROBE_DEPTH_SIZE);
+	return float2(tile * PROBE_ATLAS_TILE_SIZE);
 }
 
 struct ProbeMoments
@@ -217,14 +203,15 @@ struct ProbeMoments
 	float Variance;
 };
 
-ProbeMoments SampleProbeMoments(Texture2D moments_atlas, SamplerState moments_sampler, uint index, uint face,
-								float2 uv01)
+ProbeMoments SampleProbeMoments(Texture2D moments_atlas, SamplerState moments_sampler, uint index, float2 uv01)
 {
-	const float2 in_face = clamp(uv01 * float(PROBE_DEPTH_SIZE), 0.5, float(PROBE_DEPTH_SIZE) - 0.5) - 0.5;
-	const float2 base = floor(in_face);
-	const float2 f = in_face - base;
+	const float2 in_map = uv01 * float(PROBE_DEPTH_SIZE) - 0.5;
+	const float2 base = floor(in_map);
+	const float2 f = in_map - base;
 
-	const float2 corner = ProbeAtlasFaceOrigin(index, face) + base + 1.0;
+	// One texel past the border to the map, one more to the corner the four gathered texels share. At the map's
+	// edges the gather reaches into the border, which holds the texels across the octahedral seam.
+	const float2 corner = ProbeAtlasTileOrigin(index) + base + 2.0;
 	const float2 uv = corner / float2(PROBE_ATLAS_WIDTH, PROBE_ATLAS_HEIGHT);
 
 	const float4 means = moments_atlas.GatherRed(moments_sampler, uv) * PROBE_DEPTH_MAX_DISTANCE;
@@ -242,7 +229,7 @@ ProbeMoments SampleProbeMoments(Texture2D moments_atlas, SamplerState moments_sa
 	return moments;
 }
 
-/// Visibility of `pos_ws` as seen from probe `info_index` using its depth cubemap.
+/// Visibility of `pos_ws` as seen from probe `index` using its octahedral depth map.
 float SampleProbeVisibility(float3 pos_ws, float3 probe_pos, Texture2D moments_atlas, SamplerState moments_sampler,
 							uint index)
 {
@@ -252,11 +239,9 @@ float SampleProbeVisibility(float3 pos_ws, float3 probe_pos, Texture2D moments_a
 	const bool at_probe = raw_dist < 1e-4;
 	const float3 direction = select(at_probe, float3(0.0, 0.0, 1.0), to_receiver / max(raw_dist, 1e-4));
 
-	uint face;
-	float2 uv01;
-	ProbeDepthDirectionToFaceUV(direction, face, uv01);
+	const float2 uv01 = ProbeDepthDirectionToOctUV(direction);
 
-	const ProbeMoments moments = SampleProbeMoments(moments_atlas, moments_sampler, index, face, uv01);
+	const ProbeMoments moments = SampleProbeMoments(moments_atlas, moments_sampler, index, uv01);
 
 	// Nothing was hit in this direction.
 	const bool no_hit = moments.Mean >= PROBE_DEPTH_MAX_DISTANCE - 1e-3;
@@ -298,7 +283,6 @@ void ProbeVolumeCell(float3 pos_ws, ProbeVolume volume, out uint3 base, out floa
 	base = min(uint3(floor(local)), dims - 2);
 	cell_frac = saturate(local - float3(base));
 }
-
 
 uint ProbeGridLookup(StructuredBuffer<uint> grid, uint point_index)
 {
@@ -430,12 +414,32 @@ bool SampleProbeVolumeIrradiance(float3 pos_ws, float3 n, float3 geometric_n, fl
 
 #define REFLECTION_PROBE_MAX_LOD 5.0
 
+/// Most a reflection probe is brightened to match the light where it is used. Dimming is not limited.
+#define REFLECTION_NORMALIZE_MAX 1.5
+
 struct ReflectionProbe
 {
 	float4x4 mWorldToBox;
 	float4 vPositionAndCount;
 	float4 vFade;
+	/// Light probe irradiance luminance at the capture point along +X, +Y, +Z, w = 1 when there is any. See
+	/// ProbeManager::SampleCaptureIrradiance()
+	float4 vCaptureIrradiancePositive;
+	/// The same along -X, -Y, -Z
+	float4 vCaptureIrradianceNegative;
 };
+
+/// A cubemap holds the light around its capture point. Somewhere that gets less light than that point (a nook, under a
+/// ledge, the dark side of a doorway the box spans) would reflect it too brightly, so the cubemap is scaled by the
+/// irradiance at the pixel over the irradiance at the capture point, along the same normal.
+float ReflectionProbeNormalization(ReflectionProbe probe, float3 n, float local_luminance)
+{
+	const float3 side = select(n >= 0.0, probe.vCaptureIrradiancePositive.xyz, probe.vCaptureIrradianceNegative.xyz);
+	const float capture = dot(n * n, side);
+	const float ratio = min(local_luminance / max(capture, 1e-6), REFLECTION_NORMALIZE_MAX);
+
+	return select(probe.vCaptureIrradiancePositive.w > 0.5, ratio, 1.0);
+}
 
 uint GetReflectionProbeCount(StructuredBuffer<ReflectionProbe> probes)
 {
@@ -460,6 +464,29 @@ float ReflectionProbeWeight(float3 pos_bs, ReflectionProbe probe)
 	return saturate(min(edge.x, min(edge.y, edge.z)));
 }
 
+/// ReflectionProbeNormalization() blended over the probes the way SampleReflectionProbes() blends their cubemaps, 1 where
+/// no probe covers the position. Debug view only.
+float ReflectionProbeNormalizationBlend(float3 pos_ws, float3 n, float local_luminance,
+									   StructuredBuffer<ReflectionProbe> probes)
+{
+	const uint probe_count = (uint)probes[0].vPositionAndCount.w;
+
+	float normalization = 0.0;
+	float remaining = 1.0;
+
+	for (uint i = 0; i < probe_count; i++) {
+		const ReflectionProbe probe = probes[i];
+
+		const float3 pos_bs = mul(float4(pos_ws, 1.0), probe.mWorldToBox).xyz;
+		const float weight = ReflectionProbeWeight(pos_bs, probe);
+
+		normalization += ReflectionProbeNormalization(probe, n, local_luminance) * (weight * remaining);
+		remaining *= 1.0 - weight;
+	}
+
+	return normalization + remaining;
+}
+
 float3 ReflectionProbeCoverage(float3 pos_ws, StructuredBuffer<ReflectionProbe> probes)
 {
 	const uint probe_count = (uint)probes[0].vFade.w;
@@ -482,9 +509,11 @@ float3 ReflectionProbeCoverage(float3 pos_ws, StructuredBuffer<ReflectionProbe> 
 	return color + (float3(0.03, 0.03, 0.03) * remaining);
 }
 
+/// `n` and `local_luminance` are the normal and irradiance luminance the probes are normalized to. With
+/// `apply_normalization` off the cubemaps are used as captured.
 float3 SampleReflectionProbes(float3 pos_ws, float3 r, float roughness, float3 fallback, uint probe_count,
 							  StructuredBuffer<ReflectionProbe> probes, TextureCubeArray cubemaps,
-							  SamplerState cubemap_sampler)
+							  SamplerState cubemap_sampler, float3 n, float local_luminance, bool apply_normalization)
 {
 	const float lod = roughness * REFLECTION_PROBE_MAX_LOD;
 
@@ -504,7 +533,11 @@ float3 SampleReflectionProbes(float3 pos_ws, float3 r, float roughness, float3 f
 		const float3 dir_bs = mul(float4(r, 0.0), probe.mWorldToBox).xyz;
 		const float3 dir = ReflectionBoxProject(pos_ws, r, pos_bs, dir_bs, probe.vPositionAndCount.xyz);
 
-		radiance += cubemaps.SampleLevel(cubemap_sampler, float4(dir, float(i)), lod).rgb * (weight * remaining);
+		const float normalization =
+			select(apply_normalization, ReflectionProbeNormalization(probe, n, local_luminance), 1.0);
+
+		radiance += cubemaps.SampleLevel(cubemap_sampler, float4(dir, float(i)), lod).rgb *
+					(weight * remaining * normalization);
 		remaining *= 1.0 - weight;
 
 		if (remaining < 0.01) {

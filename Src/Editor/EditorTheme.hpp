@@ -132,6 +132,8 @@ public:
 	ViewportColors Viewport;
 };
 
+using EditorThemeArray = DynArray<EditorTheme, GrowthFunctions::Double>;
+
 class EditorThemeLibrary
 {
 public:
@@ -139,7 +141,7 @@ public:
 
 	void Load();
 
-	const DynArray<EditorTheme>& GetThemes() const { return mThemes; }
+	const EditorThemeArray& GetThemes() const { return mThemes; }
 	uint32 GetActiveIndex() const { return mActiveIndex; }
 	const EditorTheme& GetActive() const;
 
@@ -147,7 +149,7 @@ public:
 	bool ReloadActive();
 
 private:
-	DynArray<EditorTheme> mThemes;
+	EditorThemeArray mThemes;
 	uint32 mActiveIndex = 0;
 };
 

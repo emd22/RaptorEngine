@@ -25,7 +25,10 @@ class TextRenderer
 {
 public:
 	/// Max glyphs on screen at once
-	static constexpr uint32 scMaxGlyphs = 400;
+	static constexpr uint32 scMaxGlyphs = 4096;
+
+	/// Max glyphs in one DrawText call, which builds them on the stack
+	static constexpr uint32 scMaxGlyphsPerDraw = 256;
 
 	static constexpr uint32 scGlyphWidth = 6;
 	static constexpr uint32 scGlyphHeight = 12;

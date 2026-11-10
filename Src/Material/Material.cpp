@@ -245,6 +245,10 @@ ePipelineFeatures Material::GetPipelineFeatures() const
 		features |= ePipelineFeatures::Unlit;
 	}
 
+	if (IsWater()) {
+		features |= ePipelineFeatures::Water;
+	}
+
 	return features;
 }
 
@@ -313,6 +317,35 @@ void Material::SetGlass(bool value)
 	else {
 		ClearFlag(Properties.Flags, eMaterialFlags::Glass);
 	}
+	mbRequiresSync = true;
+}
+
+void Material::SetWater(bool value)
+{
+	if (value) {
+		SetFlag(Properties.Flags, eMaterialFlags::Water);
+	}
+	else {
+		ClearFlag(Properties.Flags, eMaterialFlags::Water);
+	}
+	mbRequiresSync = true;
+}
+
+void Material::SetNormalStrength(float32 strength)
+{
+	Properties.NormalStrength = strength;
+	mbRequiresSync = true;
+}
+
+void Material::SetNormalScrollSpeed(float32 speed)
+{
+	Properties.NormalScrollSpeed = speed;
+	mbRequiresSync = true;
+}
+
+void Material::SetCausticStrength(float32 strength)
+{
+	Properties.CausticStrength = strength;
 	mbRequiresSync = true;
 }
 

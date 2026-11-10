@@ -53,6 +53,10 @@ struct PipelineKey
 	VkPolygonMode PolygonMode = VK_POLYGON_MODE_FILL;
 	VkCompareOp DepthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
 
+	/// PipelineProperties::DepthBiasConstant and DepthBiasSlope as bits, floats don't have unique object representations
+	uint32 DepthBiasConstantBits = 0;
+	uint32 DepthBiasSlopeBits = 0;
+
 	bool bIsCompute = false;
 	/// False for pipelines that don't process any vertices (fullscreen passes)
 	bool bHasVertexInput = true;

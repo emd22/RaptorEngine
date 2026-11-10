@@ -1,0 +1,47 @@
+/* Functions and interop for creating and managing lights from scripts. */
+
+
+enum RLightType : uint
+{
+	Unknown,
+	Directional,
+	Point,
+	Spot,
+}
+
+enum RLightFlags : uint
+{
+	None = 0,
+	Persistent = (1 << 0),
+	Dynamic = (1 << 1)
+}
+
+
+/* The raw light handle from Raptor. */
+handle RLightSpot;
+
+struct RLightID = uint;
+
+
+impl RLightSpot
+{
+	extern RLightSpot Create(cstring name, uint flags);
+
+	extern void SetFlags(RLightSpot light, uint flags);
+	extern RLightFlags GetFlags(RLightSpot light);
+
+	extern void SetRadius(RLightSpot light, float radius);
+	extern float GetRadius(RLightSpot light);
+
+	extern void SetPosition(RLightSpot light, const float3 position);
+	extern void SetRotationEuler(RLightSpot light, const float3 euler);
+
+	extern void SetConeAngles(RLightSpot light, float inner_rad, float outer_rad);
+
+	extern float GetInnerAngle(RLightSpot light);
+	extern float GetOuterAngle(RLightSpot light);
+
+	extern void SetDirection(RLightSpot light, float3 direction);
+
+	extern void Destroy(RLightSpot light);
+}

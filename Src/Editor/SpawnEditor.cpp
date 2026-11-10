@@ -15,12 +15,6 @@
 
 namespace fx::editor {
 
-static constexpr float32 scDirectionLength = 1.5f;
-static constexpr float32 scDirectionTipHalfExtent = 0.05f;
-
-static constexpr float32 scEditTolerance = 0.0005f;
-
-
 float32 SpawnEditor::GetBodyHeight() { return physics::PhysicsPlayer::scStandingHeight; }
 
 float32 SpawnEditor::GetEyeHeight() { return physics::PhysicsPlayer::scEyeHeight; }

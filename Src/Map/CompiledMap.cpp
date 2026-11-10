@@ -18,6 +18,8 @@ constexpr uint32 scMaxLightmapSize = 8192;
 
 /// Lightmaps, probe moments, fog shadow pages and acoustic probes are zlib streams from this version on
 constexpr uint32 scFirstDeflatedVersion = 14;
+/// Probe depth moments are octahedral maps from this version on, cube faces before it
+constexpr uint32 scFirstOctahedralProbeVersion = 16;
 constexpr int scDeflateLevel = 9;
 
 bool IsNameBefore(const String& a, const String& b) { return std::strcmp(a.CStr(), b.CStr()) < 0; }
@@ -368,6 +370,79 @@ void WriteCollisionMaterials(Writer& writer, const SizedArray<CompiledMapHull>& 
 	}
 }
 
+template <typename TType>
+void ReadSectionArray(Reader& reader, SizedArray<TType>& out_values)
+{
+	const uint32 count = reader.ReadCount();
+
+	if (reader.bFailed || count == 0) {
+		return;
+	}
+
+	out_values.InitSize(count);
+	reader.ReadSection(out_values.pData, count);
+}
+
+template <typename TType>
+void WriteSectionArray(Writer& writer, const SizedArray<TType>& values)
+{
+	writer.WriteCount(values.Size);
+
+	if (values.Size > 0) {
+		writer.WriteSection(values.pData, values.Size);
+	}
+}
+
+void ReadTransport(Reader& reader, CompiledMapTransport& out_transport, const CompiledMapLightmap& lightmap)
+{
+	out_transport.ClusterSize = reader.Read<uint32>();
+
+	ReadSectionArray(reader, out_transport.Charts);
+	ReadSectionArray(reader, out_transport.Clusters);
+	ReadSectionArray(reader, out_transport.Samples);
+	ReadSectionArray(reader, out_transport.Links);
+
+	if (reader.bFailed || out_transport.IsEmpty()) {
+		out_transport = CompiledMapTransport {};
+		return;
+	}
+
+	const uint64 cluster_count = out_transport.Clusters.Size;
+	bool valid = out_transport.ClusterSize > 0;
+
+	for (const CompiledMapTransportChart& chart : out_transport.Charts) {
+		const uint64 blocks = static_cast<uint64>(chart.Blocks[0]) * chart.Blocks[1];
+
+		valid = valid && chart.FirstCluster + blocks <= cluster_count &&
+				static_cast<uint64>(chart.Min[0]) + chart.Size[0] <= lightmap.Width &&
+				static_cast<uint64>(chart.Min[1]) + chart.Size[1] <= lightmap.Height;
+	}
+
+	for (const CompiledMapTransportCluster& cluster : out_transport.Clusters) {
+		valid = valid && static_cast<uint64>(cluster.FirstLink) + cluster.LinkCount <= out_transport.Links.Size &&
+				static_cast<uint64>(cluster.FirstSample) + cluster.SampleCount <= out_transport.Samples.Size;
+	}
+
+	for (const CompiledMapTransportLink& link : out_transport.Links) {
+		valid = valid && link.Source < cluster_count;
+	}
+
+	// Leave it out rather than failing the whole map, the bake still works without it
+	if (!valid) {
+		out_transport = CompiledMapTransport {};
+	}
+}
+
+void WriteTransport(Writer& writer, const CompiledMapTransport& transport)
+{
+	writer.Write(transport.ClusterSize);
+
+	WriteSectionArray(writer, transport.Charts);
+	WriteSectionArray(writer, transport.Clusters);
+	WriteSectionArray(writer, transport.Samples);
+	WriteSectionArray(writer, transport.Links);
+}
+
 void WriteFogShadow(Writer& writer, const CompiledMapFogShadow& shadow)
 {
 	writer.Write(shadow.Right, 3);
@@ -662,9 +737,11 @@ bool CompiledMap::Load(const String& path)
 	const uint32 probe_irradiance_count = reader.ReadCount();
 	const uint32 probe_moment_count = reader.ReadCount();
 	const uint64 baked_probe_count = Probes.GetProbeCount();
+	const bool has_cube_moments = (version < scFirstOctahedralProbeVersion);
 
 	if ((probe_irradiance_count != 0 && probe_irradiance_count != baked_probe_count * scProbeSHFloats) ||
-		(probe_moment_count != 0 && probe_moment_count != baked_probe_count * scProbeMomentValues)) {
+		(probe_moment_count != 0 && !has_cube_moments &&
+		 probe_moment_count != baked_probe_count * scProbeMomentValues)) {
 		reader.bFailed = true;
 	}
 	else {
@@ -672,6 +749,14 @@ bool CompiledMap::Load(const String& path)
 		ProbeMoments.InitSize(probe_moment_count);
 		reader.Read(ProbeIrradiance.pData, probe_irradiance_count);
 		reader.ReadSection(ProbeMoments.pData, probe_moment_count);
+
+		// Moments from before the octahedral layout can't be sampled, so the map loads without its baked probes
+		if (has_cube_moments && probe_moment_count != 0 && !reader.bFailed) {
+			LogWarning("'{}' has probes baked as cube maps, recompile it to bake octahedral probes", path.CStr());
+
+			ProbeIrradiance.Free();
+			ProbeMoments.Free();
+		}
 	}
 
 	Areas.InitSize(reader.ReadCount());
@@ -764,6 +849,10 @@ bool CompiledMap::Load(const String& path)
 	if (version >= 13 && !reader.bFailed) {
 		AcousticProbes.InitSize(reader.ReadCount());
 		reader.ReadSection(AcousticProbes.pData, AcousticProbes.Size);
+	}
+
+	if (version >= 15 && !reader.bFailed) {
+		ReadTransport(reader, Transport, Lightmap);
 	}
 
 	for (const CompiledMapSurface& surface : Surfaces) {
@@ -925,6 +1014,8 @@ bool CompiledMap::Save(const String& path) const
 
 	writer.WriteCount(AcousticProbes.Size);
 	writer.WriteSection(AcousticProbes.pData, AcousticProbes.Size);
+
+	WriteTransport(writer, Transport);
 
 	return (writer.bFailed == false);
 }

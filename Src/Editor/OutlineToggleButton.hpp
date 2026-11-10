@@ -15,9 +15,6 @@ namespace fx::editor {
 class OutlineToggleButton : public wxControl
 {
 public:
-	static constexpr int32 scPadding = 5;
-	static constexpr int32 scOutlineWidth = 2;
-
 	OutlineToggleButton(wxWindow* parent, const wxBitmap& icon, const wxString& label)
 		: wxControl(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE), mIcon(icon), mLabel(label)
 	{
@@ -72,6 +69,8 @@ public:
 protected:
 	wxSize DoGetBestSize() const override
 	{
+		constexpr int32 scPadding = 5;
+
 		wxSize content;
 
 		if (mIcon.IsOk()) {
@@ -97,6 +96,8 @@ protected:
 private:
 	void OnPaint(wxPaintEvent&)
 	{
+		constexpr int32 scOutlineWidth = 2;
+
 		wxAutoBufferedPaintDC buffered(this);
 		wxGCDC dc(buffered);
 
@@ -135,13 +136,24 @@ private:
 		}
 
 		if (mIcon.IsOk()) {
-			const wxBitmap icon = enabled ? mIcon : mIcon.ConvertToDisabled(50);
+			wxBitmap icon = mIcon;
+
+			if (!enabled) {
+				icon = mIcon.ConvertToDisabled(50);
+			}
+
 			dc.DrawBitmap(icon, (size.x - icon.GetWidth()) / 2, (size.y - icon.GetHeight()) / 2, true);
 		}
 		else {
 			const wxSize text = dc.GetTextExtent(mLabel);
 
-			dc.SetTextForeground(ToWxColour(enabled ? theme.Button.Text : theme.Button.DisabledText));
+			wxColour text_colour = ToWxColour(theme.Button.DisabledText);
+
+			if (enabled) {
+				text_colour = ToWxColour(theme.Button.Text);
+			}
+
+			dc.SetTextForeground(text_colour);
 			dc.DrawText(mLabel, (size.x - text.x) / 2, (size.y - text.y) / 2);
 		}
 	}
@@ -171,7 +183,13 @@ private:
 
 		wxCommandEvent event(wxEVT_TOGGLEBUTTON, GetId());
 		event.SetEventObject(this);
-		event.SetInt(mbValue ? 1 : 0);
+		int32 value = 0;
+
+		if (mbValue) {
+			value = 1;
+		}
+
+		event.SetInt(value);
 		ProcessWindowEvent(event);
 	}
 

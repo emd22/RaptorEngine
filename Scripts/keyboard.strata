@@ -1,4 +1,4 @@
-enum KEY : uint
+enum RKey : uint
 {
 	K_A = 4,
 	K_B = 5,
@@ -60,15 +60,15 @@ enum KEY : uint
     K_MOUSE_RIGHT = 111,
 };
 
-impl KEY
+impl RKey
 {
-	extern bool is_up(KEY key);
-	extern bool is_down(KEY key);
-	extern bool is_pressed(KEY key);
+	extern bool IsUp(RKey key);
+	extern bool IsDown(RKey key);
+	extern bool IsPressed(RKey key);
 
 	/* Is `key` pressed with LCTRL? */
-	bool is_lctrl_combo(KEY key)
+	bool HasCtrl(RKey key)
 	{
-		return (KEY.K_LCTRL.is_down() && key.is_pressed());
+		return (RKey.K_LCTRL.IsDown() && key.IsPressed());
 	}
 }

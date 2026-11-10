@@ -39,6 +39,9 @@ struct PipelineDesc
 	eCullMode CullMode = eCullMode::Back;
 	eFaceOrder FaceOrder = eFaceOrder::Default;
 	VkCompareOp DepthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
+	/// See PipelineProperties::DepthBiasConstant
+	float32 DepthBiasConstant = 0.0f;
+	float32 DepthBiasSlope = 0.0f;
 	bool bDepthTest = true;
 	bool bDepthWrite = true;
 	bool bRenderLines = false;

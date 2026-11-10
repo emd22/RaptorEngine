@@ -3,11 +3,10 @@
 #include <wx/frame.h>
 #include <wx/timer.h>
 
+#include <Core/DynArray.hpp>
+#include <Core/String.hpp>
 #include <Core/Types.hpp>
-
 #include <memory>
-#include <string>
-#include <vector>
 
 class wxButton;
 class wxListCtrl;
@@ -22,9 +21,11 @@ struct ClipRegion
 	float64 End = 0.0;
 };
 
+using ClipList = DynArray<ClipRegion, GrowthFunctions::Double>;
+
 struct ClipAudio
 {
-	std::vector<float32> Samples;
+	DynArray<float32, GrowthFunctions::Double> Samples;
 	uint32 Channels = 0;
 	uint32 SampleRate = 0;
 	uint64 FrameCount = 0;
@@ -43,8 +44,8 @@ public:
 	~ClipEditorWindow() override;
 
 	const ClipAudio& GetAudio() const { return mAudio; }
-	std::vector<ClipRegion>& GetClips() { return mClips; }
-	const std::vector<ClipRegion>& GetClips() const { return mClips; }
+	ClipList& GetClips() { return mClips; }
+	const ClipList& GetClips() const { return mClips; }
 	int32 GetSelected() const { return mSelected; }
 
 	void SetSelected(int32 index);
@@ -59,12 +60,12 @@ public:
 private:
 	void OpenSound();
 	void OpenConf();
-	bool LoadAudio(const std::string& path);
-	bool LoadConf(const std::string& path);
+	bool LoadAudio(const String& path);
+	bool LoadConf(const String& path);
 	bool ConfirmDiscard();
 
 	void Save(bool choose_path);
-	bool ResolveSoundFileKey(std::string& out_key);
+	bool ResolveSoundFileKey(String& out_key);
 
 	void AutoDetect();
 	void PlayRange(float64 start, float64 end);
@@ -96,12 +97,12 @@ private:
 	wxStaticText* mpStatus = nullptr;
 
 	ClipAudio mAudio;
-	std::vector<ClipRegion> mClips;
+	ClipList mClips;
 	int32 mSelected = -1;
 	int32 mLastRandom = -1;
 
-	std::string mAudioPath;
-	std::string mConfPath;
+	String mAudioPath;
+	String mConfPath;
 	bool mbConfHasMultipleFiles = false;
 	bool mbDirty = false;
 	bool mbUpdatingControls = false;

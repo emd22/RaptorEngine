@@ -20,6 +20,7 @@
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/TextRenderer.hpp>
+#include <Script/ScriptLayout.hpp>
 #include <Script/ScriptManager.hpp>
 #include <World.hpp>
 #include <algorithm>
@@ -324,26 +325,100 @@ bool WeaponSystem::LoadWeapon(const char* path, Weapon& weapon)
 	return true;
 }
 
+static bool ValidateScriptLayouts(const script::Script& script)
+{
+	static constexpr script::HostField scDefFields[] = {
+		FX_SCRIPT_FIELD(ScriptDef, Damage, "Damage"),
+		FX_SCRIPT_FIELD(ScriptDef, Range, "Range"),
+		FX_SCRIPT_FIELD(ScriptDef, RoundsPerMinute, "RPM"),
+		FX_SCRIPT_FIELD(ScriptDef, Pellets, "NumPellets"),
+		FX_SCRIPT_FIELD(ScriptDef, FireModeFlags, "FireModes"),
+		FX_SCRIPT_FIELD(ScriptDef, DefaultMode, "DefaultMode"),
+		FX_SCRIPT_FIELD(ScriptDef, BurstCount, "Burst.BurstCount"),
+		FX_SCRIPT_FIELD(ScriptDef, BurstRoundsPerMinute, "Burst.RPM"),
+		FX_SCRIPT_FIELD(ScriptDef, BurstCooldown, "Burst.Cooldown"),
+		FX_SCRIPT_FIELD(ScriptDef, HitForce, "HitForce"),
+		FX_SCRIPT_FIELD(ScriptDef, Decals, "Decals"),
+		FX_SCRIPT_FIELD(ScriptDef, SpreadHip, "Spread.Hip"),
+		FX_SCRIPT_FIELD(ScriptDef, SpreadMoving, "Spread.Moving"),
+		FX_SCRIPT_FIELD(ScriptDef, SpreadAir, "Spread.Air"),
+		FX_SCRIPT_FIELD(ScriptDef, SpreadPerShot, "Spread.PerShot"),
+		FX_SCRIPT_FIELD(ScriptDef, SpreadMax, "Spread.Max"),
+		FX_SCRIPT_FIELD(ScriptDef, SpreadRecovery, "Spread.Recovery"),
+		FX_SCRIPT_FIELD(ScriptDef, RecoilPitch, "Recoil.Pitch"),
+		FX_SCRIPT_FIELD(ScriptDef, RecoilPitchVariance, "Recoil.PitchVariance"),
+		FX_SCRIPT_FIELD(ScriptDef, RecoilYaw, "Recoil.Yaw"),
+		FX_SCRIPT_FIELD(ScriptDef, RecoilRamp, "Recoil.Ramp"),
+		FX_SCRIPT_FIELD(ScriptDef, RecoilRampMax, "Recoil.RampMax"),
+		FX_SCRIPT_FIELD(ScriptDef, RecoilRecovery, "Recoil.Recovery"),
+		FX_SCRIPT_FIELD(ScriptDef, RecoilResetTime, "Recoil.ResetTime"),
+		FX_SCRIPT_FIELD(ScriptDef, FalloffStart, "Falloff.Start"),
+		FX_SCRIPT_FIELD(ScriptDef, FalloffEnd, "Falloff.End"),
+		FX_SCRIPT_FIELD(ScriptDef, FalloffMin, "Falloff.Min"),
+		FX_SCRIPT_FIELD(ScriptDef, MagazineSize, "MagSize"),
+		FX_SCRIPT_FIELD(ScriptDef, ReserveMax, "ReserveMax"),
+		FX_SCRIPT_FIELD(ScriptDef, ReserveStart, "ReserveStart"),
+		FX_SCRIPT_FIELD(ScriptDef, ReloadTime, "ReloadTime"),
+		FX_SCRIPT_FIELD(ScriptDef, ReloadEmptyTime, "ReloadTimeFromEmpty"),
+		FX_SCRIPT_FIELD(ScriptDef, AutoReload, "AutoReload"),
+		FX_SCRIPT_FIELD(ScriptDef, RaiseTime, "RaiseTime"),
+		FX_SCRIPT_FIELD(ScriptDef, LowerTime, "LowerTime"),
+	};
+
+	static constexpr script::HostField scStateFields[] = {
+		FX_SCRIPT_FIELD(ScriptState, Phase, "Phase"),
+		FX_SCRIPT_FIELD(ScriptState, FireMode, "FireMode"),
+		FX_SCRIPT_FIELD(ScriptState, Magazine, "Magazine"),
+		FX_SCRIPT_FIELD(ScriptState, Reserve, "Reserve"),
+		FX_SCRIPT_FIELD(ScriptState, BurstRemaining, "BurstRemaining"),
+		FX_SCRIPT_FIELD(ScriptState, RecoilShots, "RecoilShots"),
+		FX_SCRIPT_FIELD(ScriptState, Timer, "Timer"),
+		FX_SCRIPT_FIELD(ScriptState, TimerTotal, "TimerTotal"),
+		FX_SCRIPT_FIELD(ScriptState, Cooldown, "Cooldown"),
+		FX_SCRIPT_FIELD(ScriptState, SinceShot, "SinceShot"),
+		FX_SCRIPT_FIELD(ScriptState, Bloom, "Bloom"),
+		FX_SCRIPT_FIELD(ScriptState, FireBuffer, "FireBuffer"),
+	};
+
+	static constexpr script::HostField scInputFields[] = {
+		FX_SCRIPT_FIELD(ScriptInput, InputFlags, "Flags"),
+		FX_SCRIPT_FIELD(ScriptInput, MoveAmount, "MoveAmount"),
+	};
+
+	bool matches = script::ValidateScriptStruct<ScriptDef>(script, "RWeaponDef", scDefFields);
+	matches &= script::ValidateScriptStruct<ScriptState>(script, "RWeapon", scStateFields);
+	matches &= script::ValidateScriptStruct<ScriptInput>(script, "RWeaponInput", scInputFields);
+
+	return matches;
+}
+
 void WeaponSystem::BindFunctions(Weapon& weapon)
 {
+	weapon.pFnInit = nullptr;
+	weapon.pFnEquip = nullptr;
+	weapon.pFnHolster = nullptr;
+	weapon.pFnUpdate = nullptr;
+
 	if (weapon.pScript == nullptr) {
-		weapon.pFnInit = nullptr;
-		weapon.pFnEquip = nullptr;
-		weapon.pFnHolster = nullptr;
-		weapon.pFnUpdate = nullptr;
 		return;
 	}
 
-	using Signature = void(const ScriptDef*, ScriptState*);
+	if (!weapon.pScript->HasErrors() && !ValidateScriptLayouts(*weapon.pScript)) {
+		LogError(LC_SCRIPT, "Weapon '{}' ({}) disabled: its script structs do not match the engine's", weapon.Name,
+				 weapon.ScriptPath);
+		return;
+	}
 
-	weapon.pFnInit = weapon.pScript->GetFunction<Signature>("weapon_init");
-	weapon.pFnEquip = weapon.pScript->GetFunction<Signature>("weapon_equip");
-	weapon.pFnHolster = weapon.pScript->GetFunction<Signature>("weapon_holster");
-	weapon.pFnUpdate = weapon.pScript->GetFunction<void(const ScriptDef*, ScriptState*, const ScriptInput*, float32)>(
-		"weapon_update");
+	using Signature = void(ScriptState*, const ScriptDef*);
+
+	weapon.pFnInit = weapon.pScript->GetFunction<Signature>("WeaponInit");
+	weapon.pFnEquip = weapon.pScript->GetFunction<Signature>("WeaponEquip");
+	weapon.pFnHolster = weapon.pScript->GetFunction<Signature>("WeaponHolster");
+	weapon.pFnUpdate = weapon.pScript->GetFunction<void(ScriptState*, const ScriptDef*, const ScriptInput*, float32)>(
+		"WeaponUpdate");
 
 	if (weapon.pFnUpdate == nullptr) {
-		LogError(LC_SCRIPT, "Weapon '{}' ({}) has no weapon_update function", weapon.Name, weapon.ScriptPath);
+		LogError(LC_SCRIPT, "Weapon '{}' ({}) has no WeaponUpdate function", weapon.Name, weapon.ScriptPath);
 	}
 }
 
@@ -395,8 +470,8 @@ void WeaponSystem::Create(Player* player)
 		BindFunctions(weapon);
 
 		if (weapon.pFnInit != nullptr) {
-			weapon.pScript->CallFunctionPtr<void(const ScriptDef*, ScriptState*)>(weapon.pFnInit, &weapon.Def,
-																				  &weapon.State);
+			weapon.pScript->CallFunctionPtr<void(ScriptState*, const ScriptDef*)>(weapon.pFnInit, &weapon.State,
+																				  &weapon.Def);
 		}
 
 		LogInfo(LC_SCRIPT, "Loaded weapon '{}' (slot {}, {}/{} rounds)", weapon.Name, weapon.Slot,
@@ -411,7 +486,7 @@ void WeaponSystem::Create(Player* player)
 	ApplyAnimations(first);
 
 	if (first.pFnEquip != nullptr) {
-		first.pScript->CallFunctionPtr<void(const ScriptDef*, ScriptState*)>(first.pFnEquip, &first.Def, &first.State);
+		first.pScript->CallFunctionPtr<void(ScriptState*, const ScriptDef*)>(first.pFnEquip, &first.State, &first.Def);
 	}
 }
 
@@ -451,8 +526,8 @@ void WeaponSystem::SelectWeapon(uint32 index)
 	Weapon& active = mWeapons[mActive];
 
 	if (active.pFnHolster != nullptr) {
-		active.pScript->CallFunctionPtr<void(const ScriptDef*, ScriptState*)>(active.pFnHolster, &active.Def,
-																			  &active.State);
+		active.pScript->CallFunctionPtr<void(ScriptState*, const ScriptDef*)>(active.pFnHolster, &active.State,
+																			  &active.Def);
 	}
 	else {
 		active.State.Phase = ePhase::Lowered;
@@ -482,7 +557,7 @@ void WeaponSystem::UpdateSwitching()
 	ApplyAnimations(next);
 
 	if (next.pFnEquip != nullptr) {
-		next.pScript->CallFunctionPtr<void(const ScriptDef*, ScriptState*)>(next.pFnEquip, &next.Def, &next.State);
+		next.pScript->CallFunctionPtr<void(ScriptState*, const ScriptDef*)>(next.pFnEquip, &next.State, &next.Def);
 	}
 	else {
 		next.State.Phase = ePhase::Ready;
@@ -551,8 +626,8 @@ void WeaponSystem::Update(float32 delta_time)
 
 		mScriptInput.MoveAmount = std::clamp(mpPlayer->GetHorizontalSpeed() / Player::scSprintSpeed, 0.0f, 1.0f);
 
-		weapon.pScript->CallFunctionPtr<void(const ScriptDef*, ScriptState*, const ScriptInput*, float32)>(
-			weapon.pFnUpdate, &weapon.Def, &weapon.State, &mScriptInput, delta_time);
+		weapon.pScript->CallFunctionPtr<void(ScriptState*, const ScriptDef*, const ScriptInput*, float32)>(
+			weapon.pFnUpdate, &weapon.State, &weapon.Def, &mScriptInput, delta_time);
 	}
 
 	UpdateSwitching();
@@ -611,14 +686,15 @@ void WeaponSystem::PlayReflections(const Weapon& weapon)
 
 	for (uint32 i = 0; i < scReflectionRays; i++) {
 		float32 elevation = 0.0f;
-		float32 angle = base_angle + (static_cast<float32>(i) * 2.0f * static_cast<float32>(M_PI)) / scReflectionRingRays;
+		float32 angle = base_angle +
+						(static_cast<float32>(i) * 2.0f * static_cast<float32>(M_PI)) / scReflectionRingRays;
 
 		if (i >= scReflectionRingRays) {
 			const uint32 up_index = i - scReflectionRingRays;
 
 			elevation = scReflectionUpAngle;
-			angle = base_angle + (static_cast<float32>(up_index) + 0.5f) * 2.0f * static_cast<float32>(M_PI) /
-									 scReflectionUpRays;
+			angle = base_angle +
+					(static_cast<float32>(up_index) + 0.5f) * 2.0f * static_cast<float32>(M_PI) / scReflectionUpRays;
 		}
 
 		const Vec3f direction(std::cos(angle) * std::cos(elevation), std::sin(elevation),

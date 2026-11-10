@@ -2,11 +2,12 @@
  * File:        Occluders.hpp
  * Author:      emd22
  * Created:     25/10/2026
- * Description: Bounding volume hierarchy over the brushes and patch triangles that cast sun shadows
+ * Description: Bounding volume hierarchy over the brushes, patch triangles and model triangles that cast sun shadows
  */
 
 #pragma once
 
+#include "Models.hpp"
 #include "Patches.hpp"
 
 #include <algorithm>
@@ -16,10 +17,8 @@
 namespace fx::mapc {
 
 constexpr double scParallelEpsilon = 1e-14;
-constexpr double scTriangleMinDistance = 1e-6;
 
 constexpr double scNoHit = std::numeric_limits<double>::infinity();
-constexpr uint32 scLeafSize = 4;
 constexpr uint32 scMaxStackDepth = 64;
 
 struct OccluderPlane
@@ -55,7 +54,8 @@ struct BvhNode
 class OccluderSet
 {
 public:
-	void Build(const PlaneSet& planes, const MapSource& source, const PatchBuilder* patches)
+	void Build(const PlaneSet& planes, const MapSource& source, const PatchBuilder* patches,
+			   const ModelBuilder* models)
 	{
 		for (const SourceBrush& brush : source.Brushes) {
 			if (!brush.bVisible || !brush.bCastsShadow) {
@@ -109,6 +109,35 @@ public:
 			}
 		}
 
+		if (models != nullptr) {
+			for (const ModelSurface& surface : models->Surfaces) {
+				for (size_t index = 0; index + 2 < surface.Indices.Size; index += 3) {
+					Occluder occluder;
+					occluder.FirstCorner = static_cast<int32>(mCorners.Size);
+
+					for (uint32 corner = 0; corner < 3; corner++) {
+						const ModelVertex& vertex = surface.Vertices[static_cast<size_t>(surface.Indices[index + corner])];
+						const Vec3d& point = vertex.Position;
+
+						mCorners.Emplace(point);
+						occluder.Facing = occluder.Facing + vertex.Normal;
+
+						if (corner == 0) {
+							occluder.Min = point;
+							occluder.Max = point;
+						}
+
+						occluder.Min = MinVec(occluder.Min, point);
+						occluder.Max = MaxVec(occluder.Max, point);
+					}
+
+					mOccluders.Emplace(occluder);
+					mTriangleCount++;
+					mModelTriangleCount++;
+				}
+			}
+		}
+
 		if (mOccluders.Size > 0) {
 			BuildNode(0, mOccluders.Size);
 		}
@@ -116,6 +145,7 @@ public:
 
 	uint32 GetCount() const { return mOccluders.Size - mTriangleCount; }
 	uint32 GetTriangleCount() const { return mTriangleCount; }
+	uint32 GetModelTriangleCount() const { return mModelTriangleCount; }
 
 	bool GetBounds(Vec3d& out_min, Vec3d& out_max) const
 	{
@@ -308,7 +338,11 @@ public:
 			return false;
 		}
 
-		const Vec3d reference = (std::abs(normal.Y) < 0.9) ? Vec3d(0.0, 1.0, 0.0) : Vec3d(1.0, 0.0, 0.0);
+		Vec3d reference = Vec3d(1.0, 0.0, 0.0);
+		if (std::abs(normal.Y) < 0.9) {
+			reference = Vec3d(0.0, 1.0, 0.0);
+		}
+
 		const Vec3d tangent = reference.Cross(normal).Normalized();
 		const Vec3d bitangent = normal.Cross(tangent);
 
@@ -380,6 +414,8 @@ private:
 
 	bool HitsTriangle(const Occluder& occluder, const Vec3d& origin, const Vec3d& direction, double& out_time) const
 	{
+		constexpr double scTriangleMinDistance = 1e-6;
+
 		const Vec3d& a = mCorners[static_cast<uint32>(occluder.FirstCorner)];
 		const Vec3d edge_ab = mCorners[static_cast<uint32>(occluder.FirstCorner) + 1] - a;
 		const Vec3d edge_ac = mCorners[static_cast<uint32>(occluder.FirstCorner) + 2] - a;
@@ -463,6 +499,8 @@ private:
 
 	int32 BuildNode(uint32 first, uint32 count)
 	{
+		constexpr uint32 scLeafSize = 4;
+
 		const int32 node_index = static_cast<int32>(mNodes.Size);
 		mNodes.Emplace();
 
@@ -524,6 +562,7 @@ private:
 	Array<Occluder> mOccluders;
 	Array<BvhNode> mNodes;
 	uint32 mTriangleCount = 0;
+	uint32 mModelTriangleCount = 0;
 };
 
 } // namespace fx::mapc

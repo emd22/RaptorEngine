@@ -41,6 +41,13 @@ void ImageBeginComputeRead(const CommandBuffer& cmd, Image* image);
 void ImageCopyToComputeHistory(const CommandBuffer& cmd, Image* source, Image* history);
 
 /**
+ * @brief Copies a colour or depth attachment that a render pass just finished with (left in the shader read layout)
+ * into `copy`, for fragment shaders to sample. Both are left in the shader read layout, so the source can be loaded
+ * as an attachment again.
+ */
+void ImageCopyAttachmentForSampling(const CommandBuffer& cmd, Image* source, Image* copy);
+
+/**
  * @brief Makes every earlier write in the command buffer visible to compute shader reads.
  */
 void ComputeReadAfterAll(const CommandBuffer& cmd);

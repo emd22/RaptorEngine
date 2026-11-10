@@ -92,6 +92,14 @@ FX_FORCE_INLINE FLOAT4 Mul(FLOAT4 a, FLOAT4 b) { return vmulq_f32(a, b); }
 FX_FORCE_INLINE FLOAT4 Div(FLOAT4 a, FLOAT4 b) { return vdivq_f32(a, b); }
 FX_FORCE_INLINE FLOAT4 Abs(FLOAT4 value) { return vabsq_f32(value); }
 
+FX_FORCE_INLINE float HAdd(FLOAT4 a) { return vaddvq_f32(a); }
+
+/**
+ * @brief Zeros the W component of a vector, ensuring that it behaves as a Vec3. This is a must when it comes to
+ * unsanitized vectors with horizontal adds or dot prods!
+ */
+FX_FORCE_INLINE FLOAT4 AsFloat3(FLOAT4 a) { return vsetq_lane_f32(0.0f, a, 3); }
+
 FX_FORCE_INLINE UINT4 CompareLess(FLOAT4 a, FLOAT4 b) { return vcltq_f32(a, b); }
 FX_FORCE_INLINE UINT4 CompareLessEqual(FLOAT4 a, FLOAT4 b) { return vcleq_f32(a, b); }
 FX_FORCE_INLINE UINT4 And(UINT4 a, UINT4 b) { return vandq_u32(a, b); }
@@ -169,6 +177,7 @@ FX_FORCE_INLINE double Dot(DOUBLE4 a, DOUBLE4 b)
 	// Return the first lane (result of both of em)
 	return vgetq_lane_f64(result, 0);
 }
+
 
 ////////////////////////////////
 // Permute/Reorder Functions
@@ -463,6 +472,27 @@ FX_FORCE_INLINE FLOAT4 Mul(FLOAT4 a, FLOAT4 b) { return _mm_mul_ps(a, b); }
 FX_FORCE_INLINE FLOAT4 Div(FLOAT4 a, FLOAT4 b) { return _mm_div_ps(a, b); }
 FX_FORCE_INLINE FLOAT4 Abs(FLOAT4 value) { return _mm_and_ps(value, _mm_castsi128_ps(_mm_set1_epi32(0x7FFFFFFF))); }
 
+/**
+ * @brief Zeros the W component of a vector, ensuring that it behaves as a Vec3. This is a must when it comes to
+ * unsanitized vectors with horizontal adds or dot prods!
+ */
+FX_FORCE_INLINE FLOAT4 AsFloat3(FLOAT4 a) { return _mm_blend_ps(a, _mm_setzero_ps(), 0b1000); }
+
+FX_FORCE_INLINE float HAdd(FLOAT4 a)
+{
+	// The logical option would be to use _mm_hadd_ps, but I think that is still slow across a lot of
+	// microarchitectures. Theres also apparently significant latency with that approach, so this gives us the same
+	// results but with less potential issues.
+
+	// Add high half to lower half
+	__m128 v64 = _mm_add_ps(a, _mm_movehl_ps(a, a));
+	// Shuffle and add the remaining two elements
+	__m128 v32 = _mm_add_ss(v64, _mm_shuffle_ps(v64, v64, 0x55));
+
+	// Return final result (from the first lane)
+	return _mm_cvtss_f32(v32);
+}
+
 FX_FORCE_INLINE UINT4 CompareLess(FLOAT4 a, FLOAT4 b) { return _mm_castps_si128(_mm_cmplt_ps(a, b)); }
 FX_FORCE_INLINE UINT4 CompareLessEqual(FLOAT4 a, FLOAT4 b) { return _mm_castps_si128(_mm_cmple_ps(a, b)); }
 FX_FORCE_INLINE UINT4 And(UINT4 a, UINT4 b) { return _mm_and_si128(a, b); }
@@ -564,7 +594,8 @@ FX_FORCE_INLINE FLOAT4 Permute4(FLOAT4 a, FLOAT4 b)
 	else if constexpr (C_SinglePermuteForB<TComp1, TComp2, TComp3, TComp4>) {
 		return Permute4<
 			static_cast<eShuffleComponent>(TComp1 - Shuffle_BX), static_cast<eShuffleComponent>(TComp2 - Shuffle_BX),
-			static_cast<eShuffleComponent>(TComp3 - Shuffle_BX), static_cast<eShuffleComponent>(TComp4 - Shuffle_BX)>(b);
+			static_cast<eShuffleComponent>(TComp3 - Shuffle_BX), static_cast<eShuffleComponent>(TComp4 - Shuffle_BX)>(
+			b);
 	}
 	else if constexpr (TComp1 < Shuffle_BX && TComp2 < Shuffle_BX && TComp3 >= Shuffle_BX && TComp4 >= Shuffle_BX) {
 		constexpr uint8 shuffle = _MM_SHUFFLE(TComp4 & 0x03, TComp3 & 0x03, TComp2, TComp1);

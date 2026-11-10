@@ -45,7 +45,19 @@ constexpr const char* scReflectionDebugViews[] = {
 	"Off",
 	"Mirror Reflections",
 	"Probe Coverage",
+	"Normalization",
 };
+
+int32 BoolToInt(const bool value)
+{
+	int32 result = 0;
+
+	if (value) {
+		result = 1;
+	}
+
+	return result;
+}
 
 } // namespace
 
@@ -66,12 +78,8 @@ WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, w
 	mpPositionField = new Vector3Field(world_body, "Player", Vec2f(-100000.0f, 100000.0f));
 	world_section->AddRow(*mpPositionField);
 
-	mpPositionField->SetOnChange(
-		[this](const Vec3f value)
-		{
-			mShownPosition = value;
-			thread::PostToGame([value] { gWorld->Player.TeleportTo(value); });
-		});
+	mpPositionField->SetOnChange([](const Vec3f value)
+								 { thread::PostToGame([value] { gWorld->Player.TeleportTo(value); }); });
 
 	mpDebugLayerChoice = new wxChoice(world_body, wxID_ANY);
 
@@ -310,7 +318,7 @@ void WorldPropertiesPanel::BuildReflectionSection(wxSizer* sizer)
 	mpReflectionEnabledCheck->Bind(wxEVT_CHECKBOX,
 								   [this](wxCommandEvent&)
 								   {
-									   thread::PostToGame([value = mpReflectionEnabledCheck->GetValue() ? 1 : 0]
+									   thread::PostToGame([value = BoolToInt(mpReflectionEnabledCheck->GetValue())]
 														  { gCVars->Set("r_reflection_probes", value); });
 								   });
 
@@ -321,7 +329,7 @@ void WorldPropertiesPanel::BuildReflectionSection(wxSizer* sizer)
 									[this](wxCommandEvent&)
 									{
 										thread::PostToGame(
-											[value = mpReflectionFallbackCheck->GetValue() ? 1 : 0]
+											[value = BoolToInt(mpReflectionFallbackCheck->GetValue())]
 											{
 												gCVars->Set("r_reflection_level_probe", value);
 												gProbeManager->RebuildReflectionProbesFromWorld();
@@ -334,7 +342,7 @@ void WorldPropertiesPanel::BuildReflectionSection(wxSizer* sizer)
 	mpShowProbeVolumesCheck->Bind(wxEVT_CHECKBOX,
 								  [this](wxCommandEvent&)
 								  {
-									  thread::PostToGame([value = mpShowProbeVolumesCheck->GetValue() ? 1 : 0]
+									  thread::PostToGame([value = BoolToInt(mpShowProbeVolumesCheck->GetValue())]
 														 { gCVars->Set("r_show_volumes", value); });
 								  });
 
@@ -412,11 +420,6 @@ void WorldPropertiesPanel::ApplyReflectionState(const WorldPanelState& state)
 
 void WorldPropertiesPanel::ApplyState(const WorldPanelState& state)
 {
-	if (!mbShowingAnything) {
-		mbShowingAnything = true;
-		mpPositionField->SetEnabled(true);
-	}
-
 	if (state.DebugMask != mShownDebugMask) {
 		mShownDebugMask = state.DebugMask;
 

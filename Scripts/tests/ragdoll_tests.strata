@@ -1,21 +1,12 @@
-/*
- * File:        ragdoll_tests.strata
- * Description: Ragdoll tests for RaptorData/Data/blockouts/ragdoll_tests.prx. Attached to the map's test_runner volume
- *              and runs on a loop while the game is simulating. Press J to skip to the next round.
- *
- *              Falls are in front of the spawn point. Seven NPCs stand at the edges of ledges (shortest on the left), and
- *              a floating orange block pushes each one off, so the push is a real physics contact.
- *
- *              Tosses are behind the spawn point. Seven NPCs stand in a row (slowest on the left) and a box flies at
- *              each one, launched from further away the faster it is so that every flight takes the same time.
- *
- *              Results go to stdout. A test fails if nothing happened to the NPC, if it fell through the floor or if its
- *              ragdoll blew up. How hurt the NPC got is printed but not judged.
- */
+
 
 import ../interop;
-import ../common;
 import ../keyboard;
+
+import std/math;
+
+import ../math;
+
 
 const int BAY_COUNT = 7;
 const float BAY_SPACING = 5.0f;
@@ -287,7 +278,7 @@ void track_npcs()
 
 		const float3 velocity = npc_velocity(npcs[bay]);
 
-		peak_speed[bay] = fmax(peak_speed[bay], float_sqrt(dot(velocity, velocity)));
+		peak_speed[bay] = max<float>(peak_speed[bay], sqrtf(dot(velocity, velocity)));
 
 		const int state = (int)npc_state(npcs[bay]);
 
@@ -308,7 +299,7 @@ float knock_speed(int bay)
 float expected_speed(int bay)
 {
 	if (is_fall_round()) {
-		return float_sqrt(2.0f * GRAVITY * (FALL_HEIGHTS[bay] + 1.0f)) + RAM_SPEED;
+		return sqrtf(2.0f * GRAVITY * (FALL_HEIGHTS[bay] + 1.0f)) + RAM_SPEED;
 	}
 
 	return TOSS_SPEEDS[bay];
@@ -329,7 +320,7 @@ void report_bay(int bay)
 
 	const float dx = position.x - start_x[bay];
 	const float dz = position.z - start_z[bay];
-	const float moved = float_sqrt(dx * dx + dz * dz);
+	const float moved = sqrtf(dx * dx + dz * dz);
 
 	const int final_state = (int)npc_state(npcs[bay]);
 
@@ -444,7 +435,7 @@ void object_update(OBJECT self, float delta_time)
 		return;
 	}
 
-	if (KEY.K_J.is_pressed()) {
+	if (RKey.K_J.IsPressed()) {
 		printf("[ragdoll_test] Skipped\n");
 		destroy_round();
 		next_round();

@@ -10,6 +10,7 @@
 #include <Object/ObjectManager.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
+#include <Renderer/LightManager.hpp>
 #include <World.hpp>
 
 namespace fx {
@@ -34,7 +35,16 @@ void Player::Create()
 	mNoClipController.Speed = scWalkSpeed * 1.75f;
 	mNoClipController.SprintSpeed = scSprintSpeed * 2.0f;
 
+	mSwimController.Speed = scWalkSpeed * 0.5f;
+	mSwimController.SprintSpeed = scSprintSpeed * 0.5f;
+
 	Weapons.Create(this);
+
+	pFlashlight = gLightManager->NewLight<LightSpot>("Flashlight");
+	pFlashlight->Flags |= (LF_Persistent | LF_Dynamic);
+	pFlashlight->SetRadius(15.0f);
+	pFlashlight->SetConeAngles(MathUtil::DegToRad(5.0f), MathUtil::DegToRad(40.0f));
+
 
 	if (mActiveViewModel < 0) {
 		SetViewModel(scDefaultViewModel);
@@ -160,6 +170,9 @@ void Player::ResetMotion()
 {
 	mWalkController.Reset();
 	mNoClipController.Reset();
+	mSwimController.Reset();
+
+
 	mHorizontalSpeed = 0.0f;
 
 	mLandingOffset = 0.0f;
@@ -238,6 +251,7 @@ void Player::Move(float64 delta_time, const Vec3f offset)
 {
 	BaseController& controller = GetController();
 	controller.SpeedMultiplier = SpeedMultiplier;
+	Physics.SetGravityMultiplier(controller.GetGravityMultiplier());
 
 	const Vec3f velocity = controller.Update(delta_time, offset, *pCamera, bIsSprinting);
 
@@ -618,8 +632,7 @@ void Player::PlayGroundSound(const char* event, float32 volume)
 	ground.Body = character.GetGroundBodyID();
 	ground.SubShape = character.GetGroundSubShapeID();
 
-	const Vec3f position = ground.Point + (ground.Normal * AudioSystem::scSurfaceSoundOffset);
-	const SoundID sound = gAudio->PlayForSurface(event, gWorld->pPrototype->GetSurfaceAt(ground), position);
+	const SoundID sound = gAudio->PlayForSurface2D(event, gWorld->pPrototype->GetSurfaceAt(ground));
 	gAudio->SetVolume(sound, volume);
 }
 
@@ -702,6 +715,7 @@ void Player::Update(float64 delta_time)
 
 	pCamera->SetPosition(Position + mCameraOffset + Vec3f(0.0f, mLandingOffset, 0.0f));
 
+
 	const bool user_force_released = GetController().GetVelocity().IsNearZero(0.1);
 
 	// const bool should_reset_center = ((user_force_released || Physics.bIsGrounded) &&
@@ -737,6 +751,9 @@ void Player::Update(float64 delta_time)
 	UpdateFov(static_cast<float32>(delta_time), user_force_released);
 
 	pCamera->Update();
+
+	pFlashlight->SetPosition(pCamera->GetPosition() + (pCamera->GetForwardVector() * 0.5f) - Vec3f(0.0f, 0.2f, 0.0f));
+	pFlashlight->SetRotation(pCamera->GetRotation());
 
 	Weapons.Update(static_cast<float32>(delta_time));
 

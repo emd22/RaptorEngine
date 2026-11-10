@@ -6,6 +6,7 @@
 
 #include <Asset/AssetTicket.hpp>
 #include <Asset/ConfigFile.hpp>
+#include <Audio/AudioDebugView.hpp>
 #include <Controller/NoClipController.hpp>
 #include <Object/Object.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
@@ -144,7 +145,10 @@ private:
 	double mFpsWindowTime = 0.0;
 	uint64 mFpsWindowStartFrame = 0;
 
+
 	CVarValue* mpShowFpsCVar = nullptr;
+
+	AudioDebugView mAudioDebug;
 
 	String mBaseWindowTitle;
 	String mTitleBlockoutPath;
@@ -156,6 +160,7 @@ private:
 	CVarValue* mpShowGpuCVar = nullptr;
 	CVarValue* mpProbesCVar = nullptr;
 	CVarValue* mpReflectionProbesCVar = nullptr;
+	CVarValue* mpReflectionNormalizeCVar = nullptr;
 	CVarValue* mpReflectionDebugCVar = nullptr;
 	CVarValue* mpDecalsCVar = nullptr;
 	CVarValue* mpDebugBoundsCVar = nullptr;

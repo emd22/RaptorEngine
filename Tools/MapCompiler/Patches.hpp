@@ -36,6 +36,12 @@ struct PatchSurface
 	Array<int32> Indices;
 };
 
+struct PatchEdge
+{
+	int32 From = 0;
+	int32 To = 0;
+};
+
 struct PatchStats
 {
 	uint32 PatchCount = 0;
@@ -55,7 +61,7 @@ public:
 
 	void WriteCollision(double chunk_size, CompiledMap& out_map);
 
-	static void FindBoundaryEdges(const PatchSurface& surface, Array<std::pair<int32, int32>>& out_edges);
+	static void FindBoundaryEdges(const PatchSurface& surface, Array<PatchEdge>& out_edges);
 
 public:
 	Array<PatchSurface> Surfaces;

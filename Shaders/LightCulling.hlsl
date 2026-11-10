@@ -16,6 +16,10 @@ F_StructBuffer(bDecals, Decal, 5, 0);
 
 F_RWStructBuffer(bDecalMasks, uint, 6, 0);
 
+PERMIF(USE_DEPTH_BOUNDS);
+F_Texture2D(tDepth, 2, 0);
+PERMEND();
+
 struct CSConsts
 {
 	float4x4 mViewProjection;
@@ -28,6 +32,10 @@ struct CSConsts
 	uint uiReplacementSlot;
 
 	uint uiDecalCount;
+
+	/// Turn stored depth back into view depth, see LinearViewDepth()
+	float fDepthA;
+	float fDepthB;
 };
 
 F_FrameData(CSConsts, CSConst, 1);
@@ -35,15 +43,37 @@ F_FrameData(CSConsts, CSConst, 1);
 #define NUM_THREADS (LIGHT_TILE_SIZE * LIGHT_TILE_SIZE)
 #define LIGHT_MASK_WORDS ((LIGHT_COUNT + 31) / 32)
 
+// Same as the fog's FROXEL_NO_SURFACE, sky and viewmodel pixels leave the tile unbounded
+#define TILE_NO_SURFACE 60000.0
+#define VIEWMODEL_MIN_RAW_DEPTH 0.99
+
+PERMIF(USE_DEPTH_BOUNDS);
+#define TILE_PLANE_COUNT 6
+PERMELSE();
 #define TILE_PLANE_COUNT 5
+PERMEND();
 
 groupshared uint sDirectionalMask[LIGHT_MASK_WORDS];
 groupshared uint sLocalMask[LIGHT_MASK_WORDS];
 groupshared uint sTileDecalMask[DECAL_MASK_WORDS];
 
+PERMIF(USE_DEPTH_BOUNDS);
+/// Farthest view depth in the tile as float bits, which order the same as uints for positive floats
+groupshared uint sTileFarDepth;
+
+float SurfaceViewDepth(float raw_depth)
+{
+	const float view_depth = CSConst.fDepthB / max(raw_depth - CSConst.fDepthA, 1e-12);
+	const bool has_surface = and(raw_depth > 0.0, raw_depth < VIEWMODEL_MIN_RAW_DEPTH);
+
+	return select(has_surface, min(view_depth, TILE_NO_SURFACE), TILE_NO_SURFACE);
+}
+PERMEND();
+
 // World space planes bounding the part of the view a tile covers, normalized and facing inwards (Gribb & Hartmann).
-// `tile_min` and `tile_max` are in screen pixels.
-void GetTilePlanes(float2 tile_min, float2 tile_max, out float4 planes[TILE_PLANE_COUNT])
+// `tile_min` and `tile_max` are in screen pixels. With depth bounds the tile also ends at `far_depth`, only a far plane
+// since transparent surfaces aren't in the prepass.
+void GetTilePlanes(float2 tile_min, float2 tile_max, float far_depth, out float4 planes[TILE_PLANE_COUNT])
 {
 	// clip = mul(float4(p, 1), VP), so each clip component is a dot product with one column of VP
 	const float4x4 vp_columns = transpose(CSConst.mViewProjection);
@@ -59,6 +89,11 @@ void GetTilePlanes(float2 tile_min, float2 tile_max, out float4 planes[TILE_PLAN
 
 	// w >= 0, in front of the eye
 	planes[4] = vp_columns[3];
+
+PERMIF(USE_DEPTH_BOUNDS);
+	// w <= far_depth, w being the view depth
+	planes[5] = float4(-vp_columns[3].xyz, far_depth - vp_columns[3].w);
+PERMEND();
 
 	[unroll]
 	for (uint plane = 0; plane < TILE_PLANE_COUNT; plane++) {
@@ -119,14 +154,32 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_GroupThreadID)
 		sTileDecalMask[clear_word] = 0;
 	}
 
+PERMIF(USE_DEPTH_BOUNDS);
+	if (local_index == 0) {
+		sTileFarDepth = 0;
+	}
+PERMEND();
+
 	GroupMemoryBarrierWithGroupSync();
 
 	// Tile bounds in screen pixels
 	const uint2 tile_min = group_id.xy * LIGHT_TILE_SIZE;
 	const uint2 tile_max = min(tile_min + LIGHT_TILE_SIZE, uint2(CSConst.vScreenSize));
 
+PERMIF(USE_DEPTH_BOUNDS);
+	// One pixel per thread, threads past the edge of the screen repeat the last one
+	const uint2 depth_pixel = min(tile_min + thread_id.xy, tile_max - 1);
+	InterlockedMax(sTileFarDepth, asuint(SurfaceViewDepth(F_SampleLoad(tDepth, int3(depth_pixel, 0)).r)));
+
+	GroupMemoryBarrierWithGroupSync();
+
+	const float far_depth = asfloat(sTileFarDepth);
+PERMELSE();
+	const float far_depth = TILE_NO_SURFACE;
+PERMEND();
+
 	float4 tile_planes[TILE_PLANE_COUNT];
-	GetTilePlanes(float2(tile_min), float2(tile_max), tile_planes);
+	GetTilePlanes(float2(tile_min), float2(tile_max), far_depth, tile_planes);
 
 	for (uint cull_index = local_index; cull_index < CSConst.uiLightCount; cull_index += NUM_THREADS) {
 		const uint light_index = select(cull_index == CSConst.uiReplacedLight, CSConst.uiReplacementSlot, cull_index);

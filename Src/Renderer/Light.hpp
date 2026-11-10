@@ -25,6 +25,13 @@ struct LightGpuData;
 enum eLightFlags : uint16
 {
 	LF_None = 0x0000,
+
+	/// The light is omitted from bakes and is not cleared when changing levels. This is used for lights like player
+	/// flashlights.
+	LF_Persistent = (1 << 0),
+
+	/// A light that will be moving and invalidated frequently. Does not contribute to volumetric lighting.
+	LF_Dynamic = (1 << 1),
 };
 
 enum class eLightType
@@ -51,12 +58,16 @@ public:
 	void SetPosition(const Vec3f position) override;
 	void SetRotation(const Quat rotation) override;
 
+	FX_FORCE_INLINE void SetFlags(const eLightFlags flags) { Flags = flags; }
+	FX_FORCE_INLINE eLightFlags GetFlags() const { return Flags; }
+
 	virtual BBox GetBounds() const;
 
 	virtual bool IsOutsideFrustum(const Frustum& frustum) const;
 
 	FX_FORCE_INLINE float32 GetRadius() const { return mRadius; }
 	FX_FORCE_INLINE bool IsCullable() const { return Type != eLightType::Directional; }
+	FX_FORCE_INLINE bool IsPersistent() const { return (Flags & LF_Persistent) != 0; }
 
 	virtual void Render(const PerspectiveCamera& camera, BaseCamera* shadow_camera);
 
@@ -147,6 +158,8 @@ public:
 
 	FX_FORCE_INLINE float32 GetInnerAngle() const { return mInnerAngle; }
 	FX_FORCE_INLINE float32 GetOuterAngle() const { return mOuterAngle; }
+
+	FX_FORCE_INLINE bool CanContributeToFog() const { return (!HasFlag(Flags, LF_Dynamic) && bCastShadows); }
 
 	void SetDirection(const Vec3f direction);
 

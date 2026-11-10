@@ -137,8 +137,8 @@ struct ScriptInput
 static_assert(sizeof(ScriptDef) == 35 * 4);
 static_assert(sizeof(ScriptState) == 12 * 4);
 
-using FnInit = script::ScriptFunctionType<void(const ScriptDef*, ScriptState*)>;
-using FnUpdate = script::ScriptFunctionType<void(const ScriptDef*, ScriptState*, const ScriptInput*, float32)>;
+using FnInit = script::ScriptFunctionType<void(ScriptState*, const ScriptDef*)>;
+using FnUpdate = script::ScriptFunctionType<void(ScriptState*, const ScriptDef*, const ScriptInput*, float32)>;
 
 struct Weapon
 {

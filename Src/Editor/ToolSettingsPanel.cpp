@@ -7,13 +7,11 @@
 #include <wx/choice.h>
 #include <wx/clrpicker.h>
 #include <wx/sizer.h>
-#include <wx/spinctrl.h>
 #include <wx/stattext.h>
 
 #include <Audio/SoundEmitters.hpp>
 #include <Engine.hpp>
 #include <Renderer/Light.hpp>
-
 #include <functional>
 
 namespace fx::editor {
@@ -21,6 +19,18 @@ namespace fx::editor {
 /////////////////////////////////////
 // Light Tool
 /////////////////////////////////////
+
+static void EditSelectedLight(std::function<void(LightSpot&)> edit)
+{
+	thread::PostToGame(
+		[edit = std::move(edit)]
+		{
+			if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
+				edit(*light);
+				gEditor->MarkModified();
+			}
+		});
+}
 
 void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 {
@@ -41,72 +51,32 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 
 	{
 		mpPositionField = new Vector3Field(body, "Position", Vec2f(-100000.0f, 100000.0f));
-		mpPositionField->SetOnChange(
-			[](const Vec3f value)
-			{
-				thread::PostToGame(
-					[value]
-					{
-						if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
-							light->SetPosition(value);
-							gEditor->MarkModified();
-						}
-					});
-			});
+		mpPositionField->SetOnChange([](const Vec3f value)
+									 { EditSelectedLight([value](LightSpot& light) { light.SetPosition(value); }); });
 
 		section->AddRow(*mpPositionField);
 	}
 
 	{
 		mpRadiusField = new FloatField(body, "Radius", Vec2f(3.0f, 150.0f));
-		mpRadiusField->SetOnChange(
-			[](const float value)
-			{
-				thread::PostToGame(
-					[value]
-					{
-						if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
-							light->SetRadius(value);
-							gEditor->MarkModified();
-						}
-					});
-			});
+		mpRadiusField->SetOnChange([](const float value)
+								   { EditSelectedLight([value](LightSpot& light) { light.SetRadius(value); }); });
 
 		section->AddRow(*mpRadiusField);
 	}
 
 	{
 		mpIntensityField = new FloatField(body, "Intensity (cd)", Vec2f(0.0f, 100000000.0f));
-		mpIntensityField->SetOnChange(
-			[](const float value)
-			{
-				thread::PostToGame(
-					[value]
-					{
-						if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
-							light->Intensity = value;
-							gEditor->MarkModified();
-						}
-					});
-			});
+		mpIntensityField->SetOnChange([](const float value)
+									  { EditSelectedLight([value](LightSpot& light) { light.Intensity = value; }); });
 
 		section->AddRow(*mpIntensityField);
 	}
 
 	{
 		mpLumensField = new FloatField(body, "Lumens", Vec2f(0.0f, 100000000.0f));
-		mpLumensField->SetOnChange(
-			[](const float value)
-			{
-				thread::PostToGame(
-					[value]
-					{
-						if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
-							light->SetLumens(value);
-							gEditor->MarkModified();
-						}
-					});
-			});
+		mpLumensField->SetOnChange([](const float value)
+								   { EditSelectedLight([value](LightSpot& light) { light.SetLumens(value); }); });
 
 		section->AddRow(*mpLumensField);
 	}
@@ -116,14 +86,8 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 		mpOuterAngleField->SetOnChange(
 			[](const float value)
 			{
-				thread::PostToGame(
-					[value]
-					{
-						if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
-							light->SetConeAngles(light->GetInnerAngle(), MathUtil::DegreesToRadians(value));
-							gEditor->MarkModified();
-						}
-					});
+				EditSelectedLight([value](LightSpot& light)
+								  { light.SetConeAngles(light.GetInnerAngle(), MathUtil::DegreesToRadians(value)); });
 			});
 
 		section->AddRow(*mpOuterAngleField);
@@ -134,14 +98,8 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 		mpInnerAngleField->SetOnChange(
 			[](const float value)
 			{
-				thread::PostToGame(
-					[value]
-					{
-						if (LightSpot* light = gEditor->GetLightEditor().GetSelected(); light != nullptr) {
-							light->SetConeAngles(MathUtil::DegreesToRadians(value), light->GetOuterAngle());
-							gEditor->MarkModified();
-						}
-					});
+				EditSelectedLight([value](LightSpot& light)
+								  { light.SetConeAngles(MathUtil::DegreesToRadians(value), light.GetOuterAngle()); });
 			});
 
 		section->AddRow(*mpInnerAngleField);

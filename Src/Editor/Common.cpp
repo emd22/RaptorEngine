@@ -51,11 +51,16 @@ Vector3Field::Vector3Field(wxWindow* parent, const wxString& label, const Vec2f&
 
 wxTextCtrl* Vector3Field::MakeAxisField(wxWindow* parent, const wxString& axis_label, const Vec2f& limits)
 {
+	constexpr int32 scVectorFieldWidth = 40;
+
 	auto validator = wxFloatingPointValidator<float32>(scFloatPrecision, nullptr);
 	validator.SetMin(limits.X);
 	validator.SetMax(limits.Y);
 
-	const int32 label_gap = mpControls->IsEmpty() ? 0 : 6;
+	int32 label_gap = 6;
+	if (mpControls->IsEmpty()) {
+		label_gap = 0;
+	}
 	mpControls->Add(new wxStaticText(parent, wxID_ANY, axis_label),
 					wxSizerFlags().CenterVertical().Border(wxLEFT, label_gap));
 
@@ -133,6 +138,8 @@ Vector3Field::~Vector3Field()
 
 FloatField::FloatField(wxWindow* parent, const wxString& label, const Vec2f& limits) : FieldBase(parent, label)
 {
+	constexpr int32 scFieldWidth = 56;
+
 	auto validator = wxFloatingPointValidator<float32>(scFloatPrecision, nullptr);
 	validator.SetMin(limits.X);
 	validator.SetMax(limits.Y);
@@ -223,6 +230,8 @@ PropertySection::PropertySection(wxWindow* parent, const wxString& title, bool e
 
 void PropertySection::AddLabel(wxStaticText* label)
 {
+	constexpr int32 scMinLabelWidth = 96;
+
 	label->SetMinSize(wxSize(std::max(label->GetBestSize().x, scMinLabelWidth), -1));
 	mpGrid->Add(label, wxGBPosition(mRow, 0), wxDefaultSpan, wxALIGN_CENTER_VERTICAL);
 }
@@ -279,8 +288,15 @@ void PropertySection::OnHeaderPaint(wxPaintEvent&)
 	const wxColour background = ToWxColour(theme.Frame.Background);
 	const bool is_dark = background.GetLuminance() < 0.25;
 
-	const wxColour fill = background.ChangeLightness(is_dark ? 112 : 84);
-	const wxColour edge = background.ChangeLightness(is_dark ? 70 : 72);
+	int32 fill_lightness = 84;
+	int32 edge_lightness = 72;
+	if (is_dark) {
+		fill_lightness = 112;
+		edge_lightness = 70;
+	}
+
+	const wxColour fill = background.ChangeLightness(fill_lightness);
+	const wxColour edge = background.ChangeLightness(edge_lightness);
 	const wxColour text = ToWxColour(theme.Frame.Text);
 
 	const wxSize size = mpHeader->GetClientSize();

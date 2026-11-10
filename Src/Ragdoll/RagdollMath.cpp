@@ -58,9 +58,8 @@ Mat4f MatrixFromRotationTranslation(const JPH::Mat44& rotation, const JPH::Vec3&
 	const JPH::Vec3 y = rotation.GetAxisY();
 	const JPH::Vec3 z = rotation.GetAxisZ();
 
-	return Mat4f(Vec4f(x.GetX(), x.GetY(), x.GetZ(), 0.0f), Vec4f(y.GetX(), y.GetY(), y.GetZ(), 0.0f),
-				 Vec4f(z.GetX(), z.GetY(), z.GetZ(), 0.0f),
-				 Vec4f(position.GetX(), position.GetY(), position.GetZ(), 1.0f));
+	return Mat4f(Vec4f(Vec3f::FromJolt(x), 0.0f), Vec4f(Vec3f::FromJolt(y), 0.0f), Vec4f(Vec3f::FromJolt(z), 0.0f),
+				 Vec4f(Vec3f::FromJolt(position), 1.0f));
 }
 
 void NormalizeRotationRows(Mat4f& m)
@@ -82,12 +81,7 @@ void NormalizeRotationRows(Mat4f& m)
 void ScaleRotationRows(Mat4f& m, const JPH::Vec3& scale)
 {
 	for (uint32 row = 0; row < 3; row++) {
-		float32* r = &m.RawData[row * 4];
-		const float32 row_scale = scale[row];
-
-		r[0] *= row_scale;
-		r[1] *= row_scale;
-		r[2] *= row_scale;
+		m.Rows[row] *= scale[row];
 	}
 }
 

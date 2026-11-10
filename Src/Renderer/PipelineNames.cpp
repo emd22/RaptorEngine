@@ -11,12 +11,13 @@ namespace fx::renderer {
 
 static const PipelineNameInfo scNameInfos[] = {
 	NAME_INFO("DebugLayer"),	 NAME_INFO("DebugSolid"),	  NAME_INFO("DebugOverlay"),
-	NAME_INFO("LightCulling"),
+	NAME_INFO("LightCulling"),	 NAME_INFO("LightCullingCapture"),
 	NAME_INFO("TextRendering"),	 NAME_INFO("ImageRendering"), NAME_INFO("Particles"),
 	NAME_INFO("Composition"),
 	NAME_INFO("CompositionAgx"), NAME_INFO("SSAO"),			  NAME_INFO("SSAODenoise"),
 	NAME_INFO("SSAOBlur"),
 	NAME_INFO("FogFroxelInject"), NAME_INFO("FogFroxelIntegrate"), NAME_INFO("FogFroxelApply"),
+	NAME_INFO("LightTransportInject"), NAME_INFO("LightTransportBounce"), NAME_INFO("LightTransportApply"),
 };
 
 static_assert(std::size(scNameInfos) == static_cast<uint32>(ePipelineName::NumPipelines));

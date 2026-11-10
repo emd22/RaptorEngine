@@ -281,7 +281,7 @@ void PhysicsPlayer::Update(float64 delta_time)
 
 	PhysicsSystem& phys = gPhysics->pBackend->PhysicsSystem;
 
-	const Vec3 gravity = GetCharacterGravity();
+	const JPH::Vec3 gravity = (GetCharacterGravity() * GetGravityMultiplier());
 
 	// Apply gravity
 	Vec3 velocity = Vec3::sZero();
@@ -296,8 +296,10 @@ void PhysicsPlayer::Update(float64 delta_time)
 	}
 	else {
 		velocity = pPlayerVirt->GetLinearVelocity() * pPlayerVirt->GetUp();
-		if (bDisableGravity) {
-			velocity.SetY(0);
+
+		// If gravity is disabled, just zero out the Y component to avoid drift
+		if (!HasGravity()) {
+			velocity.SetY(0.0f);
 		}
 		else {
 			velocity += gravity * static_cast<float32>(delta_time);

@@ -2,6 +2,7 @@
 
 #include "Occluders.hpp"
 
+#include <Math/Rect.hpp>
 #include <atomic>
 #include <thread>
 
@@ -10,19 +11,14 @@ namespace fx::mapc {
 namespace {
 
 constexpr uint16 scUnshadowed = 0xFFFF;
-constexpr uint16 scMaxShadowedDepth = 0xFFFE;
-constexpr double scDepthMargin = 1.0;
-constexpr double scMinSunHeight = 0.05;
-constexpr double scMinHorizontal = 1e-6;
-constexpr uint32 scRowsPerClaim = 4;
 
 struct PageFrame
 {
 	int32 CellX = 0;
 	int32 CellZ = 0;
 
-	double LightMin[2] = {};
-	double LightSize[2] = {};
+	Vec2d LightMin = Vec2d(0.0);
+	Vec2d LightSize = Vec2d(0.0);
 
 	double DepthMin = 0.0;
 	double DepthMax = 0.0;
@@ -88,24 +84,31 @@ PageFrame MakePageFrame(const LightBasis& basis, int32 cell_x, int32 cell_z, dou
 	const double x0 = cell_x * page_size;
 	const double z0 = cell_z * page_size;
 
-	double light_min[2] = { scNoHit, scNoHit };
-	double light_max[2] = { -scNoHit, -scNoHit };
+	DRect light_bounds;
 
 	frame.DepthMin = scNoHit;
 	frame.DepthMax = -scNoHit;
 
 	for (uint32 corner = 0; corner < 8; corner++) {
-		const Vec3d point(x0 + ((corner & 1) ? page_size : 0.0), (corner & 2) ? max_y : min_y,
-						  z0 + ((corner & 4) ? page_size : 0.0));
+		Vec3d point(x0, min_y, z0);
 
-		const double light_x = basis.Right.Dot(point);
-		const double light_y = basis.Up.Dot(point);
+		if ((corner & 1) != 0) {
+			point.X += page_size;
+		}
+
+		if ((corner & 2) != 0) {
+			point.Y = max_y;
+		}
+
+		if ((corner & 4) != 0) {
+			point.Z += page_size;
+		}
+
+		const Vec2d light(basis.Right.Dot(point), basis.Up.Dot(point));
 		const double depth = basis.Forward.Dot(point);
 
-		light_min[0] = std::min(light_min[0], light_x);
-		light_min[1] = std::min(light_min[1], light_y);
-		light_max[0] = std::max(light_max[0], light_x);
-		light_max[1] = std::max(light_max[1], light_y);
+		light_bounds.Min = Vec2d::Min(light_bounds.Min, light);
+		light_bounds.Max = Vec2d::Max(light_bounds.Max, light);
 		frame.DepthMin = std::min(frame.DepthMin, depth);
 		frame.DepthMax = std::max(frame.DepthMax, depth);
 	}
@@ -113,13 +116,11 @@ PageFrame MakePageFrame(const LightBasis& basis, int32 cell_x, int32 cell_z, dou
 	const uint32 multiple = GetLevelMultiple();
 	const uint32 max_size = std::max(RoundUpToMultiple(options.MaxLevelSize, multiple), multiple);
 
-	for (uint32 axis = 0; axis < 2; axis++) {
-		frame.LightMin[axis] = light_min[axis];
-		frame.LightSize[axis] = std::max(light_max[axis] - light_min[axis], options.TexelSize);
-	}
+	frame.LightMin = light_bounds.Min;
+	frame.LightSize = Vec2d::Max(light_bounds.GetExtent(), Vec2d(options.TexelSize));
 
-	const uint32 width = static_cast<uint32>(std::ceil(frame.LightSize[0] / options.TexelSize));
-	const uint32 height = static_cast<uint32>(std::ceil(frame.LightSize[1] / options.TexelSize));
+	const uint32 width = static_cast<uint32>(std::ceil(frame.LightSize.X / options.TexelSize));
+	const uint32 height = static_cast<uint32>(std::ceil(frame.LightSize.Y / options.TexelSize));
 
 	frame.Width = std::min(RoundUpToMultiple(std::max(width, 1U), multiple), max_size);
 	frame.Height = std::min(RoundUpToMultiple(std::max(height, 1U), multiple), max_size);
@@ -130,8 +131,10 @@ PageFrame MakePageFrame(const LightBasis& basis, int32 cell_x, int32 cell_z, dou
 void TraceRow(const OccluderSet& occluders, const LightBasis& basis, double start_depth, uint32 samples,
 			  PageFrame& frame, uint32 row)
 {
-	const double texel_x = frame.LightSize[0] / frame.Width;
-	const double texel_y = frame.LightSize[1] / frame.Height;
+	constexpr uint16 scMaxShadowedDepth = 0xFFFE;
+
+	const double texel_x = frame.LightSize.X / frame.Width;
+	const double texel_y = frame.LightSize.Y / frame.Height;
 	const double depth_range = frame.DepthMax - frame.DepthMin;
 	const double max_time = frame.DepthMax - start_depth;
 	const double inv_samples = 1.0 / samples;
@@ -140,10 +143,10 @@ void TraceRow(const OccluderSet& occluders, const LightBasis& basis, double star
 		double nearest = scNoHit;
 
 		for (uint32 sample_y = 0; sample_y < samples; sample_y++) {
-			const double light_y = frame.LightMin[1] + (row + (sample_y + 0.5) * inv_samples) * texel_y;
+			const double light_y = frame.LightMin.Y + (row + (sample_y + 0.5) * inv_samples) * texel_y;
 
 			for (uint32 sample_x = 0; sample_x < samples; sample_x++) {
-				const double light_x = frame.LightMin[0] + (column + (sample_x + 0.5) * inv_samples) * texel_x;
+				const double light_x = frame.LightMin.X + (column + (sample_x + 0.5) * inv_samples) * texel_x;
 
 				const Vec3d origin = basis.ToWorld(light_x, light_y, start_depth);
 				const double time = occluders.TraceClosest(origin, basis.Forward, max_time);
@@ -196,6 +199,11 @@ CompiledMapFogShadowLevel ReduceLevel(const CompiledMapFogShadowLevel& source)
 bool BakeFogShadow(const OccluderSet& occluders, const Vec3d& sun_direction, const FogShadowOptions& options,
 				   CompiledMapFogShadow& out_shadow, FogShadowStats& out_stats)
 {
+	constexpr double scDepthMargin = 1.0;
+	constexpr double scMinSunHeight = 0.05;
+	constexpr double scMinHorizontal = 1e-6;
+	constexpr uint32 scRowsPerClaim = 4;
+
 	out_shadow = CompiledMapFogShadow {};
 	out_stats = FogShadowStats {};
 
@@ -217,23 +225,21 @@ bool BakeFogShadow(const OccluderSet& occluders, const Vec3d& sun_direction, con
 	const double reach = std::min((bounds_max.Y - bounds_min.Y) * horizontal / std::abs(basis.Forward.Y),
 								  options.MaxReach);
 
-	double reach_x = 0.0;
-	double reach_z = 0.0;
+	Vec2d reach_xz(0.0);
 
 	if (horizontal > scMinHorizontal) {
-		reach_x = basis.Forward.X / horizontal * reach;
-		reach_z = basis.Forward.Z / horizontal * reach;
+		reach_xz = Vec2d(basis.Forward.X / horizontal * reach, basis.Forward.Z / horizontal * reach);
 	}
 
-	const double extent_min_x = std::min(bounds_min.X, bounds_min.X + reach_x);
-	const double extent_max_x = std::max(bounds_max.X, bounds_max.X + reach_x);
-	const double extent_min_z = std::min(bounds_min.Z, bounds_min.Z + reach_z);
-	const double extent_max_z = std::max(bounds_max.Z, bounds_max.Z + reach_z);
+	const Vec2d bounds_min_xz(bounds_min.X, bounds_min.Z);
+	const Vec2d bounds_max_xz(bounds_max.X, bounds_max.Z);
+	const DRect extent(Vec2d::Min(bounds_min_xz, bounds_min_xz + reach_xz),
+					   Vec2d::Max(bounds_max_xz, bounds_max_xz + reach_xz));
 
-	const int32 cell_min_x = static_cast<int32>(std::floor(extent_min_x / options.PageSize));
-	const int32 cell_min_z = static_cast<int32>(std::floor(extent_min_z / options.PageSize));
-	const int32 cell_max_x = static_cast<int32>(std::floor(extent_max_x / options.PageSize));
-	const int32 cell_max_z = static_cast<int32>(std::floor(extent_max_z / options.PageSize));
+	const int32 cell_min_x = static_cast<int32>(std::floor(extent.Min.X / options.PageSize));
+	const int32 cell_min_z = static_cast<int32>(std::floor(extent.Min.Y / options.PageSize));
+	const int32 cell_max_x = static_cast<int32>(std::floor(extent.Max.X / options.PageSize));
+	const int32 cell_max_z = static_cast<int32>(std::floor(extent.Max.Y / options.PageSize));
 
 	const uint32 cells_x = static_cast<uint32>(cell_max_x - cell_min_x + 1);
 	const uint32 cells_z = static_cast<uint32>(cell_max_z - cell_min_z + 1);
@@ -241,8 +247,19 @@ bool BakeFogShadow(const OccluderSet& occluders, const Vec3d& sun_direction, con
 	double start_depth = scNoHit;
 
 	for (uint32 corner = 0; corner < 8; corner++) {
-		const Vec3d point((corner & 1) ? bounds_max.X : bounds_min.X, (corner & 2) ? bounds_max.Y : bounds_min.Y,
-						  (corner & 4) ? bounds_max.Z : bounds_min.Z);
+		Vec3d point = bounds_min;
+
+		if ((corner & 1) != 0) {
+			point.X = bounds_max.X;
+		}
+
+		if ((corner & 2) != 0) {
+			point.Y = bounds_max.Y;
+		}
+
+		if ((corner & 4) != 0) {
+			point.Z = bounds_max.Z;
+		}
 
 		start_depth = std::min(start_depth, basis.Forward.Dot(point));
 	}
@@ -324,10 +341,10 @@ bool BakeFogShadow(const OccluderSet& occluders, const Vec3d& sun_direction, con
 		CompiledMapFogShadowPage page;
 		page.CellX = frame.CellX;
 		page.CellZ = frame.CellZ;
-		page.LightMin[0] = static_cast<float32>(frame.LightMin[0]);
-		page.LightMin[1] = static_cast<float32>(frame.LightMin[1]);
-		page.LightSize[0] = static_cast<float32>(frame.LightSize[0]);
-		page.LightSize[1] = static_cast<float32>(frame.LightSize[1]);
+		page.LightMin[0] = static_cast<float32>(frame.LightMin.X);
+		page.LightMin[1] = static_cast<float32>(frame.LightMin.Y);
+		page.LightSize[0] = static_cast<float32>(frame.LightSize.X);
+		page.LightSize[1] = static_cast<float32>(frame.LightSize.Y);
 		page.DepthMin = static_cast<float32>(frame.DepthMin);
 		page.DepthMax = static_cast<float32>(frame.DepthMax);
 

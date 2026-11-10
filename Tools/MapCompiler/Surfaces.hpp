@@ -88,6 +88,7 @@ public:
 
 public:
 	SurfaceStats Stats;
+	Array<String> Warnings;
 
 	/// Three corners per triangle of everything that was written, for verification
 	Array<Vec3d> TrianglePoints;

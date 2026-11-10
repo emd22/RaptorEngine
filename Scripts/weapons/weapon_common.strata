@@ -1,7 +1,10 @@
 import ../interop;
-import ../common;
 
-enum WEAPONPHASE
+import ../math;
+
+import std/math;
+
+enum RWeaponPhase
 {
 	READY = 0,
 	RELOADING,
@@ -10,7 +13,7 @@ enum WEAPONPHASE
 	LOWERED,
 }
 
-enum WEAPONMODE
+enum RWeaponMode
 {
 	SEMI = (1 << 0),
 	AUTO = (1 << 1),
@@ -19,7 +22,7 @@ enum WEAPONMODE
 	COUNT = 3,
 }
 
-enum INPUTFLAGS
+enum RInputFlags
 {
 	FIRE_PRESSED = (1 << 0),
 	FIRE_HELD = (1 << 1),
@@ -31,7 +34,7 @@ enum INPUTFLAGS
 
 const float FIRE_BUFFER_TIME = 0.12f;
 
-enum WEAPONEVENT
+enum RWeaponEvent
 {
 	FIRE = 0,
 
@@ -47,161 +50,165 @@ enum WEAPONEVENT
 	MODE_CHANGED
 }
 
-struct WEAPONDEF
+struct RWeaponBurstDef
 {
-	float damage;
-	float range;
-	float rounds_per_minute;
-	int pellets;
+	int BurstCount;
+	float RPM;
+	float Cooldown;
+}
+
+struct RWeaponSpreadDef
+{
+	float Hip;
+	float Moving;
+	float Air;
+	float PerShot;
+	float Max;
+	float Recovery;
+}
+
+struct RWeaponRecoilDef
+{
+	float Pitch;
+	float PitchVariance;
+	float Yaw;
+	float Ramp;
+	float RampMax;
+	float Recovery;
+	float ResetTime;
+}
+
+struct RWeaponFalloffDef
+{
+	float Start;
+	float End;
+	float Min;
+}
+
+
+@component
+struct RWeaponDef
+{
+	float Damage;
+	float Range;
+	float RPM;
+	int NumPellets;
 
 	/* Flags for the supported weapon modes */
-	WEAPONMODE fire_modes;
-	WEAPONMODE default_mode;
-	int burst_count;
-	float burst_rounds_per_minute;
-	float burst_cooldown;
-	float hit_force;
-	int decals;
+	RWeaponMode FireModes;
+	RWeaponMode DefaultMode;
 
-	float spread_hip;
-	float spread_moving;
-	float spread_air;
-	float spread_per_shot;
-	float spread_max;
-	float spread_recovery;
+	RWeaponBurstDef Burst;
 
-	float recoil_pitch;
-	float recoil_pitch_variance;
-	float recoil_yaw;
-	float recoil_ramp;
-	float recoil_ramp_max;
-	float recoil_recovery;
-	float recoil_reset_time;
+	float HitForce;
+	int Decals;
 
-	float falloff_start;
-	float falloff_end;
-	float falloff_min;
+	RWeaponSpreadDef Spread;
 
-	int magazine_size;
-	int reserve_max;
-	int reserve_start;
-	float reload_time;
-	float reload_empty_time;
-	int auto_reload;
+	RWeaponRecoilDef Recoil;
+	RWeaponFalloffDef Falloff;
 
-	float raise_time;
-	float lower_time;
+	/* Ammo properties */
+	int MagSize;
+	int ReserveMax;
+	int ReserveStart;
+
+
+	float ReloadTime;
+	float ReloadTimeFromEmpty;
+	int AutoReload;
+
+	float RaiseTime;
+	float LowerTime;
 }
 
-struct WEAPONSTATE
+@component
+struct RWeapon
 {
-	WEAPONPHASE phase;
-	WEAPONMODE fire_mode;
-	int magazine;
-	int reserve;
-	int burst_remaining;
-	int recoil_shots;
-	float timer;
-	float timer_total;
-	float cooldown;
-	float since_shot;
-	float bloom;
-	float fire_buffer;
+	RWeaponPhase Phase;
+	RWeaponMode FireMode;
+
+	int Magazine;
+	int Reserve;
+	int BurstRemaining;
+	int RecoilShots;
+
+	float Timer;
+	float TimerTotal;
+	float Cooldown;
+	float SinceShot;
+	float Bloom;
+	float FireBuffer;
 }
 
-struct WEAPONINPUT
+@component
+struct RWeaponInput
 {
-	INPUTFLAGS flags;
-	// int fire_pressed;
-	// int fire_held;
-	// int reload_pressed;
-	// int mode_pressed;
-	// int airborne;
-	float move_amount;
+	RInputFlags Flags;
+	float MoveAmount;
 }
 
-extern float random_range(float lo, float hi);
 
-extern float weapon_trace(float yaw, float pitch, float range);
-extern void weapon_hit_apply(float damage, float force, bool decal);
-extern void weapon_kick(float pitch, float yaw);
-extern void weapon_event(WEAPONEVENT event);
 
-int imin(int a, int b)
+float GetWeaponInterval(float rounds_per_minute)
 {
-	if (a < b) {
-		return a;
-	}
-	return b;
+	return 60.0f / max<float>(rounds_per_minute, 1.0f);
 }
 
-float weapon_interval(float rounds_per_minute)
+float GetWeaponFalloff(ref RWeaponDef def, float dist)
 {
-	return 60.0f / fmax(rounds_per_minute, 1.0f);
-}
-
-float weapon_falloff(ref WEAPONDEF def, float distance)
-{
-	if (distance <= def.falloff_start) {
+	if (dist <= def.Falloff.Start) {
 		return 1.0f;
 	}
-	if (distance >= def.falloff_end) {
-		return def.falloff_min;
+	if (dist >= def.Falloff.End) {
+		return def.Falloff.Min;
 	}
 
-	float t = (distance - def.falloff_start) / (def.falloff_end - def.falloff_start);
-	return 1.0f + (def.falloff_min - 1.0f) * t;
+	float t = (dist - def.Falloff.Start) / (def.Falloff.End - def.Falloff.Start);
+	return 1.0f + (def.Falloff.Min - 1.0f) * t;
 }
 
-float weapon_spread(ref WEAPONDEF def, ref WEAPONSTATE st, ref WEAPONINPUT inp)
-{
-	float spread = def.spread_hip + st.bloom + def.spread_moving * fclamp(inp.move_amount, 0.0f, 1.0f);
 
-	if (((uint)inp.flags & (uint)INPUTFLAGS.AIRBORNE) != 0) {
-		spread = spread + def.spread_air;
+
+float GetWeaponSpread(ref RWeaponDef def, ref RWeapon st, ref RWeaponInput inp)
+{
+	float spread = def.Spread.Hip + st.Bloom + def.Spread.Moving * clamp<float>(inp.MoveAmount, 0.0f, 1.0f);
+
+	if (((uint)inp.Flags & (uint)RInputFlags.AIRBORNE) != 0) {
+		spread += def.Spread.Air;
 	}
 
 	return spread;
 }
 
-float disc_x;
-float disc_y;
 
-void sample_disc()
+
+impl RWeaponMode
 {
-	for (int i = 0; i < 8; i++) {
-		float x = random_range(-1.0f, 1.0f);
-		float y = random_range(-1.0f, 1.0f);
-
-		if (x * x + y * y <= 1.0f) {
-			disc_x = x;
-			disc_y = y;
-			return;
-		}
+	bool IsAllowed(RWeaponMode mode_flags, RWeaponMode mode)
+	{
+		return ((((uint)mode_flags) & ((uint)mode)) != 0);
 	}
 
-	disc_x = 0.0f;
-	disc_y = 0.0f;
-}
+	/* Modes are bit flags, so this steps through bit indices (SEMI -> AUTO -> BURST -> SEMI) */
+	RWeaponMode Next(RWeaponMode mode_flags, RWeaponMode current)
+	{
+		int current_bit = 0;
 
-bool mode_allowed(WEAPONMODE mode_flags, WEAPONMODE mode)
-{
-	return ((((uint)mode_flags) & ((uint)mode)) != 0);
-}
-
-WEAPONMODE next_mode(WEAPONMODE mode_flags, WEAPONMODE current)
-{
-	for (int i = 1; i <= WEAPONMODE.COUNT; i++) {
-		WEAPONMODE candidate = (WEAPONMODE)((int)current + i);
-
-		if (candidate >= WEAPONMODE.COUNT) {
-			candidate = (WEAPONMODE)((int)candidate - (int)WEAPONMODE.COUNT);
+		for (int bit = 0; bit < (int)RWeaponMode.COUNT; bit++) {
+			if ((int)current == (1 << bit)) {
+				current_bit = bit;
+			}
 		}
 
-		if (mode_allowed(mode_flags, candidate)) {
-			return candidate;
+		for (int i = 1; i <= (int)RWeaponMode.COUNT; i++) {
+			RWeaponMode candidate = (RWeaponMode)(1 << ((current_bit + i) % (int)RWeaponMode.COUNT));
+
+			if (RWeaponMode.IsAllowed(mode_flags, candidate)) {
+				return candidate;
+			}
 		}
+
+		return current;
 	}
-
-	return current;
 }

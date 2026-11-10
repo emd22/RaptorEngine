@@ -2,6 +2,7 @@
 #include "Presets.hpp"
 
 #include <cctype>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 
@@ -9,9 +10,6 @@ namespace {
 
 using namespace fx;
 using namespace fx::mapc;
-
-constexpr int scExitUsage = 2;
-constexpr int scExitVerifyFailed = 3;
 
 void PrintUsage()
 {
@@ -42,8 +40,17 @@ void PrintUsage()
 		"them, 8 bytes per ray (default: 0, off)\n"
 		"  --indirect-denoise <level> How hard to smooth the noise out of the bounced light: off, low, medium "
 		"or high (default: medium)\n"
-		"  --probe-texel-rays <n>     Rays per probe visibility texel along each axis when baking probes, 0 to "
+		"  --probe-texel-rays <n>     Probe ray density, (16n)^2 rays per cube face when baking probes, 0 to "
 		"leave the probes to the engine (default: 4)\n"
+		"  --no-models      Leave models out of the bake, so they cast no baked shadows and bounce no light\n"
+		"  --model-cell <m>           Size of the cells that hold the bounced light of model surfaces "
+		"(default: 0.25)\n"
+		"  --no-light-transport       Do not store the links between lightmap clusters that let unbaked lights "
+		"bounce at runtime\n"
+		"  --transport-min-link <f>   Drop links carrying less than this fraction of a cluster's rays, 0 to keep all "
+		"that coverage needs (default: 0.005, 0 keeps every link coverage needs)\n"
+		"  --transport-stats          Measure how many source clusters each lightmap texel and probe would need "
+		"links to if the bounced light were relit at runtime\n"
 		"  --no-fog-shadow  Do not bake the sun shadow pages that the fog is shadowed by\n"
 		"  --fog-shadow-texel <m>     Size of a fog shadow texel close up (default: 0.1)\n"
 		"  --no-acoustics   Do not bake the reverb and pathing probes for Steam Audio\n"
@@ -110,6 +117,12 @@ bool ParseArguments(int argc, char** argv, CompileOptions& out_arguments, Preset
 		else if (argument == "--indirect-bounces" && has_value) {
 			out_arguments.Lightmap.IndirectBounces = static_cast<uint32>(std::atoi(argv[++i]));
 		}
+		else if (argument == "--no-models") {
+			out_arguments.bModels = false;
+		}
+		else if (argument == "--model-cell" && has_value) {
+			out_arguments.Lightmap.ModelCellSize = std::fmax(std::atof(argv[++i]), 0.01);
+		}
 		else if (argument == "--indirect-cache" && has_value) {
 			out_arguments.Lightmap.IndirectCacheMegabytes = static_cast<uint32>(std::atoi(argv[++i]));
 		}
@@ -132,6 +145,15 @@ bool ParseArguments(int argc, char** argv, CompileOptions& out_arguments, Preset
 		}
 		else if (argument == "--list-presets") {
 			out_presets.bList = true;
+		}
+		else if (argument == "--no-light-transport") {
+			out_arguments.Lightmap.bLightTransport = false;
+		}
+		else if (argument == "--transport-min-link" && has_value) {
+			out_arguments.Lightmap.TransportMinLinkFraction = std::atof(argv[++i]);
+		}
+		else if (argument == "--transport-stats") {
+			out_arguments.Lightmap.bTransportStats = true;
 		}
 		else if (argument == "--no-indirect") {
 			out_arguments.Lightmap.bIndirect = false;
@@ -226,6 +248,9 @@ void PrintPresets(const PresetLibrary& presets)
 
 int main(int argc, char** argv)
 {
+	constexpr int scExitUsage = 2;
+	constexpr int scExitVerifyFailed = 3;
+
 	CompileOptions options;
 	PresetArguments preset_arguments;
 
@@ -279,5 +304,9 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	return result.bVerifyFailed ? scExitVerifyFailed : 0;
+	if (result.bVerifyFailed) {
+		return scExitVerifyFailed;
+	}
+
+	return 0;
 }

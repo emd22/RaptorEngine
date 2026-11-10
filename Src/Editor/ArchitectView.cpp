@@ -53,30 +53,10 @@ namespace {
 template <typename TElementType>
 using DoublingArray = DynArray<TElementType, GrowthFunctions::Double>;
 
-constexpr float32 scSegmentQuantum = 1000.0f;
-constexpr float32 scMinSegmentLengthSq = 1e-8f;
-constexpr float32 scHullMergeDistance = 1e-4f;
 constexpr float32 scMinMoveDistance = 1e-5f;
-constexpr float32 scMinRotateAngle = 1e-5f;
-constexpr float32 scGridSnapTolerance = 1e-4f;
-constexpr float32 scVerticalFaceTolerance = 0.02f;
-constexpr float32 scMinPlanNormalLength = 0.5f;
-constexpr float32 scMinFaceLength = 1e-3f;
-constexpr float32 scFaceMatchDot = 0.999f;
 constexpr float32 scVertexMatchDistance = 2e-3f;
 constexpr float32 scMinBrushExtent = 0.01f;
-constexpr uint32 scMaxRoomOperations = 200;
-constexpr float32 scHullEdgeTolerance = 1e-3f;
-constexpr float32 scGroundFootprintInset = 1e-3f;
-constexpr float32 scGroundFitTolerance = 1e-3f;
-constexpr float32 scDBoundThickness = 1.0f;
-constexpr uint32 scDBoundSideCount = 6;
 constexpr float32 scDecalDepth = 0.5f;
-constexpr float32 scDecalRayReach = 1000.0f;
-constexpr float32 scMinTextureScale = 1.0f / 64.0f;
-constexpr float32 scMinPatchTextureScale = 1e-3f;
-constexpr float32 scMaxTextureScale = 1024.0f;
-constexpr float32 scDegreesPerTurn = 360.0f;
 
 Vec2f Project(const Vec3f& vector, const ViewPlaneAxes& axes)
 {
@@ -107,6 +87,8 @@ bool IsNonLeftTurn(const Vec2f& origin, const Vec2f& a, const Vec2f& b)
 
 void ConvexHull(DoublingArray<Vec2f>& points, DoublingArray<Vec2f>& out_hull)
 {
+	constexpr float32 scHullMergeDistance = 1e-4f;
+
 	std::sort(points.begin(), points.end(),
 			  [](const Vec2f& a, const Vec2f& b) { return a.X < b.X || (a.X == b.X && a.Y < b.Y); });
 
@@ -150,6 +132,8 @@ void ConvexHull(DoublingArray<Vec2f>& points, DoublingArray<Vec2f>& out_hull)
 
 Vec2i Quantize(const Vec2f& point)
 {
+	constexpr float32 scSegmentQuantum = 1000.0f;
+
 	return Vec2i(static_cast<int32>(std::lround(point.X * scSegmentQuantum)),
 				 static_cast<int32>(std::lround(point.Y * scSegmentQuantum)));
 }
@@ -236,6 +220,8 @@ void ClipToFootprintEdge(DoublingArray<Vec3f>& points, DoublingArray<Vec3f>& scr
 
 bool IsOnBrushEdge(const Brush& brush, const Vec3f point)
 {
+	constexpr float32 scHullEdgeTolerance = 1e-3f;
+
 	for (const Brush::Face& face : brush.Faces) {
 		for (uint32 i = 0; i < face.Vertices.Size; i++) {
 			const Vec3f start = face.Vertices[i];
@@ -266,7 +252,7 @@ struct BrushSource
 	eTopViewBrushKind Kind = eTopViewBrushKind::Geometry;
 };
 
-void GatherBrushSources(Blockout& blockout, std::vector<BrushSource>& out_sources)
+void GatherBrushSources(Blockout& blockout, DoublingArray<BrushSource>& out_sources)
 {
 	for (ObjectID id : blockout.BlockoutObjects) {
 		Object* object = gObjectManager->GetObject(id);
@@ -281,7 +267,7 @@ void GatherBrushSources(Blockout& blockout, std::vector<BrushSource>& out_source
 			continue;
 		}
 
-		out_sources.push_back(BrushSource {
+		out_sources.Insert(BrushSource {
 			.pObject = object,
 			.pBrush = brush,
 			.World = object->GetWorldMatrix(),
@@ -290,11 +276,11 @@ void GatherBrushSources(Blockout& blockout, std::vector<BrushSource>& out_source
 		});
 	}
 
-	std::vector<Blockout::SubviewSolid> solids;
+	DoublingArray<Blockout::SubviewSolid> solids;
 	blockout.GetSubviewSolids(solids);
 
 	for (const Blockout::SubviewSolid& solid : solids) {
-		out_sources.push_back(BrushSource {
+		out_sources.Insert(BrushSource {
 			.pObject = solid.pOwner,
 			.pBrush = solid.pBrush,
 			.World = solid.World,
@@ -314,6 +300,9 @@ Vec3f DepthAxisVector(const eViewPlane plane, const float32 value)
 
 bool FindGroundOffset(const Vec3f min, const Vec3f max, const eViewPlane plane, float32& out_offset)
 {
+	constexpr float32 scGroundFootprintInset = 1e-3f;
+	constexpr float32 scGroundFitTolerance = 1e-3f;
+
 	Blockout* blockout = gWorld->pPrototype;
 
 	if (blockout == nullptr) {
@@ -335,7 +324,7 @@ bool FindGroundOffset(const Vec3f min, const Vec3f max, const eViewPlane plane, 
 	DoublingArray<Vec3f> points;
 	DoublingArray<Vec3f> scratch;
 
-	std::vector<BrushSource> sources;
+	DoublingArray<BrushSource> sources;
 	GatherBrushSources(*blockout, sources);
 
 	for (const BrushSource& source : sources) {
@@ -470,6 +459,8 @@ bool FindGroundOffset(const Vec3f min, const Vec3f max, const eViewPlane plane, 
 
 bool FindDecalSurfaceOffset(const Vec3f min, const Vec3f max, const eViewPlane plane, float32& out_offset)
 {
+	constexpr float32 scDecalRayReach = 1000.0f;
+
 	Blockout* blockout = gWorld->pPrototype;
 
 	if (blockout == nullptr) {
@@ -498,11 +489,11 @@ bool FindDecalSurfaceOffset(const Vec3f min, const Vec3f max, const eViewPlane p
 		sample_point(0.25f, 0.75f), sample_point(0.75f, 0.75f),
 	};
 
-	std::vector<float32> heights;
-	std::vector<float32> distances;
+	DoublingArray<float32> heights;
+	DoublingArray<float32> distances;
 
 	for (uint32 i = 0; i < std::size(samples); i++) {
-		if (i == 1 && !heights.empty()) {
+		if (i == 1 && heights.IsNotEmpty()) {
 			break;
 		}
 
@@ -510,11 +501,11 @@ bool FindDecalSurfaceOffset(const Vec3f min, const Vec3f max, const eViewPlane p
 		blockout->RaycastDecalSurfaces(origin, toward_viewer * -1.0f, scDecalRayReach * 2.0f, distances);
 
 		for (const float32 distance : distances) {
-			heights.push_back(base_height + scDecalRayReach - distance);
+			heights.Insert(base_height + scDecalRayReach - distance);
 		}
 	}
 
-	if (heights.empty()) {
+	if (heights.IsEmpty()) {
 		return false;
 	}
 
@@ -543,6 +534,18 @@ bool FindDecalSurfaceOffset(const Vec3f min, const Vec3f max, const eViewPlane p
 	return true;
 }
 
+void DropToGround(const eViewPlane plane, Vec3f& min, Vec3f& max)
+{
+	float32 offset = 0.0f;
+
+	if (FindGroundOffset(min, max, plane, offset)) {
+		const Vec3f shift = DepthAxisVector(plane, offset);
+
+		min += shift;
+		max += shift;
+	}
+}
+
 } // namespace
 
 
@@ -552,6 +555,11 @@ bool FindDecalSurfaceOffset(const Vec3f min, const Vec3f max, const eViewPlane p
 
 TopViewState RaptorEditor::BuildTopViewState()
 {
+	constexpr float32 scMinSegmentLengthSq = 1e-8f;
+	constexpr float32 scVerticalFaceTolerance = 0.02f;
+	constexpr float32 scMinPlanNormalLength = 0.5f;
+	constexpr float32 scMinFaceLength = 1e-3f;
+
 	TopViewState view;
 
 	view.bActive = true;
@@ -577,7 +585,7 @@ TopViewState RaptorEditor::BuildTopViewState()
 	const LightSpot* selected_light = mLightEditor.GetSelected();
 
 	for (const Ref<LightBase>& base : gLightManager->GetCache()) {
-		if (!base.IsValid() || base->Type != eLightType::Spot) {
+		if (!base.IsValid() || base->Type != eLightType::Spot || base->IsPersistent()) {
 			continue;
 		}
 
@@ -651,7 +659,7 @@ TopViewState RaptorEditor::BuildTopViewState()
 	DoublingArray<Vec2f> hull;
 	DoublingArray<Segment> segments;
 
-	std::vector<BrushSource> sources;
+	DoublingArray<BrushSource> sources;
 	GatherBrushSources(*blockout, sources);
 
 	const Object* last_selected = mSelection.GetLast();
@@ -1199,6 +1207,8 @@ void RaptorEditor::TopViewMove(const Vec3f offset)
 
 void RaptorEditor::TopViewRotate(const Vec3f axis, float32 angle, const Vec3f pivot, const Vec3f offset)
 {
+	constexpr float32 scMinRotateAngle = 1e-5f;
+
 	if (IsSimulationMode() || !IsToolAvailable(eEditorTool::Rotate) || std::fabs(angle) < scMinRotateAngle ||
 		axis.Length() < scMinMoveDistance) {
 		return;
@@ -1242,7 +1252,12 @@ void RaptorEditor::TopViewRotate(const Vec3f axis, float32 angle, const Vec3f pi
 		change.PositionAfter = object->GetPosition() + (new_center - center) + offset;
 		change.bMoves = (change.PositionAfter - change.PositionBefore).Length() >= scMinMoveDistance;
 
-		operation_count += change.bMoves ? 2 : 1;
+		if (change.bMoves) {
+			operation_count += 2;
+		}
+		else {
+			operation_count += 1;
+		}
 	}
 
 	for (const Change& change : changes) {
@@ -1257,6 +1272,8 @@ void RaptorEditor::TopViewRotate(const Vec3f axis, float32 angle, const Vec3f pi
 
 static int32 FindWorldFacePlane(const Brush& brush, const Object& object, const Vec3f world_normal)
 {
+	constexpr float32 scFaceMatchDot = 0.999f;
+
 	const Vec3f local_direction = world_normal.Rotate(object.mRotation.Conjugate()).Normalize();
 	const int32 plane_index = brush.FindPlane(local_direction);
 
@@ -1267,7 +1284,7 @@ static int32 FindWorldFacePlane(const Brush& brush, const Object& object, const 
 	return plane_index;
 }
 
-void RaptorEditor::TopViewMoveFace(const Vec3f world_normal, float32 distance, const DynArray<ObjectID>& object_ids)
+void RaptorEditor::TopViewMoveFaces(const DynArray<TopViewFaceRef>& faces, float32 distance)
 {
 	if (IsSimulationMode() || !IsToolAvailable(eEditorTool::Face) || std::fabs(distance) < scMinMoveDistance) {
 		return;
@@ -1276,37 +1293,40 @@ void RaptorEditor::TopViewMoveFace(const Vec3f world_normal, float32 distance, c
 	struct FaceMove
 	{
 		Object* pObject = nullptr;
+		int32 PlaneIndex = Brush::scNoPlane;
 		Vec3f LocalNormal;
 	};
 
 	DoublingArray<FaceMove> moves;
 
-	for (const ObjectID object_id : object_ids) {
-		Object* object = FindTopViewObject(object_id);
+	for (const TopViewFaceRef& face : faces) {
+		Object* object = FindTopViewObject(face.ObjectId);
 
 		if (object == nullptr || object->HasTags(eObjectTag::LockTransform) || !CanEditObject(object)) {
+			continue;
+		}
+
+		const Brush* brush = gWorld->pPrototype->GetBrush(object);
+
+		if (brush == nullptr) {
+			continue;
+		}
+
+		const int32 plane_index = FindWorldFacePlane(*brush, *object, face.Normal);
+
+		if (plane_index == Brush::scNoPlane) {
 			continue;
 		}
 
 		bool is_listed = false;
 
 		for (const FaceMove& move : moves) {
-			is_listed = is_listed || (move.pObject == object);
+			is_listed = is_listed || (move.pObject == object && move.PlaneIndex == plane_index);
 		}
 
-		const Brush* brush = gWorld->pPrototype->GetBrush(object);
-
-		if (is_listed || brush == nullptr) {
-			continue;
+		if (!is_listed) {
+			moves.Insert(FaceMove { object, plane_index, brush->Planes[plane_index].Normal });
 		}
-
-		const int32 plane_index = FindWorldFacePlane(*brush, *object, world_normal);
-
-		if (plane_index == Brush::scNoPlane) {
-			continue;
-		}
-
-		moves.Insert(FaceMove { object, brush->Planes[plane_index].Normal });
 	}
 
 	for (const FaceMove& move : moves) {
@@ -1337,7 +1357,7 @@ void RaptorEditor::TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewV
 		Patch After;
 	};
 
-	std::vector<PatchEdit> patch_edits;
+	DoublingArray<PatchEdit> patch_edits;
 
 	DoublingArray<ObjectID> object_ids;
 
@@ -1382,7 +1402,7 @@ void RaptorEditor::TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewV
 			}
 
 			if (moved_count > 0) {
-				patch_edits.push_back(PatchEdit { object, patch->Clone(), std::move(moved) });
+				patch_edits.Insert(PatchEdit { object, patch->Clone(), std::move(moved) });
 			}
 
 			continue;
@@ -1434,8 +1454,8 @@ void RaptorEditor::TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewV
 
 		if (!moved.IsValid() || extent.X < scMinBrushExtent || extent.Y < scMinBrushExtent ||
 			extent.Z < scMinBrushExtent) {
-			Warn("Cannot move those vertices of '{}', the brush would collapse or have too many faces",
-				 object->Name.Get());
+			LogWarning("Cannot move those vertices of '{}' as the brush would collapse or have too many faces",
+					   object->Name.Get());
 			continue;
 		}
 
@@ -1443,14 +1463,14 @@ void RaptorEditor::TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewV
 											[&](const Vec3f point) { return !IsOnBrushEdge(moved, point); });
 
 		if (is_concave) {
-			Warn("Cannot move those vertices of '{}', the brush would no longer be convex", object->Name.Get());
+			LogWarning("Cannot move those vertices of '{}' as the brush would no longer be convex", object->Name.Get());
 			continue;
 		}
 
 		edits.Insert(Edit { object, brush->Planes, moved.Planes });
 	}
 
-	const int32 group_size = static_cast<int32>(edits.Size + patch_edits.size());
+	const int32 group_size = static_cast<int32>(edits.Size + patch_edits.Size);
 
 	for (const Edit& edit : edits) {
 		EmplaceEditOperation<BrushEditOperation>(edit.pObject, edit.Before, edit.After, group_size);
@@ -1469,13 +1489,8 @@ void RaptorEditor::TopViewCreatePatch(eViewPlane plane, ePatchPrimitive primitiv
 		return;
 	}
 
-	float32 offset = 0.0f;
-
-	if (drop_to_ground && FindGroundOffset(min, max, plane, offset)) {
-		const Vec3f shift = DepthAxisVector(plane, offset);
-
-		min += shift;
-		max += shift;
+	if (drop_to_ground) {
+		DropToGround(plane, min, max);
 	}
 
 	Patch patch;
@@ -1661,6 +1676,8 @@ static bool IsSamePatch(const Patch& a, const Patch& b)
 
 static bool ApplyTextureMapping(Patch& patch, const PatchTextureSettings& settings, const Mat4f& world)
 {
+	constexpr float32 scMinPatchTextureScale = 1e-3f;
+
 	if (std::fabs(settings.Scale) < scMinPatchTextureScale) {
 		return false;
 	}
@@ -1854,7 +1871,7 @@ void RaptorEditor::TopViewPatchCommand(eViewPlane plane, const PatchCommand& com
 		Patch After;
 	};
 
-	std::vector<PatchEdit> edits;
+	DoublingArray<PatchEdit> edits;
 	uint32 patch_count = 0;
 
 	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
@@ -1879,7 +1896,7 @@ void RaptorEditor::TopViewPatchCommand(eViewPlane plane, const PatchCommand& com
 
 		if (patch->bIsDetailMesh && (is_weight_command || command.Type == ePatchCommand::SetClosure)) {
 			if (is_weight_command || command.Closure != ePatchClosure::None) {
-				Warn("Detail mesh patch '{}' has no weights, caps or thickness", object->Name.Get());
+				LogWarning("Detail mesh patch '{}' has no weights, caps or thickness", object->Name.Get());
 			}
 
 			continue;
@@ -1894,23 +1911,23 @@ void RaptorEditor::TopViewPatchCommand(eViewPlane plane, const PatchCommand& com
 			}
 
 			if (!ApplyTurnCommand(changed, object->GetWorldMatrix(), plane, object->ID, handles)) {
-				Warn("Select all four corners of the detail mesh cells to turn on patch '{}'", object->Name.Get());
+				LogWarning("Select all four corners of the detail mesh cells to turn on patch '{}'",
+						   object->Name.Get());
 				continue;
 			}
 		}
 		else if (is_weight_command) {
 			if (!ApplyWeightCommand(changed, command, object->GetWorldMatrix(), plane, object->ID, handles)) {
-				Warn("Select control points of patch '{}' to set their weight", object->Name.Get());
+				LogWarning("Select control points of patch '{}' to set their weight", object->Name.Get());
 				continue;
 			}
 		}
 		else if (!ApplyPatchCommand(changed, command, object->GetWorldMatrix(), has_control, column, row)) {
 			if (command.Type == ePatchCommand::MapTexture) {
-				Warn("The texture scale and repeats can't be 0");
+				LogWarning("The texture scale and repeats can't be 0");
 				break;
 			}
 
-			Warn("Patch '{}' can't be changed that way, it is at its smallest or largest size", object->Name.Get());
 			continue;
 		}
 
@@ -1922,20 +1939,20 @@ void RaptorEditor::TopViewPatchCommand(eViewPlane plane, const PatchCommand& com
 			Patch pieces[Patch::scMaxClosurePieces];
 
 			if (changed.BuildClosure(pieces) == 0) {
-				Warn("Patch '{}' has no curved open edge to cap", object->Name.Get());
+				LogWarning("Patch '{}' has no curved open edge to cap", object->Name.Get());
 			}
 		}
 
-		edits.push_back(PatchEdit { object, patch->Clone(), std::move(changed) });
+		edits.Insert(PatchEdit { object, patch->Clone(), std::move(changed) });
 	}
 
 	if (patch_count == 0 && command.Type == ePatchCommand::MapTexture) {
-		Warn("Select the patches to change the texture of first");
+		LogWarning("Select the patches to change the texture");
 	}
 
 	for (PatchEdit& edit : edits) {
 		EmplaceEditOperation<PatchEditOperation>(edit.pObject, std::move(edit.Before), std::move(edit.After),
-												 static_cast<int32>(edits.size()));
+												 static_cast<int32>(edits.Size));
 	}
 }
 
@@ -1993,22 +2010,13 @@ void RaptorEditor::TopViewCreate(eViewPlane plane, Vec3f min, Vec3f max, bool dr
 		return;
 	}
 
-	float32 offset = 0.0f;
-
-	if (drop_to_ground && FindGroundOffset(min, max, plane, offset)) {
-		const Vec3f shift = DepthAxisVector(plane, offset);
-
-		min += shift;
-		max += shift;
+	if (drop_to_ground) {
+		DropToGround(plane, min, max);
 	}
 
 	Object* created = CreateWorldBox(min, max);
 
 	if (created == nullptr) {
-		if (IsDataMode()) {
-			Warn("Pick Probe Volumes, Reflection Probes or Volumes in the Data filter to create one");
-		}
-
 		return;
 	}
 
@@ -2022,21 +2030,15 @@ void RaptorEditor::TopViewCreateRoom(eViewPlane plane, Vec3f min, Vec3f max, boo
 		return;
 	}
 
-	float32 offset = 0.0f;
-
-	if (drop_to_ground && FindGroundOffset(min, max, plane, offset)) {
-		const Vec3f shift = DepthAxisVector(plane, offset);
-
-		min += shift;
-		max += shift;
+	if (drop_to_ground) {
+		DropToGround(plane, min, max);
 	}
 
 	RoomPiece pieces[scMaxRoomPieces];
 	const uint32 piece_count = BuildRoomPieces(min, max, settings, pieces);
 
 	if (piece_count == 0) {
-		Warn("The room is too small for {} thick walls, make it bigger or check the depth field",
-			 settings.WallThickness);
+		LogWarning("The room is too small for {} thick walls", settings.WallThickness);
 		return;
 	}
 
@@ -2062,6 +2064,8 @@ void RaptorEditor::TopViewCreateRoom(eViewPlane plane, Vec3f min, Vec3f max, boo
 
 void RaptorEditor::TopViewHollowSelection(const RoomSettings& settings)
 {
+	constexpr uint32 scMaxRoomOperations = 200;
+
 	Blockout* blockout = gWorld->pPrototype;
 
 	if (blockout == nullptr || IsSimulationMode() || IsDataMode()) {
@@ -2113,23 +2117,23 @@ void RaptorEditor::TopViewHollowSelection(const RoomSettings& settings)
 	}
 
 	if (skipped_count > 0) {
-		Warn("Skipped {} brushes, only boxes that aren't rotated can be hollowed into rooms", skipped_count);
+		LogWarning("Skipped {} brushes, only boxes that aren't rotated can be hollowed into rooms", skipped_count);
 	}
 
 	if (too_small_count > 0) {
-		Warn("Skipped {} brushes that are too small for {} thick walls", too_small_count, settings.WallThickness);
+		LogWarning("Skipped {} brushes that are too small for {} thick walls", too_small_count, settings.WallThickness);
 	}
 
 	if (hollows.IsEmpty()) {
 		if (skipped_count == 0 && too_small_count == 0) {
-			Warn("Select the boxes to hollow out first");
+			LogWarning("Select the boxes to hollow");
 		}
 
 		return;
 	}
 
 	if (operation_count > scMaxRoomOperations) {
-		Warn("Hollowing the selection would make too many brushes at once");
+		LogWarning("Hollowing the selection would make too many brushes");
 		return;
 	}
 
@@ -2232,7 +2236,7 @@ void RaptorEditor::TopViewCreateDecal(eViewPlane plane, Vec3f min, Vec3f max, bo
 			max += shift;
 		}
 		else {
-			Warn("There is no surface under the decal to project onto, it was left at the base");
+			LogWarning("There is no surface under the decal to project onto");
 		}
 	}
 
@@ -2244,7 +2248,12 @@ void RaptorEditor::TopViewCreateDecal(eViewPlane plane, Vec3f min, Vec3f max, bo
 	float32 center[3];
 	center[axes.U] = (GetAxis(min, axes.U) + GetAxis(max, axes.U)) * 0.5f;
 	center[axes.V] = (GetAxis(min, axes.V) + GetAxis(max, axes.V)) * 0.5f;
-	center[axes.W] = (axes.DepthSign > 0.0f) ? GetAxis(min, axes.W) : GetAxis(max, axes.W);
+	if (axes.DepthSign > 0.0f) {
+		center[axes.W] = GetAxis(min, axes.W);
+	}
+	else {
+		center[axes.W] = GetAxis(max, axes.W);
+	}
 
 	const Vec3f half_extent(width * 0.5f, scDecalDepth * 0.5f, height * 0.5f);
 
@@ -2337,7 +2346,7 @@ void RaptorEditor::TopViewCreateArch(eViewPlane plane, DynArray<Vec3f> points, b
 	}
 
 	if (pieces.Size < segment_count) {
-		Warn("Skipped {} arch segments that were too thin to make into brushes", segment_count - pieces.Size);
+		LogWarning("Skipped {} arch segments that were too thin to make into brushes", segment_count - pieces.Size);
 	}
 
 	if (pieces.IsEmpty()) {
@@ -2397,13 +2406,16 @@ static bool ExtendBoundsByPatch(const Patch& patch, const Mat4f& world, Vec3f& m
 
 void RaptorEditor::FitDBoundsToLevel()
 {
+	constexpr float32 scDBoundThickness = 1.0f;
+	constexpr uint32 scDBoundSideCount = 6;
+
 	Blockout* blockout = gWorld->pPrototype;
 
 	if (IsSimulationMode() || blockout == nullptr) {
 		return;
 	}
 
-	std::vector<BrushSource> sources;
+	DoublingArray<BrushSource> sources;
 	GatherBrushSources(*blockout, sources);
 
 	Vec3f level_min(FLT_MAX);
@@ -2451,7 +2463,7 @@ void RaptorEditor::FitDBoundsToLevel()
 	}
 
 	if (!has_geometry) {
-		Warn("There is no level geometry to fit the map bounds to");
+		LogWarning("There is no level geometry to fit the map bounds to");
 		return;
 	}
 
@@ -2542,7 +2554,7 @@ void RaptorEditor::TopViewClip(const Vec3f point_a, const Vec3f point_b, const V
 	}
 
 	if (clips.IsEmpty()) {
-		Warn("The clip line does not cross any of the selected brushes");
+		LogWarning("The clip line does not cross any of the selected brushes");
 		return;
 	}
 
@@ -2576,18 +2588,22 @@ void RaptorEditor::TopViewSubtract(bool keep_cutters)
 	}
 
 	if (mSelection.IsEmpty()) {
-		Warn("Select the brushes to subtract first");
+		LogWarning("Select the brushes to subtract first");
 		return;
 	}
 
 	if (SubtractSelection(keep_cutters) == 0) {
-		Warn("The selected brushes do not overlap any other brushes");
+		LogWarning("The selected brushes do not overlap any other brushes");
 	}
 }
 
 static bool ApplyTextureCommand(Brush& brush, uint32 plane_index, const TextureCommand& command, float32 step,
 								const Vec3f origin)
 {
+	constexpr float32 scMinTextureScale = 1.0f / 64.0f;
+	constexpr float32 scMaxTextureScale = 1024.0f;
+	constexpr float32 scDegreesPerTurn = 360.0f;
+
 	BrushFaceTexture& texture = brush.Planes[plane_index].Texture;
 	const BrushFaceTexture before = texture;
 
@@ -2716,7 +2732,7 @@ void RaptorEditor::TopViewEditTextures(const DynArray<TopViewFaceRef>& faces, co
 		brush_count++;
 
 		if (command.Type == eTextureCommand::WorldAlign && !object->mRotation.IsCloseTo(Quat::scIdentity)) {
-			Warn("'{}' is rotated, so its textures can't be lined up with the world grid", object->Name.Get());
+			LogWarning("Textures can't be lined up with the world grid as '{}' is rotated", object->Name.Get());
 			continue;
 		}
 
@@ -2729,7 +2745,7 @@ void RaptorEditor::TopViewEditTextures(const DynArray<TopViewFaceRef>& faces, co
 				const int32 plane_index = FindWorldFacePlane(changed, *object, normal);
 
 				if (plane_index == Brush::scNoPlane) {
-					Warn("A picked face of '{}' is no longer there, pick it again", object->Name.Get());
+					LogWarning("A picked face of '{}' is no longer in the prototype", object->Name.Get());
 					continue;
 				}
 
@@ -2763,12 +2779,7 @@ void RaptorEditor::TopViewEditTextures(const DynArray<TopViewFaceRef>& faces, co
 	}
 
 	if (brush_count == 0) {
-		Warn("Pick a face with the Face tool, or select brushes, to change their textures");
 		return;
-	}
-
-	if (limited_count > 0) {
-		Warn("Some textures are already at their smallest or largest scale");
 	}
 
 	for (const Edit& edit : edits) {
@@ -2881,7 +2892,7 @@ void RaptorEditor::TopViewSetFaceMaterial(const DynArray<TopViewFaceRef>& faces,
 	}
 
 	if (IsBrushMarkerMaterial(material.GetSpecial())) {
-		Warn("'{}' can only be given to a whole brush", GetSpecialMaterialName(material.GetSpecial()));
+		LogWarning("'{}' can only be given to a whole brush", GetSpecialMaterialName(material.GetSpecial()));
 		return;
 	}
 
@@ -2906,7 +2917,7 @@ void RaptorEditor::TopViewSetFaceMaterial(const DynArray<TopViewFaceRef>& faces,
 
 		if (brush == nullptr || object->IsDecal() || !CanEditObject(object) ||
 			IsBrushMarkerMaterial(object->GetSpecialMaterial())) {
-			Warn("Only the faces of brushes can have a material of their own");
+			LogWarning("Only the faces of brushes can have a material of their own");
 			continue;
 		}
 
@@ -2928,7 +2939,7 @@ void RaptorEditor::TopViewSetFaceMaterial(const DynArray<TopViewFaceRef>& faces,
 		const int32 plane_index = FindWorldFacePlane(edit->Changed, *object, face_ref.Normal);
 
 		if (plane_index == Brush::scNoPlane) {
-			Warn("A picked face of '{}' is no longer there, pick it again", object->Name.Get());
+			LogWarning("A picked face of '{}' is no longer in the prototype", object->Name.Get());
 			continue;
 		}
 
@@ -3149,6 +3160,8 @@ void RaptorEditor::TopViewAdjustSnap(int32 direction) { AdjustSnapLevel(directio
 
 uint32 RaptorEditor::SnapSelectionToGrid()
 {
+	constexpr float32 scGridSnapTolerance = 1e-4f;
+
 	if (IsSimulationMode() || gWorld->pPrototype == nullptr || mSelection.IsEmpty()) {
 		return 0;
 	}
@@ -3160,7 +3173,7 @@ uint32 RaptorEditor::SnapSelectionToGrid()
 		Vec3f After;
 	};
 
-	std::vector<BrushSource> sources;
+	DoublingArray<BrushSource> sources;
 	GatherBrushSources(*gWorld->pPrototype, sources);
 
 	DoublingArray<Snap> snaps;

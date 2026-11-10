@@ -3,6 +3,7 @@
 #include "Areas.hpp"
 #include "Bsp.hpp"
 #include "MapSource.hpp"
+#include "Models.hpp"
 #include "Verify.hpp"
 
 #include <Asset/ConfigFile.hpp>
@@ -25,9 +26,6 @@ void Terminate() { std::terminate(); }
 namespace fx::mapc {
 
 namespace {
-
-constexpr float32 scHullPointEpsilon = 1e-5f;
-constexpr uint32 scMaxWrongLightmapPoints = 200;
 
 bool HasFloorBelow(const PlaneSet& planes, const MapSource& source, const Vec3d& point)
 {
@@ -69,10 +67,14 @@ bool HasFloorBelow(const PlaneSet& planes, const MapSource& source, const Vec3d&
 
 void AddHulls(const PlaneSet& planes, const MapSource& source, CompiledMap& map)
 {
+	constexpr float32 scHullPointEpsilon = 1e-5f;
+
 	size_t hull_count = 0;
 
 	for (const SourceBrush& brush : source.Brushes) {
-		hull_count += brush.bCollides ? 1 : 0;
+		if (brush.bCollides) {
+			hull_count++;
+		}
 	}
 
 	map.BrushNames.InitCapacity(source.Brushes.Size + source.Patches.Size);
@@ -174,8 +176,11 @@ bool WriteObj(const String& path, const CompiledMap& map)
 		const CompiledMapSurface& surface = map.Surfaces[i];
 		const CompiledMapMaterial& material = map.Materials[surface.MaterialIndex];
 
-		const String material_name = material.Name.IsEmpty() ? String::Fmt("library_{}", material.LibraryIndex)
-															 : material.Name;
+		String material_name = material.Name;
+
+		if (material.Name.IsEmpty()) {
+			material_name = String::Fmt("library_{}", material.LibraryIndex);
+		}
 
 		// std::fprintf(file, "o surface_%zu\nusemtl %s\n", i, material_name.CStr());
 		file.Write(String::Fmt("o surface_{}\nusemtl {}\n", i, material_name));
@@ -239,7 +244,14 @@ double GetSeconds(std::chrono::steady_clock::time_point since)
 	return std::chrono::duration<double>(std::chrono::steady_clock::now() - since).count();
 }
 
-double GetPercentRemoved(double before, double after) { return (before > 0.0) ? (1.0 - after / before) * 100.0 : 0.0; }
+double GetPercentRemoved(double before, double after)
+{
+	if (before > 0.0) {
+		return (1.0 - after / before) * 100.0;
+	}
+
+	return 0.0;
+}
 
 } // namespace
 
@@ -270,8 +282,12 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 		return result;
 	}
 
-	result.OutputPath = options.OutputPath.IsEmpty() ? CompiledMap::GetPathForPrototype(String(input_path.string()))
-													 : options.OutputPath;
+	if (options.OutputPath.IsEmpty()) {
+		result.OutputPath = CompiledMap::GetPathForPrototype(String(input_path.string()));
+	}
+	else {
+		result.OutputPath = options.OutputPath;
+	}
 
 	const std::filesystem::path base_path = std::filesystem::absolute(FilesystemIO::GetBasePath(), error);
 	const String engine_path = std::filesystem::relative(input_path, base_path, error).generic_string();
@@ -299,6 +315,42 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 
 	if (source.NonVisFaceCount > 0) {
 		log(String::Fmt("  nonvis       {} faces dropped", source.NonVisFaceCount));
+	}
+
+	ModelBuilder models;
+
+	if (options.bModels) {
+		models.Build(source);
+	}
+
+	if (source.Models.Size > 0) {
+		const ModelStats& model_stats = models.Stats;
+
+		if (!options.bModels) {
+			log(String::Fmt("  models       {} left out of the bake (--no-models)", source.Models.Size));
+		}
+		else {
+			log(String::Fmt("  models       {} of {} baked ({} triangles), {} probe boxes, {} left to the engine "
+							"(unlit, no shadows, scripted or moving)",
+							model_stats.BakedCount, source.Models.Size, model_stats.Triangles, model_stats.ProbeBoxes,
+							source.Models.Size - model_stats.BakedCount));
+		}
+
+		for (const String& message : models.Errors) {
+			log(String::Fmt("  warning      {}", message));
+		}
+
+		if (model_stats.SkippedMeshCount > 0) {
+			log(String::Fmt("  warning      {} skinned or joint-attached model meshes are not baked, they only have a "
+							"pose once animated",
+							model_stats.SkippedMeshCount));
+		}
+
+		if (model_stats.BlendMeshCount > 0) {
+			log(String::Fmt("  models       {} blended (see-through) model meshes neither cast baked shadows nor "
+							"bounce light",
+							model_stats.BlendMeshCount));
+		}
 	}
 
 
@@ -404,7 +456,7 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 
 	LightmapBaker lightmap;
 
-	result.bHasLightmap = lightmap.Bake(planes, source, surfaces, &patches, options.Lightmap, map);
+	result.bHasLightmap = lightmap.Bake(planes, source, surfaces, &patches, &models, options.Lightmap, map);
 	result.Lightmap = lightmap.Stats;
 
 	const String leak_path = ReplaceExtension(result.OutputPath, ".leak");
@@ -413,7 +465,12 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 
 	if (flood.bSealed) {
 		result.Seal = eSealState::Sealed;
-		log(String::Fmt("  seal         sealed{}", options.bKeepOutside ? ", faces towards the void kept" : ""));
+		const char* kept_note = "";
+		if (options.bKeepOutside) {
+			kept_note = ", faces towards the void kept";
+		}
+
+		log(String::Fmt("  seal         sealed{}", kept_note));
 	}
 	else if (flood.EntitiesUsed == 0) {
 		log("  seal         unknown, there are no entities (spawn, lights, models) in open space to fill from. Faces "
@@ -446,6 +503,11 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 
 	log(String::Fmt("  faces        {}, {} removed, {} clipped, {} overlaps cut", stats.NumSrcFaces, stats.FacesRemoved,
 					stats.FacesClipped, stats.OverlapsRemoved));
+
+	for (const String& warning : surfaces.Warnings) {
+		log(String::Fmt("  warning      {}", warning));
+	}
+
 	log(String::Fmt("  polygons     {} pieces merged into {}, {} T-junctions fixed", stats.NumPolygonsBeforeMerge,
 					stats.NumPolygons, stats.TJunctionsFixed));
 
@@ -483,12 +545,6 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 			log(String::Fmt("  warning      probes are only kept out of the first {} of {} brushes",
 							source.ProbeBoxes.Boxes.Size, source.ProbeBoxes.ObjectCount));
 		}
-
-		if (source.ModelCount > 0) {
-			log(String::Fmt(
-				"  warning      {} models are not known to the compiler, so probes are not kept out of them",
-				source.ModelCount));
-		}
 	}
 
 	if (result.bHasLightmap) {
@@ -499,8 +555,14 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 						baked.Width, baked.Height, baked.ChartCount, baked.Density, baked.LitFraction * 100.0,
 						baked.TexelCount, baked.RayCount, baked.OccluderCount));
 
-		if (baked.OccluderTriangleCount > 0) {
-			log(String::Fmt("  lightmap     {} patch triangles also cast shadows", baked.OccluderTriangleCount));
+		const uint32 patch_occluders = baked.OccluderTriangleCount - baked.OccluderModelTriangleCount;
+
+		if (patch_occluders > 0) {
+			log(String::Fmt("  lightmap     {} patch triangles also cast shadows", patch_occluders));
+		}
+
+		if (baked.OccluderModelTriangleCount > 0) {
+			log(String::Fmt("  lightmap     {} model triangles also cast shadows", baked.OccluderModelTriangleCount));
 		}
 
 		if (baked.bHasIndirect) {
@@ -516,6 +578,17 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 				options.Lightmap.IndirectBounces, baked.IndirectRayCount, baked.IndirectTriangleCount,
 				baked.IndirectBlockerCount, light_count, baked.MeanIndirect));
 
+			if (baked.IndirectModelTriangleCount > 0) {
+				log(String::Fmt("  indirect     {} model triangles bounce light through {} cells of {:.2f} m",
+								baked.IndirectModelTriangleCount, baked.IndirectModelCellCount,
+								options.Lightmap.ModelCellSize));
+			}
+
+			if (baked.IndirectWaterVolumeCount > 0) {
+				log(String::Fmt("  indirect     {} water volumes absorb the rays that cross them",
+								baked.IndirectWaterVolumeCount));
+			}
+
 			if (baked.IndirectCachedTexelCount > 0) {
 				log(String::Fmt("  hit cache    {} of {} texels ({:.1f}%) reuse their first bounce hits, {:.0f} MB",
 								baked.IndirectCachedTexelCount, baked.IndirectTexelCount,
@@ -527,6 +600,69 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 			if (baked.BakedProbeCount > 0) {
 				log(String::Fmt("  probes       {} light probes baked with {} rays, {:.0f} lux on average",
 								baked.BakedProbeCount, baked.ProbeRayCount, baked.MeanProbeIrradiance));
+			}
+
+			if (baked.TransportClusterCount > 0) {
+				log(String::Fmt("  transport    {} clusters, {} samples, {} links ({:.1f} MB), built in {:.1f} s",
+								baked.TransportClusterCount, baked.TransportSampleCount, baked.TransportLinkCount,
+								static_cast<double>(baked.TransportLinkCount * sizeof(CompiledMapTransportLink)) /
+									(1024.0 * 1024.0),
+								baked.TransportSeconds));
+			}
+
+			if (baked.Transport.bMeasured) {
+				const TransportStats& transport = baked.Transport;
+				const double ray_count = std::max<double>(static_cast<double>(transport.RayCount), 1.0);
+				constexpr double scBytesPerLink = 8.0;
+				constexpr double scBytesPerMegabyte = 1024.0 * 1024.0;
+
+				log(String::Fmt("  transport    {} rays per texel, {:.1f}% sky, {:.1f}% black, {:.1f}% off-chart, "
+								"measured in {:.1f} s",
+								transport.RaysPerTexel, 100.0 * static_cast<double>(transport.SkyRayCount) / ray_count,
+								100.0 * static_cast<double>(transport.DarkRayCount) / ray_count,
+								100.0 * static_cast<double>(transport.UnmappedRayCount) / ray_count,
+								transport.Seconds));
+
+				for (uint32 level = 0; level < TransportStats::scLevelCount; level++) {
+					const uint32 block = 1U << level;
+
+					log(String::Fmt("  transport    cluster {}x{} ({:.2f} m): {} clusters", block, block,
+									static_cast<double>(block) / baked.Density, transport.ClusterCounts[level]));
+				}
+
+				const auto log_links = [&](const String& receiver, uint32 source_level, const TransportLinkStats& links)
+				{
+					if (links.ReceiverCount == 0) {
+						return;
+					}
+
+					const double receivers = static_cast<double>(links.ReceiverCount);
+					const double mean95 = static_cast<double>(links.Link95Sum) / receivers;
+					const uint32 block = 1U << source_level;
+
+					log(String::Fmt(
+						"  transport    {} <- {}x{}: {} receivers, links unique {:.1f}, 90% {:.1f}, 95% {:.1f}, "
+						"99% {:.1f}, max 95% {}, {:.1f} MB at 95%",
+						receiver, block, block, links.ReceiverCount,
+						static_cast<double>(links.UniqueLinkSum) / receivers,
+						static_cast<double>(links.Link90Sum) / receivers, mean95,
+						static_cast<double>(links.Link99Sum) / receivers, links.MaxLink95,
+						receivers * mean95 * scBytesPerLink / scBytesPerMegabyte));
+				};
+
+				for (uint32 receiver_level = 0; receiver_level < TransportStats::scLevelCount; receiver_level++) {
+					const uint32 block = 1U << receiver_level;
+
+					for (uint32 source_level = 0; source_level < TransportStats::scLevelCount; source_level++) {
+						log_links(String::Fmt("{}x{}", block, block), source_level,
+								  transport.Texels[receiver_level][source_level]);
+					}
+				}
+
+				for (uint32 source_level = 0; source_level < TransportStats::scLevelCount; source_level++) {
+					log_links(String::Fmt("probe ({} rays)", transport.ProbeRaysPerProbe), source_level,
+							  transport.Probes[source_level]);
+				}
 			}
 
 			if (baked.MissingAlbedoCount > 0) {
@@ -568,12 +704,6 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 			log("  warning      there are no light probes, so models and other objects without a lightmap are not "
 				"shadowed by the world");
 		}
-
-		if (source.ModelCount > 0) {
-			log(String::Fmt("  warning      {} models are not known to the compiler, so they cast no baked shadows or "
-							"bounced light",
-							source.ModelCount));
-		}
 	}
 	else if (!options.Lightmap.bEnabled) {
 		log("  lightmap     off");
@@ -600,13 +730,33 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 	}
 
 	if (options.VerifyRays > 0 && result.bHasLightmap && source.bHasSun) {
-		const LightmapVerifyResult verify = VerifyLightmap(planes, source, map, patches.ReferencePoints,
-														   patches.ReferenceFacings, lightmap.Stats.Density,
-														   options.VerifyRays);
+		// Model triangles shadow the lightmap too, so the reference traces them like patch triangles
+		Array<Vec3d> occluder_points = CopyArray(patches.ReferencePoints);
+		Array<Vec3d> occluder_facings = CopyArray(patches.ReferenceFacings);
+
+		for (const ModelSurface& surface : models.Surfaces) {
+			for (size_t index = 0; index + 2 < surface.Indices.Size; index += 3) {
+				Vec3d facing = Vec3d(0.0);
+
+				for (uint32 corner = 0; corner < 3; corner++) {
+					const ModelVertex& vertex = surface.Vertices[static_cast<size_t>(surface.Indices[index + corner])];
+
+					occluder_points.Emplace(vertex.Position);
+					facing = facing + vertex.Normal;
+				}
+
+				occluder_facings.Emplace(facing);
+			}
+		}
+
+		const LightmapVerifyResult verify = VerifyLightmap(planes, source, map, occluder_points, occluder_facings,
+														   lightmap.Stats.Density, options.VerifyRays);
 
 		log(String::Fmt("  verify       {} lightmap points, {} lit, {} skipped beside a shadow edge, {} hidden "
 						"behind patches, {} wrong",
 						verify.PointCount, verify.LitCount, verify.EdgeCount, verify.HiddenCount, verify.WrongCount));
+
+		constexpr uint32 scMaxWrongLightmapPoints = 200;
 
 		if (verify.WrongCount * scMaxWrongLightmapPoints > verify.PointCount) {
 			log("  verify       FAILED, the lightmap does not match the sun");
@@ -620,12 +770,12 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 	else if (BakeAcoustics(options.Acoustics, map, result.Acoustics, log)) {
 		const AcousticStats& acoustics = result.Acoustics;
 
-		log(String::Fmt("  acoustics    {} probes {:.1f} m apart from ({:.1f}, {:.1f}, {:.1f}) to ({:.1f}, {:.1f}, {:.1f}), "
-						"baked in {:.1f} s (reverb) + {:.1f} s (pathing), {:.1f} KB",
-						acoustics.ProbeCount, options.Acoustics.ProbeSpacing, acoustics.ProbeMin.X, acoustics.ProbeMin.Y,
-						acoustics.ProbeMin.Z, acoustics.ProbeMax.X, acoustics.ProbeMax.Y, acoustics.ProbeMax.Z,
-						acoustics.ReflectionSeconds, acoustics.PathingSeconds,
-						static_cast<double>(acoustics.DataSize) / 1024.0));
+		log(String::Fmt(
+			"  acoustics    {} probes {:.1f} m apart from ({:.1f}, {:.1f}, {:.1f}) to ({:.1f}, {:.1f}, {:.1f}), "
+			"baked in {:.1f} s (reverb) + {:.1f} s (pathing), {:.1f} KB",
+			acoustics.ProbeCount, options.Acoustics.ProbeSpacing, acoustics.ProbeMin.X, acoustics.ProbeMin.Y,
+			acoustics.ProbeMin.Z, acoustics.ProbeMax.X, acoustics.ProbeMax.Y, acoustics.ProbeMax.Z,
+			acoustics.ReflectionSeconds, acoustics.PathingSeconds, static_cast<double>(acoustics.DataSize) / 1024.0));
 	}
 	else if (!result.Acoustics.Error.IsEmpty()) {
 		log(String::Fmt("  warning      no acoustics, {}", result.Acoustics.Error));

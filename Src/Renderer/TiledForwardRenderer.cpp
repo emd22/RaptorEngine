@@ -55,6 +55,7 @@ void TiledForwardRenderer::Create(const Vec2u& extent)
 	CreateBitmapTextPSO();
 	CreateParticlePSO();
 	CreateFogPSO();
+	gGraphics->Transport.CreatePipelines();
 	CreateLightCullingPSO();
 	CreateDebugLayerPSO();
 	CreateDebugSolidPSO();
@@ -71,8 +72,10 @@ void TiledForwardRenderer::CreateForwardPass()
 	// Forward pass
 	ForwardPass.Create("Forward", gGraphics->Swapchain.Extent, eSizeDivisor::FullRes);
 
-	// Lit target
-	ForwardPass.AddTarget(eImageFormat::RGBA16_Float, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+	// Lit target. Copied into SceneCopyPass when water needs the opaque scene behind it
+	ForwardPass.AddTarget(eImageFormat::RGBA16_Float,
+						  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+							  VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
 						  eImageAspectFlag::Color);
 
 	// Depth target. This shares the prepass's depth image and loads it rather than clearing, so the forward pass only
@@ -92,6 +95,42 @@ void TiledForwardRenderer::CreateForwardPass()
 	ForwardPass.AddTarget(depth);
 
 	ForwardPass.BuildRenderStage();
+
+	// The opaque scene as pre any blended draws.
+	SceneCopyPass.Create("SceneCopy", gGraphics->Swapchain.Extent, eSizeDivisor::FullRes);
+	SceneCopyPass.AddTarget(eImageFormat::RGBA16_Float,
+							VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+								VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+							eImageAspectFlag::Color);
+	SceneCopyPass.AddTarget(eImageFormat::D32_Float,
+							VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+								VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+							eImageAspectFlag::Depth);
+	SceneCopyPass.BuildRenderStage();
+
+
+	ForwardBlendPass.Create("ForwardBlend", gGraphics->Swapchain.Extent, eSizeDivisor::FullRes);
+
+	Target blend_lit(eImageFormat::RGBA16_Float, gGraphics->Swapchain.Extent, true,
+					 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+					 eImageAspectFlag::Color);
+	blend_lit.UseImageFromTarget(ForwardPass.GetTarget(eImageFormat::RGBA16_Float));
+	blend_lit.LoadOp = eLoadOp::Load;
+	blend_lit.InitialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	ForwardBlendPass.AddTarget(blend_lit);
+
+	Target blend_depth(eImageFormat::D32_Float, gGraphics->Swapchain.Extent, true,
+					   VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+						   VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+					   eImageAspectFlag::Depth);
+	blend_depth.UseImageFromTarget(prepass_depth);
+	blend_depth.LoadOp = eLoadOp::Load;
+	blend_depth.StencilLoadOp = eLoadOp::DontCare;
+	blend_depth.StencilStoreOp = eStoreOp::DontCare;
+	blend_depth.InitialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	ForwardBlendPass.AddTarget(blend_depth);
+
+	ForwardBlendPass.BuildRenderStage();
 }
 
 void TiledForwardRenderer::CreateParticlePass()
@@ -117,7 +156,9 @@ void TiledForwardRenderer::CreateDepthNormalPass()
 	Prepass.Create("DepthNormal", gGraphics->Swapchain.Extent, eSizeDivisor::FullRes);
 
 	// Depth target (index 0)
-	Prepass.AddTarget(eImageFormat::D32_Float, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+	Prepass.AddTarget(eImageFormat::D32_Float,
+					  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+						  VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
 					  eImageAspectFlag::Depth);
 
 	// World-space normals target (index 1)
@@ -160,7 +201,7 @@ void TiledForwardRenderer::CreateSSAOBlurPass()
 
 void TiledForwardRenderer::BuildPersistentDescriptor()
 {
-	SizedArray<DescriptorEntry> ds_entries(21);
+	SizedArray<DescriptorEntry> ds_entries(24);
 
 	ds_entries.Insert(DescriptorEntry::AsBuffer(0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 												ObjectManager::scBoundSize));
@@ -222,7 +263,7 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 												   eSamplerAddressMode::ClampToEdge,
 											   })));
 
-	ds_entries.Insert(DescriptorEntry::AsImage(18, eShaderType::Pixel, gGraphics->pLightmapIrradiance,
+	ds_entries.Insert(DescriptorEntry::AsImage(18, eShaderType::Pixel, gGraphics->GetShadingIrradiance(),
 											   gSamplerCache->Request({
 												   eSamplerFilter::Linear,
 												   eSamplerFilter::Linear,
@@ -270,6 +311,26 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 
 	ds_entries.Insert(DescriptorEntry::AsImage(11, eShaderType::Pixel, decal_atlas, gSamplerCache->Request({})));
 	ds_entries.Insert(DescriptorEntry::AsImage(12, eShaderType::Pixel, decal_normal_atlas, gSamplerCache->Request({})));
+
+	// tSceneColor
+	ds_entries.Insert(DescriptorEntry::AsImage(19, eShaderType::Pixel,
+											   &SceneCopyPass.GetTarget(eImageFormat::RGBA16_Float)->Image,
+											   gSamplerCache->Request({
+												   eSamplerFilter::Linear,
+												   eSamplerFilter::Linear,
+												   eSamplerFilter::Linear,
+												   eSamplerAddressMode::ClampToEdge,
+											   })));
+
+	// tSceneDepth
+	ds_entries.Insert(DescriptorEntry::AsImage(20, eShaderType::Pixel,
+											   &SceneCopyPass.GetTarget(eImageFormat::D32_Float)->Image,
+											   gSamplerCache->Request({
+												   eSamplerFilter::Nearest,
+												   eSamplerFilter::Nearest,
+												   eSamplerFilter::Nearest,
+												   eSamplerAddressMode::ClampToEdge,
+											   })));
 
 	result = gDescriptorCache->Request(ds_entries);
 	pPersistentDescriptor = result.second;
@@ -364,8 +425,6 @@ void TiledForwardRenderer::CreateDebugLayerPSO()
 
 void TiledForwardRenderer::CreateDebugSolidPSO()
 {
-	// Solid-fill variant of the debug layer (e.g. light probe markers).
-	// Same shader, but triangle topology instead of line list.
 	gPSOBuild->BeginPipeline(ePipelineName::DebugSolid);
 	gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DebugLayerPushConstants));
 
@@ -404,8 +463,8 @@ void TiledForwardRenderer::CreateDebugOverlayPSO()
 
 namespace {
 
-/// Every set of features that was built up front, in the order they are drawn in. Asking for any other set makes its
-/// pipeline the first time it is needed.
+/// All of the features that are built up front, in the order they are drawn in. Asking for another one creates it on
+/// demand
 constexpr ePipelineFeatures scStartupFeatures[] = {
 	ePipelineFeatures::None,
 	ePipelineFeatures::NormalMap,
@@ -516,6 +575,7 @@ bool TiledForwardRenderer::MakeForwardDesc(ePipelinePass pass, ePipelineFeatures
 	static const ShaderMacro scProbeCapture { .pcName = "PROBE_CAPTURE", .pcValue = "1" };
 	static const ShaderMacro scDebugViews { .pcName = "DEBUG_VIEWS", .pcValue = "1" };
 	static const ShaderMacro scBlendPass { .pcName = "BLEND_PASS", .pcValue = "1" };
+	static const ShaderMacro scWater { .pcName = "WATER", .pcValue = "1" };
 
 	const bool is_opaque = (pass == ePipelinePass::Forward || pass == ePipelinePass::ForwardDebug);
 	const bool is_blended = (pass == ePipelinePass::ForwardBlend || pass == ePipelinePass::ForwardBlendDebug);
@@ -533,13 +593,19 @@ bool TiledForwardRenderer::MakeForwardDesc(ePipelinePass pass, ePipelineFeatures
 	if (is_blended) {
 		out_desc.Macros.push_back(ShaderMacro { .pcName = "ALPHA_CUTOFF", .pcValue = "0.01" });
 		out_desc.Macros.push_back(scBlendPass);
+
+		if (HasFlag(features, ePipelineFeatures::Water)) {
+			out_desc.Macros.push_back(scWater);
+			out_desc.Features |= ePipelineFeatures::Water;
+			suffix += "Water";
+		}
 	}
 
 	const char* pass_suffix = "";
 
 	if (is_opaque) {
 		// The prepass has just drawn this geometry and already discarded its alpha masked texels, so the depth buffer
-		// holds exactly the depth of each visible fragment. Testing equal without writing depth or discarding lets the
+		// holds the depth of each VISIBLE fragment. Testing equal (without writing depth or discarding) lets the
 		// GPU reject hidden fragments before shading them.
 		out_desc.DepthCompareOp = VK_COMPARE_OP_EQUAL;
 		out_desc.bDepthWrite = false;
@@ -670,6 +736,11 @@ void TiledForwardRenderer::AddGlobalDescriptors()
 									  .MagFilter = eSamplerFilter::Linear,
 									  .MipFilter = eSamplerFilter::Linear,
 								  }));
+	// tSceneColor and tSceneDepth, bound in the persistent DS
+	gPSOBuild->AddImage(19, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
+						gSamplerCache->Request({}));
+	gPSOBuild->AddImage(20, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
+						gSamplerCache->Request({}));
 }
 
 void TiledForwardRenderer::AddDecalDescriptors()
@@ -678,7 +749,7 @@ void TiledForwardRenderer::AddDecalDescriptors()
 	gPSOBuild->AddBuffer(9, 0, eShaderType::Pixel, &gGraphics->DecalBuffer, 0, gGraphics->DecalPageSize);
 	// bDecalMasks
 	gPSOBuild->AddBuffer(10, 0, eShaderType::Pixel, &gGraphics->DecalMaskBuffer, 0, gGraphics->DecalMaskPageSize);
-	// tDecalAtlas and tDecalNormalAtlas, the real atlases are only bound in the persistent descriptor set
+	// tDecalAtlas and tDecalNormalAtlas. bound in the persistent DS
 	gPSOBuild->AddImage(11, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
 						gSamplerCache->Request({}));
 	gPSOBuild->AddImage(12, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
@@ -700,8 +771,30 @@ void TiledForwardRenderer::SetDecalAtlases(Image* atlas, Image* normal_atlas)
 
 void TiledForwardRenderer::CreateLightCullingPSO()
 {
-	gPSOBuild->BeginPipeline(ePipelineName::LightCulling);
-	gPSOBuild->SetShader(eShaderName::LightCulling, {});
+	BuildLightCullingPipeline(ePipelineName::LightCulling, true);
+	BuildLightCullingPipeline(ePipelineName::LightCullingCapture, false);
+}
+
+void TiledForwardRenderer::BuildLightCullingPipeline(ePipelineName name, bool depth_bounds)
+{
+	gPSOBuild->BeginPipeline(name);
+
+	if (depth_bounds) {
+		gPSOBuild->SetShader(eShaderName::LightCulling,
+							 { ShaderMacro { .pcName = "USE_DEPTH_BOUNDS", .pcValue = "1" } });
+
+		// tDepth
+		gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Compute, Prepass.GetTarget(eImageFormat::D32_Float),
+									  gSamplerCache->Request(SamplerProps {
+										  eSamplerFilter::Nearest,
+										  eSamplerFilter::Nearest,
+										  eSamplerFilter::Nearest,
+										  eSamplerAddressMode::ClampToEdge,
+									  }));
+	}
+	else {
+		gPSOBuild->SetShader(eShaderName::LightCulling, {});
+	}
 
 	// bLightGrid
 	gPSOBuild->AddBuffer(0, 0, eShaderType::Compute, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
@@ -762,11 +855,19 @@ void TiledForwardRenderer::DoLightCullingPass(BaseCamera& camera, const Vec2u* p
 	const bool is_main_view = (pExtentOverride == nullptr && pLightOverride == nullptr);
 	consts.DecalCount = is_main_view ? gDecalManager->GetVisibleCount() : 0;
 
-	// Probe captures cull into the same pages that the main view, and the face before, were just shaded from
+	// Same conversion as the fog, stored depth is 1 - ndc
+	const float32* projection = camera.GetProjectionMatrix().RawData;
+	consts.DepthA = static_cast<float32>(1.0 - static_cast<float64>(projection[10]));
+	consts.DepthB = -projection[14];
+
 	if (!is_main_view) {
 		BarrierHelper::BufferFragmentToCompute(cmd, &gGraphics->LightGridBuffer);
 		BarrierHelper::BufferFragmentToCompute(cmd, &gGraphics->LightIndexListBuffer);
 		BarrierHelper::BufferFragmentToCompute(cmd, &gGraphics->DecalMaskBuffer);
+	}
+	else {
+		// The prepass's render pass only syncs its depth with fragment shader reads
+		BarrierHelper::ComputeReadAfterAll(cmd);
 	}
 
 	// In binding order
@@ -776,7 +877,13 @@ void TiledForwardRenderer::DoLightCullingPass(BaseCamera& camera, const Vec2u* p
 	gPipelineCache->AddBufferOffset(0, gGraphics->GetDecalFrameOffset());
 	gPipelineCache->AddBufferOffset(0, gGraphics->GetDecalMaskFrameOffset());
 	gPipelineCache->SetFrameData(gGraphics->FrameAlloc.Push(consts));
-	gPipelineCache->Bind(ePipelineName::LightCulling, cmd);
+	ePipelineName pipeline = ePipelineName::LightCullingCapture;
+
+	if (is_main_view) {
+		pipeline = ePipelineName::LightCulling;
+	}
+
+	gPipelineCache->Bind(pipeline, cmd);
 
 	vkCmdDispatch(cmd.Get(), tile_columns, tile_rows, 1);
 
@@ -1104,12 +1211,20 @@ uint32 TiledForwardRenderer::GetViewConstants(const BaseCamera& camera, eObjectL
 		consts.Flags |= eDrawFlags::NoReflectionProbes;
 	}
 
+	if (gGraphics->bDisableReflectionNormalize) {
+		consts.Flags |= eDrawFlags::NoReflectionNormalize;
+	}
+
 	if (!is_probe_capture && gGraphics->ReflectionDebugView == 1) {
 		consts.Flags |= eDrawFlags::DebugReflection;
 	}
 
 	if (!is_probe_capture && gGraphics->ReflectionDebugView == 2) {
 		consts.Flags |= eDrawFlags::DebugReflectionCoverage;
+	}
+
+	if (!is_probe_capture && gGraphics->ReflectionDebugView == 3) {
+		consts.Flags |= eDrawFlags::DebugReflectionNormalize;
 	}
 
 	// Decals are placed in the world, and the view model only lines up with the world from the camera's position
@@ -1120,6 +1235,12 @@ uint32 TiledForwardRenderer::GetViewConstants(const BaseCamera& camera, eObjectL
 	memcpy(consts.ViewProjection, camera.GetCameraMatrix(layer).RawData, sizeof(Mat4f));
 	memcpy(consts.EyePosition, camera.GetPosition().mData, sizeof(float32) * 3);
 	consts.EyePosition[3] = 1.0f;
+
+	const float32* projection = camera.GetProjectionMatrix().RawData;
+	consts.DepthParams[0] = projection[10];
+	consts.DepthParams[1] = projection[14];
+
+	consts.Time = static_cast<float32>(gGraphics->ShaderTime);
 
 	CachedViewConstants& cached = mCachedViews[static_cast<uint32>(layer)];
 	const uint32 generation = gGraphics->FrameAlloc.GetGeneration();

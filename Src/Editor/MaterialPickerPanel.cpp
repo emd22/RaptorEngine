@@ -25,7 +25,6 @@
 #include <Material/SpecialMaterial.hpp>
 #include <World.hpp>
 #include <algorithm>
-#include <cctype>
 
 namespace fx::editor {
 
@@ -34,19 +33,14 @@ static constexpr int scCellWidth = 74;
 static constexpr int scCellPadding = 4;
 static constexpr int scLabelGap = 2;
 static constexpr int scRowsPerPage = 3;
-static constexpr uint32 scGlRgba8 = 0x8058;
-static constexpr uint32 scGlSrgb8Alpha8 = 0x8C43;
-
-static String ToLower(String text)
-{
-	std::transform(text.begin(), text.end(), text.begin(), [](unsigned char ch) { return std::tolower(ch); });
-	return text;
-}
 
 /// Reads the smallest mip that is at least `pixel_size` wide (or the base level) of an 8-bit RGBA or Basis KTX, as a
 /// bitmap that is `pixel_size / scale_factor` across on screen
 static wxBitmap LoadKtxBitmap(const String& path, const int pixel_size, const double scale_factor)
 {
+	constexpr uint32 scGlRgba8 = 0x8058;
+	constexpr uint32 scGlSrgb8Alpha8 = 0x8C43;
+
 	ktxTexture* texture = nullptr;
 	const String resolved = FilesystemIO::ResolvePath(path);
 
@@ -89,13 +83,21 @@ static wxBitmap LoadKtxBitmap(const String& path, const int pixel_size, const do
 		if (ktxTexture_GetImageOffset(texture, level, 0, 0, &offset) == KTX_SUCCESS) {
 			const uint8* pixels = ktxTexture_GetData(texture) + offset;
 
+			uint32 red_offset = 0;
+			uint32 blue_offset = 2;
+
+			if (is_bgra) {
+				red_offset = 2;
+				blue_offset = 0;
+			}
+
 			wxImage image(static_cast<int>(width), static_cast<int>(height), false);
 			uint8* rgb = image.GetData();
 
 			for (uint32 i = 0; i < width * height; i++) {
-				rgb[i * 3 + 0] = pixels[i * 4 + (is_bgra ? 2 : 0)];
+				rgb[i * 3 + 0] = pixels[i * 4 + red_offset];
 				rgb[i * 3 + 1] = pixels[i * 4 + 1];
-				rgb[i * 3 + 2] = pixels[i * 4 + (is_bgra ? 0 : 2)];
+				rgb[i * 3 + 2] = pixels[i * 4 + blue_offset];
 			}
 
 			const double scale = std::min(1.0, static_cast<double>(pixel_size) / std::max(width, height));
@@ -375,7 +377,7 @@ void MaterialPickerPanel::RebuildRows()
 
 	mShownSlots.Clear();
 
-	const String filter = ToLower(String(mpSearch->GetValue().ToStdString()));
+	const String filter = String(mpSearch->GetValue().ToStdString()).ToLower();
 
 	int selected_row = wxNOT_FOUND;
 
@@ -386,7 +388,7 @@ void MaterialPickerPanel::RebuildRows()
 			continue;
 		}
 
-		if (!filter.IsEmpty() && ToLower(name).FindNext(0, filter) == String::scNotFound) {
+		if (!filter.IsEmpty() && name.ToLower().FindNext(0, filter) == String::scNotFound) {
 			continue;
 		}
 

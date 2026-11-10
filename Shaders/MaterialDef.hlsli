@@ -5,6 +5,7 @@
 #define MF_ALPHA_MASK (1 << 2)
 #define MF_DOUBLE_SIDED (1 << 3)
 #define MF_GLASS (1 << 4)
+#define MF_WATER (1 << 5)
 
 /// Mirrors MaterialProperties in Src/Material/Material.hpp
 struct Material
@@ -28,6 +29,17 @@ struct Material
 
 	float3 vEmissiveFactor;
 	float fAlphaCutoff;
+
+	/// Scales the tangent space tilt of the normal map, 0 is flat
+	float fNormalStrength;
+
+	// For water, scrolling the normal maps
+	float fNormalScrollSpeed;
+
+	float fPadding;
+
+	/// For water, how much the light patterns on the floor under it brighten the floor. 0 has none
+	float fCausticStrength;
 };
 
 float GetAlphaCutoff(Material material)

@@ -15,17 +15,8 @@ namespace fx::physics {
 
 namespace {
 
-/// Fastest a blow can turn the figure about vertical (rad/s). It has little inertia that way, and arms held in close
-/// would otherwise spin it like a top
-constexpr float32 scMaxKnockYawRate = 1.5f;
-/// How far a sole can be off the ground and still count as a pivot (m)
-constexpr float32 scPivotClearance = 0.03f;
-
 constexpr uint32 scLocalChainLength = 3;
 constexpr float32 scLocalFalloff[scLocalChainLength] = { 1.0f, 0.6f, 0.3f };
-/// Bullets carry little momentum for how hard they should look. This is how much harder the struck limb takes it
-constexpr float32 scLocalScale = 2.5f;
-constexpr float32 scMaxLocalSpeed = 2.0f;
 
 /**
  * @brief How much of a blow on this body gets through to the rest of the figure. A limb swings with the blow and its
@@ -119,21 +110,16 @@ JPH::Mat44 GetFigureInertia(const Ragdoll& ragdoll, const JPH::Vec3 pivot)
 					  JPH::Vec4(0.0f, 0.0f, 0.0f, 1.0f));
 }
 
-JPH::Vec3 ClampLength(const JPH::Vec3 v, float32 max_length)
-{
-	const float32 length = v.Length();
-
-	if (length <= max_length || length <= 0.0f) {
-		return v;
-	}
-
-	return v * (max_length / length);
-}
-
 } // namespace
 
 Vec3f ApplyRagdollKnock(Ragdoll& ragdoll, const RagdollKnock& knock)
 {
+	// Fastest a blow can turn the figure about vertical (rad/s). It has little inertia that way, and arms held in
+	// close would otherwise spin it like a top
+	constexpr float32 scMaxKnockYawRate = 1.5f;
+	// How far a sole can be off the ground and still count as a pivot (m)
+	constexpr float32 scPivotClearance = 0.03f;
+
 	const float32 total_mass = ragdoll.GetTotalMass();
 	const uint32 body_count = ragdoll.GetSegmentCount();
 	const JPH::Vec3 up = JPH::Vec3::sAxisY();
@@ -243,6 +229,10 @@ Vec3f ApplyRagdollKnock(Ragdoll& ragdoll, const RagdollKnock& knock)
 
 void ApplyRagdollLocalHit(Ragdoll& ragdoll, uint32 body, const Vec3f impulse, const Vec3f point)
 {
+	// Bullets carry little momentum for how hard they should look. This is how much harder the struck limb takes it
+	constexpr float32 scLocalScale = 2.5f;
+	constexpr float32 scMaxLocalSpeed = 2.0f;
+
 	int32 chain[scLocalChainLength];
 	uint32 chain_length = 0;
 	float32 weighted_mass = 0.0f;

@@ -26,8 +26,10 @@ public:
 		uint32 ID = 0;
 	};
 
+	using RowArray = DynArray<Row, GrowthFunctions::Double>;
+
 private:
-	void ShowRows(const DynArray<Row>& rows);
+	void ShowRows(const RowArray& rows);
 
 	void OnRefreshButton(wxCommandEvent& event);
 	void OnItemActivated(wxListEvent& event);

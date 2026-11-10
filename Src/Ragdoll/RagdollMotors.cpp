@@ -17,22 +17,7 @@ using namespace RagdollMath;
 
 namespace {
 
-constexpr float32 scMotorMinFrequencyScale = 0.2f;
-/// How far the muscles let go as a fall completes: at full fall progress strength drops to 1 minus this
-constexpr float32 scFallLimp = 0.65f;
 constexpr float32 scMinSubtreeInertia = 1e-4f;
-constexpr float32 scGravityCompFullStrength = 0.25f;
-constexpr float32 scOverrideFadeTime = 0.4f;
-/// How quickly a joint's target eases towards what's asked for (rad/s), critically damped
-constexpr float32 scMotorTargetOmega = 40.0f;
-constexpr float32 scMotorPreciseOmega = 150.0f;
-/// How quickly a joint's stiffness and torque limit change (s)
-constexpr float32 scMotorGainTime = 0.03f;
-
-constexpr float32 scRootAssistFrequency = 6.0f;
-constexpr float32 scRootAssistDamping = 1.0f;
-constexpr float32 scRootAssistMaxForce = 1500.0f;
-constexpr float32 scRootAssistMaxTorque = 600.0f;
 
 /// Spring with natural frequency `omega` and damping ratio `damping` for a `mass` (or moment of inertia), times `scale`
 JPH::SpringSettings MakeSpring(float32 mass, float32 omega, float32 damping, float32 scale = 1.0f)
@@ -48,6 +33,8 @@ float32 GetLeadTime(float32 damping, float32 omega) { return 2.0f * damping / om
 
 void Ragdoll::OnStep(const JPH::PhysicsStepListenerContext& inContext)
 {
+	constexpr float32 scOverrideFadeTime = 0.4f;
+
 	if (mpRagdoll == nullptr) {
 		return;
 	}
@@ -256,6 +243,9 @@ JPH::Quat Ragdoll::FilterMotorTarget(MotorFilter& filter, const JPH::Quat& targe
 void Ragdoll::FilterMotorGains(MotorFilter& filter, const JPH::SpringSettings& spring, float32 torque,
 							   float32 delta_time) const
 {
+	// How quickly a joint's stiffness and torque limit change (s)
+	constexpr float32 scMotorGainTime = 0.03f;
+
 	const float32 blend = 1.0f - std::exp(-delta_time / scMotorGainTime);
 
 	filter.Stiffness += (spring.mStiffness - filter.Stiffness) * blend;
@@ -265,6 +255,13 @@ void Ragdoll::FilterMotorGains(MotorFilter& filter, const JPH::SpringSettings& s
 
 void Ragdoll::ApplyMotor(uint32 body_index, float32 delta_time)
 {
+	constexpr float32 scMotorMinFrequencyScale = 0.2f;
+	// How far the muscles let go as a fall completes: at full fall progress strength drops to 1 minus this
+	constexpr float32 scFallLimp = 0.65f;
+	// How quickly a joint's target eases towards what's asked for (rad/s), critically damped
+	constexpr float32 scMotorTargetOmega = 40.0f;
+	constexpr float32 scMotorPreciseOmega = 150.0f;
+
 	const RDSegmentInfo& info = mSegments[body_index];
 
 	if (!mbHasMotors || info.ParentBody < 0) {
@@ -288,7 +285,12 @@ void Ragdoll::ApplyMotor(uint32 body_index, float32 delta_time)
 	}
 
 	// Muscles let go as the body falls, so it folds over the approach rather than snapping limp at the threshold
-	const float32 fall = mbBalancing ? mBalance.GetStatus().FallProgress : 0.0f;
+	float32 fall = 0.0f;
+
+	if (mbBalancing) {
+		fall = mBalance.GetStatus().FallProgress;
+	}
+
 	const float32 strength = info.Strength * (1.0f - scFallLimp * fall);
 
 	const float32 frequency = info.Muscle.Stiffness * motor_override.FrequencyScale *
@@ -380,6 +382,8 @@ void Ragdoll::ApplyMotor(uint32 body_index, float32 delta_time)
 
 void Ragdoll::ApplyGravityCompensation(JPH::BodyInterface& body_interface, const JPH::Vec3 gravity)
 {
+	constexpr float32 scGravityCompFullStrength = 0.25f;
+
 	for (uint32 i = 1; i < mSegments.Size; i++) {
 		const RDSegmentInfo& info = mSegments[i];
 		const RDSegmentState& state = mSegmentStates[i];
@@ -409,6 +413,11 @@ void Ragdoll::ApplyGravityCompensation(JPH::BodyInterface& body_interface, const
 
 void Ragdoll::ApplyRootAssist(JPH::BodyInterface& body_interface, const JPH::Vec3 gravity)
 {
+	constexpr float32 scRootAssistFrequency = 6.0f;
+	constexpr float32 scRootAssistDamping = 1.0f;
+	constexpr float32 scRootAssistMaxForce = 1500.0f;
+	constexpr float32 scRootAssistMaxTorque = 600.0f;
+
 	const bool is_active = (mpRootAssist != nullptr) && (mRootAssist > 0.0f) && !mbBalancing &&
 						   (mSegments[0].Mode == eRagdollBodyMode::Powered);
 
@@ -472,12 +481,12 @@ void Ragdoll::ApplyFootPlants()
 {
 	using EAxis = JPH::SixDOFConstraint::EAxis;
 
-	/// How firmly a plant holds its spot and its level, against the weight it carries (Hz)
+	// How firmly a plant holds its spot and its level, against the weight it carries (Hz)
 	constexpr float32 scPlantFrequency = 15.0f;
 	constexpr float32 scPlantTurnFrequency = 6.0f;
-	/// Furthest a foot can be pulled from its spot before it counts as having slipped there (m)
+	// Furthest a foot can be pulled from its spot before it counts as having slipped there (m)
 	constexpr float32 scMaxPlantStretch = 0.02f;
-	/// Leverage a sole has on its own spin, compared with the sole's half length (m)
+	// Leverage a sole has on its own spin, compared with the sole's half length (m)
 	constexpr float32 scPlantSpinArm = 0.04f;
 
 	for (uint32 leg = 0; leg < RagdollRig::scLimbCount; leg++) {

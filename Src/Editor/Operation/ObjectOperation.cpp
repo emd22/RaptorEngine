@@ -305,20 +305,31 @@ ObjectEditOperation::ObjectEditOperation(Object* object, int32 group_size) : Edi
 void ObjectEditOperation::Retarget(Object* object)
 {
 	mpObject = object;
-	mObjectID = (object != nullptr) ? object->ID : ObjectID::scNull;
+
+	mObjectID = ObjectID::scNull;
+	if (object != nullptr) {
+		mObjectID = object->ID;
+	}
+}
+
+static Object* ResolveLiveObject(Object* object, ObjectID id)
+{
+	if (object == nullptr || id.IsInvalid()) {
+		return nullptr;
+	}
+
+	Object* live = gObjectManager->GetObject(id);
+
+	if (live == object) {
+		return live;
+	}
+
+	return nullptr;
 }
 
 /// Returns the op's object only if it is still alive (guards against use-after-free
 /// when an object was destroyed outside of undo/redo).
-Object* ObjectEditOperation::ResolveTarget() const
-{
-	if (mpObject == nullptr || mObjectID.IsInvalid()) {
-		return nullptr;
-	}
-
-	Object* live = gObjectManager->GetObject(mObjectID);
-	return (live == mpObject) ? live : nullptr;
-}
+Object* ObjectEditOperation::ResolveTarget() const { return ResolveLiveObject(mpObject, mObjectID); }
 
 void ObjectCreationOperation::Undo(EditorSelection& selection)
 {
@@ -620,15 +631,7 @@ DupeOperation::DupeOperation(Object* original, const Vec3f& position, int32 grou
 {
 }
 
-Object* DupeOperation::GetDupe() const
-{
-	if (mpDupe == nullptr || mDupeID.IsInvalid()) {
-		return nullptr;
-	}
-
-	Object* live = gObjectManager->GetObject(mDupeID);
-	return (live == mpDupe) ? live : nullptr;
-}
+Object* DupeOperation::GetDupe() const { return ResolveLiveObject(mpDupe, mDupeID); }
 
 void DupeOperation::Execute(EditorSelection& selection)
 {

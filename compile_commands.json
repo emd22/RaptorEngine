@@ -79,6 +79,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/Users/emd22/Projects/raptor/Submodules/libdeflate -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/raptor.dir/Src/Asset/Loader/Object/ModelGeometry.cpp.o -c /Users/emd22/Projects/raptor/Src/Asset/Loader/Object/ModelGeometry.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Asset/Loader/Object/ModelGeometry.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Asset/Loader/Object/ModelGeometry.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/Users/emd22/Projects/raptor/Submodules/libdeflate -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/raptor.dir/Src/Asset/Loader/Object/RxModelConfig.cpp.o -c /Users/emd22/Projects/raptor/Src/Asset/Loader/Object/RxModelConfig.cpp",
   "file": "/Users/emd22/Projects/raptor/Src/Asset/Loader/Object/RxModelConfig.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Asset/Loader/Object/RxModelConfig.cpp.o"
@@ -124,6 +130,12 @@
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/Users/emd22/Projects/raptor/Submodules/libdeflate -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/raptor.dir/Src/Audio/Acoustics.cpp.o -c /Users/emd22/Projects/raptor/Src/Audio/Acoustics.cpp",
   "file": "/Users/emd22/Projects/raptor/Src/Audio/Acoustics.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Audio/Acoustics.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/Users/emd22/Projects/raptor/Submodules/libdeflate -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/raptor.dir/Src/Audio/AudioDebugView.cpp.o -c /Users/emd22/Projects/raptor/Src/Audio/AudioDebugView.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Audio/AudioDebugView.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Audio/AudioDebugView.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
@@ -196,6 +208,12 @@
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/Users/emd22/Projects/raptor/Submodules/libdeflate -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/raptor.dir/Src/Controller/PlayerController.cpp.o -c /Users/emd22/Projects/raptor/Src/Controller/PlayerController.cpp",
   "file": "/Users/emd22/Projects/raptor/Src/Controller/PlayerController.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Controller/PlayerController.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/Users/emd22/Projects/raptor/Submodules/libdeflate -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/raptor.dir/Src/Controller/SwimController.cpp.o -c /Users/emd22/Projects/raptor/Src/Controller/SwimController.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Controller/SwimController.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Controller/SwimController.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
@@ -1093,6 +1111,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/Users/emd22/Projects/raptor/Submodules/libdeflate -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/raptor.dir/Src/Renderer/LightTransport.cpp.o -c /Users/emd22/Projects/raptor/Src/Renderer/LightTransport.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Renderer/LightTransport.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Renderer/LightTransport.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/Users/emd22/Projects/raptor/Submodules/libdeflate -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/raptor.dir/Src/Renderer/PSOBuild.cpp.o -c /Users/emd22/Projects/raptor/Src/Renderer/PSOBuild.cpp",
   "file": "/Users/emd22/Projects/raptor/Src/Renderer/PSOBuild.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Renderer/PSOBuild.cpp.o"
@@ -1210,6 +1234,12 @@
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/Users/emd22/Projects/raptor/Submodules/libdeflate -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/raptor.dir/Src/Script/ScriptInterop.cpp.o -c /Users/emd22/Projects/raptor/Src/Script/ScriptInterop.cpp",
   "file": "/Users/emd22/Projects/raptor/Src/Script/ScriptInterop.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Script/ScriptInterop.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DFX_IS_EDITOR -DFX_USE_PORTABILITY_EXTENSION -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -DWXUSINGDLL -D_FILE_OFFSET_BITS=64 -D__WXMAC__ -D__WXOSX_COCOA__ -D__WXOSX__ -DwxDEBUG_LEVEL=0 -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/Users/emd22/Projects/raptor/Submodules/libdeflate -isystem /Users/emd22/Projects/raptor/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -isystem /opt/homebrew/lib/wx/include/osx_cocoa-unicode-3.3 -isystem /opt/homebrew/include/wx-3.3 -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/raptor.dir/Src/Script/ScriptLayout.cpp.o -c /Users/emd22/Projects/raptor/Src/Script/ScriptLayout.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Script/ScriptLayout.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/raptor.dir/Src/Script/ScriptLayout.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
@@ -2173,6 +2203,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -I/Users/emd22/Projects/raptor/Submodules/libdeflate -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Tools/MapCompiler/Models.cpp.o -c /Users/emd22/Projects/raptor/Tools/MapCompiler/Models.cpp",
+  "file": "/Users/emd22/Projects/raptor/Tools/MapCompiler/Models.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Tools/MapCompiler/Models.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -I/Users/emd22/Projects/raptor/Submodules/libdeflate -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Tools/MapCompiler/Patches.cpp.o -c /Users/emd22/Projects/raptor/Tools/MapCompiler/Patches.cpp",
   "file": "/Users/emd22/Projects/raptor/Tools/MapCompiler/Patches.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Tools/MapCompiler/Patches.cpp.o"
@@ -2242,6 +2278,30 @@
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -I/Users/emd22/Projects/raptor/Submodules/libdeflate -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Asset/ConfigFile.cpp.o -c /Users/emd22/Projects/raptor/Src/Asset/ConfigFile.cpp",
   "file": "/Users/emd22/Projects/raptor/Src/Asset/ConfigFile.cpp",
   "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Asset/ConfigFile.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -I/Users/emd22/Projects/raptor/Submodules/libdeflate -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Asset/Loader/Object/ModelGeometry.cpp.o -c /Users/emd22/Projects/raptor/Src/Asset/Loader/Object/ModelGeometry.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Asset/Loader/Object/ModelGeometry.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Asset/Loader/Object/ModelGeometry.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -I/Users/emd22/Projects/raptor/Submodules/libdeflate -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Asset/Loader/Object/RxModelConfig.cpp.o -c /Users/emd22/Projects/raptor/Src/Asset/Loader/Object/RxModelConfig.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Asset/Loader/Object/RxModelConfig.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Asset/Loader/Object/RxModelConfig.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -I/Users/emd22/Projects/raptor/Submodules/libdeflate -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -o CMakeFiles/mapc_core.dir/Src/Asset/Loader/Object/RxModelFormat.cpp.o -c /Users/emd22/Projects/raptor/Src/Asset/Loader/Object/RxModelFormat.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/Asset/Loader/Object/RxModelFormat.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/Asset/Loader/Object/RxModelFormat.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -I/Users/emd22/Projects/raptor/Src -I/Users/emd22/Projects/raptor/Tools/MapCompiler -I/Users/emd22/Projects/raptor/Submodules/libdeflate -isystem /Users/emd22/Projects/raptor/Src/ThirdParty -isystem /Users/emd22/Projects/raptor/Lib/Include -isystem /Users/emd22/Projects/raptor/Submodules/mimalloc/include -O2 -g -DNDEBUG -std=gnu++20 -arch arm64 -Wshadow --system-header-prefix=ThirdParty/ -O2 -g -w -o CMakeFiles/mapc_core.dir/Src/ThirdParty/cgltf.cpp.o -c /Users/emd22/Projects/raptor/Src/ThirdParty/cgltf.cpp",
+  "file": "/Users/emd22/Projects/raptor/Src/ThirdParty/cgltf.cpp",
+  "output": "/Users/emd22/Projects/raptor/CMakeFiles/mapc_core.dir/Src/ThirdParty/cgltf.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
@@ -2419,6 +2479,18 @@
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/AST/ASTClone.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/AST/ASTClone.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/AST/ASTClone.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/AST/ASTClone.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/Monomorphize.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Monomorphize.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Monomorphize.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/Monomorphize.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
   "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Core/Util.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Core/Util.c",
   "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Core/Util.c",
   "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Core/Util.c.o"
@@ -2455,9 +2527,171 @@
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
-  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/ResolveOverloads.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/ResolveOverloads.c",
-  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/ResolveOverloads.c",
-  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/ResolveOverloads.c.o"
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Parse/ParseLiteral.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Parse/ParseLiteral.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Parse/ParseLiteral.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Parse/ParseLiteral.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Parse/ParseType.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Parse/ParseType.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Parse/ParseType.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Parse/ParseType.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Parse/ParseDecl.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Parse/ParseDecl.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Parse/ParseDecl.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Parse/ParseDecl.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Parse/ParseStmt.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Parse/ParseStmt.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Parse/ParseStmt.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Parse/ParseStmt.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Parse/ParseExpr.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Parse/ParseExpr.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Parse/ParseExpr.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Parse/ParseExpr.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/ConstEval.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/ConstEval.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/ConstEval.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/ConstEval.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/TypeRules.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/TypeRules.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/TypeRules.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/TypeRules.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Moves.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Moves.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Moves.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Moves.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Borrows.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Borrows.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Borrows.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Borrows.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Vectors.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Vectors.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Vectors.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Vectors.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Strings.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Strings.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Strings.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Strings.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Arrays.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Arrays.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Arrays.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Arrays.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Memory.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Memory.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Memory.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Memory.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Calls.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Calls.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Calls.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Calls.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Members.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Members.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Members.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Members.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Enums.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Enums.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Enums.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Enums.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Expr.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Expr.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Expr.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Expr.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Stmt.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Stmt.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Stmt.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Stmt.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Decls.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Decls.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Resolve/Decls.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/Resolve/Decls.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/ConstFold.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/ConstFold.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/ConstFold.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/ConstFold.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/Cfg.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Cfg.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Cfg.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/Cfg.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/MoveCheck/Places.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/MoveCheck/Places.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/MoveCheck/Places.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/MoveCheck/Places.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/MoveCheck/Facts.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/MoveCheck/Facts.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/MoveCheck/Facts.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/MoveCheck/Facts.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/MoveCheck/Loans.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/MoveCheck/Loans.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/MoveCheck/Loans.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/MoveCheck/Loans.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/MoveCheck/WriteSets.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/MoveCheck/WriteSets.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/MoveCheck/WriteSets.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/MoveCheck/WriteSets.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/MoveCheck/MoveCheck.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/MoveCheck/MoveCheck.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/MoveCheck/MoveCheck.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/MoveCheck/MoveCheck.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/NodeTypes.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/NodeTypes.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/NodeTypes.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/NodeTypes.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/Builtins.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Builtins.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Sema/Builtins.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Sema/Builtins.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
@@ -2491,9 +2725,39 @@
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
-  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Embed.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Embed.c",
-  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Embed.c",
-  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Embed.c.o"
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Embed/Pipeline.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Embed/Pipeline.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Embed/Pipeline.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Embed/Pipeline.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Embed/Compiler.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Embed/Compiler.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Embed/Compiler.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Embed/Compiler.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Embed/Jit.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Embed/Jit.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Embed/Jit.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Embed/Jit.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Embed/Aot.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Embed/Aot.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Embed/Aot.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Embed/Aot.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Embed/Types.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Embed/Types.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Embed/Types.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Embed/Types.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Embed/Runtime.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Embed/Runtime.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Embed/Runtime.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Embed/Runtime.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
@@ -2509,9 +2773,111 @@
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
-  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/LLVMModuleBuilder.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/LLVMModuleBuilder.c",
-  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/LLVMModuleBuilder.c",
-  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/LLVMModuleBuilder.c.o"
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Arrays.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Arrays.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Arrays.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Arrays.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Assign.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Assign.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Assign.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Assign.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Boxes.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Boxes.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Boxes.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Boxes.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Call.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Call.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Call.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Call.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/ConstInit.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/ConstInit.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/ConstInit.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/ConstInit.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Equality.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Equality.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Equality.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Equality.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Expr.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Expr.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Expr.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Expr.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Function.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Function.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Function.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Function.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/IrUtil.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/IrUtil.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/IrUtil.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/IrUtil.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Module.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Module.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Module.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Module.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Numeric.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Numeric.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Numeric.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Numeric.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Ownership.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Ownership.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Ownership.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Ownership.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Runtime.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Runtime.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Runtime.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Runtime.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Stmt.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Stmt.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Stmt.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Stmt.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Strings.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Strings.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Strings.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Strings.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Structs.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Structs.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Structs.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Structs.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Types.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Types.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Types.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Types.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Vectors.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Vectors.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/Builder/Vectors.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/Builder/Vectors.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
@@ -2527,9 +2893,45 @@
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/LLVMTargets.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/LLVMTargets.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Codegen/LLVMTargets.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/LLVMTargets.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
   "command": "/usr/bin/cc -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/stratac.dir/src/stratac/main.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/stratac/main.c",
   "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/stratac/main.c",
   "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/stratac.dir/src/stratac/main.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata-lsp.dir/src/Lsp/Main.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Lsp/Main.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Lsp/Main.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata-lsp.dir/src/Lsp/Main.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata-lsp.dir/src/Lsp/Json.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Lsp/Json.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Lsp/Json.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata-lsp.dir/src/Lsp/Json.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata-lsp.dir/src/Lsp/Server.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Lsp/Server.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Lsp/Server.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata-lsp.dir/src/Lsp/Server.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata-lsp.dir/src/Lsp/Transport.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Lsp/Transport.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Lsp/Transport.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata-lsp.dir/src/Lsp/Transport.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_STATIC -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata-lsp.dir/src/Lsp/Uri.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/src/Lsp/Uri.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/src/Lsp/Uri.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata-lsp.dir/src/Lsp/Uri.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
@@ -2590,6 +2992,18 @@
   "command": "/usr/bin/cc -DSTRATA_SAMPLE_DIR=\\\"/Users/emd22/Projects/raptor/Submodules/strata/samples\\\" -DSTRATA_STATIC -DSTRATA_TEST_HAS_LLVM=1 -I/Users/emd22/Projects/raptor/Submodules/strata/tests/unit -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/ParserTests.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/tests/unit/ParserTests.c",
   "file": "/Users/emd22/Projects/raptor/Submodules/strata/tests/unit/ParserTests.c",
   "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/ParserTests.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_SAMPLE_DIR=\\\"/Users/emd22/Projects/raptor/Submodules/strata/samples\\\" -DSTRATA_STATIC -DSTRATA_TEST_HAS_LLVM=1 -I/Users/emd22/Projects/raptor/Submodules/strata/tests/unit -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/GenericTests.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/tests/unit/GenericTests.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/tests/unit/GenericTests.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/GenericTests.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_SAMPLE_DIR=\\\"/Users/emd22/Projects/raptor/Submodules/strata/samples\\\" -DSTRATA_STATIC -DSTRATA_TEST_HAS_LLVM=1 -I/Users/emd22/Projects/raptor/Submodules/strata/tests/unit -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/MetaTests.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/tests/unit/MetaTests.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/tests/unit/MetaTests.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/MetaTests.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/raptor",
@@ -2728,6 +3142,18 @@
   "command": "/usr/bin/cc -DSTRATA_SAMPLE_DIR=\\\"/Users/emd22/Projects/raptor/Submodules/strata/samples\\\" -DSTRATA_STATIC -DSTRATA_TEST_HAS_LLVM=1 -I/Users/emd22/Projects/raptor/Submodules/strata/tests/unit -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/TypeAliasTests.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/tests/unit/TypeAliasTests.c",
   "file": "/Users/emd22/Projects/raptor/Submodules/strata/tests/unit/TypeAliasTests.c",
   "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/TypeAliasTests.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_SAMPLE_DIR=\\\"/Users/emd22/Projects/raptor/Submodules/strata/samples\\\" -DSTRATA_STATIC -DSTRATA_TEST_HAS_LLVM=1 -I/Users/emd22/Projects/raptor/Submodules/strata/tests/unit -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/TypeClassifyTests.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/tests/unit/TypeClassifyTests.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/tests/unit/TypeClassifyTests.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/TypeClassifyTests.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/raptor",
+  "command": "/usr/bin/cc -DSTRATA_SAMPLE_DIR=\\\"/Users/emd22/Projects/raptor/Submodules/strata/samples\\\" -DSTRATA_STATIC -DSTRATA_TEST_HAS_LLVM=1 -I/Users/emd22/Projects/raptor/Submodules/strata/tests/unit -I/Users/emd22/Projects/raptor/Submodules/strata/include -I/Users/emd22/Projects/raptor/Submodules/strata/src -O2 -g -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/CfgTests.c.o -c /Users/emd22/Projects/raptor/Submodules/strata/tests/unit/CfgTests.c",
+  "file": "/Users/emd22/Projects/raptor/Submodules/strata/tests/unit/CfgTests.c",
+  "output": "/Users/emd22/Projects/raptor/Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/CfgTests.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/raptor",

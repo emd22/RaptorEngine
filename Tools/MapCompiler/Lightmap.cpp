@@ -5,6 +5,7 @@
 
 #include <Math/MathConsts.hpp>
 #include <Math/MathUtil.hpp>
+#include <Math/Rect.hpp>
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -17,18 +18,7 @@ namespace fx::mapc {
 namespace {
 
 constexpr uint32 scChartPadding = 1;
-constexpr uint32 scMinAtlasSize = 64;
-constexpr uint32 scAtlasHeightStep = 4;
-constexpr double scAtlasFillEstimate = 1.15;
-constexpr double scDensityStep = 0.8;
-constexpr double scMinDensity = 0.25;
-constexpr double scSizeEpsilon = 1e-6;
-constexpr double scSurfaceBias = 1e-3;
 constexpr double scCoverageEpsilon = 1e-9;
-constexpr uint32 scRowsPerClaim = 8;
-constexpr uint32 scDirectionShuffle = 7919;
-constexpr uint8 scFullyLit = 255;
-constexpr double scThinInset = 0.05;
 constexpr uint32 scBuriedRays = 16;
 
 
@@ -46,7 +36,11 @@ struct SunSampler
 public:
 	SunSampler(const Vec3d& direction, double radius_degrees) : Direction(direction)
 	{
-		const Vec3d reference = (std::abs(direction.Y) < 0.9) ? Vec3d(0.0, 1.0, 0.0) : Vec3d(1.0, 0.0, 0.0);
+		Vec3d reference(1.0, 0.0, 0.0);
+
+		if (std::abs(direction.Y) < 0.9) {
+			reference = Vec3d(0.0, 1.0, 0.0);
+		}
 
 		Right = reference.Cross(direction).Normalized();
 		Up = direction.Cross(Right);
@@ -109,23 +103,25 @@ public:
 
 bool MeasureCharts(const Array<LightmapChart>& charts, double density, uint32 max_size, Array<ChartLayout>& out_layouts)
 {
+	constexpr double scSizeEpsilon = 1e-6;
+
 	out_layouts.Clear();
 
 	for (const LightmapChart& chart : charts) {
-		Vec2d min = chart.TrianglePoints[0];
-		Vec2d max = min;
+		DRect bounds;
 
 		for (const Vec2d& point : chart.TrianglePoints) {
-			min = Vec2d(std::fmin(min.X, point.X), std::fmin(min.Y, point.Y));
-			max = Vec2d(std::fmax(max.X, point.X), std::fmax(max.Y, point.Y));
+			bounds.Min = Vec2d::Min(bounds.Min, point);
+			bounds.Max = Vec2d::Max(bounds.Max, point);
 		}
 
 		ChartLayout layout;
-		layout.Min = Vec2d(std::floor(min.X * density) / density, std::floor(min.Y * density) / density);
+		layout.Min = Vec2d(std::floor(bounds.Min.X * density) / density, std::floor(bounds.Min.Y * density) / density);
 
-		layout.Width = static_cast<uint32>(std::fmax(1.0, std::ceil((max.X - layout.Min.X) * density - scSizeEpsilon)));
+		layout.Width = static_cast<uint32>(
+			std::fmax(1.0, std::ceil((bounds.Max.X - layout.Min.X) * density - scSizeEpsilon)));
 		layout.Height = static_cast<uint32>(
-			std::fmax(1.0, std::ceil((max.Y - layout.Min.Y) * density - scSizeEpsilon)));
+			std::fmax(1.0, std::ceil((bounds.Max.Y - layout.Min.Y) * density - scSizeEpsilon)));
 
 		if (layout.GetPaddedWidth() > max_size || layout.GetPaddedHeight() > max_size) {
 			return false;
@@ -176,6 +172,12 @@ bool PackCharts(Array<ChartLayout>& layouts, const Array<uint32>& order, uint32 
 bool LayOutCharts(const Array<LightmapChart>& charts, const LightmapOptions& options, Array<ChartLayout>& out_layouts,
 				  uint32& out_width, uint32& out_height, double& out_density)
 {
+	constexpr uint32 scMinAtlasSize = 64;
+	constexpr uint32 scAtlasHeightStep = 4;
+	constexpr double scAtlasFillEstimate = 1.15;
+	constexpr double scDensityStep = 0.8;
+	constexpr double scMinDensity = 0.25;
+
 	const uint32 max_size = std::max(options.MaxSize, scMinAtlasSize);
 
 	Array<uint32> order;
@@ -260,18 +262,16 @@ struct RowJob
 
 Vec2d GetClosestPointOnSegment(const Vec2d& from, const Vec2d& to, const Vec2d& point)
 {
-	const double edge_x = to.X - from.X;
-	const double edge_y = to.Y - from.Y;
-	const double length_sq = edge_x * edge_x + edge_y * edge_y;
+	const Vec2d edge = to - from;
+	const double length_sq = edge.LengthSquared();
 
 	if (length_sq <= 0.0) {
 		return from;
 	}
 
-	const double fraction = std::fmin(
-		std::fmax(((point.X - from.X) * edge_x + (point.Y - from.Y) * edge_y) / length_sq, 0.0), 1.0);
+	const double fraction = std::fmin(std::fmax((point - from).Dot(edge) / length_sq, 0.0), 1.0);
 
-	return Vec2d(from.X + edge_x * fraction, from.Y + edge_y * fraction);
+	return from + edge * fraction;
 }
 
 bool IsInsideTriangle(const Vec2d corners[3], double x, double y)
@@ -283,7 +283,7 @@ bool IsInsideTriangle(const Vec2d corners[3], double x, double y)
 		const Vec2d& from = corners[edge];
 		const Vec2d& to = corners[(edge + 1) % 3];
 
-		const double side = (to.X - from.X) * (y - from.Y) - (to.Y - from.Y) * (x - from.X);
+		const double side = to.CrossOffset(Vec2d(x, y), from);
 
 		all_positive = all_positive && (side >= -scCoverageEpsilon);
 		all_negative = all_negative && (side <= scCoverageEpsilon);
@@ -334,27 +334,24 @@ struct SurfacePoint
 SurfacePoint InterpolateChart(const LightmapChart& chart, const Vec2d texel_corners[3], uint32 first_corner, double x,
 							  double y)
 {
-	const auto signed_area = [](const Vec2d& a, const Vec2d& b, double px, double py)
-	{ return (b.X - a.X) * (py - a.Y) - (b.Y - a.Y) * (px - a.X); };
+	const double total = texel_corners[1].CrossOffset(texel_corners[2], texel_corners[0]);
 
-	const double total = signed_area(texel_corners[0], texel_corners[1], texel_corners[2].X, texel_corners[2].Y);
-
-	double weights[3] = { 1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0 };
+	Vec3d weights(1.0 / 3.0);
 
 	if (std::abs(total) > scCoverageEpsilon) {
-		weights[0] = signed_area(texel_corners[1], texel_corners[2], x, y) / total;
-		weights[1] = signed_area(texel_corners[2], texel_corners[0], x, y) / total;
-		weights[2] = 1.0 - weights[0] - weights[1];
+		weights.X = texel_corners[2].CrossOffset(Vec2d(x, y), texel_corners[1]) / total;
+		weights.Y = texel_corners[0].CrossOffset(Vec2d(x, y), texel_corners[2]) / total;
+		weights.Z = 1.0 - weights.X - weights.Y;
 
 		double sum = 0.0;
 
-		for (double& weight : weights) {
-			weight = std::fmax(weight, 0.0);
-			sum += weight;
+		for (uint32 corner = 0; corner < 3; corner++) {
+			weights.mData[corner] = std::fmax(weights.mData[corner], 0.0);
+			sum += weights.mData[corner];
 		}
 
-		for (double& weight : weights) {
-			weight /= sum;
+		for (uint32 corner = 0; corner < 3; corner++) {
+			weights.mData[corner] /= sum;
 		}
 	}
 
@@ -362,8 +359,8 @@ SurfacePoint InterpolateChart(const LightmapChart& chart, const Vec2d texel_corn
 	Vec3d normal = Vec3d(0.0);
 
 	for (uint32 corner = 0; corner < 3; corner++) {
-		point.Position = point.Position + chart.WorldPoints[first_corner + corner] * weights[corner];
-		normal = normal + chart.Normals[first_corner + corner] * weights[corner];
+		point.Position = point.Position + chart.WorldPoints[first_corner + corner] * weights.mData[corner];
+		normal = normal + chart.Normals[first_corner + corner] * weights.mData[corner];
 	}
 
 	point.Normal = normal.Normalized();
@@ -371,8 +368,17 @@ SurfacePoint InterpolateChart(const LightmapChart& chart, const Vec2d texel_corn
 	return point;
 }
 
+Vec2d GetTexelPoint(const Vec2d& point, const ChartLayout& layout, double density)
+{
+	return Vec2d((point.X - layout.Min.X) * density + scChartPadding,
+				 (point.Y - layout.Min.Y) * density + scChartPadding);
+}
+
 void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 {
+	constexpr double scSurfaceBias = 1e-3;
+	constexpr double scThinInset = 0.05;
+
 	const LightmapChart& chart = context.Charts[job.Chart];
 	const ChartLayout& layout = context.Layouts[job.Chart];
 	const bool is_planar = chart.IsPlanar();
@@ -408,18 +414,17 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 		Vec2d corners[3];
 
 		for (uint32 corner = 0; corner < 3; corner++) {
-			const Vec2d& point = chart.TrianglePoints[triangle + corner];
-
-			corners[corner] = Vec2d((point.X - layout.Min.X) * density + scChartPadding,
-									(point.Y - layout.Min.Y) * density + scChartPadding);
+			corners[corner] = GetTexelPoint(chart.TrianglePoints[triangle + corner], layout, density);
 		}
 
-		const double min_x = std::fmin(corners[0].X, std::fmin(corners[1].X, corners[2].X));
-		const double max_x = std::fmax(corners[0].X, std::fmax(corners[1].X, corners[2].X));
-		const double min_y = std::fmin(corners[0].Y, std::fmin(corners[1].Y, corners[2].Y));
-		const double max_y = std::fmax(corners[0].Y, std::fmax(corners[1].Y, corners[2].Y));
+		DRect bounds;
 
-		if (max_y < row_min || min_y > row_max) {
+		for (const Vec2d& corner : corners) {
+			bounds.Min = Vec2d::Min(bounds.Min, corner);
+			bounds.Max = Vec2d::Max(bounds.Max, corner);
+		}
+
+		if (bounds.Max.Y < row_min || bounds.Min.Y > row_max) {
 			continue;
 		}
 
@@ -429,14 +434,14 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 
 		scratch.CornerTriangles.Emplace(static_cast<int32>(triangle));
 
-		const int64 first_column = std::max<int64>(0, static_cast<int64>(std::floor(min_x * samples - 0.5)));
+		const int64 first_column = std::max<int64>(0, static_cast<int64>(std::floor(bounds.Min.X * samples - 0.5)));
 		const int64 last_column = std::min<int64>(static_cast<int64>(sample_columns) - 1,
-												  static_cast<int64>(std::ceil(max_x * samples - 0.5)));
+												  static_cast<int64>(std::ceil(bounds.Max.X * samples - 0.5)));
 
 		for (uint32 sample_row = 0; sample_row < samples; sample_row++) {
 			const double y = row_min + (sample_row + 0.5) * sample_step;
 
-			if (y < min_y - scCoverageEpsilon || y > max_y + scCoverageEpsilon) {
+			if (y < bounds.Min.Y - scCoverageEpsilon || y > bounds.Max.Y + scCoverageEpsilon) {
 				continue;
 			}
 
@@ -469,10 +474,7 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 	const auto texel_corners = [&](uint32 first_corner, Vec2d out_corners[3])
 	{
 		for (uint32 corner = 0; corner < 3; corner++) {
-			const Vec2d& point = chart.TrianglePoints[first_corner + corner];
-
-			out_corners[corner] = Vec2d((point.X - layout.Min.X) * density + scChartPadding,
-										(point.Y - layout.Min.Y) * density + scChartPadding);
+			out_corners[corner] = GetTexelPoint(chart.TrianglePoints[first_corner + corner], layout, density);
 		}
 	};
 
@@ -524,6 +526,9 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 		Vec3d normal_sum = Vec3d(0.0);
 		uint32 position_count = 0;
 
+		Vec3d nearest_position = Vec3d(0.0);
+		double nearest_distance = scNoHit;
+
 		for (uint32 sample = 0; sample < sample_count; sample++) {
 			const uint32 sample_x = sample % samples;
 			const uint32 sample_y = sample / samples;
@@ -562,6 +567,17 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 			normal_sum = normal_sum + normal;
 			position_count++;
 
+			if (!is_planar) {
+				const double offset_x = (sample_x + 0.5) * sample_step - 0.5;
+				const double offset_y = (sample_y + 0.5) * sample_step - 0.5;
+				const double distance = offset_x * offset_x + offset_y * offset_y;
+
+				if (distance < nearest_distance) {
+					nearest_distance = distance;
+					nearest_position = origin;
+				}
+			}
+
 			if (layout.bFacesSun) {
 				lit += count_lit(origin, normal, sample);
 			}
@@ -573,13 +589,12 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 		if (!touches_polygon &&
 			FindPointInTexel(scratch.Corners, column + 0.5, job.Row + 0.5, thin_point, thin_corner)) {
 			const Vec2d* thin_corners = &scratch.Corners[thin_corner];
-			const double inward_x = (thin_corners[0].X + thin_corners[1].X + thin_corners[2].X) / 3.0 - thin_point.X;
-			const double inward_y = (thin_corners[0].Y + thin_corners[1].Y + thin_corners[2].Y) / 3.0 - thin_point.Y;
-			const double inward_length = std::sqrt(inward_x * inward_x + inward_y * inward_y);
+			const Vec2d inward = (thin_corners[0] + thin_corners[1] + thin_corners[2]) / 3.0 - thin_point;
+			const double inward_length = inward.Length();
 
 			if (inward_length > 0.0) {
 				const double step = std::fmin(scThinInset, inward_length * 0.5) / inward_length;
-				thin_point = Vec2d(thin_point.X + inward_x * step, thin_point.Y + inward_y * step);
+				thin_point = thin_point + inward * step;
 			}
 
 			Vec3d origin = Vec3d(0.0);
@@ -602,6 +617,7 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 				position_sum = origin;
 				normal_sum = normal;
 				position_count = 1;
+				nearest_position = origin;
 
 				for (uint32 sample = 0; sample < sample_count && layout.bFacesSun; sample++) {
 					lit += count_lit(origin, normal, sample);
@@ -617,7 +633,14 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 		context.pTexels[texel] = static_cast<uint8>((lit * 255 + covered / 2) / covered);
 
 		if (context.pPositions != nullptr) {
-			context.pPositions[texel] = (position_sum * (1.0 / position_count)).ToVec3f();
+			// Averaging points across a curved chart's triangles can sink behind the surface
+			if (is_planar) {
+				context.pPositions[texel] = (position_sum * (1.0 / position_count)).ToVec3f();
+			}
+			else {
+				context.pPositions[texel] = nearest_position.ToVec3f();
+			}
+
 			context.pNormals[texel] = normal_sum.Normalized().ToVec3f();
 		}
 	}
@@ -708,8 +731,13 @@ bool WriteImage(const String& path, const CompiledMapLightmap& lightmap)
 } // namespace
 
 bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const SurfaceBuilder& surfaces,
-						 const PatchBuilder* patches, const LightmapOptions& options, CompiledMap& out_map)
+						 const PatchBuilder* patches, const ModelBuilder* models, const LightmapOptions& options,
+						 CompiledMap& out_map)
 {
+	constexpr uint32 scRowsPerClaim = 8;
+	constexpr uint32 scDirectionShuffle = 7919;
+	constexpr uint8 scFullyLit = 255;
+
 	Stats = LightmapStats {};
 
 	const Array<LightmapChart>& charts = surfaces.Charts;
@@ -729,7 +757,7 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 	}
 
 	OccluderSet occluders;
-	occluders.Build(planes, source, patches);
+	occluders.Build(planes, source, patches, models);
 
 	const SunSampler sun(source.SunDirection, options.SunRadiusDegrees);
 
@@ -762,13 +790,10 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 	if (source.bHasSun) {
 		lightmap.Flags |= CompiledMapLightmap::scFlagSun;
 	}
-	lightmap.SunVisibility.InitSize(texel_count);
+	lightmap.SunVisibility.InitSize(texel_count, scFullyLit);
 
 	SizedArray<uint8> valid;
-	valid.InitSize(texel_count);
-
-	std::fill(lightmap.SunVisibility.begin(), lightmap.SunVisibility.end(), scFullyLit);
-	std::fill(valid.begin(), valid.end(), static_cast<uint8>(0));
+	valid.InitSize(texel_count, static_cast<uint8>(0));
 
 	lightmap.SunDirection[0] = static_cast<float32>(source.SunDirection.X);
 	lightmap.SunDirection[1] = static_cast<float32>(source.SunDirection.Y);
@@ -915,11 +940,12 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 		input.pSunVisibility = lightmap.SunVisibility.pData;
 		input.pPositions = positions.pData;
 		input.pNormals = normals.pData;
+		input.pPlanes = &planes;
 
 		// input.pRects = rects.pData;
 		// input.RectCount = rects.Size;
 
-		BakeIndirectLight(source, surfaces, input, options, out_map, Stats);
+		BakeIndirectLight(source, surfaces, models, input, options, out_map, Stats);
 	}
 
 	uint32 probe_count = 0;
@@ -948,7 +974,9 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 
 		out_map.ProbeSunVisibility[probe] = static_cast<uint8>((lit * 255 + probe_rays / 2) / probe_rays);
 
-		Stats.LitProbeCount += (lit * 2 >= probe_rays) ? 1 : 0;
+		if (lit * 2 >= probe_rays) {
+			Stats.LitProbeCount++;
+		}
 	}
 
 	if (source.bHasSun) {
@@ -961,6 +989,7 @@ bool LightmapBaker::Bake(const PlaneSet& planes, const MapSource& source, const 
 	Stats.ChartCount = charts.Size;
 	Stats.OccluderCount = occluders.GetCount();
 	Stats.OccluderTriangleCount = occluders.GetTriangleCount();
+	Stats.OccluderModelTriangleCount = occluders.GetModelTriangleCount();
 	Stats.Density = density;
 	Stats.TexelCount = valid_count;
 	Stats.RayCount = context.RayCount.load() + static_cast<uint64>(probe_count) * probe_rays;

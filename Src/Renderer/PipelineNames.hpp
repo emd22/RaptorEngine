@@ -15,9 +15,14 @@ enum class ePipelineName : uint16
 	DebugOverlay,
 
 	/**
-	 * @brief Forward+ compute pass that culls lights into 2D screen space tiles
+	 * @brief Forward+ compute pass that culls lights into screen space tiles, each ending at the prepass depth
 	 */
 	LightCulling,
+
+	/**
+	 * @brief LightCulling without depth bounds, for probe captures, which have no prepass
+	 */
+	LightCullingCapture,
 
 	TextRendering,
 	ImageRendering,
@@ -32,6 +37,9 @@ enum class ePipelineName : uint16
 	FogFroxelInject,
 	FogFroxelIntegrate,
 	FogFroxelApply,
+	LightTransportInject,
+	LightTransportBounce,
+	LightTransportApply,
 
 	NumPipelines
 };

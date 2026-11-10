@@ -1,16 +1,24 @@
 #include "BrushEntry.hpp"
 
 #include <Asset/ConfigFile.hpp>
+#include <Core/DynArray.hpp>
+#include <Core/FilesystemIO.hpp>
+#include <Core/HashMap.hpp>
 #include <Map/CompiledMap.hpp>
 #include <Material/SpecialMaterial.hpp>
+#include <Object/ObjectLayer.hpp>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <filesystem>
-#include <unordered_map>
-#include <unordered_set>
 
 namespace fx {
+
+constexpr const char* scFaceMaterialsName = "facemats";
+
+constexpr const char* scBrushMaterialName = "-";
+
+constexpr const char* scPatchName = "patch";
 
 bool IsDecalEntry(const ConfigEntry& entry) { return entry.GetMemberValue(HashStr32(scDecalName), 0) != 0; }
 
@@ -39,11 +47,6 @@ const char* ReadBrushMaterialName(const ConfigEntry& entry)
 
 	return name;
 }
-
-/// Values stored per plane in a blockout's `uvs` array: offset U and V, scale U and V, then rotation
-constexpr uint32 scValuesPerFaceTexture = 5;
-
-constexpr float32 scMinFaceTextureScale = 1e-4f;
 
 static void ReadFaceMaterials(ConfigEntry& entry, Brush::PlaneList& planes)
 {
@@ -90,6 +93,11 @@ void WriteFaceMaterials(ConfigEntry& entry, const Brush& brush)
 
 Brush ReadBrushEntry(ConfigEntry& entry)
 {
+	// Values stored per plane in a blockout's `uvs` array: offset U and V, scale U and V, then rotation
+	constexpr uint32 scValuesPerFaceTexture = 5;
+
+	constexpr float32 scMinFaceTextureScale = 1e-4f;
+
 	ConfigEntry* scale_entry = entry.GetMember(HashStr32("scale"));
 
 	if (scale_entry != nullptr) {
@@ -177,12 +185,12 @@ Brush ReadBrushEntry(ConfigEntry& entry)
 	return Brush::FromPlanes(planes);
 }
 
-constexpr uint32 scValuesPerPatchPoint = 5;
-
 bool IsPatchEntry(const ConfigEntry& entry) { return entry.GetMember(HashStr32(scPatchName)) != nullptr; }
 
 Patch ReadPatchEntry(ConfigEntry& entry)
 {
+	constexpr uint32 scValuesPerPatchPoint = 5;
+
 	ConfigEntry* size_entry = entry.GetMember(HashStr32(scPatchName));
 	ConfigEntry* points_entry = entry.GetMember(HashStr32("points"));
 
@@ -452,11 +460,11 @@ String MakeSubviewBrushName(const String& instance_name, uint32 member_index)
 
 uint32 MakeBrushEntryNamesUnique(ConfigEntry& blocks_entry)
 {
-	std::unordered_set<String> taken;
-	std::unordered_set<String> seen;
+	HashMap<String, bool> taken;
+	HashMap<String, bool> seen;
 
 	for (const ConfigEntry& entry : blocks_entry.Members) {
-		taken.insert(entry.Name.Get());
+		taken.Insert(entry.Name.Get(), true);
 	}
 
 	uint32 renamed_count = 0;
@@ -464,7 +472,8 @@ uint32 MakeBrushEntryNamesUnique(ConfigEntry& blocks_entry)
 	for (ConfigEntry& entry : blocks_entry.Members) {
 		const String name = entry.Name.Get();
 
-		if (seen.insert(name).second) {
+		if (!seen.Contains(name)) {
+			seen.Insert(name, true);
 			continue;
 		}
 
@@ -473,12 +482,12 @@ uint32 MakeBrushEntryNamesUnique(ConfigEntry& blocks_entry)
 
 		do {
 			unique_name = String::Fmt("{}_{}", name, suffix++);
-		} while (taken.contains(unique_name));
+		} while (taken.Contains(unique_name));
 
 		entry.Name = Name(unique_name);
 
-		taken.insert(unique_name);
-		seen.insert(unique_name);
+		taken.Insert(unique_name, true);
+		seen.Insert(unique_name, true);
 		renamed_count++;
 	}
 
@@ -527,12 +536,12 @@ ConfigEntry PlaceSubviewBrushEntry(ConfigEntry& brush_entry, const String& name,
 	return placed;
 }
 
-constexpr const char* scEntityBrushMembers[] = {
-	"dynamic", "probevolume", "reflectionprobe", "spawn", "trigger", scDecalName,
-};
-
 bool IsEntityBrushEntry(const ConfigEntry& entry)
 {
+	static constexpr const char* scEntityBrushMembers[] = {
+		"dynamic", "probevolume", "reflectionprobe", "spawn", "trigger", scDecalName,
+	};
+
 	for (const char* member : scEntityBrushMembers) {
 		if (entry.GetMemberValue(HashStr32(member), 0) != 0) {
 			return true;
@@ -674,7 +683,7 @@ void AppendPlacedSubviewBrushes(ConfigEntry& out_brushes, ConfigEntry& subview_b
 }
 
 static bool FlattenSubview(const ConfigFile& info, const String& prototype_path, const String& subview_name,
-						   std::vector<String>& stack, ConfigEntry& out_brushes)
+						   DynArray<String, GrowthFunctions::Double>& stack, ConfigEntry& out_brushes)
 {
 	ConfigEntry instances;
 
@@ -686,7 +695,7 @@ static bool FlattenSubview(const ConfigFile& info, const String& prototype_path,
 		return true;
 	}
 
-	stack.push_back(subview_name);
+	stack.Insert(subview_name);
 
 	for (const ConfigEntry& instance : instances.Members) {
 		const String child_name = ReadInstanceSubviewName(instance);
@@ -708,7 +717,7 @@ static bool FlattenSubview(const ConfigFile& info, const String& prototype_path,
 		AppendPlacedSubviewBrushes(out_brushes, child_brushes, instance.Name.Get(), ReadBrushPlacement(instance));
 	}
 
-	stack.pop_back();
+	stack.RemoveLast();
 
 	return true;
 }
@@ -716,13 +725,13 @@ static bool FlattenSubview(const ConfigFile& info, const String& prototype_path,
 bool ReadSubviewBrushes(const ConfigFile& info, const String& prototype_path, const String& subview_name,
 						ConfigEntry& out_brushes)
 {
-	std::vector<String> stack;
+	DynArray<String, GrowthFunctions::Double> stack;
 
 	return FlattenSubview(info, prototype_path, subview_name, stack, out_brushes);
 }
 
 static void HashSubviewFiles(const ConfigFile& info, const String& prototype_path, const ConfigEntry& instances,
-							 std::unordered_set<String>& seen, uint64& hash)
+							 HashMap<String, bool>& seen, uint64& hash)
 {
 	constexpr uint64 scHashPrime = 1099511628211ull;
 
@@ -735,9 +744,11 @@ static void HashSubviewFiles(const ConfigFile& info, const String& prototype_pat
 	for (const ConfigEntry& instance : instances.Members) {
 		const char* subview_name = ReadInstanceSubviewName(instance);
 
-		if (subview_name == nullptr || !seen.insert(subview_name).second) {
+		if (subview_name == nullptr || seen.Contains(subview_name)) {
 			continue;
 		}
+
+		seen.Insert(subview_name, true);
 
 		if (inline_subviews != nullptr && inline_subviews->GetMember(HashStr32(subview_name)) != nullptr) {
 			continue;
@@ -754,6 +765,60 @@ static void HashSubviewFiles(const ConfigFile& info, const String& prototype_pat
 	}
 }
 
+bool IsBakedModelEntry(const ConfigEntry& model, const ConfigEntry* brushes)
+{
+	const ConfigEntry* mesh = model.GetMember(HashStr32("mesh"));
+
+	if (mesh == nullptr || mesh->Type != ConfigEntry::ePrimitiveType::String) {
+		return false;
+	}
+
+	if (model.GetMemberValue(HashStr32("shadows"), 0) == 0 || model.GetMemberValue(HashStr32("unlit"), 0) != 0 ||
+		model.GetMemberValue(HashStr32("spawn"), 0) != 0 || model.GetMemberValue(HashStr32("nobake"), 0) != 0 ||
+		model.GetMember(HashStr32("script")) != nullptr) {
+		return false;
+	}
+
+	if (model.GetMemberValue(HashStr32("layer"), 0) == static_cast<int64>(eObjectLayer::PlayerLayer)) {
+		return false;
+	}
+
+	const ConfigEntry* collider = model.GetMember(HashStr32("collider"));
+
+	if (collider != nullptr && collider->Type == ConfigEntry::ePrimitiveType::String && brushes != nullptr) {
+		const ConfigEntry* collider_brush = brushes->GetMember(HashStr32(collider->Get<const char*>()));
+
+		if (collider_brush != nullptr && collider_brush->GetMemberValue(HashStr32("dynamic"), 0) != 0) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+static void HashModelFiles(const ConfigFile& info, uint64& hash)
+{
+	constexpr uint64 scHashPrime = 1099511628211ull;
+
+	const ConfigEntry* models = info.GetEntry(HashStr32("objects"));
+
+	if (models == nullptr || !models->Members.IsInited()) {
+		return;
+	}
+
+	const ConfigEntry* brushes = info.GetEntry(HashStr32("all"));
+
+	for (const ConfigEntry& model : models->Members) {
+		if (!IsBakedModelEntry(model, brushes)) {
+			continue;
+		}
+
+		const char* mesh_path = model.GetMember(HashStr32("mesh"))->Get<const char*>();
+
+		hash = (hash ^ CompiledMap::HashFile(FilesystemIO::ResolvePath(mesh_path))) * scHashPrime;
+	}
+}
+
 uint64 HashPrototype(const String& prototype_path, const ConfigFile& info)
 {
 	uint64 hash = CompiledMap::HashFile(prototype_path);
@@ -762,13 +827,15 @@ uint64 HashPrototype(const String& prototype_path, const ConfigFile& info)
 		return 0;
 	}
 
+	HashModelFiles(info, hash);
+
 	const ConfigEntry* instances = info.GetEntry(HashStr32(scSubviewInstancesEntryName));
 
 	if (instances == nullptr) {
 		return hash;
 	}
 
-	std::unordered_set<String> seen;
+	HashMap<String, bool> seen;
 
 	HashSubviewFiles(info, prototype_path, *instances, seen, hash);
 
@@ -793,7 +860,7 @@ void ForEachSubviewBrush(const ConfigFile& info, const String& prototype_path,
 		return;
 	}
 
-	std::unordered_map<String, ConfigEntry> subviews;
+	HashMap<String, ConfigEntry> subviews;
 
 	for (const ConfigEntry& instance : instances->Members) {
 		const char* subview_name = ReadInstanceSubviewName(instance);
@@ -803,9 +870,9 @@ void ForEachSubviewBrush(const ConfigFile& info, const String& prototype_path,
 			continue;
 		}
 
-		auto found = subviews.find(subview_name);
+		ConfigEntry* found = subviews.Find(subview_name);
 
-		if (found == subviews.end()) {
+		if (found == nullptr) {
 			ConfigEntry brushes;
 
 			if (!ReadSubviewBrushes(info, prototype_path, subview_name, brushes)) {
@@ -813,10 +880,10 @@ void ForEachSubviewBrush(const ConfigFile& info, const String& prototype_path,
 						   instance.Name.Get(), subview_name);
 			}
 
-			found = subviews.emplace(subview_name, std::move(brushes)).first;
+			found = &subviews.Insert(subview_name, std::move(brushes));
 		}
 
-		ConfigEntry& subview = found->second;
+		ConfigEntry& subview = *found;
 
 		if (!subview.Members.IsInited()) {
 			continue;

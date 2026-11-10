@@ -16,20 +16,9 @@ using namespace RagdollMath;
 
 namespace {
 
-constexpr float32 scKinematicDim = 0.45f;
-constexpr float32 scMinVelocityDraw = 0.5f;
-constexpr float32 scVelocityScale = 0.15f;
-constexpr float32 scComCrossSize = 0.25f;
-constexpr float32 scComBoxHalfExtent = 0.04f;
-constexpr float32 scComGroundCrossSize = 0.12f;
-constexpr float32 scMarkerSize = 0.06f;
-
 const Color scPartColors[] = {
-	Color::FromRGBA(235, 235, 235, 255),
-	Color::FromRGBA(255, 60, 60, 255),
-	Color::FromRGBA(70, 170, 255, 255),
-	Color::FromRGBA(80, 230, 90, 255),
-	Color::FromRGBA(80, 230, 90, 255),
+	Color::FromRGBA(235, 235, 235, 255), Color::FromRGBA(255, 60, 60, 255), Color::FromRGBA(70, 170, 255, 255),
+	Color::FromRGBA(80, 230, 90, 255),	 Color::FromRGBA(80, 230, 90, 255),
 };
 const Color scLinkColor = Color::FromRGBA(255, 220, 60, 255);
 const Color scVelocityColor = Color::FromRGBA(255, 70, 220, 255);
@@ -92,6 +81,10 @@ void Ragdoll::DebugDraw() const
 
 void Ragdoll::DrawDebugSegments(const SizedArray<RDSegmentState>& samples, SizedArray<Vec3f>& out_centers) const
 {
+	constexpr float32 scKinematicDim = 0.45f;
+	constexpr float32 scMinVelocityDraw = 0.5f;
+	constexpr float32 scVelocityScale = 0.15f;
+
 	for (uint32 i = 0; i < mSegments.Size; i++) {
 		const RDSegmentInfo& info = mSegments[i];
 		const RDSegmentState& sample = samples[i];
@@ -119,9 +112,8 @@ void Ragdoll::DrawDebugSegments(const SizedArray<RDSegmentState>& samples, Sized
 			z = box_rotation.GetAxisZ() * info.BoxHalfExtent.GetZ();
 		}
 
-		const Mat4f box(Vec4f(x.GetX(), x.GetY(), x.GetZ(), 0.0f), Vec4f(y.GetX(), y.GetY(), y.GetZ(), 0.0f),
-						Vec4f(z.GetX(), z.GetY(), z.GetZ(), 0.0f),
-						Vec4f(center.GetX(), center.GetY(), center.GetZ(), 1.0f));
+		const Mat4f box(Vec4f(Vec3f::FromJolt(x), 0.0f), Vec4f(Vec3f::FromJolt(y), 0.0f),
+						Vec4f(Vec3f::FromJolt(z), 0.0f), Vec4f(Vec3f::FromJolt(center), 1.0f));
 
 		out_centers[i] = Vec3f::FromJolt(center);
 
@@ -161,6 +153,10 @@ void Ragdoll::DrawDebugLinks(const SizedArray<Vec3f>& centers) const
 
 void Ragdoll::DrawDebugSupport(const SizedArray<RDSegmentState>& samples) const
 {
+	constexpr float32 scComCrossSize = 0.25f;
+	constexpr float32 scComBoxHalfExtent = 0.04f;
+	constexpr float32 scComGroundCrossSize = 0.12f;
+
 	const GravityFrame frame = GravityFrame::FromPhysics();
 	const JPH::Vec3 up = frame.Up;
 
@@ -226,6 +222,8 @@ void Ragdoll::DrawDebugSupport(const SizedArray<RDSegmentState>& samples) const
 
 void RagdollBalance::DebugDraw() const
 {
+	constexpr float32 scMarkerSize = 0.06f;
+
 	if (!mbValid || mStatus.State == eBalanceState::Off) {
 		return;
 	}

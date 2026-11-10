@@ -7,12 +7,13 @@
 
 #pragma once
 
+#include <Core/DynArray.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/StackArray.hpp>
 #include <Core/String.hpp>
+#include <Math/BBox.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
-#include <vector>
 
 namespace fx {
 
@@ -54,6 +55,9 @@ public:
 	/// Fixed capacity so that brushes can be snapshotted by value (for the undo stack in the editor)
 	using PlaneList = StackArray<BrushPlane, scMaxPlanes>;
 
+	/// The pieces a brush is cut into, one plane list each
+	using PieceList = DynArray<PlaneList, GrowthFunctions::Double>;
+
 	struct Face
 	{
 		uint32 PlaneIndex = 0;
@@ -74,9 +78,9 @@ public:
 	bool IsValid() const { return Faces.IsNotEmpty(); }
 	bool IsBox() const;
 
-	Vec3f GetBoundsMin() const { return mBoundsMin; }
-	Vec3f GetBoundsMax() const { return mBoundsMax; }
-	Vec3f GetCenter() const { return (mBoundsMin + mBoundsMax) * 0.5f; }
+	Vec3f GetBoundsMin() const { return mBounds.Min; }
+	Vec3f GetBoundsMax() const { return mBounds.Max; }
+	Vec3f GetCenter() const { return (mBounds.Min + mBounds.Max) * 0.5f; }
 
 	/**
 	 * @brief Returns the unique corner points of the brush
@@ -117,7 +121,7 @@ public:
 	bool Split(const Vec3f normal, float32 distance, const Vec3f origin, PlaneList& out_back,
 			   PlaneList& out_front) const;
 
-	bool Subtract(const PlaneList& cutter, const Vec3f origin, std::vector<PlaneList>& out_pieces) const;
+	bool Subtract(const PlaneList& cutter, const Vec3f origin, PieceList& out_pieces) const;
 
 	/**
 	 * @brief Resets a face's texture layout to the one FromBox() uses
@@ -159,8 +163,7 @@ public:
 private:
 	SizedArray<Vec3f> mVertices;
 
-	Vec3f mBoundsMin = Vec3f::sZero;
-	Vec3f mBoundsMax = Vec3f::sZero;
+	BBox mBounds;
 };
 
 } // namespace fx

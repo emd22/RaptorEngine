@@ -75,8 +75,6 @@ enum class eReloadTarget : uint32
 class RaptorEditor
 {
 public:
-	static constexpr std::chrono::seconds scWarningDuration { 6 };
-
 	RaptorEditor() = default;
 
 
@@ -160,7 +158,7 @@ public:
 	void TopViewSelect(const DynArray<ObjectID>& object_ids, eTopViewSelectMode mode);
 	void TopViewMove(const Vec3f offset);
 	void TopViewRotate(const Vec3f axis, float32 angle, const Vec3f pivot, const Vec3f offset);
-	void TopViewMoveFace(const Vec3f world_normal, float32 distance, const DynArray<ObjectID>& object_ids);
+	void TopViewMoveFaces(const DynArray<TopViewFaceRef>& faces, float32 distance);
 	void TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewVertexHandle>& handles, const Vec3f offset);
 	void TopViewCreate(eViewPlane plane, Vec3f min, Vec3f max, bool drop_to_ground);
 	void TopViewCreateRoom(eViewPlane plane, Vec3f min, Vec3f max, bool drop_to_ground, const RoomSettings& settings);
@@ -349,18 +347,6 @@ public:
 	void MarkSaved();
 	void MarkModified();
 
-	template <typename... TTypes>
-	void Warn(const char* fmt, TTypes&&... args)
-	{
-		const String message = String::Fmt(fmt, args...);
-
-		LogWarning(LC_CORE, "{}", message.CStr());
-		ShowStatusMessage(message, scWarningDuration);
-	}
-
-	uint32 ShowStatusMessage(const String& text,
-							 std::chrono::milliseconds duration = std::chrono::milliseconds::zero());
-	void ClearStatusMessage(uint32 id);
 
 	/////////////////////////////////////
 	// Commands
@@ -405,6 +391,7 @@ private:
 	void DrawSubviews();
 
 	bool SelectSubview(uint32 instance, bool append_selection);
+	bool AddToSelection(Object* object, bool append_selection);
 
 	/// Copies the selection over to the command script
 	void SyncSelection();
@@ -465,7 +452,7 @@ private:
 		SizedArray<Vec3f> Vertices;
 	};
 
-	DynArray<PickedFaceOverlay> mPickedFaces;
+	DynArray<PickedFaceOverlay, GrowthFunctions::Double> mPickedFaces;
 
 	uint64 mSavedRevision = 0;
 	bool mbUntrackedChanges = false;

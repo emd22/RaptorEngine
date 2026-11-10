@@ -17,8 +17,6 @@ namespace fx::editor {
 class SoundEditor
 {
 public:
-	static constexpr float32 scMarkerHalfExtent = 0.15f;
-
 	SoundEmitter* GetSelected();
 	uint32 GetSelectedId() const { return mSelectedId; }
 

@@ -1,8 +1,8 @@
 #include "EditorFrame.hpp"
 
 #include "AtlasPackerWindow.hpp"
-#include "ClipEditorWindow.hpp"
 #include "CVarListWindow.hpp"
+#include "ClipEditorWindow.hpp"
 #include "EditorTheme.hpp"
 #include "EditorThread.hpp"
 #include "EditorToolbar.hpp"
@@ -47,11 +47,6 @@
 
 namespace fx::editor {
 
-static constexpr int32 scSidePanelWidth = 300;
-static constexpr int32 scMinimumSidePanelWidth = 220;
-static constexpr size_t scToolSettingsSlotIndex = 3;
-static constexpr int32 scMinimumPaneSize = 160;
-
 enum eStatusField : int
 {
 	StatusField_Message,
@@ -61,8 +56,6 @@ enum eStatusField : int
 
 	StatusField_Count,
 };
-
-static constexpr const char* scDefaultBlockoutPath = "RaptorData/Data/blockouts/btemp.prx";
 
 class EditorSplitter : public wxSplitterWindow
 {
@@ -116,6 +109,8 @@ static String ToBlockoutPath(const std::filesystem::path& chosen)
 
 static std::filesystem::path GetBlockoutDialogStart(const String& blockout_path)
 {
+	constexpr const char* scDefaultBlockoutPath = "RaptorData/Data/blockouts/btemp.prx";
+
 	if (blockout_path.IsEmpty()) {
 		return std::filesystem::absolute(scDefaultBlockoutPath);
 	}
@@ -486,7 +481,7 @@ wxMenu* EditorFrame::CreateViewMenu()
 
 	{
 		wxMenu* theme_menu = new wxMenu;
-		const DynArray<EditorTheme>& themes = GetThemeLibrary().GetThemes();
+		const EditorThemeArray& themes = GetThemeLibrary().GetThemes();
 
 		for (uint32 index = 0; index < themes.Size; index++) {
 			wxMenuItem* theme_item = theme_menu->AppendRadioItem(
@@ -594,6 +589,10 @@ wxMenu* EditorFrame::CreateSubviewMenu()
 
 EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : wxFrame(nullptr, wxID_ANY, title)
 {
+	constexpr int32 scSidePanelWidth = 300;
+	constexpr int32 scMinimumSidePanelWidth = 220;
+	constexpr int32 scMinimumPaneSize = 160;
+
 	GetThemeLibrary().Load();
 
 	wxMenuBar* menu_bar = new wxMenuBar;
@@ -606,16 +605,6 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	menu_bar->Append(CreateSubviewMenu(), "&Subview");
 
 	SetMenuBar(menu_bar);
-
-	{
-		CreateStatusBar(StatusField_Count);
-
-		const int widths[StatusField_Count] = { -1, FromDIP(260), FromDIP(220), FromDIP(260) };
-		SetStatusWidths(StatusField_Count, widths);
-
-		mStatusMessageTimer.SetOwner(this);
-		Bind(wxEVT_TIMER, [this](wxTimerEvent&) { ClearStatusMessage(mStatusMessageId); }, mStatusMessageTimer.GetId());
-	}
 
 
 	wxPanel* root = new wxPanel(this, wxID_ANY);
@@ -728,7 +717,6 @@ EditorFrame::EditorFrame(const wxString& title, const wxSize& viewport_size) : w
 	SetMinSize(wxDefaultSize);
 
 	ApplyTheme();
-	UpdateStatusBar();
 
 	Bind(wxEVT_CLOSE_WINDOW, &EditorFrame::OnClose, this);
 	Bind(wxEVT_ACTIVATE, &EditorFrame::OnActivate, this);
@@ -956,12 +944,23 @@ void EditorFrame::ShowView(const eEditorView view)
 
 void EditorFrame::ApplySplitLayout(const eEditorView view)
 {
-	const wxSplitMode wanted_mode = mbStackedSplit ? wxSPLIT_HORIZONTAL : wxSPLIT_VERTICAL;
+	wxSplitMode wanted_mode = wxSPLIT_VERTICAL;
+
+	if (mbStackedSplit) {
+		wanted_mode = wxSPLIT_HORIZONTAL;
+	}
 
 	const auto extent = [this](wxSplitMode mode)
 	{
 		const wxSize size = mpSplitter->GetClientSize();
-		return std::max((mode == wxSPLIT_HORIZONTAL) ? size.y : size.x, 1);
+
+		int extent_px = size.x;
+
+		if (mode == wxSPLIT_HORIZONTAL) {
+			extent_px = size.y;
+		}
+
+		return std::max(extent_px, 1);
 	};
 
 	if (mpSplitter->IsSplit()) {
@@ -970,8 +969,11 @@ void EditorFrame::ApplySplitLayout(const eEditorView view)
 								   0.1f, 0.9f);
 
 		if (view != eEditorView::Split || mpSplitter->GetSplitMode() != wanted_mode) {
-			wxWindow* removed = (view == eEditorView::Architect) ? static_cast<wxWindow*>(mpViewport)
-																 : static_cast<wxWindow*>(mpTopViewPanel);
+			wxWindow* removed = static_cast<wxWindow*>(mpTopViewPanel);
+
+			if (view == eEditorView::Architect) {
+				removed = static_cast<wxWindow*>(mpViewport);
+			}
 
 			mpSplitter->Unsplit(removed);
 		}
@@ -995,8 +997,12 @@ void EditorFrame::ApplySplitLayout(const eEditorView view)
 		return;
 	}
 
-	wxWindow* wanted = (view == eEditorView::Architect) ? static_cast<wxWindow*>(mpTopViewPanel)
-														: static_cast<wxWindow*>(mpViewport);
+	wxWindow* wanted = static_cast<wxWindow*>(mpViewport);
+
+	if (view == eEditorView::Architect) {
+		wanted = static_cast<wxWindow*>(mpTopViewPanel);
+	}
+
 	wxWindow* current = mpSplitter->GetWindow1();
 
 	if (current != wanted) {
@@ -1009,6 +1015,8 @@ void EditorFrame::ApplySplitLayout(const eEditorView view)
 
 void EditorFrame::SetToolSettingsPanel(ToolSettingsBasePanel* new_panel)
 {
+	constexpr size_t scToolSettingsSlotIndex = 3;
+
 	if (mpToolSettingsPanel != nullptr) {
 		mpComponentSizer->Detach(mpToolSettingsPanel);
 		mpToolSettingsPanel->Destroy();
@@ -1034,8 +1042,6 @@ void EditorFrame::ShowSelectedTool(const eEditorTool tool)
 {
 	mTool = tool;
 	mpTopViewPanel->GetCanvas()->ShowTool(tool);
-
-	UpdateStatusBar();
 }
 
 void EditorFrame::ShowSimulating(bool simulating)
@@ -1043,7 +1049,6 @@ void EditorFrame::ShowSimulating(bool simulating)
 	mbSimulating = simulating;
 	mpToolbar->ShowSimulating(simulating);
 
-	UpdateStatusBar();
 
 	FocusActiveView();
 }
@@ -1072,77 +1077,8 @@ void EditorFrame::ApplyState(const EditorPanelState& state)
 		mpTopViewPanel->ApplyState(mState.TopView);
 		mpToolbar->ApplyState(mState.TopView);
 	}
-
-	UpdateStatusBar();
 }
 
-uint32 EditorFrame::NewStatusMessageId()
-{
-	static std::atomic<uint32> sNextId = 1;
-
-	return sNextId.fetch_add(1, std::memory_order_relaxed);
-}
-
-uint32 EditorFrame::ShowStatusMessage(const wxString& text, std::chrono::milliseconds duration)
-{
-	const uint32 id = NewStatusMessageId();
-
-	ShowStatusMessage(id, text, duration);
-
-	return id;
-}
-
-void EditorFrame::ShowStatusMessage(uint32 id, const wxString& text, std::chrono::milliseconds duration)
-{
-	mStatusMessage = text;
-	mStatusMessageId = id;
-
-	if (duration > std::chrono::milliseconds::zero()) {
-		mStatusMessageTimer.StartOnce(static_cast<int>(duration.count()));
-	}
-	else {
-		mStatusMessageTimer.Stop();
-	}
-
-	UpdateStatusBar();
-}
-
-void EditorFrame::ClearStatusMessage(uint32 id)
-{
-	if (id == 0 || id != mStatusMessageId) {
-		return;
-	}
-
-	mStatusMessage.clear();
-	mStatusMessageId = 0;
-	mStatusMessageTimer.Stop();
-
-	UpdateStatusBar();
-}
-
-static void SetStatusField(wxStatusBar* status_bar, int field, const wxString& text)
-{
-	if (status_bar->GetStatusText(field) != text) {
-		status_bar->SetStatusText(text, field);
-	}
-}
-
-void EditorFrame::UpdateStatusBar()
-{
-	wxStatusBar* status_bar = GetStatusBar();
-
-	if (status_bar == nullptr) {
-		return;
-	}
-
-	wxString message = mStatusMessage;
-
-	if (message.IsEmpty() && mbSimulating) {
-		message = "Simulating, editing is paused";
-	}
-
-	SetStatusField(status_bar, StatusField_Message, message);
-}
 
 void EditorFrame::ShowMode(const eEditorMode mode, const eDataFilter filter, const uint32 available_tools)
 {
@@ -1151,8 +1087,6 @@ void EditorFrame::ShowMode(const eEditorMode mode, const eDataFilter filter, con
 
 	mpToolbar->ShowMode(mode, filter, available_tools);
 	mpTopViewPanel->GetCanvas()->SetAvailableTools(available_tools);
-
-	UpdateStatusBar();
 
 	FocusActiveView();
 }

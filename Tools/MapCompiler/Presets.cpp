@@ -3,11 +3,11 @@
 #include <Asset/ConfigFile.hpp>
 #include <Core/FilesystemIO.hpp>
 
+#include <cmath>
+
 namespace fx::mapc {
 
 namespace {
-
-constexpr int64 scPresetFileVersion = 1;
 
 constexpr const char* scDenoiseNames[] = { "off", "low", "medium", "high" };
 
@@ -34,6 +34,7 @@ ConfigEntry WritePreset(const CompilePreset& preset, uint32 index)
 	entry.AddMember(ConfigEntry::Literal("fix_tjunctions", ToInt(options.Surface.bFixTJunctions)));
 	entry.AddMember(ConfigEntry::Literal("chunk_size", static_cast<float32>(options.Surface.ChunkSize)));
 	entry.AddMember(ConfigEntry::Literal("keep_outside", ToInt(options.bKeepOutside)));
+	entry.AddMember(ConfigEntry::Literal("models", ToInt(options.bModels)));
 
 	entry.AddMember(ConfigEntry::Literal("place_probes", ToInt(options.bPlaceProbes)));
 	entry.AddMember(ConfigEntry::Literal("probe_level_spacing", options.ProbeSettings.LevelSpacing));
@@ -45,6 +46,7 @@ ConfigEntry WritePreset(const CompilePreset& preset, uint32 index)
 	entry.AddMember(ConfigEntry::Literal("lightmap_samples", static_cast<int64>(lightmap.Samples)));
 	entry.AddMember(ConfigEntry::Literal("sun_radius", static_cast<float32>(lightmap.SunRadiusDegrees)));
 	entry.AddMember(ConfigEntry::Literal("probe_texel_rays", static_cast<int64>(lightmap.ProbeTexelRays)));
+	entry.AddMember(ConfigEntry::Literal("model_cell", static_cast<float32>(lightmap.ModelCellSize)));
 	entry.AddMember(ConfigEntry::Literal("fog_shadow", ToInt(lightmap.FogShadow.bEnabled)));
 	entry.AddMember(ConfigEntry::Literal("fog_shadow_texel", static_cast<float32>(lightmap.FogShadow.TexelSize)));
 
@@ -56,7 +58,8 @@ ConfigEntry WritePreset(const CompilePreset& preset, uint32 index)
 
 	entry.AddMember(ConfigEntry::Literal("acoustics", ToInt(options.Acoustics.bEnabled)));
 	entry.AddMember(ConfigEntry::Literal("acoustic_pathing", ToInt(options.Acoustics.bPathing)));
-	entry.AddMember(ConfigEntry::Literal("acoustic_probe_spacing", static_cast<float32>(options.Acoustics.ProbeSpacing)));
+	entry.AddMember(
+		ConfigEntry::Literal("acoustic_probe_spacing", static_cast<float32>(options.Acoustics.ProbeSpacing)));
 	entry.AddMember(ConfigEntry::Literal("acoustic_probe_height", static_cast<float32>(options.Acoustics.ProbeHeight)));
 	entry.AddMember(ConfigEntry::Literal("reverb_rays", static_cast<int64>(options.Acoustics.ReverbRays)));
 	entry.AddMember(ConfigEntry::Literal("reverb_bounces", static_cast<int64>(options.Acoustics.ReverbBounces)));
@@ -100,6 +103,7 @@ CompilePreset ReadPreset(const ConfigEntry& entry)
 	options.Surface.bFixTJunctions = ReadBool(entry, "fix_tjunctions", options.Surface.bFixTJunctions);
 	options.Surface.ChunkSize = ReadDouble(entry, "chunk_size", options.Surface.ChunkSize);
 	options.bKeepOutside = ReadBool(entry, "keep_outside", options.bKeepOutside);
+	options.bModels = ReadBool(entry, "models", options.bModels);
 
 	options.bPlaceProbes = ReadBool(entry, "place_probes", options.bPlaceProbes);
 	options.ProbeSettings.LevelSpacing = static_cast<float32>(
@@ -113,6 +117,7 @@ CompilePreset ReadPreset(const ConfigEntry& entry)
 	lightmap.Samples = ReadUInt(entry, "lightmap_samples", lightmap.Samples);
 	lightmap.SunRadiusDegrees = ReadDouble(entry, "sun_radius", lightmap.SunRadiusDegrees);
 	lightmap.ProbeTexelRays = ReadUInt(entry, "probe_texel_rays", lightmap.ProbeTexelRays);
+	lightmap.ModelCellSize = std::fmax(ReadDouble(entry, "model_cell", lightmap.ModelCellSize), 0.01);
 	lightmap.FogShadow.bEnabled = ReadBool(entry, "fog_shadow", lightmap.FogShadow.bEnabled);
 	lightmap.FogShadow.TexelSize = ReadDouble(entry, "fog_shadow_texel", lightmap.FogShadow.TexelSize);
 
@@ -178,6 +183,8 @@ bool PresetLibrary::Load(const String& path)
 
 bool PresetLibrary::Save(const String& path) const
 {
+	constexpr int64 scPresetFileVersion = 1;
+
 	ConfigFile config;
 	config.AddEntry(ConfigEntry::Literal("version", scPresetFileVersion));
 

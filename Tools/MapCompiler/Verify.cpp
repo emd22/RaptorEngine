@@ -1,5 +1,6 @@
 #include "Verify.hpp"
 
+#include <Math/MathUtil.hpp>
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -10,20 +11,13 @@ namespace fx::mapc {
 namespace {
 
 constexpr double scNoHit = std::numeric_limits<double>::infinity();
-constexpr double scOriginClearance = 1e-2;
-constexpr double scHitTolerance = 1e-4;
-constexpr double scBarycentricTolerance = 1e-9;
 constexpr double scParallelEpsilon = 1e-14;
-constexpr uint32 scMaxOriginAttempts = 64;
 constexpr uint32 scSeed = 0x52415054;
-constexpr double scLightmapBias = 1e-3;
-constexpr double scLightmapEdgeTexels = 2.0;
-constexpr double scLightmapLitThreshold = 0.5;
-constexpr uint32 scHiddenRays = 16;
-constexpr double scTwoPi = 6.283185307179586;
 
 bool IsNearBrush(const PlaneSet& planes, const SourceBrush& brush, const Vec3d& point)
 {
+	constexpr double scOriginClearance = 1e-2;
+
 	for (const int32 plane_index : brush.PlaneIndices) {
 		if (planes[plane_index].DistanceTo(point) > scOriginClearance) {
 			return false;
@@ -62,11 +56,17 @@ double TraceBrush(const PlaneSet& planes, const SourceBrush& brush, const Vec3d&
 		}
 	}
 
-	return (enter > 0.0 && enter < exit) ? enter : scNoHit;
+	if (enter > 0.0 && enter < exit) {
+		return enter;
+	}
+
+	return scNoHit;
 }
 
 double TraceTriangle(const Vec3d& a, const Vec3d& b, const Vec3d& c, const Vec3d& origin, const Vec3d& direction)
 {
+	constexpr double scBarycentricTolerance = 1e-9;
+
 	const Vec3d edge_ab = b - a;
 	const Vec3d edge_ac = c - a;
 
@@ -95,7 +95,11 @@ double TraceTriangle(const Vec3d& a, const Vec3d& b, const Vec3d& c, const Vec3d
 
 	const double time = edge_ac.Dot(q) * inverse;
 
-	return (time > 0.0) ? time : scNoHit;
+	if (time > 0.0) {
+		return time;
+	}
+
+	return scNoHit;
 }
 
 bool SeesSun(const PlaneSet& planes, const MapSource& source, const Array<Vec3d>& patch_points, const Vec3d& origin)
@@ -145,18 +149,16 @@ bool IsHiddenByPatches(const PlaneSet& planes, const MapSource& source, const Ar
 		return false;
 	}
 
+	constexpr uint32 scHiddenRays = 16;
+
 	uint32 back_faces = 0;
 
 	for (uint32 ray = 0; ray < scHiddenRays; ray++) {
-		uint32 bits = ray;
-		bits = (bits << 16) | (bits >> 16);
-		bits = ((bits & 0x55555555U) << 1) | ((bits & 0xAAAAAAAAU) >> 1);
-		bits = ((bits & 0x33333333U) << 2) | ((bits & 0xCCCCCCCCU) >> 2);
-		bits = ((bits & 0x0F0F0F0FU) << 4) | ((bits & 0xF0F0F0F0U) >> 4);
-		bits = ((bits & 0x00FF00FFU) << 8) | ((bits & 0xFF00FF00U) >> 8);
+		uint32 bits = MathUtil::BitReverse32(ray);
 
 		const double u = (static_cast<double>(ray) + 0.5) / scHiddenRays;
-		const double angle = static_cast<double>(bits) * (scTwoPi / 4294967296.0);
+
+		const double angle = MathUtil::ToAngle(bits);
 		const double radius = std::sqrt(u);
 
 		const Vec3d direction = right * (std::cos(angle) * radius) + up * (std::sin(angle) * radius) +
@@ -181,7 +183,9 @@ bool IsHiddenByPatches(const PlaneSet& planes, const MapSource& source, const Ar
 			}
 		}
 
-		back_faces += is_back_face ? 1 : 0;
+		if (is_back_face) {
+			back_faces++;
+		}
 	}
 
 	return back_faces * 2 > scHiddenRays;
@@ -215,6 +219,10 @@ LightmapVerifyResult VerifyLightmap(const PlaneSet& planes, const MapSource& sou
 									const Array<Vec3d>& patch_points, const Array<Vec3d>& patch_facings, double density,
 									uint32 point_count)
 {
+	constexpr double scLightmapBias = 1e-3;
+	constexpr double scLightmapEdgeTexels = 2.0;
+	constexpr double scLightmapLitThreshold = 0.5;
+
 	LightmapVerifyResult result;
 
 	std::mt19937_64 random(scSeed);
@@ -238,14 +246,16 @@ LightmapVerifyResult VerifyLightmap(const PlaneSet& planes, const MapSource& sou
 		const size_t triangle = std::min<size_t>(static_cast<size_t>(unit(random) * triangle_count),
 												 triangle_count - 1);
 
-		double weights[3] = { unit(random), unit(random), 0.0 };
+		Vec3d weights(0.0);
+		weights.X = unit(random);
+		weights.Y = unit(random);
 
-		if (weights[0] + weights[1] > 1.0) {
-			weights[0] = 1.0 - weights[0];
-			weights[1] = 1.0 - weights[1];
+		if (weights.X + weights.Y > 1.0) {
+			weights.X = 1.0 - weights.X;
+			weights.Y = 1.0 - weights.Y;
 		}
 
-		weights[2] = 1.0 - weights[0] - weights[1];
+		weights.Z = 1.0 - weights.X - weights.Y;
 
 		Vec3d position = Vec3d(0.0);
 		double u = 0.0;
@@ -255,17 +265,17 @@ LightmapVerifyResult VerifyLightmap(const PlaneSet& planes, const MapSource& sou
 			const uint32 index = surface.Indices[triangle * 3 + corner];
 			const CompiledMapVertex& vertex = surface.Vertices[index];
 
-			position = position + Vec3d(vertex.Position) * weights[corner];
+			position = position + Vec3d(vertex.Position) * weights.mData[corner];
 
-			u += surface.LightmapTexcoords[index * 2] * weights[corner];
-			v += surface.LightmapTexcoords[index * 2 + 1] * weights[corner];
+			u += surface.LightmapTexcoords[index * 2] * weights.mData[corner];
+			v += surface.LightmapTexcoords[index * 2 + 1] * weights.mData[corner];
 		}
 
 		Vec3d weighted_normal = Vec3d(0.0);
 
 		for (uint32 corner = 0; corner < 3; corner++) {
 			const CompiledMapVertex& vertex = surface.Vertices[surface.Indices[triangle * 3 + corner]];
-			weighted_normal = weighted_normal + Vec3d(vertex.Normal) * weights[corner];
+			weighted_normal = weighted_normal + Vec3d(vertex.Normal) * weights.mData[corner];
 		}
 
 		const Vec3d normal = weighted_normal.Normalized();
@@ -288,7 +298,9 @@ LightmapVerifyResult VerifyLightmap(const PlaneSet& planes, const MapSource& sou
 		uint32 lit_count = 0;
 
 		for (const Vec3d& offset : offsets) {
-			lit_count += (faces_sun && SeesSun(planes, source, patch_points, origin + offset)) ? 1 : 0;
+			if (faces_sun && SeesSun(planes, source, patch_points, origin + offset)) {
+				lit_count++;
+			}
 		}
 
 		result.PointCount++;
@@ -306,8 +318,13 @@ LightmapVerifyResult VerifyLightmap(const PlaneSet& planes, const MapSource& sou
 		const bool expected_lit = (lit_count == 5);
 		const bool actual_lit = SampleLightmap(map.Lightmap, u, v) > scLightmapLitThreshold;
 
-		result.LitCount += expected_lit ? 1 : 0;
-		result.WrongCount += (expected_lit != actual_lit) ? 1 : 0;
+		if (expected_lit) {
+			result.LitCount++;
+		}
+
+		if (expected_lit != actual_lit) {
+			result.WrongCount++;
+		}
 	}
 
 	return result;
@@ -316,6 +333,9 @@ LightmapVerifyResult VerifyLightmap(const PlaneSet& planes, const MapSource& sou
 VerifyResult VerifyTriangles(const PlaneSet& planes, const Bsp& bsp, const MapSource& source, bool sealed,
 							 const Array<Vec3d>& triangle_points, const Array<Vec3d>& patch_points, uint32 ray_count)
 {
+	constexpr uint32 scMaxOriginAttempts = 64;
+	constexpr double scHitTolerance = 1e-4;
+
 	VerifyResult result;
 
 	std::mt19937_64 random(scSeed);

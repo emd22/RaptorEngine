@@ -6,7 +6,6 @@
 #include <Core/Random.hpp>
 #include <Math/MathConsts.hpp>
 #include <Math/MathUtil.hpp>
-#include <Math/TwoBoneIK.hpp>
 #include <algorithm>
 #include <cmath>
 
@@ -17,29 +16,9 @@ using namespace RagdollMath;
 namespace {
 
 constexpr float32 scFlinchAttack = 0.05f;
-/// How far off the spine a hit has to land to give the torso its full turn (m)
-constexpr float32 scTwistLever = 0.15f;
-/// Strength a hit body in the legs or pelvis drops to at the least, since the whole figure is standing on them
-constexpr float32 scAnchorLoosen = 0.6f;
 constexpr float32 scLookAttack = 0.1f;
-constexpr float32 scMinLookDistance = 0.2f;
-constexpr float32 scLookYawLever = 0.15f;
 constexpr float32 scGrabRamp = 0.3f;
-constexpr float32 scGutAttack = 0.08f;
-constexpr float32 scSnapAttack = 0.03f;
-constexpr float32 scLimbAttack = 0.05f;
-constexpr float32 scBehindMargin = -0.1f;
-constexpr float32 scBraceHandLift = 0.06f;
-constexpr float32 scBraceElbowBend = 0.1f;
-constexpr float32 scHeadHandSide = 0.11f;
-constexpr float32 scHeadHandForward = 0.05f;
-constexpr float32 scHeadHandDrop = 0.05f;
 constexpr float32 scFallTimeout = 4.0f;
-constexpr float32 scGroundedStopTime = 0.1f;
-constexpr float32 scWritheResumeTime = 0.5f;
-
-constexpr float32 scTimerFinished = -1.0f;
-
 
 float32 Envelope(float32 time, float32 attack, float32 total)
 {
@@ -56,6 +35,8 @@ float32 Envelope(float32 time, float32 attack, float32 total)
 
 float32 AdvanceTimer(float32 time, float32 delta_time, float32 total)
 {
+	constexpr float32 scTimerFinished = -1.0f;
+
 	if (time < 0.0f) {
 		return scTimerFinished;
 	}
@@ -97,8 +78,22 @@ float32 OutsideDeadZone(float32 value, float32 dead_zone)
 
 bool IsInFront(const BehaviourContext& ctx, const Vec3f point)
 {
+	constexpr float32 scBehindMargin = -0.1f;
+
 	const Vec3f chest = ctx.Bodies[ctx.pRig->Chest].Center;
 	return ctx.Horizontal(point - chest).Dot(ctx.Horizontal(ctx.Forward)) > scBehindMargin;
+}
+
+bool IsLandingEvent(const RagdollEvent& event)
+{
+	return event.Type == eRagdollEvent::Impact || event.Type == eRagdollEvent::OnGround;
+}
+
+void ScaleArmLimbs(BehaviourOutput& out, const RagdollRigArm& arm, float32 scale)
+{
+	out.ScaleStrength(arm.Upper, scale);
+	out.ScaleStrength(arm.Lower, scale);
+	out.ScaleStrength(arm.Hand, scale);
 }
 
 } // namespace
@@ -418,6 +413,9 @@ void ShotReactionBehaviour::Init(const RagdollRig& rig, uint32 body_count)
 
 void ShotReactionBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent& event)
 {
+	// How far off the spine a hit has to land to give the torso its full turn (m)
+	constexpr float32 scTwistLever = 0.15f;
+
 	if (event.Type != eRagdollEvent::Hit || event.Body < 0 || static_cast<uint32>(event.Body) >= ctx.GetBodyCount()) {
 		return;
 	}
@@ -507,6 +505,9 @@ void ShotReactionBehaviour::StartVariant(const BehaviourContext& ctx, const Ragd
 
 void ShotReactionBehaviour::LoosenAround(const BehaviourContext& ctx, uint32 body)
 {
+	// Strength a hit body in the legs or pelvis drops to at the least, since the whole figure is standing on them
+	constexpr float32 scAnchorLoosen = 0.6f;
+
 	const Ragdoll& ragdoll = *ctx.pRagdoll;
 	const uint32 body_count = ctx.GetBodyCount();
 	const float32 loosen = MathUtil::Clamp(Loosen, 0.0f, 1.0f);
@@ -653,6 +654,10 @@ void ShotReactionBehaviour::Update(const BehaviourContext& ctx)
 
 void ShotReactionBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& out) const
 {
+	constexpr float32 scGutAttack = 0.08f;
+	constexpr float32 scSnapAttack = 0.03f;
+	constexpr float32 scLimbAttack = 0.05f;
+
 	const RagdollRig& rig = *ctx.pRig;
 
 	// Stands on its own feet until it's finished with the wound, rather than walking off holding it
@@ -707,10 +712,7 @@ void ShotReactionBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOut
 	const float32 limb_scale = 1.0f - (1.0f - MathUtil::Clamp(LimbStrength, 0.0f, 1.0f)) * injury;
 
 	if (mInjury.Arm >= 0) {
-		const RagdollRigArm& arm = rig.Arms[mInjury.Arm];
-		out.ScaleStrength(arm.Upper, limb_scale);
-		out.ScaleStrength(arm.Lower, limb_scale);
-		out.ScaleStrength(arm.Hand, limb_scale);
+		ScaleArmLimbs(out, rig.Arms[mInjury.Arm], limb_scale);
 	}
 
 	if (mInjury.Leg >= 0) {
@@ -739,9 +741,7 @@ void ShotReactionBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOut
 	const RagdollRigArm& grab_arm = rig.Arms[mWound.Arm];
 	const float32 ease = 1.0f - (1.0f - GrabStrength) * grip;
 
-	out.ScaleStrength(grab_arm.Upper, ease);
-	out.ScaleStrength(grab_arm.Lower, ease);
-	out.ScaleStrength(grab_arm.Hand, ease);
+	ScaleArmLimbs(out, grab_arm, ease);
 
 	out.Hands[mWound.Arm] = BehaviourGoal { .Target = wound + normal * HandOffset,
 											.Weight = MathUtil::SmoothStep(ramp_in) * ramp_out };
@@ -749,6 +749,9 @@ void ShotReactionBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOut
 
 void ShotReactionBehaviour::LookAtWound(const BehaviourContext& ctx, BehaviourOutput& out) const
 {
+	constexpr float32 scMinLookDistance = 0.2f;
+	constexpr float32 scLookYawLever = 0.15f;
+
 	if (mLookBody < 0) {
 		return;
 	}
@@ -804,7 +807,7 @@ void BraceBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent& ev
 		return;
 	}
 
-	if ((event.Type == eRagdollEvent::Impact || event.Type == eRagdollEvent::OnGround) && IsActive()) {
+	if (IsLandingEvent(event) && IsActive()) {
 		mLanding.bLanded = true;
 	}
 }
@@ -864,6 +867,9 @@ void BraceBehaviour::Update(const BehaviourContext& ctx)
 
 void BraceBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& out) const
 {
+	constexpr float32 scBraceHandLift = 0.06f;
+	constexpr float32 scBraceElbowBend = 0.1f;
+
 	if (!mbHasTarget) {
 		return;
 	}
@@ -901,7 +907,7 @@ ProtectHeadBehaviour::ProtectHeadBehaviour() : RagdollBehaviour("protect_head", 
 
 void ProtectHeadBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent& event)
 {
-	if (event.Type == eRagdollEvent::Impact || event.Type == eRagdollEvent::OnGround) {
+	if (IsLandingEvent(event)) {
 		if (IsActive()) {
 			mLanding.bLanded = true;
 		}
@@ -959,6 +965,10 @@ void ProtectHeadBehaviour::Update(const BehaviourContext& ctx)
 
 void ProtectHeadBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& out) const
 {
+	constexpr float32 scHeadHandSide = 0.11f;
+	constexpr float32 scHeadHandForward = 0.05f;
+	constexpr float32 scHeadHandDrop = 0.05f;
+
 	const RagdollRig& rig = *ctx.pRig;
 	const Vec3f head = ctx.Bodies[rig.Neck].Center;
 	const Vec3f chest_up = ctx.GetChestUp();
@@ -1016,7 +1026,7 @@ void HighFallBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent&
 		return;
 	}
 
-	if ((event.Type == eRagdollEvent::Impact || event.Type == eRagdollEvent::OnGround) && IsActive()) {
+	if (IsLandingEvent(event) && IsActive()) {
 		Stop();
 	}
 }
@@ -1025,6 +1035,8 @@ void HighFallBehaviour::OnStart(const BehaviourContext& ctx) { mGroundedTime = 0
 
 void HighFallBehaviour::Update(const BehaviourContext& ctx)
 {
+	constexpr float32 scGroundedStopTime = 0.1f;
+
 	if (!IsActive()) {
 		if (ctx.bFreePose && ctx.AirTime >= MinAirTime && IsHighFall(ctx)) {
 			Start(ctx);
@@ -1115,12 +1127,14 @@ void WritheBehaviour::OnEvent(const BehaviourContext& ctx, const RagdollEvent& e
 
 void WritheBehaviour::Update(const BehaviourContext& ctx)
 {
+	constexpr float32 scWritheResumeTime = 0.5f;
+
 	if (IsActive() && !ctx.bFreePose) {
 		Stop();
 		return;
 	}
 
-	// Back to it after a get-up that didn't work, which took the body out of its free pose for a while
+	// OnGround only fires once per landing, which can be before the fall is declared and the body is in its free pose
 	if (!IsActive() && ctx.bFreePose && ctx.bBodyOnGround && ctx.GroundTime >= scWritheResumeTime) {
 		Start(ctx);
 	}
@@ -1307,374 +1321,6 @@ void ImpactRelaxBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutp
 {
 	for (uint32 i = 0; i < mRelax.Size; i++) {
 		out.Strength[i] = mRelax[i];
-	}
-}
-
-/////////////////////////////////////
-// A fallen body gets back up
-/////////////////////////////////////
-
-namespace {
-
-constexpr float32 scStandFraction = 0.85f;
-constexpr float32 scHandRadius = 0.05f;
-constexpr float32 scHandForward = 0.12f;
-constexpr float32 scFootHeight = 0.05f;
-constexpr float32 scFootSide = 0.12f;
-constexpr float32 scLegReach = 0.8f;
-
-float32 Ease(float32 progress) { return MathUtil::SmoothStep(MathUtil::Clamp(progress, 0.0f, 1.0f)); }
-
-JPH::Vec3 ToJolt(const Vec3f v) { return JPH::Vec3(v.X, v.Y, v.Z); }
-
-} // namespace
-
-GetUpBehaviour::GetUpBehaviour() : RagdollBehaviour("get_up", 15.0f)
-{
-	FadeIn = 0.1f;
-	FadeOut = 0.3f;
-
-	AddSetting("rest_time", &RestTime);
-	AddSetting("roll_time", &RollTime);
-	AddSetting("push_time", &PushTime);
-	AddSetting("rise_time", &RiseTime);
-	AddSetting("chest_lift", &ChestLift);
-	AddSetting("foot_tuck", &FootTuck);
-	AddSetting("floor_offset", &FloorOffset);
-	AddSetting("settle_time", &SettleTime);
-	AddSetting("stand_height", &StandHeight);
-	AddSetting("stand_lean", &StandLean);
-	AddSetting("stand_hold_time", &StandHoldTime);
-	AddSetting("stand_timeout", &StandTimeout);
-	AddSetting("max_attempts", &MaxAttempts);
-}
-
-void GetUpBehaviour::Init(const RagdollRig& rig, uint32 body_count)
-{
-	mStartWorld.InitSize(body_count, JPH::Quat::sIdentity());
-	mRestPose.InitSize(body_count, JPH::Quat::sIdentity());
-}
-
-void GetUpBehaviour::OnStart(const BehaviourContext& ctx)
-{
-	mStage = eGetUpStage::Resting;
-	mStageTime = 0.0f;
-	mHoldTime = 0.0f;
-	mAttempts = 0;
-
-	// Rest orientations are world space from when the body was created, but the relative poses taken from them do not
-	// depend on that
-	const Ragdoll& ragdoll = *ctx.pRagdoll;
-	mRestRoot = ragdoll.GetRestOrientation(0);
-
-	for (uint32 i = 1; i < ctx.GetBodyCount(); i++) {
-		const int32 parent = ragdoll.GetParentBody(i);
-
-		if (parent >= 0) {
-			mRestPose[i] = RelativeRotation(ragdoll.GetRestOrientation(static_cast<uint32>(parent)),
-											ragdoll.GetRestOrientation(i));
-		}
-	}
-}
-
-void GetUpBehaviour::Update(const BehaviourContext& ctx)
-{
-	if (!ctx.bAlive) {
-		Stop();
-		return;
-	}
-
-	mStageTime += ctx.DeltaTime;
-
-	if (mStage == eGetUpStage::Resting) {
-		if (!ctx.bFreePose) {
-			Stop();
-			return;
-		}
-
-		// It stays down once it has run out of tries, rather than thrashing on the floor until it dies
-		if (mStageTime >= RestTime && mAttempts < static_cast<uint32>(MaxAttempts)) {
-			BeginLift(ctx);
-		}
-
-		return;
-	}
-
-	if (mStage == eGetUpStage::Lifting) {
-		const float32 roll_time = mbSideLying ? RollTime : 0.0f;
-
-		if (mStageTime >= roll_time + PushTime + RiseTime) {
-			mStage = eGetUpStage::Settling;
-			mStageTime = 0.0f;
-		}
-
-		return;
-	}
-
-	if (mStage == eGetUpStage::Settling) {
-		if (mStageTime >= SettleTime) {
-			// Only a body that really came up goes on to stand. Handing one still on the floor to the balance
-			// controller falls straight back over, and the drawn pose jumps between lying and standing as it goes
-			if (IsUpright(ctx)) {
-				mStage = eGetUpStage::Standing;
-			}
-			else {
-				mStage = eGetUpStage::Resting;
-				mAttempts++;
-			}
-
-			mStageTime = 0.0f;
-			mHoldTime = 0.0f;
-		}
-
-		return;
-	}
-
-	if (IsUpright(ctx)) {
-		mHoldTime += ctx.DeltaTime;
-	}
-	else {
-		mHoldTime = 0.0f;
-	}
-
-	if (mHoldTime >= StandHoldTime || mStageTime >= StandTimeout) {
-		Stop();
-	}
-}
-
-void GetUpBehaviour::BeginLift(const BehaviourContext& ctx)
-{
-	const uint32 body_count = ctx.GetBodyCount();
-
-	float32 lowest = ctx.Bodies[0].Center.Dot(ctx.Up);
-
-	for (uint32 i = 1; i < body_count; i++) {
-		lowest = std::min(lowest, ctx.Bodies[i].Center.Dot(ctx.Up));
-	}
-
-	mFloorHeight = lowest - FloorOffset;
-
-	for (uint32 i = 0; i < body_count; i++) {
-		mStartWorld[i] = ctx.Bodies[i].Orientation;
-	}
-
-	const float32 facing = ctx.Forward.Dot(ctx.Up);
-
-	mbSideLying = std::abs(facing) < 0.5f;
-	mbFaceDown = facing < 0.0f || mbSideLying;
-
-	mRollAxis = ctx.GetChestUp().SafeNormalize(ctx.Up);
-	mRollAngle = 0.0f;
-
-	if (mbSideLying) {
-		// The turn about the spine that takes the chest's front to the floor
-		const Vec3f front = (ctx.Forward - mRollAxis * ctx.Forward.Dot(mRollAxis)).SafeNormalize(ctx.Forward);
-		const Vec3f down = (-ctx.Up - mRollAxis * (-ctx.Up).Dot(mRollAxis)).SafeNormalize(-ctx.Up);
-		mRollAngle = std::atan2(mRollAxis.Dot(front.Cross(down)), front.Dot(down));
-	}
-
-	mStage = eGetUpStage::Lifting;
-	mStageTime = 0.0f;
-}
-
-bool GetUpBehaviour::IsUpright(const BehaviourContext& ctx) const
-{
-	const float32 height = ctx.Bodies[0].Origin.Dot(ctx.Up) - mFloorHeight;
-	const float32 lean = MathUtil::RadToDeg(std::acos(MathUtil::Clamp(ctx.GetChestUp().Dot(ctx.Up), -1.0f, 1.0f)));
-
-	return height >= StandHeight * scStandFraction && lean <= StandLean;
-}
-
-GetUpBehaviour::LiftPose GetUpBehaviour::MakeLiftPose(const BehaviourContext& ctx) const
-{
-	LiftPose pose;
-
-	const float32 roll_time = mbSideLying ? RollTime : 0.0f;
-
-	if (mbSideLying && RollTime > 0.0f) {
-		pose.RollProgress = Ease(mStageTime / RollTime);
-	}
-
-	if (PushTime > 0.0f) {
-		pose.PushProgress = Ease((mStageTime - roll_time) / PushTime);
-	}
-
-	if (RiseTime > 0.0f) {
-		pose.RiseProgress = Ease((mStageTime - roll_time - PushTime) / RiseTime);
-	}
-
-	// The chest lifts while pushing and comes back up as the legs straighten, and the sign picks the direction that
-	// is up for the way the body is lying
-	const float32 lift = MathUtil::DegToRad(ChestLift) * pose.PushProgress * (1.0f - pose.RiseProgress);
-	const float32 sign = mbFaceDown ? -1.0f : 1.0f;
-
-	pose.Roll = JPH::Quat::sRotation(ToJolt(mRollAxis), mRollAngle * pose.RollProgress);
-	pose.Raise = JPH::Quat::sRotation(ToJolt(ctx.Right), sign * lift);
-
-	// The feet stay on the floor, so the knees have to straighten against gravity to lift the pelvis
-	const float32 tuck = FootTuck * (1.0f - pose.RiseProgress);
-
-	for (uint32 leg = 0; leg < RagdollRig::scLimbCount; leg++) {
-		SolveLegIK(ctx, leg, tuck, pose.IKThigh[leg], pose.IKShin[leg]);
-	}
-
-	return pose;
-}
-
-void GetUpBehaviour::SolveLegIK(const BehaviourContext& ctx, uint32 leg, float32 tuck, JPH::Quat& out_thigh,
-								JPH::Quat& out_shin) const
-{
-	const RagdollRigLeg& chain = ctx.pRig->Legs[leg];
-	const Vec3f head = ctx.Horizontal(ctx.GetChestUp()).SafeNormalize(ctx.Forward);
-	const Vec3f side = ctx.Right * (chain.SideSign * scFootSide);
-	const Vec3f hip = ctx.Bodies[chain.Thigh].Origin;
-
-	// The feet can only reach the floor from a low hip if they sit well out along the legs, so the horizontal offset
-	// shrinks as the hip rises and the feet only come in under the hips once the legs can straighten. The tuck is the
-	// most the feet are placed out from the hips
-	const float32 reach = scLegReach * (chain.Upper + chain.Lower);
-	const float32 hip_height = hip.Dot(ctx.Up) - (mFloorHeight + scFootHeight);
-	const float32 offset = std::min(tuck, std::sqrt(std::max(reach * reach - hip_height * hip_height, 0.0f)));
-
-	Vec3f foot = hip - head * offset + side;
-	foot = foot - ctx.Up * (foot.Dot(ctx.Up) - (mFloorHeight + scFootHeight));
-
-	// Knees bend about the body's own forward axis, which points at the floor when lying face down
-	const TwoBoneIKResult ik = SolveTwoBoneIK(hip, foot, chain.Upper, chain.Lower, ctx.Forward);
-
-	const Vec3f upper_direction = (ik.Mid - hip).SafeNormalize(-ctx.Up);
-	const Vec3f lower_direction = (ik.End - ik.Mid).SafeNormalize(upper_direction);
-
-	Vec3f hinge = upper_direction.Cross(lower_direction);
-
-	if (hinge.Length() < 1e-3f) {
-		hinge = upper_direction.Cross(ctx.Forward);
-	}
-
-	hinge = hinge.SafeNormalize(ctx.Right);
-
-	ctx.pRagdoll->GetHingeChainRotations(chain.Thigh, chain.Shin, ToJolt(upper_direction), ToJolt(lower_direction),
-										 ToJolt(hinge), out_thigh, out_shin);
-}
-
-Vec3f GetUpBehaviour::GetHandTarget(const BehaviourContext& ctx, uint32 arm) const
-{
-	const Vec3f head = ctx.Horizontal(ctx.GetChestUp()).SafeNormalize(ctx.Forward);
-	const Vec3f shoulder = ctx.Bodies[ctx.pRig->Arms[arm].Upper].Origin;
-
-	// Face down the hands go ahead of the shoulders, face up they go behind them
-	const float32 reach = mbFaceDown ? scHandForward : -scHandForward;
-	const Vec3f hand = shoulder + head * reach;
-
-	return hand - ctx.Up * (hand.Dot(ctx.Up) - (mFloorHeight + scHandRadius));
-}
-
-JPH::Quat GetUpBehaviour::UprightRoot(const BehaviourContext& ctx) const
-{
-	// The shortest turn that stands the pelvis' rest up-axis up, so the body keeps the heading it has
-	const JPH::Vec3 jolt_up = ToJolt(ctx.Up);
-	const JPH::Vec3 local_up = mRestRoot.Conjugated() * jolt_up;
-	const JPH::Quat root = ctx.Bodies[0].Orientation;
-
-	return (JPH::Quat::sFromTo(root * local_up, jolt_up) * root).Normalized();
-}
-
-JPH::Quat GetUpBehaviour::RestWorld(const BehaviourContext& ctx, uint32 body) const
-{
-	if (body == 0) {
-		return UprightRoot(ctx);
-	}
-
-	const int32 parent = ctx.pRagdoll->GetParentBody(body);
-
-	if (parent < 0) {
-		return UprightRoot(ctx) * mRestPose[body];
-	}
-
-	return (RestWorld(ctx, static_cast<uint32>(parent)) * mRestPose[body]).Normalized();
-}
-
-JPH::Quat GetUpBehaviour::LiftWorld(const BehaviourContext& ctx, const LiftPose& pose, uint32 body) const
-{
-	return (pose.Raise * pose.Roll * mStartWorld[body]).Normalized();
-}
-
-JPH::Quat GetUpBehaviour::DesiredWorld(const BehaviourContext& ctx, const LiftPose& pose, uint32 body) const
-{
-	if (body == 0) {
-		return ctx.Bodies[0].Orientation;
-	}
-
-	const RagdollRig& rig = *ctx.pRig;
-
-	for (uint32 leg = 0; leg < RagdollRig::scLimbCount; leg++) {
-		const RagdollRigLeg& chain = rig.Legs[leg];
-
-		if (body == chain.Thigh) {
-			return mStartWorld[body].SLERP(pose.IKThigh[leg], pose.PushProgress).Normalized();
-		}
-
-		if (body == chain.Shin) {
-			return mStartWorld[body].SLERP(pose.IKShin[leg], pose.PushProgress).Normalized();
-		}
-
-		if (body == chain.Foot) {
-			const JPH::Quat foot_ik = (pose.IKShin[leg] * mRestPose[body]).Normalized();
-			return mStartWorld[body].SLERP(foot_ik, pose.PushProgress).Normalized();
-		}
-	}
-
-	return LiftWorld(ctx, pose, body).SLERP(RestWorld(ctx, body), pose.RiseProgress).Normalized();
-}
-
-void GetUpBehaviour::ContributeLift(const BehaviourContext& ctx, BehaviourOutput& out) const
-{
-	const LiftPose pose = MakeLiftPose(ctx);
-	const uint32 body_count = ctx.GetBodyCount();
-
-	out.bAdditive = false;
-
-	for (uint32 i = 1; i < body_count; i++) {
-		const int32 parent = ctx.pRagdoll->GetParentBody(i);
-
-		if (parent < 0) {
-			continue;
-		}
-
-		const JPH::Quat parent_world = DesiredWorld(ctx, pose, static_cast<uint32>(parent));
-		const JPH::Quat child_world = DesiredWorld(ctx, pose, i);
-
-		out.Pose[i] = RelativeRotation(parent_world, child_world);
-		out.Mask[i] = 1.0f;
-	}
-
-	// Hands push on the floor while the body is pushing up, and come off as it rises
-	const float32 hand_weight = pose.PushProgress * (1.0f - pose.RiseProgress);
-
-	for (uint32 arm = 0; arm < RagdollRig::scLimbCount; arm++) {
-		out.Hands[arm] = BehaviourGoal { .Target = GetHandTarget(ctx, arm), .Weight = hand_weight };
-	}
-}
-
-void GetUpBehaviour::Contribute(const BehaviourContext& ctx, BehaviourOutput& out) const
-{
-	if (mStage == eGetUpStage::Lifting) {
-		ContributeLift(ctx, out);
-		return;
-	}
-
-	if (mStage == eGetUpStage::Settling || mStage == eGetUpStage::Standing) {
-		// Holds the standing rest pose, so the hand-back does not inherit a mid-stride pose from the animation
-		out.bAdditive = false;
-
-		for (uint32 i = 1; i < ctx.GetBodyCount(); i++) {
-			out.Pose[i] = mRestPose[i];
-			out.Mask[i] = 1.0f;
-		}
-	}
-
-	if (mStage == eGetUpStage::Standing) {
-		out.Balance = eBehaviourBalance::On;
 	}
 }
 

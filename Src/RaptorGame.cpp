@@ -327,6 +327,9 @@ void RaptorGame::CreateGame()
 	mpDecalsCVar = gCVars->Set("r_decals", 1);
 	mpDebugBoundsCVar = gCVars->Set("r_debug_bounds", 0);
 
+	// `$s_debug 1` shows the audio voices and mix, 2 also marks the voices in the world
+	mAudioDebug.Create();
+
 	mpExposureCVar = gCVars->Set("r_exposure_ev", gCVars->Get("r_exposure_ev", 0.0f));
 	mpApertureCVar = gCVars->Set("r_aperture", gCVars->Get("r_aperture", 16.0f));
 	mpShutterCVar = gCVars->Set("r_shutter", gCVars->Get("r_shutter", 0.01f));
@@ -340,6 +343,8 @@ void RaptorGame::CreateGame()
 	gCVars->Set("r_probe_bounces", 3);
 	gCVars->Set("r_compiled_probes", 1);
 	mpReflectionProbesCVar = gCVars->Set("r_reflection_probes", 1);
+	// 0 = reflection probes are not scaled to the light probe irradiance where they are used, for A/B
+	mpReflectionNormalizeCVar = gCVars->Set("r_reflection_normalize", 1);
 	gCVars->Set("r_reflection_level_probe", 0);
 	mpReflectionDebugCVar = gCVars->Set("r_reflection_debug", 0);
 
@@ -393,6 +398,7 @@ void RaptorGame::CreateGame()
 	gCVars->Set("r_fog", gCVars->Get("r_fog", int64(1)));
 	gCVars->Set("r_fog_distance", gCVars->Get("r_fog_distance", 100.0f));
 	gCVars->Set("r_fog_temporal", gCVars->Get("r_fog_temporal", int64(1)));
+	gCVars->Set("r_fog_debug", gCVars->Get("r_fog_debug", int64(0)));
 
 	mCrosshairTicket = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm, scCrosshairPath,
 												eImageCreateFlags::None);
@@ -673,10 +679,17 @@ void RaptorGame::ProcessControls()
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_4) && mpReflectionDebugCVar != nullptr) {
-		static const char* const scViewNames[] = { "off", "mirror reflections", "probe coverage" };
+		static const char* const scViewNames[] = { "off", "mirror reflections", "probe coverage", "normalization" };
 
-		mpReflectionDebugCVar->IntValue = (std::clamp<int64>(mpReflectionDebugCVar->IntValue, 0, 2) + 1) % 3;
-		LogInfo("Reflection probe debug view: {}", scViewNames[mpReflectionDebugCVar->IntValue]);
+		mpReflectionDebugCVar->IntValue = (std::clamp<int64>(mpReflectionDebugCVar->IntValue, 0, 3) + 1) % 4;
+		LogInfo("Reflection probe debug view {}", scViewNames[mpReflectionDebugCVar->IntValue]);
+	}
+
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_F)) {
+		LightSpot* flashlight = gWorld->GetPlayer().pFlashlight;
+		if (flashlight) {
+			flashlight->bEnabled = !flashlight->bEnabled;
+		}
 	}
 
 	if (ControlManager::IsMouseLocked()) {
@@ -997,7 +1010,8 @@ void RaptorGame::ReadNPCTuning(NPCTuning& tuning) const
 	tuning.BalanceAssist.LiftFraction = GetCVarFloat(mpNPCBalanceLiftCVar, tuning.BalanceAssist.LiftFraction);
 	tuning.BalanceAssist.ExternalResidual = GetCVarFloat(mpNPCBalanceExternalResidualCVar,
 														 tuning.BalanceAssist.ExternalResidual);
-	tuning.BalanceAssist.PelvisDamping = GetCVarFloat(mpNPCBalancePelvisDampingCVar, tuning.BalanceAssist.PelvisDamping);
+	tuning.BalanceAssist.PelvisDamping = GetCVarFloat(mpNPCBalancePelvisDampingCVar,
+													  tuning.BalanceAssist.PelvisDamping);
 	tuning.ActiveDistance = GetCVarFloat(mpNPCActiveDistanceCVar, tuning.ActiveDistance);
 	tuning.BumpSpeed = GetCVarFloat(mpNPCBumpSpeedCVar, tuning.BumpSpeed);
 	tuning.BumpImpulse = GetCVarFloat(mpNPCBumpImpulseCVar, tuning.BumpImpulse);
@@ -1241,10 +1255,11 @@ void RaptorGame::RenderText()
 		gTextRenderer->DrawText(String::Fmt("GPU={:.2f}ms", gpu.GetTotalMs()).CStr(), 1.0f, scWhite);
 		gTextRenderer->DrawText(
 			String::Fmt(
-				"shadow {:.2f} pre {:.2f} lightcull {:.2f} ao {:.2f} fwd {:.2f} part {:.2f} fog {:.2f} comp {:.2f}",
-				gpu.GetMs(eGpuMarker::Shadows), gpu.GetMs(eGpuMarker::Prepass), gpu.GetMs(eGpuMarker::LightCulling),
-				gpu.GetMs(eGpuMarker::SSAO), gpu.GetMs(eGpuMarker::Forward), gpu.GetMs(eGpuMarker::Particles),
-				gpu.GetMs(eGpuMarker::Fog), gpu.GetMs(eGpuMarker::Composition))
+				"shadow {:.2f} gi {:.2f} pre {:.2f} lightcull {:.2f} ao {:.2f} fwd {:.2f} part {:.2f} fog {:.2f} comp "
+				"{:.2f}",
+				gpu.GetMs(eGpuMarker::Shadows), gpu.GetMs(eGpuMarker::LightTransport), gpu.GetMs(eGpuMarker::Prepass),
+				gpu.GetMs(eGpuMarker::LightCulling), gpu.GetMs(eGpuMarker::SSAO), gpu.GetMs(eGpuMarker::Forward),
+				gpu.GetMs(eGpuMarker::Particles), gpu.GetMs(eGpuMarker::Fog), gpu.GetMs(eGpuMarker::Composition))
 				.CStr(),
 			1.0f, scWhite);
 
@@ -1285,7 +1300,10 @@ void RaptorGame::RenderText()
 								1.0f, scWhite);
 	}
 
-	if (gAudio->GetVoiceCount() > 0) {
+	if (mAudioDebug.IsEnabled()) {
+		mAudioDebug.DrawText(*gWorld->GetCurrentCamera());
+	}
+	else if (gAudio->GetVoiceCount() > 0) {
 		const SpatialAudio& spatial = gAudio->GetSpatial();
 
 		float32 reverb_times[3];
@@ -1343,6 +1361,7 @@ void RaptorGame::Tick()
 	}
 
 	gGraphics->DeltaTime = static_cast<float32>(DeltaTime);
+	gGraphics->ShaderTime += DeltaTime;
 
 	mFpsWindowTime += DeltaTime;
 
@@ -1420,7 +1439,8 @@ void RaptorGame::Tick()
 
 	gWorld->pPrototype->UpdateAcoustics(static_cast<float32>(DeltaTime));
 	gAudio->SetListener(listener->GetPosition(), listener->GetForwardVector(), listener->GetUpVector());
-	gAudio->Update(gGraphics->GetWindow()->IsFocused());
+	gAudio->Update(static_cast<float32>(DeltaTime), gGraphics->GetWindow()->IsFocused());
+	mAudioDebug.DrawWorld();
 	gWorld->SoundEmitters.Update(static_cast<float32>(DeltaTime), listener->GetPosition());
 
 	Ref<FPSCamera> camera = gWorld->Player.pCamera;
@@ -1464,8 +1484,10 @@ void RaptorGame::Tick()
 	gGraphics->bDisableProbes = (mpProbesCVar != nullptr) && (mpProbesCVar->IntValue == 0);
 	gGraphics->bDisableReflectionProbes = (mpReflectionProbesCVar != nullptr) &&
 										  (mpReflectionProbesCVar->IntValue == 0);
+	gGraphics->bDisableReflectionNormalize = (mpReflectionNormalizeCVar != nullptr) &&
+											 (mpReflectionNormalizeCVar->IntValue == 0);
 	gGraphics->ReflectionDebugView = (mpReflectionDebugCVar != nullptr)
-										 ? static_cast<uint32>(std::clamp<int64>(mpReflectionDebugCVar->IntValue, 0, 2))
+										 ? static_cast<uint32>(std::clamp<int64>(mpReflectionDebugCVar->IntValue, 0, 3))
 										 : 0;
 	gGraphics->Tonemapper = (mpTonemapperCVar != nullptr)
 								? static_cast<uint32>(std::clamp<int64>(mpTonemapperCVar->IntValue, 0, 1))

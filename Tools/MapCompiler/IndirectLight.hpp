@@ -14,15 +14,6 @@
 
 namespace fx::mapc {
 
-// struct LightmapRect
-// {
-// 	uint32 X = 0;
-// 	uint32 Y = 0;
-// 	uint32 Width = 0;
-// 	uint32 Height = 0;
-// };
-
-
 struct IndirectInput
 {
 	uint32 Width = 0;
@@ -34,14 +25,18 @@ struct IndirectInput
 	const Vec3f* pPositions = nullptr;
 	const Vec3f* pNormals = nullptr;
 
+	/// The brush planes of the map, for the water volumes
+	const PlaneSet* pPlanes = nullptr;
 
 	SizedArray<URect> LightmapRects;
-
-	// const LightmapRect* pRects = nullptr;
-	// uint32 RectCount = 0;
 };
 
-bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, const IndirectInput& input,
-					   const LightmapOptions& options, CompiledMap& out_map, LightmapStats& out_stats);
+/**
+ * @brief Bakes bounce light into the lightmap and the light probes. Model triangles (`models`, optional) have no
+ * lightmap texels, so their radiance lives in a bake-only cache of world space cells that is gathered like texels.
+ */
+bool BakeIndirectLight(const MapSource& source, const SurfaceBuilder& surfaces, const ModelBuilder* models,
+					   const IndirectInput& input, const LightmapOptions& options, CompiledMap& out_map,
+					   LightmapStats& out_stats);
 
 } // namespace fx::mapc

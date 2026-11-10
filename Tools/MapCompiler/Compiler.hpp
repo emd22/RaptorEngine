@@ -30,6 +30,8 @@ struct CompileOptions
 	SurfaceOptions Surface;
 
 	bool bKeepOutside = false;
+	/// Bake static glTF/.rxmodel models in as shadow casters and bounce surfaces
+	bool bModels = true;
 	bool bPlaceProbes = true;
 
 	ProbePlacementSettings ProbeSettings;

@@ -1,0 +1,45 @@
+/* CVar interop and helpers */
+
+import ./RMeta;
+
+/* Interop routines for CVars */
+struct CVarInterop
+{
+}
+impl CVarInterop
+{
+	extern void SetInt(cstring name, long value);
+	extern void SetFloat(cstring name, float value);
+	extern void SetString(cstring name, string value);
+
+	extern long GetInt(cstring name, long fallback);
+	extern float GetFloat(cstring name, float fallback);
+}
+
+void SetCVar<T>(cstring name, T value)
+{
+	if (@IsInteger(T) || @is_same(T, bool)) {
+		CVarInterop.SetInt(name, value);
+	}
+	if (@IsFloat(T)) {
+		CVarInterop.SetFloat(name, value);
+	}
+	if (@IsString(T)) {
+		CVarInterop.SetString(name, value);
+	}
+
+	// No-op
+}
+
+T GetCVar<T>(cstring name, T fallback)
+{
+	if (@IsInteger(T) || @is_same(T, bool)) {
+		return CVarInterop.GetInt(name, (long)fallback);
+	}
+	if (@IsFloat(T)) {
+		return CVarInterop.GetFloat(name, fallback);
+	}
+	if (@IsString(T)) {
+		// TODO: Implement me
+	}
+}

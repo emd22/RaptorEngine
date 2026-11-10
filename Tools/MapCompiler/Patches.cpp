@@ -11,13 +11,7 @@ namespace fx::mapc {
 
 namespace {
 
-constexpr double scSmoothCellSize = 1e-3;
-constexpr double scSmoothEpsilon = 2e-5;
-constexpr double scSmoothingCosine = 0.766;
-constexpr double scCullOffset = 1e-3;
-constexpr double scCullInset = 0.1;
 constexpr double scMinNormalLength = 1e-12;
-constexpr uint32 scOwnGroupFlag = 0x80000000u;
 
 struct SmoothKey
 {
@@ -46,6 +40,8 @@ struct SmoothKeyHash
 
 SmoothKey MakeSmoothKey(uint32 group, const Vec3d& point)
 {
+	constexpr double scSmoothCellSize = 1e-3;
+
 	return SmoothKey { group, static_cast<int64>(std::floor(point.X / scSmoothCellSize)),
 					   static_cast<int64>(std::floor(point.Y / scSmoothCellSize)),
 					   static_cast<int64>(std::floor(point.Z / scSmoothCellSize)) };
@@ -224,6 +220,10 @@ void PatchBuilder::Build(const MapSource& source, const Bsp& bsp, bool sealed, b
 
 void PatchBuilder::SmoothNormals(const MapSource& source)
 {
+	constexpr double scSmoothEpsilon = 2e-5;
+	constexpr double scSmoothingCosine = 0.766;
+	constexpr uint32 scOwnGroupFlag = 0x80000000u;
+
 	std::unordered_map<SmoothKey, Array<VertexRef>, SmoothKeyHash> cells;
 	Array<uint32> groups;
 
@@ -319,6 +319,9 @@ void PatchBuilder::SmoothNormals(const MapSource& source)
 
 void PatchBuilder::Cull(const Bsp& bsp, bool sealed)
 {
+	constexpr double scCullOffset = 1e-3;
+	constexpr double scCullInset = 0.1;
+
 	for (PatchSurface& surface : Surfaces) {
 		Array<int32> kept;
 
@@ -363,7 +366,7 @@ void PatchBuilder::Cull(const Bsp& bsp, bool sealed)
 	}
 }
 
-void PatchBuilder::FindBoundaryEdges(const PatchSurface& surface, Array<std::pair<int32, int32>>& out_edges)
+void PatchBuilder::FindBoundaryEdges(const PatchSurface& surface, Array<PatchEdge>& out_edges)
 {
 	out_edges.Clear();
 
@@ -399,7 +402,7 @@ void PatchBuilder::FindBoundaryEdges(const PatchSurface& surface, Array<std::pai
 			const int32 to = surface.Indices[index + (corner + 1) % 3];
 
 			if (edge_counts[edge_key(from, to)] == 1) {
-				out_edges.Emplace(from, to);
+				out_edges.Emplace(PatchEdge { from, to });
 			}
 		}
 	}

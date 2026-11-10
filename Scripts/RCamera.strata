@@ -1,0 +1,76 @@
+import ./interop;
+
+import ./CVar;
+
+
+struct CAMERASTATE
+{
+	float shutter;
+	float iso;
+	float aperture;
+}
+
+struct RCameraInfo
+{
+	float Shutter;
+	float ISO;
+	float Aperture;
+}
+
+/* Helper functions */
+
+/* Load the camera info from CVars into the passed in camera object. */
+void GetCameraInfo(ref RCameraInfo cam)
+{
+	cam.Shutter = GetCVar<float>("r_shutter", 300.0f);
+	cam.ISO = GetCVar<float>("r_iso", 100.0f);
+	cam.Aperture = GetCVar<float>("r_aperature", 9.0f);
+}
+
+/* Returns a new camera object */
+RCameraInfo GetCameraInfo()
+{
+	RCameraInfo cam;
+	GetCameraInfo(cam);
+	return cam;
+}
+
+void SetCameraInfo(const ref RCameraInfo cam)
+{
+	SetCVar<float>("r_shutter", cam.Shutter);
+	SetCVar<float>("r_iso", cam.ISO);
+	SetCVar<float>("r_aperture", cam.Aperture);
+}
+
+
+impl RCameraInfo
+{
+	/* Applies the camera info to the engine CVars. */
+	void Apply(ref RCameraInfo self)
+	{
+		SetCameraInfo(self);
+	}
+
+	/* Fetch the camera info from the CVars into this RCameraInfo. */
+	void Fetch(ref RCameraInfo self)
+	{
+		GetCameraInfo(self);
+	}
+}
+
+
+
+//
+// void camera_state_save(ref CAMERASTATE cs)
+// {
+// 	cs.shutter = cvar_get_float("r_shutter", 300.0f);
+// 	cs.iso = cvar_get_float("r_iso", 100.0f);
+// 	cs.aperture = cvar_get_float("r_aperture", 9.0f);
+// }
+//
+// void camera_state_load(ref CAMERASTATE cs)
+// {
+// 	cvar_set_float("r_shutter", cs.shutter);
+// 	cvar_set_float("r_iso", cs.iso);
+// 	cvar_set_float("r_aperture", cs.aperture);
+// }

@@ -25,12 +25,6 @@ FX_FORCE_INLINE uint32 GetSerial(uint64 user_data) { return static_cast<uint32>(
 class NPCMover
 {
 public:
-	/// Grounded and still for this long before the capsule stops being updated
-	static constexpr float32 scRestDelay = 0.25f;
-	/// A resting capsule still refreshes this often, so it notices the floor going away
-	static constexpr float32 scRestRefreshTime = 0.5f;
-
-public:
 	NPCMover() = default;
 	NPCMover(const NPCMover&) = delete;
 	NPCMover& operator=(const NPCMover&) = delete;
@@ -50,7 +44,13 @@ public:
 
 	FX_FORCE_INLINE bool IsCreated() const { return mpCharacter != nullptr; }
 	FX_FORCE_INLINE bool IsEnabled() const { return mbEnabled; }
-	FX_FORCE_INLINE bool IsResting() const { return mRestTime >= scRestDelay; }
+	FX_FORCE_INLINE bool IsResting() const
+	{
+		// Grounded and still for this long before the capsule stops being updated
+		constexpr float32 scRestDelay = 0.25f;
+
+		return mRestTime >= scRestDelay;
+	}
 	FX_FORCE_INLINE const physics::CharacterConfig& GetConfig() const { return mConfig; }
 
 	~NPCMover() { Destroy(); }

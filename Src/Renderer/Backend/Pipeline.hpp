@@ -73,6 +73,10 @@ enum class eDrawFlags : uint32
 	DebugReflectionCoverage = (1 << 9),
 	BakedSun = (1 << 10),
 	BakedIndirect = (1 << 11),
+	/// Reflection probes are not scaled to the light probe irradiance where they are used
+	NoReflectionNormalize = (1 << 12),
+	/// Shows how much the reflection probes are scaled at each pixel
+	DebugReflectionNormalize = (1 << 13),
 };
 
 FxEnumFlags(eDrawFlags);
@@ -103,6 +107,11 @@ struct alignas(16) ViewConstants
 
 	/// Scale applied to the lit result before it is written to the HDR target, see GraphicsBackend::PreExposure
 	float32 PreExposure = 1.0f;
+
+	float32 DepthParams[2] = { 0.0f, 0.0f };
+
+	/// See GraphicsBackend::ShaderTime
+	float32 Time = 0.0f;
 };
 
 struct DrawPushConstants
@@ -152,6 +161,9 @@ struct alignas(16) LightCullConstants
 	uint32 ReplacementSlot = 0;
 	/// Number of decals in GraphicsBackend::DecalBuffer for this frame
 	uint32 DecalCount = 0;
+	/// Turn stored depth back into view depth, for the depth bounded tiles of the main view
+	float32 DepthA = 0.0f;
+	float32 DepthB = 0.0f;
 };
 
 /// A single light slot in GraphicsBackend::LightBuffer. Mirrors `Light` in Shaders/LightingCommon.hlsli.
@@ -181,10 +193,12 @@ struct alignas(16) LightGpuData
 	/// Where the light's shadow map is in the shadow atlas: xy scales and zw offsets a shadow map UV into an atlas UV.
 	/// All zero when the light has no shadow map.
 	float32 ShadowAtlasRect[4];
+
+	uint32 Flags;
 };
 
 
-static_assert(sizeof(LightGpuData) == 144, "LightGpuData must match the Light struct in LightingCommon.hlsli");
+static_assert(sizeof(LightGpuData) == 160, "LightGpuData must match the Light struct in LightingCommon.hlsli");
 static_assert(sizeof(LightGpuData) * 64 <= 16384, "The light buffer must fit the guaranteed uniform buffer range");
 
 /// A single decal in GraphicsBackend::DecalBuffer. Mirrors `Decal` in Shaders/DecalCommon.hlsli.
@@ -228,6 +242,10 @@ struct PipelineProperties
 	bool bRenderLines : 1 = false;
 
 	VkCompareOp DepthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
+
+	/// Added to each fragment's depth, see VkPipelineRasterizationStateCreateInfo. Both zero leaves depth bias off.
+	float32 DepthBiasConstant = 0.0f;
+	float32 DepthBiasSlope = 0.0f;
 };
 
 struct PushConstants

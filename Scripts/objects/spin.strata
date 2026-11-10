@@ -7,32 +7,35 @@
  */
 
 import ../interop;
-import ../common;
+import ../RObject;
+
+import std/mathconsts;
+
 
 /* Every object a script is attached to runs its own copy of the script, so these globals belong to that object. */
-const float SPIN_SPEED = ((90.0f * MATH_PI) / 180.0f);
+const float gcSpinSpeed = ((90.0f * F_PI) / 180.0f);
 
-float3 spin_base_rotation;
-float spin_angle = 0.0f;
-
+float3 gInitialRotation;
+float gSpinAngle = 0.0f;
 
 /* Called on the first frame the object is simulated. */
-void object_start(OBJECT self)
+void ObjectBegin(RObject obj)
 {
-	spin_base_rotation = self.get_rotation();
-	spin_angle = 0.0f;
+	gInitialRotation = obj.GetRotationEuler();
+	gSpinAngle = 0.0f;
 }
 
 /* Called every simulated frame. */
-void object_update(OBJECT self, float delta_time)
+void ObjectTick(RObject obj, float delta_time)
 {
-	spin_angle += delta_time * SPIN_SPEED;
+	gSpinAngle += delta_time * gcSpinSpeed;
 
-	self.rotate_to(float3(spin_base_rotation.x, spin_base_rotation.y + spin_angle, spin_base_rotation.z));
+	const float3 new_angle = gInitialRotation + float3(0.0f, gSpinAngle, 0.0f);
+	obj.RotateToEuler(new_angle);
 }
 
 /* Called when simulation ends and the editor goes back to editing. */
-void object_stop(OBJECT self)
+void ObjectStop(RObject obj)
 {
-	self.rotate_to(spin_base_rotation);
+	obj.RotateToEuler(gInitialRotation);
 }

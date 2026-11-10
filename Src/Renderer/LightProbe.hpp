@@ -43,6 +43,23 @@ struct ReflectionProbeData
 
 static_assert(sizeof(ReflectionProbeData) == 96);
 
+/**
+ * @brief A reflection probe as is transferred to the GPU
+ */
+struct ReflectionProbeGpu
+{
+	ReflectionProbeData Probe;
+
+	/// Luminance of the light probe irradiance at the capture point (along +X +Y +Z), w if the probe was found.
+	/// All zero when there are no light probes there.
+	float32 CaptureIrradiancePositive[4];
+
+	/// The same along -X -Y -Z
+	float32 CaptureIrradianceNegative[4];
+};
+
+static_assert(sizeof(ReflectionProbeGpu) == 128);
+
 class ProbeManager
 {
 public:
@@ -58,7 +75,15 @@ public:
 
 	uint32 GetProbeCount() const { return mLayout.GetProbeCount(); }
 	Vec3f GetProbePosition(uint32 index) const { return mLayout.Positions[index]; }
-	uint32 GetCurrentProbeIndex() const { return (mBakePhase == eBakePhase::Irradiance) ? mCurrentProbe : UINT32_MAX; }
+
+	uint32 GetCurrentProbeIndex() const
+	{
+		if (mBakePhase == eBakePhase::Irradiance) {
+			return mCurrentProbe;
+		}
+
+		return UINT32_MAX;
+	}
 
 	uint32 GetVolumeCount() const { return mLayout.VolumeCount; }
 
@@ -88,7 +113,12 @@ public:
 
 	Vec2u GetCaptureExtent() const
 	{
-		const uint32 size = (mBakePhase == eBakePhase::Reflection) ? Limits::ReflectionProbeSize : scCaptureSize;
+		uint32 size = scCaptureSize;
+
+		if (mBakePhase == eBakePhase::Reflection) {
+			size = Limits::ReflectionProbeSize;
+		}
+
 		return Vec2u(size, size);
 	}
 
@@ -127,7 +157,8 @@ private:
 	bool BuildLayoutFromWorld(ProbeLayout& out_layout, uint32& out_brush_volumes) const;
 
 	uint32 SelectVolume(const Vec3f position) const;
-	bool SampleVolume(const Vec3f position, uint32 volume_index, const float32* basis, Vec3f& out_irradiance) const;
+	bool SampleVolume(const Vec3f position, uint32 volume_index, const float32* basis, Vec3f& out_irradiance,
+					  float32& out_coverage) const;
 	void ResolveSunVisibility();
 
 	void CreateCaptureResources();
@@ -147,6 +178,7 @@ private:
 	void ServiceReflectionBake();
 	bool ReadBackReflectionProbe(uint32 probe_index);
 	void UploadReflectionProbes(uint32 visible_count);
+	void SampleCaptureIrradiance(const Vec3f position, ReflectionProbeGpu& probe) const;
 	void UploadReflectionCubemap(uint32 probe_index);
 
 	bool SaveIrradianceProbes();
@@ -170,7 +202,6 @@ private:
 	ProbeInfo mProbeInfos[Limits::MaxIrradianceProbes] {};
 	bool mbGridDirty = true;
 
-	static constexpr uint32 scStaleCheckMaxWaitFrames = 600;
 	bool mbStaleCheckPending = false;
 	bool mbHasBakedLayout = false;
 	uint32 mStaleCheckWaitFrames = 0;

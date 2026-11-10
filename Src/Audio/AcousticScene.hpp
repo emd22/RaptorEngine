@@ -1,7 +1,8 @@
 #pragma once
 
-#include <Audio/Acoustics.hpp>
 #include <phonon/phonon.h>
+
+#include <Audio/Acoustics.hpp>
 
 namespace fx::Acoustics {
 
@@ -13,6 +14,8 @@ IPLVector3 ToIPL(const Vec3f value);
 IPLMaterial GetMaterial(const AcousticSurface& surface);
 
 void IPLCALL OnSteamAudioLog(IPLLogLevel level, const char* message);
+
+bool CreateContext(IPLContext& out_context);
 
 bool CreateScene(IPLContext context, const AcousticGeometry& audio_geometry, IPLScene& out_scene,
 				 IPLStaticMesh& out_mesh);

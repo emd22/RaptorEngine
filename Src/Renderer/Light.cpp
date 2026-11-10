@@ -76,6 +76,7 @@ void LightBase::FillGpuData(LightGpuData& data, const PerspectiveCamera& camera,
 	data.Intensity = Intensity;
 
 	data.Type = static_cast<uint32>(Type);
+	data.Flags = static_cast<uint32>(Flags);
 }
 
 

@@ -48,7 +48,6 @@ RS_OBJECT_END()
 
 namespace fx {
 
-static constexpr const char* scMaterialRoot = "RaptorData/Data/materials";
 static constexpr const char* scDefaultMaterialName = "proto_white";
 static constexpr const char* scEditableMaterialName = "proto_grey";
 
@@ -313,8 +312,8 @@ bool Blockout::GetClipPieces(Object* object, const Vec3f point_a, const Vec3f po
 	return true;
 }
 
-bool Blockout::GetSubtractPieces(Object* target, Object* cutter, std::vector<Brush::PlaneList>& out_pieces,
-								 std::vector<Vec3f>& out_positions)
+bool Blockout::GetSubtractPieces(Object* target, Object* cutter, Brush::PieceList& out_pieces,
+								 SizedArray<Vec3f>& out_positions)
 {
 	const Brush* brush = GetBrush(target);
 	const Brush* cutter_brush = GetBrush(cutter);
@@ -355,13 +354,13 @@ bool Blockout::GetSubtractPieces(Object* target, Object* cutter, std::vector<Bru
 		return false;
 	}
 
-	out_positions.clear();
+	out_positions.InitCapacity(out_pieces.Size);
 
 	for (const Brush::PlaneList& piece : out_pieces) {
 		const Brush shape = Brush::FromPlanes(piece);
 
-		out_positions.push_back(target->GetPosition() +
-								GetOffsetToKeepInPlace(target, brush->GetCenter(), shape.GetCenter()));
+		out_positions.Insert(target->GetPosition() +
+							 GetOffsetToKeepInPlace(target, brush->GetCenter(), shape.GetCenter()));
 	}
 
 	return true;
@@ -649,7 +648,7 @@ void Blockout::RebuildAcoustics()
 {
 	mAcousticRebuildTimer = -1.0f;
 
-	AcousticGeometry geometry = mCompiledAcoustics;
+	AcousticGeometry geometry = mCompiledAcoustics.Clone();
 
 	for (const ObjectID object_id : BlockoutObjects) {
 		Object* object = gObjectManager->GetObject(object_id);
@@ -666,8 +665,8 @@ void Blockout::RebuildAcoustics()
 			return Vec3f(transformed.X, transformed.Y, transformed.Z);
 		};
 
-		const uint32 object_surface =
-			geometry.FindOrAddSurface(GetAcousticSurface(mMaterials.FindID(object->GetMaterialID())));
+		const uint32 object_surface = geometry.FindOrAddSurface(
+			GetAcousticSurface(mMaterials.FindID(object->GetMaterialID())));
 
 		if (const Brush* brush = GetBrush(object)) {
 			for (const Brush::Face& face : brush->Faces) {
@@ -679,8 +678,8 @@ void Blockout::RebuildAcoustics()
 				uint32 surface = object_surface;
 
 				if (!plane.Material.IsEmpty()) {
-					surface =
-						geometry.FindOrAddSurface(GetAcousticSurface(mMaterials.FindIDByName(plane.Material.CStr())));
+					surface = geometry.FindOrAddSurface(
+						GetAcousticSurface(mMaterials.FindIDByName(plane.Material.CStr())));
 				}
 
 				const Vec4f normal4 = world * Vec4f(plane.Normal.X, plane.Normal.Y, plane.Normal.Z, 0.0f);
@@ -813,7 +812,7 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	mCompiledSurfaceBodies.clear();
 	mCompiledMaterialSurfaces.clear();
 	mCompiledAcoustics = AcousticGeometry {};
-	mCompiledAcousticProbes.clear();
+	mCompiledAcousticProbes.Clear();
 	mCompiledProbeLayout.Clear();
 	mCompiledProbeIrradiance.Free();
 	mCompiledProbeMoments.Free();
@@ -841,6 +840,7 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	}
 
 	renderer::gGraphics->ClearFogShadow();
+	renderer::gGraphics->Transport.Clear();
 
 	mbHasBakedSun = false;
 	mbHasBakedIndirect = false;
@@ -974,6 +974,13 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 		}
 	}
 
+	if (has_lightmap) {
+		renderer::gGraphics->Transport.Upload(map.Transport, lightmap);
+	}
+	else {
+		renderer::gGraphics->Transport.Clear();
+	}
+
 	mbHasBakedSun = has_lightmap && map.HasBakedSun();
 	mbHasBakedIndirect = has_lightmap && has_indirect;
 	mbBakedWithSun = lightmap.HasSun();
@@ -1000,10 +1007,10 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 	}
 
 	mCompiledAcoustics = AcousticGeometry {};
-	mCompiledAcousticProbes.assign(map.AcousticProbes.begin(), map.AcousticProbes.end());
+	mCompiledAcousticProbes.InitAsCopyOf(map.AcousticProbes);
 
 	for (size_t material_index = 0; material_index < map.Materials.Size; material_index++) {
-		mCompiledAcoustics.Surfaces.push_back(
+		mCompiledAcoustics.Surfaces.Insert(
 			GetAcousticSurface(FindCompiledMaterial(map, static_cast<int32>(material_index))));
 	}
 
@@ -1465,9 +1472,9 @@ bool Blockout::IsDecalReceiver(Object* object)
 		   !object->IsVolume() && !object->IsHidden() && !IsDynamic(object) && HasOpaqueMaterial(object);
 }
 
-void Blockout::GatherDecalReceivers(const BBox& bounds, std::vector<DecalReceiver>& out_receivers)
+void Blockout::GatherDecalReceivers(const BBox& bounds, DynArray<DecalReceiver, GrowthFunctions::Double>& out_receivers)
 {
-	out_receivers.clear();
+	out_receivers.Clear();
 
 	for (const ObjectID id : BlockoutObjects) {
 		Object* object = gObjectManager->GetObject(id);
@@ -1480,7 +1487,7 @@ void Blockout::GatherDecalReceivers(const BBox& bounds, std::vector<DecalReceive
 		const Mat4f world = object->GetWorldMatrix();
 
 		if (BoundsOverlap(GetBrushWorldBounds(*brush, world), bounds)) {
-			out_receivers.push_back(DecalReceiver { .pBrush = brush, .World = world, .ID = object->ID });
+			out_receivers.Insert(DecalReceiver { .pBrush = brush, .World = world, .ID = object->ID });
 		}
 	}
 
@@ -1495,11 +1502,11 @@ void Blockout::GatherDecalReceivers(const BBox& bounds, std::vector<DecalReceive
 		const Mat4f world = object->GetWorldMatrix();
 
 		if (BoundsOverlap(OBBox::FromLocalBounds(object->Bounds, world).GetWorldAABB(), bounds)) {
-			out_receivers.push_back(DecalReceiver { .pPatch = patch, .World = world, .ID = object->ID });
+			out_receivers.Insert(DecalReceiver { .pPatch = patch, .World = world, .ID = object->ID });
 		}
 	}
 
-	std::vector<SubviewSolid> solids;
+	DynArray<SubviewSolid, GrowthFunctions::Double> solids;
 	GetSubviewSolids(solids);
 
 	for (const SubviewSolid& solid : solids) {
@@ -1508,14 +1515,14 @@ void Blockout::GatherDecalReceivers(const BBox& bounds, std::vector<DecalReceive
 		}
 
 		if (BoundsOverlap(GetBrushWorldBounds(*solid.pBrush, solid.World), bounds)) {
-			out_receivers.push_back(
+			out_receivers.Insert(
 				DecalReceiver { .pBrush = solid.pBrush, .World = solid.World, .ID = solid.pOwner->ID });
 		}
 	}
 }
 
 uint64 Blockout::HashDecal(Object* decal, const Brush& volume, const BBox& bounds,
-						   const std::vector<DecalReceiver>& receivers) const
+						   const DynArray<DecalReceiver, GrowthFunctions::Double>& receivers) const
 {
 	uint64 hash = FX_HASH64_FNV1A_INIT;
 
@@ -1550,7 +1557,7 @@ void Blockout::RebuildDecalMesh(Object* decal, const Brush& volume)
 
 	MeshDecalBuilder builder(volume, world);
 
-	std::vector<DecalReceiver> receivers;
+	DynArray<DecalReceiver, GrowthFunctions::Double> receivers;
 	GatherDecalReceivers(bounds, receivers);
 
 	for (const DecalReceiver& receiver : receivers) {
@@ -1597,7 +1604,7 @@ void Blockout::RebuildDecalMesh(Object* decal, const Brush& volume)
 
 void Blockout::RefreshDecals(bool force)
 {
-	std::vector<DecalReceiver> receivers;
+	DynArray<DecalReceiver, GrowthFunctions::Double> receivers;
 
 	for (const ObjectID id : BlockoutObjects) {
 		Object* decal = gObjectManager->GetObject(id);
@@ -1705,24 +1712,24 @@ static bool RayHitsTriangle(const Vec3f origin, const Vec3f direction, const Vec
 }
 
 void Blockout::RaycastDecalSurfaces(const Vec3f origin, const Vec3f direction, float32 max_distance,
-									std::vector<float32>& out_distances)
+									DynArray<float32, GrowthFunctions::Double>& out_distances)
 {
-	out_distances.clear();
+	out_distances.Clear();
 
 	const Vec3f end = origin + direction * max_distance;
 	const BBox bounds(Vec3f::Min(origin, end), Vec3f::Max(origin, end));
 
-	std::vector<DecalReceiver> receivers;
+	DynArray<DecalReceiver, GrowthFunctions::Double> receivers;
 	GatherDecalReceivers(bounds, receivers);
 
-	std::vector<float32> candidates;
+	DynArray<float32, GrowthFunctions::Double> candidates;
 
 	for (const DecalReceiver& receiver : receivers) {
 		float32 distance = 0.0f;
 
 		if (receiver.pBrush != nullptr &&
 			RayEntersBrush(*receiver.pBrush, receiver.World, origin, direction, distance) && distance <= max_distance) {
-			candidates.push_back(distance);
+			candidates.Insert(distance);
 		}
 
 		if (receiver.pPatch == nullptr) {
@@ -1745,7 +1752,7 @@ void Blockout::RaycastDecalSurfaces(const Vec3f origin, const Vec3f direction, f
 
 			if (RayHitsTriangle(origin, direction, mesh.Positions[a], mesh.Positions[b], mesh.Positions[c], distance) &&
 				distance <= max_distance) {
-				candidates.push_back(distance);
+				candidates.Insert(distance);
 			}
 		}
 	}
@@ -1771,7 +1778,7 @@ void Blockout::RaycastDecalSurfaces(const Vec3f origin, const Vec3f direction, f
 			if (RayHitsTriangle(origin, direction, receiver.Positions[a], receiver.Positions[b], receiver.Positions[c],
 								distance) &&
 				distance <= max_distance) {
-				candidates.push_back(distance);
+				candidates.Insert(distance);
 			}
 		}
 	}
@@ -1795,7 +1802,7 @@ void Blockout::RaycastDecalSurfaces(const Vec3f origin, const Vec3f direction, f
 		}
 
 		if (!is_buried) {
-			out_distances.push_back(distance);
+			out_distances.Insert(distance);
 		}
 	}
 }
@@ -1999,6 +2006,9 @@ void Blockout::RebuildBrush(Object* object, Brush&& brush, physics::eMotionType 
 
 	if (IsBrushMarkerMaterial(object->GetSpecialMaterial())) {
 		object->ApplyVolumeState();
+	}
+	else if (object->HasWaterMaterial()) {
+		object->ApplyColliderState();
 	}
 
 	mBrushes.Insert(object->ID.GetID(), std::move(brush));
@@ -2866,6 +2876,10 @@ void Blockout::SaveLights(ConfigFile& info)
 	ConfigEntry lights_container = ConfigEntry::Struct("lights");
 
 	for (const Ref<LightBase>& light : gLightManager->GetCache()) {
+		if (light->IsPersistent()) {
+			continue;
+		}
+
 		if (light->Type != eLightType::Point && light->Type != eLightType::Spot) {
 			continue;
 		}
@@ -3101,6 +3115,8 @@ void Blockout::ApplyModelProperties(Object& object, Model& model, const ConfigEn
 
 	const ConfigEntry* collider = entry.GetMember(HashStr32("collider"));
 	model.ColliderName = (collider != nullptr) ? collider->Get<const char*>() : "";
+
+	model.bNoBake = entry.GetMemberValue(HashStr32("nobake"), 0) != 0;
 }
 
 void Blockout::LinkModelColliders()
@@ -3272,6 +3288,10 @@ void Blockout::SaveModels(ConfigFile& info)
 
 		if (!model.ColliderName.IsEmpty()) {
 			model_entry.AddMember(ConfigEntry::Literal("collider", model.ColliderName.CStr()));
+		}
+
+		if (model.bNoBake) {
+			model_entry.AddMember(ConfigEntry::Literal("nobake", 1));
 		}
 
 		models_container.AddMember(std::move(model_entry));
@@ -3873,6 +3893,12 @@ void Blockout::BuildSubview(Subview& subview)
 				}
 			}
 
+			const Material* member_material = gMaterialManager->GetMaterial(member.Material);
+
+			if (member_material != nullptr && member_material->IsWater()) {
+				continue;
+			}
+
 			SizedArray<Vec3f>& hull = hulls.emplace_back();
 			hull.InitCapacity(brush.GetVertices().Size);
 
@@ -3954,9 +3980,9 @@ uint32 Blockout::GetSubviewBrushCount(uint32 instance) const
 	return 0;
 }
 
-void Blockout::GetSubviewMembers(uint32 instance, std::vector<Object*>& out_members) const
+void Blockout::GetSubviewMembers(uint32 instance, DynArray<Object*, GrowthFunctions::Double>& out_members) const
 {
-	out_members.clear();
+	out_members.Clear();
 
 	if (instance == scNoSubview) {
 		return;
@@ -3966,14 +3992,14 @@ void Blockout::GetSubviewMembers(uint32 instance, std::vector<Object*>& out_memb
 		Object* object = gObjectManager->GetObject(id);
 
 		if (object != nullptr && object->SubviewInstance == instance) {
-			out_members.push_back(object);
+			out_members.Insert(object);
 		}
 	}
 }
 
-void Blockout::GetSubviewSolids(std::vector<SubviewSolid>& out_solids)
+void Blockout::GetSubviewSolids(DynArray<SubviewSolid, GrowthFunctions::Double>& out_solids)
 {
-	out_solids.clear();
+	out_solids.Clear();
 
 	for (const SubviewInstance& instance : mSubviewInstances) {
 		Object* root = gObjectManager->GetObject(instance.RootID);
@@ -3992,7 +4018,7 @@ void Blockout::GetSubviewSolids(std::vector<SubviewSolid>& out_solids)
 
 			const Material* material = gMaterialManager->GetMaterial(member.Material);
 
-			out_solids.push_back(SubviewSolid {
+			out_solids.Insert(SubviewSolid {
 				.pBrush = &member.LocalBrush,
 				.World = member.ToSubview * world,
 				.pOwner = root,
@@ -4047,7 +4073,7 @@ bool Blockout::GetSubviewBounds(uint32 instance, BBox& out_bounds)
 		return true;
 	}
 
-	std::vector<Object*> members;
+	DynArray<Object*, GrowthFunctions::Double> members;
 	GetSubviewMembers(instance, members);
 
 	for (const SubviewInstance& child : mSubviewInstances) {
@@ -4058,11 +4084,11 @@ bool Blockout::GetSubviewBounds(uint32 instance, BBox& out_bounds)
 		Object* child_root = gObjectManager->GetObject(child.RootID);
 
 		if (child_root != nullptr) {
-			members.push_back(child_root);
+			members.Insert(child_root);
 		}
 	}
 
-	return GetBrushBounds(members.data(), static_cast<uint32>(members.size()), out_bounds);
+	return GetBrushBounds(members.pData, members.Size, out_bounds);
 }
 
 bool Blockout::GetBrushBounds(Object* const* objects, uint32 count, BBox& out_bounds)
@@ -4347,7 +4373,7 @@ void Blockout::RemoveSubviewInstance(uint32 instance)
 	found->bPlaced = false;
 	found->bMissing = false;
 
-	std::vector<Object*> members;
+	DynArray<Object*, GrowthFunctions::Double> members;
 	GetSubviewMembers(instance, members);
 
 	for (Object* member : members) {
@@ -4357,11 +4383,11 @@ void Blockout::RemoveSubviewInstance(uint32 instance)
 	renderer::gShadowAtlas->Invalidate();
 }
 
-uint32 Blockout::DissolveSubviewInstance(uint32 instance, std::vector<ObjectID>& out_brushes,
-										 std::vector<uint32>& out_instances)
+uint32 Blockout::DissolveSubviewInstance(uint32 instance, DynArray<ObjectID, GrowthFunctions::Double>& out_brushes,
+										 DynArray<uint32, GrowthFunctions::Double>& out_instances)
 {
-	out_brushes.clear();
-	out_instances.clear();
+	out_brushes.Clear();
+	out_instances.Clear();
 
 	BrushPlacement placement;
 
@@ -4400,7 +4426,7 @@ uint32 Blockout::DissolveSubviewInstance(uint32 instance, std::vector<ObjectID>&
 			const ObjectID brush_id = CreateBrush(placed);
 
 			if (!brush_id.IsInvalid()) {
-				out_brushes.push_back(brush_id);
+				out_brushes.Insert(brush_id);
 			}
 		}
 	}
@@ -4410,12 +4436,12 @@ uint32 Blockout::DissolveSubviewInstance(uint32 instance, std::vector<ObjectID>&
 			const uint32 child = AddNestedSubviewInstance(entry, placement);
 
 			if (child != scNoSubview) {
-				out_instances.push_back(child);
+				out_instances.Insert(child);
 			}
 		}
 	}
 
-	return static_cast<uint32>(out_brushes.size() + out_instances.size());
+	return static_cast<uint32>(out_brushes.Size + out_instances.Size);
 }
 
 void Blockout::PlaceSubviewEntities(const SubviewInstance& instance)
@@ -4426,7 +4452,7 @@ void Blockout::PlaceSubviewEntities(const SubviewInstance& instance)
 		return;
 	}
 
-	std::vector<Object*> members;
+	DynArray<Object*, GrowthFunctions::Double> members;
 	GetSubviewMembers(instance.ID, members);
 
 	for (Object* member : members) {
@@ -4561,7 +4587,7 @@ void Blockout::CommitSubview(uint32 instance, const BrushPlacement& placement)
 		return;
 	}
 
-	std::vector<Object*> members;
+	DynArray<Object*, GrowthFunctions::Double> members;
 	GetSubviewMembers(instance, members);
 
 	ConfigEntry brushes = ConfigEntry::Struct(subview->Name);

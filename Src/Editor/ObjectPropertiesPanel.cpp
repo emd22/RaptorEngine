@@ -26,15 +26,14 @@ namespace fx::editor {
 struct EnterDirectionChoice
 {
 	const char* pName;
-	float32 X;
-	float32 Y;
-	float32 Z;
+	Vec3f Direction;
 };
 
-static constexpr EnterDirectionChoice scEnterDirections[] = {
-	{ "Any", 0.0f, 0.0f, 0.0f },		{ "+X (right)", 1.0f, 0.0f, 0.0f }, { "-X (left)", -1.0f, 0.0f, 0.0f },
-	{ "+Y (up)", 0.0f, 1.0f, 0.0f },	{ "-Y (down)", 0.0f, -1.0f, 0.0f }, { "+Z (forward)", 0.0f, 0.0f, 1.0f },
-	{ "-Z (back)", 0.0f, 0.0f, -1.0f },
+static const EnterDirectionChoice scEnterDirections[] = {
+	{ "Any", Vec3f(0.0f, 0.0f, 0.0f) },		   { "+X (right)", Vec3f(1.0f, 0.0f, 0.0f) },
+	{ "-X (left)", Vec3f(-1.0f, 0.0f, 0.0f) }, { "+Y (up)", Vec3f(0.0f, 1.0f, 0.0f) },
+	{ "-Y (down)", Vec3f(0.0f, -1.0f, 0.0f) }, { "+Z (forward)", Vec3f(0.0f, 0.0f, 1.0f) },
+	{ "-Z (back)", Vec3f(0.0f, 0.0f, -1.0f) },
 };
 
 static constexpr int32 scNumEnterDirections = static_cast<int32>(std::size(scEnterDirections));
@@ -42,7 +41,7 @@ static constexpr int32 scCustomEnterDirectionIndex = scNumEnterDirections;
 
 static int32 GetEnterDirectionIndex(const ObjectPanelState& state)
 {
-	static constexpr float32 scAxisMatchDot = 0.9999f;
+	constexpr float32 scAxisMatchDot = 0.9999f;
 
 	if (!state.bHasEnterDirection) {
 		return 0;
@@ -50,7 +49,7 @@ static int32 GetEnterDirectionIndex(const ObjectPanelState& state)
 
 	for (int32 i = 1; i < scNumEnterDirections; i++) {
 		const EnterDirectionChoice& choice = scEnterDirections[i];
-		const float32 dot = Vec3f(choice.X, choice.Y, choice.Z).Dot(state.EnterDirection);
+		const float32 dot = choice.Direction.Dot(state.EnterDirection);
 
 		if (dot > scAxisMatchDot) {
 			return i;
@@ -123,8 +122,7 @@ ObjectPropertiesPanel::ObjectPropertiesPanel(wxWindow* parent) : wxPanel(parent,
 	mpNameLabel = new wxStaticText(body, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_END);
 	section->AddWide(mpNameLabel);
 
-	mpNameText = new wxTextCtrl(body, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(40, -1),
-								wxTE_PROCESS_ENTER);
+	mpNameText = new wxTextCtrl(body, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(40, -1), wxTE_PROCESS_ENTER);
 	mpNameText->SetToolTip("Unique name, used by object_find in scripts and as the key in the prototype file. "
 						   "Spaces and symbols become underscores");
 	section->AddRow("Name", mpNameText);
@@ -171,8 +169,7 @@ ObjectPropertiesPanel::ObjectPropertiesPanel(wxWindow* parent) : wxPanel(parent,
 
 	wxBoxSizer* script_row = new wxBoxSizer(wxHORIZONTAL);
 
-	mpScriptText = new wxTextCtrl(body, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(40, -1),
-								  wxTE_PROCESS_ENTER);
+	mpScriptText = new wxTextCtrl(body, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(40, -1), wxTE_PROCESS_ENTER);
 	mpScriptText->SetHint("Scripts/objects/example.strata");
 	script_row->Add(mpScriptText, wxSizerFlags(1).CenterVertical());
 
@@ -351,9 +348,9 @@ void ObjectPropertiesPanel::OnEnterDirectionChoice(wxCommandEvent& event)
 		return;
 	}
 
-	const EnterDirectionChoice choice = scEnterDirections[selection];
+	const Vec3f direction = scEnterDirections[selection].Direction;
 
-	thread::PostToGame([choice] { gEditor->SetSelectionEnterDirection(Vec3f(choice.X, choice.Y, choice.Z)); });
+	thread::PostToGame([direction] { gEditor->SetSelectionEnterDirection(direction); });
 }
 
 void ObjectPropertiesPanel::BrowseScript()
@@ -375,7 +372,13 @@ void ObjectPropertiesPanel::BrowseScript()
 	const std::filesystem::path chosen(dialog.GetPath().ToStdString());
 	const std::filesystem::path relative = std::filesystem::relative(chosen, std::filesystem::current_path(), error);
 
-	mpScriptText->ChangeValue(wxString::FromUTF8((error || relative.empty()) ? chosen.string() : relative.string()));
+	std::filesystem::path shown = relative;
+
+	if (error || relative.empty()) {
+		shown = chosen;
+	}
+
+	mpScriptText->ChangeValue(wxString::FromUTF8(shown.string()));
 
 	CommitScript();
 }
@@ -433,7 +436,11 @@ void ObjectPropertiesPanel::ApplyState(const ObjectPanelState& state, const Mate
 	SetRows(mTagRows, state.Tags, state.EditableTags, state.bHasObject);
 	SetRows(mFlagRows, state.Flags, state.EditableFlags, state.bHasObject);
 
-	const int32 material_selection = state.bHasObject ? state.MaterialSlot : wxNOT_FOUND;
+	int32 material_selection = wxNOT_FOUND;
+
+	if (state.bHasObject) {
+		material_selection = state.MaterialSlot;
+	}
 
 	if (mpMaterialChoice->GetSelection() != material_selection) {
 		mpMaterialChoice->SetSelection(material_selection);
@@ -476,7 +483,12 @@ void ObjectPropertiesPanel::ApplyState(const ObjectPanelState& state, const Mate
 
 	mpEnterDirChoice->Enable(mbIsTrigger);
 
-	const int32 enter_direction_index = mbIsTrigger ? GetEnterDirectionIndex(state) : 0;
+	int32 enter_direction_index = 0;
+
+	if (mbIsTrigger) {
+		enter_direction_index = GetEnterDirectionIndex(state);
+	}
+
 	const bool has_custom_item = (static_cast<int32>(mpEnterDirChoice->GetCount()) > scNumEnterDirections);
 
 	if (enter_direction_index == scCustomEnterDirectionIndex) {
@@ -506,7 +518,13 @@ void ObjectPropertiesPanel::ApplyState(const ObjectPanelState& state, const Mate
 
 	if (has_errors != mbShownScriptErrors) {
 		mbShownScriptErrors = has_errors;
-		mpScriptStatus->SetLabel(has_errors ? wxString("Script failed to compile, see the log") : wxString());
+		wxString status_label;
+
+		if (has_errors) {
+			status_label = "Script failed to compile, see the log";
+		}
+
+		mpScriptStatus->SetLabel(status_label);
 		mpScriptStatus->Show(has_errors);
 		RelayoutToScroller(mpScriptStatus->GetParent());
 	}

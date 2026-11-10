@@ -69,37 +69,16 @@ public:
 };
 
 
-static constexpr uint32 scMaxEventsPerPump = 256;
-
-static constexpr unsigned long scUILoopWaitMs = 10;
-
-static constexpr std::chrono::milliseconds scPanelSyncInterval(100);
-
-/// How far away a subview is placed when nothing is under the crosshair
-static constexpr float32 scPlaceDistance = 4.0f;
-
-/// How far away the crosshair can place a new subview
-static constexpr float32 scCreateRange = 20.0f;
-
-/// Size of a snap step for each snap level. Mirrors tool_get_snap_multiplier() in `tool_common.strata`.
+/// Size of a snap step for each snap level.
 static constexpr float32 scSnapSteps[] = { 0.0625f, 0.125f, 0.25f, 0.5f, 1.0f };
 static constexpr int32 scSnapLevelCount = static_cast<int32>(std::size(scSnapSteps));
 
 static constexpr float32 scAngleSnapSteps[] = { 5.0f, 15.0f, 45.0f, 90.0f, 90.0f };
 static_assert(std::size(scAngleSnapSteps) == std::size(scSnapSteps));
 
-static const Vec3f scDefaultDataBrushHalfExtent(2.0f, 1.5f, 2.0f);
-
-static constexpr uint32 scMaxSubtractOperations = 200;
-
 static constexpr uint32 ToolBit(eEditorTool tool) { return 1u << static_cast<uint32>(tool); }
 
 static constexpr uint32 scBrushEditTools = ToolBit(eEditorTool::Face) | ToolBit(eEditorTool::Vertex);
-
-static constexpr uint32 scVisTools = ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Rotate) |
-									 ToolBit(eEditorTool::Create) | ToolBit(eEditorTool::Arch) |
-									 ToolBit(eEditorTool::Room) | ToolBit(eEditorTool::Curve) |
-									 ToolBit(eEditorTool::Decal) | ToolBit(eEditorTool::Clip);
 
 static constexpr uint32 scDataTools[static_cast<uint32>(eDataFilter::Count)] = {
 	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Light) | ToolBit(eEditorTool::Sound),
@@ -113,9 +92,6 @@ static constexpr uint32 scDataTools[static_cast<uint32>(eDataFilter::Count)] = {
 	ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Rotate) | ToolBit(eEditorTool::Create),
 	ToolBit(eEditorTool::Select) | ToolBit(eEditorTool::Sound),
 };
-
-static const char* const scCommandScriptPath = "./Scripts/editor/editor_cmd.strata";
-
 
 /////////////////////////////////////
 // GUI
@@ -153,7 +129,12 @@ bool RaptorEditor::InitGUI(int argc, char** argv)
 	return true;
 }
 
-void RaptorEditor::InitTools() { mpCommandScript = gScriptManager->LoadScript(scCommandScriptPath); }
+void RaptorEditor::InitTools()
+{
+	constexpr const char* scCommandScriptPath = "./Scripts/editor/editor_cmd.strata";
+
+	mpCommandScript = gScriptManager->LoadScript(scCommandScriptPath);
+}
 
 /// Moves the frame so its top edge is at the top of the display's work area, just below the menu bar. Left at
 /// wxDefaultPosition the frame opens lower than this
@@ -211,6 +192,8 @@ bool RaptorEditor::IsCloseRequested() const { return mpMainFrame != nullptr && m
 
 void RaptorEditor::DispatchEvents(unsigned long wait_ms)
 {
+	constexpr uint32 scMaxEventsPerPump = 256;
+
 	if (mpEventLoop == nullptr) {
 		return;
 	}
@@ -245,6 +228,8 @@ void RaptorEditor::PumpUI(unsigned long wait_ms)
 
 void RaptorEditor::RunUILoop()
 {
+	constexpr unsigned long scUILoopWaitMs = 10;
+
 	while (!mbGameFinished) {
 		PumpUI(scUILoopWaitMs);
 	}
@@ -422,7 +407,7 @@ EditorPanelState RaptorEditor::BuildPanelState()
 	world.DebugMask = gCVars->Get("r_debug_bounds", int64 { 0 });
 	world.bReflectionsEnabled = gCVars->Get("r_reflection_probes", int64 { 1 }) != 0;
 	world.bReflectionFallback = gCVars->Get("r_reflection_level_probe", int64 { 0 }) != 0;
-	world.ReflectionDebugView = std::clamp<int64>(gCVars->Get("r_reflection_debug", int64 { 0 }), 0, 2);
+	world.ReflectionDebugView = std::clamp<int64>(gCVars->Get("r_reflection_debug", int64 { 0 }), 0, 3);
 
 	if (LightDirectional* sun = gLightManager->GetDirectionalLight(); sun != nullptr) {
 		const Vec3f position = sun->GetPosition();
@@ -501,6 +486,8 @@ EditorPanelState RaptorEditor::BuildPanelState()
 
 void RaptorEditor::SyncPanels()
 {
+	constexpr std::chrono::milliseconds scPanelSyncInterval(100);
+
 	if (mpMainFrame == nullptr || mGamePhase != eGamePhase::Running) {
 		return;
 	}
@@ -764,7 +751,16 @@ void RaptorEditor::SetSimulating(bool simulating)
 
 bool RaptorEditor::IsToolAvailable(eEditorTool tool) const
 {
-	const uint32 available = IsDataMode() ? scDataTools[static_cast<uint32>(mDataFilter)] : scVisTools;
+	constexpr uint32 scVisTools = ToolBit(eEditorTool::Select) | scBrushEditTools | ToolBit(eEditorTool::Rotate) |
+								  ToolBit(eEditorTool::Create) | ToolBit(eEditorTool::Arch) |
+								  ToolBit(eEditorTool::Room) | ToolBit(eEditorTool::Curve) |
+								  ToolBit(eEditorTool::Decal) | ToolBit(eEditorTool::Clip);
+
+	uint32 available = scVisTools;
+
+	if (IsDataMode()) {
+		available = scDataTools[static_cast<uint32>(mDataFilter)];
+	}
 
 	return (available & ToolBit(tool)) != 0;
 }
@@ -972,19 +968,7 @@ bool RaptorEditor::SelectObject(Object* object, bool append_selection)
 		return true;
 	}
 
-	if (!append_selection) {
-		mSelection.Clear();
-	}
-
-	const bool selected = mSelection.Add(object);
-
-	if (!selected) {
-		Warn("Cannot select '{}', the selection is full", object->Name.Get());
-	}
-
-	SyncSelection();
-
-	return selected;
+	return AddToSelection(object, append_selection);
 }
 
 bool RaptorEditor::SelectSubview(uint32 instance, bool append_selection)
@@ -999,14 +983,19 @@ bool RaptorEditor::SelectSubview(uint32 instance, bool append_selection)
 		return true;
 	}
 
+	return AddToSelection(root, append_selection);
+}
+
+bool RaptorEditor::AddToSelection(Object* object, bool append_selection)
+{
 	if (!append_selection) {
 		mSelection.Clear();
 	}
 
-	const bool selected = mSelection.Add(root);
+	const bool selected = mSelection.Add(object);
 
 	if (!selected) {
-		Warn("Cannot select '{}', the selection is full", root->Name.Get());
+		LogWarning("Cannot select '{}' as the selection list is full", object->Name.Get());
 	}
 
 	SyncSelection();
@@ -1145,8 +1134,15 @@ void RaptorEditor::DeleteObject(Object* object, int32 group_size)
 
 	// Snapshot everything Undo needs before the Execute step destroys the object.
 	const Brush* brush = gWorld->pPrototype->GetBrush(object);
-	const Brush::PlaneList planes = (brush != nullptr) ? brush->Planes
-													   : Brush::FromBox(object->Bounds.Min, object->Bounds.Max).Planes;
+
+	Brush::PlaneList planes;
+
+	if (brush != nullptr) {
+		planes = brush->Planes;
+	}
+	else {
+		planes = Brush::FromBox(object->Bounds.Min, object->Bounds.Max).Planes;
+	}
 
 	EmplaceEditOperation<DeleteOperation>(object, planes, ObjectSnapshot::Capture(*object, object->GetMaterialID()),
 										  group_size);
@@ -1198,7 +1194,13 @@ Object* RaptorEditor::CreateDataBrush(const Brush::PlaneList& planes, const Vec3
 
 void RaptorEditor::SetSunEnabled(bool enabled)
 {
-	gCVars->Set("b_sun_enabled", enabled ? 1 : 0);
+	int32 sun_enabled_value = 0;
+
+	if (enabled) {
+		sun_enabled_value = 1;
+	}
+
+	gCVars->Set("b_sun_enabled", sun_enabled_value);
 
 	if (LightDirectional* sun = gLightManager->GetDirectionalLight(); sun != nullptr) {
 		sun->bEnabled = enabled;
@@ -1286,6 +1288,8 @@ void RaptorEditor::SetSunElevation(float32 elevation_degrees)
 
 Object* RaptorEditor::CreateReflectionProbeAtPlayer()
 {
+	const Vec3f scDefaultDataBrushHalfExtent(2.0f, 1.5f, 2.0f);
+
 	if (gWorld->pPrototype == nullptr) {
 		return nullptr;
 	}
@@ -1403,10 +1407,14 @@ uint32 RaptorEditor::SetSelectionScript(const String& path)
 
 uint32 RaptorEditor::SetSelectionEnterDirection(const Vec3f local_direction)
 {
-	static constexpr float32 scMinDirectionLength = 1e-4f;
-	static constexpr float32 scSameDirectionDistance = 1e-5f;
+	constexpr float32 scMinDirectionLength = 1e-4f;
+	constexpr float32 scSameDirectionDistance = 1e-5f;
 
-	const Vec3f wanted = (local_direction.Length() > scMinDirectionLength) ? local_direction.Normalize() : Vec3f::sZero;
+	Vec3f wanted = Vec3f::sZero;
+
+	if (local_direction.Length() > scMinDirectionLength) {
+		wanted = local_direction.Normalize();
+	}
 
 	Object* targets[scMaxSelectedObjects];
 	Vec3f befores[scMaxSelectedObjects];
@@ -1449,7 +1457,6 @@ bool RaptorEditor::RenameObject(Object* object, const String& name)
 	}
 
 	if (name.IsEmpty()) {
-		Warn("Objects need a name");
 		return false;
 	}
 
@@ -1462,7 +1469,7 @@ bool RaptorEditor::RenameObject(Object* object, const String& name)
 	const Object* existing = gObjectManager->FindObject(HashStr32(valid_name.CStr()));
 
 	if (existing != nullptr && existing != object) {
-		Warn("There is already an object named '{}'", valid_name);
+		LogWarning("There is already an object named '{}'", valid_name);
 		return false;
 	}
 
@@ -1480,7 +1487,6 @@ void RaptorEditor::RenameSelection(const String& name)
 	const String base_name = ConfigFile::MakeValidName(name);
 
 	if (base_name.IsEmpty()) {
-		Warn("Objects need a name");
 		return;
 	}
 
@@ -1491,7 +1497,7 @@ void RaptorEditor::RenameSelection(const String& name)
 		String After;
 	};
 
-	DynArray<Rename> renames;
+	DynArray<Rename, GrowthFunctions::Double> renames;
 	uint32 suffix = 0;
 
 	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
@@ -1636,22 +1642,25 @@ static bool CanBeSubtractedFrom(const Object* object)
 		   !gWorld->pPrototype->IsDynamic(object);
 }
 
-static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter_ids, bool keep_cutter)
+static uint32 SubtractCutter(Object* cutter, const DynArray<ObjectID, GrowthFunctions::Double>& cutter_ids,
+							 bool keep_cutter)
 {
+	constexpr uint32 scMaxSubtractOperations = 200;
+
 	const EditorSelection& selection = gEditor->GetSelection();
 
-	std::vector<std::unique_ptr<ObjectEditOperation>> ops;
-	std::vector<ObjectID> op_object_ids;
+	DynArray<std::unique_ptr<ObjectEditOperation>, GrowthFunctions::Double> ops;
+	DynArray<ObjectID, GrowthFunctions::Double> op_object_ids;
 	uint32 cut_count = 0;
 
-	std::vector<ObjectID> target_ids;
+	DynArray<ObjectID, GrowthFunctions::Double> target_ids;
 
 	for (ObjectID id : gWorld->pPrototype->BlockoutObjects) {
 		const bool is_cutter = std::any_of(cutter_ids.begin(), cutter_ids.end(),
 										   [&](ObjectID other) { return other.GetID() == id.GetID(); });
 
 		if (!is_cutter) {
-			target_ids.push_back(id);
+			target_ids.Insert(id);
 		}
 	}
 
@@ -1662,8 +1671,8 @@ static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter
 			continue;
 		}
 
-		std::vector<Brush::PlaneList> pieces;
-		std::vector<Vec3f> positions;
+		Brush::PieceList pieces;
+		SizedArray<Vec3f> positions;
 
 		if (!gWorld->pPrototype->GetSubtractPieces(target, cutter, pieces, positions)) {
 			continue;
@@ -1674,24 +1683,24 @@ static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter
 
 		cut_count++;
 
-		if (pieces.empty()) {
-			ops.push_back(
+		if (pieces.IsEmpty()) {
+			ops.Insert(
 				std::make_unique<DeleteOperation>(target, brush->Planes, ObjectSnapshot::Capture(*target, material)));
-			op_object_ids.push_back(id);
+			op_object_ids.Insert(id);
 
 			continue;
 		}
 
-		ops.push_back(std::make_unique<BrushEditOperation>(target, brush->Planes, pieces[0]));
-		op_object_ids.push_back(id);
+		ops.Insert(std::make_unique<BrushEditOperation>(target, brush->Planes, pieces[0]));
+		op_object_ids.Insert(id);
 
-		for (uint32 i = 1; i < pieces.size(); i++) {
+		for (uint32 i = 1; i < pieces.Size; i++) {
 			ObjectSnapshot snapshot = ObjectSnapshot::Capture(*target, material);
 			snapshot.ObjectName = Name();
 			snapshot.Position = positions[i];
 
-			ops.push_back(std::make_unique<CreateBrushOperation>(pieces[i], snapshot));
-			op_object_ids.push_back(ObjectID::scNull);
+			ops.Insert(std::make_unique<CreateBrushOperation>(pieces[i], snapshot));
+			op_object_ids.Insert(ObjectID::scNull);
 		}
 	}
 
@@ -1702,18 +1711,18 @@ static uint32 SubtractCutter(Object* cutter, const std::vector<ObjectID>& cutter
 	if (!keep_cutter) {
 		const Brush* cutter_brush = gWorld->pPrototype->GetBrush(cutter);
 
-		ops.push_back(std::make_unique<DeleteOperation>(cutter, cutter_brush->Planes,
-														ObjectSnapshot::Capture(*cutter, cutter->GetMaterialID())));
-		op_object_ids.push_back(cutter->ID);
+		ops.Insert(std::make_unique<DeleteOperation>(cutter, cutter_brush->Planes,
+													 ObjectSnapshot::Capture(*cutter, cutter->GetMaterialID())));
+		op_object_ids.Insert(cutter->ID);
 	}
 
-	if (ops.size() > scMaxSubtractOperations) {
-		gEditor->Warn("Subtracting '{}' would change too many blockouts at once", cutter->Name.Get());
+	if (ops.Size > scMaxSubtractOperations) {
+		LogWarning("Subtracting '{}' would change too many brushes at once", cutter->Name.Get());
 		return 0;
 	}
 
-	for (uint32 i = 0; i < ops.size(); i++) {
-		ops[i]->GroupSize = static_cast<int32>(ops.size());
+	for (uint32 i = 0; i < ops.Size; i++) {
+		ops[i]->GroupSize = static_cast<int32>(ops.Size);
 
 		if (!op_object_ids[i].IsInvalid()) {
 			ops[i]->Retarget(gObjectManager->GetObject(op_object_ids[i]));
@@ -1733,13 +1742,13 @@ uint32 RaptorEditor::SubtractSelection(bool keep_cutters)
 		return 0;
 	}
 
-	std::vector<ObjectID> cutter_ids;
+	DynArray<ObjectID, GrowthFunctions::Double> cutter_ids;
 
 	for (uint32 i = 0; i < mSelection.GetCount(); i++) {
 		Object* object = mSelection.GetObject(i);
 
 		if (blockout->GetBrush(object) != nullptr && !object->IsDecal()) {
-			cutter_ids.push_back(object->ID);
+			cutter_ids.Insert(object->ID);
 		}
 	}
 
@@ -1794,7 +1803,6 @@ bool RaptorEditor::CreateSubviewFromSelection(const String& name)
 	}
 
 	if (blockout->IsCompiledMap()) {
-		Warn("Open the prototype to make subviews, a compiled map cannot be edited");
 		return false;
 	}
 
@@ -1810,14 +1818,14 @@ bool RaptorEditor::CreateSubviewFromSelection(const String& name)
 		}
 
 		if (!blockout->HasBrush(object) && !blockout->HasPatch(object)) {
-			Warn("Only brushes, patches and subviews can be part of a subview, '{}' is none of them",
-				 object->Name.Get());
+			LogWarning("Only brushes, patches and subviews can be part of a subview, '{}' is not implemented.",
+					   object->Name.Get());
 			return false;
 		}
 
 		if (!CanEditObject(object)) {
-			Warn("'{}' is already part of the subview '{}'", object->Name.Get(),
-				 blockout->GetSubviewName(object->SubviewInstance));
+			LogWarning("'{}' is already part of the subview '{}'", object->Name.Get(),
+					   blockout->GetSubviewName(object->SubviewInstance));
 			return false;
 		}
 
@@ -1825,7 +1833,6 @@ bool RaptorEditor::CreateSubviewFromSelection(const String& name)
 	}
 
 	if (count == 0) {
-		Warn("Select the brushes to make a subview from first");
 		return false;
 	}
 
@@ -1881,7 +1888,6 @@ bool RaptorEditor::EnterSubview()
 	}
 
 	if (!IsSubviewSelected()) {
-		Warn("Select a placed subview to enter it");
 		return false;
 	}
 
@@ -1893,7 +1899,7 @@ bool RaptorEditor::EnterSubview()
 	ForgetObjects();
 
 	if (!blockout->EnterSubview(instance)) {
-		Warn("Could not enter the subview '{}'", blockout->GetSubviewName(instance));
+		LogError("Could not enter the subview '{}'", blockout->GetSubviewName(instance));
 		return false;
 	}
 
@@ -1924,6 +1930,11 @@ void RaptorEditor::LeaveSubview()
 
 bool RaptorEditor::PlaceSubview(const String& name)
 {
+	// How far away a subview is placed when nothing is under the crosshair
+	constexpr float32 scPlaceDistance = 4.0f;
+	// How far away the crosshair can place a new subview
+	constexpr float32 scCreateRange = 20.0f;
+
 	Blockout* blockout = gWorld->pPrototype;
 
 	if (blockout == nullptr || IsSimulationMode()) {
@@ -1933,7 +1944,7 @@ bool RaptorEditor::PlaceSubview(const String& name)
 	const uint32 instance = blockout->NewSubviewInstance(name);
 
 	if (instance == Blockout::scNoSubview) {
-		Warn("The subview '{}' could not be placed", name);
+		LogError("The subview '{}' could not be placed", name);
 		return false;
 	}
 
@@ -2026,31 +2037,6 @@ void RaptorEditor::ForgetObjects()
 	SyncSelection();
 }
 
-uint32 RaptorEditor::ShowStatusMessage(const String& text, std::chrono::milliseconds duration)
-{
-	const uint32 id = EditorFrame::NewStatusMessageId();
-
-	thread::PostToUI(
-		[this, id, text, duration]
-		{
-			if (mpMainFrame != nullptr) {
-				mpMainFrame->ShowStatusMessage(id, wxString::FromUTF8(text.CStr()), duration);
-			}
-		});
-
-	return id;
-}
-
-void RaptorEditor::ClearStatusMessage(uint32 id)
-{
-	thread::PostToUI(
-		[this, id]
-		{
-			if (mpMainFrame != nullptr) {
-				mpMainFrame->ClearStatusMessage(id);
-			}
-		});
-}
 
 bool RaptorEditor::HasUnsavedChanges() const { return mbUntrackedChanges || mHistory.GetRevision() != mSavedRevision; }
 
@@ -2084,7 +2070,11 @@ bool RaptorEditor::RunCommand(const String& name)
 	}
 
 	mToolState.SelectedTool = mCurrentTool;
-	mToolState.pTransformMarkerObject = (gWorld->pPrototype != nullptr) ? gWorld->pPrototype->pXFormObject : nullptr;
+	mToolState.pTransformMarkerObject = nullptr;
+
+	if (gWorld->pPrototype != nullptr) {
+		mToolState.pTransformMarkerObject = gWorld->pPrototype->pXFormObject;
+	}
 
 	SyncSelection();
 

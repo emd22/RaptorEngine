@@ -12,8 +12,6 @@ class wxStaticText;
 class wxColourPickerCtrl;
 class wxColourPickerEvent;
 class wxBoxSizer;
-class wxSpinCtrl;
-class wxSpinCtrlDouble;
 class wxChoice;
 class wxCommandEvent;
 

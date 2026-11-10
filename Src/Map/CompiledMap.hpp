@@ -27,12 +27,16 @@ struct CompiledMapVertex
 	/// The fourth value is the handedness
 	Vec4f Tangent;
 	Vec2f Texcoord;
+	/// Named so it is copied and written as zeros instead of whatever the allocation held
+	float32 Padding[2] = {};
 
 	// float32 Position[3];
 	// float32 Normal[3];
 	// float32 Tangent[4];
 	// float32 Texcoord[2];
 };
+
+static_assert(sizeof(CompiledMapVertex) == 64, "CompiledMapVertex is written to .fxmap files as is");
 
 struct CompiledMapMaterial
 {
@@ -150,6 +154,57 @@ struct CompiledMapFogShadow
 	bool IsEmpty() const { return CellCount[0] == 0 || CellCount[1] == 0; }
 };
 
+/// One lightmap chart, split into a grid of square clusters `ClusterSize` texels wide
+struct CompiledMapTransportChart
+{
+	uint32 Min[2] = {};
+	uint32 Size[2] = {};
+	uint32 Blocks[2] = {};
+	uint32 FirstCluster = 0;
+	uint32 Padding = 0;
+};
+
+/// Laid out to match LightTransportCluster in Shaders/LightTransportCommon.hlsli
+struct CompiledMapTransportCluster
+{
+	float32 Albedo[3] = {};
+	uint32 FirstLink = 0;
+	uint32 LinkCount = 0;
+	uint32 FirstSample = 0;
+	/// 0 for clusters that cover no lightmap texels
+	uint32 SampleCount = 0;
+	uint32 Padding = 0;
+};
+
+/// A point that direct light is measured at for its cluster
+struct CompiledMapTransportSample
+{
+	float32 Position[4] = {};
+	float32 Normal[4] = {};
+};
+
+/// The fraction of a cluster's gather rays that hit `Source`, after the weakest links were dropped
+struct CompiledMapTransportLink
+{
+	uint32 Source = 0;
+	float32 Weight = 0.0f;
+};
+
+/**
+ * @brief How light bounces between the lightmap's clusters, so lights that were not baked can still bounce at runtime
+ */
+struct CompiledMapTransport
+{
+	uint32 ClusterSize = 0;
+
+	SizedArray<CompiledMapTransportChart> Charts;
+	SizedArray<CompiledMapTransportCluster> Clusters;
+	SizedArray<CompiledMapTransportSample> Samples;
+	SizedArray<CompiledMapTransportLink> Links;
+
+	bool IsEmpty() const { return Clusters.Size == 0; }
+};
+
 /**
  * @brief The corners of a convex collider, in world space
  */
@@ -206,7 +261,7 @@ class CompiledMap
 {
 public:
 	static constexpr uint32 scMagic = 0x504D5846;
-	static constexpr uint32 scVersion = 14;
+	static constexpr uint32 scVersion = 16;
 	/// Oldest version that still loads, the parts added since are left empty
 	static constexpr uint32 scMinVersion = 10;
 	static constexpr const char* scExtension = ".fxmap";
@@ -261,11 +316,12 @@ public:
 	bool HasProbeLayout() const { return Probes.VolumeCount > 0; }
 
 	CompiledMapLightmap Lightmap;
+	CompiledMapTransport Transport;
 
 	SizedArray<uint8> ProbeSunVisibility;
 
 	static constexpr uint32 scProbeSHFloats = Limits::ProbeSHCoeffCount * 3;
-	static constexpr uint32 scProbeMomentValues = Limits::ProbeDepthFaces * Limits::ProbeDepthTexelsPerFace * 2;
+	static constexpr uint32 scProbeMomentValues = Limits::ProbeDepthTexelCount * 2;
 
 	SizedArray<float32> ProbeIrradiance;
 	SizedArray<uint16> ProbeMoments;

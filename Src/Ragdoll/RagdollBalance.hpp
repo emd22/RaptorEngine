@@ -130,9 +130,6 @@ class RagdollBalance
 {
 private:
 	static constexpr float32 scContactHoldTime = 0.08f;
-	static constexpr float32 scSwingPress = 0.03f;
-	/// Stagger speed (m/s) above which a new shove finds the body already reacting
-	static constexpr float32 scReactionRestartSpeed = 0.25f;
 
 	struct Swing
 	{
@@ -171,6 +168,9 @@ public:
 	/// decays on its own while balancing and is cleared when balance stops
 	FX_FORCE_INLINE void SetStaggerVelocity(const JPH::Vec3 velocity)
 	{
+		// Stagger speed (m/s) above which a new shove finds the body already reacting
+		constexpr float32 scReactionRestartSpeed = 0.25f;
+
 		const bool is_drifting = mStaggerVelocity.LengthSq() > scReactionRestartSpeed * scReactionRestartSpeed;
 
 		mStaggerVelocity = velocity;
@@ -218,6 +218,7 @@ private:
 	float32 GetLandingCaptureError(uint32 stance_leg, const JPH::Vec3 landing, float32 swing_time) const;
 	JPH::Vec3 PlanLanding(uint32 swing_leg, uint32 stance_leg, float32 time_left) const;
 	JPH::Vec3 FitLanding(uint32 swing_leg, uint32 stance_leg, JPH::Vec3 landing) const;
+	JPH::Vec3 GetLandingAnkle(const BalanceLeg& leg, const JPH::Vec3 landing) const;
 
 	void DriveStanceLegs(Ragdoll& ragdoll);
 	void DriveSwingLeg(Ragdoll& ragdoll);

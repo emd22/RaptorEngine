@@ -87,6 +87,22 @@ void* Script::GetFunctionPtr(const char* fn_name) const
 	return strataJitGetFunction(mpJit, fn_name);
 }
 
+Slice<const uint8> Script::GetTypeMetadata() const
+{
+	if (mpJit == nullptr || HasErrors()) {
+		return nullptr;
+	}
+
+	size_t size = 0;
+	const void* data = strataJitGetTypeMetadata(mpJit, &size);
+
+	if (data == nullptr) {
+		return nullptr;
+	}
+
+	return Slice<const uint8>(static_cast<const uint8*>(data), size);
+}
+
 static const PredefExtern* FindExtern(const char* name)
 {
 	Slice<const PredefExtern> predefs = GetInteropPredefs();

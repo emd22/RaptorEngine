@@ -16,13 +16,20 @@ namespace fx::physics {
 
 using namespace RagdollMath;
 
+namespace {
+
+constexpr float32 scProbeUp = 0.3f;
+constexpr float32 scProbeDown = 1.0f;
+
+} // namespace
+
 void Ragdoll::Activate(const Vec3f velocity)
 {
 	if (mpRagdoll == nullptr) {
 		return;
 	}
 
-	mpRagdoll->SetLinearVelocity(JPH::Vec3(velocity.X, velocity.Y, velocity.Z));
+	mpRagdoll->SetLinearVelocity(Vec3f::ToJolt(velocity));
 	mpRagdoll->Activate();
 
 	mbLimp = true;
@@ -198,9 +205,7 @@ void Ragdoll::SetAllBodyModes(eRagdollBodyMode mode)
 
 void Ragdoll::PlaceFeetOnGround()
 {
-	constexpr float32 scProbeUp = 0.3f;
-	constexpr float32 scProbeDown = 1.0f;
-	/// How far above the ground a sole still counts as planted (m)
+	// How far above the ground a sole still counts as planted (m)
 	constexpr float32 scPlantedHeight = 0.02f;
 
 	if (mpRagdoll == nullptr || !mRig.bCanBalance) {
@@ -309,9 +314,6 @@ void Ragdoll::PlaceFeetOnGround()
 
 float32 Ragdoll::GetSoleClearance(uint32 leg_index) const
 {
-	constexpr float32 scProbeUp = 0.3f;
-	constexpr float32 scProbeDown = 1.0f;
-
 	const RagdollRigLeg& leg = mRig.Legs[leg_index];
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
 
@@ -452,8 +454,7 @@ void Ragdoll::AddImpulse(JPH::BodyID body_id, const Vec3f impulse, const Vec3f p
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->GetBodyInterface();
 
 	body_interface.ActivateBody(body_id);
-	body_interface.AddImpulse(body_id, JPH::Vec3(impulse.X, impulse.Y, impulse.Z),
-							  JPH::RVec3(point.X, point.Y, point.Z));
+	body_interface.AddImpulse(body_id, Vec3f::ToJolt(impulse), Vec3f::ToJolt(point));
 
 	mbPoseSettled = false;
 }

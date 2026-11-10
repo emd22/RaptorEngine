@@ -3,6 +3,7 @@
  */
 
 
+@export
 extern int printf(string fmt, ...);
 
 /* Must match eScriptOpType in Src/Script/ScriptInterop.cpp! Only MOVE, SCALE and ROTATE are pushed with editor_push_op_vec */
@@ -48,6 +49,7 @@ enum EDITORTOOL
 	ROTATE,
 	CLIP,
 	LIGHT,
+	SOUND,
 }
 
 
@@ -55,8 +57,6 @@ enum EDITORTOOL
 	Math Util
  */
 
-/* Returns 1.0 if `value` is positive, returns -1.0 if negative. */
-extern float float_sign(float value);
 extern float float_sqrt(float value);
 
 extern float4 float4_round(float4 value);
@@ -71,163 +71,22 @@ float3 float3_round(float3 value)
 	return result.xyz;
 }
 
-extern float3 float3_abs(float3 value);
+// extern float3 editor_push_op_vec(OBJECT obj, OPTYPE op_type, float3 original, float3 updated, int group_size);
+// extern void editor_push_op_delete(OBJECT obj, int group_size);
 
-extern void print_float4(float4 value);
-void print_float3(float3 value)
-{
-	print_float4(float4(value, 1.0));
-}
-
-/*
-	Object
- */
-
-struct OBJECTID = uint;
-handle OBJECT;
-
-const uint OBJ_TAG_BLOCKOUT = (1 << 0);
-const uint OBJ_TAG_LOCK = (1 << 1);
-/* Set through probe_volume_mark, not set_tags: marking also takes the brush out of the world. */
-const uint OBJ_TAG_PROBEVOLUME = (1 << 2);
-const uint OBJ_TAG_REFLECTIONPROBE = (1 << 3);
-
-impl OBJECT
-{
-	extern void move_to(OBJECT obj, float3 position);
-	extern void move_by(OBJECT obj, float3 by);
-	extern float3 get_position(OBJECT obj);
-	/* Euler angles in radians (pitch, yaw, roll) */
-	extern void rotate_to(OBJECT obj, float3 euler_radians);
-	extern float3 get_rotation(OBJECT obj);
-	extern uint get_tags(OBJECT obj);
-	extern void set_tags(OBJECT obj, uint tags);
-
-	extern float3 ray_get_face(OBJECT obj);
-	extern float direction_scale(OBJECT obj, float3 direction);
-	extern float3 local_to_world(OBJECT obj, float3 point);
-	extern float3 local_dir_to_world(OBJECT obj, float3 direction);
-
-	/* The direction (unit length, world space) the player was moving when they last entered or left this trigger
-	   volume, or zero if they had not moved. Read them inside object_trigger_enter / object_trigger_exit. */
-	extern float3 get_enter_direction(OBJECT obj);
-	extern float3 get_exit_direction(OBJECT obj);
-
-	/* DO NOT CALL! (unless your name is `editor_select_object`). Selects the object in the editor, which then sends the
-	   new selection to the script. */
-	extern void _select_object_internal(OBJECT obj, bool is_selected, bool append_selection);
-
-	property float3 position {
-		get = OBJECT_get_position;
-	}
-
-	property float3 enter_direction {
-		get = OBJECT_get_enter_direction;
-	}
-
-	property float3 exit_direction {
-		get = OBJECT_get_exit_direction;
-	}
-}
-
-
-extern float3 editor_push_op_vec(OBJECT obj, OPTYPE op_type, float3 original, float3 updated, int group_size);
-extern void editor_push_op_delete(OBJECT obj, int group_size);
-
-extern OBJECT editor_op_create_object(float3 position, int group_size);
-extern OBJECT editor_op_dupe_object(OBJECT object_to_dupe, float3 position, int group_size);
+// extern OBJECT editor_op_create_object(float3 position, int group_size);
+// extern OBJECT editor_op_dupe_object(OBJECT object_to_dupe, float3 position, int group_size);
 extern int editor_snap_selection_to_grid();
+//
+// extern OBJECT object_get(OBJECTID id);
+// extern OBJECT object_find(cstring name);
 
-extern OBJECT object_get(OBJECTID id);
-extern OBJECT object_find(cstring name);
-
-/*
-	Player
- */
-
-handle PLAYER;
-
-impl PLAYER
-{
-	extern void set_speed_multiplier(PLAYER p, float mult);
-	extern float3 get_position(PLAYER p);
-	extern bool is_flymode(PLAYER p);
-
-	extern float3 ray_get_point(float range);
-	/* The normal of the surface the crosshair is on, or zero if it hits nothing within `range`. */
-	extern float3 ray_get_normal(float range);
-
-
-	property float3 position {
-		get = PLAYER_get_position;
-	}
-}
-
-PLAYER player;
 
 /* Retrieve the currently selected camera's position */
 extern float3 camera_position();
 
 /* Where the crosshair's ray meets the plane through `point` facing `normal`, or `point` if it never reaches it. */
 extern float3 camera_ray_to_plane(float3 point, float3 normal);
-
-
-/* Reloads an object from a blockout file. */
-extern void blockout_reload_object(OBJECT object);
-extern OBJECT blockout_new_object(float3 position);
-extern OBJECT blockout_dupe_object(OBJECT object);
-extern void blockout_destroy_object(OBJECT object);
-
-extern void blockout_object_scale(OBJECT object, float3 face_dir, float3 magnitude);
-
-/* The centre of the face facing along `face`, in the object's local space. */
-extern float3 blockout_face_center(OBJECT object, float3 face);
-
-/* Changes the texture on the face facing along `face`, as an undoable operation. See eFaceTextureEdit for how
-   `amount` is used. */
-extern void blockout_edit_face_texture(OBJECT object, float3 face, FACETEXTUREEDIT edit, float3 amount);
-
-/* Where the crosshair's ray hits a blockout, in world space. */
-extern float3 blockout_ray_hit_point(OBJECT object);
-
-/* See-through previews of what the Create and Clip tools will make. */
-extern void blockout_preview_box(float3 min, float3 max);
-extern void blockout_preview_clip(OBJECT object, float3 point_a, float3 point_b, float3 face_normal);
-extern void blockout_hide_preview();
-
-/* Creates a box blockout filling `min` to `max`, as an undoable operation. */
-extern OBJECT blockout_create_box(float3 min, float3 max);
-
-/* Splits a blockout in two along the line from `point_a` to `point_b`, cutting straight through the face (with world
-   space normal `face_normal`) that the line was drawn on. Both pieces are kept. Undoable. */
-extern bool blockout_clip(OBJECT object, float3 point_a, float3 point_b, float3 face_normal);
-
-/* Cuts every selected blockout out of the other blockouts it overlaps, as one undoable step per cutter. The cutters are
-   deleted unless `keep_cutters`. Returns how many blockouts were cut. */
-extern int blockout_subtract(bool keep_cutters);
-
-/* Light probes */
-
-extern void probe_volume_mark(OBJECT object, bool enabled);
-extern bool probe_volume_is_marked(OBJECT object);
-
-/* Rebuilds the probe volumes from the level and its marked brushes. Returns how many brushes were used. */
-extern int probe_rebuild_volumes();
-
-extern int probe_volume_count();
-extern int probe_count();
-extern bool probe_is_baking();
-
-/* Rebuilds the volumes, then starts baking every probe in them. */
-extern void probe_bake();
-
-/* Saves the baked probes for the current scene, picked up automatically on the next run. */
-extern bool probe_save();
-
-extern void reflection_probe_mark(OBJECT object, bool enabled);
-extern bool reflection_probe_is_marked(OBJECT object);
-extern int reflection_probe_rebuild();
-extern void reflection_probe_bake();
 
 /* Particles */
 
@@ -246,6 +105,10 @@ extern void sound_set_volume(long sound, float volume);
 extern void sound_stop(long sound);
 extern void sound_kill(long sound);
 extern bool sound_alive(long sound);
+
+/* Mix snapshots from Sounds/Mix/mix.conf. They are counted, so every start needs a matching stop. */
+extern void sound_snapshot_start(cstring name);
+extern void sound_snapshot_stop(cstring name);
 
 /* Timers. Callbacks are looked up by name and have the signature `void fn(OBJECT self, long timer)`, where `self` is
  * null for scripts that are not attached to an object. A timer belongs to the script that started it, and stops when
@@ -278,45 +141,46 @@ extern bool portal_is_open(cstring name);
  * "brace", "protect_head", "high_fall", "writhe" and "dying"; every behaviour has the settings "enabled", "priority",
  * "fade_in" and "fade_out" plus its own (npc_behaviour_list prints them). */
 
-extern int npc_find(cstring name);
+@export extern int npc_find(cstring name);
 /* The NPC hit by the last weapon_hit_apply, or 0 if it missed. */
-extern int npc_last_hit();
-extern bool npc_is_alive(int npc);
+@export extern int npc_last_hit();
+@export extern bool npc_is_alive(int npc);
 
 /* Starts a behaviour. "dying" kills the NPC; "fallen", "writhe" and "high_fall" knock it down first. */
-extern bool npc_behaviour_trigger(int npc, cstring behaviour);
-extern bool npc_behaviour_stop(int npc, cstring behaviour);
-extern bool npc_behaviour_active(int npc, cstring behaviour);
+
+@export extern bool npc_behaviour_trigger(int npc, cstring behaviour);
+@export extern bool npc_behaviour_stop(int npc, cstring behaviour);
+@export extern bool npc_behaviour_active(int npc, cstring behaviour);
 
 /* With npc 0 this changes the default for every NPC, including ones spawned later. */
-extern bool npc_behaviour_set(int npc, cstring behaviour, cstring setting, float value);
-extern float npc_behaviour_get(int npc, cstring behaviour, cstring setting);
-extern void npc_behaviour_list(int npc);
+@export extern bool npc_behaviour_set(int npc, cstring behaviour, cstring setting, float value);
+@export extern float npc_behaviour_get(int npc, cstring behaviour, cstring setting);
+@export extern void npc_behaviour_list(int npc);
 
 /* NPC movement. Animated NPCs walk in a straight line (no path finding) and give up when blocked. States are 0 idle,
  * 1 walking to a point, 2 reacting to a hit or push, 3 fleeing. */
 
-extern int npc_count();
+@export extern int npc_count();
 /* The handle of the NPC at `index` (0 to npc_count() - 1), or 0 past the end. */
-extern int npc_at(int index);
-extern bool npc_walk_to(int npc, float3 target);
-extern bool npc_flee(int npc, float3 from);
-extern bool npc_idle(int npc);
-extern int npc_brain_state(int npc);
+@export extern int npc_at(int index);
+@export extern bool npc_walk_to(int npc, float3 target);
+@export extern bool npc_flee(int npc, float3 from);
+@export extern bool npc_idle(int npc);
+@export extern int npc_brain_state(int npc);
 /* Logs the active physics budget, physics time and each NPC's brain state. */
-extern void npc_stats();
+@export extern void npc_stats();
 
 /* Spawning. The NPC model loads in the background: npc_spawn returns 0 until npc_model_ready returns true. A yaw of 0
  * faces +Z, and a yaw of `a` faces (sin a, 0, cos a). */
 
-extern bool npc_model_ready();
-extern int npc_spawn(float3 position, float yaw);
-extern void npc_destroy(int npc);
+@export extern bool npc_model_ready();
+@export extern int npc_spawn(float3 position, float yaw);
+@export extern void npc_destroy(int npc);
 
 /* Where the pelvis is in world space, which keeps following the NPC after it has fallen. */
-extern float3 npc_position(int npc);
-extern float3 npc_velocity(int npc);
-extern float npc_health(int npc);
+@export extern float3 npc_position(int npc);
+@export extern float3 npc_velocity(int npc);
+@export extern float npc_health(int npc);
 
 /* Must match N_npc_state in Src/Script/ScriptInterop.cpp! */
 enum NPC_STATE
@@ -329,30 +193,30 @@ enum NPC_STATE
 	RAGDOLL,
 }
 
-extern NPC_STATE npc_state(int npc);
+@export extern NPC_STATE npc_state(int npc);
 
 /* Physics props: dynamic boxes named by the value prop_spawn_box returns. A gravity_scale of 0 makes a prop float.
  * Props are removed once they get 50 m from the player, after which these calls do nothing. */
 
-extern long prop_spawn_box(cstring material, float size, float mass, float gravity_scale, float3 position, float3 velocity);
+@export extern long prop_spawn_box(cstring material, float size, float mass, float gravity_scale, float3 position, float3 velocity);
 /* Holds a prop at a velocity without letting contacts turn it. Call it every frame for a scripted mover. */
-extern void prop_drive(long prop, float3 velocity);
-extern float3 prop_position(long prop);
-extern void prop_destroy(long prop);
+@export extern void prop_drive(long prop, float3 velocity);
+@export extern float3 prop_position(long prop);
+@export extern void prop_destroy(long prop);
 
 /* CVars */
 
-extern void cvar_set_int(cstring name, long value);
-extern void cvar_set_float(cstring name, float value);
-extern void cvar_set_string(cstring name, string value);
+@export extern void cvar_set_int(cstring name, long value);
+@export extern void cvar_set_float(cstring name, float value);
+@export extern void cvar_set_string(cstring name, string value);
 
 void cvar_set_bool(cstring name, bool value)
 {
 	cvar_set_int(name, (long)value);
 }
 
-extern float cvar_get_float(cstring name, float fallback);
-extern long cvar_get_int(cstring name, long fallback);
+@export extern float cvar_get_float(cstring name, float fallback);
+@export extern long cvar_get_int(cstring name, long fallback);
 
 bool cvar_get_bool(cstring name, bool fallback)
 {
@@ -361,4 +225,3 @@ bool cvar_get_bool(cstring name, bool fallback)
 
 
 extern void script_error(cstring str);
-

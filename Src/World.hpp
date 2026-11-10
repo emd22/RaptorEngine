@@ -245,6 +245,9 @@ private:
 
 	uint32 mSunLightSlot = UINT32_MAX;
 
+	/// Persistent lights are written after this many light buffer slots, so probe captures can leave them out
+	uint32 mMapLightSlotCount = 0;
+
 	/// Spot light shadow maps to render this frame, see UpdateSpotShadows()
 	DynArray<SpotShadowBake> mSpotShadowBakes;
 	DynArray<ObjectID> mSpotShadowCasters;
