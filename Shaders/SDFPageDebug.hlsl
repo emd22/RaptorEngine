@@ -1,11 +1,11 @@
 F_PROGRAM(FPT_COMPUTE)
 
 #include "./Helper.hlsl"
-#include "BrickCommon.hlsli"
+#include "SDFPageCommon.hlsli"
 
-struct BrickDebugConsts
+struct SDFPageDebugConsts
 {
-	BrickScene Scene;
+	SDFPageScene Scene;
 	float4x4 mInvViewProjection;
 	float4 vEyePosition;
 	/// Target width and height, view, frame
@@ -14,8 +14,8 @@ struct BrickDebugConsts
 	float4 vParams;
 };
 
-F_StructBuffer(bBrickIndirection, uint, 0, 0);
-F_Texture3D(tBrickAtlas, 1, 0);
+F_StructBuffer(bSDFPageIndirection, uint, 0, 0);
+F_Texture3D(tSDFPageAtlas, 1, 0);
 F_Texture2D(tDepth, 2, 0);
 F_Texture2D(tNormal, 3, 0);
 F_Texture2D(tMotion, 4, 0);
@@ -24,12 +24,12 @@ F_Texture2D(tMotion, 4, 0);
 
 F_RWStructBuffer(bStats, uint, 6, 0);
 
-F_FrameData(BrickDebugConsts, Consts, 1);
+F_FrameData(SDFPageDebugConsts, Consts, 1);
 
-#define BRICK_SCENE Consts.Scene
-#include "BrickTrace.hlsli"
+#define SDF_PAGE_SCENE Consts.Scene
+#include "SDFPageTrace.hlsli"
 
-/// Mirrors BrickScene::eDebugView
+/// Mirrors SDFPageScene::eDebugView
 #define VIEW_NORMALS 1
 #define VIEW_STEPS 2
 #define VIEW_GI_RAYS 3
@@ -102,11 +102,11 @@ float3 HeatColour(float value)
 
 float3 LevelColour(uint level)
 {
-	static const float3 scColours[BRICK_MAX_LEVELS] = {
+	static const float3 scColours[SDF_PAGE_MAX_LEVELS] = {
 		float3(0.9, 0.3, 0.3), float3(0.3, 0.9, 0.3), float3(0.3, 0.4, 0.95), float3(0.9, 0.85, 0.3), float3(0.8, 0.3, 0.9),
 	};
 
-	return scColours[min(level, BRICK_MAX_LEVELS - 1)];
+	return scColours[min(level, SDF_PAGE_MAX_LEVELS - 1)];
 }
 
 #define STAT_COUNT 8
@@ -117,11 +117,11 @@ static uint sStats[STAT_COUNT];
 
 void AddStat(uint stat, uint value) { sStats[stat] += value; }
 
-void RecordSteps(BrickHit hit)
+void RecordSteps(SDFPageHit hit)
 {
 	AddStat(STAT_STEPS, hit.uiSteps);
 	AddStat(STAT_RAYS, 1u);
-	AddStat(STAT_MAX_STEPS, select(hit.uiSteps >= BRICK_MAX_STEPS, 1u, 0u));
+	AddStat(STAT_MAX_STEPS, select(hit.uiSteps >= SDF_PAGE_MAX_STEPS, 1u, 0u));
 }
 
 float3 ShadePixel(uint2 pixel, uint2 group_pixel, uint2 local)
@@ -160,7 +160,7 @@ float3 ShadePixel(uint2 pixel, uint2 group_pixel, uint2 local)
 		const float4 origin_normal = F_SampleLoad(tNormal, int3(origin_pixel, 0));
 		const float ray_length = Consts.vParams.y;
 
-		// The skybox is far outside the bricks, where its depth gives no usable position
+		// The skybox is far outside the pages, where its depth gives no usable position
 		const bool is_traceable = length(origin_surface - eye) < GI_MAX_DISTANCE;
 		const bool has_surface = and(origin_depth > 0.0, origin_depth < VIEWMODEL_STORED_DEPTH);
 
@@ -172,9 +172,9 @@ float3 ShadePixel(uint2 pixel, uint2 group_pixel, uint2 local)
 			const float2 xi = select(is_probe, (float2(local) + jitter) / PROBE_SIZE, jitter);
 
 			const float3 direction = CosineDirection(normal, xi);
-			const float3 origin = origin_surface + normal * (BrickTexelAt(origin_surface) * 1.5);
+			const float3 origin = origin_surface + normal * (SDFPageTexelAt(origin_surface) * 1.5);
 
-			const BrickHit hit = BrickTrace(origin, direction, ray_length, Consts.vParams.x);
+			const SDFPageHit hit = SDFPageTrace(origin, direction, ray_length, Consts.vParams.x);
 			RecordSteps(hit);
 
 			const float visibility = select(hit.bHit, saturate(hit.fDistance / GI_AO_DISTANCE), 1.0);
@@ -182,12 +182,12 @@ float3 ShadePixel(uint2 pixel, uint2 group_pixel, uint2 local)
 			colour = visibility.xxx;
 
 			if (view == VIEW_GI_STEPS) {
-				colour = select(hit.uiSteps >= BRICK_MAX_STEPS, float3(1.0, 0.0, 1.0), HeatColour(float(hit.uiSteps) / 96.0));
+				colour = select(hit.uiSteps >= SDF_PAGE_MAX_STEPS, float3(1.0, 0.0, 1.0), HeatColour(float(hit.uiSteps) / 96.0));
 			}
 		}
 	}
 	else {
-		const BrickHit hit = BrickTrace(eye, view_direction, PRIMARY_MAX_DISTANCE, 0.0);
+		const SDFPageHit hit = SDFPageTrace(eye, view_direction, PRIMARY_MAX_DISTANCE, 0.0);
 		RecordSteps(hit);
 
 		if (view == VIEW_STEPS) {
@@ -198,10 +198,10 @@ float3 ShadePixel(uint2 pixel, uint2 group_pixel, uint2 local)
 			const float texel = Consts.Scene.Levels[hit.uiLevel].vParams.w;
 
 			if (view == VIEW_LEVELS) {
-				colour = LevelColour(hit.uiLevel) * (0.5 + 0.5 * abs(BrickNormal(position, texel).y));
+				colour = LevelColour(hit.uiLevel) * (0.5 + 0.5 * abs(SDFPageNormal(position, texel).y));
 			}
 			else if (view == VIEW_NORMALS) {
-				colour = BrickNormal(position, texel) * 0.5 + 0.5;
+				colour = SDFPageNormal(position, texel) * 0.5 + 0.5;
 			}
 		}
 

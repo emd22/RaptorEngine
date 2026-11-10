@@ -30,6 +30,11 @@ FX_FORCE_INLINE Vec3d::Vec3d(const Vec3f other)
 // Operator overloads
 /////////////////////////////////////
 
+FX_FORCE_INLINE Vec3d Vec3d::operator-() const
+{
+	return DOUBLE4 { { vnegq_f64(mIntrin.val[0]), vnegq_f64(mIntrin.val[1]) } };
+}
+
 FX_FORCE_INLINE Vec3d Vec3d::operator+(const Vec3d& other) const
 {
 	DOUBLE4 result;

@@ -8,7 +8,7 @@
 #include "DeletionObject.hpp"
 #include "FrameAllocator.hpp"
 #include "GpuProfiler.hpp"
-#include "BrickScene.hpp"
+#include "SDFPageScene.hpp"
 #include "LightTransport.hpp"
 #include "TiledForwardRenderer.hpp"
 #include "UniformBuffer.hpp"
@@ -360,10 +360,10 @@ public:
 
 	/// Bounces the lights that were not baked through the compiled map's cluster links, on top of the lightmap
 	LightTransport Transport;
-	BrickScene Bricks;
-	BrickScene::eDebugView BrickDebugView = BrickScene::eDebugView::None;
-	float32 BrickDebugCone = 0.0f;
-	float32 BrickDebugRayLength = 50.0f;
+	SDFPageScene SDFPages;
+	SDFPageScene::eDebugView SDFPageDebugView = SDFPageScene::eDebugView::None;
+	float32 SDFPageDebugCone = 0.0f;
+	float32 SDFPageDebugRayLength = 50.0f;
 
 	/// The irradiance the forward pass shades lightmapped surfaces with: relit while the transport is active
 	Image* GetShadingIrradiance() const

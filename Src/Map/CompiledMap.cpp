@@ -20,10 +20,10 @@ constexpr uint32 scMaxLightmapSize = 8192;
 constexpr uint32 scFirstDeflatedVersion = 14;
 /// Probe depth moments are octahedral maps from this version on, cube faces before it
 constexpr uint32 scFirstOctahedralProbeVersion = 16;
-/// Every file from this version on has the GI bricks and octahedral moments. v16 was used for both on separate
-/// branches: one wrote cube moments and bricks, the other octahedral moments and no bricks. Load() tells them apart
+/// Every file from this version on has the GI SDF pages and octahedral moments. v16 was used for both on separate
+/// branches: one wrote cube moments and SDF pages, the other octahedral moments and no SDF pages. Load() tells them apart
 /// by the size of the moments and by whether anything follows the transport.
-constexpr uint32 scFirstBricksVersion = 17;
+constexpr uint32 scFirstSDFPagesVersion = 17;
 /// Values per probe in the cube face moments from before the octahedral layout (6 faces of 16x16, mean + variance)
 constexpr uint32 scCubeProbeMomentValues = 6 * 16 * 16 * 2;
 constexpr int scDeflateLevel = 9;
@@ -449,49 +449,49 @@ void WriteTransport(Writer& writer, const CompiledMapTransport& transport)
 	WriteSectionArray(writer, transport.Links);
 }
 
-void ReadBricks(Reader& reader, CompiledMapBricks& out_bricks)
+void ReadSDFPages(Reader& reader, CompiledMapSDFPages& out_sdf_pages)
 {
-	out_bricks.MarginScale = reader.Read<float32>();
+	out_sdf_pages.MarginScale = reader.Read<float32>();
 
-	ReadSectionArray(reader, out_bricks.Levels);
-	ReadSectionArray(reader, out_bricks.Bricks);
-	ReadSectionArray(reader, out_bricks.Refs);
-	ReadSectionArray(reader, out_bricks.Triangles);
+	ReadSectionArray(reader, out_sdf_pages.Levels);
+	ReadSectionArray(reader, out_sdf_pages.SDFPages);
+	ReadSectionArray(reader, out_sdf_pages.Refs);
+	ReadSectionArray(reader, out_sdf_pages.Triangles);
 
-	if (reader.bFailed || out_bricks.IsEmpty()) {
-		out_bricks = CompiledMapBricks {};
+	if (reader.bFailed || out_sdf_pages.IsEmpty()) {
+		out_sdf_pages = CompiledMapSDFPages {};
 		return;
 	}
 
-	bool valid = out_bricks.Levels.Size <= CompiledMapBricks::scMaxLevels && out_bricks.MarginScale > 0.0f;
+	bool valid = out_sdf_pages.Levels.Size <= CompiledMapSDFPages::scMaxLevels && out_sdf_pages.MarginScale > 0.0f;
 
-	for (const CompiledMapBrickLevel& level : out_bricks.Levels) {
-		valid = valid && level.BrickSize > 0.0f &&
-				static_cast<uint64>(level.FirstBrick) + level.BrickCount <= out_bricks.Bricks.Size;
+	for (const CompiledMapSDFPageLevel& level : out_sdf_pages.Levels) {
+		valid = valid && level.SDFPageSize > 0.0f &&
+				static_cast<uint64>(level.FirstSDFPage) + level.SDFPageCount <= out_sdf_pages.SDFPages.Size;
 	}
 
-	for (const CompiledMapBrick& brick : out_bricks.Bricks) {
-		valid = valid && static_cast<uint64>(brick.FirstRef) + brick.RefCount <= out_bricks.Refs.Size;
+	for (const CompiledMapSDFPage& page : out_sdf_pages.SDFPages) {
+		valid = valid && static_cast<uint64>(page.FirstRef) + page.RefCount <= out_sdf_pages.Refs.Size;
 	}
 
-	for (const uint32 ref : out_bricks.Refs) {
-		valid = valid && ref < out_bricks.Triangles.Size;
+	for (const uint32 ref : out_sdf_pages.Refs) {
+		valid = valid && ref < out_sdf_pages.Triangles.Size;
 	}
 
 	// The GI can do without it, so the rest of the map still loads
 	if (!valid) {
-		out_bricks = CompiledMapBricks {};
+		out_sdf_pages = CompiledMapSDFPages {};
 	}
 }
 
-void WriteBricks(Writer& writer, const CompiledMapBricks& bricks)
+void WriteSDFPages(Writer& writer, const CompiledMapSDFPages& pages)
 {
-	writer.Write(bricks.MarginScale);
+	writer.Write(pages.MarginScale);
 
-	WriteSectionArray(writer, bricks.Levels);
-	WriteSectionArray(writer, bricks.Bricks);
-	WriteSectionArray(writer, bricks.Refs);
-	WriteSectionArray(writer, bricks.Triangles);
+	WriteSectionArray(writer, pages.Levels);
+	WriteSectionArray(writer, pages.SDFPages);
+	WriteSectionArray(writer, pages.Refs);
+	WriteSectionArray(writer, pages.Triangles);
 }
 
 void WriteFogShadow(Writer& writer, const CompiledMapFogShadow& shadow)
@@ -908,11 +908,11 @@ bool CompiledMap::Load(const String& path)
 		ReadTransport(reader, Transport, Lightmap);
 	}
 
-	const bool has_bricks = (version >= scFirstBricksVersion) ||
+	const bool has_sdf_pages = (version >= scFirstSDFPagesVersion) ||
 							(version == scFirstOctahedralProbeVersion && file_to_read.GetPosition() < file_to_read.GetFileSize());
 
-	if (has_bricks && !reader.bFailed) {
-		ReadBricks(reader, Bricks);
+	if (has_sdf_pages && !reader.bFailed) {
+		ReadSDFPages(reader, SDFPages);
 	}
 
 	for (const CompiledMapSurface& surface : Surfaces) {
@@ -1076,7 +1076,7 @@ bool CompiledMap::Save(const String& path) const
 	writer.WriteSection(AcousticProbes.pData, AcousticProbes.Size);
 
 	WriteTransport(writer, Transport);
-	WriteBricks(writer, Bricks);
+	WriteSDFPages(writer, SDFPages);
 
 	return (writer.bFailed == false);
 }

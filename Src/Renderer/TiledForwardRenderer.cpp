@@ -56,7 +56,7 @@ void TiledForwardRenderer::Create(const Vec2u& extent)
 	CreateParticlePSO();
 	CreateFogPSO();
 	gGraphics->Transport.CreatePipelines();
-	gGraphics->Bricks.CreatePipelines(Prepass.GetTarget(eImageFormat::D32_Float),
+	gGraphics->SDFPages.CreatePipelines(Prepass.GetTarget(eImageFormat::D32_Float),
 									  Prepass.GetTarget(eImageFormat::RGBA16_Float),
 									  Prepass.GetTarget(eImageFormat::RG16_Float),
 									  ForwardPass.GetTarget(eImageFormat::RGBA16_Float));
@@ -76,7 +76,7 @@ void TiledForwardRenderer::CreateForwardPass()
 	// Forward pass
 	ForwardPass.Create("Forward", gGraphics->Swapchain.Extent, eSizeDivisor::FullRes);
 
-	// Lit target. Copied into SceneCopyPass when water needs the opaque scene behind it, and storage for the brick
+	// Lit target. Copied into SceneCopyPass when water needs the opaque scene behind it, and storage for the page
 	// debug views, which write over it.
 	ForwardPass.AddTarget(eImageFormat::RGBA16_Float,
 						  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |

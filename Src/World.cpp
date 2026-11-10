@@ -43,11 +43,11 @@ void World::Create()
 	pCVarPortalDebug = gCVars->Set<int64>("r_portal_debug", 0);
 	pCVarBakedShadows = gCVars->Set<int64>("r_baked_shadows", 1);
 	pCVarBakedIndirect = gCVars->Set<int64>("r_baked_indirect", 1);
-	pCVarBricks = gCVars->Set<int64>("r_bricks", 1);
-	pCVarBrickDebug = gCVars->Set<int64>("r_brick_debug", 0);
-	pCVarBrickBudget = gCVars->Set<int64>("r_brick_budget", 16384);
-	pCVarBrickCone = gCVars->Set<float32>("r_brick_cone", 0.05f);
-	pCVarBrickRayLength = gCVars->Set<float32>("r_brick_ray_length", 50.0f);
+	pCVarSDFPages = gCVars->Set<int64>("r_sdf_pages", 1);
+	pCVarSDFPageDebug = gCVars->Set<int64>("r_sdf_page_debug", 0);
+	pCVarSDFPageBudget = gCVars->Set<int64>("r_sdf_page_budget", 16384);
+	pCVarSDFPageCone = gCVars->Set<float32>("r_sdf_page_cone", 0.05f);
+	pCVarSDFPageRayLength = gCVars->Set<float32>("r_sdf_page_ray_length", 50.0f);
 }
 
 static bool IsTransparentMaterial(Material* mat) { return (mat != nullptr && mat->IsTransparent()); }
@@ -1222,21 +1222,21 @@ void World::Render(BaseCamera* shadow_camera)
 								gGraphics->LightBuffer.SlotIndex - mMapLightSlotCount, !gProbeManager->IsBaking());
 	gGraphics->MarkGpu(eGpuMarker::LightTransport);
 
-	const bool bricks_enabled = (pCVarBricks->IntValue != 0);
+	const bool sdf_pages_enabled = (pCVarSDFPages->IntValue != 0);
 
-	if (bricks_enabled) {
-		gGraphics->Bricks.Update(gGraphics->GetFrame()->CmdBuffer, camera.GetPosition(),
-								 static_cast<uint32>(std::max<int64>(pCVarBrickBudget->IntValue, 0)));
-		gGraphics->MarkGpu(eGpuMarker::BrickScene);
+	if (sdf_pages_enabled) {
+		gGraphics->SDFPages.Update(gGraphics->GetFrame()->CmdBuffer, camera.GetPosition(),
+								 static_cast<uint32>(std::max<int64>(pCVarSDFPageBudget->IntValue, 0)));
+		gGraphics->MarkGpu(eGpuMarker::SDFPageScene);
 	}
 
-	const int64 brick_view = pCVarBrickDebug->IntValue;
-	gGraphics->BrickDebugCone = pCVarBrickCone->FloatValue;
-	gGraphics->BrickDebugRayLength = pCVarBrickRayLength->FloatValue;
-	gGraphics->BrickDebugView = BrickScene::eDebugView::None;
+	const int64 sdf_page_view = pCVarSDFPageDebug->IntValue;
+	gGraphics->SDFPageDebugCone = pCVarSDFPageCone->FloatValue;
+	gGraphics->SDFPageDebugRayLength = pCVarSDFPageRayLength->FloatValue;
+	gGraphics->SDFPageDebugView = SDFPageScene::eDebugView::None;
 
-	if (bricks_enabled && brick_view > 0 && brick_view < static_cast<int64>(BrickScene::eDebugView::Count)) {
-		gGraphics->BrickDebugView = static_cast<BrickScene::eDebugView>(brick_view);
+	if (sdf_pages_enabled && sdf_page_view > 0 && sdf_page_view < static_cast<int64>(SDFPageScene::eDebugView::Count)) {
+		gGraphics->SDFPageDebugView = static_cast<SDFPageScene::eDebugView>(sdf_page_view);
 	}
 
 	gGraphics->pRenderer->BeginViewMotion(camera);

@@ -92,13 +92,18 @@ FX_FORCE_INLINE FLOAT4 Mul(FLOAT4 a, FLOAT4 b) { return vmulq_f32(a, b); }
 FX_FORCE_INLINE FLOAT4 Div(FLOAT4 a, FLOAT4 b) { return vdivq_f32(a, b); }
 FX_FORCE_INLINE FLOAT4 Abs(FLOAT4 value) { return vabsq_f32(value); }
 
+FX_FORCE_INLINE DOUBLE4 Abs(DOUBLE4 value) { return DOUBLE4 { { vabsq_f64(value.val[0]), vabsq_f64(value.val[1]) } }; }
+
 FX_FORCE_INLINE float HAdd(FLOAT4 a) { return vaddvq_f32(a); }
+FX_FORCE_INLINE double HAdd(DOUBLE4 a) { return vaddvq_f64(a.val[0]) + vaddvq_f64(a.val[1]); }
+
+FX_FORCE_INLINE FLOAT4 SetW(FLOAT4 a, float w) { return vsetq_lane_f32(w, a, 3); }
 
 /**
  * @brief Zeros the W component of a vector, ensuring that it behaves as a Vec3. This is a must when it comes to
  * unsanitized vectors with horizontal adds or dot prods!
  */
-FX_FORCE_INLINE FLOAT4 AsFloat3(FLOAT4 a) { return vsetq_lane_f32(0.0f, a, 3); }
+FX_FORCE_INLINE FLOAT4 RemoveW(FLOAT4 a) { return SetW(a, 0.0f); }
 
 FX_FORCE_INLINE UINT4 CompareLess(FLOAT4 a, FLOAT4 b) { return vcltq_f32(a, b); }
 FX_FORCE_INLINE UINT4 CompareLessEqual(FLOAT4 a, FLOAT4 b) { return vcleq_f32(a, b); }
@@ -176,6 +181,53 @@ FX_FORCE_INLINE double Dot(DOUBLE4 a, DOUBLE4 b)
 
 	// Return the first lane (result of both of em)
 	return vgetq_lane_f64(result, 0);
+}
+
+FX_FORCE_INLINE DOUBLE4 SetW(DOUBLE4 a, double w)
+{
+	a.val[1] = vsetq_lane_f64(w, a.val[1], 1);
+	return a;
+}
+
+FX_FORCE_INLINE DOUBLE4 RemoveW(DOUBLE4 a) { return SetW(a, 0.0); }
+
+
+/**
+ * @brief Gets the minimum lane value for a double precision 4-component vector.
+ */
+FX_FORCE_INLINE double HMin(DOUBLE4 a)
+{
+	DOUBLE2 m = vminq_f64(a.val[0], a.val[1]);
+	return vminvq_f64(m);
+}
+
+
+/**
+ * @brief Gets the minimum lane value for a double precision 3-component vector.
+ */
+FX_FORCE_INLINE double HMin3(DOUBLE4 a)
+{
+	DOUBLE2 m = vminq_f64(a.val[0], vsetq_lane_f64(INFINITY, a.val[1], 1));
+	return vminvq_f64(m);
+}
+
+/**
+ * @brief Gets the maximum lane value for a double precision 4-component vector.
+ */
+FX_FORCE_INLINE double HMax(DOUBLE4 a)
+{
+	DOUBLE2 m = vmaxq_f64(a.val[0], a.val[1]);
+	return vmaxvq_f64(m);
+}
+
+
+/**
+ * @brief Gets the maximum lane value for a double precision 3-component vector.
+ */
+FX_FORCE_INLINE double HMax3(DOUBLE4 a)
+{
+	DOUBLE2 m = vmaxq_f64(a.val[0], vsetq_lane_f64(-INFINITY, a.val[1], 1));
+	return vmaxvq_f64(m);
 }
 
 
@@ -471,12 +523,18 @@ FX_FORCE_INLINE FLOAT4 Add(FLOAT4 a, FLOAT4 b) { return _mm_add_ps(a, b); }
 FX_FORCE_INLINE FLOAT4 Mul(FLOAT4 a, FLOAT4 b) { return _mm_mul_ps(a, b); }
 FX_FORCE_INLINE FLOAT4 Div(FLOAT4 a, FLOAT4 b) { return _mm_div_ps(a, b); }
 FX_FORCE_INLINE FLOAT4 Abs(FLOAT4 value) { return _mm_and_ps(value, _mm_castsi128_ps(_mm_set1_epi32(0x7FFFFFFF))); }
+FX_FORCE_INLINE DOUBLE4 Abs(DOUBLE4 value)
+{
+	return _mm256_and_pd(value, _mm256_castsi256_pd(_mm256_set1_epi64x(0x7FFFFFFFFFFFFFFF)));
+}
+
+FX_FORCE_INLINE FLOAT4 SetW(FLOAT4 a, float w) { return _mm_blend_ps(a, _mm_set1_ps(w), 0b1000); }
 
 /**
  * @brief Zeros the W component of a vector, ensuring that it behaves as a Vec3. This is a must when it comes to
  * unsanitized vectors with horizontal adds or dot prods!
  */
-FX_FORCE_INLINE FLOAT4 AsFloat3(FLOAT4 a) { return _mm_blend_ps(a, _mm_setzero_ps(), 0b1000); }
+FX_FORCE_INLINE FLOAT4 RemoveW(FLOAT4 a) { return SetW(a, 0.0f); }
 
 FX_FORCE_INLINE float HAdd(FLOAT4 a)
 {
@@ -491,6 +549,15 @@ FX_FORCE_INLINE float HAdd(FLOAT4 a)
 
 	// Return final result (from the first lane)
 	return _mm_cvtss_f32(v32);
+}
+
+FX_FORCE_INLINE double HAdd(DOUBLE4 a)
+{
+	DOUBLE2 lo = _mm256_castpd256_pd128(a);
+	DOUBLE2 hi = _mm256_extractf128_pd(a, 1);
+	DOUBLE2 sum = _mm_add_pd(lo, hi);
+	sum = _mm_add_sd(sum, _mm_unpackhi_pd(sum, sum));
+	return _mm_cvtsd_f64(sum);
 }
 
 FX_FORCE_INLINE UINT4 CompareLess(FLOAT4 a, FLOAT4 b) { return _mm_castps_si128(_mm_cmplt_ps(a, b)); }
@@ -544,6 +611,72 @@ FX_FORCE_INLINE double Dot(DOUBLE4 a, DOUBLE4 b)
 	sum = _mm_add_sd(sum, _mm_unpackhi_pd(sum, sum));
 
 	return _mm_cvtsd_f64(sum);
+}
+
+FX_FORCE_INLINE DOUBLE4 SetW(DOUBLE4 a, double w) { return _mm256_blend_pd(a, _mm256_set1_pd(w), 0b1000); }
+FX_FORCE_INLINE DOUBLE4 RemoveW(DOUBLE4 a) { return SetW(a, 0.0); }
+
+/**
+ * @brief Gets the minimum lane value for a double precision 4-component vector.
+ */
+FX_FORCE_INLINE double HMin(DOUBLE4 v)
+{
+	DOUBLE2 lo = _mm256_castpd256_pd128(v);
+	DOUBLE2 hi = _mm256_extractf128_pd(v, 1);
+
+	DOUBLE2 m = _mm_min_pd(lo, hi);
+	m = _mm_min_sd(m, _mm_unpackhi_pd(m, m));
+
+	return _mm_cvtsd_f64(m);
+}
+
+/**
+ * @brief Gets the minimum lane value for a double precision 3-component vector.
+ */
+FX_FORCE_INLINE double HMin3(DOUBLE4 v)
+{
+	DOUBLE2 lo = _mm256_castpd256_pd128(v);
+
+	DOUBLE2 hi = _mm256_extractf128_pd(v, 1);
+	// Set W to infinity so it will never be picked
+	hi = _mm_blend_pd(hi, _mm_set1_pd(INFINITY), 0b10);
+
+	DOUBLE2 m = _mm_min_pd(lo, hi);
+	m = _mm_min_sd(m, _mm_unpackhi_pd(m, m));
+
+	return _mm_cvtsd_f64(m);
+}
+
+
+/**
+ * @brief Gets the minimum lane value for a double precision 4-component vector.
+ */
+FX_FORCE_INLINE double HMax(DOUBLE4 v)
+{
+	DOUBLE2 lo = _mm256_castpd256_pd128(v);
+	DOUBLE2 hi = _mm256_extractf128_pd(v, 1);
+
+	DOUBLE2 m = _mm_max_pd(lo, hi);
+	m = _mm_max_sd(m, _mm_unpackhi_pd(m, m));
+
+	return _mm_cvtsd_f64(m);
+}
+
+/**
+ * @brief Gets the minimum lane value for a double precision 3-component vector.
+ */
+FX_FORCE_INLINE double HMax3(DOUBLE4 v)
+{
+	DOUBLE2 lo = _mm256_castpd256_pd128(v);
+
+	DOUBLE2 hi = _mm256_extractf128_pd(v, 1);
+	// Set W to -infinity so it will never be picked
+	hi = _mm_blend_pd(hi, _mm_set1_pd(-INFINITY), 0b10);
+
+	DOUBLE2 m = _mm_max_pd(lo, hi);
+	m = _mm_max_sd(m, _mm_unpackhi_pd(m, m));
+
+	return _mm_cvtsd_f64(m);
 }
 
 ////////////////////////////////

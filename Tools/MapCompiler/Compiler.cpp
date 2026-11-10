@@ -460,7 +460,7 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 	result.Lightmap = lightmap.Stats;
 
 	if (source.Brushes.Size != 0) {
-		BuildBricks(source, surfaces, &models, options.Bricks, map, result.Bricks);
+		BuildSDFPages(source, surfaces, &models, options.SDFPages, map, result.SDFPages);
 	}
 
 	const String leak_path = ReplaceExtension(result.OutputPath, ".leak");
@@ -720,25 +720,25 @@ CompileResult CompileMap(const CompileOptions& options, const LogFunction& log)
 						options.Lightmap.MaxSize));
 	}
 
-	if (!map.Bricks.IsEmpty()) {
-		const BrickStats& bricks = result.Bricks;
+	if (!map.SDFPages.IsEmpty()) {
+		const SDFPageStats& pages = result.SDFPages;
 		String counts;
 
-		for (uint32 level = 0; level < bricks.LevelCount; level++) {
+		for (uint32 level = 0; level < pages.LevelCount; level++) {
 			if (level > 0) {
 				counts += " / ";
 			}
 
-			counts += String::Fmt("{}", bricks.BrickCounts[level]);
+			counts += String::Fmt("{}", pages.SDFPageCounts[level]);
 		}
 
-		log(String::Fmt("  bricks       {} levels from {:.2f} m, {} triangles, {} bricks, {} refs, {:.1f} MB, built in "
+		log(String::Fmt("  sdf pages    {} levels from {:.2f} m, {} triangles, {} pages, {} refs, {:.1f} MB, built in "
 						"{:.2f} s",
-						bricks.LevelCount, options.Bricks.Level0BrickSize, bricks.TriangleCount, counts,
-						bricks.RefCount, static_cast<double>(bricks.ByteCount) / (1024.0 * 1024.0), bricks.Seconds));
+						pages.LevelCount, options.SDFPages.Level0SDFPageSize, pages.TriangleCount, counts,
+						pages.RefCount, static_cast<double>(pages.ByteCount) / (1024.0 * 1024.0), pages.Seconds));
 	}
-	else if (!options.Bricks.bEnabled) {
-		log("  bricks       off");
+	else if (!options.SDFPages.bEnabled) {
+		log("  sdf pages    off");
 	}
 
 	if (options.VerifyRays > 0 && source.Brushes.Size != 0) {

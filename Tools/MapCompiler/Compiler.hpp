@@ -8,7 +8,7 @@
 #pragma once
 
 #include "AcousticBake.hpp"
-#include "Bricks.hpp"
+#include "SDFPages.hpp"
 #include "Lightmap.hpp"
 #include "Surfaces.hpp"
 
@@ -39,7 +39,7 @@ struct CompileOptions
 
 	LightmapOptions Lightmap;
 	AcousticOptions Acoustics;
-	BrickOptions Bricks;
+	SDFPageOptions SDFPages;
 
 	uint32 VerifyRays = 0;
 };
@@ -66,7 +66,7 @@ struct CompileResult
 	LightmapStats Lightmap;
 
 	AcousticStats Acoustics;
-	BrickStats Bricks;
+	SDFPageStats SDFPages;
 
 	String OutputPath;
 	String LeakPath;

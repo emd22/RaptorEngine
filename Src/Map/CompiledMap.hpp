@@ -208,17 +208,17 @@ struct CompiledMapTransport
 /**
  * @brief The corners of a convex collider, in world space
  */
-/// One clip level of the brick scene, whose bricks are `BrickSize` metres wide
-struct CompiledMapBrickLevel
+/// One clip level of the SDF page scene, whose pages are `SDFPageSize` metres wide
+struct CompiledMapSDFPageLevel
 {
-	float32 BrickSize = 0.0f;
-	uint32 FirstBrick = 0;
-	uint32 BrickCount = 0;
+	float32 SDFPageSize = 0.0f;
+	uint32 FirstSDFPage = 0;
+	uint32 SDFPageCount = 0;
 	uint32 Padding = 0;
 };
 
-/// A brick that some geometry passes within the margin of. `Coord` times the level's brick size is its minimum corner.
-struct CompiledMapBrick
+/// A page that some geometry passes within the margin of. `Coord` times the level's page size is its minimum corner.
+struct CompiledMapSDFPage
 {
 	int32 Coord[3] = {};
 	uint32 FirstRef = 0;
@@ -226,31 +226,31 @@ struct CompiledMapBrick
 	uint32 Padding = 0;
 };
 
-/// Laid out to match BrickTriangle in Shaders/BrickCommon.hlsli
-struct CompiledMapBrickTriangle
+/// Laid out to match SDFPageTriangle in Shaders/SDFPageCommon.hlsli
+struct CompiledMapSDFPageTriangle
 {
 	float32 Corners[3][4] = {};
 };
 
 /**
- * @brief The geometry the GI traces against: for every clip level, the bricks that geometry touches and the triangles
+ * @brief The geometry the GI traces against: for every clip level, the pages that geometry touches and the triangles
  * that their distances are computed from. The distances themselves are computed on the GPU.
  */
-struct CompiledMapBricks
+struct CompiledMapSDFPages
 {
-	static constexpr uint32 scTexelsPerBrick = 8;
+	static constexpr uint32 scTexelsPerSDFPage = 8;
 	static constexpr uint32 scMaxLevels = 8;
 
-	/// Distances are kept up to this many brick widths, and a brick lists every triangle within that of it
+	/// Distances are kept up to this many page widths, and a page lists every triangle within that of it
 	float32 MarginScale = 0.5f;
 
-	SizedArray<CompiledMapBrickLevel> Levels;
-	/// Each level's bricks are sorted by X, then Y, then Z
-	SizedArray<CompiledMapBrick> Bricks;
+	SizedArray<CompiledMapSDFPageLevel> Levels;
+	/// Each level's pages are sorted by X, then Y, then Z
+	SizedArray<CompiledMapSDFPage> SDFPages;
 	SizedArray<uint32> Refs;
-	SizedArray<CompiledMapBrickTriangle> Triangles;
+	SizedArray<CompiledMapSDFPageTriangle> Triangles;
 
-	bool IsEmpty() const { return Levels.Size == 0 || Bricks.Size == 0 || Triangles.Size == 0; }
+	bool IsEmpty() const { return Levels.Size == 0 || SDFPages.Size == 0 || Triangles.Size == 0; }
 };
 
 struct CompiledMapHull
@@ -362,7 +362,7 @@ public:
 
 	CompiledMapLightmap Lightmap;
 	CompiledMapTransport Transport;
-	CompiledMapBricks Bricks;
+	CompiledMapSDFPages SDFPages;
 
 	SizedArray<uint8> ProbeSunVisibility;
 

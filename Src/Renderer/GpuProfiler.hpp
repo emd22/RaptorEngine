@@ -18,7 +18,7 @@ enum class eGpuMarker : uint32
 	FrameStart,
 	Shadows,
 	LightTransport,
-	BrickScene,
+	SDFPageScene,
 	Prepass,
 	LightCulling,
 	SSAO,
@@ -26,7 +26,7 @@ enum class eGpuMarker : uint32
 	Particles,
 	Fog,
 	ProbeCapture,
-	BrickDebug,
+	SDFPageDebug,
 	Composition,
 
 	Count,

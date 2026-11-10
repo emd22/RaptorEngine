@@ -1,10 +1,10 @@
 F_PROGRAM(FPT_COMPUTE)
 
 #include "./Helper.hlsl"
-#include "BrickCommon.hlsli"
+#include "SDFPageCommon.hlsli"
 
-/// Mirrors BrickScene::Job
-struct BrickJob
+/// Mirrors SDFPageScene::Job
+struct SDFPageJob
 {
 	uint uiSlot;
 	uint uiAtlas;
@@ -13,26 +13,26 @@ struct BrickJob
 	float4 vOriginAndTexel;
 };
 
-struct BrickUpdateConsts
+struct SDFPageUpdateConsts
 {
-	/// Job count, then the atlas size in bricks
+	/// Job count, then the atlas size in pages
 	uint4 vInfo;
-	/// Margin as a fraction of a brick
+	/// Margin as a fraction of a page
 	float4 vParams;
 };
 
-F_StructBuffer(bJobs, BrickJob, 0, 0);
+F_StructBuffer(bJobs, SDFPageJob, 0, 0);
 F_StructBuffer(bRefs, uint, 1, 0);
-F_StructBuffer(bTriangles, BrickTriangle, 2, 0);
+F_StructBuffer(bTriangles, SDFPageTriangle, 2, 0);
 F_RWStructBuffer(bIndirection, uint, 3, 0);
 
 [[vk::image_format("r8")]] F_RWTexture3D(tAtlas, float, 4, 0);
 
-F_FrameData(BrickUpdateConsts, Consts, 1);
+F_FrameData(SDFPageUpdateConsts, Consts, 1);
 
-#define BRICK_UPDATE_THREADS 64
-#define BRICK_UPDATE_COLUMNS 1024
-#define TEXELS_PER_THREAD ((BRICK_TEXELS * BRICK_TEXELS * BRICK_TEXELS) / BRICK_UPDATE_THREADS)
+#define SDF_PAGE_UPDATE_THREADS 64
+#define SDF_PAGE_UPDATE_COLUMNS 1024
+#define TEXELS_PER_THREAD ((SDF_PAGE_TEXELS * SDF_PAGE_TEXELS * SDF_PAGE_TEXELS) / SDF_PAGE_UPDATE_THREADS)
 
 float Dot2(float3 v) { return dot(v, v); }
 
@@ -62,23 +62,23 @@ float TriangleDistanceSq(float3 p, float3 a, float3 b, float3 c)
 
 uint3 GetLocalTexel(uint thread, uint index)
 {
-	const uint texel = thread + index * BRICK_UPDATE_THREADS;
+	const uint texel = thread + index * SDF_PAGE_UPDATE_THREADS;
 
-	return uint3(texel & (BRICK_TEXELS - 1), (texel / BRICK_TEXELS) & (BRICK_TEXELS - 1), texel / (BRICK_TEXELS * BRICK_TEXELS));
+	return uint3(texel & (SDF_PAGE_TEXELS - 1), (texel / SDF_PAGE_TEXELS) & (SDF_PAGE_TEXELS - 1), texel / (SDF_PAGE_TEXELS * SDF_PAGE_TEXELS));
 }
 
-[numthreads(BRICK_UPDATE_THREADS, 1, 1)]
+[numthreads(SDF_PAGE_UPDATE_THREADS, 1, 1)]
 void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 {
-	const uint job_index = group.x + group.y * BRICK_UPDATE_COLUMNS;
+	const uint job_index = group.x + group.y * SDF_PAGE_UPDATE_COLUMNS;
 
 	if (job_index >= Consts.vInfo.x) {
 		return;
 	}
 
-	const BrickJob job = bJobs[job_index];
+	const SDFPageJob job = bJobs[job_index];
 
-	if (and(job.uiRefCount > 0, job.uiAtlas < BRICK_PENDING)) {
+	if (and(job.uiRefCount > 0, job.uiAtlas < SDF_PAGE_PENDING)) {
 		const float texel_size = job.vOriginAndTexel.w;
 		const float3 origin = job.vOriginAndTexel.xyz;
 
@@ -93,7 +93,7 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 
 		[loop]
 		for (uint ref = 0; ref < job.uiRefCount; ref++) {
-			const BrickTriangle triangle = bTriangles[bRefs[job.uiFirstRef + ref]];
+			const SDFPageTriangle triangle = bTriangles[bRefs[job.uiFirstRef + ref]];
 
 			[unroll]
 			for (uint index = 0; index < TEXELS_PER_THREAD; index++) {
@@ -102,8 +102,8 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 			}
 		}
 
-		const float margin = texel_size * BRICK_TEXELS * Consts.vParams.x;
-		const uint3 atlas_origin = uint3(BrickAtlasOrigin(job.uiAtlas));
+		const float margin = texel_size * SDF_PAGE_TEXELS * Consts.vParams.x;
+		const uint3 atlas_origin = uint3(SDFPageAtlasOrigin(job.uiAtlas));
 
 		[unroll]
 		for (uint index = 0; index < TEXELS_PER_THREAD; index++) {

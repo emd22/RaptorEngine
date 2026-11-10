@@ -1,4 +1,4 @@
-#include "BrickScene.hpp"
+#include "SDFPageScene.hpp"
 
 #include "Backend/BarrierHelper.hpp"
 #include "Backend/DescriptorCache.hpp"
@@ -29,17 +29,17 @@ constexpr uint32 scLogInterval = 120;
 constexpr uint8 scDirtyIndirection = 1;
 constexpr uint8 scDirtyEval = 2;
 
-struct BrickUpdateConsts
+struct SDFPageUpdateConsts
 {
-	/// Job count, then the atlas size in bricks
+	/// Job count, then the atlas size in pages
 	uint32 Info[4] = {};
-	/// Margin as a fraction of a brick
+	/// Margin as a fraction of a page
 	float32 Params[4] = {};
 };
 
-struct BrickDebugConsts
+struct SDFPageDebugConsts
 {
-	BrickSceneGpu Scene;
+	SDFPageSceneGpu Scene;
 	float32 InvViewProjection[16] = {};
 	float32 EyePosition[4] = {};
 	/// Target width and height, view, frame
@@ -48,11 +48,11 @@ struct BrickDebugConsts
 	float32 Params[4] = {};
 };
 
-static_assert(sizeof(BrickLevelGpu) == 32);
-static_assert(sizeof(BrickSceneGpu) == 192);
-static_assert(sizeof(CompiledMapBrickTriangle) == 48);
-static_assert(sizeof(BrickUpdateConsts) == 32);
-static_assert(sizeof(BrickDebugConsts) == 192 + 64 + 16 + 16 + 16);
+static_assert(sizeof(SDFPageLevelGpu) == 32);
+static_assert(sizeof(SDFPageSceneGpu) == 192);
+static_assert(sizeof(CompiledMapSDFPageTriangle) == 48);
+static_assert(sizeof(SDFPageUpdateConsts) == 32);
+static_assert(sizeof(SDFPageDebugConsts) == 192 + 64 + 16 + 16 + 16);
 
 /// Every buffer binding is dynamic, so each takes an offset in binding order
 void AddZeroOffsets(uint32 count)
@@ -81,7 +81,7 @@ void ComputeBarrier(const CommandBuffer& cmd)
 	vkCmdPipelineBarrier2(cmd.Cmd, &dep_info);
 }
 
-/// The atlas keeps its bricks between frames, so its layout changes must not discard them
+/// The atlas keeps its pages between frames, so its layout changes must not discard them
 void AtlasTransition(const CommandBuffer& cmd, Image* atlas, VkImageLayout from, VkImageLayout to)
 {
 	const VkImageMemoryBarrier2 barrier {
@@ -111,7 +111,7 @@ int32 FloorDiv(float32 value, float32 size) { return static_cast<int32>(std::flo
 
 } // namespace
 
-void BrickScene::CreateBuffer(RawGpuBuffer& buffer, uint64 size, const void* data)
+void SDFPageScene::CreateBuffer(RawGpuBuffer& buffer, uint64 size, const void* data)
 {
 	buffer.Destroy();
 
@@ -131,7 +131,7 @@ void BrickScene::CreateBuffer(RawGpuBuffer& buffer, uint64 size, const void* dat
 	buffer.FlushToGpu(0, static_cast<uint32>(buffer_size));
 }
 
-void BrickScene::Create()
+void SDFPageScene::Create()
 {
 	CreateBuffer(mRefs, 0, nullptr);
 	CreateBuffer(mTriangles, 0, nullptr);
@@ -146,21 +146,21 @@ void BrickScene::Create()
 				  VMA_MEMORY_USAGE_GPU_TO_CPU, eGpuBufferFlags::PersistentMapped | eGpuBufferFlags::TransferReceiver);
 
 	mpAtlas = gTextureManager->NewTexture();
-	mpAtlas->CreateVolume(Vec2u(scAtlasBricksX * scTexelsPerBrick, scAtlasBricksY * scTexelsPerBrick),
-						  scAtlasBricksZ * scTexelsPerBrick, eImageFormat::R8_UNorm,
+	mpAtlas->CreateVolume(Vec2u(scAtlasSDFPagesX * scTexelsPerSDFPage, scAtlasSDFPagesY * scTexelsPerSDFPage),
+						  scAtlasSDFPagesZ * scTexelsPerSDFPage, eImageFormat::R8_UNorm,
 						  VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 	mbAtlasInitialized = false;
 
-	mFreeAtlas.InitCapacity(scAtlasBrickCount);
+	mFreeAtlas.InitCapacity(scAtlasSDFPageCount);
 
 	for (uint32 level = 0; level < scMaxLevels; level++) {
 		mLevels[level].SlotAtlas.InitSize(scSlotsPerLevel, scEmpty);
-		mLevels[level].SlotBrick.InitSize(scSlotsPerLevel, scEmpty);
+		mLevels[level].SlotSDFPage.InitSize(scSlotsPerLevel, scEmpty);
 		mLevels[level].SlotDirty.InitSize(scSlotsPerLevel, 0);
 	}
 }
 
-void BrickScene::CreatePipelines(Target* depth, Target* normals, Target* motion, Target* lit)
+void SDFPageScene::CreatePipelines(Target* depth, Target* normals, Target* motion, Target* lit)
 {
 	Sampler* linear_sampler = gSamplerCache->Request(SamplerProps {
 		eSamplerFilter::Linear,
@@ -176,8 +176,8 @@ void BrickScene::CreatePipelines(Target* depth, Target* normals, Target* motion,
 		eSamplerAddressMode::ClampToEdge,
 	});
 
-	gPSOBuild->BeginPipeline(ePipelineName::BrickUpdate);
-	gPSOBuild->SetShader(eShaderName::BrickUpdate, {});
+	gPSOBuild->BeginPipeline(ePipelineName::SDFPageUpdate);
+	gPSOBuild->SetShader(eShaderName::SDFPageUpdate, {});
 	gPSOBuild->AddBuffer(0, 0, eShaderType::Compute, &mJobs, 0, static_cast<uint64>(scMaxJobsPerFrame) * sizeof(Job));
 	gPSOBuild->AddBuffer(1, 0, eShaderType::Compute, &mRefs, 0, VK_WHOLE_SIZE);
 	gPSOBuild->AddBuffer(2, 0, eShaderType::Compute, &mTriangles, 0, VK_WHOLE_SIZE);
@@ -186,8 +186,8 @@ void BrickScene::CreatePipelines(Target* depth, Target* normals, Target* motion,
 	gPSOBuild->AddFrameData(1);
 	gPSOBuild->EndPipeline();
 
-	gPSOBuild->BeginPipeline(ePipelineName::BrickDebug);
-	gPSOBuild->SetShader(eShaderName::BrickDebug, {});
+	gPSOBuild->BeginPipeline(ePipelineName::SDFPageDebug);
+	gPSOBuild->SetShader(eShaderName::SDFPageDebug, {});
 	gPSOBuild->AddBuffer(0, 0, eShaderType::Compute, &mIndirection, 0, VK_WHOLE_SIZE);
 	gPSOBuild->AddImage(1, 0, eShaderType::Compute, mpAtlas, linear_sampler);
 	gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Compute, depth, point_sampler);
@@ -199,7 +199,7 @@ void BrickScene::CreatePipelines(Target* depth, Target* normals, Target* motion,
 	gPSOBuild->EndPipeline();
 }
 
-void BrickScene::Destroy()
+void SDFPageScene::Destroy()
 {
 	mRefs.Destroy();
 	mTriangles.Destroy();
@@ -210,43 +210,43 @@ void BrickScene::Destroy()
 	mbActive = false;
 }
 
-bool BrickScene::Upload(const CompiledMapBricks& bricks)
+bool SDFPageScene::Upload(const CompiledMapSDFPages& pages)
 {
-	if (bricks.IsEmpty()) {
+	if (pages.IsEmpty()) {
 		Clear();
 		return false;
 	}
 
 	gGraphics->GetDevice()->WaitForIdle();
 
-	CreateBuffer(mRefs, bricks.Refs.GetSizeInBytes(), bricks.Refs.pData);
-	CreateBuffer(mTriangles, bricks.Triangles.GetSizeInBytes(), bricks.Triangles.pData);
+	CreateBuffer(mRefs, pages.Refs.GetSizeInBytes(), pages.Refs.pData);
+	CreateBuffer(mTriangles, pages.Triangles.GetSizeInBytes(), pages.Triangles.pData);
 
 	const RawGpuBuffer* buffers[] = { &mRefs, &mTriangles };
 
 	gDescriptorCache->RebuildUsing(Slice<const RawGpuBuffer* const>(buffers, std::size(buffers)),
 								   Slice<Image* const>(nullptr, 0));
 
-	mBricks.Free();
-	mBricks.InitSize(bricks.Bricks.Size);
-	memcpy(mBricks.pData, bricks.Bricks.pData, bricks.Bricks.GetSizeInBytes());
+	mSDFPages.Free();
+	mSDFPages.InitSize(pages.SDFPages.Size);
+	memcpy(mSDFPages.pData, pages.SDFPages.pData, pages.SDFPages.GetSizeInBytes());
 
-	mLevelCount = std::min(static_cast<uint32>(bricks.Levels.Size), scMaxLevels);
-	mMarginScale = bricks.MarginScale;
+	mLevelCount = std::min(static_cast<uint32>(pages.Levels.Size), scMaxLevels);
+	mMarginScale = pages.MarginScale;
 
 	for (uint32 level_index = 0; level_index < mLevelCount; level_index++) {
-		const CompiledMapBrickLevel& source = bricks.Levels[level_index];
+		const CompiledMapSDFPageLevel& source = pages.Levels[level_index];
 		Level& level = mLevels[level_index];
 
-		level.BrickSize = source.BrickSize;
-		level.FirstBrick = source.FirstBrick;
-		level.BrickCount = source.BrickCount;
+		level.SDFPageSize = source.SDFPageSize;
+		level.FirstSDFPage = source.FirstSDFPage;
+		level.SDFPageCount = source.SDFPageCount;
 		level.bPlaced = false;
 	}
 
 	mFreeAtlas.Clear();
 
-	for (uint32 atlas = scAtlasBrickCount; atlas > 0; atlas--) {
+	for (uint32 atlas = scAtlasSDFPageCount; atlas > 0; atlas--) {
 		mFreeAtlas.Insert(atlas - 1);
 	}
 
@@ -255,7 +255,7 @@ bool BrickScene::Upload(const CompiledMapBricks& bricks)
 
 		for (uint32 slot = 0; slot < scSlotsPerLevel; slot++) {
 			level.SlotAtlas[slot] = scEmpty;
-			level.SlotBrick[slot] = scEmpty;
+			level.SlotSDFPage[slot] = scEmpty;
 			level.SlotDirty[slot] = 0;
 		}
 
@@ -266,20 +266,20 @@ bool BrickScene::Upload(const CompiledMapBricks& bricks)
 	mDirty.Clear();
 	mbActive = true;
 
-	uint64 total_bricks = 0;
+	uint64 total_sdf_pages = 0;
 
 	for (uint32 level_index = 0; level_index < mLevelCount; level_index++) {
-		total_bricks += mLevels[level_index].BrickCount;
+		total_sdf_pages += mLevels[level_index].SDFPageCount;
 	}
 
-	LogInfo(LC_RENDER, "Brick scene: {} levels, {} bricks, {} triangles ({:.1f} MB)", mLevelCount, total_bricks,
-			bricks.Triangles.Size,
-			static_cast<double>(bricks.Triangles.GetSizeInBytes() + bricks.Refs.GetSizeInBytes()) / (1024.0 * 1024.0));
+	LogInfo(LC_RENDER, "SDF page scene: {} levels, {} pages, {} triangles ({:.1f} MB)", mLevelCount, total_sdf_pages,
+			pages.Triangles.Size,
+			static_cast<double>(pages.Triangles.GetSizeInBytes() + pages.Refs.GetSizeInBytes()) / (1024.0 * 1024.0));
 
 	return true;
 }
 
-void BrickScene::Clear()
+void SDFPageScene::Clear()
 {
 	if (!mbActive) {
 		return;
@@ -288,22 +288,22 @@ void BrickScene::Clear()
 	gGraphics->GetDevice()->WaitForIdle();
 
 	mbActive = false;
-	mBricks.Free();
+	mSDFPages.Free();
 	mLevelCount = 0;
 }
 
-uint32 BrickScene::GetSlot(const int32 coord[3]) const
+uint32 SDFPageScene::GetSlot(const int32 coord[3]) const
 {
-	constexpr uint32 scMask = scClipBricks - 1;
+	constexpr uint32 scMask = scClipSDFPages - 1;
 
 	const uint32 x = static_cast<uint32>(coord[0]) & scMask;
 	const uint32 y = static_cast<uint32>(coord[1]) & scMask;
 	const uint32 z = static_cast<uint32>(coord[2]) & scMask;
 
-	return x + y * scClipBricks + z * scClipBricks * scClipBricks;
+	return x + y * scClipSDFPages + z * scClipSDFPages * scClipSDFPages;
 }
 
-uint32 BrickScene::GetPendingCount() const
+uint32 SDFPageScene::GetPendingCount() const
 {
 	uint32 count = 0;
 
@@ -314,22 +314,22 @@ uint32 BrickScene::GetPendingCount() const
 	return count;
 }
 
-void BrickScene::FindBrickRange(const Level& level, int32 min_x, int32 max_x, uint32& out_begin,
+void SDFPageScene::FindSDFPageRange(const Level& level, int32 min_x, int32 max_x, uint32& out_begin,
 								uint32& out_end) const
 {
-	const CompiledMapBrick* first = mBricks.pData + level.FirstBrick;
-	const CompiledMapBrick* last = first + level.BrickCount;
+	const CompiledMapSDFPage* first = mSDFPages.pData + level.FirstSDFPage;
+	const CompiledMapSDFPage* last = first + level.SDFPageCount;
 
-	const CompiledMapBrick* begin = std::lower_bound(first, last, min_x, [](const CompiledMapBrick& brick, int32 x)
-													 { return brick.Coord[0] < x; });
-	const CompiledMapBrick* end = std::lower_bound(begin, last, max_x, [](const CompiledMapBrick& brick, int32 x)
-												   { return brick.Coord[0] < x; });
+	const CompiledMapSDFPage* begin = std::lower_bound(first, last, min_x, [](const CompiledMapSDFPage& page, int32 x)
+													 { return page.Coord[0] < x; });
+	const CompiledMapSDFPage* end = std::lower_bound(begin, last, max_x, [](const CompiledMapSDFPage& page, int32 x)
+												   { return page.Coord[0] < x; });
 
-	out_begin = static_cast<uint32>(begin - mBricks.pData);
-	out_end = static_cast<uint32>(end - mBricks.pData);
+	out_begin = static_cast<uint32>(begin - mSDFPages.pData);
+	out_end = static_cast<uint32>(end - mSDFPages.pData);
 }
 
-void BrickScene::MarkDirty(uint32 level_index, uint32 slot, uint8 value)
+void SDFPageScene::MarkDirty(uint32 level_index, uint32 slot, uint8 value)
 {
 	Level& level = mLevels[level_index];
 
@@ -340,17 +340,17 @@ void BrickScene::MarkDirty(uint32 level_index, uint32 slot, uint8 value)
 	level.SlotDirty[slot] = std::max(level.SlotDirty[slot], value);
 }
 
-void BrickScene::FreeSlot(Level& level, uint32 slot)
+void SDFPageScene::FreeSlot(Level& level, uint32 slot)
 {
 	if (level.SlotAtlas[slot] != scEmpty) {
 		mFreeAtlas.Insert(level.SlotAtlas[slot]);
 		level.SlotAtlas[slot] = scEmpty;
 	}
 
-	level.SlotBrick[slot] = scEmpty;
+	level.SlotSDFPage[slot] = scEmpty;
 }
 
-void BrickScene::ResetLevel(uint32 level_index)
+void SDFPageScene::ResetLevel(uint32 level_index)
 {
 	Level& level = mLevels[level_index];
 
@@ -374,16 +374,16 @@ void BrickScene::ResetLevel(uint32 level_index)
 	mDirty.Size = kept;
 }
 
-bool BrickScene::PlaceLevel(uint32 level_index, const Vec3f& center)
+bool SDFPageScene::PlaceLevel(uint32 level_index, const Vec3f& center)
 {
 	Level& level = mLevels[level_index];
 
-	constexpr int32 scHalfClip = static_cast<int32>(scClipBricks / 2);
+	constexpr int32 scHalfClip = static_cast<int32>(scClipSDFPages / 2);
 
 	const int32 new_origin[3] = {
-		FloorDiv(center.X, level.BrickSize) - scHalfClip,
-		FloorDiv(center.Y, level.BrickSize) - scHalfClip,
-		FloorDiv(center.Z, level.BrickSize) - scHalfClip,
+		FloorDiv(center.X, level.SDFPageSize) - scHalfClip,
+		FloorDiv(center.Y, level.SDFPageSize) - scHalfClip,
+		FloorDiv(center.Z, level.SDFPageSize) - scHalfClip,
 	};
 
 	const bool was_placed = level.bPlaced;
@@ -395,13 +395,13 @@ bool BrickScene::PlaceLevel(uint32 level_index, const Vec3f& center)
 	}
 
 	for (uint32 axis = 0; axis < 3; axis++) {
-		if (std::abs(new_origin[axis] - level.Origin[axis]) >= static_cast<int32>(scClipBricks)) {
+		if (std::abs(new_origin[axis] - level.Origin[axis]) >= static_cast<int32>(scClipSDFPages)) {
 			reset = true;
 		}
 	}
 
 	const int32 old_origin[3] = { level.Origin[0], level.Origin[1], level.Origin[2] };
-	const int32 clip = static_cast<int32>(scClipBricks);
+	const int32 clip = static_cast<int32>(scClipSDFPages);
 
 	const auto is_inside = [clip](const int32 coord[3], const int32 origin[3])
 	{
@@ -415,10 +415,10 @@ bool BrickScene::PlaceLevel(uint32 level_index, const Vec3f& center)
 	else {
 		uint32 begin = 0;
 		uint32 end = 0;
-		FindBrickRange(level, old_origin[0], old_origin[0] + clip, begin, end);
+		FindSDFPageRange(level, old_origin[0], old_origin[0] + clip, begin, end);
 
-		for (uint32 brick = begin; brick < end; brick++) {
-			const int32* coord = mBricks[brick].Coord;
+		for (uint32 page = begin; page < end; page++) {
+			const int32* coord = mSDFPages[page].Coord;
 
 			if (is_inside(coord, old_origin) && !is_inside(coord, new_origin)) {
 				const uint32 slot = GetSlot(coord);
@@ -436,10 +436,10 @@ bool BrickScene::PlaceLevel(uint32 level_index, const Vec3f& center)
 
 	uint32 begin = 0;
 	uint32 end = 0;
-	FindBrickRange(level, new_origin[0], new_origin[0] + clip, begin, end);
+	FindSDFPageRange(level, new_origin[0], new_origin[0] + clip, begin, end);
 
-	for (uint32 brick = begin; brick < end; brick++) {
-		const int32* coord = mBricks[brick].Coord;
+	for (uint32 page = begin; page < end; page++) {
+		const int32* coord = mSDFPages[page].Coord;
 
 		if (!is_inside(coord, new_origin) || (!reset && is_inside(coord, old_origin))) {
 			continue;
@@ -447,7 +447,7 @@ bool BrickScene::PlaceLevel(uint32 level_index, const Vec3f& center)
 
 		const uint32 slot = GetSlot(coord);
 
-		level.SlotBrick[slot] = brick;
+		level.SlotSDFPage[slot] = page;
 		level.Pending.Insert(slot);
 		MarkDirty(level_index, slot, scDirtyIndirection);
 	}
@@ -455,35 +455,35 @@ bool BrickScene::PlaceLevel(uint32 level_index, const Vec3f& center)
 	return reset;
 }
 
-void BrickScene::GetSceneConsts(BrickSceneGpu& out_consts) const
+void SDFPageScene::GetSceneConsts(SDFPageSceneGpu& out_consts) const
 {
-	out_consts = BrickSceneGpu {};
+	out_consts = SDFPageSceneGpu {};
 
 	for (uint32 level_index = 0; level_index < mLevelCount; level_index++) {
 		const Level& level = mLevels[level_index];
-		BrickLevelGpu& gpu = out_consts.Levels[level_index];
+		SDFPageLevelGpu& gpu = out_consts.Levels[level_index];
 
 		gpu.Origin[0] = level.Origin[0];
 		gpu.Origin[1] = level.Origin[1];
 		gpu.Origin[2] = level.Origin[2];
 
-		gpu.Params[0] = level.BrickSize;
-		gpu.Params[1] = 1.0f / level.BrickSize;
-		gpu.Params[2] = level.BrickSize * mMarginScale;
-		gpu.Params[3] = level.BrickSize / static_cast<float32>(scTexelsPerBrick);
+		gpu.Params[0] = level.SDFPageSize;
+		gpu.Params[1] = 1.0f / level.SDFPageSize;
+		gpu.Params[2] = level.SDFPageSize * mMarginScale;
+		gpu.Params[3] = level.SDFPageSize / static_cast<float32>(scTexelsPerSDFPage);
 	}
 
 	out_consts.Info[0] = mLevelCount;
-	out_consts.Info[1] = scAtlasBricksX;
-	out_consts.Info[2] = scAtlasBricksY;
-	out_consts.Info[3] = scAtlasBricksZ;
+	out_consts.Info[1] = scAtlasSDFPagesX;
+	out_consts.Info[2] = scAtlasSDFPagesY;
+	out_consts.Info[3] = scAtlasSDFPagesZ;
 
-	out_consts.InvAtlasSize[0] = 1.0f / static_cast<float32>(scAtlasBricksX * scTexelsPerBrick);
-	out_consts.InvAtlasSize[1] = 1.0f / static_cast<float32>(scAtlasBricksY * scTexelsPerBrick);
-	out_consts.InvAtlasSize[2] = 1.0f / static_cast<float32>(scAtlasBricksZ * scTexelsPerBrick);
+	out_consts.InvAtlasSize[0] = 1.0f / static_cast<float32>(scAtlasSDFPagesX * scTexelsPerSDFPage);
+	out_consts.InvAtlasSize[1] = 1.0f / static_cast<float32>(scAtlasSDFPagesY * scTexelsPerSDFPage);
+	out_consts.InvAtlasSize[2] = 1.0f / static_cast<float32>(scAtlasSDFPagesZ * scTexelsPerSDFPage);
 }
 
-void BrickScene::Update(CommandBuffer& cmd, const Vec3f& center, uint32 eval_budget)
+void SDFPageScene::Update(CommandBuffer& cmd, const Vec3f& center, uint32 eval_budget)
 {
 	if (!mbActive) {
 		return;
@@ -506,7 +506,7 @@ void BrickScene::Update(CommandBuffer& cmd, const Vec3f& center, uint32 eval_bud
 		while (level.PendingRead < level.Pending.Size && evaluated < eval_budget && !mFreeAtlas.IsEmpty()) {
 			const uint32 slot = level.Pending[level.PendingRead++];
 
-			if (level.SlotBrick[slot] == scEmpty || level.SlotAtlas[slot] != scEmpty) {
+			if (level.SlotSDFPage[slot] == scEmpty || level.SlotAtlas[slot] != scEmpty) {
 				continue;
 			}
 
@@ -549,17 +549,17 @@ void BrickScene::Update(CommandBuffer& cmd, const Vec3f& center, uint32 eval_bud
 			job.Atlas = level.SlotAtlas[slot];
 
 			if (level.SlotDirty[slot] == scDirtyEval) {
-				const CompiledMapBrick& brick = mBricks[level.SlotBrick[slot]];
+				const CompiledMapSDFPage& page = mSDFPages[level.SlotSDFPage[slot]];
 
-				job.FirstRef = brick.FirstRef;
-				job.RefCount = brick.RefCount;
-				job.OriginAndTexel[0] = static_cast<float32>(brick.Coord[0]) * level.BrickSize;
-				job.OriginAndTexel[1] = static_cast<float32>(brick.Coord[1]) * level.BrickSize;
-				job.OriginAndTexel[2] = static_cast<float32>(brick.Coord[2]) * level.BrickSize;
-				job.OriginAndTexel[3] = level.BrickSize / static_cast<float32>(scTexelsPerBrick);
+				job.FirstRef = page.FirstRef;
+				job.RefCount = page.RefCount;
+				job.OriginAndTexel[0] = static_cast<float32>(page.Coord[0]) * level.SDFPageSize;
+				job.OriginAndTexel[1] = static_cast<float32>(page.Coord[1]) * level.SDFPageSize;
+				job.OriginAndTexel[2] = static_cast<float32>(page.Coord[2]) * level.SDFPageSize;
+				job.OriginAndTexel[3] = level.SDFPageSize / static_cast<float32>(scTexelsPerSDFPage);
 			}
 		}
-		else if (level.SlotBrick[slot] != scEmpty) {
+		else if (level.SlotSDFPage[slot] != scEmpty) {
 			job.Atlas = scPending;
 		}
 
@@ -598,15 +598,15 @@ void BrickScene::Update(CommandBuffer& cmd, const Vec3f& center, uint32 eval_bud
 	AtlasTransition(cmd, mpAtlas, atlas_from, VK_IMAGE_LAYOUT_GENERAL);
 	mbAtlasInitialized = true;
 
-	BrickUpdateConsts consts {
-		.Info = { job_count, scAtlasBricksX, scAtlasBricksY, scAtlasBricksZ },
+	SDFPageUpdateConsts consts {
+		.Info = { job_count, scAtlasSDFPagesX, scAtlasSDFPagesY, scAtlasSDFPagesZ },
 		.Params = { mMarginScale, 0.0f, 0.0f, 0.0f },
 	};
 
 	gPipelineCache->AddBufferOffset(0, frame * scMaxJobsPerFrame * sizeof(Job));
 	AddZeroOffsets(3);
 	gPipelineCache->SetFrameData(gGraphics->FrameAlloc.Push(consts));
-	gPipelineCache->Bind(ePipelineName::BrickUpdate, cmd);
+	gPipelineCache->Bind(ePipelineName::SDFPageUpdate, cmd);
 
 	const uint32 columns = std::min(job_count, scUpdateGroupColumns);
 	const uint32 rows = (job_count + scUpdateGroupColumns - 1) / scUpdateGroupColumns;
@@ -617,7 +617,7 @@ void BrickScene::Update(CommandBuffer& cmd, const Vec3f& center, uint32 eval_bud
 	ComputeBarrier(cmd);
 }
 
-void BrickScene::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDebugView view, float32 cone_slope, float32 ray_length)
+void SDFPageScene::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDebugView view, float32 cone_slope, float32 ray_length)
 {
 	if (!mbActive || !mbAtlasInitialized || view == eDebugView::None) {
 		return;
@@ -630,7 +630,7 @@ void BrickScene::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDebu
 	mStats.InvalidateFromGpu();
 
 	if (view == eDebugView::DepthCheck) {
-		mCheckStats = BrickCheckStats {
+		mCheckStats = SDFPageCheckStats {
 			.Match = stats[0],
 			.Early = stats[1],
 			.Late = stats[2],
@@ -644,15 +644,15 @@ void BrickScene::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDebu
 	const uint32 max_step_rays = stats[7];
 
 	if ((mDebugFrame++ % scLogInterval) == 0) {
-		const BrickCheckStats& check = mCheckStats;
+		const SDFPageCheckStats& check = mCheckStats;
 		const double surfaces = std::max(1.0, static_cast<double>(check.Match + check.Early + check.Late));
 
 		LogInfo(LC_RENDER,
-				"Bricks: view {} cone {:.3f}, {} resident, {} pending, update {:.3f} ms, debug {:.3f} ms, {} rays, "
+				"SDFPages: view {} cone {:.3f}, {} resident, {} pending, update {:.3f} ms, debug {:.3f} ms, {} rays, "
 				"{:.1f} steps, {} at the step limit, check {:.2f}% match {:.2f}% early {:.2f}% late ({} surface, {} "
 				"sky, {} skipped pixels)",
 				static_cast<uint32>(view), cone_slope, GetResidentCount(), GetPendingCount(),
-				gGraphics->Profiler.GetMs(eGpuMarker::BrickScene), gGraphics->Profiler.GetMs(eGpuMarker::BrickDebug),
+				gGraphics->Profiler.GetMs(eGpuMarker::SDFPageScene), gGraphics->Profiler.GetMs(eGpuMarker::SDFPageDebug),
 				ray_count, mean_steps, max_step_rays,
 				100.0 * check.Match / surfaces, 100.0 * check.Early / surfaces, 100.0 * check.Late / surfaces,
 				check.Match + check.Early + check.Late, check.Sky, check.Skipped);
@@ -661,7 +661,7 @@ void BrickScene::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDebu
 	vkCmdFillBuffer(cmd.Get(), mStats.Buffer, static_cast<VkDeviceSize>(frame) * scStatCount * sizeof(uint32),
 					scStatCount * sizeof(uint32), 0);
 
-	BrickDebugConsts consts;
+	SDFPageDebugConsts consts;
 	GetSceneConsts(consts.Scene);
 
 	const Mat4f inverse = camera.GetCameraMatrix(eObjectLayer::WorldLayer).Inverse();
@@ -689,7 +689,7 @@ void BrickScene::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDebu
 	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->AddBufferOffset(0, frame * scStatCount * sizeof(uint32));
 	gPipelineCache->SetFrameData(gGraphics->FrameAlloc.Push(consts));
-	gPipelineCache->Bind(ePipelineName::BrickDebug, cmd);
+	gPipelineCache->Bind(ePipelineName::SDFPageDebug, cmd);
 
 	vkCmdDispatch(cmd.Get(), (extent.X + scDebugGroupSize - 1) / scDebugGroupSize,
 				  (extent.Y + scDebugGroupSize - 1) / scDebugGroupSize, 1);

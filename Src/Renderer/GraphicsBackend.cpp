@@ -211,7 +211,7 @@ void GraphicsBackend::Init(Vec2u window_size)
 			Slice<const uint8>(reinterpret_cast<const uint8*>(black_irradiance), sizeof(black_irradiance)));
 
 		Transport.Create();
-		Bricks.Create();
+		SDFPages.Create();
 	}
 
 	{
@@ -1386,9 +1386,9 @@ void GraphicsBackend::DoComposition(PerspectiveCamera& render_cam)
 		MarkGpu(eGpuMarker::ProbeCapture);
 	}
 
-	if (BrickDebugView != BrickScene::eDebugView::None) {
-		Bricks.RenderDebug(frame->CmdBuffer, render_cam, BrickDebugView, BrickDebugCone, BrickDebugRayLength);
-		MarkGpu(eGpuMarker::BrickDebug);
+	if (SDFPageDebugView != SDFPageScene::eDebugView::None) {
+		SDFPages.RenderDebug(frame->CmdBuffer, render_cam, SDFPageDebugView, SDFPageDebugCone, SDFPageDebugRayLength);
+		MarkGpu(eGpuMarker::SDFPageDebug);
 	}
 
 	pRenderer->CompPass.Begin(frame->CmdBuffer);
@@ -1560,7 +1560,7 @@ void GraphicsBackend::Destroy()
 	DecalMaskBuffer.Destroy();
 	ProbeBuffer.Destroy();
 	Transport.Destroy();
-	Bricks.Destroy();
+	SDFPages.Destroy();
 	ProbeVolumeBuffer.Destroy();
 	ProbeGridBuffer.Destroy();
 	ReflectionProbeBuffer.Destroy();

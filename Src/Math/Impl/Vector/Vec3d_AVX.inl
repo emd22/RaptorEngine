@@ -25,6 +25,8 @@ FX_FORCE_INLINE Vec3d::Vec3d(const Vec3f other) { mIntrin = _mm256_cvtps_pd(othe
 // Operator overloads
 /////////////////////////////////////
 
+FX_FORCE_INLINE Vec3d Vec3d::operator-() const { return _mm256_xor_pd(mIntrin, _mm256_set1_pd(-0.0)); }
+
 FX_FORCE_INLINE Vec3d Vec3d::operator+(const Vec3d& other) const
 {
 	return Vec3d(_mm256_add_pd(mIntrin, other.mIntrin));
