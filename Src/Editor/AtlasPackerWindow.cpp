@@ -39,7 +39,7 @@ public:
 		mpLayout = layout;
 		mSelectedGroup = selected_group;
 
-		const Vec2i pixel_size = layout->GetPixelSize();
+		const IVec2 pixel_size = layout->GetPixelSize();
 
 		if (pixels.pData == nullptr || pixel_size.X <= 0 || pixel_size.Y <= 0) {
 			mBitmap = wxBitmap();
@@ -341,7 +341,7 @@ void AtlasPackerWindow::Repack()
 
 	RebuildRows();
 
-	const Vec2i pixel_size = mLayout.GetPixelSize();
+	const IVec2 pixel_size = mLayout.GetPixelSize();
 	const bool too_large = pixel_size.X > scMaxAtlasDimension || pixel_size.Y > scMaxAtlasDimension;
 
 	if (too_large) {

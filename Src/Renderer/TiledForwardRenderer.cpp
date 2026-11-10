@@ -40,7 +40,7 @@ namespace fx::renderer {
 
 FX_SET_MODULE_NAME("DeferredRenderer")
 
-void TiledForwardRenderer::Create(const Vec2u& extent)
+void TiledForwardRenderer::Create(const UVec2& extent)
 {
 	DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10);
 	DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 20);
@@ -56,10 +56,9 @@ void TiledForwardRenderer::Create(const Vec2u& extent)
 	CreateParticlePSO();
 	CreateFogPSO();
 	gGraphics->Transport.CreatePipelines();
-	gGraphics->SDFPages.CreatePipelines(Prepass.GetTarget(eImageFormat::D32_Float),
-									  Prepass.GetTarget(eImageFormat::RGBA16_Float),
-									  Prepass.GetTarget(eImageFormat::RG16_Float),
-									  ForwardPass.GetTarget(eImageFormat::RGBA16_Float));
+	gGraphics->SDFPages.CreatePipelines(
+		Prepass.GetTarget(eImageFormat::D32_Float), Prepass.GetTarget(eImageFormat::RGBA16_Float),
+		Prepass.GetTarget(eImageFormat::RG16_Float), ForwardPass.GetTarget(eImageFormat::RGBA16_Float));
 	CreateLightCullingPSO();
 	CreateDebugLayerPSO();
 	CreateDebugSolidPSO();
@@ -823,12 +822,12 @@ void TiledForwardRenderer::BuildLightCullingPipeline(ePipelineName name, bool de
 	gPSOBuild->EndPipeline();
 }
 
-void TiledForwardRenderer::DoLightCullingPass(BaseCamera& camera, const Vec2u* pExtentOverride,
+void TiledForwardRenderer::DoLightCullingPass(BaseCamera& camera, const UVec2* pExtentOverride,
 											  const LightCullOverride* pLightOverride)
 {
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
-	const Vec2u extent = (pExtentOverride != nullptr) ? *pExtentOverride : gGraphics->Swapchain.Extent;
+	const UVec2 extent = (pExtentOverride != nullptr) ? *pExtentOverride : gGraphics->Swapchain.Extent;
 
 	const uint32 tile_columns = std::min((extent.X + (Limits::LightTileSize - 1)) / Limits::LightTileSize,
 										 Limits::MaxScreenTilesX);
@@ -843,10 +842,10 @@ void TiledForwardRenderer::DoLightCullingPass(BaseCamera& camera, const Vec2u* p
 	mLightTileColumns = tile_columns;
 	mLightTileRows = tile_rows;
 
-	const Mat4f& cam_matrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
+	const FMat4& cam_matrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 
 	LightCullConstants consts {};
-	memcpy(consts.CameraMatrix, cam_matrix.RawData, sizeof(Mat4f));
+	memcpy(consts.CameraMatrix, cam_matrix.RawData, sizeof(FMat4));
 	consts.ScreenSize[0] = static_cast<float32>(extent.X);
 	consts.ScreenSize[1] = static_cast<float32>(extent.Y);
 
@@ -1066,13 +1065,13 @@ void TiledForwardRenderer::CreateFogPSO()
 
 	const VkImageUsageFlags volume_usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
-	FroxelLighting.CreateVolume(Vec2u(scFroxelGridX, scFroxelGridY), scFroxelGridZ + 1, eImageFormat::RGBA16_Float,
+	FroxelLighting.CreateVolume(UVec2(scFroxelGridX, scFroxelGridY), scFroxelGridZ + 1, eImageFormat::RGBA16_Float,
 								volume_usage | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
-	FroxelIntegrated.CreateVolume(Vec2u(scFroxelGridX, scFroxelGridY), scFroxelGridZ, eImageFormat::RGBA16_Float,
+	FroxelIntegrated.CreateVolume(UVec2(scFroxelGridX, scFroxelGridY), scFroxelGridZ, eImageFormat::RGBA16_Float,
 								  volume_usage);
-	FroxelHistory.CreateVolume(Vec2u(scFroxelGridX, scFroxelGridY), scFroxelGridZ + 1, eImageFormat::RGBA16_Float,
+	FroxelHistory.CreateVolume(UVec2(scFroxelGridX, scFroxelGridY), scFroxelGridZ + 1, eImageFormat::RGBA16_Float,
 							   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
-	FroxelSurface.CreateVolume(Vec2u(scFroxelGridX, scFroxelGridY), 1, eImageFormat::RGBA16_Float, volume_usage);
+	FroxelSurface.CreateVolume(UVec2(scFroxelGridX, scFroxelGridY), 1, eImageFormat::RGBA16_Float, volume_usage);
 
 	Sampler* point_sampler = gSamplerCache->Request(SamplerProps {
 		eSamplerFilter::Nearest,
@@ -1241,13 +1240,13 @@ uint32 TiledForwardRenderer::GetViewConstants(const BaseCamera& camera, eObjectL
 		consts.Flags |= eDrawFlags::NoDecals;
 	}
 
-	memcpy(consts.ViewProjection, camera.GetCameraMatrix(layer).RawData, sizeof(Mat4f));
+	memcpy(consts.ViewProjection, camera.GetCameraMatrix(layer).RawData, sizeof(FMat4));
 
 	if (&camera == mpMotionCamera && !is_probe_capture) {
-		memcpy(consts.PrevViewProjection, mMotionPrevViewProjection[static_cast<uint32>(layer)].RawData, sizeof(Mat4f));
+		memcpy(consts.PrevViewProjection, mMotionPrevViewProjection[static_cast<uint32>(layer)].RawData, sizeof(FMat4));
 	}
 	else {
-		memcpy(consts.PrevViewProjection, consts.ViewProjection, sizeof(Mat4f));
+		memcpy(consts.PrevViewProjection, consts.ViewProjection, sizeof(FMat4));
 	}
 
 	memcpy(consts.EyePosition, camera.GetPosition().mData, sizeof(float32) * 3);
@@ -1257,7 +1256,7 @@ uint32 TiledForwardRenderer::GetViewConstants(const BaseCamera& camera, eObjectL
 	consts.DepthParams[0] = projection[10];
 	consts.DepthParams[1] = projection[14];
 
-	consts.Time = static_cast<float32>(gGraphics->ShaderTime);
+	consts.Time = static_cast<float32>(gGraphics->TotalRunTime);
 
 	CachedViewConstants& cached = mCachedViews[static_cast<uint32>(layer)];
 	const uint32 generation = gGraphics->FrameAlloc.GetGeneration();
@@ -1278,7 +1277,7 @@ void TiledForwardRenderer::BeginViewMotion(const BaseCamera& camera)
 	const bool is_same_camera = (&camera == mpMotionCamera);
 
 	for (uint32 layer = 0; layer < 2; layer++) {
-		const Mat4f& view_projection = camera.GetCameraMatrix(static_cast<eObjectLayer>(layer));
+		const FMat4& view_projection = camera.GetCameraMatrix(static_cast<eObjectLayer>(layer));
 
 		if (is_same_camera) {
 			mMotionPrevViewProjection[layer] = mMotionViewProjection[layer];
@@ -1300,7 +1299,7 @@ void TiledForwardRenderer::RenderComposition(BaseCamera& camera)
 	const ePipelineName pipeline_name = (gGraphics->Tonemapper == 1) ? ePipelineName::CompositionAgx
 																	 : ePipelineName::Composition;
 
-	Vec2u& extent = gGraphics->Swapchain.Extent;
+	UVec2& extent = gGraphics->Swapchain.Extent;
 
 	CompositionConsts consts {
 		.FrameExtent = { extent.X, extent.Y },

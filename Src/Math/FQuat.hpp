@@ -3,7 +3,7 @@
 #include <Core/Defines.hpp>
 #include <Core/Serialize.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Vec4.hpp>
+#include <Math/FVec4.hpp>
 
 #ifdef FX_USE_NEON
 #include <arm_neon.h>
@@ -17,19 +17,19 @@ class Quat;
 
 namespace fx {
 
-class alignas(16) Quat
+class alignas(16) FQuat
 {
 public:
-	static const Quat scIdentity;
+	static const FQuat scIdentity;
 
 public:
-	Quat() = default;
-	Quat(float32 x, float32 y, float32 z, float32 w);
-	Quat(const float32* buffer);
-	Quat(const JPH::Quat& other);
+	FQuat() = default;
+	FQuat(float32 x, float32 y, float32 z, float32 w);
+	FQuat(const float32* buffer);
+	FQuat(const JPH::Quat& other);
 
-	static Quat FromAxisAngle(const FVec3 axis, float32 angle);
-	static Quat FromEulerAngles(const FVec3 angles);
+	static FQuat FromAxisAngle(const FVec3 axis, float32 angle);
+	static FQuat FromEulerAngles(const FVec3 angles);
 
 	FVec3 GetEulerAngles() const;
 
@@ -38,21 +38,21 @@ public:
 	 */
 	FX_FORCE_INLINE FVec3 GetDirection() const;
 
-	Quat operator*(const Quat other) const;
+	FQuat operator*(const FQuat other) const;
 
 	void FromJoltQuaternion(const JPH::Quat& quat);
 	void ToJoltQuaternion(JPH::Quat& quat) const;
 
-	FX_FORCE_INLINE bool IsCloseTo(const Quat other, const float32 tolerance = 0.0001) const;
+	FX_FORCE_INLINE bool IsCloseTo(const FQuat other, const float32 tolerance = 0.0001) const;
 	bool IsCloseTo(const JPH::Quat& other, const float32 tolerance = 0.0001) const;
 
-	FX_FORCE_INLINE Quat SLerp(const Quat dest, const float32 step) const;
-	FX_FORCE_INLINE void NLerpIP(const Quat dest, float32 step);
+	FX_FORCE_INLINE FQuat SLerp(const FQuat dest, const float32 step) const;
+	FX_FORCE_INLINE void NLerpIP(const FQuat dest, float32 step);
 
-	FX_FORCE_INLINE Quat Conjugate() const;
-	FX_FORCE_INLINE Quat Normalize() const;
+	FX_FORCE_INLINE FQuat Conjugate() const;
+	FX_FORCE_INLINE FQuat Normalize() const;
 
-	FX_FORCE_INLINE Quat& SmoothInterpolate(const Quat dest, const float speed, const float delta_time)
+	FX_FORCE_INLINE FQuat& SmoothInterpolate(const FQuat dest, const float speed, const float delta_time)
 	{
 		// Lerp with exp decay
 		NLerpIP(dest, 1.0f - expf(-speed * delta_time));
@@ -82,14 +82,14 @@ public:
 #endif
 
 #ifdef FX_USE_NEON
-	explicit Quat(float32x4_t intrin) : mIntrin(intrin) {}
+	explicit FQuat(float32x4_t intrin) : mIntrin(intrin) {}
 
-	FX_FORCE_INLINE Quat& operator=(const float32x4_t& other);
+	FX_FORCE_INLINE FQuat& operator=(const float32x4_t& other);
 
 #elif defined(FX_USE_AVX)
-	explicit Quat(__m128 intrin) : mIntrin(intrin) {}
+	explicit FQuat(__m128 intrin) : mIntrin(intrin) {}
 
-	FX_FORCE_INLINE Quat& operator=(const __m128 other);
+	FX_FORCE_INLINE FQuat& operator=(const __m128 other);
 
 #endif
 public:
@@ -119,19 +119,19 @@ public:
 } // namespace fx
 
 
-RS_ARRAY_TYPE(fx::Quat, fx::float32, 4)
+RS_ARRAY_TYPE(fx::FQuat, fx::float32, 4)
 
 template <>
-struct std::formatter<fx::Quat>
+struct std::formatter<fx::FQuat>
 {
 	auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-	auto format(const fx::Quat& obj, std::format_context& ctx) const
+	auto format(const fx::FQuat& obj, std::format_context& ctx) const
 	{
 		return std::format_to(ctx.out(), "({:.04}, {:.04}, {:.04}, {:.04})", obj.X, obj.Y, obj.Z, obj.W);
 	}
 };
 
 
-#include "Impl/Quaternion/Quat_AVX.inl"
-#include "Impl/Quaternion/Quat_Neon.inl"
+#include "Impl/Quaternion/FQuat_AVX.inl"
+#include "Impl/Quaternion/FQuat_Neon.inl"

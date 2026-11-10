@@ -11,8 +11,7 @@
 namespace fx::renderer {
 
 /**
- * @brief The index of the pipeline into the pipeline cache. Smaller than something like ObjectID, as it is intended to
- * be just the index and no other identifying information.
+ * @brief The index of the pipeline into the pipeline cache
  */
 struct PipelineHandle
 {
@@ -38,10 +37,13 @@ struct PipelineKey
 
 	/// Hash of the macros the shader was compiled with
 	Hash64 MacroHash = 0;
+
 	/// Blend state of each colour attachment
 	Hash64 BlendHash = 0;
+
 	/// Format and sample count of each attachment, which is what a render pass has to match to be compatible
 	Hash64 PassHash = 0;
+
 	/// Content hashes of the descriptor set layouts, and the push constant ranges
 	Hash64 LayoutHash = 0;
 
@@ -53,12 +55,12 @@ struct PipelineKey
 	VkPolygonMode PolygonMode = VK_POLYGON_MODE_FILL;
 	VkCompareOp DepthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
 
-	/// PipelineProperties::DepthBiasConstant and DepthBiasSlope as bits, floats don't have unique object representations
 	uint32 DepthBiasConstantBits = 0;
 	uint32 DepthBiasSlopeBits = 0;
 
 	bool bIsCompute = false;
-	/// False for pipelines that don't process any vertices (fullscreen passes)
+
+	/// False for pipelines that don't process any vertices (e.g. fullscreen passes)
 	bool bHasVertexInput = true;
 	bool bDepthTest = true;
 	bool bDepthWrite = true;
@@ -67,10 +69,14 @@ struct PipelineKey
 	/// Fills the struct out to a multiple of its alignment. Always zero.
 	uint8 Reserved[3] = {};
 
+
 public:
 	bool operator==(const PipelineKey& other) const = default;
 
-	/// Not for the draw path, resolve a PipelineHandle once and keep it
+	/**
+	 * @brief Get the hash for the pipeline key.
+	 * NOTE: Not for the draw path, get a PipelineHandle once and keep it
+	 */
 	Hash64 GetHash() const { return HashObj64(*this); }
 
 	/**
@@ -84,6 +90,7 @@ public:
 };
 
 static_assert(std::has_unique_object_representations_v<PipelineKey>,
-			  "PipelineKey is hashed as raw bytes, so it can not have padding. Reorder the fields or add to Reserved.");
+			  "PipelineKey is hashed as raw bytes, so it should not have any padding. Reorder the fields or add to the "
+			  "reserved member.");
 
 } // namespace fx::renderer

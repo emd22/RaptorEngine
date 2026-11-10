@@ -24,7 +24,7 @@ ePipelineName GetShapePipeline(eDebugShape shape)
 
 } // namespace
 
-void DebugDraw::Draw(eDebugShape shape, const Mat4f& world_matrix, Color color)
+void DebugDraw::Draw(eDebugShape shape, const FMat4& world_matrix, Color color)
 {
 	if (mShapes.Size >= scMaxShapes) {
 		if (!bWarnedAboutOverflow) {
@@ -41,38 +41,38 @@ void DebugDraw::Line(const FVec3 from, const FVec3 to, Color color)
 {
 	const FVec3 delta = to - from;
 
-	const Mat4f world_matrix(Vec4f(delta.X, delta.Y, delta.Z, 0.0f), Vec4f(0.0f, 0.0f, 0.0f, 0.0f),
-							 Vec4f(0.0f, 0.0f, 0.0f, 0.0f), Vec4f(from.X, from.Y, from.Z, 1.0f));
+	const FMat4 world_matrix(FVec4(delta.X, delta.Y, delta.Z, 0.0f), FVec4(0.0f, 0.0f, 0.0f, 0.0f),
+							 FVec4(0.0f, 0.0f, 0.0f, 0.0f), FVec4(from.X, from.Y, from.Z, 1.0f));
 
 	Draw(eDebugShape::Line, world_matrix, color);
 }
 
-static Mat4f MakeBoxMatrix(const FVec3 center, const FVec3 half_extent, const Quat rotation)
+static FMat4 MakeBoxMatrix(const FVec3 center, const FVec3 half_extent, const FQuat rotation)
 {
-	return Mat4f::AsScale(half_extent) * Mat4f::AsRotation(rotation) * Mat4f::AsTranslation(center);
+	return FMat4::AsScale(half_extent) * FMat4::AsRotation(rotation) * FMat4::AsTranslation(center);
 }
 
-void DebugDraw::WireBox(const FVec3 center, const FVec3 half_extent, const Quat rotation, Color color)
+void DebugDraw::WireBox(const FVec3 center, const FVec3 half_extent, const FQuat rotation, Color color)
 {
 	WireBox(MakeBoxMatrix(center, half_extent, rotation), color);
 }
 
 void DebugDraw::WireBox(const BBox& box, Color color)
 {
-	WireBox((box.Min + box.Max) * 0.5f, (box.Max - box.Min) * 0.5f, Quat::scIdentity, color);
+	WireBox((box.Min + box.Max) * 0.5f, (box.Max - box.Min) * 0.5f, FQuat::scIdentity, color);
 }
 
-void DebugDraw::SolidBox(const FVec3 center, const FVec3 half_extent, const Quat rotation, Color color)
+void DebugDraw::SolidBox(const FVec3 center, const FVec3 half_extent, const FQuat rotation, Color color)
 {
 	SolidBox(MakeBoxMatrix(center, half_extent, rotation), color);
 }
 
 void DebugDraw::SolidBox(const BBox& box, Color color)
 {
-	SolidBox((box.Min + box.Max) * 0.5f, (box.Max - box.Min) * 0.5f, Quat::scIdentity, color);
+	SolidBox((box.Min + box.Max) * 0.5f, (box.Max - box.Min) * 0.5f, FQuat::scIdentity, color);
 }
 
-void DebugDraw::Overlay(const Ref<PrimitiveMesh>& mesh, const Mat4f& world_matrix, Color color)
+void DebugDraw::Overlay(const Ref<PrimitiveMesh>& mesh, const FMat4& world_matrix, Color color)
 {
 	if (!mesh.IsValid() || mesh->VertexList.VertexType == eVertexType::Slim || mesh->VertexList.IsSkinned()) {
 		return;
@@ -111,7 +111,7 @@ PrimitiveMesh& DebugDraw::GetMesh(eDebugShape shape)
 	return *mesh;
 }
 
-void DebugDraw::RenderOverlays(const CommandBuffer& cmd, const Mat4f& camera_matrix)
+void DebugDraw::RenderOverlays(const CommandBuffer& cmd, const FMat4& camera_matrix)
 {
 	Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugOverlay);
 	pipeline.Bind(cmd);
@@ -119,7 +119,7 @@ void DebugDraw::RenderOverlays(const CommandBuffer& cmd, const Mat4f& camera_mat
 	DebugLayerPushConstants push_constants {};
 
 	for (const QueuedOverlay& overlay : mOverlays) {
-		const Mat4f combined_matrix = overlay.WorldMatrix * camera_matrix;
+		const FMat4 combined_matrix = overlay.WorldMatrix * camera_matrix;
 		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
 		push_constants.DebugColor = overlay.Color;
 
@@ -130,7 +130,7 @@ void DebugDraw::RenderOverlays(const CommandBuffer& cmd, const Mat4f& camera_mat
 
 void DebugDraw::Render(const CommandBuffer& cmd, const BaseCamera& camera)
 {
-	const Mat4f& camera_matrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
+	const FMat4& camera_matrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 
 	if (mOverlays.Size > 0) {
 		RenderOverlays(cmd, camera_matrix);
@@ -158,7 +158,7 @@ void DebugDraw::Render(const CommandBuffer& cmd, const BaseCamera& camera)
 					mesh = &GetMesh(shape);
 				}
 
-				const Mat4f combined_matrix = queued.WorldMatrix * camera_matrix;
+				const FMat4 combined_matrix = queued.WorldMatrix * camera_matrix;
 				memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
 				push_constants.DebugColor = queued.Color;
 

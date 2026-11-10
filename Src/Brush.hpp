@@ -24,8 +24,8 @@ namespace fx {
 struct BrushFaceTexture
 {
 	/// Added after scaling, in texture repeats
-	Vec2f Offset = Vec2f(0.0f, 0.0f);
-	Vec2f Scale = Vec2f(2.0f, 2.0f);
+	FVec2 Offset = FVec2(0.0f, 0.0f);
+	FVec2 Scale = FVec2(2.0f, 2.0f);
 
 	/// In degrees
 	float32 Rotation = 0.0f;
@@ -153,7 +153,7 @@ public:
 	 * @brief Generates a triangle mesh for rendering
 	 */
 	void GenerateMesh(SizedArray<FVec3>& positions, SizedArray<FVec3>& normals, SizedArray<FVec3>& tangents,
-					  SizedArray<float32>& tangent_handedness, SizedArray<Vec2f>& texcoords,
+					  SizedArray<float32>& tangent_handedness, SizedArray<FVec2>& texcoords,
 					  SizedArray<uint32>& indices, const String* only_material = nullptr) const;
 
 public:

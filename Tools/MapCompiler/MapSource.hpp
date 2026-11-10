@@ -10,7 +10,7 @@
 #include "Geometry.hpp"
 
 #include <Map/CompiledMap.hpp>
-#include <Math/Mat4.hpp>
+#include <Math/FMat4.hpp>
 #include <Patch.hpp>
 #include <Renderer/ProbePlacement.hpp>
 
@@ -81,7 +81,7 @@ struct SourceModel
 	String MeshPath;
 
 	/// Model space to world space, as Entity::RecalculateModelMatrix builds it
-	Mat4f Transform = Mat4f::scIdentity;
+	FMat4 Transform = FMat4::scIdentity;
 
 	/// Casts baked shadows and takes part in the bounce (see IsBakedModelEntry)
 	bool bBaked = false;

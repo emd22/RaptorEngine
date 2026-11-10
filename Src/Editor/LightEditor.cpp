@@ -189,9 +189,9 @@ void LightEditor::DrawMarkers()
 		const FVec3 position = light.GetPosition();
 		const FVec3 tip = position + (light.GetDirection().Normalize() * scDirectionLength);
 
-		renderer::gDebugDraw->SolidBox(position, FVec3(scMarkerHalfExtent), Quat::scIdentity, color);
+		renderer::gDebugDraw->SolidBox(position, FVec3(scMarkerHalfExtent), FQuat::scIdentity, color);
 		renderer::gDebugDraw->Line(position, tip, color);
-		renderer::gDebugDraw->SolidBox(tip, FVec3(scDirectionTipHalfExtent), Quat::scIdentity, color);
+		renderer::gDebugDraw->SolidBox(tip, FVec3(scDirectionTipHalfExtent), FQuat::scIdentity, color);
 	}
 }
 

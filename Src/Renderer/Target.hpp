@@ -41,15 +41,15 @@ enum class eStoreOp
 struct Target
 {
 public:
-	static constexpr Vec2u scFullScreen = Vec2u(0U);
+	static constexpr UVec2 scFullScreen = UVec2(0U);
 
 public:
 	Target() = default;
 
-	Target(eImageFormat format, const Vec2u& size, bool is_fullscreen);
-	Target(eImageFormat format, const Vec2u& size, bool is_fullscreen, VkImageUsageFlags usage,
+	Target(eImageFormat format, const UVec2& size, bool is_fullscreen);
+	Target(eImageFormat format, const UVec2& size, bool is_fullscreen, VkImageUsageFlags usage,
 		   eImageAspectFlag aspect);
-	Target(eImageFormat format, const Vec2u& size, bool is_fullscreen, eLoadOp load_op, eStoreOp store_op,
+	Target(eImageFormat format, const UVec2& size, bool is_fullscreen, eLoadOp load_op, eStoreOp store_op,
 		   VkImageLayout initial_layout, VkImageLayout final_layout);
 
 	VkAttachmentDescription BuildDescription() const;
@@ -117,7 +117,7 @@ public:
 
 	bool IsCompatible(const TargetList& other) const;
 
-	void CreateImages(const Vec2u& size);
+	void CreateImages(const UVec2& size);
 	SizedArray<VkAttachmentDescription>& GetDescriptions();
 	SizedArray<VkImageView>& GetImageViews();
 
@@ -140,7 +140,7 @@ public:
 		return targets;
 	}
 
-	void RecreateImages(const Vec2u& size)
+	void RecreateImages(const UVec2& size)
 	{
 		mFlags = eTargetListFlags::None;
 		CreateImages(size);

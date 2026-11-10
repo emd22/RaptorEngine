@@ -30,7 +30,7 @@ class RenderStage
 public:
 	RenderStage() = default;
 
-	void Create(const char* name, const Vec2u& size, eSizeDivisor size_divisor);
+	void Create(const char* name, const UVec2& size, eSizeDivisor size_divisor);
 
 	void AddTarget(eImageFormat format, VkImageUsageFlags usage, eImageAspectFlag aspect);
 	void AddTarget(const Target& attachment);
@@ -60,7 +60,7 @@ public:
 	 */
 	void BuildRenderStage();
 
-	void Rebuild(const Vec2u& size);
+	void Rebuild(const UVec2& size);
 	FX_FORCE_INLINE bool IsBuilt() const { return mbIsBuilt; }
 
 	/// Begins the stage and points the viewport and scissor at all of its targets
@@ -116,7 +116,7 @@ private:
 
 	Framebuffer mFramebuffer;
 	RenderPass mRenderPass;
-	Vec2u mSize = Vec2u::scZero;
+	UVec2 mSize = UVec2::scZero;
 
 	bool mbIsFullscreen = false;
 

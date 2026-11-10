@@ -177,8 +177,8 @@ Brush ReadBrushEntry(ConfigEntry& entry)
 			continue;
 		}
 
-		texture.Offset = Vec2f(layout[0], layout[1]);
-		texture.Scale = Vec2f(layout[2], layout[3]);
+		texture.Offset = FVec2(layout[0], layout[1]);
+		texture.Scale = FVec2(layout[2], layout[3]);
 		texture.Rotation = layout[4];
 	}
 
@@ -234,7 +234,7 @@ Patch ReadPatchEntry(ConfigEntry& entry)
 
 		point.Position = FVec3(values[base].Get<float32>(), values[base + 1].Get<float32>(),
 							   values[base + 2].Get<float32>());
-		point.Texcoord = Vec2f(values[base + 3].Get<float32>(), values[base + 4].Get<float32>());
+		point.Texcoord = FVec2(values[base + 3].Get<float32>(), values[base + 4].Get<float32>());
 	}
 
 	ConfigEntry* weights_entry = entry.GetMember(HashStr32("weights"));
@@ -411,7 +411,7 @@ BrushPlacement ReadBrushPlacement(const ConfigEntry& entry)
 	const ConfigEntry* euler_entry = entry.GetMember(HashStr32("rot"));
 
 	if (euler_entry != nullptr) {
-		placement.Rotation = Quat::FromEulerAngles(euler_entry->GetValue<FVec3>());
+		placement.Rotation = FQuat::FromEulerAngles(euler_entry->GetValue<FVec3>());
 	}
 
 	Serializable<BrushPlacement>::LoadFromConfig(entry, placement);
@@ -435,7 +435,7 @@ BrushPlacement PlaceInSubview(const BrushPlacement& local, const FVec3 brush_cen
 
 BrushPlacement RemoveFromSubview(const BrushPlacement& world, const FVec3 brush_center, const BrushPlacement& instance)
 {
-	const Quat inverse = instance.Rotation.Conjugate();
+	const FQuat inverse = instance.Rotation.Conjugate();
 
 	BrushPlacement local;
 	local.Rotation = (inverse * world.Rotation).Normalize();

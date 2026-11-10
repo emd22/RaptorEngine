@@ -38,9 +38,9 @@ class Window
 public:
 	Window() = default;
 	Window(const Window& other) = delete;
-	Window(const char* title, const Vec2u& size, const eWindowFlags flags) { Create(title, size, flags); }
+	Window(const char* title, const UVec2& size, const eWindowFlags flags) { Create(title, size, flags); }
 
-	void Create(const char* title, const Vec2u& size, const eWindowFlags flags);
+	void Create(const char* title, const UVec2& size, const eWindowFlags flags);
 
 	void HandleResize();
 
@@ -65,7 +65,7 @@ public:
 
 	float32 GetAspectRatio() const { return static_cast<float32>(mSize.X) / static_cast<float32>(mSize.Y); }
 
-	FX_FORCE_INLINE const Vec2u& GetSize() const { return mSize; }
+	FX_FORCE_INLINE const UVec2& GetSize() const { return mSize; }
 
 #ifdef FX_IS_EDITOR
 	FX_FORCE_INLINE editor::EditorViewport* GetViewport() { return mpViewport; }
@@ -77,14 +77,14 @@ public:
 
 public:
 private:
-	Vec2u mSize = Vec2u::scZero;
+	UVec2 mSize = UVec2::scZero;
 
 #ifdef FX_IS_EDITOR
 	editor::EditorViewport* mpViewport = nullptr;
 #else
 	SDL_Window* mWindow = nullptr;
 
-	Vec2f mSavedMousePos = Vec2f::sZero;
+	FVec2 mSavedMousePos = FVec2::sZero;
 #endif
 };
 

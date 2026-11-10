@@ -79,7 +79,7 @@ float32 HalfToRadiance(Float16 value)
 }
 
 /// `stored_depth` is reverse-Z, and 0 where nothing was drawn
-float32 CaptureDepthToDistance(const Mat4f& inv_projection, float32 stored_depth, float32 ndc_x, float32 ndc_y)
+float32 CaptureDepthToDistance(const FMat4& inv_projection, float32 stored_depth, float32 ndc_x, float32 ndc_y)
 {
 	constexpr float32 cFar = Limits::ProbeDepthMaxDistance;
 
@@ -87,7 +87,7 @@ float32 CaptureDepthToDistance(const Mat4f& inv_projection, float32 stored_depth
 		return cFar;
 	}
 
-	const Vec4f view = inv_projection * Vec4f(ndc_x, ndc_y, 1.0f - stored_depth, 1.0f);
+	const FVec4 view = inv_projection * FVec4(ndc_x, ndc_y, 1.0f - stored_depth, 1.0f);
 	const float32 distance = FVec3(view.X, view.Y, view.Z).Length() / fabsf(view.W);
 
 	if (distance < cFar) {
@@ -263,12 +263,12 @@ static_assert(Limits::ReflectionProbeSize == 128 && Limits::ReflectionProbeMips 
 
 struct ReflectionBox
 {
-	Mat4f BoxToWorld;
+	FMat4 BoxToWorld;
 	FVec3 HalfExtent;
 	float32 Volume;
 };
 
-ReflectionBox MakeReflectionBox(const FVec3 local_min, const FVec3 local_max, const Mat4f& local_to_world)
+ReflectionBox MakeReflectionBox(const FVec3 local_min, const FVec3 local_max, const FMat4& local_to_world)
 {
 	constexpr float32 scReflectionMinHalfExtent = 0.05f;
 
@@ -276,7 +276,7 @@ ReflectionBox MakeReflectionBox(const FVec3 local_min, const FVec3 local_max, co
 	const FVec3 center = (local_max + local_min) * 0.5f;
 
 	ReflectionBox box;
-	box.BoxToWorld = Mat4f::AsScale(half_extent) * Mat4f::AsTranslation(center) * local_to_world;
+	box.BoxToWorld = FMat4::AsScale(half_extent) * FMat4::AsTranslation(center) * local_to_world;
 	box.HalfExtent = half_extent;
 	box.Volume = half_extent.X * half_extent.Y * half_extent.Z;
 
@@ -287,7 +287,7 @@ ReflectionProbeData MakeReflectionProbe(const ReflectionBox& box, const ProbePla
 {
 	constexpr float32 scReflectionRelocation = 0.9f;
 
-	const Vec4f center_h = box.BoxToWorld * Vec4f(0.0f, 0.0f, 0.0f, 1.0f);
+	const FVec4 center_h = box.BoxToWorld * FVec4(0.0f, 0.0f, 0.0f, 1.0f);
 	const FVec3 center(center_h.X, center_h.Y, center_h.Z);
 
 	FVec3 position = center;
@@ -465,8 +465,7 @@ uint32 ProbeManager::SelectVolume(const FVec3 position) const
 	return best;
 }
 
-/// `out_coverage` is the share of the trilinear weight on placed probes against placed and empty grid points (solid
-/// ones don't count), as SampleProbeVolumeIrradiance() computes it in ProbeCommon.hlsli.
+
 bool ProbeManager::SampleVolume(const FVec3 position, uint32 volume_index, const float32* basis, FVec3& out_irradiance,
 								float32& out_coverage) const
 {
@@ -974,7 +973,7 @@ void ProbeManager::CreateCaptureResources()
 					   eGpuBufferFlags::TransferReceiver);
 	};
 
-	mCaptureStage.Create("ProbeCapture", Vec2u(scCaptureSize, scCaptureSize), eSizeDivisor::FullRes);
+	mCaptureStage.Create("ProbeCapture", UVec2(scCaptureSize, scCaptureSize), eSizeDivisor::FullRes);
 	mCaptureStage.AddTarget(eImageFormat::RGBA16_Float, cColorUsage, eImageAspectFlag::Color);
 	mCaptureStage.AddTarget(eImageFormat::D32_Float, cDepthUsage | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
 							eImageAspectFlag::Depth);
@@ -988,7 +987,7 @@ void ProbeManager::CreateCaptureResources()
 		}
 	}
 
-	mReflectionStage.Create("ReflectionCapture", Vec2u(cReflectionSize, cReflectionSize), eSizeDivisor::FullRes);
+	mReflectionStage.Create("ReflectionCapture", UVec2(cReflectionSize, cReflectionSize), eSizeDivisor::FullRes);
 	mReflectionStage.AddTarget(eImageFormat::RGBA16_Float, cColorUsage, eImageAspectFlag::Color);
 	mReflectionStage.AddTarget(eImageFormat::D32_Float, cDepthUsage, eImageAspectFlag::Depth);
 	mReflectionStage.BuildRenderStage();
@@ -1015,7 +1014,7 @@ void ProbeManager::BuildCaptureTexels()
 
 	for (uint32 face = 0; face < scCaptureFaces; face++) {
 		const PerspectiveCamera& camera = mCaptureCameras[face];
-		const Mat4f inv_view_projection = camera.GetInvProjectionMatrix() * camera.GetInvViewMatrix();
+		const FMat4 inv_view_projection = camera.GetInvProjectionMatrix() * camera.GetInvViewMatrix();
 
 		mCaptureInvProjection = camera.GetInvProjectionMatrix();
 		mCaptureFaceToClip[face] = inv_view_projection.Inverse();
@@ -1025,7 +1024,7 @@ void ProbeManager::BuildCaptureTexels()
 				const float32 ndc_x = TexelToNdc(x, scCaptureSize);
 				const float32 ndc_y = TexelToNdc(y, scCaptureSize);
 
-				const Vec4f point = inv_view_projection * Vec4f(ndc_x, ndc_y, 0.5f, 1.0f);
+				const FVec4 point = inv_view_projection * FVec4(ndc_x, ndc_y, 0.5f, 1.0f);
 				const FVec3 direction = FVec3(point.X / point.W, point.Y / point.W, point.Z / point.W).Normalize();
 
 				const float32 dist_sq = 1.0f + ndc_x * ndc_x + ndc_y * ndc_y;
@@ -1343,8 +1342,8 @@ void ProbeManager::UploadMomentsAtlas(uint32 first_probe, uint32 count)
 					   eGpuBufferFlags::TransferReceiver);
 		staging.Upload(row.pData, row.GetSizeInBytes());
 
-		const Vec2u row_size(Limits::ProbeAtlasWidth, cTileSize);
-		const Vec2u row_offset(0, atlas_row * cTileSize);
+		const UVec2 row_size(Limits::ProbeAtlasWidth, cTileSize);
+		const UVec2 row_offset(0, atlas_row * cTileSize);
 
 		graphics->SubmitImmediateUploadCmd(
 			[&](CommandBuffer& cmd)
@@ -1407,7 +1406,7 @@ uint32 ProbeManager::RebuildReflectionProbesFromWorld()
 	mReflectionProbeCount = num_brush_probes;
 
 	if (has_level_probe) {
-		const ReflectionBox level_box = MakeReflectionBox(boxes.Min, boxes.Max, Mat4f::scIdentity);
+		const ReflectionBox level_box = MakeReflectionBox(boxes.Min, boxes.Max, FMat4::scIdentity);
 
 		mReflectionProbes[mReflectionProbeCount] = MakeReflectionProbe(level_box, boxes, mReflectionProbeCount);
 		mReflectionProbeCount++;
@@ -1555,8 +1554,8 @@ bool ProbeManager::ReadBackReflectionProbe(uint32 probe_index)
 				float32 unused_v;
 				ReflectionFilter::DirectionToFaceUV(direction, capture_face, unused_u, unused_v);
 
-				const Vec4f clip = mCaptureFaceToClip[capture_face] *
-								   Vec4f(direction.X, direction.Y, direction.Z, 1.0f);
+				const FVec4 clip = mCaptureFaceToClip[capture_face] *
+								   FVec4(direction.X, direction.Y, direction.Z, 1.0f);
 
 				SampleCaptureFace(captures[capture_face].pData, cSize, clip.X / clip.W, clip.Y / clip.W, out);
 			}

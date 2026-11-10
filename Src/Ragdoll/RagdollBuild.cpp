@@ -44,7 +44,7 @@ struct ResolvedBone
 struct BuildFrame
 {
 	const Skeleton& Skel;
-	const Mat4f& ObjectWorld;
+	const FMat4& ObjectWorld;
 
 	float32 Scale = 1.0f;
 	float32 TotalMass = 0.0f;
@@ -53,7 +53,7 @@ struct BuildFrame
 	JPH::Vec3 Forward = JPH::Vec3::sZero();
 	JPH::Vec3 RootPosition = JPH::Vec3::sZero();
 
-	Mat4f GetBoneWorld(uint32 bone) const { return Skel.WorldTransforms[bone] * ObjectWorld; }
+	FMat4 GetBoneWorld(uint32 bone) const { return Skel.WorldTransforms[bone] * ObjectWorld; }
 	JPH::Vec3 GetBonePosition(uint32 bone) const { return RowAsVec3(GetBoneWorld(bone), 3); }
 	JPH::Vec3 GetBoneSpan(const ResolvedBone& part) const
 	{
@@ -349,7 +349,7 @@ bool BuildBody(const BuildFrame& frame, const SizedArray<ResolvedBone>& parts, u
 {
 	const RDDefaultSegment& body_def = *parts[body_index].pDef;
 
-	const Mat4f bone_world = frame.GetBoneWorld(parts[body_index].StartBone);
+	const FMat4 bone_world = frame.GetBoneWorld(parts[body_index].StartBone);
 	const JPH::Mat44 rotation = RotationFromMatrix(bone_world);
 
 	out_body.Orientation = rotation.GetQuaternion().Normalized();
@@ -424,7 +424,7 @@ RDSegmentInfo MakeSegmentInfo(const BuildFrame& frame, const ResolvedBone& part,
 		}
 	}
 
-	const Mat4f& bone_model = frame.Skel.WorldTransforms[part.StartBone];
+	const FMat4& bone_model = frame.Skel.WorldTransforms[part.StartBone];
 
 	return RDSegmentInfo {
 		.BoneScale = JPH::Vec3(RowAsVec3(bone_model, 0).Length(), RowAsVec3(bone_model, 1).Length(),
@@ -465,7 +465,7 @@ void MakeFreeSixDOF(JPH::SixDOFConstraintSettings& settings, const JPH::Vec3 pos
 
 } // namespace
 
-bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_matrix, const RDDefinition& def)
+bool Ragdoll::Create(const Ref<Skeleton>& skeleton, const FMat4& object_world_matrix, const RDDefinition& def)
 {
 	constexpr float32 scSelfCollisionMargin = 0.02f;
 
@@ -766,7 +766,7 @@ void Ragdoll::InitBodyArrays(uint32 joint_count)
 
 	mbHasTargets = false;
 
-	mDrivenWorld.InitSize(joint_count, Mat4f::scIdentity);
+	mDrivenWorld.InitSize(joint_count, FMat4::scIdentity);
 	mIsDriven.InitSize(joint_count, static_cast<uint8>(0));
 
 	for (const RDSegmentInfo& body : mSegments) {
@@ -780,7 +780,7 @@ float32 Ragdoll::WriteInitialPose()
 	const Skeleton& skel = *mpSkeleton;
 	const uint32 joint_count = skel.JointCount;
 
-	SizedArray<Mat4f> expected;
+	SizedArray<FMat4> expected;
 	expected.InitAsCopyOf(skel.SkinningMatrices.pData, joint_count);
 
 	WriteToSkeleton();

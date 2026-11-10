@@ -5,9 +5,9 @@
 #include <Core/FilesystemIO.hpp>
 #include <Core/Hash.hpp>
 #include <Core/PagedArray.hpp>
+#include <Math/FQuat.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Quat.hpp>
-#include <Math/Vec4.hpp>
+#include <Math/FVec4.hpp>
 #include <Util/Tokenizer.hpp>
 #include <algorithm>
 #include <charconv>
@@ -306,7 +306,7 @@ void ConfigEntry::AppendValue(const FVec3 vec)
 	AppendValue(ConfigPrimitive::FromValue(vec.Z));
 }
 
-void ConfigEntry::AppendValue(const Vec4f vec)
+void ConfigEntry::AppendValue(const FVec4 vec)
 {
 	if (!ArrayData.IsInited()) {
 		ArrayData.Create(5);
@@ -319,7 +319,7 @@ void ConfigEntry::AppendValue(const Vec4f vec)
 }
 
 
-void ConfigEntry::AppendValue(const Quat quat)
+void ConfigEntry::AppendValue(const FQuat quat)
 {
 	if (!ArrayData.IsInited()) {
 		ArrayData.Create(5);

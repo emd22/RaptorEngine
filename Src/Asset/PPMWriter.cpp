@@ -6,7 +6,7 @@
 
 namespace fx::asset {
 
-void PPMWriter::WriteRGB(const String& path, const Vec2u& size, const Slice<uint8>& pixel_data)
+void PPMWriter::WriteRGB(const String& path, const UVec2& size, const Slice<uint8>& pixel_data)
 {
 	Assert(size.X > 0 && size.Y > 0);
 	Assert(pixel_data.pData != nullptr);

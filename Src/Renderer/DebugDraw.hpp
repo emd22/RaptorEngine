@@ -5,9 +5,9 @@
 #include <Core/Ref.hpp>
 #include <Core/Types.hpp>
 #include <Math/BBox.hpp>
+#include <Math/FMat4.hpp>
+#include <Math/FQuat.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Mat4.hpp>
-#include <Math/Quat.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
 
 namespace fx {
@@ -39,19 +39,19 @@ public:
 	DebugDraw(const DebugDraw&) = delete;
 	DebugDraw& operator=(const DebugDraw&) = delete;
 
-	void Draw(eDebugShape shape, const Mat4f& world_matrix, Color color);
+	void Draw(eDebugShape shape, const FMat4& world_matrix, Color color);
 
 	void Line(const FVec3 from, const FVec3 to, Color color);
 
-	void WireBox(const Mat4f& world_matrix, Color color) { Draw(eDebugShape::WireBox, world_matrix, color); }
-	void WireBox(const FVec3 center, const FVec3 half_extent, const Quat rotation, Color color);
+	void WireBox(const FMat4& world_matrix, Color color) { Draw(eDebugShape::WireBox, world_matrix, color); }
+	void WireBox(const FVec3 center, const FVec3 half_extent, const FQuat rotation, Color color);
 	void WireBox(const BBox& box, Color color);
 
-	void SolidBox(const Mat4f& world_matrix, Color color) { Draw(eDebugShape::SolidBox, world_matrix, color); }
-	void SolidBox(const FVec3 center, const FVec3 half_extent, const Quat rotation, Color color);
+	void SolidBox(const FMat4& world_matrix, Color color) { Draw(eDebugShape::SolidBox, world_matrix, color); }
+	void SolidBox(const FVec3 center, const FVec3 half_extent, const FQuat rotation, Color color);
 	void SolidBox(const BBox& box, Color color);
 
-	void Overlay(const Ref<PrimitiveMesh>& mesh, const Mat4f& world_matrix, Color color);
+	void Overlay(const Ref<PrimitiveMesh>& mesh, const FMat4& world_matrix, Color color);
 
 
 	void Render(const CommandBuffer& cmd, const BaseCamera& camera);
@@ -64,7 +64,7 @@ public:
 private:
 	struct QueuedShape
 	{
-		Mat4f WorldMatrix;
+		FMat4 WorldMatrix;
 		uint32 Color;
 		eDebugShape Shape;
 	};
@@ -72,11 +72,11 @@ private:
 	struct QueuedOverlay
 	{
 		Ref<PrimitiveMesh> Mesh;
-		Mat4f WorldMatrix;
+		FMat4 WorldMatrix;
 		uint32 Color;
 	};
 
-	void RenderOverlays(const CommandBuffer& cmd, const Mat4f& camera_matrix);
+	void RenderOverlays(const CommandBuffer& cmd, const FMat4& camera_matrix);
 
 	/**
 	 * @brief Makes the meshes a shape needs on first use, as this is created before there is a device to upload to.

@@ -1,48 +1,46 @@
 #include <Core/Defines.hpp>
 
-#ifdef FX_USE_NEON
+#ifdef FX_USE_AVX
 
 #include <ThirdParty/Jolt/Jolt.h>
 #include <ThirdParty/Jolt/Math/Quat.h>
 #include <math.h>
 
-#include <Math/FVec3.hpp>
+#include <Core/Log.hpp>
+#include <Math/FQuat.hpp>
 #include <Math/MathUtil.hpp>
-#include <Math/NeonUtil.hpp>
-#include <Math/Quat.hpp>
+#include <Math/SSE.hpp>
+#include <Math/SSEUtil.hpp>
 
 namespace fx {
 
-const Quat Quat::scIdentity = Quat(0, 0, 0, 1);
+const FQuat FQuat::scIdentity = FQuat(0, 0, 0, 1);
 
-Quat::Quat(float32 x, float32 y, float32 z, float32 w)
+FQuat::FQuat(float32 x, float32 y, float32 z, float32 w)
 {
-	float32 values[] = { x, y, z, w };
-	mIntrin = vld1q_f32(values);
+	float32 values alignas(16)[4] = { x, y, z, w };
+	mIntrin = _mm_load_ps(values);
 }
 
-Quat::Quat(const JPH::Quat& other) { mIntrin = other.mValue.mValue; }
+FQuat::FQuat(const JPH::Quat& other) { mIntrin = other.mValue.mValue; }
 
-Quat Quat::FromAxisAngle(const FVec3 axis, float32 angle)
+FQuat FQuat::FromAxisAngle(const FVec3 axis, float32 angle)
 {
 	float32 sv, cv;
 	MathUtil::SinCos(angle * 0.5f, &sv, &cv);
 
-	// Build the multiplier ({ sin A, sin A, sin A, cos A })
-	float32x4_t mp_v = vsetq_lane_f32(cv, vdupq_n_f32(sv), 3);
+	const __m128 vec = _mm_mul_ps(axis.Normalize().mIntrin, _mm_set1_ps(sv));
 
-	// { X, Y, Z, 1.0 }
-	const float32x4_t axis_v = vsetq_lane_f32(1.0, axis.Normalize().mIntrin, 3);
-	return Quat(vmulq_f32(axis_v, mp_v));
+	return FQuat(_mm_insert_ps(vec, _mm_set_ss(cv), 0x30));
 }
 
-bool Quat::IsCloseTo(const JPH::Quat& other, const float32 tolerance) const { return IsCloseTo(other.mValue.mValue); }
+bool FQuat::IsCloseTo(const JPH::Quat& other, const float32 tolerance) const { return IsCloseTo(other.mValue.mValue); }
 
 
-void Quat::FromJoltQuaternion(const JPH::Quat& quat) { mIntrin = quat.mValue.mValue; }
-void Quat::ToJoltQuaternion(JPH::Quat& quat) const { quat.mValue.mValue = mIntrin; }
+void FQuat::FromJoltQuaternion(const JPH::Quat& quat) { mIntrin = quat.mValue.mValue; }
+void FQuat::ToJoltQuaternion(JPH::Quat& quat) const { quat.mValue.mValue = mIntrin; }
 
-Quat Quat::FromEulerAngles(const FVec3 angles)
+FQuat FQuat::FromEulerAngles(const FVec3 angles)
 {
 	/*
 		Create the quaternion using
@@ -53,19 +51,19 @@ Quat Quat::FromEulerAngles(const FVec3 angles)
 		cz * cx * cy + sz * sx * sy
 	*/
 
-	const float32x4_t half_one = vdupq_n_f32(0.5);
+	const __m128 half_one = _mm_set1_ps(0.5);
 
 	// Sin and Cos all lanes at once
-	float32x4_t sv = vdupq_n_f32(0);
-	float32x4_t cv = sv;
-	Neon::SinCos4(vmulq_f32(angles.mIntrin, half_one), &sv, &cv);
+	__m128 sv = _mm_setzero_ps();
+	__m128 cv = sv;
+	SSE::SinCos4(_mm_mul_ps(angles.mIntrin, half_one), &sv, &cv);
 
 	float32 sin_vals[4];
 	float32 cos_vals[4];
 
 	// Load the values from our vector into local arrays
-	vst1q_f32(sin_vals, sv);
-	vst1q_f32(cos_vals, cv);
+	_mm_store_ps(sin_vals, sv);
+	_mm_store_ps(cos_vals, cv);
 
 	const float32 sx = sin_vals[0];
 	const float32 sy = sin_vals[1];
@@ -77,13 +75,13 @@ Quat Quat::FromEulerAngles(const FVec3 angles)
 
 	// Note that this is faster than the NEON optimized version.
 
-	return Quat(cz * sx * cy - sz * cx * sy, /* First Row */
-				cz * cx * sy + sz * sx * cy, /* Second Row */
-				sz * cx * cy - cz * sx * sy, /* Third Row */
-				cz * cx * cy + sz * sx * sy);
+	return FQuat(cz * sx * cy - sz * cx * sy, /* First Row */
+				 cz * cx * sy + sz * sx * cy, /* Second Row */
+				 sz * cx * cy - cz * sx * sy, /* Third Row */
+				 cz * cx * cy + sz * sx * sy);
 }
 
-Quat Quat::operator*(const Quat other) const
+FQuat FQuat::operator*(const FQuat other) const
 {
 	const float lx = X;
 	const float ly = Y;
@@ -95,10 +93,10 @@ Quat Quat::operator*(const Quat other) const
 	const float rz = other.Z;
 	const float rw = other.W;
 
-	return Quat(lw * rx + lx * rw + ly * rz - lz * ry, /* */
-				lw * ry - lx * rz + ly * rw + lz * rx, /* */
-				lw * rz + lx * ry - ly * rx + lz * rw, /* */
-				lw * rw - lx * rx - ly * ry - lz * rz);
+	return FQuat(lw * rx + lx * rw + ly * rz - lz * ry, /* */
+				 lw * ry - lx * rz + ly * rw + lz * rx, /* */
+				 lw * rz + lx * ry - ly * rx + lz * rw, /* */
+				 lw * rw - lx * rx - ly * ry - lz * rz);
 }
 
 // Quat Quat::FromEulerAngles_NeonTest(FVec3 angles)
@@ -197,7 +195,7 @@ Quat Quat::operator*(const Quat other) const
 // }
 
 
-FVec3 Quat::GetEulerAngles() const
+FVec3 FQuat::GetEulerAngles() const
 {
 	const float32 y_sq = Y * Y;
 
@@ -218,5 +216,6 @@ FVec3 Quat::GetEulerAngles() const
 }
 
 } // namespace fx
+
 
 #endif

@@ -28,9 +28,6 @@ namespace fx {
 template <typename T>
 concept C_IsAsset = std::is_base_of_v<AssetBase, T>;
 
-
-// Buffer deletion is deferred by enough rendered frames that any frame which could have referenced the buffer
-// has completed before the buffer is destroyed.
 static constexpr uint32 scBufferDeletionFrameSpacing = renderer::FramesInFlight + 1;
 
 
@@ -193,7 +190,7 @@ public:
 
 	/**
 	 * @brief A 1x1 RGBA8 normal map that points straight out of the surface, for materials without a normal map that
-	 * are drawn by a pipeline that samples one (e.g. every skinned pipeline).
+	 * are drawn by a pipeline that samples one (for example, skinned pipeline requires a normal map).
 	 */
 	fx::Image* GetFlatNormalImage();
 

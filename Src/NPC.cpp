@@ -5,8 +5,8 @@
 #include <Core/Random.hpp>
 #include <Decal/DecalManager.hpp>
 #include <Engine.hpp>
+#include <Math/FQuat.hpp>
 #include <Math/MathUtil.hpp>
-#include <Math/Quat.hpp>
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Physics/PhysicsManager.hpp>
@@ -134,7 +134,7 @@ bool RagdollEntity::AddWound(JPH::BodyID body_id, const FVec3 point, const FVec3
 		return false;
 	}
 
-	const Mat4f rest_to_world = pSkeleton->SkinningMatrices[bone_index] * skinned->GetWorldMatrix();
+	const FMat4 rest_to_world = pSkeleton->SkinningMatrices[bone_index] * skinned->GetWorldMatrix();
 
 	gDecalManager->AddSkinnedBloodSplat(&(*pSkeleton), rest_to_world, point, direction, size);
 
@@ -172,7 +172,7 @@ bool NPC::Create(const Object* model, const NPCDesc& desc, NPCManager& manager)
 	Object* root = mActor.GetRoot();
 
 	root->SetPosition(desc.Position);
-	root->SetRotation(Quat::FromAxisAngle(FVec3::sUp, desc.Yaw));
+	root->SetRotation(FQuat::FromAxisAngle(FVec3::sUp, desc.Yaw));
 
 	mName = desc.Name;
 
@@ -362,7 +362,7 @@ void NPC::UpdateLocomotion(float32 delta_time)
 	const FVec3 moved = position - previous_position;
 
 	root->SetPosition(position);
-	root->SetRotation(Quat::FromAxisAngle(FVec3::sUp, mYaw));
+	root->SetRotation(FQuat::FromAxisAngle(FVec3::sUp, mYaw));
 
 	const float32 speed = FVec3(moved.X, 0.0f, moved.Z).Length() / delta_time;
 
@@ -448,7 +448,7 @@ void NPC::PlaceRootUnderPelvis()
 		target = root_position + FVec3(arm.X * cos_turn + arm.Z * sin_turn, arm.Y, arm.Z * cos_turn - arm.X * sin_turn);
 
 		mYaw = NPCBrain::WrapAngle(mYaw + turn);
-		root->SetRotation(Quat::FromAxisAngle(FVec3::sUp, mYaw));
+		root->SetRotation(FQuat::FromAxisAngle(FVec3::sUp, mYaw));
 	}
 
 	const FVec3 offset = pelvis - target;
@@ -1291,7 +1291,7 @@ void NPC::SetYaw(float32 yaw)
 	}
 
 	mYaw = yaw;
-	root->SetRotation(Quat::FromAxisAngle(FVec3::sUp, yaw));
+	root->SetRotation(FQuat::FromAxisAngle(FVec3::sUp, yaw));
 	mbTeleported = true;
 }
 

@@ -121,7 +121,7 @@ SizedArray<VkLayerProperties> GraphicsBackend::GetAvailableValidationLayers()
 
 VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance);
 
-void GraphicsBackend::Init(Vec2u window_size)
+void GraphicsBackend::Init(UVec2 window_size)
 {
 	InitVulkan();
 	CreateSurfaceFromWindow();
@@ -144,7 +144,7 @@ void GraphicsBackend::Init(Vec2u window_size)
 	}
 
 	LightBuffer.Create(scLightUniformSize, Limits::MaxActiveLights);
-	BoneBuffer.Create(sizeof(Mat4f), Limits::MaxBoneMatrices, eGpuBufferType::StorageWithOffset);
+	BoneBuffer.Create(sizeof(FMat4), Limits::MaxBoneMatrices, eGpuBufferType::StorageWithOffset);
 	FrameAlloc.Create();
 
 	LightGridPageSize = Limits::MaxScreenTiles * sizeof(uint32) * 4;
@@ -180,7 +180,7 @@ void GraphicsBackend::Init(Vec2u window_size)
 
 
 	{
-		const Vec2u atlas_size(Limits::ProbeAtlasWidth, Limits::ProbeAtlasHeight);
+		const UVec2 atlas_size(Limits::ProbeAtlasWidth, Limits::ProbeAtlasHeight);
 		const uint64 atlas_bytes = static_cast<uint64>(atlas_size.X) * atlas_size.Y *
 								   ImageFormatUtil::GetPixelStride(eImageFormat::RG16_UNorm);
 
@@ -204,10 +204,10 @@ void GraphicsBackend::Init(Vec2u window_size)
 		const uint8 neutral_lightmap[4] = { 128, 128, 128, 255 };
 		const uint16 black_irradiance[4] = { 0, 0, 0, scHalfOne };
 
-		pLightmap = CreateLightmapImage(Vec2u(1, 1), eImageFormat::RGBA8_UNorm,
+		pLightmap = CreateLightmapImage(UVec2(1, 1), eImageFormat::RGBA8_UNorm,
 										Slice<const uint8>(neutral_lightmap, sizeof(neutral_lightmap)));
 		pLightmapIrradiance = CreateLightmapImage(
-			Vec2u(1, 1), eImageFormat::RGBA16_Float,
+			UVec2(1, 1), eImageFormat::RGBA16_Float,
 			Slice<const uint8>(reinterpret_cast<const uint8*>(black_irradiance), sizeof(black_irradiance)));
 
 		Transport.Create();
@@ -218,7 +218,7 @@ void GraphicsBackend::Init(Vec2u window_size)
 		const uint16 unshadowed = scFogShadowUnshadowed;
 
 		pFogShadowAtlas = CreateLightmapImage(
-			Vec2u(1, 1), eImageFormat::D16_UNorm,
+			UVec2(1, 1), eImageFormat::D16_UNorm,
 			Slice<const uint8>(reinterpret_cast<const uint8*>(&unshadowed), sizeof(unshadowed)));
 
 		FogShadowPageBufferSize = scMaxFogShadowCells * sizeof(FogShadowPageGpu);
@@ -240,7 +240,7 @@ void GraphicsBackend::Init(Vec2u window_size)
 
 		pReflectionProbes = gTextureManager->NewTexture();
 		pReflectionProbes->Create(eImageType::CubemapArray,
-								  Vec2u(Limits::ReflectionProbeSize, Limits::ReflectionProbeSize),
+								  UVec2(Limits::ReflectionProbeSize, Limits::ReflectionProbeSize),
 								  Limits::ReflectionProbeMips, eImageFormat::RGBA16_Float,
 								  VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, eImageAspectFlag::Color,
 								  eImageCreateFlags::None, Limits::MaxReflectionProbes);
@@ -267,7 +267,7 @@ void GraphicsBackend::Init(Vec2u window_size)
 	gShadowAtlas = new ShadowAtlas;
 	gShadowRenderer = new ShadowDirectional;
 
-	pNoiseTexture = ImageGen::Random(Vec2u(64));
+	pNoiseTexture = ImageGen::Random(UVec2(64));
 	pDfgLut = ImageGen::DfgLut(Limits::DfgLutSize);
 
 	pRenderer = new TiledForwardRenderer;
@@ -357,7 +357,7 @@ void GraphicsBackend::RebuildRenderStages()
 {
 	TiledForwardRenderer* rd = pRenderer;
 
-	Vec2u size = GetWindow()->GetSize();
+	UVec2 size = GetWindow()->GetSize();
 
 	// The forward pass shares the prepass's depth image, so the prepass has to be rebuilt first
 	rd->Prepass.Rebuild(size);
@@ -744,7 +744,7 @@ bool GraphicsBackend::UploadFogShadow(const CompiledMapFogShadow& shadow)
 	const uint32 atlas_width = std::max(widest,
 										static_cast<uint32>(std::min<uint64>(total_width, scFogShadowAtlasWidth)));
 
-	SizedArray<Vec2u> placements;
+	SizedArray<UVec2> placements;
 	placements.InitSize(shadow.Pages.Size);
 
 	uint32 cursor_x = 0;
@@ -760,7 +760,7 @@ bool GraphicsBackend::UploadFogShadow(const CompiledMapFogShadow& shadow)
 			shelf_height = 0;
 		}
 
-		placements[page] = Vec2u(cursor_x, shelf_y);
+		placements[page] = UVec2(cursor_x, shelf_y);
 
 		cursor_x += detail.Width;
 		shelf_height = std::max(shelf_height, detail.Height);
@@ -785,7 +785,7 @@ bool GraphicsBackend::UploadFogShadow(const CompiledMapFogShadow& shadow)
 	for (uint32 i = 0; i < shadow.Pages.Size; i++) {
 		const CompiledMapFogShadowPage& page = shadow.Pages[i];
 		const CompiledMapFogShadowLevel& detail = page.Levels[0];
-		const Vec2u position = placements[i];
+		const UVec2 position = placements[i];
 
 		for (uint32 row = 0; row < detail.Height; row++) {
 			memcpy(texels.pData + static_cast<size_t>(position.Y + row) * atlas_width + position.X,
@@ -816,7 +816,7 @@ bool GraphicsBackend::UploadFogShadow(const CompiledMapFogShadow& shadow)
 	SubmitImmediateUploadCmd(
 		[&](CommandBuffer& cmd)
 		{
-			ImageInfo info(Vec2u(atlas_width, atlas_height), eImageFormat::D16_UNorm, 0, 1,
+			ImageInfo info(UVec2(atlas_width, atlas_height), eImageFormat::D16_UNorm, 0, 1,
 						   Slice<const uint8>(reinterpret_cast<const uint8*>(texels.pData), texels.GetSizeInBytes()));
 
 			pFogShadowAtlas->CreateFromData(cmd, info, eImageCreateFlags::None);
@@ -849,7 +849,7 @@ bool GraphicsBackend::UploadFogShadow(const CompiledMapFogShadow& shadow)
 	return true;
 }
 
-Image* GraphicsBackend::CreateLightmapImage(const Vec2u& size, eImageFormat format, const Slice<const uint8>& texels)
+Image* GraphicsBackend::CreateLightmapImage(const UVec2& size, eImageFormat format, const Slice<const uint8>& texels)
 {
 	Image* image = gTextureManager->NewTexture();
 
@@ -864,7 +864,7 @@ Image* GraphicsBackend::CreateLightmapImage(const Vec2u& size, eImageFormat form
 	return image;
 }
 
-bool GraphicsBackend::UploadLightmap(const Vec2u& size, const uint8* sun_visibility, const uint16* irradiance,
+bool GraphicsBackend::UploadLightmap(const UVec2& size, const uint8* sun_visibility, const uint16* irradiance,
 									 const uint8* directions)
 {
 	if (pRenderer == nullptr || sun_visibility == nullptr || size.X == 0 || size.Y == 0 ||
@@ -891,7 +891,7 @@ bool GraphicsBackend::UploadLightmap(const Vec2u& size, const uint8* sun_visibil
 		lightmap_texels[texel * 4 + 3] = sun_visibility[texel];
 	}
 
-	Vec2u irradiance_size(1, 1);
+	UVec2 irradiance_size(1, 1);
 
 	if (irradiance != nullptr) {
 		irradiance_size = size;
@@ -1290,7 +1290,7 @@ void GraphicsBackend::RenderFog(PerspectiveCamera& camera)
 		gShadowAtlas->GetRegionUVTransform(gShadowAtlas->GetFarDirectionalRegion(), consts.FarSunAtlasRect);
 	}
 	else {
-		memcpy(consts.FarSunMatrix, Mat4f::scIdentity.RawData, sizeof(consts.FarSunMatrix));
+		memcpy(consts.FarSunMatrix, FMat4::scIdentity.RawData, sizeof(consts.FarSunMatrix));
 	}
 
 	Image& history = pRenderer->FroxelHistory;
@@ -1379,8 +1379,8 @@ void GraphicsBackend::DoComposition(PerspectiveCamera& render_cam)
 	RenderFog(render_cam);
 	MarkGpu(eGpuMarker::Fog);
 
-	// Probe capture bake faces render here: the main forward pass is done, so
-	// the capture can reuse its pipelines + light grid page before composition.
+	// Probe capture bake faces render here after the main forward pass is done.
+	// The capture can reuse its pipelines + light grid page before composition.
 	if (gProbeManager->IsCapturePending()) {
 		gWorld->RenderProbeCapture();
 		MarkGpu(eGpuMarker::ProbeCapture);
@@ -1427,7 +1427,7 @@ void GraphicsBackend::RequestFrameCapture(const char* path) { mFrameCapturePath 
 void GraphicsBackend::RecordFrameCapture(CommandBuffer& cmd)
 {
 	Image& image = Swapchain.OutputImages[GetImageIndex()];
-	const Vec2u size = Swapchain.Extent;
+	const UVec2 size = Swapchain.Extent;
 	const uint32 width = size.X;
 	const uint32 height = size.Y;
 	const uint64 byte_count = static_cast<uint64>(width) * height * 4;
@@ -1591,6 +1591,34 @@ void GraphicsBackend::Destroy()
 
 	bInitialized = false;
 }
+
+bool GraphicsBackend::ProcessDeletionQueue(bool immediate, Queue<DeletionObject>& deletion_queue)
+{
+	if (deletion_queue.IsEmpty()) {
+		return false;
+	}
+
+	DeletionObject& object = deletion_queue.First();
+
+	const bool is_frame_spaced = (mInternalFrameCounter >= object.DeletionFrameNumber);
+
+	bool did_delete = false;
+
+	if (immediate || is_frame_spaced) {
+		if (object.bIsGpuBuffer) {
+			vmaDestroyBuffer(GpuAllocator, object.Buffer, object.Allocation);
+		}
+		else {
+			object.Func(&object);
+		}
+
+		did_delete = true;
+		deletion_queue.Pop();
+	}
+
+	return did_delete;
+}
+
 
 FrameData* GraphicsBackend::GetFrame() { return &Frames[GetFrameNumber()]; }
 

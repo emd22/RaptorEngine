@@ -220,9 +220,9 @@ target_include_directories(raptor SYSTEM PRIVATE "Submodules/mimalloc/include")
 
 target_link_libraries(raptor PRIVATE turbojpeg SDL3 freetype ktx phonon libdeflate_static)
 
+# Map Compiler (mapc and mapc-gui)
 
-# Map compiler (Tools/MapCompiler): turns the brushes of a prototype file into batched world geometry.
-# mapc_core holds the compiler, mapc is the command line tool and mapc-gui (Tools/MapCompilerGui) the wxWidgets frontend
+
 file(GLOB MAPC_SOURCES "Tools/MapCompiler/*.cpp" "Tools/MapCompiler/*.hpp")
 list(FILTER MAPC_SOURCES EXCLUDE REGEX "/Tools/MapCompiler/Main\\.cpp$")
 
@@ -230,7 +230,6 @@ add_library(mapc_core STATIC
     ${MAPC_SOURCES}
     "Src/Map/CompiledMap.cpp"
     "Src/Renderer/ProbePlacement.cpp"
-    "Src/Math/BBox.cpp"
     "Src/BrushEntry.cpp"
     "Src/LightEntry.cpp"
     "Src/Brush.cpp"
@@ -251,20 +250,23 @@ add_library(mapc_core STATIC
     "Src/Core/Serialize.cpp"
     "Src/Core/String.cpp"
     "Src/Util/Tokenizer.cpp"
-    "Src/Math/Mat4.cpp"
+
+    # Math
     "Src/Math/MathUtil.cpp"
     "Src/Math/NeonUtil.cpp"
     "Src/Math/SSEUtil.cpp"
-    "Src/Math/Impl/Matrix/Mat4_Neon.cpp"
-    "Src/Math/Impl/Matrix/Mat4_AVX.cpp"
-    "Src/Math/Impl/Quaternion/Quat_Neon.cpp"
-    "Src/Math/Impl/Quaternion/Quat_AVX.cpp"
+    "Src/Math/FMat4.cpp"
+    "Src/Math/Impl/Matrix/FMat4_Neon.cpp"
+    "Src/Math/Impl/Matrix/FMat4_AVX.cpp"
+    "Src/Math/Impl/Quaternion/FQuat_Neon.cpp"
+    "Src/Math/Impl/Quaternion/FQuat_AVX.cpp"
     "Src/Math/Impl/Vector/FVec3_Neon.cpp"
     "Src/Math/Impl/Vector/FVec3_AVX.cpp"
     "Src/Math/Impl/Vector/DVec3_Neon.cpp"
     "Src/Math/Impl/Vector/DVec3_AVX.cpp"
-    "Src/Math/Impl/Vector/Vec4_Neon.cpp"
-    "Src/Math/Impl/Vector/Vec4_AVX.cpp"
+    "Src/Math/Impl/Vector/FVec4_Neon.cpp"
+    "Src/Math/Impl/Vector/FVec4_AVX.cpp"
+    "Src/Math/BBox.cpp"
 )
 
 target_include_directories(mapc_core PUBLIC "Src" "Tools/MapCompiler")

@@ -41,12 +41,10 @@ class World
 		float32 Distance;
 	};
 
-	/// A spot light whose shadow map is rendered into the shadow atlas this frame
 	struct SpotShadowBake
 	{
 		LightSpot* pLight = nullptr;
 
-		/// Range of the light's casters in mSpotShadowCasters
 		uint32 FirstCaster = 0;
 		uint32 NumCasters = 0;
 	};
@@ -85,11 +83,12 @@ public:
 	~World() { Destroy(); }
 
 private:
-	// Queue debug shapes on gDebugDraw, which draws them at the end of Render()
 	void DebugDrawPhysicsBodies();
 	void DebugDrawProbes();
 
-	/// Draws a wireframe box for each probe volume brush, which is otherwise not drawn at all
+	/**
+	 * @brief Draws a wireframe box for each probe volume brush
+	 */
 	void DebugDrawProbeVolumes();
 	void DebugDrawSelectedDecals();
 
@@ -109,21 +108,15 @@ private:
 	void CullWorldTiles(const PerspectiveCamera& cam);
 
 	void ExecuteRenderList(renderer::PipelineHandle pipeline);
-	/// Draws the list of `pipeline` with `draw_pipeline`, which is a variant of it from another pass (or itself)
+
 	void ExecuteRenderList(renderer::PipelineHandle pipeline, renderer::PipelineHandle draw_pipeline,
 						   PerspectiveCamera& camera);
 
-	/// Draws the opaque geometry with every pipeline of the forward pass
 	void ExecuteForwardRenderLists(PerspectiveCamera& camera);
 	void ExecuteTransparentRenderLists();
 	void ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const BaseCamera& shadow_camera,
 								 bool skip_lightmapped = false);
 
-	/**
-	 * @brief Re-renders the sun's shadow map centered on `center` for a probe capture, and writes a copy of the sun
-	 * that reads it into a spare light buffer slot (the main view keeps the original slot and its shadow matrix).
-	 * @return False if the light buffer is full, in which case the shadow map is left alone.
-	 */
 	bool RenderCaptureSunShadows(LightDirectional& sun, const FVec3 center, OrthoCamera& out_shadow_camera,
 								 uint32& out_light_slot);
 
@@ -137,17 +130,18 @@ private:
 	/// Renders the bakes queued by UpdateSpotShadows() into their shadow atlas tiles.
 	void BakeSpotShadows();
 
-	/// Starts a shadow pass over one region of the shadow atlas and binds the shadow pipeline's descriptors.
+	/**
+	 * @brief Starts a shadow pass over one region of the shadow atlas and binds the shadow pipeline's descriptors.
+	 */
 	void BeginShadowAtlasRegion(const URect& region);
 
 	/**
-	 * @brief Appends the shadow casters (and their attached nodes) from every tile that a sphere touches. Skinned
-	 * objects are skipped, the shadow pipeline cannot draw them.
+	 * @brief Appends the shadow casters (and their attached entities) from every tile that a sphere touches.
 	 */
 	void GatherSpotShadowCasters(const FVec3 center, float32 radius, DynArray<ObjectID>& out_casters);
 	void AddSpotShadowCasterRecursive(ObjectID id, uint32 first_caster, const FVec3 center, float32 radius,
 									  DynArray<ObjectID>& out_casters);
-	/// Draws the objects of a forward pipeline's list into the prepass, with the prepass pipeline that goes with it
+
 	void ExecutePrepassRenderList(renderer::PipelineHandle forward_pipeline);
 
 	void AddLoadedObject(Object* object);
@@ -161,6 +155,7 @@ private:
 
 	void AddToRenderListRecursive(renderer::PipelineHandle pipeline, ObjectID* id);
 	void AddShadowCasterRecursive(ObjectID id);
+
 	/**
 	 * @brief Recursively adds `id` and its attached nodes to the geometry render list, deriving each node's own
 	 * pipeline from its own material rather than inheriting the pipeline chosen for the root (attached primitives
@@ -261,7 +256,7 @@ private:
 	PortalVisibility mPortalVisibility;
 
 	bool mbPortalLocked = false;
-	Mat4f mLockedViewProjection;
+	FMat4 mLockedViewProjection;
 	FVec3 mLockedCameraPosition = FVec3::sZero;
 	FVec3 mLockedCameraDirection = FVec3::sForward;
 

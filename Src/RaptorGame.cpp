@@ -220,7 +220,7 @@ void RaptorGame::InitEngine(const eWindowFlags window_flags)
 
 	mBaseWindowTitle = String(window_title);
 
-	Ref<Window> window = MakeRef<Window>(window_title, Vec2u(window_width, window_height), window_flags);
+	Ref<Window> window = MakeRef<Window>(window_title, UVec2(window_width, window_height), window_flags);
 
 	ConfigEntry* bob_entry = Config.GetEntry(HashStr32("HeadBob"));
 
@@ -255,7 +255,7 @@ void RaptorGame::InitEngine(const eWindowFlags window_flags)
 		});
 
 	// Make the world grid approx 1.5km x 1.5km. This should be increased as the map sizes grow.
-	gWorldGrid->Create(Vec2u(15));
+	gWorldGrid->Create(UVec2(15));
 
 	sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
 
@@ -289,7 +289,7 @@ void RaptorGame::CreateLights()
 }
 
 
-Vec2f PixelsToUV(const Vec2i& pos, const Vec2f& size) { return Vec2f(pos.X / size.X, pos.Y / size.Y); }
+FVec2 PixelsToUV(const IVec2& pos, const FVec2& size) { return FVec2(pos.X / size.X, pos.Y / size.Y); }
 
 void RaptorGame::UpdateExposure()
 {
@@ -413,7 +413,7 @@ void RaptorGame::CreateGame()
 	scene_file.Load(std::format("RaptorData/Data/{}", scene_to_load));
 	gPhysics->pBackend->OptimizeBroadPhase();
 
-	// Baked probes if the scene has them, procedural gradient otherwise.
+	// Baked probes if the scene has them
 	gProbeManager->LoadProbes();
 
 	gShadowRenderer->ShadowCamera.SetPosition(FVec3(0, 8, 5));
@@ -693,7 +693,7 @@ void RaptorGame::ProcessControls()
 	}
 
 	if (ControlManager::IsMouseLocked()) {
-		Vec2f mouse_delta = ControlManager::GetMouseDelta();
+		FVec2 mouse_delta = ControlManager::GetMouseDelta();
 		mouse_delta.X *= scMouseRadiansPerPixel;
 		mouse_delta.Y *= -scMouseRadiansPerPixel;
 
@@ -788,7 +788,7 @@ void RaptorGame::ProcessControls()
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_0)) {
 		TileIndex tile_index = gWorldGrid->WorldToTile(gWorld->Player.Position);
 
-		Vec2u tile_xy = gWorldGrid->TileToTileXY(tile_index);
+		UVec2 tile_xy = gWorldGrid->TileToTileXY(tile_index);
 
 		LogInfo("Tile index: {}, {}", tile_xy.X, tile_xy.Y);
 	}
@@ -1338,13 +1338,13 @@ void RaptorGame::RenderCrosshair()
 {
 	static const uint32 scWhite = Color::FromRGBA(255, 255, 255, 255).AsUInt();
 
-	const Vec2u window_size = gGraphics->GetWindow()->GetSize();
+	const UVec2 window_size = gGraphics->GetWindow()->GetSize();
 
 	// Whole pixels keep the image's texels lined up with the screen's, so it stays sharp
-	const Vec2f position(static_cast<float32>((static_cast<int64>(window_size.X) - scCrosshairSize) / 2),
+	const FVec2 position(static_cast<float32>((static_cast<int64>(window_size.X) - scCrosshairSize) / 2),
 						 static_cast<float32>((static_cast<int64>(window_size.Y) - scCrosshairSize) / 2));
 
-	gTextRenderer->DrawImage(mpCrosshair.load(), position, Vec2f(static_cast<float32>(scCrosshairSize)), scWhite);
+	gTextRenderer->DrawImage(mpCrosshair.load(), position, FVec2(static_cast<float32>(scCrosshairSize)), scWhite);
 }
 
 
@@ -1363,7 +1363,7 @@ void RaptorGame::Tick()
 	}
 
 	gGraphics->DeltaTime = static_cast<float32>(DeltaTime);
-	gGraphics->ShaderTime += DeltaTime;
+	gGraphics->TotalRunTime += DeltaTime;
 
 	mFpsWindowTime += DeltaTime;
 

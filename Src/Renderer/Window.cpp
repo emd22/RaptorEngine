@@ -12,72 +12,72 @@
 
 namespace fx {
 
-void Window::Create(const char* title, const Vec2u& size)
+void Window::Create(const char* title, const UVec2& size)
 {
-    mSize = size;
+	mSize = size;
 
-    if (size.X > 8000 || size.Y > 8000) {
-        Panic("Window", "Window size is too large! (Size: {})", size);
-    }
+	if (size.X > 8000 || size.Y > 8000) {
+		Panic("Window", "Window size is too large! (Size: {})", size);
+	}
 
-    const uint64 window_flags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE;
+	const uint64 window_flags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE;
 
-    SDL_SetHint(SDL_HINT_WINDOWS_RAW_KEYBOARD, "1");
+	SDL_SetHint(SDL_HINT_WINDOWS_RAW_KEYBOARD, "1");
 
-    mWindow = SDL_CreateWindow(title, static_cast<int32>(size.X), static_cast<int32>(size.Y), window_flags);
+	mWindow = SDL_CreateWindow(title, static_cast<int32>(size.X), static_cast<int32>(size.Y), window_flags);
 
 
-    if (mWindow == nullptr) {
-        Panic("Window", "Could not create SDL window (SDL err: {})", SDL_GetError());
-    }
+	if (mWindow == nullptr) {
+		Panic("Window", "Could not create SDL window (SDL err: {})", SDL_GetError());
+	}
 
-    HandleResize();
+	HandleResize();
 }
 
 void Window::SetTitle(const char* title) { SDL_SetWindowTitle(mWindow, title); }
 
 void Window::HandleResize()
 {
-    int width, height;
+	int width, height;
 
-    // Get window size from SDL
-    if (!SDL_GetWindowSize(mWindow, &width, &height)) {
-        LogError(LC_RENDER, "Error retrieving window size from SDL! (SDL err: {})", SDL_GetError());
-        return;
-    }
+	// Get window size from SDL
+	if (!SDL_GetWindowSize(mWindow, &width, &height)) {
+		LogError(LC_RENDER, "Error retrieving window size from SDL! (SDL err: {})", SDL_GetError());
+		return;
+	}
 
-    mSize = Vec2u(static_cast<uint32>(width), static_cast<uint32>(height));
+	mSize = UVec2(static_cast<uint32>(width), static_cast<uint32>(height));
 }
 
 const char* const* Window::GetRequiredInstanceExtensions(uint32* out_count)
 {
-    return SDL_Vulkan_GetInstanceExtensions(out_count);
+	return SDL_Vulkan_GetInstanceExtensions(out_count);
 }
 
 VkSurfaceKHR Window::CreateSurface(VkInstance instance)
 {
-    VkSurfaceKHR surface = nullptr;
+	VkSurfaceKHR surface = nullptr;
 
-    if (!SDL_Vulkan_CreateSurface(mWindow, instance, nullptr, &surface)) {
-        Panic("Window", "Could not attach Vulkan instance to window! (SDL err: {})", SDL_GetError());
-    }
+	if (!SDL_Vulkan_CreateSurface(mWindow, instance, nullptr, &surface)) {
+		Panic("Window", "Could not attach Vulkan instance to window! (SDL err: {})", SDL_GetError());
+	}
 
-    return surface;
+	return surface;
 }
 
 void Window::SetRelativeMouseMode(bool enabled)
 {
-    if (enabled) {
-        float32 x, y;
-        SDL_GetMouseState(&x, &y);
+	if (enabled) {
+		float32 x, y;
+		SDL_GetMouseState(&x, &y);
 
-        mSavedMousePos = Vec2f(x, y);
-    }
-    else {
-        SDL_WarpMouseInWindow(mWindow, mSavedMousePos.GetX(), mSavedMousePos.GetY());
-    }
+		mSavedMousePos = FVec2(x, y);
+	}
+	else {
+		SDL_WarpMouseInWindow(mWindow, mSavedMousePos.GetX(), mSavedMousePos.GetY());
+	}
 
-    SDL_SetWindowRelativeMouseMode(mWindow, enabled);
+	SDL_SetWindowRelativeMouseMode(mWindow, enabled);
 }
 
 bool Window::IsFocused() const { return (SDL_GetWindowFlags(mWindow) & SDL_WINDOW_INPUT_FOCUS) != 0; }

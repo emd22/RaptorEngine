@@ -1,6 +1,6 @@
 #include "PerspectiveCamera.hpp"
 
-#include <Math/Vec4.hpp>
+#include <Math/FVec4.hpp>
 
 
 namespace fx {

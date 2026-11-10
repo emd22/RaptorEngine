@@ -39,7 +39,7 @@ void Ragdoll::Activate(const FVec3 velocity)
 	}
 }
 
-void Ragdoll::Drive(const Mat4f& object_world_matrix, float32 delta_time, bool teleport)
+void Ragdoll::Drive(const FMat4& object_world_matrix, float32 delta_time, bool teleport)
 {
 	if (mpRagdoll == nullptr || !mpSkeleton.IsValid() || mbLimp) {
 		return;
@@ -54,7 +54,7 @@ void Ragdoll::Drive(const Mat4f& object_world_matrix, float32 delta_time, bool t
 		RDSegmentInfo& info = mSegments[i];
 		RDSegmentTarget& target = mSegmentTargets[i];
 
-		const Mat4f bone_world = skel.WorldTransforms[info.BoneIndex] * object_world_matrix;
+		const FMat4 bone_world = skel.WorldTransforms[info.BoneIndex] * object_world_matrix;
 		const JPH::Quat orientation = RotationFromMatrix(bone_world).GetQuaternion().Normalized();
 		const JPH::Vec3 position = RowAsVec3(bone_world, 3);
 
@@ -108,7 +108,7 @@ void Ragdoll::StorePreviousPoses(JPH::BodyInterface& body_interface)
 	}
 }
 
-void Ragdoll::GoLimp(const Mat4f& object_world_matrix)
+void Ragdoll::GoLimp(const FMat4& object_world_matrix)
 {
 	if (mpRagdoll == nullptr || mbLimp) {
 		return;
@@ -648,7 +648,7 @@ bool Ragdoll::IsBodyOnGround(uint32 body_index, const JPH::Vec3 up, float32 min_
 	return GetBodyGroundContact(body_index, contact) && IsSupportNormal(contact, up, min_up);
 }
 
-Mat4f Ragdoll::GetSegmentWorldMatrix(uint32 body_index, float32 step_alpha) const
+FMat4 Ragdoll::GetSegmentWorldMatrix(uint32 body_index, float32 step_alpha) const
 {
 	JPH::RVec3 current_position;
 	JPH::Quat orientation;
@@ -663,9 +663,9 @@ Mat4f Ragdoll::GetSegmentWorldMatrix(uint32 body_index, float32 step_alpha) cons
 		orientation = previous.Orientation.SLERP(orientation, step_alpha).Normalized();
 	}
 
-	const Mat4f world = MatrixFromRotationTranslation(JPH::Mat44::sRotation(orientation), position);
+	const FMat4 world = MatrixFromRotationTranslation(JPH::Mat44::sRotation(orientation), position);
 
-	Mat4f model = world * mWorldInverse;
+	FMat4 model = world * mWorldInverse;
 	NormalizeRotationRows(model);
 	ScaleRotationRows(model, mSegments[body_index].BoneScale);
 
@@ -709,7 +709,7 @@ void Ragdoll::WriteToSkeleton()
 			JPH::Quat orientation;
 			GetPoseBlendWorld(i, position, orientation);
 
-			Mat4f model = MatrixFromRotationTranslation(JPH::Mat44::sRotation(orientation), position) * mWorldInverse;
+			FMat4 model = MatrixFromRotationTranslation(JPH::Mat44::sRotation(orientation), position) * mWorldInverse;
 			NormalizeRotationRows(model);
 			ScaleRotationRows(model, info.BoneScale);
 
@@ -729,10 +729,10 @@ void Ragdoll::WriteToSkeleton()
 
 		any_driven = true;
 
-		Mat4f model = GetSegmentWorldMatrix(i, step_alpha);
+		FMat4 model = GetSegmentWorldMatrix(i, step_alpha);
 
 		if (info.Blend < 1.0f) {
-			const Mat4f& animated = skel.WorldTransforms[info.BoneIndex];
+			const FMat4& animated = skel.WorldTransforms[info.BoneIndex];
 
 			const JPH::Quat from = RotationFromMatrix(animated).GetQuaternion().Normalized();
 			const JPH::Quat to = RotationFromMatrix(model).GetQuaternion().Normalized();

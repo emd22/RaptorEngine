@@ -14,8 +14,8 @@
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
 #include <Material/MaterialID.hpp>
+#include <Math/FQuat.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Quat.hpp>
 #include <Object/ObjectID.hpp>
 #include <Patch.hpp>
 #include <Renderer/LightID.hpp>
@@ -82,7 +82,7 @@ struct ObjectSnapshot
 {
 	FVec3 Position = FVec3::sZero;
 	MaterialID Material = MaterialID::scNull;
-	Quat Rotation = Quat::scIdentity;
+	FQuat Rotation = FQuat::scIdentity;
 	Name ObjectName;
 
 	// TODO: replace the below with flags.

@@ -154,20 +154,20 @@ enum class eTopViewBrushKind : uint8
 
 struct TopViewEdge
 {
-	Vec2f A = Vec2f::scZero;
-	Vec2f B = Vec2f::scZero;
+	FVec2 A = FVec2::scZero;
+	FVec2 B = FVec2::scZero;
 
 	bool operator==(const TopViewEdge& other) const = default;
 };
 
 struct TopViewFace
 {
-	Vec2f A = Vec2f::scZero;
-	Vec2f B = Vec2f::scZero;
-	Vec2f Normal = Vec2f::scZero;
+	FVec2 A = FVec2::scZero;
+	FVec2 B = FVec2::scZero;
+	FVec2 Normal = FVec2::scZero;
 	FVec3 WorldNormal = FVec3::sZero;
 
-	Vec2f TextureOffset = Vec2f::scZero;
+	FVec2 TextureOffset = FVec2::scZero;
 	float32 TextureScale = 2.0f;
 	float32 TextureRotation = 0.0f;
 
@@ -177,7 +177,7 @@ struct TopViewFace
 struct TopViewFrontFace
 {
 	TopViewFace Face;
-	DynArray<Vec2f> Polygon;
+	DynArray<FVec2> Polygon;
 
 	TopViewFrontFace() = default;
 	TopViewFrontFace(TopViewFrontFace&& other) = default;
@@ -202,14 +202,14 @@ struct TopViewFrontFace
 
 struct TopViewProjection
 {
-	Vec2f Pivot = Vec2f::scZero;
+	FVec2 Pivot = FVec2::scZero;
 	float32 NearDepth = 0.0f;
 
-	DynArray<Vec2f> Hull;
+	DynArray<FVec2> Hull;
 	DynArray<TopViewEdge> Edges;
 	DynArray<TopViewFace> Faces;
 	DynArray<TopViewFrontFace> FrontFaces;
-	DynArray<Vec2f> ControlPoints;
+	DynArray<FVec2> ControlPoints;
 	DynArray<float32> ControlWeights;
 	DynArray<PatchColor> ControlColors;
 

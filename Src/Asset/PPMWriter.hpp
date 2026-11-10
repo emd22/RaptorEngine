@@ -22,7 +22,7 @@ public:
 	/**
 	 * @brief Write RGB data out to a PPM image.
 	 */
-	void WriteRGB(const String& path, const Vec2u& size, const Slice<uint8>& pixel_data);
+	void WriteRGB(const String& path, const UVec2& size, const Slice<uint8>& pixel_data);
 
 	~PPMWriter() = default;
 

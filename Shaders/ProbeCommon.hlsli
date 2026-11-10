@@ -422,8 +422,7 @@ struct ReflectionProbe
 	float4x4 mWorldToBox;
 	float4 vPositionAndCount;
 	float4 vFade;
-	/// Light probe irradiance luminance at the capture point along +X, +Y, +Z, w = 1 when there is any. See
-	/// ProbeManager::SampleCaptureIrradiance()
+	/// Light probe irradiance luminance at the capture point along +X, +Y, +Z, w = 1 when there is any.
 	float4 vCaptureIrradiancePositive;
 	/// The same along -X, -Y, -Z
 	float4 vCaptureIrradianceNegative;

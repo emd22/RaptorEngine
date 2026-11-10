@@ -10,9 +10,8 @@
 #include "RenderStage.hpp"
 #include "ShaderCache.hpp"
 
-#include <bit>
-
 #include <algorithm>
+#include <bit>
 
 #define FX_DEBUG_SET_DESCRIPTOR_NAMES 1
 
@@ -239,7 +238,7 @@ void PSOBuild::SetPushConstants(eShaderType type, uint32 pc_size)
 }
 
 
-static Vec2u GetDescriptorIndexRangeForShader(const Ref<ShaderProgram>& program)
+static UVec2 GetDescriptorIndexRangeForShader(const Ref<ShaderProgram>& program)
 {
 	SizedArray<ShaderReflectionEntry>& refl = program->Reflection;
 
@@ -251,7 +250,7 @@ static Vec2u GetDescriptorIndexRangeForShader(const Ref<ShaderProgram>& program)
 		min_set = std::min(entry.Set, min_set);
 	}
 
-	return Vec2u(static_cast<uint32>(min_set), static_cast<uint32>(max_set));
+	return UVec2(static_cast<uint32>(min_set), static_cast<uint32>(max_set));
 }
 
 std::vector<VkDescriptorSetLayout> PSOBuild::BuildDescriptorSets()

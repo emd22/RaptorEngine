@@ -79,18 +79,6 @@ void WorldFile::Load(const std::string& path)
 		}
 	}
 
-
-	// Models are loaded from the blockout file as well (see Blockout::LoadModels). Blockouts saved before that keep
-	// getting them from this file's `objects` entry until they are saved again.
-	if (gWorld->pPrototype != nullptr) {
-		if (gWorld->pPrototype->HasModelsEntry()) {
-			gWorld->pPrototype->LinkModelColliders();
-		}
-		else {
-			gWorld->pPrototype->LoadLegacyModels();
-		}
-	}
-
 	if (first_time) {
 		gWorld->bIsPopulated = true;
 	}
@@ -105,7 +93,7 @@ void WorldFile::AddColliderFromEntry(const std::string& scene_path, const Config
 	physics::Body* phys = gPhysics->NewBody(collider_name);
 
 	FVec3 position = collider_entry.GetMemberValue(HashStr32("pos"), FVec3::sZero);
-	Quat rotation = collider_entry.GetMemberValue(HashStr32("rot"), Quat::scIdentity);
+	FQuat rotation = collider_entry.GetMemberValue(HashStr32("rot"), FQuat::scIdentity);
 
 	ConfigEntry* physics_type = collider_entry.GetMember(HashStr32("type"));
 	if (physics_type && physics_type->Get<uint32>() == static_cast<uint32>(physics::eMotionType::Dynamic)) {

@@ -14,8 +14,8 @@
 #include <Core/StackArray.hpp>
 #include <Core/Types.hpp>
 #include <Math/BBox.hpp>
+#include <Math/FMat4.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Mat4.hpp>
 #include <Renderer/Limits.hpp>
 #include <functional>
 #include <limits>
@@ -76,8 +76,8 @@ struct ProbePlacementBoxes
 		BBox LocalBounds;
 		BBox WorldBounds;
 		bool bAxisAligned = false;
-		Mat4f LocalToWorld;
-		Mat4f WorldToLocal;
+		FMat4 LocalToWorld;
+		FMat4 WorldToLocal;
 
 		/// Local space planes of a brush that isn't a box. Empty for a box.
 		SizedArray<Plane> Planes;
@@ -186,12 +186,12 @@ namespace ProbePlacement {
 constexpr float32 scCaptureNearPlane = 0.1f;
 
 /// @returns False if the solid is too big to be level geometry (the sky) and was left out
-bool AddBox(ProbePlacementBoxes& boxes, const BBox& local_bounds, const Mat4f& local_to_world,
+bool AddBox(ProbePlacementBoxes& boxes, const BBox& local_bounds, const FMat4& local_to_world,
 			const SizedArray<ProbePlacementBoxes::Plane>& planes);
-void AddBound(ProbePlacementBoxes& boxes, const BBox& local_bounds, const Mat4f& local_to_world,
+void AddBound(ProbePlacementBoxes& boxes, const BBox& local_bounds, const FMat4& local_to_world,
 			  const SizedArray<ProbePlacementBoxes::Plane>& planes);
 void AddSurface(ProbePlacementBoxes& boxes, const BBox& world_bounds);
-void AddPatchSurfaces(ProbePlacementBoxes& boxes, const Patch& patch, const Mat4f& local_to_world);
+void AddPatchSurfaces(ProbePlacementBoxes& boxes, const Patch& patch, const FMat4& local_to_world);
 
 bool CheckGridSize(const ProbeGridSize& grid);
 void FinaliseVolumeBounds(ProbeVolumeData& volume);

@@ -6,7 +6,7 @@
 
 namespace fx::renderer {
 
-static Vec2u GetRealTargetSize(const Vec2u& size)
+static UVec2 GetRealTargetSize(const UVec2& size)
 {
 	if (size == Target::scFullScreen) {
 		return gGraphics->Swapchain.Extent;
@@ -14,7 +14,7 @@ static Vec2u GetRealTargetSize(const Vec2u& size)
 	return size;
 }
 
-void RenderStage::Create(const char* name, const Vec2u& size, eSizeDivisor size_divisor)
+void RenderStage::Create(const char* name, const UVec2& size, eSizeDivisor size_divisor)
 {
 	pcName = name;
 
@@ -76,7 +76,7 @@ void RenderStage::BuildRenderStage()
 		MakeClearValues();
 	}
 
-	const Vec2u final_size = mSize / Vec2u(mSizeDivisor);
+	const UVec2 final_size = mSize / UVec2(mSizeDivisor);
 
 	mOutputTargets.CreateImages(final_size);
 
@@ -93,13 +93,13 @@ void RenderStage::BuildRenderStage()
 	mbIsBuilt = true;
 }
 
-void RenderStage::Rebuild(const Vec2u& size)
+void RenderStage::Rebuild(const UVec2& size)
 {
 	mSize = GetRealTargetSize(size);
 
 	mbIsBuilt = false;
 
-	const Vec2u final_size = mSize / Vec2u(mSizeDivisor);
+	const UVec2 final_size = mSize / UVec2(mSizeDivisor);
 
 	mOutputTargets.RecreateImages(final_size);
 
@@ -122,8 +122,8 @@ void RenderStage::Rebuild(const Vec2u& size)
 
 void RenderStage::Begin(CommandBuffer& cmd)
 {
-	const Vec2u size = mRenderPass.Size;
-	const Vec2u offset = mRenderPass.Offset;
+	const UVec2 size = mRenderPass.Size;
+	const UVec2 offset = mRenderPass.Offset;
 
 	Begin(cmd, VkRect2D {
 				   .offset = { .x = static_cast<int32>(offset.X), .y = static_cast<int32>(offset.Y) },
@@ -148,13 +148,12 @@ void RenderStage::Begin(CommandBuffer& cmd, const VkRect2D& render_area, const V
 
 	mRenderPass.Begin(&cmd, framebuffer, ClearValues, render_area);
 
-	// Pipelines leave the viewport and scissor to whoever is drawing, and the target is what decides them. They stay
-	// set across pipeline binds, so this is the only place that sets them.
 	const VkViewport viewport = {
 		.x = static_cast<float32>(draw_area.offset.x),
 		.y = static_cast<float32>(draw_area.offset.y),
 		.width = static_cast<float32>(draw_area.extent.width),
 		.height = static_cast<float32>(draw_area.extent.height),
+
 		// Flipped depth range, the engine uses reverse Z
 		.minDepth = 1.0f,
 		.maxDepth = 0.0f,

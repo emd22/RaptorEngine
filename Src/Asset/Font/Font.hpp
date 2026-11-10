@@ -18,13 +18,13 @@ namespace fx::renderer {
 
 struct GlyphMetrics
 {
-	Vec2f Bearing = Vec2f::sZero;
-	Vec2u Size = Vec2u::sZero;
+	FVec2 Bearing = FVec2::sZero;
+	UVec2 Size = UVec2::sZero;
 
 	float Advance = 0.0f;
 
 	float Lsb = 0.0f;
-	Vec2u AtlasOffset = Vec2u::sZero;
+	UVec2 AtlasOffset = UVec2::sZero;
 };
 
 class FontAtlas
@@ -38,7 +38,7 @@ public:
 	void Upload(Image& out_image);
 
 	float GetFontSize() const { return FontSize; }
-	Vec2u GetSize() const { return AtlasSize; }
+	UVec2 GetSize() const { return AtlasSize; }
 
 	// SizedArray<uint8>& GetAtlasData() { return AtlasData; }
 	SizedArray<uint8> GetImageData(eImageFormat format) const;
@@ -53,18 +53,18 @@ public:
 	void Destroy();
 
 private:
-	Vec2u FindSlot(uint32 width, uint32 height);
+	UVec2 FindSlot(uint32 width, uint32 height);
 
 public:
 	HashMap<uint32, GlyphMetrics> Glyphs;
 
-	Vec2u AtlasSize = Vec2u::sZero;
+	UVec2 AtlasSize = UVec2::sZero;
 	float32 FontSize = 0.0f;
 
 	SizedArray<uint8> AtlasData;
 
 private:
-	Vec2u Cursor = Vec2u::sZero;
+	UVec2 Cursor = UVec2::sZero;
 	uint32 RowHeight = 0;
 };
 

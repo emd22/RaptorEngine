@@ -373,11 +373,11 @@ void MoveOperation::Undo(EditorSelection& selection)
 }
 
 RotateOperation::RotateOperation(Object* object, const FVec3& euler_before, const FVec3& euler_after, int32 group_size)
-	: RotateOperation(object, Quat::FromEulerAngles(euler_before), Quat::FromEulerAngles(euler_after), group_size)
+	: RotateOperation(object, FQuat::FromEulerAngles(euler_before), FQuat::FromEulerAngles(euler_after), group_size)
 {
 }
 
-RotateOperation::RotateOperation(Object* object, const Quat& before, const Quat& after, int32 group_size)
+RotateOperation::RotateOperation(Object* object, const FQuat& before, const FQuat& after, int32 group_size)
 	: ObjectEditOperation(object, group_size), mBefore(before), mAfter(after)
 {
 }

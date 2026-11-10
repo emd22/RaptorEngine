@@ -50,7 +50,7 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 	mpColorPicker->Bind(wxEVT_COLOURPICKER_CHANGED, &LightToolSettingsPanel::OnColorChange, this);
 
 	{
-		mpPositionField = new Vector3Field(body, "Position", Vec2f(-100000.0f, 100000.0f));
+		mpPositionField = new Vector3Field(body, "Position", FVec2(-100000.0f, 100000.0f));
 		mpPositionField->SetOnChange([](const FVec3 value)
 									 { EditSelectedLight([value](LightSpot& light) { light.SetPosition(value); }); });
 
@@ -58,7 +58,7 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 	}
 
 	{
-		mpRadiusField = new FloatField(body, "Radius", Vec2f(3.0f, 150.0f));
+		mpRadiusField = new FloatField(body, "Radius", FVec2(3.0f, 150.0f));
 		mpRadiusField->SetOnChange([](const float value)
 								   { EditSelectedLight([value](LightSpot& light) { light.SetRadius(value); }); });
 
@@ -66,7 +66,7 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 	}
 
 	{
-		mpIntensityField = new FloatField(body, "Intensity (cd)", Vec2f(0.0f, 100000000.0f));
+		mpIntensityField = new FloatField(body, "Intensity (cd)", FVec2(0.0f, 100000000.0f));
 		mpIntensityField->SetOnChange([](const float value)
 									  { EditSelectedLight([value](LightSpot& light) { light.Intensity = value; }); });
 
@@ -74,7 +74,7 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 	}
 
 	{
-		mpLumensField = new FloatField(body, "Lumens", Vec2f(0.0f, 100000000.0f));
+		mpLumensField = new FloatField(body, "Lumens", FVec2(0.0f, 100000000.0f));
 		mpLumensField->SetOnChange([](const float value)
 								   { EditSelectedLight([value](LightSpot& light) { light.SetLumens(value); }); });
 
@@ -82,7 +82,7 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 	}
 
 	{
-		mpOuterAngleField = new FloatField(body, "Outer angle", Vec2f(1.0f, 90.0f));
+		mpOuterAngleField = new FloatField(body, "Outer angle", FVec2(1.0f, 90.0f));
 		mpOuterAngleField->SetOnChange(
 			[](const float value)
 			{
@@ -94,7 +94,7 @@ void LightToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 	}
 
 	{
-		mpInnerAngleField = new FloatField(body, "Inner angle", Vec2f(0.0f, 90.0f));
+		mpInnerAngleField = new FloatField(body, "Inner angle", FVec2(0.0f, 90.0f));
 		mpInnerAngleField->SetOnChange(
 			[](const float value)
 			{
@@ -205,22 +205,22 @@ void SoundToolSettingsPanel::Construct(wxBoxSizer* tool_panel)
 	mpSoundChoice->Bind(wxEVT_CHOICE, &SoundToolSettingsPanel::OnSoundChoice, this);
 	section->AddRow("Sound", mpSoundChoice);
 
-	mpPositionField = new Vector3Field(body, "Position", Vec2f(-100000.0f, 100000.0f));
+	mpPositionField = new Vector3Field(body, "Position", FVec2(-100000.0f, 100000.0f));
 	mpPositionField->SetOnChange([](const FVec3 value)
 								 { EditSelectedSound([value](SoundEmitter& emitter) { emitter.Position = value; }); });
 	section->AddRow(*mpPositionField);
 
-	mpVolumeField = new FloatField(body, "Volume", Vec2f(0.0f, 4.0f));
+	mpVolumeField = new FloatField(body, "Volume", FVec2(0.0f, 4.0f));
 	mpVolumeField->SetOnChange([](const float value)
 							   { EditSelectedSound([value](SoundEmitter& emitter) { emitter.Volume = value; }); });
 	section->AddRow(*mpVolumeField);
 
-	mpMinIntervalField = new FloatField(body, "Interval min (s)", Vec2f(0.0f, 3600.0f));
+	mpMinIntervalField = new FloatField(body, "Interval min (s)", FVec2(0.0f, 3600.0f));
 	mpMinIntervalField->SetOnChange(
 		[](const float value) { EditSelectedSound([value](SoundEmitter& emitter) { emitter.MinInterval = value; }); });
 	section->AddRow(*mpMinIntervalField);
 
-	mpMaxIntervalField = new FloatField(body, "Interval max (s)", Vec2f(0.0f, 3600.0f));
+	mpMaxIntervalField = new FloatField(body, "Interval max (s)", FVec2(0.0f, 3600.0f));
 	mpMaxIntervalField->SetOnChange(
 		[](const float value) { EditSelectedSound([value](SoundEmitter& emitter) { emitter.MaxInterval = value; }); });
 	section->AddRow(*mpMaxIntervalField);

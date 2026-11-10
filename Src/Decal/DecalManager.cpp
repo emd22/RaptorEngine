@@ -228,7 +228,7 @@ void DecalManager::AddBloodSplat(const FVec3 hit_point, const FVec3 hit_normal, 
 	// 	AddDecal(desc);
 }
 
-void DecalManager::AddSkinnedDecal(const Skeleton* skeleton, const Mat4f& rest_to_world, const DecalDesc& desc)
+void DecalManager::AddSkinnedDecal(const Skeleton* skeleton, const FMat4& rest_to_world, const DecalDesc& desc)
 {
 	if (skeleton == nullptr) {
 		return;
@@ -237,7 +237,7 @@ void DecalManager::AddSkinnedDecal(const Skeleton* skeleton, const Mat4f& rest_t
 	SkinnedDecalEntry entry { .GpuData = BuildEntry(desc).GpuData, .pSkeleton = skeleton };
 	renderer::DecalGpuData& gpu_data = entry.GpuData;
 
-	const Mat4f rest_to_decal = rest_to_world * Mat4f::FromRows(gpu_data.WorldToDecal);
+	const FMat4 rest_to_decal = rest_to_world * FMat4::FromRows(gpu_data.WorldToDecal);
 	memcpy(gpu_data.WorldToDecal, rest_to_decal.RawData, sizeof(gpu_data.WorldToDecal));
 
 	float32* axes[3] = { gpu_data.AxisX, gpu_data.AxisY, gpu_data.AxisZ };
@@ -297,7 +297,7 @@ void DecalManager::AddSkinnedDecal(const Skeleton* skeleton, const Mat4f& rest_t
 	mSkinnedDecals[insert_at] = entry;
 }
 
-void DecalManager::AddSkinnedBloodSplat(const Skeleton* skeleton, const Mat4f& rest_to_world, const FVec3 hit_point,
+void DecalManager::AddSkinnedBloodSplat(const Skeleton* skeleton, const FMat4& rest_to_world, const FVec3 hit_point,
 										const FVec3 direction, float32 size)
 {
 	const float32 width = size * (0.8f + (0.4f * RandomUnit()));

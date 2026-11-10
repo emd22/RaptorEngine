@@ -27,10 +27,10 @@
 
 namespace fx {
 
-void Window::Create(const char* title, const Vec2u& size, const eWindowFlags flags)
+void Window::Create(const char* title, const UVec2& size, const eWindowFlags flags)
 {
 	// Limit the window size to 8000x8000.
-	const Vec2u clamped_size = Vec2u::Min(size, Vec2u(8000));
+	const UVec2 clamped_size = UVec2::Min(size, UVec2(8000));
 	mSize = clamped_size;
 
 	eRaptorEditorFlags editor_flags = (eRaptorEditorFlags::None);
@@ -65,10 +65,10 @@ void Window::SetTitle(const char* title)
 
 void Window::HandleResize()
 {
-	const Vec2u size = mpViewport->GetCachedSize();
+	const UVec2 size = mpViewport->GetCachedSize();
 
 	// A zero sized swapchain isn't valid, and the aspect ratio would divide by zero
-	mSize = Vec2u(std::max(size.X, 1u), std::max(size.Y, 1u));
+	mSize = UVec2(std::max(size.X, 1u), std::max(size.Y, 1u));
 }
 
 const char* const* Window::GetRequiredInstanceExtensions(uint32* out_count)

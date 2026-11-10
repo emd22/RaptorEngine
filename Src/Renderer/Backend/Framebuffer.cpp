@@ -13,7 +13,7 @@ namespace fx::renderer {
 
 FX_SET_MODULE_NAME("Framebuffer")
 
-void Framebuffer::Create(const SizedArray<VkImageView>& image_views, const RenderPass& render_pass, Vec2u size)
+void Framebuffer::Create(const SizedArray<VkImageView>& image_views, const RenderPass& render_pass, UVec2 size)
 {
 	Assert(render_pass.Get() != nullptr);
 	Assert(image_views.Size > 0);

@@ -4,16 +4,16 @@
 #include <arm_neon.h>
 
 #include <Core/Assert.hpp>
-#include <Math/Mat4.hpp>
-#include <Math/Quat.hpp>
+#include <Math/FMat4.hpp>
+#include <Math/FQuat.hpp>
 #include <cstring>
 
 namespace fx {
 
-const Mat4f Mat4f::scIdentity = Mat4f((float32[16]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 });
+const FMat4 FMat4::scIdentity = FMat4((float32[16]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 });
 
 
-Mat4f Mat4f::AsRotation(const Quat quat)
+FMat4 FMat4::AsRotation(const FQuat quat)
 {
 	float x = quat.GetX();
 	float y = quat.GetY();
@@ -36,14 +36,14 @@ Mat4f Mat4f::AsRotation(const Quat quat)
 	float yw = ty * w;
 	float zw = tz * w;
 
-	return Mat4f(Vec4f((1.0f - yy) - zz, xy + zw, xz - yw, 0.0f), Vec4f(xy - zw, (1.0f - zz) - xx, yz + xw, 0.0f),
-				 Vec4f(xz + yw, yz - xw, (1.0f - xx) - yy, 0.0f), Vec4f(0.0f, 0.0f, 0.0f, 1.0f));
+	return FMat4(FVec4((1.0f - yy) - zz, xy + zw, xz - yw, 0.0f), FVec4(xy - zw, (1.0f - zz) - xx, yz + xw, 0.0f),
+				 FVec4(xz + yw, yz - xw, (1.0f - xx) - yy, 0.0f), FVec4(0.0f, 0.0f, 0.0f, 1.0f));
 }
 
 
-Mat4f Mat4f::AsRotationX(float rad)
+FMat4 FMat4::AsRotationX(float rad)
 {
-	Mat4f result;
+	FMat4 result;
 
 	const float cr = cos(rad);
 	const float sr = sin(rad);
@@ -56,9 +56,9 @@ Mat4f Mat4f::AsRotationX(float rad)
 	return result;
 }
 
-Mat4f Mat4f::AsRotationY(float rad)
+FMat4 FMat4::AsRotationY(float rad)
 {
-	Mat4f result;
+	FMat4 result;
 
 	const float cr = cos(rad);
 	const float sr = sin(rad);
@@ -72,9 +72,9 @@ Mat4f Mat4f::AsRotationY(float rad)
 }
 
 
-Mat4f Mat4f::AsRotationZ(float rad)
+FMat4 FMat4::AsRotationZ(float rad)
 {
-	Mat4f result;
+	FMat4 result;
 
 	const float cr = cos(rad);
 	const float sr = sin(rad);
@@ -87,9 +87,9 @@ Mat4f Mat4f::AsRotationZ(float rad)
 	return result;
 }
 
-Mat4f Mat4f::operator*(const Mat4f& other) const
+FMat4 FMat4::operator*(const FMat4& other) const
 {
-	Mat4f result;
+	FMat4 result;
 
 	for (int i = 0; i < 4; i++) {
 		float32x4_t r = vmulq_laneq_f32(other.Rows[0].mIntrin, Rows[i].mIntrin, 0);
@@ -102,7 +102,7 @@ Mat4f Mat4f::operator*(const Mat4f& other) const
 	return result;
 }
 
-Vec4f Mat4f::operator*(const Vec4f other) const
+FVec4 FMat4::operator*(const FVec4 other) const
 {
 #if 0
 	float32x4_t p0, p1, p2, p3;
@@ -132,11 +132,11 @@ Vec4f Mat4f::operator*(const Vec4f other) const
 	result = vfmaq_laneq_f32(result, Rows[2].mIntrin, other.mIntrin, 2);
 	result = vfmaq_laneq_f32(result, Rows[3].mIntrin, other.mIntrin, 3);
 
-	return Vec4f(result);
+	return FVec4(result);
 }
 
 
-Mat4f::Mat4f(float data[4][4]) noexcept
+FMat4::FMat4(float data[4][4]) noexcept
 {
 	Rows[0].mIntrin = vld1q_f32(data[0]);
 	Rows[1].mIntrin = vld1q_f32(data[1]);
@@ -144,16 +144,16 @@ Mat4f::Mat4f(float data[4][4]) noexcept
 	Rows[3].mIntrin = vld1q_f32(data[3]);
 }
 
-Mat4f Mat4f::GetWithoutTranslation() const
+FMat4 FMat4::GetWithoutTranslation() const
 {
-	Mat4f mat = *this;
+	FMat4 mat = *this;
 	mat.Rows[3].Set(0.0f, 0.0f, 0.0f, 1.0f);
 
 	return mat;
 }
 
 
-void Mat4f::TransposeTo(Mat4f& other) const
+void FMat4::TransposeTo(FMat4& other) const
 {
 	float32x4x2_t tmp1 = vzipq_f32(Rows[0].mIntrin, Rows[2].mIntrin);
 	float32x4x2_t tmp2 = vzipq_f32(Rows[1].mIntrin, Rows[3].mIntrin);
@@ -166,14 +166,14 @@ void Mat4f::TransposeTo(Mat4f& other) const
 	other.Rows[3].mIntrin = tmp4.val[1];
 }
 
-Mat4f Mat4f::Transposed() const
+FMat4 FMat4::Transposed() const
 {
 	float32x4x2_t tmp1 = vzipq_f32(Rows[0].mIntrin, Rows[2].mIntrin);
 	float32x4x2_t tmp2 = vzipq_f32(Rows[1].mIntrin, Rows[3].mIntrin);
 	float32x4x2_t tmp3 = vzipq_f32(tmp1.val[0], tmp2.val[0]);
 	float32x4x2_t tmp4 = vzipq_f32(tmp1.val[1], tmp2.val[1]);
 
-	Mat4f result;
+	FMat4 result;
 	result.Rows[0].mIntrin = tmp3.val[0];
 	result.Rows[1].mIntrin = tmp3.val[1];
 	result.Rows[2].mIntrin = tmp4.val[0];
@@ -181,14 +181,14 @@ Mat4f Mat4f::Transposed() const
 	return result;
 }
 
-Mat4f Mat4f::TransposeMat3()
+FMat4 FMat4::TransposeMat3()
 {
 	float32x4x2_t tmp1 = vzipq_f32(Rows[0].mIntrin, Rows[2].mIntrin);
 	float32x4x2_t tmp2 = vzipq_f32(Rows[1].mIntrin, vdupq_n_f32(0));
 	float32x4x2_t tmp3 = vzipq_f32(tmp1.val[0], tmp2.val[0]);
 	float32x4x2_t tmp4 = vzipq_f32(tmp1.val[1], tmp2.val[1]);
 
-	Mat4f result;
+	FMat4 result;
 	result.Rows[0].mIntrin = tmp3.val[0];
 	result.Rows[1].mIntrin = tmp3.val[1];
 	result.Rows[2].mIntrin = tmp4.val[0];
@@ -196,9 +196,9 @@ Mat4f Mat4f::TransposeMat3()
 	return result;
 }
 
-void Mat4f::CopyAsMat3To(float* dest) const { memcpy(dest, RawData, sizeof(float32) * 12); }
+void FMat4::CopyAsMat3To(float* dest) const { memcpy(dest, RawData, sizeof(float32) * 12); }
 
-void Mat4f::LookAt(const FVec3 eye, const FVec3 target, const FVec3 upvec)
+void FMat4::LookAt(const FVec3 eye, const FVec3 target, const FVec3 upvec)
 {
 	FVec3 forward = (target - eye);
 	forward.NormalizeIP();
@@ -214,7 +214,7 @@ void Mat4f::LookAt(const FVec3 eye, const FVec3 target, const FVec3 upvec)
 	Rows[3].Set(-eye.Dot(right), -eye.Dot(up), -eye.Dot(forward), 1.0f);
 }
 
-void Mat4f::LoadPerspectiveMatrix(float32 yfov, float32 aspect_ratio, float32 near_plane, float32 far_plane)
+void FMat4::LoadPerspectiveMatrix(float32 yfov, float32 aspect_ratio, float32 near_plane, float32 far_plane)
 {
 	LoadIdentity();
 
@@ -233,7 +233,7 @@ void Mat4f::LoadPerspectiveMatrix(float32 yfov, float32 aspect_ratio, float32 ne
 	Rows[3].W = (0);
 }
 
-void Mat4f::LoadOrthographicMatrix(float32 width, float32 height, float32 near_plane, float32 far_plane)
+void FMat4::LoadOrthographicMatrix(float32 width, float32 height, float32 near_plane, float32 far_plane)
 {
 	Assert(near_plane > 0.0f && far_plane > 0.0f);
 

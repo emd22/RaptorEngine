@@ -1,29 +1,29 @@
 #pragma once
 
-#include <Math/Quat.hpp>
+#include <Math/FQuat.hpp>
 
 #ifdef FX_USE_NEON
 
 namespace fx {
 
-FX_FORCE_INLINE Quat::Quat(const float32* buffer)
+FX_FORCE_INLINE FQuat::FQuat(const float32* buffer)
 {
 	const float aligned_buffer[] = { buffer[0], buffer[1], buffer[2], buffer[3] };
 	mIntrin = vld1q_f32(aligned_buffer);
 }
 
-FX_FORCE_INLINE Quat& Quat::operator=(const float32x4_t& other)
+FX_FORCE_INLINE FQuat& FQuat::operator=(const float32x4_t& other)
 {
 	mIntrin = other;
 	return *this;
 }
 
-FX_FORCE_INLINE bool Quat::IsCloseTo(const Quat other, const float32 tolerance) const
+FX_FORCE_INLINE bool FQuat::IsCloseTo(const FQuat other, const float32 tolerance) const
 {
 	return IsCloseTo(other.mIntrin, tolerance);
 }
 
-FX_FORCE_INLINE FVec3 Quat::GetDirection() const
+FX_FORCE_INLINE FVec3 FQuat::GetDirection() const
 {
 	// dir X = (2.0 * ((X * Z) + (Y * W)))
 	// dir Y = (2.0 * ((Y * Z) - (X * W)))
@@ -50,7 +50,7 @@ FX_FORCE_INLINE FVec3 Quat::GetDirection() const
 	return FVec3(vfmaq_f32(vld1q_f32(bias), vcombine_f32(res_lo, res_hi), vld1q_f32(scale)));
 }
 
-FX_FORCE_INLINE bool Quat::IsCloseTo(const float32x4_t& other, const float32 tolerance) const
+FX_FORCE_INLINE bool FQuat::IsCloseTo(const float32x4_t& other, const float32 tolerance) const
 {
 	// Get the absolute difference between the vectors
 	const float32x4_t diff = vabdq_f32(mIntrin, other);
@@ -62,7 +62,7 @@ FX_FORCE_INLINE bool Quat::IsCloseTo(const float32x4_t& other, const float32 tol
 	return vmaxvq_u32(lt) == 0;
 }
 
-FX_FORCE_INLINE void Quat::NLerpIP(const Quat dest, float32 time)
+FX_FORCE_INLINE void FQuat::NLerpIP(const FQuat dest, float32 time)
 {
 	// We can change (A + (B - A) * time) to ((1 - time) * A + time * B) to reduce floating point errors.
 
@@ -86,7 +86,7 @@ FX_FORCE_INLINE void Quat::NLerpIP(const Quat dest, float32 time)
 
 // Based off of https://www.euclideanspace.com/maths/algebra/realNormedAlgebra/quaternions/slerp/index.htm and optimized
 // for Neon.
-FX_FORCE_INLINE Quat Quat::SLerp(const Quat dest, const float32 step) const
+FX_FORCE_INLINE FQuat FQuat::SLerp(const FQuat dest, const float32 step) const
 {
 	// Note: there are so many different ways to implement this and a lot of them online just straight up pro
 	float32x4_t a_v = mIntrin;
@@ -106,7 +106,7 @@ FX_FORCE_INLINE Quat Quat::SLerp(const Quat dest, const float32 step) const
 
 	// if qa=qb or qa=-qb then theta = 0 and we can return qa
 	if (abs(cos_half_theta) >= 1.0f) {
-		return Quat(mIntrin);
+		return FQuat(mIntrin);
 	}
 
 	// Calculate temporary values.
@@ -121,7 +121,7 @@ FX_FORCE_INLINE Quat Quat::SLerp(const Quat dest, const float32 step) const
 		result = vmulq_f32(a_v, half);
 		result = vfmaq_f32(result, b_v, half);
 
-		return Quat(result);
+		return FQuat(result);
 	}
 
 	const float32 sht_recip = 1.0f / sin_half_theta;
@@ -131,11 +131,11 @@ FX_FORCE_INLINE Quat Quat::SLerp(const Quat dest, const float32 step) const
 	result = vmulq_f32(a_v, vdupq_n_f32(ratioA));
 	result = vfmaq_f32(result, b_v, vdupq_n_f32(ratioB));
 
-	return Quat(result);
+	return FQuat(result);
 }
 
-FX_FORCE_INLINE Quat Quat::Conjugate() const { return Quat(Neon::FlipSigns<-1, -1, -1, 1>(mIntrin)); }
-FX_FORCE_INLINE Quat Quat::Normalize() const { return Quat(Neon::Normalize(mIntrin)); }
+FX_FORCE_INLINE FQuat FQuat::Conjugate() const { return FQuat(Neon::FlipSigns<-1, -1, -1, 1>(mIntrin)); }
+FX_FORCE_INLINE FQuat FQuat::Normalize() const { return FQuat(Neon::Normalize(mIntrin)); }
 
 } // namespace fx
 

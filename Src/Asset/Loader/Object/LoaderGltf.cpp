@@ -239,8 +239,7 @@ static bool OpenGltfKtxImage(loader::LoaderKtx& ktx, const cgltf_image* image, c
 }
 
 /**
- * @brief Loads a material texture's mip chain from its KTX2 image. Material textures must be KTX2, and anything else
- * logs an error and returns false.
+ * @brief Loads a material texture's mip chain from its KTX2 image
  */
 static bool MakeMaterialTextureForPrimitive(const String& model_path, Material* material, const char* component_name,
 											MaterialComponent& component, const cgltf_texture_view& texture_view,
@@ -268,8 +267,6 @@ static bool MakeMaterialTextureForPrimitive(const String& model_path, Material* 
 		return false;
 	}
 
-	// The component decides the colour space (albedo is sRGB, normal and surface maps are linear), not whatever the
-	// exporter tagged the file with. Both are the same bits.
 	const bool wants_srgb = ImageFormatUtil::IsSrgb(component.ImageFormat);
 	const eImageFormat wanted_format = wants_srgb ? ImageFormatUtil::ToSrgb(image_info.Format)
 												  : ImageFormatUtil::ToUNorm(image_info.Format);
@@ -347,9 +344,8 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 		}
 	}
 
-	// KHR_materials_pbrSpecularGlossiness takes priority when present; any pbrMetallicRoughness block alongside it is
-	// only a fallback for loaders that don't support the extension.
-	const bool use_specular_glossiness = gltf_material->has_pbr_specular_glossiness;
+
+	// const bool use_specular_glossiness = gltf_material->has_pbr_specular_glossiness;
 
 	cgltf_pbr_metallic_roughness& gltf_mr = gltf_material->pbr_metallic_roughness;
 	cgltf_pbr_specular_glossiness& gltf_sg = gltf_material->pbr_specular_glossiness;
@@ -357,10 +353,10 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 	// Diffuse lives in whichever PBR block the material uses
 	cgltf_texture_view* diffuse_view = nullptr;
 
-	if (use_specular_glossiness) {
-		diffuse_view = &gltf_sg.diffuse_texture;
-	}
-	else if (gltf_material->has_pbr_metallic_roughness) {
+	// if (use_specular_glossiness) {
+	// 	diffuse_view = &gltf_sg.diffuse_texture;
+	// }
+	if (gltf_material->has_pbr_metallic_roughness) {
 		diffuse_view = &gltf_mr.base_color_texture;
 	}
 
@@ -376,10 +372,10 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 		material->Diffuse.SetTicket(gAssetManager->GetNullImageTicket(eImageFormat::RGBA8_UNorm));
 	}
 
-	if (use_specular_glossiness) {
-		material->SetBaseColorFactor(gltf_sg.diffuse_factor);
-	}
-	else if (gltf_material->has_pbr_metallic_roughness) {
+	// if (use_specular_glossiness) {
+	// 	material->SetBaseColorFactor(gltf_sg.diffuse_factor);
+	// }
+	if (gltf_material->has_pbr_metallic_roughness) {
 		material->SetBaseColorFactor(gltf_mr.base_color_factor);
 	}
 
@@ -390,29 +386,30 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 	}
 
 	// Load the surface texture and factors. cgltf fills in the glTF defaults for any factor the file leaves out
-	if (use_specular_glossiness) {
-		material->SetSpecularGlossiness(gltf_sg.specular_factor, gltf_sg.glossiness_factor);
+	// 	if (use_specular_glossiness) {
+	// 		material->SetSpecularGlossiness(gltf_sg.specular_factor, gltf_sg.glossiness_factor);
+	//
+	// 		if (gltf_sg.specular_glossiness_texture.texture != nullptr) {
+	// 			MakeMaterialTextureForPrimitive(mModelPath, material, "specular-glossiness",
+	// material->MetallicRoughness, 											gltf_sg.specular_glossiness_texture);
+	// 		}
+	// 	}
+	// 	else {
 
-		if (gltf_sg.specular_glossiness_texture.texture != nullptr) {
-			MakeMaterialTextureForPrimitive(mModelPath, material, "specular-glossiness", material->MetallicRoughness,
-											gltf_sg.specular_glossiness_texture);
-		}
-	}
-	else {
-		material->SetMetallicRoughness(gltf_mr.metallic_factor, gltf_mr.roughness_factor);
+	material->SetMetallicRoughness(gltf_mr.metallic_factor, gltf_mr.roughness_factor);
 
-		if (gltf_mr.metallic_roughness_texture.texture != nullptr) {
-			MakeMaterialTextureForPrimitive(mModelPath, material, "metallic-roughness", material->MetallicRoughness,
-											gltf_mr.metallic_roughness_texture);
-		}
+	if (gltf_mr.metallic_roughness_texture.texture != nullptr) {
+		MakeMaterialTextureForPrimitive(mModelPath, material, "metallic-roughness", material->MetallicRoughness,
+										gltf_mr.metallic_roughness_texture);
 	}
+
+	// }
 
 	{
 		const cgltf_texture* occlusion = gltf_material->occlusion_texture.texture;
 		const cgltf_texture* metallic_roughness = gltf_mr.metallic_roughness_texture.texture;
 
-		const bool occlusion_is_packed = !use_specular_glossiness && occlusion != nullptr &&
-										 metallic_roughness != nullptr &&
+		const bool occlusion_is_packed = occlusion != nullptr && metallic_roughness != nullptr &&
 										 GetTextureImage(occlusion) == GetTextureImage(metallic_roughness);
 
 		material->SetOcclusionStrength(occlusion_is_packed ? gltf_material->occlusion_texture.scale : 0.0f);
@@ -441,38 +438,35 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 	// Handle glTF alpha mode / baseColorFactor alpha
 	{
 		float baseAlpha = 1.0f;
-		if (use_specular_glossiness) {
-			baseAlpha = gltf_sg.diffuse_factor[3];
-		}
-		else if (gltf_material->has_pbr_metallic_roughness) {
+		// if (use_specular_glossiness) {
+		// 	baseAlpha = gltf_sg.diffuse_factor[3];
+		// }
+		if (gltf_material->has_pbr_metallic_roughness) {
 			baseAlpha = gltf_mr.base_color_factor[3];
 		}
 
 		if (gltf_material->alpha_mode == cgltf_alpha_mode_blend) {
-			// Blend mode: use baseColor alpha (and texture alpha in shader) for transparency
 			if (baseAlpha < 0.99f) {
 				material->SetAlpha(baseAlpha);
 			}
 			else if (diffuse_has_alpha) {
 				// If baseColor is opaque but texture may have alpha, force transparent path
-				// so texAlpha * matAlpha blending works with depthWrite=false.
 				material->SetAlpha(0.99f);
 			}
 			else {
-				// Nothing to blend; exporters often mark opaque materials as BLEND. Drawing those through the
-				// unsorted, depth-write-less transparent path makes a model's own faces overdraw each other.
+				// There is nothing to blend. Exporters sometimes mark opaque materials as BLEND even though they don't
+				// need it.
+
 				material->SetAlpha(1.0f);
 			}
 		}
 		else if (gltf_material->alpha_mode == cgltf_alpha_mode_mask) {
-			// Mask mode: opaque pipeline with an alpha test, the shaders discard below the material's cutoff
 			material->SetAlphaMask(true);
 			material->SetAlphaCutoff(gltf_material->alpha_cutoff);
 			material->SetAlpha(baseAlpha);
 		}
 		else { // opaque
 			if (baseAlpha < 0.99f) {
-				// Opaque material with translucent base factor -> treat as blended
 				material->SetAlpha(baseAlpha);
 			}
 			else {
@@ -779,19 +773,12 @@ std::vector<int32> LoaderGltf::BuildJointLookup(cgltf_skin* skin) const
 }
 
 
-/// Pulls the joint node's own local transform out of the GLTF, mirrored into engine space the same way
-/// the animation channels are (negate X on translations, negate Y/Z on rotations).
-///
-/// Every component an animation does not drive has to fall back to this, otherwise the joint lands at
-/// identity: bones collapse onto their parent's origin and the skin smears across the model.
 static BoneTransform MakeRestPoseForJoint(const cgltf_node* joint)
 {
 	BoneTransform rest {};
 
 	if (joint->has_matrix) {
-		// Decompose the raw matrix. GLTF stores matrices column-major, which lines up directly with
-		// the engine's row-major/row-vector matrices, so no transpose is needed here.
-		const Mat4f m(joint->matrix);
+		const FMat4 m(joint->matrix);
 
 		FVec3 axis_x = FVec3(m.Rows[0]);
 		FVec3 axis_y = FVec3(m.Rows[1]);
@@ -816,29 +803,29 @@ static BoneTransform MakeRestPoseForJoint(const cgltf_node* joint)
 				const float32 w = std::sqrt(trace + 1.0f) * 0.5f;
 				const float32 inv = 0.25f / w;
 
-				rest.Rotation = Quat((axis_y.Z - axis_z.Y) * inv, (axis_z.X - axis_x.Z) * inv,
-									 (axis_x.Y - axis_y.X) * inv, w);
+				rest.Rotation = FQuat((axis_y.Z - axis_z.Y) * inv, (axis_z.X - axis_x.Z) * inv,
+									  (axis_x.Y - axis_y.X) * inv, w);
 			}
 			else if (axis_x.X > axis_y.Y && axis_x.X > axis_z.Z) {
 				const float32 x = std::sqrt((1.0f + axis_x.X - axis_y.Y - axis_z.Z)) * 0.5f;
 				const float32 inv = 0.25f / x;
 
-				rest.Rotation = Quat(x, (axis_x.Y + axis_y.X) * inv, (axis_z.X + axis_x.Z) * inv,
-									 (axis_y.Z - axis_z.Y) * inv);
+				rest.Rotation = FQuat(x, (axis_x.Y + axis_y.X) * inv, (axis_z.X + axis_x.Z) * inv,
+									  (axis_y.Z - axis_z.Y) * inv);
 			}
 			else if (axis_y.Y > axis_z.Z) {
 				const float32 y = std::sqrt((1.0f + axis_y.Y - axis_x.X - axis_z.Z)) * 0.5f;
 				const float32 inv = 0.25f / y;
 
-				rest.Rotation = Quat((axis_x.Y + axis_y.X) * inv, y, (axis_y.Z + axis_z.Y) * inv,
-									 (axis_z.X - axis_x.Z) * inv);
+				rest.Rotation = FQuat((axis_x.Y + axis_y.X) * inv, y, (axis_y.Z + axis_z.Y) * inv,
+									  (axis_z.X - axis_x.Z) * inv);
 			}
 			else {
 				const float32 z = std::sqrt((1.0f + axis_z.Z - axis_x.X - axis_y.Y)) * 0.5f;
 				const float32 inv = 0.25f / z;
 
-				rest.Rotation = Quat((axis_z.X + axis_x.Z) * inv, (axis_y.Z + axis_z.Y) * inv, z,
-									 (axis_x.Y - axis_y.X) * inv);
+				rest.Rotation = FQuat((axis_z.X + axis_x.Z) * inv, (axis_y.Z + axis_z.Y) * inv, z,
+									  (axis_x.Y - axis_y.X) * inv);
 			}
 		}
 	}
@@ -848,7 +835,7 @@ static BoneTransform MakeRestPoseForJoint(const cgltf_node* joint)
 		}
 
 		if (joint->has_rotation) {
-			rest.Rotation = Quat(joint->rotation[0], joint->rotation[1], joint->rotation[2], joint->rotation[3]);
+			rest.Rotation = FQuat(joint->rotation[0], joint->rotation[1], joint->rotation[2], joint->rotation[3]);
 		}
 
 		if (joint->has_scale) {
@@ -858,7 +845,7 @@ static BoneTransform MakeRestPoseForJoint(const cgltf_node* joint)
 
 	// Mirror across X to match the vertex buffers and the animation tracks.
 	rest.Translation = FVec3::FlipSigns<-1, 1, 1, 1>(rest.Translation);
-	rest.Rotation = Quat(rest.Rotation.GetX(), -rest.Rotation.GetY(), -rest.Rotation.GetZ(), rest.Rotation.GetW());
+	rest.Rotation = FQuat(rest.Rotation.GetX(), -rest.Rotation.GetY(), -rest.Rotation.GetZ(), rest.Rotation.GetW());
 
 	return rest;
 }
@@ -875,7 +862,7 @@ void LoaderGltf::LoadSkeleton(Skeleton& skel, cgltf_skin* skin, const std::vecto
 
 	// The GLTF coordinate system is garbage, reflect so -X becomes X (this also changes rotation back from CCW to
 	// CW). Everything loaded out of the skin has to be conjugated by this to stay in step with the vertex buffers.
-	Mat4f reflection = Mat4f::scIdentity;
+	FMat4 reflection = FMat4::scIdentity;
 	reflection.Rows[0].X = -1.0f;
 
 	// Inverse bind matrices
@@ -888,14 +875,14 @@ void LoaderGltf::LoadSkeleton(Skeleton& skel, cgltf_skin* skin, const std::vecto
 									 joint_count * 16);
 
 		for (uint32 i = 0; i < joint_count; i++) {
-			Mat4f& m = skel.InvBindTransforms[i];
+			FMat4& m = skel.InvBindTransforms[i];
 
 			m = reflection * m * reflection;
 		}
 	}
 	else {
 		for (uint32 i = 0; i < joint_count; i++) {
-			skel.InvBindTransforms[i] = Mat4f::scIdentity;
+			skel.InvBindTransforms[i] = FMat4::scIdentity;
 		}
 	}
 
@@ -929,10 +916,10 @@ void LoaderGltf::LoadSkeleton(Skeleton& skel, cgltf_skin* skin, const std::vecto
 
 		const bool is_root_joint = (skel.ParentIndices[i] == scBoneNull);
 
-		skel.RootTransforms[i] = Mat4f::scIdentity;
+		skel.RootTransforms[i] = FMat4::scIdentity;
 
 		if (is_root_joint && joint->parent) {
-			Mat4f node_world;
+			FMat4 node_world;
 			cgltf_node_transform_world(joint->parent, reinterpret_cast<float32*>(&node_world));
 
 			skel.RootTransforms[i] = reflection * node_world * reflection;
@@ -945,7 +932,11 @@ void LoaderGltf::LoadSkeleton(Skeleton& skel, cgltf_skin* skin, const std::vecto
 void LoaderGltf::LoadAnimation(Animation& out_anim, const cgltf_animation& anim, cgltf_skin* skin,
 							   const std::vector<int32>& joint_lookup)
 {
-	const uint32 joint_count = skin ? static_cast<uint32>(skin->joints_count) : 0;
+	uint32 joint_count = 0;
+	if (skin) {
+		joint_count = static_cast<uint32>(skin->joints_count);
+	}
+
 
 	out_anim.Name = anim.name ? anim.name : "Unnamed";
 	out_anim.Duration = 0.0f;
@@ -1072,14 +1063,14 @@ void LoaderGltf::LoadAnimation(Animation& out_anim, const cgltf_animation& anim,
 				float32 buffer[4];
 
 				read_element(key_index, value_offset, buffer);
-				joint_track.Rotation.Values[key_index] = Quat(buffer);
+				joint_track.Rotation.Values[key_index] = FQuat(buffer);
 
 				if (is_cubic) {
 					read_element(key_index, 0, buffer);
-					joint_track.Rotation.InTangents[key_index] = Quat(buffer);
+					joint_track.Rotation.InTangents[key_index] = FQuat(buffer);
 
 					read_element(key_index, 2, buffer);
-					joint_track.Rotation.OutTangents[key_index] = Quat(buffer);
+					joint_track.Rotation.OutTangents[key_index] = FQuat(buffer);
 				}
 			}
 		}
@@ -1249,7 +1240,7 @@ void LoaderGltf::ProcessData(AssetTicket& ticket)
 		}
 	}
 
-	Mat4f reflection = Mat4f::scIdentity;
+	FMat4 reflection = FMat4::scIdentity;
 	reflection.Rows[0].X = -1.0f;
 
 	// Load each mesh node in the GLTF as a new separate object.
@@ -1259,7 +1250,7 @@ void LoaderGltf::ProcessData(AssetTicket& ticket)
 
 		cgltf_skin* attach_skin = nullptr;
 		const cgltf_node* attach_joint = nullptr;
-		Mat4f attach_offset = Mat4f::scIdentity;
+		FMat4 attach_offset = FMat4::scIdentity;
 
 		if (node->skin == nullptr) {
 			bool has_joint_ancestor = false;
@@ -1272,7 +1263,7 @@ void LoaderGltf::ProcessData(AssetTicket& ticket)
 			}
 
 			if (has_joint_ancestor) {
-				Mat4f chain;
+				FMat4 chain;
 				cgltf_node_transform_local(node, chain.RawData);
 
 				for (const cgltf_node* ancestor = node->parent; ancestor != nullptr; ancestor = ancestor->parent) {
@@ -1284,7 +1275,7 @@ void LoaderGltf::ProcessData(AssetTicket& ticket)
 						break;
 					}
 
-					Mat4f local;
+					FMat4 local;
 					cgltf_node_transform_local(ancestor, local.RawData);
 
 					chain = chain * local;

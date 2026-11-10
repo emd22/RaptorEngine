@@ -13,15 +13,15 @@ static constexpr float32 scMinExtent = 0.0001f;
 static constexpr float32 scCoplanarTolerance = 0.001f;
 static constexpr float32 scCoplanarDot = 0.999f;
 
-static FVec3 TransformPoint(const Mat4f& matrix, const FVec3 point)
+static FVec3 TransformPoint(const FMat4& matrix, const FVec3 point)
 {
-	const Vec4f result = matrix * Vec4f(point.X, point.Y, point.Z, 1.0f);
+	const FVec4 result = matrix * FVec4(point.X, point.Y, point.Z, 1.0f);
 	return FVec3(result.X, result.Y, result.Z);
 }
 
-static FVec3 TransformDirection(const Mat4f& matrix, const FVec3 direction)
+static FVec3 TransformDirection(const FMat4& matrix, const FVec3 direction)
 {
-	const Vec4f result = matrix * Vec4f(direction.X, direction.Y, direction.Z, 0.0f);
+	const FVec4 result = matrix * FVec4(direction.X, direction.Y, direction.Z, 0.0f);
 	return FVec3(result.X, result.Y, result.Z);
 }
 
@@ -92,7 +92,7 @@ static bool LiesOnPlane(const std::vector<FVec3>& points, const FVec3 normal, fl
 	return true;
 }
 
-MeshDecalBuilder::MeshDecalBuilder(const Brush& volume, const Mat4f& volume_to_world)
+MeshDecalBuilder::MeshDecalBuilder(const Brush& volume, const FMat4& volume_to_world)
 	: mVolume(volume), mWorldToLocal(volume_to_world.AffineInverse())
 {
 	mLocalMin = volume.GetBoundsMin();
@@ -113,13 +113,13 @@ bool MeshDecalBuilder::OverlapsVolume(const FVec3 min, const FVec3 max) const
 		   min.Z <= mLocalMax.Z + scOverlapTolerance && max.Z >= mLocalMin.Z - scOverlapTolerance;
 }
 
-void MeshDecalBuilder::AddBrush(const Brush& brush, const Mat4f& brush_to_world)
+void MeshDecalBuilder::AddBrush(const Brush& brush, const FMat4& brush_to_world)
 {
 	if (!brush.IsValid()) {
 		return;
 	}
 
-	const Mat4f to_local = brush_to_world * mWorldToLocal;
+	const FMat4 to_local = brush_to_world * mWorldToLocal;
 
 	FVec3 min(FLT_MAX);
 	FVec3 max(-FLT_MAX);
@@ -366,7 +366,7 @@ void MeshDecalBuilder::EmitPolygon(const FVec3* points, uint32 count, const FVec
 		mNormals.Insert(normal);
 		mTangents.Insert(tangent);
 		mHandedness.Insert(handedness);
-		mTexcoords.Insert(Vec2f(point.Dot(mUGradient) - mLocalMin.Dot(mUGradient),
+		mTexcoords.Insert(FVec2(point.Dot(mUGradient) - mLocalMin.Dot(mUGradient),
 								point.Dot(mVGradient) - mLocalMax.Dot(mVGradient)));
 	}
 
@@ -413,7 +413,7 @@ void MeshDecalBuilder::BuildPlaceholder(const Brush& volume, MeshGen::GeneratedM
 		out_mesh.Normals.Insert(FVec3(0.0f, 1.0f, 0.0f));
 		out_mesh.Tangents.Insert(FVec3(1.0f, 0.0f, 0.0f));
 		out_mesh.TangentHandedness.Insert(1.0f);
-		out_mesh.Texcoords.Insert(Vec2f(0.0f, 0.0f));
+		out_mesh.Texcoords.Insert(FVec2(0.0f, 0.0f));
 		out_mesh.Indices.Insert(i);
 	}
 }

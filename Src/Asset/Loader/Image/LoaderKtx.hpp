@@ -39,10 +39,10 @@ public:
 	bool IsOpen() const { return mpTexture != nullptr; }
 
 	eImageFormat GetFormat() const { return mFormat; }
-	Vec2u GetImageSize() const { return Vec2u(mpTexture->baseWidth, mpTexture->baseHeight); }
+	UVec2 GetImageSize() const { return UVec2(mpTexture->baseWidth, mpTexture->baseHeight); }
 	uint32 GetMipCount() const { return mpTexture->numLevels; }
 
-	Vec2u GetMipDimensions(uint32 mip_level) const;
+	UVec2 GetMipDimensions(uint32 mip_level) const;
 
 	/// The pixel data of a mip level. Points into the loader's memory and is valid until Destroy().
 	Slice<const uint8> GetMipData(uint32 mip_level) const;

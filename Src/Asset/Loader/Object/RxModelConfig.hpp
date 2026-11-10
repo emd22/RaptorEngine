@@ -6,8 +6,8 @@
 #include <Core/Slice.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
+#include <Math/FQuat.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Quat.hpp>
 #include <utility>
 
 namespace fx {
@@ -24,7 +24,7 @@ struct RxFileRef
 struct RxTransform
 {
 	FVec3 Position = FVec3::sZero;
-	Quat Rotation = Quat::scIdentity;
+	FQuat Rotation = FQuat::scIdentity;
 	FVec3 Scale = FVec3::sOne;
 	bool bIsIdentity = true;
 };

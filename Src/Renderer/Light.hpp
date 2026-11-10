@@ -4,7 +4,7 @@
 #include <Core/Hash.hpp>
 #include <Entity.hpp>
 #include <Math/BBox.hpp>
-#include <Math/Mat4.hpp>
+#include <Math/FMat4.hpp>
 #include <Math/MathUtil.hpp>
 #include <Renderer/Camera/BaseCamera.hpp>
 #include <Renderer/LightID.hpp>
@@ -56,7 +56,7 @@ public:
 
 	void SetRadius(const float radius);
 	void SetPosition(const FVec3 position) override;
-	void SetRotation(const Quat rotation) override;
+	void SetRotation(const FQuat rotation) override;
 
 	FX_FORCE_INLINE void SetFlags(const eLightFlags flags) { Flags = flags; }
 	FX_FORCE_INLINE eLightFlags GetFlags() const { return Flags; }
@@ -92,7 +92,7 @@ public:
 	bool bEnabled = true;
 
 	TileIndex mTileIndex = TileIndexNull;
-	Vec2u mTileSpan = Vec2u(1, 1);
+	UVec2 mTileSpan = UVec2(1, 1);
 
 	AreaSet mAreas;
 
@@ -139,7 +139,7 @@ public:
 	{
 		renderer::ShadowTileIndex AtlasTile = renderer::ShadowTileIndexNull;
 
-		Mat4f Matrix = Mat4f::scIdentity;
+		FMat4 Matrix = FMat4::scIdentity;
 
 		/// WorldGrid::GetChangeSerial() when the tile was baked. The tile is rebaked once a shadow caster changes in a
 		/// world tile the light reaches after this.
@@ -169,7 +169,7 @@ public:
 	float32 GetLumens() const;
 	void SetLumens(float32 lumens);
 
-	Mat4f CalculateShadowMatrix() const;
+	FMat4 CalculateShadowMatrix() const;
 
 	BBox GetBounds() const override;
 

@@ -9,7 +9,7 @@
 #include "RenderStage.hpp"
 #include "Vertex.hpp"
 
-#include <Math/Mat4.hpp>
+#include <Math/FMat4.hpp>
 #include <Object/ObjectLayer.hpp>
 
 namespace fx {
@@ -121,7 +121,7 @@ struct LightCullOverride
 class TiledForwardRenderer
 {
 public:
-	void Create(const Vec2u& extent);
+	void Create(const UVec2& extent);
 
 	void RenderComposition(BaseCamera& camera);
 
@@ -132,7 +132,7 @@ public:
 	 * (used by probe capture bakes, which render at a fixed small size).
 	 * @param pLightOverride Culls these lights instead of every light submitted this frame.
 	 */
-	void DoLightCullingPass(BaseCamera& camera, const Vec2u* pExtentOverride = nullptr,
+	void DoLightCullingPass(BaseCamera& camera, const UVec2* pExtentOverride = nullptr,
 							const LightCullOverride* pLightOverride = nullptr);
 
 	/**
@@ -263,8 +263,8 @@ private:
 	CachedViewConstants mCachedViews[2];
 
 	const BaseCamera* mpMotionCamera = nullptr;
-	Mat4f mMotionViewProjection[2] = { Mat4f::scIdentity, Mat4f::scIdentity };
-	Mat4f mMotionPrevViewProjection[2] = { Mat4f::scIdentity, Mat4f::scIdentity };
+	FMat4 mMotionViewProjection[2] = { FMat4::scIdentity, FMat4::scIdentity };
+	FMat4 mMotionPrevViewProjection[2] = { FMat4::scIdentity, FMat4::scIdentity };
 };
 
 } // namespace fx::renderer

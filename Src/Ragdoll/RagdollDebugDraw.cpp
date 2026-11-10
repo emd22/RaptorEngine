@@ -112,8 +112,8 @@ void Ragdoll::DrawDebugSegments(const SizedArray<RDSegmentState>& samples, Sized
 			z = box_rotation.GetAxisZ() * info.BoxHalfExtent.GetZ();
 		}
 
-		const Mat4f box(Vec4f(FVec3::FromJolt(x), 0.0f), Vec4f(FVec3::FromJolt(y), 0.0f),
-						Vec4f(FVec3::FromJolt(z), 0.0f), Vec4f(FVec3::FromJolt(center), 1.0f));
+		const FMat4 box(FVec4(FVec3::FromJolt(x), 0.0f), FVec4(FVec3::FromJolt(y), 0.0f),
+						FVec4(FVec3::FromJolt(z), 0.0f), FVec4(FVec3::FromJolt(center), 1.0f));
 
 		out_centers[i] = FVec3::FromJolt(center);
 
@@ -175,9 +175,9 @@ void Ragdoll::DrawDebugSupport(const SizedArray<RDSegmentState>& samples) const
 							   center_of_mass + FVec3::sUp * scComCrossSize, scComColor);
 	renderer::gDebugDraw->Line(center_of_mass - FVec3::sForward * scComCrossSize,
 							   center_of_mass + FVec3::sForward * scComCrossSize, scComColor);
-	renderer::gDebugDraw->WireBox(center_of_mass, FVec3(scComBoxHalfExtent), Quat::scIdentity, scComColor);
+	renderer::gDebugDraw->WireBox(center_of_mass, FVec3(scComBoxHalfExtent), FQuat::scIdentity, scComColor);
 
-	SizedArray<Vec2f> support_points;
+	SizedArray<FVec2> support_points;
 	support_points.InitCapacity(mSegments.Size);
 	float32 support_height_sum = 0.0f;
 
@@ -204,7 +204,7 @@ void Ragdoll::DrawDebugSupport(const SizedArray<RDSegmentState>& samples) const
 	renderer::gDebugDraw->Line(center_of_mass, FVec3::FromJolt(com_on_support), scComColor);
 	DrawGroundCross(com_on_support, frame.AxisU, frame.AxisV, scComGroundCrossSize, scComColor);
 
-	SizedArray<Vec2f> hull;
+	SizedArray<FVec2> hull;
 	hull.InitSize(support_points.Size + 1);
 
 	const uint32 hull_count = BuildHull(support_points.pData, static_cast<uint32>(support_points.Size), hull.pData);
@@ -213,7 +213,7 @@ void Ragdoll::DrawDebugSupport(const SizedArray<RDSegmentState>& samples) const
 		return;
 	}
 
-	const auto to_world = [&](const Vec2f point) { return FVec3::FromJolt(frame.FromPlane(point, support_height)); };
+	const auto to_world = [&](const FVec2 point) { return FVec3::FromJolt(frame.FromPlane(point, support_height)); };
 
 	for (uint32 i = 0; i < hull_count; i++) {
 		renderer::gDebugDraw->Line(to_world(hull[i]), to_world(hull[(i + 1) % hull_count]), scSupportColor);

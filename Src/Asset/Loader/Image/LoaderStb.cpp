@@ -18,7 +18,7 @@ eLoaderStatus LoaderStb::Load(AssetTicket& ticket, const String& path)
 
 	stbi_info(c_path, &mWidth, &mHeight, &mChannels);
 
-	image->Info.Size = Vec2u { uint32(mWidth), uint32(mHeight) };
+	image->Info.Size = UVec2 { uint32(mWidth), uint32(mHeight) };
 
 	uint32 data_size = mWidth * mHeight * pixel_size;
 	mDataSize = data_size;
@@ -52,7 +52,7 @@ eLoaderStatus LoaderStb::Load(AssetTicket& ticket, const uint8* data, uint32 siz
 	uint32 data_size = mWidth * mHeight * (pixel_size * sizeof(uint8));
 	mDataSize = data_size;
 
-	image->Info.Size = Vec2u { uint32(mWidth), uint32(mHeight) };
+	image->Info.Size = UVec2 { uint32(mWidth), uint32(mHeight) };
 
 	mImageData = stbi_load_from_memory(data, size, &mWidth, &mHeight, &mChannels, pixel_size);
 
@@ -65,7 +65,7 @@ eLoaderStatus LoaderStb::Load(AssetTicket& ticket, const uint8* data, uint32 siz
 }
 
 
-eLoaderStatus LoaderStb::SaveToFile(eImageSaveFormat file_format, const Slice<const uint8>& data, const Vec2u& size,
+eLoaderStatus LoaderStb::SaveToFile(eImageSaveFormat file_format, const Slice<const uint8>& data, const UVec2& size,
 									const String& path, eImageSaveFlags flags)
 {
 	if ((flags & eImageSaveFlags::FlipY) != 0) {
@@ -113,7 +113,7 @@ void LoaderStb::CreateGpuResource(AssetTicket& ticket)
 
 // void LoaderStb::LoadCubemapToLayeredImage(const Image&)
 // {
-//     Vec2u cubemap_size = cubemap_image.Size;
+//     UVec2 cubemap_size = cubemap_image.Size;
 
 //     // Here is the type of cubemap we will be looking for here:
 //     //

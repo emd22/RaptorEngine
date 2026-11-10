@@ -16,58 +16,58 @@ class GpuDevice;
 class Swapchain
 {
 public:
-    Swapchain() = default;
-    ~Swapchain();
+	Swapchain() = default;
+	~Swapchain();
 
-    void Init(Vec2u size, VkSurfaceKHR surface, GpuDevice* device);
-    void Rebuild(Vec2u new_size, VkSurfaceKHR surface);
+	void Init(UVec2 size, VkSurfaceKHR surface, GpuDevice* device);
+	void Rebuild(UVec2 new_size, VkSurfaceKHR surface);
 
-    VkSwapchainKHR GetSwapchain() const { return mSwapchain; }
+	VkSwapchainKHR GetSwapchain() const { return mSwapchain; }
 
-    float GetAspectRatio() const
-    {
-        Assert(Extent.X > 0 && Extent.Y > 0);
-        return static_cast<float>(Extent.X) / Extent.Y;
-    }
+	float GetAspectRatio() const
+	{
+		Assert(Extent.X > 0 && Extent.Y > 0);
+		return static_cast<float>(Extent.X) / Extent.Y;
+	}
 
-    void Destroy();
+	void Destroy();
 
 private:
-    void CreateSwapchain(Vec2u size, VkSurfaceKHR surface);
-    void CreateSwapchainImages();
-    void CreateImageViews();
-    void CreateFramebuffers();
-    void CreateSamplers();
+	void CreateSwapchain(UVec2 size, VkSurfaceKHR surface);
+	void CreateSwapchainImages();
+	void CreateImageViews();
+	void CreateFramebuffers();
+	void CreateSamplers();
 
-    void DestroyFramebuffersAndImageViews();
-    void DestroyInternalSwapchain();
+	void DestroyFramebuffersAndImageViews();
+	void DestroyInternalSwapchain();
 
 public:
-    SizedArray<Image> OutputImages;
+	SizedArray<Image> OutputImages;
 
-    Sampler ColorSampler;
-    Sampler ColorSamplerNearest;
-    Sampler DepthSampler;
-    Sampler ShadowDepthSampler;
-    Sampler NormalsSampler;
-    Sampler LightsSampler;
+	Sampler ColorSampler;
+	Sampler ColorSamplerNearest;
+	Sampler DepthSampler;
+	Sampler ShadowDepthSampler;
+	Sampler NormalsSampler;
+	Sampler LightsSampler;
 
-    Vec2u Extent = Vec2u::scZero;
+	UVec2 Extent = UVec2::scZero;
 
-    // VkSurfaceFormatKHR SurfaceFormat;
-    struct
-    {
-        eImageFormat Format = eImageFormat::None;
-        VkColorSpaceKHR ColorSpace;
-    } Surface;
+	// VkSurfaceFormatKHR SurfaceFormat;
+	struct
+	{
+		eImageFormat Format = eImageFormat::None;
+		VkColorSpaceKHR ColorSpace;
+	} Surface;
 
-    bool bInitialized = false;
+	bool bInitialized = false;
 
 private:
-    SizedArray<Framebuffer> mFramebuffers;
+	SizedArray<Framebuffer> mFramebuffers;
 
-    GpuDevice* mDevice = nullptr;
-    VkSwapchainKHR mSwapchain = nullptr;
+	GpuDevice* mDevice = nullptr;
+	VkSwapchainKHR mSwapchain = nullptr;
 };
 
 } // namespace fx::renderer

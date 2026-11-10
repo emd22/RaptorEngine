@@ -3,8 +3,8 @@
 #include "RxModelConfig.hpp"
 
 #include <Core/FilesystemIO.hpp>
+#include <Math/FMat4.hpp>
 #include <Math/Float16.hpp>
-#include <Math/Mat4.hpp>
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -952,8 +952,8 @@ bool ReadRxModel(const String& path, StaticModel& out_model, String& out_error)
 		}
 	}
 
-	const Mat4f root_transform = Mat4f::AsScale(desc.Root.Scale) * Mat4f::AsRotation(desc.Root.Rotation) *
-								 Mat4f::AsTranslation(desc.Root.Position);
+	const FMat4 root_transform = FMat4::AsScale(desc.Root.Scale) * FMat4::AsRotation(desc.Root.Rotation) *
+								 FMat4::AsTranslation(desc.Root.Position);
 
 	const rx::MeshHeader& header = *views.pHeader;
 

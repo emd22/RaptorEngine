@@ -32,9 +32,9 @@ float32 GetStrengthScale(float32 strength)
 }
 
 
-uint32 BuildContactHull(const GravityFrame& frame, const BalanceLeg& leg, Vec2f* out_hull)
+uint32 BuildContactHull(const GravityFrame& frame, const BalanceLeg& leg, FVec2* out_hull)
 {
-	Vec2f points[BodyGroundContact::scMaxPoints];
+	FVec2 points[BodyGroundContact::scMaxPoints];
 
 	for (uint32 i = 0; i < leg.ContactCount; i++) {
 		points[i] = frame.ToPlane(leg.ContactPoints[i]);
@@ -431,22 +431,22 @@ JPH::Vec3 RagdollBalance::LimitAnkleTorque(const BalanceLeg& leg, const JPH::Vec
 		return JPH::Vec3::sZero();
 	}
 
-	Vec2f hull[BodyGroundContact::scMaxPoints + 1];
+	FVec2 hull[BodyGroundContact::scMaxPoints + 1];
 	const uint32 count = BuildContactHull(mGroundFrame, leg, hull);
 
 	// The foot can only push back on the ankle by moving its centre of pressure, which stays under the sole
 	const JPH::Vec3 pressure = mGroundFrame.Up.Cross(torque) / normal_force;
-	const Vec2f ankle = mGroundFrame.ToPlane(leg.AnklePosition);
-	const Vec2f wanted = ankle + mGroundFrame.ToPlane(pressure);
+	const FVec2 ankle = mGroundFrame.ToPlane(leg.AnklePosition);
+	const FVec2 wanted = ankle + mGroundFrame.ToPlane(pressure);
 
 	float32 distance = 0.0f;
-	const Vec2f closest = ClosestOnHull(hull, count, wanted, distance);
+	const FVec2 closest = ClosestOnHull(hull, count, wanted, distance);
 
 	if (distance <= 0.0f) {
 		return mGroundFrame.Horizontal(torque);
 	}
 
-	const Vec2f limited = closest - ankle;
+	const FVec2 limited = closest - ankle;
 	const JPH::Vec3 limited_pressure = mGroundFrame.FromPlane(limited, 0.0f);
 
 	return limited_pressure.Cross(mGroundFrame.Up) * normal_force;
@@ -458,9 +458,9 @@ bool RagdollBalance::IsPressureInside(const BalanceLeg& leg, const JPH::Vec3 tor
 		return false;
 	}
 
-	Vec2f hull[BodyGroundContact::scMaxPoints + 1];
+	FVec2 hull[BodyGroundContact::scMaxPoints + 1];
 	const uint32 count = BuildContactHull(mGroundFrame, leg, hull);
-	const Vec2f wanted = mGroundFrame.ToPlane(leg.AnklePosition) +
+	const FVec2 wanted = mGroundFrame.ToPlane(leg.AnklePosition) +
 						 mGroundFrame.ToPlane(mGroundFrame.Up.Cross(torque) / normal_force);
 
 	float32 distance = 0.0f;

@@ -2,10 +2,6 @@
 
 #include "Physics/Body.hpp"
 
-// #include <ThirdParty/Jolt/Jolt.h>
-// #include <ThirdParty/Jolt/Physics/Body/Body.h>
-// #include <ThirdParty/Jolt/Physics/Body/BodyID.h>
-
 #include <Asset/Animation.hpp>
 #include <Core/DynArray.hpp>
 #include <Core/Name.hpp>
@@ -61,7 +57,7 @@ public:
 	void Update();
 
 	void SetPosition(const FVec3 position) override;
-	void SetRotation(const Quat rotation) override;
+	void SetRotation(const FQuat rotation) override;
 	void SetScale(const float scale) override;
 
 	void OnAttached(World* scene) override;
@@ -73,32 +69,28 @@ public:
 	// XXX: TEMP
 	void UpdateAnimation();
 
-	void AttachToBone(const Ref<Skeleton>& skeleton, BoneId bone, const Mat4f& offset);
+	void AttachToBone(const Ref<Skeleton>& skeleton, BoneId bone, const FMat4& offset);
 
 	/////////////////////////////////////
 	// Instancing
 	/////////////////////////////////////
 
-	uint32 AddInstance(const FVec3 position, const Quat rotation = Quat::scIdentity, float32 scale = 1.0f);
-	uint32 AddInstance(const Mat4f& transform);
+	uint32 AddInstance(const FVec3 position, const FQuat rotation = FQuat::scIdentity, float32 scale = 1.0f);
+	uint32 AddInstance(const FMat4& transform);
 
-	void SetInstance(uint32 index, const FVec3 position, const Quat rotation = Quat::scIdentity, float32 scale = 1.0f);
-	void SetInstance(uint32 index, const Mat4f& transform);
+	void SetInstance(uint32 index, const FVec3 position, const FQuat rotation = FQuat::scIdentity,
+					 float32 scale = 1.0f);
+	void SetInstance(uint32 index, const FMat4& transform);
 
 	void RemoveInstance(uint32 index);
 	void ClearInstances();
 
 	FX_FORCE_INLINE uint32 GetInstanceCount() const { return mInstances.Size; }
 	FX_FORCE_INLINE bool HasInstances() const { return mInstances.IsNotEmpty(); }
-	FX_FORCE_INLINE const Mat4f& GetInstance(uint32 index) const { return mInstances[index]; }
+	FX_FORCE_INLINE const FMat4& GetInstance(uint32 index) const { return mInstances[index]; }
 
 	uint32 GetDrawIndex();
 	BBox GetDrawBounds();
-
-	/////////////////////////////////////
-	// Script
-	/////////////////////////////////////
-
 
 	/////////////////////////////////////
 	// Material
@@ -234,9 +226,6 @@ public:
 	}
 
 	FX_FORCE_INLINE bool IsSkinned() const { return (pMesh != nullptr) && pMesh->VertexList.IsSkinned(); }
-
-	/// A skinned mesh can only be drawn once its pose is in the bone buffer this frame. Otherwise the shader would read
-	/// matrices outside of what was written, or past the end of the buffer.
 	FX_FORCE_INLINE bool HasBonesForDraw() const { return !IsSkinned() || BoneBufferBase != Skeleton::scNoBones; }
 
 	void SetCullable(bool value);
@@ -277,7 +266,7 @@ private:
 	void ApplyInstanceChanges();
 	void UpdateInstanceCollider();
 	void InvalidateDrawCopies();
-	Mat4f GetNodeToSource(Object& source);
+	FMat4 GetNodeToSource(Object& source);
 	const BBox& GetInstancedDrawBounds(Object& source);
 	void UpdateDrawSlots();
 	uint32 GetDrawCount();
@@ -298,12 +287,13 @@ public:
 
 	Ref<Skeleton> pSkeleton { nullptr };
 	uint32 BoneBufferBase = Skeleton::scNoBones;
+
 	/// The skeleton's pose the last time this object told the world grid it changed.
 	uint32 mLastPoseHash = 0;
 
 	Ref<Skeleton> pAttachSkeleton { nullptr };
 	BoneId AttachBone = scBoneNull;
-	Mat4f AttachOffset = Mat4f::scIdentity;
+	FMat4 AttachOffset = FMat4::scIdentity;
 	uint32 mLastAttachPoseHash = 0;
 	bool mbAttachPosed = false;
 
@@ -319,7 +309,7 @@ public:
 private:
 	MaterialID mMaterialID = MaterialID::scNull;
 
-	DynArray<Mat4f> mInstances;
+	DynArray<FMat4> mInstances;
 	bool mbInstancesPending = false;
 
 	BBox mDrawBounds;
@@ -331,7 +321,7 @@ private:
 
 	TileIndex mTileIndex = TileIndexNull;
 	/// Number of tiles (width, height) this object spans starting at mTileIndex's XY.
-	Vec2u mTileSpan = Vec2u(1, 1);
+	UVec2 mTileSpan = UVec2(1, 1);
 
 	uint64 mCullSerial = 0;
 

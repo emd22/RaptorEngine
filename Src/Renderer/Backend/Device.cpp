@@ -350,9 +350,6 @@ VkSurfaceFormatKHR GpuDevice::GetSurfaceFormat()
 
 	VkSurfaceFormatKHR best_format = surface_formats[0];
 
-	// An _SRGB format is what gets the composition pass's linear output encoded on the way to the display. A float
-	// swapchain does not: Vulkan only applies the sRGB transfer function for _SRGB formats, so pairing one with
-	// VK_COLOR_SPACE_SRGB_NONLINEAR_KHR hands the presentation engine linear values it then treats as encoded.
 	for (VkSurfaceFormatKHR surface_format : surface_formats) {
 		if (surface_format.colorSpace != VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
 			continue;

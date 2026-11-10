@@ -59,8 +59,7 @@ const char* GetBasePath();
 
 /**
  * @brief Resolves `relative_path` against `GetExecutablePath()` first, falling back to
- * `GetBasePath()` if no file exists there. Lets a packaged build ship assets next to the
- * executable while dev builds keep loading them from the repo root.
+ * `GetBasePath()` if no file exists there.
  */
 String ResolvePath(const String& relative_path);
 

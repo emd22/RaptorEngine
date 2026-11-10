@@ -11,7 +11,7 @@ namespace {
 
 constexpr float32 scMinClipW = 1e-3f;
 
-void AddToRect(const Vec4f& clip, ScreenRect& rect)
+void AddToRect(const FVec4& clip, ScreenRect& rect)
 {
 	const float32 inverse_w = 1.0f / std::max(clip.W, scMinClipW);
 	const float32 x = clip.X * inverse_w;
@@ -26,7 +26,7 @@ void AddToRect(const Vec4f& clip, ScreenRect& rect)
 
 ScreenRect MakeEmptyRect() { return ScreenRect { FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX }; }
 
-float32 GetNearDistance(const Vec4f& clip) { return clip.W - scMinClipW; }
+float32 GetNearDistance(const FVec4& clip) { return clip.W - scMinClipW; }
 
 } // namespace
 
@@ -61,7 +61,7 @@ void PortalVisibility::Disable()
 	PortalsPassed = 0;
 }
 
-void PortalVisibility::Update(const AreaGraph& graph, const Mat4f& view_projection, const FVec3& camera_position)
+void PortalVisibility::Update(const AreaGraph& graph, const FMat4& view_projection, const FVec3& camera_position)
 {
 	Disable();
 
@@ -170,9 +170,9 @@ void PortalVisibility::Flow(uint32 area, const ScreenRect& rect, uint32 depth)
 	}
 }
 
-Vec4f PortalVisibility::ToClip(const FVec3& point) const
+FVec4 PortalVisibility::ToClip(const FVec3& point) const
 {
-	return mViewProjection * Vec4f(point.X, point.Y, point.Z, 1.0f);
+	return mViewProjection * FVec4(point.X, point.Y, point.Z, 1.0f);
 }
 
 bool PortalVisibility::GetPortalRect(const MapPortal& portal, uint32 from_area, const ScreenRect& parent_rect,
@@ -222,8 +222,8 @@ bool PortalVisibility::GetPortalRect(const MapPortal& portal, uint32 from_area, 
 		mClippedPoints.Clear();
 
 		for (uint32 point = 0; point < size; point++) {
-			const Vec4f& current = mClipPoints[point];
-			const Vec4f& next = mClipPoints[(point + 1) % size];
+			const FVec4& current = mClipPoints[point];
+			const FVec4& next = mClipPoints[(point + 1) % size];
 
 			const float32 current_distance = GetNearDistance(current);
 			const float32 next_distance = GetNearDistance(next);
@@ -237,7 +237,7 @@ bool PortalVisibility::GetPortalRect(const MapPortal& portal, uint32 from_area, 
 
 				// const FVec3 current_xzw =
 
-				mClippedPoints.Insert(Vec4f(current.X + (next.X - current.X) * t, current.Y + (next.Y - current.Y) * t,
+				mClippedPoints.Insert(FVec4(current.X + (next.X - current.X) * t, current.Y + (next.Y - current.Y) * t,
 											current.Z + (next.Z - current.Z) * t,
 											current.W + (next.W - current.W) * t));
 			}
@@ -247,7 +247,7 @@ bool PortalVisibility::GetPortalRect(const MapPortal& portal, uint32 from_area, 
 			continue;
 		}
 
-		for (const Vec4f& clip : mClippedPoints) {
+		for (const FVec4& clip : mClippedPoints) {
 			AddToRect(clip, rect);
 		}
 	}
@@ -280,7 +280,7 @@ bool PortalVisibility::ProjectBounds(const BBox& bounds, ScreenRect& out_rect) c
 			point.Z = bounds.Max.Z;
 		}
 
-		const Vec4f clip = ToClip(point);
+		const FVec4 clip = ToClip(point);
 
 		if (GetNearDistance(clip) < 0.0f) {
 			return false;

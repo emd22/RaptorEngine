@@ -33,7 +33,7 @@ public:
 	static void ReleaseMouse();
 	static bool IsMouseLocked();
 
-	static Vec2f& GetMouseDelta();
+	static FVec2& GetMouseDelta();
 
 	/**
 	 * Check if a key is currently pressed.
@@ -117,7 +117,7 @@ public:
 	static void PostButtonEvent(eKey key_id, bool is_now_down);
 
 	/// Feeds relative mouse movement from a window that doesn't go through SDL (the editor viewport)
-	static void PostMouseMotion(const Vec2f& delta);
+	static void PostMouseMotion(const FVec2& delta);
 
 	/// Lifts every key and button, for when the window loses focus and won't see the key up events
 	static void PostReleaseAllKeys();
@@ -161,7 +161,7 @@ private:
 		eType Type = eType::Button;
 		eKey Key = eKey::FX_KEY_UNKNOWN;
 		bool bIsDown = false;
-		Vec2f Delta = Vec2f::scZero;
+		FVec2 Delta = FVec2::scZero;
 	};
 
 	static void Post(const PostedEvent& event);
@@ -170,7 +170,7 @@ private:
 	SizedArray<Control> mKeyMap;
 	bool mMouseCaptured = false;
 
-	Vec2f mMouseDelta = Vec2f::scZero;
+	FVec2 mMouseDelta = FVec2::scZero;
 
 	static constexpr uint32 scMaxPostedEvents = 16384;
 

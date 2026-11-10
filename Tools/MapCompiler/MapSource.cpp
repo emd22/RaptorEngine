@@ -7,8 +7,8 @@
 #include <LightEntry.hpp>
 #include <Material/MaterialDefinition.hpp>
 #include <Material/SpecialMaterial.hpp>
-#include <Math/Mat4.hpp>
-#include <Math/Quat.hpp>
+#include <Math/FMat4.hpp>
+#include <Math/FQuat.hpp>
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
@@ -41,26 +41,26 @@ struct Transform
 	DVec3 Apply(const DVec3& point) const { return Rotate(point - Pivot) + Pivot + Position; }
 };
 
-Quat ReadRotation(ConfigEntry& entry)
+FQuat ReadRotation(ConfigEntry& entry)
 {
-	Quat rotation = Quat::scIdentity;
+	FQuat rotation = FQuat::scIdentity;
 
 	ConfigEntry* euler_entry = entry.GetMember(HashStr32("rot"));
 
 	if (euler_entry != nullptr) {
-		rotation = Quat::FromEulerAngles(euler_entry->GetValue<FVec3>());
+		rotation = FQuat::FromEulerAngles(euler_entry->GetValue<FVec3>());
 	}
 
 	ConfigEntry* quat_entry = entry.GetMember(HashStr32("rotquat"));
 
 	if (quat_entry != nullptr) {
-		rotation = quat_entry->GetValue<Quat>();
+		rotation = quat_entry->GetValue<FQuat>();
 	}
 
 	return rotation;
 }
 
-Transform MakeTransform(const Quat rotation, const FVec3 pivot, const FVec3 position)
+Transform MakeTransform(const FQuat rotation, const FVec3 pivot, const FVec3 position)
 {
 	Transform transform;
 	transform.Pivot = DVec3(pivot);
@@ -69,7 +69,7 @@ Transform MakeTransform(const Quat rotation, const FVec3 pivot, const FVec3 posi
 	const bool is_identity = (rotation.X == 0.0f && rotation.Y == 0.0f && rotation.Z == 0.0f);
 
 	if (!is_identity) {
-		const Mat4f matrix = Mat4f::AsRotation(rotation);
+		const FMat4 matrix = FMat4::AsRotation(rotation);
 
 		for (int32 row = 0; row < 3; row++) {
 			const DVec3 axis(matrix.Rows[row].X, matrix.Rows[row].Y, matrix.Rows[row].Z);
@@ -80,10 +80,10 @@ Transform MakeTransform(const Quat rotation, const FVec3 pivot, const FVec3 posi
 	return transform;
 }
 
-Mat4f MakeObjectMatrix(const Quat rotation, const FVec3 pivot, const FVec3 position)
+FMat4 MakeObjectMatrix(const FQuat rotation, const FVec3 pivot, const FVec3 position)
 {
-	return Mat4f::AsScale(FVec3(1.0f)) * Mat4f::AsTranslation(-pivot) * Mat4f::AsRotation(rotation) *
-		   Mat4f::AsTranslation(pivot) * Mat4f::AsTranslation(position);
+	return FMat4::AsScale(FVec3(1.0f)) * FMat4::AsTranslation(-pivot) * FMat4::AsRotation(rotation) *
+		   FMat4::AsTranslation(pivot) * FMat4::AsTranslation(position);
 }
 
 void AddEntityPositions(const ConfigEntry* list, Array<DVec3>& out_entities)
@@ -203,14 +203,14 @@ void MapSource::AddModels(const ConfigEntry* models_entry, const ConfigEntry* br
 		}
 
 		const FVec3 position = entry.GetMemberValue(HashStr32("pos"), FVec3(0.0f));
-		Quat rotation = entry.GetMemberValue(HashStr32("rot"), Quat::scIdentity);
+		FQuat rotation = entry.GetMemberValue(HashStr32("rot"), FQuat::scIdentity);
 		rotation = entry.GetMemberValue(HashStr32("rotquat"), rotation);
 		const float32 scale = entry.GetMemberValue(HashStr32("scale"), 1.0f);
 
 		SourceModel& model = Models.Emplace();
 		model.Name = entry.Name.Get();
 		model.MeshPath = mesh->Get<const char*>();
-		model.Transform = Mat4f::AsScale(FVec3(scale)) * Mat4f::AsRotation(rotation) * Mat4f::AsTranslation(position);
+		model.Transform = FMat4::AsScale(FVec3(scale)) * FMat4::AsRotation(rotation) * FMat4::AsTranslation(position);
 		model.bBaked = IsBakedModelEntry(entry, brushes);
 		model.bProbeBox = entry.GetMemberValue(HashStr32("unlit"), 0) == 0 &&
 						  entry.GetMemberValue(HashStr32("noprobe"), 0) == 0;
@@ -279,7 +279,7 @@ void MapSource::AddPatch(ConfigEntry& entry, const String& name, const CachedMat
 
 	// Ignore transparent surfaces as they are excempt from probe baking
 	if (!is_transparent) {
-		ProbePlacement::AddPatchSurfaces(ProbeBoxes, patch, Mat4f::scIdentity);
+		ProbePlacement::AddPatchSurfaces(ProbeBoxes, patch, FMat4::scIdentity);
 	}
 
 	Patch pieces[Patch::scMaxClosurePieces];
@@ -320,7 +320,7 @@ void MapSource::AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& nam
 	}
 
 	const FVec3 position = entry.GetMemberValue<FVec3>(HashStr32("pos"), FVec3::sZero);
-	const Quat rotation = ReadRotation(entry);
+	const FQuat rotation = ReadRotation(entry);
 	const Transform transform = MakeTransform(rotation, brush.GetCenter(), position);
 
 	const String material_name = ReadBrushMaterialName(entry);
@@ -334,7 +334,7 @@ void MapSource::AddBrush(PlaneSet& planes, ConfigEntry& entry, const String& nam
 	const bool is_transparent = !IsDecalEntry(entry) && mc.TransparentMaterials.Contains(material_name);
 
 	const BBox local_bounds(brush.GetBoundsMin(), brush.GetBoundsMax());
-	const Mat4f object_matrix = MakeObjectMatrix(rotation, brush.GetCenter(), position);
+	const FMat4 object_matrix = MakeObjectMatrix(rotation, brush.GetCenter(), position);
 
 	if (is_probe_volume && !is_reflection_probe) {
 		ProbeRegions.Emplace(OBBox::FromLocalBounds(local_bounds, object_matrix).GetWorldAABB());

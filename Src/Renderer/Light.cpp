@@ -60,7 +60,7 @@ void LightBase::Render(const PerspectiveCamera& camera, BaseCamera* shadow_camer
 void LightBase::FillGpuData(LightGpuData& data, const PerspectiveCamera& camera, BaseCamera* shadow_camera) const
 {
 	// No shadow map by default (ShadowAtlasRect stays zero), shadowed lights fill these in their own FillGpuData
-	memcpy(data.LightCameraMatrix, Mat4f::scIdentity.RawData, sizeof(Mat4f));
+	memcpy(data.LightCameraMatrix, FMat4::scIdentity.RawData, sizeof(FMat4));
 
 	data.Radius = mRadius;
 
@@ -99,7 +99,7 @@ void LightBase::SetPosition(const FVec3 position)
 	}
 }
 
-void LightBase::SetRotation(const Quat rotation)
+void LightBase::SetRotation(const FQuat rotation)
 {
 	Entity::SetRotation(rotation);
 
@@ -143,7 +143,7 @@ void LightDirectional::FillGpuData(LightGpuData& data, const PerspectiveCamera& 
 	data.Position[2] = direction.Z;
 
 	const BaseCamera* light_camera = (shadow_camera != nullptr) ? shadow_camera : &camera;
-	memcpy(data.LightCameraMatrix, light_camera->GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
+	memcpy(data.LightCameraMatrix, light_camera->GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(FMat4));
 
 	if (gShadowAtlas != nullptr) {
 		gShadowAtlas->GetRegionUVTransform(gShadowAtlas->GetDirectionalRegion(), data.ShadowAtlasRect);
@@ -221,11 +221,11 @@ void LightSpot::SetDirection(const FVec3 direction)
 
 	if (w < 1e-6f) {
 		// Pointing straight back, so any half turn around an axis perpendicular to +Z works
-		SetRotation(Quat(0.0f, 1.0f, 0.0f, 0.0f));
+		SetRotation(FQuat(0.0f, 1.0f, 0.0f, 0.0f));
 		return;
 	}
 
-	SetRotation(Quat(-dir.Y, dir.X, 0.0f, w).Normalize());
+	SetRotation(FQuat(-dir.Y, dir.X, 0.0f, w).Normalize());
 }
 
 FVec3 LightSpot::GetDirection() const
@@ -241,22 +241,22 @@ FVec3 LightSpot::GetDirection() const
 	return mRotation.GetDirection();
 }
 
-Mat4f LightSpot::CalculateShadowMatrix() const
+FMat4 LightSpot::CalculateShadowMatrix() const
 {
 	const FVec3 direction = GetDirection().Normalize();
 
 	// The cone is round, so any up vector works as long as it isn't parallel to the cone
 	const FVec3 up = (std::fabs(direction.Y) > 0.99f) ? FVec3(0.0f, 0.0f, 1.0f) : FVec3::sUp;
 
-	Mat4f view = Mat4f::scIdentity;
+	FMat4 view = FMat4::scIdentity;
 	view.LookAt(mPosition, mPosition + direction, up);
 
 	const float32 half_fov = std::min(mOuterAngle + scSpotShadowFovPadding, scSpotShadowMaxHalfFov);
 	const float32 far_plane = std::max(mRadius, scShadowNearPlane * 2.0f);
 
-	Mat4f projection = Mat4f::scIdentity;
+	FMat4 projection = FMat4::scIdentity;
 
-	// Reverse-Z takes the far plane first, see Mat4f::LoadPerspectiveMatrix()
+	// Reverse-Z takes the far plane first, see FMat4::LoadPerspectiveMatrix()
 	projection.LoadPerspectiveMatrix(half_fov * 2.0f, 1.0f, far_plane, scShadowNearPlane);
 
 	return view * projection;
@@ -285,13 +285,14 @@ void LightSpot::FillGpuData(LightGpuData& data, const PerspectiveCamera& camera,
 	const float32 cos_outer = cosf(mOuterAngle);
 
 	data.SpotCosOuter = cos_outer;
+
 	// Keeps the falloff finite when both angles match (a hard edged cone)
 	data.SpotAngleScale = 1.0f / std::max(cos_inner - cos_outer, 1e-4f);
 
 	// World::UpdateSpotShadows() runs before the lights are uploaded, so a light with a tile has been baked by the time
 	// the forward pass samples it
 	if (Shadow.AtlasTile != ShadowTileIndexNull && gShadowAtlas != nullptr) {
-		memcpy(data.LightCameraMatrix, Shadow.Matrix.RawData, sizeof(Mat4f));
+		memcpy(data.LightCameraMatrix, Shadow.Matrix.RawData, sizeof(FMat4));
 		gShadowAtlas->GetRegionUVTransform(gShadowAtlas->GetSpotTileRegion(Shadow.AtlasTile), data.ShadowAtlasRect);
 	}
 }

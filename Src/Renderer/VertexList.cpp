@@ -44,8 +44,8 @@ static eVertexType ChooseVertexType(bool has_default_data, bool has_skinning, eV
 }
 
 void VertexList::CreateFrom(const SizedArray<FVec3>& positions, const SizedArray<FVec3>& normals,
-							const SizedArray<Vec2f>& uvs, const SizedArray<FVec3>& tangents,
-							const SizedArray<Vec4f>& bone_weights, const SizedArray<Vec4u>& bone_ids,
+							const SizedArray<FVec2>& uvs, const SizedArray<FVec3>& tangents,
+							const SizedArray<FVec4>& bone_weights, const SizedArray<Vec4u>& bone_ids,
 							eVertexCreateFlags create_flags, const SizedArray<float32>& tangent_handedness)
 {
 	Assert(mLocalBuffer.IsEmpty());
@@ -83,7 +83,7 @@ void VertexList::CreateFrom(const SizedArray<FVec3>& positions, const SizedArray
 
 		if (supports_default) {
 			WriteOrZeroVec<float32, FVec3, 3>(vertex.Normal, normals, vertex_index, has_normals);
-			WriteOrZeroVec<float32, Vec2f, 2>(vertex.UV, uvs, vertex_index, has_uvs);
+			WriteOrZeroVec<float32, FVec2, 2>(vertex.UV, uvs, vertex_index, has_uvs);
 			WriteOrZeroVec<float32, FVec3, 3>(vertex.Tangent, tangents, vertex_index, has_tangents);
 
 			vertex.Tangent[3] = has_handedness ? tangent_handedness[vertex_index] : 1.0f;
@@ -96,7 +96,7 @@ void VertexList::CreateFrom(const SizedArray<FVec3>& positions, const SizedArray
 
 			if (supports_skinning) {
 				WriteOrZeroVec<uint32, Vec4u, 4>(vertex.BoneIds, bone_ids, vertex_index, true);
-				WriteOrZeroVec<float32, Vec4f, 4>(vertex.BoneWeights, bone_weights, vertex_index, true);
+				WriteOrZeroVec<float32, FVec4, 4>(vertex.BoneWeights, bone_weights, vertex_index, true);
 			}
 		}
 

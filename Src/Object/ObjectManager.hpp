@@ -18,7 +18,7 @@ struct alignas(16) ObjectGpuEntry
 	float PrevModelMatrix[16];
 };
 
-class Mat4f;
+class FMat4;
 
 // using ObjectId = uint32;
 
@@ -92,7 +92,7 @@ public:
 	Object* FindObject(const Hash32 name_hash);
 
 	void Submit(const ObjectID& id, ObjectGpuEntry& entry);
-	void Submit(const ObjectID& id, const Mat4f& model_matrix);
+	void Submit(const ObjectID& id, const FMat4& model_matrix);
 	void ReleaseAllObjects();
 
 	/**

@@ -4,8 +4,8 @@
 
 #include <Core/Assert.hpp>
 #include <Core/Types.hpp>
-#include <Math/Mat4.hpp>
-#include <Math/Quat.hpp>
+#include <Math/FMat4.hpp>
+#include <Math/FQuat.hpp>
 #include <Math/SSE.hpp>
 #include <Math/SSEUtil.hpp>
 #include <cstring>
@@ -16,9 +16,9 @@ namespace fx {
 static const float32 scIdentityData[16] = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
 											0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
 
-const Mat4f Mat4f::scIdentity = Mat4f(scIdentityData);
+const FMat4 FMat4::scIdentity = FMat4(scIdentityData);
 
-Mat4f Mat4f::AsRotation(const Quat quat)
+FMat4 FMat4::AsRotation(const Quat quat)
 {
 	float x = quat.GetX();
 	float y = quat.GetY();
@@ -41,11 +41,11 @@ Mat4f Mat4f::AsRotation(const Quat quat)
 	float yw = ty * w;
 	float zw = tz * w;
 
-	return Mat4f(Vec4f((1.0f - yy) - zz, xy + zw, xz - yw, 0.0f), Vec4f(xy - zw, (1.0f - zz) - xx, yz + xw, 0.0f),
-				 Vec4f(xz + yw, yz - xw, (1.0f - xx) - yy, 0.0f), Vec4f(0.0f, 0.0f, 0.0f, 1.0f));
+	return FMat4(FVec4((1.0f - yy) - zz, xy + zw, xz - yw, 0.0f), FVec4(xy - zw, (1.0f - zz) - xx, yz + xw, 0.0f),
+				 FVec4(xz + yw, yz - xw, (1.0f - xx) - yy, 0.0f), FVec4(0.0f, 0.0f, 0.0f, 1.0f));
 }
 
-void Mat4f::LoadPerspectiveMatrix(float32 yfov, float32 aspect_ratio, float32 near_plane, float32 far_plane)
+void FMat4::LoadPerspectiveMatrix(float32 yfov, float32 aspect_ratio, float32 near_plane, float32 far_plane)
 {
 	LoadIdentity();
 
@@ -65,7 +65,7 @@ void Mat4f::LoadPerspectiveMatrix(float32 yfov, float32 aspect_ratio, float32 ne
 }
 
 
-void Mat4f::LoadOrthographicMatrix(float32 width, float32 height, float32 near_plane, float32 far_plane)
+void FMat4::LoadOrthographicMatrix(float32 width, float32 height, float32 near_plane, float32 far_plane)
 {
 	Assert(near_plane > 0.0f && far_plane > 0.0f);
 
@@ -78,9 +78,9 @@ void Mat4f::LoadOrthographicMatrix(float32 width, float32 height, float32 near_p
 }
 
 
-Mat4f Mat4f::AsRotationX(float rad)
+FMat4 FMat4::AsRotationX(float rad)
 {
-	Mat4f result;
+	FMat4 result;
 
 	const float cr = cos(rad);
 	const float sr = sin(rad);
@@ -93,9 +93,9 @@ Mat4f Mat4f::AsRotationX(float rad)
 	return result;
 }
 
-Mat4f Mat4f::AsRotationY(float rad)
+FMat4 FMat4::AsRotationY(float rad)
 {
-	Mat4f result;
+	FMat4 result;
 
 	const float cr = cos(rad);
 	const float sr = sin(rad);
@@ -109,9 +109,9 @@ Mat4f Mat4f::AsRotationY(float rad)
 }
 
 
-Mat4f Mat4f::AsRotationZ(float rad)
+FMat4 FMat4::AsRotationZ(float rad)
 {
-	Mat4f result;
+	FMat4 result;
 
 	const float cr = cos(rad);
 	const float sr = sin(rad);
@@ -125,9 +125,9 @@ Mat4f Mat4f::AsRotationZ(float rad)
 }
 
 
-Mat4f Mat4f::operator*(const Mat4f& other) const
+FMat4 FMat4::operator*(const FMat4& other) const
 {
-	Mat4f result;
+	FMat4 result;
 
 	for (int i = 0; i < 4; i++) {
 		const __m128 a = Rows[i].mIntrin;
@@ -141,7 +141,7 @@ Mat4f Mat4f::operator*(const Mat4f& other) const
 	return result;
 }
 
-Vec4f Mat4f::operator*(const Vec4f vec) const
+FVec4 FMat4::operator*(const FVec4 vec) const
 {
 	__m128 v = vec.mIntrin;
 	__m128 v0 = simd::Permute4<simd::Shuffle_AX>(v);
@@ -154,11 +154,11 @@ Vec4f Mat4f::operator*(const Vec4f vec) const
 	result = _mm_fmadd_ps(Rows[2].mIntrin, v2, result);
 	result = _mm_fmadd_ps(Rows[3].mIntrin, v3, result);
 
-	return Vec4f(result);
+	return FVec4(result);
 }
 
 
-Mat4f::Mat4f(float data[4][4]) noexcept
+FMat4::FMat4(float data[4][4]) noexcept
 {
 	Rows[0].mIntrin = _mm_loadu_ps(data[0]);
 	Rows[1].mIntrin = _mm_loadu_ps(data[1]);
@@ -166,15 +166,15 @@ Mat4f::Mat4f(float data[4][4]) noexcept
 	Rows[3].mIntrin = _mm_loadu_ps(data[3]);
 }
 
-Mat4f Mat4f::GetWithoutTranslation() const
+FMat4 FMat4::GetWithoutTranslation() const
 {
-	Mat4f mat = *this;
+	FMat4 mat = *this;
 	mat.Rows[3].Set(0.0f, 0.0f, 0.0f, 1.0f);
 
 	return mat;
 }
 
-void Mat4f::TransposeTo(Mat4f& other) const
+void FMat4::TransposeTo(FMat4& other) const
 {
 	__m256 ahalf0 = _mm256_castps128_ps256(Rows[0].mIntrin);
 	ahalf0 = _mm256_insertf128_ps(ahalf0, Rows[1].mIntrin, 1);
@@ -199,7 +199,7 @@ void Mat4f::TransposeTo(Mat4f& other) const
 	other.Rows[3].mIntrin = _mm256_extractf128_ps(ahalf1, 1);
 }
 
-Mat4f Mat4f::Transposed() const
+FMat4 FMat4::Transposed() const
 {
 	__m256 ahalf0 = _mm256_castps128_ps256(Rows[0].mIntrin);
 	ahalf0 = _mm256_insertf128_ps(ahalf0, Rows[1].mIntrin, 1);
@@ -218,7 +218,7 @@ Mat4f Mat4f::Transposed() const
 	ahalf0 = _mm256_permute2f128_ps(temp0, temp1, 0x20);
 	ahalf1 = _mm256_permute2f128_ps(temp0, temp1, 0x31);
 
-	Mat4f result;
+	FMat4 result;
 	result.Rows[0].mIntrin = _mm256_castps256_ps128(ahalf0);
 	result.Rows[1].mIntrin = _mm256_extractf128_ps(ahalf0, 1);
 	result.Rows[2].mIntrin = _mm256_castps256_ps128(ahalf1);
@@ -227,11 +227,11 @@ Mat4f Mat4f::Transposed() const
 	return result;
 }
 
-Mat4f Mat4f::TransposeMat3() { return Transposed(); }
+FMat4 FMat4::TransposeMat3() { return Transposed(); }
 
-void Mat4f::CopyAsMat3To(float* dest) const { memcpy(dest, RawData, sizeof(float32) * 12); }
+void FMat4::CopyAsMat3To(float* dest) const { memcpy(dest, RawData, sizeof(float32) * 12); }
 
-void Mat4f::LookAt(const FVec3 eye, const FVec3 target, const FVec3 upvec)
+void FMat4::LookAt(const FVec3 eye, const FVec3 target, const FVec3 upvec)
 {
 	FVec3 forward = (target - eye);
 	forward.NormalizeIP();

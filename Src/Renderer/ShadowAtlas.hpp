@@ -44,7 +44,7 @@ class ShadowAtlas
 {
 public:
 	/// The total size of the shadow atlas texture
-	static constexpr Vec2u scAtlasSize = Vec2u(4096, 2048);
+	static constexpr UVec2 scAtlasSize = UVec2(4096, 2048);
 
 	/// The size of the main sun's directional shadow map
 	static constexpr uint32 scDirectionalSize = scAtlasSize.X / 2;
@@ -58,18 +58,18 @@ public:
 
 	/// The entire section of the atlas that is available to spotlights. Note that this is inclusive of the far cascade
 	/// (not spotlights) and the dynamic spotlight tiles. This is the area of the atlas in pixels.
-	static constexpr Vec2u scTotalSpotTilesArea = Vec2u(scAtlasSize.X - scDirectionalSize, scAtlasSize.Y);
+	static constexpr UVec2 scTotalSpotTilesArea = UVec2(scAtlasSize.X - scDirectionalSize, scAtlasSize.Y);
 
 
 	/// The number of static spotlight tiles that are available in both X and Y directions.
 	/// Note that this is the number of tiles, not the pixel dimensions. In general, this is (4, 2).
-	static constexpr Vec2u scStaticSpotTiles = Vec2u(scTotalSpotTilesArea.X, scTotalSpotTilesArea.Y / 2U) /
-											   Vec2u(scSpotTileSize);
+	static constexpr UVec2 scStaticSpotTiles = UVec2(scTotalSpotTilesArea.X, scTotalSpotTilesArea.Y / 2U) /
+											   UVec2(scSpotTileSize);
 
 	/// The number of dynamic spotlight tiles that are available in both X and Y directions.
 	/// Note that this is the number of tiles, not the pixel dimensions. In general, this is (2, 2).
-	static constexpr Vec2u scDynamicSpotTiles = Vec2u(scTotalSpotTilesArea.X / 2U, scTotalSpotTilesArea.Y / 2U) /
-												Vec2u(scSpotTileSize);
+	static constexpr UVec2 scDynamicSpotTiles = UVec2(scTotalSpotTilesArea.X / 2U, scTotalSpotTilesArea.Y / 2U) /
+												UVec2(scSpotTileSize);
 
 	/// The number of spot tiles across one row of the grid to the right of the sun.
 	static constexpr uint32 scSpotGridColumns = scTotalSpotTilesArea.X / scSpotTileSize;

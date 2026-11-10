@@ -17,8 +17,8 @@ struct PageFrame
 	int32 CellX = 0;
 	int32 CellZ = 0;
 
-	Vec2d LightMin = Vec2d(0.0);
-	Vec2d LightSize = Vec2d(0.0);
+	DVec2 LightMin = DVec2(0.0);
+	DVec2 LightSize = DVec2(0.0);
 
 	double DepthMin = 0.0;
 	double DepthMax = 0.0;
@@ -104,11 +104,11 @@ PageFrame MakePageFrame(const LightBasis& basis, int32 cell_x, int32 cell_z, dou
 			point.Z += page_size;
 		}
 
-		const Vec2d light(basis.Right.Dot(point), basis.Up.Dot(point));
+		const DVec2 light(basis.Right.Dot(point), basis.Up.Dot(point));
 		const double depth = basis.Forward.Dot(point);
 
-		light_bounds.Min = Vec2d::Min(light_bounds.Min, light);
-		light_bounds.Max = Vec2d::Max(light_bounds.Max, light);
+		light_bounds.Min = DVec2::Min(light_bounds.Min, light);
+		light_bounds.Max = DVec2::Max(light_bounds.Max, light);
 		frame.DepthMin = std::min(frame.DepthMin, depth);
 		frame.DepthMax = std::max(frame.DepthMax, depth);
 	}
@@ -117,7 +117,7 @@ PageFrame MakePageFrame(const LightBasis& basis, int32 cell_x, int32 cell_z, dou
 	const uint32 max_size = std::max(RoundUpToMultiple(options.MaxLevelSize, multiple), multiple);
 
 	frame.LightMin = light_bounds.Min;
-	frame.LightSize = Vec2d::Max(light_bounds.GetExtent(), Vec2d(options.TexelSize));
+	frame.LightSize = DVec2::Max(light_bounds.GetExtent(), DVec2(options.TexelSize));
 
 	const uint32 width = static_cast<uint32>(std::ceil(frame.LightSize.X / options.TexelSize));
 	const uint32 height = static_cast<uint32>(std::ceil(frame.LightSize.Y / options.TexelSize));
@@ -225,16 +225,16 @@ bool BakeFogShadow(const OccluderSet& occluders, const DVec3& sun_direction, con
 	const double reach = std::min((bounds_max.Y - bounds_min.Y) * horizontal / std::abs(basis.Forward.Y),
 								  options.MaxReach);
 
-	Vec2d reach_xz(0.0);
+	DVec2 reach_xz(0.0);
 
 	if (horizontal > scMinHorizontal) {
-		reach_xz = Vec2d(basis.Forward.X / horizontal * reach, basis.Forward.Z / horizontal * reach);
+		reach_xz = DVec2(basis.Forward.X / horizontal * reach, basis.Forward.Z / horizontal * reach);
 	}
 
-	const Vec2d bounds_min_xz(bounds_min.X, bounds_min.Z);
-	const Vec2d bounds_max_xz(bounds_max.X, bounds_max.Z);
-	const DRect extent(Vec2d::Min(bounds_min_xz, bounds_min_xz + reach_xz),
-					   Vec2d::Max(bounds_max_xz, bounds_max_xz + reach_xz));
+	const DVec2 bounds_min_xz(bounds_min.X, bounds_min.Z);
+	const DVec2 bounds_max_xz(bounds_max.X, bounds_max.Z);
+	const DRect extent(DVec2::Min(bounds_min_xz, bounds_min_xz + reach_xz),
+					   DVec2::Max(bounds_max_xz, bounds_max_xz + reach_xz));
 
 	const int32 cell_min_x = static_cast<int32>(std::floor(extent.Min.X / options.PageSize));
 	const int32 cell_min_z = static_cast<int32>(std::floor(extent.Min.Y / options.PageSize));

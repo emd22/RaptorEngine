@@ -26,8 +26,8 @@ using RVec3 = Vec3;
 
 namespace fx {
 
-class Vec4f;
-class Quat;
+class FVec4;
+class FQuat;
 
 class alignas(16) FVec3
 {
@@ -61,9 +61,9 @@ public:
 
 #ifdef FX_USE_SIMD
 	explicit FVec3(FLOAT4 intrin) : mIntrin(intrin) {}
-	FVec3(const Vec4f& other);
+	FVec3(const FVec4& other);
 #else
-	FVec3(const Vec4f& other) : X(other.X), Y(other.Y), Z(other.Z) {}
+	FVec3(const FVec4& other) : X(other.X), Y(other.Y), Z(other.Z) {}
 #endif
 
 
@@ -134,7 +134,7 @@ public:
 	FX_FORCE_INLINE FVec3 Cross(const FVec3 other) const;
 	FVec3 CrossSlow(const FVec3 other) const;
 
-	FVec3 Rotate(const Quat rotation) const;
+	FVec3 Rotate(const FQuat rotation) const;
 
 	FX_FORCE_INLINE float32 Dot(const FVec3 other) const;
 

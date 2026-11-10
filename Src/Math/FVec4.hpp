@@ -18,7 +18,7 @@ namespace fx {
 
 class FVec3;
 
-class alignas(16) Vec4f
+class alignas(16) FVec4
 {
 private:
 #if defined(FX_USE_NEON)
@@ -28,20 +28,20 @@ private:
 #endif
 
 public:
-	static const Vec4f sZero;
-	static const Vec4f sOne;
+	static const FVec4 sZero;
+	static const FVec4 sOne;
 
 public:
-	friend class Mat4f;
+	friend class FMat4;
 
-	Vec4f() = default;
-	Vec4f(float32 x, float32 y, float32 z, float32 w);
-	Vec4f(const float32* values);
+	FVec4() = default;
+	FVec4(float32 x, float32 y, float32 z, float32 w);
+	FVec4(const float32* values);
 	/**
 	 * @brief Create a Vec4 from an existing Vec3 and a W component.
 	 */
-	Vec4f(const FVec3& xyz, float32 w);
-	explicit Vec4f(float32 scalar);
+	FVec4(const FVec3& xyz, float32 w);
+	explicit FVec4(float32 scalar);
 
 	FX_FORCE_INLINE void Set(float32 x, float32 y, float32 z, float32 w);
 	FX_FORCE_INLINE void Set(float32 scalar);
@@ -49,15 +49,15 @@ public:
 
 	FX_FORCE_INLINE bool IsZero() const;
 	FX_FORCE_INLINE bool IsNearZero(const float32 tolerance = 0.00001) const;
-	FX_FORCE_INLINE bool IsCloseTo(const Vec4f other, const float32 tolerance = 0.00001) const;
+	FX_FORCE_INLINE bool IsCloseTo(const FVec4 other, const float32 tolerance = 0.00001) const;
 #ifdef FX_USE_SIMD
 	FX_FORCE_INLINE bool IsCloseTo(const SimdType other, const float32 tolerance = 0.00001) const;
 #endif
 
-	Vec4f& operator=(const Vec4f other);
+	FVec4& operator=(const FVec4 other);
 
-	FX_FORCE_INLINE Vec4f Normalize() const;
-	FX_FORCE_INLINE Vec4f& NormalizeIP();
+	FX_FORCE_INLINE FVec4 Normalize() const;
+	FX_FORCE_INLINE FVec4& NormalizeIP();
 
 	FX_FORCE_INLINE float32 LengthSquared() const;
 	FX_FORCE_INLINE bool IsNormalized(float32 tolerance) const { return abs(LengthSquared() - 1.0f) <= tolerance; }
@@ -73,27 +73,27 @@ public:
 
 #ifdef FX_USE_NEON
 	template <int TX, int TY, int TZ, int TW>
-	FX_FORCE_INLINE static Vec4f FlipSigns(const Vec4f vec)
+	FX_FORCE_INLINE static FVec4 FlipSigns(const FVec4 vec)
 	{
-		return Vec4f(Neon::FlipSigns<TX, TY, TZ, TW>(vec.mIntrin));
+		return FVec4(Neon::FlipSigns<TX, TY, TZ, TW>(vec.mIntrin));
 	}
 
 #elif FX_USE_AVX
 	template <int TX, int TY, int TZ, int TW>
-	FX_FORCE_INLINE static Vec4f FlipSigns(const Vec4f vec)
+	FX_FORCE_INLINE static FVec4 FlipSigns(const FVec4 vec)
 	{
-		return Vec4f(SSE::FlipSigns<TX, TY, TZ, TW>(vec.mIntrin));
+		return FVec4(SSE::FlipSigns<TX, TY, TZ, TW>(vec.mIntrin));
 	}
 #else
 	template <int TX, int TY, int TZ, int TW>
-	FX_FORCE_INLINE static vec4f FlipSigns(const Vec4f vec)
+	FX_FORCE_INLINE static vec4f FlipSigns(const FVec4 vec)
 	{
 		constexpr float rx = TX > 0.0 ? vec.X : -vec.X;
 		constexpr float ry = TY > 0.0 ? vec.Y : -vec.Y;
 		constexpr float rz = TZ > 0.0 ? vec.Z : -vec.Z;
 		constexpr float rw = TW > 0.0 ? vec.W : -vec.W;
 
-		return Vec4f(rx, ry, rz, rw);
+		return FVec4(rx, ry, rz, rw);
 	}
 #endif
 
@@ -101,31 +101,31 @@ public:
 	// Operator overloads
 	/////////////////////////////////////
 
-	FX_FORCE_INLINE Vec4f operator+(const Vec4f other) const;
-	FX_FORCE_INLINE Vec4f operator-(const Vec4f other) const;
-	FX_FORCE_INLINE Vec4f operator*(const Vec4f other) const;
-	FX_FORCE_INLINE Vec4f operator/(const Vec4f other) const;
+	FX_FORCE_INLINE FVec4 operator+(const FVec4 other) const;
+	FX_FORCE_INLINE FVec4 operator-(const FVec4 other) const;
+	FX_FORCE_INLINE FVec4 operator*(const FVec4 other) const;
+	FX_FORCE_INLINE FVec4 operator/(const FVec4 other) const;
 
-	FX_FORCE_INLINE Vec4f operator*(float32 scalar) const;
-	FX_FORCE_INLINE Vec4f operator/(float32 scalar) const;
+	FX_FORCE_INLINE FVec4 operator*(float32 scalar) const;
+	FX_FORCE_INLINE FVec4 operator/(float32 scalar) const;
 
-	FX_FORCE_INLINE bool operator>(const Vec4f other) const;
-	FX_FORCE_INLINE bool operator<(const Vec4f other) const;
-	FX_FORCE_INLINE bool operator>=(const Vec4f other) const;
-	FX_FORCE_INLINE bool operator<=(const Vec4f other) const;
+	FX_FORCE_INLINE bool operator>(const FVec4 other) const;
+	FX_FORCE_INLINE bool operator<(const FVec4 other) const;
+	FX_FORCE_INLINE bool operator>=(const FVec4 other) const;
+	FX_FORCE_INLINE bool operator<=(const FVec4 other) const;
 
-	Vec4f operator-() const;
+	FVec4 operator-() const;
 
-	Vec4f& operator+=(const Vec4f other);
-	Vec4f& operator-=(const Vec4f other);
-	Vec4f& operator*=(const Vec4f other);
-	FX_FORCE_INLINE Vec4f& operator*=(float32 scalar);
+	FVec4& operator+=(const FVec4 other);
+	FVec4& operator-=(const FVec4 other);
+	FVec4& operator*=(const FVec4 other);
+	FX_FORCE_INLINE FVec4& operator*=(float32 scalar);
 
 
 #ifdef FX_USE_SIMD
-	explicit Vec4f(SimdType intrin) : mIntrin(intrin) {}
+	explicit FVec4(SimdType intrin) : mIntrin(intrin) {}
 
-	Vec4f& operator=(SimdType other)
+	FVec4& operator=(SimdType other)
 	{
 		mIntrin = other;
 		return *this;
@@ -261,16 +261,16 @@ public:
 } // namespace fx
 
 
-RS_ARRAY_TYPE(fx::Vec4f, fx::float32, 4)
+RS_ARRAY_TYPE(fx::FVec4, fx::float32, 4)
 RS_ARRAY_TYPE(fx::Vec4u, fx::uint32, 4)
 
 
 template <>
-struct std::formatter<fx::Vec4f>
+struct std::formatter<fx::FVec4>
 {
 	auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-	auto format(const fx::Vec4f& obj, std::format_context& ctx) const
+	auto format(const fx::FVec4& obj, std::format_context& ctx) const
 	{
 		return std::format_to(ctx.out(), "({:.04}, {:.04}, {:.04}, {:.04})", obj.X, obj.Y, obj.Z, obj.W);
 	}
@@ -288,6 +288,6 @@ struct std::formatter<fx::Vec4u>
 
 
 /* Definitions for inline functions */
-#include "Impl/Vector/Vec4_AVX.inl"
-#include "Impl/Vector/Vec4_Fallback.inl"
-#include "Impl/Vector/Vec4_Neon.inl"
+#include "Impl/Vector/FVec4_AVX.inl"
+#include "Impl/Vector/FVec4_Fallback.inl"
+#include "Impl/Vector/FVec4_Neon.inl"

@@ -114,7 +114,7 @@ private:
 class Vector3Field final : public FieldBase<FVec3>
 {
 public:
-	Vector3Field(wxWindow* parent, const wxString& label, const Vec2f& limits);
+	Vector3Field(wxWindow* parent, const wxString& label, const FVec2& limits);
 
 	TType GetValue() const override;
 	void SetValue(TRefType value) override;
@@ -125,7 +125,7 @@ public:
 	~Vector3Field() override;
 
 private:
-	wxTextCtrl* MakeAxisField(wxWindow* parent, const wxString& axis_label, const Vec2f& limits);
+	wxTextCtrl* MakeAxisField(wxWindow* parent, const wxString& axis_label, const FVec2& limits);
 
 private:
 	wxTextCtrl* mpFields[3] = {};
@@ -138,7 +138,7 @@ private:
 class FloatField final : public FieldBase<float32>
 {
 public:
-	FloatField(wxWindow* parent, const wxString& label, const Vec2f& limits);
+	FloatField(wxWindow* parent, const wxString& label, const FVec2& limits);
 
 	TType GetValue() const override;
 	void SetValue(TRefType value) override;

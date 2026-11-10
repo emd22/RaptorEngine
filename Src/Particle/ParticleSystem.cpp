@@ -351,7 +351,7 @@ bool ParticleSystem::LoadEffect(const char* path, const String& name, ParticleEf
 		}
 
 		if (const ConfigEntry* frames = Child(entry, "frames")) {
-			const Vec2i frame_grid = frames->GetValue<Vec2i>();
+			const IVec2 frame_grid = frames->GetValue<IVec2>();
 			emitter.FramesX = static_cast<uint32>(std::max(frame_grid.X, 1));
 			emitter.FramesY = static_cast<uint32>(std::max(frame_grid.Y, 1));
 		}
@@ -864,7 +864,7 @@ void ParticleSystem::RetireEffects()
 	}
 }
 
-uint32 ParticleSystem::GatherLayer(eObjectLayer layer, const Mat4f& view_projection, const FVec3 eye,
+uint32 ParticleSystem::GatherLayer(eObjectLayer layer, const FMat4& view_projection, const FVec3 eye,
 								   const FVec3 forward)
 {
 	Frustum frustum;
@@ -1004,8 +1004,8 @@ void ParticleSystem::Render(renderer::CommandBuffer& cmd, const BaseCamera& came
 	const FVec3 right = FVec3::sUp.Cross(forward).Normalize();
 	const FVec3 up = forward.Cross(right).Normalize();
 
-	const Mat4f& world_view_projection = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
-	const Mat4f& player_view_projection = camera.GetCameraMatrix(eObjectLayer::PlayerLayer);
+	const FMat4& world_view_projection = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
+	const FMat4& player_view_projection = camera.GetCameraMatrix(eObjectLayer::PlayerLayer);
 
 	mSortEntries.Clear();
 

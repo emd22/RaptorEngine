@@ -295,8 +295,8 @@ void DrawWorldLabels(const BaseCamera& camera, const AudioVoiceDebug* voices, ui
 	constexpr float32 scLabelHeight = 0.3f;
 	constexpr float32 scMinClipW = 1e-3f;
 
-	const Mat4f& view_projection = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
-	const Vec2u window_size = gGraphics->GetWindow()->GetSize();
+	const FMat4& view_projection = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
+	const UVec2 window_size = gGraphics->GetWindow()->GetSize();
 
 	uint32 labels = 0;
 
@@ -308,20 +308,20 @@ void DrawWorldLabels(const BaseCamera& camera, const AudioVoiceDebug* voices, ui
 		}
 
 		const FVec3 anchor = voice.Position + FVec3(0.0f, scLabelHeight, 0.0f);
-		const Vec4f clip = view_projection * Vec4f(anchor, 1.0f);
+		const FVec4 clip = view_projection * FVec4(anchor, 1.0f);
 
 		if (clip.W < scMinClipW) {
 			continue;
 		}
 
-		const Vec2f ndc = Vec2f(clip.X, clip.Y) / clip.W;
+		const FVec2 ndc = FVec2(clip.X, clip.Y) / clip.W;
 
 		if (ndc.X < -1.0f || ndc.X > 1.0f || ndc.Y < -1.0f || ndc.Y > 1.0f) {
 			continue;
 		}
 
-		const Vec2f window_extent(static_cast<float32>(window_size.X), static_cast<float32>(window_size.Y));
-		const Vec2f pixel = (ndc * 0.5f + 0.5f) * window_extent;
+		const FVec2 window_extent(static_cast<float32>(window_size.X), static_cast<float32>(window_size.Y));
+		const FVec2 pixel = (ndc * 0.5f + 0.5f) * window_extent;
 
 		String label = String::Fmt("{} {}", voice.Name, FormatDb(GetVoiceLevelDb(voice)));
 
@@ -383,7 +383,7 @@ void AudioDebugView::DrawWorld()
 									static_cast<uint8>(255.0f * occlusion), 60, 255);
 		}
 
-		gDebugDraw->WireBox(voice.Position, half_extent, Quat::scIdentity, color);
+		gDebugDraw->WireBox(voice.Position, half_extent, FQuat::scIdentity, color);
 	}
 }
 

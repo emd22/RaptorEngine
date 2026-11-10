@@ -7,8 +7,8 @@
 
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
+#include <Math/FQuat.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Quat.hpp>
 
 namespace fx {
 class ConfigFile;

@@ -83,16 +83,16 @@ Winding MergeConvex(const Array<Winding>& pieces, const Plane& plane)
 	const DVec3 u = axis.Cross(normal).Normalized();
 	const DVec3 v = normal.Cross(u);
 
-	Array<Vec2d> points;
+	Array<DVec2> points;
 
 	for (const Winding& piece : pieces) {
 		for (const DVec3& point : piece) {
-			points.Emplace(Vec2d(u.Dot(point), v.Dot(point)));
+			points.Emplace(DVec2(u.Dot(point), v.Dot(point)));
 		}
 	}
 
 	std::sort(points.begin(), points.end(),
-			  [](const Vec2d& a, const Vec2d& b)
+			  [](const DVec2& a, const DVec2& b)
 			  {
 				  if (a.X != b.X) {
 					  return a.X < b.X;
@@ -101,9 +101,9 @@ Winding MergeConvex(const Array<Winding>& pieces, const Plane& plane)
 				  return a.Y < b.Y;
 			  });
 
-	Array<Vec2d> unique;
+	Array<DVec2> unique;
 
-	for (const Vec2d& point : points) {
+	for (const DVec2& point : points) {
 		if (unique.Size > 0 && std::abs(GetLast(unique).X - point.X) < scHullPointEpsilon &&
 			std::abs(GetLast(unique).Y - point.Y) < scHullPointEpsilon) {
 			continue;
@@ -118,7 +118,7 @@ Winding MergeConvex(const Array<Winding>& pieces, const Plane& plane)
 		return hull;
 	}
 
-	Array<Vec2d> chain;
+	Array<DVec2> chain;
 
 	for (int32 pass = 0; pass < 2; pass++) {
 		const size_t start = chain.Size;
@@ -130,7 +130,7 @@ Winding MergeConvex(const Array<Winding>& pieces, const Plane& plane)
 				point_index = unique.Size - 1 - step;
 			}
 
-			const Vec2d& point = unique[point_index];
+			const DVec2& point = unique[point_index];
 
 			while (chain.Size >= start + 2 &&
 				   chain[chain.Size - 1].CrossOffset(point, chain[chain.Size - 2]) <= scHullEpsilon) {
@@ -147,7 +147,7 @@ Winding MergeConvex(const Array<Winding>& pieces, const Plane& plane)
 		return hull;
 	}
 
-	for (const Vec2d& point : chain) {
+	for (const DVec2& point : chain) {
 		hull.Emplace(normal * plane.Distance + u * point.X + v * point.Y);
 	}
 

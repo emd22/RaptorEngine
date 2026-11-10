@@ -145,7 +145,7 @@ public:
 
 	void Move(float64 delta_time, const FVec3 offset);
 
-	void RotateHead(const Vec2f& xy);
+	void RotateHead(const FVec2& xy);
 
 	FX_FORCE_INLINE FVec3 GetBob() const { return FVec3(mHeadBobX, mHeadBobY, 0.0f); }
 
@@ -164,7 +164,7 @@ private:
 	void UpdateViewModel(double delta_time);
 	void OnViewModelLoaded(uint32 index, Object* object);
 	void ActivateViewModel(uint32 index);
-	void RotateCamera(const Vec2f& xy);
+	void RotateCamera(const FVec2& xy);
 	void UpdateRecoil(float32 delta_time);
 	void UpdateViewKick(float32 delta_time);
 	void UpdateLanding(float32 delta_time);
@@ -197,7 +197,7 @@ public:
 
 	bool bIsSprinting : 1 = false;
 
-	Vec2f HeadBobStrength = Vec2f { 0.011, 0.018 };
+	FVec2 HeadBobStrength = FVec2 { 0.011, 0.018 };
 
 	float32 SpeedMultiplier = 1.0f;
 
@@ -279,7 +279,7 @@ private:
 	/// Shared by every mesh in the view model. Null if the view model has no skeleton.
 	Ref<Skeleton> mpViewModelSkeleton { nullptr };
 
-	Quat mViewModelRotation = Quat::scIdentity;
+	FQuat mViewModelRotation = FQuat::scIdentity;
 
 	/// How far (radians) the view model currently trails the camera's yaw and pitch.
 	float32 mViewModelSwayYaw = 0.0f;

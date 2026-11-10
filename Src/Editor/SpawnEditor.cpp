@@ -72,9 +72,9 @@ void SpawnEditor::DrawMarker(bool selected)
 	const FVec3 eye = spawn.Position + FVec3(0.0f, GetEyeHeight(), 0.0f);
 	const FVec3 tip = eye + (spawn.Direction.Normalize() * scDirectionLength);
 
-	renderer::gDebugDraw->WireBox(body_center, half_extent, Quat::scIdentity, color);
+	renderer::gDebugDraw->WireBox(body_center, half_extent, FQuat::scIdentity, color);
 	renderer::gDebugDraw->Line(eye, tip, color);
-	renderer::gDebugDraw->SolidBox(tip, FVec3(scDirectionTipHalfExtent), Quat::scIdentity, color);
+	renderer::gDebugDraw->SolidBox(tip, FVec3(scDirectionTipHalfExtent), FQuat::scIdentity, color);
 }
 
 } // namespace fx::editor

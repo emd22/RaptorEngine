@@ -12,10 +12,10 @@
 namespace fx {
 // We need to find the tiles that can possibly intersect with the frustum.
 
-static Vec4f ToPlane(const Vec4f vec)
+static FVec4 ToPlane(const FVec4 vec)
 {
 	float32 length = FVec3(vec.mIntrin).Length();
-	return (Vec4f(vec) / length);
+	return (FVec4(vec) / length);
 }
 
 
@@ -23,15 +23,15 @@ void Frustum::Rebuild(const PerspectiveCamera& camera) { Rebuild(camera.GetCamer
 
 void Frustum::Rebuild(const BaseCamera& camera, eObjectLayer layer) { Rebuild(camera.GetCameraMatrix(layer)); }
 
-void Frustum::Rebuild(const Mat4f& view_projection)
+void Frustum::Rebuild(const FMat4& view_projection)
 {
 	// Note that `.Transposed()` is faster than rebuilding each vector manually.
-	Mat4f vp_m = view_projection.Transposed();
+	FMat4 vp_m = view_projection.Transposed();
 
-	const Vec4f vr_x = vp_m.Rows[0];
-	const Vec4f vr_y = vp_m.Rows[1];
-	const Vec4f vr_z = vp_m.Rows[2];
-	const Vec4f vr_w = vp_m.Rows[3];
+	const FVec4 vr_x = vp_m.Rows[0];
+	const FVec4 vr_y = vp_m.Rows[1];
+	const FVec4 vr_z = vp_m.Rows[2];
+	const FVec4 vr_w = vp_m.Rows[3];
 
 	PLANE(eFrustumPlane::Left) = ToPlane(vr_w + vr_x);
 	PLANE(eFrustumPlane::Right) = ToPlane(vr_w - vr_x);
@@ -58,7 +58,7 @@ bool Frustum::TileIntersectsAABB(const BBox& tile_aabb) const
 	};
 
 	for (int i : scPlanesToTest) {
-		const Vec4f plane = mClipPlanes[i];
+		const FVec4 plane = mClipPlanes[i];
 
 		// Positive vertex: the AABB corner furthest along the plane normal.
 		FVec3 p_vertex(plane.X >= 0.0f ? tile_aabb.Max.X : tile_aabb.Min.X,
@@ -81,7 +81,7 @@ bool Frustum::IntersectsSphere(const FVec3 center, float32 radius, uint32 plane_
 			continue;
 		}
 
-		const Vec4f plane = mClipPlanes[i];
+		const FVec4 plane = mClipPlanes[i];
 
 		// The planes are normalized, so this is the signed distance to the plane
 		if (FVec3(plane).Dot(center) + plane.W < -radius) {
@@ -102,7 +102,7 @@ bool Frustum::IntersectsAABB(const BBox& aabb, uint32 plane_mask) const
 			continue;
 		}
 
-		const Vec4f plane = mClipPlanes[i];
+		const FVec4 plane = mClipPlanes[i];
 		const FVec3 normal(plane);
 
 		const float32 reach = half_extent.Dot(normal.Abs());
@@ -127,7 +127,7 @@ bool Frustum::IntersectsOBB(const OBBox& obb, uint32 plane_mask) const
 			continue;
 		}
 
-		const Vec4f plane = mClipPlanes[i];
+		const FVec4 plane = mClipPlanes[i];
 		const FVec3 normal(plane);
 
 		const float32 reach = std::abs(half_x.Dot(normal)) + std::abs(half_y.Dot(normal)) +
@@ -144,8 +144,8 @@ bool Frustum::IntersectsOBB(const OBBox& obb, uint32 plane_mask) const
 
 BBox Frustum::GetFrustumBoundingBox(const PerspectiveCamera& camera)
 {
-	Mat4f vp_matrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
-	Mat4f vp_inverse = vp_matrix.Inverse();
+	FMat4 vp_matrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
+	FMat4 vp_inverse = vp_matrix.Inverse();
 
 	static const FVec3 ndc_corners[8] = { { -1, -1, 0 }, { 1, -1, 0 }, { 1, 1, 0 }, { -1, 1, 0 },
 										  { -1, -1, 1 }, { 1, -1, 1 }, { 1, 1, 1 }, { -1, 1, 1 } };
@@ -154,7 +154,7 @@ BBox Frustum::GetFrustumBoundingBox(const PerspectiveCamera& camera)
 	FVec3 max_point(-FLT_MAX, -FLT_MAX, -FLT_MAX);
 
 	for (const FVec3 corner : ndc_corners) {
-		Vec4f world = vp_inverse * Vec4f(corner.X, corner.Y, corner.Z, 1.0f);
+		FVec4 world = vp_inverse * FVec4(corner.X, corner.Y, corner.Z, 1.0f);
 		world = (world / world.W);
 
 		min_point = FVec3::Min(min_point, FVec3(world.X, world.Y, world.Z));

@@ -151,7 +151,7 @@ static void MoveToTopOfDisplay(wxFrame* frame)
 	frame->SetPosition(wxPoint(frame->GetPosition().x, work_area.GetTop()));
 }
 
-EditorFrame* RaptorEditor::CreateMainFrame(const char* title, const Vec2u& viewport_size,
+EditorFrame* RaptorEditor::CreateMainFrame(const char* title, const UVec2& viewport_size,
 										   const eRaptorEditorFlags flags)
 {
 	mpMainFrame = new EditorFrame(wxString::FromAscii(title),
@@ -299,7 +299,7 @@ void RaptorEditor::ServiceViewportResize()
 		return;
 	}
 
-	const Vec2u size = viewport->GetCachedSize();
+	const UVec2 size = viewport->GetCachedSize();
 
 	if (size.X > 0 && size.Y > 0) {
 		renderer::gGraphics->RebuildToResizedWindow();
@@ -319,16 +319,16 @@ uint32 RaptorEditor::GetAvailableToolMask() const
 	return mask;
 }
 
-static Vec2f GetSunAngles(const FVec3 position)
+static FVec2 GetSunAngles(const FVec3 position)
 {
 	const float32 length = position.Length();
 	if (length < 1e-6f) {
-		return Vec2f::scZero;
+		return FVec2::scZero;
 	}
 
 	const FVec3 direction = position / length;
 
-	return Vec2f(MathUtil::RadiansToDegrees(std::atan2(direction.X, direction.Z)),
+	return FVec2(MathUtil::RadiansToDegrees(std::atan2(direction.X, direction.Z)),
 				 MathUtil::RadiansToDegrees(std::asin(std::clamp(direction.Y, -1.0f, 1.0f))));
 }
 
@@ -411,7 +411,7 @@ EditorPanelState RaptorEditor::BuildPanelState()
 
 	if (LightDirectional* sun = gLightManager->GetDirectionalLight(); sun != nullptr) {
 		const FVec3 position = sun->GetPosition();
-		const Vec2f angles = GetSunAngles(position);
+		const FVec2 angles = GetSunAngles(position);
 
 		world.bHasSun = true;
 		world.bSunEnabled = gCVars->Get("b_sun_enabled", true);
@@ -611,7 +611,7 @@ static void DrawModelBounds(Object* object, const Color& color)
 		const FVec3 center = (object->Bounds.Max + object->Bounds.Min) * 0.5f;
 
 		renderer::gDebugDraw->WireBox(
-			Mat4f::AsScale(half_extent) * Mat4f::AsTranslation(center) * object->GetWorldMatrix(), color);
+			FMat4::AsScale(half_extent) * FMat4::AsTranslation(center) * object->GetWorldMatrix(), color);
 	}
 
 	for (ObjectID attached_id : object->AttachedNodes) {

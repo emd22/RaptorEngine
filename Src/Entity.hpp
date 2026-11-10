@@ -3,9 +3,9 @@
 #include <Core/Name.hpp>
 #include <Core/PagedArray.hpp>
 #include <Core/Ref.hpp>
+#include <Math/FMat4.hpp>
+#include <Math/FQuat.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Mat4.hpp>
-#include <Math/Quat.hpp>
 #include <Object/ObjectID.hpp>
 #include <Renderer/Constants.hpp>
 
@@ -39,7 +39,7 @@ public:
 		MarkTransformOutOfDate();
 	}
 
-	virtual void SetRotation(const Quat rotation)
+	virtual void SetRotation(const FQuat rotation)
 	{
 		mRotation = rotation;
 		MarkTransformOutOfDate();
@@ -60,10 +60,10 @@ public:
 	void RotateY(float32 rad);
 	void RotateZ(float32 rad);
 
-	void SetModelMatrix(const Mat4f& other);
+	void SetModelMatrix(const FMat4& other);
 
-	Mat4f& GetWorldMatrix();
-	// const Mat4f& GetNormalMatrix();
+	FMat4& GetWorldMatrix();
+	// const FMat4& GetNormalMatrix();
 
 	const FVec3 GetPosition() const { return mPosition; }
 
@@ -100,7 +100,7 @@ protected:
 	/// Keeps the matrix from before the first change of a frame, which is where the object was drawn last frame
 	void BeginMatrixChange();
 
-	void SetPreTransform(const Mat4f& transform)
+	void SetPreTransform(const FMat4& transform)
 	{
 		mPreTransform = transform;
 		mbHasPreTransform = true;
@@ -119,7 +119,7 @@ public:
 	Name Name;
 
 	FVec3 mPosition = FVec3::sZero;
-	Quat mRotation = Quat::scIdentity;
+	FQuat mRotation = FQuat::scIdentity;
 	float32 mScale = 1.0f;
 
 	FVec3 RotationOrigin = FVec3::sZero;
@@ -131,18 +131,18 @@ protected:
 	bool mbMatrixOutOfDate : 1 = true;
 	bool mbHasPreTransform : 1 = false;
 
-	Mat4f mWorldMatrix = Mat4f::scIdentity;
-	Mat4f mPreTransform = Mat4f::scIdentity;
+	FMat4 mWorldMatrix = FMat4::scIdentity;
+	FMat4 mPreTransform = FMat4::scIdentity;
 
 
-	Mat4f mPrevWorldMatrix = Mat4f::scIdentity;
+	FMat4 mPrevWorldMatrix = FMat4::scIdentity;
 	uint32 mMatrixChangedFrame = UINT32_MAX;
 	bool mbHasWorldMatrix = false;
 	bool mbChangeIsMotion = false;
 
 	uint8 mMatrixSubmittedFrames = 0;
 	static_assert(renderer::FramesInFlight <= 8);
-	// Mat4f mNormalMatrix = Mat4f::Identity;
+	// FMat4 mNormalMatrix = FMat4::Identity;
 };
 
 class EntityManager

@@ -3,10 +3,10 @@
 #include "BarrierHelper.hpp"
 
 #include <Asset/Loader/Image/LoaderStb.hpp>
+#include <Core/Allocator.hpp>
 #include <Core/Assert.hpp>
 #include <Core/Defines.hpp>
 #include <Core/File.hpp>
-#include <Core/Allocator.hpp>
 #include <Core/StackArray.hpp>
 #include <Engine.hpp>
 #include <Math/Float16.hpp>
@@ -15,7 +15,6 @@
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Texture/TextureManager.hpp>
-
 #include <cmath>
 #include <limits>
 
@@ -50,11 +49,11 @@ const ImageTypeProperties ImageTypeGetProperties(eImageType image_type, uint32 c
 	return props;
 }
 
-static Vec2u GetMipDimensions(const Vec2u& ml_zero_size, uint32 mip_level)
+static UVec2 GetMipDimensions(const UVec2& ml_zero_size, uint32 mip_level)
 {
 	float32 mip_divisor = (1.0f / static_cast<float32>(1U << mip_level));
 
-	return Vec2u(std::max(static_cast<uint32>(static_cast<float32>(ml_zero_size.X) * mip_divisor), 1U),
+	return UVec2(std::max(static_cast<uint32>(static_cast<float32>(ml_zero_size.X) * mip_divisor), 1U),
 				 std::max(static_cast<uint32>(static_cast<float32>(ml_zero_size.Y) * mip_divisor), 1U));
 }
 
@@ -108,7 +107,7 @@ Image& Image::operator=(const Image& other)
 	return *this;
 }
 
-void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format,
+void Image::Create(eImageType image_type, const UVec2& size, uint16 mips_count, eImageFormat format,
 				   VkImageTiling tiling, VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags,
 				   uint32 cube_count, uint32 depth)
 {
@@ -269,13 +268,13 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 #endif
 }
 
-void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format,
+void Image::Create(eImageType image_type, const UVec2& size, uint16 mips_count, eImageFormat format,
 				   VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags, uint32 cube_count)
 {
 	Create(image_type, size, mips_count, format, VK_IMAGE_TILING_OPTIMAL, usage, aspect, flags, cube_count);
 }
 
-void Image::CreateVolume(const Vec2u& size, uint32 depth, eImageFormat format, VkImageUsageFlags usage)
+void Image::CreateVolume(const UVec2& size, uint32 depth, eImageFormat format, VkImageUsageFlags usage)
 {
 	Create(eImageType::Volume, size, 1, format, VK_IMAGE_TILING_OPTIMAL, usage, eImageAspectFlag::Color,
 		   eImageCreateFlags::IsTarget, 1, depth);
@@ -304,7 +303,7 @@ void Image::CreateFromData(renderer::CommandBuffer& cmd, const ImageInfo& info, 
 	Info.MipLevel = info.MipLevel;
 }
 
-void Image::UploadMip(renderer::CommandBuffer& cmd, uint32 mip_index, const Vec2u& size,
+void Image::UploadMip(renderer::CommandBuffer& cmd, uint32 mip_index, const UVec2& size,
 					  const Slice<const uint8>& image_data)
 {
 	renderer::RawGpuBuffer staging_buffer;
@@ -344,7 +343,7 @@ void Image::Upload(renderer::CommandBuffer& cmd, const ImageInfo& info)
 	uint64 offset = 0;
 
 	for (uint32 info_index = 0; info_index < info.MipCount; info_index++) {
-		Vec2u mip_dimensions = GetMipDimensions(info.Size, info_index);
+		UVec2 mip_dimensions = GetMipDimensions(info.Size, info_index);
 		Assert(mip_dimensions.X > 0 && mip_dimensions.Y > 0);
 
 		AssertMsg((offset % 4) == 0, "Mip level is not 4 byte aligned in the staging buffer");
@@ -443,8 +442,8 @@ static const LayoutTransitionInfo GetLayoutTransitionInfo(VkImageLayout layout)
 
 
 void Image::CopyFromBuffer(renderer::CommandBuffer& cmd, const renderer::RawGpuBuffer& buffer,
-						   VkImageLayout final_layout, Vec2u size, uint32 base_layer, uint32 mip_level,
-						   Vec2u dst_offset)
+						   VkImageLayout final_layout, UVec2 size, uint32 base_layer, uint32 mip_level,
+						   UVec2 dst_offset)
 {
 	if (mip_level < 0) {
 		return;
@@ -487,7 +486,7 @@ void Image::CopyFromBuffer(renderer::CommandBuffer& cmd, const renderer::RawGpuB
 }
 
 void Image::CopyToMip(renderer::CommandBuffer& cmd, const renderer::RawGpuBuffer& buffer, VkImageLayout final_layout,
-					  Vec2u size, uint32 mip_level)
+					  UVec2 size, uint32 mip_level)
 {
 	renderer::BarrierHelper::ImageLayoutTransition(this, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, mip_level, 1);
 
@@ -549,7 +548,7 @@ enum eCubemapLayer
 // 	Assert(tile_width == tile_height);
 
 
-// 	Create(eImageType::Cubemap, Vec2u(tile_width, tile_height), 1, image_format, VK_IMAGE_TILING_OPTIMAL,
+// 	Create(eImageType::Cubemap, UVec2(tile_width, tile_height), 1, image_format, VK_IMAGE_TILING_OPTIMAL,
 // 		   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, Aspect);
 
 // 	StackArray<VkImageCopy, 6> copy_infos;
@@ -652,7 +651,6 @@ void Image::DecRef()
 	Allocation = nullptr;
 	View = nullptr;
 }
-
 
 
 static uint8 UnitToByte(float32 value)
@@ -761,7 +759,7 @@ void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
 	}
 
 	const uint32 mip_level = Info.MipLevel;
-	const Vec2u size = GetMipDimensions(Info.Size, mip_level);
+	const UVec2 size = GetMipDimensions(Info.Size, mip_level);
 	const uint64 data_size = ImageFormatUtil::GetDataSize(Info.Format, size);
 
 	VkImageLayout original_layout = ImageLayout;

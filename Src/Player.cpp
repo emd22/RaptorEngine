@@ -188,13 +188,13 @@ static void CancelRecoilOffset(float32& offset, float32 input)
 	}
 }
 
-void Player::RotateCamera(const Vec2f& xy)
+void Player::RotateCamera(const FVec2& xy)
 {
 	mViewAngles.Rotate(xy.X, xy.Y);
 	pCamera->SetRotation(mViewAngles.ToQuat());
 }
 
-void Player::RotateHead(const Vec2f& xy)
+void Player::RotateHead(const FVec2& xy)
 {
 	CancelRecoilOffset(mRecoilOffsetYaw, xy.X);
 	CancelRecoilOffset(mRecoilOffsetPitch, xy.Y);
@@ -291,13 +291,13 @@ void Player::UpdateViewModel(double delta_time)
 	UpdateViewModelSway(static_cast<float32>(delta_time));
 
 	// Roll goes in this local offset rather than the euler angles, as FromEulerAngles applies Z last in world space.
-	const Quat sway = Quat::FromEulerAngles(FVec3(-mViewModelSwayPitch + mViewModelHolster * scHolsterPitch,
-												  mViewModelSwayYaw, mViewModelSwayYaw * scViewModelSwayRoll));
+	const FQuat sway = FQuat::FromEulerAngles(FVec3(-mViewModelSwayPitch + mViewModelHolster * scHolsterPitch,
+													mViewModelSwayYaw, mViewModelSwayYaw * scViewModelSwayRoll));
 
 	mViewModelRotation = pCamera->GetRotation() * sway;
 
 	// Build the basis from the lagging rotation (rather than the camera's) so the view model pivots around the eye.
-	const Mat4f view_model_basis = Mat4f::AsRotation(mViewModelRotation);
+	const FMat4 view_model_basis = FMat4::AsRotation(mViewModelRotation);
 
 	const FVec3 right = FVec3(view_model_basis.Rows[0]);
 	const FVec3 up = FVec3(view_model_basis.Rows[1]);
@@ -327,7 +327,7 @@ void Player::UpdateViewModel(double delta_time)
 
 	// const float32 rotx = sin(gWorld->Player.mBobCounterY * 0.5f) * 0.05f;
 
-	const Quat kick = Quat::FromEulerAngles(
+	const FQuat kick = FQuat::FromEulerAngles(
 		FVec3(-mViewKickValue[ViewKickPitch], mViewKickValue[ViewKickYaw], mViewKickValue[ViewKickRoll]));
 
 	const FVec3 view_offset = view_model_bob + (right * mViewModelOffset.X) + (up * mViewModelOffset.Y) +
@@ -337,9 +337,9 @@ void Player::UpdateViewModel(double delta_time)
 	const ViewModelSlot& slot = mViewModels[mActiveViewModel];
 
 	if (slot.bHasViewJoint) {
-		const Quat rotation = mViewModelRotation * kick *
-							  Quat::FromEulerAngles(FVec3(0.0f, static_cast<float32>(FX_PI), 0.0f));
-		const Mat4f basis = Mat4f::AsRotation(rotation);
+		const FQuat rotation = mViewModelRotation * kick *
+							   FQuat::FromEulerAngles(FVec3(0.0f, static_cast<float32>(FX_PI), 0.0f));
+		const FMat4 basis = FMat4::AsRotation(rotation);
 
 		const FVec3 view_origin = (FVec3(basis.Rows[0]) * slot.ViewOrigin.X) +
 								  (FVec3(basis.Rows[1]) * slot.ViewOrigin.Y) +
@@ -517,7 +517,7 @@ bool Player::GetViewModelJointPosition(const char* joint_name, FVec3& out_positi
 			continue;
 		}
 
-		const Mat4f joint_world = skeleton.WorldTransforms[i] * mpViewModel->GetWorldMatrix();
+		const FMat4 joint_world = skeleton.WorldTransforms[i] * mpViewModel->GetWorldMatrix();
 		out_position = FVec3(joint_world.Rows[3]);
 		return true;
 	}
@@ -610,7 +610,7 @@ void Player::UpdateRecoil(float32 delta_time)
 	if (delta_pitch != 0.0f || delta_yaw != 0.0f) {
 		const float32 pitch_before = mViewAngles.Pitch;
 
-		RotateCamera(Vec2f(delta_yaw, delta_pitch));
+		RotateCamera(FVec2(delta_yaw, delta_pitch));
 
 		const float32 clamped_pitch = delta_pitch - (mViewAngles.Pitch - pitch_before);
 

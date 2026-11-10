@@ -34,16 +34,16 @@ public:
 
 	FX_FORCE_INLINE float32 GetAspectRatio() const { return mAspectRatio; }
 
-	FX_FORCE_INLINE const Mat4f& GetInvViewMatrix() const { return mInvViewMatrix; }
-	FX_FORCE_INLINE const Mat4f& GetInvProjectionMatrix() const { return mInvProjectionMatrix; }
+	FX_FORCE_INLINE const FMat4& GetInvViewMatrix() const { return mInvViewMatrix; }
+	FX_FORCE_INLINE const FMat4& GetInvProjectionMatrix() const { return mInvProjectionMatrix; }
 
 	~PerspectiveCamera() override = default;
 
 protected:
 	// The inverse matrices for view and projection. This isn't on the BaseCamera class as we seldom need them for
 	// anything except for probe baking and some graphical effects.
-	Mat4f mInvViewMatrix = Mat4f::scIdentity;
-	Mat4f mInvProjectionMatrix = Mat4f::scIdentity;
+	FMat4 mInvViewMatrix = FMat4::scIdentity;
+	FMat4 mInvProjectionMatrix = FMat4::scIdentity;
 
 	float32 mFovY = MathUtil::DegreesToRadians(80.0f);
 	float32 mAspectRatio = 1.0f;

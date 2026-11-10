@@ -298,7 +298,7 @@ struct TriangleShading
 {
 	FVec3 U = FVec3(0.0f);
 	FVec3 V = FVec3(0.0f);
-	Vec2f Texcoord[3];
+	FVec2 Texcoord[3];
 	FVec3 Tint[3];
 	uint32 Material = 0;
 	/// Model triangles have no texels, their hits read the model cache instead
@@ -1083,7 +1083,7 @@ float32 HashToUnit(uint32 value)
 
 struct DirectionSet
 {
-	SizedArray<Vec2f> Points;
+	SizedArray<FVec2> Points;
 
 	explicit DirectionSet(uint32 count)
 	{
@@ -1100,11 +1100,11 @@ struct DirectionSet
 			const float32 u = (static_cast<float32>(index) + 0.5f) / static_cast<float32>(count);
 			const float32 v = static_cast<float32>(static_cast<double>(bits) * (1.0 / 4294967296.0));
 
-			Points[index] = Vec2f(u, v);
+			Points[index] = FVec2(u, v);
 		}
 	}
 
-	static FVec3 GetLocal(const Vec2f& point, float32 offset_u, float32 offset_v)
+	static FVec3 GetLocal(const FVec2& point, float32 offset_u, float32 offset_v)
 	{
 		const float32 u = point.X + offset_u - std::floor(point.X + offset_u);
 		const float32 v = point.Y + offset_v - std::floor(point.Y + offset_v);
@@ -1254,7 +1254,7 @@ void BleedEdges(const IndirectInput& input, FVec3* values, Array<uint8>& filled,
 
 
 		// Get the total size of the chart rect
-		const Vec2u rect_size = rect.GetExtent();
+		const UVec2 rect_size = rect.GetExtent();
 
 		Fill(filled, rect_size.X * rect_size.Y, static_cast<uint8>(0));
 
@@ -1958,7 +1958,7 @@ public:
 		const TriangleShading& shading = mShadings[triangle.Shading];
 		const float32 w = 1.0f - hit.U - hit.V;
 
-		const Vec2f texcoord = shading.Texcoord[0] * w + shading.Texcoord[1] * hit.U + shading.Texcoord[2] * hit.V;
+		const FVec2 texcoord = shading.Texcoord[0] * w + shading.Texcoord[1] * hit.U + shading.Texcoord[2] * hit.V;
 
 		if (shading.bModel) {
 			const uint32 cell = mCache.Find(origin + direction * hit.Distance, triangle.Facing);
@@ -2204,7 +2204,7 @@ public:
 		}
 
 		for (const URect& rect : input.LightmapRects) {
-			const Vec2u extent = rect.GetExtent();
+			const UVec2 extent = rect.GetExtent();
 
 			for (uint32 level = 1; level < scTransportLevels; level++) {
 				const uint32 block = 1U << level;
@@ -2607,7 +2607,7 @@ void BuildTransport(const IndirectBake& bake, const IndirectInput& input, const 
 
 	for (uint32 chart_index = 0; chart_index < input.LightmapRects.Size; chart_index++) {
 		const URect& rect = input.LightmapRects[chart_index];
-		const Vec2u extent = rect.GetExtent();
+		const UVec2 extent = rect.GetExtent();
 
 		CompiledMapTransportChart& chart = out_transport.Charts[chart_index];
 		chart.Min[0] = rect.Min.X;

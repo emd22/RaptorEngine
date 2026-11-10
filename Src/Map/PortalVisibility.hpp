@@ -4,9 +4,9 @@
 #include <Map/AreaGraph.hpp>
 #include <Map/AreaSet.hpp>
 #include <Math/BBox.hpp>
+#include <Math/FMat4.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Mat4.hpp>
-#include <Math/Vec4.hpp>
+#include <Math/FVec4.hpp>
 
 namespace fx {
 
@@ -51,7 +51,7 @@ public:
 
 public:
 	void Disable();
-	void Update(const AreaGraph& graph, const Mat4f& view_projection, const FVec3& camera_position);
+	void Update(const AreaGraph& graph, const FMat4& view_projection, const FVec3& camera_position);
 
 	bool IsActive() const { return mbActive; }
 
@@ -69,7 +69,7 @@ public:
 		return mPortalStates[portal];
 	}
 
-	const Mat4f& GetViewProjection() const { return mViewProjection; }
+	const FMat4& GetViewProjection() const { return mViewProjection; }
 	const FVec3& GetCameraPosition() const { return mCameraPosition; }
 
 	bool IsVisible(const AreaSet& areas, const BBox& bounds) const;
@@ -84,7 +84,7 @@ private:
 
 	bool GetPortalRect(const MapPortal& portal, uint32 from_area, const ScreenRect& parent_rect, ScreenRect& out_rect);
 
-	Vec4f ToClip(const FVec3& point) const;
+	FVec4 ToClip(const FVec3& point) const;
 	bool ProjectBounds(const BBox& bounds, ScreenRect& out_rect) const;
 
 private:
@@ -92,14 +92,14 @@ private:
 	int32 mCameraArea = -1;
 
 	const AreaGraph* mpGraph = nullptr;
-	Mat4f mViewProjection;
+	FMat4 mViewProjection;
 	FVec3 mCameraPosition = FVec3::sZero;
 
 	SizedArray<ScreenRect> mAreaRects;
 	SizedArray<ePortalState> mPortalStates;
 
-	SizedArray<Vec4f> mClipPoints;
-	SizedArray<Vec4f> mClippedPoints;
+	SizedArray<FVec4> mClipPoints;
+	SizedArray<FVec4> mClippedPoints;
 };
 
 } // namespace fx

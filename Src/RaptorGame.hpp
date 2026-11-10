@@ -129,7 +129,7 @@ public:
 	double Fps = 0.0;
 	double FrameTimeMs = 0.0;
 
-	Quat PistolRotationGoal = Quat::scIdentity;
+	FQuat PistolRotationGoal = FQuat::scIdentity;
 	ObjectManager ObjectManager;
 
 	bool bInCommandMode = false;

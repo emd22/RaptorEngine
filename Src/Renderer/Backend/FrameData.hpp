@@ -4,28 +4,28 @@
 #include "Descriptors.hpp"
 #include "Synchro.hpp"
 
-#include <Math/Mat4.hpp>
+#include <Math/FMat4.hpp>
 
 namespace fx::renderer {
 
 struct alignas(16) UniformBufferObject
 {
-    Mat4f MvpMatrix;
+	FMat4 MvpMatrix;
 };
 
 struct FrameData
 {
 public:
-    void Create(GpuDevice* device);
-    void Destroy();
+	void Create(GpuDevice* device);
+	void Destroy();
 
 public:
-    CommandPool CmdPool;
-    CommandBuffer CmdBuffer;
+	CommandPool CmdPool;
+	CommandBuffer CmdBuffer;
 
-    Semaphore ImageAvailable;
-    Semaphore RenderFinished;
-    Fence InFlight;
+	Semaphore ImageAvailable;
+	Semaphore RenderFinished;
+	Fence InFlight;
 };
 
 } // namespace fx::renderer

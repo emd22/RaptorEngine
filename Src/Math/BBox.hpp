@@ -1,7 +1,7 @@
 #pragma once
 
+#include "FMat4.hpp"
 #include "FVec3.hpp"
-#include "Mat4.hpp"
 
 namespace fx {
 
@@ -46,7 +46,7 @@ class OBBox
 public:
 	OBBox() = default;
 
-	static OBBox FromLocalBounds(const BBox& local_bounds, const Mat4f transform);
+	static OBBox FromLocalBounds(const BBox& local_bounds, const FMat4 transform);
 	BBox GetWorldAABB() const;
 
 public:

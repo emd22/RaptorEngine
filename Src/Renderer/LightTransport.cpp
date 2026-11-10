@@ -75,10 +75,11 @@ void LightTransport::Create()
 	const uint16 black[4] = { 0, 0, 0, scHalfOne };
 
 	mpBakedIrradiance = gGraphics->CreateLightmapImage(
-		Vec2u(1, 1), eImageFormat::RGBA16_Float, Slice<const uint8>(reinterpret_cast<const uint8*>(black), sizeof(black)));
+		UVec2(1, 1), eImageFormat::RGBA16_Float,
+		Slice<const uint8>(reinterpret_cast<const uint8*>(black), sizeof(black)));
 
 	mpRelitIrradiance = gTextureManager->NewTexture();
-	mpRelitIrradiance->Create(eImageType::Flat, Vec2u(1, 1), 1, eImageFormat::RGBA16_Float,
+	mpRelitIrradiance->Create(eImageType::Flat, UVec2(1, 1), 1, eImageFormat::RGBA16_Float,
 							  VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
 }
 
@@ -150,7 +151,7 @@ bool LightTransport::Upload(const CompiledMapTransport& transport, const Compile
 		return false;
 	}
 
-	const Vec2u size(lightmap.Width, lightmap.Height);
+	const UVec2 size(lightmap.Width, lightmap.Height);
 	const uint64 texel_count = lightmap.GetTexelCount();
 
 	SizedArray<uint32> texel_charts;
@@ -202,9 +203,9 @@ bool LightTransport::Upload(const CompiledMapTransport& transport, const Compile
 	gGraphics->SubmitImmediateUploadCmd(
 		[&](CommandBuffer& cmd)
 		{
-			ImageInfo info(size, eImageFormat::RGBA16_Float, 0, 1,
-						   Slice<const uint8>(reinterpret_cast<const uint8*>(baked_texels.pData),
-											  baked_texels.GetSizeInBytes()));
+			ImageInfo info(
+				size, eImageFormat::RGBA16_Float, 0, 1,
+				Slice<const uint8>(reinterpret_cast<const uint8*>(baked_texels.pData), baked_texels.GetSizeInBytes()));
 
 			mpBakedIrradiance->CreateFromData(cmd, info, eImageCreateFlags::None);
 		});

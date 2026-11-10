@@ -6,8 +6,8 @@
 
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
+#include <Math/FMat4.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Mat4.hpp>
 #include <Math/MathUtil.hpp>
 #include <Math/Vec2.hpp>
 #include <algorithm>
@@ -24,7 +24,7 @@ constexpr float32 scSoleCornerSigns[scSoleCorners][2] = {
 	{ -1.0f, 1.0f },
 };
 
-FX_FORCE_INLINE JPH::Vec3 RowAsVec3(const Mat4f& m, uint32 row) { return JPH::Vec3(m.Rows[row].mIntrin); }
+FX_FORCE_INLINE JPH::Vec3 RowAsVec3(const FMat4& m, uint32 row) { return JPH::Vec3(m.Rows[row].mIntrin); }
 
 FX_FORCE_INLINE JPH::Vec3 GetUpFromGravity(const JPH::Vec3 gravity)
 {
@@ -45,17 +45,17 @@ struct GravityFrame
 	static GravityFrame FromPhysics();
 
 	FX_FORCE_INLINE JPH::Vec3 Horizontal(const JPH::Vec3 v) const { return v - Up * v.Dot(Up); }
-	FX_FORCE_INLINE Vec2f ToPlane(const JPH::Vec3 point) const { return Vec2f { point.Dot(AxisU), point.Dot(AxisV) }; }
-	FX_FORCE_INLINE JPH::Vec3 FromPlane(const Vec2f point, float32 height) const
+	FX_FORCE_INLINE FVec2 ToPlane(const JPH::Vec3 point) const { return FVec2 { point.Dot(AxisU), point.Dot(AxisV) }; }
+	FX_FORCE_INLINE JPH::Vec3 FromPlane(const FVec2 point, float32 height) const
 	{
 		return AxisU * point.X + AxisV * point.Y + Up * height;
 	}
 };
 
-JPH::Mat44 RotationFromMatrix(const Mat4f& m);
-Mat4f MatrixFromRotationTranslation(const JPH::Mat44& rotation, const JPH::Vec3& position);
-void NormalizeRotationRows(Mat4f& m);
-void ScaleRotationRows(Mat4f& m, const JPH::Vec3& scale);
+JPH::Mat44 RotationFromMatrix(const FMat4& m);
+FMat4 MatrixFromRotationTranslation(const JPH::Mat44& rotation, const JPH::Vec3& position);
+void NormalizeRotationRows(FMat4& m);
+void ScaleRotationRows(FMat4& m, const JPH::Vec3& scale);
 
 /**
  * @brief Rotation of `child` relative to `parent`, both in world space.
@@ -75,8 +75,8 @@ JPH::Quat FrameRotation(const JPH::Vec3 local_axis, const JPH::Vec3 local_hinge,
  * closing vertex.
  * @returns The vertex count
  */
-uint32 BuildHull(Vec2f* points, uint32 count, Vec2f* out_hull);
-Vec2f ClosestOnHull(const Vec2f* hull, uint32 count, const Vec2f p, float32& out_signed_distance);
-Vec2f GetHullCentroid(const Vec2f* hull, uint32 count);
+uint32 BuildHull(FVec2* points, uint32 count, FVec2* out_hull);
+FVec2 ClosestOnHull(const FVec2* hull, uint32 count, const FVec2 p, float32& out_signed_distance);
+FVec2 GetHullCentroid(const FVec2* hull, uint32 count);
 
 } // namespace fx::physics::RagdollMath

@@ -6,7 +6,7 @@ ShadowDirectional::ShadowDirectional() : ShadowMapSize(ShadowAtlas::scDirectiona
 {
 	ShadowCamera.Update();
 
-	FarShadowCamera.SetBounds(Vec2f(scFarBounds));
+	FarShadowCamera.SetBounds(FVec2(scFarBounds));
 	FarShadowCamera.SetClip(0.1f, 400.0f);
 	FarShadowCamera.Update();
 }

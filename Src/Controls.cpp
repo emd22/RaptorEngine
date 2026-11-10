@@ -81,7 +81,7 @@ void ControlManager::ReleaseMouse()
 	window->SetRelativeMouseMode((inst.mMouseCaptured = false));
 }
 
-Vec2f& ControlManager::GetMouseDelta() { return GetInstance().mMouseDelta; }
+FVec2& ControlManager::GetMouseDelta() { return GetInstance().mMouseDelta; }
 
 static inline bool IsKeyInRange(eKey key_id)
 {
@@ -179,7 +179,7 @@ void ControlManager::Update()
 {
 	ControlManager& inst = GetInstance();
 
-	inst.mMouseDelta = Vec2f::scZero;
+	inst.mMouseDelta = FVec2::scZero;
 	inst.mThisTick++;
 
 	inst.ApplyPostedEvents();
@@ -236,7 +236,7 @@ void ControlManager::PostButtonEvent(eKey key_id, bool is_now_down)
 	Post(PostedEvent { .Type = PostedEvent::eType::Button, .Key = key_id, .bIsDown = is_now_down });
 }
 
-void ControlManager::PostMouseMotion(const Vec2f& delta)
+void ControlManager::PostMouseMotion(const FVec2& delta)
 {
 	Post(PostedEvent { .Type = PostedEvent::eType::MouseMotion, .Delta = delta });
 }
@@ -423,7 +423,7 @@ void ControlManager::UpdateFromKeyboardEvent(SDL_Event* event)
 
 void ControlManager::UpdateFromMouseMoveEvent(SDL_Event* event)
 {
-	GetInstance().mMouseDelta += Vec2f(event->motion.xrel, event->motion.yrel);
+	GetInstance().mMouseDelta += FVec2(event->motion.xrel, event->motion.yrel);
 }
 
 void ControlManager::UpdateFromMouseButtonEvent(SDL_Event* event)

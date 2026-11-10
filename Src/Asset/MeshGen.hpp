@@ -9,8 +9,8 @@ namespace fx {
 struct MeshGenOptions
 {
 	float32 Scale = 1.0f;
-	Vec2f UvMin = Vec2f(0.0f, 0.0f);
-	Vec2f UvMax = Vec2f(0.5f, 0.5f);
+	FVec2 UvMin = FVec2(0.0f, 0.0f);
+	FVec2 UvMax = FVec2(0.5f, 0.5f);
 };
 
 struct CubeGenOptions
@@ -53,7 +53,7 @@ public:
 		SizedArray<FVec3> Tangents;
 		/// One per vertex, -1 where the face's UVs are mirrored. Empty means +1 everywhere
 		SizedArray<float32> TangentHandedness;
-		SizedArray<Vec2f> Texcoords;
+		SizedArray<FVec2> Texcoords;
 
 		SizedArray<uint32> Indices;
 
@@ -80,7 +80,7 @@ public:
 	static Ref<GeneratedMesh> MakeWireframeBox();
 	/// A single segment from the origin to +1 on X, as a line list
 	static Ref<GeneratedMesh> MakeLine();
-	static Ref<GeneratedMesh> MakeQuad(Vec2f scale = Vec2f(1.0f, 1.0f));
+	static Ref<GeneratedMesh> MakeQuad(FVec2 scale = FVec2(1.0f, 1.0f));
 
 private:
 };

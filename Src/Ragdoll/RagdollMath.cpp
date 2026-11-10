@@ -10,9 +10,9 @@ namespace fx::physics::RagdollMath {
 
 namespace {
 
-Vec2f ClosestOnSegment(const Vec2f a, const Vec2f b, const Vec2f p)
+FVec2 ClosestOnSegment(const FVec2 a, const FVec2 b, const FVec2 p)
 {
-	const Vec2f edge = b - a;
+	const FVec2 edge = b - a;
 	const float32 length_sq = edge.LengthSquared();
 
 	if (length_sq < 1e-10f) {
@@ -40,7 +40,7 @@ GravityFrame GravityFrame::FromGravity(const JPH::Vec3 gravity)
 
 GravityFrame GravityFrame::FromPhysics() { return FromGravity(gPhysics->pBackend->PhysicsSystem.GetGravity()); }
 
-JPH::Mat44 RotationFromMatrix(const Mat4f& m)
+JPH::Mat44 RotationFromMatrix(const FMat4& m)
 {
 	const JPH::Vec3 x = RowAsVec3(m, 0).Normalized();
 
@@ -52,17 +52,17 @@ JPH::Mat44 RotationFromMatrix(const Mat4f& m)
 	return JPH::Mat44(JPH::Vec4(x, 0.0f), JPH::Vec4(y, 0.0f), JPH::Vec4(z, 0.0f), JPH::Vec4(0.0f, 0.0f, 0.0f, 1.0f));
 }
 
-Mat4f MatrixFromRotationTranslation(const JPH::Mat44& rotation, const JPH::Vec3& position)
+FMat4 MatrixFromRotationTranslation(const JPH::Mat44& rotation, const JPH::Vec3& position)
 {
 	const JPH::Vec3 x = rotation.GetAxisX();
 	const JPH::Vec3 y = rotation.GetAxisY();
 	const JPH::Vec3 z = rotation.GetAxisZ();
 
-	return Mat4f(Vec4f(FVec3::FromJolt(x), 0.0f), Vec4f(FVec3::FromJolt(y), 0.0f), Vec4f(FVec3::FromJolt(z), 0.0f),
-				 Vec4f(FVec3::FromJolt(position), 1.0f));
+	return FMat4(FVec4(FVec3::FromJolt(x), 0.0f), FVec4(FVec3::FromJolt(y), 0.0f), FVec4(FVec3::FromJolt(z), 0.0f),
+				 FVec4(FVec3::FromJolt(position), 1.0f));
 }
 
-void NormalizeRotationRows(Mat4f& m)
+void NormalizeRotationRows(FMat4& m)
 {
 	for (uint32 row = 0; row < 3; row++) {
 		float32* r = &m.RawData[row * 4];
@@ -78,7 +78,7 @@ void NormalizeRotationRows(Mat4f& m)
 	}
 }
 
-void ScaleRotationRows(Mat4f& m, const JPH::Vec3& scale)
+void ScaleRotationRows(FMat4& m, const JPH::Vec3& scale)
 {
 	for (uint32 row = 0; row < 3; row++) {
 		m.Rows[row] *= scale[row];
@@ -130,7 +130,7 @@ JPH::Quat FrameRotation(const JPH::Vec3 local_axis, const JPH::Vec3 local_hinge,
 	return (world * local.Transposed3x3()).GetQuaternion().Normalized();
 }
 
-uint32 BuildHull(Vec2f* points, uint32 count, Vec2f* out_hull)
+uint32 BuildHull(FVec2* points, uint32 count, FVec2* out_hull)
 {
 	if (count < 3) {
 		std::copy(points, points + count, out_hull);
@@ -138,13 +138,13 @@ uint32 BuildHull(Vec2f* points, uint32 count, Vec2f* out_hull)
 	}
 
 	std::sort(points, points + count,
-			  [](const Vec2f& a, const Vec2f& b) { return (a.X < b.X) || (a.X == b.X && a.Y < b.Y); });
+			  [](const FVec2& a, const FVec2& b) { return (a.X < b.X) || (a.X == b.X && a.Y < b.Y); });
 
 	uint32 size = 0;
 
 	// Pops hull vertices until appending `point` makes a strict counter-clockwise turn, never shrinking
 	// the hull below `min_size`, then appends it.
-	auto push = [&](const Vec2f& point, uint32 min_size)
+	auto push = [&](const FVec2& point, uint32 min_size)
 	{
 		while (size >= min_size && out_hull[size - 1].CrossOffset(point, out_hull[size - 2]) <= 0.0f) {
 			size--;
@@ -169,7 +169,7 @@ uint32 BuildHull(Vec2f* points, uint32 count, Vec2f* out_hull)
 	return size - 1;
 }
 
-Vec2f ClosestOnHull(const Vec2f* hull, uint32 count, const Vec2f p, float32& out_signed_distance)
+FVec2 ClosestOnHull(const FVec2* hull, uint32 count, const FVec2 p, float32& out_signed_distance)
 {
 	if (count == 0) {
 		out_signed_distance = 0.0f;
@@ -182,7 +182,7 @@ Vec2f ClosestOnHull(const Vec2f* hull, uint32 count, const Vec2f p, float32& out
 	}
 
 	bool inside = (count >= 3);
-	Vec2f closest = hull[0];
+	FVec2 closest = hull[0];
 	float32 closest_distance = std::numeric_limits<float32>::max();
 	uint32 edge_count = count;
 
@@ -192,14 +192,14 @@ Vec2f ClosestOnHull(const Vec2f* hull, uint32 count, const Vec2f p, float32& out
 	}
 
 	for (uint32 i = 0; i < edge_count; i++) {
-		const Vec2f a = hull[i];
-		const Vec2f b = hull[(i + 1) % count];
+		const FVec2 a = hull[i];
+		const FVec2 b = hull[(i + 1) % count];
 
 		if (b.CrossOffset(p, a) < 0.0f) {
 			inside = false;
 		}
 
-		const Vec2f on_edge = ClosestOnSegment(a, b, p);
+		const FVec2 on_edge = ClosestOnSegment(a, b, p);
 		const float32 distance = p.Distance(on_edge);
 
 		if (distance < closest_distance) {
@@ -217,9 +217,9 @@ Vec2f ClosestOnHull(const Vec2f* hull, uint32 count, const Vec2f p, float32& out
 	return closest;
 }
 
-Vec2f GetHullCentroid(const Vec2f* hull, uint32 count)
+FVec2 GetHullCentroid(const FVec2* hull, uint32 count)
 {
-	Vec2f average = Vec2f::scZero;
+	FVec2 average = FVec2::scZero;
 
 	for (uint32 i = 0; i < count; i++) {
 		average += hull[i] / static_cast<float32>(count);
@@ -227,11 +227,11 @@ Vec2f GetHullCentroid(const Vec2f* hull, uint32 count)
 
 	// Area-weighted centroid of the triangle fan around the vertex average, which is unbiased by vertex density
 	float32 area = 0.0f;
-	Vec2f weighted = Vec2f::scZero;
+	FVec2 weighted = FVec2::scZero;
 
 	for (uint32 i = 0; i < count; i++) {
-		const Vec2f a = hull[i] - average;
-		const Vec2f b = hull[(i + 1) % count] - average;
+		const FVec2 a = hull[i] - average;
+		const FVec2 b = hull[(i + 1) % count] - average;
 		const float32 cross = a.Cross(b);
 
 		area += cross;

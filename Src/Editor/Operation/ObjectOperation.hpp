@@ -50,14 +50,14 @@ class RotateOperation final : public ObjectEditOperation
 {
 public:
 	RotateOperation(Object* object, const FVec3& euler_before, const FVec3& euler_after, int32 group_size = 1);
-	RotateOperation(Object* object, const Quat& before, const Quat& after, int32 group_size = 1);
+	RotateOperation(Object* object, const FQuat& before, const FQuat& after, int32 group_size = 1);
 
 	void Execute(EditorSelection& selection) override;
 	void Undo(EditorSelection& selection) override;
 
 private:
-	Quat mBefore;
-	Quat mAfter;
+	FQuat mBefore;
+	FQuat mAfter;
 };
 
 class ScaleFaceOperation final : public ObjectEditOperation
@@ -134,7 +134,7 @@ private:
 
 	eObjectTag mTagsBefore = eObjectTag::None;
 	FVec3 mPositionBefore = FVec3::sZero;
-	Quat mRotationBefore = Quat::scIdentity;
+	FQuat mRotationBefore = FQuat::scIdentity;
 	DynArray<NodeFlags, GrowthFunctions::Double> mNodesBefore;
 };
 

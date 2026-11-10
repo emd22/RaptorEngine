@@ -81,7 +81,7 @@ uint16 EncodeUNorm16(float64 value) { return static_cast<uint16>((std::clamp(val
 
 namespace ImageGen {
 
-Image* Random(Vec2u size)
+Image* Random(UVec2 size)
 {
 	Image* image = gTextureManager->NewTexture();
 
@@ -140,7 +140,7 @@ Image* DfgLut(uint32 size)
 		[&](renderer::CommandBuffer& cmd)
 		{
 			ImageInfo info(
-				Vec2u(size, size), eImageFormat::RG16_UNorm, 0, 1,
+				UVec2(size, size), eImageFormat::RG16_UNorm, 0, 1,
 				Slice<const uint8>(reinterpret_cast<const uint8*>(pixel_data.pData), pixel_data.GetSizeInBytes()));
 
 			image->CreateFromData(cmd, info, eImageCreateFlags::None);

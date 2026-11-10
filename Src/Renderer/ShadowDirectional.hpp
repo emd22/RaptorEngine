@@ -22,21 +22,9 @@ public:
 public:
 	ShadowDirectional();
 
-	/**
-	 * @brief Centers `camera` on `target`, looking down along the sun. `sun_direction` points towards the sun and must
-	 * be normalized.
-	 */
 	void PlaceCamera(OrthoCamera& camera, const FVec3 target, const FVec3 sun_direction) const;
-
 	void PlaceFarCamera(const FVec3 target, const FVec3 sun_direction);
 
-	/**
-	 * @brief Checks that `position` is inside of `camera`'s shadow map and away from its edges, so that its
-	 * surroundings are shadowed too.
-	 *
-	 * @param edge_margin Fraction of the shadow map's half-width that has to be left between `position` and every
-	 * edge, 0.5 keeps it within the middle half.
-	 */
 	static bool IsWellCovered(const OrthoCamera& camera, const FVec3 position, float32 edge_margin);
 
 	~ShadowDirectional() = default;
@@ -50,7 +38,7 @@ public:
 	OrthoCamera FarShadowCamera;
 
 	/// Size of the directional region of the shadow atlas
-	Vec2u ShadowMapSize = Vec2u::scZero;
+	UVec2 ShadowMapSize = UVec2::scZero;
 };
 
 } // namespace fx::renderer

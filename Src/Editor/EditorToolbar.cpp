@@ -245,7 +245,7 @@ bool ShowPatchTextureDialog(wxWindow* parent, PatchTextureSettings& settings)
 
 	settings.Mapping = get_mapping();
 	settings.Scale = static_cast<float32>(scale_field->GetValue());
-	settings.Repeats = Vec2f(static_cast<float32>(repeats_u_field->GetValue()),
+	settings.Repeats = FVec2(static_cast<float32>(repeats_u_field->GetValue()),
 							 static_cast<float32>(repeats_v_field->GetValue()));
 
 	if (axis_choice->GetSelection() != wxNOT_FOUND) {
@@ -317,9 +317,9 @@ const char* GetDataFilterName(eDataFilter filter) { return scDataFilterNames[sta
 EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent(parent), mpCanvas(canvas)
 {
 	constexpr int scLetterButtonSize = 32;
-	constexpr Vec2f scTextureOffsetLimits = Vec2f(-100000.0f, 100000.0f);
-	constexpr Vec2f scTextureScaleLimits = Vec2f(1.0f / 64.0f, 1024.0f);
-	constexpr Vec2f scTextureRotationLimits = Vec2f(-360.0f, 360.0f);
+	constexpr FVec2 scTextureOffsetLimits = FVec2(-100000.0f, 100000.0f);
+	constexpr FVec2 scTextureScaleLimits = FVec2(1.0f / 64.0f, 1024.0f);
+	constexpr FVec2 scTextureRotationLimits = FVec2(-360.0f, 360.0f);
 
 	mpSizer = new wxBoxSizer(wxVERTICAL);
 	mpViewRow = new wxWrapSizer(wxHORIZONTAL);
@@ -498,7 +498,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 	for (uint32 i = 0; i < scViewPlaneCount; i++) {
 		const eViewPlane plane = static_cast<eViewPlane>(i);
 
-		FloatField* base_field = new FloatField(parent, scViewPlaneAxes[i].pBaseLabel, Vec2f(-100000.0f, 100000.0f));
+		FloatField* base_field = new FloatField(parent, scViewPlaneAxes[i].pBaseLabel, FVec2(-100000.0f, 100000.0f));
 		base_field->SetValue(mBase[i]);
 		base_field->SetOnChange(
 			[this, i, plane](const float32 value)
@@ -507,7 +507,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 				mpCanvas->SetCreateVolume(plane, mBase[i], mSize[i]);
 			});
 
-		FloatField* size_field = new FloatField(parent, scViewPlaneAxes[i].pSizeLabel, Vec2f(0.05f, 100000.0f));
+		FloatField* size_field = new FloatField(parent, scViewPlaneAxes[i].pSizeLabel, FVec2(0.05f, 100000.0f));
 		size_field->SetValue(mSize[i]);
 		size_field->SetOnChange(
 			[this, i, plane](const float32 value)
@@ -551,7 +551,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 	}
 
 	{
-		FloatField* sides_field = new FloatField(parent, "Sides", Vec2f(3.0f, 128.0f));
+		FloatField* sides_field = new FloatField(parent, "Sides", FVec2(3.0f, 128.0f));
 		sides_field->SetValue(static_cast<float32>(mArch.Sides));
 		sides_field->SetOnChange(
 			[this](const float32 value)
@@ -560,7 +560,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 				mpCanvas->SetArchSettings(mArch);
 			});
 
-		FloatField* wall_field = new FloatField(parent, "Wall", Vec2f(0.01f, 100000.0f));
+		FloatField* wall_field = new FloatField(parent, "Wall", FVec2(0.01f, 100000.0f));
 		wall_field->SetValue(mArch.WallWidth);
 		wall_field->SetOnChange(
 			[this](const float32 value)
@@ -569,7 +569,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 				mpCanvas->SetArchSettings(mArch);
 			});
 
-		FloatField* arc_field = new FloatField(parent, "Arc", Vec2f(1.0f, 360.0f));
+		FloatField* arc_field = new FloatField(parent, "Arc", FVec2(1.0f, 360.0f));
 		arc_field->SetValue(mArch.ArcDegrees);
 		arc_field->SetOnChange(
 			[this](const float32 value)
@@ -578,7 +578,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 				mpCanvas->SetArchSettings(mArch);
 			});
 
-		FloatField* start_field = new FloatField(parent, "Start", Vec2f(-360.0f, 360.0f));
+		FloatField* start_field = new FloatField(parent, "Start", FVec2(-360.0f, 360.0f));
 		start_field->SetValue(mArch.StartDegrees);
 		start_field->SetOnChange(
 			[this](const float32 value)
@@ -643,7 +643,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 							   mpCanvas->SetFocus();
 						   });
 
-		FloatField* wall_field = new FloatField(parent, "Wall", Vec2f(0.01f, 100000.0f));
+		FloatField* wall_field = new FloatField(parent, "Wall", FVec2(0.01f, 100000.0f));
 		wall_field->SetValue(mRoom.WallThickness);
 		wall_field->SetOnChange(
 			[this](const float32 value)
@@ -708,7 +708,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 								   mpCanvas->SetFocus();
 							   });
 
-		const Vec2f subdivision_range(static_cast<float32>(Patch::scMinSubdivisions),
+		const FVec2 subdivision_range(static_cast<float32>(Patch::scMinSubdivisions),
 									  static_cast<float32>(Patch::scMaxSubdivisions));
 
 		FloatField* subdivisions_u_field = new FloatField(parent, "Subdiv U", subdivision_range);
@@ -750,7 +750,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 		mpCurveRow->Add(subdivisions_v_field->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
 		mpCurveRow->Add(smooth_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
 
-		FloatField* thickness_field = new FloatField(parent, "Thickness", Vec2f(0.01f, 100.0f));
+		FloatField* thickness_field = new FloatField(parent, "Thickness", FVec2(0.01f, 100.0f));
 		thickness_field->SetValue(mCurve.Thickness);
 		thickness_field->SetOnChange(
 			[this](const float32 value)
@@ -798,7 +798,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 		mpCurveRow->Add(thicken_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 6));
 		mpCurveRow->Add(cap_button, wxSizerFlags().CenterVertical().Border(wxLEFT, 6));
 
-		FloatField* weight_field = new FloatField(parent, "Weight", Vec2f(Patch::scMinWeight, 100.0f));
+		FloatField* weight_field = new FloatField(parent, "Weight", FVec2(Patch::scMinWeight, 100.0f));
 		weight_field->SetValue(mCurve.Weight);
 		weight_field->GetLabel()->SetToolTip(
 			"How strongly the selected control points pull the curve toward them. Below 1 rounds it off, above 1 "
@@ -843,7 +843,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 							   mpCanvas->SetFocus();
 						   });
 
-		FloatField* alpha_field = new FloatField(parent, "Alpha", Vec2f(0.0f, 1.0f));
+		FloatField* alpha_field = new FloatField(parent, "Alpha", FVec2(0.0f, 1.0f));
 		alpha_field->SetValue(mCurve.Color.A);
 		alpha_field->GetLabel()->SetToolTip(
 			"Opacity of the selected control points (or every point of the selected patches). Only blended "
@@ -912,7 +912,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 													  "(Alt+Left and Alt+Right slide it by one grid step)");
 		mpTextureOffsetUField->SetOnChange(
 			[this](const float32 value)
-			{ mpCanvas->RunTextureCommand(TextureCommand { eTextureCommand::SetOffsetU, Vec2f(value, 0.0f) }); });
+			{ mpCanvas->RunTextureCommand(TextureCommand { eTextureCommand::SetOffsetU, FVec2(value, 0.0f) }); });
 
 		mpTextureOffsetVField = new FloatField(parent, "V", scTextureOffsetLimits);
 		mpTextureOffsetVField->SetValue(0.0f);
@@ -920,7 +920,7 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 													  "walls (Alt+Up and Alt+Down slide it by one grid step)");
 		mpTextureOffsetVField->SetOnChange(
 			[this](const float32 value)
-			{ mpCanvas->RunTextureCommand(TextureCommand { eTextureCommand::SetOffsetV, Vec2f(value, 0.0f) }); });
+			{ mpCanvas->RunTextureCommand(TextureCommand { eTextureCommand::SetOffsetV, FVec2(value, 0.0f) }); });
 
 		mpTextureScaleField = new FloatField(parent, "Tile", scTextureScaleLimits);
 		mpTextureScaleField->SetValue(BrushFaceTexture {}.Scale.X);
@@ -928,14 +928,14 @@ EditorToolbar::EditorToolbar(wxWindow* parent, TopViewCanvas* canvas) : mpParent
 													"texture bigger (Alt+[ and Alt+])");
 		mpTextureScaleField->SetOnChange(
 			[this](const float32 value)
-			{ mpCanvas->RunTextureCommand(TextureCommand { eTextureCommand::SetScale, Vec2f(value) }); });
+			{ mpCanvas->RunTextureCommand(TextureCommand { eTextureCommand::SetScale, FVec2(value) }); });
 
 		mpTextureRotationField = new FloatField(parent, "Rotate", scTextureRotationLimits);
 		mpTextureRotationField->SetValue(BrushFaceTexture {}.Rotation);
 		mpTextureRotationField->GetLabel()->SetToolTip("How far the texture is turned, in degrees (Alt+, and Alt+.)");
 		mpTextureRotationField->SetOnChange(
 			[this](const float32 value)
-			{ mpCanvas->RunTextureCommand(TextureCommand { eTextureCommand::SetRotation, Vec2f(value, 0.0f) }); });
+			{ mpCanvas->RunTextureCommand(TextureCommand { eTextureCommand::SetRotation, FVec2(value, 0.0f) }); });
 
 		mpFaceRow->Add(mpTextureOffsetUField->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));
 		mpFaceRow->Add(mpTextureOffsetVField->GetSizer(), wxSizerFlags().CenterVertical().Border(wxLEFT, 10));

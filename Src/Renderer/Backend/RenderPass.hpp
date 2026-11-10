@@ -16,35 +16,34 @@ class CommandBuffer;
 class RenderPass
 {
 public:
-    void Create(TargetList& color_attachments, Vec2u size, const Vec2u& offset = Vec2u::scZero);
+	void Create(TargetList& color_attachments, UVec2 size, const UVec2& offset = UVec2::scZero);
 
-    void Begin(CommandBuffer* cmd, VkFramebuffer framebuffer, const Slice<VkClearValue>& clear_colors);
+	void Begin(CommandBuffer* cmd, VkFramebuffer framebuffer, const Slice<VkClearValue>& clear_colors);
 
-    /**
-     * @brief Begins the render pass over part of the framebuffer. Load, clear and store ops only touch the pixels
-     * inside of `render_area`, everything outside of it keeps its contents.
-     */
-    void Begin(CommandBuffer* cmd, VkFramebuffer framebuffer, const Slice<VkClearValue>& clear_colors,
-               const VkRect2D& render_area);
-    void End();
+	/**
+	 * @brief Begins the render pass over a section of the framebuffer.
+	 */
+	void Begin(CommandBuffer* cmd, VkFramebuffer framebuffer, const Slice<VkClearValue>& clear_colors,
+			   const VkRect2D& render_area);
+	void End();
 
-    void Destroy();
+	void Destroy();
 
-    FX_FORCE_INLINE VkRenderPass Get() const { return InternalRenderPass; }
+	FX_FORCE_INLINE VkRenderPass Get() const { return InternalRenderPass; }
 
-    ~RenderPass() { Destroy(); }
+	~RenderPass() { Destroy(); }
 
 public:
-    VkRenderPass InternalRenderPass = nullptr;
-    CommandBuffer* pCommandBuffer = nullptr;
+	VkRenderPass InternalRenderPass = nullptr;
+	CommandBuffer* pCommandBuffer = nullptr;
 
-    Vec2u Size = Vec2u::scZero;
-    Vec2u Offset = Vec2u::scZero;
+	UVec2 Size = UVec2::scZero;
+	UVec2 Offset = UVec2::scZero;
 
-    uint32 AttachmentCount = 0;
+	uint32 AttachmentCount = 0;
 
 private:
-    GpuDevice* mpDevice = nullptr;
+	GpuDevice* mpDevice = nullptr;
 };
 
 } // namespace fx::renderer

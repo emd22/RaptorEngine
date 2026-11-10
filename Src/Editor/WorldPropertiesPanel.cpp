@@ -75,7 +75,7 @@ WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, w
 	wxWindow* world_body = world_section->GetBody();
 	sizer->Add(world_section, wxSizerFlags().Expand());
 
-	mpPositionField = new Vector3Field(world_body, "Player", Vec2f(-100000.0f, 100000.0f));
+	mpPositionField = new Vector3Field(world_body, "Player", FVec2(-100000.0f, 100000.0f));
 	world_section->AddRow(*mpPositionField);
 
 	mpPositionField->SetOnChange([](const FVec3 value)
@@ -106,22 +106,22 @@ WorldPropertiesPanel::WorldPropertiesPanel(wxWindow* parent) : wxPanel(parent, w
 		wxWindow* camera_body = camera_section->GetBody();
 		sizer->Add(camera_section, wxSizerFlags().Expand());
 
-		mpApertureField = new FloatField(camera_body, "Aperture (f/)", Vec2f(0.7f, 64.0f));
+		mpApertureField = new FloatField(camera_body, "Aperture (f/)", FVec2(0.7f, 64.0f));
 		mpApertureField->SetOnChange([](const float value)
 									 { thread::PostToGame([value] { SetCameraCVar("r_aperture", value); }); });
 		camera_section->AddRow(*mpApertureField);
 
-		mpShutterField = new FloatField(camera_body, "Shutter (1/s)", Vec2f(1.0f, 8000.0f));
+		mpShutterField = new FloatField(camera_body, "Shutter (1/s)", FVec2(1.0f, 8000.0f));
 		mpShutterField->SetOnChange([](const float value)
 									{ thread::PostToGame([value] { SetCameraCVar("r_shutter", 1.0f / value); }); });
 		camera_section->AddRow(*mpShutterField);
 
-		mpIsoField = new FloatField(camera_body, "ISO", Vec2f(25.0f, 25600.0f));
+		mpIsoField = new FloatField(camera_body, "ISO", FVec2(25.0f, 25600.0f));
 		mpIsoField->SetOnChange([](const float value)
 								{ thread::PostToGame([value] { SetCameraCVar("r_iso", value); }); });
 		camera_section->AddRow(*mpIsoField);
 
-		mpCompensationField = new FloatField(camera_body, "Compensation (EV)", Vec2f(-10.0f, 10.0f));
+		mpCompensationField = new FloatField(camera_body, "Compensation (EV)", FVec2(-10.0f, 10.0f));
 		mpCompensationField->SetOnChange([](const float value)
 										 { thread::PostToGame([value] { SetCameraCVar("r_exposure_ev", value); }); });
 		camera_section->AddRow(*mpCompensationField);
@@ -163,17 +163,17 @@ void WorldPropertiesPanel::BuildSunSection(wxSizer* sizer)
 																		   255)] { gEditor->SetSunColor(color); });
 						   });
 
-	mpSunIntensityField = new FloatField(body, "Lux", Vec2f(0.0f, 1000000.0f));
+	mpSunIntensityField = new FloatField(body, "Lux", FVec2(0.0f, 1000000.0f));
 	mpSunIntensityField->SetOnChange([](const float value)
 									 { thread::PostToGame([value] { gEditor->SetSunIntensity(value); }); });
 	section->AddRow(*mpSunIntensityField);
 
-	mpSunAzimuthField = new FloatField(body, "Azimuth", Vec2f(-360.0f, 360.0f));
+	mpSunAzimuthField = new FloatField(body, "Azimuth", FVec2(-360.0f, 360.0f));
 	mpSunAzimuthField->SetOnChange([](const float value)
 								   { thread::PostToGame([value] { gEditor->SetSunAzimuth(value); }); });
 	section->AddRow(*mpSunAzimuthField);
 
-	mpSunElevationField = new FloatField(body, "Elevation", Vec2f(-90.0f, 90.0f));
+	mpSunElevationField = new FloatField(body, "Elevation", FVec2(-90.0f, 90.0f));
 	mpSunElevationField->SetOnChange([](const float value)
 									 { thread::PostToGame([value] { gEditor->SetSunElevation(value); }); });
 	section->AddRow(*mpSunElevationField);
@@ -243,7 +243,7 @@ void WorldPropertiesPanel::BuildFogSection(wxSizer* sizer)
 	section->AddRow("Colour", color_row);
 	mpFogColorPicker->Bind(wxEVT_COLOURPICKER_CHANGED, [this](wxColourPickerEvent&) { PostFogSettings(); });
 
-	const auto add_field = [&](const char* label, const Vec2f& limits)
+	const auto add_field = [&](const char* label, const FVec2& limits)
 	{
 		FloatField* field = new FloatField(body, label, limits);
 		field->SetOnChange([this](const float) { PostFogSettings(); });
@@ -251,12 +251,12 @@ void WorldPropertiesPanel::BuildFogSection(wxSizer* sizer)
 		return field;
 	};
 
-	mpFogDensityField = add_field("Density", Vec2f(0.0f, 10.0f));
-	mpFogHeightField = add_field("Height", Vec2f(-10000.0f, 10000.0f));
-	mpFogFalloffField = add_field("Falloff", Vec2f(0.0f, 10.0f));
-	mpFogHazeField = add_field("Haze", Vec2f(0.0f, 10.0f));
-	mpFogAnisotropyField = add_field("Anisotropy", Vec2f(-0.95f, 0.95f));
-	mpFogAmbientField = add_field("Ambient", Vec2f(0.0f, 100.0f));
+	mpFogDensityField = add_field("Density", FVec2(0.0f, 10.0f));
+	mpFogHeightField = add_field("Height", FVec2(-10000.0f, 10000.0f));
+	mpFogFalloffField = add_field("Falloff", FVec2(0.0f, 10.0f));
+	mpFogHazeField = add_field("Haze", FVec2(0.0f, 10.0f));
+	mpFogAnisotropyField = add_field("Anisotropy", FVec2(-0.95f, 0.95f));
+	mpFogAmbientField = add_field("Ambient", FVec2(0.0f, 100.0f));
 }
 
 void WorldPropertiesPanel::PostFogSettings()

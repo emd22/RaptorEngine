@@ -19,7 +19,7 @@ struct ModelVertex
 {
 	DVec3 Position = DVec3(0.0);
 	DVec3 Normal = DVec3(0.0);
-	Vec2f Texcoord = Vec2f(0.0f, 0.0f);
+	FVec2 Texcoord = FVec2(0.0f, 0.0f);
 };
 
 struct ModelSurface

@@ -10,8 +10,8 @@
 #include <Brush.hpp>
 #include <Core/Serialize.hpp>
 #include <Core/String.hpp>
+#include <Math/FQuat.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Quat.hpp>
 #include <Patch.hpp>
 #include <functional>
 
@@ -26,10 +26,6 @@ bool IsDecalEntry(const ConfigEntry& entry);
 
 const char* ReadBrushMaterialName(const ConfigEntry& entry);
 
-/**
- * @brief Reads a blockout's brush from either a box (`scale`) or a list of planes (`planes`, with optional face
- * textures in `uvs`)
- */
 Brush ReadBrushEntry(ConfigEntry& entry);
 
 void WriteFaceMaterials(ConfigEntry& entry, const Brush& brush);
@@ -42,32 +38,21 @@ void WritePatchEntry(ConfigEntry& entry, const Patch& patch);
 // Subviews
 /////////////////////////////////////
 
-/// Entry of a prototype file that says where each subview is placed in the level. `subviews` held the brushes of
-/// the subviews before they had prototype files of their own, and is still read.
 constexpr const char* scSubviewsEntryName = "subviews";
 constexpr const char* scSubviewInstancesEntryName = "instances";
 constexpr const char* scSubviewMemberName = "subview";
 
-/**
- * @brief Where a brush or a subview instance is. A brush turns about the centre of its bounds, so its position is
- * only meaningful together with that centre.
- */
 struct BrushPlacement
 {
 	FVec3 Position = FVec3::sZero;
-	Quat Rotation = Quat::scIdentity;
+	FQuat Rotation = FQuat::scIdentity;
 };
 
 BrushPlacement ReadBrushPlacement(const ConfigEntry& entry);
 void WriteBrushPlacement(ConfigEntry& entry, const BrushPlacement& placement);
 
-/// Takes a brush from its subview's space to the world, for a subview placed at `instance`
 BrushPlacement PlaceInSubview(const BrushPlacement& local, const FVec3 brush_center, const BrushPlacement& instance);
-
-/// Takes a brush from the world to the space of a subview placed at `instance`
 BrushPlacement RemoveFromSubview(const BrushPlacement& world, const FVec3 brush_center, const BrushPlacement& instance);
-
-/// Works out where a subview is placed from one of its brushes
 BrushPlacement FindSubviewPlacement(const BrushPlacement& world, const BrushPlacement& local, const FVec3 brush_center);
 
 String MakeSubviewBrushName(const String& instance_name, uint32 member_index);
@@ -106,22 +91,11 @@ const char* ReadInstanceSubviewName(const ConfigEntry& instance);
 void AppendPlacedSubviewBrushes(ConfigEntry& out_brushes, ConfigEntry& subview_brushes, const String& instance_name,
 								const BrushPlacement& instance);
 
-/**
- * @brief Whether the map compiler bakes a model of the `objects` entry into the lighting (as an occluder that light
- * bounces off). Only models that never move and cast shadows count: no script, spawn or player layer, not unlit,
- * `shadows = 1`, no `nobake`, and no collider brush that is dynamic.
- */
 bool IsBakedModelEntry(const ConfigEntry& model, const ConfigEntry* brushes);
-
-/// The prototype file mixed with its subview files and the mesh files of every baked model
 uint64 HashPrototype(const String& prototype_path, const ConfigFile& info);
 
 uint32 CountSubviewBrushes(const ConfigFile& info, const String& prototype_path);
 
-/**
- * @brief Calls `callback` with a world space brush entry for every brush of every subview instance in a prototype
- * file, along with the instance's entry and the index of the brush in its subview
- */
 void ForEachSubviewBrush(const ConfigFile& info, const String& prototype_path,
 						 const std::function<void(ConfigEntry&, const ConfigEntry&, uint32)>& callback);
 

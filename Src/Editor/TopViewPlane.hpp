@@ -49,7 +49,7 @@ inline constexpr ViewPlaneAxes scViewPlaneAxes[scViewPlaneCount] = {
 struct TopViewVertexHandle
 {
 	ObjectID ObjectId = ObjectID::scNull;
-	Vec2f Position = Vec2f::scZero;
+	FVec2 Position = FVec2::scZero;
 };
 
 struct TopViewFaceRef
@@ -107,7 +107,7 @@ struct PatchTextureSettings
 	ePatchTextureMapping Mapping = ePatchTextureMapping::Natural;
 	ePatchTextureAxis Axis = ePatchTextureAxis::Auto;
 	float32 Scale = Patch::scDefaultTextureScale;
-	Vec2f Repeats = Vec2f(1.0f, 1.0f);
+	FVec2 Repeats = FVec2(1.0f, 1.0f);
 };
 
 struct PatchCommand
@@ -139,7 +139,7 @@ enum class eTextureCommand : uint8
 struct TextureCommand
 {
 	eTextureCommand Type = eTextureCommand::Shift;
-	Vec2f Amount = Vec2f::scZero;
+	FVec2 Amount = FVec2::scZero;
 };
 
 enum class eRoomShape : uint8

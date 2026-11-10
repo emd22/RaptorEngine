@@ -146,7 +146,7 @@ void SDFPageScene::Create()
 				  VMA_MEMORY_USAGE_GPU_TO_CPU, eGpuBufferFlags::PersistentMapped | eGpuBufferFlags::TransferReceiver);
 
 	mpAtlas = gTextureManager->NewTexture();
-	mpAtlas->CreateVolume(Vec2u(scAtlasSDFPagesX * scTexelsPerSDFPage, scAtlasSDFPagesY * scTexelsPerSDFPage),
+	mpAtlas->CreateVolume(UVec2(scAtlasSDFPagesX * scTexelsPerSDFPage, scAtlasSDFPagesY * scTexelsPerSDFPage),
 						  scAtlasSDFPagesZ * scTexelsPerSDFPage, eImageFormat::R8_UNorm,
 						  VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 	mbAtlasInitialized = false;
@@ -665,8 +665,8 @@ void SDFPageScene::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDe
 	SDFPageDebugConsts consts;
 	GetSceneConsts(consts.Scene);
 
-	const Mat4f inverse = camera.GetCameraMatrix(eObjectLayer::WorldLayer).Inverse();
-	memcpy(consts.InvViewProjection, inverse.RawData, sizeof(Mat4f));
+	const FMat4 inverse = camera.GetCameraMatrix(eObjectLayer::WorldLayer).Inverse();
+	memcpy(consts.InvViewProjection, inverse.RawData, sizeof(FMat4));
 
 	const FVec3 eye = camera.GetPosition();
 	consts.EyePosition[0] = eye.X;
@@ -674,7 +674,7 @@ void SDFPageScene::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDe
 	consts.EyePosition[2] = eye.Z;
 	consts.EyePosition[3] = 1.0f;
 
-	const Vec2u extent = gGraphics->Swapchain.Extent;
+	const UVec2 extent = gGraphics->Swapchain.Extent;
 	consts.Info[0] = extent.X;
 	consts.Info[1] = extent.Y;
 	consts.Info[2] = static_cast<uint32>(view);

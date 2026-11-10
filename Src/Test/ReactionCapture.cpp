@@ -162,14 +162,14 @@ void ReactionCapture::WriteFrame(float32 delta_time)
 		return;
 	}
 
-	const Mat4f world = skinned->GetWorldMatrix();
+	const FMat4 world = skinned->GetWorldMatrix();
 	const uint32 steps = gPhysics->pBackend->GetLastStepCount();
 	const float32 alpha = gPhysics->pBackend->GetStepAlpha();
 	const bool is_powered = ragdoll.GetBodyMode(0) != physics::eRagdollBodyMode::Kinematic;
 
 	for (uint32 i = 0; i < ragdoll.GetSegmentCount(); i++) {
-		const Mat4f drawn_matrix = skeleton.WorldTransforms[ragdoll.GetBodyBone(i)] * world;
-		const Vec4f drawn = drawn_matrix.Rows[3];
+		const FMat4 drawn_matrix = skeleton.WorldTransforms[ragdoll.GetBodyBone(i)] * world;
+		const FVec4 drawn = drawn_matrix.Rows[3];
 		const FVec3 origin = ragdoll.GetBodyOrigin(i);
 
 		std::fprintf(mpOut, "%u,%.5f,%.5f,%u,%.4f,%d,%d,%d,%.3f,%u,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f\n", mFrame, mTime,

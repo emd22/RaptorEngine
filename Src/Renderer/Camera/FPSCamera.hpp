@@ -34,7 +34,7 @@ struct ViewAngles
 		Pitch = std::asin(MathUtil::Clamp(unit.Y, -1.0f, 1.0f));
 	}
 
-	Quat ToQuat() const { return Quat::FromEulerAngles(FVec3(-Pitch, Yaw, 0.0f)); }
+	FQuat ToQuat() const { return FQuat::FromEulerAngles(FVec3(-Pitch, Yaw, 0.0f)); }
 
 	float32 Yaw = 0.0f;
 	float32 Pitch = 0.0f;
@@ -47,7 +47,7 @@ public:
 
 	bool Update() override;
 
-	const Mat4f& GetCameraMatrix(eObjectLayer layer) const override
+	const FMat4& GetCameraMatrix(eObjectLayer layer) const override
 	{
 		if (layer == eObjectLayer::PlayerLayer) {
 			return mWeaponCameraMatrix;
@@ -60,8 +60,8 @@ public:
 
 public:
 private:
-	Mat4f mWeaponCameraMatrix = Mat4f::scIdentity;
-	Mat4f mWeaponProjectionMatrix = Mat4f::scIdentity;
+	FMat4 mWeaponCameraMatrix = FMat4::scIdentity;
+	FMat4 mWeaponProjectionMatrix = FMat4::scIdentity;
 
 	float32 mWeaponFovY = MathUtil::DegreesToRadians(50.0f);
 };

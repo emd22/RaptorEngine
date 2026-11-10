@@ -20,7 +20,7 @@
 namespace fx::loader {
 
 /**
- * @brief Transforms positions, normals and tangents by an affine matrix laid out as cgltf and Mat4f::RawData store it
+ * @brief Transforms positions, normals and tangents by an affine matrix laid out as cgltf and FMat4::RawData store it
  * (translation in elements 12-14). Normals use the cofactor matrix, and a mirroring matrix flips the winding and the
  * tangent handedness.
  */

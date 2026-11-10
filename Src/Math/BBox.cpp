@@ -59,16 +59,16 @@ BBox& BBox::operator=(const BBox& other)
 // Oriented Bounding Box
 /////////////////////////////////////
 
-OBBox OBBox::FromLocalBounds(const BBox& local_bounds, const Mat4f transform)
+OBBox OBBox::FromLocalBounds(const BBox& local_bounds, const FMat4 transform)
 {
 	OBBox obb {};
 
 	for (uint32 corner = 0; corner < 8; corner++) {
-		const Vec4f local((corner & (1 << 0)) ? local_bounds.Max.X : local_bounds.Min.X,
+		const FVec4 local((corner & (1 << 0)) ? local_bounds.Max.X : local_bounds.Min.X,
 						  (corner & (1 << 1)) ? local_bounds.Max.Y : local_bounds.Min.Y,
 						  (corner & (1 << 2)) ? local_bounds.Max.Z : local_bounds.Min.Z, 1.0f);
 
-		const Vec4f world = transform * local;
+		const FVec4 world = transform * local;
 		obb.Corners[corner] = FVec3(world.X, world.Y, world.Z);
 	}
 

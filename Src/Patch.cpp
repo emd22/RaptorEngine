@@ -21,9 +21,9 @@ struct SurfaceSample
 	DVec3 Position = DVec3(0.0);
 	DVec3 DerivU = DVec3(0.0);
 	DVec3 DerivV = DVec3(0.0);
-	Vec2d Texcoord = Vec2d(0.0, 0.0);
-	Vec2d TexcoordDerivU = Vec2d(0.0, 0.0);
-	Vec2d TexcoordDerivV = Vec2d(0.0, 0.0);
+	DVec2 Texcoord = DVec2(0.0, 0.0);
+	DVec2 TexcoordDerivU = DVec2(0.0, 0.0);
+	DVec2 TexcoordDerivV = DVec2(0.0, 0.0);
 };
 
 PatchColor MixColors(const PatchColor& a, float32 weight_a, const PatchColor& b, float32 weight_b)
@@ -92,14 +92,14 @@ float32 GetAxis(const FVec3 value, uint32 axis)
 
 struct SectionPoint
 {
-	Vec2f Position = Vec2f(0.0f, 0.0f);
+	FVec2 Position = FVec2(0.0f, 0.0f);
 	float32 Weight = 1.0f;
 };
 
 constexpr SectionPoint scRing[] = {
-	{ Vec2f(1.0f, 0.5f) },		  { Vec2f(1.0f, 1.0f), scArc }, { Vec2f(0.5f, 1.0f) },
-	{ Vec2f(0.0f, 1.0f), scArc }, { Vec2f(0.0f, 0.5f) },		{ Vec2f(0.0f, 0.0f), scArc },
-	{ Vec2f(0.5f, 0.0f) },		  { Vec2f(1.0f, 0.0f), scArc }, { Vec2f(1.0f, 0.5f) },
+	{ FVec2(1.0f, 0.5f) },		  { FVec2(1.0f, 1.0f), scArc }, { FVec2(0.5f, 1.0f) },
+	{ FVec2(0.0f, 1.0f), scArc }, { FVec2(0.0f, 0.5f) },		{ FVec2(0.0f, 0.0f), scArc },
+	{ FVec2(0.5f, 0.0f) },		  { FVec2(1.0f, 0.0f), scArc }, { FVec2(1.0f, 0.5f) },
 };
 
 FVec3 GetBoxPoint(const FVec3 min, const FVec3 max, uint32 axis, float32 along, float32 a, float32 b)
@@ -334,7 +334,7 @@ Patch Patch::MakeCone(const FVec3 min, const FVec3 max, uint32 axis)
 
 Patch Patch::MakeBevel(const FVec3 min, const FVec3 max, uint32 axis)
 {
-	static constexpr SectionPoint scSection[] = { { Vec2f(0.0f, 1.0f) }, { Vec2f(1.0f, 1.0f) }, { Vec2f(1.0f, 0.0f) } };
+	static constexpr SectionPoint scSection[] = { { FVec2(0.0f, 1.0f) }, { FVec2(1.0f, 1.0f) }, { FVec2(1.0f, 0.0f) } };
 
 	Patch patch = MakeExtrusion(min, max, axis, MakeSlice(scSection), false);
 
@@ -347,8 +347,8 @@ Patch Patch::MakeBevel(const FVec3 min, const FVec3 max, uint32 axis)
 Patch Patch::MakeEndcap(const FVec3 min, const FVec3 max, uint32 axis)
 {
 	static constexpr SectionPoint scSection[] = {
-		{ Vec2f(0.0f, 0.0f) },		  { Vec2f(0.0f, 1.0f), scArc }, { Vec2f(0.5f, 1.0f) },
-		{ Vec2f(1.0f, 1.0f), scArc }, { Vec2f(1.0f, 0.0f) },
+		{ FVec2(0.0f, 0.0f) },		  { FVec2(0.0f, 1.0f), scArc }, { FVec2(0.5f, 1.0f) },
+		{ FVec2(1.0f, 1.0f), scArc }, { FVec2(1.0f, 0.0f) },
 	};
 
 	Patch patch = MakeExtrusion(min, max, axis, MakeSlice(scSection), false);
@@ -519,7 +519,7 @@ SurfaceSample SampleSubPatch(const Patch& patch, uint32 sub_column, uint32 sub_r
 		for (uint32 column = 0; column < 3; column++) {
 			const PatchPoint& point = patch.GetPoint(sub_column * 2 + column, sub_row * 2 + row);
 			const DVec3 position = DVec3(point.Position);
-			const Vec2d texcoord = Vec2d(point.Texcoord);
+			const DVec2 texcoord = DVec2(point.Texcoord);
 			const double point_weight = static_cast<double>(point.Weight);
 
 			const double weight = basis_u[column] * basis_v[row] * point_weight;
@@ -760,8 +760,8 @@ bool SolveTriangleFrame(const PatchPoint& a, const PatchPoint& b, const PatchPoi
 	SurfaceSample sample;
 	sample.DerivU = DVec3(b.Position) - DVec3(a.Position);
 	sample.DerivV = DVec3(c.Position) - DVec3(a.Position);
-	sample.TexcoordDerivU = Vec2d(b.Texcoord) - Vec2d(a.Texcoord);
-	sample.TexcoordDerivV = Vec2d(c.Texcoord) - Vec2d(a.Texcoord);
+	sample.TexcoordDerivU = DVec2(b.Texcoord) - DVec2(a.Texcoord);
+	sample.TexcoordDerivV = DVec2(c.Texcoord) - DVec2(a.Texcoord);
 
 	const DVec3 normal = sample.DerivU.Cross(sample.DerivV);
 	const double length = normal.Length();
@@ -825,13 +825,13 @@ PatchVertex EvaluateDetailMesh(const Patch& patch, double u, double v)
 		const PatchPoint& point = patch.Points[corners[corner]];
 
 		vertex.Position = vertex.Position + DVec3(point.Position) * weights[corner];
-		vertex.Texcoord += Vec2d(point.Texcoord) * weights[corner];
+		vertex.Texcoord += DVec2(point.Texcoord) * weights[corner];
 		AddColor(color, point.Color, weights[corner]);
 	}
 
 	vertex.Color = MakeColor(color);
 
-	vertex.Parameter = Vec2d(u, v);
+	vertex.Parameter = DVec2(u, v);
 
 	if (!SolveTriangleFrame(patch.Points[corners[0]], patch.Points[corners[1]], patch.Points[corners[2]], vertex.Normal,
 							vertex.Tangent, vertex.Handedness)) {
@@ -913,9 +913,9 @@ void BuildDetailMeshGrid(const Patch& patch, SizedArray<PatchVertex>& out_grid, 
 
 			PatchVertex vertex;
 			vertex.Position = DVec3(point.Position);
-			vertex.Texcoord = Vec2d(point.Texcoord);
+			vertex.Texcoord = DVec2(point.Texcoord);
 			vertex.Color = point.Color;
-			vertex.Parameter = Vec2d(static_cast<double>(column), static_cast<double>(row));
+			vertex.Parameter = DVec2(static_cast<double>(column), static_cast<double>(row));
 
 			out_grid.Insert(vertex);
 		}
@@ -942,8 +942,8 @@ void BuildDetailMeshGrid(const Patch& patch, SizedArray<PatchVertex>& out_grid, 
 
 				const DVec3 edge_b = out_grid[b].Position - out_grid[a].Position;
 				const DVec3 edge_c = out_grid[c].Position - out_grid[a].Position;
-				const Vec2d texture_b = out_grid[b].Texcoord - out_grid[a].Texcoord;
-				const Vec2d texture_c = out_grid[c].Texcoord - out_grid[a].Texcoord;
+				const DVec2 texture_b = out_grid[b].Texcoord - out_grid[a].Texcoord;
+				const DVec2 texture_c = out_grid[c].Texcoord - out_grid[a].Texcoord;
 
 				const DVec3 normal = edge_b.Cross(edge_c);
 				const double determinant = texture_b.X * texture_c.Y - texture_c.X * texture_b.Y;
@@ -1058,7 +1058,7 @@ PatchVertex Patch::Evaluate(double u, double v) const
 	vertex.Position = sample.Position;
 	vertex.Texcoord = sample.Texcoord;
 	vertex.Color = MakeColor(sample.Color);
-	vertex.Parameter = Vec2d(u, v);
+	vertex.Parameter = DVec2(u, v);
 
 	DVec3 normal_sum = DVec3(0.0);
 	DVec3 tangent_sum = DVec3(0.0);
@@ -1183,8 +1183,8 @@ bool Patch::HasVertexColors() const
 }
 
 void Patch::GenerateMesh(SizedArray<FVec3>& positions, SizedArray<FVec3>& normals, SizedArray<FVec3>& tangents,
-						 SizedArray<float32>& tangent_handedness, SizedArray<Vec2f>& texcoords,
-						 SizedArray<uint32>& indices, const Mat4f& to_world, SizedArray<uint32>* packed_colors) const
+						 SizedArray<float32>& tangent_handedness, SizedArray<FVec2>& texcoords,
+						 SizedArray<uint32>& indices, const FMat4& to_world, SizedArray<uint32>* packed_colors) const
 {
 	Patch pieces[scMaxClosurePieces];
 	const uint32 piece_count = BuildClosure(pieces, to_world);
@@ -1234,7 +1234,7 @@ void Patch::GenerateMesh(SizedArray<FVec3>& positions, SizedArray<FVec3>& normal
 			normals.Insert(vertex.Normal.ToFVec3());
 			tangents.Insert(vertex.Tangent.ToFVec3());
 			tangent_handedness.Insert(static_cast<float32>(vertex.Handedness));
-			texcoords.Insert(Vec2f::From(vertex.Texcoord));
+			texcoords.Insert(FVec2::From(vertex.Texcoord));
 
 			if (packed_colors != nullptr) {
 				packed_colors->Insert(vertex.Color.Pack());
@@ -1339,7 +1339,7 @@ bool Patch::ResampleDetailMesh(uint32 cells_u, uint32 cells_v)
 			PatchPoint& point = resampled.GetPoint(column, row);
 
 			point.Position = vertex.Position.ToFVec3();
-			point.Texcoord = Vec2f::From(vertex.Texcoord);
+			point.Texcoord = FVec2::From(vertex.Texcoord);
 			point.Color = vertex.Color;
 		}
 	}
@@ -1515,7 +1515,7 @@ void Patch::NaturalTexture(float32 scale)
 
 	for (uint32 row = 0; row < Height; row++) {
 		for (uint32 column = 0; column < Width; column++) {
-			GetPoint(column, row).Texcoord = Vec2f(static_cast<float32>(distances_u[column] / scale),
+			GetPoint(column, row).Texcoord = FVec2(static_cast<float32>(distances_u[column] / scale),
 												   static_cast<float32>(distances_v[row] / scale));
 		}
 	}
@@ -1529,7 +1529,7 @@ void Patch::FitTexture(float32 repeats_u, float32 repeats_v)
 
 	for (uint32 row = 0; row < Height; row++) {
 		for (uint32 column = 0; column < Width; column++) {
-			GetPoint(column, row).Texcoord = Vec2f(
+			GetPoint(column, row).Texcoord = FVec2(
 				repeats_u * static_cast<float32>(column) / static_cast<float32>(Width - 1),
 				repeats_v * static_cast<float32>(row) / static_cast<float32>(Height - 1));
 		}
@@ -1578,7 +1578,7 @@ void OrientOutward(Patch& patch, const DVec3& outward)
 }
 
 Patch MakeCornerCap(const PatchPoint& start, const PatchPoint& corner, const PatchPoint& end, const FVec3 fill,
-					uint32 subdivisions, const DVec3& outward, const Mat4f& to_world)
+					uint32 subdivisions, const DVec3& outward, const FMat4& to_world)
 {
 	constexpr float32 scCornerCapMinBulge = 1e-3f;
 
@@ -1658,14 +1658,14 @@ Patch MakeBridge(const SizedArray<PatchPoint>& from, const SizedArray<PatchPoint
 
 } // namespace
 
-void Patch::WorldTexture(const Mat4f& to_world, float32 scale, uint32 axis)
+void Patch::WorldTexture(const FMat4& to_world, float32 scale, uint32 axis)
 {
 	if (!IsValid() || scale == 0.0f) {
 		return;
 	}
 
 	const DVec3 facing_normal = GetFacingNormal(*this);
-	const Vec4f turned = to_world * Vec4f(facing_normal.ToFVec3(), 0.0f);
+	const FVec4 turned = to_world * FVec4(facing_normal.ToFVec3(), 0.0f);
 	const float32 normal[3] = { turned.X, turned.Y, turned.Z };
 
 	uint32 dominant = axis;
@@ -1702,10 +1702,10 @@ void Patch::WorldTexture(const Mat4f& to_world, float32 scale, uint32 axis)
 	}
 
 	for (PatchPoint& point : Points) {
-		const Vec4f moved = to_world * Vec4f(point.Position, 1.0f);
+		const FVec4 moved = to_world * FVec4(point.Position, 1.0f);
 		const FVec3 world_position(moved.X, moved.Y, moved.Z);
 
-		point.Texcoord = Vec2f(world_position.Dot(u_axis) / scale, world_position.Dot(v_axis) / scale);
+		point.Texcoord = FVec2(world_position.Dot(u_axis) / scale, world_position.Dot(v_axis) / scale);
 	}
 }
 
@@ -1865,7 +1865,7 @@ Patch Patch::MakeOffset(float32 distance) const
 	return offset;
 }
 
-Patch Patch::MakeCap(uint32 edge, const Mat4f& to_world) const
+Patch Patch::MakeCap(uint32 edge, const FMat4& to_world) const
 {
 	SizedArray<PatchPoint> ring;
 	GetEdgePoints(edge, ring);
@@ -1946,7 +1946,7 @@ uint32 Patch::Thicken(float32 distance, Patch out_pieces[scMaxThickenPieces]) co
 	return count + 1;
 }
 
-uint32 Patch::Cap(Patch out_caps[scMaxCapPieces], const Mat4f& to_world) const
+uint32 Patch::Cap(Patch out_caps[scMaxCapPieces], const FMat4& to_world) const
 {
 	uint32 count = 0;
 
@@ -2020,7 +2020,7 @@ uint32 Patch::Cap(Patch out_caps[scMaxCapPieces], const Mat4f& to_world) const
 	return count;
 }
 
-uint32 Patch::BuildClosure(Patch out_pieces[scMaxClosurePieces], const Mat4f& to_world) const
+uint32 Patch::BuildClosure(Patch out_pieces[scMaxClosurePieces], const FMat4& to_world) const
 {
 	uint32 count = 0;
 

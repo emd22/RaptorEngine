@@ -29,7 +29,7 @@ enum class eObjectFlags : uint16
 	ShadowCaster = (1 << 3),
 	Unlit = (1 << 4),
 	DisableCulling = (1 << 5),
-	/// Left out of light probe bakes (capture, capture shadows and probe placement). See Object::IsProbeVisible().
+	/// Left out of light probe bakes (capture, capture shadows and probe placement)
 	NotProbeVisible = (1 << 6),
 	Hidden = (1 << 7),
 	Lightmapped = (1 << 8),

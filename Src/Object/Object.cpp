@@ -149,7 +149,7 @@ void Object::OnAttached(World* scene)
 }
 
 
-void Object::AttachToBone(const Ref<Skeleton>& skeleton, BoneId bone, const Mat4f& offset)
+void Object::AttachToBone(const Ref<Skeleton>& skeleton, BoneId bone, const FMat4& offset)
 {
 	pAttachSkeleton = skeleton;
 	AttachBone = bone;
@@ -295,17 +295,17 @@ Object* Object::CloneWithOwnSkeleton(const std::string& name) const
 	return CloneNode(name, skeletons);
 }
 
-static Mat4f MakeInstanceTransform(const FVec3 position, const Quat rotation, float32 scale)
+static FMat4 MakeInstanceTransform(const FVec3 position, const FQuat rotation, float32 scale)
 {
-	return Mat4f::AsScale(FVec3(scale)) * Mat4f::AsRotation(rotation) * Mat4f::AsTranslation(position);
+	return FMat4::AsScale(FVec3(scale)) * FMat4::AsRotation(rotation) * FMat4::AsTranslation(position);
 }
 
-uint32 Object::AddInstance(const FVec3 position, const Quat rotation, float32 scale)
+uint32 Object::AddInstance(const FVec3 position, const FQuat rotation, float32 scale)
 {
 	return AddInstance(MakeInstanceTransform(position, rotation, scale));
 }
 
-uint32 Object::AddInstance(const Mat4f& transform)
+uint32 Object::AddInstance(const FMat4& transform)
 {
 	mInstances.Insert(transform);
 	QueueInstanceRefresh();
@@ -313,12 +313,12 @@ uint32 Object::AddInstance(const Mat4f& transform)
 	return mInstances.Size - 1;
 }
 
-void Object::SetInstance(uint32 index, const FVec3 position, const Quat rotation, float32 scale)
+void Object::SetInstance(uint32 index, const FVec3 position, const FQuat rotation, float32 scale)
 {
 	SetInstance(index, MakeInstanceTransform(position, rotation, scale));
 }
 
-void Object::SetInstance(uint32 index, const Mat4f& transform)
+void Object::SetInstance(uint32 index, const FMat4& transform)
 {
 	AssertMsg(index < mInstances.Size, "Instance index out of range");
 
@@ -387,16 +387,16 @@ void Object::UpdateInstanceCollider()
 		return;
 	}
 
-	const Mat4f body_world = Mat4f::AsRotation(body->GetRotation()) * Mat4f::AsTranslation(body->GetPosition());
-	const Mat4f& source_world = source->GetWorldMatrix();
+	const FMat4 body_world = FMat4::AsRotation(body->GetRotation()) * FMat4::AsTranslation(body->GetPosition());
+	const FMat4& source_world = source->GetWorldMatrix();
 
-	const Mat4f to_source = body_world * source_world.AffineInverse();
-	const Mat4f from_source = source_world * body_world.AffineInverse();
+	const FMat4 to_source = body_world * source_world.AffineInverse();
+	const FMat4 from_source = source_world * body_world.AffineInverse();
 
-	SizedArray<Mat4f> transforms;
+	SizedArray<FMat4> transforms;
 	transforms.InitCapacity(source->mInstances.Size);
 
-	for (const Mat4f& instance : source->mInstances) {
+	for (const FMat4& instance : source->mInstances) {
 		transforms.Insert(to_source * instance * from_source);
 	}
 
@@ -428,10 +428,10 @@ void Object::InvalidateDrawCopies()
 	mDrawSlotsFrame = UINT32_MAX;
 }
 
-Mat4f Object::GetNodeToSource(Object& source)
+FMat4 Object::GetNodeToSource(Object& source)
 {
 	if (&source == this) {
-		return Mat4f::scIdentity;
+		return FMat4::scIdentity;
 	}
 
 	return GetWorldMatrix() * source.GetWorldMatrix().AffineInverse();
@@ -443,11 +443,11 @@ const BBox& Object::GetInstancedDrawBounds(Object& source)
 		return mDrawBounds;
 	}
 
-	const Mat4f node_to_source = GetNodeToSource(source);
-	const Mat4f& source_world = source.GetWorldMatrix();
+	const FMat4 node_to_source = GetNodeToSource(source);
+	const FMat4& source_world = source.GetWorldMatrix();
 
 	for (uint32 index = 0; index < source.mInstances.Size; index++) {
-		const Mat4f world = node_to_source * source.mInstances[index] * source_world;
+		const FMat4 world = node_to_source * source.mInstances[index] * source_world;
 		const BBox copy_bounds = OBBox::FromLocalBounds(Bounds, world).GetWorldAABB();
 
 		if (index == 0) {
@@ -522,13 +522,13 @@ void Object::UpdateDrawSlots()
 		return;
 	}
 
-	const Mat4f node_to_source = GetNodeToSource(*source);
-	const Mat4f& source_world = source->GetWorldMatrix();
+	const FMat4 node_to_source = GetNodeToSource(*source);
+	const FMat4& source_world = source->GetWorldMatrix();
 
 	for (uint32 index = 0; index < count; index++) {
-		const Mat4f world = node_to_source * source->mInstances[index] * source_world;
-		memcpy(slots[index].ModelMatrix, world.RawData, sizeof(Mat4f));
-		memcpy(slots[index].PrevModelMatrix, world.RawData, sizeof(Mat4f));
+		const FMat4 world = node_to_source * source->mInstances[index] * source_world;
+		memcpy(slots[index].ModelMatrix, world.RawData, sizeof(FMat4));
+		memcpy(slots[index].PrevModelMatrix, world.RawData, sizeof(FMat4));
 	}
 
 	mDrawCount = count;
@@ -899,10 +899,10 @@ float32 Object::RaycastBounds(const FVec3 origin, const FVec3 direction, FVec3& 
 	// Into the object's own space, so a rotated box is tested against the box it actually is rather than the
 	// looser one around it. An affine transform is linear in the ray parameter, so the distance that comes back
 	// is already in world metres.
-	const Mat4f inverse_model = GetWorldMatrix().AffineInverse();
+	const FMat4 inverse_model = GetWorldMatrix().AffineInverse();
 
-	const Vec4f local_origin = inverse_model * Vec4f(origin.X, origin.Y, origin.Z, 1.0f);
-	const Vec4f local_direction = inverse_model * Vec4f(direction.X, direction.Y, direction.Z, 0.0f);
+	const FVec4 local_origin = inverse_model * FVec4(origin.X, origin.Y, origin.Z, 1.0f);
+	const FVec4 local_direction = inverse_model * FVec4(direction.X, direction.Y, direction.Z, 0.0f);
 
 	const Ray ray(FVec3(local_origin.X, local_origin.Y, local_origin.Z),
 				  FVec3(local_direction.X, local_direction.Y, local_direction.Z));
@@ -912,7 +912,7 @@ float32 Object::RaycastBounds(const FVec3 origin, const FVec3 direction, FVec3& 
 
 bool Object::ContainsPoint(const FVec3 point)
 {
-	const Vec4f local = GetWorldMatrix().AffineInverse() * Vec4f(point.X, point.Y, point.Z, 1.0f);
+	const FVec4 local = GetWorldMatrix().AffineInverse() * FVec4(point.X, point.Y, point.Z, 1.0f);
 
 	return local.X >= Bounds.Min.X && local.X <= Bounds.Max.X && local.Y >= Bounds.Min.Y && local.Y <= Bounds.Max.Y &&
 		   local.Z >= Bounds.Min.Z && local.Z <= Bounds.Max.Z;
@@ -998,9 +998,9 @@ void Object::SetScale(const float scale)
 	}
 }
 
-void Object::SetRotation(const Quat rotation)
+void Object::SetRotation(const FQuat rotation)
 {
-	const Quat delta = rotation * mRotation.Conjugate();
+	const FQuat delta = rotation * mRotation.Conjugate();
 
 	Entity::SetRotation(rotation);
 	InvalidateDrawCopies();

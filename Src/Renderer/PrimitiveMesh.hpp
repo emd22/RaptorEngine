@@ -3,7 +3,7 @@
 #include "Backend/GpuBuffer.hpp"
 #include "VertexList.hpp"
 
-#include <Math/Quat.hpp>
+#include <Math/FQuat.hpp>
 
 namespace fx {
 

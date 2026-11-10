@@ -86,7 +86,7 @@ bool HasSameTextureProjection(const FVec3 a, const FVec3 b)
 	return projection_a.UAxis == projection_b.UAxis && projection_a.VAxis == projection_b.VAxis;
 }
 
-Vec2f GetDefaultTextureOffset(const FVec3 normal, const FVec3 bounds_min, const FVec3 bounds_max)
+FVec2 GetDefaultTextureOffset(const FVec3 normal, const FVec3 bounds_min, const FVec3 bounds_max)
 {
 	const TextureProjection projection = GetTextureProjection(normal);
 
@@ -107,7 +107,7 @@ Vec2f GetDefaultTextureOffset(const FVec3 normal, const FVec3 bounds_min, const 
 
 	static const BrushFaceTexture scDefaultTexture {};
 
-	return Vec2f(-anchor.Dot(projection.UAxis) / scDefaultTexture.Scale.X,
+	return FVec2(-anchor.Dot(projection.UAxis) / scDefaultTexture.Scale.X,
 				 -anchor.Dot(projection.VAxis) / scDefaultTexture.Scale.Y);
 }
 
@@ -120,7 +120,7 @@ BrushFaceTexture GetWorldAlignedTexture(const FVec3 normal, const FVec3 origin)
 
 	BrushFaceTexture texture {};
 
-	texture.Offset = Vec2f(origin.Dot(projection.UAxis) / texture.Scale.X,
+	texture.Offset = FVec2(origin.Dot(projection.UAxis) / texture.Scale.X,
 						   origin.Dot(projection.VAxis) / texture.Scale.Y);
 
 	return texture;
@@ -1003,7 +1003,7 @@ bool Brush::HasDefaultTextures() const
 
 	for (const BrushPlane& plane : Planes) {
 		const BrushFaceTexture& texture = plane.Texture;
-		const Vec2f default_offset = GetDefaultTextureOffset(plane.Normal, mBounds.Min, mBounds.Max);
+		const FVec2 default_offset = GetDefaultTextureOffset(plane.Normal, mBounds.Min, mBounds.Max);
 
 		if (texture.Scale.X != scDefaultTexture.Scale.X || texture.Scale.Y != scDefaultTexture.Scale.Y ||
 			texture.Rotation != 0.0f || std::abs(texture.Offset.X - default_offset.X) > scTextureOffsetEpsilon ||
@@ -1064,7 +1064,7 @@ void Brush::GetTextureGradients(const BrushPlane& plane, FVec3& out_u_gradient, 
 }
 
 void Brush::GenerateMesh(SizedArray<FVec3>& positions, SizedArray<FVec3>& normals, SizedArray<FVec3>& tangents,
-						 SizedArray<float32>& tangent_handedness, SizedArray<Vec2f>& texcoords,
+						 SizedArray<float32>& tangent_handedness, SizedArray<FVec2>& texcoords,
 						 SizedArray<uint32>& indices, const String* only_material) const
 {
 	if (!IsValid()) {
@@ -1142,7 +1142,7 @@ void Brush::GenerateMesh(SizedArray<FVec3>& positions, SizedArray<FVec3>& normal
 			const float32 u = vertex.Dot(projection.UAxis);
 			const float32 v = vertex.Dot(projection.VAxis);
 
-			const Vec2f new_uv((u * cosine - v * sine) / (texture.Scale.X) + texture.Offset.X,
+			const FVec2 new_uv((u * cosine - v * sine) / (texture.Scale.X) + texture.Offset.X,
 							   (u * sine + v * cosine) / (texture.Scale.Y) + texture.Offset.Y);
 
 			positions.Insert(vertex);

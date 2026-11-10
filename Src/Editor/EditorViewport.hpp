@@ -34,7 +34,7 @@ public:
 
 	void PollRelativeMouse();
 
-	Vec2u GetCachedSize() const { return Vec2u(mCachedWidth.load(), mCachedHeight.load()); }
+	UVec2 GetCachedSize() const { return UVec2(mCachedWidth.load(), mCachedHeight.load()); }
 
 	void UpdateCachedSize();
 

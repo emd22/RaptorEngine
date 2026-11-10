@@ -13,7 +13,7 @@ public:
 
 	bool Update() override;
 
-	FX_FORCE_INLINE void SetBounds(const Vec2f size)
+	FX_FORCE_INLINE void SetBounds(const FVec2 size)
 	{
 		mSize = size;
 		mbRequireProjectionMatrixUpdate = true;
@@ -24,7 +24,7 @@ public:
 	~OrthoCamera() override = default;
 
 public:
-	Vec2f mSize = Vec2f(45.0f);
+	FVec2 mSize = FVec2(45.0f);
 };
 
 

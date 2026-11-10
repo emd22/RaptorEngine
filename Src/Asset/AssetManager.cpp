@@ -615,7 +615,7 @@ static fx::Image* CreateSolidImage(eImageFormat format, const uint8* pixel)
 		[image, format, pixel_slice](renderer::CommandBuffer& cmd)
 		{
 			ImageInfo image_info {
-				Vec2u(1, 1), format, 0, 1, pixel_slice,
+				UVec2(1, 1), format, 0, 1, pixel_slice,
 			};
 			image->Upload(cmd, image_info);
 		});

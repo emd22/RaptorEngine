@@ -77,7 +77,7 @@ bool ObjectScriptManager::PassesEnterGate(const Entry& entry, Object* object, co
 		return false;
 	}
 
-	const Vec4f world = object->GetWorldMatrix() * Vec4f(local_direction.X, local_direction.Y, local_direction.Z, 0.0f);
+	const FVec4 world = object->GetWorldMatrix() * FVec4(local_direction.X, local_direction.Y, local_direction.Z, 0.0f);
 
 	return direction.Dot(FVec3(world.X, world.Y, world.Z)) > 0.0f;
 }

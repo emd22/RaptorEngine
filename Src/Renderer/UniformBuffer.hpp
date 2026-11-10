@@ -14,8 +14,7 @@ public:
 	Uniforms() = default;
 
 	/**
-	 * @brief Creates the buffer with `count` slots of `slot_size` bytes per frame in flight. Pass `StorageWithOffset`
-	 * as the type to bind it as a storage buffer instead, for data too large for a uniform buffer's range limit.
+	 * @brief Creates the buffer with `count` slots of `slot_size` bytes per frame in flight.
 	 */
 	void Create(uint32 slot_size, uint32 count, eGpuBufferType type = eGpuBufferType::UniformWithOffset);
 

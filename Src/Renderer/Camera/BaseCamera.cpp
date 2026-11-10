@@ -6,14 +6,14 @@ namespace fx {
 
 void BaseCamera::RebuildViewMatrix()
 {
-	Mat4f basis = Mat4f::AsRotation(mRotation);
+	FMat4 basis = FMat4::AsRotation(mRotation);
 
 	const FVec3 right { basis.Rows[0] };
 	const FVec3 up { basis.Rows[1] };
 	const FVec3 forward { basis.Rows[2] };
 
 	// Note, not identity row (0.0, 0.0, 0.0, 1.0) as we sub the 1.0 in at the end
-	basis.Rows[3] = Vec4f(0.0f);
+	basis.Rows[3] = FVec4(0.0f);
 
 	// Transpose the matrix, copy the result to mViewMatrix. This is to prevent having a ton of separate load
 	// operations here.
@@ -25,27 +25,27 @@ void BaseCamera::RebuildViewMatrix()
 	mbTransformDirty = false;
 }
 
-static Quat QuatFromBasis(const FVec3 right, const FVec3 up, const FVec3 forward)
+static FQuat QuatFromBasis(const FVec3 right, const FVec3 up, const FVec3 forward)
 {
 	const float32 trace = right.X + up.Y + forward.Z;
 
 	if (trace > 0.0f) {
 		const float32 s = 0.5f / std::sqrt(trace + 1.0f);
-		return Quat((up.Z - forward.Y) * s, (forward.X - right.Z) * s, (right.Y - up.X) * s, 0.25f / s);
+		return FQuat((up.Z - forward.Y) * s, (forward.X - right.Z) * s, (right.Y - up.X) * s, 0.25f / s);
 	}
 
 	if (right.X > up.Y && right.X > forward.Z) {
 		const float32 s = 2.0f * std::sqrt(1.0f + right.X - up.Y - forward.Z);
-		return Quat(0.25f * s, (right.Y + up.X) / s, (right.Z + forward.X) / s, (up.Z - forward.Y) / s);
+		return FQuat(0.25f * s, (right.Y + up.X) / s, (right.Z + forward.X) / s, (up.Z - forward.Y) / s);
 	}
 
 	if (up.Y > forward.Z) {
 		const float32 s = 2.0f * std::sqrt(1.0f + up.Y - right.X - forward.Z);
-		return Quat((right.Y + up.X) / s, 0.25f * s, (up.Z + forward.Y) / s, (forward.X - right.Z) / s);
+		return FQuat((right.Y + up.X) / s, 0.25f * s, (up.Z + forward.Y) / s, (forward.X - right.Z) / s);
 	}
 
 	const float32 s = 2.0f * std::sqrt(1.0f + forward.Z - right.X - up.Y);
-	return Quat((right.Z + forward.X) / s, (up.Z + forward.Y) / s, 0.25f * s, (right.Y - up.X) / s);
+	return FQuat((right.Z + forward.X) / s, (up.Z + forward.Y) / s, 0.25f * s, (right.Y - up.X) / s);
 }
 
 void BaseCamera::LookAt(const FVec3 target, const FVec3 up)

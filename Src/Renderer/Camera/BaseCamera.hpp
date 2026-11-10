@@ -1,8 +1,8 @@
 #pragma once
 
+#include <Math/FMat4.hpp>
+#include <Math/FQuat.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Mat4.hpp>
-#include <Math/Quat.hpp>
 #include <Object/ObjectLayer.hpp>
 #include <algorithm>
 #include <cassert>
@@ -40,7 +40,7 @@ class BaseCamera
 {
 public:
 	BaseCamera() = default;
-	BaseCamera(const FVec3 position, const Quat rotation, float32 z_near, float32 z_far)
+	BaseCamera(const FVec3 position, const FQuat rotation, float32 z_near, float32 z_far)
 		: mPosition(position), mRotation(rotation), mZNearClip(z_near), mZFarClip(z_far)
 	{
 		// Since Raptor uses reverse-Z, the far plane must be smaller than the near plane.
@@ -87,21 +87,21 @@ public:
 	}
 
 
-	FX_FORCE_INLINE void SetRotation(const Quat rotation)
+	FX_FORCE_INLINE void SetRotation(const FQuat rotation)
 	{
 		mRotation = rotation;
 		mbTransformDirty = true;
 	}
 
 	FX_FORCE_INLINE FVec3 GetPosition() const { return mPosition; }
-	FX_FORCE_INLINE Quat GetRotation() const { return mRotation; }
+	FX_FORCE_INLINE FQuat GetRotation() const { return mRotation; }
 
 	void LookAt(const FVec3 target, const FVec3 up = FVec3::sUp);
 
-	virtual const Mat4f& GetCameraMatrix(eObjectLayer layer) const { return mCameraMatrix; }
+	virtual const FMat4& GetCameraMatrix(eObjectLayer layer) const { return mCameraMatrix; }
 
-	FX_FORCE_INLINE const Mat4f& GetViewMatrix() const { return mViewMatrix; }
-	FX_FORCE_INLINE const Mat4f& GetProjectionMatrix() const { return mProjectionMatrix; }
+	FX_FORCE_INLINE const FMat4& GetViewMatrix() const { return mViewMatrix; }
+	FX_FORCE_INLINE const FMat4& GetProjectionMatrix() const { return mProjectionMatrix; }
 
 	FX_FORCE_INLINE float32 GetNearClip() const { return mZNearClip; }
 	FX_FORCE_INLINE float32 GetFarClip() const { return mZFarClip; }
@@ -113,13 +113,13 @@ protected:
 
 protected:
 	/// The result matrix for the camera.
-	Mat4f mCameraMatrix = Mat4f::scIdentity;
+	FMat4 mCameraMatrix = FMat4::scIdentity;
 
-	Mat4f mProjectionMatrix = Mat4f::scIdentity;
-	Mat4f mViewMatrix = Mat4f::scIdentity;
+	FMat4 mProjectionMatrix = FMat4::scIdentity;
+	FMat4 mViewMatrix = FMat4::scIdentity;
 
 	FVec3 mPosition = FVec3::sZero;
-	Quat mRotation = Quat::scIdentity;
+	FQuat mRotation = FQuat::scIdentity;
 
 
 	/// True if the position or rotation has changed

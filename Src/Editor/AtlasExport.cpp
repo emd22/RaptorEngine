@@ -7,7 +7,7 @@
 
 namespace fx::editor {
 
-static ConfigEntry MakeIntPair(const char* name, Vec2i value)
+static ConfigEntry MakeIntPair(const char* name, IVec2 value)
 {
 	ConfigEntry entry = ConfigEntry::Array(name, ConfigPrimitive::ePrimitiveType::Int);
 	entry.AppendValue(ConfigPrimitive::FromValue(static_cast<int64>(value.X)));
@@ -19,7 +19,7 @@ bool ExportAtlas(const AtlasImageArray& images, const AtlasLayout& layout, const
 				 const String& config_path)
 {
 	const SizedArray<uint8> pixels = ComposeAtlas(images, layout);
-	const Vec2i pixel_size = layout.GetPixelSize();
+	const IVec2 pixel_size = layout.GetPixelSize();
 
 	if (!stbi_write_png(png_path.CStr(), pixel_size.X, pixel_size.Y, 4, pixels.pData, pixel_size.X * 4)) {
 		return false;

@@ -22,19 +22,19 @@ bool FontAtlas::Create(uint32 atlas_width, uint32 atlas_height, float font_size)
 	Assert(atlas_width > 0 && atlas_height > 0);
 	Assert(font_size > 0.0f);
 
-	AtlasSize = Vec2u(atlas_width, atlas_height);
+	AtlasSize = UVec2(atlas_width, atlas_height);
 	FontSize = font_size;
 
 	AtlasData.InitSize(atlas_width * atlas_height);
 	memset(AtlasData.pData, 0, AtlasData.GetSizeInBytes());
 
-	Cursor = Vec2u::sZero;
+	Cursor = UVec2::sZero;
 	RowHeight = 0;
 
 	return true;
 }
 
-Vec2u FontAtlas::FindSlot(uint32 width, uint32 height)
+UVec2 FontAtlas::FindSlot(uint32 width, uint32 height)
 {
 	if (Cursor.X + width > AtlasSize.X) {
 		Cursor.X = 0;
@@ -45,10 +45,10 @@ Vec2u FontAtlas::FindSlot(uint32 width, uint32 height)
 
 	if (Cursor.Y + height > AtlasSize.Y) {
 		LogError(LC_ASSET, "Font atlas out of space");
-		return Vec2u(0, 0);
+		return UVec2(0, 0);
 	}
 
-	Vec2u slot = Cursor;
+	UVec2 slot = Cursor;
 
 	Cursor.X += width;
 	RowHeight = std::max(RowHeight, height);
@@ -71,13 +71,13 @@ void FontAtlas::RenderGlyph(FT_GlyphSlot glyph, uint32 codepoint)
 		GlyphMetrics metrics {};
 		metrics.Advance = static_cast<float32>(glyph->advance.x) / 64.0f;
 		metrics.Lsb = static_cast<float32>(glyph->metrics.horiBearingX) / 64.0f;
-		metrics.Size = Vec2u::sZero;
-		metrics.Bearing = Vec2f::sZero;
+		metrics.Size = UVec2::sZero;
+		metrics.Bearing = FVec2::sZero;
 		Glyphs.Insert(codepoint, metrics);
 		return;
 	}
 
-	Vec2u slot = FindSlot(glyph_width, glyph_height);
+	UVec2 slot = FindSlot(glyph_width, glyph_height);
 
 	for (uint32 y = 0; y < glyph_height; ++y) {
 		for (uint32 x = 0; x < glyph_width; ++x) {
@@ -88,8 +88,8 @@ void FontAtlas::RenderGlyph(FT_GlyphSlot glyph, uint32 codepoint)
 
 	GlyphMetrics metrics {};
 	metrics.AtlasOffset = slot;
-	metrics.Size = Vec2u(static_cast<uint32>(glyph_width), static_cast<uint32>(glyph_height));
-	metrics.Bearing = Vec2f(static_cast<float32>(glyph->bitmap_left), static_cast<float32>(glyph->bitmap_top));
+	metrics.Size = UVec2(static_cast<uint32>(glyph_width), static_cast<uint32>(glyph_height));
+	metrics.Bearing = FVec2(static_cast<float32>(glyph->bitmap_left), static_cast<float32>(glyph->bitmap_top));
 	metrics.Advance = static_cast<float32>(glyph->advance.x) / 64.0f;
 	metrics.Lsb = static_cast<float32>(glyph->metrics.horiBearingX) / 64.0f;
 
@@ -340,7 +340,7 @@ void FontAtlas::Destroy()
 {
 	AtlasData.Free();
 	Glyphs.Clear();
-	Cursor = Vec2u::sZero;
+	Cursor = UVec2::sZero;
 	RowHeight = 0;
 }
 

@@ -925,7 +925,7 @@ void WeaponSystem::RenderHud()
 	const Weapon& weapon = mWeapons[mActive];
 	const ScriptState& state = weapon.State;
 
-	const Vec2u window_size = gGraphics->GetWindow()->GetSize();
+	const UVec2 window_size = gGraphics->GetWindow()->GetSize();
 	const float32 right_edge = static_cast<float32>(window_size.X) - 32.0f;
 	const float32 bottom_edge = 64.0f;
 
@@ -955,10 +955,10 @@ void WeaponSystem::RenderHud()
 	}
 
 	const float32 ammo_y = bottom_edge - ammo_height;
-	gTextRenderer->DrawTextAt(ammo_text.CStr(), Vec2f(right_edge - ammo_width, ammo_y), 1.0, ammo_color);
+	gTextRenderer->DrawTextAt(ammo_text.CStr(), FVec2(right_edge - ammo_width, ammo_y), 1.0, ammo_color);
 
 	const float32 mode_y = ammo_y - label_height - 6.0f;
-	gTextRenderer->DrawTextAt(mode_text.CStr(), Vec2f(right_edge - mode_width, mode_y), 1.0, grey);
+	gTextRenderer->DrawTextAt(mode_text.CStr(), FVec2(right_edge - mode_width, mode_y), 1.0, grey);
 
 	const char* status = nullptr;
 
@@ -974,7 +974,7 @@ void WeaponSystem::RenderHud()
 
 	if (status != nullptr) {
 		const float32 status_width = static_cast<float32>(std::strlen(status) * TextRenderer::scGlyphWidth) * 1.0;
-		gTextRenderer->DrawTextAt(status, Vec2f(right_edge - status_width, mode_y - label_height - 6.0f), 1.0, amber);
+		gTextRenderer->DrawTextAt(status, FVec2(right_edge - status_width, mode_y - label_height - 6.0f), 1.0, amber);
 	}
 }
 

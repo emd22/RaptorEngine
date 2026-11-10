@@ -20,7 +20,7 @@ void SetRelativeMouseMode(void* ns_view, bool enabled);
 /**
  * @brief Retrieve the mouse movement since the last call. Safe to call from any thread
  */
-Vec2f ConsumeRelativeMouseDelta();
+FVec2 ConsumeRelativeMouseDelta();
 
 /**
  * @brief Brings the editor to the front. When starting from the terminal, the application is not normally activated on

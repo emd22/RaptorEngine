@@ -73,20 +73,20 @@ uint32 Tile::FindLight(LightID id)
 // Tile System
 /////////////////////////////////////
 
-void WorldGrid::Create(const Vec2u grid_size)
+void WorldGrid::Create(const UVec2 grid_size)
 {
 	mGridSize = grid_size;
 
 	uint32 num_tiles = grid_size.X * grid_size.Y;
 	mTileBuffer.InitSize(num_tiles);
 
-	Vec2u half_grid = grid_size / Vec2u(2U);
+	UVec2 half_grid = grid_size / UVec2(2U);
 
 	// Center the grid about zero.
 	mPositionOffset = ((FVec3(half_grid.X, 0.0f, half_grid.Y) * FVec3(mTileSize.X, 0.0f, mTileSize.Y)));
 }
 
-void WorldGrid::GetObjectTileRect(Object* object, TileIndex* out_start, Vec2u* out_span) const
+void WorldGrid::GetObjectTileRect(Object* object, TileIndex* out_start, UVec2* out_span) const
 {
 	DebugAssert(out_start != nullptr);
 	DebugAssert(out_span != nullptr);
@@ -94,34 +94,34 @@ void WorldGrid::GetObjectTileRect(Object* object, TileIndex* out_start, Vec2u* o
 
 	const BBox world_bounds = object->GetDrawBounds();
 
-	const Vec2u tile_xy_start = TileToTileXY(WorldToTile(world_bounds.Min));
-	const Vec2u tile_xy_end = TileToTileXY(WorldToTile(world_bounds.Max));
+	const UVec2 tile_xy_start = TileToTileXY(WorldToTile(world_bounds.Min));
+	const UVec2 tile_xy_end = TileToTileXY(WorldToTile(world_bounds.Max));
 
 	const uint32 width_in_tiles = std::clamp(tile_xy_end.X - tile_xy_start.X + 1, 1U, mGridSize.X);
 	const uint32 height_in_tiles = std::clamp(tile_xy_end.Y - tile_xy_start.Y + 1, 1U, mGridSize.Y);
 
 	*out_start = TileFromTileXY(tile_xy_start);
-	*out_span = Vec2u(width_in_tiles, height_in_tiles);
+	*out_span = UVec2(width_in_tiles, height_in_tiles);
 }
 
-void WorldGrid::InsertObjectIntoRect(ObjectID id, TileIndex start, Vec2u span)
+void WorldGrid::InsertObjectIntoRect(ObjectID id, TileIndex start, UVec2 span)
 {
-	const Vec2u start_xy = TileToTileXY(start);
+	const UVec2 start_xy = TileToTileXY(start);
 
 	for (uint32 y = 0; y < span.Y; y++) {
 		for (uint32 x = 0; x < span.X; x++) {
-			InsertInto(TileFromTileXY(start_xy + Vec2u(x, y)), id);
+			InsertInto(TileFromTileXY(start_xy + UVec2(x, y)), id);
 		}
 	}
 }
 
-void WorldGrid::RemoveObjectFromRect(ObjectID id, TileIndex start, Vec2u span)
+void WorldGrid::RemoveObjectFromRect(ObjectID id, TileIndex start, UVec2 span)
 {
-	const Vec2u start_xy = TileToTileXY(start);
+	const UVec2 start_xy = TileToTileXY(start);
 
 	for (uint32 y = 0; y < span.Y; y++) {
 		for (uint32 x = 0; x < span.X; x++) {
-			Tile* tile = GetTile(TileFromTileXY(start_xy + Vec2u(x, y)));
+			Tile* tile = GetTile(TileFromTileXY(start_xy + UVec2(x, y)));
 			if (tile == nullptr) {
 				continue;
 			}
@@ -160,7 +160,7 @@ void WorldGrid::AddObject(ObjectID id)
 	}
 
 	TileIndex tile_start = TileIndexNull;
-	Vec2u tile_span = Vec2u(1, 1);
+	UVec2 tile_span = UVec2(1, 1);
 	GetObjectTileRect(object, &tile_start, &tile_span);
 
 	InsertObjectIntoRect(id, tile_start, tile_span);
@@ -174,10 +174,10 @@ void WorldGrid::AddObject(ObjectID id)
 	MarkObjectDirty(object);
 }
 
-bool WorldGrid::GetLightPlacement(const LightBase* light, TileIndex* out_start, Vec2u* out_span) const
+bool WorldGrid::GetLightPlacement(const LightBase* light, TileIndex* out_start, UVec2* out_span) const
 {
 	*out_start = scGlobalTileIndex;
-	*out_span = Vec2u(1, 1);
+	*out_span = UVec2(1, 1);
 
 	if (!light->IsCullable() || mTileBuffer.Capacity == 0) {
 		return true;
@@ -185,8 +185,8 @@ bool WorldGrid::GetLightPlacement(const LightBase* light, TileIndex* out_start, 
 
 	const BBox bounds = light->GetBounds();
 
-	const Vec2u tile_xy_start = TileToTileXY(WorldToTile(bounds.Min));
-	const Vec2u tile_xy_end = TileToTileXY(WorldToTile(bounds.Max));
+	const UVec2 tile_xy_start = TileToTileXY(WorldToTile(bounds.Min));
+	const UVec2 tile_xy_end = TileToTileXY(WorldToTile(bounds.Max));
 
 	const uint32 width_in_tiles = std::clamp(tile_xy_end.X - tile_xy_start.X + 1, 1U, mGridSize.X);
 	const uint32 height_in_tiles = std::clamp(tile_xy_end.Y - tile_xy_start.Y + 1, 1U, mGridSize.Y);
@@ -196,18 +196,18 @@ bool WorldGrid::GetLightPlacement(const LightBase* light, TileIndex* out_start, 
 	}
 
 	*out_start = TileFromTileXY(tile_xy_start);
-	*out_span = Vec2u(width_in_tiles, height_in_tiles);
+	*out_span = UVec2(width_in_tiles, height_in_tiles);
 
 	return false;
 }
 
-void WorldGrid::InsertLightIntoRect(LightID id, TileIndex start, Vec2u span)
+void WorldGrid::InsertLightIntoRect(LightID id, TileIndex start, UVec2 span)
 {
-	const Vec2u start_xy = TileToTileXY(start);
+	const UVec2 start_xy = TileToTileXY(start);
 
 	for (uint32 y = 0; y < span.Y; y++) {
 		for (uint32 x = 0; x < span.X; x++) {
-			const TileIndex tile_index = TileFromTileXY(start_xy + Vec2u(x, y));
+			const TileIndex tile_index = TileFromTileXY(start_xy + UVec2(x, y));
 			Tile& tile = mTileBuffer[tile_index];
 
 			if (!tile.Lights.IsInited()) {
@@ -225,13 +225,13 @@ void WorldGrid::InsertLightIntoRect(LightID id, TileIndex start, Vec2u span)
 	}
 }
 
-void WorldGrid::RemoveLightFromRect(LightID id, TileIndex start, Vec2u span)
+void WorldGrid::RemoveLightFromRect(LightID id, TileIndex start, UVec2 span)
 {
-	const Vec2u start_xy = TileToTileXY(start);
+	const UVec2 start_xy = TileToTileXY(start);
 
 	for (uint32 y = 0; y < span.Y; y++) {
 		for (uint32 x = 0; x < span.X; x++) {
-			Tile* tile = GetTile(TileFromTileXY(start_xy + Vec2u(x, y)));
+			Tile* tile = GetTile(TileFromTileXY(start_xy + UVec2(x, y)));
 			if (tile == nullptr) {
 				continue;
 			}
@@ -257,7 +257,7 @@ void WorldGrid::AddLight(LightBase* light)
 	}
 
 	TileIndex tile_start = TileIndexNull;
-	Vec2u tile_span = Vec2u(1, 1);
+	UVec2 tile_span = UVec2(1, 1);
 	const bool is_global = GetLightPlacement(light, &tile_start, &tile_span);
 
 	if (is_global) {
@@ -274,7 +274,7 @@ void WorldGrid::AddLight(LightBase* light)
 		(*out_id) = light->ID;
 
 		light->mTileIndex = scGlobalTileIndex;
-		light->mTileSpan = Vec2u(1, 1);
+		light->mTileSpan = UVec2(1, 1);
 		UpdateLightAreas(light);
 		return;
 	}
@@ -295,7 +295,7 @@ void WorldGrid::UpdateLight(LightBase* light)
 	UpdateLightAreas(light);
 
 	TileIndex tile_start = TileIndexNull;
-	Vec2u tile_span = Vec2u(1, 1);
+	UVec2 tile_span = UVec2(1, 1);
 	const bool is_global = GetLightPlacement(light, &tile_start, &tile_span);
 	const bool was_global = (light->mTileIndex == scGlobalTileIndex);
 
@@ -370,22 +370,22 @@ const SizedArray<ObjectID>& WorldGrid::GetNearbyObjects()
 		return mNearbyObjectCache;
 	}
 
-	Vec2u view_xy = TileToTileXY(ViewTileIndex);
+	UVec2 view_xy = TileToTileXY(ViewTileIndex);
 	const Tile* view_tile = GetTile(TileFromTileXY(view_xy));
 
 	const Tile* surrounding_tiles[] = {
 
 		// Get the immediate surrounding tiles (up, left, down, right)
-		GetTile(TileFromTileXY(view_xy + Vec2u(1, 0))),
-		GetTile(TileFromTileXY(view_xy + Vec2u(-1, 0))),
-		GetTile(TileFromTileXY(view_xy + Vec2u(0, -1))),
-		GetTile(TileFromTileXY(view_xy + Vec2u(0, 1))),
+		GetTile(TileFromTileXY(view_xy + UVec2(1, 0))),
+		GetTile(TileFromTileXY(view_xy + UVec2(-1, 0))),
+		GetTile(TileFromTileXY(view_xy + UVec2(0, -1))),
+		GetTile(TileFromTileXY(view_xy + UVec2(0, 1))),
 
 		// Get the diagonal surrounding tiles
-		GetTile(TileFromTileXY(view_xy + Vec2u(1, 1))),
-		GetTile(TileFromTileXY(view_xy + Vec2u(1, -1))),
-		GetTile(TileFromTileXY(view_xy + Vec2u(-1, -1))),
-		GetTile(TileFromTileXY(view_xy + Vec2u(-1, 1))),
+		GetTile(TileFromTileXY(view_xy + UVec2(1, 1))),
+		GetTile(TileFromTileXY(view_xy + UVec2(1, -1))),
+		GetTile(TileFromTileXY(view_xy + UVec2(-1, -1))),
+		GetTile(TileFromTileXY(view_xy + UVec2(-1, 1))),
 	};
 
 	std::unordered_set<ObjectID> objects_list;
@@ -594,11 +594,11 @@ void WorldGrid::MarkObjectDirty(const Object* object)
 		return;
 	}
 
-	const Vec2u start_xy = TileToTileXY(object->mTileIndex);
+	const UVec2 start_xy = TileToTileXY(object->mTileIndex);
 
 	for (uint32 y = 0; y < object->mTileSpan.Y; y++) {
 		for (uint32 x = 0; x < object->mTileSpan.X; x++) {
-			Tile* tile = GetTile(TileFromTileXY(start_xy + Vec2u(x, y)));
+			Tile* tile = GetTile(TileFromTileXY(start_xy + UVec2(x, y)));
 			if (tile != nullptr) {
 				tile->ChangeSerial = serial;
 			}
@@ -612,13 +612,13 @@ bool WorldGrid::HasChangedSince(const FVec3 center, float32 radius, uint64 seria
 		return true;
 	}
 
-	Vec2u min_tile;
-	Vec2u max_tile;
+	UVec2 min_tile;
+	UVec2 max_tile;
 	GetSphereTileRange(center, radius, &min_tile, &max_tile);
 
 	for (uint32 y = min_tile.Y; y <= max_tile.Y; y++) {
 		for (uint32 x = min_tile.X; x <= max_tile.X; x++) {
-			const Tile* tile = GetTile(TileFromTileXY(Vec2u(x, y)));
+			const Tile* tile = GetTile(TileFromTileXY(UVec2(x, y)));
 
 			if (tile != nullptr && tile->ChangeSerial > serial) {
 				return true;
@@ -629,7 +629,7 @@ bool WorldGrid::HasChangedSince(const FVec3 center, float32 radius, uint64 seria
 	return false;
 }
 
-void WorldGrid::GetSphereTileRange(const FVec3 center, float32 radius, Vec2u* out_min, Vec2u* out_max) const
+void WorldGrid::GetSphereTileRange(const FVec3 center, float32 radius, UVec2* out_min, UVec2* out_max) const
 {
 	const FVec3 extent(radius, radius, radius);
 
@@ -645,13 +645,13 @@ void WorldGrid::RelocateObject(Object* object, bool update_attached)
 		if (object->mTileIndex != scGlobalTileIndex) {
 			RemoveObjectFromRect(object->ID, object->mTileIndex, object->mTileSpan);
 			InsertInto(scGlobalTileIndex, object->ID);
-			object->mTileSpan = Vec2u(1, 1);
+			object->mTileSpan = UVec2(1, 1);
 		}
 		return;
 	}
 
 	TileIndex new_tile_start = TileIndexNull;
-	Vec2u new_tile_span = Vec2u(1, 1);
+	UVec2 new_tile_span = UVec2(1, 1);
 	GetObjectTileRect(object, &new_tile_start, &new_tile_span);
 
 	if (object->mTileIndex == scGlobalTileIndex) {
@@ -694,11 +694,11 @@ void WorldGrid::RelocateObject(Object* object, bool update_attached)
 	}
 }
 
-Vec2u WorldGrid::TileToTileXY(TileIndex tile_index) const
+UVec2 WorldGrid::TileToTileXY(TileIndex tile_index) const
 {
 	const uint32 tile_x = tile_index % mGridSize.X;
 	const uint32 tile_y = (tile_index - tile_x) / mGridSize.X;
-	return Vec2u(tile_x, tile_y);
+	return UVec2(tile_x, tile_y);
 }
 
 FVec3 WorldGrid::GetTileWorldPosition(TileIndex tile_index) const
@@ -706,7 +706,7 @@ FVec3 WorldGrid::GetTileWorldPosition(TileIndex tile_index) const
 	return TileXYToWorldCenter(TileToTileXY(tile_index));
 }
 
-FVec3 WorldGrid::TileXYToWorldCenter(Vec2u tile_xy) const
+FVec3 WorldGrid::TileXYToWorldCenter(UVec2 tile_xy) const
 {
 	return FVec3((static_cast<float32>(tile_xy.X) * mTileSize.X) - mPositionOffset.X + (mTileSize.X * 0.5f),
 				 mPositionOffset.Y,
@@ -740,7 +740,7 @@ const Tile* WorldGrid::GetTile(TileIndex index) const
 	return &mTileBuffer[index];
 }
 
-TileIndex WorldGrid::TileFromTileXY(const Vec2u& xy) const
+TileIndex WorldGrid::TileFromTileXY(const UVec2& xy) const
 {
 	return std::min(xy.Y, mGridSize.Y - 1) * mGridSize.X + std::min(xy.X, mGridSize.X - 1);
 }

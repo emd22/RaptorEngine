@@ -13,7 +13,6 @@
 #include <Core/Types.hpp>
 #include <Renderer/PipelineKey.hpp>
 #include <Renderer/PipelineNames.hpp>
-
 #include <memory>
 #include <vector>
 
@@ -38,6 +37,7 @@ public:
 	RenderList() = default;
 
 	void AddObject(PipelineHandle pipeline, const ObjectID id);
+
 	/**
 	 * @brief Invalidate object from renderlist. Use when an object is going to be destroyed or will be invalid before
 	 * the next renderlist rebuild.
@@ -49,9 +49,6 @@ public:
 
 	uint32 GetItemCount() const;
 
-	/**
-	 * @brief The objects drawn with a pipeline. Sections are made when they are first asked for, and stay where they are.
-	 */
 	RenderListSection& GetSection(PipelineHandle pipeline);
 
 private:

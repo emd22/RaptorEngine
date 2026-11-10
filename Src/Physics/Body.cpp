@@ -259,7 +259,7 @@ void Body::UpdateJoltBody(JPH::ShapeRefC shape, physics::Body::eFlags flags, phy
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->PhysicsSystem.GetBodyInterface();
 
 	FVec3 previous_position = FVec3::sZero;
-	Quat previous_rotation = Quat::scIdentity;
+	FQuat previous_rotation = FQuat::scIdentity;
 
 	if (mpPhysicsBody) {
 		previous_position = GetPosition();
@@ -304,7 +304,7 @@ void Body::UpdateJoltBody(JPH::ShapeRefC shape, physics::Body::eFlags flags, phy
 	mbHasPhysicsBody = true;
 }
 
-void Body::SetInstanceTransforms(const Mat4f* transforms, uint32 count)
+void Body::SetInstanceTransforms(const FMat4* transforms, uint32 count)
 {
 	if (!mbHasPhysicsBody || mBaseShape == nullptr) {
 		return;
@@ -400,7 +400,7 @@ void Body::AddToWorld()
 	mbIsInWorld = true;
 }
 
-void Body::Teleport(const FVec3 position, const Quat rotation)
+void Body::Teleport(const FVec3 position, const FQuat rotation)
 {
 	if (!mbHasPhysicsBody) {
 		return;

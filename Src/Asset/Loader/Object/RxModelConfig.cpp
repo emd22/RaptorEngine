@@ -211,7 +211,7 @@ struct Schema
 					Error(std::format("'{}.rotquat' has zero length", table_path));
 				}
 				else {
-					out.Rotation = Quat(values[0] / length, values[1] / length, values[2] / length, values[3] / length);
+					out.Rotation = FQuat(values[0] / length, values[1] / length, values[2] / length, values[3] / length);
 				}
 			}
 		}

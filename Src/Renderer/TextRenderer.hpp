@@ -2,7 +2,7 @@
 
 #include <Asset/AssetTicket.hpp>
 #include <Core/Ref.hpp>
-#include <Math/Mat4.hpp>
+#include <Math/FMat4.hpp>
 #include <Math/Vec2.hpp>
 #include <Renderer/Backend/Descriptors.hpp>
 #include <Renderer/Backend/GpuBuffer.hpp>
@@ -35,7 +35,7 @@ public:
 	static constexpr uint32 scAtlasColumns = 16;
 	static constexpr uint32 scAtlasRows = 6;
 
-	static constexpr Vec2f scMargin = Vec2f(20.0f);
+	static constexpr FVec2 scMargin = FVec2(20.0f);
 
 	struct InstanceData
 	{
@@ -59,14 +59,14 @@ public:
 	/**
 	 * @brief Draws `text` with its top-left corner at `position` in window pixels
 	 */
-	void DrawTextAt(const char* text, Vec2f position, float32 scale, uint32 color);
+	void DrawTextAt(const char* text, FVec2 position, float32 scale, uint32 color);
 
 	/**
 	 * @brief Draws `image` as a screen-space quad tinted by `color`, for HUD elements like the crosshair.
 	 * @param position The top-left corner in window pixels, measured down from the top-left of the window.
 	 * @param size The size of the quad in window pixels.
 	 */
-	void DrawImage(Image* image, Vec2f position, Vec2f size, uint32 color);
+	void DrawImage(Image* image, FVec2 position, FVec2 size, uint32 color);
 
 	Image* GetAtlas() const { return mpAtlas; }
 	RawGpuBuffer& GetInstanceBuffer() { return mInstanceBuffer; }
@@ -94,9 +94,9 @@ private:
 	/// Think of it as an ink ribbon, where the characters are used and the cursor moves forward.
 	uint32 mTapeOffset = 0;
 
-	Vec2f mCursorPosition = Vec2f::scZero;
+	FVec2 mCursorPosition = FVec2::scZero;
 
-	Mat4f mOrthoProjection = Mat4f::scIdentity;
+	FMat4 mOrthoProjection = FMat4::scIdentity;
 };
 
 } // namespace fx::renderer

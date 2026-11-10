@@ -99,8 +99,8 @@ public:
 
 	wxBitmap Render(const wxSize& size);
 
-	wxPoint WorldToClient(const Vec2d uv) const;
-	Vec2d ClientToWorld(const wxPoint& point) const;
+	wxPoint WorldToClient(const DVec2 uv) const;
+	DVec2 ClientToWorld(const wxPoint& point) const;
 
 	FX_FORCE_INLINE const TopViewState& GetState() const { return mState; }
 	FX_FORCE_INLINE double GetScale() const { return mScale; }
@@ -142,15 +142,15 @@ private:
 
 	struct ArchEllipse
 	{
-		Vec2d Center { Vec2d::scZero };
-		Vec2d Radius { Vec2d::scZero };
+		DVec2 Center { DVec2::scZero };
+		DVec2 Radius { DVec2::scZero };
 		bool bValid = false;
 	};
 
 	struct OutlinePreview
 	{
 		ObjectID BrushId = ObjectID::scNull;
-		DynArray<Vec2f> Polygon;
+		DynArray<FVec2> Polygon;
 	};
 
 	struct Preview
@@ -160,9 +160,9 @@ private:
 		// 		double OffsetU = 0.0;
 		// 		double OffsetV = 0.0;
 
-		Vec2d OffsetUV { Vec2d::scZero };
-		Vec2d PivotUV { Vec2d::scZero };
-		Vec2d NormalUV { Vec2d::scZero };
+		DVec2 OffsetUV { DVec2::scZero };
+		DVec2 PivotUV { DVec2::scZero };
+		DVec2 NormalUV { DVec2::scZero };
 
 		double Angle = 0.0;
 		//
@@ -182,13 +182,13 @@ private:
 		// double NormalV = 0.0;
 		DynArray<OutlinePreview> Outlines;
 
-		Vec2d ClipA { Vec2d::scZero };
-		Vec2d ClipB { Vec2d::scZero };
+		DVec2 ClipA { DVec2::scZero };
+		DVec2 ClipB { DVec2::scZero };
 
 		bool bSnappedToPatch = false;
-		Vec2d PatchSnapUV { Vec2d::scZero };
+		DVec2 PatchSnapUV { DVec2::scZero };
 
-		Vec2d AimUV { Vec2d::scZero };
+		DVec2 AimUV { DVec2::scZero };
 		double AimDepth = 0.0;
 	};
 
@@ -208,7 +208,7 @@ private:
 	{
 		// double CenterU = 0.0;
 		// double CenterV = 0.0;
-		Vec2d Center { Vec2d::scZero };
+		DVec2 Center { DVec2::scZero };
 
 		double Scale = 24.0;
 		bool bFitted = false;
@@ -241,13 +241,13 @@ private:
 
 	wxSize GetViewSize() const;
 
-	Vec2d ToScreenCoords(const Vec2d uv) const;
+	DVec2 ToScreenCoords(const DVec2 uv) const;
 
 	const ViewPlaneAxes& Axes() const;
 	const TopViewProjection& Projection(const TopViewBrush& brush) const;
-	DynArray<Vec2d> CollectVertexHandles(const TopViewBrush& brush) const;
-	FVec3 ToWorldVector(const Vec2d uv, double w) const;
-	Vec2d ProjectPoint(const FVec3& point) const;
+	DynArray<DVec2> CollectVertexHandles(const TopViewBrush& brush) const;
+	FVec3 ToWorldVector(const DVec2 uv, double w) const;
+	DVec2 ProjectPoint(const FVec3& point) const;
 	double DepthOf(const FVec3& vector) const;
 
 	void BeginPan(const wxPoint& position);
@@ -280,11 +280,11 @@ private:
 	void FinishMarkerMove();
 	void FinishMarkerAim();
 
-	DynArray<Vec2d> BuildArchSegments(const DRect& rect) const;
+	DynArray<DVec2> BuildArchSegments(const DRect& rect) const;
 	ArchEllipse FitArch(const DRect& rect) const;
 	DRect GetArchRect(const ArchEllipse& ellipse) const;
-	Vec2d GetArchHandle(eArchHandle handle) const;
-	eArchHandle PickArchHandle(const Vec2d uv) const;
+	DVec2 GetArchHandle(eArchHandle handle) const;
+	eArchHandle PickArchHandle(const DVec2 uv) const;
 	void BeginArchEdit(eArchHandle handle);
 	void UpdateArchEdit();
 	void DrawArch(wxGraphicsContext& gc, const DRect& rect, bool show_handles);
@@ -306,42 +306,42 @@ private:
 	void CancelDrag();
 
 	void ZoomAt(const wxPoint& anchor, double factor);
-	void PanByPixels(const Vec2d delta);
+	void PanByPixels(const DVec2 delta);
 	void FitBounds(const ViewBounds& bounds);
 	void TryInitialFit();
 
 	double GetGridStep(double min_step) const;
 	double Snap(double value) const;
-	Vec2d Snap(const Vec2d uv) const;
+	DVec2 Snap(const DVec2 uv) const;
 	double SnapAngle(double radians) const;
 
-	DynArray<int32> PickAt(const Vec2d uv) const;
-	int PickFaceAt(const Vec2d uv, int& out_face) const;
-	const TopViewFrontFace* PickFrontFaceAt(const Vec2d uv, ObjectID& out_brush) const;
+	DynArray<int32> PickAt(const DVec2 uv) const;
+	int PickFaceAt(const DVec2 uv, int& out_face) const;
+	const TopViewFrontFace* PickFrontFaceAt(const DVec2 uv, ObjectID& out_brush) const;
 	bool IsFacePicked(ObjectID object_id, const FVec3& normal) const;
 	void PickFace(ObjectID object_id, const FVec3& normal, bool additive);
 	void UnpickFace(ObjectID object_id, const FVec3& normal);
 	void ClearPickedFaces();
 	DynArray<TopViewFaceRef> GetFaceDragTargets() const;
 	void UpdateHover();
-	bool PickVertexAt(const Vec2d uv, TopViewVertexHandle& out_handle) const;
-	bool IsVertexSelected(ObjectID object_id, const Vec2d uv) const;
-	bool FindPatchSnapPoint(const Vec2d uv, Vec2d& out_point) const;
+	bool PickVertexAt(const DVec2 uv, TopViewVertexHandle& out_handle) const;
+	bool IsVertexSelected(ObjectID object_id, const DVec2 uv) const;
+	bool FindPatchSnapPoint(const DVec2 uv, DVec2& out_point) const;
 	const TopViewBrush* FindBrush(ObjectID object_id) const;
 	ViewBounds GetSelectionBounds() const;
-	bool GetSelectionPivot(Vec2d& out_pivot) const;
-	Vec2d GetRotateSnapOffset(const Vec2d pivot, double angle) const;
-	Vec2d SnapNudge(const Vec2d origin, const Vec2d delta) const;
+	bool GetSelectionPivot(DVec2& out_pivot) const;
+	DVec2 GetRotateSnapOffset(const DVec2 pivot, double angle) const;
+	DVec2 SnapNudge(const DVec2 origin, const DVec2 delta) const;
 	uint32 GetSelectedCount() const;
 
-	int32 PickMarkerAt(const Vec2d uv, bool& out_tip) const;
+	int32 PickMarkerAt(const DVec2 uv, bool& out_tip) const;
 	int32 FindMarker(eTopViewMarkerKind kind, uint32 light_id) const;
 	int32 FindSelectedMarker() const;
-	Vec2d GetMarkerTip(const TopViewMarker& marker, const Vec2d direction_uv) const;
+	DVec2 GetMarkerTip(const TopViewMarker& marker, const DVec2 direction_uv) const;
 	void SelectMarker(int32 index);
 	void DeselectMarkers();
 	void ApplyLocalMarkerSelection();
-	void NudgeMarker(const TopViewMarker& marker, const Vec2d delta);
+	void NudgeMarker(const TopViewMarker& marker, const DVec2 delta);
 
 	void SelectBrush(ObjectID object_id, eTopViewSelectMode mode);
 	void SelectBrushes(DynArray<ObjectID> object_ids, eTopViewSelectMode mode);
@@ -350,7 +350,7 @@ private:
 	void InvertSelection();
 	void SendCommand(thread::Task command);
 
-	void NudgeSelection(const Vec2d delta, bool snap);
+	void NudgeSelection(const DVec2 delta, bool snap);
 	void SetSnapBypass(bool bypass);
 	void SetToolFromKey(eEditorTool tool);
 	void ApplyTool(eEditorTool tool);
@@ -368,7 +368,7 @@ private:
 	// double mCenterU = 0.0;
 	// double mCenterV = 0.0;
 
-	Vec2d mCenter { Vec2d::scZero };
+	DVec2 mCenter { DVec2::scZero };
 
 	double mScale = 24.0;
 	bool mbHasFitted = false;
@@ -379,9 +379,9 @@ private:
 
 	eDrag mDrag = eDrag::None;
 	wxPoint mPressScreen;
-	Vec2d mPress { Vec2d::scZero };
-	Vec2d mCurrent { Vec2d::scZero };
-	Vec2d mHover { Vec2d::scZero };
+	DVec2 mPress { DVec2::scZero };
+	DVec2 mCurrent { DVec2::scZero };
+	DVec2 mHover { DVec2::scZero };
 	bool mbHovering = false;
 	bool mbDragMoved = false;
 	bool mbAdditive = false;
@@ -391,14 +391,14 @@ private:
 
 	double mPinchStartScale = 24.0;
 
-	Vec2d mPanStartCenter { Vec2d::scZero };
+	DVec2 mPanStartCenter { DVec2::scZero };
 
 	bool mbHasPressedBrush = false;
 	ObjectID mPressedId = ObjectID::scNull;
 	bool mbPressedWasSelected = false;
 	DynArray<ObjectID> mPressedHitIds;
 	ViewBounds mDragBounds;
-	Vec2d mRotatePivot { Vec2d::scZero };
+	DVec2 mRotatePivot { DVec2::scZero };
 	double mRotateStartAngle = 0.0;
 
 	wxPoint mLastClickScreen = wxPoint(-1000, -1000);
@@ -417,7 +417,7 @@ private:
 
 	bool mbHoverFrontFace = false;
 	TopViewFaceRef mHoverFrontFace;
-	DynArray<Vec2f> mHoverFrontPolygon;
+	DynArray<FVec2> mHoverFrontPolygon;
 
 	DynArray<TopViewVertexHandle> mSelectedVertices;
 	TopViewVertexHandle mGrabbedVertex;

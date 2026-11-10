@@ -81,7 +81,7 @@ public:
 	bool InitGUI(int argc, char** argv);
 	void InitTools();
 
-	EditorFrame* CreateMainFrame(const char* title, const Vec2u& viewport_size, const eRaptorEditorFlags flags);
+	EditorFrame* CreateMainFrame(const char* title, const UVec2& viewport_size, const eRaptorEditorFlags flags);
 
 	void BeginGameLoop();
 	void EndGameLoop();

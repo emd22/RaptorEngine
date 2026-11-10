@@ -66,7 +66,7 @@ struct LightmapChart
 	DVec3 U = DVec3::scZero;
 	DVec3 V = DVec3::scZero;
 
-	Array<Vec2d> TrianglePoints;
+	Array<DVec2> TrianglePoints;
 
 	Array<DVec3> WorldPoints;
 	Array<DVec3> Normals;
@@ -77,7 +77,7 @@ struct LightmapChart
 struct LightmapVertex
 {
 	int32 Chart = -1;
-	Vec2d Point = Vec2d(0.0, 0.0);
+	DVec2 Point = DVec2(0.0, 0.0);
 };
 
 class SurfaceBuilder

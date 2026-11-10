@@ -88,7 +88,7 @@ void ModelBuilder::Build(MapSource& source)
 								   mesh.Normals[vertex * 3 + 2]);
 
 				if (has_uvs) {
-					out.Texcoord = Vec2f(mesh.Uvs[vertex * 2], mesh.Uvs[vertex * 2 + 1]);
+					out.Texcoord = FVec2(mesh.Uvs[vertex * 2], mesh.Uvs[vertex * 2 + 1]);
 				}
 			}
 

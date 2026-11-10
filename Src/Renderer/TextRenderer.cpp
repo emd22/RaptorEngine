@@ -16,7 +16,7 @@
 #include <Asset/AssetManager.hpp>
 #include <Asset/MeshGen.hpp>
 #include <Core/StackArray.hpp>
-#include <Math/Mat4.hpp>
+#include <Math/FMat4.hpp>
 #include <Texture/TextureManager.hpp>
 
 namespace fx::renderer {
@@ -69,10 +69,10 @@ void TextRenderer::Create()
 		});
 
 
-	Ref<MeshGen::GeneratedMesh> gm = MeshGen::MakeQuad(Vec2f { 1.0f, 1.0f });
+	Ref<MeshGen::GeneratedMesh> gm = MeshGen::MakeQuad(FVec2 { 1.0f, 1.0f });
 	mpQuad = gm->AsDefaultMesh();
 
-	Vec2u window_size = gGraphics->GetWindow()->GetSize();
+	UVec2 window_size = gGraphics->GetWindow()->GetSize();
 	mOrthoProjection.LoadOrthographicMatrix(window_size.X, window_size.Y, 0.1f, 10.0f);
 
 	mInstanceBuffer.Create(eGpuBufferType::StorageWithOffset,
@@ -83,7 +83,7 @@ void TextRenderer::Create()
 
 void TextRenderer::Resize()
 {
-	Vec2u size = gGraphics->GetWindow()->GetSize();
+	UVec2 size = gGraphics->GetWindow()->GetSize();
 	mOrthoProjection.LoadOrthographicMatrix(size.X, size.Y, 0.1f, 10.0f);
 }
 
@@ -104,7 +104,7 @@ void TextRenderer::BeginFrameIfNeeded()
 	if (frame_number != mLastFrameNumber) {
 		mLastFrameNumber = frame_number;
 		mTapeOffset = 0;
-		mCursorPosition = Vec2f::scZero;
+		mCursorPosition = FVec2::scZero;
 	}
 }
 
@@ -163,11 +163,11 @@ void TextRenderer::DrawText(const char* text, float32 scale, uint32 color)
 	const float32 atlas_h = static_cast<float32>(mpAtlas->Info.Size.Y);
 
 
-	const Vec2u window_size = gGraphics->GetWindow()->GetSize();
-	const Vec2f half_window_size(static_cast<float32>(window_size.X) * 0.5f,
+	const UVec2 window_size = gGraphics->GetWindow()->GetSize();
+	const FVec2 half_window_size(static_cast<float32>(window_size.X) * 0.5f,
 								 static_cast<float32>(window_size.Y) * 0.5f);
 
-	Vec2f cursor = mCursorPosition - half_window_size + scMargin;
+	FVec2 cursor = mCursorPosition - half_window_size + scMargin;
 
 	for (const char* c = text; *c != '\0'; ++c) {
 		if (instances.Size >= scMaxGlyphsPerDraw) {
@@ -208,7 +208,7 @@ void TextRenderer::DrawText(const char* text, float32 scale, uint32 color)
 	mCursorPosition.Y += glyph_height;
 }
 
-void TextRenderer::DrawTextAt(const char* text, Vec2f position, float32 scale, uint32 color)
+void TextRenderer::DrawTextAt(const char* text, FVec2 position, float32 scale, uint32 color)
 {
 	if (mpAtlas == nullptr) {
 		return;
@@ -216,7 +216,7 @@ void TextRenderer::DrawTextAt(const char* text, Vec2f position, float32 scale, u
 
 	BeginFrameIfNeeded();
 
-	const Vec2f saved_cursor = mCursorPosition;
+	const FVec2 saved_cursor = mCursorPosition;
 
 	mCursorPosition = position - scMargin;
 	DrawText(text, scale, color);
@@ -224,7 +224,7 @@ void TextRenderer::DrawTextAt(const char* text, Vec2f position, float32 scale, u
 	mCursorPosition = saved_cursor;
 }
 
-void TextRenderer::DrawImage(Image* image, Vec2f position, Vec2f size, uint32 color)
+void TextRenderer::DrawImage(Image* image, FVec2 position, FVec2 size, uint32 color)
 {
 	if (image == nullptr) {
 		return;
@@ -247,7 +247,7 @@ void TextRenderer::DrawImage(Image* image, Vec2f position, Vec2f size, uint32 co
 	DescriptorSet* ds = gDescriptorCache->Request(entries).second;
 
 	// Instances are placed by their bottom-left corner, relative to the centre of the window with +Y up
-	const Vec2u window_size = gGraphics->GetWindow()->GetSize();
+	const UVec2 window_size = gGraphics->GetWindow()->GetSize();
 	const float32 half_width = static_cast<float32>(window_size.X) * 0.5f;
 	const float32 half_height = static_cast<float32>(window_size.Y) * 0.5f;
 

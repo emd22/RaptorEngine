@@ -51,11 +51,6 @@ public:
 private:
 	void MakeMaterialForPrimitive(Object* object, cgltf_primitive* primitive);
 
-	/**
-	 * @brief Builds the vertex list and indices of `primitive` into `mesh`. Joints and weights are only loaded when the
-	 * node has a skin, as a mesh on a node without a skin is drawn unskinned even when it carries them.
-	 * @returns false if the primitive can not be drawn
-	 */
 	bool BuildPrimitiveMesh(PrimitiveMesh& mesh, cgltf_primitive* primitive, const MeshNodeContext& context);
 
 	std::vector<int32> BuildJointLookup(cgltf_skin* skin) const;

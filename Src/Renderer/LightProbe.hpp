@@ -111,7 +111,7 @@ public:
 	bool IsCapturingReflection() const { return mbCapturingFaces && mBakePhase == eBakePhase::Reflection; }
 	bool IsCapturingBounce() const { return mbCapturingFaces && (mCurrentBounce > 0 || IsCapturingReflection()); }
 
-	Vec2u GetCaptureExtent() const
+	UVec2 GetCaptureExtent() const
 	{
 		uint32 size = scCaptureSize;
 
@@ -119,7 +119,7 @@ public:
 			size = Limits::ReflectionProbeSize;
 		}
 
-		return Vec2u(size, size);
+		return UVec2(size, size);
 	}
 
 	void RecordCaptureBatch(renderer::CommandBuffer& cmd, const RenderFaceFunc& render_face);
@@ -233,8 +233,8 @@ private:
 	renderer::RawGpuBuffer mColorStaging[scProbesPerFrame][scCaptureFaces];
 	renderer::RawGpuBuffer mDepthStaging[scProbesPerFrame][scCaptureFaces];
 	SizedArray<CaptureTexel> mCaptureTexels;
-	Mat4f mCaptureInvProjection = Mat4f::scIdentity;
-	Mat4f mCaptureFaceToClip[scCaptureFaces];
+	FMat4 mCaptureInvProjection = FMat4::scIdentity;
+	FMat4 mCaptureFaceToClip[scCaptureFaces];
 
 
 	SizedArray<PerspectiveCamera> mCaptureCameras;

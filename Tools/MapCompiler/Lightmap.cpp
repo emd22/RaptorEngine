@@ -73,23 +73,23 @@ public:
 	uint32 GetPaddedWidth() const { return Width + scChartPadding * 2; }
 	uint32 GetPaddedHeight() const { return Height + scChartPadding * 2; }
 
-	Vec2u GetSize() const { return Vec2u { Width, Height }; }
-	Vec2u GetPosition() const { return Vec2u { X, Y }; }
+	UVec2 GetSize() const { return UVec2 { Width, Height }; }
+	UVec2 GetPosition() const { return UVec2 { X, Y }; }
 
 
-	Vec2u GetPaddedSize() const
+	UVec2 GetPaddedSize() const
 	{
 		// Padding is for all sides of the chart. Multiply by 2 for this.
 		// e.g. Padding on left and right, padding on top and bottom
-		const Vec2u padding_size = Vec2u(scChartPadding * 2u);
+		const UVec2 padding_size = UVec2(scChartPadding * 2u);
 
 		return (GetSize() + padding_size);
 	}
 
 public:
-	Vec2d Min = Vec2d(0.0, 0.0);
+	DVec2 Min = DVec2(0.0, 0.0);
 
-	// TODO: Convert to Vec2u's. Note that floats would cause us to lose a good amount of precision here.
+	// TODO: Convert to UVec2's. Note that floats would cause us to lose a good amount of precision here.
 
 	uint32 Width = 0;
 	uint32 Height = 0;
@@ -110,13 +110,13 @@ bool MeasureCharts(const Array<LightmapChart>& charts, double density, uint32 ma
 	for (const LightmapChart& chart : charts) {
 		DRect bounds;
 
-		for (const Vec2d& point : chart.TrianglePoints) {
-			bounds.Min = Vec2d::Min(bounds.Min, point);
-			bounds.Max = Vec2d::Max(bounds.Max, point);
+		for (const DVec2& point : chart.TrianglePoints) {
+			bounds.Min = DVec2::Min(bounds.Min, point);
+			bounds.Max = DVec2::Max(bounds.Max, point);
 		}
 
 		ChartLayout layout;
-		layout.Min = Vec2d(std::floor(bounds.Min.X * density) / density, std::floor(bounds.Min.Y * density) / density);
+		layout.Min = DVec2(std::floor(bounds.Min.X * density) / density, std::floor(bounds.Min.Y * density) / density);
 
 		layout.Width = static_cast<uint32>(
 			std::fmax(1.0, std::ceil((bounds.Max.X - layout.Min.X) * density - scSizeEpsilon)));
@@ -260,9 +260,9 @@ struct RowJob
 	uint32 Row = 0;
 };
 
-Vec2d GetClosestPointOnSegment(const Vec2d& from, const Vec2d& to, const Vec2d& point)
+DVec2 GetClosestPointOnSegment(const DVec2& from, const DVec2& to, const DVec2& point)
 {
-	const Vec2d edge = to - from;
+	const DVec2 edge = to - from;
 	const double length_sq = edge.LengthSquared();
 
 	if (length_sq <= 0.0) {
@@ -274,16 +274,16 @@ Vec2d GetClosestPointOnSegment(const Vec2d& from, const Vec2d& to, const Vec2d& 
 	return from + edge * fraction;
 }
 
-bool IsInsideTriangle(const Vec2d corners[3], double x, double y)
+bool IsInsideTriangle(const DVec2 corners[3], double x, double y)
 {
 	bool all_positive = true;
 	bool all_negative = true;
 
 	for (uint32 edge = 0; edge < 3; edge++) {
-		const Vec2d& from = corners[edge];
-		const Vec2d& to = corners[(edge + 1) % 3];
+		const DVec2& from = corners[edge];
+		const DVec2& to = corners[(edge + 1) % 3];
 
-		const double side = to.CrossOffset(Vec2d(x, y), from);
+		const double side = to.CrossOffset(DVec2(x, y), from);
 
 		all_positive = all_positive && (side >= -scCoverageEpsilon);
 		all_negative = all_negative && (side <= scCoverageEpsilon);
@@ -296,22 +296,22 @@ struct RowScratch
 {
 	Array<uint8> Coverage;
 	Array<int32> CoverageTriangles;
-	Array<Vec2d> Corners;
+	Array<DVec2> Corners;
 	Array<int32> CornerTriangles;
 };
 
-bool FindPointInTexel(const Array<Vec2d>& corners, double center_x, double center_y, Vec2d& out_point,
+bool FindPointInTexel(const Array<DVec2>& corners, double center_x, double center_y, DVec2& out_point,
 					  uint32& out_corner)
 {
-	const Vec2d center(center_x, center_y);
+	const DVec2 center(center_x, center_y);
 
 	double best_distance = scNoHit;
 
 	for (uint32 triangle = 0; triangle + 2 < corners.Size; triangle += 3) {
-		const Vec2d* points = &corners[triangle];
+		const DVec2* points = &corners[triangle];
 
 		for (uint32 edge = 0; edge < 3; edge++) {
-			const Vec2d closest = GetClosestPointOnSegment(points[edge], points[(edge + 1) % 3], center);
+			const DVec2 closest = GetClosestPointOnSegment(points[edge], points[(edge + 1) % 3], center);
 			const double distance = std::fmax(std::abs(closest.X - center_x), std::abs(closest.Y - center_y));
 
 			if (distance < best_distance) {
@@ -331,7 +331,7 @@ struct SurfacePoint
 	DVec3 Normal = DVec3(0.0);
 };
 
-SurfacePoint InterpolateChart(const LightmapChart& chart, const Vec2d texel_corners[3], uint32 first_corner, double x,
+SurfacePoint InterpolateChart(const LightmapChart& chart, const DVec2 texel_corners[3], uint32 first_corner, double x,
 							  double y)
 {
 	const double total = texel_corners[1].CrossOffset(texel_corners[2], texel_corners[0]);
@@ -339,8 +339,8 @@ SurfacePoint InterpolateChart(const LightmapChart& chart, const Vec2d texel_corn
 	DVec3 weights(1.0 / 3.0);
 
 	if (std::abs(total) > scCoverageEpsilon) {
-		weights.X = texel_corners[2].CrossOffset(Vec2d(x, y), texel_corners[1]) / total;
-		weights.Y = texel_corners[0].CrossOffset(Vec2d(x, y), texel_corners[2]) / total;
+		weights.X = texel_corners[2].CrossOffset(DVec2(x, y), texel_corners[1]) / total;
+		weights.Y = texel_corners[0].CrossOffset(DVec2(x, y), texel_corners[2]) / total;
 		weights.Z = 1.0 - weights.X - weights.Y;
 
 		double sum = 0.0;
@@ -368,9 +368,9 @@ SurfacePoint InterpolateChart(const LightmapChart& chart, const Vec2d texel_corn
 	return point;
 }
 
-Vec2d GetTexelPoint(const Vec2d& point, const ChartLayout& layout, double density)
+DVec2 GetTexelPoint(const DVec2& point, const ChartLayout& layout, double density)
 {
-	return Vec2d((point.X - layout.Min.X) * density + scChartPadding,
+	return DVec2((point.X - layout.Min.X) * density + scChartPadding,
 				 (point.Y - layout.Min.Y) * density + scChartPadding);
 }
 
@@ -411,7 +411,7 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 	const double row_max = row_min + 1.0;
 
 	for (uint32 triangle = 0; triangle + 2 < chart.TrianglePoints.Size; triangle += 3) {
-		Vec2d corners[3];
+		DVec2 corners[3];
 
 		for (uint32 corner = 0; corner < 3; corner++) {
 			corners[corner] = GetTexelPoint(chart.TrianglePoints[triangle + corner], layout, density);
@@ -419,16 +419,16 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 
 		DRect bounds;
 
-		for (const Vec2d& corner : corners) {
-			bounds.Min = Vec2d::Min(bounds.Min, corner);
-			bounds.Max = Vec2d::Max(bounds.Max, corner);
+		for (const DVec2& corner : corners) {
+			bounds.Min = DVec2::Min(bounds.Min, corner);
+			bounds.Max = DVec2::Max(bounds.Max, corner);
 		}
 
 		if (bounds.Max.Y < row_min || bounds.Min.Y > row_max) {
 			continue;
 		}
 
-		for (const Vec2d& corner : corners) {
+		for (const DVec2& corner : corners) {
 			scratch.Corners.Emplace(corner);
 		}
 
@@ -471,7 +471,7 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 
 	const uint32 direction_count = context.DirectionsPerSample;
 
-	const auto texel_corners = [&](uint32 first_corner, Vec2d out_corners[3])
+	const auto texel_corners = [&](uint32 first_corner, DVec2 out_corners[3])
 	{
 		for (uint32 corner = 0; corner < 3; corner++) {
 			out_corners[corner] = GetTexelPoint(chart.TrianglePoints[first_corner + corner], layout, density);
@@ -480,7 +480,7 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 
 	const auto get_surface = [&](double texel_x, double texel_y, uint32 first_corner)
 	{
-		Vec2d corners[3];
+		DVec2 corners[3];
 		texel_corners(first_corner, corners);
 
 		SurfacePoint point = InterpolateChart(chart, corners, first_corner, texel_x, texel_y);
@@ -583,13 +583,13 @@ void BakeRow(BakeContext& context, const RowJob& job, RowScratch& scratch)
 			}
 		}
 
-		Vec2d thin_point(0.0, 0.0);
+		DVec2 thin_point(0.0, 0.0);
 		uint32 thin_corner = 0;
 
 		if (!touches_polygon &&
 			FindPointInTexel(scratch.Corners, column + 0.5, job.Row + 0.5, thin_point, thin_corner)) {
-			const Vec2d* thin_corners = &scratch.Corners[thin_corner];
-			const Vec2d inward = (thin_corners[0] + thin_corners[1] + thin_corners[2]) / 3.0 - thin_point;
+			const DVec2* thin_corners = &scratch.Corners[thin_corner];
+			const DVec2 inward = (thin_corners[0] + thin_corners[1] + thin_corners[2]) / 3.0 - thin_point;
 			const double inward_length = inward.Length();
 
 			if (inward_length > 0.0) {

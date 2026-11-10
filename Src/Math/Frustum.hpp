@@ -9,9 +9,9 @@
 
 #include <Core/StackArray.hpp>
 #include <Math/BBox.hpp>
-#include <Math/Mat4.hpp>
+#include <Math/FMat4.hpp>
+#include <Math/FVec4.hpp>
 #include <Math/Vec2.hpp>
-#include <Math/Vec4.hpp>
 #include <Object/ObjectLayer.hpp>
 
 namespace fx {
@@ -44,7 +44,7 @@ public:
 	void Rebuild(const PerspectiveCamera& camera);
 	void Rebuild(const BaseCamera& camera, eObjectLayer layer);
 
-	void Rebuild(const Mat4f& view_projection);
+	void Rebuild(const FMat4& view_projection);
 
 	bool TileIntersectsAABB(const BBox& tile_aabb) const;
 
@@ -56,7 +56,7 @@ public:
 
 	bool IntersectsOBB(const OBBox& obb, uint32 plane_mask = scFrustumAllPlanes) const;
 
-	FX_FORCE_INLINE const Vec4f GetPlane(const eFrustumPlane plane) const
+	FX_FORCE_INLINE const FVec4 GetPlane(const eFrustumPlane plane) const
 	{
 		return mClipPlanes[static_cast<uint32>(plane)];
 	}
@@ -64,7 +64,7 @@ public:
 	BBox GetFrustumBoundingBox(const PerspectiveCamera& camera);
 
 private:
-	StackArray<Vec4f, 6> mClipPlanes;
+	StackArray<FVec4, 6> mClipPlanes;
 
 	float32 mFrustumY = 0.0f;
 };

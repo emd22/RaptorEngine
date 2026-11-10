@@ -59,7 +59,8 @@ static bool IsBc7BlockOpaque(const uint8* data)
 	const auto are_endpoints_opaque = [&block](uint32 offset, uint32 bits)
 	{
 		const uint32 max_value = (1U << bits) - 1;
-		return ReadBlockBits(block, offset, bits) == max_value && ReadBlockBits(block, offset + bits, bits) == max_value;
+		return ReadBlockBits(block, offset, bits) == max_value &&
+			   ReadBlockBits(block, offset + bits, bits) == max_value;
 	};
 
 	switch (std::countr_zero(static_cast<uint32>(block[0] & 0xFF) | 0x100U)) {
@@ -68,14 +69,12 @@ static bool IsBc7BlockOpaque(const uint8* data)
 	case 2:
 	case 3:
 		return true;
-	case 4:
-	{
+	case 4: {
 		static constexpr uint32 offsets[4] = { 38, 8, 18, 28 };
 		const uint32 rotation = ReadBlockBits(block, 5, 2);
 		return are_endpoints_opaque(offsets[rotation], (rotation == 0) ? 6 : 5);
 	}
-	case 5:
-	{
+	case 5: {
 		static constexpr uint32 offsets[4] = { 50, 8, 22, 36 };
 		const uint32 rotation = ReadBlockBits(block, 6, 2);
 		return are_endpoints_opaque(offsets[rotation], (rotation == 0) ? 8 : 7);
@@ -206,9 +205,9 @@ eLoaderStatus LoaderKtx::Load(AssetTicket& ticket, const uint8* data, uint32 siz
 	return eLoaderStatus::Success;
 }
 
-Vec2u LoaderKtx::GetMipDimensions(uint32 mip_level) const
+UVec2 LoaderKtx::GetMipDimensions(uint32 mip_level) const
 {
-	return Vec2u(std::max(1U, mpTexture->baseWidth >> mip_level), std::max(1U, mpTexture->baseHeight >> mip_level));
+	return UVec2(std::max(1U, mpTexture->baseWidth >> mip_level), std::max(1U, mpTexture->baseHeight >> mip_level));
 }
 
 Slice<const uint8> LoaderKtx::GetMipData(uint32 mip_level) const

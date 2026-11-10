@@ -28,7 +28,7 @@ constexpr uint8 scGridPointSolid = 2;
 using Box = ProbePlacementBoxes::Box;
 using Plane = ProbePlacementBoxes::Plane;
 
-void InitBox(Box& box, const BBox& local_bounds, const BBox& world_bounds, const Mat4f& local_to_world,
+void InitBox(Box& box, const BBox& local_bounds, const BBox& world_bounds, const FMat4& local_to_world,
 			 const SizedArray<Plane>& planes)
 {
 	box.LocalBounds = local_bounds;
@@ -38,9 +38,9 @@ void InitBox(Box& box, const BBox& local_bounds, const BBox& world_bounds, const
 	box.Planes.InitAsCopyOf(planes);
 }
 
-FVec3 TransformPoint(const Mat4f& matrix, const FVec3 point)
+FVec3 TransformPoint(const FMat4& matrix, const FVec3 point)
 {
-	const Vec4f result = matrix * Vec4f(point.X, point.Y, point.Z, 1.0f);
+	const FVec4 result = matrix * FVec4(point.X, point.Y, point.Z, 1.0f);
 	return FVec3(result.X, result.Y, result.Z);
 }
 
@@ -316,7 +316,7 @@ FVec3 FaceExitPoint(const FVec3 local, const Box& box, uint32 face, FVec3& out_w
 		}
 	}
 
-	const Vec4f world_normal = box.LocalToWorld * Vec4f(local_normal.X, local_normal.Y, local_normal.Z, 0.0f);
+	const FVec4 world_normal = box.LocalToWorld * FVec4(local_normal.X, local_normal.Y, local_normal.Z, 0.0f);
 	out_world_normal = FVec3(world_normal.X, world_normal.Y, world_normal.Z).Normalize();
 
 	return TransformPoint(box.LocalToWorld, exit_local);
@@ -1096,7 +1096,7 @@ bool PlaceVolumeProbes(ProbeLayout& layout, const FVec3 volume_min, const FVec3 
 } // namespace
 
 namespace ProbePlacement {
-void AddBound(ProbePlacementBoxes& boxes, const BBox& local_bounds, const Mat4f& local_to_world,
+void AddBound(ProbePlacementBoxes& boxes, const BBox& local_bounds, const FMat4& local_to_world,
 			  const SizedArray<ProbePlacementBoxes::Plane>& planes)
 {
 	const BBox world_bounds = OBBox::FromLocalBounds(local_bounds, local_to_world).GetWorldAABB();
@@ -1112,7 +1112,7 @@ void AddSurface(ProbePlacementBoxes& boxes, const BBox& world_bounds)
 	boxes.Max = FVec3::Max(boxes.Max, world_bounds.Max);
 }
 
-void AddPatchSurfaces(ProbePlacementBoxes& boxes, const Patch& patch, const Mat4f& local_to_world)
+void AddPatchSurfaces(ProbePlacementBoxes& boxes, const Patch& patch, const FMat4& local_to_world)
 {
 	Patch pieces[Patch::scMaxClosurePieces];
 	const uint32 piece_count = patch.BuildClosure(pieces);
@@ -1142,7 +1142,7 @@ void AddPatchSurfaces(ProbePlacementBoxes& boxes, const Patch& patch, const Mat4
 				for (uint32 row = sub_row * span; row <= sub_row * span + span; row++) {
 					for (uint32 column = sub_column * span; column <= sub_column * span + span; column++) {
 						const FVec3 local = shape->GetPoint(column, row).Position;
-						const Vec4f point = local_to_world * Vec4f(local.X, local.Y, local.Z, 1.0f);
+						const FVec4 point = local_to_world * FVec4(local.X, local.Y, local.Z, 1.0f);
 
 						min = FVec3::Min(min, FVec3(point.X, point.Y, point.Z));
 						max = FVec3::Max(max, FVec3(point.X, point.Y, point.Z));
@@ -1155,7 +1155,7 @@ void AddPatchSurfaces(ProbePlacementBoxes& boxes, const Patch& patch, const Mat4
 	}
 }
 
-bool AddBox(ProbePlacementBoxes& boxes, const BBox& local_bounds, const Mat4f& local_to_world,
+bool AddBox(ProbePlacementBoxes& boxes, const BBox& local_bounds, const FMat4& local_to_world,
 			const SizedArray<ProbePlacementBoxes::Plane>& planes)
 {
 	constexpr float32 scMaxPlacementObjectSize = 100.0f;
@@ -1172,7 +1172,7 @@ bool AddBox(ProbePlacementBoxes& boxes, const BBox& local_bounds, const Mat4f& l
 
 		constexpr float32 cAxisEpsilon = 1e-5f;
 
-		const Mat4f& m = local_to_world;
+		const FMat4& m = local_to_world;
 		box.bAxisAligned = box.Planes.IsEmpty() && std::abs(m.Rows[0].Y) < cAxisEpsilon &&
 						   std::abs(m.Rows[0].Z) < cAxisEpsilon && std::abs(m.Rows[1].X) < cAxisEpsilon &&
 						   std::abs(m.Rows[1].Z) < cAxisEpsilon && std::abs(m.Rows[2].X) < cAxisEpsilon &&

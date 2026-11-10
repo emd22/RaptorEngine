@@ -42,14 +42,14 @@ wxSizer* FieldBaseImpl::GetSizer()
 // Vector3 field
 /////////////////////////////////////
 
-Vector3Field::Vector3Field(wxWindow* parent, const wxString& label, const Vec2f& limits) : FieldBase(parent, label)
+Vector3Field::Vector3Field(wxWindow* parent, const wxString& label, const FVec2& limits) : FieldBase(parent, label)
 {
 	mpFields[0] = MakeAxisField(parent, "X", limits);
 	mpFields[1] = MakeAxisField(parent, "Y", limits);
 	mpFields[2] = MakeAxisField(parent, "Z", limits);
 }
 
-wxTextCtrl* Vector3Field::MakeAxisField(wxWindow* parent, const wxString& axis_label, const Vec2f& limits)
+wxTextCtrl* Vector3Field::MakeAxisField(wxWindow* parent, const wxString& axis_label, const FVec2& limits)
 {
 	constexpr int32 scVectorFieldWidth = 40;
 
@@ -136,7 +136,7 @@ Vector3Field::~Vector3Field()
 // Float field
 /////////////////////////////////////
 
-FloatField::FloatField(wxWindow* parent, const wxString& label, const Vec2f& limits) : FieldBase(parent, label)
+FloatField::FloatField(wxWindow* parent, const wxString& label, const FVec2& limits) : FieldBase(parent, label)
 {
 	constexpr int32 scFieldWidth = 56;
 

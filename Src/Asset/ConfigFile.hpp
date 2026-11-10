@@ -15,8 +15,8 @@
 #include <Core/PagedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
+#include <Math/FQuat.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Quat.hpp>
 #include <Math/Vec2.hpp>
 #include <Util/Tokenizer.hpp>
 #include <string>
@@ -338,7 +338,7 @@ public:
 		return entry;
 	}
 
-	static ConfigEntry Literal(const String& name, const Quat value)
+	static ConfigEntry Literal(const String& name, const FQuat value)
 	{
 		ConfigEntry entry = ConfigEntry::Array(name, ConfigPrimitive::ePrimitiveType::Float);
 		entry.AppendValue(value);
@@ -378,8 +378,8 @@ public:
 	void AppendValue(ConfigPrimitive&& value);
 
 	void AppendValue(const FVec3 vec);
-	void AppendValue(const Vec4f vec);
-	void AppendValue(const Quat quat);
+	void AppendValue(const FVec4 vec);
+	void AppendValue(const FQuat quat);
 
 	/**
 	 * @brief Clones the values inside of a config entry to a new config entry under a new name.
@@ -395,13 +395,13 @@ public:
 	T GetValue() const;
 
 	template <>
-	Vec2i GetValue<Vec2i>() const
+	IVec2 GetValue<IVec2>() const
 	{
 		if (!bIsArray || ArrayData.Size() < 2) {
 			LogWarning(LC_CORE, "Config entry '{}' is not an array of at least 2 values", Name.Get());
-			return Vec2i(0, 0);
+			return IVec2(0, 0);
 		}
-		return Vec2i(ArrayData[0].Get<int32>(), ArrayData[1].Get<int32>());
+		return IVec2(ArrayData[0].Get<int32>(), ArrayData[1].Get<int32>());
 	}
 
 	template <>
@@ -415,14 +415,14 @@ public:
 	}
 
 	template <>
-	Quat GetValue<Quat>() const
+	FQuat GetValue<FQuat>() const
 	{
 		if (!bIsArray || ArrayData.Size() < 4) {
 			LogWarning(LC_CORE, "Config entry '{}' is not an array of at least 4 values", Name.Get());
-			return Quat(0.0f, 0.0f, 0.0f, 1.0f);
+			return FQuat(0.0f, 0.0f, 0.0f, 1.0f);
 		}
-		return Quat(ArrayData[0].Get<float32>(), ArrayData[1].Get<float32>(), ArrayData[2].Get<float32>(),
-					ArrayData[3].Get<float32>());
+		return FQuat(ArrayData[0].Get<float32>(), ArrayData[1].Get<float32>(), ArrayData[2].Get<float32>(),
+					 ArrayData[3].Get<float32>());
 	}
 
 	template <>

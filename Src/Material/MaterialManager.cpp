@@ -104,7 +104,7 @@ void MaterialManager::MakeNullMaterial()
 	renderer::gGraphics->SubmitImmediateUploadCmd(
 		[&](renderer::CommandBuffer& cmd)
 		{
-			ImageInfo image_info { Vec2u(4, 4), eImageFormat::RGBA8_UNorm, 0, 1,
+			ImageInfo image_info { UVec2(4, 4), eImageFormat::RGBA8_UNorm, 0, 1,
 								   Slice<const uint8>(diffuse_data.pData, diffuse_data.Size) };
 			diffuse_image->CreateFromData(cmd, image_info, eImageCreateFlags::None);
 			diffuse_ticket.MarkAndSignalLoaded();

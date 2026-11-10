@@ -14,7 +14,7 @@ FX_SET_MODULE_NAME("RenderPass")
 
 namespace fx::renderer {
 
-void RenderPass::Create(TargetList& attachments, Vec2u size, const Vec2u& offset)
+void RenderPass::Create(TargetList& attachments, UVec2 size, const UVec2& offset)
 {
 	if (size == Target::scFullScreen) {
 		size = gGraphics->Swapchain.Extent;
@@ -59,41 +59,6 @@ void RenderPass::Create(TargetList& attachments, Vec2u size, const Vec2u& offset
 		.pDepthStencilAttachment = has_depth_attachment ? &depth_attachment_ref : nullptr,
 	};
 
-	// VkSubpassDependency subpass_dependencies[] = {
-	//     VkSubpassDependency {
-	//         .srcSubpass = 0,
-	//         .dstSubpass = VK_SUBPASS_EXTERNAL,
-
-	//         .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-	//                       | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-
-	//         .dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-
-	//         .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-	//                        | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
-
-	//         .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT,
-
-	//         .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
-	//     },
-	//     VkSubpassDependency {
-	//         .srcSubpass = VK_SUBPASS_EXTERNAL,
-	//         .dstSubpass = 0,
-
-	//         .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-
-	//         .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-	//                       | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-
-	//         .srcAccessMask = VK_ACCESS_MEMORY_READ_BIT,
-
-	//         .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-	//                        | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
-
-	//         .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
-	//     }
-	// };
-	//
 	VkSubpassDependency subpass_dependencies[] = {
 		VkSubpassDependency {
 			.srcSubpass = 0,

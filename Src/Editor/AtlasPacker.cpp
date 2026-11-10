@@ -99,7 +99,7 @@ bool LoadAtlasImage(const String& path, AtlasImage& out_image)
 
 	out_image.Path = path;
 	out_image.Name = MakeGroupName(base_name);
-	out_image.Size = Vec2i(width, height);
+	out_image.Size = IVec2(width, height);
 	out_image.Pixels = SizedArray<uint8>::CreateCopyOf(data, static_cast<size_t>(width) * height * 4);
 
 	stbi_image_free(data);
@@ -200,7 +200,7 @@ AtlasLayout PackAtlas(const AtlasImageArray& images, int32 tile_size, int32 colu
 
 			for (int32 x = 0; x + group.TileCount.X <= layout.TileCount.X; x++) {
 				if (is_free(x, y, group.TileCount.X, group.TileCount.Y)) {
-					group.TilePos = Vec2i(x, y);
+					group.TilePos = IVec2(x, y);
 					placed = true;
 					break;
 				}
@@ -226,7 +226,7 @@ AtlasLayout PackAtlas(const AtlasImageArray& images, int32 tile_size, int32 colu
 
 SizedArray<uint8> ComposeAtlas(const AtlasImageArray& images, const AtlasLayout& layout)
 {
-	const Vec2i pixel_size = layout.GetPixelSize();
+	const IVec2 pixel_size = layout.GetPixelSize();
 	const size_t atlas_width = static_cast<size_t>(pixel_size.X);
 	const size_t atlas_bytes = atlas_width * pixel_size.Y * 4;
 

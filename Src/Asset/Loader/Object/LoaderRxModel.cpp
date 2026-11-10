@@ -127,7 +127,7 @@ void ReadInfluences(const MeshSource& source, uint32 base_vertex, uint32 vertex_
 }
 
 bool BuildSubmeshMesh(PrimitiveMesh& mesh, const MeshSource& source, const rx::Submesh& submesh, bool has_normal_map,
-					  const Mat4f* bake_transform)
+					  const FMat4* bake_transform)
 {
 	const uint32 vertex_count = submesh.VertexCount;
 
@@ -285,8 +285,8 @@ bool LoaderRxModel::ReadSkeleton(const RxFileRef& file_ref, Ref<Skeleton>& out_s
 		return false;
 	}
 
-	const Mat4f root_transform = Mat4f::AsScale(mDesc.Root.Scale) * Mat4f::AsRotation(mDesc.Root.Rotation) *
-								 Mat4f::AsTranslation(mDesc.Root.Position);
+	const FMat4 root_transform = FMat4::AsScale(mDesc.Root.Scale) * FMat4::AsRotation(mDesc.Root.Rotation) *
+								 FMat4::AsTranslation(mDesc.Root.Position);
 
 	Ref<Skeleton> skeleton = Ref<Skeleton>::New();
 	Skeleton& skel = *skeleton;
@@ -318,8 +318,8 @@ bool LoaderRxModel::ReadSkeleton(const RxFileRef& file_ref, Ref<Skeleton>& out_s
 
 		BoneTransform rest {};
 		rest.Translation = FVec3(bind_pose[i].Translation[0], bind_pose[i].Translation[1], bind_pose[i].Translation[2]);
-		rest.Rotation = Quat(bind_pose[i].Rotation[0], bind_pose[i].Rotation[1], bind_pose[i].Rotation[2],
-							 bind_pose[i].Rotation[3]);
+		rest.Rotation = FQuat(bind_pose[i].Rotation[0], bind_pose[i].Rotation[1], bind_pose[i].Rotation[2],
+							  bind_pose[i].Rotation[3]);
 		rest.Scale = FVec3(bind_pose[i].Scale[0], bind_pose[i].Scale[1], bind_pose[i].Scale[2]);
 
 		skel.RestPose[i] = rest;
@@ -327,8 +327,8 @@ bool LoaderRxModel::ReadSkeleton(const RxFileRef& file_ref, Ref<Skeleton>& out_s
 		float32 matrix[16];
 		memcpy(matrix, inverse_bind[i].M, sizeof(matrix));
 
-		skel.InvBindTransforms[i] = Mat4f(matrix);
-		skel.RootTransforms[i] = (joint.Parent < 0) ? root_transform : Mat4f::scIdentity;
+		skel.InvBindTransforms[i] = FMat4(matrix);
+		skel.RootTransforms[i] = (joint.Parent < 0) ? root_transform : FMat4::scIdentity;
 	}
 
 	skel.BuildEvaluationOrder();
@@ -682,8 +682,8 @@ bool LoaderRxModel::BuildObjects(const RxBinaryFile& mesh_file)
 		return false;
 	}
 
-	const Mat4f root_transform = Mat4f::AsScale(mDesc.Root.Scale) * Mat4f::AsRotation(mDesc.Root.Rotation) *
-								 Mat4f::AsTranslation(mDesc.Root.Position);
+	const FMat4 root_transform = FMat4::AsScale(mDesc.Root.Scale) * FMat4::AsRotation(mDesc.Root.Rotation) *
+								 FMat4::AsTranslation(mDesc.Root.Position);
 
 	std::vector<BuiltSubmesh> built;
 	built.reserve(drawn_submeshes.size());
@@ -699,7 +699,7 @@ bool LoaderRxModel::BuildObjects(const RxBinaryFile& mesh_file)
 		entry.pMesh = Ref<PrimitiveMesh>::New();
 		entry.pMesh->bKeepInMemory = bKeepInMemory;
 
-		const Mat4f* bake_transform = (is_static && !mDesc.Root.bIsIdentity) ? &root_transform : nullptr;
+		const FMat4* bake_transform = (is_static && !mDesc.Root.bIsIdentity) ? &root_transform : nullptr;
 
 		if (!BuildSubmeshMesh(*entry.pMesh, source, *submesh, material->FindTexture("normal") != nullptr,
 							  bake_transform)) {
@@ -890,7 +890,7 @@ bool LoaderRxModel::LoadClip(Animation& out_anim, const RxClipDesc& clip)
 				float32 value[4];
 				memcpy(value, data + key * key_stride, sizeof(value));
 
-				bone_track.Rotation.Values[key] = Quat(value[0], value[1], value[2], value[3]);
+				bone_track.Rotation.Values[key] = FQuat(value[0], value[1], value[2], value[3]);
 			}
 		}
 		else {

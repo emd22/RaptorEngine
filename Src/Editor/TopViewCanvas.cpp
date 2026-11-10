@@ -112,9 +112,9 @@ double WrapAngle(double angle)
 	return angle;
 }
 
-double DistanceToSegment(const Vec2d point, const Vec2d a, const Vec2d b)
+double DistanceToSegment(const DVec2 point, const DVec2 a, const DVec2 b)
 {
-	const Vec2d delta = b - a;
+	const DVec2 delta = b - a;
 	const double length_sq = delta.LengthSquared();
 
 	double t = 0.0;
@@ -126,18 +126,18 @@ double DistanceToSegment(const Vec2d point, const Vec2d a, const Vec2d b)
 	return (point - (a + delta * t)).Length();
 }
 
-Vec2d ToVec2d(const Vec2f& vector) { return Vec2d(vector.X, vector.Y); }
+DVec2 ToDVec2(const FVec2& vector) { return DVec2(vector.X, vector.Y); }
 
 double GetArchArc(const ArchSettings& arch) { return std::clamp<double>(arch.ArcDegrees, 1.0, 360.0) * FX_PI / 180.0; }
 
-Vec2d GetArchDirection(const ArchSettings& arch, double index)
+DVec2 GetArchDirection(const ArchSettings& arch, double index)
 {
 	const double angle = arch.StartDegrees * FX_PI / 180.0 + GetArchArc(arch) * index / static_cast<double>(arch.Sides);
 
-	return Vec2d(std::cos(angle), std::sin(angle));
+	return DVec2(std::cos(angle), std::sin(angle));
 }
 
-Vec2d GetArchWallDirection(const ArchSettings& arch)
+DVec2 GetArchWallDirection(const ArchSettings& arch)
 {
 	const double middle = static_cast<double>(arch.Sides) * 0.5;
 
@@ -146,42 +146,42 @@ Vec2d GetArchWallDirection(const ArchSettings& arch)
 
 DRect GetArchDirectionBounds(const ArchSettings& arch)
 {
-	DRect bounds { Vec2d::scZero, Vec2d::scZero };
+	DRect bounds { DVec2::scZero, DVec2::scZero };
 
 	for (uint32 i = 0; i <= arch.Sides; i++) {
-		const Vec2d direction = GetArchDirection(arch, static_cast<double>(i));
+		const DVec2 direction = GetArchDirection(arch, static_cast<double>(i));
 
-		bounds.Min = Vec2d::Min(bounds.Min, direction);
-		bounds.Max = Vec2d::Max(bounds.Max, direction);
+		bounds.Min = DVec2::Min(bounds.Min, direction);
+		bounds.Max = DVec2::Max(bounds.Max, direction);
 	}
 
 	return bounds;
 }
 
-Vec2f ToVec2f(const Vec2d& vector) { return Vec2f(static_cast<float32>(vector.X), static_cast<float32>(vector.Y)); }
+FVec2 ToFVec2(const DVec2& vector) { return FVec2(static_cast<float32>(vector.X), static_cast<float32>(vector.Y)); }
 
-bool IsSameHandle(const Vec2d& a, const Vec2d& b)
+bool IsSameHandle(const DVec2& a, const DVec2& b)
 {
 	constexpr double scHandleMergeDistance = 2e-3;
 	return std::fabs(a.X - b.X) < scHandleMergeDistance && std::fabs(a.Y - b.Y) < scHandleMergeDistance;
 }
 
-double DistanceToHull(const DynArray<Vec2f>& hull, const Vec2d point)
+double DistanceToHull(const DynArray<FVec2>& hull, const DVec2 point)
 {
 	if (hull.IsEmpty()) {
 		return DBL_MAX;
 	}
 
 	if (hull.Size == 1) {
-		return (point - ToVec2d(hull[0])).Length();
+		return (point - ToDVec2(hull[0])).Length();
 	}
 
 	bool inside = (hull.Size >= 3);
 	double best = DBL_MAX;
 
 	for (uint32 i = 0; i < hull.Size; i++) {
-		const Vec2d a = ToVec2d(hull[i]);
-		const Vec2d b = ToVec2d(hull[(i + 1) % hull.Size]);
+		const DVec2 a = ToDVec2(hull[i]);
+		const DVec2 b = ToDVec2(hull[(i + 1) % hull.Size]);
 
 		if ((b - a).Cross(point - a) < 0.0) {
 			inside = false;
@@ -197,13 +197,13 @@ double DistanceToHull(const DynArray<Vec2f>& hull, const Vec2d point)
 	return best;
 }
 
-double ThicknessAlong(const TopViewProjection& projection, const Vec2d normal)
+double ThicknessAlong(const TopViewProjection& projection, const DVec2 normal)
 {
 	double low = DBL_MAX;
 	double high = -DBL_MAX;
 
-	for (const Vec2f& point : projection.Hull) {
-		const double along = ToVec2d(point).Dot(normal);
+	for (const FVec2& point : projection.Hull) {
+		const double along = ToDVec2(point).Dot(normal);
 
 		low = std::min(low, along);
 		high = std::max(high, along);
@@ -250,7 +250,7 @@ const TopViewFrontFace* FindFrontFace(const TopViewProjection& projection, const
 	return best;
 }
 
-bool IsInsidePolygon(const DynArray<Vec2f>& polygon, const Vec2d point)
+bool IsInsidePolygon(const DynArray<FVec2>& polygon, const DVec2 point)
 {
 	if (polygon.Size < 3) {
 		return false;
@@ -260,8 +260,8 @@ bool IsInsidePolygon(const DynArray<Vec2f>& polygon, const Vec2d point)
 	bool has_negative = false;
 
 	for (uint32 i = 0; i < polygon.Size; i++) {
-		const Vec2d a = ToVec2d(polygon[i]);
-		const Vec2d b = ToVec2d(polygon[(i + 1) % polygon.Size]);
+		const DVec2 a = ToDVec2(polygon[i]);
+		const DVec2 b = ToDVec2(polygon[(i + 1) % polygon.Size]);
 		const double cross = (b - a).Cross(point - a);
 
 		has_positive = has_positive || cross > 0.0;
@@ -277,31 +277,31 @@ struct ShiftedFace
 	double Shift = 0.0;
 };
 
-DynArray<Vec2f> BuildShiftedPolygon(const TopViewProjection& projection, const DynArray<ShiftedFace>& faces)
+DynArray<FVec2> BuildShiftedPolygon(const TopViewProjection& projection, const DynArray<ShiftedFace>& faces)
 {
 	struct HalfPlane
 	{
-		Vec2d Normal;
+		DVec2 Normal;
 		double Offset;
 	};
 
 	constexpr double scFaceSameLineTolerance = 0.05;
 	constexpr double scClipExtent = 1e4;
 
-	DynArray<Vec2f> result;
+	DynArray<FVec2> result;
 
-	const DynArray<Vec2f>& hull = projection.Hull;
+	const DynArray<FVec2>& hull = projection.Hull;
 
 	if (hull.Size < 3) {
 		return result;
 	}
 
 	DynArray<HalfPlane> planes;
-	Vec2d center(0.0, 0.0);
+	DVec2 center(0.0, 0.0);
 
 	for (uint32 i = 0; i < hull.Size; i++) {
-		const Vec2d from = ToVec2d(hull[i]);
-		const Vec2d along = ToVec2d(hull[(i + 1) % hull.Size]) - from;
+		const DVec2 from = ToDVec2(hull[i]);
+		const DVec2 along = ToDVec2(hull[(i + 1) % hull.Size]) - from;
 		const double length = along.Length();
 
 		center += from / static_cast<double>(hull.Size);
@@ -310,14 +310,14 @@ DynArray<Vec2f> BuildShiftedPolygon(const TopViewProjection& projection, const D
 			continue;
 		}
 
-		const Vec2d normal(along.Y / length, -along.X / length);
+		const DVec2 normal(along.Y / length, -along.X / length);
 		const double offset = normal.Dot(from);
 
 		bool is_shifted = false;
 
 		for (const ShiftedFace& shifted : faces) {
-			const Vec2d face_normal = ToVec2d(shifted.pFace->Normal);
-			const double face_offset = face_normal.Dot(ToVec2d(shifted.pFace->A));
+			const DVec2 face_normal = ToDVec2(shifted.pFace->Normal);
+			const double face_offset = face_normal.Dot(ToDVec2(shifted.pFace->A));
 
 			if (normal.Dot(face_normal) > scFaceMatchDot && std::fabs(offset - face_offset) < scFaceSameLineTolerance) {
 				is_shifted = true;
@@ -330,24 +330,24 @@ DynArray<Vec2f> BuildShiftedPolygon(const TopViewProjection& projection, const D
 	}
 
 	for (const ShiftedFace& shifted : faces) {
-		const Vec2d face_normal = ToVec2d(shifted.pFace->Normal);
-		const double face_offset = face_normal.Dot(ToVec2d(shifted.pFace->A));
+		const DVec2 face_normal = ToDVec2(shifted.pFace->Normal);
+		const double face_offset = face_normal.Dot(ToDVec2(shifted.pFace->A));
 
 		planes.Insert(HalfPlane { face_normal, face_offset + shifted.Shift });
 	}
 
-	DynArray<Vec2d> polygon;
-	polygon.Insert(Vec2d(center.X - scClipExtent, center.Y - scClipExtent));
-	polygon.Insert(Vec2d(center.X + scClipExtent, center.Y - scClipExtent));
-	polygon.Insert(Vec2d(center.X + scClipExtent, center.Y + scClipExtent));
-	polygon.Insert(Vec2d(center.X - scClipExtent, center.Y + scClipExtent));
+	DynArray<DVec2> polygon;
+	polygon.Insert(DVec2(center.X - scClipExtent, center.Y - scClipExtent));
+	polygon.Insert(DVec2(center.X + scClipExtent, center.Y - scClipExtent));
+	polygon.Insert(DVec2(center.X + scClipExtent, center.Y + scClipExtent));
+	polygon.Insert(DVec2(center.X - scClipExtent, center.Y + scClipExtent));
 
 	for (const HalfPlane& plane : planes) {
-		DynArray<Vec2d> clipped;
+		DynArray<DVec2> clipped;
 
 		for (uint32 i = 0; i < polygon.Size; i++) {
-			const Vec2d& current = polygon[i];
-			const Vec2d& previous = polygon[(i + polygon.Size - 1) % polygon.Size];
+			const DVec2& current = polygon[i];
+			const DVec2& previous = polygon[(i + polygon.Size - 1) % polygon.Size];
 
 			const double current_side = plane.Normal.Dot(current) - plane.Offset;
 			const double previous_side = plane.Normal.Dot(previous) - plane.Offset;
@@ -372,22 +372,22 @@ DynArray<Vec2f> BuildShiftedPolygon(const TopViewProjection& projection, const D
 		}
 	}
 
-	for (const Vec2d& point : polygon) {
-		result.Insert(ToVec2f(point));
+	for (const DVec2& point : polygon) {
+		result.Insert(ToFVec2(point));
 	}
 
 	return result;
 }
 
-DynArray<Vec2d> CollectHandles(const TopViewProjection& projection)
+DynArray<DVec2> CollectHandles(const TopViewProjection& projection)
 {
-	DynArray<Vec2d> handles;
+	DynArray<DVec2> handles;
 
-	const auto add = [&handles](const Vec2f& position)
+	const auto add = [&handles](const FVec2& position)
 	{
-		const Vec2d point = ToVec2d(position);
+		const DVec2 point = ToDVec2(position);
 
-		for (const Vec2d& handle : handles) {
+		for (const DVec2& handle : handles) {
 			if (IsSameHandle(handle, point)) {
 				return;
 			}
@@ -401,28 +401,28 @@ DynArray<Vec2d> CollectHandles(const TopViewProjection& projection)
 		add(edge.B);
 	}
 
-	for (const Vec2f& point : projection.Hull) {
+	for (const FVec2& point : projection.Hull) {
 		add(point);
 	}
 
 	return handles;
 }
 
-DynArray<Vec2f> ConvexHull2D(DynArray<Vec2d> points)
+DynArray<FVec2> ConvexHull2D(DynArray<DVec2> points)
 {
 	std::sort(points.begin(), points.end(),
-			  [](const Vec2d& a, const Vec2d& b) { return a.X < b.X || (a.X == b.X && a.Y < b.Y); });
+			  [](const DVec2& a, const DVec2& b) { return a.X < b.X || (a.X == b.X && a.Y < b.Y); });
 
-	DynArray<Vec2f> result;
+	DynArray<FVec2> result;
 
 	if (points.Size < 3) {
 		return result;
 	}
 
-	const auto is_non_left_turn = [](const Vec2d& origin, const Vec2d& a, const Vec2d& b)
+	const auto is_non_left_turn = [](const DVec2& origin, const DVec2& a, const DVec2& b)
 	{ return (a - origin).Cross(b - origin) <= 0.0; };
 
-	DynArray<Vec2d> hull;
+	DynArray<DVec2> hull;
 
 	for (uint32 i = 0; i < points.Size; i++) {
 		while (hull.Size >= 2 && is_non_left_turn(hull[hull.Size - 2], hull[hull.Size - 1], points[i])) {
@@ -443,19 +443,19 @@ DynArray<Vec2f> ConvexHull2D(DynArray<Vec2d> points)
 	}
 
 	for (uint32 i = 0; i + 1 < hull.Size; i++) {
-		result.Insert(ToVec2f(hull[i]));
+		result.Insert(ToFVec2(hull[i]));
 	}
 
 	return result;
 }
 
-DynArray<Vec2f> ClipPolygon(const DynArray<Vec2f>& polygon, const Vec2d normal, double offset)
+DynArray<FVec2> ClipPolygon(const DynArray<FVec2>& polygon, const DVec2 normal, double offset)
 {
-	DynArray<Vec2f> clipped;
+	DynArray<FVec2> clipped;
 
 	for (uint32 i = 0; i < polygon.Size; i++) {
-		const Vec2d current = ToVec2d(polygon[i]);
-		const Vec2d previous = ToVec2d(polygon[(i + polygon.Size - 1) % polygon.Size]);
+		const DVec2 current = ToDVec2(polygon[i]);
+		const DVec2 previous = ToDVec2(polygon[(i + polygon.Size - 1) % polygon.Size]);
 
 		const double current_side = normal.Dot(current) - offset;
 		const double previous_side = normal.Dot(previous) - offset;
@@ -465,11 +465,11 @@ DynArray<Vec2f> ClipPolygon(const DynArray<Vec2f>& polygon, const Vec2d normal, 
 
 		if (current_inside != previous_inside) {
 			const double t = previous_side / (previous_side - current_side);
-			clipped.Insert(ToVec2f(previous + (current - previous) * t));
+			clipped.Insert(ToFVec2(previous + (current - previous) * t));
 		}
 
 		if (current_inside) {
-			clipped.Insert(ToVec2f(current));
+			clipped.Insert(ToFVec2(current));
 		}
 	}
 
@@ -488,16 +488,16 @@ struct ViewTransform
 
 	// double OffsetU = 0.0;
 	// double OffsetV = 0.0;
-	Vec2d OffsetUV = Vec2d::scZero;
+	DVec2 OffsetUV = DVec2::scZero;
 
 	double Cos = 1.0;
 	double Sin = 0.0;
 
-	Vec2d PivotUV = Vec2d::scZero;
+	DVec2 PivotUV = DVec2::scZero;
 	// double PivotU = 0.0;
 	// double PivotV = 0.0;
 
-	Vec2d Apply(const Vec2d uv) const
+	DVec2 Apply(const DVec2 uv) const
 	{
 		if (!bActive) {
 			// out_u = u;
@@ -506,7 +506,7 @@ struct ViewTransform
 		}
 
 		if (bRotate) {
-			const Vec2d rel_uv = uv - PivotUV;
+			const DVec2 rel_uv = uv - PivotUV;
 
 			// const double ru = u - PivotU;
 			// const double rv = v - PivotV;
@@ -515,7 +515,7 @@ struct ViewTransform
 			// out_u = PivotU + Cos * ru - Sin * rv;
 			// out_v = PivotV + Sin * ru + Cos * rv;
 
-			return PivotUV + Vec2d(Cos * rel_uv.X - Sin * rel_uv.Y, Sin * rel_uv.X + Cos * rel_uv.Y) + OffsetUV;
+			return PivotUV + DVec2(Cos * rel_uv.X - Sin * rel_uv.Y, Sin * rel_uv.X + Cos * rel_uv.Y) + OffsetUV;
 		}
 
 		return (uv + OffsetUV);
@@ -568,16 +568,16 @@ const TopViewProjection& TopViewCanvas::Projection(const TopViewBrush& brush) co
 	return brush.Views[static_cast<uint32>(mPlane)];
 }
 
-DynArray<Vec2d> TopViewCanvas::CollectVertexHandles(const TopViewBrush& brush) const
+DynArray<DVec2> TopViewCanvas::CollectVertexHandles(const TopViewBrush& brush) const
 {
 	if (brush.Kind == eTopViewBrushKind::Patch) {
-		DynArray<Vec2d> handles;
+		DynArray<DVec2> handles;
 
-		for (const Vec2f& control_point : Projection(brush).ControlPoints) {
-			const Vec2d point = ToVec2d(control_point);
+		for (const FVec2& control_point : Projection(brush).ControlPoints) {
+			const DVec2 point = ToDVec2(control_point);
 			bool is_merged = false;
 
-			for (const Vec2d& handle : handles) {
+			for (const DVec2& handle : handles) {
 				is_merged = is_merged || IsSameHandle(handle, point);
 			}
 
@@ -596,7 +596,7 @@ DynArray<Vec2d> TopViewCanvas::CollectVertexHandles(const TopViewBrush& brush) c
 	return CollectHandles(Projection(brush));
 }
 
-FVec3 TopViewCanvas::ToWorldVector(const Vec2d uv, double w) const
+FVec3 TopViewCanvas::ToWorldVector(const DVec2 uv, double w) const
 {
 	const ViewPlaneAxes& axes = Axes();
 
@@ -608,11 +608,11 @@ FVec3 TopViewCanvas::ToWorldVector(const Vec2d uv, double w) const
 	return result;
 }
 
-Vec2d TopViewCanvas::ProjectPoint(const FVec3& point) const
+DVec2 TopViewCanvas::ProjectPoint(const FVec3& point) const
 {
 	const ViewPlaneAxes& axes = Axes();
 
-	return Vec2d(GetAxis(point, axes.U) * axes.USign, GetAxis(point, axes.V));
+	return DVec2(GetAxis(point, axes.U) * axes.USign, GetAxis(point, axes.V));
 }
 
 double TopViewCanvas::DepthOf(const FVec3& vector) const { return GetAxis(vector, Axes().W); }
@@ -648,8 +648,8 @@ void TopViewCanvas::ApplyState(const TopViewState& state)
 			bool found = false;
 
 			if (brush != nullptr && brush->bSelected) {
-				for (const Vec2d& point : CollectVertexHandles(*brush)) {
-					found = found || IsSameHandle(point, ToVec2d(handle.Position));
+				for (const DVec2& point : CollectVertexHandles(*brush)) {
+					found = found || IsSameHandle(point, ToDVec2(handle.Position));
 				}
 			}
 
@@ -1079,7 +1079,7 @@ void TopViewCanvas::SyncWeightFromHandles()
 		const size_t count = std::min(projection.ControlPoints.Size, projection.ControlWeights.Size);
 
 		for (size_t i = 0; i < count; i++) {
-			if (!IsSameHandle(ToVec2d(projection.ControlPoints[i]), ToVec2d(handle.Position))) {
+			if (!IsSameHandle(ToDVec2(projection.ControlPoints[i]), ToDVec2(handle.Position))) {
 				continue;
 			}
 
@@ -1236,8 +1236,8 @@ void TopViewCanvas::FitAll()
 	for (const TopViewBrush& brush : mState.Brushes) {
 		const TopViewProjection& projection = Projection(brush);
 
-		for (const Vec2f& point : projection.Hull) {
-			bounds.Rect = DRect(Vec2d::Min(bounds.Rect.Min, Vec2d(point)), Vec2d::Max(bounds.Rect.Max, Vec2d(point)));
+		for (const FVec2& point : projection.Hull) {
+			bounds.Rect = DRect(DVec2::Min(bounds.Rect.Min, DVec2(point)), DVec2::Max(bounds.Rect.Max, DVec2(point)));
 
 			// bounds.MinU = std::min<double>(bounds.MinU, point.X);
 			// bounds.MinV = std::min<double>(bounds.MinV, point.Y);
@@ -1253,7 +1253,7 @@ void TopViewCanvas::FitAll()
 		// 		double center_u = 0.0;
 		// 		double center_v = 0.0;
 
-		Vec2d center { Vec2d::scZero };
+		DVec2 center { DVec2::scZero };
 
 		if (mState.bHasPlayer) {
 			center = ProjectPoint(mState.PlayerPosition);
@@ -1261,7 +1261,7 @@ void TopViewCanvas::FitAll()
 			// center_v = GetAxis(mState.PlayerPosition, axes.V);
 		}
 
-		const Vec2d margin = Vec2d(10.0);
+		const DVec2 margin = DVec2(10.0);
 
 		bounds.Rect = DRect(center - margin, center + margin);
 
@@ -1299,7 +1299,7 @@ void TopViewCanvas::FitBounds(const ViewBounds& bounds)
 	// 	const double width = std::max(bounds.MaxU - bounds.MinU, 1.0);
 	// 	const double height = std::max(bounds.MaxV - bounds.MinV, 1.0);
 
-	const Vec2d bounds_extent = Vec2d::Max(bounds.Rect.GetExtent(), Vec2d(1.0));
+	const DVec2 bounds_extent = DVec2::Max(bounds.Rect.GetExtent(), DVec2(1.0));
 
 	// 	mCenterU = (bounds.MinU + bounds.MaxU) * 0.5;
 	// 	mCenterV = (bounds.MinV + bounds.MaxV) * 0.5;
@@ -1307,7 +1307,7 @@ void TopViewCanvas::FitBounds(const ViewBounds& bounds)
 	mCenter = bounds.Rect.GetCenter();
 
 
-	const Vec2d scale_comps = Vec2d(size.x, size.y) / (bounds_extent * Vec2d(scFitMargin));
+	const DVec2 scale_comps = DVec2(size.x, size.y) / (bounds_extent * DVec2(scFitMargin));
 	mScale = std::clamp(std::min(scale_comps.X, scale_comps.Y), scMinScale, scMaxScale);
 
 	mbHasFitted = true;
@@ -1330,33 +1330,33 @@ wxSize TopViewCanvas::GetViewSize() const
 	return GetClientSize();
 }
 
-Vec2d TopViewCanvas::ToScreenCoords(const Vec2d uv) const
+DVec2 TopViewCanvas::ToScreenCoords(const DVec2 uv) const
 {
 	wxSize view_size = GetViewSize();
-	Vec2d half_view = Vec2d(static_cast<double>(view_size.x), static_cast<double>(view_size.y)) * Vec2d(0.5);
+	DVec2 half_view = DVec2(static_cast<double>(view_size.x), static_cast<double>(view_size.y)) * DVec2(0.5);
 
 	// We need to add the U and subtract the V but I just put the negation in the scale step
-	Vec2d offset = (uv - mCenter) * Vec2d(mScale, -mScale);
+	DVec2 offset = (uv - mCenter) * DVec2(mScale, -mScale);
 
 	return (half_view + offset);
 }
 
 
-wxPoint TopViewCanvas::WorldToClient(const Vec2d uv) const
+wxPoint TopViewCanvas::WorldToClient(const DVec2 uv) const
 {
-	Vec2d screen = ToScreenCoords(uv);
+	DVec2 screen = ToScreenCoords(uv);
 	return wxPoint(static_cast<int>(std::lround(screen.X)), static_cast<int>(std::lround(screen.Y)));
 }
 
-Vec2d TopViewCanvas::ClientToWorld(const wxPoint& point) const
+DVec2 TopViewCanvas::ClientToWorld(const wxPoint& point) const
 {
 	const wxSize size = GetViewSize();
-	const Vec2d half_size = Vec2d(static_cast<double>(size.x), static_cast<double>(size.y)) * 0.5;
+	const DVec2 half_size = DVec2(static_cast<double>(size.x), static_cast<double>(size.y)) * 0.5;
 
 	// Note the negation of the Y component
-	Vec2d tmp = Vec2d(static_cast<double>(point.x) - half_size.X, -(static_cast<double>(point.y) - half_size.Y));
+	DVec2 tmp = DVec2(static_cast<double>(point.x) - half_size.X, -(static_cast<double>(point.y) - half_size.Y));
 
-	return mCenter + (tmp / Vec2d(mScale, mScale));
+	return mCenter + (tmp / DVec2(mScale, mScale));
 
 	// out_u = mCenterU + (point.x - size.x * 0.5) / mScale;
 	// out_v = mCenterV - (point.y - size.y * 0.5) / mScale;
@@ -1364,18 +1364,18 @@ Vec2d TopViewCanvas::ClientToWorld(const wxPoint& point) const
 
 void TopViewCanvas::ZoomAt(const wxPoint& anchor, double factor)
 {
-	const Vec2d v_before = ClientToWorld(anchor);
+	const DVec2 v_before = ClientToWorld(anchor);
 	mScale = std::clamp(mScale * factor, scMinScale, scMaxScale);
-	const Vec2d v_after = ClientToWorld(anchor);
+	const DVec2 v_after = ClientToWorld(anchor);
 
 	mCenter += (v_before - v_after);
 
 	Refresh();
 }
 
-void TopViewCanvas::PanByPixels(const Vec2d delta)
+void TopViewCanvas::PanByPixels(const DVec2 delta)
 {
-	mCenter -= Vec2d::FlipSigns<1, 0>((delta / Vec2d(mScale)));
+	mCenter -= DVec2::FlipSigns<1, 0>((delta / DVec2(mScale)));
 	//
 	// 	mCenterU -= dx / mScale;
 	// 	mCenterV += dy / mScale;
@@ -1421,7 +1421,7 @@ double TopViewCanvas::Snap(double value) const
 	return std::round(value / mState.SnapStep) * mState.SnapStep;
 }
 
-Vec2d TopViewCanvas::Snap(const Vec2d uv) const { return Vec2d(Snap(uv.X), Snap(uv.Y)); }
+DVec2 TopViewCanvas::Snap(const DVec2 uv) const { return DVec2(Snap(uv.X), Snap(uv.Y)); }
 
 double TopViewCanvas::SnapAngle(double radians) const
 {
@@ -1508,22 +1508,22 @@ void TopViewCanvas::DrawGrid(wxGraphicsContext& gc, const wxSize& size)
 	const EditorTheme& theme = GetEditorTheme();
 
 	const DRect visible_bounds(ClientToWorld(wxPoint(0, size.y)), ClientToWorld(wxPoint(size.x, 0)));
-	const Vec2d left_bottom = visible_bounds.Min;
-	const Vec2d right_top = visible_bounds.Max;
+	const DVec2 left_bottom = visible_bounds.Min;
+	const DVec2 right_top = visible_bounds.Max;
 
 	const auto draw_lines = [&](double step, const wxColour& colour, int width)
 	{
 		wxGraphicsPath path = gc.CreatePath();
 
 		for (long i = static_cast<long>(std::ceil(left_bottom.X / step)); i * step <= right_top.X; i++) {
-			const double x = std::floor(ToScreenCoords(Vec2d(i * step, 0.0)).X) + 0.5;
+			const double x = std::floor(ToScreenCoords(DVec2(i * step, 0.0)).X) + 0.5;
 
 			path.MoveToPoint(x, 0.0);
 			path.AddLineToPoint(x, size.y);
 		}
 
 		for (long i = static_cast<long>(std::ceil(left_bottom.Y / step)); i * step <= right_top.Y; i++) {
-			const double y = std::floor(ToScreenCoords(Vec2d(0.0, i * step)).Y) + 0.5;
+			const double y = std::floor(ToScreenCoords(DVec2(0.0, i * step)).Y) + 0.5;
 
 			path.MoveToPoint(0.0, y);
 			path.AddLineToPoint(size.x, y);
@@ -1536,7 +1536,7 @@ void TopViewCanvas::DrawGrid(wxGraphicsContext& gc, const wxSize& size)
 	const double snap_step = mState.SnapStep;
 
 	if (mState.bSnapEnabled && snap_step > 0.0 && snap_step * mScale >= scSnapGridPixels) {
-		const Vec2d extent = right_top - left_bottom;
+		const DVec2 extent = right_top - left_bottom;
 		const double lines = (extent.X + extent.Y) / snap_step;
 
 		if (lines <= scMaxSnapLines) {
@@ -1552,8 +1552,8 @@ void TopViewCanvas::DrawGrid(wxGraphicsContext& gc, const wxSize& size)
 
 	const ViewPlaneAxes& axes = Axes();
 
-	const Vec2d origin = ToScreenCoords(Vec2d::scZero);
-	const Vec2d origin_px = Vec2d(std::floor(origin.X) + 0.5, std::floor(origin.Y) + 0.5);
+	const DVec2 origin = ToScreenCoords(DVec2::scZero);
+	const DVec2 origin_px = DVec2(std::floor(origin.X) + 0.5, std::floor(origin.Y) + 0.5);
 
 	gc.SetPen(wxPen(GetAxisColour(theme, axes.U), 1));
 	gc.StrokeLine(0.0, origin_px.Y, size.x, origin_px.Y);
@@ -1565,7 +1565,7 @@ void TopViewCanvas::DrawGrid(wxGraphicsContext& gc, const wxSize& size)
 	gc.SetFont(font, ToWxColour(theme.Grid.Label));
 
 	for (long i = static_cast<long>(std::ceil(left_bottom.X / major)); i * major <= right_top.X; i++) {
-		const double x = ToScreenCoords(Vec2d(i * major, 0.0)).X;
+		const double x = ToScreenCoords(DVec2(i * major, 0.0)).X;
 		double label_value = i * major * axes.USign;
 		if (i == 0) {
 			label_value = 0.0;
@@ -1574,7 +1574,7 @@ void TopViewCanvas::DrawGrid(wxGraphicsContext& gc, const wxSize& size)
 	}
 
 	for (long i = static_cast<long>(std::ceil(left_bottom.Y / major)); i * major <= right_top.Y; i++) {
-		const double y = ToScreenCoords(Vec2d(0.0, i * major)).Y;
+		const double y = ToScreenCoords(DVec2(0.0, i * major)).Y;
 		gc.DrawText(wxString::Format("%g", i * major), 3.0, y + 2.0);
 	}
 
@@ -1692,11 +1692,11 @@ void TopViewCanvas::DrawBrushes(wxGraphicsContext& gc, const wxSize& size)
 		// double min_v = DBL_MAX;
 		// double max_v = -DBL_MAX;
 
-		for (const Vec2f& point : projection.Hull) {
-			Vec2d result_uv = brush_transform.Apply(ToVec2d(point));
+		for (const FVec2& point : projection.Hull) {
+			DVec2 result_uv = brush_transform.Apply(ToDVec2(point));
 
-			uv_bounds.Min = Vec2d::Min(uv_bounds.Min, result_uv);
-			uv_bounds.Max = Vec2d::Max(uv_bounds.Max, result_uv);
+			uv_bounds.Min = DVec2::Min(uv_bounds.Min, result_uv);
+			uv_bounds.Max = DVec2::Max(uv_bounds.Max, result_uv);
 
 			// min_u = std::min(min_u, result_uv.X);
 			// max_u = std::max(max_u, result_uv.X);
@@ -1704,27 +1704,27 @@ void TopViewCanvas::DrawBrushes(wxGraphicsContext& gc, const wxSize& size)
 			// max_v = std::max(max_v, result_uv.Y);
 		}
 
-		const Vec2d screen_min = ToScreenCoords(uv_bounds.Min);
-		const Vec2d screen_max = ToScreenCoords(uv_bounds.Max);
+		const DVec2 screen_min = ToScreenCoords(uv_bounds.Min);
+		const DVec2 screen_max = ToScreenCoords(uv_bounds.Max);
 
 		if (screen_max.X < 0.0 || screen_min.X > size.x || screen_min.Y < 0.0 || screen_max.Y > size.y) {
 			continue;
 		}
 
 		if (const OutlinePreview* face_preview = find_face_preview(brush.ObjectId); face_preview != nullptr) {
-			const DynArray<Vec2f>& polygon = face_preview->Polygon;
+			const DynArray<FVec2>& polygon = face_preview->Polygon;
 
 			for (const TopViewEdge& edge : projection.Edges) {
-				const Vec2d a = ToScreenCoords(ToVec2d(edge.A));
-				const Vec2d b = ToScreenCoords(ToVec2d(edge.B));
+				const DVec2 a = ToScreenCoords(ToDVec2(edge.A));
+				const DVec2 b = ToScreenCoords(ToDVec2(edge.B));
 
 				ghost_path.MoveToPoint(a.X, a.Y);
 				ghost_path.AddLineToPoint(b.X, b.Y);
 			}
 
 			for (uint32 i = 0; i < polygon.Size; i++) {
-				const Vec2d screen = ToScreenCoords(ToVec2d(polygon[i]));
-				const Vec2d next = ToScreenCoords(ToVec2d(polygon[(i + 1) % polygon.Size]));
+				const DVec2 screen = ToScreenCoords(ToDVec2(polygon[i]));
+				const DVec2 next = ToScreenCoords(ToDVec2(polygon[(i + 1) % polygon.Size]));
 
 				if (i == 0) {
 					selected_fill.MoveToPoint(screen.X, screen.Y);
@@ -1745,7 +1745,7 @@ void TopViewCanvas::DrawBrushes(wxGraphicsContext& gc, const wxSize& size)
 			wxGraphicsPath& fill = volume_fills[static_cast<uint32>(brush.Kind)];
 
 			for (uint32 i = 0; i < projection.Hull.Size; i++) {
-				const Vec2d screen = ToScreenCoords(ToVec2d(projection.Hull[i]));
+				const DVec2 screen = ToScreenCoords(ToDVec2(projection.Hull[i]));
 
 				if (i == 0) {
 					fill.MoveToPoint(screen.X, screen.Y);
@@ -1769,8 +1769,8 @@ void TopViewCanvas::DrawBrushes(wxGraphicsContext& gc, const wxSize& size)
 		}
 
 		for (const TopViewEdge& edge : projection.Edges) {
-			const Vec2d a = ToScreenCoords(brush_transform.Apply(ToVec2d(edge.A)));
-			const Vec2d b = ToScreenCoords(brush_transform.Apply(ToVec2d(edge.B)));
+			const DVec2 a = ToScreenCoords(brush_transform.Apply(ToDVec2(edge.A)));
+			const DVec2 b = ToScreenCoords(brush_transform.Apply(ToDVec2(edge.B)));
 
 			path->MoveToPoint(a.X, a.Y);
 			path->AddLineToPoint(b.X, b.Y);
@@ -1778,8 +1778,8 @@ void TopViewCanvas::DrawBrushes(wxGraphicsContext& gc, const wxSize& size)
 
 		if (brush.bSelected && transform.bActive) {
 			for (const TopViewEdge& edge : projection.Edges) {
-				const Vec2d a = ToScreenCoords(ToVec2d(edge.A));
-				const Vec2d b = ToScreenCoords(ToVec2d(edge.B));
+				const DVec2 a = ToScreenCoords(ToDVec2(edge.A));
+				const DVec2 b = ToScreenCoords(ToDVec2(edge.B));
 
 				ghost_path.MoveToPoint(a.X, a.Y);
 				ghost_path.AddLineToPoint(b.X, b.Y);
@@ -1788,7 +1788,7 @@ void TopViewCanvas::DrawBrushes(wxGraphicsContext& gc, const wxSize& size)
 
 		if (brush.bSelected && projection.Hull.Size >= 3) {
 			for (uint32 i = 0; i < projection.Hull.Size; i++) {
-				const Vec2d screen = ToScreenCoords(brush_transform.Apply(ToVec2d(projection.Hull[i])));
+				const DVec2 screen = ToScreenCoords(brush_transform.Apply(ToDVec2(projection.Hull[i])));
 
 				if (i == 0) {
 					selected_fill.MoveToPoint(screen.X, screen.Y);
@@ -1850,8 +1850,8 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 
 	const auto to_screen_rect = [this](const DRect& rect)
 	{
-		const Vec2d top_left = ToScreenCoords(Vec2d(rect.Min.X, rect.Max.Y));
-		const Vec2d bottom_right = ToScreenCoords(Vec2d(rect.Max.X, rect.Min.Y));
+		const DVec2 top_left = ToScreenCoords(DVec2(rect.Min.X, rect.Max.Y));
+		const DVec2 bottom_right = ToScreenCoords(DVec2(rect.Max.X, rect.Min.Y));
 
 		return DRect(top_left, bottom_right);
 	};
@@ -1866,18 +1866,18 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 				continue;
 			}
 
-			for (const Vec2d& point : CollectVertexHandles(brush)) {
+			for (const DVec2& point : CollectVertexHandles(brush)) {
 				const bool selected = IsVertexSelected(brush.ObjectId, point);
 				const bool hovered = mbHoverVertex && mHoverVertex.ObjectId == brush.ObjectId &&
-									 IsSameHandle(point, ToVec2d(mHoverVertex.Position));
+									 IsSameHandle(point, ToDVec2(mHoverVertex.Position));
 
-				Vec2d position = point;
+				DVec2 position = point;
 
 				if (live && selected) {
 					position += mPreview.OffsetUV;
 				}
 
-				const Vec2d screen = ToScreenCoords(position);
+				const DVec2 screen = ToScreenCoords(position);
 				double half = scHandleHalfSize;
 				wxColour fill_colour = ToWxColour(theme.Tool.Handle);
 				wxColour outline_colour = ToWxColour(theme.Tool.HandleOutline);
@@ -1900,7 +1900,7 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 		}
 
 		if (live && mPreview.bSnappedToPatch) {
-			const Vec2d screen = ToScreenCoords(mPreview.PatchSnapUV);
+			const DVec2 screen = ToScreenCoords(mPreview.PatchSnapUV);
 			const double radius = scHandleHalfSize + 4.0;
 
 			gc.SetBrush(*wxTRANSPARENT_BRUSH);
@@ -1909,10 +1909,10 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 		}
 	}
 
-	const auto add_polygon = [this](wxGraphicsPath& path, const DynArray<Vec2f>& polygon)
+	const auto add_polygon = [this](wxGraphicsPath& path, const DynArray<FVec2>& polygon)
 	{
 		for (uint32 i = 0; i < polygon.Size; i++) {
-			const Vec2d screen = ToScreenCoords(ToVec2d(polygon[i]));
+			const DVec2 screen = ToScreenCoords(ToDVec2(polygon[i]));
 
 			if (i == 0) {
 				path.MoveToPoint(screen.X, screen.Y);
@@ -1939,8 +1939,8 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 			const TopViewProjection& projection = Projection(*brush);
 
 			if (const TopViewFace* face = FindSideFace(projection, picked.Normal); face != nullptr) {
-				const Vec2d a = ToScreenCoords(ToVec2d(face->A));
-				const Vec2d b = ToScreenCoords(ToVec2d(face->B));
+				const DVec2 a = ToScreenCoords(ToDVec2(face->A));
+				const DVec2 b = ToScreenCoords(ToDVec2(face->B));
 
 				side_lines.MoveToPoint(a.X, a.Y);
 				side_lines.AddLineToPoint(b.X, b.Y);
@@ -1969,19 +1969,19 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 
 	if (mbHoverFace && mPreview.Kind == eDrag::None) {
 		gc.SetPen(wxPen(ToWxColour(theme.Tool.Face), 3));
-		const Vec2d a = ToScreenCoords(ToVec2d(mHoverFace.A));
-		const Vec2d b = ToScreenCoords(ToVec2d(mHoverFace.B));
+		const DVec2 a = ToScreenCoords(ToDVec2(mHoverFace.A));
+		const DVec2 b = ToScreenCoords(ToDVec2(mHoverFace.B));
 
 		gc.StrokeLine(a.X, a.Y, b.X, b.Y);
 	}
 
 	if (mPreview.Kind == eDrag::Face) {
 		const double shift = mPreview.Shift;
-		const Vec2d shift_uv = mPreview.NormalUV * shift;
+		const DVec2 shift_uv = mPreview.NormalUV * shift;
 
-		const Vec2d a = ToScreenCoords(ToVec2d(mGrabbedFace.A) + shift_uv);
-		const Vec2d b = ToScreenCoords(ToVec2d(mGrabbedFace.B) + shift_uv);
-		const Vec2d middle = (a + b) * 0.5;
+		const DVec2 a = ToScreenCoords(ToDVec2(mGrabbedFace.A) + shift_uv);
+		const DVec2 b = ToScreenCoords(ToDVec2(mGrabbedFace.B) + shift_uv);
+		const DVec2 middle = (a + b) * 0.5;
 
 		gc.SetPen(wxPen(ToWxColour(theme.Tool.Face), 3));
 		gc.StrokeLine(a.X, a.Y, b.X, b.Y);
@@ -1995,11 +1995,11 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 		wxGraphicsPath pieces[2] = { gc.CreatePath(), gc.CreatePath() };
 
 		for (uint32 i = 0; i < mPreview.Outlines.Size; i++) {
-			const DynArray<Vec2f>& polygon = mPreview.Outlines[i].Polygon;
+			const DynArray<FVec2>& polygon = mPreview.Outlines[i].Polygon;
 			wxGraphicsPath& path = pieces[i % 2];
 
 			for (uint32 j = 0; j < polygon.Size; j++) {
-				const Vec2d screen = ToScreenCoords(ToVec2d(polygon[j]));
+				const DVec2 screen = ToScreenCoords(ToDVec2(polygon[j]));
 
 				if (j == 0) {
 					path.MoveToPoint(screen.X, screen.Y);
@@ -2024,13 +2024,13 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 			gc.FillPath(pieces[i], wxWINDING_RULE);
 		}
 
-		const Vec2d a = ToScreenCoords(mPreview.ClipA);
-		const Vec2d b = ToScreenCoords(mPreview.ClipB);
-		const Vec2d along = b - a;
+		const DVec2 a = ToScreenCoords(mPreview.ClipA);
+		const DVec2 b = ToScreenCoords(mPreview.ClipB);
+		const DVec2 along = b - a;
 		const double length = along.Length();
 
 		if (length > 0.0) {
-			const Vec2d unit = along / length;
+			const DVec2 unit = along / length;
 			const double reach = static_cast<double>(size.x + size.y);
 
 			gc.SetPen(wxPen(WithAlpha(ToWxColour(theme.Tool.Clip), 120), 1, wxPENSTYLE_SHORT_DASH));
@@ -2047,7 +2047,7 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 		gc.DrawEllipse(b.X - scClipHandleRadius, b.Y - scClipHandleRadius, scClipHandleRadius * 2.0,
 					   scClipHandleRadius * 2.0);
 
-		const Vec2d delta = mPreview.ClipB - mPreview.ClipA;
+		const DVec2 delta = mPreview.ClipB - mPreview.ClipA;
 
 		gc.SetFont(font, ToWxColour(theme.Tool.Clip));
 		gc.DrawText(wxString::Format("%.2f", delta.Length()), b.X + 8.0, b.Y + 6.0);
@@ -2055,8 +2055,8 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 	}
 
 	if (mDrag == eDrag::Marquee && mbDragMoved) {
-		const DRect screen = to_screen_rect(DRect(Vec2d::Min(mPress, mCurrent), Vec2d::Max(mPress, mCurrent)));
-		const Vec2d screen_extent = screen.GetExtent();
+		const DRect screen = to_screen_rect(DRect(DVec2::Min(mPress, mCurrent), DVec2::Max(mPress, mCurrent)));
+		const DVec2 screen_extent = screen.GetExtent();
 
 		gc.SetBrush(wxBrush(ToWxColour(theme.Tool.MarqueeFill)));
 		gc.SetPen(wxPen(ToWxColour(theme.Tool.Marquee), 1));
@@ -2066,8 +2066,8 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 
 	if (mPreview.Kind == eDrag::Create) {
 		const DRect screen = to_screen_rect(mPreview.RectUV);
-		const Vec2d screen_extent = screen.GetExtent();
-		const Vec2d extent = mPreview.RectUV.GetExtent();
+		const DVec2 screen_extent = screen.GetExtent();
+		const DVec2 extent = mPreview.RectUV.GetExtent();
 
 		gc.SetBrush(wxBrush(ToWxColour(theme.Tool.CreateFill)));
 		gc.SetPen(wxPen(ToWxColour(theme.Tool.Create), 2));
@@ -2086,10 +2086,10 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 			gc.SetPen(wxPen(ToWxColour(theme.Tool.Create), 1, wxPENSTYLE_SHORT_DASH));
 
 			for (uint32 i = 0; i < piece_count; i++) {
-				const Vec2d a = ProjectPoint(pieces[i].Min);
-				const Vec2d b = ProjectPoint(pieces[i].Max);
-				const DRect piece = to_screen_rect(DRect(Vec2d::Min(a, b), Vec2d::Max(a, b)));
-				const Vec2d piece_extent = piece.GetExtent();
+				const DVec2 a = ProjectPoint(pieces[i].Min);
+				const DVec2 b = ProjectPoint(pieces[i].Max);
+				const DRect piece = to_screen_rect(DRect(DVec2::Min(a, b), DVec2::Max(a, b)));
+				const DVec2 piece_extent = piece.GetExtent();
 
 				gc.DrawRectangle(piece.Min.X, piece.Min.Y, piece_extent.X, piece_extent.Y);
 			}
@@ -2111,14 +2111,14 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 	}
 
 	if (mPreview.Kind == eDrag::Rotate) {
-		const Vec2d pivot = ToScreenCoords(mPreview.PivotUV);
+		const DVec2 pivot = ToScreenCoords(mPreview.PivotUV);
 
 		gc.SetPen(wxPen(ToWxColour(theme.Tool.Rotate), 1));
 		gc.StrokeLine(pivot.X - 7.0, pivot.Y, pivot.X + 7.0, pivot.Y);
 		gc.StrokeLine(pivot.X, pivot.Y - 7.0, pivot.X, pivot.Y + 7.0);
 
 		if (mDrag == eDrag::Rotate) {
-			const Vec2d current = ToScreenCoords(mCurrent);
+			const DVec2 current = ToScreenCoords(mCurrent);
 			gc.StrokeLine(pivot.X, pivot.Y, current.X, current.Y);
 		}
 
@@ -2131,7 +2131,7 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 		const ViewBounds bounds = mDragBounds;
 
 		if (bounds.bValid) {
-			const Vec2d anchor = ToScreenCoords(bounds.Rect.Min + mPreview.OffsetUV);
+			const DVec2 anchor = ToScreenCoords(bounds.Rect.Min + mPreview.OffsetUV);
 
 			gc.SetFont(font, ToWxColour(theme.Tool.Selected));
 			gc.DrawText(wxString::Format("%+.2f, %+.2f", mPreview.OffsetUV.X * Axes().USign, mPreview.OffsetUV.Y),
@@ -2145,8 +2145,8 @@ void TopViewCanvas::DrawOverlays(wxGraphicsContext& gc, const wxSize& size)
 		const ViewBounds bounds = GetSelectionBounds();
 
 		if (bounds.bValid) {
-			const Vec2d extent = bounds.Rect.GetExtent();
-			const Vec2d anchor = ToScreenCoords(bounds.Rect.Min);
+			const DVec2 extent = bounds.Rect.GetExtent();
+			const DVec2 anchor = ToScreenCoords(bounds.Rect.Min);
 			const wxString label = wxString::Format("%.2f x %.2f", extent.X, extent.Y);
 
 			double label_width = 0.0;
@@ -2183,14 +2183,14 @@ void TopViewCanvas::DrawNames(wxGraphicsContext& gc, const wxSize& size)
 
 		DRect uv_bounds;
 
-		for (const Vec2f& point : projection.Hull) {
-			uv_bounds.Min = Vec2d::Min(uv_bounds.Min, ToVec2d(point));
-			uv_bounds.Max = Vec2d::Max(uv_bounds.Max, ToVec2d(point));
+		for (const FVec2& point : projection.Hull) {
+			uv_bounds.Min = DVec2::Min(uv_bounds.Min, ToDVec2(point));
+			uv_bounds.Max = DVec2::Max(uv_bounds.Max, ToDVec2(point));
 		}
 
-		const Vec2d top_left = ToScreenCoords(Vec2d(uv_bounds.Min.X, uv_bounds.Max.Y));
-		const Vec2d bottom_right = ToScreenCoords(Vec2d(uv_bounds.Max.X, uv_bounds.Min.Y));
-		const Vec2d center = (top_left + bottom_right) * 0.5;
+		const DVec2 top_left = ToScreenCoords(DVec2(uv_bounds.Min.X, uv_bounds.Max.Y));
+		const DVec2 bottom_right = ToScreenCoords(DVec2(uv_bounds.Max.X, uv_bounds.Min.Y));
+		const DVec2 center = (top_left + bottom_right) * 0.5;
 
 		if (bottom_right.X < 0.0 || top_left.X > size.x || bottom_right.Y < 0.0 || top_left.Y > size.y) {
 			continue;
@@ -2217,14 +2217,14 @@ void TopViewCanvas::DrawNames(wxGraphicsContext& gc, const wxSize& size)
 	}
 }
 
-Vec2d TopViewCanvas::GetMarkerTip(const TopViewMarker& marker, const Vec2d direction_uv) const
+DVec2 TopViewCanvas::GetMarkerTip(const TopViewMarker& marker, const DVec2 direction_uv) const
 {
 	constexpr double scMarkerArrowPixels = 34.0;
 	constexpr double scMarkerMinArrow = 0.35;
 
 	const double planar = direction_uv.Length();
 
-	Vec2d unit(1.0, 0.0);
+	DVec2 unit(1.0, 0.0);
 
 	if (planar > 1e-6) {
 		unit = direction_uv / planar;
@@ -2243,8 +2243,8 @@ void TopViewCanvas::DrawMarkers(wxGraphicsContext& gc)
 	const EditorTheme& theme = GetEditorTheme();
 
 	for (const TopViewMarker& marker : mState.Markers) {
-		Vec2d offset = Vec2d::scZero;
-		Vec2d direction_uv = ProjectPoint(marker.Direction);
+		DVec2 offset = DVec2::scZero;
+		DVec2 direction_uv = ProjectPoint(marker.Direction);
 
 		if (marker.bSelected && mPreview.Kind == eDrag::MarkerMove) {
 			offset = mPreview.OffsetUV;
@@ -2267,7 +2267,7 @@ void TopViewCanvas::DrawMarkers(wxGraphicsContext& gc)
 				sound_colour = WithAlpha(sound_colour, scDimMarkerAlpha);
 			}
 
-			const Vec2d centre = ToScreenCoords(ProjectPoint(marker.Position) + offset);
+			const DVec2 centre = ToScreenCoords(ProjectPoint(marker.Position) + offset);
 
 			gc.SetBrush(wxBrush(sound_colour));
 			gc.SetPen(wxPen(sound_outline, 1));
@@ -2309,14 +2309,14 @@ void TopViewCanvas::DrawMarkers(wxGraphicsContext& gc)
 			colour = WithAlpha(colour, scDimMarkerAlpha);
 		}
 
-		const Vec2d origin = ToScreenCoords(ProjectPoint(marker.AimOrigin) + offset);
-		const Vec2d tip = ToScreenCoords(GetMarkerTip(marker, direction_uv) + offset);
+		const DVec2 origin = ToScreenCoords(ProjectPoint(marker.AimOrigin) + offset);
+		const DVec2 tip = ToScreenCoords(GetMarkerTip(marker, direction_uv) + offset);
 
 		if (marker.Kind == eTopViewMarkerKind::Spawn) {
-			const Vec2d corner_a = ToScreenCoords(ProjectPoint(marker.BoundsMin) + offset);
-			const Vec2d corner_b = ToScreenCoords(ProjectPoint(marker.BoundsMax) + offset);
-			const Vec2d low = Vec2d::Min(corner_a, corner_b);
-			const Vec2d extent = Vec2d::Max(corner_a, corner_b) - low;
+			const DVec2 corner_a = ToScreenCoords(ProjectPoint(marker.BoundsMin) + offset);
+			const DVec2 corner_b = ToScreenCoords(ProjectPoint(marker.BoundsMax) + offset);
+			const DVec2 low = DVec2::Min(corner_a, corner_b);
+			const DVec2 extent = DVec2::Max(corner_a, corner_b) - low;
 
 			gc.SetBrush(wxBrush(WithAlpha(colour, fill_alpha)));
 			gc.SetPen(wxPen(colour, width));
@@ -2357,10 +2357,10 @@ void TopViewCanvas::DrawPlayer(wxGraphicsContext& gc)
 
 	constexpr double scMinMarkerDirection = 0.15;
 
-	const Vec2d position = ToScreenCoords(ProjectPoint(mState.PlayerPosition));
+	const DVec2 position = ToScreenCoords(ProjectPoint(mState.PlayerPosition));
 
-	const Vec2d player_direction = ProjectPoint(mState.PlayerDirection);
-	Vec2d direction = Vec2d(player_direction.X, -player_direction.Y);
+	const DVec2 player_direction = ProjectPoint(mState.PlayerDirection);
+	DVec2 direction = DVec2(player_direction.X, -player_direction.Y);
 
 	const double length = direction.Length();
 
@@ -2375,13 +2375,13 @@ void TopViewCanvas::DrawPlayer(wxGraphicsContext& gc)
 
 	constexpr double scSize = 9.0;
 
-	const Vec2d side = Vec2d(-direction.Y, direction.X);
+	const DVec2 side = DVec2(-direction.Y, direction.X);
 
 	wxGraphicsPath path = gc.CreatePath();
-	const Vec2d nose = position + direction * scSize * 1.4;
-	const Vec2d left_back = position - direction * scSize + side * scSize * 0.8;
-	const Vec2d notch = position - direction * scSize * 0.4;
-	const Vec2d right_back = position - direction * scSize - side * scSize * 0.8;
+	const DVec2 nose = position + direction * scSize * 1.4;
+	const DVec2 left_back = position - direction * scSize + side * scSize * 0.8;
+	const DVec2 notch = position - direction * scSize * 0.4;
+	const DVec2 right_back = position - direction * scSize - side * scSize * 0.8;
 
 	path.MoveToPoint(nose.X, nose.Y);
 	path.AddLineToPoint(left_back.X, left_back.Y);
@@ -2406,7 +2406,7 @@ void TopViewCanvas::OnSize(wxSizeEvent& event)
 // Picking
 /////////////////////////////////////
 
-DynArray<int32> TopViewCanvas::PickAt(const Vec2d uv) const
+DynArray<int32> TopViewCanvas::PickAt(const DVec2 uv) const
 {
 	struct Candidate
 	{
@@ -2453,7 +2453,7 @@ DynArray<int32> TopViewCanvas::PickAt(const Vec2d uv) const
 	return hits;
 }
 
-int TopViewCanvas::PickFaceAt(const Vec2d uv, int& out_face) const
+int TopViewCanvas::PickFaceAt(const DVec2 uv, int& out_face) const
 {
 	constexpr double scFacePickBonusPixels = 3.0;
 
@@ -2474,7 +2474,7 @@ int TopViewCanvas::PickFaceAt(const Vec2d uv, int& out_face) const
 
 		for (uint32 j = 0; j < projection.Faces.Size; j++) {
 			const TopViewFace& face = projection.Faces[j];
-			const double distance = DistanceToSegment(uv, ToVec2d(face.A), ToVec2d(face.B));
+			const double distance = DistanceToSegment(uv, ToDVec2(face.A), ToDVec2(face.B));
 
 			if (distance > tolerance) {
 				continue;
@@ -2496,7 +2496,7 @@ int TopViewCanvas::PickFaceAt(const Vec2d uv, int& out_face) const
 	return best_brush;
 }
 
-const TopViewFrontFace* TopViewCanvas::PickFrontFaceAt(const Vec2d uv, ObjectID& out_brush) const
+const TopViewFrontFace* TopViewCanvas::PickFrontFaceAt(const DVec2 uv, ObjectID& out_brush) const
 {
 	for (const int32 index : PickAt(uv)) {
 		const TopViewBrush& brush = mState.Brushes[index];
@@ -2516,10 +2516,10 @@ const TopViewFrontFace* TopViewCanvas::PickFrontFaceAt(const Vec2d uv, ObjectID&
 	return nullptr;
 }
 
-bool TopViewCanvas::IsVertexSelected(ObjectID object_id, const Vec2d uv) const
+bool TopViewCanvas::IsVertexSelected(ObjectID object_id, const DVec2 uv) const
 {
 	for (const TopViewVertexHandle& handle : mSelectedVertices) {
-		if (handle.ObjectId == object_id && IsSameHandle(uv, ToVec2d(handle.Position))) {
+		if (handle.ObjectId == object_id && IsSameHandle(uv, ToDVec2(handle.Position))) {
 			return true;
 		}
 	}
@@ -2527,7 +2527,7 @@ bool TopViewCanvas::IsVertexSelected(ObjectID object_id, const Vec2d uv) const
 	return false;
 }
 
-bool TopViewCanvas::PickVertexAt(const Vec2d uv, TopViewVertexHandle& out_handle) const
+bool TopViewCanvas::PickVertexAt(const DVec2 uv, TopViewVertexHandle& out_handle) const
 {
 	const double tolerance = scVertexPickPixels / mScale;
 
@@ -2539,13 +2539,13 @@ bool TopViewCanvas::PickVertexAt(const Vec2d uv, TopViewVertexHandle& out_handle
 			continue;
 		}
 
-		for (const Vec2d& point : CollectVertexHandles(brush)) {
+		for (const DVec2& point : CollectVertexHandles(brush)) {
 			const double distance = (point - uv).Length();
 
 			if (distance <= best) {
 				best = distance;
 				found = true;
-				out_handle = TopViewVertexHandle { brush.ObjectId, ToVec2f(point) };
+				out_handle = TopViewVertexHandle { brush.ObjectId, ToFVec2(point) };
 			}
 		}
 	}
@@ -2553,7 +2553,7 @@ bool TopViewCanvas::PickVertexAt(const Vec2d uv, TopViewVertexHandle& out_handle
 	return found;
 }
 
-bool TopViewCanvas::FindPatchSnapPoint(const Vec2d uv, Vec2d& out_point) const
+bool TopViewCanvas::FindPatchSnapPoint(const DVec2 uv, DVec2& out_point) const
 {
 	if (mbSnapBypass) {
 		return false;
@@ -2573,8 +2573,8 @@ bool TopViewCanvas::FindPatchSnapPoint(const Vec2d uv, Vec2d& out_point) const
 		bool is_moving = false;
 
 		if (brush.bSelected) {
-			for (const Vec2f& control_point : projection.ControlPoints) {
-				is_moving = is_moving || IsVertexSelected(brush.ObjectId, ToVec2d(control_point));
+			for (const FVec2& control_point : projection.ControlPoints) {
+				is_moving = is_moving || IsVertexSelected(brush.ObjectId, ToDVec2(control_point));
 			}
 		}
 
@@ -2583,9 +2583,9 @@ bool TopViewCanvas::FindPatchSnapPoint(const Vec2d uv, Vec2d& out_point) const
 		}
 
 		for (const TopViewEdge& edge : projection.Edges) {
-			const Vec2d ends[2] = { ToVec2d(edge.A), ToVec2d(edge.B) };
+			const DVec2 ends[2] = { ToDVec2(edge.A), ToDVec2(edge.B) };
 
-			for (const Vec2d& point : ends) {
+			for (const DVec2& point : ends) {
 				const double distance = (point - uv).Length();
 
 				if (distance <= best) {
@@ -2700,8 +2700,8 @@ TopViewCanvas::ViewBounds TopViewCanvas::GetSelectionBounds() const
 
 		const TopViewProjection& projection = Projection(brush);
 
-		for (const Vec2f& point : projection.Hull) {
-			bounds.Rect = DRect(Vec2d::Min(bounds.Rect.Min, Vec2d(point)), Vec2d::Max(bounds.Rect.Max, Vec2d(point)));
+		for (const FVec2& point : projection.Hull) {
+			bounds.Rect = DRect(DVec2::Min(bounds.Rect.Min, DVec2(point)), DVec2::Max(bounds.Rect.Max, DVec2(point)));
 			bounds.bValid = true;
 		}
 	}
@@ -2709,7 +2709,7 @@ TopViewCanvas::ViewBounds TopViewCanvas::GetSelectionBounds() const
 	return bounds;
 }
 
-bool TopViewCanvas::GetSelectionPivot(Vec2d& out_pivot) const
+bool TopViewCanvas::GetSelectionPivot(DVec2& out_pivot) const
 {
 	const TopViewBrush* only = nullptr;
 	uint32 count = 0;
@@ -2726,7 +2726,7 @@ bool TopViewCanvas::GetSelectionPivot(Vec2d& out_pivot) const
 	}
 
 	if (count == 1) {
-		out_pivot = ToVec2d(Projection(*only).Pivot);
+		out_pivot = ToDVec2(Projection(*only).Pivot);
 		return true;
 	}
 
@@ -2737,26 +2737,26 @@ bool TopViewCanvas::GetSelectionPivot(Vec2d& out_pivot) const
 	return bounds.bValid;
 }
 
-Vec2d TopViewCanvas::GetRotateSnapOffset(const Vec2d pivot, double angle) const
+DVec2 TopViewCanvas::GetRotateSnapOffset(const DVec2 pivot, double angle) const
 {
 	const double cos_angle = std::cos(angle);
 	const double sin_angle = std::sin(angle);
 
 	bool valid = false;
-	Vec2d min = Vec2d::scZero;
+	DVec2 min = DVec2::scZero;
 
 	for (const TopViewBrush& brush : mState.Brushes) {
 		if (!brush.bSelected) {
 			continue;
 		}
 
-		for (const Vec2f& point : Projection(brush).Hull) {
-			const Vec2d relative = Vec2d(point) - pivot;
-			const Vec2d rotated = pivot + Vec2d(cos_angle * relative.X - sin_angle * relative.Y,
+		for (const FVec2& point : Projection(brush).Hull) {
+			const DVec2 relative = DVec2(point) - pivot;
+			const DVec2 rotated = pivot + DVec2(cos_angle * relative.X - sin_angle * relative.Y,
 												sin_angle * relative.X + cos_angle * relative.Y);
 
 			if (valid) {
-				min = Vec2d::Min(min, rotated);
+				min = DVec2::Min(min, rotated);
 			}
 			else {
 				min = rotated;
@@ -2766,13 +2766,13 @@ Vec2d TopViewCanvas::GetRotateSnapOffset(const Vec2d pivot, double angle) const
 	}
 
 	if (!valid) {
-		return Vec2d::scZero;
+		return DVec2::scZero;
 	}
 
 	return Snap(min) - min;
 }
 
-Vec2d TopViewCanvas::SnapNudge(const Vec2d origin, const Vec2d delta) const
+DVec2 TopViewCanvas::SnapNudge(const DVec2 origin, const DVec2 delta) const
 {
 	constexpr double scNudgeSnapTolerance = 1e-3;
 
@@ -2797,7 +2797,7 @@ Vec2d TopViewCanvas::SnapNudge(const Vec2d origin, const Vec2d delta) const
 		return std::ceil(target - scNudgeSnapTolerance) * step - from;
 	};
 
-	return Vec2d(snap_axis(origin.X, delta.X), snap_axis(origin.Y, delta.Y));
+	return DVec2(snap_axis(origin.X, delta.X), snap_axis(origin.Y, delta.Y));
 }
 
 uint32 TopViewCanvas::GetSelectedCount() const
@@ -2813,7 +2813,7 @@ uint32 TopViewCanvas::GetSelectedCount() const
 	return count;
 }
 
-int32 TopViewCanvas::PickMarkerAt(const Vec2d uv, bool& out_tip) const
+int32 TopViewCanvas::PickMarkerAt(const DVec2 uv, bool& out_tip) const
 {
 	constexpr double scMarkerPickPixels = 7.0;
 
@@ -2844,10 +2844,10 @@ int32 TopViewCanvas::PickMarkerAt(const Vec2d uv, bool& out_tip) const
 		double distance = (ProjectPoint(marker.AimOrigin) - uv).Length();
 
 		if (marker.Kind == eTopViewMarkerKind::Spawn) {
-			const Vec2d corner_a = ProjectPoint(marker.BoundsMin);
-			const Vec2d corner_b = ProjectPoint(marker.BoundsMax);
-			const DRect rect(Vec2d::Min(corner_a, corner_b) - Vec2d(tolerance),
-							 Vec2d::Max(corner_a, corner_b) + Vec2d(tolerance));
+			const DVec2 corner_a = ProjectPoint(marker.BoundsMin);
+			const DVec2 corner_b = ProjectPoint(marker.BoundsMax);
+			const DRect rect(DVec2::Min(corner_a, corner_b) - DVec2(tolerance),
+							 DVec2::Max(corner_a, corner_b) + DVec2(tolerance));
 
 			if (rect.Contains(uv)) {
 				distance = 0.0;
@@ -3369,7 +3369,7 @@ bool TopViewCanvas::BeginHandleDrag()
 	mbVertexToggleOnRelease = false;
 
 	if (PickVertexAt(mPress, handle)) {
-		if (!IsVertexSelected(handle.ObjectId, ToVec2d(handle.Position))) {
+		if (!IsVertexSelected(handle.ObjectId, ToDVec2(handle.Position))) {
 			if (!mbAdditive) {
 				mSelectedVertices.Clear();
 			}
@@ -3451,7 +3451,7 @@ void TopViewCanvas::BeginArchEdit(eArchHandle handle)
 	mArchAngleTravel = 0.0;
 
 	if (mArchGrabEllipse.bValid) {
-		const Vec2d local = (mPress - mArchGrabEllipse.Center) / mArchGrabEllipse.Radius;
+		const DVec2 local = (mPress - mArchGrabEllipse.Center) / mArchGrabEllipse.Radius;
 		mArchLastAngle = std::atan2(local.Y, local.X);
 	}
 }
@@ -3504,7 +3504,7 @@ void TopViewCanvas::BeginRotate()
 		return;
 	}
 
-	const Vec2d from_pivot = mPress - mRotatePivot;
+	const DVec2 from_pivot = mPress - mRotatePivot;
 	mRotateStartAngle = std::atan2(from_pivot.Y, from_pivot.X);
 	mDrag = eDrag::Rotate;
 }
@@ -3543,8 +3543,8 @@ void TopViewCanvas::OnMotion(wxMouseEvent& event)
 	}
 
 	if (mDrag == eDrag::Pan) {
-		const Vec2d delta = Vec2d(position.x - mPressScreen.x, position.y - mPressScreen.y) / mScale;
-		mCenter = mPanStartCenter + Vec2d::FlipSigns<-1, 1>(delta);
+		const DVec2 delta = DVec2(position.x - mPressScreen.x, position.y - mPressScreen.y) / mScale;
+		mCenter = mPanStartCenter + DVec2::FlipSigns<-1, 1>(delta);
 		UpdateStatus();
 		Refresh();
 		return;
@@ -3553,7 +3553,7 @@ void TopViewCanvas::OnMotion(wxMouseEvent& event)
 	mCurrent = ClientToWorld(position);
 
 	if (!mbDragMoved) {
-		const Vec2d drag_offset = Vec2d(position.x - mPressScreen.x, position.y - mPressScreen.y);
+		const DVec2 drag_offset = DVec2(position.x - mPressScreen.x, position.y - mPressScreen.y);
 
 		mbDragMoved = drag_offset.Length() >= scDragThresholdPixels;
 	}
@@ -3571,7 +3571,7 @@ void TopViewCanvas::UpdatePreview()
 
 	switch (mDrag) {
 	case eDrag::Move: {
-		Vec2d delta = mCurrent - mPress;
+		DVec2 delta = mCurrent - mPress;
 
 		if (mDragBounds.bValid) {
 			delta = Snap(mDragBounds.Rect.Min + delta) - mDragBounds.Rect.Min;
@@ -3582,7 +3582,7 @@ void TopViewCanvas::UpdatePreview()
 		break;
 	}
 	case eDrag::Face: {
-		const Vec2d normal = ToVec2d(mGrabbedFace.Normal);
+		const DVec2 normal = ToDVec2(mGrabbedFace.Normal);
 
 		double shift = (mCurrent - mPress).Dot(normal);
 
@@ -3622,7 +3622,7 @@ void TopViewCanvas::UpdatePreview()
 					continue;
 				}
 
-				const double thickness = ThicknessAlong(projection, ToVec2d(face->Normal));
+				const double thickness = ThicknessAlong(projection, ToDVec2(face->Normal));
 				faces.Insert(ShiftedFace { face, std::max(shift, std::min(0.0, min_thickness - thickness)) });
 			}
 
@@ -3630,7 +3630,7 @@ void TopViewCanvas::UpdatePreview()
 				continue;
 			}
 
-			DynArray<Vec2f> polygon = BuildShiftedPolygon(projection, faces);
+			DynArray<FVec2> polygon = BuildShiftedPolygon(projection, faces);
 
 			if (polygon.Size >= 3) {
 				mPreview.Outlines.Insert(OutlinePreview { brush.ObjectId, std::move(polygon) });
@@ -3640,13 +3640,13 @@ void TopViewCanvas::UpdatePreview()
 		break;
 	}
 	case eDrag::Vertex: {
-		const Vec2d grabbed = ToVec2d(mGrabbedVertex.Position);
-		const Vec2d moved = grabbed + (mCurrent - mPress);
+		const DVec2 grabbed = ToDVec2(mGrabbedVertex.Position);
+		const DVec2 moved = grabbed + (mCurrent - mPress);
 
-		Vec2d patch_point = Vec2d::scZero;
+		DVec2 patch_point = DVec2::scZero;
 		const bool snapped_to_patch = FindPatchSnapPoint(moved, patch_point);
 
-		Vec2d target = patch_point;
+		DVec2 target = patch_point;
 
 		if (!snapped_to_patch) {
 			target = Snap(moved);
@@ -3663,10 +3663,10 @@ void TopViewCanvas::UpdatePreview()
 				continue;
 			}
 
-			DynArray<Vec2d> points = CollectVertexHandles(brush);
+			DynArray<DVec2> points = CollectVertexHandles(brush);
 			bool moves_any = false;
 
-			for (Vec2d& point : points) {
+			for (DVec2& point : points) {
 				if (IsVertexSelected(brush.ObjectId, point)) {
 					point += mPreview.OffsetUV;
 					moves_any = true;
@@ -3677,7 +3677,7 @@ void TopViewCanvas::UpdatePreview()
 				continue;
 			}
 
-			DynArray<Vec2f> polygon = ConvexHull2D(std::move(points));
+			DynArray<FVec2> polygon = ConvexHull2D(std::move(points));
 
 			if (polygon.Size >= 3) {
 				mPreview.Outlines.Insert(OutlinePreview { brush.ObjectId, std::move(polygon) });
@@ -3687,16 +3687,16 @@ void TopViewCanvas::UpdatePreview()
 		break;
 	}
 	case eDrag::Create: {
-		const Vec2d current = Snap(mCurrent);
+		const DVec2 current = Snap(mCurrent);
 
 		mPreview.Kind = eDrag::Create;
-		mPreview.RectUV = DRect(Vec2d::Min(mPress, current), Vec2d::Max(mPress, current));
+		mPreview.RectUV = DRect(DVec2::Min(mPress, current), DVec2::Max(mPress, current));
 		break;
 	}
 	case eDrag::Arch: {
-		const Vec2d current = Snap(mCurrent);
+		const DVec2 current = Snap(mCurrent);
 
-		mArchRect = DRect(Vec2d::Min(mPress, current), Vec2d::Max(mPress, current));
+		mArchRect = DRect(DVec2::Min(mPress, current), DVec2::Max(mPress, current));
 		mbArchPending = true;
 		break;
 	}
@@ -3704,7 +3704,7 @@ void TopViewCanvas::UpdatePreview()
 		UpdateArchEdit();
 		break;
 	case eDrag::Rotate: {
-		const Vec2d from_pivot = mCurrent - mRotatePivot;
+		const DVec2 from_pivot = mCurrent - mRotatePivot;
 		const double angle = std::atan2(from_pivot.Y, from_pivot.X);
 
 		mPreview.Kind = eDrag::Rotate;
@@ -3714,32 +3714,32 @@ void TopViewCanvas::UpdatePreview()
 		break;
 	}
 	case eDrag::Clip: {
-		const Vec2d current = Snap(mCurrent);
+		const DVec2 current = Snap(mCurrent);
 
 		mPreview = Preview();
 		mPreview.Kind = eDrag::Clip;
 		mPreview.ClipA = mPress;
 		mPreview.ClipB = current;
 
-		const Vec2d along = current - mPress;
+		const DVec2 along = current - mPress;
 		const double length = along.Length();
 
 		if (length < scMinClipLength) {
 			break;
 		}
 
-		const Vec2d normal(along.Y / length, -along.X / length);
+		const DVec2 normal(along.Y / length, -along.X / length);
 		const double offset = normal.Dot(mPress);
 
 		for (const TopViewBrush& brush : mState.Brushes) {
-			const DynArray<Vec2f>& hull = Projection(brush).Hull;
+			const DynArray<FVec2>& hull = Projection(brush).Hull;
 
 			if (!brush.bSelected || hull.Size < 3) {
 				continue;
 			}
 
-			DynArray<Vec2f> front = ClipPolygon(hull, normal, offset);
-			DynArray<Vec2f> back = ClipPolygon(hull, normal * -1.0, -offset);
+			DynArray<FVec2> front = ClipPolygon(hull, normal, offset);
+			DynArray<FVec2> back = ClipPolygon(hull, normal * -1.0, -offset);
 
 			if (front.Size >= 3 && back.Size >= 3) {
 				mPreview.Outlines.Insert(OutlinePreview { brush.ObjectId, std::move(front) });
@@ -3756,7 +3756,7 @@ void TopViewCanvas::UpdatePreview()
 			break;
 		}
 
-		const Vec2d position = ProjectPoint(mState.Markers[index].Position);
+		const DVec2 position = ProjectPoint(mState.Markers[index].Position);
 
 		mPreview.Kind = eDrag::MarkerMove;
 		mPreview.OffsetUV = Snap(position + (mCurrent - mPress)) - position;
@@ -3770,7 +3770,7 @@ void TopViewCanvas::UpdatePreview()
 		}
 
 		const TopViewMarker& marker = mState.Markers[index];
-		const Vec2d to_cursor = mCurrent - ProjectPoint(marker.AimOrigin);
+		const DVec2 to_cursor = mCurrent - ProjectPoint(marker.AimOrigin);
 		const double distance = to_cursor.Length();
 
 		if (distance * mScale < 2.0) {
@@ -3914,13 +3914,13 @@ void TopViewCanvas::OnLeftUp(wxMouseEvent&)
 
 void TopViewCanvas::FinishVertex()
 {
-	if (mPreview.Kind != eDrag::Vertex || mPreview.OffsetUV == Vec2d::scZero) {
+	if (mPreview.Kind != eDrag::Vertex || mPreview.OffsetUV == DVec2::scZero) {
 		if (!mbDragMoved && mbVertexToggleOnRelease) {
 			DynArray<TopViewVertexHandle> kept;
 
 			for (const TopViewVertexHandle& handle : mSelectedVertices) {
 				const bool is_grabbed = handle.ObjectId == mGrabbedVertex.ObjectId &&
-										IsSameHandle(ToVec2d(handle.Position), ToVec2d(mGrabbedVertex.Position));
+										IsSameHandle(ToDVec2(handle.Position), ToDVec2(mGrabbedVertex.Position));
 
 				if (!is_grabbed) {
 					kept.Insert(handle);
@@ -3939,7 +3939,7 @@ void TopViewCanvas::FinishVertex()
 	const eViewPlane plane = mPlane;
 
 	for (TopViewVertexHandle& handle : mSelectedVertices) {
-		handle.Position += ToVec2f(mPreview.OffsetUV);
+		handle.Position += ToFVec2(mPreview.OffsetUV);
 	}
 
 	HoldPreview();
@@ -3958,7 +3958,7 @@ void TopViewCanvas::FinishMarquee()
 			return;
 		}
 
-		const DRect rect(Vec2d::Min(mPress, mCurrent), Vec2d::Max(mPress, mCurrent));
+		const DRect rect(DVec2::Min(mPress, mCurrent), DVec2::Max(mPress, mCurrent));
 
 		if (!mbAdditive) {
 			mSelectedVertices.Clear();
@@ -3969,9 +3969,9 @@ void TopViewCanvas::FinishMarquee()
 				continue;
 			}
 
-			for (const Vec2d& point : CollectVertexHandles(brush)) {
+			for (const DVec2& point : CollectVertexHandles(brush)) {
 				if (rect.Contains(point) && !IsVertexSelected(brush.ObjectId, point)) {
-					mSelectedVertices.Insert(TopViewVertexHandle { brush.ObjectId, ToVec2f(point) });
+					mSelectedVertices.Insert(TopViewVertexHandle { brush.ObjectId, ToFVec2(point) });
 				}
 			}
 		}
@@ -3988,7 +3988,7 @@ void TopViewCanvas::FinishMarquee()
 			return;
 		}
 
-		const DRect rect(Vec2d::Min(mPress, mCurrent), Vec2d::Max(mPress, mCurrent));
+		const DRect rect(DVec2::Min(mPress, mCurrent), DVec2::Max(mPress, mCurrent));
 
 		for (const TopViewBrush& brush : mState.Brushes) {
 			const TopViewProjection& projection = Projection(brush);
@@ -3999,8 +3999,8 @@ void TopViewCanvas::FinishMarquee()
 
 			bool contained = true;
 
-			for (const Vec2f& point : projection.Hull) {
-				contained = contained && rect.Contains(ToVec2d(point));
+			for (const FVec2& point : projection.Hull) {
+				contained = contained && rect.Contains(ToDVec2(point));
 			}
 
 			if (!contained) {
@@ -4031,7 +4031,7 @@ void TopViewCanvas::FinishMarquee()
 		return;
 	}
 
-	const DRect rect(Vec2d::Min(mPress, mCurrent), Vec2d::Max(mPress, mCurrent));
+	const DRect rect(DVec2::Min(mPress, mCurrent), DVec2::Max(mPress, mCurrent));
 
 	DynArray<ObjectID> inside;
 
@@ -4044,8 +4044,8 @@ void TopViewCanvas::FinishMarquee()
 
 		bool contained = true;
 
-		for (const Vec2f& point : projection.Hull) {
-			contained = contained && rect.Contains(ToVec2d(point));
+		for (const FVec2& point : projection.Hull) {
+			contained = contained && rect.Contains(ToDVec2(point));
 		}
 
 		if (contained) {
@@ -4066,7 +4066,7 @@ void TopViewCanvas::FinishMove()
 {
 	constexpr double scClickCycleRadiusPixels = 4.0;
 
-	const bool has_offset = (mPreview.Kind == eDrag::Move && !(mPreview.OffsetUV == Vec2d::scZero));
+	const bool has_offset = (mPreview.Kind == eDrag::Move && !(mPreview.OffsetUV == DVec2::scZero));
 
 	if (mbDragMoved && (has_offset || !mbAdditive)) {
 		if (!has_offset) {
@@ -4142,7 +4142,7 @@ void TopViewCanvas::FinishCreate()
 		return;
 	}
 
-	const Vec2d extent = mPreview.RectUV.GetExtent();
+	const DVec2 extent = mPreview.RectUV.GetExtent();
 
 	if (extent.X < scMinCreateSize || extent.Y < scMinCreateSize) {
 		ClearPreview();
@@ -4209,14 +4209,14 @@ TopViewCanvas::ArchEllipse TopViewCanvas::FitArch(const DRect& rect) const
 	ArchEllipse ellipse;
 
 	const DRect direction_bounds = GetArchDirectionBounds(mArch);
-	const Vec2d low = direction_bounds.Min;
-	const Vec2d span = direction_bounds.GetExtent();
+	const DVec2 low = direction_bounds.Min;
+	const DVec2 span = direction_bounds.GetExtent();
 
 	if (span.X < 1e-6 || span.Y < 1e-6) {
 		return ellipse;
 	}
 
-	const Vec2d extent = rect.GetExtent();
+	const DVec2 extent = rect.GetExtent();
 
 	ellipse.Radius = extent / span;
 	ellipse.Center = rect.Min - low * ellipse.Radius;
@@ -4233,9 +4233,9 @@ DRect TopViewCanvas::GetArchRect(const ArchEllipse& ellipse) const
 				 ellipse.Center + direction_bounds.Max * ellipse.Radius);
 }
 
-DynArray<Vec2d> TopViewCanvas::BuildArchSegments(const DRect& rect) const
+DynArray<DVec2> TopViewCanvas::BuildArchSegments(const DRect& rect) const
 {
-	DynArray<Vec2d> corners;
+	DynArray<DVec2> corners;
 
 	const ArchEllipse ellipse = FitArch(rect);
 
@@ -4244,7 +4244,7 @@ DynArray<Vec2d> TopViewCanvas::BuildArchSegments(const DRect& rect) const
 	}
 
 	const double wall = std::max<double>(mArch.WallWidth, 0.0);
-	const Vec2d inner_radius = Vec2d::Max(ellipse.Radius - Vec2d(wall), Vec2d::scZero);
+	const DVec2 inner_radius = DVec2::Max(ellipse.Radius - DVec2(wall), DVec2::scZero);
 
 	const auto outer = [&](uint32 index)
 	{ return ellipse.Center + GetArchDirection(mArch, static_cast<double>(index)) * ellipse.Radius; };
@@ -4261,10 +4261,10 @@ DynArray<Vec2d> TopViewCanvas::BuildArchSegments(const DRect& rect) const
 	return corners;
 }
 
-Vec2d TopViewCanvas::GetArchHandle(eArchHandle handle) const
+DVec2 TopViewCanvas::GetArchHandle(eArchHandle handle) const
 {
 	const DRect& rect = mArchRect;
-	const Vec2d middle = rect.GetCenter();
+	const DVec2 middle = rect.GetCenter();
 
 	switch (handle) {
 	case eArchHandle::Wall:
@@ -4280,44 +4280,44 @@ Vec2d TopViewCanvas::GetArchHandle(eArchHandle handle) const
 				index = 0.0;
 			}
 
-			const Vec2d direction = GetArchDirection(mArch, index);
+			const DVec2 direction = GetArchDirection(mArch, index);
 
 			return ellipse.Center + direction * ellipse.Radius + direction * (scArchKnobPixels / mScale);
 		}
 
 		const double wall = std::max<double>(mArch.WallWidth, 0.0);
-		const Vec2d inner_radius = Vec2d::Max(ellipse.Radius - Vec2d(wall), Vec2d::scZero);
+		const DVec2 inner_radius = DVec2::Max(ellipse.Radius - DVec2(wall), DVec2::scZero);
 
 		return ellipse.Center + GetArchWallDirection(mArch) * inner_radius;
 	}
 	case eArchHandle::MinMin:
 		return rect.Min;
 	case eArchHandle::MaxMin:
-		return Vec2d(rect.Max.X, rect.Min.Y);
+		return DVec2(rect.Max.X, rect.Min.Y);
 	case eArchHandle::MaxMax:
 		return rect.Max;
 	case eArchHandle::MinMax:
-		return Vec2d(rect.Min.X, rect.Max.Y);
+		return DVec2(rect.Min.X, rect.Max.Y);
 	case eArchHandle::Left:
-		return Vec2d(rect.Min.X, middle.Y);
+		return DVec2(rect.Min.X, middle.Y);
 	case eArchHandle::Right:
-		return Vec2d(rect.Max.X, middle.Y);
+		return DVec2(rect.Max.X, middle.Y);
 	case eArchHandle::Bottom:
-		return Vec2d(middle.X, rect.Min.Y);
+		return DVec2(middle.X, rect.Min.Y);
 	case eArchHandle::Top:
-		return Vec2d(middle.X, rect.Max.Y);
+		return DVec2(middle.X, rect.Max.Y);
 	default:
 		return middle;
 	}
 }
 
-TopViewCanvas::eArchHandle TopViewCanvas::PickArchHandle(const Vec2d uv) const
+TopViewCanvas::eArchHandle TopViewCanvas::PickArchHandle(const DVec2 uv) const
 {
 	if (!mbArchPending || mDrag == eDrag::Arch) {
 		return eArchHandle::None;
 	}
 
-	const Vec2d screen = ToScreenCoords(uv);
+	const DVec2 screen = ToScreenCoords(uv);
 
 	constexpr eArchHandle point_handles[] = {
 		eArchHandle::End,	 eArchHandle::Start,  eArchHandle::Wall,   eArchHandle::MinMin,
@@ -4330,10 +4330,10 @@ TopViewCanvas::eArchHandle TopViewCanvas::PickArchHandle(const Vec2d uv) const
 		}
 	}
 
-	const Vec2d corner_a = ToScreenCoords(mArchRect.Min);
-	const Vec2d corner_b = ToScreenCoords(Vec2d(mArchRect.Max.X, mArchRect.Min.Y));
-	const Vec2d corner_c = ToScreenCoords(mArchRect.Max);
-	const Vec2d corner_d = ToScreenCoords(Vec2d(mArchRect.Min.X, mArchRect.Max.Y));
+	const DVec2 corner_a = ToScreenCoords(mArchRect.Min);
+	const DVec2 corner_b = ToScreenCoords(DVec2(mArchRect.Max.X, mArchRect.Min.Y));
+	const DVec2 corner_c = ToScreenCoords(mArchRect.Max);
+	const DVec2 corner_d = ToScreenCoords(DVec2(mArchRect.Min.X, mArchRect.Max.Y));
 
 	if (DistanceToSegment(screen, corner_d, corner_a) <= scPickTolerancePixels) {
 		return eArchHandle::Left;
@@ -4362,12 +4362,12 @@ void TopViewCanvas::UpdateArchEdit()
 {
 	constexpr double scMinArchWall = 0.01;
 
-	const Vec2d delta = mCurrent - mPress;
+	const DVec2 delta = mCurrent - mPress;
 	const ArchEllipse& ellipse = mArchGrabEllipse;
 
 	switch (mArchGrab) {
 	case eArchHandle::Body: {
-		const Vec2d min = Snap(mArchGrabRect.Min + delta);
+		const DVec2 min = Snap(mArchGrabRect.Min + delta);
 		mArchRect = DRect(min, min + mArchGrabRect.GetExtent());
 		break;
 	}
@@ -4376,14 +4376,14 @@ void TopViewCanvas::UpdateArchEdit()
 			break;
 		}
 
-		const Vec2d direction = GetArchWallDirection(mArch);
+		const DVec2 direction = GetArchWallDirection(mArch);
 		const double length_sq = direction.LengthSquared();
 
 		if (length_sq < 1e-9) {
 			break;
 		}
 
-		const Vec2d outer = ellipse.Center + direction * ellipse.Radius;
+		const DVec2 outer = ellipse.Center + direction * ellipse.Radius;
 		const double wall = Snap((outer - mCurrent).Dot(direction) / length_sq);
 
 		mArch.WallWidth = static_cast<float32>(
@@ -4397,7 +4397,7 @@ void TopViewCanvas::UpdateArchEdit()
 			break;
 		}
 
-		const Vec2d local = (mCurrent - ellipse.Center) / ellipse.Radius;
+		const DVec2 local = (mCurrent - ellipse.Center) / ellipse.Radius;
 		const double angle = std::atan2(local.Y, local.X);
 
 		mArchAngleTravel += WrapAngle(angle - mArchLastAngle);
@@ -4437,8 +4437,8 @@ void TopViewCanvas::UpdateArchEdit()
 		const bool top = mArchGrab == eArchHandle::MinMax || mArchGrab == eArchHandle::MaxMax ||
 						 mArchGrab == eArchHandle::Top;
 
-		Vec2d a = mArchGrabRect.Min;
-		Vec2d b = mArchGrabRect.Max;
+		DVec2 a = mArchGrabRect.Min;
+		DVec2 b = mArchGrabRect.Max;
 
 		if (left) {
 			a.X = Snap(a.X + delta.X);
@@ -4456,7 +4456,7 @@ void TopViewCanvas::UpdateArchEdit()
 			b.Y = Snap(b.Y + delta.Y);
 		}
 
-		mArchRect = DRect(Vec2d::Min(a, b), Vec2d::Max(a, b));
+		mArchRect = DRect(DVec2::Min(a, b), DVec2::Max(a, b));
 		break;
 	}
 	}
@@ -4468,7 +4468,7 @@ void TopViewCanvas::FinishArch()
 		return;
 	}
 
-	const Vec2d extent = mArchRect.GetExtent();
+	const DVec2 extent = mArchRect.GetExtent();
 
 	if (extent.X < scMinCreateSize || extent.Y < scMinCreateSize || !FitArch(mArchRect).bValid) {
 		mbArchPending = false;
@@ -4477,7 +4477,7 @@ void TopViewCanvas::FinishArch()
 
 void TopViewCanvas::FinishArchEdit()
 {
-	const Vec2d extent = mArchRect.GetExtent();
+	const DVec2 extent = mArchRect.GetExtent();
 
 	if (extent.X < scMinCreateSize || extent.Y < scMinCreateSize || !FitArch(mArchRect).bValid) {
 		mArchRect = mArchGrabRect;
@@ -4513,7 +4513,7 @@ void TopViewCanvas::CommitArch()
 	mbArchPending = false;
 	mArchHover = eArchHandle::None;
 
-	const DynArray<Vec2d> corners = BuildArchSegments(rect);
+	const DynArray<DVec2> corners = BuildArchSegments(rect);
 
 	if (corners.IsEmpty()) {
 		UpdateStatus();
@@ -4562,38 +4562,38 @@ void TopViewCanvas::DrawArch(wxGraphicsContext& gc, const DRect& rect, bool show
 	const wxColour colour = ToWxColour(theme.Tool.Create);
 	const wxFont font = wxFont(wxFontInfo(10));
 
-	const DynArray<Vec2d> corners = BuildArchSegments(rect);
+	const DynArray<DVec2> corners = BuildArchSegments(rect);
 
 	wxGraphicsPath outlines = gc.CreatePath();
 
 	for (uint32 i = 0; i + scArchCornersPerSegment <= corners.Size; i += scArchCornersPerSegment) {
-		DynArray<Vec2d> points;
+		DynArray<DVec2> points;
 
 		for (uint32 j = 0; j < scArchCornersPerSegment; j++) {
 			points.Insert(corners[i + j]);
 		}
 
-		const DynArray<Vec2f> polygon = ConvexHull2D(std::move(points));
+		const DynArray<FVec2> polygon = ConvexHull2D(std::move(points));
 
 		if (polygon.Size < 3) {
 			continue;
 		}
 
-		const Vec2d first = ToScreenCoords(ToVec2d(polygon[0]));
+		const DVec2 first = ToScreenCoords(ToDVec2(polygon[0]));
 		outlines.MoveToPoint(first.X, first.Y);
 
 		for (uint32 j = 1; j < polygon.Size; j++) {
-			const Vec2d screen_point = ToScreenCoords(ToVec2d(polygon[j]));
+			const DVec2 screen_point = ToScreenCoords(ToDVec2(polygon[j]));
 			outlines.AddLineToPoint(screen_point.X, screen_point.Y);
 		}
 
 		outlines.CloseSubpath();
 	}
 
-	const Vec2d top_left = ToScreenCoords(Vec2d(rect.Min.X, rect.Max.Y));
-	const Vec2d bottom_right = ToScreenCoords(Vec2d(rect.Max.X, rect.Min.Y));
-	const Vec2d screen_extent = bottom_right - top_left;
-	const Vec2d extent = rect.GetExtent();
+	const DVec2 top_left = ToScreenCoords(DVec2(rect.Min.X, rect.Max.Y));
+	const DVec2 bottom_right = ToScreenCoords(DVec2(rect.Max.X, rect.Min.Y));
+	const DVec2 screen_extent = bottom_right - top_left;
+	const DVec2 extent = rect.GetExtent();
 
 	gc.SetPen(wxPen(colour, 1, wxPENSTYLE_SHORT_DASH));
 	gc.SetBrush(*wxTRANSPARENT_BRUSH);
@@ -4616,9 +4616,9 @@ void TopViewCanvas::DrawArch(wxGraphicsContext& gc, const DRect& rect, bool show
 	const ArchEllipse ellipse = FitArch(rect);
 
 	if (ellipse.bValid) {
-		const Vec2d center = ToScreenCoords(ellipse.Center);
-		const Vec2d start = ToScreenCoords(GetArchHandle(eArchHandle::Start));
-		const Vec2d end = ToScreenCoords(GetArchHandle(eArchHandle::End));
+		const DVec2 center = ToScreenCoords(ellipse.Center);
+		const DVec2 start = ToScreenCoords(GetArchHandle(eArchHandle::Start));
+		const DVec2 end = ToScreenCoords(GetArchHandle(eArchHandle::End));
 
 		gc.SetPen(wxPen(WithAlpha(colour, 140), 1, wxPENSTYLE_SHORT_DASH));
 		gc.StrokeLine(center.X, center.Y, start.X, start.Y);
@@ -4642,7 +4642,7 @@ void TopViewCanvas::DrawArch(wxGraphicsContext& gc, const DRect& rect, bool show
 	};
 
 	for (const eArchHandle handle : box_handles) {
-		const Vec2d screen = ToScreenCoords(GetArchHandle(handle));
+		const DVec2 screen = ToScreenCoords(GetArchHandle(handle));
 		const bool hot = (handle == active);
 		double half = scHandleHalfSize;
 		wxColour fill_colour = ToWxColour(theme.Tool.Handle);
@@ -4666,7 +4666,7 @@ void TopViewCanvas::DrawArch(wxGraphicsContext& gc, const DRect& rect, bool show
 	constexpr eArchHandle shape_handles[] = { eArchHandle::Wall, eArchHandle::Start, eArchHandle::End };
 
 	for (const eArchHandle handle : shape_handles) {
-		const Vec2d screen = ToScreenCoords(GetArchHandle(handle));
+		const DVec2 screen = ToScreenCoords(GetArchHandle(handle));
 		const bool hot = (handle == active);
 		double radius = scArchHandleRadius;
 		wxColour fill_colour = colour;
@@ -4682,7 +4682,7 @@ void TopViewCanvas::DrawArch(wxGraphicsContext& gc, const DRect& rect, bool show
 	}
 
 	if (active == eArchHandle::Wall || active == eArchHandle::Start || active == eArchHandle::End) {
-		const Vec2d screen = ToScreenCoords(GetArchHandle(active));
+		const DVec2 screen = ToScreenCoords(GetArchHandle(active));
 		wxString label = wxString::Format("%.0f", mArch.StartDegrees);
 
 		if (active == eArchHandle::Wall) {
@@ -4717,10 +4717,10 @@ void TopViewCanvas::DrawPatchLattices(wxGraphicsContext& gc)
 			continue;
 		}
 
-		DynArray<Vec2d> points;
+		DynArray<DVec2> points;
 
-		for (const Vec2f& control_point : projection.ControlPoints) {
-			Vec2d point = ToVec2d(control_point);
+		for (const FVec2& control_point : projection.ControlPoints) {
+			DVec2 point = ToDVec2(control_point);
 
 			if (live && IsVertexSelected(brush.ObjectId, point)) {
 				point += mPreview.OffsetUV;
@@ -4761,7 +4761,7 @@ void TopViewCanvas::FinishRotate()
 		return;
 	}
 
-	const FVec3 axis = ToWorldVector(Vec2d::scZero, 1.0);
+	const FVec3 axis = ToWorldVector(DVec2::scZero, 1.0);
 	const float32 angle = static_cast<float32>(Axes().RotateSign * mPreview.Angle);
 	const FVec3 pivot = ToWorldVector(mPreview.PivotUV, 0.0);
 	const FVec3 offset = ToWorldVector(mPreview.OffsetUV, 0.0);
@@ -4779,7 +4779,7 @@ void TopViewCanvas::FinishClip()
 
 	const FVec3 point_a = ToWorldVector(mPreview.ClipA, 0.0);
 	const FVec3 point_b = ToWorldVector(mPreview.ClipB, 0.0);
-	const FVec3 view_axis = ToWorldVector(Vec2d::scZero, 1.0);
+	const FVec3 view_axis = ToWorldVector(DVec2::scZero, 1.0);
 
 	HoldPreview();
 	SendCommand([point_a, point_b, view_axis] { gEditor->TopViewClip(point_a, point_b, view_axis); });
@@ -4787,7 +4787,7 @@ void TopViewCanvas::FinishClip()
 
 void TopViewCanvas::FinishMarkerMove()
 {
-	if (!mbDragMoved || mPreview.Kind != eDrag::MarkerMove || mPreview.OffsetUV == Vec2d::scZero) {
+	if (!mbDragMoved || mPreview.Kind != eDrag::MarkerMove || mPreview.OffsetUV == DVec2::scZero) {
 		return;
 	}
 
@@ -4838,10 +4838,10 @@ void TopViewCanvas::OnWheel(wxMouseEvent& event)
 			pixels = rotation;
 		}
 
-		Vec2d pan = Vec2d(0.0, pixels);
+		DVec2 pan = DVec2(0.0, pixels);
 
 		if (horizontal) {
-			pan = Vec2d(-pixels, 0.0);
+			pan = DVec2(-pixels, 0.0);
 		}
 
 		PanByPixels(pan);
@@ -4878,12 +4878,12 @@ void TopViewCanvas::OnZoomGesture(wxZoomGestureEvent& event)
 // Keyboard
 /////////////////////////////////////
 
-void TopViewCanvas::NudgeMarker(const TopViewMarker& marker, const Vec2d delta)
+void TopViewCanvas::NudgeMarker(const TopViewMarker& marker, const DVec2 delta)
 {
 	SendMarkerMove(marker.Kind, ToWorldVector(delta, 0.0));
 }
 
-void TopViewCanvas::NudgeSelection(const Vec2d delta, bool snap)
+void TopViewCanvas::NudgeSelection(const DVec2 delta, bool snap)
 {
 	if (const int32 marker = FindSelectedMarker(); marker >= 0) {
 		const TopViewMarker& selected = mState.Markers[marker];
@@ -4904,7 +4904,7 @@ void TopViewCanvas::NudgeSelection(const Vec2d delta, bool snap)
 		return;
 	}
 
-	Vec2d moved = delta;
+	DVec2 moved = delta;
 
 	if (snap) {
 		moved = SnapNudge(bounds.Rect.Min, delta);
@@ -4993,32 +4993,32 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 			texture_command.Type = eTextureCommand::Shift;
 
 			if (key == WXK_LEFT) {
-				texture_command.Amount = Vec2f(-1.0f, 0.0f);
+				texture_command.Amount = FVec2(-1.0f, 0.0f);
 			}
 			else if (key == WXK_RIGHT) {
-				texture_command.Amount = Vec2f(1.0f, 0.0f);
+				texture_command.Amount = FVec2(1.0f, 0.0f);
 			}
 			else if (key == WXK_UP) {
-				texture_command.Amount = Vec2f(0.0f, -1.0f);
+				texture_command.Amount = FVec2(0.0f, -1.0f);
 			}
 			else {
-				texture_command.Amount = Vec2f(0.0f, 1.0f);
+				texture_command.Amount = FVec2(0.0f, 1.0f);
 			}
 		}
 		else if (key == '[' || key == ']') {
 			texture_command.Type = eTextureCommand::Scale;
-			texture_command.Amount = Vec2f(2.0f);
+			texture_command.Amount = FVec2(2.0f);
 
 			if (key == '[') {
-				texture_command.Amount = Vec2f(0.5f);
+				texture_command.Amount = FVec2(0.5f);
 			}
 		}
 		else if (key == ',' || key == '.') {
 			texture_command.Type = eTextureCommand::Rotate;
-			texture_command.Amount = Vec2f(scTextureRotateDegrees, 0.0f);
+			texture_command.Amount = FVec2(scTextureRotateDegrees, 0.0f);
 
 			if (key == ',') {
-				texture_command.Amount = Vec2f(-scTextureRotateDegrees, 0.0f);
+				texture_command.Amount = FVec2(-scTextureRotateDegrees, 0.0f);
 			}
 		}
 		else {
@@ -5064,7 +5064,7 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 		}
 
 		if (HasPendingArch()) {
-			Vec2d moved = Vec2d(du, dv);
+			DVec2 moved = DVec2(du, dv);
 
 			if (!fine) {
 				moved = SnapNudge(mArchRect.Min, moved);
@@ -5076,7 +5076,7 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 			return;
 		}
 
-		NudgeSelection(Vec2d(du, dv), !fine);
+		NudgeSelection(DVec2(du, dv), !fine);
 		return;
 	}
 
@@ -5096,7 +5096,7 @@ void TopViewCanvas::OnKeyDown(wxKeyEvent& event)
 		}
 
 		DynArray<TopViewVertexHandle> handles = mSelectedVertices.Clone();
-		const FVec3 offset = ToWorldVector(Vec2d(0.0, 0.0), distance * Axes().DepthSign);
+		const FVec3 offset = ToWorldVector(DVec2(0.0, 0.0), distance * Axes().DepthSign);
 		const eViewPlane plane = mPlane;
 
 		SendCommand([plane, handles = std::move(handles), offset]

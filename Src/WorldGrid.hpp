@@ -54,7 +54,7 @@ public:
 public:
 	WorldGrid() = default;
 
-	void Create(const Vec2u grid_size);
+	void Create(const UVec2 grid_size);
 
 	/**
 	 * @brief Inserts an object into its respective tile.
@@ -67,8 +67,8 @@ public:
 	/**
 	 * @brief Gets the rectangle of tiles (inclusive) that a sphere reaches.
 	 */
-	void GetSphereTileRange(const FVec3 center, float32 radius, Vec2u* out_min, Vec2u* out_max) const;
-	TileIndex TileFromTileXY(const Vec2u& xy) const;
+	void GetSphereTileRange(const FVec3 center, float32 radius, UVec2* out_min, UVec2* out_max) const;
+	TileIndex TileFromTileXY(const UVec2& xy) const;
 
 	const SizedArray<ObjectID>& GetNearbyObjects();
 
@@ -109,10 +109,10 @@ public:
 
 	void RemoveLight(LightBase* light);
 
-	Vec2u TileToTileXY(TileIndex tile_index) const;
+	UVec2 TileToTileXY(TileIndex tile_index) const;
 	FVec3 GetTileWorldPosition(TileIndex tile_index) const;
 
-	FVec3 TileXYToWorldCenter(Vec2u tile_xy) const;
+	FVec3 TileXYToWorldCenter(UVec2 tile_xy) const;
 
 	Tile* GetTile(TileIndex index);
 	const Tile* GetTile(TileIndex index) const;
@@ -127,7 +127,7 @@ public:
 		return BBox(tile_position - half, tile_position + half);
 	}
 
-	FX_FORCE_INLINE Vec2u GetGridSize() const { return mGridSize; }
+	FX_FORCE_INLINE UVec2 GetGridSize() const { return mGridSize; }
 
 	FX_FORCE_INLINE uint32 GetNumTiles() const { return mTileBuffer.Size; }
 
@@ -144,14 +144,14 @@ private:
 	/// Computes the rectangle of tiles (start tile + width/height in tiles) that the object's world-space
 	/// bounds overlap.
 
-	void GetObjectTileRect(Object* object, TileIndex* out_start, Vec2u* out_span) const;
+	void GetObjectTileRect(Object* object, TileIndex* out_start, UVec2* out_span) const;
 
-	void InsertObjectIntoRect(ObjectID id, TileIndex start, Vec2u span);
-	void RemoveObjectFromRect(ObjectID id, TileIndex start, Vec2u span);
+	void InsertObjectIntoRect(ObjectID id, TileIndex start, UVec2 span);
+	void RemoveObjectFromRect(ObjectID id, TileIndex start, UVec2 span);
 
-	bool GetLightPlacement(const LightBase* light, TileIndex* out_start, Vec2u* out_span) const;
-	void InsertLightIntoRect(LightID id, TileIndex start, Vec2u span);
-	void RemoveLightFromRect(LightID id, TileIndex start, Vec2u span);
+	bool GetLightPlacement(const LightBase* light, TileIndex* out_start, UVec2* out_span) const;
+	void InsertLightIntoRect(LightID id, TileIndex start, UVec2 span);
+	void RemoveLightFromRect(LightID id, TileIndex start, UVec2 span);
 
 	TileIndex InsertInto(TileIndex tile_index, ObjectID id);
 
@@ -165,11 +165,11 @@ private:
 
 
 public:
-	Vec2u mGridSize;
+	UVec2 mGridSize;
 
 	/// The size of a single tile in metres. Note that since there is an object cap on world tiles, make sure these are
 	/// small enough even though compiled maps have significantly less objects.
-	Vec2f mTileSize = Vec2f(100.0f);
+	FVec2 mTileSize = FVec2(100.0f);
 	FVec3 mPositionOffset = FVec3::sZero;
 
 	TileIndex ViewTileIndex = TileIndexNull;

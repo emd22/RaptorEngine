@@ -51,7 +51,7 @@ static constexpr float32 scDepthBiasSlope = -2.0f;
 
 static VkRect2D RegionToRect(const URect& region)
 {
-	const Vec2u extent = region.GetExtent();
+	const UVec2 extent = region.GetExtent();
 
 	return VkRect2D {
 		.offset = { .x = static_cast<int32>(region.Min.X), .y = static_cast<int32>(region.Min.Y) },
@@ -182,7 +182,7 @@ void ShadowAtlas::BeginRegion(const URect& region)
 	VkRect2D render_area = rect;
 
 	if (mbNeedsClear) {
-		render_area = RegionToRect(URect::FromRelative(Vec2u::scZero, scAtlasSize));
+		render_area = RegionToRect(URect::FromRelative(UVec2::scZero, scAtlasSize));
 		mbNeedsClear = false;
 	}
 
@@ -198,27 +198,27 @@ void ShadowAtlas::EndRegion() { RenderStage.End(); }
 URect ShadowAtlas::GetDirectionalRegion() const
 {
 	// The "whole hog" left half of the atlas
-	return URect::FromRelative(Vec2u::scZero, Vec2u(scDirectionalSize));
+	return URect::FromRelative(UVec2::scZero, UVec2(scDirectionalSize));
 }
 
 URect ShadowAtlas::GetFarDirectionalRegion() const
 {
 	// The bottom of the spot grid, directly right of the sun. Uses 4 spotlight tiles worth of space
-	Vec2u start_point = Vec2u(scDirectionalSize, scAtlasSize.Y - scFarDirectionalSize);
-	return URect::FromRelative(start_point, Vec2u(scFarDirectionalSize));
+	UVec2 start_point = UVec2(scDirectionalSize, scAtlasSize.Y - scFarDirectionalSize);
+	return URect::FromRelative(start_point, UVec2(scFarDirectionalSize));
 }
 
 URect ShadowAtlas::GetDynamicSpotTileRegion() const
 {
 	// Directly to the right of the far cascade, the same size as it
-	return GetFarDirectionalRegion().OffsetBy(Vec2u(scFarDirectionalSize, 0U));
+	return GetFarDirectionalRegion().OffsetBy(UVec2(scFarDirectionalSize, 0U));
 }
 
 URect ShadowAtlas::GetStaticSpotTileRegion() const
 {
 	// The top right of the atlas, with the bottom half left for the far cascade and dynamic tiles
-	const Vec2u start_point = Vec2u(scDirectionalSize, 0U);
-	const Vec2u size = Vec2u(scDirectionalSize, scDirectionalSize / 2U);
+	const UVec2 start_point = UVec2(scDirectionalSize, 0U);
+	const UVec2 size = UVec2(scDirectionalSize, scDirectionalSize / 2U);
 
 	return URect::FromRelative(start_point, size);
 }
@@ -230,15 +230,15 @@ URect ShadowAtlas::GetSpotTileRegion(ShadowTileIndex tile_index) const
 
 	if (tile_index >= 32U || (TileBit(tile_index) & scSpotMask) == 0U) {
 		LogError("Spot tile region is invalid!");
-		return URect::FromRelative(Vec2u::scZero, Vec2u::scZero);
+		return URect::FromRelative(UVec2::scZero, UVec2::scZero);
 	}
 
 	const uint32 column = tile_index % scSpotGridColumns;
 	const uint32 row = tile_index / scSpotGridColumns;
 
-	const Vec2u region_position = Vec2u(scDirectionalSize + (column * scSpotTileSize), row * scSpotTileSize);
+	const UVec2 region_position = UVec2(scDirectionalSize + (column * scSpotTileSize), row * scSpotTileSize);
 
-	return URect::FromRelative(region_position, Vec2u(scSpotTileSize, scSpotTileSize));
+	return URect::FromRelative(region_position, UVec2(scSpotTileSize, scSpotTileSize));
 }
 
 ShadowTileIndex ShadowAtlas::FindFreeTile(const eShadowAtlasMask mask) const
@@ -259,12 +259,12 @@ void ShadowAtlas::GetRegionUVTransform(const URect& region, float32 out_transfor
 {
 	static_assert(scAtlasSize.X > 0U && scAtlasSize.Y > 0U);
 
-	static constexpr Vec2f scAtlasSizeFloat = Vec2f::From<uint32>(scAtlasSize);
+	static constexpr FVec2 scAtlasSizeFloat = FVec2::From<uint32>(scAtlasSize);
 
 	const FRect f_region = FRect(region);
 
-	const Vec2f xform_xy = f_region.GetExtent() / scAtlasSizeFloat;
-	const Vec2f xform_zw = f_region.Min / scAtlasSizeFloat;
+	const FVec2 xform_xy = f_region.GetExtent() / scAtlasSizeFloat;
+	const FVec2 xform_zw = f_region.Min / scAtlasSizeFloat;
 
 	out_transform[0] = xform_xy.X;
 	out_transform[1] = xform_xy.Y;

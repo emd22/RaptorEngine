@@ -208,43 +208,43 @@ inline constexpr Vec2Base<T> Vec2Base<T>::scMinValue = Vec2Base<T>(std::numeric_
 template <typename T>
 inline constexpr Vec2Base<T> Vec2Base<T>::scMaxValue = Vec2Base<T>(std::numeric_limits<T>::max());
 
-using Vec2f = Vec2Base<float32>;
-using Vec2d = Vec2Base<float64>;
+using FVec2 = Vec2Base<float32>;
+using DVec2 = Vec2Base<float64>;
 
-using Vec2i = Vec2Base<int32>;
-using Vec2u = Vec2Base<uint32>;
+using IVec2 = Vec2Base<int32>;
+using UVec2 = Vec2Base<uint32>;
 
 
 } // namespace fx
 
 template <>
-struct std::formatter<fx::Vec2i>
+struct std::formatter<fx::IVec2>
 {
 	auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-	auto format(const fx::Vec2i& obj, std::format_context& ctx) const
+	auto format(const fx::IVec2& obj, std::format_context& ctx) const
 	{
 		return std::format_to(ctx.out(), "({}, {})", obj.X, obj.Y);
 	}
 };
 
 template <>
-struct std::formatter<fx::Vec2u>
+struct std::formatter<fx::UVec2>
 {
 	auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-	auto format(const fx::Vec2u& obj, std::format_context& ctx) const
+	auto format(const fx::UVec2& obj, std::format_context& ctx) const
 	{
 		return std::format_to(ctx.out(), "({}, {})", obj.X, obj.Y);
 	}
 };
 
 template <>
-struct std::formatter<fx::Vec2f>
+struct std::formatter<fx::FVec2>
 {
 	auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-	auto format(const fx::Vec2f& obj, std::format_context& ctx) const
+	auto format(const fx::FVec2& obj, std::format_context& ctx) const
 	{
 		return std::format_to(ctx.out(), "({:.04}, {:.04})", obj.X, obj.Y);
 	}
@@ -252,11 +252,11 @@ struct std::formatter<fx::Vec2f>
 
 
 template <>
-struct std::formatter<fx::Vec2d>
+struct std::formatter<fx::DVec2>
 {
 	auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-	auto format(const fx::Vec2d& obj, std::format_context& ctx) const
+	auto format(const fx::DVec2& obj, std::format_context& ctx) const
 	{
 		return std::format_to(ctx.out(), "({:.04}, {:.04})", obj.X, obj.Y);
 	}

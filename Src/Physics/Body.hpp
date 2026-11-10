@@ -79,16 +79,16 @@ public:
 
 	void DestroyPhysicsBody();
 
-	void SetInstanceTransforms(const Mat4f* transforms, uint32 count);
+	void SetInstanceTransforms(const FMat4* transforms, uint32 count);
 
 	void SetMidpoint(const FVec3 midpoint);
 
-	void Teleport(const FVec3 position, const Quat rotation);
+	void Teleport(const FVec3 position, const FQuat rotation);
 
 	void SetLinearVelocity(const FVec3 velocity);
 
 	FX_FORCE_INLINE FVec3 GetPosition() { return FVec3(mpPhysicsBody->GetPosition()); }
-	FX_FORCE_INLINE Quat GetRotation() { return Quat(mpPhysicsBody->GetRotation()); }
+	FX_FORCE_INLINE FQuat GetRotation() { return FQuat(mpPhysicsBody->GetRotation()); }
 
 	FX_FORCE_INLINE JPH::Body* GetBody() { return mpPhysicsBody; };
 	FX_FORCE_INLINE const JPH::BodyID& GetBodyID() { return mpPhysicsBody->GetID(); };

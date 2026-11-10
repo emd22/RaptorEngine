@@ -10,8 +10,8 @@
 
 #include <Core/SizedArray.hpp>
 #include <Math/DVec3.hpp>
+#include <Math/FMat4.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Mat4.hpp>
 #include <Math/Vec2.hpp>
 
 namespace fx {
@@ -33,7 +33,7 @@ struct PatchColor
 struct PatchPoint
 {
 	FVec3 Position = FVec3::sZero;
-	Vec2f Texcoord = Vec2f(0.0f, 0.0f);
+	FVec2 Texcoord = FVec2(0.0f, 0.0f);
 	float32 Weight = 1.0f;
 	PatchColor Color;
 };
@@ -44,8 +44,8 @@ struct PatchVertex
 	DVec3 Normal = DVec3(0.0);
 	DVec3 Tangent = DVec3(0.0);
 	double Handedness = 1.0;
-	Vec2d Texcoord = Vec2d(0.0, 0.0);
-	Vec2d Parameter = Vec2d(0.0, 0.0);
+	DVec2 Texcoord = DVec2(0.0, 0.0);
+	DVec2 Parameter = DVec2(0.0, 0.0);
 	PatchColor Color;
 };
 
@@ -162,8 +162,8 @@ public:
 	void Tessellate(PatchMesh& out_mesh) const;
 
 	void GenerateMesh(SizedArray<FVec3>& positions, SizedArray<FVec3>& normals, SizedArray<FVec3>& tangents,
-					  SizedArray<float32>& tangent_handedness, SizedArray<Vec2f>& texcoords,
-					  SizedArray<uint32>& indices, const Mat4f& to_world = Mat4f::scIdentity,
+					  SizedArray<float32>& tangent_handedness, SizedArray<FVec2>& texcoords,
+					  SizedArray<uint32>& indices, const FMat4& to_world = FMat4::scIdentity,
 					  SizedArray<uint32>* packed_colors = nullptr) const;
 
 	bool HasVertexColors() const;
@@ -178,7 +178,7 @@ public:
 
 	void NaturalTexture(float32 scale = scDefaultTextureScale);
 	void FitTexture(float32 repeats_u, float32 repeats_v);
-	void WorldTexture(const Mat4f& to_world = Mat4f::scIdentity, float32 scale = scDefaultTextureScale,
+	void WorldTexture(const FMat4& to_world = FMat4::scIdentity, float32 scale = scDefaultTextureScale,
 					  uint32 axis = scAutoTextureAxis);
 
 	void GetEdgePoints(uint32 edge, SizedArray<PatchPoint>& out_points) const;
@@ -187,12 +187,12 @@ public:
 	DVec3 GetEdgeOutward(uint32 edge) const;
 
 	Patch MakeOffset(float32 distance) const;
-	Patch MakeCap(uint32 edge, const Mat4f& to_world = Mat4f::scIdentity) const;
+	Patch MakeCap(uint32 edge, const FMat4& to_world = FMat4::scIdentity) const;
 
 	uint32 Thicken(float32 distance, Patch out_pieces[scMaxThickenPieces]) const;
-	uint32 Cap(Patch out_caps[scMaxCapPieces], const Mat4f& to_world = Mat4f::scIdentity) const;
+	uint32 Cap(Patch out_caps[scMaxCapPieces], const FMat4& to_world = FMat4::scIdentity) const;
 
-	uint32 BuildClosure(Patch out_pieces[scMaxClosurePieces], const Mat4f& to_world = Mat4f::scIdentity) const;
+	uint32 BuildClosure(Patch out_pieces[scMaxClosurePieces], const FMat4& to_world = FMat4::scIdentity) const;
 
 public:
 	uint32 Width = 0;

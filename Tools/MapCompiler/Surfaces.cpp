@@ -271,7 +271,7 @@ struct PlaneBasis
 		V = normal.Cross(U);
 	}
 
-	Vec2d Project(const DVec3& point) const { return Vec2d(point.Dot(U), point.Dot(V)); }
+	DVec2 Project(const DVec3& point) const { return DVec2(point.Dot(U), point.Dot(V)); }
 };
 
 class GroupPoints
@@ -280,9 +280,9 @@ public:
 	GroupPoints(const Array<DVec3>& points, const DVec3& normal) : mPoints(points), mBasis(normal) {}
 
 	/// Returned by value, since a reference into the cache would be invalidated when the cache grows
-	Vec2d operator[](int32 index)
+	DVec2 operator[](int32 index)
 	{
-		const Vec2d* found = mProjected.Find(index);
+		const DVec2* found = mProjected.Find(index);
 
 		if (found == nullptr) {
 			return mProjected.Emplace(index, mBasis.Project(mPoints[static_cast<size_t>(index)]));
@@ -294,10 +294,10 @@ public:
 private:
 	const Array<DVec3>& mPoints;
 	PlaneBasis mBasis;
-	HashMap<int32, Vec2d> mProjected;
+	HashMap<int32, DVec2> mProjected;
 };
 
-double GetSideDistance(const Vec2d& from, const Vec2d& to, const Vec2d& point)
+double GetSideDistance(const DVec2& from, const DVec2& to, const DVec2& point)
 {
 	const double length = (to - from).Length();
 
@@ -313,8 +313,8 @@ double GetLoopArea(const Loop& loop, GroupPoints& points)
 	double area = 0.0;
 
 	for (size_t i = 0; i < loop.Size; i++) {
-		const Vec2d& a = points[loop[i]];
-		const Vec2d& b = points[loop[(i + 1) % loop.Size]];
+		const DVec2& a = points[loop[i]];
+		const DVec2& b = points[loop[(i + 1) % loop.Size]];
 
 		area += a.X * b.Y - a.Y * b.X;
 	}
@@ -353,8 +353,8 @@ bool BuildLoops(const Array<EdgeKey>& edges, GroupPoints& points, Array<Loop>& o
 			const int32 from = edges[current].first;
 			const int32 at = edges[current].second;
 
-			const Vec2d& at_point = points[at];
-			const Vec2d& from_point = points[from];
+			const DVec2& at_point = points[at];
+			const DVec2& from_point = points[from];
 
 			const double back_x = from_point.X - at_point.X;
 			const double back_y = from_point.Y - at_point.Y;
@@ -367,7 +367,7 @@ bool BuildLoops(const Array<EdgeKey>& edges, GroupPoints& points, Array<Loop>& o
 					continue;
 				}
 
-				const Vec2d& to_point = points[edges[candidate].second];
+				const DVec2& to_point = points[edges[candidate].second];
 
 				const double out_x = to_point.X - at_point.X;
 				const double out_y = to_point.Y - at_point.Y;
@@ -470,9 +470,9 @@ void RemoveCollinearPoints(Loop& loop, GroupPoints& points)
 		for (size_t i = 0; i < loop.Size && loop.Size > 3; i++) {
 			const size_t count = loop.Size;
 
-			const Vec2d& previous = points[loop[(i + count - 1) % count]];
-			const Vec2d& current = points[loop[i]];
-			const Vec2d& next = points[loop[(i + 1) % count]];
+			const DVec2& previous = points[loop[(i + count - 1) % count]];
+			const DVec2& current = points[loop[i]];
+			const DVec2& next = points[loop[(i + 1) % count]];
 
 			const double along = (current.X - previous.X) * (next.X - current.X) +
 								 (current.Y - previous.Y) * (next.Y - current.Y);
@@ -577,9 +577,9 @@ bool TriangulateLoop(const Loop& loop, GroupPoints& points, Array<int32>& out_in
 			const int32 current_index = remaining[i];
 			const int32 next_index = remaining[(i + 1) % count];
 
-			const Vec2d& previous = points[previous_index];
-			const Vec2d& current = points[current_index];
-			const Vec2d& next = points[next_index];
+			const DVec2& previous = points[previous_index];
+			const DVec2& current = points[current_index];
+			const DVec2& next = points[next_index];
 
 			if (previous_index == next_index || GetSideDistance(previous, next, current) > -scCollinearEpsilon) {
 				continue;
@@ -594,7 +594,7 @@ bool TriangulateLoop(const Loop& loop, GroupPoints& points, Array<int32>& out_in
 					continue;
 				}
 
-				const Vec2d& other = points[other_index];
+				const DVec2& other = points[other_index];
 
 				blocked = GetSideDistance(previous, current, other) > -scInsideTolerance &&
 						  GetSideDistance(current, next, other) > -scInsideTolerance &&
@@ -1444,9 +1444,9 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 
 						vertex.Position = point.ToFVec3();
 						vertex.Normal = normal.ToFVec3();
-						vertex.Tangent = Vec4f(frame.Tangent.ToFVec3(), frame.Handedness);
+						vertex.Tangent = FVec4(frame.Tangent.ToFVec3(), frame.Handedness);
 
-						vertex.Texcoord = Vec2f(static_cast<float32>(map.GradientU.Dot(point) + map.OffsetU),
+						vertex.Texcoord = FVec2(static_cast<float32>(map.GradientU.Dot(point) + map.OffsetU),
 												static_cast<float32>(map.GradientV.Dot(point) + map.OffsetV));
 
 						found = batch.VertexLookup.emplace(vertex_key, batch.Vertices.Size).first;
@@ -1554,9 +1554,9 @@ void SurfaceBuilder::Triangulate(const PlaneSet& planes, const Bsp& bsp, const M
 						CompiledMapVertex vertex {};
 						vertex.Position = source_vertex.Position.ToFVec3();
 						vertex.Normal = source_vertex.Normal.ToFVec3();
-						vertex.Tangent = Vec4f(source_vertex.Tangent.ToFVec3(),
+						vertex.Tangent = FVec4(source_vertex.Tangent.ToFVec3(),
 											   static_cast<float32>(source_vertex.Handedness));
-						vertex.Texcoord = Vec2f(static_cast<float32>(source_vertex.Texcoord.X),
+						vertex.Texcoord = FVec2(static_cast<float32>(source_vertex.Texcoord.X),
 												static_cast<float32>(source_vertex.Texcoord.Y));
 
 						found = batch.PatchVertexLookup

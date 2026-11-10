@@ -11,8 +11,8 @@
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
 #include <Math/FVec3.hpp>
+#include <Math/FVec4.hpp>
 #include <Math/Vec2.hpp>
-#include <Math/Vec4.hpp>
 #include <Renderer/Limits.hpp>
 #include <Renderer/ProbePlacement.hpp>
 
@@ -25,8 +25,8 @@ struct CompiledMapVertex
 	FVec3 Position;
 	FVec3 Normal;
 	/// The fourth value is the handedness
-	Vec4f Tangent;
-	Vec2f Texcoord;
+	FVec4 Tangent;
+	FVec2 Texcoord;
 	/// Named so it is copied and written as zeros instead of whatever the allocation held
 	float32 Padding[2] = {};
 

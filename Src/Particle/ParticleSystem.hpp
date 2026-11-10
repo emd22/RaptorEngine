@@ -4,8 +4,8 @@
 #include <Core/SizedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
+#include <Math/FMat4.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Mat4.hpp>
 #include <Object/ObjectLayer.hpp>
 #include <Renderer/Backend/GpuBuffer.hpp>
 #include <Texture/AtlasConfig.hpp>
@@ -231,7 +231,7 @@ private:
 
 	struct LayerView
 	{
-		Mat4f ViewProjection;
+		FMat4 ViewProjection;
 		uint32 First = 0;
 		uint32 Count = 0;
 	};
@@ -253,7 +253,7 @@ private:
 
 	bool CollideParticle(Particle& particle, const ParticleEmitterDef& emitter, const FVec3 previous_position);
 
-	uint32 GatherLayer(eObjectLayer layer, const Mat4f& view_projection, const FVec3 eye, const FVec3 forward);
+	uint32 GatherLayer(eObjectLayer layer, const FMat4& view_projection, const FVec3 eye, const FVec3 forward);
 	void WriteInstances(uint32 first_instance, const FVec3 eye);
 
 	void BuildDescriptorSet(Image* atlas);

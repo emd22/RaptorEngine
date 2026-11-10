@@ -178,7 +178,7 @@ static void N_RObject_RotateToEuler(Object* obj, FLOAT4 euler_radians)
 		return;
 	}
 
-	obj->SetRotation(Quat::FromEulerAngles(FVec3(euler_radians)));
+	obj->SetRotation(FQuat::FromEulerAngles(FVec3(euler_radians)));
 }
 
 static FLOAT4 N_RObject_GetRotationEuler(Object* obj)
@@ -190,7 +190,7 @@ static FLOAT4 N_RObject_GetRotationEuler(Object* obj)
 	return obj->mRotation.GetEulerAngles().mIntrin;
 }
 
-static void N_print_float4(FLOAT4 v) { LogInfo(LC_SCRIPT, "{}", Vec4f(v)); }
+static void N_print_float4(FLOAT4 v) { LogInfo(LC_SCRIPT, "{}", FVec4(v)); }
 
 static uint32 N_RObject_GetTags(Object* obj)
 {
@@ -251,7 +251,7 @@ static FLOAT4 N_object_local_to_world(Object* obj, FLOAT4 point)
 	}
 
 	const FVec3 p(point);
-	const Vec4f world = obj->GetWorldMatrix() * Vec4f(p.X, p.Y, p.Z, 1.0f);
+	const FVec4 world = obj->GetWorldMatrix() * FVec4(p.X, p.Y, p.Z, 1.0f);
 
 	return FVec3(world.X, world.Y, world.Z).mIntrin;
 }
@@ -263,7 +263,7 @@ static FLOAT4 N_object_local_dir_to_world(Object* obj, FLOAT4 direction)
 	}
 
 	const FVec3 d(direction);
-	const Vec4f world = obj->GetWorldMatrix() * Vec4f(d.X, d.Y, d.Z, 0.0f);
+	const FVec4 world = obj->GetWorldMatrix() * FVec4(d.X, d.Y, d.Z, 0.0f);
 	const FVec3 world_dir(world.X, world.Y, world.Z);
 
 	if (world_dir.IsCloseTo(simd::LoadFloat4(0.0f))) {
@@ -439,7 +439,7 @@ static void N_blockout_preview_box(FLOAT4 min, FLOAT4 max)
 	FVec3 position;
 	const Brush brush = gWorld->pPrototype->MakeWorldBox(FVec3(min), FVec3(max), position);
 
-	gWorld->pPrototype->ShowPreview(position, Quat::scIdentity, brush);
+	gWorld->pPrototype->ShowPreview(position, FQuat::scIdentity, brush);
 }
 
 /// Previews the piece that a clip would split off
@@ -505,7 +505,7 @@ static void N_blockout_edit_face_texture(Object* object, FLOAT4 face, uint32 edi
 	Brush::PlaneList planes_after;
 
 	if (!gWorld->pPrototype->GetFaceTextureEdit(object, FVec3(face), static_cast<eFaceTextureEdit>(edit),
-												Vec2f(amount_vec.X, amount_vec.Y), planes_after)) {
+												FVec2(amount_vec.X, amount_vec.Y), planes_after)) {
 		return;
 	}
 
@@ -1065,7 +1065,7 @@ static void N_RLightSpot_SetPosition(LightSpot* light, FLOAT4 position) { light-
 
 static void N_RLightSpot_SetRotationEuler(LightSpot* light, FLOAT4 rotation_euler)
 {
-	light->SetRotation(Quat::FromEulerAngles(FVec3(rotation_euler)));
+	light->SetRotation(FQuat::FromEulerAngles(FVec3(rotation_euler)));
 }
 
 static float32 N_RLightSpot_GetInnerAngle(LightSpot* light) { return light->GetInnerAngle(); }

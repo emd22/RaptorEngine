@@ -28,8 +28,8 @@ public:
 	void CreateSlimFrom(const SizedArray<float32>& positions, eVertexCreateFlags create_flags);
 	void CreateSlimFrom(const SizedArray<FVec3>& positions, eVertexCreateFlags create_flags);
 
-	void CreateFrom(const SizedArray<FVec3>& positions, const SizedArray<FVec3>& normals, const SizedArray<Vec2f>& uvs,
-					const SizedArray<FVec3>& tangents, const SizedArray<Vec4f>& bone_weights,
+	void CreateFrom(const SizedArray<FVec3>& positions, const SizedArray<FVec3>& normals, const SizedArray<FVec2>& uvs,
+					const SizedArray<FVec3>& tangents, const SizedArray<FVec4>& bone_weights,
 					const SizedArray<Vec4u>& bone_ids, eVertexCreateFlags create_flags,
 					const SizedArray<float32>& tangent_handedness = {});
 

@@ -70,12 +70,12 @@ struct ChartGrid
 	uint32 Columns = 0;
 	uint32 Rows = 0;
 
-	Array<Vec2d> Points;
+	Array<DVec2> Points;
 
-	Vec2d Find(const Patch& patch, const Vec2d& parameter) const
+	DVec2 Find(const Patch& patch, const DVec2& parameter) const
 	{
 		if (Points.Size == 0) {
-			return Vec2d(0.0, 0.0);
+			return DVec2(0.0, 0.0);
 		}
 
 		const int64 column = std::clamp<int64>(std::llround(parameter.X * patch.SubdivisionsU), 0, Columns - 1);
@@ -144,7 +144,7 @@ void BuildChartGrid(const Patch& patch, ChartGrid& out_grid)
 				along += (at(row, column) - at(row, column - 1)).Length();
 			}
 
-			out_grid.Points.Emplace(Vec2d(along, row_heights[row]));
+			out_grid.Points.Emplace(DVec2(along, row_heights[row]));
 		}
 	}
 }

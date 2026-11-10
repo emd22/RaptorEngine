@@ -116,7 +116,7 @@ void SoundEditor::DrawMarkers()
 			color = colors.SoundSelected;
 		}
 
-		renderer::gDebugDraw->SolidBox(emitter.Position, FVec3(scMarkerHalfExtent), Quat::scIdentity, color);
+		renderer::gDebugDraw->SolidBox(emitter.Position, FVec3(scMarkerHalfExtent), FQuat::scIdentity, color);
 	}
 }
 

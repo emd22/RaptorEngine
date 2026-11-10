@@ -281,11 +281,11 @@ bool Blockout::GetClipPieces(Object* object, const FVec3 point_a, const FVec3 po
 		return false;
 	}
 
-	const Mat4f to_local = object->GetWorldMatrix().AffineInverse();
+	const FMat4 to_local = object->GetWorldMatrix().AffineInverse();
 
-	const Vec4f local_a = to_local * Vec4f(point_a.X, point_a.Y, point_a.Z, 1.0f);
-	const Vec4f local_b = to_local * Vec4f(point_b.X, point_b.Y, point_b.Z, 1.0f);
-	const Vec4f local_normal = to_local * Vec4f(face_normal.X, face_normal.Y, face_normal.Z, 0.0f);
+	const FVec4 local_a = to_local * FVec4(point_a.X, point_a.Y, point_a.Z, 1.0f);
+	const FVec4 local_b = to_local * FVec4(point_b.X, point_b.Y, point_b.Z, 1.0f);
+	const FVec4 local_normal = to_local * FVec4(face_normal.X, face_normal.Y, face_normal.Z, 0.0f);
 
 	const FVec3 a(local_a.X, local_a.Y, local_a.Z);
 	const FVec3 b(local_b.X, local_b.Y, local_b.Z);
@@ -322,19 +322,19 @@ bool Blockout::GetSubtractPieces(Object* target, Object* cutter, Brush::PieceLis
 		return false;
 	}
 
-	const Mat4f to_world = cutter->GetWorldMatrix();
-	const Mat4f to_local = target->GetWorldMatrix().AffineInverse();
+	const FMat4 to_world = cutter->GetWorldMatrix();
+	const FMat4 to_local = target->GetWorldMatrix().AffineInverse();
 
 	Brush::PlaneList cutter_planes;
 
 	for (const BrushPlane& plane : cutter_brush->Planes) {
 		const FVec3 point = plane.Normal * plane.Distance;
 
-		const Vec4f world_point = to_world * Vec4f(point.X, point.Y, point.Z, 1.0f);
-		const Vec4f world_normal = to_world * Vec4f(plane.Normal.X, plane.Normal.Y, plane.Normal.Z, 0.0f);
+		const FVec4 world_point = to_world * FVec4(point.X, point.Y, point.Z, 1.0f);
+		const FVec4 world_normal = to_world * FVec4(plane.Normal.X, plane.Normal.Y, plane.Normal.Z, 0.0f);
 
-		const Vec4f local_point = to_local * world_point;
-		const Vec4f local_normal = to_local * world_normal;
+		const FVec4 local_point = to_local * world_point;
+		const FVec4 local_normal = to_local * world_normal;
 
 		const FVec3 normal(local_normal.X, local_normal.Y, local_normal.Z);
 		const float32 length = normal.Length();
@@ -378,7 +378,7 @@ Brush Blockout::MakeWorldBox(const FVec3 min, const FVec3 max, FVec3& out_positi
 	return brush;
 }
 
-void Blockout::ShowPreview(const FVec3 position, const Quat rotation, const Brush& brush)
+void Blockout::ShowPreview(const FVec3 position, const FQuat rotation, const Brush& brush)
 {
 	if (!brush.IsValid()) {
 		HidePreview();
@@ -416,7 +416,7 @@ void Blockout::HidePreview()
 	pPreviewObject->SetPosition(FVec3(-200.0f));
 }
 
-bool Blockout::GetFaceTextureEdit(Object* object, const FVec3 face_normal, eFaceTextureEdit edit, const Vec2f& amount,
+bool Blockout::GetFaceTextureEdit(Object* object, const FVec3 face_normal, eFaceTextureEdit edit, const FVec2& amount,
 								  Brush::PlaneList& out_planes)
 {
 	Brush* brush = GetBrush(object);
@@ -488,9 +488,9 @@ bool Blockout::RaycastFace(Object* object, const FVec3 origin, const FVec3 direc
 	}
 
 	// Bring the ray into the brush's local space
-	const Mat4f to_local = object->GetWorldMatrix().AffineInverse();
-	const Vec4f local_origin = to_local * Vec4f(origin.X, origin.Y, origin.Z, 1.0f);
-	const Vec4f local_direction = to_local * Vec4f(direction.X, direction.Y, direction.Z, 0.0f);
+	const FMat4 to_local = object->GetWorldMatrix().AffineInverse();
+	const FVec4 local_origin = to_local * FVec4(origin.X, origin.Y, origin.Z, 1.0f);
+	const FVec4 local_direction = to_local * FVec4(direction.X, direction.Y, direction.Z, 0.0f);
 
 	float32 distance;
 	uint32 plane_index;
@@ -598,9 +598,9 @@ const String& Blockout::GetSurfaceAt(const physics::RayResult& hit)
 		return mMaterials.GetSurface(object_material);
 	}
 
-	const Mat4f to_local = object->GetWorldMatrix().AffineInverse();
-	const Vec4f local_point = to_local * Vec4f(hit.Point.X, hit.Point.Y, hit.Point.Z, 1.0f);
-	const Vec4f local_normal = to_local * Vec4f(hit.Normal.X, hit.Normal.Y, hit.Normal.Z, 0.0f);
+	const FMat4 to_local = object->GetWorldMatrix().AffineInverse();
+	const FVec4 local_point = to_local * FVec4(hit.Point.X, hit.Point.Y, hit.Point.Z, 1.0f);
+	const FVec4 local_normal = to_local * FVec4(hit.Normal.X, hit.Normal.Y, hit.Normal.Z, 0.0f);
 
 	std::vector<float32> planes(brush->Planes.Size * 4);
 
@@ -658,10 +658,10 @@ void Blockout::RebuildAcoustics()
 			continue;
 		}
 
-		const Mat4f world = object->GetWorldMatrix();
+		const FMat4 world = object->GetWorldMatrix();
 		const auto to_world = [&world](const FVec3 point)
 		{
-			const Vec4f transformed = world * Vec4f(point.X, point.Y, point.Z, 1.0f);
+			const FVec4 transformed = world * FVec4(point.X, point.Y, point.Z, 1.0f);
 			return FVec3(transformed.X, transformed.Y, transformed.Z);
 		};
 
@@ -682,7 +682,7 @@ void Blockout::RebuildAcoustics()
 						GetAcousticSurface(mMaterials.FindIDByName(plane.Material.CStr())));
 				}
 
-				const Vec4f normal4 = world * Vec4f(plane.Normal.X, plane.Normal.Y, plane.Normal.Z, 0.0f);
+				const FVec4 normal4 = world * FVec4(plane.Normal.X, plane.Normal.Y, plane.Normal.Z, 0.0f);
 				const FVec3 normal(normal4.X, normal4.Y, normal4.Z);
 
 				const FVec3 first = to_world(face.Vertices[0]);
@@ -707,7 +707,7 @@ void Blockout::RebuildAcoustics()
 			SizedArray<FVec3> normals;
 			SizedArray<FVec3> tangents;
 			SizedArray<float32> handedness;
-			SizedArray<Vec2f> texcoords;
+			SizedArray<FVec2> texcoords;
 			SizedArray<uint32> indices;
 
 			patch->GenerateMesh(positions, normals, tangents, handedness, texcoords, indices);
@@ -925,7 +925,7 @@ void Blockout::CreateCompiledShadows(const CompiledMap& map)
 			mesh->Normals.Insert(FVec3::sUp);
 			mesh->Tangents.Insert(FVec3::sRight);
 			mesh->TangentHandedness.Insert(1.0f);
-			mesh->Texcoords.Insert(Vec2f(0.0f, 0.0f));
+			mesh->Texcoords.Insert(FVec2(0.0f, 0.0f));
 		}
 
 		for (const uint32 index : surface.Indices) {
@@ -966,7 +966,7 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 	bool has_lightmap = false;
 
 	if (map.HasLightmap()) {
-		has_lightmap = renderer::gGraphics->UploadLightmap(Vec2u(lightmap.Width, lightmap.Height),
+		has_lightmap = renderer::gGraphics->UploadLightmap(UVec2(lightmap.Width, lightmap.Height),
 														   lightmap.SunVisibility.pData, irradiance, directions);
 
 		if (!has_lightmap) {
@@ -1160,7 +1160,7 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 								   });
 
 		body->SetMidpoint(midpoint);
-		body->Teleport(FVec3::sZero, Quat::scIdentity);
+		body->Teleport(FVec3::sZero, FQuat::scIdentity);
 
 		mCompiledBodies.push_back(body->GetID());
 
@@ -1207,7 +1207,7 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 		body->CreateTriangleMeshBody(positions, mesh.Indices, physics::BodyProps {}, &triangle_materials);
 
 		body->SetMidpoint(midpoint);
-		body->Teleport(FVec3::sZero, Quat::scIdentity);
+		body->Teleport(FVec3::sZero, FQuat::scIdentity);
 
 		mCompiledBodies.push_back(body->GetID());
 
@@ -1360,7 +1360,7 @@ static void HashBytes(uint64& hash, const void* data, size_t size)
 
 static void HashFloat(uint64& hash, float32 value) { HashBytes(hash, &value, sizeof(value)); }
 
-static void HashMatrix(uint64& hash, const Mat4f& matrix) { HashBytes(hash, matrix.RawData, sizeof(matrix.RawData)); }
+static void HashMatrix(uint64& hash, const FMat4& matrix) { HashBytes(hash, matrix.RawData, sizeof(matrix.RawData)); }
 
 static void HashPlanes(uint64& hash, const Brush& brush)
 {
@@ -1372,16 +1372,16 @@ static void HashPlanes(uint64& hash, const Brush& brush)
 	}
 }
 
-static FVec3 TransformPoint(const Mat4f& matrix, const FVec3 point)
+static FVec3 TransformPoint(const FMat4& matrix, const FVec3 point)
 {
-	const Vec4f moved = matrix * Vec4f(point.X, point.Y, point.Z, 1.0f);
+	const FVec4 moved = matrix * FVec4(point.X, point.Y, point.Z, 1.0f);
 
 	return FVec3(moved.X, moved.Y, moved.Z);
 }
 
-static FVec3 TransformDirection(const Mat4f& matrix, const FVec3 direction)
+static FVec3 TransformDirection(const FMat4& matrix, const FVec3 direction)
 {
-	const Vec4f turned = matrix * Vec4f(direction.X, direction.Y, direction.Z, 0.0f);
+	const FVec4 turned = matrix * FVec4(direction.X, direction.Y, direction.Z, 0.0f);
 
 	return FVec3(turned.X, turned.Y, turned.Z);
 }
@@ -1434,11 +1434,11 @@ static void AttachPatchMesh(Object* object, MeshGen::GeneratedMesh& mesh, const 
 	object->SetVertexColored(has_colors);
 }
 
-static void MakePatchWorldMesh(const Patch& patch, const Mat4f& world, PatchWorldMesh& out_mesh)
+static void MakePatchWorldMesh(const Patch& patch, const FMat4& world, PatchWorldMesh& out_mesh)
 {
 	SizedArray<FVec3> tangents;
 	SizedArray<float32> handedness;
-	SizedArray<Vec2f> texcoords;
+	SizedArray<FVec2> texcoords;
 
 	patch.GenerateMesh(out_mesh.Positions, out_mesh.Normals, tangents, handedness, texcoords, out_mesh.Indices);
 
@@ -1457,7 +1457,7 @@ static bool BoundsOverlap(const BBox& a, const BBox& b)
 		   a.Max.Z >= b.Min.Z;
 }
 
-static BBox GetBrushWorldBounds(const Brush& brush, const Mat4f& world)
+static BBox GetBrushWorldBounds(const Brush& brush, const FMat4& world)
 {
 	return OBBox::FromLocalBounds(BBox(brush.GetBoundsMin(), brush.GetBoundsMax()), world).GetWorldAABB();
 }
@@ -1487,7 +1487,7 @@ void Blockout::GatherDecalReceivers(const BBox& bounds, DynArray<DecalReceiver, 
 			continue;
 		}
 
-		const Mat4f world = object->GetWorldMatrix();
+		const FMat4 world = object->GetWorldMatrix();
 
 		if (BoundsOverlap(GetBrushWorldBounds(*brush, world), bounds)) {
 			out_receivers.Insert(DecalReceiver { .pBrush = brush, .World = world, .ID = object->ID });
@@ -1502,7 +1502,7 @@ void Blockout::GatherDecalReceivers(const BBox& bounds, DynArray<DecalReceiver, 
 			continue;
 		}
 
-		const Mat4f world = object->GetWorldMatrix();
+		const FMat4 world = object->GetWorldMatrix();
 
 		if (BoundsOverlap(OBBox::FromLocalBounds(object->Bounds, world).GetWorldAABB(), bounds)) {
 			out_receivers.Insert(DecalReceiver { .pPatch = patch, .World = world, .ID = object->ID });
@@ -1555,7 +1555,7 @@ uint64 Blockout::HashDecal(Object* decal, const Brush& volume, const BBox& bound
 
 void Blockout::RebuildDecalMesh(Object* decal, const Brush& volume)
 {
-	const Mat4f world = decal->GetWorldMatrix();
+	const FMat4 world = decal->GetWorldMatrix();
 	const BBox bounds = GetBrushWorldBounds(volume, world);
 
 	MeshDecalBuilder builder(volume, world);
@@ -1637,10 +1637,10 @@ void Blockout::RefreshDecals(bool force)
 	}
 }
 
-static bool RayEntersBrush(const Brush& brush, const Mat4f& world, const FVec3 origin, const FVec3 direction,
+static bool RayEntersBrush(const Brush& brush, const FMat4& world, const FVec3 origin, const FVec3 direction,
 						   float32& out_distance)
 {
-	const Mat4f to_local = world.AffineInverse();
+	const FMat4 to_local = world.AffineInverse();
 	const FVec3 local_origin = TransformPoint(to_local, origin);
 	const FVec3 local_direction = TransformDirection(to_local, direction);
 
@@ -2024,7 +2024,7 @@ void Blockout::RebuildPatch(Object* object, Patch&& patch)
 	const FVec3 center = patch.GetCenter();
 	object->SetRotationOrigin(-center);
 
-	const Mat4f world = object->GetWorldMatrix();
+	const FMat4 world = object->GetWorldMatrix();
 
 	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
 	SizedArray<uint32> colors;
@@ -2044,7 +2044,7 @@ void Blockout::RebuildPatch(Object* object, Patch&& patch)
 		mesh->Normals = { FVec3::sUp, FVec3::sUp, FVec3::sUp };
 		mesh->Tangents = { FVec3(1.0f, 0.0f, 0.0f), FVec3(1.0f, 0.0f, 0.0f), FVec3(1.0f, 0.0f, 0.0f) };
 		mesh->TangentHandedness = { 1.0f, 1.0f, 1.0f };
-		mesh->Texcoords = { Vec2f::scZero, Vec2f::scZero, Vec2f::scZero };
+		mesh->Texcoords = { FVec2::scZero, FVec2::scZero, FVec2::scZero };
 		mesh->Indices = { 0, 1, 2 };
 	}
 
@@ -2099,7 +2099,7 @@ void Blockout::RefreshCappedPatches()
 			continue;
 		}
 
-		const Mat4f world = object->GetWorldMatrix();
+		const FMat4 world = object->GetWorldMatrix();
 
 		uint64 frame = FX_HASH64_FNV1A_INIT;
 		HashMatrix(frame, world);
@@ -2157,9 +2157,9 @@ bool Blockout::RaycastPatch(Object* object, const FVec3 origin, const FVec3 dire
 		return false;
 	}
 
-	const Mat4f to_local = object->GetWorldMatrix().AffineInverse();
-	const Vec4f local_origin4 = to_local * Vec4f(origin.X, origin.Y, origin.Z, 1.0f);
-	const Vec4f local_direction4 = to_local * Vec4f(direction.X, direction.Y, direction.Z, 0.0f);
+	const FMat4 to_local = object->GetWorldMatrix().AffineInverse();
+	const FVec4 local_origin4 = to_local * FVec4(origin.X, origin.Y, origin.Z, 1.0f);
+	const FVec4 local_direction4 = to_local * FVec4(direction.X, direction.Y, direction.Z, 0.0f);
 
 	const DVec3 local_origin(local_origin4.X, local_origin4.Y, local_origin4.Z);
 	const DVec3 local_direction(local_direction4.X, local_direction4.Y, local_direction4.Z);
@@ -2168,7 +2168,7 @@ bool Blockout::RaycastPatch(Object* object, const FVec3 origin, const FVec3 dire
 	SizedArray<FVec3> normals;
 	SizedArray<FVec3> tangents;
 	SizedArray<float32> handedness;
-	SizedArray<Vec2f> texcoords;
+	SizedArray<FVec2> texcoords;
 	SizedArray<uint32> indices;
 
 	patch->GenerateMesh(positions, normals, tangents, handedness, texcoords, indices);
@@ -2291,7 +2291,7 @@ void Blockout::WriteBrushEntry(ConfigEntry& entry, const Object* object)
 	WriteFaceMaterials(entry, *brush);
 }
 
-ObjectID Blockout::CreateBrush(const String& name, const FVec3 position, const Quat rotation,
+ObjectID Blockout::CreateBrush(const String& name, const FVec3 position, const FQuat rotation,
 							   const MaterialID material_id, const BBox bounds)
 {
 	static constexpr eObjectTag scObjectTags = eObjectTag::Blockout;
@@ -2635,7 +2635,7 @@ bool Blockout::ContainsPoint(Object* object, const FVec3 point)
 		return object->ContainsPoint(point);
 	}
 
-	const Vec4f local = object->GetWorldMatrix().AffineInverse() * Vec4f(point.X, point.Y, point.Z, 1.0f);
+	const FVec4 local = object->GetWorldMatrix().AffineInverse() * FVec4(point.X, point.Y, point.Z, 1.0f);
 
 	return brush->ContainsPoint(FVec3(local.X, local.Y, local.Z));
 }
@@ -2685,7 +2685,7 @@ static String MakeRestoredName(const Name& name, uint32 object_count)
 	return restored_name;
 }
 
-Object* Blockout::RestorePatch(const FVec3 position, const Patch& patch, MaterialID material, const Quat rotation,
+Object* Blockout::RestorePatch(const FVec3 position, const Patch& patch, MaterialID material, const FQuat rotation,
 							   const Name& name)
 {
 	if (!patch.IsValid()) {
@@ -2718,7 +2718,7 @@ Object* Blockout::RestorePatch(const FVec3 position, const Patch& patch, Materia
 }
 
 Object* Blockout::RestoreObject(const FVec3 position, const Brush::PlaneList& planes, MaterialID material,
-								const Quat rotation, const Name& name, bool is_dynamic, bool is_decal)
+								const FQuat rotation, const Name& name, bool is_dynamic, bool is_decal)
 {
 	Brush brush = Brush::FromPlanes(planes);
 
@@ -3076,7 +3076,7 @@ void Blockout::ApplyModelProperties(Object& object, Model& model, const ConfigEn
 		object.SetShadowCaster(shadows->Get<int64>() != 0);
 	}
 
-	Quat rotation = entry.GetMemberValue(HashStr32("rot"), object.mRotation);
+	FQuat rotation = entry.GetMemberValue(HashStr32("rot"), object.mRotation);
 	rotation = entry.GetMemberValue(HashStr32("rotquat"), rotation);
 
 	object.SetPosition(entry.GetMemberValue(HashStr32("pos"), object.mPosition));
@@ -3198,19 +3198,6 @@ void Blockout::LoadModels(const ConfigEntry* list, const std::string& mesh_root)
 	LinkModelColliders();
 }
 
-void Blockout::LoadLegacyModels()
-{
-	const std::string scene_path = gAssetManager->GetScenePath().CStr();
-
-	if (scene_path.empty()) {
-		return;
-	}
-
-	ConfigFile info {};
-	info.Load(scene_path + "/info.prx");
-
-	LoadModels(info.HasErrors() ? nullptr : info.GetEntry(HashStr32("objects")), scene_path + "/Models");
-}
 
 void Blockout::LoadFog(ConfigFile& info)
 {
@@ -3366,10 +3353,10 @@ ConfigEntry Blockout::MakeBrushEntry(Object* object, const String& name, const B
 // Subviews
 /////////////////////////////////////
 
-static Mat4f MakeBrushMatrix(const BrushPlacement& placement, const FVec3 center)
+static FMat4 MakeBrushMatrix(const BrushPlacement& placement, const FVec3 center)
 {
-	return Mat4f::AsTranslation(-center) * Mat4f::AsRotation(placement.Rotation) * Mat4f::AsTranslation(center) *
-		   Mat4f::AsTranslation(placement.Position);
+	return FMat4::AsTranslation(-center) * FMat4::AsRotation(placement.Rotation) * FMat4::AsTranslation(center) *
+		   FMat4::AsTranslation(placement.Position);
 }
 
 static ConfigEntry MakeSubviewInstanceEntry(const String& name, const String& subview_name,
@@ -3774,7 +3761,7 @@ void Blockout::BuildSubview(Subview& subview)
 		std::vector<FVec3> Normals;
 		std::vector<FVec3> Tangents;
 		std::vector<float32> TangentHandedness;
-		std::vector<Vec2f> Texcoords;
+		std::vector<FVec2> Texcoords;
 		std::vector<uint32> Indices;
 
 		FVec3 Min = FVec3(FLT_MAX);
@@ -4012,7 +3999,7 @@ void Blockout::GetSubviewSolids(DynArray<SubviewSolid, GrowthFunctions::Double>&
 			continue;
 		}
 
-		const Mat4f world = root->GetWorldMatrix();
+		const FMat4 world = root->GetWorldMatrix();
 
 		for (const SubviewMember& member : subview->Members) {
 			if (!member.bMerged) {
@@ -4119,7 +4106,7 @@ bool Blockout::GetBrushBounds(Object* const* objects, uint32 count, BBox& out_bo
 			continue;
 		}
 
-		const Mat4f world = member->GetWorldMatrix();
+		const FMat4 world = member->GetWorldMatrix();
 
 		if (patch != nullptr) {
 			const OBBox box = OBBox::FromLocalBounds(member->Bounds, world);
@@ -4132,7 +4119,7 @@ bool Blockout::GetBrushBounds(Object* const* objects, uint32 count, BBox& out_bo
 		}
 
 		for (const FVec3 vertex : brush->GetVertices()) {
-			const Vec4f point = world * Vec4f(vertex.X, vertex.Y, vertex.Z, 1.0f);
+			const FVec4 point = world * FVec4(vertex.X, vertex.Y, vertex.Z, 1.0f);
 
 			min = FVec3(std::min(min.X, point.X), std::min(min.Y, point.Y), std::min(min.Z, point.Z));
 			max = FVec3(std::max(max.X, point.X), std::max(max.Y, point.Y), std::max(max.Z, point.Z));
@@ -4990,7 +4977,7 @@ void Blockout::ResetToTemplate()
 	MaterialLibraryID lib_base_material = gWorld->pPrototype->mMaterials.FindIDByName("white_tile");
 	MaterialID base_material = gWorld->pPrototype->mMaterials.GetMaterial(lib_base_material);
 
-	CreateBrush("base", FVec3(0.0f, -2.0f, 0.0f), Quat::scIdentity, base_material,
+	CreateBrush("base", FVec3(0.0f, -2.0f, 0.0f), FQuat::scIdentity, base_material,
 				BBox(FVec3(-10.0f, -0.1f, -10.0f), FVec3(10.0f, 0.0f, 10.0f)));
 
 	gLightManager->Clear();
@@ -5110,9 +5097,6 @@ ePrototypeLoadStatus Blockout::Load(const String& opened_path)
 
 	if (mbHasModelsEntry) {
 		LoadModels(models_entry, "");
-	}
-	else {
-		LoadLegacyModels();
 	}
 
 	RefreshDecals(true);

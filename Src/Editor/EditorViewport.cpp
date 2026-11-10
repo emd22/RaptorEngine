@@ -13,9 +13,9 @@ namespace fx::editor {
 
 static eKey OffsetKey(eKey base, int32 offset) { return static_cast<eKey>(static_cast<int32>(base) + offset); }
 
-static Vec2f ToMouseMotion(const wxPoint delta)
+static FVec2 ToMouseMotion(const wxPoint delta)
 {
-	return Vec2f(static_cast<float32>(delta.x), static_cast<float32>(delta.y));
+	return FVec2(static_cast<float32>(delta.x), static_cast<float32>(delta.y));
 }
 
 /**

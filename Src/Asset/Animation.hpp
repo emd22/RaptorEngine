@@ -5,9 +5,9 @@
 #include <Core/SizedArray.hpp>
 #include <Core/StackArray.hpp>
 #include <Core/String.hpp>
+#include <Math/FMat4.hpp>
+#include <Math/FQuat.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Mat4.hpp>
-#include <Math/Quat.hpp>
 #include <Renderer/Limits.hpp>
 
 namespace fx {
@@ -37,7 +37,7 @@ struct BoneTransformTrack
 struct BoneTrack
 {
 	BoneTransformTrack<FVec3> Translation;
-	BoneTransformTrack<Quat> Rotation;
+	BoneTransformTrack<FQuat> Rotation;
 	BoneTransformTrack<FVec3> Scale;
 };
 
@@ -73,7 +73,7 @@ struct AnimationPlayback
 struct BoneTransform
 {
 	FVec3 Translation = FVec3::sZero;
-	Quat Rotation = Quat::scIdentity;
+	FQuat Rotation = FQuat::scIdentity;
 	FVec3 Scale = FVec3::sOne;
 };
 
@@ -147,16 +147,25 @@ public:
 	void SetExternalPose(bool enabled);
 	FX_FORCE_INLINE bool HasExternalPose() const { return mbExternalPose; }
 
-	void PoseFromDrivenBones(const Mat4f* driven_world, const uint8* is_driven);
+	void PoseFromDrivenBones(const FMat4* driven_world, const uint8* is_driven);
 
 	void BuildEvaluationOrder();
 
+
+private:
+	void UpdatePoseSummary();
+	void EnsurePoseBuffers();
+	void StartInertialization(const AnimationPlayback* playback, float32 delta_time);
+	void ApplyInertialization(float32 delta_time);
+	void StoreOutputPose(const BoneTransform* pose, float32 delta_time);
+
+
 public:
-	SizedArray<Mat4f> InvBindTransforms;
+	SizedArray<FMat4> InvBindTransforms;
 
 	SizedArray<BoneTransform> RestPose;
 
-	SizedArray<Mat4f> RootTransforms;
+	SizedArray<FMat4> RootTransforms;
 	SizedArray<uint32> ParentIndices;
 	SizedArray<uint32> EvaluationOrder;
 
@@ -164,9 +173,9 @@ public:
 
 	uint32 JointCount = 0;
 
-	SizedArray<Mat4f> LocalTransforms;
-	SizedArray<Mat4f> WorldTransforms;
-	SizedArray<Mat4f> SkinningMatrices;
+	SizedArray<FMat4> LocalTransforms;
+	SizedArray<FMat4> WorldTransforms;
+	SizedArray<FMat4> SkinningMatrices;
 
 	SizedArray<Animation> Animations;
 
@@ -187,12 +196,6 @@ public:
 	uint32 LastPoseFrame = UINT32_MAX;
 
 private:
-	void UpdatePoseSummary();
-	void EnsurePoseBuffers();
-	void StartInertialization(const AnimationPlayback* playback, float32 delta_time);
-	void ApplyInertialization(float32 delta_time);
-	void StoreOutputPose(const BoneTransform* pose, float32 delta_time);
-
 	bool mbExternalPose = false;
 
 	/// Set once the rest pose has been evaluated, as it never changes and only needs posing once.

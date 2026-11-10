@@ -2,8 +2,8 @@
 
 #include <Core/Types.hpp>
 #include <Math/FVec3.hpp>
+#include <Math/FVec4.hpp>
 #include <Math/Vec2.hpp>
-#include <Math/Vec4.hpp>
 
 namespace fx::renderer {
 
@@ -46,8 +46,6 @@ struct Vertex<eVertexType::Default>
 	float32 Position[3];
 	float32 Normal[3];
 	float32 UV[2];
-	/// xyz is the tangent, w is the bitangent's handedness (+1 or -1) as glTF stores it. Mirrored UV shells have
-	/// it negative, and the shader rebuilds the bitangent as cross(normal, tangent) * w.
 	float32 Tangent[4];
 };
 

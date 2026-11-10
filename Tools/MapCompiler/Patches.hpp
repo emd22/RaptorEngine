@@ -20,8 +20,8 @@ struct PatchSurfaceVertex
 	DVec3 Normal = DVec3(0.0);
 	DVec3 Tangent = DVec3(0.0);
 	double Handedness = 1.0;
-	Vec2d Texcoord = Vec2d(0.0, 0.0);
-	Vec2d Chart = Vec2d(0.0, 0.0);
+	DVec2 Texcoord = DVec2(0.0, 0.0);
+	DVec2 Chart = DVec2(0.0, 0.0);
 	PatchColor Color;
 };
 

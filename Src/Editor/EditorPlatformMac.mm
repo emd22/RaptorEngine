@@ -141,7 +141,7 @@ void SetRelativeMouseMode(void* ns_view, bool enabled)
 	}
 }
 
-Vec2f ConsumeRelativeMouseDelta()
+FVec2 ConsumeRelativeMouseDelta()
 {
 	os_unfair_lock_lock(&sMouseLock);
 
@@ -149,7 +149,7 @@ Vec2f ConsumeRelativeMouseDelta()
 	const bool use_raw = (sRawDeltaX != 0.0 || sRawDeltaY != 0.0) ||
 						 (CACurrentMediaTime() - sLastRawTime) < scRawMouseHoldSeconds;
 
-	const Vec2f delta(static_cast<float32>(use_raw ? sRawDeltaX : sEventDeltaX),
+	const FVec2 delta(static_cast<float32>(use_raw ? sRawDeltaX : sEventDeltaX),
 					  static_cast<float32>(use_raw ? sRawDeltaY : sEventDeltaY));
 
 	sEventDeltaX = 0.0;

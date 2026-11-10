@@ -135,6 +135,7 @@ public:
 
 private:
 	Pipeline* mpPipeline = nullptr;
+
 	/// Pipelines made from a description have no ePipelineName, and this is NumPipelines
 	ePipelineName mPipelineName = ePipelineName::NumPipelines;
 	const char* mDebugName = "";

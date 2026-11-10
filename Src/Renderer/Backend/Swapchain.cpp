@@ -13,7 +13,7 @@ namespace fx::renderer {
 
 FX_SET_MODULE_NAME("Swapchain")
 
-void Swapchain::Init(Vec2u size, VkSurfaceKHR surface, GpuDevice* device)
+void Swapchain::Init(UVec2 size, VkSurfaceKHR surface, GpuDevice* device)
 {
 	mDevice = device;
 
@@ -26,7 +26,7 @@ void Swapchain::Init(Vec2u size, VkSurfaceKHR surface, GpuDevice* device)
 	bInitialized = true;
 }
 
-void Swapchain::Rebuild(Vec2u new_size, VkSurfaceKHR surface)
+void Swapchain::Rebuild(UVec2 new_size, VkSurfaceKHR surface)
 {
 	// Wait until the GPU has stopped processing commands and all images are unbound
 	mDevice->WaitForIdle();
@@ -108,7 +108,7 @@ void Swapchain::CreateImageViews()
 	}
 }
 
-void Swapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR surface)
+void Swapchain::CreateSwapchain(UVec2 size, VkSurfaceKHR surface)
 {
 	Extent = size;
 

@@ -4,30 +4,30 @@
 
 #ifdef FX_USE_AVX
 
-#include <Math/Quat.hpp>
+#include <Math/FQuat.hpp>
 #include <Math/SSE.hpp>
 #include <Math/SSEUtil.hpp>
 
 namespace fx {
 
-FX_FORCE_INLINE Quat& Quat::operator=(const __m128 other)
+FX_FORCE_INLINE FQuat& FQuat::operator=(const __m128 other)
 {
 	mIntrin = other;
 	return *this;
 }
 
-FX_FORCE_INLINE Quat::Quat(const float32* buffer)
+FX_FORCE_INLINE FQuat::FQuat(const float32* buffer)
 {
 	const float32 aligned_buffer[] = { buffer[0], buffer[1], buffer[2], buffer[3] };
 	mIntrin = _mm_load_ps(aligned_buffer);
 }
 
-FX_FORCE_INLINE bool Quat::IsCloseTo(const Quat other, const float32 tolerance) const
+FX_FORCE_INLINE bool FQuat::IsCloseTo(const FQuat other, const float32 tolerance) const
 {
 	return IsCloseTo(other.mIntrin, tolerance);
 }
 
-FX_FORCE_INLINE FVec3 Quat::GetDirection() const
+FX_FORCE_INLINE FVec3 FQuat::GetDirection() const
 {
 	// dir X = (2.0 * ((X * Z) + (Y * W)))
 	// dir Y = (2.0 * ((Y * Z) - (X * W)))
@@ -40,7 +40,7 @@ FX_FORCE_INLINE FVec3 Quat::GetDirection() const
 	return FVec3(dir_x, dir_y, dir_z);
 }
 
-FX_FORCE_INLINE bool Quat::IsCloseTo(const __m128 other, const float32 tolerance) const
+FX_FORCE_INLINE bool FQuat::IsCloseTo(const __m128 other, const float32 tolerance) const
 {
 	// Get the absolute difference
 	const __m128 diff = SSE::RemoveSign(_mm_sub_ps(mIntrin, other));
@@ -60,7 +60,7 @@ FX_FORCE_INLINE bool Quat::IsCloseTo(const __m128 other, const float32 tolerance
 //     mIntrin = _mm_add_ps(_mm_mul_ps(inv_step_v, mIntrin), _mm_mul_ps(step_v, dest.mIntrin));
 // }
 
-FX_FORCE_INLINE void Quat::NLerpIP(const Quat dest, float32 time)
+FX_FORCE_INLINE void FQuat::NLerpIP(const Quat dest, float32 time)
 {
 	__m128 dest_v = dest.mIntrin;
 
@@ -83,7 +83,7 @@ FX_FORCE_INLINE void Quat::NLerpIP(const Quat dest, float32 time)
 
 // Based off of https://www.euclideanspace.com/maths/algebra/realNormedAlgebra/quaternions/slerp/index.htm and optimized
 // for Neon.
-Quat Quat::SLerp(const Quat dest, const float32 step) const
+FQuat FQuat::SLerp(const FQuat dest, const float32 step) const
 {
 	// Note: there are so many different ways to implement this and a lot of them online just straight up pro
 	__m128 a_v = mIntrin;
@@ -103,7 +103,7 @@ Quat Quat::SLerp(const Quat dest, const float32 step) const
 
 	// if qa=qb or qa=-qb then theta = 0 and we can return qa
 	if (abs(cos_half_theta) >= 1.0) {
-		return Quat(mIntrin);
+		return FQuat(mIntrin);
 	}
 
 	// Calculate temporary values.
@@ -118,7 +118,7 @@ Quat Quat::SLerp(const Quat dest, const float32 step) const
 		result = _mm_mul_ps(a_v, half);
 		result = _mm_fmadd_ps(b_v, half, result);
 
-		return Quat(result);
+		return FQuat(result);
 	}
 
 	const float32 sht_recip = 1.0f / sin_half_theta;
@@ -128,11 +128,11 @@ Quat Quat::SLerp(const Quat dest, const float32 step) const
 	result = _mm_mul_ps(a_v, _mm_set1_ps(ratioA));
 	result = _mm_fmadd_ps(b_v, _mm_set1_ps(ratioB), result);
 
-	return Quat(result);
+	return FQuat(result);
 }
 
-FX_FORCE_INLINE Quat Quat::Conjugate() const { return Quat(SSE::FlipSigns<-1, -1, -1, 1>(mIntrin)); }
-FX_FORCE_INLINE Quat Quat::Normalize() const { return Quat(SSE::Normalize(mIntrin)); }
+FX_FORCE_INLINE FQuat FQuat::Conjugate() const { return FQuat(SSE::FlipSigns<-1, -1, -1, 1>(mIntrin)); }
+FX_FORCE_INLINE FQuat FQuat::Normalize() const { return FQuat(SSE::Normalize(mIntrin)); }
 
 } // namespace fx
 

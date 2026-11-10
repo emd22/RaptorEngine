@@ -1,8 +1,8 @@
 #include "Animation.hpp"
 
 #include <Core/String.hpp>
+#include <Math/FQuat.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Quat.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <World.hpp>
@@ -24,7 +24,7 @@ FVec3 Interpolate(const FVec3 a, const FVec3 b, float32 t)
 }
 
 template <>
-Quat Interpolate(const Quat a, const Quat b, float32 t)
+FQuat Interpolate(const FQuat a, const FQuat b, float32 t)
 {
 	// return b;
 	return a.SLerp(b, t);
@@ -44,7 +44,7 @@ FVec3 Hermite(const FVec3& p0, const FVec3& out0, const FVec3& p1, const FVec3& 
 }
 
 template <>
-Quat Hermite(const Quat& p0, const Quat& out0, const Quat& p1, const Quat& in1, float32 t, float32 dt)
+FQuat Hermite(const FQuat& p0, const FQuat& out0, const FQuat& p1, const FQuat& in1, float32 t, float32 dt)
 {
 	const float32 t2 = t * t;
 	const float32 t3 = t2 * t;
@@ -57,10 +57,10 @@ Quat Hermite(const Quat& p0, const Quat& out0, const Quat& p1, const Quat& in1, 
 	const float32 dot = p0.GetX() * p1.GetX() + p0.GetY() * p1.GetY() + p0.GetZ() * p1.GetZ() + p0.GetW() * p1.GetW();
 	const float32 sign = (dot < 0.0f) ? -1.0f : 1.0f;
 
-	return Quat(a * p0.GetX() + b * out0.GetX() + sign * (c * p1.GetX() + d * in1.GetX()),
-				a * p0.GetY() + b * out0.GetY() + sign * (c * p1.GetY() + d * in1.GetY()),
-				a * p0.GetZ() + b * out0.GetZ() + sign * (c * p1.GetZ() + d * in1.GetZ()),
-				a * p0.GetW() + b * out0.GetW() + sign * (c * p1.GetW() + d * in1.GetW()))
+	return FQuat(a * p0.GetX() + b * out0.GetX() + sign * (c * p1.GetX() + d * in1.GetX()),
+				 a * p0.GetY() + b * out0.GetY() + sign * (c * p1.GetY() + d * in1.GetY()),
+				 a * p0.GetZ() + b * out0.GetZ() + sign * (c * p1.GetZ() + d * in1.GetZ()),
+				 a * p0.GetW() + b * out0.GetW() + sign * (c * p1.GetW() + d * in1.GetW()))
 		.Normalize();
 }
 
@@ -105,7 +105,7 @@ static T GetComponentAtTime(float32 time, const BoneTransformTrack<T>& track, co
 	return Interpolate(track.Values.pData[current], track.Values.pData[next], alpha);
 }
 
-static FVec3 QuatToScaledAngleAxis(const Quat q)
+static FVec3 QuatToScaledAngleAxis(const FQuat q)
 {
 	float32 x = q.GetX();
 	float32 y = q.GetY();
@@ -129,18 +129,18 @@ static FVec3 QuatToScaledAngleAxis(const Quat q)
 	return FVec3(x, y, z) * (angle / sin_half);
 }
 
-static Quat QuatFromScaledAngleAxis(const FVec3 v)
+static FQuat QuatFromScaledAngleAxis(const FVec3 v)
 {
 	const float32 angle = v.Length();
 
 	if (angle < 1e-6f) {
-		return Quat(v.X * 0.5f, v.Y * 0.5f, v.Z * 0.5f, 1.0f).Normalize();
+		return FQuat(v.X * 0.5f, v.Y * 0.5f, v.Z * 0.5f, 1.0f).Normalize();
 	}
 
 	const float32 half = angle * 0.5f;
 	const float32 scale = std::sin(half) / angle;
 
-	return Quat(v.X * scale, v.Y * scale, v.Z * scale, std::cos(half));
+	return FQuat(v.X * scale, v.Y * scale, v.Z * scale, std::cos(half));
 }
 
 static FVec3 AngularVelocityToLogRate(const FVec3 log_rotation, const FVec3 angular_velocity)
@@ -158,7 +158,7 @@ static FVec3 AngularVelocityToLogRate(const FVec3 log_rotation, const FVec3 angu
 	return angular_velocity - c1 * 0.5f + c2 * k;
 }
 
-static FVec3 RotationDelta(const Quat from, const Quat to) { return QuatToScaledAngleAxis(to * from.Conjugate()); }
+static FVec3 RotationDelta(const FQuat from, const FQuat to) { return QuatToScaledAngleAxis(to * from.Conjugate()); }
 
 static BoneDelta PoseDelta(const BoneTransform& from, const BoneTransform& to)
 {
@@ -181,7 +181,7 @@ static void DecaySpring(FVec3& x, FVec3& v, float32 damping, float32 delta_time)
 void BlendPoses(const BoneTransform* a, const BoneTransform* b, float32 weight, BoneTransform* out, uint32 count)
 {
 	for (uint32 i = 0; i < count; i++) {
-		Quat rotation = a[i].Rotation;
+		FQuat rotation = a[i].Rotation;
 		rotation.NLerpIP(b[i].Rotation, weight);
 
 		out[i] = BoneTransform {
@@ -224,8 +224,8 @@ void Skeleton::ComposePose(const BoneTransform* pose)
 	const uint32 joint_count = JointCount;
 
 	for (uint32 i = 0; i < joint_count; i++) {
-		LocalTransforms.pData[i] = Mat4f::AsScale(pose[i].Scale) * Mat4f::AsRotation(pose[i].Rotation) *
-								   Mat4f::AsTranslation(pose[i].Translation);
+		LocalTransforms.pData[i] = FMat4::AsScale(pose[i].Scale) * FMat4::AsRotation(pose[i].Rotation) *
+								   FMat4::AsTranslation(pose[i].Translation);
 	}
 
 	const bool has_root_transforms = (RootTransforms.Size == joint_count);
@@ -458,7 +458,7 @@ void Skeleton::SetExternalPose(bool enabled)
 	mPendingBlendTime = -1.0f;
 }
 
-void Skeleton::PoseFromDrivenBones(const Mat4f* driven_world, const uint8* is_driven)
+void Skeleton::PoseFromDrivenBones(const FMat4* driven_world, const uint8* is_driven)
 {
 	const bool has_root_transforms = (RootTransforms.Size == JointCount);
 	const bool has_order = (EvaluationOrder.Size == JointCount);

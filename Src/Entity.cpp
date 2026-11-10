@@ -38,13 +38,13 @@ void Entity::SetScale(const float scale)
 
 // Go through SetRotation so overrides (e.g. Object syncing its physics body and attached objects) see the change.
 // Renormalize so that repeated small rotations do not accumulate scale into the model matrix.
-void Entity::RotateX(float32 rad) { SetRotation((mRotation * Quat::FromAxisAngle(FVec3::sRight, rad)).Normalize()); }
+void Entity::RotateX(float32 rad) { SetRotation((mRotation * FQuat::FromAxisAngle(FVec3::sRight, rad)).Normalize()); }
 
-void Entity::RotateY(float32 rad) { SetRotation((mRotation * Quat::FromAxisAngle(FVec3::sUp, rad)).Normalize()); }
+void Entity::RotateY(float32 rad) { SetRotation((mRotation * FQuat::FromAxisAngle(FVec3::sUp, rad)).Normalize()); }
 
-void Entity::RotateZ(float32 rad) { SetRotation((mRotation * Quat::FromAxisAngle(FVec3::sForward, rad)).Normalize()); }
+void Entity::RotateZ(float32 rad) { SetRotation((mRotation * FQuat::FromAxisAngle(FVec3::sForward, rad)).Normalize()); }
 
-void Entity::SetModelMatrix(const Mat4f& other)
+void Entity::SetModelMatrix(const FMat4& other)
 {
 	// We do not want the next update to replace the new matrix
 	mbMatrixOutOfDate = false;
@@ -57,7 +57,7 @@ void Entity::SetModelMatrix(const Mat4f& other)
 	SubmitMatrixIfNeeded();
 }
 
-// const Mat4f& Entity::GetNormalMatrix()
+// const FMat4& Entity::GetNormalMatrix()
 // {
 //     if (mbMatrixOutOfDate) {
 //         RecalculateModelMatrix();
@@ -66,7 +66,7 @@ void Entity::SetModelMatrix(const Mat4f& other)
 //     // return mNormalMatrix;
 // }
 
-Mat4f& Entity::GetWorldMatrix()
+FMat4& Entity::GetWorldMatrix()
 {
 	if (mbMatrixOutOfDate) {
 		RecalculateModelMatrix();
@@ -90,13 +90,13 @@ void Entity::SubmitMatrixIfNeeded()
 	}
 
 	ObjectGpuEntry entry;
-	memcpy(entry.ModelMatrix, mWorldMatrix.RawData, sizeof(Mat4f));
+	memcpy(entry.ModelMatrix, mWorldMatrix.RawData, sizeof(FMat4));
 
 	if (is_moving) {
-		memcpy(entry.PrevModelMatrix, mPrevWorldMatrix.RawData, sizeof(Mat4f));
+		memcpy(entry.PrevModelMatrix, mPrevWorldMatrix.RawData, sizeof(FMat4));
 	}
 	else {
-		memcpy(entry.PrevModelMatrix, mWorldMatrix.RawData, sizeof(Mat4f));
+		memcpy(entry.PrevModelMatrix, mWorldMatrix.RawData, sizeof(FMat4));
 	}
 
 	gObjectManager->Submit(ID, entry);
@@ -128,12 +128,12 @@ void Entity::RecalculateModelMatrix()
 	BeginMatrixChange();
 
 	if (TransformMode == eTransformMode::Default) {
-		mWorldMatrix = Mat4f::AsScale(FVec3(mScale)) * Mat4f::AsRotation(mRotation) * Mat4f::AsTranslation(mPosition);
+		mWorldMatrix = FMat4::AsScale(FVec3(mScale)) * FMat4::AsRotation(mRotation) * FMat4::AsTranslation(mPosition);
 	}
 	else if (TransformMode == eTransformMode::TransformFromOrigin) {
-		mWorldMatrix = Mat4f::AsScale(FVec3(mScale)) * Mat4f::AsTranslation(RotationOrigin) *
-					   Mat4f::AsRotation(mRotation) * Mat4f::AsTranslation(-RotationOrigin) *
-					   Mat4f::AsTranslation(mPosition);
+		mWorldMatrix = FMat4::AsScale(FVec3(mScale)) * FMat4::AsTranslation(RotationOrigin) *
+					   FMat4::AsRotation(mRotation) * FMat4::AsTranslation(-RotationOrigin) *
+					   FMat4::AsTranslation(mPosition);
 	}
 
 	if (mbHasPreTransform) {

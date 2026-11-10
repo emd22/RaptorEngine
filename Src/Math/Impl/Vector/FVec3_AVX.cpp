@@ -6,10 +6,10 @@
 #include <ThirdParty/Jolt/Math/Real.h>
 
 #include <Core/Log.hpp>
+#include <Math/FQuat.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Quat.hpp>
+#include <Math/FVec4.hpp>
 #include <Math/SSE.hpp>
-#include <Math/Vec4.hpp>
 
 namespace fx {
 
@@ -22,7 +22,7 @@ const FVec3 FVec3::sForward = FVec3(0.0f, 0.0f, 1.0f);
 
 
 FVec3::FVec3(const JPH::Vec3& other) { FromJoltVec3(other); }
-FVec3::FVec3(const Vec4f other) { mIntrin = other.mIntrin; }
+FVec3::FVec3(const FVec4 other) { mIntrin = other.mIntrin; }
 
 void FVec3::Print() const { LogInfo("FVec3 {{ X={:.6f}, Y={:.6f}, Z={:.6f} }}", X, Y, Z); }
 

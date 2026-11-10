@@ -5,7 +5,7 @@
 
 namespace fx::renderer {
 
-Target::Target(eImageFormat format, const Vec2u& size, bool is_fullscreen)
+Target::Target(eImageFormat format, const UVec2& size, bool is_fullscreen)
 {
 	Image.Info = ImageInfo { size, format, 0, 1, Slice<const uint8>(nullptr, 0) };
 
@@ -15,7 +15,7 @@ Target::Target(eImageFormat format, const Vec2u& size, bool is_fullscreen)
 	}
 }
 
-Target::Target(eImageFormat format, const Vec2u& size, bool is_fullscreen, eLoadOp load_op, eStoreOp store_op,
+Target::Target(eImageFormat format, const UVec2& size, bool is_fullscreen, eLoadOp load_op, eStoreOp store_op,
 			   VkImageLayout initial_layout, VkImageLayout final_layout)
 	: LoadOp(load_op), StoreOp(store_op), InitialLayout(initial_layout), FinalLayout(final_layout)
 {
@@ -27,7 +27,7 @@ Target::Target(eImageFormat format, const Vec2u& size, bool is_fullscreen, eLoad
 	}
 }
 
-Target::Target(eImageFormat format, const Vec2u& size, bool is_fullscreen, VkImageUsageFlags usage,
+Target::Target(eImageFormat format, const UVec2& size, bool is_fullscreen, VkImageUsageFlags usage,
 			   eImageAspectFlag aspect)
 	: Usage(usage), Aspect(aspect)
 {
@@ -120,7 +120,7 @@ TargetList& TargetList::Add(const Target* attachment)
 	return Add(*attachment);
 }
 
-void TargetList::CreateImages(const Vec2u& size)
+void TargetList::CreateImages(const UVec2& size)
 {
 	if ((mFlags & eTargetListFlags::ImagesCreated) != 0) {
 		return;

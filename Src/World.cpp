@@ -387,10 +387,6 @@ void World::ExecuteTransparentRenderLists()
 }
 
 
-/**
- * @brief Picks between the opaque and the alpha masked shadow pipeline as casters are drawn into a shadow atlas region,
- * so only alpha masked casters pay for sampling their albedo.
- */
 class ShadowPipelineSelector
 {
 public:
@@ -398,25 +394,32 @@ public:
 	Pipeline& Select(Object* object, const CommandBuffer& cmd)
 	{
 		const bool masked = IsMasked(object);
-		const bool skinned = object->IsSkinned();
 
-		const PipelineHandle wanted = gPipelineCache->GetOrCreateVariant(
-			ePipelinePass::Shadow,
-			skinned ? ePipelineFeatures::Skinned : (masked ? ePipelineFeatures::AlphaMask : ePipelineFeatures::None));
+		ePipelineFeatures pso_features = ePipelineFeatures::None;
 
-		if (wanted != mBound) {
-			gShadowAtlas->BindPipeline(wanted);
-			mBound = wanted;
+		if (object->IsSkinned()) {
+			pso_features |= ePipelineFeatures::Skinned;
+		}
+		else if (masked) {
+			pso_features |= ePipelineFeatures::AlphaMask;
+		}
+
+		const PipelineHandle requested_pso = gPipelineCache->GetOrCreateVariant(ePipelinePass::Shadow, pso_features);
+
+		if (requested_pso != mBoundPSO) {
+			gShadowAtlas->BindPipeline(requested_pso);
+			mBoundPSO = requested_pso;
 
 			const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0 };
 
 			gGraphics->pRenderer->pPersistentDescriptorSlim->Bind(
-				0, cmd, gPipelineCache->Get(wanted), Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
+				0, cmd, gPipelineCache->Get(requested_pso),
+				Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
 		}
 
-		Pipeline& pipeline = gPipelineCache->Get(mBound);
+		Pipeline& pipeline = gPipelineCache->Get(mBoundPSO);
 
-		if (masked || skinned) {
+		if (masked || object->IsSkinned()) {
 			if (!gMaterialManager->BindWithPipeline(cmd, pipeline, object->GetMaterialID())) {
 				gMaterialManager->BindWithPipeline(cmd, pipeline, MaterialID::scNull);
 			}
@@ -439,8 +442,7 @@ private:
 	}
 
 private:
-	/// Every region starts out with the opaque pipeline bound
-	PipelineHandle mBound = gPipelineCache->GetOrCreateVariant(ePipelinePass::Shadow, ePipelineFeatures::None);
+	PipelineHandle mBoundPSO = gPipelineCache->GetOrCreateVariant(ePipelinePass::Shadow, ePipelineFeatures::None);
 };
 
 void World::ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const BaseCamera& shadow_camera,
@@ -544,7 +546,7 @@ void World::UpdateSpotShadows()
 			}
 		}
 
-		const Mat4f shadow_matrix = light->CalculateShadowMatrix();
+		const FMat4 shadow_matrix = light->CalculateShadowMatrix();
 
 		const uint32 first_caster = mSpotShadowCasters.Size;
 		GatherSpotShadowCasters(light->GetPosition(), light->GetRadius(), mSpotShadowCasters);
@@ -673,13 +675,13 @@ void World::GatherSpotShadowCasters(const FVec3 center, float32 radius, DynArray
 		}
 	};
 
-	Vec2u min_tile;
-	Vec2u max_tile;
+	UVec2 min_tile;
+	UVec2 max_tile;
 	gWorldGrid->GetSphereTileRange(center, radius, &min_tile, &max_tile);
 
 	for (uint32 y = min_tile.Y; y <= max_tile.Y; y++) {
 		for (uint32 x = min_tile.X; x <= max_tile.X; x++) {
-			add_casters_from_tile(gWorldGrid->TileFromTileXY(Vec2u(x, y)));
+			add_casters_from_tile(gWorldGrid->TileFromTileXY(UVec2(x, y)));
 		}
 	}
 
@@ -1086,9 +1088,9 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 
 	// Super broad phase for culling.
 
-	Vec2u min_tile = gWorldGrid->TileToTileXY(
+	UVec2 min_tile = gWorldGrid->TileToTileXY(
 		gWorldGrid->WorldToTile(FVec3(frustum_bounds.Min.X, 0.0f, frustum_bounds.Min.Z)));
-	Vec2u max_tile = gWorldGrid->TileToTileXY(
+	UVec2 max_tile = gWorldGrid->TileToTileXY(
 		gWorldGrid->WorldToTile(FVec3(frustum_bounds.Max.X, 0.0f, frustum_bounds.Max.Z)));
 
 	const uint32 num_tiles_x = gWorldGrid->mGridSize.X;
@@ -1102,7 +1104,7 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 
 	for (uint32 y = min_tile.Y; y <= max_tile.Y; y++) {
 		for (uint32 x = min_tile.X; x <= max_tile.X; x++) {
-			TileIndex ti = gWorldGrid->TileFromTileXY(Vec2u(x, y));
+			TileIndex ti = gWorldGrid->TileFromTileXY(UVec2(x, y));
 
 			BBox tile_bounds = gWorldGrid->GetTileAABB(ti);
 			tile_bounds.Min.Y = frustum_bounds.Min.Y;
@@ -1301,10 +1303,6 @@ void World::Render(BaseCamera* shadow_camera)
 }
 
 
-/// Fraction of the sun shadow map's half-width that has to lie between a probe and the map's edges for the probe to
-/// be captured with it. Past that the shadow map is re-rendered around the probe.
-static constexpr float32 scProbeShadowEdgeMargin = 0.5f;
-
 bool World::RenderCaptureSunShadows(LightDirectional& sun, const FVec3 center, OrthoCamera& out_shadow_camera,
 									uint32& out_light_slot)
 {
@@ -1339,7 +1337,7 @@ void World::RenderProbeCapture()
 
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
-	const Vec2u extent = gProbeManager->GetCaptureExtent();
+	const UVec2 extent = gProbeManager->GetCaptureExtent();
 
 	const uint32 saved_tile_columns = gGraphics->pRenderer->GetLightTileColumns();
 	const uint32 saved_tile_rows = gGraphics->pRenderer->GetLightTileRows();
@@ -1349,7 +1347,7 @@ void World::RenderProbeCapture()
 
 	++mCullSerial;
 
-	const Vec2u grid_size = gWorldGrid->GetGridSize();
+	const UVec2 grid_size = gWorldGrid->GetGridSize();
 
 	for (TileIndex tile = 0; tile < grid_size.X * grid_size.Y; tile++) {
 		AddTileToRenderList(false, tile);
@@ -1357,19 +1355,17 @@ void World::RenderProbeCapture()
 
 	AddTileToRenderList(false, WorldGrid::scGlobalTileIndex);
 
-	// The sun's shadow map follows the player and only holds the casters the player can see, so each batch renders
-	// its own from every caster in the level, centered on the batch's first probe. Later probes that aren't well
-	// inside of it get it re-rendered around them. The main view was already drawn with the player's shadow map, so
-	// each re-render goes with a copy of the sun in a spare light slot, which the capture's light culling swaps in.
 	Ref<LightDirectional> sun = gLightManager->GetDirectionalLight();
 	const bool sun_has_shadows = sun.IsValid() && sun->bEnabled && (mSunLightSlot != UINT32_MAX);
 
 	OrthoCamera capture_shadow_camera;
 	bool has_capture_shadows = false;
 
-	// Only the map lights from the main view get culled, not persistent lights (the flashlight) or the copies of the
+	// Only the map lights from the main view get culled, not persistent lights (e.g. flashlight) or the copies of the
 	// sun appended after them
 	LightCullOverride light_override { .LightCount = mMapLightSlotCount };
+
+	static constexpr float32 scProbeShadowEdgeMargin = 0.5f;
 
 	gProbeManager->RecordCaptureBatch(
 		cmd,
@@ -1450,13 +1446,13 @@ void World::DebugDrawWorldGrid()
 		for (uint32 x = 0; x < gWorldGrid->mGridSize.X; x++) {
 			const FVec3 tile_offset = FVec3(x, -1.5f, y) * tile_size;
 
-			Mat4f model_matrix = Mat4f::AsScale(tile_size) * Mat4f::AsRotation(Quat::scIdentity) *
-								 Mat4f::AsTranslation((tile_offset)-gWorldGrid->mPositionOffset + (tile_size * 0.5f));
+			FMat4 model_matrix = FMat4::AsScale(tile_size) * FMat4::AsRotation(FQuat::scIdentity) *
+								 FMat4::AsTranslation((tile_offset)-gWorldGrid->mPositionOffset + (tile_size * 0.5f));
 
 			Color color = debug_color;
 
 			for (const TileIndex vis_ti : mVisibleTiles) {
-				if (vis_ti == gWorldGrid->TileFromTileXY(Vec2u(x, y))) {
+				if (vis_ti == gWorldGrid->TileFromTileXY(UVec2(x, y))) {
 					color = player_debug_color;
 				}
 			}
@@ -1533,7 +1529,7 @@ void World::DebugDrawSelectedDecals()
 		const FVec3 half_extent = (object->Bounds.Max - object->Bounds.Min) * 0.5f;
 		const FVec3 center = (object->Bounds.Max + object->Bounds.Min) * 0.5f;
 
-		gDebugDraw->WireBox(Mat4f::AsScale(half_extent) * Mat4f::AsTranslation(center) * object->GetWorldMatrix(),
+		gDebugDraw->WireBox(FMat4::AsScale(half_extent) * FMat4::AsTranslation(center) * object->GetWorldMatrix(),
 							decal_color);
 	}
 #endif
@@ -1573,7 +1569,7 @@ void World::DebugDrawProbeVolumes()
 		const FVec3 half_extent = (object.Bounds.Max - object.Bounds.Min) * 0.5f;
 		const FVec3 center = (object.Bounds.Max + object.Bounds.Min) * 0.5f;
 
-		Mat4f world_matrix = Mat4f::AsScale(half_extent) * Mat4f::AsTranslation(center) * object.GetWorldMatrix();
+		FMat4 world_matrix = FMat4::AsScale(half_extent) * FMat4::AsTranslation(center) * object.GetWorldMatrix();
 
 		Color color = object.IsReflectionProbe() ? reflection_color : volume_color;
 
@@ -1591,7 +1587,7 @@ void World::DebugDrawProbeVolumes()
 	static const FVec3 scCapturePointHalfExtent(0.12f);
 
 	for (uint32 i = 0; i < gProbeManager->GetReflectionProbeCount(); i++) {
-		gDebugDraw->SolidBox(gProbeManager->GetReflectionProbePosition(i), scCapturePointHalfExtent, Quat::scIdentity,
+		gDebugDraw->SolidBox(gProbeManager->GetReflectionProbePosition(i), scCapturePointHalfExtent, FQuat::scIdentity,
 							 reflection_color);
 	}
 }
@@ -1626,7 +1622,7 @@ void World::DebugDrawProbes()
 		for (uint32 i = first_probe; i < first_probe + num_probes; i++) {
 			const Color color = (is_baking && i == current_probe) ? capturing_color : volume_color;
 
-			gDebugDraw->SolidBox(gProbeManager->GetProbePosition(i), scProbeHalfExtent, Quat::scIdentity, color);
+			gDebugDraw->SolidBox(gProbeManager->GetProbePosition(i), scProbeHalfExtent, FQuat::scIdentity, color);
 		}
 	}
 }
@@ -1641,13 +1637,13 @@ void World::Destroy()
 	// mPhysicsObjects.Destroy();
 }
 
-static FVec3 UnprojectScreenPoint(const Mat4f& inverse_view_projection, float32 x, float32 y, const FVec3& eye,
+static FVec3 UnprojectScreenPoint(const FMat4& inverse_view_projection, float32 x, float32 y, const FVec3& eye,
 								  const FVec3& forward, float32 distance)
 {
-	const Vec4f& row_x = inverse_view_projection.Rows[0];
-	const Vec4f& row_y = inverse_view_projection.Rows[1];
-	const Vec4f& row_z = inverse_view_projection.Rows[2];
-	const Vec4f& row_w = inverse_view_projection.Rows[3];
+	const FVec4& row_x = inverse_view_projection.Rows[0];
+	const FVec4& row_y = inverse_view_projection.Rows[1];
+	const FVec4& row_z = inverse_view_projection.Rows[2];
+	const FVec4& row_w = inverse_view_projection.Rows[3];
 
 	constexpr float32 depth = 0.5f;
 
@@ -1679,10 +1675,10 @@ void World::DebugDrawCullFrustum()
 	const Color frustum_color = Color::FromRGBA(255, 60, 200, 255);
 
 	const PerspectiveCamera& camera = *mpCullCamera;
-	const Mat4f inverse_view_projection = camera.GetCameraMatrix(eObjectLayer::WorldLayer).Inverse();
+	const FMat4 inverse_view_projection = camera.GetCameraMatrix(eObjectLayer::WorldLayer).Inverse();
 
 	const float32 distances[] = { 0.25f, 5.0f, 25.0f };
-	const Vec2f ndc_corners[] = { { -1.0f, -1.0f }, { 1.0f, -1.0f }, { 1.0f, 1.0f }, { -1.0f, 1.0f } };
+	const FVec2 ndc_corners[] = { { -1.0f, -1.0f }, { 1.0f, -1.0f }, { 1.0f, 1.0f }, { -1.0f, 1.0f } };
 
 	FVec3 previous_ring[4];
 
@@ -1804,7 +1800,7 @@ void World::DebugDrawPortals()
 		gDebugDraw->WireBox(BBox(eye - FVec3(0.1f), eye + FVec3(0.1f)), rect_color);
 	}
 
-	const Mat4f inverse_view_projection = mPortalVisibility.GetViewProjection().Inverse();
+	const FMat4 inverse_view_projection = mPortalVisibility.GetViewProjection().Inverse();
 
 	for (uint32 area = 0; area < graph.GetAreaCount(); area++) {
 		if (static_cast<int32>(area) == mPortalVisibility.GetCameraArea() || !mPortalVisibility.IsAreaVisible(area)) {

@@ -4,8 +4,8 @@
 #include <Core/SizedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
+#include <Math/FMat4.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Mat4.hpp>
 #include <Renderer/Backend/Pipeline.hpp>
 #include <Texture/AtlasConfig.hpp>
 #include <atomic>
@@ -82,8 +82,8 @@ public:
 
 	void AddBloodSplat(const FVec3 hit_point, const FVec3 hit_normal, float32 size);
 
-	void AddSkinnedDecal(const Skeleton* skeleton, const Mat4f& rest_to_world, const DecalDesc& desc);
-	void AddSkinnedBloodSplat(const Skeleton* skeleton, const Mat4f& rest_to_world, const FVec3 hit_point,
+	void AddSkinnedDecal(const Skeleton* skeleton, const FMat4& rest_to_world, const DecalDesc& desc);
+	void AddSkinnedBloodSplat(const Skeleton* skeleton, const FMat4& rest_to_world, const FVec3 hit_point,
 							  const FVec3 direction, float32 size);
 	void RemoveSkinnedDecals(const Skeleton* skeleton);
 

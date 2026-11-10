@@ -21,8 +21,8 @@
 #include <Core/Log.hpp>
 #include <Core/SizedArray.hpp>
 #include <Engine.hpp>
+#include <Math/FQuat.hpp>
 #include <Math/MathConsts.hpp>
-#include <Math/Quat.hpp>
 #include <Math/Vec2.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Renderer/DebugDraw.hpp>
@@ -58,20 +58,20 @@ constexpr float32 scVertexMatchDistance = 2e-3f;
 constexpr float32 scMinBrushExtent = 0.01f;
 constexpr float32 scDecalDepth = 0.5f;
 
-Vec2f Project(const FVec3& vector, const ViewPlaneAxes& axes)
+FVec2 Project(const FVec3& vector, const ViewPlaneAxes& axes)
 {
-	return Vec2f(GetAxis(vector, axes.U) * axes.USign, GetAxis(vector, axes.V));
+	return FVec2(GetAxis(vector, axes.U) * axes.USign, GetAxis(vector, axes.V));
 }
 
 struct Segment
 {
-	Vec2i KeyA {};
-	Vec2i KeyB {};
-	Vec2f A {};
-	Vec2f B {};
+	IVec2 KeyA {};
+	IVec2 KeyB {};
+	FVec2 A {};
+	FVec2 B {};
 };
 
-bool IsKeyLess(const Vec2i& a, const Vec2i& b) { return a.X < b.X || (a.X == b.X && a.Y < b.Y); }
+bool IsKeyLess(const IVec2& a, const IVec2& b) { return a.X < b.X || (a.X == b.X && a.Y < b.Y); }
 
 bool IsSegmentKeyLess(const Segment& a, const Segment& b)
 {
@@ -80,20 +80,20 @@ bool IsSegmentKeyLess(const Segment& a, const Segment& b)
 
 bool IsSegmentKeyEqual(const Segment& a, const Segment& b) { return a.KeyA == b.KeyA && a.KeyB == b.KeyB; }
 
-bool IsNonLeftTurn(const Vec2f& origin, const Vec2f& a, const Vec2f& b)
+bool IsNonLeftTurn(const FVec2& origin, const FVec2& a, const FVec2& b)
 {
 	return (a - origin).Cross(b - origin) <= 0.0f;
 }
 
-void ConvexHull(DoublingArray<Vec2f>& points, DoublingArray<Vec2f>& out_hull)
+void ConvexHull(DoublingArray<FVec2>& points, DoublingArray<FVec2>& out_hull)
 {
 	constexpr float32 scHullMergeDistance = 1e-4f;
 
 	std::sort(points.begin(), points.end(),
-			  [](const Vec2f& a, const Vec2f& b) { return a.X < b.X || (a.X == b.X && a.Y < b.Y); });
+			  [](const FVec2& a, const FVec2& b) { return a.X < b.X || (a.X == b.X && a.Y < b.Y); });
 
-	const Vec2f* const sorted = points.begin();
-	const Vec2f* const unique_end = std::unique(points.begin(), points.end(), [](const Vec2f& a, const Vec2f& b)
+	const FVec2* const sorted = points.begin();
+	const FVec2* const unique_end = std::unique(points.begin(), points.end(), [](const FVec2& a, const FVec2& b)
 												{ return a.IsCloseTo(b, scHullMergeDistance); });
 	const size_t count = static_cast<size_t>(unique_end - sorted);
 
@@ -130,18 +130,18 @@ void ConvexHull(DoublingArray<Vec2f>& points, DoublingArray<Vec2f>& out_hull)
 	out_hull.RemoveLast();
 }
 
-Vec2i Quantize(const Vec2f& point)
+IVec2 Quantize(const FVec2& point)
 {
 	constexpr float32 scSegmentQuantum = 1000.0f;
 
-	return Vec2i(static_cast<int32>(std::lround(point.X * scSegmentQuantum)),
+	return IVec2(static_cast<int32>(std::lround(point.X * scSegmentQuantum)),
 				 static_cast<int32>(std::lround(point.Y * scSegmentQuantum)));
 }
 
-Segment MakeSegment(const Vec2f& a, const Vec2f& b)
+Segment MakeSegment(const FVec2& a, const FVec2& b)
 {
-	const Vec2i key_a = Quantize(a);
-	const Vec2i key_b = Quantize(b);
+	const IVec2 key_a = Quantize(a);
+	const IVec2 key_b = Quantize(b);
 
 	if (IsKeyLess(key_b, key_a)) {
 		return Segment { key_b, key_a, b, a };
@@ -247,7 +247,7 @@ struct BrushSource
 {
 	Object* pObject = nullptr;
 	const Brush* pBrush = nullptr;
-	Mat4f World = Mat4f::scIdentity;
+	FMat4 World = FMat4::scIdentity;
 	FVec3 Pivot = FVec3::sZero;
 	eTopViewBrushKind Kind = eTopViewBrushKind::Geometry;
 };
@@ -333,7 +333,7 @@ bool FindGroundOffset(const FVec3 min, const FVec3 max, const eViewPlane plane, 
 		}
 
 		const Brush* brush = source.pBrush;
-		const Mat4f world = source.World;
+		const FMat4 world = source.World;
 
 		HeightSpan span { FLT_MAX, -FLT_MAX };
 
@@ -344,7 +344,7 @@ bool FindGroundOffset(const FVec3 min, const FVec3 max, const eViewPlane plane, 
 
 			for (uint32 i = 0; i < face.Vertices.Size; i++) {
 				const FVec3 vertex = face.Vertices[i];
-				const Vec4f point = world * Vec4f(vertex.X, vertex.Y, vertex.Z, 1.0f);
+				const FVec4 point = world * FVec4(vertex.X, vertex.Y, vertex.Z, 1.0f);
 
 				points.Insert(FVec3(point.X, point.Y, point.Z));
 			}
@@ -379,19 +379,19 @@ bool FindGroundOffset(const FVec3 min, const FVec3 max, const eViewPlane plane, 
 		SizedArray<FVec3> normals;
 		SizedArray<FVec3> tangents;
 		SizedArray<float32> handedness;
-		SizedArray<Vec2f> texcoords;
+		SizedArray<FVec2> texcoords;
 		SizedArray<uint32> indices;
 
 		patch->GenerateMesh(positions, normals, tangents, handedness, texcoords, indices);
 
-		const Mat4f world = object->GetWorldMatrix();
+		const FMat4 world = object->GetWorldMatrix();
 
 		for (size_t index = 0; index + 2 < indices.Size; index += 3) {
 			points.Clear();
 
 			for (uint32 corner = 0; corner < 3; corner++) {
 				const FVec3 vertex = positions[indices[index + corner]];
-				const Vec4f point = world * Vec4f(vertex.X, vertex.Y, vertex.Z, 1.0f);
+				const FVec4 point = world * FVec4(vertex.X, vertex.Y, vertex.Z, 1.0f);
 
 				points.Insert(FVec3(point.X, point.Y, point.Z));
 			}
@@ -655,8 +655,8 @@ TopViewState RaptorEditor::BuildTopViewState()
 
 	DoublingArray<WorldFace> faces;
 	DoublingArray<FVec3> corners;
-	DoublingArray<Vec2f> projected;
-	DoublingArray<Vec2f> hull;
+	DoublingArray<FVec2> projected;
+	DoublingArray<FVec2> hull;
 	DoublingArray<Segment> segments;
 
 	DoublingArray<BrushSource> sources;
@@ -698,7 +698,7 @@ TopViewState RaptorEditor::BuildTopViewState()
 			continue;
 		}
 
-		const Mat4f world = source.World;
+		const FMat4 world = source.World;
 
 		TopViewBrush& out = view.Brushes.Emplace();
 
@@ -713,7 +713,7 @@ TopViewState RaptorEditor::BuildTopViewState()
 		corners.Clear();
 
 		for (const FVec3 vertex : brush->GetVertices()) {
-			const Vec4f point = world * Vec4f(vertex.X, vertex.Y, vertex.Z, 1.0f);
+			const FVec4 point = world * FVec4(vertex.X, vertex.Y, vertex.Z, 1.0f);
 			corners.Insert(FVec3(point.X, point.Y, point.Z));
 		}
 
@@ -726,7 +726,7 @@ TopViewState RaptorEditor::BuildTopViewState()
 		for (uint32 f = 0; f < brush->Faces.Size; f++) {
 			const Brush::Face& face = brush->Faces[f];
 			const FVec3 local_normal = brush->Planes[face.PlaneIndex].Normal;
-			const Vec4f world_normal = world * Vec4f(local_normal.X, local_normal.Y, local_normal.Z, 0.0f);
+			const FVec4 world_normal = world * FVec4(local_normal.X, local_normal.Y, local_normal.Z, 0.0f);
 			const FVec3 normal(world_normal.X, world_normal.Y, world_normal.Z);
 
 			WorldFace& out_face = faces.Emplace();
@@ -736,7 +736,7 @@ TopViewState RaptorEditor::BuildTopViewState()
 
 			for (uint32 i = 0; i < face.Vertices.Size; i++) {
 				const FVec3 vertex = face.Vertices[i];
-				const Vec4f point = world * Vec4f(vertex.X, vertex.Y, vertex.Z, 1.0f);
+				const FVec4 point = world * FVec4(vertex.X, vertex.Y, vertex.Z, 1.0f);
 				out_face.Points.Insert(FVec3(point.X, point.Y, point.Z));
 			}
 		}
@@ -768,8 +768,8 @@ TopViewState RaptorEditor::BuildTopViewState()
 				const size_t point_count = face.Points.Size;
 
 				for (size_t i = 0; i < point_count; i++) {
-					const Vec2f from = Project(face.Points[i], axes);
-					const Vec2f to = Project(face.Points[(i + 1) % point_count], axes);
+					const FVec2 from = Project(face.Points[i], axes);
+					const FVec2 to = Project(face.Points[(i + 1) % point_count], axes);
 
 					if ((to - from).LengthSquared() < scMinSegmentLengthSq) {
 						continue;
@@ -778,7 +778,7 @@ TopViewState RaptorEditor::BuildTopViewState()
 					segments.Insert(MakeSegment(from, to));
 				}
 
-				const Vec2f plan_normal = Project(face.Normal, axes);
+				const FVec2 plan_normal = Project(face.Normal, axes);
 				const float32 plan_length = plan_normal.Length();
 				const float32 depth_component = GetAxis(face.Normal, axes.W);
 
@@ -801,16 +801,16 @@ TopViewState RaptorEditor::BuildTopViewState()
 					continue;
 				}
 
-				const Vec2f unit = plan_normal / plan_length;
-				const Vec2f along_axis = unit.Perpendicular();
+				const FVec2 unit = plan_normal / plan_length;
+				const FVec2 along_axis = unit.Perpendicular();
 
 				float32 min_along = FLT_MAX;
 				float32 max_along = -FLT_MAX;
-				Vec2f min_point(0.0f);
-				Vec2f max_point(0.0f);
+				FVec2 min_point(0.0f);
+				FVec2 max_point(0.0f);
 
 				for (const FVec3& world_point : face.Points) {
-					const Vec2f point = Project(world_point, axes);
+					const FVec2 point = Project(world_point, axes);
 					const float32 along = point.Dot(along_axis);
 
 					if (along < min_along) {
@@ -867,7 +867,7 @@ TopViewState RaptorEditor::BuildTopViewState()
 			continue;
 		}
 
-		const Mat4f world = object->GetWorldMatrix();
+		const FMat4 world = object->GetWorldMatrix();
 
 		Patch pieces[Patch::scMaxClosurePieces];
 		const uint32 piece_count = patch->BuildClosure(pieces);
@@ -904,7 +904,7 @@ TopViewState RaptorEditor::BuildTopViewState()
 			});
 
 			for (const PatchVertex& vertex : patch_mesh.Vertices) {
-				const Vec4f point = world * Vec4f(static_cast<float32>(vertex.Position.X),
+				const FVec4 point = world * FVec4(static_cast<float32>(vertex.Position.X),
 												  static_cast<float32>(vertex.Position.Y),
 												  static_cast<float32>(vertex.Position.Z), 1.0f);
 				corners.Insert(FVec3(point.X, point.Y, point.Z));
@@ -943,7 +943,7 @@ TopViewState RaptorEditor::BuildTopViewState()
 		control_points.Clear();
 
 		for (const PatchPoint& point : patch->Points) {
-			const Vec4f moved = world * Vec4f(point.Position.X, point.Position.Y, point.Position.Z, 1.0f);
+			const FVec4 moved = world * FVec4(point.Position.X, point.Position.Y, point.Position.Z, 1.0f);
 			control_points.Insert(FVec3(moved.X, moved.Y, moved.Z));
 		}
 
@@ -979,8 +979,8 @@ TopViewState RaptorEditor::BuildTopViewState()
 
 			const auto add_edge = [&](uint32 from, uint32 to)
 			{
-				const Vec2f a = projected[from];
-				const Vec2f b = projected[to];
+				const FVec2 a = projected[from];
+				const FVec2 b = projected[to];
 
 				if ((b - a).LengthSquared() >= scMinSegmentLengthSq) {
 					segments.Insert(MakeSegment(a, b));
@@ -1217,8 +1217,8 @@ void RaptorEditor::TopViewRotate(const FVec3 axis, float32 angle, const FVec3 pi
 	struct Change
 	{
 		Object* pObject = nullptr;
-		Quat Before;
-		Quat After;
+		FQuat Before;
+		FQuat After;
 		FVec3 PositionBefore;
 		FVec3 PositionAfter;
 		bool bMoves = false;
@@ -1227,7 +1227,7 @@ void RaptorEditor::TopViewRotate(const FVec3 axis, float32 angle, const FVec3 pi
 	Object* targets[scMaxSelectedObjects];
 	const uint32 count = CollectTopViewTargets(targets);
 
-	const Quat rotation = Quat::FromAxisAngle(axis.Normalize(), angle);
+	const FQuat rotation = FQuat::FromAxisAngle(axis.Normalize(), angle);
 
 	DoublingArray<Change> changes;
 	int32 operation_count = 0;
@@ -1376,8 +1376,8 @@ void RaptorEditor::TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewV
 			continue;
 		}
 
-		const Mat4f world = object->GetWorldMatrix();
-		const Vec4f local_offset = world.AffineInverse() * Vec4f(offset.X, offset.Y, offset.Z, 0.0f);
+		const FMat4 world = object->GetWorldMatrix();
+		const FVec4 local_offset = world.AffineInverse() * FVec4(offset.X, offset.Y, offset.Z, 0.0f);
 		const FVec3 local_move(local_offset.X, local_offset.Y, local_offset.Z);
 
 		const Patch* patch = gWorld->pPrototype->GetPatch(object);
@@ -1387,8 +1387,8 @@ void RaptorEditor::TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewV
 			uint32 moved_count = 0;
 
 			for (PatchPoint& point : moved.Points) {
-				const Vec4f world_point = world * Vec4f(point.Position.X, point.Position.Y, point.Position.Z, 1.0f);
-				const Vec2f projected_position = Project(FVec3(world_point.X, world_point.Y, world_point.Z),
+				const FVec4 world_point = world * FVec4(point.Position.X, point.Position.Y, point.Position.Z, 1.0f);
+				const FVec2 projected_position = Project(FVec3(world_point.X, world_point.Y, world_point.Z),
 														 GetViewPlaneAxes(plane));
 
 				for (const TopViewVertexHandle& handle : handles) {
@@ -1421,8 +1421,8 @@ void RaptorEditor::TopViewMoveVertices(eViewPlane plane, const DynArray<TopViewV
 		uint32 moved_count = 0;
 
 		for (const FVec3 vertex : brush->GetVertices()) {
-			const Vec4f world_point = world * Vec4f(vertex.X, vertex.Y, vertex.Z, 1.0f);
-			const Vec2f projected_position = Project(FVec3(world_point.X, world_point.Y, world_point.Z),
+			const FVec4 world_point = world * FVec4(vertex.X, vertex.Y, vertex.Z, 1.0f);
+			const FVec2 projected_position = Project(FVec3(world_point.X, world_point.Y, world_point.Z),
 													 GetViewPlaneAxes(plane));
 
 			bool is_moved = false;
@@ -1523,7 +1523,7 @@ void RaptorEditor::TopViewCreatePatch(eViewPlane plane, ePatchPrimitive primitiv
 	}
 }
 
-static bool FindHandledControlPoint(const Patch& patch, const Mat4f& world, eViewPlane plane, ObjectID object_id,
+static bool FindHandledControlPoint(const Patch& patch, const FMat4& world, eViewPlane plane, ObjectID object_id,
 									const DynArray<TopViewVertexHandle>& handles, uint32& out_column, uint32& out_row)
 {
 	for (const TopViewVertexHandle& handle : handles) {
@@ -1534,7 +1534,7 @@ static bool FindHandledControlPoint(const Patch& patch, const Mat4f& world, eVie
 		for (uint32 row = 0; row < patch.Height; row++) {
 			for (uint32 column = 0; column < patch.Width; column++) {
 				const FVec3 local = patch.GetPoint(column, row).Position;
-				const Vec4f point = world * Vec4f(local.X, local.Y, local.Z, 1.0f);
+				const FVec4 point = world * FVec4(local.X, local.Y, local.Z, 1.0f);
 
 				if (Project(FVec3(point.X, point.Y, point.Z), GetViewPlaneAxes(plane))
 						.IsCloseTo(handle.Position, scVertexMatchDistance)) {
@@ -1549,12 +1549,12 @@ static bool FindHandledControlPoint(const Patch& patch, const Mat4f& world, eVie
 	return false;
 }
 
-static bool IsHandledControlPoint(const Patch& patch, const Mat4f& world, eViewPlane plane, ObjectID object_id,
+static bool IsHandledControlPoint(const Patch& patch, const FMat4& world, eViewPlane plane, ObjectID object_id,
 								  const DynArray<TopViewVertexHandle>& handles, uint32 column, uint32 row)
 {
 	const FVec3 local = patch.GetPoint(column, row).Position;
-	const Vec4f point = world * Vec4f(local.X, local.Y, local.Z, 1.0f);
-	const Vec2f projected = Project(FVec3(point.X, point.Y, point.Z), GetViewPlaneAxes(plane));
+	const FVec4 point = world * FVec4(local.X, local.Y, local.Z, 1.0f);
+	const FVec2 projected = Project(FVec3(point.X, point.Y, point.Z), GetViewPlaneAxes(plane));
 
 	for (const TopViewVertexHandle& handle : handles) {
 		if (handle.ObjectId == object_id && projected.IsCloseTo(handle.Position, scVertexMatchDistance)) {
@@ -1598,7 +1598,7 @@ static float32 GetRoundWeight(const Patch& patch, uint32 column, uint32 row)
 	return weight;
 }
 
-static bool ApplyWeightCommand(Patch& patch, const PatchCommand& command, const Mat4f& world, eViewPlane plane,
+static bool ApplyWeightCommand(Patch& patch, const PatchCommand& command, const FMat4& world, eViewPlane plane,
 							   ObjectID object_id, const DynArray<TopViewVertexHandle>& handles)
 {
 	bool has_handle = false;
@@ -1674,7 +1674,7 @@ static bool IsSamePatch(const Patch& a, const Patch& b)
 	return true;
 }
 
-static bool ApplyTextureMapping(Patch& patch, const PatchTextureSettings& settings, const Mat4f& world)
+static bool ApplyTextureMapping(Patch& patch, const PatchTextureSettings& settings, const FMat4& world)
 {
 	constexpr float32 scMinPatchTextureScale = 1e-3f;
 
@@ -1752,7 +1752,7 @@ static bool ApplyDetailMeshCommand(Patch& patch, const PatchCommand& command, bo
 	}
 }
 
-static bool ApplyColorCommand(Patch& patch, const PatchCommand& command, const Mat4f& world, eViewPlane plane,
+static bool ApplyColorCommand(Patch& patch, const PatchCommand& command, const FMat4& world, eViewPlane plane,
 							  ObjectID object_id, const DynArray<TopViewVertexHandle>& handles)
 {
 	bool has_handle = false;
@@ -1788,7 +1788,7 @@ static bool ApplyColorCommand(Patch& patch, const PatchCommand& command, const M
 	return changed;
 }
 
-static bool ApplyTurnCommand(Patch& patch, const Mat4f& world, eViewPlane plane, ObjectID object_id,
+static bool ApplyTurnCommand(Patch& patch, const FMat4& world, eViewPlane plane, ObjectID object_id,
 							 const DynArray<TopViewVertexHandle>& handles)
 {
 	bool changed = false;
@@ -1808,7 +1808,7 @@ static bool ApplyTurnCommand(Patch& patch, const Mat4f& world, eViewPlane plane,
 	return changed;
 }
 
-static bool ApplyPatchCommand(Patch& patch, const PatchCommand& command, const Mat4f& world, bool has_control,
+static bool ApplyPatchCommand(Patch& patch, const PatchCommand& command, const FMat4& world, bool has_control,
 							  uint32 column, uint32 row)
 {
 	if (patch.bIsDetailMesh) {
@@ -2094,7 +2094,7 @@ void RaptorEditor::TopViewHollowSelection(const RoomSettings& settings)
 			continue;
 		}
 
-		if (!brush->IsBox() || !object->mRotation.IsCloseTo(Quat::scIdentity)) {
+		if (!brush->IsBox() || !object->mRotation.IsCloseTo(FQuat::scIdentity)) {
 			skipped_count++;
 			continue;
 		}
@@ -2182,7 +2182,7 @@ static FVec3 UnitAxis(uint32 axis, float32 sign)
 	return FVec3(components[0], components[1], components[2]);
 }
 
-static Quat QuatFromBasis(const FVec3 x, const FVec3 y, const FVec3 z)
+static FQuat QuatFromBasis(const FVec3 x, const FVec3 y, const FVec3 z)
 {
 	const float32 trace = x.X + y.Y + z.Z;
 
@@ -2217,7 +2217,7 @@ static Quat QuatFromBasis(const FVec3 x, const FVec3 y, const FVec3 z)
 		qz = 0.25f * s;
 	}
 
-	return Quat(qx, qy, qz, qw).Normalize();
+	return FQuat(qx, qy, qz, qw).Normalize();
 }
 
 void RaptorEditor::TopViewCreateDecal(eViewPlane plane, FVec3 min, FVec3 max, bool drop_to_ground)
@@ -2372,7 +2372,7 @@ void RaptorEditor::TopViewCreateArch(eViewPlane plane, DynArray<FVec3> points, b
 	}
 }
 
-static bool ExtendBoundsByPatch(const Patch& patch, const Mat4f& world, FVec3& min, FVec3& max)
+static bool ExtendBoundsByPatch(const Patch& patch, const FMat4& world, FVec3& min, FVec3& max)
 {
 	Patch pieces[Patch::scMaxClosurePieces];
 	const uint32 piece_count = patch.BuildClosure(pieces);
@@ -2390,7 +2390,7 @@ static bool ExtendBoundsByPatch(const Patch& patch, const Mat4f& world, FVec3& m
 		shape->Tessellate(mesh);
 
 		for (const PatchVertex& vertex : mesh.Vertices) {
-			const Vec4f point = world * Vec4f(static_cast<float32>(vertex.Position.X),
+			const FVec4 point = world * FVec4(static_cast<float32>(vertex.Position.X),
 											  static_cast<float32>(vertex.Position.Y),
 											  static_cast<float32>(vertex.Position.Z), 1.0f);
 			const FVec3 world_point(point.X, point.Y, point.Z);
@@ -2438,7 +2438,7 @@ void RaptorEditor::FitDBoundsToLevel()
 		}
 
 		for (const FVec3 vertex : source.pBrush->GetVertices()) {
-			const Vec4f point = source.World * Vec4f(vertex.X, vertex.Y, vertex.Z, 1.0f);
+			const FVec4 point = source.World * FVec4(vertex.X, vertex.Y, vertex.Z, 1.0f);
 			const FVec3 world_point(point.X, point.Y, point.Z);
 
 			level_min = FVec3::Min(level_min, world_point);
@@ -2619,10 +2619,10 @@ static bool ApplyTextureCommand(Brush& brush, uint32 plane_index, const TextureC
 		break;
 	case eTextureCommand::Scale:
 	case eTextureCommand::SetScale: {
-		Vec2f scale = texture.Scale + command.Amount;
+		FVec2 scale = texture.Scale + command.Amount;
 
 		if (command.Type == eTextureCommand::SetScale) {
-			scale = Vec2f(std::copysign(command.Amount.X, texture.Scale.X),
+			scale = FVec2(std::copysign(command.Amount.X, texture.Scale.X),
 						  std::copysign(command.Amount.Y, texture.Scale.Y));
 		}
 
@@ -2731,7 +2731,7 @@ void RaptorEditor::TopViewEditTextures(const DynArray<TopViewFaceRef>& faces, co
 
 		brush_count++;
 
-		if (command.Type == eTextureCommand::WorldAlign && !object->mRotation.IsCloseTo(Quat::scIdentity)) {
+		if (command.Type == eTextureCommand::WorldAlign && !object->mRotation.IsCloseTo(FQuat::scIdentity)) {
 			LogWarning("Textures can't be lined up with the world grid as '{}' is rotated", object->Name.Get());
 			continue;
 		}
@@ -3194,7 +3194,7 @@ uint32 RaptorEditor::SnapSelectionToGrid()
 			}
 
 			for (const FVec3 vertex : source.pBrush->GetVertices()) {
-				const Vec4f point = source.World * Vec4f(vertex.X, vertex.Y, vertex.Z, 1.0f);
+				const FVec4 point = source.World * FVec4(vertex.X, vertex.Y, vertex.Z, 1.0f);
 				const FVec3 world_point(point.X, point.Y, point.Z);
 
 				if (has_bounds) {
@@ -3210,11 +3210,11 @@ uint32 RaptorEditor::SnapSelectionToGrid()
 		const Patch* patch = gWorld->pPrototype->GetPatch(object);
 
 		if (patch != nullptr) {
-			const Mat4f world = object->GetWorldMatrix();
+			const FMat4 world = object->GetWorldMatrix();
 
 			for (const PatchPoint& control_point : patch->Points) {
 				const FVec3 local = control_point.Position;
-				const Vec4f point = world * Vec4f(local.X, local.Y, local.Z, 1.0f);
+				const FVec4 point = world * FVec4(local.X, local.Y, local.Z, 1.0f);
 				const FVec3 world_point(point.X, point.Y, point.Z);
 
 				if (has_bounds) {

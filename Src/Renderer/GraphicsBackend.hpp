@@ -8,8 +8,8 @@
 #include "DeletionObject.hpp"
 #include "FrameAllocator.hpp"
 #include "GpuProfiler.hpp"
-#include "SDFPageScene.hpp"
 #include "LightTransport.hpp"
+#include "SDFPageScene.hpp"
 #include "TiledForwardRenderer.hpp"
 #include "UniformBuffer.hpp"
 #include "Window.hpp"
@@ -72,8 +72,6 @@ struct GpuUploadContext
 	CommandBuffer CmdBuffer;
 	Fence UploadFence;
 
-	// Immediate uploads can come from any thread while the asset thread records `CmdBuffer`, so they get their own pool
-	// (pools are externally synchronized) and are serialized by `ImmediateMutex`.
 	CommandPool ImmediateCmdPool;
 	CommandBuffer ImmediateCmdBuffer;
 	Fence ImmediateUploadFence;
@@ -99,7 +97,7 @@ public:
 	using ExtensionList = SizedArray<VkExtensionProperties>;
 	using ExtensionNames = std::vector<const char*>;
 
-	void Init(Vec2u window_size);
+	void Init(UVec2 window_size);
 	void Destroy();
 
 	eFrameResult BeginFrame();
@@ -107,10 +105,6 @@ public:
 	void BeginPrepass();
 	void BeginGeometry();
 
-	/**
-	 * @brief Ends the opaque part of the forward pass, copies the lit target and depth for water to sample, and
-	 * continues in ForwardBlendPass. Called once per frame at most, before the blended draws.
-	 */
 	void CopySceneForWater();
 
 	void RenderEarlyFrameEffects(PerspectiveCamera& camera);
@@ -128,20 +122,6 @@ public:
 
 	FX_FORCE_INLINE Ref<Window> GetWindow() { return mpWindow; }
 	FX_FORCE_INLINE GpuDevice* GetDevice() { return &mDevice; }
-
-	// void AddGpuBufferToDeletionQueue(VkBuffer buffer, VmaAllocation allocation)
-	// {
-	// 	SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
-
-	// 	DeletionObject obj = {
-	// 		.Buffer = buffer,
-	// 		.Allocation = allocation,
-	// 		.DeletionFrameNumber = mInternalFrameCounter + scDeletionFrameSpacing,
-	// 		.bIsGpuBuffer = true,
-	// 	};
-
-	// 	deletion_queue->Push(std::move(obj));
-	// }
 
 	VkInstance GetVulkanInstance() { return mInstance; }
 
@@ -167,70 +147,54 @@ public:
 
 	~GraphicsBackend() { Destroy(); }
 
-	bool ProcessDeletionQueue(bool immediate, Queue<DeletionObject>& deletion_queue)
-	{
-		// if (immediate) {
-		//     mInDeletionQueue.lock();
-		// }
-		// else if (!mInDeletionQueue.try_lock()) {
-		//     return false;
-		// }
-
-		if (deletion_queue.IsEmpty()) {
-			return false;
-		}
-
-		DeletionObject& object = deletion_queue.First();
-
-		const bool is_frame_spaced = (mInternalFrameCounter >= object.DeletionFrameNumber);
-
-		bool did_delete = false;
-
-		if (immediate || is_frame_spaced) {
-			if (object.bIsGpuBuffer) {
-				vmaDestroyBuffer(GpuAllocator, object.Buffer, object.Allocation);
-			}
-			else {
-				object.Func(&object);
-			}
-
-			did_delete = true;
-			deletion_queue.Pop();
-		}
-
-		return did_delete;
-	}
-
-	// void AddToDeletionQueue(DeletionObject::FuncType func)
-	// {
-	// SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
-
-	// DeletionObject obj = {
-	// 	.DeletionFrameNumber = mInternalFrameCounter + scDeletionFrameSpacing,
-	// 	.Func = func,
-	// };
-
-	// LogInfo("Adding to deletion queue ({})", deletion_queue->mSize);
-
-	// deletion_queue->Push(std::move(obj));
-	// }
+	bool ProcessDeletionQueue(bool immediate, Queue<DeletionObject>& deletion_queue);
 
 	uint32 GetElapsedFrameCount() const { return mInternalFrameCounter.load(); }
-	/// For runs that simulate without drawing: per-frame work such as animation is gated on this count changing
+
 	void CountFrameWithoutDrawing() { mInternalFrameCounter.fetch_add(1); }
 
-	/// Writes the next finished frame to `path` as it reaches the screen: width and height as uint32, then BGRA8 pixels
 	void RequestFrameCapture(const char* path);
 	uint32 GetFrameNumber() const { return mFrameNumber; }
 
 	FX_FORCE_INLINE bool DidResize() const { return bDidFrameResize; }
 
+
+	void MarkGpu(eGpuMarker marker) { Profiler.Mark(GetFrame()->CmdBuffer, marker); }
+
+
+	bool UploadLightmap(const UVec2& size, const uint8* sun_visibility, const uint16* irradiance,
+						const uint8* directions);
+	Image* CreateLightmapImage(const UVec2& size, eImageFormat format, const Slice<const uint8>& texels);
+
+	bool UploadFogShadow(const CompiledMapFogShadow& shadow);
+	void ClearFogShadow() { bHasBakedFogShadow = false; }
+
+	bool HasDebugView() const { return bOnlyRenderProbes || bRenderProbeVisibility || (ReflectionDebugView != 0); }
+
+
+	FX_FORCE_INLINE uint32 GetLightGridFrameOffset() const { return LightGridPageSize * GetFrameNumber(); }
+	FX_FORCE_INLINE uint32 GetLightIndexListFrameOffset() const { return LightIndexListPageSize * GetFrameNumber(); }
+
+
+	FX_FORCE_INLINE uint32 GetDecalFrameOffset() const { return DecalPageSize * GetFrameNumber(); }
+	FX_FORCE_INLINE uint32 GetDecalMaskFrameOffset() const { return DecalMaskPageSize * GetFrameNumber(); }
+
+	Image* GetShadingIrradiance() const
+	{
+		Image* relit = Transport.GetRelitIrradiance();
+
+		if (relit != nullptr) {
+			return relit;
+		}
+
+		return pLightmapIrradiance;
+	}
+
 private:
 	void RecordFrameCapture(CommandBuffer& cmd);
 	void WriteFrameCapture();
 
-	std::string mFrameCapturePath;
-	RawGpuBuffer mFrameCaptureBuffer;
+
 	uint64 mFrameCaptureBytes = 0;
 	uint32 mFrameCaptureWidth = 0;
 	uint32 mFrameCaptureHeight = 0;
@@ -277,12 +241,12 @@ public:
 	bool bInitialized = false;
 	bool bDidFrameResize = false;
 
-
 	float32 DeltaTime = 1.0f / 60.0f;
 
 	TiledForwardRenderer* pRenderer { nullptr };
 
 	Uniforms LightBuffer;
+
 	/// Skinning matrices for every skinned object posed this frame, one slot per matrix. Bound as a storage buffer, as
 	/// large skeletons quickly go past the 64KB range a uniform buffer is limited to.
 	Uniforms BoneBuffer;
@@ -293,44 +257,28 @@ public:
 	// Forward+ Tiled Lighting
 	///////////////////////////////////
 
-	/// Per tile light list offsets, indexed by tile. Written by the light culling compute pass.
 	RawGpuBuffer LightGridBuffer;
-
-	/// Global list of light indices, each tile owns a fixed region of `MaxLightsPerTile` entries.
 	RawGpuBuffer LightIndexListBuffer;
 
 	uint32 LightGridPageSize = 0;
 	uint32 LightIndexListPageSize = 0;
 
-	FX_FORCE_INLINE uint32 GetLightGridFrameOffset() const { return LightGridPageSize * GetFrameNumber(); }
-	FX_FORCE_INLINE uint32 GetLightIndexListFrameOffset() const { return LightIndexListPageSize * GetFrameNumber(); }
-
 	///////////////////////////////////
 	// Clustered Decals
 	///////////////////////////////////
 
-	/// The decals visible this frame, oldest first. Written by DecalManager::Update().
 	RawGpuBuffer DecalBuffer;
-
-	/// Per tile bitmask of the decals that overlap the tile, `Limits::DecalMaskWords` words per tile. Written by the
-	/// light culling pass.
 	RawGpuBuffer DecalMaskBuffer;
 
 	uint32 DecalPageSize = 0;
 	uint32 DecalMaskPageSize = 0;
 
-	FX_FORCE_INLINE uint32 GetDecalFrameOffset() const { return DecalPageSize * GetFrameNumber(); }
-	FX_FORCE_INLINE uint32 GetDecalMaskFrameOffset() const { return DecalMaskPageSize * GetFrameNumber(); }
-
 	///////////////////////////////////
 	// Light Probes
 	///////////////////////////////////
-	// Written by ProbeManager. Unlike the buffers above there's a single page, shared by every frame in flight.
 
-	/// SH irradiance, indexed by probe
 	RawGpuBuffer ProbeBuffer;
 	uint32 ProbePageSize = 0;
-
 
 	RawGpuBuffer ProbeVolumeBuffer;
 	uint32 ProbeVolumePageSize = 0;
@@ -338,7 +286,6 @@ public:
 	RawGpuBuffer ProbeGridBuffer;
 	uint32 ProbeGridPageSize = 0;
 
-	/// Depth moments for light probes
 	Image* pProbeMomentsAtlas = nullptr;
 
 	RawGpuBuffer ReflectionProbeBuffer;
@@ -358,28 +305,15 @@ public:
 	Image* pLightmap = nullptr;
 	Image* pLightmapIrradiance = nullptr;
 
-	/// Bounces the lights that were not baked through the compiled map's cluster links, on top of the lightmap
 	LightTransport Transport;
+
 	SDFPageScene SDFPages;
 	SDFPageScene::eDebugView SDFPageDebugView = SDFPageScene::eDebugView::None;
 	float32 SDFPageDebugCone = 0.0f;
 	float32 SDFPageDebugRayLength = 50.0f;
 
-	/// The irradiance the forward pass shades lightmapped surfaces with: relit while the transport is active
-	Image* GetShadingIrradiance() const
-	{
-		Image* relit = Transport.GetRelitIrradiance();
-
-		if (relit != nullptr) {
-			return relit;
-		}
-
-		return pLightmapIrradiance;
-	}
-
-	/// Sun shadow pages that the fog samples on compiled maps with a baked sun, packed into one depth atlas
 	Image* pFogShadowAtlas = nullptr;
-	/// One entry per page grid cell, saying where its page is in the atlas and in light space
+
 	RawGpuBuffer FogShadowPageBuffer;
 	uint32 FogShadowPageBufferSize = 0;
 	BakedFogShadowParams FogShadow;
@@ -389,13 +323,7 @@ public:
 	bool bBakedIndirectActive = false;
 	bool bFarSunShadowActive = false;
 
-	/// Times the stages of the GPU frame
-	GpuProfiler Profiler;
 
-	/// Writes a GPU timestamp for the end of a stage into the frame being recorded, see GpuProfiler
-	void MarkGpu(eGpuMarker marker) { Profiler.Mark(GetFrame()->CmdBuffer, marker); }
-
-	/// Turn off the probe lighting or the decals in every draw, to see what they cost in the GPU timings
 	bool bDisableProbes = false;
 	bool bDisableReflectionProbes = false;
 	bool bDisableReflectionNormalize = false;
@@ -404,25 +332,16 @@ public:
 
 	float32 PreExposure = 1.0f;
 
-	/// Seconds the game has run for, advanced by every tick's delta. Drives shader animation such as water ripples
-	float64 ShaderTime = 0.0;
+	/// The number of seconds the graphics backend has been running for.
+	float64 TotalRunTime = 0.0;
 
 	uint32 Tonemapper = 1;
 
-	/// Debug view: show blended probe irradiance instead of the lit result.
 	bool bOnlyRenderProbes = false;
-
-	/// Debug view: show blended probe visibility instead of the lit result.
 	bool bRenderProbeVisibility = false;
 
-	bool UploadLightmap(const Vec2u& size, const uint8* sun_visibility, const uint16* irradiance,
-						const uint8* directions);
-	Image* CreateLightmapImage(const Vec2u& size, eImageFormat format, const Slice<const uint8>& texels);
+	GpuProfiler Profiler;
 
-	bool UploadFogShadow(const CompiledMapFogShadow& shadow);
-	void ClearFogShadow() { bHasBakedFogShadow = false; }
-
-	bool HasDebugView() const { return bOnlyRenderProbes || bRenderProbeVisibility || (ReflectionDebugView != 0); }
 
 private:
 	GpuDevice mDevice;
@@ -436,16 +355,19 @@ private:
 
 	uint32 mImageIndex = 0;
 
+	std::string mFrameCapturePath;
+	RawGpuBuffer mFrameCaptureBuffer;
 
 protected:
 	uint32 mFrameNumber = 0;
 	std::atomic_uint32_t mInternalFrameCounter = 0;
 
-	Mat4f mFogPrevCameraMatrix = Mat4f::scIdentity;
+	FMat4 mFogPrevCameraMatrix = FMat4::scIdentity;
 	uint32 mFroxelHistoryFrame = UINT32_MAX;
 
 	/// The stage the geometry is being drawn into, ForwardPass or ForwardBlendPass after CopySceneForWater()
 	RenderStage* mpActiveForwardStage = nullptr;
+
 
 	// TSQueue<DeletionObject> mDeletionQueue;
 };

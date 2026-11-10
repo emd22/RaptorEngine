@@ -22,9 +22,9 @@
 #include <Material/MaterialID.hpp>
 #include <Material/MaterialLibrary.hpp>
 #include <Math/BBox.hpp>
+#include <Math/FMat4.hpp>
+#include <Math/FQuat.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Mat4.hpp>
-#include <Math/Quat.hpp>
 #include <Object/ObjectID.hpp>
 #include <Physics/BodyID.hpp>
 #include <Renderer/ProbePlacement.hpp>
@@ -78,17 +78,7 @@ public:
 
 	void Create(World* world);
 
-	/**
-	 * @brief Loads a level from either its prototype (.prx) or its compiled map (.fxmap). A prototype loads as
-	 * editable brushes. A compiled map loads the geometry the map compiler made, plus everything of its prototype
-	 * that the compiler leaves alone (lights, models, dynamic and data brushes); if it is missing or older than the
-	 * prototype, the prototype is loaded instead.
-	 */
 	ePrototypeLoadStatus Load(const String& path);
-
-	/**
-	 * @brief Saves the prototype. A compiled map path is saved to the prototype next to it.
-	 */
 	void Save(const String& path);
 
 	/**
@@ -97,18 +87,7 @@ public:
 	 */
 	bool MoveFace(Object* object, const FVec3 face_normal, float32 distance);
 
-	/**
-	 * @brief Rebuilds a blockout from a set of planes, e.g. to undo an edit. Anything the planes have in common with
-	 * the old brush stays where it is, even though the object may have to move for that.
-	 */
 	bool SetBrushPlanes(Object* object, const Brush::PlaneList& planes);
-
-	/**
-	 * @brief Works out how a blockout splits along the plane through `point_a` and `point_b` that is perpendicular to
-	 * the face they were drawn on. Everything is in world space.
-	 * @param out_kept The blockout's brush after the split
-	 * @param out_split The piece that splits off, for a new blockout at `out_split_position`
-	 */
 	bool GetClipPieces(Object* object, const FVec3 point_a, const FVec3 point_b, const FVec3 face_normal,
 					   Brush::PlaneList& out_kept, Brush::PlaneList& out_split, FVec3& out_split_position);
 
@@ -117,38 +96,17 @@ public:
 
 	void RefreshCappedPatches();
 
-
-	/**
-	 * @brief Returns the brush for a new blockout filling `min` to `max` in world space, with its textures lined up
-	 * with the world grid
-	 * @param out_position Where the blockout goes
-	 */
 	Brush MakeWorldBox(const FVec3 min, const FVec3 max, FVec3& out_position) const;
 
-	/**
-	 * @brief Shows a see-through preview of a brush on an object with the given transform
-	 */
-	void ShowPreview(const FVec3 position, const Quat rotation, const Brush& brush);
+	void ShowPreview(const FVec3 position, const FQuat rotation, const Brush& brush);
 	void HidePreview();
 
-	/**
-	 * @brief Returns the planes of the object's brush with the texture on one face changed, without applying them
-	 */
-	bool GetFaceTextureEdit(Object* object, const FVec3 face_normal, eFaceTextureEdit edit, const Vec2f& amount,
+	bool GetFaceTextureEdit(Object* object, const FVec3 face_normal, eFaceTextureEdit edit, const FVec2& amount,
 							Brush::PlaneList& out_planes);
 
-	/**
-	 * @brief Finds the nearest blockout that a world space ray hits
-	 * @param direction The direction of the ray, with the length of how far it reaches
-	 * @param out_face_normal The normal of the face that was hit, in the blockout's local space
-	 */
+
 	Object* RaycastBlockout(const FVec3 origin, const FVec3 direction, FVec3& out_face_normal);
 
-	/**
-	 * @brief Finds the face of a blockout that a world space ray hits
-	 * @param out_face_normal The normal of the face that was hit, in the object's local space
-	 * @param out_point Where the face was hit, in world space
-	 */
 	bool RaycastFace(Object* object, const FVec3 origin, const FVec3 direction, FVec3& out_face_normal,
 					 FVec3* out_point = nullptr);
 
@@ -158,24 +116,16 @@ public:
 
 	void RebuildObject(Object* object);
 
-	/**
-	 * @brief Creates a new blockout objectC
-	 */
 	Object* NewObject(const FVec3 position, MaterialID material = MaterialID::scNull);
-
 	Object* DupeObject(Object* object);
 
-	/// A name for a new brush that no other object has
 	std::string MakeUniqueBrushName() const;
 
-	/**
-	 * @brief Recreates a destroyed blockout object from a snapshot (undo of Delete).
-	 * Falls back to a unique name if the original name is taken.
-	 */
-	Object* RestoreObject(const FVec3 position, const Brush::PlaneList& planes, MaterialID material,
-						  const Quat rotation, const Name& name, bool is_dynamic = false, bool is_decal = false);
 
-	Object* RestorePatch(const FVec3 position, const Patch& patch, MaterialID material, const Quat rotation,
+	Object* RestoreObject(const FVec3 position, const Brush::PlaneList& planes, MaterialID material,
+						  const FQuat rotation, const Name& name, bool is_dynamic = false, bool is_decal = false);
+
+	Object* RestorePatch(const FVec3 position, const Patch& patch, MaterialID material, const FQuat rotation,
 						 const Name& name);
 
 	bool SetPatch(Object* object, Patch&& patch);
@@ -226,16 +176,9 @@ public:
 
 	MaterialID GetSpecialMaterial(eSpecialMaterial special) const;
 
-	/**
-	 * @brief True if the static world brushes were replaced by a map compiled with mapc. The prototype can't be saved
-	 * while they are, as those brushes aren't loaded.
-	 */
+
 	bool IsCompiledMap() const { return mbIsCompiledMap; }
 
-	/**
-	 * @brief Where the map compiler put the light probes, or nullptr unless a compiled world with probes is loaded.
-	 * The brushes that placement would test against are not loaded then, so the probe bake uses this instead.
-	 */
 	const ProbeLayout* GetCompiledProbeLayout() const
 	{
 		return (mbIsCompiledMap && mCompiledProbeLayout.VolumeCount > 0) ? &mCompiledProbeLayout : nullptr;
@@ -250,7 +193,6 @@ public:
 	const SizedArray<float32>& GetCompiledProbeIrradiance() const { return mCompiledProbeIrradiance; }
 	const SizedArray<uint16>& GetCompiledProbeMoments() const { return mCompiledProbeMoments; }
 
-	/// True for the surfaces of a compiled map, which stand in for many brushes each
 	bool IsCompiledObject(const Object* object) const;
 
 	bool HasBakedSun() const { return mbHasBakedSun; }
@@ -276,12 +218,6 @@ public:
 	bool IsModel(const Object* object) const;
 
 	/**
-	 * @brief Loads the models from the `objects` entry of the scene's info.prx, which is where they lived before they
-	 * were saved in the blockout file. Does nothing until the scene path is known.
-	 */
-	void LoadLegacyModels();
-
-	/**
 	 * @brief Links models to the colliders their `collider` member names, for colliders made after the models
 	 */
 	void LinkModelColliders();
@@ -295,7 +231,7 @@ public:
 	struct SubviewSolid
 	{
 		const Brush* pBrush = nullptr;
-		Mat4f World = Mat4f::scIdentity;
+		FMat4 World = FMat4::scIdentity;
 		Object* pOwner = nullptr;
 		bool bTransparent = false;
 	};
@@ -372,7 +308,7 @@ private:
 	struct SubviewMember
 	{
 		Brush LocalBrush;
-		Mat4f ToSubview = Mat4f::scIdentity;
+		FMat4 ToSubview = FMat4::scIdentity;
 		MaterialID Material = MaterialID::scNull;
 		bool bMerged = false;
 	};
@@ -460,7 +396,7 @@ private:
 	 * @brief Creates a new brush from values
 	 * @returns A null ObjectID on failure, the ObjectID of the brush otherwise
 	 */
-	ObjectID CreateBrush(const String& name, const FVec3 position, const Quat rotation, const MaterialID material_id,
+	ObjectID CreateBrush(const String& name, const FVec3 position, const FQuat rotation, const MaterialID material_id,
 						 const BBox bounds);
 
 	/**
@@ -524,7 +460,7 @@ private:
 	{
 		const Brush* pBrush = nullptr;
 		const Patch* pPatch = nullptr;
-		Mat4f World = Mat4f::scIdentity;
+		FMat4 World = FMat4::scIdentity;
 		ObjectID ID = ObjectID::scNull;
 	};
 

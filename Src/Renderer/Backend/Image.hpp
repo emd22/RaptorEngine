@@ -102,7 +102,7 @@ struct ImageInfo
 {
 	ImageInfo() = default;
 
-	ImageInfo(Vec2u size, eImageFormat format, int32 mip_level, int32 mip_count, const Slice<const uint8>& data)
+	ImageInfo(UVec2 size, eImageFormat format, int32 mip_level, int32 mip_count, const Slice<const uint8>& data)
 		: Size(size), ImageType(eImageType::Flat), Format(format), MipLevel(mip_level), MipCount(mip_count),
 		  ImageData(data)
 	{
@@ -121,7 +121,7 @@ struct ImageInfo
 	}
 
 public:
-	Vec2u Size = Vec2u::scZero;
+	UVec2 Size = UVec2::scZero;
 	uint32 Depth = 1;
 
 	eImageType ImageType = eImageType::Flat;
@@ -283,7 +283,7 @@ struct ImageFormatUtil
 	}
 
 	/// The size in bytes of one tightly packed level of `size` pixels.
-	static constexpr uint64 GetDataSize(eImageFormat format, const Vec2u& size)
+	static constexpr uint64 GetDataSize(eImageFormat format, const UVec2& size)
 	{
 		if (IsBlockCompressed(format)) {
 			return uint64((size.X + 3) / 4) * ((size.Y + 3) / 4) * 16;
@@ -432,20 +432,20 @@ public:
 
 	FX_FORCE_INLINE const ImageInfo& GetInfo() const { return Info; }
 
-	void Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format, VkImageTiling tiling,
+	void Create(eImageType image_type, const UVec2& size, uint16 mips_count, eImageFormat format, VkImageTiling tiling,
 				VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags = eImageCreateFlags::None,
 				uint32 cube_count = 1, uint32 depth = 1);
 
-	void Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format,
+	void Create(eImageType image_type, const UVec2& size, uint16 mips_count, eImageFormat format,
 				VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags = eImageCreateFlags::None,
 				uint32 cube_count = 1);
 
-	void CreateVolume(const Vec2u& size, uint32 depth, eImageFormat format, VkImageUsageFlags usage);
+	void CreateVolume(const UVec2& size, uint32 depth, eImageFormat format, VkImageUsageFlags usage);
 
 	void CreateFromData(renderer::CommandBuffer& cmd, const ImageInfo& info, eImageCreateFlags flags);
 
 
-	void UploadMip(renderer::CommandBuffer& cmd, uint32 mip_index, const Vec2u& size,
+	void UploadMip(renderer::CommandBuffer& cmd, uint32 mip_index, const UVec2& size,
 				   const Slice<const uint8>& image_data);
 
 	/**
@@ -454,12 +454,10 @@ public:
 	void Upload(renderer::CommandBuffer& cmd, const ImageInfo& info);
 
 	void CopyToMip(renderer::CommandBuffer& cmd, const renderer::RawGpuBuffer& buffer, VkImageLayout final_layout,
-				   Vec2u size, uint32 mip_level);
+				   UVec2 size, uint32 mip_level);
 
-
-	/// `dst_offset` places the copied region inside the image, for updating part of an atlas.
 	void CopyFromBuffer(renderer::CommandBuffer& cmd, const renderer::RawGpuBuffer& buffer, VkImageLayout final_layout,
-						Vec2u size, uint32 base_layer, uint32 mip_level, Vec2u dst_offset = Vec2u::scZero);
+						UVec2 size, uint32 base_layer, uint32 mip_level, UVec2 dst_offset = UVec2::scZero);
 
 	void CreateLayeredImageFromCubemap(Image& cubemap, eImageFormat image_format, VkImageAspectFlags aspect_flags,
 									   ImageCubemapOptions options);

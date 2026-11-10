@@ -30,10 +30,10 @@ constexpr float32 scStumbleStepSpeed = 0.3f;
 /// A trunk lean past this steps even while the capture point is still over the feet, at most once per scLeanStepTime
 constexpr float32 scLeanStepTilt = MathUtil::DegToRad(10.0f);
 
-Vec2f GetStancePressure(const BalanceLeg& stance, const GravityFrame& frame, const Vec2f capture)
+FVec2 GetStancePressure(const BalanceLeg& stance, const GravityFrame& frame, const FVec2 capture)
 {
-	Vec2f points[BodyGroundContact::scMaxPoints];
-	Vec2f hull[BodyGroundContact::scMaxPoints + 1];
+	FVec2 points[BodyGroundContact::scMaxPoints];
+	FVec2 hull[BodyGroundContact::scMaxPoints + 1];
 	uint32 count = 0;
 
 	for (uint32 i = 0; i < stance.ContactCount; i++) {
@@ -50,7 +50,7 @@ Vec2f GetStancePressure(const BalanceLeg& stance, const GravityFrame& frame, con
 	return ClosestOnHull(hull, count, capture, unused_distance);
 }
 
-Vec2f ExtrapolateCapture(const Vec2f pressure, const Vec2f capture, float32 growth)
+FVec2 ExtrapolateCapture(const FVec2 pressure, const FVec2 capture, float32 growth)
 {
 	return pressure + (capture - pressure) * growth;
 }
@@ -455,7 +455,7 @@ void RagdollBalance::BuildSupport()
 
 	constexpr uint32 scMaxPoints = 2 * BodyGroundContact::scMaxPoints;
 
-	Vec2f points[scMaxPoints];
+	FVec2 points[scMaxPoints];
 	uint32 count = 0;
 
 	JPH::Vec3 foot_center_sum = JPH::Vec3::sZero();
@@ -474,7 +474,7 @@ void RagdollBalance::BuildSupport()
 		}
 	}
 
-	Vec2f hull[scMaxPoints + 1];
+	FVec2 hull[scMaxPoints + 1];
 	mSupportCount = BuildHull(points, count, hull);
 
 	if (mSupportCount == 0) {
@@ -485,22 +485,22 @@ void RagdollBalance::BuildSupport()
 		return;
 	}
 
-	const Vec2f center = GetHullCentroid(hull, mSupportCount);
+	const FVec2 center = GetHullCentroid(hull, mSupportCount);
 
 	mSupportCenter = mGroundFrame.FromPlane(center, mGroundHeight);
 
-	const Vec2f closest = ClosestOnHull(hull, mSupportCount, mGroundFrame.ToPlane(mCapturePoint), mCaptureOutside);
+	const FVec2 closest = ClosestOnHull(hull, mSupportCount, mGroundFrame.ToPlane(mCapturePoint), mCaptureOutside);
 	mStatus.CaptureError = mCapturePoint - mGroundFrame.FromPlane(closest, mGroundHeight);
 
-	Vec2f shrunk[scMaxPoints + 1];
+	FVec2 shrunk[scMaxPoints + 1];
 
 	for (uint32 i = 0; i < mSupportCount; i++) {
 		shrunk[i] = center + (hull[i] - center) * scSupportShrink;
 	}
 
 	float32 unused_distance = 0.0f;
-	const Vec2f held = ClosestOnHull(shrunk, mSupportCount, mGroundFrame.ToPlane(mCenterOfMass), unused_distance);
-	const Vec2f target = held + (center - held) * scCentering;
+	const FVec2 held = ClosestOnHull(shrunk, mSupportCount, mGroundFrame.ToPlane(mCenterOfMass), unused_distance);
+	const FVec2 target = held + (center - held) * scCentering;
 
 	mSupportTarget = mGroundFrame.FromPlane(target, mGroundHeight);
 }
@@ -1014,9 +1014,9 @@ JPH::Vec3 RagdollBalance::PlanStep(uint32 swing_leg, uint32 stance_leg, float32&
 
 JPH::Vec3 RagdollBalance::PredictCapture(uint32 stance_leg, float32 time) const
 {
-	const Vec2f capture = mGroundFrame.ToPlane(mCapturePoint);
-	const Vec2f pressure = GetStancePressure(mLegs[stance_leg], mGroundFrame, capture);
-	const Vec2f predicted = ExtrapolateCapture(pressure, capture, std::exp(mOmega * time));
+	const FVec2 capture = mGroundFrame.ToPlane(mCapturePoint);
+	const FVec2 pressure = GetStancePressure(mLegs[stance_leg], mGroundFrame, capture);
+	const FVec2 predicted = ExtrapolateCapture(pressure, capture, std::exp(mOmega * time));
 
 	return mGroundFrame.FromPlane(predicted, 0.0f);
 }
@@ -1088,8 +1088,8 @@ float32 RagdollBalance::GetWeightShare(uint32 leg_index) const
 
 float32 RagdollBalance::GetCaptureDistance(const BalanceLeg& leg) const
 {
-	Vec2f points[scSoleCorners];
-	Vec2f hull[scSoleCorners + 1];
+	FVec2 points[scSoleCorners];
+	FVec2 hull[scSoleCorners + 1];
 
 	// The whole sole, since this asks how far the capture point is from where this foot could bear weight
 	for (uint32 corner = 0; corner < scSoleCorners; corner++) {
@@ -1111,8 +1111,8 @@ float32 RagdollBalance::GetLandingCaptureError(uint32 stance_leg, const JPH::Vec
 	const BalanceLeg& stance = mLegs[stance_leg];
 	const JPH::Vec3 side = mGroundFrame.Up.Cross(mForward);
 
-	Vec2f points[scSoleCorners * 2];
-	Vec2f hull[scSoleCorners * 2 + 1];
+	FVec2 points[scSoleCorners * 2];
+	FVec2 hull[scSoleCorners * 2 + 1];
 	uint32 count = 0;
 
 	for (uint32 corner = 0; corner < scSoleCorners; corner++) {
@@ -1128,9 +1128,9 @@ float32 RagdollBalance::GetLandingCaptureError(uint32 stance_leg, const JPH::Vec
 	count = BuildHull(points, count, hull);
 
 	const float32 growth = std::exp(mOmega * swing_time);
-	const Vec2f capture = mGroundFrame.ToPlane(mCapturePoint);
-	const Vec2f pressure = GetStancePressure(stance, mGroundFrame, capture);
-	const Vec2f predicted = ExtrapolateCapture(pressure, capture, growth);
+	const FVec2 capture = mGroundFrame.ToPlane(mCapturePoint);
+	const FVec2 pressure = GetStancePressure(stance, mGroundFrame, capture);
+	const FVec2 predicted = ExtrapolateCapture(pressure, capture, growth);
 
 	float32 distance = 0.0f;
 	ClosestOnHull(hull, count, predicted, distance);
@@ -1151,14 +1151,14 @@ JPH::Vec3 RagdollBalance::PlanLanding(uint32 swing_leg, uint32 stance_leg, float
 	const BalanceLeg& swing = mLegs[swing_leg];
 
 	// The capture point on the ground plane, the spot the body has to be balanced over
-	const Vec2f capture = mGroundFrame.ToPlane(mCapturePoint);
-	const Vec2f pressure = GetStancePressure(stance, mGroundFrame, capture);
+	const FVec2 capture = mGroundFrame.ToPlane(mCapturePoint);
+	const FVec2 pressure = GetStancePressure(stance, mGroundFrame, capture);
 
 	// Try and predict where the foot will be on contact with the ground
 	const float32 growth = std::exp(mOmega * std::max(time_left, 0.0f));
-	const Vec2f predicted = ExtrapolateCapture(pressure, capture, growth);
+	const FVec2 predicted = ExtrapolateCapture(pressure, capture, growth);
 	// The offset from the pressure point to the predicted capture point
-	const Vec2f pressure_point_error = (predicted - pressure);
+	const FVec2 pressure_point_error = (predicted - pressure);
 
 	// Get the world direction. With no error, fall back to horizontal velocity.
 	JPH::Vec3 direction = mGroundFrame.FromPlane(pressure_point_error, 0.0f);

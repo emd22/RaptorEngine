@@ -2,7 +2,7 @@
 
 #include <Engine.hpp>
 #include <Material/MaterialManager.hpp>
-#include <Math/Mat4.hpp>
+#include <Math/FMat4.hpp>
 #include <Object/Object.hpp>
 #include <Renderer/Backend/DescriptorCache.hpp>
 #include <Renderer/Backend/DsLayoutBuilder.hpp>
@@ -142,15 +142,15 @@ void ObjectManager::Submit(const ObjectID& object_id, ObjectGpuEntry& entry)
 	memcpy(GetBufferAtFrame(object_id.GetID()), &entry, sizeof(ObjectGpuEntry));
 }
 
-void ObjectManager::Submit(const ObjectID& object_id, const Mat4f& model_matrix)
+void ObjectManager::Submit(const ObjectID& object_id, const FMat4& model_matrix)
 {
 	static_assert(offsetof(ObjectGpuEntry, ModelMatrix) == 0);
 
 	Assert(object_id.GetID() < scMaxObjects);
 
 	ObjectGpuEntry* entry = GetBufferAtFrame(object_id.GetID());
-	memcpy(entry->ModelMatrix, model_matrix.RawData, sizeof(Mat4f));
-	memcpy(entry->PrevModelMatrix, model_matrix.RawData, sizeof(Mat4f));
+	memcpy(entry->ModelMatrix, model_matrix.RawData, sizeof(FMat4));
+	memcpy(entry->PrevModelMatrix, model_matrix.RawData, sizeof(FMat4));
 }
 
 

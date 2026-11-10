@@ -1,9 +1,9 @@
-#include <Math/Mat4.hpp>
+#include <Math/FMat4.hpp>
 #include <cstring>
 
 namespace fx {
 
-Mat4f Mat4f::Inverse() const
+FMat4 FMat4::Inverse() const
 {
 	float M[4][4];
 	for (int i = 0; i < 4; i++) {
@@ -50,10 +50,10 @@ Mat4f Mat4f::Inverse() const
 	T[3][2] = (-M[3][0] * s[3] + M[3][1] * s[1] - M[3][2] * s[0]) * idet;
 	T[3][3] = (M[2][0] * s[3] - M[2][1] * s[1] + M[2][2] * s[0]) * idet;
 
-	return Mat4f(T);
+	return FMat4(T);
 }
 
-Mat4f Mat4f::AffineInverse() const
+FMat4 FMat4::AffineInverse() const
 {
 	const FVec3 r0(Rows[0]);
 	const FVec3 r1(Rows[1]);
@@ -66,7 +66,7 @@ Mat4f Mat4f::AffineInverse() const
 
 	const float32 idet = 1.0f / r0.Dot(c0);
 
-	Mat4f result;
+	FMat4 result;
 	result.Rows[0].Set(c0.X * idet, c1.X * idet, c2.X * idet, 0.0f);
 	result.Rows[1].Set(c0.Y * idet, c1.Y * idet, c2.Y * idet, 0.0f);
 	result.Rows[2].Set(c0.Z * idet, c1.Z * idet, c2.Z * idet, 0.0f);
@@ -75,14 +75,14 @@ Mat4f Mat4f::AffineInverse() const
 	return result;
 }
 
-Mat4f Mat4f::RigidInverse() const
+FMat4 FMat4::RigidInverse() const
 {
 	const FVec3 r0(Rows[0]);
 	const FVec3 r1(Rows[1]);
 	const FVec3 r2(Rows[2]);
 	const FVec3 t(Rows[3]);
 
-	Mat4f result;
+	FMat4 result;
 	result.Rows[0].Set(r0.X, r1.X, r2.X, 0.0f);
 	result.Rows[1].Set(r0.Y, r1.Y, r2.Y, 0.0f);
 	result.Rows[2].Set(r0.Z, r1.Z, r2.Z, 0.0f);

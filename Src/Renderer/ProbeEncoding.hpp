@@ -48,7 +48,7 @@ inline void EvalSHBasis(const FVec3 d, float32 out[Limits::ProbeSHCoeffCount])
 /**
  * @brief Octahedral map coordinates in [-1, 1] for direction `d`
  */
-inline Vec2f DirectionToOctahedral(const FVec3 d)
+inline FVec2 DirectionToOctahedral(const FVec3 d)
 {
 	const float l1 = simd::HAdd(simd::Abs(d.mIntrin));
 
@@ -57,10 +57,10 @@ inline Vec2f DirectionToOctahedral(const FVec3 d)
 	FVec3 xyz = d * inv_l1;
 
 	if (d.Y >= 0.0f) {
-		return Vec2f(xyz.X, xyz.Z);
+		return FVec2(xyz.X, xyz.Z);
 	}
 
-	Vec2f sign = Vec2f(1.0f);
+	FVec2 sign = FVec2(1.0f);
 
 	if (xyz.X < 0.0f) {
 		sign.X = -1.0f;
@@ -70,7 +70,7 @@ inline Vec2f DirectionToOctahedral(const FVec3 d)
 		sign.Y = -1.0f;
 	}
 
-	const Vec2f result = Vec2f(1.0f) - Vec2f(std::fabs(xyz.Z), std::fabs(xyz.X));
+	const FVec2 result = FVec2(1.0f) - FVec2(std::fabs(xyz.Z), std::fabs(xyz.X));
 
 	return (result * sign);
 
@@ -82,7 +82,7 @@ inline uint32 DirectionToMomentTexel(const FVec3 d)
 {
 	constexpr uint32 cSize = Limits::ProbeDepthSize;
 
-	Vec2f uv = DirectionToOctahedral(d);
+	FVec2 uv = DirectionToOctahedral(d);
 
 	const auto to_texel = [](float32 coord)
 	{ return std::min(static_cast<uint32>(std::max((coord * 0.5f + 0.5f) * cSize, 0.0f)), cSize - 1); };

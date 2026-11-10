@@ -15,8 +15,8 @@
 #include <Core/Ref.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
+#include <Math/FMat4.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Mat4.hpp>
 #include <limits>
 
 namespace JPH {
@@ -191,14 +191,14 @@ public:
 	Ragdoll(const Ragdoll&) = delete;
 	Ragdoll& operator=(const Ragdoll&) = delete;
 
-	bool Create(const Ref<Skeleton>& skeleton, const Mat4f& object_world_matrix, const RDDefinition& def);
+	bool Create(const Ref<Skeleton>& skeleton, const FMat4& object_world_matrix, const RDDefinition& def);
 
 	static JPH::ObjectLayer GetModeLayer(eRagdollBodyMode mode);
 
 	void Activate(const FVec3 velocity);
 
-	void Drive(const Mat4f& object_world_matrix, float32 delta_time, bool teleport = false);
-	void GoLimp(const Mat4f& object_world_matrix);
+	void Drive(const FMat4& object_world_matrix, float32 delta_time, bool teleport = false);
+	void GoLimp(const FMat4& object_world_matrix);
 
 	void SetBodyMode(uint32 body_index, eRagdollBodyMode mode);
 	void SetAllBodyModes(eRagdollBodyMode mode);
@@ -352,7 +352,7 @@ private:
 	/**
 	 * @brief Returns the world matrix for a given body segment.
 	 */
-	Mat4f GetSegmentWorldMatrix(uint32 body_index, float32 step_alpha) const;
+	FMat4 GetSegmentWorldMatrix(uint32 body_index, float32 step_alpha) const;
 
 	void DrawDebugSegments(const SizedArray<RDSegmentState>& samples, SizedArray<FVec3>& out_centers) const;
 	void DrawDebugLinks(const SizedArray<FVec3>& centers) const;
@@ -397,9 +397,9 @@ private:
 	uint32 mContactGeneration = 0;
 	uint32 mSubstep = 0;
 
-	SizedArray<Mat4f> mDrivenWorld;
+	SizedArray<FMat4> mDrivenWorld;
 	SizedArray<uint8> mIsDriven;
-	Mat4f mWorldInverse = Mat4f::scIdentity;
+	FMat4 mWorldInverse = FMat4::scIdentity;
 	bool mbPoseSettled = false;
 };
 

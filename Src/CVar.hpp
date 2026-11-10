@@ -126,7 +126,9 @@ public:
 
 	CVarValue* GetCVar(const String& name);
 
-	/// All registered CVars, sorted by name. The pointers stay valid for the lifetime of the manager.
+	/**
+	 * @brief Returns all CVars currently registered
+	 */
 	std::vector<CVarValue*> CollectCVars();
 
 	template <typename T>

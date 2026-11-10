@@ -12,16 +12,16 @@ struct AtlasImage
 {
 	String Name;
 	String Path;
-	Vec2i Size = Vec2i::scZero;
+	IVec2 Size = IVec2::scZero;
 	SizedArray<uint8> Pixels;
 };
 
 struct AtlasGroup
 {
 	String Name;
-	Vec2i TilePos = Vec2i::scZero;
-	Vec2i TileCount = Vec2i::scZero;
-	Vec2i SourceSize = Vec2i::scZero;
+	IVec2 TilePos = IVec2::scZero;
+	IVec2 TileCount = IVec2::scZero;
+	IVec2 SourceSize = IVec2::scZero;
 };
 
 using AtlasImageArray = DynArray<AtlasImage, GrowthFunctions::Double>;
@@ -30,10 +30,10 @@ using AtlasGroupArray = DynArray<AtlasGroup, GrowthFunctions::Double>;
 struct AtlasLayout
 {
 	int32 TileSize = 0;
-	Vec2i TileCount = Vec2i::scZero;
+	IVec2 TileCount = IVec2::scZero;
 	AtlasGroupArray Groups;
 
-	Vec2i GetPixelSize() const { return TileCount * TileSize; }
+	IVec2 GetPixelSize() const { return TileCount * TileSize; }
 };
 
 bool LoadAtlasImage(const String& path, AtlasImage& out_image);

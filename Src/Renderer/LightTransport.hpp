@@ -93,7 +93,7 @@ private:
 	Image* mpBakedIrradiance = nullptr;
 	Image* mpRelitIrradiance = nullptr;
 
-	Vec2u mLightmapSize = Vec2u(1, 1);
+	UVec2 mLightmapSize = UVec2(1, 1);
 	uint32 mClusterSize = 1;
 	uint32 mClusterCount = 0;
 	uint64 mLinkCount = 0;

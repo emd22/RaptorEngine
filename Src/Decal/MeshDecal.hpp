@@ -4,8 +4,8 @@
 #include <Brush.hpp>
 #include <Core/DynArray.hpp>
 #include <Math/BBox.hpp>
+#include <Math/FMat4.hpp>
 #include <Math/FVec3.hpp>
-#include <Math/Mat4.hpp>
 #include <Math/Vec2.hpp>
 #include <vector>
 
@@ -18,9 +18,9 @@ public:
 	static constexpr float32 scMaxAngleDegrees = 80.0f;
 
 public:
-	MeshDecalBuilder(const Brush& volume, const Mat4f& volume_to_world);
+	MeshDecalBuilder(const Brush& volume, const FMat4& volume_to_world);
 
-	void AddBrush(const Brush& brush, const Mat4f& brush_to_world);
+	void AddBrush(const Brush& brush, const FMat4& brush_to_world);
 	void ClipBrushes();
 
 	void AddTriangles(const FVec3* positions, const FVec3* normals, const uint32* indices, uint32 index_count);
@@ -41,7 +41,7 @@ private:
 	struct BrushReceiver
 	{
 		const Brush* pBrush = nullptr;
-		Mat4f ToLocal;
+		FMat4 ToLocal;
 		FVec3 Min;
 		FVec3 Max;
 		std::vector<LocalPlane> Planes;
@@ -64,7 +64,7 @@ private:
 	std::vector<BrushReceiver> mBrushes;
 
 	const Brush& mVolume;
-	Mat4f mWorldToLocal;
+	FMat4 mWorldToLocal;
 
 	FVec3 mLocalMin;
 	FVec3 mLocalMax;
@@ -77,7 +77,7 @@ private:
 	GrowingArray<FVec3> mNormals;
 	GrowingArray<FVec3> mTangents;
 	GrowingArray<float32> mHandedness;
-	GrowingArray<Vec2f> mTexcoords;
+	GrowingArray<FVec2> mTexcoords;
 	GrowingArray<uint32> mIndices;
 };
 

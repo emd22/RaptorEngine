@@ -8,10 +8,10 @@ class Image;
 
 namespace renderer::ImageGen {
 
-Image* Random(Vec2u size);
+Image* Random(UVec2 size);
 
 Image* DfgLut(uint32 size);
 
-}
+} // namespace renderer::ImageGen
 
 } // namespace fx

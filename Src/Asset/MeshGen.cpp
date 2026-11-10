@@ -12,7 +12,7 @@
 namespace fx {
 
 static const float Z = (1.0f + sqrt(5.0f)) / 2.0f;	// Golden ratio
-static const Vec2f UV = Vec2f(1 / 11.0f, 1 / 3.0f); // The UV coordinates are laid out in a 11x3 grid
+static const FVec2 UV = FVec2(1 / 11.0f, 1 / 3.0f); // The UV coordinates are laid out in a 11x3 grid
 
 static const int IcoVertexCount = 22;
 static const int IcoIndexCount = 60;
@@ -24,11 +24,11 @@ static const FVec3 IcoVerts[] = {
 	FVec3(0, 1, -Z),  FVec3(0, -1, -Z), FVec3(1, Z, 0),	 FVec3(Z, 0, -1),
 };
 
-static const Vec2f IcoUvs[] = {
-	UV * Vec2f(0, 1), UV * Vec2f(1, 0),	 UV * Vec2f(1, 2),	UV * Vec2f(2, 1),  UV * Vec2f(2, 3), UV * Vec2f(3, 0),
-	UV * Vec2f(3, 2), UV * Vec2f(4, 1),	 UV * Vec2f(4, 3),	UV * Vec2f(5, 0),  UV * Vec2f(5, 2), UV * Vec2f(6, 1),
-	UV * Vec2f(6, 3), UV * Vec2f(7, 0),	 UV * Vec2f(7, 2),	UV * Vec2f(8, 1),  UV * Vec2f(8, 3), UV * Vec2f(9, 0),
-	UV * Vec2f(9, 2), UV * Vec2f(10, 1), UV * Vec2f(10, 3), UV * Vec2f(11, 2),
+static const FVec2 IcoUvs[] = {
+	UV * FVec2(0, 1), UV * FVec2(1, 0),	 UV * FVec2(1, 2),	UV * FVec2(2, 1),  UV * FVec2(2, 3), UV * FVec2(3, 0),
+	UV * FVec2(3, 2), UV * FVec2(4, 1),	 UV * FVec2(4, 3),	UV * FVec2(5, 0),  UV * FVec2(5, 2), UV * FVec2(6, 1),
+	UV * FVec2(6, 3), UV * FVec2(7, 0),	 UV * FVec2(7, 2),	UV * FVec2(8, 1),  UV * FVec2(8, 3), UV * FVec2(9, 0),
+	UV * FVec2(9, 2), UV * FVec2(10, 1), UV * FVec2(10, 3), UV * FVec2(11, 2),
 };
 
 static const int32 IcoIndex[] = {
@@ -198,7 +198,7 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeIcoSphere(int resolution)
 }
 
 static void MC_EmitQuad(SizedArray<FVec3>& positions, SizedArray<FVec3>& normals, SizedArray<FVec3>& tangents,
-						SizedArray<float32>& handedness, SizedArray<Vec2f>& uvs, SizedArray<uint32>& indices,
+						SizedArray<float32>& handedness, SizedArray<FVec2>& uvs, SizedArray<uint32>& indices,
 						const FVec3 (&verts)[4], const MeshGenOptions& options, bool flip_u, bool flip_v)
 {
 	const FVec3 surface_normal = FVec3::GetSurfaceNormal(verts[0], verts[1], verts[2]);
@@ -223,9 +223,9 @@ static void MC_EmitQuad(SizedArray<FVec3>& positions, SizedArray<FVec3>& normals
 	const float32 quad_width = (verts[1] - verts[0]).Length();
 	const float32 quad_height = (verts[3] - verts[0]).Length();
 
-	const Vec2f uv_span = options.UvMax - options.UvMin;
-	const Vec2f uv_min = options.UvMin;
-	const Vec2f uv_max = uv_min + Vec2f(uv_span.X * quad_width, uv_span.Y * quad_height);
+	const FVec2 uv_span = options.UvMax - options.UvMin;
+	const FVec2 uv_min = options.UvMin;
+	const FVec2 uv_max = uv_min + FVec2(uv_span.X * quad_width, uv_span.Y * quad_height);
 
 
 	const float32 u_left = flip_u ? uv_max.X : uv_min.X;
@@ -235,13 +235,13 @@ static void MC_EmitQuad(SizedArray<FVec3>& positions, SizedArray<FVec3>& normals
 	const float32 v_max = flip_v ? uv_min.Y : uv_max.Y;
 
 	// Top Left
-	uvs.Insert(Vec2f(u_left, v_min));
+	uvs.Insert(FVec2(u_left, v_min));
 	// Top Right
-	uvs.Insert(Vec2f(u_right, v_min));
+	uvs.Insert(FVec2(u_right, v_min));
 	// Bottom Right
-	uvs.Insert(Vec2f(u_right, v_max));
+	uvs.Insert(FVec2(u_right, v_max));
 	// Bottom Left
-	uvs.Insert(Vec2f(u_left, v_max));
+	uvs.Insert(FVec2(u_left, v_max));
 
 	// Top left triangle
 	indices.Insert(base + 0);
@@ -388,7 +388,7 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeLine()
 	return mesh;
 }
 
-Ref<MeshGen::GeneratedMesh> MeshGen::MakeQuad(Vec2f scale)
+Ref<MeshGen::GeneratedMesh> MeshGen::MakeQuad(FVec2 scale)
 {
 	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
 
