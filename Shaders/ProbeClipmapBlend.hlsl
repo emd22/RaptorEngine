@@ -14,6 +14,7 @@ F_StructBuffer(bRays, float4, 1, 0);
 [[vk::image_format("rg16f")]] [[vk::binding(7, 0)]] RWTexture2D<float2> tMoments2;
 
 F_RWStructBuffer(bStats, uint, 8, 0);
+F_RWStructBuffer(bProbeData, float4, 9, 0);
 
 F_FrameData(ProbeClipmapConsts, Consts, 1);
 
@@ -23,6 +24,8 @@ F_FrameData(ProbeClipmapConsts, Consts, 1);
 #define STAT_RESET 2
 #define STAT_BLACK 3
 #define STAT_BACKFACES 4
+#define STAT_INACTIVE 5
+#define STAT_MOVED 6
 
 /// Fixed point scale of the summed relative change
 #define STAT_CHANGE_SCALE 10000.0
@@ -220,6 +223,70 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 	}
 
 	if (thread == 0) {
+		// Relocation and classification from this update's rays, after DDGI (Majercik et al. 2021)
+		const float spacing = level.vParams.x;
+		const uint probe_index = ClipmapProbeIndex(level_index, slot);
+		const float3 previous_offset = select(reset, float3(0.0, 0.0, 0.0), bProbeData[probe_index].xyz);
+
+		uint backface_count = 0;
+		float closest_back = 1e30;
+		float3 closest_back_direction = float3(0.0, 0.0, 0.0);
+		float closest_front = 1e30;
+		float3 closest_front_direction = float3(0.0, 0.0, 0.0);
+		float farthest_front = 0.0;
+		float3 farthest_front_direction = float3(0.0, 0.0, 0.0);
+
+		for (uint ray = 0; ray < CLIPMAP_RAYS; ray++) {
+			const float signed_distance = sRays[ray].w;
+			const float distance = abs(signed_distance);
+			const float3 direction = sDirections[ray];
+
+			if (signed_distance < 0.0) {
+				backface_count++;
+
+				if (distance < closest_back) {
+					closest_back = distance;
+					closest_back_direction = direction;
+				}
+			}
+			else {
+				if (distance < closest_front) {
+					closest_front = distance;
+					closest_front_direction = direction;
+				}
+
+				if (distance > farthest_front) {
+					farthest_front = distance;
+					farthest_front_direction = direction;
+				}
+			}
+		}
+
+		const float min_front = CLIPMAP_MIN_FRONTFACE * spacing;
+		const float backface_ratio = float(backface_count) / float(CLIPMAP_RAYS);
+
+		float3 offset = previous_offset;
+
+		if (backface_ratio > CLIPMAP_RELOCATE_BACKFACES) {
+			// Inside a wall: through the nearest back face and a little past it
+			offset += closest_back_direction * (closest_back + min_front * 0.5);
+		}
+		else if (closest_front < min_front) {
+			// Too close to a surface: towards the open space, unless that is where the surface is
+			const bool is_open = dot(farthest_front_direction, closest_front_direction) <= 0.5;
+			offset += select(is_open, farthest_front_direction * min(farthest_front, spacing * 0.5), float3(0.0, 0.0, 0.0));
+		}
+
+		const bool fits = all(abs(offset) <= CLIPMAP_MAX_OFFSET * spacing);
+		const bool relocate = HAS_FLAG(Consts.vInfo.z, CLIPMAP_FLAG_RELOCATE);
+		offset = select(relocate, select(fits, offset, previous_offset), float3(0.0, 0.0, 0.0));
+
+		const bool is_active = or(!relocate, backface_ratio <= CLIPMAP_INACTIVE_BACKFACES);
+		bProbeData[probe_index] = float4(offset, select(is_active, 1.0, 0.0));
+
+		InterlockedAdd(bStats[STAT_INACTIVE], select(is_active, 0u, 1u));
+		InterlockedAdd(bStats[STAT_MOVED], select(any(offset != 0.0), 1u, 0u));
+
 		uint black = 1;
 
 		for (uint texel = 0; texel < CLIPMAP_IRRADIANCE_SIZE * CLIPMAP_IRRADIANCE_SIZE; texel++) {

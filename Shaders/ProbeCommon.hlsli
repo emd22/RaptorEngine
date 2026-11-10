@@ -1,3 +1,6 @@
+#ifndef PROBE_COMMON_HLSLI
+#define PROBE_COMMON_HLSLI
+
 ///
 /// Light-probe sampling shared by the forward passes.
 ///
@@ -546,3 +549,5 @@ float3 SampleReflectionProbes(float3 pos_ws, float3 r, float roughness, float3 f
 
 	return radiance + (fallback * remaining);
 }
+
+#endif

@@ -103,8 +103,13 @@ uint32 PackAlbedo(const FVec3& albedo)
 	return channel(albedo.X) | (channel(albedo.Y) << 8) | (channel(albedo.Z) << 16);
 }
 
+/**
+ * @brief Adds triangle abc wound so that its face normal, (b - a) x (c - a), points the way `outward` does. The GI
+ * tells probes inside walls apart by the back faces their rays hit, so the winding has to agree with the surface.
+ * A zero `outward` keeps the winding as it is.
+ */
 void AddTriangle(Array<DTriangle>& triangles, Array<uint32>& albedos, uint32 albedo, const DVec3 a, const DVec3 b,
-				 const DVec3 c)
+				 const DVec3 c, const DVec3 outward = DVec3(0.0))
 {
 	const DVec3 normal = (b - a).Cross(c - a);
 
@@ -114,7 +119,13 @@ void AddTriangle(Array<DTriangle>& triangles, Array<uint32>& albedos, uint32 alb
 		return;
 	}
 
-	triangles.Insert(DTriangle { a, b, c });
+	if (normal.Dot(outward) < 0.0) {
+		triangles.Insert(DTriangle { a, c, b });
+	}
+	else {
+		triangles.Insert(DTriangle { a, b, c });
+	}
+
 	albedos.Insert(albedo);
 }
 
@@ -144,9 +155,12 @@ void GatherTriangles(const MapSource& source, const SurfaceBuilder& surfaces, co
 		const uint32 albedo = get_albedo(map_albedos, static_cast<uint32>(surface.MaterialIndex));
 
 		for (size_t index = 0; index + 2 < surface.Indices.Size; index += 3) {
-			AddTriangle(out_triangles, out_albedos, albedo, DVec3(surface.Vertices[surface.Indices[index]].Position),
-						DVec3(surface.Vertices[surface.Indices[index + 1]].Position),
-						DVec3(surface.Vertices[surface.Indices[index + 2]].Position));
+			const CompiledMapVertex& a = surface.Vertices[surface.Indices[index]];
+			const CompiledMapVertex& b = surface.Vertices[surface.Indices[index + 1]];
+			const CompiledMapVertex& c = surface.Vertices[surface.Indices[index + 2]];
+
+			AddTriangle(out_triangles, out_albedos, albedo, DVec3(a.Position), DVec3(b.Position), DVec3(c.Position),
+						DVec3(a.Normal) + DVec3(b.Normal) + DVec3(c.Normal));
 		}
 	}
 
@@ -155,9 +169,12 @@ void GatherTriangles(const MapSource& source, const SurfaceBuilder& surfaces, co
 			const uint32 albedo = get_albedo(model_albedos, surface.MaterialIndex);
 
 			for (size_t index = 0; index + 2 < surface.Indices.Size; index += 3) {
-				AddTriangle(out_triangles, out_albedos, albedo, (surface.Vertices[static_cast<size_t>(surface.Indices[index])].Position),
-							(surface.Vertices[static_cast<size_t>(surface.Indices[index + 1])].Position),
-							(surface.Vertices[static_cast<size_t>(surface.Indices[index + 2])].Position));
+				const ModelVertex& a = surface.Vertices[static_cast<size_t>(surface.Indices[index])];
+				const ModelVertex& b = surface.Vertices[static_cast<size_t>(surface.Indices[index + 1])];
+				const ModelVertex& c = surface.Vertices[static_cast<size_t>(surface.Indices[index + 2])];
+
+				AddTriangle(out_triangles, out_albedos, albedo, a.Position, b.Position, c.Position,
+							a.Normal + b.Normal + c.Normal);
 			}
 		}
 	}

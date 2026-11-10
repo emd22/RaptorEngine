@@ -20,6 +20,17 @@
 
 #define CLIPMAP_STATE_VALID 0x01
 
+/// Probes are moved at most this much of their spacing off their grid point, along each axis
+#define CLIPMAP_MAX_OFFSET 0.45
+/// Probes this close (in spacings) to a front face are pushed away from it
+#define CLIPMAP_MIN_FRONTFACE 0.2
+/// Probes whose rays hit back faces more often than this are moved out of the wall they are in
+#define CLIPMAP_RELOCATE_BACKFACES 0.25
+/// Probes whose rays hit back faces more often than this, where they ended up, are switched off
+#define CLIPMAP_INACTIVE_BACKFACES 0.3
+/// Weight of a switched off probe in the gather, so a cell surrounded by them is still lit
+#define CLIPMAP_INACTIVE_WEIGHT 1e-3
+
 struct ClipmapLevel
 {
 	/// The window's minimum probe coordinate, in probes
@@ -55,6 +66,11 @@ int3 ClipmapSlotProbe(ClipmapLevel level, uint slot)
 }
 
 float3 ClipmapProbePosition(ClipmapLevel level, int3 probe) { return float3(probe) * level.vParams.x; }
+
+/// Index of a level's slot in the per probe buffers
+uint ClipmapProbeIndex(uint level, uint slot) { return level * CLIPMAP_PROBES_PER_LEVEL + slot; }
+
+// bProbeData holds a float4 per probe: its offset off its grid point in XYZ, and 1 in W when it is switched on
 
 /// Where slot `slot`'s tile of `tile_size` texels (border included) starts
 uint2 ClipmapTileOrigin(uint slot, uint tile_size)

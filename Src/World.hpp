@@ -229,6 +229,8 @@ public:
 	CVarValue* pCVarGIClipmapDebug = nullptr;
 	CVarValue* pCVarGIProbeBudget = nullptr;
 	CVarValue* pCVarGIHysteresis = nullptr;
+	CVarValue* pCVarGIBounce = nullptr;
+	CVarValue* pCVarGIRelocate = nullptr;
 
 	uint32 FrustumTestedObjects = 0;
 	uint32 FrustumCulledObjects = 0;

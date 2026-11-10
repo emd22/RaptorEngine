@@ -73,6 +73,12 @@ public:
 		float32 ChangeThreshold = 1.0f;
 		/// Exponent of the cosine lobe each depth moment texel gathers over
 		float32 MomentSharpness = 50.0f;
+		/// Hits take the light that reached them from last frame's probes
+		bool bBounce = true;
+		/// Probes are moved out of walls and away from surfaces, and switched off where that fails
+		bool bRelocate = true;
+		/// Radiance of the rays that miss, the same constant sky the mapc bake uses
+		float32 SkyRadiance = 1500.0f / 3.14159265f;
 	};
 
 public:
@@ -98,6 +104,7 @@ private:
 		int32 Origin[3] = {};
 		bool bPlaced = false;
 
+		/// 0 unfilled, 1 filled, scPending traced for the first time this frame
 		SizedArray<uint8> Valid;
 		uint32 Cursor = 0;
 		uint32 InvalidCount = 0;
@@ -107,6 +114,7 @@ private:
 	uint32 ScheduleJobs(uint32* jobs, const Settings& settings);
 	void GetLevelConsts(ProbeClipmapLevelGpu* out_levels, const Settings& settings) const;
 	void LogStats(uint32 frame, uint32 job_count);
+	void InitializeImages(CommandBuffer& cmd);
 
 private:
 	Level mLevels[scLevelCount];
@@ -119,6 +127,8 @@ private:
 	RawGpuBuffer mRays;
 	RawGpuBuffer mState;
 	RawGpuBuffer mStats;
+	/// Offset off the grid point and whether the probe is switched on, written by the blend
+	RawGpuBuffer mProbeData;
 
 	uint32 mUpdateCount = 0;
 	uint32 mLastJobCount = 0;

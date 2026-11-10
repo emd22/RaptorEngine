@@ -53,6 +53,8 @@ void World::Create()
 	pCVarGIClipmapDebug = gCVars->Set<int64>("r_gi_clipmap_debug", 0);
 	pCVarGIProbeBudget = gCVars->Set<int64>("r_gi_probe_budget", 3072);
 	pCVarGIHysteresis = gCVars->Set<float32>("r_gi_hysteresis", 0.97f);
+	pCVarGIBounce = gCVars->Set<int64>("r_gi_bounce", 1);
+	pCVarGIRelocate = gCVars->Set<int64>("r_gi_relocate", 1);
 }
 
 static bool IsTransparentMaterial(Material* mat) { return (mat != nullptr && mat->IsTransparent()); }
@@ -1253,6 +1255,8 @@ void World::Render(BaseCamera* shadow_camera)
 		ProbeClipmap::Settings settings;
 		settings.Budget = static_cast<uint32>(std::max<int64>(pCVarGIProbeBudget->IntValue, 0));
 		settings.Hysteresis = std::clamp(pCVarGIHysteresis->FloatValue, 0.0f, 0.999f);
+		settings.bBounce = (pCVarGIBounce->IntValue != 0);
+		settings.bRelocate = (pCVarGIRelocate->IntValue != 0);
 
 		gGraphics->GIClipmap.Update(gGraphics->GetFrame()->CmdBuffer, camera.GetPosition(), settings);
 		gGraphics->MarkGpu(eGpuMarker::GIClipmap);

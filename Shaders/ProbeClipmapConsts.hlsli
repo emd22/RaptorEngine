@@ -17,7 +17,7 @@ struct ProbeClipmapConsts
 	uint4 vLightIndices;
 	/// Light count, shading flags (SHADE_FLAG_*)
 	uint4 vLights;
-	/// Job count, frame
+	/// Job count, frame, flags (CLIPMAP_FLAG_*)
 	uint4 vInfo;
 	/// Hysteresis, hysteresis where the light changed a lot, the relative change that counts as a lot, sharpness of
 	/// the depth moment lobes
@@ -25,6 +25,9 @@ struct ProbeClipmapConsts
 	/// Radiance of the rays that miss
 	float4 vSkyRadiance;
 };
+
+#define CLIPMAP_FLAG_BOUNCE 0x01
+#define CLIPMAP_FLAG_RELOCATE 0x02
 
 /// Jobs are dispatched as rows of this many groups
 #define CLIPMAP_JOB_COLUMNS 1024

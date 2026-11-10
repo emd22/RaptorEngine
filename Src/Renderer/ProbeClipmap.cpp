@@ -28,12 +28,22 @@ constexpr uint32 scJobReset = 0x80000000U;
 constexpr uint32 scJobLevelShift = 28;
 constexpr uint32 scStateValid = 0x01;
 
+/// A slot traced for the first time this frame still holds the probe it had before until the blend, so it counts
+/// as unfilled for this frame's reads
+constexpr uint8 scPending = 2;
+
+/// Mirror CLIPMAP_FLAG_* in Shaders/ProbeClipmapConsts.hlsli
+constexpr uint32 scFlagBounce = 0x01;
+constexpr uint32 scFlagRelocate = 0x02;
+
 /// Mirrors STAT_* in Shaders/ProbeClipmapBlend.hlsl
 constexpr uint32 scStatBlended = 0;
 constexpr uint32 scStatChange = 1;
 constexpr uint32 scStatReset = 2;
 constexpr uint32 scStatBlack = 3;
 constexpr uint32 scStatBackfaces = 4;
+constexpr uint32 scStatInactive = 5;
+constexpr uint32 scStatMoved = 6;
 constexpr uint32 scStatCount = 8;
 constexpr float64 scStatChangeScale = 10000.0;
 
@@ -227,6 +237,9 @@ void ProbeClipmap::Create()
 	mStats.Create(eGpuBufferType::Storage, static_cast<uint64>(scStatCount) * sizeof(uint32) * FramesInFlight,
 				  VMA_MEMORY_USAGE_GPU_TO_CPU, eGpuBufferFlags::PersistentMapped | eGpuBufferFlags::TransferReceiver);
 
+	mProbeData.Create(eGpuBufferType::Storage, static_cast<uint64>(scLevelCount) * scProbesPerLevel * sizeof(float32) * 4,
+					  VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::TransferReceiver);
+
 	Reset();
 }
 
@@ -236,6 +249,7 @@ void ProbeClipmap::Destroy()
 	mRays.Destroy();
 	mState.Destroy();
 	mStats.Destroy();
+	mProbeData.Destroy();
 }
 
 void ProbeClipmap::CreatePipelines(Target* depth, Target* normals, Target* lit)
@@ -288,6 +302,15 @@ void ProbeClipmap::CreatePipelines(Target* depth, Target* normals, Target* lit)
 						 gGraphics->FogShadowPageBufferSize);
 	gPSOBuild->AddBuffer(10, 0, eShaderType::Compute, &mJobs, 0, static_cast<uint64>(scMaxJobsPerFrame) * sizeof(uint32));
 	gPSOBuild->AddBuffer(11, 0, eShaderType::Compute, &mRays, 0, VK_WHOLE_SIZE);
+
+	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
+		gPSOBuild->AddImage(12 + level_index, 0, eShaderType::Compute, mpIrradiance[level_index], linear_sampler);
+		gPSOBuild->AddImage(15 + level_index, 0, eShaderType::Compute, mpMoments[level_index], linear_sampler);
+	}
+
+	gPSOBuild->AddBuffer(18, 0, eShaderType::Compute, &mState, 0,
+						 static_cast<uint64>(scLevelCount) * scProbesPerLevel * sizeof(uint32));
+	gPSOBuild->AddBuffer(19, 0, eShaderType::Compute, &mProbeData, 0, VK_WHOLE_SIZE);
 	gPSOBuild->AddFrameData(1);
 	gPSOBuild->EndPipeline();
 
@@ -302,6 +325,7 @@ void ProbeClipmap::CreatePipelines(Target* depth, Target* normals, Target* lit)
 	}
 
 	gPSOBuild->AddBuffer(8, 0, eShaderType::Compute, &mStats, 0, scStatCount * sizeof(uint32));
+	gPSOBuild->AddBuffer(9, 0, eShaderType::Compute, &mProbeData, 0, VK_WHOLE_SIZE);
 	gPSOBuild->AddFrameData(1);
 	gPSOBuild->EndPipeline();
 
@@ -318,6 +342,7 @@ void ProbeClipmap::CreatePipelines(Target* depth, Target* normals, Target* lit)
 	gPSOBuild->AddBuffer(8, 0, eShaderType::Compute, &mState, 0,
 						 static_cast<uint64>(scLevelCount) * scProbesPerLevel * sizeof(uint32));
 	gPSOBuild->AddStorageImage(9, 0, eShaderType::Compute, &lit->GetImage());
+	gPSOBuild->AddBuffer(10, 0, eShaderType::Compute, &mProbeData, 0, VK_WHOLE_SIZE);
 	gPSOBuild->AddFrameData(1);
 	gPSOBuild->EndPipeline();
 }
@@ -390,7 +415,7 @@ uint32 ProbeClipmap::ScheduleJobs(uint32* jobs, const Settings& settings)
 			}
 
 			jobs[job_count++] = slot | (level_index << scJobLevelShift) | scJobReset;
-			level.Valid[slot] = 1;
+			level.Valid[slot] = scPending;
 			level.InvalidCount--;
 		}
 	}
@@ -412,7 +437,7 @@ uint32 ProbeClipmap::ScheduleJobs(uint32* jobs, const Settings& settings)
 			const uint32 slot = level.Cursor;
 			level.Cursor = (level.Cursor + 1) % scProbesPerLevel;
 
-			if (level.Valid[slot] == 0) {
+			if (level.Valid[slot] != 1) {
 				continue;
 			}
 
@@ -453,10 +478,11 @@ void ProbeClipmap::LogStats(uint32 frame, uint32 job_count)
 
 	LogInfo(LC_RENDER,
 			"GI clipmap: {} probes traced ({} new), unfilled {} / {} / {}, mean change {:.4f}, {} black, {:.1f}% "
-			"backface rays",
+			"backface rays, {} switched off, {} moved",
 			job_count, stats[scStatReset], mLevels[0].InvalidCount, mLevels[1].InvalidCount, mLevels[2].InvalidCount,
 			static_cast<float64>(stats[scStatChange]) / scStatChangeScale / blended, stats[scStatBlack],
-			100.0 * static_cast<float64>(stats[scStatBackfaces]) / (updated * scRayCount));
+			100.0 * static_cast<float64>(stats[scStatBackfaces]) / (updated * scRayCount), stats[scStatInactive],
+			stats[scStatMoved]);
 }
 
 void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Settings& settings)
@@ -486,11 +512,15 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 					static_cast<uint64>(frame) * scLevelCount * scProbesPerLevel;
 
 	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
-		const Level& level = mLevels[level_index];
+		Level& level = mLevels[level_index];
 		uint32* level_state = state + static_cast<uint64>(level_index) * scProbesPerLevel;
 
 		for (uint32 slot = 0; slot < scProbesPerLevel; slot++) {
-			level_state[slot] = (level.Valid[slot] != 0) ? scStateValid : 0U;
+			level_state[slot] = (level.Valid[slot] == 1) ? scStateValid : 0U;
+
+			if (level.Valid[slot] == scPending) {
+				level.Valid[slot] = 1;
+			}
 		}
 	}
 
@@ -521,6 +551,18 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 	consts.Info[0] = job_count;
 	consts.Info[1] = gGraphics->GetElapsedFrameCount();
 
+	if (settings.bBounce) {
+		consts.Info[2] |= scFlagBounce;
+	}
+
+	if (settings.bRelocate) {
+		consts.Info[2] |= scFlagRelocate;
+	}
+
+	consts.SkyRadiance[0] = settings.SkyRadiance;
+	consts.SkyRadiance[1] = settings.SkyRadiance;
+	consts.SkyRadiance[2] = settings.SkyRadiance;
+
 	consts.Blend[0] = settings.Hysteresis;
 	consts.Blend[1] = settings.FastHysteresis;
 	consts.Blend[2] = settings.ChangeThreshold;
@@ -530,6 +572,10 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 
 	const uint32 columns = std::min(job_count, scJobColumns);
 	const uint32 rows = (job_count + scJobColumns - 1) / scJobColumns;
+
+	if (!mbImagesInitialized) {
+		InitializeImages(cmd);
+	}
 
 	ComputeBarrier(cmd);
 
@@ -542,6 +588,8 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->AddBufferOffset(0, frame * scMaxJobsPerFrame * sizeof(uint32));
 	gPipelineCache->AddBufferOffset(0, 0);
+	gPipelineCache->AddBufferOffset(0, frame * scLevelCount * scProbesPerLevel * sizeof(uint32));
+	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->SetFrameData(consts_offset);
 	gPipelineCache->Bind(ePipelineName::ProbeClipmapTrace, cmd);
 
@@ -549,32 +597,16 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 
 	ComputeBarrier(cmd);
 
-	const VkImageLayout from = mbImagesInitialized ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
-
 	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
-		ImageBarrier(cmd, mpIrradiance[level_index], from, VK_IMAGE_LAYOUT_GENERAL);
-		ImageBarrier(cmd, mpMoments[level_index], from, VK_IMAGE_LAYOUT_GENERAL);
-	}
-
-	if (!mbImagesInitialized) {
-		const VkClearColorValue zero {};
-		const VkImageSubresourceRange range { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = 1, .layerCount = 1 };
-
-		for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
-			vkCmdClearColorImage(cmd.Get(), mpIrradiance[level_index]->InternalImage, VK_IMAGE_LAYOUT_GENERAL, &zero, 1,
-								 &range);
-			vkCmdClearColorImage(cmd.Get(), mpMoments[level_index]->InternalImage, VK_IMAGE_LAYOUT_GENERAL, &zero, 1,
-								 &range);
-		}
-
-		ComputeBarrier(cmd);
-		mbImagesInitialized = true;
+		ImageBarrier(cmd, mpIrradiance[level_index], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+		ImageBarrier(cmd, mpMoments[level_index], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
 	}
 
 	// Blend
 	gPipelineCache->AddBufferOffset(0, frame * scMaxJobsPerFrame * sizeof(uint32));
 	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->AddBufferOffset(0, frame * scStatCount * sizeof(uint32));
+	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->SetFrameData(consts_offset);
 	gPipelineCache->Bind(ePipelineName::ProbeClipmapBlend, cmd);
 
@@ -584,6 +616,27 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 		ImageBarrier(cmd, mpIrradiance[level_index], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		ImageBarrier(cmd, mpMoments[level_index], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	}
+}
+
+void ProbeClipmap::InitializeImages(CommandBuffer& cmd)
+{
+	const VkClearColorValue zero {};
+	const VkImageSubresourceRange range { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = 1, .layerCount = 1 };
+
+	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
+		Image* images[2] = { mpIrradiance[level_index], mpMoments[level_index] };
+
+		for (Image* image : images) {
+			ImageBarrier(cmd, image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+			vkCmdClearColorImage(cmd.Get(), image->InternalImage, VK_IMAGE_LAYOUT_GENERAL, &zero, 1, &range);
+			ImageBarrier(cmd, image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		}
+	}
+
+	vkCmdFillBuffer(cmd.Get(), mProbeData.Buffer, 0, VK_WHOLE_SIZE, 0);
+	ComputeBarrier(cmd);
+
+	mbImagesInitialized = true;
 }
 
 void ProbeClipmap::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDebugView view)
@@ -621,6 +674,7 @@ void ProbeClipmap::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDe
 	ImageBarrier(cmd, lit, lit->ImageLayout, VK_IMAGE_LAYOUT_GENERAL);
 
 	gPipelineCache->AddBufferOffset(0, frame * scLevelCount * scProbesPerLevel * sizeof(uint32));
+	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->SetFrameData(gGraphics->FrameAlloc.Push(consts));
 	gPipelineCache->Bind(ePipelineName::ProbeClipmapDebug, cmd);
 
