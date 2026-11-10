@@ -79,6 +79,18 @@ struct ProbeClipmapDebugConsts
 	float32 Params[4] = {};
 };
 
+/// Mirrors ClipmapForwardData in Shaders/Forward.hlsl
+struct ProbeClipmapForwardData
+{
+	ProbeClipmapLevelGpu Levels[ProbeClipmap::scLevelCount];
+	BakedSunShadowGpu BakedSun;
+	/// Flags (scForwardFlag*)
+	uint32 Info[4] = {};
+};
+
+constexpr uint32 scForwardFlagBakedSun = 0x01;
+
+static_assert(sizeof(ProbeClipmapForwardData) <= ProbeClipmap::scForwardDataFrameSize);
 static_assert(sizeof(ProbeClipmapLevelGpu) == 32);
 static_assert(sizeof(ProbeClipmapConsts) == 192 + 96 + 64 + 80 + 16 * 5);
 static_assert(sizeof(ProbeClipmapDebugConsts) == 96 + 64 + 16 * 3);
@@ -237,8 +249,11 @@ void ProbeClipmap::Create()
 	mStats.Create(eGpuBufferType::Storage, static_cast<uint64>(scStatCount) * sizeof(uint32) * FramesInFlight,
 				  VMA_MEMORY_USAGE_GPU_TO_CPU, eGpuBufferFlags::PersistentMapped | eGpuBufferFlags::TransferReceiver);
 
-	mProbeData.Create(eGpuBufferType::Storage, static_cast<uint64>(scLevelCount) * scProbesPerLevel * sizeof(float32) * 4,
-					  VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::TransferReceiver);
+	mProbeData.Create(eGpuBufferType::Storage, scProbeDataSize, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+					  eGpuBufferFlags::TransferReceiver);
+
+	mForwardData.Create(eGpuBufferType::Storage, scForwardDataFrameSize * FramesInFlight, VMA_MEMORY_USAGE_CPU_TO_GPU,
+						eGpuBufferFlags::PersistentMapped);
 
 	Reset();
 }
@@ -250,6 +265,7 @@ void ProbeClipmap::Destroy()
 	mState.Destroy();
 	mStats.Destroy();
 	mProbeData.Destroy();
+	mForwardData.Destroy();
 }
 
 void ProbeClipmap::CreatePipelines(Target* depth, Target* normals, Target* lit)
@@ -527,6 +543,8 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 	const uint32 state_size = scLevelCount * scProbesPerLevel * sizeof(uint32);
 	mState.FlushToGpu(frame * state_size, state_size);
 
+	WriteForwardData(frame, settings);
+
 	vkCmdFillBuffer(cmd.Get(), mStats.Buffer, static_cast<VkDeviceSize>(frame) * scStatCount * sizeof(uint32),
 					scStatCount * sizeof(uint32), 0);
 
@@ -616,6 +634,21 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 		ImageBarrier(cmd, mpIrradiance[level_index], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		ImageBarrier(cmd, mpMoments[level_index], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	}
+}
+
+void ProbeClipmap::WriteForwardData(uint32 frame, const Settings& settings)
+{
+	ProbeClipmapForwardData data;
+	GetLevelConsts(data.Levels, settings);
+
+	if (gGraphics->IsBakedSunShadowActive()) {
+		data.Info[0] |= scForwardFlagBakedSun;
+		data.BakedSun = gGraphics->GetBakedSunShadowGpu();
+	}
+
+	uint8* mapped = static_cast<uint8*>(mForwardData.pMappedBuffer) + frame * scForwardDataFrameSize;
+	memcpy(mapped, &data, sizeof(data));
+	mForwardData.FlushToGpu(static_cast<uint32>(frame * scForwardDataFrameSize), sizeof(data));
 }
 
 void ProbeClipmap::InitializeImages(CommandBuffer& cmd)

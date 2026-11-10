@@ -264,6 +264,39 @@ F_Texture2D(tSceneColor, 19, 0)
 F_Texture2D(tSceneDepth, 20, 0)
 PERMEND();
 
+PERMIF(CLIPMAP_GI);
+// The runtime GI probes, see ProbeClipmap. They replace the SH probe volumes and the lightmap's indirect light.
+#include "FogConsts.hlsli"
+#include "ProbeClipmapCommon.hlsli"
+
+/// Mirrors ProbeClipmapForwardData in Src/Renderer/ProbeClipmap.cpp
+struct ClipmapForwardData
+{
+	ClipmapScene Clipmap;
+	BakedSunShadowParams BakedSun;
+	/// Flags (CLIPMAP_FORWARD_FLAG_*)
+	uint4 vInfo;
+};
+
+#define CLIPMAP_FORWARD_FLAG_BAKED_SUN 0x01
+
+F_Texture2D(tIrradiance0, 21, 0)
+F_Texture2D(tIrradiance1, 22, 0)
+F_Texture2D(tIrradiance2, 23, 0)
+F_Texture2D(tMoments0, 24, 0)
+F_Texture2D(tMoments1, 25, 0)
+F_Texture2D(tMoments2, 26, 0)
+F_StructBuffer(bState, uint, 27, 0);
+F_StructBuffer(bProbeData, float4, 28, 0);
+F_StructBuffer(bClipmapForward, ClipmapForwardData, 29, 0);
+F_ShadowTexture2D(tFogShadowAtlas, 30, 0);
+F_StructBuffer(bFogShadowPages, FogShadowPage, 31, 0);
+
+#define CLIPMAP_SCENE bClipmapForward[0].Clipmap
+#include "ProbeClipmapSample.hlsli"
+#include "BakedSunShadow.hlsli"
+PERMEND();
+
 #define LIGHTMAP_DIRECTIONALITY 1.5
 
 /// How much faster water absorbs the colours that aren't its own, which shifts deeper water towards its colour
@@ -748,6 +781,22 @@ PERMELSE();
 	const bool use_probes = true;
 PERMEND();
 
+PERMIF(CLIPMAP_GI);
+	{
+		const ClipmapGatherResult clipmap = ClipmapGather(input.vPositionWS, geometric_normal, V, diffuse_normal, R,
+														  ClipmapScreenDither(input.vPosition.xy));
+
+		probe_irradiance = clipmap.vDiffuse;
+		probe_radiance = clipmap.vSpecular;
+		has_probes = clipmap.uiLevel < CLIPMAP_LEVELS;
+
+		// The clipmap has no sun term, so surfaces without a lightmap look the baked sun up directly
+		const ClipmapForwardData clipmap_data = bClipmapForward[0];
+		const float baked_sun = SampleBakedSunShadowPages(clipmap_data.BakedSun, input.vPositionWS + geometric_normal * 0.05,
+														  1.0, float2(1.0, 0.0));
+		probe_sun_visibility = select(HAS_FLAG(clipmap_data.vInfo.x, CLIPMAP_FORWARD_FLAG_BAKED_SUN), baked_sun, 1.0);
+	}
+PERMELSE();
 	if (use_probes) {
 		const uint probe_volume_count = GetProbeVolumeCount(bProbeVolume);
 
@@ -784,9 +833,11 @@ PERMEND();
 			has_probes = true;
 		}
 	}
+PERMEND();
 
 PERMIF(USE_LIGHTMAP);
 	const float4 lightmap_sample = F_SampleLevel(tLightmap, input.vLightmapUV, 0.0);
+PERMNOT(CLIPMAP_GI);
 	const float3 lightmap_irradiance = F_SampleLevel(tLightmapIrradiance, input.vLightmapUV, 0.0).rgb;
 
 	const float3 indirect_direction = (lightmap_sample.rgb * 2.0 - 1.0) * LIGHTMAP_DIRECTIONALITY;
@@ -798,6 +849,7 @@ PERMIF(USE_LIGHTMAP);
 
 	probe_irradiance = select(use_baked_indirect, baked_irradiance, probe_irradiance);
 	has_probes = or(has_probes, use_baked_indirect);
+PERMEND();
 PERMEND();
 
 PERMIF(PROBE_CAPTURE);

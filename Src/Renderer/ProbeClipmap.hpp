@@ -50,6 +50,11 @@ public:
 	static constexpr float32 scLevel0Spacing = 1.0f;
 	static constexpr uint32 scMaxJobsPerFrame = 8192;
 
+	/// Sizes of one frame's part of the paged buffers, and of the probe data
+	static constexpr uint64 scStateFrameSize = static_cast<uint64>(scLevelCount) * scProbesPerLevel * sizeof(uint32);
+	static constexpr uint64 scProbeDataSize = static_cast<uint64>(scLevelCount) * scProbesPerLevel * sizeof(float32) * 4;
+	static constexpr uint64 scForwardDataFrameSize = 256;
+
 	enum class eDebugView : uint32
 	{
 		None,
@@ -58,6 +63,7 @@ public:
 		Levels,
 		Spheres1,
 		Spheres2,
+		Visibility,
 		Count,
 	};
 
@@ -97,6 +103,15 @@ public:
 
 	bool IsReady() const { return mbImagesInitialized; }
 
+	Image* GetIrradianceImage(uint32 level) { return mpIrradiance[level]; }
+	Image* GetMomentsImage(uint32 level) { return mpMoments[level]; }
+	RawGpuBuffer* GetStateBuffer() { return &mState; }
+	RawGpuBuffer* GetProbeDataBuffer() { return &mProbeData; }
+	RawGpuBuffer* GetForwardDataBuffer() { return &mForwardData; }
+
+	uint32 GetStateFrameOffset(uint32 frame) const { return static_cast<uint32>(frame * scStateFrameSize); }
+	uint32 GetForwardDataFrameOffset(uint32 frame) const { return static_cast<uint32>(frame * scForwardDataFrameSize); }
+
 private:
 	struct Level
 	{
@@ -115,6 +130,7 @@ private:
 	void GetLevelConsts(ProbeClipmapLevelGpu* out_levels, const Settings& settings) const;
 	void LogStats(uint32 frame, uint32 job_count);
 	void InitializeImages(CommandBuffer& cmd);
+	void WriteForwardData(uint32 frame, const Settings& settings);
 
 private:
 	Level mLevels[scLevelCount];
@@ -129,6 +145,8 @@ private:
 	RawGpuBuffer mStats;
 	/// Offset off the grid point and whether the probe is switched on, written by the blend
 	RawGpuBuffer mProbeData;
+	/// What the forward pass needs to read the probes, see ProbeClipmapForwardData
+	RawGpuBuffer mForwardData;
 
 	uint32 mUpdateCount = 0;
 	uint32 mLastJobCount = 0;

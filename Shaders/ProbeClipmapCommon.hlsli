@@ -70,7 +70,12 @@ float3 ClipmapProbePosition(ClipmapLevel level, int3 probe) { return float3(prob
 /// Index of a level's slot in the per probe buffers
 uint ClipmapProbeIndex(uint level, uint slot) { return level * CLIPMAP_PROBES_PER_LEVEL + slot; }
 
-// bProbeData holds a float4 per probe: its offset off its grid point in XYZ, and 1 in W when it is switched on
+// bProbeData holds a float4 per probe: its offset off its grid point in XYZ, and CLIPMAP_PROBE_* flags in the bits of W
+#define CLIPMAP_PROBE_ACTIVE 0x01
+/// The probe moved far enough that its tiles describe somewhere else, so its next update starts them over
+#define CLIPMAP_PROBE_RESET 0x02
+/// Moves smaller than this much of a spacing keep the probe's history
+#define CLIPMAP_RESET_MOVE 0.1
 
 /// Where slot `slot`'s tile of `tile_size` texels (border included) starts
 uint2 ClipmapTileOrigin(uint slot, uint tile_size)

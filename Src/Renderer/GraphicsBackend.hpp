@@ -348,6 +348,8 @@ public:
 	uint32 SDFPageDebugProbeStride = 1;
 
 	ProbeClipmap GIClipmap;
+	/// The forward passes take their indirect light from GIClipmap this frame (r_gi_mode 1)
+	bool bClipmapGIActive = false;
 	ProbeClipmap::eDebugView GIClipmapDebugView = ProbeClipmap::eDebugView::None;
 
 	/// Filled by the world as it writes the light buffer each frame

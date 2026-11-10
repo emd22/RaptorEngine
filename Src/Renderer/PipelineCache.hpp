@@ -119,6 +119,9 @@ public:
 	PipelineHandle GetOrCreateVariant(const ePipelinePass pass, const ePipelineFeatures features);
 	PipelineHandle GetOrCreateVariantInPass(const PipelineHandle handle, const ePipelinePass pass);
 
+	/// The variant of `handle`'s pass that draws its features plus `extra`
+	PipelineHandle GetOrCreateVariantWith(const PipelineHandle handle, const ePipelineFeatures extra);
+
 	using PassTemplate = std::function<bool(ePipelineFeatures features, PipelineDesc& out_desc)>;
 
 	void RegisterPassTemplate(const ePipelinePass pass, PassTemplate pass_template);

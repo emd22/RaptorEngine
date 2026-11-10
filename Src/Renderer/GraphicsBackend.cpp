@@ -1399,8 +1399,17 @@ void GraphicsBackend::RenderFroxelFog(CommandBuffer& cmd, uint32 consts_offset)
 	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->AddBufferOffset(0, 0);
+
+	ePipelineName inject_pipeline = ePipelineName::FogFroxelInject;
+
+	if (bClipmapGIActive) {
+		inject_pipeline = ePipelineName::FogFroxelInjectClipmap;
+		gPipelineCache->AddBufferOffset(0, GIClipmap.GetStateFrameOffset(GetFrameNumber()));
+		gPipelineCache->AddBufferOffset(0, GIClipmap.GetForwardDataFrameOffset(GetFrameNumber()));
+	}
+
 	gPipelineCache->SetFrameData(consts_offset);
-	gPipelineCache->Bind(ePipelineName::FogFroxelInject, cmd);
+	gPipelineCache->Bind(inject_pipeline, cmd);
 
 	vkCmdDispatch(cmd.Get(), group_columns, group_rows, scFroxelGridZ + 1);
 

@@ -39,6 +39,8 @@ F_FrameData(ProbeClipmapDebugConsts, Consts, 1);
 #define VIEW_LEVELS 3
 #define VIEW_SPHERES_1 4
 #define VIEW_SPHERES_2 5
+/// Mean visibility of the filled probes around each surface: white sees them all, black none, red has none filled
+#define VIEW_VISIBILITY 6
 
 #define VIEWMODEL_STORED_DEPTH 0.99
 #define SPHERE_RADIUS 0.15
@@ -95,7 +97,7 @@ float3 ShadeSpheres(uint level, float3 eye, float3 direction, float max_distance
 			// Unfilled probes are magenta, switched off ones dark grey
 			colour = select(ClipmapIsValid(level, slot), ClipmapSampleIrradiance(level, slot, normal) * Consts.vParams.x,
 							float3(1.0, 0.0, 1.0));
-			colour = select(and(ClipmapIsValid(level, slot), probe_data.w < 0.5), float3(0.05, 0.05, 0.05), colour);
+			colour = select(and(ClipmapIsValid(level, slot), !ClipmapIsActive(probe_data)), float3(0.05, 0.05, 0.05), colour);
 			done = true;
 		}
 
@@ -131,14 +133,16 @@ void main(uint3 thread : SV_DispatchThreadID)
 
 	float3 colour = tOutput[pixel].rgb;
 
-	if (view == VIEW_SURFACE || view == VIEW_LEVELS) {
-		uint level;
-		float valid;
-		const float3 irradiance = ClipmapGatherIrradiance(surface, normal, level, valid);
+	if (or(or(view == VIEW_SURFACE, view == VIEW_LEVELS), view == VIEW_VISIBILITY)) {
+		const ClipmapGatherResult gather = ClipmapGather(surface, normal, -direction, normal, normal,
+														 ClipmapScreenDither(float2(pixel)));
 
-		if (has_surface) {
-			colour = select(view == VIEW_SURFACE, irradiance * Consts.vParams.x, LevelColour(level) * (0.25 + 0.75 * valid));
-		}
+		float3 surface_colour = gather.vDiffuse * Consts.vParams.x;
+		surface_colour = select(view == VIEW_LEVELS, LevelColour(gather.uiLevel) * (0.25 + 0.75 * gather.fValid), surface_colour);
+		surface_colour = select(view == VIEW_VISIBILITY,
+								select(gather.fValid > 1e-3, gather.fVisibility.xxx, float3(1.0, 0.0, 0.0)), surface_colour);
+
+		colour = select(has_surface, surface_colour, colour);
 	}
 	else {
 		uint level = 0;

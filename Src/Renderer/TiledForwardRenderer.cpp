@@ -212,7 +212,7 @@ void TiledForwardRenderer::CreateSSAOBlurPass()
 
 void TiledForwardRenderer::BuildPersistentDescriptor()
 {
-	SizedArray<DescriptorEntry> ds_entries(24);
+	SizedArray<DescriptorEntry> ds_entries(40);
 
 	ds_entries.Insert(DescriptorEntry::AsBuffer(0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 												ObjectManager::scBoundSize));
@@ -342,6 +342,33 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 												   eSamplerFilter::Nearest,
 												   eSamplerAddressMode::ClampToEdge,
 											   })));
+
+	// The runtime GI probes, read by the CLIPMAP_GI variants
+	ProbeClipmap& clipmap = gGraphics->GIClipmap;
+
+	Sampler* clipmap_sampler = gSamplerCache->Request({
+		eSamplerFilter::Linear,
+		eSamplerFilter::Linear,
+		eSamplerFilter::Nearest,
+		eSamplerAddressMode::ClampToEdge,
+	});
+
+	for (uint32 level = 0; level < ProbeClipmap::scLevelCount; level++) {
+		ds_entries.Insert(DescriptorEntry::AsImage(21 + level, eShaderType::Pixel, clipmap.GetIrradianceImage(level),
+												   clipmap_sampler));
+		ds_entries.Insert(DescriptorEntry::AsImage(24 + level, eShaderType::Pixel, clipmap.GetMomentsImage(level),
+												   clipmap_sampler));
+	}
+
+	ds_entries.Insert(DescriptorEntry::AsBuffer(27, eShaderType::Pixel, clipmap.GetStateBuffer(), 0,
+												ProbeClipmap::scStateFrameSize));
+	ds_entries.Insert(DescriptorEntry::AsBuffer(28, eShaderType::Pixel, clipmap.GetProbeDataBuffer(), 0,
+												ProbeClipmap::scProbeDataSize));
+	ds_entries.Insert(DescriptorEntry::AsBuffer(29, eShaderType::Pixel, clipmap.GetForwardDataBuffer(), 0,
+												ProbeClipmap::scForwardDataFrameSize));
+	ds_entries.Insert(DescriptorEntry::AsImage(30, eShaderType::Pixel, gGraphics->pFogShadowAtlas, GetFogShadowSampler()));
+	ds_entries.Insert(DescriptorEntry::AsBuffer(31, eShaderType::Pixel, &gGraphics->FogShadowPageBuffer, 0,
+												gGraphics->FogShadowPageBufferSize));
 
 	result = gDescriptorCache->Request(ds_entries);
 	pPersistentDescriptor = result.second;
@@ -635,6 +662,15 @@ bool TiledForwardRenderer::MakeForwardDesc(ePipelinePass pass, ePipelineFeatures
 		out_desc.Macros.push_back(scDebugViews);
 	}
 
+	// Probe captures bake the SH probes, so they keep the baked lighting
+	const bool is_capture = (pass == ePipelinePass::ForwardCapture);
+
+	if (!is_capture && HasFlag(features, ePipelineFeatures::ClipmapGI)) {
+		out_desc.Macros.push_back(ShaderMacro { .pcName = "CLIPMAP_GI", .pcValue = "1" });
+		out_desc.Features |= ePipelineFeatures::ClipmapGI;
+		suffix += "ClipmapGI";
+	}
+
 	out_desc.DebugName = std::string("Geometry") + suffix + pass_suffix + (is_debug ? "Debug" : "");
 
 	out_desc.Shader = eShaderName::Forward;
@@ -752,6 +788,22 @@ void TiledForwardRenderer::AddGlobalDescriptors()
 						gSamplerCache->Request({}));
 	gPSOBuild->AddImage(20, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 						gSamplerCache->Request({}));
+
+	// The runtime GI probes for the CLIPMAP_GI variants, bound in the persistent DS
+	ProbeClipmap& clipmap = gGraphics->GIClipmap;
+
+	for (uint32 level = 0; level < ProbeClipmap::scLevelCount; level++) {
+		gPSOBuild->AddImage(21 + level, 0, eShaderType::Pixel, clipmap.GetIrradianceImage(level), gSamplerCache->Request({}));
+		gPSOBuild->AddImage(24 + level, 0, eShaderType::Pixel, clipmap.GetMomentsImage(level), gSamplerCache->Request({}));
+	}
+
+	gPSOBuild->AddBuffer(27, 0, eShaderType::Pixel, clipmap.GetStateBuffer(), 0, ProbeClipmap::scStateFrameSize);
+	gPSOBuild->AddBuffer(28, 0, eShaderType::Pixel, clipmap.GetProbeDataBuffer(), 0, ProbeClipmap::scProbeDataSize);
+	gPSOBuild->AddBuffer(29, 0, eShaderType::Pixel, clipmap.GetForwardDataBuffer(), 0,
+						 ProbeClipmap::scForwardDataFrameSize);
+	gPSOBuild->AddImage(30, 0, eShaderType::Pixel, gGraphics->pFogShadowAtlas, GetFogShadowSampler());
+	gPSOBuild->AddBuffer(31, 0, eShaderType::Pixel, &gGraphics->FogShadowPageBuffer, 0,
+						 gGraphics->FogShadowPageBufferSize);
 }
 
 void TiledForwardRenderer::AddDecalDescriptors()
@@ -1093,38 +1145,59 @@ void TiledForwardRenderer::CreateFogPSO()
 	Target* depth_target = Prepass.GetTarget(eImageFormat::D32_Float);
 	Target* shadow_target = gShadowAtlas->GetTarget();
 
-	gPSOBuild->BeginPipeline(ePipelineName::FogFroxelInject);
-	gPSOBuild->SetShader(eShaderName::FogInject, {});
+	// The second variant takes its ambient light from the runtime GI probes (r_gi_mode 1)
+	for (const bool clipmap_gi : { false, true }) {
+		ProbeClipmap& clipmap = gGraphics->GIClipmap;
 
-	gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Compute, depth_target, point_sampler);
+		if (clipmap_gi) {
+			gPSOBuild->BeginPipeline(ePipelineName::FogFroxelInjectClipmap);
+			gPSOBuild->SetShader(eShaderName::FogInject, { ShaderMacro { .pcName = "CLIPMAP_GI", .pcValue = "1" } });
+		}
+		else {
+			gPSOBuild->BeginPipeline(ePipelineName::FogFroxelInject);
+			gPSOBuild->SetShader(eShaderName::FogInject, {});
+		}
 
-	gPSOBuild->AddBuffer(1, 0, eShaderType::Compute, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
-						 gGraphics->LightBuffer.PageSize);
-	gPSOBuild->AddBuffer(2, 0, eShaderType::Compute, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
-	gPSOBuild->AddBuffer(3, 0, eShaderType::Compute, &gGraphics->LightIndexListBuffer, 0,
-						 gGraphics->LightIndexListPageSize);
-	gPSOBuild->AddImageFromTarget(4, 0, eShaderType::Compute, shadow_target,
-								  gSamplerCache->Request({
-									  eSamplerFilter::Linear,
-									  eSamplerFilter::Linear,
-									  eSamplerFilter::Linear,
-									  eSamplerAddressMode::ClampToBorder,
-									  eSamplerBorderColor::FloatWhite,
-									  eSamplerCompareOp::Greater,
-								  }));
-	gPSOBuild->AddBuffer(5, 0, eShaderType::Compute, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
-	gPSOBuild->AddBuffer(6, 0, eShaderType::Compute, &gGraphics->ProbeVolumeBuffer, 0, gGraphics->ProbeVolumePageSize);
-	gPSOBuild->AddBuffer(7, 0, eShaderType::Compute, &gGraphics->ProbeGridBuffer, 0, gGraphics->ProbeGridPageSize);
-	gPSOBuild->AddStorageImage(8, 0, eShaderType::Compute, &FroxelLighting);
-	gPSOBuild->AddImage(9, 0, eShaderType::Compute, gGraphics->pFogShadowAtlas, GetFogShadowSampler());
-	gPSOBuild->AddBuffer(10, 0, eShaderType::Compute, &gGraphics->FogShadowPageBuffer, 0,
-						 gGraphics->FogShadowPageBufferSize);
-	gPSOBuild->AddImage(11, 0, eShaderType::Compute, &FroxelHistory, volume_sampler);
-	gPSOBuild->AddStorageImage(12, 0, eShaderType::Compute, &FroxelSurface);
+		gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Compute, depth_target, point_sampler);
 
-	gPSOBuild->AddFrameData(1);
+		gPSOBuild->AddBuffer(1, 0, eShaderType::Compute, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+							 gGraphics->LightBuffer.PageSize);
+		gPSOBuild->AddBuffer(2, 0, eShaderType::Compute, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
+		gPSOBuild->AddBuffer(3, 0, eShaderType::Compute, &gGraphics->LightIndexListBuffer, 0,
+							 gGraphics->LightIndexListPageSize);
+		gPSOBuild->AddImageFromTarget(4, 0, eShaderType::Compute, shadow_target,
+									  gSamplerCache->Request({
+										  eSamplerFilter::Linear,
+										  eSamplerFilter::Linear,
+										  eSamplerFilter::Linear,
+										  eSamplerAddressMode::ClampToBorder,
+										  eSamplerBorderColor::FloatWhite,
+										  eSamplerCompareOp::Greater,
+									  }));
+		gPSOBuild->AddBuffer(5, 0, eShaderType::Compute, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
+		gPSOBuild->AddBuffer(6, 0, eShaderType::Compute, &gGraphics->ProbeVolumeBuffer, 0, gGraphics->ProbeVolumePageSize);
+		gPSOBuild->AddBuffer(7, 0, eShaderType::Compute, &gGraphics->ProbeGridBuffer, 0, gGraphics->ProbeGridPageSize);
+		gPSOBuild->AddStorageImage(8, 0, eShaderType::Compute, &FroxelLighting);
+		gPSOBuild->AddImage(9, 0, eShaderType::Compute, gGraphics->pFogShadowAtlas, GetFogShadowSampler());
+		gPSOBuild->AddBuffer(10, 0, eShaderType::Compute, &gGraphics->FogShadowPageBuffer, 0,
+							 gGraphics->FogShadowPageBufferSize);
+		gPSOBuild->AddImage(11, 0, eShaderType::Compute, &FroxelHistory, volume_sampler);
+		gPSOBuild->AddStorageImage(12, 0, eShaderType::Compute, &FroxelSurface);
 
-	gPSOBuild->EndPipeline();
+		if (clipmap_gi) {
+			for (uint32 level = 0; level < ProbeClipmap::scLevelCount; level++) {
+				gPSOBuild->AddImage(13 + level, 0, eShaderType::Compute, clipmap.GetIrradianceImage(level), volume_sampler);
+			}
+
+			gPSOBuild->AddBuffer(16, 0, eShaderType::Compute, clipmap.GetStateBuffer(), 0, ProbeClipmap::scStateFrameSize);
+			gPSOBuild->AddBuffer(17, 0, eShaderType::Compute, clipmap.GetForwardDataBuffer(), 0,
+								 ProbeClipmap::scForwardDataFrameSize);
+		}
+
+		gPSOBuild->AddFrameData(1);
+
+		gPSOBuild->EndPipeline();
+	}
 
 	gPSOBuild->BeginPipeline(ePipelineName::FogFroxelIntegrate);
 	gPSOBuild->SetShader(eShaderName::FogIntegrate, {});

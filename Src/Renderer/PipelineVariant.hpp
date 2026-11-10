@@ -23,6 +23,8 @@ enum class ePipelineFeatures : uint32
 	VertexColor = (1 << 5),
 	/// Water samples the opaque scene behind it for depth absorption and refraction (blend passes only)
 	Water = (1 << 6),
+	/// Indirect light from the runtime GI probes (ProbeClipmap) in place of the SH probes and lightmap indirect
+	ClipmapGI = (1 << 7),
 };
 
 FxEnumFlags(ePipelineFeatures);
@@ -55,6 +57,6 @@ enum class ePipelinePass : uint8
 constexpr uint32 scNumPipelinePasses = static_cast<uint32>(ePipelinePass::Count);
 
 /// Every combination of the ePipelineFeatures bits
-constexpr uint32 scNumFeatureCombinations = 1U << 7;
+constexpr uint32 scNumFeatureCombinations = 1U << 8;
 
 } // namespace fx::renderer

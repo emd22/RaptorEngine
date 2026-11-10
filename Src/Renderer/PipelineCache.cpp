@@ -12,7 +12,7 @@
 namespace fx::renderer {
 
 static constexpr uint32 scMaxDescriptorSets = 8;
-static constexpr uint32 scMaxBuffersPerDS = 8;
+static constexpr uint32 scMaxBuffersPerDS = 16;
 
 PipelineCache::PipelineCache()
 {
@@ -412,6 +412,25 @@ PipelineHandle PipelineCache::GetOrCreateVariantInPass(const PipelineHandle hand
 	}
 
 	return GetOrCreateVariant(pass, features);
+}
+
+PipelineHandle PipelineCache::GetOrCreateVariantWith(const PipelineHandle handle, const ePipelineFeatures extra)
+{
+	ePipelinePass pass;
+	ePipelineFeatures features;
+
+	{
+		std::lock_guard lock(mMutex);
+
+		if (handle.Index >= mVariantInfos.size() || mVariantInfos[handle.Index].Pass == ePipelinePass::Count) {
+			return PipelineHandle {};
+		}
+
+		pass = mVariantInfos[handle.Index].Pass;
+		features = mVariantInfos[handle.Index].Features;
+	}
+
+	return GetOrCreateVariant(pass, features | extra);
 }
 
 PipelineHandle PipelineCache::FindVariantInPass(const PipelineHandle handle, const ePipelinePass pass) const

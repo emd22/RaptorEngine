@@ -50,6 +50,8 @@ void World::Create()
 	pCVarSDFPageRayLength = gCVars->Set<float32>("r_sdf_page_ray_length", 50.0f);
 	pCVarSDFPageProbeStride = gCVars->Set<int64>("r_sdf_page_probe_stride", 1);
 	pCVarGIClipmap = gCVars->Set<int64>("r_gi_clipmap", 0);
+	// 0 is the baked lightmap indirect and SH probes, 1 the runtime probe clipmap
+	pCVarGIMode = gCVars->Set<int64>("r_gi_mode", 0);
 	pCVarGIClipmapDebug = gCVars->Set<int64>("r_gi_clipmap_debug", 0);
 	pCVarGIProbeBudget = gCVars->Set<int64>("r_gi_probe_budget", 3072);
 	pCVarGIHysteresis = gCVars->Set<float32>("r_gi_hysteresis", 0.97f);
@@ -226,6 +228,10 @@ void World::ExecuteForwardRenderLists(PerspectiveCamera& camera)
 				draw_pipeline = gPipelineCache->GetOrCreateVariantInPass(pipeline, ePipelinePass::ForwardDebug);
 			}
 
+			if (!is_probe_capture && gGraphics->bClipmapGIActive) {
+				draw_pipeline = gPipelineCache->GetOrCreateVariantWith(draw_pipeline, ePipelineFeatures::ClipmapGI);
+			}
+
 			ExecuteRenderList(pipeline, draw_pipeline, camera);
 		});
 }
@@ -259,6 +265,10 @@ void World::ExecuteRenderList(renderer::PipelineHandle pipeline_handle, renderer
 			gGraphics->GetDecalFrameOffset(),
 			gGraphics->GetDecalMaskFrameOffset(),
 			0,
+			0,
+			gGraphics->GIClipmap.GetStateFrameOffset(gGraphics->GetFrameNumber()),
+			0,
+			gGraphics->GIClipmap.GetForwardDataFrameOffset(gGraphics->GetFrameNumber()),
 			0,
 		};
 
@@ -345,10 +355,13 @@ void World::ExecuteTransparentRenderLists()
 	for (const TransparentObjectCarrier& transparent_object : SortedEntryBuffer) {
 		// For each differing pipeline (per object), bind the pipeline.
 		if (first || !(transparent_object.Pipeline == pipeline_handle)) {
-			const PipelineHandle draw_pipeline = is_debug_view ? gPipelineCache->GetOrCreateVariantInPass(
-																	 transparent_object.Pipeline,
-																	 ePipelinePass::ForwardBlendDebug)
-															   : transparent_object.Pipeline;
+			PipelineHandle draw_pipeline = is_debug_view ? gPipelineCache->GetOrCreateVariantInPass(
+															   transparent_object.Pipeline, ePipelinePass::ForwardBlendDebug)
+														 : transparent_object.Pipeline;
+
+			if (gGraphics->bClipmapGIActive) {
+				draw_pipeline = gPipelineCache->GetOrCreateVariantWith(draw_pipeline, ePipelineFeatures::ClipmapGI);
+			}
 
 			if (!draw_pipeline.IsValid()) {
 				continue;
@@ -373,6 +386,10 @@ void World::ExecuteTransparentRenderLists()
 					gGraphics->GetDecalFrameOffset(),
 					gGraphics->GetDecalMaskFrameOffset(),
 					0,
+					0,
+					gGraphics->GIClipmap.GetStateFrameOffset(gGraphics->GetFrameNumber()),
+					0,
+					gGraphics->GIClipmap.GetForwardDataFrameOffset(gGraphics->GetFrameNumber()),
 					0,
 				};
 
@@ -1236,9 +1253,13 @@ void World::Render(BaseCamera* shadow_camera)
 	BakeSpotShadows();
 	gGraphics->MarkGpu(eGpuMarker::Shadows);
 
-	// Persistent lights are the ones that were not baked, so they are the ones that bounce at runtime
-	gGraphics->Transport.Render(gGraphics->GetFrame()->CmdBuffer, mMapLightSlotCount,
-								gGraphics->LightBuffer.SlotIndex - mMapLightSlotCount, !gProbeManager->IsBaking());
+	// Persistent lights are the ones that were not baked, so they are the ones that bounce at runtime. The runtime GI
+	// probes (r_gi_mode 1) bounce every light themselves, and nothing reads the relit lightmap then.
+	if (pCVarGIMode->IntValue != 1 || !gGraphics->GIClipmap.IsReady()) {
+		gGraphics->Transport.Render(gGraphics->GetFrame()->CmdBuffer, mMapLightSlotCount,
+									gGraphics->LightBuffer.SlotIndex - mMapLightSlotCount, !gProbeManager->IsBaking());
+	}
+
 	gGraphics->MarkGpu(eGpuMarker::LightTransport);
 
 	const bool sdf_pages_enabled = (pCVarSDFPages->IntValue != 0);
@@ -1251,7 +1272,9 @@ void World::Render(BaseCamera* shadow_camera)
 
 	gGraphics->GIClipmapDebugView = ProbeClipmap::eDebugView::None;
 
-	if (sdf_pages_enabled && pCVarGIClipmap->IntValue != 0) {
+	const bool wants_clipmap_gi = (pCVarGIMode->IntValue == 1);
+
+	if (sdf_pages_enabled && (pCVarGIClipmap->IntValue != 0 || wants_clipmap_gi)) {
 		ProbeClipmap::Settings settings;
 		settings.Budget = static_cast<uint32>(std::max<int64>(pCVarGIProbeBudget->IntValue, 0));
 		settings.Hysteresis = std::clamp(pCVarGIHysteresis->FloatValue, 0.0f, 0.999f);
@@ -1267,6 +1290,9 @@ void World::Render(BaseCamera* shadow_camera)
 			gGraphics->GIClipmapDebugView = static_cast<ProbeClipmap::eDebugView>(clipmap_view);
 		}
 	}
+
+	// The forward pass reads the probes once they hold something
+	gGraphics->bClipmapGIActive = sdf_pages_enabled && wants_clipmap_gi && gGraphics->GIClipmap.IsReady();
 
 	const int64 sdf_page_view = pCVarSDFPageDebug->IntValue;
 	gGraphics->SDFPageDebugCone = pCVarSDFPageCone->FloatValue;

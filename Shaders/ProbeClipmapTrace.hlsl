@@ -85,12 +85,12 @@ void main(uint3 group : SV_GroupID, uint ray : SV_GroupIndex)
 		radiance = SDFPageShadeHit(position, normal, albedo, float2(cos(angle), sin(angle)), Consts.BakedSun,
 								   Consts.vLightIndices, Consts.vLights.x, Consts.vLights.y);
 
-		uint bounce_level;
-		float bounce_valid;
-		const float3 bounced = ClipmapGatherIrradiance(position, normal, bounce_level, bounce_valid);
-		const bool has_bounce = and(HAS_FLAG(Consts.vInfo.z, CLIPMAP_FLAG_BOUNCE), bounce_level < CLIPMAP_LEVELS);
+		// The hit is seen from the probe, so the view bias points back along the ray
+		const float dither = frac(float(job_index * 64u + ray + Consts.vInfo.y * 977u) * 0.6180339887);
+		const ClipmapGatherResult bounced = ClipmapGather(position, normal, -direction, normal, normal, dither);
+		const bool has_bounce = and(HAS_FLAG(Consts.vInfo.z, CLIPMAP_FLAG_BOUNCE), bounced.uiLevel < CLIPMAP_LEVELS);
 
-		radiance += select(has_bounce, albedo * bounced, float3(0.0, 0.0, 0.0));
+		radiance += select(has_bounce, albedo * bounced.vDiffuse, float3(0.0, 0.0, 0.0));
 
 		// Backfaces are kept as negative distances, for telling probes inside walls apart later
 		distance = select(is_backface, -hit.fDistance, hit.fDistance);

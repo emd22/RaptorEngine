@@ -116,14 +116,12 @@ float2 GatherMoments(float3 normal, float max_distance, out float out_weight)
 	return sum / max(weight_sum, 1e-6);
 }
 
-/// Blends the new mean and second moment into the stored mean and standard deviation
+/// Blends the new mean and second moment into the stored ones
 float2 BlendMoments(float2 stored, float2 fresh, float fresh_weight, float hysteresis, bool reset)
 {
-	const float2 previous = float2(stored.x, stored.y * stored.y + stored.x * stored.x);
-	const float2 blended = select(reset, fresh, lerp(fresh, previous, hysteresis));
-	const float2 kept = select(fresh_weight > 1e-6, blended, previous);
+	const float2 blended = select(reset, fresh, lerp(fresh, stored, hysteresis));
 
-	return float2(kept.x, sqrt(max(kept.y - kept.x * kept.x, 0.0)));
+	return select(fresh_weight > 1e-6, blended, stored);
 }
 
 [numthreads(CLIPMAP_RAYS, 1, 1)]
@@ -138,7 +136,11 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 	const uint job = bJobs[job_index];
 	const uint level_index = ClipmapJobLevel(job);
 	const uint slot = ClipmapJobSlot(job);
-	const bool reset = ClipmapJobIsReset(job);
+	const uint probe_index = ClipmapProbeIndex(level_index, slot);
+	const uint probe_flags = asuint(bProbeData[probe_index].w);
+
+	// New in its slot, or moved far since its tiles were traced
+	const bool reset = or(ClipmapJobIsReset(job), HAS_FLAG(probe_flags, CLIPMAP_PROBE_RESET));
 	const ClipmapLevel level = Consts.Clipmap.Levels[level_index];
 
 	sRays[thread] = bRays[job_index * CLIPMAP_RAYS + thread];
@@ -225,8 +227,7 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 	if (thread == 0) {
 		// Relocation and classification from this update's rays, after DDGI (Majercik et al. 2021)
 		const float spacing = level.vParams.x;
-		const uint probe_index = ClipmapProbeIndex(level_index, slot);
-		const float3 previous_offset = select(reset, float3(0.0, 0.0, 0.0), bProbeData[probe_index].xyz);
+		const float3 previous_offset = select(ClipmapJobIsReset(job), float3(0.0, 0.0, 0.0), bProbeData[probe_index].xyz);
 
 		uint backface_count = 0;
 		float closest_back = 1e30;
@@ -282,7 +283,12 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 		offset = select(relocate, select(fits, offset, previous_offset), float3(0.0, 0.0, 0.0));
 
 		const bool is_active = or(!relocate, backface_ratio <= CLIPMAP_INACTIVE_BACKFACES);
-		bProbeData[probe_index] = float4(offset, select(is_active, 1.0, 0.0));
+		const bool moved_far = any(abs(offset - previous_offset) > CLIPMAP_RESET_MOVE * spacing);
+
+		uint flags = select(is_active, CLIPMAP_PROBE_ACTIVE, 0u);
+		flags |= select(moved_far, CLIPMAP_PROBE_RESET, 0u);
+
+		bProbeData[probe_index] = float4(offset, asfloat(flags));
 
 		InterlockedAdd(bStats[STAT_INACTIVE], select(is_active, 0u, 1u));
 		InterlockedAdd(bStats[STAT_MOVED], select(any(offset != 0.0), 1u, 0u));

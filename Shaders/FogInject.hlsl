@@ -32,6 +32,88 @@ F_Texture3D(tFroxelHistory, 11, 0);
 
 F_FrameData(FogConsts, Consts, 1);
 
+PERMIF(CLIPMAP_GI);
+// The runtime GI probes in place of the SH probe volumes, see ProbeClipmap
+#include "ProbeClipmapCommon.hlsli"
+
+/// Mirrors ProbeClipmapForwardData in Src/Renderer/ProbeClipmap.cpp
+struct ClipmapForwardData
+{
+	ClipmapScene Clipmap;
+	BakedSunShadowParams BakedSun;
+	uint4 vInfo;
+};
+
+F_Texture2D(tIrradiance0, 13, 0);
+F_Texture2D(tIrradiance1, 14, 0);
+F_Texture2D(tIrradiance2, 15, 0);
+F_StructBuffer(bState, uint, 16, 0);
+F_StructBuffer(bClipmapForward, ClipmapForwardData, 17, 0);
+
+float3 SampleClipmapIrradiance(uint level, uint slot, float3 direction)
+{
+	const float2 image_size = float2(CLIPMAP_TILE_COLUMNS, CLIPMAP_GRID_Z) * (CLIPMAP_IRRADIANCE_SIZE + 2);
+	const float2 texel = float2(ClipmapTileOrigin(slot, CLIPMAP_IRRADIANCE_SIZE + 2)) + 1.0 +
+						 (ClipmapDirectionToOct(direction) * 0.5 + 0.5) * float(CLIPMAP_IRRADIANCE_SIZE);
+	const float2 uv = texel / image_size;
+
+	float3 value = F_SampleLevel(tIrradiance2, uv, 0.0).rgb;
+	value = select(level == 1, F_SampleLevel(tIrradiance1, uv, 0.0).rgb, value);
+	value = select(level == 0, F_SampleLevel(tIrradiance0, uv, 0.0).rgb, value);
+
+	return value;
+}
+
+/**
+ * The mean radiance around a point in the fog, like the SH probes' L0 term: the eight probes around it, without a
+ * visibility test, each the average of its up and down irradiance. W is the sun visibility, which the clipmap
+ * leaves to the baked fog shadow.
+ */
+float4 SampleFogClipmap(float3 position_ws)
+{
+	const ClipmapScene scene = bClipmapForward[0].Clipmap;
+	const float3 last = float3(CLIPMAP_GRID_X - 1, CLIPMAP_GRID_Y - 1, CLIPMAP_GRID_Z - 1);
+
+	uint level = CLIPMAP_LEVELS - 1;
+	bool found = false;
+
+	for (uint index = CLIPMAP_LEVELS; index > 0; index--) {
+		const float3 local = position_ws * scene.Levels[index - 1].vParams.y - float3(scene.Levels[index - 1].vOrigin.xyz);
+		const bool inside = and(all(local >= 0.0), all(local < last));
+
+		level = select(inside, index - 1, level);
+		found = or(found, inside);
+	}
+
+	const float3 local = position_ws * scene.Levels[level].vParams.y;
+	const float3 base = floor(local);
+	const float3 cell_frac = local - base;
+
+	float3 sum = float3(0.0, 0.0, 0.0);
+	float total = 0.0;
+
+	[unroll]
+	for (uint corner = 0; corner < 8; corner++) {
+		const int3 offset = int3(corner, corner >> 1, corner >> 2) & 1;
+		const uint slot = ClipmapSlot(int3(base) + offset);
+
+		const float3 axis = lerp(1.0 - cell_frac, cell_frac, float3(offset));
+		const bool is_valid = HAS_FLAG(bState[ClipmapProbeIndex(level, slot)], CLIPMAP_STATE_VALID);
+		const float weight = select(is_valid, axis.x * axis.y * axis.z, 0.0);
+
+		const float3 mean = (SampleClipmapIrradiance(level, slot, float3(0.0, 1.0, 0.0)) +
+							 SampleClipmapIrradiance(level, slot, float3(0.0, -1.0, 0.0))) * 0.5;
+
+		sum += mean * weight;
+		total += weight;
+	}
+
+	const float3 radiance = select(and(found, total > 1e-6), sum / max(total, 1e-6), float3(0.0, 0.0, 0.0));
+
+	return float4(radiance, 1.0);
+}
+PERMEND();
+
 #include "FogMedium.hlsli"
 #include "BakedSunShadow.hlsli"
 #include "FogLighting.hlsli"
@@ -177,7 +259,11 @@ void main(uint3 froxel : SV_DispatchThreadID)
 	float2 pcf_rotation;
 	sincos(rotation_angle * (2.0 * FX_MATH_PI), pcf_rotation.y, pcf_rotation.x);
 
+PERMIF(CLIPMAP_GI);
+	const float4 probe = SampleFogClipmap(position_ws);
+PERMELSE();
 	const float4 probe = SampleFogProbes(position_ws);
+PERMEND();
 	const float sun_fallback = ProbeSunVisibility(probe);
 
 	float3 light_sum = probe.rgb * Consts.fAmbientScale;

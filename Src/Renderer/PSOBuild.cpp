@@ -19,7 +19,7 @@ namespace fx::renderer {
 
 
 static constexpr uint32 scMaxNumDescriptorSets = 6;
-static constexpr uint32 scMaxNumDescriptorBindings = 24;
+static constexpr uint32 scMaxNumDescriptorBindings = 40;
 
 
 void PSOBuild::BeginPipeline(const ePipelineName name)

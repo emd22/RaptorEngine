@@ -226,6 +226,7 @@ public:
 	CVarValue* pCVarSDFPageRayLength = nullptr;
 	CVarValue* pCVarSDFPageProbeStride = nullptr;
 	CVarValue* pCVarGIClipmap = nullptr;
+	CVarValue* pCVarGIMode = nullptr;
 	CVarValue* pCVarGIClipmapDebug = nullptr;
 	CVarValue* pCVarGIProbeBudget = nullptr;
 	CVarValue* pCVarGIHysteresis = nullptr;
