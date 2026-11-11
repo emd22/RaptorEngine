@@ -11,6 +11,7 @@
 #include "Target.hpp"
 
 #include <Core/Log.hpp>
+#include <Core/Memory.hpp>
 #include <Renderer/Globals.hpp>
 #include <Texture/TextureManager.hpp>
 #include <algorithm>
@@ -24,7 +25,7 @@ namespace {
 constexpr uint64 scPlaceholderBytes = 64;
 constexpr uint32 scUpdateGroupColumns = 1024;
 constexpr uint32 scDebugGroupSize = 8;
-constexpr uint32 scStatCount = 8;
+
 /// Mirrors SDF_PAGE_NEAREST_BLOCK in Shaders/SDFPageCommon.hlsli
 constexpr uint32 scNearestBlock = 2;
 
@@ -67,13 +68,6 @@ static_assert(sizeof(SDFPageUpdateConsts) == 32);
 static_assert(sizeof(BakedSunShadowGpu) == 80);
 static_assert(sizeof(SDFPageDebugConsts) == 192 + 64 + 16 + 16 + 16 + 80 + 16 + 16 + 16);
 
-/// Every buffer binding is dynamic, so each takes an offset in binding order
-void AddZeroOffsets(uint32 count)
-{
-	for (uint32 i = 0; i < count; i++) {
-		gPipelineCache->AddBufferOffset(0, 0);
-	}
-}
 
 void ComputeBarrier(const CommandBuffer& cmd)
 {
@@ -134,11 +128,10 @@ void SDFPageScene::CreateBuffer(RawGpuBuffer& buffer, uint64 size, const void* d
 				  eGpuBufferFlags::PersistentMapped);
 
 	uint8* mapped = static_cast<uint8*>(buffer.pMappedBuffer);
-
-	memset(mapped, 0, buffer_size);
+	MemorySetRaw(mapped, 0, buffer_size);
 
 	if (data != nullptr && size > 0) {
-		memcpy(mapped, data, size);
+		MemoryCopyRaw(mapped, static_cast<const uint8*>(data), size);
 	}
 
 	buffer.FlushToGpu(0, static_cast<uint32>(buffer_size));
@@ -155,13 +148,11 @@ void SDFPageScene::Create()
 	mJobs.Create(eGpuBufferType::Storage, static_cast<uint64>(scMaxJobsPerFrame) * sizeof(Job) * FramesInFlight,
 				 VMA_MEMORY_USAGE_CPU_TO_GPU, eGpuBufferFlags::PersistentMapped);
 
-	mStats.Create(eGpuBufferType::Storage, static_cast<uint64>(scStatCount) * sizeof(uint32) * FramesInFlight,
-				  VMA_MEMORY_USAGE_GPU_TO_CPU, eGpuBufferFlags::PersistentMapped | eGpuBufferFlags::TransferReceiver);
-
 	mpAtlas = gTextureManager->NewTexture();
 	mpAtlas->CreateVolume(UVec2(scAtlasSDFPagesX * scTexelsPerSDFPage, scAtlasSDFPagesY * scTexelsPerSDFPage),
 						  scAtlasSDFPagesZ * scTexelsPerSDFPage, eImageFormat::R8_UNorm,
 						  VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+
 	mpNearest = gTextureManager->NewTexture();
 	mpNearest->CreateVolume(UVec2(scAtlasSDFPagesX * scTexelsPerSDFPage / scNearestBlock,
 								  scAtlasSDFPagesY * scTexelsPerSDFPage / scNearestBlock),
@@ -176,8 +167,8 @@ void SDFPageScene::Create()
 	mFreeAtlas.InitCapacity(scAtlasSDFPageCount);
 
 	for (uint32 level = 0; level < scMaxLevels; level++) {
-		mLevels[level].SlotAtlas.InitSize(scSlotsPerLevel, scEmpty);
-		mLevels[level].SlotSDFPage.InitSize(scSlotsPerLevel, scEmpty);
+		mLevels[level].SlotAtlas.InitSize(scSlotsPerLevel, SDFPageID::scEmpty);
+		mLevels[level].SlotSDFPage.InitSize(scSlotsPerLevel, SDFPageID::scEmpty);
 		mLevels[level].SlotDirty.InitSize(scSlotsPerLevel, 0);
 	}
 }
@@ -198,55 +189,61 @@ void SDFPageScene::CreatePipelines(Target* depth, Target* normals, Target* motio
 		eSamplerAddressMode::ClampToEdge,
 	});
 
-	gPSOBuild->BeginPipeline(ePipelineName::SDFPageUpdate);
-	gPSOBuild->SetShader(eShaderName::SDFPageUpdate, {});
-	gPSOBuild->AddBuffer(0, 0, eShaderType::Compute, &mJobs, 0, static_cast<uint64>(scMaxJobsPerFrame) * sizeof(Job));
-	gPSOBuild->AddBuffer(1, 0, eShaderType::Compute, &mRefs, 0, VK_WHOLE_SIZE);
-	gPSOBuild->AddBuffer(2, 0, eShaderType::Compute, &mTriangles, 0, VK_WHOLE_SIZE);
-	gPSOBuild->AddBuffer(3, 0, eShaderType::Compute, &mIndirection, 0, VK_WHOLE_SIZE);
-	gPSOBuild->AddStorageImage(4, 0, eShaderType::Compute, mpAtlas);
-	gPSOBuild->AddStorageImage(5, 0, eShaderType::Compute, mpNearest);
-	gPSOBuild->AddBuffer(6, 0, eShaderType::Compute, &mAtlasFirstRef, 0, VK_WHOLE_SIZE);
-	gPSOBuild->AddFrameData(1);
-	gPSOBuild->EndPipeline();
+	{
+		gPSOBuild->BeginPipeline(ePipelineName::SDFPageUpdate);
+		gPSOBuild->SetShader(eShaderName::SDFPageUpdate, {});
+		gPSOBuild->AddBuffer(0, 0, eShaderType::Compute, &mJobs, 0,
+							 static_cast<uint64>(scMaxJobsPerFrame) * sizeof(Job));
+		gPSOBuild->AddBuffer(1, 0, eShaderType::Compute, &mRefs, 0, VK_WHOLE_SIZE);
+		gPSOBuild->AddBuffer(2, 0, eShaderType::Compute, &mTriangles, 0, VK_WHOLE_SIZE);
+		gPSOBuild->AddBuffer(3, 0, eShaderType::Compute, &mIndirection, 0, VK_WHOLE_SIZE);
+		gPSOBuild->AddStorageImage(4, 0, eShaderType::Compute, mpAtlas);
+		gPSOBuild->AddStorageImage(5, 0, eShaderType::Compute, mpNearest);
+		gPSOBuild->AddBuffer(6, 0, eShaderType::Compute, &mAtlasFirstRef, 0, VK_WHOLE_SIZE);
+		gPSOBuild->AddFrameData(1);
+		gPSOBuild->EndPipeline();
+	}
 
-	gPSOBuild->BeginPipeline(ePipelineName::SDFPageDebug);
-	gPSOBuild->SetShader(eShaderName::SDFPageDebug, {});
-	gPSOBuild->AddBuffer(0, 0, eShaderType::Compute, &mIndirection, 0, VK_WHOLE_SIZE);
-	gPSOBuild->AddImage(1, 0, eShaderType::Compute, mpAtlas, linear_sampler);
-	gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Compute, depth, point_sampler);
-	gPSOBuild->AddImageFromTarget(3, 0, eShaderType::Compute, normals, point_sampler);
-	gPSOBuild->AddImageFromTarget(4, 0, eShaderType::Compute, motion, point_sampler);
-	gPSOBuild->AddStorageImage(5, 0, eShaderType::Compute, &lit->GetImage());
-	gPSOBuild->AddBuffer(6, 0, eShaderType::Compute, &mStats, 0, scStatCount * sizeof(uint32));
-	gPSOBuild->AddBuffer(7, 0, eShaderType::Compute, &mTriangles, 0, VK_WHOLE_SIZE);
-	gPSOBuild->AddBuffer(8, 0, eShaderType::Compute, &mRefs, 0, VK_WHOLE_SIZE);
-	gPSOBuild->AddBuffer(9, 0, eShaderType::Compute, &mAtlasFirstRef, 0, VK_WHOLE_SIZE);
-	gPSOBuild->AddImage(10, 0, eShaderType::Compute, mpNearest, point_sampler);
-	gPSOBuild->AddBuffer(11, 0, eShaderType::Compute, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
-						 gGraphics->LightBuffer.PageSize);
-	gPSOBuild->AddImageFromTarget(12, 0, eShaderType::Compute, gShadowAtlas->GetTarget(),
-								  gSamplerCache->Request({
-									  eSamplerFilter::Linear,
-									  eSamplerFilter::Linear,
-									  eSamplerFilter::Linear,
-									  eSamplerAddressMode::ClampToBorder,
-									  eSamplerBorderColor::FloatWhite,
-									  eSamplerCompareOp::Greater,
-								  }));
-	gPSOBuild->AddImage(13, 0, eShaderType::Compute, gGraphics->pFogShadowAtlas,
-						gSamplerCache->Request({
-							eSamplerFilter::Linear,
-							eSamplerFilter::Linear,
-							eSamplerFilter::Nearest,
-							eSamplerAddressMode::ClampToEdge,
-							eSamplerBorderColor::FloatWhite,
-							eSamplerCompareOp::LessOrEqual,
-						}));
-	gPSOBuild->AddBuffer(14, 0, eShaderType::Compute, &gGraphics->FogShadowPageBuffer, 0,
-						 gGraphics->FogShadowPageBufferSize);
-	gPSOBuild->AddFrameData(1);
-	gPSOBuild->EndPipeline();
+	{
+		gPSOBuild->BeginPipeline(ePipelineName::SDFPageDebug);
+		gPSOBuild->SetShader(eShaderName::SDFPageDebug, {});
+		gPSOBuild->AddBuffer(0, 0, eShaderType::Compute, &mIndirection, 0, VK_WHOLE_SIZE);
+		gPSOBuild->AddImage(1, 0, eShaderType::Compute, mpAtlas, linear_sampler);
+		gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Compute, depth, point_sampler);
+		gPSOBuild->AddImageFromTarget(3, 0, eShaderType::Compute, normals, point_sampler);
+		gPSOBuild->AddImageFromTarget(4, 0, eShaderType::Compute, motion, point_sampler);
+		gPSOBuild->AddStorageImage(5, 0, eShaderType::Compute, &lit->GetImage());
+		gPSOBuild->AddBuffer(7, 0, eShaderType::Compute, &mTriangles, 0, VK_WHOLE_SIZE);
+		gPSOBuild->AddBuffer(8, 0, eShaderType::Compute, &mRefs, 0, VK_WHOLE_SIZE);
+		gPSOBuild->AddBuffer(9, 0, eShaderType::Compute, &mAtlasFirstRef, 0, VK_WHOLE_SIZE);
+		gPSOBuild->AddImage(10, 0, eShaderType::Compute, mpNearest, point_sampler);
+		gPSOBuild->AddBuffer(11, 0, eShaderType::Compute, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+							 gGraphics->LightBuffer.PageSize);
+		gPSOBuild->AddImageFromTarget(12, 0, eShaderType::Compute, gShadowAtlas->GetTarget(),
+									  gSamplerCache->Request({
+										  eSamplerFilter::Linear,
+										  eSamplerFilter::Linear,
+										  eSamplerFilter::Linear,
+										  eSamplerAddressMode::ClampToBorder,
+										  eSamplerBorderColor::FloatWhite,
+										  eSamplerCompareOp::Greater,
+									  }));
+		gPSOBuild->AddImage(13, 0, eShaderType::Compute, gGraphics->pFogShadowAtlas,
+							gSamplerCache->Request({
+								eSamplerFilter::Linear,
+								eSamplerFilter::Linear,
+								eSamplerFilter::Nearest,
+								eSamplerAddressMode::ClampToEdge,
+								eSamplerBorderColor::FloatWhite,
+								eSamplerCompareOp::LessOrEqual,
+							}));
+		gPSOBuild->AddBuffer(14, 0, eShaderType::Compute, &gGraphics->FogShadowPageBuffer, 0,
+							 gGraphics->FogShadowPageBufferSize);
+
+		gPSOBuild->AddFrameData(1);
+
+		gPSOBuild->EndPipeline();
+	}
 }
 
 void SDFPageScene::Destroy()
@@ -255,7 +252,6 @@ void SDFPageScene::Destroy()
 	mTriangles.Destroy();
 	mIndirection.Destroy();
 	mJobs.Destroy();
-	mStats.Destroy();
 	mAtlasFirstRef.Destroy();
 
 	mbActive = false;
@@ -279,8 +275,9 @@ bool SDFPageScene::Upload(const CompiledMapSDFPages& pages)
 								   Slice<Image* const>(nullptr, 0));
 
 	mSDFPages.Free();
+
 	mSDFPages.InitSize(pages.SDFPages.Size);
-	memcpy(mSDFPages.pData, pages.SDFPages.pData, pages.SDFPages.GetSizeInBytes());
+	MemoryCopyRaw(mSDFPages.pData, pages.SDFPages.pData, pages.SDFPages.GetSizeInBytes());
 
 	mLevelCount = std::min(static_cast<uint32>(pages.Levels.Size), scMaxLevels);
 	mMarginScale = pages.MarginScale;
@@ -305,8 +302,8 @@ bool SDFPageScene::Upload(const CompiledMapSDFPages& pages)
 		Level& level = mLevels[level_index];
 
 		for (uint32 slot = 0; slot < scSlotsPerLevel; slot++) {
-			level.SlotAtlas[slot] = scEmpty;
-			level.SlotSDFPage[slot] = scEmpty;
+			level.SlotAtlas[slot] = SDFPageID::scEmpty;
+			level.SlotSDFPage[slot] = SDFPageID::scEmpty;
 			level.SlotDirty[slot] = 0;
 		}
 
@@ -385,7 +382,7 @@ void SDFPageScene::MarkDirty(uint32 level_index, uint32 slot, uint8 value)
 	Level& level = mLevels[level_index];
 
 	if (level.SlotDirty[slot] == 0) {
-		mDirty.Insert((level_index << 24) | slot);
+		mDirty.Insert(SDFPageID::MakeID(level_index, slot));
 	}
 
 	level.SlotDirty[slot] = std::max(level.SlotDirty[slot], value);
@@ -393,12 +390,12 @@ void SDFPageScene::MarkDirty(uint32 level_index, uint32 slot, uint8 value)
 
 void SDFPageScene::FreeSlot(Level& level, uint32 slot)
 {
-	if (level.SlotAtlas[slot] != scEmpty) {
+	if (level.SlotAtlas[slot].IsNotEmpty()) {
 		mFreeAtlas.Insert(level.SlotAtlas[slot]);
-		level.SlotAtlas[slot] = scEmpty;
+		level.SlotAtlas[slot] = SDFPageID::scEmpty;
 	}
 
-	level.SlotSDFPage[slot] = scEmpty;
+	level.SlotSDFPage[slot] = SDFPageID::scEmpty;
 }
 
 void SDFPageScene::ResetLevel(uint32 level_index)
@@ -417,7 +414,7 @@ void SDFPageScene::ResetLevel(uint32 level_index)
 	uint32 kept = 0;
 
 	for (uint32 index = 0; index < mDirty.Size; index++) {
-		if ((mDirty[index] >> 24) != level_index) {
+		if (mDirty[index].GetLevelIndex() != level_index) {
 			mDirty[kept++] = mDirty[index];
 		}
 	}
@@ -454,7 +451,7 @@ bool SDFPageScene::PlaceLevel(uint32 level_index, const FVec3& center)
 	const int32 old_origin[3] = { level.Origin[0], level.Origin[1], level.Origin[2] };
 	const int32 clip = static_cast<int32>(scClipSDFPages);
 
-	const auto is_inside = [clip](const int32 coord[3], const int32 origin[3])
+	const auto IsInside = [clip](const int32 coord[3], const int32 origin[3])
 	{
 		return coord[0] >= origin[0] && coord[0] < origin[0] + clip && coord[1] >= origin[1] &&
 			   coord[1] < origin[1] + clip && coord[2] >= origin[2] && coord[2] < origin[2] + clip;
@@ -471,7 +468,7 @@ bool SDFPageScene::PlaceLevel(uint32 level_index, const FVec3& center)
 		for (uint32 page = begin; page < end; page++) {
 			const int32* coord = mSDFPages[page].Coord;
 
-			if (is_inside(coord, old_origin) && !is_inside(coord, new_origin)) {
+			if (IsInside(coord, old_origin) && !IsInside(coord, new_origin)) {
 				const uint32 slot = GetSlot(coord);
 
 				FreeSlot(level, slot);
@@ -492,7 +489,7 @@ bool SDFPageScene::PlaceLevel(uint32 level_index, const FVec3& center)
 	for (uint32 page = begin; page < end; page++) {
 		const int32* coord = mSDFPages[page].Coord;
 
-		if (!is_inside(coord, new_origin) || (!reset && is_inside(coord, old_origin))) {
+		if (!IsInside(coord, new_origin) || (!reset && IsInside(coord, old_origin))) {
 			continue;
 		}
 
@@ -548,7 +545,7 @@ void SDFPageScene::Update(CommandBuffer& cmd, const FVec3& center, uint32 eval_b
 		any_reset = any_reset || reset_levels[level_index];
 	}
 
-	// Coarse levels first, so the whole view is covered before the fine detail arrives
+	// Coarse levels first so the whole view is covered before the finer detail cascades
 	uint32 evaluated = 0;
 
 	for (uint32 level_index = mLevelCount; level_index > 0 && evaluated < eval_budget; level_index--) {
@@ -557,7 +554,7 @@ void SDFPageScene::Update(CommandBuffer& cmd, const FVec3& center, uint32 eval_b
 		while (level.PendingRead < level.Pending.Size && evaluated < eval_budget && !mFreeAtlas.IsEmpty()) {
 			const uint32 slot = level.Pending[level.PendingRead++];
 
-			if (level.SlotSDFPage[slot] == scEmpty || level.SlotAtlas[slot] != scEmpty) {
+			if (level.SlotSDFPage[slot].IsEmpty() || level.SlotAtlas[slot].IsNotEmpty()) {
 				continue;
 			}
 
@@ -575,18 +572,19 @@ void SDFPageScene::Update(CommandBuffer& cmd, const FVec3& center, uint32 eval_b
 	}
 
 	const uint32 frame = gGraphics->GetFrameNumber();
+
 	Job* jobs = reinterpret_cast<Job*>(mJobs.pMappedBuffer) + static_cast<uint64>(frame) * scMaxJobsPerFrame;
+
 	uint32 job_count = 0;
 	uint32 kept = 0;
 
-	for (uint32 index = 0; index < mDirty.Size; index++) {
-		const uint32 entry = mDirty[index];
-		const uint32 level_index = entry >> 24;
-		const uint32 slot = entry & 0xFFFFFF;
+	for (const SDFPageID page_id : mDirty) {
+		const uint32 slot = page_id.GetSlot();
+		const uint32 level_index = page_id.GetLevelIndex();
 
-		// Whatever did not fit waits for the next frame
+		// Whatever does not fit waits for the next frame
 		if (job_count == scMaxJobsPerFrame) {
-			mDirty[kept++] = entry;
+			mDirty[kept++] = page_id.GetValue();
 			continue;
 		}
 
@@ -596,22 +594,23 @@ void SDFPageScene::Update(CommandBuffer& cmd, const FVec3& center, uint32 eval_b
 		job = Job {};
 		job.Slot = level_index * scSlotsPerLevel + slot;
 
-		if (level.SlotAtlas[slot] != scEmpty) {
+		if (level.SlotAtlas[slot].IsNotEmpty()) {
 			job.Atlas = level.SlotAtlas[slot];
 
 			if (level.SlotDirty[slot] == scDirtyEval) {
-				const CompiledMapSDFPage& page = mSDFPages[level.SlotSDFPage[slot]];
+				const CompiledMapSDFPage& page = mSDFPages[level.SlotSDFPage[slot].GetSlot()];
 
 				job.FirstRef = page.FirstRef;
 				job.RefCount = page.RefCount;
+
 				job.OriginAndTexel[0] = static_cast<float32>(page.Coord[0]) * level.SDFPageSize;
 				job.OriginAndTexel[1] = static_cast<float32>(page.Coord[1]) * level.SDFPageSize;
 				job.OriginAndTexel[2] = static_cast<float32>(page.Coord[2]) * level.SDFPageSize;
 				job.OriginAndTexel[3] = level.SDFPageSize / static_cast<float32>(scTexelsPerSDFPage);
 			}
 		}
-		else if (level.SlotSDFPage[slot] != scEmpty) {
-			job.Atlas = scPending;
+		else if (level.SlotSDFPage[slot].IsNotEmpty()) {
+			job.Atlas = SDFPageID::scPending;
 		}
 
 		level.SlotDirty[slot] = 0;
@@ -633,7 +632,7 @@ void SDFPageScene::Update(CommandBuffer& cmd, const FVec3& center, uint32 eval_b
 		if (reset_levels[level_index]) {
 			vkCmdFillBuffer(cmd.Get(), mIndirection.Buffer,
 							static_cast<VkDeviceSize>(level_index) * scSlotsPerLevel * sizeof(uint32),
-							static_cast<VkDeviceSize>(scSlotsPerLevel) * sizeof(uint32), scEmpty);
+							static_cast<VkDeviceSize>(scSlotsPerLevel) * sizeof(uint32), SDFPageID::scEmpty.GetValue());
 		}
 	}
 
@@ -656,7 +655,11 @@ void SDFPageScene::Update(CommandBuffer& cmd, const FVec3& center, uint32 eval_b
 	};
 
 	gPipelineCache->AddBufferOffset(0, frame * scMaxJobsPerFrame * sizeof(Job));
-	AddZeroOffsets(4);
+	gPipelineCache->AddBufferOffset(0, 0);
+	gPipelineCache->AddBufferOffset(0, 0);
+	gPipelineCache->AddBufferOffset(0, 0);
+	gPipelineCache->AddBufferOffset(0, 0);
+
 	gPipelineCache->SetFrameData(gGraphics->FrameAlloc.Push(consts));
 	gPipelineCache->Bind(ePipelineName::SDFPageUpdate, cmd);
 
@@ -667,6 +670,7 @@ void SDFPageScene::Update(CommandBuffer& cmd, const FVec3& center, uint32 eval_b
 
 	AtlasTransition(cmd, mpAtlas, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	AtlasTransition(cmd, mpNearest, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
 	ComputeBarrier(cmd);
 }
 
@@ -678,42 +682,6 @@ void SDFPageScene::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDe
 	}
 
 	const uint32 frame = gGraphics->GetFrameNumber();
-	uint32* stats = reinterpret_cast<uint32*>(mStats.pMappedBuffer) + frame * scStatCount;
-
-	// This frame slot's fence has been waited on, so the counts its last use wrote are complete
-	mStats.InvalidateFromGpu();
-
-	if (view == eDebugView::DepthCheck) {
-		mCheckStats = SDFPageCheckStats {
-			.Match = stats[0],
-			.Early = stats[1],
-			.Late = stats[2],
-			.Sky = stats[3],
-			.Skipped = stats[4],
-		};
-	}
-
-	const uint32 ray_count = stats[6];
-	const double mean_steps = static_cast<double>(stats[5]) / std::max(1.0, static_cast<double>(ray_count));
-	const uint32 max_step_rays = stats[7];
-
-	if ((mDebugFrame++ % scLogInterval) == 0) {
-		const SDFPageCheckStats& check = mCheckStats;
-		const double surfaces = std::max(1.0, static_cast<double>(check.Match + check.Early + check.Late));
-
-		LogInfo(LC_RENDER,
-				"SDFPages: view {} cone {:.3f}, {} resident, {} pending, update {:.3f} ms, debug {:.3f} ms, {} rays, "
-				"{:.1f} steps, {} at the step limit, check {:.2f}% match {:.2f}% early {:.2f}% late ({} surface, {} "
-				"sky, {} skipped pixels)",
-				static_cast<uint32>(view), cone_slope, GetResidentCount(), GetPendingCount(),
-				gGraphics->Profiler.GetMs(eGpuMarker::SDFPageScene),
-				gGraphics->Profiler.GetMs(eGpuMarker::SDFPageDebug), ray_count, mean_steps, max_step_rays,
-				100.0 * check.Match / surfaces, 100.0 * check.Early / surfaces, 100.0 * check.Late / surfaces,
-				check.Match + check.Early + check.Late, check.Sky, check.Skipped);
-	}
-
-	vkCmdFillBuffer(cmd.Get(), mStats.Buffer, static_cast<VkDeviceSize>(frame) * scStatCount * sizeof(uint32),
-					scStatCount * sizeof(uint32), 0);
 
 	SDFPageDebugConsts consts;
 	GetSceneConsts(consts.Scene);
@@ -732,6 +700,7 @@ void SDFPageScene::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDe
 	consts.Info[1] = extent.Y;
 	consts.Info[2] = static_cast<uint32>(view);
 	consts.Info[3] = gGraphics->GetElapsedFrameCount();
+
 	consts.Params[0] = cone_slope;
 	consts.Params[1] = ray_length;
 	consts.Params[2] = gGraphics->PreExposure;
@@ -750,10 +719,12 @@ void SDFPageScene::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDe
 	BarrierHelper::ImageBeginComputeWrite(cmd, lit);
 
 	gPipelineCache->AddBufferOffset(0, 0);
-	gPipelineCache->AddBufferOffset(0, frame * scStatCount * sizeof(uint32));
-	AddZeroOffsets(3);
+	gPipelineCache->AddBufferOffset(0, 0);
+	gPipelineCache->AddBufferOffset(0, 0);
+	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->AddBufferOffset(0, gGraphics->LightBuffer.GetBaseOffset());
 	gPipelineCache->AddBufferOffset(0, 0);
+
 	gPipelineCache->SetFrameData(gGraphics->FrameAlloc.Push(consts));
 	gPipelineCache->Bind(ePipelineName::SDFPageDebug, cmd);
 

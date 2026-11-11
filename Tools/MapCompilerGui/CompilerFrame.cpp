@@ -384,7 +384,16 @@ void CompilerFrame::ShowMapState(size_t index)
 
 	const bool up_to_date = (map.SourceHash == mapc::HashPrototypeFile(entry.Path));
 
+	if (up_to_date) {
+		mpMaps->SetItemTextColour(row, *wxGREEN);
+	}
+	else {
+		mpMaps->SetItemTextColour(row, *wxRED);
+	}
+
 	mpMaps->SetItem(row, Column_State, up_to_date ? "Up to date" : "Out of date");
+
+
 	mpMaps->SetItem(row, Column_Seal, map.bSealed ? "Sealed" : "Not sealed");
 }
 

@@ -15,6 +15,7 @@
 #include <Core/Types.hpp>
 #include <Map/CompiledMap.hpp>
 #include <Math/FVec3.hpp>
+#include <Math/MathConsts.hpp>
 
 namespace fx {
 class Image;
@@ -111,11 +112,12 @@ public:
 	{
 		/// Probes traced per frame
 		uint32 Budget = 3072;
-		/// The same on every level: a ray that runs out before it hits anything is lit by the sky, so levels with
-		/// different lengths disagree about rooms longer than the shortest
-		float32 RayLengths[scLevelCount] = { 30.0f, 30.0f, 30.0f };
+
+		float32 RayLength = 30.0f;
+
 		float32 ConeSlope = 0.1f;
 		float32 Hysteresis = 0.97f;
+
 		/// Hysteresis of the probes whose short term light is ChangeThreshold or more away from their stored light,
 		/// relative to the larger of the two, fully reached at twice that
 		float32 FastHysteresis = 0.8f;
@@ -124,14 +126,12 @@ public:
 		float32 DirtyHysteresis = 0.7f;
 		/// Exponent of the cosine lobe each depth moment texel gathers over
 		float32 MomentSharpness = 50.0f;
-		/// Hits take the light that reached them from last frame's probes
+
 		bool bBounce = true;
-		/// Probes are moved out of walls and away from surfaces, and switched off where that fails
 		bool bRelocate = true;
-		/// Probes at grid points the compiled map marks as inside brushes or outside the map are never traced
 		bool bUseMask = true;
-		/// Radiance of the rays that miss, the same constant sky the mapc bake uses
-		float32 SkyRadiance = 1500.0f / 3.14159265f;
+
+		float32 SkyRadiance = 1500.0f / FX_PI;
 	};
 
 public:
@@ -219,9 +219,8 @@ private:
 	void PlaceLevel(uint32 level_index, const FVec3& center);
 	uint32 ScheduleJobs(uint32* jobs, const Settings& settings);
 	void GetLevelConsts(ProbeClipmapLevelGpu* out_levels, const Settings& settings) const;
-	void LogStats(uint32 frame, uint32 job_count);
 	void InitializeImages(CommandBuffer& cmd);
-	/// `fallback` is the irradiance over pi of the surfaces that no probe holds
+
 	void WriteForwardData(uint32 frame, const Settings& settings, float32 fallback);
 
 private:

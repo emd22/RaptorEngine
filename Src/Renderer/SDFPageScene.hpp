@@ -52,6 +52,46 @@ struct SDFPageCheckStats
 	uint32 Skipped = 0;
 };
 
+
+struct SDFPageID
+{
+public:
+	static const SDFPageID scEmpty;
+	static const SDFPageID scPending;
+
+public:
+	constexpr SDFPageID(const uint32 value) : ID(value) {}
+	constexpr SDFPageID(const SDFPageID& other) : ID(other.ID) {}
+
+	constexpr static SDFPageID MakeID(uint32 level_index, uint32 slot) { return ((level_index << 24) | slot); }
+
+	SDFPageID& operator=(const SDFPageID& other)
+	{
+		ID = other.ID;
+		return *this;
+	};
+
+	bool IsEmpty() const { return (ID == 0xFFFFFFFF); }
+	bool IsNotEmpty() const { return (ID != 0xFFFFFFFF); }
+
+	bool IsPending() const { return (ID == 0xFFFFFFFE); }
+	bool IsNotPending() const { return (ID != 0xFFFFFFFE); }
+
+	uint32 GetLevelIndex() const { return (ID >> 24); }
+	uint32 GetSlot() const { return (ID & 0x00FFFFFF); }
+
+	uint32 GetValue() const { return ID; }
+
+	~SDFPageID() = default;
+
+public:
+	uint32 ID = 0;
+};
+
+inline const SDFPageID SDFPageID::scEmpty = SDFPageID(0xFFFFFFFF);
+inline const SDFPageID SDFPageID::scPending = SDFPageID(0xFFFFFFFE);
+
+
 class SDFPageScene
 {
 public:
@@ -70,10 +110,6 @@ public:
 
 	static constexpr uint32 scMaxJobsPerFrame = 65536;
 
-	/// Indirection values that are not an atlas page
-	static constexpr uint32 scEmpty = 0xFFFFFFFF;
-	static constexpr uint32 scPending = 0xFFFFFFFE;
-
 	enum class eDebugView : uint32
 	{
 		None,
@@ -86,7 +122,6 @@ public:
 		Levels,
 		GiSteps,
 		ProbeRays,
-		/// The probe rays, with the light leaving each hit
 		ProbeShade,
 		Count,
 	};
@@ -97,7 +132,6 @@ public:
 	void CreatePipelines(Target* depth, Target* normals, Target* motion, Target* lit);
 	void Destroy();
 
-	/// Takes the compiled map's pages. Waits for the GPU to be idle.
 	bool Upload(const CompiledMapSDFPages& pages);
 	void Clear();
 
@@ -142,10 +176,12 @@ private:
 		int32 Origin[3] = {};
 		bool bPlaced = false;
 
-		/// Atlas page of every slot, or scEmpty
-		SizedArray<uint32> SlotAtlas;
-		/// The compiled page the slot should hold, or scEmpty
-		SizedArray<uint32> SlotSDFPage;
+		/// Atlas page of every slot
+		SizedArray<SDFPageID> SlotAtlas;
+
+		/// The compiled page the slot should hold
+		SizedArray<SDFPageID> SlotSDFPage;
+
 		SizedArray<uint8> SlotDirty;
 
 		/// Slots waiting for an atlas page, read from `PendingRead` on
@@ -156,7 +192,7 @@ private:
 	struct Job
 	{
 		uint32 Slot = 0;
-		uint32 Atlas = scEmpty;
+		SDFPageID Atlas = SDFPageID::scEmpty;
 		uint32 FirstRef = 0;
 		uint32 RefCount = 0;
 		float32 OriginAndTexel[4] = {};
@@ -180,7 +216,6 @@ private:
 	RawGpuBuffer mTriangles;
 	RawGpuBuffer mIndirection;
 	RawGpuBuffer mJobs;
-	RawGpuBuffer mStats;
 
 	Image* mpAtlas = nullptr;
 	/// Index into the page's refs of the triangle nearest each block of SDFPageNearestBlock texels a side
@@ -189,7 +224,7 @@ private:
 	RawGpuBuffer mAtlasFirstRef;
 	bool mbAtlasInitialized = false;
 
-	SizedArray<uint32> mFreeAtlas;
+	SizedArray<SDFPageID> mFreeAtlas;
 
 	/// CPU copy of the compiled pages, to find the ones that come into view
 	SizedArray<CompiledMapSDFPage> mSDFPages;
@@ -198,7 +233,7 @@ private:
 	uint32 mLevelCount = 0;
 	float32 mMarginScale = 0.5f;
 
-	DynArray<uint32, GrowthFunctions::Double> mDirty;
+	DynArray<SDFPageID, GrowthFunctions::Double> mDirty;
 
 	SDFPageCheckStats mCheckStats;
 	uint32 mDebugFrame = 0;

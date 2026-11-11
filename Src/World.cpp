@@ -16,8 +16,8 @@
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/LightManager.hpp>
-#include <Renderer/ReflectionProbe.hpp>
 #include <Renderer/PipelineCache.hpp>
+#include <Renderer/ReflectionProbe.hpp>
 #include <Renderer/ShadowAtlas.hpp>
 #include <Renderer/ShadowDirectional.hpp>
 #include <algorithm>
@@ -350,9 +350,10 @@ void World::ExecuteTransparentRenderLists()
 	for (const TransparentObjectCarrier& transparent_object : SortedEntryBuffer) {
 		// For each differing pipeline (per object), bind the pipeline.
 		if (first || !(transparent_object.Pipeline == pipeline_handle)) {
-			PipelineHandle draw_pipeline = is_debug_view ? gPipelineCache->GetOrCreateVariantInPass(
-															   transparent_object.Pipeline, ePipelinePass::ForwardBlendDebug)
-														 : transparent_object.Pipeline;
+			PipelineHandle draw_pipeline = is_debug_view
+											   ? gPipelineCache->GetOrCreateVariantInPass(
+													 transparent_object.Pipeline, ePipelinePass::ForwardBlendDebug)
+											   : transparent_object.Pipeline;
 
 			if (!draw_pipeline.IsValid()) {
 				continue;
@@ -1280,10 +1281,8 @@ void World::Render(BaseCamera* shadow_camera)
 		settings.bBounce = (pCVarGIBounce->IntValue != 0);
 		settings.bRelocate = (pCVarGIRelocate->IntValue != 0);
 		settings.bUseMask = (pCVarGIProbeMask->IntValue != 0);
+		settings.RayLength = std::clamp(pCVarGIRayLength->FloatValue, 1.0f, 200.0f);
 
-		for (float32& ray_length : settings.RayLengths) {
-			ray_length = std::clamp(pCVarGIRayLength->FloatValue, 1.0f, 200.0f);
-		}
 
 		if (pCVarGIDirty->IntValue != 0) {
 			gGraphics->GIClipmap.TrackLights(gGraphics->ShadeLights);
@@ -1782,8 +1781,8 @@ void World::DebugDrawProbeVolumes()
 	static const FVec3 scCapturePointHalfExtent(0.12f);
 
 	for (uint32 i = 0; i < gReflectionProbes->GetReflectionProbeCount(); i++) {
-		gDebugDraw->SolidBox(gReflectionProbes->GetReflectionProbePosition(i), scCapturePointHalfExtent, FQuat::scIdentity,
-							 reflection_color);
+		gDebugDraw->SolidBox(gReflectionProbes->GetReflectionProbePosition(i), scCapturePointHalfExtent,
+							 FQuat::scIdentity, reflection_color);
 	}
 }
 

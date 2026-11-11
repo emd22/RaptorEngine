@@ -43,18 +43,12 @@ constexpr uint8 scDead = 3;
 constexpr uint32 scFlagBounce = 0x01;
 constexpr uint32 scFlagRelocate = 0x02;
 
-/// Mirrors STAT_* in Shaders/ProbeClipmapBlend.hlsl
-constexpr uint32 scStatBlended = 0;
-constexpr uint32 scStatChange = 1;
-constexpr uint32 scStatReset = 2;
-constexpr uint32 scStatBlack = 3;
-constexpr uint32 scStatBackfaces = 4;
-constexpr uint32 scStatInactive = 5;
-constexpr uint32 scStatMoved = 6;
-constexpr uint32 scStatLight = 7;
-constexpr float64 scStatLightScale = 4.0;
-constexpr uint32 scStatCount = 8;
-constexpr float64 scStatChangeScale = 10000.0;
+enum class eProbeState
+{
+	Pending,
+	Dead,
+};
+
 
 /// Share of the budget left after the new probes that each level gets, finest first
 constexpr uint32 scLevelShares[ProbeClipmap::scLevelCount] = { 4, 2, 1 };
@@ -66,13 +60,18 @@ struct ProbeClipmapConsts
 	ProbeClipmapLevelGpu Levels[ProbeClipmap::scLevelCount];
 	float32 RayRotation[16] = {};
 	BakedSunShadowGpu BakedSun;
+
 	uint32 LightIndices[4] = {};
+
 	/// Light count, shading flags
 	uint32 Lights[4] = {};
+
 	/// Job count, frame, flags, proxy count
 	uint32 Info[4] = {};
+
 	/// Hysteresis, fast hysteresis, change threshold, moment sharpness
 	float32 Blend[4] = {};
+
 	/// Per level, how many times less often its probes are refreshed than the hysteresis is meant for. The fourth is
 	/// the dirty hysteresis.
 	float32 LevelRate[4] = {};
@@ -159,7 +158,7 @@ float32 HashToUnit(uint32 x) { return static_cast<float32>(Hash(x) & 0xFFFFFFU) 
 /// A uniformly random rotation as rows that row vectors are multiplied by (Shoemake)
 void RandomRotation(uint32 seed, float32 out_matrix[16])
 {
-	constexpr float32 scTau = 6.28318531f;
+	constexpr float32 scTau = FX_2PI;
 
 	const float32 u1 = HashToUnit(seed * 3U + 0U);
 	const float32 u2 = HashToUnit(seed * 3U + 1U);
@@ -279,9 +278,6 @@ void ProbeClipmap::Create()
 				  static_cast<uint64>(scLevelCount) * scProbesPerLevel * sizeof(uint32) * FramesInFlight,
 				  VMA_MEMORY_USAGE_CPU_TO_GPU, eGpuBufferFlags::PersistentMapped);
 
-	mStats.Create(eGpuBufferType::Storage, static_cast<uint64>(scStatCount) * sizeof(uint32) * FramesInFlight,
-				  VMA_MEMORY_USAGE_GPU_TO_CPU, eGpuBufferFlags::PersistentMapped | eGpuBufferFlags::TransferReceiver);
-
 	mProbeData.Create(eGpuBufferType::Storage, scProbeDataSize, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
 					  eGpuBufferFlags::TransferReceiver);
 
@@ -296,7 +292,6 @@ void ProbeClipmap::Destroy()
 	mJobs.Destroy();
 	mRays.Destroy();
 	mState.Destroy();
-	mStats.Destroy();
 	mProbeData.Destroy();
 	mForwardData.Destroy();
 }
@@ -329,6 +324,7 @@ void ProbeClipmap::CreatePipelines(Target* depth, Target* normals, Target* lit)
 	gPSOBuild->AddImage(5, 0, eShaderType::Compute, pages.GetNearest(), point_sampler);
 	gPSOBuild->AddBuffer(6, 0, eShaderType::Compute, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
 						 gGraphics->LightBuffer.PageSize);
+
 	gPSOBuild->AddImageFromTarget(7, 0, eShaderType::Compute, gShadowAtlas->GetTarget(),
 								  gSamplerCache->Request({
 									  eSamplerFilter::Linear,
@@ -375,7 +371,6 @@ void ProbeClipmap::CreatePipelines(Target* depth, Target* normals, Target* lit)
 		gPSOBuild->AddStorageImage(5 + level_index, 0, eShaderType::Compute, mpMoments[level_index]);
 	}
 
-	gPSOBuild->AddBuffer(8, 0, eShaderType::Compute, &mStats, 0, scStatCount * sizeof(uint32));
 	gPSOBuild->AddBuffer(9, 0, eShaderType::Compute, &mProbeData, 0, VK_WHOLE_SIZE);
 	gPSOBuild->AddFrameData(1);
 	gPSOBuild->EndPipeline();
@@ -927,40 +922,11 @@ void ProbeClipmap::GetLevelConsts(ProbeClipmapLevelGpu* out_levels, const Settin
 
 		gpu.Params[0] = level.Spacing;
 		gpu.Params[1] = 1.0f / level.Spacing;
-		gpu.Params[2] = settings.RayLengths[level_index];
+		gpu.Params[2] = settings.RayLength;
 		gpu.Params[3] = settings.ConeSlope;
 	}
 }
 
-void ProbeClipmap::LogStats(uint32 frame, uint32 job_count)
-{
-	const uint32* stats = reinterpret_cast<const uint32*>(mStats.pMappedBuffer) + frame * scStatCount;
-
-	if ((mUpdateCount % scLogInterval) != 0) {
-		return;
-	}
-
-	uint32 dead[scLevelCount] = {};
-
-	for (uint32 level_index = 0; level_index < scLevelCount; level_index++) {
-		for (uint32 slot = 0; slot < scProbesPerLevel; slot++) {
-			dead[level_index] += (mLevels[level_index].Valid[slot] == scDead) ? 1U : 0U;
-		}
-	}
-
-	const float64 blended = std::max(1.0, static_cast<float64>(stats[scStatBlended]));
-	const float64 updated = std::max(1.0, static_cast<float64>(stats[scStatBlended] + stats[scStatReset]));
-	//
-	// 	LogInfo(LC_RENDER,
-	// 			"GI clipmap: {} probes traced ({} new, {} dirty, {} / {} / {} still dirty), unfilled {} / {} / {},
-	// masked " 			"out {} / {} / {}, {:.0f} lux on average, mean change {:.4f}, {} black, {:.1f}% backface rays, {}
-	// switched off, {} moved", 			job_count, stats[scStatReset], mLastDirtyJobCount, mLevels[0].DirtyCount,
-	// mLevels[1].DirtyCount, 			mLevels[2].DirtyCount, mLevels[0].InvalidCount, mLevels[1].InvalidCount,
-	// mLevels[2].InvalidCount, dead[0], 			dead[1], dead[2], static_cast<float64>(stats[scStatLight]) / scStatLightScale /
-	// updated * 3.14159265, 			static_cast<float64>(stats[scStatChange]) / scStatChangeScale / blended,
-	// stats[scStatBlack], 			100.0 * static_cast<float64>(stats[scStatBackfaces]) / (updated * scRayCount),
-	// stats[scStatInactive], 			stats[scStatMoved]);
-}
 
 void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Settings& settings)
 {
@@ -983,9 +949,7 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 		return;
 	}
 
-	// This frame slot's fence has been waited on, so the counts its last use wrote are complete
-	mStats.InvalidateFromGpu();
-	LogStats(frame, mLastJobCount);
+
 	mUpdateCount++;
 
 	if (settings.bUseMask != mbMaskInUse) {
@@ -1028,9 +992,6 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 
 	WriteForwardData(frame, settings, 0.0f);
 
-	vkCmdFillBuffer(cmd.Get(), mStats.Buffer, static_cast<VkDeviceSize>(frame) * scStatCount * sizeof(uint32),
-					scStatCount * sizeof(uint32), 0);
-
 	if (job_count == 0) {
 		return;
 	}
@@ -1042,7 +1003,7 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 	GetLevelConsts(consts.Levels, settings);
 	RandomRotation(gGraphics->GetElapsedFrameCount(), consts.RayRotation);
 
-	gGraphics->SelectShadeLights(center, settings.RayLengths[scLevelCount - 1], consts.LightIndices, consts.Lights[0]);
+	gGraphics->SelectShadeLights(center, settings.RayLength, consts.LightIndices, consts.Lights[0]);
 
 	if (gGraphics->IsBakedSunShadowActive()) {
 		consts.Lights[1] |= scShadeFlagBakedSun;
@@ -1157,8 +1118,8 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 	// Blend
 	gPipelineCache->AddBufferOffset(0, frame * scMaxJobsPerFrame * sizeof(uint32));
 	gPipelineCache->AddBufferOffset(0, 0);
-	gPipelineCache->AddBufferOffset(0, frame * scStatCount * sizeof(uint32));
 	gPipelineCache->AddBufferOffset(0, 0);
+
 	gPipelineCache->SetFrameData(consts_offset);
 	gPipelineCache->Bind(ePipelineName::ProbeClipmapBlend, cmd);
 
@@ -1241,16 +1202,18 @@ void ProbeClipmap::RenderDebug(CommandBuffer& cmd, const BaseCamera& camera, eDe
 	Image* lit = &gGraphics->pRenderer->ForwardPass.GetTarget(eImageFormat::RGBA16_Float)->GetImage();
 
 	ComputeBarrier(cmd);
+
 	// The spheres are drawn over what the lit target holds, so its contents are kept
 	ImageBarrier(cmd, lit, lit->ImageLayout, VK_IMAGE_LAYOUT_GENERAL);
 
 	gPipelineCache->AddBufferOffset(0, frame * scLevelCount * scProbesPerLevel * sizeof(uint32));
 	gPipelineCache->AddBufferOffset(0, 0);
+
 	gPipelineCache->SetFrameData(gGraphics->FrameAlloc.Push(consts));
 	gPipelineCache->Bind(ePipelineName::ProbeClipmapDebug, cmd);
 
-	vkCmdDispatch(cmd.Get(), (extent.X + scDebugGroupSize - 1) / scDebugGroupSize,
-				  (extent.Y + scDebugGroupSize - 1) / scDebugGroupSize, 1);
+	UVec2 groups_extent = (extent + UVec2(scDebugGroupSize - 1)) / UVec2(scDebugGroupSize);
+	vkCmdDispatch(cmd.Get(), groups_extent.X, groups_extent.Y, 1);
 
 	BarrierHelper::ImageComputeWriteToRead(cmd, lit);
 }

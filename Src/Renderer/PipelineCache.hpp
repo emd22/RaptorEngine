@@ -6,13 +6,13 @@
 #include "PipelineNames.hpp"
 #include "PipelineVariant.hpp"
 
+#include <Core/HashMap.hpp>
 #include <atomic>
 #include <functional>
 #include <mutex>
 #include <optional>
 #include <string>
 #include <thread>
-#include <Core/HashMap.hpp>
 #include <vector>
 
 namespace fx::renderer {

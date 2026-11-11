@@ -13,31 +13,10 @@ F_StructBuffer(bRays, float4, 1, 0);
 [[vk::image_format("rg16f")]] [[vk::binding(6, 0)]] RWTexture2D<float2> tMoments1;
 [[vk::image_format("rg16f")]] [[vk::binding(7, 0)]] RWTexture2D<float2> tMoments2;
 
-F_RWStructBuffer(bStats, uint, 8, 0);
 F_RWStructBuffer(bProbeData, float4, 9, 0);
 
 F_FrameData(ProbeClipmapConsts, Consts, 1);
 
-/// Mirrors ProbeClipmap::scStat*
-#define STAT_BLENDED 0
-#define STAT_CHANGE 1
-#define STAT_RESET 2
-#define STAT_BLACK 3
-#define STAT_BACKFACES 4
-#define STAT_INACTIVE 5
-#define STAT_MOVED 6
-#define STAT_LIGHT 7
-
-/// Fixed point scale of the summed probe light, and the most one probe adds, so the sum fits
-#define STAT_LIGHT_SCALE 4.0
-#define STAT_LIGHT_MAX 65536.0
-
-/// Fixed point scale of the summed relative change
-#define STAT_CHANGE_SCALE 10000.0
-
-/// How much of each update goes into a texel's short term luminance, kept in the irradiance alpha. The blend speeds
-/// up where it and the irradiance disagree, which is decided before this update's rays are looked at: a decision made
-/// from the rays themselves blends bright outliers in faster than dark ones and brightens the probe over time.
 #define CLIPMAP_SHORT_BLEND 0.25
 
 groupshared float4 sRays[CLIPMAP_RAYS];
@@ -149,7 +128,9 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 	const uint job = bJobs[job_index];
 	const uint level_index = ClipmapJobLevel(job);
 	const uint slot = ClipmapJobSlot(job);
+
 	const ClipmapLevel level = Consts.Clipmap.Levels[level_index];
+
 	const int3 probe = ClipmapSlotProbe(level, slot);
 	const uint probe_index = ClipmapProbeDataIndex(level_index, probe);
 	const float4 probe_data = bProbeData[probe_index];
@@ -328,9 +309,6 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 
 		bProbeData[probe_index] = float4(offset, asfloat(flags));
 
-		InterlockedAdd(bStats[STAT_INACTIVE], select(is_active, 0u, 1u));
-		InterlockedAdd(bStats[STAT_MOVED], select(any(offset != 0.0), 1u, 0u));
-
 		uint black = 1;
 
 		for (uint texel = 0; texel < CLIPMAP_IRRADIANCE_SIZE * CLIPMAP_IRRADIANCE_SIZE; texel++) {
@@ -345,12 +323,6 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 
 		const float relative = float(sChange) / max(float(sPreviousSum), 1.0);
 
-		InterlockedAdd(bStats[STAT_BLENDED], select(reset, 0u, 1u));
-		InterlockedAdd(bStats[STAT_CHANGE], select(reset, 0u, uint(min(relative, 10.0) * STAT_CHANGE_SCALE)));
-		InterlockedAdd(bStats[STAT_RESET], select(reset, 1u, 0u));
-		InterlockedAdd(bStats[STAT_BLACK], black);
-		InterlockedAdd(bStats[STAT_BACKFACES], backfaces);
-
 		float light = 0.0;
 
 		for (uint texel = 0; texel < CLIPMAP_IRRADIANCE_SIZE * CLIPMAP_IRRADIANCE_SIZE; texel++) {
@@ -358,6 +330,5 @@ void main(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 		}
 
 		light /= float(CLIPMAP_IRRADIANCE_SIZE * CLIPMAP_IRRADIANCE_SIZE);
-		InterlockedAdd(bStats[STAT_LIGHT], uint(min(light, STAT_LIGHT_MAX) * STAT_LIGHT_SCALE));
 	}
 }

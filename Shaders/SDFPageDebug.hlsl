@@ -31,8 +31,6 @@ F_Texture2D(tMotion, 4, 0);
 
 [[vk::image_format("rgba16f")]] [[vk::binding(5, 0)]] RWTexture2D<float4> tOutput;
 
-F_RWStructBuffer(bStats, uint, 6, 0);
-
 F_StructBuffer(bTriangles, SDFPageTriangle, 7, 0);
 F_StructBuffer(bRefs, uint, 8, 0);
 F_StructBuffer(bAtlasFirstRef, uint, 9, 0);
@@ -306,13 +304,13 @@ void main(uint3 thread : SV_DispatchThreadID, uint3 group : SV_GroupID, uint3 lo
 	if (all(pixel < Consts.vInfo.xy)) {
 		tOutput[pixel] = float4(ShadePixel(pixel, group.xy, local.xy), 1.0);
 	}
-
-	[unroll]
-	for (uint stat = 0; stat < STAT_COUNT; stat++) {
-		const uint sum = WaveActiveSum(sStats[stat]);
-
-		if (WaveIsFirstLane()) {
-			InterlockedAdd(bStats[stat], sum);
-		}
-	}
+//
+// 	[unroll]
+// 	for (uint stat = 0; stat < STAT_COUNT; stat++) {
+// 		const uint sum = WaveActiveSum(sStats[stat]);
+//
+// 		if (WaveIsFirstLane()) {
+// 			InterlockedAdd(bStats[stat], sum);
+// 		}
+// 	}
 }
