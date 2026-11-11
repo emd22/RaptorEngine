@@ -36,7 +36,7 @@
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/Light.hpp>
 #include <Renderer/LightManager.hpp>
-#include <Renderer/LightProbe.hpp>
+#include <Renderer/ReflectionProbe.hpp>
 #include <Script/ObjectScripts.hpp>
 #include <Script/Script.hpp>
 #include <Script/ScriptManager.hpp>
@@ -426,18 +426,15 @@ EditorPanelState RaptorEditor::BuildPanelState()
 
 	world.Fog = gWorld->Fog;
 
-	const uint32 probe_count = gProbeManager->GetReflectionProbeCount();
+	const uint32 probe_count = gReflectionProbes->GetReflectionProbeCount();
 
-	if (gProbeManager->IsBakingReflections()) {
+	if (gReflectionProbes->IsBaking()) {
 		world.ReflectionStatus = String::Fmt("Baking {} probe(s)...", probe_count);
-	}
-	else if (gProbeManager->IsBaking()) {
-		world.ReflectionStatus = "Baking irradiance...";
 	}
 	else if (probe_count == 0) {
 		world.ReflectionStatus = "No reflection probes";
 	}
-	else if (gProbeManager->AreReflectionsBaked()) {
+	else if (gReflectionProbes->AreReflectionsBaked()) {
 		world.ReflectionStatus = String::Fmt("{} probe(s), baked", probe_count);
 	}
 	else {
@@ -1185,7 +1182,7 @@ Object* RaptorEditor::CreateDataBrush(const Brush::PlaneList& planes, const FVec
 		SelectObject(created, false);
 
 		if (mDataFilter == eDataFilter::ReflectionProbes) {
-			gProbeManager->RebuildReflectionProbesFromWorld();
+			gReflectionProbes->RebuildReflectionProbesFromWorld();
 		}
 	}
 
@@ -1314,7 +1311,7 @@ Object* RaptorEditor::CreateReflectionProbeAtPlayer()
 
 	if (created != nullptr) {
 		SelectObject(created, false);
-		gProbeManager->RebuildReflectionProbesFromWorld();
+		gReflectionProbes->RebuildReflectionProbesFromWorld();
 	}
 
 	return created;
@@ -1336,7 +1333,7 @@ uint32 RaptorEditor::SetSelectionReflectionProbe(bool enabled)
 	}
 
 	if (changed > 0) {
-		gProbeManager->RebuildReflectionProbesFromWorld();
+		gReflectionProbes->RebuildReflectionProbesFromWorld();
 	}
 
 	return changed;

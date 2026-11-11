@@ -19,7 +19,7 @@
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
 #include <Renderer/LightManager.hpp>
-#include <Renderer/LightProbe.hpp>
+#include <Renderer/ReflectionProbe.hpp>
 #include <Script/ObjectScripts.hpp>
 #include <Script/TimerManager.hpp>
 #include <Weapon/WeaponSystem.hpp>
@@ -519,7 +519,7 @@ static void N_blockout_destroy_object(Object* object) { gWorld->pPrototype->Dest
 
 
 /////////////////////////////////////
-// Light probes
+// Reflection probes
 /////////////////////////////////////
 
 static void N_probe_volume_mark(Object* obj, bool enabled)
@@ -545,30 +545,20 @@ static bool N_reflection_probe_is_marked(Object* obj) { return obj != nullptr &&
 
 static int32 N_reflection_probe_rebuild()
 {
-	return static_cast<int32>(gProbeManager->RebuildReflectionProbesFromWorld());
+	return static_cast<int32>(gReflectionProbes->RebuildReflectionProbesFromWorld());
 }
 
 static void N_reflection_probe_bake()
 {
-	gProbeManager->RebuildReflectionProbesFromWorld();
-	gProbeManager->BeginReflectionBake();
+	gReflectionProbes->RebuildReflectionProbesFromWorld();
+	gReflectionProbes->BeginBake();
 }
 
 static bool N_probe_volume_is_marked(Object* obj) { return obj != nullptr && obj->IsProbeVolume(); }
 
-static int32 N_probe_rebuild_volumes() { return static_cast<int32>(gProbeManager->RebuildVolumesFromWorld()); }
+static bool N_probe_is_baking() { return gReflectionProbes->IsBaking(); }
 
-static int32 N_probe_volume_count() { return static_cast<int32>(gProbeManager->GetVolumeCount()); }
-static int32 N_probe_count() { return static_cast<int32>(gProbeManager->GetProbeCount()); }
-static bool N_probe_is_baking() { return gProbeManager->IsBaking(); }
-
-static void N_probe_bake()
-{
-	gProbeManager->RebuildVolumesFromWorld();
-	gProbeManager->BeginBake();
-}
-
-static bool N_probe_save() { return gProbeManager->SaveProbes(); }
+static bool N_probe_save() { return gReflectionProbes->SaveProbes(); }
 
 static void N_cvar_set_int(const char* name, int64 value) { gCVars->Set(name, value); }
 static void N_cvar_set_float(const char* name, float32 value) { gCVars->Set(name, value); }
@@ -1164,14 +1154,10 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("RKey_IsDown", N_RKey_IsDown),
 	PREDEF("RKey_IsPressed", N_RKey_IsPressed),
 
-	/* Light probes */
+	/* Reflection probes */
 	PREDEF("probe_volume_mark", N_probe_volume_mark),
 	PREDEF("probe_volume_is_marked", N_probe_volume_is_marked),
-	PREDEF("probe_rebuild_volumes", N_probe_rebuild_volumes),
-	PREDEF("probe_volume_count", N_probe_volume_count),
-	PREDEF("probe_count", N_probe_count),
 	PREDEF("probe_is_baking", N_probe_is_baking),
-	PREDEF("probe_bake", N_probe_bake),
 	PREDEF("probe_save", N_probe_save),
 	PREDEF("reflection_probe_mark", N_reflection_probe_mark),
 	PREDEF("reflection_probe_is_marked", N_reflection_probe_is_marked),

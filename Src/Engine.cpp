@@ -13,7 +13,7 @@
 #include <Particle/ParticleSystem.hpp>
 #include <Physics/PhysicsManager.hpp>
 #include <Renderer/LightManager.hpp>
-#include <Renderer/LightProbe.hpp>
+#include <Renderer/ReflectionProbe.hpp>
 #include <Script/ObjectScripts.hpp>
 #include <Script/ScriptManager.hpp>
 #include <Script/TimerManager.hpp>
@@ -36,7 +36,7 @@ ThreadManager* gThreadManager = nullptr;
 WorldGrid* gWorldGrid = nullptr;
 World* gWorld = nullptr;
 LightManager* gLightManager = nullptr;
-ProbeManager* gProbeManager = nullptr;
+ReflectionProbeManager* gReflectionProbes = nullptr;
 DecalManager* gDecalManager = nullptr;
 ParticleSystem* gParticleSystem = nullptr;
 ScriptManager* gScriptManager = nullptr;
@@ -71,7 +71,7 @@ void Init()
 	gWorld = new World;
 	gLightManager = new LightManager;
 	gLightManager->Create();
-	gProbeManager = new ProbeManager;
+	gReflectionProbes = new ReflectionProbeManager;
 	gDecalManager = new DecalManager;
 	gParticleSystem = new ParticleSystem;
 	gCVars = new CVarManager;
@@ -96,7 +96,7 @@ void Destroy()
 	DESTROY_GLOBAL(gScriptManager);
 	DESTROY_GLOBAL(gWorld);
 	DESTROY_GLOBAL(gLightManager);
-	DESTROY_GLOBAL(gProbeManager);
+	DESTROY_GLOBAL(gReflectionProbes);
 	DESTROY_GLOBAL(gDecalManager);
 	DESTROY_GLOBAL(gParticleSystem);
 	DESTROY_GLOBAL(gCVars);

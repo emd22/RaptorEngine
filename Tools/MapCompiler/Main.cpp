@@ -24,35 +24,29 @@ void PrintUsage()
 		"  --no-cull        Keep every face, including the ones buried inside other brushes\n"
 		"  --no-merge       Do not merge neighbouring faces\n"
 		"  --no-tjunctions  Do not fix T-junctions\n"
-		"  --no-probes      Do not place light probes\n"
-		"  --probe-spacing <m>        Probe spacing inside probe volume brushes (default: 2.5)\n"
-		"  --probe-level-spacing <m>  Probe spacing along the surfaces of the level (default: 0.5)\n"
-		"  --no-lightmap    Do not bake a lightmap (sun shadows and bounced light)\n"
+		"  --probe-spacing <m>        Reference probe spacing inside probe volume brushes (default: 2.5)\n"
+		"  --probe-level-spacing <m>  Reference probe spacing along the surfaces of the level (default: 0.5)\n"
+		"  --no-lightmap    Do not bake a lightmap (sun shadows)\n"
 		"  --lightmap-density <n>     Lightmap texels per metre (default: 16)\n"
 		"  --lightmap-size <n>        Largest width and height of the lightmap (default: 4096)\n"
 		"  --lightmap-samples <n>     Rays per texel along each axis (default: 4)\n"
 		"  --sun-radius <degrees>     Half the angle the sun covers, wider is softer (default: 1)\n"
 		"  --lightmap-image <path>    Also write the lightmap as a PGM image\n"
-		"  --no-indirect    Do not bake the light that bounces between surfaces into the lightmap\n"
+		"  --reference-indirect       Also bake the bounced light into lightmap irradiance and SH probes. The engine "
+		"does not load them, they are the reference the runtime GI probes are compared against\n"
 		"  --indirect-rays <n>        Rays per lightmap texel for each bounce (default: 256)\n"
 		"  --indirect-bounces <n>     How many times light bounces (default: 3)\n"
 		"  --indirect-cache <MB>      Memory for keeping the first bounce's ray hits so later bounces skip tracing "
 		"them, 8 bytes per ray (default: 0, off)\n"
 		"  --indirect-denoise <level> How hard to smooth the noise out of the bounced light: off, low, medium "
 		"or high (default: medium)\n"
-		"  --probe-texel-rays <n>     Probe ray density, (16n)^2 rays per cube face when baking probes, 0 to "
-		"leave the probes to the engine (default: 4)\n"
+		"  --probe-texel-rays <n>     Reference probe ray density, (16n)^2 rays per cube face, 0 to leave the "
+		"probes unbaked (default: 4)\n"
 		"  --no-models      Leave models out of the bake, so they cast no baked shadows and bounce no light\n"
 		"  --model-cell <m>           Size of the cells that hold the bounced light of model surfaces "
 		"(default: 0.25)\n"
-		"  --no-light-transport       Do not store the links between lightmap clusters that let unbaked lights "
-		"bounce at runtime\n"
 		"  --no-sdf-pages             Do not store the GI SDF page scene\n"
 		"  --sdf-page-size <m>        Width of the finest GI SDF pages, every level after doubles (default: 0.25)\n"
-		"  --transport-min-link <f>   Drop links carrying less than this fraction of a cluster's rays, 0 to keep all "
-		"that coverage needs (default: 0.005, 0 keeps every link coverage needs)\n"
-		"  --transport-stats          Measure how many source clusters each lightmap texel and probe would need "
-		"links to if the bounced light were relit at runtime\n"
 		"  --no-fog-shadow  Do not bake the sun shadow pages that the fog is shadowed by\n"
 		"  --fog-shadow-texel <m>     Size of a fog shadow texel close up (default: 0.1)\n"
 		"  --no-acoustics   Do not bake the reverb and pathing probes for Steam Audio\n"
@@ -154,17 +148,9 @@ bool ParseArguments(int argc, char** argv, CompileOptions& out_arguments, Preset
 		else if (argument == "--sdf-page-size" && has_value) {
 			out_arguments.SDFPages.Level0SDFPageSize = std::atof(argv[++i]);
 		}
-		else if (argument == "--no-light-transport") {
-			out_arguments.Lightmap.bLightTransport = false;
-		}
-		else if (argument == "--transport-min-link" && has_value) {
-			out_arguments.Lightmap.TransportMinLinkFraction = std::atof(argv[++i]);
-		}
-		else if (argument == "--transport-stats") {
-			out_arguments.Lightmap.bTransportStats = true;
-		}
-		else if (argument == "--no-indirect") {
-			out_arguments.Lightmap.bIndirect = false;
+		else if (argument == "--reference-indirect") {
+			out_arguments.Lightmap.bIndirect = true;
+			out_arguments.bPlaceProbes = true;
 		}
 		else if (argument == "--no-fog-shadow") {
 			out_arguments.Lightmap.FogShadow.bEnabled = false;
@@ -192,9 +178,6 @@ bool ParseArguments(int argc, char** argv, CompileOptions& out_arguments, Preset
 		}
 		else if (argument == "--reverb-bounces" && has_value) {
 			out_arguments.Acoustics.ReverbBounces = static_cast<uint32>(std::atoi(argv[++i]));
-		}
-		else if (argument == "--no-probes") {
-			out_arguments.bPlaceProbes = false;
 		}
 		else if (argument == "--keep-outside") {
 			out_arguments.bKeepOutside = true;

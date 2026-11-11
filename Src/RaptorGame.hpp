@@ -158,7 +158,6 @@ private:
 
 	// $i_show_gpu shows the GPU time of each stage. $r_probes and $r_decals switch the probes and decals off when 0
 	CVarValue* mpShowGpuCVar = nullptr;
-	CVarValue* mpProbesCVar = nullptr;
 	CVarValue* mpReflectionProbesCVar = nullptr;
 	CVarValue* mpReflectionNormalizeCVar = nullptr;
 	CVarValue* mpReflectionDebugCVar = nullptr;

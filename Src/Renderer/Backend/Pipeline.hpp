@@ -66,16 +66,12 @@ enum class eDrawFlags : uint32
 	DebugProbeVisibility = (1 << 2),
 	/// World decals are not projected onto this draw
 	NoDecals = (1 << 3),
-	/// The draw does not sample the light probes
-	NoProbes = (1 << 4),
-	ProbeBounce = (1 << 5),
 	NoReflectionProbes = (1 << 6),
 	ReflectionCapture = (1 << 7),
 	DebugReflection = (1 << 8),
 	DebugReflectionCoverage = (1 << 9),
 	BakedSun = (1 << 10),
-	BakedIndirect = (1 << 11),
-	/// Reflection probes are not scaled to the light probe irradiance where they are used
+	/// Reflection probes are not scaled to the irradiance where they are used
 	NoReflectionNormalize = (1 << 12),
 	/// Shows how much the reflection probes are scaled at each pixel
 	DebugReflectionNormalize = (1 << 13),

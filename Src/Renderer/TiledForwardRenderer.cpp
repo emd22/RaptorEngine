@@ -21,7 +21,7 @@
 #include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Particle/ParticleSystem.hpp>
-#include <Renderer/LightProbe.hpp>
+#include <Renderer/ReflectionProbe.hpp>
 #include <Texture/TextureManager.hpp>
 #include <algorithm>
 
@@ -55,7 +55,6 @@ void TiledForwardRenderer::Create(const UVec2& extent)
 	CreateBitmapTextPSO();
 	CreateParticlePSO();
 	CreateFogPSO();
-	gGraphics->Transport.CreatePipelines();
 	gGraphics->SDFPages.CreatePipelines(
 		Prepass.GetTarget(eImageFormat::D32_Float), Prepass.GetTarget(eImageFormat::RGBA16_Float),
 		Prepass.GetTarget(eImageFormat::RG16_Float), ForwardPass.GetTarget(eImageFormat::RGBA16_Float));
@@ -232,26 +231,6 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 	ds_entries.Insert(DescriptorEntry::AsBuffer(3, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
 												gGraphics->LightIndexListPageSize));
 
-	// bProbeBuffer (SH irradiance, per probe)
-	ds_entries.Insert(
-		DescriptorEntry::AsBuffer(6, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize));
-
-	// bProbeVolume (spatial lookup descriptor for probe blending)
-	ds_entries.Insert(DescriptorEntry::AsBuffer(7, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
-												gGraphics->ProbeVolumePageSize));
-
-	ds_entries.Insert(DescriptorEntry::AsBuffer(13, eShaderType::Pixel, &gGraphics->ProbeGridBuffer, 0,
-												gGraphics->ProbeGridPageSize));
-
-
-	ds_entries.Insert(DescriptorEntry::AsImage(8, eShaderType::Pixel, gGraphics->pProbeMomentsAtlas,
-											   gSamplerCache->Request({
-												   eSamplerFilter::Linear,
-												   eSamplerFilter::Linear,
-												   eSamplerFilter::Linear,
-												   eSamplerAddressMode::ClampToEdge,
-											   })));
-
 	ds_entries.Insert(DescriptorEntry::AsBuffer(14, eShaderType::Pixel, &gGraphics->ReflectionProbeBuffer, 0,
 												gGraphics->ReflectionProbePageSize));
 
@@ -267,14 +246,6 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 											   })));
 
 	ds_entries.Insert(DescriptorEntry::AsImage(17, eShaderType::Pixel, gGraphics->pLightmap,
-											   gSamplerCache->Request({
-												   eSamplerFilter::Linear,
-												   eSamplerFilter::Linear,
-												   eSamplerFilter::Linear,
-												   eSamplerAddressMode::ClampToEdge,
-											   })));
-
-	ds_entries.Insert(DescriptorEntry::AsImage(18, eShaderType::Pixel, gGraphics->GetShadingIrradiance(),
 											   gSamplerCache->Request({
 												   eSamplerFilter::Linear,
 												   eSamplerFilter::Linear,
@@ -343,7 +314,7 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 												   eSamplerAddressMode::ClampToEdge,
 											   })));
 
-	// The runtime GI probes, read by the CLIPMAP_GI variants
+	// The runtime GI probes
 	ProbeClipmap& clipmap = gGraphics->GIClipmap;
 
 	Sampler* clipmap_sampler = gSamplerCache->Request({
@@ -662,15 +633,6 @@ bool TiledForwardRenderer::MakeForwardDesc(ePipelinePass pass, ePipelineFeatures
 		out_desc.Macros.push_back(scDebugViews);
 	}
 
-	// Probe captures bake the SH probes, so they keep the baked lighting
-	const bool is_capture = (pass == ePipelinePass::ForwardCapture);
-
-	if (!is_capture && HasFlag(features, ePipelineFeatures::ClipmapGI)) {
-		out_desc.Macros.push_back(ShaderMacro { .pcName = "CLIPMAP_GI", .pcValue = "1" });
-		out_desc.Features |= ePipelineFeatures::ClipmapGI;
-		suffix += "ClipmapGI";
-	}
-
 	out_desc.DebugName = std::string("Geometry") + suffix + pass_suffix + (is_debug ? "Debug" : "");
 
 	out_desc.Shader = eShaderName::Forward;
@@ -753,14 +715,6 @@ void TiledForwardRenderer::AddGlobalDescriptors()
 	// bLightIndexList
 	gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
 						 gGraphics->LightIndexListPageSize);
-	// bProbeBuffer (SH irradiance, per probe)
-	gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
-	// bProbeVolume (spatial lookup descriptor for probe blending)
-	gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0, gGraphics->ProbeVolumePageSize);
-	gPSOBuild->AddBuffer(13, 0, eShaderType::Pixel, &gGraphics->ProbeGridBuffer, 0, gGraphics->ProbeGridPageSize);
-	// tProbeMoments (per-probe depth moments for visibility)
-	gPSOBuild->AddImage(8, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
-						gSamplerCache->Request({}));
 	gPSOBuild->AddBuffer(14, 0, eShaderType::Pixel, &gGraphics->ReflectionProbeBuffer, 0,
 						 gGraphics->ReflectionProbePageSize);
 	gPSOBuild->AddImage(15, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
@@ -768,8 +722,6 @@ void TiledForwardRenderer::AddGlobalDescriptors()
 	gPSOBuild->AddImage(16, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
 						gSamplerCache->Request({}));
 	gPSOBuild->AddImage(17, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
-						gSamplerCache->Request({}));
-	gPSOBuild->AddImage(18, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RG16_UNorm),
 						gSamplerCache->Request({}));
 	// bDecals, bDecalMasks, tDecalAtlas, tDecalNormalAtlas
 	AddDecalDescriptors();
@@ -789,7 +741,7 @@ void TiledForwardRenderer::AddGlobalDescriptors()
 	gPSOBuild->AddImage(20, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 						gSamplerCache->Request({}));
 
-	// The runtime GI probes for the CLIPMAP_GI variants, bound in the persistent DS
+	// The runtime GI probes, bound in the persistent DS
 	ProbeClipmap& clipmap = gGraphics->GIClipmap;
 
 	for (uint32 level = 0; level < ProbeClipmap::scLevelCount; level++) {
@@ -1080,6 +1032,18 @@ void TiledForwardRenderer::CreateParticlePSO()
 									  eSamplerFilter::Nearest,
 								  }));
 
+	// Lit particles take the light around them from the runtime GI probes
+	ProbeClipmap& clipmap = gGraphics->GIClipmap;
+
+	for (uint32 level = 0; level < ProbeClipmap::scLevelCount; level++) {
+		gPSOBuild->AddImage(3 + level, 0, eShaderType::Vertex, clipmap.GetIrradianceImage(level),
+							gSamplerCache->Request(SamplerProps {}));
+	}
+
+	gPSOBuild->AddBuffer(6, 0, eShaderType::Vertex, clipmap.GetStateBuffer(), 0, ProbeClipmap::scStateFrameSize);
+	gPSOBuild->AddBuffer(7, 0, eShaderType::Vertex, clipmap.GetForwardDataBuffer(), 0,
+						 ProbeClipmap::scForwardDataFrameSize);
+
 	gPSOBuild->AddFrameData(1);
 
 	gPSOBuild->EndPipeline();
@@ -1145,18 +1109,11 @@ void TiledForwardRenderer::CreateFogPSO()
 	Target* depth_target = Prepass.GetTarget(eImageFormat::D32_Float);
 	Target* shadow_target = gShadowAtlas->GetTarget();
 
-	// The second variant takes its ambient light from the runtime GI probes (r_gi_mode 1)
-	for (const bool clipmap_gi : { false, true }) {
+	{
 		ProbeClipmap& clipmap = gGraphics->GIClipmap;
 
-		if (clipmap_gi) {
-			gPSOBuild->BeginPipeline(ePipelineName::FogFroxelInjectClipmap);
-			gPSOBuild->SetShader(eShaderName::FogInject, { ShaderMacro { .pcName = "CLIPMAP_GI", .pcValue = "1" } });
-		}
-		else {
-			gPSOBuild->BeginPipeline(ePipelineName::FogFroxelInject);
-			gPSOBuild->SetShader(eShaderName::FogInject, {});
-		}
+		gPSOBuild->BeginPipeline(ePipelineName::FogFroxelInject);
+		gPSOBuild->SetShader(eShaderName::FogInject, {});
 
 		gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Compute, depth_target, point_sampler);
 
@@ -1174,25 +1131,21 @@ void TiledForwardRenderer::CreateFogPSO()
 										  eSamplerBorderColor::FloatWhite,
 										  eSamplerCompareOp::Greater,
 									  }));
-		gPSOBuild->AddBuffer(5, 0, eShaderType::Compute, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
-		gPSOBuild->AddBuffer(6, 0, eShaderType::Compute, &gGraphics->ProbeVolumeBuffer, 0, gGraphics->ProbeVolumePageSize);
-		gPSOBuild->AddBuffer(7, 0, eShaderType::Compute, &gGraphics->ProbeGridBuffer, 0, gGraphics->ProbeGridPageSize);
+
+		// The ambient light of the fog is the mean of the runtime GI probes around it
+		for (uint32 level = 0; level < ProbeClipmap::scLevelCount; level++) {
+			gPSOBuild->AddImage(5 + level, 0, eShaderType::Compute, clipmap.GetIrradianceImage(level), volume_sampler);
+		}
+
 		gPSOBuild->AddStorageImage(8, 0, eShaderType::Compute, &FroxelLighting);
 		gPSOBuild->AddImage(9, 0, eShaderType::Compute, gGraphics->pFogShadowAtlas, GetFogShadowSampler());
 		gPSOBuild->AddBuffer(10, 0, eShaderType::Compute, &gGraphics->FogShadowPageBuffer, 0,
 							 gGraphics->FogShadowPageBufferSize);
 		gPSOBuild->AddImage(11, 0, eShaderType::Compute, &FroxelHistory, volume_sampler);
 		gPSOBuild->AddStorageImage(12, 0, eShaderType::Compute, &FroxelSurface);
-
-		if (clipmap_gi) {
-			for (uint32 level = 0; level < ProbeClipmap::scLevelCount; level++) {
-				gPSOBuild->AddImage(13 + level, 0, eShaderType::Compute, clipmap.GetIrradianceImage(level), volume_sampler);
-			}
-
-			gPSOBuild->AddBuffer(16, 0, eShaderType::Compute, clipmap.GetStateBuffer(), 0, ProbeClipmap::scStateFrameSize);
-			gPSOBuild->AddBuffer(17, 0, eShaderType::Compute, clipmap.GetForwardDataBuffer(), 0,
-								 ProbeClipmap::scForwardDataFrameSize);
-		}
+		gPSOBuild->AddBuffer(13, 0, eShaderType::Compute, clipmap.GetStateBuffer(), 0, ProbeClipmap::scStateFrameSize);
+		gPSOBuild->AddBuffer(14, 0, eShaderType::Compute, clipmap.GetForwardDataBuffer(), 0,
+							 ProbeClipmap::scForwardDataFrameSize);
 
 		gPSOBuild->AddFrameData(1);
 
@@ -1252,19 +1205,11 @@ uint32 TiledForwardRenderer::GetViewConstants(const BaseCamera& camera, eObjectL
 	consts.TileColumns = mLightTileColumns;
 	consts.TileRows = mLightTileRows;
 
-	// Only the probe capture faces themselves get the capture flag. Keying it off
-	// IsCapturePending() would also strip probe GI and SSAO from the main view for
-	// every frame of a grid bake.
-	if (gProbeManager != nullptr && gProbeManager->IsCapturingFaces()) {
+	// Only the reflection capture faces themselves get the capture flag, not the main view's frames during a bake
+	if (gReflectionProbes != nullptr && gReflectionProbes->IsCapturingFaces()) {
 		consts.Flags |= eDrawFlags::ProbeCapture;
 
-		if (gProbeManager->IsCapturingBounce()) {
-			consts.Flags |= eDrawFlags::ProbeBounce;
-		}
-
-		if (gProbeManager->IsCapturingReflection()) {
-			consts.Flags |= eDrawFlags::ReflectionCapture;
-		}
+		consts.Flags |= eDrawFlags::ReflectionCapture;
 	}
 
 	const bool is_probe_capture = HasFlag(consts.Flags, eDrawFlags::ProbeCapture);
@@ -1277,10 +1222,6 @@ uint32 TiledForwardRenderer::GetViewConstants(const BaseCamera& camera, eObjectL
 
 	if (gGraphics->bBakedSunActive && !is_probe_capture) {
 		consts.Flags |= eDrawFlags::BakedSun;
-	}
-
-	if (gGraphics->bBakedIndirectActive) {
-		consts.Flags |= eDrawFlags::BakedIndirect;
 	}
 
 	if (gGraphics->bOnlyRenderProbes) {

@@ -240,8 +240,8 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
 
 		L"-O3",
 
-		// Makes min16float a real half precision type (it stays full precision without this), see the probe blending in
-		// ProbeCommon.hlsli. Needs shaderFloat16 on the device.
+		// Makes min16float a real half precision type (it stays full precision without this). Needs shaderFloat16 on
+		// the device.
 		L"-enable-16bit-types",
 
 		// Output format
@@ -339,8 +339,8 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
 
 		"-O3",
 
-		// Makes min16float a real half precision type (it stays full precision without this), see the probe blending in
-		// ProbeCommon.hlsli. Needs shaderFloat16 on the device.
+		// Makes min16float a real half precision type (it stays full precision without this). Needs shaderFloat16 on
+		// the device.
 		"-enable-16bit-types",
 
 		// Output format

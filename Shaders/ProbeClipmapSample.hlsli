@@ -1,12 +1,17 @@
 #ifndef PROBE_CLIPMAP_SAMPLE_HLSLI
 #define PROBE_CLIPMAP_SAMPLE_HLSLI
 
-#include "ProbeCommon.hlsli"
 #include "ProbeClipmapCommon.hlsli"
 
 // Reads the probe clipmap. Needs tIrradiance0-2 and tMoments0-2 (declared the F_Texture2D way), bState
 // (StructuredBuffer<uint>), bProbeData (StructuredBuffer<float4>) and CLIPMAP_SCENE, the ClipmapScene in the shader's
 // constants, declared by the including shader.
+
+/// Least standard deviation of a probe's depth, in metres
+#define CLIPMAP_MIN_DEPTH_DEVIATION 0.05
+#define CLIPMAP_MIN_WEIGHT 1e-6
+/// Probe weights below this are squashed towards zero, so barely visible probes don't leak
+#define CLIPMAP_WEIGHT_CRUSH 0.2
 
 /// Receivers are moved this much of a probe spacing along their normal and towards the viewer before the visibility
 /// test, so a surface doesn't fall behind its own depth (after DDGI, Majercik et al. 2019)
@@ -79,7 +84,7 @@ float ClipmapChebyshev(uint level, float distance, float2 moments)
 	const float texel_slope = 0.11166;
 
 	const float mean = moments.x;
-	const float floor_deviation = max(mean * texel_slope, PROBE_MIN_DEPTH_STDDEV);
+	const float floor_deviation = max(mean * texel_slope, CLIPMAP_MIN_DEPTH_DEVIATION);
 	const float variance = max(moments.y - mean * mean, floor_deviation * floor_deviation);
 
 	const float d = distance - mean;
@@ -188,8 +193,8 @@ ClipmapGatherResult ClipmapGatherLevel(Texture2D irradiance, SamplerState irradi
 
 		float weight = max(ClipmapFacingWeight(position, geometric_normal, probe_position) * visibility * visibility *
 							   visibility,
-						   PROBE_MIN_WEIGHT);
-		weight = select(weight < PROBE_WEIGHT_CRUSH, weight * (weight * weight / (PROBE_WEIGHT_CRUSH * PROBE_WEIGHT_CRUSH)),
+						   CLIPMAP_MIN_WEIGHT);
+		weight = select(weight < CLIPMAP_WEIGHT_CRUSH, weight * (weight * weight / (CLIPMAP_WEIGHT_CRUSH * CLIPMAP_WEIGHT_CRUSH)),
 						weight);
 		weight *= select(ClipmapIsActive(probe_data), 1.0, CLIPMAP_INACTIVE_WEIGHT);
 		weight *= valid_trilinear;

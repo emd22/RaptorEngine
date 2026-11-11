@@ -1,4 +1,5 @@
 #include "./Helper.hlsl"
+#include "ProbeClipmapForward.hlsli"
 
 
 //////////////////////////////////
@@ -15,6 +16,9 @@ struct ParticleData
 	uint uiRotationSoftness;
 	uint2 uiColor;
 	uint2 uiUvRect;
+	/// RGB halves of what the particle reflects of the light around it, zero for unlit particles
+	uint2 uiAmbient;
+	uint2 uiPadding;
 };
 
 struct VSInput
@@ -44,6 +48,15 @@ struct ParticleConsts
 F_StructBuffer(bParticles, ParticleData, 0, 0);
 
 F_FrameData(ParticleConsts, Const, 1);
+
+// The runtime GI probes, see ProbeClipmap
+F_Texture2D(tIrradiance0, 3, 0)
+F_Texture2D(tIrradiance1, 4, 0)
+F_Texture2D(tIrradiance2, 5, 0)
+F_StructBuffer(bState, uint, 6, 0);
+F_StructBuffer(bClipmapForward, ClipmapForwardData, 7, 0);
+
+#include "ProbeClipmapMean.hlsli"
 
 static const float2 scCorners[6] = {
 	float2(-1.0, -1.0), float2(1.0, -1.0), float2(1.0, 1.0),
@@ -102,6 +115,12 @@ VSOutput main(VSInput input)
 
 	output.vUV = uv_offset + local_uv * uv_scale;
 	output.vColor = float4(UnpackHalf2(particle.uiColor.x), UnpackHalf2(particle.uiColor.y));
+
+	const float3 ambient_tint = float3(UnpackHalf2(particle.uiAmbient.x), f16tof32(particle.uiAmbient.y));
+
+	if (any(ambient_tint > 0.0)) {
+		output.vColor.rgb += ambient_tint * ClipmapMeanRadiance(particle.vPosition);
+	}
 
 	return output;
 }

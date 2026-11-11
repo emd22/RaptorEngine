@@ -3,7 +3,8 @@
  * Author:      emd22
  * Created:     10/11/2026
  * Description: Runtime GI probes in camera centred toroidal levels, traced against the SDF pages. A fixed budget of
- *              probes is traced each frame and blended into octahedral irradiance and depth moment tiles.
+ *              probes is traced each frame and blended into octahedral irradiance and depth moment tiles. They are
+ *              the only indirect light: the forward pass, the fog and the particles all read them.
  */
 
 #pragma once
@@ -187,7 +188,8 @@ private:
 	void GetLevelConsts(ProbeClipmapLevelGpu* out_levels, const Settings& settings) const;
 	void LogStats(uint32 frame, uint32 job_count);
 	void InitializeImages(CommandBuffer& cmd);
-	void WriteForwardData(uint32 frame, const Settings& settings);
+	/// `fallback` is the irradiance over pi of the surfaces that no probe holds
+	void WriteForwardData(uint32 frame, const Settings& settings, float32 fallback);
 
 private:
 	Level mLevels[scLevelCount];

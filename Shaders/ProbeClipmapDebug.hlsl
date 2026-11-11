@@ -1,7 +1,6 @@
 F_PROGRAM(FPT_COMPUTE)
 
 #include "./Helper.hlsl"
-#include "ProbeCommon.hlsli"
 #include "ProbeClipmapCommon.hlsli"
 
 struct ProbeClipmapDebugConsts

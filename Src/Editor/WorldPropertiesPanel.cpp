@@ -17,7 +17,7 @@
 #include <CVar.hpp>
 #include <Engine.hpp>
 #include <Renderer/Camera/BaseCamera.hpp>
-#include <Renderer/LightProbe.hpp>
+#include <Renderer/ReflectionProbe.hpp>
 #include <World.hpp>
 #include <algorithm>
 
@@ -332,7 +332,7 @@ void WorldPropertiesPanel::BuildReflectionSection(wxSizer* sizer)
 											[value = BoolToInt(mpReflectionFallbackCheck->GetValue())]
 											{
 												gCVars->Set("r_reflection_level_probe", value);
-												gProbeManager->RebuildReflectionProbesFromWorld();
+												gReflectionProbes->RebuildReflectionProbesFromWorld();
 											});
 									});
 
@@ -381,16 +381,10 @@ void WorldPropertiesPanel::BuildReflectionSection(wxSizer* sizer)
 	add_button("Bake Reflections",
 			   []
 			   {
-				   gProbeManager->RebuildReflectionProbesFromWorld();
-				   gProbeManager->BeginReflectionBake();
+				   gReflectionProbes->RebuildReflectionProbesFromWorld();
+				   gReflectionProbes->BeginBake();
 			   });
-	add_button("Bake All",
-			   []
-			   {
-				   gProbeManager->RebuildVolumesFromWorld();
-				   gProbeManager->BeginBake();
-			   });
-	add_button("Save Probes", [] { gProbeManager->SaveProbes(); });
+	add_button("Save Probes", [] { gReflectionProbes->SaveProbes(); });
 
 	section->AddWide(buttons);
 }

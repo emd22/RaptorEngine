@@ -20,7 +20,6 @@
 #include <Physics/PhysicsManager.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/LightManager.hpp>
-#include <Renderer/LightProbe.hpp>
 #include <Renderer/Limits.hpp>
 #include <Renderer/PipelineNames.hpp>
 #include <Script/ObjectScripts.hpp>
@@ -813,9 +812,6 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	mCompiledMaterialSurfaces.clear();
 	mCompiledAcoustics = AcousticGeometry {};
 	mCompiledAcousticProbes.Clear();
-	mCompiledProbeLayout.Clear();
-	mCompiledProbeIrradiance.Free();
-	mCompiledProbeMoments.Free();
 	mbIsCompiledMap = false;
 
 	gWorldGrid->ClearAreaGraph();
@@ -835,41 +831,17 @@ void Blockout::RemoveBlockoutFromWorld(World* world)
 	mOuterSubviews.clear();
 	mLoadingSubviews.clear();
 
-	if (mbHasBakedSun) {
-		gProbeManager->ClearSunVisibility();
-	}
-
 	renderer::gGraphics->ClearFogShadow();
-	renderer::gGraphics->Transport.Clear();
 	renderer::gGraphics->SDFPages.Clear();
 	renderer::gGraphics->GIClipmap.SetProbeMask(CompiledMapProbeMask {});
 	renderer::gGraphics->GIClipmap.Reset();
 
 	mbHasBakedSun = false;
-	mbHasBakedIndirect = false;
-	mbBakedWithSun = false;
 }
 
 bool Blockout::IsBakedSunCurrent(const FVec3 sun_position) const
 {
 	if (!mbHasBakedSun || sun_position.Length() < 1e-6f) {
-		return false;
-	}
-
-	return sun_position.Normalize().Dot(mBakedSunDirection) > scBakedSunMinCosine;
-}
-
-bool Blockout::IsBakedIndirectCurrent(bool sun_enabled, const FVec3 sun_position) const
-{
-	if (!mbHasBakedIndirect) {
-		return false;
-	}
-
-	if (!mbBakedWithSun) {
-		return !sun_enabled;
-	}
-
-	if (!sun_enabled || sun_position.Length() < 1e-6f) {
 		return false;
 	}
 
@@ -955,21 +927,12 @@ void Blockout::CreateCompiledShadows(const CompiledMap& map)
 void Blockout::CreateCompiledWorld(const CompiledMap& map)
 {
 	const CompiledMapLightmap& lightmap = map.Lightmap;
-	const bool has_indirect = lightmap.HasIndirect();
-
-	const uint16* irradiance = nullptr;
-	const uint8* directions = nullptr;
-
-	if (has_indirect) {
-		irradiance = lightmap.Irradiance.pData;
-		directions = lightmap.Directions.pData;
-	}
 
 	bool has_lightmap = false;
 
 	if (map.HasLightmap()) {
 		has_lightmap = renderer::gGraphics->UploadLightmap(UVec2(lightmap.Width, lightmap.Height),
-														   lightmap.SunVisibility.pData, irradiance, directions);
+														   lightmap.SunVisibility.pData);
 
 		if (!has_lightmap) {
 			LogWarning(LC_ASSET, "The compiled map's {}x{} lightmap is larger than {}x{}, its lighting stays dynamic",
@@ -977,20 +940,11 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 		}
 	}
 
-	if (has_lightmap) {
-		renderer::gGraphics->Transport.Upload(map.Transport, lightmap);
-	}
-	else {
-		renderer::gGraphics->Transport.Clear();
-	}
-
 	renderer::gGraphics->SDFPages.Upload(map.SDFPages);
 	renderer::gGraphics->GIClipmap.SetProbeMask(map.ProbeMask);
 	renderer::gGraphics->GIClipmap.Reset();
 
 	mbHasBakedSun = has_lightmap && map.HasBakedSun();
-	mbHasBakedIndirect = has_lightmap && has_indirect;
-	mbBakedWithSun = lightmap.HasSun();
 
 	if (mbHasBakedSun && map.HasFogShadow()) {
 		renderer::gGraphics->UploadFogShadow(map.FogShadow);
@@ -1218,36 +1172,16 @@ void Blockout::CreateCompiledWorld(const CompiledMap& map)
 		mCompiledSurfaceBodies[body->GetBodyID().GetIndexAndSequenceNumber()].bMesh = true;
 	}
 
-	mCompiledProbeLayout.CopyFrom(map.Probes);
 	mbIsCompiledMap = true;
-
-	if (map.HasBakedProbes()) {
-		mCompiledProbeIrradiance.InitAsCopyOf(map.ProbeIrradiance);
-		mCompiledProbeMoments.InitAsCopyOf(map.ProbeMoments);
-	}
-	else {
-		mCompiledProbeIrradiance.Free();
-		mCompiledProbeMoments.Free();
-	}
 
 	mBakedSunDirection = FVec3(lightmap.SunDirection[0], lightmap.SunDirection[1], lightmap.SunDirection[2]);
 
-	if (mbHasBakedIndirect) {
-		LogInfo("Loaded baked indirect light; {}x{} lightmap", lightmap.Width, lightmap.Height);
-	}
-
 	if (mbHasBakedSun) {
-		gProbeManager->SetSunVisibility(Slice<const FVec3>(map.Probes.Positions.pData, map.Probes.Positions.Size),
-										Slice<const uint8>(map.ProbeSunVisibility.pData, map.ProbeSunVisibility.Size));
-
-		LogInfo("Loaded baked sun shadows; {}x{} lightmap, {} probes", lightmap.Width, lightmap.Height,
-				map.ProbeSunVisibility.Size);
+		LogInfo("Loaded baked sun shadows; {}x{} lightmap", lightmap.Width, lightmap.Height);
 	}
 
-	LogInfo("Loaded the compiled map: {} surfaces, {} hulls and {} triangle meshes replace {} brushes and patches, {} "
-			"light probes placed",
-			map.Surfaces.Size, map.Hulls.Size, map.CollisionMeshes.Size, map.BrushNames.Size,
-			map.Probes.GetProbeCount());
+	LogInfo("Loaded the compiled map: {} surfaces, {} hulls and {} triangle meshes replace {} brushes and patches",
+			map.Surfaces.Size, map.Hulls.Size, map.CollisionMeshes.Size, map.BrushNames.Size);
 }
 
 MaterialID Blockout::GetMaterialForID(MaterialLibraryID id) const
@@ -5194,8 +5128,6 @@ void Blockout::Save(const String& save_path)
 	}
 
 	StoreLastBlockoutPath(path, "Config/Main.conf");
-
-	gProbeManager->RequestStaleCheck();
 
 #ifdef FX_IS_EDITOR
 	gEditor->MarkSaved();

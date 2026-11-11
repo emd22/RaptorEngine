@@ -8,7 +8,6 @@
 #include "DeletionObject.hpp"
 #include "FrameAllocator.hpp"
 #include "GpuProfiler.hpp"
-#include "LightTransport.hpp"
 #include "ProbeClipmap.hpp"
 #include "SDFPageScene.hpp"
 #include "TiledForwardRenderer.hpp"
@@ -191,8 +190,8 @@ public:
 	void MarkGpu(eGpuMarker marker) { Profiler.Mark(GetFrame()->CmdBuffer, marker); }
 
 
-	bool UploadLightmap(const UVec2& size, const uint8* sun_visibility, const uint16* irradiance,
-						const uint8* directions);
+	/// Replaces the lightmap, which holds how much of the baked sun reaches each texel
+	bool UploadLightmap(const UVec2& size, const uint8* sun_visibility);
 	Image* CreateLightmapImage(const UVec2& size, eImageFormat format, const Slice<const uint8>& texels);
 
 	bool UploadFogShadow(const CompiledMapFogShadow& shadow);
@@ -217,17 +216,6 @@ public:
 
 	FX_FORCE_INLINE uint32 GetDecalFrameOffset() const { return DecalPageSize * GetFrameNumber(); }
 	FX_FORCE_INLINE uint32 GetDecalMaskFrameOffset() const { return DecalMaskPageSize * GetFrameNumber(); }
-
-	Image* GetShadingIrradiance() const
-	{
-		Image* relit = Transport.GetRelitIrradiance();
-
-		if (relit != nullptr) {
-			return relit;
-		}
-
-		return pLightmapIrradiance;
-	}
 
 private:
 	void RecordFrameCapture(CommandBuffer& cmd);
@@ -313,19 +301,8 @@ public:
 	uint32 DecalMaskPageSize = 0;
 
 	///////////////////////////////////
-	// Light Probes
+	// Reflection probes
 	///////////////////////////////////
-
-	RawGpuBuffer ProbeBuffer;
-	uint32 ProbePageSize = 0;
-
-	RawGpuBuffer ProbeVolumeBuffer;
-	uint32 ProbeVolumePageSize = 0;
-
-	RawGpuBuffer ProbeGridBuffer;
-	uint32 ProbeGridPageSize = 0;
-
-	Image* pProbeMomentsAtlas = nullptr;
 
 	RawGpuBuffer ReflectionProbeBuffer;
 	uint32 ReflectionProbePageSize = 0;
@@ -342,9 +319,6 @@ public:
 	Image* pDfgLut = nullptr;
 
 	Image* pLightmap = nullptr;
-	Image* pLightmapIrradiance = nullptr;
-
-	LightTransport Transport;
 
 	SDFPageScene SDFPages;
 	SDFPageScene::eDebugView SDFPageDebugView = SDFPageScene::eDebugView::None;
@@ -354,8 +328,6 @@ public:
 	uint32 SDFPageDebugProbeStride = 1;
 
 	ProbeClipmap GIClipmap;
-	/// The forward passes take their indirect light from GIClipmap this frame (r_gi_mode 1)
-	bool bClipmapGIActive = false;
 	ProbeClipmap::eDebugView GIClipmapDebugView = ProbeClipmap::eDebugView::None;
 
 	/// Filled by the world as it writes the light buffer each frame
@@ -369,11 +341,9 @@ public:
 	bool bHasBakedFogShadow = false;
 
 	bool bBakedSunActive = false;
-	bool bBakedIndirectActive = false;
 	bool bFarSunShadowActive = false;
 
 
-	bool bDisableProbes = false;
 	bool bDisableReflectionProbes = false;
 	bool bDisableReflectionNormalize = false;
 	uint32 ReflectionDebugView = 0;

@@ -158,9 +158,9 @@ CompilerFrame::CompilerFrame(const String& map_directory)
 
 	options_sizer->Add(chunk_sizer, wxSizerFlags().Border(wxALL, scBorder));
 
-	mpPlaceProbes = add_checkbox("Place light probes", true,
-								 "Work out where the light probes go. The engine bakes them from these positions "
-								 "when the compiled map is loaded");
+	mpPlaceProbes = add_checkbox("Place reference probes", CompileOptions {}.bPlaceProbes,
+								 "Place the SH probes of the reference bake. The engine does not load them, its "
+								 "GI probes are compared against them");
 
 	const auto add_number =
 		[&](const char* label, double min, double max, double value, double step, const char* tooltip)
@@ -217,9 +217,9 @@ CompilerFrame::CompilerFrame(const String& map_directory)
 							 "Half the angle the sun covers in the sky. Wider makes softer shadow edges");
 
 	mpBakeIndirect = add_checkbox(
-		"Bake bounced light", default_lightmap.bIndirect,
-		"Gather the light that bounces between surfaces into the lightmap. The engine uses it "
-		"in place of the light probes' diffuse light on the compiled surfaces");
+		"Bake reference bounced light", default_lightmap.bIndirect,
+		"Gather the light that bounces between surfaces into the lightmap and the reference probes. The engine "
+		"does not load it, its GI probes are compared against it");
 	mpIndirectRays = add_integer("Bounce rays per texel", scMinIndirectRays, scMaxIndirectRays,
 								 static_cast<int>(default_lightmap.IndirectRays), scIndirectRayStep,
 								 "Rays each lightmap texel traces for every bounce. More is smoother and slower");

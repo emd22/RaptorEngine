@@ -33,7 +33,7 @@
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/LightManager.hpp>
-#include <Renderer/LightProbe.hpp>
+#include <Renderer/ReflectionProbe.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/ShadowDirectional.hpp>
 #include <Renderer/TextRenderer.hpp>
@@ -320,10 +320,9 @@ void RaptorGame::CreateGame()
 
 	mpShowFpsCVar = gCVars->Set("i_show_fps", 1);
 
-	// GPU time per stage on screen, and switches for the light probes and the decals to see what they cost. Set
-	// `$i_show_gpu`, `$r_probes` or `$r_decals` to 0 in the console
+	// GPU time per stage on screen, and a switch for the decals to see what they cost. Set `$i_show_gpu` or
+	// `$r_decals` to 0 in the console
 	mpShowGpuCVar = gCVars->Set("i_show_gpu", 1);
-	mpProbesCVar = gCVars->Set("r_probes", 1);
 	mpDecalsCVar = gCVars->Set("r_decals", 1);
 	mpDebugBoundsCVar = gCVars->Set("r_debug_bounds", 0);
 
@@ -336,14 +335,8 @@ void RaptorGame::CreateGame()
 	mpIsoCVar = gCVars->Set("r_iso", gCVars->Get("r_iso", 100.0f));
 	mpTonemapperCVar = gCVars->Set("r_tonemapper", 1);
 
-	// Metres between probes in a volume built from an editor brush. Set `$r_probe_spacing` in the console
-	gCVars->Set("r_probe_spacing", 2.5f);
-	gCVars->Set("r_probe_level_spacing", 0.5f);
-
-	gCVars->Set("r_probe_bounces", 3);
-	gCVars->Set("r_compiled_probes", 1);
 	mpReflectionProbesCVar = gCVars->Set("r_reflection_probes", 1);
-	// 0 = reflection probes are not scaled to the light probe irradiance where they are used, for A/B
+	// 0 = reflection probes are not scaled to the irradiance where they are used, for A/B
 	mpReflectionNormalizeCVar = gCVars->Set("r_reflection_normalize", 1);
 	gCVars->Set("r_reflection_level_probe", 0);
 	mpReflectionDebugCVar = gCVars->Set("r_reflection_debug", 0);
@@ -413,8 +406,8 @@ void RaptorGame::CreateGame()
 	scene_file.Load(std::format("RaptorData/Data/{}", scene_to_load));
 	gPhysics->pBackend->OptimizeBroadPhase();
 
-	// Baked probes if the scene has them
-	gProbeManager->LoadProbes();
+	// Baked reflection probes if the scene has them
+	gReflectionProbes->LoadProbes();
 
 	gShadowRenderer->ShadowCamera.SetPosition(FVec3(0, 8, 5));
 	gShadowRenderer->ShadowCamera.LookAt(FVec3(0.0f, 8.0f, -2.0f));
@@ -641,11 +634,6 @@ void RaptorGame::ProcessControls()
 		FireCube();
 	}
 
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_L)) {
-		gWorld->bRenderProbes = !gWorld->bRenderProbes;
-		LogInfo("Probe debug render {}", gWorld->bRenderProbes ? "enabled" : "disabled");
-	}
-
 	if (mpDebugBoundsCVar != nullptr) {
 		const std::pair<eKey, uint32> bounds_keys[] = {
 			{ eKey::FX_KEY_F5, World::scDebugBoundsObjects },
@@ -800,17 +788,9 @@ void RaptorGame::ProcessControls()
 	}
 
 
-	// `G` rebuilds the volumes from the level (a coarse volume over all of it, plus one per probe volume brush
-	// the editor has tagged) and bakes them.
-	// if (ControlManager::IsKeyPressed(eKey::FX_KEY_G)) {
-	// 	gProbeManager->RebuildVolumesFromWorld();
-	// 	gProbeManager->BeginBake();
-	// }
-
-
-	// `P` saves the volumes + probes for the current scene (auto-loaded next run).
+	// `P` saves the reflection probes for the current scene (auto-loaded next run).
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_P)) {
-		gProbeManager->SaveProbes();
+		gReflectionProbes->SaveProbes();
 	}
 
 
@@ -1257,7 +1237,7 @@ void RaptorGame::RenderText()
 			String::Fmt(
 				"shadow {:.2f} gi {:.2f} sdf {:.2f} pre {:.2f} lightcull {:.2f} ao {:.2f} fwd {:.2f} part {:.2f} fog "
 				"{:.2f} trace {:.2f} comp {:.2f}",
-				gpu.GetMs(eGpuMarker::Shadows), gpu.GetMs(eGpuMarker::LightTransport),
+				gpu.GetMs(eGpuMarker::Shadows), gpu.GetMs(eGpuMarker::GIClipmap),
 				gpu.GetMs(eGpuMarker::SDFPageScene), gpu.GetMs(eGpuMarker::Prepass),
 				gpu.GetMs(eGpuMarker::LightCulling), gpu.GetMs(eGpuMarker::SSAO), gpu.GetMs(eGpuMarker::Forward),
 				gpu.GetMs(eGpuMarker::Particles), gpu.GetMs(eGpuMarker::Fog), gpu.GetMs(eGpuMarker::SDFPageDebug),
@@ -1483,7 +1463,6 @@ void RaptorGame::Tick()
 	// This frame slot's fence has been waited on, so what it timed last time round is ready
 	gGraphics->Profiler.ReadResults(gGraphics->GetFrameNumber(), DeltaTime);
 
-	gGraphics->bDisableProbes = (mpProbesCVar != nullptr) && (mpProbesCVar->IntValue == 0);
 	gGraphics->bDisableReflectionProbes = (mpReflectionProbesCVar != nullptr) &&
 										  (mpReflectionProbesCVar->IntValue == 0);
 	gGraphics->bDisableReflectionNormalize = (mpReflectionNormalizeCVar != nullptr) &&
@@ -1542,10 +1521,8 @@ void RaptorGame::Tick()
 
 	gGraphics->DoComposition(*gWorld->GetCurrentCamera());
 
-	// Progressive probe bakes (single captures finish in one call, grid bakes
-	// advance one probe per frame).
-	gProbeManager->ServiceCaptureBake();
-	gProbeManager->ServiceStaleCheck();
+	// A reflection probe bake advances by one probe once the GI around it has settled
+	gReflectionProbes->ServiceBake();
 
 	mLastTick = current_tick;
 }

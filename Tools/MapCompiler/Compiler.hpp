@@ -33,7 +33,8 @@ struct CompileOptions
 	bool bKeepOutside = false;
 	/// Bake static glTF/.rxmodel models in as shadow casters and bounce surfaces
 	bool bModels = true;
-	bool bPlaceProbes = true;
+	/// Places the SH probes of the reference bake, see LightmapOptions::bIndirect
+	bool bPlaceProbes = false;
 
 	ProbePlacementSettings ProbeSettings;
 

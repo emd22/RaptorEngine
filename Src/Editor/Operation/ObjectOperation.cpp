@@ -6,7 +6,7 @@
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Physics/PhysicsManager.hpp>
-#include <Renderer/LightProbe.hpp>
+#include <Renderer/ReflectionProbe.hpp>
 #include <Script/ObjectScripts.hpp>
 #include <World.hpp>
 
@@ -199,7 +199,7 @@ static void ApplyTag(Object& object, eObjectTag tag, bool enabled)
 	SetObjectTag(object, tag, enabled);
 
 	if (was_reflection_probe != object.IsReflectionProbe()) {
-		gProbeManager->RebuildReflectionProbesFromWorld();
+		gReflectionProbes->RebuildReflectionProbesFromWorld();
 	}
 }
 

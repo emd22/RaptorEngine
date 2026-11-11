@@ -26,6 +26,7 @@ constexpr uint32 scFirstOctahedralProbeVersion = 16;
 /// apart by the size of the moments and by whether anything follows the transport.
 constexpr uint32 scFirstSDFPagesVersion = 17;
 constexpr uint32 scFirstProbeMaskVersion = 18;
+constexpr uint32 scFirstNoTransportVersion = 19;
 /// Values per probe in the cube face moments from before the octahedral layout (6 faces of 16x16, mean + variance)
 constexpr uint32 scCubeProbeMomentValues = 6 * 16 * 16 * 2;
 constexpr int scDeflateLevel = 9;
@@ -401,54 +402,25 @@ void WriteSectionArray(Writer& writer, const SizedArray<TType>& values)
 	}
 }
 
-void ReadTransport(Reader& reader, CompiledMapTransport& out_transport, const CompiledMapLightmap& lightmap)
+/// Files from before scFirstNoTransportVersion carry the links that bounced unbaked lights between lightmap clusters,
+/// which the runtime GI probes replaced. They are four arrays of these element sizes.
+void SkipTransport(Reader& reader)
 {
-	out_transport.ClusterSize = reader.Read<uint32>();
+	static constexpr uint32 scElementSizes[] = { 32, 32, 32, 8 };
 
-	ReadSectionArray(reader, out_transport.Charts);
-	ReadSectionArray(reader, out_transport.Clusters);
-	ReadSectionArray(reader, out_transport.Samples);
-	ReadSectionArray(reader, out_transport.Links);
+	reader.Read<uint32>();
 
-	if (reader.bFailed || out_transport.IsEmpty()) {
-		out_transport = CompiledMapTransport {};
-		return;
+	for (const uint32 element_size : scElementSizes) {
+		const uint32 count = reader.ReadCount();
+
+		if (reader.bFailed || count == 0) {
+			continue;
+		}
+
+		SizedArray<uint8> discarded;
+		discarded.InitSize(static_cast<uint64>(count) * element_size);
+		reader.ReadSection(discarded.pData, discarded.Size);
 	}
-
-	const uint64 cluster_count = out_transport.Clusters.Size;
-	bool valid = out_transport.ClusterSize > 0;
-
-	for (const CompiledMapTransportChart& chart : out_transport.Charts) {
-		const uint64 blocks = static_cast<uint64>(chart.Blocks[0]) * chart.Blocks[1];
-
-		valid = valid && chart.FirstCluster + blocks <= cluster_count &&
-				static_cast<uint64>(chart.Min[0]) + chart.Size[0] <= lightmap.Width &&
-				static_cast<uint64>(chart.Min[1]) + chart.Size[1] <= lightmap.Height;
-	}
-
-	for (const CompiledMapTransportCluster& cluster : out_transport.Clusters) {
-		valid = valid && static_cast<uint64>(cluster.FirstLink) + cluster.LinkCount <= out_transport.Links.Size &&
-				static_cast<uint64>(cluster.FirstSample) + cluster.SampleCount <= out_transport.Samples.Size;
-	}
-
-	for (const CompiledMapTransportLink& link : out_transport.Links) {
-		valid = valid && link.Source < cluster_count;
-	}
-
-	// Leave it out rather than failing the whole map, the bake still works without it
-	if (!valid) {
-		out_transport = CompiledMapTransport {};
-	}
-}
-
-void WriteTransport(Writer& writer, const CompiledMapTransport& transport)
-{
-	writer.Write(transport.ClusterSize);
-
-	WriteSectionArray(writer, transport.Charts);
-	WriteSectionArray(writer, transport.Clusters);
-	WriteSectionArray(writer, transport.Samples);
-	WriteSectionArray(writer, transport.Links);
 }
 
 void ReadSDFPages(Reader& reader, CompiledMapSDFPages& out_sdf_pages)
@@ -936,8 +908,8 @@ bool CompiledMap::Load(const String& path)
 		reader.ReadSection(AcousticProbes.pData, AcousticProbes.Size);
 	}
 
-	if (version >= 15 && !reader.bFailed) {
-		ReadTransport(reader, Transport, Lightmap);
+	if (version >= 15 && version < scFirstNoTransportVersion && !reader.bFailed) {
+		SkipTransport(reader);
 	}
 
 	const bool has_sdf_pages = (version >= scFirstSDFPagesVersion) ||
@@ -1112,7 +1084,6 @@ bool CompiledMap::Save(const String& path) const
 	writer.WriteCount(AcousticProbes.Size);
 	writer.WriteSection(AcousticProbes.pData, AcousticProbes.Size);
 
-	WriteTransport(writer, Transport);
 	WriteSDFPages(writer, SDFPages);
 	WriteProbeMask(writer, ProbeMask);
 

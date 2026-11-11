@@ -16,7 +16,7 @@
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/LightManager.hpp>
-#include <Renderer/LightProbe.hpp>
+#include <Renderer/ReflectionProbe.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/ShadowAtlas.hpp>
 #include <Renderer/ShadowDirectional.hpp>
@@ -42,16 +42,11 @@ void World::Create()
 	pCVarPortalLock = gCVars->Set<int64>("r_portal_lock", 0);
 	pCVarPortalDebug = gCVars->Set<int64>("r_portal_debug", 0);
 	pCVarBakedShadows = gCVars->Set<int64>("r_baked_shadows", 1);
-	pCVarBakedIndirect = gCVars->Set<int64>("r_baked_indirect", 1);
-	pCVarSDFPages = gCVars->Set<int64>("r_sdf_pages", 1);
 	pCVarSDFPageDebug = gCVars->Set<int64>("r_sdf_page_debug", 0);
 	pCVarSDFPageBudget = gCVars->Set<int64>("r_sdf_page_budget", 16384);
 	pCVarSDFPageCone = gCVars->Set<float32>("r_sdf_page_cone", 0.05f);
 	pCVarSDFPageRayLength = gCVars->Set<float32>("r_sdf_page_ray_length", 50.0f);
 	pCVarSDFPageProbeStride = gCVars->Set<int64>("r_sdf_page_probe_stride", 1);
-	pCVarGIClipmap = gCVars->Set<int64>("r_gi_clipmap", 0);
-	// 0 is the baked lightmap indirect and SH probes, 1 the runtime probe clipmap
-	pCVarGIMode = gCVars->Set<int64>("r_gi_mode", 0);
 	pCVarGIClipmapDebug = gCVars->Set<int64>("r_gi_clipmap_debug", 0);
 	pCVarGIProbeBudget = gCVars->Set<int64>("r_gi_probe_budget", 3072);
 	pCVarGIHysteresis = gCVars->Set<float32>("r_gi_hysteresis", 0.97f);
@@ -217,7 +212,7 @@ void World::ExecuteRenderList(renderer::PipelineHandle pipeline_handle)
 void World::ExecuteForwardRenderLists(PerspectiveCamera& camera)
 {
 	// The forward pipelines depth test against the prepass, which probe captures don't have
-	const bool is_probe_capture = gProbeManager->IsCapturingFaces();
+	const bool is_probe_capture = gReflectionProbes->IsCapturingFaces();
 	const bool is_debug_view = gGraphics->HasDebugView();
 
 	gPipelineCache->ForEachPassPipeline(
@@ -231,10 +226,6 @@ void World::ExecuteForwardRenderLists(PerspectiveCamera& camera)
 			}
 			else if (is_debug_view) {
 				draw_pipeline = gPipelineCache->GetOrCreateVariantInPass(pipeline, ePipelinePass::ForwardDebug);
-			}
-
-			if (!is_probe_capture && gGraphics->bClipmapGIActive) {
-				draw_pipeline = gPipelineCache->GetOrCreateVariantWith(draw_pipeline, ePipelineFeatures::ClipmapGI);
 			}
 
 			ExecuteRenderList(pipeline, draw_pipeline, camera);
@@ -264,12 +255,9 @@ void World::ExecuteRenderList(renderer::PipelineHandle pipeline_handle, renderer
 			0,
 			gGraphics->GetLightGridFrameOffset(),
 			gGraphics->GetLightIndexListFrameOffset(),
-			// The light probe buffers aren't paged per frame in flight
-			0,
-			0,
 			gGraphics->GetDecalFrameOffset(),
 			gGraphics->GetDecalMaskFrameOffset(),
-			0,
+			// The reflection probe buffer isn't paged per frame in flight
 			0,
 			gGraphics->GIClipmap.GetStateFrameOffset(gGraphics->GetFrameNumber()),
 			0,
@@ -283,8 +271,8 @@ void World::ExecuteRenderList(renderer::PipelineHandle pipeline_handle, renderer
 	}
 
 
-	// Light probes only capture the level, not the view model or anything else marked as not probe visible
-	const bool is_probe_capture = gProbeManager->IsCapturingFaces();
+	// Reflection probes only capture the level, not the view model or anything else marked as not probe visible
+	const bool is_probe_capture = gReflectionProbes->IsCapturingFaces();
 
 	for (ObjectID object_id : section.Objects) {
 		Object* object = gObjectManager->GetObject(object_id);
@@ -364,10 +352,6 @@ void World::ExecuteTransparentRenderLists()
 															   transparent_object.Pipeline, ePipelinePass::ForwardBlendDebug)
 														 : transparent_object.Pipeline;
 
-			if (gGraphics->bClipmapGIActive) {
-				draw_pipeline = gPipelineCache->GetOrCreateVariantWith(draw_pipeline, ePipelineFeatures::ClipmapGI);
-			}
-
 			if (!draw_pipeline.IsValid()) {
 				continue;
 			}
@@ -385,12 +369,9 @@ void World::ExecuteTransparentRenderLists()
 					0,
 					gGraphics->GetLightGridFrameOffset(),
 					gGraphics->GetLightIndexListFrameOffset(),
-					// The light probe buffers aren't paged per frame in flight
-					0,
-					0,
 					gGraphics->GetDecalFrameOffset(),
 					gGraphics->GetDecalMaskFrameOffset(),
-					0,
+					// The reflection probe buffer isn't paged per frame in flight
 					0,
 					gGraphics->GIClipmap.GetStateFrameOffset(gGraphics->GetFrameNumber()),
 					0,
@@ -493,7 +474,7 @@ void World::ExecuteShadowRenderList(renderer::PipelineHandle pipeline, const Bas
 
 	// The sun shadows rendered for a probe capture only come from casters the probes can see, so objects left out of
 	// the capture don't shadow it either
-	const bool is_probe_capture = gProbeManager->IsCapturingFaces();
+	const bool is_probe_capture = gReflectionProbes->IsCapturingFaces();
 
 	Frustum shadow_frustum;
 	shadow_frustum.Rebuild(shadow_camera, eObjectLayer::WorldLayer);
@@ -1049,7 +1030,7 @@ void World::AddTileToLightList(TileIndex tile_index, const Frustum* frustum, con
 
 void World::AddUnculledLightsToLightList()
 {
-	const bool needs_all_lights = gProbeManager->IsBaking();
+	const bool needs_all_lights = gReflectionProbes->IsBaking();
 
 	for (LightBase* light : gLightManager->GetCache()) {
 		if (needs_all_lights || light->mTileIndex == TileIndexNull) {
@@ -1058,9 +1039,14 @@ void World::AddUnculledLightsToLightList()
 	}
 }
 
-bool World::IsClipmapGIUpdating() const
+FVec3 World::GetGICenter(const BaseCamera& camera) const
 {
-	return pCVarSDFPages->IntValue != 0 && (pCVarGIClipmap->IntValue != 0 || pCVarGIMode->IntValue == 1);
+	// A reflection probe is lit by the GI probes around it, which may be far from the camera
+	if (gReflectionProbes->IsBaking()) {
+		return gReflectionProbes->GetCapturePosition();
+	}
+
+	return camera.GetPosition();
 }
 
 void World::AddGILightsToLightList(const FVec3& center)
@@ -1091,7 +1077,7 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 
 	const bool frustum_cull = (pCVarFrustumCull->IntValue != 0);
 	const Frustum* object_frustum = frustum_cull ? &mFrustum : nullptr;
-	const Frustum* light_frustum = (frustum_cull && !gProbeManager->IsBaking()) ? &mFrustum : nullptr;
+	const Frustum* light_frustum = (frustum_cull && !gReflectionProbes->IsBaking()) ? &mFrustum : nullptr;
 
 	PortalCulledObjects = 0;
 	PortalCulledLights = 0;
@@ -1108,7 +1094,7 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 		mLockedCameraDirection = cam.GetForwardVector();
 	}
 
-	if (pCVarPortalCull->IntValue != 0 && !gProbeManager->IsBaking()) {
+	if (pCVarPortalCull->IntValue != 0 && !gReflectionProbes->IsBaking()) {
 		if (mbPortalLocked) {
 			mPortalVisibility.Update(gWorldGrid->GetAreaGraph(), mLockedViewProjection, mLockedCameraPosition);
 		}
@@ -1178,9 +1164,7 @@ void World::CullWorldTiles(const PerspectiveCamera& cam)
 
 	AddUnculledLightsToLightList();
 
-	if (IsClipmapGIUpdating()) {
-		AddGILightsToLightList(cam.GetPosition());
-	}
+	AddGILightsToLightList(GetGICenter(cam));
 }
 
 
@@ -1254,15 +1238,6 @@ void World::Render(BaseCamera* shadow_camera)
 	gGraphics->bBakedSunActive = render_sun_shadows && (pCVarBakedShadows->IntValue != 0) && pPrototype != nullptr &&
 								 pPrototype->IsBakedSunCurrent(sun->GetPosition());
 
-	FVec3 sun_position = FVec3::sZero;
-
-	if (sun.IsValid()) {
-		sun_position = sun->GetPosition();
-	}
-
-	gGraphics->bBakedIndirectActive = (pCVarBakedIndirect->IntValue != 0) && pPrototype != nullptr &&
-									  pPrototype->IsBakedIndirectCurrent(render_sun_shadows, sun_position);
-
 	// With the sun off its region is left alone, apart from the atlas's very first pass that makes it sampleable
 	if (render_sun_shadows || !gShadowAtlas->IsInitialized()) {
 		BeginShadowAtlasRegion(gShadowAtlas->GetDirectionalRegion());
@@ -1288,28 +1263,15 @@ void World::Render(BaseCamera* shadow_camera)
 	BakeSpotShadows();
 	gGraphics->MarkGpu(eGpuMarker::Shadows);
 
-	// Persistent lights are the ones that were not baked, so they are the ones that bounce at runtime. The runtime GI
-	// probes (r_gi_mode 1) bounce every light themselves, and nothing reads the relit lightmap then.
-	if (pCVarGIMode->IntValue != 1 || !gGraphics->GIClipmap.IsReady()) {
-		gGraphics->Transport.Render(gGraphics->GetFrame()->CmdBuffer, mMapLightSlotCount,
-									gGraphics->LightBuffer.SlotIndex - mMapLightSlotCount, !gProbeManager->IsBaking());
-	}
+	const FVec3 gi_center = GetGICenter(camera);
 
-	gGraphics->MarkGpu(eGpuMarker::LightTransport);
-
-	const bool sdf_pages_enabled = (pCVarSDFPages->IntValue != 0);
-
-	if (sdf_pages_enabled) {
-		gGraphics->SDFPages.Update(gGraphics->GetFrame()->CmdBuffer, camera.GetPosition(),
-								   static_cast<uint32>(std::max<int64>(pCVarSDFPageBudget->IntValue, 0)));
-		gGraphics->MarkGpu(eGpuMarker::SDFPageScene);
-	}
+	gGraphics->SDFPages.Update(gGraphics->GetFrame()->CmdBuffer, gi_center,
+							   static_cast<uint32>(std::max<int64>(pCVarSDFPageBudget->IntValue, 0)));
+	gGraphics->MarkGpu(eGpuMarker::SDFPageScene);
 
 	gGraphics->GIClipmapDebugView = ProbeClipmap::eDebugView::None;
 
-	const bool wants_clipmap_gi = (pCVarGIMode->IntValue == 1);
-
-	if (sdf_pages_enabled && (pCVarGIClipmap->IntValue != 0 || wants_clipmap_gi)) {
+	{
 		ProbeClipmap::Settings settings;
 		settings.Budget = static_cast<uint32>(std::max<int64>(pCVarGIProbeBudget->IntValue, 0));
 		settings.Hysteresis = std::clamp(pCVarGIHysteresis->FloatValue, 0.0f, 0.999f);
@@ -1325,7 +1287,7 @@ void World::Render(BaseCamera* shadow_camera)
 			gGraphics->GIClipmap.TrackLights(gGraphics->ShadeLights);
 		}
 
-		gGraphics->GIClipmap.Update(gGraphics->GetFrame()->CmdBuffer, camera.GetPosition(), settings);
+		gGraphics->GIClipmap.Update(gGraphics->GetFrame()->CmdBuffer, gi_center, settings);
 		gGraphics->MarkGpu(eGpuMarker::GIClipmap);
 
 		const int64 clipmap_view = pCVarGIClipmapDebug->IntValue;
@@ -1335,16 +1297,13 @@ void World::Render(BaseCamera* shadow_camera)
 		}
 	}
 
-	// The forward pass reads the probes once they hold something
-	gGraphics->bClipmapGIActive = sdf_pages_enabled && wants_clipmap_gi && gGraphics->GIClipmap.IsReady();
-
 	const int64 sdf_page_view = pCVarSDFPageDebug->IntValue;
 	gGraphics->SDFPageDebugCone = pCVarSDFPageCone->FloatValue;
 	gGraphics->SDFPageDebugRayLength = pCVarSDFPageRayLength->FloatValue;
 	gGraphics->SDFPageDebugProbeStride = static_cast<uint32>(std::max<int64>(pCVarSDFPageProbeStride->IntValue, 1));
 	gGraphics->SDFPageDebugView = SDFPageScene::eDebugView::None;
 
-	if (sdf_pages_enabled && sdf_page_view > 0 && sdf_page_view < static_cast<int64>(SDFPageScene::eDebugView::Count)) {
+	if (sdf_page_view > 0 && sdf_page_view < static_cast<int64>(SDFPageScene::eDebugView::Count)) {
 		gGraphics->SDFPageDebugView = static_cast<SDFPageScene::eDebugView>(sdf_page_view);
 	}
 
@@ -1386,10 +1345,6 @@ void World::Render(BaseCamera* shadow_camera)
 
 	if (DebugBoundsMask & scDebugBoundsPhysics) {
 		DebugDrawPhysicsBodies();
-	}
-
-	if (bRenderProbes) {
-		DebugDrawProbes();
 	}
 
 	// Probe volumes are edited as brushes, so the editor always shows them
@@ -1438,13 +1393,13 @@ bool World::RenderCaptureSunShadows(LightDirectional& sun, const FVec3 center, O
 
 void World::RenderProbeCapture()
 {
-	if (!gProbeManager->IsCapturePending()) {
+	if (!gReflectionProbes->IsCapturePending()) {
 		return;
 	}
 
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
-	const UVec2 extent = gProbeManager->GetCaptureExtent();
+	const UVec2 extent = gReflectionProbes->GetCaptureExtent();
 
 	const uint32 saved_tile_columns = gGraphics->pRenderer->GetLightTileColumns();
 	const uint32 saved_tile_rows = gGraphics->pRenderer->GetLightTileRows();
@@ -1474,7 +1429,7 @@ void World::RenderProbeCapture()
 
 	static constexpr float32 scProbeShadowEdgeMargin = 0.5f;
 
-	gProbeManager->RecordCaptureBatch(
+	gReflectionProbes->RecordCapture(
 		cmd,
 		[&](PerspectiveCamera& camera, RenderStage& stage)
 		{
@@ -1693,44 +1648,9 @@ void World::DebugDrawProbeVolumes()
 
 	static const FVec3 scCapturePointHalfExtent(0.12f);
 
-	for (uint32 i = 0; i < gProbeManager->GetReflectionProbeCount(); i++) {
-		gDebugDraw->SolidBox(gProbeManager->GetReflectionProbePosition(i), scCapturePointHalfExtent, FQuat::scIdentity,
+	for (uint32 i = 0; i < gReflectionProbes->GetReflectionProbeCount(); i++) {
+		gDebugDraw->SolidBox(gReflectionProbes->GetReflectionProbePosition(i), scCapturePointHalfExtent, FQuat::scIdentity,
 							 reflection_color);
-	}
-}
-
-void World::DebugDrawProbes()
-{
-	if (gProbeManager == nullptr) {
-		return;
-	}
-
-	// Tiny solid cubes (~0.15m). The base debug cube spans -1..+1, so scale by half-extent.
-	static const FVec3 scProbeHalfExtent(0.1f);
-
-	static const Color scVolumeColors[Limits::MaxProbeVolumes] = {
-		Color::FromRGBA(60, 220, 255, 100),	 Color::FromRGBA(255, 220, 60, 100),  Color::FromRGBA(140, 255, 90, 100),
-		Color::FromRGBA(255, 110, 200, 100), Color::FromRGBA(170, 140, 255, 100), Color::FromRGBA(90, 255, 210, 100),
-		Color::FromRGBA(255, 160, 110, 100), Color::FromRGBA(200, 200, 200, 100),
-	};
-
-	const Color capturing_color = Color::FromRGBA(255, 150, 30, 255);
-
-	const bool is_baking = gProbeManager->IsBaking();
-	const uint32 current_probe = gProbeManager->GetCurrentProbeIndex();
-
-	for (uint32 volume = 0; volume < gProbeManager->GetVolumeCount(); volume++) {
-		uint32 first_probe;
-		uint32 num_probes;
-		gProbeManager->GetVolumeProbeRange(volume, first_probe, num_probes);
-
-		const Color volume_color = scVolumeColors[volume % std::size(scVolumeColors)];
-
-		for (uint32 i = first_probe; i < first_probe + num_probes; i++) {
-			const Color color = (is_baking && i == current_probe) ? capturing_color : volume_color;
-
-			gDebugDraw->SolidBox(gProbeManager->GetProbePosition(i), scProbeHalfExtent, FQuat::scIdentity, color);
-		}
 	}
 }
 

@@ -154,57 +154,6 @@ struct CompiledMapFogShadow
 	bool IsEmpty() const { return CellCount[0] == 0 || CellCount[1] == 0; }
 };
 
-/// One lightmap chart, split into a grid of square clusters `ClusterSize` texels wide
-struct CompiledMapTransportChart
-{
-	uint32 Min[2] = {};
-	uint32 Size[2] = {};
-	uint32 Blocks[2] = {};
-	uint32 FirstCluster = 0;
-	uint32 Padding = 0;
-};
-
-/// Laid out to match LightTransportCluster in Shaders/LightTransportCommon.hlsli
-struct CompiledMapTransportCluster
-{
-	float32 Albedo[3] = {};
-	uint32 FirstLink = 0;
-	uint32 LinkCount = 0;
-	uint32 FirstSample = 0;
-	/// 0 for clusters that cover no lightmap texels
-	uint32 SampleCount = 0;
-	uint32 Padding = 0;
-};
-
-/// A point that direct light is measured at for its cluster
-struct CompiledMapTransportSample
-{
-	float32 Position[4] = {};
-	float32 Normal[4] = {};
-};
-
-/// The fraction of a cluster's gather rays that hit `Source`, after the weakest links were dropped
-struct CompiledMapTransportLink
-{
-	uint32 Source = 0;
-	float32 Weight = 0.0f;
-};
-
-/**
- * @brief How light bounces between the lightmap's clusters, so lights that were not baked can still bounce at runtime
- */
-struct CompiledMapTransport
-{
-	uint32 ClusterSize = 0;
-
-	SizedArray<CompiledMapTransportChart> Charts;
-	SizedArray<CompiledMapTransportCluster> Clusters;
-	SizedArray<CompiledMapTransportSample> Samples;
-	SizedArray<CompiledMapTransportLink> Links;
-
-	bool IsEmpty() const { return Clusters.Size == 0; }
-};
-
 /**
  * @brief The corners of a convex collider, in world space
  */
@@ -361,7 +310,7 @@ class CompiledMap
 {
 public:
 	static constexpr uint32 scMagic = 0x504D5846;
-	static constexpr uint32 scVersion = 18;
+	static constexpr uint32 scVersion = 19;
 	/// Oldest version that still loads, the parts added since are left empty
 	static constexpr uint32 scMinVersion = 10;
 	static constexpr const char* scExtension = ".fxmap";
@@ -409,14 +358,14 @@ public:
 
 	SizedArray<uint8> AcousticProbes;
 
-	/// Where the light probes go, worked out from the brushes. Empty if the map was compiled without probes.
+	/// Where the SH probes of the reference bake go, worked out from the brushes. Empty unless mapc was asked for
+	/// the reference bake. The engine does not use them.
 	ProbeLayout Probes;
 	ProbePlacementSettings ProbeSettings;
 
 	bool HasProbeLayout() const { return Probes.VolumeCount > 0; }
 
 	CompiledMapLightmap Lightmap;
-	CompiledMapTransport Transport;
 	CompiledMapSDFPages SDFPages;
 	CompiledMapProbeMask ProbeMask;
 
@@ -431,7 +380,7 @@ public:
 	bool HasLightmap() const { return !Lightmap.IsEmpty(); }
 	bool HasBakedSun() const
 	{
-		return HasLightmap() && Lightmap.HasSun() && ProbeSunVisibility.Size == Probes.GetProbeCount();
+		return HasLightmap() && Lightmap.HasSun();
 	}
 	CompiledMapFogShadow FogShadow;
 

@@ -4,7 +4,6 @@
 #include <Engine.hpp>
 #include <Renderer/Light.hpp>
 #include <Renderer/LightManager.hpp>
-#include <Renderer/LightProbe.hpp>
 #include <Script/ObjectScripts.hpp>
 #include <World.hpp>
 

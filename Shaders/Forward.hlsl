@@ -207,7 +207,7 @@ PERMEND();
 
 #include "MaterialDef.hlsli"
 #include "LightingCommon.hlsli"
-#include "ProbeCommon.hlsli"
+#include "ReflectionProbe.hlsli"
 #include "DecalCommon.hlsli"
 
 F_CBuffer(FSLightBuffer, 4, 1)
@@ -221,21 +221,10 @@ F_StructBuffer(bMaterialBuffer, Material, 1, 0);
 F_StructBuffer(bLightGrid, TileLightData, 2, 0);
 F_StructBuffer(bLightIndexList, uint, 3, 0);
 
-// SH irradiance probes
-F_StructBuffer(bProbeBuffer, ProbeSHData, 6, 0);
-
-// Probe volume descriptors for spatial probe blending, one per placed volume
-F_StructBuffer(bProbeVolume, ProbeVolume, 7, 0);
-
-F_StructBuffer(bProbeGrid, uint, 13, 0);
-
 F_StructBuffer(bReflectionProbes, ReflectionProbe, 14, 0);
 F_TextureCubeArray(tReflectionProbes, 15, 0)
 
 F_Texture2D(tDfgLut, 16, 0)
-
-// Per-probe depth moments (6x16x16 mean + standard deviation), one atlas strip per probe, for visibility
-F_Texture2D(tProbeMoments, 8, 0)
 
 // Clustered decals, the tiles' decal masks are written by the light culling pass
 F_StructBuffer(bDecals, Decal, 9, 0);
@@ -255,8 +244,8 @@ PERMEND();
 F_ShadowTexture2D(tShadowAtlas, 4, 0);
 F_Texture2D(tSSAO, 5, 0);
 
+// How much of the baked sun reaches each lightmap texel
 F_Texture2D(tLightmap, 17, 0)
-F_Texture2D(tLightmapIrradiance, 18, 0)
 
 PERMIF(WATER);
 // The opaque scene behind the water, copied out before anything was blended, see GraphicsBackend::CopySceneForWater()
@@ -264,21 +253,8 @@ F_Texture2D(tSceneColor, 19, 0)
 F_Texture2D(tSceneDepth, 20, 0)
 PERMEND();
 
-PERMIF(CLIPMAP_GI);
-// The runtime GI probes, see ProbeClipmap. They replace the SH probe volumes and the lightmap's indirect light.
-#include "FogConsts.hlsli"
-#include "ProbeClipmapCommon.hlsli"
-
-/// Mirrors ProbeClipmapForwardData in Src/Renderer/ProbeClipmap.cpp
-struct ClipmapForwardData
-{
-	ClipmapScene Clipmap;
-	BakedSunShadowParams BakedSun;
-	/// Flags (CLIPMAP_FORWARD_FLAG_*)
-	uint4 vInfo;
-};
-
-#define CLIPMAP_FORWARD_FLAG_BAKED_SUN 0x01
+// The runtime GI probes, see ProbeClipmap
+#include "ProbeClipmapForward.hlsli"
 
 F_Texture2D(tIrradiance0, 21, 0)
 F_Texture2D(tIrradiance1, 22, 0)
@@ -295,9 +271,7 @@ F_StructBuffer(bFogShadowPages, FogShadowPage, 31, 0);
 #define CLIPMAP_SCENE bClipmapForward[0].Clipmap
 #include "ProbeClipmapSample.hlsli"
 #include "BakedSunShadow.hlsli"
-PERMEND();
 
-#define LIGHTMAP_DIRECTIONALITY 1.5
 
 /// How much faster water absorbs the colours that aren't its own, which shifts deeper water towards its colour
 #define WATER_ABSORPTION_SPREAD 3.0
@@ -768,98 +742,35 @@ PERMEND();
 	float3 probe_irradiance = float3(0.0f, 0.0f, 0.0f);
 	float3 probe_radiance = float3(0.0f, 0.0f, 0.0f);
 	float probe_visibility = 1.0f;
-	float probe_sun_visibility = 1.0f;
 	bool has_probes = false;
 
-	// An L2 SH probe is blurry (duh) and a rough surface's lobe is centred nearer the normal than the reflection.
-	// Sampling along R regardless is wrong for most instances where roughness sits at or near 1
+	// A rough surface's lobe is centred nearer the normal than the reflection
 	const float3 R = GetSpecularDominantDir(N, reflect(-V, N), specular_alpha);
 
-PERMIF(PROBE_CAPTURE);
-	const bool use_probes = HAS_FLAG(ViewConst.Flags, DRAW_FLAG_PROBE_BOUNCE);
-PERMELSE();
-	const bool use_probes = true;
-PERMEND();
-
-PERMIF(CLIPMAP_GI);
 	{
 		const ClipmapGatherResult clipmap = ClipmapGather(input.vPositionWS, geometric_normal, V, diffuse_normal, R,
 														  ClipmapScreenDither(input.vPosition.xy));
 
-		probe_irradiance = clipmap.vDiffuse;
-		probe_radiance = clipmap.vSpecular;
-		has_probes = clipmap.uiLevel < CLIPMAP_LEVELS;
+		const bool in_clipmap = clipmap.uiLevel < CLIPMAP_LEVELS;
+		const float3 fallback = bClipmapForward[0].vFallback.rgb;
 
-PERMNOT(USE_LIGHTMAP);
-		// The clipmap has no sun term, so surfaces without a lightmap look the baked sun up directly
-		const float baked_sun = SampleBakedSunShadowPages(bClipmapForward[0].BakedSun,
-														  input.vPositionWS + geometric_normal * 0.05, 1.0, float2(1.0, 0.0));
-		probe_sun_visibility = select(HAS_FLAG(bClipmapForward[0].vInfo.x, CLIPMAP_FORWARD_FLAG_BAKED_SUN), baked_sun, 1.0);
-PERMEND();
+		probe_irradiance = select(in_clipmap, clipmap.vDiffuse, fallback);
+		probe_radiance = select(in_clipmap, clipmap.vSpecular, fallback);
+		probe_visibility = clipmap.fVisibility;
+		has_probes = or(in_clipmap, any(fallback > 0.0));
 	}
-PERMELSE();
-	if (use_probes) {
-		const uint probe_volume_count = GetProbeVolumeCount(bProbeVolume);
-
-		if (probe_volume_count > 0) {
-			const uint volume_index = SelectProbeVolume(input.vPositionWS, bProbeVolume, probe_volume_count);
-
-			float probe_coverage;
-
-			SampleProbeVolumeIrradiance(input.vPositionWS, diffuse_normal, geometric_normal, R,
-										bProbeVolume[volume_index], bProbeBuffer, bProbeGrid, F_TextureName(tProbeMoments), tProbeMoments,
-										probe_irradiance, probe_radiance, probe_visibility, probe_coverage,
-										probe_sun_visibility);
-
-			if (volume_index != 0 && probe_coverage < 0.999) {
-				float3 base_irradiance;
-				float3 base_radiance;
-				float base_visibility;
-				float base_coverage;
-				float base_sun_visibility;
-
-				const bool base_sampled = SampleProbeVolumeIrradiance(
-					input.vPositionWS, diffuse_normal, geometric_normal, R, bProbeVolume[0], bProbeBuffer, bProbeGrid,
-					F_TextureName(tProbeMoments), tProbeMoments, base_irradiance, base_radiance, base_visibility,
-					base_coverage, base_sun_visibility);
-
-				const float base_blend = select(base_sampled, 1.0 - probe_coverage, 0.0);
-
-				probe_irradiance = lerp(probe_irradiance, base_irradiance, base_blend);
-				probe_radiance = lerp(probe_radiance, base_radiance, base_blend);
-				probe_visibility = lerp(probe_visibility, base_visibility, base_blend);
-				probe_sun_visibility = lerp(probe_sun_visibility, base_sun_visibility, base_blend);
-			}
-
-			has_probes = true;
-		}
-	}
-PERMEND();
-
-PERMIF(USE_LIGHTMAP);
-	const float4 lightmap_sample = F_SampleLevel(tLightmap, input.vLightmapUV, 0.0);
-PERMNOT(CLIPMAP_GI);
-	const float3 lightmap_irradiance = F_SampleLevel(tLightmapIrradiance, input.vLightmapUV, 0.0).rgb;
-
-	const float3 indirect_direction = (lightmap_sample.rgb * 2.0 - 1.0) * LIGHTMAP_DIRECTIONALITY;
-	const float indirect_balance = max(1.0 + dot(indirect_direction, geometric_normal), 1e-2);
-	const float3 baked_irradiance = lightmap_irradiance *
-									(max(1.0 + dot(indirect_direction, diffuse_normal), 0.0) / indirect_balance);
-
-	const bool use_baked_indirect = HAS_FLAG(ViewConst.Flags, DRAW_FLAG_BAKED_INDIRECT);
-
-	probe_irradiance = select(use_baked_indirect, baked_irradiance, probe_irradiance);
-	has_probes = or(has_probes, use_baked_indirect);
-PERMEND();
-PERMEND();
 
 PERMIF(PROBE_CAPTURE);
 	const float baked_sun_visibility = 1.0;
 PERMELSE();
 PERMIF(USE_LIGHTMAP);
-	const float baked_sun_sample = lightmap_sample.a;
+	const float baked_sun_sample = F_SampleLevel(tLightmap, input.vLightmapUV, 0.0).r;
 PERMELSE();
-	const float baked_sun_sample = probe_sun_visibility;
+	// The clipmap has no sun term, so surfaces without a lightmap look the baked sun up directly
+	const float baked_sun_pages = SampleBakedSunShadowPages(bClipmapForward[0].BakedSun,
+															input.vPositionWS + geometric_normal * 0.05, 1.0, float2(1.0, 0.0));
+	const float baked_sun_sample =
+		select(HAS_FLAG(bClipmapForward[0].vInfo.x, CLIPMAP_FORWARD_FLAG_BAKED_SUN), baked_sun_pages, 1.0);
 PERMEND();
 	const float baked_sun_visibility = select(HAS_FLAG(ViewConst.Flags, DRAW_FLAG_BAKED_SUN), baked_sun_sample, 1.0);
 PERMEND();

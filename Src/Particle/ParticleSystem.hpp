@@ -116,9 +116,12 @@ struct alignas(16) ParticleGpuData
 	uint32 RotationSoftness;
 	uint32 Color[2];
 	uint32 UvRect[2];
+	/// What a lit particle reflects of the light around it, which the shader reads from the GI probes
+	uint32 Ambient[2];
+	uint32 Padding[2];
 };
 
-static_assert(sizeof(ParticleGpuData) == 48);
+static_assert(sizeof(ParticleGpuData) == 64);
 
 struct alignas(16) ParticleConstants
 {

@@ -17,7 +17,7 @@
 #include <Physics/PhysicsManager.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
-#include <Renderer/LightProbe.hpp>
+#include <Renderer/ReflectionProbe.hpp>
 #include <Renderer/MeshUtil.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
@@ -567,7 +567,7 @@ void Object::RenderShallow(const BaseCamera& camera, renderer::Pipeline* pipelin
 	push_constants.MaterialIndex = mMaterialID.GetID();
 	push_constants.BoneBase = BoneBufferBase;
 
-	const bool is_probe_capture = gProbeManager != nullptr && gProbeManager->IsCapturingFaces();
+	const bool is_probe_capture = gReflectionProbes != nullptr && gReflectionProbes->IsCapturingFaces();
 
 	if (pSkeleton.IsValid() && !is_probe_capture) {
 		gDecalManager->GetSkinnedDecalRange(&(*pSkeleton), push_constants.SkinnedDecalStart,

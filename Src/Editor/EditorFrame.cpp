@@ -40,7 +40,7 @@
 #include <Core/Path.hpp>
 #include <Engine.hpp>
 #include <Renderer/Globals.hpp>
-#include <Renderer/LightProbe.hpp>
+#include <Renderer/ReflectionProbe.hpp>
 #include <World.hpp>
 #include <algorithm>
 #include <filesystem>
@@ -176,7 +176,7 @@ void EditorFrame::OpenPrototype()
 			if (load_status != ePrototypeLoadStatus::HasErrors) {
 				gWorld->PrototypePath = path;
 
-				gProbeManager->LoadProbes();
+				gReflectionProbes->LoadProbes();
 				gWorld->RespawnPlayer();
 				return;
 			}
@@ -259,7 +259,7 @@ void EditorFrame::SwitchBakedOrProto()
 			}
 
 			gWorld->PrototypePath = linked_path;
-			gProbeManager->LoadProbes();
+			gReflectionProbes->LoadProbes();
 			// No need to respawn/move the player as we are going to be in the same map structurally
 		});
 }
@@ -428,8 +428,8 @@ wxMenu* EditorFrame::CreateWorldMenu()
 
 	wxMenuItem* clean_item = world_menu->Append(wxID_ANY, "Clean", "Removes all decals and ragdolls from the world");
 
-	wxMenuItem* rebase_probes_item = world_menu->Append(wxID_ANY, "Rebake Probes",
-														"Rebakes all irradiance and reflection probes for the world");
+	wxMenuItem* rebase_probes_item = world_menu->Append(wxID_ANY, "Rebake Reflections",
+														"Rebakes all reflection probes for the world");
 
 	{
 		const auto bind_reload = [this](wxMenuItem* item, eReloadTarget target)
@@ -451,8 +451,8 @@ wxMenu* EditorFrame::CreateWorldMenu()
 				thread::PostToGame(
 					[]
 					{
-						gProbeManager->RebuildVolumesFromWorld();
-						gProbeManager->BeginBake();
+						gReflectionProbes->RebuildReflectionProbesFromWorld();
+						gReflectionProbes->BeginBake();
 					});
 			},
 			rebase_probes_item->GetId());

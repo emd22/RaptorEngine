@@ -35,8 +35,8 @@ extern World* gWorld;
 class LightManager;
 extern LightManager* gLightManager;
 
-class ProbeManager;
-extern ProbeManager* gProbeManager;
+class ReflectionProbeManager;
+extern ReflectionProbeManager* gReflectionProbes;
 
 class DecalManager;
 extern DecalManager* gDecalManager;

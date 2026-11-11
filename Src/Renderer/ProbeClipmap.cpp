@@ -98,6 +98,8 @@ struct ProbeClipmapForwardData
 	BakedSunShadowGpu BakedSun;
 	/// Flags (scForwardFlag*)
 	uint32 Info[4] = {};
+	/// Irradiance over pi where no probe holds a surface. Black unless the map has no SDF pages to trace.
+	float32 Fallback[4] = {};
 };
 
 constexpr uint32 scForwardFlagBakedSun = 0x01;
@@ -842,11 +844,22 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 {
 	SDFPageScene& pages = gGraphics->SDFPages;
 
-	if (!pages.IsTraceable()) {
-		return;
+	const uint32 frame = gGraphics->GetFrameNumber();
+
+	if (!mbImagesInitialized) {
+		InitializeImages(cmd);
 	}
 
-	const uint32 frame = gGraphics->GetFrameNumber();
+	// A map that was not compiled has nothing to trace. Its surfaces are lit by the sky alone.
+	if (!pages.IsTraceable()) {
+		const uint32 state_size = scLevelCount * scProbesPerLevel * sizeof(uint32);
+
+		memset(static_cast<uint8*>(mState.pMappedBuffer) + frame * state_size, 0, state_size);
+		mState.FlushToGpu(frame * state_size, state_size);
+
+		WriteForwardData(frame, settings, settings.SkyRadiance);
+		return;
+	}
 
 	// This frame slot's fence has been waited on, so the counts its last use wrote are complete
 	mStats.InvalidateFromGpu();
@@ -891,7 +904,7 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 	const uint32 state_size = scLevelCount * scProbesPerLevel * sizeof(uint32);
 	mState.FlushToGpu(frame * state_size, state_size);
 
-	WriteForwardData(frame, settings);
+	WriteForwardData(frame, settings, 0.0f);
 
 	vkCmdFillBuffer(cmd.Get(), mStats.Buffer, static_cast<VkDeviceSize>(frame) * scStatCount * sizeof(uint32),
 					scStatCount * sizeof(uint32), 0);
@@ -961,10 +974,6 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 	const uint32 columns = std::min(job_count, scJobColumns);
 	const uint32 rows = (job_count + scJobColumns - 1) / scJobColumns;
 
-	if (!mbImagesInitialized) {
-		InitializeImages(cmd);
-	}
-
 	if (mbClearProbeData) {
 		vkCmdFillBuffer(cmd.Get(), mProbeData.Buffer, 0, VK_WHOLE_SIZE, 0);
 		mbClearProbeData = false;
@@ -1012,10 +1021,14 @@ void ProbeClipmap::Update(CommandBuffer& cmd, const FVec3& center, const Setting
 
 }
 
-void ProbeClipmap::WriteForwardData(uint32 frame, const Settings& settings)
+void ProbeClipmap::WriteForwardData(uint32 frame, const Settings& settings, float32 fallback)
 {
 	ProbeClipmapForwardData data;
 	GetLevelConsts(data.Levels, settings);
+
+	data.Fallback[0] = fallback;
+	data.Fallback[1] = fallback;
+	data.Fallback[2] = fallback;
 
 	if (gGraphics->IsBakedSunShadowActive()) {
 		data.Info[0] |= scForwardFlagBakedSun;

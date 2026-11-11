@@ -2,7 +2,7 @@
  * File:        Lightmap.hpp
  * Author:      emd22
  * Created:     12/10/2026
- * Description: Bakes how much of the sun reaches the compiled surfaces and the light probes
+ * Description: Bakes how much of the sun reaches the compiled surfaces, and the reference bounced light
  */
 
 #pragma once
@@ -34,7 +34,9 @@ struct LightmapOptions
 
 	uint32 ProbeRays = 64;
 
-	bool bIndirect = true;
+	/// The runtime GI probes light the map. The bounced light is only baked as a reference to compare them against,
+	/// into lightmap irradiance and SH probes the engine does not load.
+	bool bIndirect = false;
 	uint32 IndirectRays = 256;
 	uint32 IndirectBounces = 3;
 	uint32 IndirectCacheMegabytes = 0;
@@ -45,45 +47,9 @@ struct LightmapOptions
 	/// Size of the cells that hold the bounced light of model surfaces, which have no lightmap texels
 	double ModelCellSize = 0.25;
 
-	bool bTransportStats = false;
-	bool bLightTransport = true;
-	/// Links that carry less than this fraction of a cluster's gather rays are dropped, even before coverage is met
-	double TransportMinLinkFraction = 0.0005;
-
 	FogShadowOptions FogShadow;
 
 	String ImagePath;
-};
-
-/// Clusters are square blocks of 1, 2, 4 or 8 texels on a side, aligned to their chart
-struct TransportLinkStats
-{
-	uint64 ReceiverCount = 0;
-	uint64 UniqueLinkSum = 0;
-	uint64 Link90Sum = 0;
-	uint64 Link95Sum = 0;
-	uint64 Link99Sum = 0;
-	uint32 MaxLink95 = 0;
-};
-
-struct TransportStats
-{
-	static constexpr uint32 scLevelCount = 4;
-
-	bool bMeasured = false;
-	uint32 RaysPerTexel = 0;
-	uint64 RayCount = 0;
-	uint64 SkyRayCount = 0;
-	uint64 DarkRayCount = 0;
-	uint64 UnmappedRayCount = 0;
-	uint64 ClusterCounts[scLevelCount] = {};
-	double Seconds = 0.0;
-
-	/// [receiver level][source level]
-	TransportLinkStats Texels[scLevelCount][scLevelCount];
-
-	uint32 ProbeRaysPerProbe = 0;
-	TransportLinkStats Probes[scLevelCount];
 };
 
 struct LightmapStats
@@ -122,13 +88,6 @@ struct LightmapStats
 	uint32 BakedProbeCount = 0;
 	uint64 ProbeRayCount = 0;
 	double MeanProbeIrradiance = 0.0;
-
-	TransportStats Transport;
-
-	uint32 TransportClusterCount = 0;
-	uint32 TransportSampleCount = 0;
-	uint64 TransportLinkCount = 0;
-	double TransportSeconds = 0.0;
 
 	bool bHasFogShadow = false;
 	FogShadowStats FogShadow;

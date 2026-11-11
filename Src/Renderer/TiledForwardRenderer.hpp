@@ -85,7 +85,6 @@ static constexpr uint32 scFroxelGridZ = 64;
 enum class eFogFlags : uint32
 {
 	None = 0,
-	ProbeSunVisibility = 0x01,
 	FarSunShadow = 0x02,
 	NearSunDynamicOnly = 0x04,
 	BakedSunShadow = 0x08,

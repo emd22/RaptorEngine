@@ -25,7 +25,6 @@
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/Light.hpp>
 #include <Renderer/LightManager.hpp>
-#include <Renderer/LightProbe.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/RenderStage.hpp>
 #include <Renderer/TiledForwardRenderer.hpp>
@@ -235,12 +234,27 @@ void ParticleSystem::BuildDescriptorSet(Image* atlas)
 
 	Target* depth = gGraphics->pRenderer->Prepass.GetTarget(eImageFormat::D32_Float);
 
-	SizedArray<DescriptorEntry> entries = {
-		DescriptorEntry::AsBuffer(0, eShaderType::Vertex, &mInstanceBuffer, 0,
-								  sizeof(ParticleGpuData) * scMaxParticles),
-		DescriptorEntry::AsImage(1, eShaderType::Pixel, atlas, gSamplerCache->Request(atlas_sampler)),
-		DescriptorEntry::AsImage(2, eShaderType::Pixel, &depth->GetImage(), gSamplerCache->Request(depth_sampler)),
-	};
+	SizedArray<DescriptorEntry> entries;
+	entries.InitCapacity(5 + ProbeClipmap::scLevelCount);
+
+	entries.Insert(DescriptorEntry::AsBuffer(0, eShaderType::Vertex, &mInstanceBuffer, 0,
+											 sizeof(ParticleGpuData) * scMaxParticles));
+	entries.Insert(DescriptorEntry::AsImage(1, eShaderType::Pixel, atlas, gSamplerCache->Request(atlas_sampler)));
+	entries.Insert(
+		DescriptorEntry::AsImage(2, eShaderType::Pixel, &depth->GetImage(), gSamplerCache->Request(depth_sampler)));
+
+	// Lit particles take the light around them from the GI probes
+	ProbeClipmap& clipmap = gGraphics->GIClipmap;
+
+	for (uint32 level = 0; level < ProbeClipmap::scLevelCount; level++) {
+		entries.Insert(DescriptorEntry::AsImage(3 + level, eShaderType::Vertex, clipmap.GetIrradianceImage(level),
+												gSamplerCache->Request(atlas_sampler)));
+	}
+
+	entries.Insert(DescriptorEntry::AsBuffer(6, eShaderType::Vertex, clipmap.GetStateBuffer(), 0,
+											 ProbeClipmap::scStateFrameSize));
+	entries.Insert(DescriptorEntry::AsBuffer(7, eShaderType::Vertex, clipmap.GetForwardDataBuffer(), 0,
+											 ProbeClipmap::scForwardDataFrameSize));
 
 	mpDescriptorSet = gDescriptorCache->Request(entries).second;
 }
@@ -779,13 +793,7 @@ void ParticleSystem::UpdateLighting(float32 delta_time)
 		has_sun = true;
 	}
 
-	const BaseCamera* camera = nullptr;
-
-	if (gWorld->GetCurrentCamera().IsValid()) {
-		camera = &(*gWorld->GetCurrentCamera());
-	}
 	const bool can_raycast = gPhysics != nullptr && gPhysics->pBackend != nullptr;
-	const bool use_probes = !gGraphics->bDisableProbes;
 	const float32 pre_exposure = gGraphics->PreExposure;
 	const float32 blend = std::min(delta_time * scSunVisibilityRate, 1.0f);
 
@@ -795,18 +803,6 @@ void ParticleSystem::UpdateLighting(float32 delta_time)
 		}
 
 		const FVec3 sample_position = effect.Position + (effect.Direction * scLightingSampleOffset);
-
-		FVec3 ambient = FVec3::sZero;
-
-		if (use_probes) {
-			FVec3 to_camera = effect.Direction;
-
-			if (camera != nullptr && camera->GetPosition().DistanceTo(sample_position) > 1e-3f) {
-				to_camera = (camera->GetPosition() - sample_position).Normalize();
-			}
-
-			gProbeManager->SampleIrradiance(sample_position, to_camera, ambient);
-		}
 
 		float32 target_visibility = 0.0f;
 
@@ -832,7 +828,7 @@ void ParticleSystem::UpdateLighting(float32 delta_time)
 
 		const FVec3 sun_light = sun_irradiance * (effect.SunVisibility * scSunScatter);
 
-		effect.Lighting = (ambient + sun_light) * pre_exposure;
+		effect.Lighting = sun_light * pre_exposure;
 	}
 }
 
@@ -912,6 +908,8 @@ void ParticleSystem::WriteInstances(uint32 base_offset, const FVec3 eye)
 	ParticleGpuData* instances = reinterpret_cast<ParticleGpuData*>(static_cast<uint8*>(mInstanceBuffer.pMappedBuffer) +
 																	base_offset);
 
+	const float32 pre_exposure = gGraphics->PreExposure;
+
 	for (uint32 i = 0; i < mSortEntries.Size; i++) {
 		const Particle& particle = mParticles[mSortEntries[i].Index];
 		const EffectInstance& effect = mEffects[particle.EffectSlot];
@@ -926,9 +924,11 @@ void ParticleSystem::WriteInstances(uint32 base_offset, const FVec3 eye)
 		}
 
 		FVec3 light = FVec3::sOne;
+		float32 ambient_scale = 0.0f;
 
 		if (emitter.bLit) {
 			light = effect.Lighting;
+			ambient_scale = pre_exposure;
 		}
 
 		float32 alpha = std::clamp(color[3], 0.0f, 1.0f);
@@ -971,6 +971,10 @@ void ParticleSystem::WriteInstances(uint32 base_offset, const FVec3 eye)
 		instance.RotationSoftness = PackHalf2(particle.Rotation, emitter.Softness);
 		instance.Color[0] = PackHalf2(color[0] * light.X * color_scale, color[1] * light.Y * color_scale);
 		instance.Color[1] = PackHalf2(color[2] * light.Z * color_scale, coverage);
+		instance.Ambient[0] = PackHalf2(color[0] * ambient_scale * color_scale, color[1] * ambient_scale * color_scale);
+		instance.Ambient[1] = PackHalf2(color[2] * ambient_scale * color_scale, 0.0f);
+		instance.Padding[0] = 0;
+		instance.Padding[1] = 0;
 		instance.UvRect[0] = PackUnorm2(frame_offset_u, frame_offset_v);
 		instance.UvRect[1] = PackUnorm2(frame_scale_u, frame_scale_v);
 	}
@@ -1060,7 +1064,13 @@ void ParticleSystem::Render(renderer::CommandBuffer& cmd, const BaseCamera& came
 	gPipelineCache->SetFrameData(world_offset);
 	gPipelineCache->Bind(ePipelineName::Particles, cmd);
 
-	mpDescriptorSet->Bind(0, cmd, pipeline, Slice<const uint32>(&base_offset, 1));
+	const uint32 buffer_offsets[] = {
+		base_offset,
+		gGraphics->GIClipmap.GetStateFrameOffset(gGraphics->GetFrameNumber()),
+		gGraphics->GIClipmap.GetForwardDataFrameOffset(gGraphics->GetFrameNumber()),
+	};
+
+	mpDescriptorSet->Bind(0, cmd, pipeline, Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
 
 	if (world_count > 0) {
 		gGraphics->FrameAlloc.Bind(cmd, pipeline, world_offset);

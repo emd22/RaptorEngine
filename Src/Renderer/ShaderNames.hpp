@@ -24,9 +24,6 @@ enum class eShaderName : uint32
 	FogInject,
 	FogIntegrate,
 	FogFroxelApply,
-	LightTransportInject,
-	LightTransportBounce,
-	LightTransportApply,
 	SDFPageUpdate,
 	SDFPageDebug,
 	ProbeClipmapTrace,
@@ -60,9 +57,6 @@ constexpr const char* GetName(const eShaderName id)
 		FX_ENUM_CASE_NAME(FogInject);
 		FX_ENUM_CASE_NAME(FogIntegrate);
 		FX_ENUM_CASE_NAME(FogFroxelApply);
-		FX_ENUM_CASE_NAME(LightTransportInject);
-		FX_ENUM_CASE_NAME(LightTransportBounce);
-		FX_ENUM_CASE_NAME(LightTransportApply);
 		FX_ENUM_CASE_NAME(SDFPageUpdate);
 		FX_ENUM_CASE_NAME(SDFPageDebug);
 		FX_ENUM_CASE_NAME(ProbeClipmapTrace);

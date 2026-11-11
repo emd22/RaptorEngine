@@ -246,7 +246,7 @@ void GpuDevice::CreateLogicalDevice()
 		.synchronization2 = VK_TRUE,
 	};
 
-	// Half precision arithmetic in shaders, see min16float in ProbeCommon.hlsli
+	// Half precision arithmetic in shaders
 	VkPhysicalDeviceShaderFloat16Int8Features float16_features {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES,
 		.pNext = &features_1_3,

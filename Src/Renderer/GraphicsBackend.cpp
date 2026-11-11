@@ -27,7 +27,7 @@
 #include <Renderer/Backend/DescriptorCache.hpp>
 #include <Renderer/Backend/ExtensionHandles.hpp>
 #include <Renderer/Globals.hpp>
-#include <Renderer/LightProbe.hpp>
+#include <Renderer/ReflectionProbe.hpp>
 #include <Renderer/PSOBuild.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/ShadowDirectional.hpp>
@@ -164,53 +164,11 @@ void GraphicsBackend::Init(UVec2 window_size)
 	DecalMaskBuffer.Create(eGpuBufferType::StorageWithOffset, DecalMaskPageSize * FramesInFlight,
 						   VMA_MEMORY_USAGE_GPU_ONLY);
 
-	// Light probes. These only change when probes are placed, baked or loaded, and ProbeManager waits for the GPU to be
-	// idle before writing them, so unlike the buffers above they have a single page shared by every frame in flight.
-	ProbePageSize = Limits::MaxIrradianceProbes * sizeof(ProbeSHData);
-	ProbeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbePageSize, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-					   eGpuBufferFlags::PersistentMapped);
-
-	ProbeVolumePageSize = Limits::MaxProbeVolumes * sizeof(ProbeVolumeData);
-	ProbeVolumeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeVolumePageSize,
-							 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
-
-	ProbeGridPageSize = Limits::MaxProbeGridPoints * sizeof(uint16);
-	ProbeGridBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeGridPageSize, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-						   eGpuBufferFlags::PersistentMapped);
-
-
 	{
-		const UVec2 atlas_size(Limits::ProbeAtlasWidth, Limits::ProbeAtlasHeight);
-		const uint64 atlas_bytes = static_cast<uint64>(atlas_size.X) * atlas_size.Y *
-								   ImageFormatUtil::GetPixelStride(eImageFormat::RG16_UNorm);
+		const uint8 fully_lit = 255;
 
-		SizedArray<uint8> blank;
-		blank.InitSize(atlas_bytes);
-		memset(blank.pData, 0xFF, atlas_bytes);
+		pLightmap = CreateLightmapImage(UVec2(1, 1), eImageFormat::R8_UNorm, Slice<const uint8>(&fully_lit, 1));
 
-		pProbeMomentsAtlas = gTextureManager->NewTexture();
-
-		SubmitImmediateUploadCmd(
-			[&](CommandBuffer& cmd)
-			{
-				ImageInfo info(atlas_size, eImageFormat::RG16_UNorm, 0, 1, Slice<const uint8>(blank.pData, blank.Size));
-
-				pProbeMomentsAtlas->CreateFromData(cmd, info, eImageCreateFlags::None);
-			});
-	}
-
-
-	{
-		const uint8 neutral_lightmap[4] = { 128, 128, 128, 255 };
-		const uint16 black_irradiance[4] = { 0, 0, 0, scHalfOne };
-
-		pLightmap = CreateLightmapImage(UVec2(1, 1), eImageFormat::RGBA8_UNorm,
-										Slice<const uint8>(neutral_lightmap, sizeof(neutral_lightmap)));
-		pLightmapIrradiance = CreateLightmapImage(
-			UVec2(1, 1), eImageFormat::RGBA16_Float,
-			Slice<const uint8>(reinterpret_cast<const uint8*>(black_irradiance), sizeof(black_irradiance)));
-
-		Transport.Create();
 		SDFPages.Create();
 		GIClipmap.Create();
 		ShadeLights.InitCapacity(Limits::MaxActiveLights);
@@ -259,7 +217,7 @@ void GraphicsBackend::Init(UVec2 window_size)
 	gObjectManager->Create();
 
 	// Upload the default probes now that the probe buffers exist
-	gProbeManager->Create();
+	gReflectionProbes->Create();
 
 	// Starts loading the decal atlas, which the renderer binds once it's in
 	gDecalManager->Create();
@@ -866,73 +824,23 @@ Image* GraphicsBackend::CreateLightmapImage(const UVec2& size, eImageFormat form
 	return image;
 }
 
-bool GraphicsBackend::UploadLightmap(const UVec2& size, const uint8* sun_visibility, const uint16* irradiance,
-									 const uint8* directions)
+bool GraphicsBackend::UploadLightmap(const UVec2& size, const uint8* sun_visibility)
 {
 	if (pRenderer == nullptr || sun_visibility == nullptr || size.X == 0 || size.Y == 0 ||
 		size.X > Limits::LightmapSize || size.Y > Limits::LightmapSize) {
 		return false;
 	}
 
-	const uint64 texel_count = static_cast<uint64>(size.X) * size.Y;
-
-	SizedArray<uint8> lightmap_texels;
-	lightmap_texels.InitSize(texel_count * 4);
-
-	for (uint64 texel = 0; texel < texel_count; texel++) {
-		for (uint32 channel = 0; channel < 3; channel++) {
-			uint8 direction = 128;
-
-			if (directions != nullptr) {
-				direction = directions[texel * 3 + channel];
-			}
-
-			lightmap_texels[texel * 4 + channel] = direction;
-		}
-
-		lightmap_texels[texel * 4 + 3] = sun_visibility[texel];
-	}
-
-	UVec2 irradiance_size(1, 1);
-
-	if (irradiance != nullptr) {
-		irradiance_size = size;
-	}
-
-	const uint64 irradiance_count = static_cast<uint64>(irradiance_size.X) * irradiance_size.Y;
-
-	SizedArray<uint16> irradiance_texels;
-	irradiance_texels.InitSize(irradiance_count * 4);
-
-	for (uint64 texel = 0; texel < irradiance_count; texel++) {
-		for (uint32 channel = 0; channel < 3; channel++) {
-			uint16 value = 0;
-
-			if (irradiance != nullptr) {
-				value = irradiance[texel * 3 + channel];
-			}
-
-			irradiance_texels[texel * 4 + channel] = value;
-		}
-
-		irradiance_texels[texel * 4 + 3] = scHalfOne;
-	}
-
 	mDevice.WaitForIdle();
 
 	Image* old_lightmap = pLightmap;
-	Image* old_irradiance = pLightmapIrradiance;
 
-	pLightmap = CreateLightmapImage(size, eImageFormat::RGBA8_UNorm,
-									Slice<const uint8>(lightmap_texels.pData, lightmap_texels.Size));
-	pLightmapIrradiance = CreateLightmapImage(
-		irradiance_size, eImageFormat::RGBA16_Float,
-		Slice<const uint8>(reinterpret_cast<const uint8*>(irradiance_texels.pData), irradiance_texels.Size * 2));
+	pLightmap = CreateLightmapImage(size, eImageFormat::R8_UNorm,
+									Slice<const uint8>(sun_visibility, static_cast<uint64>(size.X) * size.Y));
 
 	pRenderer->RebuildPersistentDescriptor();
 
 	gTextureManager->DestroyTexture(old_lightmap->ID);
-	gTextureManager->DestroyTexture(old_irradiance->ID);
 
 	return true;
 }
@@ -1334,7 +1242,6 @@ void GraphicsBackend::RenderFog(PerspectiveCamera& camera)
 	consts.Flags |= debug_bits << scFogDebugFlagShift;
 
 	if (bBakedSunActive) {
-		consts.Flags |= static_cast<uint32>(eFogFlags::ProbeSunVisibility);
 		consts.Flags |= static_cast<uint32>(eFogFlags::NearSunDynamicOnly);
 	}
 
@@ -1396,20 +1303,11 @@ void GraphicsBackend::RenderFroxelFog(CommandBuffer& cmd, uint32 consts_offset)
 	gPipelineCache->AddBufferOffset(0, GetLightGridFrameOffset());
 	gPipelineCache->AddBufferOffset(0, GetLightIndexListFrameOffset());
 	gPipelineCache->AddBufferOffset(0, 0);
-	gPipelineCache->AddBufferOffset(0, 0);
-	gPipelineCache->AddBufferOffset(0, 0);
-	gPipelineCache->AddBufferOffset(0, 0);
-
-	ePipelineName inject_pipeline = ePipelineName::FogFroxelInject;
-
-	if (bClipmapGIActive) {
-		inject_pipeline = ePipelineName::FogFroxelInjectClipmap;
-		gPipelineCache->AddBufferOffset(0, GIClipmap.GetStateFrameOffset(GetFrameNumber()));
-		gPipelineCache->AddBufferOffset(0, GIClipmap.GetForwardDataFrameOffset(GetFrameNumber()));
-	}
+	gPipelineCache->AddBufferOffset(0, GIClipmap.GetStateFrameOffset(GetFrameNumber()));
+	gPipelineCache->AddBufferOffset(0, GIClipmap.GetForwardDataFrameOffset(GetFrameNumber()));
 
 	gPipelineCache->SetFrameData(consts_offset);
-	gPipelineCache->Bind(inject_pipeline, cmd);
+	gPipelineCache->Bind(ePipelineName::FogFroxelInject, cmd);
 
 	vkCmdDispatch(cmd.Get(), group_columns, group_rows, scFroxelGridZ + 1);
 
@@ -1458,7 +1356,7 @@ void GraphicsBackend::DoComposition(PerspectiveCamera& render_cam)
 
 	// Probe capture bake faces render here after the main forward pass is done.
 	// The capture can reuse its pipelines + light grid page before composition.
-	if (gProbeManager->IsCapturePending()) {
+	if (gReflectionProbes->IsCapturePending()) {
 		gWorld->RenderProbeCapture();
 		MarkGpu(eGpuMarker::ProbeCapture);
 	}
@@ -1641,12 +1539,8 @@ void GraphicsBackend::Destroy()
 	LightIndexListBuffer.Destroy();
 	DecalBuffer.Destroy();
 	DecalMaskBuffer.Destroy();
-	ProbeBuffer.Destroy();
-	Transport.Destroy();
 	GIClipmap.Destroy();
 	SDFPages.Destroy();
-	ProbeVolumeBuffer.Destroy();
-	ProbeGridBuffer.Destroy();
 	ReflectionProbeBuffer.Destroy();
 	FogShadowPageBuffer.Destroy();
 

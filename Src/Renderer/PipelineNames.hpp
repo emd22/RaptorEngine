@@ -35,12 +35,8 @@ enum class ePipelineName : uint16
 	SSAOBlur,
 
 	FogFroxelInject,
-	FogFroxelInjectClipmap,
 	FogFroxelIntegrate,
 	FogFroxelApply,
-	LightTransportInject,
-	LightTransportBounce,
-	LightTransportApply,
 	SDFPageUpdate,
 	SDFPageDebug,
 	ProbeClipmapTrace,

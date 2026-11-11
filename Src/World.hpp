@@ -69,7 +69,7 @@ public:
 	void Render(BaseCamera* shadow_camera);
 
 	/**
-	 * @brief Captures the next batch of probes for a light probe bake. Called from DoComposition after the main forward
+	 * @brief Captures the next probe of a reflection probe bake. Called from DoComposition after the main forward
 	 * pass has ended. No-op unless a bake is running.
 	 */
 	void RenderProbeCapture();
@@ -84,7 +84,6 @@ public:
 
 private:
 	void DebugDrawPhysicsBodies();
-	void DebugDrawProbes();
 
 	/**
 	 * @brief Draws a wireframe box for each probe volume brush
@@ -153,7 +152,8 @@ private:
 	void AddUnculledLightsToLightList();
 	/// Adds the culled lights that still reach what the GI probes around `center` can see
 	void AddGILightsToLightList(const FVec3& center);
-	bool IsClipmapGIUpdating() const;
+	/// Where the SDF pages and the GI probes are centred this frame
+	FVec3 GetGICenter(const BaseCamera& camera) const;
 	void ClearRenderList();
 
 	void AddToRenderListRecursive(renderer::PipelineHandle pipeline, ObjectID* id);
@@ -177,7 +177,6 @@ public:
 	static constexpr uint32 scDebugBoundsRagdolls = (1u << 3);
 
 	uint32 DebugBoundsMask = 0;
-	bool bRenderProbes = false;
 
 	renderer::RenderList mRenderList;
 	renderer::LightList mLightList;
@@ -221,15 +220,11 @@ public:
 	CVarValue* pCVarPortalLock = nullptr;
 	CVarValue* pCVarPortalDebug = nullptr;
 	CVarValue* pCVarBakedShadows = nullptr;
-	CVarValue* pCVarBakedIndirect = nullptr;
-	CVarValue* pCVarSDFPages = nullptr;
 	CVarValue* pCVarSDFPageDebug = nullptr;
 	CVarValue* pCVarSDFPageBudget = nullptr;
 	CVarValue* pCVarSDFPageCone = nullptr;
 	CVarValue* pCVarSDFPageRayLength = nullptr;
 	CVarValue* pCVarSDFPageProbeStride = nullptr;
-	CVarValue* pCVarGIClipmap = nullptr;
-	CVarValue* pCVarGIMode = nullptr;
 	CVarValue* pCVarGIClipmapDebug = nullptr;
 	CVarValue* pCVarGIProbeBudget = nullptr;
 	CVarValue* pCVarGIHysteresis = nullptr;

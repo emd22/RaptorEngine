@@ -48,17 +48,14 @@ static_assert((MaxVisibleDecals % 32) == 0);
 // Light Probes
 //////////////////////////////////////
 
-/// Number of SH coefficients for an L2 irradiance probe.
-/// Mirrored by PROBE_SH_COEFF_COUNT in Shaders/ProbeCommon.hlsli.
+/// Number of SH coefficients for an L2 irradiance probe. These limits are for the SH probes of mapc's reference bake.
 static constexpr uint32 ProbeSHCoeffCount = 9;
 
 static constexpr uint32 MaxIrradianceProbes = 4096;
 static constexpr uint32 MaxProbeVolumes = 8;
 
-/// Mirrored by PROBE_GRID_EMPTY in Shaders/ProbeCommon.hlsli.
 static constexpr uint16 ProbeGridEmpty = 0xFFFF;
 
-/// Mirrored by PROBE_GRID_SOLID in Shaders/ProbeCommon.hlsli.
 static constexpr uint16 ProbeGridSolid = 0xFFFE;
 
 static constexpr uint32 MaxProbeGridPoints = 1u << 20;

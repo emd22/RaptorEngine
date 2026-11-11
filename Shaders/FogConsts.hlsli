@@ -53,7 +53,6 @@ struct BakedSunShadowParams
 	float4 vAtlas;
 };
 
-#define FOG_FLAG_PROBE_SUN_VISIBILITY 0x01
 #define FOG_FLAG_FAR_SUN_SHADOW 0x02
 #define FOG_FLAG_NEAR_SUN_DYNAMIC_ONLY 0x04
 #define FOG_FLAG_BAKED_SUN_SHADOW 0x08
@@ -66,8 +65,6 @@ struct BakedSunShadowParams
 #define FOG_SHADOW_BIAS -0.000005f
 
 #define FOG_PCF_RADIUS 1.5
-
-#define FOG_SH_L0_TO_RADIANCE (0.282095 * FX_MATH_1_OVER_PI)
 
 #define FROXEL_GRID_X 160
 #define FROXEL_GRID_Y 90

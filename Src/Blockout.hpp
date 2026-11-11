@@ -27,7 +27,6 @@
 #include <Math/FVec3.hpp>
 #include <Object/ObjectID.hpp>
 #include <Physics/BodyID.hpp>
-#include <Renderer/ProbePlacement.hpp>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -179,26 +178,10 @@ public:
 
 	bool IsCompiledMap() const { return mbIsCompiledMap; }
 
-	const ProbeLayout* GetCompiledProbeLayout() const
-	{
-		return (mbIsCompiledMap && mCompiledProbeLayout.VolumeCount > 0) ? &mCompiledProbeLayout : nullptr;
-	}
-
-	bool HasCompiledProbes() const
-	{
-		return GetCompiledProbeLayout() != nullptr && mCompiledProbeIrradiance.Size > 0 &&
-			   mCompiledProbeMoments.Size > 0;
-	}
-
-	const SizedArray<float32>& GetCompiledProbeIrradiance() const { return mCompiledProbeIrradiance; }
-	const SizedArray<uint16>& GetCompiledProbeMoments() const { return mCompiledProbeMoments; }
-
 	bool IsCompiledObject(const Object* object) const;
 
 	bool HasBakedSun() const { return mbHasBakedSun; }
 	bool IsBakedSunCurrent(const FVec3 sun_position) const;
-
-	bool IsBakedIndirectCurrent(bool sun_enabled, const FVec3 sun_position) const;
 
 	/**
 	 * @brief The brush that a blockout object is built from, or nullptr if the object is not a blockout.
@@ -529,13 +512,8 @@ private:
 	static constexpr float32 scAcousticRebuildDelay = 0.5f;
 	float32 mAcousticRebuildTimer = -1.0f;
 	bool mbIsCompiledMap = false;
-	ProbeLayout mCompiledProbeLayout;
-	SizedArray<float32> mCompiledProbeIrradiance;
-	SizedArray<uint16> mCompiledProbeMoments;
 
 	bool mbHasBakedSun = false;
-	bool mbHasBakedIndirect = false;
-	bool mbBakedWithSun = false;
 	FVec3 mBakedSunDirection = FVec3::sUp;
 
 	Brush::PlaneList mPreviewPlanes;
